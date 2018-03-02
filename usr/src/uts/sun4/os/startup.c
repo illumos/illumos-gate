@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2019 Peter Tribble.
  */
 
@@ -2026,7 +2027,7 @@ startup_vm(void)
 
 		(void) seg_attach(&kas, segzio_base, mmu_ptob(segziosize),
 		    &kzioseg);
-		(void) segkmem_zio_create(&kzioseg);
+		(void) segkmem_create(&kzioseg);
 
 		/* create zio area covering new segment */
 		segkmem_zio_init(segzio_base, mmu_ptob(segziosize));

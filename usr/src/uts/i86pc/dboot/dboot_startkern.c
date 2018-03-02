@@ -2303,13 +2303,7 @@ startup_kernel(void)
 	/*
 	 * Need correct target_kernel_text value
 	 */
-#if defined(_BOOT_TARGET_amd64)
-	target_kernel_text = KERNEL_TEXT_amd64;
-#elif defined(__xpv)
-	target_kernel_text = KERNEL_TEXT_i386_xpv;
-#else
-	target_kernel_text = KERNEL_TEXT_i386;
-#endif
+	target_kernel_text = KERNEL_TEXT;
 	DBG(target_kernel_text);
 
 #if defined(__xpv)

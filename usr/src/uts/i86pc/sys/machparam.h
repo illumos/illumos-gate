@@ -31,14 +31,15 @@
 #ifndef _SYS_MACHPARAM_H
 #define	_SYS_MACHPARAM_H
 
-#if !defined(_ASM)
+#ifndef _ASM
+
 #include <sys/types.h>
 
 #if defined(__xpv)
 #include <sys/xpv_impl.h>
 #endif
 
-#endif
+#endif /* !_ASM */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -54,17 +55,12 @@ extern "C" {
  * Machine dependent parameters and limits.
  */
 
-#if defined(__amd64)
 /*
  * If NCPU grows beyond 256, sizing for the x86 comm page will require
  * adjustment.
  */
 #define	NCPU	256
 #define	NCPU_LOG2	8
-#elif defined(__i386)
-#define	NCPU	32
-#define	NCPU_LOG2	5
-#endif
 
 /* NCPU_P2 is NCPU rounded to a power of 2 */
 #define	NCPU_P2	(1 << NCPU_LOG2)
@@ -116,87 +112,13 @@ extern "C" {
 /*
  * DEFAULT KERNEL THREAD stack size (in pages).
  */
-#if defined(__amd64)
 #define	DEFAULTSTKSZ_NPGS	5
-#elif defined(__i386)
-#define	DEFAULTSTKSZ_NPGS	3
-#endif
 
 #if !defined(_ASM)
 #define	DEFAULTSTKSZ	(DEFAULTSTKSZ_NPGS * PAGESIZE)
 #else	/* !_ASM */
 #define	DEFAULTSTKSZ	_MUL(DEFAULTSTKSZ_NPGS, PAGESIZE) /* as(1) lameness */
 #endif	/* !_ASM */
-
-/*
- * KERNELBASE is the virtual address at which the kernel segments start in
- * all contexts.
- *
- * KERNELBASE is not fixed.  The value of KERNELBASE can change with
- * installed memory or on 32 bit systems the eprom variable 'eprom_kernelbase'.
- *
- * common/conf/param.c requires a compile time defined value for KERNELBASE.
- * This value is save in the variable _kernelbase.  _kernelbase may then be
- * modified with to a different value in i86pc/os/startup.c.
- *
- * Most code should be using kernelbase, which resolves to a reference to
- * _kernelbase.
- */
-#define	KERNEL_TEXT_amd64	UINT64_C(0xfffffffffb800000)
-
-#ifdef __i386
-
-#define	KERNEL_TEXT_i386	ADDRESS_C(0xfe800000)
-
-/*
- * We don't use HYPERVISOR_VIRT_START, as we need both the PAE and non-PAE
- * versions in our code. We always compile based on the lower PAE address.
- */
-#define	KERNEL_TEXT_i386_xpv	\
-	(HYPERVISOR_VIRT_START_PAE - 3 * ADDRESS_C(0x400000))
-
-#endif /* __i386 */
-
-#if defined(__amd64)
-
-#define	KERNELBASE	ADDRESS_C(0xfffffd8000000000)
-
-/*
- * Size of the unmapped "red zone" at the very bottom of the kernel's
- * address space.  Corresponds to 1 slot in the toplevel pagetable.
- */
-#define	KERNEL_REDZONE_SIZE   ((uintptr_t)1 << 39)
-
-/*
- * Base of 'core' heap area, which is used for kernel and module text/data
- * that must be within a 2GB range to allow for rip-relative addressing.
- */
-#define	COREHEAP_BASE	ADDRESS_C(0xffffffffc0000000)
-
-/*
- * Beginning of the segkpm window. A lower value than this is used if
- * physical addresses exceed 1TB. See i86pc/os/startup.c
- */
-#define	SEGKPM_BASE	ADDRESS_C(0xfffffe0000000000)
-
-/*
- * This is valloc_base, above seg_kpm, but below everything else.
- * A lower value than this may be used if SEGKPM_BASE is adjusted.
- * See i86pc/os/startup.c
- */
-#define	VALLOC_BASE	ADDRESS_C(0xffffff0000000000)
-
-/*
- * default and boundary sizes for segkp
- */
-#define	SEGKPDEFSIZE	(2L * 1024L * 1024L * 1024L)		/*   2G */
-#define	SEGKPMAXSIZE	(8L * 1024L * 1024L * 1024L)		/*   8G */
-#define	SEGKPMINSIZE	(200L * 1024 * 1024L)			/* 200M */
-
-/*
- * minimum size for segzio
- */
-#define	SEGZIOMINSIZE	(400L * 1024 * 1024L)			/* 400M */
 
 /*
  * During intial boot we limit heap to the top 4Gig.
@@ -208,7 +130,6 @@ extern "C" {
  * Set KERNEL_TEXT to top_o_memory - 64Meg - 8 Meg for 8Meg of nucleus pages.
  */
 #define	PROMSTART	ADDRESS_C(0xffc00000)
-#define	KERNEL_TEXT	KERNEL_TEXT_amd64
 
 /*
  * Virtual address range available to the debugger
@@ -216,81 +137,7 @@ extern "C" {
 #define	SEGDEBUGBASE	ADDRESS_C(0xffffffffff800000)
 #define	SEGDEBUGSIZE	ADDRESS_C(0x400000)
 
-/*
- * Define upper limit on user address space
- *
- * In amd64, the upper limit on a 64-bit user address space is 1 large page
- * (2MB) below kernelbase.  The upper limit for a 32-bit user address space
- * is 1 small page (4KB) below the top of the 32-bit range.  The 64-bit
- * limit give dtrace the red zone it needs below kernelbase.  The 32-bit
- * limit gives us a small red zone to detect address-space overruns in a
- * user program.
- *
- * On the hypervisor, we limit the user to memory below the VA hole.
- * Subtract 1 large page for a red zone.
- */
-#if defined(__xpv)
-#define	USERLIMIT	ADDRESS_C(0x00007fffffe00000)
-#else
-#define	USERLIMIT	ADDRESS_C(0xfffffd7fffe00000)
-#endif
-
-#ifdef bug_5074717_is_fixed
-#define	USERLIMIT32	ADDRESS_C(0xfffff000)
-#else
-#define	USERLIMIT32	ADDRESS_C(0xfefff000)
-#endif
-
-#elif defined(__i386)
-
-#ifdef DEBUG
-#define	KERNELBASE	ADDRESS_C(0xc8000000)
-#else
-#define	KERNELBASE	ADDRESS_C(0xd4000000)
-#endif
-
-#define	KERNELBASE_MAX	ADDRESS_C(0xe0000000)
-
-/*
- * The i386 ABI requires that the user address space be at least 3Gb
- * in size.  KERNELBASE_ABI_MIN is used as the default KERNELBASE for
- * physical memory configurations > 4gb.
- */
-#define	KERNELBASE_ABI_MIN	ADDRESS_C(0xc0000000)
-
-/*
- * Size of the unmapped "red zone" at the very bottom of the kernel's
- * address space.  Since segmap start immediately above the red zone, this
- * needs to be MAXBSIZE aligned.
- */
-#define	KERNEL_REDZONE_SIZE   MAXBSIZE
-
-/*
- * This is the last 4MB of the 4G address space. Some psm modules
- * need this region of virtual address space mapped 1-1
- * The top 64MB of the address space is reserved for the hypervisor.
- */
-#define	PROMSTART	ADDRESS_C(0xffc00000)
-#ifdef __xpv
-#define	KERNEL_TEXT	KERNEL_TEXT_i386_xpv
-#else
-#define	KERNEL_TEXT	KERNEL_TEXT_i386
-#endif
-
-/*
- * Virtual address range available to the debugger
- * We place it just above the kernel text (4M) and kernel data (4M).
- */
-#define	SEGDEBUGBASE	(KERNEL_TEXT + ADDRESS_C(0x800000))
-#define	SEGDEBUGSIZE	ADDRESS_C(0x400000)
-
-/*
- * Define upper limit on user address space
- */
-#define	USERLIMIT	KERNELBASE
-#define	USERLIMIT32	USERLIMIT
-
-#endif	/* __i386 */
+#define	KERNEL_TEXT	UINT64_C(0xfffffffffb800000)
 
 /*
  * Reserve pages just below KERNEL_TEXT for the GDT, IDT, LDT, TSS and debug
@@ -305,11 +152,80 @@ extern "C" {
 #define	GDT_VA		(DEBUG_INFO_VA - MMU_PAGESIZE)
 #define	IDT_VA		(GDT_VA - MMU_PAGESIZE)
 #define	LDT_VA		(IDT_VA - (16 * MMU_PAGESIZE))
-#define	KTSS_VA		(LDT_VA - MMU_PAGESIZE)
+#define	KTSS_VA		(IDT_VA - MMU_PAGESIZE)
 #define	DFTSS_VA	(KTSS_VA - MMU_PAGESIZE)
 #define	MISC_VA_BASE	(DFTSS_VA)
 #define	MISC_VA_SIZE	(KERNEL_TEXT - MISC_VA_BASE)
 #endif /* !_ASM */
+
+/*
+ * Base of 'core' heap area, which is used for kernel and module text/data
+ * that must be within a 2GB range to allow for rip-relative addressing.
+ */
+#define	COREHEAP_BASE	ADDRESS_C(0xffffffffc0000000)
+
+/*
+ * This is valloc_base, above seg_kpm, but below everything else.
+ * A lower value than this may be used if SEGKPM_BASE is adjusted.
+ * See i86pc/os/startup.c
+ */
+#define	VALLOC_BASE	ADDRESS_C(0xfffffe0000000000)
+
+#define	SEGZIOMINSIZE	(400L * 1024 * 1024L)			/* 400M */
+#define	SEGVMMMINSIZE	(4096L * 1024 * 1024L)			/* 4G */
+
+#define	SEGKPDEFSIZE	(2L * 1024L * 1024L * 1024L)		/*   2G */
+#define	SEGKPMAXSIZE	(8L * 1024L * 1024L * 1024L)		/*   8G */
+#define	SEGKPMINSIZE	(200L * 1024 * 1024L)			/* 200M */
+
+#define	SEGKPM_BASE	ADDRESS_C(0xfffffd0000000000)
+
+/*
+ * KERNELBASE is the virtual address at which the kernel segments start in
+ * all contexts.
+ *
+ * KERNELBASE is not fixed.  The value of KERNELBASE can change with
+ * installed memory size.
+ *
+ * common/conf/param.c requires a compile time defined value for KERNELBASE.
+ * This value is save in the variable _kernelbase.  _kernelbase may then be
+ * modified with to a different value in i86pc/os/startup.c.
+ *
+ * Most code should be using kernelbase, which resolves to a reference to
+ * _kernelbase.
+ */
+#define	KERNELBASE	ADDRESS_C(0xfffffc8000000000)
+
+/*
+ * Size of the unmapped "red zone" at the very bottom of the kernel's
+ * address space.  Corresponds to 1 slot in the toplevel pagetable.
+ */
+#define	KERNEL_REDZONE_SIZE   ((uintptr_t)1 << 39)
+
+/*
+ * Define upper limit on user address space
+ *
+ * The upper limit on a 64-bit user address space is 1 large page
+ * (2MB) below kernelbase.  The upper limit for a 32-bit user address space
+ * is 1 small page (4KB) below the top of the 32-bit range.  The 64-bit
+ * limit give dtrace the red zone it needs below kernelbase.  The 32-bit
+ * limit gives us a small red zone to detect address-space overruns in a
+ * user program.
+ *
+ * On the hypervisor, we limit the user to memory below the VA hole.
+ * Subtract 1 large page for a red zone.
+ */
+#if defined(__xpv)
+#define	USERLIMIT	ADDRESS_C(0x00007fffffe00000)
+#else
+#define	USERLIMIT	ADDRESS_C(0xfffffc7fffe00000)
+#endif
+
+#ifdef bug_5074717_is_fixed
+#define	USERLIMIT32	ADDRESS_C(0xfffff000)
+#else
+#define	USERLIMIT32	ADDRESS_C(0xfefff000)
+#endif
 
 #if !defined(_ASM) && !defined(_KMDB)
 extern uintptr_t kernelbase, segmap_start, segmapsize;

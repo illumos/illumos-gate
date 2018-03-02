@@ -122,6 +122,11 @@ vmem_t *static_alloc_arena;	/* arena for allocating static memory */
 vmem_t *zio_arena = NULL;	/* arena for allocating zio memory */
 vmem_t *zio_alloc_arena = NULL;	/* arena for allocating zio memory */
 
+#if defined(__amd64)
+vmem_t *kvmm_arena;		/* arena for vmm VA */
+struct seg kvmmseg;		/* Segment for vmm memory */
+#endif
+
 /*
  * seg_kmem driver can map part of the kernel heap with large pages.
  * Currently this functionality is implemented for sparc platforms only.
@@ -655,13 +660,19 @@ segkmem_dump(struct seg *seg)
 		    segkmem_dump_range, seg->s_as);
 		vmem_walk(heaptext_arena, VMEM_ALLOC | VMEM_REENTRANT,
 		    segkmem_dump_range, seg->s_as);
+	/*
+	 * We don't want to dump pages attached to kzioseg since they
+	 * contain file data from ZFS.  If this page's segment is
+	 * kzioseg return instead of writing it to the dump device.
+	 *
+	 * Same applies to VM memory allocations.
+	 */
 	} else if (seg == &kzioseg) {
-		/*
-		 * We don't want to dump pages attached to kzioseg since they
-		 * contain file data from ZFS.  If this page's segment is
-		 * kzioseg return instead of writing it to the dump device.
-		 */
 		return;
+#if defined(__amd64)
+	} else if (seg == &kvmmseg) {
+		return;
+#endif
 	} else {
 		segkmem_dump_range(seg->s_as, seg->s_base, seg->s_size);
 	}
@@ -802,21 +813,18 @@ struct seg_ops segkmem_ops = {
 };
 
 int
-segkmem_zio_create(struct seg *seg)
-{
-	ASSERT(seg->s_as == &kas && RW_WRITE_HELD(&kas.a_lock));
-	seg->s_ops = &segkmem_ops;
-	seg->s_data = &zvp;
-	kas.a_size += seg->s_size;
-	return (0);
-}
-
-int
 segkmem_create(struct seg *seg)
 {
 	ASSERT(seg->s_as == &kas && RW_WRITE_HELD(&kas.a_lock));
 	seg->s_ops = &segkmem_ops;
-	seg->s_data = &kvp;
+	if (seg == &kzioseg)
+		seg->s_data = &kvps[KV_ZVP];
+#if defined(__amd64)
+	else if (seg == &kvmmseg)
+		seg->s_data = &kvps[KV_VVP];
+#endif
+	else
+		seg->s_data = &kvps[KV_KVP];
 	kas.a_size += seg->s_size;
 	return (0);
 }
@@ -967,10 +975,10 @@ segkmem_alloc(vmem_t *vmp, size_t size, int vmflag)
 	return (segkmem_alloc_vn(vmp, size, vmflag, &kvp));
 }
 
-void *
+static void *
 segkmem_zio_alloc(vmem_t *vmp, size_t size, int vmflag)
 {
-	return (segkmem_alloc_vn(vmp, size, vmflag, &zvp));
+	return (segkmem_alloc_vn(vmp, size, vmflag, &kvps[KV_ZVP]));
 }
 
 /*
@@ -979,8 +987,8 @@ segkmem_zio_alloc(vmem_t *vmp, size_t size, int vmflag)
  * we currently don't have a special kernel segment for non-paged
  * kernel memory that is exported by drivers to user space.
  */
-static void
-segkmem_free_vn(vmem_t *vmp, void *inaddr, size_t size, struct vnode *vp,
+void
+segkmem_xfree(vmem_t *vmp, void *inaddr, size_t size, struct vnode *vp,
     void (*func)(page_t *))
 {
 	page_t *pp;
@@ -1037,21 +1045,15 @@ segkmem_free_vn(vmem_t *vmp, void *inaddr, size_t size, struct vnode *vp,
 }
 
 void
-segkmem_xfree(vmem_t *vmp, void *inaddr, size_t size, void (*func)(page_t *))
-{
-	segkmem_free_vn(vmp, inaddr, size, &kvp, func);
-}
-
-void
 segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
 {
-	segkmem_free_vn(vmp, inaddr, size, &kvp, NULL);
+	segkmem_xfree(vmp, inaddr, size, &kvp, NULL);
 }
 
-void
+static void
 segkmem_zio_free(vmem_t *vmp, void *inaddr, size_t size)
 {
-	segkmem_free_vn(vmp, inaddr, size, &zvp, NULL);
+	segkmem_xfree(vmp, inaddr, size, &kvps[KV_ZVP], NULL);
 }
 
 void
@@ -1533,8 +1535,21 @@ segkmem_zio_init(void *zio_mem_base, size_t zio_mem_size)
 	ASSERT(zio_alloc_arena != NULL);
 }
 
-#ifdef __sparc
+#if defined(__amd64)
 
+void
+segkmem_kvmm_init(void *base, size_t size)
+{
+	ASSERT(base != NULL);
+	ASSERT(size != 0);
+
+	kvmm_arena = vmem_create("kvmm_arena", base, size, 1024 * 1024,
+	    NULL, NULL, NULL, 0, VM_SLEEP);
+
+	ASSERT(kvmm_arena != NULL);
+}
+
+#elif defined(__sparc)
 
 static void *
 segkmem_alloc_ppa(vmem_t *vmp, size_t size, int vmflag)

@@ -443,11 +443,11 @@ vn_get(vn_htable_t *hp, struct vnode *vp, uintptr_t ptr)
 
 /* Summary statistics of pages */
 typedef struct memstat {
-	struct vnode    *ms_kvp;	/* Cached address of kernel vnode */
 	struct vnode    *ms_unused_vp;	/* Unused pages vnode pointer	  */
-	struct vnode    *ms_zvp;	/* Cached address of zio vnode    */
+	struct vnode    *ms_kvps;	/* Cached address of vnode array  */
 	uint64_t	ms_kmem;	/* Pages of kernel memory	  */
 	uint64_t	ms_zfs_data;	/* Pages of zfs data		  */
+	uint64_t	ms_vmm_mem;	/* Pages of VMM mem		  */
 	uint64_t	ms_anon;	/* Pages of anonymous memory	  */
 	uint64_t	ms_vnode;	/* Pages of named (vnode) memory  */
 	uint64_t	ms_exec;	/* Pages of exec/library memory	  */
@@ -458,11 +458,8 @@ typedef struct memstat {
 	struct vnode	ms_vn;		/* vnode buffer			  */
 } memstat_t;
 
-#define	MS_PP_ISKAS(pp, stats)				\
-	((pp)->p_vnode == (stats)->ms_kvp)
-
-#define	MS_PP_ISZFS_DATA(pp, stats)			\
-	(((stats)->ms_zvp != NULL) && ((pp)->p_vnode == (stats)->ms_zvp))
+#define	MS_PP_ISTYPE(pp, stats, index) \
+	((pp)->p_vnode == &(stats->ms_kvps[index]))
 
 /*
  * Summarize pages by type and update stat information
@@ -478,10 +475,12 @@ memstat_callback(page_t *page, page_t *pp, memstat_t *stats)
 		stats->ms_bootpages++;
 	else if (pp->p_vnode == NULL || pp->p_vnode == stats->ms_unused_vp)
 		return (WALK_NEXT);
-	else if (MS_PP_ISKAS(pp, stats))
+	else if (MS_PP_ISTYPE(pp, stats, KV_KVP))
 		stats->ms_kmem++;
-	else if (MS_PP_ISZFS_DATA(pp, stats))
+	else if (MS_PP_ISTYPE(pp, stats, KV_ZVP))
 		stats->ms_zfs_data++;
+	else if (MS_PP_ISTYPE(pp, stats, KV_VVP))
+		stats->ms_vmm_mem++;
 	else if (PP_ISFREE(pp))
 		stats->ms_cachelist++;
 	else if (vn_get(stats->ms_vn_htable, vp, (uintptr_t)pp->p_vnode))
@@ -507,7 +506,6 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	memstat_t stats;
 	GElf_Sym sym;
 	vn_htable_t ht;
-	struct vnode *kvps;
 	uintptr_t vn_size = 0;
 #if defined(__i386) || defined(__amd64)
 	bln_stats_t bln_stats;
@@ -548,16 +546,10 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* read kernel vnode array pointer */
 	if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "kvps",
 	    (GElf_Sym *)&sym) == -1) {
-		mdb_warn("unable to read kvps");
+		mdb_warn("unable to look up kvps");
 		return (DCMD_ERR);
 	}
-	kvps = (struct vnode *)(uintptr_t)sym.st_value;
-	stats.ms_kvp =  &kvps[KV_KVP];
-
-	/*
-	 * Read the zio vnode pointer.
-	 */
-	stats.ms_zvp = &kvps[KV_ZVP];
+	stats.ms_kvps = (struct vnode *)(uintptr_t)sym.st_value;
 
 	/*
 	 * If physmem != total_pages, then the administrator has limited the
@@ -603,6 +595,13 @@ memstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    stats.ms_zfs_data,
 		    (uint64_t)stats.ms_zfs_data * PAGESIZE / (1024 * 1024),
 		    MS_PCT_TOTAL(stats.ms_zfs_data));
+	}
+
+	if (stats.ms_vmm_mem != 0) {
+		mdb_printf("VMM Memory       %16llu  %16llu  %3lu%%\n",
+		    stats.ms_vmm_mem,
+		    (uint64_t)stats.ms_vmm_mem * PAGESIZE / (1024 * 1024),
+		    MS_PCT_TOTAL(stats.ms_vmm_mem));
 	}
 
 	mdb_printf("Anon             %16llu  %16llu  %3lu%%\n",
