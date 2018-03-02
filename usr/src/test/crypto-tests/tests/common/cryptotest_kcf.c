@@ -375,3 +375,67 @@ decrypt_final(crypto_op_t *op, size_t encrlen)
 
 	return (kcf_do_ioctl(CRYPTO_DECRYPT_FINAL, (uint_t *)&final, "final"));
 }
+
+int
+digest_init(crypto_op_t *op)
+{
+	crypto_digest_init_t init;
+
+	bzero(&init, sizeof (init));
+
+	init.di_session = op->hsession;
+
+	init.di_mech.cm_type = op->mech;
+	init.di_mech.cm_param = NULL;
+	init.di_mech.cm_param_len = 0;
+
+	return (kcf_do_ioctl(CRYPTO_DIGEST_INIT, (uint_t *)&init, "init"));
+}
+
+int
+digest_single(crypto_op_t *op)
+{
+	crypto_digest_t digest;
+
+	bzero(&digest, sizeof (digest));
+
+	digest.cd_session = op->hsession;
+
+	digest.cd_datalen = op->inlen;
+	digest.cd_databuf = op->in;
+	digest.cd_digestlen = op->outlen;
+	digest.cd_digestbuf = op->out;
+
+	return (kcf_do_ioctl(CRYPTO_DIGEST, (uint_t *)&digest, "digest"));
+}
+
+int
+digest_update(crypto_op_t *op, int offset)
+{
+	crypto_digest_update_t update;
+
+	bzero(&update, sizeof (update));
+
+	update.du_session = op->hsession;
+
+	update.du_datalen = op->updatelen;
+	update.du_databuf = op->in + offset;
+
+	return (kcf_do_ioctl(CRYPTO_DIGEST_UPDATE, (uint_t *)&update,
+	    "update"));
+}
+
+int
+digest_final(crypto_op_t *op)
+{
+	crypto_digest_final_t final;
+
+	bzero(&final, sizeof (final));
+
+	final.df_session = op->hsession;
+
+	final.df_digestlen = op->outlen;
+	final.df_digestbuf = op->out;
+
+	return (kcf_do_ioctl(CRYPTO_DIGEST_FINAL, (uint_t *)&final, "final"));
+}

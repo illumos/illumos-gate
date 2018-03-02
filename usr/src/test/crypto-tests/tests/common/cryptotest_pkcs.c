@@ -399,3 +399,56 @@ decrypt_final(crypto_op_t *op, size_t encrlen)
 		cryptotest_error("C_DecryptFinal", rv);
 	return (rv);
 }
+
+/*
+ * DIGEST_ functions
+ */
+int
+digest_init(crypto_op_t *op)
+{
+	CK_MECHANISM mech;
+	CK_RV rv;
+
+	mech.mechanism = op->mech;
+	mech.pParameter = op->param;
+	mech.ulParameterLen = op->paramlen;
+
+	rv = C_DigestInit(op->hsession, &mech);
+	if (rv != CKR_OK)
+		cryptotest_error("C_DigestInit", rv);
+	return (rv);
+}
+
+int
+digest_single(crypto_op_t *op)
+{
+	CK_RV rv;
+
+	rv = C_Digest(op->hsession, op->in, op->inlen,
+	    op->out, (CK_ULONG_PTR)&op->outlen);
+	if (rv != CKR_OK)
+		cryptotest_error("C_Digest", rv);
+	return (rv);
+}
+
+int
+digest_update(crypto_op_t *op, int offset)
+{
+	CK_RV rv;
+
+	rv = C_DigestUpdate(op->hsession, op->in + offset, op->updatelen);
+	if (rv != CKR_OK)
+		cryptotest_error("C_DigestUpdate", rv);
+	return (rv);
+}
+
+int
+digest_final(crypto_op_t *op)
+{
+	CK_RV rv;
+
+	rv = C_DigestFinal(op->hsession, op->out, (CK_ULONG_PTR)&op->outlen);
+	if (rv != CKR_OK)
+		cryptotest_error("C_DigestFinal", rv);
+	return (rv);
+}

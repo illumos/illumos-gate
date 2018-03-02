@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #define	__EXTENSIONS__
@@ -24,6 +25,7 @@
 test_fg_t cryptotest_decr_fg = {test_decrypt_single, test_decrypt};
 test_fg_t cryptotest_encr_fg = {test_encrypt_single, test_encrypt};
 test_fg_t cryptotest_mac_fg = {test_mac_single, test_mac};
+test_fg_t cryptotest_digest_fg = {test_digest_single, test_digest};
 
 /*
  * Utils
@@ -265,4 +267,57 @@ int
 test_decrypt(cryptotest_t *args)
 {
 	return (test_decrypt_common(args, B_FALSE));
+}
+
+static int
+test_digest_common(cryptotest_t *args, boolean_t AIO)
+{
+	int ret, i;
+	crypto_op_t *crypto_op;
+
+	if ((crypto_op = cryptotest_init(args, CRYPTO_FG_DIGEST)) == NULL) {
+		(void) fprintf(stderr, "Error occured during initalization\n");
+		(void) cryptotest_close(NULL);
+		return (CTEST_INIT_FAILED);
+	}
+
+	if ((ret = get_mech_info(crypto_op)) != CRYPTO_SUCCESS)
+		goto out;
+
+	if ((ret = get_hsession_by_mech(crypto_op)) != CRYPTO_SUCCESS)
+		goto out;
+
+	if ((ret = digest_init(crypto_op)) != CRYPTO_SUCCESS)
+		goto out;
+
+	if (AIO) {
+		if ((ret = digest_single(crypto_op)) != CRYPTO_SUCCESS)
+			goto out;
+	} else {
+		for (i = 0; i < args->inlen; i += args->updatelen) {
+
+			if ((ret = digest_update(crypto_op, i)) !=
+			    CRYPTO_SUCCESS)
+				goto out;
+		}
+
+		if ((ret = digest_final(crypto_op)) != CRYPTO_SUCCESS)
+			goto out;
+	}
+
+out:
+	(void) cryptotest_close(crypto_op);
+	return (ret);
+}
+
+int
+test_digest_single(cryptotest_t *args)
+{
+	return (test_digest_common(args, B_TRUE));
+}
+
+int
+test_digest(cryptotest_t *args)
+{
+	return (test_digest_common(args, B_FALSE));
 }

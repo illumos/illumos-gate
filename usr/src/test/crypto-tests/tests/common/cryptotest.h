@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef _CRYPTOTEST_H
@@ -77,6 +78,12 @@ int decrypt_single(crypto_op_t *op);
 int decrypt_update(crypto_op_t *op, int offset, size_t *encrlen);
 int decrypt_final(crypto_op_t *op, size_t encrlen);
 
+/* CRYPTO_DIGEST */
+int digest_init(crypto_op_t *op);
+int digest_single(crypto_op_t *op);
+int digest_update(crypto_op_t *op, int);
+int digest_final(crypto_op_t *op);
+
 /* wrappers */
 int test_mac_single(cryptotest_t *args);
 int test_mac(cryptotest_t *args);
@@ -87,13 +94,18 @@ int test_encrypt(cryptotest_t *args);
 int test_decrypt_single(cryptotest_t *args);
 int test_decrypt(cryptotest_t *args);
 
+int test_digest_single(cryptotest_t *args);
+int test_digest(cryptotest_t *args);
+
 extern test_fg_t cryptotest_decr_fg;
 extern test_fg_t cryptotest_encr_fg;
 extern test_fg_t cryptotest_mac_fg;
+extern test_fg_t cryptotest_digest_fg;
 
 #define	MAC_FG (&cryptotest_mac_fg)
 #define	ENCR_FG (&cryptotest_encr_fg)
 #define	DECR_FG (&cryptotest_decr_fg)
+#define	DIGEST_FG (&cryptotest_digest_fg)
 
 #ifdef __cplusplus
 }
