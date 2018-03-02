@@ -12,6 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018, Joyent, Inc.
 #
 
 [DEFAULT]
@@ -29,4 +30,13 @@ tests = ['aes_cbc', 'aes_ccm', 'aes_cmac', 'aes_ctr', 'aes_ecb', 'aes_gcm']
 pre = setup
 user = root
 tests = ['aes_cbc', 'aes_ccm', 'aes_cmac', 'aes_ctr', 'aes_ecb', 'aes_gcm']
+post = cleanup
+
+[/opt/crypto-tests/tests/digest/pkcs]
+tests = ['sha1', 'sha256', 'sha384', 'sha512']
+
+[/opt/crypto-tests/tests/digest/kcf]
+pre = setup
+user = root
+tests = ['sha1', 'sha256', 'sha384', 'sha512']
 post = cleanup
