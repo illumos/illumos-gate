@@ -3767,7 +3767,8 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 	}
 
 	alloclen = sizeof (*samsg) + sizeof (*current) + sizeof (*expire) +
-	    2 * sizeof (sadb_address_t) + sizeof (*saext);
+	    2 * sizeof (sadb_address_t) + sizeof (*saext) +
+	    sizeof (sadb_x_kmc_t);
 
 	af = assoc->ipsa_addrfam;
 	switch (af) {
@@ -3895,6 +3896,10 @@ sadb_expire_assoc(queue_t *pfkey_q, ipsa_t *assoc)
 		    assoc->ipsa_innerdstpfx);
 		ASSERT(mp->b_wptr != NULL);
 	}
+
+	mp->b_wptr = sadb_make_kmc_ext(mp->b_wptr, end, assoc->ipsa_kmp,
+	    assoc->ipsa_kmc);
+	ASSERT(mp->b_wptr != NULL);
 
 	/* Can just putnext, we're ready to go! */
 	putnext(pfkey_q, mp1);
