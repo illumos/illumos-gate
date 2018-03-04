@@ -355,6 +355,7 @@ int ed_emacsread(void *context, int fd,char *buff,int scend, int reedit)
 				}
 				ep->ed->e_tabcount = 0;
 			}
+			/* FALLTHROUGH */
 		do_default_processing:
 		default:
 
@@ -550,6 +551,7 @@ update:
 		case KILLCHAR :
 			cur = 0;
 			oadjust = -1;
+			/* FALLTHROUGH */
 		case cntl('K') :
 			if(oadjust >= 0)
 			{
@@ -936,6 +938,7 @@ static int escape(register Emacs_t* ep,register genchar *out,int count)
 		/* file name expansion */
 		case cntl('[') :	/* filename completion */
 			i = '\\';
+			/* FALLTHROUGH */
 		case '*':		/* filename expansion */
 		case '=':	/* escape = - list all matching file names */
 			ep->mark = cur;
@@ -1053,6 +1056,7 @@ static int escape(register Emacs_t* ep,register genchar *out,int count)
 				ed_ungetchar(ep->ed,i);
 			}
 			i = '_';
+			/* FALLTHROUGH */
 
 		default:
 			/* look for user defined macro definitions */

@@ -98,7 +98,7 @@ void ss_delete_info_dir();
 /* Solaris Kerberos */
 int ss_parse (int, char *, int *, char ***, int);
 ss_abbrev_info *ss_abbrev_initialize (char *, int *);
-void ss_page_stdin (void);
+void ss_page_stdin (void) __NORETURN;
 int ss_pager_create (void);
 void ss_self_identify __SS_PROTO;
 void ss_subsystem_name __SS_PROTO;

@@ -1794,7 +1794,7 @@ scanMappingFormat(__nis_mapping_format_t *f, int curf, int nf, char *str,
 		 * So continue processing as if it was mmt_item
 		 */
 		ipaddr = TRUE;
-
+		/* FALLTHROUGH */
 	case mmt_item:
 		/*
 		 * In order to find the end of the item value, we must look

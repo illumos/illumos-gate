@@ -635,8 +635,8 @@ ppcontrol(void)
 		case MACDEF:
 			if ((pp.state & STRICT) && !(pp.mode & (HOSTED|RELAX)))
 				error(1, "#%s: non-standard directive", pp.token);
-			/*FALLTHROUGH*/
 #endif
+			/*FALLTHROUGH*/
 		case DEFINE:
 			n2 = error_info.line;
 			if ((c = pplex()) == '#' && directive == DEFINE)

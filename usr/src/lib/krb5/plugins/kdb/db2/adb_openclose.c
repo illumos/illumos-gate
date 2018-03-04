@@ -2,7 +2,6 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING WARNING 
@@ -24,13 +23,7 @@
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved
- *
- * $Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_openclose.c,v 1.8 2002/10/08 20:20:29 tlyu Exp $ 
  */
-
-#if !defined(lint) && !defined(__CODECENTER__)
-static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/srv/adb_openclose.c,v 1.8 2002/10/08 20:20:29 tlyu Exp $";
-#endif
 
 #include	<sys/file.h>
 #include	<fcntl.h>
@@ -295,7 +288,7 @@ krb5_error_code osa_adb_get_lock(osa_adb_db_t db, int mode)
      switch (mode) {
 	case KRB5_DB_LOCKMODE_PERMANENT:
 	  perm = 1;
-	/*LINTED*/
+	/* FALLTHROUGH */
 	case KRB5_DB_LOCKMODE_EXCLUSIVE:
 	  krb5_mode = KRB5_LOCKMODE_EXCLUSIVE;
 	  break;
@@ -412,6 +405,7 @@ krb5_error_code osa_adb_open_and_lock(osa_adb_princ_t db, int locktype)
 	  db->db = dbopen(db->filename, O_RDWR, 0600, DB_HASH, &db->info);
 	  if (db->db != NULL)
 	       goto open_ok;
+	  /* FALLTHROUGH */
      default:
 	  (void) osa_adb_release_lock(db);
 	  if (errno == EINVAL)

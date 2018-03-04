@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Jason King
  */
 
 #include <pthread.h>
@@ -36,7 +37,9 @@
 #include <pwd.h>
 #include <syslog.h>
 
-#include <openssl/rsa.h>
+#include <sys/crypto/common.h>	/* For CRYPTO_BYTES2BITS */
+#include <rsa_impl.h>
+#include <padding.h>
 
 #include <tss/platform.h>
 #include <tss/tss_defines.h>
@@ -2740,18 +2743,16 @@ token_specific_rsa_encrypt(
  * RSA Verify Recover
  *
  * Public key crypto is done in software, not by the TPM.
- * We bypass the TSPI library here in favor of calls directly
- * to OpenSSL because we don't want to add any padding, the in_data (signature)
- * already contains the data stream to be decrypted and is already
- * padded and formatted correctly.
+ * We use libsoftcrypto and perform the RSA operations ourselves similar
+ * to how pkcs11_softtoken performs the operation.
  */
 CK_RV
 token_specific_rsa_verify_recover(
 	TSS_HCONTEXT	hContext,
-	CK_BYTE		*in_data,	/* signature */
-	CK_ULONG	in_data_len,
-	CK_BYTE		*out_data,	/* decrypted */
-	CK_ULONG	*out_data_len,
+	CK_BYTE_PTR	pSignature,
+	CK_ULONG	ulSignatureLen,
+	CK_BYTE_PTR	pData,
+	CK_ULONG_PTR	pulDataLen,
 	OBJECT		*key_obj)
 {
 	TSS_HKEY	hKey;
@@ -2759,12 +2760,10 @@ token_specific_rsa_verify_recover(
 	CK_RV		rc;
 	BYTE		*modulus;
 	UINT32		modLen;
-	RSA		*rsa = NULL;
+	RSAbytekey	rsa = { 0 };
 	uchar_t		exp[] = { 0x01, 0x00, 0x01 };
-	int		sslrv, num;
-	BYTE		temp[MAX_RSA_KEYLENGTH];
-	BYTE		outdata[MAX_RSA_KEYLENGTH];
-	int		i;
+	CK_BYTE		plain_data[MAX_RSA_KEYLENGTH];
+	size_t		data_len;
 
 	if ((rc = token_rsa_load_key(hContext, key_obj, &hKey))) {
 		return (rc);
@@ -2777,63 +2776,27 @@ token_specific_rsa_verify_recover(
 		return (CKR_FUNCTION_FAILED);
 	}
 
-	if (in_data_len != modLen) {
+	if (ulSignatureLen != modLen) {
 		rc = CKR_SIGNATURE_LEN_RANGE;
 		goto end;
 	}
 
-	rsa = RSA_new();
-	if (rsa == NULL) {
-		rc = CKR_HOST_MEMORY;
+	rsa.modulus = modulus;
+	rsa.modulus_bits = CRYPTO_BYTES2BITS(modLen);
+	rsa.pubexpo = exp;
+	rsa.pubexpo_bytes = sizeof (exp);
+
+	if ((rc = rsa_encrypt(&rsa, pSignature, modLen, plain_data)) != CKR_OK)
 		goto end;
-	}
 
-	rsa->n = BN_bin2bn(modulus, modLen, rsa->n);
-	rsa->e = BN_bin2bn(exp, sizeof (exp), rsa->e);
-	if (rsa->n == NULL || rsa->e == NULL) {
-		rc = CKR_HOST_MEMORY;
+	data_len = modLen;
+	if ((rc = pkcs1_decode(PKCS1_VERIFY, plain_data, &data_len)) != CKR_OK)
 		goto end;
-	}
 
-	rsa->flags |= RSA_FLAG_SIGN_VER;
+	(void) memcpy(pData, &plain_data[modLen - data_len], data_len);
+	*pulDataLen = data_len;
 
-	/* use RSA_NO_PADDING because the data is already padded (PKCS1) */
-	sslrv = RSA_public_encrypt(in_data_len, in_data, outdata,
-	    rsa, RSA_NO_PADDING);
-	if (sslrv == -1) {
-		rc = CKR_FUNCTION_FAILED;
-		goto end;
-	}
-
-	/* Strip leading 0's before stripping the padding */
-	for (i = 0; i < sslrv; i++)
-		if (outdata[i] != 0)
-			break;
-
-	num = BN_num_bytes(rsa->n);
-
-	/* Use OpenSSL function for stripping PKCS#1 padding */
-	sslrv = RSA_padding_check_PKCS1_type_1(temp, sizeof (temp),
-	    &outdata[i], sslrv - i, num);
-
-	if (sslrv < 0) {
-		rc = CKR_FUNCTION_FAILED;
-		goto end;
-	}
-
-	if (*out_data_len < sslrv) {
-		rc = CKR_BUFFER_TOO_SMALL;
-		*out_data_len = 0;
-		goto end;
-	}
-
-	/* The return code indicates the number of bytes remaining */
-	(void) memcpy(out_data, temp, sslrv);
-	*out_data_len = sslrv;
 end:
 	Tspi_Context_FreeMemory(hContext, modulus);
-	if (rsa)
-		RSA_free(rsa);
-
 	return (rc);
 }

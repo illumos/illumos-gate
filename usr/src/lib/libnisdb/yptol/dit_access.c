@@ -299,6 +299,7 @@ get_ttl_value(map_ctrl *map, TTL_TYPE type)
 			logmsg(MSG_NOTIMECHECK, LOG_INFO,
 			"%s passed illegal TTL type (%d)", myself, type);
 			/* If unknown TTL type drop through to TTL_RAND */
+			/* FALLTHROUGH */
 
 		case TTL_RAND:
 			interval = table_map->initTtlHi - table_map->initTtlLo;

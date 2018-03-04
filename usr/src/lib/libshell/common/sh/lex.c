@@ -477,7 +477,7 @@ int sh_lex(Lex_t* lp)
 				}
 				lp->lex.reservok = !lp->lex.intest;
 				lp->lex.skipword = 0;
-				/* FALL THRU */
+				/* FALLTHROUGH */
 			case S_NL:
 				/* skip over new-lines */
 				lp->lex.last_quote = 0;
@@ -488,6 +488,7 @@ int sh_lex(Lex_t* lp)
 					lp->comp_assign = 0;
 					return(lp->token='\n');
 				}
+				/* FALLTHROUGH */
 			case S_BLNK:
 				if(lp->lex.incase<=TEST_RE)
 					continue;
@@ -881,6 +882,7 @@ int sh_lex(Lex_t* lp)
 			case S_ALP:
 				if(c=='.' && endchar(lp)=='$')
 					goto err;
+				/* FALLTHROUGH */
 			case S_SPC2:
 			case S_DIG:
 				wordflags |= ARG_MAC;
@@ -895,12 +897,14 @@ int sh_lex(Lex_t* lp)
 							poplevel(lp);
 						}
 						break;
+					/* FALLTHROUGH */
 #if SHOPT_TYPEDEF
 					case '@':
 #endif /* SHOPT_TYPEDEF */
 					case '!':
 						if(n!=S_ALP)
 							goto dolerr;
+						/* FALLTHROUGH */
 					case '#':
 					case RBRACE:
 						if(n==S_ALP)
@@ -1379,7 +1383,7 @@ breakloop:
 		case TEST_SEQ:
 			if(lp->lexd.warn && state[1]==0)
 				errormsg(SH_DICT,ERROR_warn(0),e_lexobsolete3,shp->inlineno);
-			/* FALL THRU */
+			/* FALLTHROUGH */
 		default:
 			if(lp->lex.testop2)
 			{
@@ -1395,6 +1399,7 @@ breakloop:
 				return(lp->token);	
 			}
 
+			/* FALLTHROUGH */
 		case TEST_OR: case TEST_AND:
 		case 0:
 			return(lp->token=0);
@@ -1563,6 +1568,7 @@ static int comsub(register Lex_t *lp, int endtok)
 				lp->lastline = line;
 				lp->lasttok = endtok;
 				sh_syntax(lp);
+				/* FALLTHROUGH */
 			    case IOSEEKSYM:
 				if(fcgetc(c)!='#' && c>0)
 					fcseek(-1);

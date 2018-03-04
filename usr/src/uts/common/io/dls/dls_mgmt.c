@@ -974,23 +974,13 @@ dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
     boolean_t tmp_hold)
 {
 	dls_devnet_t		*ddp;
-	dev_t			phydev = 0;
-	dls_dev_handle_t	ddh = NULL;
 	int			err;
-
-	/*
-	 * Hold this link to prevent it being detached in case of a
-	 * physical link.
-	 */
-	if (dls_mgmt_get_phydev(linkid, &phydev) == 0)
-		(void) softmac_hold_device(phydev, &ddh);
 
 	rw_enter(&i_dls_devnet_lock, RW_READER);
 	if ((err = mod_hash_find(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)linkid, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
 		rw_exit(&i_dls_devnet_lock);
-		softmac_rele_device(ddh);
 		return (ENOENT);
 	}
 
@@ -999,7 +989,6 @@ dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
 	if (ddp->dd_flags & DD_CONDEMNED) {
 		mutex_exit(&ddp->dd_mutex);
 		rw_exit(&i_dls_devnet_lock);
-		softmac_rele_device(ddh);
 		return (ENOENT);
 	}
 	if (tmp_hold)
@@ -1008,8 +997,6 @@ dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
 		ddp->dd_ref++;
 	mutex_exit(&ddp->dd_mutex);
 	rw_exit(&i_dls_devnet_lock);
-
-	softmac_rele_device(ddh);
 
 	*ddpp = ddp;
 	return (0);
@@ -1033,7 +1020,7 @@ dls_devnet_hold_tmp(datalink_id_t linkid, dls_devnet_t **ddpp)
 
 /*
  * This funtion is called when a DLS client tries to open a device node.
- * This dev_t could a result of a /dev/net node access (returned by
+ * This dev_t could be a result of a /dev/net node access (returned by
  * devnet_create_rvp->dls_devnet_open()) or a direct /dev node access.
  * In both cases, this function bumps up the reference count of the
  * dls_devnet_t structure. The reference is held as long as the device node
@@ -1049,7 +1036,6 @@ dls_devnet_hold_by_dev(dev_t dev, dls_dl_handle_t *ddhp)
 {
 	char			name[MAXNAMELEN];
 	char			*drv;
-	dls_dev_handle_t	ddh = NULL;
 	dls_devnet_t		*ddp;
 	int			err;
 
@@ -1059,19 +1045,11 @@ dls_devnet_hold_by_dev(dev_t dev, dls_dl_handle_t *ddhp)
 	(void) snprintf(name, sizeof (name), "%s%d", drv,
 	    DLS_MINOR2INST(getminor(dev)));
 
-	/*
-	 * Hold this link to prevent it being detached in case of a
-	 * GLDv3 physical link.
-	 */
-	if (DLS_MINOR2INST(getminor(dev)) <= DLS_MAX_PPA)
-		(void) softmac_hold_device(dev, &ddh);
-
 	rw_enter(&i_dls_devnet_lock, RW_READER);
 	if ((err = mod_hash_find(i_dls_devnet_hash,
 	    (mod_hash_key_t)name, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
 		rw_exit(&i_dls_devnet_lock);
-		softmac_rele_device(ddh);
 		return (ENOENT);
 	}
 	mutex_enter(&ddp->dd_mutex);
@@ -1079,14 +1057,11 @@ dls_devnet_hold_by_dev(dev_t dev, dls_dl_handle_t *ddhp)
 	if (ddp->dd_flags & DD_CONDEMNED) {
 		mutex_exit(&ddp->dd_mutex);
 		rw_exit(&i_dls_devnet_lock);
-		softmac_rele_device(ddh);
 		return (ENOENT);
 	}
 	ddp->dd_ref++;
 	mutex_exit(&ddp->dd_mutex);
 	rw_exit(&i_dls_devnet_lock);
-
-	softmac_rele_device(ddh);
 
 	*ddhp = ddp;
 	return (0);
@@ -1132,6 +1107,10 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp)
 	if (err != ENOENT)
 		return (err);
 
+	/*
+	 * If we reach this point it means dlmgmtd is up but has no
+	 * mapping for the link name.
+	 */
 	if (ddi_parse(link, drv, &ppa) != DDI_SUCCESS)
 		return (ENOENT);
 
@@ -1143,7 +1122,6 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp)
 		 * resulted in a link being created.
 		 */
 		err = dls_devnet_hold(linkid, ddpp);
-		ASSERT(err == 0);
 		if (err != 0) {
 			VERIFY(i_dls_devnet_destroy_iptun(linkid) == 0);
 			return (err);

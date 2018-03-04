@@ -331,11 +331,11 @@ int test_unop(register int op,register const char *arg)
 		stakputc(0);
 		arg = (const char*)stakptr(offset);
 		stakseek(offset);
-		/* FALL THRU */
 	    }
 #else
 		return(0);
 #endif /* SHOPT_FS_3D */
+		/* FALLTHROUGH */
 	    case 'd':
 		return(test_stat(arg,&statb)>=0 && S_ISDIR(statb.st_mode));
 	    case 'c':
@@ -398,6 +398,7 @@ int test_unop(register int op,register const char *arg)
 		return(*arg == 0);
 	    case 's':
 		sfsync(sfstdout);
+		/* FALLTHROUGH */
 	    case 'O':
 	    case 'G':
 		if(*arg==0 || test_stat(arg,&statb)<0)
