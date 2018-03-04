@@ -731,10 +731,12 @@ Namval_t *nv_create(const char *name,  Dt_t *root, int flags, Namfun_t *dp)
 				sp = (char*)name+c;
 				c = '.';
 			}
+			/* FALLTHROUGH */
 		skip:
 		    case '+':
 		    case '=':
 			*sp = 0;
+			/* FALLTHROUGH */
 		    case 0:
 			isref = 0;
 			dp->last = cp;

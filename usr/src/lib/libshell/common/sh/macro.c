@@ -458,6 +458,7 @@ static void copyto(register Mac_t *mp,int endch, int newquote)
 				    case -1:	/* illegal multi-byte char */
 				    case 0:
 					len = 1;
+					/* FALLTHROUGH */
 				    case 1:
 					n = state[*(unsigned char*)cp++];
 					break;
@@ -600,6 +601,7 @@ static void copyto(register Mac_t *mp,int endch, int newquote)
 				goto pattern;
 			if(endch==RBRACE && *cp==LPAREN && mp->pattern && brace)
 				goto pattern;
+			/* FALLTHROUGH */
 		    case S_EOF:
 			if(c)
 			{
@@ -616,6 +618,7 @@ static void copyto(register Mac_t *mp,int endch, int newquote)
 		    case S_QUOTE:
 			if(mp->lit || mp->arith)
 				break;
+			/* FALLTHROUGH */
 		    case S_LIT:
 			if(mp->arith)
 			{
@@ -679,6 +682,7 @@ e_badsubscript,*cp);
 				cp = first = fcseek(0);
 				break;
 			}
+			/* FALLTHROUGH */
 		    case S_PAT:
 			if(mp->pattern && !(mp->quote || mp->lit))
 			{

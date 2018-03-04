@@ -2052,7 +2052,8 @@ get_next_extract_format_item(
 							mmt_berstring_null :
 							mmt_berstring;
 						break;
-					} /* else FALLTHRU */
+					}
+					/* FALLTHROUGH */
 				case '{':	/* begin sequence */
 				case '[':	/* begin set */
 				case '}':	/* end sequence */

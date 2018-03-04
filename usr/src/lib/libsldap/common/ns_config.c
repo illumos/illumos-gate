@@ -3712,6 +3712,7 @@ __s_val_postime(ParamIndexType i, ns_default_config *def,
 				if (*(cp+1) == '\0') {
 					break;
 				}
+				/* FALLTHROUGH */
 			default:
 				(void) strcpy(errbuf, "Illegal time value");
 				return (NS_PARSE_ERR);

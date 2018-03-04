@@ -250,6 +250,7 @@ int hist_expand(const char *ln, char **xp)
 			if(!isdigit(*(cp+1)))
 				goto string_event;
 			cp++;
+			/* FALLTHROUGH */
 		case '0': /* reference by number */
 		case '1':
 		case '2':
@@ -273,6 +274,7 @@ int hist_expand(const char *ln, char **xp)
 		case '?':
 			cp++;
 			flag |= HIST_QUESTION;
+			/* FALLTHROUGH */
 		string_event:
 		default:
 			/* read until end of string or word designator/modifier */
@@ -376,6 +378,7 @@ getline:
 					sfseek(wm, 0, SEEK_SET);
 					goto skip;
 				}
+				/* FALLTHROUGH */
 			default:
 			skip2:
 				cp--;

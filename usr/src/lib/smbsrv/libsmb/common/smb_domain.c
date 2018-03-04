@@ -666,6 +666,7 @@ smb_dcache_lock(int mode)
 				return (SMB_DOMAIN_INTERNAL_ERR);
 			}
 		}
+		/* FALLTHROUGH */
 
 	default:
 		smb_dcache.dc_nops++;
