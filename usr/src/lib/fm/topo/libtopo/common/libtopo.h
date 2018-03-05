@@ -418,6 +418,14 @@ void topo_sensor_state_name(uint32_t sensor_type, uint8_t state, char *buf,
 #define	TOPO_SENSOR_UNITS	"units"
 #define	TOPO_LED_MODE		"mode"
 
+#define	TOPO_PROP_THRESHOLD_LNC		"threshold-lower-non-critical"
+#define	TOPO_PROP_THRESHOLD_LCR		"threshold-lower-critical"
+#define	TOPO_PROP_THRESHOLD_LNR		"threshold-lower-non-recoverable"
+
+#define	TOPO_PROP_THRESHOLD_UNC		"threshold-upper-non-critical"
+#define	TOPO_PROP_THRESHOLD_UCR		"threshold-upper-critical"
+#define	TOPO_PROP_THRESHOLD_UNR		"threshold-upper-non-recoverable"
+
 /*
  * Sensor Classes
  *

@@ -22,8 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <libipmi.h>
 #include <string.h>
@@ -92,6 +93,30 @@ ipmi_set_sensor_reading(ipmi_handle_t *ihp, ipmi_set_sensor_reading_t *req)
 
 	if (resp->ic_dlen != 0)
 		return (ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL));
+
+	return (0);
+}
+
+int
+ipmi_get_sensor_thresholds(ipmi_handle_t *ihp, ipmi_sensor_thresholds_t *thresh,
+    uint8_t id)
+{
+	ipmi_cmd_t cmd, *resp;
+
+	cmd.ic_netfn = IPMI_NETFN_SE;
+	cmd.ic_cmd = IPMI_CMD_GET_SENSOR_THRESHOLDS;
+	cmd.ic_lun = 0;
+	cmd.ic_data = &id;
+	cmd.ic_dlen = sizeof (id);
+
+	if ((resp = ipmi_send(ihp, &cmd)) == NULL)
+		return (-1);
+
+	if (resp->ic_dlen < sizeof (ipmi_sensor_thresholds_t)) {
+		return (ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL));
+	}
+
+	(void) memcpy(thresh, resp->ic_data, sizeof (ipmi_sensor_thresholds_t));
 
 	return (0);
 }

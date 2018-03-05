@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 #include <unistd.h>
 #include <stdio.h>
@@ -171,6 +171,7 @@ struct sensor_data {
 	uint32_t sd_stype;
 	uint32_t sd_rtype;
 	char *sd_class;
+	ipmi_sdr_full_sensor_t *sd_fs_sdr;
 };
 
 /*ARGSUSED*/
@@ -1349,14 +1350,66 @@ chassis_ident_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	return (0);
 }
 
+#define	ISBITSET(MASK, BIT)	((MASK & BIT) == BIT)
+
+struct sensor_thresh {
+	uint8_t	sthr_threshbit;
+	const char *sthr_propname;
+	uint8_t sthr_threshoff;
+};
+
+static const struct sensor_thresh threshset[] = {
+	{ IPMI_SENSOR_THRESHOLD_LOWER_NONCRIT, TOPO_PROP_THRESHOLD_LNC,
+	    offsetof(ipmi_sensor_thresholds_t, ithr_lower_noncrit) },
+	{ IPMI_SENSOR_THRESHOLD_LOWER_CRIT, TOPO_PROP_THRESHOLD_LCR,
+	    offsetof(ipmi_sensor_thresholds_t, ithr_lower_crit) },
+	{ IPMI_SENSOR_THRESHOLD_LOWER_NONRECOV, TOPO_PROP_THRESHOLD_LNR,
+	    offsetof(ipmi_sensor_thresholds_t, ithr_lower_nonrec) },
+	{ IPMI_SENSOR_THRESHOLD_UPPER_NONCRIT, TOPO_PROP_THRESHOLD_UNC,
+	    offsetof(ipmi_sensor_thresholds_t, ithr_upper_noncrit) },
+	{ IPMI_SENSOR_THRESHOLD_UPPER_CRIT, TOPO_PROP_THRESHOLD_UCR,
+	    offsetof(ipmi_sensor_thresholds_t, ithr_upper_crit) },
+	{ IPMI_SENSOR_THRESHOLD_UPPER_NONRECOV, TOPO_PROP_THRESHOLD_UNR,
+	    offsetof(ipmi_sensor_thresholds_t, ithr_upper_nonrec) }
+};
+
+static uint_t num_thresholds =
+    sizeof (threshset) / sizeof (struct sensor_thresh);
+
 static int
-make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
+set_thresh_prop(topo_mod_t *mod, tnode_t *fnode, ipmi_sdr_full_sensor_t *fs,
+    uint8_t raw_thresh, const struct sensor_thresh *thresh)
+{
+	int err;
+	double conv_thresh;
+
+	if (ipmi_sdr_conv_reading(fs, raw_thresh, &conv_thresh) != 0) {
+		topo_mod_dprintf(mod, "Failed to convert threshold %s on node "
+		    "%s", thresh->sthr_propname, topo_node_name(fnode));
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
+	}
+	if (topo_prop_set_double(fnode, TOPO_PGROUP_FACILITY,
+	    thresh->sthr_propname, TOPO_PROP_IMMUTABLE, conv_thresh, &err) !=
+	    0) {
+		topo_mod_dprintf(mod, "Failed to set property %s on node %s "
+		    "(%s)", thresh->sthr_propname, topo_node_name(fnode),
+		    topo_strerror(err));
+		return (topo_mod_seterrno(mod, err));
+	}
+	return (0);
+}
+
+static int
+make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd,
+    ipmi_handle_t *hdl)
 {
 	int err, ret, i;
 	tnode_t *fnode;
 	char *ftype = "sensor", facname[MAX_ID_LEN], **entity_refs;
 	topo_pgroup_info_t pgi;
 	nvlist_t *arg_nvl = NULL;
+	ipmi_sensor_thresholds_t thresh = { 0 };
+	uint8_t mask;
 
 	/*
 	 * Some platforms have '/' characters in the IPMI entity name, but '/'
@@ -1371,7 +1424,7 @@ make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 	if ((fnode = topo_node_facbind(mod, pnode, facname, ftype)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to bind facility node: %s\n",
 		    facname);
-		/* topo errno set */
+		/* errno set */
 		return (-1);
 	}
 
@@ -1384,23 +1437,20 @@ make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 			topo_mod_dprintf(mod,  "pgroups create failure: %s\n",
 			    topo_strerror(err));
 			topo_node_unbind(fnode);
-			return (-1);
+			return (topo_mod_seterrno(mod, err));
 		}
 	}
 	if (topo_method_register(mod, fnode, ipmi_fac_methods) < 0) {
 		topo_mod_dprintf(mod, "make_fac_node: "
 		    "failed to register facility methods");
 		topo_node_unbind(fnode);
+		/* errno set */
 		return (-1);
 	}
 	/*
 	 * For both threshold and discrete sensors we set up a propmethod for
 	 * getting the sensor state and properties to hold the entity ref,
 	 * sensor class and sensor type.
-	 *
-	 * Additionally, for analog sensors we set up a property method for
-	 * getting the converted sensor reading and property for the base
-	 * unit type
 	 */
 	if ((entity_refs = topo_mod_alloc(mod, sizeof (char *))) == NULL)
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
@@ -1414,7 +1464,7 @@ make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 		    "on node: %s=%d (%s)\n", __func__, topo_node_name(fnode),
 		    topo_node_instance(fnode), topo_strerror(err));
 		strarr_free(mod, entity_refs, 1);
-		return (-1);
+		return (topo_mod_seterrno(mod, err));
 	}
 	strarr_free(mod, entity_refs, 1);
 
@@ -1423,14 +1473,14 @@ make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 		topo_mod_dprintf(mod, "Failed to set %s property on node: "
 		    "%s=%d (%s)\n", TOPO_SENSOR_CLASS, topo_node_name(fnode),
 		    topo_node_instance(fnode), topo_strerror(err));
-		return (-1);
+		return (topo_mod_seterrno(mod, err));
 	}
 	if (topo_prop_set_uint32(fnode, TOPO_PGROUP_FACILITY,
 	    TOPO_FACILITY_TYPE, TOPO_PROP_IMMUTABLE, sd->sd_stype, &err) != 0) {
 		topo_mod_dprintf(mod, "Failed to set %s property on node: "
 		    "%s=%d (%s)\n", TOPO_FACILITY_TYPE, topo_node_name(fnode),
 		    topo_node_instance(fnode), topo_strerror(err));
-		return (-1);
+		return (topo_mod_seterrno(mod, err));
 	}
 	if (topo_mod_nvalloc(mod, &arg_nvl, NV_UNIQUE_NAME) < 0) {
 		topo_node_unbind(fnode);
@@ -1442,7 +1492,7 @@ make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 		topo_mod_dprintf(mod, "Failed build arg nvlist (%s)\n",
 		    strerror(ret));
 		nvlist_free(arg_nvl);
-		return (-1);
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
 	}
 
 	if (topo_prop_method_register(fnode, TOPO_PGROUP_FACILITY,
@@ -1452,30 +1502,75 @@ make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 		    "node %s (%s)\n", TOPO_SENSOR_STATE, topo_node_name(fnode),
 		    topo_strerror(err));
 		nvlist_free(arg_nvl);
-		return (-1);
+		return (topo_mod_seterrno(mod, err));
 	}
 
-	if (strcmp(sd->sd_class, TOPO_SENSOR_CLASS_THRESHOLD) == 0) {
-		if (topo_prop_method_register(fnode, TOPO_PGROUP_FACILITY,
-		    TOPO_SENSOR_READING, TOPO_TYPE_DOUBLE,
-		    "ipmi_sensor_reading", arg_nvl, &err) != 0) {
-			topo_mod_dprintf(mod, "Failed to register %s propmeth "
-			    "on fac node %s (%s)\n", TOPO_SENSOR_READING,
-			    topo_node_name(fnode), topo_strerror(err));
-			nvlist_free(arg_nvl);
-			return (-1);
-		}
-		if (topo_prop_set_uint32(fnode, TOPO_PGROUP_FACILITY,
-		    TOPO_SENSOR_UNITS, TOPO_PROP_IMMUTABLE, sd->sd_units, &err)
-		    != 0) {
-			topo_mod_dprintf(mod, "Failed to set units property on "
-			    "node: %s (%s)\n", topo_node_name(fnode),
-			    topo_strerror(err));
-			nvlist_free(arg_nvl);
+	/*
+	 * If it's a discrete sensor then we're done.  For threshold sensors,
+	 * there are additional properties to set up.
+	 */
+	if (strcmp(sd->sd_class, TOPO_SENSOR_CLASS_THRESHOLD) != 0) {
+		nvlist_free(arg_nvl);
+		return (0);
+	}
+
+	/*
+	 * Create properties to expose the analog sensor reading, the unit
+	 * type and the upper and lower thresholds, if available.
+	 */
+	if (topo_prop_method_register(fnode, TOPO_PGROUP_FACILITY,
+	    TOPO_SENSOR_READING, TOPO_TYPE_DOUBLE, "ipmi_sensor_reading",
+	    arg_nvl, &err) != 0) {
+		topo_mod_dprintf(mod, "Failed to register %s propmeth on fac "
+		    "node %s (%s)\n", TOPO_SENSOR_READING,
+		    topo_node_name(fnode), topo_strerror(err));
+		nvlist_free(arg_nvl);
+		return (topo_mod_seterrno(mod, err));
+	}
+	if (topo_prop_set_uint32(fnode, TOPO_PGROUP_FACILITY,
+	    TOPO_SENSOR_UNITS, TOPO_PROP_IMMUTABLE, sd->sd_units, &err) != 0) {
+		topo_mod_dprintf(mod, "Failed to set units property on node "
+		    "%s (%s)\n", topo_node_name(fnode), topo_strerror(err));
+		nvlist_free(arg_nvl);
+		return (topo_mod_seterrno(mod, err));
+	}
+	nvlist_free(arg_nvl);
+
+	/*
+	 * It is possible (though unusual) for a compact sensor record to
+	 * represent a threshold sensor.  However, due to how
+	 * ipmi_sdr_conv_reading() is currently implemented, we only support
+	 * gathering threshold readings on sensors enumerated from Full Sensor
+	 * Records.
+	 */
+	if (sd->sd_fs_sdr == NULL)
+		return (0);
+
+	if (ipmi_get_sensor_thresholds(hdl, &thresh,
+	    sd->sd_fs_sdr->is_fs_number) != 0) {
+		topo_mod_dprintf(mod, "Failed to get sensor thresholds for "
+		    "node %s (%s)\n", topo_node_name(fnode), ipmi_errmsg(hdl));
+		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
+	}
+
+	/*
+	 * The IPMI Get Sensor Thresholds command returns a bitmask describing
+	 * which of the 3 upper and lower thresholds are readable.  Iterate
+	 * through those and create a topo property for each threshold that is
+	 * readable.
+	 */
+	mask = thresh.ithr_readable_mask;
+	for (i = 0; i < num_thresholds; i++) {
+		if (!ISBITSET(mask, threshset[i].sthr_threshbit))
+			continue;
+
+		if (set_thresh_prop(mod, fnode, sd->sd_fs_sdr,
+		    *(uint8_t *)((char *)&thresh +
+		    threshset[i].sthr_threshoff), &threshset[i]) != 0) {
+			/* errno set */
 			return (-1);
 		}
 	}
-	nvlist_free(arg_nvl);
 	return (0);
 }
 
@@ -1513,6 +1608,7 @@ sdr_callback(ipmi_handle_t *hdl, const char *id, ipmi_sdr_t *sdr, void *data)
 			sd.sd_units = f_sensor->is_fs_unit2;
 			sd.sd_stype = f_sensor->is_fs_type;
 			sd.sd_rtype = f_sensor->is_fs_reading_type;
+			sd.sd_fs_sdr = f_sensor;
 			break;
 		case IPMI_SDR_TYPE_COMPACT_SENSOR:
 			c_sensor =
@@ -1527,6 +1623,7 @@ sdr_callback(ipmi_handle_t *hdl, const char *id, ipmi_sdr_t *sdr, void *data)
 			sd.sd_units = c_sensor->is_cs_unit2;
 			sd.sd_stype = c_sensor->is_cs_type;
 			sd.sd_rtype = c_sensor->is_cs_reading_type;
+			sd.sd_fs_sdr = NULL;
 			break;
 		default:
 			return (0);
@@ -1546,7 +1643,7 @@ sdr_callback(ipmi_handle_t *hdl, const char *id, ipmi_sdr_t *sdr, void *data)
 	    ei->ei_list, ei->ei_listsz) == B_TRUE) ||
 	    (sensor_entity == ei->ei_id && sensor_inst == ei->ei_inst)) {
 
-		if (make_sensor_node(ei->ei_mod, ei->ei_node, &sd) != 0) {
+		if (make_sensor_node(ei->ei_mod, ei->ei_node, &sd, hdl) != 0) {
 			topo_mod_dprintf(ei->ei_mod, "Failed to create sensor "
 			    "node for %s\n", sd.sd_entity_ref);
 			if (topo_mod_errno(ei->ei_mod) != EMOD_NODE_DUP)
