@@ -353,12 +353,12 @@ sub main {
 	if ($count > 0) { $count_flag = 1; }
 	while (1) {
 		print_header() if ($i == 0);
-		snap_stats();
 		calculate();
 		print_values();
 		last if ($count_flag == 1 && $count-- <= 1);
 		$i = (($i == $hdr_intr) && (not $raw_output)) ? 0 : $i+1;
 		sleep($int);
+		snap_stats();
 	}
 	close($out) if defined $out;
 }
