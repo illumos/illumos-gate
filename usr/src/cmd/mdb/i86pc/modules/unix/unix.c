@@ -756,6 +756,26 @@ ptable_help(void)
 	    "-m Interpret the PFN as an MFN (machine frame number)\n");
 }
 
+static const char *const scalehrtime_desc =
+	"Scales a timestamp from ticks to nanoseconds. Unscaled timestamps\n"
+	"are used as both a quick way of accumulating relative time (as for\n"
+	"usage) and as a quick way of getting the absolute current time.\n"
+	"These uses require slightly different scaling algorithms. By\n"
+	"default, if a specified time is greater than half of the unscaled\n"
+	"time at the last tick (that is, if the unscaled time represents\n"
+	"more than half the time since boot), the timestamp is assumed to\n"
+	"be absolute, and the scaling algorithm used mimics that which the\n"
+	"kernel uses in gethrtime(). Otherwise, the timestamp is assumed to\n"
+	"be relative, and the algorithm mimics scalehrtime(). This behavior\n"
+	"can be overridden by forcing the unscaled time to be interpreted\n"
+	"as relative (via -r) or absolute (via -a).\n";
+
+static void
+scalehrtime_help(void)
+{
+	mdb_printf("%s", scalehrtime_desc);
+}
+
 /*
  * NSEC_SHIFT is replicated here (it is not defined in a header file),
  * but for amusement, the reader is directed to the comment that explains
@@ -771,22 +791,31 @@ static int
 scalehrtime_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uint32_t nsec_scale;
-	hrtime_t tsc = addr, hrt;
+	hrtime_t tsc = addr, hrt, tsc_last, base, mult = 1;
 	unsigned int *tscp = (unsigned int *)&tsc;
 	uintptr_t scalehrtimef;
 	uint64_t scale;
 	GElf_Sym sym;
+	int expected = !(flags & DCMD_ADDRSPEC);
+	uint_t absolute = FALSE, relative = FALSE;
 
-	if (!(flags & DCMD_ADDRSPEC)) {
-		if (argc != 1)
-			return (DCMD_USAGE);
+	if (mdb_getopts(argc, argv,
+	    'a', MDB_OPT_SETBITS, TRUE, &absolute,
+	    'r', MDB_OPT_SETBITS, TRUE, &relative, NULL) != argc - expected)
+		return (DCMD_USAGE);
 
-		switch (argv[0].a_type) {
+	if (absolute && relative) {
+		mdb_warn("can't specify both -a and -r\n");
+		return (DCMD_USAGE);
+	}
+
+	if (expected == 1) {
+		switch (argv[argc - 1].a_type) {
 		case MDB_TYPE_STRING:
-			tsc = mdb_strtoull(argv[0].a_un.a_str);
+			tsc = mdb_strtoull(argv[argc - 1].a_un.a_str);
 			break;
 		case MDB_TYPE_IMMEDIATE:
-			tsc = argv[0].a_un.a_val;
+			tsc = argv[argc - 1].a_un.a_val;
 			break;
 		default:
 			return (DCMD_USAGE);
@@ -815,12 +844,40 @@ scalehrtime_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if (mdb_readsym(&tsc_last, sizeof (tsc_last), "tsc_last") == -1) {
+		mdb_warn("couldn't read 'tsc_last'");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readsym(&base, sizeof (base), "tsc_hrtime_base") == -1) {
+		mdb_warn("couldn't read 'tsc_hrtime_base'");
+		return (DCMD_ERR);
+	}
+
+	/*
+	 * If our time is greater than half of tsc_last, we will take our
+	 * delta against tsc_last, convert it, and add that to (or subtract it
+	 * from) tsc_hrtime_base.  This mimics what the kernel actually does
+	 * in gethrtime() (modulo the tsc_sync_tick_delta) and gets us a much
+	 * higher precision result than trying to convert a large tsc value.
+	 */
+	if (absolute || (tsc > (tsc_last >> 1) && !relative)) {
+		if (tsc > tsc_last) {
+			tsc = tsc - tsc_last;
+		} else {
+			tsc = tsc_last - tsc;
+			mult = -1;
+		}
+	} else {
+		base = 0;
+	}
+
 	scale = (uint64_t)nsec_scale;
 
 	hrt = ((uint64_t)tscp[1] * scale) << NSEC_SHIFT;
 	hrt += ((uint64_t)tscp[0] * scale) >> (32 - NSEC_SHIFT);
 
-	mdb_printf("0x%llx\n", hrt);
+	mdb_printf("0x%llx\n", base + (hrt * mult));
 
 	return (DCMD_OK);
 }
@@ -976,8 +1033,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "mfntopfn", ":", "convert hypervisor machine page to physical page",
 	    mfntopfn_dcmd },
 	{ "memseg_list", ":", "show memseg list", memseg_list },
-	{ "scalehrtime", ":",
-	    "scale an unscaled high-res time", scalehrtime_cmd },
+	{ "scalehrtime", ":[-a|-r]", "scale an unscaled high-res time",
+	    scalehrtime_cmd, scalehrtime_help },
 	{ "x86_featureset", NULL, "dump the x86_featureset vector",
 		x86_featureset_cmd },
 #ifdef _KMDB
