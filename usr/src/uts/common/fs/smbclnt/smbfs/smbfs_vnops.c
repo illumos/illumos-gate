@@ -107,8 +107,10 @@ static int	smbfslookup_cache(vnode_t *, char *, int, vnode_t **,
 			cred_t *);
 static int	smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr,
 			int cache_ok, caller_context_t *);
-static int	smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm,
-			cred_t *cr, caller_context_t *);
+static int	smbfsremove(vnode_t *dvp, vnode_t *vp, struct smb_cred *scred,
+			int flags);
+static int	smbfsrename(vnode_t *odvp, vnode_t *ovp, vnode_t *ndvp,
+			char *nnm, struct smb_cred *scred, int flags);
 static int	smbfssetattr(vnode_t *, struct vattr *, int, cred_t *);
 static int	smbfs_accessx(void *, int, cred_t *);
 static int	smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
@@ -1437,6 +1439,17 @@ smbfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	smb_credrele(&scred);
 	smbfs_rw_exit(&np->r_lkserlock);
 
+	/*
+	 * XATTR directories (and the files under them) have
+	 * little value for reclaim, so just remove them from
+	 * the "hash" (AVL) as soon as they go inactive.
+	 * Note that the node may already have been removed
+	 * from the hash by smbfsremove.
+	 */
+	if ((np->n_flag & N_XATTR) != 0 &&
+	    (np->r_flags & RHASHED) != 0)
+		smbfs_rmhash(np);
+
 	smbfs_addfree(np);
 }
 
@@ -1873,11 +1886,6 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	smb_credinit(&scred, cr);
 
 	/*
-	 * XXX: Do we need r_lkserlock too?
-	 * No use of any shared fid or fctx...
-	 */
-
-	/*
 	 * NFS needs to go over the wire, just to be sure whether the
 	 * file exists or not.  Using a cached result is dangerous in
 	 * this case when making a decision regarding existence.
@@ -2055,15 +2063,11 @@ static int
 smbfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 	int flags)
 {
-	int		error;
-	vnode_t		*vp;
-	smbnode_t	*np;
-	smbnode_t	*dnp;
 	struct smb_cred	scred;
-	/* enum smbfsstat status; */
-	smbmntinfo_t	*smi;
-
-	smi = VTOSMI(dvp);
+	vnode_t		*vp = NULL;
+	smbnode_t	*dnp = VTOSMB(dvp);
+	smbmntinfo_t	*smi = VTOSMI(dvp);
+	int		error;
 
 	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
@@ -2071,77 +2075,158 @@ smbfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 	if (smi->smi_flags & SMI_DEAD || dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
 		return (EIO);
 
-	dnp = VTOSMB(dvp);
-	if (smbfs_rw_enter_sig(&dnp->r_rwlock, RW_WRITER, SMBINTR(dvp)))
-		return (EINTR);
-	smb_credinit(&scred, cr);
-
 	/*
 	 * Verify access to the dirctory.
 	 */
 	error = smbfs_access(dvp, VWRITE|VEXEC, 0, cr, ct);
 	if (error)
-		goto out;
+		return (error);
 
-	/*
-	 * NOTE:  the darwin code gets the "vp" passed in so it looks
-	 * like the "vp" has probably been "lookup"ed by the VFS layer.
-	 * It looks like we will need to lookup the vp to check the
-	 * caches and check if the object being deleted is a directory.
-	 */
+	if (smbfs_rw_enter_sig(&dnp->r_rwlock, RW_WRITER, SMBINTR(dvp)))
+		return (EINTR);
+	smb_credinit(&scred, cr);
+
+	/* Lookup the file to remove. */
 	error = smbfslookup(dvp, nm, &vp, cr, 0, ct);
-	if (error)
-		goto out;
-
-	/* Never allow link/unlink directories on CIFS. */
-	if (vp->v_type == VDIR) {
+	if (error == 0) {
+		/*
+		 * Do the real remove work
+		 */
+		error = smbfsremove(dvp, vp, &scred, flags);
 		VN_RELE(vp);
-		error = EPERM;
-		goto out;
 	}
 
+	smb_credrele(&scred);
+	smbfs_rw_exit(&dnp->r_rwlock);
+
+	return (error);
+}
+
+/*
+ * smbfsremove does the real work of removing in SMBFS
+ * Caller has done dir access checks etc.
+ *
+ * The normal way to delete a file over SMB is open it (with DELETE access),
+ * set the "delete-on-close" flag, and close the file.  The problem for Unix
+ * applications is that they expect the file name to be gone once the unlink
+ * completes, and the SMB server does not actually delete the file until ALL
+ * opens of that file are closed.  We can't assume our open handles are the
+ * only open handles on a file we're deleting, so to be safe we'll try to
+ * rename the file to a temporary name and then set delete-on-close.  If we
+ * fail to set delete-on-close (i.e. because other opens prevent it) then
+ * undo the changes we made and give up with EBUSY.  Note that we might have
+ * permission to delete a file but lack permission to rename, so we want to
+ * continue in cases where rename fails.  As an optimization, only do the
+ * rename when we have the file open.
+ *
+ * This is similar to what NFS does when deleting a file that has local opens,
+ * but thanks to SMB delete-on-close, we don't need to keep track of when the
+ * last local open goes away and send a delete.  The server does that for us.
+ */
+/* ARGSUSED */
+static int
+smbfsremove(vnode_t *dvp, vnode_t *vp, struct smb_cred *scred,
+    int flags)
+{
+	smbnode_t	*dnp = VTOSMB(dvp);
+	smbnode_t	*np = VTOSMB(vp);
+	char		*tmpname = NULL;
+	int		tnlen;
+	int		error;
+	unsigned short	fid;
+	boolean_t	have_fid = B_FALSE;
+	boolean_t	renamed = B_FALSE;
+
 	/*
-	 * Now we have the real reference count on the vnode
-	 * Do we have the file open?
+	 * The dvp RWlock must be held as writer.
 	 */
-	np = VTOSMB(vp);
-	mutex_enter(&np->r_statelock);
+	ASSERT(dnp->r_rwlock.owner == curthread);
+
+	/* Never allow link/unlink directories on SMB. */
+	if (vp->v_type == VDIR)
+		return (EPERM);
+
+	/* Shared lock for n_fid use in smbfs_smb_setdisp etc. */
+	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
+		return (EINTR);
+
+	/* Force lookup to go OtW */
+	smbfs_attrcache_remove(np);
+
+	/*
+	 * Get a file handle with delete access.
+	 * Close this FID before return.
+	 */
+	error = smbfs_smb_tmpopen(np, STD_RIGHT_DELETE_ACCESS,
+	    scred, &fid);
+	if (error) {
+		SMBVDEBUG("error %d opening %s\n",
+		    error, np->n_rpath);
+		goto out;
+	}
+	have_fid = B_TRUE;
+
+	/*
+	 * If we have the file open, try to rename it to a temporary name.
+	 * If we can't rename, continue on and try setting DoC anyway.
+	 */
 	if ((vp->v_count > 1) && (np->n_fidrefs > 0)) {
-		/*
-		 * NFS does a rename on remove here.
-		 * Probably not applicable for SMB.
-		 * Like Darwin, just return EBUSY.
-		 *
-		 * XXX: Todo - Use Trans2rename, and
-		 * if that fails, ask the server to
-		 * set the delete-on-close flag.
-		 */
-		mutex_exit(&np->r_statelock);
-		error = EBUSY;
-	} else {
-		smbfs_attrcache_rm_locked(np);
-		mutex_exit(&np->r_statelock);
-
-		error = smbfs_smb_delete(np, &scred, NULL, 0, 0);
-
-		/*
-		 * If the file should no longer exist, discard
-		 * any cached attributes under this node.
-		 */
-		switch (error) {
-		case 0:
-		case ENOENT:
-		case ENOTDIR:
-			smbfs_attrcache_prune(np);
-			break;
+		tmpname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		tnlen = smbfs_newname(tmpname, MAXNAMELEN);
+		error = smbfs_smb_t2rename(np, tmpname, tnlen, scred, fid, 0);
+		if (error != 0) {
+			SMBVDEBUG("error %d renaming %s -> %s\n",
+				  error, np->n_rpath, tmpname);
+			/* Keep going without the rename. */
+		} else {
+			renamed = B_TRUE;
 		}
 	}
 
-	VN_RELE(vp);
+	/*
+	 * Mark the file as delete-on-close.  If we can't,
+	 * undo what we did and err out.
+	 */
+	error = smbfs_smb_setdisp(np, fid, 1, scred);
+	if (error != 0) {
+		SMBVDEBUG("error %d setting DoC on %s\n",
+		    error, np->n_rpath);
+		/*
+		 * Failed to set DoC. If we renamed, undo that.
+		 * Need np->n_rpath relative to parent (dnp).
+		 * Use parent path name length plus one for
+		 * the separator ('/' or ':')
+		 */
+		if (renamed) {
+			char *oldname;
+			int oldnlen;
+			int err2;
+
+			oldname = np->n_rpath + (dnp->n_rplen + 1);
+			oldnlen = np->n_rplen - (dnp->n_rplen + 1);
+			err2 = smbfs_smb_t2rename(np, oldname, oldnlen,
+			    scred, fid, 0);
+			SMBVDEBUG("error %d un-renaming %s -> %s\n",
+			  err2, tmpname, np->n_rpath);
+		}
+		error = EBUSY;
+		goto out;
+	}
+	/* Done! */
+	smbfs_attrcache_prune(np);
 
 out:
-	smb_credrele(&scred);
-	smbfs_rw_exit(&dnp->r_rwlock);
+	if (tmpname != NULL)
+		kmem_free(tmpname, MAXNAMELEN);
+
+	if (have_fid)
+		(void) smbfs_smb_tmpclose(np, fid, scred);
+	smbfs_rw_exit(&np->r_lkserlock);
+
+	if (error == 0) {
+		/* Keep lookup from finding this node anymore. */
+		smbfs_rmhash(np);
+	}
 
 	return (error);
 }
@@ -2157,7 +2242,11 @@ static int
 smbfs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 	caller_context_t *ct, int flags)
 {
-	/* vnode_t		*realvp; */
+	struct smb_cred	scred;
+	smbnode_t	*odnp = VTOSMB(odvp);
+	smbnode_t	*ndnp = VTOSMB(ndvp);
+	vnode_t		*ovp;
+	int error;
 
 	if (curproc->p_zone != VTOSMI(odvp)->smi_zone_ref.zref_zone ||
 	    curproc->p_zone != VTOSMI(ndvp)->smi_zone_ref.zref_zone)
@@ -2168,30 +2257,6 @@ smbfs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 	    odvp->v_vfsp->vfs_flag & VFS_UNMOUNTED ||
 	    ndvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
 		return (EIO);
-
-	return (smbfsrename(odvp, onm, ndvp, nnm, cr, ct));
-}
-
-/*
- * smbfsrename does the real work of renaming in SMBFS
- */
-/* ARGSUSED */
-static int
-smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
-	caller_context_t *ct)
-{
-	int		error;
-	int		nvp_locked = 0;
-	vnode_t		*nvp = NULL;
-	vnode_t		*ovp = NULL;
-	smbnode_t	*onp;
-	smbnode_t	*nnp;
-	smbnode_t	*odnp;
-	smbnode_t	*ndnp;
-	struct smb_cred	scred;
-	/* enum smbfsstat	status; */
-
-	ASSERT(curproc->p_zone == VTOSMI(odvp)->smi_zone_ref.zref_zone);
 
 	if (strcmp(onm, ".") == 0 || strcmp(onm, "..") == 0 ||
 	    strcmp(nnm, ".") == 0 || strcmp(nnm, "..") == 0)
@@ -2205,10 +2270,22 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 	if (odvp->v_vfsp != ndvp->v_vfsp)
 		return (EXDEV);
 
-	odnp = VTOSMB(odvp);
-	ndnp = VTOSMB(ndvp);
+	/*
+	 * Need write access on source and target.
+	 * Server takes care of most checks.
+	 */
+	error = smbfs_access(odvp, VWRITE|VEXEC, 0, cr, ct);
+	if (error)
+		return (error);
+	if (odvp != ndvp) {
+		error = smbfs_access(ndvp, VWRITE, 0, cr, ct);
+		if (error)
+			return (error);
+	}
 
 	/*
+	 * Need to lock both old/new dirs as writer.
+	 *
 	 * Avoid deadlock here on old vs new directory nodes
 	 * by always taking the locks in order of address.
 	 * The order is arbitrary, but must be consistent.
@@ -2233,36 +2310,52 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 		}
 	}
 	smb_credinit(&scred, cr);
-	/*
-	 * No returns after this point (goto out)
-	 */
 
-	/*
-	 * Need write access on source and target.
-	 * Server takes care of most checks.
-	 */
-	error = smbfs_access(odvp, VWRITE|VEXEC, 0, cr, ct);
-	if (error)
-		goto out;
-	if (odvp != ndvp) {
-		error = smbfs_access(ndvp, VWRITE, 0, cr, ct);
-		if (error)
-			goto out;
+	/* Lookup the "old" name */
+	error = smbfslookup(odvp, onm, &ovp, cr, 0, ct);
+	if (error == 0) {
+		/*
+		 * Do the real rename work
+		 */
+		error = smbfsrename(odvp, ovp, ndvp, nnm, &scred, flags);
+		VN_RELE(ovp);
 	}
 
-	/*
-	 * Lookup the source name.  Must already exist.
-	 */
-	error = smbfslookup(odvp, onm, &ovp, cr, 0, ct);
-	if (error)
-		goto out;
+	smb_credrele(&scred);
+	smbfs_rw_exit(&odnp->r_rwlock);
+	smbfs_rw_exit(&ndnp->r_rwlock);
+
+	return (error);
+}
+
+/*
+ * smbfsrename does the real work of renaming in SMBFS
+ * Caller has done dir access checks etc.
+ */
+/* ARGSUSED */
+static int
+smbfsrename(vnode_t *odvp, vnode_t *ovp, vnode_t *ndvp, char *nnm,
+    struct smb_cred *scred, int flags)
+{
+	smbnode_t	*odnp = VTOSMB(odvp);
+	smbnode_t	*onp = VTOSMB(ovp);
+	smbnode_t	*ndnp = VTOSMB(ndvp);
+	vnode_t		*nvp = NULL;
+	int		error;
+	int		nvp_locked = 0;
+
+	/* Things our caller should have checked. */
+	ASSERT(curproc->p_zone == VTOSMI(odvp)->smi_zone_ref.zref_zone);
+	ASSERT(odvp->v_vfsp == ndvp->v_vfsp);
+	ASSERT(odnp->r_rwlock.owner == curthread);
+	ASSERT(ndnp->r_rwlock.owner == curthread);
 
 	/*
 	 * Lookup the target file.  If it exists, it needs to be
 	 * checked to see whether it is a mount point and whether
 	 * it is active (open).
 	 */
-	error = smbfslookup(ndvp, nnm, &nvp, cr, 0, ct);
+	error = smbfslookup(ndvp, nnm, &nvp, scred->scr_cred, 0, NULL);
 	if (!error) {
 		/*
 		 * Target (nvp) already exists.  Check that it
@@ -2307,7 +2400,7 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 		}
 
 		/*
-		 * CIFS gives a SHARING_VIOLATION error when
+		 * CIFS may give a SHARING_VIOLATION error when
 		 * trying to rename onto an exising object,
 		 * so try to remove the target first.
 		 * (Only for files, not directories.)
@@ -2316,49 +2409,10 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 			error = EEXIST;
 			goto out;
 		}
-
-		/*
-		 * Nodes that are "not active" here have v_count=2
-		 * because vn_renameat (our caller) did a lookup on
-		 * both the source and target before this call.
-		 * Otherwise this similar to smbfs_remove.
-		 */
-		nnp = VTOSMB(nvp);
-		mutex_enter(&nnp->r_statelock);
-		if ((nvp->v_count > 2) && (nnp->n_fidrefs > 0)) {
-			/*
-			 * The target file exists, is not the same as
-			 * the source file, and is active.  Other FS
-			 * implementations unlink the target here.
-			 * For SMB, we don't assume we can remove an
-			 * open file.  Return an error instead.
-			 */
-			mutex_exit(&nnp->r_statelock);
-			error = EBUSY;
+		error = smbfsremove(ndvp, nvp, scred, flags);
+		if (error != 0)
 			goto out;
-		}
 
-		/*
-		 * Target file is not active. Try to remove it.
-		 */
-		smbfs_attrcache_rm_locked(nnp);
-		mutex_exit(&nnp->r_statelock);
-
-		error = smbfs_smb_delete(nnp, &scred, NULL, 0, 0);
-
-		/*
-		 * Similar to smbfs_remove
-		 */
-		switch (error) {
-		case 0:
-		case ENOENT:
-		case ENOTDIR:
-			smbfs_attrcache_prune(nnp);
-			break;
-		}
-
-		if (error)
-			goto out;
 		/*
 		 * OK, removed the target file.  Continue as if
 		 * lookup target had failed (nvp == NULL).
@@ -2369,10 +2423,9 @@ smbfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr,
 		nvp = NULL;
 	} /* nvp */
 
-	onp = VTOSMB(ovp);
 	smbfs_attrcache_remove(onp);
 
-	error = smbfs_smb_rename(onp, ndnp, nnm, strlen(nnm), &scred);
+	error = smbfs_smb_rename(onp, ndnp, nnm, strlen(nnm), scred);
 
 	/*
 	 * If the old name should no longer exist,
@@ -2387,12 +2440,6 @@ out:
 			vn_vfsunlock(nvp);
 		VN_RELE(nvp);
 	}
-	if (ovp)
-		VN_RELE(ovp);
-
-	smb_credrele(&scred);
-	smbfs_rw_exit(&odnp->r_rwlock);
-	smbfs_rw_exit(&ndnp->r_rwlock);
 
 	return (error);
 }

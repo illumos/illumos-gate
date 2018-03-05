@@ -622,25 +622,57 @@ smbfs_smb_seteof(struct smb_share *ssp, uint16_t fid, uint64_t newsize,
 	return (error);
 }
 
+int
+smbfs_smb_setdisp(struct smbnode *np,
+ uint16_t fid, uint8_t newdisp,
+			struct smb_cred *scrp)
+{
+	struct smb_t2rq *t2p;
+	struct smb_share *ssp = np->n_mount->smi_share;
+	struct smb_vc *vcp = SSTOVC(ssp);
+	struct mbchain *mbp;
+	int error;
+
+	error = smb_t2_alloc(SSTOCP(ssp), SMB_TRANS2_SET_FILE_INFORMATION,
+	    scrp, &t2p);
+	if (error)
+		return (error);
+	mbp = &t2p->t2_tparam;
+	mb_init(mbp);
+	mb_put_uint16le(mbp, fid);
+	if (vcp->vc_sopt.sv_caps & SMB_CAP_INFOLEVEL_PASSTHRU)
+		mb_put_uint16le(mbp, SMB_SFILEINFO_DISPOSITION_INFORMATION);
+	else
+		mb_put_uint16le(mbp, SMB_SFILEINFO_DISPOSITION_INFO);
+	mb_put_uint16le(mbp, 0); /* pad */
+	mbp = &t2p->t2_tdata;
+	mb_init(mbp);
+	mb_put_uint8(mbp, newdisp);
+	t2p->t2_maxpcount = 2;
+	t2p->t2_maxdcount = 0;
+	error = smb_t2_request(t2p);
+	smb_t2_done(t2p);
+	return (error);
+}
+
+/*
+ * On SMB1, the trans2 rename only allows a rename where the
+ * source and target are in the same directory.  If you give
+ * the server any separators, you get "status not supported".
+ */
+
 /*ARGSUSED*/
 int
-smbfs_smb_t2rename(struct smbnode *np, struct smbnode *tdnp,
-	const char *tname, int tnmlen, struct smb_cred *scrp, int overwrite)
+smbfs_smb_t2rename(struct smbnode *np,
+	const char *tname, int tnlen, struct smb_cred *scrp,
+	uint16_t fid, int overwrite)
 {
 	struct smb_t2rq *t2p;
 	struct smb_share *ssp = np->n_mount->smi_share;
 	struct smb_vc *vcp = SSTOVC(ssp);
 	struct mbchain *mbp;
 	int32_t *ucslenp;
-	int error, cerror;
-	uint16_t fid = 0;
-
-	/* Shared lock for n_fid use below. */
-	ASSERT(smbfs_rw_lock_held(&np->r_lkserlock, RW_READER));
-
-	/* After reconnect, n_fid is invalid */
-	if (np->n_vcgenid != ssp->ss_vcgenid)
-		return (ESTALE);
+	int error;
 
 	if (!(vcp->vc_sopt.sv_caps & SMB_CAP_INFOLEVEL_PASSTHRU))
 		return (ENOTSUP);
@@ -648,39 +680,29 @@ smbfs_smb_t2rename(struct smbnode *np, struct smbnode *tdnp,
 	    scrp, &t2p);
 	if (error)
 		return (error);
-	if (tdnp) {
-		error = smbfs_smb_tmpopen(tdnp, SA_RIGHT_FILE_READ_DATA, scrp,
-		    &fid);
-		if (error)
-			goto exit;
-	}
+
 	mbp = &t2p->t2_tparam;
 	mb_init(mbp);
-	mb_put_uint16le(mbp, np->n_fid);
+	mb_put_uint16le(mbp, fid);
 	mb_put_uint16le(mbp, SMB_SFILEINFO_RENAME_INFORMATION);
 	mb_put_uint16le(mbp, 0); /* reserved, nowadays */
+
 	mbp = &t2p->t2_tdata;
 	mb_init(mbp);
-	mb_put_uint32le(mbp, overwrite);
-	mb_put_uint16le(mbp, fid); /* base for tname */
-	mb_put_uint16le(mbp, 0); /* part of a 32bit fid? */
+	mb_put_uint32le(mbp, overwrite); /* one or zero */
+	mb_put_uint32le(mbp, 0); /* obsolete target dir fid */
+
 	ucslenp = (int32_t *)mb_reserve(mbp, sizeof (int32_t));
 	mbp->mb_count = 0;
-	error = smb_put_dstring(mbp, vcp, tname, SMB_CS_NONE);
+	error = smb_put_dmem(mbp, vcp, tname, tnlen, SMB_CS_NONE, NULL);
 	if (error)
-		goto exit;
-	mbp->mb_count--;	/* don't count the null */
+		goto out;
 	*ucslenp = htolel(mbp->mb_count);
+
 	t2p->t2_maxpcount = 2;
 	t2p->t2_maxdcount = 0;
 	error = smb_t2_request(t2p);
-exit:
-	if (fid) {
-		cerror = smbfs_smb_tmpclose(tdnp, fid, scrp);
-		if (cerror)
-			SMBVDEBUG("error %d closing %s\n",
-			    cerror, tdnp->n_rpath);
-	}
+out:
 	smb_t2_done(t2p);
 	return (error);
 }

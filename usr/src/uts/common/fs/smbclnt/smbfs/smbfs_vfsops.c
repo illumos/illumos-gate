@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
@@ -74,6 +75,17 @@
 #include <smbfs/smbfs_subr.h>
 
 /*
+ * Should smbfs mount enable "-o acl" by default?  There are good
+ * arguments for both.  The most common use case is individual users
+ * accessing files on some SMB server, for which "noacl" is the more
+ * convenient default.  A less common use case is data migration,
+ * where the "acl" option might be a desirable default.  We'll make
+ * the common use case the default.  This default can be changed via
+ * /etc/system, and/or set per-mount via the "acl" mount option.
+ */
+int smbfs_default_opt_acl = 0;
+
+/*
  * Local functions definitions.
  */
 int		smbfsinit(int fstyp, char *name);
@@ -100,7 +112,7 @@ static mntopt_t mntopts[] = {
  */
 	{ MNTOPT_INTR,		intr_cancel,	NULL,	MO_DEFAULT, 0 },
 	{ MNTOPT_NOINTR,	nointr_cancel,	NULL,	0,	0 },
-	{ MNTOPT_ACL,		acl_cancel,	NULL,	MO_DEFAULT, 0 },
+	{ MNTOPT_ACL,		acl_cancel,	NULL,	0,	0 },
 	{ MNTOPT_NOACL,		noacl_cancel,	NULL,	0,	0 },
 	{ MNTOPT_XATTR,		xattr_cancel,	NULL,	MO_DEFAULT, 0 },
 	{ MNTOPT_NOXATTR,	noxattr_cancel, NULL,	0,	0 }
@@ -506,11 +518,15 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * All "generic" mount options have already been
 	 * handled in vfs.c:domount() - see mntopts stuff.
 	 * Query generic options using vfs_optionisset().
+	 * Give ACL an adjustable system-wide default.
 	 */
+	if (smbfs_default_opt_acl ||
+	    vfs_optionisset(vfsp, MNTOPT_ACL, NULL))
+		smi->smi_flags |= SMI_ACL;
+	if (vfs_optionisset(vfsp, MNTOPT_NOACL, NULL))
+		smi->smi_flags &= ~SMI_ACL;
 	if (vfs_optionisset(vfsp, MNTOPT_INTR, NULL))
 		smi->smi_flags |= SMI_INT;
-	if (vfs_optionisset(vfsp, MNTOPT_ACL, NULL))
-		smi->smi_flags |= SMI_ACL;
 
 	/*
 	 * Get the mount options that come in as smbfs_args,

@@ -746,12 +746,14 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 		case 'u':
 		case 'U':
 			longmax = LDBL_ULLONG_MAX;
+			/* FALLTHROUGH */
 		case '.':
 			if(fe->size==2 && strchr("bcsqHPRQTZ",*fe->form))
 			{
 				value->ll = ((unsigned char*)argp)[0];
 				break;
 			}
+			/* FALLTHROUGH */
 		case 'd':
 		case 'D':
 		case 'i':
@@ -1010,6 +1012,7 @@ static int fmtvecho(const char *string, struct printf *pp)
 					c <<= 3;
 					c |= (*cp-'0');
 				}
+				/* FALLTHROUGH */
 			default:
 				cp--;
 		}

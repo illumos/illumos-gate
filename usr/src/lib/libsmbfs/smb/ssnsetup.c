@@ -441,17 +441,14 @@ smb__ssnsetup(struct smb_ctx *ctx,
 	err = 0;
 
 	/*
-	 * Windows systems don't suport CAP_LARGE_READX,WRITEX
-	 * when signing is enabled, so adjust sv_caps.
+	 * MS-SMB 2.2.4.5 clarifies that when SMB signing is enabled,
+	 * the client should NOT use "large read/write" even though
+	 * the server might offer those capabilities.
 	 */
-	if (ctx->ct_srv_OS &&
-	    0 == strncmp(ctx->ct_srv_OS, "Windows ", 8)) {
-		DPRINT("Server is Windows");
-		if (ctx->ct_vcflags & SMBV_WILL_SIGN) {
-			DPRINT("disable CAP_LARGE_(r/w)");
-			ctx->ct_sopt.sv_caps &=
-			    ~(SMB_CAP_LARGE_READX | SMB_CAP_LARGE_WRITEX);
-		}
+	if (ctx->ct_vcflags & SMBV_WILL_SIGN) {
+		DPRINT("signing, so disable CAP_LARGE_(r/w)");
+		ctx->ct_sopt.sv_caps &=
+		    ~(SMB_CAP_LARGE_READX | SMB_CAP_LARGE_WRITEX);
 	}
 
 out:

@@ -28,8 +28,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "stdio.h"
@@ -212,7 +210,7 @@ getfields(int fd, char *fields[], char *buf, int bufsiz, int max, char *seps)
 						break;
 					}
 					eMode = NORMAL_PARSING;
-					/* drop through to NORMAL_PARSING case */
+					/* FALLTHROUGH */
 
 				case NORMAL_PARSING: /* default legacy editing */
 					if (*p == '\\') {

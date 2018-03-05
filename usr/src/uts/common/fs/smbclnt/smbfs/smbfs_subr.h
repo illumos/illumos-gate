@@ -161,6 +161,9 @@ int  smbfs_smb_qfsattr(struct smb_share *ssp, struct smb_fs_attr_info *,
 	struct smb_cred *scrp);
 int  smbfs_smb_statfs(struct smb_share *ssp, statvfs64_t *sbp,
 	struct smb_cred *scrp);
+
+int  smbfs_smb_setdisp(struct smbnode *np, uint16_t fid, uint8_t newdisp,
+	struct smb_cred *scrp);
 int  smbfs_smb_setfsize(struct smbnode *np, uint16_t fid, uint64_t newsize,
 	struct smb_cred *scrp);
 
@@ -186,8 +189,8 @@ int  smbfs_smb_delete(struct smbnode *np, struct smb_cred *scrp,
 	const char *name, int len, int xattr);
 int  smbfs_smb_rename(struct smbnode *src, struct smbnode *tdnp,
 	const char *tname, int tnmlen, struct smb_cred *scrp);
-int  smbfs_smb_t2rename(struct smbnode *np, struct smbnode *tdnp,
-	const char *tname, int tnmlen, struct smb_cred *scrp, int overwrite);
+int  smbfs_smb_t2rename(struct smbnode *np, const char *tname, int tnmlen,
+	struct smb_cred *scrp, uint16_t fid, int replace);
 int  smbfs_smb_move(struct smbnode *src, struct smbnode *tdnp,
 	const char *tname, int tnmlen, uint16_t flags, struct smb_cred *scrp);
 int  smbfs_smb_mkdir(struct smbnode *dnp, const char *name, int len,
@@ -234,6 +237,9 @@ void smbfs_zonelist_remove(smbmntinfo_t *smi);
 int smbfs_check_table(struct vfs *vfsp, struct smbnode *srp);
 void smbfs_destroy_table(struct vfs *vfsp);
 void smbfs_rflush(struct vfs *vfsp, cred_t *cr);
+
+uint32_t smbfs_newnum(void);
+int smbfs_newname(char *buf, size_t buflen);
 
 /*
  * Function definitions - those having to do with
