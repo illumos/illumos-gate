@@ -102,8 +102,8 @@ MODSTUBS		= $(UTSBASE)/intel/ia32/ml/modstubs.s
 #
 #	Define supported builds
 #
-DEF_BUILDS		= $(DEF_BUILDS64) $(DEF_BUILDS32)
-ALL_BUILDS		= $(ALL_BUILDS64) $(ALL_BUILDS32)
+DEF_BUILDS		= $(DEF_BUILDS64)
+ALL_BUILDS		= $(ALL_BUILDS64)
 
 #
 #	x86 or amd64 inline templates
