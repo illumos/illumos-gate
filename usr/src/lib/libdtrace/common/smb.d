@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #pragma	D depends_on library ip.d
@@ -58,6 +58,7 @@ typedef struct smbopinfo {
 	uint16_t soi_fid;		/* file id */
 	uint16_t soi_flags2;		/* flags2 */
 	uint8_t  soi_flags;		/* flags */
+	zoneid_t soi_zoneid;		/* zone identifier */
 } smbopinfo_t;
 
 #pragma D binding "1.5" translator
@@ -72,6 +73,7 @@ translator smbopinfo_t < struct smb_request *P > {
 	soi_fid		= P->smb_fid;
 	soi_flags2	= P->smb_flg2;
 	soi_flags	= P->smb_flg;
+	soi_zoneid	= P->sr_server->sv_zid;
 
 	soi_share = (P->tid_tree == NULL) ? "<NULL>" :
 	    P->tid_tree->t_sharename;
@@ -137,6 +139,7 @@ typedef struct smb2opinfo {
 	uint32_t soi_tid;		/* tree ID */
 	uint32_t soi_status;
 	uint32_t soi_flags;
+	zoneid_t soi_zoneid;		/* zone identifier */
 } smb2opinfo_t;
 
 #pragma D binding "1.5" translator
@@ -149,6 +152,7 @@ translator smb2opinfo_t < struct smb_request *P > {
 	soi_tid		= P->smb_tid;
 	soi_status	= P->smb2_status;
 	soi_flags	= P->smb2_hdr_flags;
+	soi_zoneid	= P->sr_server->sv_zid;
 
 	soi_share = (P->tid_tree == NULL) ? "<NULL>" :
 	    P->tid_tree->t_sharename;

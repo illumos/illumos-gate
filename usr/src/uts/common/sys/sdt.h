@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_SDT_H
@@ -231,10 +231,16 @@ extern "C" {
     type3, arg3)							\
 	DTRACE_PROBE3(__nfsv3_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3);
+
 #define	DTRACE_NFSV3_4(name, type1, arg1, type2, arg2,			\
     type3, arg3, type4, arg4)						\
 	DTRACE_PROBE4(__nfsv3_##name, type1, arg1, type2, arg2,		\
 	    type3, arg3, type4, arg4);
+
+#define	DTRACE_NFSV3_5(name, type1, arg1, type2, arg2,			\
+    type3, arg3, type4, arg4, type5, arg5)				\
+	DTRACE_PROBE5(__nfsv3_##name, type1, arg1, type2, arg2,		\
+	    type3, arg3, type4, arg4, type5, arg5);
 
 #define	DTRACE_NFSV4_1(name, type1, arg1) \
 	DTRACE_PROBE1(__nfsv4_##name, type1, arg1);

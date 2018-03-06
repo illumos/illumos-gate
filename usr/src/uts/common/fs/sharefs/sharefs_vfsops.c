@@ -23,6 +23,10 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2018 Nexenta Systems, Inc.
+ */
+
 #include <sys/atomic.h>
 #include <sys/cmn_err.h>
 #include <sys/errno.h>
@@ -241,16 +245,6 @@ sharefs_unmount(vfs_t *vfsp, int flag, struct cred *cr)
 	data = vfsp->vfs_data;
 	if (data->sharefs_vfs_root->v_count > 1)
 		return (EBUSY);
-
-	/*
-	 * Only allow an unmount iff there are no entries in memory.
-	 */
-	rw_enter(&sharetab_lock, RW_READER);
-	if (sharetab_size != 0) {
-		rw_exit(&sharetab_lock);
-		return (EBUSY);
-	}
-	rw_exit(&sharetab_lock);
 
 	/*
 	 * Release the last hold on the root vnode

@@ -18,8 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/*
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 #include <sys/systm.h>
@@ -249,6 +254,50 @@ rfs4_database_destroy(rfs4_database_t *db)
 	kmem_free(db, sizeof (rfs4_database_t));
 }
 
+/*
+ * Used to get the correct kmem_cache database for the state table being
+ * created.
+ * Helper function for rfs4_table_create
+ */
+static kmem_cache_t *
+get_db_mem_cache(char *name)
+{
+	int i;
+
+	for (i = 0; i < RFS4_DB_MEM_CACHE_NUM; i++) {
+		if (strcmp(name, rfs4_db_mem_cache_table[i].r_db_name) == 0)
+			return (rfs4_db_mem_cache_table[i].r_db_mem_cache);
+	}
+	/*
+	 * There is no associated kmem cache for this NFS4 server state
+	 * table name
+	 */
+	return (NULL);
+}
+
+/*
+ * Used to initialize the global NFSv4 server state database.
+ * Helper funtion for rfs4_state_g_init and called when module is loaded.
+ */
+kmem_cache_t *
+/* CSTYLED */
+nfs4_init_mem_cache(char *cache_name, uint32_t idxcnt, uint32_t size, uint32_t idx)
+{
+	kmem_cache_t *mem_cache = kmem_cache_create(cache_name,
+	    sizeof (rfs4_dbe_t) + idxcnt * sizeof (rfs4_link_t) + size,
+	    0,
+	    rfs4_dbe_kmem_constructor,
+	    rfs4_dbe_kmem_destructor,
+	    NULL,
+	    NULL,
+	    NULL,
+	    0);
+	(void) strlcpy(rfs4_db_mem_cache_table[idx].r_db_name, cache_name,
+	    strlen(cache_name) + 1);
+	rfs4_db_mem_cache_table[idx].r_db_mem_cache = mem_cache;
+	return (mem_cache);
+}
+
 rfs4_table_t *
 rfs4_table_create(rfs4_database_t *db, char *tabname, time_t max_cache_time,
     uint32_t idxcnt, bool_t (*create)(rfs4_entry_t, void *),
@@ -304,15 +353,11 @@ rfs4_table_create(rfs4_database_t *db, char *tabname, time_t max_cache_time,
 	table->dbt_destroy = destroy;
 	table->dbt_expiry = expiry;
 
-	table->dbt_mem_cache = kmem_cache_create(cache_name,
-	    sizeof (rfs4_dbe_t) + idxcnt * sizeof (rfs4_link_t) + size,
-	    0,
-	    rfs4_dbe_kmem_constructor,
-	    rfs4_dbe_kmem_destructor,
-	    NULL,
-	    table,
-	    NULL,
-	    0);
+	/*
+	 * get the correct kmem_cache for this table type based on the name.
+	 */
+	table->dbt_mem_cache = get_db_mem_cache(cache_name);
+
 	kmem_free(cache_name, len+13);
 
 	table->dbt_debug = db->db_debug_flags;
@@ -364,7 +409,7 @@ rfs4_table_destroy(rfs4_database_t *db, rfs4_table_t *table)
 	kmem_free(table->dbt_name, strlen(table->dbt_name) + 1);
 	if (table->dbt_id_space)
 		id_space_destroy(table->dbt_id_space);
-	kmem_cache_destroy(table->dbt_mem_cache);
+	table->dbt_mem_cache = NULL;
 	kmem_free(table, sizeof (rfs4_table_t));
 }
 
@@ -683,11 +728,13 @@ retry:
 boolean_t
 rfs4_cpr_callb(void *arg, int code)
 {
-	rfs4_table_t *table = rfs4_client_tab;
 	rfs4_bucket_t *buckets, *bp;
 	rfs4_link_t *l;
 	rfs4_client_t *cp;
 	int i;
+
+	nfs4_srv_t *nsrv4 = nfs4_get_srv();
+	rfs4_table_t *table = nsrv4->rfs4_client_tab;
 
 	/*
 	 * We get called for Suspend and Resume events.
@@ -879,6 +926,7 @@ reaper_thread(caddr_t *arg)
 	table->dbt_db->db_shutdown_count--;
 	cv_signal(&table->dbt_db->db_shutdown_wait);
 	mutex_exit(table->dbt_db->db_lock);
+	zthread_exit();
 }
 
 static void
@@ -887,7 +935,7 @@ rfs4_start_reaper(rfs4_table_t *table)
 	if (table->dbt_max_cache_time == 0)
 		return;
 
-	(void) thread_create(NULL, 0, reaper_thread, table, 0, &p0, TS_RUN,
+	(void) zthread_create(NULL, 0, reaper_thread, table, 0,
 	    minclsyspri);
 }
 

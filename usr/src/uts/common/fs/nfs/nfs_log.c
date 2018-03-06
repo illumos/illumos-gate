@@ -18,8 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+ */
+
+/*
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 #include <sys/cred.h>
@@ -42,8 +47,6 @@
 
 #define	NUM_RECORDS_TO_WRITE 256
 #define	NUM_BYTES_TO_WRITE 65536
-
-extern krwlock_t exported_lock;
 
 static int nfslog_num_records_to_write = NUM_RECORDS_TO_WRITE;
 static int nfslog_num_bytes_to_write = NUM_BYTES_TO_WRITE;
@@ -595,11 +598,8 @@ log_file_rele(struct log_file *lfp)
  */
 /* ARGSUSED */
 void *
-nfslog_record_alloc(
-	struct exportinfo *exi,
-	int alloc_indx,
-	void **cookie,
-	int flags)
+nfslog_record_alloc(struct exportinfo *exi, int alloc_indx, void **cookie,
+    int flags)
 {
 	struct lr_alloc *lrp;
 
@@ -652,7 +652,7 @@ nfslog_record_alloc(
  */
 void
 nfslog_record_put(void *cookie, size_t size, bool_t sync,
-	unsigned int which_buffers)
+    unsigned int which_buffers)
 {
 	struct lr_alloc *lrp = (struct lr_alloc *)cookie;
 	struct log_buffer *lbp = lrp->lb;
@@ -768,8 +768,8 @@ nfslog_records_flush_to_disk_nolock(struct log_buffer *lbp)
  * them to the end of the log file.
  */
 static int
-nfslog_write_logrecords(struct log_file *lfp,
-	struct lr_alloc *lrp_writers, int num_recs)
+nfslog_write_logrecords(struct log_file *lfp, struct lr_alloc *lrp_writers,
+    int num_recs)
 {
 	struct uio uio;
 	struct iovec *iovp;
@@ -1161,8 +1161,8 @@ nfsl_flush(struct nfsl_flush_args *args, model_t model)
 		/*
 		 * Do the work asynchronously
 		 */
-		(void) thread_create(NULL, 0, nfslog_do_flush,
-		    tparams, 0, &p0, TS_RUN, minclsyspri);
+		(void) zthread_create(NULL, 0, nfslog_do_flush,
+		    tparams, 0, minclsyspri);
 	}
 
 	return (error);
@@ -1249,8 +1249,7 @@ out:
 		 */
 		kmem_free(args->buff, args->buff_len);
 		kmem_free(tparams, sizeof (*tparams));
-		thread_exit();
-		/* NOTREACHED */
+		zthread_exit();
 	}
 
 	tparams->tp_error = error;
@@ -1529,6 +1528,7 @@ static int	nfslog_dispatch_table_arglen = sizeof (nfslog_dispatch_table) /
  */
 struct exportinfo *
 nfslog_get_exi(
+	nfs_export_t *ne,
 	struct exportinfo *exi,
 	struct svc_req *req,
 	caddr_t res,
@@ -1560,7 +1560,7 @@ nfslog_get_exi(
 		return (exi);
 	}
 
-	if (exi != exi_public)
+	if (exi != ne->exi_public)
 		return (NULL);
 
 	/*
@@ -1625,8 +1625,8 @@ static long long rfslog_records_ignored = 0;
  */
 void
 nfslog_write_record(struct exportinfo *exi, struct svc_req *req,
-	caddr_t args, caddr_t res, cred_t *cr, struct netbuf *pnb,
-	unsigned int record_id, unsigned int which_buffers)
+    caddr_t args, caddr_t res, cred_t *cr, struct netbuf *pnb,
+    unsigned int record_id, unsigned int which_buffers)
 {
 	struct nfslog_prog_disp	*progtable;	/* prog struct */
 	struct nfslog_vers_disp	*verstable;	/* version struct */
@@ -1764,17 +1764,17 @@ nfslog_write_record(struct exportinfo *exi, struct svc_req *req,
 static char *
 get_publicfh_path(int *alloc_length)
 {
-	extern struct exportinfo *exi_public;
 	char *pubpath;
+	nfs_export_t *ne = nfs_get_export();
 
-	rw_enter(&exported_lock, RW_READER);
+	rw_enter(&ne->exported_lock, RW_READER);
 
-	*alloc_length = exi_public->exi_export.ex_pathlen + 1;
+	*alloc_length = ne->exi_public->exi_export.ex_pathlen + 1;
 	pubpath = kmem_alloc(*alloc_length, KM_SLEEP);
 
-	(void) strcpy(pubpath, exi_public->exi_export.ex_path);
+	(void) strcpy(pubpath, ne->exi_public->exi_export.ex_path);
 
-	rw_exit(&exported_lock);
+	rw_exit(&ne->exported_lock);
 
 	return (pubpath);
 }
@@ -1870,11 +1870,8 @@ nfslog_unshare_record(struct exportinfo *exi, cred_t *cr)
 
 
 void
-nfslog_getfh(struct exportinfo *exi,
-	fhandle *fh,
-	char *fname,
-	enum uio_seg seg,
-	cred_t *cr)
+nfslog_getfh(struct exportinfo *exi, fhandle *fh, char *fname, enum uio_seg seg,
+    cred_t *cr)
 {
 	struct svc_req	req;
 	int		res = 0;

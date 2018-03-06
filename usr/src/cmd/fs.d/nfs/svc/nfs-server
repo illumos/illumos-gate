@@ -22,8 +22,8 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 # Start/stop processes required for server NFS
@@ -53,7 +53,7 @@ configure_ipfilter()
 
         #
 	# Nothing to do if:
-        # - ipfilter isn't online 
+        # - ipfilter isn't online
 	# - global policy is 'custom'
 	# - service's policy is 'use_global'
         #
@@ -66,14 +66,6 @@ configure_ipfilter()
 
 case "$1" in
 'start')
-	# The NFS server is not supported in a local zone
-	if smf_is_nonglobalzone; then
-		/usr/sbin/svcadm disable -t svc:/network/nfs/server
-		echo "The NFS server is not supported in a local zone"
-		sleep 5 &
-		exit $SMF_EXIT_OK
-	fi
-
 	# Share all file systems enabled for sharing. sharemgr understands
 	# regular shares and ZFS shares and will handle both. Technically,
 	# the shares would have been started long before getting here since

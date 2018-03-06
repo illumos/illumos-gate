@@ -20,18 +20,19 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
+/*
+ * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
+ */
+
 #ifndef	_NFS_NFS_H
 #define	_NFS_NFS_H
-
-/*	nfs.h 2.38 88/08/19 SMI	*/
 
 #include <sys/isa_defs.h>
 #include <sys/vfs.h>
@@ -72,8 +73,56 @@ extern "C" {
 #define	NFS_VERSMIN_DEFAULT	((rpcvers_t)2)
 #define	NFS_VERSMAX_DEFAULT	((rpcvers_t)4)
 
-extern rpcvers_t nfs_versmin;
-extern rpcvers_t nfs_versmax;
+/*
+ * Used to track the state of the server so that initialization
+ * can be done properly.
+ */
+typedef enum {
+	NFS_SERVER_STOPPED,	/* server state destroyed */
+	NFS_SERVER_STOPPING,	/* server state being destroyed */
+	NFS_SERVER_RUNNING,
+	NFS_SERVER_QUIESCED,	/* server state preserved */
+	NFS_SERVER_OFFLINE	/* server pool offline */
+} nfs_server_running_t;
+
+/* Forward declarations for nfs_globals */
+struct nfs_export;
+struct nfs_srv;
+struct nfs3_srv;
+struct nfs4_srv;
+struct nfsauth_globals;
+
+/*
+ * Zone globals variables of NFS server
+ */
+typedef struct nfs_globals {
+	list_node_t		nfs_g_link;	/* all globals list */
+
+	rpcvers_t		nfs_versmin;
+	rpcvers_t		nfs_versmax;
+
+	/* NFS server locks and state */
+	nfs_server_running_t	nfs_server_upordown;
+	kmutex_t		nfs_server_upordown_lock;
+	kcondvar_t		nfs_server_upordown_cv;
+
+	/* RDMA wait variables */
+	kcondvar_t		rdma_wait_cv;
+	kmutex_t		rdma_wait_mutex;
+
+	zoneid_t		nfs_zoneid;
+	/* Per-zone data structures private to each module */
+	struct nfs_export	*nfs_export;	/* nfs_export.c */
+	struct nfs_srv		*nfs_srv;	/* nfs_srv.c */
+	struct nfs3_srv		*nfs3_srv;	/* nfs3_srv.c */
+	struct nfs4_srv		*nfs4_srv;	/* nfs4_srv.c */
+	struct nfsauth_globals	*nfs_auth;	/* nfs_auth.c */
+
+	/* statistic: nfs_stat.c, etc. */
+	kstat_named_t		*svstat[NFS_VERSMAX + 1];
+	kstat_named_t		*rfsproccnt[NFS_VERSMAX + 1];
+	kstat_named_t		*aclproccnt[NFS_VERSMAX + 1];
+} nfs_globals_t;
 
 /*
  * Default delegation setting for the server ==> "on"
@@ -872,6 +921,8 @@ extern void	rfs_statfs(fhandle_t *, struct nfsstatfs *, struct exportinfo *,
 extern void	*rfs_statfs_getfh(fhandle_t *);
 extern void	rfs_srvrinit(void);
 extern void	rfs_srvrfini(void);
+extern void	rfs_srv_zone_init(nfs_globals_t *);
+extern void	rfs_srv_zone_fini(nfs_globals_t *);
 
 /*
  * flags to define path types during Multi Component Lookups
@@ -883,6 +934,8 @@ extern void	rfs_srvrfini(void);
 
 /* index for svstat_ptr */
 enum nfs_svccounts {NFS_CALLS, NFS_BADCALLS, NFS_REFERRALS, NFS_REFERLINKS};
+
+#define	NFS_V2	NFS_VERSION
 
 /*	function defs for NFS kernel */
 extern int	nfs_waitfor_purge_complete(vnode_t *);
@@ -904,7 +957,7 @@ extern int	nfs_async_stop_sig(struct vfs *);
 extern int	nfs_clntinit(void);
 extern void	nfs_clntfini(void);
 extern int	nfstsize(void);
-extern int	nfs_srvinit(void);
+extern void	nfs_srvinit(void);
 extern void	nfs_srvfini(void);
 extern int	vattr_to_sattr(struct vattr *, struct nfssattr *);
 extern void	setdiropargs(struct nfsdiropargs *, char *, vnode_t *);
@@ -942,10 +995,14 @@ extern int	nfsauth_access(struct exportinfo *, struct svc_req *, cred_t *,
     uid_t *, gid_t *, uint_t *, gid_t **);
 extern void	nfsauth_init(void);
 extern void	nfsauth_fini(void);
+extern void	nfsauth_zone_init(nfs_globals_t *);
+extern void	nfsauth_zone_fini(nfs_globals_t *);
+extern void	nfsauth_zone_shutdown(nfs_globals_t *);
 extern int	nfs_setopts(vnode_t *, model_t, struct nfs_args *);
 extern int	nfs_mount_label_policy(vfs_t *, struct netbuf *,
     struct knetconfig *, cred_t *);
 extern boolean_t nfs_has_ctty(void);
+extern nfs_globals_t *nfs_srv_getzg(void);
 extern void	nfs_srv_stop_all(void);
 extern void	nfs_srv_quiesce_all(void);
 extern int	rfs4_dss_setpaths(char *, size_t);
@@ -957,9 +1014,12 @@ extern nvlist_t	*rfs4_dss_paths, *rfs4_dss_oldpaths;
 
 extern kstat_named_t	*global_svstat_ptr[];
 
+extern zone_key_t	nfssrv_zone_key;
+extern list_t		nfssrv_globals_list;
+extern krwlock_t	nfssrv_globals_rwl;
+
 extern krwlock_t	rroklock;
 extern vtype_t		nf_to_vt[];
-extern kstat_named_t	*rfsproccnt_v2_ptr;
 extern kmutex_t		nfs_minor_lock;
 extern int		nfs_major;
 extern int		nfs_minor;
@@ -975,16 +1035,13 @@ extern int		(*nfs_srv_dss_func)(char *, size_t);
  */
 struct nfs_version_stats {
 	kstat_named_t	*aclreqcnt_ptr;		/* nfs_acl:0:aclreqcnt_v? */
-	kstat_named_t	*aclproccnt_ptr;	/* nfs_acl:0:aclproccnt_v? */
 	kstat_named_t	*rfsreqcnt_ptr;		/* nfs:0:rfsreqcnt_v? */
-	kstat_named_t	*rfsproccnt_ptr;	/* nfs:0:rfsproccnt_v? */
 };
 
 /*
  * A bit of asymmetry: nfs:0:nfs_client isn't part of this structure.
  */
 struct nfs_stats {
-	kstat_named_t		*nfs_stats_svstat_ptr[NFS_VERSMAX + 1];
 	struct nfs_version_stats	nfs_stats_v2;
 	struct nfs_version_stats	nfs_stats_v3;
 	struct nfs_version_stats	nfs_stats_v4;
@@ -1000,6 +1057,9 @@ extern zone_key_t nfsstat_zone_key;
  */
 extern void	*nfsstat_zone_init(zoneid_t);
 extern void	nfsstat_zone_fini(zoneid_t, void *);
+
+extern void rfs_stat_zone_init(nfs_globals_t *);
+extern void rfs_stat_zone_fini(nfs_globals_t *);
 
 #endif	/* _KERNEL */
 
@@ -2248,6 +2308,8 @@ extern void	rfs3_commit(COMMIT3args *, COMMIT3res *, struct exportinfo *,
 extern void	*rfs3_commit_getfh(COMMIT3args *);
 extern void	rfs3_srvrinit(void);
 extern void	rfs3_srvrfini(void);
+extern void	rfs3_srv_zone_init(nfs_globals_t *);
+extern void	rfs3_srv_zone_fini(nfs_globals_t *);
 
 extern int	nfs3_validate_caches(vnode_t *, cred_t *);
 extern void	nfs3_cache_post_op_attr(vnode_t *, post_op_attr *, hrtime_t,
@@ -2282,7 +2344,6 @@ extern int	rfs_cross_mnt(vnode_t **, struct exportinfo **);
 extern int	rfs_climb_crossmnt(vnode_t **, struct exportinfo **, cred_t *);
 
 extern vtype_t		nf3_to_vt[];
-extern kstat_named_t	*rfsproccnt_v3_ptr;
 extern vfsops_t		*nfs3_vfsops;
 extern struct vnodeops	*nfs3_vnodeops;
 extern const struct fs_operation_def nfs3_vnodeops_template[];
@@ -2312,10 +2373,10 @@ extern bool_t	rfs4_check_delegated(int mode, vnode_t *, bool_t trunc);
  * if no delegation is present.
  */
 extern int	rfs4_delegated_getattr(vnode_t *, vattr_t *, int, cred_t *);
-extern void	rfs4_hold_deleg_policy(void);
-extern void	rfs4_rele_deleg_policy(void);
 
 extern int	do_xattr_exists_check(vnode_t *, ulong_t *, cred_t *);
+
+extern int	protect_zfs_mntpt(vnode_t *);
 
 extern ts_label_t *nfs_getflabel(vnode_t *, struct exportinfo *);
 extern boolean_t do_rfs_label_check(bslabel_t *, vnode_t *, int,

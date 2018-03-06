@@ -22,6 +22,8 @@
 
 	Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 	Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+	Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+	Copyright 2019 Nexenta by DDN, Inc.  All rights reserved.
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -65,7 +67,7 @@
 	    grouping='require_all'
 	    restart_on='error'
 	    type='service'>
-	    	<service_fmri value='svc:/system/filesystem/minimal' />
+		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
 	<exec_method
@@ -93,7 +95,7 @@
 	</property_group>
 	<instance name='default' enabled='false'>
 	  <property_group name='nfs-props' type='com.oracle.nfs,props'>
-	    <propval name='grace_period' type='integer' value='90'/>
+	    <propval name='grace_period' type='integer' value='60'/>
 	    <propval name='lockd_listen_backlog' type='integer' value='32'/>
 	    <propval name='lockd_retransmit_timeout' type='integer' value='5'/>
 	    <propval name='lockd_servers' type='integer' value='256'/>

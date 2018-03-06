@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+#
 # cmd/fs.d/nfs/Makefile
 #
 #  cmd/fs.d/nfs is the directory of all nfs specific commands
@@ -33,7 +35,7 @@ include $(SRC)/Makefile.master
 
 SUBDIR1=	exportfs nfsd rquotad \
 		statd nfsstat mountd dfshares \
-		nfsfind nfs4cbd share tests
+		nfsfind nfs4cbd share tests dtrace
 
 # These do "make catalog"
 SUBDIR2=	clear_locks lockd umount showmount \
@@ -52,14 +54,13 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 catalog:=       TARGET= catalog
 
 .KEEP_STATE:
 
 .PARALLEL:	$(SUBDIRS)
 
-all install clean clobber lint: $(SUBDIRS)
+all install clean clobber: $(SUBDIRS)
 
 catalog: $(SUBDIR2)
 	$(RM) $(POFILE)

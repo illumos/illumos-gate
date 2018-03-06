@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -25,6 +26,10 @@
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
+
+/*
+ * Copyright 2018 Nexenta Systems, Inc.
+ */
 
 #ifndef	_NFS_CMD_H
 #define	_NFS_CMD_H
@@ -80,12 +85,16 @@ extern struct charset_cache *nfscmd_findmap(struct exportinfo *,
     struct sockaddr *);
 extern char *nfscmd_convname(struct sockaddr *, struct exportinfo *,
     char *, int, size_t);
+
 extern char *nfscmd_convdirent(struct sockaddr *, struct exportinfo *, char *,
     size_t, enum nfsstat3 *);
 extern size_t nfscmd_convdirplus(struct sockaddr *, struct exportinfo *, char *,
     size_t, size_t, char **);
 extern size_t nfscmd_countents(char *, size_t);
 extern size_t nfscmd_dropped_entrysize(struct dirent64 *, size_t, size_t);
+
+extern void nfscmd_init(void);
+extern void nfscmd_fini(void);
 
 #endif
 

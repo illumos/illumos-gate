@@ -18,12 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  * All rights reserved.
+ */
+
+/*
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 #include <sys/types.h>
@@ -80,8 +87,6 @@ nfs_export(void *arg)
 {
 	STRUCT_DECL(exportfs_args, ea);
 
-	if (!INGLOBALZONE(curproc))
-		return (set_errno(EPERM));
 	STRUCT_INIT(ea, get_udatamodel());
 	if (copyin(arg, STRUCT_BUF(ea), STRUCT_SIZE(ea)))
 		return (set_errno(EFAULT));
@@ -110,9 +115,6 @@ nfssys(enum nfssys_op opcode, void *arg)
 		if (rfs4_client_clrst == NULL) {
 			break;
 		}
-
-		if (!INGLOBALZONE(curproc))
-			return (set_errno(EPERM));
 
 		STRUCT_INIT(u_clr, get_udatamodel());
 
@@ -164,8 +166,6 @@ nfssys(enum nfssys_op opcode, void *arg)
 		struct rdma_svc_args rsa;
 		char netstore[20] = "tcp";
 
-		if (!INGLOBALZONE(curproc))
-			return (set_errno(EPERM));
 		if (get_udatamodel() != DATAMODEL_NATIVE) {
 			STRUCT_DECL(rdma_svc_args, ursa);
 
@@ -189,9 +189,6 @@ nfssys(enum nfssys_op opcode, void *arg)
 
 	case NFS_SVC: { /* NFS server daemon */
 		STRUCT_DECL(nfs_svc_args, nsa);
-
-		if (!INGLOBALZONE(curproc))
-			return (set_errno(EPERM));
 		STRUCT_INIT(nsa, get_udatamodel());
 
 		if (copyin(arg, STRUCT_BUF(nsa), STRUCT_SIZE(nsa)))
@@ -209,8 +206,6 @@ nfssys(enum nfssys_op opcode, void *arg)
 	case NFS_GETFH: { /* get a file handle */
 		STRUCT_DECL(nfs_getfh_args, nga);
 
-		if (!INGLOBALZONE(curproc))
-			return (set_errno(EPERM));
 		STRUCT_INIT(nga, get_udatamodel());
 		if (copyin(arg, STRUCT_BUF(nga), STRUCT_SIZE(nga)))
 			return (set_errno(EFAULT));

@@ -73,7 +73,6 @@ typedef struct rpcdisp {
 typedef struct rpc_disptable {
 	int dis_nprocs;
 	char **dis_procnames;
-	kstat_named_t **dis_proccntp;
 	struct rpcdisp *dis_table;
 } rpc_disptable_t;
 
