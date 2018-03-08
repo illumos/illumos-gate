@@ -105,6 +105,7 @@ mac_fix_cksum(mblk_t *mp_chain)
 		uint32_t offset;
 		struct ether_header *ehp;
 		uint16_t sap;
+		mblk_t *skipped_hdr = NULL;
 
 		mac_hcksum_get(mp, &start, &stuff, &end, &value, &flags);
 		if (flags == 0)
@@ -147,6 +148,12 @@ mac_fix_cksum(mblk_t *mp_chain)
 			offset = sizeof (struct ether_header);
 		}
 
+		/*
+		 * If the first mblk in the chain for this packet contains only
+		 * the ethernet header, skip past it for now.  Packets with
+		 * their data contained in only a single mblk can then use the
+		 * fastpaths tuned to that possibility.
+		 */
 		if (MBLKL(mp) <= offset) {
 			offset -= MBLKL(mp);
 			if (mp->b_cont == NULL) {
@@ -161,6 +168,7 @@ mac_fix_cksum(mblk_t *mp_chain)
 				mp = mp1;
 				continue;
 			}
+			skipped_hdr = mp;
 			mp = mp->b_cont;
 		}
 
@@ -263,21 +271,17 @@ mac_fix_cksum(mblk_t *mp_chain)
 		if (flags & HCK_PARTIALCKSUM) {
 			uint16_t *up, partial, cksum;
 			uchar_t *ipp; /* ptr to beginning of IP header */
+			mblk_t *old_mp = NULL;
 
 			if (mp->b_cont != NULL) {
-				mblk_t *mp1;
+				mblk_t *new_mp;
 
-				mp1 = msgpullup(mp, offset + end);
-				if (mp1 == NULL)
+				new_mp = msgpullup(mp, offset + end);
+				if (new_mp == NULL) {
 					continue;
-				mp1->b_next = mp->b_next;
-				mp->b_next = NULL;
-				freemsg(mp);
-				if (prev != NULL)
-					prev->b_next = mp1;
-				else
-					new_chain = mp1;
-				mp = mp1;
+				}
+				old_mp = mp;
+				mp = new_mp;
 			}
 
 			ipp = mp->b_rptr + offset;
@@ -299,9 +303,57 @@ mac_fix_cksum(mblk_t *mp_chain)
 			flags &= ~HCK_PARTIALCKSUM;
 			flags |= HCK_FULLCKSUM_OK;
 			value = 0;
+
+			/*
+			 * If 'mp' is the result of a msgpullup(), it needs to
+			 * be properly reattached into the existing chain of
+			 * messages before continuing.
+			 */
+			if (old_mp != NULL) {
+				if (skipped_hdr != NULL) {
+					/*
+					 * If the ethernet header was cast
+					 * aside before checksum calculation,
+					 * prepare for it to be reattached to
+					 * the pulled-up mblk.
+					 */
+					skipped_hdr->b_cont = mp;
+				} else {
+					/* Link the new mblk into the chain. */
+					mp->b_next = old_mp->b_next;
+
+					if (prev != NULL)
+						prev->b_next = mp;
+					else
+						new_chain = mp;
+				}
+
+				old_mp->b_next = NULL;
+				freemsg(old_mp);
+			}
 		}
 
 		mac_hcksum_set(mp, start, stuff, end, value, flags);
+
+		/*
+		 * If the header was skipped over, we must seek back to it,
+		 * since it is that mblk that is part of any packet chain.
+		 */
+		if (skipped_hdr != NULL) {
+			ASSERT3P(skipped_hdr->b_cont, ==, mp);
+
+			/*
+			 * Duplicate the HCKSUM data into the header mblk.
+			 * This mimics mac_add_vlan_tag which ensures that both
+			 * the first mblk _and_ the first data bearing mblk
+			 * possess the HCKSUM information.  Consumers like IP
+			 * will end up discarding the ether_header mblk, so for
+			 * now, it is important that the data be available in
+			 * both places.
+			 */
+			mac_hcksum_clone(mp, skipped_hdr);
+			mp = skipped_hdr;
+		}
 	}
 
 	return (new_chain);
