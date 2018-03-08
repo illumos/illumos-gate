@@ -20,7 +20,7 @@ PROGS =		attach detach statechange uninstall
 PROG1 =		boot
 PROG2 =		bhhwcompat
 PROGS +=	$(PROG1) $(PROG2)
-CLEANFILES +=	$(PROGS)
+CLEANFILES +=	$(PROG1) $(PROG2)
 
 $(PROG1) :=	LDLIBS += -lnvpair
 $(PROG2) :=	CPPFLAGS = -I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
