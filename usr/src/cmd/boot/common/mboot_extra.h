@@ -34,8 +34,8 @@ extern "C" {
 #include <sys/types.h>
 #include "bblk_einfo.h"
 
-/* multiboot header needs to be located in the first 32KB. */
-#define	MBOOT_SCAN_SIZE		(32 * 1024)
+/* multiboot header needs to be located in the first 64KB. */
+#define	MBOOT_SCAN_SIZE		(64 * 1024)
 
 /* multiboot header AOUT_KLUDGE flag. */
 #define	BB_MBOOT_AOUT_FLAG	(0x00010000)
