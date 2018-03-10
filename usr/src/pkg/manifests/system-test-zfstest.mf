@@ -79,6 +79,7 @@ dir path=opt/zfs-tests/tests/functional/cli_root/zpool_get
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_history
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_import
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_import/blockfiles
+dir path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_offline
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_online
@@ -1569,6 +1570,44 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import_rename_001_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/cleanup \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize.kshlib \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_attach_detach_add_remove \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_import_export \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_offline_export_import_online \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_online_offline \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_split \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_start_and_cancel_neg \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_start_and_cancel_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_suspend_resume \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_unsupported_vdevs \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_verify_checksums \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_initialize/zpool_initialize_verify_initialized \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear/labelclear.cfg \

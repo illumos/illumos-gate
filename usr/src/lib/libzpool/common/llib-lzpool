@@ -45,6 +45,7 @@
 #include <sys/space_map.h>
 #include <sys/vdev.h>
 #include <sys/vdev_impl.h>
+#include <sys/vdev_initialize.h>
 #include <sys/zap.h>
 #include <sys/zio.h>
 #include <sys/zio_compress.h>

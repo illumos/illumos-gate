@@ -215,6 +215,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	zpool_import_props;
 	zpool_import_status;
 	zpool_in_use;
+	zpool_initialize;
 	zpool_is_bootable;
 	zpool_iter;
 	zpool_label_disk;
