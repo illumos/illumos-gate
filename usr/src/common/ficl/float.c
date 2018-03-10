@@ -402,7 +402,7 @@ ficlPrimitiveF2LocalParen(ficlVm *vm)
 
 /*
  * Add float words to a system's dictionary.
- * system -- Pointer to the Ficl sytem to add float words to.
+ * system -- Pointer to the Ficl system to add float words to.
  */
 void
 ficlSystemCompileFloat(ficlSystem *system)

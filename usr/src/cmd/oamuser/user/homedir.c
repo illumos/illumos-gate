@@ -305,7 +305,7 @@ get_default_zfs_flags()
 	return (flags);
 }
 
-/* Get the name of a mounted filesytem */
+/* Get the name of a mounted filesystem */
 char *
 get_mnt_special(char *mountp, char *fstype)
 {

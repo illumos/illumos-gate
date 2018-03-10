@@ -912,7 +912,7 @@
 01-10-05 misc/glob.c: fix `\(x/*' GLOB_NOMATCH bug that returned `(x'
 	 misc/optget.c: fix localization lookup that didn't drop doubled : ? ]
 01-10-04 comp/setlocale.c: handle sizeof(wchar_t)!=4 in debug locale
-	 comp/conf.sh: handle sytems where _SC_* is both an enum and a macro
+	 comp/conf.sh: handle systems where _SC_* is both an enum and a macro
 01-09-25 astconf: add LIBPREFIX
 01-09-20 features/common: add __DYNAMIC__() for dll externs
 01-09-19 cdt: kpv update

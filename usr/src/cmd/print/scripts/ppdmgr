@@ -1422,7 +1422,7 @@ VENDOR=vendor
 ADMIN=admin
 USER=user
 
-# Sytem PPD cache name used by printmgr
+# System PPD cache name used by printmgr
 GOLDCACHE=${USERREP}/ppdcache
 
 # Delivered caches directory

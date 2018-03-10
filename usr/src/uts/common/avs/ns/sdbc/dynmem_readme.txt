@@ -48,7 +48,7 @@ in module sd_bcache.c. When a request is received for cache and system
 resources it is broken down and each piece catagorized both as an
 independent entity and as a member of a group with close neighbors. Cache
 resources comprise cache control entries (ccent), write control entries 
-(wctrl for FWC support) and sytem memory. The current allocation algorithim
+(wctrl for FWC support) and system memory. The current allocation algorithim
 for ccent and wrctl remains the same. The memory allocation has been modified
 and falls into two general catagories - single page and multi-page 
 allocations.

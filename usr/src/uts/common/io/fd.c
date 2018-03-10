@@ -600,7 +600,7 @@ fd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * (We guess this by looking for a block open.  Character
 		 * opens are fine.)  This limits some of the usability of
 		 * suspend/resume, but it certainly avoids this
-		 * potential filesytem corruption from pilot error.
+		 * potential filesystem corruption from pilot error.
 		 * Given the decreasing popularity of floppy media, we
 		 * don't see this as much of a limitation.
 		 */

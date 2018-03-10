@@ -871,7 +871,7 @@ vpm_map_pages(
 		 * If we did not find the page or if this page was not
 		 * in vpm cache(p_vpmref == 0), then let VOP_GETPAGE get
 		 * all the pages.
-		 * We need to call VOP_GETPAGE so that filesytems can do some
+		 * We need to call VOP_GETPAGE so that filesystems can do some
 		 * (un)necessary tracking for sequential access.
 		 */
 

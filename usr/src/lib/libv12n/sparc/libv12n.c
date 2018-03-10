@@ -537,7 +537,7 @@ v12n_domain_uuid(uuid_t uuid)
 }
 
 /*
- * Send 'agent-sytem' request message.
+ * Send 'agent-system' request message.
  */
 static int
 v12n_ldma_send_request()

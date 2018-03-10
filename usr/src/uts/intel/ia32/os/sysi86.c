@@ -293,7 +293,7 @@ ssd_to_usd(struct ssd *ssd, user_desc_t *usd)
 
 	/*
 	 * 64-bit code selectors are never allowed in the LDT.
-	 * Reserved bit is always 0 on 32-bit sytems.
+	 * Reserved bit is always 0 on 32-bit systems.
 	 */
 #if defined(__amd64)
 	usd->usd_long = 0;
