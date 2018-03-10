@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -2200,8 +2198,8 @@ case OP_Transaction: {
       }
       case SQLITE_READONLY: {
         rc = SQLITE_OK;
-        /* Fall thru into the next case */
       }
+      /* FALLTHROUGH */
       case SQLITE_OK: {
         p->inTempTrans = 0;
         busy = 0;

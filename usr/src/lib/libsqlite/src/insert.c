@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -722,8 +719,8 @@ void sqliteGenerateConstraintChecks(
     switch( onError ){
       default: {
         onError = OE_Abort;
-        /* Fall thru into the next case */
       }
+      /* FALLTHROUGH */
       case OE_Rollback:
       case OE_Abort:
       case OE_Fail: {
