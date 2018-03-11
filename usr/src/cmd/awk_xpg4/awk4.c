@@ -30,8 +30,6 @@
  * Based on MKS awk(1) ported to be /usr/xpg4/bin/awk with POSIX/XCU4 changes
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "awk.h"
 #include "y.tab.h"
 #include <time.h>
@@ -386,10 +384,11 @@ f_split(NODE *np)
 	case VAR:
 		if (isstring(tnp->n_flags) && tnp->n_string==_null)
 			break;
+		/* FALLTHROUGH */
+
 	default:
 		awkerr(gettext(
 			"second parameter to \"split\" must be an array"));
-		/*NOTREACHED*/
 	}
 	/*
 	 * If an argument has been passed in to be used as the
