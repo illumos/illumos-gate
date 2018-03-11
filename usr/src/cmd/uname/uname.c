@@ -17,13 +17,13 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
+ *
+ * Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -49,6 +49,8 @@
 #include <sys/utsname.h>
 #include <sys/systeminfo.h>
 
+#define	OS_NAME "illumos"
+
 static void usage(void);
 
 /* ARGSUSED */
@@ -56,9 +58,9 @@ int
 main(int argc, char *argv[], char *envp[])
 {
 	char *nodename;
-	char *optstring = "asnrpvmiS:X";
+	char *optstring = "asnrpvmioS:X";
 	int sflg = 0, nflg = 0, rflg = 0, vflg = 0, mflg = 0;
-	int pflg = 0, iflg = 0, Sflg = 0;
+	int pflg = 0, iflg = 0, oflg = 0, Sflg = 0;
 	int errflg = 0, optlet;
 	int Xflg = 0;
 	struct utsname  unstr, *un;
@@ -104,6 +106,9 @@ main(int argc, char *argv[], char *envp[])
 		case 'i':
 			iflg++;
 			break;
+		case 'o':
+			oflg++;
+			break;
 		case 'S':
 			Sflg++;
 			nodename = optarg;
@@ -121,7 +126,7 @@ main(int argc, char *argv[], char *envp[])
 
 	if ((Sflg > 1) ||
 	    (Sflg && (sflg || nflg || rflg || vflg || mflg || pflg || iflg ||
-	    Xflg))) {
+	    oflg || Xflg))) {
 		usage();
 	}
 
@@ -148,7 +153,8 @@ main(int argc, char *argv[], char *envp[])
 	/*
 	 * "uname -s" is the default
 	 */
-	if (!(sflg || nflg || rflg || vflg || mflg || pflg || iflg || Xflg))
+	if (!(sflg || nflg || rflg || vflg || mflg || pflg || iflg ||
+	    oflg || Xflg))
 		sflg++;
 	if (sflg) {
 		(void) fprintf(stdout, fs, sizeof (un->sysname),
@@ -189,6 +195,10 @@ main(int argc, char *argv[], char *envp[])
 		(void) fprintf(stdout, fs, strlen(procbuf), procbuf);
 		fs = fmt_string;
 	}
+	if (oflg) {
+		(void) fprintf(stdout, fs, strlen(OS_NAME), OS_NAME);
+		fs = fmt_string;
+	}
 	if (Xflg) {
 		int	val;
 
@@ -224,7 +234,7 @@ usage(void)
 {
 	{
 		(void) fprintf(stderr, gettext(
-		    "usage:	uname [-snrvmapiX]\n"
+		    "usage:	uname [-snrvmapioX]\n"
 		    "	uname [-S system_name]\n"));
 	}
 	exit(1);

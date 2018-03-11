@@ -6,7 +6,8 @@
 .\" BY THE AUTHOR AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
 .\" SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
 .\" OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.TH MOUNT_SMBFS 1M "Mar 31, 2009"
+.\" Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+.TH MOUNT_SMBFS 1M "Jan 2, 2012"
 .SH NAME
 mount_smbfs, umount_smbfs \- mount and unmount a shared resource from a CIFS
 file server
@@ -165,6 +166,26 @@ See the \fBmount\fR(1M) man page for the list of supported
 Sets the file system-specific properties. You can specify more than one
 name-value pair as a list of comma-separated pairs. No spaces are permitted in
 the list. The properties are as follows:
+
+.sp
+.ne 2
+.na
+\fB\fBacl\fR|\fBnoacl\fR\fR
+.ad
+.sp .6
+.RS 4n
+Enable (or disable) presentation of Access Control Lists (ACLs)
+on files and directories under this \fBsmbfs\fR(7FS) mount.
+The default behavior is \fBnoacl\fR, which presents files and
+directories as owned by the owner of the mount point and having
+permissions based on \fBfileperms\fR or \fBdirperms\fR.
+With the \fBacl\fR mount option, files are presented with ACLs
+obtained from the SMB server.
+Setting the \fBacl\fR mount option is not advised unless the system
+is joined to an Active Directory domain and using \fBldap\fR(1)
+so it can correctly present ACL identities from the SMB server.
+.RE
+
 .sp
 .ne 2
 .na
@@ -479,7 +500,8 @@ Interface Stability	Committed
 .SH SEE ALSO
 .sp
 .LP
-\fBsmbutil\fR(1), \fBmount\fR(1M), \fBmountall\fR(1M), \fBsvcadm\fR(1M),
+\fBldap\fR(1), \fBsmbutil\fR(1),
+\fBmount\fR(1M), \fBmountall\fR(1M), \fBsvcadm\fR(1M),
 \fBacl\fR(2), \fBfcntl\fR(2), \fBlink\fR(2), \fBmknod\fR(2), \fBmount\fR(2),
 \fBsymlink\fR(2), \fBumount\fR(2), \fBmnttab\fR(4), \fBnsmbrc\fR(4),
 \fBvfstab\fR(4), \fBattributes\fR(5), \fBpcfs\fR(7FS), \fBsmbfs\fR(7FS)
