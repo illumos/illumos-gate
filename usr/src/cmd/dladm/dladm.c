@@ -3974,6 +3974,8 @@ iptun_process_addrarg(char *addrarg, iptun_params_t *params)
 	while (*addrarg != '\0') {
 		switch (getsubopt(&addrarg, iptun_addropts, &addrval)) {
 		case IPTUN_LOCAL:
+			if (addrval == NULL)
+				die("tunnel source address value is missing");
 			params->iptun_param_flags |= IPTUN_PARAM_LADDR;
 			if (strlcpy(params->iptun_param_laddr, addrval,
 			    sizeof (params->iptun_param_laddr)) >=
@@ -3981,6 +3983,9 @@ iptun_process_addrarg(char *addrarg, iptun_params_t *params)
 				die("tunnel source address is too long");
 			break;
 		case IPTUN_REMOTE:
+			if (addrval == NULL)
+				die("tunnel destination address value "
+				    "is missing");
 			params->iptun_param_flags |= IPTUN_PARAM_RADDR;
 			if (strlcpy(params->iptun_param_raddr, addrval,
 			    sizeof (params->iptun_param_raddr)) >=
