@@ -305,6 +305,7 @@ fd_probe(dev_info_t *dip)
 		 * So fall through
 		 */
 #endif	/* CMOS_CONF_MEM */
+		/* FALLTHROUGH */
 	default:		/* need to check conf file */
 		len = sizeof (density);
 		if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN_AND_VAL_BUF,
@@ -381,6 +382,7 @@ fd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 * So fall through
 			 */
 #endif	/* CMOS_CONF_MEM */
+			/* FALLTHROUGH */
 		default:		/* need to check .conf file */
 			drive_type = 0;
 			len = sizeof (density);
@@ -1269,7 +1271,7 @@ fdstart(struct fcu_obj *fjp)
 /* ARGSUSED */
 static int
 fd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
-	int *rval_p)
+    int *rval_p)
 {
 	union {
 		struct dk_cinfo dki;
