@@ -21,7 +21,6 @@
 /*
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -32,6 +31,7 @@
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 #ifndef _SYS_X86_ARCHEXT_H
@@ -246,26 +246,7 @@ extern "C" {
 #define	CPUID_INTC_EAX_D_1_XSAVEC	0x00000002	/* xsavec inst. */
 #define	CPUID_INTC_EAX_D_1_XSAVES	0x00000008	/* xsaves inst. */
 
-#define	P5_MCHADDR	0x0
-#define	P5_CESR		0x11
-#define	P5_CTR0		0x12
-#define	P5_CTR1		0x13
-
-#define	K5_MCHADDR	0x0
-#define	K5_MCHTYPE	0x01
-#define	K5_TSC		0x10
-#define	K5_TR12		0x12
-
-#define	REG_PAT		0x277
-
-#define	REG_MC0_CTL		0x400
-#define	REG_MC5_MISC		0x417
-#define	REG_PERFCTR0		0xc1
-#define	REG_PERFCTR1		0xc2
-
-#define	REG_PERFEVNT0		0x186
-#define	REG_PERFEVNT1		0x187
-
+#define	REG_PAT			0x277
 #define	REG_TSC			0x10	/* timestamp counter */
 #define	REG_APIC_BASE_MSR	0x1b
 #define	REG_X2APIC_BASE_MSR	0x800	/* The MSR address offset of x2APIC */

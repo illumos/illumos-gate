@@ -23,7 +23,7 @@
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 #
@@ -699,7 +699,7 @@ GENUNIX_KMODS	+= genunix
 #
 #	Performance Counter BackEnd modules (/usr/kernel/pcbe)
 #
-PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe core_pcbe
+PCBE_KMODS	+= p4_pcbe opteron_pcbe core_pcbe
 
 #
 #	MAC-Type Plugin Modules (/kernel/mac)
