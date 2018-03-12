@@ -25,8 +25,6 @@
 \
 \ CPU-save structure offsets for use in assembly code.
 \
-\ Keep in sync with kdi_state.h
-\
 
 #include <sys/cpuvar.h>
 #include <sys/kdi_impl.h>
@@ -60,16 +58,9 @@ kdi_cpusave_t	KRS_SIZE
 		krs_curcrumb
 		krs_crumbs
 
-cpu
-		cpu_id
-
 greg_t		KREG_SIZE
 
-#if defined(__amd64)
 \#define	REG_SHIFT		3
-#else
-\#define	REG_SHIFT		2
-#endif
 
 \#define	DRADDR_IDX(num)		_CONST(_MUL(num, DR_ADDR_INCR))
 \#define	DRADDR_OFF(num)		_CONST(DRADDR_IDX(num) + DR_ADDR)

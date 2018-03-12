@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -60,6 +61,7 @@
 #include <sys/cmn_err.h>
 #include <sys/segments.h>
 #include <sys/clock.h>
+#include <vm/hat_i86.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #include <sys/note.h>
@@ -346,7 +348,19 @@ ldt_load(void)
 	xen_set_ldt(get_ssd_base(&curproc->p_ldt_desc),
 	    curproc->p_ldtlimit + 1);
 #else
-	*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = curproc->p_ldt_desc;
+	size_t len;
+	system_desc_t desc;
+
+	/*
+	 * Before we can use the LDT on this CPU, we must install the LDT in the
+	 * user mapping table.
+	 */
+	len = (curproc->p_ldtlimit + 1) * sizeof (user_desc_t);
+	bcopy(curproc->p_ldt, CPU->cpu_m.mcpu_ldt, len);
+	CPU->cpu_m.mcpu_ldt_len = len;
+	set_syssegd(&desc, CPU->cpu_m.mcpu_ldt, len - 1, SDT_SYSLDT, SEL_KPL);
+	*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = desc;
+
 	wr_ldtr(ULDT_SEL);
 #endif
 }
@@ -363,6 +377,9 @@ ldt_unload(void)
 #else
 	*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = null_sdesc;
 	wr_ldtr(0);
+
+	bzero(CPU->cpu_m.mcpu_ldt, CPU->cpu_m.mcpu_ldt_len);
+	CPU->cpu_m.mcpu_ldt_len = 0;
 #endif
 }
 
@@ -714,7 +731,8 @@ ldt_alloc(proc_t *pp, uint_t seli)
 	ASSERT(pp->p_ldtlimit == 0);
 
 	/*
-	 * Allocate new LDT just large enough to contain seli.
+	 * Allocate new LDT just large enough to contain seli. The LDT must
+	 * always be allocated in units of pages for KPTI.
 	 */
 	ldtsz = P2ROUNDUP((seli + 1) * sizeof (user_desc_t), PAGESIZE);
 	nsels = ldtsz / sizeof (user_desc_t);
@@ -832,7 +850,8 @@ ldt_grow(proc_t *pp, uint_t seli)
 	ASSERT(pp->p_ldtlimit != 0);
 
 	/*
-	 * Allocate larger LDT just large enough to contain seli.
+	 * Allocate larger LDT just large enough to contain seli. The LDT must
+	 * always be allocated in units of pages for KPTI.
 	 */
 	nldtsz = P2ROUNDUP((seli + 1) * sizeof (user_desc_t), PAGESIZE);
 	nsels = nldtsz / sizeof (user_desc_t);

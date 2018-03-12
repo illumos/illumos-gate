@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_ARCHSYSTM_H
@@ -80,22 +80,26 @@ extern void int20(void);
 extern void int_cmci(void);
 
 #if defined(__amd64)
-extern void sys_syscall();
-extern void sys_syscall32();
+extern void sys_syscall(), tr_sys_syscall();
+extern void sys_syscall32(), tr_sys_syscall32();
 extern void sys_lcall32();
 extern void sys_syscall_int();
-extern void brand_sys_syscall();
-extern void brand_sys_syscall32();
-extern void brand_sys_syscall_int();
+extern void tr_sys_syscall_int();
+extern void brand_sys_syscall(), tr_brand_sys_syscall();
+extern void brand_sys_syscall32(), tr_brand_sys_syscall32();
+extern void brand_sys_syscall_int(), tr_brand_sys_syscall_int();
 extern int update_sregs();
 extern void reset_sregs();
 #elif defined(__i386)
 extern void sys_call();
+extern void tr_sys_call();
 extern void brand_sys_call();
 #endif
 extern void sys_sysenter();
+extern void tr_sys_sysenter();
 extern void _sys_sysenter_post_swapgs();
 extern void brand_sys_sysenter();
+extern void tr_brand_sys_sysenter();
 extern void _brand_sys_sysenter_post_swapgs();
 
 extern void dosyscall(void);

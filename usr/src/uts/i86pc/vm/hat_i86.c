@@ -27,7 +27,7 @@
  */
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2017 Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
  */
 
@@ -41,6 +41,191 @@
  * that work in conjunction with this code.
  *
  * Routines used only inside of i86pc/vm start with hati_ for HAT Internal.
+ */
+
+/*
+ * amd64 HAT Design
+ *
+ * ----------
+ * Background
+ * ----------
+ *
+ * On x86, the address space is shared between a user process and the kernel.
+ * This is different from SPARC. Conventionally, the kernel lives at the top of
+ * the address space and the user process gets to enjoy the rest of it. If you
+ * look at the image of the address map in uts/i86pc/os/startup.c, you'll get a
+ * rough sense of how the address space is laid out and used.
+ *
+ * Every unique address space is represented by an instance of a HAT structure
+ * called a 'hat_t'. In addition to a hat_t structure for each process, there is
+ * also one that is used for the kernel (kas.a_hat), and each CPU ultimately
+ * also has a HAT.
+ *
+ * Each HAT contains a pointer to its root page table. This root page table is
+ * what we call an L3 page table in illumos and Intel calls the PML4. It is the
+ * physical address of the L3 table that we place in the %cr3 register which the
+ * processor uses.
+ *
+ * Each of the many layers of the page table is represented by a structure
+ * called an htable_t. The htable_t manages a set of 512 8-byte entries. The
+ * number of entries in a given page table is constant across all different
+ * level page tables. Note, this is only true on amd64. This has not always been
+ * the case on x86.
+ *
+ * Each entry in a page table, generally referred to as a PTE, may refer to
+ * another page table or a memory location, depending on the level of the page
+ * table and the use of large pages. Importantly, the top-level L3 page table
+ * (PML4) only supports linking to further page tables. This is also true on
+ * systems which support a 5th level page table (which we do not currently
+ * support).
+ *
+ * Historically, on x86, when a process was running on CPU, the root of the page
+ * table was inserted into %cr3 on each CPU on which it was currently running.
+ * When processes would switch (by calling hat_switch()), then the value in %cr3
+ * on that CPU would change to that of the new HAT. While this behavior is still
+ * maintained in the xpv kernel, this is not what is done today.
+ *
+ * -------------------
+ * Per-CPU Page Tables
+ * -------------------
+ *
+ * Throughout the system the 64-bit kernel has a notion of what it calls a
+ * per-CPU page table or PCP. The notion of a per-CPU page table was originally
+ * introduced as part of the original work to support x86 PAE. On the 64-bit
+ * kernel, it was originally used for 32-bit processes running on the 64-bit
+ * kernel. The rationale behind this was that each 32-bit process could have all
+ * of its memory represented in a single L2 page table as each L2 page table
+ * entry represents 1 GbE of memory.
+ *
+ * Following on from this, the idea was that given that all of the L3 page table
+ * entries for 32-bit processes are basically going to be identical with the
+ * exception of the first entry in the page table, why not share those page
+ * table entries. This gave rise to the idea of a per-CPU page table.
+ *
+ * The way this works is that we have a member in the machcpu_t called the
+ * mcpu_hat_info. That structure contains two different 4k pages: one that
+ * represents the L3 page table and one that represents an L2 page table. When
+ * the CPU starts up, the L3 page table entries are copied in from the kernel's
+ * page table. The L3 kernel entries do not change throughout the lifetime of
+ * the kernel. The kernel portion of these L3 pages for each CPU have the same
+ * records, meaning that they point to the same L2 page tables and thus see a
+ * consistent view of the world.
+ *
+ * When a 32-bit process is loaded into this world, we copy the 32-bit process's
+ * four top-level page table entries into the CPU's L2 page table and then set
+ * the CPU's first L3 page table entry to point to the CPU's L2 page.
+ * Specifically, in hat_pcp_update(), we're copying from the process's
+ * HAT_COPIED_32 HAT into the page tables specific to this CPU.
+ *
+ * As part of the implementation of kernel page table isolation, this was also
+ * extended to 64-bit processes. When a 64-bit process runs, we'll copy their L3
+ * PTEs across into the current CPU's L3 page table. (As we can't do the
+ * first-L3-entry trick for 64-bit processes, ->hci_pcp_l2ptes is unused in this
+ * case.)
+ *
+ * The use of per-CPU page tables has a lot of implementation ramifications. A
+ * HAT that runs a user process will be flagged with the HAT_COPIED flag to
+ * indicate that it is using the per-CPU page table functionality. In tandem
+ * with the HAT, the top-level htable_t will be flagged with the HTABLE_COPIED
+ * flag. If the HAT represents a 32-bit process, then we will also set the
+ * HAT_COPIED_32 flag on that hat_t.
+ *
+ * These two flags work together. The top-level htable_t when using per-CPU page
+ * tables is 'virtual'. We never allocate a ptable for this htable_t (i.e.
+ * ht->ht_pfn is PFN_INVALID).  Instead, when we need to modify a PTE in an
+ * HTABLE_COPIED ptable, x86pte_access_pagetable() will redirect any accesses to
+ * ht_hat->hat_copied_ptes.
+ *
+ * Of course, such a modification won't actually modify the HAT_PCP page tables
+ * that were copied from the HAT_COPIED htable. When we change the top level
+ * page table entries (L2 PTEs for a 32-bit process and L3 PTEs for a 64-bit
+ * process), we need to make sure to trigger hat_pcp_update() on all CPUs that
+ * are currently tied to this HAT (including the current CPU).
+ *
+ * To do this, PCP piggy-backs on TLB invalidation, specifically via the
+ * hat_tlb_inval() path from link_ptp() and unlink_ptp().
+ *
+ * (Importantly, in all such cases, when this is in operation, the top-level
+ * entry should not be able to refer to an actual page table entry that can be
+ * changed and consolidated into a large page. If large page consolidation is
+ * required here, then there will be much that needs to be reconsidered.)
+ *
+ * -----------------------------------------------
+ * Kernel Page Table Isolation and the Per-CPU HAT
+ * -----------------------------------------------
+ *
+ * All Intel CPUs that support speculative execution and paging are subject to a
+ * series of bugs that have been termed 'Meltdown'. These exploits allow a user
+ * process to read kernel memory through cache side channels and speculative
+ * execution. To mitigate this on vulnerable CPUs, we need to use a technique
+ * called kernel page table isolation. What this requires is that we have two
+ * different page table roots. When executing in kernel mode, we will use a %cr3
+ * value that has both the user and kernel pages. However when executing in user
+ * mode, we will need to have a %cr3 that has all of the user pages; however,
+ * only a subset of the kernel pages required to operate.
+ *
+ * These kernel pages that we need mapped are:
+ *
+ *   o Kernel Text that allows us to switch between the cr3 values.
+ *   o The current global descriptor table (GDT)
+ *   o The current interrupt descriptor table (IDT)
+ *   o The current task switching state (TSS)
+ *   o The current local descriptor table (LDT)
+ *   o Stacks and scratch space used by the interrupt handlers
+ *
+ * For more information on the stack switching techniques, construction of the
+ * trampolines, and more, please see i86pc/ml/kpti_trampolines.s. The most
+ * important part of these mappings are the following two constraints:
+ *
+ *   o The mappings are all per-CPU (except for read-only text)
+ *   o The mappings are static. They are all established before the CPU is
+ *     started (with the exception of the boot CPU).
+ *
+ * To facilitate the kernel page table isolation we employ our per-CPU
+ * page tables discussed in the previous section and add the notion of a per-CPU
+ * HAT. Fundamentally we have a second page table root. There is both a kernel
+ * page table (hci_pcp_l3ptes), and a user L3 page table (hci_user_l3ptes).
+ * Both will have the user page table entries copied into them, the same way
+ * that we discussed in the section 'Per-CPU Page Tables'.
+ *
+ * The complex part of this is how do we construct the set of kernel mappings
+ * that should be present when running with the user page table. To answer that,
+ * we add the notion of a per-CPU HAT. This HAT functions like a normal HAT,
+ * except that it's not really associated with an address space the same way
+ * that other HATs are.
+ *
+ * This HAT lives off of the 'struct hat_cpu_info' which is a member of the
+ * machcpu in the member hci_user_hat. We use this per-CPU HAT to create the set
+ * of kernel mappings that should be present on this CPU. The kernel mappings
+ * are added to the per-CPU HAT through the function hati_cpu_punchin(). Once a
+ * mapping has been punched in, it may not be punched out. The reason that we
+ * opt to leverage a HAT structure is that it knows how to allocate and manage
+ * all of the lower level page tables as required.
+ *
+ * Because all of the mappings are present at the beginning of time for this CPU
+ * and none of the mappings are in the kernel pageable segment, we don't have to
+ * worry about faulting on these HAT structures and thus the notion of the
+ * current HAT that we're using is always the appropriate HAT for the process
+ * (usually a user HAT or the kernel's HAT).
+ *
+ * A further constraint we place on the system with these per-CPU HATs is that
+ * they are not subject to htable_steal(). Because each CPU will have a rather
+ * fixed number of page tables, the same way that we don't steal from the
+ * kernel's HAT, it was determined that we should not steal from this HAT due to
+ * the complications involved and somewhat criminal nature of htable_steal().
+ *
+ * The per-CPU HAT is initialized in hat_pcp_setup() which is called as part of
+ * onlining the CPU, but before the CPU is actually started. The per-CPU HAT is
+ * removed in hat_pcp_teardown() which is called when a CPU is being offlined to
+ * be removed from the system (which is different from what psradm usually
+ * does).
+ *
+ * Finally, once the CPU has been onlined, the set of mappings in the per-CPU
+ * HAT must not change. The HAT related functions that we call are not meant to
+ * be called when we're switching between processes. For example, it is quite
+ * possible that if they were, they would try to grab an htable mutex which
+ * another thread might have. One needs to treat hat_switch() as though they
+ * were above LOCK_LEVEL and therefore _must not_ block under any circumstance.
  */
 
 #include <sys/machparam.h>
@@ -96,15 +281,18 @@ struct hat_mmu_info mmu;
  *
  * For 32 bit PAE support on i86pc, the kernel hat will use the 1st 4 entries
  * on this 4K page for its top level page table. The remaining groups of
- * 4 entries are used for per processor copies of user VLP pagetables for
+ * 4 entries are used for per processor copies of user PCP pagetables for
  * running threads.  See hat_switch() and reload_pae32() for details.
  *
- * vlp_page[0..3] - level==2 PTEs for kernel HAT
- * vlp_page[4..7] - level==2 PTEs for user thread on cpu 0
- * vlp_page[8..11]  - level==2 PTE for user thread on cpu 1
+ * pcp_page[0..3] - level==2 PTEs for kernel HAT
+ * pcp_page[4..7] - level==2 PTEs for user thread on cpu 0
+ * pcp_page[8..11]  - level==2 PTE for user thread on cpu 1
  * etc...
+ *
+ * On the 64-bit kernel, this is the normal root of the page table and there is
+ * nothing special about it when used for other CPUs.
  */
-static x86pte_t *vlp_page;
+static x86pte_t *pcp_page;
 
 /*
  * forward declaration of internal utility routines
@@ -171,7 +359,7 @@ kmutex_t	hat_list_lock;
 kcondvar_t	hat_list_cv;
 kmem_cache_t	*hat_cache;
 kmem_cache_t	*hat_hash_cache;
-kmem_cache_t	*vlp_hash_cache;
+kmem_cache_t	*hat32_hash_cache;
 
 /*
  * Simple statistics
@@ -237,6 +425,32 @@ hati_constructor(void *buf, void *handle, int kmflags)
 }
 
 /*
+ * Put it at the start of the global list of all hats (used by stealing)
+ *
+ * kas.a_hat is not in the list but is instead used to find the
+ * first and last items in the list.
+ *
+ * - kas.a_hat->hat_next points to the start of the user hats.
+ *   The list ends where hat->hat_next == NULL
+ *
+ * - kas.a_hat->hat_prev points to the last of the user hats.
+ *   The list begins where hat->hat_prev == NULL
+ */
+static void
+hat_list_append(hat_t *hat)
+{
+	mutex_enter(&hat_list_lock);
+	hat->hat_prev = NULL;
+	hat->hat_next = kas.a_hat->hat_next;
+	if (hat->hat_next)
+		hat->hat_next->hat_prev = hat;
+	else
+		kas.a_hat->hat_prev = hat;
+	kas.a_hat->hat_next = hat;
+	mutex_exit(&hat_list_lock);
+}
+
+/*
  * Allocate a hat structure for as. We also create the top level
  * htable and initialize it to contain the kernel hat entries.
  */
@@ -245,7 +459,7 @@ hat_alloc(struct as *as)
 {
 	hat_t			*hat;
 	htable_t		*ht;	/* top level htable */
-	uint_t			use_vlp;
+	uint_t			use_copied;
 	uint_t			r;
 	hat_kernel_range_t	*rp;
 	uintptr_t		va;
@@ -253,6 +467,7 @@ hat_alloc(struct as *as)
 	uint_t			start;
 	uint_t			cnt;
 	htable_t		*src;
+	boolean_t		use_hat32_cache;
 
 	/*
 	 * Once we start creating user process HATs we can enable
@@ -269,30 +484,71 @@ hat_alloc(struct as *as)
 
 #if defined(__xpv)
 	/*
-	 * No VLP stuff on the hypervisor due to the 64-bit split top level
+	 * No PCP stuff on the hypervisor due to the 64-bit split top level
 	 * page tables.  On 32-bit it's not needed as the hypervisor takes
 	 * care of copying the top level PTEs to a below 4Gig page.
 	 */
-	use_vlp = 0;
+	use_copied = 0;
+	use_hat32_cache = B_FALSE;
+	hat->hat_max_level = mmu.max_level;
+	hat->hat_num_copied = 0;
+	hat->hat_flags = 0;
 #else	/* __xpv */
-	/* 32 bit processes uses a VLP style hat when running with PAE */
 #if defined(__amd64)
-	use_vlp = (ttoproc(curthread)->p_model == DATAMODEL_ILP32);
+
+	/*
+	 * All processes use HAT_COPIED on the 64-bit kernel if KPTI is
+	 * turned on.
+	 */
+	if (ttoproc(curthread)->p_model == DATAMODEL_ILP32) {
+		use_copied = 1;
+		hat->hat_max_level = mmu.max_level32;
+		hat->hat_num_copied = mmu.num_copied_ents32;
+		use_hat32_cache = B_TRUE;
+		hat->hat_flags |= HAT_COPIED_32;
+		HATSTAT_INC(hs_hat_copied32);
+	} else if (kpti_enable == 1) {
+		use_copied = 1;
+		hat->hat_max_level = mmu.max_level;
+		hat->hat_num_copied = mmu.num_copied_ents;
+		use_hat32_cache = B_FALSE;
+		HATSTAT_INC(hs_hat_copied64);
+	} else {
+		use_copied = 0;
+		use_hat32_cache = B_FALSE;
+		hat->hat_max_level = mmu.max_level;
+		hat->hat_num_copied = 0;
+		hat->hat_flags = 0;
+		HATSTAT_INC(hs_hat_normal64);
+	}
 #elif defined(__i386)
-	use_vlp = mmu.pae_hat;
+	use_copied = mmu.pae_hat;
+	if (use_copied) {
+		use_hat32_cache = B_TRUE;
+		hat->hat_num_copied = mmu.num_copied_ents;
+		HATSTAT_INC(hs_hat_copied32);
+	} else {
+		use_hat32_cache = B_FALSE;
+		hat->hat_num_copied = 0;
+	}
 #endif
 #endif	/* __xpv */
-	if (use_vlp) {
-		hat->hat_flags = HAT_VLP;
-		bzero(hat->hat_vlp_ptes, VLP_SIZE);
+	if (use_copied) {
+		hat->hat_flags |= HAT_COPIED;
+		bzero(hat->hat_copied_ptes, sizeof (hat->hat_copied_ptes));
 	}
 
 	/*
-	 * Allocate the htable hash
+	 * Allocate the htable hash. For 32-bit PCP processes we use the
+	 * hat32_hash_cache. However, for 64-bit PCP processes we do not as the
+	 * number of entries that they have to handle is closer to
+	 * hat_hash_cache in count (though there will be more wastage when we
+	 * have more DRAM in the system and thus push down the user address
+	 * range).
 	 */
-	if ((hat->hat_flags & HAT_VLP)) {
-		hat->hat_num_hash = mmu.vlp_hash_cnt;
-		hat->hat_ht_hash = kmem_cache_alloc(vlp_hash_cache, KM_SLEEP);
+	if (use_hat32_cache) {
+		hat->hat_num_hash = mmu.hat32_hash_cnt;
+		hat->hat_ht_hash = kmem_cache_alloc(hat32_hash_cache, KM_SLEEP);
 	} else {
 		hat->hat_num_hash = mmu.hash_cnt;
 		hat->hat_ht_hash = kmem_cache_alloc(hat_hash_cache, KM_SLEEP);
@@ -310,7 +566,7 @@ hat_alloc(struct as *as)
 	hat->hat_htable = ht;
 
 #if defined(__amd64)
-	if (hat->hat_flags & HAT_VLP)
+	if (hat->hat_flags & HAT_COPIED)
 		goto init_done;
 #endif
 
@@ -335,9 +591,9 @@ hat_alloc(struct as *as)
 				    start;
 
 #if defined(__i386) && !defined(__xpv)
-			if (ht->ht_flags & HTABLE_VLP) {
-				bcopy(&vlp_page[start],
-				    &hat->hat_vlp_ptes[start],
+			if (ht->ht_flags & HTABLE_COPIED) {
+				bcopy(&pcp_page[start],
+				    &hat->hat_copied_ptes[start],
 				    cnt * sizeof (x86pte_t));
 				continue;
 			}
@@ -362,30 +618,54 @@ init_done:
 #endif
 	XPV_ALLOW_MIGRATE();
 
-	/*
-	 * Put it at the start of the global list of all hats (used by stealing)
-	 *
-	 * kas.a_hat is not in the list but is instead used to find the
-	 * first and last items in the list.
-	 *
-	 * - kas.a_hat->hat_next points to the start of the user hats.
-	 *   The list ends where hat->hat_next == NULL
-	 *
-	 * - kas.a_hat->hat_prev points to the last of the user hats.
-	 *   The list begins where hat->hat_prev == NULL
-	 */
-	mutex_enter(&hat_list_lock);
-	hat->hat_prev = NULL;
-	hat->hat_next = kas.a_hat->hat_next;
-	if (hat->hat_next)
-		hat->hat_next->hat_prev = hat;
-	else
-		kas.a_hat->hat_prev = hat;
-	kas.a_hat->hat_next = hat;
-	mutex_exit(&hat_list_lock);
+	hat_list_append(hat);
 
 	return (hat);
 }
+
+#if !defined(__xpv)
+/*
+ * Cons up a HAT for a CPU. This represents the user mappings. This will have
+ * various kernel pages punched into it manually. Importantly, this hat is
+ * ineligible for stealing. We really don't want to deal with this ever
+ * faulting and figuring out that this is happening, much like we don't with
+ * kas.
+ */
+static hat_t *
+hat_cpu_alloc(cpu_t *cpu)
+{
+	hat_t *hat;
+	htable_t *ht;
+
+	hat = kmem_cache_alloc(hat_cache, KM_SLEEP);
+	hat->hat_as = NULL;
+	mutex_init(&hat->hat_mutex, NULL, MUTEX_DEFAULT, NULL);
+	hat->hat_max_level = mmu.max_level;
+	hat->hat_num_copied = 0;
+	hat->hat_flags = HAT_PCP;
+
+	hat->hat_num_hash = mmu.hash_cnt;
+	hat->hat_ht_hash = kmem_cache_alloc(hat_hash_cache, KM_SLEEP);
+	bzero(hat->hat_ht_hash, hat->hat_num_hash * sizeof (htable_t *));
+
+	hat->hat_next = hat->hat_prev = NULL;
+
+	/*
+	 * Because this HAT will only ever be used by the current CPU, we'll go
+	 * ahead and set the CPUSET up to only point to the CPU in question.
+	 */
+	CPUSET_ADD(hat->hat_cpus, cpu->cpu_id);
+
+	hat->hat_htable = NULL;
+	hat->hat_ht_cached = NULL;
+	ht = htable_create(hat, (uintptr_t)0, TOP_LEVEL(hat), NULL);
+	hat->hat_htable = ht;
+
+	hat_list_append(hat);
+
+	return (hat);
+}
+#endif /* !__xpv */
 
 /*
  * process has finished executing but as has not been cleaned up yet.
@@ -442,6 +722,7 @@ hat_free_end(hat_t *hat)
 	/*
 	 * On the hypervisor, unpin top level page table(s)
 	 */
+	VERIFY3U(hat->hat_flags & HAT_PCP, ==, 0);
 	xen_unpin(hat->hat_htable->ht_pfn);
 #if defined(__amd64)
 	xen_unpin(hat->hat_user_ptable);
@@ -456,14 +737,25 @@ hat_free_end(hat_t *hat)
 	/*
 	 * Decide which kmem cache the hash table came from, then free it.
 	 */
-	if (hat->hat_flags & HAT_VLP)
-		cache = vlp_hash_cache;
-	else
+	if (hat->hat_flags & HAT_COPIED) {
+#if defined(__amd64)
+		if (hat->hat_flags & HAT_COPIED_32) {
+			cache = hat32_hash_cache;
+		} else {
+			cache = hat_hash_cache;
+		}
+#else
+		cache = hat32_hash_cache;
+#endif
+	} else {
 		cache = hat_hash_cache;
+	}
 	kmem_cache_free(cache, hat->hat_ht_hash);
 	hat->hat_ht_hash = NULL;
 
 	hat->hat_flags = 0;
+	hat->hat_max_level = 0;
+	hat->hat_num_copied = 0;
 	kmem_cache_free(hat_cache, hat);
 }
 
@@ -518,6 +810,53 @@ set_max_page_level()
 }
 
 /*
+ * Determine the number of slots that are in used in the top-most level page
+ * table for user memory. This is based on _userlimit. In effect this is similar
+ * to htable_va2entry, but without the convenience of having an htable.
+ */
+void
+mmu_calc_user_slots(void)
+{
+	uint_t ent, nptes;
+	uintptr_t shift;
+
+	nptes = mmu.top_level_count;
+	shift = _userlimit >> mmu.level_shift[mmu.max_level];
+	ent = shift & (nptes - 1);
+
+	/*
+	 * Ent tells us the slot that the page for _userlimit would fit in. We
+	 * need to add one to this to cover the total number of entries.
+	 */
+	mmu.top_level_uslots = ent + 1;
+
+#if defined(__amd64)
+	/*
+	 * When running 32-bit compatability processes on a 64-bit kernel, we
+	 * will only need to use one slot.
+	 */
+	mmu.top_level_uslots32 = 1;
+
+	/*
+	 * Record the number of PCP page table entries that we'll need to copy
+	 * around. For 64-bit processes this is the number of user slots. For
+	 * 32-bit proceses, this is 4 1 GiB pages.
+	 */
+	mmu.num_copied_ents = mmu.top_level_uslots;
+	mmu.num_copied_ents32 = 4;
+#elif defined(__xpv)
+	/*
+	 *
+	 */
+	if (mmu.pae_hat) {
+		mmu.num_copied_ents = 4;
+	} else {
+		mmu.num_copied_ents = 0;
+	}
+#endif
+}
+
+/*
  * Initialize hat data structures based on processor MMU information.
  */
 void
@@ -535,6 +874,17 @@ mmu_init(void)
 	if (is_x86_feature(x86_featureset, X86FSET_PGE) &&
 	    (getcr4() & CR4_PGE) != 0)
 		mmu.pt_global = PT_GLOBAL;
+
+#if defined(__amd64) && !defined(__xpv)
+	/*
+	 * The 64-bit x86 kernel has split user/kernel page tables. As such we
+	 * cannot have the global bit set. The simplest way for us to deal with
+	 * this is to just say that pt_global is zero, so the global bit isn't
+	 * present.
+	 */
+	if (kpti_enable == 1)
+		mmu.pt_global = 0;
+#endif
 
 	/*
 	 * Detect NX and PAE usage.
@@ -594,6 +944,11 @@ mmu_init(void)
 	mmu.ptes_per_table = 512;
 	mmu.top_level_count = 512;
 
+	/*
+	 * 32-bit processes only use 1 GB ptes.
+	 */
+	mmu.max_level32 = 2;
+
 	mmu.level_shift[0] = 12;
 	mmu.level_shift[1] = 21;
 	mmu.level_shift[2] = 30;
@@ -630,6 +985,7 @@ mmu_init(void)
 	}
 
 	set_max_page_level();
+	mmu_calc_user_slots();
 
 	mmu_page_sizes = mmu.max_page_level + 1;
 	mmu_exported_page_sizes = mmu.umax_page_level + 1;
@@ -665,7 +1021,7 @@ mmu_init(void)
 	mmu.hash_cnt = MMU_PAGESIZE / sizeof (htable_t *);
 	while (mmu.hash_cnt > 16 && mmu.hash_cnt >= max_htables)
 		mmu.hash_cnt >>= 1;
-	mmu.vlp_hash_cnt = mmu.hash_cnt;
+	mmu.hat32_hash_cnt = mmu.hash_cnt;
 
 #if defined(__amd64)
 	/*
@@ -714,14 +1070,15 @@ hat_init()
 	    NULL, 0, 0);
 
 	/*
-	 * VLP hats can use a smaller hash table size on large memroy machines
+	 * 32-bit PCP hats can use a smaller hash table size on large memory
+	 * machines
 	 */
-	if (mmu.hash_cnt == mmu.vlp_hash_cnt) {
-		vlp_hash_cache = hat_hash_cache;
+	if (mmu.hash_cnt == mmu.hat32_hash_cnt) {
+		hat32_hash_cache = hat_hash_cache;
 	} else {
-		vlp_hash_cache = kmem_cache_create("HatVlpHash",
-		    mmu.vlp_hash_cnt * sizeof (htable_t *), 0, NULL, NULL, NULL,
-		    NULL, 0, 0);
+		hat32_hash_cache = kmem_cache_create("Hat32Hash",
+		    mmu.hat32_hash_cnt * sizeof (htable_t *), 0, NULL, NULL,
+		    NULL, NULL, 0, 0);
 	}
 
 	/*
@@ -736,6 +1093,13 @@ hat_init()
 
 	CPUSET_ZERO(khat_cpuset);
 	CPUSET_ADD(khat_cpuset, CPU->cpu_id);
+
+	/*
+	 * The kernel HAT doesn't use PCP regardless of architectures.
+	 */
+	ASSERT3U(mmu.max_level, >, 0);
+	kas.a_hat->hat_max_level = mmu.max_level;
+	kas.a_hat->hat_num_copied = 0;
 
 	/*
 	 * The kernel hat's next pointer serves as the head of the hat list .
@@ -769,57 +1133,165 @@ hat_init()
 	    KM_SLEEP);
 }
 
+
+extern void kpti_tramp_start();
+extern void kpti_tramp_end();
+
+extern void kdi_isr_start();
+extern void kdi_isr_end();
+
+extern gate_desc_t kdi_idt[NIDT];
+
 /*
- * Prepare CPU specific pagetables for VLP processes on 64 bit kernels.
+ * Prepare per-CPU pagetables for all processes on the 64 bit kernel.
  *
  * Each CPU has a set of 2 pagetables that are reused for any 32 bit
- * process it runs. They are the top level pagetable, hci_vlp_l3ptes, and
- * the next to top level table for the bottom 512 Gig, hci_vlp_l2ptes.
+ * process it runs. They are the top level pagetable, hci_pcp_l3ptes, and
+ * the next to top level table for the bottom 512 Gig, hci_pcp_l2ptes.
  */
 /*ARGSUSED*/
 static void
-hat_vlp_setup(struct cpu *cpu)
+hat_pcp_setup(struct cpu *cpu)
 {
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	struct hat_cpu_info *hci = cpu->cpu_hat_info;
-	pfn_t pfn;
+	uintptr_t va;
+	size_t len;
 
 	/*
 	 * allocate the level==2 page table for the bottom most
 	 * 512Gig of address space (this is where 32 bit apps live)
 	 */
 	ASSERT(hci != NULL);
-	hci->hci_vlp_l2ptes = kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
+	hci->hci_pcp_l2ptes = kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
 
 	/*
 	 * Allocate a top level pagetable and copy the kernel's
-	 * entries into it. Then link in hci_vlp_l2ptes in the 1st entry.
+	 * entries into it. Then link in hci_pcp_l2ptes in the 1st entry.
 	 */
-	hci->hci_vlp_l3ptes = kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
-	hci->hci_vlp_pfn =
-	    hat_getpfnum(kas.a_hat, (caddr_t)hci->hci_vlp_l3ptes);
-	ASSERT(hci->hci_vlp_pfn != PFN_INVALID);
-	bcopy(vlp_page, hci->hci_vlp_l3ptes, MMU_PAGESIZE);
+	hci->hci_pcp_l3ptes = kmem_zalloc(MMU_PAGESIZE, KM_SLEEP);
+	hci->hci_pcp_l3pfn =
+	    hat_getpfnum(kas.a_hat, (caddr_t)hci->hci_pcp_l3ptes);
+	ASSERT3U(hci->hci_pcp_l3pfn, !=, PFN_INVALID);
+	bcopy(pcp_page, hci->hci_pcp_l3ptes, MMU_PAGESIZE);
 
-	pfn = hat_getpfnum(kas.a_hat, (caddr_t)hci->hci_vlp_l2ptes);
-	ASSERT(pfn != PFN_INVALID);
-	hci->hci_vlp_l3ptes[0] = MAKEPTP(pfn, 2);
-#endif /* __amd64 && !__xpv */
+	hci->hci_pcp_l2pfn =
+	    hat_getpfnum(kas.a_hat, (caddr_t)hci->hci_pcp_l2ptes);
+	ASSERT3U(hci->hci_pcp_l2pfn, !=, PFN_INVALID);
+
+	/*
+	 * Now go through and allocate the user version of these structures.
+	 * Unlike with the kernel version, we allocate a hat to represent the
+	 * top-level page table as that will make it much simpler when we need
+	 * to patch through user entries.
+	 */
+	hci->hci_user_hat = hat_cpu_alloc(cpu);
+	hci->hci_user_l3pfn = hci->hci_user_hat->hat_htable->ht_pfn;
+	ASSERT3U(hci->hci_user_l3pfn, !=, PFN_INVALID);
+	hci->hci_user_l3ptes =
+	    (x86pte_t *)hat_kpm_mapin_pfn(hci->hci_user_l3pfn);
+
+	/* Skip the rest of this if KPTI is switched off at boot. */
+	if (kpti_enable != 1)
+		return;
+
+	/*
+	 * OK, now that we have this we need to go through and punch the normal
+	 * holes in the CPU's hat for this. At this point we'll punch in the
+	 * following:
+	 *
+	 *   o GDT
+	 *   o IDT
+	 *   o LDT
+	 *   o Trampoline Code
+	 *   o machcpu KPTI page
+	 *   o kmdb ISR code page (just trampolines)
+	 *
+	 * If this is cpu0, then we also can initialize the following because
+	 * they'll have already been allocated.
+	 *
+	 *   o TSS for CPU 0
+	 *   o Double Fault for CPU 0
+	 *
+	 * The following items have yet to be allocated and have not been
+	 * punched in yet. They will be punched in later:
+	 *
+	 *   o TSS (mach_cpucontext_alloc_tables())
+	 *   o Double Fault Stack (mach_cpucontext_alloc_tables())
+	 */
+	hati_cpu_punchin(cpu, (uintptr_t)cpu->cpu_gdt, PROT_READ);
+	hati_cpu_punchin(cpu, (uintptr_t)cpu->cpu_idt, PROT_READ);
+
+	/*
+	 * As the KDI IDT is only active during kmdb sessions (including single
+	 * stepping), typically we don't actually need this punched in (we
+	 * consider the routines that switch to the user cr3 to be toxic).  But
+	 * if we ever accidentally end up on the user cr3 while on this IDT,
+	 * we'd prefer not to triple fault.
+	 */
+	hati_cpu_punchin(cpu, (uintptr_t)&kdi_idt, PROT_READ);
+
+	CTASSERT(((uintptr_t)&kpti_tramp_start % MMU_PAGESIZE) == 0);
+	CTASSERT(((uintptr_t)&kpti_tramp_end % MMU_PAGESIZE) == 0);
+	for (va = (uintptr_t)&kpti_tramp_start;
+	    va < (uintptr_t)&kpti_tramp_end; va += MMU_PAGESIZE) {
+		hati_cpu_punchin(cpu, va, PROT_READ | PROT_EXEC);
+	}
+
+	VERIFY3U(((uintptr_t)cpu->cpu_m.mcpu_ldt) % MMU_PAGESIZE, ==, 0);
+	for (va = (uintptr_t)cpu->cpu_m.mcpu_ldt, len = LDT_CPU_SIZE;
+	    len >= MMU_PAGESIZE; va += MMU_PAGESIZE, len -= MMU_PAGESIZE) {
+		hati_cpu_punchin(cpu, va, PROT_READ);
+	}
+
+	/* mcpu_pad2 is the start of the page containing the kpti_frames. */
+	hati_cpu_punchin(cpu, (uintptr_t)&cpu->cpu_m.mcpu_pad2[0],
+	    PROT_READ | PROT_WRITE);
+
+	if (cpu == &cpus[0]) {
+		/*
+		 * CPU0 uses a global for its double fault stack to deal with
+		 * the chicken and egg problem. We need to punch it into its
+		 * user HAT.
+		 */
+		extern char dblfault_stack0[];
+
+		hati_cpu_punchin(cpu, (uintptr_t)cpu->cpu_m.mcpu_tss,
+		    PROT_READ);
+
+		for (va = (uintptr_t)dblfault_stack0,
+		    len = DEFAULTSTKSZ; len >= MMU_PAGESIZE;
+		    va += MMU_PAGESIZE, len -= MMU_PAGESIZE) {
+			hati_cpu_punchin(cpu, va, PROT_READ | PROT_WRITE);
+		}
+	}
+
+	CTASSERT(((uintptr_t)&kdi_isr_start % MMU_PAGESIZE) == 0);
+	CTASSERT(((uintptr_t)&kdi_isr_end % MMU_PAGESIZE) == 0);
+	for (va = (uintptr_t)&kdi_isr_start;
+	    va < (uintptr_t)&kdi_isr_end; va += MMU_PAGESIZE) {
+		hati_cpu_punchin(cpu, va, PROT_READ | PROT_EXEC);
+	}
+#endif /* !__xpv */
 }
 
 /*ARGSUSED*/
 static void
-hat_vlp_teardown(cpu_t *cpu)
+hat_pcp_teardown(cpu_t *cpu)
 {
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	struct hat_cpu_info *hci;
 
 	if ((hci = cpu->cpu_hat_info) == NULL)
 		return;
-	if (hci->hci_vlp_l2ptes)
-		kmem_free(hci->hci_vlp_l2ptes, MMU_PAGESIZE);
-	if (hci->hci_vlp_l3ptes)
-		kmem_free(hci->hci_vlp_l3ptes, MMU_PAGESIZE);
+	if (hci->hci_pcp_l2ptes != NULL)
+		kmem_free(hci->hci_pcp_l2ptes, MMU_PAGESIZE);
+	if (hci->hci_pcp_l3ptes != NULL)
+		kmem_free(hci->hci_pcp_l3ptes, MMU_PAGESIZE);
+	if (hci->hci_user_hat != NULL) {
+		hat_free_start(hci->hci_user_hat);
+		hat_free_end(hci->hci_user_hat);
+	}
 #endif
 }
 
@@ -829,6 +1301,8 @@ hat_vlp_teardown(cpu_t *cpu)
 	kernel_ranges[r].hkr_end_va = e;	\
 	++r;					\
 }
+
+extern uint64_t kpti_safe_cr3;
 
 /*
  * Finish filling in the kernel hat.
@@ -915,13 +1389,16 @@ hat_init_finish(void)
 	/*
 	 * 32 bit PAE metal kernels use only 4 of the 512 entries in the
 	 * page holding the top level pagetable. We use the remainder for
-	 * the "per CPU" page tables for VLP processes.
+	 * the "per CPU" page tables for PCP processes.
 	 * Map the top level kernel pagetable into the kernel to make
 	 * it easy to use bcopy access these tables.
+	 *
+	 * PAE is required for the 64-bit kernel which uses this as well to
+	 * perform the per-CPU pagetables. See the big theory statement.
 	 */
 	if (mmu.pae_hat) {
-		vlp_page = vmem_alloc(heap_arena, MMU_PAGESIZE, VM_SLEEP);
-		hat_devload(kas.a_hat, (caddr_t)vlp_page, MMU_PAGESIZE,
+		pcp_page = vmem_alloc(heap_arena, MMU_PAGESIZE, VM_SLEEP);
+		hat_devload(kas.a_hat, (caddr_t)pcp_page, MMU_PAGESIZE,
 		    kas.a_hat->hat_htable->ht_pfn,
 #if !defined(__xpv)
 		    PROT_WRITE |
@@ -929,7 +1406,7 @@ hat_init_finish(void)
 		    PROT_READ | HAT_NOSYNC | HAT_UNORDERED_OK,
 		    HAT_LOAD | HAT_LOAD_NOCONSIST);
 	}
-	hat_vlp_setup(CPU);
+	hat_pcp_setup(CPU);
 
 	/*
 	 * Create kmap (cached mappings of kernel PTEs)
@@ -942,6 +1419,11 @@ hat_init_finish(void)
 	size = segmapsize;
 #endif
 	hat_kmap_init((uintptr_t)segmap_start, size);
+
+#if defined(__amd64) && !defined(__xpv)
+	ASSERT3U(kas.a_hat->hat_htable->ht_pfn, !=, PFN_INVALID);
+	ASSERT3U(kpti_safe_cr3, ==, MAKECR3(kas.a_hat->hat_htable->ht_pfn));
+#endif
 }
 
 /*
@@ -959,12 +1441,12 @@ reload_pae32(hat_t *hat, cpu_t *cpu)
 
 	/*
 	 * Load the 4 entries of the level 2 page table into this
-	 * cpu's range of the vlp_page and point cr3 at them.
+	 * cpu's range of the pcp_page and point cr3 at them.
 	 */
 	ASSERT(mmu.pae_hat);
-	src = hat->hat_vlp_ptes;
-	dest = vlp_page + (cpu->cpu_id + 1) * VLP_NUM_PTES;
-	for (i = 0; i < VLP_NUM_PTES; ++i) {
+	src = hat->hat_copied_ptes;
+	dest = pcp_page + (cpu->cpu_id + 1) * MAX_COPIED_PTES;
+	for (i = 0; i < MAX_COPIED_PTES; ++i) {
 		for (;;) {
 			pte = dest[i];
 			if (pte == src[i])
@@ -975,6 +1457,89 @@ reload_pae32(hat_t *hat, cpu_t *cpu)
 	}
 }
 #endif
+
+/*
+ * Update the PCP data on the CPU cpu to the one on the hat. If this is a 32-bit
+ * process, then we must update the L2 pages and then the L3. If this is a
+ * 64-bit process then we must update the L3 entries.
+ */
+static void
+hat_pcp_update(cpu_t *cpu, const hat_t *hat)
+{
+	ASSERT3U(hat->hat_flags & HAT_COPIED, !=, 0);
+
+	if ((hat->hat_flags & HAT_COPIED_32) != 0) {
+		const x86pte_t *l2src;
+		x86pte_t *l2dst, *l3ptes, *l3uptes;
+		/*
+		 * This is a 32-bit process. To set this up, we need to do the
+		 * following:
+		 *
+		 *  - Copy the 4 L2 PTEs into the dedicated L2 table
+		 *  - Zero the user L3 PTEs in the user and kernel page table
+		 *  - Set the first L3 PTE to point to the CPU L2 table
+		 */
+		l2src = hat->hat_copied_ptes;
+		l2dst = cpu->cpu_hat_info->hci_pcp_l2ptes;
+		l3ptes = cpu->cpu_hat_info->hci_pcp_l3ptes;
+		l3uptes = cpu->cpu_hat_info->hci_user_l3ptes;
+
+		l2dst[0] = l2src[0];
+		l2dst[1] = l2src[1];
+		l2dst[2] = l2src[2];
+		l2dst[3] = l2src[3];
+
+		/*
+		 * Make sure to use the mmu to get the number of slots. The
+		 * number of PLP entries that this has will always be less as
+		 * it's a 32-bit process.
+		 */
+		bzero(l3ptes, sizeof (x86pte_t) * mmu.top_level_uslots);
+		l3ptes[0] = MAKEPTP(cpu->cpu_hat_info->hci_pcp_l2pfn, 2);
+		bzero(l3uptes, sizeof (x86pte_t) * mmu.top_level_uslots);
+		l3uptes[0] = MAKEPTP(cpu->cpu_hat_info->hci_pcp_l2pfn, 2);
+	} else {
+		/*
+		 * This is a 64-bit process. To set this up, we need to do the
+		 * following:
+		 *
+		 *  - Zero the 4 L2 PTEs in the CPU structure for safety
+		 *  - Copy over the new user L3 PTEs into the kernel page table
+		 *  - Copy over the new user L3 PTEs into the user page table
+		 */
+		ASSERT3S(kpti_enable, ==, 1);
+		bzero(cpu->cpu_hat_info->hci_pcp_l2ptes, sizeof (x86pte_t) * 4);
+		bcopy(hat->hat_copied_ptes, cpu->cpu_hat_info->hci_pcp_l3ptes,
+		    sizeof (x86pte_t) * mmu.top_level_uslots);
+		bcopy(hat->hat_copied_ptes, cpu->cpu_hat_info->hci_user_l3ptes,
+		    sizeof (x86pte_t) * mmu.top_level_uslots);
+	}
+}
+
+static void
+reset_kpti(struct kpti_frame *fr, uint64_t kcr3)
+{
+	ASSERT3U(fr->kf_tr_flag, ==, 0);
+#if DEBUG
+	if (fr->kf_kernel_cr3 != 0) {
+		ASSERT3U(fr->kf_lower_redzone, ==, 0xdeadbeefdeadbeef);
+		ASSERT3U(fr->kf_middle_redzone, ==, 0xdeadbeefdeadbeef);
+		ASSERT3U(fr->kf_upper_redzone, ==, 0xdeadbeefdeadbeef);
+	}
+#endif
+
+	bzero(fr, offsetof(struct kpti_frame, kf_kernel_cr3));
+	bzero(&fr->kf_unused, sizeof (struct kpti_frame) -
+	    offsetof(struct kpti_frame, kf_unused));
+
+	fr->kf_kernel_cr3 = kcr3;
+	fr->kf_user_cr3 = 0;
+	fr->kf_tr_ret_rsp = (uintptr_t)&fr->kf_tr_rsp;
+
+	fr->kf_lower_redzone = 0xdeadbeefdeadbeef;
+	fr->kf_middle_redzone = 0xdeadbeefdeadbeef;
+	fr->kf_upper_redzone = 0xdeadbeefdeadbeef;
+}
 
 /*
  * Switch to a new active hat, maintaining bit masks to track active CPUs.
@@ -1010,17 +1575,9 @@ hat_switch(hat_t *hat)
 	/*
 	 * now go ahead and load cr3
 	 */
-	if (hat->hat_flags & HAT_VLP) {
-#if defined(__amd64)
-		x86pte_t *vlpptep = cpu->cpu_hat_info->hci_vlp_l2ptes;
-
-		VLP_COPY(hat->hat_vlp_ptes, vlpptep);
-		newcr3 = MAKECR3(cpu->cpu_hat_info->hci_vlp_pfn);
-#elif defined(__i386)
-		reload_pae32(hat, cpu);
-		newcr3 = MAKECR3(kas.a_hat->hat_htable->ht_pfn) +
-		    (cpu->cpu_id + 1) * VLP_SIZE;
-#endif
+	if (hat->hat_flags & HAT_COPIED) {
+		hat_pcp_update(cpu, hat);
+		newcr3 = MAKECR3(cpu->cpu_hat_info->hci_pcp_l3pfn);
 	} else {
 		newcr3 = MAKECR3((uint64_t)hat->hat_htable->ht_pfn);
 	}
@@ -1032,7 +1589,7 @@ hat_switch(hat_t *hat)
 
 		t[0].cmd = MMUEXT_NEW_BASEPTR;
 		t[0].arg1.mfn = mmu_btop(pa_to_ma(newcr3));
-#if defined(__amd64)
+
 		/*
 		 * There's an interesting problem here, as to what to
 		 * actually specify when switching to the kernel hat.
@@ -1044,7 +1601,7 @@ hat_switch(hat_t *hat)
 		else
 			t[1].arg1.mfn = pfn_to_mfn(hat->hat_user_ptable);
 		++opcnt;
-#endif	/* __amd64 */
+
 		if (HYPERVISOR_mmuext_op(t, opcnt, &retcnt, DOMID_SELF) < 0)
 			panic("HYPERVISOR_mmu_update() failed");
 		ASSERT(retcnt == opcnt);
@@ -1052,6 +1609,16 @@ hat_switch(hat_t *hat)
 	}
 #else
 	setcr3(newcr3);
+	reset_kpti(&cpu->cpu_m.mcpu_kpti, newcr3);
+	reset_kpti(&cpu->cpu_m.mcpu_kpti_flt, newcr3);
+	reset_kpti(&cpu->cpu_m.mcpu_kpti_dbg, newcr3);
+
+	if (kpti_enable == 1) {
+		newcr3 = MAKECR3(cpu->cpu_hat_info->hci_user_l3pfn);
+		cpu->cpu_m.mcpu_kpti.kf_user_cr3 = newcr3;
+		cpu->cpu_m.mcpu_kpti_dbg.kf_user_cr3 = newcr3;
+		cpu->cpu_m.mcpu_kpti_flt.kf_user_cr3 = newcr3;
+	}
 #endif
 	ASSERT(cpu == CPU);
 }
@@ -1364,10 +1931,9 @@ hati_pte_map(
 			ASSERT(flags & HAT_LOAD_NOCONSIST);
 		}
 #if defined(__amd64)
-		if (ht->ht_flags & HTABLE_VLP) {
+		if (ht->ht_flags & HTABLE_COPIED) {
 			cpu_t *cpu = CPU;
-			x86pte_t *vlpptep = cpu->cpu_hat_info->hci_vlp_l2ptes;
-			VLP_COPY(hat->hat_vlp_ptes, vlpptep);
+			hat_pcp_update(cpu, hat);
 		}
 #endif
 		HTABLE_INC(ht->ht_valid_cnt);
@@ -1439,7 +2005,8 @@ hati_load_common(
 	++curthread->t_hatdepth;
 	ASSERT(curthread->t_hatdepth < 16);
 
-	ASSERT(hat == kas.a_hat || AS_LOCK_HELD(hat->hat_as));
+	ASSERT(hat == kas.a_hat || (hat->hat_flags & HAT_PCP) != 0 ||
+	    AS_LOCK_HELD(hat->hat_as));
 
 	if (flags & HAT_LOAD_SHARE)
 		hat->hat_flags |= HAT_SHARED;
@@ -1459,15 +2026,23 @@ hati_load_common(
 		ht = htable_create(hat, va, level, NULL);
 		ASSERT(ht != NULL);
 	}
+	/*
+	 * htable_va2entry checks this condition as well, but it won't include
+	 * much useful info in the panic. So we do it in advance here to include
+	 * all the context.
+	 */
+	if (ht->ht_vaddr > va || va > HTABLE_LAST_PAGE(ht)) {
+		panic("hati_load_common: bad htable: va=%p, last page=%p, "
+		    "ht->ht_vaddr=%p, ht->ht_level=%d", (void *)va,
+		    (void *)HTABLE_LAST_PAGE(ht), (void *)ht->ht_vaddr,
+		    (int)ht->ht_level);
+	}
 	entry = htable_va2entry(va, ht);
 
 	/*
 	 * a bunch of paranoid error checking
 	 */
 	ASSERT(ht->ht_busy > 0);
-	if (ht->ht_vaddr > va || va > HTABLE_LAST_PAGE(ht))
-		panic("hati_load_common: bad htable %p, va %p",
-		    (void *)ht, (void *)va);
 	ASSERT(ht->ht_level == level);
 
 	/*
@@ -1958,14 +2533,12 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 	/*
 	 * Otherwise we reload cr3 to effect a complete TLB flush.
 	 *
-	 * A reload of cr3 on a VLP process also means we must also recopy in
-	 * the pte values from the struct hat
+	 * A reload of cr3 when using PCP also means we must also recopy in the
+	 * pte values from the struct hat
 	 */
-	if (hat->hat_flags & HAT_VLP) {
+	if (hat->hat_flags & HAT_COPIED) {
 #if defined(__amd64)
-		x86pte_t *vlpptep = CPU->cpu_hat_info->hci_vlp_l2ptes;
-
-		VLP_COPY(hat->hat_vlp_ptes, vlpptep);
+		hat_pcp_update(CPU, hat);
 #elif defined(__i386)
 		reload_pae32(hat, CPU);
 #endif
@@ -4075,7 +4648,7 @@ hat_cpu_online(struct cpu *cpup)
 {
 	if (cpup != CPU) {
 		x86pte_cpu_init(cpup);
-		hat_vlp_setup(cpup);
+		hat_pcp_setup(cpup);
 	}
 	CPUSET_ATOMIC_ADD(khat_cpuset, cpup->cpu_id);
 }
@@ -4090,7 +4663,7 @@ hat_cpu_offline(struct cpu *cpup)
 	ASSERT(cpup != CPU);
 
 	CPUSET_ATOMIC_DEL(khat_cpuset, cpup->cpu_id);
-	hat_vlp_teardown(cpup);
+	hat_pcp_teardown(cpup);
 	x86pte_cpu_fini(cpup);
 }
 
@@ -4406,7 +4979,7 @@ hat_kpm_mseghash_update(pgcnt_t inx, struct memseg *msp)
 #ifndef	__xpv
 void
 hat_kpm_addmem_mseg_update(struct memseg *msp, pgcnt_t nkpmpgs,
-	offset_t kpm_pages_off)
+    offset_t kpm_pages_off)
 {
 	_NOTE(ARGUNUSED(nkpmpgs, kpm_pages_off));
 	pfn_t base, end;
@@ -4465,7 +5038,7 @@ hat_kpm_delmem_mseg_update(struct memseg *msp, struct memseg **mspp)
 
 void
 hat_kpm_split_mseg_update(struct memseg *msp, struct memseg **mspp,
-	struct memseg *lo, struct memseg *mid, struct memseg *hi)
+    struct memseg *lo, struct memseg *mid, struct memseg *hi)
 {
 	_NOTE(ARGUNUSED(msp, mspp, lo, mid, hi));
 	ASSERT(0);
@@ -4537,3 +5110,32 @@ hat_release_mapping(hat_t *hat, caddr_t addr)
 	XPV_ALLOW_MIGRATE();
 }
 #endif	/* __xpv */
+
+/*
+ * Helper function to punch in a mapping that we need with the specified
+ * attributes.
+ */
+void
+hati_cpu_punchin(cpu_t *cpu, uintptr_t va, uint_t attrs)
+{
+	int ret;
+	pfn_t pfn;
+	hat_t *cpu_hat = cpu->cpu_hat_info->hci_user_hat;
+
+	ASSERT3S(kpti_enable, ==, 1);
+	ASSERT3P(cpu_hat, !=, NULL);
+	ASSERT3U(cpu_hat->hat_flags & HAT_PCP, ==, HAT_PCP);
+	ASSERT3U(va & (MMU_PAGESIZE - 1), ==, 0);
+
+	pfn = hat_getpfnum(kas.a_hat, (caddr_t)va);
+	VERIFY3U(pfn, !=, PFN_INVALID);
+
+	/*
+	 * We purposefully don't try to find the page_t. This means that this
+	 * will be marked PT_NOCONSIST; however, given that this is pretty much
+	 * a static mapping that we're using we should be relatively OK.
+	 */
+	attrs |= HAT_STORECACHING_OK;
+	ret = hati_load_common(cpu_hat, va, NULL, attrs, 0, 0, pfn);
+	VERIFY3S(ret, ==, 0);
+}

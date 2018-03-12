@@ -432,6 +432,9 @@ ttrace_dumpregs(trap_trace_rec_t *rec)
 	mdb_printf(THREEREGS, DUMP(gs), "trp", regs->r_trapno, DUMP(err));
 	mdb_printf(THREEREGS, DUMP(rip), DUMP(cs), DUMP(rfl));
 	mdb_printf(THREEREGS, DUMP(rsp), DUMP(ss), "cr2", rec->ttr_cr2);
+	mdb_printf("         %3s: %16lx %3s: %16lx\n",
+	    "fsb", regs->__r_fsbase,
+	    "gsb", regs->__r_gsbase);
 	mdb_printf("\n");
 }
 
@@ -753,7 +756,18 @@ ptable_help(void)
 	    "Given a PFN holding a page table, print its contents, and\n"
 	    "the address of the corresponding htable structure.\n"
 	    "\n"
-	    "-m Interpret the PFN as an MFN (machine frame number)\n");
+	    "-m Interpret the PFN as an MFN (machine frame number)\n"
+	    "-l force page table level (3 is top)\n");
+}
+
+static void
+ptmap_help(void)
+{
+	mdb_printf(
+	    "Report all mappings represented by the page table hierarchy\n"
+	    "rooted at the given cr3 value / physical address.\n"
+	    "\n"
+	    "-w run ::whatis on mapping start addresses\n");
 }
 
 static const char *const scalehrtime_desc =
@@ -1000,10 +1014,10 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("%%cr2 = 0x%08x <%a>\n", cr2, cr2);
 
 	if ((cr4 & CR4_PCIDE)) {
-		mdb_printf("%%cr3 = 0x%08x <pfn:%lu pcid:%u>\n",
+		mdb_printf("%%cr3 = 0x%08x <pfn:0x%lx pcid:%u>\n",
 		    cr3 >> MMU_PAGESHIFT, cr3 & MMU_PAGEOFFSET);
 	} else {
-		mdb_printf("%%cr3 = 0x%08x <pfn:%lu flags:%b>\n", cr3,
+		mdb_printf("%%cr3 = 0x%08x <pfn:0x%lx flags:%b>\n", cr3,
 		    cr3 >> MMU_PAGESHIFT, cr3, cr3_flag_bits);
 	}
 
@@ -1024,9 +1038,11 @@ static const mdb_dcmd_t dcmds[] = {
 	    report_maps_dcmd, report_maps_help },
 	{ "htables", "", "Given hat_t *, lists all its htable_t * values",
 	    htables_dcmd, htables_help },
-	{ "ptable", ":[-m]", "Given PFN, dump contents of a page table",
+	{ "ptable", ":[-lm]", "Given PFN, dump contents of a page table",
 	    ptable_dcmd, ptable_help },
-	{ "pte", ":[-p XXXXX] [-l N]", "print human readable page table entry",
+	{ "ptmap", ":", "Given a cr3 value, dump all mappings",
+	    ptmap_dcmd, ptmap_help },
+	{ "pte", ":[-l N]", "print human readable page table entry",
 	    pte_dcmd },
 	{ "pfntomfn", ":", "convert physical page to hypervisor machine page",
 	    pfntomfn_dcmd },

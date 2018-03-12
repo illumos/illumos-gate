@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc.  All rights reserverd.
+ * Copyright (c) 2018 Joyent, Inc.  All rights reserverd.
  */
 
 /*
@@ -471,6 +471,21 @@
 #include <sys/hypervisor.h>
 #endif
 
+#if defined(__amd64) && !defined(__xpv)
+/* If this fails, then the padding numbers in machcpuvar.h are wrong. */
+CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_pad))
+    < MMU_PAGESIZE);
+CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_kpti))
+    >= MMU_PAGESIZE);
+CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_kpti_dbg))
+    < 2 * MMU_PAGESIZE);
+CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_pad2))
+    < 2 * MMU_PAGESIZE);
+CTASSERT(((sizeof (struct kpti_frame)) & 0xF) == 0);
+CTASSERT(((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_kpti_dbg))
+    & 0xF) == 0);
+CTASSERT((offsetof(struct kpti_frame, kf_tr_rsp) & 0xF) == 0);
+#endif
 
 #if defined(__xpv) && defined(DEBUG)
 
@@ -1472,6 +1487,21 @@ loop:
 #endif	/* __amd64 */
 		return (1);
 	}
+
+#if !defined(__xpv)
+	/*
+	 * Assert that we're not trying to return into the syscall return
+	 * trampolines. Things will go baaaaad if we try to do that.
+	 *
+	 * Note that none of these run with interrupts on, so this should
+	 * never happen (even in the sysexit case the STI doesn't take effect
+	 * until after sysexit finishes).
+	 */
+	extern void tr_sysc_ret_start();
+	extern void tr_sysc_ret_end();
+	ASSERT(!(rp->r_pc >= (uintptr_t)tr_sysc_ret_start &&
+	    rp->r_pc <= (uintptr_t)tr_sysc_ret_end));
+#endif
 
 	/*
 	 * Here if we are returning to supervisor mode.

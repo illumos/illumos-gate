@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
@@ -133,6 +133,9 @@ const mdb_tgt_regdesc_t mdb_amd64_kregs[] = {
 	{ "sp",  KREG_RSP, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "spl", KREG_RSP, MDB_TGT_R_EXPORT | MDB_TGT_R_8L },
 	{ "ss", KREG_SS, MDB_TGT_R_EXPORT },
+	{ "gsbase", KREG_GSBASE, MDB_TGT_R_EXPORT },
+	{ "kgsbase", KREG_KGSBASE, MDB_TGT_R_EXPORT },
+	{ "cr2", KREG_CR2, MDB_TGT_R_EXPORT },
 	{ NULL, 0, 0 }
 };
 
@@ -186,13 +189,13 @@ mdb_amd64_printregs(const mdb_tgt_gregset_t *gregs)
 	    (rflags & KREG_EFLAGS_PF_MASK) ? "PF" : "pf",
 	    (rflags & KREG_EFLAGS_CF_MASK) ? "CF" : "cf");
 
-	mdb_printf("%24s%%cs = 0x%04x\t%%ds = 0x%04x\t%%es = 0x%04x\n",
-	    " ", kregs[KREG_CS], kregs[KREG_DS], kregs[KREG_ES]);
-
-	mdb_printf("%%trapno = 0x%x\t\t%%fs = 0x%04x\t%%gs = 0x%04x\n",
-	    kregs[KREG_TRAPNO], (kregs[KREG_FS] & 0xffff),
-	    (kregs[KREG_GS] & 0xffff));
-	mdb_printf("   %%err = 0x%x\n", kregs[KREG_ERR]);
+	mdb_printf("%%cs = 0x%04x\t%%ds = 0x%04x\t"
+	    "%%es = 0x%04x\t%%fs = 0x%04x\n", kregs[KREG_CS], kregs[KREG_DS],
+	    kregs[KREG_ES], kregs[KREG_FS] & 0xffff);
+	mdb_printf("%%gs = 0x%04x\t%%gsbase = 0x%lx\t%%kgsbase = 0x%lx\n",
+	    kregs[KREG_GS] & 0xffff, kregs[KREG_GSBASE], kregs[KREG_KGSBASE]);
+	mdb_printf("%%trapno = 0x%x\t%%err = 0x%x\t%%cr2 = 0x%lx\n",
+	    kregs[KREG_TRAPNO], kregs[KREG_ERR], kregs[KREG_CR2]);
 }
 
 int

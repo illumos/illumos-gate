@@ -26,7 +26,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2011 Joyent, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc
  */
 
 /*
@@ -174,13 +174,15 @@ mach_cpucontext_alloc_tables(struct cpu *cp)
 {
 	tss_t *ntss;
 	struct cpu_tables *ct;
+	size_t ctsize;
 
 	/*
 	 * Allocate space for stack, tss, gdt and idt. We round the size
 	 * allotted for cpu_tables up, so that the TSS is on a unique page.
 	 * This is more efficient when running in virtual machines.
 	 */
-	ct = kmem_zalloc(P2ROUNDUP(sizeof (*ct), PAGESIZE), KM_SLEEP);
+	ctsize = P2ROUNDUP(sizeof (*ct), PAGESIZE);
+	ct = kmem_zalloc(ctsize, KM_SLEEP);
 	if ((uintptr_t)ct & PAGEOFFSET)
 		panic("mach_cpucontext_alloc_tables: cpu%d misaligned tables",
 		    cp->cpu_id);
@@ -188,16 +190,62 @@ mach_cpucontext_alloc_tables(struct cpu *cp)
 	ntss = cp->cpu_tss = &ct->ct_tss;
 
 #if defined(__amd64)
+	uintptr_t va;
+	size_t len;
 
 	/*
 	 * #DF (double fault).
 	 */
-	ntss->tss_ist1 = (uint64_t)&ct->ct_stack[sizeof (ct->ct_stack)];
+	ntss->tss_ist1 = (uintptr_t)&ct->ct_stack1[sizeof (ct->ct_stack1)];
+
+	/*
+	 * #NM (non-maskable interrupt)
+	 */
+	ntss->tss_ist2 = (uintptr_t)&ct->ct_stack2[sizeof (ct->ct_stack2)];
+
+	/*
+	 * #MC (machine check exception / hardware error)
+	 */
+	ntss->tss_ist3 = (uintptr_t)&ct->ct_stack3[sizeof (ct->ct_stack3)];
+
+	/*
+	 * #DB, #BP debug interrupts and KDI/kmdb
+	 */
+	ntss->tss_ist4 = (uintptr_t)&cp->cpu_m.mcpu_kpti_dbg.kf_tr_rsp;
+
+	if (kpti_enable == 1) {
+		/*
+		 * #GP, #PF, #SS fault interrupts
+		 */
+		ntss->tss_ist5 = (uintptr_t)&cp->cpu_m.mcpu_kpti_flt.kf_tr_rsp;
+
+		/*
+		 * Used by all other interrupts
+		 */
+		ntss->tss_ist6 = (uint64_t)&cp->cpu_m.mcpu_kpti.kf_tr_rsp;
+
+		/*
+		 * On AMD64 we need to make sure that all of the pages of the
+		 * struct cpu_tables are punched through onto the user CPU for
+		 * kpti.
+		 *
+		 * The final page will always be the TSS, so treat that
+		 * separately.
+		 */
+		for (va = (uintptr_t)ct, len = ctsize - MMU_PAGESIZE;
+		    len >= MMU_PAGESIZE;
+		    len -= MMU_PAGESIZE, va += MMU_PAGESIZE) {
+			/* The doublefault stack must be RW */
+			hati_cpu_punchin(cp, va, PROT_READ | PROT_WRITE);
+		}
+		ASSERT3U((uintptr_t)ntss, ==, va);
+		hati_cpu_punchin(cp, (uintptr_t)ntss, PROT_READ);
+	}
 
 #elif defined(__i386)
 
 	ntss->tss_esp0 = ntss->tss_esp1 = ntss->tss_esp2 = ntss->tss_esp =
-	    (uint32_t)&ct->ct_stack[sizeof (ct->ct_stack)];
+	    (uint32_t)&ct->ct_stack1[sizeof (ct->ct_stack1)];
 
 	ntss->tss_ss0 = ntss->tss_ss1 = ntss->tss_ss2 = ntss->tss_ss = KDS_SEL;
 
