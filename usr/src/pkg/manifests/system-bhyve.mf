@@ -1,0 +1,62 @@
+#
+# CDDL HEADER START
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2018 Joyent, Inc.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/bhyve@$(PKGVERS)
+set name=pkg.description value="BSD hypervisor"
+set name=pkg.summary value="BSD hypervisor"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Virtualization
+set name=variant.arch value=i386
+dir path=kernel group=sys
+dir path=kernel/kmdb group=sys
+dir path=kernel/kmdb/$(ARCH64) group=sys
+dir path=lib group=bin
+dir path=lib/$(ARCH64) group=bin
+dir path=usr group=sys
+dir path=usr/kernel/drv group=sys
+dir path=usr/kernel/drv/$(ARCH64) group=sys
+dir path=usr/lib group=bin
+dir path=usr/lib/mdb group=sys
+dir path=usr/lib/mdb/kvm group=sys
+dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+dir path=usr/sbin
+driver name=ppt
+driver name=viona
+driver name=vmm
+file path=kernel/kmdb/$(ARCH64)/vmm mode=0555
+file path=lib/$(ARCH64)/libvmmapi.so.1
+file path=usr/kernel/drv/$(ARCH64)/ppt
+file path=usr/kernel/drv/$(ARCH64)/viona
+file path=usr/kernel/drv/$(ARCH64)/vmm
+file path=usr/kernel/drv/ppt.conf
+file path=usr/kernel/drv/viona.conf
+file path=usr/kernel/drv/vmm.conf
+file path=usr/lib/mdb/kvm/$(ARCH64)/vmm.so mode=0555
+file path=usr/sbin/$(ARCH64)/bhyve mode=0555
+file path=usr/sbin/$(ARCH64)/bhyvectl mode=0555
+hardlink path=usr/sbin/bhyve target=../lib/isaexec
+hardlink path=usr/sbin/bhyvectl target=../lib/isaexec
+license lic_CDDL license=lic_CDDL
+link path=lib/$(ARCH64)/libvmmapi.so target=./libvmmapi.so.1

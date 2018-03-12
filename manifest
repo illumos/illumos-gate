@@ -1307,6 +1307,8 @@ f lib/amd64/libuuid.so.1 0755 root bin
 s lib/amd64/libuuid.so=libuuid.so.1
 f lib/amd64/libuutil.so.1 0755 root bin
 s lib/amd64/libuutil.so=libuutil.so.1
+f lib/amd64/libvmmapi.so.1 0755 root bin
+s lib/amd64/libvmmapi.so=libvmmapi.so.1
 f lib/amd64/libw.so.1 0755 root bin
 s lib/amd64/libw.so=libw.so.1
 f lib/amd64/libxnet.so.1 0755 root bin
@@ -4574,6 +4576,7 @@ f usr/kernel/drv/amd64/lxautofs 0755 root sys
 f usr/kernel/drv/amd64/nsmb 0755 root sys
 f usr/kernel/drv/amd64/pm 0755 root sys
 f usr/kernel/drv/amd64/pool 0755 root sys
+f usr/kernel/drv/amd64/ppt 0755 root sys
 f usr/kernel/drv/amd64/ptm 0755 root sys
 f usr/kernel/drv/amd64/pts 0755 root sys
 f usr/kernel/drv/amd64/signalfd 0755 root sys
@@ -4581,6 +4584,8 @@ f usr/kernel/drv/amd64/smbsrv 0755 root sys
 f usr/kernel/drv/amd64/sppp 0755 root sys
 f usr/kernel/drv/amd64/sppptun 0755 root sys
 f usr/kernel/drv/amd64/timerfd 0755 root sys
+f usr/kernel/drv/amd64/viona 0755 root sys
+f usr/kernel/drv/amd64/vmm 0755 root sys
 f usr/kernel/drv/amd64/zcons 0755 root sys
 f usr/kernel/drv/amd64/zfd 0755 root sys
 f usr/kernel/drv/bpf.conf 0644 root sys
@@ -4599,6 +4604,7 @@ f usr/kernel/drv/lx_systrace.conf 0644 root sys
 f usr/kernel/drv/nsmb.conf 0644 root sys
 f usr/kernel/drv/pm.conf 0644 root sys
 f usr/kernel/drv/pool.conf 0644 root sys
+f usr/kernel/drv/ppt.conf 0644 root sys
 f usr/kernel/drv/ptm.conf 0644 root sys
 f usr/kernel/drv/pts.conf 0644 root sys
 f usr/kernel/drv/signalfd.conf 0644 root sys
@@ -4606,6 +4612,8 @@ f usr/kernel/drv/smbsrv.conf 0644 root sys
 f usr/kernel/drv/sppp.conf 0644 root sys
 f usr/kernel/drv/sppptun.conf 0644 root sys
 f usr/kernel/drv/timerfd.conf 0644 root sys
+f usr/kernel/drv/viona.conf 0644 root sys
+f usr/kernel/drv/vmm.conf 0644 root sys
 d usr/kernel/fs 0755 root sys
 d usr/kernel/fs/amd64 0755 root sys
 f usr/kernel/fs/amd64/fdfs 0755 root sys
@@ -5099,6 +5107,7 @@ f usr/lib/brand/bhyve/uninstall 0555 root sys
 f usr/lib/brand/bhyve/config.xml 0444 root sys
 f usr/lib/brand/bhyve/platform.xml 0444 root sys
 f usr/lib/brand/bhyve/statechange 0555 root sys
+h usr/lib/brand/bhyve/zhyve=usr/sbin/amd64/bhyve
 d usr/lib/brand/lx 0755 root bin
 s usr/lib/brand/lx/64=amd64
 d usr/lib/brand/lx/amd64 0755 root bin
@@ -9601,6 +9610,7 @@ f usr/lib/mdb/kvm/amd64/sv.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ufs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/uhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/usba.so 0555 root sys
+f usr/lib/mdb/kvm/amd64/vmm.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/xhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/zfs.so 0555 root sys
 d usr/lib/mdb/proc 0755 root sys
@@ -10263,6 +10273,8 @@ f usr/sbin/acpixtract 0555 root bin
 f usr/sbin/add_drv 0555 root bin
 f usr/sbin/allocate 4555 root bin
 d usr/sbin/amd64 0755 root bin
+f usr/sbin/amd64/bhyve 0555 root sys
+f usr/sbin/amd64/bhyvectl 0555 root sys
 f usr/sbin/amd64/dtrace 0555 root bin
 f usr/sbin/amd64/intrstat 0555 root bin
 f usr/sbin/amd64/ipf 0555 root bin
@@ -10284,6 +10296,8 @@ f usr/sbin/auditstat 0555 root bin
 h usr/sbin/audlinks=usr/sbin/devfsadm
 s usr/sbin/automount=../lib/fs/autofs/automount
 s usr/sbin/autopush=../../sbin/autopush
+h usr/sbin/bhyve=usr/lib/isaexec
+h usr/sbin/bhyvectl=usr/lib/isaexec
 f usr/sbin/cfgadm 0555 root bin
 f usr/sbin/check-hostname 0555 root mail
 f usr/sbin/check-permissions 0555 root mail
