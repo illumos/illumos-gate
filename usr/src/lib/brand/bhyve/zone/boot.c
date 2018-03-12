@@ -128,63 +128,145 @@ add_ram(int *argc, char **argv)
 }
 
 int
-add_disks(int *argc, char **argv)
+add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
 {
-	char *disks;
-	char *disk;
-	char *lasts;
-	int next_cd = 0;
-	int next_other = 0;
-	char slotconf[MAXNAMELEN];
-	char *boot = NULL;
+	static char *boot = NULL;
+	static int next_cd = 0;
+	static int next_other = 0;
+	int pcislot;
+	int pcifn;
 
-	if ((disks = get_zcfg_var("device", "resources", NULL)) == NULL) {
+	/* Allow at most one "primary" disk */
+	if (is_env_true("device", disk, "boot")) {
+		if (boot != NULL) {
+			(void) printf("Error: multiple boot disks: %s %s\n",
+			    boot, path);
+			return (-1);
+		}
+		boot = path;
+		pcislot = PCI_SLOT_BOOT_DISK;
+		pcifn = 0;
+	} else if (is_env_true("device", disk, "cdrom")) {
+		pcislot = PCI_SLOT_CD;
+		pcifn = next_cd;
+		next_cd++;
+	} else {
+		pcislot = PCI_SLOT_OTHER_DISKS;
+		pcifn = next_other;
+		next_other++;
+	}
+
+	if (snprintf(slotconf, slotconf_len, "%d:%d,virtio-blk,%s",
+	    pcislot, pcifn, path) >= slotconf_len) {
+		(void) printf("Error: disk path '%s' too long\n", path);
+		return (-1);
+	}
+
+	return (0);
+}
+
+int
+add_ppt(int *argc, char **argv, char *ppt, char *path, char *slotconf,
+    size_t slotconf_len)
+{
+	static boolean_t wired = B_FALSE;
+	static boolean_t acpi = B_FALSE;
+	unsigned int bus = 0, dev = 0, func = 0;
+	char *pcislot;
+
+	pcislot = get_zcfg_var("device", ppt, "pci_slot");
+
+	if (pcislot == NULL) {
+		(void) printf("Error: device %s has no PCI slot\n", ppt);
+		return (-1);
+	}
+
+	switch (sscanf(pcislot, "%u:%u:%u", &bus, &dev, &func)) {
+	case 3:
+		break;
+	case 2:
+	case 1:
+		func = dev;
+		dev = bus;
+		bus = 0;
+		break;
+	default:
+		(void) printf("Error: device %s has illegal PCI slot: %s\n",
+		    dev, pcislot);
+		return (-1);
+	}
+
+	if (bus > 255 || dev > 31 || func > 7) {
+		(void) printf("Error: device %s has illegal PCI slot: %s\n",
+		    dev, pcislot);
+		return (-1);
+	}
+
+	if (bus > 0) {
+		if (!acpi)
+			add_arg(argc, argv, "-A");
+		acpi = B_TRUE;
+	}
+
+	if (!wired)
+		add_arg(argc, argv, "-S");
+	wired = B_TRUE;
+
+	if (snprintf(slotconf, slotconf_len, "%d:%d:%d,passthru,%s",
+	    bus, dev, func, path) >= slotconf_len) {
+		(void) printf("Error: device path '%s' too long\n", path);
+		return (-1);
+	}
+
+	return (0);
+}
+
+int
+add_devices(int *argc, char **argv)
+{
+	char *devices;
+	char *dev;
+	char *lasts;
+	char slotconf[MAXNAMELEN];
+
+	if ((devices = get_zcfg_var("device", "resources", NULL)) == NULL) {
 		return (0);
 	}
 
-	for (disk = strtok_r(disks, " ", &lasts); disk != NULL;
-	    disk = strtok_r(NULL, " ", &lasts)) {
-		int pcislot;
-		int pcifn;
+	for (dev = strtok_r(devices, " ", &lasts); dev != NULL;
+	    dev = strtok_r(NULL, " ", &lasts)) {
+		int ret;
 		char *path;
+		char *model;
 
 		/* zoneadmd is not careful about a trailing delimiter. */
-		if (disk[0] == '\0') {
+		if (dev[0] == '\0') {
 			continue;
 		}
 
-		if ((path = get_zcfg_var("device", disk, "path")) == NULL) {
-			(void) printf("Error: disk %s has no path\n", disk);
+		if ((path = get_zcfg_var("device", dev, "path")) == NULL) {
+			(void) printf("Error: device %s has no path\n", dev);
 			return (-1);
 		}
 
-		/* Allow at most one "primary" disk */
-		if (is_env_true("device", disk, "boot")) {
-			if (boot != NULL) {
-				(void) printf("Error: "
-				    "multiple boot disks: %s %s\n",
-				    boot, path);
-				return (-1);
-			}
-			boot = path;
-			pcislot = PCI_SLOT_BOOT_DISK;
-			pcifn = 0;
-		} else if (is_env_true("device", disk, "cdrom")) {
-			pcislot = PCI_SLOT_CD;
-			pcifn = next_cd;
-			next_cd++;
+		if ((model = get_zcfg_var("device", dev, "model")) == NULL) {
+			(void) printf("Error: device %s has no model\n", dev);
+			return (-1);
+		}
+
+		if (strcmp(model, "virtio") == 0) {
+			ret = add_disk(dev, path, slotconf, sizeof (slotconf));
+		} else if (strcmp(model, "passthru") == 0) {
+			ret = add_ppt(argc, argv, dev, path, slotconf,
+			    sizeof (slotconf));
 		} else {
-			pcislot = PCI_SLOT_OTHER_DISKS;
-			pcifn = next_other;
-			next_other++;
+			(void) printf("Error: device %s has invalid model: "
+			    "%s\n", dev, model);
+			ret = -1;
 		}
 
-		if (snprintf(slotconf, sizeof (slotconf),
-		    "%d:%d,virtio-blk,%s", pcislot, pcifn, path) >=
-		    sizeof (slotconf)) {
-			(void) printf("Error: disk path '%s' too long\n", path);
+		if (ret != 0)
 			return (-1);
-		}
 
 		if (add_arg(argc, argv, "-s") != 0 ||
 		    add_arg(argc, argv, slotconf) != 0) {
@@ -445,7 +527,7 @@ main(int argc, char **argv)
 	if (add_lpc(&zhargc, (char **)&zhargv) != 0 ||
 	    add_cpu(&zhargc, (char **)&zhargv) != 0 ||
 	    add_ram(&zhargc, (char **)&zhargv) != 0 ||
-	    add_disks(&zhargc, (char **)&zhargv) != 0 ||
+	    add_devices(&zhargc, (char **)&zhargv) != 0 ||
 	    add_nets(&zhargc, (char **)&zhargv) != 0 ||
 	    add_bhyve_opts(&zhargc, (char **)&zhargv) != 0 ||
 	    add_vmname(&zhargc, (char **)&zhargv) != 0) {

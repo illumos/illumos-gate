@@ -901,8 +901,8 @@ setup_subproc_env(boolean_t debug)
 	 * program.  At such a time as brand callbacks can be executed as part
 	 * of the zoneadmd process, this should be removed.
 	 *
-	 * The bhyve brand only supports disk-like devices and does not support
-	 * regular expressions.
+	 * The bhyve brand only supports disk-like and ppt devices and does not
+	 * support regular expressions.
 	 */
 	if ((res = zonecfg_setdevent(snap_hndl)) != Z_OK)
 		goto done;
