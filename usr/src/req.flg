@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc
 #
 
 echo_file usr/src/Makefile
@@ -32,3 +33,5 @@ echo_file usr/src/Makefile.master.64
 echo_file usr/src/Makefile.msg.targ
 echo_file usr/src/Makefile.psm
 echo_file usr/src/Makefile.psm.targ
+
+find_files "s.*" usr/contrib/freebsd

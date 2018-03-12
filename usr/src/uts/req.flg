@@ -22,6 +22,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 
 #
@@ -37,6 +38,7 @@ echo_file usr/src/Makefile
 
 # For full builds (open and closed), we want both etc/certs and
 # etc/keys.  For an open source build, there's no etc/keys directory.
+find_files "s.*" usr/contrib/freebsd
 find_files "s.*" usr/src/cmd/cmd-crypto/etc
 find_files "s.*" usr/src/common/acl
 find_files "s.*" usr/src/common/atomic
@@ -56,4 +58,5 @@ find_files "s.*" usr/src/common/smbios
 find_files "s.*" usr/src/common/tsol
 find_files "s.*" usr/src/common/util
 find_files "s.*" usr/src/common/zfs
+find_files "s.*" usr/src/compat/freebsd
 find_files "s.*" usr/src/psm/promif
