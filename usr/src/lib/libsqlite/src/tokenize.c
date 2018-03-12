@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -443,8 +440,8 @@ int sqliteRunParser(Parse *pParse, const char *zSql, char **pzErrMsg){
       }
       case TK_SEMI: {
         pParse->zTail = &zSql[i];
-        /* Fall thru into the default case */
       }
+      /* FALLTHROUGH */
       default: {
         sqliteParser(pEngine, tokenType, pParse->sLastToken, pParse);
         lastTokenParsed = tokenType;

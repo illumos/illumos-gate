@@ -43,238 +43,163 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2018 Nexenta Systems, Inc.
 .\"
-.TH UNAME 1 "May 13, 2017"
-.SH NAME
-uname \- print name of current system
-.SH SYNOPSIS
-.LP
-.nf
-\fBuname\fR [\fB-aimnprsvX\fR]
-.fi
-
-.LP
-.nf
-\fBuname\fR [\fB-S\fR \fIsystem_name\fR]
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBuname\fR utility prints information about the current system on the
-standard output. When options are specified, symbols representing one or more
-system characteristics will be written to the standard output. If no options
-are specified, \fBuname\fR prints the current operating system's name. The
-options print selected information returned by \fBuname\fR(2),
-\fBsysinfo\fR(2), or both.
-.SH OPTIONS
-.LP
+.Dd February 9, 2018
+.Dt UNAME 1
+.Os
+.Sh NAME
+.Nm uname
+.Nd print name of current system
+.Sh SYNOPSIS
+.Nm
+.Op Fl aimnoprsvX
+.Nm
+.Fl S Ar system_name
+.Sh DESCRIPTION
+The
+.Nm
+utility prints information about the current system on the standard output.
+When options are specified, symbols representing one or more system
+characteristics will be written to the standard output.
+If no options are specified,
+.Nm
+prints the current operating system's name.
+The options print selected information returned by
+.Xr uname 2 ,
+.Xr sysinfo 2 ,
+or both.
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR\fR
-.ad
-.RS 18n
+.Bl -tag -width Ds
+.It Fl a
 Prints basic information currently available from the system.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR\fR
-.ad
-.RS 18n
+.It Fl i
 Prints the name of the platform.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-m\fR\fR
-.ad
-.RS 18n
-Prints the machine hardware name (class). Use of this option is discouraged.
-Use \fBuname\fR \fB-p\fR instead. See NOTES section below.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-n\fR\fR
-.ad
-.RS 18n
+.It Fl m
+Prints the machine hardware name (class).
+Use of this option is discouraged.
+Use
+.Nm Fl p
+instead.
+See
+.Sx NOTES
+section below.
+.It Fl n
 Prints the nodename (the nodename is the name by which the system is known to a
 communications network).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-p\fR\fR
-.ad
-.RS 18n
-Prints the current host's \fBISA\fR or processor type.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-r\fR\fR
-.ad
-.RS 18n
+.It Fl o
+Prints the name of the kernel/OS.
+.It Fl p
+Prints the current host's ISA or processor type.
+.It Fl r
 Prints the operating system release level.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR\fR
-.ad
-.RS 18n
-Prints the name of the operating system. This is the default.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-S\fR \fIsystem_name\fR\fR
-.ad
-.RS 18n
-The nodename may be changed by specifying a system name argument. The system
-name argument is restricted to \fBSYS_NMLN\fR characters. \fBSYS_NMLN\fR is an
-implementation specific value defined in \fB<sys/utsname.h>\fR\&. Only the
-super-user is allowed this capability. This change does not persist across
-reboots of the system. See \fBnodename\fR(4) for details of how to change a
-host's name permanently.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-v\fR\fR
-.ad
-.RS 18n
+.It Fl s
+Prints the name of the operating system.
+This is the default.
+.It Fl S Ar system_name
+The nodename may be changed by specifying a system name argument.
+The system name argument is restricted to
+.Dv SYS_NMLN
+characters.
+.Dv SYS_NMLN
+is an implementation specific value defined in
+.In sys/utsname.h .
+Only the super-user is allowed this capability.
+This change does not persist across reboots of the system.
+See
+.Xr nodename 4
+for details of how to change a host's name permanently.
+.It Fl v
 Prints the operating system version.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-X\fR \fR
-.ad
-.RS 18n
+.It Fl X
 Prints expanded system information, one information element per line, as
-expected by SCO UNIX. The displayed information includes:
-.RS +4
-.TP
-.ie t \(bu
-.el o
+expected by SCO UNIX.
+The displayed information includes:
+.Bl -bullet
+.It
 system name, node, release, version, machine, and number of CPUs.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 BusType, Serial, and Users (set to "unknown" in Solaris)
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-OEM# and Origin# (set to \fB0\fR and \fB1\fR, respectively)
-.RE
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRPrinting the OS name and release level
-.sp
-.LP
+.It
+OEM# and Origin# (set to 0 and 1, respectively)
+.El
+.El
+.Sh EXIT STATUS
+.Ex -std
+.Sh EXAMPLES
+.Bl -tag -width Ds
+.It Sy Example 1 No Printing the OS name and release level
 The following command:
-
-.sp
-.in +2
-.nf
-example% \fBuname \(misr\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-prints the operating system name and release level, separated by one SPACE
+.Bd -literal
+$ uname -sr
+.Ed
+.Pp
+\&...prints the operating system name and release level, separated by one SPACE
 character.
-
-.SH ENVIRONMENT VARIABLES
-.LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
-that affect the execution of \fBuname\fR: \fBLANG\fR, \fBLC_ALL\fR,
-\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-
-.SH EXIT STATUS
-.LP
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR \fR
-.ad
-.RS 7n
-Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB>0\fR \fR
-.ad
-.RS 7n
-An error occurred.
-.RE
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.LP
-\fBarch\fR(1), \fBisalist\fR(1), \fBsysinfo\fR(2),
-\fBuname\fR(2), \fBnodename\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBstandards\fR(5)
-.SH NOTES
-.LP
-Independent software vendors (\fBISV\fRs) and others who need to determine
-detailed characteristics of the platform on which their software is either
-being installed or executed should use the \fBuname\fR command.
-.sp
-.LP
-To determine the operating system name and release level, use \fBuname
-\fR\fB-sr\fR. To determine only the operating system release level, use
-\fBuname \fR\fB-r\fR. Notice that operating system release levels are not
-guaranteed to be in \fIx.y\fR format (such as 5.3, 5.4, 5.5, and so forth);
-but could be in the \fIx.y.z\fR format (such as 5.5.1).
-.sp
-.LP
-In SunOS 4.\fIx\fR releases, the \fBarch\fR(1) command was often used to obtain
-information similar to that obtained by using the \fBuname\fR command. The
-\fBarch\fR(1) command output "sun4" was often incorrectly interpreted to
-signify a SunOS SPARC system. If hardware platform information is desired, use
-\fBuname \fR\fB-sp\fR.
-.sp
-.LP
-The \fBarch\fR \fB-k\fR and \fBuname\fR \fB-m\fR commands return equivalent
-values; however, the use of either of these commands by third party programs is
-discouraged, as is the use of the \fBarch\fR command in general. To determine
-the machine's Instruction Set Architecture (\fBISA\fR or processor type), use
-\fBuname\fR with the \fB-p\fR option.
+.El
+.Sh ENVIRONMENT VARIABLES
+See
+.Xr environ 5
+for descriptions of the following environment variables that affect the
+execution of
+.Nm :
+.Ev LANG , LC_ALL , LC_CTYPE , LC_MESSAGES ,
+and
+.Ev NLSPATH .
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh SEE ALSO
+.Xr arch 1 ,
+.Xr isalist 1 ,
+.Xr sysinfo 2 ,
+.Xr uname 2 ,
+.Xr nodename 4 ,
+.Xr attributes 5 ,
+.Xr environ 5 ,
+.Xr standards 5
+.Sh NOTES
+Independent software vendors (ISVs) and others who need to determine detailed
+characteristics of the platform on which their software is either being
+installed or executed should use the
+.Nm
+command.
+.Pp
+To determine the operating system name and release level, use
+.Nm Fl sr .
+To determine only the operating system release level, use
+.Nm Fl r .
+Notice that operating system release levels are not guaranteed to be in
+.Em x.y
+format (such as 5.3, 5.4, 5.5, and so forth); but could be in the
+.Em x.y.z
+format (such as 5.5.1).
+.Pp
+In SunOS 4.x releases, the
+.Xr arch 1
+command was often used to obtain information similar to that obtained by using
+the
+.Nm
+command.
+The
+.Xr arch 1
+command output
+.Ql sun4
+was often incorrectly interpreted to signify a SunOS SPARC system.
+If hardware platform information is desired, use
+.Nm Fl sp .
+.Pp
+The
+.Nm arch Fl k
+and
+.Nm Fl m
+commands return equivalent values; however, the use of either of these commands
+by third party programs is discouraged, as is the use of the
+.Nm arch
+command in general.
+To determine the machine's Instruction Set Architecture (ISA or processor type),
+use
+.Nm
+with the
+.Fl p
+option.

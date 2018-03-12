@@ -279,7 +279,7 @@ typedef enum {
 extern void dnerror(const dt_node_t *, dt_errtag_t, const char *, ...);
 extern void dnwarn(const dt_node_t *, dt_errtag_t, const char *, ...);
 
-extern void xyerror(dt_errtag_t, const char *, ...);
+extern void xyerror(dt_errtag_t, const char *, ...) __NORETURN;
 extern void xywarn(dt_errtag_t, const char *, ...);
 extern void xyvwarn(dt_errtag_t, const char *, va_list);
 

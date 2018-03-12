@@ -1,6 +1,6 @@
 /*	$NetBSD: nullfs.c,v 1.1 1996/01/13 22:25:39 leo Exp $	*/
 
-/*-
+/*
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -15,7 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,45 +61,51 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include "stand.h"
 
 /*
  * Null filesystem
  */
-int	null_open (const char *path, struct open_file *f)
+int
+null_open(const char *path, struct open_file *f)
 {
 	return EINVAL;
 }
 
-int	null_close(struct open_file *f)
+int
+null_close(struct open_file *f)
 {
 	return 0;
 }
 
-int	null_read (struct open_file *f, void *buf, size_t size, size_t *resid)
+int
+null_read(struct open_file *f, void *buf, size_t size, size_t *resid)
 {
 	return EIO;
 }
 
-int	null_write (struct open_file *f, void *buf, size_t size, size_t *resid)
+int
+null_write(struct open_file *f, const void *buf, size_t size, size_t *resid)
 {
-	return EIO;
+	return EROFS;
 }
 
-off_t	null_seek (struct open_file *f, off_t offset, int where)
+off_t
+null_seek(struct open_file *f, off_t offset, int where)
 {
 	errno = EIO;
 	return -1;
 }
 
-int	null_stat (struct open_file *f, struct stat *sb)
+int
+null_stat(struct open_file *f, struct stat *sb)
 {
 	return EIO;
 }
 
-int	null_readdir(struct open_file *f, struct dirent *d)
+int
+null_readdir(struct open_file *f, struct dirent *d)
 {
 	return EIO;
 }

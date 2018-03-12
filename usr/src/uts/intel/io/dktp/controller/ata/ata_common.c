@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 RackTop Systems.
  */
 
 #include <sys/types.h>
@@ -3469,7 +3471,7 @@ ata_spec_init_controller(dev_info_t *dip)
  */
 static int
 ata_prop_lookup_int(dev_t match_dev, dev_info_t *dip,
-	uint_t flags, char *name, int defvalue)
+    uint_t flags, char *name, int defvalue)
 {
 
 	char *bufp, *cp;
@@ -3499,6 +3501,9 @@ ata_prop_lookup_int(dev_t match_dev, dev_info_t *dip,
 static void
 ata_init_pm(dev_info_t *dip)
 {
+	int		instance;
+	ata_ctl_t 	*ata_ctlp;
+#ifdef	ATA_USE_AUTOPM
 	char		pmc_name[16];
 	char		*pmc[] = {
 				NULL,
@@ -3506,8 +3511,7 @@ ata_init_pm(dev_info_t *dip)
 				"3=PowerOn (PCI D0 State)",
 				NULL
 			};
-	int		instance;
-	ata_ctl_t 	*ata_ctlp;
+#endif
 
 
 	instance = ddi_get_instance(dip);
@@ -3518,10 +3522,10 @@ ata_init_pm(dev_info_t *dip)
 	if (!ata_is_pci(dip))
 		return;
 
+#ifdef	ATA_USE_AUTOPM
 	(void) sprintf(pmc_name, "NAME=ata%d", instance);
 	pmc[0] = pmc_name;
 
-#ifdef	ATA_USE_AUTOPM
 	if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
 	    "pm-components", pmc, 3) != DDI_PROP_SUCCESS) {
 		return;

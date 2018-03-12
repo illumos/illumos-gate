@@ -68,7 +68,7 @@ ksocket_socket(ksocket_t *ksp, int domain, int type, int protocol, int flags,
 			char *mod = NULL;
 
 			/*
-			 * Could be that root file sytem is not loaded or
+			 * Could be that root file system is not loaded or
 			 * soconfig has not run yet.
 			 */
 			if (type == SOCK_STREAM && (domain == AF_INET ||

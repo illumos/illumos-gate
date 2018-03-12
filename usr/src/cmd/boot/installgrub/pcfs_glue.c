@@ -49,7 +49,7 @@ int bootrd_debug = 0;
 
 static unsigned int *blocklist;
 
-/* diskread_callback is set in filesytem module (pcfs.c) */
+/* diskread_callback is set in filesystem module (pcfs.c) */
 int (*diskread_callback)(int, int);
 int (*fileread_callback)(int, int);
 

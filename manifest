@@ -1858,8 +1858,6 @@ f platform/i86pc/kernel/misc/amd64/drmach_acpi 0755 root sys
 d platform/i86pc/kernel/pcbe 0755 root sys
 d platform/i86pc/kernel/pcbe/amd64 0755 root sys
 f platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.15 0755 root sys
-f platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.5 0755 root sys
-f platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6 0755 root sys
 f platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.15 0755 root sys
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.23=pcbe.GenuineIntel.6.15
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.26=pcbe.GenuineIntel.6.15
