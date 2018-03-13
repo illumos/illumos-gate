@@ -148,8 +148,8 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
 
     howto = bi_getboothowto(args);
 
-    /* 
-     * Allow the environment variable 'rootdev' to override the supplied device 
+    /*
+     * Allow the environment variable 'rootdev' to override the supplied device
      * This should perhaps go to MI code and/or have $rootdev tested/set by
      * MI code before launching the kernel.
      */
@@ -168,7 +168,7 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
     /* XXX - use a default bootdev of 0.  Is this ok??? */
     bootdevnr = 0;
 
-    switch(rootdev->dd.d_type) {
+    switch(rootdev->dd.d_dev->dv_type) {
     case DEVT_CD:
 	    /* Pass in BIOS device number. */
 	    bi.bi_bios_dev = bc_unit2bios(rootdev->dd.d_unit);
@@ -187,7 +187,7 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
 
     default:
 	printf("WARNING - don't know how to boot from device type %d\n",
-	    rootdev->dd.d_type);
+	    rootdev->dd.d_dev->dv_type);
     }
     if (bootdevnr == -1) {
 	printf("root device %s invalid\n", i386_fmtdev(rootdev));

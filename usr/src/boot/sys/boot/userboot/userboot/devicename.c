@@ -39,7 +39,7 @@
 
 static int	userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **path);
 
-/* 
+/*
  * Point (dev) at an allocated device specifier for the device matching the
  * path in (devspec). If it contains an explicit device specification,
  * use that.  If not, use the default device.
@@ -49,13 +49,13 @@ userboot_getdev(void **vdev, const char *devspec, const char **path)
 {
     struct disk_devdesc **dev = (struct disk_devdesc **)vdev;
     int				rv;
-    
+
     /*
      * If it looks like this is just a path and no
      * device, go with the current device.
      */
-    if ((devspec == NULL) || 
-	(devspec[0] == '/') || 
+    if ((devspec == NULL) ||
+	(devspec[0] == '/') ||
 	(strchr(devspec, ':') == NULL)) {
 
 	if (((rv = userboot_parsedev(dev, getenv("currdev"), NULL)) == 0) &&
@@ -63,7 +63,7 @@ userboot_getdev(void **vdev, const char *devspec, const char **path)
 		*path = devspec;
 	return(rv);
     }
-    
+
     /*
      * Try to parse the device name off the beginning of the devspec
      */
@@ -82,7 +82,7 @@ userboot_getdev(void **vdev, const char *devspec, const char **path)
  * For disk-type devices, the syntax is:
  *
  * disk<unit>[s<slice>][<partition>]:
- * 
+ *
  */
 static int
 userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **path)
@@ -109,7 +109,7 @@ userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **p
     idev = malloc(sizeof(struct disk_devdesc));
     err = 0;
     np = (devspec + strlen(dv->dv_name));
-        
+
     switch(dv->dv_type) {
     case DEVT_NONE:			/* XXX what to do here?  Do we care? */
 	break;
@@ -158,7 +158,6 @@ userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **p
 	goto fail;
     }
     idev->dd.d_dev = dv;
-    idev->dd.d_type = dv->dv_type;
     if (dev == NULL) {
 	free(idev);
     } else {
@@ -178,7 +177,7 @@ userboot_fmtdev(void *vdev)
     struct disk_devdesc	*dev = (struct disk_devdesc *)vdev;
     static char		buf[128];	/* XXX device length constant? */
 
-    switch(dev->dd.d_type) {
+    switch(dev->dd.d_dev->dv_type) {
     case DEVT_NONE:
 	strcpy(buf, "(no device)");
 	break;

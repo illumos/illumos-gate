@@ -142,7 +142,7 @@ loader_main(struct loader_callbacks *cb, void *arg, int version, int ndisks)
 }
 
 /*
- * Set the 'current device' by (if possible) recovering the boot device as 
+ * Set the 'current device' by (if possible) recovering the boot device as
  * supplied by the initial bootstrap.
  */
 static void
@@ -169,7 +169,6 @@ extract_currdev(void)
 
 	if (userboot_disk_maxunit > 0) {
 		dev.dd.d_dev = &userboot_disk;
-		dev.dd.d_type = dev.dd.d_dev->dv_type;
 		dev.dd.d_unit = 0;
 		dev.d_slice = 0;
 		dev.d_partition = 0;
@@ -183,7 +182,6 @@ extract_currdev(void)
 		}
 	} else {
 		dev.dd.d_dev = &host_dev;
-		dev.dd.d_type = dev.dd.d_dev->dv_type;
 		dev.dd.d_unit = 0;
 	}
 

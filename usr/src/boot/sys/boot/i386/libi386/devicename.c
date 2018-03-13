@@ -158,7 +158,6 @@ i386_parsedev(struct i386_devdesc **dev, const char *devspec, const char **path)
 	}
 
 	idev->dd.d_dev = dv;
-	idev->dd.d_type = dv->dv_type;
 
 	if (dev != NULL)
 		*dev = idev;
@@ -178,7 +177,7 @@ i386_fmtdev(void *vdev)
 	struct i386_devdesc *dev = (struct i386_devdesc *)vdev;
 	static char buf[SPECNAMELEN + 1];
 
-	switch (dev->dd.d_type) {
+	switch (dev->dd.d_dev->dv_type) {
 	case DEVT_NONE:
 		strlcpy(buf, "(no device)", sizeof (buf));
 		break;
