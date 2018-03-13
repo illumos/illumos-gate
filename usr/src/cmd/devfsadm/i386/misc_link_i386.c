@@ -46,6 +46,7 @@ static int kdmouse(di_minor_t minor, di_node_t node);
 static int ipmi(di_minor_t minor, di_node_t node);
 static int mc_node(di_minor_t minor, di_node_t node);
 static int vmmctl(di_minor_t minor, di_node_t node);
+static int ppt(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "vt00", "ddi_display", NULL,
@@ -92,7 +93,7 @@ static devfsadm_create_t misc_cbt[] = {
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, vmmctl,
 	},
 	{ "pseudo", "ddi_pseudo", "ppt",
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ln_minor_name,
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ppt,
 	}
 };
 
@@ -373,5 +374,17 @@ vmmctl(di_minor_t minor, di_node_t node)
 {
 	if (strcmp(di_minor_name(minor), "ctl") == 0)
 		(void) devfsadm_mklink("vmmctl", node, minor, 0);
+	return (DEVFSADM_CONTINUE);
+}
+
+static int
+ppt(di_minor_t minor, di_node_t node)
+{
+	char linkpath[PATH_MAX];
+
+	(void) snprintf(linkpath, sizeof (linkpath), "ppt%d",
+	    di_instance(node));
+
+	(void) devfsadm_mklink(linkpath, node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }
