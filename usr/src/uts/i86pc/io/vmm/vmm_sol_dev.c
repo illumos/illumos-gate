@@ -1611,6 +1611,9 @@ vmmdev_do_vm_destroy(const char *name, cred_t *cr)
 	vmm_softc_t	*sc;
 	int		err;
 
+	if (crgetuid(cr) != 0)
+		return (EPERM);
+
 	mutex_enter(&vmmdev_mtx);
 	mutex_enter(&vmm_mtx);
 
@@ -1618,6 +1621,15 @@ vmmdev_do_vm_destroy(const char *name, cred_t *cr)
 		mutex_exit(&vmm_mtx);
 		mutex_exit(&vmmdev_mtx);
 		return (ENOENT);
+	}
+	/*
+	 * We don't check this in vmm_lookup() since that function is also used
+	 * for validation during create and currently vmm names must be unique.
+	 */
+	if (!INGLOBALZONE(curproc) && sc->vmm_zone != curzone) {
+		mutex_exit(&vmm_mtx);
+		mutex_exit(&vmmdev_mtx);
+		return (EPERM);
 	}
 	err = vmm_do_vm_destroy_locked(sc, B_TRUE);
 
