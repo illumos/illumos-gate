@@ -312,35 +312,6 @@ efi_guid_to_name(EFI_GUID *guid, char **name)
 	return (efi_guid_to_str(guid, name));
 }
 
-/*
- * Simple wrappers to the underlying UEFI functions.
- * See http://wiki.phoenix.com/wiki/index.php/EFI_RUNTIME_SERVICES
- * for details.
- */
-EFI_STATUS
-efi_get_next_variable_name(UINTN *variable_name_size, CHAR16 *variable_name,
-    EFI_GUID *vendor_guid)
-{
-	return (RS->GetNextVariableName(variable_name_size, variable_name,
-	    vendor_guid));
-}
-
-EFI_STATUS
-efi_get_variable(CHAR16 *variable_name, EFI_GUID *vendor_guid,
-    UINT32 *attributes, UINTN *data_size, void *data)
-{
-	return (RS->GetVariable(variable_name, vendor_guid, attributes,
-	    data_size, data));
-}
-
-EFI_STATUS
-efi_set_variable(CHAR16 *variable_name, EFI_GUID *vendor_guid,
-    UINT32 attributes, UINTN data_size, void *data)
-{
-	return (RS->SetVariable(variable_name, vendor_guid, attributes,
-	    data_size, data));
-}
-
 void
 efi_init_environment(void)
 {
@@ -665,7 +636,7 @@ efi_print_var(CHAR16 *varnamearg, EFI_GUID *matchguid, int lflag)
 
 	str = NULL;
 	datasz = 0;
-	status = efi_get_variable(varnamearg, matchguid, &attr, &datasz, NULL);
+	status = RS->GetVariable(varnamearg, matchguid, &attr, &datasz, NULL);
 	if (status != EFI_BUFFER_TOO_SMALL) {
 		printf("Can't get the variable: error %#lx\n",
 		    EFI_ERROR_CODE(status));
@@ -677,7 +648,7 @@ efi_print_var(CHAR16 *varnamearg, EFI_GUID *matchguid, int lflag)
 		return (CMD_ERROR);
 	}
 
-	status = efi_get_variable(varnamearg, matchguid, &attr, &datasz, data);
+	status = RS->GetVariable(varnamearg, matchguid, &attr, &datasz, data);
 	if (status != EFI_SUCCESS) {
 		printf("Can't get the variable: error %#lx\n",
 		    EFI_ERROR_CODE(status));
@@ -849,7 +820,7 @@ command_efi_show(int argc, char *argv[])
 	varname[0] = 0;
 	while (1) {
 		varsz = varalloc;
-		status = efi_get_next_variable_name(&varsz, varname, &varguid);
+		status = RS->GetNextVariableName(&varsz, varname, &varguid);
 		if (status == EFI_BUFFER_TOO_SMALL) {
 			varalloc = varsz;
 			newnm = realloc(varname, varalloc);
@@ -934,7 +905,7 @@ command_efi_set(int argc, char *argv[])
 	}
 	cpy8to16(var, wvar, nitems(wvar));
 #if 0
-	err = efi_set_variable(wvar, &guid, EFI_VARIABLE_NON_VOLATILE |
+	err = RS->SetVariable(wvar, &guid, EFI_VARIABLE_NON_VOLATILE |
 	    EFI_VARIABLE_RUNTIME_ACCESS | EFI_VARIABLE_BOOTSERVICE_ACCESS,
 	    strlen(val) + 1, val);
 	if (EFI_ERROR(err)) {
@@ -970,7 +941,7 @@ command_efi_unset(int argc, char *argv[])
 	}
 	cpy8to16(var, wvar, nitems(wvar));
 #if 0
-	err = efi_set_variable(wvar, &guid, 0, 0, NULL);
+	err = RS->SetVariable(wvar, &guid, 0, 0, NULL);
 	if (EFI_ERROR(err)) {
 		printf("Failed to unset variable: error %lu\n",
 		    EFI_ERROR_CODE(err));
@@ -985,14 +956,14 @@ command_efi_unset(int argc, char *argv[])
 /*
  * Loader interaction words and extras
  *
- * 	efi-setenv  ( value n name n guid n attr -- 0 | -1)
- * 	efi-getenv  ( guid n addr n -- addr' n' | -1 )
- * 	efi-unsetenv ( name n guid n'' -- )
+ *	efi-setenv  ( value n name n guid n attr -- 0 | -1)
+ *	efi-getenv  ( guid n addr n -- addr' n' | -1 )
+ *	efi-unsetenv ( name n guid n'' -- )
  */
 
 /*
  * efi-setenv
- * 	efi-setenv  ( value n name n guid n attr -- 0 | -1)
+ *	efi-setenv  ( value n name n guid n attr -- 0 | -1)
  *
  * Set environment variables using the SetVariable EFI runtime service.
  *
@@ -1072,12 +1043,12 @@ ficlEfiSetenv(ficlVm *pVM)
 	}
 	memcpy(value, valuep, values);
 
-	status = efi_set_variable(name, (EFI_GUID *)&u, attr, values, value);
+	status = RS->SetVariable(name, (EFI_GUID *)&u, attr, values, value);
 	if (status == EFI_SUCCESS) {
 		ficlStackPushInteger(pStack, 0);
 	} else {
 		ficlStackPushInteger(pStack, -1);
-		error = "Error: efi_set_variable failed";
+		error = "Error: SetVariable failed";
 	}
 
 out:
