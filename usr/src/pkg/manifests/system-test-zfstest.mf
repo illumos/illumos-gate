@@ -13,6 +13,7 @@
 # Copyright (c) 2012, 2017 by Delphix. All rights reserved.
 # Copyright 2015, 2016 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -2396,6 +2397,14 @@ file path=opt/zfs-tests/tests/functional/reservation/reservation_016_pos \
 file path=opt/zfs-tests/tests/functional/reservation/reservation_017_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/reservation/reservation_018_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/reservation/reservation_019_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/reservation/reservation_020_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/reservation/reservation_021_neg \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/reservation/reservation_022_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/reservation/setup mode=0555
 file path=opt/zfs-tests/tests/functional/rootpool/cleanup mode=0555
