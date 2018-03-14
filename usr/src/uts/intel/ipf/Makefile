@@ -21,6 +21,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 # uts/intel/ipf/Makefile
 #
@@ -59,6 +60,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CPPFLAGS += -DIPFILTER_LKM -DIPFILTER_LOG -DIPFILTER_LOOKUP -DUSE_INET6
 CPPFLAGS += -DSUNDDI -DSOLARIS2=$(RELEASE_MINOR) -DIRE_ILL_CN
 LDFLAGS += -dy -Ndrv/ip -Nmisc/md5 -Nmisc/neti -Nmisc/hook -Nmisc/kcf -Ndrv/vnd
+LDFLAGS += -Nmisc/mac
 
 INC_PATH += -I$(UTSBASE)/common/inet/ipf
 

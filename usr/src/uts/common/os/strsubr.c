@@ -26,6 +26,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -8449,6 +8450,12 @@ mblk_copycred(mblk_t *mp, const mblk_t *src)
 		dbp->db_cpid = cpid;
 }
 
+
+/*
+ * Now that NIC drivers are expected to deal only with M_DATA mblks, the
+ * hcksum_assoc and hcksum_retrieve functions are deprecated in favor of their
+ * respective mac_hcksum_set and mac_hcksum_get counterparts.
+ */
 int
 hcksum_assoc(mblk_t *mp,  multidata_t *mmd, pdesc_t *pd,
     uint32_t start, uint32_t stuff, uint32_t end, uint32_t value,

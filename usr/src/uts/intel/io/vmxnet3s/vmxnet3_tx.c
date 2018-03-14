@@ -15,6 +15,7 @@
 
 /*
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <vmxnet3.h>
@@ -79,7 +80,7 @@ vmxnet3_tx_prepare_offload(vmxnet3_softc_t *dp, vmxnet3_offload_t *ol,
 	ol->hlen = 0;
 	ol->msscof = 0;
 
-	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, NULL, &value, &flags);
+	mac_hcksum_get(mp, &start, &stuff, NULL, &value, &flags);
 
 	mac_lso_get(mp, &mss, &lso_flag);
 

@@ -14,6 +14,7 @@
  */
 /*
  * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <vmxnet3.h>
@@ -322,7 +323,7 @@ vmxnet3_rx_hwcksum(vmxnet3_softc_t *dp, mblk_t *mp,
 
 		VMXNET3_DEBUG(dp, 3, "rx cksum flags = 0x%x\n", flags);
 
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0, flags, 0);
+		mac_hcksum_set(mp, 0, 0, 0, 0, flags);
 	}
 }
 

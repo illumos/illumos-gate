@@ -1211,7 +1211,6 @@ proto_unitdata_req(dld_str_t *dsp, mblk_t *mp)
 	uint16_t		sap;
 	uint_t			addr_length;
 	mblk_t			*bp, *payload;
-	uint32_t		start, stuff, end, value, flags;
 	t_uscalar_t		dl_err;
 	uint_t			max_sdu;
 
@@ -1280,9 +1279,7 @@ proto_unitdata_req(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Transfer the checksum offload information if it is present.
 	 */
-	hcksum_retrieve(payload, NULL, NULL, &start, &stuff, &end, &value,
-	    &flags);
-	(void) hcksum_assoc(bp, NULL, NULL, start, stuff, end, value, flags, 0);
+	mac_hcksum_clone(payload, bp);
 
 	/*
 	 * Link the payload onto the new header.

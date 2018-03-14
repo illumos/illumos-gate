@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #if !defined(lint)
@@ -27,6 +27,7 @@ static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21
 #include <sys/sunddi.h>
 #include <sys/ksynch.h>
 #include <sys/kmem.h>
+#include <sys/mac_provider.h>
 #include <sys/mkdev.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
@@ -1799,8 +1800,7 @@ int len;
 		 * Need to preserve checksum information by copying them
 		 * to newmp which heads the pulluped message.
 		 */
-		hcksum_retrieve(m, NULL, NULL, &start, &stuff, &end,
-		    &value, &flags);
+		mac_hcksum_get(m, &start, &stuff, &end, &value, &flags);
 
 		if (pullupmsg(m, len + ipoff + inc) == 0) {
 			ATOMIC_INCL(ifs->ifs_frstats[out].fr_pull[1]);
@@ -1813,8 +1813,7 @@ int len;
 			return NULL;
 		}
 
-		(void) hcksum_assoc(m, NULL, NULL, start, stuff, end,
-		    value, flags, 0);
+		mac_hcksum_set(m, start, stuff, end, value, flags);
 
 		m->b_prev = m2;
 		m->b_rptr += inc;

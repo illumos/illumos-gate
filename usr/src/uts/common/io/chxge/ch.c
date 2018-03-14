@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -59,6 +60,7 @@
 #include <sys/sunddi.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
+#include <sys/mac_provider.h>
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <inet/common.h>
@@ -1377,8 +1379,7 @@ ch_send_up(ch_t *chp, mblk_t *mp, uint32_t cksum, int flg)
 		 * set in /etc/system (see sge.c).
 		 */
 		if (flg)
-			(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, cksum,
-			    HCK_FULLCKSUM, 0);
+			mac_hcksum_set(mp, 0, 0, 0, cksum, HCK_FULLCKSUM);
 		gld_recv(chp->ch_macp, mp);
 	} else {
 		freemsg(mp);
@@ -1693,8 +1694,7 @@ ch_send(gld_mac_info_t *macinfo, mblk_t *mp)
 	msg_flg = 0;
 	if (chp->ch_config.cksum_enabled) {
 		if (is_T2(chp)) {
-			hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL,
-			    NULL, &msg_flg);
+			mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &msg_flg);
 			flg = (msg_flg & HCK_FULLCKSUM)?
 			    CH_NO_CPL: CH_NO_HWCKSUM|CH_NO_CPL;
 		} else

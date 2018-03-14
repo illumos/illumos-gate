@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -272,8 +273,7 @@ ibd_async_rc_process_too_big(ibd_state_t *state, ibd_req_t *req)
 	icmph->icmph_checksum = IP_CSUM(pmtu_mp,
 	    (int32_t)sizeof (ib_header_info_t) + (int32_t)sizeof (ipha_t), 0);
 
-	(void) hcksum_assoc(pmtu_mp, NULL, NULL, 0, 0, 0, 0,
-	    HCK_FULLCKSUM | HCK_FULLCKSUM_OK, 0);
+	mac_hcksum_set(pmtu_mp, 0, 0, 0, 0, HCK_FULLCKSUM | HCK_FULLCKSUM_OK);
 
 	DPRINT(30, "ibd_async_rc_process_too_big: sap=0x%x, ip_src=0x%x, "
 	    "ip_dst=0x%x, ttl=%d, len_needed=%d, msg_len=%d",
@@ -1560,8 +1560,7 @@ ibd_rc_process_rx(ibd_rc_chan_t *chan, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	/*
 	 * Can RC mode in IB guarantee its checksum correctness?
 	 *
-	 *	(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
-	 *	    HCK_FULLCKSUM | HCK_FULLCKSUM_OK, 0);
+	 * mac_hcksum_set(mp, 0, 0, 0, 0, HCK_FULLCKSUM | HCK_FULLCKSUM_OK);
 	 */
 
 	/*

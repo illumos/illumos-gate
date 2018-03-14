@@ -587,11 +587,12 @@ extern void			mac_prop_info_set_range_uint32(
 extern void			mac_prop_info_set_perm(mac_prop_info_handle_t,
 				    uint8_t);
 
-extern void			mac_hcksum_get(mblk_t *, uint32_t *,
+extern void			mac_hcksum_get(const mblk_t *, uint32_t *,
 				    uint32_t *, uint32_t *, uint32_t *,
 				    uint32_t *);
 extern void			mac_hcksum_set(mblk_t *, uint32_t, uint32_t,
 				    uint32_t, uint32_t, uint32_t);
+extern void			mac_hcksum_clone(const mblk_t *, mblk_t *);
 
 extern void			mac_lso_get(mblk_t *, uint32_t *, uint32_t *);
 
