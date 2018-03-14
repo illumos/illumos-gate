@@ -1,6 +1,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -1163,8 +1164,7 @@ elxl_m_tx(void *arg, mblk_t *mp)
 		cflags = 0;
 		if ((sc->ex_conf & CONF_90XB) != 0) {
 			uint32_t	pflags;
-			hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL,
-			    &pflags);
+			mac_hcksum_get(mp, NULL, NULL, NULL, NULL, &pflags);
 			if (pflags & HCK_IPV4_HDRCKSUM) {
 				cflags |= EX_DPD_IPCKSUM;
 			}
@@ -1327,7 +1327,7 @@ elxl_recv(elxl_t *sc, ex_desc_t *rxd, uint32_t stat)
 		if (stat & (EX_UPD_TCPCHECKED | EX_UPD_UDPCHECKED)) {
 			pflags |= (HCK_FULLCKSUM | HCK_FULLCKSUM_OK);
 		}
-		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0, pflags, 0);
+		mac_hcksum_set(mp, 0, 0, 0, 0, pflags);
 	}
 
 	return (mp);

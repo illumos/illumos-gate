@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -4550,8 +4551,7 @@ gld_unitdata(queue_t *q, mblk_t *mp)
 	ifp = ((gld_mac_pvt_t *)macinfo->gldm_mac_pvt)->interfacep;
 
 	/* grab any checksum information that may be present */
-	hcksum_retrieve(mp->b_cont, NULL, NULL, &start, &stuff, &end,
-	    &value, &flags);
+	mac_hcksum_get(mp->b_cont, &start, &stuff, &end, &value, &flags);
 
 	/*
 	 * Prepend a valid header for transmission
@@ -4567,8 +4567,7 @@ gld_unitdata(queue_t *q, mblk_t *mp)
 	}
 
 	/* apply any checksum information to the first block in the chain */
-	(void) hcksum_assoc(nmp, NULL, NULL, start, stuff, end, value,
-	    flags, 0);
+	mac_hcksum_set(nmp, start, stuff, end, value, flags);
 
 	GLD_CLEAR_MBLK_VTAG(nmp);
 	if (gld_start(q, nmp, GLD_WSRV, upri) == GLD_NORESOURCES) {

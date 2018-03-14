@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -55,15 +56,12 @@ static mblk_t *
 mac_copymsg_cksum(mblk_t *mp)
 {
 	mblk_t *mp1;
-	uint32_t start, stuff, end, value, flags;
 
 	mp1 = copymsg(mp);
 	if (mp1 == NULL)
 		return (NULL);
 
-	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, &end, &value, &flags);
-	(void) hcksum_assoc(mp1, NULL, NULL, start, stuff, end, value,
-	    flags, KM_NOSLEEP);
+	mac_hcksum_clone(mp, mp1);
 
 	return (mp1);
 }
@@ -108,8 +106,7 @@ mac_fix_cksum(mblk_t *mp_chain)
 		struct ether_header *ehp;
 		uint16_t sap;
 
-		hcksum_retrieve(mp, NULL, NULL, &start, &stuff, &end, &value,
-		    &flags);
+		mac_hcksum_get(mp, &start, &stuff, &end, &value, &flags);
 		if (flags == 0)
 			continue;
 
@@ -304,8 +301,7 @@ mac_fix_cksum(mblk_t *mp_chain)
 			value = 0;
 		}
 
-		(void) hcksum_assoc(mp, NULL, NULL, start, stuff, end,
-		    value, flags, KM_NOSLEEP);
+		mac_hcksum_set(mp, start, stuff, end, value, flags);
 	}
 
 	return (new_chain);
@@ -320,7 +316,6 @@ mac_add_vlan_tag(mblk_t *mp, uint_t pri, uint16_t vid)
 	mblk_t *hmp;
 	struct ether_vlan_header *evhp;
 	struct ether_header *ehp;
-	uint32_t start, stuff, end, value, flags;
 
 	ASSERT(pri != 0 || vid != 0);
 
@@ -350,9 +345,7 @@ mac_add_vlan_tag(mblk_t *mp, uint_t pri, uint16_t vid)
 	 * Free the original message if it's now empty. Link the
 	 * rest of messages to the header message.
 	 */
-	hcksum_retrieve(mp, NULL, NULL, &start, &stuff, &end, &value, &flags);
-	(void) hcksum_assoc(hmp, NULL, NULL, start, stuff, end, value, flags,
-	    KM_NOSLEEP);
+	mac_hcksum_clone(mp, hmp);
 	if (MBLKL(mp) == 0) {
 		hmp->b_cont = mp->b_cont;
 		freeb(mp);

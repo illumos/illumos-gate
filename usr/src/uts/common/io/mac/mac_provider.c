@@ -1496,7 +1496,8 @@ mac_prop_info_set_perm(mac_prop_info_handle_t ph, uint8_t perm)
 	pr->pr_flags |= MAC_PROP_INFO_PERM;
 }
 
-void mac_hcksum_get(mblk_t *mp, uint32_t *start, uint32_t *stuff,
+void
+mac_hcksum_get(const mblk_t *mp, uint32_t *start, uint32_t *stuff,
     uint32_t *end, uint32_t *value, uint32_t *flags_ptr)
 {
 	uint32_t flags;
@@ -1521,8 +1522,9 @@ void mac_hcksum_get(mblk_t *mp, uint32_t *start, uint32_t *stuff,
 		*flags_ptr = flags;
 }
 
-void mac_hcksum_set(mblk_t *mp, uint32_t start, uint32_t stuff,
-    uint32_t end, uint32_t value, uint32_t flags)
+void
+mac_hcksum_set(mblk_t *mp, uint32_t start, uint32_t stuff, uint32_t end,
+    uint32_t value, uint32_t flags)
 {
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
@@ -1531,6 +1533,24 @@ void mac_hcksum_set(mblk_t *mp, uint32_t start, uint32_t stuff,
 	DB_CKSUMEND(mp) = (intptr_t)end;
 	DB_CKSUMFLAGS(mp) = (uint16_t)flags;
 	DB_CKSUM16(mp) = (uint16_t)value;
+}
+
+void
+mac_hcksum_clone(const mblk_t *src, mblk_t *dst)
+{
+	ASSERT3U(DB_TYPE(src), ==, M_DATA);
+	ASSERT3U(DB_TYPE(dst), ==, M_DATA);
+
+	/*
+	 * Do these assignments unconditionally, rather than only when flags is
+	 * non-zero.  This protects a situation where zeroed hcksum data does
+	 * not make the jump onto an mblk_t with stale data in those fields.
+	 */
+	DB_CKSUMFLAGS(dst) = (DB_CKSUMFLAGS(src) & HCK_FLAGS);
+	DB_CKSUMSTART(dst) = DB_CKSUMSTART(src);
+	DB_CKSUMSTUFF(dst) = DB_CKSUMSTUFF(src);
+	DB_CKSUMEND(dst) = DB_CKSUMEND(src);
+	DB_CKSUM16(dst) = DB_CKSUM16(src);
 }
 
 void

@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2018 Joyent, Inc.
 .\"
-.Dd June 01, 2016
+.Dd March 15, 2018
 .Dt MAC_HCKSUM_GET 9F
 .Os
 .Sh NAME
@@ -22,7 +22,7 @@
 .In sys/mac_provider.h
 .Ft void
 .Fo mac_hcksum_get
-.Fa "mblk_t *mp"
+.Fa "const mblk_t *mp"
 .Fa "uint32_t *start"
 .Fa "uint32_t *stuff"
 .Fa "uint32_t *end"

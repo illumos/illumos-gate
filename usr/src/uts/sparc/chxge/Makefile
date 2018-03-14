@@ -21,6 +21,7 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 
 #
@@ -69,9 +70,9 @@ CFLAGS		+= -DSUN_KSTATS -DHOST_PAUSE -DTX_CKSUM_FIX -DTX_THREAD_RECLAIM
 # CFLAGS		+= -DCH_DEBUG=1 -DPE_DBGOUT_ENABLED=1
 
 #
-#	Driver depends on GLD & IP
+#	Driver depends on GLD, IP, and MAC
 #
-LDFLAGS		+= -dy -N misc/gld -N drv/ip
+LDFLAGS		+= -dy -N misc/gld -N drv/ip -N misc/mac
 
 #	Lint flag
 #

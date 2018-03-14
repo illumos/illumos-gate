@@ -55,12 +55,6 @@ extern "C" {
 
 
 
-/*
- */
-#pragma weak   hcksum_retrieve
-#pragma weak   hcksum_assoc
-
-
 #include "listq.h"
 #include "lm5706.h"
 #include "54xx_reg.h"
