@@ -14,15 +14,19 @@
  */
 
 /*
- * Exit 0 if the current hardware is bhyve-compatible, non-zero otherwise.
- * A '-v' option can be used to print the incompatibility reason provided by
- * the kernel.
+ * With no option, exit 0 if the current hardware is bhyve-compatible, non-zero
+ * otherwise. A '-v' option can be used to print the incompatibility reason
+ * provided by the kernel.
+ *
+ * The -c option can be used to print the number of virtual CPUs supported by
+ * bhyve build.
  */
 
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <sys/vmm.h>
 
 #include <sys/param.h>
 #include <sys/cpuset.h>
@@ -32,7 +36,7 @@
 static void
 usage()
 {
-	fprintf(stderr, "bhhwcompat [-v]\n");
+	fprintf(stderr, "bhhwcompat [-cv]\n");
 	exit(1);
 }
 
@@ -41,16 +45,24 @@ main(int argc, char *argv[])
 {
 	int fd, c;
 	char emsg[128];
+	boolean_t max_cpu = B_FALSE;
 	boolean_t verbose = B_FALSE;
 
-	while ((c = getopt(argc, argv, "v")) != -1) {
+	while ((c = getopt(argc, argv, "cv")) != -1) {
 		switch (c) {
+		case 'c':
+			max_cpu = B_TRUE;
+			break;
 		case 'v':
 			verbose = B_TRUE;
 			break;
 		default:
 			usage();
 		}
+	}
+
+	if (max_cpu) {
+		(void) printf("%d\n", VM_MAXCPU);
 	}
 
 	if ((fd = open(VMM_CTL_DEV, O_RDONLY | O_EXCL)) < 0) {
