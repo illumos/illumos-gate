@@ -5107,7 +5107,7 @@ f usr/lib/brand/bhyve/uninstall 0555 root sys
 f usr/lib/brand/bhyve/config.xml 0444 root sys
 f usr/lib/brand/bhyve/platform.xml 0444 root sys
 f usr/lib/brand/bhyve/statechange 0555 root sys
-h usr/lib/brand/bhyve/zhyve=usr/sbin/amd64/bhyve
+h usr/lib/brand/bhyve/zhyve=usr/sbin/bhyve
 d usr/lib/brand/lx 0755 root bin
 s usr/lib/brand/lx/64=amd64
 d usr/lib/brand/lx/amd64 0755 root bin
@@ -10273,8 +10273,6 @@ f usr/sbin/acpixtract 0555 root bin
 f usr/sbin/add_drv 0555 root bin
 f usr/sbin/allocate 4555 root bin
 d usr/sbin/amd64 0755 root bin
-f usr/sbin/amd64/bhyve 0555 root sys
-f usr/sbin/amd64/bhyvectl 0555 root sys
 f usr/sbin/amd64/dtrace 0555 root bin
 f usr/sbin/amd64/intrstat 0555 root bin
 f usr/sbin/amd64/ipf 0555 root bin
@@ -10296,8 +10294,8 @@ f usr/sbin/auditstat 0555 root bin
 h usr/sbin/audlinks=usr/sbin/devfsadm
 s usr/sbin/automount=../lib/fs/autofs/automount
 s usr/sbin/autopush=../../sbin/autopush
-h usr/sbin/bhyve=usr/lib/isaexec
-h usr/sbin/bhyvectl=usr/lib/isaexec
+f usr/sbin/bhyve 0555 root sys
+f usr/sbin/bhyvectl 0555 root sys
 f usr/sbin/cfgadm 0555 root bin
 f usr/sbin/check-hostname 0555 root mail
 f usr/sbin/check-permissions 0555 root mail

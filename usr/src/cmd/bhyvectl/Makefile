@@ -11,31 +11,47 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG =		bhyvectl
 
 include ../Makefile.cmd
+include ../Makefile.cmd.64
 
-$(BUILD64)SUBDIRS += $(MACH64)
+SRCS =		bhyvectl.c
+OBJS =		$(SRCS:.c=.o) humanize_number.o
 
-all	:=	TARGET = all
-install	:=	TARGET = install
-clean	:=	TARGET = clean
-clobber	:=	TARGET = clobber
-lint	:=	TARGET = lint
+CLEANFILES =	$(PROG)
+CLOBBERFILES +=	$(ROOTUSRSBINPROG)
 
 .KEEP_STATE:
 
-all clean clobber lint:	$(SUBDIRS)
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
+		-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64 \
+		$(CPPFLAGS.master) \
+		-I$(ROOT)/usr/platform/i86pc/include \
+		-I$(SRC)/uts/i86pc/io/vmm
+LDLIBS +=	-lvmmapi
 
-install: $(SUBDIRS)
-	-$(RM) $(ROOTUSRSBINPROG)
-	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
+CERRWARN +=	-_gcc=-Wno-uninitialized
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) CW_NO_SHADOW=true __GNUC= $(TARGET)
+all: $(PROG)
 
-FRC:
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTUSRSBINPROG)
+
+clean:
+	$(RM) $(OBJS) $(CLEANFILES)
+
+lint:	lint_SRCS
 
 include ../Makefile.targ
+
+%.o: $(CONTRIB)/freebsd/lib/libutil/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
