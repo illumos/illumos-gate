@@ -35,7 +35,7 @@
 #define	BHYVE_DIR		"var/run/bhyve"
 #define	BHYVE_ARGS_FILE		BHYVE_DIR "/" "zhyve.cmd"
 
-#define ZH_MAXARGS		100
+#define	ZH_MAXARGS		100
 
 #define	DEFAULT_BOOTROM		"/usr/share/bhyve/uefi-csm-rom.bin"
 
@@ -205,7 +205,7 @@ add_nets(int *argc, char **argv)
 	char slotconf[MAXNAMELEN];
 	char *primary = NULL;
 
-	if ((nets = get_zcfg_var("net", "resources", NULL))== NULL) {
+	if ((nets = get_zcfg_var("net", "resources", NULL)) == NULL) {
 		return (0);
 	}
 
@@ -381,6 +381,31 @@ init_debug(void)
 	debug = (val != NULL && val[0] != '\0');
 }
 
+static int
+setup_reboot(char *zonename)
+{
+	zoneid_t	zoneid;
+
+	if ((zoneid = getzoneidbyname(zonename)) < 0) {
+		(void) printf("Error: bhyve zoneid (%s) does not exist\n",
+		    zonename);
+		return (-1);
+	}
+
+	if (zoneid == GLOBAL_ZONEID) {
+		(void) printf("Error: bhyve global zoneid (%s)\n", zonename);
+		return (-1);
+	}
+
+	if (zone_setattr(zoneid, ZONE_ATTR_INITREBOOT, NULL, 0) < 0 ||
+	    zone_setattr(zoneid, ZONE_ATTR_INITRESTART0, NULL, 0) < 0) {
+		(void) printf("Error: bhyve zoneid %d setattr failed: %s\n",
+		    zoneid, strerror(errno));
+		return (-1);
+	}
+
+	return (0);
+}
 
 int
 main(int argc, char **argv)
@@ -409,6 +434,9 @@ main(int argc, char **argv)
 	}
 	zonename = argv[1];
 	zonepath = argv[2];
+
+	if (setup_reboot(zonename) < 0)
+		return (1);
 
 	for (zhargc = 0; zhargv[zhargc] != NULL; zhargc++) {
 		dprintf(("def_arg: argv[%d]='%s'\n", zhargc, zhargv[zhargc]));
