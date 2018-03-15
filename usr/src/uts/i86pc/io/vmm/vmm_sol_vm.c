@@ -115,7 +115,7 @@ struct vmspace_mapping {
 };
 typedef struct vmspace_mapping vmspace_mapping_t;
 
-#define VMSM_OFFSET(vmsm, addr)	(			\
+#define	VMSM_OFFSET(vmsm, addr)	(			\
 	    (vmsm)->vmsm_offset +			\
 	    ((addr) - (uintptr_t)(vmsm)->vmsm_addr))
 
@@ -941,7 +941,12 @@ vm_object_allocate(objtype_t type, vm_pindex_t psize)
 	switch (type) {
 	case OBJT_DEFAULT: {
 		/* XXXJOY: opt-in to larger pages? */
-		vmo->vmo_data = vmem_alloc(vmm_arena, size, KM_SLEEP);
+		vmo->vmo_data = vmem_alloc(vmm_arena, size, KM_NOSLEEP);
+		if (vmo->vmo_data == NULL) {
+			mutex_destroy(&vmo->vmo_lock);
+			kmem_free(vmo, sizeof (*vmo));
+			return (NULL);
+		}
 		/* XXXJOY: Better zeroing approach? */
 		bzero(vmo->vmo_data, size);
 		vmo->vmo_pager = vm_object_pager_heap;
@@ -1300,7 +1305,7 @@ vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 	vmo = vmsm->vmsm_object;
 	prot = vmsm->vmsm_prot;
 
-	for (uintptr_t pos = addr; pos < end;) {
+	for (uintptr_t pos = addr; pos < end; ) {
 		pfn_t pfn;
 		uintptr_t pg_size, map_addr;
 		uint_t map_lvl = 0;

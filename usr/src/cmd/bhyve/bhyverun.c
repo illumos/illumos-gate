@@ -1005,7 +1005,20 @@ main(int argc, char *argv[])
 	fbsdrun_set_capabilities(ctx, BSP);
 
 	vm_set_memflags(ctx, memflags);
+#ifdef	__FreeBSD__
 	err = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
+#else
+	do {
+		errno = 0;
+		err = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
+		error = errno;
+		if (err != 0 && error == ENOMEM) {
+			(void) fprintf(stderr, "Unable to allocate memory "
+			    "(%llu), retrying in 1 second\n", memsize);
+			sleep(1);
+		}
+	} while (error == ENOMEM);
+#endif
 	if (err) {
 		fprintf(stderr, "Unable to setup memory (%d)\n", errno);
 		exit(1);
