@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
  * Copyright 2017 Joyent, Inc.
  */
@@ -153,6 +153,7 @@ struct nvme {
 	boolean_t n_lba_range_supported;
 	boolean_t n_auto_pst_supported;
 	boolean_t n_async_event_supported;
+	boolean_t n_progress_supported;
 
 	int n_nssr_supported;
 	int n_doorbell_stride;

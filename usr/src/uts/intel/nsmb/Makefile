@@ -53,12 +53,36 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET	= $(ALL_TARGET_$(OBJS_DIR))
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET	= $(INSTALL_TARGET_$(OBJS_DIR))
 
 #
 #	Overrides.
+#
+#	We need some unusual overrides here so we'll
+#	build ioc_check.h for both 32-bit/64-bit,
+#	but only build 64-bit binaries.
+#
+
+# Build 32-bit also...
+DEF_BUILDS	= $(DEF_BUILDS64) $(DEF_BUILDS32)
+ALL_BUILDS	= $(ALL_BUILDS64) $(ALL_BUILDS32)
+# ... but don't build any 32-bit objects
+ALL_TARGET_debug32	= $(IOC_CHECK_H)
+ALL_TARGET_debug64	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET_obj32	= $(IOC_CHECK_H)
+ALL_TARGET_obj64	= $(BINARY) $(SRC_CONFILE)
+# ... and remove -xcg92 (not supported by cw)
+CFLAGS_32=
+# ... same deal for install targets
+INSTALL_TARGET_debug32	= $(IOC_CHECK_H)
+INSTALL_TARGET_debug64	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET_obj32	= $(IOC_CHECK_H)
+INSTALL_TARGET_obj64	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+#
+# Now the normal overrides...
 #
 MODSTUBS_DIR	= $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DNSMB_MODULE

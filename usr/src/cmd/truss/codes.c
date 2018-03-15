@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014, OmniTI Computer Consulting, Inc. All rights reserved.
@@ -1164,6 +1164,10 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_POOL_GET_HISTORY,	"ZFS_IOC_POOL_GET_HISTORY",
 		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_CHECKPOINT,	"ZFS_IOC_POOL_CHECKPOINT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_DISCARD_CHECKPOINT,
+		"ZFS_IOC_POOL_DISCARD_CHECKPOINT", "zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_VDEV_ADD,		"ZFS_IOC_VDEV_ADD",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_VDEV_REMOVE,		"ZFS_IOC_VDEV_REMOVE",
