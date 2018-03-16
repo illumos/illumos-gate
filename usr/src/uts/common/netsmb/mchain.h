@@ -36,7 +36,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MCHAIN_H_
@@ -105,6 +105,7 @@
  */
 
 #include <sys/stream.h> /* mblk_t */
+#include <sys/strsun.h> /* MBLKL */
 typedef mblk_t mbuf_t;
 
 /* BEGIN CSTYLED */
@@ -226,6 +227,7 @@ void mb_initm(mbchain_t *, mbuf_t *);
 void mb_done(mbchain_t *);
 void *mb_reserve(mbchain_t *, int size);
 
+int  mb_put_align8(mbchain_t *mbp);
 int  mb_put_padbyte(mbchain_t *mbp);
 int  mb_put_uint8(mbchain_t *, uint8_t);
 int  mb_put_uint16be(mbchain_t *, uint16_t);
@@ -236,6 +238,7 @@ int  mb_put_uint64be(mbchain_t *, uint64_t);
 int  mb_put_uint64le(mbchain_t *, uint64_t);
 int  mb_put_mem(mbchain_t *, const void *, int, int);
 int  mb_put_mbuf(mbchain_t *, mbuf_t *);
+int  mb_put_mbchain(mbchain_t *, mbchain_t *);
 
 int  md_init(mdchain_t *mdp);
 void md_initm(mdchain_t *mbp, mbuf_t *m);
@@ -250,5 +253,7 @@ int  md_get_uint64be(mdchain_t *, uint64_t *);
 int  md_get_uint64le(mdchain_t *, uint64_t *);
 int  md_get_mem(mdchain_t *, void *, int, int);
 int  md_get_mbuf(mdchain_t *, int, mbuf_t **);
+int  md_seek(mdchain_t *, uint32_t);
+uint32_t md_tell(mdchain_t *);
 
 #endif	/* !_MCHAIN_H_ */

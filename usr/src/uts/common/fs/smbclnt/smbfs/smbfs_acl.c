@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -69,12 +71,12 @@ static int
 smbfs_getsd(vnode_t *vp, uint32_t selector, mblk_t **mp, cred_t *cr)
 {
 	struct smb_cred scred;
-	int error, cerror;
 	smbmntinfo_t *smi;
 	smbnode_t	*np;
-	u_int16_t	fid = SMB_FID_UNUSED;
+	smb_fh_t	*fid = NULL;
 	uint32_t	sdlen = SMALL_SD_SIZE;
 	uint32_t	rights = STD_RIGHT_READ_CONTROL_ACCESS;
+	int error;
 
 	if (selector & SACL_SECURITY_INFORMATION)
 		rights |= SEC_RIGHT_SYSTEM_SECURITY;
@@ -82,9 +84,6 @@ smbfs_getsd(vnode_t *vp, uint32_t selector, mblk_t **mp, cred_t *cr)
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
 
-	/* Shared lock for (possible) n_fid use. */
-	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
-		return (EINTR);
 	smb_credinit(&scred, cr);
 
 	error = smbfs_smb_tmpopen(np, rights, &scred, &fid);
@@ -95,8 +94,8 @@ again:
 	/*
 	 * This does the OTW Get
 	 */
-	error = smbfs_smb_getsec_m(smi->smi_share, fid,
-	    &scred, selector, mp, &sdlen);
+	error = smbfs_smb_getsec(smi->smi_share, fid,
+	    selector, mp, &sdlen, &scred);
 	/*
 	 * Server may give us an error indicating that we
 	 * need a larger data buffer to receive the SD,
@@ -115,14 +114,10 @@ again:
 	    sdlen <= MAX_RAW_SD_SIZE)
 		goto again;
 
-	cerror = smbfs_smb_tmpclose(np, fid, &scred);
-	if (cerror)
-		SMBVDEBUG("error %d closing file %s\n",
-		    cerror, np->n_rpath);
+	smbfs_smb_tmpclose(np, fid);
 
 out:
 	smb_credrele(&scred);
-	smbfs_rw_exit(&np->r_lkserlock);
 
 	return (error);
 }
@@ -139,11 +134,11 @@ static int
 smbfs_setsd(vnode_t *vp, uint32_t selector, mblk_t **mp, cred_t *cr)
 {
 	struct smb_cred scred;
-	int error, cerror;
 	smbmntinfo_t *smi;
 	smbnode_t	*np;
 	uint32_t	rights;
-	u_int16_t	fid = SMB_FID_UNUSED;
+	smb_fh_t	*fid = NULL;
+	int error;
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
@@ -164,9 +159,6 @@ smbfs_setsd(vnode_t *vp, uint32_t selector, mblk_t **mp, cred_t *cr)
 	if (selector & SACL_SECURITY_INFORMATION)
 		rights |= SEC_RIGHT_SYSTEM_SECURITY;
 
-	/* Shared lock for (possible) n_fid use. */
-	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
-		return (EINTR);
 	smb_credinit(&scred, cr);
 
 	error = smbfs_smb_tmpopen(np, rights, &scred, &fid);
@@ -185,17 +177,13 @@ smbfs_setsd(vnode_t *vp, uint32_t selector, mblk_t **mp, cred_t *cr)
 	/*
 	 * This does the OTW Set
 	 */
-	error = smbfs_smb_setsec_m(smi->smi_share, fid,
-	    &scred, selector, mp);
+	error = smbfs_smb_setsec(smi->smi_share, fid,
+	    selector, mp, &scred);
 
-	cerror = smbfs_smb_tmpclose(np, fid, &scred);
-	if (cerror)
-		SMBVDEBUG("error %d closing file %s\n",
-		    cerror, np->n_rpath);
+	smbfs_smb_tmpclose(np, fid);
 
 out:
 	smb_credrele(&scred);
-	smbfs_rw_exit(&np->r_lkserlock);
 
 	return (error);
 }

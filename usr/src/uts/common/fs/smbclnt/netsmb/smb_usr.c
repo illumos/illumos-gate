@@ -53,6 +53,7 @@
 
 #include <netsmb/smb_osdep.h>
 
+#include <smb/winioctl.h>
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_rq.h>
@@ -102,96 +103,83 @@ smb_usr_xnp(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 {
 	struct smb_cred scred;
 	struct smb_share *ssp;
+	struct smb_fh *fhp;
 	smbioc_xnp_t *ioc = NULL;
-	struct smb_t2rq *t2p = NULL;
-	struct mdchain *mdp;
-	int err, len, mbseg;
-	uint16_t setup[2];
+	struct mbchain send_mb;
+	struct mdchain recv_md;
+	uint32_t rdlen;
+	int err, mbseg;
 
-	/* This ioctl requires a share. */
-	if ((ssp = sdp->sd_share) == NULL)
-		return (ENOTCONN);
+	/* This ioctl requires a file handle. */
+	if ((fhp = sdp->sd_fh) == NULL)
+		return (EINVAL);
+	ssp = FHTOSS(fhp);
 
-	smb_credinit(&scred, cr);
+	/* After reconnect, force close+reopen */
+	if (fhp->fh_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
+	bzero(&send_mb, sizeof (send_mb));
+	bzero(&recv_md, sizeof (recv_md));
+
 	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
 	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
 		err = EFAULT;
 		goto out;
 	}
 
-	/* See ddi_copyin, ddi_copyout */
+	/*
+	 * Copyin the send data, into an mbchain,
+	 * save output buffer size.
+	 */
 	mbseg = (flags & FKIOCTL) ? MB_MSYSTEM : MB_MUSER;
+	err = smb_cpdatain(&send_mb, ioc->ioc_tdlen, ioc->ioc_tdata, mbseg);
+	if (err)
+		goto out;
+	rdlen = ioc->ioc_rdlen;
 
 	/*
-	 * Fill in the FID for libsmbfs transact named pipe.
+	 * Run the SMB2 ioctl or SMB1 trans2
 	 */
-	if (ioc->ioc_fh == -1) {
-		if (sdp->sd_vcgenid != ssp->ss_vcgenid) {
-			err = ESTALE;
-			goto out;
-		}
-		ioc->ioc_fh = sdp->sd_smbfid;
+	smb_credinit(&scred, cr);
+	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
+		err = smb2_smb_ioctl(ssp, &fhp->fh_fid2,
+		    &send_mb, &recv_md, &rdlen,
+		    FSCTL_PIPE_TRANSCEIVE, &scred);
+	} else {
+		err = smb_t2_xnp(ssp, fhp->fh_fid1,
+		    &send_mb, &recv_md, &rdlen,
+		    &ioc->ioc_more, &scred);
 	}
-
-	setup[0] = TRANS_TRANSACT_NAMED_PIPE;
-	setup[1] = (uint16_t)ioc->ioc_fh;
-
-	t2p = kmem_alloc(sizeof (*t2p), KM_SLEEP);
-	err = smb_t2_init(t2p, SSTOCP(ssp), setup, 2, &scred);
-	if (err)
-		goto out;
-	t2p->t2_setupcount = 2;
-	t2p->t2_setupdata  = setup;
-
-	t2p->t_name = "\\PIPE\\";
-	t2p->t_name_len = 6;
-
-	t2p->t2_maxscount = 0;
-	t2p->t2_maxpcount = 0;
-	t2p->t2_maxdcount = ioc->ioc_rdlen;
-
-	/* Transmit parameters (none) */
-
-	/* Transmit data */
-	err = smb_cpdatain(&t2p->t2_tdata,
-	    ioc->ioc_tdlen, ioc->ioc_tdata, mbseg);
-	if (err)
-		goto out;
-
-	err = smb_t2_request(t2p);
-
-	/* No returned parameters. */
+	smb_credrele(&scred);
 
 	/* Copyout returned data. */
-	mdp = &t2p->t2_rdata;
-	if (err == 0 && mdp->md_top != NULL) {
-		/* User's buffer large enough? */
-		len = m_fixhdr(mdp->md_top);
+	if (err == 0 && recv_md.md_top != NULL) {
+		/* User's buffer large enough for copyout? */
+		size_t len = m_fixhdr(recv_md.md_top);
 		if (len > ioc->ioc_rdlen) {
 			err = EMSGSIZE;
 			goto out;
 		}
-		ioc->ioc_rdlen = (ushort_t)len;
-		err = md_get_mem(mdp, ioc->ioc_rdata, len, mbseg);
+		err = md_get_mem(&recv_md, ioc->ioc_rdata, len, mbseg);
 		if (err)
 			goto out;
 	} else
 		ioc->ioc_rdlen = 0;
 
-	if (t2p->t2_sr_error == NT_STATUS_BUFFER_OVERFLOW)
+	/* Tell caller received length */
+	if (rdlen <= ioc->ioc_rdlen) {
+		/* Normal case */
+		ioc->ioc_rdlen = rdlen;
+	} else {
+		/* Buffer overlow. Leave ioc_rdlen */
 		ioc->ioc_more = 1;
+	}
 
 	(void) ddi_copyout(ioc, (void *)arg, sizeof (*ioc), flags);
 
-
 out:
-	if (t2p != NULL) {
-		/* Note: t2p->t_name no longer allocated */
-		smb_t2_done(t2p);
-		kmem_free(t2p, sizeof (*t2p));
-	}
 	kmem_free(ioc, sizeof (*ioc));
-	smb_credrele(&scred);
 
 	return (err);
 }
@@ -219,22 +207,22 @@ smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 {
 	struct smb_cred scred;
 	struct smb_share *ssp;
+	struct smb_fh *fhp;
 	smbioc_rw_t *ioc = NULL;
 	struct iovec aiov[1];
 	struct uio  auio;
-	uint16_t fh;
 	int err;
 	uio_rw_t rw;
 
-	/* This ioctl requires a share. */
-	if ((ssp = sdp->sd_share) == NULL)
-		return (ENOTCONN);
+	/* This ioctl requires a file handle. */
+	if ((fhp = sdp->sd_fh) == NULL)
+		return (EINVAL);
+	ssp = FHTOSS(fhp);
 
 	/* After reconnect, force close+reopen */
-	if (sdp->sd_vcgenid != ssp->ss_vcgenid)
+	if (fhp->fh_vcgenid != ssp->ss_vcgenid)
 		return (ESTALE);
 
-	smb_credinit(&scred, cr);
 	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
 	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
 		err = EFAULT;
@@ -253,15 +241,6 @@ smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 		goto out;
 	}
 
-	/*
-	 * If caller passes -1 in ioc_fh, then
-	 * use the FID from SMBIOC_NTCREATE.
-	 */
-	if (ioc->ioc_fh == -1)
-		fh = (uint16_t)sdp->sd_smbfid;
-	else
-		fh = (uint16_t)ioc->ioc_fh;
-
 	aiov[0].iov_base = ioc->ioc_base;
 	aiov[0].iov_len = (size_t)ioc->ioc_cnt;
 
@@ -273,7 +252,9 @@ smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 	auio.uio_fmode = 0;
 	auio.uio_resid = (size_t)ioc->ioc_cnt;
 
-	err = smb_rwuio(ssp, fh, rw, &auio, &scred, 0);
+	smb_credinit(&scred, cr);
+	err = smb_rwuio(fhp, rw, &auio, &scred, 0);
+	smb_credrele(&scred);
 
 	/*
 	 * On return ioc_cnt holds the
@@ -285,7 +266,6 @@ smb_usr_rw(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 
 out:
 	kmem_free(ioc, sizeof (*ioc));
-	smb_credrele(&scred);
 
 	return (err);
 }
@@ -300,20 +280,20 @@ smb_usr_ntcreate(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 	struct smb_cred scred;
 	struct mbchain name_mb;
 	struct smb_share *ssp;
+	struct smb_fh *fhp = NULL;
 	smbioc_ntcreate_t *ioc = NULL;
-	uint16_t fid;
 	int err, nmlen;
+
+	mb_init(&name_mb);
 
 	/* This ioctl requires a share. */
 	if ((ssp = sdp->sd_share) == NULL)
 		return (ENOTCONN);
 
-	/* Must not be already open. */
-	if (sdp->sd_smbfid != -1)
+	/* Must not already have a file handle. */
+	if (sdp->sd_fh != NULL)
 		return (EINVAL);
 
-	mb_init(&name_mb);
-	smb_credinit(&scred, cr);
 	ioc = kmem_alloc(sizeof (*ioc), KM_SLEEP);
 	if (ddi_copyin((void *) arg, ioc, sizeof (*ioc), flags)) {
 		err = EFAULT;
@@ -329,7 +309,14 @@ smb_usr_ntcreate(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 	if (err != 0)
 		goto out;
 
-	/* Do the OtW open, save the FID. */
+	err = smb_fh_create(ssp, &fhp);
+	if (err != 0)
+		goto out;
+
+	/*
+	 * Do the OtW open, save the FID.
+	 */
+	smb_credinit(&scred, cr);
 	err = smb_smb_ntcreate(ssp, &name_mb,
 	    0,	/* create flags */
 	    ioc->ioc_req_acc,
@@ -339,18 +326,22 @@ smb_usr_ntcreate(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 	    ioc->ioc_creat_opts,
 	    NTCREATEX_IMPERSONATION_IMPERSONATION,
 	    &scred,
-	    &fid,
+	    fhp,
 	    NULL,
 	    NULL);
+	smb_credrele(&scred);
 	if (err != 0)
 		goto out;
 
-	sdp->sd_smbfid = fid;
-	sdp->sd_vcgenid = ssp->ss_vcgenid;
+	fhp->fh_rights = ioc->ioc_req_acc;
+	smb_fh_opened(fhp);
+	sdp->sd_fh = fhp;
+	fhp = NULL;
 
 out:
+	if (fhp != NULL)
+		smb_fh_rele(fhp);
 	kmem_free(ioc, sizeof (*ioc));
-	smb_credrele(&scred);
 	mb_done(&name_mb);
 
 	return (err);
@@ -363,11 +354,17 @@ out:
 int
 smb_usr_printjob(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 {
+	static const char invalid_chars[] = SMB_FILENAME_INVALID_CHARS;
 	struct smb_cred scred;
+	struct mbchain name_mb;
 	struct smb_share *ssp;
+	struct smb_fh *fhp = NULL;
 	smbioc_printjob_t *ioc = NULL;
-	uint16_t fid;
-	int err;
+	int err, cklen, nmlen;
+	uint32_t access = SA_RIGHT_FILE_WRITE_DATA |
+	    SA_RIGHT_FILE_READ_ATTRIBUTES;
+
+	mb_init(&name_mb);
 
 	/* This ioctl requires a share. */
 	if ((ssp = sdp->sd_share) == NULL)
@@ -377,8 +374,8 @@ smb_usr_printjob(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 	if (ssp->ss_type != STYPE_PRINTQ)
 		return (EINVAL);
 
-	/* Must not be already open. */
-	if (sdp->sd_smbfid != -1)
+	/* Must not already have a file handle. */
+	if (sdp->sd_fh != NULL)
 		return (EINVAL);
 
 	smb_credinit(&scred, cr);
@@ -387,21 +384,68 @@ smb_usr_printjob(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 		err = EFAULT;
 		goto out;
 	}
-	ioc->ioc_title[SMBIOC_MAX_NAME-1] = '\0';
 
-	/* Do the OtW open, save the FID. */
-	err = smb_smb_open_prjob(ssp, ioc->ioc_title,
-	    ioc->ioc_setuplen, ioc->ioc_prmode,
-	    &scred, &fid);
+	/*
+	 * Use the print job title as the file name to open, but
+	 * check for invalid characters first.  See the notes in
+	 * libsmbfs/smb/print.c about job name sanitizing.
+	 */
+	ioc->ioc_title[SMBIOC_MAX_NAME-1] = '\0';
+	nmlen = strnlen(ioc->ioc_title, SMBIOC_MAX_NAME-1);
+	cklen = strcspn(ioc->ioc_title, invalid_chars);
+	if (cklen < nmlen) {
+		err = EINVAL;
+		goto out;
+	}
+
+	/* Build name_mb */
+	err = smb_put_dmem(&name_mb, SSTOVC(ssp),
+	    ioc->ioc_title, nmlen,
+	    SMB_CS_NONE, NULL);
 	if (err != 0)
 		goto out;
 
-	sdp->sd_smbfid = fid;
-	sdp->sd_vcgenid = ssp->ss_vcgenid;
+	err = smb_fh_create(ssp, &fhp);
+	if (err != 0)
+		goto out;
+
+	/*
+	 * Do the OtW open, save the FID.
+	 */
+	smb_credinit(&scred, cr);
+	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
+		err = smb2_smb_ntcreate(ssp, &name_mb,
+		    NULL, NULL, /* cctx in, out */
+		    0,	/* create flags */
+		    access,
+		    SMB_EFA_NORMAL,
+		    NTCREATEX_SHARE_ACCESS_NONE,
+		    NTCREATEX_DISP_CREATE,
+		    NTCREATEX_OPTIONS_NON_DIRECTORY_FILE,
+		    NTCREATEX_IMPERSONATION_IMPERSONATION,
+		    &scred,
+		    &fhp->fh_fid2,
+		    NULL,
+		    NULL);
+	} else {
+		err = smb_smb_open_prjob(ssp, ioc->ioc_title,
+		    ioc->ioc_setuplen, ioc->ioc_prmode,
+		    &scred, &fhp->fh_fid1);
+	}
+	smb_credrele(&scred);
+	if (err != 0)
+		goto out;
+
+	fhp->fh_rights = access;
+	smb_fh_opened(fhp);
+	sdp->sd_fh = fhp;
+	fhp = NULL;
 
 out:
+	if (fhp != NULL)
+		smb_fh_rele(fhp);
 	kmem_free(ioc, sizeof (*ioc));
-	smb_credrele(&scred);
+	mb_done(&name_mb);
 
 	return (err);
 }
@@ -410,31 +454,21 @@ out:
  * Helper for nsmb_ioctl case
  * SMBIOC_CLOSEFH
  */
+/*ARGSUSED*/
 int
 smb_usr_closefh(smb_dev_t *sdp, cred_t *cr)
 {
-	struct smb_cred scred;
-	struct smb_share *ssp;
-	uint16_t fid;
-	int err;
+	struct smb_fh *fhp;
 
-	/* This ioctl requires a share. */
-	if ((ssp = sdp->sd_share) == NULL)
-		return (ENOTCONN);
+	/* This ioctl requires a file handle. */
+	if ((fhp = sdp->sd_fh) == NULL)
+		return (EINVAL);
+	sdp->sd_fh = NULL;
 
-	if (sdp->sd_smbfid == -1)
-		return (0);
-	fid = (uint16_t)sdp->sd_smbfid;
-	sdp->sd_smbfid = -1;
+	smb_fh_close(fhp);
+	smb_fh_rele(fhp);
 
-	smb_credinit(&scred, cr);
-	if (ssp->ss_type == STYPE_PRINTQ)
-		err = smb_smb_close_prjob(ssp, fid, &scred);
-	else
-		err = smb_smb_close(ssp, fid, NULL, &scred);
-	smb_credrele(&scred);
-
-	return (err);
+	return (0);
 }
 
 /*
@@ -732,7 +766,7 @@ smb_usr_iod_ioctl(smb_dev_t *sdp, int cmd, intptr_t arg, int flags, cred_t *cr)
 	switch (cmd) {
 
 	case SMBIOC_IOD_CONNECT:
-		err = nsmb_iod_connect(vcp);
+		err = nsmb_iod_connect(vcp, cr);
 		break;
 
 	case SMBIOC_IOD_NEGOTIATE:

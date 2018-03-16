@@ -33,9 +33,10 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -420,6 +421,22 @@ mb_put_padbyte(struct mbchain *mbp)
 	return (0);
 }
 
+/*
+ * Adds padding to 8 byte boundary
+ */
+int
+mb_put_align8(struct mbchain *mbp)
+{
+	static const char zeros[8] = { 0 };
+	int pad_len = 0;
+
+	if ((mbp->mb_count % 8) != 0) {
+		pad_len = 8 - (mbp->mb_count % 8);
+		MB_PUT_INLINE(mbp, zeros, pad_len);
+	}
+	return (0);
+}
+
 int
 mb_put_uint8(struct mbchain *mbp, u_int8_t x)
 {
@@ -537,6 +554,7 @@ mb_put_mem(struct mbchain *mbp, const void *vsrc, int size, int type)
 
 /*
  * Append an mblk to the chain.
+ * Note: The mblk_t *m is consumed.
  */
 int
 mb_put_mbuf(struct mbchain *mbp, mblk_t *m)
@@ -573,6 +591,29 @@ mb_put_mbuf(struct mbchain *mbp, mblk_t *m)
 	}
 
 	return (0);
+}
+
+/*
+ * Put an mbchain into another mbchain
+ * Leave sub_mbp untouched.
+ */
+int
+mb_put_mbchain(struct mbchain *mbp, struct mbchain *sub_mbp)
+{
+	mblk_t *m;
+
+	if (sub_mbp == NULL)
+		return (0);
+
+	m = sub_mbp->mb_top;
+	if (m == NULL)
+		return (0);
+
+	m = dupmsg(m);
+	if (m == NULL)
+		return (ENOSR);
+
+	return (mb_put_mbuf(mbp, m));
 }
 
 /*
@@ -875,6 +916,7 @@ md_get_mem(struct mdchain *mdp, void *vdst, int size, int type)
 
 /*
  * Get the next SIZE bytes as a separate mblk.
+ * Advances position in mdp by SIZE.
  */
 int
 md_get_mbuf(struct mdchain *mdp, int size, mblk_t **ret)
@@ -898,6 +940,7 @@ md_get_mbuf(struct mdchain *mdp, int size, mblk_t **ret)
 	rm = m_copym(m, off, size, M_WAITOK);
 	if (rm == NULL)
 		return (EBADRPC);
+	(void) md_get_mem(mdp, NULL, size, MB_MSYSTEM);
 
 	*ret = rm;
 	return (0);

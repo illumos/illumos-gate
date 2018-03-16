@@ -33,9 +33,10 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _FS_SMBFS_SMBFS_SUBR_H_
@@ -85,6 +86,7 @@ struct timespec;
 typedef enum {
 	ft_LM1 = 1,
 	ft_LM2,
+	ft_SMB2,
 	ft_XA
 } smbfs_fctx_type_t;
 
@@ -120,31 +122,33 @@ struct smbfs_fctx {
 	/*
 	 * Internal variables
 	 */
+	uint16_t	f_infolevel;
 	uint16_t	f_limit;	/* maximum number of entries */
-	uint16_t	f_attrmask;	/* SMB_FA_ */
+	uint32_t	f_attrmask;	/* SMB_FA_ */
 	int		f_wclen;
 	const char	*f_wildcard;
 	struct smbnode	*f_dnp;
 	struct smb_cred	*f_scred;
 	struct smb_share	*f_ssp;
+	struct smb_fh	*f_fhp;
 	union {
 		struct smb_rq *uf_rq;
 		struct smb_t2rq *uf_t2;
-	} f_urq;
+	} f_urq;	// XXX remove and use...
+	struct mdchain	f_mdchain;
 	int		f_left;		/* entries left */
 	int		f_ecnt;		/* entries left in current response */
 	int		f_eofs;		/* entry offset in data block */
 	uchar_t		f_skey[SMB_SKEYLEN]; /* server side search context */
 	uchar_t		f_fname[8 + 1 + 3 + 1]; /* for 8.3 filenames */
 	uint16_t	f_Sid;		/* Search handle (like a FID) */
-	uint16_t	f_infolevel;
 	int		f_rnamelen;
 	char		*f_rname;	/* resume name */
 	int		f_rnameofs;
 	int		f_otws;		/* # over-the-wire ops so far */
 	char		*f_firstnm;	/* first filename we got back */
 	int		f_firstnmlen;
-	int		f_rkey;		/* resume key */
+	uint32_t	f_rkey;		/* resume key */
 };
 typedef struct smbfs_fctx smbfs_fctx_t;
 
@@ -152,73 +156,163 @@ typedef struct smbfs_fctx smbfs_fctx_t;
 #define	f_t2	f_urq.uf_t2
 
 /*
- * smb level (smbfs_smb.c)
+ * Internal form of FileFsFullSizeInformation
+ * [MS-FSCC] 2.5.4 FileFsFullSizeInformation
+ * for the _statfs functions.
+ */
+struct smb_fs_size_info {
+	uint64_t total_units;
+	uint64_t caller_avail;
+	uint64_t actual_avail;
+	uint32_t sect_per_unit;
+	uint32_t bytes_per_sect;
+};
+
+/*
+ * smb common functions (smbfs_smbx.c)
  */
 int  smbfs_smb_lock(struct smbnode *np, int op, caddr_t id,
 	offset_t start, uint64_t len,	int largelock,
 	struct smb_cred *scrp, uint32_t timeout);
+int  smbfs_smb_getfattr(struct smbnode *np, smb_fh_t *fhp,
+	struct smbfattr *fap, struct smb_cred *scrp);
+int  smbfs_smb_getpattr(struct smbnode *np, struct smbfattr *fap,
+	struct smb_cred *scrp);
 int  smbfs_smb_qfsattr(struct smb_share *ssp, struct smb_fs_attr_info *,
 	struct smb_cred *scrp);
 int  smbfs_smb_statfs(struct smb_share *ssp, statvfs64_t *sbp,
 	struct smb_cred *scrp);
-
-int  smbfs_smb_setdisp(struct smbnode *np, uint16_t fid, uint8_t newdisp,
+int  smbfs_smb_setdisp(struct smb_share *ssp, smb_fh_t *fid, uint8_t newdisp,
 	struct smb_cred *scrp);
-int  smbfs_smb_setfsize(struct smbnode *np, uint16_t fid, uint64_t newsize,
+int  smbfs_smb_setfsize(struct smb_share *ssp, smb_fh_t *fid, uint64_t newsize,
 	struct smb_cred *scrp);
-
-int  smbfs_smb_getfattr(struct smbnode *np, struct smbfattr *fap,
-	struct smb_cred *scrp);
-
-int  smbfs_smb_setfattr(struct smbnode *np, int fid,
+int  smbfs_smb_setfattr(struct smb_share *ssp, smb_fh_t *fid,
 	uint32_t attr, struct timespec *mtime, struct timespec *atime,
 	struct smb_cred *scrp);
+int  smbfs_smb_flush(struct smb_share *ssp, smb_fh_t *fid,
+	struct smb_cred *scrp);
 
+int smbfs_smb_ntcreatex(
+	struct smbnode *np, const char *name, int nmlen, int xattr,
+	uint32_t req_acc, uint32_t efa, uint32_t share_acc,
+	uint32_t disp, uint32_t createopt, struct smb_cred *scrp,
+	smb_fh_t *fhpp, uint32_t *cr_act_p, struct smbfattr *fap);
+
+int  smbfs_smb_tmpopen(struct smbnode *np, uint32_t rights,
+	struct smb_cred *scrp, smb_fh_t **fidpp);
+void smbfs_smb_tmpclose(struct smbnode *ssp, smb_fh_t *fid);
 int  smbfs_smb_open(struct smbnode *np, const char *name, int nmlen,
 	int xattr, uint32_t rights, struct smb_cred *scrp,
-	uint16_t *fidp, uint32_t *rightsp, struct smbfattr *fap);
-int  smbfs_smb_tmpopen(struct smbnode *np, uint32_t rights,
-	struct smb_cred *scrp, uint16_t *fidp);
-int  smbfs_smb_close(struct smb_share *ssp, uint16_t fid,
-	struct timespec *mtime, struct smb_cred *scrp);
-int  smbfs_smb_tmpclose(struct smbnode *ssp, uint16_t fid,
-	struct smb_cred *scrp);
+	smb_fh_t **fidpp, struct smbfattr *fap);
+void smbfs_smb_close(smb_fh_t *fid);
 int  smbfs_smb_create(struct smbnode *dnp, const char *name, int nmlen,
-	int xattr, uint32_t disp, struct smb_cred *scrp, uint16_t *fidp);
-int  smbfs_smb_delete(struct smbnode *np, struct smb_cred *scrp,
-	const char *name, int len, int xattr);
-int  smbfs_smb_rename(struct smbnode *src, struct smbnode *tdnp,
-	const char *tname, int tnmlen, struct smb_cred *scrp);
-int  smbfs_smb_t2rename(struct smbnode *np, const char *tname, int tnmlen,
-	struct smb_cred *scrp, uint16_t fid, int replace);
-int  smbfs_smb_move(struct smbnode *src, struct smbnode *tdnp,
-	const char *tname, int tnmlen, uint16_t flags, struct smb_cred *scrp);
+	int xattr, uint32_t disp, struct smb_cred *scrp, smb_fh_t **fidpp);
+int  smbfs_smb_rename(struct smbnode *sdnp, struct smbnode *src,
+	struct smbnode *tdnp, const char *tname, int tnmlen,
+	smb_fh_t *fid, struct smb_cred *scrp);
 int  smbfs_smb_mkdir(struct smbnode *dnp, const char *name, int len,
 	struct smb_cred *scrp);
-int  smbfs_smb_rmdir(struct smbnode *np, struct smb_cred *scrp);
+
 int  smbfs_smb_findopen(struct smbnode *dnp, const char *wildcard, int wclen,
 	int attr, struct smb_cred *scrp, struct smbfs_fctx **ctxpp);
 int  smbfs_smb_findnext(struct smbfs_fctx *ctx, int limit,
 	struct smb_cred *scrp);
 int  smbfs_smb_findclose(struct smbfs_fctx *ctx, struct smb_cred *scrp);
-int  smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp,
-	struct smbnode *dnp, const char *name, int nmlen, uint8_t sep);
+
 int  smbfs_smb_lookup(struct smbnode *dnp, const char **namep, int *nmlenp,
 	struct smbfattr *fap, struct smb_cred *scrp);
-int  smbfs_smb_hideit(struct smbnode *np, const char *name, int len,
-	struct smb_cred *scrp);
-int  smbfs_smb_unhideit(struct smbnode *np, const char *name, int len,
-			struct smb_cred *scrp);
-int smbfs_smb_flush(struct smbnode *np, struct smb_cred *scrp);
-int smbfs_0extend(vnode_t *vp, uint16_t fid, len_t from, len_t to,
-		struct smb_cred *scredp, int timo);
 
 /* get/set security descriptor */
-int  smbfs_smb_getsec_m(struct smb_share *ssp, uint16_t fid,
-	struct smb_cred *scrp, uint32_t selector,
-	mblk_t **res, uint32_t *reslen);
-int  smbfs_smb_setsec_m(struct smb_share *ssp, uint16_t fid,
-	struct smb_cred *scrp, uint32_t selector, mblk_t **mp);
+int  smbfs_smb_getsec(struct smb_share *ssp, smb_fh_t *fid,
+	uint32_t selector, mblk_t **res, uint32_t *reslen,
+	struct smb_cred *scrp);
+int  smbfs_smb_setsec(struct smb_share *ssp, smb_fh_t *fid,
+	uint32_t selector, mblk_t **mp, struct smb_cred *scrp);
+
+/*
+ * SMB1 functions
+ */
+int smbfs_smb1_trans2_query(struct smbnode *np, uint16_t fid,
+	struct smbfattr *fap, struct smb_cred *scrp);
+int smbfs_smb1_qfsattr(struct smb_share *ssp, struct smb_fs_attr_info *,
+	struct smb_cred *scrp);
+int smbfs_smb1_statfs(struct smb_share *ssp,
+	struct smb_fs_size_info *info, struct smb_cred *scrp);
+int smbfs_smb1_seteof(struct smb_share *ssp, uint16_t fid, uint64_t newsize,
+	struct smb_cred *scrp);
+int smbfs_smb1_setdisp(struct smb_share *ssp, uint16_t fid, uint8_t newdisp,
+	struct smb_cred *scrp);
+int smbfs_smb1_setfattr(struct smb_share *ssp, uint16_t fid,
+	struct mbchain *, struct smb_cred *);
+int smbfs_smb1_flush(struct smb_share *ssp, uint16_t fid,
+	struct smb_cred *scrp);
+int smbfs_smb1_t2rename(struct smbnode *np, const char *tname, int tnmlen,
+	uint16_t fid, struct smb_cred *scrp);
+int smbfs_smb1_oldrename(struct smbnode *src, struct smbnode *tdnp,
+	const char *tname, int tnmlen, struct smb_cred *scrp);
+
+int smbfs_smb_findopenLM2(struct smbfs_fctx *ctx, struct smbnode *dnp,
+    const char *wildcard, int wclen, uint32_t attr);
+int smbfs_smb_findnextLM2(struct smbfs_fctx *ctx, uint16_t limit);
+int smbfs_smb_findcloseLM2(struct smbfs_fctx *ctx);
+int smbfs_smb1_get_streaminfo(smbnode_t *np, struct mdchain *mdp,
+	struct smb_cred *scrp);
+
+int smbfs_smb1_getsec(struct smb_share *ssp, uint16_t fid,
+	uint32_t selector, mblk_t **res, uint32_t *reslen,
+	struct smb_cred *scrp);
+int smbfs_smb1_setsec(struct smb_share *ssp, uint16_t fid,
+	uint32_t selector, mblk_t **mp,
+	struct smb_cred *scrp);
+
+/*
+ * SMB2 functions
+ */
+
+int smbfs_smb2_getpattr(struct smbnode *np, struct smbfattr *fap,
+	struct smb_cred *scrp);
+int smbfs_smb2_qfileinfo(struct smb_share *ssp, smb2fid_t *fid,
+	struct smbfattr *fap, struct smb_cred *scrp);
+int smbfs_smb2_qfsattr(struct smb_share *ssp, struct smb_fs_attr_info *,
+	struct smb_cred *scrp);
+int smbfs_smb2_statfs(struct smb_share *ssp,
+	struct smb_fs_size_info *info, struct smb_cred *scrp);
+int smbfs_smb2_seteof(struct smb_share *ssp, smb2fid_t *fid, uint64_t newsize,
+	struct smb_cred *scrp);
+int smbfs_smb2_setdisp(struct smb_share *ssp, smb2fid_t *fid, uint8_t newdisp,
+	struct smb_cred *scrp);
+int smbfs_smb2_flush(struct smb_share *ssp, smb2fid_t *fid,
+	struct smb_cred *scrp);
+int smbfs_smb2_setfattr(struct smb_share *ssp, smb2fid_t *fid,
+	struct mbchain *, struct smb_cred *);
+int smbfs_smb2_rename(struct smbnode *np, struct smbnode *tdnp,
+	const char *tname, int tnlen, int overwrite,
+	smb2fid_t *fid, struct smb_cred *scrp);
+
+int smbfs_smb2_findopen(struct smbfs_fctx *ctx, struct smbnode *dnp,
+    const char *wildcard, int wclen, uint32_t attr);
+int smbfs_smb2_findnext(struct smbfs_fctx *ctx, uint16_t limit);
+int smbfs_smb2_findclose(struct smbfs_fctx *ctx);
+int smbfs_smb2_get_streaminfo(smbnode_t *np, struct mdchain *mdp,
+	struct smb_cred *scrp);
+
+int smbfs_smb2_getsec(struct smb_share *ssp, smb2fid_t *fid,
+	uint32_t selector, mblk_t **res, uint32_t *reslen,
+	struct smb_cred *scrp);
+int smbfs_smb2_setsec(struct smb_share *ssp, smb2fid_t *fid,
+	uint32_t selector, mblk_t **mp,
+	struct smb_cred *scrp);
+
+
+/* smbfs_subr.c */
+
+int  smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp,
+	struct smbnode *dnp, const char *name, int nmlen, uint8_t sep);
+int smbfs_decode_dirent(struct smbfs_fctx *ctx);
+int smbfs_decode_file_all_info(struct smb_share *ssp,
+	struct mdchain *mdp, struct smbfattr *fap);
+int smbfs_decode_fs_attr_info(struct smb_share *ssp,
+	struct mdchain *mdp, struct smb_fs_attr_info *fsa);
 
 /*
  * VFS-level init, fini stuff

@@ -34,6 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (C) 2001 - 2013 Apple Inc. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -52,10 +53,12 @@
 #include <netsmb/smb_osdep.h>
 
 #include <netsmb/smb.h>
+#include <netsmb/smb2.h>
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_tran.h>
 #include <netsmb/smb_rq.h>
+#include <netsmb/smb2_rq.h>
 
 /*
  * How long to wait before restarting a request (after reconnect)
@@ -70,9 +73,8 @@
 
 
 static int  smb_rq_reply(struct smb_rq *rqp);
+static int  smb_rq_parsehdr(struct smb_rq *rqp);
 static int  smb_rq_enqueue(struct smb_rq *rqp);
-static int  smb_rq_getenv(struct smb_connobj *layer,
-		struct smb_vc **vcpp, struct smb_share **sspp);
 static int  smb_rq_new(struct smb_rq *rqp, uchar_t cmd);
 static int  smb_t2_reply(struct smb_t2rq *t2p);
 static int  smb_nt_reply(struct smb_ntrq *ntp);
@@ -148,7 +150,6 @@ smb_rq_init(struct smb_rq *rqp, struct smb_connobj *co, uchar_t cmd,
 
 	rqp->sr_rexmit = SMBMAXRESTARTS;
 	rqp->sr_cred = scred;	/* Note: ref hold done by caller. */
-	rqp->sr_pid = (uint16_t)ddi_get_pid();
 	error = smb_rq_new(rqp, cmd);
 
 	return (error);
@@ -164,7 +165,6 @@ smb_rq_new(struct smb_rq *rqp, uchar_t cmd)
 	ASSERT(rqp != NULL);
 
 	rqp->sr_sendcnt = 0;
-	rqp->sr_cmd = cmd;
 
 	mb_done(mbp);
 	md_done(&rqp->sr_rp);
@@ -172,18 +172,42 @@ smb_rq_new(struct smb_rq *rqp, uchar_t cmd)
 	if (error)
 		return (error);
 
-	/*
-	 * Is this the right place to save the flags?
-	 */
-	rqp->sr_rqflags  = vcp->vc_hflags;
-	rqp->sr_rqflags2 = vcp->vc_hflags2;
+	if (vcp->vc_flags & SMBV_SMB2) {
+		/*
+		 * SMB2 request initialization
+		 */
+		rqp->sr2_command = cmd;
+		rqp->sr2_creditcharge = 1;
+		rqp->sr2_creditsrequested = 1;
+		rqp->sr_pid = 0xFEFF;	/* Made up, just like Windows */
+		rqp->sr2_rqflags = 0;
+		if ((vcp->vc_flags & SMBV_SIGNING) != 0 &&
+		    vcp->vc_mackey != NULL) {
+			rqp->sr2_rqflags |= SMB2_FLAGS_SIGNED;
+		}
 
-	/*
-	 * The SMB header is filled in later by
-	 * smb_rq_fillhdr (see below)
-	 * Just reserve space here.
-	 */
-	mb_put_mem(mbp, NULL, SMB_HDRLEN, MB_MZERO);
+		/*
+		 * The SMB2 header is filled in later by
+		 * smb2_rq_fillhdr (see smb2_rq.c)
+		 * Just reserve space here.
+		 */
+		mb_put_mem(mbp, NULL, SMB2_HDRLEN, MB_MZERO);
+	} else {
+		/*
+		 * SMB1 request initialization
+		 */
+		rqp->sr_cmd = cmd;
+		rqp->sr_pid = (uint32_t)ddi_get_pid();
+		rqp->sr_rqflags  = vcp->vc_hflags;
+		rqp->sr_rqflags2 = vcp->vc_hflags2;
+
+		/*
+		 * The SMB header is filled in later by
+		 * smb_rq_fillhdr (see below)
+		 * Just reserve space here.
+		 */
+		mb_put_mem(mbp, NULL, SMB_HDRLEN, MB_MZERO);
+	}
 
 	return (0);
 }
@@ -191,7 +215,7 @@ smb_rq_new(struct smb_rq *rqp, uchar_t cmd)
 /*
  * Given a request with it's body already composed,
  * rewind to the start and fill in the SMB header.
- * This is called after the request is enqueued,
+ * This is called when the request is enqueued,
  * so we have the final MID, seq num. etc.
  */
 void
@@ -218,7 +242,7 @@ smb_rq_fillhdr(struct smb_rq *rqp)
 	mb_put_mem(mbp, NULL, 8, MB_MZERO);	/* MAC sig. (later) */
 	mb_put_uint16le(mbp, 0);	/* reserved */
 	mb_put_uint16le(mbp, rqp->sr_rqtid);
-	mb_put_uint16le(mbp, rqp->sr_pid);
+	mb_put_uint16le(mbp, (uint16_t)rqp->sr_pid);
 	mb_put_uint16le(mbp, rqp->sr_rquid);
 	mb_put_uint16le(mbp, rqp->sr_mid);
 
@@ -282,6 +306,8 @@ smb_rq_enqueue(struct smb_rq *rqp)
 	struct smb_share *ssp = rqp->sr_share;
 	int error = 0;
 
+	ASSERT((vcp->vc_flags & SMBV_SMB2) == 0);
+
 	/*
 	 * Normal requests may initiate a reconnect,
 	 * and/or wait for state changes to finish.
@@ -326,37 +352,73 @@ smb_rq_enqueue(struct smb_rq *rqp)
 ok_out:
 	rqp->sr_rquid = vcp->vc_smbuid;
 	rqp->sr_rqtid = ssp ? ssp->ss_tid : SMB_TID_UNKNOWN;
-	error = smb_iod_addrq(rqp);
+	error = smb1_iod_addrq(rqp);
 
 	return (error);
 }
 
 /*
- * Used by the IOD thread during connection setup.
+ * Used by the IOD thread during connection setup,
+ * and for smb_echo after network timeouts.  Note that
+ * unlike smb_rq_simple, callers must check sr_error.
  */
 int
 smb_rq_internal(struct smb_rq *rqp, int timeout)
 {
 	struct smb_vc *vcp = rqp->sr_vc;
-	int err;
+	int error;
+
+	ASSERT((vcp->vc_flags & SMBV_SMB2) == 0);
 
 	rqp->sr_flags &= ~SMBR_RESTART;
 	rqp->sr_timo = timeout;	/* in seconds */
 	rqp->sr_state = SMBRQ_NOTSENT;
 
 	/*
-	 * Skip smb_rq_enqueue(rqp) here, as we don't want it
-	 * trying to reconnect etc.  We're doing that.
+	 * In-line smb_rq_enqueue(rqp) here, as we don't want it
+	 * trying to reconnect etc. for an internal request.
 	 */
 	rqp->sr_rquid = vcp->vc_smbuid;
 	rqp->sr_rqtid = SMB_TID_UNKNOWN;
-	err = smb_iod_addrq(rqp);
-	if (err != 0)
-		return (err);
+	rqp->sr_flags |= SMBR_INTERNAL;
+	error = smb1_iod_addrq(rqp);
+	if (error != 0)
+		return (error);
 
-	err = smb_rq_reply(rqp);
+	/*
+	 * In-line a variant of smb_rq_reply(rqp) here as we may
+	 * need to do custom parsing for SMB1-to-SMB2 negotiate.
+	 */
+	if (rqp->sr_timo == SMBNOREPLYWAIT) {
+		smb_iod_removerq(rqp);
+		return (0);
+	}
 
-	return (err);
+	error = smb_iod_waitrq_int(rqp);
+	if (error)
+		return (error);
+
+	/*
+	 * If the request was signed, validate the
+	 * signature on the response.
+	 */
+	if (rqp->sr_rqflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) {
+		error = smb_rq_verify(rqp);
+		if (error)
+			return (error);
+	}
+
+	/*
+	 * Parse the SMB header.
+	 */
+	error = smb_rq_parsehdr(rqp);
+
+	/*
+	 * Skip the error translation smb_rq_reply does.
+	 * Callers of this expect "raw" NT status.
+	 */
+
+	return (error);
 }
 
 /*
@@ -427,15 +489,6 @@ smb_rq_bend(struct smb_rq *rqp)
 }
 
 int
-smb_rq_intr(struct smb_rq *rqp)
-{
-	if (rqp->sr_flags & SMBR_INTR)
-		return (EINTR);
-
-	return (0);
-}
-
-static int
 smb_rq_getenv(struct smb_connobj *co,
 	struct smb_vc **vcpp, struct smb_share **sspp)
 {
@@ -486,14 +539,12 @@ out:
 }
 
 /*
- * Wait for reply on the request
+ * Wait for a reply to this request, then parse it.
  */
 static int
 smb_rq_reply(struct smb_rq *rqp)
 {
-	struct mdchain *mdp = &rqp->sr_rp;
-	u_int8_t tb;
-	int error, rperror = 0;
+	int error;
 
 	if (rqp->sr_timo == SMBNOREPLYWAIT) {
 		smb_iod_removerq(rqp);
@@ -517,27 +568,23 @@ smb_rq_reply(struct smb_rq *rqp)
 	/*
 	 * Parse the SMB header
 	 */
-	error = md_get_uint32le(mdp, NULL);
-	if (error)
+	error = smb_rq_parsehdr(rqp);
+	if (error != 0)
 		return (error);
-	error = md_get_uint8(mdp, &tb);
-	error = md_get_uint32le(mdp, &rqp->sr_error);
-	error = md_get_uint8(mdp, &rqp->sr_rpflags);
-	error = md_get_uint16le(mdp, &rqp->sr_rpflags2);
 
 	if (rqp->sr_error != 0) {
 		if (rqp->sr_rpflags2 & SMB_FLAGS2_ERR_STATUS) {
-			rperror = smb_maperr32(rqp->sr_error);
+			error = smb_maperr32(rqp->sr_error);
 		} else {
 			uint8_t errClass = rqp->sr_error & 0xff;
 			uint16_t errCode = rqp->sr_error >> 16;
 			/* Convert to NT status */
 			rqp->sr_error = smb_doserr2status(errClass, errCode);
-			rperror = smb_maperror(errClass, errCode);
+			error = smb_maperror(errClass, errCode);
 		}
 	}
 
-	if (rperror) {
+	if (error != 0) {
 		/*
 		 * Do a special check for STATUS_BUFFER_OVERFLOW;
 		 * it's not an error.
@@ -550,22 +597,63 @@ smb_rq_reply(struct smb_rq *rqp)
 			 * STATUS_BUFFER_OVERFLOW.
 			 */
 			rqp->sr_flags |= SMBR_MOREDATA;
-			rperror = 0;
+			error = 0;
 		}
 	} else {
 		rqp->sr_flags &= ~SMBR_MOREDATA;
 	}
 
-	error = md_get_uint32le(mdp, NULL);
-	error = md_get_uint32le(mdp, NULL);
-	error = md_get_uint32le(mdp, NULL);
+	return (error);
+}
 
-	error = md_get_uint16le(mdp, &rqp->sr_rptid);
-	error = md_get_uint16le(mdp, &rqp->sr_rppid);
-	error = md_get_uint16le(mdp, &rqp->sr_rpuid);
+/*
+ * Parse the SMB header
+ */
+static int
+smb_rq_parsehdr(struct smb_rq *rqp)
+{
+	struct mdchain mdp_save;
+	struct mdchain *mdp = &rqp->sr_rp;
+	u_int8_t tb, sig[4];
+	int error;
+
+	/*
+	 * Parse the signature.  The reader already checked that
+	 * the signature is valid.  Here we just have to check
+	 * for SMB1-to-SMB2 negotiate.  Caller handles an EPROTO
+	 * as a signal that we got an SMB2 reply.  If we return
+	 * EPROTO, rewind the mdchain back where it was.
+	 */
+	mdp_save = *mdp;
+	error = md_get_mem(mdp, sig, 4, MB_MSYSTEM);
+	if (error)
+		return (error);
+	if (sig[0] != SMB_HDR_V1) {
+		if (rqp->sr_cmd == SMB_COM_NEGOTIATE) {
+			*mdp = mdp_save;
+			return (EPROTO);
+		}
+		return (EBADRPC);
+	}
+
+	/* Check cmd */
+	error = md_get_uint8(mdp, &tb);
+	if (tb != rqp->sr_cmd)
+		return (EBADRPC);
+
+	md_get_uint32le(mdp, &rqp->sr_error);
+	md_get_uint8(mdp, &rqp->sr_rpflags);
+	md_get_uint16le(mdp, &rqp->sr_rpflags2);
+
+	/* Skip: pid-high(2), MAC sig(8), reserved(2) */
+	md_get_mem(mdp, NULL, 12, MB_MSYSTEM);
+
+	md_get_uint16le(mdp, &rqp->sr_rptid);
+	md_get_uint16le(mdp, &rqp->sr_rppid);
+	md_get_uint16le(mdp, &rqp->sr_rpuid);
 	error = md_get_uint16le(mdp, &rqp->sr_rpmid);
 
-	return ((error) ? error : rperror);
+	return (error);
 }
 
 
@@ -1166,7 +1254,7 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 			mb_put_mbuf(mbp, m);
 		}
 		smb_rq_bend(rqp);
-		error = smb_iod_multirq(rqp);
+		error = smb1_iod_multirq(rqp);
 		if (error)
 			goto bad;
 	}	/* while left params or data */
@@ -1377,7 +1465,7 @@ smb_nt_request_int(struct smb_ntrq *ntp)
 			mb_put_mbuf(mbp, m);
 		}
 		smb_rq_bend(rqp);
-		error = smb_iod_multirq(rqp);
+		error = smb1_iod_multirq(rqp);
 		if (error)
 			goto bad;
 	}	/* while left params or data */
@@ -1469,4 +1557,84 @@ smb_nt_request(struct smb_ntrq *ntp)
 		mutex_exit(&(ntp)->nt_lock);
 	}
 	return (error);
+}
+
+/*
+ * Run an SMB transact named pipe.
+ * Note: send_mb is consumed.
+ */
+int
+smb_t2_xnp(struct smb_share *ssp, uint16_t fid,
+    struct mbchain *send_mb, struct mdchain *recv_md,
+    uint32_t *data_out_sz, /* max / returned */
+    uint32_t *more, struct smb_cred *scrp)
+{
+	struct smb_t2rq *t2p = NULL;
+	mblk_t *m;
+	uint16_t setup[2];
+	int err;
+
+	setup[0] = TRANS_TRANSACT_NAMED_PIPE;
+	setup[1] = fid;
+
+	t2p = kmem_alloc(sizeof (*t2p), KM_SLEEP);
+	err = smb_t2_init(t2p, SSTOCP(ssp), setup, 2, scrp);
+	if (err) {
+		*data_out_sz = 0;
+		goto out;
+	}
+
+	t2p->t2_setupcount = 2;
+	t2p->t2_setupdata  = setup;
+
+	t2p->t_name = "\\PIPE\\";
+	t2p->t_name_len = 6;
+
+	t2p->t2_maxscount = 0;
+	t2p->t2_maxpcount = 0;
+	t2p->t2_maxdcount = (uint16_t)*data_out_sz;
+
+	/* Transmit parameters (none) */
+
+	/*
+	 * Transmit data
+	 *
+	 * Copy the mb, and clear the source so we
+	 * don't end up with a double free.
+	 */
+	t2p->t2_tdata = *send_mb;
+	bzero(send_mb, sizeof (*send_mb));
+
+	/*
+	 * Run the request
+	 */
+	err = smb_t2_request(t2p);
+
+	/* No returned parameters. */
+
+	if (err == 0 && (m = t2p->t2_rdata.md_top) != NULL) {
+		/*
+		 * Received data
+		 *
+		 * Copy the mdchain, and clear the source so we
+		 * don't end up with a double free.
+		 */
+		*data_out_sz = msgdsize(m);
+		md_initm(recv_md, m);
+		t2p->t2_rdata.md_top = NULL;
+	} else {
+		*data_out_sz = 0;
+	}
+
+	if (t2p->t2_sr_error == NT_STATUS_BUFFER_OVERFLOW)
+		*more = 1;
+
+out:
+	if (t2p != NULL) {
+		/* Note: t2p->t_name no longer allocated */
+		smb_t2_done(t2p);
+		kmem_free(t2p, sizeof (*t2p));
+	}
+
+	return (err);
 }

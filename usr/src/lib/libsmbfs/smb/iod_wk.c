@@ -104,6 +104,7 @@ smb_iod_work(smb_ctx_t *ctx)
 				DPRINT("ioc_idle: err %d", err);
 				goto out;
 			}
+			DPRINT("Ret. from _ioc_idle");
 			continue;
 
 		case SMBIOD_ST_RECONNECT:
@@ -119,16 +120,14 @@ smb_iod_work(smb_ctx_t *ctx)
 			 * will need to run smbutil to get
 			 * a new thread with new auth info.
 			 */
-			if (err == EAUTH)
+			if (err == EAUTH) {
+				DPRINT("iod_connect: EAUTH (give up)");
 				goto out;
-			continue;
-
-		case SMBIOD_ST_RCFAILED:
+			}
 			/*
-			 * Reconnect failed.  Kill off any
-			 * requests waiting in the driver,
-			 * then get ready to try again.
-			 * Next state is normally IDLE.
+			 * Reconnect failed.  Notify any requests
+			 * that we're not connected, and delay.
+			 * Next state will be IDLE or RECONNECT.
 			 */
 			DPRINT("Call _iod_rcfail...");
 			if (nsmb_ioctl(ctx->ct_dev_fd,
@@ -152,9 +151,11 @@ smb_iod_work(smb_ctx_t *ctx)
 				DPRINT("iod_work: err %d", err);
 				goto out;
 			}
+			DPRINT("Ret. from _ioc_work");
 			continue;
 
 		case SMBIOD_ST_DEAD:
+			DPRINT("got state=DEAD");
 			err = 0;
 			goto out;
 

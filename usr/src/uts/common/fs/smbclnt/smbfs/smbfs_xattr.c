@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -45,7 +45,9 @@
 #include <sys/u8_textprep.h>
 
 #include <netsmb/smb_osdep.h>
+
 #include <netsmb/smb.h>
+#include <netsmb/smb2.h>
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_rq.h>
@@ -291,31 +293,19 @@ smbfs_xa_getfattr(struct smbnode *xnp, struct smbfattr *fap,
 }
 
 /*
- * Fetch the entire attribute list here in findopen.
- * Will parse the results in findnext.
+ * Actually go OtW to get the list of "streams".
  *
  * This is called on the XATTR directory, so we
  * have to get the (real) parent object first.
  */
-/* ARGSUSED */
-int
-smbfs_xa_findopen(struct smbfs_fctx *ctx, struct smbnode *dnp,
-	const char *wildcard, int wclen)
+static int
+smbfs_xa_get_streaminfo(struct smbfs_fctx *ctx)
 {
 	vnode_t *pvp;	/* parent */
 	smbnode_t *pnp;
-	struct smb_t2rq *t2p;
-	struct smb_vc *vcp = SSTOVC(ctx->f_ssp);
-	struct mbchain *mbp;
+	smbnode_t *dnp = ctx->f_dnp;
+	struct mdchain *mdp;
 	int error;
-
-	ASSERT(dnp->n_flag & N_XATTR);
-
-	ctx->f_type = ft_XA;
-	ctx->f_namesz = SMB_MAXFNAMELEN + 1;
-	if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp)))
-		ctx->f_namesz *= 2;
-	ctx->f_name = kmem_alloc(ctx->f_namesz, KM_SLEEP);
 
 	error = smbfs_xa_parent(SMBTOV(dnp), &pvp);
 	if (error)
@@ -324,40 +314,31 @@ smbfs_xa_findopen(struct smbfs_fctx *ctx, struct smbnode *dnp,
 	/* Note: pvp has a VN_HOLD */
 	pnp = VTOSMB(pvp);
 
-	if (ctx->f_t2) {
-		smb_t2_done(ctx->f_t2);
-		ctx->f_t2 = NULL;
-	}
-
-	error = smb_t2_alloc(SSTOCP(ctx->f_ssp),
-	    SMB_TRANS2_QUERY_PATH_INFORMATION,
-	    ctx->f_scred, &t2p);
-	if (error)
-		goto out;
-	ctx->f_t2 = t2p;
-
-	mbp = &t2p->t2_tparam;
-	(void) mb_init(mbp);
-	(void) mb_put_uint16le(mbp, SMB_QFILEINFO_STREAM_INFO);
-	(void) mb_put_uint32le(mbp, 0);
-	error = smbfs_fullpath(mbp, vcp, pnp, NULL, NULL, 0);
-	if (error)
-		goto out;
-	t2p->t2_maxpcount = 2;
-	t2p->t2_maxdcount = INT16_MAX;
-	error = smb_t2_request(t2p);
-	if (error) {
-		if (t2p->t2_sr_error == NT_STATUS_INVALID_PARAMETER)
-			error = ENOTSUP;
-	}
 	/*
-	 * No returned parameters to parse.
-	 * Returned data are in t2_rdata,
-	 * which we'll parse in _findnext.
-	 * However, save the wildcard.
+	 * Get stream info into f_mdchain
 	 */
-	ctx->f_wildcard = wildcard;
-	ctx->f_wclen = wclen;
+	mdp = &ctx->f_mdchain;
+	md_done(mdp);
+
+	if (SSTOVC(ctx->f_ssp)->vc_flags & SMBV_SMB2) {
+		error = smbfs_smb2_get_streaminfo(pnp, mdp, ctx->f_scred);
+	} else {
+		error = smbfs_smb1_get_streaminfo(pnp, mdp, ctx->f_scred);
+	}
+	if (error)
+		goto out;
+
+	/*
+	 * Have stream info in ctx->f_mdchain
+	 * Initialize buffer length, position.
+	 */
+	ctx->f_left = m_fixhdr(mdp->md_top);
+	ctx->f_eofs = 0;
+
+	/*
+	 * After one successful call, we're at EOF.
+	 */
+	ctx->f_flags |= SMBFS_RDD_EOF;
 
 out:
 	VN_RELE(pvp);
@@ -365,83 +346,62 @@ out:
 }
 
 /*
- * Get the next name in an XATTR directory into f_name
+ * Get a buffer of directory entries (if we don't already have
+ * some remaining in the current buffer) then decode one.
+ */
+int
+smbfs_xa_findopen(struct smbfs_fctx *ctx, struct smbnode *dnp,
+	const char *wildcard, int wclen)
+{
+
+	ASSERT(dnp->n_flag & N_XATTR);
+
+	ctx->f_type = ft_XA;
+	ctx->f_namesz = SMB_MAXFNAMELEN + 1;
+	ctx->f_name = kmem_alloc(ctx->f_namesz, KM_SLEEP);
+	ctx->f_infolevel = FileStreamInformation;
+	ctx->f_wildcard = wildcard;
+	ctx->f_wclen = wclen;
+
+	return (0);
+}
+
+
+/*
+ * Get the next name in an XATTR directory
  */
 /* ARGSUSED */
 int
 smbfs_xa_findnext(struct smbfs_fctx *ctx, uint16_t limit)
 {
-	struct mdchain *mdp;
-	struct smb_t2rq *t2p;
-	uint32_t size, next;
-	uint64_t llongint;
-	int error, skip, used, nmlen;
-
-	t2p = ctx->f_t2;
-	mdp = &t2p->t2_rdata;
-
-	if (ctx->f_flags & SMBFS_RDD_FINDSINGLE) {
-		ASSERT(ctx->f_wildcard);
-		SMBVDEBUG("wildcard: %s\n", ctx->f_wildcard);
-	}
-
-again:
-	if (ctx->f_flags & SMBFS_RDD_EOF)
-		return (ENOENT);
-
-	/* Parse FILE_STREAM_INFORMATION */
-	if ((error = md_get_uint32le(mdp, &next)) != 0)	/* offset to */
-		return (ENOENT);
-	if ((error = md_get_uint32le(mdp, &size)) != 0) /* name len */
-		return (ENOENT);
-	(void) md_get_uint64le(mdp, &llongint); /* file size */
-	ctx->f_attr.fa_size = llongint;
-	(void) md_get_uint64le(mdp, NULL);	/* alloc. size */
-	used = 4 + 4 + 8 + 8;	/* how much we consumed */
+	int error;
 
 	/*
-	 * Copy the string, but skip the first char (":")
-	 * Watch out for zero-length strings here.
+	 * If we've scanned to the end of the current buffer
+	 * try to read anohther buffer of dir entries.
+	 * Treat anything less than 8 bytes as an "empty"
+	 * buffer to ensure we can read something.
+	 * (There may be up to 8 bytes of padding.)
 	 */
-	if (SMB_UNICODE_STRINGS(SSTOVC(ctx->f_ssp))) {
-		if (size >= 2) {
-			size -= 2; used += 2;
-			(void) md_get_uint16le(mdp, NULL);
-		}
-		nmlen = min(size, SMB_MAXFNAMELEN * 2);
-	} else {
-		if (size >= 1) {
-			size -= 1; used += 1;
-			(void) md_get_uint8(mdp, NULL);
-		}
-		nmlen = min(size, SMB_MAXFNAMELEN);
+again:
+	if ((ctx->f_eofs + 8) > ctx->f_left) {
+		/* Scanned the whole buffer. */
+		if (ctx->f_flags & SMBFS_RDD_EOF)
+			return (ENOENT);
+		ctx->f_limit = limit;
+		error = smbfs_xa_get_streaminfo(ctx);
+		if (error)
+			return (error);
+		ctx->f_otws++;
 	}
 
-	ASSERT(nmlen < ctx->f_namesz);
-	ctx->f_nmlen = nmlen;
-	error = md_get_mem(mdp, ctx->f_name, nmlen, MB_MSYSTEM);
+	/*
+	 * Decode one entry, advance f_eofs
+	 */
+	error = smbfs_decode_dirent(ctx);
 	if (error)
 		return (error);
-	used += nmlen;
-
-	/*
-	 * Convert UCS-2 to UTF-8
-	 */
-	smbfs_fname_tolocal(ctx);
-	if (nmlen)
-		SMBVDEBUG("name: %s\n", ctx->f_name);
-	else
-		SMBVDEBUG("null name!\n");
-
-	/*
-	 * Skip padding until next offset
-	 */
-	if (next > used) {
-		skip = next - used;
-		(void) md_get_mem(mdp, NULL, skip, MB_MSYSTEM);
-	}
-	if (next == 0)
-		ctx->f_flags |= SMBFS_RDD_EOF;
+	SMBVDEBUG("name: %s\n", ctx->f_name);
 
 	/*
 	 * Chop off the trailing ":$DATA"
@@ -464,8 +424,10 @@ again:
 		goto again;
 
 	/*
-	 * If this is a lookup of a specific name,
-	 * skip past any non-matching names.
+	 * When called by lookup, we'll have the "single" flag,
+	 * and a name with no wildcards.  We need to filter here
+	 * because smbfs_xa_get_streaminfo() gets ALL the names
+	 * (not just those matching our pattern).
 	 */
 	if (ctx->f_flags & SMBFS_RDD_FINDSINGLE) {
 		if (ctx->f_wclen != ctx->f_nmlen)
@@ -490,8 +452,6 @@ smbfs_xa_findclose(struct smbfs_fctx *ctx)
 
 	if (ctx->f_name)
 		kmem_free(ctx->f_name, ctx->f_namesz);
-	if (ctx->f_t2)
-		smb_t2_done(ctx->f_t2);
 
 	return (0);
 }

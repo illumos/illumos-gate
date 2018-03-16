@@ -36,6 +36,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Portions Copyright (C) 2001 - 2013 Apple Inc. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -47,6 +48,7 @@
 #include <sys/queue.h> /* for SLIST below */
 #include <sys/uio.h>
 #include <netsmb/smb_dev.h>
+#include "smb_signing.h"
 
 /*
  * Credentials of user/process for processing in the connection procedures
@@ -66,7 +68,10 @@ typedef struct smb_cred {
  */
 #define	SMBV_UNICODE		0x0040	/* conn configured to use Unicode */
 #define	SMBV_EXT_SEC		0x0080	/* conn to use extended security */
-#define	SMBV_WILL_SIGN		0x0100	/* negotiated signing */
+#define	SMBV_SIGNING		0x0100	/* negotiated signing */
+#define	SMBV_SMB2		0x0200	/* VC using SMB 2 or 3 */
+#define	SMBV_HAS_FILEIDS	0x0400	/* Use File IDs for hash and inode numbers */
+#define	SMBV_NO_WRITE_THRU	0x0800	/* Can't use ... */
 
 /*
  * Note: the common "obj" level uses this GONE flag by
@@ -86,6 +91,16 @@ typedef struct smb_cred {
  * the name SMBO_GONE.  Keep this alias as a reminder.
  */
 #define	SMBS_GONE		SMBO_GONE
+
+/*
+ * bits in smb_fh fh_flags (a.k.a. ss_co.co_flags)
+ */
+#define	SMBFH_VALID		0x0002	/* FID is valid */
+/*
+ * Note: the common "obj" level uses this GONE flag by
+ * the name SMBO_GONE.  Keep this alias as a reminder.
+ */
+#define	SMBFH_GONE		SMBO_GONE
 
 struct smb_rq;
 /* This declares struct smb_rqhead */
@@ -139,9 +154,12 @@ typedef struct smb_connobj smb_connobj_t;
 /*
  * "Level" in the connection object hierarchy
  */
-#define	SMBL_SM		0
-#define	SMBL_VC		1
-#define	SMBL_SHARE	2
+enum smbco_level {
+	SMBL_SM = 0,
+	SMBL_VC = 1,
+	SMBL_SHARE = 2,
+	SMBL_FH = 3
+};
 
 /*
  * SMB1 Negotiated protocol parameters
@@ -157,6 +175,16 @@ struct smb_sopt {
 	uint32_t	sv_maxraw;	/* maximum raw-buffer size */
 	uint32_t	sv_skey;	/* session key */
 	uint32_t	sv_caps;	/* capabilites SMB_CAP_ */
+
+	/* SMB2+ fields */
+	uint32_t	sv2_sessflags;	/* final session setup reply flags */
+	uint16_t	sv2_dialect;	/* dialect (non zero for SMB 2/3 */
+	uint32_t	sv2_capabilities;	/* capabilities */
+	uint32_t	sv2_maxtransact;	/* max transact size */
+	uint32_t	sv2_maxread;	/* max read size */
+	uint32_t	sv2_maxwrite;	/* max write size */
+	uint8_t		sv2_guid[16];	/* GUID */
+	uint16_t	sv2_security_mode;	/* security mode */
 };
 typedef struct smb_sopt smb_sopt_t;
 
@@ -197,18 +225,28 @@ typedef struct smb_vc {
 	int			vc_ssnkeylen;	/* session key length */
 	uint8_t			*vc_mackey;	/* MAC key buffer */
 	uint8_t			*vc_ssnkey;	/* session key buffer */
+	smb_sign_mech_t		vc_signmech;
 
-	ksema_t			vc_sendlock;
 	struct smb_tran_desc	*vc_tdesc;	/* transport ops. vector */
 	void			*vc_tdata;	/* transport control block */
 
+	/* SMB2+ fields */
+	uint64_t	vc2_oldest_message_id;
+	uint64_t	vc2_next_message_id;
+	uint64_t	vc2_limit_message_id;
+	uint64_t	vc2_session_id;		/* session id */
+	uint64_t	vc2_prev_session_id;	/* for reconnect */
+	uint32_t	vc2_lease_key;		/* lease key gen */
+
 	kcondvar_t		iod_idle; 	/* IOD thread idle CV */
 	krwlock_t		iod_rqlock;	/* iod_rqlist */
-	struct smb_rqhead	iod_rqlist;	/* list of outstanding reqs */
+	struct smb_rqhead	iod_rqlist;	/* list of active reqs */
 	struct _kthread 	*iod_thr;	/* the IOD (reader) thread */
 	int			iod_flags;	/* see SMBIOD_* below */
-	int			iod_newrq;	/* send needed (iod_rqlock) */
-	int			iod_muxfull;	/* maxmux limit reached */
+	uint_t			iod_muxcnt;	/* num. active requests */
+	uint_t			iod_muxwant;	/* waiting to be active */
+	kcondvar_t		iod_muxwait;
+	boolean_t		iod_noresp;	/* Logged "not responding" */
 
 	smb_iods_t		vc_iods;
 	smb_sopt_t		vc_sopt;
@@ -225,13 +263,16 @@ typedef struct smb_vc {
 
 /* defines for members in vc_ssn */
 #define	vc_owner	vc_ssn.ssn_owner
+#define	vc_vopt 	vc_ssn.ssn_vopt
+#define	vc_minver 	vc_ssn.ssn_minver
+#define	vc_maxver 	vc_ssn.ssn_maxver
 #define	vc_srvname	vc_ssn.ssn_srvname
 #define	vc_srvaddr	vc_ssn.ssn_id.id_srvaddr
 #define	vc_domain	vc_ssn.ssn_id.id_domain
 #define	vc_username	vc_ssn.ssn_id.id_user
-#define	vc_vopt 	vc_ssn.ssn_vopt
 
 /* defines for members in vc_work */
+#define	vc_cl_guid	vc_work.wk_cl_guid
 
 /* defines for members in vc_sopt ? */
 #define	vc_maxmux	vc_sopt.sv_maxmux
@@ -250,7 +291,12 @@ typedef struct smb_vc {
 #define	SMB_VC_LOCK(vcp)	mutex_enter(&(vcp)->vc_lock)
 #define	SMB_VC_UNLOCK(vcp)	mutex_exit(&(vcp)->vc_lock)
 
-#define	SMB_UNICODE_STRINGS(vcp)	((vcp)->vc_hflags2 & SMB_FLAGS2_UNICODE)
+#define	CPTOVC(cp)	((struct smb_vc *)((void *)(cp)))
+#define	VCTOCP(vcp)	(&(vcp)->vc_co)
+
+#define	SMB_UNICODE_STRINGS(vcp) \
+	(((vcp)->vc_flags & SMBV_SMB2) != 0 ||	\
+	((vcp)->vc_hflags2 & SMB_FLAGS2_UNICODE) != 0)
 
 /* Bits in iod_flags */
 #define	SMBIOD_RUNNING		0x0001
@@ -268,6 +314,9 @@ typedef struct smb_share {
 	int		ss_vcgenid;	/* check VC generation ID */
 	uint16_t	ss_tid;		/* TID */
 	uint16_t	ss_options;	/* option support bits */
+	uint32_t	ss2_tree_id;
+	uint32_t	ss2_share_flags;
+	uint32_t	ss2_share_caps;
 	smbioc_oshare_t ss_ioc;
 } smb_share_t;
 
@@ -282,27 +331,47 @@ typedef struct smb_share {
 #define	SMB_SS_LOCK(ssp)	mutex_enter(&(ssp)->ss_lock)
 #define	SMB_SS_UNLOCK(ssp)	mutex_exit(&(ssp)->ss_lock)
 
-#define	CPTOVC(cp)	((struct smb_vc *)((void *)(cp)))
-#define	VCTOCP(vcp)	(&(vcp)->vc_co)
-
 #define	CPTOSS(cp)	((struct smb_share *)((void *)(cp)))
-#define	SSTOVC(ssp)	CPTOVC(((ssp)->ss_co.co_parent))
 #define	SSTOCP(ssp)	(&(ssp)->ss_co)
+#define	SSTOVC(ssp)	CPTOVC(((ssp)->ss_co.co_parent))
+
+typedef struct smb2fid {
+	uint64_t fid_persistent;
+	uint64_t fid_volatile;
+} smb2fid_t;
+
+/*
+ * smb_fh struct describes an open file handle under some share.
+ */
+typedef struct smb_fh {
+	struct smb_connobj fh_co;	/* keep first! See CPTOSS */
+	int	fh_vcgenid;		/* check VC generation ID */
+	uint32_t fh_rights;		/* granted access */
+	smb2fid_t fh_fid2;
+	uint16_t fh_fid1;
+} smb_fh_t;
+
+#define	fh_lock		fh_co.co_lock
+#define	fh_flags	fh_co.co_flags
+
+#define	SMB_FH_LOCK(fhp)	mutex_enter(&(fhp)->fh_lock)
+#define	SMB_FH_UNLOCK(fhp)	mutex_exit(&(fhp)->fh_lock)
+
+#define	CPTOFH(cp)	((struct smb_fh *)((void *)(cp)))
+#define	FHTOCP(fhp)	(&(fhp)->fh_co)
+#define	FHTOSS(fhp)	CPTOSS(((fhp)->fh_co.co_parent))
 
 /*
  * Call-back operations vector, so the netsmb module
  * can notify smbfs about events affecting mounts.
  * Installed in netsmb after smbfs loads.
+ * Note: smbfs only uses the fscb_discon hook.
  */
 typedef struct smb_fscb {
 	/* Called when the VC has disconnected. */
 	void (*fscb_disconn)(smb_share_t *);
 	/* Called when the VC has reconnected. */
 	void (*fscb_connect)(smb_share_t *);
-	/* Called when the server becomes unresponsive. */
-	void (*fscb_down)(smb_share_t *);
-	/* Called when the server is responding again. */
-	void (*fscb_up)(smb_share_t *);
 } smb_fscb_t;
 /* Install the above vector, or pass NULL to clear it. */
 void smb_fscb_set(smb_fscb_t *);
@@ -315,14 +384,14 @@ typedef struct smb_dev {
 	kmutex_t	sd_lock;
 	struct smb_vc	*sd_vc;		/* Reference to VC */
 	struct smb_share *sd_share;	/* Reference to share if any */
+	struct smb_fh	*sd_fh;		/* Reference to FH, if any */
 	int		sd_level;	/* SMBL_VC, ... */
 	int		sd_vcgenid;	/* Generation of share or VC */
 	int		sd_poll;	/* Future use */
 	int		sd_flags;	/* State of connection */
-#define	NSMBFL_OPEN		0x0001
-#define	NSMBFL_IOD		0x0002
-#define	NSMBFL_IOCTL		0x0004
-	int		sd_smbfid;	/* library read/write */
+#define	NSMBFL_OPEN		0x0001	/* Device minor is open */
+#define	NSMBFL_IOD		0x0004	/* Open by IOD */
+#define	NSMBFL_IOCTL		0x0010	/* Serialize ioctl calls */
 	zoneid_t	zoneid;		/* Zone id */
 } smb_dev_t;
 
@@ -370,9 +439,11 @@ int smb_pkey_ioctl(int, intptr_t, int, cred_t *);
 int  smb_iod_create(smb_vc_t *vcp);
 int  smb_iod_destroy(smb_vc_t *vcp);
 void smb_iod_disconnect(smb_vc_t *vcp);
-int  smb_iod_addrq(struct smb_rq *rqp);
-int  smb_iod_multirq(struct smb_rq *rqp);
+int  smb2_iod_addrq(struct smb_rq *rqp);
+int  smb1_iod_addrq(struct smb_rq *rqp);
+int  smb1_iod_multirq(struct smb_rq *rqp);
 int  smb_iod_waitrq(struct smb_rq *rqp);
+int  smb_iod_waitrq_int(struct smb_rq *rqp);
 void smb_iod_removerq(struct smb_rq *rqp);
 int  smb_iod_sendrecv(struct smb_rq *, int);
 void smb_iod_shutdown_share(smb_share_t *ssp);
@@ -380,7 +451,7 @@ void smb_iod_shutdown_share(smb_share_t *ssp);
 void smb_iod_sendall(smb_vc_t *);
 int smb_iod_recvall(smb_vc_t *, boolean_t);
 
-int nsmb_iod_connect(smb_vc_t *vcp);
+int nsmb_iod_connect(smb_vc_t *vcp, cred_t *cr);
 int nsmb_iod_negotiate(smb_vc_t *vcp, cred_t *cr);
 int nsmb_iod_ssnsetup(smb_vc_t *vcp, cred_t *cr);
 int smb_iod_vc_work(smb_vc_t *, int, cred_t *);
@@ -425,5 +496,14 @@ void smb_share_kill(smb_share_t *ssp);
 
 void smb_share_invalidate(smb_share_t *ssp);
 int  smb_share_tcon(smb_share_t *, smb_cred_t *);
+
+/*
+ * File handle level functions
+ */
+int smb_fh_create(smb_share_t *ssp, struct smb_fh **fhpp);
+void smb_fh_opened(struct smb_fh *fhp);
+void smb_fh_close(struct smb_fh *fhp);
+void smb_fh_hold(struct smb_fh *fhp);
+void smb_fh_rele(struct smb_fh *fhp);
 
 #endif /* _SMB_CONN_H */

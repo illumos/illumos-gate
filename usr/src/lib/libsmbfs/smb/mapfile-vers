@@ -68,6 +68,9 @@ SYMBOL_VERSION SUNWprivate {
 	nsmb_close		{ FLAGS = NODIRECT };
 	nsmb_ioctl		{ FLAGS = NODIRECT };
 
+	smb_cf_minauth_from_str;
+	smb_cf_version_from_str;
+
 	smb_close_rcfile;
 
 	smb_ctx_alloc;
@@ -91,6 +94,8 @@ SYMBOL_VERSION SUNWprivate {
 	smb_ctx_setauthflags;
 	smb_ctx_setdomain;
 	smb_ctx_setfullserver;
+	smb_ctx_setminver;
+	smb_ctx_setmaxver;
 	smb_ctx_setnbflags;
 	smb_ctx_setpassword;
 	smb_ctx_setpwhash;

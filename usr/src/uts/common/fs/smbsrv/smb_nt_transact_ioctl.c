@@ -20,11 +20,11 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/winioctl.h>
+#include <smb/winioctl.h>
 
 
 static uint32_t smb_nt_trans_ioctl_noop(smb_request_t *, smb_xa_t *);

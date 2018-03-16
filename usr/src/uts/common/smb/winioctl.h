@@ -22,10 +22,10 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
-#ifndef _SMBSRV_WINIOCTL_H
-#define	_SMBSRV_WINIOCTL_H
+#ifndef _SMB_WINIOCTL_H
+#define	_SMB_WINIOCTL_H
 
 /*
  * Standard Windows NT IOCTL/FSCTL definitions (derived from the VC++
@@ -544,4 +544,4 @@ extern "C" {
 }
 #endif
 
-#endif /* _SMBSRV_WINIOCTL_H */
+#endif /* _SMB_WINIOCTL_H */

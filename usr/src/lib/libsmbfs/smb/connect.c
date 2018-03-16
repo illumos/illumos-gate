@@ -51,6 +51,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <uuid/uuid.h>
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
@@ -58,6 +59,8 @@
 #include <netsmb/netbios.h>
 #include <netsmb/nb_lib.h>
 #include <netsmb/smb_dev.h>
+
+#include <cflib.h>
 
 #include "charsets.h"
 #include "private.h"
@@ -115,12 +118,18 @@ smb_iod_state_name(enum smbiod_state st)
 
 /*
  * Make a new connection, or reconnect.
+ *
+ * This is called first from the door service thread in smbiod
+ * (so that can report success or failure to the door client)
+ * and thereafter it's called when we need to reconnect after a
+ * network outage (or whatever might cause connection loss).
  */
 int
 smb_iod_connect(smb_ctx_t *ctx)
 {
 	smbioc_ossn_t *ossn = &ctx->ct_ssn;
 	smbioc_ssn_work_t *work = &ctx->ct_work;
+	char *uuid_str;
 	int err;
 	struct mbdata blob;
 	char *nego_buf = NULL;
@@ -149,6 +158,20 @@ smb_iod_connect(smb_ctx_t *ctx)
 			return (err);
 		}
 	}
+
+	/*
+	 * Get local machine uuid.
+	 */
+	uuid_str = cf_get_client_uuid();
+	if (uuid_str == NULL) {
+		err = EINVAL;
+		smb_error(dgettext(TEXT_DOMAIN,
+		    "can't get local UUID"), err);
+			return (err);
+	}
+	(void) uuid_parse(uuid_str, ctx->ct_work.wk_cl_guid);
+	free(uuid_str);
+	uuid_str = NULL;
 
 	/*
 	 * We're called with each IP address
@@ -227,6 +250,13 @@ out:
 	return (err);
 }
 
+/*
+ * smb_ssnsetup_spnego
+ *
+ * This does an SMB session setup sequence using SPNEGO.
+ * The state changes seen during this sequence are there
+ * just to help track what's going on.
+ */
 int
 smb_ssnsetup_spnego(struct smb_ctx *ctx, struct mbdata *hint_mb)
 {
@@ -249,25 +279,39 @@ smb_ssnsetup_spnego(struct smb_ctx *ctx, struct mbdata *hint_mb)
 	}
 	for (;;) {
 		err = smb__ssnsetup(ctx, &send_mb, &recv_mb);
-		if (err != 0 && err != EINPROGRESS) {
-			DPRINT("smb__ssnsetup, err=%d", err);
-			goto out;
-		}
-		DPRINT("smb__ssnsetup, new state=%s",
+		DPRINT("smb__ssnsetup rc=%d, new state=%s", err,
 		    smb_iod_state_name(work->wk_out_state));
-		if (work->wk_out_state == SMBIOD_ST_AUTHOK) {
-			err = 0;
+
+		if (err == 0) {
+			/*
+			 * Session setup complete w/ success.
+			 * Should have state AUTHOK
+			 */
+			if (work->wk_out_state != SMBIOD_ST_AUTHOK) {
+				DPRINT("Wrong state (expected AUTHOK)");
+			}
 			break;
 		}
-		if (work->wk_out_state == SMBIOD_ST_AUTHFAIL) {
-			err = EAUTH;
+
+		if (err != EINPROGRESS) {
+			/*
+			 * Session setup complete w/ failure.
+			 * Should have state AUTHFAIL
+			 */
+			if (work->wk_out_state != SMBIOD_ST_AUTHFAIL) {
+				DPRINT("Wrong state (expected AUTHFAIL)");
+			}
 			goto out;
 		}
+
+		/*
+		 * err == EINPROGRESS
+		 * Session setup continuing.
+		 * Should have state AUTHCONT
+		 */
 		if (work->wk_out_state != SMBIOD_ST_AUTHCONT) {
-			err = EPROTO;
-			goto out;
+			DPRINT("Wrong state (expected AUTHCONT)");
 		}
-		/* state == SMBIOD_ST_AUTHCONT */
 
 		/* middle calls get both in, out */
 		err = ssp_ctx_next_token(ctx, &recv_mb, &send_mb);
@@ -277,7 +321,12 @@ smb_ssnsetup_spnego(struct smb_ctx *ctx, struct mbdata *hint_mb)
 		}
 	}
 
-	/* NULL output indicates last call. */
+	/*
+	 * Only get here via break in the err==0 case above,
+	 * so we're finalizing a successful session setup.
+	 *
+	 * NULL output token here indicates the final call.
+	 */
 	(void) ssp_ctx_next_token(ctx, &recv_mb, NULL);
 
 	/*

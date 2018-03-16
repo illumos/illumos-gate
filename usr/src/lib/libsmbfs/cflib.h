@@ -35,6 +35,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _CFLIB_H_
@@ -84,6 +86,8 @@ int  opt_args_parseopt(struct opt_args *, int, char *, opt_callback_t *);
 int  cf_getopt(int, char * const *, const char *);
 void cf_opt_lock(void);
 void cf_opt_unlock(void);
+
+char *cf_get_client_uuid(void);
 
 int  rc_getstringptr(struct rcfile *, const char *, const char *, char **);
 int  rc_getstring(struct rcfile *, const char *, const char *, size_t, char *);

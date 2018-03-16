@@ -40,6 +40,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_H_
@@ -66,8 +67,8 @@ enum smb_dialects {
 	SMB_DIALECT_LANMAN1_0,		/* MICROSOFT NETWORKS 3.0, LANMAN1.0 */
 	SMB_DIALECT_LANMAN2_0,		/* LM1.2X002, DOS LM1.2X002, Samba */
 	SMB_DIALECT_LANMAN2_1,		/* DOS LANMAN2.1, LANMAN2.1 */
-	SMB_DIALECT_NTLM0_12		/* NT LM 0.12, Windows for Workgroups */
-					/* 3.1a, * NT LANMAN 1.0 */
+	SMB_DIALECT_NTLM0_12,		/* NT LM 0.12, etc. */
+	SMB_DIALECT_SMB2_FF		/* SMB1 negotiate to SMB2 */
 };
 
 /*
@@ -82,11 +83,18 @@ enum smb_dialects {
 /*
  * SMB header
  */
+
 #define	SMB_SIGNATURE		"\xFFSMB"
 #define	SMB_SIGLEN		4
 #define	SMB_HDRCMD(p)		(*((uchar_t *)(p) + SMB_SIGLEN))
 #define	SMB_HDRMID(p)		(*(ushort_t *)((uchar_t *)(p) + 30))
+#define	SMB_HDR_OFF_MID		30
 #define	SMB_HDRLEN		32
+
+#define	SMB_HDR_V1	0xFF
+#define	SMB_HDR_V2	0xFE
+#define	SMB_HDR_V3E	0xFD	/* SMB3 encrypted */
+
 /*
  * bits in the smb_flags field
  */
@@ -150,6 +158,25 @@ enum smb_dialects {
 #define	SMB_CAP_BULK_TRANSFER		0x20000000
 #define	SMB_CAP_COMPRESSED_DATA		0x40000000
 #define	SMB_CAP_EXT_SECURITY		0x80000000
+
+/* SMB_COM_TREE_CONNECT_ANDX  flags. See [MS-SMB] for a complete description. */
+#define	TREE_CONNECT_ANDX_DISCONNECT_TID		0x0001
+#define	TREE_CONNECT_ANDX_EXTENDED_SIGNATURES	0x0004
+#define	TREE_CONNECT_ANDX_EXTENDED_RESPONSE		0x0008
+
+/*
+ * SMB_COM_TREE_CONNECT_ANDX  optional support flags. See [MS-SMB] for a
+ * complete description.
+ */
+#define	SMB_SUPPORT_SEARCH_BITS		0x0001	/* supports SearchAttributes */
+#define	SMB_SHARE_IS_IN_DFS		0x0002	/* share is managed by DFS */
+#define	SMB_CSC_MASK			0x000C	/* Offline-caching bits. */
+#define	SMB_UNIQUE_FILE_NAME		0x0010	/* Long file names only */
+#define	SMB_EXTENDED_SIGNATURES		0x0020	/* Signing key protection. */
+/* See [MS-SMB] for a complete description of SMB_CSC_MASK bits. */
+#define	SMB_CSC_CACHE_MANUAL_REINT	0x0000
+#define	SMB_CSC_CACHE_AUTO_REINT	0x0004
+#define	SMB_CSC_CACHE_VDO		0x0008
 
 /*
  * File attributes
@@ -372,6 +399,7 @@ enum smb_dialects {
 #define	SMB_QFS_DEVICE_INFO			0x104
 #define	SMB_QFS_ATTRIBUTE_INFO			0x105
 #define	SMB_QFS_UNIX_INFO			0x200
+#define	SMB_QFS_POSIX_WHOAMI			0x202
 #define	SMB_QFS_MAC_FS_INFO			0x301
 #define	SMB_QFS_VOLUME_INFORMATION		1001
 #define	SMB_QFS_SIZE_INFORMATION		1003
@@ -381,6 +409,11 @@ enum smb_dialects {
 #define	SMB_QFS_FULL_SIZE_INFORMATION		1007
 #define	SMB_QFS_OBJECTID_INFORMATION		1008
 
+/*
+ * NT Notify Change Compeletion Filter
+ * NT Notify Actions
+ * (We don't use these.)
+ */
 
 /*
  * SMB_QFS_ATTRIBUTE_INFO bits.
@@ -403,6 +436,7 @@ enum smb_dialects {
 #define	FILE_SUPPORTS_OBJECT_IDS	0x00010000
 #define	FILE_SUPPORTS_ENCRYPTION	0x00020000
 #define	FILE_NAMED_STREAMS		0x00040000
+#define	FILE_READ_ONLY_VOLUME		0x00080000
 
 /*
  * SMB_TRANS2_QUERY_PATH levels
@@ -424,9 +458,12 @@ enum smb_dialects {
 #define	SMB_QFILEINFO_COMPRESSION_INFO		0x10b
 #define	SMB_QFILEINFO_UNIX_BASIC		0x200
 #define	SMB_QFILEINFO_UNIX_LINK			0x201
+#define	SMB_QFILEINFO_POSIX_ACL			0x204
+#define	SMB_QFILEINFO_UNIX_INFO2		0x20B
 #define	SMB_QFILEINFO_MAC_DT_GET_APPL		0x306
 #define	SMB_QFILEINFO_MAC_DT_GET_ICON		0x307
 #define	SMB_QFILEINFO_MAC_DT_GET_ICON_INFO	0x308
+#define	SMB_QFILEINFO_MAC_SPOTLIGHT		0x310
 #define	SMB_QFILEINFO_BASIC_INFORMATION		1004
 #define	SMB_QFILEINFO_STANDARD_INFORMATION	1005
 #define	SMB_QFILEINFO_INTERNAL_INFORMATION	1006
@@ -454,6 +491,9 @@ enum smb_dialects {
 #define	SMB_FIND_NAME_INFO		0x103
 #define	SMB_FIND_BOTH_DIRECTORY_INFO	0x104
 #define	SMB_FIND_UNIX_INFO		0x200
+/* Transact 2 Find First levels */
+#define	SMB_FIND_FILE_UNIX		0x202
+#define	SMB_FIND_FILE_UNIX_INFO2	0x20B /* UNIX File Info2 */
 
 /*
  * Selectors for NT_TRANSACT_QUERY_SECURITY_DESC and
@@ -707,6 +747,9 @@ typedef struct ntsid ntsid_t;
 #define	SMB_SFILEINFO_UNIX_BASIC		0x200
 #define	SMB_SFILEINFO_UNIX_LINK			0x201
 #define	SMB_SFILEINFO_UNIX_HLINK		0x203
+#define	SMB_SFILEINFO_POSIX_ACL			0x204
+#define	SMB_SFILEINFO_POSIX_UNLINK		0x20A
+#define	SMB_SFILEINFO_UNIX_INFO2		0x20B
 #define	SMB_SFILEINFO_DIRECTORY_INFORMATION	1001
 #define	SMB_SFILEINFO_FULL_DIRECTORY_INFORMATION	1002
 #define	SMB_SFILEINFO_BOTH_DIRECTORY_INFORMATION	1003
@@ -815,5 +858,20 @@ typedef struct ntlmv2_namehdr ntlmv2_namehdr_t;
 #define	STYPE_MASK			0x0000000F
 #define	STYPE_TEMPORARY			0x40000000
 #define	STYPE_HIDDEN			0x80000000
+
+/*
+ * Characters that are not allowed in an SMB file name component.
+ * From MSDN: Naming Files, Paths, ...
+ *	< (less than)
+ *	> (greater than)
+ *	: (colon)
+ *	" (double quote)
+ *	/ (forward slash)
+ *	\ (backslash)
+ *	| (vertical bar or pipe)
+ *	? (question mark)
+ *	* (asterisk)
+ */
+#define	SMB_FILENAME_INVALID_CHARS	"<>:\"/\\|?*"
 
 #endif /* _NETSMB_SMB_H_ */

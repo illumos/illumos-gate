@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -57,12 +57,15 @@ SYMBOL_VERSION SUNWprivate {
 	mb_done;
 	mb_init;
 	mb_initm;
+	mb_put_mbchain;
+	mb_put_mbuf;
 	mb_put_mem;
 	mb_put_padbyte;
 	mb_put_uint16le;
 	mb_put_uint32le;
 	mb_put_uint64le;
 	mb_put_uint8;
+	mb_put_uio;
 	mb_reserve;
 
 	md_done;
@@ -82,9 +85,15 @@ SYMBOL_VERSION SUNWprivate {
 
 	smb_credinit;
 	smb_credrele;
+	smb_debugmsg		{ FLAGS = NODIRECT };
 	smb_dev2share;
-	smb_dos2unixtime;
-	smb_errmsg;
+	smb_errmsg		{ FLAGS = NODIRECT };
+	smb_fh_close;
+	smb_fh_create;
+	smb_fh_hold;
+	smb_fh_opened;
+	smb_fh_rele;
+	smb_get_dstring;
 	smb_nt_alloc;
 	smb_nt_done;
 	smb_nt_request;
@@ -110,11 +119,15 @@ SYMBOL_VERSION SUNWprivate {
 	smb_time_local2NT;
 	smb_time_local2server;
 	smb_time_server2local;
-	smb_time_unix2dos;
 	smb_timo_append;
 	smb_timo_open;
 	smb_timo_read;
 	smb_timo_write;
+
+	smb2_rq_simple;
+	smb2_rq_simple_timed;
+	smb2_smb_close;
+	smb2_smb_ntcreate;
 
     local:
 	*;

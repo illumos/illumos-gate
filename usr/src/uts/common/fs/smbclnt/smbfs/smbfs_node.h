@@ -33,9 +33,10 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _FS_SMBFS_NODE_H_
@@ -221,10 +222,8 @@ typedef struct smbnode {
 	struct smbfs_fctx	*n_dirseq;	/* ff context */
 	int		n_dirofs;	/* last ff offset */
 	int		n_fidrefs;
-	uint16_t	n_fid;		/* file handle */
+	smb_fh_t	*n_fid;		/* file handle */
 	enum vtype	n_ovtype;	/* vnode type opened */
-	uint32_t	n_rights;	/* granted rights */
-	int		n_vcgenid;	/* gereration no. (reconnect) */
 
 	/*
 	 * Misc. bookkeeping

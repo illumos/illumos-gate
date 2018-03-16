@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_H
@@ -39,7 +39,7 @@
 #include <smb/nterror.h>
 #include <smb/lmerr.h>
 #include <smb/doserror.h>
-#include <smbsrv/ntaccess.h>
+#include <smb/ntaccess.h>
 
 /*
  * Macintosh Extensions for CIFS

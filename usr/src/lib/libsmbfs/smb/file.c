@@ -217,7 +217,6 @@ smb_fh_read(int fd, off64_t offset, size_t count,
 	struct smbioc_rw rwrq;
 
 	bzero(&rwrq, sizeof (rwrq));
-	rwrq.ioc_fh = -1;	/* tell driver to supply this */
 	rwrq.ioc_base = dst;
 	rwrq.ioc_cnt = count;
 	rwrq.ioc_offset = offset;
@@ -234,7 +233,6 @@ smb_fh_write(int fd, off64_t offset, size_t count,
 	struct smbioc_rw rwrq;
 
 	bzero(&rwrq, sizeof (rwrq));
-	rwrq.ioc_fh = -1;	/* tell driver to supply this */
 	rwrq.ioc_base = (char *)src;
 	rwrq.ioc_cnt = count;
 	rwrq.ioc_offset = offset;
@@ -262,7 +260,6 @@ smb_fh_xactnp(int fd,
 
 	/* this gets copyin & copyout */
 	bzero(&ioc, sizeof (ioc));
-	ioc.ioc_fh = -1;	/* tell driver to supply this */
 	ioc.ioc_tdlen = tdlen;
 	ioc.ioc_rdlen = *rdlen;
 	ioc.ioc_more = 0;

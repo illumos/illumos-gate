@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -41,7 +41,7 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/ntaccess.h>
+#include <smb/ntaccess.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/netrauth.h>
 #include <libsmbrdr.h>

@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -59,8 +61,10 @@ extern struct smbclnt_proto_option_defs smbclnt_proto_options[];
 #define	PROTO_OPT_DOMAIN		9
 #define	PROTO_OPT_WORKGROUP		10
 #define	PROTO_OPT_SIGNING		11
+#define	PROTO_OPT_MIN_PROTOCOL		12
+#define	PROTO_OPT_MAX_PROTOCOL		13
 
-#define	SMBC_OPT_MAX	PROTO_OPT_SIGNING
+#define	SMBC_OPT_MAX	PROTO_OPT_MAX_PROTOCOL
 
 /*
  * Flags values

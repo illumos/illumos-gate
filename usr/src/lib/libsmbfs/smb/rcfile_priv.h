@@ -30,6 +30,23 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+#ifndef _RCFILE_PRIV_H
+#define	_RCFILE_PRIV_H
+
+/*
+ * Private RC file support.
+ */
+
+#include <sys/queue.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct rckey {
 	SLIST_ENTRY(rckey)	rk_next;
 	char 			*rk_name;
@@ -52,3 +69,12 @@ struct rcfile {
 
 #define	RCFILE_HOME_NSMBRC 1
 #define	RCFILE_IS_INSECURE 2
+#define	RCFILE_DELETE_ON_CLOSE	4
+
+int rc_scf_get_sharectl(FILE *);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _RCFILE_PRIV_H */

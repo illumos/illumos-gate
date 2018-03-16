@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -70,6 +72,7 @@ static int yes_no_validator(int, char *, char *);
 static int ip_address_validator(int, char *, char *);
 static int minauth_validator(int, char *, char *);
 static int password_validator(int, char *, char *);
+static int protocol_validator(int, char *, char *);
 static int signing_validator(int, char *, char *);
 
 int propset_changed = 0;
@@ -182,6 +185,12 @@ struct smbclnt_proto_option_defs smbclnt_proto_options[] = {
 	{ "signing", NULL, PROTO_OPT_SIGNING,
 	    0, 0, MAX_VALUE_BUFLEN,
 	    signing_validator},
+	{ "min_protocol", NULL, PROTO_OPT_MIN_PROTOCOL,
+	    0, 0, MAX_VALUE_BUFLEN,
+	    protocol_validator},
+	{ "max_protocol", NULL, PROTO_OPT_MAX_PROTOCOL,
+	    0, 0, MAX_VALUE_BUFLEN,
+	    protocol_validator},
 	{NULL}
 };
 
@@ -270,18 +279,30 @@ ip_address_validator(int index, char *section, char *value)
 static int
 minauth_validator(int index, char *section, char *value)
 {
+	int ival;
+
 	if (value == NULL)
 		return (SA_BAD_VALUE);
-	if (strlen(value) == 0)
-		return (SA_OK);
-	if (strcmp(value, "kerberos") == 0 ||
-	    strcmp(value, "ntlmv2") == 0 ||
-	    strcmp(value, "ntlm") == 0 ||
-	    strcmp(value, "lm") == 0 ||
-	    strcmp(value, "none") == 0)
-		return (SA_OK);
-	else
+	ival = smb_cf_minauth_from_str(value);
+	if (ival == -1)
 		return (SA_BAD_VALUE);
+
+	return (SA_OK);
+}
+
+/*ARGSUSED*/
+static int
+protocol_validator(int index, char *section, char *value)
+{
+	int ival;
+
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+	ival = smb_cf_version_from_str(value);
+	if (ival == -1)
+		return (SA_BAD_VALUE);
+
+	return (SA_OK);
 }
 
 /*ARGSUSED*/

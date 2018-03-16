@@ -32,7 +32,7 @@
  * $Id: rcfile.c,v 1.1.1.2 2001/07/06 22:38:43 conrad Exp $
  */
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <fcntl.h>
@@ -60,7 +60,6 @@
 #define	SMB_CFG_FILE	"/etc/nsmb.conf"
 #define	OLD_SMB_CFG_FILE	"/usr/local/etc/nsmb.conf"
 #endif
-#define	SMBFS_SHARECTL_CMD	"/usr/sbin/sharectl get smbfs"
 
 extern int smb_debug;
 
@@ -150,36 +149,76 @@ rc_merge(const char *filename, struct rcfile **rcfile)
 }
 
 /*
- * Like rc_open, but does popen of command:
- * sharectl get smbfs
+ * Like rc_open, but creates a temporary file and
+ * reads the sharectl settings into it.
+ * The file is deleted when we close it.
  */
 static int
-rc_popen_cmd(const char *command, struct rcfile **rcfile)
+rc_open_sharectl(struct rcfile **rcfile)
 {
-	struct rcfile *rcp;
-	FILE *f;
+	static char template[24] = "/tmp/smbfsXXXXXX";
+	struct rcfile *rcp = NULL;
+	FILE *fp = NULL;
+	int err;
+	int fd = -1;
 
 	assert(MUTEX_HELD(&rcfile_mutex));
 
-	f = popen(command, "r");
-	if (f == NULL)
-		return (errno);
-	insecure_nsmbrc = 0;
+	fd = mkstemp(template);
+	if (fd < 0) {
+		err = errno;
+		goto errout;
+	}
+
+	fp = fdopen(fd, "w+");
+	if (fp == NULL) {
+		err = errno;
+		close(fd);
+		goto errout;
+	}
+	fd = -1; /* The fp owns this fd now. */
+
+	/*
+	 * Get smbfs sharectl settings into the file.
+	 */
+	if ((err = rc_scf_get_sharectl(fp)) != 0)
+		goto errout;
 
 	rcp = malloc(sizeof (struct rcfile));
 	if (rcp == NULL) {
-		fclose(f);
-		return (ENOMEM);
+		err = ENOMEM;
+		goto errout;
 	}
 	bzero(rcp, sizeof (struct rcfile));
-	rcp->rf_name = strdup(command);
-	rcp->rf_f = f;
+
+	rcp->rf_name = strdup(template);
+	if (rcp->rf_name == NULL) {
+		err = ENOMEM;
+		goto errout;
+	}
+	rcp->rf_f = fp;
+	rcp->rf_flags = RCFILE_DELETE_ON_CLOSE;
+
 	SLIST_INSERT_HEAD(&pf_head, rcp, rf_next);
+	insecure_nsmbrc = 0;
 	rc_parse(rcp);
 	*rcfile = rcp;
 	/* fclose(f) in rc_close */
 	return (0);
+
+errout:
+	if (rcp != NULL)
+		free(rcp);
+	if (fp != NULL) {
+		fclose(fp);
+		fd = -1;
+	}
+	if (fd != -1)
+		close(fd);
+
+	return (err);
 }
+
 
 static int
 rc_close(struct rcfile *rcp)
@@ -189,6 +228,9 @@ rc_close(struct rcfile *rcp)
 	mutex_lock(&rcfile_mutex);
 
 	fclose(rcp->rf_f);
+	if (rcp->rf_flags & RCFILE_DELETE_ON_CLOSE)
+		(void) unlink(rcp->rf_name);
+
 	for (p = SLIST_FIRST(&rcp->rf_sect); p; ) {
 		n = p;
 		p = SLIST_NEXT(p, rs_next);
@@ -663,8 +705,8 @@ smb_open_rcfile(char *home)
 	fn = SMB_CFG_FILE;
 	error = rc_open(fn, &smb_rc);
 #else
-	fn = SMBFS_SHARECTL_CMD;
-	error = rc_popen_cmd(fn, &smb_rc);
+	fn = "(sharectl get smbfs)";
+	error = rc_open_sharectl(&smb_rc);
 #endif
 	if (error != 0 && error != ENOENT) {
 		/* Error from fopen. strerror is OK. */
