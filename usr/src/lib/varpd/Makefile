@@ -10,10 +10,10 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS = libvarpd .WAIT direct files svp
+SUBDIRS = libvarpd direct files svp
 
 all :=		TARGET = all
 clean :=	TARGET = clean
@@ -26,6 +26,7 @@ lint :=		TARGET = lint
 .KEEP_STATE:
 
 all clean clobber install install_h check lint: $(SUBDIRS)
+direct files svp: libvarpd
 
 $(SUBDIRS):  FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
