@@ -27,6 +27,10 @@
  */
 
 /*
+ * Copyright 2018 Joyent, Inc.
+ */
+
+/*
  * Micro event library for FreeBSD, designed for a single i/o thread 
  * using kqueue, and having events be persistent by default.
  */
@@ -47,7 +51,14 @@ __FBSDID("$FreeBSD$");
 #ifndef WITHOUT_CAPSICUM
 #include <sys/capsicum.h>
 #endif
+#ifdef __FreeBSD__
 #include <sys/event.h>
+#else
+#include <port.h>
+#include <sys/poll.h>
+#include <sys/siginfo.h>
+#include <sys/queue.h>
+#endif
 #include <sys/time.h>
 
 #include <pthread.h>
@@ -73,12 +84,21 @@ struct mevent {
 	void	(*me_func)(int, enum ev_type, void *);
 #define me_msecs me_fd
 	int	me_fd;
+#ifdef __FreeBSD__
 	int	me_timid;
+#else
+	timer_t me_timid;
+#endif
 	enum ev_type me_type;
 	void    *me_param;
 	int	me_cq;
 	int	me_state;
 	int	me_closefd;
+#ifndef __FreeBSD__
+	port_notify_t	me_notify;
+	struct sigevent	me_sigev;
+	boolean_t	me_auto_requeue;
+#endif
 	LIST_ENTRY(mevent) me_list;			   
 };
 
@@ -124,7 +144,7 @@ mevent_notify(void)
 		write(mevent_pipefd[1], &c, 1);
 	}
 }
-
+#ifdef __FreeBSD__
 static int
 mevent_kq_filter(struct mevent *mevp)
 {
@@ -243,6 +263,155 @@ mevent_handle(struct kevent *kev, int numev)
 		(*mevp->me_func)(mevp->me_fd, mevp->me_type, mevp->me_param);
 	}
 }
+
+#else /* __FreeBSD__ */
+
+static void
+mevent_update_one(struct mevent *mevp)
+{
+	int portfd = mevp->me_notify.portnfy_port;
+
+	switch (mevp->me_type) {
+	case EVF_READ:
+	case EVF_WRITE:
+		mevp->me_auto_requeue = B_FALSE;
+
+		switch (mevp->me_state) {
+		case MEV_ADD:
+		case MEV_ENABLE:
+		{
+			int events;
+
+			events = (mevp->me_type == EVF_READ) ? POLLIN : POLLOUT;
+
+			if (port_associate(portfd, PORT_SOURCE_FD, mevp->me_fd,
+			    events, mevp) != 0) {
+				(void) fprintf(stderr,
+				    "port_associate fd %d %p failed: %s\n",
+				    mevp->me_fd, mevp, strerror(errno));
+			}
+			return;
+		}
+		case MEV_DISABLE:
+		case MEV_DEL_PENDING:
+			/*
+			 * A disable that comes in while an event is being
+			 * handled will result in an ENOENT.
+			 */
+			if (port_dissociate(portfd, PORT_SOURCE_FD,
+			    mevp->me_fd) != 0 && errno != ENOENT) {
+				(void) fprintf(stderr, "port_dissociate "
+				    "portfd %d fd %d mevp %p failed: %s\n",
+				    portfd, mevp->me_fd, mevp, strerror(errno));
+			}
+			return;
+		default:
+			goto abort;
+		}
+
+	case EVF_TIMER:
+		mevp->me_auto_requeue = B_TRUE;
+
+		switch (mevp->me_state) {
+		case MEV_ADD:
+		case MEV_ENABLE:
+		{
+			struct itimerspec it = { 0 };
+
+			mevp->me_sigev.sigev_notify = SIGEV_PORT;
+			mevp->me_sigev.sigev_value.sival_ptr = &mevp->me_notify;
+
+			if (timer_create(CLOCK_REALTIME, &mevp->me_sigev,
+			    &mevp->me_timid) != 0) {
+				(void) fprintf(stderr,
+				    "timer_create failed: %s", strerror(errno));
+				return;
+			}
+
+			/* The first timeout */
+			it.it_value.tv_sec = mevp->me_msecs / MILLISEC;
+			it.it_value.tv_nsec =
+				MSEC2NSEC(mevp->me_msecs % MILLISEC);
+			/* Repeat at the same interval */
+			it.it_interval = it.it_value;
+
+			if (timer_settime(mevp->me_timid, 0, &it, NULL) != 0) {
+				(void) fprintf(stderr, "timer_settime failed: "
+				    "%s", strerror(errno));
+			}
+			return;
+		}
+		case MEV_DISABLE:
+		case MEV_DEL_PENDING:
+			if (timer_delete(mevp->me_timid) != 0) {
+				(void) fprintf(stderr, "timer_delete failed: "
+				    "%s", strerror(errno));
+			}
+			return;
+		default:
+			goto abort;
+		}
+	default:
+		/* EVF_SIGNAL not yet implemented. */
+		goto abort;
+	}
+
+abort:
+	(void) fprintf(stderr, "%s: unhandled type %d state %d\n", __func__,
+	    mevp->me_type, mevp->me_state);
+	abort();
+}
+
+static void
+mevent_update_pending(int portfd)
+{
+	struct mevent *mevp, *tmpp;
+
+	mevent_qlock();
+
+	LIST_FOREACH_SAFE(mevp, &change_head, me_list, tmpp) {
+		mevp->me_notify.portnfy_port = portfd;
+		mevp->me_notify.portnfy_user = mevp;
+		if (mevp->me_closefd) {
+			/*
+			 * A close of the file descriptor will remove the
+			 * event
+			 */
+			(void) close(mevp->me_fd);
+			mevp->me_fd = -1;
+		} else {
+			mevent_update_one(mevp);
+		}
+
+		mevp->me_cq = 0;
+		LIST_REMOVE(mevp, me_list);
+
+		if (mevp->me_state == MEV_DEL_PENDING) {
+			free(mevp);
+		} else {
+			LIST_INSERT_HEAD(&global_head, mevp, me_list);
+		}
+	}
+
+	mevent_qunlock();
+}
+
+static void
+mevent_handle_pe(port_event_t *pe)
+{
+	struct mevent *mevp = pe->portev_user;
+
+	mevent_qunlock();
+
+	(*mevp->me_func)(mevp->me_fd, mevp->me_type, mevp->me_param);
+
+	mevent_qlock();
+	if (!mevp->me_cq && !mevp->me_auto_requeue) {
+		mevent_update_one(mevp);
+	}
+	mevent_qunlock();
+}
+#endif
 
 struct mevent *
 mevent_add(int tfd, enum ev_type type,
@@ -400,11 +569,16 @@ mevent_set_name(void)
 void
 mevent_dispatch(void)
 {
+#ifdef __FreeBSD__
 	struct kevent changelist[MEVENT_MAX];
 	struct kevent eventlist[MEVENT_MAX];
 	struct mevent *pipev;
 	int mfd;
 	int numev;
+#else
+	struct mevent *pipev;
+	int portfd;
+#endif
 	int ret;
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_t rights;
@@ -413,8 +587,13 @@ mevent_dispatch(void)
 	mevent_tid = pthread_self();
 	mevent_set_name();
 
+#ifdef __FreeBSD__
 	mfd = kqueue();
 	assert(mfd > 0);
+#else
+	portfd = port_create();
+	assert(portfd >= 0);
+#endif
 
 #ifndef WITHOUT_CAPSICUM
 	cap_rights_init(&rights, CAP_KQUEUE);
@@ -448,6 +627,7 @@ mevent_dispatch(void)
 	assert(pipev != NULL);
 
 	for (;;) {
+#ifdef __FreeBSD__
 		/*
 		 * Build changelist if required.
 		 * XXX the changelist can be put into the blocking call
@@ -474,5 +654,22 @@ mevent_dispatch(void)
 		 * Handle reported events
 		 */
 		mevent_handle(eventlist, ret);
+
+#else /* __FreeBSD__ */
+		port_event_t pev;
+
+		/* Handle any pending updates */
+		mevent_update_pending(portfd);
+
+		/* Block awaiting events */
+		ret = port_get(portfd, &pev, NULL);
+		if (ret != 0 && errno != EINTR) {
+			perror("Error return from port_get");
+			continue;
+		}
+
+		/* Handle reported event */
+		mevent_handle_pe(&pev);
+#endif /* __FreeBSD__ */
 	}			
 }
