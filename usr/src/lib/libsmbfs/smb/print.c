@@ -33,7 +33,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -57,12 +57,24 @@
 
 #include "private.h"
 
+/*
+ * Replacing invalid characters in print job titles:
+ *
+ * The spec. is unclear about what characters are allowed in a
+ * print job title (used with NtCreate) so out of caution this
+ * makes sure the title contains none of the characters that
+ * are known to be illegal in a file name component.
+ */
+static const char invalid_chars[] = SMB_FILENAME_INVALID_CHARS;
+
 int
 smb_open_printer(struct smb_ctx *ctx, const char *title,
 	int setuplen, int mode)
 {
 	smbioc_printjob_t ioc;
-	int err, tlen, new_fd;
+	char *p;
+	int err, tlen;
+	int new_fd = -1;
 	int32_t from_fd;
 
 	tlen = strlen(title);
@@ -90,6 +102,14 @@ smb_open_printer(struct smb_ctx *ctx, const char *title,
 	ioc.ioc_setuplen = setuplen;
 	ioc.ioc_prmode = mode;
 	strlcpy(ioc.ioc_title, title, SMBIOC_MAX_NAME);
+
+	/*
+	 * The title is used in NtCreate so sanitize by
+	 * replacing any illegal chars with spaces.
+	 */
+	for (p = ioc.ioc_title; *p != '\0'; p++)
+		if (strchr(invalid_chars, *p) != NULL)
+			*p = ' ';
 
 	if (nsmb_ioctl(new_fd, SMBIOC_PRINTJOB, &ioc) == -1) {
 		err = errno;

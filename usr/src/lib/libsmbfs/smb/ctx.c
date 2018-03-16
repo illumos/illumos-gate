@@ -165,6 +165,8 @@ dump_iod_ssn(smb_iod_ssn_t *is)
 	    ssn->ssn_domain, ssn->ssn_user);
 	printf(" ct_vopt=0x%x, ct_owner=%d\n",
 	    ssn->ssn_vopt, ssn->ssn_owner);
+	printf(" ct_minver=0x%x, ct_maxver=0x%x\n",
+	    ssn->ssn_minver, ssn->ssn_maxver);
 	printf(" ct_authflags=0x%x\n", is->iod_authflags);
 
 	printf(" ct_nthash:");
@@ -259,6 +261,7 @@ smb_ctx_init(struct smb_ctx *ctx)
 	ctx->ct_owner = SMBM_ANY_OWNER;
 	ctx->ct_authflags = SMB_AT_DEFAULT;
 	ctx->ct_minauth = SMB_AT_MINAUTH;
+	ctx->ct_maxver = SMB2_DIALECT_MAX;
 
 	/*
 	 * Default domain, user, ...
@@ -856,6 +859,37 @@ smb_ctx_setsigning(struct smb_ctx *ctx, int enable, int require)
 	return (0);
 }
 
+/*
+ * Handle .nsmbrc "minver" option.
+ * Must be <= maxver
+ */
+int
+smb_ctx_setminver(struct smb_ctx *ctx, int ver)
+{
+	if (ver < 0 || ver > ctx->ct_maxver)
+		return (EINVAL);
+	ctx->ct_minver = (uint16_t)ver;
+	return (0);
+}
+
+/*
+ * Handle .nsmbrc "maxver" option.
+ * Must be >= minver
+ *
+ * Any "too high" value is just clamped, so the caller
+ * doesn't need to know what's the highest we support.
+ */
+int
+smb_ctx_setmaxver(struct smb_ctx *ctx, int ver)
+{
+	if (ver < 1 || ver < ctx->ct_minver)
+		return (EINVAL);
+	if (ver > SMB2_DIALECT_MAX)
+		ver = SMB2_DIALECT_MAX;
+	ctx->ct_maxver = (uint16_t)ver;
+	return (0);
+}
+
 static int
 smb_parse_owner(char *pair, uid_t *uid, gid_t *gid)
 {
@@ -1120,8 +1154,12 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 		 * If we don't have a p/w yet,
 		 * try the keychain.
 		 */
-		if (ctx->ct_password[0] == '\0')
-			(void) smb_get_keychain(ctx);
+		if (ctx->ct_password[0] == '\0' &&
+		    smb_get_keychain(ctx) == 0) {
+			strlcpy(ctx->ct_password, "$HASH",
+			    sizeof (ctx->ct_password));
+		}
+
 		/*
 		 * Mask out disallowed auth types.
 		 */
@@ -1362,6 +1400,35 @@ minauth_table[] = {
 	{ NULL }
 };
 
+int
+smb_cf_minauth_from_str(char *str)
+{
+	struct nv *nvp;
+
+	for (nvp = minauth_table; nvp->name; nvp++)
+		if (strcmp(nvp->name, str) == 0)
+			return (nvp->value);
+	return (-1);
+}
+
+
+static struct nv
+smbver_table[] = {
+	{ "2.1",	SMB2_DIALECT_0210 },
+	{ "1",		1 },
+	{ NULL,		0 }
+};
+
+int
+smb_cf_version_from_str(char *str)
+{
+	struct nv *nvp;
+
+	for (nvp = smbver_table; nvp->name; nvp++)
+		if (strcmp(nvp->name, str) == 0)
+			return (nvp->value);
+	return (-1);
+}
 
 /*
  * level values:
@@ -1374,7 +1441,9 @@ static int
 smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 {
 	char *p;
+	int ival;
 	int error;
+	int minver, maxver;
 
 #ifdef	KICONV_SUPPORT
 	if (level > 0) {
@@ -1392,19 +1461,79 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 	if (level <= 1) {
 		/* Section is: [default] or [server] */
 
+		/*
+		 * Handle min_protocol, max_protocol
+		 * (SMB protocol versions)
+		 */
+		minver = -1;
+		rc_getstringptr(smb_rc, sname, "min_protocol", &p);
+		if (p != NULL) {
+			minver = smb_cf_version_from_str(p);
+			if (minver == -1) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid min_protocol value \"%s\" specified in the section %s"),
+				    0, p, sname);
+			}
+		}
+		maxver = -1;
+		rc_getstringptr(smb_rc, sname, "max_protocol", &p);
+		if (p != NULL) {
+			maxver = smb_cf_version_from_str(p);
+			if (maxver == -1) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid max_protocol value \"%s\" specified in the section %s"),
+				    0, p, sname);
+			}
+		}
+
+		/*
+		 * If setting both min/max protocol,
+		 * validate against each other
+		 */
+		if (minver != -1 && maxver != -1) {
+			if (minver > maxver) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid min/max protocol combination in the section %s"),
+				    0, sname);
+			} else {
+				ctx->ct_minver = minver;
+				ctx->ct_maxver = maxver;
+			}
+		}
+
+		/*
+		 * Setting just min or max, validate against
+		 * current settings
+		 */
+		if (minver != -1) {
+			if (minver > ctx->ct_maxver) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid min/max protocol combination in the section %s"),
+				    0, sname);
+			} else {
+				ctx->ct_minver = minver;
+			}
+		}
+		if (maxver != -1) {
+			if (maxver < ctx->ct_minver) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid min/max protocol combination in the section %s"),
+				    0, sname);
+			} else {
+				ctx->ct_maxver = maxver;
+			}
+		}
+
 		rc_getstringptr(smb_rc, sname, "minauth", &p);
 		if (p) {
 			/*
 			 * "minauth" was set in this section; override
 			 * the current minimum authentication setting.
 			 */
-			struct nv *nvp;
-			for (nvp = minauth_table; nvp->name; nvp++)
-				if (strcmp(p, nvp->name) == 0)
-					break;
-			if (nvp->name)
-				ctx->ct_minauth = nvp->value;
-			else {
+			ival = smb_cf_minauth_from_str(p);
+			if (ival != -1) {
+				ctx->ct_minauth = ival;
+			} else {
 				/*
 				 * Unknown minimum authentication level.
 				 */

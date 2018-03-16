@@ -41,7 +41,7 @@
 
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/string.h>
-#include <smbsrv/winioctl.h>
+#include <smb/winioctl.h>
 #include <smbsrv/smb_door.h>
 
 /* Size of the token on the wire due to encoding */

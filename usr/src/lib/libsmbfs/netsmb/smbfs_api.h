@@ -22,7 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMBFS_API_H
@@ -48,7 +49,7 @@ extern "C" {
  * EAUTH is used for CIFS authentication errors.
  */
 #ifndef EBADRPC
-#define	EBADRPC 	113
+#define	EBADRPC		113
 #endif
 #ifndef EAUTH
 #define	EAUTH		114
@@ -122,6 +123,8 @@ int  smb_ctx_setauthflags(struct smb_ctx *, int);
 int  smb_ctx_setcharset(struct smb_ctx *, const char *);
 int  smb_ctx_setfullserver(struct smb_ctx *, const char *);
 int  smb_ctx_setsigning(struct smb_ctx *, int ena, int req);
+int  smb_ctx_setminver(struct smb_ctx *, int ver);
+int  smb_ctx_setmaxver(struct smb_ctx *, int ver);
 
 int  smb_ctx_setnbflags(struct smb_ctx *, int ena, int bcast);
 int  smb_ctx_setscope(struct smb_ctx *, const char *);

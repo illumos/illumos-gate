@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -30,7 +30,7 @@
 #include <smbsrv/string.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/mailslot.h>
-#include <smbsrv/winioctl.h>
+#include <smb/winioctl.h>
 
 /*
  * count of bytes in server response packet
@@ -943,7 +943,7 @@ smb_trans_net_share_enum(struct smb_request *sr, struct smb_xa *xa)
 		    data_off,		/* Data offset from header start */
 		    data_disp,		/* Data displacement */
 		    n_setup,		/* suwcnt */
-		    &xa->rep_setup_mb, 	/* setup[] */
+		    &xa->rep_setup_mb,	/* setup[] */
 		    tot_packet_bytes,	/* Total data bytes */
 		    param_pad,
 		    &xa->rep_param_mb,

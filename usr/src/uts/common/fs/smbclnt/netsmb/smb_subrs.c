@@ -86,6 +86,14 @@ smb_credrele(struct smb_cred *scred)
 	}
 }
 
+#ifndef	_KERNEL
+/* ARGSUSED */
+void
+smb_debugmsg(const char *func, char *msg)
+{
+}
+#endif	/* _KERNEL */
+
 /*
  * Helper for the SMBERROR macro, etc.
  * This is also a good place for a breakpoint
@@ -108,6 +116,9 @@ smb_errmsg(int cel, const char *func_name, const char *fmt, ...)
 		DTRACE_PROBE2(debugmsg2,
 		    (char *), func_name,
 		    (char *), buf);
+#ifndef	_KERNEL
+		smb_debugmsg(func_name, buf);
+#endif
 	} else {
 		/*
 		 * This is one of our xxxERROR macros.
@@ -160,6 +171,9 @@ m_dumpm(mblk_t *m)
 #endif
 #ifndef ETIME
 #define	ETIME ETIMEDOUT
+#endif
+#ifndef	EMOREDATA
+#define	EMOREDATA (0x7fff)
 #endif
 
 /*
@@ -597,14 +611,6 @@ static const nt2doserr_t nt2doserr[] = {
 	{ERRHRD,	ERRgeneral,	NT_STATUS_NO_GUID_TRANSLATION},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_CANNOT_IMPERSONATE},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_IMAGE_ALREADY_LOADED},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_NOT_PRESENT},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_LID_NOT_EXIST},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_LID_ALREADY_OWNED},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_NOT_LID_OWNER},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_INVALID_COMMAND},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_INVALID_LID},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_SELECTOR_NOT_AVAILABLE},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_INVALID_SELECTOR},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_NO_LDT},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_INVALID_LDT_SIZE},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_INVALID_LDT_OFFSET},
@@ -1013,13 +1019,90 @@ smb_maperror(int eclass, int eno)
 	return (EIO);
 }
 
-#if defined(NOICONVSUPPORT) || defined(lint)
-extern int iconv_conv(void *handle, const char **inbuf,
-    size_t *inbytesleft, char **outbuf, size_t *outbytesleft);
-#endif
-
 #define	SMALL_CONV 256
 
+/*
+ * Decode an SMB OTW string (Unicode or OEM chars)
+ * converting to UTF-8 in the output buffer.
+ * outlen is in/out (max size on input)
+ * insize is the wire size (2 * chars if unicode)
+ * The output string is null terminated.
+ * Output length does not include the null.
+ */
+int
+smb_get_dstring(struct mdchain *mdc, struct smb_vc *vcp,
+	char *outbuf, size_t *outlen, int insize)
+{
+	uint16_t convbuf[SMALL_CONV];
+	uint16_t *cbuf;
+	size_t cbufalloc, inlen, outsize;
+	int error;
+
+	if (insize <= 0)
+		return (0);
+	/* Note: inlen is UTF-16 symbols. */
+	inlen = insize / 2;
+
+	if (*outlen < 2)
+		return (EINVAL);
+	outsize = *outlen - 1; /* room for null */
+
+	/*
+	 * Get a buffer for the conversion and fill it.
+	 * Use stack buffer if the string is
+	 * small enough, else allocate.
+	 */
+	if (insize < sizeof (convbuf)) {
+		cbufalloc = 0;
+		cbuf = convbuf;
+	} else {
+		cbufalloc = insize + 2;
+		cbuf = kmem_alloc(cbufalloc, KM_SLEEP);
+	}
+	error = md_get_mem(mdc, cbuf, insize, MB_MSYSTEM);
+	if (error != 0)
+		goto out;
+	cbuf[inlen] = 0;
+
+	/*
+	 * Handle the easy case (non-unicode).
+	 * XXX: Technically, we should convert
+	 * the string to OEM codeset first...
+	 * Modern servers all use Unicode, so
+	 * this is good enough.
+	 */
+	if (SMB_UNICODE_STRINGS(vcp) == 0) {
+		*outlen = strlcpy(outbuf, (char *)cbuf, outsize);
+		if (*outlen > outsize) {
+			*outlen = outsize;
+			error = E2BIG;
+		}
+	} else {
+		/*
+		 * Convert from UTF-16 to UTF-8
+		 */
+		error = uconv_u16tou8(cbuf, &inlen,
+		    (uchar_t *)outbuf, outlen,
+		    UCONV_IN_LITTLE_ENDIAN);
+		if (error == 0) {
+			outbuf[*outlen] = '\0';
+		}
+	}
+
+	ASSERT(*outlen == strlen(outbuf));
+
+out:
+	if (cbufalloc != 0)
+		kmem_free(cbuf, cbufalloc);
+
+	return (error);
+}
+
+/*
+ * It's surprising that this function does utf8-ucs2 conversion.
+ * One would expect only smb_put_dstring to do that.
+ * Fixing that will require changing a bunch of callers. XXX
+ */
 /*ARGSUSED*/
 int
 smb_put_dmem(struct mbchain *mbp, struct smb_vc *vcp, const char *src,
@@ -1094,6 +1177,133 @@ smb_put_dstring(struct mbchain *mbp, struct smb_vc *vcp, const char *src,
 	error = smb_put_dmem(mbp, vcp, src, len, caseopt, NULL);
 	if (error)
 		return (error);
+
+	return (error);
+}
+int
+smb_smb_ntcreate(struct smb_share *ssp, struct mbchain *name_mb,
+	uint32_t crflag, uint32_t req_acc, uint32_t efa, uint32_t sh_acc,
+	uint32_t disp, uint32_t createopt,  uint32_t impersonate,
+	struct smb_cred *scrp, smb_fh_t *fhp,
+	uint32_t *cr_act_p, struct smbfattr *fap)
+{
+	int err;
+
+	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
+		err = smb2_smb_ntcreate(ssp, name_mb, NULL, NULL,
+		   crflag, req_acc, efa, sh_acc, disp, createopt,
+		   impersonate, scrp, &fhp->fh_fid2, cr_act_p, fap);
+	} else {
+		err = smb1_smb_ntcreate(ssp, name_mb, crflag, req_acc,
+		    efa, sh_acc, disp, createopt,  impersonate, scrp,
+		    &fhp->fh_fid1, cr_act_p, fap);
+	}
+	return (err);
+}
+
+int
+smb_smb_close(struct smb_share *ssp, smb_fh_t *fhp,
+	struct smb_cred *scrp)
+{
+	int err;
+
+	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
+		err = smb2_smb_close(ssp, &fhp->fh_fid2, scrp);
+	} else {
+		err = smb1_smb_close(ssp, fhp->fh_fid1, NULL, scrp);
+	}
+
+	return (err);
+}
+
+/*
+ * Largest size to use with LARGE_READ/LARGE_WRITE.
+ * Specs say up to 64k data bytes, but Windows traffic
+ * uses 60k... no doubt for some good reason.
+ * (Probably to keep 4k block alignment.)
+ */
+uint32_t smb1_large_io_max = (60*1024);
+
+/*
+ * Common function for read/write with UIO.
+ * Called by netsmb smb_usr_rw,
+ *  smbfs_readvnode, smbfs_writevnode
+ */
+int
+smb_rwuio(smb_fh_t *fhp, uio_rw_t rw,
+	uio_t *uiop, smb_cred_t *scred, int timo)
+{
+	struct smb_share *ssp = FHTOSS(fhp);
+	struct smb_vc *vcp = SSTOVC(ssp);
+	ssize_t  save_resid;
+	uint32_t len, rlen, maxlen;
+	int error = 0;
+	int (*iofun)(smb_fh_t *, uint32_t *,
+	    uio_t *, smb_cred_t *, int);
+
+	/* After reconnect, the fid is invalid. */
+	if (fhp->fh_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
+	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
+		if (rw == UIO_READ) {
+			iofun = smb2_smb_read;
+			maxlen = vcp->vc_sopt.sv2_maxread;
+		} else { /* UIO_WRITE */
+			iofun = smb2_smb_write;
+			maxlen = vcp->vc_sopt.sv2_maxwrite;
+		}
+	} else {
+		/*
+		 * Using NT LM 0.12, so readx, writex.
+		 * Make sure we can represent the offset.
+		 */
+		if ((vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_FILES) == 0 &&
+		    (uiop->uio_loffset + uiop->uio_resid) > UINT32_MAX)
+			return (EFBIG);
+
+		if (rw == UIO_READ) {
+			iofun = smb_smb_readx;
+			if (vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_READX)
+				maxlen = smb1_large_io_max;
+			else
+				maxlen = vcp->vc_rxmax;
+		} else { /* UIO_WRITE */
+			iofun = smb_smb_writex;
+			if (vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_WRITEX)
+				maxlen = smb1_large_io_max;
+			else
+				maxlen = vcp->vc_wxmax;
+		}
+	}
+
+	save_resid = uiop->uio_resid;
+	while (uiop->uio_resid > 0) {
+		/* Lint: uio_resid may be 64-bits */
+		rlen = len = (uint32_t)min(maxlen, uiop->uio_resid);
+		error = (*iofun)(fhp, &rlen, uiop, scred, timo);
+
+		/*
+		 * Note: the iofun called uio_update, so
+		 * not doing that here as one might expect.
+		 *
+		 * Quit the loop either on error, or if we
+		 * transferred less then requested.
+		 */
+		if (error || (rlen < len))
+			break;
+
+		timo = 0; /* only first I/O should wait */
+	}
+	if (error && (save_resid != uiop->uio_resid)) {
+		/*
+		 * Stopped on an error after having
+		 * successfully transferred data.
+		 * Suppress this error.
+		 */
+		SMBSDEBUG("error %d suppressed\n", error);
+		error = 0;
+	}
 
 	return (error);
 }

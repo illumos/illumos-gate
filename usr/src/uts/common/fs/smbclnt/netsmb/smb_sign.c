@@ -59,16 +59,6 @@
 int nsmb_signing_fudge = 0;
 #endif
 
-/* Mechanism definitions */
-static  smb_sign_mech_t smb_mech_md5;
-
-void
-smb_crypto_mech_init(void)
-{
-	if (smb_md5_getmech(&smb_mech_md5) != 0)
-		cmn_err(CE_NOTE, "nsmb can't get md5 mech");
-}
-
 /*
  * This is called just after session setup completes,
  * at the top of smb_iod_vc_work().  Initialize signing.
@@ -76,9 +66,16 @@ smb_crypto_mech_init(void)
 int
 smb_sign_init(smb_vc_t *vcp)
 {
+	int rc;
 
 	ASSERT(vcp->vc_ssnkey != NULL);
 	ASSERT(vcp->vc_mackey == NULL);
+
+	rc = smb_md5_getmech(&vcp->vc_signmech);
+	if (rc != 0) {
+		cmn_err(CE_NOTE, "smb can't get signing mechanism");
+		return (EAUTH);
+	}
 
 	/*
 	 * Convert the session key to the MAC key.
@@ -134,11 +131,10 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 		} s;
 	} smbhdr;
 
-	/* Later: check vcp->sign_mech == NULL */
 	if (vcp->vc_mackey == NULL)
 		return (-1);
 
-	if ((rc = smb_md5_init(&ctx, &smb_mech_md5)) != 0)
+	if ((rc = smb_md5_init(&ctx, &vcp->vc_signmech)) != 0)
 		return (rc);
 
 	/* Digest the MAC Key */
@@ -146,6 +142,7 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	if (rc != 0)
 		return (rc);
 
+	/* Our caller should ensure mp has a contiguous header */
 	ASSERT(m != NULL);
 	ASSERT(MBLKL(m) >= SMB_HDRLEN);
 
@@ -154,8 +151,6 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	 * fill in the sequence number, and digest.
 	 */
 	size = SMB_HDRLEN;
-	if (MBLKL(m) < size)
-		(void) pullupmsg(m, size);
 	bcopy(m->b_rptr, smbhdr.r.raw, size);
 	smbhdr.s.sig[0] = htolel(seqno);
 	smbhdr.s.sig[1] = 0;
@@ -192,7 +187,7 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	 * Finally, store the signature.
 	 * (first 8 bytes of the mac)
 	 */
-	if (signature)
+	if (signature != NULL)
 		bcopy(digest, signature, SMBSIGLEN);
 
 	return (0);
@@ -210,13 +205,10 @@ smb_rq_sign(struct smb_rq *rqp)
 	int status;
 
 	/*
-	 * Our mblk allocation ensures this,
-	 * but just in case...
+	 * smb_rq_new() ensures this,
+	 * but just in case..
 	 */
-	if (MBLKL(mp) < SMB_HDRLEN) {
-		if (!pullupmsg(mp, SMB_HDRLEN))
-			return;
-	}
+	ASSERT(MBLKL(mp) >= SMB_HDRLEN);
 	sigloc = mp->b_rptr + SMBSIGOFF;
 
 	if (vcp->vc_mackey == NULL) {
@@ -269,10 +261,8 @@ smb_rq_verify(struct smb_rq *rqp)
 		SMBSDEBUG("empty reply\n");
 		return (0);
 	}
-	if (MBLKL(mp) < SMB_HDRLEN) {
-		if (!pullupmsg(mp, SMB_HDRLEN))
-			return (0);
-	}
+
+	ASSERT(MBLKL(mp) >= SMB_HDRLEN);
 	sigloc = mp->b_rptr + SMBSIGOFF;
 
 	/*

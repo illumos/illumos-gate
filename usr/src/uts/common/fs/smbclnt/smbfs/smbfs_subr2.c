@@ -27,7 +27,7 @@
  */
 /*
  * Copyright (c) 2017 by Delphix. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -433,7 +433,7 @@ start:
 	np->r_vnode = vp;
 	np->n_mount = mi;
 
-	np->n_fid = SMB_FID_UNUSED;
+	np->n_fid = NULL;
 	np->n_uid = mi->smi_uid;
 	np->n_gid = mi->smi_gid;
 	/* Leave attributes "stale." */

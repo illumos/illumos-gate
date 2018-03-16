@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_NTACCESS_H
 #define	_SMBSRV_NTACCESS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file defines the NT compatible access control masks and values.

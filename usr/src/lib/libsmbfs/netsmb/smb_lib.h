@@ -126,6 +126,8 @@ struct smb_ctx {
  */
 #define	ct_ssn		ct_iod_ssn.iod_ossn
 #define	ct_vopt		ct_iod_ssn.iod_ossn.ssn_vopt
+#define	ct_minver	ct_iod_ssn.iod_ossn.ssn_minver
+#define	ct_maxver	ct_iod_ssn.iod_ossn.ssn_maxver
 #define	ct_owner	ct_iod_ssn.iod_ossn.ssn_owner
 #define	ct_srvaddr	ct_iod_ssn.iod_ossn.ssn_srvaddr
 #define	ct_domain	ct_iod_ssn.iod_ossn.ssn_domain
@@ -193,6 +195,9 @@ int smb_iod_work(struct smb_ctx *);
 
 int  smb_open_rcfile(char *);
 void smb_close_rcfile(void);
+
+int smb_cf_minauth_from_str(char *);
+int smb_cf_version_from_str(char *);
 
 void smb_simplecrypt(char *dst, const char *src);
 int  smb_simpledecrypt(char *dst, const char *src);

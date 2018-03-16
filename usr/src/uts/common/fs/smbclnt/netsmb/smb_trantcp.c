@@ -558,98 +558,6 @@ smb_nbst_done(struct smb_vc *vcp)
 	return (0);
 }
 
-/*
- * XXX - Later, get rid of nb_loan_fp, nb_unloan_fp
- *
- * Loan a transport file pointer (from user space) to this
- * IOD endpoint.  There should be no other thread using this
- * endpoint when we do this, but lock for consistency.
- */
-static int
-nb_loan_fp(struct nbpcb *nbp, struct file *fp, cred_t *cr)
-{
-	TIUSER *tiptr;
-	int err;
-
-	err = t_kopen(fp, 0, 0, &tiptr, cr);
-	if (err != 0)
-		return (err);
-
-	mutex_enter(&nbp->nbp_lock);
-
-	nbp->nbp_tiptr = tiptr;
-	nbp->nbp_fmode = tiptr->fp->f_flag;
-	nbp->nbp_flags |= NBF_CONNECTED;
-	nbp->nbp_state = NBST_SESSION;
-
-	mutex_exit(&nbp->nbp_lock);
-
-	return (0);
-}
-
-/*
- * Take back the transport file pointer we previously loaned.
- * It's possible there may be another thread in here, so let
- * others get out of the way before we pull the rug out.
- *
- * Some notes about the locking here:  The higher-level IOD code
- * serializes activity such that at most one reader and writer
- * thread can be active in this code (and possibly both).
- * Keeping nbp_lock held during the activities of these two
- * threads would lead to the possibility of nbp_lock being
- * held by a blocked thread, so this instead sets one of the
- * flags (NBF_SENDLOCK | NBF_RECVLOCK) when a sender or a
- * receiver is active (respectively).  Lastly, tear-down is
- * the only tricky bit (here) where we must wait for any of
- * these activities to get out of current calls so they will
- * notice that we've turned off the NBF_CONNECTED flag.
- */
-static void
-nb_unloan_fp(struct nbpcb *nbp)
-{
-
-	mutex_enter(&nbp->nbp_lock);
-
-	nbp->nbp_flags &= ~NBF_CONNECTED;
-	while (nbp->nbp_flags & (NBF_SENDLOCK | NBF_RECVLOCK)) {
-		nbp->nbp_flags |= NBF_LOCKWAIT;
-		cv_wait(&nbp->nbp_cv, &nbp->nbp_lock);
-	}
-	if (nbp->nbp_frag != NULL) {
-		freemsg(nbp->nbp_frag);
-		nbp->nbp_frag = NULL;
-	}
-	if (nbp->nbp_tiptr != NULL) {
-		(void) t_kclose(nbp->nbp_tiptr, 0);
-		nbp->nbp_tiptr = NULL;
-	}
-	nbp->nbp_state = NBST_CLOSED;
-
-	mutex_exit(&nbp->nbp_lock);
-}
-
-static int
-smb_nbst_loan_fp(struct smb_vc *vcp, struct file *fp, cred_t *cr)
-{
-	struct nbpcb *nbp = vcp->vc_tdata;
-	int error = 0;
-
-	/*
-	 * Un-loan the existing one, if any.
-	 */
-	(void) nb_disconnect(nbp);
-	nb_unloan_fp(nbp);
-
-	/*
-	 * Loan the new one passed in.
-	 */
-	if (fp != NULL) {
-		error = nb_loan_fp(nbp, fp, cr);
-	}
-
-	return (error);
-}
-
 static int
 smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap)
 {
@@ -662,6 +570,18 @@ smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap)
 		return (ENOTSUP);
 
 	err = t_kbind(tiptr, NULL, NULL);
+
+	return (err);
+}
+
+static int
+smb_nbst_unbind(struct smb_vc *vcp)
+{
+	struct nbpcb *nbp = vcp->vc_tdata;
+	TIUSER *tiptr = nbp->nbp_tiptr;
+	int err;
+
+	err = t_kunbind(tiptr);
 
 	return (err);
 }
@@ -956,7 +876,7 @@ smb_nbst_setparam(struct smb_vc *vcp, int param, void *data)
 		return (EPROTO);
 	}
 
-	if (ores.flags != T_SUCCESS) {
+	if ((ores.flags & T_SUCCESS) == 0) {
 		cmn_err(CE_NOTE, "smb_nbst_setparam: "
 		    "flags 0x%x, status 0x%x",
 		    (int)ores.flags, (int)opts.oh.status);
@@ -989,12 +909,12 @@ struct smb_tran_desc smb_tran_nbtcp_desc = {
 	smb_nbst_create,
 	smb_nbst_done,
 	smb_nbst_bind,
+	smb_nbst_unbind,
 	smb_nbst_connect,
 	smb_nbst_disconnect,
 	smb_nbst_send,
 	smb_nbst_recv,
 	smb_nbst_poll,
-	smb_nbst_loan_fp,
 	smb_nbst_getparam,
 	smb_nbst_setparam,
 	smb_nbst_fatal,

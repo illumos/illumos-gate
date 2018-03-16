@@ -69,6 +69,7 @@
 #include <netsmb/mchain.h>		/* for "htoles()" */
 
 #include <netsmb/smb.h>
+#include <netsmb/smb2.h>
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_dev.h>
@@ -196,12 +197,6 @@ _init(void)
 	/* Initialize password Key chain DB. */
 	smb_pkey_init();
 
-	/* Time conversion stuff. */
-	smb_time_init();
-
-	/* Initialize crypto mechanisms. */
-	smb_crypto_mech_init();
-
 #ifdef	_KERNEL
 	zone_key_create(&nsmb_zone_key, NULL, nsmb_zone_shutdown,
 	    nsmb_zone_destroy);
@@ -258,9 +253,6 @@ _fini(void)
 
 	(void) zone_key_delete(nsmb_zone_key);
 #endif	/* _KERNEL */
-
-	/* Time conversion stuff. */
-	smb_time_fini();
 
 	/* Destroy password Key chain DB. */
 	smb_pkey_fini();
@@ -498,7 +490,6 @@ found:
 	*dev = makedevice(nsmb_major, m);
 	mutex_exit(&dev_lck);
 
-	sdp->sd_smbfid = -1;
 	sdp->sd_flags |= NSMBFL_OPEN;
 	sdp->zoneid = crgetzoneid(cr);
 	mutex_init(&sdp->sd_lock, NULL, MUTEX_DRIVER, NULL);
@@ -536,14 +527,17 @@ nsmb_close(dev_t dev, int flags, int otyp, cred_t *cr)
 	return (err);
 }
 
+/*ARGSUSED*/
 static int
 nsmb_close2(smb_dev_t *sdp, cred_t *cr)
 {
 	struct smb_vc *vcp;
 	struct smb_share *ssp;
+	struct smb_fh *fhp;
 
-	if (sdp->sd_smbfid != -1)
-		(void) smb_usr_closefh(sdp, cr);
+	fhp = sdp->sd_fh;
+	if (fhp != NULL)
+		smb_fh_rele(fhp);
 
 	ssp = sdp->sd_share;
 	if (ssp != NULL)

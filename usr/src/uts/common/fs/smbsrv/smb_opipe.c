@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -35,7 +35,7 @@
 #include <sys/filio.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_xdr.h>
-#include <smbsrv/winioctl.h>
+#include <smb/winioctl.h>
 
 static uint32_t smb_opipe_transceive(smb_request_t *, smb_fsctl_t *);
 

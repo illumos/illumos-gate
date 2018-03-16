@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -144,6 +144,7 @@ static int	smbfssetattr(vnode_t *, struct vattr *, int, cred_t *);
 static int	smbfs_accessx(void *, int, cred_t *);
 static int	smbfs_readvdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp,
 			caller_context_t *);
+static int	smbfsflush(smbnode_t *, struct smb_cred *);
 static void	smbfs_rele_fid(smbnode_t *, struct smb_cred *);
 static uint32_t xvattr_to_dosattr(smbnode_t *, struct vattr *);
 
@@ -201,14 +202,13 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	smbnode_t	*np;
 	vnode_t		*vp;
 	smbfattr_t	fa;
-	u_int32_t	rights, rightsrcvd;
-	u_int16_t	fid, oldfid;
-	int		oldgenid;
+	smb_fh_t	*fid = NULL;
+	smb_fh_t	*oldfid;
+	uint32_t	rights;
 	struct smb_cred scred;
 	smbmntinfo_t	*smi;
 	smb_share_t	*ssp;
 	cred_t		*oldcr;
-	int		tmperror;
 	int		error = 0;
 
 	vp = *vpp;
@@ -280,14 +280,15 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	 * check whether the rights are sufficient for FID reuse.
 	 */
 	if (np->n_fidrefs > 0 &&
-	    np->n_vcgenid == ssp->ss_vcgenid) {
+	    (fid = np->n_fid) != NULL &&
+	    fid->fh_vcgenid == ssp->ss_vcgenid) {
 		int upgrade = 0;
 
 		if ((flag & FWRITE) &&
-		    !(np->n_rights & SA_RIGHT_FILE_WRITE_DATA))
+		    !(fid->fh_rights & SA_RIGHT_FILE_WRITE_DATA))
 			upgrade = 1;
 		if ((flag & FREAD) &&
-		    !(np->n_rights & SA_RIGHT_FILE_READ_DATA))
+		    !(fid->fh_rights & SA_RIGHT_FILE_READ_DATA))
 			upgrade = 1;
 		if (!upgrade) {
 			/*
@@ -296,8 +297,9 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 			np->n_fidrefs++;
 			goto have_fid;
 		}
+		fid = NULL;
 	}
-	rights = np->n_fidrefs ? np->n_rights : 0;
+	rights = (fid != NULL) ? fid->fh_rights : 0;
 
 	/*
 	 * we always ask for READ_CONTROL so we can always get the
@@ -316,7 +318,7 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	error = smbfs_smb_open(np,
 	    NULL, 0, 0, /* name nmlen xattr */
 	    rights, &scred,
-	    &fid, &rightsrcvd, &fa);
+	    &fid, &fa);
 	if (error)
 		goto out;
 	smbfs_attrcache_fa(vp, &fa);
@@ -325,24 +327,10 @@ smbfs_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 	 * We have a new FID and access rights.
 	 */
 	oldfid = np->n_fid;
-	oldgenid = np->n_vcgenid;
 	np->n_fid = fid;
-	np->n_vcgenid = ssp->ss_vcgenid;
-	np->n_rights = rightsrcvd;
 	np->n_fidrefs++;
-	if (np->n_fidrefs > 1 &&
-	    oldgenid == ssp->ss_vcgenid) {
-		/*
-		 * We already had it open (presumably because
-		 * it was open with insufficient rights.)
-		 * Close old wire-open.
-		 */
-		tmperror = smbfs_smb_close(ssp,
-		    oldfid, NULL, &scred);
-		if (tmperror)
-			SMBVDEBUG("error %d closing %s\n",
-			    tmperror, np->n_rpath);
-	}
+	if (oldfid != NULL)
+		smb_fh_rele(oldfid);
 
 	/*
 	 * This thread did the open.
@@ -488,13 +476,11 @@ smbfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 static void
 smbfs_rele_fid(smbnode_t *np, struct smb_cred *scred)
 {
-	smb_share_t	*ssp;
 	cred_t		*oldcr;
 	struct smbfs_fctx *fctx;
 	int		error;
-	uint16_t ofid;
+	smb_fh_t	*ofid;
 
-	ssp = np->n_mount->smi_share;
 	error = 0;
 
 	/* Make sure we serialize for n_dirseq use. */
@@ -523,13 +509,9 @@ smbfs_rele_fid(smbnode_t *np, struct smb_cred *scred)
 		ASSERT(np->n_fidrefs > 0);
 		if (--np->n_fidrefs)
 			return;
-		if ((ofid = np->n_fid) != SMB_FID_UNUSED) {
-			np->n_fid = SMB_FID_UNUSED;
-			/* After reconnect, n_fid is invalid */
-			if (np->n_vcgenid == ssp->ss_vcgenid) {
-				error = smbfs_smb_close(
-				    ssp, ofid, NULL, scred);
-			}
+		if ((ofid = np->n_fid) != NULL) {
+			np->n_fid = NULL;
+			smb_fh_rele(ofid);
 		}
 		break;
 
@@ -567,14 +549,12 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	struct vattr	va;
 	smbnode_t	*np;
 	smbmntinfo_t	*smi;
-	smb_share_t	*ssp;
 	offset_t	endoff;
 	ssize_t		past_eof;
 	int		error;
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
-	ssp = smi->smi_share;
 
 	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
@@ -636,12 +616,8 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 			return (EINTR);
 		smb_credinit(&scred, cr);
 
-		/* After reconnect, n_fid is invalid */
-		if (np->n_vcgenid != ssp->ss_vcgenid)
-			error = ESTALE;
-		else
-			error = smb_rwuio(ssp, np->n_fid, UIO_READ,
-			    uiop, &scred, smb_timo_read);
+		error = smb_rwuio(np->n_fid, UIO_READ,
+		    uiop, &scred, smb_timo_read);
 
 		smb_credrele(&scred);
 		smbfs_rw_exit(&np->r_lkserlock);
@@ -729,7 +705,6 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	struct vattr    va;
 	smbnode_t	*np;
 	smbmntinfo_t	*smi;
-	smb_share_t	*ssp;
 	offset_t	endoff, limit;
 	ssize_t		past_limit;
 	int		error, timo;
@@ -741,7 +716,6 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
-	ssp = smi->smi_share;
 
 	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EIO);
@@ -852,12 +826,8 @@ smbfs_fwrite:
 			return (EINTR);
 		smb_credinit(&scred, cr);
 
-		/* After reconnect, n_fid is invalid */
-		if (np->n_vcgenid != ssp->ss_vcgenid)
-			error = ESTALE;
-		else
-			error = smb_rwuio(ssp, np->n_fid, UIO_WRITE,
-			    uiop, &scred, timo);
+		error = smb_rwuio(np->n_fid, UIO_WRITE,
+		    uiop, &scred, timo);
 
 		if (error == 0) {
 			mutex_enter(&np->r_statelock);
@@ -867,7 +837,7 @@ smbfs_fwrite:
 			mutex_exit(&np->r_statelock);
 			if (ioflag & (FSYNC | FDSYNC)) {
 				/* Don't error the I/O if this fails. */
-				(void) smbfs_smb_flush(np, &scred);
+				(void) smbfsflush(np, &scred);
 			}
 		}
 
@@ -1274,7 +1244,6 @@ smbfs_bio(struct buf *bp, int sync, cred_t *cr)
 	struct smb_cred scred;
 	smbnode_t *np = VTOSMB(bp->b_vp);
 	smbmntinfo_t *smi = np->n_mount;
-	smb_share_t *ssp = smi->smi_share;
 	offset_t offset;
 	offset_t endoff;
 	size_t count;
@@ -1330,12 +1299,8 @@ smbfs_bio(struct buf *bp, int sync, cred_t *cr)
 
 	if (bp->b_flags & B_READ) {
 
-		/* After reconnect, n_fid is invalid */
-		if (np->n_vcgenid != ssp->ss_vcgenid)
-			error = ESTALE;
-		else
-			error = smb_rwuio(ssp, np->n_fid, UIO_READ,
-			    &auio, &scred, smb_timo_read);
+		error = smb_rwuio(np->n_fid, UIO_READ,
+		    &auio, &scred, smb_timo_read);
 
 		/* Like NFS, only set b_error here. */
 		bp->b_error = error;
@@ -1349,12 +1314,8 @@ smbfs_bio(struct buf *bp, int sync, cred_t *cr)
 		}
 	} else {
 
-		/* After reconnect, n_fid is invalid */
-		if (np->n_vcgenid != ssp->ss_vcgenid)
-			error = ESTALE;
-		else
-			error = smb_rwuio(ssp, np->n_fid, UIO_WRITE,
-			    &auio, &scred, smb_timo_write);
+		error = smb_rwuio(np->n_fid, UIO_WRITE,
+		    &auio, &scred, smb_timo_write);
 
 		/* Like NFS, only set b_error here. */
 		bp->b_error = error;
@@ -1363,7 +1324,7 @@ smbfs_bio(struct buf *bp, int sync, cred_t *cr)
 		if (!error && auio.uio_resid != 0)
 			error = EIO;
 		if (!error && sync) {
-			(void) smbfs_smb_flush(np, &scred);
+			(void) smbfsflush(np, &scred);
 		}
 	}
 
@@ -1618,12 +1579,12 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 {
 	int		error = 0;
 	smbnode_t	*np = VTOSMB(vp);
+	smbmntinfo_t	*smi = np->n_mount;
 	uint_t		mask = vap->va_mask;
 	struct timespec	*mtime, *atime;
 	struct smb_cred	scred;
-	int		cerror, modified = 0;
-	unsigned short	fid;
-	int have_fid = 0;
+	int		modified = 0;
+	smb_fh_t	*fid = NULL;
 	uint32_t rights = 0;
 	uint32_t dosattr = 0;
 
@@ -1675,9 +1636,6 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	 * with a partially complete request.
 	 */
 
-	/* Shared lock for (possible) n_fid use. */
-	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
-		return (EINTR);
 	smb_credinit(&scred, cr);
 
 	/*
@@ -1715,7 +1673,7 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 			    error, np->n_rpath);
 			goto out;
 		}
-		have_fid = 1;
+		ASSERT(fid != NULL);
 	}
 
 	/*
@@ -1734,8 +1692,9 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 		/*
 		 * Set the file size to vap->va_size.
 		 */
-		ASSERT(have_fid);
-		error = smbfs_smb_setfsize(np, fid, vap->va_size, &scred);
+		ASSERT(fid != NULL);
+		error = smbfs_smb_setfsize(smi->smi_share, fid,
+		    vap->va_size, &scred);
 		if (error) {
 			SMBVDEBUG("setsize error %d file %s\n",
 			    error, np->n_rpath);
@@ -1747,6 +1706,7 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 			 */
 			mutex_enter(&np->r_statelock);
 			np->r_size = vap->va_size;
+			np->n_flag |= (NFLUSHWIRE | NATTRCHANGED);
 			mutex_exit(&np->r_statelock);
 			modified = 1;
 		}
@@ -1763,8 +1723,8 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 		/*
 		 * Always use the handle-based set attr call now.
 		 */
-		ASSERT(have_fid);
-		error = smbfs_smb_setfattr(np, fid,
+		ASSERT(fid != NULL);
+		error = smbfs_smb_setfattr(smi->smi_share, fid,
 		    dosattr, mtime, atime, &scred);
 		if (error) {
 			SMBVDEBUG("set times error %d file %s\n",
@@ -1775,15 +1735,10 @@ smbfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	}
 
 out:
-	if (have_fid) {
-		cerror = smbfs_smb_tmpclose(np, fid, &scred);
-		if (cerror)
-			SMBVDEBUG("error %d closing %s\n",
-			    cerror, np->n_rpath);
-	}
+	if (fid != NULL)
+		smbfs_smb_tmpclose(np, fid);
 
 	smb_credrele(&scred);
-	smbfs_rw_exit(&np->r_lkserlock);
 
 	if (modified) {
 		/*
@@ -2052,11 +2007,42 @@ smbfs_fsync(vnode_t *vp, int syncflag, cred_t *cr, caller_context_t *ct)
 		return (EINTR);
 	smb_credinit(&scred, cr);
 
-	error = smbfs_smb_flush(np, &scred);
+	error = smbfsflush(np, &scred);
 
 	smb_credrele(&scred);
 	smbfs_rw_exit(&np->r_lkserlock);
 
+	return (error);
+}
+
+static int
+smbfsflush(smbnode_t *np, struct smb_cred *scrp)
+{
+	struct smb_share *ssp = np->n_mount->smi_share;
+	smb_fh_t *fhp;
+	int error;
+
+	/* Shared lock for n_fid use below. */
+	ASSERT(smbfs_rw_lock_held(&np->r_lkserlock, RW_READER));
+
+	if (!(np->n_flag & NFLUSHWIRE))
+		return (0);
+	if (np->n_fidrefs == 0)
+		return (0); /* not open */
+	if ((fhp = np->n_fid) == NULL)
+		return (0);
+
+	/* After reconnect, n_fid is invalid */
+	if (fhp->fh_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
+	error = smbfs_smb_flush(ssp, fhp, scrp);
+
+	if (!error) {
+		mutex_enter(&np->r_statelock);
+		np->n_flag &= ~NFLUSHWIRE;
+		mutex_exit(&np->r_statelock);
+	}
 	return (error);
 }
 
@@ -2149,8 +2135,8 @@ smbfs_inactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	case VREG:
 		if (np->n_fidrefs == 0)
 			break;
-		SMBVDEBUG("open file: refs %d id 0x%x path %s\n",
-		    np->n_fidrefs, np->n_fid, np->n_rpath);
+		SMBVDEBUG("open file: refs %d path %s\n",
+		    np->n_fidrefs, np->n_rpath);
 		/* Force last close. */
 		np->n_fidrefs = 1;
 		smbfs_rele_fid(np, &scred);
@@ -2228,6 +2214,14 @@ smbfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 
 	smbfs_rw_exit(&dnp->r_rwlock);
 
+	/*
+	 * If the caller passes an invalid name here, we'll have
+	 * error == EINVAL but want to return ENOENT.  This is
+	 * common with things like "ls foo*" with no matches.
+	 */
+	if (error == EINVAL)
+		error = ENOENT;
+
 	return (error);
 }
 
@@ -2255,14 +2249,7 @@ smbfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr,
 
 	ASSERT(curproc->p_zone == smi->smi_zone_ref.zref_zone);
 
-#ifdef NOT_YET
-	vcp = SSTOVC(smi->smi_share);
-
-	/* XXX: Should compute this once and store it in smbmntinfo_t */
-	supplen = (SMB_DIALECT(vcp) >= SMB_DIALECT_LANMAN2_0) ? 255 : 12;
-#else
 	supplen = 255;
-#endif
 
 	/*
 	 * RWlock must be held, either reader or writer.
@@ -2549,7 +2536,6 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	vsecattr_t *vsecp)
 {
 	int		error;
-	int		cerror;
 	vfs_t		*vfsp;
 	vnode_t		*vp;
 	smbnode_t	*np;
@@ -2561,7 +2547,7 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	const char *name = (const char *)nm;
 	int		nmlen = strlen(nm);
 	uint32_t	disp;
-	uint16_t	fid;
+	smb_fh_t	*fid = NULL;
 	int		xattr;
 
 	vfsp = dvp->v_vfsp;
@@ -2723,11 +2709,7 @@ smbfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	 * Should use the fid to get/set the size
 	 * while we have it opened here.  See above.
 	 */
-
-	cerror = smbfs_smb_close(smi->smi_share, fid, NULL, &scred);
-	if (cerror)
-		SMBVDEBUG("error %d closing %s\\%s\n",
-		    cerror, dnp->n_rpath, name);
+	smbfs_smb_close(fid);
 
 	/*
 	 * In the open case, the name may differ a little
@@ -2796,13 +2778,29 @@ smbfs_remove(vnode_t *dvp, char *nm, cred_t *cr, caller_context_t *ct,
 
 	/* Lookup the file to remove. */
 	error = smbfslookup(dvp, nm, &vp, cr, 0, ct);
-	if (error == 0) {
-		/*
-		 * Do the real remove work
-		 */
-		error = smbfsremove(dvp, vp, &scred, flags);
-		VN_RELE(vp);
+	if (error != 0)
+		goto out;
+
+	/* Don't allow unlink of a directory. */
+	if (vp->v_type == VDIR) {
+		error = EPERM;
+		goto out;
 	}
+
+	/*
+	 * Do the real remove work
+	 */
+	error = smbfsremove(dvp, vp, &scred, flags);
+	if (error != 0)
+		goto out;
+
+#ifdef	SMBFS_VNEVENT
+	vnevent_remove(vp, dvp, nm, ct);
+#endif
+
+out:
+	if (vp != NULL)
+		VN_RELE(vp);
 
 	smb_credrele(&scred);
 	smbfs_rw_exit(&dnp->r_rwlock);
@@ -2838,21 +2836,17 @@ smbfsremove(vnode_t *dvp, vnode_t *vp, struct smb_cred *scred,
 {
 	smbnode_t	*dnp = VTOSMB(dvp);
 	smbnode_t	*np = VTOSMB(vp);
+	smbmntinfo_t	*smi = np->n_mount;
 	char		*tmpname = NULL;
 	int		tnlen;
 	int		error;
-	unsigned short	fid;
-	boolean_t	have_fid = B_FALSE;
+	smb_fh_t	*fid = NULL;
 	boolean_t	renamed = B_FALSE;
 
 	/*
 	 * The dvp RWlock must be held as writer.
 	 */
 	ASSERT(dnp->r_rwlock.owner == curthread);
-
-	/* Never allow link/unlink directories on SMB. */
-	if (vp->v_type == VDIR)
-		return (EPERM);
 
 	/*
 	 * We need to flush any dirty pages which happen to
@@ -2872,10 +2866,6 @@ smbfsremove(vnode_t *dvp, vnode_t *vp, struct smb_cred *scred,
 		}
 	}
 
-	/* Shared lock for n_fid use in smbfs_smb_setdisp etc. */
-	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
-		return (EINTR);
-
 	/*
 	 * Get a file handle with delete access.
 	 * Close this FID before return.
@@ -2887,16 +2877,18 @@ smbfsremove(vnode_t *dvp, vnode_t *vp, struct smb_cred *scred,
 		    error, np->n_rpath);
 		goto out;
 	}
-	have_fid = B_TRUE;
+	ASSERT(fid != NULL);
 
 	/*
 	 * If we have the file open, try to rename it to a temporary name.
 	 * If we can't rename, continue on and try setting DoC anyway.
+	 * Unnecessary for directories.
 	 */
-	if ((vp->v_count > 1) && (np->n_fidrefs > 0)) {
+	if (vp->v_type != VDIR && vp->v_count > 1 && np->n_fidrefs > 0) {
 		tmpname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 		tnlen = smbfs_newname(tmpname, MAXNAMELEN);
-		error = smbfs_smb_t2rename(np, tmpname, tnlen, scred, fid, 0);
+		error = smbfs_smb_rename(dnp, np, dnp, tmpname, tnlen,
+		    fid, scred);
 		if (error != 0) {
 			SMBVDEBUG("error %d renaming %s -> %s\n",
 			    error, np->n_rpath, tmpname);
@@ -2910,7 +2902,7 @@ smbfsremove(vnode_t *dvp, vnode_t *vp, struct smb_cred *scred,
 	 * Mark the file as delete-on-close.  If we can't,
 	 * undo what we did and err out.
 	 */
-	error = smbfs_smb_setdisp(np, fid, 1, scred);
+	error = smbfs_smb_setdisp(smi->smi_share, fid, 1, scred);
 	if (error != 0) {
 		SMBVDEBUG("error %d setting DoC on %s\n",
 		    error, np->n_rpath);
@@ -2927,8 +2919,8 @@ smbfsremove(vnode_t *dvp, vnode_t *vp, struct smb_cred *scred,
 
 			oldname = np->n_rpath + (dnp->n_rplen + 1);
 			oldnlen = np->n_rplen - (dnp->n_rplen + 1);
-			err2 = smbfs_smb_t2rename(np, oldname, oldnlen,
-			    scred, fid, 0);
+			err2 = smbfs_smb_rename(dnp, np, dnp, oldname, oldnlen,
+			    fid, scred);
 			SMBVDEBUG("error %d un-renaming %s -> %s\n",
 			    err2, tmpname, np->n_rpath);
 		}
@@ -2936,19 +2928,14 @@ smbfsremove(vnode_t *dvp, vnode_t *vp, struct smb_cred *scred,
 		goto out;
 	}
 	/* Done! */
+	smbfs_attrcache_remove(np);
 	smbfs_attrcache_prune(np);
-
-#ifdef	SMBFS_VNEVENT
-	vnevent_remove(vp, dvp, nm, ct);
-#endif
 
 out:
 	if (tmpname != NULL)
 		kmem_free(tmpname, MAXNAMELEN);
-
-	if (have_fid)
-		(void) smbfs_smb_tmpclose(np, fid, scred);
-	smbfs_rw_exit(&np->r_lkserlock);
+	if (fid != NULL)
+		smbfs_smb_tmpclose(np, fid);
 
 	if (error == 0) {
 		/* Keep lookup from finding this node anymore. */
@@ -3080,6 +3067,7 @@ smbfsrename(vnode_t *odvp, vnode_t *ovp, vnode_t *ndvp, char *nnm,
 	vnode_t		*nvp = NULL;
 	int		error;
 	int		nvp_locked = 0;
+	smb_fh_t	*fid = NULL;
 
 	/* Things our caller should have checked. */
 	ASSERT(curproc->p_zone == VTOSMI(odvp)->smi_zone_ref.zref_zone);
@@ -3160,8 +3148,23 @@ smbfsrename(vnode_t *odvp, vnode_t *ovp, vnode_t *ndvp, char *nnm,
 		nvp = NULL;
 	} /* nvp */
 
+	/*
+	 * Get a file handle with delete access.
+	 * Close this FID before return.
+	 */
+	error = smbfs_smb_tmpopen(onp, STD_RIGHT_DELETE_ACCESS,
+	    scred, &fid);
+	if (error) {
+		SMBVDEBUG("error %d opening %s\n",
+		    error, onp->n_rpath);
+		goto out;
+	}
+
 	smbfs_attrcache_remove(onp);
-	error = smbfs_smb_rename(onp, ndnp, nnm, strlen(nnm), scred);
+	error = smbfs_smb_rename(odnp, onp, ndnp, nnm, strlen(nnm),
+	    fid, scred);
+
+	smbfs_smb_tmpclose(onp, fid);
 
 	/*
 	 * If the old name should no longer exist,
@@ -3202,7 +3205,7 @@ smbfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 	struct smbfattr	fattr;
 	const char		*name = (const char *) nm;
 	int		nmlen = strlen(name);
-	int		error, hiderr;
+	int		error;
 
 	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
 		return (EPERM);
@@ -3243,10 +3246,6 @@ smbfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp,
 	if (error)
 		goto out;
 
-	if (name[0] == '.')
-		if ((hiderr = smbfs_smb_hideit(VTOSMB(vp), NULL, 0, &scred)))
-			SMBVDEBUG("hide failure %d\n", hiderr);
-
 	/* Success! */
 	*vpp = vp;
 	error = 0;
@@ -3270,12 +3269,12 @@ static int
 smbfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 	caller_context_t *ct, int flags)
 {
+	struct smb_cred	scred;
 	vnode_t		*vp = NULL;
 	int		vp_locked = 0;
 	struct smbmntinfo *smi = VTOSMI(dvp);
 	struct smbnode	*dnp = VTOSMB(dvp);
 	struct smbnode	*np;
-	struct smb_cred	scred;
 	int		error;
 
 	if (curproc->p_zone != smi->smi_zone_ref.zref_zone)
@@ -3284,17 +3283,16 @@ smbfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 	if (smi->smi_flags & SMI_DEAD || dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED)
 		return (EIO);
 
+	/*
+	 * Verify access to the dirctory.
+	 */
+	error = smbfs_access(dvp, VWRITE|VEXEC, 0, cr, ct);
+	if (error)
+		return (error);
+
 	if (smbfs_rw_enter_sig(&dnp->r_rwlock, RW_WRITER, SMBINTR(dvp)))
 		return (EINTR);
 	smb_credinit(&scred, cr);
-
-	/*
-	 * Require w/x access in the containing directory.
-	 * Server handles all other access checks.
-	 */
-	error = smbfs_access(dvp, VEXEC|VWRITE, 0, cr, ct);
-	if (error)
-		goto out;
 
 	/*
 	 * First lookup the entry to be removed.
@@ -3327,22 +3325,16 @@ smbfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr,
 		goto out;
 	}
 
-	smbfs_attrcache_remove(np);
-	error = smbfs_smb_rmdir(np, &scred);
-
 	/*
-	 * Similar to smbfs_remove
+	 * Do the real rmdir work
 	 */
-	switch (error) {
-	case 0:
-	case ENOENT:
-	case ENOTDIR:
-		smbfs_attrcache_prune(np);
-		break;
-	}
-
+	error = smbfsremove(dvp, vp, &scred, flags);
 	if (error)
 		goto out;
+
+#ifdef	SMBFS_VNEVENT
+	vnevent_rmdir(vp, dvp, nm, ct);
+#endif
 
 	mutex_enter(&np->r_statelock);
 	dnp->n_flag |= NMODIFIED;

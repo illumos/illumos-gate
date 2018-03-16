@@ -20,9 +20,10 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -72,12 +73,13 @@ print_str(uintptr_t addr)
  */
 typedef struct smb_co_walk_data {
 	uintptr_t	pp;
-	int level;		/* SMBL_SM, SMBL_VC, SMBL_SHARE  */
+	int level;		/* SMBL_SM, SMBL_VC, SMBL_SHARE, ...  */
 	int size;		/* sizeof (union member) */
 	union co_u {
 		smb_connobj_t	co;	/* copy of the list element */
 		smb_vc_t	vc;
 		smb_share_t	ss;
+		smb_fh_t	fh;
 	} u;
 } smb_co_walk_data_t;
 
@@ -113,6 +115,9 @@ smb_co_walk_init(mdb_walk_state_t *wsp, int level)
 		break;
 	case SMBL_SHARE:
 		smbw->size = sizeof (smbw->u.ss);
+		break;
+	case SMBL_FH:
+		smbw->size = sizeof (smbw->u.fh);
 		break;
 	default:
 		smbw->size = sizeof (smbw->u);
@@ -180,6 +185,24 @@ smb_ss_walk_init(mdb_walk_state_t *wsp)
 }
 
 /*
+ * Walk the file hande list below some share.
+ */
+int
+smb_fh_walk_init(mdb_walk_state_t *wsp)
+{
+
+	/*
+	 * Initial walk_addr is address of parent (share)
+	 */
+	if (wsp->walk_addr == 0) {
+		mdb_warn("::walk smb_fh does not support global walks\n");
+		return (WALK_ERR);
+	}
+
+	return (smb_co_walk_init(wsp, SMBL_FH));
+}
+
+/*
  * Common walk_step for walking structs inherited
  * from smb_connobj_t (smb_vc_t, smb_share_t)
  */
@@ -221,6 +244,30 @@ typedef struct smb_co_cbdata {
 } smb_co_cbdata_t;
 
 /*
+ * Call-back function for walking a file handle list.
+ */
+/* ARGSUSED */
+int
+smb_fh_cb(uintptr_t addr, const void *data, void *arg)
+{
+	const smb_fh_t *fhp = data;
+	// smb_co_cbdata_t *cbd = arg;
+
+	mdb_inc_indent(2);
+	mdb_printf(" %-p", addr);
+	if (fhp->fh_fid2.fid_volatile != 0) {
+		mdb_printf("\t0x%llx\n",
+		    (long long) fhp->fh_fid2.fid_volatile);
+	} else {
+		mdb_printf("\t0x%x\n", fhp->fh_fid1);
+	}
+
+	mdb_dec_indent(2);
+
+	return (WALK_NEXT);
+}
+
+/*
  * Call-back function for walking a share list.
  */
 int
@@ -228,12 +275,20 @@ smb_ss_cb(uintptr_t addr, const void *data, void *arg)
 {
 	const smb_share_t *ssp = data;
 	smb_co_cbdata_t *cbd = arg;
+	uint32_t tid;
 
-	mdb_printf(" %-p\t%s\n", addr, ssp->ss_name);
+	tid = ssp->ss2_tree_id;
+	if (tid == 0)
+		tid = ssp->ss_tid;
 
-	if (cbd->flags & OPT_VERBOSE) {
+	mdb_printf(" %-p\t0x%x\t%s\n", addr, tid, ssp->ss_name);
+
+	if (cbd->flags & OPT_RECURSE) {
 		mdb_inc_indent(2);
-		/* Anything wanted here? */
+		if (mdb_pwalk("nsmb_fh", smb_fh_cb, cbd, addr) < 0) {
+			mdb_warn("failed to walk 'nsmb_fh'");
+			/* Don't: return (WALK_ERR); */
+		}
 		mdb_dec_indent(2);
 	}
 
@@ -414,6 +469,7 @@ rqlist_walk_step(mdb_walk_state_t *wsp)
 
 typedef struct rqlist_cbdata {
 	int printed_header;
+	int vcflags;
 	uintptr_t uid;		/* optional filtering by UID */
 } rqlist_cbdata_t;
 
@@ -429,8 +485,13 @@ rqlist_cb(uintptr_t addr, const void *data, void *arg)
 	}
 
 	mdb_printf(" %-p", addr);	/* smb_rq_t */
-	mdb_printf(" x%04x", rq->sr_mid);
-	mdb_printf(" x%02x", rq->sr_cmd);
+	if ((cbd->vcflags & SMBV_SMB2) != 0) {
+		mdb_printf(" x%04llx", (long long)rq->sr2_messageid);
+		mdb_printf(" x%02x", rq->sr2_command);
+	} else {
+		mdb_printf(" x%04x", rq->sr_mid);
+		mdb_printf(" x%02x", rq->sr_cmd);
+	}
 	mdb_printf(" %d", rq->sr_state);
 	mdb_printf(" x%x", rq->sr_flags);
 	mdb_printf("\n");
@@ -443,8 +504,19 @@ int
 rqlist_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	rqlist_cbdata_t cbd;
+	smb_vc_t *vcp;
+	size_t vcsz;
 
 	memset(&cbd, 0, sizeof (cbd));
+
+	/* Need the VC again to get  */
+	vcsz = sizeof (*vcp);
+	vcp = mdb_alloc(vcsz, UM_SLEEP | UM_GC);
+	if (mdb_vread(vcp, vcsz, addr) != vcsz) {
+		mdb_warn("cannot read VC from %p", addr);
+		return (DCMD_ERR);
+	}
+	cbd.vcflags = vcp->vc_flags;
 
 	/*
 	 * Initial walk_addr is address of parent (VC)
@@ -606,6 +678,8 @@ static const mdb_walker_t walkers[] = {
 		smb_vc_walk_init, smb_co_walk_step, NULL },
 	{ "nsmb_ss", "walk nsmb share list for some VC",
 		smb_ss_walk_init, smb_co_walk_step, NULL },
+	{ "nsmb_fh", "walk nsmb share list for some VC",
+		smb_fh_walk_init, smb_co_walk_step, NULL },
 	{ "nsmb_rqlist", "walk request list for some VC",
 		rqlist_walk_init, rqlist_walk_step, NULL },
 	{ "nsmb_pwtree", "walk passord AVL tree",

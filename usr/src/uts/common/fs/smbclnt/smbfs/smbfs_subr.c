@@ -33,9 +33,10 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -47,6 +48,7 @@
 #include <netsmb/smb_osdep.h>
 
 #include <netsmb/smb.h>
+#include <netsmb/smb2.h>
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_rq.h>
@@ -73,10 +75,11 @@ smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *dnp,
 	int unicode = (SMB_UNICODE_STRINGS(vcp)) ? 1 : 0;
 	int error;
 
-	if (SMB_DIALECT(vcp) < SMB_DIALECT_LANMAN1_0)
-		caseopt |= SMB_CS_UPPER;
-
-	if (unicode) {
+	/*
+	 * SMB1 may need an alignment pad before (not SMB2)
+	 */
+	if (((vcp)->vc_flags & SMBV_SMB2) == 0 &&
+	    ((vcp)->vc_hflags2 & SMB_FLAGS2_UNICODE) != 0) {
 		error = mb_put_padbyte(mbp);
 		if (error)
 			return (error);
@@ -122,11 +125,14 @@ smbfs_fullpath(struct mbchain *mbp, struct smb_vc *vcp, struct smbnode *dnp,
 		if (error)
 			return (error);
 	}
-	/* Put NULL termination. */
-	if (unicode)
-		error = mb_put_uint16le(mbp, 0);
-	else
-		error = mb_put_uint8(mbp, 0);
+
+	/* SMB1 wants NULL termination. */
+	if (((vcp)->vc_flags & SMBV_SMB2) == 0) {
+		if (unicode)
+			error = mb_put_uint16le(mbp, 0);
+		else
+			error = mb_put_uint8(mbp, 0);
+	}
 
 	return (error);
 }
@@ -182,4 +188,272 @@ errout:
 	 * Don't expect to ever see this.
 	 */
 	(void) strlcpy(ctx->f_name, "?", ctx->f_namesz);
+}
+
+/*
+ * Decode a directory entry from OtW form into ctx->f_attr
+ *
+ * Caller already put some (wire-format) directory entries
+ * into ctx->f_mdchain and we expect to find one.
+ *
+ * Advancing correctly through the buffer can be tricky if one
+ * tries to add up the size of an entry as you go (which is how
+ * the darwin code this is derived from did it).  The easiest way
+ * to correctly advance the position is to get a whole dirent
+ * into another mdchain (entry_mdc) based on NextEntryOffset,
+ * and then scan the data from that mdchain.  On the last entry,
+ * we don't know the entire length, so just scan directly from
+ * what remains of the multi-entry buffer instead of trying to
+ * figure out the length to copy into a separate mdchain.
+ */
+int
+smbfs_decode_dirent(struct smbfs_fctx *ctx)
+{
+	struct mdchain entry_mdc;
+	struct mdchain *mdp = &ctx->f_mdchain;
+	size_t nmlen;
+	uint64_t llongint;
+	uint32_t nmsize, dattr;
+	uint32_t nextoff = 0;
+	int error;
+
+	/* In case we error out... */
+	ctx->f_nmlen = 0;
+	ctx->f_rkey = (uint32_t)-1;
+	bzero(&entry_mdc, sizeof (entry_mdc));
+
+	/*
+	 * Setup mdp to point to an mbchain holding
+	 * what should be a single directory entry.
+	 */
+	error = md_get_uint32le(mdp, &nextoff);
+	if (error != 0)
+		goto errout;
+	if (nextoff >= 4) {
+		/*
+		 * More entries follow.  Make a new mbchain
+		 * holding just this one entry, then advance.
+		 */
+		mblk_t *m = NULL;
+		error = md_get_mbuf(mdp, nextoff - 4, &m);
+		if (error != 0)
+			goto errout;
+		md_initm(&entry_mdc, m);
+		mdp = &entry_mdc;
+		ctx->f_eofs += nextoff;
+	} else {
+		/* Scan directly from ctx->f_mdchain */
+		ctx->f_eofs = ctx->f_left;
+	}
+
+	/*
+	 * Decode the fixed-size parts
+	 */
+	switch (ctx->f_infolevel) {
+	case FileFullDirectoryInformation:
+	case SMB_FIND_FULL_DIRECTORY_INFO:
+		md_get_uint32le(mdp, &ctx->f_rkey);	/* resume key (idx) */
+		md_get_uint64le(mdp, &llongint);	/* creation time */
+		smb_time_NT2local(llongint, &ctx->f_attr.fa_createtime);
+		md_get_uint64le(mdp, &llongint);
+		smb_time_NT2local(llongint, &ctx->f_attr.fa_atime);
+		md_get_uint64le(mdp, &llongint);
+		smb_time_NT2local(llongint, &ctx->f_attr.fa_mtime);
+		md_get_uint64le(mdp, &llongint);
+		smb_time_NT2local(llongint, &ctx->f_attr.fa_ctime);
+		md_get_uint64le(mdp, &llongint);	/* file size */
+		ctx->f_attr.fa_size = llongint;
+		md_get_uint64le(mdp, &llongint);	/* alloc. size */
+		ctx->f_attr.fa_allocsz = llongint;
+		md_get_uint32le(mdp, &dattr);	/* ext. file attributes */
+		ctx->f_attr.fa_attr = dattr;
+		error = md_get_uint32le(mdp, &nmsize);	/* name size (otw) */
+		if (error)
+			goto errout;
+		md_get_uint32le(mdp, NULL);	/* Ea size */
+		break;
+
+	case FileStreamInformation:
+		error = md_get_uint32le(mdp, &nmsize);	/* name size (otw) */
+		md_get_uint64le(mdp, &llongint);	/* file size */
+		ctx->f_attr.fa_size = llongint;
+		md_get_uint64le(mdp, &llongint);	/* alloc. size */
+		ctx->f_attr.fa_allocsz = llongint;
+		/*
+		 * Stream names start with a ':' that we want to skip.
+		 * This is the easiest place to take care of that.
+		 * Always unicode here.
+		 */
+		if (nmsize >= 2) {
+			struct mdchain save_mdc;
+			uint16_t wch;
+			save_mdc = *mdp;
+			md_get_uint16le(mdp, &wch);
+			if (wch == ':') {
+				/* OK, we skipped the ':' */
+				nmsize -= 2;
+			} else {
+				SMBVDEBUG("No leading : in stream?\n");
+				/* restore position */
+				*mdp = save_mdc;
+			}
+		}
+		break;
+
+	default:
+		SMBVDEBUG("unexpected info level %d\n", ctx->f_infolevel);
+		error = EINVAL;
+		goto errout;
+	}
+
+	/*
+	 * Get the filename, and convert to utf-8
+	 * Allocated f_name in findopen
+	 */
+	nmlen = ctx->f_namesz;
+	error = smb_get_dstring(mdp, SSTOVC(ctx->f_ssp),
+	    ctx->f_name, &nmlen, nmsize);
+	if (error != 0)
+		goto errout;
+	ctx->f_nmlen = (int)nmlen;
+	md_done(&entry_mdc);
+	return (0);
+
+errout:
+	/*
+	 * Something bad has happened and we ran out of data
+	 * before we could parse all f_ecnt entries expected.
+	 * Give up on the current buffer.
+	 */
+	SMBVDEBUG("ran out of data\n");
+	ctx->f_eofs = ctx->f_left;
+	md_done(&entry_mdc);
+	return (error);
+}
+
+/*
+ * Decode FileAllInformation
+ *
+ * The data is a concatenation of:
+ *	FileBasicInformation
+ *	FileStandardInformation
+ *	FileInternalInformation
+ *	FileEaInformation
+ *	FilePositionInformation
+ *	FileModeInformation
+ *	FileAlignmentInformation
+ *	FileNameInformation
+ */
+/*ARGSUSED*/
+int
+smbfs_decode_file_all_info(struct smb_share *ssp,
+	struct mdchain *mdp, struct smbfattr *fap)
+{
+	uint64_t llongint, lsize;
+	uint32_t dattr;
+	int error;
+
+	/*
+	 * This part is: FileBasicInformation
+	 */
+
+	/* creation time */
+	md_get_uint64le(mdp, &llongint);
+	smb_time_NT2local(llongint, &fap->fa_createtime);
+
+	/* last access time */
+	md_get_uint64le(mdp, &llongint);
+	smb_time_NT2local(llongint, &fap->fa_atime);
+
+	/* last write time */
+	md_get_uint64le(mdp, &llongint);
+	smb_time_NT2local(llongint, &fap->fa_mtime);
+
+	/* last change time */
+	md_get_uint64le(mdp, &llongint);
+	smb_time_NT2local(llongint, &fap->fa_ctime);
+
+	/* attributes */
+	md_get_uint32le(mdp, &dattr);
+	fap->fa_attr = dattr;
+
+	/* reserved */
+	md_get_uint32le(mdp, NULL);
+
+	/*
+	 * This part is: FileStandardInformation
+	 */
+
+	/* allocation size */
+	md_get_uint64le(mdp, &lsize);
+	fap->fa_allocsz = lsize;
+
+	/* File size */
+	error = md_get_uint64le(mdp, &lsize);
+	fap->fa_size = lsize;
+
+	/*
+	 * There's more after this but we don't need it:
+	 * Remainder of FileStandardInformation
+	 *	NumLlinks, DeletOnClose, IsDir, reserved.
+	 * Then:
+	 *	FileInternalInformation
+	 *	FileEaInformation
+	 *	FilePositionInformation
+	 *	FileModeInformation
+	 *	FileAlignmentInformation
+	 *	FileNameInformation
+	 */
+
+	return (error);
+}
+
+/*
+ * Decode FileFsAttributeInformation
+ *
+ *    ULONG FileSystemAttributes;
+ *    LONG MaximumComponentNameLength;
+ *    ULONG FileSystemNameLength;
+ *    WCHAR FileSystemName[1];
+ */
+int
+smbfs_decode_fs_attr_info(struct smb_share *ssp,
+	struct mdchain *mdp, struct smb_fs_attr_info *fsa)
+{
+	struct smb_vc *vcp = SSTOVC(ssp);
+	uint32_t nlen;
+	int error;
+
+	md_get_uint32le(mdp, &fsa->fsa_aflags);
+	md_get_uint32le(mdp, &fsa->fsa_maxname);
+	error = md_get_uint32le(mdp, &nlen);	/* fs name length */
+	if (error)
+		goto out;
+
+	/*
+	 * Get the FS type name.
+	 */
+	bzero(fsa->fsa_tname, FSTYPSZ);
+	if (SMB_UNICODE_STRINGS(vcp)) {
+		uint16_t tmpbuf[FSTYPSZ];
+		size_t tmplen, outlen;
+
+		if (nlen > sizeof (tmpbuf))
+			nlen = sizeof (tmpbuf);
+		error = md_get_mem(mdp, tmpbuf, nlen, MB_MSYSTEM);
+		if (error != 0)
+			goto out;
+		tmplen = nlen / 2;	/* UCS-2 chars */
+		outlen = FSTYPSZ - 1;
+		error = uconv_u16tou8(tmpbuf, &tmplen,
+		    (uchar_t *)fsa->fsa_tname, &outlen,
+		    UCONV_IN_LITTLE_ENDIAN);
+	} else {
+		if (nlen > (FSTYPSZ - 1))
+			nlen = FSTYPSZ - 1;
+		error = md_get_mem(mdp, fsa->fsa_tname, nlen, MB_MSYSTEM);
+	}
+
+out:
+	return (error);
 }

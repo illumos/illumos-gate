@@ -114,9 +114,19 @@
 #define	SMBVOPT_PERMANENT	0x0010	/* object will keep last reference */
 #define	SMBVOPT_ANONYMOUS	0x0020	/* using a NULL session */
 
-#define	SMBVOPT_SIGNING_ENABLED		0x0100	/* sign if server agrees */
-#define	SMBVOPT_SIGNING_REQUIRED	0x0200	/* signing required */
-#define	SMBVOPT_SIGNING_MASK		0x0300	/* all signing bits */
+#define	SMBVOPT_SIGNING_ENABLED		0x10000	/* sign if server agrees */
+#define	SMBVOPT_SIGNING_REQUIRED	0x20000 /* signing required */
+#define	SMBVOPT_SIGNING_MASK		0x30000	/* all signing bits */
+
+#define	SMB2_DIALECT_BASE	0x0200
+#define	SMB2_DIALECT_0202	0x0202
+#define	SMB2_DIALECT_02ff	0x02ff
+#define	SMB2_DIALECT_0210	0x0210
+#define	SMB2_DIALECT_0300	0x0300
+#define	SMB2_DIALECT_0302	0x0302
+
+/* Maximum supported dialect (for ssn_maxver) */
+#define	SMB2_DIALECT_MAX	SMB2_DIALECT_0210
 
 /*
  * Option flags in smbioc_oshare.ioc_opt
@@ -208,8 +218,10 @@ typedef struct smbioc_ssn_ident smbioc_ssn_ident_t;
  * Structure used with SMBIOC_SSN_FIND, _CREATE
  */
 struct smbioc_ossn {
-	uint32_t		ssn_vopt;	/* i.e. SMBVOPT_CREATE */
 	uint32_t		ssn_owner;	/* Unix owner (UID) */
+	uint32_t		ssn_vopt;	/* i.e. SMBVOPT_CREATE */
+	uint16_t		ssn_minver;	/* Min SMB version. */
+	uint16_t		ssn_maxver;	/* Max SMB version. */
 	smbioc_ssn_ident_t	ssn_id;
 	char			ssn_srvname[SMBIOC_MAX_NAME];
 };
@@ -248,7 +260,7 @@ struct smbioc_ssn_work {
 	uint32_t	wk_u_auth_wlen;	/* send auth tok len */
 	lptr_t		wk_u_auth_rbuf;	/* recv auth tok buf */
 	lptr_t		wk_u_auth_wbuf;	/* send auth tok buf */
-	uint8_t		wk_ssn_key[SMBIOC_HASH_SZ]; /* session key */
+	uint8_t		wk_cl_guid[16];	/* client GUID */
 };
 typedef struct smbioc_ssn_work smbioc_ssn_work_t;
 
@@ -257,8 +269,8 @@ typedef struct smbioc_ssn_work smbioc_ssn_work_t;
  */
 
 typedef struct smbioc_rw {
-	int32_t		ioc_fh;
 	uint32_t	ioc_cnt;
+	uint32_t	ioc_flags;
 	lloff_t	_ioc_offset;
 	lptr_t	_ioc_base;
 } smbioc_rw_t;
@@ -267,10 +279,10 @@ typedef struct smbioc_rw {
 
 /* Transact on named pipe (send/recv) */
 typedef struct smbioc_xnp {
-	int32_t		ioc_fh;
 	uint32_t	ioc_tdlen;	/* transmit len */
 	uint32_t	ioc_rdlen;	/* recv maxlen */
 	uint32_t	ioc_more;	/* more data to read */
+	uint32_t	ioc_pad1;
 	lptr_t		_ioc_tdata;
 	lptr_t		_ioc_rdata;
 } smbioc_xnp_t;

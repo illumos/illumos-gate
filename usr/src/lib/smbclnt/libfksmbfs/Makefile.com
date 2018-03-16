@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 LIBRARY =	libfksmbfs.a
@@ -55,6 +55,8 @@ OBJS_FS_SMBFS = \
 	smbfs_client.o \
 	smbfs_node.o \
 	smbfs_smb.o \
+	smbfs_smb1.o \
+	smbfs_smb2.o \
 	smbfs_subr.o \
 	smbfs_subr2.o \
 	smbfs_acl.o \
