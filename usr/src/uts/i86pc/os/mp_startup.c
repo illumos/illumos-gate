@@ -29,6 +29,7 @@
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -1527,6 +1528,19 @@ start_other_cpus(int cprboot)
 
 	cmn_err(CE_CONT, "?cpu%d: %s\n", CPU->cpu_id, CPU->cpu_idstr);
 	cmn_err(CE_CONT, "?cpu%d: %s\n", CPU->cpu_id, CPU->cpu_brandstr);
+
+	/*
+	 * KPTI initialisation happens very early in boot, before logging is
+	 * set up. Output a status message now as the boot CPU comes online.
+	 */
+	cmn_err(CE_CONT, "?KPTI %s (PCID %s, INVPCID %s)\n",
+	    kpti_enable ? "enabled" : "disabled",
+	    x86_use_pcid == 1 ? "in use" :
+	    (is_x86_feature(x86_featureset, X86FSET_PCID) ? "disabled" :
+	    "not supported"),
+	    x86_use_pcid == 1 && x86_use_invpcid == 1 ? "in use" :
+	    (is_x86_feature(x86_featureset, X86FSET_INVPCID) ? "disabled" :
+	    "not supported"));
 
 	/*
 	 * Initialize our syscall handlers
