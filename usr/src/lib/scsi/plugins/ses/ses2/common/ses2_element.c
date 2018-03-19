@@ -21,10 +21,9 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <stddef.h>
@@ -871,6 +870,9 @@ elem_parse_aes_misc(const ses2_aes_descr_eip_impl_t *dep, nvlist_t *nvl,
 	nphy = MIN(s1p->sadsi_n_phy_descriptors,
 	    (len - offsetof(ses2_aes_descr_sas1_impl_t,
 	    sadsi_phys)) / sizeof (ses2_aes_phy1_descr_impl_t));
+
+	if (nphy == 0)
+		return (0);
 
 	nva = ses_zalloc(nphy * sizeof (nvlist_t *));
 	if (nva == NULL)
