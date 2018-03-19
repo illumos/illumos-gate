@@ -701,11 +701,17 @@ sdev_plugin_unregister_cb(sdev_node_t *rdp, void *arg)
 	rw_exit(&rdp->sdev_contents);
 }
 
+int sdev_plugin_unregister_allowed;
+
 /*
  * Remove a plugin. This will block until everything has become a zombie, thus
  * guaranteeing the caller that nothing will call into them again once this call
  * returns. While the call is ongoing, it could be called into. Note that while
  * this is ongoing, it will block other mounts.
+ *
+ * NB: this is not safe when used from detach() context - we will be DEVI_BUSY,
+ * and other sdev threads may be waiting for this.  Only use the over-ride if
+ * willing to risk it.
  */
 int
 sdev_plugin_unregister(sdev_plugin_hdl_t hdl)
@@ -713,6 +719,9 @@ sdev_plugin_unregister(sdev_plugin_hdl_t hdl)
 	sdev_plugin_t *spp = (sdev_plugin_t *)hdl;
 	if (spp->sp_islegacy)
 		return (EINVAL);
+
+	if (!sdev_plugin_unregister_allowed)
+		return (EBUSY);
 
 	mutex_enter(&sdev_plugin_lock);
 	list_remove(&sdev_plugin_list, spp);

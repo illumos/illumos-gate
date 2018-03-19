@@ -1982,17 +1982,18 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	mutex_exit(&vmm_mtx);
 
+	if (vmm_sdev_hdl != NULL && sdev_plugin_unregister(vmm_sdev_hdl) != 0) {
+		mutex_exit(&vmmdev_mtx);
+		return (DDI_FAILURE);
+	}
+
+	vmm_sdev_hdl = NULL;
+
 	/* XXX: This needs updating */
 	if (!vmm_arena_fini()) {
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
 	}
-
-	if (vmm_sdev_hdl != NULL && sdev_plugin_unregister(vmm_sdev_hdl) != 0) {
-		mutex_exit(&vmmdev_mtx);
-		return (DDI_FAILURE);
-	}
-	vmm_sdev_hdl = NULL;
 
 	/* Remove the control node. */
 	ddi_remove_minor_node(dip, "ctl");
