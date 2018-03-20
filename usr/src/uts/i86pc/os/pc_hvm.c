@@ -10,9 +10,12 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
+#include <sys/cmn_err.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/mutex.h>
@@ -35,12 +38,17 @@ static const char *hvm_excl_holder = NULL;
 boolean_t
 hvm_excl_hold(const char *consumer)
 {
-	boolean_t res = B_FALSE;
+	boolean_t res;
 
 	mutex_enter(&hvm_excl_lock);
 	if (hvm_excl_holder == NULL) {
 		hvm_excl_holder = consumer;
 		res = B_TRUE;
+	} else {
+		cmn_err(CE_WARN, "zone '%s' cannot take HVM exclusion lock as "
+		    "'%s': held by '%s'", curproc->p_zone->zone_name, consumer,
+		    hvm_excl_holder);
+		res = B_FALSE;
 	}
 	mutex_exit(&hvm_excl_lock);
 
