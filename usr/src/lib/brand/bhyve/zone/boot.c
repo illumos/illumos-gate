@@ -379,13 +379,13 @@ add_lpc(int *argc, char **argv)
 }
 
 int
-add_bhyve_opts(int *argc, char **argv)
+add_bhyve_extra_opts(int *argc, char **argv)
 {
 	char *val;
 	char *tok;
 	char *lasts;
 
-	if ((val = get_zcfg_var("attr", "bhyve_opts", NULL)) == NULL) {
+	if ((val = get_zcfg_var("attr", "bhyve_extra_opts", NULL)) == NULL) {
 		return (0);
 	}
 
@@ -529,7 +529,7 @@ main(int argc, char **argv)
 	    add_ram(&zhargc, (char **)&zhargv) != 0 ||
 	    add_devices(&zhargc, (char **)&zhargv) != 0 ||
 	    add_nets(&zhargc, (char **)&zhargv) != 0 ||
-	    add_bhyve_opts(&zhargc, (char **)&zhargv) != 0 ||
+	    add_bhyve_extra_opts(&zhargc, (char **)&zhargv) != 0 ||
 	    add_vmname(&zhargc, (char **)&zhargv) != 0) {
 		return (1);
 	}
