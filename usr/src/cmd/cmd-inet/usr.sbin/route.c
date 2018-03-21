@@ -6,6 +6,7 @@
 /* All Rights Reserved	*/
 
 /* Copyright (c) 1990  Mentat Inc. */
+/* Copyright 2018, Joyent, Inc. */
 
 /*
  *
@@ -78,6 +79,13 @@
 #include <stdarg.h>
 #include <assert.h>
 #include <strings.h>
+
+#include <libcontract.h>
+#include <sys/ctfs.h>
+#include <sys/contract/process.h>
+#include <sys/wait.h>
+#include <libzonecfg.h>
+#include <zone.h>
 
 #include <libtsnet.h>
 #include <tsol/label.h>
@@ -292,6 +300,7 @@ static void		syntax_error(char *err, ...);
 static void		usage(char *cp);
 static void		write_to_rtfile(FILE *fp, int argc, char **argv);
 static void		pmsg_secattr(const char *, size_t, const char *);
+static void		do_zone(char *);
 
 static pid_t		pid;
 static int		s;
@@ -308,6 +317,7 @@ static char		perm_file_sfx[] = "/etc/inet/static_routes";
 static char		*perm_file;
 static char		temp_file_sfx[] = "/etc/inet/static_routes.tmp";
 static char		*temp_file;
+static char		*zonename;
 static struct in6_addr	in6_host_mask = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 /*
@@ -354,7 +364,7 @@ usage(char *cp)
 		    cp);
 	}
 	(void) fprintf(stderr, gettext("usage: route [ -fnpqv ] "
-	    "[ -R <root-dir> ] cmd [[ -<qualifers> ] args ]\n"));
+	    "[-z <zone> ] [ -R <root-dir> ] cmd [[ -<qualifers> ] args ]\n"));
 	exit(1);
 	/* NOTREACHED */
 }
@@ -418,7 +428,7 @@ main(int argc, char **argv)
 	if (argc < 2)
 		usage(NULL);
 
-	while ((ch = getopt(argc, argv, "R:nqdtvfp")) != EOF) {
+	while ((ch = getopt(argc, argv, "R:nqdtvfpz:")) != EOF) {
 		switch (ch) {
 		case 'n':
 			nflag = B_TRUE;
@@ -444,6 +454,9 @@ main(int argc, char **argv)
 		case 'R':
 			root_dir = optarg;
 			break;
+		case 'z':
+			zonename = optarg;
+			break;
 		case '?':
 		default:
 			usage(NULL);
@@ -452,6 +465,8 @@ main(int argc, char **argv)
 	}
 	argc -= optind;
 	argv += optind;
+
+	do_zone(zonename);
 
 	pid = getpid();
 	if (tflag)
@@ -3251,4 +3266,75 @@ pmsg_secattr(const char *sptr, size_t msglen, const char *labelstr)
 		(void) printf("\n%s%s", labelstr, rtsa_to_str(rtsa, buf,
 		    sizeof (buf)));
 	}
+}
+
+static void
+do_zone(char *name)
+{
+	zoneid_t zoneid;
+	zone_state_t st;
+	int fd, status, rc = 0;
+	pid_t pid;
+
+	if (name == NULL)
+		return;
+
+	if (getzoneid() != GLOBAL_ZONEID) {
+		(void) fprintf(stderr,
+		    "route: -z can only be specified from the global zone\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (strcmp(name, GLOBAL_ZONENAME) == 0)
+		return;
+
+	if (zone_get_state(name, &st) != Z_OK)
+		quit("unable to get zone state", errno);
+
+	if (st != ZONE_STATE_RUNNING) {
+		(void) fprintf(stderr, "route: zone must be running\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if ((zoneid = getzoneidbyname(name)) == -1)
+		quit("cannot determine zone id", errno);
+
+	if ((fd = open64(CTFS_ROOT "/process/template", O_RDWR)) == -1)
+		quit("cannot open ctfs template", errno);
+
+	/*
+	 * zone_enter() does not allow contracts to straddle zones, so we must
+	 * create a new, though largely unused contract.  Once we fork, the
+	 * child is the only member of the new contract, so it can perform a
+	 * zone_enter().
+	 */
+	rc |= ct_tmpl_set_critical(fd, 0);
+	rc |= ct_tmpl_set_informative(fd, 0);
+	rc |= ct_pr_tmpl_set_fatal(fd, CT_PR_EV_HWERR);
+	rc |= ct_pr_tmpl_set_param(fd, CT_PR_PGRPONLY | CT_PR_REGENT);
+	if (rc || ct_tmpl_activate(fd)) {
+		(void) close(fd);
+		quit("could not create contract", errno);
+	}
+
+	switch (pid = fork1()) {
+	case 0:
+		(void) ct_tmpl_clear(fd);
+		(void) close(fd);
+		if (zone_enter(zoneid) == -1)
+			quit("could not enter zone", errno);
+		return;
+
+	case -1:
+		quit("fork1 failed", errno);
+
+	default:
+		(void) ct_tmpl_clear(fd);
+		(void) close(fd);
+		if (waitpid(pid, &status, 0) < 0)
+			quit("waitpid failed", errno);
+
+		exit(WEXITSTATUS(status));
+	}
+
 }

@@ -3,40 +3,40 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH ROUTE 1M "May 13, 2017"
+.TH ROUTE 1M "Mar 26, 2018"
 .SH NAME
 route \- manually manipulate the routing tables
 .SH SYNOPSIS
 .LP
 .nf
-\fBroute\fR [\fB-fnvq\fR] \fIsub-command\fR [ [\fImodifiers\fR] \fIargs\fR]
+\fBroute\fR [\fB-fnvq\fR] [\fB-z\fR \fIzone\fR] \fIsub-command\fR [ [\fImodifiers\fR] \fIargs\fR]
 .fi
 
 .LP
 .nf
-\fBroute\fR [\fB-fnvq\fR] [\fB-p\fR [\fB-R\fR \fIroot-dir\fR]] add | delete [\fImodifiers\fR] \fIdestination\fR \fIgateway\fR
+\fBroute\fR [\fB-fnvq\fR] [\fB-z\fR \fIzone\fR] [\fB-p\fR [\fB-R\fR \fIroot-dir\fR]] add | delete [\fImodifiers\fR] \fIdestination\fR \fIgateway\fR
      [\fIargs\fR]
 .fi
 
 .LP
 .nf
-\fBroute\fR [\fB-fnvq\fR] change | get [\fImodifiers\fR] \fIdestination\fR
+\fBroute\fR [\fB-fnvq\fR] [\fB-z\fR \fIzone\fR] change | get [\fImodifiers\fR] \fIdestination\fR
      [\fIgateway\fR [\fIargs\fR]]
 .fi
 
 .LP
 .nf
-\fBroute\fR [\fB-fn\fR] monitor [\fImodifiers\fR]
+\fBroute\fR [\fB-fn\fR] [\fB-z\fR \fIzone\fR] monitor [\fImodifiers\fR]
 .fi
 
 .LP
 .nf
-\fBroute\fR [\fB-fnvq\fR] flush [\fImodifiers\fR]
+\fBroute\fR [\fB-fnvq\fR] [\fB-z\fR \fIzone\fR] flush [\fImodifiers\fR]
 .fi
 
 .LP
 .nf
-\fBroute\fR \fB-p\fR [\fB-R\fR \fIroot-dir\fR] show
+\fBroute\fR \fB-p\fR [\fB-R\fR \fIroot-dir\fR] [\fB-z\fR \fIzone\fR] show
 .fi
 
 .SH DESCRIPTION
@@ -124,6 +124,16 @@ addition, certain checks, such as the existence of network interfaces used with
 .ad
 .RS 15n
 Print additional details in verbose mode.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-z\fR \fIzone\fR\fR
+.ad
+.RS 15n
+Apply commands to the zone \fIzone\fR.  The zone must be running and must not
+be a shared-\fBIP\fR zone.
 .RE
 
 .SS "Subcommands"
@@ -652,7 +662,7 @@ List of network names and addresses
 \fBuname\fR(1), \fBin.ripngd\fR(1M), \fBin.routed\fR(1M), \fBnetstat\fR(1M),
 \fBrouted\fR(1M), \fBioctl\fR(2), \fBgetipnodebyname\fR(3SOCKET),
 \fBgetnetbyname\fR(3SOCKET), \fBinet_addr\fR(3SOCKET), \fBdefaultrouter\fR(4),
-\fBhosts\fR(4), \fBnetworks\fR(4), \fBattributes\fR(5), \fBARP\fR(7P),
+\fBhosts\fR(4), \fBnetworks\fR(4), \fBattributes\fR(5), \fBzones\fR(5), \fBARP\fR(7P),
 \fBip\fR(7P), \fBroute\fR(7P), \fBrouting\fR(7P)
 .SH DIAGNOSTICS
 .ne 2
@@ -752,7 +762,7 @@ process does not have appropriate privileges.
 
 .SH NOTES
 .LP
-Specifying that destinations are local (with the \fB-interface\fRmodifier)
+Specifying that destinations are local (with the \fB-interface\fR modifier)
 assumes that the routers implement \fBproxy ARP\fR, meaning that they respond
 to ARP queries for all reachable destinations. Normally, using either router
 discovery or RIP is more reliable and scalable than using proxy ARP. See

@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2018, Joyent, Inc.
 #
 
 SYNCPROG=	syncinit syncloop syncstat
@@ -161,6 +162,7 @@ if_mpadm.po		:=	XGETFLAGS += -a
 route			:=	CPPFLAGS += -DNDEBUG
 ndd			:=	LDLIBS += -ldladm -lipadm
 in.comsat		:=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
+route			:=	LDLIBS += -lzonecfg -lcontract
 
 .KEEP_STATE:
 
@@ -263,7 +265,7 @@ lint: $(LINTSUBDIRS)
 		in.telnetd.c $(LDLIBS) -lbsm -lpam -lsocket -lnsl
 	$(LINT.c) if_mpadm.c $(LDLIBS) -lsocket -lnsl -lipmp -linetutil
 	$(LINT.c) ipaddrsel.c $(LDLIBS) -lsocket -lnsl
-	$(LINT.c) route.c $(LDLIBS) -lsocket -lnsl -ltsnet
+	$(LINT.c) route.c $(LDLIBS) -lsocket -lnsl -ltsnet -lcontract -lzonecfg
 	$(LINT.c) syncinit.c $(LDLIBS) -ldlpi
 	$(LINT.c) syncloop.c $(LDLIBS) -ldlpi
 	$(LINT.c) syncstat.c $(LDLIBS) -ldlpi
