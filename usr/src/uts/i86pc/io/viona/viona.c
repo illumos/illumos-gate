@@ -1094,7 +1094,16 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 		(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
 	} while (!VRING_NEED_BAIL(ring, p));
 
+	mutex_exit(&ring->vr_lock);
+	/*
+	 * Clearing the RX function involves MAC quiescing any flows on that
+	 * client.  If MAC happens to be delivering packets to this ring via
+	 * viona_rx() at the time of worker clean-up, that thread may need to
+	 * acquire vr_lock for tasks such as delivering an interrupt.  In order
+	 * to avoid such deadlocks, vr_lock must temporarily be dropped here.
+	 */
 	mac_rx_clear(link->l_mch);
+	mutex_enter(&ring->vr_lock);
 }
 
 static void
