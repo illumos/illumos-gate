@@ -13,22 +13,30 @@
 # Copyright 2018 Toomas Soome <tsoome@me.com>
 #
 
-include $(SRC)/Makefile.master
-
-install all: softcore.c
+include		../Makefile.tools
 
 SOFTCORE=	$(SRC)/common/ficl/softcore
-PROG=		$(ONBLD_TOOLS)/bin/$(MACH)/makesoftcore
+PROG=		makesoftcore
 
-#
-# not needed: file access
-#
-FR = softcore.fr ifbrack.fr prefix.fr ficl.fr jhlocal.fr marker.fr
-FR += freebsd.fr ficllocal.fr oo.fr classes.fr string.fr wordsets.fr
-SOURCES=	$(FR:%=$(SOFTCORE)/%)
+CPPFLAGS +=	-I$(SRC)/lib/libficl -I$(SRC)/common/ficl
+OBJS=		makesoftcore.o lz4.o
+SRCS=		makesoftcore.c lz4.c
+LDLIBS=		-lumem
 
-softcore.c: $(SOURCES)
-	$(PROG) $(SOURCES)
+.KEEP_STATE:
 
-clobber clean:
-	$(RM) softcore.c
+all:		$(PROG)
+
+install:	all .WAIT $(ROOTONBLDMACHPROG)
+
+clean:
+		$(RM) $(PROG) $(OBJS)
+
+$(PROG):	$(OBJS)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
+
+%.o:		$(SOFTCORE)/%.c
+		$(COMPILE.c) -o $@ $<
+
+include		../Makefile.targ
