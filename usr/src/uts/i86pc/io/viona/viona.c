@@ -1081,6 +1081,10 @@ viona_ioc_set_notify_ioport(viona_link_t *link, uint_t ioport)
 /*
  * Return the number of available descriptors in the vring taking care of the
  * 16-bit index wraparound.
+ *
+ * Note: If the number of apparently available descriptors is larger than the
+ * ring size (due to guest misbehavior), this check will still report the
+ * positive count of descriptors.
  */
 static inline int
 viona_vr_num_avail(viona_vring_t *ring)
@@ -1095,8 +1099,6 @@ viona_vr_num_avail(viona_vring_t *ring)
 	 * A cast back to unsigned is necessary for proper operation.
 	 */
 	ndesc = (unsigned)*ring->vr_avail_idx - (unsigned)ring->vr_cur_aidx;
-
-	ASSERT(ndesc <= ring->vr_size);
 
 	return (ndesc);
 }
@@ -1139,7 +1141,6 @@ static void
 viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 {
 	proc_t *p = ttoproc(curthread);
-	size_t ntx = 0;
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT(ring->vr_state == (VRS_INIT|VRS_REQ_START));
@@ -1149,13 +1150,23 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 
 	for (;;) {
 		boolean_t bail = B_FALSE;
+		uint_t ntx = 0;
 
 		atomic_or_16(ring->vr_used_flags, VRING_USED_F_NO_NOTIFY);
 		while (viona_vr_num_avail(ring)) {
 			viona_tx(link, ring);
-			ntx++;
+
+			/*
+			 * It is advantageous for throughput to keep this
+			 * transmission loop tight, but periodic breaks to
+			 * check for other events are of value too.
+			 */
+			if (ntx++ >= ring->vr_size)
+				break;
 		}
 		atomic_and_16(ring->vr_used_flags, ~VRING_USED_F_NO_NOTIFY);
+
+		VIONA_PROBE2(tx, viona_link_t *, link, uint_t, ntx);
 
 		/*
 		 * Check for available descriptors on the ring once more in
@@ -1166,8 +1177,6 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 			continue;
 		}
 
-		VIONA_PROBE2(tx, viona_link_t *, link, uint_t, ntx);
-		ntx = 0;
 		if ((link->l_features & VIRTIO_F_RING_NOTIFY_ON_EMPTY) != 0) {
 			viona_intr_ring(ring);
 		}
@@ -1318,11 +1327,16 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, int niov, uint16_t *cookie)
 		return (0);
 	}
 	if (ndesc > ring->vr_size) {
+		/*
+		 * Despite the fact that the guest has provided an 'avail_idx'
+		 * which indicates that an impossible number of descriptors are
+		 * available, continue on and attempt to process the next one.
+		 *
+		 * The transgression will not escape the probe or stats though.
+		 */
 		VIONA_PROBE2(ndesc_too_high, viona_vring_t *, ring,
 		    uint16_t, ndesc);
 		VIONA_RING_STAT_INCR(ring, ndesc_too_high);
-		mutex_exit(&ring->vr_a_mutex);
-		return (-1);
 	}
 
 	head = ring->vr_avail_ring[idx & ring->vr_mask];
