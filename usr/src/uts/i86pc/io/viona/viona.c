@@ -413,6 +413,7 @@ typedef struct viona_vring {
 		uint64_t	rs_bad_rx_frame;
 		uint64_t	rs_rx_merge_overrun;
 		uint64_t	rs_rx_merge_underrun;
+		uint64_t	rs_rx_pad_short;
 		uint64_t	rs_too_short;
 		uint64_t	rs_tx_absent;
 	} vr_stats;
@@ -1796,6 +1797,8 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 	caddr_t buf = NULL;
 	boolean_t end = B_FALSE;
 
+	ASSERT(msz >= MIN_BUF_SIZE);
+
 	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie);
 	if (n <= 0) {
 		/* Without available buffers, the frame must be dropped. */
@@ -1833,11 +1836,8 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 		copied += viona_copy_mblk(mp, copied, buf, len, &end);
 	}
 
-	/*
-	 * Is the copied data long enough to be considered an ethernet frame of
-	 * the minimum length?  Does it match the total length of the mblk?
-	 */
-	if (copied < MIN_BUF_SIZE || copied != msz) {
+	/* Was the expected amount of data copied? */
+	if (copied != msz) {
 		VIONA_PROBE5(too_short, viona_vring_t *, ring,
 		    uint16_t, cookie, mblk_t *, mp, size_t, copied,
 		    size_t, msz);
@@ -1885,6 +1885,8 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 	struct virtio_net_mrgrxhdr *hdr = NULL;
 	const size_t hdr_sz = sizeof (struct virtio_net_mrgrxhdr);
 	boolean_t end = B_FALSE;
+
+	ASSERT(msz >= MIN_BUF_SIZE);
 
 	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie);
 	if (n <= 0) {
@@ -1976,16 +1978,15 @@ viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz)
 	uelem[0].len += hdr_sz;
 
 	/*
-	 * Is the copied data long enough to be considered an ethernet frame of
-	 * the minimum length?  Does it match the total length of the mblk?
+	 * If no other errors were encounted during the copy, was the expected
+	 * amount of data transfered?
 	 */
-	if (copied < MIN_BUF_SIZE || copied != msz) {
-		/* Do not override an existing error */
+	if (err == 0 && copied != msz) {
 		VIONA_PROBE5(too_short, viona_vring_t *, ring,
 		    uint16_t, cookie, mblk_t *, mp, size_t, copied,
 		    size_t, msz);
 		VIONA_RING_STAT_INCR(ring, too_short);
-		err = (err == 0) ? EINVAL : err;
+		err = EINVAL;
 	}
 
 	/* Add chksum bits, if needed */
@@ -2047,10 +2048,16 @@ viona_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t loopback)
 		size = msgsize(mp);
 
 		/*
-		 * Stripping the VLAN tag off already-small frames can cause
-		 * them to fall below the minimum size.  If this happens, pad
-		 * them out as they would have been if they lacked the tag in
-		 * the first place.
+		 * Ethernet frames are expected to be padded out in order to
+		 * meet the minimum size.
+		 *
+		 * A special case is made for frames which are short by
+		 * VLAN_TAGSZ, having been stripped of their VLAN tag while
+		 * traversing MAC.  A preallocated (and recycled) mblk is used
+		 * for that specific condition.
+		 *
+		 * All other frames that fall short on length will have custom
+		 * zero-padding allocated appended to them.
 		 */
 		if (size == NEED_VLAN_PAD_SIZE) {
 			ASSERT(MBLKL(viona_vlan_pad_mp) == VLAN_TAGSZ);
@@ -2061,6 +2068,23 @@ viona_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t loopback)
 
 			pad->b_cont = viona_vlan_pad_mp;
 			size += VLAN_TAGSZ;
+		} else if (size < MIN_BUF_SIZE) {
+			const size_t pad_size = MIN_BUF_SIZE - size;
+			mblk_t *zero_mp;
+
+			zero_mp = allocb(pad_size, BPRI_MED);
+			if (zero_mp == NULL) {
+				err = ENOMEM;
+				goto pad_drop;
+			}
+
+			VIONA_PROBE3(rx_pad_short, viona_vring_t *, ring,
+			    mblk_t *, mp, size_t, pad_size);
+			VIONA_RING_STAT_INCR(ring, rx_pad_short);
+			zero_mp->b_wptr += pad_size;
+			bzero(zero_mp->b_rptr, pad_size);
+			linkb(mp, zero_mp);
+			size += pad_size;
 		}
 
 		if (do_merge) {
@@ -2071,12 +2095,16 @@ viona_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp, boolean_t loopback)
 
 		/*
 		 * The VLAN padding mblk is meant for continual reuse, so
-		 * remove it from the chain to prevent it from being freed
+		 * remove it from the chain to prevent it from being freed.
+		 *
+		 * Custom allocated padding does not require this treatment and
+		 * is freed normally.
 		 */
 		if (pad != NULL) {
 			pad->b_cont = NULL;
 		}
 
+pad_drop:
 		if (err != 0) {
 			*mpdrop_prevp = mp;
 			mpdrop_prevp = &mp->b_next;
