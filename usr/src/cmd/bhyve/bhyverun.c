@@ -1119,17 +1119,16 @@ main(int argc, char *argv[])
 	 */
 	fbsdrun_addcpu(ctx, BSP, BSP, rip);
 
-	/*
-	 * Head off to the main event dispatch loop
-	 */
-	mevent_dispatch();
-#ifndef __FreeBSD
+#ifndef __FreeBSD__
 	if (vm_started_cb != NULL) {
 		vm_started_cb();
 	}
 #endif
 
-	pthread_exit(NULL);
+	/*
+	 * Head off to the main event dispatch loop
+	 */
+	mevent_dispatch();
 
 	exit(1);
 }
