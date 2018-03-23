@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 
 # This file provides exceptions to the usual rules applied to ELF objects by
@@ -76,7 +77,7 @@ EXEC_STACK	^opt/os-tests/tests/secflags/stacky$
 
 # Objects for which we allow relocations to the text segment
 TEXTREL		^platform/.*/MACH(kernel)/unix$
-TEXTREL		^usr/sbin/amd64/bhyve$
+TEXTREL		^usr/sbin/bhyve$
 
 # Directories and files that are allowed to have no direct bound symbols
 NODIRECT	^platform/.*/MACH(kernel)/unix$
