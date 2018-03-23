@@ -539,6 +539,42 @@ tr_intr_ret_start:
 	iretq
 	SET_SIZE(tr_iret_user)
 
+	/*
+	 * This special return trampoline is for KDI's use only (with kmdb).
+	 *
+	 * KDI/kmdb do not use swapgs -- they directly write the GSBASE MSR
+	 * instead. This trampoline runs after GSBASE has already been changed
+	 * back to the userland value (so we can't use %gs).
+	 *
+	 * Instead, the caller gives us a pointer to the kpti_dbg frame in %r13.
+	 * The KPTI_R13 member in the kpti_dbg has already been set to what the
+	 * real %r13 should be before we IRET.
+	 *
+	 * Additionally, KDI keeps a copy of the incoming %cr3 value when it
+	 * took an interrupt, and has put that back in the kpti_dbg area for us
+	 * to use, so we don't do any sniffing of %cs here. This is important
+	 * so that debugging code that changes %cr3 is possible.
+	 */
+	ENTRY_NP(tr_iret_kdi)
+	movq	%r14, KPTI_R14(%r13)	/* %r14 has to be preserved by us */
+
+	movq	%rsp, %r14	/* original %rsp is pointing at IRET frame */
+	leaq	KPTI_TOP(%r13), %rsp
+	pushq	T_FRAMERET_SS(%r14)
+	pushq	T_FRAMERET_RSP(%r14)
+	pushq	T_FRAMERET_RFLAGS(%r14)
+	pushq	T_FRAMERET_CS(%r14)
+	pushq	T_FRAMERET_RIP(%r14)
+
+	movq	KPTI_TR_CR3(%r13), %r14
+	movq	%r14, %cr3
+
+	movq	KPTI_R14(%r13), %r14
+	movq	KPTI_R13(%r13), %r13	/* preserved by our caller */
+
+	iretq
+	SET_SIZE(tr_iret_kdi)
+
 .global	tr_intr_ret_end
 tr_intr_ret_end:
 

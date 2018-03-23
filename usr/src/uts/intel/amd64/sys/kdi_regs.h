@@ -58,17 +58,18 @@ extern "C" {
 #define	KDIREG_GSBASE	18
 #define	KDIREG_KGSBASE	19
 #define	KDIREG_CR2	20
-#define	KDIREG_DS	21
-#define	KDIREG_ES	22
-#define	KDIREG_FS	23
-#define	KDIREG_GS	24
-#define	KDIREG_TRAPNO	25
-#define	KDIREG_ERR	26
-#define	KDIREG_RIP	27
-#define	KDIREG_CS	28
-#define	KDIREG_RFLAGS	29
-#define	KDIREG_RSP	30
-#define	KDIREG_SS	31
+#define	KDIREG_CR3	21
+#define	KDIREG_DS	22
+#define	KDIREG_ES	23
+#define	KDIREG_FS	24
+#define	KDIREG_GS	25
+#define	KDIREG_TRAPNO	26
+#define	KDIREG_ERR	27
+#define	KDIREG_RIP	28
+#define	KDIREG_CS	29
+#define	KDIREG_RFLAGS	30
+#define	KDIREG_RSP	31
+#define	KDIREG_SS	32
 
 #define	KDIREG_NGREG	(KDIREG_SS + 1)
 
