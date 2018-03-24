@@ -90,7 +90,9 @@ umask 002;
 	"logadm18",
 	"logadm19",
 	"logadm20",
-	"logadm21"
+	"logadm21",
+	"logadm22",
+	"logadm23"
 );
 
 use Getopt::Std;
@@ -2128,7 +2130,87 @@ EOF
         set_file('runtest', <<"EOF");
 # test "logadm21"
 $envsetup
-$bindir/logadm -f logadm.conf 2>std.err
+$bindir/logadm -f logadm.conf -F /dev/null 2>std.err
 exit 0
 EOF
+}
+
+#############################################################################
+#
+#         logadm22 - test for keeping timestamps in timestamps file on -w
+#
+#############################################################################
+
+sub logadm22 {
+	set_file('logadm.conf', <<'EOF');
+wildcard_test -A 3d dir1/*.log
+regular_test -A 3d dir2/test.log
+EOF
+
+set_file('logadm.conf.expect', <<'EOF');
+wildcard_test -A 3d dir1/*.log
+regular_test -A 3d dir2/test.log
+dir3/test.log -A 3d
+EOF
+
+	set_file('logadm.timestamps', <<'EOF');
+# This file holds internal data for logadm(1M).
+# Do not edit.
+dir1/foo.log -P 'Thu Nov  1 16:56:42 2001'
+dir2/test.log -P 'Thu Nov  1 16:56:42 2001'
+EOF
+	system("/bin/cp logadm.timestamps logadm.timestamps.expect");
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && { cat std.err; exit 1; }
+/bin/diff logadm.conf.expect logadm.conf || exit 1
+/bin/diff logadm.timestamps.expect logadm.timestamps || exit 1
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm22"
+$envsetup
+$bindir/logadm -f logadm.conf -F logadm.timestamps -w dir3/test.log -A 3d 2>std.err
+exit 0
+EOF
+
+}
+
+#############################################################################
+#
+#         logadm23 - test for keeping timestamps in timestamps file on -r
+#
+#############################################################################
+
+sub logadm23 {
+	set_file('logadm.conf', <<'EOF');
+wildcard_test -A 3d dir1/*.log
+regular_test -A 3d dir2/test.log
+EOF
+
+set_file('logadm.conf.expect', <<'EOF');
+wildcard_test -A 3d dir1/*.log
+EOF
+
+	set_file('logadm.timestamps', <<'EOF');
+# This file holds internal data for logadm(1M).
+# Do not edit.
+dir1/foo.log -P 'Thu Nov  1 16:56:42 2001'
+dir2/test.log -P 'Thu Nov  1 16:56:42 2001'
+EOF
+	system("/bin/cp logadm.timestamps logadm.timestamps.expect");
+
+	set_file('checktest', <<'EOF');
+[ -s std.err ] && { cat std.err; exit 1; }
+/bin/diff logadm.conf.expect logadm.conf || exit 1
+/bin/diff logadm.timestamps.expect logadm.timestamps || exit 1
+EOF
+
+	set_file('runtest', <<"EOF");
+# test "logadm23"
+$envsetup
+$bindir/logadm -f logadm.conf -F logadm.timestamps -r regular_test 2>std.err
+exit 0
+EOF
+
 }

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2018 Sebastian Wiedenroth
  */
 
 /*
@@ -82,6 +83,7 @@ struct confinfo {
 };
 
 #define	CONFF_DELETED	1	/* entry should be deleted on write back */
+#define	CONFF_TSONLY	2	/* entry should only be in timestamps file */
 
 static struct confinfo *Confinfo;	/* the entries in the config file */
 static struct confinfo *Confinfolast;	/* end of list */
@@ -178,6 +180,7 @@ conf_scan(const char *fname, char *buf, int buflen, int timescan)
 {
 	int ret = 1;
 	int lineno = 0;
+	int flags = 0;
 	char *line;
 	char *eline;
 	char *ebuf;
@@ -298,7 +301,11 @@ conf_scan(const char *fname, char *buf, int buflen, int timescan)
 				 * the case where the logname is not the same as
 				 * the log file name.
 				 */
-				fillconflist(lineno, entry, opts, comment, 0);
+				flags = 0;
+				if (cp == NULL)
+					flags = CONFF_TSONLY;
+				fillconflist(lineno, entry, opts, comment,
+				    flags);
 			}
 		LOCAL_ERR_END }
 
@@ -655,9 +662,6 @@ conf_print(FILE *cstream, FILE *tstream)
 		if (cp->cf_flags & CONFF_DELETED)
 			continue;
 		if (cp->cf_entry) {
-			opts_printword(cp->cf_entry, cstream);
-			if (cp->cf_opts)
-				opts_print(cp->cf_opts, cstream, exclude_opts);
 			/* output timestamps to tstream */
 			if (tstream != NULL && (timestamp =
 			    opts_optarg(cp->cf_opts, "P")) != NULL) {
@@ -666,6 +670,12 @@ conf_print(FILE *cstream, FILE *tstream)
 				opts_printword(timestamp, tstream);
 				(void) fprintf(tstream, "\n");
 			}
+			if (cp->cf_flags & CONFF_TSONLY)
+				continue;
+
+			opts_printword(cp->cf_entry, cstream);
+			if (cp->cf_opts)
+				opts_print(cp->cf_opts, cstream, exclude_opts);
 		}
 		if (cp->cf_com) {
 			if (cp->cf_entry)

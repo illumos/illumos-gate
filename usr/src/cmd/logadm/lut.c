@@ -38,8 +38,6 @@
  * was needed by logadm for options processing.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <strings.h>
 #include "err.h"
@@ -170,8 +168,6 @@ lut_free(struct lut *root, void (*callback)(void *rhs))
 void
 printer(const char *lhs, void *rhs, void *arg)
 {
-	struct lut *root = (struct lut *)arg;
-
 	printf("<%s> <%s> (<%s>)\n", lhs, (char *)rhs,
 	    (char *)lut_lookup(arg, lhs));
 }
