@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -561,12 +562,21 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	if (ctlop == DDI_CTLOPS_NREGS)
 		*(int *)result = totreg;
 	else if (ctlop == DDI_CTLOPS_REGSIZE) {
+		uint64_t rs;
+
 		rn = *(int *)arg;
 		if (rn >= totreg) {
 			kmem_free(drv_regp, reglen);
 			return (DDI_FAILURE);
 		}
-		*(off_t *)result = drv_regp[rn].pci_size_low;
+
+		rs = drv_regp[rn].pci_size_low |
+		    ((uint64_t)drv_regp[rn].pci_size_hi << 32);
+		if (rs > OFF_MAX) {
+			kmem_free(drv_regp, reglen);
+			return (DDI_FAILURE);
+		}
+		*(off_t *)result = rs;
 	}
 
 	kmem_free(drv_regp, reglen);

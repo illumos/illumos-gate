@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -893,8 +893,9 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 {
 	uchar_t bus, dev, func;
 	uchar_t parbus, subbus;
-	uint_t io_base, io_limit, mem_base, mem_limit;
-	uint_t io_size, mem_size, io_align, mem_align;
+	uint_t io_base, io_limit, mem_base;
+	uint_t io_size, io_align;
+	uint64_t mem_size, mem_align, mem_limit;
 	uint64_t addr = 0;
 	int *regp = NULL;
 	uint_t reglen;
@@ -1049,9 +1050,9 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 				    pci_bus_res[parbus].io_reprogram;
 
 				cmn_err(CE_NOTE, "!add io-range on subtractive"
-				    " ppb[%x/%x/%x]: 0x%x ~ 0x%x\n",
-				    bus, dev, func, (uint32_t)addr,
-				    (uint32_t)addr + io_size - 1);
+				    " ppb[%x/%x/%x]: "
+				    "0x%"PRIx64" ~ 0x%"PRIx64"\n",
+				    bus, dev, func, addr, addr + io_size - 1);
 			}
 		}
 		/*
@@ -1066,9 +1067,10 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 				    pci_bus_res[parbus].mem_reprogram;
 
 				cmn_err(CE_NOTE, "!add mem-range on "
-				    "subtractive ppb[%x/%x/%x]: 0x%x ~ 0x%x\n",
-				    bus, dev, func, (uint32_t)addr,
-				    (uint32_t)addr + mem_size - 1);
+				    "subtractive ppb[%x/%x/%x]: "
+				    "0x%"PRIx64" ~ 0x%"PRIx64"\n",
+				    bus, dev, func,
+				    addr, addr + mem_size - 1);
 			}
 		}
 
@@ -1197,15 +1199,15 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 				if (is_vga(list, MEM))
 					continue;
 				if (mem_base == 0) {
-					mem_base = (uint_t)list->ml_address;
+					mem_base = list->ml_address;
 					mem_base = P2ALIGN(mem_base,
 					    PPB_MEM_ALIGNMENT);
-					mem_limit = (uint_t)(list->ml_address +
+					mem_limit = (list->ml_address +
 					    list->ml_size - 1);
 				} else {
 					if ((list->ml_address + list->ml_size) >
 					    mem_limit) {
-						mem_limit = (uint_t)
+						mem_limit =
 						    (list->ml_address +
 						    list->ml_size - 1);
 					}
@@ -1265,7 +1267,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 			add_ranges_prop(secbus, 1);
 
 			cmn_err(CE_NOTE, "!reprogram mem-range on"
-			    " ppb[%x/%x/%x]: 0x%x ~ 0x%x\n",
+			    " ppb[%x/%x/%x]: 0x%x ~ 0x%"PRIx64"\n",
 			    bus, dev, func, mem_base, mem_limit);
 		}
 	}
@@ -2360,7 +2362,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 {
 	uchar_t baseclass, subclass, progclass, header;
 	ushort_t bar_sz;
-	uint_t value = 0, len, devloc;
+	uint64_t value = 0;
+	uint_t devloc;
 	uint_t base, base_hi, type;
 	ushort_t offset, end;
 	int max_basereg, j, reprogram = 0;
@@ -2444,6 +2447,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		/* construct phys hi,med.lo, size hi, lo */
 		if ((pciide && j < 4) || (base & PCI_BASE_SPACE_IO)) {
 			int hard_decode = 0;
+			uint_t len;
 
 			/* i/o space */
 			bar_sz = PCI_BAR_SZ_32;
@@ -2528,26 +2532,34 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 			nreg++, nasgn++;
 
 		} else {
+			uint64_t len;
 			/* memory space */
 			if ((base & PCI_BASE_TYPE_M) == PCI_BASE_TYPE_ALL) {
 				bar_sz = PCI_BAR_SZ_64;
 				base_hi = pci_getl(bus, dev, func, offset + 4);
+				pci_putl(bus, dev, func, offset + 4,
+				    0xffffffff);
+				value |= (uint64_t)pci_getl(bus, dev, func,
+				    offset + 4) << 32;
+				pci_putl(bus, dev, func, offset + 4, base_hi);
 				phys_hi = PCI_ADDR_MEM64;
+				value &= PCI_BASE_M_ADDR64_M;
 			} else {
 				bar_sz = PCI_BAR_SZ_32;
 				base_hi = 0;
 				phys_hi = PCI_ADDR_MEM32;
+				value &= PCI_BASE_M_ADDR_M;
 			}
 
 			/* skip base regs with size of 0 */
-			value &= PCI_BASE_M_ADDR_M;
-
 			if (value == 0)
 				continue;
 
 			len = ((value ^ (value-1)) + 1) >> 1;
 			regs[nreg].pci_size_low =
-			    assigned[nasgn].pci_size_low = len;
+			    assigned[nasgn].pci_size_low = len & 0xffffffff;
+			regs[nreg].pci_size_hi =
+			    assigned[nasgn].pci_size_hi = len >> 32;
 
 			phys_hi |= (devloc | offset);
 			if (base & PCI_BASE_PREF_M)
@@ -2644,7 +2656,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 				} else
 					cmn_err(CE_WARN, "failed to program "
 					    "mem space [%d/%d/%d] BAR@0x%x"
-					    " length 0x%x",
+					    " length 0x%"PRIx64,
 					    bus, dev, func, offset, len);
 			}
 			assigned[nasgn].pci_phys_low = base;
@@ -2677,6 +2689,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		value = 0;
 
 	if (value != 0) {
+		uint_t len;
+
 		regs[nreg].pci_phys_hi = (PCI_ADDR_MEM32 | devloc) + offset;
 		assigned[nasgn].pci_phys_hi = (PCI_RELOCAT_B |
 		    PCI_ADDR_MEM32 | devloc) + offset;

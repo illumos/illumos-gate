@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_PCI_H
@@ -582,6 +582,7 @@ extern "C" {
 #define	PCI_BASE_TYPE_M		0x00000006  /* type indicator mask */
 #define	PCI_BASE_PREF_M		0x00000008  /* prefetch mask */
 #define	PCI_BASE_M_ADDR_M	0xfffffff0  /* memory address mask */
+#define	PCI_BASE_M_ADDR64_M	0xfffffffffffffff0ULL /* 64bit mem addr mask */
 #define	PCI_BASE_IO_ADDR_M	0xfffffffe  /* I/O address mask */
 
 #define	PCI_BASE_ROM_ADDR_M	0xfffff800  /* ROM address mask */
