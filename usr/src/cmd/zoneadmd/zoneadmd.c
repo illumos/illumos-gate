@@ -1285,16 +1285,19 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	 */
 	notify_zonestatd(zone_id);
 
+	/* Startup a thread to perform zfd logging/tty svc for the zone. */
+	create_log_thread(zlogp, zone_id);
+
 	if (zone_boot(zoneid) == -1) {
 		zerror(zlogp, B_TRUE, "unable to boot zone");
+		destroy_log_thread();
 		goto bad;
 	}
 
-	if (brand_poststatechg(zlogp, zstate, Z_BOOT, debug) != 0)
+	if (brand_poststatechg(zlogp, zstate, Z_BOOT, debug) != 0) {
+		destroy_log_thread();
 		goto bad;
-
-	/* Startup a thread to perform zfd logging/tty svc for the zone. */
-	create_log_thread(zlogp, zone_id);
+	}
 
 	return (0);
 

@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -89,6 +89,7 @@ static thread_t logger_tid;
 static int	logfd = -1;
 static size_t	log_sz = 0;
 static size_t	log_rot_sz = 0;
+static char	log_name[MAXNAMELEN] = "stdio.log";
 
 static void rotate_log();
 
@@ -98,9 +99,9 @@ static void rotate_log();
  */
 static int eventstream[2] = {-1, -1};
 
-#define	LOGNAME			"stdio.log"
 #define	ZLOG_MODE		"zlog-mode"
-#define	LOG_MAXSZ		"zlog-max-size"
+#define	ZLOG_MAXSZ		"zlog-max-size"
+#define	ZLOG_NAME		"zlog-name"
 #define	ZFDNEX_DEVTREEPATH	"/pseudo/zfdnex@2"
 #define	ZFDNEX_FILEPATH		"/devices/pseudo/zfdnex@2"
 #define	SERVER_SOCKPATH		ZONES_TMPDIR "/%s.server_%s"
@@ -1132,7 +1133,7 @@ open_logfile()
 	(void) mkdir(logpath, 0700);
 
 	(void) snprintf(logpath, sizeof (logpath), "%s/logs/%s", zonepath,
-	    LOGNAME);
+	    log_name);
 
 	if ((logfd = open(logpath, O_WRONLY | O_APPEND | O_CREAT,
 	    0600)) == -1) {
@@ -1159,9 +1160,9 @@ rotate_log()
 
 	(void) snprintf(rnm, sizeof (rnm),
 	    "%s/logs/%s.%d%02d%02dT%02d%02d%02dZ",
-	    zonepath, LOGNAME, gtm.tm_year + 1900, gtm.tm_mon + 1, gtm.tm_mday,
+	    zonepath, log_name, gtm.tm_year + 1900, gtm.tm_mon + 1, gtm.tm_mday,
 	    gtm.tm_hour, gtm.tm_min, gtm.tm_sec);
-	(void) snprintf(onm, sizeof (onm), "%s/logs/%s", zonepath, LOGNAME);
+	(void) snprintf(onm, sizeof (onm), "%s/logs/%s", zonepath, log_name);
 
 	(void) close(logfd);
 	if (rename(onm, rnm) != 0)
@@ -1369,8 +1370,10 @@ get_mode_logmax(zfd_mode_t *mode)
 				mode->zmode_n_stddevs = 3;
 				mode->zmode_n_addl_devs = 0;
 			}
+			continue;
+		}
 
-		} else if (strcmp(LOG_MAXSZ, attr.zone_attr_name) == 0) {
+		if (strcmp(ZLOG_MAXSZ, attr.zone_attr_name) == 0) {
 			char *p;
 			long lval;
 
@@ -1378,6 +1381,13 @@ get_mode_logmax(zfd_mode_t *mode)
 			lval = strtol(p, &p, 10);
 			if (*p == '\0')
 				log_rot_sz = (size_t)lval;
+			continue;
+		}
+
+		if (strcmp(ZLOG_NAME, attr.zone_attr_name) == 0) {
+			(void) strlcpy(log_name, attr.zone_attr_value,
+			    sizeof (log_name));
+			continue;
 		}
 	}
 	(void) zonecfg_endattrent(handle);

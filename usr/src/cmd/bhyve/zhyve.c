@@ -28,7 +28,6 @@
 #include <sys/corectl.h>
 
 #define	ZHYVE_CMD_FILE	"/var/run/bhyve/zhyve.cmd"
-#define	ZHYVE_LOG_FILE	"/tmp/zhyve.log"
 
 #define	FILE_PROVISIONING	"/var/svc/provisioning"
 #define	FILE_PROVISION_SUCCESS	"/var/svc/provision_success"
@@ -158,15 +157,22 @@ main(int argc, char **argv)
 		(void) dup2(fd, STDIN_FILENO);
 		(void) close(fd);
 	}
-	fd = open(ZHYVE_LOG_FILE, O_WRONLY|O_CREAT|O_APPEND, 0644);
+
+	fd = open("/dev/zfd/1", O_WRONLY);
 	assert(fd >= 0);
-	(void) dup2(fd, STDOUT_FILENO);
-	setvbuf(stdout, NULL, _IONBF, 0);
-	(void) dup2(fd, STDERR_FILENO);
-	setvbuf(stderr, NULL, _IONBF, 0);
-	if (fd != STDOUT_FILENO && fd != STDERR_FILENO) {
+	if (fd != STDOUT_FILENO) {
+		(void) dup2(fd, STDOUT_FILENO);
 		(void) close(fd);
 	}
+	setvbuf(stdout, NULL, _IONBF, 0);
+
+	fd = open("/dev/zfd/2", O_WRONLY);
+	assert(fd >= 0);
+	if (fd != STDERR_FILENO) {
+		(void) dup2(fd, STDERR_FILENO);
+		(void) close(fd);
+	}
+	setvbuf(stderr, NULL, _IONBF, 0);
 
 	if (parse_options_file(ZHYVE_CMD_FILE, &zargc, &zargv) != 0) {
 		(void) fprintf(stderr, "%s: failed to parse %s: %s\n",
