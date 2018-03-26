@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS	*/
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <setjmp.h>
@@ -123,10 +121,8 @@ static char *procnames_long[] = {
 };
 
 void
-interpret_nisbind(flags, type, xid, vers, proc, data, len)
-	int flags, type, xid, vers, proc;
-	char *data;
-	int len;
+interpret_nisbind(int flags, int type, int xid, int vers, int proc, char *data,
+    int len)
 {
 	char *line;
 	char buff[YPMAXDOMAIN + 1];
@@ -143,20 +139,19 @@ interpret_nisbind(flags, type, xid, vers, proc, data, len)
 		line = get_sum_line();
 
 		if (type == CALL) {
-			(void) sprintf(line,
-				"NISBIND C %s",
-				procnames_bind_short[proc]);
+			(void) sprintf(line, "NISBIND C %s",
+			    procnames_bind_short[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case YPBINDPROC_NULL:
 				break;
 			case YPBINDPROC_DOMAIN:
 				(void) sprintf(line, " %s",
-					getxdr_string(buff, YPMAXDOMAIN));
+				    getxdr_string(buff, YPMAXDOMAIN));
 				break;
 			case YPBINDPROC_SETDOM:
 				(void) sprintf(line, " %s",
-					getxdr_string(buff, YPMAXDOMAIN));
+				    getxdr_string(buff, YPMAXDOMAIN));
 				break;
 			default:
 				break;
@@ -164,7 +159,7 @@ interpret_nisbind(flags, type, xid, vers, proc, data, len)
 			check_retransmit(line, xid);
 		} else {
 			(void) sprintf(line, "NISBIND R %s ",
-				procnames_bind_short[proc]);
+			    procnames_bind_short[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case YPBINDPROC_NULL:
@@ -176,7 +171,7 @@ interpret_nisbind(flags, type, xid, vers, proc, data, len)
 				} else {		/* failure */
 					status = getxdr_long();
 					(void) sprintf(line, "ERROR=%s",
-						ypbind_error(status));
+					    ypbind_error(status));
 				}
 				break;
 			case YPBINDPROC_SETDOM:
@@ -189,25 +184,24 @@ interpret_nisbind(flags, type, xid, vers, proc, data, len)
 
 	if (flags & F_DTAIL) {
 		show_header("NISBIND:",
-			"Network Information Service Bind", len);
+		    "Network Information Service Bind", len);
 		show_space();
 		if (setjmp(xdr_err)) {
 			return;
 		}
-		(void) sprintf(get_line(0, 0),
-			"Proc = %d (%s)",
-			proc, procnames_bind_long[proc]);
+		(void) sprintf(get_line(0, 0), "Proc = %d (%s)",
+		    proc, procnames_bind_long[proc]);
 		if (type == CALL) {
 			switch (proc) {
 			case YPBINDPROC_NULL:
 				break;
 			case YPBINDPROC_DOMAIN:
 				(void) showxdr_string(YPMAXDOMAIN,
-					"Domain = %s");
+				    "Domain = %s");
 				break;
 			case YPBINDPROC_SETDOM:
 				(void) showxdr_string(YPMAXDOMAIN,
-					"Domain = %s");
+				    "Domain = %s");
 				(void) showxdr_hex(4, "Address=%s");
 				(void) showxdr_hex(2, "Port=%s");
 				(void) showxdr_u_long("Version=%lu");
@@ -222,20 +216,17 @@ interpret_nisbind(flags, type, xid, vers, proc, data, len)
 			case YPBINDPROC_DOMAIN:
 				status = getxdr_u_long();
 				(void) sprintf(get_line(0, 0),
-					"Status = %lu (%s)",
-					status,
-					status == 1 ? "OK":"Fail");
+				    "Status = %lu (%s)",
+				    status,
+				    status == 1 ? "OK":"Fail");
 				if (status == 1) {
-					(void) showxdr_hex(4,
-						"Address=%s");
-					(void) showxdr_hex(2,
-						"Port=%s");
+					(void) showxdr_hex(4, "Address=%s");
+					(void) showxdr_hex(2, "Port=%s");
 				} else {
 					status = getxdr_u_long();
 					(void) sprintf(get_line(0, 0),
-						"Error = %lu (%s)",
-						status,
-						ypbind_error(status));
+					    "Error = %lu (%s)", status,
+					    ypbind_error(status));
 				}
 				break;
 			case YPBINDPROC_SETDOM:
@@ -249,10 +240,8 @@ interpret_nisbind(flags, type, xid, vers, proc, data, len)
 }
 
 void
-interpret_nis(flags, type, xid, vers, proc, data, len)
-	int flags, type, xid, vers, proc;
-	char *data;
-	int len;
+interpret_nis(int flags, int type, int xid, int vers, int proc, char *data,
+    int len)
 {
 	char *line;
 	char *dom, *map, *key;
@@ -272,9 +261,8 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 			if (proc > MAXPROC)
 				(void) sprintf(line, "NIS C %d", proc);
 			else
-				(void) sprintf(line,
-					"NIS C %s",
-					procnames_short[proc]);
+				(void) sprintf(line, "NIS C %s",
+				    procnames_short[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case YPPROC_NULL:
@@ -284,7 +272,7 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 			case YPPROC_MAPLIST:
 				/* YPMAXDOMAIN > YPMAXMAP */
 				(void) sprintf(line, " %s",
-					getxdr_string(buff1, YPMAXDOMAIN));
+				    getxdr_string(buff1, YPMAXDOMAIN));
 				break;
 			case YPPROC_FIRST:
 				dom = getxdr_string(buff1, YPMAXDOMAIN);
@@ -296,17 +284,13 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 				dom = getxdr_string(buff1, YPMAXDOMAIN);
 				map = getxdr_string(buff2, YPMAXMAP);
 				key = getxdr_string(buff3, YPMAXRECORD);
-				(void) sprintf(line,
-					" %s in %s",
-					key, map);
+				(void) sprintf(line, " %s in %s", key, map);
 				break;
 			case YPPROC_NEWXFR:
 			case YPPROC_XFR:
 				dom = getxdr_string(buff1, YPMAXDOMAIN);
 				map = getxdr_string(buff2, YPMAXMAP);
-				(void) sprintf(line,
-					" map %s in %s",
-					map, dom);
+				(void) sprintf(line, " map %s in %s", map, dom);
 				break;
 			case YPPROC_CLEAR:
 				break;
@@ -315,9 +299,7 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 			case YPPROC_ORDER:
 				dom = getxdr_string(buff1, YPMAXDOMAIN);
 				map = getxdr_string(buff2, YPMAXMAP);
-				(void) sprintf(line,
-					" map %s in %s",
-					map, dom);
+				(void) sprintf(line, " map %s in %s", map, dom);
 				break;
 			default:
 				break;
@@ -328,7 +310,7 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 				(void) sprintf(line, "NIS R %d ", proc);
 			else
 				(void) sprintf(line, "NIS R %s ",
-					procnames_short[proc]);
+				    procnames_short[proc]);
 			line += strlen(line);
 			switch (proc) {
 			case YPPROC_NULL:
@@ -336,7 +318,7 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 			case YPPROC_DOMAIN:
 			case YPPROC_DOMAIN_NONACK:
 				(void) sprintf(line, "%s",
-					getxdr_long() ? "OK":"Fail");
+				    getxdr_long() ? "OK":"Fail");
 				break;
 			case YPPROC_MATCH:
 				(void) sum_ypstat(line);
@@ -346,19 +328,18 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 				if (sum_ypstat(line) == YP_TRUE) {
 					line += strlen(line);
 					(void) getxdr_string(buff1,
-							YPMAXRECORD);
+					    YPMAXRECORD);
 					(void) sprintf(line, " key=%s",
-						getxdr_string(buff1,
-							YPMAXRECORD));
+					    getxdr_string(buff1,
+					    YPMAXRECORD));
 				}
 				break;
 			case YPPROC_NEWXFR:
 			case YPPROC_XFR:
 				transid = getxdr_u_long();
 				status  = getxdr_long();
-				(void) sprintf(line, "transid=%lu %s",
-					transid,
-					sum_ypxfrstat(status));
+				(void) sprintf(line, "transid=%lu %s", transid,
+				    sum_ypxfrstat(status));
 				break;
 			case YPPROC_CLEAR:
 				break;
@@ -369,30 +350,28 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 					(void) sprintf(line, " key=%s",
 					    getxdr_string(buff1, YPMAXRECORD));
 				} else {
-					(void) sprintf(line,
-						"No more");
+					(void) sprintf(line, "No more");
 				}
 				break;
 			case YPPROC_MASTER:
 				if (sum_ypstat(line) == YP_TRUE) {
 					line += strlen(line);
 					(void) sprintf(line, " peer=%s",
-						getxdr_string(buff1,
-							YPMAXPEER));
+					    getxdr_string(buff1, YPMAXPEER));
 				}
 				break;
 			case YPPROC_ORDER:
 				if (sum_ypstat(line) == YP_TRUE) {
 					line += strlen(line);
 					(void) sprintf(line, " order=%lu",
-						getxdr_u_long());
+					    getxdr_u_long());
 				}
 				break;
 			case YPPROC_MAPLIST:
 				if (sum_ypstat(line) == YP_TRUE) {
 					line += strlen(line);
 					(void) sprintf(line, " %s",
-						sum_ypmaplist());
+					    sum_ypmaplist());
 				}
 				break;
 			default:
@@ -407,10 +386,8 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
 		if (setjmp(xdr_err)) {
 			return;
 		}
-		(void) sprintf(get_line(0, 0),
-			"Proc = %d (%s)",
-			proc,
-			proc > MAXPROC ? "unknown" : procnames_long[proc]);
+		(void) sprintf(get_line(0, 0), "Proc = %d (%s)", proc,
+		    proc > MAXPROC ? "unknown" : procnames_long[proc]);
 		if (type == CALL)
 			niscall(proc);
 		else
@@ -424,8 +401,7 @@ interpret_nis(flags, type, xid, vers, proc, data, len)
  */
 
 static void
-niscall(proc)
-	int proc;
+niscall(int proc)
 {
 	switch (proc) {
 	case YPPROC_NULL:
@@ -481,8 +457,7 @@ niscall(proc)
  */
 
 void
-nisreply(proc)
-	int proc;
+nisreply(int proc)
 {
 	unsigned int xfrstat, more;
 
@@ -491,9 +466,8 @@ nisreply(proc)
 		break;
 	case YPPROC_DOMAIN:
 	case YPPROC_DOMAIN_NONACK:
-		(void) sprintf(get_line(0, 0),
-			"Result=%s",
-			getxdr_u_long() ? "OK":"Fail");
+		(void) sprintf(get_line(0, 0), "Result=%s",
+		    getxdr_u_long() ? "OK":"Fail");
 		break;
 	case YPPROC_MATCH:
 		(void) detail_ypstat();
@@ -509,17 +483,15 @@ nisreply(proc)
 	case YPPROC_XFR:
 		(void) showxdr_u_long("Transid = %lu");
 		xfrstat = getxdr_u_long();
-		(void) sprintf(get_line(0, 0),
-			"Transfer status = %lu (%s)",
-			xfrstat, sum_ypxfrstat(xfrstat));
+		(void) sprintf(get_line(0, 0), "Transfer status = %lu (%s)",
+		    xfrstat, sum_ypxfrstat(xfrstat));
 		break;
 	case YPPROC_CLEAR:
 		break;
 	case YPPROC_ALL:
 		more = getxdr_u_long();
-		(void) sprintf(get_line(0, 0),
-			"More = %s",
-			more ? "true" : "false");
+		(void) sprintf(get_line(0, 0), "More = %s",
+		    more ? "true" : "false");
 		if (more) {
 			(void) detail_ypstat();
 			(void) showxdr_string(YPMAXRECORD, "Value = %s");
@@ -529,6 +501,7 @@ nisreply(proc)
 	case YPPROC_MASTER:
 		(void) detail_ypstat();
 		(void) showxdr_string(YPMAXPEER, "Peer = %s");
+		break;
 	case YPPROC_ORDER:
 		(void) detail_ypstat();
 		(void) showxdr_u_long("Order=%lu");
@@ -543,8 +516,7 @@ nisreply(proc)
 }
 
 char *
-sum_ypxfrstat(status)
-	int status;
+sum_ypxfrstat(int status)
 {
 	static char buff [16];
 
@@ -573,8 +545,7 @@ sum_ypxfrstat(status)
 }
 
 static int
-sum_ypstat(line)
-	char *line;
+sum_ypstat(char *line)
 {
 	ulong_t status;
 	char *str;
@@ -602,22 +573,20 @@ sum_ypstat(line)
 }
 
 static int
-detail_ypstat()
+detail_ypstat(void)
 {
 	ulong_t status;
 	char buff[32];
 
 
 	status = sum_ypstat(buff);
-	(void) sprintf(get_line(0, 0),
-		"Status = %d (%s)",
-		status, buff);
+	(void) sprintf(get_line(0, 0), "Status = %d (%s)", status, buff);
 
 	return ((int)status);
 }
 
 char *
-sum_ypmaplist()
+sum_ypmaplist(void)
 {
 	static char buff[YPMAXMAP + 1];
 	int maps = 0;
@@ -637,14 +606,13 @@ sum_ypmaplist()
 }
 
 void
-detail_ypmaplist()
+detail_ypmaplist(void)
 {
 	int maps = 0;
 
 	if (setjmp(xdr_err)) {
 		(void) sprintf(get_line(0, 0),
-			" %d+ maps. (Frame is incomplete)",
-			maps);
+		    " %d+ maps. (Frame is incomplete)", maps);
 		return;
 	}
 
@@ -659,8 +627,7 @@ detail_ypmaplist()
 }
 
 char *
-ypbind_error(err)
-	int err;
+ypbind_error(int err)
 {
 	static char buff[16];
 

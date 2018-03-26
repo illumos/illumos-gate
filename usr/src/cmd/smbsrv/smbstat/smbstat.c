@@ -263,7 +263,7 @@ static void *smbstat_zalloc(size_t);
 static void smbstat_free(void *, size_t);
 static void smbstat_fail(int, char *, ...);
 static void smbstat_snapshot_inc_idx(void);
-static void smbstat_usage(FILE *, int);
+static void smbstat_usage(FILE *, int) __NORETURN;
 static uint_t smbstat_strtoi(char const *, char *);
 static double smbstat_hrtime_delta(hrtime_t, hrtime_t);
 static double smbstat_sub_64(uint64_t, uint64_t);

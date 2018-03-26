@@ -109,7 +109,7 @@ ascii_to_int(char *str)
 	if (c == NULL || *c == '\0')
 		return (-1);
 
-	while (c != '\0' && *c == ' ')
+	while (*c == ' ')
 		c++;
 	if (*c == '\0')
 		return (-1);
@@ -2097,7 +2097,7 @@ genent_aliases(char *line, int (*cback)())
 	}
 
 	t[0] = '\0';
-	if (++t == '\0') {
+	if ((++t)[0] == '\0') {
 		(void) strlcpy(parse_err_msg, gettext("no alias value"),
 		    PARSE_ERR_MSG_LEN);
 		return (GENENT_PARSEERR);

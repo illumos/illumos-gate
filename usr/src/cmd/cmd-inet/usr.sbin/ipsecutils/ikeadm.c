@@ -79,6 +79,9 @@ CPL_MATCH_FN(no_match)
 	return (0);
 }
 
+static void command_complete(int s) __NORETURN;
+static void usage(void) __NORETURN;
+
 static void
 command_complete(int s)
 {
@@ -90,7 +93,7 @@ command_complete(int s)
 }
 
 static void
-usage()
+usage(void)
 {
 	if (!interactive) {
 		(void) fprintf(stderr, gettext("Usage:\t"
@@ -810,7 +813,7 @@ parse_cky(int argc, char **argv, uint64_t *ckyp)
 
 static int
 parse_addr_pr(int argc, char **argv, struct hostent **h1pp,
-	struct hostent **h2pp)
+    struct hostent **h2pp)
 {
 	int	rtn, consumed = 0;
 

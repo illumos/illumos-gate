@@ -926,9 +926,9 @@ immu_dmar_blacklisted(char **strptr, uint_t nstrs)
 	for (i = 0; nstrs - i >= 4; i++) {
 		if (strcmp(*strptr++, "DMAR") == 0) {
 			if (strcmp(*strptr++, tbl->tbl_oem_id) == 0 &&
-			    ((char *)strptr == '\0' ||
+			    (*strptr[0] == '\0' ||
 			    strcmp(*strptr++, tbl->tbl_oem_tblid) == 0) &&
-			    ((char *)strptr == '\0' ||
+			    (*strptr[0] == '\0' ||
 			    strcmp(*strptr++, oem_rev) == 0)) {
 				return (B_TRUE);
 			}

@@ -1010,15 +1010,13 @@ load_option:
 		 * going into SELECTING.
 		 */
 
-		if (debug_level == 0 && set_start_timer(dsmp)) {
-			/* next destination: dhcp_start() */
-			break;
-		} else {
+		if (debug_level != 0 || !set_start_timer(dsmp)) {
 			dhcp_selecting(dsmp);
 			/* next destination: dhcp_requesting() */
-			break;
 		}
+		/* else next destination: dhcp_start() */
 	}
+	break;
 
 	case DHCP_STATUS: {
 		dhcp_status_t	status;

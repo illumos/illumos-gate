@@ -52,7 +52,6 @@ CFLAGS=	-nostdinc -DBOOTPROG=\"gptzfsboot\" \
 	-I../../../cddl/boot/zfs \
 	-I../btx/lib -I. \
 	-I../../.. \
-	-I../../../sys \
 	-I../libi386 \
 	-Wall -Waggregate-return -Wbad-function-cast -Wcast-align \
 	-Wmissing-declarations -Wmissing-prototypes -Wnested-externs \
@@ -134,6 +133,9 @@ devicename.o: ../libi386/devicename.c
 
 time.o: ../libi386/time.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ ../libi386/$*.c
+
+multiboot.o: ../../common/multiboot.S
+	$(CC) $(CFLAGS) $(CCASFLAGS) -c -o $@ ../../common/$*.S
 
 .S.o:
 	$(CC) $(CFLAGS) $(CCASFLAGS) -c -o $@ $<
