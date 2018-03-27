@@ -17,38 +17,14 @@
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_ATOMIC_H_
 #define	_COMPAT_FREEBSD_AMD64_MACHINE_ATOMIC_H_
 
-static __inline u_char
-atomic_load_acq_char(volatile u_char *p)
-{
-	u_char res;
-
-	__asm volatile("lock ; " "cmpxchgb %b0,%1"
-		       : "=a" (res), "=m" (*p)
-		       : "m" (*p) : "memory", "cc");
-	return (res);
-}
-
-static __inline u_short
-atomic_load_acq_short(volatile u_short *p)
-{
-	u_short res;
-
-	__asm volatile("lock ; " "cmpxchgw %w0,%1"
-		       : "=a" (res), "=m" (*p)
-		       : "m" (*p)
-		       : "memory", "cc");
-	return (res);
-}
-
 static __inline u_int
 atomic_load_acq_int(volatile u_int *p)
 {
 	u_int res;
 
-	__asm volatile("lock ; " "cmpxchgl %0,%1"
-		       : "=a" (res), "=m" (*p)
-		       : "m" (*p)
-		       : "memory", "cc");
+	res = *p;
+	__asm volatile("" : : : "memory");
+
 	return (res);
 }
 
@@ -57,25 +33,10 @@ atomic_load_acq_long(volatile u_long *p)
 {
 	u_long res;
 
-	__asm volatile("lock ; " "cmpxchgq %0,%1"
-		       : "=a" (res), "=m" (*p)
-		       : "m" (*p)
-		       : "memory", "cc");
+	res = *p;
+	__asm volatile("" : : : "memory");
+
 	return (res);
-}
-
-static __inline void
-atomic_store_rel_char(volatile u_char *p, u_char v)
-{
-	__asm volatile("" : : : "memory");
-	*p = v;
-}
-
-static __inline void
-atomic_store_rel_short(volatile u_short *p, u_short v)
-{
-	__asm volatile("" : : : "memory");
-	*p = v;
 }
 
 static __inline void
