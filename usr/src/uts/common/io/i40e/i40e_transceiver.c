@@ -1045,6 +1045,13 @@ i40e_free_ring_mem(i40e_t *i40e, boolean_t failed_init)
 		i40e_rx_data_t *rxd = i40e->i40e_trqpairs[i].itrq_rxdata;
 
 		/*
+		 * In some cases i40e_alloc_rx_data() may have failed
+		 * and in that case there is no rxd to free.
+		 */
+		if (rxd == NULL)
+			continue;
+
+		/*
 		 * Clean up our RX data. We have to free DMA resources first and
 		 * then if we have no more pending RCB's, then we'll go ahead
 		 * and clean things up. Note, we can't set the stopped flag on

@@ -69,12 +69,7 @@
  * ---------------------
  *
  * The hardware keeps statistics at each physical function/MAC (PF) and it keeps
- * statistics on each virtual station interface (VSI). Currently we only use one
- * VSI per PF (see the i40e_main.c theory statement). The hardware has a limited
- * number of statistics units available. While every PF is guaranteed to have a
- * statistics unit, it is possible that we will run out for a given VSI. We'll
- * have to figure out an appropriate strategy here when we end up supporting
- * multiple VSIs.
+ * statistics on each virtual station interface (VSI).
  *
  * The hardware keeps these statistics as 32-bit and 48-bit counters. We are
  * required to read them and then compute the differences between them. The
@@ -100,10 +95,10 @@
  * data.
  *
  * The pf kstats data is stored in the i40e_t`i40e_pf_kstat. It is backed by the
- * i40e_t`i40e_pf_stat structure. Similarly the VSI related kstat is in
- * i40e_t`i40e_vsi_kstat and the data is backed in the i40e_t`i40e_vsi_stat. All
- * of this data is protected by the i40e_stat_lock, which should be taken last,
- * when acquiring locks.
+ * i40e_t`i40e_pf_stat structure. Similarly the VSI related kstats are in
+ * i40e_t`i40e_vsis[idx].iv_kstats and the data is backed in the
+ * i40e_t`i40e_vsis[idx].iv_stats. All of this data is protected by the
+ * i40e_stat_lock, which should be taken last, when acquiring locks.
  */
 
 static void
@@ -169,15 +164,15 @@ i40e_stat_get_uint32(i40e_t *i40e, uintptr_t reg, kstat_named_t *kstat,
 }
 
 static void
-i40e_stat_vsi_update(i40e_t *i40e, boolean_t init)
+i40e_stat_vsi_update(i40e_t *i40e, uint_t idx, boolean_t init)
 {
 	i40e_vsi_stats_t *ivs;
 	i40e_vsi_kstats_t *ivk;
-	int id = i40e->i40e_vsi_stat_id;
+	uint16_t id = i40e->i40e_vsis[idx].iv_stats_id;
 
-	ASSERT(i40e->i40e_vsi_kstat != NULL);
-	ivs = &i40e->i40e_vsi_stat;
-	ivk = i40e->i40e_vsi_kstat->ks_data;
+	ASSERT3P(i40e->i40e_vsis[idx].iv_kstats, !=, NULL);
+	ivs = &i40e->i40e_vsis[idx].iv_stats;
+	ivk = i40e->i40e_vsis[idx].iv_kstats->ks_data;
 
 	mutex_enter(&i40e->i40e_stat_lock);
 
@@ -231,39 +226,41 @@ i40e_stat_vsi_kstat_update(kstat_t *ksp, int rw)
 		return (EACCES);
 
 	i40e = ksp->ks_private;
-	i40e_stat_vsi_update(i40e, B_FALSE);
+	for (uint_t i = 0; i < i40e->i40e_num_rx_groups; i++)
+		i40e_stat_vsi_update(i40e, i, B_FALSE);
+
 	return (0);
 }
 
 void
-i40e_stat_vsi_fini(i40e_t *i40e)
+i40e_stat_vsi_fini(i40e_t *i40e, uint_t idx)
 {
-	if (i40e->i40e_vsi_kstat != NULL) {
-		kstat_delete(i40e->i40e_vsi_kstat);
-		i40e->i40e_vsi_kstat = NULL;
+	if (i40e->i40e_vsis[idx].iv_kstats != NULL) {
+		kstat_delete(i40e->i40e_vsis[idx].iv_kstats);
+		i40e->i40e_vsis[idx].iv_kstats = NULL;
 	}
 }
 
 boolean_t
-i40e_stat_vsi_init(i40e_t *i40e)
+i40e_stat_vsi_init(i40e_t *i40e, uint_t idx)
 {
 	kstat_t *ksp;
 	i40e_vsi_kstats_t *ivk;
 	char buf[64];
+	uint16_t vsi_id = i40e->i40e_vsis[idx].iv_seid;
 
-	(void) snprintf(buf, sizeof (buf), "vsi_%d", i40e->i40e_vsi_id);
+	(void) snprintf(buf, sizeof (buf), "vsi_%u", vsi_id);
 
 	ksp = kstat_create(I40E_MODULE_NAME, ddi_get_instance(i40e->i40e_dip),
 	    buf, "net", KSTAT_TYPE_NAMED,
 	    sizeof (i40e_vsi_kstats_t) / sizeof (kstat_named_t), 0);
 
 	if (ksp == NULL) {
-		i40e_error(i40e, "Failed to create kstats for VSI %d",
-		    i40e->i40e_vsi_id);
+		i40e_error(i40e, "Failed to create kstats for VSI %u", vsi_id);
 		return (B_FALSE);
 	}
 
-	i40e->i40e_vsi_kstat = ksp;
+	i40e->i40e_vsis[idx].iv_kstats = ksp;
 	ivk = ksp->ks_data;
 	ksp->ks_update = i40e_stat_vsi_kstat_update;
 	ksp->ks_private = i40e;
@@ -291,9 +288,9 @@ i40e_stat_vsi_init(i40e_t *i40e)
 	kstat_named_init(&ivk->ivk_tx_errors, "tx_errors",
 	    KSTAT_DATA_UINT64);
 
-	bzero(&i40e->i40e_vsi_stat, sizeof (i40e_vsi_stats_t));
-	i40e_stat_vsi_update(i40e, B_TRUE);
-	kstat_install(i40e->i40e_vsi_kstat);
+	bzero(&i40e->i40e_vsis[idx].iv_stats, sizeof (i40e_vsi_stats_t));
+	i40e_stat_vsi_update(i40e, idx, B_TRUE);
+	kstat_install(i40e->i40e_vsis[idx].iv_kstats);
 
 	return (B_TRUE);
 }
@@ -670,7 +667,12 @@ i40e_stat_pf_init(i40e_t *i40e)
 void
 i40e_stats_fini(i40e_t *i40e)
 {
-	ASSERT(i40e->i40e_vsi_kstat == NULL);
+#ifdef DEBUG
+	for (uint_t i = 0; i < i40e->i40e_num_rx_groups; i++) {
+		ASSERT3P(i40e->i40e_vsis[i].iv_kstats, ==, NULL);
+	}
+#endif
+
 	if (i40e->i40e_pf_kstat != NULL) {
 		kstat_delete(i40e->i40e_pf_kstat);
 		i40e->i40e_pf_kstat = NULL;

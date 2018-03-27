@@ -39,7 +39,8 @@ char *i40e_priv_props[] = {
 static int
 i40e_group_remove_mac(void *arg, const uint8_t *mac_addr)
 {
-	i40e_t *i40e = arg;
+	i40e_rx_group_t *rxg = arg;
+	i40e_t *i40e = rxg->irg_i40e;
 	struct i40e_aqc_remove_macvlan_element_data filt;
 	struct i40e_hw *hw = &i40e->i40e_hw_space;
 	int ret, i, last;
@@ -107,10 +108,11 @@ done:
 static int
 i40e_group_add_mac(void *arg, const uint8_t *mac_addr)
 {
-	i40e_t *i40e = arg;
-	struct i40e_hw *hw = &i40e->i40e_hw_space;
-	int i, ret;
-	i40e_uaddr_t *iua;
+	i40e_rx_group_t	*rxg = arg;
+	i40e_t		*i40e = rxg->irg_i40e;
+	struct i40e_hw	*hw = &i40e->i40e_hw_space;
+	int		i, ret;
+	i40e_uaddr_t	*iua;
 	struct i40e_aqc_add_macvlan_element_data filt;
 
 	if (I40E_IS_MULTICAST(mac_addr))
@@ -136,16 +138,12 @@ i40e_group_add_mac(void *arg, const uint8_t *mac_addr)
 		}
 	}
 
-	/*
-	 * Note, the general use of the i40e_vsi_id will have to be refactored
-	 * when we have proper group support.
-	 */
 	bzero(&filt, sizeof (filt));
 	bcopy(mac_addr, filt.mac_addr, ETHERADDRL);
 	filt.flags = I40E_AQC_MACVLAN_ADD_PERFECT_MATCH	|
 	    I40E_AQC_MACVLAN_ADD_IGNORE_VLAN;
 
-	if ((ret = i40e_aq_add_macvlan(hw, i40e->i40e_vsi_id, &filt, 1,
+	if ((ret = i40e_aq_add_macvlan(hw, rxg->irg_vsi_seid, &filt, 1,
 	    NULL)) != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to add mac address "
 		    "%2x:%2x:%2x:%2x:%2x:%2x to unicast filter: %d",
@@ -157,7 +155,7 @@ i40e_group_add_mac(void *arg, const uint8_t *mac_addr)
 
 	iua = &i40e->i40e_uaddrs[i40e->i40e_resources.ifr_nmacfilt_used];
 	bcopy(mac_addr, iua->iua_mac, ETHERADDRL);
-	iua->iua_vsi = i40e->i40e_vsi_id;
+	iua->iua_vsi = rxg->irg_vsi_seid;
 	i40e->i40e_resources.ifr_nmacfilt_used++;
 	ASSERT(i40e->i40e_resources.ifr_nmacfilt_used <=
 	    i40e->i40e_resources.ifr_nmacfilt);
@@ -227,7 +225,7 @@ i40e_m_promisc(void *arg, boolean_t on)
 	}
 
 
-	ret = i40e_aq_set_vsi_unicast_promiscuous(hw, i40e->i40e_vsi_id,
+	ret = i40e_aq_set_vsi_unicast_promiscuous(hw, I40E_DEF_VSI_SEID(i40e),
 	    on, NULL, B_FALSE);
 	if (ret != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to %s unicast promiscuity on "
@@ -246,7 +244,7 @@ i40e_m_promisc(void *arg, boolean_t on)
 		goto done;
 	}
 
-	ret = i40e_aq_set_vsi_multicast_promiscuous(hw, i40e->i40e_vsi_id,
+	ret = i40e_aq_set_vsi_multicast_promiscuous(hw, I40E_DEF_VSI_SEID(i40e),
 	    on, NULL);
 	if (ret != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to %s multicast promiscuity on "
@@ -257,8 +255,8 @@ i40e_m_promisc(void *arg, boolean_t on)
 		 * Try our best to put us back into a state that MAC expects us
 		 * to be in.
 		 */
-		ret = i40e_aq_set_vsi_unicast_promiscuous(hw, i40e->i40e_vsi_id,
-		    !on, NULL, B_FALSE);
+		ret = i40e_aq_set_vsi_unicast_promiscuous(hw,
+		    I40E_DEF_VSI_SEID(i40e), !on, NULL, B_FALSE);
 		if (ret != I40E_SUCCESS) {
 			i40e_error(i40e, "failed to %s unicast promiscuity on "
 			    "the default VSI after toggling multicast failed: "
@@ -294,11 +292,11 @@ i40e_multicast_add(i40e_t *i40e, const uint8_t *multicast_address)
 		if (i40e->i40e_mcast_promisc_count == 0 &&
 		    i40e->i40e_promisc_on == B_FALSE) {
 			ret = i40e_aq_set_vsi_multicast_promiscuous(hw,
-			    i40e->i40e_vsi_id, B_TRUE, NULL);
+			    I40E_DEF_VSI_SEID(i40e), B_TRUE, NULL);
 			if (ret != I40E_SUCCESS) {
 				i40e_error(i40e, "failed to enable multicast "
 				    "promiscuous mode on VSI %d: %d",
-				    i40e->i40e_vsi_id, ret);
+				    I40E_DEF_VSI_SEID(i40e), ret);
 				return (EIO);
 			}
 		}
@@ -312,7 +310,7 @@ i40e_multicast_add(i40e_t *i40e, const uint8_t *multicast_address)
 	filt.flags = I40E_AQC_MACVLAN_ADD_HASH_MATCH |
 	    I40E_AQC_MACVLAN_ADD_IGNORE_VLAN;
 
-	if ((ret = i40e_aq_add_macvlan(hw, i40e->i40e_vsi_id, &filt, 1,
+	if ((ret = i40e_aq_add_macvlan(hw, I40E_DEF_VSI_SEID(i40e), &filt, 1,
 	    NULL)) != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to add mac address "
 		    "%2x:%2x:%2x:%2x:%2x:%2x to multicast filter: %d",
@@ -353,8 +351,8 @@ i40e_multicast_remove(i40e_t *i40e, const uint8_t *multicast_address)
 		filt.flags = I40E_AQC_MACVLAN_DEL_HASH_MATCH |
 		    I40E_AQC_MACVLAN_DEL_IGNORE_VLAN;
 
-		if (i40e_aq_remove_macvlan(hw, i40e->i40e_vsi_id,
-		    &filt, 1, NULL) != I40E_SUCCESS) {
+		if (i40e_aq_remove_macvlan(hw, I40E_DEF_VSI_SEID(i40e), &filt,
+		    1, NULL) != I40E_SUCCESS) {
 			i40e_error(i40e, "failed to remove mac address "
 			    "%2x:%2x:%2x:%2x:%2x:%2x from multicast "
 			    "filter: %d",
@@ -381,11 +379,11 @@ i40e_multicast_remove(i40e_t *i40e, const uint8_t *multicast_address)
 		if (i40e->i40e_mcast_promisc_count == 1 &&
 		    i40e->i40e_promisc_on == B_FALSE) {
 			ret = i40e_aq_set_vsi_multicast_promiscuous(hw,
-			    i40e->i40e_vsi_id, B_FALSE, NULL);
+			    I40E_DEF_VSI_SEID(i40e), B_FALSE, NULL);
 			if (ret != I40E_SUCCESS) {
 				i40e_error(i40e, "failed to disable "
 				    "multicast promiscuous mode on VSI %d: %d",
-				    i40e->i40e_vsi_id, ret);
+				    I40E_DEF_VSI_SEID(i40e), ret);
 				return (EIO);
 			}
 		}
@@ -490,7 +488,7 @@ i40e_fill_tx_ring(void *arg, mac_ring_type_t rtype, const int group_index,
 	 * we're not actually grouping things tx-wise at this time.
 	 */
 	ASSERT(group_index == -1);
-	ASSERT(ring_index < i40e->i40e_num_trqpairs);
+	ASSERT(ring_index < i40e->i40e_num_trqpairs_per_vsi);
 
 	itrq->itrq_mactxring = rh;
 	infop->mri_driver = (mac_ring_driver_t)itrq;
@@ -516,15 +514,16 @@ i40e_fill_rx_ring(void *arg, mac_ring_type_t rtype, const int group_index,
 {
 	i40e_t *i40e = arg;
 	mac_intr_t *mintr = &infop->mri_intr;
-	i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[ring_index];
+	uint_t trqpair_index;
+	i40e_trqpair_t *itrq;
 
-	/*
-	 * We assert the group number and ring index to help sanity check
-	 * ourselves and mark that we'll need to rework this when we have
-	 * multiple groups.
-	 */
-	ASSERT3S(group_index, ==, 0);
-	ASSERT3S(ring_index, <, i40e->i40e_num_trqpairs);
+	/* This assumes static groups. */
+	ASSERT3S(group_index, >=, 0);
+	ASSERT3S(ring_index, >=, 0);
+	trqpair_index = (group_index * i40e->i40e_num_trqpairs_per_vsi) +
+	    ring_index;
+	ASSERT3U(trqpair_index, <, i40e->i40e_num_trqpairs);
+	itrq = &i40e->i40e_trqpairs[trqpair_index];
 
 	itrq->itrq_macrxring = rh;
 	infop->mri_driver = (mac_ring_driver_t)itrq;
@@ -552,24 +551,22 @@ i40e_fill_rx_group(void *arg, mac_ring_type_t rtype, const int index,
     mac_group_info_t *infop, mac_group_handle_t gh)
 {
 	i40e_t *i40e = arg;
+	i40e_rx_group_t *rxg;
 
 	if (rtype != MAC_RING_TYPE_RX)
 		return;
 
-	/*
-	 * Note, this is a simplified view of a group, given that we only have a
-	 * single group and a single ring at the moment. We'll want to expand
-	 * upon this as we leverage more hardware functionality.
-	 */
-	i40e->i40e_rx_group_handle = gh;
-	infop->mgi_driver = (mac_group_driver_t)i40e;
+	rxg = &i40e->i40e_rx_groups[index];
+	rxg->irg_grp_hdl = gh;
+
+	infop->mgi_driver = (mac_group_driver_t)rxg;
 	infop->mgi_start = NULL;
 	infop->mgi_stop = NULL;
 	infop->mgi_addmac = i40e_group_add_mac;
 	infop->mgi_remmac = i40e_group_remove_mac;
 
-	ASSERT(i40e->i40e_num_rx_groups == I40E_GROUP_MAX);
-	infop->mgi_count = i40e->i40e_num_trqpairs;
+	ASSERT(i40e->i40e_num_rx_groups <= I40E_GROUP_MAX);
+	infop->mgi_count = i40e->i40e_num_trqpairs_per_vsi;
 }
 
 static int
@@ -750,14 +747,14 @@ i40e_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		switch (cap_rings->mr_type) {
 		case MAC_RING_TYPE_TX:
 			/*
-			 * Note, saying we have no rings, but some number of
-			 * groups indicates to MAC that it should create
-			 * psuedo-groups with one for each TX ring. This may not
-			 * be the long term behavior we want, but it'll work for
-			 * now.
+			 * Note, saying we have no groups, but some
+			 * number of rings indicates to MAC that it
+			 * should create psuedo-groups with one for
+			 * each TX ring. This may not be the long term
+			 * behavior we want, but it'll work for now.
 			 */
 			cap_rings->mr_gnum = 0;
-			cap_rings->mr_rnum = i40e->i40e_num_trqpairs;
+			cap_rings->mr_rnum = i40e->i40e_num_trqpairs_per_vsi;
 			cap_rings->mr_rget = i40e_fill_tx_ring;
 			cap_rings->mr_gget = NULL;
 			cap_rings->mr_gaddring = NULL;
@@ -766,7 +763,7 @@ i40e_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		case MAC_RING_TYPE_RX:
 			cap_rings->mr_rnum = i40e->i40e_num_trqpairs;
 			cap_rings->mr_rget = i40e_fill_rx_ring;
-			cap_rings->mr_gnum = I40E_GROUP_MAX;
+			cap_rings->mr_gnum = i40e->i40e_num_rx_groups;
 			cap_rings->mr_gget = i40e_fill_rx_group;
 			cap_rings->mr_gaddring = NULL;
 			cap_rings->mr_gremring = NULL;

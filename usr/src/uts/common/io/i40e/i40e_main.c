@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -188,14 +188,15 @@
  * VSI Management
  * --------------
  *
- * At this time, we currently only support a single MAC group, and thus a single
- * VSI. This VSI is considered the default VSI and should be the only one that
- * exists after a reset. Currently it is stored as the member
- * i40e_t`i40e_vsi_id. While this works for the moment and for an initial
- * driver, it's not sufficient for the longer-term path of the driver. Instead,
- * we'll want to actually have a unique i40e_vsi_t structure which is used
- * everywhere. Note that this means that every place that uses the
- * i40e_t`i40e_vsi_id will need to be refactored.
+ * The PFs share 384 VSIs. The firmware creates one VSI per PF by default.
+ * During chip start we retrieve the SEID of this VSI and assign it as the
+ * default VSI for our VEB (one VEB per PF). We then add additional VSIs to
+ * the VEB up to the determined number of rx groups: i40e_t`i40e_num_rx_groups.
+ * We currently cap this number to I40E_GROUP_MAX to a) make sure all PFs can
+ * allocate the same number of VSIs, and b) to keep the interrupt multiplexing
+ * under control. In the future, when we improve the interrupt allocation, we
+ * may want to revisit this cap to make better use of the available VSIs. The
+ * VSI allocation and configuration can be found in i40e_chip_start().
  *
  * ----------------
  * Structure Layout
@@ -240,7 +241,7 @@
  *          | i40e_hw_t               --+---> Intel common code structure
  *          | mac_handle_t            --+---> GLDv3 handle to MAC
  *          | ddi_periodic_t          --+---> Link activity timer
- *          | int (vsi_id)            --+---> VSI ID, main identifier
+ *          | i40e_vsi_t *            --+---> Array of VSIs
  *          | i40e_func_rsrc_t        --+---> Available hardware resources
  *          | i40e_switch_rsrc_t *    --+---> Switch resource snapshot
  *          | i40e_sdu                --+---> Current MTU
@@ -249,11 +250,10 @@
  *          | i40e_maddr_t *          --+---> Array of assigned multicast MACs
  *          | i40e_mcast_promisccount --+---> Active multicast state
  *          | i40e_promisc_on         --+---> Current promiscuous mode state
- *          | int                     --+---> Number of transmit/receive pairs
+ *          | uint_t                  --+---> Number of transmit/receive pairs
+ *          | i40e_rx_group_t *       --+---> Array of Rx groups
  *          | kstat_t *               --+---> PF kstats
- *          | kstat_t *               --+---> VSI kstats
  *          | i40e_pf_stats_t         --+---> PF kstat backing data
- *          | i40e_vsi_stats_t        --+---> VSI kstat backing data
  *          | i40e_trqpair_t *        --+---------+
  *          +---------------------------+         |
  *                                                |
@@ -359,7 +359,6 @@
  * While bugs have been filed to cover this future work, the following gives an
  * overview of expected work:
  *
- *  o Multiple group support
  *  o DMA binding and breaking up the locking in ring recycling.
  *  o Enhanced detection of device errors
  *  o Participation in IRM
@@ -760,15 +759,49 @@ i40e_fm_ereport(i40e_t *i40e, char *detail)
 }
 
 /*
- * Here we're trying to get the ID of the default VSI. In general, when we come
- * through and look at this shortly after attach, we expect there to only be a
- * single element present, which is the default VSI. Importantly, each PF seems
- * to not see any other devices, in part because of the simple switch mode that
- * we're using. If for some reason, we see more artifact, we'll need to revisit
- * what we're doing here.
+ * Here we're trying to set the SEID of the default VSI. In general,
+ * when we come through and look at this shortly after attach, we
+ * expect there to only be a single element present, which is the
+ * default VSI. Importantly, each PF seems to not see any other
+ * devices, in part because of the simple switch mode that we're
+ * using. If for some reason, we see more artifacts, we'll need to
+ * revisit what we're doing here.
+ */
+static boolean_t
+i40e_set_def_vsi_seid(i40e_t *i40e)
+{
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
+	struct i40e_aqc_get_switch_config_resp *sw_config;
+	uint8_t aq_buf[I40E_AQ_LARGE_BUF];
+	uint16_t next = 0;
+	int rc;
+
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
+	sw_config = (struct i40e_aqc_get_switch_config_resp *)aq_buf;
+	rc = i40e_aq_get_switch_config(hw, sw_config, sizeof (aq_buf), &next,
+	    NULL);
+	if (rc != I40E_SUCCESS) {
+		i40e_error(i40e, "i40e_aq_get_switch_config() failed %d: %d",
+		    rc, hw->aq.asq_last_status);
+		return (B_FALSE);
+	}
+
+	if (LE_16(sw_config->header.num_reported) != 1) {
+		i40e_error(i40e, "encountered multiple (%d) switching units "
+		    "during attach, not proceeding",
+		    LE_16(sw_config->header.num_reported));
+		return (B_FALSE);
+	}
+
+	I40E_DEF_VSI_SEID(i40e) = sw_config->element[0].seid;
+	return (B_TRUE);
+}
+
+/*
+ * Get the SEID of the uplink MAC.
  */
 static int
-i40e_get_vsi_id(i40e_t *i40e)
+i40e_get_mac_seid(i40e_t *i40e)
 {
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 	struct i40e_aqc_get_switch_config_resp *sw_config;
@@ -786,14 +819,7 @@ i40e_get_vsi_id(i40e_t *i40e)
 		return (-1);
 	}
 
-	if (LE_16(sw_config->header.num_reported) != 1) {
-		i40e_error(i40e, "encountered multiple (%d) switching units "
-		    "during attach, not proceeding",
-		    LE_16(sw_config->header.num_reported));
-		return (-1);
-	}
-
-	return (sw_config->element[0].seid);
+	return (LE_16(sw_config->element[0].uplink_seid));
 }
 
 /*
@@ -1097,11 +1123,16 @@ i40e_disable_interrupts(i40e_t *i40e)
 static void
 i40e_free_trqpairs(i40e_t *i40e)
 {
-	int i;
 	i40e_trqpair_t *itrq;
 
+	if (i40e->i40e_rx_groups != NULL) {
+		kmem_free(i40e->i40e_rx_groups,
+		    sizeof (i40e_rx_group_t) * i40e->i40e_num_rx_groups);
+		i40e->i40e_rx_groups = NULL;
+	}
+
 	if (i40e->i40e_trqpairs != NULL) {
-		for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+		for (uint_t i = 0; i < i40e->i40e_num_trqpairs; i++) {
 			itrq = &i40e->i40e_trqpairs[i];
 			mutex_destroy(&itrq->itrq_rx_lock);
 			mutex_destroy(&itrq->itrq_tx_lock);
@@ -1132,7 +1163,6 @@ i40e_free_trqpairs(i40e_t *i40e)
 static boolean_t
 i40e_alloc_trqpairs(i40e_t *i40e)
 {
-	int i;
 	void *mutexpri = DDI_INTR_PRI(i40e->i40e_intr_pri);
 
 	/*
@@ -1145,7 +1175,7 @@ i40e_alloc_trqpairs(i40e_t *i40e)
 
 	i40e->i40e_trqpairs = kmem_zalloc(sizeof (i40e_trqpair_t) *
 	    i40e->i40e_num_trqpairs, KM_SLEEP);
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+	for (uint_t i = 0; i < i40e->i40e_num_trqpairs; i++) {
 		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
 
 		itrq->itrq_i40e = i40e;
@@ -1153,6 +1183,16 @@ i40e_alloc_trqpairs(i40e_t *i40e)
 		mutex_init(&itrq->itrq_tx_lock, NULL, MUTEX_DRIVER, mutexpri);
 		mutex_init(&itrq->itrq_tcb_lock, NULL, MUTEX_DRIVER, mutexpri);
 		itrq->itrq_index = i;
+	}
+
+	i40e->i40e_rx_groups = kmem_zalloc(sizeof (i40e_rx_group_t) *
+	    i40e->i40e_num_rx_groups, KM_SLEEP);
+
+	for (uint_t i = 0; i < i40e->i40e_num_rx_groups; i++) {
+		i40e_rx_group_t *rxg = &i40e->i40e_rx_groups[i];
+
+		rxg->irg_index = i;
+		rxg->irg_i40e = i40e;
 	}
 
 	return (B_TRUE);
@@ -1163,16 +1203,19 @@ i40e_alloc_trqpairs(i40e_t *i40e)
 /*
  * Unless a .conf file already overrode i40e_t structure values, they will
  * be 0, and need to be set in conjunction with the now-available HW report.
- *
- * However, at the moment, we cap all of these resources as we only support a
- * single receive ring and a single group.
  */
 /* ARGSUSED */
 static void
 i40e_hw_to_instance(i40e_t *i40e, i40e_hw_t *hw)
 {
-	if (i40e->i40e_num_trqpairs == 0) {
-		i40e->i40e_num_trqpairs = I40E_TRQPAIR_MAX;
+	if (i40e->i40e_num_trqpairs_per_vsi == 0) {
+		if (i40e_is_x722(i40e)) {
+			i40e->i40e_num_trqpairs_per_vsi =
+			    I40E_722_MAX_TC_QUEUES;
+		} else {
+			i40e->i40e_num_trqpairs_per_vsi =
+			    I40E_710_MAX_TC_QUEUES;
+		}
 	}
 
 	if (i40e->i40e_num_rx_groups == 0) {
@@ -1308,12 +1351,11 @@ i40e_common_code_init(i40e_t *i40e, i40e_hw_t *hw)
 	}
 
 	/*
-	 * We need to obtain the Virtual Station ID (VSI) before we can
-	 * perform other operations on the device.
+	 * We need to obtain the Default Virtual Station SEID (VSI)
+	 * before we can perform other operations on the device.
 	 */
-	i40e->i40e_vsi_id = i40e_get_vsi_id(i40e);
-	if (i40e->i40e_vsi_id == -1) {
-		i40e_error(i40e, "failed to obtain VSI ID");
+	if (!i40e_set_def_vsi_seid(i40e)) {
+		i40e_error(i40e, "failed to obtain Default VSI SEID");
 		return (B_FALSE);
 	}
 
@@ -1730,15 +1772,56 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 	}
 
 	i40e->i40e_intr_type = 0;
+	i40e->i40e_num_rx_groups = I40E_GROUP_MAX;
 
+	/*
+	 * We need to determine the number of queue pairs per traffic
+	 * class. We only have one traffic class (TC0), so we'll base
+	 * this off the number of interrupts provided. Furthermore,
+	 * since we only use one traffic class, the number of queues
+	 * per traffic class and per VSI are the same.
+	 */
 	if ((intr_types & DDI_INTR_TYPE_MSIX) &&
-	    i40e->i40e_intr_force <= I40E_INTR_MSIX) {
-		if (i40e_alloc_intr_handles(i40e, devinfo,
-		    DDI_INTR_TYPE_MSIX)) {
-			i40e->i40e_num_trqpairs =
-			    MIN(i40e->i40e_intr_count - 1, max_trqpairs);
-			return (B_TRUE);
-		}
+	    (i40e->i40e_intr_force <= I40E_INTR_MSIX) &&
+	    (i40e_alloc_intr_handles(i40e, devinfo, DDI_INTR_TYPE_MSIX))) {
+		uint32_t n;
+
+		/*
+		 * While we want the number of queue pairs to match
+		 * the number of interrupts, we must keep stay in
+		 * bounds of the maximum number of queues per traffic
+		 * class. We subtract one from i40e_intr_count to
+		 * account for interrupt zero; which is currently
+		 * restricted to admin queue commands and other
+		 * interrupt causes.
+		 */
+		n = MIN(i40e->i40e_intr_count - 1, max_trqpairs);
+		ASSERT3U(n, >, 0);
+
+		/*
+		 * Round up to the nearest power of two to ensure that
+		 * the QBASE aligns with the TC size which must be
+		 * programmed as a power of two. See the queue mapping
+		 * description in section 7.4.9.5.5.1.
+		 *
+		 * If i40e_intr_count - 1 is not a power of two then
+		 * some queue pairs on the same VSI will have to share
+		 * an interrupt.
+		 *
+		 * We may want to revisit this logic in a future where
+		 * we have more interrupts and more VSIs. Otherwise,
+		 * each VSI will use as many interrupts as possible.
+		 * Using more QPs per VSI means better RSS for each
+		 * group, but at the same time may require more
+		 * sharing of interrupts across VSIs. This may be a
+		 * good candidate for a .conf tunable.
+		 */
+		n = 0x1 << ddi_fls(n);
+		i40e->i40e_num_trqpairs_per_vsi = n;
+		ASSERT3U(i40e->i40e_num_rx_groups, >, 0);
+		i40e->i40e_num_trqpairs = i40e->i40e_num_trqpairs_per_vsi *
+		    i40e->i40e_num_rx_groups;
+		return (B_TRUE);
 	}
 
 	/*
@@ -1747,6 +1830,7 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 	 * single MSI interrupt.
 	 */
 	i40e->i40e_num_trqpairs = I40E_TRQPAIR_NOMSIX;
+	i40e->i40e_num_trqpairs_per_vsi = i40e->i40e_num_trqpairs;
 	i40e->i40e_num_rx_groups = I40E_GROUP_NOMSIX;
 
 	if ((intr_types & DDI_INTR_TYPE_MSI) &&
@@ -1769,24 +1853,20 @@ i40e_alloc_intrs(i40e_t *i40e, dev_info_t *devinfo)
 static boolean_t
 i40e_map_intrs_to_vectors(i40e_t *i40e)
 {
-	int i;
-
 	if (i40e->i40e_intr_type != DDI_INTR_TYPE_MSIX) {
 		return (B_TRUE);
 	}
 
 	/*
-	 * Each queue pair is mapped to a single interrupt, so transmit
-	 * and receive interrupts for a given queue share the same vector.
-	 * The number of queue pairs is one less than the number of interrupt
-	 * vectors and is assigned the vector one higher than its index.
-	 * Vector zero is reserved for the admin queue.
+	 * Each queue pair is mapped to a single interrupt, so
+	 * transmit and receive interrupts for a given queue share the
+	 * same vector. Vector zero is reserved for the admin queue.
 	 */
-	ASSERT(i40e->i40e_intr_count == i40e->i40e_num_trqpairs + 1);
+	for (uint_t i = 0; i < i40e->i40e_num_trqpairs; i++) {
+		uint_t vector = i % (i40e->i40e_intr_count - 1);
 
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		i40e->i40e_trqpairs[i].itrq_rx_intrvec = i + 1;
-		i40e->i40e_trqpairs[i].itrq_tx_intrvec = i + 1;
+		i40e->i40e_trqpairs[i].itrq_rx_intrvec = vector + 1;
+		i40e->i40e_trqpairs[i].itrq_tx_intrvec = vector + 1;
 	}
 
 	return (B_TRUE);
@@ -1925,69 +2005,269 @@ i40e_init_macaddrs(i40e_t *i40e, i40e_hw_t *hw)
 }
 
 /*
- * Configure the hardware for the Virtual Station Interface (VSI).  Currently
- * we only support one, but in the future we could instantiate more than one
- * per attach-point.
+ * Set the properties which have common values across all the VSIs.
+ * Consult the "Add VSI" command section (7.4.9.5.5.1) for a
+ * complete description of these properties.
+ */
+static void
+i40e_set_shared_vsi_props(i40e_t *i40e,
+    struct i40e_aqc_vsi_properties_data *info, uint_t vsi_idx)
+{
+	uint_t tc_queues;
+	uint16_t vsi_qp_base;
+
+	/*
+	 * It's important that we use bitwise-OR here; callers to this
+	 * function might enable other sections before calling this
+	 * function.
+	 */
+	info->valid_sections |= LE_16(I40E_AQ_VSI_PROP_QUEUE_MAP_VALID |
+	    I40E_AQ_VSI_PROP_VLAN_VALID);
+
+	/*
+	 * Calculate the starting QP index for this VSI. This base is
+	 * relative to the PF queue space; so a value of 0 for PF#1
+	 * represents the absolute index PFLAN_QALLOC_FIRSTQ for PF#1.
+	 */
+	vsi_qp_base = vsi_idx * i40e->i40e_num_trqpairs_per_vsi;
+	info->mapping_flags = LE_16(I40E_AQ_VSI_QUE_MAP_CONTIG);
+	info->queue_mapping[0] =
+	    LE_16((vsi_qp_base << I40E_AQ_VSI_QUEUE_SHIFT) &
+		I40E_AQ_VSI_QUEUE_MASK);
+
+	/*
+	 * tc_queues determines the size of the traffic class, where
+	 * the size is 2^^tc_queues to a maximum of 64 for the X710
+	 * and 128 for the X722.
+	 *
+	 * Some examples:
+	 * 	i40e_num_trqpairs_per_vsi == 1 =>  tc_queues = 0, 2^^0 = 1.
+	 * 	i40e_num_trqpairs_per_vsi == 7 =>  tc_queues = 3, 2^^3 = 8.
+	 * 	i40e_num_trqpairs_per_vsi == 8 =>  tc_queues = 3, 2^^3 = 8.
+	 * 	i40e_num_trqpairs_per_vsi == 9 =>  tc_queues = 4, 2^^4 = 16.
+	 * 	i40e_num_trqpairs_per_vsi == 17 => tc_queues = 5, 2^^5 = 32.
+	 * 	i40e_num_trqpairs_per_vsi == 64 => tc_queues = 6, 2^^6 = 64.
+	 */
+	tc_queues = ddi_fls(i40e->i40e_num_trqpairs_per_vsi - 1);
+
+	/*
+	 * The TC queue mapping is in relation to the VSI queue space.
+	 * Since we are only using one traffic class (TC0) we always
+	 * start at queue offset 0.
+	 */
+	info->tc_mapping[0] =
+	    LE_16(((0 << I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT) &
+		    I40E_AQ_VSI_TC_QUE_OFFSET_MASK) |
+		((tc_queues << I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT) &
+		    I40E_AQ_VSI_TC_QUE_NUMBER_MASK));
+
+	/*
+	 * I40E_AQ_VSI_PVLAN_MODE_ALL ("VLAN driver insertion mode")
+	 *
+	 *	Allow tagged and untagged packets to be sent to this
+	 *	VSI from the host.
+	 *
+	 * I40E_AQ_VSI_PVLAN_EMOD_NOTHING ("VLAN and UP expose mode")
+	 *
+	 *	Leave the tag on the frame and place no VLAN
+	 *	information in the descriptor. We want this mode
+	 *	because our MAC layer will take care of the VLAN tag,
+	 *	if there is one.
+	 */
+	info->port_vlan_flags = I40E_AQ_VSI_PVLAN_MODE_ALL |
+	    I40E_AQ_VSI_PVLAN_EMOD_NOTHING;
+}
+
+/*
+ * Delete the VSI at this index, if one exists. We assume there is no
+ * action we can take if this command fails but to log the failure.
+ */
+static void
+i40e_delete_vsi(i40e_t *i40e, uint_t idx)
+{
+	i40e_hw_t	*hw = &i40e->i40e_hw_space;
+	uint16_t	seid = i40e->i40e_vsis[idx].iv_seid;
+
+	if (seid != 0) {
+		int rc;
+
+		rc = i40e_aq_delete_element(hw, seid, NULL);
+
+		if (rc != I40E_SUCCESS) {
+			i40e_error(i40e, "Failed to delete VSI %d: %d",
+			    rc, hw->aq.asq_last_status);
+		}
+
+		i40e->i40e_vsis[idx].iv_seid = 0;
+	}
+}
+
+/*
+ * Add a new VSI.
  */
 static boolean_t
-i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
+i40e_add_vsi(i40e_t *i40e, i40e_hw_t *hw, uint_t idx)
 {
-	struct i40e_vsi_context	context;
-	int err, tc_queues;
+	struct i40e_vsi_context	ctx;
+	i40e_rx_group_t		*rxg;
+	int			rc;
 
-	bzero(&context, sizeof (struct i40e_vsi_context));
-	context.seid = i40e->i40e_vsi_id;
-	context.pf_num = hw->pf_id;
-	err = i40e_aq_get_vsi_params(hw, &context, NULL);
+	/*
+	 * The default VSI is created by the controller. This function
+	 * creates new, non-defualt VSIs only.
+	 */
+	ASSERT3U(idx, !=, 0);
+
+	bzero(&ctx, sizeof (struct i40e_vsi_context));
+	ctx.uplink_seid = i40e->i40e_veb_seid;
+	ctx.pf_num = hw->pf_id;
+	ctx.flags = I40E_AQ_VSI_TYPE_PF;
+	ctx.connection_type = I40E_AQ_VSI_CONN_TYPE_NORMAL;
+	i40e_set_shared_vsi_props(i40e, &ctx.info, idx);
+
+	rc = i40e_aq_add_vsi(hw, &ctx, NULL);
+	if (rc != I40E_SUCCESS) {
+		i40e_error(i40e, "i40e_aq_add_vsi() failed %d: %d", rc,
+		    hw->aq.asq_last_status);
+		return (B_FALSE);
+	}
+
+	rxg = &i40e->i40e_rx_groups[idx];
+	rxg->irg_vsi_seid = ctx.seid;
+	i40e->i40e_vsis[idx].iv_number = ctx.vsi_number;
+	i40e->i40e_vsis[idx].iv_seid = ctx.seid;
+	i40e->i40e_vsis[idx].iv_stats_id = LE_16(ctx.info.stat_counter_idx);
+
+	if (i40e_stat_vsi_init(i40e, idx) == B_FALSE)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Configure the hardware for the Default Virtual Station Interface (VSI).
+ */
+static boolean_t
+i40e_config_def_vsi(i40e_t *i40e, i40e_hw_t *hw)
+{
+	struct i40e_vsi_context	ctx;
+	i40e_rx_group_t *def_rxg;
+	int err;
+	struct i40e_aqc_remove_macvlan_element_data filt;
+
+	bzero(&ctx, sizeof (struct i40e_vsi_context));
+	ctx.seid = I40E_DEF_VSI_SEID(i40e);
+	ctx.pf_num = hw->pf_id;
+	err = i40e_aq_get_vsi_params(hw, &ctx, NULL);
 	if (err != I40E_SUCCESS) {
 		i40e_error(i40e, "get VSI params failed with %d", err);
 		return (B_FALSE);
 	}
 
-	i40e->i40e_vsi_num = context.vsi_number;
-
-	/*
-	 * Set the queue and traffic class bits.  Keep it simple for now.
-	 */
-	context.info.valid_sections = I40E_AQ_VSI_PROP_QUEUE_MAP_VALID;
-	context.info.mapping_flags = I40E_AQ_VSI_QUE_MAP_CONTIG;
-	context.info.queue_mapping[0] = I40E_ASSIGN_ALL_QUEUES;
-
-	/*
-	 * tc_queues determines the size of the traffic class, where the size is
-	 * 2^^tc_queues to a maximum of 64 for the X710 and 128 for the X722.
-	 *
-	 * Some examples:
-	 * 	i40e_num_trqpairs == 1 =>  tc_queues = 0, 2^^0 = 1.
-	 * 	i40e_num_trqpairs == 7 =>  tc_queues = 3, 2^^3 = 8.
-	 * 	i40e_num_trqpairs == 8 =>  tc_queues = 3, 2^^3 = 8.
-	 * 	i40e_num_trqpairs == 9 =>  tc_queues = 4, 2^^4 = 16.
-	 * 	i40e_num_trqpairs == 17 => tc_queues = 5, 2^^5 = 32.
-	 * 	i40e_num_trqpairs == 64 => tc_queues = 6, 2^^6 = 64.
-	 */
-	tc_queues = ddi_fls(i40e->i40e_num_trqpairs - 1);
-
-	context.info.tc_mapping[0] = ((0 << I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT) &
-	    I40E_AQ_VSI_TC_QUE_OFFSET_MASK) |
-	    ((tc_queues << I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT) &
-	    I40E_AQ_VSI_TC_QUE_NUMBER_MASK);
-
-	context.info.valid_sections |= I40E_AQ_VSI_PROP_VLAN_VALID;
-	context.info.port_vlan_flags = I40E_AQ_VSI_PVLAN_MODE_ALL |
-	    I40E_AQ_VSI_PVLAN_EMOD_NOTHING;
-
-	context.flags = LE16_TO_CPU(I40E_AQ_VSI_TYPE_PF);
-
-	i40e->i40e_vsi_stat_id = LE16_TO_CPU(context.info.stat_counter_idx);
-	if (i40e_stat_vsi_init(i40e) == B_FALSE)
+	ctx.info.valid_sections = 0;
+	i40e->i40e_vsis[0].iv_number = ctx.vsi_number;
+	i40e->i40e_vsis[0].iv_stats_id = LE_16(ctx.info.stat_counter_idx);
+	if (i40e_stat_vsi_init(i40e, 0) == B_FALSE)
 		return (B_FALSE);
 
-	err = i40e_aq_update_vsi_params(hw, &context, NULL);
+	i40e_set_shared_vsi_props(i40e, &ctx.info, I40E_DEF_VSI_IDX);
+
+	err = i40e_aq_update_vsi_params(hw, &ctx, NULL);
 	if (err != I40E_SUCCESS) {
 		i40e_error(i40e, "Update VSI params failed with %d", err);
 		return (B_FALSE);
 	}
 
+	def_rxg = &i40e->i40e_rx_groups[0];
+	def_rxg->irg_vsi_seid = I40E_DEF_VSI_SEID(i40e);
+
+	/*
+	 * The controller places an implicit L2 filter for the primary
+	 * MAC pointing to the default VSI. We remove this filter to
+	 * prevent duplicate delivery of packets destined for the
+	 * primary MAC address as DLS will create the same filter on a
+	 * non-default VSI for the primary MAC client.
+	 */
+	bzero(&filt, sizeof (filt));
+	bcopy(hw->mac.port_addr, filt.mac_addr, ETHERADDRL);
+	filt.flags = I40E_AQC_MACVLAN_DEL_PERFECT_MATCH;
+	filt.vlan_tag = 0;
+
+
+	ASSERT3U(i40e->i40e_resources.ifr_nmacfilt_used, <=, 1);
+
+	err = i40e_aq_remove_macvlan(hw, I40E_DEF_VSI_SEID(i40e), &filt, 1,
+	    NULL);
+	if (err != I40E_SUCCESS) {
+		i40e_error(i40e, "Failed to remove primary MAC from default VSI"
+		    ":  %d (%d)", err, hw->aq.asq_last_status);
+		return (B_FALSE);
+	}
+
+	/*
+	 *  As mentioned above, the controller created an implicit L2
+	 *  filter for the primary MAC. We want to remove both the
+	 *  filter and decrement the filter count. However, not all
+	 *  controllers count this implicit filter against the total
+	 *  MAC filter count. So here we are making sure it is either
+	 *  one or zero. If it is one, then we know it is for the
+	 *  implicit filter and we should decrement since we just
+	 *  removed the filter above. If it is zero then we know the
+	 *  controller that does not count the implicit filter, and it
+	 *  was enough to just remove it; we leave the count alone.
+	 *  But if it is neither, then we have never seen a controller
+	 *  like this before and we should fail to attach.
+	 *
+	 *  It is unfortunate that this code must exist but the
+	 *  behavior of this implicit L2 filter and its corresponding
+	 *  count were dicovered through empirical testing. The
+	 *  programming manuals hint at this filter but do not
+	 *  explicitly call out the exact behavior.
+	 */
+	if (i40e->i40e_resources.ifr_nmacfilt_used == 1) {
+		i40e->i40e_resources.ifr_nmacfilt_used--;
+	} else {
+		if (i40e->i40e_resources.ifr_nmacfilt_used != 0) {
+			i40e_error(i40e, "Unexpected MAC filter count: %u"
+			    " (expected 0)",
+			    i40e->i40e_resources.ifr_nmacfilt_used);
+			    return (B_FALSE);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+static boolean_t
+i40e_config_rss_key_x722(i40e_t *i40e, i40e_hw_t *hw)
+{
+	for (uint_t i = 0; i < i40e->i40e_num_rx_groups; i++) {
+		uint32_t seed[I40E_PFQF_HKEY_MAX_INDEX + 1];
+		struct i40e_aqc_get_set_rss_key_data key;
+		const char *u8seed;
+		enum i40e_status_code status;
+		uint16_t vsi_number = i40e->i40e_vsis[i].iv_number;
+
+		(void) random_get_pseudo_bytes((uint8_t *)seed, sizeof (seed));
+		u8seed = (char *)seed;
+
+		CTASSERT(sizeof (key) >= (sizeof (key.standard_rss_key) +
+		    sizeof (key.extended_hash_key)));
+
+		bcopy(u8seed, key.standard_rss_key,
+		    sizeof (key.standard_rss_key));
+		bcopy(&u8seed[sizeof (key.standard_rss_key)],
+		    key.extended_hash_key, sizeof (key.extended_hash_key));
+
+		ASSERT3U(vsi_number, !=, 0);
+		status = i40e_aq_set_rss_key(hw, vsi_number, &key);
+
+		if (status != I40E_SUCCESS) {
+			i40e_error(i40e, "failed to set RSS key for VSI %u: %d",
+			    vsi_number, status);
+			return (B_FALSE);
+		}
+	}
 
 	return (B_TRUE);
 }
@@ -2000,31 +2280,14 @@ i40e_config_vsi(i40e_t *i40e, i40e_hw_t *hw)
 static boolean_t
 i40e_config_rss_key(i40e_t *i40e, i40e_hw_t *hw)
 {
-	uint32_t seed[I40E_PFQF_HKEY_MAX_INDEX + 1];
-
-	(void) random_get_pseudo_bytes((uint8_t *)seed, sizeof (seed));
-
 	if (i40e_is_x722(i40e)) {
-		struct i40e_aqc_get_set_rss_key_data key;
-		const char *u8seed = (char *)seed;
-		enum i40e_status_code status;
-
-		CTASSERT(sizeof (key) >= (sizeof (key.standard_rss_key) +
-		    sizeof (key.extended_hash_key)));
-
-		bcopy(u8seed, key.standard_rss_key,
-		    sizeof (key.standard_rss_key));
-		bcopy(&u8seed[sizeof (key.standard_rss_key)],
-		    key.extended_hash_key, sizeof (key.extended_hash_key));
-
-		status = i40e_aq_set_rss_key(hw, i40e->i40e_vsi_num, &key);
-		if (status != I40E_SUCCESS) {
-			i40e_error(i40e, "failed to set rss key: %d", status);
+		if (!i40e_config_rss_key_x722(i40e, hw))
 			return (B_FALSE);
-		}
 	} else {
-		uint_t i;
-		for (i = 0; i <= I40E_PFQF_HKEY_MAX_INDEX; i++)
+		uint32_t seed[I40E_PFQF_HKEY_MAX_INDEX + 1];
+
+		(void) random_get_pseudo_bytes((uint8_t *)seed, sizeof (seed));
+		for (uint_t i = 0; i <= I40E_PFQF_HKEY_MAX_INDEX; i++)
 			i40e_write_rx_ctl(hw, I40E_PFQF_HKEY(i), seed[i]);
 	}
 
@@ -2036,11 +2299,12 @@ i40e_config_rss_key(i40e_t *i40e, i40e_hw_t *hw)
  * family, with the X722 using a known 7-bit width. On the X710 controller, this
  * is programmed through its control registers where as on the X722 this is
  * configured through the admin queue. Also of note, the X722 allows the LUT to
- * be set on a per-PF or VSI basis. At this time, as we only have a single VSI,
- * we use the PF setting as it is the primary VSI.
+ * be set on a per-PF or VSI basis. At this time we use the PF setting. If we
+ * decide to use the per-VSI LUT in the future, then we will need to modify the
+ * i40e_add_vsi() function to set the RSS LUT bits in the queueing section.
  *
  * We populate the LUT in a round robin fashion with the rx queue indices from 0
- * to i40e_num_trqpairs - 1.
+ * to i40e_num_trqpairs_per_vsi - 1.
  */
 static boolean_t
 i40e_config_rss_hlut(i40e_t *i40e, i40e_hw_t *hw)
@@ -2070,15 +2334,20 @@ i40e_config_rss_hlut(i40e_t *i40e, i40e_hw_t *hw)
 		lut_mask = (1 << hw->func_caps.rss_table_entry_width) - 1;
 	}
 
-	for (i = 0; i < I40E_HLUT_TABLE_SIZE; i++)
-		((uint8_t *)hlut)[i] = (i % i40e->i40e_num_trqpairs) & lut_mask;
+	for (i = 0; i < I40E_HLUT_TABLE_SIZE; i++) {
+		((uint8_t *)hlut)[i] =
+		    (i % i40e->i40e_num_trqpairs_per_vsi) & lut_mask;
+	}
 
 	if (i40e_is_x722(i40e)) {
 		enum i40e_status_code status;
-		status = i40e_aq_set_rss_lut(hw, i40e->i40e_vsi_num, B_TRUE,
-		    (uint8_t *)hlut, I40E_HLUT_TABLE_SIZE);
+
+		status = i40e_aq_set_rss_lut(hw, 0, B_TRUE, (uint8_t *)hlut,
+		    I40E_HLUT_TABLE_SIZE);
+
 		if (status != I40E_SUCCESS) {
-			i40e_error(i40e, "failed to set RSS LUT: %d", status);
+			i40e_error(i40e, "failed to set RSS LUT %d: %d",
+			    status, hw->aq.asq_last_status);
 			goto out;
 		}
 	} else {
@@ -2190,8 +2459,34 @@ i40e_chip_start(i40e_t *i40e)
 
 	i40e_intr_chip_init(i40e);
 
-	if (!i40e_config_vsi(i40e, hw))
+	rc = i40e_get_mac_seid(i40e);
+	if (rc == -1) {
+		i40e_error(i40e, "failed to obtain MAC Uplink SEID");
 		return (B_FALSE);
+	}
+	i40e->i40e_mac_seid = (uint16_t)rc;
+
+	/*
+	 * Create a VEB in order to support multiple VSIs. Each VSI
+	 * functions as a MAC group. This call sets the PF's MAC as
+	 * the uplink port and the PF's default VSI as the default
+	 * downlink port.
+	 */
+	rc = i40e_aq_add_veb(hw, i40e->i40e_mac_seid, I40E_DEF_VSI_SEID(i40e),
+	    0x1, B_TRUE, &i40e->i40e_veb_seid, B_FALSE, NULL);
+	if (rc != I40E_SUCCESS) {
+		i40e_error(i40e, "i40e_aq_add_veb() failed %d: %d", rc,
+		    hw->aq.asq_last_status);
+		return (B_FALSE);
+	}
+
+	if (!i40e_config_def_vsi(i40e, hw))
+		return (B_FALSE);
+
+	for (uint_t i = 1; i < i40e->i40e_num_rx_groups; i++) {
+		if (!i40e_add_vsi(i40e, hw, i))
+			return (B_FALSE);
+	}
 
 	if (!i40e_config_rss(i40e, hw))
 		return (B_FALSE);
@@ -2551,7 +2846,7 @@ i40e_setup_tx_hmc(i40e_trqpair_t *itrq)
 	 * assigned to traffic class zero, because we don't actually use them.
 	 */
 	bzero(&context, sizeof (struct i40e_vsi_context));
-	context.seid = i40e->i40e_vsi_id;
+	context.seid = I40E_DEF_VSI_SEID(i40e);
 	context.pf_num = hw->pf_id;
 	err = i40e_aq_get_vsi_params(hw, &context, NULL);
 	if (err != I40E_SUCCESS) {
@@ -2655,7 +2950,8 @@ i40e_setup_tx_rings(i40e_t *i40e)
 void
 i40e_stop(i40e_t *i40e, boolean_t free_allocations)
 {
-	int i;
+	uint_t i;
+	i40e_hw_t *hw = &i40e->i40e_hw_space;
 
 	ASSERT(MUTEX_HELD(&i40e->i40e_general_lock));
 
@@ -2691,6 +2987,27 @@ i40e_stop(i40e_t *i40e, boolean_t free_allocations)
 
 	delay(50 * drv_usectohz(1000));
 
+	/*
+	 * We don't delete the default VSI because it replaces the VEB
+	 * after VEB deletion (see the "Delete Element" section).
+	 * Furthermore, since the default VSI is provided by the
+	 * firmware, we never attempt to delete it.
+	 */
+	for (i = 1; i < i40e->i40e_num_rx_groups; i++) {
+		i40e_delete_vsi(i40e, i);
+	}
+
+	if (i40e->i40e_veb_seid != 0) {
+		int rc = i40e_aq_delete_element(hw, i40e->i40e_veb_seid, NULL);
+
+		if (rc != I40E_SUCCESS) {
+			i40e_error(i40e, "Failed to delete VEB %d: %d", rc,
+			    hw->aq.asq_last_status);
+		}
+
+		i40e->i40e_veb_seid = 0;
+	}
+
 	i40e_intr_chip_fini(i40e);
 
 	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
@@ -2720,7 +3037,9 @@ i40e_stop(i40e_t *i40e, boolean_t free_allocations)
 		mutex_exit(&i40e->i40e_trqpairs[i].itrq_tx_lock);
 	}
 
-	i40e_stat_vsi_fini(i40e);
+	for (i = 0; i < i40e->i40e_num_rx_groups; i++) {
+		i40e_stat_vsi_fini(i40e, i);
+	}
 
 	i40e->i40e_link_speed = 0;
 	i40e->i40e_link_duplex = 0;
@@ -2785,7 +3104,8 @@ i40e_start(i40e_t *i40e, boolean_t alloc)
 	 * Enable broadcast traffic; however, do not enable multicast traffic.
 	 * That's handle exclusively through MAC's mc_multicst routines.
 	 */
-	err = i40e_aq_set_vsi_broadcast(hw, i40e->i40e_vsi_id, B_TRUE, NULL);
+	err = i40e_aq_set_vsi_broadcast(hw, I40E_DEF_VSI_SEID(i40e), B_TRUE,
+	    NULL);
 	if (err != I40E_SUCCESS) {
 		i40e_error(i40e, "failed to set default VSI: %d", err);
 		rc = B_FALSE;
