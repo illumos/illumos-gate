@@ -79,6 +79,7 @@ auditsys(struct auditcalls *uap, rval_t *rvp)
 			result = auditdoor((int)uap->a1);
 			break;
 		}
+		/* FALLTHROUGH */
 	default:
 		if (audit_active == C2AUDIT_LOADED) {
 			result = EINVAL;
