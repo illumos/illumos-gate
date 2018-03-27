@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -3049,9 +3050,11 @@ conn_status_cb(uintptr_t addr, const void *walk_data,
 	char src_addrstr[INET6_ADDRSTRLEN];
 	char rem_addrstr[INET6_ADDRSTRLEN];
 	const ipcl_hash_walk_data_t *iw = walk_data;
-	conn_t *conn = iw->conn;
+	conn_t c, *conn = &c;
 
-	if (mdb_vread(conn, sizeof (conn_t), addr) == -1) {
+	if (iw != NULL)
+		conn = iw->conn;
+	else if (mdb_vread(conn, sizeof (conn_t), addr) == -1) {
 		mdb_warn("failed to read conn_t at %p", addr);
 		return (WALK_ERR);
 	}
