@@ -129,7 +129,8 @@ char pre_statechg_hook[2 * MAXPATHLEN];
 char post_statechg_hook[2 * MAXPATHLEN];
 char query_hook[2 * MAXPATHLEN];
 
-zlog_t logsys;
+zlog_t logsys;			/* log to syslog */
+zlog_t logplat;			/* log to platform.log */
 
 mutex_t	lock = DEFAULTMUTEX;	/* to serialize stuff */
 mutex_t	msglock = DEFAULTMUTEX;	/* for calling setlocale() */
@@ -141,6 +142,8 @@ static int	zone_door = -1;
 
 boolean_t in_death_throes = B_FALSE;	/* daemon is dying */
 boolean_t bringup_failure_recovery = B_FALSE; /* ignore certain failures */
+
+static int platloghdl = -1;	/* Handle for <zonepath>/logs/platform.log */
 
 #if !defined(TEXT_DOMAIN)		/* should be defined by cc -D */
 #define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it wasn't */
@@ -224,17 +227,14 @@ zerror(zlog_t *zlogp, boolean_t use_strerror, const char *fmt, ...)
 {
 	va_list alist;
 	char buf[MAXPATHLEN * 2]; /* enough space for err msg with a path */
-	char *bp;
+	char *bp, *bp_nozone;
 	int saved_errno = errno;
 
-	if (zlogp == NULL)
-		return;
 	if (zlogp == &logsys)
-		(void) snprintf(buf, sizeof (buf), "[zone '%s'] ",
-		    zone_name);
+		(void) snprintf(buf, sizeof (buf), "[zone '%s'] ", zone_name);
 	else
 		buf[0] = '\0';
-	bp = &(buf[strlen(buf)]);
+	bp = bp_nozone = &(buf[strlen(buf)]);
 
 	/*
 	 * In theory, the locale pointer should be set to either "C" or a
@@ -251,15 +251,28 @@ zerror(zlog_t *zlogp, boolean_t use_strerror, const char *fmt, ...)
 	if (use_strerror)
 		(void) snprintf(bp, sizeof (buf) - (bp - buf), ": %s",
 		    strerror(saved_errno));
+
+	(void) strlcat(buf, "\n", sizeof (buf));
+
+	logstream_write(platloghdl, bp_nozone, strlen(bp_nozone));
+
+	if (zlogp == NULL || zlogp == &logplat) {
+		return;
+	}
+
 	if (zlogp == &logsys) {
+		bp = strrchr(buf, '\n');
+		if (bp != NULL && bp[1] == '\0') {
+			*bp = '\0';
+		}
 		(void) syslog(LOG_ERR, "%s", buf);
 	} else if (zlogp->logfile != NULL) {
-		(void) fprintf(zlogp->logfile, "%s\n", buf);
+		(void) fprintf(zlogp->logfile, "%s", buf);
 	} else {
 		size_t buflen;
 		size_t copylen;
 
-		buflen = snprintf(zlogp->log, zlogp->loglen, "%s\n", buf);
+		buflen = snprintf(zlogp->log, zlogp->loglen, "%s", buf);
 		copylen = MIN(buflen, zlogp->loglen);
 		zlogp->log += copylen;
 		zlogp->loglen -= copylen;
@@ -1117,7 +1130,7 @@ restartinit(brand_handle_t bh)
  * application will be terminated.
  */
 static boolean_t
-is_app_svc_dep(brand_handle_t bh)
+is_app_svc_dep(void)
 {
 	struct zone_attrtab a;
 
@@ -1207,7 +1220,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	 * See if we need to setup contract dependencies between the zone's
 	 * primary application and any of its services.
 	 */
-	app_svc_dep = is_app_svc_dep(bh);
+	app_svc_dep = is_app_svc_dep();
 
 	brand_close(bh);
 
@@ -1233,6 +1246,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 		goto bad;
 	}
 
+	/* LINTED: E_NOP_IF_STMT */
 	if ((st.st_mode & S_IFMT) == S_IFLNK) {
 		/* symlink, we'll have to wait and resolve when we boot */
 	} else if ((st.st_mode & S_IXUSR) == 0) {
@@ -1295,16 +1309,16 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate, boolean_t debug)
 	notify_zonestatd(zone_id);
 
 	/* Startup a thread to perform zfd logging/tty svc for the zone. */
-	create_log_thread(zlogp, zone_id);
+	create_log_thread(zlogp);
 
 	if (zone_boot(zoneid) == -1) {
 		zerror(zlogp, B_TRUE, "unable to boot zone");
-		destroy_log_thread();
+		destroy_log_thread(zlogp);
 		goto bad;
 	}
 
 	if (brand_poststatechg(zlogp, zstate, Z_BOOT, debug) != 0) {
-		destroy_log_thread();
+		destroy_log_thread(zlogp);
 		goto bad;
 	}
 
@@ -1337,12 +1351,12 @@ zone_halt(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting, int zstate,
 	if (vplat_teardown(zlogp, unmount_cmd, rebooting, debug) != 0) {
 		if (!bringup_failure_recovery)
 			zerror(zlogp, B_FALSE, "unable to destroy zone");
-		destroy_log_thread();
+		destroy_log_thread(zlogp);
 		return (-1);
 	}
 
 	/* Shut down is done, stop the log thread */
-	destroy_log_thread();
+	destroy_log_thread(zlogp);
 
 	if (unmount_cmd == B_FALSE &&
 	    brand_poststatechg(zlogp, zstate, Z_HALT, debug) != 0)
@@ -1595,6 +1609,8 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	 * it is time for us to shut down zoneadmd.
 	 */
 	if (zargp == DOOR_UNREF_DATA) {
+		logstream_close(platloghdl);
+
 		/*
 		 * See comment at end of main() for info on the last rites.
 		 */
@@ -1706,7 +1722,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			rval = -1;
 			goto out;
 		}
-		zlogp = &logsys;	/* Log errors to syslog */
+		zlogp = &logplat;	/* Log errors to platform.log */
 	}
 
 	/*
@@ -2163,8 +2179,6 @@ top:
 		 * state.
 		 */
 		if (zstate > ZONE_STATE_INSTALLED) {
-			static zoneid_t zid;
-
 			zerror(zlogp, B_FALSE,
 			    "zone '%s': WARNING: zone is in state '%s', but "
 			    "zoneadmd does not appear to be available; "
@@ -2174,10 +2188,10 @@ top:
 			/*
 			 * Startup a thread to perform the zfd logging/tty svc
 			 * for the zone. zlogp won't be valid for much longer
-			 * so use logsys.
+			 * so use logplat.
 			 */
-			if ((zid = getzoneidbyname(zone_name)) != -1) {
-				create_log_thread(&logsys, zid);
+			if (getzoneidbyname(zone_name) != -1) {
+				create_log_thread(&logplat);
 			}
 
 			/* recover the global configuration snapshot */
@@ -2618,6 +2632,15 @@ main(int argc, char *argv[])
 	openlog("zoneadmd", LOG_PID, LOG_DAEMON);
 
 	/*
+	 * Allow logging to <zonepath>/logs/<file>.
+	 */
+	logstream_init(zlogp);
+	platloghdl = logstream_open("platform.log", "zoneadmd", 0);
+
+	/* logplat looks the same as logsys, but logs to platform.log */
+	logplat = logsys;
+
+	/*
 	 * The eventstream is used to publish state changes in the zone
 	 * from the door threads to the console I/O poller.
 	 */
@@ -2636,7 +2659,6 @@ main(int argc, char *argv[])
 	if (make_daemon_exclusive(zlogp) == -1)
 		goto child_out;
 
-
 	/*
 	 * Create/join a new session; we need to be careful of what we do with
 	 * the console from now on so we don't end up being the session leader
@@ -2646,9 +2668,13 @@ main(int argc, char *argv[])
 
 	/*
 	 * This thread shouldn't be receiving any signals; in particular,
-	 * SIGCHLD should be received by the thread doing the fork().
+	 * SIGCHLD should be received by the thread doing the fork().  The
+	 * exceptions are SIGHUP and SIGUSR1 for log rotation, set up by
+	 * logstream_init().
 	 */
 	(void) sigfillset(&blockset);
+	(void) sigdelset(&blockset, SIGHUP);
+	(void) sigdelset(&blockset, SIGUSR1);
 	(void) thr_sigsetmask(SIG_BLOCK, &blockset, NULL);
 
 	/*

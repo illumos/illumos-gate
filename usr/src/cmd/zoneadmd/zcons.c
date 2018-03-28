@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -40,10 +40,10 @@
  *
  *                                      Global Zone | Non-Global Zone
  *                        .--------------.          |
- *        .-----------.   | zoneadmd -z  |          | .--------. .---------.
- *        | zlogin -C |   |     myzone   |          | | ttymon | | syslogd |
- *        `-----------'   `--------------'          | `--------' `---------'
- *                  |       |       | |             |      |       |
+ *        .-----------.   | zoneadmd -z  |--.       | .--------. .---------.
+ *        | zlogin -C |   |     myzone   |  |       | | ttymon | | syslogd |
+ *        `-----------'   `--------------'  V       | `--------' `---------'
+ *                  |       |       | | console.log |      |       |
  *  User            |       |       | |             |      V       V
  * - - - - - - - - -|- - - -|- - - -|-|- - - - - - -|- - /dev/zconsole - - -
  *  Kernel          V       V       | |                        |
@@ -81,6 +81,8 @@
  *   functions as a two-way proxy for console I/O, relaying user input
  *   to the master side of the console, and relaying output from the
  *   zone to the user.
+ *
+ * - Logging output to <zonepath>/logs/console.log.
  */
 
 #include <sys/types.h>
@@ -734,7 +736,7 @@ test_client(int clifd)
  * messages) can be output in the user's locale.
  */
 static void
-do_console_io(zlog_t *zlogp, int consfd, int servfd)
+do_console_io(zlog_t *zlogp, int consfd, int servfd, int conslog)
 {
 	struct pollfd pollfds[4];
 	char ibuf[BUFSIZ];
@@ -783,6 +785,9 @@ do_console_io(zlog_t *zlogp, int consfd, int servfd)
 				if (cc <= 0 && (errno != EINTR) &&
 				    (errno != EAGAIN))
 					break;
+
+				logstream_write(conslog, ibuf, cc);
+
 				/*
 				 * Lose I/O if no one is listening
 				 */
@@ -939,6 +944,9 @@ serve_console(zlog_t *zlogp)
 	zone_state_t zstate;
 	char conspath[MAXPATHLEN];
 	static boolean_t cons_warned = B_FALSE;
+	int conslog;
+
+	conslog = logstream_open("console.log", "console", LS_LINE_BUFFERED);
 
 	(void) snprintf(conspath, sizeof (conspath),
 	    "/dev/zcons/%s/%s", zone_name, ZCONS_MASTER_NAME);
@@ -1005,7 +1013,7 @@ serve_console(zlog_t *zlogp)
 			goto death;
 		}
 
-		do_console_io(zlogp, masterfd, serverfd);
+		do_console_io(zlogp, masterfd, serverfd, conslog);
 
 		/*
 		 * We would prefer not to do this, but hostile zone processes
@@ -1046,4 +1054,6 @@ death:
 
 	destroy_console_sock(serverfd);
 	(void) destroy_console_devs(zlogp);
+
+	logstream_close(conslog);
 }

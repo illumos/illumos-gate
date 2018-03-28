@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_ZONEADMD_H
@@ -33,6 +33,9 @@ extern "C" {
 #endif
 
 #include <libdladm.h>
+#include <libzonecfg.h>
+#include <thread.h>
+#include <synch.h>
 
 /*
  * Multi-threaded programs should avoid MT-unsafe library calls (i.e., any-
@@ -85,7 +88,8 @@ typedef struct zlog {
 	char *locale;	/* locale to use for gettext() */
 } zlog_t;
 
-extern zlog_t logsys;
+extern zlog_t logsys;		/* syslog */
+extern zlog_t logplat;		/* platform.log */
 
 extern mutex_t lock;
 extern mutex_t msglock;
@@ -160,10 +164,18 @@ extern void serve_console(zlog_t *);
 extern void zcons_statechanged();
 
 /*
- * Zone FD log thread creation.
+ * Logging routines
  */
-extern void create_log_thread(zlog_t *, zoneid_t);
-extern void destroy_log_thread();
+typedef enum {
+	LS_LINE_BUFFERED = 0x1		/* Write when \n found or full buffer */
+} logstream_flags_t;
+
+extern void create_log_thread(zlog_t *);
+extern void destroy_log_thread(zlog_t *);
+extern void logstream_init(zlog_t *);
+extern int logstream_open(const char *, const char *, logstream_flags_t);
+extern void logstream_write(int, char *, int);
+extern void logstream_close(int);
 
 /*
  * Contract handling.

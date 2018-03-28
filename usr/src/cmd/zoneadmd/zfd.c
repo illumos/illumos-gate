@@ -83,15 +83,9 @@
 
 #include "zoneadmd.h"
 
-static zlog_t	*zlogp;
 static int	shutting_down = 0;
 static thread_t logger_tid;
-static int	logfd = -1;
-static size_t	log_sz = 0;
-static size_t	log_rot_sz = 0;
 static char	log_name[MAXNAMELEN] = "stdio.log";
-
-static void rotate_log();
 
 /*
  * The eventstream is a simple one-directional flow of messages implemented
@@ -100,7 +94,6 @@ static void rotate_log();
 static int eventstream[2] = {-1, -1};
 
 #define	ZLOG_MODE		"zlog-mode"
-#define	ZLOG_MAXSZ		"zlog-max-size"
 #define	ZLOG_NAME		"zlog-name"
 #define	ZFDNEX_DEVTREEPATH	"/pseudo/zfdnex@2"
 #define	ZFDNEX_FILEPATH		"/devices/pseudo/zfdnex@2"
@@ -342,7 +335,7 @@ error:
 }
 
 static int
-init_server_sock(zlog_t *zlogp, int *servfd, char *nm)
+init_server_sock(int *servfd, char *nm)
 {
 	int resfd = -1;
 	struct sockaddr_un servaddr;
@@ -353,20 +346,21 @@ init_server_sock(zlog_t *zlogp, int *servfd, char *nm)
 	    SERVER_SOCKPATH, zone_name, nm);
 
 	if ((resfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		zerror(zlogp, B_TRUE, "server setup: could not create socket");
+		zerror(&logplat, B_TRUE,
+		    "server setup: could not create socket");
 		goto err;
 	}
 	(void) unlink(servaddr.sun_path);
 
 	if (bind(resfd, (struct sockaddr *)&servaddr, sizeof (servaddr))
 	    == -1) {
-		zerror(zlogp, B_TRUE,
+		zerror(&logplat, B_TRUE,
 		    "server setup: could not bind to socket");
 		goto err;
 	}
 
 	if (listen(resfd, 4) == -1) {
-		zerror(zlogp, B_TRUE,
+		zerror(&logplat, B_TRUE,
 		    "server setup: could not listen on socket");
 		goto err;
 	}
@@ -616,127 +610,6 @@ test_client(int clifd)
 }
 
 /*
- * Modify the input string with json escapes. Since the destination can thus
- * be larger than the source, it may get truncated, although we do use a
- * larger buffer.
- */
-static void
-escape_json(char *sbuf, int slen, char *dbuf, int dlen)
-{
-	int i;
-	mbstate_t mbr;
-	wchar_t c;
-	size_t sz;
-
-	bzero(&mbr, sizeof (mbr));
-
-	sbuf[slen] = '\0';
-	i = 0;
-	while (i < dlen && (sz = mbrtowc(&c, sbuf, MB_CUR_MAX, &mbr)) > 0) {
-		switch (c) {
-		case '\\':
-			dbuf[i++] = '\\';
-			dbuf[i++] = '\\';
-			break;
-
-		case '"':
-			dbuf[i++] = '\\';
-			dbuf[i++] = '"';
-			break;
-
-		case '\b':
-			dbuf[i++] = '\\';
-			dbuf[i++] = 'b';
-			break;
-
-		case '\f':
-			dbuf[i++] = '\\';
-			dbuf[i++] = 'f';
-			break;
-
-		case '\n':
-			dbuf[i++] = '\\';
-			dbuf[i++] = 'n';
-			break;
-
-		case '\r':
-			dbuf[i++] = '\\';
-			dbuf[i++] = 'r';
-			break;
-
-		case '\t':
-			dbuf[i++] = '\\';
-			dbuf[i++] = 't';
-			break;
-
-		default:
-			if ((c >= 0x00 && c <= 0x1f) ||
-			    (c > 0x7f && c <= 0xffff)) {
-
-				i += snprintf(&dbuf[i], (dlen - i), "\\u%04x",
-				    (int)(0xffff & c));
-			} else if (c >= 0x20 && c <= 0x7f) {
-				dbuf[i++] = 0xff & c;
-			}
-
-			break;
-		}
-		sbuf += sz;
-	}
-
-	if (i == dlen)
-		dbuf[--i] = '\0';
-	else
-		dbuf[i] = '\0';
-}
-
-/*
- * We output to the log file as json.
- * ex. for string 'msg\n' on the zone's stdout:
- *    {"log":"msg\n","stream":"stdout","time":"2014-10-24T20:12:11.101973117Z"}
- *
- * We use ns in the last field of the timestamp for compatability.
- *
- * We keep track of the size of the log file and rotate it when we exceed
- * the log size limit (if one is set).
- */
-static void
-wr_log_msg(char *buf, int len, int from)
-{
-	struct timeval tv;
-	int olen;
-	char ts[64];
-	char nbuf[BUFSIZ * 2];
-	char obuf[BUFSIZ * 2];
-	static boolean_t log_wr_err = B_FALSE;
-
-	if (logfd == -1)
-		return;
-
-	escape_json(buf, len, nbuf, sizeof (nbuf));
-
-	if (gettimeofday(&tv, NULL) != 0)
-		return;
-	(void) strftime(ts, sizeof (ts), "%FT%T", gmtime(&tv.tv_sec));
-
-	olen = snprintf(obuf, sizeof (obuf),
-	    "{\"log\":\"%s\",\"stream\":\"%s\",\"time\":\"%s.%ldZ\"}\n",
-	    nbuf, (from == 1) ? "stdout" : "stderr", ts, tv.tv_usec * 1000);
-
-	if (write(logfd, obuf, olen) != olen) {
-		if (!log_wr_err) {
-			zerror(zlogp, B_TRUE, "log file write error");
-			log_wr_err = B_TRUE;
-		}
-		return;
-	}
-
-	log_sz += olen;
-	if (log_rot_sz > 0 && log_sz >= log_rot_sz)
-		rotate_log();
-}
-
-/*
  * We want to sleep for a little while but need to be responsive if the zone is
  * halting. We poll/sleep on the event stream so we can notice if we're halting.
  * Return true if halting, otherwise false.
@@ -789,7 +662,7 @@ halt_sleep(int slptime)
  */
 static void
 do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
-    int stderrfd)
+    int stderrfd, int logout, int logerr)
 {
 	struct pollfd pollfds[8];
 	char ibuf[BUFSIZ + 1];
@@ -845,7 +718,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 
 		ret = poll(pollfds, 8, -1);
 		if (ret == -1 && errno != EINTR) {
-			zerror(zlogp, B_TRUE, "poll failed");
+			zerror(&logplat, B_TRUE, "poll failed");
 			/* we are hosed, close connection */
 			break;
 		}
@@ -858,7 +731,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 		} else if (pollfds[0].revents) {
 			/* bail if any error occurs */
 			pollerr = pollfds[0].revents;
-			zerror(zlogp, B_FALSE, "closing connection "
+			zerror(&logplat, B_FALSE, "closing connection "
 			    "with control channel, pollerr %d\n", pollerr);
 			break;
 		}
@@ -882,7 +755,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 				} else if (pollfds[1].revents & (POLLERR |
 				    POLLNVAL))  {
 					pollerr = pollfds[1].revents;
-					zerror(zlogp, B_FALSE,
+					zerror(&logplat, B_FALSE,
 					    "closing connection "
 					    "with client, pollerr %d\n",
 					    pollerr);
@@ -940,7 +813,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 				    (errno != EAGAIN))
 					break;
 				if (cc > 0) {
-					wr_log_msg(ibuf, cc, 1);
+					logstream_write(logout, ibuf, cc);
 
 					/*
 					 * Lose output if no one is listening,
@@ -951,7 +824,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 				}
 			} else {
 				pollerr = pollfds[2].revents;
-				zerror(zlogp, B_FALSE,
+				zerror(&logplat, B_FALSE,
 				    "closing connection with stdout zfd, "
 				    "pollerr %d\n", pollerr);
 				break;
@@ -969,7 +842,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 				    (errno != EAGAIN))
 					break;
 				if (cc > 0) {
-					wr_log_msg(ibuf, cc, 2);
+					logstream_write(logerr, ibuf, cc);
 
 					/*
 					 * Lose output if no one is listening,
@@ -981,7 +854,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 				}
 			} else {
 				pollerr = pollfds[3].revents;
-				zerror(zlogp, B_FALSE,
+				zerror(&logplat, B_FALSE,
 				    "closing connection with stderr zfd, "
 				    "pollerr %d\n", pollerr);
 				break;
@@ -1025,7 +898,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 				 * first. If we see this, tear everything down
 				 * and start over.
 				 */
-				zerror(zlogp, B_FALSE, "GZ zfd stdin/stdout "
+				zerror(&logplat, B_FALSE, "GZ zfd stdin/stdout "
 				    "connection attempt with no GZ control\n");
 				break;
 			}
@@ -1046,7 +919,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 				/*
 				 * Same conditions apply to stderr as stdin/out.
 				 */
-				zerror(zlogp, B_FALSE, "GZ zfd stderr "
+				zerror(&logplat, B_FALSE, "GZ zfd stderr "
 				    "connection attempt with no GZ control\n");
 				break;
 			}
@@ -1082,7 +955,7 @@ do_zfd_io(int gzctlfd, int gzservfd, int gzerrfd, int stdinfd, int stdoutfd,
 }
 
 static int
-open_fd(zlog_t *zlogp, int id, int rw)
+open_fd(int id, int rw)
 {
 	int fd;
 	int flag = O_NONBLOCK | O_NOCTTY | O_CLOEXEC;
@@ -1104,7 +977,7 @@ open_fd(zlog_t *zlogp, int id, int rw)
 			 * control element is received.
 			 */
 			if (ioctl(fd, I_SRDOPT, RNORM|RPROTDIS) == -1) {
-				zerror(zlogp, B_TRUE,
+				zerror(&logplat, B_TRUE,
 				    "failed to set options on zfd");
 				return (-1);
 			}
@@ -1117,68 +990,8 @@ open_fd(zlog_t *zlogp, int id, int rw)
 		(void) sleep(1);
 	}
 
-	zerror(zlogp, B_TRUE, "failed to open zfd");
+	zerror(&logplat, B_TRUE, "failed to open zfd");
 	return (-1);
-}
-
-static void
-open_logfile()
-{
-	char logpath[MAXPATHLEN];
-
-	logfd = -1;
-	log_sz = 0;
-
-	(void) snprintf(logpath, sizeof (logpath), "%s/logs", zonepath);
-	(void) mkdir(logpath, 0700);
-
-	(void) snprintf(logpath, sizeof (logpath), "%s/logs/%s", zonepath,
-	    log_name);
-
-	if ((logfd = open(logpath, O_WRONLY | O_APPEND | O_CREAT,
-	    0600)) == -1) {
-		zerror(zlogp, B_TRUE, "failed to open log file");
-	} else {
-		struct stat64 sb;
-
-		if (fstat64(logfd, &sb) == 0)
-			log_sz = sb.st_size;
-	}
-}
-
-static void
-rotate_log()
-{
-	time_t t;
-	struct tm gtm;
-	char onm[MAXPATHLEN], rnm[MAXPATHLEN];
-
-	if ((t = time(NULL)) == (time_t)-1 || gmtime_r(&t, &gtm) == NULL) {
-		zerror(zlogp, B_TRUE, "failed to format time");
-		return;
-	}
-
-	(void) snprintf(rnm, sizeof (rnm),
-	    "%s/logs/%s.%d%02d%02dT%02d%02d%02dZ",
-	    zonepath, log_name, gtm.tm_year + 1900, gtm.tm_mon + 1, gtm.tm_mday,
-	    gtm.tm_hour, gtm.tm_min, gtm.tm_sec);
-	(void) snprintf(onm, sizeof (onm), "%s/logs/%s", zonepath, log_name);
-
-	(void) close(logfd);
-	if (rename(onm, rnm) != 0)
-		zerror(zlogp, B_TRUE, "failed to rotate log file");
-	open_logfile();
-}
-
-
-/* ARGSUSED */
-void
-hup_handler(int i)
-{
-	if (logfd != -1) {
-		(void) close(logfd);
-		open_logfile();
-	}
 }
 
 /*
@@ -1197,65 +1010,59 @@ srvr(void *modearg)
 	int gzoutfd = -1;
 	int stdinfd = -1;
 	int stdoutfd = -1;
-	sigset_t blockset;
 	int gzerrfd = -1;
 	int stderrfd = -1;
 	int flags;
 	int len;
 	char ibuf[BUFSIZ + 1];
+	int logout = -1;
+	int logerr = -1;
 
-	if (!shutting_down && mode->zmode_gzlogging)
-		open_logfile();
-
-	/*
-	 * This thread should receive SIGHUP so that it can close the log
-	 * file, and reopen it, during log rotation.
-	 */
-	sigset(SIGHUP, hup_handler);
-	(void) sigfillset(&blockset);
-	(void) sigdelset(&blockset, SIGHUP);
-	(void) thr_sigsetmask(SIG_BLOCK, &blockset, NULL);
+	if (!shutting_down && mode->zmode_gzlogging) {
+		logout = logstream_open(log_name, "stdout", 0);
+		logerr = logstream_open(log_name, "stderr", 0);
+	}
 
 	if (!shutting_down) {
 		if (pipe(eventstream) != 0) {
-			zerror(zlogp, B_TRUE, "failed to open logger control "
-			    "pipe");
+			zerror(&logplat, B_TRUE, "failed to open logger "
+			    "control pipe");
 			return;
 		}
 	}
 
 	while (!shutting_down) {
-		if (init_server_sock(zlogp, &gzctlfd, "ctl") == -1) {
-			zerror(zlogp, B_FALSE,
+		if (init_server_sock(&gzctlfd, "ctl") == -1) {
+			zerror(&logplat, B_FALSE,
 			    "server setup: control socket init failed");
 			goto death;
 		}
-		if (init_server_sock(zlogp, &gzoutfd, "out") == -1) {
-			zerror(zlogp, B_FALSE,
+		if (init_server_sock(&gzoutfd, "out") == -1) {
+			zerror(&logplat, B_FALSE,
 			    "server setup: stdout socket init failed");
 			goto death;
 		}
-		if (init_server_sock(zlogp, &gzerrfd, "err") == -1) {
-			zerror(zlogp, B_FALSE,
+		if (init_server_sock(&gzerrfd, "err") == -1) {
+			zerror(&logplat, B_FALSE,
 			    "server setup: stderr socket init failed");
 			goto death;
 		}
 
 		if (mode->zmode_n_stddevs == 1) {
-			if ((stdinfd = open_fd(zlogp, 0, O_RDWR)) == -1) {
+			if ((stdinfd = open_fd(0, O_RDWR)) == -1) {
 				goto death;
 			}
 			stdoutfd = stdinfd;
 		} else {
-			if ((stdinfd = open_fd(zlogp, 0, O_WRONLY)) == -1 ||
-			    (stdoutfd = open_fd(zlogp, 1, O_RDONLY)) == -1 ||
-			    (stderrfd = open_fd(zlogp, 2, O_RDONLY)) == -1) {
+			if ((stdinfd = open_fd(0, O_WRONLY)) == -1 ||
+			    (stdoutfd = open_fd(1, O_RDONLY)) == -1 ||
+			    (stderrfd = open_fd(2, O_RDONLY)) == -1) {
 				goto death;
 			}
 		}
 
 		do_zfd_io(gzctlfd, gzoutfd, gzerrfd, stdinfd, stdoutfd,
-		    stderrfd);
+		    stderrfd, logout, logerr);
 death:
 		destroy_server_sock(gzctlfd, "ctl");
 		destroy_server_sock(gzoutfd, "out");
@@ -1278,8 +1085,9 @@ death:
 	 */
 	flags = fcntl(stdoutfd, F_GETFL, 0);
 	if (fcntl(stdoutfd, F_SETFL, flags | O_NONBLOCK) != -1) {
-		while ((len = read(stdoutfd, ibuf, BUFSIZ)) > 0)
-			wr_log_msg(ibuf, len, 1);
+		while ((len = read(stdoutfd, ibuf, BUFSIZ)) > 0) {
+			logstream_write(logout, ibuf, len);
+		}
 	}
 	(void) close(stdoutfd);
 
@@ -1287,8 +1095,9 @@ death:
 		(void) close(stdinfd);
 		flags = fcntl(stderrfd, F_GETFL, 0);
 		if (fcntl(stderrfd, F_SETFL, flags | O_NONBLOCK) != -1) {
-			while ((len = read(stderrfd, ibuf, BUFSIZ)) > 0)
-				wr_log_msg(ibuf, len, 2);
+			while ((len = read(stderrfd, ibuf, BUFSIZ)) > 0) {
+				logstream_write(logerr, ibuf, len);
+			}
 		}
 		(void) close(stderrfd);
 	}
@@ -1298,8 +1107,8 @@ death:
 	eventstream[0] = -1;
 	(void) close(eventstream[1]);
 	eventstream[1] = -1;
-	if (logfd != -1)
-		(void) close(logfd);
+	logstream_close(logout);
+	logstream_close(logerr);
 }
 
 /*
@@ -1320,8 +1129,8 @@ death:
  * -t-             n      y       n
  * ---             n      n       n
  *
- * This function also obtains a maximum log size while it is reading the
- * zone configuration.
+ * This function also obtains any custom name for stdio.log while it is reading
+ * the zone configuration.
  */
 static void
 get_mode_logmax(zfd_mode_t *mode)
@@ -1373,17 +1182,6 @@ get_mode_logmax(zfd_mode_t *mode)
 			continue;
 		}
 
-		if (strcmp(ZLOG_MAXSZ, attr.zone_attr_name) == 0) {
-			char *p;
-			long lval;
-
-			p = attr.zone_attr_value;
-			lval = strtol(p, &p, 10);
-			if (*p == '\0')
-				log_rot_sz = (size_t)lval;
-			continue;
-		}
-
 		if (strcmp(ZLOG_NAME, attr.zone_attr_name) == 0) {
 			(void) strlcpy(log_name, attr.zone_attr_value,
 			    sizeof (log_name));
@@ -1397,12 +1195,11 @@ done:
 }
 
 void
-create_log_thread(zlog_t *logp, zoneid_t id)
+create_log_thread(zlog_t *zlogp)
 {
 	int res;
 
 	shutting_down = 0;
-	zlogp = logp;
 
 	get_mode_logmax(&mode);
 	if (mode.zmode_n_stddevs == 0)
@@ -1423,7 +1220,7 @@ create_log_thread(zlog_t *logp, zoneid_t id)
 }
 
 void
-destroy_log_thread()
+destroy_log_thread(zlog_t *zlogp)
 {
 	if (logger_tid != 0) {
 		int stop = 1;

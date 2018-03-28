@@ -30,7 +30,7 @@ include ../../Makefile.ctf
 
 ROOTCMDDIR=	$(ROOTLIB)/zones
 
-OBJS= zoneadmd.o zcons.o zfd.o vplat.o
+OBJS= zoneadmd.o zcons.o zfd.o vplat.o log.o
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
