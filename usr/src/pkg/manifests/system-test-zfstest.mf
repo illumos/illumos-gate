@@ -1420,6 +1420,9 @@ file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_features_004_neg \
     mode=0555
 file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_tempname \
+    mode=0555
+file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_destroy/zpool_destroy.cfg \
     mode=0444
 file \
@@ -1569,6 +1572,9 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import_013_neg \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import_014_pos \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_import/zpool_import_all_001_pos \

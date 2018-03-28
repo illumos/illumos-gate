@@ -243,7 +243,8 @@ tests = ['zpool_create_001_pos', 'zpool_create_002_pos',
     'zpool_create_018_pos', 'zpool_create_019_pos', 'zpool_create_020_pos',
     'zpool_create_021_pos', 'zpool_create_022_pos', 'zpool_create_023_neg',
     'zpool_create_features_001_pos', 'zpool_create_features_002_pos',
-    'zpool_create_features_003_pos', 'zpool_create_features_004_neg']
+    'zpool_create_features_003_pos', 'zpool_create_features_004_neg',
+    'zpool_create_tempname']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_destroy]
 tests = ['zpool_destroy_001_pos', 'zpool_destroy_002_pos',
@@ -274,7 +275,8 @@ tests = ['zpool_import_001_pos', 'zpool_import_002_pos',
     'zpool_import_003_pos', 'zpool_import_004_pos', 'zpool_import_005_pos',
     'zpool_import_006_pos', 'zpool_import_007_pos', 'zpool_import_008_pos',
     'zpool_import_009_neg', 'zpool_import_010_pos', 'zpool_import_011_neg',
-    'zpool_import_012_pos', 'zpool_import_013_neg', 'zpool_import_all_001_pos',
+    'zpool_import_012_pos', 'zpool_import_013_neg', 'zpool_import_014_pos',
+    'zpool_import_all_001_pos',
     'zpool_import_features_001_pos', 'zpool_import_features_002_neg',
     'zpool_import_features_003_pos', 'zpool_import_missing_001_pos',
     'zpool_import_missing_002_pos', 'zpool_import_missing_003_pos',
