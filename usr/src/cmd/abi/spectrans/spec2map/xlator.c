@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  Back-end functions for spec to mapfile converter
  */
@@ -268,8 +266,7 @@ xlator_start_if(const Meta_info meta_info, const int token, char *value)
  *              XLATOR_NONFATAL	on error
  */
 int
-xlator_take_kvpair(const Meta_info meta_info, const int token,
-	char *value)
+xlator_take_kvpair(const Meta_info meta_info, const int token, char *value)
 {
 	char *p;
 	char *subv = NULL;
@@ -327,7 +324,7 @@ xlator_take_kvpair(const Meta_info meta_info, const int token,
 		case VS_INVALID:	/* Both Version and Arch are invalid */
 			errlog(INPUT|ERROR, "Error: Invalid version and "
 			    "architecture string in spec or version file"
-				": %s", subv);
+			    ": %s", subv);
 			free(subv);
 			return (XLATOR_NONFATAL);
 
@@ -880,7 +877,7 @@ writemapfile(FILE *mapfp)
 					(void) fprintf(mapfp, "    global:\n");
 
 					strtab = get_stringtable(
-						b->b_global_table, 0);
+					    b->b_global_table, 0);
 
 					if (strtab == NULL) {
 						/*
@@ -927,7 +924,7 @@ writemapfile(FILE *mapfp)
 				}
 				/* Print name of all parents. */
 				for (p = parents_of(b);
-				    p !=  NULL && *p != '\0'; ++p) {
+				    p !=  NULL && *p != NULL; ++p) {
 					(void) fprintf(mapfp, " %s", *p);
 				}
 				bl = b->b_uncles;
