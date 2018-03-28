@@ -25,13 +25,14 @@
 /*
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2014 by Delphix. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/cpuvar.h>
 #include <sys/psm.h>
 #include <sys/archsystm.h>
 #include <sys/apic.h>
+#include <sys/apic_common.h>
 #include <sys/sunddi.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/mach_intr.h>
@@ -218,6 +219,34 @@ x2apic_send_ipi(int cpun, int ipl)
 	intr_restore(flag);
 }
 
+void
+x2apic_send_pir_ipi(processorid_t cpun)
+{
+	const int vector = apic_pir_vect;
+	ulong_t flag;
+
+	ASSERT(apic_mode == LOCAL_X2APIC);
+	ASSERT((vector >= APIC_BASE_VECT) && (vector <= APIC_SPUR_INTR));
+
+	/* Serialize as described in x2apic_send_ipi() above. */
+	atomic_or_ulong(&flag, 1);
+
+	flag = intr_clear();
+
+	/* Self-IPI for inducing PIR makes no sense. */
+	if ((cpun != psm_get_cpu_id())) {
+#ifdef	DEBUG
+		/* Only for debugging. (again, see: x2apic_send_ipi) */
+		APIC_AV_PENDING_SET();
+#endif	/* DEBUG */
+
+		apic_reg_ops->apic_write_int_cmd(apic_cpus[cpun].aci_local_id,
+		    vector);
+	}
+
+	intr_restore(flag);
+}
+
 /*
  * Generates IPI to another CPU depending on the local APIC mode.
  * apic_send_ipi() and x2apic_send_ipi() depends on the configured
@@ -249,4 +278,17 @@ apic_common_send_ipi(int cpun, int ipl)
 	local_apic_regs_ops.apic_write_int_cmd(apic_cpus[cpun].aci_local_id,
 	    vector);
 	intr_restore(flag);
+}
+
+void
+apic_common_send_pir_ipi(processorid_t cpun)
+{
+	const int mode = apic_local_mode();
+
+	if (mode == LOCAL_X2APIC) {
+		x2apic_send_pir_ipi(cpun);
+		return;
+	}
+
+	apic_send_pir_ipi(cpun);
 }

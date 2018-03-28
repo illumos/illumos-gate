@@ -376,7 +376,7 @@ vmm_init(void)
 	if (vmm_ipinum < 0)
 		vmm_ipinum = IPI_AST;
 #else
-	/* XXX: verify for EPT settings */
+	/* We use cpu_poke() for IPIs */
 	vmm_ipinum = 0;
 #endif
 
@@ -417,8 +417,10 @@ vmm_handler(module_t mod, int what, void *arg)
 		if (error == 0) {
 			vmm_resume_p = NULL;
 			iommu_cleanup();
+#ifdef __FreeBSD__
 			if (vmm_ipinum != IPI_AST)
 				lapic_ipi_free(vmm_ipinum);
+#endif
 			error = VMM_CLEANUP();
 			/*
 			 * Something bad happened - prevent new

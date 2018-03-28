@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 
 #ifndef __FreeBSD__
 #include <sys/x86_archext.h>
+#include <sys/smp_impldefs.h>
 #endif
 
 #include <vm/vm.h>
@@ -518,8 +519,10 @@ vmx_disable(void *arg __unused)
 static int
 vmx_cleanup(void)
 {
+#ifdef __FreeBSD__
 	if (pirvec >= 0)
 		lapic_ipi_free(pirvec);
+#endif
 
 	if (vpid_unr != NULL) {
 		delete_unrhdr(vpid_unr);
@@ -739,19 +742,30 @@ vmx_init(int ipinum)
 		    MSR_VMX_TRUE_PINBASED_CTLS, PINBASED_POSTED_INTERRUPT, 0,
 		    &tmp);
 		if (error == 0) {
+#ifdef __FreeBSD__
 			pirvec = lapic_ipi_alloc(&IDTVEC(justreturn));
 			if (pirvec < 0) {
-#ifdef __FreeBSD__
 				if (bootverbose) {
 					printf("vmx_init: unable to allocate "
 					    "posted interrupt vector\n");
 				}
-#endif
 			} else {
 				posted_interrupts = 1;
 				TUNABLE_INT_FETCH("hw.vmm.vmx.use_apic_pir",
 				    &posted_interrupts);
 			}
+#else
+			/*
+			 * If the PSM-provided interfaces for requesting and
+			 * using a PIR IPI vector are present, use them for
+			 * posted interrupts.
+			 */
+			if (psm_get_pir_ipivect != NULL &&
+			    psm_send_pir_ipi != NULL) {
+				pirvec = psm_get_pir_ipivect();
+				posted_interrupts = 1;
+			}
+#endif
 		}
 	}
 
@@ -3546,8 +3560,11 @@ vmx_enable_x2apic_mode(struct vlapic *vlapic)
 static void
 vmx_post_intr(struct vlapic *vlapic, int hostcpu)
 {
-
+#ifdef __FreeBSD__
 	ipi_cpu(hostcpu, pirvec);
+#else
+	psm_send_pir_ipi(hostcpu);
+#endif
 }
 
 /*

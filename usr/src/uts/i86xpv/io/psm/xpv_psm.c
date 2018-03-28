@@ -1676,7 +1676,8 @@ static struct psm_ops xen_psm_ops = {
 	(int (*)(psm_state_request_t *))NULL,	/* psm_state		*/
 	(int (*)(psm_cpu_request_t *))NULL,	/* psm_cpu_ops		*/
 
-	(int (*)(int, int))NULL,		/* psm_cached_ipivect	*/
+	(int (*)(void))NULL,			/* psm_get_pir_ipivect	*/
+	(void (*)(processorid_t))NULL,		/* psm_send_pir_ipi	*/
 };
 
 static struct psm_info xen_psm_info = {

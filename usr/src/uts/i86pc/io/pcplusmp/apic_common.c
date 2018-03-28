@@ -130,6 +130,8 @@ int cmci_cpu_setup_registered;
 
 lock_t apic_mode_switch_lock;
 
+int apic_pir_vect;
+
 /*
  * Patchable global variables.
  */
@@ -629,6 +631,31 @@ apic_send_ipi(int cpun, int ipl)
 	intr_restore(flag);
 }
 
+void
+apic_send_pir_ipi(processorid_t cpun)
+{
+	const int vector = apic_pir_vect;
+	ulong_t flag;
+
+	ASSERT((vector >= APIC_BASE_VECT) && (vector <= APIC_SPUR_INTR));
+
+	flag = intr_clear();
+
+	/* Self-IPI for inducing PIR makes no sense. */
+	if ((cpun != psm_get_cpu_id())) {
+		APIC_AV_PENDING_SET();
+		apic_reg_ops->apic_write_int_cmd(apic_cpus[cpun].aci_local_id,
+		    vector);
+	}
+
+	intr_restore(flag);
+}
+
+int
+apic_get_pir_ipivect(void)
+{
+	return (apic_pir_vect);
+}
 
 /*ARGSUSED*/
 void
@@ -1706,15 +1733,4 @@ apic_get_ioapicid(uchar_t ioapicindex)
 	ASSERT(ioapicindex < MAX_IO_APIC);
 
 	return (apic_io_id[ioapicindex]);
-}
-
-int
-apic_cached_ipivect(int ipl, int type)
-{
-	uchar_t vector = 0;
-
-	if (type != -1 && ipl >= 0 && ipl <= MAXIPL) {
-		vector = apic_resv_vector[ipl];
-	}
-	return ((vector != 0) ? vector : -1);
 }

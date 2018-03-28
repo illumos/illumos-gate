@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _MDB_INTR_COMMON_H
@@ -72,6 +73,9 @@ extern int	option_flags;
  * gld_intr_addr is used to save address of gld_intr() ISR
  */
 extern uintptr_t	gld_intr_addr;
+
+/* cached the PIR ipi vector to differentiate it from poke_cpu */
+extern int	apic_pir_vect;
 
 #ifdef __cplusplus
 }

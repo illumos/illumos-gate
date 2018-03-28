@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include "intr_common.h"
@@ -169,6 +170,10 @@ _mdb_init(void)
 	if (mdb_lookup_by_name("gld_intr", &sym) != -1)
 		if (GELF_ST_TYPE(sym.st_info) == STT_FUNC)
 			gld_intr_addr = (uintptr_t)sym.st_value;
+
+	if (mdb_readvar(&apic_pir_vect, "apic_pir_vect") == -1) {
+		apic_pir_vect = -1;
+	}
 
 	return (&modinfo);
 }

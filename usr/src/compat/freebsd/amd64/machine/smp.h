@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_SMP_H_
@@ -19,19 +20,10 @@
 #ifdef _KERNEL
 
 /*
- * APIC-related definitions would normally be stored in x86/include/apicvar.h,
- * accessed here via x86/include/x86_smp.h.  Until it becomes necessary to
- * implment that whole chain of includes, those definitions are short-circuited
- * into this file.
+ * APIC-related functions are replaced with native calls rather than shims
+ * which attempt to replicate the FreeBSD interfaces.  This is empty, but will
+ * remain present to appease sources which wish to include the path.
  */
-
-#define	IDTVEC(name)	idtvec_ ## name
-
-extern int idtvec_justreturn;
-
-extern int lapic_ipi_alloc(int *);
-extern void lapic_ipi_free(int vec);
-
 
 #endif /* _KERNEL */
 
