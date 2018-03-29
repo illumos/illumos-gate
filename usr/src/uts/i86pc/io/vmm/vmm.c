@@ -111,7 +111,10 @@ struct vcpu {
 	kcondvar_t	vcpu_cv;	/* (o) cpu waiter cv */
 	kcondvar_t	state_cv;	/* (o) IDLE-transition cv */
 #endif /* __FreeBSD__ */
-	int		hostcpu;	/* (o) vcpu's host cpu */
+	int		hostcpu;	/* (o) vcpu's current host cpu */
+#ifndef __FreeBSD__
+	int		lasthostcpu;	/* (o) vcpu's last host cpu */
+#endif
 	int		reqidle;	/* (i) request vcpu to idle */
 	struct vlapic	*vlapic;	/* (i) APIC device model */
 	enum x2apic_state x2apic_state;	/* (i) APIC mode */
@@ -314,6 +317,9 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 		vcpu_lock_init(vcpu);
 		vcpu->state = VCPU_IDLE;
 		vcpu->hostcpu = NOCPU;
+#ifndef __FreeBSD__
+		vcpu->lasthostcpu = NOCPU;
+#endif
 		vcpu->guestfpu = fpu_save_area_alloc();
 		vcpu->stats = vmm_stat_alloc();
 	}
@@ -1269,6 +1275,11 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 	VCPU_CTR2(vm, vcpuid, "vcpu state changed from %s to %s",
 	    vcpu_state2str(vcpu->state), vcpu_state2str(newstate));
 
+#ifndef __FreeBSD__
+	if (vcpu->state == VCPU_RUNNING)
+		vcpu->lasthostcpu = curcpu;
+#endif
+
 	vcpu->state = newstate;
 	if (newstate == VCPU_RUNNING)
 		vcpu->hostcpu = curcpu;
@@ -1745,7 +1756,7 @@ vm_exit_astpending(struct vm *vm, int vcpuid, uint64_t rip)
 static void
 vm_localize_resources(struct vm *vm, struct vcpu *vcpu)
 {
-	if (vcpu->hostcpu == curcpu)
+	if (vcpu->lasthostcpu == curcpu)
 		return;
 
 	/*
