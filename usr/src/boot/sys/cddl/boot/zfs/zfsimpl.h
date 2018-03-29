@@ -1553,6 +1553,7 @@ typedef struct spa {
 	vdev_list_t	spa_vdevs;	/* list of all toplevel vdevs */
 	objset_phys_t	spa_mos;	/* MOS for this pool */
 	int		spa_inited;	/* initialized */
+	vdev_t		*spa_boot_vdev;	/* boot device for kernel */
 } spa_t;
 
 static void decode_embedded_bp_compressed(const blkptr_t *, void *);

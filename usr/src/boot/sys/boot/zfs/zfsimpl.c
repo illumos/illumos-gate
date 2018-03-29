@@ -1108,6 +1108,10 @@ vdev_probe(vdev_phys_read_t *phys_read, void *read_priv, spa_t **spap)
 		return (EIO);
 	}
 
+	/* Record boot vdev for spa. */
+	if (is_newer == 1)
+		spa->spa_boot_vdev = vdev;
+
 	/*
 	 * Re-evaluate top-level vdev state.
 	 */
