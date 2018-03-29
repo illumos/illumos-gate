@@ -385,6 +385,42 @@ ppt_bar_crawl(struct pptdev *ppt)
 	return (err);
 }
 
+static boolean_t
+ppt_bar_verify_mmio(struct pptdev *ppt, uint64_t base, uint64_t size)
+{
+	const uint64_t map_end = base + size;
+
+	/* Zero-length or overflow mappings are not valid */
+	if (map_end <= base) {
+		return (B_FALSE);
+	}
+	/* MMIO bounds should be page-aligned */
+	if ((base & PAGEOFFSET) != 0 || (size & PAGEOFFSET) != 0) {
+		return (B_FALSE);
+	}
+
+	for (uint_t i = 0; i < PCI_BASE_NUM; i++) {
+		const struct pptbar *bar = &ppt->pptd_bars[i];
+		const uint64_t bar_end = bar->base + bar->size;
+
+		/* Only memory BARs can be mapped */
+		if (bar->type != PCI_ADDR_MEM32 &&
+		    bar->type != PCI_ADDR_MEM64) {
+			continue;
+		}
+
+		/* Does the mapping fit within this BAR? */
+		if (base < bar->base || base >= bar_end ||
+		    map_end < bar->base || map_end > bar_end) {
+			continue;
+		}
+
+		/* This BAR satisfies the provided map */
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
 static int
 ppt_ddi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -760,8 +796,8 @@ ppt_unmap_mmio(struct vm *vm, struct pptdev *ppt)
 		seg = &ppt->mmio[i];
 		if (seg->len == 0)
 			continue;
-		(void)vm_unmap_mmio(vm, seg->gpa, seg->len);
-		bzero(seg, sizeof(struct pptseg));
+		(void) vm_unmap_mmio(vm, seg->gpa, seg->len);
+		bzero(seg, sizeof (struct pptseg));
 	}
 }
 
@@ -1040,6 +1076,15 @@ ppt_map_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len,
 		goto done;
 	}
 
+	/*
+	 * Ensure that the host-physical range of the requested mapping fits
+	 * within one of the MMIO BARs of the device.
+	 */
+	if (!ppt_bar_verify_mmio(ppt, hpa, len)) {
+		err = EINVAL;
+		goto done;
+	}
+
 	for (uint_t i = 0; i < MAX_MMIOSEGS; i++) {
 		struct pptseg *seg = &ppt->mmio[i];
 
@@ -1222,9 +1267,9 @@ ppt_setup_msix(struct vm *vm, int vcpu, int pptfd, int idx, uint64_t addr,
 
 		ppt->msix.num_msgs = numvec;
 
-		ppt->msix.arg_sz = numvec * sizeof(ppt->msix.arg[0]);
+		ppt->msix.arg_sz = numvec * sizeof (ppt->msix.arg[0]);
 		ppt->msix.arg = kmem_zalloc(ppt->msix.arg_sz, KM_SLEEP);
-		ppt->msix.inth_sz = numvec * sizeof(ddi_intr_handle_t);
+		ppt->msix.inth_sz = numvec * sizeof (ddi_intr_handle_t);
 		ppt->msix.inth = kmem_zalloc(ppt->msix.inth_sz, KM_SLEEP);
 
 		if (ddi_intr_alloc(dip, ppt->msix.inth, DDI_INTR_TYPE_MSIX, 0,
