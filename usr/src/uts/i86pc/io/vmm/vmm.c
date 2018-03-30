@@ -459,7 +459,6 @@ vmm_mod_load()
 {
 	int	error;
 
-	vmmdev_init();
 	error = vmm_init();
 	if (error == 0)
 		vmm_initialized = 1;
@@ -472,7 +471,6 @@ vmm_mod_unload()
 {
 	int	error;
 
-	vmmdev_cleanup();
 	error = VMM_CLEANUP();
 	if (error)
 		return (error);

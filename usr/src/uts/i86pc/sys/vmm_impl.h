@@ -78,37 +78,4 @@ int vmm_do_vm_destroy(vmm_softc_t *, boolean_t);
 
 #endif /* _KERNEL */
 
-/*
- * VMM trace ring buffer constants
- */
-#define	VMM_DMSG_RING_SIZE		0x100000	/* 1MB */
-#define	VMM_DMSG_BUF_SIZE		256
-
-/*
- * VMM trace ring buffer content
- */
-typedef struct vmm_trace_dmsg {
-	timespec_t		timestamp;
-	char			buf[VMM_DMSG_BUF_SIZE];
-	struct vmm_trace_dmsg	*next;
-} vmm_trace_dmsg_t;
-
-/*
- * VMM trace ring buffer header
- */
-typedef struct vmm_trace_rbuf {
-	kmutex_t		lock;		/* lock to avoid clutter */
-	int			looped;		/* completed ring */
-	int			allocfailed;	/* dmsg mem alloc failed */
-	size_t			size;		/* current size */
-	size_t			maxsize;	/* max size */
-	vmm_trace_dmsg_t	*dmsgh;		/* messages head */
-	vmm_trace_dmsg_t	*dmsgp;		/* ptr to last message */
-} vmm_trace_rbuf_t;
-
-/*
- * VMM trace ring buffer interfaces
- */
-void vmm_trace_log(const char *fmt, ...);
-
 #endif	/* _VMM_IMPL_H_ */

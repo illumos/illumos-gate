@@ -30,22 +30,16 @@ set name=info.classification \
     value=org.opensolaris.category.2008:System/Virtualization
 set name=variant.arch value=i386
 dir path=kernel group=sys
-dir path=kernel/kmdb group=sys
-dir path=kernel/kmdb/$(ARCH64) group=sys
 dir path=lib group=bin
 dir path=lib/$(ARCH64) group=bin
 dir path=usr group=sys
 dir path=usr/kernel/drv group=sys
 dir path=usr/kernel/drv/$(ARCH64) group=sys
 dir path=usr/lib group=bin
-dir path=usr/lib/mdb group=sys
-dir path=usr/lib/mdb/kvm group=sys
-dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
 dir path=usr/sbin
 driver name=ppt
 driver name=viona
 driver name=vmm
-file path=kernel/kmdb/$(ARCH64)/vmm mode=0555
 file path=lib/$(ARCH64)/libvmmapi.so.1
 file path=usr/kernel/drv/$(ARCH64)/ppt
 file path=usr/kernel/drv/$(ARCH64)/viona
@@ -53,7 +47,6 @@ file path=usr/kernel/drv/$(ARCH64)/vmm
 file path=usr/kernel/drv/ppt.conf
 file path=usr/kernel/drv/viona.conf
 file path=usr/kernel/drv/vmm.conf
-file path=usr/lib/mdb/kvm/$(ARCH64)/vmm.so mode=0555
 file path=usr/sbin/bhyve mode=0555
 file path=usr/sbin/bhyvectl mode=0555
 license lic_CDDL license=lic_CDDL

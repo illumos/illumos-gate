@@ -9610,7 +9610,6 @@ f usr/lib/mdb/kvm/amd64/sv.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ufs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/uhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/usba.so 0555 root sys
-f usr/lib/mdb/kvm/amd64/vmm.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/xhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/zfs.so 0555 root sys
 d usr/lib/mdb/proc 0755 root sys
