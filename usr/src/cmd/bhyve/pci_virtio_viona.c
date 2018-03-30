@@ -671,6 +671,7 @@ pci_viona_write(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		assert(size == 2);
 		assert(sc->vsc_curq != VIONA_CTLQ);
 		sc->vsc_msix_table_idx[sc->vsc_curq] = value;
+		pci_viona_ring_set_msix(pi, sc->vsc_curq);
 		break;
 	case VIONA_R_CFG0:
 	case VIONA_R_CFG1:
