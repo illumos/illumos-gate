@@ -113,7 +113,7 @@ struct vcpu {
 #endif /* __FreeBSD__ */
 	int		hostcpu;	/* (o) vcpu's current host cpu */
 #ifndef __FreeBSD__
-	int		lasthostcpu;	/* (o) vcpu's last host cpu */
+	int		lastloccpu;	/* (o) last host cpu localized to */
 #endif
 	int		reqidle;	/* (i) request vcpu to idle */
 	struct vlapic	*vlapic;	/* (i) APIC device model */
@@ -318,7 +318,7 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 		vcpu->state = VCPU_IDLE;
 		vcpu->hostcpu = NOCPU;
 #ifndef __FreeBSD__
-		vcpu->lasthostcpu = NOCPU;
+		vcpu->lastloccpu = NOCPU;
 #endif
 		vcpu->guestfpu = fpu_save_area_alloc();
 		vcpu->stats = vmm_stat_alloc();
@@ -1277,11 +1277,6 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 	VCPU_CTR2(vm, vcpuid, "vcpu state changed from %s to %s",
 	    vcpu_state2str(vcpu->state), vcpu_state2str(newstate));
 
-#ifndef __FreeBSD__
-	if (vcpu->state == VCPU_RUNNING)
-		vcpu->lasthostcpu = curcpu;
-#endif
-
 	vcpu->state = newstate;
 	if (newstate == VCPU_RUNNING)
 		vcpu->hostcpu = curcpu;
@@ -1752,20 +1747,30 @@ vm_exit_astpending(struct vm *vm, int vcpuid, uint64_t rip)
 /*
  * Some vmm resources, such as the lapic, may have CPU-specific resources
  * allocated to them which would benefit from migration onto the host CPU which
- * is processing the vcpu state.  When running on a host CPU different from
- * previous activity, attempt to localize resources when possible.
+ * is processing the vcpu state.
  */
 static void
 vm_localize_resources(struct vm *vm, struct vcpu *vcpu)
 {
-	if (vcpu->lasthostcpu == curcpu)
+	/*
+	 * Localizing cyclic resources requires acquisition of cpu_lock, and
+	 * doing so with kpreempt disabled is a recipe for deadlock disaster.
+	 */
+	VERIFY(curthread->t_preempt == 0);
+
+	/*
+	 * Do not bother with localization if this vCPU is about to return to
+	 * the host CPU it was last localized to.
+	 */
+	if (vcpu->lastloccpu == curcpu)
 		return;
 
 	/*
-	 * The cyclic backing the LAPIC timer is nice to have local as
-	 * reprogramming operations would otherwise require a crosscall.
+	 * Resource localization is done without CPU affinity, and since it may
+	 * block on resources like cpu_lock, migration may occur during this
+	 * course of action.  This is an accepted risk, as the localization is
+	 * simply an optimization and not required for correctness.
 	 */
-	vlapic_localize_resources(vcpu->vlapic);
 
 	/*
 	 * Localize system-wide resources to the primary boot vCPU.  While any
@@ -1777,6 +1782,17 @@ vm_localize_resources(struct vm *vm, struct vcpu *vcpu)
 		vrtc_localize_resources(vm->vrtc);
 	}
 
+	/*
+	 * The cyclic backing the LAPIC timer is nice to have local as
+	 * reprogramming operations would otherwise require a crosscall.
+	 *
+	 * It is done last, giving it the highest chance of being localized
+	 * without the thread being migrated elsewhere before running the vCPU.
+	 */
+	vlapic_localize_resources(vcpu->vlapic);
+
+	/* Record where we localized to only once the operation is complete. */
+	vcpu->lastloccpu = curcpu;
 }
 #endif /* __FreeBSD */
 
@@ -1813,6 +1829,11 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	evinfo.sptr = &vm->suspend;
 	evinfo.iptr = &vcpu->reqidle;
 restart:
+#ifndef	__FreeBSD__
+	/* Localize before setting affinity and disabling kpreempt */
+	vm_localize_resources(vm, vcpu);
+#endif
+
 	critical_enter();
 
 	KASSERT(!CPU_ISSET(curcpu, &pmap->pm_active),
@@ -1829,8 +1850,6 @@ restart:
 #endif
 
 #ifndef	__FreeBSD__
-	vm_localize_resources(vm, vcpu);
-
 	installctx(curthread, vcpu, save_guest_fpustate,
 	    restore_guest_fpustate, NULL, NULL, NULL, NULL);
 #endif
