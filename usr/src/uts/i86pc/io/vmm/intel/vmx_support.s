@@ -102,6 +102,21 @@ vmx_enter_guest(struct vmxctx *ctx, struct vmx *vmx, int launched)
 	movq	VMXCTX_GUEST_R15(%rdi),%r15;				\
 	movq	VMXCTX_GUEST_RDI(%rdi),%rdi; /* restore rdi the last */
 
+/*
+ * Flush scratch registers to avoid lingering guest state being used for
+ * Spectre v1 attacks when returning from guest entry.
+ */
+#define	VMX_GUEST_FLUSH_SCRATCH						\
+	xorl	%edi, %edi;						\
+	xorl	%esi, %esi;						\
+	xorl	%edx, %edx;						\
+	xorl	%ecx, %ecx;						\
+	xorl	%r8d, %r8d;						\
+	xorl	%r9d, %r9d;						\
+	xorl	%r10d, %r10d;						\
+	xorl	%r11d, %r11d;
+
+
 /* Stack layout (offset from %rsp) for vmx_enter_guest */
 #define	VMXSTK_TMPRDI	0x00	/* temp store %rdi on vmexit		*/
 #define	VMXSTK_R15	0x08	/* callee saved %r15			*/
@@ -223,6 +238,9 @@ inst_error:
 	movq	VMXSTK_R13(%rsp), %r13
 	movq	VMXSTK_R14(%rsp), %r14
 	movq	VMXSTK_R15(%rsp), %r15
+
+	VMX_GUEST_FLUSH_SCRATCH
+
 	addq	$VMXSTKSIZE, %rsp
 	popq	%rbp
 	ret
@@ -277,6 +295,9 @@ ALTENTRY(vmx_exit_guest)
 	movq	VMXSTK_R13(%rsp), %r13
 	movq	VMXSTK_R14(%rsp), %r14
 	movq	VMXSTK_R15(%rsp), %r15
+
+	VMX_GUEST_FLUSH_SCRATCH
+
 	addq	$VMXSTKSIZE, %rsp
 	popq	%rbp
 	ret
