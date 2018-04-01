@@ -24,7 +24,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
@@ -983,7 +983,7 @@ file path=usr/include/sys/feature_tests.h
 file path=usr/include/sys/fem.h
 file path=usr/include/sys/file.h
 file path=usr/include/sys/filio.h
-file path=usr/include/sys/firmload.h
+$(i386_ONLY)file path=usr/include/sys/firmload.h
 file path=usr/include/sys/flock.h
 file path=usr/include/sys/flock_impl.h
 $(sparc_ONLY)file path=usr/include/sys/fm/cpu/SPARC64-VI.h
@@ -1059,7 +1059,7 @@ file path=usr/include/sys/ftrace.h
 file path=usr/include/sys/fx.h
 file path=usr/include/sys/fxpriocntl.h
 file path=usr/include/sys/gfs.h
-file path=usr/include/sys/gfx_private.h
+$(i386_ONLY)file path=usr/include/sys/gfx_private.h
 file path=usr/include/sys/gld.h
 file path=usr/include/sys/gldpriv.h
 file path=usr/include/sys/group.h
