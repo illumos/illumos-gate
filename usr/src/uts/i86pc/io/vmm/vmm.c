@@ -1766,13 +1766,6 @@ vm_localize_resources(struct vm *vm, struct vcpu *vcpu)
 		return;
 
 	/*
-	 * Resource localization is done without CPU affinity, and since it may
-	 * block on resources like cpu_lock, migration may occur during this
-	 * course of action.  This is an accepted risk, as the localization is
-	 * simply an optimization and not required for correctness.
-	 */
-
-	/*
 	 * Localize system-wide resources to the primary boot vCPU.  While any
 	 * of the other vCPUs may access them, it keeps the potential interrupt
 	 * footprint constrained to CPUs involved with this instance.
@@ -1782,16 +1775,8 @@ vm_localize_resources(struct vm *vm, struct vcpu *vcpu)
 		vrtc_localize_resources(vm->vrtc);
 	}
 
-	/*
-	 * The cyclic backing the LAPIC timer is nice to have local as
-	 * reprogramming operations would otherwise require a crosscall.
-	 *
-	 * It is done last, giving it the highest chance of being localized
-	 * without the thread being migrated elsewhere before running the vCPU.
-	 */
 	vlapic_localize_resources(vcpu->vlapic);
 
-	/* Record where we localized to only once the operation is complete. */
 	vcpu->lastloccpu = curcpu;
 }
 #endif /* __FreeBSD */
@@ -1830,7 +1815,15 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	evinfo.iptr = &vcpu->reqidle;
 restart:
 #ifndef	__FreeBSD__
-	/* Localize before setting affinity and disabling kpreempt */
+	thread_affinity_set(curthread, CPU_CURRENT);
+	/*
+	 * Resource localization should happen after the CPU affinity for the
+	 * thread has been set to ensure that access from restricted contexts,
+	 * such as VMX-accelerated APIC operations, can occur without inducing
+	 * cyclic cross-calls.
+	 *
+	 * This must be done prior to disabling kpreempt via critical_enter().
+	 */
 	vm_localize_resources(vm, vcpu);
 #endif
 
@@ -1863,6 +1856,12 @@ restart:
 #ifndef	__FreeBSD__
 	removectx(curthread, vcpu, save_guest_fpustate,
 	    restore_guest_fpustate, NULL, NULL, NULL, NULL);
+
+	/*
+	 * Once clear of the delicate contexts comprising the VM_RUN handler,
+	 * thread CPU affinity can be loosened while other processing occurs.
+	 */
+	thread_affinity_clear(curthread);
 #endif
 
 	vmm_stat_incr(vm, vcpuid, VCPU_TOTAL_RUNTIME, rdtsc() - tscval);

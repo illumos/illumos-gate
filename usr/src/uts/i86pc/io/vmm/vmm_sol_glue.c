@@ -259,28 +259,13 @@ mtx_destroy(struct mtx *mtx)
 void
 critical_enter(void)
 {
-	kthread_t *tp = curthread;
-
 	kpreempt_disable();
-	if (tp->t_preempt == 1) {
-		/*
-		 * Avoid extra work when nested calls to this are made and only
-		 * set affinity on the top-level entry.  This also means only
-		 * removing the affinity in critical_exit() when at last call.
-		 */
-		thread_affinity_set(tp, CPU_CURRENT);
-	}
 }
 
 void
 critical_exit(void)
 {
-	kthread_t *tp = curthread;
-
 	kpreempt_enable();
-	if (tp->t_preempt == 0) {
-		thread_affinity_clear(tp);
-	}
 }
 
 struct unrhdr;
