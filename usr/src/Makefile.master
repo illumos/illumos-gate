@@ -119,7 +119,9 @@ ONBLD_TOOLS=		$(BUILD_TOOLS)/onbld
 JAVA_HOME=	/usr/java
 # define buildtime JAVA_ROOT
 JAVA_ROOT=	/usr/java
-# define to build with JAVA 8
+# Build uses java7 by default.  Pass one the variables below set to empty
+# string in the environment to override.
+BLD_JAVA_6=	$(POUND_SIGN)
 BLD_JAVA_8=	$(POUND_SIGN)
 
 GCC_ROOT=	/opt/gcc/4.4.4
