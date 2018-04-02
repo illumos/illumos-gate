@@ -160,6 +160,10 @@ typedef struct vmspace * (*vmi_vmspace_alloc)(vm_offset_t min, vm_offset_t max);
 typedef void	(*vmi_vmspace_free)(struct vmspace *vmspace);
 typedef struct vlapic * (*vmi_vlapic_init)(void *vmi, int vcpu);
 typedef void	(*vmi_vlapic_cleanup)(void *vmi, struct vlapic *vlapic);
+#ifndef __FreeBSD__
+typedef void	(*vmi_savectx)(void *vmi, int vcpu);
+typedef void	(*vmi_restorectx)(void *vmi, int vcpu);
+#endif
 
 struct vmm_ops {
 	vmm_init_func_t		init;		/* module wide initialization */
@@ -179,6 +183,11 @@ struct vmm_ops {
 	vmi_vmspace_free	vmspace_free;
 	vmi_vlapic_init		vlapic_init;
 	vmi_vlapic_cleanup	vlapic_cleanup;
+
+#ifndef __FreeBSD__
+	vmi_savectx		vmsavectx;
+	vmi_restorectx		vmrestorectx;
+#endif
 };
 
 extern struct vmm_ops vmm_ops_intel;

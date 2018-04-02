@@ -24,6 +24,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -2268,5 +2272,14 @@ struct vmm_ops vmm_ops_amd = {
 	svm_npt_alloc,
 	svm_npt_free,
 	svm_vlapic_init,
-	svm_vlapic_cleanup	
+	svm_vlapic_cleanup,
+
+#ifndef __FreeBSD__
+	/*
+	 * When SVM support is wired up and tested, it is likely to require
+	 * savectx/restorectx functions similar to VMX.
+	 */
+	NULL,
+	NULL,
+#endif
 };

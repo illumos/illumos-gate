@@ -27,7 +27,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _VMX_H_
@@ -123,6 +123,7 @@ struct vmx {
 #ifndef	__FreeBSD__
 	uint64_t	host_msrs[VM_MAXCPU][GUEST_MSR_NUM];
 	uint64_t	tsc_offset[VM_MAXCPU];
+	boolean_t	ctx_loaded[VM_MAXCPU];
 #endif
 	struct vmxctx	ctx[VM_MAXCPU];
 	struct vmxcap	cap[VM_MAXCPU];

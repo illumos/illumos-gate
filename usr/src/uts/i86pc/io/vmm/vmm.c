@@ -265,6 +265,16 @@ typedef struct vm_ioport_hook {
 	vmm_rmem_cb_t	vmih_rmem_cb;
 	vmm_wmem_cb_t	vmih_wmem_cb;
 } vm_ioport_hook_t;
+
+/* Flags for vtc_status */
+#define	VTCS_FPU_RESTORED	1 /* guest FPU restored, host FPU saved */
+#define	VTCS_FPU_CTX_CRITICAL	2 /* in ctx where FPU restore cannot be lazy */
+
+typedef struct vm_thread_ctx {
+	struct vm	*vtc_vm;
+	int		vtc_vcpuid;
+	uint_t		vtc_status;
+} vm_thread_ctx_t;
 #endif /* __FreeBSD__ */
 
 #ifdef KTR
@@ -1777,6 +1787,61 @@ vm_localize_resources(struct vm *vm, struct vcpu *vcpu)
 
 	vcpu->lastloccpu = curcpu;
 }
+
+void
+vmm_savectx(void *arg)
+{
+	vm_thread_ctx_t *vtc = arg;
+	struct vm *vm = vtc->vtc_vm;
+	const int vcpuid = vtc->vtc_vcpuid;
+
+	if (ops->vmsavectx != NULL) {
+		ops->vmsavectx(vm->cookie, vcpuid);
+	}
+
+	/*
+	 * If the CPU holds the restored guest FPU state, save it and restore
+	 * the host FPU state before this thread goes off-cpu.
+	 */
+	if ((vtc->vtc_status & VTCS_FPU_RESTORED) != 0) {
+		struct vcpu *vcpu = &vm->vcpu[vcpuid];
+
+		save_guest_fpustate(vcpu);
+		vtc->vtc_status &= ~VTCS_FPU_RESTORED;
+	}
+}
+
+void
+vmm_restorectx(void *arg)
+{
+	vm_thread_ctx_t *vtc = arg;
+	struct vm *vm = vtc->vtc_vm;
+	const int vcpuid = vtc->vtc_vcpuid;
+
+	/*
+	 * When coming back on-cpu, only restore the guest FPU status if the
+	 * thread is in a context marked as requiring it.  This should be rare,
+	 * occurring only when a future logic error results in a voluntary
+	 * sleep during the VMRUN critical section.
+	 *
+	 * The common case will result in elision of the guest FPU state
+	 * restoration, deferring that action until it is clearly necessary
+	 * during vm_run.
+	 */
+	VERIFY((vtc->vtc_status & VTCS_FPU_RESTORED) == 0);
+	if ((vtc->vtc_status & VTCS_FPU_CTX_CRITICAL) != 0) {
+		struct vcpu *vcpu = &vm->vcpu[vcpuid];
+
+		restore_guest_fpustate(vcpu);
+		vtc->vtc_status |= VTCS_FPU_RESTORED;
+	}
+
+	if (ops->vmrestorectx != NULL) {
+		ops->vmrestorectx(vm->cookie, vcpuid);
+	}
+
+}
+
 #endif /* __FreeBSD */
 
 
@@ -1793,6 +1858,9 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	struct vm_exit *vme;
 	bool retu, intr_disabled;
 	pmap_t pmap;
+#ifndef	__FreeBSD__
+	vm_thread_ctx_t vtc;
+#endif
 
 	vcpuid = vmrun->cpuid;
 
@@ -1811,6 +1879,16 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	evinfo.rptr = &vm->rendezvous_func;
 	evinfo.sptr = &vm->suspend;
 	evinfo.iptr = &vcpu->reqidle;
+
+#ifndef	__FreeBSD__
+	vtc.vtc_vm = vm;
+	vtc.vtc_vcpuid = vcpuid;
+	vtc.vtc_status = 0;
+
+	installctx(curthread, &vtc, vmm_savectx, vmm_restorectx, NULL, NULL,
+	    NULL, NULL);
+#endif
+
 restart:
 #ifndef	__FreeBSD__
 	thread_affinity_set(curthread, CPU_CURRENT);
@@ -1840,21 +1918,27 @@ restart:
 	ttolwp(curthread)->lwp_pcb.pcb_rupdate = 1;
 #endif
 
-#ifndef	__FreeBSD__
-	installctx(curthread, vcpu, save_guest_fpustate,
-	    restore_guest_fpustate, NULL, NULL, NULL, NULL);
-#endif
+#ifdef	__FreeBSD__
 	restore_guest_fpustate(vcpu);
+#else
+	if ((vtc.vtc_status & VTCS_FPU_RESTORED) == 0) {
+		restore_guest_fpustate(vcpu);
+		vtc.vtc_status |= VTCS_FPU_RESTORED;
+	}
+	vtc.vtc_status |= VTCS_FPU_CTX_CRITICAL;
+#endif
 
 	vcpu_require_state(vm, vcpuid, VCPU_RUNNING);
 	error = VMRUN(vm->cookie, vcpuid, vcpu->nextrip, pmap, &evinfo);
 	vcpu_require_state(vm, vcpuid, VCPU_FROZEN);
 
+#ifdef	__FreeBSD__
 	save_guest_fpustate(vcpu);
-#ifndef	__FreeBSD__
-	removectx(curthread, vcpu, save_guest_fpustate,
-	    restore_guest_fpustate, NULL, NULL, NULL, NULL);
+#else
+	vtc.vtc_status &= ~VTCS_FPU_CTX_CRITICAL;
+#endif
 
+#ifndef	__FreeBSD__
 	/*
 	 * Once clear of the delicate contexts comprising the VM_RUN handler,
 	 * thread CPU affinity can be loosened while other processing occurs.
@@ -1910,6 +1994,24 @@ restart:
 
 	if (error == 0 && retu == false)
 		goto restart;
+
+#ifndef	__FreeBSD__
+	/*
+	 * Before returning to userspace, explicitly restore the host FPU state
+	 * (saving the guest state).  This is done with kpreempt disabled to
+	 * ensure it is not interrupted, potentially confusing the soon-to-be
+	 * removed savectx/restorectx handlers.
+	 */
+	kpreempt_disable();
+	if ((vtc.vtc_status & VTCS_FPU_RESTORED) != 0) {
+		save_guest_fpustate(vcpu);
+		vtc.vtc_status &= ~VTCS_FPU_RESTORED;
+	}
+	kpreempt_enable();
+
+	removectx(curthread, &vtc, vmm_savectx, vmm_restorectx, NULL, NULL,
+	    NULL, NULL);
+#endif
 
 	VCPU_CTR2(vm, vcpuid, "retu %d/%d", error, vme->exitcode);
 

@@ -2800,6 +2800,11 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 
 	VMPTRLD(vmcs);
 
+#ifndef __FreeBSD__
+	VERIFY(!vmx->ctx_loaded[vcpu] && curthread->t_preempt != 0);
+	vmx->ctx_loaded[vcpu] = B_TRUE;
+#endif
+
 	/*
 	 * XXX
 	 * We do this every time because we may setup the virtual machine
@@ -2913,6 +2918,11 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 
 	VMCLEAR(vmcs);
 	vmx_msr_guest_exit(vmx, vcpu);
+
+#ifndef __FreeBSD__
+	VERIFY(vmx->ctx_loaded[vcpu] && curthread->t_preempt != 0);
+	vmx->ctx_loaded[vcpu] = B_FALSE;
+#endif
 
 	return (0);
 }
@@ -3705,6 +3715,32 @@ vmx_vlapic_cleanup(void *arg, struct vlapic *vlapic)
 	free(vlapic, M_VLAPIC);
 }
 
+#ifndef __FreeBSD__
+static void
+vmx_savectx(void *arg, int vcpu)
+{
+	struct vmx *vmx = arg;
+	struct vmcs *vmcs = &vmx->vmcs[vcpu];
+
+	if (vmx->ctx_loaded[vcpu]) {
+		VERIFY3U(vmclear(vmcs), ==, 0);
+		vmx_msr_guest_exit(vmx, vcpu);
+	}
+}
+
+static void
+vmx_restorectx(void *arg, int vcpu)
+{
+	struct vmx *vmx = arg;
+	struct vmcs *vmcs = &vmx->vmcs[vcpu];
+
+	if (vmx->ctx_loaded[vcpu]) {
+		vmx_msr_guest_enter(vmx, vcpu);
+		VERIFY3U(vmptrld(vmcs), ==, 0);
+	}
+}
+#endif /* __FreeBSD__ */
+
 struct vmm_ops vmm_ops_intel = {
 	vmx_init,
 	vmx_cleanup,
@@ -3722,6 +3758,11 @@ struct vmm_ops vmm_ops_intel = {
 	ept_vmspace_free,
 	vmx_vlapic_init,
 	vmx_vlapic_cleanup,
+
+#ifndef __FreeBSD__
+	vmx_savectx,
+	vmx_restorectx,
+#endif
 };
 
 #ifndef __FreeBSD__
