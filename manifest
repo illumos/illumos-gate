@@ -10570,6 +10570,7 @@ d usr/sfw/bin 0755 root bin
 d usr/sfw/bin/amd64 0755 root bin
 d usr/share 0755 root sys
 d usr/share/hwdata 0755 root sys
+f usr/share/hwdata/efi.fixes 0444 root bin
 f usr/share/hwdata/pci.ids 0444 root bin
 d usr/share/lib 0755 root sys
 d usr/share/lib/dict 0755 root bin

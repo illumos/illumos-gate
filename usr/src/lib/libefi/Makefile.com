@@ -20,9 +20,8 @@
 #
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libefi.a
@@ -37,7 +36,7 @@ include ../../Makefile.rootfs
 SRCDIR =	../common
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-luuid -lc
+LDLIBS +=	-luuid -lsmbios -lc
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 
