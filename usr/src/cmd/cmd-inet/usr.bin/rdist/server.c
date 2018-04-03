@@ -218,6 +218,7 @@ server()
 
 		default:
 			error("server: unknown command '%s'\n", cp);
+			continue;
 		case '\0':
 			continue;
 		}
@@ -1619,7 +1620,7 @@ more:
 
 	default:
 		s--;
-		/* fall into... */
+		/* FALLTHROUGH */
 	case '\1':
 	case '\2':
 		nerrs++;

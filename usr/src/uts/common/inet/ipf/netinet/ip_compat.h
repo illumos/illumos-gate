@@ -28,14 +28,19 @@
 #if defined(_KERNEL) || defined(KERNEL) || defined(__KERNEL__)
 # undef	KERNEL
 # undef	_KERNEL
-# undef 	__KERNEL__
+# undef		__KERNEL__
 # define	KERNEL
 # define	_KERNEL
-# define 	__KERNEL__
+# define	__KERNEL__
 #endif
 
-#ifndef	SOLARIS
-#define	SOLARIS	(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+#ifdef	SOLARIS
+#undef	SOLARIS
+#endif
+#if (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+#define	SOLARIS	(1)
+#else
+#define	SOLARIS	(0)
 #endif
 #if SOLARIS2 >= 8
 # ifndef	USE_INET6

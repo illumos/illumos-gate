@@ -3099,6 +3099,7 @@ check_srom_valid(uchar_t *vi)
 					crc ^= 7;
 				}
 			}
+		/* FALLTHROUGH */
 
 	default:
 		return (0);
