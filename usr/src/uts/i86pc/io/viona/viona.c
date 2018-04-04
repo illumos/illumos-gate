@@ -56,6 +56,7 @@
 #include <sys/mac_provider.h>
 #include <sys/mac_client_priv.h>
 #include <sys/vlan.h>
+#include <inet/ip.h>
 
 #include <sys/vmm_drv.h>
 #include <sys/viona_io.h>
@@ -1934,6 +1935,28 @@ viona_desb_release(viona_desb_t *dp)
 	mutex_exit(&ring->vr_lock);
 }
 
+static int
+viona_mb_get_uint8(mblk_t *mp, off_t off, uint8_t *out)
+{
+	size_t mpsize;
+	uint8_t *bp;
+
+	mpsize = msgsize(mp);
+	if (off + sizeof (uint8_t) > mpsize)
+		return (-1);
+
+	mpsize = MBLKL(mp);
+	while (off >= mpsize) {
+		mp = mp->b_cont;
+		off -= mpsize;
+		mpsize = MBLKL(mp);
+	}
+
+	bp = mp->b_rptr + off;
+	*out = *bp;
+	return (0);
+}
+
 static boolean_t
 viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
     mblk_t *mp, uint32_t len)
@@ -1942,6 +1965,7 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 	const struct ether_header *eth;
 	uint_t eth_len = sizeof (struct ether_header);
 	ushort_t ftype;
+	uint8_t ipproto = IPPROTO_NONE; /* NONE is not exactly right, but ok */
 
 	eth = (const struct ether_header *)mp->b_rptr;
 	if (MBLKL(mp) < sizeof (*eth)) {
@@ -1959,11 +1983,22 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 		ftype = ntohs(veth->ether_type);
 	}
 
+	if (ftype == ETHERTYPE_IP) {
+		const size_t off = offsetof(ipha_t, ipha_protocol) + eth_len;
+
+		(void) viona_mb_get_uint8(mp, off, &ipproto);
+	} else if (ftype == ETHERTYPE_IPV6) {
+		const size_t off = offsetof(ip6_t, ip6_nxt) + eth_len;
+
+		(void) viona_mb_get_uint8(mp, off, &ipproto);
+	}
+
 	/*
 	 * Partial checksum support from the NIC is ideal, since it most
 	 * closely maps to the interface defined by virtio.
 	 */
-	if ((link->l_cap_csum & HCKSUM_INET_PARTIAL) != 0) {
+	if ((link->l_cap_csum & HCKSUM_INET_PARTIAL) != 0 &&
+	    (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP)) {
 		uint_t start, stuff, end;
 
 		/*
@@ -1984,7 +2019,8 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 	 * checksum will need to calculated inline.
 	 */
 	if (ftype == ETHERTYPE_IP) {
-		if ((link->l_cap_csum & HCKSUM_INET_FULL_V4) != 0) {
+		if ((link->l_cap_csum & HCKSUM_INET_FULL_V4) != 0 &&
+		    (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP)) {
 			mac_hcksum_set(mp, 0, 0, 0, 0, HCK_FULLCKSUM);
 			return (B_TRUE);
 		}
@@ -1994,7 +2030,8 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 		VIONA_RING_STAT_INCR(ring, fail_hcksum);
 		return (B_FALSE);
 	} else if (ftype == ETHERTYPE_IPV6) {
-		if ((link->l_cap_csum & HCKSUM_INET_FULL_V6) != 0) {
+		if ((link->l_cap_csum & HCKSUM_INET_FULL_V6) != 0 &&
+		    (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP)) {
 			mac_hcksum_set(mp, 0, 0, 0, 0, HCK_FULLCKSUM);
 			return (B_TRUE);
 		}

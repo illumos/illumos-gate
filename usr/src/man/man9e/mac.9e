@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2016 Joyent, Inc.
+.\" Copyright 2018 Joyent, Inc.
 .\"
-.Dd March 26, 2017
+.Dd March 23, 2018
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -550,24 +550,28 @@ The following set of flags may be combined through a bitwise inclusive OR:
 .Bl -tag -width Ds
 .It Sy HCKSUM_INET_PARTIAL
 This indicates that the hardware can calculate a partial checksum for
-both IPv4 and IPv6; however, it requires the pseudo-header checksum be
-calculated for it.
+both IPv4 and IPv6 UDP and TCP packets; however, it requires the pseudo-header
+checksum be calculated for it.
 The pseudo-header checksum will be available for the mblk_t when calling
 .Xr mac_hcksum_get 9F .
-Note this does not imply that the hardware is capable of calculating the
-IPv4 header checksum.
+Note this does not imply that the hardware is capable of calculating
+the partial checksum for other L4 protocols or the IPv4 header checksum.
 That should be indicated with the
 .Sy HCKSUM_IPHDRCKSUM flag.
 .It Sy HCKSUM_INET_FULL_V4
-This indicates that the hardware will fully calculate the L4 checksum
-for outgoing IPv4 packets and does not require a pseudo-header checksum.
+This indicates that the hardware will fully calculate the L4 checksum for
+outgoing IPv4 UDP or TCP packets only, and does not require a pseudo-header
+checksum.
 Note this does not imply that the hardware is capable of calculating the
-IPv4 header checksum.
+checksum for other L4 protocols or the IPv4 header checksum.
 That should be indicated with the
 .Sy HCKSUM_IPHDRCKSUM .
 .It Sy HCKSUM_INET_FULL_V6
-This indicates that the hardware will fully calculate the L4 checksum
-for outgoing IPv6 packets and does not require a pseudo-header checksum.
+This indicates that the hardware will fully calculate the L4 checksum for
+outgoing IPv6 UDP or TCP packets only, and does not require a pseudo-header
+checksum.
+Note this does not imply that the hardware is capable of calculating the
+checksum for any other L4 protocols.
 .It Sy HCKSUM_IPHDRCKSUM
 This indicates that the hardware supports calculating the checksum for
 the IPv4 header itself.

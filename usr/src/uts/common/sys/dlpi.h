@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -676,11 +677,11 @@ typedef struct {
 #define	HCKSUM_ENABLE		0x01	/* Set to enable hardware checksum */
 					/* capability */
 #define	HCKSUM_INET_PARTIAL	0x02	/* Partial 1's complement checksum */
-					/* ability */
+					/* ability for TCP/UDP packets. */
 #define	HCKSUM_INET_FULL_V4	0x04	/* Full 1's complement checksum */
-					/* ability for IPv4 packets. */
+					/* ability for IPv4 TCP/UDP packets. */
 #define	HCKSUM_INET_FULL_V6	0x08	/* Full 1's complement checksum */
-					/* ability for IPv6 packets. */
+					/* ability for IPv6 TCP/UDP packets. */
 #define	HCKSUM_IPHDRCKSUM	0x10	/* IPv4 Header checksum offload */
 					/* capability */
 #ifdef _KERNEL

@@ -33,6 +33,9 @@
 * limitations under the License.
 */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
 
 #include "qede.h"
 
@@ -2009,12 +2012,10 @@ qede_mac_get_capability(void *arg,
 		}
 
 		/*
-		 * Hardware does not support ICMPv6 checksumming. Right now the
-		 * GLDv3 doesn't provide us a way to specify that we don't
-		 * support that. As such, we cannot indicate
-		 * HCKSUM_INET_FULL_V6.
+		 * Hardware does not support ICMPv6 checksumming, but
+		 * HCKSUM_INET_FULL_V4/6 only applies for UDP and TCP.
 		 */
-		*tx_flags = HCKSUM_INET_FULL_V4 |
+		*tx_flags = HCKSUM_INET_FULL_V4 | HCKSUM_INET_FULL_V6 |
 		    HCKSUM_IPHDRCKSUM;
 		ret = B_TRUE;
 		break;

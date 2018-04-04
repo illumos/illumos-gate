@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1737,6 +1738,13 @@ ip_output_cksum_v4(iaflags_t ixaflags, mblk_t *mp, ipha_t *ipha,
 #endif
 			sctph->sh_chksum = sctp_cksum(mp, ip_hdr_length);
 		goto ip_hdr_cksum;
+	} else if (protocol == IPPROTO_ICMP) {
+		/*
+		 * Note that we always calculate a SW checksum for ICMP. In the
+		 * future, if HW support for ICMP is advertised, we can change
+		 * this.
+		 */
+		return (ip_output_sw_cksum_v4(mp, ipha, ixa));
 	} else {
 	ip_hdr_cksum:
 		/* Calculate IPv4 header checksum */
