@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2018 Joyent, Inc.
+#
 
 PROG = smbios
 OBJS = smbios.o
@@ -34,6 +36,8 @@ LDLIBS += -lsmbios
 
 FILEMODE = 0555
 STRIPFLAG =
+
+LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN
 
 .KEEP_STATE:
 

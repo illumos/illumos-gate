@@ -104,6 +104,7 @@
 #include <libdladm.h>
 #include <sys/dls_mgmt.h>
 #include <libscf.h>
+#include <uuid/uuid.h>
 
 #include <libzonecfg.h>
 #include <zonestat_impl.h>
@@ -841,10 +842,18 @@ setup_subproc_env(boolean_t debug)
 	char net_resources[MAXNAMELEN * 2];
 	char dev_resources[MAXNAMELEN * 2];
 	char didstr[16];
+	char uuidstr[UUID_PRINTABLE_STRING_LENGTH];
+	uuid_t uuid;
 
 	/* snap_hndl is null when called through the set_brand_env code path */
 	if (snap_hndl == NULL)
 		return (Z_OK);
+
+	if ((res = zonecfg_get_uuid(zone_name, uuid)) != Z_OK)
+		return (res);
+
+	uuid_unparse(uuid, uuidstr);
+	(void) setenv("_ZONECFG_uuid", uuidstr, 1);
 
 	(void) snprintf(didstr, sizeof (didstr), "%d", zone_did);
 	(void) setenv("_ZONECFG_did", didstr, 1);

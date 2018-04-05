@@ -28,6 +28,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 #include <zone.h>
 
@@ -48,11 +49,13 @@ typedef enum {
 	PCI_SLOT_NICS
 } pci_slot_t;
 
-boolean_t debug;
+static boolean_t debug;
+static const char *zonename;
+static const char *zonepath;
 
 #define	dprintf(x) if (debug) (void)printf x
 
-char *
+static char *
 get_zcfg_var(const char *rsrc, const char *inst, const char *prop)
 {
 	char envvar[MAXNAMELEN];
@@ -77,7 +80,7 @@ get_zcfg_var(const char *rsrc, const char *inst, const char *prop)
 	return (ret);
 }
 
-boolean_t
+static boolean_t
 is_env_true(const char *rsrc, const char *inst, const char *prop)
 {
 	char *val = get_zcfg_var(rsrc, inst, prop);
@@ -85,8 +88,8 @@ is_env_true(const char *rsrc, const char *inst, const char *prop)
 	return (val != NULL && strcmp(val, "true") == 0);
 }
 
-int
-add_arg(int *argc, char **argv, char *val)
+static int
+add_arg(int *argc, char **argv, const char *val)
 {
 	if (*argc >= ZH_MAXARGS) {
 		(void) printf("Error: too many arguments\n");
@@ -99,7 +102,46 @@ add_arg(int *argc, char **argv, char *val)
 	return (0);
 }
 
-int
+static int
+add_smbios(int *argc, char **argv)
+{
+	char smbios[MAXPATHLEN];
+	struct utsname utsname;
+	const char *version;
+	const char *uuid;
+
+	/*
+	 * Look for something like joyent_20180329T120303Z.  A little mucky, but
+	 * it's exactly what sysinfo does.
+	 */
+	(void) uname(&utsname);
+	if (strncmp(utsname.version, "joyent_", strlen("joyent_")) == 0)
+		version = utsname.version + strlen("joyent_");
+	else
+		version = "?";
+
+	/*
+	 * This is based upon the SMBIOS values we expose to KVM guests.
+	 */
+	(void) snprintf(smbios, sizeof (smbios),
+	    "1,manufacturer=Joyent,product=SmartDC HVM,version=7.%s,"
+	    "serial=%s,sku=001,family=Virtual Machine",
+	    version, zonename);
+
+	if (add_arg(argc, argv, "-B") != 0 ||
+	    add_arg(argc, argv, smbios) != 0)
+		return (1);
+
+	if ((uuid = getenv("_ZONECFG_uuid")) != NULL) {
+		if (add_arg(argc, argv, "-U") != 0 ||
+		    add_arg(argc, argv, uuid) != 0)
+			return (1);
+	}
+
+	return (0);
+}
+
+static int
 add_cpu(int *argc, char **argv)
 {
 	char *val;
@@ -113,7 +155,7 @@ add_cpu(int *argc, char **argv)
 	return (0);
 }
 
-int
+static int
 add_ram(int *argc, char **argv)
 {
 	char *val;
@@ -127,7 +169,7 @@ add_ram(int *argc, char **argv)
 	return (0);
 }
 
-int
+static int
 add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
 {
 	static char *boot = NULL;
@@ -165,7 +207,7 @@ add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
 	return (0);
 }
 
-int
+static int
 add_ppt(int *argc, char **argv, char *ppt, char *path, char *slotconf,
     size_t slotconf_len)
 {
@@ -191,25 +233,26 @@ add_ppt(int *argc, char **argv, char *ppt, char *path, char *slotconf,
 		bus = 0;
 		break;
 	default:
-		(void) printf("Error: device %s has illegal PCI slot: %s\n",
+		(void) printf("Error: device %d has illegal PCI slot: %s\n",
 		    dev, pcislot);
 		return (-1);
 	}
 
 	if (bus > 255 || dev > 31 || func > 7) {
-		(void) printf("Error: device %s has illegal PCI slot: %s\n",
+		(void) printf("Error: device %d has illegal PCI slot: %s\n",
 		    dev, pcislot);
 		return (-1);
 	}
 
 	if (bus > 0) {
-		if (!acpi)
-			add_arg(argc, argv, "-A");
+		if (!acpi && add_arg(argc, argv, "-A") != 0)
+			return (-1);
 		acpi = B_TRUE;
 	}
 
-	if (!wired)
-		add_arg(argc, argv, "-S");
+	if (!wired && add_arg(argc, argv, "-S") != 0)
+		return (-1);
+
 	wired = B_TRUE;
 
 	if (snprintf(slotconf, slotconf_len, "%d:%d:%d,passthru,%s",
@@ -221,7 +264,7 @@ add_ppt(int *argc, char **argv, char *ppt, char *path, char *slotconf,
 	return (0);
 }
 
-int
+static int
 add_devices(int *argc, char **argv)
 {
 	char *devices;
@@ -277,7 +320,7 @@ add_devices(int *argc, char **argv)
 	return (0);
 }
 
-int
+static int
 add_nets(int *argc, char **argv)
 {
 	char *nets;
@@ -331,7 +374,7 @@ add_nets(int *argc, char **argv)
 	return (0);
 }
 
-int
+static int
 add_lpc(int *argc, char **argv)
 {
 	char *lpcdevs[] = { "bootrom", "com1", "com2", NULL };
@@ -378,7 +421,7 @@ add_lpc(int *argc, char **argv)
 	return (0);
 }
 
-int
+static int
 add_bhyve_extra_opts(int *argc, char **argv)
 {
 	char *val;
@@ -410,7 +453,7 @@ add_bhyve_extra_opts(int *argc, char **argv)
 }
 
 /* Must be called last */
-int
+static int
 add_vmname(int *argc, char **argv)
 {
 	char buf[32];				/* VM_MAX_NAMELEN */
@@ -433,7 +476,7 @@ add_vmname(int *argc, char **argv)
  * paranoid and call fdsync() at the end.  That's not really need for this use
  * case because it is being written to tmpfs.
  */
-int
+static int
 full_write(int fd, char *buf, size_t buflen)
 {
 	ssize_t nwritten;
@@ -455,7 +498,7 @@ full_write(int fd, char *buf, size_t buflen)
 	return (0);
 }
 
-void
+static void
 init_debug(void)
 {
 	char *val = getenv("_ZONEADMD_brand_debug");
@@ -464,7 +507,7 @@ init_debug(void)
 }
 
 static int
-setup_reboot(char *zonename)
+setup_reboot(void)
 {
 	zoneid_t	zoneid;
 
@@ -481,7 +524,7 @@ setup_reboot(char *zonename)
 
 	if (zone_setattr(zoneid, ZONE_ATTR_INITREBOOT, NULL, 0) < 0 ||
 	    zone_setattr(zoneid, ZONE_ATTR_INITRESTART0, NULL, 0) < 0) {
-		(void) printf("Error: bhyve zoneid %d setattr failed: %s\n",
+		(void) printf("Error: bhyve zoneid %ld setattr failed: %s\n",
 		    zoneid, strerror(errno));
 		return (-1);
 	}
@@ -496,16 +539,13 @@ main(int argc, char **argv)
 	char *zhargv[ZH_MAXARGS] = {
 		"zhyve",	/* Squats on argv[0] */
 		"-H",		/* vmexit on halt isns */
-		"-B", "1,product=SmartDC HVM",
 		NULL };
-	int zhargc;
+	int zhargc = 2;
 	nvlist_t *nvl;
 	char *nvbuf = NULL;
 	size_t nvbuflen = 0;
 	char zoneroot[MAXPATHLEN];
 	int zrfd;
-	char *zonename;
-	char *zonepath;
 
 	init_debug();
 
@@ -517,14 +557,11 @@ main(int argc, char **argv)
 	zonename = argv[1];
 	zonepath = argv[2];
 
-	if (setup_reboot(zonename) < 0)
+	if (setup_reboot() < 0)
 		return (1);
 
-	for (zhargc = 0; zhargv[zhargc] != NULL; zhargc++) {
-		dprintf(("def_arg: argv[%d]='%s'\n", zhargc, zhargv[zhargc]));
-	}
-
-	if (add_lpc(&zhargc, (char **)&zhargv) != 0 ||
+	if (add_smbios(&zhargc, (char **)&zhargv) != 0 ||
+	    add_lpc(&zhargc, (char **)&zhargv) != 0 ||
 	    add_cpu(&zhargc, (char **)&zhargv) != 0 ||
 	    add_ram(&zhargc, (char **)&zhargv) != 0 ||
 	    add_devices(&zhargc, (char **)&zhargv) != 0 ||
@@ -578,7 +615,7 @@ main(int argc, char **argv)
 	 */
 	if (mkdirat(zrfd, BHYVE_DIR, 0700) != 0 && errno != EEXIST) {
 		(void) printf("Error: failed to create directory %s "
-		    "in zone: %s\n" BHYVE_DIR, strerror(errno));
+		    "in zone: %s\n", BHYVE_DIR, strerror(errno));
 		return (1);
 	}
 
