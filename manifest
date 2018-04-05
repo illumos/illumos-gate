@@ -3311,7 +3311,6 @@ f usr/include/smbsrv/alloc.h 0644 root bin
 f usr/include/smbsrv/cp_unicode.h 0644 root bin
 f usr/include/smbsrv/cp_usascii.h 0644 root bin
 f usr/include/smbsrv/hash_table.h 0644 root bin
-f usr/include/smbsrv/libmlrpc.h 0644 root bin
 f usr/include/smbsrv/libmlsvc.h 0644 root bin
 f usr/include/smbsrv/libsmb.h 0644 root bin
 f usr/include/smbsrv/libsmbns.h 0644 root bin
@@ -3325,17 +3324,14 @@ f usr/include/smbsrv/ndl/eventlog.ndl 0644 root bin
 f usr/include/smbsrv/ndl/llsrpc.ndl 0644 root bin
 f usr/include/smbsrv/ndl/lsarpc.ndl 0644 root bin
 f usr/include/smbsrv/ndl/msgsvc.ndl 0644 root bin
-f usr/include/smbsrv/ndl/ndrtypes.ndl 0644 root bin
 f usr/include/smbsrv/ndl/netdfs.ndl 0644 root bin
 f usr/include/smbsrv/ndl/netlogon.ndl 0644 root bin
-f usr/include/smbsrv/ndl/rpcpdu.ndl 0644 root bin
 f usr/include/smbsrv/ndl/samrpc.ndl 0644 root bin
 f usr/include/smbsrv/ndl/security.ndl 0644 root bin
 f usr/include/smbsrv/ndl/spoolss.ndl 0644 root bin
 f usr/include/smbsrv/ndl/srvsvc.ndl 0644 root bin
 f usr/include/smbsrv/ndl/svcctl.ndl 0644 root bin
 f usr/include/smbsrv/ndl/winreg.ndl 0644 root bin
-f usr/include/smbsrv/ndr.h 0644 root bin
 f usr/include/smbsrv/netbios.h 0644 root bin
 f usr/include/smbsrv/netrauth.h 0644 root bin
 f usr/include/smbsrv/nmpipes.h 0644 root bin
@@ -3363,7 +3359,6 @@ f usr/include/smbsrv/string.h 0644 root bin
 f usr/include/smbsrv/svrapi.h 0644 root bin
 f usr/include/smbsrv/winioctl.h 0644 root bin
 f usr/include/smbsrv/winsvc.h 0644 root bin
-f usr/include/smbsrv/wintypes.h 0644 root bin
 f usr/include/smhbaapi.h 0644 root bin
 f usr/include/spawn.h 0644 root bin
 f usr/include/stack_unwind.h 0644 root bin
@@ -10001,8 +9996,6 @@ f usr/lib/smbfs/smbiod 0555 root bin
 f usr/lib/smbfs/smbiod-svc 0555 root bin
 d usr/lib/smbsrv 0755 root bin
 d usr/lib/smbsrv/amd64 0755 root bin
-f usr/lib/smbsrv/amd64/libmlrpc.so.1 0755 root bin
-s usr/lib/smbsrv/amd64/libmlrpc.so=libmlrpc.so.1
 f usr/lib/smbsrv/amd64/libmlsvc.so.1 0755 root bin
 s usr/lib/smbsrv/amd64/libmlsvc.so=libmlsvc.so.1
 f usr/lib/smbsrv/amd64/libsmb.so.1 0755 root bin
@@ -10018,7 +10011,6 @@ f usr/lib/smbsrv/dtrace/smbnode.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbsrv.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbvfs.d 0555 root bin
 f usr/lib/smbsrv/libmlsvc.so.1 0755 root bin
-f usr/lib/smbsrv/libsmb.so.0 0755 root bin
 f usr/lib/smbsrv/libsmbns.so.1 0755 root bin
 f usr/lib/smbsrv/smbd 0755 root bin
 d usr/lib/smedia 0755 root bin
