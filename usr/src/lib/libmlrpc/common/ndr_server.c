@@ -36,9 +36,7 @@
 #include <string.h>
 #include <thread.h>
 
-#include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
-#include <smbsrv/ntaccess.h>
+#include <libmlrpc.h>
 
 #define	NDR_PIPE_SEND(np, buf, len) \
 	((np)->np_send)((np), (buf), (len))
@@ -129,42 +127,6 @@ out2:
 	ndr_heap_destroy(mxa->heap);
 out1:
 	return (rc);
-}
-
-/*
- * Check whether or not the specified user has administrator privileges,
- * i.e. is a member of Domain Admins or Administrators.
- * Returns true if the user is an administrator, otherwise returns false.
- */
-boolean_t
-ndr_is_admin(ndr_xa_t *xa)
-{
-	smb_netuserinfo_t *ctx = xa->pipe->np_user;
-
-	return (ctx->ui_flags & SMB_ATF_ADMIN);
-}
-
-/*
- * Check whether or not the specified user has power-user privileges,
- * i.e. is a member of Domain Admins, Administrators or Power Users.
- * This is typically required for operations such as managing shares.
- * Returns true if the user is a power user, otherwise returns false.
- */
-boolean_t
-ndr_is_poweruser(ndr_xa_t *xa)
-{
-	smb_netuserinfo_t *ctx = xa->pipe->np_user;
-
-	return ((ctx->ui_flags & SMB_ATF_ADMIN) ||
-	    (ctx->ui_flags & SMB_ATF_POWERUSER));
-}
-
-int32_t
-ndr_native_os(ndr_xa_t *xa)
-{
-	smb_netuserinfo_t *ctx = xa->pipe->np_user;
-
-	return (ctx->ui_native_os);
 }
 
 /*

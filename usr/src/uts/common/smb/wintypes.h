@@ -18,13 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
-#ifndef _SMBSRV_WINTYPES_H
-#define	_SMBSRV_WINTYPES_H
+#ifndef _SMB_WINTYPES_H
+#define	_SMB_WINTYPES_H
 
 #include <sys/types.h>
 
@@ -42,36 +45,26 @@ extern "C" {
 typedef	uint8_t BYTE;
 typedef	uint16_t WORD;
 typedef	uint32_t DWORD;
-typedef	uint32_t ntstatus_t;
+typedef	DWORD ntstatus_t;
+
+/* pointers to those types */
+typedef	BYTE *LPBYTE;
+typedef	WORD *LPWORD;
+typedef	DWORD *LPDWORD;
+
+/* Note: Internally, this is always a UTF-8 string. */
 typedef	uint8_t *LPTSTR;
-typedef	uint8_t *LPBYTE;
-typedef	uint16_t *LPWORD;
-typedef	uint32_t *LPDWORD;
 
 #endif /* UNSIGNED_TYPES_DEFINED */
-
 
 #ifndef ANY_SIZE_ARRAY
 #define	ANY_SIZE_ARRAY  1
 #endif /* ANY_SIZE_ARRAY */
 
-/*
- * Opaque context handle.
- */
-#ifndef CONTEXT_HANDLE
-#define	CONTEXT_HANDLE(NAME)	\
-	struct NAME {		\
-		DWORD data1;    \
-		DWORD data2;    \
-		WORD  data3[2]; \
-		BYTE  data4[8];	\
-	};			\
-	typedef struct NAME
-#endif /* CONTEXT_HANDLE */
-
+/* CONTEXT_HANDLE now in ndrtypes.ndl */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _SMBSRV_WINTYPES_H */
+#endif /* _SMB_WINTYPES_H */

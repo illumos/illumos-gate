@@ -2143,7 +2143,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 				    "manufacturing information (%u). Driver "
 				    "will not attach. Please contact the "
 				    "firmware vendor about this.", num_phys,
-				    mpt->m_num_phys, mpt->m_num_phys);
+				    mpt->m_num_phys);
 				rval = DDI_FAILURE;
 				goto cleanup;
 			}
@@ -2243,7 +2243,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 				    "manufacturing information (%u). Driver "
 				    "will not attach. Please contact the "
 				    "firmware vendor about this.", num_phys,
-				    mpt->m_num_phys, mpt->m_num_phys);
+				    mpt->m_num_phys);
 				rval = DDI_FAILURE;
 				goto cleanup;
 			}

@@ -34,8 +34,7 @@
 #include <strings.h>
 #include <assert.h>
 
-#include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
+#include <libmlrpc.h>
 
 
 /*

@@ -79,6 +79,7 @@ file path=usr/lib/fs/smbfs/mount mode=4555
 file path=usr/lib/fs/smbfs/share mode=0555
 file path=usr/lib/fs/smbfs/umount mode=4555
 file path=usr/lib/fs/smbfs/unshare mode=0555
+file path=usr/lib/libmlrpc.so.2
 file path=usr/lib/libsmbfs.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/nsmb.so mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/smbfs.so mode=0555

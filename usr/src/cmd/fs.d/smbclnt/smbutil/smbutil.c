@@ -33,6 +33,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -65,10 +67,11 @@ static struct commands {
 	const char	*name;
 	cmd_fn_t	*fn;
 	cmd_usage_t	*usage;
-	int 		flags;
+	int		flags;
 } commands[] = {
 	{"crypt",	cmd_crypt,	NULL, CMDFL_NO_KMOD},
 	{"help",	cmd_help,	help_usage, CMDFL_NO_KMOD},
+	{"info",	cmd_info,	info_usage, 0},
 	{"login",	cmd_login,	login_usage, 0},
 	{"logout",	cmd_logout,	logout_usage, 0},
 	{"logoutall",	cmd_logoutall,	logoutall_usage, 0},
@@ -187,13 +190,14 @@ help(void) {
 	printf(gettext("where subcommands are:\n"
 	" crypt		slightly obscure password\n"
 	" help		display help on specified subcommand\n"
-	/* " lc 		display active connections\n" */
+	/* " lc		display active connections\n" */
+	" info		display server type and version\n"
 	" login		login to specified host\n"
-	" logout 	logout from specified host\n"
+	" logout	logout from specified host\n"
 	" logoutall	logout all users (requires privilege)\n"
-	" lookup 	resolve NetBIOS name to IP address\n"
+	" lookup	resolve NetBIOS name to IP address\n"
 	" print		print file to the specified remote printer\n"
-	" status 	resolve IP address or DNS name to NetBIOS names\n"
+	" status	resolve IP address or DNS name to NetBIOS names\n"
 	" view		list resources on specified host\n"
 	"\n"));
 	exit(1);

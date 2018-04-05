@@ -37,8 +37,8 @@
 #include <netdb.h>
 #include <thread.h>
 
+#include <libmlrpc/libmlrpc.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/netlogon.ndl>
 #include <smbsrv/netrauth.h>

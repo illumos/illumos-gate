@@ -33,7 +33,6 @@ HDRS=	alloc.h			\
 	mailslot.h		\
 	mbuf.h			\
 	msgbuf.h		\
-	ndr.h			\
 	netbios.h		\
 	netrauth.h		\
 	nmpipes.h		\
@@ -63,18 +62,15 @@ HDRS=	alloc.h			\
 	string.h		\
 	svrapi.h		\
 	winioctl.h		\
-	winsvc.h		\
-	wintypes.h
+	winsvc.h
 
 NDLHDRS= dssetup.ndl		\
 	eventlog.ndl		\
 	llsrpc.ndl		\
 	lsarpc.ndl		\
 	msgsvc.ndl		\
-	ndrtypes.ndl		\
 	netdfs.ndl		\
 	netlogon.ndl		\
-	rpcpdu.ndl		\
 	samrpc.ndl		\
 	security.ndl		\
 	spoolss.ndl		\

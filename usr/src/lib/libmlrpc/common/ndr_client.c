@@ -21,14 +21,15 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/errno.h>
 #include <string.h>
 #include <strings.h>
 
-#include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
+#include <libmlrpc.h>
 
 #define	NDR_DEFAULT_FRAGSZ	8192
 #define	NDR_MULTI_FRAGSZ	(60 * 1024)
@@ -38,23 +39,18 @@ static int ndr_clnt_get_frags(ndr_client_t *, ndr_xa_t *);
 static int ndr_clnt_get_frag(ndr_client_t *, ndr_xa_t *, ndr_common_header_t *);
 
 int
-ndr_clnt_bind(ndr_client_t *clnt, const char *service_name,
+ndr_clnt_bind(ndr_client_t *clnt, ndr_service_t *msvc,
     ndr_binding_t **ret_binding_p)
 {
-	ndr_service_t		*msvc;
 	ndr_binding_t		*mbind;
 	ndr_xa_t		mxa;
 	ndr_bind_hdr_t		*bhdr;
-	ndr_p_cont_elem_t 	*pce;
+	ndr_p_cont_elem_t	*pce;
 	ndr_bind_ack_hdr_t	*bahdr;
 	ndr_p_result_t		*pre;
 	int			rc;
 
 	bzero(&mxa, sizeof (mxa));
-
-	msvc = ndr_svc_lookup_name(service_name);
-	if (msvc == NULL)
-		return (NDR_DRC_FAULT_API_SERVICE_INVALID);
 
 	mxa.binding_list = clnt->binding_list;
 	if ((mbind = ndr_svc_new_binding(&mxa)) == NULL)
@@ -140,15 +136,11 @@ int
 ndr_clnt_call(ndr_binding_t *mbind, int opnum, void *params)
 {
 	ndr_client_t		*clnt = mbind->clnt;
-	ndr_service_t		*msvc = mbind->service;
 	ndr_xa_t		mxa;
 	ndr_request_hdr_t	*reqhdr;
 	ndr_common_header_t	*rsphdr;
 	unsigned long		recv_pdu_scan_offset;
 	int			rc;
-
-	if (ndr_svc_lookup_name(msvc->name) == NULL)
-		return (NDR_DRC_FAULT_API_SERVICE_INVALID);
 
 	bzero(&mxa, sizeof (mxa));
 	mxa.ptype = NDR_PTYPE_REQUEST;

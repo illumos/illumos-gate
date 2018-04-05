@@ -140,8 +140,8 @@ typedef void (*smb_ctx_close_hook_t)(struct smb_ctx *);
 void smb_ctx_set_close_hook(smb_ctx_close_hook_t);
 int  smb_fh_close(int);
 int  smb_fh_open(struct smb_ctx *ctx, const char *, int);
-int  smb_fh_read(int, off_t, size_t, char *);
-int  smb_fh_write(int, off_t, size_t, const char *);
+int  smb_fh_read(int, off64_t, size_t, char *);
+int  smb_fh_write(int, off64_t, size_t, const char *);
 int  smb_fh_xactnp(int, int, const char *,
 	int *, char *, int *);
 int  smb_fh_getssnkey(int, uchar_t *, size_t);

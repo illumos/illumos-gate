@@ -6333,6 +6333,7 @@ f usr/lib/libmenu.so.1 0755 root bin
 s usr/lib/libmenu.so=libmenu.so.1
 f usr/lib/libmilter.so.1 0755 root bin
 s usr/lib/libmilter.so=libmilter.so.1
+f usr/lib/libmlrpc.so.2 0755 root bin
 s usr/lib/libmp.so.1=../../lib/libmp.so.1
 s usr/lib/libmp.so.2=../../lib/libmp.so.2
 s usr/lib/libmp.so=../../lib/libmp.so.2
@@ -10016,14 +10017,9 @@ f usr/lib/smbsrv/dtrace/smbd-pipesvc.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbnode.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbsrv.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbvfs.d 0555 root bin
-f usr/lib/smbsrv/libmlrpc.so.1 0755 root bin
-s usr/lib/smbsrv/libmlrpc.so=libmlrpc.so.1
 f usr/lib/smbsrv/libmlsvc.so.1 0755 root bin
-s usr/lib/smbsrv/libmlsvc.so=libmlsvc.so.1
-f usr/lib/smbsrv/libsmb.so.1 0755 root bin
-s usr/lib/smbsrv/libsmb.so=libsmb.so.1
+f usr/lib/smbsrv/libsmb.so.0 0755 root bin
 f usr/lib/smbsrv/libsmbns.so.1 0755 root bin
-s usr/lib/smbsrv/libsmbns.so=libsmbns.so.1
 f usr/lib/smbsrv/smbd 0755 root bin
 d usr/lib/smedia 0755 root bin
 d usr/lib/smedia/amd64 0755 root bin

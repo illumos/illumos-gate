@@ -42,47 +42,74 @@ $mapfile_version 2
 
 SYMBOL_VERSION SUNWprivate {
     global:
-        ndr_buf_decode;
-        ndr_buf_fini;
-        ndr_buf_init;
-        ndr_clnt_bind;
-        ndr_clnt_call;
-        ndr_clnt_free_heap;
+	mlrpc_clh_bind;
+	mlrpc_clh_create;
+	mlrpc_clh_free;
+	mlrpc_clh_unbind;
+
+	# Allow debug/test programs to provide these.
+	ndo_printf		{ FLAGS = NODIRECT };
+	ndo_trace		{ FLAGS = NODIRECT };
+
+	ndr_buf_decode;
+	ndr_buf_fini;
+	ndr_buf_init;
+	ndr_clnt_bind;
+	ndr_clnt_call;
+	ndr_clnt_free_heap;
 	ndr_generic_call_stub;
-        ndr_heap_avail;
-        ndr_heap_create;
-        ndr_heap_destroy;
-        ndr_heap_malloc;
-        ndr_heap_mkvcb;
-        ndr_heap_mkvcs;
+	ndr_heap_avail;
+	ndr_heap_create;
+	ndr_heap_destroy;
+	ndr_heap_dupmem;
+	ndr_heap_malloc;
+	ndr_heap_mkvcb;
+	ndr_heap_mkvcs;
 	ndr_heap_mstring;
-	ndr_heap_siddup;
-        ndr_heap_strdup;
-        ndr_heap_used;
+	ndr_heap_strdup;
+	ndr_heap_used;
 	ndr_hdalloc;
+	ndr_hdclose;
 	ndr_hdfree;
 	ndr_hdlookup;
-        ndr_inner;
-	ndr_is_admin;
-	ndr_is_poweruser;
+	ndr_inherit_handle;
+	ndr_inner;
+	ndr_is_bind_handle;
+	ndr_is_null_handle;
 	ndr_mbstowcs;
-	ndr_mbtowc;
-	ndr_native_os;
-        ndr_params;
+	ndr_params;
 	ndr_pipe_worker;
-        ndr_svc_binding_pool_init;
+	ndr_rpc_call;
+	ndr_rpc_get_heap;
+	ndr_rpc_get_ssnkey;
+	ndr_rpc_malloc;
+	ndr_rpc_release;
+	ndr_rpc_set_nonull;
+	ndr_svc_binding_pool_init;
 	ndr_svc_lookup_name;
-        ndr_svc_register;
-        ndr_topmost;
+	ndr_svc_register;
+	ndr_topmost;
 	ndr_uuid_parse;
 	ndr_uuid_unparse;
-        nds_destruct;
-        nds_initialize;
-        ndt__char;
-        ndt_s_wchar;
-        ndt__uchar;
-        ndt__ulong;
-        ndt__ushort;
+
+	nds_destruct;
+	nds_initialize;
+
+	ndt__char;
+	ndt_s_char;
+	ndt__uchar;
+	ndt_s_uchar;
+	ndt__wchar;
+	ndt_s_wchar;
+	ndt__short;
+	ndt_s_short;
+	ndt__ushort;
+	ndt_s_ushort;
+	ndt__long;
+	ndt_s_long;
+	ndt__ulong;
+	ndt_s_ulong;
+
     local:
 	*;
 };

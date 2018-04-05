@@ -29,7 +29,7 @@
 /*
  * Security Identifier (SID) interface definition.
  */
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 
 #ifdef __cplusplus
 extern "C" {

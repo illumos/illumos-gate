@@ -39,8 +39,8 @@
 #include <netdb.h>
 #include <assert.h>
 #include <grp.h>
+#include <libmlrpc/libmlrpc.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/nmpipes.h>

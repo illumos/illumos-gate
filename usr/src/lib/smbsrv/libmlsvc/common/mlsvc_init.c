@@ -111,7 +111,7 @@ mlsvc_timecheck(void *arg)
 		if (!smb_domain_getinfo(&di))
 			continue;
 
-		ndr_srvsvc_timecheck(di.d_dci.dc_name,
+		srvsvc_timecheck(di.d_dci.dc_name,
 		    di.d_primary.di_nbname);
 	}
 

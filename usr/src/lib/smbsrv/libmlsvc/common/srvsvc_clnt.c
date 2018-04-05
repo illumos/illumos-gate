@@ -34,9 +34,11 @@
  */
 
 #include <sys/errno.h>
+#include <sys/tzfile.h>
 #include <stdio.h>
 #include <time.h>
 #include <strings.h>
+#include <unistd.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
@@ -348,65 +350,45 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 }
 
 /*
- * Windows 95+ and Windows NT4.0 both report the version as 4.0.
- * Windows 2000+ reports the version as 5.x.
+ * Compare the time here with the remote time on the server
+ * and report clock skew.
  */
-int
-srvsvc_net_server_getinfo(char *server, char *domain,
-    srvsvc_server_info_t *svinfo)
+void
+srvsvc_timecheck(char *server, char *domain)
 {
-	mlsvc_handle_t handle;
-	struct mslm_NetServerGetInfo arg;
-	struct mslm_SERVER_INFO_101 *sv101;
-	int len, opnum, rc;
-	char user[SMB_USERNAME_MAXLEN];
+	char			hostname[MAXHOSTNAMELEN];
+	struct timeval		dc_tv;
+	struct tm		dc_tm;
+	struct tm		*tm;
+	time_t			tnow;
+	time_t			tdiff;
+	int			priority;
 
-	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
-
-	if (srvsvc_open(server, domain, user, &handle) != 0)
-		return (-1);
-
-	opnum = SRVSVC_OPNUM_NetServerGetInfo;
-	bzero(&arg, sizeof (arg));
-
-	len = strlen(server) + 4;
-	arg.servername = ndr_rpc_malloc(&handle, len);
-	if (arg.servername == NULL)
-		return (-1);
-
-	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
-	arg.level = 101;
-
-	rc = ndr_rpc_call(&handle, opnum, &arg);
-	if ((rc != 0) || (arg.status != 0)) {
-		srvsvc_close(&handle);
-		return (-1);
+	if (srvsvc_net_remote_tod(server, domain, &dc_tv, &dc_tm) < 0) {
+		syslog(LOG_DEBUG, "srvsvc_net_remote_tod failed");
+		return;
 	}
 
-	sv101 = arg.result.bufptr.bufptr101;
+	tnow = time(NULL);
 
-	bzero(svinfo, sizeof (srvsvc_server_info_t));
-	svinfo->sv_platform_id = sv101->sv101_platform_id;
-	svinfo->sv_version_major = sv101->sv101_version_major;
-	svinfo->sv_version_minor = sv101->sv101_version_minor;
-	svinfo->sv_type = sv101->sv101_type;
-	if (sv101->sv101_name)
-		svinfo->sv_name = strdup((char *)sv101->sv101_name);
-	if (sv101->sv101_comment)
-		svinfo->sv_comment = strdup((char *)sv101->sv101_comment);
+	if (tnow > dc_tv.tv_sec)
+		tdiff = (tnow - dc_tv.tv_sec) / SECSPERMIN;
+	else
+		tdiff = (dc_tv.tv_sec - tnow) / SECSPERMIN;
 
-	if (svinfo->sv_type & SV_TYPE_WFW)
-		svinfo->sv_os = NATIVE_OS_WIN95;
-	if (svinfo->sv_type & SV_TYPE_WINDOWS)
-		svinfo->sv_os = NATIVE_OS_WIN95;
-	if ((svinfo->sv_type & SV_TYPE_NT) ||
-	    (svinfo->sv_type & SV_TYPE_SERVER_NT))
-		svinfo->sv_os = NATIVE_OS_WINNT;
-	if (svinfo->sv_version_major > 4)
-		svinfo->sv_os = NATIVE_OS_WIN2000;
+	if (tdiff != 0) {
+		(void) strlcpy(hostname, "localhost", MAXHOSTNAMELEN);
+		(void) gethostname(hostname, MAXHOSTNAMELEN);
 
-	srvsvc_close(&handle);
-	return (0);
+		priority = (tdiff > 2) ? LOG_NOTICE : LOG_DEBUG;
+		syslog(priority, "DC [%s] clock skew detected: %u minutes",
+		    server, tdiff);
+
+		tm = gmtime(&dc_tv.tv_sec);
+		syslog(priority, "%-8s  UTC: %s", server, asctime(tm));
+		tm = gmtime(&tnow);
+		syslog(priority, "%-8s  UTC: %s", hostname, asctime(tm));
+	}
 }
 
 /*
@@ -543,40 +525,4 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 
 	srvsvc_close(&handle);
 	return (0);
-}
-
-void
-srvsvc_net_test(char *server, char *domain, char *netname)
-{
-	smb_domainex_t di;
-	srvsvc_server_info_t svinfo;
-
-	(void) smb_tracef("%s %s %s", server, domain, netname);
-
-	if (smb_domain_getinfo(&di)) {
-		server = di.d_dci.dc_name;
-		domain = di.d_primary.di_nbname;
-	}
-
-	if (srvsvc_net_server_getinfo(server, domain, &svinfo) == 0) {
-		smb_tracef("NetServerGetInfo: %s %s (%d.%d) id=%d type=0x%08x",
-		    svinfo.sv_name ? svinfo.sv_name : "NULL",
-		    svinfo.sv_comment ? svinfo.sv_comment : "NULL",
-		    svinfo.sv_version_major, svinfo.sv_version_minor,
-		    svinfo.sv_platform_id, svinfo.sv_type);
-
-		free(svinfo.sv_name);
-		free(svinfo.sv_comment);
-	}
-
-	(void) srvsvc_net_share_get_info(server, domain, netname);
-#if 0
-	/*
-	 * The NetSessionEnum server-side definition was updated.
-	 * Disabled until the client-side has been updated.
-	 */
-	(void) srvsvc_net_session_enum(server, domain, netname);
-#endif
-	(void) srvsvc_net_connect_enum(server, domain, netname, 0);
-	(void) srvsvc_net_connect_enum(server, domain, netname, 1);
 }

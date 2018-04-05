@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_LSA_NDL_
@@ -38,7 +39,7 @@
  * user principal name (UPN) form, such as john@example.com.
  */
 
-#include "ndrtypes.ndl"
+#include <libmlrpc/ndrtypes.ndl>
 
 
 #define	LSARPC_OPNUM_CloseHandle			0x00

@@ -21,11 +21,11 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 
-#include <smbsrv/libmlrpc.h>
+#include <libmlrpc.h>

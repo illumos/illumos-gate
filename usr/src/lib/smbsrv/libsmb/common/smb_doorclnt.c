@@ -33,8 +33,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/mman.h>
+#include <smb/wintypes.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/wintypes.h>
 #include <smbsrv/smb_door.h>
 
 static int smb_door_call(uint32_t, void *, xdrproc_t, void *, xdrproc_t);

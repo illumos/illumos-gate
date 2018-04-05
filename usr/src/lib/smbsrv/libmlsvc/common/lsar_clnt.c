@@ -383,7 +383,6 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name, smb_account_t *info)
 		lsar_lookup_names1
 	};
 
-	const srvsvc_server_info_t	*svinfo;
 	lsa_names_t	names;
 	char		*p;
 	uint32_t	length;
@@ -396,20 +395,15 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name, smb_account_t *info)
 
 	bzero(info, sizeof (smb_account_t));
 
-	svinfo = ndr_rpc_server_info(lsa_handle);
-	if (svinfo->sv_os == NATIVE_OS_WIN2000 &&
-	    svinfo->sv_version_major == 5 && svinfo->sv_version_minor == 0) {
-		/*
-		 * Windows 2000 doesn't like an LSA lookup for
-		 * DOMAIN\Administrator.
-		 */
-		if ((p = strchr(name, '\\')) != 0) {
-			++p;
+	/*
+	 * Windows 2000 (or later) doesn't like an LSA lookup for
+	 * DOMAIN\Administrator.
+	 */
+	if ((p = strchr(name, '\\')) != 0) {
+		++p;
 
-			if (strcasecmp(p, "administrator") == 0)
-				name = p;
-		}
-
+		if (strcasecmp(p, "administrator") == 0)
+			name = p;
 	}
 
 	length = smb_wcequiv_strlen(name);
@@ -418,17 +412,12 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name, smb_account_t *info)
 	names.name[0].str = (unsigned char *)name;
 	names.n_entry = 1;
 
-	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_WIN2000) {
-		for (i = 0; i < n_op; ++i) {
-			ndr_rpc_set_nonull(lsa_handle);
-			status = (*ops[i])(lsa_handle, &names, info);
-
-			if (status != NT_STATUS_INVALID_PARAMETER)
-				break;
-		}
-	} else {
+	for (i = 0; i < n_op; ++i) {
 		ndr_rpc_set_nonull(lsa_handle);
-		status = lsar_lookup_names1(lsa_handle, &names, info);
+		status = (*ops[i])(lsa_handle, &names, info);
+
+		if (status != NT_STATUS_INVALID_PARAMETER)
+			break;
 	}
 
 	if (status == NT_STATUS_SUCCESS) {
@@ -726,10 +715,8 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, smb_sid_t *sid,
 	smb_sid_tostr(sid, sidbuf);
 	smb_tracef("%s", sidbuf);
 
-	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_WIN2000)
-		status = lsar_lookup_sids2(lsa_handle, (lsa_sid_t *)sid,
-		    account);
-	else
+	status = lsar_lookup_sids2(lsa_handle, (lsa_sid_t *)sid, account);
+	if (status == RPC_NT_PROCNUM_OUT_OF_RANGE)
 		status = lsar_lookup_sids1(lsa_handle, (lsa_sid_t *)sid,
 		    account);
 
@@ -1167,8 +1154,7 @@ lsar_lookup_priv_value(mlsvc_handle_t *lsa_handle, char *name,
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
 
 	length = smb_wcequiv_strlen(name);
-	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_WIN2000)
-		length += sizeof (smb_wchar_t);
+	length += sizeof (smb_wchar_t);
 
 	arg.name.length = length;
 	arg.name.allosize = length;

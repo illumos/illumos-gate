@@ -40,18 +40,14 @@
  * ogspecs@opengroup.org
  */
 
-#if defined(_KERNEL) || defined(_FAKE_KERNEL)
-#error "not used in kernel code"
-#else /* _KERNEL */
 #include <sys/types.h>
 #include <sys/uio.h>
-#include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
-#include <smbsrv/wintypes.h>
-#include <smbsrv/ndl/rpcpdu.ndl>
-#include <smbsrv/string.h>
-#endif	/* _KERNEL */
+
+#include <smb/wintypes.h>
+#include <libmlrpc/ndrtypes.ndl>
+#include <libmlrpc/rpcpdu.ndl>
 
 #ifdef __cplusplus
 extern "C" {
@@ -455,8 +451,7 @@ int ndr_inner_pointer(ndr_ref_t *);
 int ndr_inner_reference(ndr_ref_t *);
 int ndr_inner_array(ndr_ref_t *);
 
-size_t ndr_mbstowcs(struct ndr_stream *, smb_wchar_t *, const char *, size_t);
-int ndr_mbtowc(struct ndr_stream *, smb_wchar_t *, const char *, size_t);
+size_t ndr_mbstowcs(struct ndr_stream *, ndr_wchar_t *, const char *, size_t);
 
 void nds_bswap(void *src, void *dst, size_t len);
 
