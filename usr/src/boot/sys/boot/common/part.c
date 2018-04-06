@@ -36,6 +36,8 @@
 #include <sys/queue.h>
 #include <sys/vtoc.h>
 
+#include <fs/cd9660/iso.h>
+
 #include <zlib.h>
 #include <part.h>
 #include <uuid.h>
@@ -101,6 +103,7 @@ static struct parttypes {
 	{ PART_LINUX,		"Linux" },
 	{ PART_LINUX_SWAP,	"Linux swap" },
 	{ PART_DOS,		"DOS/Windows" },
+	{ PART_ISO9660,		"ISO9660" },
 	{ PART_SOLARIS2,	"Solaris 2" },
 	{ PART_ILLUMOS_UFS,	"illumos UFS" },
 	{ PART_ILLUMOS_ZFS,	"illumos ZFS" },
@@ -710,6 +713,45 @@ out:
 	return (table);
 }
 
+#define	cdb2devb(bno)	((bno) * ISO_DEFAULT_BLOCK_SIZE / table->sectorsize)
+
+static struct ptable *
+ptable_iso9660read(struct ptable *table, void *dev, diskread_t dread)
+{
+	uint8_t *buf;
+	struct iso_primary_descriptor *vd;
+	struct pentry *entry;
+
+	buf = malloc(table->sectorsize);
+	if (buf == NULL)
+		return (table);
+
+	if (dread(dev, buf, 1, cdb2devb(16)) != 0) {
+		DEBUG("read failed");
+		ptable_close(table);
+		table = NULL;
+		goto out;
+	}
+	vd = (struct iso_primary_descriptor *)buf;
+	if (bcmp(vd->id, ISO_STANDARD_ID, sizeof (vd->id)) != 0)
+		goto out;
+
+	entry = malloc(sizeof (*entry));
+	if (entry == NULL)
+		goto out;
+	entry->part.start = 0;
+	entry->part.end = table->sectors;
+	entry->part.type = PART_ISO9660;
+	entry->part.index = 0;
+	STAILQ_INSERT_TAIL(&table->entries, entry, entry);
+
+	table->type = PTABLE_ISO9660;
+
+out:
+	free(buf);
+	return (table);
+}
+
 struct ptable *
 ptable_open(void *dev, uint64_t sectors, uint16_t sectorsize, diskread_t *dread)
 {
@@ -739,6 +781,13 @@ ptable_open(void *dev, uint64_t sectors, uint16_t sectorsize, diskread_t *dread)
 	table->sectorsize = sectorsize;
 	table->type = PTABLE_NONE;
 	STAILQ_INIT(&table->entries);
+
+	if (ptable_iso9660read(table, dev, dread) == NULL) {
+		/* Read error. */
+		table = NULL;
+		goto out;
+	} else if (table->type == PTABLE_ISO9660)
+		goto out;
 
 	if (ptable_dklabelread(table, dev, dread) == NULL) { /* Read error. */
 		table = NULL;

@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2012 Andrey V. Elsukov <ae@FreeBSD.org>
  * All rights reserved.
  *
@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _PART_H_
@@ -37,7 +35,8 @@ enum ptable_type {
 	PTABLE_MBR,
 	PTABLE_GPT,
 	PTABLE_VTOC8,
-	PTABLE_VTOC
+	PTABLE_VTOC,
+	PTABLE_ISO9660
 };
 
 enum partition_type {
@@ -53,6 +52,7 @@ enum partition_type {
 	PART_LINUX,
 	PART_LINUX_SWAP,
 	PART_DOS,
+	PART_ISO9660,
 	PART_SOLARIS2,
 	PART_ILLUMOS_UFS,
 	PART_ILLUMOS_ZFS,
@@ -64,7 +64,7 @@ enum partition_type {
 	PART_VTOC_BACKUP,
 	PART_VTOC_STAND,
 	PART_VTOC_VAR,
-	PART_VTOC_HOME,
+	PART_VTOC_HOME
 };
 
 struct ptable_entry {

@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * Copyright (c) 2012 Andrey V. Elsukov <ae@FreeBSD.org>
  * All rights reserved.
@@ -36,16 +36,16 @@
 #include "disk.h"
 
 #ifdef DISK_DEBUG
-# define DEBUG(fmt, args...)	printf("%s: " fmt "\n" , __func__ , ## args)
+#define	DEBUG(fmt, args...)	printf("%s: " fmt "\n", __func__, ## args)
 #else
-# define DEBUG(fmt, args...)
+#define	DEBUG(fmt, args...)
 #endif
 
 struct open_disk {
 	struct ptable		*table;
 	uint64_t		mediasize;
 	uint64_t		entrysize;
-	u_int			sectorsize;
+	uint_t			sectorsize;
 };
 
 struct print_args {
@@ -56,7 +56,7 @@ struct print_args {
 
 /* Convert size to a human-readable number. */
 static char *
-display_size(uint64_t size, u_int sectorsize)
+display_size(uint64_t size, uint_t sectorsize)
 {
 	static char buf[80];
 	char unit;
@@ -96,7 +96,7 @@ ptblread(void *d, void *buf, size_t blocks, uint64_t offset)
 	 * As the GPT backup partition is located at the end of the disk,
 	 * to avoid reading past disk end, flag bcache not to use RA.
 	 */
-	return (dev->dd.d_dev->dv_strategy(dev, F_READ | F_NORA , offset,
+	return (dev->dd.d_dev->dv_strategy(dev, F_READ | F_NORA, offset,
 	    blocks * od->sectorsize, (char *)buf, NULL));
 }
 
@@ -170,7 +170,7 @@ disk_print(struct disk_devdesc *dev, char *prefix, int verbose)
 }
 
 int
-disk_read(struct disk_devdesc *dev, void *buf, uint64_t offset, u_int blocks)
+disk_read(struct disk_devdesc *dev, void *buf, uint64_t offset, uint_t blocks)
 {
 	struct open_disk *od;
 	int ret;
@@ -183,7 +183,7 @@ disk_read(struct disk_devdesc *dev, void *buf, uint64_t offset, u_int blocks)
 }
 
 int
-disk_write(struct disk_devdesc *dev, void *buf, uint64_t offset, u_int blocks)
+disk_write(struct disk_devdesc *dev, void *buf, uint64_t offset, uint_t blocks)
 {
 	struct open_disk *od;
 	int ret;
@@ -196,7 +196,7 @@ disk_write(struct disk_devdesc *dev, void *buf, uint64_t offset, u_int blocks)
 }
 
 int
-disk_ioctl(struct disk_devdesc *dev, u_long cmd, void *data)
+disk_ioctl(struct disk_devdesc *dev, unsigned long cmd, void *data)
 {
 	struct open_disk *od = dev->dd.d_opendata;
 
@@ -205,7 +205,7 @@ disk_ioctl(struct disk_devdesc *dev, u_long cmd, void *data)
 
 	switch (cmd) {
 	case DIOCGSECTORSIZE:
-		*(u_int *)data = od->sectorsize;
+		*(uint_t *)data = od->sectorsize;
 		break;
 	case DIOCGMEDIASIZE:
 		if (dev->d_offset == 0)
@@ -221,7 +221,7 @@ disk_ioctl(struct disk_devdesc *dev, u_long cmd, void *data)
 }
 
 int
-disk_open(struct disk_devdesc *dev, uint64_t mediasize, u_int sectorsize)
+disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 {
 	struct open_disk *od;
 	struct ptable *table;
@@ -237,7 +237,7 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, u_int sectorsize)
 	table = NULL;
 	slice = dev->d_slice;
 	partition = dev->d_partition;
-	od = (struct open_disk *)malloc(sizeof(struct open_disk));
+	od = (struct open_disk *)malloc(sizeof (struct open_disk));
 	if (od == NULL) {
 		DEBUG("no memory");
 		return (ENOMEM);
@@ -272,6 +272,9 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, u_int sectorsize)
 			dev->d_offset = part.start;
 			od->entrysize = part.end - part.start + 1;
 		}
+	} else if (ptable_gettype(od->table) == PTABLE_ISO9660) {
+		dev->d_offset = 0;
+		od->entrysize = mediasize;
 	} else if (slice >= 0) {
 		/* Try to get information about partition */
 		if (slice == 0)
@@ -358,7 +361,7 @@ disk_close(struct disk_devdesc *dev)
 	return (0);
 }
 
-char*
+char *
 disk_fmtdev(struct disk_devdesc *dev)
 {
 	static char buf[128];
