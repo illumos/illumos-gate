@@ -735,13 +735,3 @@ i386_zfs_probe(void)
 			probe_disk(devname);
 	}
 }
-
-uint64_t
-ldi_get_size(void *priv)
-{
-	int fd = (uintptr_t) priv;
-	uint64_t size;
-
-	ioctl(fd, DIOCGMEDIASIZE, &size);
-	return (size);
-}
