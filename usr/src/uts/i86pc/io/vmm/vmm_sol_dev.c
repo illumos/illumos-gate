@@ -292,6 +292,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_SET_REGISTER:
 	case VM_GET_SEGMENT_DESCRIPTOR:
 	case VM_SET_SEGMENT_DESCRIPTOR:
+	case VM_GET_REGISTER_SET:
+	case VM_SET_REGISTER_SET:
 	case VM_INJECT_EXCEPTION:
 	case VM_GET_CAPABILITY:
 	case VM_SET_CAPABILITY:
@@ -299,6 +301,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_PPTDEV_MSIX:
 	case VM_SET_X2APIC_STATE:
 	case VM_GLA2GPA:
+	case VM_GLA2GPA_NOFAULT:
 	case VM_ACTIVATE_CPU:
 	case VM_SET_INTINFO:
 	case VM_GET_INTINFO:
@@ -760,6 +763,82 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		break;
 	}
+	case VM_GET_REGISTER_SET: {
+		struct vm_register_set vrs;
+		int regnums[VM_REG_LAST];
+		uint64_t regvals[VM_REG_LAST];
+
+		if (ddi_copyin(datap, &vrs, sizeof (vrs), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (vrs.count > VM_REG_LAST || vrs.count == 0) {
+			error = EINVAL;
+			break;
+		}
+		if (ddi_copyin(vrs.regnums, regnums,
+		    sizeof (int) * vrs.count, md)) {
+			error = EFAULT;
+			break;
+		}
+
+		error = 0;
+		for (uint_t i = 0; i < vrs.count && error == 0; i++) {
+			if (regnums[i] < 0) {
+				error = EINVAL;
+				break;
+			}
+			error = vm_get_register(sc->vmm_vm, vcpu, regnums[i],
+			    &regvals[i]);
+		}
+		if (error == 0 && ddi_copyout(regvals, vrs.regvals,
+		    sizeof (uint64_t) * vrs.count, md)) {
+			error = EFAULT;
+		}
+		break;
+	}
+	case VM_SET_REGISTER_SET: {
+		struct vm_register_set vrs;
+		int regnums[VM_REG_LAST];
+		uint64_t regvals[VM_REG_LAST];
+
+		if (ddi_copyin(datap, &vrs, sizeof (vrs), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (vrs.count > VM_REG_LAST || vrs.count == 0) {
+			error = EINVAL;
+			break;
+		}
+		if (ddi_copyin(vrs.regnums, regnums,
+		    sizeof (int) * vrs.count, md)) {
+			error = EFAULT;
+			break;
+		}
+		if (ddi_copyin(vrs.regvals, regvals,
+		    sizeof (uint64_t) * vrs.count, md)) {
+			error = EFAULT;
+			break;
+		}
+
+		error = 0;
+		for (uint_t i = 0; i < vrs.count && error == 0; i++) {
+			/*
+			 * Setting registers in a set is not atomic, since a
+			 * failure in the middle of the set will cause a
+			 * bail-out and inconsistent register state.  Callers
+			 * should be wary of this.
+			 */
+			if (regnums[i] < 0) {
+				error = EINVAL;
+				break;
+			}
+			error = vm_set_register(sc->vmm_vm, vcpu, regnums[i],
+			    regvals[i]);
+		}
+		break;
+	}
+
 	case VM_GET_CAPABILITY: {
 		struct vm_capability vmcap;
 
@@ -859,6 +938,27 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		break;
 	}
+	case VM_GLA2GPA_NOFAULT: {
+		struct vm_gla2gpa gg;
+
+		CTASSERT(PROT_READ == VM_PROT_READ);
+		CTASSERT(PROT_WRITE == VM_PROT_WRITE);
+		CTASSERT(PROT_EXEC == VM_PROT_EXECUTE);
+
+		if (ddi_copyin(datap, &gg, sizeof (gg), md)) {
+			error = EFAULT;
+			break;
+		}
+		gg.vcpuid = vcpu;
+		error = vm_gla2gpa_nofault(sc->vmm_vm, vcpu, &gg.paging,
+		    gg.gla, gg.prot, &gg.gpa, &gg.fault);
+		if (error == 0 && ddi_copyout(&gg, datap, sizeof (gg), md)) {
+			error = EFAULT;
+			break;
+		}
+		break;
+	}
+
 	case VM_ACTIVATE_CPU:
 		error = vm_activate_cpu(sc->vmm_vm, vcpu);
 		break;

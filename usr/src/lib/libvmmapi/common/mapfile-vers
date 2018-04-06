@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 #
@@ -60,13 +60,15 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_get_lowmem_size;
 		vm_get_memflags;
 		vm_get_memseg;
-                vm_get_pptdev_limits;
+		vm_get_pptdev_limits;
 		vm_get_register;
+		vm_get_register_set;
 		vm_get_seg_desc;
 		vm_get_stat_desc;
 		vm_get_stats;
 		vm_get_x2apic_state;
 		vm_gla2gpa;
+		vm_gla2gpa_nofault;
 		vm_inject_exception;
 		vm_inject_nmi;
 		vm_isa_assert_irq;
@@ -102,6 +104,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_set_intinfo;
 		vm_set_memflags;
 		vm_set_register;
+		vm_set_register_set;
 		vm_set_x2apic_state;
 		vm_setup_memory;
 		vm_setup_pptdev_msi;

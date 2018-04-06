@@ -1,0 +1,15 @@
+The bhyve kernel module and its associated userland consumers have been updated
+to the latest upstream FreeBSD sources as of:
+
+commit 32e2f94b53c0599c7c674ff88c75b289f714c7c9
+Author: grehan <grehan@FreeBSD.org>
+Date:   Sun Mar 11 08:27:11 2018 +0000
+
+    Add CR2 get/set support.
+
+    Reported/Tested by:  Fabian Freyer
+    Reviewed by:    araujo
+    Differential Revision:  https://reviews.freebsd.org/D14648
+    MFC after:      3 weeks
+
+Which corresponds to SVN revision: 330764

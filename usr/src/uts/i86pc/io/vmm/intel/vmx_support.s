@@ -102,6 +102,30 @@ vmx_enter_guest(struct vmxctx *ctx, struct vmx *vmx, int launched)
 	movq	VMXCTX_GUEST_R15(%rdi),%r15;				\
 	movq	VMXCTX_GUEST_RDI(%rdi),%rdi; /* restore rdi the last */
 
+#define	VMX_GUEST_SAVE							\
+	movq	%rdi, VMXSTK_TMPRDI(%rsp);				\
+	movq	VMXSTK_RDI(%rsp), %rdi;					\
+	movq	%rbp, VMXCTX_GUEST_RBP(%rdi);				\
+	leaq	VMXSTK_FP(%rsp), %rbp;					\
+	movq	%rsi, VMXCTX_GUEST_RSI(%rdi);				\
+	movq	%rdx, VMXCTX_GUEST_RDX(%rdi);				\
+	movq	%rcx, VMXCTX_GUEST_RCX(%rdi);				\
+	movq	%r8, VMXCTX_GUEST_R8(%rdi);				\
+	movq	%r9, VMXCTX_GUEST_R9(%rdi);				\
+	movq	%rax, VMXCTX_GUEST_RAX(%rdi);				\
+	movq	%rbx, VMXCTX_GUEST_RBX(%rdi);				\
+	movq	%r10, VMXCTX_GUEST_R10(%rdi);				\
+	movq	%r11, VMXCTX_GUEST_R11(%rdi);				\
+	movq	%r12, VMXCTX_GUEST_R12(%rdi);				\
+	movq	%r13, VMXCTX_GUEST_R13(%rdi);				\
+	movq	%r14, VMXCTX_GUEST_R14(%rdi);				\
+	movq	%r15, VMXCTX_GUEST_R15(%rdi);				\
+	movq	%cr2, %rbx;						\
+	movq	%rbx, VMXCTX_GUEST_CR2(%rdi);				\
+	movq	VMXSTK_TMPRDI(%rsp), %rdx;				\
+	movq	%rdx, VMXCTX_GUEST_RDI(%rdi);
+
+
 /*
  * Flush scratch registers to avoid lingering guest state being used for
  * Spectre v1 attacks when returning from guest entry.
@@ -252,32 +276,8 @@ inst_error:
  */
 .align	ASM_ENTRY_ALIGN;
 ALTENTRY(vmx_exit_guest)
-	/*
-	 * Save guest state that is not automatically saved in the vmcs.
-	 */
-	movq	%rdi, VMXSTK_TMPRDI(%rsp)
-	movq	VMXSTK_RDI(%rsp), %rdi
-	movq	%rbp, VMXCTX_GUEST_RBP(%rdi)
-	leaq	VMXSTK_FP(%rsp), %rbp
-
-	movq	%rsi, VMXCTX_GUEST_RSI(%rdi)
-	movq	%rdx, VMXCTX_GUEST_RDX(%rdi)
-	movq	%rcx, VMXCTX_GUEST_RCX(%rdi)
-	movq	%r8, VMXCTX_GUEST_R8(%rdi)
-	movq	%r9, VMXCTX_GUEST_R9(%rdi)
-	movq	%rax, VMXCTX_GUEST_RAX(%rdi)
-	movq	%rbx, VMXCTX_GUEST_RBX(%rdi)
-	movq	%r10, VMXCTX_GUEST_R10(%rdi)
-	movq	%r11, VMXCTX_GUEST_R11(%rdi)
-	movq	%r12, VMXCTX_GUEST_R12(%rdi)
-	movq	%r13, VMXCTX_GUEST_R13(%rdi)
-	movq	%r14, VMXCTX_GUEST_R14(%rdi)
-	movq	%r15, VMXCTX_GUEST_R15(%rdi)
-
-	movq	%cr2, %rbx
-	movq	%rbx, VMXCTX_GUEST_CR2(%rdi)
-	movq	VMXSTK_TMPRDI(%rsp), %rdx
-	movq	%rdx, VMXCTX_GUEST_RDI(%rdi)
+	/* Save guest state that is not automatically saved in the vmcs. */
+	VMX_GUEST_SAVE
 
 	/* Deactivate guest pmap on this cpu. */
 	movq	VMXCTX_PMAP(%rdi), %rdi
@@ -302,6 +302,58 @@ ALTENTRY(vmx_exit_guest)
 	popq	%rbp
 	ret
 SET_SIZE(vmx_enter_guest)
+
+
+
+.align	ASM_ENTRY_ALIGN;
+ALTENTRY(vmx_exit_guest_flush_rsb)
+	/* Save guest state that is not automatically saved in the vmcs. */
+	VMX_GUEST_SAVE
+
+	/* Deactivate guest pmap on this cpu. */
+	movq	VMXCTX_PMAP(%rdi), %rdi
+	leaq	PM_ACTIVE(%rdi), %rdi
+	movl	%gs:CPU_ID, %esi
+	call	cpuset_atomic_del
+
+	VMX_GUEST_FLUSH_SCRATCH
+
+	/*
+	 * To prevent malicious branch target predictions from affecting the
+	 * host, overwrite all entries in the RSB upon exiting a guest.
+	 */
+	movl	$16, %ecx	/* 16 iterations, two calls per loop */
+	movq	%rsp, %rax
+loop:
+	call	2f		/* create an RSB entry. */
+1:
+	pause
+	call	1b		/* capture rogue speculation. */
+2:
+	call	2f		/* create an RSB entry. */
+1:
+	pause
+	call	1b		/* capture rogue speculation. */
+2:
+	subl	$1, %ecx
+	jnz	loop
+	movq	%rax, %rsp
+
+	/*
+	 * This will return to the caller of 'vmx_enter_guest()' with a return
+	 * value of VMX_GUEST_VMEXIT.
+	 */
+	movl	$VMX_GUEST_VMEXIT, %eax
+	movq	VMXSTK_RBX(%rsp), %rbx
+	movq	VMXSTK_R12(%rsp), %r12
+	movq	VMXSTK_R13(%rsp), %r13
+	movq	VMXSTK_R14(%rsp), %r14
+	movq	VMXSTK_R15(%rsp), %r15
+
+	addq	$VMXSTKSIZE, %rsp
+	popq	%rbp
+	ret
+SET_SIZE(vmx_exit_guest_flush_rsb)
 
 /*
  * %rdi = trapno

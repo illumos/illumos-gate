@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -34,10 +36,12 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/proc.h>
 
 #include <machine/clock.h>
 #include <machine/cpufunc.h>
 #include <machine/md_var.h>
+#include <machine/pcb.h>
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
 
@@ -374,7 +378,10 @@ vmx_msr_guest_enter(struct vmx *vmx, int vcpuid)
 	host_msrs[IDX_MSR_SF_MASK] = rdmsr(MSR_SF_MASK);
 #endif /* __FreeBSD__ */
 
-	/* Save host MSRs (if any) and restore guest MSRs */
+	/* Save host MSRs (in particular, KGSBASE) and restore guest MSRs */
+#ifdef __FreeBSD__
+	update_pcb_bases(curpcb);
+#endif
 	wrmsr(MSR_LSTAR, guest_msrs[IDX_MSR_LSTAR]);
 	wrmsr(MSR_CSTAR, guest_msrs[IDX_MSR_CSTAR]);
 	wrmsr(MSR_STAR, guest_msrs[IDX_MSR_STAR]);

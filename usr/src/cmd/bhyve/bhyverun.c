@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
  *
@@ -52,6 +54,9 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/segments.h>
 
+#ifndef WITHOUT_CAPSICUM
+#include <capsicum_helpers.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -65,10 +70,6 @@ __FBSDID("$FreeBSD$");
 #include <pthread_np.h>
 #include <sysexits.h>
 #include <stdbool.h>
-#ifndef WITHOUT_CAPSICUM
-#include <nl_types.h>
-#include <termios.h>
-#endif
 
 #include <machine/vmm.h>
 #ifndef WITHOUT_CAPSICUM
@@ -1038,7 +1039,7 @@ main(int argc, char *argv[])
 	sci_init(ctx);
 
 	/*
-	 * Exit if a device emulation finds an error in it's initilization
+	 * Exit if a device emulation finds an error in its initilization
 	 */
 	if (init_pci(ctx) != 0)
 		exit(1);
@@ -1085,9 +1086,9 @@ main(int argc, char *argv[])
 		fwctl_init();
 
 #ifndef WITHOUT_CAPSICUM
-	
+	caph_cache_catpages();
 
-	if (bhyve_caph_limit_stdoe() == -1)
+	if (caph_limit_stdout() == -1 || caph_limit_stderr() == -1)
 		errx(EX_OSERR, "Unable to apply rights for sandbox");
 
 	if (cap_enter() == -1 && errno != ENOSYS)

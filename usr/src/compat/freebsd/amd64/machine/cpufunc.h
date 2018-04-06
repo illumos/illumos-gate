@@ -198,4 +198,95 @@ load_xcr(u_int reg, u_long val)
 	__asm __volatile("xsetbv" : : "c" (reg), "a" (low), "d" (high));
 }
 
+static __inline void
+write_rflags(u_long rf)
+{
+	__asm __volatile("pushq %0;  popfq" : : "r" (rf));
+}
+
+static __inline uint64_t
+rdr0(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr0,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr0(uint64_t dr0)
+{
+	__asm __volatile("movq %0,%%dr0" : : "r" (dr0));
+}
+
+static __inline uint64_t
+rdr1(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr1,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr1(uint64_t dr1)
+{
+	__asm __volatile("movq %0,%%dr1" : : "r" (dr1));
+}
+
+static __inline uint64_t
+rdr2(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr2,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr2(uint64_t dr2)
+{
+	__asm __volatile("movq %0,%%dr2" : : "r" (dr2));
+}
+
+static __inline uint64_t
+rdr3(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr3,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr3(uint64_t dr3)
+{
+	__asm __volatile("movq %0,%%dr3" : : "r" (dr3));
+}
+
+static __inline uint64_t
+rdr6(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr6,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr6(uint64_t dr6)
+{
+	__asm __volatile("movq %0,%%dr6" : : "r" (dr6));
+}
+
+static __inline uint64_t
+rdr7(void)
+{
+	uint64_t data;
+	__asm __volatile("movq %%dr7,%0" : "=r" (data));
+	return (data);
+}
+
+static __inline void
+load_dr7(uint64_t dr7)
+{
+	__asm __volatile("movq %0,%%dr7" : : "r" (dr7));
+}
+
+
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_CPUFUNC_H_ */

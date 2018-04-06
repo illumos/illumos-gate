@@ -1417,6 +1417,7 @@ usr/src/cmd/bhyve/pci_lpc.[ch]
 usr/src/cmd/bhyve/pci_passthru.c
 usr/src/cmd/bhyve/pci_uart.c
 usr/src/cmd/bhyve/pci_virtio_block.c
+usr/src/cmd/bhyve/pci_virtio_console.c
 usr/src/cmd/bhyve/pci_virtio_net.c
 usr/src/cmd/bhyve/pci_virtio_rnd.c
 usr/src/cmd/bhyve/pci_xhci.[ch]

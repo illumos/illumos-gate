@@ -54,6 +54,7 @@ SRCS =	acpi.c			\
 	pci_passthru.c		\
 	pci_uart.c		\
 	pci_virtio_block.c	\
+	pci_virtio_console.c	\
 	pci_virtio_net.c	\
 	pci_virtio_rnd.c	\
 	pci_virtio_viona.c	\
@@ -102,6 +103,9 @@ CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
 		-I$(SRC)/lib/libdladm/common \
 		-DWITHOUT_CAPSICUM
 LDLIBS +=	-lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz -lnvpair
+
+# Disable the crypto code until it is wired up
+CPPFLAGS +=	-DNO_OPENSSL
 
 POST_PROCESS += ; $(GENSETDEFS) $@
 
