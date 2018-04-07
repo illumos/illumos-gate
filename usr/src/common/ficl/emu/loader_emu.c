@@ -799,7 +799,8 @@ bf_init(const char *rc, ficlOutputFunction out)
 			printf("error interpreting forth: %d\n", rv);
 			exit(1);
 		}
-		sprintf(create_buf, "builtin: %s", cmdp->c_name);
+		snprintf(create_buf, sizeof (create_buf), "builtin: %s",
+		    cmdp->c_name);
 		rv = ficlVmEvaluate(bf_vm, create_buf);
 		if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
 			printf("error interpreting forth: %d\n", rv);
@@ -1068,6 +1069,7 @@ help_getnext(int fd, char **topic, char **subtopic, char **desc)
 {
 	char line[81], *cp, *ep;
 
+	*topic = *subtopic = *desc = NULL;
 	for (;;) {
 		if (fgetstr(line, 80, fd) < 0)
 			return (0);
@@ -1094,10 +1096,8 @@ help_getnext(int fd, char **topic, char **subtopic, char **desc)
 			cp = ep;
 		}
 		if (*topic == NULL) {
-			if (*subtopic != NULL)
-				free(*subtopic);
-			if (*desc != NULL)
-				free(*desc);
+			free(*subtopic);
+			free(*desc);
 			continue;
 		}
 		return (1);
@@ -1134,7 +1134,7 @@ command_help(int argc, char *argv[])
 	char *topic, *subtopic, *t, *s, *d;
 
 	/* page the help text from our load path */
-	sprintf(buf, "/boot/loader.help");
+	snprintf(buf, sizeof (buf), "/boot/loader.help");
 	if ((hfd = open(buf, O_RDONLY)) < 0) {
 		printf("Verbose help not available, "
 		    "use '?' to list commands\n");
@@ -1198,25 +1198,27 @@ command_help(int argc, char *argv[])
 		free(t);
 		free(s);
 		free(d);
+		t = s = d = NULL;
 	}
+	free(t);
+	free(s);
+	free(d);
 	pager_close();
 	close(hfd);
 	if (!matched) {
 		snprintf(command_errbuf, sizeof (command_errbuf),
 		    "no help available for '%s'", topic);
 		free(topic);
-		if (subtopic)
-			free(subtopic);
+		free(subtopic);
 		return (CMD_ERROR);
 	}
 	free(topic);
-	if (subtopic)
-		free(subtopic);
+	free(subtopic);
 	return (CMD_OK);
 }
 
 static int
-command_commandlist(int argc, char *argv[])
+command_commandlist(int argc __unused, char *argv[] __unused)
 {
 	struct bootblk_command *cmdp;
 	int res;
@@ -1230,7 +1232,8 @@ command_commandlist(int argc, char *argv[])
 		if (res)
 			break;
 		if ((cmdp->c_name != NULL) && (cmdp->c_desc != NULL)) {
-			sprintf(name, "  %-15s  ", cmdp->c_name);
+			snprintf(name, sizeof (name), "  %-15s  ",
+			    cmdp->c_name);
 			pager_output(name);
 			pager_output(cmdp->c_desc);
 			res = pager_output("\n");
@@ -1451,14 +1454,16 @@ command_more(int argc, char *argv[])
 	res = 0;
 	pager_open();
 	for (i = 1; (i < argc) && (res == 0); i++) {
-		sprintf(line, "*** FILE %s BEGIN ***\n", argv[i]);
+		snprintf(line, sizeof (line), "*** FILE %s BEGIN ***\n",
+		    argv[i]);
 		if (pager_output(line))
 			break;
 		name = get_dev(argv[i]);
 		res = page_file(name);
 		free(name);
 		if (!res) {
-			sprintf(line, "*** FILE %s END ***\n", argv[i]);
+			snprintf(line, sizeof (line), "*** FILE %s END ***\n",
+			    argv[i]);
 			res = pager_output(line);
 		}
 	}
@@ -1537,20 +1542,22 @@ command_ls(int argc, char *argv[])
 			sb.st_size = 0;
 			sb.st_mode = 0;
 			buf = malloc(strlen(path) + strlen(d->d_name) + 2);
-			if (path[0] == '\0')
-				sprintf(buf, "%s", d->d_name);
-			else
-				sprintf(buf, "%s/%s", path, d->d_name);
+			if (path[0] == '\0') {
+				snprintf(buf, sizeof (buf), "%s", d->d_name);
+			} else {
+				snprintf(buf, sizeof (buf), "%s/%s", path,
+				    d->d_name);
+			}
 			/* ignore return, could be symlink, etc. */
 			if (stat(buf, &sb))
 				sb.st_size = 0;
 			free(buf);
 			if (verbose) {
-				sprintf(lbuf, " %c %8d %s\n",
+				snprintf(lbuf, sizeof (lbuf), " %c %8d %s\n",
 				    typestr[sb.st_mode >> 12],
 				    (int)sb.st_size, d->d_name);
 			} else {
-				sprintf(lbuf, " %c  %s\n",
+				snprintf(lbuf, sizeof (lbuf), " %c  %s\n",
 				    typestr[sb.st_mode >> 12], d->d_name);
 			}
 			if (pager_output(lbuf))
