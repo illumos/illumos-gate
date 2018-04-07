@@ -71,6 +71,7 @@ file path=usr/share/man/man1/ed.1
 file path=usr/share/man/man1/eject.1
 file path=usr/share/man/man1/encrypt.1
 file path=usr/share/man/man1/env.1
+file path=usr/share/man/man1/etdump.1
 file path=usr/share/man/man1/exec.1
 file path=usr/share/man/man1/exit.1
 file path=usr/share/man/man1/expr.1
