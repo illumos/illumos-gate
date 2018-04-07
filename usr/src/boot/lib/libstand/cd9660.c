@@ -308,6 +308,7 @@ cd9660_open(const char *path, struct open_file *f)
 
 	first = 1;
 	use_rrip = 0;
+	lenskip = 0;
 	while (*path) {
 		bno = isonum_733(rec.extent) + isonum_711(rec.ext_attr_length);
 		dsize = isonum_733(rec.size);

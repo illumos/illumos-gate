@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Robert Nordier
  * Copyright (c) 2010 Pawel Jakub Dawidek <pjd@FreeBSD.org>
  * All rights reserved.
@@ -15,28 +15,23 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 
 #include <btxv86.h>
 
+#include "stand.h"
 #include "rbx.h"
-#include "util.h"
 #include "drv.h"
 #include "edd.h"
-#ifdef USE_XREAD
-#include "xreadorg.h"
-#endif
 
-#ifdef GPT
 static struct edd_params params;
 
 uint64_t
 drvsize(struct dsk *dskp)
 {
 
-	params.len = sizeof(struct edd_params);
+	params.len = sizeof (struct edd_params);
 	v86.ctl = V86_FLAGS;
 	v86.addr = 0x13;
 	v86.eax = 0x4800;
@@ -50,11 +45,8 @@ drvsize(struct dsk *dskp)
 	}
 	return (params.sectors);
 }
-#endif	/* GPT */
 
-#ifndef USE_XREAD
 static struct edd_packet packet;
-#endif
 
 int
 drvread(struct dsk *dskp, void *buf, daddr_t lba, unsigned nblk)
@@ -63,8 +55,7 @@ drvread(struct dsk *dskp, void *buf, daddr_t lba, unsigned nblk)
 
 	if (!OPT_CHECK(RBX_QUIET))
 		printf("%c\b", c = c << 8 | c >> 24);
-#ifndef USE_XREAD
-	packet.len = sizeof(struct edd_packet);
+	packet.len = sizeof (struct edd_packet);
 	packet.count = nblk;
 	packet.off = VTOPOFF(buf);
 	packet.seg = VTOPSEG(buf);
@@ -75,30 +66,20 @@ drvread(struct dsk *dskp, void *buf, daddr_t lba, unsigned nblk)
 	v86.edx = dskp->drive;
 	v86.ds = VTOPSEG(&packet);
 	v86.esi = VTOPOFF(&packet);
-#else	/* USE_XREAD */
-	v86.ctl = V86_ADDR | V86_CALLF | V86_FLAGS;
-	v86.addr = XREADORG;		/* call to xread in boot1 */
-	v86.es = VTOPSEG(buf);
-	v86.eax = lba;
-	v86.ebx = VTOPOFF(buf);
-	v86.ecx = lba >> 32;
-	v86.edx = nblk << 8 | dskp->drive;
-#endif	/* USE_XREAD */
 	v86int();
 	if (V86_CY(v86.efl)) {
-		printf("%s: error %u lba %u\n",
+		printf("%s: error %u lba %llu\n",
 		    BOOTPROG, v86.eax >> 8 & 0xff, lba);
 		return (-1);
 	}
 	return (0);
 }
 
-#ifdef GPT
 int
 drvwrite(struct dsk *dskp, void *buf, daddr_t lba, unsigned nblk)
 {
 
-	packet.len = sizeof(struct edd_packet);
+	packet.len = sizeof (struct edd_packet);
 	packet.count = nblk;
 	packet.off = VTOPOFF(buf);
 	packet.seg = VTOPSEG(buf);
@@ -111,9 +92,8 @@ drvwrite(struct dsk *dskp, void *buf, daddr_t lba, unsigned nblk)
 	v86.esi = VTOPOFF(&packet);
 	v86int();
 	if (V86_CY(v86.efl)) {
-		printf("error %u lba %u\n", v86.eax >> 8 & 0xff, lba);
+		printf("error %u lba %llu\n", v86.eax >> 8 & 0xff, lba);
 		return (-1);
 	}
 	return (0);
 }
-#endif	/* GPT */

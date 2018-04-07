@@ -72,6 +72,7 @@ $(i386_ONLY)file path=boot/forth/support.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/version.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/gptzfsboot group=sys mode=0444
 $(i386_ONLY)file path=boot/illumos.png group=sys mode=0444
+$(i386_ONLY)file path=boot/isoboot group=sys mode=0444
 $(i386_ONLY)file path=boot/loader group=sys mode=0444
 $(i386_ONLY)file path=boot/loader.help group=sys mode=0444
 $(i386_ONLY)file path=boot/loader.rc group=sys mode=0444
@@ -85,6 +86,7 @@ $(i386_ONLY)file path=usr/share/man/man5/check-password.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/color.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/delay.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/gptzfsboot.5
+$(i386_ONLY)file path=usr/share/man/man5/isoboot.5
 $(i386_ONLY)file path=usr/share/man/man5/loader.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/loader.5
 $(i386_ONLY)file path=usr/share/man/man5/menu.4th.5

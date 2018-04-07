@@ -28,7 +28,7 @@ clobber:=	TARGET= clobber
 
 all clean clobber: $(SUBDIRS)
 
-install: $(SUBDIRS)
+install: all
 
 FRC:
 

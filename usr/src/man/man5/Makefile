@@ -62,6 +62,7 @@ _MANFILES=	Intro.5			\
 		ieee802.11.5		\
 		ipfilter.5		\
 		isalist.5		\
+		isoboot.5		\
 		kerberos.5		\
 		krb5_auth_rules.5	\
 		krb5envvar.5		\
