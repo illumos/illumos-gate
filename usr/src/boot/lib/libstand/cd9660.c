@@ -42,8 +42,8 @@
 #include <sys/param.h>
 #include <string.h>
 #include <sys/dirent.h>
-#include <isofs/cd9660/iso.h>
-#include <isofs/cd9660/cd9660_rrip.h>
+#include <fs/cd9660/iso.h>
+#include <fs/cd9660/cd9660_rrip.h>
 
 #include "stand.h"
 

@@ -1,4 +1,6 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
  * Copyright (c) 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -15,7 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +74,7 @@ struct iso_primary_descriptor {
 	char unused3			[ISODCL(89, 120)];
 	char volume_set_size		[ISODCL(121, 124)]; /* 723 */
 	char volume_sequence_number	[ISODCL(125, 128)]; /* 723 */
-	uchar_t logical_block_size		[ISODCL(129, 132)]; /* 723 */
+	uchar_t logical_block_size	[ISODCL(129, 132)]; /* 723 */
 	char path_table_size		[ISODCL(133, 140)]; /* 733 */
 	char type_l_path_table		[ISODCL(141, 144)]; /* 731 */
 	char opt_type_l_path_table	[ISODCL(145, 148)]; /* 731 */
@@ -95,7 +97,8 @@ struct iso_primary_descriptor {
 	char application_data		[ISODCL(884, 1395)];
 	char unused5			[ISODCL(1396, 2048)];
 } __packed;
-#define	ISO_DEFAULT_BLOCK_SIZE		2048
+#define ISO_DEFAULT_BLOCK_SHIFT		11
+#define ISO_DEFAULT_BLOCK_SIZE		(1 << ISO_DEFAULT_BLOCK_SHIFT)
 
 /*
  * Used by Microsoft Joliet extension to ISO9660. Almost the same
@@ -229,6 +232,11 @@ enum ISO_FTYPE	{
 #define	ISOFSMNT_ROOT	0
 #endif
 
+/*
+ * When ino_t becomes 64-bit, we can remove this definition in favor of ino_t.
+ */
+typedef __uint64_t cd_ino_t;
+
 struct iso_mnt {
 	uint64_t im_flags;
 
@@ -262,8 +270,8 @@ struct iso_mnt {
 struct ifid {
 	ushort_t	ifid_len;
 	ushort_t	ifid_pad;
-	int	ifid_ino;
-	long	ifid_start;
+	cd_ino_t	ifid_ino;
+	long		ifid_start;
 };
 
 #define	VFSTOISOFS(mp)	((struct iso_mnt *)((mp)->mnt_data))
@@ -273,9 +281,9 @@ struct ifid {
 #define	lblkno(imp, loc)	((loc) >> (imp)->im_bshift)
 #define	blksize(imp, ip, lbn)	((imp)->logical_block_size)
 
-int cd9660_vget_internal(struct mount *, ino_t, int, struct vnode **, int,
+int cd9660_vget_internal(struct mount *, cd_ino_t, int, struct vnode **, int,
     struct iso_directory_record *);
-#define	cd9660_sysctl ((int (*)(int *, uint_t, void *, size_t *, void *, \
+#define cd9660_sysctl ((int (*)(int *, u_int, void *, size_t *, void *, \
 				size_t, struct proc *))eopnotsupp)
 
 extern struct vop_vector cd9660_vnodeops;
@@ -283,9 +291,8 @@ extern struct vop_vector cd9660_fifoops;
 
 int isochar(uchar_t *, uchar_t *, int, ushort_t *, int *, int, void *);
 int isofncmp(uchar_t *, int, uchar_t *, int, int, int, void *, void *);
-void isofntrans(uchar_t *, int, uchar_t *, ushort_t *, int, int, int, int,
-    void *);
-ino_t isodirino(struct iso_directory_record *, struct iso_mnt *);
+void isofntrans(uchar_t *, int, uchar_t *, ushort_t *, int, int, int, int, void *);
+cd_ino_t isodirino(struct iso_directory_record *, struct iso_mnt *);
 ushort_t sgetrune(const char *, size_t, char const **, int, void *);
 
 #endif /* _KERNEL */
