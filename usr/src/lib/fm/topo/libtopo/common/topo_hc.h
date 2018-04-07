@@ -102,6 +102,7 @@ extern "C" {
 #define	TOPO_PGROUP_IO		"io"
 #define	TOPO_IO_DEVTYPE		"devtype"
 #define	TOPO_IO_DRIVER		"driver"
+#define	TOPO_IO_INSTANCE	"instance"
 #define	TOPO_IO_MODULE		"module"
 #define	TOPO_IO_DEV		"dev"
 #define	TOPO_IO_DEVID		"devid"
@@ -236,7 +237,7 @@ extern "C" {
 #define	TOPO_DIMM_TYPE_LPDDR3		"LPDDR3"
 #define	TOPO_DIMM_TYPE_LPDDR4		"LPDDR4"
 
-#define TOPO_PGROUP_MOTHERBOARD		"motherboard-properties"
+#define	TOPO_PGROUP_MOTHERBOARD		"motherboard-properties"
 #define	TOPO_PROP_MB_MANUFACTURER	"manufacturer"
 #define	TOPO_PROP_MB_PRODUCT		"product-id"
 #define	TOPO_PROP_MB_ASSET		"assert-tag"

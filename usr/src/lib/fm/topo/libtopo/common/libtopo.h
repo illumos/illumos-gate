@@ -365,6 +365,7 @@ extern int topo_fmri_getpgrp(topo_hdl_t *, nvlist_t *, const char *,
     nvlist_t **, int *);
 extern int topo_fmri_setprop(topo_hdl_t *, nvlist_t *, const char *,
     nvlist_t *, int, nvlist_t *, int *);
+extern void topo_pgroup_hcset(tnode_t *, nvlist_t *);
 
 /* Property node NVL names used in topo_prop_getprops */
 #define	TOPO_PROP_GROUP		"property-group"

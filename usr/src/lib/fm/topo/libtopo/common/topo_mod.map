@@ -94,4 +94,5 @@ SYMBOL_SCOPE {
 	topo_prop_set_fmri_array	{ TYPE = FUNCTION; FLAGS = extern };
 	topo_prop_inherit		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_pgroup_create		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_pgroup_hcset		{ TYPE = FUNCTION; FLAGS = extern };
 };
