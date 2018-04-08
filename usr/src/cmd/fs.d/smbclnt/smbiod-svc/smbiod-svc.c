@@ -560,14 +560,14 @@ child_gone(uid_t uid, pid_t pid, int status)
 		x = WEXITSTATUS(status);
 		if (x != 0) {
 			fprintf(stderr,
-			    "uid %d, pid %d exit %d",
+			    "uid %d, pid %d exit %d\n",
 			    uid, (int)pid, x);
 		}
 	}
 	if (WIFSIGNALED(status)) {
 		x = WTERMSIG(status);
 		fprintf(stderr,
-		    "uid %d, pid %d signal %d",
+		    "uid %d, pid %d signal %d\n",
 		    uid, (int)pid, x);
 	}
 }

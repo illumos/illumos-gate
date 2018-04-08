@@ -1,18 +1,24 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Right Reserved.
+.\" Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 .\" Portions Copyright 1994-2008 The FreeBSD Project. All rights reserved.
 .\" Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following
 .\" disclaimer. 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution. THIS SOFTWARE IS PROVIDED BY THE FREEBSD PROJECT ``AS IS'' AND
 .\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE FREEBSD PROJECT OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 .\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
 .\" OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-.TH SMBUTIL 1 "Jun 24, 2009"
+.TH SMBUTIL 1 "Apr 11, 2018"
 .SH NAME
 smbutil \- Solaris CIFS client utility
 .SH SYNOPSIS
 .LP
 .nf
 \fB/usr/bin/smbutil crypt\fR
+.fi
+
+.LP
+.nf
+\fB/usr/bin/smbutil discon //[\fIdomain\fR;][\fIuser\fR@]\fIserver\fR\fR
 .fi
 
 .LP
@@ -66,12 +72,10 @@ smbutil \- Solaris CIFS client utility
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsmbutil\fR command controls the Solaris CIFS client and issues various
 commands.
 .SS "Subcommands"
-.sp
 .LP
 The \fBsmbutil\fR command supports the following subcommands:
 .sp
@@ -92,6 +96,19 @@ sure that you escape the special characters in the password.
 If you plan to store hashed passwords in your \fB$HOME/.nsmbrc\fR file, ensure
 that the file permissions are set so that only the owner can read or write the
 file (\fB400\fR or \fB600\fR), or the passwords are ignored.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBdiscon -U \fIuser\fR]
+//[\fIdomain\fR;][\fIuser\fR\fIserver\fR\fR\fR
+.ad
+.sp .6
+.RS 4n
+Disconnects the specified SMB session to \fIserver\fR.
+Usage is similar to the \fB\fBview\fR\fR subcommand.
+This subcommand is primarily for use in tests.
 .RE
 
 .sp
@@ -202,7 +219,6 @@ shell. For instance, surround the entire resource name with single quotes:
 .RE
 
 .SH OPTIONS
-.sp
 .LP
 The following global options are supported:
 .sp
@@ -408,7 +424,6 @@ Server: EXAMPLE
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB$HOME/.nsmbrc\fR\fR
@@ -420,7 +435,6 @@ connection.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -439,16 +453,13 @@ Interface Stability	See below.
 .LP
 The output is Uncommitted. The rest of the interface is Committed.
 .SH SEE ALSO
-.sp
 .LP
 \fBmount_smbfs\fR(1M), \fBnsmbrc\fR(4), \fBattributes\fR(5), \fBsmbfs\fR(7FS)
 .SH AUTHORS
-.sp
 .LP
 This manual page contains material originally authored by Boris Popov,
 \fBbp@butya.kz\fR, \fBbp@FreeBSD.org\fR.
 .SH NOTES
-.sp
 .LP
 The Solaris CIFS client always attempts to use \fBgethostbyname()\fR to resolve
 host names. If the host name cannot be resolved, the CIFS client uses NetBIOS

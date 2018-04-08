@@ -70,6 +70,7 @@ static struct commands {
 	int		flags;
 } commands[] = {
 	{"crypt",	cmd_crypt,	NULL, CMDFL_NO_KMOD},
+	{"discon",	cmd_discon,	discon_usage, 0},
 	{"help",	cmd_help,	help_usage, CMDFL_NO_KMOD},
 	{"info",	cmd_info,	info_usage, 0},
 	{"login",	cmd_login,	login_usage, 0},
@@ -184,7 +185,8 @@ main(int argc, char *argv[])
 }
 
 static void
-help(void) {
+help(void)
+{
 	printf("\n");
 	printf(gettext("usage: %s [-hv] subcommand [args]\n"), __progname);
 	printf(gettext("where subcommands are:\n"
@@ -204,7 +206,8 @@ help(void) {
 }
 
 void
-help_usage(void) {
+help_usage(void)
+{
 	printf(gettext("usage: smbutil help command\n"));
 	exit(1);
 }

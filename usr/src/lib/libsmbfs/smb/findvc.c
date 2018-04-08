@@ -96,6 +96,11 @@ smb_ctx_findvc(struct smb_ctx *ctx)
 	if ((ctx->ct_flags & SMBCF_RESOLVED) == 0)
 		return (EINVAL);
 
+	if (ctx->ct_dev_fd < 0) {
+		if ((err = smb_ctx_gethandle(ctx)))
+			return (err);
+	}
+
 	for (ai = ctx->ct_addrinfo; ai; ai = ai->ai_next) {
 
 		switch (ai->ai_family) {

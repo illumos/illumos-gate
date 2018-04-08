@@ -64,6 +64,7 @@ SYMBOL_VERSION SUNWprivate {
 
 	smb_ctx_alloc;
 	smb_ctx_done;
+	smb_ctx_findvc;
 	smb_ctx_flags2;
 	smb_ctx_free;
 	smb_ctx_get_ssn;

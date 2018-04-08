@@ -177,18 +177,6 @@ smb_iod_disconnect(struct smb_vc *vcp)
 	 * the server will take care of the logoff.
 	 */
 	SMB_TRAN_DISCONNECT(vcp);
-
-	/*
-	 * If we have an IOD, it should immediately notice
-	 * that its connection has closed.  But in case
-	 * it doesn't, let's also send it a signal.
-	 */
-	SMB_VC_LOCK(vcp);
-	if (vcp->iod_thr != NULL &&
-	    vcp->iod_thr != curthread) {
-		tsignal(vcp->iod_thr, SIGKILL);
-	}
-	SMB_VC_UNLOCK(vcp);
 }
 
 /*

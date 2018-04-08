@@ -45,6 +45,7 @@ extern "C" {
 #include <stdlib.h>
 
 int  cmd_crypt(int argc, char *argv[]);
+int  cmd_discon(int argc, char *argv[]);
 int  cmd_help(int argc, char *argv[]);
 int  cmd_info(int argc, char *argv[]);
 int  cmd_login(int argc, char *argv[]);
@@ -56,6 +57,7 @@ int  cmd_status(int argc, char *argv[]);
 int  cmd_view(int argc, char *argv[]);
 
 void crypt_usage(void);
+void discon_usage(void);
 void help_usage(void);
 void info_usage(void);
 void login_usage(void);

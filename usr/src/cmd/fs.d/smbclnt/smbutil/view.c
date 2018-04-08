@@ -146,7 +146,7 @@ again:
 
 out:
 	smb_ctx_free(ctx);
-	return (0);
+	return (error);
 }
 
 #ifdef I18N	/* not defined, put here so xgettext(1) can find strings */
