@@ -58,6 +58,7 @@
 #include <sys/vfs_opreg.h>
 #include <sys/policy.h>
 #include <sys/sdt.h>
+#include <sys/taskq_impl.h>
 #include <sys/zone.h>
 #include <sys/vmsystm.h>
 
@@ -153,7 +154,7 @@ static int	smbfs_getapage(vnode_t *, u_offset_t, size_t, uint_t *,
 			enum seg_rw, cred_t *);
 static int	smbfs_putapage(vnode_t *, page_t *, u_offset_t *, size_t *,
 			int, cred_t *);
-static void	smbfs_delmap_callback(struct as *, void *, uint_t);
+static void	smbfs_delmap_async(void *);
 
 /*
  * Error flags used to pass information about certain special errors
@@ -4475,6 +4476,13 @@ done:
 	return (error);
 }
 
+/*
+ * This uses addmap/delmap functions to hold the SMB FID open as long as
+ * there are pages mapped in this as/seg.  Increment the FID refs. when
+ * the maping count goes from zero to non-zero, and release the FID ref
+ * when the maping count goes from non-zero to zero.
+ */
+
 /* ARGSUSED */
 static int
 smbfs_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
@@ -4504,20 +4512,27 @@ smbfs_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 }
 
 /*
- * Use an address space callback to flush pages dirty pages after unmap,
- * which we can't do directly in smbfs_delmap due to locking issues.
+ * Args passed to smbfs_delmap_async
  */
 typedef struct smbfs_delmap_args {
-	vnode_t			*vp;
-	cred_t			*cr;
-	offset_t		off;
-	caddr_t			addr;
-	size_t			len;
-	uint_t			prot;
-	uint_t			maxprot;
-	uint_t			flags;
-	boolean_t		dec_fidrefs;
+	taskq_ent_t		dm_tqent;
+	cred_t			*dm_cr;
+	vnode_t			*dm_vp;
+	offset_t		dm_off;
+	caddr_t			dm_addr;
+	size_t			dm_len;
+	uint_t			dm_prot;
+	uint_t			dm_maxprot;
+	uint_t			dm_flags;
+	boolean_t		dm_rele_fid;
 } smbfs_delmap_args_t;
+
+/*
+ * Using delmap not only to release the SMB FID (as described above)
+ * but to flush dirty pages as needed.  Both of those do the actual
+ * work in an async taskq job to avoid interfering with locks held
+ * in the VM layer when this is called.
+ */
 
 /* ARGSUSED */
 static int
@@ -4525,58 +4540,48 @@ smbfs_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 	size_t len, uint_t prot, uint_t maxprot, uint_t flags,
 	cred_t *cr, caller_context_t *ct)
 {
-	smbnode_t *np = VTOSMB(vp);
+	smbnode_t		*np = VTOSMB(vp);
+	smbmntinfo_t		*smi = VTOSMI(vp);
 	smbfs_delmap_args_t	*dmapp;
-	int error;
 
 	dmapp = kmem_zalloc(sizeof (*dmapp), KM_SLEEP);
 
-	dmapp->vp = vp;
-	dmapp->off = off;
-	dmapp->addr = addr;
-	dmapp->len = len;
-	dmapp->prot = prot;
-	dmapp->maxprot = maxprot;
-	dmapp->flags = flags;
-	dmapp->cr = cr;
-	dmapp->dec_fidrefs = B_FALSE;
+	/*
+	 * The VM layer may segvn_free the seg holding this vnode
+	 * before our callback has a chance run, so take a hold on
+	 * the vnode here and release it in the callback.
+	 * (same for the cred)
+	 */
+	crhold(cr);
+	VN_HOLD(vp);
+
+	dmapp->dm_vp = vp;
+	dmapp->dm_cr = cr;
+	dmapp->dm_off = off;
+	dmapp->dm_addr = addr;
+	dmapp->dm_len = len;
+	dmapp->dm_prot = prot;
+	dmapp->dm_maxprot = maxprot;
+	dmapp->dm_flags = flags;
+	dmapp->dm_rele_fid = B_FALSE;
 
 	/*
-	 * When r_mapcnt returns to zero, arrange for the
-	 * callback to decrement n_fidrefs
+	 * Go ahead and decrement r_mapcount now, which is
+	 * the primary purpose of this function.
+	 *
+	 * When r_mapcnt goes to zero, we need to call
+	 * smbfs_rele_fid, but can't do that here, so
+	 * set a flag telling the async task to do it.
 	 */
 	mutex_enter(&np->r_statelock);
 	np->r_mapcnt -= btopr(len);
 	ASSERT(np->r_mapcnt >= 0);
 	if (np->r_mapcnt == 0)
-		dmapp->dec_fidrefs = B_TRUE;
+		dmapp->dm_rele_fid = B_TRUE;
 	mutex_exit(&np->r_statelock);
 
-	error = as_add_callback(as, smbfs_delmap_callback, dmapp,
-	    AS_UNMAP_EVENT, addr, len, KM_SLEEP);
-	if (error != 0) {
-		/*
-		 * So sad, no callback is coming. Can't flush pages
-		 * in delmap (as locks).  Just handle n_fidrefs.
-		 */
-		cmn_err(CE_NOTE, "smbfs_delmap(%p) "
-		    "as_add_callback err=%d",
-		    (void *)vp, error);
-
-		if (dmapp->dec_fidrefs) {
-			struct smb_cred scred;
-
-			(void) smbfs_rw_enter_sig(&np->r_lkserlock,
-			    RW_WRITER, 0);
-			smb_credinit(&scred, dmapp->cr);
-
-			smbfs_rele_fid(np, &scred);
-
-			smb_credrele(&scred);
-			smbfs_rw_exit(&np->r_lkserlock);
-		}
-		kmem_free(dmapp, sizeof (*dmapp));
-	}
+	taskq_dispatch_ent(smi->smi_taskq, smbfs_delmap_async, dmapp, 0,
+	    &dmapp->dm_tqent);
 
 	return (0);
 }
@@ -4587,14 +4592,16 @@ smbfs_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
  */
 /* ARGSUSED */
 static void
-smbfs_delmap_callback(struct as *as, void *arg, uint_t event)
+smbfs_delmap_async(void *varg)
 {
+	smbfs_delmap_args_t	*dmapp = varg;
+	cred_t			*cr;
 	vnode_t			*vp;
 	smbnode_t		*np;
 	smbmntinfo_t		*smi;
-	smbfs_delmap_args_t	*dmapp = arg;
 
-	vp = dmapp->vp;
+	cr = dmapp->dm_cr;
+	vp = dmapp->dm_vp;
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
 
@@ -4609,7 +4616,8 @@ smbfs_delmap_callback(struct as *as, void *arg, uint_t event)
 	 * unmount smbfs
 	 */
 	if (vn_has_cached_data(vp) && !vn_is_readonly(vp) &&
-	    dmapp->flags == MAP_SHARED && (dmapp->maxprot & PROT_WRITE)) {
+	    dmapp->dm_flags == MAP_SHARED &&
+	    (dmapp->dm_maxprot & PROT_WRITE) != 0) {
 		mutex_enter(&np->r_statelock);
 		np->r_flags |= RDIRTY;
 		mutex_exit(&np->r_statelock);
@@ -4618,23 +4626,23 @@ smbfs_delmap_callback(struct as *as, void *arg, uint_t event)
 		 * Need to finish the putpage before we
 		 * close the OtW FID needed for I/O.
 		 */
-		(void) smbfs_putpage(vp, dmapp->off, dmapp->len, 0,
-		    dmapp->cr, NULL);
+		(void) smbfs_putpage(vp, dmapp->dm_off, dmapp->dm_len, 0,
+		    dmapp->dm_cr, NULL);
 	}
 
 	if ((np->r_flags & RDIRECTIO) || (smi->smi_flags & SMI_DIRECTIO))
-		(void) smbfs_putpage(vp, dmapp->off, dmapp->len,
-		    B_INVAL, dmapp->cr, NULL);
+		(void) smbfs_putpage(vp, dmapp->dm_off, dmapp->dm_len,
+		    B_INVAL, dmapp->dm_cr, NULL);
 
 	/*
 	 * If r_mapcnt went to zero, drop our FID ref now.
 	 * On the last fidref, this does an OtW close.
 	 */
-	if (dmapp->dec_fidrefs) {
+	if (dmapp->dm_rele_fid) {
 		struct smb_cred scred;
 
 		(void) smbfs_rw_enter_sig(&np->r_lkserlock, RW_WRITER, 0);
-		smb_credinit(&scred, dmapp->cr);
+		smb_credinit(&scred, dmapp->dm_cr);
 
 		smbfs_rele_fid(np, &scred);
 
@@ -4642,7 +4650,10 @@ smbfs_delmap_callback(struct as *as, void *arg, uint_t event)
 		smbfs_rw_exit(&np->r_lkserlock);
 	}
 
-	(void) as_delete_callback(as, arg);
+	/* Release holds taken in smbfs_delmap */
+	VN_RELE(vp);
+	crfree(cr);
+
 	kmem_free(dmapp, sizeof (*dmapp));
 }
 

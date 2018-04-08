@@ -52,6 +52,7 @@
 #include <sys/statvfs.h>
 #include <sys/errno.h>
 #include <sys/debug.h>
+#include <sys/disp.h>
 #include <sys/cmn_err.h>
 #include <sys/modctl.h>
 #include <sys/policy.h>
@@ -60,6 +61,7 @@
 #include <sys/vfs_opreg.h>
 #include <sys/mntent.h>
 #include <sys/priv.h>
+#include <sys/taskq.h>
 #include <sys/tsol/label.h>
 #include <sys/tsol/tndb.h>
 #include <inet/ip.h>
@@ -84,6 +86,12 @@
  * /etc/system, and/or set per-mount via the "acl" mount option.
  */
 int smbfs_default_opt_acl = 0;
+
+/*
+ * How many taskq threads per-mount should we use.
+ * Just one is fine (until we do more async work).
+ */
+int smbfs_tq_nthread = 1;
 
 /*
  * Local functions definitions.
@@ -633,6 +641,14 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	smi->smi_root = rtnp;
 
 	/*
+	 * Create a taskq for async work (i.e. putpage)
+	 */
+	smi->smi_taskq = taskq_create_proc("smbfs",
+	    smbfs_tq_nthread, minclsyspri,
+	    smbfs_tq_nthread, smbfs_tq_nthread * 2,
+	    zone->zone_zsched, TASKQ_PREPOPULATE);
+
+	/*
 	 * NFS does other stuff here too:
 	 *   async worker threads
 	 *   init kstats
@@ -701,15 +717,6 @@ smbfs_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	vfsp->vfs_flag |= VFS_UNMOUNTED;
 
 	/*
-	 * Shutdown any outstanding I/O requests on this share,
-	 * and force a tree disconnect.  The share object will
-	 * continue to hang around until smb_share_rele().
-	 * This should also cause most active nodes to be
-	 * released as their operations fail with EIO.
-	 */
-	smb_share_kill(smi->smi_share);
-
-	/*
 	 * If we hold the root VP (and we normally do)
 	 * then it's safe to release it now.
 	 */
@@ -730,6 +737,21 @@ smbfs_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 	 * after their last vn_rele.
 	 */
 	smbfs_destroy_table(vfsp);
+
+	/*
+	 * Shutdown any outstanding I/O requests on this share,
+	 * and force a tree disconnect.  The share object will
+	 * continue to hang around until smb_share_rele().
+	 * This should also cause most active nodes to be
+	 * released as their operations fail with EIO.
+	 */
+	smb_share_kill(smi->smi_share);
+
+	/*
+	 * Any async taskq work should be giving up.
+	 * Wait for those to exit.
+	 */
+	taskq_destroy(smi->smi_taskq);
 
 	/*
 	 * Delete our kstats...
