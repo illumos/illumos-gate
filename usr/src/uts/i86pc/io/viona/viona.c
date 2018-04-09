@@ -37,6 +37,178 @@
  * Copyright 2018 Joyent, Inc.
  */
 
+/*
+ * viona - VirtIO-Net, Accelerated
+ *
+ * The purpose of viona is to provide high performance virtio-net devices to
+ * bhyve guests.  It does so by sitting directly atop MAC, skipping all of the
+ * DLS/DLD stack.
+ *
+ * --------------------
+ * General Architecture
+ * --------------------
+ *
+ * A single viona instance is comprised of a "link" handle and two "rings".
+ * After opening the viona device, it must be associated with a MAC network
+ * interface and a bhyve (vmm) instance to form its link resource.  This is
+ * done with the VNA_IOC_CREATE ioctl, where the datalink ID and vmm fd are
+ * passed in to perform the initialization.  With the MAC client opened, and a
+ * driver handle to the vmm instance established, the device is ready to be
+ * configured by the guest.
+ *
+ * The userspace portion of bhyve, which interfaces with the PCI device
+ * emulation framework, is meant to stay out of the datapath if at all
+ * possible.  Configuration changes made via PCI are mapped to actions which
+ * will steer the operation of the in-kernel logic.
+ *
+ *
+ * -----------
+ * Ring Basics
+ * -----------
+ *
+ * Each viona link has two viona_vring_t entities, RX and TX, for handling data
+ * transfers to and from the guest.  They represent an interface to the
+ * standard virtio ring structures.  When intiailized and active, each ring is
+ * backed by a kernel worker thread (parented to the bhyve process for the
+ * instance) which handles ring events.  The RX worker has the simple task of
+ * watching for ring shutdown conditions.  The TX worker does that in addition
+ * to processing all requests to transmit data.  Data destined for the guest is
+ * delivered directly by MAC to viona_rx() when the ring is active.
+ *
+ *
+ * -----------
+ * Ring States
+ * -----------
+ *
+ * The viona_vring_t instances follow a simple path through the possible state
+ * values represented in virtio_vring_t`vr_state:
+ *
+ *        +<--------------------------------------------+
+ *        |						|
+ *        V						^
+ *  +-----------+	This is the initial state when a link is created or
+ *  | VRS_RESET |	when the ring has been explicitly reset.
+ *  +-----------+
+ *        |						^
+ *        |---* ioctl(VNA_IOC_RING_INIT) issued		|
+ *        |						|
+ *        |						^
+ *        V
+ *  +-----------+	The ring parameters (size, guest physical addresses)
+ *  | VRS_SETUP |	have been set and start-up of the ring worker thread
+ *  +-----------+	has begun.
+ *        |						^
+ *        |						|
+ *        |---* ring worker thread begins execution	|
+ *        |						|
+ *        +-------------------------------------------->+
+ *        |	      | 				^
+ *        |	      |
+ *        |	      *	If ring shutdown is requested (by ioctl or impending
+ *        |		bhyve process death) while the worker thread is
+ *        |		starting, the worker will transition the ring to
+ *        |		VRS_RESET and exit.
+ *        |						^
+ *        |						|
+ *        |						^
+ *        V
+ *  +-----------+	The worker thread associated with the ring has started
+ *  | VRS_INIT  |	executing.  It has allocated any extra resources needed
+ *  +-----------+	for the ring to operate.
+ *        |						^
+ *        |						|
+ *        +-------------------------------------------->+
+ *        |	      |					^
+ *        |	      |
+ *        |	      *	If ring shutdown is requested while the worker is
+ *        |		waiting in VRS_INIT, it will free any extra resources
+ *        |		and transition to VRS_RESET.
+ *        |						^
+ *        |						|
+ *        |--* ioctl(VNA_IOC_RING_KICK) issued		|
+ *        |						^
+ *        V
+ *  +-----------+	The worker thread associated with the ring is executing
+ *  | VRS_RUN   |	workload specific to that ring.
+ *  +-----------+
+ *        |						^
+ *        |---* ioctl(VNA_IOC_RING_RESET) issued	|
+ *        |	(or bhyve process begins exit)		|
+ *        V						|
+ *        +-------------------------------------------->+
+ *
+ *
+ * While the worker thread is not running, changes to vr_state are only made by
+ * viona_ioc_ring_init() under vr_lock.  There, it initializes the ring, starts
+ * the worker, and sets the ring state to VRS_SETUP.  Once the worker thread
+ * has been started, only it may perform ring state transitions (still under
+ * the protection of vr_lock), when requested by outside consumers via
+ * vr_state_flags or when the containing bhyve process initiates an exit.
+ *
+ *
+ * ----------------------------
+ * Transmission mblk_t Handling
+ * ----------------------------
+ *
+ * For incoming frames destined for a bhyve guest, the data must first land in
+ * a host OS buffer from the physical NIC before it is copied into the awaiting
+ * guest buffer(s).  Outbound frames transmitted by the guest are not bound by
+ * this limitation and can avoid extra copying before the buffers are accessed
+ * directly by the NIC.  When a guest designates buffers to be transmitted,
+ * viona translates the guest-physical addresses contained in the ring
+ * descriptors to host-virtual addresses via vmm_dr_gpa2kva().  That pointer is
+ * wrapped in an mblk_t using a preallocated viona_desb_t for the desballoc().
+ * Doing so increments vr_xfer_outstanding, preventing the ring from being
+ * reset (allowing the link to drop its vmm handle to the guest) until all
+ * transmit mblks referencing guest memory have been processed.  Allocation of
+ * the viona_desb_t entries is done during the VRS_INIT stage of the ring
+ * worker thread.  The ring size informs that allocation as the number of
+ * concurrent transmissions is limited by the number of descriptors in the
+ * ring.  This minimizes allocation in the transmit hot-path by aqcuiring those
+ * fixed-size resources during initialization.
+ *
+ * This optimization depends on the underlying NIC driver freeing the mblks in
+ * a timely manner after they have been transmitted by the hardware.  Some
+ * drivers have been found to flush TX descriptors only when new transmissions
+ * are initiated.  This means that there is no upper bound to the time needed
+ * for an mblk to be flushed and can stall bhyve guests from shutting down
+ * since their memory must be free of viona TX references prior to clean-up.
+ *
+ * This expectation of deterministic mblk_t processing is likely the reason
+ * behind the notable exception to the zero-copy TX path: systems with 'bnxe'
+ * loaded will copy transmit data into fresh buffers rather than passing up
+ * zero-copy mblks.  It is a hold-over from the original viona sources provided
+ * by Pluribus and its continued necessity has not been confirmed.
+ *
+ *
+ * ----------------------------
+ * Ring Notification Fast-paths
+ * ----------------------------
+ *
+ * Device operation for viona requires that notifications flow to and from the
+ * guest to indicate certain ring conditions.  In order to minimize latency and
+ * processing overhead, the notification procedures are kept in-kernel whenever
+ * possible.
+ *
+ * Guest-to-host notifications, when new available descriptors have been placed
+ * in the ring, are posted via the 'queue notify' address in the virtio BAR.
+ * The vmm_drv_ioport_hook() interface was added to bhyve which allows viona to
+ * install a callback hook on an ioport address.  Guest exits for accesses to
+ * viona-hooked ioport addresses will result in direct calls to notify the
+ * appropriate ring worker without a trip to userland.
+ *
+ * Host-to-guest notifications in the form of interrupts enjoy similar
+ * acceleration.  Each viona ring can be configured to send MSI notifications
+ * to the guest as virtio conditions dictate.  This in-kernel interrupt
+ * configuration is kept synchronized through viona ioctls which are utilized
+ * during writes to the associated PCI config registers or MSI-X BAR.
+ *
+ * Guests which do not utilize MSI-X will result in viona falling back to the
+ * slow path for interrupts.  It will poll(2) the viona handle, receiving
+ * notification when ring events necessitate the assertion of an interrupt.
+ *
+ */
+
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -173,20 +345,18 @@ struct viona_desb;
 typedef struct viona_desb viona_desb_t;
 
 enum viona_ring_state {
-	VRS_RESET	= 0x00,	/* just allocated or reset */
-	VRS_INIT	= 0x01,	/* init-ed with addrs and worker thread */
-	VRS_RUN		= 0x02,	/* running work routine */
-
-	/* Additional flag(s): */
-	VRS_SETUP	= 0x04,
-	VRS_REQ_START	= 0x08,
-	VRS_REQ_STOP	= 0x10,
+	VRS_RESET	= 0x0,	/* just allocated or reset */
+	VRS_SETUP	= 0x1,	/* addrs setup and starting worker thread */
+	VRS_INIT	= 0x2,	/* worker thread started & waiting to run */
+	VRS_RUN		= 0x3,	/* running work routine */
+};
+enum viona_ring_state_flags {
+	VRSF_REQ_START	= 0x1,	/* start running from INIT state */
+	VRSF_REQ_STOP	= 0x2,	/* stop running, clean up, goto RESET state */
 };
 
-#define	VRS_STATE_MASK (VRS_RESET|VRS_INIT|VRS_RUN)
-
-#define	VRING_NEED_BAIL(ring, proc)				\
-		(((ring)->vr_state & VRS_REQ_STOP) != 0 ||	\
+#define	VRING_NEED_BAIL(ring, proc)					\
+		(((ring)->vr_state_flags & VRSF_REQ_STOP) != 0 ||	\
 		((proc)->p_flag & SEXITING) != 0)
 
 typedef struct viona_vring {
@@ -194,7 +364,8 @@ typedef struct viona_vring {
 
 	kmutex_t	vr_lock;
 	kcondvar_t	vr_cv;
-	uint_t		vr_state;
+	uint16_t	vr_state;
+	uint16_t	vr_state_flags;
 	uint_t		vr_xfer_outstanding;
 	kthread_t	*vr_worker_thread;
 	viona_desb_t	*vr_desb;
@@ -308,12 +479,13 @@ static int viona_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
     struct pollhead **phpp);
 
 static int viona_ioc_create(viona_soft_state_t *, void *, int, cred_t *);
-static int viona_ioc_delete(viona_soft_state_t *ss);
+static int viona_ioc_delete(viona_soft_state_t *, boolean_t);
 
 static void *viona_gpa2kva(viona_link_t *link, uint64_t gpa, size_t len);
 
 static void viona_ring_alloc(viona_link_t *, viona_vring_t *);
 static void viona_ring_free(viona_vring_t *);
+static int viona_ring_reset(viona_vring_t *, boolean_t);
 static kthread_t *viona_create_worker(viona_vring_t *);
 
 static int viona_ioc_set_notify_ioport(viona_link_t *, uint_t);
@@ -559,7 +731,7 @@ viona_close(dev_t dev, int flag, int otype, cred_t *credp)
 		return (ENXIO);
 	}
 
-	viona_ioc_delete(ss);
+	VERIFY0(viona_ioc_delete(ss, B_TRUE));
 	ddi_soft_state_free(viona_state, minor);
 	id_free(viona_minors, minor);
 
@@ -583,7 +755,7 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 	case VNA_IOC_CREATE:
 		return (viona_ioc_create(ss, dptr, md, cr));
 	case VNA_IOC_DELETE:
-		return (viona_ioc_delete(ss));
+		return (viona_ioc_delete(ss, B_FALSE));
 	default:
 		break;
 	}
@@ -770,26 +942,41 @@ bail:
 }
 
 static int
-viona_ioc_delete(viona_soft_state_t *ss)
+viona_ioc_delete(viona_soft_state_t *ss, boolean_t on_close)
 {
 	viona_link_t *link;
 
 	mutex_enter(&ss->ss_lock);
 	if ((link = ss->ss_link) == NULL) {
+		/* Link destruction already complete */
 		mutex_exit(&ss->ss_lock);
 		return (0);
 	}
 
 	if (link->l_destroyed) {
-		/* Another thread made it here first. */
+		/*
+		 * Link destruction has been started by another thread, but has
+		 * not completed.  This condition should be impossible to
+		 * encounter when performing the on-close destroy of the link,
+		 * since racing ioctl accessors must necessarily be absent.
+		 */
+		VERIFY(!on_close);
 		mutex_exit(&ss->ss_lock);
 		return (EAGAIN);
 	}
+	/*
+	 * The link deletion cannot fail after this point, continuing until its
+	 * successful completion is reached.
+	 */
 	link->l_destroyed = B_TRUE;
 	mutex_exit(&ss->ss_lock);
 
-	VERIFY0(viona_ioc_ring_reset(link, VIONA_VQ_RX));
-	VERIFY0(viona_ioc_ring_reset(link, VIONA_VQ_TX));
+	/*
+	 * Return the rings to their reset state, ignoring any possible
+	 * interruptions from signals.
+	 */
+	VERIFY0(viona_ring_reset(&link->l_vrings[VIONA_VQ_RX], B_FALSE));
+	VERIFY0(viona_ring_reset(&link->l_vrings[VIONA_VQ_TX], B_FALSE));
 
 	mutex_enter(&ss->ss_lock);
 	VERIFY0(viona_ioc_set_notify_ioport(link, 0));
@@ -848,6 +1035,36 @@ viona_ring_free(viona_vring_t *ring)
 }
 
 static int
+viona_ring_reset(viona_vring_t *ring, boolean_t heed_signals)
+{
+	mutex_enter(&ring->vr_lock);
+	if (ring->vr_state == VRS_RESET) {
+		mutex_exit(&ring->vr_lock);
+		return (0);
+	}
+
+	if ((ring->vr_state_flags & VRSF_REQ_STOP) == 0) {
+		ring->vr_state_flags |= VRSF_REQ_STOP;
+		cv_broadcast(&ring->vr_cv);
+	}
+	while (ring->vr_state != VRS_RESET) {
+		if (!heed_signals) {
+			cv_wait(&ring->vr_cv, &ring->vr_lock);
+		} else {
+			int rs;
+
+			rs = cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
+			if (rs <= 0 && ring->vr_state != VRS_RESET) {
+				mutex_exit(&ring->vr_lock);
+				return (EINTR);
+			}
+		}
+	}
+	mutex_exit(&ring->vr_lock);
+	return (0);
+}
+
+static int
 viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 {
 	vioc_ring_init_t kri;
@@ -876,6 +1093,7 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 		mutex_exit(&ring->vr_lock);
 		return (EBUSY);
 	}
+	VERIFY(ring->vr_state_flags == 0);
 
 	pos = kri.ri_qaddr;
 	desc_sz = cnt * sizeof (struct virtio_desc);
@@ -941,7 +1159,7 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 		goto fail;
 	}
 	ring->vr_worker_thread = t;
-	ring->vr_state = VRS_RESET|VRS_SETUP;
+	ring->vr_state = VRS_SETUP;
 	cv_broadcast(&ring->vr_cv);
 	mutex_exit(&ring->vr_lock);
 	return (0);
@@ -949,6 +1167,7 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 fail:
 	if (ring->vr_desb != NULL) {
 		kmem_free(ring->vr_desb, sizeof (viona_desb_t) * cnt);
+		ring->vr_desb = NULL;
 	}
 	ring->vr_size = 0;
 	ring->vr_mask = 0;
@@ -961,7 +1180,6 @@ fail:
 	ring->vr_used_idx = NULL;
 	ring->vr_used_ring = NULL;
 	ring->vr_used_avail_event = NULL;
-	ring->vr_state = VRS_RESET;
 	mutex_exit(&ring->vr_lock);
 	return (err);
 }
@@ -976,29 +1194,13 @@ viona_ioc_ring_reset(viona_link_t *link, uint_t idx)
 	}
 	ring = &link->l_vrings[idx];
 
-	mutex_enter(&ring->vr_lock);
-	if (ring->vr_state != VRS_RESET) {
-		ring->vr_state |= VRS_REQ_STOP;
-		cv_broadcast(&ring->vr_cv);
-		while (ring->vr_state != VRS_RESET) {
-			cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
-		}
-	}
-	if (ring->vr_desb != NULL) {
-		VERIFY(ring->vr_xfer_outstanding == 0);
-		kmem_free(ring->vr_desb, sizeof (viona_desb_t) * ring->vr_size);
-		ring->vr_desb = NULL;
-	}
-	mutex_exit(&ring->vr_lock);
-
-	return (0);
+	return (viona_ring_reset(ring, B_TRUE));
 }
 
 static int
 viona_ioc_ring_kick(viona_link_t *link, uint_t idx)
 {
 	viona_vring_t *ring;
-	uint_t state;
 	int err;
 
 	if (idx >= VIONA_VQ_MAX) {
@@ -1007,10 +1209,16 @@ viona_ioc_ring_kick(viona_link_t *link, uint_t idx)
 	ring = &link->l_vrings[idx];
 
 	mutex_enter(&ring->vr_lock);
-	state = ring->vr_state & VRS_STATE_MASK;
-	switch (state) {
+	switch (ring->vr_state) {
+	case VRS_SETUP:
+		/*
+		 * An early kick to a ring which is starting its worker thread
+		 * is fine.  Once that thread is active, it will process the
+		 * start-up request immediately.
+		 */
+		/* FALLTHROUGH */
 	case VRS_INIT:
-		ring->vr_state |= VRS_REQ_START;
+		ring->vr_state_flags |= VRSF_REQ_START;
 		/* FALLTHROUGH */
 	case VRS_RUN:
 		cv_broadcast(&ring->vr_cv);
@@ -1110,11 +1318,10 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 	proc_t *p = ttoproc(curthread);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
-	ASSERT(ring->vr_state == (VRS_INIT|VRS_REQ_START));
+	ASSERT3U(ring->vr_state, ==, VRS_RUN);
 
 	atomic_or_16(ring->vr_used_flags, VRING_USED_F_NO_NOTIFY);
 	mac_rx_set(link->l_mch, viona_rx, link);
-	ring->vr_state = VRS_RUN;
 
 	do {
 		/*
@@ -1144,9 +1351,8 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 	proc_t *p = ttoproc(curthread);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
-	ASSERT(ring->vr_state == (VRS_INIT|VRS_REQ_START));
+	ASSERT3U(ring->vr_state, ==, VRS_RUN);
 
-	ring->vr_state = VRS_RUN;
 	mutex_exit(&ring->vr_lock);
 
 	for (;;) {
@@ -1203,6 +1409,12 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		 */
 		cv_wait(&ring->vr_cv, &ring->vr_lock);
 	}
+
+	/* Free any desb resources before the ring is completely stopped */
+	if (ring->vr_desb != NULL) {
+		kmem_free(ring->vr_desb, sizeof (viona_desb_t) * ring->vr_size);
+		ring->vr_desb = NULL;
+	}
 }
 
 static void
@@ -1213,20 +1425,28 @@ viona_worker(void *arg)
 	proc_t *p = ttoproc(curthread);
 
 	mutex_enter(&ring->vr_lock);
-	VERIFY(ring->vr_state == (VRS_RESET|VRS_SETUP));
+	VERIFY3U(ring->vr_state, ==, VRS_SETUP);
+
+	/* Bail immediately if ring shutdown or process exit was requested */
+	if (VRING_NEED_BAIL(ring, p)) {
+		goto cleanup;
+	}
 
 	/* Report worker thread as alive and notify creator */
 	ring->vr_state = VRS_INIT;
 	cv_broadcast(&ring->vr_cv);
 
-	while (ring->vr_state == VRS_INIT) {
+	while (ring->vr_state_flags == 0) {
 		(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
 
 		if (VRING_NEED_BAIL(ring, p)) {
 			goto cleanup;
 		}
 	}
-	ASSERT(ring->vr_state & VRS_REQ_START);
+
+	ASSERT((ring->vr_state_flags & VRSF_REQ_START) != 0);
+	ring->vr_state = VRS_RUN;
+	ring->vr_state_flags &= ~VRSF_REQ_START;
 
 	/* Process actual work */
 	if (ring == &link->l_vrings[VIONA_VQ_RX]) {
@@ -1238,8 +1458,16 @@ viona_worker(void *arg)
 	}
 
 cleanup:
+	/* Free any desb resources before the ring is completely stopped */
+	if (ring->vr_desb != NULL) {
+		VERIFY(ring->vr_xfer_outstanding == 0);
+		kmem_free(ring->vr_desb, sizeof (viona_desb_t) * ring->vr_size);
+		ring->vr_desb = NULL;
+	}
+
 	ring->vr_cur_aidx = 0;
 	ring->vr_state = VRS_RESET;
+	ring->vr_state_flags = 0;
 	ring->vr_worker_thread = NULL;
 	cv_broadcast(&ring->vr_cv);
 	mutex_exit(&ring->vr_lock);
