@@ -1250,7 +1250,6 @@ devaudioctl_wput(audio_client_t *c, mblk_t *mp)
 		/*
 		 * No audio data on control nodes!
 		 */
-		freemsg(mp);
 
 	default:
 		freemsg(mp);

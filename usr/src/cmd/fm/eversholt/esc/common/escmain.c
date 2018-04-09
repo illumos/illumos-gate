@@ -29,8 +29,6 @@
  * modules is driven by this file.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #ifdef sun
@@ -165,6 +163,7 @@ main(int argc, char *argv[])
 			    VERSION_MAJOR, VERSION_MINOR);
 			out(O_DIE|O_USAGE, "%s\n%s", Usage, Help);
 			/*NOTREACHED*/
+			break;
 
 		case 'o':
 			outfile = optarg;

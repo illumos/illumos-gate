@@ -110,6 +110,7 @@ __vcos(int n, double * restrict x, int stridex, double * restrict y,
 	sysave = stridey;
 	biguns = 0;
 
+	x0 = *x;	/* 'x0' may be used uninitialized */
 	do /* MAIN LOOP */
 	{
 		/* Gotos here so _break_ exits MAIN LOOP. */

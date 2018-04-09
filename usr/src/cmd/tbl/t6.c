@@ -13,8 +13,6 @@
  * specifies the terms and conditions for redistribution.
  */
      
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /* t6.c: compute tab stops */
 # define tx(a) (a>(char *)0 && a<(char *)128)
 # include "t..c"
@@ -58,6 +56,7 @@ for(icol=0; icol <ncol; icol++)
 					doubled[icol]=1;
 					fprintf(tabout, ".if \\n(%c->\\n(%d .nr %d \\n(%c-\n",s,S2,S2,s);
 					}
+				/* FALLTHROUGH */
 			case 'n':
 				if (table[ilin][icol].rcol!=0)
 					{
@@ -78,6 +77,7 @@ for(icol=0; icol <ncol; icol++)
 						}
 					continue;
 					}
+				/* FALLTHROUGH */
 			case 'r':
 			case 'c':
 			case 'l':

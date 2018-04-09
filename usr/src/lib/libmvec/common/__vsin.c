@@ -90,6 +90,7 @@ __vsin(int n, double * restrict x, int stridex, double * restrict y,
 	sysave = stridey;
 	biguns = 0;
 
+	x0 = *x;	/* error: 'x0' may be used uninitialized */
 	do
 	{
 LOOP0:
