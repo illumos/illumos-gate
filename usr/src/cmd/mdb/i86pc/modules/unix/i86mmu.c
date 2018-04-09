@@ -835,7 +835,6 @@ do_ptable_dcmd(pfn_t pfn, uint64_t level)
 	int entry;
 	uintptr_t pagesize;
 	x86pte_t pte;
-	x86pte_t buf;
 	physaddr_t paddr;
 	size_t len;
 
@@ -899,11 +898,10 @@ found_it:
 
 	paddr = mmu_ptob((physaddr_t)pfn);
 	for (entry = 0; entry < mmu.ptes_per_table; ++entry) {
-		len = mdb_pread(&buf, mmu.pte_size,
+		len = mdb_pread(&pte, mmu.pte_size,
 		    paddr + entry * mmu.pte_size);
 		if (len != mmu.pte_size)
 			return (DCMD_ERR);
-			pte = buf;
 
 		if (pte == 0)
 			continue;
