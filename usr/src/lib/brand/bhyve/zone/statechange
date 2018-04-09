@@ -15,47 +15,8 @@
 
 ps_brand=bhyve
 
-subcommand=$1
-ZONENAME=$2
-ZONEPATH=$3
-state=$4
-cmd=$5
+typeset -A FORCED_ATTRS
+FORCED_ATTRS["zlog-mode"]=g--
+FORCED_ATTRS["zlog-name"]=platform.log
 
-#
-# In the initial release of the bhyve brand, the platform log did not exist.
-# If zlog-mode and/or zlog-name attributes are not set in the zone's
-# configuration, this sets it and moves aside any stale zhyve.log file.
-#
-function setup_platform_log {
-	if [[ -n $_ZONECFG_attr_zlog_mode && -n $_ZONECFG_attr_zlog_name ]]
-	then
-		return
-	fi
-
-	zonecfg -z "$ZONENAME" \
-	    "remove attr name=zlog-mode; add attr; set name=zlog-mode;" \
-	    "set type=string; set value=g--; end;" \
-	    "remove attr name=zlog-name; add attr; set name=zlog-name;" \
-	    "set type=string; set value=platform.log; end;"
-
-	typeset logdir=$ZONEPATH/root/tmp
-	(
-		# exit this subshell if things aren't as expected
-		set -e
-		cd "$logdir"
-		[[ $(pwd -P) == "$logdir" ]] || exit
-		[[ -f zhyve.log ]] || exit
-
-		rm -f zhyve.log.obsolete
-		mv zhyve.log zhyve.log.obsolete
-	)
-}
-
-if [[ $subcommand == pre && $cmd == 1 ]]; then
-	setup_platform_log
-fi
-
-#
-# Now, carry on with all of the common statechange work.
-#
 . /usr/lib/brand/jcommon/statechange
