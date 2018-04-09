@@ -715,9 +715,10 @@ aggr_port_addvlan(aggr_port_t *port, uint_t idx, uint16_t vid)
 	 * nothing to do.
 	 */
 	if (port->lp_hwghs[idx] == NULL)
-		return (0);
+		err = 0;
+	else
+		err = mac_hwgroup_addvlan(port->lp_hwghs[idx], vid);
 
-	err = mac_hwgroup_addvlan(port->lp_hwghs[idx], vid);
 	mac_perim_exit(pmph);
 	return (err);
 }
@@ -737,9 +738,10 @@ aggr_port_remvlan(aggr_port_t *port, uint_t idx, uint16_t vid)
 		idx = 0;
 
 	if (port->lp_hwghs[idx] == NULL)
-		return (0);
+		err = 0;
+	else
+		err = mac_hwgroup_remvlan(port->lp_hwghs[idx], vid);
 
-	err = mac_hwgroup_remvlan(port->lp_hwghs[idx], vid);
 	mac_perim_exit(pmph);
 	return (err);
 }
