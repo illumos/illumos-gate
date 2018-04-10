@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright (c) 2017 Joyent, Inc.
+.\" Copyright (c) 2018 Joyent, Inc.
 .\"
-.Dd September 8, 2017
+.Dd May 23, 2018
 .Dt I40E 7D
 .Os
 .Sh NAME
@@ -272,6 +272,22 @@ By setting this property to its minimum, all frames will be processed with DMA
 binding.
 By setting this property to its maximum, all frames will be processed by copying
 the frame.
+.Ed
+.It Sy tx_lso_enable
+.Bd -filled -compact
+Minimum:
+.Sy 0 |
+Maximum:
+.Sy 1
+.Ed
+.Bd -filled
+The
+.Sy tx_lso_enable
+property controls whether or not the device enables support for Large Segment
+Offloand (LSO) when transmitting packets.
+The default is to always enable support for this.
+Turning it off will decrease throughput when transmitting packets, but should
+be done if a hardware bug is suspected.
 .Ed
 .El
 .Sh ARCHITECTURE

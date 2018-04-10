@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include "i40e_sw.h"
@@ -1249,6 +1249,9 @@ i40e_stats_trqpair_init(i40e_trqpair_t *itrq)
 	kstat_named_init(&tsp->itxs_hck_badl4, "tx_hck_badl4",
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_hck_badl4.value.ui64 = 0;
+	kstat_named_init(&tsp->itxs_lso_nohck, "tx_lso_nohck",
+	    KSTAT_DATA_UINT64);
+	tsp->itxs_lso_nohck.value.ui64 = 0;
 	kstat_named_init(&tsp->itxs_err_notcb, "tx_err_notcb",
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_err_notcb.value.ui64 = 0;

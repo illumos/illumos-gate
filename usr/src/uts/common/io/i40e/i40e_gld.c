@@ -732,6 +732,18 @@ i40e_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		break;
 	}
 
+	case MAC_CAPAB_LSO: {
+		mac_capab_lso_t *cap_lso = cap_data;
+
+		if (i40e->i40e_tx_lso_enable == B_TRUE) {
+			cap_lso->lso_flags = LSO_TX_BASIC_TCP_IPV4;
+			cap_lso->lso_basic_tcp_ipv4.lso_max = I40E_LSO_MAXLEN;
+		} else {
+			return (B_FALSE);
+		}
+		break;
+	}
+
 	case MAC_CAPAB_RINGS:
 		cap_rings = cap_data;
 		cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
