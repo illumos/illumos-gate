@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -229,12 +229,20 @@ i40e_intr_adminq_disable(i40e_t *i40e)
 	I40E_WRITE_REG(hw, I40E_PFINT_DYN_CTL0, reg);
 }
 
+/*
+ * The next two functions enable/disable the reception of interrupts
+ * on the given vector. Only vectors 1..N are programmed by these
+ * functions; vector 0 is special and handled by a different register.
+ * We must subtract one from the vector because i40e implicitly adds
+ * one to the vector value. See section 10.2.2.10.13 for more details.
+ */
 static void
 i40e_intr_io_enable(i40e_t *i40e, int vector)
 {
 	uint32_t reg;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 
+	ASSERT3S(vector, >, 0);
 	reg = I40E_PFINT_DYN_CTLN_INTENA_MASK |
 	    I40E_PFINT_DYN_CTLN_CLEARPBA_MASK |
 	    (I40E_ITR_INDEX_NONE << I40E_PFINT_DYN_CTLN_ITR_INDX_SHIFT);
@@ -247,6 +255,7 @@ i40e_intr_io_disable(i40e_t *i40e, int vector)
 	uint32_t reg;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 
+	ASSERT3S(vector, >, 0);
 	reg = I40E_ITR_INDEX_NONE << I40E_PFINT_DYN_CTLN_ITR_INDX_SHIFT;
 	I40E_WRITE_REG(hw, I40E_PFINT_DYN_CTLN(vector - 1), reg);
 }
@@ -375,49 +384,109 @@ i40e_intr_chip_fini(i40e_t *i40e)
 }
 
 /*
- * Enable all of the queues and set the corresponding LNKLSTN registers. Note
- * that we always enable queues as interrupt sources, even though we don't
- * enable the MSI-X interrupt vectors.
+ * Set the head of the interrupt linked list. The PFINT_LNKLSTN[N]
+ * register actually refers to the 'N + 1' interrupt vector. E.g.,
+ * PFINT_LNKLSTN[0] refers to interrupt vector 1.
+ */
+static void
+i40e_set_lnklstn(i40e_t *i40e, uint_t vector, uint_t queue)
+{
+	uint32_t	reg;
+	i40e_hw_t	*hw = &i40e->i40e_hw_space;
+
+	reg = (queue << I40E_PFINT_LNKLSTN_FIRSTQ_INDX_SHIFT) |
+	    (I40E_QUEUE_TYPE_RX << I40E_PFINT_LNKLSTN_FIRSTQ_TYPE_SHIFT);
+
+	I40E_WRITE_REG(hw, I40E_PFINT_LNKLSTN(vector), reg);
+	DEBUGOUT2("PFINT_LNKLSTN[%u] = 0x%x", vector, reg);
+}
+
+/*
+ * Set the QINT_RQCTL[queue] register. The next queue is always the Tx
+ * queue associated with this Rx queue. Unlike PFINT_LNKLSTN, the
+ * vector should be the actual vector this queue is on -- i.e., it
+ * should be equal to itrq_rx_intrvec.
+ */
+static void
+i40e_set_rqctl(i40e_t *i40e, uint_t vector, uint_t queue)
+{
+	uint32_t	reg;
+	i40e_hw_t	*hw = &i40e->i40e_hw_space;
+
+	ASSERT3U(vector, ==, i40e->i40e_trqpairs[queue].itrq_rx_intrvec);
+
+	reg = (vector << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
+	    (I40E_ITR_INDEX_RX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
+	    (queue << I40E_QINT_RQCTL_NEXTQ_INDX_SHIFT) |
+	    (I40E_QUEUE_TYPE_TX << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT) |
+	    I40E_QINT_RQCTL_CAUSE_ENA_MASK;
+
+	I40E_WRITE_REG(hw, I40E_QINT_RQCTL(queue), reg);
+	DEBUGOUT2("QINT_RQCTL[%u] = 0x%x", queue, reg);
+}
+
+/*
+ * Like i40e_set_rqctl(), but for QINT_TQCTL[queue]. The next queue is
+ * either the Rx queue of another TRQP, or EOL.
+ */
+static void
+i40e_set_tqctl(i40e_t *i40e, uint_t vector, uint_t queue, uint_t next_queue)
+{
+	uint32_t	reg;
+	i40e_hw_t	*hw = &i40e->i40e_hw_space;
+
+	ASSERT3U(vector, ==, i40e->i40e_trqpairs[queue].itrq_tx_intrvec);
+
+	reg = (vector << I40E_QINT_TQCTL_MSIX_INDX_SHIFT) |
+	    (I40E_ITR_INDEX_TX << I40E_QINT_TQCTL_ITR_INDX_SHIFT) |
+	    (next_queue << I40E_QINT_TQCTL_NEXTQ_INDX_SHIFT) |
+	    (I40E_QUEUE_TYPE_RX << I40E_QINT_TQCTL_NEXTQ_TYPE_SHIFT) |
+	    I40E_QINT_TQCTL_CAUSE_ENA_MASK;
+
+	I40E_WRITE_REG(hw, I40E_QINT_TQCTL(queue), reg);
+	DEBUGOUT2("QINT_TQCTL[%u] = 0x%x", queue, reg);
+}
+
+/*
+ * Program the interrupt linked list. Each vector has a linked list of
+ * queues which act as event sources for that vector. When one of
+ * those sources has an event the associated interrupt vector is
+ * fired. This mapping must match the mapping found in
+ * i40e_map_intrs_to_vectors().
+ *
+ * See section 7.5.3 for more information about the configuration of
+ * the interrupt linked list.
  */
 static void
 i40e_intr_init_queue_msix(i40e_t *i40e)
 {
-	i40e_hw_t *hw = &i40e->i40e_hw_space;
-	uint32_t reg;
-	int i;
+	uint_t intr_count;
 
 	/*
-	 * Map queues to MSI-X interrupts. Queue i is mapped to vector i + 1.
-	 * Note that we skip the ITR logic for the moment, just to make our
-	 * lives as explicit and simple as possible.
+	 * The 0th vector is for 'Other Interrupts' only (subject to
+	 * change in the future).
 	 */
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
-		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
+	intr_count = i40e->i40e_intr_count - 1;
 
-		reg = (i << I40E_PFINT_LNKLSTN_FIRSTQ_INDX_SHIFT) |
-		    (I40E_QUEUE_TYPE_RX <<
-		    I40E_PFINT_LNKLSTN_FIRSTQ_TYPE_SHIFT);
-		I40E_WRITE_REG(hw, I40E_PFINT_LNKLSTN(i), reg);
+	for (uint_t vec = 0; vec < intr_count; vec++) {
+		boolean_t head = B_TRUE;
 
-		reg =
-		    (itrq->itrq_rx_intrvec << I40E_QINT_RQCTL_MSIX_INDX_SHIFT) |
-		    (I40E_ITR_INDEX_RX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
-		    (i << I40E_QINT_RQCTL_NEXTQ_INDX_SHIFT) |
-		    (I40E_QUEUE_TYPE_TX << I40E_QINT_RQCTL_NEXTQ_TYPE_SHIFT) |
-		    I40E_QINT_RQCTL_CAUSE_ENA_MASK;
+		for (uint_t qidx = vec; qidx < i40e->i40e_num_trqpairs;
+		     qidx += intr_count) {
+			uint_t next_qidx = qidx + intr_count;
 
-		I40E_WRITE_REG(hw, I40E_QINT_RQCTL(i), reg);
+			next_qidx = (next_qidx > i40e->i40e_num_trqpairs) ?
+			    I40E_QUEUE_TYPE_EOL : next_qidx;
 
-		reg =
-		    (itrq->itrq_tx_intrvec << I40E_QINT_TQCTL_MSIX_INDX_SHIFT) |
-		    (I40E_ITR_INDEX_TX << I40E_QINT_RQCTL_ITR_INDX_SHIFT) |
-		    (I40E_QUEUE_TYPE_EOL << I40E_QINT_TQCTL_NEXTQ_INDX_SHIFT) |
-		    (I40E_QUEUE_TYPE_RX << I40E_QINT_TQCTL_NEXTQ_TYPE_SHIFT) |
-		    I40E_QINT_TQCTL_CAUSE_ENA_MASK;
+			if (head) {
+				i40e_set_lnklstn(i40e, vec, qidx);
+				head = B_FALSE;
+			}
 
-		I40E_WRITE_REG(hw, I40E_QINT_TQCTL(i), reg);
+			i40e_set_rqctl(i40e, vec + 1, qidx);
+			i40e_set_tqctl(i40e, vec + 1, qidx, next_qidx);
+		}
 	}
-
 }
 
 /*
@@ -604,31 +673,26 @@ i40e_intr_adminq_work(i40e_t *i40e)
 }
 
 static void
-i40e_intr_rx_work(i40e_t *i40e, int queue)
+i40e_intr_rx_work(i40e_t *i40e, i40e_trqpair_t *itrq)
 {
 	mblk_t *mp = NULL;
-	i40e_trqpair_t *itrq;
-
-	ASSERT(queue < i40e->i40e_num_trqpairs);
-	itrq = &i40e->i40e_trqpairs[queue];
 
 	mutex_enter(&itrq->itrq_rx_lock);
 	if (!itrq->itrq_intr_poll)
 		mp = i40e_ring_rx(itrq, I40E_POLL_NULL);
 	mutex_exit(&itrq->itrq_rx_lock);
 
-	if (mp != NULL) {
-		mac_rx_ring(i40e->i40e_mac_hdl, itrq->itrq_macrxring, mp,
-		    itrq->itrq_rxgen);
-	}
+	if (mp == NULL)
+		return;
+
+	mac_rx_ring(i40e->i40e_mac_hdl, itrq->itrq_macrxring, mp,
+	    itrq->itrq_rxgen);
 }
 
+/* ARGSUSED */
 static void
-i40e_intr_tx_work(i40e_t *i40e, int queue)
+i40e_intr_tx_work(i40e_t *i40e, i40e_trqpair_t *itrq)
 {
-	i40e_trqpair_t *itrq;
-
-	itrq = &i40e->i40e_trqpairs[queue];
 	i40e_tx_recycle_ring(itrq);
 }
 
@@ -665,11 +729,17 @@ i40e_intr_other_work(i40e_t *i40e)
 	i40e_intr_adminq_enable(i40e);
 }
 
+/*
+ * Handle an MSI-X interrupt. See section 7.5.1.3 for an overview of
+ * the MSI-X interrupt sequence.
+ */
 uint_t
 i40e_intr_msix(void *arg1, void *arg2)
 {
 	i40e_t *i40e = (i40e_t *)arg1;
-	int vector_idx = (int)(uintptr_t)arg2;
+	uint_t vector_idx = (uint_t)(uintptr_t)arg2;
+
+	ASSERT3U(vector_idx, <, i40e->i40e_intr_count);
 
 	/*
 	 * When using MSI-X interrupts, vector 0 is always reserved for the
@@ -681,10 +751,29 @@ i40e_intr_msix(void *arg1, void *arg2)
 		return (DDI_INTR_CLAIMED);
 	}
 
-	i40e_intr_rx_work(i40e, vector_idx - 1);
-	i40e_intr_tx_work(i40e, vector_idx - 1);
-	i40e_intr_io_enable(i40e, vector_idx);
+	ASSERT3U(vector_idx, >, 0);
 
+	/*
+	 * We determine the queue indexes via simple arithmetic (as
+	 * opposed to keeping explicit state like a bitmap). While
+	 * conveinent, it does mean that i40e_map_intrs_to_vectors(),
+	 * i40e_intr_init_queue_msix(), and this function must be
+	 * modified as a unit.
+	 *
+	 * We subtract 1 from the vector to offset the addition we
+	 * performed during i40e_map_intrs_to_vectors().
+	 */
+	for (uint_t i = vector_idx - 1; i < i40e->i40e_num_trqpairs;
+	     i += (i40e->i40e_intr_count - 1)) {
+		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
+
+		ASSERT3U(i, <, i40e->i40e_num_trqpairs);
+		ASSERT3P(itrq, !=, NULL);
+		i40e_intr_rx_work(i40e, itrq);
+		i40e_intr_tx_work(i40e, itrq);
+	}
+
+	i40e_intr_io_enable(i40e, vector_idx);
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -693,6 +782,7 @@ i40e_intr_notx(i40e_t *i40e, boolean_t shared)
 {
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 	uint32_t reg;
+	i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[0];
 	int ret = DDI_INTR_CLAIMED;
 
 	if (shared == B_TRUE) {
@@ -722,10 +812,10 @@ i40e_intr_notx(i40e_t *i40e, boolean_t shared)
 		i40e_intr_adminq_work(i40e);
 
 	if (reg & I40E_INTR_NOTX_RX_MASK)
-		i40e_intr_rx_work(i40e, 0);
+		i40e_intr_rx_work(i40e, itrq);
 
 	if (reg & I40E_INTR_NOTX_TX_MASK)
-		i40e_intr_tx_work(i40e, 0);
+		i40e_intr_tx_work(i40e, itrq);
 
 done:
 	i40e_intr_adminq_enable(i40e);

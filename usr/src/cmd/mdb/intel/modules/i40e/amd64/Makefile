@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 MODULE = i40e.so
@@ -23,6 +23,7 @@ include ../../../../../Makefile.cmd.64
 include ../../../Makefile.amd64
 include ../../../../Makefile.module
 
+CPPFLAGS += -I$(SRC)/cmd/mdb/common
 CPPFLAGS += -I$(SRC)/uts/common/io/i40e
 CPPFLAGS += -I$(SRC)/uts/common/io/i40e/core
 CPPFLAGS += -I$(SRC)/uts/common

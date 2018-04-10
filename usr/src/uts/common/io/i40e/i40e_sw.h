@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -152,9 +152,10 @@ typedef enum i40e_itr_index {
 } i40e_itr_index_t;
 
 /*
- * Table 1-5 of the PRM notes that LSO supports up to 256 KB.
+ * The hardware claims to support LSO up to 256 KB, but due to the limitations
+ * imposed by the IP header for non-jumbo frames, we cap it at 64 KB.
  */
-#define	I40E_LSO_MAXLEN	(256 * 1024)
+#define	I40E_LSO_MAXLEN	(64 * 1024)
 
 #define	I40E_CYCLIC_PERIOD NANOSEC	/* 1 second */
 #define	I40E_DRAIN_RX_WAIT	(500 * MILLISEC)	/* In us */
@@ -173,11 +174,20 @@ typedef enum i40e_itr_index {
 #define	I40E_BUF_IPHDR_ALIGNMENT	2
 
 /*
- * The XL710 controller has a limit of eight buffers being allowed to be used
- * for the transmission of a single frame. This is defined in 8.4.1 - Transmit
+ * The XL710 controller has a total of eight buffers available for the
+ * transmission of any single frame. This is defined in 8.4.1 - Transmit
  * Packet in System Memory.
  */
 #define	I40E_TX_MAX_COOKIE	8
+
+/*
+ * An LSO frame can be as large as 64KB, so we allow a DMA bind to span more
+ * cookies than a non-LSO frame.  The key here to is to select a value such
+ * that once the HW has chunked up the LSO frame into MSS-sized segments that no
+ * single segment spans more than 8 cookies (see comments for
+ * I40E_TX_MAX_COOKIE)
+ */
+#define	I40E_TX_LSO_MAX_COOKIE	32
 
 /*
  * Sizing to determine the amount of available descriptors at which we'll
@@ -201,6 +211,12 @@ typedef enum i40e_itr_index {
 #define	I40E_MIN_TX_DMA_THRESH		0
 #define	I40E_DEF_TX_DMA_THRESH		256
 #define	I40E_MAX_TX_DMA_THRESH		INT32_MAX
+
+/*
+ * The max size of each individual tx buffer is 16KB - 1.
+ * See table 8-17
+ */
+#define	I40E_MAX_TX_BUFSZ		0x0000000000003FFFull
 
 /*
  * Resource sizing counts. There are various aspects of hardware where we may
@@ -240,21 +256,6 @@ typedef enum i40e_itr_index {
 #define	I40E_HMC_TX_TPH_DISABLE		0
 
 /*
- * Whenever we establish and create a VSI, we need to assign some number of
- * queues that it's allowed to access from the PF. Because we only have a single
- * VSI per PF at this time, we assign it all the queues.
- *
- * Many of the devices support what's called Data-center Bridging. Which is a
- * feature that we don't have much use of at this time. However, we still need
- * to fill in this information. We follow the guidance of the note in Table 7-80
- * which talks about bytes 62-77. It says that if we don't want to assign
- * anything to traffic classes, we should set the field to zero. Effectively
- * this means that everything in the system is assigned to traffic class zero.
- */
-#define	I40E_ASSIGN_ALL_QUEUES		0
-#define	I40E_TRAFFIC_CLASS_NO_QUEUES	0
-
-/*
  * This defines the error mask that we care about from rx descriptors. Currently
  * we're only concerned with the general errors and oversize errors.
  */
@@ -268,12 +269,12 @@ typedef enum i40e_itr_index {
 #define	I40E_DDI_PROP_LEN	64
 
 /*
- * We currently consolidate some overrides that we use in the code here. These
- * will be gone in the fullness of time, but as we're bringing up the device,
- * this is what we use.
+ * Place an artificial limit on the max number of groups. The X710
+ * series supports up to 384 VSIs to be partitioned across PFs as the
+ * driver sees fit. But until we support more interrupts this seems
+ * like a good place to start.
  */
-#define	I40E_GROUP_MAX		1
-#define	I40E_TRQPAIR_MAX	1
+#define	I40E_GROUP_MAX		32
 
 #define	I40E_GROUP_NOMSIX	1
 #define	I40E_TRQPAIR_NOMSIX	1
@@ -405,18 +406,29 @@ typedef struct i40e_rx_control_block {
 typedef enum {
 	I40E_TX_NONE,
 	I40E_TX_COPY,
-	I40E_TX_DMA
+	I40E_TX_DMA,
+	I40E_TX_DESC,
 } i40e_tx_type_t;
 
 typedef struct i40e_tx_desc i40e_tx_desc_t;
+typedef struct i40e_tx_context_desc i40e_tx_context_desc_t;
 typedef union i40e_32byte_rx_desc i40e_rx_desc_t;
+
+struct i40e_dma_bind_info {
+	caddr_t dbi_paddr;
+	size_t dbi_len;
+};
 
 typedef struct i40e_tx_control_block {
 	struct i40e_tx_control_block	*tcb_next;
 	mblk_t				*tcb_mp;
 	i40e_tx_type_t			tcb_type;
 	ddi_dma_handle_t		tcb_dma_handle;
+	ddi_dma_handle_t		tcb_lso_dma_handle;
 	i40e_dma_buffer_t		tcb_dma;
+	struct i40e_dma_bind_info	*tcb_bind_info;
+	uint_t				tcb_bind_ncookies;
+	boolean_t			tcb_used_lso;
 } i40e_tx_control_block_t;
 
 /*
@@ -517,6 +529,8 @@ typedef struct i40e_txq_stat {
 	kstat_named_t	itxs_packets;		/* Packets out on queue */
 	kstat_named_t	itxs_descriptors;	/* Descriptors issued */
 	kstat_named_t	itxs_recycled;		/* Descriptors reclaimed */
+	kstat_named_t	itxs_force_copy;	/* non-TSO force copy */
+	kstat_named_t	itxs_tso_force_copy;	/* TSO force copy */
 	/*
 	 * Various failure conditions.
 	 */
@@ -526,6 +540,9 @@ typedef struct i40e_txq_stat {
 	kstat_named_t	itxs_hck_nol4info;	/* Missing l4 info */
 	kstat_named_t	itxs_hck_badl3;		/* Not IPv4/IPv6 */
 	kstat_named_t	itxs_hck_badl4;		/* Bad L4 Paylaod */
+	kstat_named_t	itxs_lso_nohck;		/* Missing offloads for LSO */
+	kstat_named_t	itxs_bind_fails;	/* DMA bind failures */
+	kstat_named_t	itxs_tx_short;		/* Tx chain too short */
 
 	kstat_named_t	itxs_err_notcb;		/* No tcb's available */
 	kstat_named_t	itxs_err_nodescs;	/* No tcb's available */
@@ -761,6 +778,25 @@ typedef struct i40e_func_rsrc {
 	uint_t	ifr_nmcastfilt_used;
 } i40e_func_rsrc_t;
 
+typedef struct i40e_vsi {
+	uint16_t		iv_seid;
+	uint16_t		iv_number;
+	kstat_t			*iv_kstats;
+	i40e_vsi_stats_t	iv_stats;
+	uint16_t		iv_stats_id;
+} i40e_vsi_t;
+
+/*
+ * While irg_index and irg_grp_hdl aren't used anywhere, they are
+ * still useful for debugging.
+ */
+typedef struct i40e_rx_group {
+	uint32_t		irg_index;    /* index in i40e_rx_groups[] */
+	uint16_t		irg_vsi_seid; /* SEID of VSI for this group */
+	mac_group_handle_t	irg_grp_hdl;  /* handle to mac_group_t */
+	struct i40e		*irg_i40e;    /* ref to i40e_t */
+} i40e_rx_group_t;
+
 /*
  * Main i40e per-instance state.
  */
@@ -789,11 +825,18 @@ typedef struct i40e {
 	struct i40e_aq_get_phy_abilities_resp	i40e_phy;
 	void 					*i40e_aqbuf;
 
+#define	I40E_DEF_VSI_IDX	0
+#define	I40E_DEF_VSI(i40e)	((i40e)->i40e_vsis[I40E_DEF_VSI_IDX])
+#define	I40E_DEF_VSI_SEID(i40e)	(I40E_DEF_VSI(i40e).iv_seid)
+
 	/*
 	 * Device state, switch information, and resources.
 	 */
-	int			i40e_vsi_id;
-	uint16_t		i40e_vsi_num;
+	i40e_vsi_t		i40e_vsis[I40E_GROUP_MAX];
+	uint16_t		i40e_mac_seid;	 /* SEID of physical MAC */
+	uint16_t		i40e_veb_seid;	 /* switch atop MAC (SEID) */
+	uint16_t		i40e_vsi_avail;	 /* VSIs avail to this PF */
+	uint16_t		i40e_vsi_used;	 /* VSIs used by this PF */
 	struct i40e_device	*i40e_device;
 	i40e_func_rsrc_t	i40e_resources;
 	uint16_t		i40e_switch_rsrc_alloc;
@@ -814,12 +857,13 @@ typedef struct i40e {
 	 */
 	i40e_trqpair_t	*i40e_trqpairs;
 	boolean_t 	i40e_mr_enable;
-	int		i40e_num_trqpairs;
+	uint_t		i40e_num_trqpairs; /* total TRQPs (per PF) */
+	uint_t		i40e_num_trqpairs_per_vsi; /* TRQPs per VSI */
 	uint_t		i40e_other_itr;
 
-	int		i40e_num_rx_groups;
+	i40e_rx_group_t	*i40e_rx_groups;
+	uint_t		i40e_num_rx_groups;
 	int		i40e_num_rx_descs;
-	mac_group_handle_t i40e_rx_group_handle;
 	uint32_t	i40e_rx_ring_size;
 	uint32_t	i40e_rx_buf_size;
 	boolean_t	i40e_rx_hcksum_enable;
@@ -832,6 +876,7 @@ typedef struct i40e {
 	uint32_t	i40e_tx_buf_size;
 	uint32_t	i40e_tx_block_thresh;
 	boolean_t	i40e_tx_hcksum_enable;
+	boolean_t	i40e_tx_lso_enable;
 	uint32_t	i40e_tx_dma_min;
 	uint_t		i40e_tx_itr;
 
@@ -855,6 +900,7 @@ typedef struct i40e {
 	 */
 	ddi_dma_attr_t		i40e_static_dma_attr;
 	ddi_dma_attr_t		i40e_txbind_dma_attr;
+	ddi_dma_attr_t		i40e_txbind_lso_dma_attr;
 	ddi_device_acc_attr_t	i40e_desc_acc_attr;
 	ddi_device_acc_attr_t	i40e_buf_acc_attr;
 
@@ -872,10 +918,7 @@ typedef struct i40e {
 	 */
 	kmutex_t		i40e_stat_lock;
 	kstat_t			*i40e_pf_kstat;
-	kstat_t			*i40e_vsi_kstat;
 	i40e_pf_stats_t		i40e_pf_stat;
-	i40e_vsi_stats_t	i40e_vsi_stat;
-	uint16_t		i40e_vsi_stat_id;
 
 	/*
 	 * Misc. stats and counters that should maybe one day be kstats.
@@ -975,8 +1018,8 @@ extern void i40e_tx_cleanup_ring(i40e_trqpair_t *);
  */
 extern boolean_t i40e_stats_init(i40e_t *);
 extern void i40e_stats_fini(i40e_t *);
-extern boolean_t i40e_stat_vsi_init(i40e_t *);
-extern void i40e_stat_vsi_fini(i40e_t *);
+extern boolean_t i40e_stat_vsi_init(i40e_t *, uint_t);
+extern void i40e_stat_vsi_fini(i40e_t *, uint_t);
 extern boolean_t i40e_stats_trqpair_init(i40e_trqpair_t *);
 extern void i40e_stats_trqpair_fini(i40e_trqpair_t *);
 extern int i40e_m_stat(void *, uint_t, uint64_t *);
