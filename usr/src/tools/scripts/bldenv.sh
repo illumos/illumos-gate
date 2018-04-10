@@ -290,8 +290,6 @@ if "${flags.t}" ; then
 	export STABS="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/stabs"
 	export CTFSTABS="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfstabs"
 	export GENOFFSETS="${TOOLS_PROTO}/opt/onbld/bin/genoffsets"
-	export CTFCONVERT="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert"
-	export CTFMERGE="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge"
 	export NDRGEN="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ndrgen"
 
 	PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"
