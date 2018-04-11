@@ -473,17 +473,17 @@
 
 #if defined(__amd64) && !defined(__xpv)
 /* If this fails, then the padding numbers in machcpuvar.h are wrong. */
-CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_pad))
-    < MMU_PAGESIZE);
-CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_kpti))
-    >= MMU_PAGESIZE);
-CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_kpti_dbg))
-    < 2 * MMU_PAGESIZE);
-CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_pad2))
-    < 2 * MMU_PAGESIZE);
+CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_pad)) <
+    MMU_PAGESIZE);
+CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_kpti)) >=
+    MMU_PAGESIZE);
+CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_kpti_dbg)) <
+    2 * MMU_PAGESIZE);
+CTASSERT((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_pad2)) <
+    2 * MMU_PAGESIZE);
 CTASSERT(((sizeof (struct kpti_frame)) & 0xF) == 0);
-CTASSERT(((offsetof(cpu_t, cpu_m) + offsetof(struct machcpu, mcpu_kpti_dbg))
-    & 0xF) == 0);
+CTASSERT(((offsetof(cpu_t, cpu_m) +
+    offsetof(struct machcpu, mcpu_kpti_dbg)) & 0xF) == 0);
 CTASSERT((offsetof(struct kpti_frame, kf_tr_rsp) & 0xF) == 0);
 #endif
 
