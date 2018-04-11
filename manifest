@@ -9995,13 +9995,6 @@ d usr/lib/smbfs 0755 root bin
 f usr/lib/smbfs/smbiod 0555 root bin
 f usr/lib/smbfs/smbiod-svc 0555 root bin
 d usr/lib/smbsrv 0755 root bin
-d usr/lib/smbsrv/amd64 0755 root bin
-f usr/lib/smbsrv/amd64/libmlsvc.so.1 0755 root bin
-s usr/lib/smbsrv/amd64/libmlsvc.so=libmlsvc.so.1
-f usr/lib/smbsrv/amd64/libsmb.so.1 0755 root bin
-s usr/lib/smbsrv/amd64/libsmb.so=libsmb.so.1
-f usr/lib/smbsrv/amd64/libsmbns.so.1 0755 root bin
-s usr/lib/smbsrv/amd64/libsmbns.so=libsmbns.so.1
 d usr/lib/smbsrv/dtrace 0755 root bin
 f usr/lib/smbsrv/dtrace/smbd-all.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbd-authsvc.d 0555 root bin
@@ -10011,6 +10004,7 @@ f usr/lib/smbsrv/dtrace/smbnode.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbsrv.d 0555 root bin
 f usr/lib/smbsrv/dtrace/smbvfs.d 0555 root bin
 f usr/lib/smbsrv/libmlsvc.so.1 0755 root bin
+f usr/lib/smbsrv/libsmb.so.1 0755 root bin
 f usr/lib/smbsrv/libsmbns.so.1 0755 root bin
 f usr/lib/smbsrv/smbd 0755 root bin
 d usr/lib/smedia 0755 root bin
