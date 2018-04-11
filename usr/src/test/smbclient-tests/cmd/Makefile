@@ -10,13 +10,19 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+.PARALLEL:	$(SUBDIRS)
 
-SUBDIRS = libc-tests crypto-tests os-tests test-runner util-tests zfs-tests \
-	smbclient-tests
+SUBDIRS=	abort_conn	\
+		close_wr	\
+		cp_mmap		\
+		file_trunc	\
+		mkfile_mmap	\
+		no_close	\
+		prot_mmap	\
+		rw_mmap		\
+		scripts
 
-include Makefile.com
+include		$(SRC)/test/Makefile.com

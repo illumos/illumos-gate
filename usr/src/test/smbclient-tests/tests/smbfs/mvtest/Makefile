@@ -10,13 +10,21 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include		$(SRC)/Makefile.master
+include		../../../Makefile.com
 
-SUBDIRS = libc-tests crypto-tests os-tests test-runner util-tests zfs-tests \
-	smbclient-tests
+ROOTTESTDIR=	$(ROOTOPTPKG)/tests/smbfs/mvtest
 
-include Makefile.com
+TESTS=	\
+		tp_mvtest_001	\
+		tp_mvtest_002	\
+		tp_mvtest_003	\
+		tp_mvtest_004	\
+		tp_mvtest_005	\
+		tp_mvtest_006	\
+		tp_mvtest_007
+
+include		../../Makefile.tests

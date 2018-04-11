@@ -14,24 +14,31 @@
 #
 
 include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
 
-ROOTOPTPKG = $(ROOT)/opt/test-runner
-INCLUDEDIR = $(ROOTOPTPKG)/stf/contrib/include
+SRCS =	default.run \
+	just-nsmbrc.run \
+	just-sharectl.run \
+	just-smbfs.run \
+	just-smbmount.run \
+	just-smbutil.run \
+	perf-regression.run
 
-PROGS = logapi.shlib ctiutils.shlib
+ROOTOPTPKG = $(ROOT)/opt/smbclient-tests
+RUNFILES = $(ROOTOPTPKG)/runfiles
 
-CMDS = $(PROGS:%=$(INCLUDEDIR)/%)
-$(CMDS) := FILEMODE = 0555
+CMDS = $(SRCS:%=$(RUNFILES)/%)
+$(CMDS) := FILEMODE = 0444
 
-all lint clean clobber:
+all: $(SRCS)
 
 install: $(CMDS)
 
-$(CMDS): $(INCLUDEDIR)
+clean lint clobber:
 
-$(INCLUDEDIR):
+$(CMDS): $(RUNFILES) $(SRCS)
+
+$(RUNFILES):
 	$(INS.dir)
 
-$(INCLUDEDIR)/%: %
+$(RUNFILES)/%: %
 	$(INS.file)

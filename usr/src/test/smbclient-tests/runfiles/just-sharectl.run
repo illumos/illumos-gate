@@ -13,25 +13,16 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
-include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+[DEFAULT]
+pre =
+verbose = False
+quiet = False
+timeout = 60
+post =
+outputdir = /var/tmp/test_results
+user =
 
-ROOTOPTPKG = $(ROOT)/opt/test-runner
-INCLUDEDIR = $(ROOTOPTPKG)/stf/contrib/include
-
-PROGS = logapi.shlib ctiutils.shlib
-
-CMDS = $(PROGS:%=$(INCLUDEDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(INCLUDEDIR)
-
-$(INCLUDEDIR):
-	$(INS.dir)
-
-$(INCLUDEDIR)/%: %
-	$(INS.file)
+[/opt/smbclient-tests/tests/sharectl]
+tests = ['tp_sharectl_001', 'tp_sharectl_002', 'tp_sharectl_003',
+	'tp_sharectl_004', 'tp_sharectl_005', 'tp_sharectl_006']
+user = root

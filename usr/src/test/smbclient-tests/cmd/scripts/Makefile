@@ -10,28 +10,31 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+include		$(SRC)/Makefile.master
+include		../../Makefile.com
 
-ROOTOPTPKG = $(ROOT)/opt/test-runner
-INCLUDEDIR = $(ROOTOPTPKG)/stf/contrib/include
+PROGS=		passwd.exp	\
+		runone		\
+		smbclienttest	\
+		smbutil.exp
 
-PROGS = logapi.shlib ctiutils.shlib
-
-CMDS = $(PROGS:%=$(INCLUDEDIR)/%)
-$(CMDS) := FILEMODE = 0555
+ROOTPROGS=	$(PROGS:%=$(ROOTBINDIR)/%)
+$(ROOTPROGS) :=	FILEMODE = 0555
 
 all lint clean clobber:
 
-install: $(CMDS)
+install:	$(ROOTPROGS)
 
-$(CMDS): $(INCLUDEDIR)
+$(ROOTPROGS):	$(ROOTBINDIR)
 
-$(INCLUDEDIR):
-	$(INS.dir)
+$(ROOTBINDIR):
+		$(INS.dir)
 
-$(INCLUDEDIR)/%: %
-	$(INS.file)
+$(ROOTBINDIR)/%: %
+		$(INS.file)
+
+$(ROOTBINDIR)/%: %.ksh
+		$(INS.rename)

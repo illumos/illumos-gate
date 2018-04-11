@@ -10,28 +10,31 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+include		$(SRC)/Makefile.master
+include		../Makefile.com
 
-ROOTOPTPKG = $(ROOT)/opt/test-runner
-INCLUDEDIR = $(ROOTOPTPKG)/stf/contrib/include
+CONFS=	\
+		fileio.prof		\
+		filemacro.prof		\
+		filemicro.prof		\
+		generic.func		\
+		randomread.prof		\
+		seqread.prof
 
-PROGS = logapi.shlib ctiutils.shlib
-
-CMDS = $(PROGS:%=$(INCLUDEDIR)/%)
-$(CMDS) := FILEMODE = 0555
+ROOTCONFS=	$(CONFS:%=$(ROOTCONFDIR)/%)
+$(ROOTCONFS) :=	FILEMODE = 0444
 
 all lint clean clobber:
 
-install: $(CMDS)
+install:	$(ROOTCONFS)
 
-$(CMDS): $(INCLUDEDIR)
+$(ROOTCONFS):	$(ROOTCONFDIR)
 
-$(INCLUDEDIR):
-	$(INS.dir)
+$(ROOTCONFDIR):
+		$(INS.dir)
 
-$(INCLUDEDIR)/%: %
-	$(INS.file)
+$(ROOTCONFDIR)/%: %
+		$(INS.file)

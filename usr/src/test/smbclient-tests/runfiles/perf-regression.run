@@ -10,13 +10,17 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+[DEFAULT]
+pre = setup
+quiet = False
+pre_user = root
+timeout = 0
+post = cleanup
+outputdir = /var/tmp/test_results
 
-SUBDIRS = libc-tests crypto-tests os-tests test-runner util-tests zfs-tests \
-	smbclient-tests
-
-include Makefile.com
+[/opt/smbclient-tests/tests/performance/filebench]
+tests = ['tp_filebench_001', 'tp_filebench_002', 'tp_filebench_003',
+	'tp_filebench_004', 'tp_filebench_005']

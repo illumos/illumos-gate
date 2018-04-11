@@ -81,6 +81,8 @@ class Result(object):
     def done(self, proc, killed):
         """
         Finalize the results of this Cmd.
+	Report SKIP for return codes 3,4 (NOTINUSE, UNSUPPORTED)
+	as defined in ../stf/include/stf.shlib
         """
         Result.total += 1
         m, s = divmod(time() - self.starttime, 60)
@@ -92,6 +94,9 @@ class Result(object):
         elif self.returncode is 0:
             self.result = 'PASS'
             Result.runresults['PASS'] += 1
+        elif self.returncode is 3 or self.returncode is 4:
+            self.result = 'SKIP'
+            Result.runresults['SKIP'] += 1
         elif self.returncode is not 0:
             self.result = 'FAIL'
             Result.runresults['FAIL'] += 1

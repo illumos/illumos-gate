@@ -13,25 +13,15 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 #
 
-include $(SRC)/Makefile.master
-include $(SRC)/test/Makefile.com
+[DEFAULT]
+pre =
+verbose = False
+quiet = False
+timeout = 60
+post =
+outputdir = /var/tmp/test_results
+user =
 
-ROOTOPTPKG = $(ROOT)/opt/test-runner
-INCLUDEDIR = $(ROOTOPTPKG)/stf/contrib/include
-
-PROGS = logapi.shlib ctiutils.shlib
-
-CMDS = $(PROGS:%=$(INCLUDEDIR)/%)
-$(CMDS) := FILEMODE = 0555
-
-all lint clean clobber:
-
-install: $(CMDS)
-
-$(CMDS): $(INCLUDEDIR)
-
-$(INCLUDEDIR):
-	$(INS.dir)
-
-$(INCLUDEDIR)/%: %
-	$(INS.file)
+[/opt/smbclient-tests/tests/nsmbrc]
+tests = ['tp_nsmbrc_001', 'tp_nsmbrc_002', 'tp_nsmbrc_003', 'tp_nsmbrc_004',
+	'tp_nsmbrc_005', 'tp_nsmbrc_006']

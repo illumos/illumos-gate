@@ -10,13 +10,23 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include		$(SRC)/Makefile.master
+include		../../../Makefile.com
 
-SUBDIRS = libc-tests crypto-tests os-tests test-runner util-tests zfs-tests \
-	smbclient-tests
+ROOTTESTDIR=	$(ROOTOPTPKG)/tests/smbfs/xattr
 
-include Makefile.com
+TESTS=	\
+		tp_xattr_001	\
+		tp_xattr_002	\
+		tp_xattr_003	\
+		tp_xattr_004	\
+		tp_xattr_005	\
+		tp_xattr_006	\
+		tp_xattr_007	\
+		tp_xattr_008	\
+		tp_xattr_009
+
+include		../../Makefile.tests

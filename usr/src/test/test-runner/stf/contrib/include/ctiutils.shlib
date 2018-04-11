@@ -1,0 +1,894 @@
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# This is free software; you can redistribute it and/or modify it
+# under the terms of the "Artistic License" which is located in the
+# file named "LICENSE.Artistic" which is included with this software.
+#
+
+#
+# This file was originally part of the "contrib" portion of the
+# TET3 test harness from The OpenGroup, originally found here:
+# http://tetworks.opengroup.org/tet/ or ftp://ftp.xopen.org/pub/TET3/
+# and later published in hg.opensolaris.org/hg/test-dev/stcnv-gate
+#
+# A build of that repository delivers this file as part of the
+# SUNWstc-tetlite package, which carries the "Artistic" license
+# referred to above.
+#
+
+#
+# The "Artistic License" places some restrictions on the kinds of
+# changes that may be made to this file.  The changes made here
+# relative to the original are "portability fixes" to allow these
+# functions to operate in the "test-runner" environment.
+#
+# The original from which this was derived can be found here:
+#   https://bitbucket.org/illumos/illumos-stc/
+# under the path:
+#   usr/src/tools/tet/contrib/ctitools/src/lib/ksh/ctiutils.ksh
+
+########################################################################
+#
+# NAME:		ctiutils.shlib
+#
+# SYNOPSIS:
+#	cti_assert assertion_number assertion_msg
+#	cti_report arg ...
+#	cti_pass
+#	cti_fail [msg ...]
+#	cti_unresolved [msg ...]
+#	cti_untested [msg ...]
+#	cti_unsupported [msg ...]
+#	cti_notinuse [msg ...]
+#	cti_pathtrace
+#	cti_checkpath expected-path-count
+#	cti_deleteall reason
+#	cti_reportfile path [title]
+#	cti_rmf [files...]
+#	cti_writefile path mode lines...
+#	cti_appendfile path mode lines...
+#	cti_execute [-c out|err] [-i input] result cmd [args...]
+#	cti_runexpect failtext command pattern action [pattern action ...]
+#	cti_expecttest failtext command pattern action [pattern action ...]
+#	cti_cancel test_num [msg ...] [test result]
+#	cti_cancelall [msg ...] [test result]
+#
+# DESCRIPTION:
+#	Common korn shell functions for tests.
+#
+#	cti_report() writes an informational line to the journal.
+#
+#	The functions cti_pass(), cti_fail(), cti_unresolved(),
+#	cti_untested(), cti_unsupported() and cti_notinuse() each
+#	registers the corresponding result code against the current test,
+#	and write any arguments to the execution results file, as a
+#	single line.
+#
+#	The cti_pathtrace() and cti_checkpath() are used in path tracing.
+#	cti_pathtrace() increments the variable pathok. cti_checkpath()
+#	checks the path tracing and registers a PASS result if
+#	appropriate.
+#
+#	cti_deleteall() cancels all tests in the current test case.
+#
+#	cti_reportfile() writes the contents of a file to the journal.
+#
+#	cti_rmf() removes files.
+#
+#	cti_writefile() writes to the contents of a file;
+#	cti_appendfile() appends to contents of a file.
+#
+#	cti_execute() executes a command.
+#
+#	cti_runexpect() runs the expect utility. cti_expecttest() is
+#	like cti_runexpect() except that it is written with path tracing
+#	and is designed to do the complete work of a test purpose.
+#       cti_runexpect() runs the expect utility. cti_expecttest() is
+#       like cti_runexpect() except that it is written with path tracing
+#       and is designed to do the complete work of a test purpose.
+#
+#       cti_cancel() cancels the dedicated test purpose in the current test
+#       case from execution with the test result that user gives. It will work
+#       in startup function.
+#
+#       cti_cancelall() cancels all tests in the current test case. It could
+#       be used in startup function to cancel the execution of test cases
+#       with the test result that user gives.
+#
+########################################################################
+
+#
+# cti_lf_checkargs() - check number of arguments passed to a shell function.
+#
+# Usage: cti_lf_checkargs argc expected-argc operator funcname
+#
+# operator can be EQ or GE.
+#
+# Returns 0 if the expected number of arguments were passed, non-zero
+# otherwise.
+#
+function cti_lf_checkargs
+{
+	typeset -i cti_lv_argc=$1
+	typeset -i cti_lv_expargc=$2
+	typeset cti_lv_op="$3"
+	typeset cti_lv_funcname="$4"
+
+	case "$cti_lv_op" in
+	EQ)
+		if test $cti_lv_argc -ne $cti_lv_expargc
+		then
+			cti_unresolved "Test coding error:" \
+				"$cti_lv_funcname() called with $cti_lv_argc" \
+				"args, need $cti_lv_expargc"
+			return 1
+		fi
+		;;
+	GE)
+		if test $cti_lv_argc -lt $cti_lv_expargc
+		then
+			cti_unresolved "Test coding error:" \
+				"$cti_lv_funcname() called with $cti_lv_argc" \
+				"args, need >= $cti_lv_expargc"
+			return 1
+		fi
+		;;
+	*)
+		cti_unresolved "Internal error: cti_lf_checkargs()" \
+			"called for $funcname() with operator $cti_lv_op"
+		return 1
+		;;
+	esac
+
+	return 0
+}
+
+#
+# cti_result() - register a result and write informational line to journal.
+#
+# Usage: cti_result result [msg ...]
+#
+# If the current test function is not a startup or cleanup, this routine
+# registers the specified result code for the current test. The remaining
+# arguments, if any, are written to the execution results file as a single
+# line.
+#
+# Modifications for test-runner:
+# Print the result and test name (in place of tet_result)
+# On failure, return non-zero to tell test-runner our status.
+#
+function cti_result
+{
+	typeset res
+	typeset -i rv=0
+
+	test $# -eq 0 && return
+	res=$1
+	shift
+
+	my_host=`hostname`
+	my_timestamp=`date | awk '{print $4}'`
+
+	test $# -gt 0 && print "$my_host $my_timestamp $@"
+
+	# Print the result and test name (as tet_result would)
+	print "$res: ${tc_id:-$(basename $0)}"
+
+	# Return non-zero for failures.  See codes in:
+	# test-runner/stf/include/stf.shlib
+	case "$res" in
+	PASS)
+		;;
+	FAIL)
+		rv=1
+		;;
+	UNRESOLVED)
+		rv=2
+		;;
+	NOTINUSE)
+		rv=3
+		;;
+	UNSUPPORTED)
+		rv=4
+		;;
+	UNTESTED)
+		rv=5
+		;;
+	UNINITIATED)
+		rv=6
+		;;
+	NORESULT)
+		rv=7
+		;;
+	WARNING)
+		rv=8
+		;;
+	TIMED_OUT)
+		rv=9
+		;;
+	*)
+		echo "cti_result: $res: unknown result code"
+		rv=10
+		;;
+	esac
+	return $rv
+}
+
+#
+# cti_report() - write an informational line to the journal
+#
+# Usage: cti_report arg ...
+#
+# Writes the arguments to the execution results file, as a single line.
+#
+function cti_report
+{
+	my_host=`hostname`
+	my_timestamp=`date | awk '{print $4}'`
+
+	print "$my_host $my_timestamp $@"
+}
+
+#
+# cti_assert() - write an Assert line to the journal
+#
+# Usage: cti_assert assertion_number assertion_msg
+#
+# Writes the arguments to the execution results file, as a single line.
+#
+function cti_assert
+{
+	cti_lf_checkargs $# 2 GE cti_assert || return 1
+
+	cti_report "ASSERT $1: $2"
+}
+
+#
+# cti_pass() - register a PASS result.
+#
+# Usage: cti_pass [msg ...]
+#
+function cti_pass
+{
+	cti_result PASS "$@"
+}
+
+#
+# cti_fail() - register a FAIL result.
+#
+# Usage: cti_fail [msg ...]
+#
+# Registers a FAIL result for the current test, and writes any arguments to
+# the execution results file, as a single line.
+#
+function cti_fail
+{
+	cti_result FAIL "$@"
+}
+
+#
+# cti_unresolved() - register an UNRESOLVED result.
+#
+# Usage: cti_unresolved [msg ...]
+#
+# Registers an UNRESOLVED result for the current test, and writes any arguments
+# to the execution results file, as a single line.
+#
+function cti_unresolved
+{
+	cti_result UNRESOLVED "$@"
+}
+
+
+#
+# cti_uninitiated() - register an UNINITIATED result.
+#
+# Usage: cti_uninitiated [msg ...]
+#
+# Registers an UNINITIATED result for the current test, and writes any arguments
+# to the execution results file, as a single line.
+#
+function cti_uninitiated
+{
+	cti_result UNINITIATED "$@"
+}
+
+#
+# cti_untested() - register an UNTESTED result.
+#
+# Usage: cti_untested [msg ...]
+#
+# Registers an UNTESTED result for the current test, and writes any arguments
+# to the execution results file, as a single line.
+#
+function cti_untested
+{
+	cti_result UNTESTED "$@"
+}
+
+#
+# cti_unsupported() - register an UNSUPPORTED result.
+#
+# Usage: cti_unsupported [msg ...]
+#
+# Registers an UNSUPPORTED result for the current test, and writes any
+# arguments to the execution results file, as a single line.
+#
+function cti_unsupported
+{
+	cti_result UNSUPPORTED "$@"
+}
+
+#
+# cti_notinuse() - register a NOTINUSE result.
+#
+# Usage: cti_notinuse [msg ...]
+#
+# Registers a NOTINUSE result for the current test, and writes any arguments
+# to the execution results file, as a single line.
+#
+function cti_notinuse
+{
+	cti_result NOTINUSE "$@"
+}
+
+#
+# cti_pathtrace() - increment path counter.
+#
+# Usage: cti_pathtrace
+#
+# Increments variable pathok. Like C macro PATH_TRACE.
+#
+function cti_pathtrace
+{
+	: $((pathok += 1))
+}
+
+#
+# cti_checkpath() - check path tracing and register a PASS result.
+#
+# Usage: cti_checkpath expected-path-count
+#
+# Like C macro PATH_XS_RPT().
+#
+function cti_checkpath
+{
+	cti_lf_checkargs $# 1 EQ cti_checkpath || return
+
+	if test $pathok -eq $1
+	then
+		cti_pass
+	else
+		cti_unresolved "Path tracing error: path counter $pathok," \
+			"expecting $1"
+	fi
+}
+
+#
+# cti_deleteall() - cancel all tests.
+#
+# Usage: cti_deleteall reason
+#
+# Cancels all tests
+#
+function cti_deleteall
+{
+	typeset cti_lv_ic
+	typeset cti_lv_tp
+
+	test $# -eq 0 && return
+
+	for cti_lv_ic in $iclist
+	do
+		for cti_lv_tp in `eval echo \\$$cti_lv_ic`
+		do
+			if test -n "$cti_lv_tp"
+			then
+				echo "Deleted test: $cti_lv_tp" "$@"
+			fi
+		done
+	done
+}
+
+#
+# cti_reportfile() - write the contents of a file to the journal.
+#
+# Usage: cti_reportfile path [title]
+#
+# Writes the contents of the file specified by path to the execution results
+# file, line by line.
+#
+function cti_reportfile
+{
+	typeset cti_lv_path=$1
+	typeset cti_lv_title="${2:-$cti_lv_path}"
+	typeset cti_lv_line
+
+	cti_lf_checkargs $# 1 GE cti_reportfile || return
+
+	cti_report "+++ $cti_lv_title +++"
+
+	/usr/bin/cat $cti_lv_path
+
+	cti_report "+++ end +++"
+	cti_report " "
+}
+
+#
+# cti_rmf() - remove files.
+#
+# Usage: cti_rmf [files...]
+#
+# Calls "rm -f" to remove the files, and verifies that they have been removed.
+#
+# Returns 0 on success, non-zero if any of the files could not be removed.
+#
+function cti_rmf
+{
+	typeset cti_lv_file
+
+	for cti_lv_file in "$@"
+	do
+		rm -f "$cti_lv_file"
+
+		if test -f "$cti_lv_file"
+		then
+			cti_unresolved "Error removing file \"$cti_lv_file\""
+			return 1
+		fi
+	done
+
+	return 0
+}
+
+#
+# cti_writefile() - write contents of a file.
+#
+# Usage: cti_writefile path mode lines...
+#
+# Truncates the file specified by path and then writes the third and
+# subsequent arguments to the specified file as separate lines.
+#
+# Returns 0 on success, non-zero if any of the files could not be removed.
+#
+function cti_writefile
+{
+	cti_lf_checkargs $# 3 GE cti_writefile || return 1
+
+	cti_rmf "$1" || return 1
+	cti_appendfile "$@"
+}
+
+#
+# cti_appendfile() - append to contents of a file.
+#
+# Usage: cti_appendfile path mode lines...
+#
+# Appends the third and subsequent arguments to the specified file as separate
+# lines.
+#
+# Returns 0 on success, non-zero if any of the files could not be removed.
+#
+function cti_appendfile
+{
+	typeset cti_lv_path="$1"
+	typeset cti_lv_mode="$2"
+	typeset cti_lv_line
+
+	cti_lf_checkargs $# 3 GE cti_appendfile || return 1
+	shift 2
+
+	for cti_lv_line in "$@"
+	do
+		echo "$cti_lv_line" >> "$cti_lv_path"
+
+		if [[ $? -ne 0 ]]
+		then
+			cti_unresolved \
+				"Error writing to file \"$cti_lv_path\""
+			return 1
+		fi
+	done
+
+	cti_execute UNRESOLVED chmod "$cti_lv_mode" "$cti_lv_path"
+	return $?
+}
+
+#
+# cti_execute() - execute a command
+#
+# Usage: cti_execute [-c out|err] [-i input] result cmd [args...]
+#
+# Executes a command. The standard output is redirected to the file cti_stdout
+# and the standard error is redirected to the file cti_stderr.
+#
+# If the command has a non-zero exit status, cti_execute() registers a result
+# code of `result'.
+#
+# Options:
+#	-c out|err	Check standard output/error. If anything is written to
+#			the specified output channel, a result code of `result'
+#			is registered and the output written to the journal.
+#			May have multiple -c options.
+#	-i input	Use -i as an input line to the command.
+#			May have multiple -i options.
+#
+# Returns 0 on success, non-zero on failure (returning the
+#  exit status from the command when possible).
+#
+function cti_execute
+{
+	typeset cti_lv_opt
+	typeset -i cti_lv_checkstdout=0
+	typeset -i cti_lv_checkstderr=0
+	typeset cti_lv_result
+	typeset -i cti_lv_status
+	typeset -i cti_lv_rv=0
+
+	# Remove files used for redirecting standard I/O.
+	cti_rmf cti_stdin cti_stdout cti_stderr || return 1
+
+	# Create (empty) files to take standard output and error so there are
+	# no problems later when we come to run the command.
+	touch cti_stdout cti_stderr
+
+	if [[ $? -ne 0 ]]
+	then
+		cti_unresolved "Error creating files cti_stdout and cti_stderr"
+		return 1
+	fi
+
+	# Parse command line options
+	while getopts "c:i:l:s:" cti_lv_opt
+	do
+		case $cti_lv_opt in
+		c)
+			case "$OPTARG" in
+			out|err)
+				eval cti_lv_checkstd$OPTARG=1
+				;;
+			*)
+				cti_unresolved "cti_execute() called with" \
+					"bad option argument -c $OPTARG"
+				return 1
+				;;
+			esac
+			;;
+		i)
+			echo "$OPTARG" >> cti_stdin
+			if [[ $? -ne 0 ]]
+			then
+				cti_unresolved "Error writing to cti_stdin"
+				return 1
+			fi
+			;;
+		*)
+			cti_unresolved "cti_execute() called with illegal" \
+				"option $cti_lv_opt"
+			return 1
+			;;
+		esac
+	done
+
+	shift $((OPTIND-1))
+
+	# Verify the correct number of arguments were passed.
+	cti_lf_checkargs $# 2 GE cti_execute || return 1
+
+	# First (non-option) argument is the result code to use if the command
+	# fails.
+	cti_lv_result="${1:-UNRESOLVED}"
+	shift
+
+	# Execute the command, redirecting standard input if required.
+	if test -f cti_stdin
+	then
+		eval "$@" < cti_stdin > cti_stdout 2> cti_stderr
+	else
+		eval "$@" > cti_stdout 2> cti_stderr
+	fi
+
+	cti_lv_status=$?
+
+	# Check the exit status of the command
+	if test $cti_lv_status -ne 0
+	then
+		if [[ "$cti_lv_result" = "CTI" ]]
+		then
+			cti_report CTI "Command \"$*\" failed "\
+				"with status $cti_lv_status"
+		else
+			cti_result "$cti_lv_result"\
+				"Command \"$*\" failed "\
+				"with status $cti_lv_status"
+			cti_lv_rv=$cti_lv_status
+		fi
+	fi
+
+	# Always log output of cti_execute_cmd
+	if [[ "$cti_lv_result" = "CTI" ]]
+	then
+
+		if test -s cti_stdout
+		then
+			cti_reportfile cti_stdout "Standard output from command \"$*\""
+		fi
+		if test -s cti_stderr
+		then
+			cti_reportfile cti_stderr "Standard error from command \"$*\""
+		fi
+		return $cti_lv_status
+	fi
+
+	# If cmd failed, or if "-c err", check standard error.
+	if test \( $cti_lv_rv -ne 0 -o $cti_lv_checkstderr -eq 1 \) \
+		-a -s cti_stderr
+	then
+		cti_result "$cti_lv_result" \
+			"Command \"$*\" produced standard error"
+		cti_reportfile cti_stderr "Standard error from command \"$*\""
+		[[ $cti_lv_rv = 0 ]] && cti_lv_rv=1
+	fi
+
+	#  If cmd failed, or if "-c out", check standard output.
+	if test \( $cti_lv_rv -ne 0 -o $cti_lv_checkstdout -eq 1 \) \
+		-a -s cti_stdout
+	then
+		cti_result "$cti_lv_result" \
+			"Command \"$*\" produced standard output"
+		cti_reportfile cti_stdout "Standard output from command \"$*\""
+		[[ $cti_lv_rv = 0 ]] && cti_lv_rv=1
+	fi
+
+	return $cti_lv_rv
+}
+
+#
+# Exit values for expect scripts.
+# N.B. Do not use 0, as expect uses this for e.g. syntax errors.
+#
+typeset -ri CTI_EXP_RV_TIMEDOUT=1
+typeset -ri CTI_EXP_RV_TESTFAIL=2
+typeset -ri CTI_EXP_RV_OK=3
+
+#
+# cti_runexpect() - run the expect utility.
+#
+# Usage: cti_runexpect failtext command pattern action [pattern action ...]
+#
+# Executes the expect utility using the command line specified in the second
+# argument. Generates a temporary expect script which is removed at the end of
+# the call. The arguments following the second are pattern-action pairs. The
+# pattern can be a regular expression or "CALL", which indicates the action is
+# simply a function call which is unconditionally executed at that point.
+#
+# The following expect functions are available:
+#
+#	startcritical	Indicates that failures from this point onwards
+#			constitute a test failure. In that case the
+#			``failtext'' argument is used to report the error
+#			message.
+#	endcritical	Indicates the end of the test failure section begun by
+#			startcritical.
+#	finish		Exit the expect script here - the test has passed.
+#
+# Returns 0 on success, non-zero on failure.
+#
+function cti_runexpect
+{
+	typeset -ri CTI_EXP_TIMEOUT=5
+	typeset -r cti_lv_expfile="./cti_$tc_id-$$.exp"
+	typeset cti_lv_failtext="$1"
+	typeset cti_lv_command="$2"
+	typeset -i cti_lv_rv=0
+	typeset cti_lv_dopt
+
+	# Verify the correct number of arguments were passed.
+	cti_lf_checkargs $# 4 GE cti_runexpect || return 1
+
+	shift 2
+
+	# Generate expect script.
+	{
+	echo "set STATUS_OK       $CTI_EXP_RV_OK"
+	echo "set STATUS_FAIL     $CTI_EXP_RV_TESTFAIL"
+	echo "set STATUS_TIMEDOUT $CTI_EXP_RV_TIMEDOUT"
+	echo ''
+        echo "set timeout $CTI_EXP_TIMEOUT"
+        echo 'set retval $STATUS_TIMEDOUT'
+	echo ''
+	echo 'eval spawn [lrange $argv 0 end]'
+	echo ''
+	echo 'proc startcritical {} {'
+	echo '	global retval'
+	echo '	global STATUS_FAIL'
+	echo '	set retval $STATUS_FAIL'
+	echo '}'
+	echo ''
+	echo 'proc endcritical {} {'
+	echo '	global retval'
+	echo '	global STATUS_TIMEDOUT'
+	echo '	set retval $STATUS_TIMEDOUT'
+	echo '}'
+	echo ''
+	echo 'proc finish {} {'
+	echo '	global STATUS_OK'
+	echo '	exit $STATUS_OK'
+	echo '}'
+
+	while test $# -gt 1
+	do
+		echo ''
+
+		if test "$1" = "CALL"
+		then
+			echo "$2"
+		else
+			echo 'expect {'
+			echo "	-re \"$1\" {"
+			echo "		$2 "
+			echo '	}'
+			echo '	timeout {'
+			echo '		exit $retval'
+			echo '	}'
+			echo '}'
+		fi
+
+		shift 2
+	done
+	} > $cti_lv_expfile
+
+	# Check that there were no errors writing to the script file.
+	if test $? -ne 0
+	then
+		cti_unresolved "Error writing expect script to file" \
+			"\"$cti_lv_expfile\""
+		return 1
+	fi
+
+	# If debug is on, turn on expect debug flag.
+	case "$CTI_SHELL_DEBUG" in
+	y*|Y*)
+		cti_lv_dopt='-d'
+		;;
+	esac
+
+	# Execute expect using generated script.
+	expect $cti_lv_dopt -f $cti_lv_expfile $cti_lv_command > cti_expout 2>&1
+	cti_lv_rv=$?
+
+	# If debug is on, save expect script and output, otherwise remove
+	# script.
+	case "$CTI_SHELL_DEBUG" in
+	y*|Y*)
+		cp cti_expout ${cti_lv_expfile%.exp}.out
+		cti_report "DEBUG: expect script is $PWD/$cti_lv_expfile," \
+			"expect output is in $PWD/${cti_lv_expfile%.exp}.out"
+		;;
+	*)
+		rm -f $cti_lv_expfile
+	esac
+
+	# Deal with return value from expect.
+	case $cti_lv_rv in
+	$CTI_EXP_RV_OK)
+		return 0
+		;;
+	$CTI_EXP_RV_TIMEDOUT)
+		cti_unresolved "Expect script timed-out during test setup"
+		;;
+	$CTI_EXP_RV_TESTFAIL)
+		cti_fail "$cti_lv_failtext"
+		;;
+	*)
+		cti_unresolved "Test coding error or expect bug:" \
+			"unexpected exit status $cti_lv_rv from expect script"
+		cti_reportfile cti_expout "Output from expect"
+		;;
+	esac
+
+	return 1
+}
+
+#
+# cti_expecttest() - run the expect utility.
+#
+# Usage: cti_expecttest failtext command pattern action [pattern action ...]
+#
+# Common test function for test purposes which use expect. Like cti_runexpect()
+# except that this is written with path tracing and is designed to do the
+# complete work of a test purpose.
+#
+function cti_expecttest
+{
+	# Verify the correct number of arguments were passed.
+	cti_lf_checkargs $# 4 GE cti_expecttest || return
+
+	# Use cti_runexpect() to execute expect utililty.
+	if cti_runexpect "$@"
+	then
+		cti_pathtrace
+	else
+		return
+	fi
+
+	cti_checkpath 1
+}
+
+function cti_execute_cmd
+{
+	cti_execute CTI "$@"
+}
+
+#
+# "private" functions for internal use by cti_cancel function
+# used to replace test purpose functions which will be canceled.
+#
+function cancel_ic {
+	cti_result $cticancel_result "$cticancel_msg"
+}
+
+#
+# cti_cancel() - cancel an individual test purpose.
+#
+# Usage: cti_cancel tp reason [test result]
+#
+# Cancels an individual test by replace the tp function with
+# cancel_ic function
+#
+function cti_cancel {
+	test $# -gt 3 && return
+	test_num=$1
+	cticancel_msg="$2"
+	cticancel_result=${3:-"UNSUPPORTED"}
+	typeset cti_lv_ic cti_lv_ic_mod
+	typeset cti_lv_tp
+
+	cti_report "Canceling test $test_num: $cticancel_msg"
+	#
+	# translate the ic and point the test purpose ic to
+	# cancel_ic function
+	#
+	for cti_lv_ic in $iclist
+	do
+		cti_lv_ic_mod=""
+		for cti_lv_tp in `eval echo \\$$cti_lv_ic`
+		do
+			if [ X"$cti_lv_tp" == X"$test_num" ]; then
+				cti_lv_ic_mod=$cti_lv_ic_mod" cancel_ic"
+			else
+				cti_lv_ic_mod=$cti_lv_ic_mod" $cti_lv_tp"
+			fi
+		done
+		eval "$cti_lv_ic=\"$cti_lv_ic_mod\""
+	done
+}
+
+#
+# cti_cancelall() - cancel all tests.
+#
+# Usage: cti_cancelall reason [test result]
+#
+# Cancels all tests by replace the tests functions with cancel_ic function
+#
+function cti_cancelall {
+	typeset cti_lv_ic
+	typeset cti_lv_tp
+	cticancel_msg=$1
+	cticancel_result=${2:-"UNSUPPORTED"}
+
+	test $# -eq 0 && return
+
+	for cti_lv_ic in $iclist
+	do
+		for cti_lv_tp in `eval echo \\$$cti_lv_ic`
+		do
+			cti_cancel $cti_lv_tp "$cticancel_msg" \
+			    $cticancel_result
+		done
+	done
+}
