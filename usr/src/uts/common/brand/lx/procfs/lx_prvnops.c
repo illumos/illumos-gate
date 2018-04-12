@@ -3528,6 +3528,7 @@ lxpr_format_tcp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 	conn_t *connp;
 	netstack_t *ns;
 	ip_stack_t *ipst;
+	int sonode_shift;
 
 	ASSERT(ipver == IPV4_VERSION || ipver == IPV6_VERSION);
 	if (ipver == IPV4_VERSION) {
@@ -3566,15 +3567,16 @@ lxpr_format_tcp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 		return;
 	ipst = ns->netstack_ip;
 
+	sonode_shift = highbit(sizeof (sonode_t));
+
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
 		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 		connp = NULL;
 		while ((connp =
 		    ipcl_get_next_conn(connfp, connp, IPCL_TCPCONN)) != NULL) {
 			tcp_t *tcp;
-			vattr_t attr;
+			ino_t inode;
 			sonode_t *so = (sonode_t *)connp->conn_upper_handle;
-			vnode_t *vp = (so != NULL) ? so->so_vnode : NULL;
 			if (connp->conn_ipversion != ipver)
 				continue;
 			tcp = connp->conn_tcp;
@@ -3603,10 +3605,16 @@ lxpr_format_tcp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 				    ntohs(connp->conn_fport));
 			}
 
-			/* fetch the simulated inode for the socket */
-			if (vp == NULL ||
-			    VOP_GETATTR(vp, &attr, 0, CRED(), NULL) != 0)
-				attr.va_nodeid = 0;
+			/*
+			 * We cannot use VOP_GETATTR here to fetch the
+			 * simulated inode for the socket via the
+			 * so->so_vnode. This is because there is a (very
+			 * tight) race for when the v_vfsp is set on the
+			 * sonode's vnode. However, all we really want here is
+			 * the inode number, which we can compute using the
+			 * same algorithm as socket_vop_getattr.
+			 */
+			inode = ((ino_t)so >> sonode_shift) & 0xFFFF;
 
 			lxpr_uiobuf_printf(uiobuf,
 			    "%02X %08X:%08X %02X:%08X %08X "
@@ -3618,7 +3626,7 @@ lxpr_format_tcp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 			    connp->conn_cred->cr_uid,
 			    0, /* timeout */
 			    /* inode + more */
-			    (ino_t)attr.va_nodeid, 0, NULL, 0, 0, 0, 0, 0);
+			    inode, 0, NULL, 0, 0, 0, 0, 0);
 		}
 	}
 	netstack_rele(ns);
@@ -3644,6 +3652,7 @@ lxpr_format_udp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 	conn_t *connp;
 	netstack_t *ns;
 	ip_stack_t *ipst;
+	int sonode_shift;
 
 	ASSERT(ipver == IPV4_VERSION || ipver == IPV6_VERSION);
 	if (ipver == IPV4_VERSION) {
@@ -3682,16 +3691,17 @@ lxpr_format_udp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 		return;
 	ipst = ns->netstack_ip;
 
+	sonode_shift = highbit(sizeof (sonode_t));
+
 	for (i = 0; i < CONN_G_HASH_SIZE; i++) {
 		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 		connp = NULL;
 		while ((connp =
 		    ipcl_get_next_conn(connfp, connp, IPCL_UDPCONN)) != NULL) {
 			udp_t *udp;
+			ino_t inode;
 			int state = 0;
-			vattr_t attr;
 			sonode_t *so = (sonode_t *)connp->conn_upper_handle;
-			vnode_t *vp = (so != NULL) ? so->so_vnode : NULL;
 			if (connp->conn_ipversion != ipver)
 				continue;
 			udp = connp->conn_udp;
@@ -3730,10 +3740,16 @@ lxpr_format_udp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 				break;
 			}
 
-			/* fetch the simulated inode for the socket */
-			if (vp == NULL ||
-			    VOP_GETATTR(vp, &attr, 0, CRED(), NULL) != 0)
-				attr.va_nodeid = 0;
+			/*
+			 * We cannot use VOP_GETATTR here to fetch the
+			 * simulated inode for the socket via the
+			 * so->so_vnode. This is because there is a (very
+			 * tight) race for when the v_vfsp is set on the
+			 * sonode's vnode. However, all we really want here is
+			 * the inode number, which we can compute using the
+			 * same algorithm as socket_vop_getattr.
+			 */
+			inode = ((ino_t)so >> sonode_shift) & 0xFFFF;
 
 			lxpr_uiobuf_printf(uiobuf,
 			    "%02X %08X:%08X %02X:%08X %08X "
@@ -3745,7 +3761,7 @@ lxpr_format_udp(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf, ushort_t ipver)
 			    connp->conn_cred->cr_uid,
 			    0, /* timeout */
 			    /* inode, ref, pointer, drops */
-			    (ino_t)attr.va_nodeid, 0, NULL, 0);
+			    inode, 0, NULL, 0);
 		}
 	}
 	netstack_rele(ns);
