@@ -13,7 +13,7 @@
  * Copyright (c) 2017, 2018 by Delphix. All rights reserved.
  */
 
-env.BASE_IMAGE_ID = 'ami-0eef1a0856c59b194'
+env.BASE_IMAGE_ID = 'ami-0c064fc31125ac7e5'
 
 node('master') {
     def commit = null
