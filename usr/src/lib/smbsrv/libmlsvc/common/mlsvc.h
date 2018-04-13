@@ -46,7 +46,6 @@ void netr_initialize(void);
 void samr_initialize(void);
 void svcctl_initialize(void);
 void winreg_initialize(void);
-int srvsvc_gettime(unsigned long *);
 void msgsvcsend_initialize(void);
 void spoolss_initialize(void);
 void netdfs_initialize(void);
@@ -64,7 +63,8 @@ int netr_setup_authenticator(struct netr_info *, struct netr_authenticator *,
     struct netr_authenticator *);
 DWORD netr_validate_chain(struct netr_info *, struct netr_authenticator *);
 
-void ndr_srvsvc_timecheck(char *, char *);
+int srvsvc_gettime(unsigned long *);
+void srvsvc_timecheck(char *, char *);
 
 /* Generic functions to get/set windows Security Descriptors */
 uint32_t srvsvc_sd_get(smb_share_t *, uint8_t *, uint32_t *);

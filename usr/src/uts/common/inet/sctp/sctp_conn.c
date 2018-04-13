@@ -493,8 +493,8 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen,
 			return (err);
 		}
 		RUN_SCTP(sctp);
-		/* FALLTHRU */
 	}
+	/* FALLTHROUGH */
 
 	case SCTPS_BOUND:
 		ASSERT(sctp->sctp_nsaddrs > 0);

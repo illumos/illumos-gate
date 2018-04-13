@@ -53,7 +53,7 @@
  * ctfs, the contract filesystem.
  *
  * Exposes the construct subsystem to userland.  The structure of the
- * filesytem is a public interface, but the behavior of the files is
+ * filesystem is a public interface, but the behavior of the files is
  * private and unstable.  Contract consumers are expected to use
  * libcontract(3lib) to operate on ctfs file descriptors.
  *

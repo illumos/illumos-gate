@@ -1,14 +1,14 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright (c) 2017, Joyent, Inc.
 .\" Copyright 2014, Nexenta Systems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add
 .\" the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MPT_SAS 7D "Apr 24, 2014"
+.TH MPT_SAS 7D "Dec 15, 2017"
 .SH NAME
 mpt_sas \- SAS-2/3 host bus adapter driver
 .SH SYNOPSIS
-.sp
 .in +2
 .nf
 scsi@unit-address
@@ -16,14 +16,13 @@ scsi@unit-address
 .in -2
 
 .SH DESCRIPTION
-.sp
 .LP
-The \fBmpt_sas\fR host bus adapter driver is a nexus driver that supports the
-LSI SAS200x/2x08 and SAS300x/3x08 series of chips. These chips support SAS/SATA
+The \fBmpt_sas\fR host bus adapter driver is a nexus driver that supports
+Broadcom (formerly LSI and Avago) SAS chipsets including the SAS200x/2x08/2x16
+and SAS300x/3x08/3x16/3x24 series of chips. These chips support SAS/SATA
 interfaces, including tagged and untagged queuing, SATA 3G/SAS 3G/SAS 6G/SAS
 12G.
 .SS "Configuration"
-.sp
 .LP
 The \fBmpt_sas\fR driver is configured by defining properties in
 \fBmpt_sas.conf\fR. These properties override the global SCSI settings. The
@@ -70,7 +69,6 @@ mpxio-disable="yes";
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/kernel/drv/mpt_sas\fR\fR
@@ -111,7 +109,6 @@ Optional configuration file
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for a description of the following attributes:
 .sp
@@ -127,7 +124,6 @@ Architecture	SPARC, x86
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBprtconf\fR(1M), \fBdriver.conf\fR(4), \fBpci\fR(4), \fBattributes\fR(5),
 \fBscsi_abort\fR(9F), \fBscsi_device\fR(9S), \fBscsi_extended_sense\fR(9S),

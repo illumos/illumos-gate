@@ -1655,7 +1655,7 @@ icmp_inbound_v4(mblk_t *mp, ip_recv_attr_t *ira)
 			/* Update DCE and adjust MTU is icmp header if needed */
 			icmp_inbound_too_big_v4(icmph, ira);
 		}
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	default:
 		icmp_inbound_error_fanout_v4(mp, icmph, ira);
 		break;
@@ -2283,8 +2283,8 @@ icmp_inbound_error_fanout_v4(mblk_t *mp, icmph_t *icmph, ip_recv_attr_t *ira)
 			return;
 		}
 		/* No self-encapsulated */
-		/* FALLTHRU */
 	}
+	/* FALLTHROUGH */
 	case IPPROTO_IPV6:
 		if ((connp = ipcl_iptun_classify_v4(&ripha.ipha_src,
 		    &ripha.ipha_dst, ipst)) != NULL) {
@@ -2298,7 +2298,7 @@ icmp_inbound_error_fanout_v4(mblk_t *mp, icmph_t *icmph, ip_recv_attr_t *ira)
 		 * No IP tunnel is interested, fallthrough and see
 		 * if a raw socket will want it.
 		 */
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	default:
 		ira->ira_flags |= IRAF_ICMP_ERROR;
 		ip_fanout_proto_v4(mp, &ripha, ira);
@@ -6326,7 +6326,7 @@ ip_opt_set_multicast_group(conn_t *connp, t_scalar_t name,
 	case IP_ADD_MEMBERSHIP:
 	case IPV6_JOIN_GROUP:
 		mcast_opt = B_FALSE;
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	case MCAST_JOIN_GROUP:
 		fmode = MODE_IS_EXCLUDE;
 		optfn = ip_opt_add_group;
@@ -6335,7 +6335,7 @@ ip_opt_set_multicast_group(conn_t *connp, t_scalar_t name,
 	case IP_DROP_MEMBERSHIP:
 	case IPV6_LEAVE_GROUP:
 		mcast_opt = B_FALSE;
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	case MCAST_LEAVE_GROUP:
 		fmode = MODE_IS_INCLUDE;
 		optfn = ip_opt_delete_group;
@@ -6440,7 +6440,7 @@ ip_opt_set_multicast_sources(conn_t *connp, t_scalar_t name,
 	switch (name) {
 	case IP_BLOCK_SOURCE:
 		mcast_opt = B_FALSE;
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	case MCAST_BLOCK_SOURCE:
 		fmode = MODE_IS_EXCLUDE;
 		optfn = ip_opt_add_group;
@@ -6448,7 +6448,7 @@ ip_opt_set_multicast_sources(conn_t *connp, t_scalar_t name,
 
 	case IP_UNBLOCK_SOURCE:
 		mcast_opt = B_FALSE;
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	case MCAST_UNBLOCK_SOURCE:
 		fmode = MODE_IS_EXCLUDE;
 		optfn = ip_opt_delete_group;
@@ -6456,7 +6456,7 @@ ip_opt_set_multicast_sources(conn_t *connp, t_scalar_t name,
 
 	case IP_ADD_SOURCE_MEMBERSHIP:
 		mcast_opt = B_FALSE;
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	case MCAST_JOIN_SOURCE_GROUP:
 		fmode = MODE_IS_INCLUDE;
 		optfn = ip_opt_add_group;
@@ -6464,7 +6464,7 @@ ip_opt_set_multicast_sources(conn_t *connp, t_scalar_t name,
 
 	case IP_DROP_SOURCE_MEMBERSHIP:
 		mcast_opt = B_FALSE;
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	case MCAST_LEAVE_SOURCE_GROUP:
 		fmode = MODE_IS_INCLUDE;
 		optfn = ip_opt_delete_group;
@@ -7963,7 +7963,7 @@ ip_rput_notdata(ill_t *ill, mblk_t *mp)
 			putnext(ill->ill_rq, mp);
 			return;
 		}
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	case M_ERROR:
 	case M_HANGUP:
 		mutex_enter(&ill->ill_lock);
@@ -7990,7 +7990,7 @@ ip_rput_notdata(ill_t *ill, mblk_t *mp)
 		default:
 			break;
 		}
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	default:
 		putnext(ill->ill_rq, mp);
 		return;
@@ -9095,7 +9095,7 @@ ip_forward_options(mblk_t *mp, ipha_t *ipha, ill_t *dst_ill,
 					/* Not for us */
 					break;
 				}
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			case IPOPT_TS_TSANDADDR:
 				off = IP_ADDR_LEN + IPOPT_TS_TIMELEN;
 				break;
@@ -9131,7 +9131,7 @@ ip_forward_options(mblk_t *mp, ipha_t *ipha, ill_t *dst_ill,
 				}
 				bcopy(&ifaddr, (char *)opt + off, IP_ADDR_LEN);
 				opt[IPOPT_OFFSET] += IP_ADDR_LEN;
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			case IPOPT_TS_TSONLY:
 				off = opt[IPOPT_OFFSET] - 1;
 				/* Compute # of milliseconds since midnight */
@@ -9322,7 +9322,7 @@ ip_input_local_options(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 					/* Not for us */
 					break;
 				}
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			case IPOPT_TS_TSANDADDR:
 				off = IP_ADDR_LEN + IPOPT_TS_TIMELEN;
 				break;
@@ -9357,7 +9357,7 @@ ip_input_local_options(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 				}
 				bcopy(&ifaddr, (char *)opt + off, IP_ADDR_LEN);
 				opt[IPOPT_OFFSET] += IP_ADDR_LEN;
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			case IPOPT_TS_TSONLY:
 				off = opt[IPOPT_OFFSET] - 1;
 				/* Compute # of milliseconds since midnight */
@@ -12010,7 +12010,7 @@ ip_output_local_options(ipha_t *ipha, ip_stack_t *ipst)
 					/* Not for us */
 					break;
 				}
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			case IPOPT_TS_TSANDADDR:
 				off = IP_ADDR_LEN + IPOPT_TS_TIMELEN;
 				break;
@@ -12039,7 +12039,7 @@ ip_output_local_options(ipha_t *ipha, ip_stack_t *ipst)
 				dst = htonl(INADDR_LOOPBACK);
 				bcopy(&dst, (char *)opt + off, IP_ADDR_LEN);
 				opt[IPOPT_OFFSET] += IP_ADDR_LEN;
-				/* FALLTHRU */
+				/* FALLTHROUGH */
 			case IPOPT_TS_TSONLY:
 				off = opt[IPOPT_OFFSET] - 1;
 				/* Compute # of milliseconds since midnight */

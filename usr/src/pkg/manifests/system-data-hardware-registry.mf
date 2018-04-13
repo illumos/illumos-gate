@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/data/hardware-registry@$(PKGVERS)
@@ -33,10 +34,13 @@ set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/share
 dir path=usr/share/hwdata group=sys
+file path=usr/share/hwdata/efi.fixes preserve=renamenew
 file path=usr/share/hwdata/pci.ids
 file path=usr/share/hwdata/usb.ids
 legacy pkg=SUNWhwdata \
     desc="ASCII databases describing various PCI, USB and other hardware" \
     name="Hardware data files"
+license usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes \
+    license=usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes
 license usr/src/data/hwdata/THIRDPARTYLICENSE.pciids \
     license=usr/src/data/hwdata/THIRDPARTYLICENSE.pciids

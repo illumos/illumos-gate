@@ -551,7 +551,7 @@ install_flar()
 #
 #   c) inside the zonepath root: We'll see all the top level dirs, ./etc,
 #      ./var, ./usr....  This is also the case we see when we get an archive
-#      of a physical sytem.  We must be in ZONEROOT when we unpack the archive.
+#      of a physical system.  We must be in ZONEROOT when we unpack the archive.
 #
 # Note that there can be a directory named "root" under the ZONEPATH/root
 # directory.

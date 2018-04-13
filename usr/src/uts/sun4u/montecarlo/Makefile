@@ -59,24 +59,25 @@ def all clean.lint clean clobber modlist: $(MONTECARLO_KMODS)
 
 modlintlib:	$(MONTECARLO_KMODS)
 
-install:        $(ROOT_MONTECARLO_DIR) $(USR_MONTECARLO_DIR) \
+install:        $(ROOT_MONTECARLO_DIR) \
+		$(USR_MONTECARLO_DIR) \
                 $(USR_MONTECARLO_INC_DIR) \
                 $(USR_MONTECARLO_SBIN_DIR) \
                 $(USR_MONTECARLO_LIB_DIR) \
                 .WAIT $(MONTECARLO_KMODS) \
 		se.conf ttymux.conf
 
-se.conf:	$(ROOT_MONTECARLO_DRV_DIR)
-		-@$(RM) $(ROOT_MONTECARLO_DRV_DIR)/$@
+se.conf:	$(ROOT_MONTECARLO_DRV_DIR_32)
+		-@$(RM) $(ROOT_MONTECARLO_DRV_DIR_32)/$@
 		$(CP) $(UTSBASE)/sun4u/montecarlo/io/$@ \
-		$(ROOT_MONTECARLO_DRV_DIR)/$@
-		$(CHMOD) $(CFILEMODE) $(ROOT_MONTECARLO_DRV_DIR)/$@
+		$(ROOT_MONTECARLO_DRV_DIR_32)/$@
+		$(CHMOD) $(CFILEMODE) $(ROOT_MONTECARLO_DRV_DIR_32)/$@
 
-ttymux.conf:	$(ROOT_MONTECARLO_DRV_DIR)
-		-@$(RM) $(ROOT_MONTECARLO_DRV_DIR)/$@
+ttymux.conf:	$(ROOT_MONTECARLO_DRV_DIR_32)
+		-@$(RM) $(ROOT_MONTECARLO_DRV_DIR_32)/$@
 		$(CP) $(UTSBASE)/sun4u/montecarlo/io/$@ \
-		$(ROOT_MONTECARLO_DRV_DIR)/$@
-		$(CHMOD) $(CFILEMODE) $(ROOT_MONTECARLO_DRV_DIR)/$@
+		$(ROOT_MONTECARLO_DRV_DIR_32)/$@
+		$(CHMOD) $(CFILEMODE) $(ROOT_MONTECARLO_DRV_DIR_32)/$@
 
 install_h check:	FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)

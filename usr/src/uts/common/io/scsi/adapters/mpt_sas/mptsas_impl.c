@@ -1707,9 +1707,12 @@ mptsas_sasiou_page_0_cb(mptsas_t *mpt, caddr_t page_memp,
 	/*
 	 * ASSERT that the num_phys value in SAS IO Unit Page 0 is the same as
 	 * was initially set.  This should never change throughout the life of
-	 * the driver.
+	 * the driver.  Note, due to cases where we've seen page zero have more
+	 * phys than the reported manufacturing information, we limit the number
+	 * of phys here to what we got from the manufacturing information.
 	 */
-	ASSERT(num_phys == mpt->m_num_phys);
+	ASSERT3U(num_phys, >=, mpt->m_num_phys);
+	num_phys = mpt->m_num_phys;
 	for (i = 0; i < num_phys; i++) {
 		cpdi[i] = ddi_get32(accessp,
 		    &sasioupage0->PhyData[i].
@@ -1771,11 +1774,14 @@ mptsas_sasiou_page_1_cb(mptsas_t *mpt, caddr_t page_memp,
 	sasioupage1 = (pMpi2SasIOUnitPage1_t)page_memp;
 	num_phys = ddi_get8(accessp, &sasioupage1->NumPhys);
 	/*
-	 * ASSERT that the num_phys value in SAS IO Unit Page 1 is the same as
+	 * ASSERT that the num_phys value in SAS IO Unit Page 0 is the same as
 	 * was initially set.  This should never change throughout the life of
-	 * the driver.
+	 * the driver.  Note, due to cases where we've seen page zero have more
+	 * phys than the reported manufacturing information, we limit the number
+	 * of phys here to what we got from the manufacturing information.
 	 */
-	ASSERT(num_phys == mpt->m_num_phys);
+	ASSERT3U(num_phys, >=, mpt->m_num_phys);
+	num_phys = mpt->m_num_phys;
 	for (i = 0; i < num_phys; i++) {
 		cpdi[i] = ddi_get32(accessp, &sasioupage1->PhyData[i].
 		    ControllerPhyDeviceInfo);
@@ -1932,7 +1938,7 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 	pMpi2SasIOUnitPage1_t	sasioupage1;
 	int			recv_numbytes;
 	caddr_t			recv_memp, page_memp;
-	int			i, num_phys, start_phy = 0;
+	uint_t			i, num_phys, start_phy = 0;
 	int			page0_size =
 	    sizeof (MPI2_CONFIG_PAGE_SASIOUNIT_0) +
 	    (sizeof (MPI2_SAS_IO_UNIT0_PHY_DATA) * (MPTSAS_MAX_PHYS - 1));
@@ -2112,13 +2118,32 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 
 			num_phys = ddi_get8(page_accessp,
 			    &sasioupage0->NumPhys);
-			ASSERT(num_phys == mpt->m_num_phys);
 			if (num_phys > MPTSAS_MAX_PHYS) {
 				mptsas_log(mpt, CE_WARN, "Number of phys "
 				    "supported by HBA (%d) is more than max "
 				    "supported by driver (%d).  Driver will "
 				    "not attach.", num_phys,
 				    MPTSAS_MAX_PHYS);
+				rval = DDI_FAILURE;
+				goto cleanup;
+			}
+			if (num_phys > mpt->m_num_phys) {
+				mptsas_log(mpt, CE_WARN, "Number of phys "
+				    "reported by HBA SAS IO Unit Page 0 (%u) "
+				    "is greater than that reported by the "
+				    "manufacturing information (%u). Driver "
+				    "phy count limited to %u. Please contact "
+				    "the firmware vendor about this.", num_phys,
+				    mpt->m_num_phys, mpt->m_num_phys);
+				num_phys = mpt->m_num_phys;
+			} else if (num_phys < mpt->m_num_phys) {
+				mptsas_log(mpt, CE_WARN, "Number of phys "
+				    "reported by HBA SAS IO Unit Page 0 (%u) "
+				    "is less than that reported by the "
+				    "manufacturing information (%u). Driver "
+				    "will not attach. Please contact the "
+				    "firmware vendor about this.", num_phys,
+				    mpt->m_num_phys);
 				rval = DDI_FAILURE;
 				goto cleanup;
 			}
@@ -2193,13 +2218,32 @@ mptsas_get_sas_io_unit_page_hndshk(mptsas_t *mpt)
 
 			num_phys = ddi_get8(page_accessp,
 			    &sasioupage1->NumPhys);
-			ASSERT(num_phys == mpt->m_num_phys);
 			if (num_phys > MPTSAS_MAX_PHYS) {
 				mptsas_log(mpt, CE_WARN, "Number of phys "
 				    "supported by HBA (%d) is more than max "
 				    "supported by driver (%d).  Driver will "
 				    "not attach.", num_phys,
 				    MPTSAS_MAX_PHYS);
+				rval = DDI_FAILURE;
+				goto cleanup;
+			}
+			if (num_phys > mpt->m_num_phys) {
+				mptsas_log(mpt, CE_WARN, "Number of phys "
+				    "reported by HBA SAS IO Unit Page 1 (%u) "
+				    "is greater than that reported by the "
+				    "manufacturing information (%u). Limiting "
+				    "phy count to %u. Please contact the "
+				    "firmware vendor about this.", num_phys,
+				    mpt->m_num_phys, mpt->m_num_phys);
+				num_phys = mpt->m_num_phys;
+			} else if (num_phys < mpt->m_num_phys) {
+				mptsas_log(mpt, CE_WARN, "Number of phys "
+				    "reported by HBA SAS IO Unit Page 1 (%u) "
+				    "is less than that reported by the "
+				    "manufacturing information (%u). Driver "
+				    "will not attach. Please contact the "
+				    "firmware vendor about this.", num_phys,
+				    mpt->m_num_phys);
 				rval = DDI_FAILURE;
 				goto cleanup;
 			}
@@ -2307,7 +2351,8 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 		goto done;
 	}
 
-	if (iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) !=
+	    0) {
 		mptsas_log(mpt, CE_WARN, "mptsas_get_manufacture_page5 update: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
 		    ddi_get32(recv_accessp, &configreply->IOCLogInfo));
@@ -2367,7 +2412,8 @@ mptsas_get_manufacture_page5(mptsas_t *mpt)
 		goto done;
 	}
 
-	if (iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) !=
+	    0) {
 		mptsas_log(mpt, CE_WARN, "mptsas_get_manufacture_page5 config: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
 		    ddi_get32(recv_accessp, &configreply->IOCLogInfo));
@@ -2685,7 +2731,8 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 		goto done;
 	}
 
-	if (iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) !=
+	    0) {
 		mptsas_log(mpt, CE_WARN, "mptsas_get_manufacture_page5 update: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
 		    ddi_get32(recv_accessp, &configreply->IOCLogInfo));
@@ -2743,7 +2790,8 @@ mptsas_get_manufacture_page0(mptsas_t *mpt)
 		goto done;
 	}
 
-	if (iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(recv_accessp, &configreply->IOCStatus)) !=
+	    0) {
 		mptsas_log(mpt, CE_WARN, "mptsas_get_manufacture_page0 config: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
 		    ddi_get32(recv_accessp, &configreply->IOCLogInfo));

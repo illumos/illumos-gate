@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -76,6 +78,7 @@
 #include <sys/kdi_impl.h>
 #include <sys/x_call.h>
 #include <ia32/sys/psw.h>
+#include <vm/hat_i86.h>
 
 #define	KDI_GATE_NVECS	3
 
@@ -100,9 +103,6 @@ uint32_t	kdi_fs;
 uint32_t	kdi_gs;
 #endif
 
-uint_t		kdi_msr_wrexit_msr;
-uint64_t	*kdi_msr_wrexit_valp;
-
 uintptr_t	kdi_kernel_handler;
 
 int		kdi_trap_switch;
@@ -117,11 +117,10 @@ typedef void idt_hdlr_f(void);
 extern idt_hdlr_f kdi_trap0, kdi_trap1, kdi_int2, kdi_trap3, kdi_trap4;
 extern idt_hdlr_f kdi_trap5, kdi_trap6, kdi_trap7, kdi_trap9;
 extern idt_hdlr_f kdi_traperr10, kdi_traperr11, kdi_traperr12;
-extern idt_hdlr_f kdi_traperr13, kdi_traperr14, kdi_trap16, kdi_trap17;
+extern idt_hdlr_f kdi_traperr13, kdi_traperr14, kdi_trap16, kdi_traperr17;
 extern idt_hdlr_f kdi_trap18, kdi_trap19, kdi_trap20, kdi_ivct32;
 extern idt_hdlr_f kdi_invaltrap;
 extern size_t kdi_ivct_size;
-extern char kdi_slave_entry_patch;
 
 typedef struct kdi_gate_spec {
 	uint_t kgs_vec;
@@ -139,7 +138,7 @@ static const kdi_gate_spec_t kdi_gate_specs[KDI_GATE_NVECS] = {
 
 static gate_desc_t kdi_kgates[KDI_GATE_NVECS];
 
-gate_desc_t kdi_idt[NIDT];
+extern gate_desc_t kdi_idt[NIDT];
 
 struct idt_description {
 	uint_t id_low;
@@ -166,7 +165,7 @@ struct idt_description {
 	{ T_PGFLT, 0,		kdi_traperr14, NULL },
 	{ 15, 0,		kdi_invaltrap, NULL },
 	{ T_EXTERRFLT, 0, 	kdi_trap16, NULL },
-	{ T_ALIGNMENT, 0, 	kdi_trap17, NULL },
+	{ T_ALIGNMENT, 0, 	kdi_traperr17, NULL },
 	{ T_MCE, 0,		kdi_trap18, NULL },
 	{ T_SIMDFPE, 0,		kdi_trap19, NULL },
 	{ T_DBGENTR, 0,		kdi_trap20, NULL },
@@ -185,51 +184,17 @@ kdi_idt_init(selector_t sel)
 		uint_t high = id->id_high != 0 ? id->id_high : id->id_low;
 		size_t incr = id->id_incrp != NULL ? *id->id_incrp : 0;
 
+#if !defined(__xpv)
+		if (kpti_enable && sel == KCS_SEL && id->id_low == T_DBLFLT)
+			id->id_basehdlr = tr_syserrtrap;
+#endif
+
 		for (i = id->id_low; i <= high; i++) {
 			caddr_t hdlr = (caddr_t)id->id_basehdlr +
 			    incr * (i - id->id_low);
 			set_gatesegd(&kdi_idt[i], (void (*)())hdlr, sel,
-			    SDT_SYSIGT, TRP_KPL, i);
+			    SDT_SYSIGT, TRP_KPL, IST_DBG);
 		}
-	}
-}
-
-/*
- * Patch caller-provided code into the debugger's IDT handlers.  This code is
- * used to save MSRs that must be saved before the first branch.  All handlers
- * are essentially the same, and end with a branch to kdi_cmnint.  To save the
- * MSR, we need to patch in before the branch.  The handlers have the following
- * structure: KDI_MSR_PATCHOFF bytes of code, KDI_MSR_PATCHSZ bytes of
- * patchable space, followed by more code.
- */
-void
-kdi_idt_patch(caddr_t code, size_t sz)
-{
-	int i;
-
-	ASSERT(sz <= KDI_MSR_PATCHSZ);
-
-	for (i = 0; i < sizeof (kdi_idt) / sizeof (struct gate_desc); i++) {
-		gate_desc_t *gd;
-		uchar_t *patch;
-
-		if (i == T_DBLFLT)
-			continue;	/* uses kernel's handler */
-
-		gd = &kdi_idt[i];
-		patch = (uchar_t *)GATESEG_GETOFFSET(gd) + KDI_MSR_PATCHOFF;
-
-		/*
-		 * We can't ASSERT that there's a nop here, because this may be
-		 * a debugger restart.  In that case, we're copying the new
-		 * patch point over the old one.
-		 */
-		/* FIXME: dtrace fbt ... */
-		bcopy(code, patch, sz);
-
-		/* Fill the rest with nops to be sure */
-		while (sz < KDI_MSR_PATCHSZ)
-			patch[sz++] = 0x90; /* nop */
 	}
 }
 
@@ -245,7 +210,7 @@ kdi_idt_gates_install(selector_t sel, int saveold)
 		const kdi_gate_spec_t *gs = &kdi_gate_specs[i];
 		uintptr_t func = GATESEG_GETOFFSET(&kdi_idt[gs->kgs_vec]);
 		set_gatesegd(&gates[i], (void (*)())func, sel, SDT_SYSIGT,
-		    gs->kgs_dpl, gs->kgs_vec);
+		    gs->kgs_dpl, IST_DBG);
 	}
 
 	for (i = 0; i < KDI_GATE_NVECS; i++) {
@@ -276,79 +241,6 @@ kdi_idt_sync(void)
 {
 	kdi_idt_init(KCS_SEL);
 	kdi_idt_gates_install(KCS_SEL, KDI_IDT_SAVE);
-}
-
-/*
- * On some processors, we'll need to clear a certain MSR before proceeding into
- * the debugger.  Complicating matters, this MSR must be cleared before we take
- * any branches.  We have patch points in every trap handler, which will cover
- * all entry paths for master CPUs.  We also have a patch point in the slave
- * entry code.
- */
-static void
-kdi_msr_add_clrentry(uint_t msr)
-{
-#ifdef __amd64
-	uchar_t code[] = {
-		0x51, 0x50, 0x52,		/* pushq %rcx, %rax, %rdx */
-		0xb9, 0x00, 0x00, 0x00, 0x00,	/* movl $MSRNUM, %ecx */
-		0x31, 0xc0,			/* clr %eax */
-		0x31, 0xd2,			/* clr %edx */
-		0x0f, 0x30,			/* wrmsr */
-		0x5a, 0x58, 0x59		/* popq %rdx, %rax, %rcx */
-	};
-	uchar_t *patch = &code[4];
-#else
-	uchar_t code[] = {
-		0x60,				/* pushal */
-		0xb9, 0x00, 0x00, 0x00, 0x00,	/* movl $MSRNUM, %ecx */
-		0x31, 0xc0,			/* clr %eax */
-		0x31, 0xd2,			/* clr %edx */
-		0x0f, 0x30,			/* wrmsr */
-		0x61				/* popal */
-	};
-	uchar_t *patch = &code[2];
-#endif
-
-	bcopy(&msr, patch, sizeof (uint32_t));
-
-	kdi_idt_patch((caddr_t)code, sizeof (code));
-
-	bcopy(code, &kdi_slave_entry_patch, sizeof (code));
-}
-
-static void
-kdi_msr_add_wrexit(uint_t msr, uint64_t *valp)
-{
-	kdi_msr_wrexit_msr = msr;
-	kdi_msr_wrexit_valp = valp;
-}
-
-void
-kdi_set_debug_msrs(kdi_msr_t *msrs)
-{
-	int nmsrs, i;
-
-	ASSERT(kdi_cpusave[0].krs_msr == NULL);
-
-	/* Look in CPU0's MSRs for any special MSRs. */
-	for (nmsrs = 0; msrs[nmsrs].msr_num != 0; nmsrs++) {
-		switch (msrs[nmsrs].msr_type) {
-		case KDI_MSR_CLEARENTRY:
-			kdi_msr_add_clrentry(msrs[nmsrs].msr_num);
-			break;
-
-		case KDI_MSR_WRITEDELAY:
-			kdi_msr_add_wrexit(msrs[nmsrs].msr_num,
-			    msrs[nmsrs].kdi_msr_valp);
-			break;
-		}
-	}
-
-	nmsrs++;
-
-	for (i = 0; i < kdi_ncpusave; i++)
-		kdi_cpusave[i].krs_msr = &msrs[nmsrs * i];
 }
 
 void
@@ -394,7 +286,7 @@ void
 kdi_cpu_init(void)
 {
 	kdi_idt_gates_install(KCS_SEL, KDI_IDT_NOSAVE);
-	/* Load the debug registers and MSRs */
+	/* Load the debug registers. */
 	kdi_cpu_debug_init(&kdi_cpusave[CPU->cpu_id]);
 }
 
@@ -447,9 +339,6 @@ kdi_activate(kdi_main_t main, kdi_cpusave_t *cpusave, uint_t ncpusave)
 
 	kdi_drreg.dr_ctl = KDIREG_DRCTL_RESERVED;
 	kdi_drreg.dr_stat = KDIREG_DRSTAT_RESERVED;
-
-	kdi_msr_wrexit_msr = 0;
-	kdi_msr_wrexit_valp = NULL;
 
 	if (boothowto & RB_KMDB) {
 		kdi_idt_gates_install(KMDBCODE_SEL, KDI_IDT_NOSAVE);
@@ -507,9 +396,17 @@ kdi_trap_pass(kdi_cpusave_t *cpusave)
 	 * See the comments in the kernel's T_SGLSTP handler for why we need to
 	 * do this.
 	 */
+#if !defined(__xpv)
 	if (tt == T_SGLSTP &&
-	    (pc == (greg_t)sys_sysenter || pc == (greg_t)brand_sys_sysenter))
+	    (pc == (greg_t)sys_sysenter || pc == (greg_t)brand_sys_sysenter ||
+	    pc == (greg_t)tr_sys_sysenter ||
+	    pc == (greg_t)tr_brand_sys_sysenter)) {
+#else
+	if (tt == T_SGLSTP &&
+	    (pc == (greg_t)sys_sysenter || pc == (greg_t)brand_sys_sysenter)) {
+#endif
 		return (1);
+	}
 
 	return (0);
 }

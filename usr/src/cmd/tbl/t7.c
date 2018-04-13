@@ -62,6 +62,7 @@ for(c=0; c<ncol; c++)
 			if (table[ldata][c].rcol)
 			  if (lused[c]) /*Zero field width*/
 				fprintf(tabout, "\\n(%du ",c+CMID);
+			/* FALLTHROUGH */
 		case 'c':
 		case 'l':
 		case 'r':

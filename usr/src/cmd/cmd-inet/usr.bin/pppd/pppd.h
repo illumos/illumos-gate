@@ -82,15 +82,22 @@ extern "C" {
  * If this evaluates non-zero, then sifup() must be called before
  * sifaddr().
  */
-#define SIFUPFIRST \
- (defined(SVR4) && (defined(SNI) || defined(__USLC__)))
+#if (defined(SVR4) && (defined(SNI) || defined(__USLC__)))
+#define SIFUPFIRST (1)
+#else
+#define SIFUPFIRST (0)
+#endif
 
 /*
  * If this evaluates non-zero, then sif6up() must be called before
  * sif6addr().
  */
-#define SIF6UPFIRST \
- (defined(__linux__) || (defined(SVR4) && (defined(SNI) || defined(__USLC__))))
+#if (defined(__linux__) || \
+	(defined(SVR4) && (defined(SNI) || defined(__USLC__))))
+#define SIF6UPFIRST (1)
+#else
+#define SIF6UPFIRST (0)
+#endif
 
 /*
  * Option descriptor structure.

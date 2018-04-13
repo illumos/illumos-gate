@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <npi_mac.h>
 
 #define	MIF_DELAY	500
@@ -1292,6 +1290,7 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 			    " npi_mac_port_attr" "MAC_PORT_IPG:"
 			    "  Invalid Input: portn <%d>",
 			    portn));
+			/* FALLTHROUGH */
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}
@@ -1390,6 +1389,7 @@ npi_mac_port_attr(npi_handle_t handle, io_op_t op, uint8_t portn,
 			    " MAC_PORT_IPG:"
 			    " Invalid Input: portn <%d>",
 			    portn));
+			/* FALLTHROUGH */
 		default:
 			return (NPI_FAILURE | NPI_MAC_PORT_INVALID(portn));
 		}

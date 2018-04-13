@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_PC_MMU_H
 #define	_SYS_PC_MMU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,8 +50,15 @@ void reload_cr3(void);
 
 #ifndef _BOOT
 
-void mmu_tlbflush_entry(caddr_t);
-void setcr3(ulong_t);
+extern uint64_t kpti_safe_cr3;
+
+#define	INVPCID_ADDR		(0)
+#define	INVPCID_ID		(1)
+#define	INVPCID_ALL_GLOBAL	(2)
+#define	INVPCID_ALL_NONGLOBAL	(3)
+
+extern void invpcid_insn(uint64_t, uint64_t, uintptr_t);
+extern void tr_mmu_flush_user_range(uint64_t, size_t, size_t, uint64_t);
 
 #if defined(__GNUC__)
 #include <asm/mmu.h>

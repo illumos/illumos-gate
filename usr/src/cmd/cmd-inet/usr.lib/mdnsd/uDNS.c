@@ -2310,7 +2310,8 @@ mDNSlocal void UpdateOneSRVRecord(mDNS *m, AuthRecord *rr)
 
     case regState_NATError:
         if (!NATChanged) return;
-    // if nat changed, register if we have a target (below)
+	// if nat changed, register if we have a target (below)
+	/* FALLTHROUGH */
 
     case regState_NoTarget:
         if (!newtarget->c[0])

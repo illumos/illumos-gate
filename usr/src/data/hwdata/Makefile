@@ -22,24 +22,30 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/data/Makefile.data
 
-HWDATA=		pci.ids usb.ids
+HWDATA=		pci.ids usb.ids efi.fixes
 HWDATADIR=	$(ROOT)/usr/share/hwdata
 ROOTHWDATA=	$(HWDATA:%=$(HWDATADIR)/%)
 
-CLOBBERFILES=	THIRDPARTYLICENSE.pciids
+CLOBBERFILES=	THIRDPARTYLICENSE.pciids THIRDPARTYLICENSE.efifixes
 
 $(ROOTHWDATA):=	FILEMODE = 444
 
-all install:	THIRDPARTYLICENSE.pciids
+all install:	THIRDPARTYLICENSE.pciids THIRDPARTYLICENSE.efifixes
 
 THIRDPARTYLICENSE.pciids: pci.ids THIRDPARTYLICENSE.pciids.tmpl
 		$(RM) $@
 		$(SED) -e '/^$$/,$$ d' < pci.ids > $@
 		$(CAT) THIRDPARTYLICENSE.pciids.tmpl >> $@
+
+THIRDPARTYLICENSE.efifixes: efi.fixes THIRDPARTYLICENSE.efifixes.tmpl
+		$(RM) $@
+		$(SED) -e '/^$$/,$$ d' < efi.fixes > $@
+		$(CAT) THIRDPARTYLICENSE.efifixes.tmpl >> $@
 
 install:	$(ROOTHWDATA)
 

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_SVCCTL_NDL_
@@ -32,7 +34,7 @@
  * stop services.
  */
 
-#include "ndrtypes.ndl"
+#include <libmlrpc/ndrtypes.ndl>
 
 /* Windows NT */
 #define SVCCTL_OPNUM_Close			0x00

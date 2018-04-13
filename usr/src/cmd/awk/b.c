@@ -28,8 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	DEBUG
 
 #include "awk.h"
@@ -639,6 +637,7 @@ primary(void)
 			ERROR "syntax error in regular expression %s at %s",
 			    lastre, prestr FATAL;
 		}
+		/* FALLTHROUGH */
 	default:
 		ERROR "illegal primary in regular expression %s at %s",
 		    lastre, prestr FATAL;

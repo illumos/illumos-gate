@@ -23,7 +23,7 @@
 #include <sys/disk.h>
 #include <sys/reboot.h>
 #include <sys/queue.h>
-#include <multiboot.h>
+#include <sys/multiboot.h>
 
 #include <machine/bootinfo.h>
 #include <machine/elf.h>

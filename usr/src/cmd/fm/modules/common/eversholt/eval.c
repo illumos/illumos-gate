@@ -1698,6 +1698,7 @@ eval_expr(struct node *np, struct lut *ex, struct node *events[],
 		out(O_ALTFP|O_DIE, "eval_expr: wrong context for operation %s",
 		    ptree_nodetype2str(np->t));
 		/*NOTREACHED*/
+		break;
 
 	case T_NE:
 		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,

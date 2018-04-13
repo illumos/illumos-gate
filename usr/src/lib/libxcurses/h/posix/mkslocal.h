@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * <mkslocal.h>, POSIX Version - local <mks.h> requirements
  *
@@ -814,7 +812,7 @@ char	**m_setenv ANSI((void));/* for use of the environment variables via
 				/* this pathname identifies a file that
 				 * is similar to M_FSMOUNT, but instead of 
 				 * the actively mounted file systems, it 
-				 * has a list of ALL possible filesytems
+				 * has a list of ALL possible filesystems
 				 * that could be mounted.
 				 * This file normally used by the mount 
 				 * command to find all the file systems

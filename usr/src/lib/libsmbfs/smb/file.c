@@ -204,7 +204,7 @@ smb_fh_open(struct smb_ctx *ctx, const char *path, int oflag)
 }
 
 int
-smb_fh_read(int fd, off_t offset, size_t count,
+smb_fh_read(int fd, off64_t offset, size_t count,
 	char *dst)
 {
 	struct smbioc_rw rwrq;
@@ -221,7 +221,7 @@ smb_fh_read(int fd, off_t offset, size_t count,
 }
 
 int
-smb_fh_write(int fd, off_t offset, size_t count,
+smb_fh_write(int fd, off64_t offset, size_t count,
 	const char *src)
 {
 	struct smbioc_rw rwrq;

@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
- * Copyright (c) 2017 Joyent, Inc.
+ * Copyright (c) 2018 Joyent, Inc.
  */
 
 /*
@@ -81,7 +81,7 @@ ndptrap_frstor(void)
 
 #define	NPTRAP_NOERR(trapno)	\
 	pushq	$0;		\
-	pushq	$trapno	
+	pushq	$trapno
 
 #define	TRAP_NOERR(trapno)	\
 	XPV_TRAP_POP;		\
@@ -93,13 +93,13 @@ ndptrap_frstor(void)
  */
 #define	TRAP_ERR(trapno)	\
 	XPV_TRAP_POP;		\
-	pushq	$trapno	
+	pushq	$trapno
 
 #else /* __xpv && __amd64 */
 
 #define	TRAP_NOERR(trapno)	\
 	push	$0;		\
-	push	$trapno	
+	push	$trapno
 
 #define	NPTRAP_NOERR(trapno) TRAP_NOERR(trapno)
 
@@ -108,10 +108,24 @@ ndptrap_frstor(void)
  * onto stack.
  */
 #define	TRAP_ERR(trapno)	\
-	push	$trapno	
+	push	$trapno
 
 #endif	/* __xpv && __amd64 */
 
+	/*
+	 * These are the stacks used on cpu0 for taking double faults,
+	 * NMIs and MCEs (the latter two only on amd64 where we have IST).
+	 *
+	 * We define them here instead of in a C file so that we can page-align
+	 * them (gcc won't do that in a .c file).
+	 */
+	.data
+	DGDEF3(dblfault_stack0, DEFAULTSTKSZ, MMU_PAGESIZE)
+	.fill	DEFAULTSTKSZ, 1, 0
+	DGDEF3(nmi_stack0, DEFAULTSTKSZ, MMU_PAGESIZE)
+	.fill	DEFAULTSTKSZ, 1, 0
+	DGDEF3(mce_stack0, DEFAULTSTKSZ, MMU_PAGESIZE)
+	.fill	DEFAULTSTKSZ, 1, 0
 
 	/*
 	 * #DE
@@ -163,6 +177,12 @@ ndptrap_frstor(void)
 	je	1f
 	leaq	brand_sys_sysenter(%rip), %r11
 	cmpq	%r11, 24(%rsp)	/* Compare to saved r_rip on the stack */
+	je	1f
+	leaq	tr_sys_sysenter(%rip), %r11
+	cmpq	%r11, 24(%rsp)
+	je	1f
+	leaq	tr_brand_sys_sysenter(%rip), %r11
+	cmpq	%r11, 24(%rsp)
 	jne	2f
 1:	SWAPGS
 2:	popq	%r11
@@ -214,6 +234,10 @@ ndptrap_frstor(void)
  * the cpu structs for all processors till we find a match for the gdt
  * of the trapping processor.  The stack is expected to be pointing at
  * the standard regs pushed by hardware on a trap (plus error code and trapno).
+ *
+ * It's ok for us to clobber gsbase here (and possibly end up with both gsbase
+ * and kgsbase set to the same value) because we're not going back the normal
+ * way out of here (via IRET). Where we're going, we don't need no user %gs.
  */
 #define	SET_CPU_GSBASE							\
 	subq	$REGOFF_TRAPNO, %rsp;	/* save regs */			\
@@ -294,7 +318,7 @@ ndptrap_frstor(void)
 	call	av_dispatch_nmivect
 
 	INTR_POP
-	IRET
+	jmp	tr_iret_auto
 	/*NOTREACHED*/
 	SET_SIZE(nmiint)
 
@@ -319,8 +343,8 @@ ndptrap_frstor(void)
 
 	movl	%esp, %ebp
 
-	pushl	%ebp	
-	call	av_dispatch_nmivect	
+	pushl	%ebp
+	call	av_dispatch_nmivect
 	addl	$4, %esp
 
 	INTR_POP_USER
@@ -433,7 +457,7 @@ ud_push:
 	movq	32(%rsp), %rax		/* reload calling RSP */
 	movq	%rbp, (%rax)		/* store %rbp there */
 	popq	%rax			/* pop off temp */
-	IRET				/* return from interrupt */
+	jmp	tr_iret_kernel		/* return from interrupt */
 	/*NOTREACHED*/
 
 ud_leave:
@@ -454,7 +478,7 @@ ud_leave:
 	movq	%rbp, 32(%rsp)		/* store new %rsp */
 	movq	%rax, %rbp		/* set new %rbp */
 	popq	%rax			/* pop off temp */
-	IRET				/* return from interrupt */
+	jmp	tr_iret_kernel		/* return from interrupt */
 	/*NOTREACHED*/
 
 ud_nop:
@@ -464,7 +488,7 @@ ud_nop:
 	 */
 	INTR_POP
 	incq	(%rsp)
-	IRET
+	jmp	tr_iret_kernel
 	/*NOTREACHED*/
 
 ud_ret:
@@ -475,7 +499,7 @@ ud_ret:
 	movq	%rax, 8(%rsp)		/* store calling RIP */
 	addq	$8, 32(%rsp)		/* adjust new %rsp */
 	popq	%rax			/* pop off temp */
-	IRET				/* return from interrupt */
+	jmp	tr_iret_kernel		/* return from interrupt */
 	/*NOTREACHED*/
 
 ud_trap:
@@ -633,7 +657,7 @@ _emul_done:
 	 */
 	TRAP_NOERR(T_NOEXTFLT)	/* $7 */
 	INTR_PUSH
-	
+
 	/*
 	 * We want to do this quickly as every lwp using fp will take this
 	 * after a context switch -- we do the frequent path in ndptrap_frstor
@@ -709,7 +733,7 @@ _patch_xrstorq_rbx:
 	SWAPGS				/* if from user, need swapgs */
 	LOADCPU(%rax)
 	SWAPGS
-2:	
+2:
 	/*
 	 * Xrstor needs to use edx as part of its flag.
 	 * NOTE: have to push rdx after "cmpw ...24(%rsp)", otherwise rsp+$24
@@ -749,7 +773,7 @@ _patch_xrstorq_rbx:
 	popq	%rdx
 	popq	%rbx
 	popq	%rax
-	IRET
+	jmp	tr_iret_auto
 	/*NOTREACHED*/
 
 .handle_in_trap:
@@ -867,7 +891,7 @@ _patch_xrstor_ebx:
 
 1:	addq	$DESCTBR_SIZE, %rsp
 	popq	%rax
-	
+
 	DFTRAP_PUSH
 
 	/*
@@ -1127,7 +1151,7 @@ check_for_user_address:
 #endif	/* !__amd64 */
 
 	ENTRY_NP(resvtrap)
-	TRAP_NOERR(15)		/* (reserved)  */
+	TRAP_NOERR(T_RESVTRAP)	/* (reserved)  */
 	jmp	cmntrap
 	SET_SIZE(resvtrap)
 
@@ -1207,14 +1231,9 @@ check_for_user_address:
 	SET_SIZE(xmtrap)
 
 	ENTRY_NP(invaltrap)
-	TRAP_NOERR(30)		/* very invalid */
+	TRAP_NOERR(T_INVALTRAP)	/* very invalid */
 	jmp	cmntrap
 	SET_SIZE(invaltrap)
-
-	ENTRY_NP(invalint)
-	TRAP_NOERR(31)		/* even more so */
-	jmp	cmnint
-	SET_SIZE(invalint)
 
 	.globl	fasttable
 
@@ -1286,7 +1305,7 @@ check_for_user_address:
 	ENTRY_NP(fast_null)
 	XPV_TRAP_POP
 	orq	$PS_C, 24(%rsp)	/* set carry bit in user flags */
-	IRET
+	jmp	tr_iret_auto
 	/*NOTREACHED*/
 	SET_SIZE(fast_null)
 

@@ -2,7 +2,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_SEGMENTS_H
@@ -98,28 +98,29 @@ extern "C" {
  */
 #if defined(__xpv)
 
-#if defined(__amd64)
-
 #define	SEL_XPL		0		/* hypervisor privilege level */
 #define	SEL_KPL		3		/* both kernel and user in ring 3 */
 #define	TRP_KPL		1		/* system gate priv (user blocked) */
-
-#elif defined(__i386)
-
-#define	SEL_XPL		0		/* hypervisor privilege level */
-#define	SEL_KPL		1		/* kernel privilege level */
-#define	TRP_KPL		SEL_KPL		/* system gate priv (user blocked) */
-
-#endif	/* __i386 */
-
 #define	TRP_XPL		0		/* system gate priv (hypervisor) */
+
+#define	IST_DBG		0
 
 #else	/* __xpv */
 
 #define	SEL_KPL		0		/* kernel privilege level on metal */
 #define	TRP_KPL		SEL_KPL		/* system gate priv (user blocked) */
 
+
+#define	IST_DF		1
+#define	IST_NMI		2
+#define	IST_MCE		3
+#define	IST_DBG		4
+#define	IST_NESTABLE	5
+#define	IST_DEFAULT	6
+
 #endif	/* __xpv */
+
+#define	IST_NONE	0
 
 #define	SEL_UPL		3		/* user priority level */
 #define	TRP_UPL		3		/* system gate priv (user allowed) */
@@ -401,6 +402,8 @@ extern void set_usegd(user_desc_t *, void *, size_t, uint_t, uint_t,
 
 #endif	/* __i386 */
 
+extern uint_t idt_vector_to_ist(uint_t);
+
 extern void set_gatesegd(gate_desc_t *, void (*)(void), selector_t,
     uint_t, uint_t, uint_t);
 
@@ -646,6 +649,10 @@ void init_boot_gdt(user_desc_t *);
 #define	MINNLDT		512	/* Current min solaris ldt size (1 4K page) */
 #define	MAXNLDT		8192	/* max solaris ldt size (16 4K pages) */
 
+#ifdef _KERNEL
+#define	LDT_CPU_SIZE	(16 * 4096)	/* Size of kernel per-CPU allocation */
+#endif
+
 #ifndef	_ASM
 
 extern	gate_desc_t	*idt0;
@@ -686,9 +693,26 @@ extern void xmtrap();
 extern void fasttrap();
 extern void dtrace_ret();
 
+/* KPTI trampolines */
+extern void tr_invaltrap();
+extern void tr_div0trap(), tr_dbgtrap(), tr_nmiint(), tr_brktrap();
+extern void tr_ovflotrap(), tr_boundstrap(), tr_invoptrap(), tr_ndptrap();
+#if !defined(__xpv)
+extern void tr_syserrtrap();
+#endif
+extern void tr_invaltrap(), tr_invtsstrap(), tr_segnptrap(), tr_stktrap();
+extern void tr_gptrap(), tr_pftrap(), tr_ndperr();
+extern void tr_overrun(), tr_resvtrap();
+extern void tr_achktrap(), tr_mcetrap();
+extern void tr_xmtrap();
+extern void tr_fasttrap();
+extern void tr_dtrace_ret();
+
 #if !defined(__amd64)
 extern void pentium_pftrap();
 #endif
+
+extern uint64_t kpti_enable;
 
 #endif /* _ASM */
 

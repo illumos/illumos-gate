@@ -61,10 +61,13 @@ COMMONBASE=	$(UTSBASE)/../common
 # The NOT_RELEASE_BUILD noise is to maintain compatibility with the
 # gatekeeper's nightly build script.
 #
+DEF_BUILDS32				= obj32
 DEF_BUILDS64				= obj64
 DEF_BUILDSONLY64			= obj64
+$(NOT_RELEASE_BUILD)DEF_BUILDS32	= debug32
 $(NOT_RELEASE_BUILD)DEF_BUILDS64	= debug64
 $(NOT_RELEASE_BUILD)DEF_BUILDSONLY64	= debug64
+ALL_BUILDS32				= obj32 debug32
 ALL_BUILDS64				= obj64 debug64
 ALL_BUILDSONLY64			= obj64 debug64
 
@@ -73,11 +76,14 @@ ALL_BUILDSONLY64			= obj64 debug64
 #	or modules in 64b dirs that aren't built 32b we
 #	need to create empty modlintlib files so global lint works
 #
+LINT32_BUILDS	= debug32
 LINT64_BUILDS	= debug64
 
 #
-#	Build class (64b)
+#	Build class (32b or 64b)
 #
+CLASS_OBJ32	= 32
+CLASS_DBG32	= 32
 CLASS_OBJ64	= 64
 CLASS_DBG64	= 64
 CLASS		= $(CLASS_$(BUILD_TYPE))
@@ -85,6 +91,8 @@ CLASS		= $(CLASS_$(BUILD_TYPE))
 #
 #	Build subdirectory
 #
+OBJS_DIR_OBJ32	= obj32
+OBJS_DIR_DBG32	= debug32
 OBJS_DIR_OBJ64	= obj64
 OBJS_DIR_DBG64	= debug64
 OBJS_DIR	= $(OBJS_DIR_$(BUILD_TYPE))

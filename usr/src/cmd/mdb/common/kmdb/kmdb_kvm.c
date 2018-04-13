@@ -21,6 +21,8 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <kmdb/kmdb_kvm.h>
@@ -549,7 +551,6 @@ kmt_dmod_status(char *msg, int state)
 static int
 kmt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	kmt_data_t *kmt = mdb.m_target->t_data;
 	struct utsname uts;
 	char uuid[37];
 	kreg_t tt;
@@ -577,11 +578,6 @@ kmt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		(void) strcpy(uuid, "(invalid)");
 	}
 	mdb_printf("image uuid: %s\n", uuid);
-
-	if (kmt->kmt_cpu != NULL) {
-		mdb_printf("CPU-specific support: %s\n",
-		    kmt_cpu_name(kmt->kmt_cpu));
-	}
 
 	mdb_printf("DTrace state: %s\n", (kmdb_kdi_dtrace_get_state() ==
 	    KDI_DTSTATE_DTRACE_ACTIVE ? "active (debugger breakpoints cannot "
@@ -2392,9 +2388,6 @@ kmt_destroy(mdb_tgt_t *t)
 	if (kmt->kmt_trapmap != NULL)
 		mdb_free(kmt->kmt_trapmap, BT_SIZEOFMAP(kmt->kmt_trapmax));
 
-	if (kmt->kmt_cpu != NULL)
-		kmt_cpu_destroy(kmt->kmt_cpu);
-
 	if (kmt != NULL)
 		mdb_free(kmt, sizeof (kmt_data_t));
 }
@@ -2435,7 +2428,6 @@ static const mdb_tgt_ops_t kmt_ops = {
 	(int (*)()) mdb_tgt_notsup,		/* t_run */
 	kmt_step,				/* t_step */
 	kmt_step_out,				/* t_step_out */
-	kmt_step_branch,			/* t_step_branch */
 	kmt_next,				/* t_next */
 	kmt_continue,				/* t_cont */
 	(int (*)()) mdb_tgt_notsup,		/* t_signal */
@@ -2504,10 +2496,6 @@ kmt_sync(mdb_tgt_t *t)
 		(void) mdb_tgt_sespec_activate_all(t);
 	}
 
-	if (kmt->kmt_cpu_retry && ((kmt->kmt_cpu = kmt_cpu_create(t)) !=
-	    NULL || errno != EAGAIN))
-		kmt->kmt_cpu_retry = FALSE;
-
 	(void) mdb_tgt_status(t, &t->t_status);
 }
 
@@ -2536,7 +2524,6 @@ kmdb_kvm_create(mdb_tgt_t *t, int argc, const char *argv[])
 	kmt_init_isadep(t);
 
 	kmt->kmt_symavail = FALSE;
-	kmt->kmt_cpu_retry = TRUE;
 
 	bzero(&kmt_defbp_list, sizeof (mdb_list_t));
 

@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_LANMAN_NDL_
@@ -30,7 +32,7 @@
  * LanMan RPC (WKSSVC and SRVSVC) interface definitions.
  */
 
-#include "ndrtypes.ndl"
+#include <libmlrpc/ndrtypes.ndl>
 
 /*
  * WARNING: The cpp(1) macros in this file are not understood by

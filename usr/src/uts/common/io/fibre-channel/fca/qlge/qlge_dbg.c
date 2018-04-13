@@ -743,9 +743,9 @@ ql_dump_pci_config(qlge_t *qlge)
 		    qlge->pci_cfg.pci_doorbell_mem_base_address_lower);
 		ql_printf("\tpci_doorbell_mem_base_address_upper =0x%x.\n",
 		    qlge->pci_cfg.pci_doorbell_mem_base_address_upper);
-		ql_printf("\tSubsytem Vendor Id =0x%x.\n",
+		ql_printf("\tSubsystem Vendor Id =0x%x.\n",
 		    qlge->pci_cfg.sub_vendor_id);
-		ql_printf("\tSubsytem Id =0x%x.\n",
+		ql_printf("\tSubsystem Id =0x%x.\n",
 		    qlge->pci_cfg.sub_device_id);
 		ql_printf("\tExpansion ROM Base Register =0x%x.\n",
 		    qlge->pci_cfg.expansion_rom);

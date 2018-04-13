@@ -64,7 +64,7 @@ static int validate_size(char *disk, diskaddr_t size);
 static void exenv(void);
 static struct fs *read_sb(char *);
 /*PRINTFLIKE1*/
-static void fatal(char *fmt, ...);
+static void fatal(char *fmt, ...) __NORETURN;
 
 #define	EPATH "PATH=/usr/sbin:/sbin:"
 #define	CPATH "/sbin"					/* an EPATH element */

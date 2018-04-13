@@ -21,12 +21,12 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _KVM_ISADEP_H
 #define	_KVM_ISADEP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,7 +45,6 @@ extern int kmt_wrmsr(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 extern int kmt_rdpcicfg(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int kmt_wrpcicfg(uintptr_t, uint_t, int, const mdb_arg_t *);
-extern int kmt_msr_validate(const kdi_msr_t *);
 
 #ifdef __cplusplus
 }

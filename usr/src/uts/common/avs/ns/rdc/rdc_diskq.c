@@ -192,7 +192,7 @@ rdc_open_diskq(rdc_k_info_t *krdc)
 
 	mutex_enter(&grp->diskqmutex);
 	mutexheld++;
-	if (&urdc->disk_queue[0] == '\0') {
+	if (urdc->disk_queue[0] == '\0') {
 		goto fail;
 	}
 
@@ -606,7 +606,7 @@ rdc_read_diskq_header(rdc_k_info_t *krdc)
 		(void) snprintf(buf, NSC_MAXPATH, "%s:%s", urdc->secondary.intf,
 		    &urdc->secondary.intf[0]);
 		cmn_err(CE_WARN, "!Disk Queue Header read failed for %s",
-		    &urdc->group_name[0] == '\0' ? buf:
+		    urdc->group_name[0] == '\0' ? buf:
 		    &urdc->group_name[0]);
 		return (-1);
 	}
@@ -626,7 +626,7 @@ rdc_read_diskq_header(rdc_k_info_t *krdc)
 		(void) snprintf(buf, NSC_MAXPATH, "%s:%s", urdc->secondary.intf,
 		    &urdc->secondary.file[0]);
 		cmn_err(CE_WARN, "!Disk Queue Header read failed(%d) for %s",
-		    rc, &urdc->group_name[0] == '\0' ? buf :
+		    rc, urdc->group_name[0] == '\0' ? buf :
 		    &urdc->group_name[0]);
 		return (-1);
 	}

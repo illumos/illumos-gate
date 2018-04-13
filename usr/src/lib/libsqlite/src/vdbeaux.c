@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2003 September 6
 **
@@ -864,8 +861,8 @@ int sqliteVdbeReset(Vdbe *p, char **pzErrMsg){
           }
           break;
         }
-        /* Fall through to ROLLBACK */
       }
+      /* FALLTHROUGH */
       case OE_Rollback: {
         sqliteRollbackAll(db);
         db->flags &= ~SQLITE_InTrans;

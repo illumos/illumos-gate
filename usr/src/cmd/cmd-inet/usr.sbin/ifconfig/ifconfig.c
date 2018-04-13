@@ -213,6 +213,7 @@ static dladm_status_t	ifconfig_dladm_open(const char *, datalink_class_t,
 static void		dladmerr_exit(dladm_status_t status, const char *str);
 static void		ipadmerr_exit(ipadm_status_t status, const char *str);
 static boolean_t	ifconfig_use_libipadm(int, const char *);
+void			Perror0_exit(const char *cmd) __NORETURN;
 
 #define	max(a, b)	((a) < (b) ? (b) : (a))
 

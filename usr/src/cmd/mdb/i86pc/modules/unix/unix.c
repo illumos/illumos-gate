@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -409,6 +409,7 @@ static struct {
 typedef struct ttrace_dcmd {
 	processorid_t ttd_cpu;
 	uint_t ttd_extended;
+	uintptr_t ttd_kthread;
 	trap_trace_ctl_t ttd_ttc[NCPU];
 } ttrace_dcmd_t;
 
@@ -431,6 +432,9 @@ ttrace_dumpregs(trap_trace_rec_t *rec)
 	mdb_printf(THREEREGS, DUMP(gs), "trp", regs->r_trapno, DUMP(err));
 	mdb_printf(THREEREGS, DUMP(rip), DUMP(cs), DUMP(rfl));
 	mdb_printf(THREEREGS, DUMP(rsp), DUMP(ss), "cr2", rec->ttr_cr2);
+	mdb_printf("         %3s: %16lx %3s: %16lx\n",
+	    "fsb", regs->__r_fsbase,
+	    "gsb", regs->__r_gsbase);
 	mdb_printf("\n");
 }
 
@@ -476,6 +480,10 @@ ttrace_walk(uintptr_t addr, trap_trace_rec_t *rec, ttrace_dcmd_t *dcmd)
 	}
 
 	if (dcmd->ttd_cpu != -1 && cpu != dcmd->ttd_cpu)
+		return (WALK_NEXT);
+
+	if (dcmd->ttd_kthread != 0 &&
+	    dcmd->ttd_kthread != rec->ttr_curthread)
 		return (WALK_NEXT);
 
 	mdb_printf("%3d %15llx ", cpu, rec->ttr_stamp);
@@ -537,7 +545,8 @@ ttrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_getopts(argc, argv,
-	    'x', MDB_OPT_SETBITS, TRUE, &dcmd.ttd_extended, NULL) != argc)
+	    'x', MDB_OPT_SETBITS, TRUE, &dcmd.ttd_extended,
+	    't', MDB_OPT_UINTPTR, &dcmd.ttd_kthread, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (DCMD_HDRSPEC(flags)) {
@@ -747,7 +756,18 @@ ptable_help(void)
 	    "Given a PFN holding a page table, print its contents, and\n"
 	    "the address of the corresponding htable structure.\n"
 	    "\n"
-	    "-m Interpret the PFN as an MFN (machine frame number)\n");
+	    "-m Interpret the PFN as an MFN (machine frame number)\n"
+	    "-l force page table level (3 is top)\n");
+}
+
+static void
+ptmap_help(void)
+{
+	mdb_printf(
+	    "Report all mappings represented by the page table hierarchy\n"
+	    "rooted at the given cr3 value / physical address.\n"
+	    "\n"
+	    "-w run ::whatis on mapping start addresses\n");
 }
 
 /*
@@ -886,7 +906,7 @@ x86_featureset_cmd(uintptr_t addr, uint_t flags, int argc,
 static int
 crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	ulong_t cr0, cr4;
+	ulong_t cr0, cr2, cr3, cr4;
 	static const mdb_bitmask_t cr0_flag_bits[] = {
 		{ "PE",		CR0_PE,		CR0_PE },
 		{ "MP",		CR0_MP,		CR0_MP },
@@ -900,6 +920,12 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		{ "CD",		CR0_CD,		CR0_CD },
 		{ "PG",		CR0_PG,		CR0_PG },
 		{ NULL,		0,		0 }
+	};
+
+	static const mdb_bitmask_t cr3_flag_bits[] = {
+		{ "PCD",	CR3_PCD,	CR3_PCD },
+		{ "PWT",	CR3_PWT,	CR3_PWT },
+		{ NULL,		0,		0, }
 	};
 
 	static const mdb_bitmask_t cr4_flag_bits[] = {
@@ -916,6 +942,7 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		{ "OSXMMEXCPT",	CR4_OSXMMEXCPT,	CR4_OSXMMEXCPT },
 		{ "VMXE",	CR4_VMXE,	CR4_VMXE },
 		{ "SMXE",	CR4_SMXE,	CR4_SMXE },
+		{ "PCIDE",	CR4_PCIDE,	CR4_PCIDE },
 		{ "OSXSAVE",	CR4_OSXSAVE,	CR4_OSXSAVE },
 		{ "SMEP",	CR4_SMEP,	CR4_SMEP },
 		{ "SMAP",	CR4_SMAP,	CR4_SMAP },
@@ -923,9 +950,22 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	};
 
 	cr0 = kmdb_unix_getcr0();
+	cr2 = kmdb_unix_getcr2();
+	cr3 = kmdb_unix_getcr3();
 	cr4 = kmdb_unix_getcr4();
-	mdb_printf("%%cr0 = 0x%08x <%b>\n", cr0, cr0, cr0_flag_bits);
-	mdb_printf("%%cr4 = 0x%08x <%b>\n", cr4, cr4, cr4_flag_bits);
+	mdb_printf("%%cr0 = 0x%lx <%b>\n", cr0, cr0, cr0_flag_bits);
+	mdb_printf("%%cr2 = 0x%lx <%a>\n", cr2, cr2);
+
+	if ((cr4 & CR4_PCIDE)) {
+		mdb_printf("%%cr3 = 0x%lx <pfn:0x%lx pcid:%lu>\n", cr3,
+		    cr3 >> MMU_PAGESHIFT, cr3 & MMU_PAGEOFFSET);
+	} else {
+		mdb_printf("%%cr3 = 0x%lx <pfn:0x%lx flags:%b>\n", cr3,
+		    cr3 >> MMU_PAGESHIFT, cr3, cr3_flag_bits);
+	}
+
+	mdb_printf("%%cr4 = 0x%lx <%b>\n", cr4, cr4, cr4_flag_bits);
+
 	return (DCMD_OK);
 }
 #endif
@@ -933,7 +973,7 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static const mdb_dcmd_t dcmds[] = {
 	{ "gate_desc", ":", "dump a gate descriptor", gate_desc },
 	{ "idt", ":[-v]", "dump an IDT", idt },
-	{ "ttrace", "[-x]", "dump trap trace buffers", ttrace },
+	{ "ttrace", "[-x] [-t kthread]", "dump trap trace buffers", ttrace },
 	{ "vatopfn", ":[-a as]", "translate address to physical page",
 	    va2pfn_dcmd },
 	{ "report_maps", ":[-m]",
@@ -941,9 +981,11 @@ static const mdb_dcmd_t dcmds[] = {
 	    report_maps_dcmd, report_maps_help },
 	{ "htables", "", "Given hat_t *, lists all its htable_t * values",
 	    htables_dcmd, htables_help },
-	{ "ptable", ":[-m]", "Given PFN, dump contents of a page table",
+	{ "ptable", ":[-lm]", "Given PFN, dump contents of a page table",
 	    ptable_dcmd, ptable_help },
-	{ "pte", ":[-p XXXXX] [-l N]", "print human readable page table entry",
+	{ "ptmap", ":", "Given a cr3 value, dump all mappings",
+	    ptmap_dcmd, ptmap_help },
+	{ "pte", ":[-l N]", "print human readable page table entry",
 	    pte_dcmd },
 	{ "pfntomfn", ":", "convert physical page to hypervisor machine page",
 	    pfntomfn_dcmd },

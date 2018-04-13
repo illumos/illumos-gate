@@ -26,17 +26,22 @@
 #ifndef	_LIBMLSVC_H
 #define	_LIBMLSVC_H
 
-#include <uuid/uuid.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/ksynch.h>
+#include <uuid/uuid.h>
+
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
+#include <syslog.h>
 #include <netdb.h>
 #include <libuutil.h>
-#include <smbsrv/wintypes.h>
+
+#include <smb/wintypes.h>
+#include <libmlrpc/libmlrpc.h>
+
 #include <smbsrv/hash_table.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/smb_privilege.h>
@@ -44,8 +49,6 @@
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_dfs.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libmlrpc.h>
-#include <smbsrv/ndl/lsarpc.ndl>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -128,24 +131,6 @@ typedef struct ms_luid {
 } ms_luid_t;
 
 /*
- * Information about a server as reported by NetServerGetInfo.
- * The SV_PLATFORM and SV_TYPE definitions are in srvsvc.ndl.
- */
-typedef struct srvsvc_server_info {
-	uint32_t	sv_platform_id;
-	char		*sv_name;
-	uint32_t	sv_version_major;
-	uint32_t	sv_version_minor;
-	uint32_t	sv_type;
-	char		*sv_comment;
-	uint32_t	sv_os;
-} srvsvc_server_info_t;
-
-int srvsvc_net_server_getinfo(char *, char *, srvsvc_server_info_t *);
-int srvsvc_net_remote_tod(char *, char *, struct timeval *, struct tm *);
-
-
-/*
  * A client_t is created while binding a client connection to hold the
  * context for calls made using that connection.
  *
@@ -153,28 +138,22 @@ int srvsvc_net_remote_tod(char *, char *, struct timeval *, struct tm *);
  * ensure that each handle has a pointer to the client_t.  When the top
  * level (bind) handle is released, we close the connection.
  */
-typedef struct mlsvc_handle {
-	ndr_hdid_t			handle;
-	ndr_client_t			*clnt;
-	srvsvc_server_info_t		svinfo;
-} mlsvc_handle_t;
+typedef struct mlrpc_handle mlsvc_handle_t;
 
+/* mlsvc_client.c */
 void ndr_rpc_init(void);
 void ndr_rpc_fini(void);
 uint32_t ndr_rpc_bind(mlsvc_handle_t *, char *, char *, char *, const char *);
 void ndr_rpc_unbind(mlsvc_handle_t *);
-int ndr_rpc_call(mlsvc_handle_t *, int, void *);
-void ndr_rpc_set_nonull(mlsvc_handle_t *);
-const srvsvc_server_info_t *ndr_rpc_server_info(mlsvc_handle_t *);
-uint32_t ndr_rpc_server_os(mlsvc_handle_t *);
-int ndr_rpc_get_ssnkey(mlsvc_handle_t *, unsigned char *, size_t);
-void *ndr_rpc_malloc(mlsvc_handle_t *, size_t);
-ndr_heap_t *ndr_rpc_get_heap(mlsvc_handle_t *);
-void ndr_rpc_release(mlsvc_handle_t *);
-boolean_t ndr_is_null_handle(mlsvc_handle_t *);
-boolean_t ndr_is_bind_handle(mlsvc_handle_t *);
-void ndr_inherit_handle(mlsvc_handle_t *, mlsvc_handle_t *);
 void ndr_rpc_status(mlsvc_handle_t *, int, uint32_t);
+
+/* These three get info about the connected client. */
+boolean_t ndr_is_admin(ndr_xa_t *);
+boolean_t ndr_is_poweruser(ndr_xa_t *);
+int32_t ndr_native_os(ndr_xa_t *);
+
+/* SRVSVC */
+int srvsvc_net_remote_tod(char *, char *, struct timeval *, struct tm *);
 
 /* SVCCTL service */
 /*

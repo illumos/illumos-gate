@@ -691,9 +691,9 @@ blacklisted_smbios(void)
 		strptr = &black_array[i];
 		if (strcmp(*strptr++, "SMBIOS") == 0) {
 			if (strcmp(*strptr++, mfg) == 0 &&
-			    ((char *)strptr == '\0' ||
+			    (*strptr[0] == '\0' ||
 			    strcmp(*strptr++, product) == 0) &&
-			    ((char *)strptr == '\0' ||
+			    (*strptr[0] == '\0' ||
 			    strcmp(*strptr++, version) == 0)) {
 				return (B_TRUE);
 			}

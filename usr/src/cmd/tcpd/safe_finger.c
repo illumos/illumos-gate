@@ -14,16 +14,13 @@
   * Author: Wietse Venema, Eindhoven University of Technology, The Netherlands.
   */
 
-#ifndef lint
-static char sccsid[] = "@(#) safe_finger.c 1.4 94/12/28 17:42:41";
-#endif
-
 /* System libraries */
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <pwd.h>
 
@@ -40,6 +37,7 @@ char    path[] = "PATH=/bin:/usr/bin:/usr/ucb:/usr/bsd:/etc:/usr/etc:/usr/sbin";
 #define	UNPRIV_NAME	"nobody"	/* Preferred privilege level */
 #define	UNPRIV_UGID	32767		/* Default uid and gid */
 
+void    perror_exit(char *text) __NORETURN;
 int     finger_pid;
 
 void    cleanup(sig)
@@ -136,8 +134,8 @@ char  **argv;
 
 /* perror_exit - report system error text and terminate */
 
-void    perror_exit(text)
-char   *text;
+void
+perror_exit(char *text)
 {
     perror(text);
     exit(1);

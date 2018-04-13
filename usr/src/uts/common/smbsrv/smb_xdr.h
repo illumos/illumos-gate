@@ -34,14 +34,13 @@ extern "C" {
 #include <sys/param.h>
 #include <sys/avl.h>
 #include <sys/list.h>
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 #include <smbsrv/smb_sid.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_ioctl.h>
 #include <smbsrv/smb_sid.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smb_dfs.h>
-#include <smbsrv/wintypes.h>
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/sysmacros.h>

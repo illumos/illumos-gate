@@ -23,7 +23,7 @@
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 #
@@ -102,8 +102,8 @@ MODSTUBS		= $(UTSBASE)/intel/ia32/ml/modstubs.s
 #
 #	Define supported builds
 #
-DEF_BUILDS		= $(DEF_BUILDS64) $(DEF_BUILDS32)
-ALL_BUILDS		= $(ALL_BUILDS64) $(ALL_BUILDS32)
+DEF_BUILDS		= $(DEF_BUILDS64)
+ALL_BUILDS		= $(ALL_BUILDS64)
 
 #
 #	x86 or amd64 inline templates
@@ -699,7 +699,7 @@ GENUNIX_KMODS	+= genunix
 #
 #	Performance Counter BackEnd modules (/usr/kernel/pcbe)
 #
-PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe core_pcbe
+PCBE_KMODS	+= p4_pcbe opteron_pcbe core_pcbe
 
 #
 #	MAC-Type Plugin Modules (/kernel/mac)

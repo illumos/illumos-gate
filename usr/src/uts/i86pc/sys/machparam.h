@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -293,7 +293,8 @@ extern "C" {
 #endif	/* __i386 */
 
 /*
- * Reserve pages just below KERNEL_TEXT for the GDT, IDT, TSS and debug info.
+ * Reserve pages just below KERNEL_TEXT for the GDT, IDT, LDT, TSS and debug
+ * info.
  *
  * For now, DEBUG_INFO_VA must be first in this list for "xm" initiated dumps
  * of solaris domUs to be usable with mdb. Relying on a fixed VA is not viable
@@ -303,7 +304,8 @@ extern "C" {
 #define	DEBUG_INFO_VA	(KERNEL_TEXT - MMU_PAGESIZE)
 #define	GDT_VA		(DEBUG_INFO_VA - MMU_PAGESIZE)
 #define	IDT_VA		(GDT_VA - MMU_PAGESIZE)
-#define	KTSS_VA		(IDT_VA - MMU_PAGESIZE)
+#define	LDT_VA		(IDT_VA - (16 * MMU_PAGESIZE))
+#define	KTSS_VA		(LDT_VA - MMU_PAGESIZE)
 #define	DFTSS_VA	(KTSS_VA - MMU_PAGESIZE)
 #define	MISC_VA_BASE	(DFTSS_VA)
 #define	MISC_VA_SIZE	(KERNEL_TEXT - MISC_VA_BASE)

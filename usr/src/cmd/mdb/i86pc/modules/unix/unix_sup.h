@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _UNIX_SUP_H
@@ -27,6 +27,8 @@ extern "C" {
 #endif
 
 extern ulong_t kmdb_unix_getcr0(void);
+extern ulong_t kmdb_unix_getcr2(void);
+extern ulong_t kmdb_unix_getcr3(void);
 extern ulong_t kmdb_unix_getcr4(void);
 
 #ifdef __cplusplus

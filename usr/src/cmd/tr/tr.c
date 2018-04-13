@@ -52,7 +52,7 @@ STR s1 = { STRING1, NORMAL, 0, OOBCH, 0, { 0, OOBCH }, NULL, NULL };
 STR s2 = { STRING2, NORMAL, 0, OOBCH, 0, { 0, OOBCH }, NULL, NULL };
 
 static struct cset *setup(char *, STR *, int, int);
-static void usage(void);
+static void usage(void) __NORETURN;
 
 static wint_t
 cmap_lookup(struct cmap *cm, wint_t from)

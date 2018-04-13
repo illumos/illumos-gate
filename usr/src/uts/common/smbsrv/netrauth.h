@@ -33,7 +33,7 @@
  */
 
 #include <sys/types.h>
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smbinfo.h>
 #include <netdb.h>

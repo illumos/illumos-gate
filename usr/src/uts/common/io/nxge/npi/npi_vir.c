@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <npi_vir.h>
 
 /* One register only */
@@ -1052,6 +1050,7 @@ npi_ldsv_ld_get(npi_handle_t handle, uint8_t ldg, uint8_t ld,
 
 	case VECTOR2:
 		offset = LDSV2_REG + LDSV_OFFSET(ldg);
+		break;
 
 	default:
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL, "npi_ldsv_get"

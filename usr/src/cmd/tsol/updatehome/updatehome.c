@@ -139,6 +139,7 @@ main(int argc, char **argv)
 		case '?':		/* switch error */
 			(void) fprintf(stderr, gettext("Bad option -%c.\n"),
 			    (char)optopt);
+			/* FALLTHROUGH */
 
 		default:
 			(void) fprintf(stderr, gettext("usage: %s [-cirs].\n"),

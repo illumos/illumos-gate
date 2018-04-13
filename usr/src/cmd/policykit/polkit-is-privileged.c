@@ -181,6 +181,7 @@ main (int argc, char *argv[])
 
 	case LIBPOLKIT_RESULT_NOT_PRIVILEGED:
 		g_print ("Not privileged.\n");
+		goto out;
 
 	case LIBPOLKIT_RESULT_NO_SUCH_PRIVILEGE:
 		g_print ("No such privilege '%s'.\n", privilege);

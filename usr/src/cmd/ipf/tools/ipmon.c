@@ -9,9 +9,13 @@
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
  */
 
-
-#ifndef SOLARIS
-#define SOLARIS (defined(__SVR4) || defined(__svr4__)) && defined(sun)
+#ifdef SOLARIS
+#undef	SOLARIS
+#endif
+#if (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+#define	SOLARIS	(1)
+#else
+#define	SOLARIS	(0)
 #endif
 
 #include <sys/types.h>

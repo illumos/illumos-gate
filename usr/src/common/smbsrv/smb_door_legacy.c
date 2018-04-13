@@ -39,7 +39,7 @@
 #include <sys/errno.h>
 #endif
 
-#include <smbsrv/wintypes.h>
+#include <smb/wintypes.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smb_door.h>
 #include <smbsrv/alloc.h>

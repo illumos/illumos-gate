@@ -160,6 +160,8 @@ static void sa_update(statistic_bag_t *, int);
 /* statistics printing function	*/
 static void prt_pool_stats(poolstat_list_element_t *);
 
+static void usage(void) __NORETURN;
+
 static void
 usage(void)
 {

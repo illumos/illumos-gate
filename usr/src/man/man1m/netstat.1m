@@ -1,4 +1,5 @@
 '\" te
+.\" Copyright 2018, Joyent, Inc.
 .\" Copyright (C) 2002, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
@@ -34,18 +35,18 @@ netstat \- show network status
 
 .LP
 .nf
-\fBnetstat\fR \fB-i\fR [\fB-I\fR \fIinterface\fR] [\fB-an\fR] [\fB-f\fR \fIaddress_family\fR]
+\fBnetstat\fR \fB-i\fR [\fB-I\fR \fIinterface\fR] [\fB-acn\fR] [\fB-f\fR \fIaddress_family\fR]
      [\fB-T\fR u | d ] [\fIinterval\fR [\fIcount\fR]]
 .fi
 
 .LP
 .nf
-\fBnetstat\fR \fB-r\fR [\fB-anvR\fR] [\fB-f\fR \fIaddress_family\fR | \fIfilter\fR]
+\fBnetstat\fR \fB-r\fR [\fB-acnvR\fR] [\fB-f\fR \fIaddress_family\fR | \fIfilter\fR]
 .fi
 
 .LP
 .nf
-\fBnetstat\fR \fB-M\fR [\fB-ns\fR] [\fB-f\fR \fIaddress_family\fR]
+\fBnetstat\fR \fB-M\fR [\fB-cns\fR] [\fB-f\fR \fIaddress_family\fR]
 .fi
 
 .LP
@@ -122,6 +123,19 @@ Show the state of all sockets, all routing table entries, or all interfaces,
 both physical and logical. Normally, listener sockets used by server processes
 are not shown. Under most conditions, only interface, host, network, and
 default routes are shown and only the status of physical interfaces is shown.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-c\fR\fR
+.ad
+.sp .6
+.RS 4n
+Print IPv4 networks using CIDR (x.y.z.a/NN) notation with the \fB-i\fR,
+\fB-r\fR, and \fB-M\fR options. IPv6 networks default to this, but due to
+backward compatibility, IPv4 ones do not without this flag.  A noncontiguous
+IPv4 netmask will print "/NM" if this flag is enabled.
 .RE
 
 .sp

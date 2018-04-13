@@ -27,7 +27,7 @@
  * From	$NetBSD: stand.h,v 1.22 1997/06/26 19:17:40 drochner Exp $	
  */
 
-/*-
+/*
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -104,7 +104,7 @@ struct fs_ops {
     int		(*fo_close)(struct open_file *f);
     int		(*fo_read)(struct open_file *f, void *buf,
 			   size_t size, size_t *resid);
-    int		(*fo_write)(struct open_file *f, void *buf,
+    int		(*fo_write)(struct open_file *f, const void *buf,
 			    size_t size, size_t *resid);
     off_t	(*fo_seek)(struct open_file *f, off_t offset, int where);
     int		(*fo_stat)(struct open_file *f, struct stat *sb);
@@ -282,7 +282,7 @@ extern int	open(const char *, int);
 extern int	close(int);
 extern void	closeall(void);
 extern ssize_t	read(int, void *, size_t);
-extern ssize_t	write(int, void *, size_t);
+extern ssize_t	write(int, const void *, size_t);
 extern struct	dirent *readdirfd(int);
 
 extern void	srandom(u_long seed);
@@ -369,7 +369,7 @@ extern void	nullsys(void);
 extern int	null_open(const char *path, struct open_file *f);
 extern int	null_close(struct open_file *f);
 extern int	null_read(struct open_file *f, void *buf, size_t size, size_t *resid);
-extern int	null_write(struct open_file *f, void *buf, size_t size, size_t *resid);
+extern int	null_write(struct open_file *f, const void *buf, size_t size, size_t *resid);
 extern off_t	null_seek(struct open_file *f, off_t offset, int where);
 extern int	null_stat(struct open_file *f, struct stat *sb);
 extern int	null_readdir(struct open_file *f, struct dirent *d);
@@ -385,6 +385,7 @@ extern void		putchar(int);
 extern int		devopen(struct open_file *, const char *, const char **);
 extern int		devclose(struct open_file *f);
 extern void		panic(const char *, ...) __dead2 __printflike(1, 2);
+extern time_t		getsecs(void);
 extern struct fs_ops	*file_system[];
 extern struct fs_ops	*exclusive_file_system;
 extern struct devsw	*devsw[];

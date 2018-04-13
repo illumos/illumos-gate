@@ -244,8 +244,8 @@ conn_ip_output(mblk_t *mp, ip_xmit_attr_t *ixa)
 
 				break;
 			}
-			/* FALLTHROUGH */
 		}
+		/* FALLTHROUGH */
 		default:
 			ip_drop_output("ipIfStatsOutDiscards - verify nce",
 			    mp, NULL);

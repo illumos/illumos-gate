@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/t_lock.h>
@@ -61,92 +63,9 @@
 #include <sys/hypervisor.h>
 #endif
 
-caddr_t
-i86devmap(pfn_t pf, pgcnt_t pgcnt, uint_t prot)
-{
-	caddr_t addr;
-	caddr_t addr1;
-	page_t *pp;
-
-	addr1 = addr = vmem_alloc(heap_arena, mmu_ptob(pgcnt), VM_SLEEP);
-
-	for (; pgcnt != 0; addr += MMU_PAGESIZE, ++pf, --pgcnt) {
-		pp = page_numtopp_nolock(pf);
-		if (pp == NULL) {
-			hat_devload(kas.a_hat, addr, MMU_PAGESIZE, pf,
-			    prot | HAT_NOSYNC, HAT_LOAD_LOCK);
-		} else {
-			hat_memload(kas.a_hat, addr, pp,
-			    prot | HAT_NOSYNC, HAT_LOAD_LOCK);
-		}
-	}
-
-	return (addr1);
-}
-
-/*
- * This routine is like page_numtopp, but accepts only free pages, which
- * it allocates (unfrees) and returns with the exclusive lock held.
- * It is used by machdep.c/dma_init() to find contiguous free pages.
- *
- * XXX this and some others should probably be in vm_machdep.c
- */
-page_t *
-page_numtopp_alloc(pfn_t pfnum)
-{
-	page_t *pp;
-
-retry:
-	pp = page_numtopp_nolock(pfnum);
-	if (pp == NULL) {
-		return (NULL);
-	}
-
-	if (!page_trylock(pp, SE_EXCL)) {
-		return (NULL);
-	}
-
-	if (page_pptonum(pp) != pfnum) {
-		page_unlock(pp);
-		goto retry;
-	}
-
-	if (!PP_ISFREE(pp)) {
-		page_unlock(pp);
-		return (NULL);
-	}
-	if (pp->p_szc) {
-		page_demote_free_pages(pp);
-		page_unlock(pp);
-		goto retry;
-	}
-
-	/* If associated with a vnode, destroy mappings */
-
-	if (pp->p_vnode) {
-
-		page_destroy_free(pp);
-
-		if (!page_lock(pp, SE_EXCL, (kmutex_t *)NULL, P_NO_RECLAIM)) {
-			return (NULL);
-		}
-
-		if (page_pptonum(pp) != pfnum) {
-			page_unlock(pp);
-			goto retry;
-		}
-	}
-
-	if (!PP_ISFREE(pp)) {
-		page_unlock(pp);
-		return (NULL);
-	}
-
-	if (!page_reclaim(pp, (kmutex_t *)NULL))
-		return (NULL);
-
-	return (pp);
-}
+#define	ON_USER_HAT(cpu) \
+	((cpu)->cpu_m.mcpu_current_hat != NULL && \
+	(cpu)->cpu_m.mcpu_current_hat != kas.a_hat)
 
 /*
  * Flag is not set early in boot. Once it is set we are no longer
@@ -436,20 +355,6 @@ hat_kern_alloc(
 	table_cnt += mmu.top_level_count - ((kernelbase >>
 	    LEVEL_SHIFT(mmu.max_level)) & (mmu.top_level_count - 1));
 
-#if defined(__i386)
-	/*
-	 * The 32 bit PAE hat allocates tables one level below the top when
-	 * kernelbase isn't 1 Gig aligned. We'll just be sloppy and allocate
-	 * a bunch more to the reserve. Any unused will be returned later.
-	 * Note we've already counted these mappings, just not the extra
-	 * pagetables.
-	 */
-	if (mmu.pae_hat != 0 && (kernelbase & LEVEL_OFFSET(mmu.max_level)) != 0)
-		table_cnt += mmu.ptes_per_table -
-		    ((kernelbase & LEVEL_OFFSET(mmu.max_level)) >>
-		    LEVEL_SHIFT(mmu.max_level - 1));
-#endif
-
 	/*
 	 * Add 1/4 more into table_cnt for extra slop.  The unused
 	 * slop is freed back when we htable_adjust_reserve() later.
@@ -493,15 +398,11 @@ hat_kern_setup(void)
 #ifdef __xpv
 	    mmu_btop(xen_info->pt_base - ONE_GIG));
 #else
-	    mmu_btop(getcr3()));
+	    mmu_btop(getcr3_pa()));
 #endif
 	/* END CSTYLED */
 
-#if defined(__i386) && !defined(__xpv)
-	CPU->cpu_tss->tss_cr3 = dftss0->tss_cr3 = getcr3();
-#endif /* __i386 */
-
-#if defined(__xpv) && defined(__amd64)
+#if defined(__xpv)
 	/*
 	 * Try to make the kpm mappings r/w. Failures here are OK, as
 	 * it's probably just a pagetable
@@ -517,3 +418,179 @@ hat_kern_setup(void)
 	CPUSET_ATOMIC_ADD(kas.a_hat->hat_cpus, CPU->cpu_id);
 	CPU->cpu_current_hat = kas.a_hat;
 }
+
+#ifndef __xpv
+
+/*
+ * Note that the INVPCID_ALL* variants can be used even in the !PCIDE case, but
+ * INVPCID_ADDR isn't.
+ */
+static void
+invpcid(uint64_t type, uint64_t pcid, uintptr_t addr)
+{
+	ulong_t	flag;
+	uint64_t cr4;
+
+	if (x86_use_invpcid == 1) {
+		ASSERT(is_x86_feature(x86_featureset, X86FSET_INVPCID));
+		invpcid_insn(type, pcid, addr);
+		return;
+	}
+
+	switch (type) {
+	case INVPCID_ALL_GLOBAL:
+		flag = intr_clear();
+		cr4 = getcr4();
+		setcr4(cr4 & ~(ulong_t)CR4_PGE);
+		setcr4(cr4 | CR4_PGE);
+		intr_restore(flag);
+		break;
+
+	case INVPCID_ALL_NONGLOBAL:
+		if (!(getcr4() & CR4_PCIDE)) {
+			reload_cr3();
+		} else {
+			flag = intr_clear();
+			cr4 = getcr4();
+			setcr4(cr4 & ~(ulong_t)CR4_PGE);
+			setcr4(cr4 | CR4_PGE);
+			intr_restore(flag);
+		}
+		break;
+
+	case INVPCID_ADDR:
+		if (pcid == PCID_USER) {
+			flag = intr_clear();
+			ASSERT(addr < kernelbase);
+			ASSERT(ON_USER_HAT(CPU));
+			ASSERT(CPU->cpu_m.mcpu_kpti.kf_user_cr3 != 0);
+			tr_mmu_flush_user_range(addr, MMU_PAGESIZE,
+			    MMU_PAGESIZE, CPU->cpu_m.mcpu_kpti.kf_user_cr3);
+			intr_restore(flag);
+		} else {
+			mmu_invlpg((caddr_t)addr);
+		}
+		break;
+
+	default:
+		panic("unsupported invpcid(%lu)", type);
+		break;
+	}
+}
+
+/*
+ * Flush one kernel mapping.
+ *
+ * We want to assert on kernel space here mainly for reasoning about the PCIDE
+ * case: namely, this flush should never need to flush a non-current PCID
+ * mapping.  This presumes we never have reason to flush the kernel regions
+ * available to PCID_USER (the trampolines and so on).  It also relies on
+ * PCID_KERNEL == PCID_NONE.
+ */
+void
+mmu_flush_tlb_kpage(uintptr_t va)
+{
+	ASSERT(va >= kernelbase);
+	ASSERT(getpcid() == PCID_KERNEL);
+	mmu_invlpg((caddr_t)va);
+}
+
+/*
+ * Flush one mapping: local CPU version of hat_tlb_inval().
+ *
+ * If this is a userspace address in the PCIDE case, we need two invalidations,
+ * one for any potentially stale PCID_USER mapping, as well as any established
+ * while in the kernel.
+ */
+void
+mmu_flush_tlb_page(uintptr_t va)
+{
+	ASSERT(getpcid() == PCID_KERNEL);
+
+	if (va >= kernelbase) {
+		mmu_flush_tlb_kpage(va);
+		return;
+	}
+
+	if (!(getcr4() & CR4_PCIDE)) {
+		mmu_invlpg((caddr_t)va);
+		return;
+	}
+
+	/*
+	 * Yes, kas will need to flush below kernelspace, at least during boot.
+	 * But there's no PCID_USER context.
+	 */
+	if (ON_USER_HAT(CPU))
+		invpcid(INVPCID_ADDR, PCID_USER, va);
+	invpcid(INVPCID_ADDR, PCID_KERNEL, va);
+}
+
+static void
+mmu_flush_tlb_range(uintptr_t addr, size_t len, size_t pgsz)
+{
+	EQUIV(addr < kernelbase, (addr + len - 1) < kernelbase);
+	ASSERT(len > 0);
+	ASSERT(pgsz != 0);
+
+	if (!(getcr4() & CR4_PCIDE) || x86_use_invpcid == 1) {
+		for (uintptr_t va = addr; va < (addr + len); va += pgsz)
+			mmu_flush_tlb_page(va);
+		return;
+	}
+
+	/*
+	 * As an emulated invpcid() in the PCIDE case requires jumping
+	 * cr3s, we batch the invalidations.  We should only need to flush the
+	 * user range if we're on a user-space HAT.
+	 */
+	if (addr < kernelbase && ON_USER_HAT(CPU)) {
+		ulong_t flag = intr_clear();
+		ASSERT(CPU->cpu_m.mcpu_kpti.kf_user_cr3 != 0);
+		tr_mmu_flush_user_range(addr, len, pgsz,
+		    CPU->cpu_m.mcpu_kpti.kf_user_cr3);
+		intr_restore(flag);
+	}
+
+	for (uintptr_t va = addr; va < (addr + len); va += pgsz)
+		mmu_invlpg((caddr_t)va);
+}
+
+/*
+ * MMU TLB (and PT cache) flushing on this CPU.
+ *
+ * FLUSH_TLB_ALL: invalidate everything, all PCIDs, all PT_GLOBAL.
+ * FLUSH_TLB_NONGLOBAL: invalidate all PCIDs, excluding PT_GLOBAL
+ * FLUSH_TLB_RANGE: invalidate the given range, including PCID_USER
+ * mappings as appropriate.  If using invpcid, PT_GLOBAL mappings are not
+ * invalidated.
+ */
+void
+mmu_flush_tlb(flush_tlb_type_t type, tlb_range_t *range)
+{
+	ASSERT(getpcid() == PCID_KERNEL);
+
+	switch (type) {
+	case FLUSH_TLB_ALL:
+		ASSERT(range == NULL);
+		invpcid(INVPCID_ALL_GLOBAL, 0, 0);
+		break;
+
+	case FLUSH_TLB_NONGLOBAL:
+		ASSERT(range == NULL);
+		invpcid(INVPCID_ALL_NONGLOBAL, 0, 0);
+		break;
+
+	case FLUSH_TLB_RANGE: {
+		mmu_flush_tlb_range(range->tr_va, TLB_RANGE_LEN(range),
+		    LEVEL_SIZE(range->tr_level));
+		break;
+	}
+
+	default:
+		panic("invalid call mmu_flush_tlb(%d)", type);
+		break;
+	}
+}
+
+#endif /* ! __xpv */

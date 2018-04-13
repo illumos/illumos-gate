@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * slk.c
  * 
@@ -34,12 +32,6 @@
  * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved.
  *
  */
-
-#if M_RCSID
-#ifndef lint
-static char rcsID[] = "$Header: /rd/src/libc/xcurses/rcs/slk.c 1.1 1995/07/19 16:38:06 ant Exp $";
-#endif
-#endif
 
 #include <private.h>
 
@@ -72,7 +64,7 @@ slk_attron(const chtype at)
 	__m_trace("slk_attron(%lx)", at);
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
+	if (__m_screen->_slk._w != NULL)
 		code = wattron(__m_screen->_slk._w, at);
 
 	return __m_return_code("slk_attron", code);
@@ -87,7 +79,7 @@ slk_attroff(const chtype at)
 	__m_trace("slk_attroff(%lx)", at);
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
+	if (__m_screen->_slk._w != NULL)
 		code = wattroff(__m_screen->_slk._w, at);
 
 	return __m_return_code("slk_attroff", code);
@@ -102,7 +94,7 @@ slk_attrset(const chtype at)
 	__m_trace("slk_attrset(%lx)", at);
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
+	if (__m_screen->_slk._w != NULL)
 		code = wattrset(__m_screen->_slk._w, at);
 
 	return __m_return_code("slk_attrset", code);
@@ -117,7 +109,7 @@ slk_attr_off(const attr_t at, void *opts)
 	__m_trace("slk_attr_off(%x, %p)", at, opts);
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
+	if (__m_screen->_slk._w != NULL)
 		code = wattr_off(__m_screen->_slk._w, at, opts);
 
 	return __m_return_code("slk_attr_off", code);
@@ -132,7 +124,7 @@ slk_attr_on(const attr_t at, void *opts)
 	__m_trace("slk_attr_on(%x, %p)", at, opts);
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
+	if (__m_screen->_slk._w != NULL)
 		code = wattr_on(__m_screen->_slk._w, at, opts);
 
 	return __m_return_code("slk_attr_on", code);
@@ -147,7 +139,7 @@ slk_attr_set(const attr_t at, short co, void *opts)
 	__m_trace("slk_attr_set(%x, %d, %p)", at, co, opts);
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
+	if (__m_screen->_slk._w != NULL)
 		code = wattr_set(__m_screen->_slk._w, at, co, opts);
 
 	return __m_return_code("slk_attr_set", code);
@@ -162,8 +154,8 @@ slk_color(short co)
 	__m_trace("slk_color(%d)", co);
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
-		code = wcolor_set(__m_screen->_slk._w, co, (void *) 0);
+	if (__m_screen->_slk._w != NULL)
+		code = wcolor_set(__m_screen->_slk._w, co, NULL);
 
 	return __m_return_code("slk_color", code);
 }
@@ -177,7 +169,7 @@ slk_touch()
 	__m_trace("slk_touch(void)");
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
+	if (__m_screen->_slk._w != NULL)
 		code = wtouchln(__m_screen->_slk._w, 0, 1, 1);
 
 	return __m_return_code("slk_touch", code);
@@ -192,10 +184,10 @@ slk_clear()
 	__m_trace("slk_clear(void)");
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0) {
+	if (__m_screen->_slk._w != NULL) {
 		if (werase(__m_screen->_slk._w) == OK)
 			code = wrefresh(__m_screen->_slk._w);
-	} else if (label_off != (char *) 0) {
+	} else if (label_off != NULL) {
 		(void) tputs(label_off, 1, __m_outc);
 		(void) fflush(__m_screen->_of);
 		code = OK;
@@ -213,9 +205,9 @@ slk_restore()
 	__m_trace("slk_clear(void)");
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0) {
+	if (__m_screen->_slk._w != NULL) {
 		for (i = 0; i < 8; ++i) {
-			if (__m_screen->_slk._labels[i] != (char *) 0) {
+			if (__m_screen->_slk._labels[i] != NULL) {
 				(void) slk_set(
 					i, __m_screen->_slk._labels[i],
 					__m_screen->_slk._justify[i]
@@ -224,7 +216,7 @@ slk_restore()
 		}
 
 		code = slk_refresh();
-	} else if (label_on != (char *) 0) {
+	} else if (label_on != NULL) {
 		(void) tputs(label_on, 1, __m_outc);
 		(void) fflush(__m_screen->_of);
 		code = OK;
@@ -242,7 +234,7 @@ slk_noutrefresh()
 	__m_trace("slk_noutrefresh(void)");
 #endif
 
-	if (__m_screen->_slk._w != (WINDOW *) 0)
+	if (__m_screen->_slk._w != NULL)
 		code = wnoutrefresh(__m_screen->_slk._w);
 
 	return __m_return_code("slk_noutrefresh", code);
@@ -314,11 +306,11 @@ slk_wset(int index, const wchar_t *label, int justify)
 	if (index < 1 || 8 < index || justify < 0 || 2 < justify)
 		goto error1;
 
-	if (label == (wchar_t *) 0)
+	if (label == NULL)
 		label = M_MB_L("");
 
 	/* Copy the characters that fill the first 8 columns of the label. */
-	for (wp = wcs, width = 0; label != '\0'; label += i, wp += cc._n) {
+	for (wp = wcs, width = 0; *label != '\0'; label += i, wp += cc._n) {
 		if ((i = __m_wcs_cc(label, A_NORMAL, 0, &cc)) < 0)
 			goto error1;	
 
@@ -335,12 +327,12 @@ slk_wset(int index, const wchar_t *label, int justify)
 
 	/* Remember the new label. */
 	__m_screen->_slk._justify[index] = (short) justify;
-	if (__m_screen->_slk._labels[index] != (char *) 0)
+	if (__m_screen->_slk._labels[index] != NULL)
 		free(__m_screen->_slk._labels[index]);
-	if ((__m_screen->_slk._labels[index] = m_strdup(mbs)) == (char *) 0)
+	if ((__m_screen->_slk._labels[index] = m_strdup(mbs)) == NULL)
 		goto error1;
 	
-	if (__m_screen->_slk._w != (WINDOW *) 0) {
+	if (__m_screen->_slk._w != NULL) {
 		/* Write the justified label into the slk window. */
 		i = format[__m_slk_format][index];
 		(void) __m_cc_erase(__m_screen->_slk._w, 0, i, 0, i + 7);
@@ -357,19 +349,19 @@ slk_wset(int index, const wchar_t *label, int justify)
 		}
 
 		(void) mvwaddstr(__m_screen->_slk._w, 0, i, mbs);
-	} else if (plab_norm != (char *) 0) {
+	} else if (plab_norm != NULL) {
 		(void) tputs(
 			tparm(
 				plab_norm, (long) index, (long) mbs,
 				0L, 0L, 0L, 0L, 0L, 0L, 0L
 			), 1, __m_outc
 		);
-	} else if (pkey_plab != (char *) 0) {
+	} else if (pkey_plab != NULL) {
 		/* Lookup multibyte sequence for the function key. */
 		for (i = KEY_F(index), k = __m_keyindex; (*k)[1] != i; ++k)
 			;
 
-		if (cur_term->_str[**k] != (char *) 0) {
+		if (cur_term->_str[**k] != NULL) {
 			(void) tputs(
 				tparm(
 					pkey_plab, (long) index, 
@@ -384,4 +376,3 @@ slk_wset(int index, const wchar_t *label, int justify)
 error1:
 	return __m_return_code("slk_wset", code);
 }
-

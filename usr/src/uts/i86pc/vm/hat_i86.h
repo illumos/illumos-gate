@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VM_HAT_I86_H
@@ -62,19 +63,25 @@ extern "C" {
  */
 
 /*
- * VLP processes have a 32 bit address range, so their top level is 2 and
- * with only 4 PTEs in that table.
+ * Maximum number of per-CPU pagetable entries that we'll need to cache in the
+ * HAT. See the big theory statement in uts/i86pc/vm/hat_i86.c for more
+ * information.
  */
-#define	VLP_LEVEL	(2)
-#define	VLP_NUM_PTES	(4)
-#define	VLP_SIZE	(VLP_NUM_PTES * sizeof (x86pte_t))
-#define	TOP_LEVEL(h)	(((h)->hat_flags & HAT_VLP) ? VLP_LEVEL : mmu.max_level)
-#define	VLP_COPY(fromptep, toptep) { \
-	toptep[0] = fromptep[0]; \
-	toptep[1] = fromptep[1]; \
-	toptep[2] = fromptep[2]; \
-	toptep[3] = fromptep[3]; \
-}
+#if defined(__xpv)
+/*
+ * The Xen hypervisor does not use per-CPU pagetables (PCP). Define a single
+ * struct member for it at least to make life easier and not make the member
+ * conditional.
+ */
+#define	MAX_COPIED_PTES	1
+#else
+/*
+ * The 64-bit kernel may have up to 512 PTEs present in it for a given process.
+ */
+#define	MAX_COPIED_PTES	512
+#endif	/* __xpv */
+
+#define	TOP_LEVEL(h)	(((h)->hat_max_level))
 
 /*
  * The hat struct exists for each address space.
@@ -87,13 +94,15 @@ struct hat {
 	pgcnt_t		hat_ism_pgcnt;
 	cpuset_t	hat_cpus;
 	uint16_t	hat_flags;
+	uint8_t		hat_max_level;	/* top level of this HAT */
+	uint_t		hat_num_copied;	/* Actual num of hat_copied_ptes[] */
 	htable_t	*hat_htable;	/* top level htable */
 	struct hat	*hat_next;
 	struct hat	*hat_prev;
 	uint_t		hat_num_hash;	/* number of htable hash buckets */
 	htable_t	**hat_ht_hash;	/* htable hash buckets */
 	htable_t	*hat_ht_cached;	/* cached free htables */
-	x86pte_t	hat_vlp_ptes[VLP_NUM_PTES];
+	x86pte_t	hat_copied_ptes[MAX_COPIED_PTES];
 #if defined(__amd64) && defined(__xpv)
 	pfn_t		hat_user_ptable; /* alt top ptable for user mode */
 #endif
@@ -106,14 +115,16 @@ typedef struct hat hat_t;
 	atomic_dec_ulong(&(hat)->hat_pages_mapped[level]);
 
 /*
- * Flags for the hat_flags field
+ * Flags for the hat_flags field. For more information, please see the big
+ * theory statement on the HAT design in uts/i86pc/vm/hat_i86.c.
  *
  * HAT_FREEING - set when HAT is being destroyed - mostly used to detect that
  *	demap()s can be avoided.
  *
- * HAT_VLP - indicates a 32 bit process has a virtual address range less than
- *	the hardware's physical address range. (VLP->Virtual Less-than Physical)
- *	Note - never used on the hypervisor.
+ * HAT_COPIED - Indicates this HAT is a source for per-cpu page tables: see the
+ * 	big comment in hat_i86.c for a description.
+ *
+ * HAT_COPIED_32 - HAT_COPIED, but for an ILP32 process.
  *
  * HAT_VICTIM - This is set while a hat is being examined for page table
  *	stealing and prevents it from being freed.
@@ -121,12 +132,17 @@ typedef struct hat hat_t;
  * HAT_SHARED - The hat has exported it's page tables via hat_share()
  *
  * HAT_PINNED - On the hypervisor, indicates the top page table has been pinned.
+ *
+ * HAT_PCP - Used for the per-cpu user page table (i.e. associated with a CPU,
+ *	not a process).
  */
 #define	HAT_FREEING	(0x0001)
-#define	HAT_VLP		(0x0002)
-#define	HAT_VICTIM	(0x0004)
-#define	HAT_SHARED	(0x0008)
-#define	HAT_PINNED	(0x0010)
+#define	HAT_VICTIM	(0x0002)
+#define	HAT_SHARED	(0x0004)
+#define	HAT_PINNED	(0x0008)
+#define	HAT_COPIED	(0x0010)
+#define	HAT_COPIED_32	(0x0020)
+#define	HAT_PCP		(0x0040)
 
 /*
  * Additional platform attribute for hat_devload() to force no caching.
@@ -155,6 +171,9 @@ struct hatstats {
 	ulong_t	hs_hm_steals;
 	ulong_t	hs_hm_steal_exam;
 	ulong_t hs_tlb_inval_delayed;
+	ulong_t hs_hat_copied64;
+	ulong_t hs_hat_copied32;
+	ulong_t hs_hat_normal64;
 };
 extern struct hatstats hatstat;
 #ifdef DEBUG
@@ -228,7 +247,6 @@ extern void halt(char *fmt);
 extern void hat_kern_alloc(caddr_t segmap_base, size_t segmap_size,
 	caddr_t ekernelheap);
 extern void hat_kern_setup(void);
-extern void hat_tlb_inval(struct hat *hat, uintptr_t va);
 extern void hat_pte_unmap(htable_t *ht, uint_t entry, uint_t flags,
 	x86pte_t old_pte, void *pte_ptr, boolean_t tlb);
 extern void hat_init_finish(void);
@@ -240,28 +258,34 @@ extern void hat_kmap_init(uintptr_t base, size_t len);
 
 extern hment_t *hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry);
 
-#if !defined(__xpv)
-/*
- * routines to deal with delayed TLB invalidations for idle CPUs
- */
-extern void tlb_going_idle(void);
-extern void tlb_service(void);
-#endif
-
-/*
- * Hat switch function invoked to load a new context into %cr3
- */
+extern void mmu_calc_user_slots(void);
+extern void hat_tlb_inval(struct hat *hat, uintptr_t va);
 extern void hat_switch(struct hat *hat);
 
-#ifdef __xpv
+#define	TLB_RANGE_LEN(r)	((r)->tr_cnt << LEVEL_SHIFT((r)->tr_level))
+
+/*
+ * A range of virtual pages for purposes of demapping.
+ */
+typedef struct tlb_range {
+	uintptr_t tr_va; 	/* address of page */
+	ulong_t	tr_cnt; 	/* number of pages in range */
+	int8_t	tr_level; 	/* page table level */
+} tlb_range_t;
+
+#if defined(__xpv)
+
+#define	XPV_DISALLOW_MIGRATE()	xen_block_migrate()
+#define	XPV_ALLOW_MIGRATE()	xen_allow_migrate()
+
+#define	mmu_flush_tlb_page(va)	mmu_invlpg((caddr_t)va)
+#define	mmu_flush_tlb_kpage(va)	mmu_invlpg((caddr_t)va)
+
 /*
  * Interfaces to use around code that maps/unmaps grant table references.
  */
 extern void hat_prepare_mapping(hat_t *, caddr_t, uint64_t *);
 extern void hat_release_mapping(hat_t *, caddr_t);
-
-#define	XPV_DISALLOW_MIGRATE()	xen_block_migrate()
-#define	XPV_ALLOW_MIGRATE()	xen_allow_migrate()
 
 #else
 
@@ -270,8 +294,25 @@ extern void hat_release_mapping(hat_t *, caddr_t);
 
 #define	pfn_is_foreign(pfn)	__lintzero
 
-#endif
+typedef enum flush_tlb_type {
+	FLUSH_TLB_ALL = 1,
+	FLUSH_TLB_NONGLOBAL = 2,
+	FLUSH_TLB_RANGE = 3,
+} flush_tlb_type_t;
 
+extern void mmu_flush_tlb(flush_tlb_type_t, tlb_range_t *);
+extern void mmu_flush_tlb_kpage(uintptr_t);
+extern void mmu_flush_tlb_page(uintptr_t);
+
+extern void hati_cpu_punchin(cpu_t *cpu, uintptr_t va, uint_t attrs);
+
+/*
+ * routines to deal with delayed TLB invalidations for idle CPUs
+ */
+extern void tlb_going_idle(void);
+extern void tlb_service(void);
+
+#endif /* !__xpv */
 
 #endif	/* _KERNEL */
 

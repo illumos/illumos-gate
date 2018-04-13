@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_MDB_TARGET_IMPL_H
@@ -104,7 +104,6 @@ typedef struct mdb_tgt_ops {
 	int (*t_run)(mdb_tgt_t *, int, const struct mdb_arg *);
 	int (*t_step)(mdb_tgt_t *, mdb_tgt_status_t *);
 	int (*t_step_out)(mdb_tgt_t *, uintptr_t *);
-	int (*t_step_branch)(mdb_tgt_t *);
 	int (*t_next)(mdb_tgt_t *, uintptr_t *);
 	int (*t_cont)(mdb_tgt_t *, mdb_tgt_status_t *);
 	int (*t_signal)(mdb_tgt_t *, int);

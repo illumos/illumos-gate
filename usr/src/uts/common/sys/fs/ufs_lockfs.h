@@ -27,8 +27,6 @@
 #ifndef _SYS_FS_UFS_LOCKFS_H
 #define	_SYS_FS_UFS_LOCKFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/lockfs.h>
 
 #ifdef	__cplusplus
@@ -55,7 +53,7 @@ extern "C" {
  *
  * ufs_vnodeops(es) that conflict with the above file system lock types
  *	will get either suspended, or get a EAGAIN error,
- *	or get an EIO error if the file sytem is hard locked,
+ *	or get an EIO error if the file system is hard locked,
  *	or will block if the file system is error locked.
  *
  * There are exceptions.

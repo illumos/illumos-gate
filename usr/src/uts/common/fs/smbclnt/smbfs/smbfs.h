@@ -94,6 +94,7 @@ struct smb_share;
 #define	SMI_NOAC	0x10		/* don't cache attributes */
 #define	SMI_LLOCK	0x80		/* local locking only */
 #define	SMI_ACL		0x2000		/* share supports ACLs */
+#define	SMI_DIRECTIO	0x40000		/* do direct I/O */
 #define	SMI_EXTATTR	0x80000		/* share supports ext. attrs */
 #define	SMI_DEAD	0x200000	/* mount has been terminated */
 

@@ -1,0 +1,177 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
+
+/*
+ * SRVSVC - Server Service (partial)
+ *
+ * This module needs only NetShareEnum (levels 0, 1)
+ * and NetServerGetInfo (levels 100, 101)
+ */
+
+#include <libmlrpc/ndrtypes.ndl>
+
+/*
+ * SRVSVC - Server Service
+ */
+
+#define SRVSVC_OPNUM_NetShareEnum                0x0f
+#define SRVSVC_OPNUM_NetServerGetInfo            0x15
+
+/*
+ * SRVSVC NetShareEnum (
+ *	IN  LPTSTR	servername,
+ *	IN  DWORD	level;
+ *	OUT union switch(level) {
+ *		case 0: struct {
+ *				DWORD entriesread;
+ *			     [size_is(entriesread)]
+ *				_SHARE_INFO_0 *entries;
+ *			} *bufptr0;
+ *		case 1: struct {
+ *				DWORD entriesread;
+ *			     [size_is(entriesread)]
+ *				_SHARE_INFO_1 *entries;
+ *			} *bufptr1;
+ *		...
+ *	    }		bufptr,
+ *	IN  DWORD	prefmaxlen,
+ *	OUT DWORD	totalentries,
+ *	IN OUT DWORD ?*	resume_handle,
+ *	OUT DWORD	status
+ *      )
+ */
+
+struct mslm_NetShareInfo_0 {
+	LPTSTR shi0_netname;
+};
+struct mslm_NetShareInfo_0_result {
+	DWORD	entriesread;
+	SIZE_IS(entriesread)
+	struct mslm_NetShareInfo_0 *entries;
+};
+
+struct mslm_NetShareInfo_1 {
+	LPTSTR	shi1_netname;
+	DWORD	shi1_type; /* type of resource such as IPC$ */
+	LPTSTR	shi1_comment;
+};
+struct mslm_NetShareInfo_1_result {
+	DWORD	entriesread;
+	SIZE_IS(entriesread)
+	struct mslm_NetShareInfo_1 *entries;
+};
+
+union mslm_NetShareEnum_ru {
+	CASE(0)		struct mslm_NetShareInfo_0_result *bufptr0;
+	CASE(1)		struct mslm_NetShareInfo_1_result *bufptr1;
+	DEFAULT		char *nullptr;
+};
+struct mslm_NetShareEnum_result {
+	DWORD	level;
+	SWITCH(level)
+	union mslm_NetShareEnum_ru ru;
+};
+
+
+OPERATION(SRVSVC_OPNUM_NetShareEnum)
+struct mslm_NetShareEnum {
+	IN		LPTSTR	servername;
+	INOUT		DWORD	level;
+	INOUT		struct mslm_NetShareEnum_result result;
+	IN		DWORD	prefmaxlen;
+	OUT		DWORD	totalentries;
+	INOUT		DWORD	*resume_handle;
+	OUT		DWORD	status;
+};
+
+
+/*
+ * SRVSVC NetServerGetInfo (
+ *	IN LPTSTR	servername,
+ *	IN DWORD	level,
+ *	OUT union switch(level) {
+ *		case 100: _SERVER_INFO_100 *	p100;
+ *		case 101: _SERVER_INFO_101 *	p101;
+ *		case 102: _SERVER_INFO_102 *	p102;
+ *	    }		bufptr,
+ *	OUT DWORD	status
+ *      )
+ */
+
+/* for svX_platform (note: decimal!) */
+#define	SV_PLATFORM_ID_DOS	300
+#define	SV_PLATFORM_ID_OS2	400
+#define	SV_PLATFORM_ID_NT	500
+#define	SV_PLATFORM_ID_OSF	600
+#define	SV_PLATFORM_ID_VMS	700
+
+struct mslm_SERVER_INFO_100 {
+	DWORD		sv100_platform_id;
+	LPTSTR		sv100_name;
+};
+
+struct mslm_SERVER_INFO_101 {
+	DWORD		sv101_platform_id;
+	LPTSTR		sv101_name;
+	DWORD		sv101_version_major;
+	DWORD		sv101_version_minor;
+	DWORD		sv101_type;
+	LPTSTR		sv101_comment;
+};
+
+union mslm_NetServerGetInfo_ru {
+	CASE(100)	struct mslm_SERVER_INFO_100 *info100;
+	CASE(101)	struct mslm_SERVER_INFO_101 *info101;
+	DEFAULT		char *nullptr;
+};
+
+struct mslm_NetServerGetInfo_result {
+	DWORD level;
+	SWITCH(level)
+	union mslm_NetServerGetInfo_ru ru;
+};
+
+
+OPERATION(SRVSVC_OPNUM_NetServerGetInfo)
+struct mslm_NetServerGetInfo {
+	IN  LPTSTR	servername;
+	IN  DWORD	level;
+	OUT struct mslm_NetServerGetInfo_result result;
+	OUT DWORD	status;
+};
+
+
+/*
+ * The SRVSVC interface
+ */
+INTERFACE(0)
+union srvsvc_interface {
+	CASE(SRVSVC_OPNUM_NetShareEnum)
+		struct mslm_NetShareEnum	NetShareEnum;
+	CASE(SRVSVC_OPNUM_NetServerGetInfo)
+		struct mslm_NetServerGetInfo	NetServerGetInfo;
+};
+typedef union srvsvc_interface	srvsvc_interface_t;
+EXTERNTYPEINFO(srvsvc_interface)

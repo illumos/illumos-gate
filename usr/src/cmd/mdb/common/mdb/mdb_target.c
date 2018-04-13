@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -182,8 +184,7 @@
  * Define convenience macro for referencing target flag pending continue bits.
  */
 #define	T_CONT_BITS	\
-	(MDB_TGT_F_STEP | MDB_TGT_F_STEP_OUT | MDB_TGT_F_STEP_BRANCH | \
-	MDB_TGT_F_NEXT | MDB_TGT_F_CONT)
+	(MDB_TGT_F_STEP | MDB_TGT_F_STEP_OUT | MDB_TGT_F_NEXT | MDB_TGT_F_CONT)
 
 mdb_tgt_t *
 mdb_tgt_create(mdb_tgt_ctor_f *ctor, int flags, int argc, const char *argv[])
@@ -390,7 +391,7 @@ mdb_tgt_auxv(mdb_tgt_t *t, const auxv_t **auxvp)
 
 ssize_t
 mdb_tgt_aread(mdb_tgt_t *t, mdb_tgt_as_t as,
-	void *buf, size_t n, mdb_tgt_addr_t addr)
+    void *buf, size_t n, mdb_tgt_addr_t addr)
 {
 	if (t->t_flags & MDB_TGT_F_ASIO)
 		return (t->t_ops->t_aread(t, as, buf, n, addr));
@@ -410,7 +411,7 @@ mdb_tgt_aread(mdb_tgt_t *t, mdb_tgt_as_t as,
 
 ssize_t
 mdb_tgt_awrite(mdb_tgt_t *t, mdb_tgt_as_t as,
-	const void *buf, size_t n, mdb_tgt_addr_t addr)
+    const void *buf, size_t n, mdb_tgt_addr_t addr)
 {
 	if (!(t->t_flags & MDB_TGT_F_RDWR))
 		return (set_errno(EMDB_TGTRDONLY));
@@ -499,7 +500,7 @@ mdb_tgt_vtop(mdb_tgt_t *t, mdb_tgt_as_t as, uintptr_t va, physaddr_t *pap)
 
 ssize_t
 mdb_tgt_readstr(mdb_tgt_t *t, mdb_tgt_as_t as, char *buf,
-	size_t nbytes, mdb_tgt_addr_t addr)
+    size_t nbytes, mdb_tgt_addr_t addr)
 {
 	ssize_t n, nread = mdb_tgt_aread(t, as, buf, nbytes, addr);
 	char *p;
@@ -533,7 +534,7 @@ done:
 
 ssize_t
 mdb_tgt_writestr(mdb_tgt_t *t, mdb_tgt_as_t as,
-	const char *buf, mdb_tgt_addr_t addr)
+    const char *buf, mdb_tgt_addr_t addr)
 {
 	ssize_t nwritten = mdb_tgt_awrite(t, as, buf, strlen(buf) + 1, addr);
 	return (nwritten > 0 ? nwritten - 1 : nwritten);
@@ -541,7 +542,7 @@ mdb_tgt_writestr(mdb_tgt_t *t, mdb_tgt_as_t as,
 
 int
 mdb_tgt_lookup_by_name(mdb_tgt_t *t, const char *obj,
-	const char *name, GElf_Sym *symp, mdb_syminfo_t *sip)
+    const char *name, GElf_Sym *symp, mdb_syminfo_t *sip)
 {
 	mdb_syminfo_t info;
 	GElf_Sym sym;
@@ -572,7 +573,7 @@ found:
 
 int
 mdb_tgt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
-	char *buf, size_t len, GElf_Sym *symp, mdb_syminfo_t *sip)
+    char *buf, size_t len, GElf_Sym *symp, mdb_syminfo_t *sip)
 {
 	mdb_syminfo_t info;
 	GElf_Sym sym;
@@ -603,7 +604,7 @@ mdb_tgt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
  */
 int
 mdb_tgt_lookup_by_scope(mdb_tgt_t *t, const char *s, GElf_Sym *symp,
-	mdb_syminfo_t *sip)
+    mdb_syminfo_t *sip)
 {
 	const char *object = MDB_TGT_OBJ_EVERY;
 	const char *name = s;
@@ -633,7 +634,7 @@ mdb_tgt_lookup_by_scope(mdb_tgt_t *t, const char *s, GElf_Sym *symp,
 
 int
 mdb_tgt_symbol_iter(mdb_tgt_t *t, const char *obj, uint_t which,
-	uint_t type, mdb_tgt_sym_f *cb, void *p)
+    uint_t type, mdb_tgt_sym_f *cb, void *p)
 {
 	if ((which != MDB_TGT_SYMTAB && which != MDB_TGT_DYNSYM) ||
 	    (type & ~(MDB_TGT_BIND_ANY | MDB_TGT_TYPE_ANY)) != 0)
@@ -644,7 +645,7 @@ mdb_tgt_symbol_iter(mdb_tgt_t *t, const char *obj, uint_t which,
 
 ssize_t
 mdb_tgt_readsym(mdb_tgt_t *t, mdb_tgt_as_t as, void *buf, size_t nbytes,
-	const char *obj, const char *name)
+    const char *obj, const char *name)
 {
 	GElf_Sym sym;
 
@@ -656,7 +657,7 @@ mdb_tgt_readsym(mdb_tgt_t *t, mdb_tgt_as_t as, void *buf, size_t nbytes,
 
 ssize_t
 mdb_tgt_writesym(mdb_tgt_t *t, mdb_tgt_as_t as, const void *buf,
-	size_t nbytes, const char *obj, const char *name)
+    size_t nbytes, const char *obj, const char *name)
 {
 	GElf_Sym sym;
 
@@ -1088,8 +1089,6 @@ tgt_continue(mdb_tgt_t *t, mdb_tgt_status_t *tsp,
 		t_cont = t->t_ops->t_step;
 	else if (t->t_flags & MDB_TGT_F_NEXT)
 		t_cont = t->t_ops->t_step;
-	else if (t->t_flags & MDB_TGT_F_STEP_BRANCH)
-		t_cont = t->t_ops->t_cont;
 	else if (t->t_flags & MDB_TGT_F_STEP_OUT)
 		t_cont = t->t_ops->t_cont;
 
@@ -1118,16 +1117,6 @@ tgt_continue(mdb_tgt_t *t, mdb_tgt_status_t *tsp,
 
 		if (mdb_tgt_add_vbrkpt(t, addr, MDB_TGT_SPEC_HIDDEN |
 		    MDB_TGT_SPEC_TEMPORARY, no_se_f, NULL) == 0)
-			return (-1); /* errno is set for us */
-	}
-
-	/*
-	 * To handle step-branch, we ask the target to enable it for the coming
-	 * continue.  Step-branch is incompatible with step, so don't enable it
-	 * if we're going to be stepping.
-	 */
-	if (t->t_flags & MDB_TGT_F_STEP_BRANCH && t_cont == t->t_ops->t_cont) {
-		if (t->t_ops->t_step_branch(t) == -1)
 			return (-1); /* errno is set for us */
 	}
 
@@ -1392,13 +1381,6 @@ int
 mdb_tgt_step_out(mdb_tgt_t *t, mdb_tgt_status_t *tsp)
 {
 	t->t_flags |= MDB_TGT_F_STEP_OUT; /* set flag even if tgt not busy */
-	return (tgt_request_continue(t, tsp, 0, t->t_ops->t_cont));
-}
-
-int
-mdb_tgt_step_branch(mdb_tgt_t *t, mdb_tgt_status_t *tsp)
-{
-	t->t_flags |= MDB_TGT_F_STEP_BRANCH; /* set flag even if tgt not busy */
 	return (tgt_request_continue(t, tsp, 0, t->t_ops->t_cont));
 }
 
@@ -1864,7 +1846,7 @@ mdb_tgt_nop()
 
 int
 mdb_tgt_xdata_insert(mdb_tgt_t *t, const char *name, const char *desc,
-	ssize_t (*copy)(mdb_tgt_t *, void *, size_t))
+    ssize_t (*copy)(mdb_tgt_t *, void *, size_t))
 {
 	mdb_xdata_t *xdp;
 

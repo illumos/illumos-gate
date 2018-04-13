@@ -24,6 +24,7 @@
  */
 /*
  * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_VM_HTABLE_H
@@ -41,7 +42,6 @@ extern void atomic_andb(uint8_t *addr, uint8_t value);
 extern void atomic_orb(uint8_t *addr, uint8_t value);
 extern void atomic_inc16(uint16_t *addr);
 extern void atomic_dec16(uint16_t *addr);
-extern void mmu_tlbflush_entry(caddr_t addr);
 
 /*
  * Each hardware page table has an htable_t describing it.
@@ -85,12 +85,13 @@ typedef struct htable htable_t;
 /*
  * Flags values for htable ht_flags field:
  *
- * HTABLE_VLP - this is the top level htable of a VLP HAT.
+ * HTABLE_COPIED - This is the top level htable of a HAT being used with per-CPU
+ * 	pagetables.
  *
  * HTABLE_SHARED_PFN - this htable had its PFN assigned from sharing another
  * 	htable. Used by hat_share() for ISM.
  */
-#define	HTABLE_VLP		(0x01)
+#define	HTABLE_COPIED		(0x01)
 #define	HTABLE_SHARED_PFN	(0x02)
 
 /*
@@ -106,14 +107,19 @@ typedef struct htable htable_t;
 	((uintptr_t)(hat) >> 4)) & ((hat)->hat_num_hash - 1))
 
 /*
- * Each CPU gets a unique hat_cpu_info structure in cpu_hat_info.
+ * Each CPU gets a unique hat_cpu_info structure in cpu_hat_info. For more
+ * information on its use and members, see uts/i86pc/vm/hat_i86.c.
  */
 struct hat_cpu_info {
 	kmutex_t hci_mutex;		/* mutex to ensure sequential usage */
 #if defined(__amd64)
-	pfn_t	hci_vlp_pfn;		/* pfn of hci_vlp_l3ptes */
-	x86pte_t *hci_vlp_l3ptes;	/* VLP Level==3 pagetable (top) */
-	x86pte_t *hci_vlp_l2ptes;	/* VLP Level==2 pagetable */
+	pfn_t	hci_pcp_l3pfn;		/* pfn of hci_pcp_l3ptes */
+	pfn_t	hci_pcp_l2pfn;		/* pfn of hci_pcp_l2ptes */
+	x86pte_t *hci_pcp_l3ptes;	/* PCP Level==3 pagetable (top) */
+	x86pte_t *hci_pcp_l2ptes;	/* PCP Level==2 pagetable */
+	struct hat *hci_user_hat;	/* CPU specific HAT */
+	pfn_t	hci_user_l3pfn;		/* pfn of hci_user_l3ptes */
+	x86pte_t *hci_user_l3ptes;	/* PCP User L3 pagetable */
 #endif	/* __amd64 */
 };
 
@@ -127,7 +133,8 @@ struct hat_cpu_info {
  * XX64 - The check for the VA hole needs to be better generalized.
  */
 #if defined(__amd64)
-#define	HTABLE_NUM_PTES(ht)	(((ht)->ht_flags & HTABLE_VLP) ? 4 : 512)
+#define	HTABLE_NUM_PTES(ht)	(((ht)->ht_flags & HTABLE_COPIED) ? \
+	(((ht)->ht_level == mmu.max_level) ? 512 : 4) : 512)
 
 #define	HTABLE_LAST_PAGE(ht)						\
 	((ht)->ht_level == mmu.max_level ? ((uintptr_t)0UL - MMU_PAGESIZE) :\

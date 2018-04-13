@@ -289,7 +289,9 @@ compile(char *instring, char *ep, const char *endbuf, int seof)
 					*ep++ = (char)c;
 					continue;
 				}
+				/* FALLTHROUGH */
 			}
+			/* FALLTHROUGH */
 	/* Drop through to default to use \ to turn off special chars */
 
 		defchar:

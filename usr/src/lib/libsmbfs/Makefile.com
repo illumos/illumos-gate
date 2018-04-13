@@ -59,7 +59,6 @@ OBJ_LIB=\
 	nb_ssn.o \
 	nbns_rq.o \
 	negprot.o \
-	netshareenum.o \
 	newvc.o \
 	nls.o \
 	ntlm.o \

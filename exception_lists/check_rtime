@@ -63,11 +63,9 @@ SKIP		^usr/lib/sysevent/modules/picl_slm.so$
 # Objects that are allowed to have executable data segments
 EXEC_DATA	^MACH(lib)/ld\.so\.1$
 EXEC_DATA	^lib/libc\.so\.1$	# 6524709, 32-bit, needed for x86 only
-EXEC_DATA	^lib/amd64/libumem\.so\.1$ # ptcumem
-EXEC_DATA	^lib/libumem\.so\.1$	# ptcumem
+EXEC_DATA	^MACH(lib)/libumem\.so\.1$ # ptcumem
 EXEC_DATA	^opt/SUNWdtrt/tst/.*/ustack/tst\.helper\.exe$
 EXEC_DATA	^platform/.*/MACH(kernel)/unix$
-EXEC_DATA	^platform/.*/multiboot$
 
 # Objects that are allowed to have an executable stack
 EXEC_STACK	^platform/.*/MACH(kernel)/unix$
@@ -96,9 +94,6 @@ UNDEF_REF	^usr/lib/libnisdb\.so\.2$
 # Objects allowed to have unused dependencies
 UNUSED_DEPS	^usr/lib/picl/plugins/		# require devtree dependencies
 
-# libm.so.2 dependency
-UNUSED_OBJ	unused object=.*MACH(libm)/libm_hwcap1\.so\.2
-
 # libnetsnmphelpers.so is empty in some net-snmp versions
 UNUSED_OBJ	unused object=.*/libnetsnmphelpers\.so\..*
 UNREF_OBJ	unreferenced object=.*/libnetsnmphelpers\.so\..*
@@ -107,7 +102,6 @@ UNREF_OBJ	unreferenced object=.*/libnetsnmphelpers\.so\..*
 UNUSED_RPATH	/usr/lib/fs/autofs.*\ from\ .automountd
 UNUSED_RPATH	/etc/ppp/plugins.*\ from\ .*pppd
 UNUSED_RPATH	/usr/lib/inet/ppp.*\ from\ .*pppd
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libipsecutil\.so\.1
 UNUSED_RPATH	/usr/platform/.*rsmlib.*\ from\ .*librsm\.so\.2
 UNUSED_RPATH	\$ORIGIN.*\ from\ .*fcode.so
 UNUSED_RPATH	/opt/VRTSvxvm/lib.*\ from\ .*libdiskmgt\.so\.1
@@ -122,33 +116,14 @@ UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnss3\.so
 UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libnssutil3\.so
 UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libsmime3\.so
 UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libssl3\.so
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libdbus-1\.so\.3
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libdbus-glib-1\.so\.2
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libglib-2\.0\.so\.0
-UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libglib-2\.0\.so\.0
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgobject-2\.0\.so\.0
-UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libgobject-2\.0\.so\.0
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgthread-2\.0\.so\.0
-UNUSED_RPATH	/usr/X11/lib.*\ from\ .*libgthread-2\.0\.so\.0
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libcrypto\.so\.0\.9\.8
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\..*
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1
-UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*libgcc_s\.so\.1
-UNUSED_RPATH	/usr/lib.*\ from\ .*libgcc_s\.so\.1
-UNUSED_RPATH	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5
-UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libpq\.so\.5
 UNUSED_RPATH	/usr/lib.*\ from\ .*/usr/lib/mps
-UNUSED_RPATH	/usr/ccs/lib.*\ from\ .*/usr/lib/mps
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/libpython2\..
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython2\..
 UNUSED_RPATH	/usr/snadm/lib.*\ from\ .*/usr/snadm/lib/libspmicommon\.so\.1
 UNUSED_RPATH	/usr/gcc/.*/lib.*\ from\ .*
 
-
 # Unused runpaths for reasons not captured above
 UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 	# future needs
-UNUSED_RPATH	/usr.*\ from\ .*tst\.gcc\.exe			# gcc built
-
 
 # Unreferenced objects of non-OSnet objects we can't change
 UNREF_OBJ	/lib.*\ of\ .*libcimapi\.so
@@ -212,21 +187,52 @@ OLDDEP		libw\.so\.1			# on297 build 7
 # for implementation reasons, and the mangled names used to encode argument
 # and return value types are difficult to handle well in mapfiles.
 # Furthermore, the Sun compiler and gcc use different and incompatible
-# name mangling conventions. Since ON must be buildable by either, we
+# name mangling conventions. Since illumos must be buildable by either, we
 # would have to maintain two sets of mapfiles for each such object.
-# C++ use is rare in ON, so this is not worth pursuing.
+# C++ use is rare in illumos, so this is not worth pursuing.
 #
 NOSYMSORT	opt/SUNWdtrt/tst/common/pid/tst.weak2.exe	# DTrace test
-NOSYMSORT	lib/amd64/libnsl\.so\.1				# C++
-NOSYMSORT	lib/sparcv9/libnsl\.so\.1			# C++
-NOSYMSORT	lib/sparcv9/libfru\.so\.1			# C++
-NOSYMSORT	usr/lib/lms					# C++
 NOSYMSORT	ld\.so\.1					# libc_pic.a user
-NOSYMSORT	lib/libsun_fc\.so\.1				# C++
-NOSYMSORT	lib/amd64/libsun_fc\.so\.1			# C++
-NOSYMSORT	lib/sparcv9/libsun_fc\.so\.1 			# C++
-NOSYMSORT	usr/lib/amd64/libfru\.so\.1			# C++
+NOSYMSORT	usr/MACH(lib)/libsun_fc\.so\.1			# C++
+NOSYMSORT	usr/MACH(lib)/libfru\.so\.1			# C++
 
+# The majority of illumos deliverables should not depend on the GCC runtime
+# (any necessary runtime symbol should be provided by libc.so, instead).
+# However, the GNU C++ runtime requires the GCC runtime, so certain objects
+# must be excepted.
+FORBIDDEN	libgcc_s\.so
+FORBIDDEN_DEP	usr/bin/audioconvert            # C++
+FORBIDDEN_DEP   usr/bin/make                    # C++
+FORBIDDEN_DEP   usr/MACH(lib)/libfru.so.1       # C++
+FORBIDDEN_DEP   usr/MACH(lib)/libsun_fc.so.1    # C++
+FORBIDDEN_DEP   usr/lib/netsvc/yp/rpc.yppasswdd # C++
+FORBIDDEN_DEP   usr/lib/netsvc/yp/ypserv        # C++
+FORBIDDEN_DEP   usr/lib/netsvc/yp/ypxfr         # C++
+FORBIDDEN_DEP   usr/lib/netsvc/yp/ypxfrd        # C++
+
+# libfakekernel is a test environment, not intended for general use
+FORBIDDEN libfakekernel\.so
+FORBIDDEN_DEP usr/MACH(lib)/libzpool.so.1
+FORBIDDEN_DEP usr/bin/amd64/ztest
+FORBIDDEN_DEP usr/bin/i86/ztest
+FORBIDDEN_DEP usr/bin/sparcv7/ztest
+FORBIDDEN_DEP usr/bin/sparcv9/ztest
+FORBIDDEN_DEP usr/lib/MACH(smbsrv)/libfksmbsrv.so.1
+FORBIDDEN_DEP usr/lib/smbsrv/fksmbd
+FORBIDDEN_DEP usr/sbin/amd64/zdb
+FORBIDDEN_DEP usr/sbin/i86/zdb
+FORBIDDEN_DEP usr/sbin/sparcv7/zdb
+FORBIDDEN_DEP usr/sbin/sparcv9/zdb
+
+# libucb is intended for legacy compatibility, not general use
+FORBIDDEN libucb\.so
+FORBIDDEN_DEP usr/ucb/
+FORBIDDEN_DEP usr/ucblib/
+
+# Older versions of libraries only provided for binary compatibility
+FORBIDDEN libm\.so\.1
+FORBIDDEN libresolv\.so\.1
+FORBIDDEN libxcurses\.so\.1
 
 # The libprtdiag_psr.so.1 objects built under usr/src/lib/libprtdiag_psr
 # are a family, all built using the same makefile, targeted at different
@@ -234,5 +240,3 @@ NOSYMSORT	usr/lib/amd64/libfru\.so\.1			# C++
 # one size fits all approach causes an object to be linked against an
 # unneeded library.
 UNREF_OBJ	lib/(libdevinfo|libcfgadm)\.so\.1; .*\ of\ .*SUNW,Netra-CP2300/lib/libprtdiag_psr\.so\.1
-
-

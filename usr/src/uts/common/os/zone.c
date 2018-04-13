@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -5656,6 +5657,8 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 			error = EFAULT;
 		break;
 	case ZONE_ATTR_NETWORK:
+		bufsize = MIN(bufsize, PIPE_BUF + sizeof (zone_net_data_t));
+		size = bufsize;
 		zbuf = kmem_alloc(bufsize, KM_SLEEP);
 		if (copyin(buf, zbuf, bufsize) != 0) {
 			error = EFAULT;

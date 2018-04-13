@@ -22,18 +22,21 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+#
 
 #
 # Common targets for smbsrv Makefiles
 #
 
 %_ndr.c: $(NDLDIR)/%.ndl
-	$(NDRGEN) -Y $(CC) $<
+	$(NDRGEN) -Y $(ANSI_CPP) $(CPPFLAGS) $<
 
 pics/%.o:	$(SRC)/common/smbsrv/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
+
+pics/%.o := CPPFLAGS += -I$(ROOTSMBHDRDIR)/ndl
 
 .KEEP_STATE:
 
