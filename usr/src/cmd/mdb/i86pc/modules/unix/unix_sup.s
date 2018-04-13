@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #if !defined(__lint)
@@ -32,6 +32,10 @@ kmdb_unix_getcr0(void)
 { return (0); }
 
 ulong_t
+kmdb_unix_getcr3(void)
+{ return (0); }
+
+ulong_t
 kmdb_unix_getcr4(void)
 { return (0); }
 
@@ -43,6 +47,16 @@ kmdb_unix_getcr4(void)
 	ret
 	SET_SIZE(kmdb_unix_getcr0)
 
+	ENTRY(kmdb_unix_getcr2)
+	movq %cr2, %rax
+	ret
+	SET_SIZE(kmdb_unix_getcr2)
+
+	ENTRY(kmdb_unix_getcr3)
+	movq %cr3, %rax
+	ret
+	SET_SIZE(kmdb_unix_getcr3)
+
 	ENTRY(kmdb_unix_getcr4)
 	movq %cr4, %rax
 	ret
@@ -53,6 +67,16 @@ kmdb_unix_getcr4(void)
 	movl %cr0, %eax
 	ret
 	SET_SIZE(kmdb_unix_getcr0)
+
+	ENTRY(kmdb_unix_getcr2)
+	movl %cr2, %eax
+	ret
+	SET_SIZE(kmdb_unix_getcr2)
+
+	ENTRY(kmdb_unix_getcr3)
+	movl %cr3, %eax
+	ret
+	SET_SIZE(kmdb_unix_getcr3)
 
 	ENTRY(kmdb_unix_getcr4)
 	movl %cr4, %eax

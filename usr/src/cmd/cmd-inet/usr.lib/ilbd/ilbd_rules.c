@@ -839,7 +839,7 @@ i_ilbd_rule_action(const char *rule_name, const struct passwd *ps,
 			rc = ilbd_check_client_config_auth(ps);
 		/* generate the audit record before bailing out */
 		if (rc != ILB_STATUS_OK) {
-			if (rule_name != '\0') {
+			if (*rule_name != '\0') {
 				ilbd_audit_rule_event(rule_name, NULL,
 				    cmd, rc, ucredp);
 			} else {

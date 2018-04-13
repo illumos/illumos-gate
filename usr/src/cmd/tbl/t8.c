@@ -12,8 +12,6 @@
  * specifies the terms and conditions for redistribution.
  */
   
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
  /* t8.c: write out one line of output table */
 # include "t..c"
 # include <locale.h>
@@ -173,6 +171,7 @@ for(c=0; c<ncol; c++)
 				form=1;
 				break;
 				}
+			/* FALLTHROUGH */
 		case 'c':
 			form=3; break;
 		case 'r':

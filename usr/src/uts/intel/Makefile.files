@@ -22,7 +22,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Joyent, Inc. All rights reserved.
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 #
@@ -234,11 +234,6 @@ SDT_OBJS += sdt.o
 #	AMD8111 NIC driver module
 #
 AMD8111S_OBJS += amd8111s_main.o amd8111s_hw.o
-
-#
-#	Pentium Performance Counter BackEnd module
-#
-P123_PCBE_OBJS = p123_pcbe.o
 
 #
 #	Pentium 4 Performance Counter BackEnd module

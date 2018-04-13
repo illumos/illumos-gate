@@ -26,7 +26,7 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  *
- * Copyright 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -845,6 +845,12 @@ do_bsys_doint(bootops_t *bop, int intnum, struct bop_regs *rp)
 	static int firsttime = 1;
 	bios_func_t bios_func = (bios_func_t)(void *)(uintptr_t)0x5000;
 	bios_regs_t br;
+
+	/*
+	 * We're about to disable paging; we shouldn't be PCID enabled.
+	 */
+	if (getcr4() & CR4_PCIDE)
+		prom_panic("do_bsys_doint() with PCID enabled\n");
 
 	/*
 	 * The first time we do this, we have to copy the pre-packaged

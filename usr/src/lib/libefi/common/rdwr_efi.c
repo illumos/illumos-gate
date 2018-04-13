@@ -23,6 +23,7 @@
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Toomas Soome <tsoome@me.com>
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
@@ -30,6 +31,7 @@
 #include <errno.h>
 #include <strings.h>
 #include <unistd.h>
+#include <smbios.h>
 #include <uuid/uuid.h>
 #include <libintl.h>
 #include <sys/types.h>
@@ -114,6 +116,8 @@ int efi_debug = 1;
 #else
 int efi_debug = 0;
 #endif
+
+#define	EFI_FIXES_DB "/usr/share/hwdata/efi.fixes"
 
 extern unsigned int	efi_crc32(const unsigned char *, unsigned int);
 static int		efi_read(int, struct dk_gpt *);
@@ -555,6 +559,104 @@ efi_read(int fd, struct dk_gpt *vtoc)
 	return (dki_info.dki_partition);
 }
 
+static void
+hardware_workarounds(int *slot, int *active)
+{
+	smbios_struct_t s_sys, s_mb;
+	smbios_info_t sys, mb;
+	smbios_hdl_t *shp;
+	char buf[0x400];
+	FILE *fp;
+	int err;
+
+	if ((fp = fopen(EFI_FIXES_DB, "rF")) == NULL)
+		return;
+
+	if ((shp = smbios_open(NULL, SMB_VERSION, 0, &err)) == NULL) {
+		if (efi_debug)
+			(void) fprintf(stderr,
+			    "libefi failed to load SMBIOS: %s\n",
+			    smbios_errmsg(err));
+		(void) fclose(fp);
+		return;
+	}
+
+	if (smbios_lookup_type(shp, SMB_TYPE_SYSTEM, &s_sys) == SMB_ERR ||
+	    smbios_info_common(shp, s_sys.smbstr_id, &sys) == SMB_ERR)
+		(void) memset(&sys, '\0', sizeof (sys));
+	if (smbios_lookup_type(shp, SMB_TYPE_BASEBOARD, &s_mb) == SMB_ERR ||
+	    smbios_info_common(shp, s_mb.smbstr_id, &mb) == SMB_ERR)
+		(void) memset(&mb, '\0', sizeof (mb));
+
+	while (fgets(buf, sizeof (buf), fp) != NULL) {
+		char *tok, *val, *end;
+
+		tok = buf + strspn(buf, " \t");
+		if (*tok == '#')
+			continue;
+		while (*tok != '\0') {
+			tok += strspn(tok, " \t");
+			if ((val = strchr(tok, '=')) == NULL)
+				break;
+			*val++ = '\0';
+			if (*val == '"')
+				end = strchr(++val, '"');
+			else
+				end = strpbrk(val, " \t\n");
+			if (end == NULL)
+				break;
+			*end++ = '\0';
+
+			if (strcmp(tok, "sys.manufacturer") == 0 &&
+			    (sys.smbi_manufacturer == NULL ||
+			    strcasecmp(val, sys.smbi_manufacturer)))
+				break;
+			if (strcmp(tok, "sys.product") == 0 &&
+			    (sys.smbi_product == NULL ||
+			    strcasecmp(val, sys.smbi_product)))
+				break;
+			if (strcmp(tok, "sys.version") == 0 &&
+			    (sys.smbi_version == NULL ||
+			    strcasecmp(val, sys.smbi_version)))
+				break;
+			if (strcmp(tok, "mb.manufacturer") == 0 &&
+			    (mb.smbi_manufacturer == NULL ||
+			    strcasecmp(val, mb.smbi_manufacturer)))
+				break;
+			if (strcmp(tok, "mb.product") == 0 &&
+			    (mb.smbi_product == NULL ||
+			    strcasecmp(val, mb.smbi_product)))
+				break;
+			if (strcmp(tok, "mb.version") == 0 &&
+			    (mb.smbi_version == NULL ||
+			    strcasecmp(val, mb.smbi_version)))
+				break;
+
+			if (strcmp(tok, "pmbr_slot") == 0) {
+				*slot = atoi(val);
+				if (*slot < 0 || *slot > 3)
+					*slot = 0;
+				if (efi_debug)
+					(void) fprintf(stderr,
+					    "Using slot %d\n", *slot);
+			}
+
+			if (strcmp(tok, "pmbr_active") == 0) {
+				*active = atoi(val);
+				if (*active < 0 || *active > 1)
+					*active = 0;
+				if (efi_debug)
+					(void) fprintf(stderr,
+					    "Using active %d\n", *active);
+			}
+
+			tok = end;
+		}
+	}
+	(void) fclose(fp);
+	smbios_close(shp);
+}
+
 /* writes a "protective" MBR */
 static int
 write_pmbr(int fd, struct dk_gpt *vtoc)
@@ -564,7 +666,11 @@ write_pmbr(int fd, struct dk_gpt *vtoc)
 	uchar_t		*cp;
 	diskaddr_t	size_in_lba;
 	uchar_t		*buf;
-	int		len;
+	int		len, slot, active;
+
+	slot = active = 0;
+
+	hardware_workarounds(&slot, &active);
 
 	len = (vtoc->efi_lbasize == 0) ? sizeof (mb) : vtoc->efi_lbasize;
 	buf = calloc(len, 1);
@@ -590,9 +696,9 @@ write_pmbr(int fd, struct dk_gpt *vtoc)
 	}
 
 	bzero(&mb.parts, sizeof (mb.parts));
-	cp = (uchar_t *)&mb.parts[0];
+	cp = (uchar_t *)&mb.parts[slot * sizeof (struct ipart)];
 	/* bootable or not */
-	*cp++ = 0;
+	*cp++ = active ? ACTIVE : NOTACTIVE;
 	/* beginning CHS; 0xffffff if not representable */
 	*cp++ = 0xff;
 	*cp++ = 0xff;

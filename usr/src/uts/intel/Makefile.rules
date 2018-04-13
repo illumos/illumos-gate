@@ -21,7 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2012 Joyent, Inc.  All rights reserved.
+# Copyright 2018 Joyent, Inc.  All rights reserved.
 # Copyright 2017 Nexenta Systems, Inc.
 #
 
@@ -272,9 +272,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/kdi/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/kdi/%.s
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/kdi/$(SUBARCH_DIR)/%.s
-	$(COMPILE.s) -o $@ $<
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/zfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -487,9 +484,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/kdi/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/kdi/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/kdi/$(SUBARCH_DIR)/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/nskern/%.s

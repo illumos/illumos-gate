@@ -1897,7 +1897,8 @@ mptsas_do_detach(dev_info_t *dip)
 			 */
 			ndi_devi_enter(scsi_vhci_dip, &circ1);
 			ndi_devi_enter(dip, &circ);
-			while (pip = mdi_get_next_client_path(dip, NULL)) {
+			while ((pip = mdi_get_next_client_path(dip, NULL)) !=
+			    NULL) {
 				if (mdi_pi_free(pip, 0) == MDI_SUCCESS) {
 					continue;
 				}
@@ -6464,10 +6465,11 @@ handle_topo_change:
 		 * If HBA is being reset, don't perform operations depending
 		 * on the IOC. We must free the topo list, however.
 		 */
-		if (!mpt->m_in_reset)
+		if (!mpt->m_in_reset) {
 			mptsas_handle_topo_change(topo_node, parent);
-		else
+		} else {
 			NDBG20(("skipping topo change received during reset"));
+		}
 		save_node = topo_node;
 		topo_node = topo_node->next;
 		ASSERT(save_node);
@@ -6903,6 +6905,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				    MPTSAS_VIRTUAL_PORT);
 				mptsas_log(mpt, CE_WARN, "mptsas virtual port "
 				    "prop update failed");
+				mutex_enter(&mpt->m_mutex);
 				return;
 			}
 			/*
@@ -6915,6 +6918,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				    MPTSAS_NUM_PHYS);
 				mptsas_log(mpt, CE_WARN, "mptsas num phys"
 				    "prop update failed");
+				mutex_enter(&mpt->m_mutex);
 				return;
 			}
 			/*
@@ -6928,6 +6932,7 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 				    SCSI_ADDR_PROP_ATTACHED_PORT);
 				mptsas_log(mpt, CE_WARN, "mptsas attached port "
 				    "prop update failed");
+				mutex_enter(&mpt->m_mutex);
 				return;
 			}
 		}
@@ -7062,8 +7067,8 @@ mptsas_handle_event_sync(void *args)
 	    (mpt->m_reply_frame_dma_addr & 0xffffffffu)));
 	event = ddi_get16(mpt->m_acc_reply_frame_hdl, &eventreply->Event);
 
-	if (iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
-	    &eventreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
+	    &eventreply->IOCStatus)) != 0) {
 		if (iocstatus == MPI2_IOCSTATUS_FLAG_LOG_INFO_AVAILABLE) {
 			mptsas_log(mpt, CE_WARN,
 			    "!mptsas_handle_event_sync: event 0x%x, "
@@ -7767,8 +7772,8 @@ mptsas_handle_event(void *args)
 	    (mpt->m_reply_frame_dma_addr & 0xffffffffu)));
 	event = ddi_get16(mpt->m_acc_reply_frame_hdl, &eventreply->Event);
 
-	if (iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
-	    &eventreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(mpt->m_acc_reply_frame_hdl,
+	    &eventreply->IOCStatus)) != 0) {
 		if (iocstatus == MPI2_IOCSTATUS_FLAG_LOG_INFO_AVAILABLE) {
 			mptsas_log(mpt, CE_WARN,
 			    "!mptsas_handle_event: IOCStatus=0x%x, "
@@ -8302,6 +8307,60 @@ mptsas_handle_event(void *args)
 		}
 		break;
 	}
+	case MPI2_EVENT_ACTIVE_CABLE_EXCEPTION:
+	{
+		pMpi26EventDataActiveCableExcept_t	actcable;
+		uint32_t power;
+		uint8_t reason, id;
+
+		actcable = (pMpi26EventDataActiveCableExcept_t)
+		    eventreply->EventData;
+		power = ddi_get32(mpt->m_acc_reply_frame_hdl,
+		    &actcable->ActiveCablePowerRequirement);
+		reason = ddi_get8(mpt->m_acc_reply_frame_hdl,
+		    &actcable->ReasonCode);
+		id = ddi_get8(mpt->m_acc_reply_frame_hdl,
+		    &actcable->ReceptacleID);
+
+		/*
+		 * It'd be nice if this weren't just logging to the system but
+		 * were telling FMA about the active cable problem and FMA was
+		 * aware of the cable topology and state.
+		 */
+		switch (reason) {
+		case MPI26_EVENT_ACTIVE_CABLE_PRESENT:
+			/* Don't log anything if it's fine */
+			break;
+		case MPI26_EVENT_ACTIVE_CABLE_INSUFFICIENT_POWER:
+			mptsas_log(mpt, CE_WARN, "An active cable (id %u) does "
+			    "not have sufficient power to be enabled. "
+			    "Devices connected to this cable will not be "
+			    "visible to the system.", id);
+			if (power == UINT32_MAX) {
+				mptsas_log(mpt, CE_CONT, "The cable's power "
+				    "requirements are unknown.\n");
+			} else {
+				mptsas_log(mpt, CE_CONT, "The cable requires "
+				    "%u mW of power to function.\n", power);
+			}
+			break;
+		case MPI26_EVENT_ACTIVE_CABLE_DEGRADED:
+			mptsas_log(mpt, CE_WARN, "An active cable (id %u) is "
+			    "degraded and not running at its full speed. "
+			    "Some devices might not appear.", id);
+			break;
+		default:
+			break;
+		}
+		break;
+	}
+	case MPI2_EVENT_PCIE_DEVICE_STATUS_CHANGE:
+	case MPI2_EVENT_PCIE_ENUMERATION:
+	case MPI2_EVENT_PCIE_TOPOLOGY_CHANGE_LIST:
+	case MPI2_EVENT_PCIE_LINK_COUNTER:
+		mptsas_log(mpt, CE_NOTE, "Unhandled mpt_sas PCIe device "
+		    "event received (0x%x)", event);
+		break;
 	default:
 		NDBG20(("mptsas%d: unknown event %x received",
 		    mpt->m_instance, event));
@@ -10671,15 +10730,17 @@ mpi_pre_fw_download(mptsas_t *mpt, mptsas_pt_request_t *pt)
 
 	pt->sgl_offset = offsetof(MPI2_FW_DOWNLOAD_REQUEST, SGL) +
 	    sizeof (*tcsge);
-	if (pt->request_size != pt->sgl_offset)
+	if (pt->request_size != pt->sgl_offset) {
 		NDBG15(("mpi_pre_fw_download(): Incorrect req size, "
 		    "0x%x, should be 0x%x, dataoutsz 0x%x",
 		    (int)pt->request_size, (int)pt->sgl_offset,
 		    (int)pt->dataout_size));
-	if (pt->data_size < sizeof (MPI2_FW_DOWNLOAD_REPLY))
+	}
+	if (pt->data_size < sizeof (MPI2_FW_DOWNLOAD_REPLY)) {
 		NDBG15(("mpi_pre_fw_download(): Incorrect rep size, "
 		    "0x%x, should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_FW_DOWNLOAD_REPLY)));
+	}
 }
 
 /*
@@ -10709,15 +10770,17 @@ mpi_pre_fw_25_download(mptsas_t *mpt, mptsas_pt_request_t *pt)
 	req25->ImageSize = tcsge->ImageSize;
 
 	pt->sgl_offset = offsetof(MPI25_FW_DOWNLOAD_REQUEST, SGL);
-	if (pt->request_size != pt->sgl_offset)
+	if (pt->request_size != pt->sgl_offset) {
 		NDBG15(("mpi_pre_fw_25_download(): Incorrect req size, "
 		    "0x%x, should be 0x%x, dataoutsz 0x%x",
 		    pt->request_size, pt->sgl_offset,
 		    pt->dataout_size));
-	if (pt->data_size < sizeof (MPI2_FW_DOWNLOAD_REPLY))
+	}
+	if (pt->data_size < sizeof (MPI2_FW_DOWNLOAD_REPLY)) {
 		NDBG15(("mpi_pre_fw_25_download(): Incorrect rep size, "
 		    "0x%x, should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_FW_UPLOAD_REPLY)));
+	}
 }
 
 /*
@@ -10753,15 +10816,17 @@ mpi_pre_fw_upload(mptsas_t *mpt, mptsas_pt_request_t *pt)
 
 	pt->sgl_offset = offsetof(MPI2_FW_UPLOAD_REQUEST, SGL) +
 	    sizeof (*tcsge);
-	if (pt->request_size != pt->sgl_offset)
+	if (pt->request_size != pt->sgl_offset) {
 		NDBG15(("mpi_pre_fw_upload(): Incorrect req size, "
 		    "0x%x, should be 0x%x, dataoutsz 0x%x",
 		    pt->request_size, pt->sgl_offset,
 		    pt->dataout_size));
-	if (pt->data_size < sizeof (MPI2_FW_UPLOAD_REPLY))
+	}
+	if (pt->data_size < sizeof (MPI2_FW_UPLOAD_REPLY)) {
 		NDBG15(("mpi_pre_fw_upload(): Incorrect rep size, "
 		    "0x%x, should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_FW_UPLOAD_REPLY)));
+	}
 }
 
 /*
@@ -10791,15 +10856,17 @@ mpi_pre_fw_25_upload(mptsas_t *mpt, mptsas_pt_request_t *pt)
 	req25->ImageSize = tcsge->ImageSize;
 
 	pt->sgl_offset = offsetof(MPI25_FW_UPLOAD_REQUEST, SGL);
-	if (pt->request_size != pt->sgl_offset)
+	if (pt->request_size != pt->sgl_offset) {
 		NDBG15(("mpi_pre_fw_25_upload(): Incorrect req size, "
 		    "0x%x, should be 0x%x, dataoutsz 0x%x",
 		    pt->request_size, pt->sgl_offset,
 		    pt->dataout_size));
-	if (pt->data_size < sizeof (MPI2_FW_UPLOAD_REPLY))
+	}
+	if (pt->data_size < sizeof (MPI2_FW_UPLOAD_REPLY)) {
 		NDBG15(("mpi_pre_fw_25_upload(): Incorrect rep size, "
 		    "0x%x, should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_FW_UPLOAD_REPLY)));
+	}
 }
 
 /*
@@ -10811,16 +10878,18 @@ mpi_pre_ioc_facts(mptsas_t *mpt, mptsas_pt_request_t *pt)
 #ifndef __lock_lint
 	_NOTE(ARGUNUSED(mpt))
 #endif
-	if (pt->request_size != sizeof (MPI2_IOC_FACTS_REQUEST))
+	if (pt->request_size != sizeof (MPI2_IOC_FACTS_REQUEST)) {
 		NDBG15(("mpi_pre_ioc_facts(): Incorrect req size, "
 		    "0x%x, should be 0x%x, dataoutsz 0x%x",
 		    pt->request_size,
 		    (int)sizeof (MPI2_IOC_FACTS_REQUEST),
 		    pt->dataout_size));
-	if (pt->data_size != sizeof (MPI2_IOC_FACTS_REPLY))
+	}
+	if (pt->data_size != sizeof (MPI2_IOC_FACTS_REPLY)) {
 		NDBG15(("mpi_pre_ioc_facts(): Incorrect rep size, "
 		    "0x%x, should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_IOC_FACTS_REPLY)));
+	}
 	pt->sgl_offset = (uint16_t)pt->request_size;
 }
 
@@ -10833,16 +10902,18 @@ mpi_pre_port_facts(mptsas_t *mpt, mptsas_pt_request_t *pt)
 #ifndef __lock_lint
 	_NOTE(ARGUNUSED(mpt))
 #endif
-	if (pt->request_size != sizeof (MPI2_PORT_FACTS_REQUEST))
+	if (pt->request_size != sizeof (MPI2_PORT_FACTS_REQUEST)) {
 		NDBG15(("mpi_pre_port_facts(): Incorrect req size, "
 		    "0x%x, should be 0x%x, dataoutsz 0x%x",
 		    pt->request_size,
 		    (int)sizeof (MPI2_PORT_FACTS_REQUEST),
 		    pt->dataout_size));
-	if (pt->data_size != sizeof (MPI2_PORT_FACTS_REPLY))
+	}
+	if (pt->data_size != sizeof (MPI2_PORT_FACTS_REPLY)) {
 		NDBG15(("mpi_pre_port_facts(): Incorrect rep size, "
 		    "0x%x, should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_PORT_FACTS_REPLY)));
+	}
 	pt->sgl_offset = (uint16_t)pt->request_size;
 }
 
@@ -10856,15 +10927,17 @@ mpi_pre_sata_passthrough(mptsas_t *mpt, mptsas_pt_request_t *pt)
 	_NOTE(ARGUNUSED(mpt))
 #endif
 	pt->sgl_offset = offsetof(MPI2_SATA_PASSTHROUGH_REQUEST, SGL);
-	if (pt->request_size != pt->sgl_offset)
+	if (pt->request_size != pt->sgl_offset) {
 		NDBG15(("mpi_pre_sata_passthrough(): Incorrect req size, "
 		    "0x%x, should be 0x%x, dataoutsz 0x%x",
 		    pt->request_size, pt->sgl_offset,
 		    pt->dataout_size));
-	if (pt->data_size != sizeof (MPI2_SATA_PASSTHROUGH_REPLY))
+	}
+	if (pt->data_size != sizeof (MPI2_SATA_PASSTHROUGH_REPLY)) {
 		NDBG15(("mpi_pre_sata_passthrough(): Incorrect rep size, "
 		    "0x%x, should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_SATA_PASSTHROUGH_REPLY)));
+	}
 }
 
 static void
@@ -10874,15 +10947,17 @@ mpi_pre_smp_passthrough(mptsas_t *mpt, mptsas_pt_request_t *pt)
 	_NOTE(ARGUNUSED(mpt))
 #endif
 	pt->sgl_offset = offsetof(MPI2_SMP_PASSTHROUGH_REQUEST, SGL);
-	if (pt->request_size != pt->sgl_offset)
+	if (pt->request_size != pt->sgl_offset) {
 		NDBG15(("mpi_pre_smp_passthrough(): Incorrect req size, "
 		    "0x%x, should be 0x%x, dataoutsz 0x%x",
 		    pt->request_size, pt->sgl_offset,
 		    pt->dataout_size));
-	if (pt->data_size != sizeof (MPI2_SMP_PASSTHROUGH_REPLY))
+	}
+	if (pt->data_size != sizeof (MPI2_SMP_PASSTHROUGH_REPLY)) {
 		NDBG15(("mpi_pre_smp_passthrough(): Incorrect rep size, "
 		    "0x%x, should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_SMP_PASSTHROUGH_REPLY)));
+	}
 }
 
 /*
@@ -10895,14 +10970,16 @@ mpi_pre_config(mptsas_t *mpt, mptsas_pt_request_t *pt)
 	_NOTE(ARGUNUSED(mpt))
 #endif
 	pt->sgl_offset = offsetof(MPI2_CONFIG_REQUEST, PageBufferSGE);
-	if (pt->request_size != pt->sgl_offset)
+	if (pt->request_size != pt->sgl_offset) {
 		NDBG15(("mpi_pre_config(): Incorrect req size, 0x%x, "
 		    "should be 0x%x, dataoutsz 0x%x", pt->request_size,
 		    pt->sgl_offset, pt->dataout_size));
-	if (pt->data_size != sizeof (MPI2_CONFIG_REPLY))
+	}
+	if (pt->data_size != sizeof (MPI2_CONFIG_REPLY)) {
 		NDBG15(("mpi_pre_config(): Incorrect rep size, 0x%x, "
 		    "should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_CONFIG_REPLY)));
+	}
 	pt->simple = 1;
 }
 
@@ -10916,15 +10993,17 @@ mpi_pre_scsi_io_req(mptsas_t *mpt, mptsas_pt_request_t *pt)
 	_NOTE(ARGUNUSED(mpt))
 #endif
 	pt->sgl_offset = offsetof(MPI2_SCSI_IO_REQUEST, SGL);
-	if (pt->request_size != pt->sgl_offset)
+	if (pt->request_size != pt->sgl_offset) {
 		NDBG15(("mpi_pre_config(): Incorrect req size, 0x%x, "
 		    "should be 0x%x, dataoutsz 0x%x", pt->request_size,
 		    pt->sgl_offset,
 		    pt->dataout_size));
-	if (pt->data_size != sizeof (MPI2_SCSI_IO_REPLY))
+	}
+	if (pt->data_size != sizeof (MPI2_SCSI_IO_REPLY)) {
 		NDBG15(("mpi_pre_config(): Incorrect rep size, 0x%x, "
 		    "should be 0x%x", pt->data_size,
 		    (int)sizeof (MPI2_SCSI_IO_REPLY)));
+	}
 }
 
 /*
@@ -14188,6 +14267,9 @@ mptsas_bus_config(dev_info_t *pdip, uint_t flag,
 		mptsas_config_all(pdip);
 		ret = NDI_SUCCESS;
 		break;
+	default:
+		ret = NDI_FAILURE;
+		break;
 	}
 
 	if ((ret == NDI_SUCCESS) && bconfig) {
@@ -14475,11 +14557,13 @@ mptsas_config_luns(dev_info_t *pdip, mptsas_target_t *ptgt)
 			continue;
 		}
 		saved_repluns[lun_cnt] = lun_num;
-		if (cdip = mptsas_find_child_addr(pdip, sas_wwn, lun_num))
+		if ((cdip = mptsas_find_child_addr(pdip, sas_wwn, lun_num)) !=
+		    NULL) {
 			ret = DDI_SUCCESS;
-		else
+		} else {
 			ret = mptsas_probe_lun(pdip, lun_num, &cdip,
 			    ptgt);
+		}
 		if ((ret == DDI_SUCCESS) && (cdip != NULL)) {
 			(void) ndi_prop_remove(DDI_DEV_T_NONE, cdip,
 			    MPTSAS_DEV_GONE);

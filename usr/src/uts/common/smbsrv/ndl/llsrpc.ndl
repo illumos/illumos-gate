@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_LLSR_NDL_
@@ -41,7 +43,7 @@
  *	0x3b	closes the handle obtained via 0x3a
  */
 
-#include "ndrtypes.ndl"
+#include <libmlrpc/ndrtypes.ndl>
 
 #define LLSR_OPNUM_Open			0x00
 #define LLSR_OPNUM_Close		0x01

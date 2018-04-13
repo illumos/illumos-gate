@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2018 Joyent, Inc.
+#
 
 PROMSRCS += \
 	prom_env.c \
@@ -36,8 +38,6 @@ KMDBSRCS += \
 	kmdb_fault_isadep.c \
 	kmdb_kdi_isadep.c \
 	kmdb_promif_isadep.c \
-	kvm_cpu_amd.c \
-	kvm_cpu_p4.c \
 	kvm_isadep.c
 
 KMDBML += \

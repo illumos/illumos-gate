@@ -351,15 +351,15 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 {
 	char		*data = uap->dataptr;
 	int		error;
-	smbnode_t 	*rtnp = NULL;	/* root of this fs */
-	smbmntinfo_t 	*smi = NULL;
-	dev_t 		smbfs_dev;
-	int 		version;
-	int 		devfd;
+	smbnode_t	*rtnp = NULL;	/* root of this fs */
+	smbmntinfo_t	*smi = NULL;
+	dev_t		smbfs_dev;
+	int		version;
+	int		devfd;
 	zone_t		*zone = curproc->p_zone;
 	zone_t		*mntzone = NULL;
-	smb_share_t 	*ssp = NULL;
-	smb_cred_t 	scred;
+	smb_share_t	*ssp = NULL;
+	smb_cred_t	scred;
 	int		flags, sec;
 
 	STRUCT_DECL(smbfs_args, args);		/* smbfs mount arguments */
@@ -533,8 +533,8 @@ smbfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * starting with args.flags (SMBFS_MF_xxx)
 	 */
 	flags = STRUCT_FGET(args, flags);
-	smi->smi_uid 	= STRUCT_FGET(args, uid);
-	smi->smi_gid 	= STRUCT_FGET(args, gid);
+	smi->smi_uid	= STRUCT_FGET(args, uid);
+	smi->smi_gid	= STRUCT_FGET(args, gid);
 	smi->smi_fmode	= STRUCT_FGET(args, file_mode) & 0777;
 	smi->smi_dmode	= STRUCT_FGET(args, dir_mode) & 0777;
 
@@ -881,8 +881,6 @@ cache_hit:
 	return (error);
 }
 
-static kmutex_t smbfs_syncbusy;
-
 /*
  * Flush dirty smbfs files for file system vfsp.
  * If vfsp == NULL, all smbfs files are flushed.
@@ -891,14 +889,25 @@ static kmutex_t smbfs_syncbusy;
 static int
 smbfs_sync(vfs_t *vfsp, short flag, cred_t *cr)
 {
+
 	/*
-	 * Cross-zone calls are OK here, since this translates to a
-	 * VOP_PUTPAGE(B_ASYNC), which gets picked up by the right zone.
+	 * SYNC_ATTR is used by fsflush() to force old filesystems like UFS
+	 * to sync metadata, which they would otherwise cache indefinitely.
+	 * Semantically, the only requirement is that the sync be initiated.
+	 * Assume the server-side takes care of attribute sync.
 	 */
-	if (!(flag & SYNC_ATTR) && mutex_tryenter(&smbfs_syncbusy) != 0) {
-		smbfs_rflush(vfsp, cr);
-		mutex_exit(&smbfs_syncbusy);
+	if (flag & SYNC_ATTR)
+		return (0);
+
+	if (vfsp == NULL) {
+		/*
+		 * Flush ALL smbfs mounts in this zone.
+		 */
+		smbfs_flushall(cr);
+		return (0);
 	}
+
+	smbfs_rflush(vfsp, cr);
 
 	return (0);
 }
@@ -909,7 +918,6 @@ smbfs_sync(vfs_t *vfsp, short flag, cred_t *cr)
 int
 smbfs_vfsinit(void)
 {
-	mutex_init(&smbfs_syncbusy, NULL, MUTEX_DEFAULT, NULL);
 	return (0);
 }
 
@@ -919,7 +927,6 @@ smbfs_vfsinit(void)
 void
 smbfs_vfsfini(void)
 {
-	mutex_destroy(&smbfs_syncbusy);
 }
 
 void

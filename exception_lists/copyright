@@ -23,6 +23,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 syntax: glob
@@ -99,6 +100,8 @@ usr/src/common/bzip2/decompress.c
 usr/src/common/bzip2/bzlib_private.h
 usr/src/common/bzip2/huffman.c
 usr/src/common/ficl/*
+usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.descrip
+usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.tmpl
 usr/src/grub/grub-0.97/stage2/Makefile.am
 usr/src/grub/grub-0.97/stage2/builtins.c
 usr/src/grub/grub-0.97/stage2/disk_io.c
@@ -457,18 +460,5 @@ usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.lz4.descrip
 usr/src/uts/common/fs/zfs/THIRDPARTYLICENSE.cityhash.descrip
 usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload
 usr/src/uts/common/sys/THIRDPARTYLICENSE.firmload.descrip
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/THIRDPARTYLICENSE.descrip
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/THIRDPARTYLICENSE
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_hbd.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_history.txt
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_init.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_ioc.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_ra.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_raid.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_sas.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_targ.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h
-usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/mpi2_type.h
+usr/src/uts/common/sys/scsi/adapters/mpt_sas/mpi/*
 usr/src/uts/sparc/nsmb/ioc_check.ref

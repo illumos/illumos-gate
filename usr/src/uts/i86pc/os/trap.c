@@ -32,7 +32,7 @@
 /*								*/
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -480,7 +480,6 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	int watchcode;
 	int watchpage;
 	caddr_t vaddr;
-	int singlestep_twiddle;
 	size_t sz;
 	int ta;
 #ifdef __amd64
@@ -1091,58 +1090,35 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 
 	case T_SGLSTP: /* single step/hw breakpoint exception */
 
-		/* Now evaluate how we got here */
+#if !defined(__xpv)
+		/*
+		 * We'd never normally get here, as kmdb handles its own single
+		 * step traps.  There is one nasty exception though, as
+		 * described in more detail in sys_sysenter().  Note that
+		 * checking for all four locations covers both the KPTI and the
+		 * non-KPTI cases correctly: the former will never be found at
+		 * (brand_)sys_sysenter, and vice versa.
+		 */
 		if (lwp != NULL && (lwp->lwp_pcb.pcb_drstat & DR_SINGLESTEP)) {
-			/*
-			 * i386 single-steps even through lcalls which
-			 * change the privilege level. So we take a trap at
-			 * the first instruction in privileged mode.
-			 *
-			 * Set a flag to indicate that upon completion of
-			 * the system call, deal with the single-step trap.
-			 *
-			 * The same thing happens for sysenter, too.
-			 */
-			singlestep_twiddle = 0;
-			if (rp->r_pc == (uintptr_t)sys_sysenter ||
-			    rp->r_pc == (uintptr_t)brand_sys_sysenter) {
-				singlestep_twiddle = 1;
-#if defined(__amd64)
-				/*
-				 * Since we are already on the kernel's
-				 * %gs, on 64-bit systems the sysenter case
-				 * needs to adjust the pc to avoid
-				 * executing the swapgs instruction at the
-				 * top of the handler.
-				 */
-				if (rp->r_pc == (uintptr_t)sys_sysenter)
-					rp->r_pc = (uintptr_t)
-					    _sys_sysenter_post_swapgs;
-				else
-					rp->r_pc = (uintptr_t)
-					    _brand_sys_sysenter_post_swapgs;
-#endif
-			}
-#if defined(__i386)
-			else if (rp->r_pc == (uintptr_t)sys_call ||
-			    rp->r_pc == (uintptr_t)brand_sys_call) {
-				singlestep_twiddle = 1;
-			}
-#endif
-			else {
-				/* not on sysenter/syscall; uregs available */
-				if (tudebug && tudebugbpt)
-					showregs(type, rp, (caddr_t)0);
-			}
-			if (singlestep_twiddle) {
+			if (rp->r_pc == (greg_t)brand_sys_sysenter ||
+			    rp->r_pc == (greg_t)sys_sysenter ||
+			    rp->r_pc == (greg_t)tr_brand_sys_sysenter ||
+			    rp->r_pc == (greg_t)tr_sys_sysenter) {
+
+				rp->r_pc += 0x3; /* sizeof (swapgs) */
+
 				rp->r_ps &= ~PS_T; /* turn off trace */
 				lwp->lwp_pcb.pcb_flags |= DEBUG_PENDING;
 				ct->t_post_sys = 1;
 				aston(curthread);
 				goto cleanup;
+			} else {
+				if (tudebug && tudebugbpt)
+					showregs(type, rp, (caddr_t)0);
 			}
 		}
-		/* XXX - needs review on debugger interface? */
+#endif /* !__xpv */
+
 		if (boothowto & RB_DEBUG)
 			debug_enter((char *)NULL);
 		else
@@ -1731,16 +1707,16 @@ showregs(uint_t type, struct regs *rp, caddr_t addr)
 	 * this clause can be deleted when lint bug 4870403 is fixed
 	 * (lint thinks that bit 32 is illegal in a %b format string)
 	 */
-	printf("cr0: %x cr4: %b\n",
+	printf("cr0: %x  cr4: %b\n",
 	    (uint_t)getcr0(), (uint_t)getcr4(), FMT_CR4);
 #else
-	printf("cr0: %b cr4: %b\n",
+	printf("cr0: %b  cr4: %b\n",
 	    (uint_t)getcr0(), FMT_CR0, (uint_t)getcr4(), FMT_CR4);
 #endif	/* __lint */
 
-	printf("cr2: %lx", getcr2());
+	printf("cr2: %lx  ", getcr2());
 #if !defined(__xpv)
-	printf("cr3: %lx", getcr3());
+	printf("cr3: %lx  ", getcr3());
 #if defined(__amd64)
 	printf("cr8: %lx\n", getcr8());
 #endif
@@ -1846,7 +1822,8 @@ instr_is_segregs_pop(caddr_t pc)
 #endif	/* __i386 */
 
 /*
- * Test to see if the instruction is part of _sys_rtt.
+ * Test to see if the instruction is part of _sys_rtt (or the KPTI trampolines
+ * which are used by _sys_rtt).
  *
  * Again on the hypervisor if we try to IRET to user land with a bad code
  * or stack selector we will get vectored through xen_failsafe_callback.
@@ -1857,6 +1834,19 @@ static int
 instr_is_sys_rtt(caddr_t pc)
 {
 	extern void _sys_rtt(), _sys_rtt_end();
+
+#if !defined(__xpv)
+	extern void tr_sysc_ret_start(), tr_sysc_ret_end();
+	extern void tr_intr_ret_start(), tr_intr_ret_end();
+
+	if ((uintptr_t)pc >= (uintptr_t)tr_sysc_ret_start &&
+	    (uintptr_t)pc <= (uintptr_t)tr_sysc_ret_end)
+		return (1);
+
+	if ((uintptr_t)pc >= (uintptr_t)tr_intr_ret_start &&
+	    (uintptr_t)pc <= (uintptr_t)tr_intr_ret_end)
+		return (1);
+#endif
 
 	if ((uintptr_t)pc < (uintptr_t)_sys_rtt ||
 	    (uintptr_t)pc > (uintptr_t)_sys_rtt_end)

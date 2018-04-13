@@ -334,6 +334,7 @@ updatelabel(void)
 		 * after update unix volume descriptor,
 		 * fall thru to update the iso primary vol descriptor
 		 */
+		/* FALLTHROUGH */
 	case 1:
 		copystring(sysid, (char *)ISO_sys_id(iso_buf), 32);
 		copystring(volid, (char *)ISO_vol_id(iso_buf), 32);

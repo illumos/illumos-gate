@@ -26,6 +26,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright (c) 2017 by Delphix. All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -1023,7 +1024,9 @@ function logshuffle {
 	if [ -f $LLOG -o -d $LLOG ]; then
 	    	LLOG=$LLOG.$$
 	fi
-	mkdir $LLOG
+
+	rm -f "$ATLOG/latest" 2>/dev/null
+	mkdir -p $LLOG
 	export LLOG
 
 	if [ "$build_ok" = "y" ]; then
@@ -1105,6 +1108,8 @@ function logshuffle {
 	fi
 
 	mv $LOGFILE $LLOG
+
+	ln -s "$LLOG" "$ATLOG/latest"
 }
 
 #

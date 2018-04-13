@@ -26,8 +26,10 @@ PROG=		boot1.sym
 MACHINE=$(MACH64)
 
 # architecture-specific loader code
-SRCS=	boot1.c self_reloc.c start.S ufs_module.c zfs_module.c devopen.c
-OBJS=	boot1.o self_reloc.o start.o ufs_module.o zfs_module.o devopen.o
+SRCS=	multiboot.S boot1.c self_reloc.c start.S ufs_module.c zfs_module.c \
+	devopen.c
+OBJS=	multiboot.o boot1.o self_reloc.o start.o ufs_module.o zfs_module.o \
+	devopen.o
 
 ASFLAGS=-m64 -fPIC
 CFLAGS= -O2
@@ -91,6 +93,7 @@ boot1.efi: ${PROG}
 		-j .dynamic -j .dynsym -j .rel.dyn \
 		-j .rela.dyn -j .reloc -j .eh_frame \
 		--output-target=${EFI_TARGET} --subsystem efi-app ${PROG} $@
+	$(BTXLD) -V ${BOOT_VERSION} -o $@ $@
 
 boot1.o: ./../../common/ufsread.c
 
@@ -119,6 +122,9 @@ clean clobber:
 
 %.o:	../loader/%.c
 	$(COMPILE.c) $<
+
+%.o:	../../common/%.S
+	$(COMPILE.S) $<
 
 %.o:	../../common/%.c
 	$(COMPILE.c) $<

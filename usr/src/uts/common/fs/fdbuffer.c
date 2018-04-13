@@ -25,8 +25,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/kmem.h>
@@ -332,6 +330,7 @@ fdb_zero_holes(fdbuffer_t *fdb)
 			fdh = fdh->next_hole;
 			kmem_free(pfdh, sizeof (fdb_holes_t));
 		}
+		break;
 	default:
 		panic("fdb_zero_holes: Unknown fdb type.");
 		break;

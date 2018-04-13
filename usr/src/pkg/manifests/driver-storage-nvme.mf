@@ -25,7 +25,7 @@
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/driver/storage/nvme@$(PKGVERS)
 set name=pkg.description \
-    value="Driver for Intel NVMe 1.1b compliant storage devices"
+    value="Driver for NVM Express compliant storage devices"
 set name=pkg.summary value="NVMe driver"
 set name=info.classification \
     value=org.opensolaris.category.2008:System/Hardware

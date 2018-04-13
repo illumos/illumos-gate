@@ -293,6 +293,7 @@ if "${flags.t}" ; then
 
 	export CTFCONVERT="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert"
 	export CTFMERGE="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge"
+	export NDRGEN="${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ndrgen"
 
 	PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"
 	PATH="${TOOLS_PROTO}/opt/onbld/bin:${PATH}"

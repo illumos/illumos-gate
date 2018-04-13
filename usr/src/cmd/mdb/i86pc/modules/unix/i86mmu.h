@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_I86MMU_H
@@ -40,6 +42,9 @@ extern int htables_dcmd(uintptr_t addr, uint_t flags, int argc,
 	const mdb_arg_t *argv);
 
 extern int ptable_dcmd(uintptr_t addr, uint_t flags, int argc,
+	const mdb_arg_t *argv);
+
+extern int ptmap_dcmd(uintptr_t addr, uint_t flags, int argc,
 	const mdb_arg_t *argv);
 
 extern int va2pfn_dcmd(uintptr_t addr, uint_t flags, int argc,

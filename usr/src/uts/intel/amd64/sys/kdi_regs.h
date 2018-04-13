@@ -22,18 +22,16 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _AMD64_SYS_KDI_REGS_H
 #define	_AMD64_SYS_KDI_REGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define	KDIREG_NGREG	31
 
 /*
  * A modified version of struct regs layout.
@@ -59,36 +57,25 @@ extern "C" {
 #define	KDIREG_FSBASE	17
 #define	KDIREG_GSBASE	18
 #define	KDIREG_KGSBASE	19
-#define	KDIREG_DS	20
-#define	KDIREG_ES	21
-#define	KDIREG_FS	22
-#define	KDIREG_GS	23
-#define	KDIREG_TRAPNO	24
-#define	KDIREG_ERR	25
-#define	KDIREG_RIP	26
-#define	KDIREG_CS	27
-#define	KDIREG_RFLAGS	28
-#define	KDIREG_RSP	29
-#define	KDIREG_SS	30
+#define	KDIREG_CR2	20
+#define	KDIREG_CR3	21
+#define	KDIREG_DS	22
+#define	KDIREG_ES	23
+#define	KDIREG_FS	24
+#define	KDIREG_GS	25
+#define	KDIREG_TRAPNO	26
+#define	KDIREG_ERR	27
+#define	KDIREG_RIP	28
+#define	KDIREG_CS	29
+#define	KDIREG_RFLAGS	30
+#define	KDIREG_RSP	31
+#define	KDIREG_SS	32
+
+#define	KDIREG_NGREG	(KDIREG_SS + 1)
 
 #define	KDIREG_PC	KDIREG_RIP
 #define	KDIREG_SP	KDIREG_RSP
 #define	KDIREG_FP	KDIREG_RBP
-
-#ifdef _ASM
-
-/* Patch point for MSR clearing. */
-#define	KDI_MSR_PATCH \
-	nop; nop; nop; nop; \
-	nop; nop; nop; nop; \
-	nop; nop; nop; nop; \
-	nop; nop; nop; nop; \
-	nop
-
-#endif	/* _ASM */
-
-#define	KDI_MSR_PATCHOFF	8	/* bytes of code before patch point */
-#define	KDI_MSR_PATCHSZ		17	/* bytes in KDI_MSR_PATCH, above */
 
 #ifdef __cplusplus
 }

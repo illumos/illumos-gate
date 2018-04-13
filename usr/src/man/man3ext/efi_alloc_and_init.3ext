@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EFI_ALLOC_AND_INIT 3EXT "April 9, 2016"
+.TH EFI_ALLOC_AND_INIT 3EXT "February 6, 2018"
 .SH NAME
 efi_alloc_and_init, efi_alloc_and_read, efi_free, efi_write, efi_use_whole_disk
 \- manipulate a disk's EFI Partition Table
@@ -55,7 +56,8 @@ The \fBefi_free()\fR function frees the memory allocated by
 \fBefi_alloc_and_init()\fR and \fBefi_alloc_and_read()\fR.
 .sp
 .LP
-The \fBefi_write()\fR function writes the EFI partition table.
+The \fBefi_write()\fR function writes the EFI partition table and creates a
+Protective Master Boot Record (PMBR); see below.
 .sp
 .LP
 The \fBefi_use_whole_disk()\fR function takes any space that is not contained
@@ -76,7 +78,7 @@ partition table and contains at least the following members:
 .in +2
 .nf
 uint_t          efi_version;     /* set to EFI_VERSION_CURRENT */
-uint_t          efi_nparts;      /* number of partitions in efi_parts */
+uint_t          efi_nparts;      /* no. of partitions in efi_parts */
 uint_t          efi_lbasize;     /* size of block in bytes */
 diskaddr_t      efi_last_lba;    /* last block on the disk */
 diskaddr_t      efi_first_u_lba; /* first block after labels */
@@ -84,6 +86,18 @@ diskaddr_t      efi_last_u_lba;  /* last block before backup labels */
 struct dk_part  efi_parts[];     /* array of partitions */
 .fi
 .in -2
+
+.SS "Protective Master Boot Record"
+.LP
+When a disk receives an EFI label, a protective MBR (\fBPMBR\fR) is also
+written containing a single partiton of type \fBEEh\fR and spanning the
+entire disk (up to the limit of what can be represented in an MBR). By
+default that partition is placed in slot 0 of the PMBR and not marked as
+active. Some BIOS implementations contain bugs that require the entry to be
+placed into a different slot or to be made active in order for the system
+to boot successfully. The default behaviour is modified for systems with known
+firmware bugs, refer to \fB/usr/share/hwdata/efi.fixes\fR for more
+information.
 
 .SH RETURN VALUES
 .LP

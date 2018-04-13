@@ -37,8 +37,6 @@
  *	contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libintl.h>
 #include <stdlib.h>
 
@@ -123,7 +121,7 @@ TOP:
 					}
 					break;
 				}
-				/* intentional drop through */
+				/* FALLTHROUGH */
 			default:
 				if ((len = mblen(cp1, MB_CUR_MAX)) <= 0)
 					len = 1;

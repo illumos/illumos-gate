@@ -1,90 +1,124 @@
-'\" te
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018 Gary Mills
 .\" Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH RTC 1M "Oct 3, 2003"
-.SH NAME
-rtc \- provide all real-time clock and GMT-lag management
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/sbin/rtc\fR [\fB-c\fR] [\fB-z\fR \fIzone-name\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-On x86 systems, the \fBrtc\fR command reconciles the difference in the way that
-time is established between UNIX and MS-DOS systems. UNIX systems utilize
-Greenwich Mean Time (\fBGMT\fR), while \fBMS-DOS\fR systems utilize local time.
-.sp
-.LP
-Without arguments, \fBrtc\fR displays the currently configured time zone
-string. The currently configured time zone string is based on what was last
-recorded by \fBrtc\fR\fB-z\fR \fIzone-name\fR.
-.sp
-.LP
-The \fBrtc\fR command is not normally run from a shell prompt; it is generally
-invoked by the system. Commands such as \fBdate\fR(1) and \fBrdate\fR(1M),
-which are used to set the time on a system, invoke \fB/usr/sbin/rtc\fR \fB-c\fR
-to ensure that daylight savings time (\fBDST\fR) is corrected for properly.
-.SH OPTIONS
-.sp
-.ne 2
-.na
-\fB\fB-c\fR\fR
-.ad
-.RS 16n
-This option checks for \fBDST\fR and makes corrections if necessary. It is
-normally run once a day by a \fBcron\fR job.
-.sp
-If there is no \fBRTC\fR time zone or \fB/etc/rtc_config\fR file, this option
-will do nothing.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fR\fB-z\fR\fB \fR\fIzone-name\fR\fR
-.ad
-.RS 16n
+.\"
+.Dd January 31, 2018
+.Dt RTC 1M
+.Os
+.Sh NAME
+.Nm rtc
+.Nd provide all real-time clock and UTC-lag management
+.Sh SYNOPSIS
+.Nm
+.Op Fl csuvw
+.Op Fl z Ar zone-name
+.Sh DESCRIPTION
+The Real Time Clock (RTC) is the hardware device on x86 computers that maintains
+the date and time.
+The RTC is battery-powered, so that it keeps running when the computer is shut
+down.
+It can be set from the BIOS and also from the operating system running on the
+computer.
+The RTC has no setting for the time zone or for Daylight Saving Time (DST).
+It relies on the operating system for these facilities and for automatic changes
+between standard time and DST.
+.Pp
+On x86 systems, the
+.Nm
+command reconciles the difference in the way that time is established between
+UNIX and Windows systems.
+The internal clock on UNIX systems utilizes Universal Coordinated Time (UTC)
+while Windows systems usually expect the RTC to run in local time, including DST
+changes.
+.Pp
+Without arguments,
+.Nm
+displays the currently configured time zone string for the RTC.
+The currently configured time zone string is based on what was last recorded by
+.Nm Fl z Ar zone-name .
+.Pp
+The
+.Nm
+command is not normally run from a shell prompt; it is generally invoked by the
+system.
+Commands such as
+.Xr date 1
+and
+.Xr rdate 1M ,
+which are used to set the time on a system, invoke
+.Nm Fl c
+to ensure that daylight savings time (DST) is corrected for properly.
+.Sh OPTIONS
+.Bl -tag -width Ds
+.It Fl c
+This option checks for DST and makes corrections to the RTC if necessary.
+It is normally run once a day by a
+.Xr cron 1M
+job.
+.Pp
+If there is no RTC time zone or
+.Pa /etc/rtc_config
+file, this option will do nothing.
+.It Fl s
+This option specifies that the RTC runs in local standard time all year round.
+It is incompatible with Windows, but is convenient if only one operating system
+is to be run on the computer.
+The
+.Xr cron 1M
+command is not necessary, and should not be run.
+.It Fl u
+This option specifies that the RTC runs in UTC time.
+As a side effect, it sets the time zone in
+.Pa /etc/rtc_config
+to UTC.
+Windows can operate in UTC time, but requires a registry change to do so.
+The
+.Xr cron 1M
+command is not necessary.
+.It Fl v
+This option specifies that the RTC tracks local time, including DST changes.
+This is the default.
+It accomodates Windows with no changes.
+The
+.Xr cron 1M
+command is necessary to change the RTC when DST is in effect.
+.It Fl w
+This option does nothing.
+It is present for compatibility with Solaris 11.
+.It Fl z Ar zone-name
 This option, which is normally run by the system at software installation time,
-is used to specify the time zone in which the \fBRTC\fR is to be maintained. It
-updates the configuration file \fB/etc/rtc_config\fR with the name of the
-specified zone and the current \fBGMT\fR lag for that zone. If there is an
-existing \fBrtc_config\fR file, this command will update it. If not, this
-command will create it.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/etc/rtc_config\fR\fR
-.ad
-.RS 19n
-The data file used to record the time zone and \fBGMT\fR lag. This file is
-completely managed by \fB/usr/sbin/rtc\fR, and it is read by the kernel.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	x86
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBdate\fR(1), \fBrdate\fR(1M), \fBattributes\fR(5)
+is used to specify the time zone in which the RTC is to be maintained.
+It updates the configuration file
+.Pa /etc/rtc_config
+with the name of the specified zone and the current UTC lag for that zone.
+If there is an existing
+.Pa /etc/rtc_config
+file, this command will update it.
+If not, this command will create it.
+.El
+.Sh FILES
+.Bl -tag -width "/etc/rtc_config"
+.It Pa /etc/rtc_config
+The data file used to record the time zone and UTC lag.
+This file is completely managed by
+.Nm .
+At boot time, the kernel reads the UTC lag from this file, and uses it to set
+the system time.
+.El
+.Sh ARCHITECTURE
+.Sy x86
+.Sh SEE ALSO
+.Xr date 1 ,
+.Xr cron 1M ,
+.Xr rdate 1M ,
+.Xr attributes 5

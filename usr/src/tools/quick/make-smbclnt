@@ -1,0 +1,304 @@
+#!/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+#
+
+# Use distributed make (dmake) by default.
+make=${MAKE:-dmake}
+
+CLOSED_IS_PRESENT=no
+export CLOSED_IS_PRESENT
+
+# Do this if you want to use dbx or gdb
+# export SOURCEDEBUG=yes
+
+[ -n "$SRC" ] || {
+  echo "SRC not set.  Run 'ws' or 'bldenv' first."
+  exit 1
+}
+
+cpu=`uname -p`
+case $cpu in
+i386)
+	x=intel
+	kmdb_arch="amd64"
+	mdb_arch="ia32 amd64"
+	arch64=amd64
+	;;
+sparc)
+	x=sparc
+	kmdb_arch=v9
+	mdb_arch="v7 v9"
+	arch64=sparcv9
+	;;
+*)  echo "Huh?" ; exit 1;;
+esac
+
+################################################################
+
+build_tools() {
+  test -f $SRC/tools/proto/root_i386-nd/opt/onbld/bin/genoffsets ||
+    (cd $SRC/tools && $make install)
+  (cd $SRC/common/mapfiles; $make install)
+}
+
+clobber_tools() {
+  (cd $SRC/tools && $make clobber)
+  (cd $SRC/common/mapfiles; $make clobber)
+}
+
+################################################################
+
+do_hdrs() {
+
+targ=$1
+if [ "$targ" = clobber ]
+then
+  (cd $SRC/uts && $make -k clobber_h)
+  (cd $SRC/head && $make clobber)
+fi
+
+if [ "$targ" = install ]
+then
+  targ=install_h
+
+  # Just the parts of "make sgs" we need, and
+  # skip them if they appear to be done.
+  # ... stuff under $SRC
+  test -f $SRC/uts/common/sys/priv_names.h ||
+    (cd $SRC/uts && $make -k all_h)
+
+  test -f $SRC/head/rpcsvc/nispasswd.h ||
+    (cd $SRC/head && $make -k install_h)
+
+  # ... stuff under $ROOT (proto area)
+  test -d $ROOT/usr/include/sys ||
+    (cd $SRC && $make rootdirs)
+  test -f $ROOT/usr/include/sys/types.h ||
+    (cd $SRC/uts && $make -k install_h)
+  test -f $ROOT/usr/include/rpcsvc/daemon_utils.h ||
+    (cd $SRC/head && $make install_h)
+
+  # always update the smb headers to be safe
+  (cd $SRC/uts/common/smb && $make -k install_h)
+
+fi
+
+# Need some library headers too...
+for lib in \
+  libcryptoutil \
+  libmlrpc \
+  libpam \
+  libsec \
+  libshare \
+  libsmbfs \
+  passwdutil
+do
+  (cd $SRC/lib/$lib && $make $targ)
+done
+}
+
+################################################################
+
+do_kern() {
+  case $1 in
+  lint) targ=modlintlib ;;
+  *) targ=$1 ;;
+  esac
+  ( unset SOURCEDEBUG ;
+  (cd $SRC/uts/$x/nsmb && $make $targ) ;
+  (cd $SRC/uts/$x/smbfs && $make $targ) )
+}
+
+################################################################
+
+# Note lib1 builds prerequisite libraries not delivered by the
+# tar file we create below.  To accelerate clean/install, we
+# skip these on clean (but still nuke them for clobber)
+
+do_lib1() {
+  :
+}
+
+# lib2 builds stuff we include in the tar file,
+# or that we don't mind rebuilding after clean.
+
+do_lib2() {
+
+(cd $SRC/lib/libsmbfs && $make $1)
+[ "$1" = install ] &&
+  (cd $SRC/lib/libsmbfs && $make _msg)
+(cd $SRC/lib/libmlrpc && $make $1)
+(cd $SRC/lib/libshare && $make $1 PLUGINS=smbfs)
+(cd $SRC/lib/passwdutil && $make $1)
+(cd $SRC/lib/pam_modules/smbfs && $make $1)
+
+}
+
+################################################################
+
+do_cmds() {
+
+case $1 in
+install)
+  # mount programs need fslib.o
+  (cd $SRC/cmd/fs.d && $make fslib.o)
+  (cd $SRC/cmd/fs.d/smbclnt && $make $1 catalog)
+  ;;
+clean|clobber)
+  (cd $SRC/cmd/fs.d/smbclnt && $make $1)
+  (cd $SRC/cmd/fs.d && $make ${1}_local)
+  ;;
+esac
+
+# Build the MDB modules, WITH the linktest
+(cd $SRC/cmd/mdb/tools && $make $1)
+
+# kmdb_arch is 64-bit only
+for a in $kmdb_arch
+do
+  case $1 in
+  install|lint)
+    (cd $SRC/cmd/mdb/$x/$a/kmdb &&
+	$make kmdb_modlinktest.o )
+    ;;
+  clean|clobber)
+    (cd $SRC/cmd/mdb/$x/$a/kmdb &&
+	$make -k $1 )
+    ;;
+  esac
+
+  (cd $SRC/cmd/mdb/$x/$a/nsmb &&
+	$make $1 KMDB_LINKTEST_ENABLE= )
+  (cd $SRC/cmd/mdb/$x/$a/smbfs &&
+	$make $1 KMDB_LINKTEST_ENABLE= )
+done
+}
+
+
+################################################################
+# This builds $SRC/TAGS (and cscope.files) in a helpful order.
+
+do_tags() {
+	(cd $SRC ;
+	find uts/common/sys -name '*.[ch]' -print |sort
+	find uts/common/net -name '*.[ch]' -print |sort
+	find uts/common/netinet -name '*.[ch]' -print |sort
+	find uts/common/smb -name '*.[ch]' -print |sort
+	find uts/common/netsmb -name '*.[ch]' -print |sort
+	find uts/common/fs/smbclnt -name '*.[ch]' -print |sort
+	find head -name '*.h' -print |sort
+	find lib/libsmbfs -name '*.[ch]' -print |sort
+	find cmd/fs.d/smbclnt -name '*.[ch]' -print |sort
+	find common/smbclnt -name '*.[ch]' -print |sort
+	) > $SRC/cscope.files
+
+	(cd $SRC ;
+	exctags -e --langmap=c:+.ndl -h ndl -L - < cscope.files
+	cscope -b )
+}
+
+################################################################
+# This creates a tarfile one can use to update a test machine.
+
+do_tar() {
+	git_rev=`git rev-parse --short=8 HEAD`
+	files="
+lib/svc/manifest/network/smb/client.xml
+lib/svc/method/smb-client
+opt/smbcl-tests/tests/srvenum
+opt/smbcl-tests/tests/srvinfo
+opt/smbcl-tests/tests/tconn
+usr/bin/smbutil
+usr/kernel/drv/$arch64/nsmb
+usr/kernel/fs/$arch64/smbfs
+usr/kernel/kmdb/$arch64/nsmb
+usr/kernel/kmdb/$arch64/smbfs
+usr/lib/$arch64/libsmbfs.so.1
+usr/lib/fs/smbfs/$arch64/libshare_smbfs.so.1
+usr/lib/fs/smbfs/chacl
+usr/lib/fs/smbfs/dfshares
+usr/lib/fs/smbfs/libshare_smbfs.so.1
+usr/lib/fs/smbfs/lsacl
+usr/lib/fs/smbfs/mount
+usr/lib/fs/smbfs/share
+usr/lib/fs/smbfs/umount
+usr/lib/fs/smbfs/unshare
+usr/lib/libmlrpc.so.2
+usr/lib/libsmbfs.so.1
+usr/lib/mdb/kvm/$arch64/nsmb.so
+usr/lib/mdb/kvm/$arch64/smbfs.so
+usr/lib/mdb/kvm/nsmb.so
+usr/lib/mdb/kvm/smbfs.so
+usr/lib/security/$arch64/pam_smbfs_login.so.1
+usr/lib/security/pam_smbfs_login.so.1
+usr/lib/smbfs/smbiod
+usr/lib/smbfs/smbiod-svc
+"
+
+	(cd $ROOT && tar cfj ../../smbclnt-${git_rev}.tar.bz2 $files)
+}
+
+################################################################
+
+if [ "$1" = "" ]; then
+  set '?' # force usage
+fi
+
+set -x
+
+for arg
+do
+  case "$arg" in
+  install)
+    build_tools
+    set -e
+    do_hdrs $arg
+    do_kern $arg
+    do_lib1 $arg
+    do_lib2 $arg
+    do_cmds $arg
+    ;;
+  lint)
+    do_kern $arg
+    do_lib1 $arg
+    do_lib2 $arg
+    do_cmds $arg
+    ;;
+  clean)
+    # intentionally skip: lib1, hdrs, tools
+    do_cmds $arg
+    do_lib2 $arg
+    do_kern $arg
+    ;;
+  clobber)
+    do_cmds $arg
+    do_lib2 $arg
+    do_lib1 $arg
+    do_kern $arg
+    do_hdrs $arg
+    clobber_tools
+    ;;
+  tags)
+    do_tags
+    ;;
+  tar)
+    do_tar
+    ;;
+  *)
+    echo "Usage: $0 {install|lint|clean|clobber|tags|tar}";
+    exit 1;
+    ;;
+  esac
+done

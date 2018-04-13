@@ -1,0 +1,72 @@
+# This file contains definitions of systems which are known to have problems
+# booting from an EFI/GPT partitioned disk, and the workaround. It is used
+# by libefi to change the way in which the protective master-boot-record (PMBR)
+# is written to the disk when the EFI label changes.
+
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+
+# Copyright (c) 2016 Allan Jude <allanjude@freebsd.org>
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+
+# Each line consists of a number of whitespace delimited name=value pairs
+# which define conditions for the host system which are matched against values
+# in SMBIOS tables. These are followed by actions to take if the host system
+# matches; more than one action can be specified.
+#
+# Conditions:
+#  From the SMB_TYPE_SYSTEM table (`smbios -t SMB_TYPE_SYSTEM`)
+#	sys.manufacturer
+#	sys.product
+#	sys.version
+#  From the SMB_TYPE_BASEBOARD table (`smbios -t SMB_TYPE_BASEBOARD`)
+#	mb.manufacturer
+#	mb.product
+#	mb.version
+#
+# Actions:
+#	pmbr_slot=n     0 <= n <= 3     (default 0)
+#		Place the EFI partition entry into slot n in the PMBR
+#	pmbr_active=n   0 <= n <= 1     (default 0)
+#		Mark the EFI partition as active within the PMBR
+
+# References:
+#   https://lists.freebsd.org/pipermail/freebsd-i386/2013-March/010437.html
+#   https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=194359
+
+sys.manufacturer="Lenovo" sys.version="ThinkPad X220"		pmbr_slot=1
+sys.manufacturer="Lenovo" sys.version="ThinkPad T420"		pmbr_slot=1
+sys.manufacturer="Lenovo" sys.version="ThinkPad T520"		pmbr_slot=1
+sys.manufacturer="Lenovo" sys.version="ThinkPad W520"		pmbr_slot=1
+sys.manufacturer="Lenovo" sys.version="ThinkPad X1"		pmbr_slot=1
+
+sys.manufacturer="Dell Inc." sys.product="Latitude E6330"	pmbr_active=1
+sys.manufacturer="Dell Inc." sys.product="Latitude E7440"	pmbr_active=1
+sys.manufacturer="Dell Inc." sys.product="Latitude E7240"	pmbr_active=1
+sys.manufacturer="Dell Inc." sys.product="Precision Tower 5810"	pmbr_active=1
+
+sys.manufacturer="Hewlett-Packard" sys.product="HP ProBook 4330s" pmbr_active=1
+
+mb.manufacturer="Intel Corporation" mb.product="DP965LT"	pmbr_active=1
+mb.manufacturer="Intel Corporation" mb.product="D510MO"		pmbr_active=1
+
+mb.manufacturer="Acer" mb.product="Veriton M6630G"		pmbr_active=1
+

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * inetadm - administer services controlled by inetd and print out inetd
  * service related information.
@@ -1026,6 +1024,7 @@ main(int argc, char *argv[])
 			} else {
 				usage(B_FALSE);
 			}
+			break;
 		default:
 			usage(B_FALSE);
 		}

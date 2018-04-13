@@ -167,9 +167,12 @@ PM_TRANSFORMS= common_actions publish restart_fmri facets defaults \
 	extract_metadata
 PM_INC= transforms manifests
 
-JAVA_8_ONLY=$(BLD_JAVA_8)
 JAVA_7_ONLY=
+JAVA_8_ONLY=
+$(BLD_JAVA_6)JAVA_7_ONLY=$(POUND_SIGN)
+$(BLD_JAVA_6)JAVA_8_ONLY=$(POUND_SIGN)
 $(BLD_JAVA_8)JAVA_7_ONLY=$(POUND_SIGN)
+$(JAVA_7_ONLY)JAVA_8_ONLY=$(POUND_SIGN)
 
 PKGMOG_DEFINES= \
 	i386_ONLY=$(POUND_SIGN) \

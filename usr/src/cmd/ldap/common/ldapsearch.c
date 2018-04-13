@@ -240,7 +240,7 @@ main( int argc, char **argv )
 
 	if ( argv[ optind ] == NULL ) {
 	    attrs = NULL;
-	} else if ( sortattr == NULL || *sortattr == '\0' || server_sort) {
+	} else if ( sortattr == NULL || *sortattr == NULL || server_sort) {
 	    attrs = &argv[ optind ];
 	} else {
 	    attrs = ldap_charray_dup( &argv[ optind ] );

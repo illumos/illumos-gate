@@ -882,7 +882,7 @@ static char open_fmt[] = "cannot open \"%s\", %s\n";
 
 /*
  * Verify the filesystem type for a regular statefile is "ufs"
- * or verify a block device is not in use as a mounted filesytem.
+ * or verify a block device is not in use as a mounted filesystem.
  * Returns 1 if any error, otherwise 0.
  */
 static int

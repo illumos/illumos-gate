@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Joyent, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -83,6 +83,7 @@
 #include <sys/kdi.h>
 #include <sys/mach_mmu.h>
 #include <sys/systm.h>
+#include <sys/note.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -128,8 +129,13 @@ user_desc_t	ucs32_on;
 user_desc_t	ucs32_off;
 #endif	/* __amd64 */
 
-#pragma	align	16(dblfault_stack0)
-char		dblfault_stack0[DEFAULTSTKSZ];
+/*
+ * If the size of this is changed, you must update hat_pcp_setup() and the
+ * definitions in exception.s
+ */
+extern char dblfault_stack0[DEFAULTSTKSZ];
+extern char nmi_stack0[DEFAULTSTKSZ];
+extern char mce_stack0[DEFAULTSTKSZ];
 
 extern void	fast_null(void);
 extern hrtime_t	get_hrtime(void);
@@ -310,56 +316,72 @@ get_ssd_base(system_desc_t *dp)
 
 /*
  * Install gate segment descriptor for interrupt, trap, call and task gates.
+ *
+ * For 64 bit native if we have KPTI enabled, we use the IST stack mechanism on
+ * all interrupts.  We have different ISTs for each class of exceptions that are
+ * most likely to occur while handling an existing exception; while many of
+ * these are just going to panic, it's nice not to trample on the existing
+ * exception state for debugging purposes.
+ *
+ * Normal interrupts are all redirected unconditionally to the KPTI trampoline
+ * stack space. This unifies the trampoline handling between user and kernel
+ * space (and avoids the need to touch %gs).
+ *
+ * The KDI IDT *all* uses the DBG IST: consider single stepping tr_pftrap, when
+ * we do a read from KMDB that cause another #PF.  Without its own IST, this
+ * would stomp on the kernel's mcpu_kpti_flt frame.
  */
+uint_t
+idt_vector_to_ist(uint_t vector)
+{
+#if defined(__xpv)
+	_NOTE(ARGUNUSED(vector));
+	return (IST_NONE);
+#else
+	switch (vector) {
+	/* These should always use IST even without KPTI enabled. */
+	case T_DBLFLT:
+		return (IST_DF);
+	case T_NMIFLT:
+		return (IST_NMI);
+	case T_MCE:
+		return (IST_MCE);
 
-#if defined(__amd64)
+	case T_BPTFLT:
+	case T_SGLSTP:
+		if (kpti_enable == 1) {
+			return (IST_DBG);
+		}
+		return (IST_NONE);
+	case T_STKFLT:
+	case T_GPFLT:
+	case T_PGFLT:
+		if (kpti_enable == 1) {
+			return (IST_NESTABLE);
+		}
+		return (IST_NONE);
+	default:
+		if (kpti_enable == 1) {
+			return (IST_DEFAULT);
+		}
+		return (IST_NONE);
+	}
+#endif
+}
 
-/*ARGSUSED*/
 void
 set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
-    uint_t type, uint_t dpl, uint_t vector)
+    uint_t type, uint_t dpl, uint_t ist)
 {
 	dp->sgd_looffset = (uintptr_t)func;
 	dp->sgd_hioffset = (uintptr_t)func >> 16;
 	dp->sgd_hi64offset = (uintptr_t)func >> (16 + 16);
-
 	dp->sgd_selector =  (uint16_t)sel;
-
-	/*
-	 * For 64 bit native we use the IST stack mechanism
-	 * for double faults. All other traps use the CPL = 0
-	 * (tss_rsp0) stack.
-	 */
-#if !defined(__xpv)
-	if (vector == T_DBLFLT)
-		dp->sgd_ist = 1;
-	else
-#endif
-		dp->sgd_ist = 0;
-
+	dp->sgd_ist = ist;
 	dp->sgd_type = type;
 	dp->sgd_dpl = dpl;
 	dp->sgd_p = 1;
 }
-
-#elif defined(__i386)
-
-/*ARGSUSED*/
-void
-set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
-    uint_t type, uint_t dpl, uint_t unused)
-{
-	dp->sgd_looffset = (uintptr_t)func;
-	dp->sgd_hioffset = (uintptr_t)func >> 16;
-
-	dp->sgd_selector =  (uint16_t)sel;
-	dp->sgd_stkcpy = 0;	/* always zero bytes */
-	dp->sgd_type = type;
-	dp->sgd_dpl = dpl;
-	dp->sgd_p = 1;
-}
-
-#endif	/* __i386 */
 
 /*
  * Updates a single user descriptor in the the GDT of the current cpu.
@@ -917,22 +939,30 @@ init_gdt(void)
 static void
 init_idt_common(gate_desc_t *idt)
 {
-	set_gatesegd(&idt[T_ZERODIV], &div0trap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    0);
-	set_gatesegd(&idt[T_SGLSTP], &dbgtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    0);
-	set_gatesegd(&idt[T_NMIFLT], &nmiint, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    0);
-	set_gatesegd(&idt[T_BPTFLT], &brktrap, KCS_SEL, SDT_SYSIGT, TRP_UPL,
-	    0);
-	set_gatesegd(&idt[T_OVFLW], &ovflotrap, KCS_SEL, SDT_SYSIGT, TRP_UPL,
-	    0);
-	set_gatesegd(&idt[T_BOUNDFLT], &boundstrap, KCS_SEL, SDT_SYSIGT,
-	    TRP_KPL, 0);
-	set_gatesegd(&idt[T_ILLINST], &invoptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    0);
-	set_gatesegd(&idt[T_NOEXTFLT], &ndptrap,  KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    0);
+	set_gatesegd(&idt[T_ZERODIV],
+	    (kpti_enable == 1) ? &tr_div0trap : &div0trap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_ZERODIV));
+	set_gatesegd(&idt[T_SGLSTP],
+	    (kpti_enable == 1) ? &tr_dbgtrap : &dbgtrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_SGLSTP));
+	set_gatesegd(&idt[T_NMIFLT],
+	    (kpti_enable == 1) ? &tr_nmiint : &nmiint,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_NMIFLT));
+	set_gatesegd(&idt[T_BPTFLT],
+	    (kpti_enable == 1) ? &tr_brktrap : &brktrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_UPL, idt_vector_to_ist(T_BPTFLT));
+	set_gatesegd(&idt[T_OVFLW],
+	    (kpti_enable == 1) ? &tr_ovflotrap : &ovflotrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_UPL, idt_vector_to_ist(T_OVFLW));
+	set_gatesegd(&idt[T_BOUNDFLT],
+	    (kpti_enable == 1) ? &tr_boundstrap : &boundstrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_BOUNDFLT));
+	set_gatesegd(&idt[T_ILLINST],
+	    (kpti_enable == 1) ? &tr_invoptrap : &invoptrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_ILLINST));
+	set_gatesegd(&idt[T_NOEXTFLT],
+	    (kpti_enable == 1) ? &tr_ndptrap : &ndptrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_NOEXTFLT));
 
 	/*
 	 * double fault handler.
@@ -942,63 +972,62 @@ init_idt_common(gate_desc_t *idt)
 	 * and/or stack is in a broken state. See xen_failsafe_callback.
 	 */
 #if !defined(__xpv)
-#if defined(__amd64)
-
-	set_gatesegd(&idt[T_DBLFLT], &syserrtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    T_DBLFLT);
-
-#elif defined(__i386)
-
-	/*
-	 * task gate required.
-	 */
-	set_gatesegd(&idt[T_DBLFLT], NULL, DFTSS_SEL, SDT_SYSTASKGT, TRP_KPL,
-	    0);
-
-#endif	/* __i386 */
+	set_gatesegd(&idt[T_DBLFLT],
+	    (kpti_enable == 1) ? &tr_syserrtrap : &syserrtrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_DBLFLT));
 #endif	/* !__xpv */
 
 	/*
 	 * T_EXTOVRFLT coprocessor-segment-overrun not supported.
 	 */
-
-	set_gatesegd(&idt[T_TSSFLT], &invtsstrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    0);
-	set_gatesegd(&idt[T_SEGFLT], &segnptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    0);
-	set_gatesegd(&idt[T_STKFLT], &stktrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
-	set_gatesegd(&idt[T_GPFLT], &gptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
-	set_gatesegd(&idt[T_PGFLT], &pftrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
-	set_gatesegd(&idt[T_EXTERRFLT], &ndperr, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-	    0);
-	set_gatesegd(&idt[T_ALIGNMENT], &achktrap, KCS_SEL, SDT_SYSIGT,
-	    TRP_KPL, 0);
-	set_gatesegd(&idt[T_MCE], &mcetrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
-	set_gatesegd(&idt[T_SIMDFPE], &xmtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
+	set_gatesegd(&idt[T_TSSFLT],
+	    (kpti_enable == 1) ? &tr_invtsstrap : &invtsstrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_TSSFLT));
+	set_gatesegd(&idt[T_SEGFLT],
+	    (kpti_enable == 1) ? &tr_segnptrap : &segnptrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_SEGFLT));
+	set_gatesegd(&idt[T_STKFLT],
+	    (kpti_enable == 1) ? &tr_stktrap : &stktrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_STKFLT));
+	set_gatesegd(&idt[T_GPFLT],
+	    (kpti_enable == 1) ? &tr_gptrap : &gptrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_GPFLT));
+	set_gatesegd(&idt[T_PGFLT],
+	    (kpti_enable == 1) ? &tr_pftrap : &pftrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_PGFLT));
+	set_gatesegd(&idt[T_EXTERRFLT],
+	    (kpti_enable == 1) ? &tr_ndperr : &ndperr,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_EXTERRFLT));
+	set_gatesegd(&idt[T_ALIGNMENT],
+	    (kpti_enable == 1) ? &tr_achktrap : &achktrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_ALIGNMENT));
+	set_gatesegd(&idt[T_MCE],
+	    (kpti_enable == 1) ? &tr_mcetrap : &mcetrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_MCE));
+	set_gatesegd(&idt[T_SIMDFPE],
+	    (kpti_enable == 1) ? &tr_xmtrap : &xmtrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_KPL, idt_vector_to_ist(T_SIMDFPE));
 
 	/*
 	 * install fast trap handler at 210.
 	 */
-	set_gatesegd(&idt[T_FASTTRAP], &fasttrap, KCS_SEL, SDT_SYSIGT, TRP_UPL,
-	    0);
+	set_gatesegd(&idt[T_FASTTRAP],
+	    (kpti_enable == 1) ? &tr_fasttrap : &fasttrap,
+	    KCS_SEL, SDT_SYSIGT, TRP_UPL, idt_vector_to_ist(T_FASTTRAP));
 
 	/*
 	 * System call handler.
 	 */
-#if defined(__amd64)
-	set_gatesegd(&idt[T_SYSCALLINT], &sys_syscall_int, KCS_SEL, SDT_SYSIGT,
-	    TRP_UPL, 0);
-
-#elif defined(__i386)
-	set_gatesegd(&idt[T_SYSCALLINT], &sys_call, KCS_SEL, SDT_SYSIGT,
-	    TRP_UPL, 0);
-#endif	/* __i386 */
+	set_gatesegd(&idt[T_SYSCALLINT],
+	    (kpti_enable == 1) ? &tr_sys_syscall_int : &sys_syscall_int,
+	    KCS_SEL, SDT_SYSIGT, TRP_UPL, idt_vector_to_ist(T_SYSCALLINT));
 
 	/*
 	 * Install the DTrace interrupt handler for the pid provider.
 	 */
-	set_gatesegd(&idt[T_DTRACE_RET], &dtrace_ret, KCS_SEL,
-	    SDT_SYSIGT, TRP_UPL, 0);
+	set_gatesegd(&idt[T_DTRACE_RET],
+	    (kpti_enable == 1) ? &tr_dtrace_ret : &dtrace_ret,
+	    KCS_SEL, SDT_SYSIGT, TRP_UPL, idt_vector_to_ist(T_DTRACE_RET));
 
 	/*
 	 * Prepare interposing descriptor for the syscall handler
@@ -1007,13 +1036,10 @@ init_idt_common(gate_desc_t *idt)
 	brand_tbl[0].ih_inum = T_SYSCALLINT;
 	brand_tbl[0].ih_default_desc = idt0[T_SYSCALLINT];
 
-#if defined(__amd64)
-	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_syscall_int,
-	    KCS_SEL, SDT_SYSIGT, TRP_UPL, 0);
-#elif defined(__i386)
-	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_call,
-	    KCS_SEL, SDT_SYSIGT, TRP_UPL, 0);
-#endif	/* __i386 */
+	set_gatesegd(&(brand_tbl[0].ih_interp_desc),
+	    (kpti_enable == 1) ? &tr_brand_sys_syscall_int :
+	    &brand_sys_syscall_int, KCS_SEL, SDT_SYSIGT, TRP_UPL,
+	    idt_vector_to_ist(T_SYSCALLINT));
 
 	brand_tbl[1].ih_inum = 0;
 }
@@ -1041,27 +1067,53 @@ init_idt(gate_desc_t *idt)
 	 * since it can only be generated on a 386 processor. 15 is also
 	 * unsupported and reserved.
 	 */
-	for (i = 0; i < NIDT; i++)
+#if !defined(__xpv)
+	for (i = 0; i < NIDT; i++) {
+		set_gatesegd(&idt[i],
+		    (kpti_enable == 1) ? &tr_resvtrap : &resvtrap,
+		    KCS_SEL, SDT_SYSIGT, TRP_KPL,
+		    idt_vector_to_ist(T_RESVTRAP));
+	}
+#else
+	for (i = 0; i < NIDT; i++) {
 		set_gatesegd(&idt[i], &resvtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-		    0);
+		    IST_NONE);
+	}
+#endif
 
 	/*
 	 * 20-31 reserved
 	 */
-	for (i = 20; i < 32; i++)
+#if !defined(__xpv)
+	for (i = 20; i < 32; i++) {
+		set_gatesegd(&idt[i],
+		    (kpti_enable == 1) ? &tr_invaltrap : &invaltrap,
+		    KCS_SEL, SDT_SYSIGT, TRP_KPL,
+		    idt_vector_to_ist(T_INVALTRAP));
+	}
+#else
+	for (i = 20; i < 32; i++) {
 		set_gatesegd(&idt[i], &invaltrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
-		    0);
+		    IST_NONE);
+	}
+#endif
 
 	/*
 	 * interrupts 32 - 255
 	 */
 	for (i = 32; i < 256; i++) {
+#if !defined(__xpv)
+		(void) snprintf(ivctname, sizeof (ivctname),
+		    (kpti_enable == 1) ? "tr_ivct%d" : "ivct%d", i);
+#else
 		(void) snprintf(ivctname, sizeof (ivctname), "ivct%d", i);
+#endif
 		ivctptr = (void (*)(void))kobj_getsymvalue(ivctname, 0);
 		if (ivctptr == NULL)
 			panic("kobj_getsymvalue(%s) failed", ivctname);
 
-		set_gatesegd(&idt[i], ivctptr, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
+		set_gatesegd(&idt[i], ivctptr, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+		    idt_vector_to_ist(i));
 	}
 
 	/*
@@ -1090,18 +1142,39 @@ init_ldt(void)
 }
 
 #if !defined(__xpv)
-#if defined(__amd64)
 
 static void
 init_tss(void)
 {
+	extern struct cpu cpus[];
+
 	/*
-	 * tss_rsp0 is dynamically filled in by resume() on each context switch.
-	 * All exceptions but #DF will run on the thread stack.
-	 * Set up the double fault stack here.
+	 * tss_rsp0 is dynamically filled in by resume() (in swtch.s) on each
+	 * context switch but it'll be overwritten with this same value anyway.
 	 */
-	ktss0->tss_ist1 =
-	    (uint64_t)&dblfault_stack0[sizeof (dblfault_stack0)];
+	if (kpti_enable == 1) {
+		ktss0->tss_rsp0 = (uint64_t)&cpus->cpu_m.mcpu_kpti.kf_tr_rsp;
+	}
+
+	/* Set up the IST stacks for double fault, NMI, MCE. */
+	ktss0->tss_ist1 = (uintptr_t)&dblfault_stack0[sizeof (dblfault_stack0)];
+	ktss0->tss_ist2 = (uintptr_t)&nmi_stack0[sizeof (nmi_stack0)];
+	ktss0->tss_ist3 = (uintptr_t)&mce_stack0[sizeof (mce_stack0)];
+
+	/*
+	 * This IST stack is used for #DB,#BP (debug) interrupts (when KPTI is
+	 * enabled), and also for KDI (always).
+	 */
+	ktss0->tss_ist4 = (uint64_t)&cpus->cpu_m.mcpu_kpti_dbg.kf_tr_rsp;
+
+	if (kpti_enable == 1) {
+		/* This IST stack is used for #GP,#PF,#SS (fault) interrupts. */
+		ktss0->tss_ist5 =
+		    (uint64_t)&cpus->cpu_m.mcpu_kpti_flt.kf_tr_rsp;
+
+		/* This IST stack is used for all other intrs (for KPTI). */
+		ktss0->tss_ist6 = (uint64_t)&cpus->cpu_m.mcpu_kpti.kf_tr_rsp;
+	}
 
 	/*
 	 * Set I/O bit map offset equal to size of TSS segment limit
@@ -1116,56 +1189,6 @@ init_tss(void)
 	wr_tsr(KTSS_SEL);
 }
 
-#elif defined(__i386)
-
-static void
-init_tss(void)
-{
-	/*
-	 * ktss0->tss_esp dynamically filled in by resume() on each
-	 * context switch.
-	 */
-	ktss0->tss_ss0	= KDS_SEL;
-	ktss0->tss_eip	= (uint32_t)_start;
-	ktss0->tss_ds	= ktss0->tss_es = ktss0->tss_ss = KDS_SEL;
-	ktss0->tss_cs	= KCS_SEL;
-	ktss0->tss_fs	= KFS_SEL;
-	ktss0->tss_gs	= KGS_SEL;
-	ktss0->tss_ldt	= ULDT_SEL;
-
-	/*
-	 * Initialize double fault tss.
-	 */
-	dftss0->tss_esp0 = (uint32_t)&dblfault_stack0[sizeof (dblfault_stack0)];
-	dftss0->tss_ss0	= KDS_SEL;
-
-	/*
-	 * tss_cr3 will get initialized in hat_kern_setup() once our page
-	 * tables have been setup.
-	 */
-	dftss0->tss_eip	= (uint32_t)syserrtrap;
-	dftss0->tss_esp	= (uint32_t)&dblfault_stack0[sizeof (dblfault_stack0)];
-	dftss0->tss_cs	= KCS_SEL;
-	dftss0->tss_ds	= KDS_SEL;
-	dftss0->tss_es	= KDS_SEL;
-	dftss0->tss_ss	= KDS_SEL;
-	dftss0->tss_fs	= KFS_SEL;
-	dftss0->tss_gs	= KGS_SEL;
-
-	/*
-	 * Set I/O bit map offset equal to size of TSS segment limit
-	 * for no I/O permission map. This will force all user I/O
-	 * instructions to generate #gp fault.
-	 */
-	ktss0->tss_bitmapbase = sizeof (*ktss0);
-
-	/*
-	 * Point %tr to descriptor for ktss0 in gdt.
-	 */
-	wr_tsr(KTSS_SEL);
-}
-
-#endif	/* __i386 */
 #endif	/* !__xpv */
 
 #if defined(__xpv)
@@ -1257,6 +1280,14 @@ init_desctbls(void)
 	CPU->cpu_gdt = gdt;
 
 	/*
+	 * Initialize this CPU's LDT.
+	 */
+	CPU->cpu_m.mcpu_ldt = BOP_ALLOC(bootops, (caddr_t)LDT_VA,
+	    LDT_CPU_SIZE, PAGESIZE);
+	bzero(CPU->cpu_m.mcpu_ldt, LDT_CPU_SIZE);
+	CPU->cpu_m.mcpu_ldt_len = 0;
+
+	/*
 	 * Setup and install our IDT.
 	 */
 	init_idt(idt0);
@@ -1277,6 +1308,9 @@ init_desctbls(void)
 	init_tss();
 	CPU->cpu_tss = ktss0;
 	init_ldt();
+
+	/* Stash this so that the NMI,MCE,#DF and KDI handlers can use it. */
+	kpti_safe_cr3 = (uint64_t)getcr3();
 }
 
 #endif	/* __xpv */
@@ -1337,15 +1371,26 @@ brand_interpositioning_enable(void)
 #else
 
 	if (is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
-		wrmsr(MSR_AMD_LSTAR, (uintptr_t)brand_sys_syscall);
-		wrmsr(MSR_AMD_CSTAR, (uintptr_t)brand_sys_syscall32);
+		if (kpti_enable == 1) {
+			wrmsr(MSR_AMD_LSTAR, (uintptr_t)tr_brand_sys_syscall);
+			wrmsr(MSR_AMD_CSTAR, (uintptr_t)tr_brand_sys_syscall32);
+		} else {
+			wrmsr(MSR_AMD_LSTAR, (uintptr_t)brand_sys_syscall);
+			wrmsr(MSR_AMD_CSTAR, (uintptr_t)brand_sys_syscall32);
+		}
 	}
 
 #endif
 #endif	/* __amd64 */
 
-	if (is_x86_feature(x86_featureset, X86FSET_SEP))
-		wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)brand_sys_sysenter);
+	if (is_x86_feature(x86_featureset, X86FSET_SEP)) {
+		if (kpti_enable == 1) {
+			wrmsr(MSR_INTC_SEP_EIP,
+			    (uintptr_t)tr_brand_sys_sysenter);
+		} else {
+			wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)brand_sys_sysenter);
+		}
+	}
 }
 
 /*
@@ -1381,13 +1426,23 @@ brand_interpositioning_disable(void)
 #else
 
 	if (is_x86_feature(x86_featureset, X86FSET_ASYSC)) {
-		wrmsr(MSR_AMD_LSTAR, (uintptr_t)sys_syscall);
-		wrmsr(MSR_AMD_CSTAR, (uintptr_t)sys_syscall32);
+		if (kpti_enable == 1) {
+			wrmsr(MSR_AMD_LSTAR, (uintptr_t)tr_sys_syscall);
+			wrmsr(MSR_AMD_CSTAR, (uintptr_t)tr_sys_syscall32);
+		} else {
+			wrmsr(MSR_AMD_LSTAR, (uintptr_t)sys_syscall);
+			wrmsr(MSR_AMD_CSTAR, (uintptr_t)sys_syscall32);
+		}
 	}
 
 #endif
 #endif	/* __amd64 */
 
-	if (is_x86_feature(x86_featureset, X86FSET_SEP))
-		wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)sys_sysenter);
+	if (is_x86_feature(x86_featureset, X86FSET_SEP)) {
+		if (kpti_enable == 1) {
+			wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)tr_sys_sysenter);
+		} else {
+			wrmsr(MSR_INTC_SEP_EIP, (uintptr_t)sys_sysenter);
+		}
+	}
 }

@@ -22,6 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 RackTop Systems.
  */
 /*
  * Silicon Image 3XXX controller specific processing
@@ -55,8 +57,7 @@ sil3xxx_init_controller(dev_info_t *dip, ushort_t vendor_id, ushort_t device_id)
 	uint32_t fifo_cnt_ctl;
 	int ports, i;
 
-#ifdef	DEBUG
-	/* LINTED */
+#ifdef	ATA_DEBUG
 	ushort_t sfiscfg_val __unused;
 #endif
 
@@ -122,7 +123,7 @@ sil3xxx_init_controller(dev_info_t *dip, ushort_t vendor_id, ushort_t device_id)
 		/*
 		 * Correct default setting for FIS0cfg
 		 */
-#ifdef	DEBUG
+#ifdef	ATA_DEBUG
 		GET_BAR5_INDIRECT(pci_conf_handle, sfiscfg[i],
 		    sfiscfg_val);
 		ADBG_WARN(("sil3xxx_init_controller: old val SFISCfg "
@@ -130,7 +131,7 @@ sil3xxx_init_controller(dev_info_t *dip, ushort_t vendor_id, ushort_t device_id)
 #endif
 		PUT_BAR5_INDIRECT(pci_conf_handle, sfiscfg[i],
 		    SFISCFG_ERRATA);
-#ifdef	DEBUG
+#ifdef	ATA_DEBUG
 		GET_BAR5_INDIRECT(pci_conf_handle, sfiscfg[i],
 		    sfiscfg_val);
 		ADBG_WARN(("sil3xxx_init_controller: new val SFISCfg "

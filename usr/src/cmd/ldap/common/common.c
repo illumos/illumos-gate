@@ -647,8 +647,8 @@ ldaptool_process_args( int argc, char **argv, char *extra_opts,
 	    break;
 	case 'y':   /* old (version 1) proxied authorization control */
 		proxyauth_version = 1;
+		/* FALLTHROUGH */
 	case 'Y':   /* new (version 2 ) proxied authorization control */
-		/*FALLTHRU*/
 	    proxyauth_id = strdup(optarg);
 	    if (NULL == proxyauth_id)
 	    {

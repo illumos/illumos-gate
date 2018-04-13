@@ -22,6 +22,8 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright 2018 Joyent, Inc.
+#
 
 #	This Makefile defines file modules in the directory uts/i86xpv
 #	and its children. These are the source files which are i86xpv
@@ -65,7 +67,6 @@ CORE_OBJS +=			\
 	instr_size.o		\
 	intr.o			\
 	kboot_mmu.o		\
-	kdi_subr.o		\
 	kdi_idt.o		\
 	kdi_idthdl.o		\
 	kdi_asm.o		\
@@ -160,7 +161,8 @@ SPECIAL_OBJS_64 +=		\
 	locore.o		\
 	fast_trap_asm.o		\
 	interrupt.o		\
-	syscall_asm_amd64.o
+	syscall_asm_amd64.o 	\
+	kpti_trampolines.o
 
 SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
 
@@ -252,5 +254,3 @@ ASSYM_DEPS      += 		\
 	syscall_asm_amd64.o
 
 $(KDI_ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h
-
-ASSYM_DEPS += kdi_asm.o

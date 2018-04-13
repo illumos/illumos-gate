@@ -15,7 +15,6 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 
@@ -205,6 +204,7 @@ again:
 			;
 		if (c == EOF)
 			return(0);
+		/* FALLTHROUGH */
 	case '\n':
 		yylineno++;
 	case ' ':

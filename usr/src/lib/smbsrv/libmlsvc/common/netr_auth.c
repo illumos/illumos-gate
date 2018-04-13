@@ -191,6 +191,10 @@ netr_server_req_challenge(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	return (0);
 }
 
+uint32_t netr_server_auth2_flags =
+    NETR_NEGOTIATE_BASE_FLAGS |
+    NETR_NEGOTIATE_STRONGKEY_FLAG;
+
 /*
  * netr_server_authenticate2
  */
@@ -216,10 +220,9 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	arg.account_name = (unsigned char *)account_name;
 	arg.account_type = NETR_WKSTA_TRUST_ACCOUNT_TYPE;
 	arg.hostname = (unsigned char *)netr_info->hostname;
-	arg.negotiate_flags = NETR_NEGOTIATE_BASE_FLAGS;
+	arg.negotiate_flags = netr_server_auth2_flags;
 
-	if (ndr_rpc_server_os(netr_handle) == NATIVE_OS_WIN2000) {
-		arg.negotiate_flags |= NETR_NEGOTIATE_STRONGKEY_FLAG;
+	if (arg.negotiate_flags & NETR_NEGOTIATE_STRONGKEY_FLAG) {
 		if (netr_gen_skey128(netr_info) != SMBAUTH_SUCCESS)
 			return (-1);
 	} else {

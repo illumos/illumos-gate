@@ -2321,7 +2321,7 @@ err3:
  * 	array and set up the agp aperture page to physical memory page
  * 	translation.
  * Arguments:
- * 	type		valid sytem arc types ARC_AMD64AGP, ARC_INTELAGP,
+ * 	type		valid system arc types ARC_AMD64AGP, ARC_INTELAGP,
  * 			ARC_AMD64AGP
  * 	pfnarray	allocated physical page frame number array
  * 	pg_offset	agp aperture start page to be bound

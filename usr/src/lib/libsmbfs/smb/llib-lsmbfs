@@ -34,7 +34,6 @@
 
 #include <netsmb/smb_lib.h>
 #include <netsmb/smb_keychain.h>
-#include <netsmb/smb_netshareenum.h>
 #include <netsmb/smb_rap.h>
 #include <netsmb/spnego.h>
 

@@ -296,9 +296,8 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		dump_messages();
 
 		invoke_cb = B_TRUE;
-
-		/* FALLTHROUGH */
 	}
+	/* FALLTHROUGH */
 
 	case A_REBOOT:
 		if ((mdep != NULL) && (*(char *)mdep == '/')) {

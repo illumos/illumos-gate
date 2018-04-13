@@ -67,7 +67,7 @@ static void	awkvarinit(void);
 static wint_t	lexgetc(void);
 static void	lexungetc(wint_t c);
 static size_t	lexescape(wint_t endc, int regx, int cmd_line_operand);
-static void	awkierr(int perr, char *fmt, va_list ap);
+static void	awkierr(int perr, char *fmt, va_list ap) __NORETURN;
 static int	usage(void);
 void		strescape(wchar_t *str);
 static const char	*toprint(wint_t);
@@ -544,7 +544,7 @@ yylex()
 					c = ';';
 					break;
 				}
-			/*FALLTHRU*/
+			/* FALLTHROUGH */
 			case AND:
 			case OR:
 			case COMMA:
@@ -557,6 +557,7 @@ yylex()
 			case '}':
 				if (nbrace != 0)
 					continue;
+				/* FALLTHROUGH */
 
 			default:
 				c = ';';
@@ -678,7 +679,7 @@ yylex()
 		if (!catterm || lexlast != CONSTANT || wasfield)
 			break;
 
-	/*FALLTHRU*/
+	/* FALLTHROUGH */
 	case UFUNC:
 	case FUNC:
 	case GETLINE:
@@ -695,10 +696,10 @@ yylex()
 	case '}':
 		if (nbrace == 0)
 			savetoken = ';';
-	/*FALLTHRU*/
+	/* FALLTHROUGH */
 	case ';':
 		inprint = 0;
-	/*FALLTHRU*/
+	/* FALLTHROUGH */
 	default:
 		if (c == DEFFUNC)
 			isfuncdef = 1;
@@ -795,6 +796,7 @@ lexid(wint_t c)
 		case PRINT:
 		case PRINTF:
 			++inprint;
+			/* FALLTHROUGH */
 		default:
 			return ((int)np->n_keywtype);
 		}
@@ -831,7 +833,7 @@ do_funparm:
 			needsplit = 1;
 		} else if (np == varENVIRON)
 			needenviron = 1;
-	/*FALLTHRU*/
+	/* FALLTHROUGH */
 	case PARM:
 		return (VAR);
 
@@ -840,7 +842,7 @@ do_funparm:
 		 * It is ok to redefine functions as parameters
 		 */
 		if (funparm) goto do_funparm;
-	/*FALLTHRU*/
+	/* FALLTHROUGH */
 	case FUNC:
 	case GETLINE:
 		/*

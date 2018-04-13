@@ -2,6 +2,8 @@
 \ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
+\ Copyright 2018 Joyent, Inc.
+\
 \ CDDL HEADER START
 \
 \ The contents of this file are subject to the terms of the
@@ -21,11 +23,7 @@
 \
 \ CDDL HEADER END
 \
-\ ident	"%Z%%M%	%I%	%E% SMI"
-\
 \ CPU-save structure offsets for use in assembly code.
-\
-\ Keep in sync with kdi_state.h
 \
 
 #include <sys/cpuvar.h>
@@ -47,12 +45,6 @@ kdi_drreg_t
 		dr_stat
 		dr_addr
 
-kdi_msr_t	MSR_SIZE
-		msr_num
-		msr_type
-		_u._msr_valp			MSR_VALP
-		_u._msr_val			MSR_VAL
-
 kdi_cpusave_t	KRS_SIZE
 		krs_gregs
 		krs_dr
@@ -61,22 +53,14 @@ kdi_cpusave_t	KRS_SIZE
 		krs_gdt
 		krs_idt
 		krs_cr0
-		krs_msr
 		krs_cpu_state
 		krs_curcrumbidx
 		krs_curcrumb
 		krs_crumbs
 
-cpu
-		cpu_id
-
 greg_t		KREG_SIZE
 
-#if defined(__amd64)
 \#define	REG_SHIFT		3
-#else
-\#define	REG_SHIFT		2
-#endif
 
 \#define	DRADDR_IDX(num)		_CONST(_MUL(num, DR_ADDR_INCR))
 \#define	DRADDR_OFF(num)		_CONST(DRADDR_IDX(num) + DR_ADDR)

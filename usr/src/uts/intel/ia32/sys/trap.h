@@ -25,6 +25,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _IA32_SYS_TRAP_H
@@ -53,11 +55,13 @@ extern "C" {
 #define	T_STKFLT	0xc	/* #ss	stack fault			*/
 #define	T_GPFLT		0xd	/* #gp	general protection fault	*/
 #define	T_PGFLT		0xe	/* #pf	page fault			*/
+#define	T_RESVTRAP	0xf	/*	reserved			*/
 #define	T_EXTERRFLT	0x10	/* #mf	x87 FPU error fault		*/
 #define	T_ALIGNMENT	0x11	/* #ac	alignment check error		*/
 #define	T_MCE		0x12	/* #mc	machine check exception		*/
 #define	T_SIMDFPE	0x13	/* #xm	SSE/SSE exception		*/
 #define	T_DBGENTR	0x14	/*	debugger entry 			*/
+#define	T_INVALTRAP	0x1e	/*	invalid				*/
 #define	T_ENDPERR	0x21	/*	emulated extension error flt	*/
 #define	T_ENOEXTFLT	0x20	/*	emulated ext not present	*/
 #define	T_FASTTRAP	0xd2	/*	fast system call		*/
@@ -101,6 +105,22 @@ extern "C" {
 #define	T_GETLGRP	6	/* Get home lgrpid			*/
 
 #define	T_LASTFAST	6	/* Last valid subfunction		*/
+
+/*
+ * Offsets for an interrupt/trap frame.
+ */
+#define	T_FRAME_ERR	0
+#define	T_FRAME_RIP	8
+#define	T_FRAME_CS	16
+#define	T_FRAME_RFLAGS	24
+#define	T_FRAME_RSP	32
+#define	T_FRAME_SS	40
+
+#define	T_FRAMERET_RIP		0
+#define	T_FRAMERET_CS		8
+#define	T_FRAMERET_RFLAGS	16
+#define	T_FRAMERET_RSP		24
+#define	T_FRAMERET_SS		32
 
 #ifdef	__cplusplus
 }

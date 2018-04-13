@@ -29,8 +29,6 @@
  * Based on MKS awk(1) ported to be /usr/xpg4/bin/awk with POSIX/XCU4 changes
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "awk.h"
 #include "y.tab.h"
 
@@ -250,7 +248,7 @@ top:
 	switch (left->n_type) {
 	case INDEX:
 		left = exprreduce(left);
-	/*FALLTHRU*/
+		/* FALLTHROUGH */
 	case VAR:
 		return (nassign(left, right));
 
@@ -701,7 +699,7 @@ action(NODE *wp)
 
 		case NEXT:
 			loopexit = NEXT;
-		/*FALLTHRU*/
+		/* FALLTHROUGH */
 		case BREAK:
 		case CONTINUE:
 			return (np->n_type);
@@ -748,6 +746,7 @@ action(NODE *wp)
 				if (isstring(l->n_flags) &&
 				    l->n_string == _null)
 					break;
+				/* FALLTHROUGH */
 			default:
 				awkerr(gettext(
 				    "may delete only array element or array"));
@@ -1224,11 +1223,9 @@ do_asn_op:
 	case ARRAY:
 		awkerr(badarray, np->n_name);
 
-	/*FALLTHRU*/
 	case UFUNC:
 		awkerr(varnotfunc, np->n_name);
 
-	/*FALLTHRU*/
 	default:
 		awkerr(gettext("panic: exprreduce(%d)"), t);
 		/* NOTREACHED */

@@ -31,8 +31,13 @@
 #  include <osreldate.h>
 # endif
 #endif
-#ifndef SOLARIS
-# define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+#ifdef SOLARIS
+#undef	SOLARIS
+#endif
+#if (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+#define	SOLARIS	(1)
+#else
+#define	SOLARIS	(0)
 #endif
 #include <sys/errno.h>
 #include <sys/types.h>

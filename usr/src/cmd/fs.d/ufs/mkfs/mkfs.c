@@ -403,7 +403,7 @@ static void wtfs_breakup(diskaddr_t bno, int size, char *bf);
 static int isblock(struct fs *fs, unsigned char *cp, int h);
 static void clrblock(struct fs *fs, unsigned char *cp, int h);
 static void setblock(struct fs *fs, unsigned char *cp, int h);
-static void usage();
+static void usage(void) __NORETURN;
 static void dump_fscmd(char *fsys, int fsi);
 static uint64_t number(uint64_t d_value, char *param, int flags);
 static int match(char *s);
@@ -572,7 +572,7 @@ diskaddr_t		testfrags;
 int		inlockexit;
 int		isbad;
 
-void		lockexit(int);
+void		lockexit(int) __NORETURN;
 void		randomgeneration(void);
 void		checksummarysize(void);
 int		checksblock(struct fs, int);
@@ -3452,7 +3452,7 @@ setblock(struct fs *fs, unsigned char *cp, int h)
 }
 
 static void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr,
 	    gettext("ufs usage: mkfs [-F FSType] [-V] [-m] [-o options] "

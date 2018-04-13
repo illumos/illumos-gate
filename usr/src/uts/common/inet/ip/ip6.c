@@ -414,7 +414,7 @@ icmp_inbound_v6(mblk_t *mp, ip_recv_attr_t *ira)
 	case ICMP6_PACKET_TOO_BIG:
 		/* Update DCE and adjust MTU is icmp header if needed */
 		icmp_inbound_too_big_v6(icmp6, ira);
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	default:
 		icmp_inbound_error_fanout_v6(mp, icmp6, ira);
 		break;
@@ -962,8 +962,8 @@ icmp_inbound_error_fanout_v6(mblk_t *mp, icmp6_t *icmp6, ip_recv_attr_t *ira)
 			icmp_inbound_error_fanout_v6(mp, icmp6, ira);
 			return;
 		}
-		/* FALLTHRU */
 	}
+	/* FALLTHROUGH */
 	case IPPROTO_ENCAP:
 		if ((connp = ipcl_iptun_classify_v6(&rip6h.ip6_src,
 		    &rip6h.ip6_dst, ipst)) != NULL) {
@@ -977,7 +977,7 @@ icmp_inbound_error_fanout_v6(mblk_t *mp, icmp6_t *icmp6, ip_recv_attr_t *ira)
 		 * No IP tunnel is interested, fallthrough and see
 		 * if a raw socket will want it.
 		 */
-		/* FALLTHRU */
+		/* FALLTHROUGH */
 	default:
 		ira->ira_flags |= IRAF_ICMP_ERROR;
 		ASSERT(ira->ira_protocol == nexthdr);
@@ -4072,7 +4072,7 @@ ip_source_routed_v6(ip6_t *ip6h, mblk_t *mp, ip_stack_t *ipst)
 				ip1dbg(("ip_source_routed_v6: Not local\n"));
 			}
 		}
-	/* FALLTHRU */
+	/* FALLTHROUGH */
 	default:
 		ip2dbg(("ip_source_routed_v6: Not source routed here\n"));
 		return (B_FALSE);

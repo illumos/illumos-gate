@@ -137,6 +137,36 @@ mptsas_devid_type_string(mptsas_t *mpt)
 	case MPI25_MFGPAGE_DEVID_SAS3108_5:
 	case MPI25_MFGPAGE_DEVID_SAS3108_6:
 		return ("SAS3108");
+	case MPI26_MFGPAGE_DEVID_SAS3216:
+	case MPI26_MFGPAGE_DEVID_SAS3316_1:
+	case MPI26_MFGPAGE_DEVID_SAS3316_2:
+	case MPI26_MFGPAGE_DEVID_SAS3316_3:
+	case MPI26_MFGPAGE_DEVID_SAS3316_4:
+		return ("SAS3216");
+	case MPI26_MFGPAGE_DEVID_SAS3224:
+	case MPI26_MFGPAGE_DEVID_SAS3324_1:
+	case MPI26_MFGPAGE_DEVID_SAS3324_2:
+	case MPI26_MFGPAGE_DEVID_SAS3324_3:
+	case MPI26_MFGPAGE_DEVID_SAS3324_4:
+		return ("SAS3224");
+	case MPI26_MFGPAGE_DEVID_SAS3408:
+		return ("SAS3408");
+	case MPI26_MFGPAGE_DEVID_SAS3416:
+		return ("SAS3416");
+	case MPI26_MFGPAGE_DEVID_SAS3508:
+	case MPI26_MFGPAGE_DEVID_SAS3508_1:
+		return ("SAS3508");
+	case MPI26_MFGPAGE_DEVID_SAS3516:
+	case MPI26_MFGPAGE_DEVID_SAS3516_1:
+		return ("SAS3516");
+	case MPI26_MFGPAGE_DEVID_SAS3616:
+		return ("SAS3616");
+	case MPI26_MFGPAGE_DEVID_SAS3708:
+		return ("SAS3708");
+	case MPI26_MFGPAGE_DEVID_SAS3716:
+		return ("SAS3716");
+	case MPI26_MFGPAGE_DEVID_SAS4008:
+		return ("SAS4008");
 	default:
 		return ("?");
 	}
@@ -219,7 +249,7 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 		return (DDI_FAILURE);
 	}
 
-	if (iocstatus = ddi_get16(accessp, &factsreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(accessp, &factsreply->IOCStatus)) != 0) {
 		mptsas_log(mpt, CE_WARN, "mptsas_ioc_do_get_facts_reply: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
 		    ddi_get32(accessp, &factsreply->IOCLogInfo));
@@ -432,7 +462,7 @@ mptsas_ioc_do_get_port_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 		return (DDI_FAILURE);
 	}
 
-	if (iocstatus = ddi_get16(accessp, &factsreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(accessp, &factsreply->IOCStatus)) != 0) {
 		mptsas_log(mpt, CE_WARN, "mptsas_ioc_do_get_port_facts_reply: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
 		    ddi_get32(accessp, &factsreply->IOCLogInfo));
@@ -512,7 +542,7 @@ mptsas_ioc_do_enable_port_reply(mptsas_t *mpt, caddr_t memp, int var,
 		return (DDI_FAILURE);
 	}
 
-	if (iocstatus = ddi_get16(accessp, &portreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(accessp, &portreply->IOCStatus)) != 0) {
 		mptsas_log(mpt, CE_WARN, "mptsas_ioc_do_enable_port_reply: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
 		    ddi_get32(accessp, &portreply->IOCLogInfo));
@@ -594,7 +624,7 @@ mptsas_ioc_do_enable_event_notification_reply(mptsas_t *mpt, caddr_t memp,
 		return (DDI_FAILURE);
 	}
 
-	if (iocstatus = ddi_get16(accessp, &eventsreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(accessp, &eventsreply->IOCStatus)) != 0) {
 		mptsas_log(mpt, CE_WARN,
 		    "mptsas_ioc_do_enable_event_notification_reply: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
@@ -721,7 +751,7 @@ mptsas_do_ioc_init_reply(mptsas_t *mpt, caddr_t memp, int var,
 		return (DDI_FAILURE);
 	}
 
-	if (iocstatus = ddi_get16(accessp, &initreply->IOCStatus)) {
+	if ((iocstatus = ddi_get16(accessp, &initreply->IOCStatus)) != 0) {
 		mptsas_log(mpt, CE_WARN, "mptsas_do_ioc_init_reply: "
 		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus,
 		    ddi_get32(accessp, &initreply->IOCLogInfo));

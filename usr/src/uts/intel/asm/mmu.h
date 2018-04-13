@@ -21,6 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _ASM_MMU_H
@@ -33,9 +35,9 @@
 extern "C" {
 #endif
 
-#if defined(__GNUC__) && !defined(__xpv)
+#if defined(__GNUC__)
 
-#if defined(__amd64)
+#if !defined(__xpv)
 
 extern __GNU_INLINE ulong_t
 getcr3(void)
@@ -57,30 +59,22 @@ setcr3(ulong_t value)
 	    : "r" (value));
 }
 
-extern __GNU_INLINE void
-reload_cr3(void)
-{
-	setcr3(getcr3());
-}
-
-#elif defined(__i386)
-
 extern __GNU_INLINE ulong_t
-getcr3(void)
+getcr4(void)
 {
-	uint32_t value;
+	uint64_t value;
 
 	__asm__ __volatile__(
-	    "movl %%cr3, %0"
+	    "movq %%cr4, %0"
 	    : "=r" (value));
 	return (value);
 }
 
 extern __GNU_INLINE void
-setcr3(ulong_t value)
+setcr4(ulong_t value)
 {
 	__asm__ __volatile__(
-	    "movl %0, %%cr3"
+	    "movq %0, %%cr4"
 	    : /* no output */
 	    : "r" (value));
 }
@@ -91,9 +85,33 @@ reload_cr3(void)
 	setcr3(getcr3());
 }
 
-#endif
+/*
+ * We clobber memory: we're not writing anything, but we don't want to
+ * potentially get re-ordered beyond the TLB flush.
+ */
+extern __GNU_INLINE void
+invpcid_insn(uint64_t type, uint64_t pcid, uintptr_t addr)
+{
+	uint64_t pcid_desc[2] = { pcid, addr };
+	__asm__ __volatile__(
+	    "invpcid %0, %1"
+	    : /* no output */
+	    : "m" (*pcid_desc), "r" (type)
+	    : "memory");
+}
 
-#endif /* __GNUC__ && !__xpv */
+#endif /* !__xpv */
+
+extern __GNU_INLINE void
+mmu_invlpg(caddr_t addr)
+{
+	__asm__ __volatile__(
+	    "invlpg %0"
+	    : "=m" (*addr)
+	    : "m" (*addr));
+}
+
+#endif /* __GNUC__ */
 
 #ifdef __cplusplus
 }

@@ -306,6 +306,16 @@ symcheck $(SYM_DEPS)		:= TARGET = symcheck
 ALL_TARGS	= def all clean clobber lint modlintlib \
 		  clean.lint lintlib install symcheck
 
+ALL_OBJ32	= $(ALL_TARGS:%=%.obj32)
+
+$(ALL_OBJ32):	FRC
+	@BUILD_TYPE=OBJ32 VERSION='$(VERSION)' $(MAKE) $(NO_STATE) $(TARGET).targ
+
+ALL_DEBUG32	= $(ALL_TARGS:%=%.debug32)
+
+$(ALL_DEBUG32):	FRC
+	@BUILD_TYPE=DBG32 VERSION='$(VERSION)' $(MAKE) $(NO_STATE) $(TARGET).targ
+
 ALL_OBJ64	= $(ALL_TARGS:%=%.obj64)
 
 $(ALL_OBJ64):	FRC
@@ -477,6 +487,19 @@ lint64:
 		if [ ! -d $$dir ]; then mkdir $$dir; fi \
 	done
 	@for file in $(LINT64_FILES); do \
+		if [ ! -f $$file ]; then touch $$file; fi \
+	done
+
+#
+#	In some places we also need to create fake lintlibs for 32b
+#	dirs so global linting works
+#
+lint32:
+	@$(ECHO) $(MODULE) fake lints
+	@for dir in $(LINT32_DIRS); do \
+		if [ ! -d $$dir ]; then mkdir $$dir; fi \
+	done
+	@for file in $(LINT32_FILES); do \
 		if [ ! -f $$file ]; then touch $$file; fi \
 	done
 

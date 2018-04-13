@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -45,6 +47,9 @@
 
 #include <vm/page.h>
 #include <vm/hat_i86.h>
+
+#define	VA_SIGN_BIT (1UL << 47)
+#define	VA_SIGN_EXTEND(va) (((va) ^ VA_SIGN_BIT) - VA_SIGN_BIT)
 
 struct pfn2pp {
 	pfn_t pfn;
@@ -398,13 +403,6 @@ pte2mfn(x86pte_t pte, uint_t level)
 	return (mfn);
 }
 
-/*
- * Print a PTE in more human friendly way. The PTE is assumed to be in
- * a level 0 page table, unless -l specifies another level.
- *
- * The PTE value can be specified as the -p option, since on a 32 bit kernel
- * with PAE running it's larger than a uintptr_t.
- */
 static int
 do_pte_dcmd(int level, uint64_t pte)
 {
@@ -414,12 +412,13 @@ do_pte_dcmd(int level, uint64_t pte)
 	int pat_index = 0;
 	pfn_t mfn;
 
-	mdb_printf("pte=%llr: ", pte);
-	if (PTE_GET(pte, mmu.pt_nx))
-		mdb_printf("noexec ");
+	mdb_printf("pte=0x%llr: ", pte);
 
 	mfn = pte2mfn(pte, level);
 	mdb_printf("%s=0x%lr ", is_xpv ? "mfn" : "pfn", mfn);
+
+	if (PTE_GET(pte, mmu.pt_nx))
+		mdb_printf("noexec ");
 
 	if (PTE_GET(pte, PT_NOCONSIST))
 		mdb_printf("noconsist ");
@@ -476,52 +475,34 @@ do_pte_dcmd(int level, uint64_t pte)
 /*
  * Print a PTE in more human friendly way. The PTE is assumed to be in
  * a level 0 page table, unless -l specifies another level.
- *
- * The PTE value can be specified as the -p option, since on a 32 bit kernel
- * with PAE running it's larger than a uintptr_t.
  */
 /*ARGSUSED*/
 int
 pte_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	int level = 0;
-	uint64_t pte = 0;
-	char *level_str = NULL;
-	char *pte_str = NULL;
+	uint64_t level = 0;
 
 	init_mmu();
 
 	if (mmu.num_level == 0)
 		return (DCMD_ERR);
 
-	if (mdb_getopts(argc, argv,
-	    'p', MDB_OPT_STR, &pte_str,
-	    'l', MDB_OPT_STR, &level_str) != argc)
+	if ((flags & DCMD_ADDRSPEC) == 0)
 		return (DCMD_USAGE);
 
-	/*
-	 * parse the PTE to decode, if it's 0, we don't do anything
-	 */
-	if (pte_str != NULL) {
-		pte = mdb_strtoull(pte_str);
-	} else {
-		if ((flags & DCMD_ADDRSPEC) == 0)
-			return (DCMD_USAGE);
-		pte = addr;
+	if (mdb_getopts(argc, argv,
+	    'l', MDB_OPT_UINT64, &level) != argc)
+		return (DCMD_USAGE);
+
+	if (level > mmu.max_level) {
+		mdb_warn("invalid level %lu\n", level);
+		return (DCMD_ERR);
 	}
-	if (pte == 0)
+
+	if (addr == 0)
 		return (DCMD_OK);
 
-	/*
-	 * parse the level if supplied
-	 */
-	if (level_str != NULL) {
-		level = mdb_strtoull(level_str);
-		if (level < 0 || level > mmu.max_level)
-			return (DCMD_ERR);
-	}
-
-	return (do_pte_dcmd(level, pte));
+	return (do_pte_dcmd((int)level, addr));
 }
 
 static size_t
@@ -537,25 +518,20 @@ static x86pte_t
 get_pte(hat_t *hat, htable_t *htable, uintptr_t addr)
 {
 	x86pte_t buf;
-	x86pte32_t *pte32 = (x86pte32_t *)&buf;
-	size_t len;
 
-	if (htable->ht_flags & HTABLE_VLP) {
-		uintptr_t ptr = (uintptr_t)hat->hat_vlp_ptes;
+	if (htable->ht_flags & HTABLE_COPIED) {
+		uintptr_t ptr = (uintptr_t)hat->hat_copied_ptes;
 		ptr += va2entry(htable, addr) << mmu.pte_size_shift;
-		len = mdb_vread(&buf, mmu.pte_size, ptr);
-	} else {
-		paddr_t paddr = mmu_ptob((paddr_t)htable->ht_pfn);
-		paddr += va2entry(htable, addr) << mmu.pte_size_shift;
-		len = mdb_pread(&buf, mmu.pte_size, paddr);
+		return (*(x86pte_t *)ptr);
 	}
 
-	if (len != mmu.pte_size)
-		return (0);
+	paddr_t paddr = mmu_ptob((paddr_t)htable->ht_pfn);
+	paddr += va2entry(htable, addr) << mmu.pte_size_shift;
 
-	if (mmu.pte_size == sizeof (x86pte_t))
+	if ((mdb_pread(&buf, mmu.pte_size, paddr)) == mmu.pte_size)
 		return (buf);
-	return (*pte32);
+
+	return (0);
 }
 
 static int
@@ -621,8 +597,8 @@ do_va2pa(uintptr_t addr, struct as *asp, int print_level, physaddr_t *pap,
 				pte = get_pte(&hat, &htable, addr);
 
 				if (print_level) {
-					mdb_printf("\tlevel=%d htable=%p "
-					    "pte=%llr\n", level, ht, pte);
+					mdb_printf("\tlevel=%d htable=0x%p "
+					    "pte=0x%llr\n", level, ht, pte);
 				}
 
 				if (!PTE_ISVALID(pte)) {
@@ -725,8 +701,6 @@ do_report_maps(pfn_t pfn)
 	int level;
 	int entry;
 	x86pte_t pte;
-	x86pte_t buf;
-	x86pte32_t *pte32 = (x86pte32_t *)&buf;
 	physaddr_t paddr;
 	size_t len;
 
@@ -796,14 +770,10 @@ do_report_maps(pfn_t pfn)
 					    base >= kernelbase)
 						continue;
 
-					len = mdb_pread(&buf, mmu.pte_size,
+					len = mdb_pread(&pte, mmu.pte_size,
 					    paddr + entry * mmu.pte_size);
 					if (len != mmu.pte_size)
 						return (DCMD_ERR);
-					if (mmu.pte_size == sizeof (x86pte_t))
-						pte = buf;
-					else
-						pte = *pte32;
 
 					if ((pte & PT_VALID) == 0)
 						continue;
@@ -854,7 +824,7 @@ report_maps_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 static int
-do_ptable_dcmd(pfn_t pfn)
+do_ptable_dcmd(pfn_t pfn, uint64_t level)
 {
 	struct hat *hatp;
 	struct hat hat;
@@ -862,12 +832,10 @@ do_ptable_dcmd(pfn_t pfn)
 	htable_t htable;
 	uintptr_t base;
 	int h;
-	int level;
 	int entry;
 	uintptr_t pagesize;
 	x86pte_t pte;
 	x86pte_t buf;
-	x86pte32_t *pte32 = (x86pte32_t *)&buf;
 	physaddr_t paddr;
 	size_t len;
 
@@ -912,14 +880,21 @@ do_ptable_dcmd(pfn_t pfn)
 found_it:
 	if (htable.ht_pfn == pfn) {
 		mdb_printf("htable=%p\n", ht);
-		level = htable.ht_level;
+		if (level == (uint64_t)-1) {
+			level = htable.ht_level;
+		} else if (htable.ht_level != level) {
+			mdb_warn("htable has level %d but forcing level %lu\n",
+			    htable.ht_level, level);
+		}
 		base = htable.ht_vaddr;
 		pagesize = mmu.level_size[level];
 	} else {
-		mdb_printf("Unknown pagetable - assuming level/addr 0");
-		level = 0;	/* assume level == 0 for PFN */
+		if (level == (uint64_t)-1)
+			level = 0;
+		mdb_warn("couldn't find matching htable, using level=%lu, "
+		    "base address=0x0\n", level);
 		base = 0;
-		pagesize = MMU_PAGESIZE;
+		pagesize = mmu.level_size[level];
 	}
 
 	paddr = mmu_ptob((physaddr_t)pfn);
@@ -928,15 +903,13 @@ found_it:
 		    paddr + entry * mmu.pte_size);
 		if (len != mmu.pte_size)
 			return (DCMD_ERR);
-		if (mmu.pte_size == sizeof (x86pte_t))
 			pte = buf;
-		else
-			pte = *pte32;
 
 		if (pte == 0)
 			continue;
 
-		mdb_printf("[%3d] va=%p ", entry, base + entry * pagesize);
+		mdb_printf("[%3d] va=0x%p ", entry,
+		    VA_SIGN_EXTEND(base + entry * pagesize));
 		do_pte_dcmd(level, pte);
 	}
 
@@ -953,6 +926,7 @@ ptable_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	pfn_t pfn;
 	uint_t mflag = 0;
+	uint64_t level = (uint64_t)-1;
 
 	init_mmu();
 
@@ -963,14 +937,20 @@ ptable_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	if (mdb_getopts(argc, argv,
-	    'm', MDB_OPT_SETBITS, TRUE, &mflag, NULL) != argc)
+	    'm', MDB_OPT_SETBITS, TRUE, &mflag,
+	    'l', MDB_OPT_UINT64, &level, NULL) != argc)
 		return (DCMD_USAGE);
+
+	if (level != (uint64_t)-1 && level > mmu.max_level) {
+		mdb_warn("invalid level %lu\n", level);
+		return (DCMD_ERR);
+	}
 
 	pfn = (pfn_t)addr;
 	if (mflag)
 		pfn = mdb_mfn_to_pfn(pfn);
 
-	return (do_ptable_dcmd(pfn));
+	return (do_ptable_dcmd(pfn, level));
 }
 
 static int
@@ -1030,4 +1010,113 @@ htables_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	hat = (hat_t *)addr;
 
 	return (do_htables_dcmd(hat));
+}
+
+static uintptr_t
+entry2va(size_t *entries)
+{
+	uintptr_t va = 0;
+
+	for (level_t l = mmu.max_level; l >= 0; l--)
+		va += entries[l] << mmu.level_shift[l];
+
+	return (VA_SIGN_EXTEND(va));
+}
+
+static void
+ptmap_report(size_t *entries, uintptr_t start,
+    boolean_t user, boolean_t writable, boolean_t wflag)
+{
+	uint64_t curva = entry2va(entries);
+
+	mdb_printf("mapped %s,%s range of %lu bytes: %a-%a\n",
+	    user ? "user" : "kernel", writable ? "writable" : "read-only",
+	    curva - start, start, curva - 1);
+	if (wflag && start >= kernelbase)
+		(void) mdb_call_dcmd("whatis", start, DCMD_ADDRSPEC, 0, NULL);
+}
+
+int
+ptmap_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	physaddr_t paddrs[MAX_NUM_LEVEL] = { 0, };
+	size_t entry[MAX_NUM_LEVEL] = { 0, };
+	uintptr_t start = (uintptr_t)-1;
+	boolean_t writable = B_FALSE;
+	boolean_t user = B_FALSE;
+	boolean_t wflag = B_FALSE;
+	level_t curlevel;
+
+	if ((flags & DCMD_ADDRSPEC) == 0)
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'w', MDB_OPT_SETBITS, TRUE, &wflag, NULL) != argc)
+		return (DCMD_USAGE);
+
+	init_mmu();
+
+	if (mmu.num_level == 0)
+		return (DCMD_ERR);
+
+	curlevel = mmu.max_level;
+
+	paddrs[curlevel] = addr & MMU_PAGEMASK;
+
+	for (;;) {
+		physaddr_t pte_addr;
+		x86pte_t pte;
+
+		pte_addr = paddrs[curlevel] +
+		    (entry[curlevel] << mmu.pte_size_shift);
+
+		if (mdb_pread(&pte, sizeof (pte), pte_addr) != sizeof (pte)) {
+			mdb_warn("couldn't read pte at %p", pte_addr);
+			return (DCMD_ERR);
+		}
+
+		if (PTE_GET(pte, PT_VALID) == 0) {
+			if (start != (uintptr_t)-1) {
+				ptmap_report(entry, start,
+				    user, writable, wflag);
+				start = (uintptr_t)-1;
+			}
+		} else if (curlevel == 0 || PTE_GET(pte, PT_PAGESIZE)) {
+			if (start == (uintptr_t)-1) {
+				start = entry2va(entry);
+				user = PTE_GET(pte, PT_USER);
+				writable = PTE_GET(pte, PT_WRITABLE);
+			} else if (user != PTE_GET(pte, PT_USER) ||
+			    writable != PTE_GET(pte, PT_WRITABLE)) {
+				ptmap_report(entry, start,
+				    user, writable, wflag);
+				start = entry2va(entry);
+				user = PTE_GET(pte, PT_USER);
+				writable = PTE_GET(pte, PT_WRITABLE);
+			}
+		} else {
+			/* Descend a level. */
+			physaddr_t pa = mmu_ptob(pte2mfn(pte, curlevel));
+			paddrs[--curlevel] = pa;
+			entry[curlevel] = 0;
+			continue;
+		}
+
+		while (++entry[curlevel] == mmu.ptes_per_table) {
+			/* Ascend back up. */
+			entry[curlevel] = 0;
+			if (curlevel == mmu.max_level) {
+				if (start != (uintptr_t)-1) {
+					ptmap_report(entry, start,
+					    user, writable, wflag);
+				}
+				goto out;
+			}
+
+			curlevel++;
+		}
+	}
+
+out:
+	return (DCMD_OK);
 }

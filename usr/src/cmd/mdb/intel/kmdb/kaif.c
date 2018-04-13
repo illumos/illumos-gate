@@ -21,9 +21,9 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The debugger/"PROM" interface layer
@@ -50,6 +50,7 @@
 #include <sys/bitmap.h>
 #include <sys/termios.h>
 #include <sys/kdi_impl.h>
+#include <sys/sysmacros.h>
 
 /*
  * This is the area containing the saved state when we enter
@@ -256,10 +257,44 @@ kaif_set_register(const char *regname, kreg_t val)
 	return (0);
 }
 
+/*
+ * Refuse to single-step or break within any stub that loads a user %cr3 value.
+ * As the KDI traps are not careful to restore such a %cr3, this can all go
+ * wrong, both spectacularly and subtly.
+ */
+static boolean_t
+kaif_toxic_text(uintptr_t addr)
+{
+	static GElf_Sym toxic_syms[2] = { 0, };
+	size_t i;
+
+	if (toxic_syms[0].st_name == NULL) {
+		if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+		    "tr_iret_user", &toxic_syms[0], NULL) != 0)
+			warn("couldn't find tr_iret_user\n");
+		if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
+		    "tr_mmu_flush_user_range", &toxic_syms[1], NULL) != 0)
+			warn("couldn't find tr_mmu_flush_user_range\n");
+	}
+
+	for (i = 0; i < ARRAY_SIZE(toxic_syms); i++) {
+		if (addr >= toxic_syms[i].st_value &&
+		    addr - toxic_syms[i].st_value < toxic_syms[i].st_size)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static int
 kaif_brkpt_arm(uintptr_t addr, mdb_instr_t *instrp)
 {
 	mdb_instr_t bkpt = KAIF_BREAKPOINT_INSTR;
+
+	if (kaif_toxic_text(addr)) {
+		warn("%a cannot be a breakpoint target\n", addr);
+		return (set_errno(EMDB_TGTNOTSUP));
+	}
 
 	if (mdb_tgt_vread(mdb.m_target, instrp, sizeof (mdb_instr_t), addr) !=
 	    sizeof (mdb_instr_t))
@@ -445,6 +480,11 @@ kaif_step(void)
 
 	(void) kmdb_dpi_get_register("pc", &pc);
 
+	if (kaif_toxic_text(pc)) {
+		warn("%a cannot be stepped\n", pc);
+		return (set_errno(EMDB_TGTNOTSUP));
+	}
+
 	if ((npc = mdb_dis_nextins(mdb.m_disasm, mdb.m_target,
 	    MDB_TGT_AS_VIRT, pc)) == pc) {
 		warn("failed to decode instruction at %a for step\n", pc);
@@ -603,38 +643,6 @@ kaif_step(void)
 	}
 }
 
-/*
- * The target has already configured the chip for branch step, leaving us to
- * actually make the machine go.  Due to a number of issues involving
- * the potential alteration of system state via instructions like sti, cli,
- * pushfl, and popfl, we're going to treat this like a normal system resume.
- * All CPUs will be released, on the kernel's IDT.  Our primary concern is
- * the alteration/storage of our TF'd EFLAGS via pushfl and popfl.  There's no
- * real workaround - we don't have opcode breakpoints - so the best we can do is
- * to ensure that the world won't end if someone does bad things to EFLAGS.
- *
- * Two things can happen:
- *  1. EFLAGS.TF may be cleared, either maliciously or via a popfl from saved
- *     state.  The CPU will continue execution beyond the branch, and will not
- *     reenter the debugger unless brought/sent in by other means.
- *  2. Someone may pushlf the TF'd EFLAGS, and may stash a copy of it somewhere.
- *     When the saved version is popfl'd back into place, the debugger will be
- *     re-entered on a single-step trap.
- */
-static void
-kaif_step_branch(void)
-{
-	kreg_t fl;
-
-	(void) kmdb_dpi_get_register(FLAGS_REG_NAME, &fl);
-	(void) kmdb_dpi_set_register(FLAGS_REG_NAME,
-	    (fl | (1 << KREG_EFLAGS_TF_SHIFT)));
-
-	kmdb_dpi_resume_master();
-
-	(void) kmdb_dpi_set_register(FLAGS_REG_NAME, fl);
-}
-
 /*ARGSUSED*/
 static uintptr_t
 kaif_call(uintptr_t funcva, uint_t argc, const uintptr_t argv[])
@@ -722,47 +730,6 @@ kaif_modchg_cancel(void)
 	ASSERT(kaif_modchg_cb != NULL);
 
 	kaif_modchg_cb = NULL;
-}
-
-static void
-kaif_msr_add(const kdi_msr_t *msrs)
-{
-	kdi_msr_t *save;
-	size_t nr_msrs = 0;
-	size_t i;
-
-	while (msrs[nr_msrs].msr_num != 0)
-		nr_msrs++;
-	/* we want to copy the terminating kdi_msr_t too */
-	nr_msrs++;
-
-	save = mdb_zalloc(sizeof (kdi_msr_t) * nr_msrs * kaif_ncpusave,
-	    UM_SLEEP);
-
-	for (i = 0; i < kaif_ncpusave; i++)
-		bcopy(msrs, &save[nr_msrs * i], sizeof (kdi_msr_t) * nr_msrs);
-
-	kmdb_kdi_set_debug_msrs(save);
-}
-
-static uint64_t
-kaif_msr_get(int cpuid, uint_t num)
-{
-	kdi_cpusave_t *save;
-	kdi_msr_t *msr;
-	int i;
-
-	if ((save = kaif_cpuid2save(cpuid)) == NULL)
-		return (-1); /* errno is set for us */
-
-	msr = save->krs_msr;
-
-	for (i = 0; msr[i].msr_num != 0; i++) {
-		if (msr[i].msr_num == num && (msr[i].msr_type & KDI_MSR_READ))
-			return (msr[i].kdi_msr_val);
-	}
-
-	return (0);
 }
 
 void
@@ -884,9 +851,6 @@ dpi_ops_t kmdb_dpi_ops = {
 	kaif_wapt_disarm,
 	kaif_wapt_match,
 	kaif_step,
-	kaif_step_branch,
 	kaif_call,
 	kaif_dump_crumbs,
-	kaif_msr_add,
-	kaif_msr_get,
 };

@@ -22,8 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright 2018 Joyent, Inc.
 
 KMDBML += \
 	kaif_invoke.s \
@@ -31,7 +30,6 @@ KMDBML += \
 
 KMDBSRCS += \
 	mdb_ia32util.c \
-	kmdb_makecontext.c \
-	kvm_cpu_p6.c
+	kmdb_makecontext.c
 
 SACPPFLAGS = -D__$(MACH)

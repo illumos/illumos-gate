@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -18,7 +15,6 @@
 ** $Id: select.c,v 1.161.2.4 2004/07/20 01:45:49 drh Exp $
 */
 #include "sqliteInt.h"
-
 
 /*
 ** Allocate a new Select structure and return a pointer to that
@@ -1347,8 +1343,8 @@ static int multiSelect(Parse *pParse, Select *p, int eDest, int iParm){
         if( rc ) return rc;
         break;
       }
-      /* For UNION ALL ... ORDER BY fall through to the next case */
     }
+    /* FALLTHROUGH */
     case TK_EXCEPT:
     case TK_UNION: {
       int unionTab;    /* Cursor number of the temporary table holding result */

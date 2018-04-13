@@ -533,7 +533,7 @@ mountfs(struct mnttab *mnt)
 	 */
 	if (gflg || findopt(mnt->mnt_mntopts, MNTOPT_GLOBAL)) {
 		if (!(flags & MS_RDONLY)) {
-			if (mnt->mnt_mntopts != '\0')
+			if (mnt->mnt_mntopts[0] != '\0')
 				(void) strcat(mnt->mnt_mntopts, ",");
 			(void) strcat(mnt->mnt_mntopts, MNTOPT_LOGGING);
 			args.flags |= UFSMNT_LOGGING;
@@ -542,7 +542,7 @@ mountfs(struct mnttab *mnt)
 			 * Turn off logging for read only global mounts.
 			 * It was set to logging as default above.
 			 */
-			if (mnt->mnt_mntopts != '\0')
+			if (mnt->mnt_mntopts[0] != '\0')
 				(void) strcat(mnt->mnt_mntopts, ",");
 			(void) strcat(mnt->mnt_mntopts, MNTOPT_NOLOGGING);
 			args.flags &= ~UFSMNT_LOGGING;

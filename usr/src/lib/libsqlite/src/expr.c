@@ -1,6 +1,3 @@
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 ** 2001 September 15
 **
@@ -652,6 +649,7 @@ int sqliteExprResolveIds(
     }
     /* A lone identifier is the name of a columnd.
     */
+    /* FALLTHROUGH */
     case TK_ID: {
       if( lookupName(pParse, 0, 0, &pExpr->token, pSrcList, pEList, pExpr) ){
         return 1;
@@ -894,6 +892,7 @@ int sqliteExprCheck(Parse *pParse, Expr *pExpr, int allowAgg, int *pIsAgg){
         pExpr->dataType = SQLITE_SO_TEXT;
       }
     }
+    /* FALLTHROUGH */
     default: {
       if( pExpr->pLeft ){
         nErr = sqliteExprCheck(pParse, pExpr->pLeft, allowAgg, pIsAgg);
@@ -1081,8 +1080,8 @@ void sqliteExprCode(Parse *pParse, Expr *pExpr){
       if( pParse->db->file_format>=4 && sqliteExprType(pExpr)==SQLITE_SO_TEXT ){
         op += 6;  /* Convert numeric opcodes to text opcodes */
       }
-      /* Fall through into the next case */
     }
+    /* FALLTHROUGH */
     case TK_AND:
     case TK_OR:
     case TK_PLUS:
@@ -1127,6 +1126,7 @@ void sqliteExprCode(Parse *pParse, Expr *pExpr){
       }
       /* Fall through into TK_NOT */
     }
+    /* FALLTHROUGH */
     case TK_BITNOT:
     case TK_NOT: {
       sqliteExprCode(pParse, pExpr->pLeft);

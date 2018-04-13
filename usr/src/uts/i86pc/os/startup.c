@@ -23,7 +23,7 @@
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
- * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2018 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 /*
@@ -446,8 +446,10 @@ static pgcnt_t kphysm_init(page_t *, pgcnt_t);
  * 0xFFFFFFFF.FBC00000  |-----------------------|
  *			|      Kernel Text	|
  * 0xFFFFFFFF.FB800000  |-----------------------|- KERNEL_TEXT
- *			|---       GDT       ---|- GDT page (GDT_VA)
  *			|---    debug info   ---|- debug info (DEBUG_INFO_VA)
+ *			|---       GDT       ---|- GDT page (GDT_VA)
+ *			|---       IDT       ---|- IDT page (IDT_VA)
+ *			|---       LDT       ---|- LDT pages (LDT_VA)
  *			|			|
  *			|      Core heap	| (used for loadable modules)
  * 0xFFFFFFFF.C0000000  |-----------------------|- core_base / ekernelheap
@@ -951,6 +953,17 @@ kpm_init()
 		panic("segkpm_create segkpm");
 
 	rw_exit(&kas.a_lock);
+
+	kpm_enable = 1;
+
+	/*
+	 * As the KPM was disabled while setting up the system, go back and fix
+	 * CPU zero's access to its user page table. This is a bit gross, but
+	 * we have a chicken and egg problem otherwise.
+	 */
+	ASSERT(CPU->cpu_hat_info->hci_user_l3ptes == NULL);
+	CPU->cpu_hat_info->hci_user_l3ptes =
+	    (x86pte_t *)hat_kpm_mapin_pfn(CPU->cpu_hat_info->hci_user_l3pfn);
 }
 
 /*
@@ -1414,6 +1427,9 @@ static void
 startup_kmem(void)
 {
 	extern void page_set_colorequiv_arr(void);
+#if !defined(__xpv)
+	extern uint64_t kpti_kbase;
+#endif
 
 	PRM_POINT("startup_kmem() starting...");
 
@@ -1476,12 +1492,18 @@ startup_kmem(void)
 	*(uintptr_t *)&_userlimit = kernelbase;
 #if defined(__amd64)
 	*(uintptr_t *)&_userlimit -= KERNELBASE - USERLIMIT;
+#if !defined(__xpv)
+	kpti_kbase = kernelbase;
+#endif
 #else
 	*(uintptr_t *)&_userlimit32 = _userlimit;
 #endif
 	PRM_DEBUG(_kernelbase);
 	PRM_DEBUG(_userlimit);
 	PRM_DEBUG(_userlimit32);
+
+	/* We have to re-do this now that we've modified _userlimit. */
+	mmu_calc_user_slots();
 
 	layout_kernel_va();
 
@@ -2121,32 +2143,6 @@ startup_vm(void)
 	if (boothowto & RB_DEBUG)
 		kdi_dvec_memavail();
 
-	/*
-	 * The following code installs a special page fault handler (#pf)
-	 * to work around a pentium bug.
-	 */
-#if !defined(__amd64) && !defined(__xpv)
-	if (x86_type == X86_TYPE_P5) {
-		desctbr_t idtr;
-		gate_desc_t *newidt;
-
-		if ((newidt = kmem_zalloc(MMU_PAGESIZE, KM_NOSLEEP)) == NULL)
-			panic("failed to install pentium_pftrap");
-
-		bcopy(idt0, newidt, NIDT * sizeof (*idt0));
-		set_gatesegd(&newidt[T_PGFLT], &pentium_pftrap,
-		    KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
-
-		(void) as_setprot(&kas, (caddr_t)newidt, MMU_PAGESIZE,
-		    PROT_READ | PROT_EXEC);
-
-		CPU->cpu_idt = newidt;
-		idtr.dtr_base = (uintptr_t)CPU->cpu_idt;
-		idtr.dtr_limit = (NIDT * sizeof (*idt0)) - 1;
-		wr_idtr(&idtr);
-	}
-#endif	/* !__amd64 */
-
 #if !defined(__xpv)
 	/*
 	 * Map page pfn=0 for drivers, such as kd, that need to pick up
@@ -2209,10 +2205,8 @@ startup_vm(void)
 	 * kpm segment
 	 */
 	segmap_kpm = 0;
-	if (kpm_desired) {
+	if (kpm_desired)
 		kpm_init();
-		kpm_enable = 1;
-	}
 
 	/*
 	 * Now create segmap segment.
@@ -2335,12 +2329,18 @@ startup_end(void)
 	xs_domu_init();
 #endif
 
-#if defined(__amd64) && !defined(__xpv)
+#if !defined(__xpv)
 	/*
 	 * Intel IOMMU has been setup/initialized in ddi_impl.c
 	 * Start it up now.
 	 */
 	immu_startup();
+
+	/*
+	 * Now that we're no longer going to drop into real mode for a BIOS call
+	 * via bootops, we can enable PCID (which requires CR0.PG).
+	 */
+	enable_pcid();
 #endif
 
 	PRM_POINT("Enabling interrupts");

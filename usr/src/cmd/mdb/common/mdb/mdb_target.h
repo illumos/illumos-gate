@@ -22,6 +22,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_MDB_TARGET_H
@@ -79,13 +81,12 @@ extern int kmdb_kvm_create(mdb_tgt_t *, int, const char *[]);
 #define	MDB_TGT_F_NOSTOP	0x0020	/* Do not stop target on attach */
 #define	MDB_TGT_F_STEP		0x0040	/* Single-step is pending */
 #define	MDB_TGT_F_STEP_OUT	0x0080	/* Step-out is pending */
-#define	MDB_TGT_F_STEP_BRANCH	0x0100	/* Step-branch is pending */
-#define	MDB_TGT_F_NEXT		0x0200	/* Step-over is pending */
-#define	MDB_TGT_F_CONT		0x0400	/* Continue is pending */
-#define	MDB_TGT_F_BUSY		0x0800	/* Target is busy executing */
-#define	MDB_TGT_F_ASIO		0x1000	/* Use t_aread and t_awrite for i/o */
-#define	MDB_TGT_F_UNLOAD	0x2000	/* Unload has been requested */
-#define	MDB_TGT_F_ALL		0x3fff	/* Mask of all valid flags */
+#define	MDB_TGT_F_NEXT		0x0100	/* Step-over is pending */
+#define	MDB_TGT_F_CONT		0x0200	/* Continue is pending */
+#define	MDB_TGT_F_BUSY		0x0400	/* Target is busy executing */
+#define	MDB_TGT_F_ASIO		0x0800	/* Use t_aread and t_awrite for i/o */
+#define	MDB_TGT_F_UNLOAD	0x1000	/* Unload has been requested */
+#define	MDB_TGT_F_ALL		0x1fff	/* Mask of all valid flags */
 
 typedef int mdb_tgt_ctor_f(mdb_tgt_t *, int, const char *[]);
 
@@ -352,7 +353,6 @@ extern int mdb_tgt_status(mdb_tgt_t *, mdb_tgt_status_t *);
 extern int mdb_tgt_run(mdb_tgt_t *, int, const struct mdb_arg *);
 extern int mdb_tgt_step(mdb_tgt_t *, mdb_tgt_status_t *);
 extern int mdb_tgt_step_out(mdb_tgt_t *, mdb_tgt_status_t *);
-extern int mdb_tgt_step_branch(mdb_tgt_t *, mdb_tgt_status_t *);
 extern int mdb_tgt_next(mdb_tgt_t *, mdb_tgt_status_t *);
 extern int mdb_tgt_continue(mdb_tgt_t *, mdb_tgt_status_t *);
 extern int mdb_tgt_signal(mdb_tgt_t *, int);

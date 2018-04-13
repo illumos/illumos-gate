@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -145,7 +147,7 @@ kbm_remap_window(paddr_t physaddr, int writeable)
 		*((x86pte_t *)pte_to_window) = physaddr | pt_bits;
 	else
 		*((x86pte32_t *)pte_to_window) = physaddr | pt_bits;
-	mmu_tlbflush_entry(window);
+	mmu_invlpg(window);
 #endif
 	DBG(window);
 	return (window);
@@ -195,7 +197,7 @@ kbm_map(uintptr_t va, paddr_t pa, uint_t level, uint_t is_kernel)
 		*ptep = pteval;
 	else
 		*((x86pte32_t *)ptep) = pteval;
-	mmu_tlbflush_entry((caddr_t)va);
+	mmu_invlpg((caddr_t)va);
 #endif
 }
 
@@ -349,7 +351,7 @@ kbm_unmap(uintptr_t va)
 			*ptep = 0;
 		else
 			*((x86pte32_t *)ptep) = 0;
-		mmu_tlbflush_entry((caddr_t)va);
+		mmu_invlpg((caddr_t)va);
 #endif
 	}
 }
@@ -388,7 +390,7 @@ kbm_remap(uintptr_t va, pfn_t pfn)
 		*((x86pte_t *)ptep) = pte_val;
 	else
 		*((x86pte32_t *)ptep) = pte_val;
-	mmu_tlbflush_entry((caddr_t)va);
+	mmu_invlpg((caddr_t)va);
 #endif
 
 	if (!(old_pte & PT_VALID) || ma_to_pa(old_pte) == -1)
@@ -421,7 +423,7 @@ kbm_read_only(uintptr_t va, paddr_t pa)
 		*ptep = pte_val;
 	else
 		*((x86pte32_t *)ptep) = pte_val;
-	mmu_tlbflush_entry((caddr_t)va);
+	mmu_invlpg((caddr_t)va);
 #endif
 }
 
@@ -459,7 +461,7 @@ kbm_pop(void)
 		*((x86pte_t *)pte_to_window) = save_pte;
 	else
 		*((x86pte32_t *)pte_to_window) = save_pte;
-	mmu_tlbflush_entry(window);
+	mmu_invlpg(window);
 #endif
 }
 

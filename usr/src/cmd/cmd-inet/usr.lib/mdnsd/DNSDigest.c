@@ -610,16 +610,21 @@ void md5_block_data_order (MD5_CTX *c, const void *p,int num);
 #define HOST_p_c2l(c,l,n)   {                   \
         switch (n) {                    \
         case 0: l =((unsigned long)(*((c)++)));     \
+	/* FALLTHROUGH */	\
         case 1: l|=((unsigned long)(*((c)++)))<< 8; \
+	/* FALLTHROUGH */	\
         case 2: l|=((unsigned long)(*((c)++)))<<16; \
+	/* FALLTHROUGH */	\
         case 3: l|=((unsigned long)(*((c)++)))<<24; \
         } }
 #define HOST_p_c2l_p(c,l,sc,len) {                  \
         switch (sc) {                   \
         case 0: l =((unsigned long)(*((c)++)));     \
             if (--len == 0) break;                                                 \
+	/* FALLTHROUGH */	\
         case 1: l|=((unsigned long)(*((c)++)))<< 8; \
             if (--len == 0) break;                                                 \
+	/* FALLTHROUGH */	\
         case 2: l|=((unsigned long)(*((c)++)))<<16; \
         } }
 /* NOTE the pointer is not incremented at the end of this */
@@ -627,7 +632,9 @@ void md5_block_data_order (MD5_CTX *c, const void *p,int num);
         l=0; (c)+=n;                    \
         switch (n) {                    \
         case 3: l =((unsigned long)(*(--(c))))<<16; \
+	/* FALLTHROUGH */	\
         case 2: l|=((unsigned long)(*(--(c))))<< 8; \
+	/* FALLTHROUGH */	\
         case 1: l|=((unsigned long)(*(--(c))));     \
         } }
 #define _HOST_l2c(l,c)  (*((c)++)=(unsigned char)(((l)    )&0xff),  \

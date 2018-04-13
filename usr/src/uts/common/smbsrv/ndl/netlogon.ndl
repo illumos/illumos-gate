@@ -36,7 +36,7 @@
  ***********************************************************************
  */
 
-#include "ndrtypes.ndl"
+#include <libmlrpc/ndrtypes.ndl>
 
 
 #define NETR_OPNUM_UasLogon			0x00

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 
@@ -52,6 +53,9 @@ int fb_swtch_silence_lint = 0;
 
 
 #define	DISABLE_PAGING							\
+	movl	%cr4, %eax						;\
+	btrl	$17, %eax	/* clear PCIDE bit */			;\
+	movl	%eax, %cr4						;\
 	movl	%cr0, %eax						;\
 	btrl	$31, %eax	/* clear PG bit */			;\
 	movl	%eax, %cr0
@@ -222,6 +226,7 @@ _start:
 	 * Disable long mode by:
 	 * - shutting down paging (bit 31 of cr0).  This will flush the
 	 *   TLBs.
+	 * - turning off PCID in cr4
 	 * - disabling LME (long mode enable) in EFER (extended feature reg)
 	 */
 #endif

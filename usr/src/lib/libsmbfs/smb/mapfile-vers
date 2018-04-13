@@ -111,7 +111,6 @@ SYMBOL_VERSION SUNWprivate {
 	smb_iod_start;
 	smb_iod_work;
 	smb_lib_init;
-	smb_netshareenum;	# will move to libnetapi
 	smb_open_printer;
 	smb_open_rcfile;
 	smb_simplecrypt;

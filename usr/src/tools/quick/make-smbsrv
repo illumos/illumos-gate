@@ -107,8 +107,9 @@ for lib in \
   libdevid \
   libfakekernel	\
   libgss \
-  libkrb5 \
   libidmap \
+  libkrb5 \
+  libmlrpc \
   libpam \
   libsec \
   libscf \
@@ -164,7 +165,8 @@ do_lib2() {
 for lib in \
   libfakekernel \
   libads \
-  libsmbfs
+  libsmbfs \
+  libmlrpc
 do
   (cd $SRC/lib/$lib && $make $1)
 done
@@ -287,7 +289,7 @@ usr/lib/mdb/kvm/$arch64/smbsrv.so
 usr/lib/reparse/libreparse_smb.so.1
 usr/lib/security/pam_smb_passwd.so.1
 usr/lib/smbsrv/dtrace
-usr/lib/smbsrv/libmlrpc.so.1
+usr/lib/libmlrpc.so.2
 usr/lib/smbsrv/libmlsvc.so.1
 usr/lib/smbsrv/libsmb.so.1
 usr/lib/smbsrv/libsmbns.so.1

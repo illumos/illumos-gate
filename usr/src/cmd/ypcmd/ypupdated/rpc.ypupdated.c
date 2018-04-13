@@ -32,6 +32,7 @@
 #include <sys/time.h>
 #include <sys/file.h>
 #include <ctype.h>
+#define	PORTMAP
 #include <rpc/rpc.h>
 #include <rpc/auth_des.h>
 #include <sys/socket.h>
@@ -54,20 +55,16 @@
 char YPDIR[] = "/var/yp";
 char UPDATEFILE[] = "updaters";
 
-void ypupdate_prog();
-void detachfromtty();
+void ypupdate_prog(struct svc_req *rqstp, SVCXPRT *transp);
+void detachfromtty(void);
 
 static int addr2netname(char *, SVCXPRT *);
-static int issock();
+static int issock(int);
 
 int insecure;
-extern SVCXPRT *svctcp_create(int, uint_t, uint_t);
-extern SVCXPRT *svcudp_create();
 
 int
-main(argc, argv)
-	int argc;
-	char *argv[];
+main(int argc, char *argv[])
 {
 	char *cmd;
 	int connmaxrec = RPC_MAXDATASIZE;
@@ -81,7 +78,7 @@ main(argc, argv)
 	 */
 	if (stat(NTOL_MAP_FILE, &filestat) != -1) {
 		fprintf(stderr, "rpc.updated not supported in NIS to LDAP "
-				"transition mode.");
+		    "transition mode.");
 		exit(1);
 	}
 
@@ -101,6 +98,7 @@ main(argc, argv)
 			insecure = 0;
 			break;
 		}
+		/* FALLTHROUGH */
 	default:
 		fprintf(stderr, "%s: warning -- options ignored\n", cmd);
 		break;
@@ -129,7 +127,7 @@ main(argc, argv)
 			exit(1);
 		}
 		if (!svc_register(transp, YPU_PROG, YPU_VERS, ypupdate_prog,
-				proto)) {
+		    proto)) {
 			fprintf(stderr, "%s: couldn't register service\n", cmd);
 			exit(1);
 		}
@@ -157,8 +155,7 @@ main(argc, argv)
  * Determine if a descriptor belongs to a socket or not
  */
 static int
-issock(fd)
-	int fd;
+issock(int fd)
 {
 	struct stat st;
 
@@ -170,7 +167,7 @@ issock(fd)
 
 
 void
-detachfromtty()
+detachfromtty(void)
 {
 	int tt;
 
@@ -197,9 +194,7 @@ detachfromtty()
 }
 
 void
-ypupdate_prog(rqstp, transp)
-	struct svc_req *rqstp;
-	SVCXPRT *transp;
+ypupdate_prog(struct svc_req *rqstp, SVCXPRT *transp)
 {
 	struct ypupdate_args args;
 	uint_t rslt;
@@ -207,6 +202,9 @@ ypupdate_prog(rqstp, transp)
 	char *netname;
 	char namebuf[MAXNETNAMELEN+1];
 	struct authunix_parms *aup;
+
+	CTASSERT(sizeof (struct authdes_cred) <= RQCRED_SIZE);
+	CTASSERT(sizeof (struct authunix_parms) <= RQCRED_SIZE);
 
 	switch (rqstp->rq_proc) {
 	case NULLPROC:
@@ -229,13 +227,10 @@ ypupdate_prog(rqstp, transp)
 		return;
 	}
 
-	CTASSERT(sizeof (struct authdes_cred) <= RQCRED_SIZE);
-	CTASSERT(sizeof (struct authunix_parms) <= RQCRED_SIZE);
-
 	switch (rqstp->rq_cred.oa_flavor) {
 	case AUTH_DES:
 		netname = ((struct authdes_cred *)
-			rqstp->rq_clntcred)->adc_fullname.name;
+		    rqstp->rq_clntcred)->adc_fullname.name;
 		break;
 	case AUTH_UNIX:
 		if (insecure) {
@@ -251,6 +246,7 @@ ypupdate_prog(rqstp, transp)
 			netname = namebuf;
 			break;
 		}
+		/* FALLTHROUGH */
 	default:
 		svcerr_weakauth(transp);
 		return;
@@ -261,8 +257,8 @@ ypupdate_prog(rqstp, transp)
 		return;
 	}
 	rslt = update(netname,
-		args.mapname, op, args.key.yp_buf_len, args.key.yp_buf_val,
-		args.datum.yp_buf_len, args.datum.yp_buf_val);
+	    args.mapname, op, args.key.yp_buf_len, args.key.yp_buf_val,
+	    args.datum.yp_buf_len, args.datum.yp_buf_val);
 	if (!svc_sendreply(transp, xdr_u_int, (const caddr_t)&rslt)) {
 		debug("svc_sendreply failed");
 	}
@@ -277,14 +273,8 @@ ypupdate_prog(rqstp, transp)
  * if there is no access violation.
  */
 int
-update(requester, mapname, op, keylen, key, datalen, data)
-	char *requester;
-	char *mapname;
-	uint_t op;
-	uint_t keylen;
-	char *key;
-	uint_t datalen;
-	char *data;
+update(char *requester, char *mapname, uint_t op, uint_t keylen, char *key,
+    uint_t datalen, char *data)
 {
 	char updater[MAXMAPNAMELEN + 40];
 	FILE *childargs;
@@ -306,7 +296,7 @@ update(requester, mapname, op, keylen, key, datalen, data)
 	/* check to see if we have a valid mapname */
 	strncpy(fake_key, "junk", 4);
 	err = yp_match(default_domain, mapname,
-			fake_key, strlen(fake_key), &outval, &outval_len);
+	    fake_key, strlen(fake_key), &outval, &outval_len);
 	switch (err) {
 		case 0:
 		case YPERR_KEY:
@@ -353,17 +343,15 @@ update(requester, mapname, op, keylen, key, datalen, data)
 }
 
 #if 0
-addr2netname(namebuf, addr)
-	char *namebuf;
-	struct sockaddr_in *addr;
+addr2netname(char *namebuf, struct sockaddr_in *addr)
 {
 	struct hostent *h;
 
 	h = gethostbyaddr((const char *) &addr->sin_addr,
-				sizeof (addr->sin_addr), AF_INET);
+	    sizeof (addr->sin_addr), AF_INET);
 	if (h == NULL) {
 		host2netname(namebuf, (const char *) inet_ntoa(addr->sin_addr),
-				NULL);
+		    NULL);
 	} else {
 		host2netname(namebuf, h->h_name, NULL);
 	}
@@ -372,9 +360,7 @@ addr2netname(namebuf, addr)
 
 
 static int
-addr2netname(namebuf, transp)
-	char *namebuf;
-	SVCXPRT *transp;
+addr2netname(char *namebuf, SVCXPRT *transp)
 {
 	struct nd_hostservlist *hostservs = NULL;
 	struct netconfig *nconf;
@@ -383,8 +369,7 @@ addr2netname(namebuf, transp)
 	who = svc_getrpccaller(transp);
 	if ((who == NULL) || (who->len == 0))
 		return (-1);
-	if ((nconf = getnetconfigent(transp->xp_netid))
-		== (struct netconfig *)NULL)
+	if ((nconf = getnetconfigent(transp->xp_netid)) == NULL)
 		return (-1);
 	if (netdir_getbyaddr(nconf, &hostservs, who) != 0) {
 		(void) freenetconfigent(nconf);

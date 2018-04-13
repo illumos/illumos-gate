@@ -30,6 +30,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ */
+
 #ifndef _SMBUTIL_COMMON_H
 #define	_SMBUTIL_COMMON_H
 
@@ -42,6 +46,7 @@ extern "C" {
 
 int  cmd_crypt(int argc, char *argv[]);
 int  cmd_help(int argc, char *argv[]);
+int  cmd_info(int argc, char *argv[]);
 int  cmd_login(int argc, char *argv[]);
 int  cmd_logout(int argc, char *argv[]);
 int  cmd_logoutall(int argc, char *argv[]);
@@ -50,8 +55,9 @@ int  cmd_print(int argc, char *argv[]);
 int  cmd_status(int argc, char *argv[]);
 int  cmd_view(int argc, char *argv[]);
 
-/* No crypt_usage? */
+void crypt_usage(void);
 void help_usage(void);
+void info_usage(void);
 void login_usage(void);
 void logout_usage(void);
 void logoutall_usage(void);
@@ -60,7 +66,10 @@ void print_usage(void);
 void status_usage(void);
 void view_usage(void);
 
-extern int loadsmbvfs();
+/* See view.c */
+int share_enum_rap(struct smb_ctx *ctx);
+int share_enum_rpc(struct smb_ctx *ctx, char *server);
+void view_print_share(char *share, int type, char *comment);
 
 #ifdef __cplusplus
 }

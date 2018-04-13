@@ -903,7 +903,7 @@ _chkopts(RSTATUS *prs, CANDIDATE *pc, FSTATUS *pfs)
 		ret |= chk;
 
 	/*
-	 * If the sytem is labeled, then user who wants 'nolabels' must
+	 * If the system is labeled, then user who wants 'nolabels' must
 	 * have PRINT_UNLABELED_AUTH authorizations to allow it.
 	 */
 	if (is_system_labeled() && (wants_nolabels == 1)) {

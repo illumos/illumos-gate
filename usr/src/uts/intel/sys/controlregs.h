@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef	_SYS_CONTROLREGS_H
@@ -88,8 +88,14 @@ extern "C" {
 
 #define	CR3_PCD	0x00000010		/* cache disable 		*/
 #define	CR3_PWT 0x00000008		/* write through 		*/
-
-#define	FMT_CR3	"\20\5pcd\4pwt"
+#if defined(_ASM)
+#define	CR3_NOINVL_BIT	0x8000000000000000
+#else
+#define	CR3_NOINVL_BIT	0x8000000000000000ULL /* no invalidation	*/
+#endif
+#define	PCID_NONE	0x000		/* generic PCID			*/
+#define	PCID_KERNEL	0x000		/* kernel's PCID		*/
+#define	PCID_USER	0x001		/* user-space PCID		*/
 
 /* CR4 Register */
 
@@ -108,12 +114,13 @@ extern "C" {
 					/* 0x1000 reserved */
 #define	CR4_VMXE	0x2000
 #define	CR4_SMXE	0x4000
+#define	CR4_PCIDE	0x20000		/* PCID enable */
 #define	CR4_OSXSAVE	0x40000		/* OS xsave/xrestore support	*/
 #define	CR4_SMEP	0x100000	/* NX for user pages in kernel */
 #define	CR4_SMAP	0x200000	/* kernel can't access user pages */
 
 #define	FMT_CR4						\
-	"\20\26smap\25smep\23osxsav"			\
+	"\20\26smap\25smep\23osxsav\22pcide"		\
 	"\17smxe\16vmxe\13xmme\12fxsr\11pce\10pge"	\
 	"\7mce\6pae\5pse\4de\3tsd\2pvi\1vme"
 

@@ -26,7 +26,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2015 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018 Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2017 by Delphix. All rights reserved.
  */
@@ -2741,11 +2741,6 @@ cmd_step(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (strcmp(argv->a_un.a_str, "out") == 0) {
 			func = &mdb_tgt_step_out;
 			name = "step (out)";
-			argv++;
-			argc--;
-		} else if (strcmp(argv->a_un.a_str, "branch") == 0) {
-			func = &mdb_tgt_step_branch;
-			name = "step (branch)";
 			argv++;
 			argc--;
 		} else if (strcmp(argv->a_un.a_str, "over") == 0) {

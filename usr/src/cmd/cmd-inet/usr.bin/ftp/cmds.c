@@ -36,9 +36,6 @@
  *	contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 /*
  * FTP User Program -- Command Routines.
  */
@@ -1941,7 +1938,7 @@ domap(char *name)
 					cp2 += len2;	/* Consume wide char */
 				break;
 			}
-			/* intentional drop through */
+			/* FALLTHROUGH */
 		default:
 			if (wc2 != wc1)
 				match = 0;
@@ -2074,7 +2071,7 @@ LOOP:
 				cp2++;
 				break;
 			}
-			/* intentional drop through */
+			/* FALLTHROUGH */
 		default:
 			if ((len2 = mblen(cp2, MB_CUR_MAX)) <= 0)
 				len2 = 1;

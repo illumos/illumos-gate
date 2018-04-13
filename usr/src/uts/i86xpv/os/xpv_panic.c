@@ -23,6 +23,8 @@
  * Copyright 2016 PALO, Richard.
  *
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -174,7 +176,7 @@ xpv_panic_map(int level, pfn_t pfn)
 		*(x86pte32_t *)pteptr = pte;
 	XPV_DISALLOW_PAGETABLE_UPDATES();
 
-	mmu_tlbflush_entry(PWIN_VA(level));
+	mmu_flush_tlb_page((uintptr_t)PWIN_VA(level));
 }
 
 /*

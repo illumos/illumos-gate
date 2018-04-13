@@ -862,7 +862,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;
 		}
 
-		if ((apid_n = ibnex_get_apid(dcp)) == '\0') {
+		if ((apid_n = ibnex_get_apid(dcp)) == NULL) {
 			IBTF_DPRINTF_L2("ibnex",
 			    "%s: ibnex_get_apid failed", msg);
 			rv = EIO;
@@ -970,7 +970,7 @@ ibnex_devctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;
 		}
 
-		if ((apid_n = ibnex_get_apid(dcp)) == '\0') {
+		if ((apid_n = ibnex_get_apid(dcp)) == NULL) {
 			IBTF_DPRINTF_L2("ibnex",
 			    "%s: ibnex_get_apid failed", msg);
 			rv = EIO;

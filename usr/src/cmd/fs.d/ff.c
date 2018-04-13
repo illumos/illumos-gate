@@ -28,9 +28,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<stdio.h>
+#include	<stdlib.h>
 #include 	<limits.h>
 #include	<string.h>
 #include	<sys/fstyp.h>
