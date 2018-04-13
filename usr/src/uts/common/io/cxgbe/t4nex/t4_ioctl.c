@@ -44,6 +44,7 @@ static int read_cim_la(struct adapter *sc, void *data, int flags);
 static int read_cim_qcfg(struct adapter *sc, void *data, int flags);
 static int read_cim_ibq(struct adapter *sc, void *data, int flags);
 static int read_edc(struct adapter *sc, void *data, int flags);
+static int flash_fw(struct adapter *, void *, int);
 
 int
 t4_ioctl(struct adapter *sc, int cmd, void *data, int mode)
@@ -88,6 +89,9 @@ t4_ioctl(struct adapter *sc, int cmd, void *data, int mode)
 		break;
 	case T4_IOCTL_GET_EDC:
 		rc = read_edc(sc, data, mode);
+		break;
+	case T4_IOCTL_LOAD_FW:
+		rc = flash_fw(sc, data, mode);
 		break;
 	default:
 		return (EINVAL);
@@ -1426,9 +1430,11 @@ get_devlog(struct adapter *sc, void *data, int flags)
 		goto done1;
 
 	/* Copyout device log buffer and then carrier buffer */
-	if (ddi_copyout(buf, dl.data, dl.len, flags) < 0)
+	if (ddi_copyout(buf, (void *)((uintptr_t)data + sizeof(dl)), dl.len,
+	    flags) < 0)
 		rc = EFAULT;
-	else if (ddi_copyout(&dl, data, sizeof (dl), flags) < 0)
+
+	if (ddi_copyout(&dl, data, sizeof(dl), flags) < 0)
 		rc = EFAULT;
 
 done1:
@@ -1633,5 +1639,39 @@ read_mbox(struct adapter *sc, void *data, int flags)
 	kmem_free(buf, t4mbox.len);
 
 _exit:
+	return (rc);
+}
+
+static int
+flash_fw(struct adapter *sc, void *data, int flags)
+{
+	unsigned int mbox = M_PCIE_FW_MASTER + 1;
+	struct t4_ldfw fw;
+	u8 *ptr = NULL;
+	int rc = 0;
+
+	if (ddi_copyin(data, &fw, sizeof(struct t4_ldfw), flags) < 0)
+		return EFAULT;
+
+	if (!fw.len)
+		return EINVAL;
+
+	ptr = (u8 *)kmem_zalloc(fw.len, KM_NOSLEEP);
+	if (ptr == NULL)
+		return ENOMEM;
+
+	if (ddi_copyin((void *)((uintptr_t)data + sizeof(fw)), ptr, fw.len,
+	    flags) < 0) {
+		kmem_free(ptr, fw.len);
+		return EFAULT;
+	}
+
+	if (sc->flags & FULL_INIT_DONE)
+		mbox = sc->mbox;
+
+	rc = -t4_fw_upgrade(sc, mbox, ptr, fw.len, true);
+
+	kmem_free(ptr, fw.len);
+
 	return (rc);
 }

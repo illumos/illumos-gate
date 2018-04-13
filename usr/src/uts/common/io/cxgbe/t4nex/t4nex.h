@@ -42,6 +42,7 @@ extern "C" {
 #define	T4_IOCTL_GET_CIM_QCFG	(T4_IOCTL + 12)
 #define	T4_IOCTL_GET_CIM_IBQ	(T4_IOCTL + 13)
 #define	T4_IOCTL_GET_EDC	(T4_IOCTL + 14)
+#define	T4_IOCTL_LOAD_FW	(T4_IOCTL + 15)
 
 enum {
 	T4_CTXT_EGRESS,
@@ -115,7 +116,12 @@ struct t4_cim_qcfg {
 #define	T4_DEVLOG_SIZE	32768
 struct t4_devlog {
 	uint32_t len;
-	uint8_t  *data;
+	uint32_t data[0];
+};
+
+struct t4_ldfw {
+	uint32_t len;
+	uint32_t data[0];
 };
 
 #ifdef __cplusplus
