@@ -4700,6 +4700,8 @@ f usr/lib/adb/adbgen1 0755 root sys
 f usr/lib/adb/adbgen3 0755 root sys
 f usr/lib/adb/adbgen4 0755 root sys
 f usr/lib/adb/adbsub.o 0644 root sys
+d usr/lib/ahci 0755 root sys
+f usr/lib/ahci/ahciem 0555 root bin
 d usr/lib/adb/amd64 0755 root sys
 f usr/lib/adb/amd64/adbsub.o 0644 root sys
 d usr/lib/amd64 0755 root bin
