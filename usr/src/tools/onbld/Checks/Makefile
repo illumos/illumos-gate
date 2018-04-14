@@ -44,11 +44,12 @@ PYSRCS = \
 	Mapfile.py	\
 	ProcessCheck.py \
 	SpellCheck.py \
+	WsCheck.py \
 	__init__.py
 
 PYOBJS =	$(PYSRCS:%.py=%.pyc)
 PYTOPDIR =	$(ROOTONBLDLIB)
-PYMODDIR = 	onbld/Checks
+PYMODDIR =	onbld/Checks
 
 include ../../Makefile.python
 

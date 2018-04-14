@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!@PYTHON@
 #
 # CDDL HEADER START
 #
@@ -21,26 +21,34 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-# Copyright 2010, Richard Lowe
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-
 #
-# The 'checks' package contains various checks that may be run
+# Check file for whitespace issues
+# (space tab, trailing space)
 #
 
-__all__ = [
-	'Cddl',
-	'Comments',
-	'Copyright',
-	'CStyle',
-	'HdrChk',
-	'JStyle',
-	'Keywords',
-	'ManLint',
-	'Mapfile',
-	'SpellCheck',
-	'WsCheck']
+import sys, os
+
+sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
+                                "python%d.%d" % sys.version_info[:2]))
+
+# Allow running from the source tree, using the modules in the source tree
+sys.path.insert(2, os.path.join(os.path.dirname(__file__), '..'))
+
+from onbld.Checks.WsCheck import wscheck
+
+ret = 0
+for filename in sys.argv[1:]:
+	try:
+		fh = open(filename, 'r')
+	except IOError, e:
+		sys.stderr.write("failed to open '%s': %s\n" %
+				 (e.filename, e.strerror))
+                continue
+
+	ret |= wscheck(fh, output=sys.stderr)
+	fh.close()
+
+sys.exit(ret)

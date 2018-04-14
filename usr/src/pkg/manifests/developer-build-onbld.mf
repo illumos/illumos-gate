@@ -120,6 +120,7 @@ file path=opt/onbld/bin/wdiff mode=0555
 file path=opt/onbld/bin/webrev mode=0555
 file path=opt/onbld/bin/which_scm mode=0555
 file path=opt/onbld/bin/ws mode=0555
+file path=opt/onbld/bin/wscheck mode=0555
 file path=opt/onbld/bin/wsdiff mode=0555
 file path=opt/onbld/bin/xref mode=0555
 file path=opt/onbld/bin/xref.mk
@@ -184,6 +185,10 @@ file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/ProcessCheck.pyc \
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/SpellCheck.py \
     mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/SpellCheck.pyc \
+    mode=0444
+file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/WsCheck.py \
+    mode=0444
+file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/WsCheck.pyc \
     mode=0444
 file path=opt/onbld/lib/python$(PYTHON_VERSION)/onbld/Checks/__init__.py \
     mode=0444
