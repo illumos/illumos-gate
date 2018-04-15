@@ -162,11 +162,13 @@ auto_lookup_aux(fnnode_t *fnp, char *name, cred_t *cred)
 	bzero(&link, sizeof (link));
 	error = auto_lookup_request(fnip, name, &link, TRUE, &mountreq, cred);
 	if (!error) {
-		if (link.link != NULL || link.link != '\0') {
+		if (link.link != NULL) {
+			error = ENOENT;
 			/*
 			 * This node should be a symlink
 			 */
-			error = auto_perform_link(fnp, &link, cred);
+			if (*link.link != '\0')
+				error = auto_perform_link(fnp, &link, cred);
 		} else if (mountreq) {
 			/*
 			 * The automount daemon is requesting a mount,
