@@ -115,6 +115,7 @@ typedef struct smbmntinfo {
 	struct vfs		*smi_vfsp;	/* mount back pointer to vfs */
 	struct smbnode		*smi_root;	/* the root node */
 	struct smb_share	*smi_share;	/* netsmb SMB share conn data */
+	struct taskq		*smi_taskq;	/* for async work */
 	kmutex_t		smi_lock;	/* mutex for flags, etc. */
 	uint32_t		smi_flags;	/* NFS-derived flag bits */
 	uint32_t		smi_status;	/* status bits for this mount */

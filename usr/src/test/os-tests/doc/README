@@ -36,7 +36,7 @@ and the testrunner without running a full nightly:
 Then set the publisher on the test machine to point to your repository and
 install the OS Unit Test Suite.
 
-	test_machine# pkg install pkg:/system/test/zfstest
+	test_machine# pkg install pkg:/system/test/ostest
 
 Note, the framework will be installed automatically, as the OS Unit Test Suite
 depends on it.
