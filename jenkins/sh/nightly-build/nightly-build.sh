@@ -179,6 +179,7 @@ log_must nightly_env_set_var "ON_CLOSED_BINS" "$OPENZFS_DIRECTORY/closed"
 log_must nightly_env_set_var "ENABLE_IPP_PRINTING" "#"
 log_must nightly_env_set_var "ENABLE_SMB_PRINTING" "#"
 log_must nightly_env_set_var "VERSION" "$BUILD_VERSION"
+log_must nightly_env_set_var "TMPDIR" "/var/tmp"
 
 log_must cp usr/src/tools/scripts/nightly.sh .
 log_must chmod +x nightly.sh
