@@ -151,6 +151,7 @@ uint32_t (*psm_get_localapicid)(uint32_t) = NULL;
 uchar_t (*psm_xlate_vector_by_irq)(uchar_t) = NULL;
 int (*psm_get_pir_ipivect)(void) = NULL;
 void (*psm_send_pir_ipi)(processorid_t) = NULL;
+void (*psm_cmci_setup)(processorid_t, boolean_t) = NULL;
 
 int (*psm_clkinit)(int) = NULL;
 void (*psm_timer_reprogram)(hrtime_t) = NULL;
@@ -1158,6 +1159,7 @@ mach_smpinit(void)
 	psm_get_ipivect = pops->psm_get_ipivect;
 	psm_get_pir_ipivect = pops->psm_get_pir_ipivect;
 	psm_send_pir_ipi = pops->psm_send_pir_ipi;
+	psm_cmci_setup = pops->psm_cmci_setup;
 
 
 	(void) add_avintr((void *)NULL, XC_HI_PIL, xc_serv, "xc_intr",

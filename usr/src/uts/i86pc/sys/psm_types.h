@@ -194,6 +194,7 @@ struct 	psm_ops {
 
 	int	(*psm_get_pir_ipivect)(void);
 	void	(*psm_send_pir_ipi)(processorid_t cpu);
+	void	(*psm_cmci_setup)(processorid_t cpu, boolean_t);
 #endif
 };
 

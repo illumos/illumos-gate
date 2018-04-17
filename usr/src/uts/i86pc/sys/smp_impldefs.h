@@ -76,6 +76,7 @@ extern uint32_t (*psm_get_localapicid)(uint32_t);	/* get local-apic id */
 extern uchar_t (*psm_xlate_vector_by_irq)(uchar_t); /* get vector for an irq */
 extern int (*psm_get_pir_ipivect)(void); /* get PIR (for VMM) ipi vect	*/
 extern void (*psm_send_pir_ipi)(processorid_t);	/* send PIR ipi		*/
+extern void (*psm_cmci_setup)(processorid_t, boolean_t); /* Control CPU CMCI */
 
 extern int (*slvltovect)(int);	/* ipl interrupt priority level		*/
 extern int (*setlvl)(int, int *); /* set intr pri represented by vect	*/

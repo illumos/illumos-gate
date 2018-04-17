@@ -189,7 +189,7 @@ extern void	apic_send_pir_ipi(processorid_t);
 
 extern int apic_error_intr();
 extern void apic_cpcovf_mask_clear(void);
-extern int cmci_cpu_setup(cpu_setup_t what, int cpuid, void *arg);
+extern void apic_cmci_setup(processorid_t, boolean_t);
 extern void apic_intrmap_init(int apic_mode);
 extern processorid_t apic_find_cpu(int flag);
 extern processorid_t apic_get_next_bind_cpu(void);

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -145,6 +146,15 @@ gcpu_post_startup(cmi_hdl_t hdl)
 	 * be run on cpu 0 so we can assure that by starting from here.
 	 */
 	gcpu_mca_poll_start(hdl);
+#else
+	/*
+	 * The boot CPU has a bit of a chicken and egg problem for CMCI. Its MCA
+	 * initialization is run before we have initialized the PSM module that
+	 * we would use for enabling CMCI. Therefore, we use this as a chance to
+	 * enable CMCI for the boot CPU. For all other CPUs, this chicken and
+	 * egg problem will have already been solved.
+	 */
+	gcpu_mca_cmci_enable(hdl);
 #endif
 }
 

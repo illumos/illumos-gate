@@ -203,6 +203,7 @@ static struct	psm_ops apic_ops = {
 
 	apic_get_pir_ipivect,
 	apic_send_pir_ipi,
+	apic_cmci_setup,
 };
 
 struct psm_ops *psmops = &apic_ops;
@@ -428,31 +429,21 @@ apic_init_intr(void)
 		apic_reg_ops->apic_write(APIC_ERROR_STATUS, 0);
 	}
 
-	/* Enable CMCI interrupt */
-	if (cmi_enable_cmci) {
+	/*
+	 * Ensure a CMCI interrupt is allocated, regardless of whether it is
+	 * enabled or not.
+	 */
+	if (apic_cmci_vect == 0) {
+		const int ipl = 0x2;
+		int irq = apic_get_ipivect(ipl, -1);
 
-		mutex_enter(&cmci_cpu_setup_lock);
-		if (cmci_cpu_setup_registered == 0) {
-			mutex_enter(&cpu_lock);
-			register_cpu_setup_func(cmci_cpu_setup, NULL);
-			mutex_exit(&cpu_lock);
-			cmci_cpu_setup_registered = 1;
-		}
-		mutex_exit(&cmci_cpu_setup_lock);
+		ASSERT(irq != -1);
+		apic_cmci_vect = apic_irq_table[irq]->airq_vector;
+		ASSERT(apic_cmci_vect);
 
-		if (apic_cmci_vect == 0) {
-			int ipl = 0x2;
-			int irq = apic_get_ipivect(ipl, -1);
-
-			ASSERT(irq != -1);
-			apic_cmci_vect = apic_irq_table[irq]->airq_vector;
-			ASSERT(apic_cmci_vect);
-
-			(void) add_avintr(NULL, ipl,
-			    (avfunc)cmi_cmci_trap,
-			    "apic cmci intr", irq, NULL, NULL, NULL, NULL);
-		}
-		apic_reg_ops->apic_write(APIC_CMCI_VECT, apic_cmci_vect);
+		(void) add_avintr(NULL, ipl,
+		    (avfunc)cmi_cmci_trap,
+		    "apic cmci intr", irq, NULL, NULL, NULL, NULL);
 	}
 }
 

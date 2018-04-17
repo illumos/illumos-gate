@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -94,7 +95,8 @@ gcpu_ntv_mca_poll(cmi_hdl_t hdl, int what)
 	ASSERT(MUTEX_HELD(&gcpu->gcpu_shared->gcpus_poll_lock));
 
 	/* Enable CMCI in first poll if is supported */
-	if (cmi_enable_cmci && (!mca->gcpu_mca_first_poll_cmci_enabled)) {
+	if ((mca->gcpu_mca_flags & GCPU_MCA_F_CMCI_ENABLE) != 0 &&
+	    (!mca->gcpu_mca_first_poll_cmci_enabled)) {
 		int i;
 		uint64_t ctl2;
 

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -49,6 +50,7 @@
 #include <sys/fm/smb/fmsmb.h>
 #include <sys/sysevent.h>
 #include <sys/ontrap.h>
+#include <sys/smp_impldefs.h>
 
 #include "gcpu.h"
 
@@ -82,6 +84,12 @@ int gcpu_mca_telemetry_retries = 5;
 #ifndef __xpv
 int gcpu_mca_cmci_throttling_threshold = 10;
 int gcpu_mca_cmci_reenable_threshold = 1000;
+
+/*
+ * This is used to determine whether or not we have registered the CMCI CPU
+ * setup function. This is protected by cpu_lock.
+ */
+static boolean_t gcpu_mca_cpu_registered = B_FALSE;
 #endif
 
 static gcpu_error_disp_t gcpu_errtypes[] = {
@@ -1031,6 +1039,83 @@ gcpu_errorq_init(size_t datasz)
 
 static uint_t global_nbanks;
 
+#ifndef __xpv
+/*ARGSUSED*/
+int
+gcpu_cmci_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
+{
+	/*
+	 * In general, we'd expect that in a multi-socket configuration, either
+	 * all CPUs would support CMCI or none of them would.  Unfortunately,
+	 * that may not be the case in the wild.  While we'd rather check the
+	 * handle's enablement state here, that itself is a bit complicated. We
+	 * don't have a guarantee in a heterogenous situation that the CPU in
+	 * question is using the generic CPU module or not, even though we've
+	 * been registered. As such, we allow the interrupt to be registered and
+	 * written to the local apic anyways. We won't have a CMCI interrupt
+	 * generated anyways because the MCA banks will not be programmed as
+	 * such for that CPU by the polling thread.
+	 */
+	switch (what) {
+	case CPU_ON:
+		psm_cmci_setup(cpuid, B_TRUE);
+		break;
+	case CPU_OFF:
+		psm_cmci_setup(cpuid, B_FALSE);
+		break;
+	default:
+		break;
+	}
+
+	return (0);
+}
+
+void
+gcpu_mca_cmci_enable(cmi_hdl_t hdl)
+{
+	gcpu_data_t *gcpu = cmi_hdl_getcmidata(hdl);
+	gcpu_mca_t *mca = &gcpu->gcpu_mca;
+
+	/*
+	 * If this CPU doesn't support CMCI, don't do anything.
+	 */
+	if ((mca->gcpu_mca_flags & GCPU_MCA_F_CMCI_CAPABLE) == 0)
+		return;
+
+	/*
+	 * If we don't have support from the PSM module, then there's nothing we
+	 * can do. Note that this changes as we start up the system. The only
+	 * case where it may be mistakenly NULL is for the boot CPU. The boot
+	 * CPU will have this taken care of for it in gcpu_post_startup(), once
+	 * we know for certain whether or not the PSM module supports CMCI.
+	 */
+	if (psm_cmci_setup == NULL) {
+		return;
+	}
+
+	mca->gcpu_mca_flags |= GCPU_MCA_F_CMCI_ENABLE;
+	if (MUTEX_HELD(&cpu_lock)) {
+		if (!gcpu_mca_cpu_registered) {
+			register_cpu_setup_func(gcpu_cmci_cpu_setup, NULL);
+			gcpu_mca_cpu_registered = B_TRUE;
+		}
+	} else {
+		mutex_enter(&cpu_lock);
+		if (!gcpu_mca_cpu_registered) {
+			register_cpu_setup_func(gcpu_cmci_cpu_setup, NULL);
+			gcpu_mca_cpu_registered = B_TRUE;
+		}
+		mutex_exit(&cpu_lock);
+	}
+
+	/*
+	 * Call the PSM op to make sure that we initialize things on
+	 * this CPU.
+	 */
+	psm_cmci_setup(cmi_hdl_logical_id(hdl), B_TRUE);
+}
+#endif	/* !__xpv */
+
 void
 gcpu_mca_init(cmi_hdl_t hdl)
 {
@@ -1257,8 +1342,10 @@ gcpu_mca_init(cmi_hdl_t hdl)
 	}
 
 #ifndef __xpv
-	if (cmci_capable)
-		cmi_enable_cmci = 1;
+	if (cmci_capable) {
+		mca->gcpu_mca_flags |= GCPU_MCA_F_CMCI_CAPABLE;
+		gcpu_mca_cmci_enable(hdl);
+	}
 #endif
 
 #ifndef __xpv

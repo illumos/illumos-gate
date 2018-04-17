@@ -897,6 +897,7 @@ static struct psm_ops xen_uppc_ops = {
 
 	(int (*)(void))NULL,			/* psm_get_pir_ipivect	*/
 	(void (*)(processorid_t))NULL,		/* psm_send_pir_ipi	*/
+	(void (*)(processorid_t, boolean_t))NULL	/* psm_cmci_setup */
 };
 
 static struct psm_info xen_uppc_info = {
