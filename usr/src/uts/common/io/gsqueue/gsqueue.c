@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -72,7 +72,7 @@
  * described in `gs_ncpus`. The ordering of `gs_cpus` is unimportant.  When
  * there is no longer a need for a given binding (see the following section for
  * more explanation on when this is the case) then we move the entry to the
- * `gs_defunct` list which is just a singly linked list of gsqueue_cpu_t.
+ * `gs_defunct` list which is just a list_t of gsqueue_cpu_t.
  *
  * In addition, each gsqueue_set_t can have a series of callbacks registered
  * with it. These are described in the following section. Graphically, a given
@@ -166,7 +166,7 @@ typedef struct gsqueue_cb {
 } gsqueue_cb_t;
 
 typedef struct gsqueue_cpu {
-	struct gsqueue_cpu *gqc_next;
+	list_node_t gqc_lnode;
 	squeue_t *gqc_head;
 	processorid_t gqc_cpuid;
 } gsqueue_cpu_t;
@@ -177,7 +177,7 @@ struct gsqueue_set {
 	kmutex_t gs_lock;
 	int gs_ncpus;
 	gsqueue_cpu_t **gs_cpus;
-	gsqueue_cpu_t *gs_defunct;
+	list_t gs_defunct;
 	gsqueue_cb_t *gs_cbs;
 };
 
@@ -194,7 +194,7 @@ gsqueue_cpu_create(pri_t wpri, processorid_t cpuid)
 
 	scp = kmem_cache_alloc(gsqueue_cpu_cache, KM_SLEEP);
 
-	scp->gqc_next = NULL;
+	list_link_init(&scp->gqc_lnode);
 	scp->gqc_cpuid = cpuid;
 	scp->gqc_head = squeue_create(wpri, B_FALSE);
 	scp->gqc_head->sq_state = SQS_DEFAULT;
@@ -268,8 +268,7 @@ gsqueue_set_destroy(gsqueue_set_t *gssp)
 	for (i = 0; i < gssp->gs_ncpus; i++) {
 		scp = gssp->gs_cpus[i];
 		squeue_unbind(scp->gqc_head);
-		scp->gqc_next = gssp->gs_defunct;
-		gssp->gs_defunct = scp;
+		list_insert_tail(&gssp->gs_defunct, scp);
 		gssp->gs_cpus[i] = NULL;
 	}
 	gssp->gs_ncpus = 0;
@@ -277,11 +276,7 @@ gsqueue_set_destroy(gsqueue_set_t *gssp)
 	mutex_exit(&gssp->gs_lock);
 	mutex_exit(&cpu_lock);
 
-	while (gssp->gs_defunct != NULL) {
-		gsqueue_cpu_t *scp;
-
-		scp = gssp->gs_defunct;
-		gssp->gs_defunct = scp->gqc_next;
+	while ((scp = list_remove_head(&gssp->gs_defunct)) != NULL) {
 		gsqueue_cpu_destroy(scp);
 	}
 
@@ -293,9 +288,9 @@ gsqueue_set_destroy(gsqueue_set_t *gssp)
 		kmem_cache_free(gsqueue_cb_cache, cbp);
 	}
 
-	ASSERT(gssp->gs_ncpus == 0);
-	ASSERT(gssp->gs_defunct == NULL);
-	ASSERT(gssp->gs_cbs == NULL);
+	ASSERT3U(gssp->gs_ncpus, ==, 0);
+	ASSERT3P(list_head(&gssp->gs_defunct), ==, NULL);
+	ASSERT3P(gssp->gs_cbs, ==, NULL);
 	kmem_cache_free(gsqueue_set_cache, gssp);
 }
 
@@ -404,11 +399,12 @@ gsqueue_handle_online(processorid_t id)
 		gsqueue_cpu_t *scp;
 
 		mutex_enter(&gssp->gs_lock);
-		scp = gssp->gs_defunct;
-		while (scp != NULL) {
-			if (scp->gqc_cpuid == id)
+		for (scp = list_head(&gssp->gs_defunct); scp != NULL;
+		    scp = list_next(&gssp->gs_defunct, scp)) {
+			if (scp->gqc_cpuid == id) {
+				list_remove(&gssp->gs_defunct, scp);
 				break;
-			scp = scp->gqc_next;
+			}
 		}
 
 		if (scp == NULL) {
@@ -416,6 +412,7 @@ gsqueue_handle_online(processorid_t id)
 		} else {
 			squeue_bind(scp->gqc_head, id);
 		}
+
 		ASSERT(gssp->gs_ncpus < NCPU);
 		gssp->gs_cpus[gssp->gs_ncpus] = scp;
 		gssp->gs_ncpus++;
@@ -447,8 +444,7 @@ gsqueue_handle_offline(processorid_t id)
 
 		if (scp != NULL) {
 			squeue_unbind(scp->gqc_head);
-			scp->gqc_next = gssp->gs_defunct;
-			gssp->gs_defunct = scp;
+			list_insert_tail(&gssp->gs_defunct, scp);
 			gssp->gs_cpus[i] = gssp->gs_cpus[gssp->gs_ncpus-1];
 			gssp->gs_ncpus--;
 			gsqueue_notify(gssp, scp->gqc_head, B_FALSE);
@@ -498,8 +494,9 @@ gsqueue_set_cache_construct(void *buf, void *arg, int kmflags)
 		return (-1);
 
 	mutex_init(&gssp->gs_lock, NULL, MUTEX_DRIVER, NULL);
+	list_create(&gssp->gs_defunct, sizeof (gsqueue_cpu_t),
+	    offsetof(gsqueue_cpu_t, gqc_lnode));
 	gssp->gs_ncpus = 0;
-	gssp->gs_defunct = NULL;
 	gssp->gs_cbs = NULL;
 
 	return (0);
@@ -513,6 +510,7 @@ gsqueue_set_cache_destruct(void *buf, void *arg)
 
 	kmem_free(gssp->gs_cpus, sizeof (gsqueue_cpu_t *) * NCPU);
 	gssp->gs_cpus = NULL;
+	list_destroy(&gssp->gs_defunct);
 	mutex_destroy(&gssp->gs_lock);
 }
 
