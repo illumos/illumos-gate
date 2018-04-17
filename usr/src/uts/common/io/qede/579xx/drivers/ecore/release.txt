@@ -1,0 +1,6690 @@
+﻿                          ============================
+                           R E L E A S E    N O T E S
+                          ============================
+                                     ECORE
+
+Version 8.18.19.0 (Mar DD, 2017)
+================================
+Internal FW 8.18.19.0
+
+Fixes:
+------
+ 1. Problem:    CQ92630 - NULL pointer dereference in query stats flow
+                during load/unload.
+
+    Change:     Introduce locking scheme to avoid race.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE / iWARP.
+
+Version 8.18.18.0 (Mar 22, 2017)
+================================
+Internal FW 8.18.19.0
+
+Fixes:
+------
+ 1. Problem:    The MFW might be still running for a short while after
+                responding to a halt mailbox command.
+
+    Change:     Verify that the MCP is in a soft halt state, after sending the
+                command and before proceeding.
+
+    Introduced: 8.5.3.0.
+
+    Relevance:  GRC dump / MCP trace.
+
+ 2. Problem:    CQ92434 - system crash after loading qedr with MTU=128.
+
+    Change:     Fix calculation of number of ooo rx buffers and limit to 16K.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 3. Problem:    CQ91521 - System hits assertion while trying to modify Jumbo
+                MTU settings on PF with VFs enumerated.
+
+    Change:     OSAL_IOV_VF_VPORT_STOP is introduced to allow upper-client to
+                execute required operations before closing vport.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 4. Problem:    CQ91595 - Firmware stop sending packets for some time after
+                getting consecutive PFC packets.
+
+    Change:     [FW] Increase the threshold for PAUSE_TOO_LONG interrupt.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE, RoCE.
+
+ 5. Problem:    CQ92301, CQ92431, CQ92465 - Firmware assertion may happen when
+                opening or closing many connections.
+
+    Change:     [FW] Fix a race condition in Firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP, iSCSI, FCoE.
+
+ 6. Problem:    CQ92424 - When peer is unreachable, connection tear-down may
+                take ~45 seconds.
+
+    Change:     [FW] Decrease threshold for maximum count of retransmissions
+                before reporting an error.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 7. Problem:    CQ92054 - FW assertion may happen on a race condition where RST
+                arrives after MPA request.
+
+    Change:     [FW] Defer RST reporting until offloading MPA connection.
+
+    Introduced: FW 8.18.16.0.
+
+    Relevance:  iWARP.
+
+ 8. Problem:    MPA Reject lead to leak of free eps.
+
+    Change:     Return ep object to free list in reject flow.
+
+    Introduced: 8.18.17.0.
+
+    Relevance:  iWARP.
+
+Version 8.18.17.0 (Mar 15, 2017)
+================================
+Internal FW 8.18.18.0
+
+Fixes:
+------
+ 1. Problem:    CQ91975 - memory leak.
+
+    Change:     Fix memory leaks in destroy qp and driver unload
+                flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 2. Problem:    CQ92275 - Can't create number of qps requested.
+
+    Change:     When allocating resources take into account additional
+                preallocated cids and make sure requested number of qps
+                is available.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 3. Problem:    STAG value received from the MFW is not propagated to firmware.
+
+    Change:     Send updated STAG configuration to the Firmware.
+
+    Introduced: 8.18.6.0.
+
+    Relevance:  STAG update from MFW.
+
+ 4. Problem:    CQ92152 - FW assert - BDQ fetch time exceeded maximum.
+
+    Change:     [FW] Fix BDQ fetch flow.
+
+    Introduced: FW 8.14.6.0.
+
+    Relevance:  iSCSI, FCoE.
+
+ 5. Problem:    FW assert may happen if there are unaligned PDUs on a connection
+                that was re-established.
+
+    Change:     [FW] Give indication to the driver that connection was closed so
+                all connections' resources will be deleted.
+
+    Introduced: FW 8.14.6.0.
+
+    Relevance:  iWARP.
+
+ 6. Problem:    CQ92540 - MPA Reject lead to the 4-tuple not being freed from
+                the connection list, this lead to the same 4-tuple connection
+                request to be dropped.
+
+    Change:     Handle reject flow properly.
+
+    Introduced: 8.18.16.0.
+
+    Relevance:  iWARP.
+
+Enhancements:
+-------------
+ 1. Request:    iWARP - Handle flush completion on unaligned ll2 connection.
+
+Version 8.18.16.0 (Mar 08, 2017)
+================================
+Internal FW 8.18.17.0
+
+Fixes:
+------
+ 1. Problem:    Possible division by 0 when the number of active ports is 0.
+
+    Change:     Have a default value of 1.
+
+    Introduced: Day 1.
+
+    Relevance:  AH.
+
+ 2. Problem:    AH VFs always have MSI-x table of 17 entries.
+
+    Change:     Make sure all child VFs of the same PF have same MSI-x number.
+
+    Introduced: Day 1.
+
+    Relevance:  AH SRIOV.
+
+ 3. Problem:    CQ92058 - HW attention may occur when opening many connections.
+
+    Change:     [FW] Fix connection establishment flow.
+
+    Introduced: FW 8.14.7.0.
+
+    Relevance:  iWARP.
+
+ 4. Problem:    FW assertion may happen during closing a connection after an
+                error detected.
+
+    Change:     [FW] Fix error handling flow.
+
+    Introduced: FW 8.18.14.0.
+
+    Relevance:  iWARP.
+
+ 5. Problem:    CQ92056 - FW assert when performing load/unload during traffic.
+
+    Change:     Handle case where reset arrives for a connection that was not
+                yet accepted.
+
+    Introduced: FW 8.18.15.0.
+
+    Relevance:  iWARP.
+
+ 6. Problem:    CQ92275 - Driver crash when attempting to open more than
+                supported number of QPs.
+
+    Change:     Don't assert.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+Enhancements:
+-------------
+ 1. Request:    [FW] iWARP - Performance optimizations.
+
+Version 8.18.15.0 (Feb 28, 2017)
+================================
+Internal FW 8.18.16.0
+
+Fixes:
+------
+ 1. Problem:    FW assert may happen if the IO size is a multiple of maximum
+                iWARP PDU length.
+
+    Change:     [FW] Fix calculation of the length that is going to be
+                transmitted.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 2. Problem:    CQ91898, CQ91843 - FW assert may happen if there are
+                retransmissions after an error was detected.
+
+    Change:     [FW] Fix RX flow on the case an error was detected.
+
+    Introduced: FW 8.18.8.0.
+
+    Relevance:  iWARP.
+
+ 3. Problem:    Application may get stuck if the driver was unloaded on the
+                passive side.
+
+    Change:     [FW] Support timeouts during MPA negotiation.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 4. Problem:    CQ91978 - FW assert may happen during closing a connection.
+
+    Change:     [FW] Handle a race condition that may happen during closing a
+                connection.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP.
+
+ 5. Problem:    CQ91909 - FW may avoid giving flushes on a QP if an error was
+                detected.
+
+    Change:     [FW] Fix error handling flow.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP.
+
+ 6. Problem:    Kernel space application that uses RDMA READ may not work well
+                on new kernels.
+
+    Change:     [FW] Fix flow of "read with invalidate".
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP Linux only (Kernel 4.7 and above).
+
+ 7. Problem:    CQ92124 - Initial WWPN/WWNN values are incorrect.
+
+    Change:     Flip bit-order of lower/upper 32-bit of said fields when read.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE.
+
+Enhancements:
+-------------
+ 1. Request:    Initialize FW parameter for max fin retransmit before
+                sending reset.
+
+ 2. Request:    Restricting iWARP max MSS value for sake of performance.
+
+Version 8.18.14.0 (Feb 22, 2017)
+================================
+Internal FW 8.18.15.0
+
+Fixes:
+------
+ 1. Problem:    CQ91708 - FW assert when running load/unload during traffic.
+
+    Change:     Wait for connections to close entirely before closing ll2
+                connections.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 2. Problem:    Malicious VF can cause assert by using vport-stop.
+
+    Change:     Don't send vport-stop to firmware from malicious VFs.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 3. Problem:    CQ91871 - "ethtool -T" fails for two out of four Quest ports.
+
+    Change:     Port_id is internal to the engine and ecore shouldn't use it as
+                port_num. Ecore needs to derive it from the absolute pf-id.
+
+    Introduced: 8.18.11.0.
+
+    Relevance:  PTP.
+
+ 4. Problem:    CQ91393 - Chip may be stuck if Firmware detected an error on TX
+                path.
+
+    Change:     [FW] Fix error handling flow in TX path.
+
+    Introduced: FW 8.18.10.0.
+
+    Relevance:  iWARP.
+
+ 5. Problem:    Chip may be stuck if Firmware detected an error on RX path.
+
+    Change:     [FW] Fix error handling flow in RX path.
+
+    Introduced: FW 8.18.10.0.
+
+    Relevance:  iWARP.
+
+ 6. Problem:    CQ91707 - P2P mode of PTP fails.
+
+    Change:     Set DA #1 related bits in HW configuration.
+
+    Introduced: Day 1.
+
+    Relevance:  PTP.
+
+Version 8.18.13.0 (Feb 15, 2017)
+================================
+Internal FW 8.18.14.0
+
+Fixes:
+------
+ 1. Problem:    Possible race leading to VF timeout in multiple VF scenarios.
+
+    Change:     Change logic for setting/clear pending events of VFs.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 2. Problem:    Wrong CQE opcode was written during underRun flow with sense
+                data.
+
+    Change:     [FW] Change under run flow.
+
+    Introduced: FW 8.10.4.0.
+
+    Relevance:  iSCSI Initiator.
+
+ 3. Problem:    Firmware may send incorrect sequence number on packets after
+                detecting an error.
+
+    Change:     [FW] Sync Tx-path with correct TCP sequence number once error is
+                detected.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP.
+
+ 4. Problem:    CQ91437 - StatSN FW validation error in case of non-first login
+                response with Status-Class = 0.
+
+    Change:     [FW] Fix the StatSN validation.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    When moving from slow start to congestion avoidance stage the
+                cwnd is wrongfully calculated (as if we are still in slow start
+                stage).
+
+    Change:     [FW] Fix calculation of cwnd.
+
+    Introduced: Day 1.
+
+    Relevance:  TCP.
+
+ 6. Problem:    Wrong initial slow start threshold was used after connection
+                establishment.
+
+    Change:     [FW] Initialize slow start threshold to 64K.
+
+    Introduced: FW 8.10.4.0.
+
+    Relevance:  iSCSI, iWARP.
+
+ 7. Problem:    Performing multiple destroy QP ramrods under stress, may cause
+                transmission queues getting stuck.
+
+    Change:     [FW] Fixed transmission queues credit calculation.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 8. Problem:    Block name in attentions parsing can be wrong.
+
+    Change:     [FW] Fixed block names.
+
+    Introduced: FW 8.18.10.0.
+
+    Relevance:  Debug tools.
+
+ 9. Problem:    CQ91210 - Firmware assertion may happen during a driver unload
+                if an error was detected prior unloading the driver.
+
+    Change:     [FW] Fixed error handling path that may cause an assertion
+                during function unload.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP.
+
+10. Problem:    CQ91528 - FW assertion may occur during retransmissions of RDMA
+                READ_RSP.
+
+    Change:     [FW] Fixed retransmission TX path.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+11. Problem:    CQ915210 - FW assertion may occur on a race condition where we
+                are getting RST and sending RST at the same time.
+
+    Change:     [FW] Don't handle incoming RST in case we have already sent a
+                RST.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP.
+
+12. Problem:    CQ91474 - FW assertion may occur if running perf test without
+                rdma_cm_mode.
+
+    Change:     [FW] Handle race condition in modify qp flow.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP.
+
+13. Problem:    CQ91527, CQ91654 - Retransmission flow in rare cases might cause
+                HW attention.
+
+    Change:     [FW] Fix retransmission flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+14. Problem:    SYN Packets received with errors aren't handled properly.
+
+    Change:     Check error flags and drop SYN packet if it is received with
+                error.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+15. Problem:    Memory leak when SYN packet processing fails.
+
+    Change:     If SYN packet processing failed for any reason, return RX
+                buffer to pool.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+16. Problem:    Theoretical bug can occur when an unaligned FPDU is split over
+                more than 2 tcp segments and a buffer is posted back to rx
+                chain before FW completed processing other packets placed on
+                the same tcp segment.
+
+    Change:     Change buffer repost flow to go via tx chain to ensure all
+                previous data has completed transmission.
+
+    Introduced: 8.18.12.0.
+
+    Relevance:  iWARP unaligned MPA flows.
+
+Enhancements:
+-------------
+ 1. Request:    ecore_iov_pf_add_pending_events() is removed.
+                ecore_iov_pf_get_and_clear_pending_events() is renamed
+                ecore_iov_pf_get_pending_events().
+
+ 2. Request:    If iWARP receive window size configured is less than the
+                minimum 64K, 64K will be set instead of 1M. Remove support for
+                configuring a default value in case a value is not provided.
+
+ 3. Request:    [FW] Add support for 'drop' destination for LL2 TX packets.
+
+Version 8.18.12.0 (Feb 09, 2017)
+================================
+Internal FW 8.18.13.0
+
+Fixes:
+------
+ 1. Problem:    CQ91001 - AH: PTP Sync not working.
+
+    Change:     Add workaround for latching the 2-step ptp packets.
+
+    Introduced: Day 1.
+
+    Relevance:  PTP.
+
+ 2. Problem:    CQ91465 - driver disable hits assert.
+
+    Change:     Correctly release tcp cids.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 3. Problem:    The LL2 RX completion spin lock may be unlocked with a set of
+                flags that is different from the ones it was locked with.
+
+    Change:     Unlock the spin lock with the same set of flags it was locked
+                with.
+
+    Introduced: Day 1.
+
+    Relevance:  LL2.
+
+ 4. Problem:    CQ91499 - driver crash while unloading RDMA driver.
+
+    Change:     iWARP related bitmaps should only be freed if iWARP is enabled.
+
+    Introduced: 8.18.8.0.
+
+    Relevance:  iWARP.
+
+ 5. Problem:    CQ91210 - driver assert while unloading during traffic.
+
+    Change:     wait for all cids to be released.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+Enhancements:
+-------------
+ 1. Request:    PF ECORE allows to UL to prevent HW overriding VF MSI-X
+                table size.
+
+ 2. Request:    Remove support in default SmartLinQ configuration. Feature is
+                in the MFW-only domain.
+
+ 3. Request:    Add support for Energy efficient ethernet (EEE) feature.
+
+ 4. Request:    Mask parity errors once they are asserted.
+
+ 5. Request:    Add support for unaligned MPA packets received over
+                more than two tcp segments.
+
+ 6. Request:    Add unaligned rx packets received statistic for iWARP.
+
+Version 8.18.11.0 (Feb 02, 2017)
+================================
+Internal FW 8.18.13.0
+
+Fixes:
+------
+ 1. Problem:    Usage of a non-initialized spinlock.
+
+    Change:     Move initialization earlier.
+
+    Introduced: Day 1 of iWARP.
+
+    Relevance:  iWARP.
+
+ 2. Problem:    Receive window used for verification when receiving packets is
+                wrongfully reduced by scaling it down and up.
+
+    Change:     [FW] Fix receive window calculation.
+
+    Introduced: Day 1.
+
+    Relevance:  TCP.
+
+ 3. Problem:    Post send before connection is established doesn't work.
+
+    Change:     [FW] Initialize Send-Queue parameters during create QP rather
+                than when moving to full mode (after connection is established).
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 4. Problem:    CQ90930 - FW assert in case of tcp window edge going backward
+                during fast-rxmit.
+
+    Change:     [FW] Fix fast-rxmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    CQ91241 - Receiving Syn or Syn-Ack packet with MSS option
+                smaller than 536 will not be accepted.
+
+    Change:     [FW] Change MSS minimum to 64 in validation.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  TCP.
+
+ 6. Problem:    PF ID not configured correctly in aRFS profile.
+
+    Change:     [FW] Fix set_rfs_mode_enable HSI function.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 7. Problem:    RTR may accidentally sent after RST had arrived.
+
+    Change:     [FW] Don't send RTR if we already got RST.
+
+    Introduced: FW 8.18.11.0.
+
+    Relevance:  iWARP.
+
+ 8. Problem:    RDMA application hangs.
+
+    Change:     Output the number of WIDs an application can use so the
+                application can verify that it is giving a doorbell in the valid
+                range.
+
+    Introduced: 8.18.9.0.
+
+    Relevance:  RDMA.
+
+Enhancements:
+-------------
+ 1. Request:    Implement PTP MFW resource locking mechanism. Only PF which
+                holds this lock is allowed to use ptp clock on the port.
+
+ 2. Request:    Added OSAL_DIV_S64() to help 64-bit division
+                on 32-bit platforms.
+
+ 3. Request:    Add a warning printout in case of a DID mismatch between
+                nvm-cfg/efuse.
+
+Version 8.18.10.0 (Jan 24, 2017)
+================================
+Internal FW 8.18.12.0
+
+Fixes:
+------
+ 1. Problem:    CQ90788, CQ90801 - FW assert may happen when a connection is
+                re-established after RST had arrived.
+
+    Change:     [FW] Fix error handling flow.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP.
+
+ 2. Problem:    Can't open connection with same 4-tuple after previous failed.
+
+    Change:     Fix error handling flow in driver.
+
+    Introduced: FW 8.18.9.0.
+
+    Relevance:  iWARP.
+
+ 3. Problem:    Rejecting a connection after MPA reply arrived is not working
+                properly.
+
+    Change:     [FW] Fix the flow that aborts the TCP connection without
+                changing the QP state.
+
+    Introduced: FW 8.18.11.0.
+
+    Relevance:  iWARP (Windows only).
+
+ 4. Problem:    CQ91075 - FW assert may happen during retransmissions.
+
+    Change:     [FW] Fix missing initialization of TCP receive window.
+
+    Introduced: FW 8.18.10.0.
+
+    Relevance:  iWARP.
+
+Enhancements:
+-------------
+ 1. Request:    CQ90608 - when setting link via ecore_mcp_set_link(), always
+                inform client via OSAL_LINK_UPDATE of current state.
+
+ 2. Request:    [FW] Add support for iWARP (phase 2).
+
+ 3. Request:    Add SmartLinQ support - link_capabilities now contain the
+                default, link_params have new field 'smartlinq' to enable it.
+
+ 4. Request:    Added new API ecore_iwarp_tcp_abort().
+
+ 5. Request:    Add an option to override the default force load behavior.
+
+ 6. Request:    Increase the max number of CQs from 64 to 128.
+
+ 7. Request:    Add support for the mdump GET/CLR_RETAIN sub commands.
+
+Version 8.18.9.0 (Jan 18, 2017)
+===============================
+Internal FW 8.18.10.0
+
+Fixes:
+------
+ 1. Problem:    Not zeroing the whole union data of the MFW mailbox, and thus
+                disabling future extension of existing union members.
+
+    Change:     Zero the whole union data before copying the actual union
+                member.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    Outbound limit of the initiator isn't reduced in case inbound
+                limit of the peer is lower.
+
+    Change:     Reducing the limit accordingly.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 3. Problem:    CQ90180, CQ88940, CQ90409, CQ90313 - Condition race between MFW
+                attentions and pf stop command during unload flow cause ASSERT.
+
+    Change:     Sync PF stop and MFW UNLOAD Request flow.
+
+    Introduced: Day 1.
+
+    Relevance:  Unload, Power Management.
+
+ 4. Problem:    CQ90157 - PTP sync fails after restarting ptp4l application.
+
+    Change:     Reset the Rx-timestamp register when configuring the rx filters.
+                This is a work-around till we root-cause the issue of missing/
+                FW-dropped PTP packet when the application is restarted.
+
+    Introduced: Day 1.
+
+    Relevance:  PTP.
+
+ 5. Problem:    CQ90915: Cannot start all VFs due to lack of queues.
+
+    Change:     Assign VF-queues and only later the PF-queues.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 6. Problem:    Can't set interrupt coalescing of 128+ usecs.
+
+    Change:     Pass igu index instead of protocol index in coalesce flow.
+
+    Introduced: 8.18.7.0.
+
+    Relevance:  All.
+
+ 7. Problem:    IPv4 Packets were transmitted with the flag 'dont fragment'
+                cleared.
+
+    Change:     [FW] Set the 'dont fragment' flag.
+
+    Introduced: Day 1.
+
+    Relevance:  TCP.
+
+ 8. Problem:    SYN-ACK packets with TS option were sent with wrong ts_echo
+                value.
+
+    Change:     [FW] Fix extraction of ts_val from SYN packet.
+
+    Introduced: FW 8.10.3.0.
+
+    Relevance:  TCP option 2 with timestamp enabled.
+
+ 9. Problem:    In rare cases when running with more than 2 QPs and sending
+                read/atomic request, completion error may be generated.
+
+    Change:     [FW] Fix transmission flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE, iWARP.
+
+10. Problem:    Reading DBU_REG_CMD in AH as part of GRC Dump can cause an
+                address error.
+
+    Change:     [FW] Excluded DBU_REG_CMD from GRC Dump in AH.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug tools.
+
+11. Problem:    Application may hang when re-establishing a connection after it
+                was rejected.
+
+    Change:     [FW] Fix MPA reject flow.
+
+    Introduced: FW 8.18.9.0.
+
+    Relevance:  iWARP.
+
+12. Problem:    Always trying to release the resource lock when the resource
+                allocation fails, even when it is not needed.
+
+    Change:     Try to release only when it is required.
+
+    Introduced: 8.18.7.0.
+
+    Relevance:  All.
+
+13. Problem:    CQ91075 - iWARP assert during boot with latest components.
+
+    Change:     Fix driver initialization of default number of ooo buffers.
+
+    Introduced: 8.18.9.0.
+
+    Relevance:  All.
+
+14. Problem:    CQ90379: Driver provides MFW with bad primary MAC when changed.
+
+    Change:     Prepare MAC in native endian order for MFW to read.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Infrastructure changes toward supporting Multiple Txq on same
+                queue zone for VF.
+
+ 2. Request:    Added new OSAL - OSAL_DPC_SYNC().
+
+ 3. Request:    Added ll2 option to limit the number of maximum bds per
+                packet. This is to reduce descriptor size when maximum bds per
+                packet is low and enable allocating a larger number of tx
+                descriptors if needed.
+
+ 4. Request:    iWARP Support for packed and unaligned fdpus.
+
+ 5. Request:    Remove the un-needed ecore API ecore_ptp_enable_pkt2host().
+
+ 6. Request:    Read the BB/AH MAC counters from the suitable statistics bins.
+
+ 7. Request:    ecore_int_get_num_sbs() returns more information about SBs.
+
+ 8. Request:    Add new API ecore_int_igu_relocate_sb() to be used for moving
+                SBs between PF and its child-VFs.
+
+ 9. Request:    ecore_queue_start_common_params needs SB reference instead
+                of index.
+
+10. Request:    Add new OSAL - OSAL_CRC8().
+
+11. Request:    Add new OSAL - OSAL_CRC8_POPULATE().
+
+12. Request:    [FW] iWARP performance optimization of WRITE & SEND flows.
+
+13. Request:    [FW] RoCE support of Unreliable Datagram QP for GSI offload.
+
+14. Request:    Added new API ecore_iov_pf_configure_vf_queue_coalesce(),
+                PF configures the Rx/Tx coalesce values of its child-VFs
+                on per Rx/Tx queue basis.
+
+15. Request:    Add new OSAL - OSAL_CACHE_LINE_SIZE.
+
+16. Request:    Add a restriction on the pad to cache line size register.
+
+17. Request:    RoCE support of Unreliable Datagram QP for GSI offload.
+
+Version 8.18.8.0 (Jan 11, 2017)
+===============================
+Internal FW 8.18.9.0
+
+Fixes:
+------
+ 1. Problem:    CQ90907 - Continuous SGMII 10M/100M interrupts in AN mode.
+
+    Change:     Removed all NWM and NWS initializations from the Init Tool.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Version 8.18.7.0 (Dec 29, 2016)
+===============================
+Internal FW 8.18.9.0
+
+Fixes:
+------
+ 1. Problem:    CQ90214 - Speed of the VF is not same as that of the PF.
+
+    Change:     Updated bulletin board with link state during VF initialization.
+
+    Introduced: Day 1.
+
+    Relevance:  VF Link.
+
+ 2. Problem:    Responder doesn't set peer2peer correctly in MPA rev2 in some
+                cases.
+
+    Change:     Fix driver to always respond with peer2peer in MPA rev2 if
+                requester requested peer2peer mode.
+
+    Introduced: 8.18.4.0.
+
+    Relevance:  iWARP MPA enhanced mode.
+
+ 3. Problem:    CQ90010 - FW may accidentally drop packets when Tx Switching
+                Same-as-Last feature is enabled.
+
+    Change:     [FW] Fix Tx Switching Same-as-Last classification logic.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 4. Problem:    CQ90198 - Firmware may not give flush on incomplete SQ wqes
+                after the QP was moved to error state.
+
+    Change:     [FW] Fix the error handling flow that give flushes to SQ.
+
+    Introduced: FW 8.18.5.0.
+
+    Relevance:  iWARP.
+
+ 5. Problem:    Placement to an address out of the MR scope may pass firmware
+                verifications.
+
+    Change:     [FW] Fix the calculation of the last byte address of the MR.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP, RoCE.
+
+ 6. Problem:    Destination GID was missing from LL2 RX GSI API.
+
+    Change:     Add it.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP, RoCE.
+
+ 7. Problem:    Assert in ecore_sp_vf_start() while installing drivers for VF.
+
+    Change:     Added missing initialization in case of personality is iWARP.
+
+    Introduced: iWARP Day 1.
+
+    Relevance:  iWARP and SRIOV coexistence.
+
+ 8. Problem:    GRC Dump corrupts a debug bus recording that was taken on
+                another PF on the same engine.
+
+    Change:     [FW] Skip static debug dump if the DBG block is enabled
+                (indicates that a debug bus recording is in progress).
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+ 9. Problem:    GRC Dump writes to protected registers, causing error entries
+                in REG FIFO.
+
+    Change:     [FW] Modified GRC Dump to avoid taking LED and AVS_WRAP blocks
+                out of reset.
+
+    Introduced: FW 8.10.5.0.
+
+    Relevance:  Debug Tools.
+
+10. Problem:    A DPM doorbell can cause a false parity attention.
+
+    Change:     [FW] Initialized the entire DORQ WQE buffer with zeros.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+11. Problem:    CQ90473 – DCQCN packets may not be received in BB B0 in 100G,
+                2x50G and 4x25G mode.
+
+    Change:     [FW] HW bug workaround - initialize the register to the correct
+                value.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE DCQCN.
+
+12. Problem:    DMAE failure when stopping RDMA during the unload phase of the
+                recovery process.
+
+    Change:     Avoid DMAE transactions while a recovery is in progress.
+
+    Introduced: Day 1.
+
+    Relevance:  Error recovery.
+
+Enhancements:
+-------------
+ 1. Request:    VF tunneling support.
+
+ 2. Request:    VF ethtool coalescing support.
+
+ 3. Request:    Enable mutually exclusive rdma flavor.
+                Added API via ecore_rdma_pf_params to configure RDMA flavor.
+
+ 4. Request:    iWARP support for MPA reject flow.
+
+ 5. Request:    iWARP support for RTR Read (Revision 2).
+
+ 6. Request:    Resource allocation interface v2.0 (setting values of soft
+                resources).
+
+ 7. Request:    Client to provide vport & RSS engine IDs when initializing VFs.
+
+ 8. Request:    Add udp ports in bulletin to notify VFs for port change.
+
+Version 8.18.6.0 (Dec 15, 2016)
+===============================
+Internal FW 8.18.7.0
+
+Fixes:
+------
+ 1. Problem:    Default number of iWARP OOO RX Buffers is 512 instead of 8K.
+
+    Change:     Fix default value initialization.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 2. Problem:    CQ90310,CQ90311, CQ90219 - Incorrect input buffer thresholds of
+                Pause and PFC.
+
+    Change:     [FW] Fixed incorrect input buffer thresholds for better support
+                of Pause and PFC.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI, iWARP (AH only).
+
+ 3. Problem:    CQ89928 - Asynchronous message of "QP catastrophic error" return
+                during retransmit sequence.
+
+    Change:     [FW] Fix retransmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    CQ90121 - FW assertion after unloading qedr will occur if
+                register/deregister MR operation failed.
+
+    Change:     [FW] Fix MR register and deregister flows.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 5. Problem:    CQ90357 - iWARP wrong ird/ord values published.
+
+    Change:     Set correct maximum ord/ird values for iWARP.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+Enhancements:
+-------------
+ 1. Request:    Revise tunnel struct/APIs.
+
+ 2. Request:    Add support for usage of the MFW generic resource lock.
+
+ 3. Request:    RSS configuration via vport-update is done using queue-handles.
+
+ 4. Request:    New API: ecore_mcp_ov_get_fc_npiv - Read NPIV table from MFW.
+
+ 5. Request:    New API: ecore_mcp_update_fcoe_cvid - Send FCoE vlan to MFW.
+
+ 6. Request:    New API: ecore_mcp_update_fcoe_fabric_name - Send Fabric name
+                to MFW.
+
+ 7. Request:    New OSAL: OSAL_HW_INFO_CHANGE to indicate of management changes
+                to hw_info fields.
+
+ 8. Request:    OSAL_VALLOC is obsolete and is replaced by OSAL_VZALLOC which
+                should also zero the memory.
+
+ 9. Request:    Add support for the new load request flow for handling a
+                previous driver unload.
+
+10. Request:    Add ecore support to recognize the iwarp app TLV, and configure
+                the device with the user provided values.
+
+Version 8.18.5.0 (Dec 05, 2016)
+===============================
+Internal FW 8.18.6.0
+
+Fixes:
+------
+ 1. Problem:    CQ90347 - AH 10GBaseT: [One time crash] System hit a bugcheck on
+                disabling both ports from switch. System halts if CID resource
+                is not available for allocation.
+
+    Change:     Don't cause system halt, just return error code.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 2. Problem:    CQ90311 - Disable Nop-Out and login to target, seeing
+                "iscsi_error - rq ring full".
+
+    Change:     BDQ resource management is fixed.
+
+    Introduced: 8.18.4.0.
+
+    Relevance:  Storage.
+
+ 3. Problem:    CQ90198: freeing contiguous memory from dpc context.
+
+    Change:     Fix ecore to free memory from passive context.
+
+    Introduced: 8.18.4.0.
+
+    Relevance:  iWARP.
+
+ 4. Problem:    CQ90033 - fw assert due to improper out-of-order handling.
+
+    Change:     [FW] fix out-of-order trimming flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI, iWARP.
+
+ 5. Problem:    CQ90098 - FW may not give completions after the connection was
+                re-offloaded.
+
+    Change:     [FW] Init all parameters when the connection is offloaded.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 6. Problem:    CQ90334 - FW "flr_cleanup_func_invalid_state" Fatal Assert upon
+                scenario of consecutive FLR Initial cleanups to function.
+
+    Change:     [FW] Severity of "flr_cleanup_func_invalid_state" reduced to
+                Warning (scenario may occur).
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 7. Problem:    Firmware may be stuck if it gets a SYN packet with 40B of
+                options.
+
+    Change:     [FW] Support such scenario in Firmware.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI Target, iWARP.
+
+ 8. Problem:    VF isolation problem - VF can cause parity errors by reading
+                from X or Y Storm VF Zone.
+
+    Change:     [FW] Fix Zone B configuration in init tool.
+
+    Introduced: FW 8.18.2.0.
+
+    Relevance:  SR-IOV.
+
+ 9. Problem:    Device transmitter pipe stuck.
+
+    Change:     Use correct TC for loopback in 4 port environment.
+
+    Introduced: Day 1.
+
+    Relevance:  iWarp/iSCSI Arrowhead 4 port.
+
+Enhancements:
+-------------
+ 1. Request:    Change database of connections in OOO from linked list to array
+                to improve search time.
+
+Version 8.18.4.0 (Nov 28, 2016)
+===============================
+Internal FW 8.18.5.0
+
+Fixes:
+------
+ 1. Problem:    Initialization fails due to supposed lack of VFs SBs.
+
+    Change:     Correct calculation of first_vf_in_pf for servers with no ARI.
+
+    Introduced: Day 1.
+
+    Relevance:  AH, no ARI.
+
+ 2. Problem:    Firmware doesn't set the invalidate flag in RQ CQE when there
+                is send w/ invalidate.
+
+    Change:     [FW] Set the invalidate flag and invalidated S-TAG on the RQ CQE
+                (when Send W/ Invalidate arrives).
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 3. Problem:    CQ89925, CQ90099, CQ90065, CQ90068, CQ90247 - Firmware may avoid
+                sending SYN-ACK to the peer and stall the TX path.
+
+    Change:     [FW] Fix the firmware flow on passive side.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 4. Problem:    CQ90262 - Parsing SYN options field may cause Tcp offload ramrod
+                to stuck.
+
+    Change:     [FW] Fix Tcp options field parsing.
+
+    Introduced: FW 8.10.3.0.
+
+    Relevance:  iSCSI (Target), iWARP.
+
+ 5. Problem:    CQ90311 - Disable Nop-Out and login to target, seeing
+                "iscsi_error - rq ring full".
+
+    Change:     BDQ resource management is fixed.
+
+    Introduced: 8.18.3.0.
+
+    Relevance:  Storage.
+
+Enhancements:
+-------------
+ 1. Request:    L2 queue APIs changed - require less parameters to open
+                queues and move into a handler-based implementation.
+
+ 2. Request:    Add ecore support for processing the TLV request from MFW.
+
+ 3. Request:    Improve cache-alignment of ecore_chain - place all fields
+                required for produce/consume in a single cacheline [64 bytes].
+
+ 4. Request:    iWARP support for Read With Invalidate.
+
+ 5. Request:    iWARP - Add support for MPA revision 2 (enhanced).
+
+ 6. Request:    iWARP - Add support for SYN retransmit timeout indication.
+
+Version 8.18.3.0 (Nov 21, 2016)
+===============================
+Internal FW 8.18.4.0
+
+Fixes:
+------
+ 1. Problem:    Driver does not get completions when entering retransmit flow
+                for high functions of an engine.
+
+    Change:     Driver did not initialize a resource correctly.
+
+    Introduced: 8.18.0.0.
+
+    Relevance:  iWARP NPAR and 4-port mode.
+
+ 2. Problem:    CQ89024 - while running qperf a tid deregistration fails.
+                Cause: after FW requested a NIG drain then the retransmitted
+                ramrod is sent without properly configuring the itid.
+
+    Change:     Properly configure the itid in the retransmitted ramrod.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE/iWARP.
+
+ 3. Problem:    CQ90143 - iSCSI discovery fails if done while FCoE driver is
+                loaded.
+
+    Change:     Fail storage driver load if queue/cq request is beyond CQ
+                resource allocation.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI/FCoE.
+
+ 4. Problem:    HW attentions cause idle check failures even when they are
+                masked.
+
+    Change:     (FW) Updated idle check to consider attentions masking.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+ 5. Problem:    Possible garbage in PCIE Trace due to HW reset value bug.
+
+    Change:     (FW) HW bug workaround - initialize the register to the correct
+                value.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+ 6. Problem:    CQ89179 - HW attention may occur due to a HW bug that may
+                exposed when there is a traffic with DIF.
+
+    Change:     (FW FCoE) Work-around in FCoE RX path.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE, DIF.
+
+ 7. Problem:    Heavy iWARP traffic that includes retransmissions may cause to
+                unexpected behavior.
+
+    Change:     (FW iWARP) Verify there is a place in OOO queue before placing
+                there packets.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 8. Problem:    Parity attention may occur when dumping a debug bus recording
+                from the DBG block internal buffer, due to a HW bug.
+
+    Change:     (FW) Masked the parity attention.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+ 9. Problem:    iWARP Rxmit statistics don't appear properly on high functions.
+
+    Change:     Wrong id passed to FW macro.
+
+    Introduced: 8.18.2.0.
+
+    Relevance:  iWARP rxmit statistics.
+
+10. Problem:    CQ89459 - System hits a bugcheck on setting ND Max QP to 16.
+
+    Change:     Nullify hwfn structures' pointers after being freed.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Remove the `ver_str' field that the upper driver should have set
+                before calling hw_init().
+
+ 2. Request:    Support RoCE event statistics.
+
+ 3. Request:    Add ecore interfaces for MFW TLV request processing.
+
+ 4. Request:    Add WoL magic packet support routines for Windows.
+
+ 5. Request:    (FW) Debug Bus tool updates:
+                - Modified recording format to allow data synchronization in
+                  case of: multiple groups per debug line, debug line split in
+                  wrap-around mode, and data drops due to low bandwidth.
+                - Improved readability of parsed HW blocks recordings.
+                - Automatic detection of 256-bit debug lines.
+                - Support specifying debug lines by name.
+
+ 6. Request:    (FW iSCSI) iSCSI support for test unit ready (R=0, W=0).
+
+ 7. Request:    (FW iWARP) Add support to MPA version2 (enhanced) in iWARP.
+
+ 8. Request:    Add new OSAL - OSAL_STRTOUL().
+
+ 9. Request:    Use the MFW mailbox for getting BDQ resource allocation
+                information.
+
+Version 8.18.2.0 (Nov 13, 2016)
+===============================
+Internal FW 8.18.3.0
+
+Fixes:
+------
+ 1. Problem:    CNIG attentions appear when hitting NWM/NWS attentions.
+
+    Change:     Correct AH aeu bit mapping to HW blocks.
+
+    Introduced: Day 1.
+
+    Relevance:  AH.
+
+ 2. Problem:    Modifying QP to IDLE before destroying the QP will cause
+                the next connection attempt done with an identical 4-tuple to
+                fail.
+
+    Change:     Fix flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 3. Problem:    CQ89764: AH-Duluth-10GBaseT: Observed QEVBDA assert while
+                running WHCK test PNP surprise Remove Device Test.
+
+    Change:     If CID bitmap isn't allocated yet, assume there are no QPs.
+
+    Introduced: 8.5.2.0.
+
+    Relevance:  RoCE/iWARP.
+
+ 4. Problem:    Newer MFW might cause driver to reach OSAL_ASSERT.
+
+    Change:     Don't do DP_NOTICE() in case of unknown MFW message.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 5. Problem:    FW assert may happen during connection establishment when there
+                are retransmits.
+
+    Change:     (FW iWARP) Fix ingress processing during connection
+                establishment.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 6. Problem:    Traffic continues after disable VPORT.
+
+    Change:     (FW L2) Fix VPORT disable FW flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 7. Problem:    VF isolation problem - VF can access parts of internal RAM of
+                Storms in which VF Zone is unused.
+
+    Change:     (FW) Disable VF access to Zone B of unused Storms.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 8. Problem:    Malicious VF Flood - Malicious VF driver can cause EQEs flood
+                to parent PF by constantly writing to Ustorm VF zone.
+
+    Change:     (FW) Block malicious VF.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 9. Problem:    Dropped RDMA read response may cause the RDMA read request to
+                be sent multiple times.
+
+    Change:     (FW RoCE) Fix implied NAK implementation to only retransmit
+                once.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+10. Problem:    Modifying QP to error state, while there is still traffic
+                running, might results with error return on completion queue.
+
+    Change:     (FW RoCE) Fix Requester flow.
+
+    Introduced: FW 8.3.0.0.
+
+    Relevance:  RoCE.
+
+11. Problem:    Multiple MTU RDMA Writes with T10 DIF sent without ACK request
+                resulting in low performance.
+
+    Change:     (FW RoCE) Fix ACK request flag setting.
+
+    Introduced: FW 8.18.0.0.
+
+    Relevance:  RoCE.
+
+12. Problem:    Parity attention on SEMI interrupt table.
+
+    Change:     (FW) Initialize the entire interrupt table with default event.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+13. Problem:    CQ89456 - HW attention on BRB RC0_EOP_OUT_SYNC_FIFO_PUSH_ERROR.
+
+    Change:     (FW) Mask BRB RC0_EOP_OUT_SYNC_FIFO_PUSH_ERROR.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+14. Problem:    CQ89756 - full out-of-order queue results in deadlock and
+                connection errors.
+
+    Change:     (FW iSCSI) Add almost-full limit to the queue filling logic.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+15. Problem:    Out-of-bound memory access on MFW interaction for resource
+                allocation.
+
+    Change:     Fix the access to use the suitable driver mailbox union.
+
+    Introduced: 8.10.5.0.
+
+    Relevance:  All.
+
+16. Problem:    Malicious VF Flood - Malicious VF driver can cause EQEs flood to
+                parent PF by constantly writing 0 to vf_pf_msg_valid in Ustorm
+                VF zone.
+
+    Change:     (FW) Block malicious VF.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+17. Problem:    CQ89695 - Ramrod stuck while rebooting VF. False detection of
+                PCI read error.
+
+    Change:     (FW) Fix PCI error check for VF slow path.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+18. Problem:    CQ89793 - ASSERT might occur during driver load.
+
+    Change:     (FW) Remove the initialization of NWM_REG_PRTY_MASK_H_1 from the
+                Init Tool.
+
+    Introduced: Day 1.
+
+    Relevance:  FC-FEC, AH only.
+
+19. Problem:    CQ86787 - HW attention may occur during TCP establishment or
+                tear-down.
+
+    Change:     (FW iSCSI) Fix pure-ack flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+20. Problem:    FW assertion may occur during TCP tear-down.
+
+    Change:     (FW iSCSI) Fix Clear SQ flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+21. Problem:    CQ89179 - HW attention during iSCSI non-DIF Rx traffic.
+
+    Change:     (FW iSCSI) Fix iSCSI non-DIF Rx flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+22. Problem:    Wrong HW attentions debug print when attentions appear in more
+                than one register per block.
+
+    Change:     (FW) Fix HW attentions debug print.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+23. Problem:    In CFC Delete Flow - When driver unloads, if there is active L2
+                traffic, a Fatal "common_poll_reg_timeout_assert" FW assert is
+                invoked.
+
+    Change:     (FW RoCE) "common_poll_reg_timeout_assert" reduced to warning.
+
+    Introduced: FW 8.10.8.0.
+
+    Relevance:  RoCE.
+
+24. Problem:    In retransmit flow, FW ran out of buffers.
+
+    Change:     Driver flow didn't initialize param correctly.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+25. Problem:    FW assert if VF vport closed while queues are activei.
+
+    Change:     Make sure VF queue are closed before stopping vport.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+Enhancements:
+-------------
+ 1. Request:    New API function ecore_vf_get_num_mac_filters().
+
+ 2. Request:    Case 00041880 - NIG_REG_{RX_BRB, STORM}_OUT_EN shouldn't
+                change; MFW will close the BRB-NIG interface properly.
+
+ 3. Request:    Add API for getting/setting LLDP MAC address.
+
+ 4. Request:    Decrease memory consumption used for SYN packet handling in
+                iWARP.
+
+ 5. Request:    CQ89592: Add new rdma pf param `max_cnqs' and expose the API
+                to `ecore_hw_set_feat()'. To be used under certain limitations.
+
+ 6. Request:    Restructure QM initialization code. QM info is no longer
+                reallocated at DCBx renegotiation. Vports and PQs are no
+                longer allocated at max values but allocated exactly.
+
+ 7. Request:    (FW) Add CRC to all debug binary dumps.
+
+ 8. Request:    Protect releasing LL2/iSCSI/OOO resources flow by NULL checking.
+
+ 9. Request:    iWARP: Add retransmit statistics to ecore_rdma_stats.
+
+10. Request:    (FW RoCE) Add RoCE statistics for internal CRC, retransmit
+                tries, RNR nak and silent drops.
+
+11. Request:    (FW) Add support for context validation.
+
+12. Request:    Allocate an additional QM physical queue for roce PFs for low
+                latency during traffic.
+
+13. Request:    Add ecore API for getting the MBI version.
+
+Version 8.18.1.0 (Oct 30, 2016)
+===============================
+Internal FW 8.18.1.0
+
+Fixes:
+------
+ 1. Problem:    When querying a RoCE port the max_msg_sz field is set to zero.
+
+    Change:     Configure the max_msg_sz field.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE/iWARP.
+
+ 2. Problem:    CNIG attentions appear on port #4 regardless of actual port.
+
+    Change:     Correct logic finding first CNIG attention to be asserted.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 3. Problem:    Register MR might fail if we did before Deregister MR while the
+                port was paused.
+
+    Change:     (FW RoCE) Fix deregister MR flow.
+
+    Introduced: FW 8.14.2.0.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    Encapsulated broadcast packet may be dropped, if VNI used for
+                tunnel classification and more than 160 filters configured.
+
+    Change:     (FW L2) Fix FW flow.
+
+    Introduced: FW 8.10.4.0.
+
+    Relevance:  L2.
+
+ 5. Problem:    After QP is destroyed during traffic, reusing the connection
+                resource may lead to firmware assert.
+
+    Change:     (FW RoCE) Fix internal firmware queue state tracking code.
+
+    Introduced: FW 8.3.0.0.
+
+    Relevance:  RoCE.
+
+ 6. Problem:    Same aRFS filter used for TCP and UDP traffic.
+
+    Change:     (FW L2) Add L4 protocol type to aRFS filter profile.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 7. Problem:    TCP window probe will not be retransmitted (if it wasn't ACKed).
+
+    Change:     (FW iSCSI/iWARP) Retransmit the window probe if it wasn't ACKed
+                for RTO time.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI, iWARP.
+
+ 8. Problem:    FW assertion may happen when doing modify QP to error.
+
+    Change:     (FW iWARP) Check that SQ is empty instead of verifying we gave
+                completions for all wqes (might be non-signalled wqes).
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 9. Problem:    AH Bug in High Malicious VF limitation and VFP (VF PF Channel).
+                When High (191 for instance) VFs are used (on VMs for instance)
+                and a malicious VF is detected.
+                In addition FLR Cleanup was not completed properly..
+
+    Change:     (FW SRIOV) Allow up to 192 Malicious VFs (range 0..191) support.
+                Wrong limitation to VF vector caused it. Also - VPC's ready-bit
+                must be set as VF is returned to its original ("virgin") state,
+                in which the VPC must be ready regardless of whether the driver
+                acked (set the ready bit) the last request or not.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+10. Problem:    Data integrity when re-transmitting large (>255 DIF intervals)
+                IO with Dif.
+
+    Change:     (FW iSCSI) Fix FW flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+11. Problem:    User application hang due to RT failure.
+
+    Change:     (FW iWARP) Fix the RT flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+Enhancements:
+-------------
+ 1. Request:    New API function ecore_int_get_sb_dbg() to return SB dbg info.
+
+ 2. Request:    hw_prepare() parameters can now be used to allow graceful
+                behavior, allowing 'lacking' probes to succeed.
+
+Version 8.18.0.0 (Oct 19, 2016)
+===============================
+Internal FW 8.18.0.0
+
+Fixes:
+------
+ 1. Problem:    CQ89032 - iWARP - crash during initialization with SRIOV
+                enabled.
+
+    Change:     Fix TM block ILT initialization.
+
+    Introduced: 8.14.3.0 TM attention fix.
+
+    Relevance:  iWARP and SRIOV coexistence.
+
+ 2. Problem:    FW return code is checked even if TID register ramrod posting
+                failed.
+
+    Change:     Check FW return code only if ramrod was posted successfully.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 3. Problem:    CQ88918 - iWARP - Assert during connection close, freeing
+                dma-able memory from dpc by ecore.
+
+    Change:     Move memory free to later phase which is called in passive.
+
+    Introduced: iWARP Day 1.
+
+    Relevance:  iWARP.
+
+ 4. Problem:    iWARP - Application hangs during destroy.
+
+    Change:     CLOSE callback not called properly in all cases.
+
+    Introduced: 8.14.4.0.
+
+    Relevance:  iWARP.
+
+ 5. Problem:    If creating a CQ failed then the CQ bitmap was cleared without
+                lock.
+
+    Change:     Clear the relevant bit from the bitmap under lock.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 6. Problem:    CQ88823 - Value of number of queue is showing 2 with default
+                resource allocation value i.e. 0.
+
+    Change:     Change qid value from 8 bit field to 16 bit.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 7. Problem:    False idle check failure on NIG DBGMUX_SYNCFIFO_ERROR_WR
+                interrupt.
+
+    Change:     (FW) Fix idle check rule that checks NIG_REG_INT_STS.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+ 8. Problem:    HW attention while running Rx traffic with DIF.
+
+    Change:     (FW iSCSI) Fix the iSCSI Rx DIF flow.
+
+    Introduced: FW 8.14.0.0.
+
+    Relevance:  iSCSI DIF.
+
+ 9. Problem:    CQ89197 - logs show AH0 for an arrowhead A1 adapter.
+
+    Change:     Consider both REV and METAL, and change print into AH A{0,1}.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+10. Problem:    After FLR, previously malicious VF fails to init sometimes.
+
+    Change:     Make VF-PF channel operational while handling VF FLR.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+11. Problem:    CQ89309 - VFs creation fail in Default mode with storage.
+
+    Change:     Add new feature ECORE_VF_L2_QUE to reflect supported number
+                of queues by all VFs.
+
+    Introduced: Day 1.
+
+    Relevance:  IOV on BB 4-port / AH 2-port+ with storage enabled.
+
+12. Problem:    The nvram test fails after MFW crash dump is collected and its
+                image's CRC stops being valid.
+
+    Change:     Exclude the image of the MFW crash dump from the nvram test.
+
+    Introduced: Day 1.
+
+    Relevance:  Selftests.
+
+13. Problem:    Cont00089354 - Arrowhead-10G: Observed QEVBDA Assert while
+                running SMB SmbConnect LOGO test on AH 10G board.
+                Allocation of RoCE resource managed via a bitmap can cause an
+                assert if bitmap is full.
+
+    Change:     Don't assert in such a scenario.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+14. Problem:    QP resource leak.
+
+    Change:     Free resource even if QP responder/requester was never
+                offloaded.
+
+    Introduced: 8.14.0.0.
+
+    Relevance:  RoCE.
+
+15. Problem:    iWARP MSS wasn't configured properly on passive side.
+
+    Change:     Calculate header size correctly in passive side.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+16. Problem:    The PQs allocation doesn't enforce a granularity of 8.
+
+    Change:     Make sure the number of PQs per-PF and their start value are
+                divisible by 8.
+
+    Introduced: 8.10.5.0.
+
+    Relevance:  All.
+
+17. Problem:    cq89243 AH A1: RoCE: Assert @ 'qevbda!ecore_int_deassertion_aeu
+                bit+4fd' when rebooting host after RoCE I/O.
+
+    Change:     Make sure that the ILT resources are released after the FW has
+                completed its asynchronous operations.
+
+    Introduced: 8.14.0.0.
+
+    Relevance:  RoCE/iWARP.
+
+18. Problem:    cq89522 iWARP: traffic failed over VLAN interfaces.
+
+    Change:     Vlan comparison wasn't done correctly for cases where listen
+                was done on ANY_IPADDR.
+
+    Introduced: Day 1 of iWARP.
+
+    Relevance:  iWARP.
+
+19. Problem:    cq89307 iWARP: statistics not updated correctly for all ports.
+
+    Change:     Same statistic counter was used for different ports.
+
+    Introduced: Day 1 of iWARP.
+
+    Relevance:  iWARP.
+
+Enhancements:
+-------------
+ 1. Request:    Read default mtu value from the shared-memory during the device
+                initialization.
+
+ 2. Request:    Add support for the following OneView APIs.
+                ecore_mcp_ov_update_mtu - Send MTU value to the MFW.
+                ecore_mcp_ov_update_mac - Send MAC address to the MFW.
+                ecore_mcp_ov_update_wol - Send WoL mode to the MFW.
+
+ 3. Request:    Send eswitch_mode to MFW after the firmware load.
+
+ 4. Request:    Configure NIG EDPM per TC enablement control bits for RoCE,
+                RoCE_V2 traffic types.
+
+ 5. Request:    Expose crc_needed and rcv_wnd_size to upper layer driver.
+
+ 6. Request:    Update mfw when ecore assigns a default mtu value.
+
+ 7. Request:    Add support for accessing an external phy.
+
+ 8. Request:    (FW iWARP) Add support for iWARP phase-1.5 (Retransmissions and
+                DCBX).
+
+ 9. Request:    Utilize DRV_MSG_CODE_GET_PF_RDMA_PROTOCOL for learning RDMA
+                capabilities of interface.
+
+10. Request:    Add new OSAL - OSAL_CRC32().
+
+11. Request:    iWARP OOO support.
+
+12. Request:    Prevent replication error bit from mismatch between the local
+                and remote sending local admin MIB.
+
+13. Request:    Add WoL magic packet support.
+
+Version 8.14.4.0 (Sep 18, 2016)
+===============================
+Internal FW 8.14.7.0
+
+Fixes:
+------
+ 1. Problem:    BB indirect CNIG registers cannot be accessed by GRC Dump and
+                MFW simultaneously.
+
+    Change:     (FW) Excluded CNIG_REG_PMFC_IF_* and CNIG_REG_PMEG_IF_* from GRC
+                Dump in BB.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+ 2. Problem:    When final-cleanup sent on inactive function FW may send delete
+                on wrong function.
+
+    Change:     (FW) Verify activity of function before sending delete flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 3. Problem:    Firmware assertion may happen during iWARP traffic that involves
+                RDMA_READ/SENDs.
+
+    Change:     (FW iWARP) Fix RQ handling flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 4. Problem:    Closing RDMA function and opening it again without unloading the
+                PF might cause memory access violation when accessing MRs.
+
+    Change:     (FW RDMA) Fix MR registration flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RDMA.
+
+ 5. Problem:    CQ88872 - FW assertion while running Tx traffic.
+
+    Change:     (FW iSCSI) Fix the iSCSI RT flow.
+
+    Introduced: FW 8.14.0.0.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    Can’t open more than one QP simultaneously, and can’t post
+                buffers prior to rdma_connect.
+
+    Change:     (FW iWARP) Implement a new scheme of separating between tcp
+                connection establishment cid and Iwarp QP cid. A.k.a. cid
+                migration.
+
+    Introduced: Day 1.
+
+    Relevance:  iWARP.
+
+ 7. Problem:    CQ84502 - System crash during qevbd disable with verifier on.
+
+    Change:     Fix memory leakage.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 8. Problem:    Dcbx update flag is being sent incorrectly to the FW.
+
+    Change:     The flag is incorrectly converted to boolean before assigning
+                it to ramrod data, fix this typecasting.
+
+    Introduced: Day 1.
+
+    Relevance:  dscp.
+
+ 9. Problem:    OS crash on partial driver reload, when the second load
+                fails to allocate resources (e.g., requested too many QPs).
+
+    Change:     Set pointers to OSAL_NULL after freeing the allocations.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Update ecore_hw_init() to send storm firmware version to MFW.
+
+ 2. Request:    Send driver state as DISABLED to MFW as part of ecore_hw_init(),
+                and, as UNLOADED as part of ecore_hw_remove(). Now it's the
+                ecore client's responsibility to set the driver state as ACTIVE/
+                DISABLED depending on whether the driver is operational or not.
+
+ 3. Request:    ecore_mcp_ov_update_current_config() was sending incorrect value
+                for MFW parameter field.
+
+ 4. Request:    Remove attribute field from update_current_config() API, MFW
+                need to know only the last entity who configured the device.
+
+Version 8.14.3.0 (Sep 07, 2016)
+===============================
+Internal FW 8.14.6.0
+
+Fixes:
+------
+ 1. Problem:    CQ88392 E4 4x25G: System hits an assert on running RoCE traffic.
+
+    Change:     Read the error flag before releasing the memory.
+
+    Introduced: 8.14.0.0.
+
+    Relevance:  RoCE.
+
+ 2. Problem:    expStatSN validation error after receiving Reject PDU.
+
+    Change:     (FW iSCSI) Advance expStatSN for incoming REJECT PDU.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI Initiator.
+
+ 3. Problem:    Setting final bit for TEXT Request PDU even if continue bit is
+                set.
+
+    Change:     (FW iSCSI) Fix TEXT Request transmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI Initiator.
+
+ 4. Problem:    Not advancing statSN after sending REJECT, ASYNC and TMF
+                Response PDUs.
+
+    Change:     (FW iSCSI) Fix the Tx flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI Target.
+
+ 5. Problem:    Setting final bit for TEXT Response PDU even if continue bit is
+                set.
+
+    Change:     (FW iSCSI) Fix TEXT Response transmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI Target.
+
+ 6. Problem:    Overwriting statSN field while retransmitting SCSI Response,
+                TEXT Response, LOGIN Response, LOGOUT Response, TMF Response,
+                ASYNC and REJECT PDUs.
+
+    Change:     (FW iSCSI) Fix TX retransmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI Target.
+
+ 7. Problem:    "Got a non-regular LB LL2 completion" might appear
+                [and possibly assert] in iscsi scenarios.
+
+    Change:     Correct logic handling an Rx queue flush for OOO.
+
+    Introduced: 8.14.0.0.
+
+    Relevance:  iSCSI OOO.
+
+ 8. Problem:    TM block attention when configuring iWARP with a large number
+                of supported ethernet connections.
+
+    Change:     TM ILT memory was not computed properly.
+
+    Introduced: day 1.
+
+    Relevance:  iWARP.
+
+ 9. Problem:    Receiving a SYN packet on an already open connection was not
+                detected properly.
+
+    Change:     Fixed compare code.
+
+    Introduced: day 1.
+
+    Relevance:  iWARP.
+
+Enhancements:
+-------------
+ 1. Request:    Improve Tx-switched performance by utilizing the FW provided
+                feature of same_as_last_id.
+
+Version 8.14.2.0 (Aug 25, 2016)
+===============================
+Internal FW 8.14.4.0
+
+Fixes:
+------
+ 1. Problem:    CQ88564 - duplicate iSCSI app TLV when setting iSCSI
+                QoS Policy in DCBX IEEE mode.
+
+    Change:     CEE selection field must be set regardless CEE/IEEE mode.
+
+    Introduced: 8.10.6.0.
+
+    Relevance:  DCBX.
+
+ 2. Problem:    Malicious VF can cause crash due to out-of-bound access in HV
+                by using a too-high index when starting an Rx queue.
+
+    Change:     Validate queue index before accessing queue array.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 3. Problem:    Segmentation fault on RDMA stop if SRQ is not initialized.
+
+    Change:     Free the SRQ bitmap only if it was allocated.
+
+    Introduced: 8.14.1.0.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    VF acquisition fails over a legacy PF.
+
+    Change:     Correct logic handling rejections by legacy PF.
+
+    Introduced: 8.14.0.0.
+
+    Relevance:  SRIOV.
+
+ 5. Problem:    Malicious VF removal will cause a FW assertion.
+
+    Change:     PF to start rejecting malicious VF requests.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 6. Problem:    If a regular ramrod received while processing a consolidated
+                ramrod, the regular ramrod might not be processed.
+                Multiple outstanding consolidated ramrods might not be
+                processed.
+
+    Change:     (FW) Fix common ramrod flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI, FCoE, iWARP.
+
+ 7. Problem:    When tx offload requests are passed on BD,'no snooping' mode
+                might be set which may result in connections failing to
+                establish.
+
+    Change:     (FW) Fix load Tx bd flow.
+
+    Introduced: FW 8.14.0.0.
+
+    Relevance:  RoCE, iWARP, iSCSI, FCoE.
+
+ 8. Problem:    CQ87192 - AH NWM parity attention.
+
+    Change:     (FW) Masked parities 0,1,6,7 in NWM_REG_PRTY_MASK_H_2 as a
+                temporary workaround.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 9. Problem:    AH PCIE debug bus sampling rate is two clock cycles instead of
+                one cycle.
+
+    Change:     (FW) Configured PCIE_REG_DBG_SAMPLING_INTERVAL to 0 instead of
+                1.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+10. Problem:    DBU_REG_RXDATA contains invalid values in AH GRC Dump (due to
+                a HW bug).
+
+    Change:     (FW) Excluded DBU_REG_RXDATA from GRC Dump in AH.
+
+    Introduced: Day 1.
+
+    Relevance:  Debug Tools.
+
+11. Problem:    In multiple retransmissions scenario with RDMA reads an RDMA
+                read request might be retransmitted from more than max ORD
+                backwards (a request that was already responded).
+
+    Change:     (FW RoCE) Fix retransmission flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+12. Problem:    T10 DIF RDMA Write errors reported in all IOs of the TID after
+                detection.
+
+    Change:     (FW RoCE) Clear detected errors at end of Invalidate flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+13. Problem:    Outbound T10 DIF without runt, following inbound T10 DIF with
+                runt causes false runt error report.
+
+    Change:     (FW RoCE) Properly clear runt valid flags between operations.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+14. Problem:    FW Did not report malicious_vf_error_id for anti-spoofing checks
+                failures.
+
+    Change:     (FW) FW Reports malicious_vf_error_id: ETH_ANTI_SPOOFING_ERR
+                upon anti-spoofing failure.
+
+    Introduced: Day 1.
+
+    Relevance:  ETH.
+
+15. Problem:    CQ88677 - Rhel6.8 VM OS is not coming up after installing
+                drivers from NCDE 11 60.
+
+    Change:     DCBX config is not supported on VFs, fail the DCBX query for
+                VF interfaces.
+
+    Introduced: 8.10.0.0.
+
+    Relevance:  DCBX.
+
+Enhancements:
+-------------
+ 1. Request:    Add ecore_iov_is_vf_started() api.
+
+ 2. Request:    ecore_sp_vport_start_params have several new b_err_* values
+                that when set cause FW to be harsher toward egress errors -
+                default is to silently drop, if set would turn VF into
+                malicious state, or for a PF cause an assertion.
+
+ 3. Request:    (FW) Add T/RDIF_REG_DEBUG_ERROR_INFO memories to GRC Dump.
+
+Version 8.14.1.0 (Aug 14, 2016)
+===============================
+Internal FW 8.14.3.0
+
+Fixes:
+------
+ 1. Problem:    Dcbx config bit-fields are not cleared before updating with the
+                user provided value.
+
+    Change:     Clear the bit-field before updating it with new value.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 2. Problem:    CQ86528 - Incorrect parsing of packet with unsupported
+                GRE/GENEVE version.
+
+    Change:     (FW L2) Apply FW workaround in Rx flow.
+
+    Introduced: Day 1.
+
+    Relevance:  GRE, GENEVE.
+
+ 3. Problem:    Initiator mode write exchange with T10 DIF may produce corrupt
+                payload.
+
+    Change:     (FW iSCSI) Propagate T10 DIF attributes to Tx flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    CQ88494 - RoCE throughput inconsistent when traffic is run on F0
+                and F2 (functions sharing same HW engine).
+
+    Change:     Fix Queue Zone allocation.
+
+    Introduced: 8.10.2.0.
+
+    Relevance:  RoCE w/ more than one function per engine.
+
+Enhancements:
+-------------
+ 1. Request:    Remove unused parameter of loopback indication from RoCE API.
+
+ 2. Request:    Add two APIs to configure A-RFS mode and A-RFS ntuple filter.
+
+ 3. Request:    Improve robustness of the SET_FIELD macro by using a mask.
+
+ 4. Request:    Add ecore API for getting the MFW crash dump info.
+
+ 5. Request:    Separate index to keep cid and Qzone id to support multi COS.
+
+ 6. Request:    Check that ECORE RoCE bitmaps are clear before freeing them.
+
+ 7. Request:    (FW iSCSI) Improve iSCSI IOPS performance with DIF enabled.
+
+ 8. Request:    (FW) Support AH ASIC.
+
+ 9. Request:    Add support for iWARP (phase-1).
+
+10. Request:    Add support for external PHY BCM8485x.
+
+Version 8.14.0.0 (Jul 31, 2016)
+===============================
+Internal FW 8.14.1.0
+
+Fixes:
+------
+ 1. Problem:    RDMA interrupt not being received from FW. This happened because
+                the interrupt arming doorbell was ignored by the HW.
+
+    Change:     Allocate a number of CIDs that is aligned to 16 (while not
+                dropping the alignment to ILT page), which is the HW Doorbell
+                Queue units when specifying the maximum Doorbell Queue number.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 2. Problem:    CQ86624 - RoCE and ping traffic stops while running stress+
+                longrun testing and seeing pglue errors is still seen despite
+                fix from 8.10.6.0.
+
+    Change:     (Init Tool) Fix ordering bug in init tool.
+
+    Introduced: Day 1.
+
+    Relevance:  Roce.
+
+ 3. Problem:    CQ87398 - VF VLAN creation throws error in linux rhel6.8.
+
+    Change:     Allow VLAN stripping request from VF for linux as well.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV under rhel6.x.
+
+ 4. Problem:    iWARP pure Syn LB packets not identified.
+
+    Change:     (FW iWARP) Correct value is checked for tcp syn packets.
+
+    Introduced: FW 8.10.7.0.
+
+    Relevance:  iWARP.
+
+ 5. Problem:    CQ87377 - Malicious VFs can send pause frames.
+
+    Change:     Configure FW to drop VF flow control packets according to MAC.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 6. Problem:    Memory leaks in a few ECORE RoCE error flows.
+
+    Change:     Release the allocated memory even before exiting the functions.
+
+    Introduced: Day 1.
+
+    Relevance:  ECORE RoCE.
+
+ 7. Problem:    Ethtype value is being read incorrectly in ieee-dcbx mode.
+
+    Change:     Use the ieee specific mask value for reading the ethtype value
+                in ieee-dcbx mode.
+
+    Introduced: Day 1.
+
+    Relevance:  Dcbx.
+
+ 8. Problem:    Endian-ness conversion is being applied incorrectly for dcbx
+                pri_to_tc field while reading/writing.
+
+    Change:     Do not apply the conversion for pri_to_tc value.
+
+    Introduced: Day 1.
+
+    Relevance:  Dcbx.
+
+ 9. Problem:    Transmission stop in case of large IOs with DIF.
+
+    Change:     (FW iSCSI) Fix the FW DIF flow.
+
+    Introduced: FW 8.10.8.0.
+
+    Relevance:  iSCSI.
+
+10. Problem:    HW attention during retransmit.
+
+    Change:     (FW Storage) Change the FW init.
+
+    Introduced: FW 8.10.8.0.
+
+    Relevance:  iSCSI, FCoE.
+
+11. Problem:    Pure TCP Syn packets not received correctly when function
+                personality is Eth or iWARP.
+
+    Change:     (FW iWARP) Fix the Eth FW.
+
+    Introduced: FW 8.10.7.0.
+
+    Relevance:  iWARP.
+
+12. Problem:    Login-request PDU is always transmitted with T(Transit) bit set.
+
+    Change:     (FW iSCSI) Set 'T' bit according to initialized value.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+13. Problem:    CQ87318 - FW assertion during re-transmit.
+
+    Change:     (FW iSCSI) Fix the iSCSI RT flow.
+
+    Introduced: FW 8.10.7.50.
+
+    Relevance:  iSCSI.
+
+14. Problem:    WQE with Fence indicator might result with "Local QP Operation"
+                error completion.
+
+    Change:     (FW RoCE) Fix the RoCE Requester flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+15. Problem:    PF asserts on second [incorrect] ACQUIRE request from VF.
+
+    Change:     Deny ACQUIRE requests from already acquired VFs.
+
+    Introduced: 8.10.4.0.
+
+    Relevance:  SRIOV.
+
+Enhancements:
+-------------
+ 1. Request:    Avoid forcing the driver's default resource allocation in case
+                of a diff with the MFW's allocation values.
+
+ 2. Request:    Remove PF MR configuration but allocate as many RoCE MRs as
+                possible.
+
+ 3. Request:    Allow backward compatibility with PF/VF from 8.7 and 8.8
+                releases. New VF over old PF might require datapath changes.
+
+ 4. Request:    Add an optional initiation of PF FLR as part of
+                ecore_hw_prepare().
+
+ 5. Request:    (FW RoCE) Improving RoCE 'Destroy QP' verb duration.
+
+Version 8.10.7.0 (Jul 10, 2016)
+===============================
+Internal FW 8.10.8.0
+
+Fixes:
+------
+ 1. Problem:    Dcbx ieee selector-field value is not populated in the case of
+                ecore interacting with old MFW.
+
+    Change:     Populate the value.
+
+    Introduced: Day 1.
+
+    Relevance:  Dcbx.
+
+ 2. Problem:    MTU Violation (compared with Transmitted Packet Size) was not
+                checked for LSO packets.
+
+    Change:     (FW L2) MTU Violation (compared with Transmitted Packet Size) is
+                now checked for LSO packets as well.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 3. Problem:    T10 DIF RDMA Write retransmission reports AppTag failures when
+                retransmitting from middle of IO.
+
+    Change:     (FW RoCE) Correct AppTag calculation in retransmission flow.
+
+    Introduced: FW 8.10.5.0.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    T10 DIF RDMA Write retransmission reports RefTag failures when
+                retransmitting from start of IO.
+
+    Change:     (FW RoCE) Correct RefTag offset calculation in retransmission
+                flow.
+
+    Introduced: FW 8.10.7.0.
+
+    Relevance:  RoCE.
+
+ 5. Problem:    FW Fatal assert might occur when doing destroy QP after modify
+                QP.
+
+    Change:     (FW RoCE) Remove code responsible for this FW fatal assert.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 6. Problem:    Doing RoCE start driver during L2 traffic is getting stuck due
+                to ramrod failure.
+
+    Change:     (FW RoCE) Fix FW flow.
+
+    Introduced: FW 8.10.0.0.
+
+    Relevance:  RoCE.
+
+ 7. Problem:    CQE with RDMA_CQE_RESP_STS_LOCAL_ACCESS_ERR is received when
+                using RQ sge with 'reserved key'.
+
+    Change:     (FW RoCE) Fix FW flow.
+
+    Introduced: FW 8.10.4.0.
+
+    Relevance:  RoCE.
+
+ 8. Problem:    Termination ramrod of multiple CIDs stuck.
+
+    Change:     (FW Storage) Fix the iSCSI/FCoE consolidation queue flow.
+
+    Introduced: Day 1.
+
+    Relevance:  Storage.
+
+ 9. Problem:    Wrong iSCSI statistics ram pointer.
+
+    Change:     (FW iSCSI) Fix the ram pointer value.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+10. Problem:    CQ87065/CQ86013/CQ86522 - HW bug causing HW attention.
+
+    Change:     (FW iSCSI) Apply FW workaround to Rx placement flow (MU ldr
+                command per SGE).
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+11. Problem:    CQ87014 - FW may report incorrect RSP flags to the driver as
+                part of CQE.
+
+    Change:     (FW FCoE) Fix the RSP handling flow.
+
+    Introduced: FW 8.10.7.0.
+
+    Relevance:  FCoE.
+
+12. Problem:    CQ87399 E4-RoCE: RoCE traffic failed over PFC configuration.
+
+    Change:     Configure the correct TC to the PF.
+
+    Introduced: 8.10.6.0.
+
+    Relevance:  Dcbx.
+
+Enhancements:
+-------------
+ 1. Request:    Add the NIG registers configuration for PTP in AH.
+
+ 2. Request:    Fix the calculation of the MFW port number in AH.
+
+ 3. Request:    Populate the dscp related info in the dcbx ramrod data.
+
+ 4. Request:    Add new OSAL - OSAL_WARN().
+
+ 5. Request:    Moved the roce_flavor parameter from
+                ecore_ll2_acquire_connection() to ecore_ll2_prepare_tx_packet().
+
+ 6. Request:    Add support for a destination MAC address update ramrod for
+                an iSCSI offloaded connection.
+
+ 7. Request:    Add support for ECORE LL2 loopback per packet.
+
+Version 8.10.6.0 (Jun 27, 2016)
+===============================
+Internal FW 8.10.7.0
+
+Fixes:
+------
+ 1. Problem:    Ecore sets NIG_REG_DSCP_TO_TC_MAP_ENABLE register even when the
+                dscp mapping is not written to the shared memory.
+
+    Change:     Set the register only when user configures the dscp mapping.
+
+    Introduced: Day 1.
+
+    Relevance:  Dcbx.
+
+ 2. Problem:    CQ87007 - E4 RoCE: latest component broken PFC with RoCEv2.
+
+    Change:     Use the new config path/fields defined by the FW for RoCEv2
+                protocol data.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 3. Problem:    CQ86902 - SW workaround for CFC VF weak & strong enable.
+                CQ86624 - RoCE and ping traffic stops while running stress+
+                          longrun testing and seeing pglue errors.
+
+    Change:     Initialize weak enable to 0 on top of existing configuration
+                of strong enable to 1. The fix for these issues is composed
+                of this initialization together with an init tool change to
+                zero ILT on engine phase.
+
+    Introduced: Day 1.
+
+    Relevance:  Roce.
+
+ 4. Problem:    The MR (TID) registration function returned to the user before
+                the registration was complete in the FW (the ramrod was sent
+                in a non-blocking manner so the verb consumer was informed of
+                success before a completion was received from the FW).
+
+    Change:     Removed the possibility for non-blocking a.k.a. concurrent
+                registration of TID registration. The latency issue that started
+                this effort to begin with was mitigated by lowering the ramrod
+                completion wait time in ecore SPQ.
+
+    Introduced: 8.7.0.0.
+
+    Relevance:  Verbs consumers that register MRs.
+
+ 5. Problem:    Ecore nvram test implementation has memory leak in error flow.
+
+    Change:     Fix the memory leak.
+
+    Introduced: Day 1.
+
+    Relevance:  Selftests.
+
+ 6. Problem:    SFP read and write can't exceed 16 bytes.
+
+    Change:     Zero the size and offset parameters before setting them.
+
+    Introduced: Day 1.
+
+    Relevance:  all.
+
+Enhancements:
+-------------
+ 1. Request:    Added the roce_mode parameter to ecore LL2 to configure if LL2
+                RoCE mode to RoCE v1/v2 IPv4/6.
+
+ 2. Request:    Add support for multiple classes of service.
+
+ 3. Request:    Enable tunnel HW GRO TPA aggregation.
+
+ 4. Request:    Semantic changes in several ecore Rx and Tx APIs.
+
+ 5. Request:    Clear appropriate indirect registers for arrowhead.
+
+ 6. Request:    Add dcbx app support for IEEE Selection Field.
+
+Version 8.10.5.0 (Jun 09, 2016)
+===============================
+Internal FW 8.10.7.0
+
+Fixes:
+------
+ 1. Problem:    CQ86777 - latest driver broken VF stop functionality.
+
+    Change:     Fixed flow in case VF is released without being acquired and
+                FLR before release.
+
+    Introduced: 8.10.4.0.
+
+    Relevance:  SRIOV.
+
+ 2. Problem:    CQ86809 - Observing yellow bang in SRIOV VF vbd.
+
+    Change:     Moved VF mail box mutex release to after handling the reply
+                message instead of after sending the message to the PF.
+
+    Introduced: 8.10.4.0.
+
+    Relevance:  SRIOV.
+
+ 3. Problem:    CQ86842 - FW assertion is hit when VFs are malfunctioning.
+
+    Change:     Prevent vport-update on PF if the VF's vport wasn't started.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 4. Problem:    CQ86922 - FW assertion is hit after re-load of driver in VM.
+
+    Change:     Close VF in firmware when the VF is being released.
+
+    Introduced: 8.10.4.0.
+
+    Relevance:  SRIOV.
+
+ 5. Problem:    CQ86541 - A HW bug that sometimes causes CFC-delete to succeed
+                before write-backs are complete, which can result in memory
+                corruption on host.
+
+    Change:     (FW) Apply FW workaround.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 6. Problem:    Tx-Switched packet may be sent to a wrong destination after FLR,
+                filter update or Vport up/down.
+
+    Change:     (FW L2) Fixed Tx-Switching cache clean FW flow.
+
+    Introduced: Day 1.
+
+    Relevance:  Tx Switching.
+
+ 7. Problem:    DCQCN RP timeout not update.
+
+    Change:     (FW RoCE) Fix firmware configuration flow.
+
+    Introduced: FW 8.10.0.0.
+
+    Relevance:  DCQCN.
+
+ 8. Problem:    T10 DIF RDMA Write calculates wrong expected CRC value in DIF
+                Tag.
+
+    Change:     (FW RoCE) Correct CRC machine initialization code.
+
+    Introduced: FW 8.10.5.0.
+
+    Relevance:  T10 DIF RDMA.
+
+ 9. Problem:    T10 DIF RDMA Write expected Runt value not verified against
+                calculated value.
+
+    Change:     (FW RoCE) Correct firmware flow to verify Runt result and report
+                errors.
+
+    Introduced: FW 8.10.5.0.
+
+    Relevance:  T10 DIF RDMA.
+
+10. Problem:    T10 DIF RDMA Read flow asserts.
+
+    Change:     (FW RoCE) Correct CRC machine initialization code.
+
+    Introduced: FW 8.10.5.0.
+
+    Relevance:  T10 DIF RDMA.
+
+11. Problem:    T10 DIF RDMA Write error result reported only on first IO.
+
+    Change:     (FW RoCE) Clear queued indication after first error result
+                handler.
+
+    Introduced: FW 8.10.5.0.
+
+    Relevance:  T10 DIF RDMA.
+
+12. Problem:    T10 DIF RDMA Write expected runt CRC checked in reverse
+                endianity.
+
+    Change:     (FW RoCE) Reverse endianity when verifying expected runt result
+                in firmware.
+
+    Introduced: FW 8.10.5.0.
+
+    Relevance:  T10 DIF RDMA.
+
+13. Problem:    T10 DIF RDMA Read Runt CRC value written to host in reverse
+                endianity.
+
+    Change:     (FW RoCE) Swap bytes in firmware before writing to host.
+
+    Introduced: FW 8.10.5.0.
+
+    Relevance:  T10 DIF RDMA.
+
+Enhancements:
+-------------
+ 1. Request:    Add support for the MFW crash dump.
+
+ 2. Request:    Use the MFW mailbox for getting resource allocation information.
+
+ 3. Request:    Improve the way a blocked context waits for a ramrod to be
+                completed.
+
+ 4. Request:    (FW RoCE) Change RoCE retransmission flow to start from middle
+                of retransmitted WQE (to help in interoperability).
+
+ 5. Request:    (FW RoCE) Add IP DSCP field setting from DCB per-port database.
+
+ 6. Request:    (FW RoCE) Add VLAN priority setting from DCB per-port database
+                for RROCE.
+
+Version 8.10.4.0 (May 26, 2016)
+===============================
+Internal FW 8.10.5.0
+
+Fixes:
+------
+ 1. Problem:    The FCoE discovery process fails.
+
+    Change:     Add a DUALMODE configuration in the LLH.
+
+    Introduced: 8.10.3.0.
+
+    Relevance:  FCoE.
+
+ 2. Problem:    Memory corruption when allocating dynamic ilt task.
+
+    Change:     Fixed the task initialization.
+
+    Introduced: 8.10.3.0.
+
+    Relevance:  RoCE.
+
+ 3. Problem:    PF allows VF to probe even when requiring too many resources.
+
+    Change:     Correct resource-agreement flow in VF acquisition message.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 4. Problem:    VF can exhaust all unicast MAC filters in HW, preventing PF
+                traffic.
+
+    Change:     PF enforces MAC limitation on VFs.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 5. Problem:    VF requesting to initialize unallocated queues can hang device.
+
+    Change:     PF to validate queue indices passed by VF before usage.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+Enhancements:
+-------------
+ 1. Request:    Add support for AH nvm cfg.
+
+ 2. Request:    Add support for dcbx static mode.
+
+ 3. Request:    Remove ECORE LL2 API to update MAC address.
+
+ 4. Request:    Add new image type for MFW AH bundle: NVM_TYPE_ETH_PHY_FW1
+                and NVM_TYPE_ETH_PHY_FW2.
+
+ 5. Request:    Add support for reading AH statistics.
+
+ 6. Request:    Add new OSAL - OSAL_SNPRINTF.
+
+ 7. Request:    Extend compatibility between PF/VF drivers - no longer do they
+                need a matching storm FW version, but rather a matching
+                fastpath Major number [which should rarely change].
+
+ 8. Request:    Added 'ecore_mcp_get_nvm_image()' API for reading an nvram img.
+
+ 9. Request:    Add support for dscp-map query/config.
+
+10. Request:    Differ BDQ resource ID for FCOe and iSCSI [BB only].
+
+11. Request:    Enable the dscp-to-tc map bit when operational mib is received.
+
+Version 8.10.3.0 (May 09, 2016)
+===============================
+Internal FW 8.10.5.0
+
+Fixes:
+------
+ 1. Problem:    SRIOV is not functional - ping on VF fails.
+
+    Change:     Correct the offset for producer update in RX queue start
+                response to the VF.
+
+    Introduced: 8.10.2.0.
+
+    Relevance:  SRIOV.
+
+ 2. Problem:    Register/clock selftests are failing for 100G adapters.
+
+    Change:     Use the correct ptt for a given hwfn.
+
+    Introduced: Day 1.
+
+    Relevance:  selftests.
+
+ 3. Problem:    When resizing a CQ the CQ bitmap is changed without lock.
+
+    Change:     Add lock.
+
+    Introduced: 8.10.2.0.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    Some hardware don't support atomic bit operations.
+
+    Change:     change name of OSAL_ATOMIC_TEST_AND_FLIP to OSAL_TEST_AND_FLIP.
+                note that it is harmless for the implementation to remain
+                atomic.
+
+    Introduced: 8.10.2.0.
+
+    Relevance:  RoCE.
+
+ 5. Problem:    CQ86300- Retaining the old mac after removal and creation of VF.
+
+    Change:     Clear the forced MAC while disabling VF.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 6. Problem:    CQ86133 - Upgrading FW hogs CPU for long period of time.
+
+    Change:     Add short sleeps while reading-from/writing-to the nvram.
+
+    Introduced: Day 1.
+
+    Relevance:  Voluntary-preemption schemes.
+
+ 7. Problem:    RoCE app PFC config gets overridden with the default app config.
+
+    Change:     If RoCE-V2 TLV is not detected, use RoCE app data for RoCE-v2.
+
+    Introduced: 8.10.2.0.
+
+    Relevance:  RoCE.
+
+ 8. Problem:    CQ86411 - E4:100G:getting Ramrod stuck while loading driver in
+                MSI mode.
+
+    Change:     Fail the initialization for 100G devices if invoked in MSI mode.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 9. Problem:    CQ86213 - FW assertion while re-connecting.
+
+    Change:     (FW iSCSI) Fix the TCP params initialization.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+10. Problem:    CQ85263 - FW assertion while doing host reset with iscsi + L2.
+
+    Change:     (FW iSCSI) Fix a thread-id bug.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+11. Problem:    CQ86155 - Incorret data digest may be transmitted for PDUs with
+                size > 12KB.
+
+    Change:     (FW iSCSI) Fix retransmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+Enhancements:
+-------------
+ 1. Request:    RoCE shared receive queue support.
+
+ 2. Request:    Fix minor issues in dcbx set-app implementation.
+
+ 3. Request:    Added handlers for "Dual Stage Classification".
+
+ 4. Request:    Added chain print API.
+
+ 5. Request:    DIF support.
+
+ 6. Request:    Support Binary debug tools.
+
+Version 8.10.2.0 (Apr 19, 2016)
+===============================
+Internal FW 8.10.4.0
+
+Fixes:
+------
+ 1. Problem:    CQ85618 - NPAR Max/Min Bandwidth settings are not honoured.
+
+    Change:     Workaround - saving qm rate limiter values before reinitialize
+                it due to dcbx update.
+
+    Introduced: Day 1.
+
+    Relevance:  NPAR, DCBX.
+
+ 2. Problem:    CQ83753 - TX switch treats LSO traffic with outband VLAN wrong.
+
+    Change:     (FW L2) Update tag before TX switch on all LSO flows.
+
+    Introduced: FW 8.1.2.0.
+
+    Relevance:  SRIOV.
+
+ 3. Problem:    CQ85054, CQ85371, CQ85298 – Chip might hang when receiving a
+                RoCE packet with invalid destination QP (can be caused by mac
+                CRC errors).
+
+    Change:     (FW RoCE) Disregard the packet with invalid destination QP.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    CQ85528 - HW attention when ABTS request arrives to Initiator.
+
+    Change:     (FW FCoE) Fix the unsolicited FW flow (ABTS request from Target
+                should be handled by Initiator as unsolicited packet).
+
+    Introduced: FW 8.10.0.0.
+
+    Relevance:  FCoE.
+
+ 5. Problem:    CQ85384 - SRIOV over NPAR - ramrod stuck when linux VM
+                with pvid set is powered off/on.
+
+    Change:     In case of when PVID is configured, if we do VM power off and
+                power on, ecore sends ETH_RAMROD_RX_QUEUE_UPDATE ramrod without
+                ETH_RAMROD_RX_QUEUE_START because ‘rxq_active’ flag is not
+                cleared during FLR and ecore checks for the same. Clear this
+                flag as part of FLR cleanup.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV along with PVID.
+
+ 6. Problem:    CQ85553 - the QM lock is not initialized for the non-first
+                loaded monolithic driver.
+
+    Change:     Move the QM lock initialization to a common location.
+
+    Introduced: 8.10.0.0.
+
+    Relevance:  Monolithic drivers.
+
+ 7. Problem:    Ringing a LL2 Tx doorbell might happen before its BDs data is
+                updated.
+
+    Change:     Add a missing write barrier before the doorbell.
+
+    Introduced: Day 1.
+
+    Relevance:  LL2.
+
+ 8. Problem:    CQ85899 - Wrong calculation of the resources start indices when
+                hiding the non-last functions on the engine.
+
+    Change:     Use the PF index within the enabled functions.
+
+    Introduced: 8.7.6.0.
+
+    Relevance:  All.
+
+ 9. Problem:    Timeset value is being configured incorrectly for a given Tx/Rx
+                coalescing value.
+
+    Change:     Ecore always used to configure timeset as half the requested
+                coalescing value. Configure the timeset and timer-resolution
+                correctly for a given coalescing value.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+10. Problem:    Number of EQ elements is smaller than it should be for RoCE
+                personality.
+
+    Change:     Fix the calculation of number of EQ elements.
+
+    Introduced: 8.10.0.0.
+
+    Relevance:  RoCE.
+
+11. Problem:    Anti spoofing does not work for tunneled packets.
+
+    Change:     (FW L2) Added tunneling logic to anti-spoofing feature.
+
+    Introduced: FW 8.2.1.0.
+
+    Relevance:  SRIOV.
+
+12. Problem:    Unmatched unicast traffic may be classified to a wrong PF when
+                the same MACs are used for both ports.
+
+    Change:     (FW L2) Fix HW init values.
+
+    Introduced: Day 1.
+
+    Relevance:  NPAR 4 port mode.
+
+13. Problem:    TX TCP window doesn't advance.
+
+    Change:     (FW iSCSI) Initialize the snd_wl1 parameter.
+
+    Introduced: FW 8.10.3.0.
+
+    Relevance:  iSCSI.
+
+14. Problem:    Chip may stall when retransmitting large (>64K) SlowIOs.
+
+    Change:     (FW iSCSI) Fix SlowIO scan flow.
+
+    Introduced: FW 8.5.1.0.
+
+    Relevance:  iSCSI.
+
+15. Problem:    Connection might (in low probability) stop giving SQ completions
+                in a scenario with packet loss.
+
+    Change:     (FW RoCE) Fix firmware retransmission flow..
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+16. Problem:    Page fault occured during hw initialization phase.
+
+    Change:     Fixed initialization of internal driver structures under iSCSI
+                personality.
+
+    Introduced: 8.10.1.0.
+
+    Relevance:  iSCSI personality.
+
+17. Problem:    The EQ size is too small in case of iSCSI personality.
+
+    Change:     Fix the EQ size calculation.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+18. Problem:    QP counters were showing double the number of QP.
+
+    Change:     Fixed calculation of QP Counters.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+19. Problem:    Tx-switched traffic rate is limited by physical line speed.
+
+    Change:     If no rate-limiters are needed, use maximum possible speed.
+
+    Introduced: Day 1.
+
+    Relevance:  Tx-switching.
+
+20. Problem:    Printing results of a clean idle check mistakenly fails.
+
+    Change:     (FW) Fix the parsing flow.
+
+    Introduced: Day 1.
+
+    Relevance:  Idle check.
+
+Enhancements:
+-------------
+ 1. Request:    (FW L2) Add tunnel statistics per PF statistics.
+
+ 2. Request:    Add support for iSCSI/TCP connection offload for type 2.
+
+ 3. Request:    Remove support for the obsolete iSCSI/FCoE RQ mechanism.
+
+ 4. Request:    Add ecore API/support for dcbx configuration.
+
+ 5. Request:    Add support to gather ECC statistics.
+
+ 6. Request:    Add support to gather GPIO information.
+
+ 7. Request:    Add app related fields/code for dcbx APIs. Also fix minor issues
+                in the set implementation.
+
+ 8. Request:    Add common API for LLH protocol filtering.
+
+ 9. Request:    Modify LL2 API to allow flexibility in OOO RX buffer allocation.
+
+10. Request:    (FW iWARP) Initial support for iWARP.
+
+11. Request:    Printouts reflecting OOO RX events are added.
+
+12. Request:    Printouts reflecting iSCSI offload/terminate events are added.
+
+13. Request:    Refactored implementation of RoCE bitmaps with new bitmap OSALs.
+
+14. Request:    Add support for 100g VFs.
+
+15. Request:    Add support for handling RoCE version-2 type TLVs.
+
+Version 8.10.1.0 (Mar 15, 2016)
+===============================
+Internal FW 8.10.2.0
+
+Fixes:
+------
+ 1. Problem:    Dynamic ILT allocation is not protected when being run from
+                different contexts, and it updates a wide-bus register with
+                separate 32-bit accesses.
+
+    Change:     Lock the allocation flow and change the wide-bus access into
+                a DMAE transaction.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 2. Problem:    Read/Write to grc may fail after resuming from low power state.
+
+    Change:     Invalidating the grc ptts when entering low power state.
+
+    Introduced: Day 1.
+
+    Relevance:  ALL.
+
+ 3. Problem:    Phy mac_stat doesn't show the correct port statistics.
+
+    Change:     Fixed function to use the port input correctly.
+
+    Introduced: 8.7.1.0.
+
+    Relevance:  ALL.
+
+ 4. Problem:    CQ85037 – FW assert during the transmit of ASYNC and REJECT
+                PDUs.
+
+    Change:     (FW iSCSI) Add support for ASYNC and REJECT PDUs.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    CQ85012 - Cleanup for task timed out after clearSQ in middle of
+                R2TE processing.
+
+    Change:     (FW iSCSI) Continue processing the R2TE.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    CQ85012 - Login exchange cleanup & clear SQ fix.
+
+    Change:     (FW iSCSI) Fix the login exchange cleanup & clear SQ.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 7. Problem:    CQ85072 - E4:RoCE:while running multiple sessions(200/500/1000)
+                system crashes or getting assertions/ramrod stuck.
+
+    Change:     Avoid weak ordering writes when the doorbells BAR is mapped as
+                write combining with the proper write barriers.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Added ECORE RoCE API that returns the number and maximum number
+                of: PDs, CQs, QPs, TIDs and DPIs.
+
+ 2. Request:    Populate the priority/bandwidth tables (to be used by clients).
+
+ 3. Request:    (FW L2) Added TX switch statistics per PF - counts mcast, bcast
+                and ucast bytes and packets both on TX and RX path.
+
+ 4. Request:    Remove ftrace support from driver.
+
+ 5. Request:    Add support for enabling dcqcn in RoCE.
+
+ 6. Request:    Add support for RDMA Queue Statistics.
+
+Version 8.10.0.0 (Feb 23, 2016)
+===============================
+Internal FW 8.10.1.0
+
+Fixes:
+------
+ 1. Problem:    Max amount of cqs is not initialized.
+
+    Change:     Return intialization of max number of completion queues which
+                was dropped by mistake.
+
+    Introduced: 8.7.8.0.
+
+    Relevance:  RoCE.
+
+ 2. Problem:    CQ84044 - E4:NPAR: Seeing qed call traces on  DELL730 after
+                reboot "BUG: scheduling while atomic: swapper/10/0/0x10000100".
+
+    Change:     Modify the locking scheme when sending a MB to the MFW, from a
+                mutex to a spinlock.
+
+    Introduced: 8.5.8.0.
+
+    Relevance:  All.
+
+ 3. Problem:    Connection recovery failure - un-completed task cleanup.
+
+    Change:     (FW iSCSI) Fix the clear SQ in middle of R2TQE flow.
+
+    Introduced: FW 8.7.4.0.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    Data integrity issue for SlowIO write exchanges.
+
+    Change:     (FW iSCSI) Fix SlowIO flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    CQ84287 - system asserted when switch port shut/no-shut
+                multiple times with RDMA traffic running.
+
+    Change:     Fixed cookie pointer when pending spq entry is moved to the
+                pending sending list.
+
+    Introduced: Day 1.
+
+    Relevance:  ALL.
+
+ 6. Problem:    Wrong calculation of the enabled functions on the 2nd engine in
+                case of 100G.
+
+    Change:     Fix the calculation.
+
+    Introduced: 8.7.6.0.
+
+    Relevance:  100G.
+
+ 7. Problem:    CQ84343 - Getting Aborts while doing iSCSI Discovery Login.
+
+    Change:     Fixed the chain pointer passed to zero the chain memory.
+
+    Introduced: 8.7.8.0.
+
+    Relevance:  iSCSI.
+
+ 8. Problem:    EDPM wasn't turned off, even if required to so by user
+                configuration / doorbell BAR size configuration.
+
+    Change:     Disable DPM via register if required to do so via user
+                configuration.
+
+    Introduced: 8.7.8.0.
+
+    Relevance:  RoCE.
+
+ 9. Problem:    CQ84363 - Traffic sometimes doesn't work in NPAR.
+
+    Change:     Protect against race when configuring DCBx results in QM.
+
+    Introduced: 8.2.3.0.
+
+    Relevance:  Multi-function, DCBx.
+
+10. Problem:    CQ84636 - MB param is misconfigured.
+
+    Change:     Fixed MB param creation.
+
+    Introduced: 8.7.5.0.
+
+    Relevance:  All.
+
+11. Problem:    CQ84582 - VF traffic doesn't work.
+
+    Change:     Correct VF doorbell address calculation.
+
+    Introduced: 8.7.7.0.
+
+    Relevance:  SRIOV.
+
+12. Problem:    Hypervisor might crash when VF ACQUIRE message is blocked.
+
+    Change:     Initialize length used for preparing the VF response.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+13. Problem:    CQ84077 - Data corruption when RSC enable.
+
+    Change:     (FW L2) Fix TPA flow for packets with ETH padding.
+
+    Introduced: Day 1.
+
+    Relevance:  RSC, LRO.
+
+14. Problem:    CQ84512, CQ84077 - Hw interrupt while running L2 traffic.
+
+    Change:     (FW L2) Fix line credit handling in L2 TX fastpath.
+
+    Introduced: FW 8.7.6.0.
+
+    Relevance:  L2.
+
+15. Problem:    CQ84546 - Running interoperability scenarios with switch may
+                cause hardware attention.
+
+    Change:     (FW) Fix error handling flow when receiving packets with wrong
+                destination qp.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+16. Problem:    CQ84496 - System hit a bugcheck on starting RoCE traffic.
+
+    Change:     Fixed handling of unlimited pending slowpath ramrods with
+                blocking completion mode.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+17. Problem:    Memory leak when failng to allocate a chain PBL table.
+
+    Change:     Fix the flow so the virtual PBL table will be freed in such a
+                case.
+
+    Introduced: 8.7.7.0.
+
+    Relevance:  All.
+
+18. Problem:    Multicast and broadcast packets not forwarded to LL2, when
+                default PF is used.
+
+    Change:     (FW) Allow multicast and broadcast packets forwarding, when
+                default PF is used.
+
+    Introduced: FW 8.2.3.0.
+
+    Relevance:  NPAR, QPAR.
+
+19. Problem:    CQ84177 - 16 CQs causing System crash in iSCSI (relevant also
+                for FCoE).
+
+    Change:     (FW Storage) Fix the initialization of CQs during Function Init.
+
+    Introduced: Day 1.
+
+    Relevance:  Storage.
+
+20. Problem:    Statistics for requester received packets are not counted.
+
+    Change:     (FW RoCE) Fix RX statistics collection flow.
+
+    Introduced: FW 8.7.6.0.
+
+    Relevance:  RoCE.
+
+21. Problem:    CQ84638 - Connect after termination on the same CID failure.
+
+    Change:     (FW iSCSI) Fix the close flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+Enhancements:
+-------------
+ 1. Request:    Add ecore API to exract FCoE/iSCSI/LL2 statistics.
+
+ 2. Request:    Use a seperate Ystorm queue zone ID for each Tx queue ID.
+
+ 3. Request:    Add ecore support for configuring Tx coalesce value.
+
+ 4. Request:    (FW L2) TX performance improvements.
+
+ 5. Request:    Add ecore_selftest_api.h and, move selftest APIs to this file.
+
+ 6. Request:    Add clock, register and nvram tests to selftest.
+
+ 7. Request:    Add support for new device mode 4x25G, mainly for MNM.
+
+ 8. Request:    Add ecore API for setting whether the general behavior should
+                be preventing attention from being reasserted.
+
+ 9. Request:    Add New OSAL_IOV_PRE_START_VPORT().
+
+10. Request:    Add selftest APIs to the documentation.
+
+11. Request:    Added "default_speed_autoneg" and "default_speed" params to
+                ecore_mcp_link_capabilities and initializing them according to
+                the nvm settings.
+
+12. Request:    Add a CRC check to the nvram selftest.
+
+13. Request:    Add an API to get the temperature sensors info from the MFW.
+
+14. Request:    ECORE RoCE API to use num_qps and num_mrs instead of num_cons
+                and num_tasks. Move out all non-input fields from ecore_roce_pf-
+                params.
+
+15. Request:    Move dcbx_pfc specific elements to new sub-structure and also,
+                populate the pfc-bitmap in the ecore.
+
+16. Request:    Add an API to get MBA versions from the MFW.
+
+17. Request:    Change return values of sfp get functions.
+
+18. Request:    (FW L2) Add support to control frames detection on TX path -
+                SRIOV security feature, configured per vport, and detection by
+                ether-type or by MAC address.
+
+19. Request:    (FW RoCE) Adding DCQCN support.
+
+20. Request:    Add FCoE support for BDQ and the corresponding API.
+
+Version 8.7.8.0 (Jan 12, 2016)
+==============================
+Internal FW 8.7.5.0
+
+Fixes:
+------
+ 1. Problem:    Cont00084227 -E4:25G:"qed_dmae_host2grc: Wait Failed" ,probe
+                failed and not able to load qede driver on specific Gen9 system
+                Cont00084206 - E4 2015U2: 100G interface fails to show with
+                driver 8.7.7.0.
+                Failure to probe device (init hw) was followed by an invalid BUS
+                read that prevented re-loading the driver, possibly crashing the
+                machine on re-load.
+
+    Change:     Stop the timers (TM) as part of the failure code.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    Memory corruption in ecore_iscsi_setup_connection().
+
+    Change:     Zero pbl chain memory page by page.
+
+    Introduced: 8.7.7.0.
+
+    Relevance:  iSCSI.
+
+ 3. Problem:    Due to a workaround to a HW bug the number of TIDs was limited
+                to 128K-1.
+
+    Change:     Use newly introduced FW defines.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    CQ82195 - Add Fan Failure support.
+
+    Change:     Notify the upper driver about a fan failure event.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Add ecore API to send empty ramrod to the fw.
+
+ 2. Request:    Add a user configuration roce_edpm that allows enabling,
+                disabling or forcing EDPM.
+
+ 3. Request:    Add a CNQ size limit.
+
+ 4. Request:    Add notifications of HW errors to upper driver.
+                Add new OSAL - OSAL_HW_ERROR_OCCURRED.
+
+Version 8.7.7.0 (Jan 07, 2016)
+==============================
+Internal FW 8.7.5.0
+
+Fixes:
+------
+ 1. Problem:    MFW commands might timeout when enabling iov.
+
+    Change:     Take MCP lock when communicate MSI-x requirements for VF.
+
+    Introduced: 8.4.0.0.
+
+    Relevance:  SRIOV.
+
+ 2. Problem:    Disabling the PCIe relaxed ordering attribute through a PGLCS
+                register won't be applied if secure mode is enabled.
+
+    Change:     Replace the register write with a PCI config space access.
+
+    Introduced: 8.2.4.0.
+
+    Relevance:  All.
+
+ 3. Problem:    When getting a process kill indication in CMT mode, attentions
+                are disabled in the IGU block for only a single HW function.
+
+    Change:     Disable attentions for all HW functions, while carrying out the
+                other operations by only HW function 0.
+
+    Introduced: 8.5.6.0.
+
+    Relevance:  Error recovery.
+
+ 4. Problem:    Cont0084053 - E4 2x25G 2015U2: ib_read_bw exits with
+                "Segmentation fault (core dumped)" when "--run_infinitely"
+                option is used.
+
+    Change:     Updated the maximum CQE.
+
+    Introduced: 8.7.4.0.
+
+    Relevance:  RoCE.
+
+Enhancements:
+-------------
+ 1. Request:    VF0 works on AH FPGA.
+
+ 2. Request:    Modify the ILT allocation to be divided between the actual
+                enabled PFs.
+
+ 3. Request:    Add new OSALs - OSAL_PCI_FIND_CAPABILITY and
+                OSAL_PCI_WRITE_CONFIG_WORD.
+
+ 4. Request:    Modify the ecore chain allocation to be page by page.
+
+ 5. Request:    Add new OSALs - OSAL_VALLOC and OSAL_VFREE.
+
+ 6. Request:    Increase maximum RoCE QPs to 8192. Added the ability to
+                configure the number of RoCE DPIs and QPs via qede. Added
+                support for configurable normal region (change "DEMS size").
+
+ 7. Request:    Add support for sfp get and set.
+
+ 8. Request:    Add support for gpio read and write.
+
+Version 8.7.6.0 (Dec 28, 2015)
+==============================
+Internal FW 8.7.5.0
+
+Fixes:
+------
+ 1. Problem:    Failing to transmit packets with LLC/SNAP header.
+
+    Change:     (FW L2) Add LLC/SNAP FW support.
+
+    Introduced: FW 8.6.0.0.
+
+    Relevance:  L2.
+
+ 2. Problem:    In case out of order packet is a new Isle which can't be
+                allocated (either because connection reached maximal isles
+                configuration, or no more global isles resources left), TCP
+                drops the packet, but would send a pure ACK.
+
+    Change:     (FW iSCSI) Send pure ack only if a new isle can be allocated for
+                the connection.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 3. Problem:    Login Response with header or digest enable failure.
+
+    Change:     (FW iSCSI) Fix the Login Response RT flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    Rx connection error.
+
+    Change:     (FW iSCSI) Disable the Mstorm valid bit in case of local
+                completion.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    IO timeouts during OOO scenarios.
+
+    Change:     (FW iSCSI) Re-open TCP window once last Out-Of-Order packet is
+                received from Out-Of-Order queue.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    Ack processing.
+
+    Change:     (FW iSCSI) Do ack processing on packets that are supposed to be
+                truncated.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 7. Problem:    Connection activity counters may be improperly released in error
+                condition if SQ WQE contains multiple SGEs, eventually leading
+                to stuck firmware.
+
+    Change:     (FW RoCE) Fix connection activity counter release firmware.
+
+    Introduced: FW 8.7.4.0.
+
+    Relevance:  RoCE.
+
+ 8. Problem:    Race condition between data placement and error CQE when an
+                error occurs in requester RX path.
+
+    Change:     (FW RoCE) Guarantee placement complete before posting error CQE.
+
+    Introduced: FW 8.7.3.0.
+
+    Relevance:  RoCE.
+
+Enhancements:
+-------------
+ 1. Request:    Properly learn number of ports in AH.
+
+ 2. Request:    Add verification for mcp_resume.
+
+ 3. Request:    Add zero_placement_offset param to ecore_sp_vport_start_params.
+
+ 4. Request:    Optimize the resource allocation scheme by considering the
+                actual number of enabled PFs.
+
+ 5. Request:    Add max_mr_size to ECORE ROCE.
+
+Version 8.7.5.0 (Dec 17, 2015)
+==============================
+Internal FW 8.7.4.0
+
+Fixes:
+------
+ 1. Problem:    PCI read/write access by the device when Bus Master Enable was
+                was down. Seen in CQ83517 and CQ82629 although this is not the
+                root cause of these issues.
+
+    Change:     When PF stop ramrod fails, don't abort unload flow. Instead,
+                continue to the HW disable flow disabling HW from accessing
+                the host.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    After L2 interfaces is disabled (linux ifdown) roce ramrods
+                can't pass. Example scenario: rping, ifdown, kill application.
+
+    Change:     When calling stop_fastpath, don;t diable timers, since slowpath
+                should still be active, and roce slowpath requires timers to be
+                active.
+
+    Introduced: Day 1.
+
+    Relevance:  Roce.
+
+ 3. Problem:    Clear SQ failure (2nd force load command).
+
+    Change:     (FW iSCSI) Fix the WQE offset as part of the clear SQ ramrod.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    IO timeout due to TCP close window or
+                ISCSI_EVENT_TYPE_ASYN_MAX_KA_PROBES_CNT connection error.
+
+    Change:     (FW iSCSI) Fix the in-order TCP window update.
+
+    Introduced: FW 8.4.2.0.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    Missing TCP ACK.
+
+    Change:     (FW iSCSI) Fix the TCP ACK processing flow in case of segmented
+                PDUs.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    FW assert after iscsi connection error (relevant for recovery
+                flows).
+
+    Change:     (FW iSCSI) Fix the cid error MCM FOC flow.
+
+    Introduced: FW 8.7.0.0.
+
+    Relevance:  All.
+
+ 7. Problem:    Stop sending packets while in Fast RT.
+
+    Change:     (FW iSCSI) Enable more to send rule in Fast RT if needed.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 8. Problem:    CQ83520, 82997, 83118 - System break or ping stop during RoCE
+                traffic.
+
+    Change:     (FW RoCE) New hardware initializations as workaround for HW
+                issue found.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 9. Problem:    Firmware stuck in error handling race flow.
+
+    Change:     (FW RoCE) Fix error handling flow in Requester.
+
+    Introduced: FW 8.7.3.0.
+
+    Relevance:  RoCE.
+
+10. Problem:    Memory region activity counters may not be released in error
+                condition if SQ WQE contains multiple SGEs, eventually leading
+                to stuck firmware.
+
+    Change:     (FW RoCE) Release all relevant activity counters.
+
+    Introduced: FW 8.4.1.0.
+
+    Relevance:  RoCE.
+
+11. Problem:    In case packet is received with both RST and URG flags set, TCP
+                would return TCP_SEG_PROC_URG result to upper layer and ignore
+                the RST.
+
+    Change:     (FW) Completely ignore URG flag by the TCP stack.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+Enhancements:
+-------------
+ 1. Request:    Add support for SFP/QSFP read, write and decode commands.
+
+ 2. Request:    Update the variable names for MAC Rx stats to the more
+                meaningful ones similar to the MAC Tx stats.
+
+ 3. Request:   (FW Storage) Adding support for dropless queues (for CmdQ and
+               BdQ).
+
+Version 8.7.4.0 (Dec 03, 2015)
+==============================
+Internal FW 8.7.3.0
+
+Fixes:
+------
+ 1. Problem:    The RoCE device capability of CQ elements reported was smaller
+                than possible by one CQE.
+
+    Change:     Report the maximum capability of allowed CQ elements.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    The handling of the SPQ out-of-order completions has a wrong
+                bitmap calculation.
+
+    Change:     Fix the calculation.
+
+    Introduced: 8.7.2.0.
+
+    Relevance:  All.
+
+ 3. Problem:    CQ83395 - Firmware assert exposes when performing exchange
+                cleanup on a middle-path task.
+
+    Change:     (FW FCoE) Allow handling exchange cleanup on a middle-path task.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE.
+
+ 4. Problem:    CQ82443 - Storm gets to 100% utilization and blocks the FCoE
+                performance to 2.2 MIOPS.
+
+    Change:     (FW FCoE) Remove assert logs from the fast-path flows.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE.
+
+ 5. Problem:    CQ83451 - Connection Error in case of Login Response StatSN
+                value > 0.
+
+    Change:     (FW iSCSI) Fix the Login Response flow.
+
+    Introduced: FW 8.7.2.0.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    Uncompleted task cleanup.
+
+    Change:     (FW iSCSI) Fix the cleanup flow (UnValid task after cleanup HQ
+                scan).
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 7. Problem:    CQ83452 - CQE with flush not posted for SQ after Responder error
+                detected.
+
+    Change:     (FW RoCE) Resolve race in error handling CQE generation.
+
+    Introduced: FW 8.3.0.0.
+
+    Relevance:  RoCE.
+
+ 8. Problem:    CCFC execution error when getting packets with CRC errors.
+
+    Change:     Workaround - set the "strong_enable" bit in the CCFC for all VFs
+                to enable the FW error handler to invoke in this case.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Version 8.7.3.0 (Nov 22, 2015)
+==============================
+Internal FW 8.7.2.0
+
+Fixes:
+------
+ 1. Problem:    Coexistence ROCE/iSCSI and FCoE problem.
+
+    Change:     Ecore does not care about LLH classification type but MFW
+                initializes involved registers.
+                Fix is effective with MFW 8.7.1.0 and later.
+
+    Introduced: Day 1.
+
+    Relevance:  ROCE, iSCSI, FCoE.
+
+ 2. Problem:    CQ80844 - Ping stops once adding vlan ID.
+
+    Change:     (FW L2) Fix add VLAN filter flow.
+
+    Introduced: FW 8.2.1.0.
+
+    Relevance:  L2.
+
+ 3. Problem:    Rx traffic stops after remove all VLAN filters.
+
+    Change:     (FW L2) Fix remove all filters flow.
+
+    Introduced: FW 8.7.1.0.
+
+    Relevance:  L2.
+
+ 4. Problem:    Tx stop in middle of traffic.
+
+    Change:     (FW iSCSI) Fix the Tx.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    OOO event causing Rx connection error.
+
+    Change:     (FW iSCSI) Fix the OOO right edge trimming.
+
+    Introduced: FW 8.4.0.0.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    exp_stat_sn validation error.
+
+    Change:     (FW iSCSI) Fix the Rx validations.
+
+    Introduced: FW 8.7.1.0.
+
+    Relevance:  iSCSI.
+
+Enhancements:
+-------------
+ 1. Request:    Add OSAL_POLL_MODE_DPC to support single-threaded operation.
+
+ 2. Request:    Major refactoring of LL2 code.
+
+ 3. Request:    Add support for 16 PF AH emulation.
+
+ 4. Request:    Add support for 32-bit chains.
+
+Version 8.7.2.0 (Nov 16, 2015)
+==============================
+Internal FW 8.7.1.0
+
+Fixes:
+------
+ 1. Problem:    Concurrent non-blocking slowpath ramrods can cause an overflow
+                in the SPQ.
+
+    Change:     Handle out-of-order completions, and fix the way a pending SPQ
+                entry is moved to the pending sending list.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    The elements left calculation for "next pointer" chains may miss
+                an unusable entry.
+
+    Change:     Fix the calculation.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 3. Problem:    GRC access error on writing to MCP shmem during Function init
+                and FLR initial cleanup.
+
+    Change:     (FW) Fix FW FLR flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 4. Problem:    CQ82539 - Final FLR ack is not always written to the correct
+                location.
+
+    Change:     (FW) Fix FW FLR flow.
+
+    Introduced: 8.7.0.0.
+
+    Relevance:  All.
+
+ 5. Problem:    CQ82059 - unexpected RSC exceptions seen when traffic is run.
+
+    Change:     (FW L2) Do not increment tpa_aborts_num when aggregation closed
+                due to timeout.
+
+    Introduced: Day 1.
+
+    Relevance:  RSC, LRO, GRO.
+
+ 6. Problem:    'force_vlan_mode' flag in first TX BD overrides default VLAN
+                setting.
+
+    Change:     (FW L2) Fix Tx flow. Now, 'force_vlan_mode' flag will only
+                override DCB PCP.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 7. Problem:    CQ83089 - Modifying a QP to error state while retransmitting
+                from the SQ might cause some SQ WQEs not to be completed.
+
+    Change:     (FW RoCE) Fix Modifying to error state flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 8. Problem:    CQ82386 - Error during transmitting RDMA read responses might
+                cause the chip to get stuck.
+
+    Change:     (FW RoCE) Fix flow of handling transmission from IRQ after error
+                was detected.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 9. Problem:    CQ83210 - Firmware assert may be exposed while performing
+                exchange cleanup.
+
+    Change:     (FW FCoE) Fix firmware exchange cleanup flow.
+
+    Introduced: 8.7.0.0.
+
+    Relevance:  FCoE.
+
+10. Problem:    FW assert during connection recovery.
+
+    Change:     (FW iSCSI) Fix the clear SQ flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+11. Problem:    FW OOO slow recovery.
+
+    Change:     (FW iSCSI) Fix OOO flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+12. Problem:    Data-In with statusBit=1 Re-transmit failure.
+
+    Change:     (FW iSCSI) Fix the Data-In Re-transmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+13. Problem:    StatSN value skip.
+
+    Change:     (FW iSCSI) Fix the StatSN transmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+Version 8.7.1.0 (Nov 09, 2015)
+==============================
+Internal FW 8.7.0.0
+
+Fixes:
+------
+ 1. Problem:    Can't initialize AH higher PFs when IOV capability exists.
+
+    Change:     Calculate first VF index without reading PCI core registers.
+
+    Introduced: Day 1.
+
+    Relevance:  IOV, AH.
+
+ 2. Problem:    Driver Probe fails.
+
+    Change:     Temporarily not require FW to ack final cleanup indication as
+                it is broken in FW 8.7.0.0.
+
+    Introduced: FW 8.7.0.0.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Added ecore_phy_api.h for phy commands used by debugfs.
+
+Version 8.7.0.0 (Nov 05, 2015)
+==============================
+Internal FW 8.7.0.0
+
+Fixes:
+------
+ 1. Problem:    Double doorbel of LL2 TX packet.
+
+    Change:     Flow of TX packet submission is fixed.
+
+    Introduced: Day 1.
+
+    Relevance:  LL2.
+
+ 2. Problem:    CQ80267 - Rx gets stuck because of miss-ordered rx update.
+
+    Change:     (FW iSCSI) Fix in retransmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 3. Problem:    Rx ACK processing during/after retransmit caused assertion.
+
+    Change:     (FW iSCSI) Fix Rx ACK processing after re-transmit [Q0 flow].
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    CQ82892 - HW attention observed when working on TAPE mode.
+
+    Change:     Fixed CONF/XFER placement firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE Tape.
+
+ 5. Problem:    NIG tag-mac classification always done according to outer MAC.
+
+    Change:     Fixed the check of whether chip is switch-independt MF.
+
+    Introduced: 8.2.1.0.
+
+    Relevance:  Switch Dependent MF.
+
+ 6. Problem:    Compilation failure issue on Power PC.
+
+    Change:     Compare 64 bit variables instead of 32 bit.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 7. Problem:    Capability of max_cqe was too high in 32 bit systems.
+
+    Change:     Configure max_cqe to an appropriate value in 32 bit systems.
+
+    Introduced: 8.6.1.0.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Configure ramrods with incremental 'echo'.
+
+ 2. Request:    Reintroduce enhancement for Cont00081796 - speed up NFS over
+                RoCE mount time. Change: when registering an ecore roce tid the
+                caller can choose if the registration will be blocking or
+                non-blocking i.e. concurrent.
+
+Version 8.6.1.0 (Oct 29, 2015)
+==============================
+Internal FW 8.6.1.0
+
+Fixes:
+------
+ 1. Problem:    CQ81448 - E4 RDMA - Traffic moving to L2 path after link
+                down/up from switch.
+
+    Change:     Added new qp state ECORE_ROCE_QP_STATE_SQ_ERR.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCe.
+
+ 2. Problem:    Assertions seen while running lots of storage connections.
+
+    Change:     Next entries in the searcher T2 table are initialized as BE.
+                This introduces OSAL_CPU_TO_BE64.
+
+    Introduced: Day 1.
+
+    Relevance:  Storage.
+
+ 3. Problem:    CQ81507 - Event Queue / Common Queue completion might be placed
+                at the wrong place in the ring.
+
+    Change:     (FW) Fixed Common Queues PBL pre-fetch FW flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 4. Problem:    tag insertion on EDPM packets with tunneling didn't work as
+                expected.
+
+    Change:     (FW) Update relevant EDPM flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 5. Problem:    CQ82798 - Firmware caused an ecore assert during device unload.
+
+    Change:     (L2) Fixed Firmware device unload flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 6. Problem:    CQ82638 - System crash while running L2 traffic and changing
+                MTU after enabling WOL in lediag.
+
+    Change:     Update the link-status only when the driver requests for the
+                link.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 7. Problem:    CQ81593: RDMA connections getting dropped with large number
+                of queue pairs.
+
+    Change:     Changed ECORE MR TID registration from callback to block.
+                (This reverses the fix to: Cont00081796 - speed up NFS over
+                RoCE mount time). Use ramrod with echo equals to 0.
+
+    Introduced: 8.6.0.0.
+
+    Relevance:  RoCE.
+
+Enhancements:
+-------------
+ 1. Request:    Add ECORE RoCE API for CQ ring mode.
+
+ 2. Request:    Add support for SRIOV vf min rate configuration.
+
+Version 8.6.0.0 (Oct 14, 2015)
+==============================
+Internal FW 8.6.0.0
+
+Fixes:
+------
+ 1. Problem:    CQ82537 - Unable to create gvlan on the VF after PVID toggle.
+
+    Change:     Clear vlan shadow config in VF FLR flow.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 2. Problem:    CQ80777 - RH6.6 System crashed while loading qede driver with
+                INT#x (Legacy) interrupt.
+
+    Change:     Complete the IGU configuration before requesting for the
+                interrupts.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 3. Problem:    L5 with inner VLAN causing connection error.
+
+    Change:     (FW iSCSI) Fixed the vlan parsing configuration.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    CQ81502 - ISCSI errors are observed during Initiator READ I/Os.
+
+    Change:     (FW iSCSI) Fixed the Rx delineation flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    CQ81084, CQ81864 - iSCSI with inner vlan --> connection errors.
+
+    Change:     (FW iSCSI) Fixed the vlan parsing configuration.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    CQ82107 - HW attention after re-login to tape device.
+
+    Change:     (FW FcoE) Fix flow that sends CONF packets.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE - Tape devices.
+
+ 7. Problem:    CQ82055 - Assertion during VM power while runninng L2 traffic.
+
+    Change:     (FW) Fix VF start flow.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 8. Problem:    Rx flow gets stuck because of missing update from Tx-side.
+
+    Change:     (FW iSCSI) Fix Tx no-payload flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 9. Problem:    Performance degredation in signle connection fow.
+
+    Change:     (FW L2) Fix Tx double buffer logic.
+
+    Introduced: 8.2.1.0.
+
+    Relevance:  L2.
+
+Enhancements:
+-------------
+ 1. Request:    Cont00081796 - speed up NFS over RoCE mount time.
+
+ 2. Request:    Add support for RoCE on AH emulation.
+
+ 3. Request:    HSI files changes - added RDMA hsi files to be used by RoCE.
+                A significant amount of renames from RoCE to RDMA in hsi.
+
+ 4. Request:    Prevent malicious VF from causing attentions by doorebell.
+
+Version 8.5.9.0 (Oct 08, 2015)
+==============================
+Internal FW 8.5.6.0
+
+Fixes:
+------
+ 1. Problem:    CQ82290 - Scheduling while atomic might occur if GFP_KERNEL is
+                supported.
+
+    Change:     Fix DCBx flow to allocate using GFP_ATOMIC from sleepless ctx.
+
+    Introduced: 8.5.8.0.
+
+    Relevance:  All.
+
+ 2. Problem:    OOO packets corrupts memory in linux.
+
+    Change:     Don't assume iterator at end of list is OSAL_NULL.
+
+    Introduced: 8.3.5.0.
+
+    Relevance:  iSCSI OOO.
+
+ 3. Problem:    CQ80462 - driver load failure on 100G Board.
+
+    Change:     Do not obtain BAR size from OS callback, as in some environments
+                too large values are returend, causing device access intended
+                for engine 1 to arrive on engine 0. Instead, obtain BAR size
+                from device register.
+
+    Introduced: Day 1.
+
+    Relevance:  100G.
+
+ 4. Problem:    OOO TC isn't properly configured in HW.
+
+    Change:     Workaround - enable 5 TCs per port instead of 4.
+
+    Introduced: 8.5.8.0.
+
+    Relevance:  iSCSI OOO.
+
+Enhancements:
+-------------
+ 1. Request:    Add APIs for vport level min rate configuration.
+
+ 2. Request:    Add APIs to configure PF min and max bandwidth dynamically.
+
+ 3. Request:    Add ecore support for handling the dynamic bandwidth change
+                notifications from the mfw.
+
+ 4. Request:    Make __ecore_get_vport_stats() public API to allow reading
+                statistics from a given engine on a 100g device.
+
+ 5. Request:    Remove slowdown logic as its not working in secure mode.
+
+Version 8.5.8.0 (Sep 21, 2015)
+==============================
+Internal FW 8.5.6.0
+
+Fixes:
+------
+ 1. Problem:    CQ77036 - Port identification does not work in linux driver.
+
+    Change:     Add ecore support for port identification.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    OOO packets corrupts memory in linux.
+
+    Change:     Check for empty lists before iterating over them.
+
+    Introduced: 8.3.5.0.
+
+    Relevance:  iSCSI OOO.
+
+ 3. Problem:    Connection error during out of order processing.
+
+    Change:     (FW iSCSI) Fixed the out-of-order flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI OOO.
+
+ 4. Problem:    CFC execution error might occur.
+
+    Change:     (FW L2) Changes the L2 TX AC policy.
+
+    Introduced: 8.5.6.0.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Remove 'tpa_buf_size' from ecore_sp_vport_start() [deprecated].
+
+ 2. Request:    Support proper TC for iSCSO OOO TX chain.
+
+ 3. Request:    Change slowpath allocation from GFP_ATOMIC into GFP_KERNEL.
+
+ 4. Request:    Add ecore support for NCSI statistics.
+
+Version 8.5.7.0 (Sep 02, 2015)
+==============================
+Internal FW 8.5.5.0
+
+Fixes:
+------
+ 1. Problem:    RoCE isn't working.
+
+    Change:     Translate ecore MF modes into FW MF modes when initializing.
+
+    Introduced: 8.5.6.0.
+
+    Relevance:  All.
+
+ 2. Problem:    CQ81178 - accept-any-vlan is being reset when no VLAN filters.
+
+    Change:     (FW L2) Fixed any-vlan update flow.
+
+    Introduced: 8.2.2.0.
+
+    Relevance:  L2.
+
+ 3. Problem:    CQ81412 - Timestamp value in TCP handshake is inconsistent
+                with value in packets sent after it.
+
+    Change:     (FW iSCSI) Fix timestamp option on handshake packets.
+
+    Introduced: Day 1.
+
+    Relevance:  TCP option 2 with timestamp enabled.
+
+ 4. Problem:    Completion for inline EDPM was given on WQE regardless of
+                signaled attributes.
+
+    Change:     (FW RoCE) Fix processing of EDPM WQEs flow.
+
+    Introduced: Day 1.
+
+    Relevance:  Inline WQEs with EDPM enabled.
+
+ 5. Problem:    Connection failure after task cleanup.
+
+    Change:     (FW iSCSI) Fixed the exp_stat_sn validation after task cleanup.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI initiator.
+
+ 6. Problem:    FW might still assert when transmitting [length > MTU].
+
+    Change:     (FW L2) Fixed MTU violation flag initialization.
+
+    Introduced: 8.5.6.0.
+
+    Relevance:  L2.
+
+Enhancements:
+-------------
+ 1. Request:    Major changes in L2 Rx HSI - support TPA over BDs, remove
+                SGE rings.
+
+ 2. Request:    Add support for PF to suggest VF its mac via new api
+                ecore_iov_bulletin_set_mac().
+
+ 3. Request:    Update ecore_sp_vport_start function prototype to have an
+                argument structure inplace of large number of arguments.
+
+Version 8.5.6.0 (Aug 26, 2015)
+==============================
+Internal FW 8.5.4.0
+
+Fixes:
+------
+ 1. Problem:    When vport is configured to accept only untagged packets as
+                default behavior, stopping HW might cause FW assertion.
+
+    Change:     (FW L2) Fixed relevant flow.
+
+    Introduced: 8.3.3.0.
+
+    Relevance:  L2.
+
+ 2. Problem:    CQ80743, CQ81295 - FW assertion appear during vport stop.
+
+    Change:     (FW L2) Fixed contextless slow-path firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 3. Problem:    Posting 'send' or 'rdma write' WQE with multiple SGEs where
+                at least one of the SGEs has length <= 64K might stuck chip.
+
+    Change:     (FW RoCE) Fixed relevant flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    Target write failure in case of R2T PDU packet delayed ack.
+
+    Change:     (FW iSCSI) Fix the R2T PDU packet delayed ack.
+
+    Introduced: 8.4.1.0.
+
+    Relevance:  RoCE.
+
+ 5. Problem:    FW assert during the re-transmit of logic PDU.
+
+    Change:     (FW iSCSI) Fix the logic PDU re-transmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    Initiator mode is not updating the driver about sense data.
+
+    Change:     (FW iSCSI) Fix the updating of the sense data.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 7. Problem:    GRC dump can't be parsed when taken with 'crash' preset.
+
+    Change:     (FW tools) Fix the grcDump.
+
+    Introduced: 8.5.4.0.
+
+    Relevance:  All.
+
+ 8. Problem:    CQ80746 - FW asserts When transmitting [length > MTU].
+
+    Change:     (FW L2) Silently drop such packets instead of asserting.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 9. Problem:    CQ80796 - Assertions seen while running non-common block error
+                recovery with ping traffic.
+
+    Change:     Disable attentions in the IGU block when getting a process kill
+                notification.
+
+    Introduced: Day 1.
+
+    Relevance:  Error recovery.
+
+Enhancements:
+-------------
+ 1. Request:    VF can request default behavior regarding vlan-tagged ingress
+                when starting its vport.
+
+ 2. Request:    Add ecore APIs for OneView support.
+
+ 3. Request:    Add ecore_iov_get_vf_stats() through which a PF can read the
+                statistics of any of its child VFs.
+
+ 4. Request:    (FW) MCP trace is taken while MCP is halted.
+
+ 5. Request:    Avoid waiting till timers linear scan is done during driver
+                unload while recovery is in progress.
+
+ 6. Request:    Avoid checking for incorrect states in the QM/xCFC blocks during
+                driver unload while recovery is in progress.
+
+ 7. Request:    Remove SF mode support from ecore and, add the support for
+                Default-MF mode.
+
+ 8. Request:    Added the following iov related api:
+                ecore_iov_get_vf_num_rxqs(), ecore_iov_get_vf_num_active_rxqs(),
+                ecore_iov_get_vf_ctx(), ecore_iov_get_vf_num_sbs(),
+                ecore_iov_is_vf_wait_for_acquire(),
+                ecore_iov_is_vf_acquired_not_initialized(),
+                ecore_iov_is_vf_initialized().
+
+ 9. Request:    Added ecore_sb_cnt_info struct which can be filled by
+                ecore_int_get_num_sbs().
+
+10. Request:    Workaround for a FW issue - disable QM opportunistic flow in the
+                tx_queue_start ramrod.
+
+Version 8.5.5.0 (Aug 13, 2015)
+==============================
+Internal FW 8.5.3.0
+
+Fixes:
+------
+ 1. Problem:    Mcp Trace comes up empty.
+
+    Change:     Improve "Corrupted Data" condition in Mcp Trace code
+                (Prod has wrapped around but cons has not yet).
+
+    Introduced: FW 8.5.3.0.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Enable LRO for tunneled packets in vport update.
+
+Version 8.5.4.0 (Aug 10, 2015)
+==============================
+Internal FW 8.5.3.0
+
+Fixes:
+------
+ 1. Problem:    CQ80841 - Abnormal consumption of one (per switch) physical
+                processor of the host when traffic is run on multiple VFs of
+                same switch.
+
+    Change:     Removed setting of tx accept all ucast.
+
+    Introduced: Day 1.
+
+    Relevance:  L2 Tx Switching.
+
+ 2. Problem:    CQ81093: When VFs are enabled PF0 logs obscure error message
+                "Consecutive igu vectors for HWFN 0 vfs is broken".
+
+    Change:     Prevent said print due to uninitialized CAM entries.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 3. Problem:    Packets will be transmitted without timestamp even if such
+                was negotiated in option 2 active connect.
+
+    Change:     (FW iSCSI) Fix reading of TCP options from SYN-ACK packet.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    CQ78157 - OS scaling used is not correct in option 2
+                active connect when IP version is IPv6.
+
+    Change:     (FW iSCSI) Fix reading of TCP options from SYN-ACK packet.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    CQ78673 - System crashes when disabling function while traffic
+                is running.
+
+    Change:     (FW RoCE) Fix QP destruction flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+Enhancements:
+-------------
+ 1. Request:    Storage ecore API operates by relative Q ID.
+                No more first_global_q.
+
+ 2. Request:    Add limited support for AH emulation [single PF, 4-port].
+
+ 3. Request:    Added extra arguments to ecore_filter_accept_cmd() to pass
+                accept any vlan behavior.
+
+ 4. Request:    Add support for reg fifo debug feature in ecore.
+
+ 5. Request:    Add support for AH fpga.
+
+ 6. Request:    Add support for RoCE v2 (API structures were slightly changed).
+
+ 7. Request:    Add support for protection override feature in ecore.
+
+Version 8.5.3.0 (Jul 26, 2015)
+==============================
+Internal FW 8.5.2.0
+
+Fixes:
+------
+ 1. Problem:    LLH filters might get exhausted and traffic fail after reloads.
+
+    Change:     Prevent same LLH entry cleaning twice.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    CQ80867 - E4:RoCE:qedr driver is not detecting RoCE functions
+                using MFW:8.5.0.0.
+
+    Change:     Enabling RoCE if personality is ETH and device capability in
+                the nvm supports RoCE capability.
+
+    Introduced: MFW 8.5.0.0.
+
+    Relevance:  RoCE.
+
+ 3. Problem:    CQ80514 - system crash when running port0 Medusa stress and
+                port1 load/unload (verifier enabled).
+
+    Change:     Always return error status when ecore_resc_alloc() fail.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 4. Problem:    Parity error may occur while running non-L2 traffic.
+
+    Change:     (FW) Temporary mask the parity.
+
+    Introduced: 8.5.2.0.
+
+    Relevance:  BB B0, non-L2.
+
+ 5. Problem:    CQ80705 - attention when running traffic containing 'send with
+                invalidate' packets.
+
+    Change:     (FW RoCE) workaround for HW issue.
+
+    Introduced: 8.5.2.0.
+
+    Relevance:  BB B0, RoCE.
+
+ 6. Problem:    Recovery failure after local completion timeout.
+
+    Change:     (FW iSCSI) Fix the local compilation recovery flow.
+
+    Introduced: 8.4.1.0.
+
+    Relevance:  iSCSI.
+
+ 7. Problem:    Slow IO recovery failure.
+
+    Change:     (FW iSCSI) Fix the recovery flow.
+
+    Introduced: 8.5.2.0.
+
+    Relevance:  iSCSI.
+
+ 8. Problem:    DataOut may be sent with wrong [advanced] sequence ID in the
+                middle of a sequence [i.e., sequence count != 0].
+
+    Change:     (FW FCoE) Correct sequence ID handling according to the count.
+
+    Introduced: Day 1.
+
+    Relevance:  Target or Tape device.
+
+Enhancements:
+-------------
+ 1. Request:    Call OSAL_DMA_SYNC() only for physical addresses, not GRC.
+
+ 2. Request:    Added OS identifier for Solaris [for SRIOV].
+
+ 3. Request:    ecore_mcp_get_mfw_ver() now can also return the bundle-id.
+
+ 4. Request:    Added ecore_iov_bulletin_set_forced_untagged_default() to allow
+                Hypervisor to determine VFs default behavior when no vlan
+                filter is configured.
+
+ 5. Request:    Remove the cleanup of general attention 35 since is done by the
+                MFW (starting at version 8.5.0.0).
+
+ 6. Request:    Add ecore APIs for MCP halt/resume functionalities.
+
+Version 8.5.2.0 (Jul 14, 2015)
+==============================
+Internal FW 8.5.1.0
+
+Fixes:
+------
+ 1. Problem:    CQ80492 - E4: Ethtool "autoneg" option can not be turned off
+                once "autoneg" turned.
+
+    Change:     Add the changes for 25G speed support.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    TCP URG flag caused connection error.
+
+    Change:     (FW TCP) Ignore the TCP URG flag.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 3. Problem:    Data digest retransmit failure.
+
+    Change:     (FW iSCSI) Fix the data digest retransmit flow.
+
+    Introduced: 8.4.1.0.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    CQ80221 - FW assertion when using different ib applications -
+                ib_send_bw on server adn ib_read_bw on client.
+
+    Change:     (FW RoCE) Enable graceful error handling of illegal remote
+                access using Reserved LKEY.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 5. Problem:    CQ80349 - E4: Changing the port vlan id to different value do
+                not stop the pvid traffic from vf to external
+
+    Change:     Fix forced feature handling logic in ecore to allow consecutive
+                configurations of PVID by ecore.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV - PVID
+
+ 6. Problem:    CQ80498 - link down after load/unload.
+                CQ80453 - crash while enable disable SRIOV.
+
+    Change:     Fix igu int attention enable init.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 7. Problem:    hw_mdoe isn`t initialized with 40/100_MODE.
+
+    Change:     Added 40/100_MODE init to hw_mode calculation.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 8. Problem:    Re-transmit data corruption.
+
+    Change:     (FW iSCSI) Fix the iscsi history queue.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 9. Problem:    CQ80465 - E4: Assertions seen in the Hypervisor when VF
+                attached VM is powered on.
+
+    Change:     Configure VFs status blocks in CAU after setting them in
+                in IGU.
+
+    Introduced: 8.4.1.0.
+
+    Relevance:  SRIOV.
+
+10. Problem:    If NVM is reset, load fail causes NULL pointer dereference.
+
+    Change:     Set pointer to OSAL_NULL after freeing it.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Implement DCBx-DPM state machine. DPM is enabled by default
+                for all PFs. DPM will be disabled for PFs with ROCE
+                personality  when DCBx change occurs while there are allocated
+                cids. DPM can subsequently be enabled if another DCBx change
+                occirs with no cids allocated.
+
+ 2. Request:    Added dp_ctx to struct ecore_dev and ecore_hwfn. This param is
+                passed to PRINT() and PRINT_ERR().
+
+ 3. Request:    Added extra argument to ecore_sp_vport_start() to pass
+                default untagged vlan filter behavior.
+
+ 4. Request:    Support a number of isles as sum of one isle per connection
+                and shared pool.
+
+ 5. Request:    Asynchronous event iSCSI OOO isle delete support.
+
+ 6. Request:    (FW) Added BRB configurations to BB B0.
+
+ 7. Request:    (FW iSCSI) Implement re-transmit of slowIO.
+
+Version 8.5.1.0 (Jul 05, 2015)
+==============================
+Internal FW 8.4.2.0
+
+Fixes:
+------
+ 1. Problem:    Closing devices sporadically causes ramrod failures.
+
+    Change:     Move all CAU widebus initializations into using dmae.
+
+    Introduced: Day 1.
+
+    Relevance:  NPAR.
+
+ 2. Problem:    B0 isn't being properly initialized.
+
+    Change:     Determine A0/B0 based MISCS_REG_CHIP_REV.
+
+    Introduced: Day 1.
+
+    Relevance:  B0.
+
+Enhancements:
+-------------
+ 1. Request:    Modify the VID/DID read to be from the config space instead of
+                from the nvram copy in the shmem.
+
+Version 8.5.0.0 (Jun 25, 2015)
+==============================
+Internal FW 8.4.2.0
+
+Version 8.4.1.0 (Jun 25, 2015)
+==============================
+Internal FW 8.4.2.0
+
+Fixes:
+------
+ 1. Problem:    CQ80051 - System crash while installing QEVBD driver
+                in NPAR mode.
+
+    Change:     Clears ROCE search for all functions to prevent involving
+                non initialized function in processing ROCE packet.
+
+    Introduced: Day 1.
+
+    Relevance:  NPAR.
+
+ 2. Problem:    CQ78105 - loading drivers gives continuous qed_int_deassertion
+                messages in logs.
+
+    Change:     Configure SBs in CAU from IGU mapping.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 3. Problem:    CQ80034 - Seeing FW assertions / ramrod stuck using large QP
+                [size 512]; HW reports ILT error.
+
+    Change:     (FW RoCE) RoCE connection and task contexts are not deleted
+                during FUNC_CLOSE instead of PF_STOP.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    Running a benchmark more than once without removing the driver
+                will cause the QP post completions with 'FLUSH' on each RQ WQE
+                posted.
+
+    Change:     (FW RoCE) Fix QP cleanup code on destruction.
+
+    Introduced: 8.4.0.0.
+
+    Relevance:  RoCE.
+
+ 5. Problem:    CQ79651 - Payload with data corruption when retransmitting near
+                TCP sequence wrap-around.
+
+    Change:     (FW iSCSI) Use cyclic instead of linear arithmetic in
+                retransmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    Out-of-order iSCSI was disabled during traffic.
+
+    Change:     (FW iSCSI) Fix Out-of-order mode.
+
+    Introduced: 8.4.0.0.
+
+    Relevance:  iSCSI.
+
+Enhancements:
+-------------
+ 1. Request:    Add ecore support for configuring the driver version.
+
+ 2. Request:    Add ecore support for configuring Rx coalesce value.
+
+ 3. Request:    TPA for encapsulated packets is disabled by default.
+
+ 4. Request:    Modified ecore_mcp_get_mfw_ver() to get ptt parameter.
+
+ 5. Request:    Added OSAL_NVM_IS_ACCESS_ENABLED(hwfn).
+
+Version 8.4.0.0 (Jun 19, 2015)
+==============================
+Internal FW 8.4.1.0
+
+Fixes:
+------
+ 1. Problem:    Inconsistency between advertised number of QPs supported to the
+                number of QPs that can be opened.
+
+    Change:     Fix flow to allocate enough resources for capability
+                adverstised.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 2. Problem:    CQ79933 - E4 DCBX: assigning strict priority to FCOE result
+                in system assert.
+
+    Change:     Sanitize values provided by MFW.
+
+    Introduced: Day 1.
+
+    Relevance:  DCBx.
+
+ 3. Problem:    QEDR interrupts in mF are received only on qedr0/1.
+
+    Change:     Fixed configuration CNQ ID.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE w/ mF.
+
+ 4. Problem:    CQ79564 - FCoE: NPIV ports doesn't logs in to Target after
+                creating around 70 NPIV ports.
+                CQ79301 - [RHEL66-E4]fcoe plogi issue in NPAR(1.0)mode.
+
+    Change:     LLH ethertype classification is involved.
+
+    Introduced: Day 1.
+
+    Relevance:  FCOE under NPAR.
+
+ 5. Problem:    CQ79801 - iSCSI: Assertion while disable enable iscsi port
+                from device manager.
+                CQ78952 - iSCSI: Function failed to obtain IP address after
+                driver disable/enable.
+                CQ79264 - FCOE: port doesn't Login after load/unload
+                for long time.
+
+    Change:     Initialization FW variables on LL2 chains creation.
+
+    Introduced: Day 1.
+
+    Relevance:  LL2/Storage.
+
+ 6. Problem:    cq79688: VF traffic is failing for VFs with 'high' parent PF.
+
+    Change:     Fix setting of IGU value [set parent PF instead of SISR].
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV, VF-RSS.
+
+ 7. Problem:    VFs aren't operational in secure-mode.
+
+    Change:     Move VF configuration from shmem-based approach into using
+                drv_data on MFW commands.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV, secure-mode.
+
+ 8. Problem:    "VF[<..>] did not fill the address of SB <..>" appear in logs.
+
+    Change:     Reduce verbosity of error print.
+
+    Introduced: 8.2.0.0.
+
+    Relevance:  SRIOV, VF-RSS.
+
+ 9. Problem:    VF`s personality is different from its PF.
+
+    Change:     Fixed VF`s personality initialization in vf start ramrod.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+10. Problem:    Fail to add same MAC filter to different vports.
+
+    Change:     (FW L2) Fix HW definitions.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+11. Problem:    CQ79620 - System crash while disabling RSC under traffic.
+
+    Change:     (FW L2) Fix TPA disable flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2 with TPA.
+
+12. Problem:    CQ79868 - Summarized RSC aggregation size greater than defined.
+
+    Change:     (FW L2) Fix TPA decision rule.
+
+    Introduced: Day 1.
+
+    Relevance:  L2 with TPA.
+
+13. Problem:    Responder retransmit flow after only 1 or 2 RDMA read
+                operations since QP creation will cause fw assertion.
+
+    Change:     (FW RoCE) Fix scanback code for near-empty responder ops queue.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+14. Problem:    First retransmit request may be silently discarded depending on
+                initial PSN used.
+
+    Change:     (FW RoCE) Correct out-of-order PSN comparison flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+15. Problem:    Repetitive RNR-NAKs will cause a transport retry error when
+                infinite retry is configured.
+
+    Change:     (FW RoCE) Fix RNR NAK counter modification.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+16. Problem:    FW assert during connection recovery after link-down.
+
+    Change:     (FW iSCSI) Fix the connection connect flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+17. Problem:    CQ79825 - Connecting to several targets results in assertion.
+
+    Change:     (FW iSCS) Fix the connect flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+18. Problem:    FW assert may (rarely) occur during heavy storage/RoCE traffic.
+
+    Change:     (FW) Fix common firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+19. Problem:    Requester FW may get stuck in retransmit and flush SQ flows.
+
+    Change:     (FW RoCE) Fix internal SQ scan-back firmware code.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+20. Problem:    HW attention in responder retransmission.
+
+    Change:     (FW RoCE) Fix responder retransmission.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+21. Problem:    Responder may generate multiple duplicate ACKs when RDMA write
+                and send operations are retransmitted by requester.
+
+    Change:     (FW RoCE) Block such responses when a retransmit flow is
+                already in progress.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+22. Problem:    FW assert during unload if more than 160 filters are used on a
+                single engine for classification.
+
+    Change:     (FW L2) Fix filter removal flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+23. Problem:    CQ80060 - Incorrect data digest produced in fast-retransmit.
+
+    Change:     (FW iSCSI) Fix dummy read flow.
+
+    Introduced: 8.3.4.0.
+
+    Relevance:  iSCSI.
+
+Enhancements:
+-------------
+ 1. Request:    Added an osal(osal_unintptr_t) for typecasting.
+
+ 2. Request:    Initial implementation of error recovery.
+
+ 3. Request:    Add new pmm stats.
+
+ 4. Request:    Support LLH (NPAR) classification by ethertype.
+
+ 5. Request:    'Sealed' HW-channel for forward/backward support purposes.
+                Changed OSAL_VF_FILL_ACQUIRE_RESC_REQ() and added
+                OSAL_IOV_GET_OS_TYPE() for this purpose.
+
+ 6. Request:    Modified the HSI functions get_*_results_buf_size and
+                print_*_results to return a status code.
+
+ 7. Request:    Added ISCSI_EVENT_TYPE_ASYNC_DELETE_OOO_ISLES as a possible
+                async event.
+
+ 8. Request:    HSI file structure changes - separate targets were removed.
+                All clients should now use same set of HSI files.
+
+Version 8.3.5.0 (May 20, 2015)
+==============================
+Internal FW 8.3.8.0
+
+Fixes:
+------
+ 1. Problem:    Compilation failure when using ECORE_CONFIG_DIRECT_HWFN.
+
+    Change:     Correct type of 'p_hwfn' into ecore_hwfn*.
+
+    Introduced: Day 1.
+
+    Relevance:  ECORE_CONFIG_DIRECT_HWFN.
+
+ 2. Problem:    CQ79448 - When MCP is reset, need to re-read MFW
+                mailbox offsets correctly.
+
+    Change:     Use MCP history register to check if MCP reset occurred between
+                init time and now, while accessing MCP mailboxes.
+
+    Introduced: 8.3.0.0.
+
+    Relevance:  MCP access.
+
+ 3. Problem:    Interrupts for RoCE CNQ not received when working with RoCE
+                over 100g.
+
+    Change:     Set personality to be the same between hwfns.
+
+    Introduced: 8.3.4.0.
+
+    Relevance:  RoCE over 100g.
+
+ 4. Problem:    Connection recovery bug in case the data was already acked.
+
+    Change:     (FW iSCSI) Fix the connection recovery flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    Data corruption possible when transmitting IO contained in
+                single buffer descriptor.
+
+    Change:     (FW iSCSI) Fix cached BD transmit flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    CQ79391 - FCoE: Npar: HW aseertion on stop FCoE function.
+
+    Change:     Timers scans on FCoE tasks are disabled before FCoE function
+                stop/destroy.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE.
+
+Enhancements:
+-------------
+ 1. Request:    iSCSI OOO support.
+
+ 2. Request:    Enable end-to-end flow control in responder by default.
+
+ 3. Request:    Masked NIG "pause too long" attentions [sometimes appeared
+                when dcbx was active].
+
+Version 8.3.4.0 (May 07, 2015)
+==============================
+Internal FW 8.3.7.0
+
+Fixes:
+------
+ 1. Problem:    CQ79434 - Failed to read nvm directory after MFW upgrade.
+
+    Change:     Re-read MFW mailbox and mcp trace meta file after mcp reset.
+
+    Introduced: Day 1.
+
+    Relevance:  MFW upgrade.
+
+ 2. Problem:    CQ79497 - FW asserts on MTU 4000.
+
+    Change:     Set maximum aggregation size to be maximum supported by FW.
+
+    Introduced: Day 1.
+
+    Relevance:  GRO.
+
+ 3. Problem:    iSCSi target connect - negative scenario failure.
+
+    Change:     (FW iSCSI) Fix the option 2 connect negative scenario flow.
+
+    Introduced: 8.2.1.0.
+
+    Relevance:  iSCSI.
+
+ 4. Problem:    Retransmittion of iSCSI traffic with data digest enabled may
+                cause HW attention.
+
+    Change:     (FW iSCSI) Fix dummy-read flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    iSCSI multi-function connect failure.
+
+    Change:     (FW iSCSI) Fix the multi-function init flow.
+
+    Introduced: 8.3.2.0.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    iSCSI unsolicited packed PDUs failure.
+
+    Change:     (FW iSCSI) Fix the unsolicited packed PDUs flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 7. Problem:    No traffic when maximum bandwidth configured for Pf is 1Mb/s.
+
+    Change:     (FW) Make sure Rate-limiter is always configured to non-zero.
+
+    Introduced: Day 1.
+
+    Relevance:  L2, NPAR.
+
+ 8. Problem:    NIG attention appears during bi-directional 100g traffic.
+
+    Change:     (FW) Mask attentions in A0.
+
+    Introduced: Day 1.
+
+    Relevance:  100g.
+
+ 9. Problem:    cq79476 - VF Traffic is not working.
+
+    Change:     Fix return status in VFs ucast configuration by PF.
+
+    Introduced: 8.3.3.0.
+
+    Relevance:  SRIOV.
+
+Enhancements:
+-------------
+ 1. Request:    Add VFs rate (max rate) limiting support.
+
+ 2. Request:    Enable RoCE to work on 100G device.
+
+Version 8.3.3.0 (Apr 29, 2015)
+==============================
+Internal FW 8.3.6.0
+
+Fixes:
+------
+ 1. Problem:    Memory overrun during roce stop.
+
+    Change:     ILT range for RoCE tasks was calculated based on hard coded
+                values instead of configurable ones.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 2. Problem:    Drivers fail to load on emulation.
+
+    Change:     Prevent final cleanup and shmem-based logic from running on
+                FPGA and emulations.
+
+    Introduced: 8.2.4.0.
+
+    Relevance:  FPGA, Emulation.
+
+ 3. Problem:    FW assertion due to sync. loss on Tx buffer sequence.
+
+    Change:     (FW L2) Fix the Tx descrptors fetch flow.
+
+    Introduced: 8.2.1.0.
+
+    Relevance:  L2.
+
+ 4. Problem:    Data corruption if TCP send window closes during transmission
+                of slowIO type iSCSI exchange.
+
+    Change:     (FW iSCSI) Fix SlowIO transmit firmware flow.
+
+    Introduced: 8.3.1.0.
+
+    Relevance:  iSCSI.
+
+ 5. Problem:    Seperate response withut Sense Data failure.
+
+    Change:     (FW iSCSI) Fix the completion flow of seperate response.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    Option 2 active connect failure.
+
+    Change:     (FW iSCSI) Fix the connect flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 7. Problem:    Option 2 FIN re-transmit failure.
+
+    Change:     (FW iSCSI) Fix the termination flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 8. Problem:    Cont00078980 E4:NPAR_RoCE: flooding messages "Silently dropping
+                invalid QP1 packet" once interfaces are up /while running
+                traffic.
+
+    Change:     Disable broadcast/multicast packet duplication to LL2.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+Enhancements:
+-------------
+ 1. Request:    Added new API function ecore_mcp_get_personality_cnt().
+
+ 2. Request:    Memory barrier osals (MMIOWB, BARRIER, SMP_RMP, SMP_WMB,
+                RMB, WMB) now pass 'struct *ecore_dev' as a parameter.
+
+ 3. Request:    FCoE: PRS_REG_TASK_ID_MAX_TARGET_PF is set in target mode.
+
+ 4. Request:    ecore_mcp_function_info 'protocol' now holds ECORE_PCI_ values
+                instead of ECORE_MCP_PROTOCOL_ values which were removed.
+
+ 5. Request:    DIRECT_REG_{RD,WR} now pass 'struct *ecore_hwfn' as a
+                parameter [If needed, ecore should be compiled with
+                CONFIG_ECORE_DIRECT_HWFN].
+
+ 6. Request:    ecore_int_sb_setup can be called externally to re-set the sb.
+
+ 7. Request:    Added 3 new iov-related OSALs: IOV_VF_ACQUIRE, IOV_VF_CLEANUP,
+                and IOV_VF_VPORT_UPDATE.
+
+ 8. Request:    Add support for VF's pvid configuration via a new API function
+                ecore_iov_bulletin_set_forced_mac().
+
+ 9. Request:    Added support for end-to-end flow control REP message.
+
+Version 8.3.2.0 (Apr 21, 2015)
+==============================
+Internal FW 8.3.5.0
+
+Fixes:
+------
+ 1. Problem:    Possible context corruption.
+
+    Change:     (INIT) Employe CCFC/TCFC HW bug workaround.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 2. Problem:    QM attentions may appear when running in NPAR.
+
+    Change:     (INIT) Use regular (external) vport ids as global rate-limiter
+                id instead of the internal QM vport id.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 3. Problem:    iSCSI out-of-order silently drops all packets.
+
+    Change:     (FW) Revise flow that checks whether a packet is to be dropped.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 4. Problem:    Application freezes when testing writes on RoCE flow.
+
+    Change:     (FW) On start of Rx/Tx, clear old data written to driver by
+                previous connections.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 5. Problem:    SYN, SYN+ACK re-transmit failures.
+
+    Change:     (FW iSCSI) Fix re-transmission flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 6. Problem:    Receive RESET during connect failure.
+
+    Change:     (FW iSCSI) Fix re-transmission flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 7. Problem:    Possible re-transmit corruption.
+
+    Change:     (FW iSCSI) Transmit history queue fix.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 8. Problem:    CQ78086 - Rx path may be stalled after FW reports an error.
+
+    Change:     (FW FCoE) Fix error reproting flow.
+
+    Introduced: Day 1.
+
+    Relevance:  FCoE.
+
+ 9. Problem:    BD ring might get out of sync.
+
+    Change:     (FW L2) Fix BD ring synchronization problem.
+
+    Introduced: 8.2.1.0.
+
+    Relevance:  L2.
+
+10. Problem:    BMC packets are mistakenly dropped.
+
+    Change:     (FW L2) Remove anti-spoofing check for BMC packets.
+
+    Introduced: 8.2.1.0.
+
+    Relevance:  Management traffic.
+
+11. Problem:    PCI performance degredation on Grantly plaform.
+
+    Change:     (FW L2) Set RO=0 fo rall PCI transactions.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+12. Problem:    During FLR, non-FLRed functions may freeze.
+
+    Change:     (FW L2) FLRed function FW verifies it cleaned stale data for
+                non-FLRed functions.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+13. Problem:    CQ79115 - 25G: System hitting exception while loading driver.
+
+    Change:     Added handling in 25G port mode.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+14. Problem:    PF start ramrod fails to pass on some environments.
+
+    Change:     Don't assume OSAL_DMA_ALLOC_COHERENT zeroes context memory.
+
+    Introduced: Day 1.
+
+    Relevance:  ESX Beta build.
+
+Enhancements:
+-------------
+ 1. Request:    Added calls to OSAL_DMA_SYNC(), for clients needing to sync
+                memory before and after DMA operations.
+
+ 2. Request:    Added the following OSALs: MUTEX_ALLOC(), MUTEX_DEALLOC(),
+                SPIN_LOCK_ALLOC(), SPIN_LOCK_DEALLOC() for clients that need
+                to dynamically allocate lock primitives. Such clients should
+                also pass CONFIG_ECORE_LOCK_ALLOC when compiling ecore sources.
+
+ 3. Request:    Remove workaround for iSCSI asynchrounous event.
+
+ 4. Request:    Support FCoE target configuration.
+
+ 5. Request:    Add support to utilize binary firmware files.
+
+ 6. Request:    ecore_eth_cqe_completion() receive hw-function instead of queue
+                index, allowing client to employe any logic when mapping queues
+                to engines in 100g device.
+
+ 7. Request:    Added new API function ecore_mcp_get_personality_cnt().
+
+Version 8.3.1.0 (Apr 08, 2015)
+==============================
+Internal FW 8.3.4.0
+
+Fixes:
+------
+ 1. Problem:    Potential access to an un-allocated memory may occur during
+                function unload.
+
+    Change:     (FW) Fix common function unload FW flow.
+
+    Introduced: Day 1.
+
+    Relevance:  MF.
+
+ 2. Problem:    CQ78857 - PFC packet received will only stop traffic on
+                requested TC for maximum of ~200usec and not as requested on
+                packet.
+
+    Change:     (FW) Fix timeout value after stopping TC due to received PFC
+                packet.
+
+    Introduced: 8.2.3.0.
+
+    Relevance:  Port 1 in 2x40Gb configuration.
+
+ 3. Problem:    Error of VF FLR flow.
+
+    Change:     (FW) Fix flow on VF load.
+
+    Introduced: 8.3.0.0.
+
+    Relevance:  SRIOV.
+
+ 4. Problem:    L2 losses connectivity after running RoCE traffic.
+
+    Change:     (FW) Fix internal cache management flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2, RoCE.
+
+ 5. Problem:    Driver unload during RDMA Read operation may cause wrong CQE
+                generation.
+
+    Change:     (FW) Fix calculation of packets per operation code.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 6. Problem:    Driver unload or error condition in responder while RDMA read
+                or atomic responses are pending transmission may cause
+                firmware assert.
+
+    Change:     (FW) Correct activity counter calculation in error state.
+
+    Introduced: 8.3.0.0.
+
+    Relevance:  RoCE.
+
+ 7. Problem:    When during retransmission (slow start) the transmission is
+                stopped due to window, one packet will be sent every RTO timer
+                until retransmission will end.
+
+    Change:     (FW) Fix retransmission flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 8. Problem:    iSCSI traffic on function other than pfid 0 causes HW attention
+                from PCFC.
+
+    Change:     (FW) Fix connection-establishment flow.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+ 9. Problem:    Connection recovery failure.
+
+    Change:     (FW) Fix offload ramrod fix.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+10. Problem:    iSCSI response PDU with "BUSY" status is treated as connection
+                error and leads to termination of the connection.
+
+    Change:     (FW) Fix response PDU validations code to accept "BUSY" status.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+11. Problem:    R2T stat sn validation error (misbehave target).
+
+    Change:     (FW) Disable R2T stat sn validation.
+
+    Introduced: Day 1.
+
+    Relevance:  iSCSI.
+
+12. Problem:    iSCSI target - response packet with wrong statSN value.
+
+    Change:     Fix target Tx flow.
+
+    Introduced: 8.2.1.0.
+
+    Relevance:  iSCSI.
+
+13. Problem:    CQ78903 - crash on disable driver.
+                CQ78959 - OS Crash while doing Load Unload (MPIO Failover)
+                and traffic is running.
+
+    Change:     Remove obsolete workaround of PTU HW block invalidation.
+
+    Relevance:  NPAR and 4 ports modes.
+
+14. Problem:    A re-established TX LL2 connection failed to transmit.
+
+    Change:     Reset driver intenral variable (consumer of queue)upon
+                connection  establishment.
+
+    Introduced: Day 1.
+
+    Relevance:  LL2.
+
+Enhancements:
+-------------
+ 1. Request:    Restructure DCBx implementation so that there is DCBx API file
+                to facilitate QED access into DCBx data structures.
+
+ 2. Request:    Allocated or reused iSCSI connection memory must be zeroed.
+
+ 3. Request:    (FW) Support creation of QP without End-to-End flow control.
+
+ 4. Request:    (FW) Support switch-dependent multi-function.
+
+ 5. Request:    (FW) Support Target mode.
+
+Version 8.3.0.0 (Mar 24, 2015)
+==============================
+Internal FW 8.3.3.0
+
+Fixes:
+------
+ 1. Problem:    Memory corruption happens on VF bulletin board when
+                PF is posting to it.
+
+    Change:     Fixed dame write command size to dwords value instead of bytes.
+
+    Introduced: Day 1.
+
+ 2. Problem:    DMAE timeout sometimes randomly appear.
+
+    Change:     DMAE completion is made into 32-bit variable.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 3. Problem:    Loss of L2 connectivity after running RoCE apps with rdma cm.
+
+    Change:     Change hw configuration to use separate internal cache indices
+                for l2 packets going to RoCE CM and l2 regular packets.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE-CM / L2.
+
+ 4. Problem:    Cont00078455 - E4 : Crash found when configuring  SRIOV 240
+                vfs in NPAR.
+
+    Change:     Added error handling for DMA memory allocation failure.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 5. Problem:    CQ78435 - Nictest test D1 "Internal loopback test" fails
+                after programing NVM with manufacture kit 8562_40Gv11,
+                with Roce personality (nvm cfg option 92).
+
+    Change:     Fixed ecore_cxt_set_pf_params() not to fail in case
+                of roce personality without setting roce parameters.
+                Show information warning in this case.
+
+    Introduced: 8.2.6.0.
+
+    Relevance:  Roce.
+
+ 6. Problem:    Ethernet traffic carries a zeroed vlan tag when DCBx was
+                negotiated. This has a detrimental effect on some OSs (e.g.
+                RH6.5) and only negligible effect on others (in RH7.0 it only
+                clutters up a network trace). An additional effect is that
+                the vlan priority will be overwritten with 0 even if user
+                configured it (the tag value will remain unaffected).
+
+    Change:     Do not enable DCBx for ethernet even if DCBx was negotiated.
+                The OS should be the one to supply the vlan tag if required.
+
+    Introduced: 8.2.2.0.
+
+    Relevance:  L2 when DCBx is negotiated.
+
+ 7. Problem:    CQ78700 - E4:RoCE:RDMA applications are not working on
+                servers with 72 cpus.
+
+    Change:     Doorbells weren't accepted due to misscalculations performed
+                based on number of CPUs. There is no need for basing these
+                calculations on #cpus at this stage.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+Enhancements:
+-------------
+ 1. Request:    Ecore self test initial support.
+
+ 2. Request:    ecore_mcp_drain() now returns only after drain period is over.
+
+ 3. Request:    OSAL_ASSERT() follow GNU - Assert when condition is false.
+
+ 4. Request:    VF RXQ update support.
+
+ 5. Request:    VF Vport Update SGE/TPA support.
+
+ 6. Request:    Add infrastructure to support Secure Nvram.
+
+ 7. Request:    VFs are using their own PQs [required for VF rate-shaping].
+
+Version 8.2.4.0 (Feb 26, 2015)
+==============================
+Internal FW 8.2.7.0
+
+Fixes:
+------
+ 1. Problem:    tpa_max_size is calculated in a way that only 16 segments are
+                being aggregated.
+
+    Change:     Change the tpa_max_size calculation so max_sges_num will be the
+                upper limiter for tpa aggregations.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 2. Problem:    Incorrect shadow mb register after comming back from D3.
+
+    Change:     When comming back from hiberbate state, read the mb shadow
+                after we call ecore_mcp_load_req request.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 3. Problem:    Wrong device capabilities reported for maximum number of
+                outstanding work requests send or Receive queue.
+
+    Change:     Correct calculation of maximum number.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 4. Problem:    Dynamic ILT memory allocated by RoCE device was not freed on
+                RoCE driver unload.
+
+    Change:     Free RoCE ILT memory on RoCE driver unload.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 5. Problem:    Memory leakage when reconfiguring qm info upon DCBx update.
+
+    Change:     Free qm info memory before re-initialize it.
+
+    Introduced: 8.2.2.0.
+
+    Relevance:  DCBx.
+
+ 6. Problem:    CQ77989 - Chip may hang during stress test with L2 and
+                non L2 traffic.
+
+    Change:     Fix relevant firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 7. Problem:    Anti spoofing did not work with default Vlan.
+
+    Change:     Fix relevant firmware flow.
+
+    Introduced: 8.2.1.0.
+
+    Relevance:  SRIOV.
+
+ 8. Problem:    Pause PFC not working properly on engine 1 in 2x50 mode.
+                Also, PAUSE and PFC handling may be less than optimal in 4x10
+                Eagle mode (Firmware wokaround was operational though HW
+                handling is okay in these modes).
+
+    Change:     Activate Firmware workaround in 2x50, do not activate it in
+                4x10 Eagle.
+
+    Introduced: 8.2.0.0.
+
+    Relevance:  Scenarios involving Pause / PFC and 4x10 Eagle or 2x50.
+
+Enhancements:
+-------------
+ 1. Request:    Disable relaxed ordering in the PCI config space till the root
+                cause for the performance drop is found.
+
+ 2. Request:    Add support for guest VLAN filtering on VFs.
+
+ 3. Request:    Add support for accept any VLAN mode on PFs and VFs.
+
+ 4. Request:    Initial firmware error handling for abortive peer disconnect
+                scenario during traffic.
+
+ 5. Request:    Initialize personality according to shmem value.
+
+Version 8.2.3.0 (Feb 12, 2015)
+==============================
+Internal FW 8.2.4.0
+
+Fixes:
+------
+ 1. Problem:    BRB discard and truncate statistics are incorrect.
+
+    Change:     Fix logic in ecore_get_vport_stats().
+
+    Introduced: 8.2.2.0.
+
+    Relevance:  All.
+
+ 2. Problem:    DCBx set as enabled to zeroed priorities and zeroed TCs when
+                DCBx negotiation failed, instead of being set to disabled.
+
+    Change:     Use new indication for MFW on whether negotiation succeeded
+                and communicate the same to storm FW.
+
+    Introduced: 8.2.2.0.
+
+    Relevance:  DCBx.
+
+ 3. Problem:    ll2 connections use the wrong protocol in DCBx flows in FW.
+
+    Change:     Utilize api for supplying ll2 connections with their protocol.
+
+    Introduced: 8.2.2.0.
+
+    Relevance:  DCBx.
+
+Enhancements:
+-------------
+ 1. Request:    Support PFC on engine 1 by implementing FW workaround for
+                Eagle A0 PFC HW bug.
+
+Version 8.2.2.0 (Feb 11, 2015)
+==============================
+Internal FW 8.2.4.0
+
+Fixes:
+------
+ 1. Problem:    Unloading a 100g interface fails.
+
+    Change:     Clear the enble_fid only after all hw-functions are unloaded.
+
+    Introduced: ~Day 1.
+
+    Relevance:  100g.
+
+ 2. Problem:    Statistics are counted only for first hw-function.
+
+    Change:     Correct loops on hw-function when gathering statistics.
+
+    Introduced: Day 1.
+
+    Relevance:  100g.
+
+ 3. Problem:    Sending COMMON_RAMROD_PF_STOP ramrod unfer traffic may stall
+                ramrod processing.
+
+    Change:     (FW) Fix relevant FW flows.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 4. Problem:    CQ77422 - CCFC assert, if vport started with RSC.
+
+    Change:     (FW ETH) Fix packet drop flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2 Rx traffic with SGE enable.
+
+ 5. Problem:    Under heavy traffic, low proabability that local operation
+                with fence might cause the QP not to post a CQE.
+
+    Change:     (FW RoCE) Fix relevant firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+ 6. Problem:    PFC packets are not honored on port 1.
+
+    Change:     (FW) Implement workaround that will receive PFC packets in FW
+                and configure the hardware accordingly.
+
+    Introduced: Day 1.
+
+    Relevance:  2x40Gb A0.
+
+
+ 7. Problem:    Tx start after Tx stop on same CID causes firmware assert.
+
+    Change:     (FW LL2) Fix relevant firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  LL2.
+
+ 8. Problem:    Default vlan update doesn't work.
+
+    Change:     (FW ETH) Fix relevant firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2.
+
+ 9. Problem:    Tx switching didn't work correctly with EDPM packets.
+
+    Change:     (FW ETH) Fix relevant firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  L2 with EDPM.
+
+10. Problem:    Packets vlan-tagged with id 0 will be discarded if no vlan
+                tag was defined for the QP/connection.
+
+    Change:     (FW RoCE, ISCSI) Fix relevnat firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE, ISCSI.
+
+11. Problem:    Multi-Function ISCSI works only on PF[0|1].
+
+    Change:     (FW ISCSI) Use function queues relative offset, and init
+                the default queue during offload ramrod.
+
+    Introduced: Day 1.
+
+    Relevance:  Multi-Function ISCSI.
+
+12. Problem:    Potential overlap in resource allocated for RoCE CNQs and
+                ISCSI/FCoE CMDQS/CQS in npar/multi function, when each function
+                is configured with a different personality.
+
+    Change:     RoCE CNQs and ISCSI/FCoE CMDQS/CQS share the same resource.
+                Fixed code to take this into account.
+
+    Introduced: Day 1.
+
+    Relevance:  Multi-Function ISCSI/FCoE/RoCE.
+
+13. Problem:    CQ77101- machine crashes due to list corruption.
+
+    Change:     Fix the error flows of the SPQ.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+
+ 1. Request:    Implement static bandwidth configuration for NPAR1.0.
+
+ 2. Request:    Initial DCBx support. Ecore detects DCBx negotiation results
+                and reconfigures QM and updates storm FW according to results.
+
+ 3. Request:    In 2x40g Single-Function mode, add support for 120 vfs-per-pf.
+
+ 4. Request:    Change attention behaviour - reach OSAL_ASSERT() on malevolent
+                attnetions, and don't clear interrupts so they'll appear in
+                idle checks later.
+
+ 5. Request:    Add the ability for a PF to query the link configuration in
+                its VF's bulletin boards.
+
+Version 8.2.1.0 (Feb 04, 2015)
+==============================
+Internal FW 8.2.2.0
+
+Fixes:
+------
+ 1. Problem:    Traffic passes only if first PF on engine is running.
+
+    Change:     (FW ETH) Fix registers init values.
+
+    Introduced: Day 1.
+
+    Relevance:   NPAR1.0.
+
+ 2. Problem:    TPH control for Rx packet placement is not functional
+                for Rx connections without SGL rings.
+
+    Change:     (FW ETH) Fix relevant FW flows.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 3. Problem:    Wrong Rx producer received after Rx queue restart.
+
+    Change:     (FW ETH) Add CAU flush to slowpath flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 4. Problem:    Posting WQE that will require 256+ packets will cause the
+                QP traffic to halt.
+
+    Change:     (FW RoCE) Fix relevant FW flows.
+
+    Introduced:  Day 1.
+
+    Relevance:  All.
+
+ 5. Problem:    TCP Option 2 timestamp error.
+
+    Change:     (FW) Fix relevant FW flows.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+ 6. Problem:    FW error in case of FIN tcp segment.
+
+    Change:     (FW ISCSI) Fix relevant FW flows.
+
+    Introducd:  Day 1.
+
+    Relevance:  All.
+
+ 7. Problem:    HW attention in case of repeated transmit.
+
+    Change:     (FW ISCSI) Fix relevant FW flows.
+
+    Introducd:  Day 1.
+
+    Relevance:  All.
+
+ 8. Problem:    SCSI timeout expiration.
+
+    Change:     (FW ISCSI) Fix relevant FW flows.
+
+    Introducd:  Day 1.
+
+    Relevance:  All.
+
+ 9. Problem:    RSP with payload of less than 24B causes error.
+
+    Change:     (FW FCoE) Handle such packets.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+10. Problem:    FCoE with MAC error may cause HW to stuck.
+
+    Change:     (FW FCoE) Fix Rx MAC error flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+11. Problem:    Write tasks with SGEs that are not aligned to page size
+                may cause FW to stuck.
+
+    Change:     (FW FCoE) Fix relevant FW flows.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+12. Problem:    CQ76456 - FW asserts a short time after sending a 4K read.
+
+    Change:     (FW FCoE) Fix relevant FW flows.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+13. Problem:    RSP with resid_underflow = 0 arriving before FCP_DATA causes
+                FW to report an error.
+
+    Change:     (FW FCoE) Fix relevant FW flows.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+14. Problem:    CQ77279 - Rx queue arriving after queue stop cause FW to assert.
+
+    Change:     (FW LL2) Fix Rx MAC Error flow.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+15. Problem:    Ethernet FCS error on port0 increment statistics of port1.
+
+    Change:     (FW) Fix relevant FW flows.
+
+    Introduced: Day 1.
+
+    Relevance:  Multi Function devices.
+
+16. Problem:    HW attention is observed during initialization.
+
+    Change:     (FW Storage) Fix CMDQ initialization.
+
+    Introduced: 8.0.0.1.
+
+    Relevance:  FCoE/ISCSI Initiator.
+
+17. Problem:    CQ77508 - valid packets are dropped after false expiration.
+
+    Change:     (FW FCoE) Fix relevant flows.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+18. Problem:    De-registering a memory region which is used for incoming read
+                requests on a QP and was moved to error state may lead to HW
+                attetnion.
+
+    Change:     (FW RoCE) Fix relevant flows.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+19. Problem:    CQ77696 - fatal assert while running fcoe traffic.
+
+    Change:     Initializes QM correctly with the number of tasks supported.
+
+    Introduced: Day 1.
+
+    Relevance:  Fcoe.
+
+20. Problem:    CQ77765: Hardware attention when a packet with destination qp0
+                arrives before any QP was offloaded.
+
+    Change:     Initialize HW not to try offloading RoCE packets according to
+                destination qp before first RoCE QP is offloaded.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE Personality.
+
+Enhancements:
+-------------
+ 1. Request:    Mask AVS stop attention during interrupt init.
+
+ 2. Request:    (FW) Filter replacement only remove matching filters
+                [e.g., replacing vlan would remove only existing vlans]
+
+ 3. Request:    Implement VF multicast filtering and RX/TX accept flags.
+
+ 4. Request:    CQ76942, CQ76894 - added function for [de]activating
+                clock-slowdown.
+
+ 5. Request:    Implement VF update rss as part of VPORT update.
+
+ 6. Request:    Pass speed capabilities via bulletin board to VFs.
+
+ 7. Request:    Remove the driver configuration of PSWRQ2 R/W MBS since is done
+                by MFW (starting at MFW 8.2.2.0).
+
+ 8. Request:    Implement NIG drain.
+
+ 9. Request:    Implemented new interrupt mode for polling.
+
+10. Request:    int_mode propagates via ecore_hw_init(); No need for upper
+                layer driver to set it explicitly.
+
+11. Request:    Fail resource acquisition if requesting too many PQs.
+
+12. Request:    Added default vlan configuration to Vport Update.
+
+13. Request:    Re-factored IOV code and added division between inner and
+                outer ecore users.
+
+14. Request:    Print all possible bits in case of parity of BMB/OPTE/MCP.
+
+Version 8.2.0.0 (Jan 11, 2015)
+==============================
+Internal FW 8.2.0.0
+
+Fixes:
+------
+ 1. Problem:    Disabling sriov on higher PFs can lead to chip getting stuck.
+
+    Change:     Pass the VF's opaque vfid during VF initialization.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 2. Problem:    Disabling sriov while num_vfs < total vfs can lead to stop
+                ramrods being sent for disabled VFs.
+
+    Change:     Correct setting of vf state even if final cleanup isn't sent.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 3. Problem:    pglue_b attentions may appear in system logs after FLR.
+
+    Change:     Cleanup the PF information for a vf after it is FLR-ed.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 4. Problem:    Vlan-tagged traffic from VFs might fail to reach destination.
+
+    Change:     Pass VF request for vlan stripping on hw channel.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 5. Problem:    VFs are marked as STOPPED after FLR, even if they're restarted.
+
+    Change:     Don't force STOPPED state unless previously at RESET state.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 6. Problem:    Do not process any pending message after VF FLR.
+
+    Change:     Clear pending event bit for the VF which has been FLRed.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 7. Problem:    Sequence of several SRIOV disable procedures get stuck.
+
+    Change:     (FW) Fix relevant FW flow.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV
+
+ 8. Problem:    Wrong value returned to MCP at the end of SRIOV disable flow.
+
+    Change:     (FW) Fix relevant FW flow.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+ 9. Problem:    RSS parities appear when using high vports IDs.
+
+    Change:     (FW ETH) Fix RSS resource allocation flow.
+
+    Introduced: Day 1.
+
+    Relevance:  ETH.
+
+10. Problem:    Posting atomic operation WQE will cause hardware attention.
+
+    Change:     (FW RoCE) Fix relevant firmware flow.
+
+    Introduced: Day 1.
+
+    Relevance:  RoCE.
+
+11. Problem:    FW error in case of TCP segment that includes only iSCSI
+                padding or digest (without iSCSI data).
+
+    Change:     (FW iSCSI) Fix relevant firmware flow.
+
+    Introduced: Day 1.
+
+    Relevnace:  iSCSI.
+
+12. Problem:    VF RX producers in FW has old value after sending RXQ START.
+
+    Change:     Initializing rx producers in VF before sending RXQ START
+                request.
+
+    Introduced: Day 1.
+
+    Relevance:  SRIOV.
+
+13. Problem:    cq75387 - statistics aren't cleared after interface down/up.
+
+    Change:     Compensate for non-resetting port statistics using baseline.
+
+    Introduced: Day 1.
+
+    Relevance:  All.
+
+Enhancements:
+-------------
+ 1. Request:    Read function information from shmem during function init.
+
+ 2. Request:    ROCE: adding support of cq interrupt moderation feature.
+
+ 3. Request:    Implement polling on HW resources prior to FLR final cleanup.
+
+ 4. Request:    Prevent initialization of early PCI error [i.e., when reads
+                return all Fs].
+
+ 5. Request:    Avoid out-of-bound access to indices of the firmware resources
+                allocated for each function.
+
+ 6. Request:    Add ecore_mcp_api.h for upper-layer api of mcp functionality.
+
+ 7. Request:    Add inter-PF Tx switching in NPAR mode.
+
+ 8. Request:    Support processing asynchronous iSCSI events.
+
+ 9. Request:    Add support for VF rss.
+
+10. Request:    ROCE: Add vlan support.
+
+11. Request:    Pass FW & MFW versions to VF via acquire response TLV.
+
+12. Request:    Add initial support for Physical Device Assignment [of PFs].
+
+13. Request:    Add support to use VPORT update TLV as list of extended tlvs.
+
+14. Request:    Add support to allow the activation of non-continuous VFs.

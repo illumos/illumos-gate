@@ -396,6 +396,7 @@ DRV_KMODS	+= hme
 DRV_KMODS	+= mxfe
 DRV_KMODS	+= nge
 DRV_KMODS	+= pcn
+DRV_KMODS	+= qede
 DRV_KMODS	+= rge
 DRV_KMODS	+= rtls
 DRV_KMODS	+= sfe

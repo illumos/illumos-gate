@@ -2260,3 +2260,15 @@ BNXE_OBJS +=	bnxe_cfg.o		\
 		lm_sp_req_mgr.o		\
 		lm_stats.o		\
 		lm_util.o
+
+#
+# The QEDE_EN_OBJS list are general objects that are shared across
+# multiple different operating systems. QEDE_OBJS are illumos-specific
+# objects.
+#
+QEDE_OBJS += qede_cfg.o qede_dbg.o qede_fp.o qede_gld.o \
+	     qede_kstat.o qede_main.o qede_misc.o qede_osal.o
+QEDE_GEN_OBJS += ecore_hw.o ecore_cxt.o ecore_selftest.o ecore_init_ops.o \
+		  ecore_init_fw_funcs.o ecore_sp_commands.o ecore_dcbx.o \
+		  ecore_dbg_fw_funcs.o ecore_mcp.o ecore_spq.o ecore_phy.o \
+		  ecore_dev.o ecore_l2.o ecore_int.o

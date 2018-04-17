@@ -981,6 +981,7 @@ usr/src/uts/common/io/ixgbe/core/ixgbe_x540.c
 usr/src/uts/common/io/ixgbe/core/ixgbe_x540.h
 usr/src/uts/common/io/ixgbe/core/ixgbe_x550.c
 usr/src/uts/common/io/ixgbe/core/ixgbe_x550.h
+usr/src/uts/common/io/qede/*
 usr/src/uts/common/io/sfxge/common/ef10_ev.c
 usr/src/uts/common/io/sfxge/common/ef10_filter.c
 usr/src/uts/common/io/sfxge/common/ef10_impl.h

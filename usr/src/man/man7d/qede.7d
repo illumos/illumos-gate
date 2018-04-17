@@ -1,0 +1,100 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2014 QLogic Corporation. All Rights Reserved
+.\"
+.Dd August 28, 2017
+.Dt QEDE 7D
+.Os
+.Sh NAME
+.Nm qede
+.Nd QLogic FastLinQ QL45xxx 10/25/40/50/100 Gigabit Ethernet Driver
+.Sh SYNOPSIS
+.Pa /dev/net/qede*
+.Sh DESCRIPTION
+The
+.Nm
+Ethernet driver is a multi-threaded, loadable, clonable, GLDv3-based
+driver supporting the Data Link Provider Interface,
+.Xr dlpi 7P ,
+over QLogic FastLinQ QL45xxx 10/25/40/50/100 Gigabit Ethernet
+controllers.
+Multiple QLogic FastLinQ controllers installed within the system are
+supported by the driver.
+.Pp
+The
+.Nm
+driver provides support for the QLogic QL45xxx line of devices.
+Functions include chip initialization, frame transmit and receive,
+multicast and promiscuous support, error recovery and reporting.
+These devices provide 10000/25000/40000/50000/100000 Mbps networking
+interfaces.
+.Sh DRIVER CONFIGURATION
+The primary methods of configuration are via modification of the
+.Pa /kernel/drv/qede.conf
+file or execution of the
+.Xr dladm 1M
+utility.
+There are many configuration items available and all are thoroughly
+documented in the
+.Pa /kernel/drv/qede.conf
+file.
+Note that for changes to this file to take affect the driver must be
+reloaded or the system rebooted.
+In order to reload the driver with new configuration changes all
+.Nm qede
+interfaces must be first unplumbed and then the
+.Xr update_drv 1M
+tool must be executed.
+For the configuration items that do not require a driver reload the
+.Xr dladm 1M
+tool can be used to dynamically change the option.
+Use of
+.Xr dladm 1M
+is the preferred method.
+.Sh DEBUGGING
+.Ss kstat
+There are many statistics exposed via
+.Xr kstat 1M
+by the
+.Nm
+driver.
+The main groups are:
+.Bl -tag -width Em
+.It Em intr
+for interrupts stats
+.It Em l2chip
+for layer 2 chip stats
+.It Em l2driver
+for layer 2 driver stats
+.It Em l2stats
+for general layer 2 stats
+.It Em link
+for detailed link status
+.It Em mac
+for GLDv3 MAC layer stats
+.It Em rxq#
+for Rx ring stats
+.It Em txq#
+for Tx ring stats
+.It Em stats
+for general driver stats and version info.
+.El
+.Pp
+To get a list of all the individual statistics in these goups run:
+.Bd -literal -offset indent
+# kstat -m qede -i 0 -l
+.Ed
+.Sh SEE ALSO
+.Xr dladm 1M ,
+.Xr ifconfig 1M ,
+.Xr driver.conf 4 ,
+.Xr dlpi 7P
