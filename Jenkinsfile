@@ -116,14 +116,14 @@ node('master') {
                 stage('archive build artifacts') {
                     shscript('download-remote-file', false, [
                         ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
-                        ['REMOTE_FILE', "${build_workspace}/log/*/nightly.log"],
+                        ['REMOTE_FILE', "${build_workspace}/log/latest/nightly.log"],
                         ['LOCAL_FILE', 'nightly.log']
                     ])
                     archive(includes: 'nightly.log')
 
                     shscript('download-remote-file', false, [
                         ['INSTANCE_ID', env.BUILD_INSTANCE_ID],
-                        ['REMOTE_FILE', "${build_workspace}/log/*/mail_msg"],
+                        ['REMOTE_FILE', "${build_workspace}/log/latest/mail_msg"],
                         ['LOCAL_FILE', 'nightly-mail.log']
                     ])
                     archive(includes: 'nightly-mail.log')
