@@ -5102,7 +5102,7 @@ f usr/lib/brand/bhyve/uninstall 0555 root sys
 f usr/lib/brand/bhyve/config.xml 0444 root sys
 f usr/lib/brand/bhyve/platform.xml 0444 root sys
 f usr/lib/brand/bhyve/statechange 0555 root sys
-h usr/lib/brand/bhyve/zhyve=usr/sbin/bhyve
+f usr/lib/brand/bhyve/zhyve 0555 root sys
 d usr/lib/brand/lx 0755 root bin
 s usr/lib/brand/lx/64=amd64
 d usr/lib/brand/lx/amd64 0755 root bin

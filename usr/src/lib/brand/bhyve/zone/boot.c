@@ -110,6 +110,12 @@ add_smbios(int *argc, char **argv)
 	const char *version;
 	const char *uuid;
 
+	if ((uuid = getenv("_ZONECFG_uuid")) != NULL) {
+		if (add_arg(argc, argv, "-U") != 0 ||
+		    add_arg(argc, argv, uuid) != 0)
+			return (1);
+	}
+
 	/*
 	 * Look for something like joyent_20180329T120303Z.  A little mucky, but
 	 * it's exactly what sysinfo does.
@@ -131,12 +137,6 @@ add_smbios(int *argc, char **argv)
 	if (add_arg(argc, argv, "-B") != 0 ||
 	    add_arg(argc, argv, smbios) != 0)
 		return (1);
-
-	if ((uuid = getenv("_ZONECFG_uuid")) != NULL) {
-		if (add_arg(argc, argv, "-U") != 0 ||
-		    add_arg(argc, argv, uuid) != 0)
-			return (1);
-	}
 
 	return (0);
 }
@@ -537,7 +537,7 @@ main(int argc, char **argv)
 {
 	int fd, err;
 	char *zhargv[ZH_MAXARGS] = {
-		"zhyve",	/* Squats on argv[0] */
+		"bhyve",	/* Squats on argv[0] */
 		"-H",		/* vmexit on halt isns */
 		NULL };
 	int zhargc = 2;
@@ -577,7 +577,7 @@ main(int argc, char **argv)
 	 * exit.
 	 */
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
-	    nvlist_add_string_array(nvl, "zhyve_args", zhargv, zhargc) != 0) {
+	    nvlist_add_string_array(nvl, "bhyve_args", zhargv, zhargc) != 0) {
 		(void) printf("Error: failed to create nvlist: %s\n",
 		    strerror(errno));
 		return (1);

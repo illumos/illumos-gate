@@ -77,6 +77,10 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <vmmapi.h>
 
+#ifndef __FreeBSD__
+#include <sys/stat.h>
+#endif
+
 #include "bhyverun.h"
 #include "acpi.h"
 #include "atkbdc.h"
@@ -128,7 +132,6 @@ int bcons_wait = 0;
 int bcons_connected = 0;
 pthread_mutex_t bcons_wait_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t bcons_wait_done = PTHREAD_COND_INITIALIZER;
-void (*vm_started_cb)(void) = NULL;
 #endif
 
 static cpuset_t cpumask;
@@ -860,6 +863,28 @@ do_open(const char *vmname)
 	return (ctx);
 }
 
+#ifndef __FreeBSD__
+
+#define	FILE_PROVISIONING	"/var/svc/provisioning"
+#define	FILE_PROVISION_SUCCESS	"/var/svc/provision_success"
+
+static void
+mark_provisioned(void)
+{
+	struct stat stbuf;
+
+	if (lstat(FILE_PROVISIONING, &stbuf) != 0)
+		return;
+
+	if (rename(FILE_PROVISIONING, FILE_PROVISION_SUCCESS) != 0) {
+		(void) fprintf(stderr, "Cannot rename %s to %s: %s\n",
+		    FILE_PROVISIONING, FILE_PROVISION_SUCCESS,
+		    strerror(errno));
+	}
+}
+
+#endif
+
 int
 main(int argc, char *argv[])
 {
@@ -1121,9 +1146,7 @@ main(int argc, char *argv[])
 	fbsdrun_addcpu(ctx, BSP, BSP, rip);
 
 #ifndef __FreeBSD__
-	if (vm_started_cb != NULL) {
-		vm_started_cb();
-	}
+	mark_provisioned();
 #endif
 
 	/*

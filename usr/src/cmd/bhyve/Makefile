@@ -15,7 +15,6 @@
 #
 
 PROG =		bhyve
-ZHYVE =		$(ROOT)/usr/lib/brand/bhyve/zhyve
 
 include ../Makefile.cmd
 include ../Makefile.cmd.64
@@ -76,18 +75,21 @@ SRCS =	acpi.c			\
 	vmm_instruction_emul.c	\
 	xmsr.c			\
 	spinup_ap.c		\
-	bhyve_sol_glue.c	\
-	zhyve.c
+	bhyve_sol_glue.c
 
 OBJS = $(SRCS:.c=.o)
 
-CLEANFILES =	$(PROG)
 CLOBBERFILES =	$(ROOTUSRSBINPROG) $(ZHYVE)
+
+ZHYVE_DIR =	$(ROOT)/usr/lib/brand/bhyve
+ZHYVE_PROG = 	zhyve
+ZHYVE =		$(ZHYVE_DIR)/$(ZHYVE_PROG)
 
 MEVENT_TEST_PROG = mevent_test
 MEVENT_TEST_SRCS = mevent.c mevent_test.c
 MEVENT_TEST_OBJS = $(MEVENT_TEST_SRCS:.c=.o)
-CLEANFILES +=	$(MEVENT_TEST_PROG) $(MEVENT_TEST_OBJS)
+
+CLEANFILES =	$(PROG) $(ZHYVE_PROG) $(MEVENT_TEST_PROG) $(MEVENT_TEST_OBJS)
 
 CFLAGS +=	$(CCVERBOSE) -_gcc=-Wimplicit-function-declaration -_gcc=-Wno-parentheses
 CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
@@ -102,19 +104,19 @@ CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
 		-I$(SRC)/uts/i86pc \
 		-I$(SRC)/lib/libdladm/common \
 		-DWITHOUT_CAPSICUM
-LDLIBS +=	-lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz -lnvpair
 
 # Disable the crypto code until it is wired up
 CPPFLAGS +=	-DNO_OPENSSL
+
+LDLIBS +=	-lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz
+
+zhyve := LDLIBS = -lnvpair
 
 POST_PROCESS += ; $(GENSETDEFS) $@
 
 .KEEP_STATE:
 
-# Real main is in zhyve.c
-bhyverun.o :=	CPPFLAGS += -Dmain=bhyve_main
-
-all: $(PROG) $(MEVENT_TEST_PROG) $(SUBDIRS)
+all: $(PROG) $(MEVENT_TEST_PROG) $(ZHYVE_PROG) $(SUBDIRS)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
@@ -123,9 +125,7 @@ $(PROG): $(OBJS)
 $(MEVENT_TEST_PROG): $(MEVENT_TEST_OBJS)
 	$(LINK.c) -o $@ $(MEVENT_TEST_OBJS) -lsocket
 
-install: all $(ROOTUSRSBINPROG) $(SUBDIRS)
-	$(RM) $(ZHYVE)
-	$(LN) $(ROOTUSRSBIN)/$(PROG) $(ZHYVE)
+install: all $(ZHYVE) $(ROOTUSRSBINPROG) $(SUBDIRS)
 
 clean: $(SUBDIRS)
 	$(RM) $(OBJS) $(CLEANFILES)
@@ -141,6 +141,9 @@ $(SUBDIRS): FRC
 FRC:
 
 include ../Makefile.targ
+
+$(ZHYVE_DIR)/%: %
+	$(INS.file)
 
 %.o: $(SRC)/uts/i86pc/io/vmm/%.c
 	$(COMPILE.c) $<

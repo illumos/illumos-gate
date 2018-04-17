@@ -9,9 +9,14 @@
  * http://www.illumos.org/license/CDDL.
  */
 
-
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
+ * This small 'zhyve' stub is init for the zone: we therefore need to pick up
+ * our command-line arguments placed in ZHYVE_CMD_FILE by the boot stub, do a
+ * little administration, and exec the real bhyve binary.
  */
 
 #include <assert.h>
@@ -28,28 +33,6 @@
 #include <sys/corectl.h>
 
 #define	ZHYVE_CMD_FILE	"/var/run/bhyve/zhyve.cmd"
-
-#define	FILE_PROVISIONING	"/var/svc/provisioning"
-#define	FILE_PROVISION_SUCCESS	"/var/svc/provision_success"
-
-extern int bhyve_main(int, char **);
-void (*vm_started_cb)(void);
-const char *cmdname;
-
-/*
- * Much like basename() but does not alter the path passed to it.
- */
-static void
-get_cmdname(const char *path)
-{
-	cmdname = strrchr(path, '/');
-	if (cmdname == NULL) {
-		cmdname = path;
-		return;
-	}
-	assert(*cmdname == '/');
-	cmdname++;
-}
 
 /*
  * Do a read of the specified size or return an error.  Returns 0 on success
@@ -101,7 +84,7 @@ parse_options_file(const char *path, uint_t *argcp, char ***argvp)
 	    (buf = malloc(stbuf.st_size)) == NULL ||
 	    full_read(fd, buf, stbuf.st_size) != 0 ||
 	    nvlist_unpack(buf, stbuf.st_size, &nvl, 0) != 0 ||
-	    nvlist_lookup_string_array(nvl, "zhyve_args", argvp, argcp) != 0) {
+	    nvlist_lookup_string_array(nvl, "bhyve_args", argvp, argcp) != 0) {
 		nvlist_free(nvl);
 		ret = -1;
 	} else {
@@ -117,16 +100,6 @@ parse_options_file(const char *path, uint_t *argcp, char ***argvp)
 	return (ret);
 }
 
-static void
-mark_provisioned(void)
-{
-	if (rename(FILE_PROVISIONING, FILE_PROVISION_SUCCESS) != 0) {
-		(void) fprintf(stderr, "Cannot rename %s to %s: %s\n",
-		    FILE_PROVISIONING, FILE_PROVISION_SUCCESS,
-		    strerror(errno));
-	}
-}
-
 /*
  * Setup to suppress core dumps within the zone.
  */
@@ -139,15 +112,10 @@ config_core_dumps()
 int
 main(int argc, char **argv)
 {
+	char **tmpargs;
 	uint_t zargc;
 	char **zargv;
 	int fd;
-	struct stat stbuf;
-
-	get_cmdname(argv[0]);
-	if (strcmp(cmdname, "zhyve") != 0) {
-		return (bhyve_main(argc, argv));
-	}
 
 	config_core_dumps();
 
@@ -176,13 +144,24 @@ main(int argc, char **argv)
 
 	if (parse_options_file(ZHYVE_CMD_FILE, &zargc, &zargv) != 0) {
 		(void) fprintf(stderr, "%s: failed to parse %s: %s\n",
-		    cmdname, ZHYVE_CMD_FILE, strerror(errno));
-		return (1);
+		    argv[0], ZHYVE_CMD_FILE, strerror(errno));
+		return (EXIT_FAILURE);
 	}
 
-	if (lstat(FILE_PROVISIONING, &stbuf) == 0) {
-		vm_started_cb = mark_provisioned;
+	/*
+	 * Annoyingly, we need a NULL at the end.
+	 */
+
+	if ((tmpargs = malloc(sizeof (*zargv) * (zargc + 1))) == NULL) {
+		perror("malloc failed");
+		return (EXIT_FAILURE);
 	}
 
-	return (bhyve_main(zargc, zargv));
+	memcpy(tmpargs, zargv, sizeof (*zargv) * zargc);
+	tmpargs[zargc] = NULL;
+
+	(void) execv("/usr/sbin/bhyve", tmpargs);
+
+	perror("execv failed");
+	return (EXIT_FAILURE);
 }
