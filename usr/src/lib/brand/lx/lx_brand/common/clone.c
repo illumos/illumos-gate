@@ -557,6 +557,11 @@ lx_clone(uintptr_t p1, uintptr_t p2, uintptr_t p3, uintptr_t p4, uintptr_t p5)
 			}
 
 			/*
+			 * Re-enable signal delivery in the child process.
+			 */
+			lx_unblock_all_signals();
+
+			/*
 			 * Stop for ptrace if required.
 			 */
 			lx_ptrace_stop_if_option(ptrace_event, B_TRUE, 0, NULL);
