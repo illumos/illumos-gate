@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 RackTop Systems.
  */
 
 #include <string.h>
@@ -1336,6 +1337,7 @@ match_conn_mt(ns_conn_user_t *cu, ns_conn_mt_t **cmt,
 	}
 
 	if (matched == B_TRUE && ((server != NULL || cred != NULL) &&
+	    cm->conn != NULL &&
 	    is_server_cred_matched(server, cred, cm) == B_FALSE))
 		matched = B_FALSE;
 
