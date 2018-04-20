@@ -1,0 +1,77 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2017 by Delphix. All rights reserved.
+#
+
+---
+#
+# The VM we use to do builds will generally be outdated, so before we
+# attempt to install any new packages, we want to ensure the IPS
+# repository index is updated
+#
+- name: refresh IPS repository index
+  command: pkg refresh
+
+- name: install build tools meta package (OmniOS)
+  pkg5:
+    name:
+      - pkg:/developer/illumos-tools
+  register: result
+  until: not result|failed
+  retries: 10
+  delay: 60
+  when: ansible_distribution == "OmniOS"
+
+#
+# Since OmniOS doesn't install the "easy_install" in any easy to find
+# location (e.g. it's not in the default PATH), we add a symlink so
+# later scripts and Ansible roles will be able to easily find it.
+#
+- name: create easy_install symlink (OmniOS)
+  file:
+    src: /usr/lib/python2.7/vendor-packages/easy_install
+    dest: /usr/bin/easy_install
+    owner: root
+    group: root
+    state: link
+  when: ansible_distribution == "OmniOS"
+
+- name: install build tools meta package (OpenIndiana)
+  pkg5:
+    name:
+      - pkg:/metapackages/build-essential
+  register: result
+  until: not result|failed
+  retries: 10
+  delay: 60
+  when: ansible_distribution == "OpenIndiana"
+
+- name: install additional packages
+  pkg5:
+    name:
+      - pkg:/archiver/gnu-tar
+      - pkg:/developer/sunstudio12u1
+      - pkg:/diagnostic/diskinfo
+      - pkg:/install/distribution-constructor
+      - pkg:/security/sudo
+      - pkg:/service/file-system/nfs
+      - pkg:/service/file-system/smb
+      - pkg:/system/test/fio
+      - pkg:/system/test/libctest
+      - pkg:/system/test/ostest
+      - pkg:/system/test/utiltest
+      - pkg:/system/test/zfstest
+  register: result
+  until: not result|failed
+  retries: 10
+  delay: 60

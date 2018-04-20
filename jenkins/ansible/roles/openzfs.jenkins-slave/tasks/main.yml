@@ -1,0 +1,142 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2017 by Delphix. All rights reserved.
+#
+
+---
+- name: assert required variables are defined
+  assert:
+    that:
+      - jenkins_slave_name != "example-slave-name"
+      - jenkins_master_url != "http://jenkins.example.com"
+
+- name: ensure the jenkins group is present
+  group:
+    name: "{{ jenkins_group }}"
+    state: present
+
+- name: create root home directory
+  file:
+    path: /export/home
+    owner: root
+    group: root
+    state: directory
+    mode: 0755
+
+- name: ensure the jenkins user is present
+  user:
+    name: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    home: /export/home/jenkins
+    createhome: yes
+    state: present
+
+- name: ensure jenkins user has password-less sudo access
+  lineinfile:
+    dest: "/etc/sudoers.d/{{ jenkins_user }}"
+    line: "{{ jenkins_user }} ALL=(ALL) NOPASSWD: ALL"
+    owner: root
+    group: root
+    mode: 0644
+    create: true
+
+- name: disable ssh host key checking
+  blockinfile:
+    dest: /etc/ssh/ssh_config
+    block: |
+      Host *
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+
+- name: create jenkins directories
+  file:
+    path: "{{ item }}"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    state: directory
+    mode: 0755
+  with_items:
+    - "{{ jenkins_directory }}"
+    - "{{ jenkins_directory }}/root"
+
+- name: download swarm client
+  get_url:
+    url: "https://repo.jenkins-ci.org/releases/org/jenkins-ci/plugins/swarm-client/3.7/swarm-client-3.7.jar"
+    dest: "{{ jenkins_directory }}/swarm-client.jar"
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+    mode: 0644
+  register: result
+  until: not result|failed
+  retries: 10
+  delay: 60
+
+- name: copy jenkins slave connect script
+  template:
+    src: "var/jenkins/jenkins-slave-connect.j2"
+    dest: "{{ jenkins_directory }}/jenkins-slave-connect"
+    mode: 0755
+    owner: "{{ jenkins_user }}"
+    group: "{{ jenkins_group }}"
+
+- name: copy automatic shutdown script
+  copy:
+    src: "var/jenkins/automatic-shutdown"
+    dest: "{{ jenkins_directory }}/automatic-shutdown"
+    mode: 0755
+    owner: "root"
+    group: "root"
+
+- name: ensure supervisord package is present
+  easy_install:
+    name: supervisor
+    state: latest
+
+- name: copy supervisord configuration file
+  copy:
+    dest: '/etc/supervisord.conf'
+    owner: root
+    group: root
+    mode: 0644
+    content: |
+      [unix_http_server]
+      file=/var/run/supervisor.sock
+
+      [supervisord]
+      logfile=/var/log/supervisord.log
+      pidfile=/var/run/supervisord.pid
+
+      [rpcinterface:supervisor]
+      supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+      [supervisorctl]
+      serverurl=unix:///var/run/supervisor.sock
+
+      [program:jenkins-slave]
+      command={{ jenkins_directory }}/jenkins-slave-connect
+      user=jenkins
+      autostart=true
+      redirect_stderr=true
+      stdout_logfile=/var/log/jenkins-slave.log
+
+      [program:automatic-shutdown]
+      command={{ jenkins_directory }}/automatic-shutdown
+      user=root
+      autostart=true
+      redirect_stderr=true
+      stdout_logfile=/var/log/automatic-shutdown.log
+
+- name: start supervisord
+  command: supervisord -c /etc/supervisord.conf
+  args:
+    creates: /var/run/supervisor.sock

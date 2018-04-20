@@ -1,0 +1,27 @@
+{
+  "BlockDeviceMappings": [{
+    "DeviceName": "/dev/xvdb",
+    "Ebs": {
+      "VolumeSize": 8,
+      "DeleteOnTermination": true,
+      "VolumeType": "gp2",
+      "Encrypted": false
+    }
+  }, {
+    "DeviceName": "/dev/xvdc",
+    "Ebs": {
+      "VolumeSize": 8,
+      "DeleteOnTermination": true,
+      "VolumeType": "gp2",
+      "Encrypted": false
+    }
+  }, {
+    "DeviceName": "/dev/xvdd",
+    "Ebs": {
+      "VolumeSize": 8,
+      "DeleteOnTermination": true,
+      "VolumeType": "gp2",
+      "Encrypted": false
+    }
+  }]
+}
