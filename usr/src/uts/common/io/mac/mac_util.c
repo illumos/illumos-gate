@@ -48,6 +48,7 @@
 #include <inet/sadb.h>
 #include <inet/ipsecesp.h>
 #include <inet/ipsecah.h>
+#include <inet/sctp_ip.h>
 
 /*
  * Copy an mblk, preserving its hardware checksum flags.
@@ -88,10 +89,164 @@ mac_copymsgchain_cksum(mblk_t *mp)
 	return (nmp);
 }
 
+static void
+mac_ipv4_chksum(mblk_t *mp, uint32_t offset, ipha_t *ipha)
+{
+	uint8_t proto;
+	ipaddr_t src, dst;
+	uint16_t len;
+	uint32_t cksum;
+	uint16_t *up;
+
+	/*
+	 * Pointer to checksum field in ULP header.
+	 */
+	proto = ipha->ipha_protocol;
+	ASSERT(ipha->ipha_version_and_hdr_length == IP_SIMPLE_HDR_VERSION);
+
+	switch (proto) {
+	case IPPROTO_TCP:
+		/* LINTED: improper alignment cast */
+		up = IPH_TCPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+		cksum = IP_TCP_CSUM_COMP;
+		break;
+	case IPPROTO_UDP:
+		/* LINTED: improper alignment cast */
+		up = IPH_UDPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+		cksum = IP_UDP_CSUM_COMP;
+		break;
+	case IPPROTO_SCTP: {
+		sctp_hdr_t *sctph;
+
+		ASSERT(MBLKL(mp) >= (IP_SIMPLE_HDR_LENGTH + sizeof (*sctph)));
+		sctph = (sctp_hdr_t *)(mp->b_rptr + IP_SIMPLE_HDR_LENGTH);
+		/*
+		 * Zero out the checksum field to ensure proper checksum
+		 * calculation.
+		 */
+		sctph->sh_chksum = 0;
+		sctph->sh_chksum = sctp_cksum(mp, IP_SIMPLE_HDR_LENGTH);
+		return;
+	}
+	default:
+		return;
+	}
+
+	/*
+	 * Pseudo-header checksum.
+	 */
+	src = ipha->ipha_src;
+	dst = ipha->ipha_dst;
+	len = ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH;
+
+	cksum += (dst >> 16) + (dst & 0xFFFF) + (src >> 16) + (src & 0xFFFF);
+	cksum += htons(len);
+
+	/*
+	 * The checksum value stored in the packet needs to be correct. Compute
+	 * it here.
+	 */
+	*up = 0;
+	cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH + offset, cksum);
+	*up = (uint16_t)(cksum ? cksum : ~cksum);
+}
+
+static void
+mac_ipv6_chksum(mblk_t *mp, uint32_t offset, ip6_t *ip6h)
+{
+	uint8_t proto;
+	uint32_t cksum;
+	uint16_t *up;
+	uint16_t ip_hdr_length = ip_hdr_length_v6(mp, ip6h);
+
+#define	iphs	((uint16_t *)ip6h)
+
+	/*
+	 * Pointer to checksum field in ULP header.
+	 */
+	proto = ip6h->ip6_nxt;
+
+	/*
+	 * The IPv6 SW checksum code calculation (ip_output_cksum_v6) handles
+	 * IXAF_SET_RAW_CKSUM, but that is never a factor when full HW checksum
+	 * offload is in use, so we can't worry about it here either. We have
+	 * to calculate the noraml ICMPv6 checksum.
+	 */
+
+	switch (proto) {
+	case IPPROTO_TCP:
+		/* LINTED: improper alignment cast */
+		up = IPH_TCPH_CHECKSUMP(ip6h, ip_hdr_length);
+		cksum = IP_TCP_CSUM_COMP;
+		break;
+
+	case IPPROTO_UDP:
+		/* LINTED: improper alignment cast */
+		up = IPH_UDPH_CHECKSUMP(ip6h, ip_hdr_length);
+		cksum = IP_UDP_CSUM_COMP;
+		break;
+
+	case IPPROTO_SCTP: {
+		sctp_hdr_t *sctph;
+
+		ASSERT(MBLKL(mp) >= (ip_hdr_length + sizeof (*sctph)));
+		sctph = (sctp_hdr_t *)(mp->b_rptr + ip_hdr_length);
+		/*
+		 * Zero out the checksum field to ensure proper
+		 * checksum calculation.
+		 */
+		sctph->sh_chksum = 0;
+		sctph->sh_chksum = sctp_cksum(mp, ip_hdr_length);
+		return;
+	}
+
+	case IPPROTO_ICMPV6:
+		up = IPH_ICMPV6_CHECKSUMP(ip6h, ip_hdr_length);
+		cksum = IP_ICMPV6_CSUM_COMP;    /* Pseudo-header cksum */
+		break;
+
+	default:
+		return;
+	}
+
+	/* ULP assumes the checksum field is in the first mblk */
+	ASSERT(((uchar_t *)up) + sizeof (uint16_t) <= mp->b_wptr);
+
+	/*
+	 * Restore the original entry in the checksum field so that we can
+	 * properly calculate the checksum.
+	 */
+	*up = DB_CKSUMOCSUM(mp);
+
+	/*
+	 * We accumulate the pseudo header checksum in cksum. This is pretty
+	 * hairy code, so watch close. One thing to keep in mind is that UDP
+	 * and TCP have stored their respective datagram lengths in their
+	 * checksum fields. This lines things up real nice.
+	 */
+	cksum += iphs[4] + iphs[5] + iphs[6] + iphs[7] + iphs[8] + iphs[9] +
+	    iphs[10] + iphs[11] + iphs[12] + iphs[13] + iphs[14] + iphs[15] +
+	    iphs[16] + iphs[17] + iphs[18] + iphs[19];
+	cksum = IP_CSUM(mp, ip_hdr_length + offset, cksum);
+
+	/* For UDP/IPv6 a zero UDP checksum is not allowed. Change to 0xffff */
+	if (proto == IPPROTO_UDP && cksum == 0)
+		cksum = ~cksum;
+	*up = cksum;
+
+#undef	iphs
+	/* No IP header checksum for IPv6 */
+}
+
 /*
  * Process the specified mblk chain for proper handling of hardware
  * checksum offload. This routine is invoked for loopback traffic
- * between MAC clients.
+ * between MAC clients. The specific issue is that the upstack code (IP) may
+ * not calculate any checksums, or perhaps a partial checksum, based on the
+ * advertised HW checksum offload features of the underlying NIC below the
+ * netstack, but since we're looping back the packet without ever hitting the
+ * NIC, we may have to calculate the checksums ourselves at this point.
+ *
  * The function handles a NULL mblk chain passed as argument.
  */
 mblk_t *
@@ -122,6 +277,7 @@ mac_fix_cksum(mblk_t *mp_chain)
 				continue;
 			mp1->b_next = mp->b_next;
 			mp->b_next = NULL;
+			DB_CKSUMOCSUM(mp1) = DB_CKSUMOCSUM(mp);
 			freemsg(mp);
 			if (prev != NULL)
 				prev->b_next = mp1;
@@ -173,98 +329,67 @@ mac_fix_cksum(mblk_t *mp_chain)
 		}
 
 		if (flags & (HCK_FULLCKSUM | HCK_IPV4_HDRCKSUM)) {
-			ipha_t *ipha = NULL;
-
 			/*
 			 * In order to compute the full and header
 			 * checksums, we need to find and parse
-			 * the IP and/or ULP headers.
+			 * the IP/IPv6 and/or ULP headers.
 			 */
 
 			sap = (sap < ETHERTYPE_802_MIN) ? 0 : sap;
 
-			/*
-			 * IP header.
-			 */
-			if (sap != ETHERTYPE_IP)
-				continue;
-
-			ASSERT(MBLKL(mp) >= offset + sizeof (ipha_t));
-			/* LINTED: improper alignment cast */
-			ipha = (ipha_t *)(mp->b_rptr + offset);
-
-			if (flags & HCK_FULLCKSUM) {
-				ipaddr_t src, dst;
-				uint32_t cksum;
-				uint16_t *up;
-				uint8_t proto;
-
+			if (sap == ETHERTYPE_IP) {
 				/*
-				 * Pointer to checksum field in ULP header.
+				 * IP header.
 				 */
-				proto = ipha->ipha_protocol;
-				ASSERT(ipha->ipha_version_and_hdr_length ==
-				    IP_SIMPLE_HDR_VERSION);
+				ipha_t *ipha;
 
-				switch (proto) {
-				case IPPROTO_TCP:
-					/* LINTED: improper alignment cast */
-					up = IPH_TCPH_CHECKSUMP(ipha,
-					    IP_SIMPLE_HDR_LENGTH);
-					break;
+				ASSERT(MBLKL(mp) >= offset + sizeof (ipha_t));
+				/* LINTED: improper alignment cast */
+				ipha = (ipha_t *)(mp->b_rptr + offset);
 
-				case IPPROTO_UDP:
-					/* LINTED: improper alignment cast */
-					up = IPH_UDPH_CHECKSUMP(ipha,
-					    IP_SIMPLE_HDR_LENGTH);
-					break;
-
-				default:
-					cmn_err(CE_WARN, "mac_fix_cksum: "
-					    "unexpected protocol: %d", proto);
-					continue;
+				if (flags & HCK_FULLCKSUM) {
+					mac_ipv4_chksum(mp, offset, ipha);
+					/*
+					 * Flag the packet so that it appears
+					 * that the checksum has already been
+					 * verified by the hardware.
+					 */
+					flags &= ~HCK_FULLCKSUM;
+					flags |= HCK_FULLCKSUM_OK;
+					value = 0;
 				}
 
+				if (flags & HCK_IPV4_HDRCKSUM) {
+					ASSERT(ipha != NULL);
+					ipha->ipha_hdr_checksum = 0;
+					ipha->ipha_hdr_checksum =
+					    (uint16_t)ip_csum_hdr(ipha);
+					flags &= ~HCK_IPV4_HDRCKSUM;
+					flags |= HCK_IPV4_HDRCKSUM_OK;
+				}
+			} else if (sap == ETHERTYPE_IPV6) {
 				/*
-				 * Pseudo-header checksum.
+				 * IPv6 header.
 				 */
-				src = ipha->ipha_src;
-				dst = ipha->ipha_dst;
-				len = ntohs(ipha->ipha_length) -
-				    IP_SIMPLE_HDR_LENGTH;
+				ip6_t *ip6ha;
 
-				cksum = (dst >> 16) + (dst & 0xFFFF) +
-				    (src >> 16) + (src & 0xFFFF);
-				cksum += htons(len);
+				ASSERT(MBLKL(mp) >= offset + sizeof (ip6_t));
+				/* LINTED: improper alignment cast */
+				ip6ha = (ip6_t *)(mp->b_rptr + offset);
 
-				/*
-				 * The checksum value stored in the packet needs
-				 * to be correct. Compute it here.
-				 */
-				*up = 0;
-				cksum += (((proto) == IPPROTO_UDP) ?
-				    IP_UDP_CSUM_COMP : IP_TCP_CSUM_COMP);
-				cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH +
-				    offset, cksum);
-				*(up) = (uint16_t)(cksum ? cksum : ~cksum);
-
-				/*
-				 * Flag the packet so that it appears
-				 * that the checksum has already been
-				 * verified by the hardware.
-				 */
-				flags &= ~HCK_FULLCKSUM;
-				flags |= HCK_FULLCKSUM_OK;
-				value = 0;
-			}
-
-			if (flags & HCK_IPV4_HDRCKSUM) {
-				ASSERT(ipha != NULL);
-				ipha->ipha_hdr_checksum =
-				    (uint16_t)ip_csum_hdr(ipha);
-				flags &= ~HCK_IPV4_HDRCKSUM;
-				flags |= HCK_IPV4_HDRCKSUM_OK;
-
+				if (flags & HCK_FULLCKSUM) {
+					mac_ipv6_chksum(mp, offset, ip6ha);
+					/*
+					 * Flag the packet so that it appears
+					 * that the checksum has already been
+					 * verified by the hardware.
+					 */
+					flags &= ~HCK_FULLCKSUM;
+					flags |= HCK_FULLCKSUM_OK;
+					value = 0;
+				}
+			} else {
+				continue;
 			}
 		}
 
@@ -283,6 +408,13 @@ mac_fix_cksum(mblk_t *mp_chain)
 				old_mp = mp;
 				mp = new_mp;
 			}
+
+			/*
+			 * Note: this code properly handles a partial checksum
+			 * for either IPv4 or IPv6. The "stuff", "start" and
+			 * "end" returned from mac_hcksum_get() is correct for
+			 * both protocols.
+			 */
 
 			ipp = mp->b_rptr + offset;
 			/* LINTED: cast may result in improper alignment */
