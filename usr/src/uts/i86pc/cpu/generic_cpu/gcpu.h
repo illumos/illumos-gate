@@ -190,6 +190,7 @@ struct gcpu_chipshared {
 	kmutex_t gcpus_poll_lock;	/* serialize pollers on the same chip */
 	uint32_t gcpus_actv_banks;	/* MCA bank numbers active on chip */
 	volatile uint32_t gcpus_actv_cnt; /* active cpu count in this chip */
+	char *gcpus_ident;		/* ident string, if available */
 };
 
 struct gcpu_data {

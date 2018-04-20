@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -121,6 +122,7 @@ struct cmi_hdl_ops {
 	const char *(*cmio_chiprevstr)(cmi_hdl_impl_t *);
 	uint32_t (*cmio_getsockettype)(cmi_hdl_impl_t *);
 	const char *(*cmio_getsocketstr)(cmi_hdl_impl_t *);
+	uint_t (*cmio_chipsig)(cmi_hdl_impl_t *);
 
 	id_t (*cmio_logical_id)(cmi_hdl_impl_t *);
 	/*
@@ -684,6 +686,12 @@ ntv_getsocketstr(cmi_hdl_impl_t *hdl)
 	return (cpuid_getsocketstr(HDLPRIV(hdl)));
 }
 
+static uint_t
+ntv_chipsig(cmi_hdl_impl_t *hdl)
+{
+	return (cpuid_getsig(HDLPRIV(hdl)));
+}
+
 static id_t
 ntv_logical_id(cmi_hdl_impl_t *hdl)
 {
@@ -995,6 +1003,13 @@ xpv_getsocketstr(cmi_hdl_impl_t *hdl)
 {
 	return (_cpuid_sktstr(xpv_vendor(hdl), xpv_family(hdl),
 	    xpv_model(hdl), xpv_stepping(hdl)));
+}
+
+/* ARGSUSED */
+static uint_t
+xpv_chipsig(cmi_hdl_impl_t *hdl)
+{
+	return (0);
 }
 
 static id_t
@@ -1595,6 +1610,7 @@ cmi_hdl_class(cmi_hdl_t ophdl)
 		    cmio_##what(IMPLHDL(ophdl)));		\
 	}
 
+/* BEGIN CSTYLED */
 CMI_HDL_OPFUNC(vendor, uint_t)
 CMI_HDL_OPFUNC(vendorstr, const char *)
 CMI_HDL_OPFUNC(family, uint_t)
@@ -1614,6 +1630,8 @@ CMI_HDL_OPFUNC(logical_id, id_t)
 CMI_HDL_OPFUNC(smbiosid, uint16_t)
 CMI_HDL_OPFUNC(smb_chipid, uint_t)
 CMI_HDL_OPFUNC(smb_bboard, nvlist_t *)
+CMI_HDL_OPFUNC(chipsig, uint_t)
+/* END CSTYLED */
 
 boolean_t
 cmi_hdl_is_cmt(cmi_hdl_t ophdl)
@@ -1990,6 +2008,7 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	xpv_chiprevstr,		/* cmio_chiprevstr */
 	xpv_getsockettype,	/* cmio_getsockettype */
 	xpv_getsocketstr,	/* cmio_getsocketstr */
+	xpv_chipsig,		/* cmio_chipsig */
 	xpv_logical_id,		/* cmio_logical_id */
 	NULL,			/* cmio_getcr4 */
 	NULL,			/* cmio_setcr4 */
@@ -2022,6 +2041,7 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	ntv_chiprevstr,		/* cmio_chiprevstr */
 	ntv_getsockettype,	/* cmio_getsockettype */
 	ntv_getsocketstr,	/* cmio_getsocketstr */
+	ntv_chipsig,		/* cmio_chipsig */
 	ntv_logical_id,		/* cmio_logical_id */
 	ntv_getcr4,		/* cmio_getcr4 */
 	ntv_setcr4,		/* cmio_setcr4 */

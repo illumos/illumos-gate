@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef	_SYS_DEVFM_H
@@ -120,6 +121,7 @@ typedef struct fm_ioc_data32 {
 #define	FM_PHYSCPU_INFO_CHIP_REV	"chip_rev"
 #define	FM_PHYSCPU_INFO_SOCKET_TYPE	"socket_type"
 #define	FM_PHYSCPU_INFO_CPU_ID		"cpuid"
+#define	FM_PHYSCPU_INFO_CHIP_IDENTSTR	"chip_identstr"
 
 #ifdef	__cplusplus
 }

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/stat.h>
@@ -150,6 +151,7 @@ populate_cpu(nvlist_t **nvlp, cmi_hdl_t hdl)
 {
 	uint_t	fm_chipid;
 	uint16_t smbios_id;
+	const char *idstr;
 
 	(void) nvlist_alloc(nvlp, NV_UNIQUE_NAME, KM_SLEEP);
 
@@ -203,6 +205,16 @@ populate_cpu(nvlist_t **nvlp, cmi_hdl_t hdl)
 	    FM_PHYSCPU_INFO_CPU_ID, DATA_TYPE_INT32,
 	    (int32_t)cmi_hdl_logical_id(hdl),
 	    NULL);
+
+	/*
+	 * Do this separately so that way if there is no ident string we do not
+	 * trigger an error.
+	 */
+	if ((idstr = cmi_hdl_chipident(hdl)) != NULL) {
+		fm_payload_set(*nvlp,
+		    FM_PHYSCPU_INFO_CHIP_IDENTSTR, DATA_TYPE_STRING, idstr,
+		    NULL);
+	}
 }
 
 /*ARGSUSED*/
