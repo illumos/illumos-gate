@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _CHIP_H
@@ -181,6 +182,8 @@ extern int ntv_page_service_state(topo_mod_t *, tnode_t *, topo_version_t,
 extern int ntv_page_unretire(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 extern int ntv_page_unusable(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+extern int chip_fmri_replaced(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
 extern int mem_asru_create(topo_mod_t *, nvlist_t *, nvlist_t **);

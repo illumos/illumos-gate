@@ -334,6 +334,18 @@ extern "C" {
 #define	MSR_PRP4_LBSTK_TO_14	0x6ce
 #define	MSR_PRP4_LBSTK_TO_15	0x6cf
 
+/*
+ * General Xeon based MSRs
+ */
+#define	MSR_PPIN_CTL		0x04e
+#define	MSR_PPIN		0x04f
+#define	MSR_PLATFORM_INFO	0x0ce
+
+#define	MSR_PLATFORM_INFO_PPIN	(1 << 23)
+#define	MSR_PPIN_CTL_MASK	0x03
+#define	MSR_PPIN_CTL_LOCKED	0x01
+#define	MSR_PPIN_CTL_ENABLED	0x02
+
 #define	MCI_CTL_VALUE		0xffffffff
 
 #define	MTRR_TYPE_UC		0
@@ -668,6 +680,19 @@ extern "C" {
 #define	X86_SOCKET_FP2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x080000)
 #define	X86_SOCKET_FS1R2	_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x100000)
 #define	X86_SOCKET_FM2		_X86_SOCKET_MKVAL(X86_VENDOR_AMD, 0x200000)
+
+
+/*
+ * Definitions for Intel processor models. Note, these model values can overlap
+ * in a given family. Processor models are added here on an as needed basis. The
+ * Xeon extension here is to refer to what has been called the EP/EX lines or
+ * E5/E7, generally multi-socket capable processors.
+ */
+#define	INTC_MODEL_IVYBRIDGE_XEON	0x3E
+#define	INTC_MODEL_HASWELL_XEON		0x3F
+#define	INTC_MODEL_BROADWELL_XEON	0x4F
+#define	INTC_MODEL_BROADWELL_XEON_D	0x56
+#define	INTC_MODEL_SKYLAKE_XEON		0x55
 
 /*
  * xgetbv/xsetbv support

@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _SYS_CPU_MODULE_IMPL_H
@@ -64,6 +65,7 @@ typedef struct cmi_ops {
 	void (*cmi_hdl_poke)(cmi_hdl_t);
 	void (*cmi_fini)(cmi_hdl_t);
 	void (*cmi_panic_callback)(void);
+	const char *(*cmi_ident)(cmi_hdl_t);
 } cmi_ops_t;
 
 /*

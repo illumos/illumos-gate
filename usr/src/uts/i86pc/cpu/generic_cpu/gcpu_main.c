@@ -43,6 +43,7 @@
 #include <sys/kmem.h>
 #include <sys/modctl.h>
 #include <sys/pghw.h>
+#include <sys/x86_archext.h>
 
 #include "gcpu.h"
 
@@ -53,6 +54,115 @@ int gcpu_disable = 0;
 
 #define	GCPU_MAX_CHIPID		32
 static struct gcpu_chipshared *gcpu_shared[GCPU_MAX_CHIPID];
+#ifdef	DEBUG
+int gcpu_id_disable = 0;
+static const char *gcpu_id_override[GCPU_MAX_CHIPID] = { NULL };
+#endif
+
+#ifndef	__xpv
+/*
+ * This should probably be delegated to a CPU specific module. However, as those
+ * haven't been developed as actively for recent CPUs, we should revisit this
+ * when we do have it and move this out of gcpu.
+ *
+ * This method is only supported on Intel Xeon platforms. It relies on a
+ * combination of the PPIN and the cpuid signature. Both are required to form
+ * the synthetic ID. This ID is preceded with iv0-INTC to represent that this is
+ * an Intel synthetic ID. The iv0 is the illumos version zero of the ID for
+ * Intel. If we have a new scheme for a new generation of processors, then that
+ * should rev the version field, otherwise for a given processor, this synthetic
+ * ID should not change. For more information on PPIN and these MSRS, see the
+ * relevant processor external design specification.
+ */
+static char *
+gcpu_init_ident_intc(cmi_hdl_t hdl)
+{
+	uint64_t msr;
+
+	/*
+	 * This list should be extended as new Intel Xeon family processors come
+	 * out.
+	 */
+	switch (cmi_hdl_model(hdl)) {
+	case INTC_MODEL_IVYBRIDGE_XEON:
+	case INTC_MODEL_HASWELL_XEON:
+	case INTC_MODEL_BROADWELL_XEON:
+	case INTC_MODEL_BROADWELL_XEON_D:
+	case INTC_MODEL_SKYLAKE_XEON:
+		break;
+	default:
+		return (NULL);
+	}
+
+	if (cmi_hdl_rdmsr(hdl, MSR_PLATFORM_INFO, &msr) != CMI_SUCCESS) {
+		return (NULL);
+	}
+
+	if ((msr & MSR_PLATFORM_INFO_PPIN) == 0) {
+		return (NULL);
+	}
+
+	if (cmi_hdl_rdmsr(hdl, MSR_PPIN_CTL, &msr) != CMI_SUCCESS) {
+		return (NULL);
+	}
+
+	if ((msr & MSR_PPIN_CTL_ENABLED) == 0) {
+		if ((msr & MSR_PPIN_CTL_LOCKED) != 0) {
+			return (NULL);
+		}
+
+		if (cmi_hdl_wrmsr(hdl, MSR_PPIN_CTL, MSR_PPIN_CTL_ENABLED) !=
+		    CMI_SUCCESS) {
+			return (NULL);
+		}
+	}
+
+	if (cmi_hdl_rdmsr(hdl, MSR_PPIN, &msr) != CMI_SUCCESS) {
+		return (NULL);
+	}
+
+	/*
+	 * Now that we've read data, lock the PPIN. Don't worry about success or
+	 * failure of this part, as we will have gotten everything that we need.
+	 * It is possible that it locked open, for example.
+	 */
+	(void) cmi_hdl_wrmsr(hdl, MSR_PPIN_CTL, MSR_PPIN_CTL_LOCKED);
+
+	return (kmem_asprintf("iv0-INTC-%x-%llx", cmi_hdl_chipsig(hdl), msr));
+}
+#endif	/* __xpv */
+
+static void
+gcpu_init_ident(cmi_hdl_t hdl, struct gcpu_chipshared *sp)
+{
+#ifdef	DEBUG
+	uint_t chipid;
+
+	/*
+	 * On debug, allow a developer to override the string to more
+	 * easily test CPU autoreplace without needing to physically
+	 * replace a CPU.
+	 */
+	if (gcpu_id_disable != 0) {
+		return;
+	}
+
+	chipid = cmi_hdl_chipid(hdl);
+	if (gcpu_id_override[chipid] != NULL) {
+		sp->gcpus_ident = strdup(gcpu_id_override[chipid]);
+		return;
+	}
+#endif
+
+#ifndef __xpv
+	switch (cmi_hdl_vendor(hdl)) {
+	case X86_VENDOR_Intel:
+		sp->gcpus_ident = gcpu_init_ident_intc(hdl);
+	default:
+		break;
+	}
+#endif	/* __xpv */
+}
 
 /*
  * Our cmi_init entry point, called during startup of each cpu instance.
@@ -91,6 +201,8 @@ gcpu_init(cmi_hdl_t hdl, void **datap)
 			mutex_destroy(&sp->gcpus_poll_lock);
 			kmem_free(sp, sizeof (struct gcpu_chipshared));
 			sp = osp;
+		} else {
+			gcpu_init_ident(hdl, sp);
 		}
 	}
 
@@ -175,6 +287,26 @@ gcpu_post_mpstartup(cmi_hdl_t hdl)
 #endif
 }
 
+const char *
+gcpu_ident(cmi_hdl_t hdl)
+{
+	uint_t chipid;
+	struct gcpu_chipshared *sp;
+
+	if (gcpu_disable)
+		return (NULL);
+
+	chipid = cmi_hdl_chipid(hdl);
+	if (chipid >= GCPU_MAX_CHIPID)
+		return (NULL);
+
+	if (cmi_hdl_getcmidata(hdl) == NULL)
+		return (NULL);
+
+	sp = gcpu_shared[cmi_hdl_chipid(hdl)];
+	return (sp->gcpus_ident);
+}
+
 #ifdef __xpv
 #define	GCPU_OP(ntvop, xpvop)	xpvop
 #else
@@ -196,6 +328,7 @@ const cmi_ops_t _cmi_ops = {
 	GCPU_OP(gcpu_hdl_poke, NULL),		/* cmi_hdl_poke */
 	gcpu_fini,				/* cmi_fini */
 	GCPU_OP(NULL, gcpu_xpv_panic_callback),	/* cmi_panic_callback */
+	gcpu_ident				/* cmi_ident */
 };
 
 static struct modlcpu modlcpu = {

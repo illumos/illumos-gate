@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -811,4 +812,55 @@ ntv_page_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	topo_mod_dprintf(mod, "ntv_page_unusable: rc = %u\n", rc);
 	return (set_retnvl(mod, out, TOPO_METH_UNUSABLE_RET,
 	    rc == FMD_AGENT_RETIRE_DONE ? 1 : 0));
+}
+
+/*
+ * Determine whether or not we believe a chip has been replaced. While it's
+ * tempting to just do a straight up comparison of the FMRI and its serial
+ * number, things are not that straightforward.
+ *
+ * The presence of a serial number on the CPU is not always guaranteed. It is
+ * possible that systems firmware can hide the information required to generate
+ * a synthesized serial number or that it is strictly not present. As such, we
+ * will only declare something replaced when both the old and current resource
+ * have a serial number present. If it is missing for whatever reason, then we
+ * cannot assume anything about a replacement having occurred.
+ *
+ * This logic applies regardless of whether or not we have an FM-aware SMBIOS.
+ */
+int
+chip_fmri_replaced(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	nvlist_t *rsrc = NULL;
+	int err, ret;
+	char *old_serial, *new_serial;
+
+	if (version > TOPO_METH_REPLACED_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (topo_node_resource(node, &rsrc, &err) == -1) {
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	if (nvlist_lookup_string(rsrc, FM_FMRI_HC_SERIAL_ID,
+	    &new_serial) != 0) {
+		ret = FMD_OBJ_STATE_UNKNOWN;
+		goto out;
+	}
+
+	if (nvlist_lookup_string(in, FM_FMRI_HC_SERIAL_ID, &old_serial) != 0) {
+		ret = FMD_OBJ_STATE_UNKNOWN;
+		goto out;
+	}
+
+	if (strcmp(old_serial, new_serial) == 0) {
+		ret = FMD_OBJ_STATE_STILL_PRESENT;
+	} else {
+		ret = FMD_OBJ_STATE_REPLACED;
+	}
+
+out:
+	nvlist_free(rsrc);
+	return (set_retnvl(mod, out, TOPO_METH_REPLACED_RET, ret));
 }

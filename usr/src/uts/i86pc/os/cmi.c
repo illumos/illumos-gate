@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -959,4 +960,16 @@ cmi_panic_callback(void)
 		CMI_OPS(cmi)->cmi_panic_callback();
 
 	cmi_hdl_rele(hdl);
+}
+
+
+const char *
+cmi_hdl_chipident(cmi_hdl_t hdl)
+{
+	cmi_t *cmi = cmi_hdl_getcmi(hdl);
+
+	if (!CMI_OP_PRESENT(cmi, cmi_ident))
+		return (NULL);
+
+	return (CMI_OPS(cmi)->cmi_ident(hdl));
 }

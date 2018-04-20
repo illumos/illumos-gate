@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <unistd.h>
@@ -86,6 +87,9 @@ static const topo_method_t chip_methods[] = {
 	    TOPO_STABILITY_INTERNAL, a4fplus_chip_label},
 	{ FSB2_CHIP_LBL, "Property method", 0,
 	    TOPO_STABILITY_INTERNAL, fsb2_chip_label},
+	{ TOPO_METH_REPLACED, TOPO_METH_REPLACED_DESC,
+	    TOPO_METH_REPLACED_VERSION, TOPO_STABILITY_INTERNAL,
+	    chip_fmri_replaced },
 	{ NULL }
 };
 
@@ -143,7 +147,7 @@ is_xpv(void)
 
 static tnode_t *
 create_node(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth, char *name,
-    topo_instance_t inst, uint16_t smbios_id)
+    topo_instance_t inst, nvlist_t *cpu, uint16_t smbios_id)
 {
 	nvlist_t *fmri;
 	tnode_t *cnode;
@@ -179,6 +183,17 @@ create_node(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth, char *name,
 		topo_mod_strfree(mod, (char *)serial);
 		topo_mod_strfree(mod, (char *)part);
 		topo_mod_strfree(mod, (char *)rev);
+	} else {
+		char *serial = NULL;
+
+		if (nvlist_lookup_string(cpu, FM_PHYSCPU_INFO_CHIP_IDENTSTR,
+		    &serial) == 0) {
+			if (nvlist_add_string(fmri, FM_FMRI_HC_SERIAL_ID,
+			    serial) != 0) {
+				whinge(mod, NULL,
+				    "create_node: nvlist_add_string failed\n");
+			}
+		}
 	}
 
 	cnode = topo_node_bind(mod, pnode, name, inst, fmri);
@@ -218,7 +233,7 @@ create_strand(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 	}
 
 	if ((strand = create_node(mod, pnode, auth, STRAND_NODE_NAME,
-	    strandid, chip_smbiosid)) == NULL)
+	    strandid, cpu, chip_smbiosid)) == NULL)
 		return (-1);
 
 	/*
@@ -339,7 +354,7 @@ create_core(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 	}
 	if ((core = topo_node_lookup(pnode, CORE_NODE_NAME, coreid)) == NULL) {
 		if ((core = create_node(mod, pnode, auth, CORE_NODE_NAME,
-		    coreid, chip_smbiosid)) == NULL)
+		    coreid, cpu, chip_smbiosid)) == NULL)
 			return (-1);
 
 		/*
@@ -508,7 +523,7 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 
 	if ((chip = topo_node_lookup(pnode, CHIP_NODE_NAME, chipid)) == NULL) {
 		if ((chip = create_node(mod, pnode, auth, CHIP_NODE_NAME,
-		    chipid, smbios_id)) == NULL)
+		    chipid, cpu, smbios_id)) == NULL)
 			return (-1);
 		/*
 		 * Do not register XML map methods if SMBIOS can provide
