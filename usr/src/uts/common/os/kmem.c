@@ -2211,33 +2211,6 @@ typedef struct kmem_dumpctl {
 	((kmem_dumpctl_t *)P2ROUNDUP((uintptr_t)(buf) + (cp)->cache_bufsize, \
 	    sizeof (void *)))
 
-/* Keep some simple stats. */
-#define	KMEM_DUMP_LOGS	(100)
-
-typedef struct kmem_dump_log {
-	kmem_cache_t	*kdl_cache;
-	uint_t		kdl_allocs;		/* # of dump allocations */
-	uint_t		kdl_frees;		/* # of dump frees */
-	uint_t		kdl_alloc_fails;	/* # of allocation failures */
-	uint_t		kdl_free_nondump;	/* # of non-dump frees */
-	uint_t		kdl_unsafe;		/* cache was used, but unsafe */
-} kmem_dump_log_t;
-
-static kmem_dump_log_t *kmem_dump_log;
-static int kmem_dump_log_idx;
-
-#define	KDI_LOG(cp, stat) {						\
-	kmem_dump_log_t *kdl;						\
-	if ((kdl = (kmem_dump_log_t *)((cp)->cache_dumplog)) != NULL) {	\
-		kdl->stat++;						\
-	} else if (kmem_dump_log_idx < KMEM_DUMP_LOGS) {		\
-		kdl = &kmem_dump_log[kmem_dump_log_idx++];		\
-		kdl->stat++;						\
-		kdl->kdl_cache = (cp);					\
-		(cp)->cache_dumplog = kdl;				\
-	}								\
-}
-
 /* set non zero for full report */
 uint_t kmem_dump_verbose = 0;
 
@@ -2267,25 +2240,17 @@ kmem_dumppr(char **pp, char *e, const char *format, ...)
 void
 kmem_dump_init(size_t size)
 {
+	/* Our caller ensures size is always set. */
+	ASSERT3U(size, >, 0);
+
 	if (kmem_dump_start != NULL)
 		kmem_free(kmem_dump_start, kmem_dump_size);
 
-	if (kmem_dump_log == NULL)
-		kmem_dump_log = (kmem_dump_log_t *)kmem_zalloc(KMEM_DUMP_LOGS *
-		    sizeof (kmem_dump_log_t), KM_SLEEP);
-
 	kmem_dump_start = kmem_alloc(size, KM_SLEEP);
-
-	if (kmem_dump_start != NULL) {
-		kmem_dump_size = size;
-		kmem_dump_curr = kmem_dump_start;
-		kmem_dump_end = (void *)((char *)kmem_dump_start + size);
-		copy_pattern(KMEM_UNINITIALIZED_PATTERN, kmem_dump_start, size);
-	} else {
-		kmem_dump_size = 0;
-		kmem_dump_curr = NULL;
-		kmem_dump_end = NULL;
-	}
+	kmem_dump_size = size;
+	kmem_dump_curr = kmem_dump_start;
+	kmem_dump_end = (void *)((char *)kmem_dump_start + size);
+	copy_pattern(KMEM_UNINITIALIZED_PATTERN, kmem_dump_start, size);
 }
 
 /*
@@ -2296,24 +2261,23 @@ kmem_dump_init(size_t size)
 void
 kmem_dump_begin(void)
 {
+	kmem_cache_t *cp;
+
 	ASSERT(panicstr != NULL);
-	if (kmem_dump_start != NULL) {
-		kmem_cache_t *cp;
 
-		for (cp = list_head(&kmem_caches); cp != NULL;
-		    cp = list_next(&kmem_caches, cp)) {
-			kmem_cpu_cache_t *ccp = KMEM_CPU_CACHE(cp);
+	for (cp = list_head(&kmem_caches); cp != NULL;
+	    cp = list_next(&kmem_caches, cp)) {
+		kmem_cpu_cache_t *ccp = KMEM_CPU_CACHE(cp);
 
-			if (cp->cache_arena->vm_cflags & VMC_DUMPSAFE) {
-				cp->cache_flags |= KMF_DUMPDIVERT;
-				ccp->cc_flags |= KMF_DUMPDIVERT;
-				ccp->cc_dump_rounds = ccp->cc_rounds;
-				ccp->cc_dump_prounds = ccp->cc_prounds;
-				ccp->cc_rounds = ccp->cc_prounds = -1;
-			} else {
-				cp->cache_flags |= KMF_DUMPUNSAFE;
-				ccp->cc_flags |= KMF_DUMPUNSAFE;
-			}
+		if (cp->cache_arena->vm_cflags & VMC_DUMPSAFE) {
+			cp->cache_flags |= KMF_DUMPDIVERT;
+			ccp->cc_flags |= KMF_DUMPDIVERT;
+			ccp->cc_dump_rounds = ccp->cc_rounds;
+			ccp->cc_dump_prounds = ccp->cc_prounds;
+			ccp->cc_rounds = ccp->cc_prounds = -1;
+		} else {
+			cp->cache_flags |= KMF_DUMPUNSAFE;
+			ccp->cc_flags |= KMF_DUMPUNSAFE;
 		}
 	}
 }
@@ -2326,18 +2290,18 @@ kmem_dump_begin(void)
 size_t
 kmem_dump_finish(char *buf, size_t size)
 {
-	int kdi_idx;
-	int kdi_end = kmem_dump_log_idx;
 	int percent = 0;
-	int header = 0;
-	int warn = 0;
 	size_t used;
-	kmem_cache_t *cp;
-	kmem_dump_log_t *kdl;
 	char *e = buf + size;
 	char *p = buf;
 
-	if (kmem_dump_size == 0 || kmem_dump_verbose == 0)
+	if (kmem_dump_curr == kmem_dump_end) {
+		cmn_err(CE_WARN, "exceeded kmem_dump space of %lu "
+		    "bytes: kmem state in dump may be inconsistent",
+		    kmem_dump_size);
+	}
+
+	if (kmem_dump_verbose == 0)
 		return (0);
 
 	used = (char *)kmem_dump_curr - (char *)kmem_dump_start;
@@ -2350,25 +2314,6 @@ kmem_dump_finish(char *buf, size_t size)
 	    kmem_dump_oversize_allocs);
 	kmem_dumppr(&p, e, "Oversize max size,%ld\n",
 	    kmem_dump_oversize_max);
-
-	for (kdi_idx = 0; kdi_idx < kdi_end; kdi_idx++) {
-		kdl = &kmem_dump_log[kdi_idx];
-		cp = kdl->kdl_cache;
-		if (cp == NULL)
-			break;
-		if (kdl->kdl_alloc_fails)
-			++warn;
-		if (header == 0) {
-			kmem_dumppr(&p, e,
-			    "Cache Name,Allocs,Frees,Alloc Fails,"
-			    "Nondump Frees,Unsafe Allocs/Frees\n");
-			header = 1;
-		}
-		kmem_dumppr(&p, e, "%s,%d,%d,%d,%d,%d\n",
-		    cp->cache_name, kdl->kdl_allocs, kdl->kdl_frees,
-		    kdl->kdl_alloc_fails, kdl->kdl_free_nondump,
-		    kdl->kdl_unsafe);
-	}
 
 	/* return buffer size used */
 	if (p < e)
@@ -2387,9 +2332,8 @@ kmem_cache_alloc_dump(kmem_cache_t *cp, int kmflag)
 	char *bufend;
 
 	/* return a constructed object */
-	if ((buf = cp->cache_dumpfreelist) != NULL) {
-		cp->cache_dumpfreelist = KMEM_DUMPCTL(cp, buf)->kdc_next;
-		KDI_LOG(cp, kdl_allocs);
+	if ((buf = cp->cache_dump.kd_freelist) != NULL) {
+		cp->cache_dump.kd_freelist = KMEM_DUMPCTL(cp, buf)->kdc_next;
 		return (buf);
 	}
 
@@ -2410,7 +2354,7 @@ kmem_cache_alloc_dump(kmem_cache_t *cp, int kmflag)
 	/* fall back to normal alloc if reserved area is used up */
 	if (bufend > (char *)kmem_dump_end) {
 		kmem_dump_curr = kmem_dump_end;
-		KDI_LOG(cp, kdl_alloc_fails);
+		cp->cache_dump.kd_alloc_fails++;
 		return (NULL);
 	}
 
@@ -2432,12 +2376,11 @@ kmem_cache_alloc_dump(kmem_cache_t *cp, int kmflag)
 		if (kmem_dump_curr == bufend)
 			kmem_dump_curr = curr;
 
+		cp->cache_dump.kd_alloc_fails++;
 		/* fall back to normal alloc if the constructor fails */
-		KDI_LOG(cp, kdl_alloc_fails);
 		return (NULL);
 	}
 
-	KDI_LOG(cp, kdl_allocs);
 	return (buf);
 }
 
@@ -2450,14 +2393,10 @@ kmem_cache_free_dump(kmem_cache_t *cp, void *buf)
 	/* save constructed buffers for next time */
 	if ((char *)buf >= (char *)kmem_dump_start &&
 	    (char *)buf < (char *)kmem_dump_end) {
-		KMEM_DUMPCTL(cp, buf)->kdc_next = cp->cache_dumpfreelist;
-		cp->cache_dumpfreelist = buf;
-		KDI_LOG(cp, kdl_frees);
+		KMEM_DUMPCTL(cp, buf)->kdc_next = cp->cache_dump.kd_freelist;
+		cp->cache_dump.kd_freelist = buf;
 		return (0);
 	}
-
-	/* count all non-dump buf frees */
-	KDI_LOG(cp, kdl_free_nondump);
 
 	/* just drop buffers that were allocated before dump started */
 	if (kmem_dump_curr < kmem_dump_end)
@@ -2491,7 +2430,7 @@ kmem_cache_alloc(kmem_cache_t *cp, int kmflag)
 				if (ccp->cc_flags & KMF_DUMPUNSAFE) {
 					ASSERT(!(ccp->cc_flags &
 					    KMF_DUMPDIVERT));
-					KDI_LOG(cp, kdl_unsafe);
+					cp->cache_dump.kd_unsafe++;
 				}
 				if ((ccp->cc_flags & KMF_BUFTAG) &&
 				    kmem_cache_alloc_debug(cp, buf, kmflag, 0,
@@ -2522,7 +2461,7 @@ kmem_cache_alloc(kmem_cache_t *cp, int kmflag)
 			if (ccp->cc_flags & KMF_DUMPUNSAFE) {
 				ASSERT(!(ccp->cc_flags & KMF_DUMPDIVERT));
 				/* log it so that we can warn about it */
-				KDI_LOG(cp, kdl_unsafe);
+				cp->cache_dump.kd_unsafe++;
 			} else {
 				if ((buf = kmem_cache_alloc_dump(cp, kmflag)) !=
 				    NULL) {
@@ -2718,7 +2657,7 @@ kmem_cache_free(kmem_cache_t *cp, void *buf)
 		if (ccp->cc_flags & KMF_DUMPUNSAFE) {
 			ASSERT(!(ccp->cc_flags & KMF_DUMPDIVERT));
 			/* log it so that we can warn about it */
-			KDI_LOG(cp, kdl_unsafe);
+			cp->cache_dump.kd_unsafe++;
 		} else if (KMEM_DUMPCC(ccp) && !kmem_cache_free_dump(cp, buf)) {
 			return;
 		}

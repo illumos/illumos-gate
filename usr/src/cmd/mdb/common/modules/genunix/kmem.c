@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -3012,7 +3012,7 @@ typedef struct kmem_verify {
 	uint64_t *kmv_buf;		/* buffer to read cache contents into */
 	size_t kmv_size;		/* number of bytes in kmv_buf */
 	int kmv_corruption;		/* > 0 if corruption found. */
-	int kmv_besilent;		/* report actual corruption sites */
+	uint_t kmv_flags;		/* dcmd flags */
 	struct kmem_cache kmv_cache;	/* the cache we're operating on */
 } kmem_verify_t;
 
@@ -3057,7 +3057,7 @@ verify_free(uintptr_t addr, const void *data, void *private)
 	int64_t corrupt;		/* corruption offset */
 	kmem_buftag_t *buftagp;		/* ptr to buftag */
 	kmem_cache_t *cp = &kmv->kmv_cache;
-	int besilent = kmv->kmv_besilent;
+	boolean_t besilent = !!(kmv->kmv_flags & (DCMD_LOOP | DCMD_PIPE_OUT));
 
 	/*LINTED*/
 	buftagp = KMEM_BUFTAG(cp, buf);
@@ -3103,6 +3103,8 @@ verify_free(uintptr_t addr, const void *data, void *private)
 
 	return (WALK_NEXT);
 corrupt:
+	if (kmv->kmv_flags & DCMD_PIPE_OUT)
+		mdb_printf("%p\n", addr);
 	kmv->kmv_corruption++;
 	return (WALK_NEXT);
 }
@@ -3124,7 +3126,7 @@ verify_alloc(uintptr_t addr, const void *data, void *private)
 	uint32_t *ip = (uint32_t *)buftagp;
 	uint8_t *bp = (uint8_t *)buf;
 	int looks_ok = 0, size_ok = 1;	/* flags for finding corruption */
-	int besilent = kmv->kmv_besilent;
+	boolean_t besilent = !!(kmv->kmv_flags & (DCMD_LOOP | DCMD_PIPE_OUT));
 
 	/*
 	 * Read the buffer to check.
@@ -3182,6 +3184,9 @@ verify_alloc(uintptr_t addr, const void *data, void *private)
 
 	return (WALK_NEXT);
 corrupt:
+	if (kmv->kmv_flags & DCMD_PIPE_OUT)
+		mdb_printf("%p\n", addr);
+
 	kmv->kmv_corruption++;
 	return (WALK_NEXT);
 }
@@ -3200,10 +3205,18 @@ kmem_verify(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_ERR);
 		}
 
+		if ((kmv.kmv_cache.cache_dump.kd_unsafe ||
+		    kmv.kmv_cache.cache_dump.kd_alloc_fails) &&
+		    !(flags & (DCMD_LOOP | DCMD_PIPE_OUT))) {
+			mdb_warn("WARNING: cache was used during dump: "
+			    "corruption may be incorrectly reported\n");
+		}
+
 		kmv.kmv_size = kmv.kmv_cache.cache_buftag +
 		    sizeof (kmem_buftag_t);
 		kmv.kmv_buf = mdb_alloc(kmv.kmv_size, UM_SLEEP | UM_GC);
 		kmv.kmv_corruption = 0;
+		kmv.kmv_flags = flags;
 
 		if ((kmv.kmv_cache.cache_flags & KMF_REDZONE)) {
 			check_alloc = 1;
@@ -3218,16 +3231,10 @@ kmem_verify(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_ERR);
 		}
 
-		if (flags & DCMD_LOOP) {
-			/*
-			 * table mode, don't print out every corrupt buffer
-			 */
-			kmv.kmv_besilent = 1;
-		} else {
+		if (!(flags & (DCMD_LOOP | DCMD_PIPE_OUT))) {
 			mdb_printf("Summary for cache '%s'\n",
 			    kmv.kmv_cache.cache_name);
 			mdb_inc_indent(2);
-			kmv.kmv_besilent = 0;
 		}
 
 		if (check_alloc)
@@ -3235,31 +3242,31 @@ kmem_verify(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (check_free)
 			(void) mdb_pwalk("freemem", verify_free, &kmv, addr);
 
-		if (flags & DCMD_LOOP) {
-			if (kmv.kmv_corruption == 0) {
-				mdb_printf("%-*s %?p clean\n",
-				    KMEM_CACHE_NAMELEN,
-				    kmv.kmv_cache.cache_name, addr);
+		if (!(flags & DCMD_PIPE_OUT)) {
+			if (flags & DCMD_LOOP) {
+				if (kmv.kmv_corruption == 0) {
+					mdb_printf("%-*s %?p clean\n",
+					    KMEM_CACHE_NAMELEN,
+					    kmv.kmv_cache.cache_name, addr);
+				} else {
+					mdb_printf("%-*s %?p %d corrupt "
+					    "buffer%s\n", KMEM_CACHE_NAMELEN,
+					    kmv.kmv_cache.cache_name, addr,
+					    kmv.kmv_corruption,
+					    kmv.kmv_corruption > 1 ? "s" : "");
+				}
 			} else {
-				char *s = "";	/* optional s in "buffer[s]" */
-				if (kmv.kmv_corruption > 1)
-					s = "s";
+				/*
+				 * This is the more verbose mode, when the user
+				 * typed addr::kmem_verify.  If the cache was
+				 * clean, nothing will have yet been printed. So
+				 * say something.
+				 */
+				if (kmv.kmv_corruption == 0)
+					mdb_printf("clean\n");
 
-				mdb_printf("%-*s %?p %d corrupt buffer%s\n",
-				    KMEM_CACHE_NAMELEN,
-				    kmv.kmv_cache.cache_name, addr,
-				    kmv.kmv_corruption, s);
+				mdb_dec_indent(2);
 			}
-		} else {
-			/*
-			 * This is the more verbose mode, when the user has
-			 * type addr::kmem_verify.  If the cache was clean,
-			 * nothing will have yet been printed. So say something.
-			 */
-			if (kmv.kmv_corruption == 0)
-				mdb_printf("clean\n");
-
-			mdb_dec_indent(2);
 		}
 	} else {
 		/*
@@ -3267,8 +3274,23 @@ kmem_verify(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 * kmem_cache's, specifying ourself as a callback for each...
 		 * this is the equivalent of '::walk kmem_cache .::kmem_verify'
 		 */
-		mdb_printf("%<u>%-*s %-?s %-20s%</b>\n", KMEM_CACHE_NAMELEN,
-		    "Cache Name", "Addr", "Cache Integrity");
+
+		if (!(flags & DCMD_PIPE_OUT)) {
+			uintptr_t dump_curr;
+			uintptr_t dump_end;
+
+			if (mdb_readvar(&dump_curr, "kmem_dump_curr") != -1 &&
+			    mdb_readvar(&dump_end, "kmem_dump_end") != -1 &&
+			    dump_curr == dump_end) {
+				mdb_warn("WARNING: exceeded kmem_dump_size; "
+				    "corruption may be incorrectly reported\n");
+			}
+
+			mdb_printf("%<u>%-*s %-?s %-20s%</b>\n",
+			    KMEM_CACHE_NAMELEN, "Cache Name", "Addr",
+			    "Cache Integrity");
+		}
+
 		(void) (mdb_walk_dcmd("kmem_cache", "kmem_verify", 0, NULL));
 	}
 
