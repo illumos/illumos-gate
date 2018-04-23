@@ -36,6 +36,7 @@ verify_runnable "both"
 
 function cleanup
 {
+	mdb_set_uint32 zfs_override_estimate_recordsize 8192
 	for ds in $datasets; do
                 datasetexists $ds && zfs destroy -rf $ds
 	done
@@ -92,6 +93,7 @@ function verify_size_estimates
 
 log_assert "Verify 'zfs send -nvP' generates valid stream estimates"
 log_onexit cleanup
+mdb_set_uint32 zfs_override_estimate_recordsize 0
 typeset -l block_count=0
 typeset -l block_size
 typeset -i PERCENT=1
