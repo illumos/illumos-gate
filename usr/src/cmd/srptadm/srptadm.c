@@ -207,7 +207,7 @@ main(int argc, char *argv[])
 				    newargv[optind-1]);
 				(void) fprintf(stderr, "\n");
 
-				/* fall through to default */
+				/* FALLTHROUGH */
 			default:
 				ret = 1;
 				break;

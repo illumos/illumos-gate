@@ -2378,6 +2378,7 @@ scsa1394_cmd_fake_comp(scsa1394_state_t *sp, scsa1394_cmd_t *cmd)
 			mutex_exit(&lp->l_mutex);
 			return (scsa1394_cmd_fake_mode_sense(sp, cmd));
 		}
+		break;
 	default:
 		ret = DDI_FAILURE;
 	}

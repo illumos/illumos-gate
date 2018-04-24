@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PCMCIA Card Services
  *	The PCMCIA Card Services is a loadable module which
@@ -7681,7 +7679,7 @@ cs_make_device_node(client_handle_t client_handle, make_device_node_t *mdn)
 		    SocketServices(CSInitDev, &ss_make_device_node);
 		    error = CS_SUCCESS;
 		}
-		/* fall-through case */
+		/* FALLTHROUGH */
 	    default:
 		EVENT_THREAD_MUTEX_EXIT(client_lock_acquired, sp);
 		return (error);

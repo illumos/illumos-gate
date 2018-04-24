@@ -501,6 +501,7 @@ for (j = 1; j < argc; j++) {
 					option_end = 1;
 					break;
 				}
+				/* FALLTHROUGH */
 			default:
 				optmsg(argv[j]);
 			}

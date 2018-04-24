@@ -15,8 +15,6 @@
 #ifndef _RESTORE_H
 #define	_RESTORE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
@@ -250,7 +248,7 @@ extern struct direct *rst_readdir(RST_DIR *);
 extern void setdirmodes(void);
 extern int genliteraldir(char *, ino_t);
 extern int inodetype(ino_t);
-extern void done(int);
+extern void done(int) __NORETURN;
 extern void runcmdshell(void);
 extern void canon(char *, char *, size_t);
 extern void onintr(int);

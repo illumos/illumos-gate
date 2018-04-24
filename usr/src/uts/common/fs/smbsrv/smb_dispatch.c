@@ -145,7 +145,7 @@ static int is_andx_com(unsigned char);
 static int smbsr_check_result(struct smb_request *, int, int);
 static void smb1_tq_work(void *);
 
-static const smb_disp_entry_t const
+static const smb_disp_entry_t
 smb_disp_table[SMB_COM_NUM] = {
 	{ "SmbCreateDirectory", SMB_SDT_OPS(create_directory),  /* 0x00 000 */
 	    0x00, PC_NETWORK_PROGRAM_1_0 },

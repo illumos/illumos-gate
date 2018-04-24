@@ -156,7 +156,7 @@ off_t           file_pos, file_size;
 int             fnum, no_intty, no_tty;
 int             dum_opt;
 off_t           dlines;
-void end_it(int sig);
+void end_it(int sig) __NORETURN;
 void onquit(int sig);
 void chgwinsz(int sig);
 #ifdef SIGTSTP
@@ -1061,7 +1061,6 @@ command(char *filename, register FILE *f)
         case 'q':
         case 'Q':
             end_it(0);
-	    /*NOTREACHED*/
         case 's':
         case 'f':
             if (nlines == 0) nlines++;
@@ -1129,7 +1128,7 @@ command(char *filename, register FILE *f)
             break;
         case 'n':
             lastp++;
-	    /*FALLTHROUGH*/
+	    /* FALLTHROUGH */
         case '/':
             if (nlines == 0) nlines++;
             kill_line ();
@@ -1175,6 +1174,7 @@ command(char *filename, register FILE *f)
                 execute (filename, VI, "vi", cmdbuf, fnames[fnum], 0);
                 break;
             }
+	    /* FALLTHROUGH */
         default:
 		if (dum_opt) {
 			kill_line ();
@@ -1702,6 +1702,7 @@ expand(char *outbuf, char *inbuf)
                 *out_str++ = *in_str++;
                 break;
             }
+	    /* FALLTHROUGH */
         default:
             *out_str++ = ch;
         }

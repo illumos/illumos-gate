@@ -27,8 +27,6 @@
 #ifndef	_COMMON_H
 #define	_COMMON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -73,7 +71,7 @@ struct flags {
 
 extern int	parse_option(int *, char ***, struct flags *);
 
-extern void	error(char *, ...);
+extern void	error(char *, ...) __NORETURN;
 extern void	warning(char *, ...);
 extern void	diag(char *, ...);
 extern void *Xmalloc(size_t);

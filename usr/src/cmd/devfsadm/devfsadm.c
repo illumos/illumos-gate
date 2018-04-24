@@ -2800,6 +2800,7 @@ create_link_common(char *devlink, char *contents, int *exists)
 				case EINVAL:
 					/* not a symlink, remove and create */
 					s_unlink(devlink);
+					/* FALLTHROUGH */
 				default:
 					/* maybe it didn't exist at all */
 					try = CREATE_LINK;
@@ -6307,7 +6308,7 @@ split_devlinktab_entry(char *entry, char **selector, char **p_link,
 		return (DEVFSADM_FAILURE);
 	}
 
-	if (*p_link == '\0') {
+	if (**p_link == '\0') {
 		err_print(MISSING_DEVNAME, devlinktab_line, devlinktab_file);
 		return (DEVFSADM_FAILURE);
 	}

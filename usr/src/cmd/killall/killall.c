@@ -27,7 +27,6 @@
  * Copyright (c) 1998 by Sun Microsystems, Inc.
  * All rights reserved.
  */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.21	*/
 
 #include <sys/types.h>
 #include <signal.h>
@@ -55,6 +54,7 @@ main(int argc, char *argv[])
 		case 2:
 			if (str2sig(argv[1], &sig) == 0)
 				break;
+			/* FALLTHROUGH */
 		default:
 			(void) write(2, usage, sizeof (usage)-1);
 			return (1);

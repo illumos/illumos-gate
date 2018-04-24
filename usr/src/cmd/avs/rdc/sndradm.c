@@ -2211,6 +2211,7 @@ main(int argc, char *argv[])
 					iflag |= RDC_OPT_REVERSE_ROLE;
 					break;
 				}
+				/* FALLTHROUGH */
 			default:
 				usage();
 				exit(1);

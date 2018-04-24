@@ -3229,8 +3229,8 @@ hermon_icm_tables_init(hermon_state_t *state)
 		case HERMON_AUXC:
 #ifdef HERMON_FW_WORKAROUND
 			icm[i].table_size = 0x80000000ull;
-			/* FALLTHROUGH */
 #endif
+			/* FALLTHROUGH */
 		case HERMON_CMPT_QPC:
 		case HERMON_RDB:
 		case HERMON_ALTC:

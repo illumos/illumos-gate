@@ -27,7 +27,7 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  *	acctcon1 [-p] [-t] [-l file] [-o file] <wtmpx-file >ctmp-file
  *	-p	print input only, no processing
@@ -259,6 +259,7 @@ loop()
 		return;
 	case BOOT_TIME:
 		upall();
+		/* FALLTHROUGH */
 	case ACCOUNTING:
 	case RUN_LVL:
 		lastime = wb.ut_xtime;

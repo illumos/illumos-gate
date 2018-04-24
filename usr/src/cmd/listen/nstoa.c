@@ -28,9 +28,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
 	stoa - convert string to address
 
@@ -213,6 +210,7 @@ int	quote;
 
 			case 'v':	/* vert. tab */
 				buf[len++] = '\v'; s++;
+				/* FALLTHROUGH */
 
 			case '0':
 			case '1':

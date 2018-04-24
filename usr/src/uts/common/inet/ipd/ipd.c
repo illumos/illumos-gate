@@ -1091,6 +1091,7 @@ ipd_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	case DDI_INFO_DEVT2INSTANCE:
 		*result = (void *)(uintptr_t)getminor((dev_t)arg);
 		error = DDI_SUCCESS;
+		break;
 	default:
 		error = DDI_FAILURE;
 		break;

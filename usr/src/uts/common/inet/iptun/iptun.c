@@ -2629,8 +2629,8 @@ iptun_input_icmp_v6(iptun_t *iptun, mblk_t *data_mp, icmp6_t *icmp6h,
 			iptun_drop_pkt(data_mp, &iptun->iptun_oerrors);
 			return;
 		}
-		/* FALLTHRU */
 	}
+	/* FALLTHROUGH */
 	case ICMP6_TIME_EXCEEDED:
 	case ICMP6_DST_UNREACH:
 		type = (inner4 != NULL ? ICMP_DEST_UNREACHABLE :

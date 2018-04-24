@@ -143,6 +143,7 @@ _make_db()
 	case 0:
 		if (execl(MKDEVALLOC, MKDEVALLOC, DA_IS_LABELED, NULL) == -1)
 			exit((errno == ENOENT) ? 0 : 1);
+		return (1);
 	default:
 		for (;;) {
 			wpid = waitpid(pid, &status, 0);

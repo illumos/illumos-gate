@@ -1892,7 +1892,7 @@ handle_error:
 				goto revalidate;
 			}
 		}
-		/*LINTED*/
+		/* FALLTHROUGH */
 	case CMT_LINEAGE_NON_PROMOTABLE:
 		/*
 		 * We've detected a PG that already exists in another CPU's

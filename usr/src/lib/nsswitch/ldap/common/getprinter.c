@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _nss_ldap__printers_constr = _nss_ldap_printers_constr
 
 #include "ldap_common.h"
@@ -135,9 +133,8 @@ _nss_ldap_printers2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		if (strcasecmp(attr->attrname, "sun-printer-kvp") == 0) {
 			for (j = 0; j < attr->value_count; j++) {
 				len = strlen(attr->attrvalue[j]);
-				if (len < 1 ||
-				    (attr->attrvalue[j] == '\0')) {
-					*buffer = 0;
+				if (len < 1 ) {
+					*buffer = '\0';
 					nss_result = (int)NSS_STR_PARSE_PARSE;
 					goto result_printers2str;
 				}

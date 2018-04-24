@@ -24,8 +24,6 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * vs_eng.c manages the vs_engines array of scan engine.
  * Access to the array and other private data is protected by vs_eng_mutex.
@@ -624,7 +622,7 @@ vs_eng_release(const vs_eng_ctx_t *eng_ctx)
 			(void) gettimeofday(&cxn->vsc_avail_time, NULL);
 			break;
 		}
-		/* LINTED E_CASE_FALL_THROUGH - close connection */
+		/* FALLTHROUGH */
 	case VS_ENG_CLOSE_PENDING:
 		(void) close(cxn->vsc_sockfd);
 		cxn->vsc_sockfd = -1;

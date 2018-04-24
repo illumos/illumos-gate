@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 2001-2006 Advanced Micro Devices, Inc.  All rights reserved.
  *
@@ -1483,7 +1481,7 @@ mdlChangeFilter(struct LayerPointers *pLayerPointers, unsigned long  *ArrayPtr)
 			 */
 			FilterByte = HashCode >> 3;
 			pLayerPointers->pMdl->TempLADRF[FilterByte] &=
-			    !(1 << (HashCode & 0x07));
+			    ~(1 << (HashCode & 0x07));
 			break;
 
 		default:

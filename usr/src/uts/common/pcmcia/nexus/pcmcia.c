@@ -850,7 +850,7 @@ pcmcia_prop_op(dev_t dev, dev_info_t *dip, dev_info_t *ch_dip,
 			break;
 		case PCMCIA_PROP_CARDBUS:
 			propptr = NULL;
-			if (!(ppd->ppd_flags * PPD_CARD_CARDBUS))
+			if ((ppd->ppd_flags & PPD_CARD_CARDBUS) == 0)
 				return (DDI_PROP_NOT_FOUND);
 			break;
 		}

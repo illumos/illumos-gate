@@ -26,8 +26,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "parseproto.h"
 #include <assert.h>
 
@@ -773,12 +771,14 @@ restart:
 			skipcomment();
 			goto restart;
 		}
+		return (c);
 
 	case '.':
 		if (lookahead('.')) {
 			if (lookahead('.'))
 				return (ELLIPSIS);
 		}
+		return (c);
 
 	case EOF:
 	case '(':
