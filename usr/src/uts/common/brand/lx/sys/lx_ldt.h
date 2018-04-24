@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_LINUX_LDT_H
@@ -63,7 +63,7 @@ struct ldt_info {
 	USEGD_SETBASE(desc, (info)->base_addr);				\
 	USEGD_SETLIMIT(desc, (info)->limit);				\
 	(desc)->usd_type = ((info)->contents << 2) | 			\
-	    ((info)->read_exec_only ^ 1) << 1 | 0x10;			\
+	    ((info)->read_exec_only ^ 1) << 1 | SDT_S | SDT_A;		\
 	(desc)->usd_dpl = SEL_UPL;					\
 	(desc)->usd_p = (info)->seg_not_present ^ 1;			\
 	(desc)->usd_def32 = (info)->seg_32bit;				\

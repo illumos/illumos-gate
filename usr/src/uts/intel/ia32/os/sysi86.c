@@ -284,9 +284,12 @@ ssd_to_usd(struct ssd *ssd, user_desc_t *usd)
 	USEGD_SETLIMIT(usd, ssd->ls);
 
 	/*
-	 * set type, dpl and present bits.
+	 * Set type, dpl and present bits.
+	 *
+	 * Force the "accessed" bit to on so that we don't run afoul of
+	 * KPTI.
 	 */
-	usd->usd_type = ssd->acc1;
+	usd->usd_type = ssd->acc1 | SDT_A;
 	usd->usd_dpl = ssd->acc1 >> 5;
 	usd->usd_p = ssd->acc1 >> (5 + 2);
 
