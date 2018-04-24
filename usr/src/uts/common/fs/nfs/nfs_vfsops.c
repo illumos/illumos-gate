@@ -1142,7 +1142,7 @@ static uint_t nfs_cots_timeo = NFS_COTS_TIMEO;
 
 static int
 nfsrootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
-	int flags, cred_t *cr, zone_t *zone)
+    int flags, cred_t *cr, zone_t *zone)
 {
 	vnode_t *rtvp;
 	mntinfo_t *mi;
@@ -1203,6 +1203,10 @@ nfsrootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 
 	if (flags & NFSMNT_DIRECTIO)
 		mi->mi_flags |= MI_DIRECTIO;
+
+	mutex_init(&mi->mi_rnodes_lock, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&mi->mi_rnodes, sizeof (rnode_t),
+	    offsetof(rnode_t, r_mi_link));
 
 	/*
 	 * Make a vfs struct for nfs.  We do this here instead of below

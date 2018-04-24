@@ -2348,6 +2348,10 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 
 	mi->mi_flags |= MI4_MOUNTING;
 
+	mutex_init(&mi->mi_rnodes_lock, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&mi->mi_rnodes, sizeof (rnode4_t),
+	    offsetof(rnode4_t, r_mi_link));
+
 	/*
 	 * Make a vfs struct for nfs.  We do this here instead of below
 	 * because rtvp needs a vfs before we can do a getattr on it.

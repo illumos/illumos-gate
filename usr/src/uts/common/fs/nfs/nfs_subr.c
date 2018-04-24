@@ -2821,6 +2821,7 @@ rp_rmfree(rnode_t *rp)
 static void
 rp_addhash(rnode_t *rp)
 {
+	mntinfo_t *mi;
 
 	ASSERT(RW_WRITE_HELD(&rp->r_hashq->r_lock));
 	ASSERT(!(rp->r_flags & RHASHED));
@@ -2833,6 +2834,11 @@ rp_addhash(rnode_t *rp)
 	mutex_enter(&rp->r_statelock);
 	rp->r_flags |= RHASHED;
 	mutex_exit(&rp->r_statelock);
+
+	mi = VTOMI(RTOV(rp));
+	mutex_enter(&mi->mi_rnodes_lock);
+	list_insert_tail(&mi->mi_rnodes, rp);
+	mutex_exit(&mi->mi_rnodes_lock);
 }
 
 /*
@@ -2843,6 +2849,7 @@ rp_addhash(rnode_t *rp)
 static void
 rp_rmhash_locked(rnode_t *rp)
 {
+	mntinfo_t *mi;
 
 	ASSERT(RW_WRITE_HELD(&rp->r_hashq->r_lock));
 	ASSERT(rp->r_flags & RHASHED);
@@ -2853,6 +2860,12 @@ rp_rmhash_locked(rnode_t *rp)
 	mutex_enter(&rp->r_statelock);
 	rp->r_flags &= ~RHASHED;
 	mutex_exit(&rp->r_statelock);
+
+	mi = VTOMI(RTOV(rp));
+	mutex_enter(&mi->mi_rnodes_lock);
+	if (list_link_active(&rp->r_mi_link))
+		list_remove(&mi->mi_rnodes, rp);
+	mutex_exit(&mi->mi_rnodes_lock);
 }
 
 /*
@@ -2914,7 +2927,7 @@ rfind(rhashq_t *rhtp, nfs_fhandle *fh, struct vfs *vfsp)
 }
 
 /*
- * Return 1 if there is a active vnode belonging to this vfs in the
+ * Return 1 if there is an active vnode belonging to this vfs in the
  * rtable cache.
  *
  * Several of these checks are done without holding the usual
@@ -2925,28 +2938,27 @@ rfind(rhashq_t *rhtp, nfs_fhandle *fh, struct vfs *vfsp)
 int
 check_rtable(struct vfs *vfsp)
 {
-	int index;
 	rnode_t *rp;
 	vnode_t *vp;
+	mntinfo_t *mi;
 
-	for (index = 0; index < rtablesize; index++) {
-		rw_enter(&rtable[index].r_lock, RW_READER);
-		for (rp = rtable[index].r_hashf;
-		    rp != (rnode_t *)(&rtable[index]);
-		    rp = rp->r_hashf) {
-			vp = RTOV(rp);
-			if (vp->v_vfsp == vfsp) {
-				if (rp->r_freef == NULL ||
-				    (vn_has_cached_data(vp) &&
-				    (rp->r_flags & RDIRTY)) ||
-				    rp->r_count > 0) {
-					rw_exit(&rtable[index].r_lock);
-					return (1);
-				}
-			}
+	ASSERT(vfsp != NULL);
+	mi = VFTOMI(vfsp);
+
+	mutex_enter(&mi->mi_rnodes_lock);
+	for (rp = list_head(&mi->mi_rnodes); rp != NULL;
+	    rp = list_next(&mi->mi_rnodes, rp)) {
+		vp = RTOV(rp);
+
+		if (rp->r_freef == NULL ||
+		    (vn_has_cached_data(vp) && (rp->r_flags & RDIRTY)) ||
+		    rp->r_count > 0) {
+			mutex_exit(&mi->mi_rnodes_lock);
+			return (1);
 		}
-		rw_exit(&rtable[index].r_lock);
 	}
+	mutex_exit(&mi->mi_rnodes_lock);
+
 	return (0);
 }
 
@@ -2958,47 +2970,42 @@ check_rtable(struct vfs *vfsp)
 void
 destroy_rtable(struct vfs *vfsp, cred_t *cr)
 {
-	int index;
 	rnode_t *rp;
-	rnode_t *rlist;
-	rnode_t *r_hashf;
-	vnode_t *vp;
+	mntinfo_t *mi;
 
-	rlist = NULL;
+	ASSERT(vfsp != NULL);
 
-	for (index = 0; index < rtablesize; index++) {
-		rw_enter(&rtable[index].r_lock, RW_WRITER);
-		for (rp = rtable[index].r_hashf;
-		    rp != (rnode_t *)(&rtable[index]);
-		    rp = r_hashf) {
-			/* save the hash pointer before destroying */
-			r_hashf = rp->r_hashf;
-			vp = RTOV(rp);
-			if (vp->v_vfsp == vfsp) {
-				mutex_enter(&rpfreelist_lock);
-				if (rp->r_freef != NULL) {
-					rp_rmfree(rp);
-					mutex_exit(&rpfreelist_lock);
-					rp_rmhash_locked(rp);
-					rp->r_hashf = rlist;
-					rlist = rp;
-				} else
-					mutex_exit(&rpfreelist_lock);
-			}
-		}
-		rw_exit(&rtable[index].r_lock);
-	}
+	mi = VFTOMI(vfsp);
 
-	for (rp = rlist; rp != NULL; rp = rlist) {
-		rlist = rp->r_hashf;
+	mutex_enter(&rpfreelist_lock);
+	mutex_enter(&mi->mi_rnodes_lock);
+	while ((rp = list_remove_head(&mi->mi_rnodes)) != NULL) {
+		/*
+		 * If the rnode is no longer on the freelist it is not
+		 * ours and it will be handled by some other thread, so
+		 * skip it.
+		 */
+		if (rp->r_freef == NULL)
+			continue;
+		mutex_exit(&mi->mi_rnodes_lock);
+
+		rp_rmfree(rp);
+		mutex_exit(&rpfreelist_lock);
+
+		rp_rmhash(rp);
+
 		/*
 		 * This call to rp_addfree will end up destroying the
 		 * rnode, but in a safe way with the appropriate set
 		 * of checks done.
 		 */
 		rp_addfree(rp, cr);
-	}
 
+		mutex_enter(&rpfreelist_lock);
+		mutex_enter(&mi->mi_rnodes_lock);
+	}
+	mutex_exit(&mi->mi_rnodes_lock);
+	mutex_exit(&rpfreelist_lock);
 }
 
 /*
@@ -3066,6 +3073,53 @@ rflush(struct vfs *vfsp, cred_t *cr)
 	cnt = 0;
 
 	/*
+	 * If the vfs is known we can do fast path by iterating all rnodes that
+	 * belongs to this vfs.  This is much faster than the traditional way
+	 * of iterating rtable (below) in a case there is a lot of rnodes that
+	 * does not belong to our vfs.
+	 */
+	if (vfsp != NULL) {
+		mntinfo_t *mi = VFTOMI(vfsp);
+
+		mutex_enter(&mi->mi_rnodes_lock);
+		for (rp = list_head(&mi->mi_rnodes); rp != NULL;
+		    rp = list_next(&mi->mi_rnodes, rp)) {
+			vp = RTOV(rp);
+			/*
+			 * Don't bother sync'ing a vp if it
+			 * is part of virtual swap device or
+			 * if VFS is read-only
+			 */
+			if (IS_SWAPVP(vp) || vn_is_readonly(vp))
+				continue;
+			/*
+			 * If the vnode has pages and is marked as either dirty
+			 * or mmap'd, hold and add this vnode to the list of
+			 * vnodes to flush.
+			 */
+			ASSERT(vp->v_vfsp == vfsp);
+			if (vn_has_cached_data(vp) &&
+			    ((rp->r_flags & RDIRTY) || rp->r_mapcnt > 0)) {
+				VN_HOLD(vp);
+				vplist[cnt++] = vp;
+				if (cnt == num) {
+					/*
+					 * The vplist is full because there is
+					 * too many rnodes.  We are done for
+					 * now.
+					 */
+					break;
+				}
+			}
+		}
+		mutex_exit(&mi->mi_rnodes_lock);
+
+		goto done;
+	}
+
+	ASSERT(vfsp == NULL);
+
+	/*
 	 * Walk the hash queues looking for rnodes with page
 	 * lists associated with them.  Make a list of these
 	 * files.
@@ -3084,26 +3138,29 @@ rflush(struct vfs *vfsp, cred_t *cr)
 			if (IS_SWAPVP(vp) || vn_is_readonly(vp))
 				continue;
 			/*
-			 * If flushing all mounted file systems or
-			 * the vnode belongs to this vfs, has pages
-			 * and is marked as either dirty or mmap'd,
-			 * hold and add this vnode to the list of
+			 * If the vnode has pages and is marked as either dirty
+			 * or mmap'd, hold and add this vnode to the list of
 			 * vnodes to flush.
 			 */
-			if ((vfsp == NULL || vp->v_vfsp == vfsp) &&
-			    vn_has_cached_data(vp) &&
+			if (vn_has_cached_data(vp) &&
 			    ((rp->r_flags & RDIRTY) || rp->r_mapcnt > 0)) {
 				VN_HOLD(vp);
 				vplist[cnt++] = vp;
 				if (cnt == num) {
 					rw_exit(&rtable[index].r_lock);
-					goto toomany;
+					/*
+					 * The vplist is full because there is
+					 * too many rnodes.  We are done for
+					 * now.
+					 */
+					goto done;
 				}
 			}
 		}
 		rw_exit(&rtable[index].r_lock);
 	}
-toomany:
+
+done:
 
 	/*
 	 * Flush and release all of the files on the list.

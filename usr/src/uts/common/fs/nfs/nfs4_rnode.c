@@ -969,6 +969,8 @@ rp4_rmfree(rnode4_t *rp)
 void
 rp4_addhash(rnode4_t *rp)
 {
+	mntinfo4_t *mi;
+
 	ASSERT(RW_WRITE_HELD(&rp->r_hashq->r_lock));
 	ASSERT(!(rp->r_flags & R4HASHED));
 
@@ -984,6 +986,11 @@ rp4_addhash(rnode4_t *rp)
 	mutex_enter(&rp->r_statelock);
 	rp->r_flags |= R4HASHED;
 	mutex_exit(&rp->r_statelock);
+
+	mi = VTOMI4(RTOV4(rp));
+	mutex_enter(&mi->mi_rnodes_lock);
+	list_insert_tail(&mi->mi_rnodes, rp);
+	mutex_exit(&mi->mi_rnodes_lock);
 }
 
 /*
@@ -994,6 +1001,8 @@ rp4_addhash(rnode4_t *rp)
 void
 rp4_rmhash_locked(rnode4_t *rp)
 {
+	mntinfo4_t *mi;
+
 	ASSERT(RW_WRITE_HELD(&rp->r_hashq->r_lock));
 	ASSERT(rp->r_flags & R4HASHED);
 
@@ -1003,6 +1012,12 @@ rp4_rmhash_locked(rnode4_t *rp)
 	mutex_enter(&rp->r_statelock);
 	rp->r_flags &= ~R4HASHED;
 	mutex_exit(&rp->r_statelock);
+
+	mi = VTOMI4(RTOV4(rp));
+	mutex_enter(&mi->mi_rnodes_lock);
+	if (list_link_active(&rp->r_mi_link))
+		list_remove(&mi->mi_rnodes, rp);
+	mutex_exit(&mi->mi_rnodes_lock);
 }
 
 /*
@@ -1100,11 +1115,11 @@ r4find_unlocked(nfs4_sharedfh_t *fh, struct vfs *vfsp)
 }
 
 /*
- * Return >0 if there is a active vnode belonging to this vfs in the
+ * Return 1 if there is an active vnode belonging to this vfs in the
  * rtable4 cache.
  *
  * Several of these checks are done without holding the usual
- * locks.  This is safe because destroy_rtable(), rp_addfree(),
+ * locks.  This is safe because destroy_rtable4(), rp4_addfree(),
  * etc. will redo the necessary checks before actually destroying
  * any rnodes.
  */
@@ -1113,45 +1128,26 @@ check_rtable4(struct vfs *vfsp)
 {
 	rnode4_t *rp;
 	vnode_t *vp;
-	int busy = NFSV4_RTABLE4_OK;
-	int index;
+	mntinfo4_t *mi;
 
-	for (index = 0; index < rtable4size; index++) {
-		rw_enter(&rtable4[index].r_lock, RW_READER);
+	ASSERT(vfsp != NULL);
+	mi = VFTOMI4(vfsp);
 
-		for (rp = rtable4[index].r_hashf;
-		    rp != (rnode4_t *)(&rtable4[index]);
-		    rp = rp->r_hashf) {
+	mutex_enter(&mi->mi_rnodes_lock);
+	for (rp = list_head(&mi->mi_rnodes); rp != NULL;
+	    rp = list_next(&mi->mi_rnodes, rp)) {
+		vp = RTOV4(rp);
 
-			vp = RTOV4(rp);
-			if (vp->v_vfsp == vfsp) {
-				if (rp->r_freef == NULL) {
-					busy = NFSV4_RTABLE4_NOT_FREE_LIST;
-				} else if (nfs4_has_pages(vp) &&
-				    (rp->r_flags & R4DIRTY)) {
-					busy = NFSV4_RTABLE4_DIRTY_PAGES;
-				} else if (rp->r_count > 0) {
-					busy = NFSV4_RTABLE4_POS_R_COUNT;
-				}
-
-				if (busy != NFSV4_RTABLE4_OK) {
-#ifdef DEBUG
-					char *path;
-
-					path = fn_path(rp->r_svnode.sv_name);
-					DTRACE_NFSV4_3(rnode__e__debug,
-					    int, busy, char *, path,
-					    rnode4_t *, rp);
-					kmem_free(path, strlen(path)+1);
-#endif
-					rw_exit(&rtable4[index].r_lock);
-					return (busy);
-				}
-			}
+		if (rp->r_freef == NULL ||
+		    (nfs4_has_pages(vp) && (rp->r_flags & R4DIRTY)) ||
+		    rp->r_count > 0) {
+			mutex_exit(&mi->mi_rnodes_lock);
+			return (1);
 		}
-		rw_exit(&rtable4[index].r_lock);
 	}
-	return (busy);
+	mutex_exit(&mi->mi_rnodes_lock);
+
+	return (0);
 }
 
 /*
@@ -1164,45 +1160,42 @@ check_rtable4(struct vfs *vfsp)
 void
 destroy_rtable4(struct vfs *vfsp, cred_t *cr)
 {
-	int index;
-	vnode_t *vp;
-	rnode4_t *rp, *r_hashf, *rlist;
+	rnode4_t *rp;
+	mntinfo4_t *mi;
 
-	rlist = NULL;
+	ASSERT(vfsp != NULL);
 
-	for (index = 0; index < rtable4size; index++) {
-		rw_enter(&rtable4[index].r_lock, RW_WRITER);
-		for (rp = rtable4[index].r_hashf;
-		    rp != (rnode4_t *)(&rtable4[index]);
-		    rp = r_hashf) {
-			/* save the hash pointer before destroying */
-			r_hashf = rp->r_hashf;
+	mi = VFTOMI4(vfsp);
 
-			vp = RTOV4(rp);
-			if (vp->v_vfsp == vfsp) {
-				mutex_enter(&rp4freelist_lock);
-				if (rp->r_freef != NULL) {
-					rp4_rmfree(rp);
-					mutex_exit(&rp4freelist_lock);
-					rp4_rmhash_locked(rp);
-					rp->r_hashf = rlist;
-					rlist = rp;
-				} else
-					mutex_exit(&rp4freelist_lock);
-			}
-		}
-		rw_exit(&rtable4[index].r_lock);
-	}
+	mutex_enter(&rp4freelist_lock);
+	mutex_enter(&mi->mi_rnodes_lock);
+	while ((rp = list_remove_head(&mi->mi_rnodes)) != NULL) {
+		/*
+		 * If the rnode is no longer on the freelist it is not
+		 * ours and it will be handled by some other thread, so
+		 * skip it.
+		 */
+		if (rp->r_freef == NULL)
+			continue;
+		mutex_exit(&mi->mi_rnodes_lock);
 
-	for (rp = rlist; rp != NULL; rp = r_hashf) {
-		r_hashf = rp->r_hashf;
+		rp4_rmfree(rp);
+		mutex_exit(&rp4freelist_lock);
+
+		rp4_rmhash(rp);
+
 		/*
 		 * This call to rp4_addfree will end up destroying the
 		 * rnode, but in a safe way with the appropriate set
 		 * of checks done.
 		 */
 		rp4_addfree(rp, cr);
+
+		mutex_enter(&rp4freelist_lock);
+		mutex_enter(&mi->mi_rnodes_lock);
 	}
+	mutex_exit(&mi->mi_rnodes_lock);
+	mutex_exit(&rp4freelist_lock);
 }
 
 /*
@@ -1297,6 +1290,53 @@ r4flush(struct vfs *vfsp, cred_t *cr)
 	cnt = 0;
 
 	/*
+	 * If the vfs is known we can do fast path by iterating all rnodes that
+	 * belongs to this vfs.  This is much faster than the traditional way
+	 * of iterating rtable4 (below) in a case there is a lot of rnodes that
+	 * does not belong to our vfs.
+	 */
+	if (vfsp != NULL) {
+		mntinfo4_t *mi = VFTOMI4(vfsp);
+
+		mutex_enter(&mi->mi_rnodes_lock);
+		for (rp = list_head(&mi->mi_rnodes); rp != NULL;
+		    rp = list_next(&mi->mi_rnodes, rp)) {
+			vp = RTOV4(rp);
+			/*
+			 * Don't bother sync'ing a vp if it
+			 * is part of virtual swap device or
+			 * if VFS is read-only
+			 */
+			if (IS_SWAPVP(vp) || vn_is_readonly(vp))
+				continue;
+			/*
+			 * If the vnode has pages and is marked as either dirty
+			 * or mmap'd, hold and add this vnode to the list of
+			 * vnodes to flush.
+			 */
+			ASSERT(vp->v_vfsp == vfsp);
+			if (nfs4_has_pages(vp) &&
+			    ((rp->r_flags & R4DIRTY) || rp->r_mapcnt > 0)) {
+				VN_HOLD(vp);
+				vplist[cnt++] = vp;
+				if (cnt == num) {
+					/*
+					 * The vplist is full because there is
+					 * too many rnodes.  We are done for
+					 * now.
+					 */
+					break;
+				}
+			}
+		}
+		mutex_exit(&mi->mi_rnodes_lock);
+
+		goto done;
+	}
+
+	ASSERT(vfsp == NULL);
+
+	/*
 	 * Walk the hash queues looking for rnodes with page
 	 * lists associated with them.  Make a list of these
 	 * files.
@@ -1315,26 +1355,29 @@ r4flush(struct vfs *vfsp, cred_t *cr)
 			if (IS_SWAPVP(vp) || vn_is_readonly(vp))
 				continue;
 			/*
-			 * If flushing all mounted file systems or
-			 * the vnode belongs to this vfs, has pages
-			 * and is marked as either dirty or mmap'd,
-			 * hold and add this vnode to the list of
+			 * If the vnode has pages and is marked as either dirty
+			 * or mmap'd, hold and add this vnode to the list of
 			 * vnodes to flush.
 			 */
-			if ((vfsp == NULL || vp->v_vfsp == vfsp) &&
-			    nfs4_has_pages(vp) &&
+			if (nfs4_has_pages(vp) &&
 			    ((rp->r_flags & R4DIRTY) || rp->r_mapcnt > 0)) {
 				VN_HOLD(vp);
 				vplist[cnt++] = vp;
 				if (cnt == num) {
 					rw_exit(&rtable4[index].r_lock);
-					goto toomany;
+					/*
+					 * The vplist is full because there is
+					 * too many rnodes.  We are done for
+					 * now.
+					 */
+					goto done;
 				}
 			}
 		}
 		rw_exit(&rtable4[index].r_lock);
 	}
-toomany:
+
+done:
 
 	/*
 	 * Flush and release all of the files on the list.

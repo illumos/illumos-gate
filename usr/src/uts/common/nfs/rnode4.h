@@ -336,6 +336,8 @@ typedef struct rnode4 {
 	nfs4_stub_type_t	r_stub_type;
 					/* e.g. mirror-mount or referral */
 	uint_t		r_inmap;	/* to serialize read/write and mmap */
+	list_node_t	r_mi_link;	/* linkage into list of rnodes for */
+					/* this mntinfo */
 } rnode4_t;
 
 #define	r_vnode	r_svnode.sv_r_vnode
@@ -392,12 +394,6 @@ extern long nrnode;
 /* Used for r_delay_interval */
 #define	NFS4_INITIAL_DELAY_INTERVAL	 1
 #define	NFS4_MAX_DELAY_INTERVAL		20
-
-/* Used for check_rtable4 */
-#define	NFSV4_RTABLE4_OK		0
-#define	NFSV4_RTABLE4_NOT_FREE_LIST	1
-#define	NFSV4_RTABLE4_DIRTY_PAGES	2
-#define	NFSV4_RTABLE4_POS_R_COUNT	3
 
 extern rnode4_t	*r4find(r4hashq_t *, nfs4_sharedfh_t *, struct vfs *);
 extern rnode4_t	*r4find_unlocked(nfs4_sharedfh_t *, struct vfs *);

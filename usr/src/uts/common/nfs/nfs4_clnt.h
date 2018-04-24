@@ -1099,6 +1099,11 @@ typedef struct mntinfo4 {
 	 * Referral related info.
 	 */
 	int		mi_vfs_referral_loop_cnt;
+	/*
+	 * List of rnode4_t structures that belongs to this mntinfo4
+	 */
+	kmutex_t	mi_rnodes_lock;	/* protects the mi_rnodes list */
+	list_t		mi_rnodes;	/* the list */
 } mntinfo4_t;
 
 /*

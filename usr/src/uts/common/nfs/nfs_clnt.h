@@ -428,6 +428,11 @@ typedef struct mntinfo {
 	 * before acquiring any other rnode lock.
 	 */
 	kmutex_t	mi_remap_lock;
+	/*
+	 * List of rnode_t structures that belongs to this mntinfo
+	 */
+	kmutex_t	mi_rnodes_lock;	/* protects the mi_rnodes list */
+	list_t		mi_rnodes;	/* the list */
 } mntinfo_t;
 #endif	/* _KERNEL */
 

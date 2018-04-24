@@ -1354,8 +1354,8 @@ nfs_async_manager_stop(vfs_t *vfsp)
 
 int
 nfs_async_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr,
-	struct seg *seg, cred_t *cr, void (*readahead)(vnode_t *,
-	u_offset_t, caddr_t, struct seg *, cred_t *))
+    struct seg *seg, cred_t *cr, void (*readahead)(vnode_t *,
+    u_offset_t, caddr_t, struct seg *, cred_t *))
 {
 	rnode_t *rp;
 	mntinfo_t *mi;
@@ -1454,8 +1454,8 @@ noasync:
 
 int
 nfs_async_putapage(vnode_t *vp, page_t *pp, u_offset_t off, size_t len,
-	int flags, cred_t *cr, int (*putapage)(vnode_t *, page_t *,
-	u_offset_t, size_t, int, cred_t *))
+    int flags, cred_t *cr, int (*putapage)(vnode_t *, page_t *,
+    u_offset_t, size_t, int, cred_t *))
 {
 	rnode_t *rp;
 	mntinfo_t *mi;
@@ -1576,8 +1576,8 @@ noasync:
 
 int
 nfs_async_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
-	int flags, cred_t *cr, int (*pageio)(vnode_t *, page_t *, u_offset_t,
-	size_t, int, cred_t *))
+    int flags, cred_t *cr, int (*pageio)(vnode_t *, page_t *, u_offset_t,
+    size_t, int, cred_t *))
 {
 	rnode_t *rp;
 	mntinfo_t *mi;
@@ -1709,7 +1709,7 @@ noasync:
 
 void
 nfs_async_readdir(vnode_t *vp, rddir_cache *rdc, cred_t *cr,
-	int (*readdir)(vnode_t *, rddir_cache *, cred_t *))
+    int (*readdir)(vnode_t *, rddir_cache *, cred_t *))
 {
 	rnode_t *rp;
 	mntinfo_t *mi;
@@ -1806,8 +1806,7 @@ noasync:
 
 void
 nfs_async_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
-	cred_t *cr, void (*commit)(vnode_t *, page_t *, offset3, count3,
-	cred_t *))
+    cred_t *cr, void (*commit)(vnode_t *, page_t *, offset3, count3, cred_t *))
 {
 	rnode_t *rp;
 	mntinfo_t *mi;
@@ -3223,11 +3222,13 @@ nfs_free_mi(mntinfo_t *mi)
 	mutex_destroy(&mi->mi_lock);
 	mutex_destroy(&mi->mi_remap_lock);
 	mutex_destroy(&mi->mi_async_lock);
+	mutex_destroy(&mi->mi_rnodes_lock);
 	cv_destroy(&mi->mi_failover_cv);
 	cv_destroy(&mi->mi_async_work_cv[NFS_ASYNC_QUEUE]);
 	cv_destroy(&mi->mi_async_work_cv[NFS_ASYNC_PGOPS_QUEUE]);
 	cv_destroy(&mi->mi_async_reqs_cv);
 	cv_destroy(&mi->mi_async_cv);
+	list_destroy(&mi->mi_rnodes);
 	zone_rele_ref(&mi->mi_zone_ref, ZONE_REF_NFS);
 	kmem_free(mi, sizeof (*mi));
 }

@@ -303,6 +303,8 @@ typedef struct rnode {
 	kthread_t	*r_serial;	/* id of purging thread */
 	list_t		r_indelmap;	/* list of delmap callers */
 	uint_t		r_inmap;	/* to serialize read/write and mmap */
+	list_node_t	r_mi_link;	/* linkage into list of rnodes for */
+					/* this mntinfo */
 } rnode_t;
 #endif /* _KERNEL */
 
