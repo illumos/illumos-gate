@@ -62,10 +62,6 @@ __FBSDID("$FreeBSD$");
 #include "pci_emul.h"
 #include "mem.h"
 
-#ifndef _PATH_MEM
-#define	_PATH_MEM	"/dev/mem"
-#endif
-
 #define	LEGACY_SUPPORT	1
 
 #define MSIX_TABLE_COUNT(ctrl) (((ctrl) & PCIM_MSIXCTRL_TABLE_SIZE) + 1)
@@ -541,18 +537,6 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc, uint64_t base)
 			pi->pi_msix.pba_page = NULL;
 			pi->pi_msix.pba_page_offset = 0;
 		} else {
-			int memfd;
-
-			/*
-			 * This cannot work in a zone and should be replaced
-			 * with a better interface offered by the ppt driver.
-			 */
-			memfd = open(_PATH_MEM, O_RDWR, 0);
-			if (memfd < 0) {
-				warn("failed to open %s", _PATH_MEM);
-				return (-1);
-			}
-
 			/*
 			 * The PBA overlaps with either the first or last
 			 * page of the MSI-X table region.  Map the
@@ -564,9 +548,8 @@ init_msix_table(struct vmctx *ctx, struct passthru_softc *sc, uint64_t base)
 				pi->pi_msix.pba_page_offset = table_offset +
 				    table_size - 4096;
 			pi->pi_msix.pba_page = mmap(NULL, 4096, PROT_READ |
-			    PROT_WRITE, MAP_SHARED, memfd, start +
+			    PROT_WRITE, MAP_SHARED, sc->pptfd,
 			    pi->pi_msix.pba_page_offset);
-			(void) close(memfd);
 			if (pi->pi_msix.pba_page == MAP_FAILED) {
 				warn("Failed to map PBA page for MSI-X on %d",
 				    sc->pptfd);

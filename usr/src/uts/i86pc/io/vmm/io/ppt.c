@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/pci_cap.h>
 #include <sys/ppt_dev.h>
 #include <sys/mkdev.h>
+#include <sys/sysmacros.h>
 
 #include "vmm_lapic.h"
 #include "vmm_ktr.h"
@@ -318,6 +319,64 @@ ppt_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 	return (0);
 }
 
+static int
+ppt_find_pba_bar(struct pptdev *ppt)
+{
+	uint16_t base;
+	uint32_t pba_off;
+
+	if (PCI_CAP_LOCATE(ppt->pptd_cfg, PCI_CAP_ID_MSI_X, &base) !=
+	    DDI_SUCCESS)
+		return (-1);
+
+	pba_off = pci_config_get32(ppt->pptd_cfg, base + PCI_MSIX_PBA_OFFSET);
+
+	if (pba_off == PCI_EINVAL32)
+		return (-1);
+
+	return (pba_off & PCI_MSIX_PBA_BIR_MASK);
+}
+
+static int
+ppt_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
+    size_t *maplen, uint_t model)
+{
+	minor_t minor;
+	struct pptdev *ppt;
+	int err;
+	int bar;
+
+	minor = getminor(dev);
+
+	if ((ppt = ddi_get_soft_state(ppt_state, minor)) == NULL)
+		return (ENXIO);
+
+#ifdef _MULTI_DATAMODEL
+	if (ddi_model_convert_from(model) != DDI_MODEL_NONE)
+		return (ENXIO);
+#endif
+
+	if (off < 0 || off != P2ALIGN(off, PAGESIZE))
+		return (EINVAL);
+
+	if ((bar = ppt_find_pba_bar(ppt)) == -1)
+		return (EINVAL);
+
+	/*
+	 * Add 1 to the BAR number to get the register number used by DDI.
+	 * Register 0 corresponds to PCI config space, the PCI BARs start at 1.
+	 */
+	bar += 1;
+
+	err = devmap_devmem_setup(dhp, ppt->pptd_dip, NULL, bar, off, len,
+	    PROT_USER | PROT_READ | PROT_WRITE, IOMEM_DATA_CACHED, &ppt_attr);
+
+	if (err == DDI_SUCCESS)
+		*maplen = len;
+
+	return (err);
+}
+
 
 static void
 ppt_bar_wipe(struct pptdev *ppt)
@@ -448,7 +507,6 @@ ppt_ddi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ppt_bar_crawl(ppt) != 0) {
 		goto fail;
 	}
-
 	if (ddi_create_minor_node(dip, PPT_MINOR_NAME, S_IFCHR, inst,
 	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		goto fail;
@@ -539,13 +597,14 @@ static struct cb_ops ppt_cb_ops = {
 	nodev,		/* read */
 	nodev,		/* write */
 	ppt_ioctl,
-	nodev,		/* devmap */
-	nodev,		/* mmap */
-	nodev,		/* segmap */
+	ppt_devmap,	/* devmap */
+	NULL,		/* mmap */
+	NULL,		/* segmap */
 	nochpoll,	/* poll */
 	ddi_prop_op,
 	NULL,
-	D_NEW | D_MP | D_DEVMAP
+	D_NEW | D_MP | D_64BIT | D_DEVMAP,
+	CB_REV
 };
 
 static struct dev_ops ppt_ops = {
