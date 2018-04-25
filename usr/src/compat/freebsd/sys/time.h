@@ -100,6 +100,16 @@ bttosbt(const struct bintime bt)
 	return (((sbintime_t)bt.sec << 32) + (bt.frac >> 32));
 }
 
+static __inline struct bintime
+sbttobt(sbintime_t _sbt)
+{
+	struct bintime _bt;
+
+	_bt.sec = _sbt >> 32;
+	_bt.frac = _sbt << 32;
+	return (_bt);
+}
+
 static __inline sbintime_t
 sbinuptime(void)
 {
