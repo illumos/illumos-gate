@@ -25,6 +25,7 @@
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -4074,7 +4075,7 @@ update_archive(char *root, char *opt)
 	/*
 	 * Never update non-BE root in update_all
 	 */
-	if (!is_be(root) && bam_update_all)
+	if (bam_update_all && !is_be(root))
 		return (BAM_SUCCESS);
 	/*
 	 * root must belong to a boot archive based OS,
