@@ -12,6 +12,7 @@
 #
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018, Joyent, Inc.
 #
 
 PROG=		mandoc
@@ -78,6 +79,6 @@ OBJS +=		compat_ohash.o
 CFLAGS +=	$(CC_VERBOSE)
 CSTD =	$(CSTD_GNU99)
 
-CPPFLAGS +=	-DOSNAME="\"illumos\""
+CPPFLAGS +=	-DOSNAME="\"illumos\"" -D_FILE_OFFSET_BITS=64
 
 LDLIBS +=	-lz
