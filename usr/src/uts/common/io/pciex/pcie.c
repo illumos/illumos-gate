@@ -684,6 +684,7 @@ pcie_init_pfd(dev_info_t *dip)
 
 	pfd_p->pe_bus_p = bus_p;
 	pfd_p->pe_severity_flags = 0;
+	pfd_p->pe_severity_mask = 0;
 	pfd_p->pe_orig_severity_flags = 0;
 	pfd_p->pe_lock = B_FALSE;
 	pfd_p->pe_valid = B_FALSE;
@@ -840,6 +841,7 @@ pcie_rc_init_pfd(dev_info_t *dip, pf_data_t *pfd_p)
 {
 	pfd_p->pe_bus_p = PCIE_DIP2DOWNBUS(dip);
 	pfd_p->pe_severity_flags = 0;
+	pfd_p->pe_severity_mask = 0;
 	pfd_p->pe_orig_severity_flags = 0;
 	pfd_p->pe_lock = B_FALSE;
 	pfd_p->pe_valid = B_FALSE;
@@ -921,7 +923,7 @@ pcie_rc_init_bus(dev_info_t *dip)
 	bus_p->bus_aer_off = (uint16_t)-1;
 
 	/* Needed only for handle lookup */
-	bus_p->bus_fm_flags |= PF_FM_READY;
+	atomic_or_uint(&bus_p->bus_fm_flags, PF_FM_READY);
 
 	ndi_set_bus_private(dip, B_FALSE, DEVI_PORT_TYPE_PCI, bus_p);
 
@@ -1340,7 +1342,7 @@ caps_done:
 	}
 
 	bus_p->bus_soft_state = PCI_SOFT_STATE_CLOSED;
-	bus_p->bus_fm_flags = 0;
+	(void) atomic_swap_uint(&bus_p->bus_fm_flags, 0);
 	bus_p->bus_mps = 0;
 
 	ndi_set_bus_private(dip, B_TRUE, DEVI_PORT_TYPE_PCI, (void *)bus_p);
