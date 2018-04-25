@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2018 Joyent, Inc.  All rights reserved.
 #
 
 PROG= vndadm
@@ -37,6 +37,8 @@ lint	:= TARGET += lint
 SUBDIRS = test
 
 .KEEP_STATE:
+
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

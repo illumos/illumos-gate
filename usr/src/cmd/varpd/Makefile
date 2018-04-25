@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG= varpd
@@ -42,6 +42,8 @@ C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
+
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
