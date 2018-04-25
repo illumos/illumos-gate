@@ -773,8 +773,6 @@ ip_output_sw_cksum_v6(mblk_t *mp, ip6_t *ip6h, ip_xmit_attr_t *ixa)
 	/* ULP puts the checksum field is in the first mblk */
 	ASSERT(((uchar_t *)cksump) + sizeof (uint16_t) <= mp->b_wptr);
 
-	DB_CKSUMOCSUM(mp) = *cksump;
-
 	/*
 	 * We accumulate the pseudo header checksum in cksum.
 	 * This is pretty hairy code, so watch close.  One
@@ -806,11 +804,7 @@ ip_output_sw_cksum_v6(mblk_t *mp, ip6_t *ip6h, ip_xmit_attr_t *ixa)
 #undef	iphs
 }
 
-/*
- * Sadly, removing this unused global variable will actually break the build.
- * Compiling the "ip" module explicitly checks that no global variables
- * are added or removed.
- */
+/* There are drivers that can't do partial checksum for ICMPv6 */
 int nxge_cksum_workaround = 1;
 
 /*
@@ -892,9 +886,6 @@ ip_output_cksum_v6(iaflags_t ixaflags, mblk_t *mp, ip6_t *ip6h,
 	/* ULP puts the checksum field is in the first mblk */
 	ASSERT(((uchar_t *)cksump) + sizeof (uint16_t) <= mp->b_wptr);
 
-	/* Record original checksum field in case needed within MAC */
-	DB_CKSUMOCSUM(mp) = *cksump;
-
 	/*
 	 * Underlying interface supports hardware checksum offload for
 	 * the payload; leave the payload checksum for the hardware to
@@ -914,7 +905,8 @@ ip_output_cksum_v6(iaflags_t ixaflags, mblk_t *mp, ip6_t *ip6h,
 		DB_CKSUMFLAGS(mp) |= HCK_FULLCKSUM;
 		return (B_TRUE);
 	}
-	if (hck_flags & HCKSUM_INET_PARTIAL) {
+	if (((hck_flags) & HCKSUM_INET_PARTIAL) &&
+	    (protocol != IPPROTO_ICMPV6 || !nxge_cksum_workaround)) {
 		/*
 		 * Partial checksum offload has been enabled.  Fill
 		 * the checksum field in the protocol header with the

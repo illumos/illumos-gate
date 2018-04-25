@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.  All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -338,8 +338,7 @@ typedef struct datab {
 				uint16_t u16;
 			} cksum_val;    /* used to store calculated cksum */
 			uint16_t flags;
-			uint16_t pad;	/* not padding, see DB_LSOMSS, DB_TCI */
-			uint32_t ocsum;	/* original cksum field value */
+			uint16_t pad;
 		} cksum;
 		/*
 		 * Union used for future extensions (pointer to data ?).
