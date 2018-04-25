@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sunddi.h>
 #include <sys/pci.h>
 #include <sys/pci_cap.h>
+#include <sys/pcie_impl.h>
 #include <sys/ppt_dev.h>
 #include <sys/mkdev.h>
 #include <sys/sysmacros.h>
@@ -1019,6 +1020,7 @@ ppt_assign_device(struct vm *vm, int pptfd)
 	ppt->vm = vm;
 	iommu_remove_device(iommu_host_domain(), pci_get_bdf(ppt->pptd_dip));
 	iommu_add_device(vm_iommu_domain(vm), pci_get_bdf(ppt->pptd_dip));
+	pf_set_passthru(ppt->pptd_dip, B_TRUE);
 
 done:
 	releasef(pptfd);
@@ -1067,6 +1069,8 @@ ppt_do_unassign(struct pptdev *ppt)
 	 */
 	ppt_reset_pci_power_state(ppt->pptd_dip);
 	(void) pci_restore_config_regs(ppt->pptd_dip);
+
+	pf_set_passthru(ppt->pptd_dip, B_FALSE);
 
 	ppt_unmap_mmio(vm, ppt);
 	ppt_teardown_msi(ppt);
