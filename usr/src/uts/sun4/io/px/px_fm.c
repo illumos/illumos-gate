@@ -756,6 +756,7 @@ px_get_pfd(px_t *px_p) {
 	}
 
 	pfd_p->pe_severity_flags = 0;
+	pfd_p->pe_severity_mask = 0;
 	pfd_p->pe_orig_severity_flags = 0;
 	pfd_p->pe_valid = B_TRUE;
 

@@ -393,6 +393,7 @@ struct pf_data {
 	boolean_t		pe_lock;
 	boolean_t		pe_valid;
 	uint32_t		pe_severity_flags;	/* Severity of error */
+	uint32_t		pe_severity_mask;
 	uint32_t		pe_orig_severity_flags; /* Original severity */
 	pf_affected_dev_t	*pe_affected_dev;
 	pcie_bus_t		*pe_bus_p;
@@ -421,6 +422,7 @@ typedef struct pf_impl {
 /* bus_fm_flags field */
 #define	PF_FM_READY		(1 << 0)	/* bus_fm_lock initialized */
 #define	PF_FM_IS_NH		(1 << 1)	/* known as non-hardened */
+#define	PF_FM_IS_PASSTHRU	(1 << 2)	/* device is controlled by VM */
 
 /*
  * PCIe fabric handle lookup address flags.  Used to define what type of
@@ -615,6 +617,7 @@ extern void pf_eh_enter(pcie_bus_t *bus_p);
 extern void pf_eh_exit(pcie_bus_t *bus_p);
 extern int pf_scan_fabric(dev_info_t *rpdip, ddi_fm_error_t *derr,
     pf_data_t *root_pfd_p);
+extern void pf_set_passthru(dev_info_t *, boolean_t);
 extern void pf_init(dev_info_t *, ddi_iblock_cookie_t, ddi_attach_cmd_t);
 extern void pf_fini(dev_info_t *, ddi_detach_cmd_t);
 extern int pf_hdl_lookup(dev_info_t *, uint64_t, uint32_t, uint64_t,
