@@ -2554,6 +2554,13 @@ nvme_init(nvme_t *nvme)
 	 * Identify Namespaces
 	 */
 	nvme->n_namespace_count = nvme->n_idctl->id_nn;
+
+	if (nvme->n_namespace_count == 0) {
+		dev_err(nvme->n_dip, CE_WARN,
+		    "!controllers without namespaces are not supported");
+		goto fail;
+	}
+
 	if (nvme->n_namespace_count > NVME_MINOR_MAX) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!too many namespaces: %d, limiting to %d\n",
