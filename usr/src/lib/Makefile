@@ -606,7 +606,7 @@ libds:		libsysevent
 libdscfg:	libnsctl libunistat libadm
 libdtrace:	libproc libgen libctf libmapmalloc
 libdtrace_jni:	libuutil libdtrace
-libefi:		libuuid
+libefi:		libuuid libsmbios
 libelfsign:	libcryptoutil libkmf ../cmd/sgs/libelf
 libeti:		libcurses
 libexacct/demo:	libexacct libproject
