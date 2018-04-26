@@ -1288,6 +1288,8 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_CHANNEL_PROGRAM,	"ZFS_IOC_CHANNEL_PROGRAM",
 		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_INITIALIZE,	"ZFS_IOC_POOL_INITIALIZE",
+		"zfs_cmd_t" },
 
 	/* kssl ioctls */
 	{ (uint_t)KSSL_ADD_ENTRY,		"KSSL_ADD_ENTRY",
