@@ -161,6 +161,7 @@ static logstream_t streams[MAX_LOG_STREAMS];
 static logfile_t logfiles[MAX_LOG_STREAMS];
 
 static boolean_t logging_initialized = B_FALSE;
+static boolean_t logging_poisoned = B_FALSE;
 static uint64_t logging_rot_size;		/* See ZLOG_MAXSZ */
 static uint64_t logging_rot_keep;		/* See ZLOG_KEEP */
 static int logging_pending_sig = 0;		/* Signal recvd while logging */
@@ -206,7 +207,7 @@ logstream_lock(void)
 {
 	int ret;
 
-	assert(logging_initialized);
+	assert(logging_initialized && !logging_poisoned);
 
 	ret = mutex_lock(&logging_lock);
 	assert(ret == 0);
@@ -325,6 +326,10 @@ logstream_sighandler(int sig)
 	}
 
 	logstream_lock();
+	if (logging_poisoned) {
+		logstream_unlock();
+		return;
+	}
 
 	for (i = 0; i < ARRAY_SIZE(logfiles); i++) {
 		/* Inactive logfile slot */
@@ -379,6 +384,32 @@ get_attr_uint64(zlog_t *zlogp, zone_dochandle_t handle, const char *name,
 	*valp = val;
 }
 
+static void
+logstream_atfork_prepare(void)
+{
+	logstream_lock();
+}
+
+static void
+logstream_atfork_parent(void)
+{
+	logstream_unlock();
+}
+
+static void
+logstream_atfork_child(void)
+{
+	/*
+	 * This does just enough to cause any errant logging call in the child
+	 * to lead to a failed assertion.  logstream_init() must not be called
+	 * in the child.  It is expected that the child will be calling exec()
+	 * real soon.
+	 */
+	logging_poisoned = B_TRUE;
+	logging_pending_sig = 0;
+	logstream_unlock();
+}
+
 void
 logstream_init(zlog_t *zlogp)
 {
@@ -394,6 +425,10 @@ logstream_init(zlog_t *zlogp)
 	for (i = 0; i < ARRAY_SIZE(logfiles); i++) {
 		logfiles[i].lf_fd = -1;
 	}
+
+	err = pthread_atfork(logstream_atfork_prepare,
+	    logstream_atfork_parent, logstream_atfork_child);
+	assert(err == 0);
 
 	logging_initialized = B_TRUE;
 
