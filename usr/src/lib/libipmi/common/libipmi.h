@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBIPMI_H
@@ -1592,6 +1592,24 @@ extern ipmi_sdr_full_sensor_t *ipmi_sdr_lookup_full_sensor(
 #define	IPMI_ET_SATA_SAS		0x33
 #define	IPMI_ET_FSB			0x34
 #define	IPMI_ET_RTC			0x35
+
+/*
+ * Get Sensor Threshold.  See section 35.9
+ */
+#define	IPMI_CMD_GET_SENSOR_THRESHOLDS	0x27
+
+typedef struct ipmi_sensor_thresholds {
+	uint8_t ithr_readable_mask;
+	uint8_t ithr_lower_noncrit;
+	uint8_t ithr_lower_crit;
+	uint8_t ithr_lower_nonrec;
+	uint8_t ithr_upper_noncrit;
+	uint8_t ithr_upper_crit;
+	uint8_t ithr_upper_nonrec;
+} ipmi_sensor_thresholds_t;
+
+extern int ipmi_get_sensor_thresholds(ipmi_handle_t *,
+    ipmi_sensor_thresholds_t *, uint8_t);
 
 /*
  * Get Sensor Reading.  See section 35.14.

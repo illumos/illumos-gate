@@ -23,7 +23,7 @@
 #
 
 #
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -66,6 +66,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	ipmi_get_channel_info;
 	ipmi_get_deviceid;
 	ipmi_get_sensor_reading;
+	ipmi_get_sensor_thresholds;
 	ipmi_is_sun_ilom;
 	ipmi_lan_get_config;
 	ipmi_lan_set_config;

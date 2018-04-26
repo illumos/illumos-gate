@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
+ */
 
 #ifndef _LIBTOPO_H
 #define	_LIBTOPO_H
@@ -412,6 +415,14 @@ void topo_sensor_state_name(uint32_t sensor_type, uint8_t state, char *buf,
 #define	TOPO_FACILITY_TYPE	"type"
 #define	TOPO_SENSOR_UNITS	"units"
 #define	TOPO_LED_MODE		"mode"
+
+#define	TOPO_PROP_THRESHOLD_LNC		"threshold-lower-non-critical"
+#define	TOPO_PROP_THRESHOLD_LCR		"threshold-lower-critical"
+#define	TOPO_PROP_THRESHOLD_LNR		"threshold-lower-non-recoverable"
+
+#define	TOPO_PROP_THRESHOLD_UNC		"threshold-upper-non-critical"
+#define	TOPO_PROP_THRESHOLD_UCR		"threshold-upper-critical"
+#define	TOPO_PROP_THRESHOLD_UNR		"threshold-upper-non-recoverable"
 
 /*
  * Sensor Classes
