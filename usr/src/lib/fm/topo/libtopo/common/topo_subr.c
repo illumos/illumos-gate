@@ -561,7 +561,7 @@ static const topo_pgroup_info_t auth_pgroup = {
 void
 topo_pgroup_hcset(tnode_t *node, nvlist_t *auth)
 {
-	int err, ret;
+	int err;
 	char isa[MAXNAMELEN];
 	struct utsname uts;
 	char *prod, *psn, *csn, *server;
