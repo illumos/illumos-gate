@@ -38,6 +38,7 @@ PROGS = \
 	endian \
 	env-7076 \
 	fnmatch \
+	printf-9511 \
 	psignal-5097 \
 	quick_exit_order \
 	quick_exit_status \
