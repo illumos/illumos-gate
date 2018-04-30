@@ -3043,14 +3043,14 @@ conn_status_walk_step(mdb_walk_state_t *wsp)
 
 /* ARGSUSED */
 static int
-conn_status_cb(uintptr_t addr, const void *walk_data,
-    void *private)
+conn_status_cb(uintptr_t addr, const void *walk_data, void *private)
 {
 	netstack_t nss;
 	char src_addrstr[INET6_ADDRSTRLEN];
 	char rem_addrstr[INET6_ADDRSTRLEN];
 	const ipcl_hash_walk_data_t *iw = walk_data;
 	conn_t c, *conn = &c;
+	in_port_t lport, fport;
 
 	if (iw != NULL)
 		conn = iw->conn;
@@ -3078,8 +3078,10 @@ conn_status_cb(uintptr_t addr, const void *walk_data,
 		mdb_snprintf(rem_addrstr, sizeof (rem_addrstr), "%I",
 		    V4_PART_OF_V6((conn->conn_faddr_v6)));
 	}
+	mdb_nhconvert(&lport, &conn->conn_lport, sizeof (lport));
+	mdb_nhconvert(&fport, &conn->conn_fport, sizeof (fport));
 	mdb_printf("%s:%-5d\n%s:%-5d\n",
-	    src_addrstr, conn->conn_lport, rem_addrstr, conn->conn_fport);
+	    src_addrstr, lport, rem_addrstr, fport);
 	return (WALK_NEXT);
 }
 
