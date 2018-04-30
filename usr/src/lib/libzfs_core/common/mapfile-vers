@@ -41,7 +41,7 @@ SYMBOL_VERSION ILLUMOS_0.3 {
 	global:
 
 	lzc_initialize;
-} ILLUMOS_0.1;
+} ILLUMOS_0.2;
 
 
 SYMBOL_VERSION ILLUMOS_0.2 {
