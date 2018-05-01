@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 /*
@@ -252,7 +253,7 @@ xvdi_init_dev(dev_info_t *dip)
 	char *xsname;
 	void *prop_str;
 	unsigned int prop_len;
-	char unitaddr[8];
+	char unitaddr[16];
 
 	devcls = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "devclass", XEN_INVAL);
@@ -333,7 +334,7 @@ xvdi_init_dev(dev_info_t *dip)
 	 * of the xenstore node containing the device configuration
 	 * and is contained in the 'vdev' property.
 	 * VIF devices are named using an incrementing integer.
-	 * VBD devices are either named using the 16-bit dev_t value
+	 * VBD devices are either named using the 32-bit dev_t value
 	 * for linux 'hd' and 'xvd' devices, or a simple integer value
 	 * in the range 0..767.  768 is the base value of the linux
 	 * dev_t namespace, the dev_t value for 'hda'.
