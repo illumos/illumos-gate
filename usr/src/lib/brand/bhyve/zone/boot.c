@@ -170,11 +170,13 @@ add_ram(int *argc, char **argv)
 }
 
 static int
-add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
+add_disk(char *disk, char *path, const char *model, char *slotconf,
+    size_t slotconf_len)
 {
 	static char *boot = NULL;
 	static int next_cd = 0;
 	static int next_other = 0;
+	const char *emulation = "virtio-blk";
 	int pcislot;
 	int pcifn;
 
@@ -198,8 +200,22 @@ add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
 		next_other++;
 	}
 
-	if (snprintf(slotconf, slotconf_len, "%d:%d,virtio-blk,%s",
-	    pcislot, pcifn, path) >= slotconf_len) {
+
+	if (strcmp(model, "virtio") == 0) {
+		emulation = "virtio-blk";
+	} else if (strcmp(model, "ahci") == 0) {
+		if (is_env_true("device", disk, "cdrom")) {
+			emulation = "ahci-cd";
+		} else {
+			emulation = "ahci-hd";
+		}
+	} else {
+		(void) printf("Error: unknown disk model '%s'\n", model);
+		return (-1);
+	}
+
+	if (snprintf(slotconf, slotconf_len, "%d:%d,%s,%s",
+	    pcislot, pcifn, emulation, path) >= slotconf_len) {
 		(void) printf("Error: disk path '%s' too long\n", path);
 		return (-1);
 	}
@@ -297,15 +313,12 @@ add_devices(int *argc, char **argv)
 			return (-1);
 		}
 
-		if (strcmp(model, "virtio") == 0) {
-			ret = add_disk(dev, path, slotconf, sizeof (slotconf));
-		} else if (strcmp(model, "passthru") == 0) {
+		if (strcmp(model, "passthru") == 0) {
 			ret = add_ppt(argc, argv, dev, path, slotconf,
 			    sizeof (slotconf));
 		} else {
-			(void) printf("Error: device %s has invalid model: "
-			    "%s\n", dev, model);
-			ret = -1;
+			ret = add_disk(dev, path, model, slotconf,
+			    sizeof (slotconf));
 		}
 
 		if (ret != 0)
