@@ -3598,11 +3598,9 @@ done:
 #ifdef XPV_HVM_DRIVER
 	xdf_hvm_add(dip);
 
-	/* Report our version to dom0.  */
-	if (xenbus_printf(XBT_NULL, "guest/xdf", "version", "%d",
-	    HVMPV_XDF_VERS))
-		cmn_err(CE_WARN, "xdf: couldn't write version\n");
-
+	/* Report our version to dom0 */
+	(void) xenbus_printf(XBT_NULL, "guest/xdf", "version", "%d",
+	    HVMPV_XDF_VERS);
 #endif /* XPV_HVM_DRIVER */
 
 	/* Create kstat for iostat(1M) */

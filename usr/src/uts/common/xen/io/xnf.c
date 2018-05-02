@@ -1057,12 +1057,9 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	xnfp->xnf_rx_new_buffers_posted = B_FALSE;
 
 #ifdef XPV_HVM_DRIVER
-	/*
-	 * Report our version to dom0.
-	 */
-	if (xenbus_printf(XBT_NULL, "guest/xnf", "version", "%d",
-	    HVMPV_XNF_VERS))
-		cmn_err(CE_WARN, "xnf: couldn't write version\n");
+	/* Report our version to dom0 */
+	(void) xenbus_printf(XBT_NULL, "guest/xnf", "version", "%d",
+	    HVMPV_XNF_VERS);
 #endif
 
 	/*

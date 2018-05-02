@@ -28,6 +28,7 @@ OBJS +=		fts.o \
 		recallocarray.o \
 		strtonum.o
 
+CPPFLAGS +=	-_gcc=-nostdinc
 CPPFLAGS +=	-I. -include fts.h
 CPPFLAGS +=	-I$(NATIVE_ADJUNCT)/include
 LDFLAGS +=	-L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib

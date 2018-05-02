@@ -739,12 +739,9 @@ xpv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	memscrub_disable();
 
-	/*
-	 * Report our version to dom0.
-	 */
-	if (xenbus_printf(XBT_NULL, "guest/xpv", "version", "%d",
-	    HVMPV_XPV_VERS))
-		cmn_err(CE_WARN, "xpv: couldn't write version\n");
+	/* Report our version to dom0 */
+	(void) xenbus_printf(XBT_NULL, "guest/xpv", "version", "%d",
+	    HVMPV_XPV_VERS);
 
 	return (DDI_SUCCESS);
 }
