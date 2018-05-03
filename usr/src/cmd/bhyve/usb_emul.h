@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014 Leon Dang <ldang@nahannisys.com>
+ * Copyright 2018 Joyent, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +33,9 @@
 #include <stdlib.h>
 #include <sys/linker_set.h>
 #include <pthread.h>
+#ifndef __FreeBSD__
+#include <synch.h>
+#endif
 
 #define	USB_MAX_XFER_BLOCKS	8
 
@@ -145,7 +149,9 @@ enum USB_ERRCODE {
 #define	USB_DATA_XFER_UNLOCK(x)	do {					\
 			pthread_mutex_unlock(&((x)->mtx));		\
 		} while (0)
-
+#ifndef __FreeBSD__
+#define	USB_DATA_XFER_LOCK_HELD(x) MUTEX_HELD(&((x)->mtx))
+#endif
 
 struct usb_devemu *usb_emu_finddev(char *name);
 

@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2014 Leon Dang <ldang@nahannisys.com>
+ * Copyright 2018 Joyent, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1661,7 +1662,16 @@ pci_xhci_try_usb_xfer(struct pci_xhci_softc *sc,
 	do_intr = 0;
 
 	xfer = devep->ep_xfer;
+#ifdef __FreeBSD__
 	USB_DATA_XFER_LOCK(xfer);
+#else
+	/*
+	 * At least one caller needs to hold this lock across the call to this
+	 * function and other code.  To avoid deadlock from a recursive mutex
+	 * enter, we ensure that all callers hold this lock.
+	 */
+	assert(USB_DATA_XFER_LOCK_HELD(xfer));
+#endif
 
 	/* outstanding requests queued up */
 	if (dev->dev_ue->ue_data != NULL) {
@@ -1684,8 +1694,9 @@ pci_xhci_try_usb_xfer(struct pci_xhci_softc *sc,
 		}
 	}
 
+#ifdef __FreeBSD__
 	USB_DATA_XFER_UNLOCK(xfer);
-
+#endif
 
 	return (err);
 }
@@ -1917,7 +1928,13 @@ pci_xhci_device_doorbell(struct pci_xhci_softc *sc, uint32_t slot,
 
 	/* handle pending transfers */
 	if (devep->ep_xfer->ndata > 0) {
+#ifndef __FreeBSD__
+		USB_DATA_XFER_LOCK(devep->ep_xfer);
+#endif
 		pci_xhci_try_usb_xfer(sc, dev, devep, ep_ctx, slot, epid);
+#ifndef __FreeBSD__
+		USB_DATA_XFER_UNLOCK(devep->ep_xfer);
+#endif
 		return;
 	}
 
