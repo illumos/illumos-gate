@@ -31,6 +31,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <errno.h>
@@ -369,6 +370,101 @@ unsigned char pkinit_4096_dhprime[4096/8] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
 };
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+/*
+ * Many things have changed in OpenSSL 1.1. The code in this file has been
+ * updated to use the v1.1 APIs but some are new and require emulation
+ * for older OpenSSL versions.
+ */
+
+/* EVP_MD_CTX construct and destructor names have changed */
+
+#define EVP_MD_CTX_new EVP_MD_CTX_create
+#define EVP_MD_CTX_free EVP_MD_CTX_destroy
+
+/* ASN1_STRING_data is deprecated */
+#define ASN1_STRING_get0_data ASN1_STRING_data
+
+/* X509_STORE_CTX_trusted_stack is deprecated */
+#define X509_STORE_CTX_set0_trusted_stack X509_STORE_CTX_trusted_stack
+
+/* get_rfc2409_prime_1024() has been renamed. */
+#define BN_get_rfc2409_prime_1024 get_rfc2409_prime_1024
+
+#define OBJ_get0_data(o) ((o)->data)
+#define OBJ_length(o) ((o)->length)
+
+/* Some new DH functions that aren't in OpenSSL 1.0.x */
+#define DH_bits(dh) BN_num_bits((dh)->p);
+
+#define DH_set0_pqg(dh, p, q, g) __DH_set0_pqg(dh, p, q, g)
+static int
+__DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g)
+{
+    if ((dh->p == NULL && p == NULL) || (dh->g == NULL && g == NULL))
+        return 0;
+
+    if (p != NULL) {
+        BN_free(dh->p);
+        dh->p = p;
+    }
+    if (q != NULL) {
+        BN_free(dh->q);
+        dh->q = q;
+    }
+    if (g != NULL) {
+        BN_free(dh->g);
+        dh->g = g;
+    }
+
+    if (q != NULL) {
+        dh->length = BN_num_bits(q);
+    }
+
+    return 1;
+}
+
+#define DH_get0_pqg(dh, p, q, g) __DH_get0_pqg(dh, p, q, g)
+static void
+__DH_get0_pqg(const DH *dh, const BIGNUM **p, const BIGNUM **q,
+    const BIGNUM **g)
+{
+    if (p != NULL)
+        *p = dh->p;
+    if (q != NULL)
+        *q = dh->q;
+    if (g != NULL)
+        *g = dh->g;
+}
+
+#define DH_set0_key(dh, pub, priv) __DH_set0_key(dh, pub, priv)
+static int
+__DH_set0_key(DH *dh, BIGNUM *pub_key, BIGNUM *priv_key)
+{
+    if (pub_key != NULL) {
+        BN_free(dh->pub_key);
+        dh->pub_key = pub_key;
+    }
+    if (priv_key != NULL) {
+        BN_free(dh->priv_key);
+        dh->priv_key = priv_key;
+    }
+
+    return 1;
+}
+
+#define DH_get0_key(dh, pub, priv) __DH_get0_key(dh, pub, priv)
+static void
+__DH_get0_key(const DH *dh, const BIGNUM **pub, const BIGNUM **priv)
+{
+    if (pub != NULL)
+        *pub = dh->pub_key;
+    if (priv != NULL)
+        *priv = dh->priv_key;
+}
+
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+
 /* Solaris Kerberos */
 static k5_mutex_t oids_mutex = K5_MUTEX_PARTIAL_INITIALIZER;
 static int pkinit_oids_refs = 0;
@@ -524,7 +620,7 @@ pkinit_init_pkinit_oids(pkinit_plg_crypto_context ctx)
 	    } \
 	} \
 	ctx->vn = OBJ_nid2obj(nid);
-    
+
     /* Solaris Kerberos */
     retval = k5_mutex_lock(&oids_mutex);
     if (retval != 0)
@@ -567,7 +663,7 @@ pkinit_init_pkinit_oids(pkinit_plg_crypto_context ctx)
 
     /* Success */
     retval = 0;
-    
+
     pkinit_oids_refs++;
     /* Solaris Kerberos */
     k5_mutex_unlock(&oids_mutex);
@@ -656,9 +752,48 @@ pkinit_fini_pkinit_oids(pkinit_plg_crypto_context ctx)
     /* Only call OBJ_cleanup once! */
     /* Solaris Kerberos: locking */
     k5_mutex_lock(&oids_mutex);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+    /*
+     * In OpenSSL versions prior to 1.1.0, OBJ_cleanup() cleaned up OpenSSL's
+     * internal object table. This function is deprecated in version 1.1.0.
+     * No explicit de-initialisation is now required.
+     */
     if (--pkinit_oids_refs == 0)
 	OBJ_cleanup();
+#else
+    pkinit_oids_refs--;
+#endif
     k5_mutex_unlock(&oids_mutex);
+}
+
+static DH *
+make_dhprime(uint8_t *prime, size_t len)
+{
+    DH *dh = NULL;
+    BIGNUM *p = NULL, *q = NULL, *g = NULL;
+
+    if ((p = BN_bin2bn(prime, len, NULL)) == NULL)
+	goto cleanup;
+    if ((q = BN_new()) == NULL)
+	goto cleanup;
+    if (!BN_rshift1(q, p))
+	goto cleanup;
+    if ((g = BN_new()) == NULL)
+	goto cleanup;
+    if (!BN_set_word(g, DH_GENERATOR_2))
+	goto cleanup;
+
+    dh = DH_new();
+    if (dh == NULL)
+	goto cleanup;
+    DH_set0_pqg(dh, p, q, g);
+    p = g = q = NULL;
+
+cleanup:
+    BN_free(p);
+    BN_free(q);
+    BN_free(g);
+    return dh;
 }
 
 static krb5_error_code
@@ -666,38 +801,20 @@ pkinit_init_dh_params(pkinit_plg_crypto_context plgctx)
 {
     krb5_error_code retval = ENOMEM;
 
-    plgctx->dh_1024 = DH_new();
+    plgctx->dh_1024 = make_dhprime(pkinit_1024_dhprime,
+        sizeof(pkinit_1024_dhprime));
     if (plgctx->dh_1024 == NULL)
 	goto cleanup;
-    plgctx->dh_1024->p = BN_bin2bn(pkinit_1024_dhprime,
-	sizeof(pkinit_1024_dhprime), NULL);
-    if ((plgctx->dh_1024->g = BN_new()) == NULL ||
-	(plgctx->dh_1024->q = BN_new()) == NULL)
-	goto cleanup;
-    BN_set_word(plgctx->dh_1024->g, DH_GENERATOR_2);
-    BN_rshift1(plgctx->dh_1024->q, plgctx->dh_1024->p);
 
-    plgctx->dh_2048 = DH_new();
+    plgctx->dh_2048 = make_dhprime(pkinit_2048_dhprime,
+        sizeof(pkinit_2048_dhprime));
     if (plgctx->dh_2048 == NULL)
 	goto cleanup;
-    plgctx->dh_2048->p = BN_bin2bn(pkinit_2048_dhprime,
-	sizeof(pkinit_2048_dhprime), NULL);
-    if ((plgctx->dh_2048->g = BN_new()) == NULL ||
-	(plgctx->dh_2048->q = BN_new()) == NULL)
-	goto cleanup;
-    BN_set_word(plgctx->dh_2048->g, DH_GENERATOR_2);
-    BN_rshift1(plgctx->dh_2048->q, plgctx->dh_2048->p);
 
-    plgctx->dh_4096 = DH_new();
+    plgctx->dh_4096 = make_dhprime(pkinit_4096_dhprime,
+        sizeof(pkinit_4096_dhprime));
     if (plgctx->dh_4096 == NULL)
 	goto cleanup;
-    plgctx->dh_4096->p = BN_bin2bn(pkinit_4096_dhprime,
-	sizeof(pkinit_4096_dhprime), NULL);
-    if ((plgctx->dh_4096->g = BN_new()) == NULL ||
-	(plgctx->dh_4096->q = BN_new()) == NULL)
-	goto cleanup;
-    BN_set_word(plgctx->dh_4096->g, DH_GENERATOR_2);
-    BN_rshift1(plgctx->dh_4096->q, plgctx->dh_4096->p);
 
     retval = 0;
 
@@ -858,7 +975,7 @@ cms_signeddata_create(krb5_context context,
     ASN1_TYPE *pkinit_data = NULL;
     STACK_OF(X509) * cert_stack = NULL;
     ASN1_OCTET_STRING *digest_attr = NULL;
-    EVP_MD_CTX ctx, ctx2;
+    EVP_MD_CTX *ctx = NULL, *ctx2 = NULL;
     const EVP_MD *md_tmp = NULL;
     unsigned char md_data[EVP_MAX_MD_SIZE], md_data2[EVP_MAX_MD_SIZE];
     unsigned char *digestInfo_buf = NULL, *abuf = NULL;
@@ -902,27 +1019,29 @@ cms_signeddata_create(krb5_context context,
     } else {
 	/* create a cert chain */
 	X509_STORE *certstore = NULL;
-	X509_STORE_CTX certctx;
+	X509_STORE_CTX *certctx;
 	STACK_OF(X509) *certstack = NULL;
 	char buf[DN_BUF_LEN];
 	int i = 0, size = 0;
 
 	if ((certstore = X509_STORE_new()) == NULL)
 	    goto cleanup;
+	if ((certctx = X509_STORE_CTX_new()) == NULL)
+	    goto cleanup;
 	pkiDebug("building certificate chain\n");
-	X509_STORE_set_verify_cb_func(certstore, openssl_callback);
-	X509_STORE_CTX_init(&certctx, certstore, cert,
+	X509_STORE_set_verify_cb(certstore, openssl_callback);
+	X509_STORE_CTX_init(certctx, certstore, cert,
 			    id_cryptoctx->intermediateCAs);
-	X509_STORE_CTX_trusted_stack(&certctx, id_cryptoctx->trustedCAs);
+	X509_STORE_CTX_set0_trusted_stack(certctx, id_cryptoctx->trustedCAs);
 	/* Solaris Kerberos */
-	if (X509_verify_cert(&certctx) <= 0) {
-	    pkiDebug("failed to create a certificate chain: %s\n", 
-	    X509_verify_cert_error_string(X509_STORE_CTX_get_error(&certctx)));
-	    if (!sk_X509_num(id_cryptoctx->trustedCAs)) 
+	if (X509_verify_cert(certctx) <= 0) {
+	    pkiDebug("failed to create a certificate chain: %s\n",
+	    X509_verify_cert_error_string(X509_STORE_CTX_get_error(certctx)));
+	    if (!sk_X509_num(id_cryptoctx->trustedCAs))
 		pkiDebug("No trusted CAs found. Check your X509_anchors\n");
 	    goto cleanup;
 	}
-	certstack = X509_STORE_CTX_get1_chain(&certctx);
+	certstack = X509_STORE_CTX_get1_chain(certctx);
 	size = sk_X509_num(certstack);
 	pkiDebug("size of certificate chain = %d\n", size);
 	for(i = 0; i < size - 1; i++) {
@@ -931,7 +1050,7 @@ cms_signeddata_create(krb5_context context,
 	    pkiDebug("cert #%d: %s\n", i, buf);
 	    sk_X509_push(cert_stack, X509_dup(x));
 	}
-	X509_STORE_CTX_cleanup(&certctx);
+	X509_STORE_CTX_free(certctx);
 	X509_STORE_free(certstore);
 	sk_X509_pop_free(certstack, X509_free);
     }
@@ -947,9 +1066,9 @@ cms_signeddata_create(krb5_context context,
 	goto cleanup;
     /* because ASN1_INTEGER_set is used to set a 'long' we will do
      * things the ugly way. */
-    M_ASN1_INTEGER_free(p7si->issuer_and_serial->serial);
+    ASN1_INTEGER_free(p7si->issuer_and_serial->serial);
     if (!(p7si->issuer_and_serial->serial =
-	  M_ASN1_INTEGER_dup(X509_get_serialNumber(cert))))
+	  ASN1_INTEGER_dup(X509_get_serialNumber(cert))))
 	goto cleanup;
 
     /* will not fill-out EVP_PKEY because it's on the smartcard */
@@ -983,11 +1102,16 @@ cms_signeddata_create(krb5_context context,
     } else {
 	/* add signed attributes */
 	/* compute sha1 digest over the EncapsulatedContentInfo */
-	EVP_MD_CTX_init(&ctx);
-	EVP_DigestInit_ex(&ctx, EVP_sha1(), NULL);
-	EVP_DigestUpdate(&ctx, data, data_len);
-	md_tmp = EVP_MD_CTX_md(&ctx);
-	EVP_DigestFinal_ex(&ctx, md_data, &md_len);
+	ctx = EVP_MD_CTX_new();
+	if (ctx == NULL)
+	    goto cleanup2;
+	EVP_MD_CTX_init(ctx);
+	EVP_DigestInit_ex(ctx, EVP_sha1(), NULL);
+	EVP_DigestUpdate(ctx, data, data_len);
+	md_tmp = EVP_MD_CTX_md(ctx);
+	EVP_DigestFinal_ex(ctx, md_data, &md_len);
+	EVP_MD_CTX_free(ctx);
+	ctx = NULL;
 
 	/* create a message digest attr */
 	digest_attr = ASN1_OCTET_STRING_new();
@@ -996,7 +1120,7 @@ cms_signeddata_create(krb5_context context,
 				   V_ASN1_OCTET_STRING, (char *) digest_attr);
 
 	/* create a content-type attr */
-	PKCS7_add_signed_attribute(p7si, NID_pkcs9_contentType, 
+	PKCS7_add_signed_attribute(p7si, NID_pkcs9_contentType,
 				   V_ASN1_OBJECT, oid);
 
 	/* create the signature over signed attributes. get DER encoded value */
@@ -1016,17 +1140,22 @@ cms_signeddata_create(krb5_context context,
      *	digestAlgorithm  AlgorithmIdentifier,
      *	digest OCTET STRING }
      */
-    if (id_cryptoctx->pkcs11_method == 1 && 
+    if (id_cryptoctx->pkcs11_method == 1 &&
 	    id_cryptoctx->mech == CKM_RSA_PKCS) {
 	pkiDebug("mech = CKM_RSA_PKCS\n");
-	EVP_MD_CTX_init(&ctx2);
+	ctx2 = EVP_MD_CTX_new();
+	if (ctx2 == NULL)
+	    goto cleanup2;
+	EVP_MD_CTX_init(ctx2);
 	/* if this is not draft9 request, include digest signed attribute */
-	if (cms_msg_type != CMS_SIGN_DRAFT9) 
-	    EVP_DigestInit_ex(&ctx2, md_tmp, NULL);
+	if (cms_msg_type != CMS_SIGN_DRAFT9)
+	    EVP_DigestInit_ex(ctx2, md_tmp, NULL);
 	else
-	    EVP_DigestInit_ex(&ctx2, EVP_sha1(), NULL);
-	EVP_DigestUpdate(&ctx2, abuf, alen);
-	EVP_DigestFinal_ex(&ctx2, md_data2, &md_len2);
+	    EVP_DigestInit_ex(ctx2, EVP_sha1(), NULL);
+	EVP_DigestUpdate(ctx2, abuf, alen);
+	EVP_DigestFinal_ex(ctx2, md_data2, &md_len2);
+	EVP_MD_CTX_free(ctx2);
+	ctx2 = NULL;
 
 	alg = X509_ALGOR_new();
 	if (alg == NULL)
@@ -1074,7 +1203,7 @@ cms_signeddata_create(krb5_context context,
 #ifdef DEBUG_SIG
     print_buffer(sig, sig_len);
 #endif
-    if (cms_msg_type != CMS_SIGN_DRAFT9) 
+    if (cms_msg_type != CMS_SIGN_DRAFT9)
 	free(abuf);
     if (retval)
 	goto cleanup2;
@@ -1159,12 +1288,14 @@ cms_signeddata_create(krb5_context context,
 #endif
 
   cleanup2:
-    if (cms_msg_type != CMS_SIGN_DRAFT9) 
-	EVP_MD_CTX_cleanup(&ctx);
+    if (cms_msg_type != CMS_SIGN_DRAFT9)
+	if (ctx != NULL)
+		EVP_MD_CTX_free(ctx);
 #ifndef WITHOUT_PKCS11
-    if (id_cryptoctx->pkcs11_method == 1 && 
+    if (id_cryptoctx->pkcs11_method == 1 &&
 	    id_cryptoctx->mech == CKM_RSA_PKCS) {
-	EVP_MD_CTX_cleanup(&ctx2);
+	if (ctx2 != NULL)
+		EVP_MD_CTX_free(ctx2);
 	if (digest_buf != NULL)
 	    free(digest_buf);
 	if (digestInfo_buf != NULL)
@@ -1178,7 +1309,7 @@ cms_signeddata_create(krb5_context context,
     if (alg != NULL)
 	X509_ALGOR_free(alg);
   cleanup:
-    if (p7 != NULL) 
+    if (p7 != NULL)
 	PKCS7_free(p7);
     if (sig != NULL)
 	free(sig);
@@ -1210,7 +1341,7 @@ cms_signeddata_verify(krb5_context context,
     PKCS7_SIGNER_INFO *si = NULL;
     X509 *x = NULL;
     X509_STORE *store = NULL;
-    X509_STORE_CTX cert_ctx;
+    X509_STORE_CTX *cert_ctx;
     STACK_OF(X509) *intermediateCAs = NULL;
     STACK_OF(X509_CRL) *revoked = NULL;
     STACK_OF(X509) *verified_chain = NULL;
@@ -1254,9 +1385,9 @@ cms_signeddata_verify(krb5_context context,
     /* check if we are inforcing CRL checking */
     vflags = X509_V_FLAG_CRL_CHECK|X509_V_FLAG_CRL_CHECK_ALL;
     if (require_crl_checking)
-	X509_STORE_set_verify_cb_func(store, openssl_callback);
+	X509_STORE_set_verify_cb(store, openssl_callback);
     else
-	X509_STORE_set_verify_cb_func(store, openssl_callback_ignore_crls);
+	X509_STORE_set_verify_cb(store, openssl_callback_ignore_crls);
     X509_STORE_set_flags(store, vflags);
 
     /* get the signer's information from the PKCS7 message */
@@ -1307,14 +1438,16 @@ cms_signeddata_verify(krb5_context context,
     /* initialize x509 context with the received certificate and
      * trusted and intermediate CA chains and CRLs
      */
-    if (!X509_STORE_CTX_init(&cert_ctx, store, x, intermediateCAs))
+    if ((cert_ctx = X509_STORE_CTX_new()) == NULL)
+	goto cleanup;
+    if (!X509_STORE_CTX_init(cert_ctx, store, x, intermediateCAs))
 	goto cleanup;
 
-    X509_STORE_CTX_set0_crls(&cert_ctx, revoked);
+    X509_STORE_CTX_set0_crls(cert_ctx, revoked);
 
     /* add trusted CAs certificates for cert verification */
     if (idctx->trustedCAs != NULL)
-	X509_STORE_CTX_trusted_stack(&cert_ctx, idctx->trustedCAs);
+	X509_STORE_CTX_set0_trusted_stack(cert_ctx, idctx->trustedCAs);
     else {
 	pkiDebug("unable to find any trusted CAs\n");
 	goto cleanup;
@@ -1349,11 +1482,12 @@ cms_signeddata_verify(krb5_context context,
     }
 #endif
 
-    i = X509_verify_cert(&cert_ctx);
+    i = X509_verify_cert(cert_ctx);
     if (i <= 0) {
-	int j = X509_STORE_CTX_get_error(&cert_ctx);
+	int j = X509_STORE_CTX_get_error(cert_ctx);
 
-	reqctx->received_cert = X509_dup(cert_ctx.current_cert);
+	reqctx->received_cert = X509_dup(
+	    X509_STORE_CTX_get_current_cert(cert_ctx));
 	switch(j) {
 	    case X509_V_ERR_CERT_REVOKED:
 		retval = KRB5KDC_ERR_REVOKED_CERTIFICATE;
@@ -1385,10 +1519,10 @@ cms_signeddata_verify(krb5_context context,
 #endif
     } else {
 	/* retrieve verified certificate chain */
-	if (cms_msg_type == CMS_SIGN_CLIENT || cms_msg_type == CMS_SIGN_DRAFT9) 
-	    verified_chain = X509_STORE_CTX_get1_chain(&cert_ctx);
+	if (cms_msg_type == CMS_SIGN_CLIENT || cms_msg_type == CMS_SIGN_DRAFT9)
+	    verified_chain = X509_STORE_CTX_get1_chain(cert_ctx);
     }
-    X509_STORE_CTX_cleanup(&cert_ctx);
+    X509_STORE_CTX_free(cert_ctx);
     if (i <= 0)
 	goto cleanup;
 
@@ -1398,7 +1532,7 @@ cms_signeddata_verify(krb5_context context,
     if (PKCS7_verify(p7, NULL, store, NULL, out, flags)) {
 	int valid_oid = 0;
 
-	if (!OBJ_cmp(p7->d.sign->contents->type, oid)) 
+	if (!OBJ_cmp(p7->d.sign->contents->type, oid))
 	    valid_oid = 1;
 	else if (cms_msg_type == CMS_SIGN_DRAFT9) {
 	    /*
@@ -1416,12 +1550,13 @@ cms_signeddata_verify(krb5_context context,
 		valid_oid = 1;
 	}
 
-	if (valid_oid) 
+	if (valid_oid)
 	    pkiDebug("PKCS7 Verification successful\n");
 	else {
+	    const ASN1_OBJECT *etype = p7->d.sign->contents->type;
 	    pkiDebug("wrong oid in eContentType\n");
-	    print_buffer((unsigned char *)p7->d.sign->contents->type->data, 
-		(unsigned int)p7->d.sign->contents->type->length);
+	    print_buffer((unsigned char *)OBJ_get0_data(etype),
+		OBJ_length(etype));
 	    retval = KRB5KDC_ERR_PREAUTH_FAILED;
 	    krb5_set_error_message(context, retval, "wrong oid\n");
 	    goto cleanup;
@@ -1460,11 +1595,11 @@ cms_signeddata_verify(krb5_context context,
     /* generate authorization data */
     if (cms_msg_type == CMS_SIGN_CLIENT || cms_msg_type == CMS_SIGN_DRAFT9) {
 
-	if (authz_data == NULL || authz_data_len == NULL) 
+	if (authz_data == NULL || authz_data_len == NULL)
 	    goto out;
 
 	*authz_data = NULL;
-	retval = create_identifiers_from_stack(verified_chain, 
+	retval = create_identifiers_from_stack(verified_chain,
 					       &krb5_verified_chain);
 	if (retval) {
 	    pkiDebug("create_identifiers_from_stack failed\n");
@@ -1602,15 +1737,15 @@ cms_envelopeddata_create(krb5_context context,
     }
     switch (pa_type) {
 	case KRB5_PADATA_PK_AS_REQ:
-	    p7->d.enveloped->enc_data->content_type = 
+	    p7->d.enveloped->enc_data->content_type =
 		OBJ_nid2obj(NID_pkcs7_signed);
 	    break;
 	case KRB5_PADATA_PK_AS_REP_OLD:
 	case KRB5_PADATA_PK_AS_REQ_OLD:
-	    p7->d.enveloped->enc_data->content_type = 
+	    p7->d.enveloped->enc_data->content_type =
 		OBJ_nid2obj(NID_pkcs7_data);
 	    break;
-    } 
+    }
 
     *out_len = i2d_PKCS7(p7, NULL);
     if (!*out_len || (p = *out = (unsigned char *)malloc(*out_len)) == NULL) {
@@ -1924,7 +2059,7 @@ crypto_retrieve_X509_sans(krb5_context context,
 		    pkiDebug("%s: found dns name = %s\n",
 			     __FUNCTION__, gen->d.dNSName->data);
 		    dnss[d] = (unsigned char *)
-				    strdup((char *)gen->d.dNSName->data); 
+				    strdup((char *)gen->d.dNSName->data);
 		    if (dnss[d] == NULL) {
 			pkiDebug("%s: failed to duplicate dns name\n",
 				 __FUNCTION__);
@@ -2163,39 +2298,40 @@ client_create_dh(krb5_context context,
     krb5_error_code retval = KRB5KDC_ERR_PREAUTH_FAILED;
     unsigned char *buf = NULL;
     int dh_err = 0;
-    ASN1_INTEGER *pub_key = NULL;
+    ASN1_INTEGER *asn_pub_key = NULL;
+    BIGNUM *p, *g, *q;
+    const BIGNUM *pub_key;
 
     if (cryptoctx->dh == NULL) {
 	if ((cryptoctx->dh = DH_new()) == NULL)
 	    goto cleanup;
-	if ((cryptoctx->dh->g = BN_new()) == NULL ||
-	    (cryptoctx->dh->q = BN_new()) == NULL)
+	if ((g = BN_new()) == NULL || (q = BN_new()) == NULL)
 	    goto cleanup;
 
 	switch(dh_size) {
 	    case 1024:
 		pkiDebug("client uses 1024 DH keys\n");
-		cryptoctx->dh->p = get_rfc2409_prime_1024(NULL);
+		cryptoctx->dh = make_dhprime(pkinit_1024_dhprime,
+		    sizeof(pkinit_1024_dhprime));
 		break;
 	    case 2048:
 		pkiDebug("client uses 2048 DH keys\n");
-		cryptoctx->dh->p = BN_bin2bn(pkinit_2048_dhprime,
-		    sizeof(pkinit_2048_dhprime), NULL);
+		cryptoctx->dh = make_dhprime(pkinit_2048_dhprime,
+		    sizeof(pkinit_2048_dhprime));
 		break;
 	    case 4096:
 		pkiDebug("client uses 4096 DH keys\n");
-		cryptoctx->dh->p = BN_bin2bn(pkinit_4096_dhprime,
-		    sizeof(pkinit_4096_dhprime), NULL);
+		cryptoctx->dh = make_dhprime(pkinit_4096_dhprime,
+		    sizeof(pkinit_4096_dhprime));
 		break;
-	    default:
-		goto cleanup;
 	}
-
-	BN_set_word((cryptoctx->dh->g), DH_GENERATOR_2);
-	BN_rshift1(cryptoctx->dh->q, cryptoctx->dh->p);
+	if (cryptoctx->dh == NULL)
+		goto cleanup;
     }
 
     DH_generate_key(cryptoctx->dh);
+    DH_get0_key(cryptoctx->dh, &pub_key, NULL);
+
 /* Solaris Kerberos */
 #ifdef DEBUG
     DH_check(cryptoctx->dh, &dh_err);
@@ -2213,10 +2349,10 @@ client_create_dh(krb5_context context,
 #endif
 #ifdef DEBUG_DH
     print_dh(cryptoctx->dh, "client's DH params\n");
-    print_pubkey(cryptoctx->dh->pub_key, "client's pub_key=");
+    print_pubkey(pub_key, "client's pub_key=");
 #endif
 
-    DH_check_pub_key(cryptoctx->dh, cryptoctx->dh->pub_key, &dh_err);
+    DH_check_pub_key(cryptoctx->dh, pub_key, &dh_err);
     if (dh_err != 0) {
 	pkiDebug("dh_check_pub_key failed with %d\n", dh_err);
 	goto cleanup;
@@ -2226,8 +2362,9 @@ client_create_dh(krb5_context context,
     /* aglo: usually we could just call i2d_DHparams to encode DH params
      * however, PKINIT requires RFC3279 encoding and openssl does pkcs#3.
      */
-    retval = pkinit_encode_dh_params(cryptoctx->dh->p, cryptoctx->dh->g,
-	cryptoctx->dh->q, dh_params, dh_params_len);
+    DH_get0_pqg(cryptoctx->dh, (const BIGNUM **)&p, (const BIGNUM **)&q,
+	(const BIGNUM **)&g);
+    retval = pkinit_encode_dh_params(p, g, q, dh_params, dh_params_len);
     if (retval)
 	goto cleanup;
 
@@ -2237,18 +2374,18 @@ client_create_dh(krb5_context context,
      * subjectPublicKey component (a BIT STRING) of the SubjectPublicKeyInfo
      * data element
      */
-    if ((pub_key = BN_to_ASN1_INTEGER(cryptoctx->dh->pub_key, NULL)) == NULL)
+    if ((asn_pub_key = BN_to_ASN1_INTEGER(pub_key, NULL)) == NULL)
 	goto cleanup;
-    *dh_pubkey_len = i2d_ASN1_INTEGER(pub_key, NULL);
+    *dh_pubkey_len = i2d_ASN1_INTEGER(asn_pub_key, NULL);
     if ((buf = *dh_pubkey = (unsigned char *)
-	    malloc((size_t) *dh_pubkey_len)) == NULL) {
-	retval  = ENOMEM;
-	goto cleanup;
+        malloc((size_t) *dh_pubkey_len)) == NULL) {
+	    retval = ENOMEM;
+	    goto cleanup;
     }
-    i2d_ASN1_INTEGER(pub_key, &buf);
+    i2d_ASN1_INTEGER(asn_pub_key, &buf);
 
-    if (pub_key != NULL)
-	ASN1_INTEGER_free(pub_key);
+    if (asn_pub_key != NULL)
+	ASN1_INTEGER_free(asn_pub_key);
 
     retval = 0;
     return retval;
@@ -2263,8 +2400,8 @@ client_create_dh(krb5_context context,
     if (*dh_pubkey != NULL)
 	free(*dh_pubkey);
     *dh_pubkey = NULL;
-    if (pub_key != NULL)
-	ASN1_INTEGER_free(pub_key);
+    if (asn_pub_key != NULL)
+	ASN1_INTEGER_free(asn_pub_key);
 
     return retval;
 }
@@ -2352,6 +2489,7 @@ server_check_dh(krb5_context context,
     unsigned char *tmp = NULL;
     int dh_prime_bits;
     krb5_error_code retval = KRB5KDC_ERR_DH_KEY_PARAMETERS_NOT_ACCEPTED;
+    const BIGNUM *p, *g, *q, *p2;
 
     tmp = dh_params->data;
     dh = DH_new();
@@ -2361,8 +2499,10 @@ server_check_dh(krb5_context context,
 	goto cleanup;
     }
 
+    DH_get0_pqg(dh, &p, &q, &g);
+
     /* KDC SHOULD check to see if the key parameters satisfy its policy */
-    dh_prime_bits = BN_num_bits(dh->p);
+    dh_prime_bits = BN_num_bits(p);
     if (minbits && dh_prime_bits < minbits) {
 	pkiDebug("client sent dh params with %d bits, we require %d\n",
 		 dh_prime_bits, minbits);
@@ -2370,22 +2510,22 @@ server_check_dh(krb5_context context,
     }
 
     /* check dhparams is group 2 */
-    if (pkinit_check_dh_params(cryptoctx->dh_1024->p,
-			       dh->p, dh->g, dh->q) == 0) {
+    DH_get0_pqg(cryptoctx->dh_1024, &p2, NULL, NULL);
+    if (pkinit_check_dh_params(p2, p, g, q) == 0) {
 	retval = 0;
 	goto cleanup;
     }
 
     /* check dhparams is group 14 */
-    if (pkinit_check_dh_params(cryptoctx->dh_2048->p,
-			       dh->p, dh->g, dh->q) == 0) {
+    DH_get0_pqg(cryptoctx->dh_2048, &p2, NULL, NULL);
+    if (pkinit_check_dh_params(p2, p, g, q) == 0) {
 	retval = 0;
 	goto cleanup;
     }
 
     /* check dhparams is group 16 */
-    if (pkinit_check_dh_params(cryptoctx->dh_4096->p,
-			       dh->p, dh->g, dh->q) == 0) {
+    DH_get0_pqg(cryptoctx->dh_4096, &p2, NULL, NULL);
+    if (pkinit_check_dh_params(p2, p, g, q) == 0) {
 	retval = 0;
 	goto cleanup;
     }
@@ -2416,8 +2556,10 @@ server_process_dh(krb5_context context,
     /* Solaris Kerberos */
     krb5_error_code retval = KRB5KRB_ERR_GENERIC;
     DH *dh = NULL, *dh_server = NULL;
-    unsigned char *p = NULL;
-    ASN1_INTEGER *pub_key = NULL;
+    const BIGNUM *p, *g, *q, *s_pub_key;
+    BIGNUM *pub_key;
+    unsigned char *s = NULL;
+    ASN1_INTEGER *asn_pub_key = NULL;
 
     /* get client's received DH parameters that we saved in server_check_dh */
     dh = cryptoctx->dh;
@@ -2425,33 +2567,36 @@ server_process_dh(krb5_context context,
     dh_server = DH_new();
     if (dh_server == NULL)
 	goto cleanup;
-    dh_server->p = BN_dup(dh->p);
-    dh_server->g = BN_dup(dh->g);
-    dh_server->q = BN_dup(dh->q);
+    DH_get0_pqg(dh, &p, &g, &q);
+    DH_set0_pqg(dh_server, BN_dup(p), BN_dup(g), BN_dup(q));
 
     /* decode client's public key */
-    p = data;
-    pub_key = d2i_ASN1_INTEGER(NULL, (const unsigned char **)&p, (int)data_len);
+    s = data;
+    asn_pub_key = d2i_ASN1_INTEGER(NULL,
+	(const unsigned char **)&s, (int)data_len);
+    if (asn_pub_key == NULL)
+	goto cleanup;
+    pub_key = ASN1_INTEGER_to_BN(asn_pub_key, NULL);
     if (pub_key == NULL)
 	goto cleanup;
-    dh->pub_key = ASN1_INTEGER_to_BN(pub_key, NULL);
-    if (dh->pub_key == NULL)
-	goto cleanup;
-    ASN1_INTEGER_free(pub_key);
+    DH_set0_key(dh, pub_key, NULL);
+    ASN1_INTEGER_free(asn_pub_key);
 
     if (!DH_generate_key(dh_server))
 	goto cleanup;
 
     /* generate DH session key */
     *server_key_len = DH_size(dh_server);
-    if ((*server_key = (unsigned char *) malloc((size_t)*server_key_len)) == NULL)
-	goto cleanup;
-    DH_compute_key(*server_key, dh->pub_key, dh_server);
+    if ((*server_key = (unsigned char *) malloc((size_t)*server_key_len))
+	== NULL)
+	    goto cleanup;
+    DH_compute_key(*server_key, pub_key, dh_server);
+    DH_get0_key(dh_server, &s_pub_key, NULL);
 
 #ifdef DEBUG_DH
     print_dh(dh_server, "client&server's DH params\n");
-    print_pubkey(dh->pub_key, "client's pub_key=");
-    print_pubkey(dh_server->pub_key, "server's pub_key=");
+    print_pubkey(pub_key, "client's pub_key=");
+    print_pubkey(s_pub_key, "server's pub_key=");
     pkiDebug("server secret key=");
     print_buffer(*server_key, *server_key_len);
 #endif
@@ -2463,14 +2608,15 @@ server_process_dh(krb5_context context,
      * subjectPublicKey component (a BIT STRING) of the SubjectPublicKeyInfo
      * data element
      */
-    if ((pub_key = BN_to_ASN1_INTEGER(dh_server->pub_key, NULL)) == NULL)
+    if ((asn_pub_key = BN_to_ASN1_INTEGER(s_pub_key, NULL)) == NULL)
 	goto cleanup;
-    *dh_pubkey_len = i2d_ASN1_INTEGER(pub_key, NULL);
-    if ((p = *dh_pubkey = (unsigned char *) malloc((size_t)*dh_pubkey_len)) == NULL)
-	goto cleanup;
-    i2d_ASN1_INTEGER(pub_key, &p);
-    if (pub_key != NULL)
-	ASN1_INTEGER_free(pub_key);
+    *dh_pubkey_len = i2d_ASN1_INTEGER(asn_pub_key, NULL);
+    if ((s = *dh_pubkey = (unsigned char *) malloc((size_t)*dh_pubkey_len))
+	== NULL)
+	    goto cleanup;
+    i2d_ASN1_INTEGER(asn_pub_key, &s);
+    if (asn_pub_key != NULL)
+	ASN1_INTEGER_free(asn_pub_key);
 
     retval = 0;
 
@@ -2504,9 +2650,15 @@ openssl_init()
     if (ret == 0) {
 	if (!did_init) {
 	    /* initialize openssl routines */
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	    /*
+	     * As of version 1.1.0, OpenSSL will automatically allocate
+	     * resources as-needed.
+	     */
 	    CRYPTO_malloc_init();
 	    ERR_load_crypto_strings();
 	    OpenSSL_add_all_algorithms();
+#endif
 	    did_init++;
 	}
 	k5_mutex_unlock(&init_mutex);
@@ -2515,7 +2667,7 @@ openssl_init()
 }
 
 static krb5_error_code
-pkinit_encode_dh_params(BIGNUM *p, BIGNUM *g, BIGNUM *q,
+pkinit_encode_dh_params(const BIGNUM *p, const BIGNUM *g, const BIGNUM *q,
 			unsigned char **buf, unsigned int *buf_len)
 {
     krb5_error_code retval = KRB5KDC_ERR_PREAUTH_FAILED;
@@ -2559,6 +2711,8 @@ cleanup:
 
     return retval;
 }
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 
 static DH *
 pkinit_decode_dh_params(DH ** a, unsigned char **pp, unsigned int len)
@@ -2618,6 +2772,63 @@ pkinit_decode_dh_params(DH ** a, unsigned char **pp, unsigned int len)
     M_ASN1_D2I_Finish(a, DH_free, 0);
 
 }
+
+#else
+
+/*
+ * This is taken from the internal dh_asn1.c file in OpenSSL 1.1, modified to
+ * make q an optional field.
+ */
+
+typedef struct {
+    ASN1_BIT_STRING *seed;
+    BIGNUM *counter;
+} int_dhvparams;
+
+typedef struct {
+    BIGNUM *p;
+    BIGNUM *q;
+    BIGNUM *g;
+    BIGNUM *j;
+    int_dhvparams *vparams;
+} int_dhx942_dh;
+
+ASN1_SEQUENCE(DHvparams) = {
+    ASN1_SIMPLE(int_dhvparams, seed, ASN1_BIT_STRING),
+    ASN1_SIMPLE(int_dhvparams, counter, BIGNUM)
+} static_ASN1_SEQUENCE_END_name(int_dhvparams, DHvparams)
+
+ASN1_SEQUENCE(DHxparams) = {
+    ASN1_SIMPLE(int_dhx942_dh, p, BIGNUM),
+    ASN1_SIMPLE(int_dhx942_dh, g, BIGNUM),
+    ASN1_OPT(int_dhx942_dh, q, BIGNUM),
+    ASN1_OPT(int_dhx942_dh, j, BIGNUM),
+    ASN1_OPT(int_dhx942_dh, vparams, DHvparams),
+} static_ASN1_SEQUENCE_END_name(int_dhx942_dh, DHxparams)
+
+static DH *
+pkinit_decode_dh_params(DH **a, unsigned char **pp, unsigned int len)
+{
+	int_dhx942_dh *params;
+	DH *dh = *a;
+
+	if (dh == NULL)
+		return NULL;
+
+	params = (int_dhx942_dh *)ASN1_item_d2i(NULL,
+	    (const unsigned char **)pp, len, ASN1_ITEM_rptr(DHxparams));
+	if (params == NULL) {
+		DH_free(dh);
+		return NULL;
+	}
+
+	DH_set0_pqg(dh, params->p, params->q, params->g);
+	params->p = params->q = params->g = NULL;
+	ASN1_item_free((ASN1_VALUE *)params, ASN1_ITEM_rptr(DHxparams));
+	return dh;
+}
+
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
 
 static krb5_error_code
 pkinit_create_sequence_of_principal_identifiers(
@@ -2763,6 +2974,7 @@ pkinit_create_td_dh_parameters(krb5_context context,
     krb5_typed_data **typed_data = NULL;
     krb5_data *data = NULL, *encoded_algId = NULL;
     krb5_algorithm_identifier **algId = NULL;
+    const BIGNUM *p, *q, *g;
 
     /* Solaris Kerberos */
     if (opts->dh_min_bits > 4096) {
@@ -2771,22 +2983,19 @@ pkinit_create_td_dh_parameters(krb5_context context,
     }
 
     if (opts->dh_min_bits <= 1024) {
-	retval = pkinit_encode_dh_params(plg_cryptoctx->dh_1024->p,
-	    plg_cryptoctx->dh_1024->g, plg_cryptoctx->dh_1024->q,
-	    &buf1, &buf1_len);
+	DH_get0_pqg(plg_cryptoctx->dh_1024, &p, &q, &g);
+	retval = pkinit_encode_dh_params(p, g, q, &buf1, &buf1_len);
 	if (retval)
 	    goto cleanup;
     }
     if (opts->dh_min_bits <= 2048) {
-	retval = pkinit_encode_dh_params(plg_cryptoctx->dh_2048->p,
-	    plg_cryptoctx->dh_2048->g, plg_cryptoctx->dh_2048->q,
-	    &buf2, &buf2_len);
+	DH_get0_pqg(plg_cryptoctx->dh_2048, &p, &q, &g);
+	retval = pkinit_encode_dh_params(p, g, q, &buf2, &buf2_len);
 	if (retval)
 	    goto cleanup;
     }
-    retval = pkinit_encode_dh_params(plg_cryptoctx->dh_4096->p,
-	plg_cryptoctx->dh_4096->g, plg_cryptoctx->dh_4096->q,
-	&buf3, &buf3_len);
+    DH_get0_pqg(plg_cryptoctx->dh_4096, &p, &q, &g);
+    retval = pkinit_encode_dh_params(p, g, q, &buf3, &buf3_len);
     if (retval)
 	goto cleanup;
 
@@ -2980,7 +3189,8 @@ cleanup:
 }
 
 static int
-pkinit_check_dh_params(BIGNUM * p1, BIGNUM * p2, BIGNUM * g1, BIGNUM * q1)
+pkinit_check_dh_params(const BIGNUM *p1, const BIGNUM *p2, const BIGNUM *g1,
+    const BIGNUM *q1)
 {
     BIGNUM *g2 = NULL, *q2 = NULL;
     /* Solaris Kerberos */
@@ -3024,6 +3234,7 @@ pkinit_process_td_dh_params(krb5_context context,
     while (algId[i] != NULL) {
 	DH *dh = NULL;
 	unsigned char *tmp = NULL;
+	const BIGNUM *p, *g, *q, *p2;
 	int dh_prime_bits = 0;
 
 	if (algId[i]->algorithm.length != dh_oid.length ||
@@ -3033,27 +3244,28 @@ pkinit_process_td_dh_params(krb5_context context,
 	tmp = algId[i]->parameters.data;
 	dh = DH_new();
 	dh = pkinit_decode_dh_params(&dh, &tmp, algId[i]->parameters.length);
-	dh_prime_bits = BN_num_bits(dh->p);
+	dh_prime_bits = DH_bits(dh);
 	pkiDebug("client sent %d DH bits server prefers %d DH bits\n",
 		 *new_dh_size, dh_prime_bits);
+	DH_get0_pqg(dh, &p, &q, &g);
 	switch(dh_prime_bits) {
 	    case 1024:
-		if (pkinit_check_dh_params(cryptoctx->dh_1024->p, dh->p,
-			dh->g, dh->q) == 0) {
+		DH_get0_pqg(cryptoctx->dh_1024, &p2, NULL, NULL);
+		if (pkinit_check_dh_params(p2, p, g, q) == 0) {
 		    *new_dh_size = 1024;
 		    ok = 1;
 		}
 		break;
 	    case 2048:
-		if (pkinit_check_dh_params(cryptoctx->dh_2048->p, dh->p,
-			dh->g, dh->q) == 0) {
+		DH_get0_pqg(cryptoctx->dh_2048, &p2, NULL, NULL);
+		if (pkinit_check_dh_params(p2, p, g, q) == 0) {
 		    *new_dh_size = 2048;
 		    ok = 1;
 		}
 		break;
 	    case 4096:
-		if (pkinit_check_dh_params(cryptoctx->dh_4096->p, dh->p,
-			dh->g, dh->q) == 0) {
+		DH_get0_pqg(cryptoctx->dh_4096, &p2, NULL, NULL);
+		if (pkinit_check_dh_params(p2, p, g, q) == 0) {
 		    *new_dh_size = 4096;
 		    ok = 1;
 		}
@@ -3093,7 +3305,7 @@ cleanup:
     return retval;
 }
 
-/* ARGSUSED */ 
+/* ARGSUSED */
 static int
 openssl_callback(int ok, X509_STORE_CTX * ctx)
 {
@@ -3113,14 +3325,8 @@ openssl_callback(int ok, X509_STORE_CTX * ctx)
 static int
 openssl_callback_ignore_crls(int ok, X509_STORE_CTX * ctx)
 {
-    if (!ok) {
-	switch (ctx->error) {
-	    case X509_V_ERR_UNABLE_TO_GET_CRL:
-		return 1;
-	    default:
-		return 0;
-	}
-    }
+    if (!ok)
+	return (X509_STORE_CTX_get_error(ctx) == X509_V_ERR_UNABLE_TO_GET_CRL);
     return ok;
 }
 
@@ -3141,7 +3347,7 @@ pkinit_pkcs7type2oid(pkinit_plg_crypto_context cryptoctx, int pkcs7_type)
 	     * We need this shadow version because our code
 	     * depends on the "other" type to be unknown to the
 	     * OpenSSL code.
-	     */ 
+	     */
 	    if (cryptoctx->id_pkinit_authData9 == NULL) {
 		pkiDebug("%s: Creating shadow instance of pkcs7-data oid\n",
 			 __FUNCTION__);
@@ -3309,33 +3515,30 @@ prepare_enc_data(unsigned char *indata,
 		 unsigned char **outdata,
 		 int *outdata_len)
 {
-    /* Solaris Kerberos */
-    ASN1_const_CTX c;
-    long length = indata_len;
-    int Ttag, Tclass;
-    long Tlen;
+    int tag, class;
+    long tlen, slen;
+    const uint8_t *p = indata, *oldp;
 
-    c.pp = (const unsigned char **)&indata;
-    c.q = *(const unsigned char **)&indata;
-    c.error = ERR_R_NESTED_ASN1_ERROR;
-    c.p= *(const unsigned char **)&indata;
-    c.max = (length == 0)?0:(c.p+length);
+    /* Top-bit set means that the conversion failed. */
+    if (ASN1_get_object(&p, &slen, &tag, &class, indata_len) & 0x80)
+        return EINVAL;
+    if (tag != V_ASN1_SEQUENCE)
+        return EINVAL;
 
-    asn1_GetSequence(&c,&length);
+    oldp = p;
+    if (ASN1_get_object(&p, &tlen, &tag, &class, slen) & 0x80)
+        return EINVAL;
+    p += tlen;
+    slen -= (p - oldp);
 
-    ASN1_get_object(&c.p,&Tlen,&Ttag,&Tclass,c.slen);
-    c.p += Tlen;
-    ASN1_get_object(&c.p,&Tlen,&Ttag,&Tclass,c.slen);
+    if (ASN1_get_object(&p, &tlen, &tag, &class, slen) & 0x80)
+        return EINVAL;
 
-    asn1_const_Finish(&c);
-
-    *outdata = (unsigned char *)malloc((size_t)Tlen);
-    /* Solaris Kerberos */
-    if (outdata == NULL)
-	return ENOMEM;
-    
-    (void) memcpy(*outdata, c.p, (size_t)Tlen);
-    *outdata_len = Tlen;
+    *outdata = malloc(tlen);
+    if (*outdata == NULL)
+        return ENOMEM;
+    memcpy(*outdata, p, tlen);
+    *outdata_len = tlen;
 
     return 0;
 }
@@ -3901,7 +4104,7 @@ out:
 
     if (cert_id)
         free(cert_id);
-    
+
     return (r);
 }
 
@@ -3965,7 +4168,7 @@ pkinit_open_session(krb5_context context,
      * If C_Initialize was already called by the process before the pkinit
      * module was loaded then record that fact.
      * "finalize_pkcs11" is used by pkinit_fini_pkcs11 to determine whether
-     * or not C_Finalize() should be called. 
+     * or not C_Finalize() should be called.
      */
      cctx->finalize_pkcs11 =
 	(r == CKR_CRYPTOKI_ALREADY_INITIALIZED ? FALSE : TRUE);
@@ -4023,7 +4226,7 @@ pkinit_open_session(krb5_context context,
 	    goto out;
 	}
     }
-    
+
 tryagain:
     /* get count of slots that have tokens */
     if ((r = cctx->p11->C_GetSlotList(TRUE, NULL, &count)) != CKR_OK) {
@@ -4065,7 +4268,7 @@ tryagain:
 
     if (slotlist != NULL)
 	free(slotlist);
- 
+
     slotlist = malloc(count * sizeof (CK_SLOT_ID));
     if (slotlist == NULL) {
 	krb5_set_error_message(context, KRB5KDC_ERR_PREAUTH_FAILED,
@@ -4368,6 +4571,7 @@ pkinit_find_private_key(pkinit_identity_crypto_context id_cryptoctx,
     CK_ATTRIBUTE attrs[4];
     CK_ULONG count;
     CK_KEY_TYPE keytype;
+    RSA *rsa;
     unsigned int nattrs = 0;
     int r;
 #ifdef PKINIT_USE_KEY_USAGE
@@ -4428,6 +4632,7 @@ pkinit_find_private_key(pkinit_identity_crypto_context id_cryptoctx,
 
 	EVP_PKEY *priv;
 	X509 *cert;
+	const BIGNUM *rsan;
 	unsigned int n_len;
 	unsigned char *n_bytes;
 
@@ -4459,20 +4664,28 @@ pkinit_find_private_key(pkinit_identity_crypto_context id_cryptoctx,
 	attrs[nattrs].ulValueLen = sizeof keytype;
 	nattrs++;
 
-	n_len = BN_num_bytes(priv->pkey.rsa->n);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	rsa = priv->pkey.rsa;
+	rsan = rsa->n;
+	n_len = BN_num_bytes(rsan);
+#else
+	rsa = EVP_PKEY_get0_RSA(priv);
+	RSA_get0_key(rsa, &rsan, NULL, NULL);
+	n_len = RSA_size(rsa);
+#endif
 	n_bytes = (unsigned char *) malloc((size_t) n_len);
 	if (n_bytes == NULL) {
 		return (ENOMEM);
 	}
 
-	if (BN_bn2bin(priv->pkey.rsa->n, n_bytes) == 0) {
+	if (BN_bn2bin(rsan, n_bytes) == 0) {
 		free (n_bytes);
-    		pkiDebug("zero-byte key modulus\n");
+		pkiDebug("zero-byte key modulus\n");
 		return KRB5KDC_ERR_PREAUTH_FAILED;
 	}
 
 	attrs[nattrs].type = CKA_MODULUS;
-	attrs[nattrs].ulValueLen = n_len; 
+	attrs[nattrs].ulValueLen = n_len;
 	attrs[nattrs].pValue = n_bytes;
 
 	nattrs++;
@@ -4774,11 +4987,7 @@ decode_data(unsigned char **out_data, unsigned int *out_data_len,
     if (buf == NULL)
 	return ENOMEM;
 
-#if OPENSSL_VERSION_NUMBER < 0x10000000L
-    len = EVP_PKEY_decrypt(buf, data, (int)data_len, pkey);
-#else
     len = EVP_PKEY_decrypt_old(buf, data, (int)data_len, pkey);
-#endif
     if (len <= 0) {
 	pkiDebug("unable to decrypt received data (len=%d)\n", data_len);
 	/* Solaris Kerberos */
@@ -4796,23 +5005,26 @@ create_signature(unsigned char **sig, unsigned int *sig_len,
 		 unsigned char *data, unsigned int data_len, EVP_PKEY *pkey)
 {
     krb5_error_code retval = ENOMEM;
-    EVP_MD_CTX md_ctx;
+    EVP_MD_CTX *md_ctx;
 
     if (pkey == NULL)
 	/* Solaris Kerberos */
 	return EINVAL;
 
-    EVP_VerifyInit(&md_ctx, EVP_sha1());
-    EVP_SignUpdate(&md_ctx, data, data_len);
+    if ((md_ctx = EVP_MD_CTX_new()) == NULL)
+	return EINVAL;
+
+    EVP_VerifyInit(md_ctx, EVP_sha1());
+    EVP_SignUpdate(md_ctx, data, data_len);
     *sig_len = EVP_PKEY_size(pkey);
     if ((*sig = (unsigned char *) malloc((size_t) *sig_len)) == NULL)
 	goto cleanup;
-    EVP_SignFinal(&md_ctx, *sig, sig_len, pkey);
+    EVP_SignFinal(md_ctx, *sig, sig_len, pkey);
 
     retval = 0;
 
   cleanup:
-    EVP_MD_CTX_cleanup(&md_ctx);
+    EVP_MD_CTX_free(md_ctx);
 
     return retval;
 }
@@ -5153,7 +5365,7 @@ pkinit_get_certs_dir(krb5_context context,
     retval = 0;
 
   cleanup:
-    if (d) 
+    if (d)
 	(void) closedir(d);
 
     return retval;
@@ -5450,7 +5662,7 @@ crypto_cert_iteration_next(krb5_context context,
 
     if (id_cryptoctx->creds[id->index] == NULL)
 	return PKINIT_ITER_NO_MORE;
-    
+
     cd = calloc(1, sizeof(*cd));
     if (cd == NULL)
 	return ENOMEM;
@@ -5506,7 +5718,7 @@ crypto_retieve_X509_key_usage(krb5_context context,
 	pkiDebug("%s: EKUs not requested, not checking\n", __FUNCTION__);
 	goto check_kus;
     }
-    
+
     /* Start with Extended Key usage */
     i = X509_get_ext_by_NID(x, NID_ext_key_usage, -1);
     if (i >= 0) {
@@ -5727,8 +5939,8 @@ crypto_cert_select(krb5_context context,
     cd = (struct _pkinit_cert_data *)md->ch;
     if (cd == NULL || cd->magic != CERT_MAGIC)
 	return EINVAL;
-    
-    /* copy the selected cert into our id_cryptoctx */ 
+
+    /* copy the selected cert into our id_cryptoctx */
     if (cd->idctx->my_certs != NULL) {
 	sk_X509_pop_free(cd->idctx->my_certs, X509_free);
     }
@@ -5740,7 +5952,7 @@ crypto_cert_select(krb5_context context,
     if (cd->idctx->pkcs11_method != 1) {
 	cd->idctx->my_key = cd->cred->key;
 	cd->idctx->creds[cd->index]->key = NULL;    /* Don't free it twice */
-    } 
+    }
 #ifndef WITHOUT_PKCS11
     else {
 	cd->idctx->cert_id = cd->cred->cert_id;
@@ -5782,7 +5994,7 @@ crypto_cert_select_default(krb5_context context,
 		 __FUNCTION__, cert_count);
 	goto errout;
     }
-    /* copy the selected cert into our id_cryptoctx */ 
+    /* copy the selected cert into our id_cryptoctx */
     if (id_cryptoctx->my_certs != NULL) {
 	sk_X509_pop_free(id_cryptoctx->my_certs, X509_free);
     }
@@ -5794,7 +6006,7 @@ crypto_cert_select_default(krb5_context context,
     if (id_cryptoctx->pkcs11_method != 1) {
 	id_cryptoctx->my_key = id_cryptoctx->creds[0]->key;
 	id_cryptoctx->creds[0]->key = NULL;	/* Don't free it twice */
-    } 
+    }
 #ifndef WITHOUT_PKCS11
     else {
 	id_cryptoctx->cert_id = id_cryptoctx->creds[0]->cert_id;
@@ -5878,7 +6090,7 @@ load_cas_and_crls(krb5_context context,
      */
     for (i = 0; i < sk_X509_INFO_num(sk); i++) {
 	X509_INFO *xi = sk_X509_INFO_value(sk, i);
-	if (xi != NULL && xi->x509 != NULL && catype != CATYPE_CRLS) { 
+	if (xi != NULL && xi->x509 != NULL && catype != CATYPE_CRLS) {
 	    int j = 0, size = sk_X509_num(ca_certs), flag = 0;
 
 	    if (!size) {
@@ -5891,7 +6103,7 @@ load_cas_and_crls(krb5_context context,
 		flag = X509_cmp(x, xi->x509);
 		if (flag == 0)
 		    break;
-		else 
+		else
 		    continue;
 	    }
 	    if (flag != 0) {
@@ -5925,7 +6137,7 @@ load_cas_and_crls(krb5_context context,
     case CATYPE_ANCHORS:
 	if (sk_X509_num(ca_certs) == 0) {
 	    pkiDebug("no anchors in file, %s\n", filename);
-	    if (id_cryptoctx->trustedCAs == NULL) 
+	    if (id_cryptoctx->trustedCAs == NULL)
 		sk_X509_free(ca_certs);
 	} else {
 	    if (id_cryptoctx->trustedCAs == NULL)
@@ -5935,7 +6147,7 @@ load_cas_and_crls(krb5_context context,
     case CATYPE_INTERMEDIATES:
 	if (sk_X509_num(ca_certs) == 0) {
 	    pkiDebug("no intermediates in file, %s\n", filename);
-	    if (id_cryptoctx->intermediateCAs == NULL) 
+	    if (id_cryptoctx->intermediateCAs == NULL)
 		sk_X509_free(ca_certs);
 	} else {
 	    if (id_cryptoctx->intermediateCAs == NULL)
@@ -5976,7 +6188,7 @@ load_cas_and_crls_dir(krb5_context context,
 		      pkinit_req_crypto_context req_cryptoctx,
 		      pkinit_identity_crypto_context id_cryptoctx,
 		      int catype,
-		      char *dirname) 
+		      char *dirname)
 {
     krb5_error_code retval = EINVAL;
     DIR *d = NULL;
@@ -5987,7 +6199,7 @@ load_cas_and_crls_dir(krb5_context context,
 	return EINVAL;
 
     d = opendir(dirname);
-    if (d == NULL) 
+    if (d == NULL)
 	return ENOENT;
 
     while ((dentry = readdir(d))) {
@@ -6014,7 +6226,7 @@ load_cas_and_crls_dir(krb5_context context,
     retval = 0;
 
   cleanup:
-    if (d != NULL) 
+    if (d != NULL)
 	(void) closedir(d);
 
     return retval;
@@ -6029,7 +6241,7 @@ crypto_load_cas_and_crls(krb5_context context,
 			 pkinit_identity_crypto_context id_cryptoctx,
 			 int idtype,
 			 int catype,
-			 char *id) 
+			 char *id)
 {
     pkiDebug("%s: called with idtype %s and catype %s\n",
 	     __FUNCTION__, idtype2string(idtype), catype2string(catype));
@@ -6098,8 +6310,8 @@ if (longhorn == 0) { /* XXX Longhorn doesn't like this */
 #endif
 	is = PKCS7_ISSUER_AND_SERIAL_new();
 	X509_NAME_set(&is->issuer, X509_get_issuer_name(x));
-	M_ASN1_INTEGER_free(is->serial);
-	is->serial = M_ASN1_INTEGER_dup(X509_get_serialNumber(x));
+	ASN1_INTEGER_free(is->serial);
+	is->serial = ASN1_INTEGER_dup(X509_get_serialNumber(x));
 	len = i2d_PKCS7_ISSUER_AND_SERIAL(is, NULL);
 	if ((p = krb5_cas[i]->issuerAndSerialNumber.data =
 	     (unsigned char *)malloc((size_t) len)) == NULL)
@@ -6173,7 +6385,7 @@ create_krb5_invalidCertificates(krb5_context context,
 	return KRB5KDC_ERR_PREAUTH_FAILED;
 
     sk = sk_X509_new_null();
-    if (sk == NULL) 
+    if (sk == NULL)
 	goto cleanup;
     sk_X509_push(sk, req_cryptoctx->received_cert);
 
@@ -6241,7 +6453,7 @@ create_krb5_trustedCertifiers(krb5_context context,
 	return KRB5KDC_ERR_PREAUTH_FAILED;
 
     return create_identifiers_from_stack(sk, ids);
-    
+
 }
 
 /* ARGSUSED */
@@ -6303,8 +6515,8 @@ create_krb5_trustedCas(krb5_context context,
 		krb5_cas[i]->u.issuerAndSerial.length = 0;
 		is = PKCS7_ISSUER_AND_SERIAL_new();
 		X509_NAME_set(&is->issuer, X509_get_issuer_name(x));
-		M_ASN1_INTEGER_free(is->serial);
-		is->serial = M_ASN1_INTEGER_dup(X509_get_serialNumber(x));
+		ASN1_INTEGER_free(is->serial);
+		is->serial = ASN1_INTEGER_dup(X509_get_serialNumber(x));
 		len = i2d_PKCS7_ISSUER_AND_SERIAL(is, NULL);
 		if ((p = krb5_cas[i]->u.issuerAndSerial.data =
 		    (unsigned char *)malloc((size_t) len)) == NULL)
@@ -6353,8 +6565,8 @@ create_issuerAndSerial(krb5_context context,
 
     is = PKCS7_ISSUER_AND_SERIAL_new();
     X509_NAME_set(&is->issuer, X509_get_issuer_name(cert));
-    M_ASN1_INTEGER_free(is->serial);
-    is->serial = M_ASN1_INTEGER_dup(X509_get_serialNumber(cert));
+    ASN1_INTEGER_free(is->serial);
+    is->serial = ASN1_INTEGER_dup(X509_get_serialNumber(cert));
     len = i2d_PKCS7_ISSUER_AND_SERIAL(is, NULL);
     if ((p = *out = (unsigned char *)malloc((size_t) len)) == NULL)
 	goto cleanup;
@@ -6404,7 +6616,7 @@ pkcs7_decrypt(krb5_context context,
     }
 #pragma error_messages (default, E_END_OF_LOOP_CODE_NOT_REACHED)
 
-    return 0; 
+    return 0;
 }
 
 krb5_error_code
@@ -6539,9 +6751,9 @@ pkcs7_dataDecode(krb5_context context,
 	    int tmp_ret = 0;
 	    ri=sk_PKCS7_RECIP_INFO_value(rsk,i);
 	    tmp_ret = X509_NAME_cmp(ri->issuer_and_serial->issuer,
-				    cert->cert_info->issuer);
+		X509_get_issuer_name(cert));
 	    if (!tmp_ret) {
-		tmp_ret = M_ASN1_INTEGER_cmp(cert->cert_info->serialNumber,
+		tmp_ret = ASN1_INTEGER_cmp(X509_get_serialNumber(cert),
 					     ri->issuer_and_serial->serial);
 		if (!tmp_ret)
 		    break;
@@ -6562,8 +6774,8 @@ pkcs7_dataDecode(krb5_context context,
 	for (i=0; i<sk_PKCS7_RECIP_INFO_num(rsk); i++) {
 	    ri=sk_PKCS7_RECIP_INFO_value(rsk,i);
 	    jj = pkinit_decode_data(context, id_cryptoctx,
-		M_ASN1_STRING_data(ri->enc_key),
-		(unsigned int) M_ASN1_STRING_length(ri->enc_key),
+		(unsigned char *)ASN1_STRING_get0_data(ri->enc_key),
+		ASN1_STRING_length(ri->enc_key),
 		&tmp, &tmp_len);
 	    if (jj) {
 		PKCS7err(PKCS7_F_PKCS7_DATADECODE, ERR_R_EVP_LIB);
@@ -6580,14 +6792,14 @@ pkcs7_dataDecode(krb5_context context,
 	}
 
 	if (ri == NULL) {
-	    PKCS7err(PKCS7_F_PKCS7_DATADECODE, PKCS7_R_NO_RECIPIENT_MATCHES_KEY);
+	    PKCS7err(PKCS7_F_PKCS7_DATADECODE,PKCS7_R_NO_RECIPIENT_MATCHES_CERTIFICATE);
 	    goto cleanup;
 	}
     }
     else {
 	jj = pkinit_decode_data(context, id_cryptoctx,
-	    M_ASN1_STRING_data(ri->enc_key),
-	    (unsigned int) M_ASN1_STRING_length(ri->enc_key),
+	    (unsigned char *)ASN1_STRING_get0_data(ri->enc_key),
+	    ASN1_STRING_length(ri->enc_key),
 	    &tmp, &tmp_len);
 	/* Solaris Kerberos: tmp_len is unsigned. Cannot be < 0 */
 	if (jj || tmp_len == 0) {
@@ -6611,7 +6823,7 @@ pkcs7_dataDecode(krb5_context context,
 	 */
 	if(!EVP_CIPHER_CTX_set_key_length(evp_ctx, (int)jj)) {
 	    PKCS7err(PKCS7_F_PKCS7_DATADECODE,
-		     PKCS7_R_DECRYPTED_KEY_IS_WRONG_LENGTH);
+		     PKCS7_R_DECRYPT_ERROR);
 	    goto cleanup;
 	}
     }
