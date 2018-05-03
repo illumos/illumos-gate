@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2015 Tycho Nightingale <tycho.nightingale@pluribusnetworks.com>
  * Copyright (c) 2015 Leon Dang
+ * Copyright 2018 Joyent, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,6 +56,10 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 
 #include <zlib.h>
+
+#ifndef __FreeBSD__
+#include <sys/debug.h>
+#endif
 
 #include "bhyvegc.h"
 #include "console.h"
@@ -1060,3 +1065,86 @@ rfb_init(char *hostname, int port, int wait, char *password)
 
 	return (0);
 }
+
+#ifndef __FreeBSD__
+int
+rfb_init_unix(char *path, int wait, char *password)
+{
+	struct rfb_softc *rc;
+	struct sockaddr_un sock;
+
+	if ((rc = calloc(1, sizeof (struct rfb_softc))) == NULL) {
+		perror("calloc");
+		return (-1);
+	}
+	rc->sfd = -1;
+
+	if ((rc->crc = calloc(howmany(RFB_MAX_WIDTH * RFB_MAX_HEIGHT, 32),
+	    sizeof (uint32_t))) == NULL) {
+		perror("calloc");
+		goto fail;
+	}
+	if ((rc->crc_tmp = calloc(howmany(RFB_MAX_WIDTH * RFB_MAX_HEIGHT, 32),
+	    sizeof (uint32_t))) == NULL) {
+		perror("calloc");
+		goto fail;
+	}
+	rc->crc_width = RFB_MAX_WIDTH;
+	rc->crc_height = RFB_MAX_HEIGHT;
+
+	rc->password = password;
+
+	rc->sfd = socket(PF_UNIX, SOCK_STREAM, 0);
+	if (rc->sfd < 0) {
+		perror("socket");
+		goto fail;
+	}
+
+	sock.sun_family = AF_UNIX;
+	if (strlcpy(sock.sun_path, path, sizeof (sock.sun_path)) >=
+	    sizeof (sock.sun_path)) {
+		(void) fprintf(stderr, "socket path '%s' too long\n", path);
+		goto fail;
+	}
+
+	(void) unlink(path);
+	if (bind(rc->sfd, (struct sockaddr *)&sock, sizeof (sock)) < 0) {
+		perror("bind");
+		goto fail;
+	}
+
+	if (listen(rc->sfd, 1) < 0) {
+		perror("listen");
+		goto fail;
+	}
+
+	rc->hw_crc = sse42_supported();
+
+	rc->conn_wait = wait;
+	if (wait) {
+		VERIFY3S(pthread_mutex_init(&rc->mtx, NULL), ==, 0);
+		VERIFY3S(pthread_cond_init(&rc->cond, NULL), ==, 0);
+	}
+
+	VERIFY3S(pthread_create(&rc->tid, NULL, rfb_thr, rc), ==, 0);
+	pthread_set_name_np(rc->tid, "rfb");
+
+	if (wait) {
+		DPRINTF(("Waiting for rfb client...\n"));
+		VERIFY3S(pthread_mutex_lock(&rc->mtx), ==, 0);
+		VERIFY3S(pthread_cond_wait(&rc->cond, &rc->mtx), ==, 0);
+		VERIFY3S(pthread_mutex_unlock(&rc->mtx), ==, 0);
+	}
+
+	return (0);
+
+fail:
+	if (rc->sfd != -1) {
+		VERIFY3S(close(rc->sfd), ==, 0);
+	}
+	free(rc->crc);
+	free(rc->crc_tmp);
+	free(rc);
+	return (-1);
+}
+#endif

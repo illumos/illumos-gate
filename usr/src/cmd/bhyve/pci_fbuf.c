@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2015 Nahanni Systems, Inc.
+ * Copyright 2018 Joyent, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -95,6 +96,9 @@ struct pci_fbuf_softc {
 	char      *rfb_host;
 	char      *rfb_password;
 	int       rfb_port;
+#ifndef __FreeBSD__
+	char	  *rfb_unix;
+#endif
 	int       rfb_wait;
 	int       vga_enabled;
 	int	  vga_full;
@@ -256,6 +260,10 @@ pci_fbuf_parse_opts(struct pci_fbuf_softc *sc, char *opts)
 				sc->rfb_port = atoi(config);
 				sc->rfb_host = tmpstr;
 			}
+#ifndef __FreeBSD__
+		} else if (!strcmp(xopts, "unix")) {
+			sc->rfb_unix = config;
+#endif
 	        } else if (!strcmp(xopts, "vga")) {
 			if (!strcmp(config, "off")) {
 				sc->vga_enabled = 0;
@@ -409,7 +417,17 @@ pci_fbuf_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 
 	memset((void *)sc->fb_base, 0, FB_SIZE);
 
+#ifdef __FreeBSD__
 	error = rfb_init(sc->rfb_host, sc->rfb_port, sc->rfb_wait, sc->rfb_password);
+#else
+	if (sc->rfb_unix != NULL) {
+		error = rfb_init_unix(sc->rfb_unix, sc->rfb_wait,
+		    sc->rfb_password);
+	} else {
+		error = rfb_init(sc->rfb_host, sc->rfb_port, sc->rfb_wait,
+		    sc->rfb_password);
+	}
+#endif
 done:
 	if (error)
 		free(sc);
