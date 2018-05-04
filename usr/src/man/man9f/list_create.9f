@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIST_CREATE 9F "Sep 17, 2009"
+.TH LIST_CREATE 9F "May 3, 2018"
 .SH NAME
 list_create, list_destroy, list_insert_after, list_insert_before,
 list_insert_head, list_insert_tail, list_remove, list_remove_head,
@@ -102,7 +102,7 @@ functions
 
 .LP
 .nf
-\fBvoid\fR \fBlist_link_replace\fR(\fBlist_node_t *\fR\fInode1\fR, \fBlist_node_t *\fR\fInode2\fR);
+\fBvoid\fR \fBlist_link_replace\fR(\fBlist_node_t *\fR\fIlold\fR, \fBlist_node_t *\fR\fIlnew\fR);
 .fi
 
 .SH DESCRIPTION
@@ -191,10 +191,10 @@ lists were initialized using identical size and offset parameters. Upon
 completion, the \fIsrc\fR list will be empty.
 .sp
 .LP
-The \fBlist_link_replace()\fR function swaps two items on a list.  Note that
-the items need not be on the same list, but extreme care must be used to ensure
-that both lists are protected from concurrent accesses and that the lists were
-initialized with identical size and offset parameters.
+The \fBlist_link_replace()\fR function replaces \fIlold\fR node on an active
+list with the \fIlnew\fR node.  When the function is called the \fIlnew\fR node
+must not be linked on any list.  Upon completion the \fIlold\fR node will be
+left unlinked from any list.
 .SH ATTRIBUTES
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
