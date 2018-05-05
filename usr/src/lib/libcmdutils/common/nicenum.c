@@ -24,6 +24,7 @@
  * Copyright 2017 Jason king
  */
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -84,13 +85,13 @@ nicenum_scale(uint64_t n, size_t units, char *buf, size_t buflen,
 	u = " KMGTPE"[index];
 
 	if (index == 0) {
-		rc = snprintf(buf, buflen, "%llu", n);
+		rc = snprintf(buf, buflen, "%" PRIu64, n);
 	} else if (n % divisor == 0) {
 		/*
 		 * If this is an even multiple of the base, always display
 		 * without any decimal precision.
 		 */
-		rc = snprintf(buf, buflen, "%llu%c", n / divisor, u);
+		rc = snprintf(buf, buflen, "%" PRIu64 "%c", n / divisor, u);
 	} else {
 		/*
 		 * We want to choose a precision that reflects the best choice
