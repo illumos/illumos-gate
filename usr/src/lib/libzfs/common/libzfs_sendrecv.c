@@ -3593,7 +3593,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		zfs_nicenum(bytes, buf1, sizeof (buf1));
 		zfs_nicenum(bytes/delta, buf2, sizeof (buf1));
 
-		(void) printf("received %sB stream in %lu seconds (%sB/sec)\n",
+		(void) printf("received %sB stream in %zd seconds (%sB/sec)\n",
 		    buf1, delta, buf2);
 	}
 
