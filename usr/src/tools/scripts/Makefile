@@ -68,6 +68,7 @@ PYFILES= \
 	hdrchk \
 	mapfilechk \
 	validate_pkg \
+	wscheck \
 	wsdiff
 
 SCRIPTLINKS= \
@@ -158,7 +159,7 @@ bldenv: bldenv.sh stdenv.sh
 	shlintout="$$( /usr/bin/ksh93 -n "$@" 2>&1 )" ; \
 		[[ "$${shlintout}" != "" ]] && \
 		{ print -r -- "$${shlintout}" ;	false ; } || true
-	$(CHMOD) +x "$@" 
+	$(CHMOD) +x "$@"
 
 bldenv.1onbld: bldenv
 	$(RM) "$@"
@@ -170,7 +171,7 @@ bldenv.1onbld: bldenv
 nightly: nightly.sh stdenv.sh
 	$(RM) "$@"
 	sed -e '/# STDENV_START/ r stdenv.sh' nightly.sh > nightly
-	$(CHMOD) +x "$@" 
+	$(CHMOD) +x "$@"
 
 include ../Makefile.targ
 

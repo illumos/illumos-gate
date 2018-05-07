@@ -48,7 +48,7 @@ sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
 sys.path.insert(2, os.path.join(os.path.dirname(__file__), ".."))
 
 from onbld.Scm import Ignore
-from onbld.Checks import Comments, Copyright, CStyle, HdrChk
+from onbld.Checks import Comments, Copyright, CStyle, HdrChk, WsCheck
 from onbld.Checks import JStyle, Keywords, ManLint, Mapfile, SpellCheck
 
 
@@ -122,7 +122,7 @@ def git_parent_branch(branch):
     if not branch:
         return None
 
-    p = git(["for-each-ref", "--format=%(refname:short) %(upstream:short)", 
+    p = git(["for-each-ref", "--format=%(refname:short) %(upstream:short)",
             "refs/heads/"])
 
     if not p:
@@ -310,6 +310,14 @@ def keywords(root, parent, flist, output):
         fh.close()
     return ret
 
+def wscheck(root, parent, flist, output):
+    ret = 0
+    output.write("white space nits:\n")
+    for f in flist():
+        fh = open(f, 'r')
+        ret |= WsCheck.wscheck(fh, output=output)
+        fh.close()
+    return ret
 
 def run_checks(root, parent, cmds, paths='', opts={}):
     """Run the checks given in 'cmds', expected to have well-known signatures,
@@ -343,7 +351,8 @@ def nits(root, parent, paths):
             jstyle,
             keywords,
             manlint,
-            mapfilechk]
+            mapfilechk,
+	    wscheck]
     run_checks(root, parent, cmds, paths)
 
 
@@ -355,7 +364,8 @@ def pbchk(root, parent, paths):
             jstyle,
             keywords,
             manlint,
-            mapfilechk]
+            mapfilechk,
+	    wscheck]
     run_checks(root, parent, cmds)
 
 
