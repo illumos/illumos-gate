@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <fcntl.h>
@@ -134,7 +135,6 @@ get_mech_info(crypto_op_t *op)
 	    (uint_t *)&get_number, "get_mech_info") != CRYPTO_SUCCESS) {
 		(void) fprintf(stderr, "failed to resolve mechanism name %s\n",
 		    op->mechname);
-		(void) cryptotest_close(op);
 		return (CTEST_NAME_RESOLVE_FAILED);
 	}
 	op->mech = get_number.pn_internal_number;
@@ -158,7 +158,6 @@ get_hsession_by_mech(crypto_op_t *op)
 		(void) fprintf(stderr,
 		    "could not find provider for mechanism %llu\n",
 		    mech.mech_type);
-		(void) cryptotest_close(op);
 		return (CTEST_MECH_NO_PROVIDER);
 	}
 
