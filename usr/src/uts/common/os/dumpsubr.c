@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -73,6 +73,8 @@
 #include <sys/hold_page.h>
 
 #include <bzip2/bzlib.h>
+
+#define	ONE_GIG	(1024 * 1024 * 1024UL)
 
 /*
  * Crash dump time is dominated by disk write time.  To reduce this,
@@ -138,7 +140,7 @@ uint_t dump_plat_mincpu = MINCPU_NOT_SET;
 
 /* tunables for pre-reserved heap */
 uint_t dump_kmem_permap = 1024;
-uint_t dump_kmem_pages = 8;
+uint_t dump_kmem_pages = 0;
 
 /* Define multiple buffers per helper to avoid stalling */
 #define	NCBUF_PER_HELPER	2
@@ -679,11 +681,23 @@ dump_update_clevel()
 	}
 
 	/*
-	 * Reserve memory for kmem allocation calls made during crash
-	 * dump.  The hat layer allocates memory for each mapping
-	 * created, and the I/O path allocates buffers and data structs.
-	 * Add a few pages for safety.
+	 * Reserve memory for kmem allocation calls made during crash dump.  The
+	 * hat layer allocates memory for each mapping created, and the I/O path
+	 * allocates buffers and data structs.
+	 *
+	 * On larger systems, we easily exceed the lower amount, so we need some
+	 * more space; the cut-over point is relatively arbitrary.  If we run
+	 * out, the only impact is that kmem state in the dump becomes
+	 * inconsistent.
 	 */
+
+	if (dump_kmem_pages == 0) {
+		if (physmem > (16 * ONE_GIG) / PAGESIZE)
+			dump_kmem_pages = 20;
+		else
+			dump_kmem_pages = 8;
+	}
+
 	kmem_dump_init((new->ncmap * dump_kmem_permap) +
 	    (dump_kmem_pages * PAGESIZE));
 

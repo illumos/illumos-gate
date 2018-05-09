@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_KMEM_IMPL_H
@@ -328,6 +329,12 @@ typedef struct kmem_defrag {
 	kthread_t	*kmd_thread;		/* thread calling move */
 } kmem_defrag_t;
 
+typedef struct kmem_dump {
+	void		*kd_freelist;		/* heap during crash dump */
+	uint_t		kd_alloc_fails;		/* # of allocation failures */
+	uint_t		kd_unsafe;		/* cache was used, but unsafe */
+} kmem_dump_t;
+
 #define	KMEM_CACHE_NAMELEN	31
 
 struct kmem_cache {
@@ -398,8 +405,7 @@ struct kmem_cache {
 	kmem_magtype_t	*cache_magtype;		/* magazine type */
 	kmem_maglist_t	cache_full;		/* full magazines */
 	kmem_maglist_t	cache_empty;		/* empty magazines */
-	void		*cache_dumpfreelist;	/* heap during crash dump */
-	void		*cache_dumplog;		/* log entry during dump */
+	kmem_dump_t	cache_dump;		/* used during crash dump */
 
 	/*
 	 * Per-CPU layer
