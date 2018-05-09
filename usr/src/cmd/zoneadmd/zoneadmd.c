@@ -1039,7 +1039,6 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr, boolean_t debug)
 
 	if ((child = fork()) == 0) {
 		int in;
-		struct sigaction sa = { 0 };
 
 		/*
 		 * SIGINT is currently ignored.  It probably shouldn't be so
