@@ -25,6 +25,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -46,9 +47,9 @@ extern void __assert(const char *, const char *, int);
 /*
  * In C11 the static_assert macro is always defined, unlike the assert macro.
  */
-#if __STDC_VERSION__ - 0 >= 201112L
+#if __STDC_VERSION__ - 0 >= 201112L && !defined(__cplusplus)
 #define	static_assert	_Static_assert
-#endif /* __STDC_VERSION - 0 >= 201112L */
+#endif /* __STDC_VERSION - 0 >= 201112L && !defined(__cplusplus) */
 
 #ifdef	__cplusplus
 }
