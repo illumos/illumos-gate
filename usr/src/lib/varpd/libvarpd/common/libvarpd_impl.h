@@ -100,6 +100,7 @@ typedef struct varpd_client_instance_arg {
 typedef struct varpd_client_nprops_arg {
 	uint64_t	vcna_id;
 	uint_t		vcna_nprops;
+	uint8_t		vcna_pad[4];
 } varpd_client_nprops_arg_t;
 
 typedef struct varpd_client_propinfo_arg {
@@ -109,6 +110,7 @@ typedef struct varpd_client_propinfo_arg {
 	uint_t		vcfa_prot;
 	uint32_t	vcfa_defsize;
 	uint32_t	vcfa_psize;
+	uint8_t		vcfa_pad[4];
 	char		vcfa_name[LIBVARPD_PROP_NAMELEN];
 	uint8_t		vcfa_default[LIBVARPD_PROP_SIZEMAX];
 	uint8_t		vcfa_poss[LIBVARPD_PROP_SIZEMAX];

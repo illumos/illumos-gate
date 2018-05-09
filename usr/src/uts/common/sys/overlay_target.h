@@ -282,6 +282,7 @@ typedef struct overlay_targ_cache_iter {
 	uint32_t			otci_pad;
 	uint64_t			otci_marker;
 	uint16_t			otci_count;
+	uint8_t				otci_pad2[3];
 	overlay_targ_cache_entry_t	otci_ents[];
 } overlay_targ_cache_iter_t;
 
