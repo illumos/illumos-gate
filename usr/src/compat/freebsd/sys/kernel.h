@@ -11,16 +11,31 @@
 
 /*
  * Copyright 2013 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_KERNEL_H_
 #define	_COMPAT_FREEBSD_SYS_KERNEL_H_
 
-#define	SYSINIT(uniquifier, subsystem, order, func, ident)
 #define	TUNABLE_INT_FETCH(path, var)
 
 #include <sys/linker_set.h>
+
+typedef void (*sysinit_func_t)(const void *);
+
+struct sysinit {
+	const sysinit_func_t func;
+	const void *data;
+};
+
+#define	SYSINIT(uniquifier, subsystem, order, func, ident) \
+	static struct sysinit uniquifier ## _sys_init = {  \
+		(const sysinit_func_t)func,		   \
+		(const void *)&(ident)			   \
+	};						   \
+	DATA_SET(sysinit_set, uniquifier ## _sys_init);
+
+extern void sysinit(void);
 
 #define	ticks	ddi_get_lbolt()
 

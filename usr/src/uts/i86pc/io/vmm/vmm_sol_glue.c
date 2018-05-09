@@ -61,10 +61,21 @@
 #include <machine/specialreg.h>
 #include <machine/vmm.h>
 #include <sys/vmm_impl.h>
+#include <sys/kernel.h>
 
 #include <vm/as.h>
 #include <vm/seg_kmem.h>
 
+SET_DECLARE(sysinit_set, struct sysinit);
+
+void
+sysinit(void)
+{
+	struct sysinit **si;
+
+	SET_FOREACH(si, sysinit_set)
+		(*si)->func((*si)->data);
+}
 
 u_char const bin2bcd_data[] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,

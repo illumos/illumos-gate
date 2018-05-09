@@ -80,7 +80,7 @@
 /*
  * Initialize before referring to a given linker set.
  */
-#ifdef	__FreeBSD__
+#if defined(__FreeBSD__) || defined(_KERNEL)
 #define SET_DECLARE(set, ptype)						\
 	extern ptype *__CONCAT(__start_set_,set);			\
 	extern ptype *__CONCAT(__stop_set_,set)

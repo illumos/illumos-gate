@@ -29,6 +29,8 @@
 #include <sys/id_space.h>
 #include <sys/fs/sdev_plugin.h>
 
+#include <sys/kernel.h>
+
 #include <sys/vmm.h>
 #include <sys/vmm_instruction_emul.h>
 #include <sys/vmm_dev.h>
@@ -1970,6 +1972,8 @@ int
 _init(void)
 {
 	int	error;
+
+	sysinit();
 
 	mutex_init(&vmmdev_mtx, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vmm_mtx, NULL, MUTEX_DRIVER, NULL);

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 #
@@ -91,6 +91,8 @@ AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 CFLAGS		+= -_gcc=-Wimplicit-function-declaration
 # The FreeBSD %# notation makes gcc gripe
 CFLAGS		+= -_gcc=-Wno-format
+# enable collection of VMM statistics
+CFLAGS		+= -DVMM_KEEP_STATS
 
 $(OBJS_DIR)/vmm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
 $(OBJS_DIR)/svm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
@@ -106,6 +108,9 @@ ASSYM_SVM	= $(OBJS_DIR)/svm_assym.h
 ASSYM_H		= $(ASSYM_VMX) $(ASSYM_SVM)
 
 CLEANFILES	+= $(ASSYM_H)
+
+# create linker set start/stop symbols, needed by VMM stats
+POST_PROCESS	+= ; $(GENSETDEFS) $@
 
 #
 #	Default build targets.

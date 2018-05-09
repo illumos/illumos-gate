@@ -44,6 +44,8 @@
 #ifndef	_VMM_DEV_H_
 #define	_VMM_DEV_H_
 
+#include <machine/vmm.h>
+
 struct vm_memmap {
 	vm_paddr_t	gpa;
 	int		segid;		/* memory segment */
@@ -209,7 +211,12 @@ struct vm_nmi {
 	int		cpuid;
 };
 
+#ifdef __FreeBSD__
 #define	MAX_VM_STATS	64
+#else
+#define	MAX_VM_STATS	(64 + VM_MAXCPU)
+#endif
+
 struct vm_stats {
 	int		cpuid;				/* in */
 	int		num_entries;			/* out */
