@@ -104,7 +104,6 @@ get_mech_info(crypto_op_t *op)
 		cryptotest_error("get_mech_info", rv);
 		(void) fprintf(stderr, "failed to resolve mechanism name %s\n",
 		    op->mechname);
-		(void) cryptotest_close(op);
 		return (CTEST_NAME_RESOLVE_FAILED);
 	}
 	return (rv);
@@ -121,7 +120,6 @@ get_hsession_by_mech(crypto_op_t *op)
 		(void) fprintf(stderr,
 		    "could not find provider for mechanism %lu\n",
 		    op->mech);
-		(void) cryptotest_close(op);
 		return (CTEST_MECH_NO_PROVIDER);
 	}
 	return (rv);
