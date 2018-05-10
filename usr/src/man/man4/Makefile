@@ -13,6 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2015, Joyent, Inc.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2018 Gary Mills
 #
 
 include		$(SRC)/Makefile.master
@@ -100,7 +101,6 @@ _MANFILES=	Intro.4				\
 		ldapfilter.conf.4		\
 		ldapsearchprefs.conf.4		\
 		ldaptemplates.conf.4		\
-		loader.conf.4			\
 		logadm.conf.4			\
 		logindevperm.4			\
 		loginlog.4			\
@@ -205,7 +205,8 @@ _MANFILES=	Intro.4				\
 
 sparc_MANFILES=	sbus.4
 
-i386_MANFILES=	sysbus.4
+i386_MANFILES=	loader.conf.4			\
+		sysbus.4
 
 _MANLINKS=	addresses.4			\
 		devid_cache.4			\
