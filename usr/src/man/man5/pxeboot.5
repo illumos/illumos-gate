@@ -22,7 +22,9 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd May 28, 2017
+.\" Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd Apr 13, 2018
 .Dt PXEBOOT 5
 .Os
 .Sh NAME
@@ -52,7 +54,7 @@ The
 .Nm
 binary is loaded just like any other boot file,
 by specifying it in the DHCP server's configuration file.
-Below is a sample configuration for the ISC DHCP v2 server:
+Below is a sample configuration for the ISC DHCP server:
 .Bd -literal -offset indent
 option domain-name "example.com";
 option routers 10.0.0.1;
@@ -68,7 +70,7 @@ max-lease-time 120;
 subnet 10.0.0.0 netmask 255.255.255.0 {
        filename "pxeboot";
        range 10.0.0.10 10.0.0.254;
-       if exists user-class and option user-class = "illumos" {
+       if exists user-class and option user-class ~~ "illumos" {
             option root-path "tftp://10.0.0.1/illumos";
        }
 }
@@ -114,6 +116,11 @@ defaults to using NFS if the
 variable is in the
 .Qq Pa ip-address Ns :/ Ns Pa path
 form, otherwise TFTP is used.
+If no
+.Va root-path
+option is set in the DHCP response,
+.Nm
+defaults to using TFTP.
 .Pp
 .Nm
 defaults to a conservative 1024 byte NFS data packet size.
