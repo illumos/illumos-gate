@@ -70,6 +70,8 @@ int smb3_encrypt_init_mech(smb_session_t *s);
 uint32_t smb2_fsctl_fs(smb_request_t *, smb_fsctl_t *);
 uint32_t smb2_fsctl_netfs(smb_request_t *, smb_fsctl_t *);
 uint32_t smb2_fsctl_copychunk(smb_request_t *, smb_fsctl_t *);
+uint32_t smb2_fsctl_odx_read(smb_request_t *, smb_fsctl_t *);
+uint32_t smb2_fsctl_odx_write(smb_request_t *, smb_fsctl_t *);
 uint32_t smb2_fsctl_set_resilient(smb_request_t *, smb_fsctl_t *);
 
 /* smb2_fsctl_sparse.c */

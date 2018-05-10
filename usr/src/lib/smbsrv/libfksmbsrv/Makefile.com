@@ -135,6 +135,7 @@ OBJS_FS_SMBSRV = \
 		smb2_flush.o \
 		smb2_fsctl_copychunk.o \
 		smb2_fsctl_fs.o \
+		smb2_fsctl_odx.o \
 		smb2_fsctl_sparse.o \
 		smb2_ioctl.o \
 		smb2_lease.o \

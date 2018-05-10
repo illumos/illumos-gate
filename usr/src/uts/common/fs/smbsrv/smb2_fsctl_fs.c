@@ -146,8 +146,10 @@ smb2_fsctl_fs(smb_request_t *sr, smb_fsctl_t *fsctl)
 		func = smb2_fsctl_notsup;
 		break;
 	case FSCTL_OFFLOAD_READ:		/* 153 */
+		func = smb2_fsctl_odx_read;
+		break;
 	case FSCTL_OFFLOAD_WRITE:		/* 154 */
-		func = smb2_fsctl_notsup;
+		func = smb2_fsctl_odx_write;
 		break;
 	case FSCTL_SET_INTEGRITY_INFORMATION:	/* 160 */
 		func = smb2_fsctl_notsup;
