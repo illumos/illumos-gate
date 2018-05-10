@@ -22,7 +22,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 CDDL HEADER END
 
 Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 
 NOTE:  This service manifest is not editable; its contents will
@@ -38,7 +38,7 @@ file.
 <service
     name='network/smb/server'
     type='service'
-    version='1'>
+    version='2'>
 
 	<!-- 2. Create default service instance. -->
 	<create_default_instance enabled='false' />
@@ -192,9 +192,7 @@ file.
 		<propval name='signing_enabled' type='boolean'
 			value='true' override='true'/>
 		<propval name='signing_required' type='boolean'
-			value='false' override='true'/>
-		<propval name='signing_check' type='boolean'
-			value='false' override='true'/>
+			value='true' override='true'/>
 		<propval name='sync_enable' type='boolean'
 			value='false' override='true'/>
 		<propval name='security' type='astring'
