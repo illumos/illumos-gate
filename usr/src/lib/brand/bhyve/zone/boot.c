@@ -89,6 +89,15 @@ is_env_true(const char *rsrc, const char *inst, const char *prop)
 	return (val != NULL && strcmp(val, "true") == 0);
 }
 
+static boolean_t
+is_env_string(const char *rsrc, const char *inst, const char *prop,
+    const char *val)
+{
+	char *pval = get_zcfg_var(rsrc, inst, prop);
+
+	return (pval != NULL && strcmp(pval, val) == 0);
+}
+
 static int
 add_arg(int *argc, char **argv, const char *val)
 {
@@ -171,13 +180,12 @@ add_ram(int *argc, char **argv)
 }
 
 static int
-add_disk(char *disk, char *path, const char *model, char *slotconf,
-    size_t slotconf_len)
+add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
 {
 	static char *boot = NULL;
 	static int next_cd = 0;
 	static int next_other = 0;
-	const char *emulation = "virtio-blk";
+	const char *model = "virtio-blk";
 	int pcislot;
 	int pcifn;
 
@@ -191,7 +199,7 @@ add_disk(char *disk, char *path, const char *model, char *slotconf,
 		boot = path;
 		pcislot = PCI_SLOT_BOOT_DISK;
 		pcifn = 0;
-	} else if (is_env_true("device", disk, "cdrom")) {
+	} else if (is_env_string("device", disk, "media", "cdrom")) {
 		pcislot = PCI_SLOT_CD;
 		pcifn = next_cd;
 		next_cd++;
@@ -202,13 +210,13 @@ add_disk(char *disk, char *path, const char *model, char *slotconf,
 	}
 
 
-	if (strcmp(model, "virtio") == 0) {
-		emulation = "virtio-blk";
-	} else if (strcmp(model, "ahci") == 0) {
-		if (is_env_true("device", disk, "cdrom")) {
-			emulation = "ahci-cd";
+	if (is_env_string("device", disk, "model", "virtio")) {
+		model = "virtio-blk";
+	} else if (is_env_string("device", disk, "model", "ahci")) {
+		if (is_env_string("device", disk, "media", "cdrom")) {
+			model = "ahci-cd";
 		} else {
-			emulation = "ahci-hd";
+			model = "ahci-hd";
 		}
 	} else {
 		(void) printf("Error: unknown disk model '%s'\n", model);
@@ -216,7 +224,7 @@ add_disk(char *disk, char *path, const char *model, char *slotconf,
 	}
 
 	if (snprintf(slotconf, slotconf_len, "%d:%d,%s,%s",
-	    pcislot, pcifn, emulation, path) >= slotconf_len) {
+	    pcislot, pcifn, model, path) >= slotconf_len) {
 		(void) printf("Error: disk path '%s' too long\n", path);
 		return (-1);
 	}
@@ -318,8 +326,7 @@ add_devices(int *argc, char **argv)
 			ret = add_ppt(argc, argv, dev, path, slotconf,
 			    sizeof (slotconf));
 		} else {
-			ret = add_disk(dev, path, model, slotconf,
-			    sizeof (slotconf));
+			ret = add_disk(dev, path, slotconf, sizeof (slotconf));
 		}
 
 		if (ret != 0)
