@@ -722,6 +722,14 @@ typedef struct ixgbe {
 	ddi_periodic_t		periodic_id; /* for link check timer func */
 
 	/*
+	 * LED related constants.
+	 */
+	boolean_t		ixgbe_led_active;
+	boolean_t		ixgbe_led_blink;
+	uint32_t		ixgbe_led_reg;
+	uint32_t		ixgbe_led_index;
+
+	/*
 	 * Kstat definitions
 	 */
 	kstat_t			*ixgbe_ks;

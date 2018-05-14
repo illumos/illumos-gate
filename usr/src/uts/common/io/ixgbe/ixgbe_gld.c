@@ -220,6 +220,61 @@ ixgbe_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	}
 }
 
+static int
+ixgbe_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
+{
+	ixgbe_t *ixgbe = arg;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint32_t lidx = ixgbe->ixgbe_led_index;
+
+	if (flags != 0)
+		return (EINVAL);
+
+	if (mode != MAC_LED_DEFAULT &&
+	    mode != MAC_LED_IDENT &&
+	    mode != MAC_LED_OFF &&
+	    mode != MAC_LED_ON)
+		return (ENOTSUP);
+
+	if (ixgbe->ixgbe_led_blink && mode != MAC_LED_IDENT) {
+		if (ixgbe_blink_led_stop(hw, lidx) != IXGBE_SUCCESS) {
+			return (EIO);
+		}
+		ixgbe->ixgbe_led_blink = B_FALSE;
+	}
+
+	if (mode != MAC_LED_DEFAULT && !ixgbe->ixgbe_led_active) {
+		ixgbe->ixgbe_led_reg = IXGBE_READ_REG(hw, IXGBE_LEDCTL);
+		ixgbe->ixgbe_led_active = B_TRUE;
+	}
+
+	switch (mode) {
+	case MAC_LED_DEFAULT:
+		if (ixgbe->ixgbe_led_active) {
+			IXGBE_WRITE_REG(hw, IXGBE_LEDCTL, ixgbe->ixgbe_led_reg);
+			ixgbe->ixgbe_led_active = B_FALSE;
+		}
+		break;
+	case MAC_LED_IDENT:
+		if (ixgbe_blink_led_start(hw, lidx) != IXGBE_SUCCESS)
+			return (EIO);
+		ixgbe->ixgbe_led_blink = B_TRUE;
+		break;
+	case MAC_LED_OFF:
+		if (ixgbe_led_off(hw, lidx) != IXGBE_SUCCESS)
+			return (EIO);
+		break;
+	case MAC_LED_ON:
+		if (ixgbe_led_on(hw, lidx) != IXGBE_SUCCESS)
+			return (EIO);
+		break;
+	default:
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
 /*
  * Obtain the MAC's capabilities and associated data from
  * the driver.
@@ -294,6 +349,16 @@ ixgbe_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		mct->mct_info = ixgbe_transceiver_info;
 		mct->mct_read = ixgbe_transceiver_read;
 		return (B_TRUE);
+	}
+	case MAC_CAPAB_LED: {
+		mac_capab_led_t *mcl = cap_data;
+
+		mcl->mcl_flags = 0;
+		mcl->mcl_modes = MAC_LED_DEFAULT | MAC_LED_ON | MAC_LED_OFF |
+		    MAC_LED_IDENT;
+		mcl->mcl_set = ixgbe_led_set;
+		break;
+
 	}
 	default:
 		return (B_FALSE);

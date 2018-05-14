@@ -1241,6 +1241,42 @@ ixgbe_destroy_locks(ixgbe_t *ixgbe)
 	mutex_destroy(&ixgbe->watchdog_lock);
 }
 
+/*
+ * We need to try and determine which LED index in hardware corresponds to the
+ * link/activity LED. This is the one that'll be overwritten when we perform
+ * GLDv3 LED activity.
+ */
+static void
+ixgbe_led_init(ixgbe_t *ixgbe)
+{
+	uint32_t reg, i;
+	struct ixgbe_hw *hw = &ixgbe->hw;
+
+	reg = IXGBE_READ_REG(hw, IXGBE_LEDCTL);
+	for (i = 0; i < 4; i++) {
+		if (((reg >> IXGBE_LED_MODE_SHIFT(i)) &
+		    IXGBE_LED_MODE_MASK_BASE) == IXGBE_LED_LINK_ACTIVE) {
+			ixgbe->ixgbe_led_index = i;
+			return;
+		}
+	}
+
+	/*
+	 * If we couldn't determine this, we use the default for various MACs
+	 * based on information Intel has inserted into other drivers over the
+	 * years.  Note, when we have support for the X553 which should add the
+	 * ixgbe_x550_em_a mac type, that should be at index 0.
+	 */
+	switch (hw->mac.type) {
+	case ixgbe_mac_X550EM_x:
+		ixgbe->ixgbe_led_index = 1;
+		break;
+	default:
+		ixgbe->ixgbe_led_index = 2;
+		break;
+	}
+}
+
 static int
 ixgbe_resume(dev_info_t *devinfo)
 {
@@ -1427,6 +1463,11 @@ ixgbe_init(ixgbe_t *ixgbe)
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, ixgbe->dip,
 		    "printed-board-assembly", (char *)pbanum);
 	}
+
+	/*
+	 * Determine LED index.
+	 */
+	ixgbe_led_init(ixgbe);
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
 		goto init_fail;
