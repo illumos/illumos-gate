@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -717,7 +717,8 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			}
 		}
 
-		if (cmd == F_OFD_SETLK || cmd == F_OFD_SETLKW) {
+		if (cmd == F_OFD_GETLK || cmd == F_OFD_SETLK ||
+		    cmd == F_OFD_SETLKW) {
 			/*
 			 * TBD OFD-style locking is currently limited to
 			 * covering the entire file.
