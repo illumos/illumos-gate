@@ -4928,6 +4928,7 @@ f usr/lib/amd64/libpool.so.1 0755 root bin
 s usr/lib/amd64/libpool.so=libpool.so.1
 s usr/lib/amd64/libposix4.so.1=../../../lib/amd64/librt.so.1
 s usr/lib/amd64/libposix4.so=../../../lib/amd64/librt.so.1
+f usr/lib/amd64/libppt.so.1 0755 root bin
 s usr/lib/amd64/libproc.so.1=../../../lib/amd64/libproc.so.1
 s usr/lib/amd64/libproc.so=../../../lib/amd64/libproc.so.1
 f usr/lib/amd64/libproject.so.1 0755 root bin
@@ -6379,6 +6380,7 @@ s usr/lib/libposix4.so.1=../../lib/librt.so.1
 s usr/lib/libposix4.so=../../lib/librt.so.1
 f usr/lib/libpp.so.1 0755 root bin
 s usr/lib/libpp.so=libpp.so.1
+f usr/lib/libppt.so.1 0755 root bin
 s usr/lib/libproc.so.1=../../lib/libproc.so.1
 s usr/lib/libproc.so=../../lib/libproc.so.1
 f usr/lib/libproject.so.1 0755 root bin
@@ -10450,6 +10452,7 @@ f usr/sbin/poolbind 0555 root bin
 f usr/sbin/poolcfg 0555 root bin
 h usr/sbin/ports=usr/sbin/devfsadm
 h usr/sbin/poweroff=usr/sbin/halt
+f usr/sbin/pptadm 0555 root bin
 f usr/sbin/praudit 0555 root bin
 f usr/sbin/projadd 0555 root sys
 f usr/sbin/projdel 0555 root sys
@@ -12093,6 +12096,7 @@ f usr/share/man/man1m/poold.1m 0444 root bin
 f usr/share/man/man1m/poolstat.1m 0444 root bin
 f usr/share/man/man1m/ports.1m 0444 root bin
 s usr/share/man/man1m/poweroff.1m=halt.1m
+f usr/share/man/man1m/pptadm.1m 0444 root bin
 f usr/share/man/man1m/praudit.1m 0444 root bin
 f usr/share/man/man1m/projadd.1m 0444 root bin
 f usr/share/man/man1m/projdel.1m 0444 root bin

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent Inc.
+ * Copyright 2018, Joyent Inc.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  */
 
@@ -1198,9 +1198,15 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 		goto cleanup;
 	}
 	while (zonecfg_getdevent(snap_hndl, &ztab) == Z_OK) {
-		if (di_prof_add_dev(prof, ztab.zone_dev_match)) {
+		char path[MAXPATHLEN];
+
+		if ((err = resolve_device_match(zlogp, &ztab,
+		    path, sizeof (path))) != Z_OK)
+			goto cleanup;
+
+		if (di_prof_add_dev(prof, path)) {
 			zerror(zlogp, B_TRUE, "failed to add "
-			    "user-specified device");
+			    "user-specified device '%s'", path);
 			goto cleanup;
 		}
 	}

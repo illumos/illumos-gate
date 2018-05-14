@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -57,10 +58,12 @@ struct hwc_class *hcl_head;	/* head of list of classes */
 static kmutex_t hcl_lock;	/* for accessing list of classes */
 
 #define	DAFILE		"/etc/driver_aliases"
+#define	PPTFILE		"/etc/ppt_aliases"
 #define	CLASSFILE	"/etc/driver_classes"
 #define	DACFFILE	"/etc/dacf.conf"
 
 static char class_file[] = CLASSFILE;
+static char pptfile[] = PPTFILE;
 static char dafile[] = DAFILE;
 static char dacffile[] = DACFFILE;
 
@@ -2136,14 +2139,13 @@ hwc_parse_now(char *fname, struct par_list **pl, ddi_prop_t **props)
 	return (0);	/* always return success */
 }
 
-void
-make_aliases(struct bind **bhash)
+static void
+parse_aliases(struct bind **bhash, struct _buf *file)
 {
 	enum {
 		AL_NEW, AL_DRVNAME, AL_DRVNAME_COMMA, AL_ALIAS, AL_ALIAS_COMMA
 	} state;
 
-	struct _buf *file;
 	char tokbuf[MAXPATHLEN];
 	char drvbuf[MAXPATHLEN];
 	token_t token;
@@ -2151,9 +2153,6 @@ make_aliases(struct bind **bhash)
 	int done = 0;
 	static char dupwarn[] = "!Driver alias \"%s\" conflicts with "
 	    "an existing driver name or alias.";
-
-	if ((file = kobj_open_file(dafile)) == (struct _buf *)-1)
-		return;
 
 	state = AL_NEW;
 	major = DDI_MAJOR_T_NONE;
@@ -2239,8 +2238,22 @@ make_aliases(struct bind **bhash)
 			kobj_file_err(CE_WARN, file, tok_err, tokbuf);
 		}
 	}
+}
 
-	kobj_close_file(file);
+void
+make_aliases(struct bind **bhash)
+{
+	struct _buf *file;
+
+	if ((file = kobj_open_file(pptfile)) != (struct _buf *)-1) {
+		parse_aliases(bhash, file);
+		kobj_close_file(file);
+	}
+
+	if ((file = kobj_open_file(dafile)) != (struct _buf *)-1) {
+		parse_aliases(bhash, file);
+		kobj_close_file(file);
+	}
 }
 
 

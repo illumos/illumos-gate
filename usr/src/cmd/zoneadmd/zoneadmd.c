@@ -105,6 +105,7 @@
 #include <sys/dls_mgmt.h>
 #include <libscf.h>
 #include <uuid/uuid.h>
+#include <libppt.h>
 
 #include <libzonecfg.h>
 #include <zonestat_impl.h>
@@ -830,6 +831,46 @@ set_zonecfg_env(char *rsrc, char *attr, char *name, char *val)
 }
 
 /*
+ * Resolve a device:match value to a path.  This is only different for PPT
+ * devices, where we expect the match property to be a /devices/... path, and
+ * configured for PPT already.
+ */
+int
+resolve_device_match(zlog_t *zlogp, struct zone_devtab *dtab,
+    char *path, size_t len)
+{
+	struct zone_res_attrtab *rap;
+
+	for (rap = dtab->zone_dev_attrp; rap != NULL;
+	    rap = rap->zone_res_attr_next) {
+		if (strcmp(rap->zone_res_attr_name, "model") == 0 &&
+		    strcmp(rap->zone_res_attr_value, "passthru") == 0)
+			break;
+	}
+
+	if (rap == NULL) {
+		if (strlcpy(path, dtab->zone_dev_match, len) >= len)
+			return (Z_INVAL);
+		return (Z_OK);
+	}
+
+	if (strncmp(dtab->zone_dev_match, "/devices",
+	    strlen("/devices")) != 0) {
+		zerror(zlogp, B_FALSE, "invalid passthru match value '%s'",
+		    dtab->zone_dev_match);
+		return (Z_INVAL);
+	}
+
+	if (ppt_devpath_to_dev(dtab->zone_dev_match, path, len) != 0) {
+		zerror(zlogp, B_TRUE, "failed to resolve passthru device %s",
+		    dtab->zone_dev_match);
+		return (Z_INVAL);
+	}
+
+	return (Z_OK);
+}
+
+/*
  * Export various zonecfg properties into environment for the boot and state
  * change hooks.
  *
@@ -846,7 +887,7 @@ set_zonecfg_env(char *rsrc, char *attr, char *name, char *val)
  * SmartOS.
  */
 static int
-setup_subproc_env(boolean_t debug)
+setup_subproc_env(zlog_t *zlogp, boolean_t debug)
 {
 	int res;
 	struct zone_nwiftab ntab;
@@ -931,17 +972,19 @@ setup_subproc_env(boolean_t debug)
 
 	dev_resources[0] = '\0';
 	while (zonecfg_getdevent(snap_hndl, &dtab) == Z_OK) {
+		char *match = dtab.zone_dev_match;
 		struct zone_res_attrtab *rap;
-		char *match;
+		char path[MAXPATHLEN];
 
-		match = dtab.zone_dev_match;
+		res = resolve_device_match(zlogp, &dtab, path, sizeof (path));
+		if (res != Z_OK)
+			goto done;
 
 		/*
-		 * In the environment variable name, the value of match will be
-		 * mangled.  Thus, we store the value of match in a "path"
-		 * environment variable.
+		 * Even if not modified, the match path will be mangled in the
+		 * environment variable name, so we always store the value here.
 		 */
-		set_zonecfg_env(RSRC_DEV, match, "path", match);
+		set_zonecfg_env(RSRC_DEV, match, "path", path);
 
 		for (rap = dtab.zone_dev_attrp; rap != NULL;
 		    rap = rap->zone_res_attr_next) {
@@ -1078,7 +1121,7 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr, boolean_t debug)
 		}
 		closefrom(STDERR_FILENO + 1);
 
-		if (setup_subproc_env(debug) != Z_OK) {
+		if (setup_subproc_env(zlogp, debug) != Z_OK) {
 			(void) fprintf(stderr, "failed to setup environment");
 			_exit(127);
 		}

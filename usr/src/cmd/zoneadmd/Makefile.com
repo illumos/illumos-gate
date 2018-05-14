@@ -35,7 +35,7 @@ OBJS= zoneadmd.o zcons.o zfd.o vplat.o log.o
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
-	-linetutil -lproc -lscf
+	-linetutil -lproc -lscf -lppt
 
 CSTD= $(CSTD_GNU99)
 

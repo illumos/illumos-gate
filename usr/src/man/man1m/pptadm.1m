@@ -1,0 +1,74 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2018 Joyent, Inc.
+.\"
+.Dd April 10, 2018
+.Dt PPTADM 1M
+.Os
+.Sh NAME
+.Nm pptadm
+.Nd PPT administration utility
+.Sh SYNOPSIS
+.Nm
+.Cm list -j
+.Op Fl a
+.Nm
+.Cm list
+.Op Fl ap Op Fl o Ar fields
+.Sh DESCRIPTION
+The
+.Nm
+utility can enumerate passthrough devices for use by a virtualized guest.
+.Sh OPTIONS
+The following options to the
+.Cm list
+command are supported:
+.Bl -tag -width Ds
+.It Fl a
+Show all PPT devices, both available and assigned.
+.It Fl j
+Output JSON.
+.It Fl o
+Specify fields to output, or "all". Available fields are
+dev,path,vendor,device,subvendor,subdevice,rev,label
+.It Fl p
+Output in a parsable format; this requires the -o option to be specified.
+.El
+.Sh JSON OUTPUT
+The JSON output consists of an array under the key "devices" with the fields:
+.Bl -tag -width Ds
+.It dev
+The PPT /dev path, if assigned and bound.
+.It path
+The physical /devices path.
+.It vendor-id
+The PCI vendor ID.
+.It device-id
+The PCI device ID.
+.It subsystem-vendor-id
+The PCI subsystem vendor ID.
+.It subsystem-id
+The PCI subsystem ID.
+.It revision-id
+The PCI device revision.
+.It label
+Human-readable description from the PCI database.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It /etc/ppt_aliases
+Containts the bindings of PPT devices in the same format as /etc/driver_aliases
+.It /etc/ppt_matches
+Identifies devices that PPT could be bound to, either by physical path, or by
+PCI ID.
+.El
+.Sh EXIT STATUS
+.Ex -std

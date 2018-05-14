@@ -187,6 +187,12 @@ extern int init_template(void);
  */
 extern int do_subproc(zlog_t *, char *, char **, boolean_t);
 
+/*
+ * Resource handling.
+ */
+extern int resolve_device_match(zlog_t *, struct zone_devtab *,
+    char *, size_t);
+
 #ifdef __cplusplus
 }
 #endif
