@@ -34,7 +34,6 @@
  */
 #define tolower(C)	(((C) >= 'A' && (C) <= 'Z') ? (C) - 'A' + 'a' : (C))
 #define toupper(C)      (((C) >= 'a' && (C) <= 'z') ? (C) - 'a' + 'A': (C))
-#define iscntrl(C)	((((C) >= 0) && ((C) <= 0x1f)) || ((C) == 0x7f))
 #define isgraph(C)	((C) >= 0x21 && (C) <= 0x7E)
 #define ispunct(C)	(((C) >= 0x21 && (C) <= 0x2F) || \
     ((C) >= 0x3A && (C) <= 0x40) || \
@@ -284,6 +283,13 @@ static const char *classend (MatchState *ms, const char *p) {
       return p;
     }
   }
+}
+
+
+static int
+iscntrl(int c)
+{
+	return ((c < 0x20) || (c == 0x7f));
 }
 
 

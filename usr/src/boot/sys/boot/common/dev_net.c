@@ -27,6 +27,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <sys/cdefs.h>
 
 /*
@@ -362,6 +366,8 @@ net_print(int verbose)
  * If an IPv4 address has been specified, it will be stripped out and passed
  * out as the return value of this function in network byte order.
  *
+ * If no rootpath is present then we will default to TFTP.
+ *
  * If no global default scheme has been specified and no scheme has been
  * specified, we will assume that this is an NFS URL.
  *
@@ -388,11 +394,15 @@ net_parse_rootpath(void)
 	ptr = rootpath;
 	/* Fallback for compatibility mode */
 	if (netproto == NET_NONE) {
-		netproto = NET_NFS;
-		(void) strsep(&ptr, ":");
-		if (ptr != NULL) {
-			addr = inet_addr(rootpath);
-			bcopy(ptr, rootpath, strlen(ptr) + 1);
+		if (strcmp(rootpath, "/") == 0) {
+			netproto = NET_TFTP;
+		} else {
+			netproto = NET_NFS;
+			(void) strsep(&ptr, ":");
+			if (ptr != NULL) {
+				addr = inet_addr(rootpath);
+				bcopy(ptr, rootpath, strlen(ptr) + 1);
+			}
 		}
 	} else {
 		ptr += strlen(uri_schemes[i].scheme);
@@ -405,6 +415,11 @@ net_parse_rootpath(void)
 			 * Also will need rework for IPv6.
 			 */
 			val = strchr(ptr, '/');
+			if (val == NULL) {
+				/* If no pathname component, default to / */
+				strlcat(rootpath, "/", sizeof (rootpath));
+				val = strchr(ptr, '/');
+			}
 			if (val != NULL) {
 				snprintf(ip, sizeof (ip), "%.*s",
 				    (int)((uintptr_t)val - (uintptr_t)ptr),
