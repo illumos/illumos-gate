@@ -964,6 +964,12 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_ACTIVATE_CPU:
 		error = vm_activate_cpu(sc->vmm_vm, vcpu);
 		break;
+	case VM_SUSPEND_CPU:
+		error = vm_suspend_cpu(sc->vmm_vm, vcpu);
+		break;
+	case VM_RESUME_CPU:
+		error = vm_resume_cpu(sc->vmm_vm, vcpu);
+		break;
 
 	case VM_GET_CPUS: {
 		struct vm_cpuset vm_cpuset;
@@ -993,6 +999,8 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			tempset = vm_active_cpus(sc->vmm_vm);
 		} else if (vm_cpuset.which == VM_SUSPENDED_CPUS) {
 			tempset = vm_suspended_cpus(sc->vmm_vm);
+		} else if (vm_cpuset.which == VM_DEBUG_CPUS) {
+			tempset = vm_debug_cpus(sc->vmm_vm);
 		} else {
 			error = EINVAL;
 		}
@@ -1079,6 +1087,29 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_RESTART_INSTRUCTION:
 		error = vm_restart_instruction(sc->vmm_vm, vcpu);
 		break;
+
+	case VM_SET_TOPOLOGY: {
+		struct vm_cpu_topology topo;
+
+		if (ddi_copyin(datap, &topo, sizeof (topo), md) != 0) {
+			error = EFAULT;
+			break;
+		}
+		error = vm_set_topology(sc->vmm_vm, topo.sockets, topo.cores,
+		    topo.threads, topo.maxcpus);
+		break;
+	}
+	case VM_GET_TOPOLOGY: {
+		struct vm_cpu_topology topo;
+
+		vm_get_topology(sc->vmm_vm, &topo.sockets, &topo.cores,
+		    &topo.threads, &topo.maxcpus);
+		if (ddi_copyout(&topo, datap, sizeof (topo), md) != 0) {
+			error = EFAULT;
+			break;
+		}
+		break;
+	}
 
 #ifndef __FreeBSD__
 	case VM_DEVMEM_GETOFFSET: {

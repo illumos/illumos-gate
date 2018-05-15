@@ -817,6 +817,10 @@ ppt_flr(dev_info_t *dip, boolean_t force)
 	return (B_TRUE);
 
 fail:
+	/*
+	 * TODO: If the FLR fails for some reason, we should attempt a reset
+	 * using the PCI power management facilities (if possible).
+	 */
 	pci_config_teardown(&hdl);
 	return (B_FALSE);
 }

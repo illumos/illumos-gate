@@ -1401,6 +1401,7 @@ usr/src/cmd/bhyve/console.[ch]
 usr/src/cmd/bhyve/consport.c
 usr/src/cmd/bhyve/dbgport.[ch]
 usr/src/cmd/bhyve/fwctl.[ch]
+usr/src/cmd/bhyve/gdb.[ch]
 usr/src/cmd/bhyve/inout.[ch]
 usr/src/cmd/bhyve/ioapic.[ch]
 usr/src/cmd/bhyve/mem.[ch]

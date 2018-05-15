@@ -10,15 +10,14 @@
  */
 
 /*
- * Copyright 2013 Pluribus Networks Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
-#ifndef _COMPAT_FREEBSD_SYS_IOCTL_H_
-#define	_COMPAT_FREEBSD_SYS_IOCTL_H_
+#ifndef _COMPAT_FREEBSD_ERR_H_
+#define	_COMPAT_FREEBSD_ERR_H_
 
-#include <sys/ioccom.h>
-/* Get BSD compatibility from the ioctl header */
-#define	BSD_COMP
-#include_next <sys/ioctl.h>
+#define	errc(code, num, ...)	err(code, __VA_ARGS__)
 
-#endif	/* _COMPAT_FREEBSD_SYS_IOCTL_H_ */
+#include_next <err.h>
+
+#endif	/* _COMPAT_FREEBSD_ERR_H_ */

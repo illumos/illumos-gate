@@ -47,6 +47,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_create_devmem;
 		vm_create;
 		vm_create_devmem;
+		vm_debug_cpus;
 		vm_destroy;
 		vm_destroy;
 		vm_get_capability;
@@ -66,6 +67,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_get_seg_desc;
 		vm_get_stat_desc;
 		vm_get_stats;
+		vm_get_topology;
 		vm_get_x2apic_state;
 		vm_gla2gpa;
 		vm_gla2gpa_nofault;
@@ -105,12 +107,15 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_set_memflags;
 		vm_set_register;
 		vm_set_register_set;
+		vm_set_topology;
 		vm_set_x2apic_state;
 		vm_setup_memory;
 		vm_setup_pptdev_msi;
 		vm_setup_pptdev_msix;
 		vm_suspend;
+		vm_suspend_cpu;
 		vm_suspended_cpus;
+		vm_resume_cpu;
 		vm_unassign_pptdev;
 
 	local:
