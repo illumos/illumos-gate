@@ -74,7 +74,8 @@ openFcoe(int flag, int *fd)
 }
 
 static void
-WWN2str(char *buf, FCOE_PORT_WWN *wwn) {
+WWN2str(char *buf, FCOE_PORT_WWN *wwn)
+{
 	int j;
 	unsigned char *pc = (unsigned char *)&(wwn->wwn[0]);
 	buf[0] = '\0';
@@ -769,6 +770,8 @@ FCOE_GetPortList(
 			case FCOEIOE_MORE_DATA:
 				status = FCOE_STATUS_ERROR_MORE_DATA;
 				retry++;
+				break;
+
 			default:
 				status = FCOE_STATUS_ERROR;
 				(void) close(fcoe_fd);

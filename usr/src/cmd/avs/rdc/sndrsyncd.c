@@ -1020,7 +1020,7 @@ cleanup_hostlist(rdc_status_t *rdc_info)
 			if (!rdc_info->rdc_set[j].flags & RDC_ENABLED)
 				continue;
 			if ((!host_list->configured[i]) ||
-			    (host_list->hosts[i] == '\0')) {
+			    (host_list->hosts[i] == NULL)) {
 				(void) mutex_unlock(&host_list->hosts_mutex);
 				return;
 			}

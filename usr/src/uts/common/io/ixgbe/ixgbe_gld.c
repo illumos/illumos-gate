@@ -223,7 +223,6 @@ ixgbe_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 static int
 ixgbe_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 {
-	int ret;
 	ixgbe_t *ixgbe = arg;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	uint32_t lidx = ixgbe->ixgbe_led_index;
@@ -238,7 +237,7 @@ ixgbe_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 		return (ENOTSUP);
 
 	if (ixgbe->ixgbe_led_blink && mode != MAC_LED_IDENT) {
-		if ((ret = ixgbe_blink_led_stop(hw, lidx)) != IXGBE_SUCCESS) {
+		if (ixgbe_blink_led_stop(hw, lidx) != IXGBE_SUCCESS) {
 			return (EIO);
 		}
 		ixgbe->ixgbe_led_blink = B_FALSE;
@@ -257,16 +256,16 @@ ixgbe_led_set(void *arg, mac_led_mode_t mode, uint_t flags)
 		}
 		break;
 	case MAC_LED_IDENT:
-		if ((ret = ixgbe_blink_led_start(hw, lidx)) != IXGBE_SUCCESS)
+		if (ixgbe_blink_led_start(hw, lidx) != IXGBE_SUCCESS)
 			return (EIO);
 		ixgbe->ixgbe_led_blink = B_TRUE;
 		break;
 	case MAC_LED_OFF:
-		if ((ret = ixgbe_led_off(hw, lidx)) != IXGBE_SUCCESS)
+		if (ixgbe_led_off(hw, lidx) != IXGBE_SUCCESS)
 			return (EIO);
 		break;
 	case MAC_LED_ON:
-		if ((ret = ixgbe_led_on(hw, lidx)) != IXGBE_SUCCESS)
+		if (ixgbe_led_on(hw, lidx) != IXGBE_SUCCESS)
 			return (EIO);
 		break;
 	default:

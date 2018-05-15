@@ -40,6 +40,7 @@
 #include <sys/lofi.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
+#include <sys/modctl.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <fcntl.h>
@@ -302,8 +303,22 @@ name_to_minor(const char *devicename)
 		return (0);
 	}
 
+	/*
+	 * For disk devices we use modctl(MODGETNAME) to read driver name
+	 * for major device.
+	 */
 	if (st.st_mode & S_IFCHR || st.st_mode & S_IFBLK) {
-		return (LOFI_MINOR2ID(minor(st.st_rdev)));
+		major_t maj;
+		char mname[MODMAXNAMELEN];
+
+		maj = major(st.st_rdev);
+
+		if (modctl(MODGETNAME, mname,  MODMAXNAMELEN, &maj) == 0) {
+			if (strncmp(mname, LOFI_DRIVER_NAME,
+			    sizeof (LOFI_DRIVER_NAME)) == 0) {
+				return (LOFI_MINOR2ID(minor(st.st_rdev)));
+			}
+		}
 	}
 
 	return (0);

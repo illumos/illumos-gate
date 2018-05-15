@@ -932,7 +932,9 @@ usr/lib/sparcv9/llib-lvrrpadm.ln	sparc
 #
 opt/onbld/bin/i386/mandoc	i386
 opt/onbld/bin/sparc/mandoc	sparc
+opt/onbld/bin/i386/makesoftcore	i386
 opt/onbld/bin/i386/vtfontcvt	i386
+opt/onbld/bin/sparc/makesoftcore	sparc
 opt/onbld/bin/sparc/vtfontcvt	sparc
 
 #

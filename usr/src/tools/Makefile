@@ -48,6 +48,7 @@ COMMON_SUBDIRS= \
 	findunref \
 	lintdump \
 	make \
+	makesoftcore \
 	ndrgen \
 	onbld \
 	protocmp \
