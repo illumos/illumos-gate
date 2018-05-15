@@ -27,6 +27,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2018 Gary Mills
 #
 
 include ../Makefile.master
@@ -451,7 +452,6 @@ COMMON_SUBDIRS=		\
 	wracct		\
 	write		\
 	xargs		\
-	xhci		\
 	xstr		\
 	yes		\
 	ypcmd		\
@@ -482,6 +482,7 @@ i386_SUBDIRS=		\
 	nvmeadm		\
 	rtc		\
 	ucodeadm	\
+	xhci		\
 	xvm
 
 sparc_SUBDIRS=		\
