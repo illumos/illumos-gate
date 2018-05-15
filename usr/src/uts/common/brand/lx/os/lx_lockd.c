@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -77,6 +77,11 @@ lx_lockd_alive(pid_t lockd_pid)
 	}
 
 	mutex_enter(&p->p_lock);
+	if (p->p_stat == SZOMB || (p->p_flag & SEXITING) != 0) {
+		mutex_exit(&p->p_lock);
+		mutex_exit(&pidlock);
+		return (B_FALSE);
+	}
 	vp = p->p_exec;
 	VN_HOLD(vp);
 	mutex_exit(&p->p_lock);
