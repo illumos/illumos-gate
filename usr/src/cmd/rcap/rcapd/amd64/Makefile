@@ -23,8 +23,6 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../../../Makefile.cmd
 include ../../../Makefile.cmd.64
@@ -32,9 +30,4 @@ COMMON_DIR=	../../common	# for Makefile.com
 include ../Makefile.rcapd
 include ../../Makefile.com
 
-ROOTUSRLIBRCAPLINK=$(ROOTUSRLIBRCAPPROG)
-$(ROOTUSRLIBRCAPLINK): $(ISAEXEC) $(ROOTUSRLIBRCAP) $(ROOTUSRLIBRCAPPROG64)
-	-$(RM) $(ROOTUSRLIBRCAPPROG)
-	$(LN) $(ISAEXEC) $(ROOTUSRLIBRCAPPROG)
-
-install: all $(ROOTUSRLIBRCAPPROG64) $(ROOTUSRLIBRCAPLINK)
+install: all $(ROOTUSRLIBRCAPPROG64) $(ROOTUSRLIBRCAP)

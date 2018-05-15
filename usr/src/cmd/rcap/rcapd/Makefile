@@ -45,9 +45,13 @@ install := TARGET = install
 lint := TARGET = lint
 _msg := TARGET = _msg
 
+include		Makefile.ins
+
 all clean clobber lint: $(SUBDIRS)
 
-install:	all $(SUBDIRS) $(ROOTMANIFEST)
+install:	all $(SUBDIRS) $(ROOTMANIFEST) $(ISAEXEC)
+	-$(RM) $(ROOTUSRLIBRCAPPROG)
+	$(LN) $(ISAEXEC) $(ROOTUSRLIBRCAPPROG)
 
 check:		$(CHKMANIFEST)
 
