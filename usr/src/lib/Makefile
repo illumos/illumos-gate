@@ -680,8 +680,8 @@ libsmbfs:	libkrb5 libsec libidmap pkcs11
 libsmbios:	libdevinfo
 libsrpt:	libstmf
 libstmf:	libscf
-libstmfproxy: 	libstmf libpthread
-libsum: 	libast
+libstmfproxy:	libstmf libpthread
+libsum:		libast
 libsun_ima:	libdevinfo libsysevent
 libsysevent:	libsecdb
 libtecla:	libcurses
@@ -697,7 +697,7 @@ libvrrpadm:	libdladm libscf
 libvscan:	libscf libsecdb
 libzdoor:	libc libzonecfg libcontract
 libzfs:		libdevid libgen libuutil libadm libavl libefi libidmap \
-		libumem libtsol libzfs_core libcmdutils
+		libumem libtsol libzfs_core
 libzfs_jni:	libdiskmgt libzfs
 libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
 		libuutil libbsm libsecdb
@@ -713,7 +713,7 @@ passwdutil:	libsldap
 pkcs11:		libcryptoutil libgen libuuid
 policykit:	dbusdeps
 print:		libldap5 libmd5 libsendfile
-pylibbe: 	libbe libzfs
+pylibbe:	libbe libzfs
 pysolaris:	libsec libidmap
 pyzfs:		libzfs
 raidcfg_plugins: libraidcfg librcm libcfgadm libpicl libpicltree
