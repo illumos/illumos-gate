@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2021 Joyent, Inc.
  */
 
 #include <secdb.h>
@@ -355,7 +356,7 @@ result_exec2str:
 static nss_status_t
 _exec_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 {
-	int 			status;
+	int			status;
 	nss_status_t		nss_stat = NSS_UNAVAIL;
 	ns_ldap_attr_t		*attrptr;
 	ns_ldap_entry_t		*entry;
@@ -420,7 +421,7 @@ get_wild(ldap_backend_ptr be, nss_XbyY_args_t *argp, int getby_flag)
 	const char	*policy = _priv_exec->policy;
 	const char	*type = _priv_exec->type;
 
-	if (strpbrk(policy, "*()\\") != NULL ||
+	if ((policy != NULL && strpbrk(policy, "*()\\") != NULL) ||
 	    type != NULL && strpbrk(type, "*()\\") != NULL)
 		return ((nss_status_t)NSS_NOTFOUND);
 
@@ -446,11 +447,12 @@ get_wild(ldap_backend_ptr be, nss_XbyY_args_t *argp, int getby_flag)
 		switch (getby_flag) {
 		case NSS_DBOP_EXECATTR_BYID:
 			ret = snprintf(searchfilter, sizeof (searchfilter),
-			    _EXEC_GETEXECID, id, policy, ISWILD(type));
+			    _EXEC_GETEXECID, id, ISWILD(policy), ISWILD(type));
 			if (ret >= sizeof (searchfilter) || ret < 0)
 				goto go_out;
 			ret = snprintf(userdata, sizeof (userdata),
-			    _EXEC_GETEXECID_SSD, id, policy, ISWILD(type));
+			    _EXEC_GETEXECID_SSD, id, ISWILD(policy),
+			    ISWILD(type));
 			if (ret >= sizeof (userdata) || ret < 0)
 				goto go_out;
 			break;
@@ -458,12 +460,12 @@ get_wild(ldap_backend_ptr be, nss_XbyY_args_t *argp, int getby_flag)
 		case NSS_DBOP_EXECATTR_BYNAMEID:
 			ret = snprintf(searchfilter, sizeof (searchfilter),
 			    _EXEC_GETEXECNAMEID, name, id,
-			    policy, ISWILD(type));
+			    ISWILD(policy), ISWILD(type));
 			if (ret >= sizeof (searchfilter) || ret < 0)
 				goto go_out;
 			ret = snprintf(userdata, sizeof (userdata),
 			    _EXEC_GETEXECNAMEID_SSD, name, id,
-			    policy, ISWILD(type));
+			    ISWILD(policy), ISWILD(type));
 			if (ret >= sizeof (userdata) || ret < 0)
 				goto go_out;
 			break;
@@ -484,8 +486,8 @@ go_out:
 }
 
 static nss_status_t
-exec_attr_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp) {
-
+exec_attr_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp)
+{
 	_priv_execattr	*_priv_exec = (_priv_execattr *)(argp->key.attrp);
 	int		stat, nss_stat = NSS_SUCCESS;
 
@@ -497,10 +499,10 @@ exec_attr_process_val(ldap_backend_ptr be, nss_XbyY_args_t *argp) {
 			if (argp->buf.result != NULL) {
 				/* file format -> execstr_t */
 				stat = (*argp->str2ent)(be->buffer,
-					be->buflen,
-					argp->buf.result,
-					argp->buf.buffer,
-					argp->buf.buflen);
+				    be->buflen,
+				    argp->buf.result,
+				    argp->buf.buffer,
+				    argp->buf.buflen);
 				if (stat == NSS_STR_PARSE_SUCCESS) {
 					argp->returnval = argp->buf.result;
 					argp->returnlen = 1; /* irrelevant */
@@ -544,16 +546,16 @@ getbynam(ldap_backend_ptr be, void *a)
 	const char	*policy = _priv_exec->policy;
 	const char	*type = _priv_exec->type;
 
-	if (strpbrk(policy, "*()\\") != NULL ||
+	if (policy != NULL && strpbrk(policy, "*()\\") != NULL ||
 	    type != NULL && strpbrk(type, "*()\\") != NULL ||
 	    _ldap_filter_name(name, _priv_exec->name, sizeof (name)) != 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 	ret = snprintf(searchfilter, sizeof (searchfilter),
-	    _EXEC_GETEXECNAME, name, policy, ISWILD(type));
+	    _EXEC_GETEXECNAME, name, ISWILD(policy), ISWILD(type));
 	if (ret >= sizeof (searchfilter) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 	ret = snprintf(userdata, sizeof (userdata),
-	    _EXEC_GETEXECNAME_SSD, name, policy, ISWILD(type));
+	    _EXEC_GETEXECNAME_SSD, name, ISWILD(policy), ISWILD(type));
 	if (ret >= sizeof (userdata) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
