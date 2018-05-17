@@ -151,14 +151,14 @@ i386_parsedev(struct i386_devdesc **dev, const char *devspec, const char **path)
 			goto fail;
 		}
 
-		idev->d_unit = unit;
+		idev->dd.d_unit = unit;
 		if (path != NULL)
 			*path = (*cp == '\0') ? cp : cp + 1;
 		break;
 	}
 
-	idev->d_dev = dv;
-	idev->d_type = dv->dv_type;
+	idev->dd.d_dev = dv;
+	idev->dd.d_type = dv->dv_type;
 
 	if (dev != NULL)
 		*dev = idev;
@@ -178,7 +178,7 @@ i386_fmtdev(void *vdev)
 	struct i386_devdesc *dev = (struct i386_devdesc *)vdev;
 	static char buf[SPECNAMELEN + 1];
 
-	switch (dev->d_type) {
+	switch (dev->dd.d_type) {
 	case DEVT_NONE:
 		strlcpy(buf, "(no device)", sizeof (buf));
 		break;
@@ -190,8 +190,8 @@ i386_fmtdev(void *vdev)
 		return (zfs_fmtdev(vdev));
 
 	default:
-		snprintf(buf, sizeof (buf), "%s%d:", dev->d_dev->dv_name,
-		    dev->d_unit);
+		snprintf(buf, sizeof (buf), "%s%d:", dev->dd.d_dev->dv_name,
+		    dev->dd.d_unit);
 		break;
 	}
 	return (buf);

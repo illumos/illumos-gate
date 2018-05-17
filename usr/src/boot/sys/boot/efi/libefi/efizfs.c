@@ -29,6 +29,7 @@
 
 #include <sys/param.h>
 #include <sys/disk.h>
+#include <stand.h>
 
 #include <libzfs.h>
 

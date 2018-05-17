@@ -3458,11 +3458,11 @@ resolvePath(char **r_path)
 
 	/* entry assertions */
 
-	assert(r_path != (char **)NULL);
+	assert(r_path != NULL);
 
 	/* return error if the path is completely empty */
 
-	if (*r_path == '\0') {
+	if (**r_path == '\0') {
 		return (R_FAILURE);
 	}
 

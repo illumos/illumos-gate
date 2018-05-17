@@ -292,7 +292,7 @@ linux_exec(struct preloaded_file *fp)
 
 	i386_getdev((void **)(&rootdev), fp->f_name, NULL);
 	if (rootdev != NULL)
-		relocator_edx = bd_unit2bios(rootdev->d_unit);
+		relocator_edx = bd_unit2bios(rootdev->dd.d_unit);
 
 	/*
 	 * command line

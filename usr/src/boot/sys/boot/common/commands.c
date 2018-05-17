@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include <string.h>
@@ -64,7 +63,9 @@ static int
 help_getnext(int fd, char **topic, char **subtopic, char **desc) 
 {
     char	line[81], *cp, *ep;
-    
+
+    /* Make sure we provide sane values. */
+    *topic = *subtopic = *desc = NULL;
     for (;;) {
 	if (fgetstr(line, 80, fd) < 0)
 	    return(0);
@@ -72,9 +73,8 @@ help_getnext(int fd, char **topic, char **subtopic, char **desc)
 	if ((strlen(line) < 3) || (line[0] != '#') || (line[1] != ' '))
 	    continue;
 
-	*topic = *subtopic = *desc = NULL;
 	cp = line + 2;
-	while((cp != NULL) && (*cp != 0)) {
+	while ((cp != NULL) && (*cp != 0)) {
 	    ep = strchr(cp, ' ');
 	    if ((*cp == 'T') && (*topic == NULL)) {
 		if (ep != NULL)
@@ -91,11 +91,10 @@ help_getnext(int fd, char **topic, char **subtopic, char **desc)
 	    cp = ep;
 	}
 	if (*topic == NULL) {
-	    if (*subtopic != NULL)
 		free(*subtopic);
-	    if (*desc != NULL)
 		free(*desc);
-	    continue;
+		*subtopic = *desc = NULL;
+		continue;
 	}
 	return(1);
     }
@@ -132,7 +131,7 @@ command_help(int argc, char *argv[])
     char	*topic, *subtopic, *t, *s, *d;
 
     /* page the help text from our load path */
-    sprintf(buf, "%s/boot/loader.help", getenv("loaddev"));
+    snprintf(buf, sizeof (buf), "%s/boot/loader.help", getenv("loaddev"));
     if ((hfd = open(buf, O_RDONLY)) < 0) {
 	printf("Verbose help not available, use '?' to list commands\n");
 	return(CMD_OK);
@@ -161,7 +160,7 @@ command_help(int argc, char *argv[])
     
     /* Scan the helpfile looking for help matching the request */
     pager_open();
-    while(help_getnext(hfd, &t, &s, &d)) {
+    while (help_getnext(hfd, &t, &s, &d)) {
 
 	if (doindex) {		/* dink around formatting */
 	    if (help_emitsummary(t, s, d))
@@ -169,7 +168,7 @@ command_help(int argc, char *argv[])
 
 	} else if (strcmp(topic, t)) {
 	    /* topic mismatch */
-	    if(matched)		/* nothing more on this topic, stop scanning */
+	    if (matched)	/* nothing more on this topic, stop scanning */
 		break;
 
 	} else {
@@ -178,7 +177,7 @@ command_help(int argc, char *argv[])
 	    if (((subtopic == NULL) && (s == NULL)) ||
 		((subtopic != NULL) && (s != NULL) && !strcmp(subtopic, s))) {
 		/* exact match, print text */
-		while((fgetstr(buf, 80, hfd) >= 0) && (buf[0] != '#')) {
+		while ((fgetstr(buf, 80, hfd) >= 0) && (buf[0] != '#')) {
 		    if (pager_output(buf))
 			break;
 		    if (pager_output("\n"))
@@ -193,29 +192,29 @@ command_help(int argc, char *argv[])
 	free(t);
 	free(s);
 	free(d);
+	t = s = d = NULL;
     }
+    free(t);
+    free(s);
+    free(d);
     pager_close();
     close(hfd);
     if (!matched) {
 	snprintf(command_errbuf, sizeof (command_errbuf),
 	    "no help available for '%s'", topic);
 	free(topic);
-	if (subtopic)
-	    free(subtopic);
+	free(subtopic);
 	return(CMD_ERROR);
     }
     free(topic);
-    if (subtopic)
-	free(subtopic);
+    free(subtopic);
     return(CMD_OK);
 }
-
 
 COMMAND_SET(commandlist, "?", "list commands", command_commandlist);
 
 static int
-command_commandlist(int argc __attribute((unused)),
-    char *argv[] __attribute((unused)))
+command_commandlist(int argc __unused, char *argv[] __unused)
 {
     struct bootblk_command	**cmdp;
     int		res;
@@ -228,7 +227,7 @@ command_commandlist(int argc __attribute((unused)),
 	if (res)
 	    break;
 	if (((*cmdp)->c_name != NULL) && ((*cmdp)->c_desc != NULL)) {
-	    sprintf(name, "  %-15s  ", (*cmdp)->c_name);
+	    snprintf(name, sizeof (name), "  %-15s  ", (*cmdp)->c_name);
 	    pager_output(name);
 	    pager_output((*cmdp)->c_desc);
 	    res = pager_output("\n");
@@ -446,12 +445,12 @@ command_more(int argc, char *argv[])
     res=0;
     pager_open();
     for (i = 1; (i < argc) && (res == 0); i++) {
-	sprintf(line, "*** FILE %s BEGIN ***\n", argv[i]);
+	snprintf(line, sizeof (line), "*** FILE %s BEGIN ***\n", argv[i]);
 	if (pager_output(line))
 		break;
         res = page_file(argv[i]);
 	if (!res) {
-	    sprintf(line, "*** FILE %s END ***\n", argv[i]);
+	    snprintf(line, sizeof (line), "*** FILE %s END ***\n", argv[i]);
 	    res = pager_output(line);
 	}
     }
@@ -512,7 +511,7 @@ command_lsdev(int argc, char *argv[])
 	    if (devsw[i]->dv_print(verbose))
 		break;
 	} else {
-	    sprintf(line, "%s: (unknown)\n", devsw[i]->dv_name);
+	    snprintf(line, sizeof (line), "%s: (unknown)\n", devsw[i]->dv_name);
 	    if (pager_output(line))
 		break;
 	}

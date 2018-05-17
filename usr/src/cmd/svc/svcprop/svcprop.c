@@ -53,7 +53,7 @@
  * Error functions.  These can change if the quiet (-q) option is used.
  */
 static void (*warn)(const char *, ...) = uu_warn;
-static void (*die)(const char *, ...) = uu_die;
+static __NORETURN void (*die)(const char *, ...) = uu_die;
 
 /*
  * Entity encapsulation.  This allows me to treat services and instances
@@ -121,7 +121,7 @@ static int return_code;			/* main's return code */
  * uu_die() from appending the errno error.
  */
 static void
-scfdie()
+scfdie(void)
 {
 	die(gettext("Unexpected libscf error: %s.  Exiting.\n"),
 	    scf_strerror(scf_error()));
@@ -140,7 +140,7 @@ safe_malloc(size_t sz)
 }
 
 static void
-usage()
+usage(void)
 {
 	(void) fprintf(stderr, gettext("Usage: %1$s [-fqtv] "
 	    "[-C | -c | -s snapshot] [-z zone] "
@@ -816,8 +816,6 @@ do_wait(void *unused, scf_walkinfo_t *wip)
 				case SCF_ERROR_NOT_FOUND:
 					die(emsg_not_found);
 
-					/* NOTREACHED */
-
 				default:
 					scfdie();
 				}
@@ -842,11 +840,10 @@ do_wait(void *unused, scf_walkinfo_t *wip)
 				uu_xdie(UU_EXIT_USAGE, gettext("Invalid "
 				    "property group name \"%s\".\n"),
 				    p->spn_comp1);
+				/* NOTREACHED */
 
 			case SCF_ERROR_NOT_FOUND:
 				die(emsg_not_found);
-
-				/* NOTREACHED */
 
 			default:
 				scfdie();
@@ -863,11 +860,10 @@ do_wait(void *unused, scf_walkinfo_t *wip)
 					uu_xdie(UU_EXIT_USAGE,
 					    gettext("Invalid property name "
 					    "\"%s\".\n"), propname);
+					/* NOTREACHED */
 
 				case SCF_ERROR_NOT_FOUND:
 					die(emsg_not_found);
-
-					/* NOTREACHED */
 
 				default:
 					scfdie();
@@ -891,6 +887,7 @@ do_wait(void *unused, scf_walkinfo_t *wip)
 				uu_xdie(UU_EXIT_USAGE, gettext("Invalid "
 				    "property group name \"%s\".\n"),
 				    p->spn_comp1);
+				/* NOTREACHED */
 
 			case SCF_ERROR_NOT_FOUND:
 				die(emsg_not_found);
@@ -915,8 +912,6 @@ do_wait(void *unused, scf_walkinfo_t *wip)
 
 				case SCF_ERROR_NOT_FOUND:
 					die(emsg_not_found);
-
-					/* NOTREACHED */
 
 				default:
 					scfdie();
@@ -986,7 +981,7 @@ quiet_warn(const char *fmt, ...)
 }
 
 /*ARGSUSED*/
-static void
+static __NORETURN void
 quiet_die(const char *fmt, ...)
 {
 	exit(UU_EXIT_FATAL);

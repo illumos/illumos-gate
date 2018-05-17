@@ -1612,7 +1612,7 @@ lxml_get_notification_parameters(entity_t *entity, xmlNodePtr np)
 		if (entity->sc_etype != SVCCFG_INSTANCE_OBJECT ||
 		    strcmp(entity->sc_fmri, SCF_NOTIFY_PARAMS_INST) != 0) {
 			semerr(gettext(
-			    "Non-SMF transition evenst must go to %s\n"),
+			    "Non-SMF transition events must go to %s\n"),
 			    SCF_NOTIFY_PARAMS_INST);
 			goto out;
 		}
@@ -1625,6 +1625,7 @@ lxml_get_notification_parameters(entity_t *entity, xmlNodePtr np)
 
 			lxml_get_event(entity, pgname, np);
 		}
+		break;
 
 	default:	/* smf state transition tokens */
 		if (entity->sc_etype == SVCCFG_SERVICE_OBJECT &&
