@@ -267,7 +267,7 @@ apix_probe()
 	 *
 	 * Please remove when/if the issue is resolved.
 	 */
-	if (get_hwenv() == HW_XEN_HVM)
+	if (get_hwenv() & HW_XEN_HVM)
 		return (PSM_FAILURE);
 
 	/* check for hw features if specified  */
