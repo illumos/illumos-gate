@@ -479,7 +479,6 @@ add_bhyve_extra_opts(int *argc, char **argv)
 static int
 add_fbuf(int *argc, char **argv)
 {
-	char *val;
 	char conf[MAXPATHLEN];
 	int len;
 
