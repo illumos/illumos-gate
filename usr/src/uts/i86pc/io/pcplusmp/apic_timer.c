@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -90,34 +91,12 @@ static apic_timer_t	apic_timer;
 int
 apic_timer_init(int hertz)
 {
-	uint_t		apic_ticks = 0;
-	uint_t		pit_ticks;
 	int		ret, timer_mode;
-	uint16_t	pit_ticks_adj;
 	static int	firsttime = 1;
 
 	if (firsttime) {
 		/* first time calibrate on CPU0 only */
-
-		apic_reg_ops->apic_write(APIC_DIVIDE_REG, apic_divide_reg_init);
-		apic_reg_ops->apic_write(APIC_INIT_COUNT, APIC_MAXVAL);
-		apic_ticks = apic_calibrate(apicadr, &pit_ticks_adj);
-
-		/* total number of PIT ticks corresponding to apic_ticks */
-		pit_ticks = APIC_TIME_COUNT + pit_ticks_adj;
-
-		/*
-		 * Determine the number of nanoseconds per APIC clock tick
-		 * and then determine how many APIC ticks to interrupt at the
-		 * desired frequency
-		 * apic_ticks / (pitticks / PIT_HZ) = apic_ticks_per_s
-		 * (apic_ticks * PIT_HZ) / pitticks = apic_ticks_per_s
-		 * apic_ticks_per_ns = (apic_ticks * PIT_HZ) / (pitticks * 10^9)
-		 * pic_ticks_per_SFns =
-		 * (SF * apic_ticks * PIT_HZ) / (pitticks * 10^9)
-		 */
-		apic_ticks_per_SFnsecs = ((SF * apic_ticks * PIT_HZ) /
-		    ((uint64_t)pit_ticks * NANOSEC));
+		apic_ticks_per_SFnsecs = apic_calibrate();
 
 		/* the interval timer initial count is 32 bit max */
 		apic_nsec_max = APIC_TICKS_TO_NSECS(APIC_MAXVAL);

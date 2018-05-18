@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 /*
  * Copyright 2018 Joyent, Inc.
@@ -183,7 +184,7 @@ extern void	apic_unset_idlecpu(processorid_t cpun);
 extern void	apic_shutdown(int cmd, int fcn);
 extern void	apic_preshutdown(int cmd, int fcn);
 extern processorid_t	apic_get_next_processorid(processorid_t cpun);
-extern uint_t	apic_calibrate(volatile uint32_t *, uint16_t *);
+extern uint64_t	apic_calibrate();
 extern int	apic_get_pir_ipivect(void);
 extern void	apic_send_pir_ipi(processorid_t);
 

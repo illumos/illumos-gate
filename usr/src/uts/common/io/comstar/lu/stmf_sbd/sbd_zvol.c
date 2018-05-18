@@ -59,12 +59,12 @@
  * zfs internal interfaces referenced here:
  *
  * FUNCTIONS
- *    dmu_buf_hold_array_by_bonus()
+ *    dmu_buf_hold_array_by_dnode()
  *    dmu_buf_rele_array()
  *
- *    dmu_request_arc_buf()
+ *    arc_loan_buf()
  *    dmu_assign_arcbuf()
- *    dmu_return_arc()
+ *    dmu_return_arcbuf()
  *    arc_buf_size()
  *
  *    dmu_tx_create()
@@ -88,7 +88,7 @@
  *    zv_objset		- dmu_tx_create
  *    zv_zilog		- zil_commit
  *    zv_znode		- zfs_range_lock
- *    zv_dbuf		- dmu_buf_hold_array_by_bonus, dmu_request_arcbuf
+ *    zv_dn		- dmu_buf_hold_array_by_bonus, dmu_request_arcbuf
  * GLOBAL DATA
  *    zvol_maxphys
  */
@@ -114,7 +114,7 @@ sbd_zvol_get_volume_params(sbd_lu_t *sl)
 	    &sl->sl_zvol_objset_hdl,	/* dmu_tx_create */
 	    &sl->sl_zvol_zil_hdl,	/* zil_commit */
 	    &sl->sl_zvol_rl_hdl,	/* zfs_range_lock */
-	    &sl->sl_zvol_bonus_hdl);	/* dmu_buf_hold_array_by_bonus, */
+	    &sl->sl_zvol_dn_hdl);	/* dmu_buf_hold_array_by_dnode, */
 					/* dmu_request_arcbuf, */
 					/* dmu_assign_arcbuf */
 
@@ -153,10 +153,10 @@ int
 sbd_zvol_alloc_read_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 {
 	sbd_zvol_io_t	*zvio = dbuf->db_lu_private;
-	rl_t 		*rl;
-	int 		numbufs, error;
-	uint64_t 	len = dbuf->db_data_size;
-	uint64_t 	offset = zvio->zvio_offset;
+	rl_t		*rl;
+	int		numbufs, error;
+	uint64_t	len = dbuf->db_data_size;
+	uint64_t	offset = zvio->zvio_offset;
 	dmu_buf_t	**dbpp, *dbp;
 
 	/* Make sure request is reasonable */
@@ -171,8 +171,9 @@ sbd_zvol_alloc_read_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	 */
 	rl = zfs_range_lock(sl->sl_zvol_rl_hdl, offset, len, RL_READER);
 
-	error = dmu_buf_hold_array_by_bonus(sl->sl_zvol_bonus_hdl, offset,
-	    len, TRUE, RDTAG, &numbufs, &dbpp);
+	error = dmu_buf_hold_array_by_dnode(sl->sl_zvol_dn_hdl,
+	    offset, len, TRUE, RDTAG, &numbufs, &dbpp,
+	    DMU_READ_PREFETCH);
 
 	zfs_range_unlock(rl);
 
@@ -242,8 +243,8 @@ sbd_zvol_alloc_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	uint64_t	blksize;
 	arc_buf_t	**abp;
 	stmf_sglist_ent_t *sgl;
-	uint64_t 	len = dbuf->db_data_size;
-	uint64_t 	offset = zvio->zvio_offset;
+	uint64_t	len = dbuf->db_data_size;
+	uint64_t	offset = zvio->zvio_offset;
 
 	/* Make sure request is reasonable */
 	if (len > sl->sl_max_xfer_len)
@@ -293,7 +294,8 @@ sbd_zvol_alloc_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 		if (seglen == 0)
 			seglen = blksize;
 		seglen = MIN(seglen, len);
-		abp[i] = dmu_request_arcbuf(sl->sl_zvol_bonus_hdl, (int)seglen);
+		abp[i] = arc_loan_buf(dmu_objset_spa(sl->sl_zvol_objset_hdl),
+		    B_FALSE, (int)seglen);
 		ASSERT(arc_buf_size(abp[i]) == (int)seglen);
 		sgl->seg_addr = abp[i]->b_data;
 		sgl->seg_length = (uint32_t)seglen;
@@ -335,7 +337,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	sbd_zvol_io_t	*zvio = dbuf->db_lu_private;
 	dmu_tx_t	*tx;
 	int		sync, i, error;
-	rl_t 		*rl;
+	rl_t		*rl;
 	arc_buf_t	**abp = zvio->zvio_abp;
 	int		flags = zvio->zvio_flags;
 	uint64_t	toffset, offset = zvio->zvio_offset;
@@ -364,7 +366,8 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 
 		abuf = abp[i];
 		size = arc_buf_size(abuf);
-		dmu_assign_arcbuf(sl->sl_zvol_bonus_hdl, toffset, abuf, tx);
+		dmu_assign_arcbuf_dnode(sl->sl_zvol_dn_hdl, toffset, abuf,
+		    tx);
 		toffset += size;
 		resid -= size;
 	}
@@ -391,7 +394,7 @@ int
 sbd_zvol_copy_read(sbd_lu_t *sl, uio_t *uio)
 {
 	int		error;
-	rl_t 		*rl;
+	rl_t		*rl;
 	uint64_t	len = (uint64_t)uio->uio_resid;
 	uint64_t	offset = (uint64_t)uio->uio_loffset;
 
@@ -403,7 +406,7 @@ sbd_zvol_copy_read(sbd_lu_t *sl, uio_t *uio)
 
 	rl = zfs_range_lock(sl->sl_zvol_rl_hdl, offset, len, RL_READER);
 
-	error = dmu_read_uio_dbuf(sl->sl_zvol_bonus_hdl, uio, len);
+	error = dmu_read_uio_dnode(sl->sl_zvol_dn_hdl, uio, len);
 
 	zfs_range_unlock(rl);
 	if (error == ECKSUM)
@@ -418,8 +421,8 @@ sbd_zvol_copy_read(sbd_lu_t *sl, uio_t *uio)
 int
 sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags)
 {
-	rl_t 		*rl;
-	dmu_tx_t 	*tx;
+	rl_t		*rl;
+	dmu_tx_t	*tx;
 	int		error, sync;
 	uint64_t	len = (uint64_t)uio->uio_resid;
 	uint64_t	offset = (uint64_t)uio->uio_loffset;
@@ -442,7 +445,7 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags)
 	if (error) {
 		dmu_tx_abort(tx);
 	} else {
-		error = dmu_write_uio_dbuf(sl->sl_zvol_bonus_hdl, uio, len, tx);
+		error = dmu_write_uio_dnode(sl->sl_zvol_dn_hdl, uio, len, tx);
 		if (error == 0) {
 			zvol_log_write_minor(sl->sl_zvol_minor_hdl, tx, offset,
 			    (ssize_t)len, sync);

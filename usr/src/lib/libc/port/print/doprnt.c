@@ -1574,7 +1574,7 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int prflag)
 					p = insert_thousands_sep(buf, p);
 
 				/* Put in a decimal point if needed */
-				if (prec != 0 || (flagword & FSHARP))
+				if (prec > 0 || (flagword & FSHARP))
 					p = insert_decimal_point(p);
 
 				/* Digits (if any) after the decimal point */

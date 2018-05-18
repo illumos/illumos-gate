@@ -46,13 +46,13 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2017 RackTop Systems.
+ *
  * Sun elects to use this software under the MPL license.
  */
 
 #ifndef _MPI_PRIV_H
 #define _MPI_PRIV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* $Id: mpi-priv.h,v 1.20 2005/11/22 07:16:43 relyea%netscape.com Exp $ */
 
@@ -300,7 +300,7 @@ mp_err   MPI_ASM_DECL s_mpv_div_2dx1d(mp_digit Nhi, mp_digit Nlo,
 
 /* c += a * b * (MP_RADIX ** offset);  */
 #define s_mp_mul_d_add_offset(a, b, c, off) \
-(s_mpv_mul_d_add_prop(MP_DIGITS(a), MP_USED(a), b, MP_DIGITS(c) + off), MP_OKAY)
+	s_mpv_mul_d_add_prop(MP_DIGITS(a), MP_USED(a), b, MP_DIGITS(c) + off)
 
 typedef struct {
   mp_int       N;	/* modulus N */
