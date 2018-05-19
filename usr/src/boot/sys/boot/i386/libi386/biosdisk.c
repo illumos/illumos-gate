@@ -49,22 +49,22 @@
 #include "disk.h"
 #include "libi386.h"
 
-CTASSERT(sizeof(struct i386_devdesc) >= sizeof(struct disk_devdesc));
+CTASSERT(sizeof (struct i386_devdesc) >= sizeof (struct disk_devdesc));
 
-#define BIOS_NUMDRIVES		0x475
-#define BIOSDISK_SECSIZE	512
-#define BUFSIZE			(1 * BIOSDISK_SECSIZE)
+#define	BIOS_NUMDRIVES		0x475
+#define	BIOSDISK_SECSIZE	512
+#define	BUFSIZE			(1 * BIOSDISK_SECSIZE)
 
-#define DT_ATAPI		0x10		/* disk type for ATAPI floppies */
-#define WDMAJOR			0		/* major numbers for devices we frontend for */
-#define WFDMAJOR		1
-#define FDMAJOR			2
-#define DAMAJOR			4
+#define	DT_ATAPI	0x10	/* disk type for ATAPI floppies */
+#define	WDMAJOR		0	/* major numbers for devices we frontend for */
+#define	WFDMAJOR	1
+#define	FDMAJOR		2
+#define	DAMAJOR		4
 
 #ifdef DISK_DEBUG
-# define DEBUG(fmt, args...)	printf("%s: " fmt "\n" , __func__ , ## args)
+#define	DEBUG(fmt, args...)	printf("%s: " fmt "\n", __func__, ## args)
 #else
-# define DEBUG(fmt, args...)
+#define	DEBUG(fmt, args...)
 #endif
 
 /*
@@ -160,7 +160,7 @@ bd_init(void)
 			 * Check the BIOS equipment list for number
 			 * of fixed disks.
 			 */
-			if(base == 0x80 &&
+			if (base == 0x80 &&
 			    (nfd >= *(unsigned char *)PTOV(BIOS_NUMDRIVES)))
 				break;
 #endif
@@ -182,7 +182,7 @@ bd_init(void)
 		}
 	}
 	bcache_add_dev(nbdinfo);
-	return(0);
+	return (0);
 }
 
 /*
@@ -239,7 +239,7 @@ bd_int13probe(struct bdinfo *bd)
 	if ((v86.eax & 0xff00) >= 0x3000)
 		bd->bd_flags |= BD_MODEEDD3;
 	/* Get disk params */
-	params.len = sizeof(struct edd_params);
+	params.len = sizeof (struct edd_params);
 	v86.ctl = V86_FLAGS;
 	v86.addr = 0x13;
 	v86.eax = 0x4800;
@@ -417,7 +417,7 @@ bd_ioctl(struct open_file *f, u_long cmd, void *data)
 
 	switch (cmd) {
 	case DIOCGSECTORSIZE:
-		*(u_int *)data = BD(dev).bd_sectorsize;
+		*(uint32_t *)data = BD(dev).bd_sectorsize;
 		break;
 	case DIOCGMEDIASIZE:
 		*(uint64_t *)data = BD(dev).bd_sectors * BD(dev).bd_sectorsize;
@@ -592,70 +592,71 @@ static int
 bd_edd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
     int dowrite)
 {
-    static struct edd_packet packet;
+	static struct edd_packet packet;
 
-    packet.len = sizeof(struct edd_packet);
-    packet.count = blks;
-    packet.off = VTOPOFF(dest);
-    packet.seg = VTOPSEG(dest);
-    packet.lba = dblk;
-    v86.ctl = V86_FLAGS;
-    v86.addr = 0x13;
-    if (dowrite)
+	packet.len = sizeof (struct edd_packet);
+	packet.count = blks;
+	packet.off = VTOPOFF(dest);
+	packet.seg = VTOPSEG(dest);
+	packet.lba = dblk;
+	v86.ctl = V86_FLAGS;
+	v86.addr = 0x13;
 	/* Should we Write with verify ?? 0x4302 ? */
-	v86.eax = 0x4300;
-    else
-	v86.eax = 0x4200;
-    v86.edx = BD(dev).bd_unit;
-    v86.ds = VTOPSEG(&packet);
-    v86.esi = VTOPOFF(&packet);
-    v86int();
-    if (V86_CY(v86.efl))
-	return (v86.eax >> 8);
-    return (0);
+	if (dowrite)
+		v86.eax = 0x4300;
+	else
+		v86.eax = 0x4200;
+	v86.edx = BD(dev).bd_unit;
+	v86.ds = VTOPSEG(&packet);
+	v86.esi = VTOPOFF(&packet);
+	v86int();
+	if (V86_CY(v86.efl))
+		return (v86.eax >> 8);
+	return (0);
 }
 
 static int
 bd_chs_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
     int dowrite)
 {
-    u_int	x, bpc, cyl, hd, sec;
+	uint32_t x, bpc, cyl, hd, sec;
 
-    bpc = BD(dev).bd_sec * BD(dev).bd_hds;	/* blocks per cylinder */
-    x = dblk;
-    cyl = x / bpc;			/* block # / blocks per cylinder */
-    x %= bpc;				/* block offset into cylinder */
-    hd = x / BD(dev).bd_sec;		/* offset / blocks per track */
-    sec = x % BD(dev).bd_sec;		/* offset into track */
+	bpc = BD(dev).bd_sec * BD(dev).bd_hds;	/* blocks per cylinder */
+	x = dblk;
+	cyl = x / bpc;			/* block # / blocks per cylinder */
+	x %= bpc;				/* block offset into cylinder */
+	hd = x / BD(dev).bd_sec;		/* offset / blocks per track */
+	sec = x % BD(dev).bd_sec;		/* offset into track */
 
-    /* correct sector number for 1-based BIOS numbering */
-    sec++;
+	/* correct sector number for 1-based BIOS numbering */
+	sec++;
 
-    if (cyl > 1023)
-	/* CHS doesn't support cylinders > 1023. */
-	return (1);
+	if (cyl > 1023) {
+		/* CHS doesn't support cylinders > 1023. */
+		return (1);
+	}
 
-    v86.ctl = V86_FLAGS;
-    v86.addr = 0x13;
-    if (dowrite)
-	v86.eax = 0x300 | blks;
-    else
-	v86.eax = 0x200 | blks;
-    v86.ecx = ((cyl & 0xff) << 8) | ((cyl & 0x300) >> 2) | sec;
-    v86.edx = (hd << 8) | BD(dev).bd_unit;
-    v86.es = VTOPSEG(dest);
-    v86.ebx = VTOPOFF(dest);
-    v86int();
-    if (V86_CY(v86.efl))
-	return (v86.eax >> 8);
-    return (0);
+	v86.ctl = V86_FLAGS;
+	v86.addr = 0x13;
+	if (dowrite)
+		v86.eax = 0x300 | blks;
+	else
+		v86.eax = 0x200 | blks;
+	v86.ecx = ((cyl & 0xff) << 8) | ((cyl & 0x300) >> 2) | sec;
+	v86.edx = (hd << 8) | BD(dev).bd_unit;
+	v86.es = VTOPSEG(dest);
+	v86.ebx = VTOPOFF(dest);
+	v86int();
+	if (V86_CY(v86.efl))
+		return (v86.eax >> 8);
+	return (0);
 }
 
 static int
 bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
     int dowrite)
 {
-	u_int result, retry;
+	int result, retry;
 
 	/* Just in case some idiot actually tries to read/write -1 blocks... */
 	if (blks < 0)
@@ -691,21 +692,18 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 	if (result != 0 && result != 0x20) {
 		if (dowrite != 0) {
 			printf("%s%d: Write %d sector(s) from %p (0x%x) "
-			    "to %lld: 0x%x", dev->dd.d_dev->dv_name,
+			    "to %lld: 0x%x\n", dev->dd.d_dev->dv_name,
 			    dev->dd.d_unit, blks, dest, VTOP(dest), dblk,
 			    result);
 		} else {
 			printf("%s%d: Read %d sector(s) from %lld to %p "
-			    "(0x%x): 0x%x", dev->dd.d_dev->dv_name,
+			    "(0x%x): 0x%x\n", dev->dd.d_dev->dv_name,
 			    dev->dd.d_unit, blks, dblk, dest, VTOP(dest),
 			    result);
+		}
 	}
 
-	if (result != 0)
-	    return (result);
-    }
-
-    return(0);
+	return (result);
 }
 
 /*
@@ -722,19 +720,19 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
  * disk.  And, incidentally, what is returned is not the geometry as
  * such but the highest valid cylinder, head, and sector numbers.
  */
-u_int32_t
+uint32_t
 bd_getbigeom(int bunit)
 {
 
-    v86.ctl = V86_FLAGS;
-    v86.addr = 0x13;
-    v86.eax = 0x800;
-    v86.edx = 0x80 + bunit;
-    v86int();
-    if (V86_CY(v86.efl))
-	return 0x4f010f;
-    return ((v86.ecx & 0xc0) << 18) | ((v86.ecx & 0xff00) << 8) |
-	   (v86.edx & 0xff00) | (v86.ecx & 0x3f);
+	v86.ctl = V86_FLAGS;
+	v86.addr = 0x13;
+	v86.eax = 0x800;
+	v86.edx = 0x80 + bunit;
+	v86int();
+	if (V86_CY(v86.efl))
+		return (0x4f010f);
+	return (((v86.ecx & 0xc0) << 18) | ((v86.ecx & 0xff00) << 8) |
+	    (v86.edx & 0xff00) | (v86.ecx & 0x3f));
 }
 
 /*
@@ -746,49 +744,49 @@ bd_getbigeom(int bunit)
 int
 bd_getdev(struct i386_devdesc *d)
 {
-    struct disk_devdesc		*dev;
-    int				biosdev;
-    int				major;
-    int				rootdev;
-    char			*nip, *cp;
-    int				i, unit;
+	struct disk_devdesc *dev;
+	int	biosdev;
+	int	major;
+	int	rootdev;
+	char	*nip, *cp;
+	int	i, unit;
 
-    dev = (struct disk_devdesc *)d;
-    biosdev = bd_unit2bios(dev->dd.d_unit);
-    DEBUG("unit %d BIOS device %d", dev->dd.d_unit, biosdev);
-    if (biosdev == -1)				/* not a BIOS device */
-	return(-1);
-    if (disk_open(dev, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
-	BD(dev).bd_sectorsize) != 0)		/* oops, not a viable device */
-	    return (-1);
-    else
-	disk_close(dev);
+	dev = (struct disk_devdesc *)d;
+	biosdev = bd_unit2bios(dev->dd.d_unit);
+	DEBUG("unit %d BIOS device %d", dev->dd.d_unit, biosdev);
+	if (biosdev == -1)			/* not a BIOS device */
+		return (-1);
+	if (disk_open(dev, BD(dev).bd_sectors * BD(dev).bd_sectorsize,
+	    BD(dev).bd_sectorsize) != 0)	/* oops, not a viable device */
+		return (-1);
+	else
+		disk_close(dev);
 
-    if (biosdev < 0x80) {
-	/* floppy (or emulated floppy) or ATAPI device */
-	if (bdinfo[dev->dd.d_unit].bd_type == DT_ATAPI) {
-	    /* is an ATAPI disk */
-	    major = WFDMAJOR;
+	if (biosdev < 0x80) {
+		/* floppy (or emulated floppy) or ATAPI device */
+		if (bdinfo[dev->dd.d_unit].bd_type == DT_ATAPI) {
+			/* is an ATAPI disk */
+			major = WFDMAJOR;
+		} else {
+			/* is a floppy disk */
+			major = FDMAJOR;
+		}
 	} else {
-	    /* is a floppy disk */
-	    major = FDMAJOR;
+		/* assume an IDE disk */
+		major = WDMAJOR;
 	}
-    } else {
-	    /* assume an IDE disk */
-	    major = WDMAJOR;
-    }
-    /* default root disk unit number */
-    unit = biosdev & 0x7f;
+	/* default root disk unit number */
+	unit = biosdev & 0x7f;
 
-    /* XXX a better kludge to set the root disk unit number */
-    if ((nip = getenv("root_disk_unit")) != NULL) {
-	i = strtol(nip, &cp, 0);
-	/* check for parse error */
-	if ((cp != nip) && (*cp == 0))
-	    unit = i;
-    }
+	/* XXX a better kludge to set the root disk unit number */
+	if ((nip = getenv("root_disk_unit")) != NULL) {
+		i = strtol(nip, &cp, 0);
+		/* check for parse error */
+		if ((cp != nip) && (*cp == 0))
+			unit = i;
+	}
 
-    rootdev = MAKEBOOTDEV(major, dev->d_slice + 1, unit, dev->d_partition);
-    DEBUG("dev is 0x%x\n", rootdev);
-    return(rootdev);
+	rootdev = MAKEBOOTDEV(major, dev->d_slice + 1, unit, dev->d_partition);
+	DEBUG("dev is 0x%x\n", rootdev);
+	return (rootdev);
 }
