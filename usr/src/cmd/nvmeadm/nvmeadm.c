@@ -472,6 +472,8 @@ nvme_dskname(const nvme_process_arg_t *npa)
 	di_node_t child;
 	di_dim_t dim;
 	char *addr;
+	char *disk_ctd;
+	char *diskname = NULL;
 
 	dim = di_dim_init();
 
@@ -501,19 +503,23 @@ nvme_dskname(const nvme_process_arg_t *npa)
 
 		/* Chop off 's0' and get everything past the last '/' */
 		path[strlen(path) - 2] = '\0';
-		path = strrchr(path, '/');
-		if (path == NULL)
+		disk_ctd = strrchr(path, '/');
+		if (disk_ctd == NULL)
 			goto fail;
-		path++;
+		diskname = strdup(++disk_ctd);
+		if (diskname == NULL)
+			goto fail;
 
+		free(path);
 		break;
 	}
 
 	di_dim_fini(dim);
 
-	return (path);
+	return (diskname);
 
 fail:
+	free(path);
 	err(-1, "nvme_dskname");
 }
 
@@ -561,14 +567,15 @@ nvme_process(di_node_t node, di_minor_t minor, void *arg)
 
 out:
 	di_devfs_path_free(npa->npa_path);
-	free(npa->npa_dsk);
 	free(npa->npa_version);
 	free(npa->npa_idctl);
 	free(npa->npa_idns);
+	free(npa->npa_dsk);
 
 	npa->npa_version = NULL;
 	npa->npa_idctl = NULL;
 	npa->npa_idns = NULL;
+	npa->npa_dsk = NULL;
 
 	nvme_close(fd);
 
