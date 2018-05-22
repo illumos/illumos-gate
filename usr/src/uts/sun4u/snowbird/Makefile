@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 Gary mills
 #
 #	This makefile drives the production of the sun4u snowbird platform
 #	module.
@@ -77,13 +78,13 @@ modlintlib:	$(SNOWBIRD_KMODS)
 $(SNOWBIRD_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
-ttymux_dacf:	$(ROOT_SNOWBIRD_DACF_DIR_64) 
+ttymux_dacf:	$(ROOT_SNOWBIRD_DACF_DIR_64)
 		-@$(RM) $(ROOT_SNOWBIRD_DACF_DIR_64)/$@
 		$(SYMLINK) $(ROOT_SNOWBIRD_DACF_LINK_64)/$@ \
 		$(ROOT_SNOWBIRD_DACF_DIR_64)/$@
 
 
-ttymux.conf:	$(ROOT_SNOWBIRD_DRV_DIR)
+ttymux.conf:	$(ROOT_SNOWBIRD_DRV_DIR_32)
 		-@$(RM) $(ROOT_SNOWBIRD_DRV_DIR_32)/$@
 		$(SYMLINK) $(ROOT_SNOWBIRD_DRV_LINK_32)/$@ \
 		$(ROOT_SNOWBIRD_DRV_DIR_32)/$@
@@ -92,7 +93,7 @@ install_h check:	FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
 
 lint:	modlintlib
- 
+
 LINT_LIBS	= $(LINT_LIB) \
 			-L$(SNOWBIRD_LINT_LIB_DIR) \
 			-L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
