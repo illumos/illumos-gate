@@ -576,6 +576,7 @@ zfs_params(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"zvol_maxphys",
 		"zvol_unmap_enabled",
 		"zvol_unmap_sync_enabled",
+		"zfs_max_dataset_nesting",
 	};
 
 	for (int i = 0; i < sizeof (params) / sizeof (params[0]); i++) {
