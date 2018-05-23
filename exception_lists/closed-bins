@@ -78,7 +78,9 @@
 ./usr/kernel/drv/llc2.conf
 ./usr/kernel/drv/llc2
 ./usr/lib/inet/i86
+./usr/lib/inet/sparcv7
 ./usr/lib/inet/i86/in.iked
+./usr/lib/inet/sparcv7/in.iked
 ./usr/lib/libike.so
 ./usr/lib/llc2
 ./usr/lib/llc2/llc2_config
