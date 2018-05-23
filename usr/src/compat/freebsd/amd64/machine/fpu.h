@@ -11,12 +11,11 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_FPU_H_
 #define	_COMPAT_FREEBSD_AMD64_MACHINE_FPU_H_
-
-#define	XSAVE_AREA_ALIGN	64
 
 void	fpuexit(kthread_t *td);
 void	fpurestore(void *);

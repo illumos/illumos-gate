@@ -52,6 +52,7 @@
 #include <sys/psm_defs.h>
 #include <sys/smp_impldefs.h>
 #include <sys/modhash.h>
+#include <sys/hma.h>
 
 #include <sys/x86_archext.h>
 
@@ -504,157 +505,65 @@ vmm_cpuid_init(void)
 	cpu_exthigh = regs[0];
 }
 
-struct savefpu {
-	fpu_ctx_t	fsa_fp_ctx;
-};
-
-static vmem_t *fpu_save_area_arena;
-
-static void
-fpu_save_area_init(void)
-{
-	fpu_save_area_arena = vmem_create("fpu_save_area",
-	    NULL, 0, XSAVE_AREA_ALIGN,
-	    segkmem_alloc, segkmem_free, heap_arena, 0, VM_BESTFIT | VM_SLEEP);
-}
-
-static void
-fpu_save_area_cleanup(void)
-{
-	vmem_destroy(fpu_save_area_arena);
-}
-
+/*
+ * FreeBSD uses the struct savefpu for managing the FPU state. That is mimicked
+ * by our hypervisor multiplexor framework structure.
+ */
 struct savefpu *
 fpu_save_area_alloc(void)
 {
-	struct savefpu *fsa = vmem_alloc(fpu_save_area_arena,
-	    sizeof (struct savefpu), VM_SLEEP);
-
-	bzero(fsa, sizeof (struct savefpu));
-	fsa->fsa_fp_ctx.fpu_regs.kfpu_u.kfpu_generic =
-	    kmem_cache_alloc(fpsave_cachep, KM_SLEEP);
-
-	return (fsa);
+	return ((struct savefpu *)hma_fpu_alloc(KM_SLEEP));
 }
 
 void
 fpu_save_area_free(struct savefpu *fsa)
 {
-	kmem_cache_free(fpsave_cachep,
-	    fsa->fsa_fp_ctx.fpu_regs.kfpu_u.kfpu_generic);
-	vmem_free(fpu_save_area_arena, fsa, sizeof (struct savefpu));
+	hma_fpu_t *fpu = (hma_fpu_t *)fsa;
+	hma_fpu_free(fpu);
 }
 
 void
 fpu_save_area_reset(struct savefpu *fsa)
 {
-	extern const struct fxsave_state sse_initial;
-	extern const struct xsave_state avx_initial;
-	struct fpu_ctx *fp;
-	struct fxsave_state *fx;
-	struct xsave_state *xs;
-
-	fp = &fsa->fsa_fp_ctx;
-
-	fp->fpu_regs.kfpu_status = 0;
-	fp->fpu_regs.kfpu_xstatus = 0;
-
-	switch (fp_save_mech) {
-	case FP_FXSAVE:
-		fx = fp->fpu_regs.kfpu_u.kfpu_fx;
-		bcopy(&sse_initial, fx, sizeof (*fx));
-		break;
-	case FP_XSAVE:
-		fp->fpu_xsave_mask = (XFEATURE_ENABLED_X87 |
-		    XFEATURE_ENABLED_SSE | XFEATURE_ENABLED_AVX);
-		xs = fp->fpu_regs.kfpu_u.kfpu_xs;
-		bcopy(&avx_initial, xs, sizeof (*xs));
-		break;
-	default:
-		panic("Invalid fp_save_mech");
-		/*NOTREACHED*/
-	}
+	hma_fpu_t *fpu = (hma_fpu_t *)fsa;
+	hma_fpu_init(fpu);
 }
 
+/*
+ * This glue function is supposed to save the host's FPU state. This is always
+ * paired in the general bhyve code with a call to fpusave. Therefore, we treat
+ * this as a nop and do all the work in fpusave(), which will have the context
+ * argument that we want anyways.
+ */
 void
 fpuexit(kthread_t *td)
 {
-	fp_save(&curthread->t_lwp->lwp_pcb.pcb_fpu);
 }
 
-static __inline void
-vmm_fxrstor(struct fxsave_state *addr)
-{
-	__asm __volatile("fxrstor %0" : : "m" (*(addr)));
-}
-
-static __inline void
-vmm_fxsave(struct fxsave_state *addr)
-{
-	__asm __volatile("fxsave %0" : "=m" (*(addr)));
-}
-
-static __inline void
-vmm_xrstor(struct xsave_state *addr, uint64_t mask)
-{
-	uint32_t low, hi;
-
-	low = mask;
-	hi = mask >> 32;
-	__asm __volatile("xrstor %0" : : "m" (*addr), "a" (low), "d" (hi));
-}
-
-static __inline void
-vmm_xsave(struct xsave_state *addr, uint64_t mask)
-{
-	uint32_t low, hi;
-
-	low = mask;
-	hi = mask >> 32;
-	__asm __volatile("xsave %0" : "=m" (*addr) : "a" (low), "d" (hi) :
-	    "memory");
-}
-
+/*
+ * This glue function is supposed to restore the guest's FPU state from the save
+ * area back to the host. In FreeBSD, it is assumed that the host state has
+ * already been saved by a call to fpuexit(); however, we do both here.
+ */
 void
 fpurestore(void *arg)
 {
-	struct savefpu *fsa = (struct savefpu *)arg;
-	struct fpu_ctx *fp;
+	hma_fpu_t *fpu = arg;
 
-	fp = &fsa->fsa_fp_ctx;
-
-	switch (fp_save_mech) {
-	case FP_FXSAVE:
-		vmm_fxrstor(fp->fpu_regs.kfpu_u.kfpu_fx);
-		break;
-	case FP_XSAVE:
-		vmm_xrstor(fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
-		break;
-	default:
-		panic("Invalid fp_save_mech");
-		/*NOTREACHED*/
-	}
+	hma_fpu_start_guest(fpu);
 }
 
+/*
+ * This glue function is supposed to save the guest's FPU state. The host's FPU
+ * state is not expected to be restored necessarily due to the use of FPU
+ * emulation through CR0.TS. However, we can and do restore it here.
+ */
 void
 fpusave(void *arg)
 {
-	struct savefpu *fsa = (struct savefpu *)arg;
-	struct fpu_ctx *fp;
+	hma_fpu_t *fpu = arg;
 
-	fp = &fsa->fsa_fp_ctx;
-
-	switch (fp_save_mech) {
-	case FP_FXSAVE:
-		vmm_fxsave(fp->fpu_regs.kfpu_u.kfpu_fx);
-		break;
-	case FP_XSAVE:
-		vmm_xsave(fp->fpu_regs.kfpu_u.kfpu_xs, fp->fpu_xsave_mask);
-		break;
-	default:
-		panic("Invalid fp_save_mech");
-		/*NOTREACHED*/
-	}
+	hma_fpu_stop_guest(fpu);
 }
 
 void
@@ -662,14 +571,12 @@ vmm_sol_glue_init(void)
 {
 	vmm_alloc_init();
 	vmm_cpuid_init();
-	fpu_save_area_init();
 	unr_idx = 0;
 }
 
 void
 vmm_sol_glue_cleanup(void)
 {
-	fpu_save_area_cleanup();
 	vmm_alloc_cleanup();
 }
 

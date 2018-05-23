@@ -25,7 +25,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -67,9 +67,6 @@
 #include <sys/brand.h>
 #include <sys/machbrand.h>
 #include <sys/cmn_err.h>
-
-extern const struct fnsave_state x87_initial;
-extern const struct fxsave_state sse_initial;
 
 /*
  * Map an fnsave-formatted save area into an fxsave-formatted save area.
