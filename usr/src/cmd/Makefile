@@ -113,6 +113,7 @@ COMMON_SUBDIRS=		\
 	ctrun		\
 	ctstat		\
 	ctwatch		\
+	cxgbetool	\
 	datadm		\
 	date		\
 	dc		\

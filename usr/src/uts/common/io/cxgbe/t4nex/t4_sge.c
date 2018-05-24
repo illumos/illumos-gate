@@ -693,7 +693,6 @@ t4_intr_rx_work(struct sge_iq *iq)
 uint_t
 t4_intr(caddr_t arg1, caddr_t arg2)
 {
-	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	struct sge_iq *iq = (struct sge_iq *)arg2;
 	int state;
 

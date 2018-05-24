@@ -10305,6 +10305,7 @@ f usr/sbin/consadmd 0555 root sys
 f usr/sbin/cpustat 0555 root bin
 f usr/sbin/cron 0555 root sys
 s usr/sbin/cryptoadm=../../sbin/cryptoadm
+f usr/sbin/cxgbetool 0555 root sys
 s usr/sbin/dcopy=clri
 h usr/sbin/deallocate=usr/sbin/allocate
 f usr/sbin/devfsadm 0755 root sys
