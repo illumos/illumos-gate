@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_FSOPS_H
@@ -78,7 +78,7 @@ int smb_fsop_freesp(smb_request_t *sr, cred_t *cr, smb_ofile_t *,
 		    off64_t, off64_t);
 
 int smb_fsop_read(smb_request_t *, cred_t *, smb_node_t *, smb_ofile_t *,
-    uio_t *);
+    uio_t *, int);
 
 int smb_fsop_write(smb_request_t *, cred_t *, smb_node_t *, smb_ofile_t *,
     uio_t *, uint32_t *, int);

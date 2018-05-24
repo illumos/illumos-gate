@@ -1380,7 +1380,7 @@ smb_fsop_freesp(
  */
 int
 smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
-    smb_ofile_t *ofile, uio_t *uio)
+    smb_ofile_t *ofile, uio_t *uio, int ioflag)
 {
 	caller_context_t ct;
 	cred_t *kcr = zone_kcred();
@@ -1449,7 +1449,7 @@ smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		}
 	}
 
-	rc = smb_vop_read(snode->vp, uio, cr);
+	rc = smb_vop_read(snode->vp, uio, ioflag, cr);
 	smb_node_end_crit(snode);
 
 	return (rc);

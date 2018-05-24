@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -74,6 +74,7 @@ static uint16_t smb2_versions[] = {
 	0x202,	/* SMB 2.002 */
 	0x210,	/* SMB 2.1 */
 	0x300,	/* SMB 3.0 */
+	0x302,	/* SMB 3.02 */
 };
 static uint16_t smb2_nversions =
     sizeof (smb2_versions) / sizeof (smb2_versions[0]);

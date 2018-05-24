@@ -20,6 +20,8 @@
 #include <smbsrv/smb2_kproto.h>
 #include <smbsrv/smb_fsops.h>
 
+extern boolean_t smb_allow_unbuffered;
+
 smb_sdrc_t
 smb2_read(smb_request_t *sr)
 {
@@ -29,6 +31,7 @@ smb2_read(smb_request_t *sr)
 	struct mbuf *m = NULL;
 	uint16_t StructSize;
 	uint8_t Padding;
+	uint8_t Flags;
 	uint8_t DataOff;
 	uint32_t Length;
 	uint64_t Offset;
@@ -41,15 +44,18 @@ smb2_read(smb_request_t *sr)
 	uint32_t XferCount;
 	uint32_t status;
 	int rc = 0;
+	boolean_t unbuffered = B_FALSE;
+	int ioflag = 0;
 
 	/*
 	 * SMB2 Read request
 	 */
 	rc = smb_mbc_decodef(
 	    &sr->smb_data,
-	    "wb.lqqqlllww",
+	    "wbblqqqlllww",
 	    &StructSize,		/* w */
-	    &Padding,			/* b. */
+	    &Padding,			/* b */
+	    &Flags,			/* b */
 	    &Length,			/* l */
 	    &Offset,			/* q */
 	    &smb2fid.persistent,	/* q */
@@ -104,6 +110,21 @@ smb2_read(smb_request_t *sr)
 	sr->raw_data.max_bytes = Length;
 	m = smb_mbuf_allocate(&vdb->vdb_uio);
 
+	/*
+	 * Unbuffered refers to the MS-FSA Read argument by the same name.
+	 * It indicates that the cache for this range should be flushed to disk,
+	 * and data read directly from disk, bypassing the cache.
+	 * We don't allow that degree of cache management.
+	 * Translate this directly as FRSYNC,
+	 * which should at least flush the cache first.
+	 */
+
+	if (smb_allow_unbuffered &&
+	    (Flags & SMB2_READFLAG_READ_UNBUFFERED) != 0) {
+		unbuffered = B_TRUE;
+		ioflag = FRSYNC;
+	}
+
 	switch (of->f_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
 		if (!smb_node_is_dir(of->f_node)) {
@@ -116,10 +137,13 @@ smb2_read(smb_request_t *sr)
 			}
 		}
 		rc = smb_fsop_read(sr, of->f_cr, of->f_node, of,
-		    &vdb->vdb_uio);
+		    &vdb->vdb_uio, ioflag);
 		break;
 	case STYPE_IPC:
-		rc = smb_opipe_read(sr, &vdb->vdb_uio);
+		if (unbuffered)
+			rc = EINVAL;
+		else
+			rc = smb_opipe_read(sr, &vdb->vdb_uio);
 		break;
 	default:
 	case STYPE_PRINTQ:

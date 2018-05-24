@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -438,7 +438,7 @@ smb_common_read(smb_request_t *sr, smb_rw_param_t *param)
 		top = smb_mbuf_allocate(&vdb->vdb_uio);
 
 		rc = smb_fsop_read(sr, sr->user_cr, node, ofile,
-		    &vdb->vdb_uio);
+		    &vdb->vdb_uio, 0);
 
 		sr->raw_data.max_bytes -= vdb->vdb_uio.uio_resid;
 		smb_mbuf_trim(top, sr->raw_data.max_bytes);

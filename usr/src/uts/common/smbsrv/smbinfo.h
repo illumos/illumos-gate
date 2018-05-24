@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_SMBSRV_SMBINFO_H
@@ -230,6 +230,7 @@ const char *smbnative_lm_str(smb_version_t *);
 #define	SMB_VERS_2_002		0x202	/* "2.002" */
 #define	SMB_VERS_2_1		0x210	/* "2.1" */
 #define	SMB_VERS_3_0		0x300	/* "3.0" */
+#define	SMB_VERS_3_02		0x302	/* "3.02" */
 
 #ifdef __cplusplus
 }

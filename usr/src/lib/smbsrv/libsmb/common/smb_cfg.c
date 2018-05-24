@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -165,6 +165,7 @@ static smb_cfg_param_t smb_cfg_table[] =
  */
 static struct str_val
 smb_versions[] = {
+	{ "3.02",	SMB_VERS_3_02 },
 	{ "3.0",	SMB_VERS_3_0 },
 	{ "2.1",	SMB_VERS_2_1 },
 	{ "2.002",	SMB_VERS_2_002 },
@@ -1223,7 +1224,7 @@ smb_config_get_protocol(smb_cfg_id_t id, char *name, uint32_t default_val)
  * whole range that we implement). For that reason, this should usually be the
  * highest protocol version we implement.
  */
-uint32_t max_protocol_default = SMB_VERS_3_0;
+uint32_t max_protocol_default = SMB_VERS_3_02;
 
 uint32_t
 smb_config_get_max_protocol(void)
