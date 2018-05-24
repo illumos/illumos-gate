@@ -154,6 +154,10 @@ vmm_zsd_destroy(zoneid_t zid, void *data)
 	vmm_zsd_t *zsd = data;
 	vmm_softc_t *sc;
 
+	mutex_enter(&vmm_zsd_lock);
+	list_remove(&vmm_zsd_list, zsd);
+	mutex_exit(&vmm_zsd_lock);
+
 	mutex_enter(&zsd->vz_lock);
 	ASSERT(!zsd->vz_active);
 
@@ -171,7 +175,6 @@ vmm_zsd_destroy(zoneid_t zid, void *data)
 	mutex_exit(&zsd->vz_lock);
 	mutex_destroy(&zsd->vz_lock);
 
-	list_remove(&vmm_zsd_list, zsd);
 	kmem_free(zsd, sizeof (*zsd));
 }
 
