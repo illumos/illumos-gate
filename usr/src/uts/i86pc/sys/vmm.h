@@ -343,6 +343,9 @@ enum vcpu_state {
 int vcpu_set_state(struct vm *vm, int vcpu, enum vcpu_state state,
     bool from_idle);
 enum vcpu_state vcpu_get_state(struct vm *vm, int vcpu, int *hostcpu);
+#ifndef __FreeBSD__
+uint64_t vcpu_tsc_offset(struct vm *vm, int vcpuid);
+#endif
 
 static __inline int
 vcpu_is_running(struct vm *vm, int vcpu, int *hostcpu)
