@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018 by Delphix. All rights reserved.
  */
 
 #include <sys/note.h>
@@ -583,6 +584,21 @@ replace:			np->nvp_devid = new_devid;
 				DEVID_DEBUG((CE_CONT, "devid register: "
 				    "devid %s does not match\n", path));
 				/*
+				 * We do not expect devids to change, log it.
+				 */
+				char *devid_stored =
+				    ddi_devid_str_encode(np->nvp_devid, NULL);
+				char *devid_new =
+				    ddi_devid_str_encode(devid, NULL);
+
+				cmn_err(CE_CONT, "devid register: devid for "
+				    "%s does not match. stored: %s, new: %s.",
+				    path, devid_stored, devid_new);
+
+				ddi_devid_str_free(devid_stored);
+				ddi_devid_str_free(devid_new);
+
+				/*
 				 * Replace cached devid for this path
 				 * with newly registered devid.  A devid
 				 * may map to multiple paths but one path
@@ -780,7 +796,7 @@ e_devid_minor_to_devlist(
  */
 static int
 e_devid_cache_devi_path_lists(ddi_devid_t devid, int retmax,
-	int *retndevis, dev_info_t **retdevis, int *retnpaths, char **retpaths)
+    int *retndevis, dev_info_t **retdevis, int *retnpaths, char **retpaths)
 {
 	nvp_devid_t *np;
 	int ndevis, npaths;
@@ -862,7 +878,7 @@ e_devid_cache_devi_path_lists(ddi_devid_t devid, int retmax,
  */
 int
 e_devid_cache_to_devt_list(ddi_devid_t devid, char *minor_name,
-	int *retndevts, dev_t **retdevts)
+    int *retndevts, dev_t **retdevts)
 {
 	char		*path, **paths;
 	int		i, j, n;
