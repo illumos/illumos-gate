@@ -58,9 +58,12 @@ namespace std {
 
 #if !defined(_STRICT_SYMBOLS) || defined(_STDC_C11)
 extern void *aligned_alloc(size_t, size_t);
+#endif /* !_STRICT_SYMBOLS || _STDC_C11 */
+
+#if !defined(_STRICT_SYMBOLS) || defined(_STDC_C11) || __cplusplus >= 201103L
 extern int at_quick_exit(void (*)(void));
 extern _NORETURN_KYWD void quick_exit(int);
-#endif /* !_STRICT_SYMBOLS || _STDC_C11 */
+#endif /* !_STRICT_SYMBOLS || _STDC_C11 || __cplusplus >= 201103L */
 
 #if __cplusplus >= 199711L
 }
