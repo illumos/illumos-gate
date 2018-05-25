@@ -1,0 +1,45 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018 Nexenta Systems, Inc.
+.\"
+.Dd April 22, 2018
+.Dt SMARTPQI 4D
+.Os
+.Sh NAME
+.Nm smartpqi
+.Nd Microsemi HBA 1100 driver
+.Sh DESCRIPTION
+The
+.Nm
+is a nexus driver that supports the Microsemi HBA 1100.
+.Sh CONFIGURATION
+The
+.Nm
+driver has no configurable options.
+.Sh ARCHITECTURE
+.Sy x86
+.Sh SEE ALSO
+.Xr prtconf 1M ,
+.Xr driver.conf 4 ,
+.Xr pci 4 ,
+.Xr attributes 5 ,
+.Xr scsi_abort 9F ,
+.Xr scsi_hba_attach_setup 9F ,
+.Xr scsi_ifgetcap 9F ,
+.Xr scsi_ifsetcap 9F ,
+.Xr scsi_reset 9F ,
+.Xr scsi_sync_pkt 9F ,
+.Xr scsi_transport 9F ,
+.Xr scsi_device 9S ,
+.Xr scsi_extended_sense 9S ,
+.Xr scsi_inquiry 9S ,
+.Xr scsi_pkt 9S

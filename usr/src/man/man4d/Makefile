@@ -123,6 +123,7 @@ _MANFILES=	aac.4d		\
 		ses.4d		\
 		sfe.4d		\
 		sgen.4d		\
+		smartpqi.4d	\
 		srpt.4d		\
 		st.4d		\
 		sysmsg.4d	\

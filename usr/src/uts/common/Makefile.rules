@@ -974,6 +974,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/adapters/lmrc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/adapters/smartpqi/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/mxfe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)

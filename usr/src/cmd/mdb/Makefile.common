@@ -101,6 +101,7 @@ COMMON_MODULES_KVM = \
 	scsi_vhci \
 	sctp \
 	sd \
+	smartpqi \
 	smbfs \
 	smbsrv \
 	sockfs \

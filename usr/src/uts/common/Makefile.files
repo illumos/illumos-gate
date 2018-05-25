@@ -1908,6 +1908,11 @@ MXFE_OBJS += mxfe.o
 
 MPTSAS_OBJS += mptsas.o mptsas_impl.o mptsas_init.o mptsas_raid.o mptsas_smhba.o
 
+SMARTPQI_OBJS += smartpqi_main.o smartpqi_intr.o smartpqi_hba.o \
+		smartpqi_util.o smartpqi_hw.o smartpqi_init.o \
+		smartpqi_sis.o
+
+
 SFE_OBJS += sfe.o sfe_util.o
 
 BFE_OBJS += bfe.o
