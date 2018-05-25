@@ -61,6 +61,8 @@ static devfsadm_create_t usb_cbt[] = {
 						ILEVEL_0, usb_process },
 	{ "usb", DDI_NT_NEXUS, "ehci",	DRV_EXACT|TYPE_EXACT,
 						ILEVEL_0, usb_process },
+	{ "usb", DDI_NT_NEXUS, "xhci",	DRV_EXACT|TYPE_EXACT,
+						ILEVEL_0, usb_process },
 	{ "usb", DDI_NT_SCSI_NEXUS, "scsa2usb",	DRV_EXACT|TYPE_EXACT,
 						ILEVEL_0, usb_process },
 	{ "usb", DDI_NT_UGEN, "scsa2usb",	DRV_EXACT|TYPE_EXACT,
@@ -189,28 +191,29 @@ minor_fini(void)
 }
 
 typedef enum {
-	DRIVER_HUBD	= 0,
-	DRIVER_OHCI	= 1,
-	DRIVER_EHCI	= 2,
-	DRIVER_UHCI	= 3,
-	DRIVER_USB_AC	= 4,
-	DRIVER_USB_AS	= 5,
-	DRIVER_HID	= 6,
-	DRIVER_USB_MID	= 7,
-	DRIVER_DDIVS_USBC = 8,
-	DRIVER_SCSA2USB = 9,
-	DRIVER_USBPRN	= 10,
-	DRIVER_UGEN	= 11,
-	DRIVER_VIDEO	= 12,
-	DRIVER_HWAHC	= 13,
-	DRIVER_HWARC	= 14,
-	DRIVER_WUSB_CA	= 15,
-	DRIVER_UNKNOWN	= 16
+	DRIVER_HUBD,
+	DRIVER_OHCI,
+	DRIVER_EHCI,
+	DRIVER_UHCI,
+	DRIVER_XHCI,
+	DRIVER_USB_AC,
+	DRIVER_USB_AS,
+	DRIVER_HID,
+	DRIVER_USB_MID,
+	DRIVER_DDIVS_USBC,
+	DRIVER_SCSA2USB,
+	DRIVER_USBPRN,
+	DRIVER_UGEN,
+	DRIVER_VIDEO,
+	DRIVER_HWAHC,
+	DRIVER_HWARC,
+	DRIVER_WUSB_CA,
+	DRIVER_UNKNOWN
 } driver_defs_t;
 
 typedef struct {
 	char	*driver_name;
-	int	index;
+	driver_defs_t	index;
 } driver_name_table_entry_t;
 
 driver_name_table_entry_t driver_name_table[] = {
@@ -218,6 +221,7 @@ driver_name_table_entry_t driver_name_table[] = {
 	{ "ohci",	DRIVER_OHCI },
 	{ "ehci",	DRIVER_EHCI },
 	{ "uhci",	DRIVER_UHCI },
+	{ "xhci",	DRIVER_XHCI },
 	{ "usb_ac",	DRIVER_USB_AC },
 	{ "usb_as",	DRIVER_USB_AS },
 	{ "hid",	DRIVER_HID },
@@ -244,7 +248,8 @@ usb_process(di_minor_t minor, di_node_t node)
 	devfsadm_enumerate_t rules[1];
 	char *l_path, *p_path, *buf, *devfspath;
 	char *minor_nm, *drvr_nm, *name = (char *)NULL;
-	int i, index;
+	int i;
+	driver_defs_t index;
 	int flags = 0;
 	int create_secondary_link = 0;
 
@@ -307,6 +312,7 @@ usb_process(di_minor_t minor, di_node_t node)
 	case DRIVER_OHCI:
 	case DRIVER_EHCI:
 	case DRIVER_UHCI:
+	case DRIVER_XHCI:
 		rules[0] = hub_rules[0];	/* For HUBs */
 		name = "hub";
 

@@ -570,9 +570,9 @@ print_processor(smbios_hdl_t *shp, id_t id, FILE *fp)
 	else
 		oprintf(fp, "  Current Speed: Unknown\n");
 
-	id_printf(fp, "  L1 Cache: ", p.smbp_l1cache);
-	id_printf(fp, "  L2 Cache: ", p.smbp_l2cache);
-	id_printf(fp, "  L3 Cache: ", p.smbp_l3cache);
+	id_printf(fp, "  L1 Cache Handle: ", p.smbp_l1cache);
+	id_printf(fp, "  L2 Cache Handle: ", p.smbp_l2cache);
+	id_printf(fp, "  L3 Cache Handle: ", p.smbp_l3cache);
 }
 
 static void

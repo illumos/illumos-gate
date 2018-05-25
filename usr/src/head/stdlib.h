@@ -80,6 +80,18 @@ using std::wcstombs;
 using std::wctomb;
 #endif
 
+/*
+ * Allow global visibility for symbols defined in
+ * C++ "std" namespace in <iso/stdlib_c11.h>.
+ */
+#if __cplusplus >= 201103L
+using std::at_quick_exit;
+using std::quick_exit;
+#endif
+#if __cplusplus >= 201703L
+using std::aligned_alloc;
+#endif
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
