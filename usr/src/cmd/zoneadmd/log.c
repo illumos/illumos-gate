@@ -154,6 +154,8 @@ typedef struct jsonpair {
 	const char *jp_val;
 } jsonpair_t;
 
+boolean_t logging_poisoned = B_FALSE;
+
 /*
  * MAX_LOG_STREAMS is a small number so we allocate in the simplest way.
  */
@@ -161,7 +163,6 @@ static logstream_t streams[MAX_LOG_STREAMS];
 static logfile_t logfiles[MAX_LOG_STREAMS];
 
 static boolean_t logging_initialized = B_FALSE;
-static boolean_t logging_poisoned = B_FALSE;
 static uint64_t logging_rot_size;		/* See ZLOG_MAXSZ */
 static uint64_t logging_rot_keep;		/* See ZLOG_KEEP */
 static int logging_pending_sig = 0;		/* Signal recvd while logging */
@@ -396,15 +397,17 @@ logstream_atfork_parent(void)
 	logstream_unlock();
 }
 
+/*
+ * logstream_*() should never be called in a child process, so we make sure this
+ * code is never called there.
+ *
+ * zerror() in a child process is still safe: it knows to check for poisoning,
+ * and in such a case will redirect its output to stderr on the presumption it
+ * is a pipe to the parent.
+ */
 static void
 logstream_atfork_child(void)
 {
-	/*
-	 * This does just enough to cause any errant logging call in the child
-	 * to lead to a failed assertion.  logstream_init() must not be called
-	 * in the child.  It is expected that the child will be calling exec()
-	 * real soon.
-	 */
 	logging_poisoned = B_TRUE;
 	logging_pending_sig = 0;
 	logstream_unlock();

@@ -170,6 +170,8 @@ typedef enum {
 	LS_LINE_BUFFERED = 0x1		/* Write when \n found or full buffer */
 } logstream_flags_t;
 
+extern boolean_t logging_poisoned;
+
 extern void create_log_thread(zlog_t *);
 extern void destroy_log_thread(zlog_t *);
 extern void logstream_init(zlog_t *);

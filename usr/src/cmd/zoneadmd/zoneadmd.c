@@ -255,10 +255,20 @@ zerror(zlog_t *zlogp, boolean_t use_strerror, const char *fmt, ...)
 
 	(void) strlcat(buf, "\n", sizeof (buf));
 
-	logstream_write(platloghdl, bp_nozone, strlen(bp_nozone));
+	/*
+	 * If we don't have the platform log, we are in a child process, and
+	 * should log to stderr (which is a pipe) instead of the file.
+	 */
+	if (logging_poisoned) {
+		(void) fprintf(stderr, "%s", buf);
 
-	if (zlogp == NULL || zlogp == &logplat) {
-		return;
+		if (zlogp != &logsys && zlogp->logfile == stderr)
+			return;
+	} else {
+		logstream_write(platloghdl, bp_nozone, strlen(bp_nozone));
+
+		if (zlogp == &logplat)
+			return;
 	}
 
 	if (zlogp == &logsys) {
@@ -1094,9 +1104,7 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr, boolean_t debug)
 		sigset(SIGINT, SIG_DFL);
 
 		/*
-		 * Do not call zerror() in child process as neither zerror() nor
-		 * logstream_*() functions are designed to handle multiple
-		 * processes logging.  Rather, write all errors to the pipe.
+		 * Set up a pipe for the child to log to.
 		 */
 		if (dup2(fds[1], STDERR_FILENO) == -1) {
 			(void) snprintf(buf, sizeof (buf),
@@ -1116,19 +1124,20 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr, boolean_t debug)
 		 */
 		if ((in = open("/dev/null", O_RDONLY)) == -1 ||
 		    dup2(in, STDIN_FILENO) == -1) {
-			perror("subprocess failed to set up STDIN_FILENO");
+			zerror(zlogp, B_TRUE,
+			    "subprocess failed to set up STDIN_FILENO");
 			_exit(127);
 		}
 		closefrom(STDERR_FILENO + 1);
 
 		if (setup_subproc_env(zlogp, debug) != Z_OK) {
-			(void) fprintf(stderr, "failed to setup environment");
+			zerror(zlogp, B_FALSE, "failed to setup environment");
 			_exit(127);
 		}
 
 		(void) execl("/bin/sh", "sh", "-c", cmdbuf, NULL);
 
-		perror("subprocess execl failed");
+		zerror(zlogp, B_TRUE, "subprocess execl failed");
 		_exit(127);
 	} else if (child == -1) {
 		zerror(zlogp, B_TRUE, "failed to create subprocess for '%s'",
