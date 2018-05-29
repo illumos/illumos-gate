@@ -1789,8 +1789,11 @@ mac_rx_srs_long_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *mp,
 		 * when mac_ip_hdr_length_v6() fails because of malformed
 		 * packets or because mblks need to be concatenated using
 		 * pullupmsg().
+		 *
+		 * Perform a version check to prevent parsing weirdness...
 		 */
-		if (!mac_ip_hdr_length_v6(ip6h, mp->b_wptr, &hdr_len, &nexthdr,
+		if (IPH_HDR_VERSION(ip6h) != IPV6_VERSION ||
+		    !mac_ip_hdr_length_v6(ip6h, mp->b_wptr, &hdr_len, &nexthdr,
 		    NULL)) {
 			goto src_dst_based_fanout;
 		}
