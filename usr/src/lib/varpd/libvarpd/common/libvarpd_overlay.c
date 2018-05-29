@@ -514,6 +514,8 @@ libvarpd_plugin_query_reply(varpd_query_handle_t *vqh, int action)
 	else
 		libvarpd_panic("plugin %s passed in an invalid action: %d",
 		    vqp->vq_instance->vri_plugin->vpp_name, action);
+
+	umem_cache_free(vqp->vq_instance->vri_impl->vdi_qcache, vqp);
 }
 
 void
