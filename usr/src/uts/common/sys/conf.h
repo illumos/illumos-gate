@@ -24,6 +24,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_CONF_H
@@ -220,6 +221,8 @@ extern int cdev_prop_op(dev_t, dev_info_t *, ddi_prop_op_t,
 #define	_D_DIRECT	0x80000	/* Private flag for transport modules */
 
 #define	D_OPEN_RETURNS_EINTR	0x100000 /* EINTR expected from open(9E) */
+
+#define	_D_SINGLE_INSTANCE	0x200000 /* Module may only be pushed once */
 
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 

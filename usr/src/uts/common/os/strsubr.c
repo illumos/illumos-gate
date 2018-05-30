@@ -26,6 +26,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -950,7 +951,7 @@ str_sendsig(vnode_t *vp, int event, uchar_t band, int error)
  */
 static void
 dosendsig(proc_t *proc, int events, int sevent, k_siginfo_t *info,
-	uchar_t band, int error)
+    uchar_t band, int error)
 {
 	ASSERT(MUTEX_HELD(&proc->p_lock));
 
@@ -2350,7 +2351,7 @@ mux_rmvedge(stdata_t *upstp, int muxid, str_stack_t *ss)
  */
 int
 devflg_to_qflag(struct streamtab *stp, uint32_t devflag, uint32_t *qflagp,
-	uint32_t *sqtypep)
+    uint32_t *sqtypep)
 {
 	uint32_t qflag = 0;
 	uint32_t sqtype = 0;
@@ -2463,6 +2464,17 @@ devflg_to_qflag(struct streamtab *stp, uint32_t devflag, uint32_t *qflagp,
 			goto bad;
 		qflag |= _QDIRECT;
 	}
+
+	/*
+	 * Private flag used to indicate that a streams module should only
+	 * be pushed once. The TTY streams modules have this flag since if
+	 * libc believes itself to be an xpg4 process then it will
+	 * automatically and unconditionally push them when a PTS device is
+	 * opened. If an application is not aware of this then without this
+	 * flag we would end up with duplicate modules.
+	 */
+	if (devflag & _D_SINGLE_INSTANCE)
+		qflag |= _QSINGLE_INSTANCE;
 
 	*qflagp = qflag;
 	*sqtypep = sqtype;
@@ -8087,7 +8099,7 @@ strflushrq(vnode_t *vp, int flag)
 
 void
 strsetrputhooks(vnode_t *vp, uint_t flags,
-		msgfunc_t protofunc, msgfunc_t miscfunc)
+    msgfunc_t protofunc, msgfunc_t miscfunc)
 {
 	struct stdata *stp = vp->v_stream;
 

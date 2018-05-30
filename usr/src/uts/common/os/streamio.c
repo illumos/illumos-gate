@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -3782,6 +3783,30 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 
 		TRACE_2(TR_FAC_STREAMS_FR, TR_I_PUSH,
 		    "I_PUSH:fp %p stp %p", fp, stp);
+
+		/*
+		 * If the module is flagged as single-instance, then check
+		 * to see if the module is already pushed. If it is, return
+		 * as if the push was successful.
+		 */
+		if (fp->f_qflag & _QSINGLE_INSTANCE) {
+			queue_t *q;
+
+			claimstr(stp->sd_wrq);
+			for (q = stp->sd_wrq->q_next; q; q = q->q_next) {
+				if (q->q_flag & QREADR) {
+					q = NULL;
+					break;
+				}
+				if (strcmp(mname, Q2NAME(q)) == 0)
+					break;
+			}
+			releasestr(stp->sd_wrq);
+			if (q != NULL) {
+				fmodsw_rele(fp);
+				return (0);
+			}
+		}
 
 		if (error = strstartplumb(stp, flag, cmd)) {
 			fmodsw_rele(fp);
