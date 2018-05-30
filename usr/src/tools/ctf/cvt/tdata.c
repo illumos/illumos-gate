@@ -246,22 +246,22 @@ static void (*free_cbs[])(tdesc_t *) = {
 };
 
 /*ARGSUSED1*/
-static int
-tdesc_free_cb(tdesc_t *tdp, void *private)
+static void
+tdesc_free_cb(void *ptr, void *private)
 {
+	tdesc_t *tdp = ptr;
+
 	if (tdp->t_name)
 		free(tdp->t_name);
 	if (free_cbs[tdp->t_type])
 		free_cbs[tdp->t_type](tdp);
 	free(tdp);
-
-	return (1);
 }
 
 void
 tdesc_free(tdesc_t *tdp)
 {
-	(void) tdesc_free_cb(tdp, NULL);
+	tdesc_free_cb(tdp, NULL);
 }
 
 static int
@@ -390,8 +390,8 @@ tdata_new(void)
 void
 tdata_free(tdata_t *td)
 {
-	hash_free(td->td_iihash, (void (*)())iidesc_free, NULL);
-	hash_free(td->td_layouthash, (void (*)())tdesc_free_cb, NULL);
+	hash_free(td->td_iihash, iidesc_free_cb, NULL);
+	hash_free(td->td_layouthash, tdesc_free_cb, NULL);
 	hash_free(td->td_idhash, NULL, NULL);
 	list_free(td->td_fwdlist, NULL, NULL);
 

@@ -448,7 +448,7 @@ parse_stab(stab_t *stab, char *cp, iidesc_t **iidescp)
 	bzero(&resetbuf, sizeof (resetbuf));
 
 	if (rc < 0 || ii->ii_type == II_NOT) {
-		iidesc_free(ii, NULL);
+		iidesc_free(ii);
 		return (rc);
 	}
 

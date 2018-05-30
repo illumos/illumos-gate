@@ -58,11 +58,11 @@ extern "C" {
 #endif
 
 #ifndef MAX
-#define	MAX(a, b) 		((a) < (b) ? (b) : (a))
+#define	MAX(a, b)		((a) < (b) ? (b) : (a))
 #endif
 
 #ifndef MIN
-#define	MIN(a, b) 		((a) > (b) ? (b) : (a))
+#define	MIN(a, b)		((a) > (b) ? (b) : (a))
 #endif
 
 #define	TRUE	1
@@ -271,13 +271,13 @@ typedef enum iitype {
 typedef struct iidesc {
 	iitype_t	ii_type;
 	char		*ii_name;
-	tdesc_t 	*ii_dtype;
+	tdesc_t		*ii_dtype;
 	char		*ii_owner;	/* File that defined this node */
 	int		ii_flags;
 
 	/* Function arguments (if any) */
 	int		ii_nargs;
-	tdesc_t 	**ii_args;
+	tdesc_t		**ii_args;
 	int		ii_vargs;	/* Function uses varargs */
 } iidesc_t;
 
@@ -358,14 +358,15 @@ void iter_iidescs_by_name(tdata_t *, const char *,
 iidesc_t *iidesc_dup(iidesc_t *);
 iidesc_t *iidesc_dup_rename(iidesc_t *, char const *, char const *);
 void iidesc_add(hash_t *, iidesc_t *);
-void iidesc_free(iidesc_t *, void *);
+void iidesc_free(iidesc_t *);
+void iidesc_free_cb(void *, void *);
 int iidesc_count_type(void *, void *);
 void iidesc_stats(hash_t *);
 int iidesc_dump(iidesc_t *);
 
 /* input.c */
 typedef enum source_types {
-	SOURCE_NONE 	= 0,
+	SOURCE_NONE	= 0,
 	SOURCE_UNKNOWN	= 1,
 	SOURCE_C	= 2,
 	SOURCE_S	= 4
