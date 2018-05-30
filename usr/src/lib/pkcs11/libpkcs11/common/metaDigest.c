@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Message Digesting Functions
@@ -70,7 +69,7 @@ meta_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	meta_session_t *session;
 
 
-	if (pData == NULL || pulDigestLen == NULL)
+	if ((pData == NULL && ulDataLen != 0) || pulDigestLen == NULL)
 		return (CKR_ARGUMENTS_BAD);
 
 	rv = meta_handle2session(hSession, &session);

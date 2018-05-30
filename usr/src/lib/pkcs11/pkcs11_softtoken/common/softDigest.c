@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <pthread.h>
@@ -120,7 +121,7 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if (pData == NULL || pulDigestLen == NULL) {
+	if ((pData == NULL && ulDataLen != 0) || pulDigestLen == NULL) {
 		rv = CKR_ARGUMENTS_BAD;
 		goto clean_exit;
 	}
