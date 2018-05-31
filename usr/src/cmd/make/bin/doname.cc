@@ -130,23 +130,29 @@ Doname
 doname_check(register Name target, register Boolean do_get, register Boolean implicit, register Boolean automatic)
 {
 	int first_time = 1;
+	Doname rv = build_failed;
+
 	(void) fflush(stdout);
 try_again:
 	switch (doname(target, do_get, implicit, automatic)) {
 	case build_ok:
 		second_pass = 0;
-		return build_ok;
+		rv = build_ok;
+		break;
 	case build_running:
 		second_pass = 0;
-		return build_running;
+		rv = build_running;
+		break;
 	case build_failed:
 		if (!continue_after_error) {
-			fatal(gettext("Target `%s' not remade because of errors"),
-			      target->string_mb);
+			fatal(
+			    gettext("Target `%s' not remade because of errors"),
+			    target->string_mb);
 		}
 		build_failed_seen = true;
 		second_pass = 0;
-		return build_failed;
+		rv = build_failed;
+		break;
 	case build_dont_know:
 		/*
 		 * If we can't figure out how to build an automatic
@@ -158,7 +164,8 @@ try_again:
 		 */
 		if (automatic || (report_dependencies_level > 0)) {
 			second_pass = 0;
-			return build_dont_know;
+			rv = build_dont_know;
+			break;
 		}
 		if(first_time) {
 			first_time = 0;
@@ -170,14 +177,14 @@ try_again:
 			warning(gettext("Don't know how to make target `%s'"),
 				target->string_mb);
 			build_failed_seen = true;
-			return build_failed;
+			rv = build_failed;
+			break;
 		}
-		fatal(gettext("Don't know how to make target `%s'"), target->string_mb);
+		fatal(gettext("Don't know how to make target `%s'"),
+		    target->string_mb);
 		break;
 	}
-#ifdef lint
-	return build_failed;
-#endif
+	return (rv);
 }
 
 
@@ -355,7 +362,7 @@ doname(register Name target, register Boolean do_get, register Boolean implicit,
 		} else {
 			recheck_conditionals = true;
 		}
-  	}
+	}
 	if (target->state == build_subtree) {
 		/* A dynamic macro subtree is being built */
 		target->state = build_dont_know;
@@ -1718,7 +1725,7 @@ run_command(register Property line, Boolean)
 						current_line = NULL;
 						target->parallel = false;
 						line->body.line.command_used =
-						  			NULL;
+						    NULL;
 						return build_serial;
 					}
 				}
@@ -2468,11 +2475,11 @@ build_command_strings(Name target, register Property line)
 	(void) SETVAR(percent_name, (Name) NULL, false);
 	(void) SETVAR(query, (Name) NULL, false);
         if (query_list != NULL) {
-        	delete_query_chain(query_list);
+		delete_query_chain(query_list);
         }
 	(void) SETVAR(hat, (Name) NULL, false);
         if (hat_list != NULL) {
-        	delete_query_chain(hat_list);
+		delete_query_chain(hat_list);
         }
 
 	if (conditional_macro_used) {
