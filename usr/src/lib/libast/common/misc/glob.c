@@ -374,6 +374,7 @@ again:
 		case '(':
 			if (!(gp->gl_flags & GLOB_AUGMENTED))
 				continue;
+			/* FALLTHROUGH */
 		case '*':
 		case '?':
 			meta = MATCH_META;

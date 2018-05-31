@@ -1132,27 +1132,9 @@ typedef struct _sftab_
 
 /* note that MEMCPY advances the associated pointers */
 #define MEMCPY(to,fr,n) \
-	switch(n) \
-	{ default : memcpy((Void_t*)to,(Void_t*)fr,n); to += n; fr += n; break; \
-	  case  7 : *to++ = *fr++; \
-	  case  6 : *to++ = *fr++; \
-	  case  5 : *to++ = *fr++; \
-	  case  4 : *to++ = *fr++; \
-	  case  3 : *to++ = *fr++; \
-	  case  2 : *to++ = *fr++; \
-	  case  1 : *to++ = *fr++; \
-	}
+	{ memcpy((Void_t*)to,(Void_t*)fr,n); to += n; fr += n; }
 #define MEMSET(s,c,n) \
-	switch(n) \
-	{ default : memset((Void_t*)s,(int)c,n); s += n; break; \
-	  case  7 : *s++ = c; \
-	  case  6 : *s++ = c; \
-	  case  5 : *s++ = c; \
-	  case  4 : *s++ = c; \
-	  case  3 : *s++ = c; \
-	  case  2 : *s++ = c; \
-	  case  1 : *s++ = c; \
-	}
+	{ memset((Void_t*)s,(int)c,n); s += n; }
 
 _BEGIN_EXTERNS_
 
