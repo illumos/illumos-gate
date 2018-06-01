@@ -1,5 +1,6 @@
 /*
  * Copyright 2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2018 RackTop Systems.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -10,7 +11,7 @@
 #ifndef LIBCRYPTO_COMPAT_H
 #define	LIBCRYPTO_COMPAT_H
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 
 #include <openssl/rsa.h>
 #include <openssl/dsa.h>
@@ -86,6 +87,6 @@ RSA *EVP_PKEY_get0_RSA(EVP_PKEY *pkey);
 #define	X509_getm_notBefore  X509_get_notBefore
 #define	X509_getm_notAfter X509_get_notAfter
 
-#endif /* OPENSSL_VERSION_NUMBER */
+#endif /* OPENSSL_VERSION_NUMBER || LIBRESSL_VERSION_NUMBER */
 
 #endif /* LIBCRYPTO_COMPAT_H */

@@ -3,6 +3,7 @@
  *	All rights reserved.
  * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2018 RackTop Systems.
  *
  * By using this file, you agree to the terms and conditions set
  * forth in the LICENSE file which can be found at the top level of
@@ -39,7 +40,7 @@ static int	tls_verify_log __P((int, X509_STORE_CTX *, char *));
 #  include <openssl/dh.h>
 #  include <openssl/dsa.h>
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 
 /*
  * This compatibility function is taken from
@@ -319,7 +320,7 @@ bool
 init_tls_library()
 {
 	/* basic TLS initialization, ignore result for now */
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	/* No longer available (nor necessary) in OpenSSL 1.1 */
 	SSL_library_init();
 	SSL_load_error_strings();

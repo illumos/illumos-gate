@@ -1,5 +1,6 @@
 /*
  * Copyright 2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2018 RackTop Systems.
  *
  * Licensed under the OpenSSL license (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -12,7 +13,7 @@
 #include <openssl/engine.h>
 #include "compat.h"
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 
 static void *
 OPENSSL_zalloc(size_t num)
@@ -443,4 +444,4 @@ EVP_PKEY_get0_RSA(EVP_PKEY *pkey)
 	return (pkey->pkey.rsa);
 }
 
-#endif /* OPENSSL_VERSION_NUMBER */
+#endif /* OPENSSL_VERSION_NUMBER || LIBRESSL_VERSION_NUMBER */
