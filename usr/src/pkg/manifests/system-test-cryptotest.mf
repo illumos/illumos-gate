@@ -115,6 +115,12 @@ file opt/crypto-tests/tests/aes/pkcs/aes_gcm_64 \
 file opt/crypto-tests/tests/digest/kcf/cleanup \
     path=opt/crypto-tests/tests/digest/kcf/cleanup group=root mode=0555 \
     owner=root
+file opt/crypto-tests/tests/digest/kcf/md5_32 \
+    path=opt/crypto-tests/tests/digest/kcf/md5_32 group=root mode=0555 \
+    owner=root
+file opt/crypto-tests/tests/digest/kcf/md5_64 \
+    path=opt/crypto-tests/tests/digest/kcf/md5_64 group=root mode=0555 \
+    owner=root
 file opt/crypto-tests/tests/digest/kcf/setup \
     path=opt/crypto-tests/tests/digest/kcf/setup group=root mode=0555 \
     owner=root
@@ -153,6 +159,12 @@ file opt/crypto-tests/tests/digest/kcf/sha512_32 \
     owner=root
 file opt/crypto-tests/tests/digest/kcf/sha512_64 \
     path=opt/crypto-tests/tests/digest/kcf/sha512_64 group=root mode=0555 \
+    owner=root
+file opt/crypto-tests/tests/digest/pkcs/md5_32 \
+    path=opt/crypto-tests/tests/digest/pkcs/md5_32 group=root mode=0555 \
+    owner=root
+file opt/crypto-tests/tests/digest/pkcs/md5_64 \
+    path=opt/crypto-tests/tests/digest/pkcs/md5_64 group=root mode=0555 \
     owner=root
 file opt/crypto-tests/tests/digest/pkcs/sha1_32 \
     path=opt/crypto-tests/tests/digest/pkcs/sha1_32 group=root mode=0555 \
