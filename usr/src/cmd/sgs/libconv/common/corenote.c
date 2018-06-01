@@ -25,7 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -106,20 +106,21 @@ conv_cnote_auxv_type(Word type, Conv_fmt_flags_t fmt_flags,
 	static const conv_ds_msg_t ds_types_2000_2011 = {
 	    CONV_DS_MSG_INIT(2000, types_2000_2011) };
 
-	static const Msg	types_2014_2025[] = {
+	static const Msg	types_2014_2026[] = {
 		MSG_AUXV_AT_SUN_EXECNAME,	MSG_AUXV_AT_SUN_MMU,
 		MSG_AUXV_AT_SUN_LDDATA,		MSG_AUXV_AT_SUN_AUXFLAGS,
 		MSG_AUXV_AT_SUN_EMULATOR,	MSG_AUXV_AT_SUN_BRANDNAME,
 		MSG_AUXV_AT_SUN_BRAND_AUX1,	MSG_AUXV_AT_SUN_BRAND_AUX2,
 		MSG_AUXV_AT_SUN_BRAND_AUX3,	MSG_AUXV_AT_SUN_HWCAP2,
-		MSG_AUXV_AT_SUN_BRAND_NROOT,	MSG_AUXV_AT_SUN_COMMPAGE
+		MSG_AUXV_AT_SUN_BRAND_NROOT,	MSG_AUXV_AT_SUN_BRAND_AUX4,
+		MSG_AUXV_AT_SUN_COMMPAGE
 	};
-	static const conv_ds_msg_t ds_types_2014_2025 = {
-	    CONV_DS_MSG_INIT(2014, types_2014_2025) };
+	static const conv_ds_msg_t ds_types_2014_2026 = {
+	    CONV_DS_MSG_INIT(2014, types_2014_2026) };
 
 	static const conv_ds_t	*ds[] = {
 		CONV_DS_ADDR(ds_types_0_25), CONV_DS_ADDR(ds_types_2000_2011),
-		CONV_DS_ADDR(ds_types_2014_2025), NULL };
+		CONV_DS_ADDR(ds_types_2014_2026), NULL };
 
 	return (conv_map_ds(ELFOSABI_NONE, EM_NONE, type, ds, fmt_flags,
 	    inv_buf));
