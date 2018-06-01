@@ -597,7 +597,7 @@ mb_kernel_cmdline(struct preloaded_file *fp, struct devdesc *rootdev,
 	else
 		mb2 = true;
 
-	if (rootdev->d_type == DEVT_ZFS)
+	if (rootdev->d_dev->dv_type == DEVT_ZFS)
 		zfs_root = true;
 
 	/* If we have fstype set in env, reset zfs_root if needed. */

@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD$
- * From	$NetBSD: stand.h,v 1.22 1997/06/26 19:17:40 drochner Exp $	
+ * From	$NetBSD: stand.h,v 1.22 1997/06/26 19:17:40 drochner Exp $
  */
 
 /*
@@ -131,7 +131,7 @@ extern struct fs_ops pkgfs_fsops;
 #define	SEEK_CUR	1	/* set file offset to current plus offset */
 #define	SEEK_END	2	/* set file offset to EOF plus offset */
 
-/* 
+/*
  * Device switch
  */
 struct devsw {
@@ -167,7 +167,6 @@ extern int errno;
  */
 struct devdesc {
     struct devsw	*d_dev;
-    int			d_type;
     int			d_unit;
     void		*d_opendata;
 };
@@ -286,7 +285,7 @@ extern struct	dirent *readdirfd(int);
 
 extern void	srandom(u_long seed);
 extern u_long	random(void);
-    
+
 /* imports from stdlib, locally modified */
 extern long	strtol(const char *, char **, int);
 extern unsigned long	strtoul(const char *, char **, int);
@@ -374,9 +373,9 @@ extern int	null_stat(struct open_file *f, struct stat *sb);
 extern int	null_readdir(struct open_file *f, struct dirent *d);
 
 
-/* 
- * Machine dependent functions and data, must be provided or stubbed by 
- * the consumer 
+/*
+ * Machine dependent functions and data, must be provided or stubbed by
+ * the consumer
  */
 extern int		getchar(void);
 extern int		ischar(void);

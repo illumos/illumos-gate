@@ -137,7 +137,7 @@ has_keyboard(void)
 			} else if (DevicePathType(path) == MESSAGING_DEVICE_PATH &&
 			    DevicePathSubType(path) == MSG_USB_CLASS_DP) {
 				USB_CLASS_DEVICE_PATH *usb;
-       
+
 				usb = (USB_CLASS_DEVICE_PATH *)(void *)path;
 				if (usb->DeviceClass == 3 && /* HID */
 				    usb->DeviceSubClass == 1 && /* Boot devices */
@@ -161,7 +161,6 @@ set_devdesc_currdev(struct devsw *dev, int unit)
 	char *devname;
 
 	currdev.d_dev = dev;
-	currdev.d_type = currdev.d_dev->dv_type;
 	currdev.d_unit = unit;
 	devname = efi_fmtdev(&currdev);
 
@@ -188,7 +187,6 @@ find_currdev(EFI_LOADED_IMAGE *img)
 
 		currdev.dd.d_dev = &zfs_dev;
 		currdev.dd.d_unit = 0;
-		currdev.dd.d_type = currdev.dd.d_dev->dv_type;
 		currdev.pool_guid = pool_guid;
 		currdev.root_guid = 0;
 		devname = efi_fmtdev(&currdev);
@@ -206,7 +204,6 @@ find_currdev(EFI_LOADED_IMAGE *img)
 		struct disk_devdesc currdev;
 
 		currdev.dd.d_dev = &efipart_hddev;
-		currdev.dd.d_type = currdev.dd.d_dev->dv_type;
 		currdev.dd.d_unit = dp->pd_unit;
 		currdev.d_slice = -1;
 		currdev.d_partition = -1;
@@ -890,7 +887,7 @@ command_chain(int argc, char *argv[])
 		struct disk_devdesc *d_dev;
 		pdinfo_t *hd, *pd;
 
-		switch (dev->d_type) {
+		switch (dev->d_dev->dv_type) {
 		case DEVT_ZFS:
 			z_dev = (struct zfs_devdesc *)dev;
 			loaded_image->DeviceHandle =
