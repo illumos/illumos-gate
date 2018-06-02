@@ -434,6 +434,7 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_enter(&hidp->hid_mutex);
 	if (usb_ep_xdescr_fill(USB_EP_XDESCR_CURRENT_VERSION, dip, ep_data,
 	    &hidp->hid_ep_intr_xdescr) != USB_SUCCESS) {
+		mutex_exit(&hidp->hid_mutex);
 
 		goto fail;
 	}
@@ -1072,11 +1073,11 @@ hid_wput(queue_t *q, mblk_t *mp)
 {
 	hid_state_t	*hidp = (hid_state_t *)q->q_ptr;
 	int		error = USB_SUCCESS;
-	struct iocblk 	*iocbp;
+	struct iocblk	*iocbp;
 	mblk_t		*datap;
 	int		direction;
 	struct copyresp *crp;
-	queue_t 	*tmpq;
+	queue_t		*tmpq;
 	int		flag;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
@@ -2576,7 +2577,7 @@ hid_send_async_ctrl_request(hid_default_pipe_arg_t *hid_default_pipe_arg,
 	}
 
 	ctrl_req->ctrl_bmRequestType	= request_type;
-	ctrl_req->ctrl_bRequest 	= (uint8_t)request_request;
+	ctrl_req->ctrl_bRequest		= (uint8_t)request_request;
 	ctrl_req->ctrl_wValue		= hid_request->hid_req_wValue;
 	ctrl_req->ctrl_wIndex		= request_index;
 	ctrl_req->ctrl_wLength		= hid_request->hid_req_wLength;
