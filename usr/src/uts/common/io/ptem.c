@@ -26,6 +26,7 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -62,7 +63,7 @@ extern struct streamtab pteminfo;
 static struct fmodsw fsw = {
 	"ptem",
 	&pteminfo,
-	D_MTQPAIR | D_MP
+	D_MTQPAIR | D_MP | _D_SINGLE_INSTANCE
 };
 
 static struct modlstrmod modlstrmod = {

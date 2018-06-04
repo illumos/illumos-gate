@@ -9747,10 +9747,7 @@ d usr/lib/raidcfg/amd64 0755 root bin
 f usr/lib/raidcfg/amd64/mpt.so.1 0755 root bin
 f usr/lib/raidcfg/mpt.so.1 0755 root bin
 d usr/lib/rcap 0755 root bin
-d usr/lib/rcap/amd64 0755 root bin
-f usr/lib/rcap/amd64/rcapd 0555 root bin
-d usr/lib/rcap/i86 0755 root bin
-h usr/lib/rcap/rcapd=usr/lib/isaexec
+f usr/lib/rcap/rcapd 0555 root bin
 d usr/lib/rcm 0755 root bin
 d usr/lib/rcm/modules 0755 root bin
 f usr/lib/rcm/modules/SUNW_aggr_rcm.so 0555 root bin

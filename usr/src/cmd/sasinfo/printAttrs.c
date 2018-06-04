@@ -99,6 +99,7 @@ static SAS_STATE phystate_string[] = {
 	HBA_SASSPEED_1_5GBIT,		"1.5Gbit",
 	HBA_SASSPEED_3GBIT,		"3Gbit",
 	HBA_SASSPEED_6GBIT,		"6Gbit",
+	HBA_SASSPEED_12GBIT,		"12Gbit",
 	-1,				NULL,
 };
 
@@ -165,7 +166,8 @@ getPhyStateString(HBA_UINT32 key, phystat_type phyt)
 	HBA_UINT32 physpeed[] = {
 		HBA_SASSPEED_1_5GBIT,
 		HBA_SASSPEED_3GBIT,
-		HBA_SASSPEED_6GBIT
+		HBA_SASSPEED_6GBIT,
+		HBA_SASSPEED_12GBIT
 	};
 
 	len = sizeof (physpeed) / sizeof (HBA_UINT32);

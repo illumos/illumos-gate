@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines for manipulating iidesc_t structures
  */
@@ -99,7 +97,7 @@ iidesc_add(hash_t *hash, iidesc_t *new)
 		bcopy(new, old, sizeof (*old));
 		bcopy(&tmp, new, sizeof (*new));
 
-		iidesc_free(new, NULL);
+		iidesc_free(new);
 		return;
 	}
 
@@ -151,15 +149,20 @@ iidesc_dup_rename(iidesc_t *src, char const *name, char const *owner)
 
 /*ARGSUSED*/
 void
-iidesc_free(iidesc_t *idp, void *private)
+iidesc_free_cb(void *ptr, void *private)
 {
-	if (idp->ii_name)
-		free(idp->ii_name);
-	if (idp->ii_nargs)
-		free(idp->ii_args);
-	if (idp->ii_owner)
-		free(idp->ii_owner);
+	iidesc_t *idp = ptr;
+
+	free(idp->ii_name);
+	free(idp->ii_args);
+	free(idp->ii_owner);
 	free(idp);
+}
+
+void
+iidesc_free(iidesc_t *idp)
+{
+	iidesc_free_cb(idp, NULL);
 }
 
 int

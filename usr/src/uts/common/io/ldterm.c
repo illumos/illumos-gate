@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -381,7 +382,7 @@ static struct streamtab ldtrinfo;
 static struct fmodsw fsw = {
 	"ldterm",
 	&ldtrinfo,
-	D_MTQPAIR | D_MP
+	D_MTQPAIR | D_MP | _D_SINGLE_INSTANCE
 };
 
 static struct modlstrmod modlstrmod = {

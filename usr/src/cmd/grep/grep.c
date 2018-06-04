@@ -35,6 +35,7 @@
  */
 
 /*
+ * Copyright 2018 RackTop Systems.
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2013 Damian Bogel. All rights reserved.
  */
@@ -1277,8 +1278,8 @@ L_start_process:
 			goto L_next_line;
 
 		/* Do we have room to add this line to the context buffer? */
-		if ((line_len + 1) > (conbuflen -
-		    (conptrend >= conptr) ? conptrend - conbuf : 0)) {
+		while ((line_len + 1) > (conbuflen -
+		    ((conptrend >= conptr) ? conptrend - conbuf : 0))) {
 			char *oldconbuf = conbuf;
 			char *oldconptr = conptr;
 			long tmp = matchptr - conptr;

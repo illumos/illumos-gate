@@ -504,9 +504,11 @@ worker_runphase2(workqueue_t *wq)
 /*
  * Main loop for worker threads.
  */
-static void
-worker_thread(workqueue_t *wq)
+static void *
+worker_thread(void *ptr)
 {
+	workqueue_t *wq = ptr;
+
 	worker_runphase1(wq);
 
 	debug(2, "%d: entering first barrier\n", pthread_self());
@@ -530,6 +532,7 @@ worker_thread(workqueue_t *wq)
 	debug(2, "%d: phase 1 complete\n", pthread_self());
 
 	worker_runphase2(wq);
+	return (NULL);
 }
 
 /*
@@ -692,7 +695,7 @@ start_threads(workqueue_t *wq)
 
 	for (i = 0; i < wq->wq_nthreads; i++) {
 		pthread_create(&wq->wq_thread[i], NULL,
-		    (void *(*)(void *))worker_thread, wq);
+		    worker_thread, wq);
 	}
 
 	sigset(SIGINT, handle_sig);

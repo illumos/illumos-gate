@@ -43,13 +43,11 @@ dir path=usr/share/man/man1
 dir path=usr/share/man/man1m
 file path=lib/svc/manifest/system/rcap.xml group=sys mode=0444
 file path=usr/bin/rcapstat mode=0555
-file path=usr/lib/rcap/$(ARCH32)/rcapd mode=0555
-file path=usr/lib/rcap/$(ARCH64)/rcapd mode=0555
+file path=usr/lib/rcap/rcapd mode=0555
 file path=usr/sbin/rcapadm mode=0555
 file path=usr/share/man/man1/rcapstat.1
 file path=usr/share/man/man1m/rcapadm.1m
 file path=usr/share/man/man1m/rcapd.1m
-hardlink path=usr/lib/rcap/rcapd target=../isaexec
 legacy pkg=SUNWrcapr desc="Solaris Resource Capping Daemon (Root)" \
     name="Solaris Resource Capping Daemon (Root)"
 legacy pkg=SUNWrcapu desc="Solaris Resource Capping Daemon (Usr)" \

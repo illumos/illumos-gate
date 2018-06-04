@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines used to read stabs data from a file, and to build a tdata structure
  * based on the interesting parts of that data.
@@ -331,7 +329,7 @@ stabs_read(tdata_t *td, Elf *elf, const char *file)
 		 */
 		if (scope && stab->n_type != N_PSYM) {
 			if (iidescp)
-				iidesc_free(iidescp, NULL);
+				iidesc_free(iidescp);
 			goto parse_loop_end;
 		}
 
@@ -356,7 +354,7 @@ stabs_read(tdata_t *td, Elf *elf, const char *file)
 
 		case II_PSYM:
 			fnarg_add(curfun, iidescp);
-			iidesc_free(iidescp, NULL);
+			iidesc_free(iidescp);
 			break;
 		default:
 			aborterr("invalid ii_type %d for stab type %d",
