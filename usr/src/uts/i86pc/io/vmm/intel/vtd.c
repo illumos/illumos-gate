@@ -705,6 +705,7 @@ vtd_create_domain(vm_paddr_t maxaddr)
 	if ((uintptr_t)dom->ptp & PAGE_MASK)
 		panic("vtd_create_domain: ptp (%p) not page aligned", dom->ptp);
 
+#ifdef __FreeBSD__
 #ifdef notyet
 	/*
 	 * XXX superpage mappings for the iommu do not work correctly.
@@ -719,6 +720,18 @@ vtd_create_domain(vm_paddr_t maxaddr)
 	 *
 	 * There is not any code to deal with the demotion at the moment
 	 * so we disable superpage mappings altogether.
+	 */
+	dom->spsmask = VTD_CAP_SPS(vtdmap->cap);
+#endif
+#else
+	/*
+	 * On illumos we decidedly do not remove memory mapped to a VM's domain
+	 * from the host_domain, so we don't have to deal with page demotion and
+	 * can just use large pages.
+	 *
+	 * Since VM memory is currently allocated as 4k pages and mapped into
+	 * the VM domain page by page, the use of large pages is essentially
+	 * limited to the host_domain.
 	 */
 	dom->spsmask = VTD_CAP_SPS(vtdmap->cap);
 #endif
