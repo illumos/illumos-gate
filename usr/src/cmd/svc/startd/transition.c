@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2016 RackTop Systems.
+ * Copyright 2016-2018 RackTop Systems.
  */
 
 
@@ -163,24 +163,21 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
 	int to_offline = v->gv_flags & GV_TOOFFLINE;
-	int to_disable = v->gv_flags & GV_TODISABLE;
 
 	v->gv_flags &= ~GV_TOOFFLINE;
 
 	/*
-	 * If the instance should be enabled, see if we can start it.
-	 * Otherwise send a disable command.
-	 * If a instance has the GV_TOOFFLINE flag set then it must
-	 * remains offline until the disable process completes.
+	 * If the instance should be disabled send it a disable command.
+	 * Otherwise, if GV_TOOFFLINE was not set, see if we can start it.
 	 */
-	if (v->gv_flags & GV_ENABLED) {
-		if (to_offline == 0 && to_disable == 0)
-			graph_start_if_satisfied(v);
-	} else {
+	if (v->gv_flags & GV_TODISABLE) {
 		if (gt_running(old_state) && v->gv_post_disable_f)
 			v->gv_post_disable_f();
 
 		vertex_send_event(v, RESTARTER_EVENT_TYPE_DISABLE);
+	} else if (v->gv_flags & GV_ENABLED) {
+		if (to_offline == 0)
+			graph_start_if_satisfied(v);
 	}
 
 	/*
