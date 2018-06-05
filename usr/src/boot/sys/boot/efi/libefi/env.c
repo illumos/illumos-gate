@@ -28,6 +28,7 @@
 #include <stand.h>
 #include <string.h>
 #include <efi.h>
+#include <efichar.h>
 #include <efilib.h>
 #include <efigpt.h>	/* Partition GUIDS */
 #include <Guid/MemoryTypeInformation.h>
@@ -46,6 +47,7 @@ static struct efi_uuid_mapping {
 	EFI_GUID efi_guid;
 } efi_uuid_mapping[] = {
 	{ .efi_guid_name = "global", .efi_guid = EFI_GLOBAL_VARIABLE },
+	{ .efi_guid_name = "illumos", .efi_guid = ILLUMOS_BOOT_VAR_GUID },
 	/* EFI Systab entry names. */
 	{ .efi_guid_name = "MPS Table", .efi_guid = MPS_TABLE_GUID },
 	{ .efi_guid_name = "ACPI Table", .efi_guid = ACPI_TABLE_GUID },
@@ -102,12 +104,12 @@ static struct efi_uuid_mapping {
 	{ .efi_guid_name = "loaded image device path",
 	    .efi_guid = EFI_LOADED_IMAGE_DEVICE_PATH_PROTOCOL_GUID },
 	{ .efi_guid_name = "ISA io", .efi_guid = EFI_ISA_IO_PROTOCOL_GUID },
-        { .efi_guid_name = "IDE controller init",
+	{ .efi_guid_name = "IDE controller init",
 	    .efi_guid = EFI_IDE_CONTROLLER_INIT_PROTOCOL_GUID },
-        { .efi_guid_name = "ISA ACPI", .efi_guid = EFI_ISA_ACPI_PROTOCOL_GUID },
-        { .efi_guid_name = "PCI", .efi_guid = EFI_PCI_IO_PROTOCOL_GUID },
-        { .efi_guid_name = "PCI root", .efi_guid = EFI_PCI_ROOT_IO_GUID },
-        { .efi_guid_name = "PCI enumeration",
+	{ .efi_guid_name = "ISA ACPI", .efi_guid = EFI_ISA_ACPI_PROTOCOL_GUID },
+	{ .efi_guid_name = "PCI", .efi_guid = EFI_PCI_IO_PROTOCOL_GUID },
+	{ .efi_guid_name = "PCI root", .efi_guid = EFI_PCI_ROOT_IO_GUID },
+	{ .efi_guid_name = "PCI enumeration",
 	    .efi_guid = EFI_PCI_ENUMERATION_COMPLETE_GUID },
         { .efi_guid_name = "Driver diagnostics",
 	    .efi_guid = EFI_DRIVER_DIAGNOSTICS_PROTOCOL_GUID },
@@ -443,24 +445,43 @@ efi_print_mem_type(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
 	return (CMD_OK);
 }
 
+/*
+ * Print illumos variables.
+ * We have LoaderPath and LoaderDev as CHAR16 strings.
+ */
+static int
+efi_print_illumos(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
+{
+	int rv = -1;
+	char *var = NULL;
+
+	if (ucs2_to_utf8(varnamearg, &var) != 0)
+		return (CMD_ERROR);
+
+	if (strcmp("LoaderPath", var) == 0 ||
+	    strcmp("LoaderDev", var) == 0) {
+		printf(" = ");
+		printf("%S", (CHAR16 *)data);
+
+		if (pager_output("\n"))
+			rv = CMD_WARN;
+		else
+			rv = CMD_OK;
+	}
+
+	free(var);
+	return (rv);
+}
+
 /* Print global variables. */
 static int
 efi_print_global(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
 {
-	int len;
 	int rv = -1;
-	char *var;
+	char *var = NULL;
 
-	for (len = 0; varnamearg[len] != 0; len++)
-		;
-
-	if (len == 0)
-		return (CMD_OK);
-	len++;
-
-	if ((var = malloc(len)) == NULL)
+	if (ucs2_to_utf8(varnamearg, &var) != 0)
 		return (CMD_ERROR);
-	cpy16to8(varnamearg, var, len);
 
 	if (strcmp("AuditMode", var) == 0) {
 		printf(" = ");
@@ -667,6 +688,8 @@ efi_print_var(CHAR16 *varnamearg, EFI_GUID *matchguid, int lflag)
 	if (lflag == 0) {
 		if (strcmp(str, "global") == 0)
 			rv = efi_print_global(varnamearg, data, datasz);
+		else if (strcmp(str, "illumos") == 0)
+			rv = efi_print_illumos(varnamearg, data, datasz);
 		else if (strcmp(str,
 		    EFI_MEMORY_TYPE_INFORMATION_VARIABLE_NAME) == 0)
 			rv = efi_print_mem_type(varnamearg, data, datasz);

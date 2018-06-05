@@ -61,4 +61,9 @@ Revision History
 #include "efipoint.h"
 #include "efiuga.h"
 
+/*
+ * illumos UUID
+ */
+#define	ILLUMOS_BOOT_VAR_GUID \
+	{ 0x8B54B311, 0x7163, 0x40d3, {0xA6, 0x7B, 0xE7, 0xB2, 0x95, 0x1B, 0x3D, 0x56} }
 #endif
