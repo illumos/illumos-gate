@@ -9,7 +9,7 @@
  * http://www.illumos.org/license/CDDL.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -222,7 +222,7 @@ typedef struct ipd_netstack {
 	net_handle_t	ipdn_v6hdl;		/* IPv4 net handle */
 	int		ipdn_hooked;		/* are hooks registered */
 	hook_t		*ipdn_v4in;		/* IPv4 traffic in hook */
-	hook_t		*ipdn_v4out;		/* IPv4 traffice out hook */
+	hook_t		*ipdn_v4out;		/* IPv4 traffic out hook */
 	hook_t		*ipdn_v6in;		/* IPv6 traffic in hook */
 	hook_t		*ipdn_v6out;		/* IPv6 traffic out hook */
 	int		ipdn_enabled;		/* which perturbs are on */
@@ -613,7 +613,7 @@ ipd_toggle_delay(ipd_netstack_t *ins, uint32_t delay)
 	/*
 	 * If ipd_check_hooks_failed, that must mean that we failed to set up
 	 * the hooks, so we are going to effectively zero out and fail the
-	 * request to enable corruption.
+	 * request to enable packet delays.
 	 */
 	if (rval != 0)
 		ins->ipdn_delay = 0;

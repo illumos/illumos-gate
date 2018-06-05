@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -35,7 +35,7 @@ extern "C" {
 #endif
 
 #define	IPD_DEV_PATH	"/dev/ipd"
-#define	IPD_MAX_DELAY	10000		/* 10 ms in us */
+#define	IPD_MAX_DELAY	1000000		/* 1 second in microseconds */
 
 typedef struct ipd_ioc_perturb {
 	zoneid_t	ipip_zoneid;
