@@ -23,13 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-/* Note: Must match the 'struct devdesc' in stand.h */
 struct uboot_devdesc {
-	struct devdesc	dd;
+	struct devdesc	dd;	/* Must be first. */
 	union {
 		struct {
 			int	slice;

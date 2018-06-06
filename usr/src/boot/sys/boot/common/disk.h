@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2011 Google, Inc.
  * All rights reserved.
  *
@@ -30,44 +30,44 @@
  *
  * Whole disk access:
  *
- * 	d_slice = -1
- * 	d_partition = -1
+ *	d_slice = -1
+ *	d_partition = -1
  *
  * Whole MBR slice:
  *
- * 	d_slice = MBR slice number (typically 1..4)
- * 	d_partition = -1
+ *	d_slice = MBR slice number (typically 1..4)
+ *	d_partition = -1
  *
  * VTOC disklabel partition within an MBR slice:
  *
- * 	d_slice = MBR slice number (typically 1..4)
- * 	d_partition = disklabel partition (typically 0..19)
+ *	d_slice = MBR slice number (typically 1..4)
+ *	d_partition = disklabel partition (typically 0..19)
  *
  * BSD disklabel partition within an MBR slice:
  *
- * 	d_slice = MBR slice number (typically 1..4)
- * 	d_partition = disklabel partition (typically 0..19)
+ *	d_slice = MBR slice number (typically 1..4)
+ *	d_partition = disklabel partition (typically 0..19)
  *
  * BSD disklabel partition on the true dedicated disk:
  *
- * 	d_slice = -1
- * 	d_partition = disklabel partition (typically 0..19)
+ *	d_slice = -1
+ *	d_partition = disklabel partition (typically 0..19)
  *
  * GPT partition:
  *
- * 	d_slice = GPT partition number (typically 1..N)
- * 	d_partition = 255
+ *	d_slice = GPT partition number (typically 1..N)
+ *	d_partition = 255
  *
  * For both MBR and GPT, to automatically find the 'best' slice or partition,
  * set d_slice to zero. This uses the partition type to decide which partition
  * to use according to the following list of preferences:
  *
- * 	Solaris2 (active)
- * 	Solaris2 (inactive)
- * 	Linux (active)
- * 	Linux (inactive)
- * 	DOS/Windows (active)
- * 	DOS/Windows (inactive)
+ *	Solaris2 (active)
+ *	Solaris2 (inactive)
+ *	Linux (active)
+ *	Linux (inactive)
+ *	DOS/Windows (active)
+ *	DOS/Windows (inactive)
  *
  * Active MBR slices (marked as bootable) are preferred over inactive. GPT
  * doesn't have the concept of active/inactive partitions. In both MBR and GPT,
@@ -84,9 +84,8 @@
 #ifndef	_DISK_H
 #define	_DISK_H
 
-/* Note: Must match the 'struct devdesc' in stand.h */
 struct disk_devdesc {
-	struct devdesc	dd;
+	struct devdesc	dd;		/* Must be first. */
 	int		d_slice;
 	int		d_partition;
 	uint64_t	d_offset;
