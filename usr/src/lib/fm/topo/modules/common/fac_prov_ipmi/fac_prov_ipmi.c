@@ -113,6 +113,9 @@ static const topo_method_t ipmi_node_methods[] = {
 	{ "cs_ipmi_entity", TOPO_PROP_METH_DESC,
 	    TOPO_METH_DIMM_IPMI_ENTITY_VERSION,
 	    TOPO_STABILITY_INTERNAL, cs_ipmi_entity },
+	{ TOPO_METH_SENSOR_FAILURE, TOPO_METH_SENSOR_FAILURE_DESC,
+	    TOPO_METH_SENSOR_FAILURE_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_method_sensor_failure },
 	{ NULL }
 };
 
@@ -351,10 +354,12 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	ipmi_handle_t *hdl;
 	int err, i;
 	uint8_t sensor_num;
+	uint32_t e_id, e_inst;
 	ipmi_sdr_full_sensor_t *fsensor;
 	ipmi_sdr_compact_sensor_t *csensor;
 	nvlist_t *nvl;
 	boolean_t found_sdr = B_FALSE;
+	tnode_t *pnode;
 
 	if (vers > TOPO_METH_IPMI_STATE_VERSION)
 		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
@@ -372,8 +377,18 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		return (-1);
 	}
 
+	pnode = topo_node_parent(node);
+	if (topo_prop_get_uint32(pnode, TOPO_PGROUP_IPMI,
+	    TOPO_PROP_IPMI_ENTITY_ID, &e_id, &err) != 0 ||
+	    topo_prop_get_uint32(pnode, TOPO_PGROUP_IPMI,
+	    TOPO_PROP_IPMI_ENTITY_INST, &e_inst, &err) != 0) {
+		e_id = IPMI_ET_UNSPECIFIED;
+		e_inst = 0;
+	}
+
 	for (i = 0; i < nelems; i++) {
-		if ((sdr = ipmi_sdr_lookup(hdl, entity_refs[i])) != NULL) {
+		if ((sdr = ipmi_sdr_lookup_precise(hdl, entity_refs[i],
+		    (uint8_t)e_id, (uint8_t)e_inst)) != NULL) {
 			found_sdr = B_TRUE;
 			break;
 		} else
@@ -438,12 +453,16 @@ ipmi_sensor_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	char **entity_refs, reading_str[BUFSZ];
 	uint_t nelems;
 	int err = 0, i;
-	ipmi_sdr_full_sensor_t *sensor;
+	ipmi_sdr_t *sdr = NULL;
+	ipmi_sdr_full_sensor_t *fsensor;
 	ipmi_sensor_reading_t  *reading;
 	double conv_reading;
 	ipmi_handle_t *hdl;
 	nvlist_t *nvl;
 	boolean_t found_sdr = B_FALSE;
+	uint8_t sensor_num;
+	uint32_t e_id, e_inst;
+	tnode_t *pnode;
 
 	if (vers > TOPO_METH_IPMI_READING_VERSION)
 		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
@@ -461,9 +480,18 @@ ipmi_sensor_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		return (-1);
 	}
 
+	pnode = topo_node_parent(node);
+	if (topo_prop_get_uint32(pnode, TOPO_PGROUP_IPMI,
+	    TOPO_PROP_IPMI_ENTITY_ID, &e_id, &err) != 0 ||
+	    topo_prop_get_uint32(pnode, TOPO_PGROUP_IPMI,
+	    TOPO_PROP_IPMI_ENTITY_INST, &e_inst, &err) != 0) {
+		e_id = IPMI_ET_UNSPECIFIED;
+		e_inst = 0;
+	}
+
 	for (i = 0; i < nelems; i++) {
-		if ((sensor = ipmi_sdr_lookup_full_sensor(hdl, entity_refs[i]))
-		    != NULL) {
+		if ((sdr = ipmi_sdr_lookup_precise(hdl, entity_refs[i],
+		    (uint8_t)e_id, (uint8_t)e_inst)) != NULL) {
 			found_sdr = B_TRUE;
 			break;
 		} else
@@ -476,19 +504,30 @@ ipmi_sensor_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
+	switch (sdr->is_type) {
+		case IPMI_SDR_TYPE_FULL_SENSOR:
+			fsensor = (ipmi_sdr_full_sensor_t *)sdr->is_record;
+			sensor_num = fsensor->is_fs_number;
+			break;
+		default:
+			topo_mod_dprintf(mod, "%s does not refer to a full "
+			    "sensor SDR\n", entity_refs[i]);
+			topo_mod_ipmi_rele(mod);
+			strarr_free(mod, entity_refs, nelems);
+			return (-1);
+	}
 
-	if ((reading = ipmi_get_sensor_reading(hdl, sensor->is_fs_number))
-	    == NULL) {
+	if ((reading = ipmi_get_sensor_reading(hdl, sensor_num)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to get sensor reading for sensor "
 		    "%s, sensor_num=%d (%s)\n", entity_refs[i],
-		    sensor->is_fs_number, ipmi_errmsg(hdl));
+		    sensor_num, ipmi_errmsg(hdl));
 		strarr_free(mod, entity_refs, nelems);
 		topo_mod_ipmi_rele(mod);
 		return (-1);
 	}
 	topo_mod_ipmi_rele(mod);
 
-	if (ipmi_sdr_conv_reading(sensor, reading->isr_reading, &conv_reading)
+	if (ipmi_sdr_conv_reading(fsensor, reading->isr_reading, &conv_reading)
 	    != 0) {
 		topo_mod_dprintf(mod, "Failed to convert sensor reading for "
 		    "sensor %s (%s)\n", entity_refs[i], ipmi_errmsg(hdl));

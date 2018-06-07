@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <fm/fmd_api.h>
@@ -56,6 +57,7 @@ typedef struct sensor_transport {
 	 * we'll tolerate before sending an ereport.
 	 */
 	uint32_t	st_tolerance;
+	nvlist_t	*st_spoofs;
 } sensor_transport_t;
 
 typedef struct st_stats {
@@ -72,6 +74,7 @@ st_stats_t st_stats = {
 
 static int st_check_component_complaints;
 static int have_complained;
+static char *spoof_prop = NULL;
 
 static int
 st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
@@ -83,7 +86,7 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 	char *fmri;
 	int err, ret;
 	int32_t last_source, source = -1;
-	boolean_t nonrecov, faulted, predictive, source_diff;
+	boolean_t nonrecov, faulted, predictive, source_diff, injected;
 	nvpair_t *nvp;
 	uint64_t ena;
 	nvlist_t *event;
@@ -117,7 +120,8 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 	}
 
 	if (topo_method_invoke(node, TOPO_METH_SENSOR_FAILURE,
-	    TOPO_METH_SENSOR_FAILURE_VERSION, NULL, &nvl, &err) != 0) {
+	    TOPO_METH_SENSOR_FAILURE_VERSION, stp->st_spoofs, &nvl, &err) !=
+	    0) {
 		if (err == ETOPO_METHOD_NOTSUP) {
 			st_check_component_complaints++;
 			if (!have_complained) {
@@ -131,7 +135,7 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 		nvl = NULL;
 	}
 
-	if (topo_node_fru(node, &fru, NULL, NULL) != 0) {
+	if (topo_node_fru(node, &fru, NULL, &err) != 0) {
 		st_stats.st_bad_fmri.fmds_value.ui64++;
 		nvlist_free(nvl);
 		nvlist_free(rsrc);
@@ -148,7 +152,7 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 
 	nvlist_free(fru);
 
-	faulted = nonrecov = source_diff = B_FALSE;
+	faulted = nonrecov = source_diff = injected = B_FALSE;
 	predictive = B_TRUE;
 	if (nvl != NULL)  {
 		nvp = NULL;
@@ -173,6 +177,9 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 			 *
 			 * 3) source will be set to unknown unless all facility
 			 *    nodes agree on the source
+			 *
+			 * 4) injected defaults to false, but will be set to
+			 *    true if any of the sensor states were injected.
 			 */
 			if (nonrecov == B_FALSE)
 				if (nvlist_lookup_boolean_value(props,
@@ -182,6 +189,8 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 				if (nvlist_lookup_boolean_value(props,
 				    "predictive", &predictive) != 0)
 					predictive = B_FALSE;
+			(void) nvlist_lookup_boolean_value(props,
+			    "injected", &injected);
 
 			last_source = source;
 			if (nvlist_lookup_uint32(props, "source",
@@ -209,10 +218,10 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 		/*
 		 * We add this FRU to our list under two circumstances:
 		 *
-		 * 	1. This FRU is faulted and needs to be remembered to
+		 *	1. This FRU is faulted and needs to be remembered to
 		 *	   avoid duplicate ereports.
 		 *
-		 * 	2. This is the initial pass, and we want to repair the
+		 *	2. This is the initial pass, and we want to repair the
 		 *	   FRU in case it was repaired while we were offline.
 		 */
 		if (stp->st_first || faulted) {
@@ -260,7 +269,8 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 			(void) nvlist_add_uint64(event, FM_EREPORT_ENA, ena);
 			(void) nvlist_add_nvlist(event, FM_EREPORT_DETECTOR,
 			    rsrc);
-
+			(void) nvlist_add_boolean_value(event, "__injected",
+			    injected);
 			fmd_xprt_post(hdl, stp->st_xprt, event, 0);
 			fmd_hdl_debug(hdl, "posted ereport: %s",
 			    ST_EREPORT_CLASS);
@@ -351,16 +361,81 @@ st_timeout(fmd_hdl_t *hdl, id_t id, void *data)
 	stp->st_timer = fmd_timer_install(hdl, NULL, NULL, stp->st_interval);
 }
 
+/*
+ * Parse the value of the spoof-sensor-state module property and store the
+ * result in an nvlist of nvlists.  The format of the value is 3-tuple,
+ * delimited by colons, as follows:
+ *
+ * FMRIPATTERN:SENSORNAME:SENSORSTATE;...
+ *
+ * where FMRIPATTERN can be a string with wildcards that matches the FMRI
+ * of a node associated with the target sensor facility.
+ *
+ * where SENSORNAME is the node name of the target sensor facility
+ *
+ * where SENSORSTATE is the desired sensor state value to spoof.
+ *
+ * Multiple tuples can be specifed, delimited by semicolons.
+ *
+ * If any errors are encountered while parsing the value, all parsing is
+ * ceased and an ereport will be generated indicating a failure to parse
+ * the value.
+ */
+/*ARGSUSED*/
+static int
+parse_spoof_param(fmd_hdl_t *hdl, char *param, sensor_transport_t *stp)
+{
+	char *sensor, *last_sensor, *field, *last_field;
+	nvlist_t *spoof;
+
+	if (nvlist_alloc(&stp->st_spoofs, NV_UNIQUE_NAME, 0) != NULL) {
+		return (-1);
+	}
+
+	sensor = strtok_r(param, ";", &last_sensor);
+	while (sensor != NULL) {
+		if (nvlist_alloc(&spoof, NV_UNIQUE_NAME, 0) != 0)
+			goto err;
+
+		if ((field = strtok_r(sensor, ":", &last_field)) == NULL ||
+		    nvlist_add_string(spoof, ST_SPOOF_FMRI, field) != 0)
+			goto err;
+
+		if ((field = strtok_r(NULL, ":", &last_field)) == NULL ||
+		    nvlist_add_string(spoof, ST_SPOOF_SENSOR, field) != 0)
+			goto err;
+
+		if ((field = strtok_r(NULL, ":", &last_field)) == NULL ||
+		    nvlist_add_uint32(spoof, ST_SPOOF_STATE,
+		    strtol(field, NULL, 0)) != 0)
+			goto err;
+
+		if (nvlist_add_nvlist(stp->st_spoofs, sensor, spoof) != 0)
+			goto err;
+
+		spoof = NULL;
+		sensor = strtok_r(NULL, ";", &last_sensor);
+	}
+
+	return (0);
+err:
+	nvlist_free(spoof);
+	nvlist_free(stp->st_spoofs);
+	stp->st_spoofs = NULL;
+	return (-1);
+}
+
 static const fmd_prop_t fmd_props[] = {
 	{ "interval", FMD_TYPE_TIME, "1min" },
 	{ "tolerance", FMD_TYPE_UINT32, "1" },
+	{ "spoof_sensor_state", FMD_TYPE_STRING, NULL },
 	{ NULL, 0, NULL }
 };
 
 static const fmd_hdl_ops_t fmd_ops = {
 	NULL,			/* fmdo_recv */
 	st_timeout,		/* fmdo_timeout */
-	NULL, 			/* fmdo_close */
+	NULL,			/* fmdo_close */
 	NULL,			/* fmdo_stats */
 	NULL,			/* fmdo_gc */
 	NULL,			/* fmdo_send */
@@ -397,6 +472,10 @@ _fmd_init(fmd_hdl_t *hdl)
 	stp = fmd_hdl_zalloc(hdl, sizeof (sensor_transport_t), FMD_SLEEP);
 	stp->st_interval = fmd_prop_get_int64(hdl, "interval");
 	stp->st_tolerance = fmd_prop_get_int32(hdl, "tolerance");
+	spoof_prop = fmd_prop_get_string(hdl, "spoof_sensor_state");
+
+	if (spoof_prop != NULL && parse_spoof_param(hdl, spoof_prop, stp) != 0)
+		fmd_hdl_error(hdl, "Error parsing config file");
 
 	fmd_hdl_setspecific(hdl, stp);
 
@@ -424,7 +503,8 @@ _fmd_fini(fmd_hdl_t *hdl)
 			fmd_hdl_strfree(hdl, sfp->sf_fru);
 			fmd_hdl_free(hdl, sfp, sizeof (sensor_fault_t));
 		}
-
+		nvlist_free(stp->st_spoofs);
 		fmd_hdl_free(hdl, stp, sizeof (sensor_transport_t));
 	}
+	fmd_prop_free_string(hdl, spoof_prop);
 }

@@ -22,11 +22,15 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <pthread.h>
 #include <assert.h>
 #include <errno.h>
 #include <dirent.h>
+#include <fnmatch.h>
 #include <limits.h>
 #include <alloca.h>
 #include <unistd.h>
@@ -358,6 +362,44 @@ topo_sensor_failed(int32_t type, uint32_t state, struct sensor_errinfo *seinfo)
 	return (failed);
 }
 
+static boolean_t
+topo_spoof_apply(topo_hdl_t *thp, tnode_t *node, tnode_t *facnode,
+    nvlist_t *in, uint32_t *state)
+{
+	nvpair_t *elem = NULL;
+	nvlist_t *spoof, *rsrc = NULL;
+	char *fmrimatch, *fmri, *facmatch;
+	uint32_t spoof_state;
+	int err;
+
+	while ((elem = nvlist_next_nvpair(in, elem)) != NULL) {
+		if (nvpair_value_nvlist(elem, &spoof) != 0)
+			return (B_FALSE);
+
+		if (nvlist_lookup_string(spoof, ST_SPOOF_FMRI, &fmrimatch) !=
+		    0 || nvlist_lookup_string(spoof, ST_SPOOF_SENSOR,
+		    &facmatch) != 0 || nvlist_lookup_uint32(spoof,
+		    ST_SPOOF_STATE, &spoof_state) != 0)
+			continue;
+
+		if (topo_node_resource(node, &rsrc, &err) != 0 ||
+		    topo_fmri_nvl2str(thp, rsrc, &fmri, &err) != 0) {
+			nvlist_free(rsrc);
+			continue;
+		}
+		nvlist_free(rsrc);
+
+		if (fnmatch(fmrimatch, fmri, 0) == 0 &&
+		    strcmp(facmatch, topo_node_name(facnode)) == 0) {
+			*state = spoof_state;
+			topo_hdl_strfree(thp, fmri);
+			return (B_TRUE);
+		}
+		topo_hdl_strfree(thp, fmri);
+	}
+	return (B_FALSE);
+}
+
 /*
  * Determine whether there are any sensors indicating failure.  This function
  * is used internally to determine whether a given component is usable, as well
@@ -365,23 +407,26 @@ topo_sensor_failed(int32_t type, uint32_t state, struct sensor_errinfo *seinfo)
  * which sensors indicated failure.  The return value is an nvlist of nvlists
  * indexed by sensor name, each entry with the following contents:
  *
- * 	type, state, units, reading
+ *	type, state, units, reading
  *
- * 		Identical to sensor node.
+ *	Identical to sensor node.
  *
- * 	nonrecov
+ *	nonrecov
  *
- * 		Boolean value that is set to indicate that the error is
- * 		non-recoverable (the unit is out of service).  The default is
- * 		critical failure, which indicates a fault but the unit is still
- * 		operating.
+ *		Boolean value that is set to indicate that the error is
+ *		non-recoverable (the unit is out of service).  The default is
+ *		critical failure, which indicates a fault but the unit is still
+ *		operating.
+ *
+ *	injected
+ *
+ *		Boolean value indicating that the sensor state was injected.
  */
 /*ARGSUSED*/
 int
 topo_method_sensor_failure(topo_mod_t *mod, tnode_t *node,
     topo_version_t version, nvlist_t *in, nvlist_t **out)
 {
-	const char *name = topo_node_name(node);
 	topo_faclist_t faclist, *fp;
 	int err;
 	nvlist_t *nvl, *props, *propval, *tmp;
@@ -390,11 +435,8 @@ topo_method_sensor_failure(topo_mod_t *mod, tnode_t *node,
 	nvpair_t *elem;
 	double reading;
 	char *propname;
-	boolean_t has_reading;
+	boolean_t has_reading, is_spoofed = B_FALSE;
 	struct sensor_errinfo seinfo;
-
-	if (strcmp(name, PSU) != 0 && strcmp(name, FAN) != 0)
-		return (topo_mod_seterrno(mod, ETOPO_METHOD_NOTSUP));
 
 	if (topo_node_facility(mod->tm_hdl, node, TOPO_FAC_TYPE_SENSOR,
 	    TOPO_FAC_TYPE_ANY, &faclist, &err) != 0)
@@ -441,6 +483,10 @@ topo_method_sensor_failure(topo_mod_t *mod, tnode_t *node,
 			}
 		}
 
+		if (in != NULL)
+			is_spoofed = topo_spoof_apply(mod->tm_hdl, node,
+			    fp->tf_node, in, &state);
+
 		if (topo_sensor_failed(type, state, &seinfo)) {
 			tmp = NULL;
 			if (topo_mod_nvalloc(mod, &tmp, NV_UNIQUE_NAME) != 0 ||
@@ -456,6 +502,8 @@ topo_method_sensor_failure(topo_mod_t *mod, tnode_t *node,
 			    "predictive", seinfo.se_predictive) != 0 ||
 			    nvlist_add_uint32(tmp, "source",
 			    seinfo.se_src) != 0 ||
+			    nvlist_add_boolean_value(nvl, "injected",
+			    is_spoofed) != 0 ||
 			    (has_reading && nvlist_add_double(tmp,
 			    TOPO_SENSOR_READING, reading) != 0) ||
 			    nvlist_add_nvlist(nvl, topo_node_name(fp->tf_node),
@@ -472,6 +520,7 @@ topo_method_sensor_failure(topo_mod_t *mod, tnode_t *node,
 		}
 
 		nvlist_free(props);
+		is_spoofed = B_FALSE;
 	}
 
 	*out = nvl;

@@ -1522,10 +1522,13 @@ extern int ipmi_sdr_iter(ipmi_handle_t *,
     int (*)(ipmi_handle_t *, const char *, ipmi_sdr_t *, void *), void *);
 
 /*
- * Lookup the given sensor type by name.  These functions automatically read in
- * and cache the complete SDR repository.
+ * Lookup the given sensor type by name or a combination of name and entity
+ * ID/instance.  These functions automatically read in and cache the complete
+ * SDR repository.
  */
 extern ipmi_sdr_t *ipmi_sdr_lookup(ipmi_handle_t *, const char *);
+extern ipmi_sdr_t *ipmi_sdr_lookup_precise(ipmi_handle_t *, const char *,
+    uint8_t, uint8_t);
 extern ipmi_sdr_fru_locator_t *ipmi_sdr_lookup_fru(ipmi_handle_t *,
     const char *);
 extern ipmi_sdr_generic_locator_t *ipmi_sdr_lookup_generic(ipmi_handle_t *,

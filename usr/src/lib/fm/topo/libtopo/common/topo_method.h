@@ -23,7 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 #ifndef _TOPO_METHOD_H
 #define	_TOPO_METHOD_H
 
@@ -52,6 +54,14 @@ extern topo_imethod_t *topo_method_lookup(tnode_t *, const char *);
 extern int topo_prop_method_version_register(tnode_t *, const char *,
     const char *, topo_type_t, const char *, topo_version_t, const nvlist_t *,
     int *);
+
+/*
+ * These are for the private consumption of the sensor-transport fmd plugin
+ * and topo_method_sensor_failure()
+ */
+#define	ST_SPOOF_FMRI		"spoof_resource_fmri"
+#define	ST_SPOOF_SENSOR		"spoof_sensor_name"
+#define	ST_SPOOF_STATE		"spoof_sensor_state"
 
 /*
  * FMRI methods
