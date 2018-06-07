@@ -1458,7 +1458,20 @@ vm_handle_rendezvous(struct vm *vm, int vcpuid)
 		mtx_sleep(&vm->rendezvous_func, &vm->rendezvous_mtx, 0,
 		    "vmrndv", 0);
 #else
-		cv_wait(&vm->rendezvous_cv, &vm->rendezvous_mtx.m);
+		/*
+		 * A cv_wait() call should be adequate for this, but since the
+		 * bhyve process could be killed in the middle of an unfinished
+		 * vm_smp_rendezvous, rendering its completion impossible, a
+		 * timed wait is necessary.  When bailing out early from a
+		 * rendezvous, the instance may be left in a bizarre state, but
+		 * that is preferable to a thread stuck waiting in the kernel.
+		 */
+		if (cv_reltimedwait_sig(&vm->rendezvous_cv,
+		    &vm->rendezvous_mtx.m, hz, TR_CLOCK_TICK) <= 0) {
+			if ((curproc->p_flag & SEXITING) != 0) {
+				break;
+			}
+		}
 #endif
 	}
 	mtx_unlock(&vm->rendezvous_mtx);
@@ -1711,7 +1724,21 @@ vm_handle_suspend(struct vm *vm, int vcpuid, bool *retu)
 #ifdef __FreeBSD__
 			msleep_spin(vcpu, &vcpu->mtx, "vmsusp", hz);
 #else
-			cv_wait(&vcpu->vcpu_cv, &vcpu->mtx.m);
+			/*
+			 * Like vm_handle_rendezvous, vm_handle_suspend could
+			 * become stuck in the kernel if the bhyve process
+			 * driving its vCPUs is killed.  Offer a bail-out in
+			 * that case, even though not all the vCPUs have
+			 * reached the suspended state.
+			 */
+			if (cv_reltimedwait_sig(&vcpu->vcpu_cv, &vcpu->mtx.m,
+			    hz, TR_CLOCK_TICK) <= 0) {
+				if ((curproc->p_flag & SEXITING) != 0) {
+					vcpu_require_state_locked(vm, vcpuid,
+					    VCPU_FROZEN);
+					break;
+				}
+			}
 #endif
 			vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
 		} else {
