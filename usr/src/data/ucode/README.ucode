@@ -1,0 +1,33 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2018, Joyent, Inc.
+#
+
+Microcode Management
+
+Historically microcode files were delivered by Intel as a single
+microcode file that we would break apart and install with ucodeadm. Each
+individual file represented a single platform's microcode. However,
+recently Intel has changed that policy and is no longer distributing
+microcode in that fashion. Further, we also relied on bootadm to go
+through and turn this microcode into individual files as part of setting
+up the boot environment.
+
+Intead of using this method, we will update the microcode and manage
+them in here as individual files. When updating files, please indicate
+the release that the microcode was obtained from here.
+
+AMD: Updated in March 2012 as part of illumos#2546. Exact revision
+unknown.
+
+Intel: Linux 20180312 release
