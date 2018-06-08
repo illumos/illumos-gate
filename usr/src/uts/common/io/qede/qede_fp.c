@@ -1772,8 +1772,6 @@ qede_ring_tx(void *arg, mblk_t *mp)
 	}
 
 	if (!qede->params.link_state){
-		qede_print_err("!%s(%d): Link !up for xmit",
-		    __func__, qede->instance);
 		goto exit;
 	}
 
