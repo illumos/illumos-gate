@@ -279,7 +279,12 @@ pci_vtblk_proc(struct pci_vtblk_softc *sc, struct vqueue_info *vq)
 		err = blockif_read(sc->bc, &io->io_req);
 		break;
 	case VBH_OP_WRITE:
+#ifdef __FreeBSD__
 		err = blockif_write(sc->bc, &io->io_req);
+#else
+		err = blockif_write(sc->bc, &io->io_req,
+		    (sc->vbsc_vs.vs_negotiated_caps & VTBLK_F_FLUSH) == 0);
+#endif
 		break;
 	case VBH_OP_FLUSH:
 	case VBH_OP_FLUSH_OUT:

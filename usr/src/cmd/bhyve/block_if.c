@@ -71,6 +71,9 @@ __FBSDID("$FreeBSD$");
 enum blockop {
 	BOP_READ,
 	BOP_WRITE,
+#ifndef __FreeBSD__
+	BOP_WRITE_SYNC,
+#endif
 	BOP_FLUSH,
 	BOP_DELETE
 };
@@ -143,6 +146,9 @@ blockif_enqueue(struct blockif_ctxt *bc, struct blockif_req *breq,
 	switch (op) {
 	case BOP_READ:
 	case BOP_WRITE:
+#ifndef __FreeBSD__
+	case BOP_WRITE_SYNC:
+#endif
 	case BOP_DELETE:
 		off = breq->br_offset;
 		for (i = 0; i < breq->br_iovcnt; i++)
@@ -215,6 +221,8 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 	struct blockif_req *br;
 #ifdef	__FreeBSD__
 	off_t arg[2];
+#else
+	boolean_t sync = B_FALSE;
 #endif
 	ssize_t clen, len, off, boff, voff;
 	int i, err;
@@ -260,6 +268,11 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 			br->br_resid -= len;
 		}
 		break;
+#ifndef __FreeBSD__
+	case BOP_WRITE_SYNC:
+		sync = B_TRUE;
+		/* FALLTHROUGH */
+#endif
 	case BOP_WRITE:
 		if (bc->bc_rdonly) {
 			err = EROFS;
@@ -301,13 +314,16 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 		}
 		break;
 	case BOP_FLUSH:
-		if (bc->bc_ischr) {
 #ifdef	__FreeBSD__
+		if (bc->bc_ischr) {
 			if (ioctl(bc->bc_fd, DIOCGFLUSH))
 				err = errno;
-#endif
 		} else if (fsync(bc->bc_fd))
 			err = errno;
+#else
+		if (fsync(bc->bc_fd))
+			err = errno;
+#endif
 		break;
 	case BOP_DELETE:
 		if (!bc->bc_candelete)
@@ -331,6 +347,11 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 		err = EINVAL;
 		break;
 	}
+
+#ifndef __FreeBSD__
+	if (sync && err == 0 && fsync(bc->bc_fd) < 0)
+		err = errno;
+#endif
 
 	be->be_status = BST_DONE;
 
@@ -641,11 +662,19 @@ blockif_read(struct blockif_ctxt *bc, struct blockif_req *breq)
 }
 
 int
+#ifdef __FreeBSD__
 blockif_write(struct blockif_ctxt *bc, struct blockif_req *breq)
+#else
+blockif_write(struct blockif_ctxt *bc, struct blockif_req *breq, boolean_t sync)
+#endif
 {
 
 	assert(bc->bc_magic == BLOCKIF_SIG);
+#ifdef __FreeBSD__
 	return (blockif_request(bc, breq, BOP_WRITE));
+#else
+	return (blockif_request(bc, breq, sync ? BOP_WRITE_SYNC : BOP_WRITE));
+#endif
 }
 
 int

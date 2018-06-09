@@ -738,7 +738,16 @@ ahci_handle_rw(struct ahci_port *p, int slot, uint8_t *cfis, uint32_t done)
 	if (readop)
 		err = blockif_read(p->bctx, breq);
 	else
+#ifdef __FreeBSD__
 		err = blockif_write(p->bctx, breq);
+#else
+		/*
+		 * XXX: We currently don't handle disabling of the write cache.
+		 * Once this is fixed we need to revisit this code to do sync
+		 * writes when the cache is disabled.
+		 */
+		err = blockif_write(p->bctx, breq, B_FALSE);
+#endif
 	assert(err == 0);
 }
 

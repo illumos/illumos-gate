@@ -67,7 +67,12 @@ int	blockif_queuesz(struct blockif_ctxt *bc);
 int	blockif_is_ro(struct blockif_ctxt *bc);
 int	blockif_candelete(struct blockif_ctxt *bc);
 int	blockif_read(struct blockif_ctxt *bc, struct blockif_req *breq);
+#ifdef __FreeBSD__
 int	blockif_write(struct blockif_ctxt *bc, struct blockif_req *breq);
+#else
+int	blockif_write(struct blockif_ctxt *bc, struct blockif_req *breq,
+    boolean_t sync);
+#endif
 int	blockif_flush(struct blockif_ctxt *bc, struct blockif_req *breq);
 int	blockif_delete(struct blockif_ctxt *bc, struct blockif_req *breq);
 int	blockif_cancel(struct blockif_ctxt *bc, struct blockif_req *breq);
