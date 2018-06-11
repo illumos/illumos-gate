@@ -497,6 +497,7 @@ vmm_mod_unload()
 {
 	int	error;
 
+	iommu_cleanup();
 	error = VMM_CLEANUP();
 	if (error)
 		return (error);

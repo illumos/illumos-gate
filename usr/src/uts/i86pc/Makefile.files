@@ -262,6 +262,7 @@ VMM_OBJS += vmm.o \
 	vmx.o \
 	vmx_support.o \
 	vtd.o \
+	vtd_sol.o \
 	svm.o \
 	svm_msr.o \
 	npt.o \

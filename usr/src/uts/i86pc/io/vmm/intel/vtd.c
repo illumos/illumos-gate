@@ -122,6 +122,9 @@ static int		drhd_num;
 static struct vtdmap	*vtdmaps[DRHD_MAX_UNITS];
 static int		max_domains;
 typedef int		(*drhd_ident_func_t)(void);
+#ifndef __FreeBSD__
+static dev_info_t	*vtddips[DRHD_MAX_UNITS];
+#endif
 
 static uint64_t root_table[PAGE_SIZE / sizeof(uint64_t)] __aligned(4096);
 static uint64_t ctx_tables[256][PAGE_SIZE / sizeof(uint64_t)] __aligned(4096);
@@ -240,11 +243,8 @@ vtd_translation_disable(struct vtdmap *vtdmap)
 }
 
 static void *
-vtd_map(ACPI_DMAR_HARDWARE_UNIT *drhd, int unit)
+vtd_map(dev_info_t *dip)
 {
-	struct ddi_parent_private_data *pdptr;
-	struct regspec reg;
-	dev_info_t *dip;
 	caddr_t regs;
 	ddi_acc_handle_t hdl;
 	int error;
@@ -255,60 +255,32 @@ vtd_map(ACPI_DMAR_HARDWARE_UNIT *drhd, int unit)
 		DDI_STRICTORDER_ACC,
 	};
 
-	dip = ddi_add_child(ddi_root_node(), "vtd",
-	    DEVI_SID_NODEID, unit);
-
-#if 0
-	drhd->dr_dip = dip;
-#endif
-
-	reg.regspec_bustype = 0;
-	reg.regspec_addr = drhd->Address;
-	reg.regspec_size = PAGE_SIZE;
-
-	/*
-	 * update the reg properties
-	 *
-	 *   reg property will be used for register
-	 *   set access
-	 *
-	 * refer to the bus_map of root nexus driver
-	 * I/O or memory mapping:
-	 *
-	 * <bustype=0, addr=x, len=x>: memory
-	 * <bustype=1, addr=x, len=x>: i/o
-	 * <bustype>1, addr=0, len=x>: x86-compatibility i/o
-	 */
-	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
-	    dip, "reg", (int *)&reg,
-	    sizeof (struct regspec) / sizeof (int));
-
-	/*
-	 * This is an artificially constructed dev_info, and we
-	 * need to set a few more things to be able to use it
-	 * for ddi_dma_alloc_handle/free_handle.
-	 */
-	ddi_set_driver(dip, ddi_get_driver(ddi_root_node()));
-	DEVI(dip)->devi_bus_dma_allochdl =
-	    DEVI(ddi_get_driver((ddi_root_node())));
-
-	pdptr = kmem_zalloc(sizeof (struct ddi_parent_private_data)
-	    + sizeof (struct regspec), KM_SLEEP);
-	pdptr->par_nreg = 1;
-	pdptr->par_reg = (struct regspec *)(pdptr + 1);
-	pdptr->par_reg->regspec_bustype = 0;
-	pdptr->par_reg->regspec_addr = drhd->Address;
-	pdptr->par_reg->regspec_size = PAGE_SIZE;
-	ddi_set_parent_data(dip, pdptr);
-
 	error = ddi_regs_map_setup(dip, 0, &regs, 0, PAGE_SIZE, &regs_attr,
 	    &hdl);
 
 	if (error != DDI_SUCCESS)
 		return (NULL);
 
+	ddi_set_driver_private(dip, hdl);
+
 	return (regs);
 }
+
+static void
+vtd_unmap(dev_info_t *dip)
+{
+	ddi_acc_handle_t hdl = ddi_get_driver_private(dip);
+
+	if (hdl != NULL)
+		ddi_regs_map_free(&hdl);
+}
+
+#ifndef __FreeBSD__
+/*
+ * This lives in vtd_sol.c for license reasons.
+ */
+extern dev_info_t *vtd_get_dip(ACPI_DMAR_HARDWARE_UNIT *, int);
+#endif
 
 static int
 vtd_init(void)
@@ -373,7 +345,10 @@ vtd_init(void)
 #ifdef __FreeBSD__
 		vtdmaps[units++] = (struct vtdmap *)PHYS_TO_DMAP(drhd->Address);
 #else
-		vtdmaps[units] = (struct vtdmap *)vtd_map(drhd, units);
+		vtddips[units] = vtd_get_dip(drhd, units);
+		vtdmaps[units] = (struct vtdmap *)vtd_map(vtddips[units]);
+		if (vtdmaps[units] == NULL)
+			goto fail;
 		units++;
 #endif
 		if (units >= DRHD_MAX_UNITS)
@@ -407,11 +382,36 @@ skip_dmar:
 	}
 
 	return (0);
+
+#ifndef __FreeBSD__
+fail:
+	for (i = 0; i <= units; i++)
+		vtd_unmap(vtddips[i]);
+	return (ENXIO);
+#endif
 }
 
 static void
 vtd_cleanup(void)
 {
+#ifndef __FreeBSD__
+	int i;
+
+	KASSERT(SLIST_EMPTY(&domhead), ("domain list not empty"));
+
+	bzero(root_table, sizeof (root_table));
+
+	for (i = 0; i <= drhd_num; i++) {
+		vtdmaps[i] = NULL;
+		/*
+		 * Unmap the vtd registers. Note that the devinfo nodes
+		 * themselves aren't removed, they are considered system state
+		 * and can be reused when the module is reloaded.
+		 */
+		if (vtddips[i] != NULL)
+			vtd_unmap(vtddips[i]);
+	}
+#endif
 }
 
 static void
