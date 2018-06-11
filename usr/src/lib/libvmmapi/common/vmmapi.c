@@ -384,13 +384,26 @@ vm_get_memseg(struct vmctx *ctx, int segid, size_t *lenp, char *namebuf,
 }
 
 static int
+#ifdef __FreeBSD__
 setup_memory_segment(struct vmctx *ctx, vm_paddr_t gpa, size_t len, char *base)
+#else
+setup_memory_segment(struct vmctx *ctx, int segid, vm_paddr_t gpa, size_t len,
+    char *base)
+#endif
 {
 	char *ptr;
 	int error, flags;
 
 	/* Map 'len' bytes starting at 'gpa' in the guest address space */
+#ifdef __FreeBSD__
 	error = vm_mmap_memseg(ctx, gpa, VM_SYSMEM, gpa, len, PROT_ALL);
+#else
+	/*
+	 * As we use two segments for lowmem/highmem the offset within the
+	 * segment is 0 on illumos.
+	 */
+	error = vm_mmap_memseg(ctx, gpa, segid, 0, len, PROT_ALL);
+#endif
 	if (error)
 		return (error);
 
@@ -430,9 +443,11 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 		objsize = ctx->lowmem;
 	}
 
+#ifdef __FreeBSD__
 	error = vm_alloc_memseg(ctx, VM_SYSMEM, objsize, NULL);
 	if (error)
 		return (error);
+#endif
 
 	/*
 	 * Stake out a contiguous region covering the guest physical memory
@@ -445,6 +460,8 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 		return (-1);
 
 	baseaddr = ptr + VM_MMAP_GUARD_SIZE;
+
+#ifdef __FreeBSD__
 	if (ctx->highmem > 0) {
 		gpa = 4*GB;
 		len = ctx->highmem;
@@ -460,6 +477,29 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 		if (error)
 			return (error);
 	}
+#else
+	if (ctx->highmem > 0) {
+		error = vm_alloc_memseg(ctx, VM_HIGHMEM, ctx->highmem, NULL);
+		if (error)
+			return (error);
+		gpa = 4*GB;
+		len = ctx->highmem;
+		error = setup_memory_segment(ctx, VM_HIGHMEM, gpa, len, baseaddr);
+		if (error)
+			return (error);
+	}
+
+	if (ctx->lowmem > 0) {
+		error = vm_alloc_memseg(ctx, VM_LOWMEM, ctx->lowmem, NULL);
+		if (error)
+			return (error);
+		gpa = 0;
+		len = ctx->lowmem;
+		error = setup_memory_segment(ctx, VM_LOWMEM, gpa, len, baseaddr);
+		if (error)
+			return (error);
+	}
+#endif
 
 	ctx->baseaddr = baseaddr;
 

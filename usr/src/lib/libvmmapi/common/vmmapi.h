@@ -78,7 +78,12 @@ enum vm_mmap_style {
  * - the remaining identifiers can be used to create devmem segments.
  */
 enum {
+#ifdef __FreeBSD__
 	VM_SYSMEM,
+#else
+	VM_LOWMEM,
+	VM_HIGHMEM,
+#endif
 	VM_BOOTROM,
 	VM_FRAMEBUFFER,
 };

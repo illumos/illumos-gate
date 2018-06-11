@@ -146,7 +146,11 @@ struct mem_seg {
 	bool	sysmem;
 	struct vm_object *object;
 };
+#ifdef __FreeBSD__
 #define	VM_MAX_MEMSEGS	3
+#else
+#define	VM_MAX_MEMSEGS	4
+#endif
 
 struct mem_map {
 	vm_paddr_t	gpa;
