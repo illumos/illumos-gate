@@ -294,12 +294,15 @@ contigfree(void *addr, unsigned long size, struct malloc_type *type)
 void
 mtx_init(struct mtx *mtx, char *name, const char *type_name, int opts)
 {
-	if (opts & MTX_SPIN) {
-		mutex_init(&mtx->m, name, MUTEX_SPIN,
-		    (ddi_iblock_cookie_t)ipltospl(DISP_LEVEL));
-	} else {
-		mutex_init(&mtx->m, name, MUTEX_DRIVER, NULL);
-	}
+	/*
+	 * Requests that a mutex be initialized to the MTX_SPIN type are
+	 * ignored.  The limitations which may have required spinlocks on
+	 * FreeBSD do not apply to how bhyve has been structured here.
+	 *
+	 * Adaptive mutexes are required to avoid deadlocks when certain
+	 * cyclics behavior interacts with interrupts and contended locks.
+	 */
+	mutex_init(&mtx->m, name, MUTEX_ADAPTIVE, NULL);
 }
 
 void

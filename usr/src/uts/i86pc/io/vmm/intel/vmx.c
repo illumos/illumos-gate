@@ -1417,8 +1417,13 @@ vmx_apply_tsc_adjust(struct vmx *vmx, int vcpu)
 #define	HWINTR_BLOCKING	(VMCS_INTERRUPTIBILITY_STI_BLOCKING |		\
 			 VMCS_INTERRUPTIBILITY_MOVSS_BLOCKING)
 
+#ifndef __FreeBSD__
+static uint32_t
+vmx_inject_nmi(struct vmx *vmx, int vcpu)
+#else
 static void
 vmx_inject_nmi(struct vmx *vmx, int vcpu)
+#endif
 {
 	uint32_t gi, info;
 
@@ -1441,8 +1446,190 @@ vmx_inject_nmi(struct vmx *vmx, int vcpu)
 
 	/* Clear the request */
 	vm_nmi_clear(vmx->vm, vcpu);
+
+#ifndef __FreeBSD__
+	return (info);
+#endif
 }
 
+#ifndef __FreeBSD__
+static void
+vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
+    uint64_t guestrip)
+{
+	uint64_t entryinfo, rflags;
+	uint32_t gi, info;
+	int vector;
+	boolean_t extint_pending = B_FALSE;
+
+	gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
+	info = vmcs_read(VMCS_ENTRY_INTR_INFO);
+
+	if (vmx->state[vcpu].nextrip != guestrip &&
+	    (gi & HWINTR_BLOCKING) != 0) {
+		VCPU_CTR2(vmx->vm, vcpu, "Guest interrupt blocking "
+		    "cleared due to rip change: %#lx/%#lx",
+		    vmx->state[vcpu].nextrip, guestrip);
+		gi &= ~HWINTR_BLOCKING;
+		vmcs_write(VMCS_GUEST_INTERRUPTIBILITY, gi);
+	}
+
+	/*
+	 * It could be that an interrupt is already pending for injection from
+	 * the VMCS.  This would be the case if the vCPU exited for conditions
+	 * such as an AST before a vm-entry delivered the injection.
+	 */
+	if ((info & VMCS_INTR_VALID) != 0) {
+		goto cantinject;
+	}
+
+	if (vm_entry_intinfo(vmx->vm, vcpu, &entryinfo)) {
+		KASSERT((entryinfo & VMCS_INTR_VALID) != 0, ("%s: entry "
+		    "intinfo is not valid: %#lx", __func__, entryinfo));
+
+		KASSERT((info & VMCS_INTR_VALID) == 0, ("%s: cannot inject "
+		     "pending exception: %#lx/%#x", __func__, entryinfo, info));
+
+		info = entryinfo;
+		vector = info & 0xff;
+		if (vector == IDT_BP || vector == IDT_OF) {
+			/*
+			 * VT-x requires #BP and #OF to be injected as software
+			 * exceptions.
+			 */
+			info &= ~VMCS_INTR_T_MASK;
+			info |= VMCS_INTR_T_SWEXCEPTION;
+		}
+
+		if (info & VMCS_INTR_DEL_ERRCODE)
+			vmcs_write(VMCS_ENTRY_EXCEPTION_ERROR, entryinfo >> 32);
+
+		vmcs_write(VMCS_ENTRY_INTR_INFO, info);
+	}
+
+	if (vm_nmi_pending(vmx->vm, vcpu)) {
+		int need_nmi_exiting = 1;
+
+		/*
+		 * If there are no conditions blocking NMI injection then
+		 * inject it directly here otherwise enable "NMI window
+		 * exiting" to inject it as soon as we can.
+		 *
+		 * We also check for STI_BLOCKING because some implementations
+		 * don't allow NMI injection in this case. If we are running
+		 * on a processor that doesn't have this restriction it will
+		 * immediately exit and the NMI will be injected in the
+		 * "NMI window exiting" handler.
+		 */
+		if ((gi & (HWINTR_BLOCKING | NMI_BLOCKING)) == 0) {
+			if ((info & VMCS_INTR_VALID) == 0) {
+				info = vmx_inject_nmi(vmx, vcpu);
+				need_nmi_exiting = 0;
+			} else {
+				VCPU_CTR1(vmx->vm, vcpu, "Cannot inject NMI "
+				    "due to VM-entry intr info %#x", info);
+			}
+		} else {
+			VCPU_CTR1(vmx->vm, vcpu, "Cannot inject NMI due to "
+			    "Guest Interruptibility-state %#x", gi);
+		}
+
+		if (need_nmi_exiting) {
+			vmx_set_nmi_window_exiting(vmx, vcpu);
+			return;
+		}
+	}
+
+	/* Check the AT-PIC and APIC for interrupts. */
+	if (vm_extint_pending(vmx->vm, vcpu)) {
+		/* Ask the legacy pic for a vector to inject */
+		vatpic_pending_intr(vmx->vm, &vector);
+		extint_pending = B_TRUE;
+
+		/*
+		 * From the Intel SDM, Volume 3, Section "Maskable
+		 * Hardware Interrupts":
+		 * - maskable interrupt vectors [0,255] can be delivered
+		 *   through the INTR pin.
+		 */
+		KASSERT(vector >= 0 && vector <= 255,
+		    ("invalid vector %d from INTR", vector));
+	} else if (!virtual_interrupt_delivery) {
+		/* Ask the local apic for a vector to inject */
+		if (!vlapic_pending_intr(vlapic, &vector))
+			return;
+
+		/*
+		 * From the Intel SDM, Volume 3, Section "Maskable
+		 * Hardware Interrupts":
+		 * - maskable interrupt vectors [16,255] can be delivered
+		 *   through the local APIC.
+		*/
+		KASSERT(vector >= 16 && vector <= 255,
+		    ("invalid vector %d from local APIC", vector));
+	} else {
+		/* No futher injection needed */
+		return;
+	}
+
+	/*
+	 * Verify that the guest is interruptable and the above logic has not
+	 * already queued an event for injection.
+	 */
+	if ((gi & HWINTR_BLOCKING) != 0) {
+		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
+		    "Guest Interruptibility-state %#x", vector, gi);
+		goto cantinject;
+	}
+	if ((info & VMCS_INTR_VALID) != 0) {
+		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
+		    "VM-entry intr info %#x", vector, info);
+		goto cantinject;
+	}
+	rflags = vmcs_read(VMCS_GUEST_RFLAGS);
+	if ((rflags & PSL_I) == 0) {
+		VCPU_CTR2(vmx->vm, vcpu, "Cannot inject vector %d due to "
+		    "rflags %#lx", vector, rflags);
+		goto cantinject;
+	}
+
+	/* Inject the interrupt */
+	info = VMCS_INTR_T_HWINTR | VMCS_INTR_VALID;
+	info |= vector;
+	vmcs_write(VMCS_ENTRY_INTR_INFO, info);
+
+	if (extint_pending) {
+		vm_extint_clear(vmx->vm, vcpu);
+		vatpic_intr_accepted(vmx->vm, vector);
+
+		/*
+		 * After we accepted the current ExtINT the PIC may
+		 * have posted another one.  If that is the case, set
+		 * the Interrupt Window Exiting execution control so
+		 * we can inject that one too.
+		 *
+		 * Also, interrupt window exiting allows us to inject any
+		 * pending APIC vector that was preempted by the ExtINT
+		 * as soon as possible. This applies both for the software
+		 * emulated vlapic and the hardware assisted virtual APIC.
+		 */
+		vmx_set_int_window_exiting(vmx, vcpu);
+	} else {
+		/* Update the Local APIC ISR */
+		vlapic_intr_accepted(vlapic, vector);
+	}
+
+	VCPU_CTR1(vmx->vm, vcpu, "Injecting hwintr at vector %d", vector);
+	return;
+
+cantinject:
+	/*
+	 * Set the Interrupt Window Exiting execution control so we can inject
+	 * the interrupt as soon as blocking condition goes away.
+	 */
+	vmx_set_int_window_exiting(vmx, vcpu);
+}
+#else
 static void
 vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
     uint64_t guestrip)
@@ -1630,6 +1817,7 @@ cantinject:
 	 */
 	vmx_set_int_window_exiting(vmx, vcpu);
 }
+#endif /* __FreeBSD__ */
 
 /*
  * If the Virtual NMIs execution control is '1' then the logical processor
@@ -2987,8 +3175,8 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 	VMPTRLD(vmcs);
 
 #ifndef __FreeBSD__
-	VERIFY(!vmx->ctx_loaded[vcpu] && curthread->t_preempt != 0);
-	vmx->ctx_loaded[vcpu] = B_TRUE;
+	VERIFY(vmx->vmcs_state[vcpu] == VS_NONE && curthread->t_preempt != 0);
+	vmx->vmcs_state[vcpu] = VS_LOADED;
 #endif
 
 	/*
@@ -3026,9 +3214,21 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		 * The same reasoning applies to the IPI generated by
 		 * pmap_invalidate_ept().
 		 */
-		/* XXXJOY: this is _long_ time to keep interrupts disabled */
+#ifdef __FreeBSD__
 		disable_intr();
 		vmx_inject_interrupts(vmx, vcpu, vlapic, rip);
+#else
+		/*
+		 * The bulk of guest interrupt injection is done without
+		 * interrupts disabled on the host CPU.  This is necessary
+		 * since contended mutexes might force the thread to sleep.
+		 */
+		vmx_inject_interrupts(vmx, vcpu, vlapic, rip);
+		disable_intr();
+		if (virtual_interrupt_delivery) {
+			vmx_inject_pir(vlapic);
+		}
+#endif /* __FreeBSD__ */
 
 		/*
 		 * Check for vcpu suspension after injecting events because
@@ -3080,12 +3280,21 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			}
 			break;
 		}
-#endif
 
+		/*
+		 * If this thread has gone off-cpu due to mutex operations
+		 * during vmx_run, the VMCS will have been unloaded, forcing a
+		 * re-VMLAUNCH as opposed to VMRESUME.
+		 */
+		launched = (vmx->vmcs_state[vcpu] & VS_LAUNCHED) != 0;
+#endif
 		vmx_run_trace(vmx, vcpu);
 		vmx_dr_enter_guest(vmxctx);
 		rc = vmx_enter_guest(vmxctx, vmx, launched);
 		vmx_dr_leave_guest(vmxctx);
+#ifndef	__FreeBSD__
+		vmx->vmcs_state[vcpu] |= VS_LAUNCHED;
+#endif
 
 #ifndef __FreeBSD__
 		ht_release();
@@ -3108,7 +3317,9 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			enable_intr();
 			vmx_exit_inst_error(vmxctx, rc, vmexit);
 		}
+#ifdef	__FreeBSD__
 		launched = 1;
+#endif
 		vmx_exit_trace(vmx, vcpu, rip, exit_reason, handled);
 		rip = vmexit->rip;
 	} while (handled);
@@ -3137,8 +3348,8 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 	vmx_msr_guest_exit(vmx, vcpu);
 
 #ifndef __FreeBSD__
-	VERIFY(vmx->ctx_loaded[vcpu] && curthread->t_preempt != 0);
-	vmx->ctx_loaded[vcpu] = B_FALSE;
+	VERIFY(vmx->vmcs_state != VS_NONE && curthread->t_preempt != 0);
+	vmx->vmcs_state[vcpu] = VS_NONE;
 #endif
 
 	return (0);
@@ -3972,9 +4183,14 @@ vmx_savectx(void *arg, int vcpu)
 	struct vmx *vmx = arg;
 	struct vmcs *vmcs = &vmx->vmcs[vcpu];
 
-	if (vmx->ctx_loaded[vcpu]) {
+	if ((vmx->vmcs_state[vcpu] & VS_LOADED) != 0) {
 		VERIFY3U(vmclear(vmcs), ==, 0);
 		vmx_msr_guest_exit(vmx, vcpu);
+		/*
+		 * Having VMCLEARed the VMCS, it can no longer be re-entered
+		 * with VMRESUME, but must be VMLAUNCHed again.
+		 */
+		vmx->vmcs_state[vcpu] &= ~VS_LAUNCHED;
 	}
 
 	reset_gdtr_limit();
@@ -3986,7 +4202,9 @@ vmx_restorectx(void *arg, int vcpu)
 	struct vmx *vmx = arg;
 	struct vmcs *vmcs = &vmx->vmcs[vcpu];
 
-	if (vmx->ctx_loaded[vcpu]) {
+	ASSERT0(vmx->vmcs_state[vcpu] & VS_LAUNCHED);
+
+	if ((vmx->vmcs_state[vcpu] & VS_LOADED) != 0) {
 		vmx_msr_guest_enter(vmx, vcpu);
 		VERIFY3U(vmptrld(vmcs), ==, 0);
 	}
