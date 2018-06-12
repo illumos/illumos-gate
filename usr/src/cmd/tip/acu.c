@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
 
 extern acu_t	acutable[];
@@ -154,7 +152,7 @@ acutype(char *s)
 	acu_t *p;
 
 	if (s != NOSTR)
-		for (p = acutable; p->acu_name != '\0'; p++)
+		for (p = acutable; p->acu_name != NULL; p++)
 			if (equal(s, p->acu_name))
 				return (p);
 	return (NOACU);

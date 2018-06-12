@@ -1307,22 +1307,22 @@ ckreturn(int retcode, char *msg)
 	    case 12:
 	    case 22:
 		warnflag++;
-		/*FALLTHRU*/
 		if (msg)
 			progerr(msg);
+		/* FALLTHROUGH */
 	    case 10:
 	    case 20:
 		if (retcode >= 10)
 			dreboot++;
 		if (retcode >= 20)
 			ireboot++;
-		/*FALLTHRU*/
+		/* FALLTHROUGH */
 	    case 0:
 		break; /* okay */
 
 	    case -1:
 		retcode = 99;
-		/*FALLTHRU*/
+		/* FALLTHROUGH */
 	    case 99:
 	    case 1:
 	    case 11:
@@ -1335,7 +1335,7 @@ ckreturn(int retcode, char *msg)
 	    case 25:
 		if (msg)
 			progerr(msg);
-		/*FALLTHRU*/
+		/* FALLTHROUGH */
 	    case 3:
 	    case 13:
 	    case 23:

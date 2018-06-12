@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Western Digital Corporation.  All rights reserved.
  */
 
 #include <sys/cpuvar.h>
@@ -329,6 +330,13 @@ apix_do_softint_epilog(struct cpu *cpu, uint_t oldpil)
 		 */
 		set_base_spl();
 		/* mcpu->mcpu_pri = cpu->cpu_base_spl; */
+
+		/*
+		 * If there are pending interrupts, send a softint to
+		 * re-enter apix_do_interrupt() and get them processed.
+		 */
+		if (apixs[cpu->cpu_id]->x_intr_pending)
+			siron();
 
 		it->t_state = TS_FREE;
 		it->t_link = cpu->cpu_intr_thread;
@@ -720,6 +728,13 @@ apix_intr_thread_epilog(struct cpu *cpu, uint_t oldpil)
 		mcpu->mcpu_pri = basespl;
 		(*setlvlx)(basespl, 0);
 
+		/*
+		 * If there are pending interrupts, send a softint to
+		 * re-enter apix_do_interrupt() and get them processed.
+		 */
+		if (apixs[cpu->cpu_id]->x_intr_pending)
+			siron();
+
 		it->t_state = TS_FREE;
 		/*
 		 * Return interrupt thread to pool
@@ -937,7 +952,14 @@ apix_do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 	    newipl > MAX(oldipl, cpu->cpu_base_spl)) {
 		caddr_t newsp;
 
-		if (newipl > LOCK_LEVEL) {
+		if (INTR_PENDING(apixs[cpu->cpu_id], newipl)) {
+			/*
+			 * There are already vectors pending at newipl,
+			 * queue this one and fall through to process
+			 * all pending.
+			 */
+			apix_add_pending_hardint(vector);
+		} else if (newipl > LOCK_LEVEL) {
 			if (apix_hilevel_intr_prolog(cpu, newipl, oldipl, rp)
 			    == 0) {
 				newsp = cpu->cpu_intr_stack;

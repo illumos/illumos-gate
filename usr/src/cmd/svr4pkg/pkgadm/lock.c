@@ -394,7 +394,7 @@ admin_lock(int argc, char **argv)
 
 		case ':':
 			log_msg(LOG_MSG_ERR, MSG_MISSING_OPERAND, optopt);
-			/* LINTED fallthrough on case statement */
+			/* FALLTHROUGH */
 		case '?':
 
 		default:

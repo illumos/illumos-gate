@@ -44,7 +44,7 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH WAITID 2 "Jun 9, 2004"
+.TH WAITID 2 "Jun 8, 2018"
 .SH NAME
 waitid \- wait for child process to change state
 .SH SYNOPSIS
@@ -56,7 +56,6 @@ waitid \- wait for child process to change state
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBwaitid()\fR function suspends the calling process until one of its child
 processes changes state. It records the current state of a child in the
@@ -164,15 +163,13 @@ process is available and \fBWNOWAIT\fR was not specified in \fIoptions\fR, any
 pending \fBSIGCHLD\fR signal associated with the process ID of that child
 process is discarded. Any other pending \fBSIGCHLD\fR signals remain pending.
 .SH RETURN VALUES
-.sp
 .LP
 If \fBwaitid()\fR returns due to a change of state of one of its children and
 \fBWNOHANG\fR was not used,  \fB0\fR is returned.  Otherwise, \fB\(mi1\fR is
 returned and  \fBerrno\fR is set to indicate the error. If \fBWNOHANG\fR was
 used,  \fB0\fR can be returned (indicating no error); however, no children may
-have changed state if \fBinfo->si_pid\fR is \fB0\fR.
+have changed state if \fBinfop->si_pid\fR is \fB0\fR.
 .SH ERRORS
-.sp
 .LP
 The \fBwaitid()\fR function will fail if:
 .sp
@@ -215,14 +212,12 @@ specify an invalid set of processes.
 .RE
 
 .SH USAGE
-.sp
 .LP
 With \fIoptions\fR equal to \fBWEXITED\fR | \fBWTRAPPED\fR, \fBwaitid()\fR is
 equivalent to \fBwaitpid\fR(3C). With \fIidtype\fR equal to \fBP_ALL\fR and
 \fIoptions\fR equal to \fBWEXITED\fR | \fBWTRAPPED\fR, \fBwaitid()\fR is
 equivalent to \fBwait\fR(3C).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -240,7 +235,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(2), \fBexec\fR(2), \fBexit\fR(2), \fBfork\fR(2), \fBpause\fR(2),
 \fBsigaction\fR(2), \fBptrace\fR(3C), \fBsignal\fR(3C), \fBsiginfo.h\fR(3HEAD),
