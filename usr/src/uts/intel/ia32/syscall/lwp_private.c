@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -72,12 +71,12 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 	 * of zero for %fs and %gs to use the 64-bit fs_base and gs_base
 	 * respectively.
 	 */
-	if (pcb->pcb_rupdate == 0) {
+	if (!PCB_NEED_UPDATE_SEGS(pcb)) {
 		pcb->pcb_ds = rp->r_ds;
 		pcb->pcb_es = rp->r_es;
 		pcb->pcb_fs = rp->r_fs;
 		pcb->pcb_gs = rp->r_gs;
-		pcb->pcb_rupdate = 1;
+		PCB_SET_UPDATE_SEGS(pcb);
 		t->t_post_sys = 1;
 	}
 	ASSERT(t->t_post_sys);
@@ -171,7 +170,7 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 	case _LWP_FSBASE:
 		if ((sbase = pcb->pcb_fsbase) != 0) {
 			if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
-				if (pcb->pcb_rupdate == 1) {
+				if (PCB_NEED_UPDATE_SEGS(pcb)) {
 					if (pcb->pcb_fs == 0)
 						break;
 				} else {
@@ -179,7 +178,7 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 						break;
 				}
 			} else {
-				if (pcb->pcb_rupdate == 1) {
+				if (PCB_NEED_UPDATE_SEGS(pcb)) {
 					if (pcb->pcb_fs == LWPFS_SEL)
 						break;
 				} else {
@@ -193,7 +192,7 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 	case _LWP_GSBASE:
 		if ((sbase = pcb->pcb_gsbase) != 0) {
 			if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
-				if (pcb->pcb_rupdate == 1) {
+				if (PCB_NEED_UPDATE_SEGS(pcb)) {
 					if (pcb->pcb_gs == 0)
 						break;
 				} else {
@@ -201,7 +200,7 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 						break;
 				}
 			} else {
-				if (pcb->pcb_rupdate == 1) {
+				if (PCB_NEED_UPDATE_SEGS(pcb)) {
 					if (pcb->pcb_gs == LWPGS_SEL)
 						break;
 				} else {

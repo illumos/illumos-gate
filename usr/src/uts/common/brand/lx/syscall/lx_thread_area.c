@@ -21,7 +21,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -65,7 +65,7 @@ lx_arch_prctl(int code, ulong_t addr)
 			/*
 			 * Ensure we go out via update_sregs.
 			 */
-			pcb->pcb_rupdate = 1;
+			PCB_SET_UPDATE_SEGS(pcb);
 		}
 		kpreempt_enable();
 		break;
@@ -87,7 +87,7 @@ lx_arch_prctl(int code, ulong_t addr)
 			/*
 			 * Ensure we go out via update_sregs.
 			 */
-			pcb->pcb_rupdate = 1;
+			PCB_SET_UPDATE_SEGS(pcb);
 		}
 		kpreempt_enable();
 		break;

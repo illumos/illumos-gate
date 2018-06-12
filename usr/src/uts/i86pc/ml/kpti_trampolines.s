@@ -137,6 +137,12 @@
 	DGDEF3(kpti_enable, 8, 8)
 	.fill	1, 8, 1
 
+#if DEBUG
+	.data
+_bad_ts_panic_msg:
+	.string "kpti_trampolines.s: tr_iret_user but CR0.TS set"
+#endif
+
 .section ".text";
 .align MMU_PAGESIZE
 
@@ -523,6 +529,28 @@ tr_intr_ret_start:
 	SET_SIZE(tr_iret_kernel)
 
 	ENTRY_NP(tr_iret_user)
+#if DEBUG
+	/*
+	 * Ensure that we return to user land with CR0.TS clear. We do this
+	 * before we trampoline back and pivot the stack and %cr3. This way
+	 * we're still on the kernel stack and kernel %cr3, though we are on the
+	 * user GSBASE.
+	 */
+	pushq	%rax
+	mov	%cr0, %rax
+	testq	$CR0_TS, %rax
+	jz	1f
+	swapgs
+	popq	%rax
+	leaq	_bad_ts_panic_msg(%rip), %rdi
+	xorl	%eax, %eax
+	pushq	%rbp
+	movq	%rsp, %rbp
+	call	panic
+1:
+	popq	%rax
+#endif
+
 	cmpq	$1, kpti_enable
 	jne	1f
 

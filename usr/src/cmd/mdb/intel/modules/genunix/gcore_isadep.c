@@ -10,6 +10,7 @@
  */
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -71,7 +72,7 @@ gcore_getgregs(mdb_klwp_t *lwp, gregset_t grp)
 	grp[REG_R15] = rp->r_r15;
 	grp[REG_FSBASE] = pcb->pcb_fsbase;
 	grp[REG_GSBASE] = pcb->pcb_gsbase;
-	if (pcb->pcb_rupdate == 1) {
+	if (PCB_NEED_UPDATE_SEGS(pcb)) {
 		grp[REG_DS] = pcb->pcb_ds;
 		grp[REG_ES] = pcb->pcb_es;
 		grp[REG_FS] = pcb->pcb_fs;

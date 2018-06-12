@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -391,7 +391,7 @@ lx_get_user_regs32(lx_lwp_data_t *lwpd, lx_user_regs32_t *lxrp)
 	lxrp->lxur_xss = (int32_t)rp->r_ss;
 
 	kpreempt_disable();
-	if (pcb->pcb_rupdate == 1) {
+	if (PCB_NEED_UPDATE_SEGS(pcb)) {
 		lxrp->lxur_xds = pcb->pcb_ds;
 		lxrp->lxur_xes = pcb->pcb_es;
 		lxrp->lxur_xfs = pcb->pcb_fs;
@@ -523,7 +523,7 @@ lx_set_user_regs32(lx_lwp_data_t *lwpd, lx_user_regs32_t *lxrp)
 	    DATAMODEL_ILP32);
 
 	kpreempt_disable();
-	pcb->pcb_rupdate = 1;
+	PCB_SET_UPDATE_SEGS(pcb);
 	pcb->pcb_ds = fix_segreg(lxrp->lxur_xds, IS_NOT_CS, DATAMODEL_ILP32);
 	pcb->pcb_es = fix_segreg(lxrp->lxur_xes, IS_NOT_CS, DATAMODEL_ILP32);
 	pcb->pcb_fs = fix_segreg(lxrp->lxur_xfs, IS_NOT_CS, DATAMODEL_ILP32);
@@ -738,7 +738,7 @@ lx_get_user_regs64(lx_lwp_data_t *lwpd, lx_user_regs64_t *lxrp)
 	}
 
 	kpreempt_disable();
-	if (pcb->pcb_rupdate == 1) {
+	if (PCB_NEED_UPDATE_SEGS(pcb)) {
 		lxrp->lxur_xds = pcb->pcb_ds;
 		lxrp->lxur_xes = pcb->pcb_es;
 		lxrp->lxur_xfs = pcb->pcb_fs;
@@ -915,7 +915,7 @@ lx_set_user_regs64(lx_lwp_data_t *lwpd, lx_user_regs64_t *lxrp)
 	pcb->pcb_gsbase = lxrp->lxur_xgs_base;
 
 	kpreempt_disable();
-	pcb->pcb_rupdate = 1;
+	PCB_SET_UPDATE_SEGS(pcb);
 	pcb->pcb_ds = fix_segreg(lxrp->lxur_xds, IS_NOT_CS, DATAMODEL_LP64);
 	pcb->pcb_es = fix_segreg(lxrp->lxur_xes, IS_NOT_CS, DATAMODEL_LP64);
 	pcb->pcb_fs = fix_segreg(lxrp->lxur_xfs, IS_NOT_CS, DATAMODEL_LP64);
@@ -1271,7 +1271,7 @@ lx_switch_to_native(klwp_t *lwp)
 		 * is loaded:
 		 */
 		kpreempt_disable();
-		if (pcb->pcb_rupdate == 1) {
+		if (PCB_NEED_UPDATE_SEGS(pcb)) {
 			/*
 			 * If we are already flushing the segment registers,
 			 * then ensure we are flushing the native %gs.
@@ -1290,7 +1290,7 @@ lx_switch_to_native(klwp_t *lwp)
 				/*
 				 * Ensure we go out via update_sregs.
 				 */
-				pcb->pcb_rupdate = 1;
+				PCB_SET_UPDATE_SEGS(pcb);
 			}
 		}
 		kpreempt_enable();
@@ -1314,7 +1314,7 @@ lx_switch_to_native(klwp_t *lwp)
 				/*
 				 * Ensure we go out via update_sregs.
 				 */
-				pcb->pcb_rupdate = 1;
+				PCB_SET_UPDATE_SEGS(pcb);
 			}
 			kpreempt_enable();
 		}
@@ -1331,7 +1331,7 @@ lx_switch_to_native(klwp_t *lwp)
 				/*
 				 * Ensure we go out via update_sregs.
 				 */
-				pcb->pcb_rupdate = 1;
+				PCB_SET_UPDATE_SEGS(pcb);
 			}
 			kpreempt_enable();
 		}

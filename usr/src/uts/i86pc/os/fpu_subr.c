@@ -148,8 +148,7 @@ fpu_probe(void)
 		ENABLE_SSE();
 
 		if (is_x86_feature(x86_featureset, X86FSET_AVX)) {
-			ASSERT(is_x86_feature(x86_featureset,
-			    X86FSET_XSAVE));
+			ASSERT(is_x86_feature(x86_featureset, X86FSET_XSAVE));
 			fp_kind |= __FP_AVX;
 		}
 
@@ -180,7 +179,7 @@ fpu_probe(void)
 					fpsave_ctxt = xsave_ctxt;
 				}
 			}
-			patch_xsave();
+			fprestore_ctxt = xrestore_ctxt;
 			fpsave_cachep = kmem_cache_create("xsave_cache",
 			    cpuid_get_xsave_size(), XSAVE_ALIGN,
 			    NULL, NULL, NULL, NULL, NULL, 0);
