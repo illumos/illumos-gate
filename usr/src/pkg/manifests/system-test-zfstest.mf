@@ -2365,7 +2365,7 @@ file path=opt/zfs-tests/tests/functional/refreserv/refreserv_004_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_005_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/setup mode=0555
 file path=opt/zfs-tests/tests/functional/removal/cleanup mode=0555
-file path=opt/zfs-tests/tests/functional/removal/removal.kshlib mode=0555
+file path=opt/zfs-tests/tests/functional/removal/removal.kshlib mode=0444
 file path=opt/zfs-tests/tests/functional/removal/removal_all_vdev mode=0555
 file path=opt/zfs-tests/tests/functional/removal/removal_check_space mode=0555
 file path=opt/zfs-tests/tests/functional/removal/removal_condense_export \
@@ -2396,6 +2396,7 @@ file path=opt/zfs-tests/tests/functional/removal/removal_with_snapshot \
     mode=0555
 file path=opt/zfs-tests/tests/functional/removal/removal_with_write mode=0555
 file path=opt/zfs-tests/tests/functional/removal/removal_with_zdb mode=0555
+file path=opt/zfs-tests/tests/functional/removal/remove_expanded mode=0555
 file path=opt/zfs-tests/tests/functional/removal/remove_mirror mode=0555
 file path=opt/zfs-tests/tests/functional/removal/remove_mirror_sanity \
     mode=0555
