@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -306,15 +306,15 @@ unctrl_str(const char *src, int escape_slash, int *unprintable)
  * a set of safe characters and adding those few common punctuation characters
  * which are known to be safe.  The rules are:
  *
- * 	If this is a printable character (graph), and not punctuation, it is
- * 	safe to leave unquoted.
+ *	If this is a printable character (graph), and not punctuation, it is
+ *	safe to leave unquoted.
  *
- * 	If it's one of known hard-coded safe characters, it's also safe to leave
- * 	unquoted.
+ *	If it's one of the known hard-coded safe characters, it's also safe to
+ *	leave unquoted.
  *
- * 	Otherwise, the entire argument must be quoted.
+ *	Otherwise, the entire argument must be quoted.
  *
- * This will cause some strings to be unecessarily quoted, but it is safer than
+ * This will cause some strings to be unnecessarily quoted, but it is safer than
  * having a character unintentionally interpreted by the shell.
  */
 static int
@@ -357,12 +357,12 @@ quote_string_ascii(pargs_data_t *datap, char *src)
 	 * with by unctrl_str().  We make the following subtitution when we
 	 * encounter a single quote:
 	 *
-	 * 	' = '"'"'
+	 *	' = '"'"'
 	 *
 	 * In addition, we put single quotes around the entire argument.  For
 	 * example:
 	 *
-	 * 	foo'bar = 'foo'"'"'bar'
+	 *	foo'bar = 'foo'"'"'bar'
 	 */
 	dstlen = strlen(src) + 3 + 4 * quote_count;
 	dst = safe_zalloc(dstlen);
@@ -711,7 +711,7 @@ at_str(long val, char *instr, size_t n, char *str)
  */
 
 #define	FMT_AV(s, n, hwcap, mask, name)				\
-	if ((hwcap) & (mask)) 					\
+	if ((hwcap) & (mask))					\
 		(void) snprintf(s, n, "%s" name " | ", s)
 
 /*ARGSUSED*/
@@ -837,7 +837,9 @@ static struct aux_id aux_arr[] = {
 	{ AT_SUN_BRAND_AUX1,	"AT_SUN_BRAND_AUX1",	at_null	},
 	{ AT_SUN_BRAND_AUX2,	"AT_SUN_BRAND_AUX2",	at_null	},
 	{ AT_SUN_BRAND_AUX3,	"AT_SUN_BRAND_AUX3",	at_null	},
-	{ AT_SUN_COMMPAGE,	"AT_SUN_COMMPAGE",	at_null	}
+	{ AT_SUN_COMMPAGE,	"AT_SUN_COMMPAGE",	at_null	},
+	{ AT_SUN_FPTYPE,	"AT_SUN_FPTYPE",	at_null },
+	{ AT_SUN_FPSIZE,	"AT_SUN_FPSIZE",	at_null }
 };
 
 #define	N_AT_ENTS (sizeof (aux_arr) / sizeof (struct aux_id))

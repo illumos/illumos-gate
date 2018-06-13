@@ -26,7 +26,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -70,6 +70,7 @@
 
 #if defined(__x86)
 #include <sys/comm_page_util.h>
+#include <sys/fp.h>
 #endif /* defined(__x86) */
 
 
@@ -289,8 +290,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
     int brand_action)
 {
 	caddr_t		phdrbase = NULL;
-	caddr_t 	bssbase = 0;
-	caddr_t 	brkbase = 0;
+	caddr_t		bssbase = 0;
+	caddr_t		brkbase = 0;
 	size_t		brksize = 0;
 	ssize_t		dlnsize;
 	aux_entry_t	*aux;
@@ -522,9 +523,12 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 * On supported kernels (x86_64) make room in the auxv for the
 	 * AT_SUN_COMMPAGE entry.  This will go unpopulated on i86xpv systems
 	 * which do not provide such functionality.
+	 *
+	 * Additionally cover the floating point information AT_SUN_FPSIZE and
+	 * AT_SUN_FPTYPE.
 	 */
 #if defined(__amd64)
-	args->auxsize += sizeof (aux_entry_t);
+	args->auxsize += 3 * sizeof (aux_entry_t);
 #endif /* defined(__amd64) */
 
 	if ((brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
@@ -833,6 +837,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 	if (hasauxv) {
 		int auxf = AF_SUN_HWCAPVERIFY;
+		size_t fpsize;
+		int fptype;
 
 		/*
 		 * Note: AT_SUN_PLATFORM and AT_SUN_EXECNAME were filled in via
@@ -910,7 +916,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		}
 
 		/*
-		 * Add the comm page auxv entry, mapping it in if needed.
+		 * Add the comm page auxv entry, mapping it in if needed. Also
+		 * take care of the FPU entries.
 		 */
 #if defined(__amd64)
 		if (args->commpage != NULL ||
@@ -921,6 +928,16 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 * If the comm page cannot be mapped, pad out the auxv
 			 * to satisfy later size checks.
 			 */
+			ADDAUX(aux, AT_NULL, 0)
+		}
+
+		fptype = AT_386_FPINFO_NONE;
+		fpu_auxv_info(&fptype, &fpsize);
+		if (fptype != AT_386_FPINFO_NONE) {
+			ADDAUX(aux, AT_SUN_FPTYPE, fptype)
+			ADDAUX(aux, AT_SUN_FPSIZE, fpsize)
+		} else {
+			ADDAUX(aux, AT_NULL, 0)
 			ADDAUX(aux, AT_NULL, 0)
 		}
 #endif /* defined(__amd64) */

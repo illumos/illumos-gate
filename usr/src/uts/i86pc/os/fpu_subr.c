@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -35,6 +35,7 @@
 #include <sys/archsystm.h>
 #include <sys/fp.h>
 #include <sys/cmn_err.h>
+#include <sys/exec.h>
 
 #define	XMM_ALIGN	16
 
@@ -61,13 +62,15 @@ int fpu_exists = 1;
 int fp_kind = FP_387;
 
 /*
+ * The kind of FPU we advertise to rtld so it knows what to do on context
+ * switch.
+ */
+int fp_elf = AT_386_FPINFO_FXSAVE;
+
+/*
  * Mechanism to save FPU state.
  */
-#if defined(__amd64)
 int fp_save_mech = FP_FXSAVE;
-#elif defined(__i386)
-int fp_save_mech = FP_FNSAVE;
-#endif
 
 /*
  * The variable fpu_ignored is provided to allow other code to
@@ -83,16 +86,6 @@ int fpu_ignored = 0;
 int use_sse_pagecopy = 0;
 int use_sse_pagezero = 0;
 int use_sse_copy = 0;
-
-#if defined(__i386)
-
-/*
- * The variable fpu_pentium_fdivbug is provided to allow other code to
- * determine whether the system contains a Pentium with the FDIV problem.
- */
-int fpu_pentium_fdivbug = 0;
-
-#endif
 
 #if defined(__xpv)
 
@@ -117,230 +110,142 @@ int fpu_pentium_fdivbug = 0;
 void
 fpu_probe(void)
 {
-	do {
-		if (fpu_initial_probe() != 0)
-			continue;
+	if (fpu_initial_probe() != 0)
+		goto nofpu;
 
-		if (fpu_exists == 0) {
-			fpu_ignored = 1;
-			continue;
-		}
-
-#if defined(__i386)
-		fpu_pentium_fdivbug = fpu_probe_pentium_fdivbug();
-		/*
-		 * The test does some real floating point operations.
-		 * Reset it back to previous state.
-		 */
-		(void) fpu_initial_probe();
-
-		if (fpu_pentium_fdivbug != 0) {
-			fpu_ignored = 1;
-			continue;
-		}
-#endif
+	if (fpu_exists == 0) {
+		fpu_ignored = 1;
+		goto nofpu;
+	}
 
 #ifndef __xpv
-		/*
-		 * Check and see if the fpu is present by looking
-		 * at the "extension type" bit.  (While this used to
-		 * indicate a 387DX coprocessor in days gone by,
-		 * it's forced on by modern implementations for
-		 * compatibility.)
-		 */
-		if ((getcr0() & CR0_ET) == 0)
-			continue;
+	/*
+	 * Check and see if the fpu is present by looking
+	 * at the "extension type" bit.  (While this used to
+	 * indicate a 387DX coprocessor in days gone by,
+	 * it's forced on by modern implementations for
+	 * compatibility.)
+	 */
+	if ((getcr0() & CR0_ET) == 0)
+		goto nofpu;
 #endif
 
-#if defined(__amd64)
-		/* Use the more complex exception clearing code if necessary */
-		if (cpuid_need_fp_excp_handling())
-			fpsave_ctxt = fpxsave_excp_clr_ctxt;
+	/* Use the more complex exception clearing code if necessary */
+	if (cpuid_need_fp_excp_handling())
+		fpsave_ctxt = fpxsave_excp_clr_ctxt;
 
-		/*
-		 * SSE and SSE2 are required for the 64-bit ABI.
-		 *
-		 * If they're not present, we can in principal run
-		 * 32-bit userland, though 64-bit processes will be hosed.
-		 *
-		 * (Perhaps we should complain more about this case!)
-		 */
-		if (is_x86_feature(x86_featureset, X86FSET_SSE) &&
-		    is_x86_feature(x86_featureset, X86FSET_SSE2)) {
-			fp_kind |= __FP_SSE;
-			ENABLE_SSE();
+	/*
+	 * SSE and SSE2 are required for the 64-bit ABI.
+	 *
+	 * If they're not present, we can in principal run
+	 * 32-bit userland, though 64-bit processes will be hosed.
+	 *
+	 * (Perhaps we should complain more about this case!)
+	 */
+	if (is_x86_feature(x86_featureset, X86FSET_SSE) &&
+	    is_x86_feature(x86_featureset, X86FSET_SSE2)) {
+		fp_kind |= __FP_SSE;
+		ENABLE_SSE();
 
-			if (is_x86_feature(x86_featureset, X86FSET_AVX)) {
-				ASSERT(is_x86_feature(x86_featureset,
-				    X86FSET_XSAVE));
-				fp_kind |= __FP_AVX;
-			}
-
-			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
-				fp_save_mech = FP_XSAVE;
-				if (is_x86_feature(x86_featureset,
-				    X86FSET_XSAVEOPT)) {
-					/*
-					 * Use the more complex exception
-					 * clearing code if necessary.
-					 */
-					if (cpuid_need_fp_excp_handling()) {
-						fpsave_ctxt =
-						    xsaveopt_excp_clr_ctxt;
-					} else {
-						fpsave_ctxt = xsaveopt_ctxt;
-					}
-					xsavep = xsaveopt;
-				} else {
-					/*
-					 * Use the more complex exception
-					 * clearing code if necessary.
-					 */
-					if (cpuid_need_fp_excp_handling()) {
-						fpsave_ctxt =
-						    xsave_excp_clr_ctxt;
-					} else {
-						fpsave_ctxt = xsave_ctxt;
-					}
-				}
-				patch_xsave();
-				fpsave_cachep = kmem_cache_create("xsave_cache",
-				    cpuid_get_xsave_size(), XSAVE_ALIGN,
-				    NULL, NULL, NULL, NULL, NULL, 0);
-			} else {
-				/* fp_save_mech defaults to FP_FXSAVE */
-				fpsave_cachep =
-				    kmem_cache_create("fxsave_cache",
-				    sizeof (struct fxsave_state), FXSAVE_ALIGN,
-				    NULL, NULL, NULL, NULL, NULL, 0);
-			}
-		}
-#elif defined(__i386)
-		/*
-		 * SSE and SSE2 are both optional, and we patch kernel
-		 * code to exploit it when present.
-		 */
-		if (is_x86_feature(x86_featureset, X86FSET_SSE)) {
-			fp_kind |= __FP_SSE;
-			ENABLE_SSE();
-			fp_save_mech = FP_FXSAVE;
-			/*
-			 * Use the more complex exception clearing code if
-			 * necessary.
-			 */
-			if (cpuid_need_fp_excp_handling()) {
-				fpsave_ctxt = fpxsave_excp_clr_ctxt;
-			} else {
-				fpsave_ctxt = fpxsave_ctxt;
-			}
-
-			if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
-				patch_sse2();
-			}
-
-			if (is_x86_feature(x86_featureset, X86FSET_AVX)) {
-				ASSERT(is_x86_feature(x86_featureset,
-				    X86FSET_XSAVE));
-				fp_kind |= __FP_AVX;
-			}
-
-			if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
-				fp_save_mech = FP_XSAVE;
-				if (is_x86_feature(x86_featureset,
-				    X86FSET_XSAVEOPT)) {
-					/*
-					 * Use the more complex exception
-					 * clearing code if necessary.
-					 */
-					if (cpuid_need_fp_excp_handling()) {
-						fpsave_ctxt =
-						    xsaveopt_excp_clr_ctxt;
-					} else {
-						fpsave_ctxt = xsaveopt_ctxt;
-					}
-					xsavep = xsaveopt;
-				} else {
-					/*
-					 * Use the more complex exception
-					 * clearing code if necessary.
-					 */
-					if (cpuid_need_fp_excp_handling()) {
-						fpsave_ctxt =
-						    xsave_excp_clr_ctxt;
-					} else {
-						fpsave_ctxt = xsave_ctxt;
-					}
-				}
-				patch_xsave();
-				fpsave_cachep = kmem_cache_create("xsave_cache",
-				    cpuid_get_xsave_size(), XSAVE_ALIGN,
-				    NULL, NULL, NULL, NULL, NULL, 0);
-			} else {
-				patch_sse();	/* use fxrstor */
-				fpsave_cachep =
-				    kmem_cache_create("fxsave_cache",
-				    sizeof (struct fxsave_state), FXSAVE_ALIGN,
-				    NULL, NULL, NULL, NULL, NULL, 0);
-			}
-		} else {
-			remove_x86_feature(x86_featureset, X86FSET_SSE2);
-			/*
-			 * We will not likely to have a chip with AVX but not
-			 * SSE. But to be safe we disable AVX if SSE is not
-			 * enabled.
-			 */
-			remove_x86_feature(x86_featureset, X86FSET_AVX);
-			/*
-			 * (Just in case the BIOS decided we wanted SSE
-			 * enabled when we didn't. See 4965674.)
-			 */
-			DISABLE_SSE();
-
-			/*
-			 * fp_save_mech defaults to FP_FNSAVE. Use the same
-			 * alignment as used for fxsave (preserves legacy
-			 * behavior).
-			 */
-			fpsave_cachep = kmem_cache_create("fnsave_cache",
-			    sizeof (struct fnsave_state), FXSAVE_ALIGN,
-			    NULL, NULL, NULL, NULL, NULL, 0);
-		}
-#endif
-		if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
-			use_sse_pagecopy = use_sse_pagezero = use_sse_copy = 1;
+		if (is_x86_feature(x86_featureset, X86FSET_AVX)) {
+			ASSERT(is_x86_feature(x86_featureset,
+			    X86FSET_XSAVE));
+			fp_kind |= __FP_AVX;
 		}
 
-		if (fp_kind & __FP_SSE) {
-			struct fxsave_state *fx;
-			uint8_t fxsave_state[sizeof (struct fxsave_state) +
-			    XMM_ALIGN];
-
-			/*
-			 * Extract the mxcsr mask from our first fxsave
-			 */
-			fx = (void *)(((uintptr_t)(&fxsave_state[0]) +
-			    XMM_ALIGN) & ~(XMM_ALIGN - 1ul));
-
-			fx->fx_mxcsr_mask = 0;
-			fxsave_insn(fx);
-			if (fx->fx_mxcsr_mask != 0) {
+		if (is_x86_feature(x86_featureset, X86FSET_XSAVE)) {
+			fp_save_mech = FP_XSAVE;
+			fp_elf = AT_386_FPINFO_XSAVE;
+			if (is_x86_feature(x86_featureset, X86FSET_XSAVEOPT)) {
 				/*
-				 * Override default mask initialized in fpu.c
+				 * Use the more complex exception
+				 * clearing code if necessary.
 				 */
-				sse_mxcsr_mask = fx->fx_mxcsr_mask;
+				if (cpuid_need_fp_excp_handling()) {
+					fpsave_ctxt = xsaveopt_excp_clr_ctxt;
+					fp_elf = AT_386_FPINFO_XSAVE_AMD;
+				} else {
+					fpsave_ctxt = xsaveopt_ctxt;
+				}
+				xsavep = xsaveopt;
+			} else {
+				/*
+				 * Use the more complex exception
+				 * clearing code if necessary.
+				 */
+				if (cpuid_need_fp_excp_handling()) {
+					fpsave_ctxt = xsave_excp_clr_ctxt;
+					fp_elf = AT_386_FPINFO_XSAVE_AMD;
+				} else {
+					fpsave_ctxt = xsave_ctxt;
+				}
 			}
+			patch_xsave();
+			fpsave_cachep = kmem_cache_create("xsave_cache",
+			    cpuid_get_xsave_size(), XSAVE_ALIGN,
+			    NULL, NULL, NULL, NULL, NULL, 0);
+		} else {
+			/* fp_save_mech defaults to FP_FXSAVE */
+			fpsave_cachep = kmem_cache_create("fxsave_cache",
+			    sizeof (struct fxsave_state), FXSAVE_ALIGN,
+			    NULL, NULL, NULL, NULL, NULL, 0);
+			fp_elf = AT_386_FPINFO_FXSAVE;
 		}
+	}
 
-		setcr0(CR0_ENABLE_FPU_FLAGS(getcr0()));
-		return;
-		/*CONSTANTCONDITION*/
-	} while (0);
+	if (is_x86_feature(x86_featureset, X86FSET_SSE2)) {
+		use_sse_pagecopy = use_sse_pagezero = use_sse_copy = 1;
+	}
+
+	if (fp_kind & __FP_SSE) {
+		struct fxsave_state *fx;
+		uint8_t fxsave_state[sizeof (struct fxsave_state) + XMM_ALIGN];
+
+		/*
+		 * Extract the mxcsr mask from our first fxsave
+		 */
+		fx = (void *)(((uintptr_t)(&fxsave_state[0]) +
+		    XMM_ALIGN) & ~(XMM_ALIGN - 1ul));
+
+		fx->fx_mxcsr_mask = 0;
+		fxsave_insn(fx);
+		if (fx->fx_mxcsr_mask != 0) {
+			/*
+			 * Override default mask initialized in fpu.c
+			 */
+			sse_mxcsr_mask = fx->fx_mxcsr_mask;
+		}
+	}
+
+	setcr0(CR0_ENABLE_FPU_FLAGS(getcr0()));
+	return;
 
 	/*
 	 * No FPU hardware present
 	 */
+nofpu:
 	setcr0(CR0_DISABLE_FPU_FLAGS(getcr0()));
 	DISABLE_SSE();
 	fp_kind = FP_NO;
 	fpu_exists = 0;
+}
+
+/*
+ * Fill in FPU information that is required by exec.
+ */
+void
+fpu_auxv_info(int *typep, size_t *lenp)
+{
+	*typep = fp_elf;
+	switch (fp_save_mech) {
+	case FP_FXSAVE:
+		*lenp = sizeof (struct fxsave_state);
+		break;
+	case FP_XSAVE:
+		*lenp = cpuid_get_xsave_size();
+		break;
+	default:
+		*lenp = 0;
+		break;
+	}
 }

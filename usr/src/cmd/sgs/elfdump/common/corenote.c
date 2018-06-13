@@ -25,7 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -498,6 +498,8 @@ dump_auxv(note_state_t *state, const char *title)
 		case AT_SUN_GID:
 		case AT_SUN_RGID:
 		case AT_SUN_LPAGESZ:
+		case AT_SUN_FPSIZE:
+		case AT_SUN_FPTYPE:
 			num_fmt = SL_FMT_NUM_DEC;
 			break;
 

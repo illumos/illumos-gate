@@ -29,7 +29,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef	_SYS_AUXV_H
@@ -193,8 +193,11 @@ extern uint_t getisax(uint32_t *, uint_t);
 #define	AT_SUN_COMMPAGE		2026
 
 /*
- * Note that 2023 is reserved for the AT_SUN_HWCAP2 word defined above.
+ * These two AUX vectors are generally used to define information about the FPU.
+ * These values are currently only used on the x86 platform.
  */
+#define	AT_SUN_FPTYPE		2027
+#define	AT_SUN_FPSIZE		2028
 
 /*
  * The kernel is in a better position to determine whether a process needs to

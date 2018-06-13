@@ -690,6 +690,17 @@ extern "C" {
 	(XFEATURE_LEGACY_FP | XFEATURE_SSE | XFEATURE_AVX | XFEATURE_MPX | \
 	XFEATURE_AVX512 | XFEATURE_PKRU)
 
+/*
+ * Define the set of xfeature flags that should be considered valid in the xsave
+ * state vector when we initialize an lwp. This is distinct from the full set so
+ * that all of the processor's normal logic and tracking of the xsave state is
+ * usable. This should correspond to the state that's been initialized by the
+ * ABI to hold meaningful values. Adding additional bits here can have serious
+ * performance implications and cause performance degradations when using the
+ * FPU vector (xmm) registers.
+ */
+#define	XFEATURE_FP_INITIAL	(XFEATURE_LEGACY_FP | XFEATURE_SSE)
+
 #if !defined(_ASM)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)

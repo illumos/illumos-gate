@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -237,7 +237,7 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 		cfx->fx_mxcsr = fx->fx_mxcsr & ~SSE_MXCSR_EFLAGS;
 		cfx->fx_fcw = fx->fx_fcw;
 		cxs->xs_xstate_bv |= (get_xcr(XFEATURE_ENABLED_MASK) &
-		    XFEATURE_FP_ALL);
+		    XFEATURE_FP_INITIAL);
 		break;
 	default:
 		panic("Invalid fp_save_mech");
@@ -383,8 +383,7 @@ fp_seed(void)
 	 * Always initialize a new context and initialize the hardware.
 	 */
 	if (fp_save_mech == FP_XSAVE) {
-		fp->fpu_xsave_mask = get_xcr(XFEATURE_ENABLED_MASK) &
-		    XFEATURE_FP_ALL;
+		fp->fpu_xsave_mask = XFEATURE_FP_ALL;
 	}
 
 	installctx(curthread, fp,

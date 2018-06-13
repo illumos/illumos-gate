@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2018 Joyent, Inc.
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -102,6 +102,8 @@
 @ MSG_AUXV_AT_SUN_BRAND_AUX3		"SUN_BRAND_AUX3"
 @ MSG_AUXV_AT_SUN_HWCAP2		"SUN_HWCAP2"
 @ MSG_AUXV_AT_SUN_COMMPAGE		"SUN_COMMPAGE"
+@ MSG_AUXV_AT_SUN_FPTYPE		"SUN_FPTYPE"
+@ MSG_AUXV_AT_SUN_FPSIZE		"SUN_FPSIZE"
 
 
 @ MSG_CC_CONTENT_STACK		"STACK"
@@ -339,7 +341,7 @@
 @ MSG_REG_AMD64_R12		"[ r12 ]"
 @ MSG_REG_AMD64_R11		"[ r11 ]"
 @ MSG_REG_AMD64_R10		"[ r10 ]"
-@ MSG_REG_AMD64_R9 		"[ r9 ]" 
+@ MSG_REG_AMD64_R9		"[ r9 ]"
 @ MSG_REG_AMD64_R8		"[ r8 ]"
 @ MSG_REG_AMD64_RDI		"[ rdi ]"
 @ MSG_REG_AMD64_RSI		"[ rsi ]"
@@ -706,7 +708,7 @@
 @ MSG_SYS_FCNTL				"[ fcntl ]"			# 62
 @ MSG_SYS_FCNTL_ALT			"fcntl"
 @ MSG_SYS_ULIMIT			"[ ulimit ]"			# 63
-@ MSG_SYS_ULIMIT_ALT			"ulimit"	
+@ MSG_SYS_ULIMIT_ALT			"ulimit"
 @ MSG_SYS_RENAMEAT			"[ renameat ]"			# 64
 @ MSG_SYS_RENAMEAT_ALT			"renameat"
 @ MSG_SYS_UNLINKAT			"[ unlinkat ]"			# 65
@@ -730,7 +732,7 @@
 @ MSG_SYS_RCTLSYS			"[ rctlsys ]"			# 74
 @ MSG_SYS_RCTLSYS_ALT			"rctlsys	"
 @ MSG_SYS_SIDSYS			"[ sidsys ]"			# 75
-@ MSG_SYS_SIDSYS_ALT			"sidsys"	
+@ MSG_SYS_SIDSYS_ALT			"sidsys"
 @ MSG_SYS_76				"76"				# 76 (u)
 @ MSG_SYS_LWP_PARK			"[ lwp_park ]"			# 77
 @ MSG_SYS_LWP_PARK_ALT			"lwp_park"
