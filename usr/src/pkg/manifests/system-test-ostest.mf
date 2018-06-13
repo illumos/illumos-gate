@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/ostest@$(PKGVERS)
@@ -26,6 +26,7 @@ dir path=opt/os-tests/bin
 dir path=opt/os-tests/runfiles
 dir path=opt/os-tests/tests
 dir path=opt/os-tests/tests/file-locking
+$(i386_ONLY)dir path=opt/os-tests/tests/i386
 dir path=opt/os-tests/tests/pf_key
 dir path=opt/os-tests/tests/sdevfs
 dir path=opt/os-tests/tests/secflags
@@ -40,6 +41,7 @@ file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.64 mode=0555
+$(i386_ONLY)file path=opt/os-tests/tests/i386/ldt mode=0555
 file path=opt/os-tests/tests/pf_key/acquire-compare mode=0555
 file path=opt/os-tests/tests/pf_key/acquire-spray mode=0555
 file path=opt/os-tests/tests/pf_key/eacq-enabler mode=0555
