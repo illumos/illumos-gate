@@ -345,6 +345,9 @@ extern void fp_lwp_init(struct _klwp *);
 extern void fp_lwp_cleanup(struct _klwp *);
 extern void fp_lwp_dup(struct _klwp *);
 
+extern const struct fxsave_state sse_initial;
+extern const struct xsave_state avx_initial;
+
 #endif	/* _KERNEL */
 
 #ifdef __cplusplus
