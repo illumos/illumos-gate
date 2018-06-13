@@ -105,6 +105,7 @@ hma_fpu_alloc(int kmflag)
 	case FP_FXSAVE:
 		bzero(fpu->hf_guest_fpu.fpu_regs.kfpu_u.kfpu_generic,
 		    sizeof (struct fxsave_state));
+		break;
 	case FP_XSAVE:
 		bzero(fpu->hf_guest_fpu.fpu_regs.kfpu_u.kfpu_generic,
 		    cpuid_get_xsave_size());
