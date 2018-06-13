@@ -271,7 +271,18 @@
  * between entering privileged mode and performing the assertion,
  * otherwise we may perform a context switch on the thread, which
  * will end up setting pcb_rupdate to 1 again.
+ *
+ * ASSERT(%cr0 & CR0_TS == 0);
+ * Preconditions:
+ *	(%rsp is ready for normal call sequence)
+ * Postconditions (if assertion is true):
+ *      (specified register is clobbered)
+ *
+ * Check to make sure that we are returning to user land and that CR0.TS
+ * is not set. This is required as part of the eager FPU (see
+ * uts/intel/ia32/os/fpu.c for more information).
  */
+
 #if defined(DEBUG)
 
 #if !defined(__lint)
@@ -284,6 +295,9 @@ __codesel_msg:
 
 __no_rupdate_msg:
 	.string	"syscall_asm_amd64.s:%d lwp %p, pcb_rupdate != 0"
+
+__bad_ts_msg:
+	.string "sysscall_asm_amd64.s:%d CR0.TS set on user return"
 
 #endif	/* !__lint */
 
@@ -310,9 +324,20 @@ __no_rupdate_msg:
 	call	panic;					\
 8:
 
+#define	ASSERT_CR0TS_ZERO(reg)				\
+	movq	%cr0, reg;				\
+	testq	$CR0_TS, reg;				\
+	jz	9f;					\
+	leaq	__bad_ts_msg(%rip), %rdi;		\
+	movl	$__LINE__, %esi;			\
+	xorl	%eax, %eax;				\
+	call	panic;					\
+9:
+
 #else
 #define	ASSERT_LWPTOREGS(lwp, rp)
 #define	ASSERT_NO_RUPDATE_PENDING(lwp)
+#define	ASSERT_CR0TS_ZERO(reg)
 #endif
 
 /*
@@ -614,6 +639,11 @@ _syscall_invoke:
 	movq	%r13, REGOFF_RDX(%rsp)
 
 	/*
+	 * Clobber %r11 as we check CR0.TS.
+	 */
+	ASSERT_CR0TS_ZERO(%r11)
+
+	/*
 	 * To get back to userland, we need the return %rip in %rcx and
 	 * the return %rfl in %r11d.  The sysretq instruction also arranges
 	 * to fix up %cs and %ss; everything else is our responsibility.
@@ -895,6 +925,11 @@ _syscall32_save:
 	CHECK_POSTSYS_NE(%r15, %r14, %ebx)
 	jne	_full_syscall_postsys32
 	SIMPLE_SYSCALL_POSTSYS(%r15, %r14, %bx)
+
+	/*
+	 * Clobber %r11 as we check CR0.TS.
+	 */
+	ASSERT_CR0TS_ZERO(%r11)
 
 	/*
 	 * To get back to userland, we need to put the return %rip in %rcx and
@@ -1181,6 +1216,11 @@ sys_sysenter()
 	 * doesn't enable interrupts too soon.
 	 */
 	andq	$_BITNOT(PS_IE), REGOFF_RFL(%rsp)
+
+	/*
+	 * Clobber %r11 as we check CR0.TS.
+	 */
+	ASSERT_CR0TS_ZERO(%r11)
 
 	/*
 	 * (There's no point in loading up %edx because the sysexit

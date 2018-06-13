@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -195,7 +196,7 @@ s10_amd64_correct_fsreg(klwp_t *l)
 	if (lwp_getdatamodel(l) == DATAMODEL_NATIVE) {
 		kpreempt_disable();
 		l->lwp_pcb.pcb_fs = LWPFS_SEL;
-		l->lwp_pcb.pcb_rupdate = 1;
+		PCB_SET_UPDATE_SEGS(&l->lwp_pcb);
 		lwptot(l)->t_post_sys = 1;	/* Guarantee update_sregs() */
 		kpreempt_enable();
 	}

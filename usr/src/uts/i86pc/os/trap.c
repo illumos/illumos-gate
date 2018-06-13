@@ -993,50 +993,25 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		fault = FLTIOVF;
 		break;
 
+	/*
+	 * When using an eager FPU on x86, the #NM trap is no longer meaningful.
+	 * Userland should not be able to trigger it. Anything that does
+	 * represents a fatal error in the kernel and likely in the register
+	 * state of the system. User FPU state should always be valid.
+	 */
 	case T_NOEXTFLT + USER:	/* math coprocessor not available */
-		if (tudebug && tudebugfpe)
-			showregs(type, rp, addr);
-		if (fpnoextflt(rp)) {
-			siginfo.si_signo = SIGILL;
-			siginfo.si_code  = ILL_ILLOPC;
-			siginfo.si_addr  = (caddr_t)rp->r_pc;
-			fault = FLTILL;
-		}
+	case T_NOEXTFLT:
+		(void) die(type, rp, addr, cpuid);
 		break;
 
-	case T_EXTOVRFLT:	/* extension overrun fault */
-		/* check if we took a kernel trap on behalf of user */
-		{
-			extern  void ndptrap_frstor(void);
-			if (rp->r_pc != (uintptr_t)ndptrap_frstor) {
-				sti(); /* T_EXTOVRFLT comes in via cmninttrap */
-				(void) die(type, rp, addr, cpuid);
-			}
-			type |= USER;
-		}
-		/*FALLTHROUGH*/
-	case T_EXTOVRFLT + USER:	/* extension overrun fault */
-		if (tudebug && tudebugfpe)
-			showregs(type, rp, addr);
-		if (fpextovrflt(rp)) {
-			siginfo.si_signo = SIGSEGV;
-			siginfo.si_code  = SEGV_MAPERR;
-			siginfo.si_addr  = (caddr_t)rp->r_pc;
-			fault = FLTBOUNDS;
-		}
-		break;
-
+	/*
+	 * Kernel threads leveraging floating point need to mask the exceptions
+	 * or ensure that they cannot happen. There is no recovery from this.
+	 */
 	case T_EXTERRFLT:	/* x87 floating point exception pending */
-		/* check if we took a kernel trap on behalf of user */
-		{
-			extern  void ndptrap_frstor(void);
-			if (rp->r_pc != (uintptr_t)ndptrap_frstor) {
-				sti(); /* T_EXTERRFLT comes in via cmninttrap */
-				(void) die(type, rp, addr, cpuid);
-			}
-			type |= USER;
-		}
-		/*FALLTHROUGH*/
+		sti(); /* T_EXTERRFLT comes in via cmninttrap */
+		(void) die(type, rp, addr, cpuid);
+		break;
 
 	case T_EXTERRFLT + USER: /* x87 floating point exception pending */
 		if (tudebug && tudebugfpe)
@@ -1939,7 +1914,7 @@ kern_gpfault(struct regs *rp)
 	}
 
 #if defined(__amd64)
-	if (trp == NULL && lwp->lwp_pcb.pcb_rupdate != 0) {
+	if (trp == NULL && PCB_NEED_UPDATE_SEGS(&lwp->lwp_pcb)) {
 
 		/*
 		 * This is the common case -- we're trying to load

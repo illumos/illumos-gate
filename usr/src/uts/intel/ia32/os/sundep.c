@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc. */
@@ -393,12 +393,12 @@ lwp_forkregs(klwp_t *lwp, klwp_t *clwp)
 	struct pcb *pcb = &clwp->lwp_pcb;
 	struct regs *rp = lwptoregs(lwp);
 
-	if (pcb->pcb_rupdate == 0) {
+	if (!PCB_NEED_UPDATE_SEGS(pcb)) {
 		pcb->pcb_ds = rp->r_ds;
 		pcb->pcb_es = rp->r_es;
 		pcb->pcb_fs = rp->r_fs;
 		pcb->pcb_gs = rp->r_gs;
-		pcb->pcb_rupdate = 1;
+		PCB_SET_UPDATE_SEGS(pcb);
 		lwptot(clwp)->t_post_sys = 1;
 	}
 	ASSERT(lwptot(clwp)->t_post_sys);
@@ -436,22 +436,22 @@ lwp_pcb_exit(void)
  * as a segment-not-present trap.
  *
  * Here we save the current values from the lwp regs into the pcb
- * and set pcb->pcb_rupdate to 1 to tell the rest of the kernel
- * that the pcb copy of the segment registers is the current one.
- * This ensures the lwp's next trip to user land via update_sregs.
- * Finally we set t_post_sys to ensure that no system call fast-path's
- * its way out of the kernel via sysret.
+ * and or PCB_UPDATE_SEGS (1) in pcb->pcb_rupdate to tell the rest
+ * of the kernel that the pcb copy of the segment registers is the
+ * current one.  This ensures the lwp's next trip to user land via
+ * update_sregs.  Finally we set t_post_sys to ensure that no
+ * system call fast-path's its way out of the kernel via sysret.
  *
- * (This means that we need to have interrupts disabled when we test
- * t->t_post_sys in the syscall handlers; if the test fails, we need
- * to keep interrupts disabled until we return to userland so we can't
- * be switched away.)
+ * (This means that we need to have interrupts disabled when we
+ * test t->t_post_sys in the syscall handlers; if the test fails,
+ * we need to keep interrupts disabled until we return to userland
+ * so we can't be switched away.)
  *
- * As a result of all this, we don't really have to do a whole lot if
- * the thread is just mucking about in the kernel, switching on and
- * off the cpu for whatever reason it feels like. And yet we still
- * preserve fast syscalls, cause if we -don't- get descheduled,
- * we never come here either.
+ * As a result of all this, we don't really have to do a whole lot
+ * if the thread is just mucking about in the kernel, switching on
+ * and off the cpu for whatever reason it feels like. And yet we
+ * still preserve fast syscalls, cause if we -don't- get
+ * descheduled, we never come here either.
  */
 
 #define	VALID_LWP_DESC(udp) ((udp)->usd_type == SDT_MEMRWA && \
@@ -468,7 +468,7 @@ lwp_segregs_save(klwp_t *lwp)
 	ASSERT(VALID_LWP_DESC(&pcb->pcb_fsdesc));
 	ASSERT(VALID_LWP_DESC(&pcb->pcb_gsdesc));
 
-	if (pcb->pcb_rupdate == 0) {
+	if (!PCB_NEED_UPDATE_SEGS(pcb)) {
 		rp = lwptoregs(lwp);
 
 		/*
@@ -482,7 +482,7 @@ lwp_segregs_save(klwp_t *lwp)
 		pcb->pcb_es = rp->r_es;
 		pcb->pcb_fs = rp->r_fs;
 		pcb->pcb_gs = rp->r_gs;
-		pcb->pcb_rupdate = 1;
+		PCB_SET_UPDATE_SEGS(pcb);
 		lwp->lwp_thread->t_post_sys = 1;
 	}
 #endif	/* __amd64 */
@@ -833,7 +833,8 @@ lwp_installctx(klwp_t *lwp)
 	 * On the amd64 kernel, the context handlers are responsible for
 	 * virtualizing %ds, %es, %fs, and %gs to the lwp.  The register
 	 * values are only ever changed via sys_rtt when the
-	 * pcb->pcb_rupdate == 1.  Only sys_rtt gets to clear the bit.
+	 * PCB_UPDATE_SEGS bit (1) is set in pcb->pcb_rupdate. Only
+	 * sys_rtt gets to clear the bit.
 	 *
 	 * On the i386 kernel, the context handlers are responsible for
 	 * virtualizing %gs/%fs to the lwp by updating the per-cpu GDTs
@@ -964,7 +965,7 @@ setregs(uarg_t *args)
 
 	pcb->pcb_ds = rp->r_ds;
 	pcb->pcb_es = rp->r_es;
-	pcb->pcb_rupdate = 1;
+	PCB_SET_UPDATE_SEGS(pcb);
 
 #elif defined(__i386)
 
@@ -991,17 +992,15 @@ setregs(uarg_t *args)
 	t->t_post_sys = 1;
 
 	/*
-	 * Here we initialize minimal fpu state.
-	 * The rest is done at the first floating
-	 * point instruction that a process executes.
-	 */
-	pcb->pcb_fpu.fpu_flags = 0;
-
-	/*
 	 * Add the lwp context handlers that virtualize segment registers,
 	 * and/or system call stacks etc.
 	 */
 	lwp_installctx(lwp);
+
+	/*
+	 * Reset the FPU flags and then initialize the FPU for this lwp.
+	 */
+	fp_exec();
 }
 
 user_desc_t *

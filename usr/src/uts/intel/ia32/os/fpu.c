@@ -61,10 +61,387 @@
 #include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
 
+/*
+ * FPU Management Overview
+ * -----------------------
+ *
+ * The x86 FPU has evolved substantially since its days as the x87 coprocessor;
+ * however, many aspects of its life as a coprocessor are still around in x86.
+ *
+ * Today, when we refer to the 'FPU', we don't just mean the original x87 FPU.
+ * While that state still exists, there is much more that is covered by the FPU.
+ * Today, this includes not just traditional FPU state, but also supervisor only
+ * state. The following state is currently managed and covered logically by the
+ * idea of the FPU registers:
+ *
+ *    o Traditional x87 FPU
+ *    o Vector Registers (%xmm, %ymm, %zmm)
+ *    o Memory Protection Extensions (MPX) Bounds Registers
+ *    o Protected Key Rights Registers (PKRU)
+ *    o Processor Trace data
+ *
+ * The rest of this covers how the FPU is managed and controlled, how state is
+ * saved and restored between threads, interactions with hypervisors, and other
+ * information exported to user land through aux vectors. A lot of background
+ * information is here to synthesize major parts of the Intel SDM, but
+ * unfortunately, it is not a replacement for reading it.
+ *
+ * FPU Control Registers
+ * ---------------------
+ *
+ * Because the x87 FPU began its life as a co-processor and the FPU was
+ * optional there are several bits that show up in %cr0 that we have to
+ * manipulate when dealing with the FPU. These are:
+ *
+ *   o CR0.ET	The 'extension type' bit. This was used originally to indicate
+ *   		that the FPU co-processor was present. Now it is forced on for
+ *   		compatibility. This is often used to verify whether or not the
+ *   		FPU is present.
+ *
+ *   o CR0.NE	The 'native error' bit. Used to indicate that native error
+ *		mode should be enabled. This indicates that we should take traps
+ *		on FPU errors. The OS enables this early in boot.
+ *
+ *   o CR0.MP	The 'Monitor Coprocessor' bit. Used to control whether or not
+ *   		wait/fwait instructions generate a #NM if CR0.TS is set.
+ *
+ *   o CR0.EM	The 'Emulation' bit. This is used to cause floating point
+ *		operations (x87 through SSE4) to trap with a #UD so they can be
+ *		emulated. The system never sets this bit, but makes sure it is
+ *		clear on processor start up.
+ *
+ *   o CR0.TS	The 'Task Switched' bit. When this is turned on, a floating
+ *		point operation will generate a #NM. An fwait will as well,
+ *		depending on the value in CR0.MP.
+ *
+ * Our general policy is that CR0.ET, CR0.NE, and CR0.MP are always set by
+ * the system. Similarly CR0.EM is always unset by the system. CR0.TS has a more
+ * complicated role. Historically it has been used to allow running systems to
+ * restore the FPU registers lazily. This will be discussed in greater depth
+ * later on.
+ *
+ * %cr4 is also used as part of the FPU control. Specifically we need to worry
+ * about the following bits in the system:
+ *
+ *   o CR4.OSFXSR	This bit is used to indicate that the OS understands and
+ *			supports the execution of the fxsave and fxrstor
+ *			instructions. This bit is required to be set to enable
+ *			the use of the SSE->SSE4 instructions.
+ *
+ *   o CR4.OSXMMEXCPT	This bit is used to indicate that the OS can understand
+ *			and take a SIMD floating point exception (#XM). This bit
+ *			is always enabled by the system.
+ *
+ *   o CR4.OSXSAVE	This bit is used to indicate that the OS understands and
+ *			supports the execution of the xsave and xrstor family of
+ *			instructions. This bit is required to use any of the AVX
+ *			and newer feature sets.
+ *
+ * Because all supported processors are 64-bit, they'll always support the XMM
+ * extensions and we will enable both CR4.OXFXSR and CR4.OSXMMEXCPT in boot.
+ * CR4.OSXSAVE will be enabled and used whenever xsave is reported in cpuid.
+ *
+ * %xcr0 is used to manage the behavior of the xsave feature set and is only
+ * present on the system if xsave is supported. %xcr0 is read and written to
+ * through by the xgetbv and xsetbv instructions. This register is present
+ * whenever the xsave feature set is supported. Each bit in %xcr0 refers to a
+ * different component of the xsave state and controls whether or not that
+ * information is saved and restored. For newer feature sets like AVX and MPX,
+ * it also controls whether or not the corresponding instructions can be
+ * executed (much like CR0.OSFXSR does for the SSE feature sets).
+ *
+ * Everything in %xcr0 is around features available to users. There is also the
+ * IA32_XSS MSR which is used to control supervisor-only features that are still
+ * part of the xsave state. Bits that can be set in %xcr0 are reserved in
+ * IA32_XSS and vice versa. This is an important property that is particularly
+ * relevant to how the xsave instructions operate.
+ *
+ * Save Mechanisms
+ * ---------------
+ *
+ * When switching between running threads the FPU state needs to be saved and
+ * restored by the OS. If this state was not saved, users would rightfully
+ * complain about corrupt state. There are three mechanisms that exist on the
+ * processor for saving and restoring these state images:
+ *
+ *   o fsave
+ *   o fxsave
+ *   o xsave
+ *
+ * fsave saves and restores only the x87 FPU and is the oldest of these
+ * mechanisms. This mechanism is never used in the kernel today because we are
+ * always running on systems that support fxsave.
+ *
+ * The fxsave and fxrstor mechanism allows the x87 FPU and the SSE register
+ * state to be saved and restored to and from a struct fxsave_state. This is the
+ * default mechanism that is used to save and restore the FPU on amd64. An
+ * important aspect of fxsave that was different from the original i386 fsave
+ * mechanism is that the restoring of FPU state with pending exceptions will not
+ * generate an exception, it will be deferred to the next use of the FPU.
+ *
+ * The final and by far the most complex mechanism is that of the xsave set.
+ * xsave allows for saving and restoring all of the traditional x86 pieces (x87
+ * and SSE), while allowing for extensions that will save the %ymm, %zmm, etc.
+ * registers.
+ *
+ * Data is saved and restored into and out of a struct xsave_state. The first
+ * part of the struct xsave_state is equivalent to the struct fxsave_state.
+ * After that, there is a header which is used to describe the remaining
+ * portions of the state. The header is a 64-byte value of which the first two
+ * uint64_t values are defined and the rest are reserved and must be zero. The
+ * first uint64_t is the xstate_bv member. This describes which values in the
+ * xsave_state are actually valid and present. This is updated on a save and
+ * used on restore. The second member is the xcomp_bv member. Its last bit
+ * determines whether or not a compressed version of the structure is used.
+ *
+ * When the uncompressed structure is used (currently the only format we
+ * support), then each state component is at a fixed offset in the structure,
+ * even if it is not being used. For example, if you only saved the AVX related
+ * state, but did not save the MPX related state, the offset would not change
+ * for any component. With the compressed format, components that aren't used
+ * are all elided (though the x87 and SSE state are always there).
+ *
+ * Unlike fxsave which saves all state, the xsave family does not always save
+ * and restore all the state that could be covered by the xsave_state. The
+ * instructions all take an argument which is a mask of what to consider. This
+ * is the same mask that will be used in the xstate_bv vector and it is also the
+ * same values that are present in %xcr0 and IA32_XSS. Though IA32_XSS is only
+ * considered with the xsaves and xrstors instructions.
+ *
+ * When a save or restore is requested, a bitwise and is performed between the
+ * requested bits and those that have been enabled in %xcr0. Only the bits that
+ * match that are then saved or restored. Others will be silently ignored by
+ * the processor. This idea is used often in the OS. We will always request that
+ * we save and restore all of the state, but only those portions that are
+ * actually enabled in %xcr0 will be touched.
+ *
+ * If a feature has been asked to be restored that is not set in the xstate_bv
+ * feature vector of the save state, then it will be set to its initial state by
+ * the processor (usually zeros). Also, when asked to save state, the processor
+ * may not write out data that is in its initial state as an optimization. This
+ * optimization only applies to saving data and not to restoring data.
+ *
+ * There are a few different variants of the xsave and xrstor instruction. They
+ * are:
+ *
+ *   o xsave	This is the original save instruction. It will save all of the
+ *		requested data in the xsave state structure. It only saves data
+ *		in the uncompressed (xcomp_bv[63] is zero) format. It may be
+ *		executed at all privilege levels.
+ *
+ *   o xrstor	This is the original restore instruction. It will restore all of
+ *		the requested data. The xrstor function can handle both the
+ *		compressed and uncompressed formats. It may be executed at all
+ *		privilege levels.
+ *
+ *   o xsaveopt	This is a variant of the xsave instruction that employs
+ *		optimizations to try and only write out state that has been
+ *		modified since the last time an xrstor instruction was called.
+ *		The processor tracks a tuple of information about the last
+ *		xrstor and tries to ensure that the same buffer is being used
+ *		when this optimization is being used. However, because of the
+ *		way that it tracks the xrstor buffer based on the address of it,
+ *		it is not suitable for use if that buffer can be easily reused.
+ *		The most common case is trying to save data to the stack in
+ *		rtld. It may be executed at all privilege levels.
+ *
+ *   o xsavec	This is a variant of the xsave instruction that writes out the
+ *		compressed form of the xsave_state. Otherwise it behaves as
+ *		xsave. It may be executed at all privilege levels.
+ *
+ *   o xsaves	This is a variant of the xsave instruction. It is similar to
+ *		xsavec in that it always writes the compressed form of the
+ *		buffer. Unlike all the other forms, this instruction looks at
+ *		both the user (%xcr0) and supervisor (IA32_XSS MSR) to determine
+ *		what to save and restore. xsaves also implements the same
+ *		optimization that xsaveopt does around modified pieces. User
+ *		land may not execute the instruction.
+ *
+ *   o xrstors	This is a variant of the xrstor instruction. Similar to xsaves
+ *		it can save and restore both the user and privileged states.
+ *		Unlike xrstor it can only operate on the compressed form.
+ *		User land may not execute the instruction.
+ *
+ * Based on all of these, the kernel has a precedence for what it will use.
+ * Basically, xsaves (not supported) is preferred to xsaveopt, which is
+ * preferred to xsave. A similar scheme is used when informing rtld (more later)
+ * about what it should use. xsavec is preferred to xsave. xsaveopt is not
+ * recommended due to the modified optimization not being appropriate for this
+ * use.
+ *
+ * Finally, there is one last gotcha with the xsave state. Importantly some AMD
+ * processors did not always save and restore some of the FPU exception state in
+ * some cases like Intel did. In those cases the OS will make up for this fact
+ * itself.
+ *
+ * FPU Initialization
+ * ------------------
+ *
+ * One difference with the FPU registers is that not all threads have FPU state,
+ * only those that have an lwp. Generally this means kernel threads, which all
+ * share p0 and its lwp, do not have FPU state. Though there are definitely
+ * exceptions such as kcfpoold. In the rest of this discussion we'll use thread
+ * and lwp interchangeably, just think of thread meaning a thread that has a
+ * lwp.
+ *
+ * Each lwp has its FPU state allocated in its pcb (process control block). The
+ * actual storage comes from the fpsave_cachep kmem cache. This cache is sized
+ * dynamically at start up based on the save mechanism that we're using and the
+ * amount of memory required for it. This is dynamic because the xsave_state
+ * size varies based on the supported feature set.
+ *
+ * The hardware side of the FPU is initialized early in boot before we mount the
+ * root file system. This is effectively done in fpu_probe(). This is where we
+ * make the final decision about what the save and restore mechanisms we should
+ * use are, create the fpsave_cachep kmem cache, and initialize a number of
+ * function pointers that use save and restoring logic.
+ *
+ * The thread/lwp side is a a little more involved. There are two different
+ * things that we need to concern ourselves with. The first is how the FPU
+ * resources are allocated and the second is how the FPU state is initialized
+ * for a given lwp.
+ *
+ * We allocate the FPU save state from our kmem cache as part of lwp_fp_init().
+ * This is always called unconditionally by the system as part of creating an
+ * LWP.
+ *
+ * There are three different initialization paths that we deal with. The first
+ * is when we are executing a new process. As part of exec all of the register
+ * state is reset. The exec case is particularly important because init is born
+ * like Athena, sprouting from the head of the kernel, without any true parent
+ * to fork from. The second is used whenever we fork or create a new lwp.  The
+ * third is to deal with special lwps like the agent lwp.
+ *
+ * During exec, we will call fp_exec() which will initialize and set up the FPU
+ * state for the process. That will fill in the initial state for the FPU and
+ * also set that state in the FPU itself. As part of fp_exec() we also install a
+ * thread context operations vector that takes care of dealing with the saving
+ * and restoring of the FPU. These context handlers will also be called whenever
+ * an lwp is created or forked. In those cases, to initialize the FPU we will
+ * call fp_new_lwp(). Like fp_exec(), fp_new_lwp() will install a context
+ * operations vector for the new thread.
+ *
+ * Next we'll end up in the context operation fp_new_lwp(). This saves the
+ * current thread's state, initializes the new thread's state, and copies over
+ * the relevant parts of the originating thread's state. It's as this point that
+ * we also install the FPU context operations into the new thread, which ensures
+ * that all future threads that are descendants of the current one get the
+ * thread context operations (unless they call exec).
+ *
+ * To deal with some things like the agent lwp, we double check the state of the
+ * FPU in sys_rtt_common() to make sure that it has been enabled before
+ * returning to user land. In general, this path should be rare, but it's useful
+ * for the odd lwp here and there.
+ *
+ * The FPU state will remain valid most of the time. There are times that
+ * the state will be rewritten. For example in restorecontext, due to /proc, or
+ * the lwp calls exec(). Whether the context is being freed or we are resetting
+ * the state, we will call fp_free() to disable the FPU and our context.
+ *
+ * Finally, when the lwp is destroyed, it will actually destroy and free the FPU
+ * state by calling fp_lwp_cleanup().
+ *
+ * Kernel FPU Multiplexing
+ * -----------------------
+ *
+ * Just as the kernel has to maintain all of the general purpose registers when
+ * switching between scheduled threads, the same is true of the FPU registers.
+ *
+ * When a thread has FPU state, it also has a set of context operations
+ * installed. These context operations take care of making sure that the FPU is
+ * properly saved and restored during a context switch (fpsave_ctxt and
+ * fprestore_ctxt respectively). This means that the current implementation of
+ * the FPU is 'eager', when a thread is running the CPU will have its FPU state
+ * loaded. While this is always true when executing in userland, there are a few
+ * cases where this is not true in the kernel.
+ *
+ * This was not always the case. Traditionally on x86 a 'lazy' FPU restore was
+ * employed. This meant that the FPU would be saved on a context switch and the
+ * CR0.TS bit would be set. When a thread next tried to use the FPU, it would
+ * then take a #NM trap, at which point we would restore the FPU from the save
+ * area and return to user land. Given the frequency of use of the FPU alone by
+ * libc, there's no point returning to user land just to trap again.
+ *
+ * There are a few cases though where the FPU state may need to be changed for a
+ * thread on its behalf. The most notable cases are in the case of processes
+ * using /proc, restorecontext, forking, etc. In all of these cases the kernel
+ * will force a threads FPU state to be saved into the PCB through the fp_save()
+ * function. Whenever the FPU is saved, then the FPU_VALID flag is set on the
+ * pcb. This indicates that the save state holds currently valid data. As a side
+ * effect of this, CR0.TS will be set. To make sure that all of the state is
+ * updated before returning to user land, in these cases, we set a flag on the
+ * PCB that says the FPU needs to be updated. This will make sure that we take
+ * the slow path out of a system call to fix things up for the thread. Due to
+ * the fact that this is a rather rare case, effectively setting the equivalent
+ * of t_postsys is acceptable.
+ *
+ * CR0.TS will be set after a save occurs and cleared when a restore occurs.
+ * Generally this means it will be cleared immediately by the new thread that is
+ * running in a context switch. However, this isn't the case for kernel threads.
+ * They currently operate with CR0.TS set as no kernel state is restored for
+ * them. This means that using the FPU will cause a #NM and panic.
+ *
+ * The FPU_VALID flag on the currently executing thread's pcb is meant to track
+ * what the value of CR0.TS should be. If it is set, then CR0.TS will be set.
+ * However, because we eagerly restore, the only time that CR0.TS should be set
+ * for a non-kernel thread is during operations where it will be cleared before
+ * returning to user land and importantly, the only data that is in it is its
+ * own.
+ *
+ * FPU Exceptions
+ * --------------
+ *
+ * Certain operations can cause the kernel to take traps due to FPU activity.
+ * Generally these events will cause a user process to receive a SIGFPU and if
+ * the kernel receives it in kernel context, we will die. Traditionally the #NM
+ * (Device Not Available / No Math) exception generated by CR0.TS would have
+ * caused us to restore the FPU. Now it is a fatal event regardless of whether
+ * or not user land causes it.
+ *
+ * While there are some cases where the kernel uses the FPU, it is up to the
+ * kernel to use the FPU in a way such that it cannot receive a trap or to use
+ * the appropriate trap protection mechanisms.
+ *
+ * Hypervisors
+ * -----------
+ *
+ * When providing support for hypervisors things are a little bit more
+ * complicated because the FPU is not virtualized at all. This means that they
+ * need to save and restore the FPU and %xcr0 across entry and exit to the
+ * guest. To facilitate this, we provide a series of APIs in <sys/hma.h>. These
+ * allow us to use the full native state to make sure that we are always saving
+ * and restoring the full FPU that the host sees, even when the guest is using a
+ * subset.
+ *
+ * One tricky aspect of this is that the guest may be using a subset of %xcr0
+ * and therefore changing our %xcr0 on the fly. It is vital that when we're
+ * saving and restoring the FPU that we always use the largest %xcr0 contents
+ * otherwise we will end up leaving behind data in it.
+ *
+ * ELF PLT Support
+ * ---------------
+ *
+ * rtld has to preserve a subset of the FPU when it is saving and restoring
+ * registers due to the amd64 SYS V ABI. See cmd/sgs/rtld/amd64/boot_elf.s for
+ * more information. As a result, we set up an aux vector that contains
+ * information about what save and restore mechanisms it should be using and
+ * the sizing thereof based on what the kernel supports. This is passed down in
+ * a series of aux vectors SUN_AT_FPTYPE and SUN_AT_FPSIZE. This information is
+ * initialized in fpu_subr.c.
+ */
+
 kmem_cache_t *fpsave_cachep;
 
 /* Legacy fxsave layout + xsave header + ymm */
 #define	AVX_XSAVE_SIZE		(512 + 64 + 256)
+
+/*
+ * Various sanity checks.
+ */
+CTASSERT(sizeof (struct fxsave_state) == 512);
+CTASSERT(sizeof (struct fnsave_state) == 108);
+CTASSERT((offsetof(struct fxsave_state, fx_xmm[0]) & 0xf) == 0);
+CTASSERT(sizeof (struct xsave_state) >= AVX_XSAVE_SIZE);
 
 /*CSTYLED*/
 #pragma	align 16 (sse_initial)
@@ -150,20 +527,12 @@ const struct fnsave_state x87_initial = {
 	/* rest of structure is zero */
 };
 
-#if defined(__amd64)
 /*
  * This vector is patched to xsave_ctxt() if we discover we have an
  * XSAVE-capable chip in fpu_probe.
  */
 void (*fpsave_ctxt)(void *) = fpxsave_ctxt;
-#elif defined(__i386)
-/*
- * This vector is patched to fpxsave_ctxt() if we discover we have an
- * SSE-capable chip in fpu_probe(). It is patched to xsave_ctxt
- * if we discover we have an XSAVE-capable chip in fpu_probe.
- */
-void (*fpsave_ctxt)(void *) = fpnsave_ctxt;
-#endif
+void (*fprestore_ctxt)(void *) = fpxrestore_ctxt;
 
 /*
  * This function pointer is changed to xsaveopt if the CPU is xsaveopt capable.
@@ -187,9 +556,6 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	struct fpu_ctx *fp;		/* parent fpu context */
 	struct fpu_ctx *cfp;		/* new fpu context */
 	struct fxsave_state *fx, *cfx;
-#if defined(__i386)
-	struct fnsave_state *fn, *cfn;
-#endif
 	struct xsave_state *cxs;
 
 	ASSERT(fp_kind != FP_NO);
@@ -207,15 +573,13 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 	cfp->fpu_regs.kfpu_status = 0;
 	cfp->fpu_regs.kfpu_xstatus = 0;
 
+	/*
+	 * Make sure that the child's FPU is cleaned up and made ready for user
+	 * land.
+	 */
+	PCB_SET_UPDATE_FPU(&ct->t_lwp->lwp_pcb);
+
 	switch (fp_save_mech) {
-#if defined(__i386)
-	case FP_FNSAVE:
-		fn = fp->fpu_regs.kfpu_u.kfpu_fn;
-		cfn = cfp->fpu_regs.kfpu_u.kfpu_fn;
-		bcopy(&x87_initial, cfn, sizeof (*cfn));
-		cfn->f_fcw = fn->f_fcw;
-		break;
-#endif
 	case FP_FXSAVE:
 		fx = fp->fpu_regs.kfpu_u.kfpu_fx;
 		cfx = cfp->fpu_regs.kfpu_u.kfpu_fx;
@@ -244,14 +608,13 @@ fp_new_lwp(kthread_id_t t, kthread_id_t ct)
 		/*NOTREACHED*/
 	}
 
-	installctx(ct, cfp,
-	    fpsave_ctxt, NULL, fp_new_lwp, fp_new_lwp, NULL, fp_free);
 	/*
-	 * Now, when the new lwp starts running, it will take a trap
-	 * that will be handled inline in the trap table to cause
-	 * the appropriate f*rstor instruction to load the save area we
-	 * constructed above directly into the hardware.
+	 * Mark that both the parent and child need to have the FPU cleaned up
+	 * before returning to user land.
 	 */
+
+	installctx(ct, cfp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
+	    fp_new_lwp, NULL, fp_free);
 }
 
 /*
@@ -313,11 +676,6 @@ fp_save(struct fpu_ctx *fp)
 	ASSERT(curthread->t_lwp && fp == &curthread->t_lwp->lwp_pcb.pcb_fpu);
 
 	switch (fp_save_mech) {
-#if defined(__i386)
-	case FP_FNSAVE:
-		fpsave(fp->fpu_regs.kfpu_u.kfpu_fn);
-		break;
-#endif
 	case FP_FXSAVE:
 		fpxsave(fp->fpu_regs.kfpu_u.kfpu_fx);
 		break;
@@ -331,6 +689,18 @@ fp_save(struct fpu_ctx *fp)
 	}
 
 	fp->fpu_flags |= FPU_VALID;
+
+	/*
+	 * We save the FPU as part of forking, execing, modifications via /proc,
+	 * restorecontext, etc. As such, we need to make sure that we return to
+	 * userland with valid state in the FPU. If we're context switched out
+	 * before we hit sys_rtt_common() we'll end up having restored the FPU
+	 * as part of the context ops operations. The restore logic always makes
+	 * sure that FPU_VALID is set before doing a restore so we don't restore
+	 * it a second time.
+	 */
+	PCB_SET_UPDATE_FPU(&curthread->t_lwp->lwp_pcb);
+
 	kpreempt_enable();
 }
 
@@ -344,11 +714,6 @@ void
 fp_restore(struct fpu_ctx *fp)
 {
 	switch (fp_save_mech) {
-#if defined(__i386)
-	case FP_FNSAVE:
-		fprestore(fp->fpu_regs.kfpu_u.kfpu_fn);
-		break;
-#endif
 	case FP_FXSAVE:
 		fpxrestore(fp->fpu_regs.kfpu_u.kfpu_fx);
 		break;
@@ -364,6 +729,33 @@ fp_restore(struct fpu_ctx *fp)
 	fp->fpu_flags &= ~FPU_VALID;
 }
 
+/*
+ * Reset the FPU such that it is in a valid state for a new thread that is
+ * coming out of exec. The FPU will be in a usable state at this point. At this
+ * point we know that the FPU state has already been allocated and if this
+ * wasn't an init process, then it will have had fp_free() previously called.
+ */
+void
+fp_exec(void)
+{
+	struct fpu_ctx *fp = &ttolwp(curthread)->lwp_pcb.pcb_fpu;
+
+	if (fp_save_mech == FP_XSAVE) {
+		fp->fpu_xsave_mask = XFEATURE_FP_ALL;
+	}
+
+	/*
+	 * Make sure that we're not preempted in the middle of initializing the
+	 * FPU on CPU.
+	 */
+	kpreempt_disable();
+	installctx(curthread, fp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
+	    fp_new_lwp, NULL, fp_free);
+	fpinit();
+	fp->fpu_flags = FPU_EN;
+	kpreempt_enable();
+}
+
 
 /*
  * Seeds the initial state for the current thread.  The possibilities are:
@@ -371,7 +763,7 @@ fp_restore(struct fpu_ctx *fp)
  *         initialization: Load the FPU state from the LWP state.
  *      2. The FPU state has not been externally modified:  Load a clean state.
  */
-static void
+void
 fp_seed(void)
 {
 	struct fpu_ctx *fp = &ttolwp(curthread)->lwp_pcb.pcb_fpu;
@@ -386,8 +778,8 @@ fp_seed(void)
 		fp->fpu_xsave_mask = XFEATURE_FP_ALL;
 	}
 
-	installctx(curthread, fp,
-	    fpsave_ctxt, NULL, fp_new_lwp, fp_new_lwp, NULL, fp_free);
+	installctx(curthread, fp, fpsave_ctxt, fprestore_ctxt, fp_new_lwp,
+	    fp_new_lwp, NULL, fp_free);
 	fpinit();
 
 	/*
@@ -452,11 +844,6 @@ fp_lwp_dup(struct _klwp *lwp)
 	size_t sz;
 
 	switch (fp_save_mech) {
-#if defined(__i386)
-	case FP_FNSAVE:
-		sz = sizeof (struct fnsave_state);
-		break;
-#endif
 	case FP_FXSAVE:
 		sz = sizeof (struct fxsave_state);
 		break;
@@ -472,119 +859,6 @@ fp_lwp_dup(struct _klwp *lwp)
 	bcopy(lwp->lwp_pcb.pcb_fpu.fpu_regs.kfpu_u.kfpu_generic, xp, sz);
 	/* now restore the pointer */
 	lwp->lwp_pcb.pcb_fpu.fpu_regs.kfpu_u.kfpu_generic = xp;
-}
-
-
-/*
- * This routine is called from trap() when User thread takes No Extension
- * Fault. The possiblities are:
- *	1. User thread has executed a FP instruction for the first time.
- *	   Save current FPU context if any. Initialize FPU, setup FPU
- *	   context for the thread and enable FP hw.
- *	2. Thread's pcb has a valid FPU state: Restore the FPU state and
- *	   enable FP hw.
- *
- * Note that case #2 is inlined in the trap table.
- */
-int
-fpnoextflt(struct regs *rp)
-{
-	struct fpu_ctx *fp = &ttolwp(curthread)->lwp_pcb.pcb_fpu;
-
-#if !defined(__lint)
-	ASSERT(sizeof (struct fxsave_state) == 512 &&
-	    sizeof (struct fnsave_state) == 108);
-	ASSERT((offsetof(struct fxsave_state, fx_xmm[0]) & 0xf) == 0);
-
-	ASSERT(sizeof (struct xsave_state) >= AVX_XSAVE_SIZE);
-
-#if defined(__i386)
-	ASSERT(sizeof (struct _fpu) == sizeof (struct __old_fpu));
-#endif	/* __i386 */
-#endif	/* !__lint */
-
-	kpreempt_disable();
-	/*
-	 * Now we can enable the interrupts.
-	 * (NOTE: fp-no-coprocessor comes thru interrupt gate)
-	 */
-	sti();
-
-	if (!fpu_exists) { /* check for FPU hw exists */
-		if (fp_kind == FP_NO) {
-			uint32_t inst;
-
-			/*
-			 * When the system has no floating point support,
-			 * i.e. no FP hardware and no emulator, skip the
-			 * two kinds of FP instruction that occur in
-			 * fpstart.  Allows processes that do no real FP
-			 * to run normally.
-			 */
-			if (fuword32((void *)rp->r_pc, &inst) != -1 &&
-			    ((inst & 0xFFFF) == 0x7dd9 ||
-			    (inst & 0xFFFF) == 0x6dd9)) {
-				rp->r_pc += 3;
-				kpreempt_enable();
-				return (0);
-			}
-		}
-
-		/*
-		 * If we have neither a processor extension nor
-		 * an emulator, kill the process OR panic the kernel.
-		 */
-		kpreempt_enable();
-		return (1); /* error */
-	}
-
-#if !defined(__xpv)	/* XXPV	Is this ifdef needed now? */
-	/*
-	 * A paranoid cross-check: for the SSE case, ensure that %cr4 is
-	 * configured to enable fully fledged (%xmm) fxsave/fxrestor on
-	 * this CPU.  For the non-SSE case, ensure that it isn't.
-	 */
-	ASSERT(((fp_kind & __FP_SSE) &&
-	    (getcr4() & CR4_OSFXSR) == CR4_OSFXSR) ||
-	    (!(fp_kind & __FP_SSE) &&
-	    (getcr4() & (CR4_OSXMMEXCPT|CR4_OSFXSR)) == 0));
-#endif
-
-	if (fp->fpu_flags & FPU_EN) {
-		/* case 2 */
-		fp_restore(fp);
-	} else {
-		/* case 1 */
-		fp_seed();
-	}
-	kpreempt_enable();
-	return (0);
-}
-
-
-/*
- * Handle a processor extension overrun fault
- * Returns non zero for error.
- *
- * XXX	Shouldn't this just be abolished given that we're not supporting
- *	anything prior to Pentium?
- */
-
-/* ARGSUSED */
-int
-fpextovrflt(struct regs *rp)
-{
-#if !defined(__xpv)		/* XXPV	Do we need this ifdef either */
-	ulong_t cur_cr0;
-
-	ASSERT(fp_kind != FP_NO);
-
-	cur_cr0 = getcr0();
-	fpinit();		/* initialize the FPU hardware */
-	setcr0(cur_cr0);
-#endif
-	sti();
-	return (1); 		/* error, send SIGSEGV signal to the thread */
 }
 
 /*
@@ -622,14 +896,6 @@ fpexterrflt(struct regs *rp)
 
 	/* clear exception flags in saved state, as if by fnclex */
 	switch (fp_save_mech) {
-#if defined(__i386)
-	case FP_FNSAVE:
-		fpsw = fp->fpu_regs.kfpu_u.kfpu_fn->f_fsw;
-		fpcw = fp->fpu_regs.kfpu_u.kfpu_fn->f_fcw;
-		fp->fpu_regs.kfpu_u.kfpu_fn->f_fsw &= ~FPS_SW_EFLAGS;
-		break;
-#endif
-
 	case FP_FXSAVE:
 		fpsw = fp->fpu_regs.kfpu_u.kfpu_fx->fx_fsw;
 		fpcw = fp->fpu_regs.kfpu_u.kfpu_fx->fx_fcw;
@@ -811,11 +1077,6 @@ fpsetcw(uint16_t fcw, uint32_t mxcsr)
 	fp_save(fp);
 
 	switch (fp_save_mech) {
-#if defined(__i386)
-	case FP_FNSAVE:
-		fp->fpu_regs.kfpu_u.kfpu_fn->f_fcw = fcw;
-		break;
-#endif
 	case FP_FXSAVE:
 		fx = fp->fpu_regs.kfpu_u.kfpu_fx;
 		fx->fx_fcw = fcw;

@@ -51,17 +51,7 @@
 #include <sys/traptrace.h>
 #include <sys/machparam.h>
 
-/*
- * only one routine in this file is interesting to lint
- */
-
-#if defined(__lint)
-
-void
-ndptrap_frstor(void)
-{}
-
-#else
+#if !defined(__lint)
 
 #include "assym.h"
 
@@ -643,219 +633,15 @@ _emul_done:
 
 #endif	/* __i386 */
 
-#if defined(__amd64)
-
 	/*
 	 * #NM
 	 */
-#if defined(__xpv)
 
 	ENTRY_NP(ndptrap)
-	/*
-	 * (On the hypervisor we must make a hypercall so we might as well
-	 * save everything and handle as in a normal trap.)
-	 */
-	TRAP_NOERR(T_NOEXTFLT)	/* $7 */
-	INTR_PUSH
-
-	/*
-	 * We want to do this quickly as every lwp using fp will take this
-	 * after a context switch -- we do the frequent path in ndptrap_frstor
-	 * below; for all other cases, we let the trap code handle it
-	 */
-	LOADCPU(%rax)			/* swapgs handled in hypervisor */
-	cmpl	$0, fpu_exists(%rip)
-	je	.handle_in_trap		/* let trap handle no fp case */
-	movq	CPU_THREAD(%rax), %rbx	/* %rbx = curthread */
-	movl	$FPU_EN, %eax
-	movq	T_LWP(%rbx), %rbx	/* %rbx = lwp */
-	testq	%rbx, %rbx
-	jz	.handle_in_trap		/* should not happen? */
-#if LWP_PCB_FPU	!= 0
-	addq	$LWP_PCB_FPU, %rbx	/* &lwp->lwp_pcb.pcb_fpu */
-#endif
-	testl	%eax, PCB_FPU_FLAGS(%rbx)
-	jz	.handle_in_trap		/* must be the first fault */
-	CLTS
-	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%rbx)
-#if FPU_CTX_FPU_REGS != 0
-	addq	$FPU_CTX_FPU_REGS, %rbx
-#endif
-
-	movl	FPU_CTX_FPU_XSAVE_MASK(%rbx), %eax	/* for xrstor */
-	movl	FPU_CTX_FPU_XSAVE_MASK+4(%rbx), %edx	/* for xrstor */
-
-	/*
-	 * the label below is used in trap.c to detect FP faults in
-	 * kernel due to user fault.
-	 */
-	ALTENTRY(ndptrap_frstor)
-	movq (%rbx), %rbx		/* fpu_regs.kfpu_u.kfpu_XX pointer */
-	.globl  _patch_xrstorq_rbx
-_patch_xrstorq_rbx:
-	fxrstorq (%rbx)
-	cmpw	$KCS_SEL, REGOFF_CS(%rsp)
-	je	.return_to_kernel
-
-	ASSERT_UPCALL_MASK_IS_SET
-	USER_POP
-	IRET				/* return to user mode */
-	/*NOTREACHED*/
-
-.return_to_kernel:
-	INTR_POP
-	IRET
-	/*NOTREACHED*/
-
-.handle_in_trap:
-	INTR_POP
-	pushq	$0			/* can not use TRAP_NOERR */
-	pushq	$T_NOEXTFLT
-	jmp	cmninttrap
-	SET_SIZE(ndptrap_frstor)
+	TRAP_NOERR(T_NOEXTFLT)	/* $0 */
+	SET_CPU_GSBASE
+	jmp	cmntrap
 	SET_SIZE(ndptrap)
-
-#else	/* __xpv */
-
-	ENTRY_NP(ndptrap)
-	/*
-	 * We want to do this quickly as every lwp using fp will take this
-	 * after a context switch -- we do the frequent path in ndptrap_frstor
-	 * below; for all other cases, we let the trap code handle it
-	 */
-	pushq	%rax
-	pushq	%rbx
-	cmpw    $KCS_SEL, 24(%rsp)	/* did we come from kernel mode? */
-	jne     1f
-	LOADCPU(%rax)			/* if yes, don't swapgs */
-	jmp	2f
-1:
-	SWAPGS				/* if from user, need swapgs */
-	LOADCPU(%rax)
-	SWAPGS
-2:
-	/*
-	 * Xrstor needs to use edx as part of its flag.
-	 * NOTE: have to push rdx after "cmpw ...24(%rsp)", otherwise rsp+$24
-	 * will not point to CS.
-	 */
-	pushq	%rdx
-	cmpl	$0, fpu_exists(%rip)
-	je	.handle_in_trap		/* let trap handle no fp case */
-	movq	CPU_THREAD(%rax), %rbx	/* %rbx = curthread */
-	movl	$FPU_EN, %eax
-	movq	T_LWP(%rbx), %rbx	/* %rbx = lwp */
-	testq	%rbx, %rbx
-	jz	.handle_in_trap		/* should not happen? */
-#if LWP_PCB_FPU	!= 0
-	addq	$LWP_PCB_FPU, %rbx	/* &lwp->lwp_pcb.pcb_fpu */
-#endif
-	testl	%eax, PCB_FPU_FLAGS(%rbx)
-	jz	.handle_in_trap		/* must be the first fault */
-	clts
-	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%rbx)
-#if FPU_CTX_FPU_REGS != 0
-	addq	$FPU_CTX_FPU_REGS, %rbx
-#endif
-
-	movl	FPU_CTX_FPU_XSAVE_MASK(%rbx), %eax	/* for xrstor */
-	movl	FPU_CTX_FPU_XSAVE_MASK+4(%rbx), %edx	/* for xrstor */
-
-	/*
-	 * the label below is used in trap.c to detect FP faults in
-	 * kernel due to user fault.
-	 */
-	ALTENTRY(ndptrap_frstor)
-	movq (%rbx), %rbx		/* fpu_regs.kfpu_u.kfpu_XX pointer */
-	.globl  _patch_xrstorq_rbx
-_patch_xrstorq_rbx:
-	fxrstorq (%rbx)
-	popq	%rdx
-	popq	%rbx
-	popq	%rax
-	jmp	tr_iret_auto
-	/*NOTREACHED*/
-
-.handle_in_trap:
-	popq	%rdx
-	popq	%rbx
-	popq	%rax
-	TRAP_NOERR(T_NOEXTFLT)	/* $7 */
-	jmp	cmninttrap
-	SET_SIZE(ndptrap_frstor)
-	SET_SIZE(ndptrap)
-
-#endif	/* __xpv */
-
-#elif defined(__i386)
-
-	ENTRY_NP(ndptrap)
-	/*
-	 * We want to do this quickly as every lwp using fp will take this
-	 * after a context switch -- we do the frequent path in fpnoextflt
-	 * below; for all other cases, we let the trap code handle it
-	 */
-	pushl	%eax
-	pushl	%ebx
-	pushl	%edx			/* for xrstor */
-	pushl	%ds
-	pushl	%gs
-	movl	$KDS_SEL, %ebx
-	movw	%bx, %ds
-	movl	$KGS_SEL, %eax
-	movw	%ax, %gs
-	LOADCPU(%eax)
-	cmpl	$0, fpu_exists
-	je	.handle_in_trap		/* let trap handle no fp case */
-	movl	CPU_THREAD(%eax), %ebx	/* %ebx = curthread */
-	movl	$FPU_EN, %eax
-	movl	T_LWP(%ebx), %ebx	/* %ebx = lwp */
-	testl	%ebx, %ebx
-	jz	.handle_in_trap		/* should not happen? */
-#if LWP_PCB_FPU != 0
-	addl	$LWP_PCB_FPU, %ebx 	/* &lwp->lwp_pcb.pcb_fpu */
-#endif
-	testl	%eax, PCB_FPU_FLAGS(%ebx)
-	jz	.handle_in_trap		/* must be the first fault */
-	CLTS
-	andl	$_BITNOT(FPU_VALID), PCB_FPU_FLAGS(%ebx)
-#if FPU_CTX_FPU_REGS != 0
-	addl	$FPU_CTX_FPU_REGS, %ebx
-#endif
-
-	movl	FPU_CTX_FPU_XSAVE_MASK(%ebx), %eax	/* for xrstor */
-	movl	FPU_CTX_FPU_XSAVE_MASK+4(%ebx), %edx	/* for xrstor */
-
-	/*
-	 * the label below is used in trap.c to detect FP faults in kernel
-	 * due to user fault.
-	 */
-	ALTENTRY(ndptrap_frstor)
-	movl	(%ebx), %ebx		/* fpu_regs.kfpu_u.kfpu_XX pointer */
-	.globl  _patch_fxrstor_ebx
-_patch_fxrstor_ebx:
-	.globl  _patch_xrstor_ebx
-_patch_xrstor_ebx:
-	frstor	(%ebx)		/* may be patched to fxrstor or xrstor */
-	popl	%gs
-	popl	%ds
-	popl	%edx
-	popl	%ebx
-	popl	%eax
-	IRET
-
-.handle_in_trap:
-	popl	%gs
-	popl	%ds
-	popl	%edx
-	popl	%ebx
-	popl	%eax
-	TRAP_NOERR(T_NOEXTFLT)	/* $7 */
-	jmp	cmninttrap
-	SET_SIZE(ndptrap_frstor)
-	SET_SIZE(ndptrap)
-
-#endif	/* __i386 */
 
 #if !defined(__xpv)
 #if defined(__amd64)
@@ -1035,12 +821,6 @@ make_frame:
 
 #endif	/* __i386 */
 #endif	/* !__xpv */
-
-	ENTRY_NP(overrun)
-	push	$0
-	TRAP_NOERR(T_EXTOVRFLT)	/* $9 i386 only - not generated */
-	jmp	cmninttrap
-	SET_SIZE(overrun)
 
 	/*
 	 * #TS

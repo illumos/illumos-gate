@@ -317,6 +317,7 @@ setfpregs(klwp_t *lwp, fpregset_t *fp)
 
 	fpu->fpu_regs.kfpu_status = fp->fp_reg_set.fpchip_state.status;
 	fpu->fpu_flags |= FPU_VALID;
+	PCB_SET_UPDATE_FPU(&lwp->lwp_pcb);
 }
 
 /*
@@ -464,7 +465,7 @@ getgregs(klwp_t *lwp, gregset_t grp)
 	grp[REG_GSBASE] = pcb->pcb_gsbase;
 	if (thisthread)
 		kpreempt_disable();
-	if (pcb->pcb_rupdate == 1) {
+	if (PCB_NEED_UPDATE_SEGS(pcb)) {
 		grp[REG_DS] = pcb->pcb_ds;
 		grp[REG_ES] = pcb->pcb_es;
 		grp[REG_FS] = pcb->pcb_fs;
@@ -500,7 +501,7 @@ getgregs32(klwp_t *lwp, gregset32_t grp)
 
 	if (thisthread)
 		kpreempt_disable();
-	if (pcb->pcb_rupdate == 1) {
+	if (PCB_NEED_UPDATE_SEGS(pcb)) {
 		grp[GS] = (uint16_t)pcb->pcb_gs;
 		grp[FS] = (uint16_t)pcb->pcb_fs;
 		grp[DS] = (uint16_t)pcb->pcb_ds;
@@ -753,7 +754,7 @@ setgregs(klwp_t *lwp, gregset_t grp)
 		/*
 		 * Ensure that we go out via update_sregs
 		 */
-		pcb->pcb_rupdate = 1;
+		PCB_SET_UPDATE_SEGS(pcb);
 		lwptot(lwp)->t_post_sys = 1;
 		if (thisthread)
 			kpreempt_enable();
@@ -790,7 +791,7 @@ setgregs(klwp_t *lwp, gregset_t grp)
 		/*
 		 * Ensure that we go out via update_sregs
 		 */
-		pcb->pcb_rupdate = 1;
+		PCB_SET_UPDATE_SEGS(pcb);
 		lwptot(lwp)->t_post_sys = 1;
 		if (thisthread)
 			kpreempt_enable();

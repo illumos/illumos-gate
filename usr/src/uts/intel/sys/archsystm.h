@@ -55,11 +55,8 @@ extern void mfence_insn(void);
 extern uint16_t getgs(void);
 extern void setgs(uint16_t);
 
-extern void patch_sse(void);
-extern void patch_sse2(void);
 #endif
 
-extern void patch_xsave(void);
 extern kmem_cache_t *fpsave_cachep;
 
 extern void cli(void);

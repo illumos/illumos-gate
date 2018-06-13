@@ -1446,6 +1446,8 @@ loop:
 	 */
 	tp = CPU->cpu_thread;
 	if (USERMODE(rp->r_cs)) {
+		pcb_t *pcb;
+
 		/*
 		 * Check if AST pending.
 		 */
@@ -1460,14 +1462,29 @@ loop:
 			goto loop;
 		}
 
-#if defined(__amd64)
+		pcb = &tp->t_lwp->lwp_pcb;
+
+		/*
+		 * Check to see if we need to initialize the FPU for this
+		 * thread. This should be an uncommon occurrence, but may happen
+		 * in the case where the system creates an lwp through an
+		 * abnormal path such as the agent lwp. Make sure that we still
+		 * happen to have the FPU in a good state.
+		 */
+		if ((pcb->pcb_fpu.fpu_flags & FPU_EN) == 0) {
+			kpreempt_disable();
+			fp_seed();
+			kpreempt_enable();
+			PCB_SET_UPDATE_FPU(pcb);
+		}
+
 		/*
 		 * We are done if segment registers do not need updating.
 		 */
-		if (tp->t_lwp->lwp_pcb.pcb_rupdate == 0)
+		if (!PCB_NEED_UPDATE(pcb))
 			return (1);
 
-		if (update_sregs(rp, tp->t_lwp)) {
+		if (PCB_NEED_UPDATE_SEGS(pcb) && update_sregs(rp, tp->t_lwp)) {
 			/*
 			 * 1 or more of the selectors is bad.
 			 * Deliver a SIGSEGV.
@@ -1482,9 +1499,15 @@ loop:
 			tp->t_sig_check = 1;
 			cli();
 		}
-		tp->t_lwp->lwp_pcb.pcb_rupdate = 0;
+		PCB_CLEAR_UPDATE_SEGS(pcb);
 
-#endif	/* __amd64 */
+		if (PCB_NEED_UPDATE_FPU(pcb)) {
+			fprestore_ctxt(&pcb->pcb_fpu);
+		}
+		PCB_CLEAR_UPDATE_FPU(pcb);
+
+		ASSERT0(PCB_NEED_UPDATE(pcb));
+
 		return (1);
 	}
 
