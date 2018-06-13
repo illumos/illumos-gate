@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SNOOP_H
@@ -275,6 +275,7 @@ extern int interpret_trill(int, struct ether_header **, char *, int *);
 extern int interpret_isis(int, char *, int, boolean_t);
 extern int interpret_bpdu(int, char *, int);
 extern int interpret_vxlan(int, char *, int);
+extern int interpret_svp(int, char *, int);
 extern void init_ldap(void);
 extern boolean_t arp_for_ether(char *, struct ether_addr *);
 extern char *ether_ouiname(uint32_t);

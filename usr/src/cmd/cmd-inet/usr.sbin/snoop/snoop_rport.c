@@ -21,7 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2015, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -130,6 +130,7 @@ static struct porttable pt_tcp[] = {
 	{ 540,			"UUCP" },
 	{ 600,			"PCSERVER" },
 	{ IPPORT_SOCKS,		"SOCKS" },
+	{ 1296,			"SVP" },
 	{ 1524,			"INGRESLOCK" },
 	{ 2904,			"M2UA" },
 	{ 2905,			"M3UA" },
@@ -430,6 +431,12 @@ interpret_reserved(int flags, int proto, in_port_t src, in_port_t dst,
 		case IPPORT_VXLAN:
 			(void) interpret_vxlan(flags, data, dlen);
 			return (1);
+		case 1296:
+			if (proto == IPPROTO_TCP) {
+				(void) interpret_svp(flags, data, dlen);
+				return (1);
+			}
+			break;
 		}
 	}
 

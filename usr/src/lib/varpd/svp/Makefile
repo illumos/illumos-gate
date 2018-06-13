@@ -10,11 +10,13 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 include		../../Makefile.lib
 
+HDRS =		libvarpd_svp_prot.h	# For snoop
+HDRDIR =	common
 SUBDIRS =	$(MACH)
 $(BUILD64)SUBDIRS +=	$(MACH64)
 
@@ -28,7 +30,8 @@ lint :=		TARGET = lint
 
 all clean clobber install lint: $(SUBDIRS)
 
-install_h:
+install:	install_h
+install_h:	$(ROOTHDRS)
 
 check:
 
