@@ -362,11 +362,6 @@ mlsetup(struct regs *rp)
 	CPU->cpu_pri = 12;		/* initial PIL for the boot CPU */
 
 	/*
-	 * The kernel doesn't use LDTs unless a process explicitly requests one.
-	 */
-	p0.p_ldt_desc = null_sdesc;
-
-	/*
 	 * Initialize thread/cpu microstate accounting
 	 */
 	init_mstate(&t0, LMS_SYSTEM);

@@ -10,13 +10,37 @@
 #
 
 #
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS_i386 = i386
-
-SUBDIRS = poll secflags sigqueue spoof-ras sdevfs sockfs stress file-locking \
-	pf_key $(SUBDIRS_$(MACH))
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+PROG +=	ldt
+
+ROOTOPTPKG = $(ROOT)/opt/os-tests
+TESTDIR = $(ROOTOPTPKG)/tests/i386
+
+CSTD = $(CSTD_GNU99)
+
+CMDS = $(PROG:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all: $(PROG)
+
+install: all $(CMDS)
+
+lint:
+
+clobber: clean
+	-$(RM) $(PROG)
+
+clean:
+
+$(CMDS): $(TESTDIR) $(PROG)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)

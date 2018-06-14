@@ -751,8 +751,8 @@ extern void setcr4(ulong_t);
 
 extern void mtrr_sync(void);
 
-extern void cpu_fast_syscall_enable(void *);
-extern void cpu_fast_syscall_disable(void *);
+extern void cpu_fast_syscall_enable(void);
+extern void cpu_fast_syscall_disable(void);
 
 struct cpu;
 

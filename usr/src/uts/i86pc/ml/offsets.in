@@ -75,8 +75,6 @@ proc		PROCSIZE
 	p_as
 	p_lockp
 	p_user
-	p_ldt
-	p_ldt_desc
 	p_model
 	p_pctx
 	p_agenttp

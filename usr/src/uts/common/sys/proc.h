@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -301,7 +301,8 @@ typedef struct	proc {
 	 */
 	kmutex_t	p_ldtlock;	/* protects the following fields */
 	user_desc_t	*p_ldt;		/* Pointer to private LDT */
-	system_desc_t	p_ldt_desc;	/* segment descriptor for private LDT */
+	uint64_t	p_unused1;	/* no longer used */
+	uint64_t	p_unused2;	/* no longer used */
 	ushort_t	p_ldtlimit;	/* highest selector used */
 #endif
 	size_t p_swrss;			/* resident set size before last swap */

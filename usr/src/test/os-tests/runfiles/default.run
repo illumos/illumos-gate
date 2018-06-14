@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -62,3 +62,8 @@ tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'sockpair']
 [/opt/os-tests/tests/pf_key]
 user = root
 tests = ['acquire-compare', 'acquire-spray']
+
+[/opt/os-tests/tests/i386]
+user = root
+arch = i86pc
+tests = ['ldt']

@@ -14,11 +14,13 @@
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+# Copyright 2018 Joyent, Inc.
 #
 
 import ConfigParser
 import os
 import logging
+import platform
 from logging.handlers import WatchedFileHandler
 from datetime import datetime
 from optparse import OptionParser
@@ -564,6 +566,10 @@ class TestRun(object):
         self.outputdir = os.path.join(self.outputdir, self.timestamp)
 
         for section in config.sections():
+            if ('arch' in config.options(section) and
+                platform.machine() != config.get(section, 'arch')):
+                continue
+
             if 'tests' in config.options(section):
                 testgroup = TestGroup(section)
                 for prop in TestGroup.props:

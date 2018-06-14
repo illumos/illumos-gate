@@ -482,6 +482,10 @@ void init_boot_gdt(user_desc_t *);
 #define	SDT_MEMERC	30	/* execute read conforming */
 #define	SDT_MEMERAC	31	/* execute read accessed conforming */
 
+/* These bits are within the "type" field, like the values above. */
+#define	SDT_A		0x01	/* accessed bit */
+#define	SDT_S		0x10	/* S-bit at the top of "type" for usegs */
+
 /*
  * Entries in the Interrupt Descriptor Table (IDT)
  */

@@ -178,8 +178,6 @@ static struct interposing_handler brand_tbl[2];
  * can understand.
  */
 
-#if defined(__amd64)
-
 /*
  * In long mode we have the new L or long mode attribute bit
  * for code segments. Only the conforming bit in type is used along
@@ -193,6 +191,8 @@ set_usegd(user_desc_t *dp, uint_t lmode, void *base, size_t size,
     uint_t type, uint_t dpl, uint_t gran, uint_t defopsz)
 {
 	ASSERT(lmode == SDP_SHORT || lmode == SDP_LONG);
+	/* This should never be a "system" segment. */
+	ASSERT3U(type & SDT_S, !=, 0);
 
 	/*
 	 * 64-bit long mode.
@@ -204,6 +204,14 @@ set_usegd(user_desc_t *dp, uint_t lmode, void *base, size_t size,
 		 * 32-bit compatibility mode.
 		 */
 		dp->usd_def32 = defopsz;	/* 0 = 16, 1 = 32-bit ops */
+
+	/*
+	 * We should always set the "accessed" bit (SDT_A), otherwise the CPU
+	 * will write to the GDT whenever we change segment registers around.
+	 * With KPTI on, the GDT is read-only in the user page table, which
+	 * causes crashes if we don't set this.
+	 */
+	ASSERT3U(type & SDT_A, !=, 0);
 
 	dp->usd_long = lmode;	/* 64-bit mode */
 	dp->usd_type = type;
@@ -218,36 +226,9 @@ set_usegd(user_desc_t *dp, uint_t lmode, void *base, size_t size,
 	dp->usd_hilimit = (uintptr_t)size >> 16;
 }
 
-#elif defined(__i386)
-
-/*
- * Install user segment descriptor for code and data.
- */
-void
-set_usegd(user_desc_t *dp, void *base, size_t size, uint_t type,
-    uint_t dpl, uint_t gran, uint_t defopsz)
-{
-	dp->usd_lolimit = size;
-	dp->usd_hilimit = (uintptr_t)size >> 16;
-
-	dp->usd_lobase = (uintptr_t)base;
-	dp->usd_midbase = (uintptr_t)base >> 16;
-	dp->usd_hibase = (uintptr_t)base >> (16 + 8);
-
-	dp->usd_type = type;
-	dp->usd_dpl = dpl;
-	dp->usd_p = 1;
-	dp->usd_def32 = defopsz;	/* 0 = 16, 1 = 32 bit operands */
-	dp->usd_gran = gran;		/* 0 = bytes, 1 = pages */
-}
-
-#endif	/* __i386 */
-
 /*
  * Install system segment descriptor for LDT and TSS segments.
  */
-
-#if defined(__amd64)
 
 void
 set_syssegd(system_desc_t *dp, void *base, size_t size, uint_t type,
@@ -280,39 +261,6 @@ get_ssd_base(system_desc_t *dp)
 	    (uintptr_t)dp->ssd_hi64base << (16 + 8 + 8);
 	return ((void *)base);
 }
-
-#elif defined(__i386)
-
-void
-set_syssegd(system_desc_t *dp, void *base, size_t size, uint_t type,
-    uint_t dpl)
-{
-	dp->ssd_lolimit = size;
-	dp->ssd_hilimit = (uintptr_t)size >> 16;
-
-	dp->ssd_lobase = (uintptr_t)base;
-	dp->ssd_midbase = (uintptr_t)base >> 16;
-	dp->ssd_hibase = (uintptr_t)base >> (16 + 8);
-
-	dp->ssd_type = type;
-	dp->ssd_zero = 0;	/* must be zero */
-	dp->ssd_dpl = dpl;
-	dp->ssd_p = 1;
-	dp->ssd_gran = 0;	/* force byte units */
-}
-
-void *
-get_ssd_base(system_desc_t *dp)
-{
-	uintptr_t	base;
-
-	base = (uintptr_t)dp->ssd_lobase |
-	    (uintptr_t)dp->ssd_midbase << 16 |
-	    (uintptr_t)dp->ssd_hibase << (16 + 8);
-	return ((void *)base);
-}
-
-#endif	/* __i386 */
 
 /*
  * Install gate segment descriptor for interrupt, trap, call and task gates.
@@ -391,17 +339,30 @@ set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
 void
 gdt_update_usegd(uint_t sidx, user_desc_t *udp)
 {
-#if defined(__xpv)
+#if defined(DEBUG)
+	/* This should never be a "system" segment, but it might be null. */
+	if (udp->usd_p != 0 || udp->usd_type != 0) {
+		ASSERT3U(udp->usd_type & SDT_S, !=, 0);
+	}
+	/*
+	 * We should always set the "accessed" bit (SDT_A), otherwise the CPU
+	 * will write to the GDT whenever we change segment registers around.
+	 * With KPTI on, the GDT is read-only in the user page table, which
+	 * causes crashes if we don't set this.
+	 */
+	if (udp->usd_p != 0 || udp->usd_type != 0) {
+		ASSERT3U(udp->usd_type & SDT_A, !=, 0);
+	}
+#endif
 
+#if defined(__xpv)
 	uint64_t dpa = CPU->cpu_m.mcpu_gdtpa + sizeof (*udp) * sidx;
 
 	if (HYPERVISOR_update_descriptor(pa_to_ma(dpa), *(uint64_t *)udp))
 		panic("gdt_update_usegd: HYPERVISOR_update_descriptor");
 
 #else	/* __xpv */
-
 	CPU->cpu_gdt[sidx] = *udp;
-
 #endif	/* __xpv */
 }
 
@@ -412,8 +373,23 @@ gdt_update_usegd(uint_t sidx, user_desc_t *udp)
 int
 ldt_update_segd(user_desc_t *ldp, user_desc_t *udp)
 {
-#if defined(__xpv)
+#if defined(DEBUG)
+	/* This should never be a "system" segment, but it might be null. */
+	if (udp->usd_p != 0 || udp->usd_type != 0) {
+		ASSERT3U(udp->usd_type & SDT_S, !=, 0);
+	}
+	/*
+	 * We should always set the "accessed" bit (SDT_A), otherwise the CPU
+	 * will write to the LDT whenever we change segment registers around.
+	 * With KPTI on, the LDT is read-only in the user page table, which
+	 * causes crashes if we don't set this.
+	 */
+	if (udp->usd_p != 0 || udp->usd_type != 0) {
+		ASSERT3U(udp->usd_type & SDT_A, !=, 0);
+	}
+#endif
 
+#if defined(__xpv)
 	uint64_t dpa;
 
 	dpa = mmu_ptob(hat_getpfnum(kas.a_hat, (caddr_t)ldp)) |
@@ -427,7 +403,6 @@ ldt_update_segd(user_desc_t *ldp, user_desc_t *udp)
 		return (EINVAL);
 
 #else	/* __xpv */
-
 	*ldp = *udp;
 
 #endif	/* __xpv */
