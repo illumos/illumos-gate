@@ -49,23 +49,10 @@ CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function
 
 ALL_TARGET	= $(BINARY) $(CONFMOD)
-<<<<<<< HEAD
-LINT_TARGET	= $(MODULE).lint
-=======
->>>>>>> FETCH_HEAD
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 LDFLAGS		+= -dy -N misc/mac
 
-<<<<<<< HEAD
-#
-# We only support the 64-bit version of this driver.
-#
-DEF_BUILDS	= $(DEF_BUILDSONLY64)
-ALL_BUILDS	= $(ALL_BUILDSONLY64)
-
-=======
->>>>>>> FETCH_HEAD
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)
@@ -76,17 +63,9 @@ clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
 
-<<<<<<< HEAD
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
-=======
 lint:
 modlintlib:
 clean.lint:
->>>>>>> FETCH_HEAD
 
 install:	$(INSTALL_DEPS)
 
