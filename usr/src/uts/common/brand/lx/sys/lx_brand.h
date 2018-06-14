@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _LX_BRAND_H
@@ -40,6 +40,7 @@
 #include <sys/sunldi.h>
 #include <sys/cpuvar.h>
 #include <sys/lx_futex.h>
+#include <sys/lx_userhz.h>
 #endif
 
 #ifdef	__cplusplus
@@ -521,6 +522,9 @@ struct lx_lwp_data {
 	void	*br_set_ctidp;		/* clone thread id ptr */
 	void	*br_robust_list;	/* robust lock list, if any */
 
+	/* first 4 syscall args - used for auditing */
+	uintptr_t br_syscall_args[4];
+
 	/*
 	 * The following struct is used by some system calls to pass extra
 	 * flags into the kernel without impinging on the namespace for
@@ -619,6 +623,12 @@ struct lx_lwp_data {
  */
 #define	LX_BR_ARGS_SIZE_MAX	(1024)
 
+typedef enum lx_audit_enbl {
+	LXAE_DISABLED,
+	LXAE_ENABLED,
+	LXAE_LOCKED
+} lx_audit_enbl_t;
+
 /*
  * brand specific data
  *
@@ -640,6 +650,8 @@ typedef struct lx_zone_data {
 	uint_t lxzd_aio_nr;			/* see lx_aio.c */
 	uint_t lxzd_pipe_max_sz;		/* pipe-max-size sysctl val */
 	boolean_t lxzd_swap_disabled;		/* no fake swap in zone? */
+	lx_audit_enbl_t	lxzd_audit_enabled;	/* auditing? */
+	struct lx_audit_state *lxzd_audit_state; /* zone's audit state */
 } lx_zone_data_t;
 
 /* LWP br_lwp_flags values */
@@ -704,6 +716,12 @@ extern void lx_trace_sysenter(int, uintptr_t *);
 extern void lx_trace_sysreturn(int, long);
 
 extern void lx_emulate_user(klwp_t *, int, uintptr_t *);
+
+extern void lx_audit_ld();
+extern void lx_audit_unld();
+extern void lx_audit_fini(zone_t *);
+extern void lx_audit_syscall_exit(int, long);
+
 #if defined(_SYSCALL32_IMPL)
 extern void lx_emulate_user32(klwp_t *, int, uintptr_t *);
 #endif

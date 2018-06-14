@@ -245,6 +245,11 @@ lx_syscall_return(klwp_t *lwp, int syscall_num, long ret)
 	(void) lx_ptrace_stop(LX_PR_SYSEXIT);
 
 	/*
+	 * Emit audit record, if necessary.
+	 */
+	lx_audit_syscall_exit(syscall_num, ret);
+
+	/*
 	 * Fire the DTrace "lx-syscall:::return" probe:
 	 */
 	lx_trace_sysreturn(syscall_num, ret);
@@ -371,6 +376,10 @@ lx_syscall_enter(void)
 	 */
 	error = lx_emulate_args(lwp, s, args);
 	lx_trace_sysenter(syscall_num, args);
+	lwpd->br_syscall_args[0] = args[0];
+	lwpd->br_syscall_args[1] = args[1];
+	lwpd->br_syscall_args[2] = args[2];
+	lwpd->br_syscall_args[3] = args[3];
 	if (error != 0) {
 		/*
 		 * Could not read and process the arguments.  Return the error

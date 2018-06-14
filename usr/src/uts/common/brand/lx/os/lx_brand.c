@@ -1278,6 +1278,7 @@ lx_free_brand_data(zone_t *zone)
 	lx_zone_data_t *data = ztolxzd(zone);
 	ASSERT(data != NULL);
 	mutex_enter(&data->lxzd_lock);
+	lx_audit_fini(zone);
 	if (data->lxzd_ioctl_sock != NULL) {
 		/*
 		 * Since zone_kcred has been cleaned up already, close the
@@ -2623,6 +2624,7 @@ _init(void)
 	lx_futex_init();
 	lx_ptrace_init();
 	lx_socket_init();
+	lx_audit_ld();
 
 	err = mod_install(&modlinkage);
 	if (err != 0) {
@@ -2666,6 +2668,7 @@ _fini(void)
 	lx_pid_fini();
 	lx_ioctl_fini();
 	lx_socket_fini();
+	lx_audit_unld();
 
 	if ((err = lx_futex_fini()) != 0) {
 		goto done;

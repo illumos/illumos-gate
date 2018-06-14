@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2017, Joyent, Inc.
+# Copyright 2018, Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
 #
 
@@ -299,6 +299,7 @@ LX_BRAND_OBJS  =		\
 	lx_acl.o		\
 	lx_aio.o		\
 	lx_archdep.o		\
+	lx_audit.o		\
 	lx_auxv.o		\
 	lx_brand.o		\
 	lx_brk.o		\

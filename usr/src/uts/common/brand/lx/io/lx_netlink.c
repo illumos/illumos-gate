@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -39,12 +39,16 @@
 #include <sys/lx_misc.h>
 #include <sys/lx_socket.h>
 #include <sys/lx_impl.h>
+#include <sys/lx_audit.h>
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
 #include <sys/policy.h>
+#include <sys/ddi.h>
 
 /*
  * Flags in netlink header
+ * See Linux include/uapi/linux/netlink.h
+ * Additional flags for "GET" requests
  */
 #define	LX_NETLINK_NLM_F_REQUEST		1
 #define	LX_NETLINK_NLM_F_MULTI			2
@@ -286,6 +290,26 @@
 #define	LX_RTSCOPE_HOST		254
 #define	LX_RTSCOPE_NOWHERE	255
 
+/*
+ * Audit message types (lxnh_type in the lx_netlink_hdr_t msg header)
+ * See Linux include/uapi/linux/audit.h and user-level auditd source
+ * lib/libaudit.h.
+ *
+ * The types fall into range blocks:
+ * 1000-1099 is for audit system control commands
+ * 1100-2999 various messages, as detailed in include/uapi/linux/audit.h
+ */
+#define	LX_AUDIT_GET		1000	/* get audit system status */
+#define	LX_AUDIT_SET		1001	/* set audit system status */
+#define	LX_AUDIT_WATCH_INS	1007	/* insert file watch */
+#define	LX_AUDIT_WATCH_REM	1008	/* remove file watch */
+#define	LX_AUDIT_WATCH_LIST	1009	/* list file watchs */
+#define	LX_AUDIT_ADD_RULE	1011	/* add syscall rule */
+#define	LX_AUDIT_DEL_RULE	1012	/* del syscall rule */
+#define	LX_AUDIT_LIST_RULES	1013	/* list syscall rules */
+#define	LX_AUDIT_SET_FEATURE	1018
+#define	LX_AUDIT_GET_FEATURE	1019
+#define	LX_AUDIT_USER_MSG_START	1100
 
 /*
  * Netlink sockopts
@@ -306,6 +330,7 @@
 
 /* Internal socket flags */
 #define	LXNLF_RECVUCRED			0x1
+#define	LXNLF_AUDITD			0x2
 
 /* nlmsg structure macros */
 #define	LXNLMSG_ALIGNTO	4
@@ -405,6 +430,7 @@ typedef struct lx_netlink_reply {
 } lx_netlink_reply_t;
 
 static lx_netlink_sock_t *lx_netlink_head;	/* head of lx_netlink sockets */
+static uint_t lx_netlink_audit_cnt;		/* prevent unload for audit */
 static kmutex_t lx_netlink_lock;		/* lock to protect state */
 static ldi_ident_t lx_netlink_ldi;		/* LDI handle */
 static int lx_netlink_bufsize = 4096;		/* default buffer size */
@@ -644,7 +670,9 @@ lx_netlink_alloc_mp1(lx_netlink_sock_t *lxsock)
 		return (NULL);
 	}
 
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	tunit = (struct T_unitdata_ind *)mp->b_rptr;
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
 	lxsa = (lx_netlink_sockaddr_t *)((caddr_t)tunit + sizeof (*tunit));
 	mp->b_wptr += size;
 
@@ -662,6 +690,7 @@ lx_netlink_alloc_mp1(lx_netlink_sock_t *lxsock)
 		struct cmsghdr *cmsg;
 		struct ucred_s *ucred;
 
+		/* LINTED: E_BAD_PTR_CAST_ALIGN */
 		cmsg = (struct cmsghdr *)((caddr_t)lxsa + sizeof (*lxsa));
 		ucred = (struct ucred_s *)CMSG_CONTENT(cmsg);
 		cmsg->cmsg_len = sizeof (*cmsg) + sizeof (*ucred);
@@ -926,6 +955,41 @@ lx_netlink_reply_error(lx_netlink_sock_t *lxsock,
 
 	return (0);
 }
+
+/*
+ * Send an ack message with an explicit errno of 0.
+ * TODO: this needs more work
+ */
+/*
+ * static void
+ * lx_netlink_reply_ack(lx_netlink_reply_t *reply)
+ * {
+ * 	lx_netlink_sock_t *lxsock = reply->lxnr_sock;
+ * 	mblk_t *mp;
+ * 	lx_netlink_hdr_t *hdr;
+ * 	lx_netlink_err_t *err;
+ *
+ * 	lx_netlink_reply_msg(reply, NULL, 0);
+ *
+ * 	mp = reply->lxnr_err;
+ * 	VERIFY(mp != NULL);
+ * 	reply->lxnr_err = NULL;
+ * 	err = (lx_netlink_err_t *)mp->b_rptr;
+ * 	hdr = &err->lxne_hdr;
+ *
+ * 	err->lxne_failed = reply->lxnr_hdr;
+ * 	err->lxne_errno = 0;
+ * 	hdr->lxnh_type = LX_NETLINK_NLMSG_ERROR;
+ * 	hdr->lxnh_seq = reply->lxnr_hdr.lxnh_seq;
+ * 	hdr->lxnh_len = sizeof (lx_netlink_err_t);
+ * 	hdr->lxnh_seq = reply->lxnr_hdr.lxnh_seq;
+ * 	hdr->lxnh_pid = lxsock->lxns_port;
+ *
+ * 	lx_netlink_reply_sendup(reply, mp, reply->lxnr_mp1);
+ *
+ * 	kmem_free(reply, sizeof (lx_netlink_reply_t));
+ * }
+ */
 
 static int
 lx_netlink_parse_msg_attrs(mblk_t *mp, void **msgp, unsigned int msg_size,
@@ -1485,14 +1549,339 @@ lx_netlink_getroute(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr,
 	return (0);
 }
 
+/*
+ * Auditing callback to emit response.
+ */
+static void
+lx_netlink_au_cb(void *r, void *b, uint_t blen)
+{
+	lx_netlink_reply_t *reply = (lx_netlink_reply_t *)r;
 
-/*ARGSUSED*/
+	lx_netlink_reply_msg(reply, b, blen);
+}
+
+/*
+ * Audit get
+ */
+static int
+lx_netlink_au_get(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr)
+{
+	lx_netlink_reply_t *reply;
+
+	reply = lx_netlink_reply(lxsock, hdr, LX_AUDIT_GET);
+	if (reply == NULL)
+		return (ENOMEM);
+
+	lx_audit_get(reply, lx_netlink_au_cb);
+	lx_netlink_reply_send(reply);
+	lx_netlink_reply_done(reply);
+	return (0);
+}
+
+/*
+ * Set or clear flag indicating socket is being used to communicate with the
+ * user-level auditd. Also update the counter which prevents this module
+ * from unloading while auditing is using the socket to the auditd.
+ */
+static void
+lx_netlink_au_sock_cb(void *s, boolean_t set)
+{
+	lx_netlink_sock_t *lxsock = (lx_netlink_sock_t *)s;
+
+	if (set) {
+		lxsock->lxns_flags |= LXNLF_AUDITD;
+		mutex_enter(&lx_netlink_lock);
+		lx_netlink_audit_cnt++;
+		mutex_exit(&lx_netlink_lock);
+	} else {
+		lxsock->lxns_flags &= ~LXNLF_AUDITD;
+		mutex_enter(&lx_netlink_lock);
+		VERIFY(lx_netlink_audit_cnt > 0);
+		lx_netlink_audit_cnt--;
+		mutex_exit(&lx_netlink_lock);
+	}
+}
+
+static int
+lx_netlink_au_set(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr, mblk_t *mp)
+{
+	lx_netlink_reply_t *reply;
+	void *datap;
+	size_t datalen;
+	int err;
+
+	datap = (void *)(mp->b_rptr + sizeof (lx_netlink_hdr_t));
+	datalen = MBLKL(mp) - sizeof (lx_netlink_hdr_t);
+
+	err = lx_audit_set(lxsock, datap, datalen, lx_netlink_au_sock_cb);
+	if (err != 0)
+		return (err);
+
+	reply = lx_netlink_reply(lxsock, hdr, LX_AUDIT_SET);
+	if (reply == NULL)
+		return (ENOMEM);
+
+	lx_netlink_reply_done(reply);
+	return (0);
+}
+
+/*
+ * Audit append rule
+ */
+static int
+lx_netlink_au_ar(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr, mblk_t *mp)
+{
+	lx_netlink_reply_t *reply;
+	void *datap;
+	size_t datalen;
+	int err;
+
+	/*
+	 * TODO: At this time, everything we support fits in a single mblk,
+	 * but as we add additional field support, eventually we might need
+	 * to handle an mblk chain for really long string data in the
+	 * rulep->lxar_buf.
+	 */
+	if (mp->b_cont != NULL)
+		return (EINVAL);
+
+	datap = (void *)(mp->b_rptr + sizeof (lx_netlink_hdr_t));
+	datalen = MBLKL(mp) - sizeof (lx_netlink_hdr_t);
+
+	if ((err = lx_audit_append_rule(datap, datalen)) != 0)
+		return (err);
+
+	reply = lx_netlink_reply(lxsock, hdr, LX_AUDIT_ADD_RULE);
+	if (reply == NULL)
+		return (ENOMEM);
+
+	lx_netlink_reply_done(reply);
+	return (0);
+}
+
+/*
+ * Audit delete rule
+ */
+static int
+lx_netlink_au_dr(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr, mblk_t *mp)
+{
+	lx_netlink_reply_t *reply;
+	void *datap;
+	size_t datalen;
+	int err;
+
+	/*
+	 * TODO: At this time, everything we support fits in a single mblk,
+	 * but as we add additional field support, eventually we might need
+	 * to handle an mblk chain for really long string data in the
+	 * rulep->lxar_buf.
+	 */
+	if (mp->b_cont != NULL)
+		return (EINVAL);
+
+	datap = (void *)(mp->b_rptr + sizeof (lx_netlink_hdr_t));
+	datalen = MBLKL(mp) - sizeof (lx_netlink_hdr_t);
+
+	if ((err = lx_audit_delete_rule(datap, datalen)) != 0)
+		return (err);
+
+	reply = lx_netlink_reply(lxsock, hdr, LX_AUDIT_DEL_RULE);
+	if (reply == NULL)
+		return (ENOMEM);
+
+	lx_netlink_reply_done(reply);
+	return (0);
+}
+
+/*
+ * Auditing callback to emit rule list.
+ */
+static void
+lx_netlink_au_lr_cb(void *r, void *b0, uint_t b0_len, void *b1, uint_t b1_len)
+{
+	lx_netlink_reply_t *reply = (lx_netlink_reply_t *)r;
+
+	lx_netlink_reply_msg(reply, b0, b0_len);
+	lx_netlink_reply_add(reply, b1, b1_len);
+	lx_netlink_reply_send(reply);
+}
+
+/*
+ * Audit list rules
+ */
+static int
+lx_netlink_au_lr(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr)
+{
+	lx_netlink_reply_t *reply;
+
+	reply = lx_netlink_reply(lxsock, hdr, LX_AUDIT_LIST_RULES);
+	if (reply == NULL)
+		return (ENOMEM);
+
+	lx_audit_list_rules(reply, lx_netlink_au_lr_cb);
+	lx_netlink_reply_done(reply);
+	return (0);
+}
+
+/*
+ * Audit get feature
+ */
+static int
+lx_netlink_au_gf(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr)
+{
+	lx_netlink_reply_t *reply;
+
+	reply = lx_netlink_reply(lxsock, hdr, LX_AUDIT_GET_FEATURE);
+	if (reply == NULL)
+		return (ENOMEM);
+
+	lx_audit_get_feature(reply, lx_netlink_au_cb);
+	lx_netlink_reply_send(reply);
+	lx_netlink_reply_done(reply);
+	return (0);
+}
+
+/*
+ * Audit user message
+ * User messages are submitted as free-form messages which need to get sent
+ * back up to the auditd. This includes informative messages such as starting
+ * or stopping auditing.
+ */
+static int
+lx_netlink_au_um(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr, mblk_t *mp)
+{
+	lx_netlink_reply_t *reply;
+	size_t datalen;
+	void *bp;
+
+	bp = mp->b_rptr + sizeof (lx_netlink_hdr_t);
+	datalen = MBLKL(mp) - (sizeof (lx_netlink_hdr_t));
+
+	/*
+	 * TODO: At this time, everything we support fits in a single mblk,
+	 * but eventually we might need to handle an mblk chain for a really
+	 * long user message.
+	 */
+	if (mp->b_cont != NULL)
+		return (EINVAL);
+
+	lx_audit_emit_user_msg(hdr->lxnh_type, datalen, bp);
+
+	if (hdr->lxnh_flags & LX_NETLINK_NLM_F_ACK) {
+		reply = lx_netlink_reply(lxsock, hdr, hdr->lxnh_type);
+		if (reply == NULL)
+			return (ENOMEM);
+
+		lx_netlink_reply_done(reply);
+	}
+	return (0);
+}
+
+static int
+lx_netlink_au_emit_cb(void *s, uint_t type, const char *msg, uint_t size)
+{
+	lx_netlink_sock_t *lxsock = (lx_netlink_sock_t *)s;
+	lx_netlink_hdr_t *hdr;
+	mblk_t *mp, *mp1;
+	int error;
+	uint32_t len;
+
+	len = LXNLMSG_ALIGN(sizeof (lx_netlink_hdr_t));
+	if (msg != NULL) {
+		len += LXNLMSG_ALIGN(size);
+		if (len > lxsock->lxns_bufsize)
+			return (E2BIG);
+	}
+
+	if ((mp = allocb(lxsock->lxns_bufsize, 0)) == NULL) {
+		return (ENOMEM);
+	}
+
+	bzero(mp->b_rptr, lxsock->lxns_bufsize);
+	/* LINTED: E_BAD_PTR_CAST_ALIGN */
+	hdr = (lx_netlink_hdr_t *)mp->b_rptr;
+	hdr->lxnh_flags = LX_NETLINK_NLM_F_MULTI;
+	hdr->lxnh_len = len;
+	hdr->lxnh_type = (msg == NULL ? LX_NETLINK_NLMSG_DONE : type);
+	hdr->lxnh_seq = 0;
+	hdr->lxnh_pid = 0;
+
+	mp->b_wptr += LXNLMSG_ALIGN(sizeof (lx_netlink_hdr_t));
+	if (msg != NULL) {
+		bcopy(msg, mp->b_wptr, size);
+		mp->b_wptr += LXNLMSG_ALIGN(size);
+	}
+
+	if ((mp1 = lx_netlink_alloc_mp1(lxsock)) == NULL) {
+		freeb(mp);
+		return (ENOMEM);
+	}
+	/* As in lx_netlink_reply_sendup, send as T_UNITDATA_IND message. */
+	mp1->b_cont = mp;
+	lxsock->lxns_upcalls->su_recv(lxsock->lxns_uphandle, mp1,
+	    msgdsize(mp1), 0, &error, NULL);
+
+	return (error);
+}
+
 static int
 lx_netlink_audit(lx_netlink_sock_t *lxsock, lx_netlink_hdr_t *hdr, mblk_t *mp)
 {
 	/*
-	 * For all auditing messages, we return ECONNREFUSED, which seems to
-	 * keep user-level auditing happy.  (Or at least, non-suicidal.)
+	 * This is paranoia, in case our socket somehow escaped the zone.
+	 */
+	if (curproc->p_zone->zone_brand != &lx_brand)
+		return (ECONNREFUSED);
+
+	if (MBLKL(mp) < sizeof (lx_netlink_hdr_t))
+		return (EINVAL);
+
+	/*
+	 * Ensure audit state is setup whenever we get an audit control msg.
+	 * However, we skip initialization for user messages since some apps
+	 * (e.g. systemd) blindly send audit messages, even though auditing
+	 * is not installed or in use. Uninitialized state is handled in
+	 * lx_audit_user_msg().
+	 */
+	if (hdr->lxnh_type < LX_AUDIT_USER_MSG_START)
+		lx_audit_init(lx_netlink_au_emit_cb);
+
+	/*
+	 * Within Linux, when a netlink message requests an ack, the code
+	 * first sends the ack as an error response (NLMSG_ERROR) with an
+	 * error code of 0.
+	 *
+	 * TODO: this needs more work, but is unnecessary for now.
+	 * if (hdr->lxnh_flags & LX_NETLINK_NLM_F_ACK) {
+	 *	reply = lx_netlink_reply(lxsock, hdr, LX_NETLINK_NLMSG_ERROR);
+	 *	if (reply == NULL)
+	 *		return (ENOMEM);
+	 *	lx_netlink_reply_ack(reply);
+	 * }
+	 */
+
+	if (hdr->lxnh_type >= LX_AUDIT_USER_MSG_START) {
+		return (lx_netlink_au_um(lxsock, hdr, mp));
+	}
+
+	switch (hdr->lxnh_type) {
+	case LX_AUDIT_GET:
+		return (lx_netlink_au_get(lxsock, hdr));
+	case LX_AUDIT_SET:
+		return (lx_netlink_au_set(lxsock, hdr, mp));
+	case LX_AUDIT_ADD_RULE:
+		return (lx_netlink_au_ar(lxsock, hdr, mp));
+	case LX_AUDIT_DEL_RULE:
+		return (lx_netlink_au_dr(lxsock, hdr, mp));
+	case LX_AUDIT_LIST_RULES:
+		return (lx_netlink_au_lr(lxsock, hdr));
+	case LX_AUDIT_GET_FEATURE:
+		return (lx_netlink_au_gf(lxsock, hdr));
+	}
+
+	/*
+	 * For all other auditing messages (i.e. one we don't yet support), we
+	 * return ECONNREFUSED.
 	 */
 	return (ECONNREFUSED);
 }
@@ -1605,6 +1994,9 @@ static int
 lx_netlink_close(sock_lower_handle_t handle, int flags, cred_t *cr)
 {
 	lx_netlink_sock_t *lxsock = (lx_netlink_sock_t *)handle, *sock, **prev;
+
+	if (lxsock->lxns_flags & LXNLF_AUDITD)
+		lx_audit_stop_worker(lxsock, lx_netlink_au_sock_cb);
 
 	mutex_enter(&lx_netlink_lock);
 
@@ -1769,13 +2161,16 @@ _fini(void)
 
 	mutex_enter(&lx_netlink_lock);
 
-	if (lx_netlink_head != NULL)
+	if (lx_netlink_head != NULL || lx_netlink_audit_cnt != 0)
 		err = EBUSY;
 
 	mutex_exit(&lx_netlink_lock);
 
-	if (err == 0 && (err = mod_remove(&ml)) == 0)
-		lx_netlink_fini();
+	if (err == 0) {
+		lx_audit_cleanup();
+		if ((err = mod_remove(&ml)) == 0)
+			lx_netlink_fini();
+	}
 
 	return (err);
 }
