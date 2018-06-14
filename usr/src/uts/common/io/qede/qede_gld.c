@@ -33,14 +33,13 @@
 * limitations under the License.
 */
 
-/*
- * Copyright 2018 Joyent, Inc.
- */
 
 #include "qede.h"
 
-#define	FP_LOCK(ptr)	mutex_enter(&ptr->fp_lock);
-#define	FP_UNLOCK(ptr)	mutex_exit(&ptr->fp_lock);
+#define	FP_LOCK(ptr)	\
+mutex_enter(&ptr->fp_lock);
+#define	FP_UNLOCK(ptr)	\
+mutex_exit(&ptr->fp_lock);
 
 int
 qede_ucst_find(qede_t *qede, const uint8_t *mac_addr)
@@ -48,8 +47,8 @@ qede_ucst_find(qede_t *qede, const uint8_t *mac_addr)
 	int slot;
 
 	for(slot = 0; slot < qede->ucst_total; slot++) {
-		if(bcmp(qede->ucst_mac[slot].mac_addr.ether_addr_octet,
-					mac_addr, ETHERADDRL) == 0) {
+		if (bcmp(qede->ucst_mac[slot].mac_addr.ether_addr_octet,
+		    mac_addr, ETHERADDRL) == 0) {
 			return (slot);
 		}
 	}
@@ -62,7 +61,7 @@ qede_set_mac_addr(qede_t *qede, uint8_t *mac_addr, uint8_t fl)
 {
 	struct ecore_filter_ucast params;
 
-	memset(&params, 0, sizeof(params));
+	memset(&params, 0, sizeof (params));
 
 	params.opcode = fl;
 	params.type = ECORE_FILTER_MAC;
@@ -70,73 +69,82 @@ qede_set_mac_addr(qede_t *qede, uint8_t *mac_addr, uint8_t fl)
 	params.is_tx_filter = true;
 	COPY_ETH_ADDRESS(mac_addr, params.mac);
 
-	//return ecore_filter_ucast_cmd(&qede->edev, &params, ECORE_SPQ_MODE_CB, NULL);
-	return ecore_filter_ucast_cmd(&qede->edev, &params, ECORE_SPQ_MODE_EBLOCK, NULL);
+	return (ecore_filter_ucast_cmd(&qede->edev, 
+	    &params, ECORE_SPQ_MODE_EBLOCK, NULL));
 
 			
 }
 static int 
 qede_add_macaddr(qede_t *qede, uint8_t *mac_addr) 
 {
-	int i , ret = 0;
+	int i, ret = 0;
 
 	i = qede_ucst_find(qede, mac_addr);
-	if(i != -1) {
-		qede_info(qede, "mac addr already added %d\n", qede->ucst_avail);
-		return 0;
+	if (i != -1) {
+		/* LINTED E_ARGUMENT_MISMATCH */
+		qede_info(qede, "mac addr already added %d\n", 
+		    qede->ucst_avail);
+		return (0);
 	}
-	if(qede->ucst_avail == 0) {
+	if (qede->ucst_avail == 0) {
 		qede_info(qede, "add macaddr ignored \n");
 		return (ENOSPC);
 	}
 	for (i = 0; i < qede->ucst_total; i++) {
-		if (qede->ucst_mac[i].set == 0)
+		if (qede->ucst_mac[i].set == 0) {
 			break;
+		}
 	}
 	if (i >= qede->ucst_total) {
 		qede_info(qede, "add macaddr ignored no space");
 		return (ENOSPC);
 	}
-	/*ret = qede_set_mac_addr(qede, (uint8_t *)qede->ether_addr, ECORE_FILTER_REMOVE);
+	ret = qede_set_mac_addr(qede, (uint8_t *)mac_addr, ECORE_FILTER_ADD);
 	if (ret == 0) {
-		qede_info(qede, "!qede_add_macaddr remove primary mac  passed qede %p\n", qede);*/
-		ret = qede_set_mac_addr(qede, (uint8_t *)mac_addr, ECORE_FILTER_ADD);
-		if (ret == 0) {
-			bcopy(mac_addr, qede->ucst_mac[i].mac_addr.ether_addr_octet,
-									ETHERADDRL);
-			qede->ucst_mac[i].set = 1;
-			qede->ucst_avail--;
-			qede_info(qede,  " add macaddr passed for addr "
-					"%02x:%02x:%02x:%02x:%02x:%02x",
-				        mac_addr[0], mac_addr[1],
-				       mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-		} else {
+		bcopy(mac_addr, 
+		    qede->ucst_mac[i].mac_addr.ether_addr_octet,
+		    ETHERADDRL);
+		qede->ucst_mac[i].set = 1;
+		qede->ucst_avail--;
+		/* LINTED E_ARGUMENT_MISMATCH */
+		qede_info(qede,  " add macaddr passed for addr "
+		    "%02x:%02x:%02x:%02x:%02x:%02x",
+		    mac_addr[0], mac_addr[1],
+		    mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+	} else {
+		/* LINTED E_ARGUMENT_MISMATCH */
+		qede_info(qede,  "add macaddr failed for addr "
+		    "%02x:%02x:%02x:%02x:%02x:%02x",
+		    mac_addr[0], mac_addr[1],
+		    mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
 
-			qede_info(qede,  "add macaddr failed for addr "
-					"%02x:%02x:%02x:%02x:%02x:%02x",
-				       mac_addr[0], mac_addr[1],
-				       mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
-
-		}
-		if(qede->ucst_avail == (qede->ucst_total -1)) {
-			u8 bcast_addr[] = { 0xff, 0xff, 0xff, 0xff, 0xff,
-		                            0xff };
+	}
+	if (qede->ucst_avail == (qede->ucst_total -1)) {
+			u8 bcast_addr[] = 
+			{ 
+				0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff 
+			};
 			for (i = 0; i < qede->ucst_total; i++) {
 				if (qede->ucst_mac[i].set == 0)
 					break;
 			}
-			ret = qede_set_mac_addr(qede, (uint8_t *)bcast_addr, ECORE_FILTER_ADD);
+			ret = qede_set_mac_addr(qede, 
+			    (uint8_t *)bcast_addr, ECORE_FILTER_ADD);
 			if (ret == 0) {
-				bcopy(bcast_addr, qede->ucst_mac[i].mac_addr.ether_addr_octet,
-									ETHERADDRL);
+				bcopy(bcast_addr, 
+				    qede->ucst_mac[i].mac_addr.ether_addr_octet,
+				    ETHERADDRL);
 				qede->ucst_mac[i].set = 1;
 				qede->ucst_avail--;
 			} else {
 
+			/* LINTED E_ARGUMENT_MISMATCH */
 			qede_info(qede,  "add macaddr failed for addr "
-					"%02x:%02x:%02x:%02x:%02x:%02x",
-				       mac_addr[0], mac_addr[1],
-				       mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+			    "%02x:%02x:%02x:%02x:%02x:%02x",
+		            mac_addr[0], mac_addr[1],
+		            mac_addr[2], mac_addr[3], mac_addr[4], 
+			    mac_addr[5]);
 		       }
 
 		}	
@@ -155,9 +163,9 @@ qede_add_mac_addr(void *arg, const uint8_t *mac_addr)
 {
 	qede_mac_group_t *rx_group = (qede_mac_group_t *)arg;
 	qede_t *qede = rx_group->qede;
-	int group_index = rx_group->group_index;
 	int ret = DDI_SUCCESS;
 
+	/* LINTED E_ARGUMENT_MISMATCH */
 	qede_info(qede, " mac addr :" MAC_STRING,  MACTOSTR(mac_addr));
 	
 	mutex_enter(&qede->gld_lock);
@@ -174,15 +182,18 @@ qede_add_mac_addr(void *arg, const uint8_t *mac_addr)
 }
 
 static int
-qede_rem_macaddr(qede_t * qede, uint8_t *mac_addr)
+qede_rem_macaddr(qede_t *qede, uint8_t *mac_addr)
 {
 	int ret = 0;
 	int i;
 
 	i = qede_ucst_find(qede, mac_addr);
-	if(i == -1) {
-		qede_info(qede, "mac addr not there to remove", MAC_STRING, MACTOSTR(mac_addr));
-		return 0;
+	if (i == -1) {
+		/* LINTED E_ARGUMENT_MISMATCH */
+		qede_info(qede, 
+		    "mac addr not there to remove", 
+		    MAC_STRING, MACTOSTR(mac_addr));
+		return (0);
 	}
 	if (qede->ucst_mac[i].set == 0) {
 	       	return (EINVAL);
@@ -193,9 +204,11 @@ qede_rem_macaddr(qede_t * qede, uint8_t *mac_addr)
 		qede->ucst_mac[i].set = 0;
 		qede->ucst_avail++;
 	} else {
-		qede_info(qede, "mac addr remove failed", MAC_STRING, MACTOSTR(mac_addr));
+		/* LINTED E_ARGUMENT_MISMATCH */
+		qede_info(qede, "mac addr remove failed", 
+		    MAC_STRING, MACTOSTR(mac_addr));
 	}
-	return ret;
+	return (ret);
 
 }
 
@@ -205,9 +218,9 @@ qede_rem_mac_addr(void *arg, const uint8_t *mac_addr)
 {
 	qede_mac_group_t *rx_group = (qede_mac_group_t *)arg;
 	qede_t *qede = rx_group->qede;
-	int group_index = rx_group->group_index;
 	int ret = DDI_SUCCESS;
 
+	/* LINTED E_ARGUMENT_MISMATCH */
 	qede_info(qede, "mac addr remove:" MAC_STRING, MACTOSTR(mac_addr));
 	mutex_enter(&qede->gld_lock);
 	if (qede->qede_state == QEDE_STATE_SUSPENDED) {
@@ -216,7 +229,7 @@ qede_rem_mac_addr(void *arg, const uint8_t *mac_addr)
 	}
 	ret = qede_rem_macaddr(qede, (uint8_t *)mac_addr);
 	mutex_exit(&qede->gld_lock);
-	return ret;
+	return (ret);
 }
 
 
@@ -231,7 +244,7 @@ qede_tx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
 
 
 	if (qede->qede_state == QEDE_STATE_SUSPENDED)
-		return(ECANCELED);
+		return (ECANCELED);
 
 	switch (stat) {
 	case MAC_STAT_OBYTES:
@@ -265,20 +278,20 @@ qede_rx_ring_poll(void *arg, int poll_bytes)
 	mblk_t *mp = NULL;
 	int work_done = 0;
 	qede_t *qede = fp->qede;
-	//qede_print("!%s(%d): called", __func__,fp->qede->instance);
 
-	if (poll_bytes == 0)
+	if (poll_bytes == 0) {
 		return (NULL);
+	}
 
 	mutex_enter(&fp->fp_lock);
-//	mp = qede_poll_fastpath(fp, poll_bytes, poll_pkts);
 	qede->intrSbPollCnt[fp->vect_info->vect_index]++;
 
 	mp = qede_process_fastpath(fp, poll_bytes, poll_pkts, &work_done);
-	if (mp != NULL)
+	if (mp != NULL) {
 		fp->rx_ring->rx_poll_cnt++;
-	else if((mp == NULL) && (work_done == 0))
+	} else if ((mp == NULL) && (work_done == 0)) {
 		qede->intrSbPollNoChangeCnt[fp->vect_info->vect_index]++;
+	}
 
 	mutex_exit(&fp->fp_lock);
 	return (mp);
@@ -295,7 +308,7 @@ qede_rx_ring_intr_enable(mac_intr_handle_t rh)
 	qede_fastpath_t *fp = (qede_fastpath_t *)rh;
 
 	mutex_enter(&fp->qede->drv_lock);
-	if(!fp->sb_phys && (fp->sb_dma_handle == NULL)) {
+	if (!fp->sb_phys && (fp->sb_dma_handle == NULL)) {
 		mutex_exit(&fp->qede->drv_lock);
 		return (DDI_FAILURE);
 	}
@@ -319,7 +332,7 @@ qede_rx_ring_intr_disable(mac_intr_handle_t rh)
 	qede_fastpath_t *fp = (qede_fastpath_t *)rh;
 
 	mutex_enter(&fp->qede->drv_lock);
-	if(!fp->sb_phys && (fp->sb_dma_handle == NULL)) {
+	if (!fp->sb_phys && (fp->sb_dma_handle == NULL)) {
 		mutex_exit(&fp->qede->drv_lock);
 		return (DDI_FAILURE);
 	}
@@ -340,22 +353,21 @@ qede_rx_ring_stat(mac_ring_driver_t rh, uint_t stat, uint64_t *val)
 	qede_t *qede = fp->qede;
 	qede_rx_ring_t *rx_ring = fp->rx_ring;
 
-	/*qede_print("!%s(%d): called", __func__,qede->instance);*/
-	// Stub
-	if (qede->qede_state == QEDE_STATE_SUSPENDED)
+	if (qede->qede_state == QEDE_STATE_SUSPENDED) {
 		return (ECANCELED);
+	}
 
 	switch (stat) {
-		case MAC_STAT_RBYTES:
-			*val = rx_ring->rx_byte_cnt;
-			break;
-		case MAC_STAT_IPACKETS:
-			*val = rx_ring->rx_pkt_cnt;
-			break;
-		default:
-			*val = 0;
-			ret = ENOTSUP;
-			break;	
+	case MAC_STAT_RBYTES:
+		*val = rx_ring->rx_byte_cnt;
+		break;
+	case MAC_STAT_IPACKETS:
+		*val = rx_ring->rx_pkt_cnt;
+		break;
+	default:
+		*val = 0;
+		ret = ENOTSUP;
+		break;	
 	}
 
 	return (ret);
@@ -368,15 +380,16 @@ qede_get_global_ring_index(qede_t *qede, int gindex, int rindex)
 	qede_rx_ring_t *rx_ring;
 	int i = 0;
 
-	/*qede_print("!%s(%d): called", __func__,qede->instance);*/
 	for (i = 0; i < qede->num_fp; i++) {
 		fp = &qede->fp_array[i];
 		rx_ring = fp->rx_ring;
 
-		if (rx_ring->group_index == gindex)
+		if (rx_ring->group_index == gindex) {
 			rindex--;
-		if (rindex < 0)
+		}
+		if (rindex < 0) {
 			return (i);
+		}
 	}
 
 	return (-1);
@@ -442,9 +455,10 @@ qede_fill_ring(void *arg, mac_ring_type_t rtype, const int group_index,
 		 */
 		ASSERT(global_ring_index >= 0);
 
-		if (rh == NULL)
+		if (rh == NULL) {
 			cmn_err(CE_WARN, "!rx ring(%d) ring handle NULL",
 			    global_ring_index);
+		}
 
 		fp = &qede->fp_array[global_ring_index];
 		rx_ring = fp->rx_ring;
@@ -539,8 +553,9 @@ qede_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 		infop->mgi_remmac = qede_rem_mac_addr;
 		infop->mgi_count =  qede->num_fp;
 #ifndef ILLUMOS
-		if (index == 0)
+		if (index == 0) {
 			infop->mgi_flags = MAC_GROUP_DEFAULT;
+		}
 #endif
 
 		break;
@@ -568,8 +583,9 @@ qede_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 		infop->mgi_count = qede->num_fp;
 
 #ifndef ILLUMOS
-		if (index == 0)
+		if (index == 0) {
 			infop->mgi_flags = MAC_GROUP_DEFAULT;
+		}
 #endif
 		break;
 	}
@@ -582,92 +598,92 @@ qede_fill_group(void *arg, mac_ring_type_t rtype, const int index,
 static int
 qede_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
 {
-	qede_t *qede = arg;
-	struct ecore_dev *edev = &qede->edev;
-	struct ecore_hwfn *hwfn;
-	struct ecore_ptt *ptt;
-	uint32_t transceiver_state;
+        qede_t *qede = arg;
+        struct ecore_dev *edev = &qede->edev;
+        struct ecore_hwfn *hwfn;
+        struct ecore_ptt *ptt;
+        uint32_t transceiver_state;
 
-	if (id >= edev->num_hwfns || arg == NULL || infop == NULL)
-		return (EINVAL);
+        if (id >= edev->num_hwfns || arg == NULL || infop == NULL)
+                return (EINVAL);
 
-	hwfn = &edev->hwfns[id];
-	ptt = ecore_ptt_acquire(hwfn);
-	if (ptt == NULL) {
-		return (EIO);
-	}
+        hwfn = &edev->hwfns[id];
+        ptt = ecore_ptt_acquire(hwfn);
+        if (ptt == NULL) {
+                return (EIO);
+        }
+        /*
+         * Use the underlying raw API to get this information. While the
+         * ecore_phy routines have some ways of getting to this information, it
+         * ends up writing the raw data as ASCII characters which doesn't help
+         * us one bit.
+         */
+        transceiver_state = ecore_rd(hwfn, ptt, hwfn->mcp_info->port_addr +
+            OFFSETOF(struct public_port, transceiver_data));
+        transceiver_state = GET_FIELD(transceiver_state, ETH_TRANSCEIVER_STATE);
+        ecore_ptt_release(hwfn, ptt);
 
-	/*
-	 * Use the underlying raw API to get this information. While the
-	 * ecore_phy routines have some ways of getting to this information, it
-	 * ends up writing the raw data as ASCII characters which doesn't help
-	 * us one bit.
-	 */
-	transceiver_state = ecore_rd(hwfn, ptt, hwfn->mcp_info->port_addr +
-	    OFFSETOF(struct public_port, transceiver_data));
-	transceiver_state = GET_FIELD(transceiver_state, ETH_TRANSCEIVER_STATE);
-	ecore_ptt_release(hwfn, ptt);
+        if ((transceiver_state & ETH_TRANSCEIVER_STATE_PRESENT) != 0) {
+                mac_transceiver_info_set_present(infop, B_TRUE);
+                /*
+                 * Based on our testing, the ETH_TRANSCEIVER_STATE_VALID flag is
+                 * not set, so we cannot rely on it. Instead, we have found that
+                 * the ETH_TRANSCEIVER_STATE_UPDATING will be set when we cannot
+                 * use the transceiver.
+                 */
+                if ((transceiver_state & ETH_TRANSCEIVER_STATE_UPDATING) != 0) {
+                        mac_transceiver_info_set_usable(infop, B_FALSE);
+                } else {
+                        mac_transceiver_info_set_usable(infop, B_TRUE);
+                }
+        } else {
+                mac_transceiver_info_set_present(infop, B_FALSE);
+                mac_transceiver_info_set_usable(infop, B_FALSE);
+        }
 
-	if ((transceiver_state & ETH_TRANSCEIVER_STATE_PRESENT) != 0) {
-		mac_transceiver_info_set_present(infop, B_TRUE);
-		/*
-		 * Based on our testing, the ETH_TRANSCEIVER_STATE_VALID flag is
-		 * not set, so we cannot rely on it. Instead, we have found that
-		 * the ETH_TRANSCEIVER_STATE_UPDATING will be set when we cannot
-		 * use the transceiver.
-		 */
-		if ((transceiver_state & ETH_TRANSCEIVER_STATE_UPDATING) != 0) {
-			mac_transceiver_info_set_usable(infop, B_FALSE);
-		} else {
-			mac_transceiver_info_set_usable(infop, B_TRUE);
-		}
-	} else {
-		mac_transceiver_info_set_present(infop, B_FALSE);
-		mac_transceiver_info_set_usable(infop, B_FALSE);
-	}
-
-	return (0);
+        return (0);
 }
 
 static int
 qede_transceiver_read(void *arg, uint_t id, uint_t page, void *buf,
     size_t nbytes, off_t offset, size_t *nread)
 {
-	qede_t *qede = arg;
-	struct ecore_dev *edev = &qede->edev;
-	struct ecore_hwfn *hwfn;
-	uint32_t port, lane;
-	struct ecore_ptt *ptt;
-	enum _ecore_status_t ret;
+        qede_t *qede = arg;
+        struct ecore_dev *edev = &qede->edev;
+        struct ecore_hwfn *hwfn;
+        uint32_t port, lane;
+        struct ecore_ptt *ptt;
+        enum _ecore_status_t ret;
 
-	if (id >= edev->num_hwfns || buf == NULL || nbytes == 0 || nread == NULL ||
-	    (page != 0xa0 && page != 0xa2) || offset < 0)
-		return (EINVAL);
+        if (id >= edev->num_hwfns || buf == NULL || nbytes == 0 || nread == NULL ||
+            (page != 0xa0 && page != 0xa2) || offset < 0)
+                return (EINVAL);
 
-	/*
-	 * Both supported pages have a length of 256 bytes, ensure nothing asks
-	 * us to go beyond that.
-	 */
-	if (nbytes > 256 || offset >= 256 || (offset + nbytes > 256)) {
-		return (EINVAL);
-	}
+        /*
+         * Both supported pages have a length of 256 bytes, ensure nothing asks
+         * us to go beyond that.
+         */
+        if (nbytes > 256 || offset >= 256 || (offset + nbytes > 256)) {
+               return (EINVAL);
+        }
 
-	hwfn = &edev->hwfns[id];
-	ptt = ecore_ptt_acquire(hwfn);
-	if (ptt == NULL) {
-		return (EIO);
-	}
+        hwfn = &edev->hwfns[id];
+        ptt = ecore_ptt_acquire(hwfn);
+        if (ptt == NULL) {
+                return (EIO);
+        }
 
-	ret = ecore_mcp_phy_sfp_read(hwfn, ptt, hwfn->port_id, page, offset,
-	    nbytes, buf);
-	ecore_ptt_release(hwfn, ptt);
-	if (ret != ECORE_SUCCESS) {
-		return (EIO);
-	}
-	*nread = nbytes;
-	return (0);
+        ret = ecore_mcp_phy_sfp_read(hwfn, ptt, hwfn->port_id, page, offset,
+            nbytes, buf);
+        ecore_ptt_release(hwfn, ptt);
+        if (ret != ECORE_SUCCESS) {
+                return (EIO);
+        }
+        *nread = nbytes;
+        return (0);
 }
 #endif /* ILLUMOS */
+
 
 static int
 qede_mac_stats(void *     arg,
@@ -683,16 +699,14 @@ qede_mac_stats(void *     arg,
 	qede_rx_ring_t *rx_ring;
 	qede_tx_ring_t *tx_ring;
 
-	if ((qede == NULL) || (value == NULL))
-	{
+	if ((qede == NULL) || (value == NULL)) {
 		return EINVAL;
 	}
 
 
 	mutex_enter(&qede->gld_lock);
 
-	if(qede->qede_state != QEDE_STATE_STARTED)
-	{
+	if(qede->qede_state != QEDE_STATE_STARTED) {
 		mutex_exit(&qede->gld_lock);
 		return EAGAIN;
 	}
@@ -711,30 +725,31 @@ qede_mac_stats(void *     arg,
 	switch (stat)
 	{
 	case MAC_STAT_IFSPEED:
-			*value = (qede->props.link_speed * 1000000ULL);
-			break;
+		*value = (qede->props.link_speed * 1000000ULL);
+		break;
 	case MAC_STAT_MULTIRCV:
-			*value = vstats.common.rx_mcast_pkts;
-			break;
+		*value = vstats.common.rx_mcast_pkts;
+		break;
 	case MAC_STAT_BRDCSTRCV:
-			*value = vstats.common.rx_bcast_pkts;
-			break;
+		*value = vstats.common.rx_bcast_pkts;
+		break;
 	case MAC_STAT_MULTIXMT:
-			*value = vstats.common.tx_mcast_pkts;
-			break;
+		*value = vstats.common.tx_mcast_pkts;
+		break;
 	case MAC_STAT_BRDCSTXMT:
-			*value = vstats.common.tx_bcast_pkts;
-			break;
+		*value = vstats.common.tx_bcast_pkts;
+		break;
 	case MAC_STAT_NORCVBUF:
-			*value = vstats.common.no_buff_discards;
-			break;
+		*value = vstats.common.no_buff_discards;
+		break;
 	case MAC_STAT_NOXMTBUF:
-			*value = 0;
-			break;
+		*value = 0;
+		break;
 	case MAC_STAT_IERRORS:
 	case ETHER_STAT_MACRCV_ERRORS:
 		*value = vstats.common.mac_filter_discards + 
-				vstats.common.packet_too_big_discard + vstats.common.rx_crc_errors;	
+		    vstats.common.packet_too_big_discard + 
+		    vstats.common.rx_crc_errors;	
 		break;
 	
 	case MAC_STAT_OERRORS:
@@ -745,19 +760,27 @@ qede_mac_stats(void *     arg,
 		break;
 
 	case MAC_STAT_RBYTES:
-		*value = vstats.common.rx_ucast_bytes + vstats.common.rx_mcast_bytes + vstats.common.rx_bcast_bytes;
+		*value = vstats.common.rx_ucast_bytes + 
+		    vstats.common.rx_mcast_bytes + 
+		    vstats.common.rx_bcast_bytes;
 		break;
 
 	case MAC_STAT_IPACKETS:
-		*value = vstats.common.rx_ucast_pkts + vstats.common.rx_mcast_pkts + vstats.common.rx_bcast_pkts; 
+		*value = vstats.common.rx_ucast_pkts + 
+		    vstats.common.rx_mcast_pkts + 
+		    vstats.common.rx_bcast_pkts; 
 		break;
 
 	case MAC_STAT_OBYTES:
-		*value = vstats.common.tx_ucast_bytes + vstats.common.tx_mcast_bytes + vstats.common.tx_bcast_bytes;
+		*value = vstats.common.tx_ucast_bytes + 
+		    vstats.common.tx_mcast_bytes + 
+		    vstats.common.tx_bcast_bytes;
 		break;
 
 	case MAC_STAT_OPACKETS:
-		*value = vstats.common.tx_ucast_pkts + vstats.common.tx_mcast_pkts + vstats.common.tx_bcast_pkts;
+		*value = vstats.common.tx_ucast_pkts + 
+		    vstats.common.tx_mcast_pkts + 
+		    vstats.common.tx_bcast_pkts;
 		break;
 
 	case ETHER_STAT_ALIGN_ERRORS:
@@ -774,13 +797,13 @@ qede_mac_stats(void *     arg,
 	case ETHER_STAT_MULTI_COLLISIONS:
 		break;
 
-    case ETHER_STAT_DEFER_XMTS:
+	case ETHER_STAT_DEFER_XMTS:
 		break;
 
 	case ETHER_STAT_TX_LATE_COLLISIONS:
 		break;
 
-    case ETHER_STAT_EX_COLLISIONS:
+	case ETHER_STAT_EX_COLLISIONS:
 		break;
 
 	case ETHER_STAT_MACXMT_ERRORS:
@@ -805,12 +828,11 @@ qede_mac_stats(void *     arg,
         	break;
 
 	case ETHER_STAT_XCVR_ID:
-        *value = 0;
-        break;
+        	*value = 0;
+        	break;
 
 	case ETHER_STAT_XCVR_INUSE:
-		switch (qede->props.link_speed)
-		{
+		switch (qede->props.link_speed) {
 		default:
 			*value = XCVR_UNDEFINED;
 		}
@@ -820,26 +842,18 @@ qede_mac_stats(void *     arg,
 		*value = 0;
 		break;
 #endif
-   case ETHER_STAT_CAP_100FDX:
-        *value = 0;
-        break;	
-   case ETHER_STAT_CAP_100HDX:
-        *value = 0;
-        break;	
-
-case ETHER_STAT_CAP_10FDX:
-        *value = 0;
-        break;	
-	
-	
+	case ETHER_STAT_CAP_100FDX:
+        	*value = 0;
+        	break;	
+	case ETHER_STAT_CAP_100HDX:
+        	*value = 0;
+        	break;	
 	case ETHER_STAT_CAP_ASMPAUSE:
 		*value = 1;
 		break;
-
 	case ETHER_STAT_CAP_PAUSE:	
 		*value = 1;
 		break;
-
 	case ETHER_STAT_CAP_AUTONEG:
 		*value = 1;
 		break;
@@ -881,83 +895,82 @@ case ETHER_STAT_CAP_10FDX:
 		*value = (qede->props.link_duplex == DUPLEX_FULL) ?
 				    LINK_DUPLEX_FULL : LINK_DUPLEX_HALF;
 		break;
+        /*
+         * Supported speeds. These indicate what hardware is capable of.
+         */
+        case ETHER_STAT_CAP_1000HDX:
+                *value = qede->curcfg.supp_capab.param_1000hdx;
+                break;
 
-	/*
-	 * Supported speeds. These indicate what hardware is capable of.
-	 */
-	case ETHER_STAT_CAP_1000HDX:
-		*value = qede->curcfg.supp_capab.param_1000hdx;
-		break;
+        case ETHER_STAT_CAP_1000FDX:
+                *value = qede->curcfg.supp_capab.param_1000fdx;
+                break;
 
-	case ETHER_STAT_CAP_1000FDX:
-		*value = qede->curcfg.supp_capab.param_1000fdx;
-		break;
+        case ETHER_STAT_CAP_10GFDX:
+                *value = qede->curcfg.supp_capab.param_10000fdx;
+                break;
 
-	case ETHER_STAT_CAP_10GFDX:
-		*value = qede->curcfg.supp_capab.param_10000fdx;
-		break;
+        case ETHER_STAT_CAP_25GFDX:
+                *value = qede->curcfg.supp_capab.param_25000fdx;
+                break;
 
-	case ETHER_STAT_CAP_25GFDX:
-		*value = qede->curcfg.supp_capab.param_25000fdx;
-		break;
+        case ETHER_STAT_CAP_40GFDX:
+                *value = qede->curcfg.supp_capab.param_40000fdx;
+                break;
 
-	case ETHER_STAT_CAP_40GFDX:
-		*value = qede->curcfg.supp_capab.param_40000fdx;
-		break;
+        case ETHER_STAT_CAP_50GFDX:
+                *value = qede->curcfg.supp_capab.param_50000fdx;
+                break;
 
-	case ETHER_STAT_CAP_50GFDX:
-		*value = qede->curcfg.supp_capab.param_50000fdx;
-		break;
+        case ETHER_STAT_CAP_100GFDX:
+                *value = qede->curcfg.supp_capab.param_100000fdx;
+                break;
 
-	case ETHER_STAT_CAP_100GFDX:
-		*value = qede->curcfg.supp_capab.param_100000fdx;
-		break;
+        /*
+         * Advertised speeds. These indicate what hardware is currently sending.
+         */
+        case ETHER_STAT_ADV_CAP_1000HDX:
+                *value = qede->curcfg.adv_capab.param_1000hdx;
+                break;
 
-	/*
-	 * Advertised speeds. These indicate what hardware is currently sending.
-	 */
-	case ETHER_STAT_ADV_CAP_1000HDX:
-		*value = qede->curcfg.adv_capab.param_1000hdx;
-		break;
+        case ETHER_STAT_ADV_CAP_1000FDX:
+                *value = qede->curcfg.adv_capab.param_1000fdx;
+                break;
 
-	case ETHER_STAT_ADV_CAP_1000FDX:
-		*value = qede->curcfg.adv_capab.param_1000fdx;
-		break;
+        case ETHER_STAT_ADV_CAP_10GFDX:
+                *value = qede->curcfg.adv_capab.param_10000fdx;
+                break;
 
-	case ETHER_STAT_ADV_CAP_10GFDX:
-		*value = qede->curcfg.adv_capab.param_10000fdx;
-		break;
+        case ETHER_STAT_ADV_CAP_25GFDX:
+                *value = qede->curcfg.adv_capab.param_25000fdx;
+                break;
 
-	case ETHER_STAT_ADV_CAP_25GFDX:
-		*value = qede->curcfg.adv_capab.param_25000fdx;
-		break;
+        case ETHER_STAT_ADV_CAP_40GFDX:
+                *value = qede->curcfg.adv_capab.param_40000fdx;
+                break;
 
-	case ETHER_STAT_ADV_CAP_40GFDX:
-		*value = qede->curcfg.adv_capab.param_40000fdx;
-		break;
+        case ETHER_STAT_ADV_CAP_50GFDX:
+                *value = qede->curcfg.adv_capab.param_50000fdx;
+                break;
 
-	case ETHER_STAT_ADV_CAP_50GFDX:
-		*value = qede->curcfg.adv_capab.param_50000fdx;
-		break;
-
-	case ETHER_STAT_ADV_CAP_100GFDX:
-		*value = qede->curcfg.adv_capab.param_100000fdx;
-		break;
+        case ETHER_STAT_ADV_CAP_100GFDX:
+                *value = qede->curcfg.adv_capab.param_100000fdx;
+                break;
 
 	default:
 		rc = ENOTSUP;
 	}
 
 	mutex_exit(&qede->gld_lock);
-	return rc;
+	return (rc);
 }
 
 /* (flag) TRUE = on, FALSE = off */
 static int
-qede_mac_promiscuous(void *    arg,
-                              boolean_t on)
+qede_mac_promiscuous(void *arg,
+    boolean_t on)
 {
-    	qede_t * qede = (qede_t *)arg;
+    	qede_t *qede = (qede_t *)arg;
 	qede_print("!%s(%d): called", __func__,qede->instance);
 	int ret = DDI_SUCCESS;
 	enum qede_filter_rx_mode_type mode;
@@ -1004,7 +1017,8 @@ int qede_set_rx_mac_mcast(qede_t *qede, enum ecore_filter_opcode opcode,
         }
 
 
-        return ecore_filter_mcast_cmd(&qede->edev, &cmd, ECORE_SPQ_MODE_CB, NULL);
+        return (ecore_filter_mcast_cmd(&qede->edev, &cmd, 
+	    ECORE_SPQ_MODE_CB, NULL));
 		
 }
 
@@ -1017,18 +1031,22 @@ qede_set_filter_rx_mode(qede_t * qede, enum qede_filter_rx_mode_type type)
 
 	flg.update_rx_mode_config      = 1;
 	flg.update_tx_mode_config      = 1;
-	flg.rx_accept_filter           = ECORE_ACCEPT_UCAST_MATCHED | ECORE_ACCEPT_MCAST_MATCHED | ECORE_ACCEPT_BCAST;
-	flg.tx_accept_filter = ECORE_ACCEPT_UCAST_MATCHED | ECORE_ACCEPT_MCAST_MATCHED | ECORE_ACCEPT_BCAST;
+	flg.rx_accept_filter           = ECORE_ACCEPT_UCAST_MATCHED | 
+	    ECORE_ACCEPT_MCAST_MATCHED | ECORE_ACCEPT_BCAST;
+	flg.tx_accept_filter = ECORE_ACCEPT_UCAST_MATCHED | 
+	    ECORE_ACCEPT_MCAST_MATCHED | ECORE_ACCEPT_BCAST;
 
 	if (type == QEDE_FILTER_RX_MODE_PROMISC)
-		flg.rx_accept_filter |= ECORE_ACCEPT_UCAST_UNMATCHED | ECORE_ACCEPT_MCAST_UNMATCHED;
+		flg.rx_accept_filter |= ECORE_ACCEPT_UCAST_UNMATCHED | 
+		    ECORE_ACCEPT_MCAST_UNMATCHED;
 	else if (type == QEDE_FILTER_RX_MODE_MULTI_PROMISC)
 		flg.rx_accept_filter |= ECORE_ACCEPT_MCAST_UNMATCHED;
-	qede_info(qede, "rx_mode rx_filter=0x%x tx_filter=0x%x type=0x%x\n", flg.rx_accept_filter, flg.tx_accept_filter, type);
-	return ecore_filter_accept_cmd(&qede->edev, 0, flg,
+	qede_info(qede, "rx_mode rx_filter=0x%x tx_filter=0x%x type=0x%x\n", 
+	    flg.rx_accept_filter, flg.tx_accept_filter, type);
+	return (ecore_filter_accept_cmd(&qede->edev, 0, flg,
 			0, /* update_accept_any_vlan */
 			0, /* accept_any_vlan */
-			ECORE_SPQ_MODE_CB, NULL);
+			ECORE_SPQ_MODE_CB, NULL));
 }
 
 int 
@@ -1043,25 +1061,25 @@ qede_multicast(qede_t *qede, boolean_t flag, const uint8_t *ptr_mcaddr)
 	boolean_t mcmac_exists = B_FALSE;
 	enum qede_filter_rx_mode_type mode;
 
-	if (!ptr_mcaddr) 
+	if (!ptr_mcaddr)  {
 		cmn_err(CE_NOTE, "Removing all multicast");
-	else 
-		cmn_err(CE_NOTE,"qede=%p %s multicast: %02x:%02x:%02x:%02x:%02x:%02x",
-			qede, (flag) ? "Adding" : "Removing", ptr_mcaddr[0], 
-			ptr_mcaddr[1],ptr_mcaddr[2],ptr_mcaddr[3],ptr_mcaddr[4],
-			ptr_mcaddr[5]);
+	} else  {
+		cmn_err(CE_NOTE,
+		    "qede=%p %s multicast: %02x:%02x:%02x:%02x:%02x:%02x",
+		    qede, (flag) ? "Adding" : "Removing", ptr_mcaddr[0], 
+		    ptr_mcaddr[1],ptr_mcaddr[2],ptr_mcaddr[3],ptr_mcaddr[4],
+		    ptr_mcaddr[5]);
+	}
 
 
-
-	if (flag && (ptr_mcaddr == NULL))
-	{
+	if (flag && (ptr_mcaddr == NULL)) {
 		cmn_err(CE_WARN, "ERROR: Multicast address not specified");
 		return EINVAL;
 	}
 
 
 	/* exceeds addition of mcaddr above limit */
-	if( flag && (qede->mc_cnt >= MAX_MC_SOFT_LIMIT) ) {
+	if (flag && (qede->mc_cnt >= MAX_MC_SOFT_LIMIT)) {
 		qede_info(qede, "Cannot add more than MAX_MC_SOFT_LIMIT");
 		return ENOENT;
 	}
@@ -1069,8 +1087,7 @@ qede_multicast(qede_t *qede, boolean_t flag, const uint8_t *ptr_mcaddr)
 	size = MAX_MC_SOFT_LIMIT * ETH_ALLEN;
 
 	mc_macs = kmem_zalloc(size, KM_NOSLEEP);
-	if (!mc_macs) 
-	{
+	if (!mc_macs) { 
 		cmn_err(CE_WARN, "ERROR: Failed to allocate for mc_macs");
 		return EINVAL;
 	}
@@ -1078,67 +1095,76 @@ qede_multicast(qede_t *qede, boolean_t flag, const uint8_t *ptr_mcaddr)
 	tmpmc = mc_macs;
 
         /* remove all multicast - as flag not set and mcaddr not specified*/
-        if (!flag && (ptr_mcaddr == NULL))
-        {
-                QEDE_LIST_FOR_EACH_ENTRY(ptr_entry, &qede->mclist.head, qede_mcast_list_entry_t, mclist_entry)
+        if (!flag && (ptr_mcaddr == NULL)) {
+                QEDE_LIST_FOR_EACH_ENTRY(ptr_entry, 
+		    &qede->mclist.head, qede_mcast_list_entry_t, mclist_entry)
                 {
-                        if(ptr_entry != NULL)
-                        {
-                        QEDE_LIST_REMOVE(&ptr_entry->mclist_entry, &qede->mclist.head);
-                        kmem_free(ptr_entry, sizeof(qede_mcast_list_entry_t) + ETH_ALLEN);
+                        if (ptr_entry != NULL) {
+                        QEDE_LIST_REMOVE(&ptr_entry->mclist_entry, 
+			    &qede->mclist.head);
+                        kmem_free(ptr_entry, 
+			    sizeof (qede_mcast_list_entry_t) + ETH_ALLEN);
                         }
                 }
 
-                ret = qede_set_rx_mac_mcast(qede, ECORE_FILTER_REMOVE, mc_macs, 1);
+                ret = qede_set_rx_mac_mcast(qede, 
+		    ECORE_FILTER_REMOVE, mc_macs, 1);
                 qede->mc_cnt = 0;
                 goto exit;
         }
 
-        QEDE_LIST_FOR_EACH_ENTRY(ptr_entry, &qede->mclist.head, qede_mcast_list_entry_t, mclist_entry)
+        QEDE_LIST_FOR_EACH_ENTRY(ptr_entry, 
+	    &qede->mclist.head, qede_mcast_list_entry_t, mclist_entry)
         {
-                if(ptr_entry != NULL && IS_ETH_ADDRESS_EQUAL(ptr_mcaddr, ptr_entry->mac) ) {
+                if ((ptr_entry != NULL) && 
+		    IS_ETH_ADDRESS_EQUAL(ptr_mcaddr, ptr_entry->mac)) {
                         mcmac_exists = B_TRUE;
                         break;
                 }
         }
-        if( flag && mcmac_exists) {
-                /*qede_info(qede, "mcaddr already added\n");*/
+        if (flag && mcmac_exists) {
                 ret = DDI_SUCCESS;
                 goto exit;
-        } else if ( !flag && !mcmac_exists) {
-                /*qede_info(qede, "mcaddr is not there mc_cnt = %d\n", qede->mc_cnt);*/
+        } else if (!flag && !mcmac_exists) {
                 ret = DDI_SUCCESS;
                 goto exit;
         }
 
-       if (flag)
-        {
-                ptr_entry = kmem_zalloc((sizeof(qede_mcast_list_entry_t) + ETH_ALLEN), KM_NOSLEEP);
-                ptr_entry->mac = (uint8_t *)ptr_entry + sizeof(qede_mcast_list_entry_t);
+       if (flag) {
+                ptr_entry = kmem_zalloc((sizeof (qede_mcast_list_entry_t) + 
+		    ETH_ALLEN), KM_NOSLEEP);
+                ptr_entry->mac = (uint8_t *)ptr_entry + 
+		    sizeof (qede_mcast_list_entry_t);
                 COPY_ETH_ADDRESS(ptr_mcaddr, ptr_entry->mac);
                 QEDE_LIST_ADD(&ptr_entry->mclist_entry, &qede->mclist.head);
         } else {
                 QEDE_LIST_REMOVE(&ptr_entry->mclist_entry, &qede->mclist.head);
-                kmem_free(ptr_entry, sizeof(qede_mcast_list_entry_t) + ETH_ALLEN);
+                kmem_free(ptr_entry, sizeof(qede_mcast_list_entry_t) + 
+		    ETH_ALLEN);
         }
 
 	mc_cnt = 0;
-        QEDE_LIST_FOR_EACH_ENTRY(ptr_entry, &qede->mclist.head, qede_mcast_list_entry_t, mclist_entry) {
+        QEDE_LIST_FOR_EACH_ENTRY(ptr_entry, &qede->mclist.head, 
+	    qede_mcast_list_entry_t, mclist_entry) {
                 COPY_ETH_ADDRESS(ptr_entry->mac, tmpmc);
                 tmpmc += ETH_ALLEN;
                 mc_cnt++;
         }
         qede->mc_cnt = mc_cnt;
-        if(mc_cnt <=64) {
-                ret = qede_set_rx_mac_mcast(qede, ECORE_FILTER_ADD, (unsigned char *)mc_macs, mc_cnt);
-                if  ((qede->params.multi_promisc_fl == B_TRUE) && (qede->params.promisc_fl == B_FALSE)) {
+        if (mc_cnt <=64) {
+                ret = qede_set_rx_mac_mcast(qede, ECORE_FILTER_ADD, 
+		    (unsigned char *)mc_macs, mc_cnt);
+                if ((qede->params.multi_promisc_fl == B_TRUE) && 
+		    (qede->params.promisc_fl == B_FALSE)) {
                         mode = QEDE_FILTER_RX_MODE_REGULAR;
                         ret = qede_set_filter_rx_mode(qede, mode);
                 }
                 qede->params.multi_promisc_fl = B_FALSE;
         } else {
-                if ((qede->params.multi_promisc_fl == B_FALSE) && (qede->params.promisc_fl = B_FALSE)) {
-                        ret = qede_set_filter_rx_mode(qede, QEDE_FILTER_RX_MODE_MULTI_PROMISC);
+                if ((qede->params.multi_promisc_fl == B_FALSE) && 
+		    (qede->params.promisc_fl = B_FALSE)) {
+                        ret = qede_set_filter_rx_mode(qede, 
+			    QEDE_FILTER_RX_MODE_MULTI_PROMISC);
                 }
                 qede->params.multi_promisc_fl = B_TRUE;
                 qede_info(qede, "mode is MULTI_PROMISC");
@@ -1146,7 +1172,7 @@ qede_multicast(qede_t *qede, boolean_t flag, const uint8_t *ptr_mcaddr)
 exit:
 kmem_free(mc_macs, size);
 qede_info(qede, "multicast ret %d mc_cnt %d\n", ret, qede->mc_cnt);
-return ret;
+return (ret);
 }
 
 /*
@@ -1155,19 +1181,18 @@ return ret;
  * (flag) TRUE = add, FALSE = remove
  */
 static int
-qede_mac_multicast(void *          arg,
-                            boolean_t       flag,
-                            const uint8_t * mcast_addr)
+qede_mac_multicast(void *arg,
+    boolean_t       flag,
+    const uint8_t * mcast_addr)
 {
-    qede_t * qede = (qede_t *)arg;
-    int ret = DDI_SUCCESS;
+	qede_t *qede = (qede_t *)arg;
+	int ret = DDI_SUCCESS;
 
 
 	mutex_enter(&qede->gld_lock);
-	if(qede->qede_state != QEDE_STATE_STARTED)
-	{
+	if(qede->qede_state != QEDE_STATE_STARTED) {
 		mutex_exit(&qede->gld_lock);
-		return EAGAIN;
+		return (EAGAIN);
 	}
 	ret = qede_multicast(qede, flag, mcast_addr);
 		
@@ -1180,44 +1205,49 @@ qede_clear_filters(qede_t *qede)
 {
 	int ret = 0;
 	int i;
-	if((qede->params.promisc_fl == B_TRUE) || (qede->params.multi_promisc_fl == B_TRUE)) {
-		ret = qede_set_filter_rx_mode(qede, QEDE_FILTER_RX_MODE_REGULAR);
-		if(ret)
-			qede_info(qede, "qede_clear_filters failed to set rx_mode");
+	if ((qede->params.promisc_fl == B_TRUE) || 
+	    (qede->params.multi_promisc_fl == B_TRUE)) {
+		ret = qede_set_filter_rx_mode(qede, 
+		    QEDE_FILTER_RX_MODE_REGULAR);
+		if (ret) {
+			qede_info(qede, 
+			    "qede_clear_filters failed to set rx_mode");
+		}
 	}
 	for (i=0; i < qede->ucst_total; i++)
 	{
-		if(qede->ucst_mac[i].set) {
-			qede_rem_macaddr(qede, qede->ucst_mac[i].mac_addr.ether_addr_octet);
+		if (qede->ucst_mac[i].set) {
+			qede_rem_macaddr(qede, 
+			    qede->ucst_mac[i].mac_addr.ether_addr_octet);
 		}
 	}
 	qede_multicast(qede, B_FALSE, NULL);
-	return ret;
+	return (ret);
 }
 
 
-#ifdef	NO_CROSSBOW
+#ifdef  NO_CROSSBOW
 static int
-qede_mac_unicast(void *          arg,
-                          const uint8_t * mac_addr)
+qede_mac_unicast(void *arg,
+    const uint8_t * mac_addr)
 {
-    qede_t * qede = (qede_t *)arg;
+    qede_t *qede = (qede_t *)arg;
     return 0;
 }
 
 
 static mblk_t *
-qede_mac_tx(void *   arg,
-                          mblk_t * mblk)
+qede_mac_tx(void *arg,
+    mblk_t * mblk)
 {
-    qede_t * qede = (qede_t *)arg;
+    qede_t *qede = (qede_t *)arg;
     qede_fastpath_t *fp = &qede->fp_array[0];
 
     mblk = qede_ring_tx((void *)fp, mblk);
 
-    return mblk;
+    return (mblk);
 }
-#endif	/* NO_CROSSBOW */
+#endif  /* NO_CROSSBOW */
 
 
 static lb_property_t loopmodes[] = {
@@ -1244,57 +1274,57 @@ qede_set_loopback_mode(qede_t *qede, uint32_t mode)
 	ptt = ecore_ptt_acquire(hwfn);
 
 	switch(mode) {
-		default:
-			qede_info(qede, "unknown loopback mode !!");
-			ecore_ptt_release(hwfn, ptt);
-			return IOC_INVAL;
+	default:
+		qede_info(qede, "unknown loopback mode !!");
+		ecore_ptt_release(hwfn, ptt);
+		return IOC_INVAL;
 
-		case QEDE_LOOP_NONE:
-			ecore_mcp_set_link(hwfn, ptt, 0);
+	case QEDE_LOOP_NONE:
+		ecore_mcp_set_link(hwfn, ptt, 0);
 
-			while(qede->params.link_state && i < 5000){
-				OSAL_MSLEEP(1);
-				i++;
-			}
-			i = 0;
+		while (qede->params.link_state && i < 5000) {
+			OSAL_MSLEEP(1);
+			i++;
+		}
+		i = 0;
 
-			link_params->loopback_mode = ETH_LOOPBACK_NONE;
-			qede->loop_back_mode = QEDE_LOOP_NONE;
-			ret = ecore_mcp_set_link(hwfn, ptt, 1);
-			ecore_ptt_release(hwfn, ptt);
+		link_params->loopback_mode = ETH_LOOPBACK_NONE;
+		qede->loop_back_mode = QEDE_LOOP_NONE;
+		ret = ecore_mcp_set_link(hwfn, ptt, 1);
+		ecore_ptt_release(hwfn, ptt);
 
-			while(!qede->params.link_state && i < 5000){
-				OSAL_MSLEEP(1);
-				i++;
-			}
-			return IOC_REPLY;
+		while (!qede->params.link_state && i < 5000) {
+			OSAL_MSLEEP(1);
+			i++;
+		}
+		return IOC_REPLY;
 
-		case QEDE_LOOP_INTERNAL:
-			qede_print("!%s(%d) : loopback mode (INTERNAL) is set!",
-			    __func__, qede->instance);
-			ecore_mcp_set_link(hwfn, ptt, 0);
+	case QEDE_LOOP_INTERNAL:
+		qede_print("!%s(%d) : loopback mode (INTERNAL) is set!",
+		    __func__, qede->instance);
+		    ecore_mcp_set_link(hwfn, ptt, 0);
 
-			while(qede->params.link_state && i < 5000){
-				OSAL_MSLEEP(1);
-				i++;
-			}
-			i = 0;
-			link_params->loopback_mode = ETH_LOOPBACK_INT_PHY;
-			qede->loop_back_mode = QEDE_LOOP_INTERNAL;
-			ret = ecore_mcp_set_link(hwfn, ptt, 1);
-			ecore_ptt_release(hwfn, ptt);
+		while(qede->params.link_state && i < 5000) {
+			OSAL_MSLEEP(1);
+			i++;
+		}
+		i = 0;
+		link_params->loopback_mode = ETH_LOOPBACK_INT_PHY;
+		qede->loop_back_mode = QEDE_LOOP_INTERNAL;
+		ret = ecore_mcp_set_link(hwfn, ptt, 1);
+		ecore_ptt_release(hwfn, ptt);
 
-			while(!qede->params.link_state && i < 5000){
-				OSAL_MSLEEP(1);
-				i++;
-			}
-			return IOC_REPLY;
+		while(!qede->params.link_state && i < 5000) {
+			OSAL_MSLEEP(1);
+			i++;
+		}
+		return IOC_REPLY;
 
-		case QEDE_LOOP_EXTERNAL:
-			qede_print("!%s(%d) : External loopback mode is not supported",
-			    __func__, qede->instance);
-			ecore_ptt_release(hwfn, ptt);
-			return IOC_INVAL;
+	case QEDE_LOOP_EXTERNAL:
+		qede_print("!%s(%d) : External loopback mode is not supported",
+		    __func__, qede->instance);
+		ecore_ptt_release(hwfn, ptt);
+		return IOC_INVAL;
 	}
 }
 
@@ -1308,25 +1338,24 @@ qede_ioctl_pcicfg_rd(qede_t *qede, u32 addr, void *data,
 	ddi_acc_handle_t pci_cfg_handle  = qede->pci_cfg_handle;
 	qede_ioctl_data_t * data1 = (qede_ioctl_data_t *) data;
 	
-#if 1
 	cap_offset = pci_config_get8(pci_cfg_handle, PCI_CONF_CAP_PTR);
 	while (cap_offset != 0) {
-		/* Check for an invalid PCI read. */
-		if (cap_offset == PCI_EINVAL8) {
-			return DDI_FAILURE;
-		}
+                /* Check for an invalid PCI read. */
+                if (cap_offset == PCI_EINVAL8) {
+                        return DDI_FAILURE;
+                }
 		cap_id = pci_config_get8(pci_cfg_handle, cap_offset);
 		if (cap_id == PCI_CAP_ID_PCI_E) {
 			/* PCIe expr capab struct found */
 			break;
 		} else {
-			next_cap = pci_config_get8(pci_cfg_handle, cap_offset + 1);
+			next_cap = pci_config_get8(pci_cfg_handle,
+			    cap_offset + 1);
 			cap_offset = next_cap;
 		}
 	}
-#endif
 
-	switch (len){
+	switch (len) {
 	case 1:
 		ret = pci_config_get8(qede->pci_cfg_handle, addr);
 		(void) memcpy(data, &ret, sizeof(uint8_t));
@@ -1341,9 +1370,9 @@ qede_ioctl_pcicfg_rd(qede_t *qede, u32 addr, void *data,
 		break;
 	default:
 		cmn_err(CE_WARN, "bad length for pci config read\n");
-		return 1;
+		return (1);
 	}
-	return 0;
+	return (0);
 }
 
 static int
@@ -1362,7 +1391,8 @@ qede_ioctl_pcicfg_wr(qede_t *qede, u32 addr, void *data,
 			/* PCIe expr capab struct found */
 			break;
 		} else {
-			next_cap = pci_config_get8(pci_cfg_handle, cap_offset + 1);
+			next_cap = pci_config_get8(pci_cfg_handle, 
+			    cap_offset + 1);
 			cap_offset = next_cap;
 		}
 	}
@@ -1385,9 +1415,9 @@ qede_ioctl_pcicfg_wr(qede_t *qede, u32 addr, void *data,
 		break;
 		
 	default:
-		return 1;
+		return (1);
 	}
-	return 0;
+	return (0);
 }
 
 static int
@@ -1421,17 +1451,18 @@ qede_ioctl_rd_wr_reg(qede_t *qede, void *data)
 		break;
 
 	default:
-		cmn_err(CE_WARN, "wrong command in register read/write from application\n");
+		cmn_err(CE_WARN, 
+		    "wrong command in register read/write from application\n");
 		break;
 	}
-	return ret;
+	return (ret);
 }
 
 static int
 qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 {
-	//qede_ioctl_data_t *data1 = (qede_ioctl_data_t *)(mp->b_cont->b_rptr), *data2;
-	qede_nvram_data_t *data1 = (qede_nvram_data_t *)(mp->b_cont->b_rptr), *data2, *next_data;
+	qede_nvram_data_t *data1 = (qede_nvram_data_t *)(mp->b_cont->b_rptr); 
+	qede_nvram_data_t *data2, *next_data;
 	struct ecore_dev *edev = &qede->edev;
 	uint32_t ret = 0, hdr_size = 24, bytes_to_copy, copy_len = 0;
 	uint32_t copy_len1 = 0;
@@ -1446,10 +1477,10 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 	switch(cmd) {
 	case QEDE_NVRAM_CMD_READ:
 		buf = kmem_zalloc(size, GFP_KERNEL);
-		//buf = OSAL_ZALLOC(edev, GFP_KERNEL, size);
 		if(buf == NULL) {
-			cmn_err(CE_WARN, "memory allocation failed in nvram read ioctl\n");
-			return DDI_FAILURE;
+			cmn_err(CE_WARN, "memory allocation failed" 
+			" in nvram read ioctl\n");
+			return (DDI_FAILURE);
 		}
 		ret = ecore_mcp_nvm_read(edev, addr, buf, data1->size);
 
@@ -1475,7 +1506,8 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 			}
 			data2 = (qede_nvram_data_t *)mp1->b_rptr;
 			if (copy_len > bytes_to_copy) {
-				(void) memcpy(data2->uabc, tmp_buf, bytes_to_copy);
+				(void) memcpy(data2->uabc, tmp_buf, 
+				    bytes_to_copy);
 				kmem_free(buf, size);
 				//OSAL_FREE(edev, buf);
 				break;
@@ -1505,11 +1537,13 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 			//buf = qede->reserved_buf;
 			qede->nvm_buf_size = data1->size;
 			if(buf == NULL) {
-				cmn_err(CE_WARN, "memory allocation failed in START_NVM_WRITE\n");
+				cmn_err(CE_WARN, 
+				"memory allocation failed in START_NVM_WRITE\n");
 				return DDI_FAILURE;
 			}
 			qede->nvm_buf_start = buf;
-			cmn_err(CE_NOTE, "buf = %p, size = %x\n", qede->nvm_buf_start, size);
+			cmn_err(CE_NOTE, 
+			    "buf = %p, size = %x\n", qede->nvm_buf_start, size);
 			qede->nvm_buf = buf;
 			qede->copy_len = 0;
 			//tmp_buf = buf + addr;
@@ -1522,15 +1556,19 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 			if(copy_len > buf_size) {
 			 	if (buf_size < qede->nvm_buf_size) {
 				(void) memcpy(tmp_buf, data1->uabc, buf_size);
-					qede->copy_len = qede->copy_len + buf_size;
+					qede->copy_len = qede->copy_len + 
+					    buf_size;
 				} else {
-					(void) memcpy(tmp_buf, data1->uabc, qede->nvm_buf_size);
-					qede->copy_len = qede->copy_len + qede->nvm_buf_size;
+					(void) memcpy(tmp_buf, 
+					    data1->uabc, qede->nvm_buf_size);
+					qede->copy_len = 
+					    qede->copy_len + qede->nvm_buf_size;
 				}
 				tmp_buf = tmp_buf + buf_size;
 				qede->nvm_buf = tmp_buf;
 				//qede->copy_len = qede->copy_len + buf_size;
-				cmn_err(CE_NOTE, "buf_size from app = %x\n", copy_len);
+				cmn_err(CE_NOTE, 
+				    "buf_size from app = %x\n", copy_len);
 				ret = 0;
 				break;
 			}
@@ -1548,12 +1586,15 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 				}
 				next_data = (qede_nvram_data_t *) mp1->b_rptr;
 				if (copy_len > bytes_to_copy){
-					(void) memcpy(tmp_buf, next_data->uabc, bytes_to_copy);
-					qede->copy_len = qede->copy_len + bytes_to_copy;
+					(void) memcpy(tmp_buf, next_data->uabc,
+					    bytes_to_copy);
+					qede->copy_len = qede->copy_len + 
+					    bytes_to_copy;
 					ret = 0;
 					break;
 				}
-				(void) memcpy(tmp_buf, next_data->uabc, copy_len);
+				(void) memcpy(tmp_buf, next_data->uabc, 
+				    copy_len);
 				qede->copy_len = qede->copy_len + copy_len;
 				tmp_buf = tmp_buf + copy_len;
 				copy_len = copy_len1 + copy_len;
@@ -1571,7 +1612,8 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 		case READ_BUF:
 			tmp_buf = (uint8_t *)qede->nvm_buf_start;
 			for(i = 0; i < size ; i++){
-				cmn_err(CE_NOTE, "buff (%d) : %d\n", i, *tmp_buf);
+				cmn_err(CE_NOTE, 
+				    "buff (%d) : %d\n", i, *tmp_buf);
 				tmp_buf ++;
 			}
 			ret = 0;
@@ -1612,10 +1654,11 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 		break;
 
 	default:
-		cmn_err(CE_WARN, "wrong command in NVRAM read/write from application\n");
+		cmn_err(CE_WARN, 
+		    "wrong command in NVRAM read/write from application\n");
 		break;
 	}
-	return DDI_SUCCESS;	
+	return (DDI_SUCCESS);	
 }
 
 static int
@@ -1634,45 +1677,53 @@ qede_get_func_info(qede_t *qede, void *data)
 	if(hwfn == NULL){
 		cmn_err(CE_WARN, "(%s) : cannot acquire hwfn\n",
 		    __func__);
-		return DDI_FAILURE;
+		return (DDI_FAILURE);
 	}
 	memcpy(&params, &hwfn->mcp_info->link_input, sizeof(params));
 	memcpy(&link, &hwfn->mcp_info->link_output, sizeof(link));
 
-	if(link.link_up)
+	if(link.link_up) {
 		link_op.link_up = true;
+	}
 
 	link_op.supported_caps = SUPPORTED_FIBRE;
-	if(params.speed.autoneg)
+	if(params.speed.autoneg) {
 		link_op.supported_caps |= SUPPORTED_Autoneg;
+	}
 	
 	if(params.pause.autoneg ||
-	    (params.pause.forced_rx && params.pause.forced_tx))
+	    (params.pause.forced_rx && params.pause.forced_tx)) {
 		link_op.supported_caps |= SUPPORTED_Asym_Pause;
+	}
 
 	if (params.pause.autoneg || params.pause.forced_rx ||
-	     params.pause.forced_tx)
+	     params.pause.forced_tx) {
 		link_op.supported_caps |= SUPPORTED_Pause;
+	}
 	
 	if (params.speed.advertised_speeds &
-	    NVM_CFG1_PORT_DRV_SPEED_CAPABILITY_MASK_1G)
-	        link_op.supported_caps |= SUPPORTED_1000baseT_Half |
-			                    SUPPORTED_1000baseT_Full;
+	    NVM_CFG1_PORT_DRV_SPEED_CAPABILITY_MASK_1G) {
+		link_op.supported_caps |= SUPPORTED_1000baseT_Half |
+	    	    SUPPORTED_1000baseT_Full;
+	}
 
 	if (params.speed.advertised_speeds &
-	    NVM_CFG1_PORT_DRV_SPEED_CAPABILITY_MASK_10G)
+	    NVM_CFG1_PORT_DRV_SPEED_CAPABILITY_MASK_10G) {
 		link_op.supported_caps |= SUPPORTED_10000baseKR_Full;
+	}
 	
 	if (params.speed.advertised_speeds &
-	    NVM_CFG1_PORT_DRV_LINK_SPEED_40G)
+	    NVM_CFG1_PORT_DRV_LINK_SPEED_40G) {
 		link_op.supported_caps |= SUPPORTED_40000baseLR4_Full;
+	}
 	
 	link_op.advertised_caps = link_op.supported_caps;
 
-	if(link.link_up)
+	if(link.link_up) {
 		link_op.speed = link.speed;
-	else
+	} else {
 		link_op.speed = 0;
+	}
 
 	link_op.duplex = DUPLEX_FULL;
 	link_op.port = PORT_FIBRE;
@@ -1681,34 +1732,42 @@ qede_get_func_info(qede_t *qede, void *data)
 
 	/* Link partner capabilities */
 	if (link.partner_adv_speed &
-	    ECORE_LINK_PARTNER_SPEED_1G_HD)
+	    ECORE_LINK_PARTNER_SPEED_1G_HD) {
 		link_op.lp_caps |= SUPPORTED_1000baseT_Half;
+	}
 	
 	if (link.partner_adv_speed &
-	    ECORE_LINK_PARTNER_SPEED_1G_FD)
+	    ECORE_LINK_PARTNER_SPEED_1G_FD) {
 		link_op.lp_caps |= SUPPORTED_1000baseT_Full;
+	}
 	
 	if (link.partner_adv_speed &
-	    ECORE_LINK_PARTNER_SPEED_10G)
+	    ECORE_LINK_PARTNER_SPEED_10G) {
 		link_op.lp_caps |= SUPPORTED_10000baseKR_Full;
+	}
 	
 	if (link.partner_adv_speed &
-	    ECORE_LINK_PARTNER_SPEED_20G)
+	    ECORE_LINK_PARTNER_SPEED_20G) {
 		link_op.lp_caps |= SUPPORTED_20000baseKR2_Full;
+	}
 	
 	if (link.partner_adv_speed &
-	    ECORE_LINK_PARTNER_SPEED_40G)
+	    ECORE_LINK_PARTNER_SPEED_40G) {
 		link_op.lp_caps |= SUPPORTED_40000baseLR4_Full;
+	}
 	
-	if (link.an_complete)
+	if (link.an_complete) {
 		link_op.lp_caps |= SUPPORTED_Autoneg;
+	}
 	
-	if (link.partner_adv_pause)
+	if (link.partner_adv_pause) {
 		link_op.lp_caps |= SUPPORTED_Pause;
+	}
 	
 	if (link.partner_adv_pause == ECORE_LINK_PARTNER_ASYMMETRIC_PAUSE ||
-	    link.partner_adv_pause == ECORE_LINK_PARTNER_BOTH_PAUSE)
+	    link.partner_adv_pause == ECORE_LINK_PARTNER_BOTH_PAUSE) {
 		link_op.lp_caps |= SUPPORTED_Asym_Pause;
+	}
 
 	func_info.supported = link_op.supported_caps;
 	func_info.advertising = link_op.advertised_caps;
@@ -1719,7 +1778,7 @@ qede_get_func_info(qede_t *qede, void *data)
 	
 	(void) memcpy(data1->uabc, &func_info, sizeof(qede_func_info_t));
 	
-	return 0;
+	return (0);
 }
 
 static int 
@@ -1746,26 +1805,31 @@ qede_do_ioctl(qede_t *qede, queue_t *q, mblk_t *mp)
 	off = up_data->off;
 	size = up_data->size;
 	
-	switch(cmd) {
+	switch (cmd) {
 	case QEDE_DRV_INFO:
 		hwfn = &edev->hwfns[0]; 
 		ptt = ecore_ptt_acquire(hwfn);
 	
 		snprintf(driver_info.drv_name, MAX_QEDE_NAME_LEN, "%s", "qede");
-		//snprintf(driver_info.drv_name, MAX_QEDE_NAME_LEN, "%s", qede->name);
-		snprintf(driver_info.drv_version, QEDE_STR_SIZE, "v:%s", qede->version);
-		snprintf(driver_info.mfw_version, QEDE_STR_SIZE, "%s", qede->versionMFW);
-		snprintf(driver_info.stormfw_version, QEDE_STR_SIZE, "%s", qede->versionFW);
-		snprintf(driver_info.bus_info, QEDE_STR_SIZE, "%s", qede->bus_dev_func);
+		snprintf(driver_info.drv_version, QEDE_STR_SIZE, 
+		    "v:%s", qede->version);
+		snprintf(driver_info.mfw_version, QEDE_STR_SIZE, 
+		    "%s", qede->versionMFW);
+		snprintf(driver_info.stormfw_version, QEDE_STR_SIZE, 
+		    "%s", qede->versionFW);
+		snprintf(driver_info.bus_info, QEDE_STR_SIZE, 
+		    "%s", qede->bus_dev_func);
 
 
-		/* calling ecore_mcp_nvm_rd_cmd to find the flash length, i
+		/* 
+		 * calling ecore_mcp_nvm_rd_cmd to find the flash length, i
 		 * 0x08 is equivalent of NVM_TYPE_MFW_TRACE1
 		 */
 		ecore_mcp_get_flash_size(hwfn, ptt, &flash_size);
 		driver_info.eeprom_dump_len = flash_size;	
-		(void) memcpy(up_data->uabc, &driver_info, sizeof(qede_driver_info_t));
-		up_data->size = sizeof(qede_driver_info_t);
+		(void) memcpy(up_data->uabc, &driver_info, 
+		    sizeof (qede_driver_info_t));
+		up_data->size = sizeof (qede_driver_info_t);
 
 		ecore_ptt_release(hwfn, ptt);
 		break;
@@ -1806,7 +1870,7 @@ qede_do_ioctl(qede_t *qede, queue_t *q, mblk_t *mp)
 	//}
 	miocack (q, mp, (sizeof(qede_ioctl_data_t)), ret);
 	//miocack (q, mp, 0, ret);
-	return IOC_REPLY;
+	return (IOC_REPLY);
 }
 
 static void
@@ -1836,51 +1900,52 @@ qede_loopback_ioctl(qede_t *qede, queue_t *wq, mblk_t *mp,
 	/*
 	 * Validate format of ioctl
 	 */
-	if(mp->b_cont == NULL)
+	if(mp->b_cont == NULL) {
 		return IOC_INVAL;
+	}
 	
 	cmd = iocp->ioc_cmd;
 
 	switch(cmd) {
-		default:
-			qede_print("!%s(%d): unknown ioctl command %x\n",
-			    __func__, qede->instance, cmd);
+	default:
+		qede_print("!%s(%d): unknown ioctl command %x\n",
+		    __func__, qede->instance, cmd);
+		return IOC_INVAL;
+	case LB_GET_INFO_SIZE:
+		if (iocp->ioc_count != sizeof(lb_info_sz_t)) {
+			qede_info(qede, "error: ioc_count %d, sizeof %d",
+			    iocp->ioc_count,  sizeof(lb_info_sz_t));
 			return IOC_INVAL;
-		case LB_GET_INFO_SIZE:
-			if (iocp->ioc_count != sizeof(lb_info_sz_t)) {
-				qede_info(qede, "error: ioc_count %d, sizeof %d",
-				    iocp->ioc_count,  sizeof(lb_info_sz_t));
-				return IOC_INVAL;
-			}
-			lb_info_size = (void *)mp->b_cont->b_rptr;
-			*lb_info_size = sizeof(loopmodes);
-			return IOC_REPLY;
-		case LB_GET_INFO:
-			if (iocp->ioc_count != sizeof (loopmodes)) {
-				qede_info(qede, "error: iocp->ioc_count %d, sizepof %d",
-				    iocp->ioc_count,  sizeof (loopmodes));
-				return (IOC_INVAL);
-			}
-			lb_prop = (void *)mp->b_cont->b_rptr;
-			bcopy(loopmodes, lb_prop, sizeof (loopmodes));
-			return IOC_REPLY;
-		case LB_GET_MODE:
-			if (iocp->ioc_count != sizeof (uint32_t)) {
-				qede_info(qede, "iocp->ioc_count %d, sizeof : %d\n",
-				    iocp->ioc_count, sizeof (uint32_t));
-				return (IOC_INVAL);
-			}
-			lb_mode = (void *)mp->b_cont->b_rptr;
-			*lb_mode = qede->loop_back_mode;
-			return IOC_REPLY;
-		case LB_SET_MODE:
-			if (iocp->ioc_count != sizeof (uint32_t)) {
-				qede_info(qede, "iocp->ioc_count %d, sizeof : %d\n",
-				    iocp->ioc_count, sizeof (uint32_t));
-				return (IOC_INVAL);
-			}
-			lb_mode = (void *)mp->b_cont->b_rptr;
-			return (qede_set_loopback_mode(qede,*lb_mode));
+		}
+		lb_info_size = (void *)mp->b_cont->b_rptr;
+		*lb_info_size = sizeof(loopmodes);
+		return IOC_REPLY;
+	case LB_GET_INFO:
+		if (iocp->ioc_count != sizeof (loopmodes)) {
+			qede_info(qede, "error: iocp->ioc_count %d, sizepof %d",
+			    iocp->ioc_count,  sizeof (loopmodes));
+			return (IOC_INVAL);
+		}
+		lb_prop = (void *)mp->b_cont->b_rptr;
+		bcopy(loopmodes, lb_prop, sizeof (loopmodes));
+		return IOC_REPLY;
+	case LB_GET_MODE:
+		if (iocp->ioc_count != sizeof (uint32_t)) {
+			qede_info(qede, "iocp->ioc_count %d, sizeof : %d\n",
+			    iocp->ioc_count, sizeof (uint32_t));
+			return (IOC_INVAL);
+		}
+		lb_mode = (void *)mp->b_cont->b_rptr;
+		*lb_mode = qede->loop_back_mode;
+		return IOC_REPLY;
+	case LB_SET_MODE:
+		if (iocp->ioc_count != sizeof (uint32_t)) {
+			qede_info(qede, "iocp->ioc_count %d, sizeof : %d\n",
+			    iocp->ioc_count, sizeof (uint32_t));
+			return (IOC_INVAL);
+		}
+		lb_mode = (void *)mp->b_cont->b_rptr;
+		return (qede_set_loopback_mode(qede,*lb_mode));
 	}
 }
 
@@ -1900,7 +1965,7 @@ qede_mac_ioctl(void *    arg,
 
 	mutex_enter(&qede->drv_lock);
 	if ((qede->qede_state == QEDE_STATE_SUSPENDING) ||
-	   (qede->qede_state == QEDE_STATE_SUSPENDED)){
+	   (qede->qede_state == QEDE_STATE_SUSPENDED)) {
 		mutex_exit(&qede->drv_lock);
 		miocnak(wq, mp, 0, EINVAL);
 		return;
@@ -2010,12 +2075,14 @@ qede_mac_get_capability(void *arg,
 			ret = B_FALSE;
 			break;
 		}
+                /*
+                 * Hardware does not support ICMPv6 checksumming. Right now the
+                 * GLDv3 doesn't provide us a way to specify that we don't
+                 * support that. As such, we cannot indicate
+                 * HCKSUM_INET_FULL_V6.
+                 */
 
-		/*
-		 * Hardware does not support ICMPv6 checksumming, but
-		 * HCKSUM_INET_FULL_V4/6 only applies for UDP and TCP.
-		 */
-		*tx_flags = HCKSUM_INET_FULL_V4 | HCKSUM_INET_FULL_V6 |
+		*tx_flags = HCKSUM_INET_FULL_V4 |
 		    HCKSUM_IPHDRCKSUM;
 		ret = B_TRUE;
 		break;
@@ -2082,17 +2149,17 @@ qede_mac_get_capability(void *arg,
 		break; /* CASE MAC_CAPAB_RINGS */
 	}
 #ifdef ILLUMOS
-	case MAC_CAPAB_TRANSCEIVER: {
-		mac_capab_transceiver_t *mct = cap_data;
+        case MAC_CAPAB_TRANSCEIVER: {
+                mac_capab_transceiver_t *mct = cap_data;
 
-		mct->mct_flags = 0;
-		mct->mct_ntransceivers = qede->edev.num_hwfns;
-		mct->mct_info = qede_transceiver_info;
-		mct->mct_read = qede_transceiver_read;
+                mct->mct_flags = 0;
+                mct->mct_ntransceivers = qede->edev.num_hwfns;
+                mct->mct_info = qede_transceiver_info;
+                mct->mct_read = qede_transceiver_read;
 
-		ret = B_TRUE;
-		break;
-	}
+                ret = B_TRUE;
+                break;
+        }
 #endif
 	default:
 		break;
@@ -2116,30 +2183,77 @@ qede_mac_set_property(void *        arg,
 	struct ecore_dev *edev = &qede->edev;
 	struct ecore_hwfn *hwfn;
 	int ret_val = 0, i;
+	uint32_t option;
 
 	mutex_enter(&qede->gld_lock);
 	switch (pr_num)
 	{
+        case MAC_PROP_MTU:
+                bcopy(pr_val, &option, sizeof (option));
+
+                if(option == qede->mtu) {
+                        ret_val = 0;
+                        break;
+                }
+                if ((option != DEFAULT_JUMBO_MTU) &&
+                   (option != DEFAULT_MTU)) {
+                        ret_val = EINVAL;
+                        break;
+                }
+                if(qede->qede_state == QEDE_STATE_STARTED) {
+                        ret_val = EBUSY;
+                        break;
+                }
+
+                ret_val = mac_maxsdu_update(qede->mac_handle, qede->mtu);
+                if (ret_val == 0) {
+
+                        qede->mtu = option;
+                        if (option == DEFAULT_JUMBO_MTU) {
+                                qede->jumbo_enable = B_TRUE;
+			} else {
+				qede->jumbo_enable = B_FALSE;
+			}
+
+                        hwfn = ECORE_LEADING_HWFN(edev);
+                        hwfn->hw_info.mtu = qede->mtu;
+                        ret_val = ecore_mcp_ov_update_mtu(hwfn, 
+			    hwfn->p_main_ptt,
+			    hwfn->hw_info.mtu);
+                        if (ret_val != ECORE_SUCCESS) {
+                                qede_print("!%s(%d): MTU change %d option %d"
+				    "FAILED",
+				    __func__,qede->instance, qede->mtu, option);
+				break;
+			}
+                        qede_print("!%s(%d): MTU changed  %d MTU option"
+			    " %d hwfn %d",
+			    __func__,qede->instance, qede->mtu, 
+			    option, hwfn->hw_info.mtu);
+                }
+                break;
+
 	case MAC_PROP_EN_10GFDX_CAP:
 		hwfn = &edev->hwfns[0];
 		link_params = ecore_mcp_get_link_params(hwfn);
-		if(*(uint8_t *) pr_val){
+		if (*(uint8_t *) pr_val) {
 			link_params->speed.autoneg = 0;
 			link_params->speed.forced_speed = 10000;
-			link_params->speed.advertised_speeds = NVM_CFG1_PORT_DRV_SPEED_CAPABILITY_MASK_10G;
+			link_params->speed.advertised_speeds = 
+			    NVM_CFG1_PORT_DRV_SPEED_CAPABILITY_MASK_10G;
 			qede->forced_speed_10G = *(uint8_t *)pr_val;
 		}
 		else {
-			memcpy(link_params, &qede->link_input_params.default_link_params, 
-			    sizeof(struct ecore_mcp_link_params));
+			memcpy(link_params, 
+			    &qede->link_input_params.default_link_params, 
+			    sizeof (struct ecore_mcp_link_params));
 			qede->forced_speed_10G = *(uint8_t *)pr_val;
 		}
-		if(qede->qede_state == QEDE_STATE_STARTED){
+		if (qede->qede_state == QEDE_STATE_STARTED) {
 			qede_configure_link(qede,1);
-		}
-		else{
+		} else {
 			mutex_exit(&qede->gld_lock);
-			return 0;
+			return (0);
 		}
 		break;
 	default:
@@ -2147,13 +2261,13 @@ qede_mac_set_property(void *        arg,
 		break;
 	}
 	mutex_exit(&qede->gld_lock);
-	return ret_val; 
+	return (ret_val); 
 }
 
 static void
-qede_mac_stop(void * arg)
+qede_mac_stop(void *arg)
 {
-    qede_t * qede = (qede_t *)arg;
+    qede_t *qede = (qede_t *)arg;
 	int status;
 
 	qede_print("!%s(%d): called",
@@ -2171,14 +2285,15 @@ qede_mac_stop(void * arg)
 }
 
 static int
-qede_mac_start(void * arg)
+qede_mac_start(void *arg)
 {
-    	qede_t * qede = (qede_t *)arg;
+    	qede_t *qede = (qede_t *)arg;
 	int status;
 
 	qede_print("!%s(%d): called", __func__,qede->instance);
-	if (!mutex_tryenter(&qede->drv_lock))
+	if (!mutex_tryenter(&qede->drv_lock)) {
 		return (EAGAIN);
+	}
 
 	if (qede->qede_state == QEDE_STATE_SUSPENDED) {
 		mutex_exit(&qede->drv_lock);
@@ -2186,7 +2301,7 @@ qede_mac_start(void * arg)
 	}
 
 	status = qede_start(qede);
-	if(status != DDI_SUCCESS) {
+	if (status != DDI_SUCCESS) {
 		mutex_exit(&qede->drv_lock);
 		return (EIO);
 	}
@@ -2200,28 +2315,26 @@ qede_mac_start(void * arg)
 }
 
 static int
-qede_mac_get_property(void *        arg,
-                              const char *  pr_name,
-                              mac_prop_id_t pr_num,
-                              uint_t        pr_valsize,
-                              void *        pr_val)
+qede_mac_get_property(void *arg,
+    const char *pr_name,
+    mac_prop_id_t pr_num,
+    uint_t        pr_valsize,
+    void *pr_val)
 {
-	qede_t * qede = (qede_t *)arg;
+	qede_t *qede = (qede_t *)arg;
 	struct ecore_dev *edev = &qede->edev;
 	link_state_t    link_state;
 	link_duplex_t   link_duplex;
 	uint64_t        link_speed;
 	link_flowctrl_t link_flowctrl;
 	struct qede_link_cfg link_cfg;
-	qede_link_cfg_t  * hw_cfg  = &qede->hwinit;
+	qede_link_cfg_t  *hw_cfg  = &qede->hwinit;
 	int ret_val = 0;
 
-	memset(&link_cfg, 0, sizeof(struct qede_link_cfg));
+	memset(&link_cfg, 0, sizeof (struct qede_link_cfg));
 	qede_get_link_info(&edev->hwfns[0], &link_cfg);
 
 	
-	/*mutex_enter(&qede->drv_lock);
-	mutex_exit(&qede->drv_lock);*/
 
 	switch (pr_num)
 	{
@@ -2270,34 +2383,29 @@ qede_mac_get_property(void *        arg,
  * illumos does not have the notion of LINK_FLOWCTRL_AUTO at this time.
  */
 #ifndef	ILLUMOS
-		if(link_cfg.pause_cfg & QEDE_LINK_PAUSE_AUTONEG_ENABLE) 
-		{
+		if (link_cfg.pause_cfg & QEDE_LINK_PAUSE_AUTONEG_ENABLE)  {
 	            link_flowctrl = LINK_FLOWCTRL_AUTO;
 		}
 #endif
 
 		if (!(link_cfg.pause_cfg & QEDE_LINK_PAUSE_RX_ENABLE) && 
-						!(link_cfg.pause_cfg & QEDE_LINK_PAUSE_TX_ENABLE))
-		{
+		    !(link_cfg.pause_cfg & QEDE_LINK_PAUSE_TX_ENABLE)) {
 	            link_flowctrl = LINK_FLOWCTRL_NONE;
 		}
 		if ((link_cfg.pause_cfg & QEDE_LINK_PAUSE_RX_ENABLE) && 
-						!(link_cfg.pause_cfg & QEDE_LINK_PAUSE_TX_ENABLE))
-		{
+		    !(link_cfg.pause_cfg & QEDE_LINK_PAUSE_TX_ENABLE)) {
 	            link_flowctrl = LINK_FLOWCTRL_RX;
 	    	}
         	if (!(link_cfg.pause_cfg & QEDE_LINK_PAUSE_RX_ENABLE) && 
-						(link_cfg.pause_cfg & QEDE_LINK_PAUSE_TX_ENABLE))
-        	{
+		    (link_cfg.pause_cfg & QEDE_LINK_PAUSE_TX_ENABLE)) {
 	            link_flowctrl = LINK_FLOWCTRL_TX;
 		}
 		if ((link_cfg.pause_cfg & QEDE_LINK_PAUSE_RX_ENABLE) && 
-						(link_cfg.pause_cfg & QEDE_LINK_PAUSE_TX_ENABLE))
-		{
+		    (link_cfg.pause_cfg & QEDE_LINK_PAUSE_TX_ENABLE)) {
 	            link_flowctrl = LINK_FLOWCTRL_BI;
 		}
 
-        	bcopy(&link_flowctrl, pr_val, sizeof(link_flowctrl_t));
+        	bcopy(&link_flowctrl, pr_val, sizeof (link_flowctrl_t));
         	break;
 
 	case MAC_PROP_ADV_10GFDX_CAP:
@@ -2310,25 +2418,23 @@ qede_mac_get_property(void *        arg,
 
 	case MAC_PROP_PRIVATE:
 	default:
-		return ENOTSUP;
+		return (ENOTSUP);
 
 	}
 		
-	return(0);
+	return (0);
 }
 
 static void
-qede_mac_property_info(void *                 arg,
-                                const char *           pr_name,
-                                mac_prop_id_t          pr_num, 
-                                mac_prop_info_handle_t prh)
+qede_mac_property_info(void *arg,
+    const char *pr_name,
+    mac_prop_id_t  pr_num, 
+    mac_prop_info_handle_t prh)
 {
-	qede_t * qede = (qede_t *)arg;
+	qede_t *qede = (qede_t *)arg;
 	qede_link_props_t *def_cfg = &qede_def_link_props;
 	link_flowctrl_t link_flowctrl;
 
-	/*mutex_enter(&qede->drv_lock);
-	mutex_exit(&qede->drv_lock);*/
 
 	switch (pr_num)
 	{
@@ -2342,8 +2448,8 @@ qede_mac_property_info(void *                 arg,
 	case MAC_PROP_MTU:
 
 		mac_prop_info_set_range_uint32(prh,
-						MIN_MTU,
-						MAX_MTU);
+		    MIN_MTU,
+		    MAX_MTU);
 		break;
 
 	case MAC_PROP_AUTONEG:
@@ -2353,10 +2459,11 @@ qede_mac_property_info(void *                 arg,
  
 	case MAC_PROP_FLOWCTRL:
 
-		if(!def_cfg->pause)
+		if (!def_cfg->pause) {
 			link_flowctrl = LINK_FLOWCTRL_NONE;
-		else
+		} else {
 			link_flowctrl = LINK_FLOWCTRL_BI;
+		}
 
 		mac_prop_info_set_default_link_flowctrl(prh, link_flowctrl);
 		break;
@@ -2410,7 +2517,7 @@ static mac_callbacks_t qede_callbacks =
 };
 
 boolean_t
-qede_gld_init(qede_t * qede)
+qede_gld_init(qede_t *qede)
 {
 	int status, ret;
 	mac_register_t *macp;
@@ -2418,7 +2525,7 @@ qede_gld_init(qede_t * qede)
 	macp = mac_alloc(MAC_VERSION);
 	if (macp == NULL) {
 		cmn_err(CE_NOTE, "%s: mac_alloc() failed\n", __func__);
-		return(B_FALSE);
+		return (B_FALSE);
 	}
 
  	macp->m_driver = qede;
@@ -2436,18 +2543,20 @@ qede_gld_init(qede_t * qede)
 #endif
 
 	status = mac_register(macp, &qede->mac_handle);
-	if (status != 0)
+	if (status != 0) {
 		cmn_err(CE_NOTE, "%s: mac_register() failed\n", __func__);
+	}
 
 	mac_free(macp);
-	if (status == 0)
-		return(B_TRUE);
-	return(B_FALSE);
+	if (status == 0) {
+		return (B_TRUE);
+	}
+	return (B_FALSE);
 }
 
 boolean_t qede_gld_fini(qede_t * qede)
 {
-    return B_TRUE;
+    return (B_TRUE);
 }
 
 

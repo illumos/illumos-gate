@@ -99,17 +99,19 @@ qede_put_bcopy_pkt(qede_tx_ring_t *tx_ring, qede_tx_bcopy_pkt_t *pkt)
 	mutex_exit(&list->lock);
 }
 
-void qede_print_tx_indexes(qede_tx_ring_t *tx_ring)
+void 
+qede_print_tx_indexes(qede_tx_ring_t *tx_ring)
 {
 	uint16_t hw_consumer = LE_16(*tx_ring->hw_cons_ptr);
 	uint16_t chain_idx = ecore_chain_get_cons_idx(&tx_ring->tx_bd_ring);
 	hw_consumer &= TX_RING_MASK;
 	chain_idx &= TX_RING_MASK;
 	qede_print_err("!indices: hw_cons %d, chain_cons = %d, sw_prod = %d",
-	        hw_consumer, chain_idx, tx_ring->sw_tx_prod); 
+	    hw_consumer, chain_idx, tx_ring->sw_tx_prod); 
 }
 
-void qede_print_rx_indexes(qede_rx_ring_t *rx_ring)
+void 
+qede_print_rx_indexes(qede_rx_ring_t *rx_ring)
 {
 	u16 hw_bd_cons = HOST_TO_LE_16(*rx_ring->hw_cons_ptr);
 	u16 sw_bd_cons = ecore_chain_get_cons_idx(&rx_ring->rx_cqe_ring);
@@ -117,7 +119,7 @@ void qede_print_rx_indexes(qede_rx_ring_t *rx_ring)
 	hw_bd_cons &= (rx_ring->qede->rx_ring_size - 1);
 	sw_bd_cons &= (rx_ring->qede->rx_ring_size - 1);
 	qede_print_err("!RX indices: hw_cons %d, chain_cons = %d",
-	        hw_bd_cons, sw_bd_cons); 
+	    hw_bd_cons, sw_bd_cons); 
 }
 
 
@@ -126,7 +128,8 @@ void qede_print_rx_indexes(qede_rx_ring_t *rx_ring)
  * NOTE: statu_block dma mem. must be sync'ed
  * in the interrupt handler
  */
-int qede_process_tx_completions(qede_tx_ring_t *tx_ring)
+int 
+qede_process_tx_completions(qede_tx_ring_t *tx_ring)
 {
 	int count = 0;
 	u16 hw_consumer;
@@ -172,20 +175,23 @@ int qede_process_tx_completions(qede_tx_ring_t *tx_ring)
 			qede_put_bcopy_pkt(tx_ring, bcopy_pkt);
 			recycle_entry->bcopy_pkt = NULL;
 		} else {
-			qede_warn(tx_ring->qede, "Invalid completion at index %d",
+			qede_warn(tx_ring->qede,
+			    "Invalid completion at index %d",
 			    sw_consumer);
 		}
 
 		sw_consumer = (sw_consumer + 1) & TX_RING_MASK;
 
 		first_bd =
-		    (struct eth_tx_1st_bd *)ecore_chain_consume(&tx_ring->tx_bd_ring);
+		    (struct eth_tx_1st_bd *)ecore_chain_consume(
+		    &tx_ring->tx_bd_ring);
 		bd_consumed++;
 		
 		nbd = first_bd->data.nbds;
 
-		while (bd_consumed++ < nbd)
+		while (bd_consumed++ < nbd) {
 			ecore_chain_consume(&tx_ring->tx_bd_ring);
+		}
 
 		chain_idx = ecore_chain_get_cons_idx(&tx_ring->tx_bd_ring);
 		count++;
@@ -212,7 +218,6 @@ qede_has_tx_work(qede_tx_ring_t *tx_ring)
 	u16 sw_bd_cons = ecore_chain_get_cons_idx(&tx_ring->tx_bd_ring);
 
 	if (sw_bd_cons == (hw_bd_cons + 1)) {
-	    //qede_print_err("!%s(): sw_bd_cons == (hw_bd_cons - 1)",	__func__);
 		return (0);
 	}
 	return (hw_bd_cons != sw_bd_cons);
@@ -242,19 +247,21 @@ qede_set_cksum_flags(mblk_t *mp,
 	iphdr_len_err = (parse_flags >> PARSING_AND_ERR_FLAGS_IPHDRERROR_SHIFT)
 	    & PARSING_AND_ERR_FLAGS_IPHDRERROR_MASK;
 
-    if (l4_is_calc) {
-        if (l4_csum_err) {
-            error = 1;
-        } else if (iphdr_len_err) {
-            error = 2;
-        } else
+	if (l4_is_calc) {
+		if (l4_csum_err) {
+			error = 1;
+        	} else if (iphdr_len_err) {
+            		error = 2;
+        	} else {
 			cksum_flags =  HCK_FULLCKSUM_OK | HCK_IPV4_HDRCKSUM_OK;
-    }
+		}
+	}
 	
-	if (error == 1)
-	    qede_print_err("!%s: got L4 csum error",__func__);
-	else if (error == 2)
-	    qede_print_err("!%s: got IPHDER csum error" ,__func__);
+	if (error == 1) {
+		qede_print_err("!%s: got L4 csum error",__func__);
+	} else if (error == 2) {
+		qede_print_err("!%s: got IPHDER csum error" ,__func__);
+	}
 
 	mac_hcksum_set(mp, 0, 0, 0, 0, cksum_flags);
 }
@@ -263,7 +270,7 @@ static qede_rx_buffer_t *
 qede_get_next_rx_buffer(qede_rx_ring_t *rx_ring,
     uint32_t *free_buffer_count)
 {
-	qede_rx_buffer_t * rx_buffer;
+	qede_rx_buffer_t *rx_buffer;
 	uint32_t num_entries;
 
 	rx_buffer = qede_get_from_active_list(rx_ring, &num_entries);
@@ -280,7 +287,7 @@ qede_get_next_lro_buffer(qede_rx_ring_t *rx_ring,
 {
 	lro_info->rx_buffer[lro_info->bd_count] =
 	    qede_get_next_rx_buffer(rx_ring,
-		    &lro_info->free_buffer_count);
+	    &lro_info->free_buffer_count);
 	lro_info->bd_count++;
 	return (DDI_SUCCESS);
 }
@@ -290,24 +297,28 @@ bool agg_print = B_TRUE;
 #endif
 static void
 qede_lro_start(qede_rx_ring_t *rx_ring,
-        struct eth_fast_path_rx_tpa_start_cqe *cqe)
+    struct eth_fast_path_rx_tpa_start_cqe *cqe)
 {
 	qede_lro_info_t *lro_info;
 	int i, len_on_first_bd, seg_len; 
 
 	lro_info = &rx_ring->lro_info[cqe->tpa_agg_index];
 
-	/*ASSERT(lro_info->agg_state != QEDE_AGG_STATE_NONE);*/
+	/* ASSERT(lro_info->agg_state != QEDE_AGG_STATE_NONE); */
 
 #ifdef DEBUG_LRO
-	if (agg_count++ < 30) qede_dump_start_lro_cqe(cqe);
-	else agg_print = B_FALSE;
+	if (agg_count++ < 30)  {
+		qede_dump_start_lro_cqe(cqe);
+	} else { 
+		agg_print = B_FALSE;
+	}
 #endif
 
-	memset(lro_info, 0, sizeof(qede_lro_info_t));
+	memset(lro_info, 0, sizeof (qede_lro_info_t));
 	lro_info->agg_state = QEDE_AGG_STATE_START;
 	rx_ring->lro_active_count++;
-	struct parsing_and_err_flags pars_flags /* Parsing and error flags from the parser */;
+
+	/* Parsing and error flags from the parser */;
 		
 	lro_info->pars_flags = LE_16(cqe->pars_flags.flags);
 	lro_info->pad = LE_16(cqe->placement_offset);
@@ -329,8 +340,9 @@ qede_lro_start(qede_rx_ring_t *rx_ring,
 		 * multiple buffer descriptors.
 		 */
 		for (i = 0; i < ETH_TPA_CQE_START_LEN_LIST_SIZE; i++) {
-			if (cqe->ext_bd_len_list[i] == 0)
+			if (cqe->ext_bd_len_list[i] == 0) {
 			    break;
+			}
 			qede_get_next_lro_buffer(rx_ring, lro_info);
 		}
 	}
@@ -338,29 +350,32 @@ qede_lro_start(qede_rx_ring_t *rx_ring,
 
 static void
 qede_lro_cont(qede_rx_ring_t *rx_ring,
-        struct eth_fast_path_rx_tpa_cont_cqe *cqe)
+    struct eth_fast_path_rx_tpa_cont_cqe *cqe)
 {
 	qede_lro_info_t *lro_info;
 	int i;
 
 	lro_info = &rx_ring->lro_info[cqe->tpa_agg_index];
 
-	/*ASSERT(lro_info->agg_state != QEDE_AGG_STATE_START);*/
+	/* ASSERT(lro_info->agg_state != QEDE_AGG_STATE_START); */
 #ifdef DEBUG_LRO
-	if (agg_print) qede_dump_cont_lro_cqe(cqe);
+	if (agg_print) {
+		qede_dump_cont_lro_cqe(cqe);
+	}
 #endif
 
 	for (i = 0; i < ETH_TPA_CQE_CONT_LEN_LIST_SIZE; i++) {
-		if (cqe->len_list[i] == 0)
-		    break;
+		if (cqe->len_list[i] == 0) {
+			break;
+		}
 		qede_get_next_lro_buffer(rx_ring, lro_info);
 	}
 }
 
 static mblk_t *
 qede_lro_end(qede_rx_ring_t *rx_ring,
-        struct eth_fast_path_rx_tpa_end_cqe *cqe,
-        int *pkt_bytes)
+    struct eth_fast_path_rx_tpa_end_cqe *cqe,
+    int *pkt_bytes)
 {
 	qede_lro_info_t *lro_info;
 	mblk_t *head = NULL, *tail = NULL, *mp = NULL;
@@ -372,10 +387,12 @@ qede_lro_end(qede_rx_ring_t *rx_ring,
 
 	lro_info = &rx_ring->lro_info[cqe->tpa_agg_index];
 
-	/*ASSERT(lro_info->agg_state != QEDE_AGG_STATE_START);*/
+	/* ASSERT(lro_info->agg_state != QEDE_AGG_STATE_START); */
 
 #ifdef DEBUG_LRO
-	if (agg_print) qede_dump_end_lro_cqe(cqe);
+	if (agg_print) {
+		qede_dump_end_lro_cqe(cqe);
+	}
 #endif
 
 	work_length = total_packet_length = LE_16(cqe->total_packet_len);
@@ -384,19 +401,20 @@ qede_lro_end(qede_rx_ring_t *rx_ring,
 	 * Get any buffer descriptors for this cqe
 	 */
 	for (i=0; i<ETH_TPA_CQE_END_LEN_LIST_SIZE; i++) {
-		if (cqe->len_list[i] == 0)
+		if (cqe->len_list[i] == 0) {
 		    break;
+		}
 		qede_get_next_lro_buffer(rx_ring, lro_info);
 	}
 
-	/*ASSERT(lro_info->bd_count != cqe->num_of_bds);*/
+	/* ASSERT(lro_info->bd_count != cqe->num_of_bds); */
 
 	if (lro_info->free_buffer_count < 
 	    rx_ring->rx_low_buffer_threshold) {
 		for (i = 0; i < lro_info->bd_count; i++) {
-		qede_recycle_copied_rx_buffer(
+			qede_recycle_copied_rx_buffer(
 			    lro_info->rx_buffer[i]);
-		    lro_info->rx_buffer[i] = NULL;
+			lro_info->rx_buffer[i] = NULL;
 		}
 		rx_ring->rx_low_water_cnt++;
 		lro_info->agg_state = QEDE_AGG_STATE_NONE;
@@ -419,10 +437,12 @@ qede_lro_end(qede_rx_ring_t *rx_ring,
 
 		rx_buffer = lro_info->rx_buffer[i];
 
-		bd_len = (work_length > rx_buf_size) ? rx_buf_size : work_length;
+		bd_len = 
+		    (work_length > rx_buf_size) ? rx_buf_size : work_length;
 		if (i == 0 &&
-		    (cqe->num_of_bds > 1))
+		    (cqe->num_of_bds > 1)) {
 			bd_len -= lro_info->pad;
+		}
 
 		dma_info = &rx_buffer->dma_info;		
 		ddi_dma_sync(dma_info->dma_handle,
@@ -446,53 +466,55 @@ qede_lro_end(qede_rx_ring_t *rx_ring,
 	}
 
 	qede_set_cksum_flags(head, lro_info->pars_flags);
-//	mac_hcksum_set(head, 0, 0, 0, 0, HCK_FULLCKSUM_OK | HCK_IPV4_HDRCKSUM_OK);
  
 	rx_ring->rx_lro_pkt_cnt++;
 	rx_ring->lro_active_count--;	
 	lro_info->agg_state = QEDE_AGG_STATE_NONE;
 
 #ifdef DEBUG_LRO
-	if (agg_print) qede_dump_mblk_chain_bcont_ptr(rx_ring->qede, head);
+	if (agg_print) {
+		qede_dump_mblk_chain_bcont_ptr(rx_ring->qede, head);
+	}
 #endif
-//	memset(lro_info, 0, sizeof(qede_lro_info_t));
 	*pkt_bytes = (int)total_packet_length;
 	return (head);
 }
 
 
 
-//#define DEBUG_JUMBO
 #ifdef DEBUG_JUMBO
 int jumbo_count = 0;
 bool jumbo_print = B_TRUE;
 #endif
 static mblk_t *
 qede_reg_jumbo_cqe(qede_rx_ring_t *rx_ring,
-        struct eth_fast_path_rx_reg_cqe *cqe)
+   struct eth_fast_path_rx_reg_cqe *cqe)
 {
 	int i;
 	qede_rx_buffer_t *rx_buf, *rx_buffer[ETH_RX_MAX_BUFF_PER_PKT];
 	mblk_t *mp = NULL, *head = NULL, *tail = NULL;
 	uint32_t free_buffer_count;
-	uint16_t work_length, pkt_len, bd_len;
-	uint32_t rx_buf_size = rx_ring->rx_buf_size;
+	uint16_t work_length;
+	uint32_t rx_buf_size = rx_ring->rx_buf_size, bd_len;
 	qede_dma_info_t *dma_info;
 	u8 pad = cqe->placement_offset;
 
 #ifdef DEBUG_JUMBO
-	if (jumbo_count++ < 8) qede_dump_reg_cqe(cqe);
-	else jumbo_print = B_FALSE;
+	if (jumbo_count++ < 8) { 
+		qede_dump_reg_cqe(cqe);
+	} else {
+		jumbo_print = B_FALSE;
+	}
 #endif
 
-	work_length = pkt_len = HOST_TO_LE_16(cqe->pkt_len);
+	work_length = HOST_TO_LE_16(cqe->pkt_len);
 
 	/*
 	 * Get the buffers/mps for this cqe
 	 */
 	for (i = 0; i < cqe->bd_num; i++) {
 		rx_buffer[i] =
-			qede_get_next_rx_buffer(rx_ring, &free_buffer_count);
+		    qede_get_next_rx_buffer(rx_ring, &free_buffer_count);
 	}
 
 	/*
@@ -501,8 +523,9 @@ qede_reg_jumbo_cqe(qede_rx_ring_t *rx_ring,
 	 */
 	if (free_buffer_count < 
 	    rx_ring->rx_low_buffer_threshold) {
-		for (i = 0; i < cqe->bd_num; i++)
+		for (i = 0; i < cqe->bd_num; i++) {
 			qede_recycle_copied_rx_buffer(rx_buffer[i]);
+		}
 		rx_ring->rx_low_water_cnt++;
 		return (NULL);
 	}
@@ -510,14 +533,16 @@ qede_reg_jumbo_cqe(qede_rx_ring_t *rx_ring,
 	for (i = 0; i < cqe->bd_num; i++) {
 		rx_buf = rx_buffer[i];
 
-		bd_len = (work_length > rx_buf_size) ? rx_buf_size : work_length;
+		bd_len = 
+		    (work_length > rx_buf_size) ? rx_buf_size : work_length;
 
 		/*
 		 * Adjust for placement offset
 		 * on first bufffer.
 		 */
-		if (i == 0)
+		if (i == 0) {
 			bd_len -= pad;
+		}
 
 		dma_info = &rx_buf->dma_info;		
 		ddi_dma_sync(dma_info->dma_handle,
@@ -531,8 +556,9 @@ qede_reg_jumbo_cqe(qede_rx_ring_t *rx_ring,
 		 * Adjust for placement offset
 		 * on first bufffer.
 		 */
-		if (i == 0)
+		if (i == 0) {
 			mp->b_rptr += pad;
+		}
 
 		mp->b_wptr = (uchar_t *)((unsigned long)mp->b_rptr + bd_len);
 
@@ -549,7 +575,9 @@ qede_reg_jumbo_cqe(qede_rx_ring_t *rx_ring,
 	qede_set_cksum_flags(head,
 		    HOST_TO_LE_16(cqe->pars_flags.flags));
 #ifdef DEBUG_JUMBO
-	if (jumbo_print) qede_dump_mblk_chain_bcont_ptr(rx_ring->qede, head);
+	if (jumbo_print) {
+		qede_dump_mblk_chain_bcont_ptr(rx_ring->qede, head);
+	}
 #endif
 	rx_ring->rx_jumbo_pkt_cnt++;
 	return (head);
@@ -557,9 +585,10 @@ qede_reg_jumbo_cqe(qede_rx_ring_t *rx_ring,
 
 static mblk_t *
 qede_reg_cqe(qede_rx_ring_t *rx_ring,
-        struct eth_fast_path_rx_reg_cqe *cqe,
-        int *pkt_bytes)
+    struct eth_fast_path_rx_reg_cqe *cqe,
+    int *pkt_bytes)
 {
+	qede_t *qede = rx_ring->qede;
 	qede_rx_buffer_t *rx_buffer;
 	uint32_t free_buffer_count;
 	mblk_t *mp;
@@ -588,7 +617,7 @@ qede_reg_cqe(qede_rx_ring_t *rx_ring,
 	
 	
 	rx_buffer = qede_get_next_rx_buffer(rx_ring,
-        &free_buffer_count);
+            &free_buffer_count);
 
 	if (free_buffer_count < 
 	    rx_ring->rx_low_buffer_threshold) {
@@ -615,15 +644,17 @@ qede_reg_cqe(qede_rx_ring_t *rx_ring,
 			 * drop packet
 			 */
 			qede_print_err("!%s(%d): allocb failed",
-		    	__func__,
+		    	    __func__,
 			    rx_ring->qede->instance);
+			qede->allocbFailures++;
+                        goto freebuf;
 		}
 		/* 
 		 * We've copied it (or not) and are done with it
 		 * so put it back into the passive list.
 		 */
 		ddi_dma_sync(dma_handle,
-	        0, 0, DDI_DMA_SYNC_FORDEV);
+	            0, 0, DDI_DMA_SYNC_FORDEV);
 		qede_recycle_copied_rx_buffer(rx_buffer);
 		rx_ring->rx_copy_cnt++;
 	} else {
@@ -645,12 +676,17 @@ qede_reg_cqe(qede_rx_ring_t *rx_ring,
 	qede_set_cksum_flags(mp,
 	    HOST_TO_LE_16(cqe->pars_flags.flags));
 #ifdef DEBUG_JUMBO
-	if (jumbo_print) qede_dump_mblk_chain_bnext_ptr(rx_ring->qede, mp);
+	if (jumbo_print) {
+	    qede_dump_mblk_chain_bnext_ptr(rx_ring->qede, mp);
+	}
 #endif
-
 
 	rx_ring->rx_reg_pkt_cnt++;
 	return (mp);	
+
+freebuf:
+        qede_recycle_copied_rx_buffer(rx_buffer);
+        return (NULL);
 }
 
 /*
@@ -662,17 +698,10 @@ static mblk_t *
 qede_process_rx_ring(qede_rx_ring_t *rx_ring, int nbytes, int npkts)
 {
 	union eth_rx_cqe *cqe;
-	struct eth_fast_path_rx_reg_cqe *fp_cqe;
 	u16 last_cqe_consumer = rx_ring->last_cqe_consumer;
-	u16 rxbd_cons;
 	enum eth_rx_cqe_type cqe_type;
-	int status = DDI_SUCCESS;
 	u16 sw_comp_cons, hw_comp_cons;
-	qede_rx_buffer_t *rx_buffer;
-	char *virt_addr;
-	u16 len, pad;
 	mblk_t *mp = NULL, *first_mp = NULL, *last_mp = NULL;
-	ddi_dma_handle_t dma_handle = 0;
 	int pkt_bytes = 0, byte_cnt = 0, pkt_cnt = 0;
 
 	hw_comp_cons = HOST_TO_LE_16(*rx_ring->hw_cons_ptr);
@@ -682,52 +711,55 @@ qede_process_rx_ring(qede_rx_ring_t *rx_ring, int nbytes, int npkts)
 	
 	while (sw_comp_cons != hw_comp_cons) {
 		if ((byte_cnt >= nbytes) ||
-		    (pkt_cnt >= npkts))
+		    (pkt_cnt >= npkts)) {
 			break;
+		}
 
 		cqe = (union eth_rx_cqe *)
-		    ecore_chain_consume(&rx_ring->rx_cqe_ring);	 // Get next element and increment the cons_idx
+		    ecore_chain_consume(&rx_ring->rx_cqe_ring);
+		/* Get next element and increment the cons_idx */
 
-		(void) ddi_dma_sync(rx_ring->rx_cqe_dmah,		// sync this descriptor
+		(void) ddi_dma_sync(rx_ring->rx_cqe_dmah,
 		    last_cqe_consumer, sizeof (*cqe),
 		    DDI_DMA_SYNC_FORKERNEL);
 
 		cqe_type = cqe->fast_path_regular.type;
 
 		switch (cqe_type) {
-			case ETH_RX_CQE_TYPE_SLOW_PATH:
-				ecore_eth_cqe_completion(&rx_ring->qede->edev.hwfns[0],
-				    (struct eth_slow_path_rx_cqe *)cqe);
-				goto next_cqe;
-			case ETH_RX_CQE_TYPE_REGULAR:
-				mp = qede_reg_cqe(rx_ring,
-						&cqe->fast_path_regular,
-						&pkt_bytes);
-				break;
-			case ETH_RX_CQE_TYPE_TPA_START:
-				qede_lro_start(rx_ring,
-						&cqe->fast_path_tpa_start);
-				goto next_cqe;
-			case ETH_RX_CQE_TYPE_TPA_CONT:
-				qede_lro_cont(rx_ring,
-						&cqe->fast_path_tpa_cont);
-				goto next_cqe;
-			case ETH_RX_CQE_TYPE_TPA_END:
-				mp = qede_lro_end(rx_ring,
-						&cqe->fast_path_tpa_end,
-						&pkt_bytes);
-				break;
-			default:
-				if (cqe_type != 0) {
+		case ETH_RX_CQE_TYPE_SLOW_PATH:
+			ecore_eth_cqe_completion(&rx_ring->qede->edev.hwfns[0],
+			    (struct eth_slow_path_rx_cqe *)cqe);
+			goto next_cqe;
+		case ETH_RX_CQE_TYPE_REGULAR:
+			mp = qede_reg_cqe(rx_ring,
+			    &cqe->fast_path_regular,
+			    &pkt_bytes);
+			break;
+		case ETH_RX_CQE_TYPE_TPA_START:
+			qede_lro_start(rx_ring,
+			    &cqe->fast_path_tpa_start);
+			goto next_cqe;
+		case ETH_RX_CQE_TYPE_TPA_CONT:
+			qede_lro_cont(rx_ring,
+			    &cqe->fast_path_tpa_cont);
+			goto next_cqe;
+		case ETH_RX_CQE_TYPE_TPA_END:
+			mp = qede_lro_end(rx_ring,
+			    &cqe->fast_path_tpa_end,
+			    &pkt_bytes);
+			break;
+		default:
+			if (cqe_type != 0) {
 				qede_print_err("!%s(%d): cqe_type %x not "
 				    "supported", __func__,
 				    rx_ring->qede->instance,
 				    cqe_type);
-				}
-				goto exit_rx;
+			}
+			goto exit_rx;
 		}
 
-		/* If we arrive here with no mp,
+		/* 
+		 * If we arrive here with no mp,
 		 * then we hit an RX buffer threshold
 		 * where we had to drop the packet and
 		 * give the buffers back to the device.
@@ -746,11 +778,12 @@ qede_process_rx_ring(qede_rx_ring_t *rx_ring, int nbytes, int npkts)
 		pkt_cnt++;
 		byte_cnt += pkt_bytes;
 next_cqe:
-		ecore_chain_recycle_consumed(&rx_ring->rx_cqe_ring); // increment prod_idx
+		ecore_chain_recycle_consumed(&rx_ring->rx_cqe_ring);
 		last_cqe_consumer = sw_comp_cons;
 		sw_comp_cons = ecore_chain_get_cons_idx(&rx_ring->rx_cqe_ring);
-		if(!(qede_has_rx_work(rx_ring)))
+		if (!(qede_has_rx_work(rx_ring))) {
 			ecore_sb_update_sb_idx(rx_ring->fp->sb_info);
+		}
 		hw_comp_cons = HOST_TO_LE_16(*rx_ring->hw_cons_ptr);
 	}
 	rx_ring->rx_pkt_cnt += pkt_cnt;
@@ -795,16 +828,18 @@ qede_process_fastpath(qede_fastpath_t *fp,
 		}
 	}
 
-	if(!(qede_has_rx_work(rx_ring)))
+	if (!(qede_has_rx_work(rx_ring))) {
 		ecore_sb_update_sb_idx(fp->sb_info);
+	}
 
 	rx_ring = fp->rx_ring;
 	if (qede_has_rx_work(rx_ring)) {
 		mutex_enter(&rx_ring->rx_lock);
 		mp = qede_process_rx_ring(rx_ring,
 		    nbytes, npkts);
-		if (mp)
+		if (mp) {
 			*work_done += 1;
+		}
 		mutex_exit(&rx_ring->rx_lock);
 	}
 
@@ -821,7 +856,8 @@ qede_process_fastpath(qede_fastpath_t *fp,
 static void
 qede_pkt_parse_lso_headers(qede_tx_pktinfo_t *pktinfo, mblk_t *mp)
 {
-	struct ether_header *eth_hdr = (struct ether_header *)(void *)mp->b_rptr;
+	struct ether_header *eth_hdr =
+	    (struct ether_header *)(void *)mp->b_rptr;
 	ipha_t *ip_hdr;
 	struct tcphdr *tcp_hdr;
 
@@ -874,12 +910,14 @@ qede_get_pkt_offload_info(qede_t *qede, mblk_t *mp,
 }
 
 static void
+/* LINTED E_FUNC_ARG_UNUSED */
 qede_get_pkt_info(qede_t *qede, mblk_t *mp,
     qede_tx_pktinfo_t *pktinfo)
 {
 	mblk_t *bp;
 	size_t size;
-	int i = 0;
+	struct ether_header *eth_hdr =
+	    (struct ether_header *)(void *)mp->b_rptr;
 
 	pktinfo->total_len = 0;
 	pktinfo->mblk_no = 0;
@@ -896,6 +934,16 @@ qede_get_pkt_info(qede_t *qede, mblk_t *mp,
 
 		pktinfo->total_len += size;
 		pktinfo->mblk_no++;
+	}
+	/* mac header type and len */
+	if (ntohs(eth_hdr->ether_type) == ETHERTYPE_IP) {
+		pktinfo->ether_type = ntohs(eth_hdr->ether_type);
+		pktinfo->mac_hlen = sizeof (struct ether_header);
+	} else if (ntohs(eth_hdr->ether_type) == ETHERTYPE_VLAN) {
+		struct ether_vlan_header *vlan_hdr =
+		    (struct ether_vlan_header *)(void *)mp->b_rptr;
+		pktinfo->ether_type = ntohs(vlan_hdr->ether_type);
+		pktinfo->mac_hlen = sizeof (struct ether_vlan_header);
 	}
 
 }
@@ -952,8 +1000,9 @@ qede_tx_bcopy(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 
 	for (bp = mp; bp != NULL; bp = bp->b_cont) {
 		mblen = MBLKL(bp);
-		if (mblen == 0)
+		if (mblen == 0) {
 			continue;
+		}
 		bcopy(bp->b_rptr, txb, mblen);
 		txb += mblen;
 	}
@@ -983,13 +1032,11 @@ qede_tx_bcopy(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 	    (1 << ETH_TX_1ST_BD_FLAGS_START_BD_SHIFT);
 
 	if (pktinfo->cksum_flags & HCK_IPV4_HDRCKSUM) {
-		//qede_info(tx_ring->qede, "HCK_IPV4_HDRCKSUM on pkt");
 		first_bd->data.bd_flags.bitfields |=
 		    (1 << ETH_TX_1ST_BD_FLAGS_IP_CSUM_SHIFT);
 	}
 
 	if (pktinfo->cksum_flags & HCK_FULLCKSUM) {
-		//qede_info(tx_ring->qede, "HCK_FULLCKSUM used on pkt mp %p", mp);
 		first_bd->data.bd_flags.bitfields |=
 		    (1 << ETH_TX_1ST_BD_FLAGS_L4_CSUM_SHIFT);
 	}
@@ -999,7 +1046,8 @@ qede_tx_bcopy(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 	    pktinfo->total_len);
 
 	first_bd->data.bitfields |=
-		(pktinfo->total_len & ETH_TX_DATA_1ST_BD_PKT_LEN_MASK) << ETH_TX_DATA_1ST_BD_PKT_LEN_SHIFT;
+		(pktinfo->total_len & ETH_TX_DATA_1ST_BD_PKT_LEN_MASK) 
+		<< ETH_TX_DATA_1ST_BD_PKT_LEN_SHIFT;
 
 	tx_ring->tx_db.data.bd_prod =
 	    HOST_TO_LE_16(ecore_chain_get_prod_idx(&tx_ring->tx_bd_ring));
@@ -1031,13 +1079,13 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 {
 	enum qede_xmit_status status = XMIT_FAILED;
 	int ret;
-	qede_dma_handles_list_t *dmah_list = &tx_ring->dmah_list;
-	qede_dma_handle_entry_t *dmah_entry = NULL, *head = NULL, *tail = NULL, *hdl;
+	qede_dma_handle_entry_t *dmah_entry = NULL; 
+	qede_dma_handle_entry_t *head = NULL, *tail = NULL, *hdl;
 	struct eth_tx_1st_bd *first_bd;
-	struct eth_tx_2nd_bd *second_bd;
-	struct eth_tx_3rd_bd *third_bd;
+	struct eth_tx_2nd_bd *second_bd = 0;
+	struct eth_tx_3rd_bd *third_bd = 0;
 	struct eth_tx_bd *tx_data_bd;
-	struct eth_tx_bd local_bd[64] = {0};
+	struct eth_tx_bd local_bd[64] = { 0 };
 	ddi_dma_cookie_t cookie[64];
 	u32 ncookies, total_cookies = 0, max_cookies = 0, index = 0;
 	ddi_dma_handle_t dma_handle;
@@ -1046,7 +1094,7 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 	bool is_premapped = B_FALSE;
 	u64 dma_premapped = 0, dma_bound = 0;
 	u32 hdl_reserved = 0;
-	u32 nbd = 0;
+	u8 nbd = 0;
 	int i, bd_index;
 	u16 last_producer;
 	qede_tx_recycle_list_t *tx_recycle_list = tx_ring->tx_recycle_list;
@@ -1057,7 +1105,6 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 		/*
 		 * For tso pkt, we can use as many as 255 bds
 		 */
-		//max_cookies = 255;
 		max_cookies = ETH_TX_MAX_BDS_PER_NON_LSO_PACKET - 1;
 		qede_pkt_parse_lso_headers(pktinfo, mp);
 	} else {
@@ -1069,8 +1116,9 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 
 	for (bp = mp; bp != NULL; bp = bp->b_cont) {
 		mblen = MBLKL(bp);
-		if (mblen == 0)
+		if (mblen == 0) {
 			continue;
+		}
 		is_premapped = B_FALSE;
 		/*
 		 * If the mblk is premapped then get the
@@ -1115,11 +1163,13 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 			    != DDI_DMA_MAPPED) {
 
 #ifdef DEBUG_PULLUP
-				qede_info(tx_ring->qede, "addr_bind() failed for "
-				    "handle %p, len %d mblk_no %d tot_len 0x%x use_lso %d",  dmah_entry->dma_handle,
-				    mblen, pktinfo->mblk_no, pktinfo->total_len, pktinfo->use_lso);
+			qede_info(tx_ring->qede, "addr_bind() failed for "
+			    "handle %p, len %d mblk_no %d tot_len 0x%x" 
+			    " use_lso %d",  dmah_entry->dma_handle,
+			    mblen, pktinfo->mblk_no, pktinfo->total_len, 
+			    pktinfo->use_lso);
 
-				qede_info(tx_ring->qede, "Falling back to pullup");
+			qede_info(tx_ring->qede, "Falling back to pullup");
 #endif
 				status = XMIT_FALLBACK_PULLUP;
 				tx_ring->tx_bind_fail++;
@@ -1149,7 +1199,8 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 		if (total_cookies > max_cookies) {
 			tx_ring->tx_too_many_cookies++;
 #ifdef DEBUG_PULLUP
-			qede_info(tx_ring->qede, "total_cookies > max_cookies, "
+			qede_info(tx_ring->qede, 
+			    "total_cookies > max_cookies, "
 			    "pktlen %d, mb num %d",
 			    pktinfo->total_len, pktinfo->mblk_no);
 #endif
@@ -1181,7 +1232,7 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 		goto err_map_sec;
 	}
 
-	if (total_cookies > max_cookies){
+	if (total_cookies > max_cookies) {
 		tx_ring->tx_too_many_cookies++;
 		status = XMIT_TOO_MANY_COOKIES;
 		goto err_map_sec;
@@ -1243,7 +1294,8 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 				bd_index++;
 			} else if (first_bd->nbytes < pktinfo->total_hlen) {
 #ifdef DEBUG_PULLUP
-				qede_info(tx_ring->qede, "Headers not in single bd");
+				qede_info(tx_ring->qede, 
+				    "Headers not in single bd");
 #endif
 				status = XMIT_FALLBACK_PULLUP;
 				goto err_map_sec;
@@ -1281,7 +1333,8 @@ qede_tx_mapped(qede_tx_ring_t *tx_ring, mblk_t *mp, qede_tx_pktinfo_t *pktinfo)
 	} else {
 		nbd = total_cookies;
 		first_bd->data.bitfields |=
-			(pktinfo->total_len & ETH_TX_DATA_1ST_BD_PKT_LEN_MASK) << ETH_TX_DATA_1ST_BD_PKT_LEN_SHIFT;
+		    (pktinfo->total_len & ETH_TX_DATA_1ST_BD_PKT_LEN_MASK) 
+		    << ETH_TX_DATA_1ST_BD_PKT_LEN_SHIFT;
 	}
 
 	first_bd->data.nbds = nbd;
@@ -1353,8 +1406,9 @@ err_map_sec:
 		hdl = hdl->next;
 	}
 
-	if (head != NULL)
+	if (head != NULL) {
 		qede_put_dmah_entries(tx_ring, head);
+	}
 
 	return (status);
 }
@@ -1363,11 +1417,11 @@ static enum qede_xmit_status
 qede_send_tx_packet(qede_t *qede, qede_tx_ring_t *tx_ring, mblk_t *mp)
 {
 	boolean_t force_pullup = B_FALSE;
-	enum qede_xmit_status status;
+	enum qede_xmit_status status = XMIT_FAILED;
 	enum qede_xmit_mode xmit_mode = USE_BCOPY;
 	qede_tx_pktinfo_t pktinfo;
-	u16 cons, prod;
 	mblk_t *original_mp = NULL, *pulled_up_mp = NULL;
+	struct ether_vlan_header *ethvhdr;
 
 	mutex_enter(&tx_ring->tx_lock);
 	if (ecore_chain_get_elem_left(&tx_ring->tx_bd_ring) <
@@ -1429,10 +1483,11 @@ do_pullup:
 	qede_get_pkt_info(qede, mp, &pktinfo);
 
 
-	if ((!pktinfo.use_lso) &&
-                 (pktinfo.total_len > (qede->mtu + QEDE_MAX_ETHER_HDR))) {
-  		qede_info(tx_ring->qede, "Packet drop as packet len 0x%x > 0x%x",
-                                pktinfo.total_len, (qede->mtu + QEDE_MAX_ETHER_HDR));
+	if ((!pktinfo.use_lso) && 
+                 (pktinfo.total_len > (qede->mtu + pktinfo.mac_hlen))) {
+  		qede_info(tx_ring->qede, 
+		    "Packet drop as packet len 0x%x > 0x%x",
+		    pktinfo.total_len, (qede->mtu + QEDE_MAX_ETHER_HDR));
 		status = XMIT_FAILED;
 		goto exit;
 	}
@@ -1440,7 +1495,8 @@ do_pullup:
 
 #ifdef	DEBUG_PULLUP
 	if (force_pullup) {
-	qede_print_err("!%s: mp %p, pktinfo : total_len %d, mblk_no %d, ether_type %d\n"
+	qede_print_err("!%s: mp %p, pktinfo : total_len %d,"
+	    " mblk_no %d, ether_type %d\n"
 	    "mac_hlen %d, ip_hlen %d, l4_hlen %d\n"
 	    "l4_proto %d, use_cksum:use_lso %d:%d mss %d", __func__, mp,
 	    pktinfo.total_len, pktinfo.mblk_no, pktinfo.ether_type,
@@ -1451,22 +1507,26 @@ do_pullup:
 #endif
 
 #ifdef	DEBUG_PREMAP
-	if (DBLK_IS_PREMAPPED(mp->b_datap))
+	if (DBLK_IS_PREMAPPED(mp->b_datap)) {
 		qede_print_err("!%s(%d): mp %p id PREMAPPMED",
 		    __func__, qede->instance);
+	}
 #endif
 
 #ifdef	DBLK_DMA_PREMAP	
 	if (DBLK_IS_PREMAPPED(mp->b_datap) ||
-	    pktinfo.total_len > qede->tx_bcopy_threshold)
+	    pktinfo.total_len > qede->tx_bcopy_threshold) {
 		xmit_mode = USE_DMA_BIND;
+	}
 #else
-	if (pktinfo.total_len > qede->tx_bcopy_threshold)
+	if (pktinfo.total_len > qede->tx_bcopy_threshold) {
 		xmit_mode = USE_DMA_BIND;
+	}
 #endif
 	
-	if (pktinfo.total_len <= qede->tx_bcopy_threshold)
+	if (pktinfo.total_len <= qede->tx_bcopy_threshold) {
 		xmit_mode = USE_BCOPY;
+	}
 
 	/*
 	 * if mac + ip hdr not in one contiguous block,
@@ -1515,14 +1575,15 @@ do_pullup:
 	if (xmit_mode == USE_DMA_BIND) {
 		status = qede_tx_mapped(tx_ring, mp, &pktinfo);
 		if (status == XMIT_DONE) {
-			if (pktinfo.use_lso)
+			if (pktinfo.use_lso) {
 				tx_ring->tx_lso_pkt_count++;
-			else if(pktinfo.total_len > 1518)
+			} else if(pktinfo.total_len > 1518) {
 				tx_ring->tx_jumbo_pkt_count++;
+			}
 			tx_ring->tx_mapped_pkts++;
 			goto exit;
                 } else if ((status == XMIT_TOO_MANY_COOKIES ||
-                                (status == XMIT_FALLBACK_PULLUP)) && !force_pullup) {
+		    (status == XMIT_FALLBACK_PULLUP)) && !force_pullup) {
 			xmit_mode = USE_PULLUP;
 		} else {
 			status = XMIT_FAILED;
@@ -1570,7 +1631,8 @@ exit:
 		 */
 		if (pulled_up_mp) {
 #ifdef	DEBUG_PULLUP
-			qede_info(qede, "success, free ori mp %p", original_mp);
+			qede_info(qede, 
+			    "success, free ori mp %p", original_mp);
 #endif
 			freemsg(original_mp);
 		}
@@ -1612,7 +1674,8 @@ register ub4 initval;	/* the previous hash, or an arbitrary value */
 	c = initval;		/* the previous hash value */
 
 	/* handle most of the key */
-	while (len >= 12) {
+	while (len >= 12) 
+	{
 		a += (k[0] +((ub4)k[1]<<8) +((ub4)k[2]<<16) +((ub4)k[3]<<24));
 		b += (k[4] +((ub4)k[5]<<8) +((ub4)k[6]<<16) +((ub4)k[7]<<24));
 		c += (k[8] +((ub4)k[9]<<8) +((ub4)k[10]<<16)+((ub4)k[11]<<24));
@@ -1624,30 +1687,42 @@ register ub4 initval;	/* the previous hash, or an arbitrary value */
 	/* handle the last 11 bytes */
 	c += length;
 	/* all the case statements fall through */
-	switch (len) {
-		/* FALLTHRU */
-	case 11: c += ((ub4)k[10]<<24);
-		/* FALLTHRU */
-	case 10: c += ((ub4)k[9]<<16);
-		/* FALLTHRU */
-	case 9 : c += ((ub4)k[8]<<8);
+	switch (len) 
+	{
+	/* FALLTHRU */
+	case 11: 
+		c += ((ub4)k[10]<<24);
+	/* FALLTHRU */
+	case 10: 
+		c += ((ub4)k[9]<<16);
+	/* FALLTHRU */
+	case 9 : 
+		c += ((ub4)k[8]<<8);
 	/* the first byte of c is reserved for the length */
-		/* FALLTHRU */
-	case 8 : b += ((ub4)k[7]<<24);
-		/* FALLTHRU */
-	case 7 : b += ((ub4)k[6]<<16);
-		/* FALLTHRU */
-	case 6 : b += ((ub4)k[5]<<8);
-		/* FALLTHRU */
-	case 5 : b += k[4];
-		/* FALLTHRU */
-	case 4 : a += ((ub4)k[3]<<24);
-		/* FALLTHRU */
-	case 3 : a += ((ub4)k[2]<<16);
-		/* FALLTHRU */
-	case 2 : a += ((ub4)k[1]<<8);
-		/* FALLTHRU */
-	case 1 : a += k[0];
+	/* FALLTHRU */
+	case 8 : 
+		b += ((ub4)k[7]<<24);
+	/* FALLTHRU */
+	case 7 : 
+		b += ((ub4)k[6]<<16);
+	/* FALLTHRU */
+	case 6 : 
+		b += ((ub4)k[5]<<8);
+	/* FALLTHRU */
+	case 5 : 
+		b += k[4];
+	/* FALLTHRU */
+	case 4 : 
+		a += ((ub4)k[3]<<24);
+	/* FALLTHRU */
+	case 3 : 
+		a += ((ub4)k[2]<<16);
+	/* FALLTHRU */
+	case 2 : 
+		a += ((ub4)k[1]<<8);
+	/* FALLTHRU */
+	case 1 : 
+		a += k[0];
 	/* case 0: nothing left to add */
 	}
 	mix(a, b, c);
@@ -1674,8 +1749,9 @@ qede_hash_get_txq(qede_t *qede, caddr_t bp)
 	uint16_t dest_port = 0;
 	uint8_t key[12];
 
-	if (qede->num_fp == 1)
+	if (qede->num_fp == 1) {
 		return (tx_ring_id);
+	}
 
 	ethhdr = (struct ether_header *)((void *)bp);
 	ethvhdr = (struct ether_vlan_header *)((void *)bp);
@@ -1771,7 +1847,9 @@ qede_ring_tx(void *arg, mblk_t *mp)
 		goto exit;
 	}
 
-	if (!qede->params.link_state){
+	if (!qede->params.link_state) {
+		qede_print_err("!%s(%d): Link !up for xmit",
+		    __func__, qede->instance);
 		goto exit;
 	}
 
@@ -1788,7 +1866,8 @@ qede_ring_tx(void *arg, mblk_t *mp)
 		tx_ring = fp->tx_ring[0];
 
 		if (qede->num_tc > 1) {
-			qede_info(qede, "Traffic classes(%d) > 1 not supported",
+			qede_info(qede, 
+			    "Traffic classes(%d) > 1 not supported",
 			    qede->num_tc);
 			goto exit;
 		}
@@ -1802,11 +1881,9 @@ qede_ring_tx(void *arg, mblk_t *mp)
 			mp = next;
 		} else if (status == XMIT_PAUSE_QUEUE) {
 			tx_ring->tx_ring_pause++;
-			//qede_info(qede, "Pausing tx queue");
 			mp->b_next = next;
 			break;
 		} else if (status == XMIT_FAILED) {
-			//qede_info(qede, "Failed tx");
 			goto exit;
 		}
 	}

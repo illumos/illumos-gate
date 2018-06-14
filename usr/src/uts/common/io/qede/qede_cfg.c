@@ -36,26 +36,29 @@
 
 #include "qede.h"
 
-qede_link_props_t qede_def_link_props  = {
-GLDM_FIBER,
-B_TRUE,
-B_TRUE,
-B_TRUE,
-B_TRUE,
-B_TRUE,
-B_TRUE,
-B_TRUE,
-B_TRUE,
-B_FALSE
+qede_link_props_t qede_def_link_props  = 
+{
+	GLDM_FIBER,
+	B_TRUE,
+	B_TRUE,
+	B_TRUE,
+	B_TRUE,
+	B_TRUE,
+	B_TRUE,
+	B_TRUE,
+	B_TRUE,
+	B_FALSE
 };
-static void qede_cfg_get_val(qede_t  * qede,
-								char *        pName,
-								void *        pVal,
-								int           defaultVal,
-								boolean_t     boolVal)
+static void 
+qede_cfg_get_val(qede_t  *qede,
+    char *        pName,
+    void *        pVal,
+    int           defaultVal,
+    boolean_t     boolVal)
 {
 	int val;
-#define QEDE_CFG_NAME_LEN_MAX 128
+#define		QEDE_CFG_NAME_LEN_MAX 		128
+
 	char name[QEDE_CFG_NAME_LEN_MAX];
 
 	/* first check if the hardcoded default has been overridden */
@@ -63,31 +66,30 @@ static void qede_cfg_get_val(qede_t  * qede,
 	snprintf(name, QEDE_CFG_NAME_LEN_MAX, "default_%s", pName);
 
 	val = ddi_prop_get_int(DDI_DEV_T_ANY,
-				qede->dip,
-				(DDI_PROP_NOTPROM | DDI_PROP_DONTPASS),
-				name,
-				defaultVal);
+		qede->dip,
+		(DDI_PROP_NOTPROM | DDI_PROP_DONTPASS),
+		name,
+		defaultVal);
 	/* now check for a config for this specific instance */
 
-	snprintf(name, QEDE_CFG_NAME_LEN_MAX, "qede%d_%s", qede->instance, pName);
+	snprintf(name, QEDE_CFG_NAME_LEN_MAX, "qede%d_%s", qede->instance, 
+	    pName);
 
 	val = ddi_prop_get_int(DDI_DEV_T_ANY,
-				qede->dip,
-				(DDI_PROP_NOTPROM | DDI_PROP_DONTPASS),
-				name,
-				val);
+		qede->dip,
+		(DDI_PROP_NOTPROM | DDI_PROP_DONTPASS),
+		name,
+		val);
 
-	if (boolVal)
-	{
+	if (boolVal) {
 		*((boolean_t *)pVal) = (val) ? B_TRUE : B_FALSE;
-	}
-	else
-	{
+	} else {
 		*((int *)pVal) = val;
 	}
 }
 
-void qede_cfg_init(qede_t *qede)
+void 
+qede_cfg_init(qede_t *qede)
 {
 
 	int option;
@@ -111,74 +113,75 @@ void qede_cfg_init(qede_t *qede)
 			  &qede->checksum,
 			  qede->checksum,
 			  B_FALSE);
-	switch(qede->checksum)
-	{
-		case USER_OPTION_CKSUM_L3:
-		case USER_OPTION_CKSUM_L3_L4:
-			qede->checksum = DEFAULT_CKSUM_OFFLOAD;
-			break;
+	switch(qede->checksum) {
+	case USER_OPTION_CKSUM_L3:
+	case USER_OPTION_CKSUM_L3_L4:
+		qede->checksum = DEFAULT_CKSUM_OFFLOAD;
+		break;
 	}
 
 	qede_cfg_get_val(qede, "mtu", &option,
-					 qede->mtu,
-					 B_FALSE);
+	    qede->mtu,
+	    B_FALSE);
 
 	if (option != DEFAULT_JUMBO_MTU &&
 	    option != DEFAULT_MTU) {
 		qede->mtu = DEFAULT_MTU;
 		qede->jumbo_enable = B_FALSE;
 	} else {
-		if (qede->mtu != option)
+		if (qede->mtu != option) {
 		qede->mtu = option;
-		if (option == DEFAULT_JUMBO_MTU)
+		}
+		if (option == DEFAULT_JUMBO_MTU) {
 		    qede->jumbo_enable = B_TRUE;
+		}
 	}
 
 	qede_cfg_get_val(qede, "num_fp", &option,
-			 qede->num_fp,
-			 B_FALSE);
+	    qede->num_fp,
+	    B_FALSE);
 	qede->num_fp = (option < MIN_FASTPATH_COUNT) ?
-				  MIN_FASTPATH_COUNT :
-				  (option > MAX_FASTPATH_COUNT) ?
-				  MAX_FASTPATH_COUNT :
-				  option;
+	    MIN_FASTPATH_COUNT :
+	    (option > MAX_FASTPATH_COUNT) ?
+	    MAX_FASTPATH_COUNT :
+	    option;
 
 	qede_cfg_get_val(qede, "rx_ring_size", &option,
-			 qede->rx_ring_size,
-			 B_FALSE);
+	    qede->rx_ring_size,
+	    B_FALSE);
 	qede->rx_ring_size = (option < MIN_RX_RING_SIZE) ?
-				 MIN_RX_RING_SIZE :
-				(option > MAX_RX_RING_SIZE) ?
-				 MAX_RX_RING_SIZE :
-				 option;
+	    MIN_RX_RING_SIZE :
+	    (option > MAX_RX_RING_SIZE) ?
+	    MAX_RX_RING_SIZE :
+	    option;
 	qede_cfg_get_val(qede, "tx_ring_size", &option,
-			 qede->tx_ring_size,
-			 B_FALSE);
+	    qede->tx_ring_size,
+	    B_FALSE);
 	qede->tx_ring_size = (option < MIN_TX_RING_SIZE) ?
-				 MIN_TX_RING_SIZE :
-				(option > MAX_TX_RING_SIZE) ?
-				 MAX_TX_RING_SIZE :
-				option;
+	    MIN_TX_RING_SIZE :
+	    (option > MAX_TX_RING_SIZE) ?
+	    MAX_TX_RING_SIZE :
+	    option;
 	qede_cfg_get_val(qede, "rx_copy_threshold", &option,
-			 qede->rx_copy_threshold,
-			 B_FALSE);
+	    qede->rx_copy_threshold,
+	    B_FALSE);
 	qede_cfg_get_val(qede, "tx_copy_threshold", &option,
-			 qede->tx_bcopy_threshold,
-			 B_FALSE);
+	    qede->tx_bcopy_threshold,
+	    B_FALSE);
 	qede_cfg_get_val(qede, "tx_recycle_threshold", &option,
-			 qede->tx_bcopy_threshold,
-			 B_FALSE);
+	    qede->tx_bcopy_threshold,
+	    B_FALSE);
 	qede->tx_recycle_threshold =
-		(option < 0) ? 0:
-		(option > qede->tx_ring_size) ?
-		qede->tx_ring_size : option;
+	    (option < 0) ? 0:
+	    (option > qede->tx_ring_size) ?
+	    qede->tx_ring_size : option;
 	qede_cfg_get_val(qede, "lso_enable", &option,
-			 qede->lso_enable,
-			 B_TRUE);
+	    qede->lso_enable,
+	    B_TRUE);
 	qede->lso_enable = option;
 	qede_cfg_get_val(qede, "lro_enable", &option,
-			 qede->lro_enable,
-			 B_TRUE);
+	    qede->lro_enable,
+	    B_TRUE);
 	qede->lro_enable = option;
 
 	if(qede->checksum != DEFAULT_CKSUM_OFFLOAD) {
@@ -187,21 +190,22 @@ void qede_cfg_init(qede_t *qede)
 	}
 
 	qede_cfg_get_val(qede, "log_enable", &option,
-			 qede->log_enable,
-			 B_TRUE);
+	    qede->log_enable,
+	    B_TRUE);
 	qede_cfg_get_val(qede, "debug_level", &option,
-			 qede->ecore_debug_level,
-			 B_FALSE);
+	    qede->ecore_debug_level,
+	    B_FALSE);
 	qede->ecore_debug_level =  (uint32_t)((option < 0) ? 0 : option);
 
 	qede_cfg_get_val(qede, "debug_module", &option,
-			qede->ecore_debug_module,
-			B_FALSE);
+	    qede->ecore_debug_module,
+	    B_FALSE);
 	qede->ecore_debug_module = (uint32_t)((option < 0) ? 0 : option);
 }
 
 
-void qede_cfg_reset(qede_t *qede)
+void 
+qede_cfg_reset(qede_t *qede)
 {
 	qede->params.link_state = 0;
 	/* reset the link status */

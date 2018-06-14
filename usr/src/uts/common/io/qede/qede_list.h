@@ -33,14 +33,16 @@
 * limitations under the License.
 */
 
+#ifndef _QEDE_LIST_H
+#define _QEDE_LIST_H
 
 typedef struct qede_list_s {
-	struct qede_list_s  	*next;
-	struct qede_list_s  	*prev;
+	struct qede_list_s *next;
+	struct qede_list_s *prev;
 }qede_list_t;
 
 typedef struct qede_mem_list_entry {
-	void			*buf;
+	void *buf;
 	size_t			size;
 	qede_list_t	 	mem_entry;
 } qede_mem_list_entry_t;
@@ -55,8 +57,8 @@ typedef	struct phys_mem_entry {
 	ddi_dma_handle_t 	dma_handle;
 	ddi_acc_handle_t 	dma_acc_handle;
 	size_t 			size;
-	void			*virt_addr;
-	void			*paddr;
+	void *virt_addr;
+	void *paddr;
 } qede_phys_mem_entry_t;
 
 typedef struct qede_phys_mem_list {
@@ -79,7 +81,8 @@ typedef qede_list_t osal_list_entry_t;
 /*
  * Linked list helpers
  */
-static inline void QEDE_INIT_LIST_HEAD(qede_list_t *list)
+static inline void 
+QEDE_INIT_LIST_HEAD(qede_list_t *list)
 {
 	list->next = list;
 	list->prev = list;
@@ -87,7 +90,8 @@ static inline void QEDE_INIT_LIST_HEAD(qede_list_t *list)
 
 #define	OSAL_LIST_INIT(_list_) QEDE_INIT_LIST_HEAD(_list_)
 
-static inline void qede_list_add(qede_list_t *new,
+static inline void 
+qede_list_add(qede_list_t *new,
     qede_list_t *prev,
     qede_list_t *next)
 {
@@ -97,33 +101,39 @@ static inline void qede_list_add(qede_list_t *new,
 	prev->next = new;
 }
 
-static inline bool qede_list_empty(qede_list_t *entry)
+static inline bool 
+qede_list_empty(qede_list_t *entry)
 {
 	return (entry->next == entry);
 }
 
-static inline void qede_list_del(qede_list_t *prev, qede_list_t *next)
+static inline void 
+qede_list_del(qede_list_t *prev, qede_list_t *next)
 {
 	next->prev = prev;
 	prev->next = next;
 }
 
-static inline void QEDE_LIST_ADD(qede_list_t *new, qede_list_t *head)
+static inline void 
+QEDE_LIST_ADD(qede_list_t *new, qede_list_t *head)
 {
 	qede_list_add(new, head, head->next);
 }
 
-static inline void QEDE_LIST_ADD_TAIL(qede_list_t *new, qede_list_t *head)
+static inline void 
+QEDE_LIST_ADD_TAIL(qede_list_t *new, qede_list_t *head)
 {
 	qede_list_add(new, head->prev, head);
 }
 
-static inline void QEDE_LIST_REMOVE(qede_list_t *entry, qede_list_t *head)
+static inline void 
+QEDE_LIST_REMOVE(qede_list_t *entry, qede_list_t *head)
 {
 	qede_list_del(entry->prev, entry->next);
 }
 
-static inline void list_splice(const qede_list_t *list,
+static inline void 
+list_splice(const qede_list_t *list,
     qede_list_t *prev,
     qede_list_t *next)
 {
@@ -137,14 +147,17 @@ static inline void list_splice(const qede_list_t *list,
 	next->prev = last;
 }
 
-static inline void qede_list_splice(qede_list_t *list,
+static inline void 
+qede_list_splice(qede_list_t *list,
     qede_list_t *head)
 {
-	if (!qede_list_empty(list))
+	if (!qede_list_empty(list)) {
 		list_splice(list, head, head->next);
+	}
 }
 
-static inline void qede_list_splice_tail(qede_list_t *list,
+static inline void 
+qede_list_splice_tail(qede_list_t *list,
     qede_list_t *head)
 {
 	if (!qede_list_empty(list)) {
@@ -161,3 +174,5 @@ static inline void qede_list_splice_tail(qede_list_t *list,
 #define	QEDE_LIST_FOR_EACH_ENTRY(_entry_, _list_, _type_, _member_) \
 	OSAL_LIST_FOR_EACH_ENTRY(_entry_, _list_, _member_, _type_)
 #define	QEDE_LIST_FOR_EACH_ENTRY_SAFE	OSAL_LIST_FOR_EACH_ENTRY_SAFE
+
+#endif  /* !_QEDE_LIST_H */

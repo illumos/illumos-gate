@@ -33,6 +33,9 @@
 * limitations under the License.
 */
 
+#ifndef _QEDE_FP_H
+#define _QEDE_FP_H
+
 #define	RX_INDICATE_UPSTREAM(rx_ring, mp) \
 	mac_rx_ring(rx_ring->qede->mac_handle, \
 	    rx_ring->mac_ring_handle, mp, \
@@ -40,8 +43,8 @@
 
 #define	MAX_TX_RING_SIZE		8192
 
-#define	RESUME_TX(tx_ring)	mac_tx_ring_update(tx_ring->qede->mac_handle, \
-				    tx_ring->mac_ring_handle)
+#define	RESUME_TX(tx_ring)  mac_tx_ring_update(tx_ring->qede->mac_handle, \
+			    tx_ring->mac_ring_handle)
 
 #define CQE_FLAGS_ERR   (PARSING_AND_ERR_FLAGS_IPHDRERROR_MASK <<   \
 			PARSING_AND_ERR_FLAGS_IPHDRERROR_SHIFT |   \
@@ -65,7 +68,6 @@
 #endif
 
 #ifndef	QEDE_TX_MAP_PATH_PAUSE_THRESHOLD
-//#define	QEDE_TX_MAP_PATH_PAUSE_THRESHOLD		ETH_TX_MAX_BDS_PER_NON_LSO_PACKET
 #define	QEDE_TX_MAP_PATH_PAUSE_THRESHOLD	128	
 #endif
 
@@ -135,19 +137,19 @@ typedef struct qede_tx_pktinfo_s {
 } qede_tx_pktinfo_t;
 
 typedef struct qede_tx_bcopy_pkt_s {
-	mblk_t			*mp;
+	mblk_t *mp;
 	ddi_acc_handle_t	acc_handle;
 	ddi_dma_handle_t	dma_handle;
 	u32			ncookies;
 	u32			offset;
 	u64			phys_addr;
-	void			*virt_addr;
+	void *virt_addr;
 	u32			padding;
 } qede_tx_bcopy_pkt_t;
 
 typedef	struct qede_tx_bcopy_list_s {
-	qede_tx_bcopy_pkt_t	*bcopy_pool;
-	qede_tx_bcopy_pkt_t	*free_list[MAX_TX_RING_SIZE];
+	qede_tx_bcopy_pkt_t *bcopy_pool;
+	qede_tx_bcopy_pkt_t *free_list[MAX_TX_RING_SIZE];
 	u16		head;
 	u16		tail;
 	kmutex_t	lock;
@@ -155,7 +157,7 @@ typedef	struct qede_tx_bcopy_list_s {
 } qede_tx_bcopy_list_t;
 
 typedef	struct qede_dma_handle_entry_s {
-	mblk_t			*mp;
+	mblk_t *mp;
 	ddi_dma_handle_t	dma_handle;
 	struct qede_dma_handle_entry_s *next;
 } qede_dma_handle_entry_t;
@@ -170,8 +172,10 @@ typedef	struct qede_dma_handles_list_s {
 } qede_dma_handles_list_t;
 
 typedef struct qede_tx_recycle_list_s {
-	qede_tx_bcopy_pkt_t	*bcopy_pkt;
+	qede_tx_bcopy_pkt_t *bcopy_pkt;
 	qede_dma_handle_entry_t	*dmah_entry;
 } qede_tx_recycle_list_t;
 
 mblk_t *qede_ring_tx(void *arg, mblk_t *mp);
+
+#endif  /* !_QEDE_FP_H */

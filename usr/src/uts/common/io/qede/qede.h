@@ -106,8 +106,9 @@
 #endif
 #define QEDE_STR_SIZE   32
 /* Product Identification Banner */
-//#define	QEDE_PRODUCT_INFO	"QLogic 40/100G NIC v" STRINGIFY(MAJVERSION) "." STRINGIFY(MINVERSION) "." STRINGIFY(REVVERSION)
-#define	QEDE_PRODUCT_INFO	"QLogic FastLinQ QL45xxx " STRINGIFY(MAJVERSION) "." STRINGIFY(MINVERSION) "." STRINGIFY(REVVERSION)
+#define	QEDE_PRODUCT_INFO\
+	"QLogic FastLinQ QL45xxx " STRINGIFY(MAJVERSION) \
+	"." STRINGIFY(MINVERSION) "." STRINGIFY(REVVERSION)
 
 /*
  * Debug Infrastructure
@@ -122,21 +123,22 @@
 #define	qede_dbg(MASK, ptr, fmt, ...) \
 do { \
 	if (DEBUG_LEVEL & (MASK)) { \
-		qede_print("!%s(%d) STRINGIFY(MASK):" fmt, __func__, (ptr)->instance, \
-		##__VA_ARGS__);\
+		qede_print("!%s(%d) STRINGIFY(MASK):" fmt, __func__, \
+		    (ptr)->instance, \
+##__VA_ARGS__);\
 	} \
 } while (0);
 
 #define	qede_info(ptr, fmt, ...) \
 do { \
 	qede_print("!%s(%d):" fmt, __func__, (ptr)->instance, \
-	##__VA_ARGS__); \
+##__VA_ARGS__); \
 } while (0);
 
 #define	qede_warn(ptr, fmt, ...) \
 do { \
 	qede_print_err("!%s(%d):" fmt, __func__, (ptr)->instance, \
-	##__VA_ARGS__); \
+##__VA_ARGS__); \
 } while (0);
 
 #ifdef __sparc
@@ -158,8 +160,8 @@ do { \
 
 #define QEDE_LSO_MAXLEN                 65535
 
-#define	BUF_2K_SIZE		2048
-#define	BUF_2K_ALIGNMENT	BUF_2K_SIZE
+#define	BUF_2K_SIZE			2048
+#define	BUF_2K_ALIGNMENT		BUF_2K_SIZE
 
 #define	MIN_TX_RING_COUNT		1
 #define	MAX_TX_RING_COUNT		1
@@ -173,7 +175,7 @@ do { \
 #define	DEFAULT_TX_COPY_THRESHOLD	256
 #define	DEFAULT_TX_RECYCLE_THRESHOLD	128
 
-#define	TX_RING_MASK	(tx_ring->tx_ring_size - 1)
+#define	TX_RING_MASK			(tx_ring->tx_ring_size - 1)
 
 #define	IP_ALIGNMENT_BYTES		2
 #define	QEDE_MAX_ETHER_HDR		18 
@@ -191,7 +193,7 @@ do { \
 #define	DEFAULT_RX_BUF_SIZE		2048
 
 #define	DEFAULT_RX_COPY_THRESHOLD	128
-#define	RX_RING_MASK	(rx_ring->rx_buf_count - 1)
+#define	RX_RING_MASK			(rx_ring->rx_buf_count - 1)
 #define	MIN_RX_BUF_COUNT		MIN_RX_RING_SIZE	
 #define	MAX_RX_BUF_COUNT		MAX_RX_RING_SIZE	
 #define	DEFAULT_RX_BUF_COUNT		DEFAULT_RX_RING_SIZE	
@@ -241,39 +243,39 @@ do { \
 
 typedef struct _KstatRingMap
 {
-    uint32_t  idx;  /* ring index */
-    void * qede;  /* reference back to qede_t */
+    uint32_t  idx;	/* ring index */
+    void * qede;	/* reference back to qede_t */
 } KstatRingMap;
 
-#define IS_ETH_MULTICAST(eth_addr)			\
+#define IS_ETH_MULTICAST(eth_addr) \
 	(((unsigned char *) (eth_addr))[0] & ((unsigned char) 0x01))
 
-#define IS_ETH_ADDRESS_EQUAL(eth_addr1, eth_addr2)                       \
-	((((unsigned char *) (eth_addr1))[0] ==                              \
-	((unsigned char *) (eth_addr2))[0]) &&                               \
-	(((unsigned char *) (eth_addr1))[1] ==                               \
-	((unsigned char *) (eth_addr2))[1]) &&                               \
-	(((unsigned char *) (eth_addr1))[2] ==                               \
-	((unsigned char *) (eth_addr2))[2]) &&                               \
-	(((unsigned char *) (eth_addr1))[3] ==                               \
-	((unsigned char *) (eth_addr2))[3]) &&                               \
-	(((unsigned char *) (eth_addr1))[4] ==                               \
-	((unsigned char *) (eth_addr2))[4]) &&                               \
-	(((unsigned char *) (eth_addr1))[5] ==                               \
+#define IS_ETH_ADDRESS_EQUAL(eth_addr1, eth_addr2)  \
+	((((unsigned char *) (eth_addr1))[0] ==     \
+	((unsigned char *) (eth_addr2))[0]) &&      \
+	(((unsigned char *) (eth_addr1))[1] ==      \
+	((unsigned char *) (eth_addr2))[1]) &&      \
+	(((unsigned char *) (eth_addr1))[2] ==      \
+	((unsigned char *) (eth_addr2))[2]) &&      \
+	(((unsigned char *) (eth_addr1))[3] ==      \
+	((unsigned char *) (eth_addr2))[3]) &&      \
+	(((unsigned char *) (eth_addr1))[4] ==      \
+	((unsigned char *) (eth_addr2))[4]) &&      \
+	(((unsigned char *) (eth_addr1))[5] ==      \
 	((unsigned char *) (eth_addr2))[5]))
 
-#define COPY_ETH_ADDRESS(src, dst)                                       \
-	((unsigned char *) (dst))[0] = ((unsigned char *) (src))[0];         \
-	((unsigned char *) (dst))[1] = ((unsigned char *) (src))[1];         \
-	((unsigned char *) (dst))[2] = ((unsigned char *) (src))[2];         \
-	((unsigned char *) (dst))[3] = ((unsigned char *) (src))[3];         \
-	((unsigned char *) (dst))[4] = ((unsigned char *) (src))[4];         \
+#define COPY_ETH_ADDRESS(src, dst) \
+	((unsigned char *) (dst))[0] = ((unsigned char *) (src))[0]; \
+	((unsigned char *) (dst))[1] = ((unsigned char *) (src))[1]; \
+	((unsigned char *) (dst))[2] = ((unsigned char *) (src))[2]; \
+	((unsigned char *) (dst))[3] = ((unsigned char *) (src))[3]; \
+	((unsigned char *) (dst))[4] = ((unsigned char *) (src))[4]; \
 	((unsigned char *) (dst))[5] = ((unsigned char *) (src))[5];
 
 
 union db_prod {
 	struct eth_db_data data;
-	uint32_t		raw;
+	uint32_t raw;
 };
 
 struct qede;
@@ -283,9 +285,9 @@ struct qede_tx_pktinfo_s;
 
 typedef struct qede_tx_ring {
 	struct qede_fastpath	*fp;
-	struct qede		*qede;
-	uint32_t		tx_queue_index;
-	uint16_t		*hw_cons_ptr;
+	struct qede *qede;
+	uint32_t tx_queue_index;
+	uint16_t *hw_cons_ptr;
 
 	/* pointer to driver ring control */
 	struct ecore_chain	tx_bd_ring;
@@ -294,7 +296,7 @@ typedef struct qede_tx_ring {
 	u16			bd_ring_size;
 
 	/* From ecore_sp_tx_queue_start() */
-	void __iomem    	*doorbell_addr;
+	void __iomem *doorbell_addr;
 	ddi_acc_handle_t	doorbell_handle;
 
 	/* Saved copy of doorbell data for this tx queue */
@@ -312,7 +314,7 @@ typedef struct qede_tx_ring {
 	/* pre-allocated dma handles */
 	qede_dma_handles_list_t	dmah_list;
 	/* List of recycle entires for tx packets */
-	qede_tx_recycle_list_t	*tx_recycle_list;
+	qede_tx_recycle_list_t *tx_recycle_list;
 
 #ifdef	DBLK_DMA_PREMAP	
 	pm_handle_t		pm_handle;
@@ -323,21 +325,21 @@ typedef struct qede_tx_ring {
 
 	bool			tx_q_sleeping;
 
-	uint64_t tx_pkt_count;
-	uint64_t tx_byte_count;
-	uint64_t tx_pkt_dropped;
-	uint64_t tx_copy_count;
-	uint64_t tx_bind_count;
-	uint64_t tx_bind_fail;
-	uint64_t tx_premap_count;
-	uint64_t tx_premap_fail;
-	uint64_t tx_pullup_count;
-	uint64_t tx_too_many_cookies;
-	uint64_t tx_lso_pkt_count;
-	uint64_t tx_ring_pause;
-	uint64_t tx_too_many_mblks;
-	uint64_t tx_mapped_pkts;
-	uint64_t tx_jumbo_pkt_count;
+	uint64_t 		tx_pkt_count;
+	uint64_t 		tx_byte_count;
+	uint64_t 		tx_pkt_dropped;
+	uint64_t 		tx_copy_count;
+	uint64_t 		tx_bind_count;
+	uint64_t 		tx_bind_fail;
+	uint64_t 		tx_premap_count;
+	uint64_t 		tx_premap_fail;
+	uint64_t 		tx_pullup_count;
+	uint64_t 		tx_too_many_cookies;
+	uint64_t 		tx_lso_pkt_count;
+	uint64_t 		tx_ring_pause;
+	uint64_t 		tx_too_many_mblks;
+	uint64_t 		tx_mapped_pkts;
+	uint64_t 		tx_jumbo_pkt_count;
 	struct ecore_queue_cid *p_cid;
 } qede_tx_ring_t;
 
@@ -348,7 +350,7 @@ typedef struct qede_vector_info {
 	 * or to a hwfnc.
 	 */ 
 	void *fp;
-	struct qede		*qede;
+	struct qede *qede;
 	uint32_t vect_index;
 	bool handler_added;
 	/* set and cleared by ISR, checked by stop path
@@ -359,18 +361,18 @@ typedef struct qede_vector_info {
 
 
 typedef struct qede_fastpath {
-	qede_vector_info_t 	*vect_info;
+	qede_vector_info_t *vect_info;
 
 	/* Status block associated with this fp */
     	ddi_dma_handle_t	sb_dma_handle; 
     	ddi_acc_handle_t	sb_acc_handle;
-	struct status_block	*sb_virt;
+	struct status_block *sb_virt;
 	uint64_t		sb_phys;
 
-	struct ecore_sb_info	*sb_info;
-	struct qede_rx_ring	*rx_ring;
-	qede_tx_ring_t		*tx_ring[MAX_TC];
-	struct qede		*qede;
+	struct ecore_sb_info *sb_info;
+	struct qede_rx_ring *rx_ring;
+	qede_tx_ring_t	*tx_ring[MAX_TC];
+	struct qede *qede;
 
 	uint32_t	fp_index;
 	uint32_t	fp_hw_eng_index;
@@ -379,7 +381,7 @@ typedef struct qede_fastpath {
 	uint32_t	rx_queue_index;	
 	uint32_t	rss_id;
 	kmutex_t	fp_lock;
-	uint32_t disabled_by_poll;
+	uint32_t 	disabled_by_poll;
 } qede_fastpath_t;
 
 enum qede_agg_state {
@@ -408,7 +410,7 @@ typedef	struct qede_dma_info_s {
 	u32	ncookies;
 	u32	offset;
 	u64	phys_addr;
-	void	*virt_addr;
+	void *virt_addr;
 	u32	pad;
 } qede_dma_info_t;
 
@@ -423,9 +425,9 @@ struct qede_rx_buf_area;
 
 typedef	struct qede_rx_buffer_s {
 	qede_dma_info_t	dma_info;
-	mblk_t		*mp;
+	mblk_t *mp;
 	u32		index;
-	struct qede_rx_ring	*rx_ring;
+	struct qede_rx_ring *rx_ring;
 
 	/* Recycle function */
 	frtn_t		recycle;
@@ -438,7 +440,7 @@ typedef	struct qede_rx_buf_list_s {
 	kmutex_t		lock;
 	u16			head, tail;
 	u32			num_entries;
-	qede_rx_buffer_t	*buf_list[DEFAULT_RX_RING_SIZE];
+	qede_rx_buffer_t *buf_list[DEFAULT_RX_RING_SIZE];
 } qede_rx_buf_list_t;
 
 typedef	struct qede_rx_buf_area {
@@ -449,7 +451,7 @@ typedef	struct qede_rx_buf_area {
 	qede_rx_buf_list_t	passive_buf_list;
 		
 	u32			bufs_per_page;
-	struct qede_rx_ring	*rx_ring;
+	struct qede_rx_ring *rx_ring;
 	u32			inactive;
 	u32			buf_upstream;
 } qede_rx_buf_area_t;
@@ -464,7 +466,7 @@ typedef struct qede_rx_ring {
 	 * to update producer indicies for
 	 * CQE and RX buffer chains.
 	 */
-	void __iomem            *hw_rxq_prod_addr;
+	void __iomem *hw_rxq_prod_addr;
 
 	/* Pointer to hw cqe consumer index.
 	 * Taken from sb_virt->pi_array after
@@ -475,7 +477,7 @@ typedef struct qede_rx_ring {
 	 * It is updated by ecore and read by
 	 * the driver while processing rings.
 	 */
-	uint16_t                  *hw_cons_ptr;
+	uint16_t *hw_cons_ptr;
 
 	u16	sw_rx_cons;
 	u16 sw_rx_prod;
@@ -486,8 +488,8 @@ typedef struct qede_rx_ring {
 	 * buffers on a one-to-one releationship
 	 * to ecore_chain rx_bd_ring.
 	 */
-	qede_rx_buffer_t	*rx_buffers;
-	qede_rx_buf_area_t	*rx_buf_area;
+	qede_rx_buffer_t *rx_buffers;
+	qede_rx_buf_area_t *rx_buf_area;
 	/*
 	 * Descriptor rings returned from
 	 * ecore_chain_alloc()
@@ -504,7 +506,7 @@ typedef struct qede_rx_ring {
 	u64			mr_gen_num; /* Mac rings generation number */
 	uint32_t		group_index;
 	qede_fastpath_t	*fp;
-	struct qede	*qede;
+	struct qede *qede;
 
 	/* dma_handles for rx dma mem */
 	ddi_dma_handle_t	rx_bd_dmah;
@@ -611,7 +613,6 @@ enum qede_filter_rx_mode_type {
 };
 
 
-/*VAI*/
 
 struct qede_mcast_filter_params {
 	enum qede_filter_rx_mode_type acc_flg;
@@ -677,7 +678,7 @@ enum qede_vport_state {
 typedef struct qede_mac_group {
 	int				group_index;
 	mac_group_handle_t		group_handle;
-	struct qede			*qede;
+	struct qede *qede;
 } qede_mac_group_t;
 
 typedef struct qede_link_input_params {
@@ -687,7 +688,7 @@ typedef struct qede_link_input_params {
 
 typedef struct qede {
 	struct ecore_dev 		edev; /* keep this at the beginning of the structure */
-	dev_info_t 			*dip;
+	dev_info_t *dip;
 	int 				instance;
 	enum qede_state			qede_state;
 #define	MAX_QEDE_NAME_LEN		8
@@ -718,7 +719,7 @@ typedef struct qede {
 	qede_mac_group_t		rx_groups[QEDE_MAX_GROUPS];
 	qede_mac_group_t		tx_groups[QEDE_MAX_GROUPS];
 
-	u8				*sp_dpc;
+	u8 *sp_dpc;
 	/* 
 	 * pre-mapped buffer cache handle for TX 
 	 * used for getting sglist for mbkls
@@ -771,7 +772,7 @@ typedef struct qede {
 	qede_fastpath_t			fp_array[MAX_FASTPATH_COUNT];
 	struct ecore_sb_info		sb_array[MAX_FASTPATH_COUNT];
 	qede_rx_ring_t			rx_array[MAX_FASTPATH_COUNT];
-	qede_tx_ring_t			tx_array[MAX_TC_COUNT][MAX_FASTPATH_COUNT];
+	qede_tx_ring_t	  tx_array[MAX_TC_COUNT][MAX_FASTPATH_COUNT];
 
 	uint16_t			tx_bcopy_threshold;
 	uint16_t			pad1; /* remove later */
@@ -819,40 +820,37 @@ typedef struct qede {
 	uint64_t			intrFired;
 	kmutex_t			kstat_lock;
 	kmutex_t			gld_lock;
-	uint64_t			intrSbCnt[MAX_FASTPATH_COUNT + 1];  /* TBD */
-	uint64_t			intrSbNoChangeCnt[MAX_FASTPATH_COUNT + 1];
+	uint64_t			intrSbCnt[MAX_FASTPATH_COUNT + 1];
+	uint64_t     intrSbNoChangeCnt[MAX_FASTPATH_COUNT + 1];
 	uint64_t			intrSbPollCnt[MAX_FASTPATH_COUNT + 1];
 	uint64_t			intrSbPollNoChangeCnt[MAX_FASTPATH_COUNT + 1];
     
-	ddi_dma_handle_t		sp_sb_handle;
-	ddi_dma_handle_t		sp_attn_handle;
-	timeout_id_t   			qede_watchdog_tid;
-	boolean_t	   		qede_watchdog_enable;
-	boolean_t	   		qede_watchdog_start;
-	kmutex_t	   		qede_watchdog_lock;
-	uint32_t	   		qede_watchdog_flow_control;
-	kstat_t *                       kstats;
-	kstat_t *                       kstats_link;
-	kstat_t *                       kstats_intr;
-	kstat_t *            		kstats_vport;
-	kstat_t *             		kstats_rxq[MAX_FASTPATH_COUNT];
+	kstat_t *kstats;
+	kstat_t *kstats_link;
+	kstat_t *kstats_intr;
+	kstat_t *kstats_vport;
+	kstat_t *kstats_rxq[MAX_FASTPATH_COUNT];
 	KstatRingMap          		kstats_rxq_map[MAX_FASTPATH_COUNT];
-	kstat_t *             		kstats_txq[MAX_FASTPATH_COUNT];
+	kstat_t *kstats_txq[MAX_FASTPATH_COUNT];
 	KstatRingMap          		kstats_txq_map[MAX_FASTPATH_COUNT];
     	struct ecore_eth_stats  	save_stats;
 
-    	mblk_t		 		*stored_mp;
+    	mblk_t	*stored_mp;
     	int 		 		mp_index;
     	qede_link_input_params_t 	link_input_params;  /*(test) */
 	uint32_t			loop_back_mode;     /*(test) */
 	bool				lb_linkup;	    /*(test) */
 	uint32_t			forced_speed_10G;
-	uint8_t				pci_func;	    /*added for func_info ioctl*/
-        void 				*nvm_buf;
-        void 				*nvm_buf_start;
+	uint8_t				pci_func;    
+        void *nvm_buf;
+        void *nvm_buf_start;
 	uint32_t			nvm_buf_size;
 	uint32_t			copy_len;
 	uint8_t 			*reserved_buf;	
+	int                             fm_cap;
+        uint64_t                        allocbFailures;
+        volatile uint32_t               detach_unsafe;
+
 } qede_t;
 
 /*
@@ -1010,14 +1008,15 @@ enum {
 
 extern qede_link_props_t qede_def_link_props;
 /* Functions exported by qede_cfg.c */
-void qede_cfg_reset(qede_t * qede);
+void qede_cfg_reset(qede_t *qede);
 void qede_cfg_init(qede_t *qede);
 
 /* Functions exported by qede_gld.c */
-boolean_t qede_gld_init(qede_t * qede);
+boolean_t qede_gld_init(qede_t *qede);
 int qede_multicast(qede_t * qede, boolean_t flag, const uint8_t *ptr_mcaddr);
-int qede_set_filter_rx_mode(qede_t * qede, enum qede_filter_rx_mode_type type);
-int qede_set_rx_mac_mcast(qede_t *qede, enum ecore_filter_opcode opcode,uint8_t *mac, int mc_cnt);
+int qede_set_filter_rx_mode(qede_t *qede, enum qede_filter_rx_mode_type type);
+int qede_set_rx_mac_mcast(qede_t *qede, enum ecore_filter_opcode opcode,
+    uint8_t *mac, int mc_cnt);
 int qede_ucst_find(qede_t *qede, const uint8_t *mac_addr);
 int qede_clear_filters(qede_t *qede);
 /* Functions exported by qede_main.c */

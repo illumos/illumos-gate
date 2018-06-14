@@ -2423,6 +2423,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/spppasyn/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/sppptun/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/qede/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ral/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 

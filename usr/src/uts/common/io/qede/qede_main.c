@@ -37,29 +37,31 @@
 #include "qede.h"
 
 ddi_device_acc_attr_t qede_regs_acc_attr = {					
-	DDI_DEVICE_ATTR_V1,							 // devacc_attr_version;				
-	DDI_STRUCTURE_LE_ACC,						 // devacc_attr_endian_flags;				
-	DDI_STRICTORDER_ACC,						 // devacc_attr_dataorder;				
-	DDI_FLAGERR_ACC								 // devacc_attr_access;
+	DDI_DEVICE_ATTR_V1,     // devacc_attr_version;				
+	DDI_STRUCTURE_LE_ACC,   // devacc_attr_endian_flags;				
+	DDI_STRICTORDER_ACC,    // devacc_attr_dataorder;				
+	DDI_FLAGERR_ACC         // devacc_attr_access;
 };
 
 ddi_device_acc_attr_t qede_desc_acc_attr = {
-	DDI_DEVICE_ATTR_V0,							 // devacc_attr_version;		
-	DDI_STRUCTURE_LE_ACC,						 // devacc_attr_endian_flags;
-	DDI_STRICTORDER_ACC							 // devacc_attr_dataorder;		
+	DDI_DEVICE_ATTR_V0,    // devacc_attr_version;		
+	DDI_STRUCTURE_LE_ACC,  // devacc_attr_endian_flags;
+	DDI_STRICTORDER_ACC    // devacc_attr_dataorder;		
 };
 
 /*
  * DMA access attributes for BUFFERS.
  */
-ddi_device_acc_attr_t qede_buf_acc_attr = {					
-	DDI_DEVICE_ATTR_V0,							 // devacc_attr_version;						
-	DDI_NEVERSWAP_ACC,							 // devacc_attr_endian_flags;				
-	DDI_STRICTORDER_ACC							 // devacc_attr_dataorder;						
+ddi_device_acc_attr_t qede_buf_acc_attr = 
+{					
+	DDI_DEVICE_ATTR_V0,   // devacc_attr_version;						
+	DDI_NEVERSWAP_ACC,    // devacc_attr_endian_flags;				
+	DDI_STRICTORDER_ACC   // devacc_attr_dataorder;						
 };																
 
 
-ddi_dma_attr_t qede_desc_dma_attr = {
+ddi_dma_attr_t qede_desc_dma_attr = 
+{
 	DMA_ATTR_V0,
 	0x0000000000000000ull,
 	0xFFFFFFFFFFFFFFFFull,
@@ -74,7 +76,8 @@ ddi_dma_attr_t qede_desc_dma_attr = {
 	DDI_DMA_FLAGERR
 };
 
-ddi_dma_attr_t qede_gen_buf_dma_attr = {
+ddi_dma_attr_t qede_gen_buf_dma_attr = 
+{
 	DMA_ATTR_V0,
 	0x0000000000000000ull,
 	0xFFFFFFFFFFFFFFFFull,
@@ -92,7 +95,8 @@ ddi_dma_attr_t qede_gen_buf_dma_attr = {
 /*
  * DMA attributes for transmit.
  */
-ddi_dma_attr_t qede_tx_buf_dma_attr = {
+ddi_dma_attr_t qede_tx_buf_dma_attr = 
+{
 	DMA_ATTR_V0,
 	0x0000000000000000ull,
 	0xFFFFFFFFFFFFFFFFull,
@@ -108,7 +112,8 @@ ddi_dma_attr_t qede_tx_buf_dma_attr = {
 };
 
 
-ddi_dma_attr_t qede_dma_attr_desc = {
+ddi_dma_attr_t qede_dma_attr_desc = 
+{
 	DMA_ATTR_V0,		/* dma_attr_version */
 	0,			/* dma_attr_addr_lo */
 	0xffffffffffffffffull,	/* dma_attr_addr_hi */
@@ -123,7 +128,8 @@ ddi_dma_attr_t qede_dma_attr_desc = {
 	DDI_DMA_FLAGERR		/* dma_attr_flags */
 };
 
-static ddi_dma_attr_t qede_dma_attr_txbuf = {
+static ddi_dma_attr_t qede_dma_attr_txbuf = 
+{
 	DMA_ATTR_V0,		/* dma_attr_version */
 	0,			/* dma_attr_addr_lo */
 	0xffffffffffffffffull,	/* dma_attr_addr_hi */
@@ -138,7 +144,8 @@ static ddi_dma_attr_t qede_dma_attr_txbuf = {
 	0			/* dma_attr_flags */
 };
 
-ddi_dma_attr_t qede_dma_attr_rxbuf = {
+ddi_dma_attr_t qede_dma_attr_rxbuf = 
+{
 	DMA_ATTR_V0,		/* dma_attr_version */
 	0,			/* dma_attr_addr_lo */
 	0xffffffffffffffffull,	/* dma_attr_addr_hi */
@@ -153,7 +160,9 @@ ddi_dma_attr_t qede_dma_attr_rxbuf = {
 	DDI_DMA_RELAXED_ORDERING	/* dma_attr_flags */
 };
 
-static ddi_dma_attr_t qede_dma_attr_cmddesc = {
+/* LINTED E_STATIC_UNUSED */
+static ddi_dma_attr_t qede_dma_attr_cmddesc = 
+{
 	DMA_ATTR_V0,		/* dma_attr_version */
 	0,			/* dma_attr_addr_lo */
 	0xffffffffffffffffull,	/* dma_attr_addr_hi */
@@ -173,22 +182,25 @@ static ddi_dma_attr_t qede_dma_attr_cmddesc = {
 /*
  * Generic dma attribute for single sg
  */
-static ddi_dma_attr_t qede_gen_dma_attr_desc = {
-	DMA_ATTR_V0,			/* dma_attr_version */
-	0,						/* dma_attr_addr_lo */
+/* LINTED E_STATIC_UNUSED */
+static ddi_dma_attr_t qede_gen_dma_attr_desc = 
+{
+	DMA_ATTR_V0,            /* dma_attr_version */
+	0,                      /* dma_attr_addr_lo */
 	0xffffffffffffffffull,	/* dma_attr_addr_hi */
-	0x000fffffull,			/* dma_attr_count_max */
-	4096,					/* dma_attr_align */
-	0x000fffffull,			/* dma_attr_burstsizes */
-	4,						/* dma_attr_minxfer */
-	0xffffffffull,			/* dma_attr_maxxfer */
-	0xffffffffull,			/* dma_attr_seg */
-	1,						/* dma_attr_sgllen */
-	1,						/* dma_attr_granular */
-	DDI_DMA_FLAGERR			/* dma_attr_flags */
+	0x000fffffull,          /* dma_attr_count_max */
+	4096,                   /* dma_attr_align */
+	0x000fffffull,          /* dma_attr_burstsizes */
+	4,                      /* dma_attr_minxfer */
+	0xffffffffull,          /* dma_attr_maxxfer */
+	0xffffffffull,          /* dma_attr_seg */
+	1,                      /* dma_attr_sgllen */
+	1,                      /* dma_attr_granular */
+	DDI_DMA_FLAGERR         /* dma_attr_flags */
 };
 
-ddi_dma_attr_t qede_buf2k_dma_attr_txbuf = {
+ddi_dma_attr_t qede_buf2k_dma_attr_txbuf = 
+{
 	DMA_ATTR_V0,		/* dma_attr_version */
 	0,			/* dma_attr_addr_lo */
 	0xffffffffffffffffull,	/* dma_attr_addr_hi */
@@ -203,88 +215,104 @@ ddi_dma_attr_t qede_buf2k_dma_attr_txbuf = {
 	0			/* dma_attr_flags */
 };
 
-char *qede_get_ddi_fail(int status)
+char * 
+qede_get_ddi_fail(int status)
 {
-	switch(status)
-	{
+	switch (status) {
 	case DDI_FAILURE:
-		return("DDI_FAILURE");
+		return ("DDI_FAILURE");
 	case DDI_NOT_WELL_FORMED:
-		return("DDI_NOT_WELL_FORMED");
+		return ("DDI_NOT_WELL_FORMED");
 	case DDI_EAGAIN:
-		return("DDI_EAGAIN");
+		return ("DDI_EAGAIN");
 	case DDI_EINVAL:
-		return("DDI_EINVAL");
+		return ("DDI_EINVAL");
 	case DDI_ENOTSUP:
-		return("DDI_ENOTSUP");
+		return ("DDI_ENOTSUP");
 	case DDI_EPENDING:
-		return("DDI_EPENDING");
+		return ("DDI_EPENDING");
 	case DDI_EALREADY:
-		return("DDI_EALREADY");
+		return ("DDI_EALREADY");
 	case DDI_ENOMEM:
-		return("DDI_ENOMEM");
+		return ("DDI_ENOMEM");
 	case DDI_EBUSY:
-		return("DDI_EBUSY");
+		return ("DDI_EBUSY");
 	case DDI_ETRANSPORT:
-		return("DDI_ETRANSPORT");
+		return ("DDI_ETRANSPORT");
 	case DDI_ECONTEXT:
-		return("DDI_ECONTEXT");
+		return ("DDI_ECONTEXT");
 	default:
-		return("ERROR CODE NOT FOUND!");
+		return ("ERROR CODE NOT FOUND!");
 	}
 }
 
-char *qede_get_ecore_fail(int status)
+char *
+qede_get_ecore_fail(int status)
 {
-	switch(status)
-	{
+	switch (status) {
 	case ECORE_UNKNOWN_ERROR:
-		return("ECORE_UNKNOWN_ERROR");
+		return ("ECORE_UNKNOWN_ERROR");
 	case ECORE_NORESOURCES:
-		return("ECORE_NORESOURCES");
+		return ("ECORE_NORESOURCES");
 	case ECORE_NODEV:
-		return("ECORE_NODEV");
+		return ("ECORE_NODEV");
 	case ECORE_ABORTED:
-		return("ECORE_ABORTED");
+		return ("ECORE_ABORTED");
 	case ECORE_AGAIN:
-		return("ECORE_AGAIN");
+		return ("ECORE_AGAIN");
 	case ECORE_NOTIMPL:
-		return("ECORE_NOTIMPL");
+		return ("ECORE_NOTIMPL");
 	case ECORE_EXISTS:
-		return("ECORE_EXISTS");
+		return ("ECORE_EXISTS");
 	case ECORE_IO:
-		return("ECORE_IO");
+		return ("ECORE_IO");
 	case ECORE_TIMEOUT:
-		return("ECORE_TIMEOUT");
+		return ("ECORE_TIMEOUT");
 	case ECORE_INVAL:
-		return("ECORE_INVAL");
+		return ("ECORE_INVAL");
 	case ECORE_BUSY:
-		return("ECORE_BUSY");
+		return ("ECORE_BUSY");
 	case ECORE_NOMEM:
-		return("ECORE_NOMEM");
+		return ("ECORE_NOMEM");
 	case ECORE_SUCCESS:
-		return("ECORE_SUCCESS");
+		return ("ECORE_SUCCESS");
 	case ECORE_PENDING:
-		return("ECORE_PENDING");
+		return ("ECORE_PENDING");
 	default:
-		return("ECORE ERROR CODE NOT FOUND!");
+		return ("ECORE ERROR CODE NOT FOUND!");
 	}
 }
 
-#define QEDE_CHIP_NUM(_p) (((_p)->edev.chip_num) & 0xffff)
+#define QEDE_CHIP_NUM(_p)\
+ (((_p)->edev.chip_num) & 0xffff)
 
-char * qede_chip_name(qede_t * qede)
+char *
+qede_chip_name(qede_t *qede)
 {
-    switch (QEDE_CHIP_NUM(qede))
-    {
-        case 0x1634: return "BCM57980E";
-        case 0x1629: return "BCM57980S";
-        case 0x1630: return "BCM57940_KR2";
-	case 0x8070: return "ARROWHEAD";
-	case 0x8071: return "ARROWHEAD";
-	case 0x8072: return "ARROWHEAD";	     
-	case 0x8073: return "ARROWHEAD";	     
-        default:     return "UNKNOWN";
+    switch (QEDE_CHIP_NUM(qede)) {
+        case 0x1634: 
+		return ("BCM57980E");
+
+        case 0x1629: 
+		return ("BCM57980S");
+
+        case 0x1630: 
+		return ("BCM57940_KR2");
+
+	case 0x8070: 
+		return ("ARROWHEAD");
+
+	case 0x8071: 
+		return ("ARROWHEAD");
+
+	case 0x8072: 
+		return ("ARROWHEAD");	     
+
+	case 0x8073: 
+		return ("ARROWHEAD");	     
+
+        default:     
+		return ("UNKNOWN");
     }
 }
 
@@ -294,11 +322,10 @@ char * qede_chip_name(qede_t * qede)
 static void
 qede_destroy_locks(qede_t *qede)
 {
-	qede_intr_context_t *intr_ctx = &qede->intr_ctx;
 	qede_fastpath_t *fp = &qede->fp_array[0];
 	qede_rx_ring_t *rx_ring;
 	qede_tx_ring_t *tx_ring;
-	int i,j;
+	int i, j;
 
 	mutex_destroy(&qede->drv_lock);
 	mutex_destroy(&qede->watch_lock);
@@ -309,7 +336,6 @@ qede_destroy_locks(qede_t *qede)
 		rx_ring = fp->rx_ring;
 		mutex_destroy(&rx_ring->rx_lock);
 		mutex_destroy(&rx_ring->rx_replen_lock);
-		//mutex_destroy(&rx_ring->rx_buf_area->rx_buf_area_lock);
 
 		for (j = 0; j < qede->num_tc; j++) {
 			tx_ring = fp->tx_ring[j];
@@ -343,8 +369,6 @@ qede_init_locks(qede_t *qede)
 		    MUTEX_DRIVER, DDI_INTR_PRI(intr_ctx->intr_pri));
 		mutex_init(&rx_ring->rx_replen_lock, NULL,
 		    MUTEX_DRIVER, DDI_INTR_PRI(intr_ctx->intr_pri));
-		//mutex_init(&rx_ring->rx_buf_area->rx_buf_area_lock, NULL,
-		//    MUTEX_DRIVER, DDI_INTR_PRI(intr_ctx->intr_pri));
 
 		for (tc = 0; tc < qede->num_tc; tc++) {
 			tx_ring = fp->tx_ring[tc];
@@ -359,16 +383,14 @@ qede_init_locks(qede_t *qede)
 	    MUTEX_DRIVER, DDI_INTR_PRI(intr_ctx->intr_pri));
 }
 
-static void
-qede_free_io_structs(qede_t *qede)
+/* LINTED E_FUNC_ARG_UNUSED */
+static void qede_free_io_structs(qede_t *qede)
 {
-	return;
 }
 
 static int
 qede_alloc_io_structs(qede_t *qede)
 {
-	int vector_count;
 	qede_fastpath_t *fp;
 	qede_rx_ring_t *rx_ring;
 	qede_tx_ring_t *tx_array, *tx_ring;
@@ -392,7 +414,7 @@ qede_alloc_io_structs(qede_t *qede)
 		rx_ring->group_index = 0;
 	}
 	
-	return(DDI_SUCCESS);
+	return (DDI_SUCCESS);
 }
 
 static int
@@ -406,27 +428,42 @@ qede_get_config_params(qede_t *qede)
 	qede->num_hwfns = edev->num_hwfns;
 	qede->rx_buf_count = qede->rx_ring_size;
 	qede->rx_buf_size = DEFAULT_RX_BUF_SIZE;
-	qede_print("!%s:%d: qede->num_fp = %d\n", __func__, qede->instance, qede->num_fp);
-	qede_print("!%s:%d: qede->rx_ring_size = %d\n", __func__, qede->instance, qede->rx_ring_size);
-	qede_print("!%s:%d: qede->rx_buf_count = %d\n", __func__, qede->instance, qede->rx_buf_count);
-	qede_print("!%s:%d: qede->rx_buf_size = %d\n", __func__, qede->instance, qede->rx_buf_size);
-	qede_print("!%s:%d: qede->rx_copy_threshold = %d\n", __func__, qede->instance, qede->rx_copy_threshold);
-	qede_print("!%s:%d: qede->tx_ring_size = %d\n", __func__, qede->instance, qede->tx_ring_size);
-	qede_print("!%s:%d: qede->tx_copy_threshold = %d\n", __func__, qede->instance, qede->tx_bcopy_threshold);
-	qede_print("!%s:%d: qede->lso_enable = %d\n", __func__, qede->instance, qede->lso_enable);
-	qede_print("!%s:%d: qede->lro_enable = %d\n", __func__, qede->instance, qede->lro_enable);
-	qede_print("!%s:%d: qede->jumbo_enable = %d\n", __func__, qede->instance, qede->jumbo_enable);
-	qede_print("!%s:%d: qede->log_enable = %d\n", __func__, qede->instance, qede->log_enable);
-	qede_print("!%s:%d: qede->checksum = %d\n", __func__, qede->instance, qede->checksum);
-	qede_print("!%s:%d: qede->debug_level = 0x%x\n", __func__, qede->instance, qede->ecore_debug_level);
-	qede_print("!%s:%d: qede->num_hwfns = %d\n", __func__, qede->instance,qede->num_hwfns);
+	qede_print("!%s:%d: qede->num_fp = %d\n", __func__, qede->instance, 
+		qede->num_fp);
+	qede_print("!%s:%d: qede->rx_ring_size = %d\n", __func__, 
+		qede->instance, qede->rx_ring_size);
+	qede_print("!%s:%d: qede->rx_buf_count = %d\n", __func__, 
+		qede->instance, qede->rx_buf_count);
+	qede_print("!%s:%d: qede->rx_buf_size = %d\n", __func__, 
+		qede->instance, qede->rx_buf_size);
+	qede_print("!%s:%d: qede->rx_copy_threshold = %d\n", __func__, 
+		qede->instance, qede->rx_copy_threshold);
+	qede_print("!%s:%d: qede->tx_ring_size = %d\n", __func__, 
+		qede->instance, qede->tx_ring_size);
+	qede_print("!%s:%d: qede->tx_copy_threshold = %d\n", __func__, 
+		qede->instance, qede->tx_bcopy_threshold);
+	qede_print("!%s:%d: qede->lso_enable = %d\n", __func__, 
+		qede->instance, qede->lso_enable);
+	qede_print("!%s:%d: qede->lro_enable = %d\n", __func__, 
+		qede->instance, qede->lro_enable);
+	qede_print("!%s:%d: qede->jumbo_enable = %d\n", __func__, 
+		qede->instance, qede->jumbo_enable);
+	qede_print("!%s:%d: qede->log_enable = %d\n", __func__, 
+		qede->instance, qede->log_enable);
+	qede_print("!%s:%d: qede->checksum = %d\n", __func__, 
+		qede->instance, qede->checksum);
+	qede_print("!%s:%d: qede->debug_level = 0x%x\n", __func__, 
+		qede->instance, qede->ecore_debug_level);
+	qede_print("!%s:%d: qede->num_hwfns = %d\n", __func__, 
+		qede->instance,qede->num_hwfns);
 
 	//qede->tx_buf_size = qede->mtu + QEDE_MAX_ETHER_HDR;
 	qede->tx_buf_size = BUF_2K_SIZE;
 	return (DDI_SUCCESS);
 }
 
-void qede_config_debug(qede_t * qede)
+void 
+qede_config_debug(qede_t *qede)
 {
 
 	struct ecore_dev *edev = &qede->edev;
@@ -448,8 +485,9 @@ qede_set_operating_params(qede_t *qede)
 
 	/* Get qede.conf paramters from user */
 	status = qede_get_config_params(qede);
-	if (status != DDI_SUCCESS)
+	if (status != DDI_SUCCESS) {
 		return (DDI_FAILURE);
+	}
 	/* config debug level */
 	qede_config_debug(qede);
 
@@ -461,13 +499,13 @@ qede_set_operating_params(qede_t *qede)
 	/* set max number of Unicast list */
 	qede->ucst_total = QEDE_MAX_UCST_CNT;
 	qede->ucst_avail = QEDE_MAX_UCST_CNT;
-	bzero(&qede->ucst_mac[0], sizeof(qede_mac_addr_t) * qede->ucst_total);
+	bzero(&qede->ucst_mac[0], sizeof (qede_mac_addr_t) * qede->ucst_total);
 	qede->params.multi_promisc_fl = B_FALSE;
 	qede->params.promisc_fl = B_FALSE;
 	qede->mc_cnt = 0;
 	qede->rx_low_buffer_threshold = RX_LOW_BUFFER_THRESHOLD;
 
-	return(status);
+	return (status);
 }
 
 /* Resume the interface */
@@ -515,14 +553,11 @@ static int
 qede_config_pci(qede_t *qede)
 {
 	int ret;
-	off_t regsize;
-	struct ecore_dev *edev;
-
-	edev = &qede->edev;
 
 	ret = pci_config_setup(qede->dip, &qede->pci_cfg_handle);
 	if (ret != DDI_SUCCESS) {
-		cmn_err(CE_NOTE, "%s:%d Failed to get PCI config handle\n", __func__, qede->instance);
+		cmn_err(CE_NOTE, "%s:%d Failed to get PCI config handle\n", 
+			__func__, qede->instance);
 		return (DDI_FAILURE);
 	}
 
@@ -606,16 +641,17 @@ err_exit:
 	return (DDI_FAILURE);
 }
 
-//typedef uint_t (ddi_intr_handler_t)(caddr_t arg1, caddr_t arg2);
 static uint_t
 qede_sp_handler(caddr_t arg1, caddr_t arg2)
 {
+	/*LINTED E_BAD_PTR_CAST_ALIGN*/
 	struct ecore_hwfn *p_hwfn = (struct ecore_hwfn *)arg1;
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	qede_vector_info_t *vect_info = (qede_vector_info_t *)arg2;
 	struct ecore_dev *edev = p_hwfn->p_dev;
-	qede_t * qede = (qede_t *)edev;
+	qede_t *qede = (qede_t *)edev;
 
-	if (arg1 == NULL || arg2 == NULL) {
+	if ((arg1 == NULL) || (arg2 == NULL)) {
 		cmn_err(CE_WARN, "qede_sp_handler: invalid parameters");
 		/*
 		 * MSIX intr should always
@@ -656,14 +692,16 @@ qede_disable_hw_intr(qede_fastpath_t *fp)
 static uint_t
 qede_fp_handler(caddr_t arg1, caddr_t arg2)
 {
-	qede_vector_info_t *vect_info = (qede_vector_info_t *)arg1;;
+	/* LINTED E_BAD_PTR_CAST_ALIGN */ 
+	qede_vector_info_t *vect_info = (qede_vector_info_t *)arg1;
+	/* LINTED E_BAD_PTR_CAST_ALIGN */ 
 	qede_t *qede = (qede_t *)arg2;
 	qede_fastpath_t *fp;
 	qede_rx_ring_t *rx_ring;
 	mblk_t *mp;
 	int work_done = 0;
 
-	if (vect_info == NULL || vect_info->fp == NULL) {
+	if ((vect_info == NULL) || (vect_info->fp == NULL)) {
 		cmn_err(CE_WARN, "qede_fp_handler: invalid parameters");
         	return (DDI_INTR_UNCLAIMED);
 	}
@@ -685,15 +723,20 @@ qede_fp_handler(caddr_t arg1, caddr_t arg2)
 
 	if (mp)
 #ifndef NO_CROSSBOW
+	{
 		mac_rx_ring(rx_ring->qede->mac_handle,
 		    rx_ring->mac_ring_handle,
 		    mp,
 		    rx_ring->mr_gen_num);
+	}
 #else
+	{
 		mac_rx(qede->mac_handle, NULL, mp);
+	}
 #endif
-       else if(!mp && (work_done == 0))
+       else if (!mp && (work_done == 0)) {
 		qede->intrSbNoChangeCnt[vect_info->vect_index]++;
+	}
 
 
 	mutex_enter(&fp->qede->drv_lock);
@@ -704,13 +747,14 @@ qede_fp_handler(caddr_t arg1, caddr_t arg2)
 	 * In this case we do not want to 
 	 * enable them here.
 	 */
-	if (fp->disabled_by_poll == 0)
+	if (fp->disabled_by_poll == 0) {
 		qede_enable_hw_intr(fp);
+	}
 	mutex_exit(&fp->qede->drv_lock);
 
 	mutex_exit(&fp->fp_lock);
 
-    return (work_done ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
+	return (work_done ? DDI_INTR_CLAIMED : DDI_INTR_UNCLAIMED);
 }
 
 static int
@@ -722,13 +766,13 @@ qede_disable_intr(qede_t *qede, uint32_t index)
 	status = ddi_intr_disable(intr_ctx->intr_hdl_array[index]);
 	if (status != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_enable with %s"
-				" for index %d\n",
-				__func__, qede_get_ddi_fail(status), index);
-		return(status);
+		    " for index %d\n",
+		    __func__, qede_get_ddi_fail(status), index);
+		return (status);
 	}									  
 	atomic_and_32(&intr_ctx->intr_state, ~(1 << index));
 
-	return(status);
+	return (status);
 }
 
 static int
@@ -742,14 +786,14 @@ qede_enable_intr(qede_t *qede, int index)
 	
 	if (status != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_enable with %s"
-				" for index %d\n",
-				__func__, qede_get_ddi_fail(status), index);
-		return(status);
+		    " for index %d\n",
+		    __func__, qede_get_ddi_fail(status), index);
+		return (status);
 	}
 	
 	atomic_or_32(&intr_ctx->intr_state, (1 << index));
 	
-	return(status);
+	return (status);
 }
 
 static int
@@ -759,10 +803,11 @@ qede_disable_all_fastpath_intrs(qede_t *qede)
 
 	for (i = qede->num_hwfns; i <= qede->num_fp; i++) {
 		status = qede_disable_intr(qede, i);
-		if (status != DDI_SUCCESS)
-			return(status);
+		if (status != DDI_SUCCESS) {
+			return (status);
+		}
 	}
-	return(DDI_SUCCESS);
+	return (DDI_SUCCESS);
 }
 
 static int
@@ -772,10 +817,11 @@ qede_enable_all_fastpath_intrs(qede_t *qede)
 
 	for (i = qede->num_hwfns; i <= qede->num_fp; i++) {
 		status = qede_enable_intr(qede, i);
-		if (status != DDI_SUCCESS)
-			return(status);
+		if (status != DDI_SUCCESS) {
+			return (status);
+		}
 	}
-	return(DDI_SUCCESS);
+	return (DDI_SUCCESS);
 }
 
 static int
@@ -785,10 +831,11 @@ qede_disable_slowpath_intrs(qede_t *qede)
 
 	for (i = 0; i < qede->num_hwfns; i++) {
 		status = qede_disable_intr(qede, i);
-		if (status != DDI_SUCCESS)
-			return(status);
+		if (status != DDI_SUCCESS) {
+			return (status);
+		}
 	}
-	return(DDI_SUCCESS);
+	return (DDI_SUCCESS);
 }
 
 static int
@@ -798,10 +845,11 @@ qede_enable_slowpath_intrs(qede_t *qede)
 
 	for (i = 0; i < qede->num_hwfns; i++) {
 		status = qede_enable_intr(qede, i);
-		if (status != DDI_SUCCESS)
-			return(status);
+		if (status != DDI_SUCCESS) {
+			return (status);
+		}
 	}
-	return(DDI_SUCCESS);
+	return (DDI_SUCCESS);
 }
 
 static int
@@ -809,10 +857,6 @@ qede_prepare_edev(qede_t *qede)
 {
 	struct ecore_dev *edev = &qede->edev;
 	struct ecore_hw_prepare_params p_params;
-	int status;
-	u32 dp_module;
-	u8 dp_level;
-	time_t epoch;
 
 	/*
 	 * Setup the bar0 and bar2 base address
@@ -821,10 +865,10 @@ qede_prepare_edev(qede_t *qede)
 	edev->regview = (void *)qede->regview;
 	edev->doorbells = (void *)qede->doorbell;
 
+	/* LINTED E_FUNC_RET_MAYBE_IGNORED2 */
 	strcpy(edev->name, qede->name);
 	ecore_init_struct(edev);
 	
-	//memset((void *)p_params, 0, sizeof(struct ecore_hw_prepare_params));	
 	p_params.personality = ECORE_PCI_ETH;
 	p_params.drv_resc_alloc = 0;
 	p_params.chk_reg_fifo = 1;
@@ -845,17 +889,17 @@ qede_config_edev(qede_t *qede)
 	for (i = 0; i < qede->num_hwfns; i++) {
 		struct ecore_hwfn *p_hwfn = &edev->hwfns[i];
 		params = &p_hwfn->pf_params; 
-		memset((void *)params, 0, sizeof(struct ecore_pf_params));
-		//params->eth_pf_params.num_cons = 4;
+		memset((void *)params, 0, sizeof (struct ecore_pf_params));
 		params->eth_pf_params.num_cons = 32;
 	}
 	status = ecore_resc_alloc(edev);
 	if (status != ECORE_SUCCESS) {
-		cmn_err(CE_NOTE, "%s: Could not allocate ecore resources\n", __func__);
-		return(DDI_ENOMEM);
+		cmn_err(CE_NOTE, "%s: Could not allocate ecore resources\n",
+		 __func__);
+		return (DDI_ENOMEM);
 	}
 	ecore_resc_setup(edev);
-	return(DDI_SUCCESS);
+	return (DDI_SUCCESS);
 }
 
 static void
@@ -868,11 +912,14 @@ qede_unconfig_intrs(qede_t *qede)
 	for (i = 0; i < intr_ctx->intr_vect_allocated; i++) {
 		vect_info = &intr_ctx->intr_vect_info[i];
 		if (intr_ctx->intr_vect_info[i].handler_added == B_TRUE) {
-			status = ddi_intr_remove_handler(intr_ctx->intr_hdl_array[i]);
+			status = ddi_intr_remove_handler(
+				intr_ctx->intr_hdl_array[i]);
 			if (status != DDI_SUCCESS) {
-				cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_remove_handler with %s"
+				cmn_err(CE_WARN, "qede:%s: Failed" 
+					" ddi_intr_remove_handler with %s"
 					" for index %d\n",
-				__func__, qede_get_ddi_fail(status), i);
+				__func__, qede_get_ddi_fail(
+				status), i);
 			}
 		
 			(void) ddi_intr_free(intr_ctx->intr_hdl_array[i]);
@@ -889,7 +936,7 @@ qede_config_intrs(qede_t *qede)
 	qede_intr_context_t *intr_ctx = &qede->intr_ctx;
 	qede_vector_info_t *vect_info;
 	struct ecore_dev *edev = &qede->edev;
-	int i, status = DDI_SUCCESS, fp_index = 0;
+	int i, status = DDI_FAILURE;
 	ddi_intr_handler_t *handler;
 	void *arg1, *arg2;
 
@@ -902,7 +949,8 @@ qede_config_intrs(qede_t *qede)
 		/* Store the table index */
 		vect_info->vect_index = i;
 		vect_info->qede = qede;
-		/* Store the interrupt handler's argument.
+		/* 
+		 * Store the interrupt handler's argument.
 		 * This will be the a pointer to ecore_dev->hwfns
 		 * for slowpath, a pointer to the fastpath
 		 * structure for fastpath.
@@ -913,12 +961,13 @@ qede_config_intrs(qede_t *qede)
 			arg1 = (caddr_t)&qede->edev.hwfns[i];
 			arg2 = (caddr_t)vect_info;
 		} else {
-			/* loop index includes hwfns
+			/* 
+			 * loop index includes hwfns
 			 * so they need to be subtracked
 			 * for fp_array
 			 */
 			vect_info->fp =
-				(void *)&qede->fp_array[i - qede->num_hwfns];
+			    (void *)&qede->fp_array[i - qede->num_hwfns];
 			handler = qede_fp_handler; 
 			arg1 = (caddr_t)vect_info;
 			arg2 = (caddr_t)qede;
@@ -930,20 +979,22 @@ qede_config_intrs(qede_t *qede)
 		    arg1,
 		    arg2);
 		if (status != DDI_SUCCESS) {
-				cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_add_handler with %s"
-					" for index %d\n",
-				__func__, qede_get_ddi_fail(status), i);
+			cmn_err(CE_WARN, "qede:%s: Failed "
+			    " ddi_intr_add_handler with %s"
+			    " for index %d\n",
+			    __func__, qede_get_ddi_fail(
+			    status), i);
 			qede_unconfig_intrs(qede);
 			return (DDI_FAILURE);
 		}
 		vect_info->handler_added = B_TRUE;
 	}
 		
-	return(status);
+	return (status);
 }
 
 static void
-qede_free_intrs(qede_t * qede)
+qede_free_intrs(qede_t *qede)
 {
 	qede_intr_context_t *intr_ctx;
 	int i, status;
@@ -955,30 +1006,37 @@ qede_free_intrs(qede_t * qede)
 	if (intr_ctx->intr_hdl_array) {
 		for (i = 0; i < intr_ctx->intr_vect_allocated; i++) {
 			if (intr_ctx->intr_hdl_array[i]) {
-				status = ddi_intr_free(intr_ctx->intr_hdl_array[i]);
-				if (status != DDI_SUCCESS)
-					cmn_err(CE_NOTE, "qede:%s: Failed ddi_intr_free with %s\n",
-					__func__, qede_get_ddi_fail(status));
+				status = 
+				    ddi_intr_free(intr_ctx->intr_hdl_array[i]);
+				if (status != DDI_SUCCESS) {
+					cmn_err(CE_NOTE, 
+					    "qede:%s: Failed ddi_intr_free"
+					    " with %s\n",
+					    __func__, 
+					    qede_get_ddi_fail(status));
+				}
 			}
 		}
 		intr_ctx->intr_hdl_array = NULL;
 	}
 
 	if (intr_ctx->intr_hdl_array) {
-		kmem_free(intr_ctx->intr_hdl_array, intr_ctx->intr_hdl_array_size);
+		kmem_free(intr_ctx->intr_hdl_array, 
+		    intr_ctx->intr_hdl_array_size);
 		intr_ctx->intr_hdl_array = NULL;
 	}
 
 	if (intr_ctx->intr_vect_info) {
-		kmem_free(intr_ctx->intr_vect_info, intr_ctx->intr_vect_info_array_size);
+		kmem_free(intr_ctx->intr_vect_info, 
+		    intr_ctx->intr_vect_info_array_size);
 		intr_ctx->intr_vect_info = NULL;
 	}
 }
 
 static int
-qede_alloc_intrs(qede_t * qede)
+qede_alloc_intrs(qede_t *qede)
 {
-	int i, status, type_supported, num_supported;
+	int status, type_supported, num_supported;
 	int actual, num_available, num_to_request;
 	dev_info_t *dip;
 	qede_intr_context_t *intr_ctx = &qede->intr_ctx;
@@ -987,39 +1045,55 @@ qede_alloc_intrs(qede_t * qede)
 
 	status = ddi_intr_get_supported_types(dip, &type_supported);
 	if (status != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_get_supported_types with %s\n",
-			__func__, qede_get_ddi_fail(status));
-		return(status);
+		cmn_err(CE_WARN, 
+		    "qede:%s: Failed ddi_intr_get_supported_types with %s\n",
+		    __func__, qede_get_ddi_fail(status));
+		return (status);
 	}
 	intr_ctx->intr_types_available = type_supported;
 
 	if (type_supported & DDI_INTR_TYPE_MSIX) {
 		intr_ctx->intr_type_in_use = DDI_INTR_TYPE_MSIX;
 
-		/* get the total number of vectors supported by the device */
-		status = ddi_intr_get_nintrs(qede->dip, DDI_INTR_TYPE_MSIX, &num_supported);
+		/* 
+		 * get the total number of vectors 
+		 * supported by the device 
+		 */
+		status = ddi_intr_get_nintrs(qede->dip, 
+		             DDI_INTR_TYPE_MSIX, &num_supported);
 		if (status != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_get_nintrs with %s\n",
-				__func__, qede_get_ddi_fail(status));
-			return(status);
+			cmn_err(CE_WARN, 
+			    "qede:%s: Failed ddi_intr_get_nintrs with %s\n",
+			    __func__, qede_get_ddi_fail(status));
+			return (status);
 		}
 		intr_ctx->intr_vect_supported = num_supported;
 
-		/* get the total number of vectors available for this instance */
-		status = ddi_intr_get_navail(dip, DDI_INTR_TYPE_MSIX, &num_available);
+		/* 
+		 * get the total number of vectors 
+		 * available for this instance 
+		 */
+		status = ddi_intr_get_navail(dip, DDI_INTR_TYPE_MSIX, 
+		             &num_available);
 		if (status != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_get_navail with %s\n",
-				__func__, qede_get_ddi_fail(status));
+			cmn_err(CE_WARN, 
+			    "qede:%s: Failed ddi_intr_get_navail with %s\n",
+			    __func__, qede_get_ddi_fail(status));
 			return (status);
 		}
 
-                if ((num_available < intr_ctx->intr_vect_to_request) && (num_available >= 2)) {
+                if ((num_available < intr_ctx->intr_vect_to_request) && 
+			(num_available >= 2)) {
 			qede->num_fp = num_available - qede->num_hwfns;
-			cmn_err(CE_NOTE, "qede:%s: allocated %d interrupts requested was %d\n",
-				__func__, num_available, intr_ctx->intr_vect_to_request);
+			cmn_err(CE_NOTE, 
+			    "qede:%s: allocated %d interrupts"
+			    " requested was %d\n",
+			    __func__, num_available, 
+			    intr_ctx->intr_vect_to_request);
 			intr_ctx->intr_vect_to_request = num_available;
 		} else if(num_available < 2) {
-			cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_get_navail with %s\n",
+			cmn_err(CE_WARN, 
+			    "qede:%s: Failed ddi_intr_get_navail with %s\n",
 				__func__, qede_get_ddi_fail(status));
 			return (DDI_FAILURE);
 		}
@@ -1032,15 +1106,21 @@ qede_alloc_intrs(qede_t * qede)
 		    sizeof (qede_vector_info_t);
 
 		/* Allocate an array big enough for maximum supported */
-		intr_ctx->intr_hdl_array = kmem_zalloc(intr_ctx->intr_hdl_array_size, KM_SLEEP);
+		intr_ctx->intr_hdl_array = kmem_zalloc(
+		    intr_ctx->intr_hdl_array_size, KM_SLEEP);
 		if (intr_ctx->intr_hdl_array == NULL) {
-			cmn_err(CE_WARN, "qede:%s: Failed to allocate intr_ctx->intr_hdl_array\n",
+			cmn_err(CE_WARN, 
+			    "qede:%s: Failed to allocate"
+			    " intr_ctx->intr_hdl_array\n",
 				__func__);
-			return(status);
+			return (status);
 		}
-		intr_ctx->intr_vect_info = kmem_zalloc(intr_ctx->intr_vect_info_array_size, KM_SLEEP);
+		intr_ctx->intr_vect_info = kmem_zalloc(
+		    intr_ctx->intr_vect_info_array_size, KM_SLEEP);
 		if (intr_ctx->intr_vect_info_array_size == NULL) {
-			cmn_err(CE_WARN, "qede:%s: Failed to allocate intr_ctx->vect_info_array_size\n",
+			cmn_err(CE_WARN, 
+			    "qede:%s: Failed to allocate"
+			    " intr_ctx->vect_info_array_size\n",
 				__func__);
 			goto err_exit;
 		}
@@ -1053,40 +1133,49 @@ qede_alloc_intrs(qede_t * qede)
 		 * (Though we would need to account for the slowpath vector)
 		 */
 		status = ddi_intr_alloc(qede->dip, 
-					intr_ctx->intr_hdl_array, 
-					DDI_INTR_TYPE_MSIX,
-          			0, 
-          			num_to_request,
-          			&actual,
-          			DDI_INTR_ALLOC_STRICT);
+			intr_ctx->intr_hdl_array, 
+			DDI_INTR_TYPE_MSIX,
+			0, 
+			num_to_request,
+			&actual,
+			DDI_INTR_ALLOC_STRICT);
 		if (status != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "qede:%s: Failed to allocate %d interrupts with %s\n",
-				__func__, num_to_request, qede_get_ddi_fail(status));
-			cmn_err(CE_WARN, "qede:%s: Only %d interrupts available.\n",
-				__func__, actual);
+			cmn_err(CE_WARN, 
+			    "qede:%s: Failed to allocate"
+			    " %d interrupts with %s\n",
+			    __func__, num_to_request, 
+			    qede_get_ddi_fail(status));
+			cmn_err(CE_WARN, 
+			    "qede:%s: Only %d interrupts available.\n",
+			    __func__, actual);
 			goto err_exit;
 		}
 		intr_ctx->intr_vect_allocated = num_to_request;
 
-		status = ddi_intr_get_pri(intr_ctx->intr_hdl_array[0], &intr_ctx->intr_pri);
+		status = ddi_intr_get_pri(intr_ctx->intr_hdl_array[0], 
+			    &intr_ctx->intr_pri);
 		if (status != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_get_pri with %s\n",
-				__func__, qede_get_ddi_fail(status));
+			cmn_err(CE_WARN, 
+			    "qede:%s: Failed ddi_intr_get_pri with %s\n",
+			    __func__, qede_get_ddi_fail(status));
 			goto err_exit;
 		}
 
-		status = ddi_intr_get_cap(intr_ctx->intr_hdl_array[0], &intr_ctx->intr_cap);
+		status = ddi_intr_get_cap(intr_ctx->intr_hdl_array[0], 
+			    &intr_ctx->intr_cap);
 		if (status != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "qede:%s: Failed ddi_intr_get_cap with %s\n",
+			cmn_err(CE_WARN, 
+			    "qede:%s: Failed ddi_intr_get_cap with %s\n",
 				__func__, qede_get_ddi_fail(status));
 			goto err_exit;
 		}
 
 	} else {
 		/* For now we only support type MSIX */
-		cmn_err(CE_WARN, "qede:%s: Failed to allocate intr_ctx->intr_hdl_array\n",
+		cmn_err(CE_WARN, 
+		    "qede:%s: Failed to allocate intr_ctx->intr_hdl_array\n",
 			__func__);
-		return(DDI_FAILURE);
+		return (DDI_FAILURE);
 	}
 	
 	intr_ctx->intr_mode = ECORE_INT_MODE_MSIX;	
@@ -1097,25 +1186,54 @@ err_exit:
 }
 
 static void
-qede_unconfig_fm(qede_t * qede)
+/* LINTED E_FUNC_ARG_UNUSED */
+qede_unconfig_fm(qede_t *qede)
 {
-	return;
 }
+
+/* LINTED E_FUNC_ARG_UNUSED */
+static int
+qede_fm_err_cb(dev_info_t *dip, ddi_fm_error_t *err,
+    const void *impl_data)
+{
+        pci_ereport_post(dip, err, NULL);
+        return (err->fme_status);
+}
+
 
 static int
 qede_config_fm(qede_t * qede)
 {
-	/*qede_info(qede, "Entered");*/
-	return (DDI_SUCCESS);
+        ddi_iblock_cookie_t iblk;
+
+        cmn_err(CE_NOTE, "Entered qede_config_fm\n");
+        qede_regs_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+        qede_desc_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+        qede_buf_acc_attr.devacc_attr_access = DDI_FLAGERR_ACC;
+        qede_desc_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+        qede_gen_buf_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+        qede_tx_buf_dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+        qede_dma_attr_desc.dma_attr_flags = DDI_DMA_FLAGERR;
+        qede_dma_attr_txbuf.dma_attr_flags = DDI_DMA_FLAGERR;
+        qede_dma_attr_rxbuf.dma_attr_flags = DDI_DMA_FLAGERR;
+        qede_dma_attr_cmddesc.dma_attr_flags = DDI_DMA_FLAGERR;
+        qede_gen_dma_attr_desc.dma_attr_flags = DDI_DMA_FLAGERR;
+        qede_buf2k_dma_attr_txbuf.dma_attr_flags = DDI_DMA_FLAGERR;
+
+        ddi_fm_init(qede->dip, &qede->fm_cap, &iblk);
+
+        if (DDI_FM_EREPORT_CAP(qede->fm_cap) ||
+            DDI_FM_ERRCB_CAP(qede->fm_cap)) {
+                pci_ereport_setup(qede->dip);
+        }
+
+        if (DDI_FM_ERRCB_CAP(qede->fm_cap)) {
+                ddi_fm_handler_register(qede->dip,
+                    qede_fm_err_cb, (void *)qede);
+        }
+        return (DDI_SUCCESS);
+
 }
-
-
-static int
-qede_alloc_mem_sb(qede_t *qede, qede_fastpath_t *fp)
-{
-	return (0);
-}
-
 
 int
 qede_dma_mem_alloc(qede_t *qede,
@@ -1129,8 +1247,9 @@ qede_dma_mem_alloc(qede_t *qede,
 
 	*dma_handle = NULL;
 
-	if (size <= 0)
+	if (size <= 0) {
 		return (DDI_ENOMEM);
+	}
 
 	err = ddi_dma_alloc_handle(qede->dip,
 	    dma_attr,
@@ -1217,7 +1336,7 @@ qede_vport_stop(qede_t *qede)
 {
 	struct ecore_dev *edev = &qede->edev;
 	struct ecore_hwfn *p_hwfn;
-	int i, status; 
+	int i, status = ECORE_BUSY; 
 
 	for (i = 0; i < edev->num_hwfns; i++) {
 		p_hwfn = &edev->hwfns[i];
@@ -1229,8 +1348,8 @@ qede_vport_stop(qede_t *qede)
 		}
 
 		status = ecore_sp_vport_stop(p_hwfn,
-				p_hwfn->hw_info.opaque_fid,
-				i); /* vport needs fix */
+			p_hwfn->hw_info.opaque_fid,
+			i); /* vport needs fix */
 		if (status != ECORE_SUCCESS) {
 			cmn_err(CE_WARN, "!qede_vport_stop: "
 			    "FAILED for hwfn%d ", i);
@@ -1243,7 +1362,7 @@ qede_vport_stop(qede_t *qede)
 		    QEDE_VPORT_STOPPED;
 	}
 
-	return (DDI_SUCCESS);
+	return (status);
 }
 
 static uint8_t
@@ -1252,9 +1371,12 @@ qede_get_active_rss_params(qede_t *qede, u8 hwfn_id)
 	struct ecore_rss_params rss_params;
 	qede_fastpath_t *fp;
 	int i;
-	const uint64_t hash_key[] = { 0xbeac01fa6a42b73bULL, 0x8030f20c77cb2da3ULL,
-	    0xae7b30b4d0ca2bcbULL, 0x43a38fb04167253dULL,
-	    0x255b0ec26d5a56daULL };
+	const uint64_t hash_key[] = 
+	{ 
+		0xbeac01fa6a42b73bULL, 0x8030f20c77cb2da3ULL,
+		0xae7b30b4d0ca2bcbULL, 0x43a38fb04167253dULL,
+		0x255b0ec26d5a56daULL 
+	};
 	uint8_t enable_rss = 0;
 
 	bzero(&rss_params, sizeof (rss_params));
@@ -1282,9 +1404,10 @@ qede_get_active_rss_params(qede_t *qede, u8 hwfn_id)
 
 	rss_params.rss_table_size_log = 7; /* 2^7 = 128 */
 
-	bcopy(&hash_key[0], &rss_params.rss_key[0], sizeof (rss_params.rss_key));
+	bcopy(&hash_key[0], &rss_params.rss_key[0], 
+		sizeof (rss_params.rss_key));
 
-	for (i = 0; i < ECORE_RSS_IND_TABLE_SIZE; i++ ) {
+	for (i = 0; i < ECORE_RSS_IND_TABLE_SIZE; i++) {
 		fp = &qede->fp_array[i % qede->num_fp];
 		rss_params.rss_ind_table[i] = (void *)(fp->rx_ring->p_cid);
 	}
@@ -1301,8 +1424,9 @@ qede_vport_update(qede_t *qede,
 	struct ecore_hwfn *p_hwfn;
 	struct ecore_sp_vport_update_params *vport_params;
 	struct ecore_sge_tpa_params tpa_params;
-	int i, status = DDI_SUCCESS;
+	int  status = DDI_SUCCESS;
 	bool new_state;
+	uint8_t i;
 
 	cmn_err(CE_NOTE, "qede_vport_update: "
 	    "Enter, state = %s%s%s%s%s",
@@ -1318,11 +1442,11 @@ qede_vport_update(qede_t *qede,
 	 * together.  Later we can split them
 	 * and set other params as well.
 	 */
-	if (state == QEDE_VPORT_ON)
+	if (state == QEDE_VPORT_ON) {
 	    new_state = B_TRUE;
-	else if (state == QEDE_VPORT_OFF)
+	} else if (state == QEDE_VPORT_OFF) {
 	    new_state = B_FALSE;
-	else {
+	} else {
 		cmn_err(CE_WARN, "qede_vport_update: "
 		    "invalid, state = %d", state);
 		return (DDI_EINVAL);
@@ -1339,12 +1463,18 @@ qede_vport_update(qede_t *qede,
 
 		vport_params->update_vport_active_rx_flg =
 		    1;
-		vport_params->vport_active_rx_flg =
-		    new_state;
+                if (new_state == B_TRUE)
+                        vport_params->vport_active_rx_flg = 1;
+                else
+                        vport_params->vport_active_rx_flg = 0;
+
 		vport_params->update_vport_active_tx_flg =
 		    1;
-		vport_params->vport_active_tx_flg =
-		    new_state;
+                if (new_state == B_TRUE)
+                        vport_params->vport_active_tx_flg = 1;
+                else
+                        vport_params->vport_active_tx_flg = 0;
+
 		vport_params->update_inner_vlan_removal_flg =
 		    0;
 		vport_params->inner_vlan_removal_flg =
@@ -1373,26 +1503,27 @@ qede_vport_update(qede_t *qede,
 		vport_params->accept_flags.update_rx_mode_config = 1;
 		vport_params->accept_flags.update_tx_mode_config = 1;
 		vport_params->accept_flags.rx_accept_filter =
-			ECORE_ACCEPT_BCAST |
-			ECORE_ACCEPT_UCAST_UNMATCHED |
-			ECORE_ACCEPT_MCAST_UNMATCHED;
+		    ECORE_ACCEPT_BCAST |
+		    ECORE_ACCEPT_UCAST_UNMATCHED |
+		    ECORE_ACCEPT_MCAST_UNMATCHED;
 		vport_params->accept_flags.tx_accept_filter =
-			ECORE_ACCEPT_BCAST |
-			ECORE_ACCEPT_UCAST_UNMATCHED |
-			ECORE_ACCEPT_MCAST_UNMATCHED;
+		    ECORE_ACCEPT_BCAST |
+		    ECORE_ACCEPT_UCAST_UNMATCHED |
+		    ECORE_ACCEPT_MCAST_UNMATCHED;
 
 		vport_params->sge_tpa_params = NULL;
 
 		if (qede->lro_enable &&
-		    new_state == B_TRUE) {
+		    (new_state == B_TRUE)) {
 			qede_print("!%s(%d): enabling LRO ",
-		    			__func__, qede->instance);
+				__func__, qede->instance);
 
-			memset(&tpa_params, 0, sizeof (struct ecore_sge_tpa_params));
+			memset(&tpa_params, 0, 
+			    sizeof (struct ecore_sge_tpa_params));
 			tpa_params.max_buffers_per_cqe = 5;
 			tpa_params.update_tpa_en_flg = 1;
-			tpa_params.tpa_ipv4_en_flg = new_state;
-			tpa_params.tpa_ipv6_en_flg = new_state;
+			tpa_params.tpa_ipv4_en_flg = 1;
+			tpa_params.tpa_ipv6_en_flg = 1;
 			tpa_params.tpa_ipv4_tunn_en_flg = 0;
 			tpa_params.tpa_ipv6_tunn_en_flg = 0;
 			tpa_params.update_tpa_param_flg = 1;
@@ -1415,7 +1546,6 @@ qede_vport_update(qede_t *qede,
 			vport_params->rss_params = NULL;
 		}
 
-//		qede_print_vport_params(qede, vport_params);
 		status = ecore_sp_vport_update(p_hwfn,
 		    vport_params,
 		    ECORE_SPQ_MODE_EBLOCK,
@@ -1425,12 +1555,10 @@ qede_vport_update(qede_t *qede,
 			cmn_err(CE_WARN, "ecore_sp_vport_update: "
 			    "FAILED for hwfn%d "
 			    " with ", i);
-//			    qede_get_ecore_fail(status));
 			return (DDI_FAILURE);
 		}
 		cmn_err(CE_NOTE, "!ecore_sp_vport_update: "
 		    "SUCCESS for hwfn%d ", i);
-		//qede->vport_state[i] = state;
 
 					
 	}
@@ -1444,15 +1572,17 @@ qede_vport_start(qede_t *qede)
 	struct ecore_dev *edev = &qede->edev;
 	struct ecore_hwfn *p_hwfn;
 	struct ecore_sp_vport_start_params params;
-	int i, status;
+	uint8_t i;
+	int  status = ECORE_BUSY;
 
 	for (i = 0; i < edev->num_hwfns; i++) {
 		p_hwfn = &edev->hwfns[i];
 		if ((qede->vport_state[i] !=
 		    QEDE_VPORT_UNKNOWN) &&
 		    (qede->vport_state[i] !=
-		    QEDE_VPORT_STOPPED))
+		    QEDE_VPORT_STOPPED)) {
 		    continue;
+		}
 
 		params.tpa_mode = ECORE_TPA_MODE_NONE;
 		params.remove_inner_vlan = 0;
@@ -1462,7 +1592,6 @@ qede_vport_start(qede_t *qede)
 		params.drop_ttl0 = 1;
 		params.max_buffers_per_cqe = 16; 
 		params.concrete_fid = p_hwfn->hw_info.concrete_fid;
-		//params.tpa_buf_size = qede->rx_buf_size;
 		params.opaque_fid = p_hwfn->hw_info.opaque_fid;
 		params.vport_id = i;
 		params.mtu = qede->mtu;
@@ -1487,8 +1616,9 @@ qede_update_rx_q_producer(qede_rx_ring_t *rx_ring)
 {
 	u16 bd_prod = ecore_chain_get_prod_idx(&rx_ring->rx_bd_ring);
 	u16 cqe_prod = ecore_chain_get_prod_idx(&rx_ring->rx_cqe_ring);
-	u16 sge_prod = 0;
-	struct eth_rx_prod_data rx_prod_cmd = {0};
+	/* LINTED E_FUNC_SET_NOT_USED */
+        struct eth_rx_prod_data rx_prod_cmd = { 0 };
+
 
 	rx_prod_cmd.bd_prod = HOST_TO_LE_32(bd_prod);
 	rx_prod_cmd.cqe_prod = HOST_TO_LE_32(cqe_prod);
@@ -1498,7 +1628,7 @@ qede_update_rx_q_producer(qede_rx_ring_t *rx_ring)
 static int
 qede_fastpath_stop_queues(qede_t *qede)
 {
-	int i,j;
+	int i, j;
 	int status = DDI_FAILURE;
 	struct ecore_dev *edev;
 	struct ecore_hwfn *p_hwfn;
@@ -1507,11 +1637,9 @@ qede_fastpath_stop_queues(qede_t *qede)
 	qede_fastpath_t *fp;
 	qede_rx_ring_t *rx_ring;
 	qede_tx_ring_t *tx_ring;
-	qede_vector_info_t *vect_info;
-	int num_fp;
 
 	ASSERT(qede != NULL);
-	/*ASSERT(qede->edev != NULL);*/
+	/* ASSERT(qede->edev != NULL); */
 
 	edev = &qede->edev;
 
@@ -1530,17 +1658,18 @@ qede_fastpath_stop_queues(qede_t *qede)
 			tx_ring = fp->tx_ring[j];
 			if (tx_ring->queue_started == B_TRUE) {
 				cmn_err(CE_WARN, "Stopping tx queue "
-					"%d:%d. ", i, j);
+				    "%d:%d. ", i, j);
 				p_tx_cid = tx_ring->p_cid; 
 				status = ecore_eth_tx_queue_stop(p_hwfn,
-						(void *)p_tx_cid);
+					(void *)p_tx_cid);
 				if (status != ECORE_SUCCESS) {
 					cmn_err(CE_WARN, "FAILED to "
-			    	    "stop tx queue %d:%d", i, j);
+			    	    	    "stop tx queue %d:%d", i, j);
 					return (DDI_FAILURE);
 				}
 				tx_ring->queue_started = B_FALSE;
-				cmn_err(CE_NOTE, "tx_ring %d:%d stopped\n", i, j);
+				cmn_err(CE_NOTE, "tx_ring %d:%d stopped\n", i, 
+				    j);
 			}
 		}
 
@@ -1552,9 +1681,9 @@ qede_fastpath_stop_queues(qede_t *qede)
 			    (void *)p_rx_cid, B_TRUE, B_FALSE);
 			if (status != ECORE_SUCCESS) {
 				cmn_err(CE_WARN, "FAILED to "
-			    	"stop rx queue %d "
-			    	"with ecore status %s",
-			    	i, qede_get_ecore_fail(status));
+			    	    "stop rx queue %d "
+			    	    "with ecore status %s",
+				    i, qede_get_ecore_fail(status));
 				return (DDI_FAILURE);
 			}
 			rx_ring->queue_started = B_FALSE;
@@ -1577,7 +1706,7 @@ qede_fastpath_stop_queues(qede_t *qede)
 static int
 qede_fastpath_start_queues(qede_t *qede)
 {
-	int i,j;
+	int i, j;
 	int status = DDI_FAILURE;
 	struct ecore_dev *edev;
 	struct ecore_hwfn *p_hwfn;
@@ -1587,13 +1716,11 @@ qede_fastpath_start_queues(qede_t *qede)
 	qede_fastpath_t *fp;
 	qede_rx_ring_t *rx_ring;
 	qede_tx_ring_t *tx_ring;
-	qede_vector_info_t *vect_info;
 	dma_addr_t p_phys_table;
         u16 page_cnt;
-	int num_fp;
 
 	ASSERT(qede != NULL);
-	/*ASSERT(qede->edev != NULL);*/
+	/* ASSERT(qede->edev != NULL); */
 	edev = &qede->edev;
 
 	status = qede_vport_start(qede);
@@ -1629,7 +1756,7 @@ qede_fastpath_start_queues(qede_t *qede)
 		rx_ring->p_cid = rx_ret_params.p_handle;
 		if (status != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "ecore_sp_eth_rx_queue_start "
-		        "FAILED for rxq%d", i);
+		            "FAILED for rxq%d", i);
 			return (DDI_FAILURE);
 		}
 		rx_ring->hw_cons_ptr = &fp->sb_info->sb_virt->pi_array[RX_PI];
@@ -1650,8 +1777,10 @@ qede_fastpath_start_queues(qede_t *qede)
 			params.p_sb = fp->sb_info;
 			params.sb_idx = TX_PI(j);
 
-			p_phys_table = ecore_chain_get_pbl_phys(&tx_ring->tx_bd_ring);
-			page_cnt = ecore_chain_get_page_cnt(&tx_ring->tx_bd_ring);
+			p_phys_table = ecore_chain_get_pbl_phys(
+			    &tx_ring->tx_bd_ring);
+			page_cnt = ecore_chain_get_page_cnt(
+			    &tx_ring->tx_bd_ring);
 			status = ecore_eth_tx_queue_start(p_hwfn,
 			    p_hwfn->hw_info.opaque_fid,
 			    &params, 
@@ -1663,14 +1792,18 @@ qede_fastpath_start_queues(qede_t *qede)
 			tx_ring->p_cid = tx_ret_params.p_handle;	
 			if (status != DDI_SUCCESS) {
 				cmn_err(CE_WARN, "ecore_sp_eth_tx_queue_start "
-		            "FAILED for txq%d:%d", i,j);
+				    "FAILED for txq%d:%d", i,j);
 				return (DDI_FAILURE);
 			}
-			tx_ring->hw_cons_ptr = &fp->sb_info->sb_virt->pi_array[TX_PI(j)];
+			tx_ring->hw_cons_ptr = 
+			    &fp->sb_info->sb_virt->pi_array[TX_PI(j)];
+			/* LINTED E_CONSTANT_CONDITION */
 			SET_FIELD(tx_ring->tx_db.data.params,
 			    ETH_DB_DATA_DEST, DB_DEST_XCM);
+			/* LINTED E_CONSTANT_CONDITION */
 			SET_FIELD(tx_ring->tx_db.data.params,
 			    ETH_DB_DATA_AGG_CMD, DB_AGG_CMD_SET);
+			/* LINTED E_CONSTANT_CONDITION */
 			SET_FIELD(tx_ring->tx_db.data.params,
 			    ETH_DB_DATA_AGG_VAL_SEL, DQ_XCM_ETH_TX_BD_PROD_CMD);
 			tx_ring->tx_db.data.agg_flags = DQ_XCM_ETH_DQ_CF_CMD;
@@ -1712,11 +1845,13 @@ qede_free_lro_rx_buffers(qede_rx_ring_t *rx_ring)
 
 	for (i = 0; i < ETH_TPA_MAX_AGGS_NUM; i++) {
 		lro_info = &rx_ring->lro_info[i];
-		if (lro_info->agg_state == QEDE_AGG_STATE_NONE)
+		if (lro_info->agg_state == QEDE_AGG_STATE_NONE) {
 			continue;
+		}
 		for (j = 0; j < QEDE_MAX_BD_PER_AGG; j++) {
-			if (lro_info->rx_buffer[j] == NULL)
+			if (lro_info->rx_buffer[j] == NULL) {
 				break;
+			}
 			qede_recycle_copied_rx_buffer(
 			    lro_info->rx_buffer[j]);
 			lro_info->rx_buffer[j] = NULL;
@@ -1730,7 +1865,7 @@ qede_free_rx_buffers_legacy(qede_t *qede, qede_rx_buf_area_t *rx_buf_area)
 {
 	int i, j;
 	u32 ref_cnt, bufs_per_page;
-	qede_rx_buffer_t *rx_buffer, *first_rx_buf_in_page;
+	qede_rx_buffer_t *rx_buffer, *first_rx_buf_in_page = 0;
 	qede_rx_ring_t *rx_ring = rx_buf_area->rx_ring;
 	bool free_rx_buffer;
 
@@ -1741,22 +1876,26 @@ qede_free_rx_buffers_legacy(qede_t *qede, qede_rx_buf_area_t *rx_buf_area)
 	if (rx_buf_area) {
 		for (i = 0; i < rx_ring->rx_buf_count; i += bufs_per_page) {
 			free_rx_buffer = B_TRUE;
-			first_rx_buf_in_page = NULL;
 			for (j = 0; j < bufs_per_page; j++) {
-				if (!j)
+				if (!j) {
 					first_rx_buf_in_page = rx_buffer;
+				}
 				if (rx_buffer->ref_cnt != 0) {
 					ref_cnt = atomic_dec_32_nv(
 					    &rx_buffer->ref_cnt);
 					if (ref_cnt == 0) {
-						/* Buffer is now completely free */
+						/*
+						 * Buffer is now 
+						 * completely free 
+						 */
 						if (rx_buffer->mp) {
 							freemsg(rx_buffer->mp);
 							rx_buffer->mp = NULL;
 						}
 					} else {
 						/*
-						 * Since Buffer still held up in Stack,
+						 * Since Buffer still 
+						 * held up in Stack,
 						 * we cant free the whole page
 						 */
 						free_rx_buffer = B_FALSE;
@@ -1765,18 +1904,27 @@ qede_free_rx_buffers_legacy(qede_t *qede, qede_rx_buf_area_t *rx_buf_area)
 				rx_buffer++;
 			}
 
-			if (free_rx_buffer == B_TRUE && first_rx_buf_in_page != NULL) {
-				qede_pci_free_consistent(&first_rx_buf_in_page->dma_info.dma_handle,
+			if (free_rx_buffer == B_TRUE) {
+				qede_pci_free_consistent(
+				    &first_rx_buf_in_page->dma_info.dma_handle,
 			    	    &first_rx_buf_in_page->dma_info.acc_handle);
 			}
 		}
 
-		/* If no more buffers are with the stack then free the buf pools */
+		/* 
+		 * If no more buffers are with the stack
+		 *  then free the buf pools 
+		 */
 		if (rx_buf_area->buf_upstream == 0) {
 			mutex_destroy(&rx_buf_area->active_buf_list.lock);
 			mutex_destroy(&rx_buf_area->passive_buf_list.lock);
 
 			kmem_free(rx_buf_area, sizeof (qede_rx_buf_area_t));
+			rx_buf_area = NULL;
+			if (atomic_cas_32(&qede->detach_unsafe, 2, 2)) {
+				atomic_dec_32(&qede->detach_unsafe);
+			}
+			
 		}
 	}
 }
@@ -1794,7 +1942,6 @@ static void
 qede_free_rx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 {
 	qede_rx_ring_t *rx_ring;
-	size_t size;
 
 	ASSERT(qede != NULL);
 	ASSERT(fp != NULL);
@@ -1814,13 +1961,14 @@ qede_free_rx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 	if (rx_ring->rx_cqe_ring.p_virt_addr) {
 		ecore_chain_free(&qede->edev, &rx_ring->rx_cqe_ring);
 		rx_ring->rx_cqe_ring.p_virt_addr = NULL;
-		if(rx_ring->rx_cqe_ring.pbl_sp.p_virt_table)
+		if (rx_ring->rx_cqe_ring.pbl_sp.p_virt_table) {
 			rx_ring->rx_cqe_ring.pbl_sp.p_virt_table = NULL;
+		}
 	}
 	rx_ring->hw_cons_ptr = NULL;
 	rx_ring->hw_rxq_prod_addr = NULL;
 	rx_ring->sw_rx_cons = 0;
-	rx_ring->sw_rx_prod =0;
+	rx_ring->sw_rx_prod = 0;
 
 }
 
@@ -1828,21 +1976,17 @@ qede_free_rx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 static int
 qede_init_bd(qede_t *qede, qede_rx_ring_t *rx_ring)
 {
-	u16 prod_idx;
 	struct eth_rx_bd *bd = NULL;
 	int ret = DDI_SUCCESS;
 	int i;
 	qede_rx_buffer_t *rx_buffer;
 	qede_rx_buf_area_t *rx_buf_area = rx_ring->rx_buf_area;
 	qede_rx_buf_list_t *active_buf_list = &rx_buf_area->active_buf_list;
-	u16 tail = 0;  
 
 	for (i = 0; i < rx_ring->rx_buf_count; i++) {
 		rx_buffer = &rx_buf_area->rx_buf_pool[i];
 		active_buf_list->buf_list[i] = rx_buffer;
 		active_buf_list->num_entries++;
-		tail = i;
-		prod_idx = ecore_chain_get_prod_idx(&rx_ring->rx_bd_ring) & RX_RING_MASK;
 		bd = ecore_chain_produce(&rx_ring->rx_bd_ring);
 		if (bd == NULL) {
 			qede_print_err("!%s(%d): invalid NULL bd in "
@@ -1851,12 +1995,10 @@ qede_init_bd(qede_t *qede, qede_rx_ring_t *rx_ring)
 			goto err;
 		}
 
-		bd->addr.lo = HOST_TO_LE_32(U64_LO(rx_buffer->dma_info.phys_addr)); 
-		bd->addr.hi = HOST_TO_LE_32(U64_HI(rx_buffer->dma_info.phys_addr));
-
-
-
-
+		bd->addr.lo = HOST_TO_LE_32(U64_LO(
+				rx_buffer->dma_info.phys_addr)); 
+		bd->addr.hi = HOST_TO_LE_32(U64_HI(
+				rx_buffer->dma_info.phys_addr));
 	
 	}
 	active_buf_list->tail = 0;
@@ -1881,7 +2023,7 @@ qede_get_from_active_list(qede_rx_ring_t *rx_ring,
 	if (rx_buffer) {
 		atomic_dec_32(&active_buf_list->num_entries);
 		atomic_inc_32(&rx_ring->rx_buf_area->buf_upstream);
-		atomic_inc_32(&rx_buffer->ref_cnt);	// qede_get_from_active_list()
+		atomic_inc_32(&rx_buffer->ref_cnt);
 		rx_buffer->buf_state = RX_BUF_STATE_WITH_OS;
 
 		if (rx_buffer->mp == NULL) {
@@ -1943,8 +2085,17 @@ qede_replenish_rx_buffers(qede_rx_ring_t *rx_ring)
 	qede_rx_buffer_t *rx_buffer;
 	int count = 0;
 	struct eth_rx_bd *bd;
-	qede_rx_buf_list_t *passive_buf_list=
-	    &rx_ring->rx_buf_area->passive_buf_list;
+
+        /*
+         * Only replenish when we have at least
+         * 1/4th of the ring to do.  We don't want
+         * to incur many lock contentions and
+         * cycles for just a few buffers.
+         * We don't bother with the passive area lock
+         * here because we're just getting an
+         * estimate.  Also, we only pull from
+         * the passive list in this function.
+         */
 	
 	/*
 	 * Use a replenish lock because we can do the
@@ -1954,7 +2105,9 @@ qede_replenish_rx_buffers(qede_rx_ring_t *rx_ring)
 	 * layers.
 	 */
 	if (mutex_tryenter(&rx_ring->rx_replen_lock) == 0) {
-		qede_info(rx_ring->qede, "Failed to take replenish_lock");
+		qede_info(rx_ring->qede, "!%s(%d): Failed to take"
+			" replenish_lock",
+			__func__, rx_ring->qede->instance);
 		return;
 	}
 
@@ -1963,13 +2116,16 @@ qede_replenish_rx_buffers(qede_rx_ring_t *rx_ring)
 	while (rx_buffer != NULL) {
 		bd = ecore_chain_produce(&rx_ring->rx_bd_ring);
 		if (bd == NULL) {
-			qede_info(rx_ring->qede, "bd = null");
+			qede_info(rx_ring->qede, "!%s(%d): bd = null",
+				__func__, rx_ring->qede->instance);
 			qede_put_to_passive_list(rx_ring, rx_buffer);
 			break;
 		}
 
-		bd->addr.lo = HOST_TO_LE_32(U64_LO(rx_buffer->dma_info.phys_addr));
-		bd->addr.hi = HOST_TO_LE_32(U64_HI(rx_buffer->dma_info.phys_addr));
+		bd->addr.lo = HOST_TO_LE_32(U64_LO(
+				rx_buffer->dma_info.phys_addr));
+		bd->addr.hi = HOST_TO_LE_32(
+				U64_HI(rx_buffer->dma_info.phys_addr));
 
 		/*
 		 * Put the buffer in active list since it will be
@@ -1989,7 +2145,7 @@ qede_replenish_rx_buffers(qede_rx_ring_t *rx_ring)
 int
 qede_put_to_passive_list(qede_rx_ring_t *rx_ring, qede_rx_buffer_t *rx_buffer)
 {
-	qede_rx_buf_list_t *passive_buf_list=
+	qede_rx_buf_list_t *passive_buf_list =
 	    &rx_ring->rx_buf_area->passive_buf_list;
 	qede_rx_buf_area_t *rx_buf_area = rx_ring->rx_buf_area;
 	int tail = 0;
@@ -2010,12 +2166,13 @@ qede_put_to_passive_list(qede_rx_ring_t *rx_ring, qede_rx_buffer_t *rx_buffer)
 		    rx_ring->rx_buf_count);
 	}
 	mutex_exit(&passive_buf_list->lock);
-	return passive_buf_list->num_entries;
+	return (passive_buf_list->num_entries);
 }
 
 void
 qede_recycle_rx_buffer(char *arg)
 {
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	qede_rx_buffer_t *rx_buffer = (qede_rx_buffer_t *)arg;
 	qede_rx_ring_t *rx_ring = rx_buffer->rx_ring;
 	qede_rx_buf_area_t *rx_buf_area = rx_buffer->rx_buf_area;
@@ -2035,7 +2192,7 @@ qede_recycle_rx_buffer(char *arg)
     	rx_buffer->mp = desballoc(rx_buffer->dma_info.virt_addr,
 	    rx_ring->rx_buf_size, 0, &rx_buffer->recycle);
 
-	ref_cnt = atomic_dec_32_nv(&rx_buffer->ref_cnt);	// qede_recycle_rx_buffer()
+	ref_cnt = atomic_dec_32_nv(&rx_buffer->ref_cnt);
 	if (ref_cnt == 1) {
 		/* Put the buffer into passive_buf_list to be reused */
 		num_entries = qede_put_to_passive_list(rx_ring, rx_buffer);
@@ -2047,7 +2204,8 @@ qede_recycle_rx_buffer(char *arg)
 			}
 		}
 	} else if (ref_cnt == 0) {
-		/* This is a buffer from a previous load instance of
+		/* 
+		 * This is a buffer from a previous load instance of
 		 * rx_buf_area. Free the rx_buffer and if no more
 		 * buffers are upstream from this rx_buf_area instance
 		 * then free the rx_buf_area;
@@ -2062,7 +2220,7 @@ qede_recycle_rx_buffer(char *arg)
 		if (buf_upstream >= 1) {
 			atomic_dec_32(&rx_buf_area->buf_upstream);
 		}
-		if (rx_buf_area->inactive && rx_buf_area->buf_upstream == 0) {
+		if (rx_buf_area->inactive && (rx_buf_area->buf_upstream == 0)) {
 			qede_free_rx_buffers_legacy(qede, rx_buf_area);
 		}
 
@@ -2088,7 +2246,8 @@ qede_recycle_copied_rx_buffer(qede_rx_buffer_t *rx_buffer)
 		 * Can happen if the buffer is being free'd
 		 * in the stop routine
 		 */
-		qede_info(qede, "rx_buffer->ref_cnt = 0");
+		qede_info(qede, "!%s(%d): rx_buffer->ref_cnt = 0",
+		    __func__, qede->instance);
 		return;
 	}
 
@@ -2104,16 +2263,14 @@ qede_recycle_copied_rx_buffer(qede_rx_buffer_t *rx_buffer)
 	 * Though we could also be recycling a buffer that got copied,
 	 * so in that case the mp would still be intact.
 	 */
-	//if(rx_buffer->mp == NULL)
-//    	rx_buffer->mp = desballoc(rx_buffer->dma_info.virt_addr,
-//	        rx_ring->rx_buf_size, 0, &rx_buffer->recycle);
 
-	ref_cnt = atomic_dec_32_nv(&rx_buffer->ref_cnt);	// qede_recycle_rx_buffer()
+	ref_cnt = atomic_dec_32_nv(&rx_buffer->ref_cnt);
 	if (ref_cnt == 1) {
 		qede_put_to_passive_list(rx_ring, rx_buffer);
 		/* Put the buffer into passive_buf_list to be reused */
 	} else if (ref_cnt == 0) {
-		/* This is a buffer from a previous load instance of
+		/* 
+		 * This is a buffer from a previous load instance of
 		 * rx_buf_area. Free the rx_buffer and if no more
 		 * buffers are upstream from this rx_buf_area instance
 		 * then free the rx_buf_area;
@@ -2126,7 +2283,7 @@ qede_recycle_copied_rx_buffer(qede_rx_buffer_t *rx_buffer)
 			rx_buffer->mp = NULL;
 		}
 
-		if (rx_buf_area->inactive && rx_buf_area->buf_upstream == 0) {
+		if (rx_buf_area->inactive && (rx_buf_area->buf_upstream == 0)) {
 			mutex_enter(&qede->drv_lock);
 			qede_free_rx_buffers_legacy(qede, rx_buf_area);
 			mutex_exit(&qede->drv_lock);
@@ -2144,18 +2301,15 @@ static int
 qede_alloc_rx_buffers(qede_t *qede, qede_rx_ring_t *rx_ring)
 {
 	int ret = DDI_SUCCESS, i, j;
-	qede_rx_buffer_t *rx_buf_pool;
 	qede_rx_buffer_t *rx_buffer;
 	qede_rx_buf_area_t *rx_buf_area = rx_ring->rx_buf_area;
-	struct eth_rx_bd *bd = NULL;
-	uint16_t prod_idx;
 	u32 bufs_per_page, buf_size;
-	int page_size = (int) ddi_ptob(qede->dip, 1);
+	int page_size = (int)ddi_ptob(qede->dip, 1);
 	qede_dma_info_t *dma_info;
 	ddi_dma_cookie_t temp_cookie;
 	int allocated = 0;
 	u64 dma_addr;
-	u8  *vaddr;
+	u8 *vaddr;
 	ddi_dma_handle_t dma_handle;
 	ddi_acc_handle_t acc_handle;
 
@@ -2180,14 +2334,14 @@ qede_alloc_rx_buffers(qede_t *qede, qede_rx_ring_t *rx_ring)
 		dma_info = &rx_buffer->dma_info;
 
 		ret = qede_dma_mem_alloc(qede,
-				    buf_size,
-				    DDI_DMA_READ | DDI_DMA_STREAMING | DDI_DMA_CONSISTENT,
-				    (caddr_t *)&dma_info->virt_addr,
-				    &temp_cookie,
-				    &dma_info->dma_handle,
-				    &dma_info->acc_handle,
-				    &qede_dma_attr_rxbuf,
-				    &qede_buf_acc_attr); 
+			buf_size,
+			DDI_DMA_READ | DDI_DMA_STREAMING | DDI_DMA_CONSISTENT,
+			(caddr_t *)&dma_info->virt_addr,
+			&temp_cookie,
+			&dma_info->dma_handle,
+			&dma_info->acc_handle,
+			&qede_dma_attr_rxbuf,
+			&qede_buf_acc_attr); 
 		if (ret != DDI_SUCCESS) {
 			goto err;
 		}
@@ -2210,22 +2364,22 @@ qede_alloc_rx_buffers(qede_t *qede, qede_rx_ring_t *rx_ring)
 			rx_buffer->recycle.free_arg = (caddr_t)rx_buffer;
 
 			rx_buffer->mp = desballoc(dma_info->virt_addr,
-				    rx_ring->rx_buf_size, 0,
-				    &rx_buffer->recycle);
+				    	rx_ring->rx_buf_size, 0,
+				    	&rx_buffer->recycle);
 			if (rx_buffer->mp == NULL) {
-				qede_warn(qede, "desballoc() failed, index %d", i);
+				qede_warn(qede, "desballoc() failed, index %d",
+				     i);
 			}
 			rx_buffer->rx_ring = rx_ring;
 			rx_buffer->rx_buf_area = rx_buf_area;
 			rx_buffer->index = i + j;
-			rx_buffer->ref_cnt = 1;	// qede_alloc_rx_buffers()
+			rx_buffer->ref_cnt = 1;
 			rx_buffer++;
 
 			vaddr += rx_ring->rx_buf_size;
 			dma_addr += rx_ring->rx_buf_size;
 		}
 		rx_ring->sw_rx_prod++;
-//		allocated++;
 	}
 
 	/*
@@ -2257,13 +2411,14 @@ qede_alloc_rx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 
 	rx_ring = fp->rx_ring;
 
-	size = sizeof (qede_rx_buffer_t) * qede->rx_ring_size;
+	atomic_inc_32(&qede->detach_unsafe);
 	/*
 	 * Allocate rx_buf_area for the plumb instance
 	 */
 	rx_buf_area = kmem_zalloc(sizeof (*rx_buf_area), KM_SLEEP);
 	if (rx_buf_area == NULL) {
-		qede_info(qede, "Cannot alloc rx_buf_area");
+		qede_info(qede, "!%s(%d): Cannot alloc rx_buf_area",
+			__func__, qede->instance);
 		return (DDI_FAILURE);
 	}
 
@@ -2290,7 +2445,7 @@ qede_alloc_rx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 			ECORE_CHAIN_MODE_PBL,
 			ECORE_CHAIN_CNT_TYPE_U16,
 			qede->rx_ring_size,
-			sizeof(union eth_rx_cqe),
+			sizeof (union eth_rx_cqe),
 			&rx_ring->rx_cqe_ring,
 			NULL) != ECORE_SUCCESS) {
 		cmn_err(CE_WARN, "Failed to allocate "
@@ -2322,7 +2477,6 @@ qede_free_tx_bd_ring(qede_t *qede, qede_fastpath_t *fp)
 		if (tx_ring->tx_bd_ring.p_virt_addr) {
 			ecore_chain_free(&qede->edev, &tx_ring->tx_bd_ring);
 			tx_ring->tx_bd_ring.p_virt_addr = NULL;
-			/*cmn_err(CE_NOTE, "!%s(%d): tx bd ring freed\n", __func__, qede->instance);*/
 		}
 		tx_ring->hw_cons_ptr = NULL;
 		tx_ring->sw_tx_cons = 0;
@@ -2356,7 +2510,7 @@ error:
 }
 
 static void
-qede_free_tx_bcopy_buffers(qede_t *qede, qede_tx_ring_t *tx_ring)
+qede_free_tx_bcopy_buffers(qede_tx_ring_t *tx_ring)
 {
 	qede_tx_bcopy_pkt_t *bcopy_pkt;
 	int i;
@@ -2415,7 +2569,8 @@ qede_alloc_tx_bcopy_buffers(qede_t *qede, qede_tx_ring_t *tx_ring)
 	size = sizeof (qede_tx_bcopy_pkt_t) * qede->tx_ring_size;
 	bcopy_list = kmem_zalloc(size, KM_SLEEP);
 	if (bcopy_list == NULL) {
-		qede_warn(qede, "Failed to allocate bcopy_list");
+		qede_warn(qede, "!%s(%d): Failed to allocate bcopy_list",
+		    __func__, qede->instance);
 		ret = DDI_FAILURE;
 		goto exit;
 	}
@@ -2497,7 +2652,9 @@ qede_alloc_tx_dma_handles(qede_t *qede, qede_tx_ring_t *tx_ring)
 	size = sizeof (qede_dma_handle_entry_t) * qede->tx_ring_size;
 	dmah_list = kmem_zalloc(size, KM_SLEEP);
 	if (dmah_list == NULL) {
-		qede_warn(qede, "Failed to allocated dmah_list");
+		qede_warn(qede, "!%s(%d): Failed to allocated dmah_list",
+		    __func__, qede->instance);
+                /* LINTED E_CONST_TRUNCATED_BY_ASSIGN */
 		ret = DDI_FAILURE;
 		goto exit;
 	}
@@ -2523,6 +2680,7 @@ qede_alloc_tx_dma_handles(qede_t *qede, qede_tx_ring_t *tx_ring)
 			qede_print_err("!%s(%d): dma alloc handle failed "
 			    "for index %d",
 			    __func__, qede->instance, i);
+			/* LINTED E_CONST_TRUNCATED_BY_ASSIGN */
 			ret = DDI_FAILURE;
 			goto exit;
 		}
@@ -2537,7 +2695,7 @@ exit:
 static u32 
 qede_alloc_tx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 {
-	int i, tc;
+	int i;
 	qede_tx_ring_t *tx_ring;
 	u32 ret = DDI_SUCCESS;
 	size_t size;
@@ -2556,7 +2714,7 @@ qede_alloc_tx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 		ret = qede_alloc_tx_bd_ring(qede, tx_ring);
 		if (ret) {
 			cmn_err(CE_WARN, "!%s(%d): failed, %s",
-			    __func__, qede->instance,qede_get_ddi_fail(ret));
+			    __func__, qede->instance, qede_get_ddi_fail(ret));
 			return (ret);
 		}
 
@@ -2567,6 +2725,7 @@ qede_alloc_tx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 		if (ret) {
 			qede_print_err("!%s(%d): Failed to alloc tx copy "
 			    "buffers", __func__, qede->instance);
+			/* LINTED E_CONST_TRUNCATED_BY_ASSIGN */
 			ret = DDI_FAILURE;
 			goto exit;
 		}
@@ -2578,6 +2737,7 @@ qede_alloc_tx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 		if (ret) {
 			qede_print_err("!%s(%d): Failed to alloc tx dma "
 			    "handles", __func__, qede->instance);
+			/* LINTED E_CONST_TRUNCATED_BY_ASSIGN */
 			ret = DDI_FAILURE;
 			goto exit; 
 		}
@@ -2586,7 +2746,9 @@ qede_alloc_tx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 		size = sizeof (qede_tx_recycle_list_t) * qede->tx_ring_size;
 		recycle_list = kmem_zalloc(size, KM_SLEEP);
 		if (recycle_list == NULL) {
-			qede_warn(qede, "Failed to allocate tx_recycle_list");
+			qede_warn(qede, "!%s(%d): Failed to allocate"
+			    " tx_recycle_list", __func__, qede->instance);
+			/* LINTED E_CONST_TRUNCATED_BY_ASSIGN */
 			ret = DDI_FAILURE;
 			goto exit;
 		}
@@ -2598,6 +2760,7 @@ exit:
 }
 
 static void
+/* LINTED E_FUNC_ARG_UNUSED */
 qede_free_sb_phys(qede_t *qede, qede_fastpath_t *fp)
 {
 	qede_pci_free_consistent(&fp->sb_dma_handle, &fp->sb_acc_handle);
@@ -2610,8 +2773,6 @@ qede_alloc_sb_phys(qede_t *qede, qede_fastpath_t *fp)
 {
 	int status;
 	int sb_id;
-	struct status_block *sb_addr;
-	uint64_t sb_phyaddr;
 	struct ecore_dev *edev = &qede->edev;
 	struct ecore_hwfn *p_hwfn;
 	qede_vector_info_t *vect_info = fp->vect_info;
@@ -2651,11 +2812,11 @@ qede_alloc_sb_phys(qede_t *qede, qede_fastpath_t *fp)
 
 
 	status = ecore_int_sb_init(p_hwfn, 
-					p_hwfn->p_main_ptt, 
-					fp->sb_info,
-					(void *)fp->sb_virt,
-					fp->sb_phys, 
-					fp->fp_index);
+			p_hwfn->p_main_ptt, 
+			fp->sb_info,
+			(void *)fp->sb_virt,
+			fp->sb_phys, 
+			fp->fp_index);
 	if (status != ECORE_SUCCESS) {
 		cmn_err(CE_WARN, "Failed ecore_int_sb_init");
 		return (DDI_FAILURE);
@@ -2673,12 +2834,12 @@ qede_free_tx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 	for (i = 0; i < qede->num_tc; i++) {
 		tx_ring = fp->tx_ring[i];
 		qede_free_tx_dma_handles(qede, tx_ring);
-		qede_free_tx_bcopy_buffers(qede, tx_ring);
+		qede_free_tx_bcopy_buffers(tx_ring);
 		qede_free_tx_bd_ring(qede, fp);
 
 		if (tx_ring->tx_recycle_list) {
 			kmem_free(tx_ring->tx_recycle_list,
-			    sizeof(qede_tx_recycle_list_t)
+			    sizeof (qede_tx_recycle_list_t)
 			    * qede->tx_ring_size);
 		}
 	}
@@ -2687,7 +2848,7 @@ qede_free_tx_ring_phys(qede_t *qede, qede_fastpath_t *fp)
 static void
 qede_fastpath_free_phys_mem(qede_t *qede)
 {
-	int status = 0, i;
+	int  i;
 	qede_fastpath_t *fp;
 
 	for (i = 0; i < qede->num_fp; i++) {
@@ -2709,7 +2870,6 @@ qede_save_fp_dma_handles(qede_t *qede, qede_fastpath_t *fp)
 	int ret, i;
 	qede_rx_ring_t *rx_ring;
 	qede_tx_ring_t *tx_ring;
-	dma_addr_t p_phys_table;
 
 	rx_ring = fp->rx_ring;
 
@@ -2734,15 +2894,14 @@ qede_save_fp_dma_handles(qede_t *qede, qede_fastpath_t *fp)
 		    rx_ring->rx_cqe_ring.p_phys_addr);
 		goto exit;
 	}
-	p_phys_table = ecore_chain_get_pbl_phys(&rx_ring->rx_cqe_ring);
 	/* rx cqe ring pbl */
 	ret = qede_osal_find_dma_handle_for_block(qede,
-	    (void *)p_phys_table,
+	    (void *)rx_ring->rx_cqe_ring.pbl_sp.p_phys_table,
 	    &rx_ring->rx_cqe_pbl_dmah);
 	if (ret) {
 		qede_print_err("!%s(%d): Cannot find dma_handle for "
 		    "rx_cqe pbl, addr %p", __func__, qede->instance,
-		    p_phys_table);
+		    rx_ring->rx_cqe_ring.pbl_sp.p_phys_table);
 		goto exit;
 	}
 
@@ -2761,14 +2920,13 @@ qede_save_fp_dma_handles(qede_t *qede, qede_fastpath_t *fp)
 			goto exit;
 		}
 
-		p_phys_table = ecore_chain_get_pbl_phys(&tx_ring->tx_bd_ring);
 		ret = qede_osal_find_dma_handle_for_block(qede,
-		    (void *)p_phys_table,
+		    (void *)tx_ring->tx_bd_ring.pbl_sp.p_phys_table,
 		    &tx_ring->tx_pbl_dmah);
 		if (ret) {
 			qede_print_err("!%s(%d): Cannot find dma_handle for "
 			    "tx_bd pbl, addr %p", __func__, qede->instance,
-			    p_phys_table);
+			    tx_ring->tx_bd_ring.pbl_sp.p_phys_table);
 			goto exit;
 		}
 	}
@@ -2787,21 +2945,25 @@ qede_fastpath_alloc_phys_mem(qede_t *qede)
 		fp = &qede->fp_array[i];
 
 		status = qede_alloc_sb_phys(qede, fp);
-		if (status != DDI_SUCCESS)
+		if (status != DDI_SUCCESS) {
 			goto err;
+		}
 
 		status = qede_alloc_rx_ring_phys(qede, fp);
-		if (status != DDI_SUCCESS)
+		if (status != DDI_SUCCESS) {
 			goto err;
+		}
 
 		status = qede_alloc_tx_ring_phys(qede, fp);
-		if (status != DDI_SUCCESS)
+		if (status != DDI_SUCCESS) {
 			goto err;
+		}
 		status = qede_save_fp_dma_handles(qede, fp);
-		if (status != DDI_SUCCESS)
+		if (status != DDI_SUCCESS) {
 			goto err;
+		}
 	}
-	return(status);
+	return (status);
 err:
 	qede_fastpath_free_phys_mem(qede);
 	return (status);
@@ -2815,7 +2977,6 @@ qede_fastpath_config(qede_t *qede)
 	qede_rx_ring_t *rx_ring;
 	qede_tx_ring_t *tx_ring;
 	qede_vector_info_t *vect_info;
-	struct tx_recycle_entry *recycle_entries;
 	int num_fp, num_hwfns;
 
 	ASSERT(qede != NULL);
@@ -2857,7 +3018,6 @@ qede_fastpath_config(qede_t *qede)
 		rx_ring->rx_buf_size = qede->rx_buf_size;
 		rx_ring->qede = qede;
 		rx_ring->sw_rx_cons = 0;
-//		rx_ring->sw_rx_prod = 0;
 		rx_ring->rx_copy_threshold = qede->rx_copy_threshold;
 		rx_ring->rx_low_buffer_threshold =
 		    qede->rx_low_buffer_threshold;
@@ -2870,7 +3030,8 @@ qede_fastpath_config(qede_t *qede)
 			tx_ring->qede = qede;
 			tx_ring->fp = fp;
 			tx_ring->fp_idx = i;
-			tx_ring->tx_queue_index = i * qede->num_fp + fp->fp_index;
+			tx_ring->tx_queue_index = i * qede->num_fp + 
+			    fp->fp_index;
 			tx_ring->tx_buf_size = qede->tx_buf_size;
 			tx_ring->tx_ring_size = qede->tx_ring_size;
 			tx_ring->queue_started = B_FALSE;
@@ -2915,7 +3076,7 @@ qede_configure_link(qede_t *qede, bool op)
 
 		ecore_ptt_release(hwfn, ptt);
 		if (ret) {
-			 /* if link config fails, make sure ptt is released */
+			/* if link config fails, make sure ptt is released */
 			goto exit;
 		}
 	}
@@ -2929,9 +3090,7 @@ exit:
 int
 qede_stop(qede_t *qede)
 {
-	int status, i, count;
-	qede_fastpath_t *fp;
-	qede_rx_ring_t *rx_ring;
+	int status;
 
 	ASSERT(mutex_owned(&qede->drv_lock));
 	qede->qede_state = QEDE_STATE_STOPPING;
@@ -2941,6 +3100,7 @@ qede_stop(qede_t *qede)
 	qede_disable_all_fastpath_intrs(qede);
 	status = qede_configure_link(qede, 0 /* Re-Set */);
 	if (status) {
+		/* LINTED E_BAD_FORMAT_ARG_TYPE2 */
 		cmn_err(CE_NOTE, "!%s(%d): Failed to reset link",
 		    __func__, qede->instance);
 		return (status);
@@ -2948,6 +3108,7 @@ qede_stop(qede_t *qede)
 	qede_clear_filters(qede);
 	status = qede_fastpath_stop_queues(qede);
 	if (status != DDI_SUCCESS) {
+		/* LINTED E_BAD_FORMAT_ARG_TYPE2 */
 		cmn_err(CE_WARN, "qede_stop:"
 		    " qede_fastpath_stop_queues FAILED "
 		    " qede=%p\n",
@@ -2958,6 +3119,7 @@ qede_stop(qede_t *qede)
 	qede_fastpath_free_phys_mem(qede);
 	
 	qede->qede_state = QEDE_STATE_STOPPED;
+	/* LINTED E_BAD_FORMAT_ARG_TYPE2 */
 	cmn_err(CE_WARN, "qede_stop SUCCESS =%p\n", qede);
 	return (DDI_SUCCESS);
 }
@@ -2981,12 +3143,12 @@ qede_start(qede_t *qede)
 	 * the sb_info, rx_ring and tx_rings
 	 */
 	if (qede_fastpath_config(qede) != DDI_SUCCESS) {
+		/* LINTED E_BAD_FORMAT_ARG_TYPE2 */
 		qede_print_err("!%s(%d): qede_fastpath_config failed",
 		    __func__, qede->instance);
 		return (DDI_FAILURE);
 	}
 
-	/*cmn_err(CE_NOTE, "qede_start fastpath_config qede=%p\n", qede);*/
 	
 	/*
 	 * Allocate the physical memory
@@ -2998,7 +3160,6 @@ qede_start(qede_t *qede)
 		    " failed qede=%p\n", qede);
 		return (DDI_FAILURE);
 	}
-	/*cmn_err(CE_NOTE, "qede_start fastpath_alloc_phys_mem qede=%p\n", qede);*/
 	
 	status = qede_fastpath_start_queues(qede);
 	if (status) {
@@ -3019,13 +3180,16 @@ qede_start(qede_t *qede)
 	/*
 	 * Put interface in regular mode 
 	 */
-	if (qede_set_filter_rx_mode(qede, QEDE_FILTER_RX_MODE_REGULAR) != DDI_SUCCESS) {
-		qede_warn(qede, "Failed to set filter mode");
+	if (qede_set_filter_rx_mode(qede, 
+		QEDE_FILTER_RX_MODE_REGULAR) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "!%s(%d): Failed to set filter mode",
+		    __func__, qede->instance);
 		goto err_out1;
 	}
 
 	status = qede_enable_all_fastpath_intrs(qede);
 	if (status) {
+		/* LINTED E_BAD_FORMAT_ARG_TYPE2 */
 		cmn_err(CE_NOTE, "!%s(%d): Failed to enable intrs",
 		    __func__, qede->instance);
 		goto err_out2;
@@ -3037,7 +3201,7 @@ qede_start(qede_t *qede)
 	return (status);
 
 err_out2:
-	(void)qede_fastpath_stop_queues(qede);
+	(void) qede_fastpath_stop_queues(qede);
 err_out1:
 	qede_fastpath_free_phys_mem(qede);
 	return (DDI_FAILURE);
@@ -3156,16 +3320,14 @@ qede_suspend(qede_t *qede)
 }
 
 static int
-qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
+qede_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-    	qede_t * qede;
+    	qede_t *qede;
 	struct ecore_dev *edev;
 	int instance;
 	uint32_t vendor_id;
 	uint32_t device_id;
 	struct ecore_hwfn *p_hwfn;
-	struct ecore_sb_sp_info *sp_sb;
-	struct ecore_sb_attn_info *attn_sb;
 	struct ecore_ptt *p_ptt;
 	struct ecore_mcp_link_params *link_params;
 	struct ecore_hw_init_params hw_init_params;
@@ -3174,16 +3336,14 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
        	uint32_t num_props;
 	int rc = 0;
 
-    	switch (cmd)
-    	{
+    	switch (cmd) {
     	default:
        		return (DDI_FAILURE);
     
 	case DDI_RESUME:
 	{
        		qede = (qede_t * )ddi_get_driver_private(dip);
-        	if (qede == NULL || qede->dip != dip)
-        	{
+        	if (qede == NULL || qede->dip != dip) {
 			cmn_err(CE_NOTE, "qede:%s: Could not allocate"
 			    " adapter structure\n", __func__);
 			return (DDI_FAILURE);
@@ -3195,8 +3355,7 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
         		return (DDI_FAILURE);
 		}
         
-		if (qede_resume(qede) != DDI_SUCCESS)
-        	{
+		if (qede_resume(qede) != DDI_SUCCESS) {
 			cmn_err(CE_NOTE, "%s:%d resume operation failure\n",
 			    __func__, qede->instance);
 			mutex_exit(&qede->drv_lock);
@@ -3214,8 +3373,7 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 		    instance);
 
     		/* Allocate main structure rounded up to cache line size */
-    		if ((qede = kmem_zalloc(sizeof(qede_t), KM_SLEEP)) == NULL)
-    		{
+    		if ((qede = kmem_zalloc(sizeof (qede_t), KM_SLEEP)) == NULL) {
 			cmn_err(CE_NOTE, "!%s(%d): Could not allocate adapter "
 			    "structure\n", __func__, instance);
         		return (DDI_FAILURE);
@@ -3225,7 +3383,7 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
     		ddi_set_driver_private(dip, qede);
 		qede->dip = dip;
    		qede->instance = instance;
-    		snprintf(qede->name, sizeof(qede->name), "qede%d", instance);
+    		snprintf(qede->name, sizeof (qede->name), "qede%d", instance);
 		edev = &qede->edev;
 	
 		if (qede_config_fm(qede) != DDI_SUCCESS) {
@@ -3233,7 +3391,9 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 		}
 		qede->attach_resources |= QEDE_FM;
 
-		/* Do PCI config setup and map the register and doorbell space */
+		/* 
+		 * Do PCI config setup and map the register 
+		 * and doorbell space */
 		if (qede_config_pci(qede) != DDI_SUCCESS) {
         		goto exit_with_err;
 		}
@@ -3246,7 +3406,7 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 		 */
 		mutex_init(&qede->mem_list.mem_list_lock, NULL,
 		    MUTEX_DRIVER, 0);
-		mutex_init(&qede->phys_mem_list.lock , NULL,
+		mutex_init(&qede->phys_mem_list.lock, NULL,
 		    MUTEX_DRIVER, 0);
 		QEDE_INIT_LIST_HEAD(&qede->mem_list.mem_list_head);
 		QEDE_INIT_LIST_HEAD(&qede->phys_mem_list.head);
@@ -3287,7 +3447,7 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 #endif
 		qede_cfg_reset(qede);
 
-		if (qede_alloc_intrs(qede) ) {
+		if (qede_alloc_intrs(qede)) {
 			cmn_err(CE_NOTE, "%s: Could not allocate interrupts\n",
 			    __func__);
         		goto exit_with_err;
@@ -3322,7 +3482,7 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 		}
 		qede->attach_resources |= QEDE_EDEV_CONFIG;
 
-		if(qede_kstat_init(qede) == B_FALSE) {
+		if (qede_kstat_init(qede) == B_FALSE) {
 			cmn_err(CE_NOTE, "%s: Could not initialize kstat \n",
 			    __func__);
 			goto exit_with_err;
@@ -3346,38 +3506,44 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 
 		qede->attach_resources |= QEDE_SP_INTR_ENBL;
 
-		cmn_err(CE_NOTE, "qede->attach_resources = %x\n", qede->attach_resources);			
+		cmn_err(CE_NOTE, "qede->attach_resources = %x\n", 
+		    qede->attach_resources);			
 
-		memset((void *)&hw_init_params, 0, sizeof(struct ecore_hw_init_params));
+		memset((void *)&hw_init_params, 0, 
+		    sizeof (struct ecore_hw_init_params));
 		hw_init_params.p_drv_load_params = &load_params;
 
-		hw_init_params.p_tunn = NULL; /* tunnel params */
-		hw_init_params.b_hw_start = true; /* hw_start */
-		hw_init_params.int_mode = qede->intr_ctx.intr_mode; /* enum ecore_int_mode */
-		hw_init_params.allow_npar_tx_switch = false; /* Allow tx npar switch */
-		hw_init_params.bin_fw_data = NULL; /* if NULL, fw_data used from hsi files */
+		hw_init_params.p_tunn = NULL; 
+		hw_init_params.b_hw_start = true;
+		hw_init_params.int_mode = qede->intr_ctx.intr_mode;
+		hw_init_params.allow_npar_tx_switch = false;
+		hw_init_params.bin_fw_data = NULL;
 		load_params.is_crash_kernel = false;
 		load_params.mfw_timeout_val = 0; 
 		load_params.avoid_eng_reset = false;
-		load_params.override_force_load = ECORE_OVERRIDE_FORCE_LOAD_NONE;
+		load_params.override_force_load = 
+		    ECORE_OVERRIDE_FORCE_LOAD_NONE;
 
 		if (ecore_hw_init(edev, &hw_init_params) != ECORE_SUCCESS) {
-			cmn_err(CE_NOTE, "%s: Could not initialze ecore block\n", __func__);
+			cmn_err(CE_NOTE,
+			    "%s: Could not initialze ecore block\n",
+			     __func__);
 			goto exit_with_err;
 		}
 		qede->attach_resources |= QEDE_ECORE_HW_INIT;
 		qede->qede_state = QEDE_STATE_ATTACHED;
 
+		qede->detach_unsafe = 0;
 
 		snprintf(qede->version,
-             		sizeof(qede->version),
+             		sizeof (qede->version),
              		"%d.%d.%d",
              		MAJVERSION,
              		MINVERSION,
              		REVVERSION);
 
 		snprintf(qede->versionFW,
-             		sizeof(qede->versionFW),
+             		sizeof (qede->versionFW),
              		"%d.%d.%d.%d",
              		FW_MAJOR_VERSION,
              		FW_MINOR_VERSION,
@@ -3390,9 +3556,11 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 		 * (test) : saving the default link_input params 
 		 */
 		link_params = ecore_mcp_get_link_params(p_hwfn);
-		memset(&qede->link_input_params, 0, sizeof(qede_link_input_params_t));
-		memcpy(&qede->link_input_params.default_link_params, link_params,
-		       sizeof(struct ecore_mcp_link_params));
+		memset(&qede->link_input_params, 0, 
+		    sizeof (qede_link_input_params_t));
+		memcpy(&qede->link_input_params.default_link_params, 
+		    link_params,
+		    sizeof (struct ecore_mcp_link_params));
 
 		p_hwfn = ECORE_LEADING_HWFN(edev);
         	ecore_mcp_get_mfw_ver(p_hwfn, p_ptt, &qede->mfw_ver, NULL);
@@ -3400,7 +3568,7 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 		ecore_ptt_release(p_hwfn, p_ptt);
 
 		snprintf(qede->versionMFW,
-			sizeof(qede->versionMFW),
+			sizeof (qede->versionMFW),
 			"%d.%d.%d.%d",
 			(qede->mfw_ver >> 24) & 0xFF,
 	        	(qede->mfw_ver >> 16) & 0xFF,
@@ -3408,12 +3576,12 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 			qede->mfw_ver & 0xFF);	
 
 		snprintf(qede->chip_name,
-             		sizeof(qede->chip_name),
+             		sizeof (qede->chip_name),
 			"%s",
 			ECORE_IS_BB(edev) ? "BB" : "AH");
 
 	   	snprintf(qede->chipID,
-			sizeof(qede->chipID),
+			sizeof (qede->chipID),
              		"0x%x",
              		qede->edev.chip_num);
 
@@ -3427,13 +3595,16 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 		if((rc == DDI_PROP_SUCCESS) && (num_props > 0)) {
 
 		snprintf(qede->bus_dev_func,
-			sizeof(qede->bus_dev_func),
+			sizeof (qede->bus_dev_func),
 			"%04x:%02x:%02x",
 			PCI_REG_BUS_G(props[0]),
 			PCI_REG_DEV_G(props[0]),
 			PCI_REG_FUNC_G(props[0]));
 	
-		/* This information is used in the QEDE_FUNC_INFO ioctl */
+		/* 
+		 * This information is used 
+		 * in the QEDE_FUNC_INFO ioctl 
+		 */
 		qede->pci_func = (uint8_t) PCI_REG_FUNC_G(props[0]);
 
 		ddi_prop_free(props);
@@ -3455,56 +3626,60 @@ qede_attach(dev_info_t * dip, ddi_attach_cmd_t cmd)
 
 
 		snprintf(qede->vendor_device,
-			sizeof(qede->vendor_device),
+			sizeof (qede->vendor_device),
 			"%04x:%04x",
 			vendor_id,
 			device_id);
 
 
 		snprintf(qede->intrAlloc,
-			sizeof(qede->intrAlloc), "%d %s",
-			(qede->intr_ctx.intr_type_in_use == DDI_INTR_TYPE_FIXED) ? 1 :
+			sizeof (qede->intrAlloc), "%d %s",
+			(qede->intr_ctx.intr_type_in_use == DDI_INTR_TYPE_FIXED)
+ 			? 1 :
 			qede->intr_ctx.intr_vect_allocated,
-			(qede->intr_ctx.intr_type_in_use == DDI_INTR_TYPE_MSIX) ? "MSIX" :
-			(qede->intr_ctx.intr_type_in_use == DDI_INTR_TYPE_MSI) ? "MSI"  : "Fixed");
+			(qede->intr_ctx.intr_type_in_use == DDI_INTR_TYPE_MSIX)
+			? "MSIX" :
+			(qede->intr_ctx.intr_type_in_use == DDI_INTR_TYPE_MSI) 
+			? "MSI"  : "Fixed");
 
 	        qede_print("%s(%d): success, addr %p chip %s id %s intr %s\n",
-		    __func__, qede->instance, qede, qede->chip_name, qede->vendor_device,qede->intrAlloc);
+		    __func__, qede->instance, qede, qede->chip_name, 
+		    qede->vendor_device,qede->intrAlloc);
 
 	        qede_print("%s(%d): version %s FW %s MFW %s\n",
-		    __func__, qede->instance, qede->version,qede->versionFW, qede->versionMFW);
+		    __func__, qede->instance, qede->version,
+		    qede->versionFW, qede->versionMFW);
 
 		return (DDI_SUCCESS);
 	}
 	}
 exit_with_err:
-	cmn_err(CE_WARN, "%s:%d   failed %x\n", __func__, qede->instance, qede->attach_resources);			
+	cmn_err(CE_WARN, "%s:%d   failed %x\n", __func__, qede->instance, 
+	    qede->attach_resources);			
 	(void)qede_free_attach_resources(qede);
 	return (DDI_FAILURE);
 }
 
-static
-int qede_detach(dev_info_t * dip, ddi_detach_cmd_t cmd)
+static int
+qede_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 
-	qede_t * qede;
+	qede_t *qede;
 	int status;
+	uint32_t count = 0;
 
 	qede = (qede_t *)ddi_get_driver_private(dip);
-	if (qede == NULL || qede->dip != dip)
-	{
+	if ((qede == NULL) || (qede->dip != dip)) {
 		return (DDI_FAILURE);
 	}
 
-	switch (cmd)
-	{
+	switch (cmd) {
 	default:
 		return (DDI_FAILURE);
 	case DDI_SUSPEND:
 		mutex_enter(&qede->drv_lock);
 		status = qede_suspend(qede); 
-		if (status != DDI_SUCCESS)
-		{
+		if (status != DDI_SUCCESS) {
 			mutex_exit(&qede->drv_lock);
 			return (DDI_FAILURE);
 		}
@@ -3525,77 +3700,30 @@ int qede_detach(dev_info_t * dip, ddi_detach_cmd_t cmd)
 			}
 		}
 		mutex_exit(&qede->drv_lock);
+                if (qede->detach_unsafe) {
+                        /*
+                         * wait for rx buffers to be returned from
+                         * upper layers
+                         */
+                        count = 0;
+                        while ((qede->detach_unsafe) && (count < 100)) {
+                                qede_delay(100);
+                                count++;
+                        }
+                        if (qede->detach_unsafe) {
+                                qede_info(qede, "!%s(%d) : Buffers still with"
+                                    " OS, failing detach\n",
+                                    qede->name, qede->instance);
+                                return (DDI_FAILURE);
+                        }
+                }
 		qede_free_attach_resources(qede);
-
 		return (DDI_SUCCESS);
 	}
-
-	qede->qede_state = QEDE_STATE_FAILED;
-	mutex_exit(&qede->drv_lock);
-	return (DDI_FAILURE);
-}
-
-
-static int
-qede_disable_all_fp_hw_intrs(qede_t *qede)
-{
-	qede_fastpath_t *fp;
-	int num_fp, i;
-	num_fp = qede->num_fp;
-	if(!num_fp){
-		qede_warn(qede, "(%s)%d : no fastpaths?",
-		    __func__, qede->instance);
-		return (DDI_FAILURE);
-	}
-
-	for(i = 0; i < num_fp; i++){
-		if(!&qede->fp_array[i]){
-			qede_warn(qede, "(%s)%d: no fastpath structures!",
-			    __func__, qede->instance);
-			return (DDI_FAILURE);
-		}
-		fp = &qede->fp_array[i];
-
-		if(!fp->sb_info){
-			qede_warn(qede, "(%s)%d: sb_info is NULL!",
-			    __func__, qede->instance);
-			return (DDI_FAILURE);
-		}
-
-		ecore_sb_ack(fp->sb_info, IGU_INT_DISABLE, 0);
-	}
-	return (DDI_SUCCESS);
-}
-
-
-static int
-qede_disable_hw_intrs(qede_t *qede)
-{
-	struct ecore_dev *edev = &qede->edev;
-	struct ecore_hwfn *hwfn;
-	struct ecore_ptt *ptt = NULL;
-	int ret;
-	ret = qede_disable_all_fp_hw_intrs(qede);
-	if(ret != DDI_SUCCESS){
-		qede_warn(qede, "(%s)%d : cannot disable fastpath hw interrupts!",
-		    __func__, qede->instance);
-		return ret;
-	}
-	
-	hwfn = &edev->hwfns[0];
-	ptt = ecore_ptt_acquire(hwfn);
-	if(ptt == NULL){
-		qede_warn(qede, "(%s)%d : Cannot acquire ptt from ecore",
-		    __func__, qede->instance);
-	}
-	
-	ecore_int_igu_disable_int(hwfn, ptt);
-
-	ecore_ptt_release(hwfn, ptt);
-	return (DDI_SUCCESS);
 }
 
 static int
+/* LINTED E_FUNC_ARG_UNUSED */
 qede_quiesce(dev_info_t *dip)
 {
 	qede_t *qede = (qede_t *)ddi_get_driver_private(dip);
@@ -3608,35 +3736,12 @@ qede_quiesce(dev_info_t *dip)
 	p_hwfn = ECORE_LEADING_HWFN(edev);
 	p_ptt = ecore_ptt_acquire(p_hwfn);
 	if (p_ptt) {
-		ecore_start_recovery_process(p_hwfn, p_ptt);
+		status = ecore_start_recovery_process(p_hwfn, p_ptt);
 		ecore_ptt_release(p_hwfn, p_ptt);
 		OSAL_MSLEEP(5000);
 	}
-	return status;
+	return (status);
 
-}
-
-
-static int
-qede_bus_ctl(dev_info_t *   dip,
-                      dev_info_t *   pRDev,
-                      ddi_ctl_enum_t op,
-                      void *         pArg,
-                      void *         pResult)
-{
-    return 0;
-}
-
-
-static int
-qede_cb_ioctl(dev_t    dev,
-                       int      cmd,
-                       intptr_t arg,
-                       int      mode,
-                       cred_t * credp,
-                       int *    rvalp)
-{
-	return (DDI_FAILURE);
 }
 
 
@@ -3658,7 +3763,8 @@ static struct modlinkage qede_modlinkage =
     NULL           /* NULL termination */
 };
 
-int _init(void)
+int 
+_init(void)
 {
     int rc;
 
@@ -3666,32 +3772,31 @@ int _init(void)
     mac_init_ops(&qede_dev_ops, "qede");
 
     /* Install module information with O/S */
-    if ((rc = mod_install(&qede_modlinkage)) != DDI_SUCCESS)
-    {
+    if ((rc = mod_install(&qede_modlinkage)) != DDI_SUCCESS) {
         mac_fini_ops(&qede_dev_ops);
 	cmn_err(CE_NOTE, "mod_install failed");
-        return rc;
+        return (rc);
     }
 
-    return rc;
+    return (rc);
 }
 
 
-int _fini(void)
+int 
+_fini(void)
 {
     int rc;
 
-    if ((rc = mod_remove(&qede_modlinkage)) == DDI_SUCCESS)
-    {
+    if ((rc = mod_remove(&qede_modlinkage)) == DDI_SUCCESS) {
         mac_fini_ops(&qede_dev_ops);
     }
 
-    return rc;
+    return (rc);
 }
 
 
 int
 _info(struct modinfo * modinfop)
 {
-    return mod_info(&qede_modlinkage, modinfop);
+    return (mod_info(&qede_modlinkage, modinfop));
 }

@@ -33,6 +33,9 @@
 * limitations under the License.
 */
 
+#ifndef _QEDE_TYPES_H
+#define _QEDE_TYPES_H
+
 typedef uint8_t			u8;
 typedef uint8_t			U8;
 typedef uint16_t		u16;
@@ -65,3 +68,5 @@ typedef u64 dma_addr_t;
  * requirement
  */
 typedef	u64 osal_uintptr_t;
+
+#endif  /* !_QEDE_TYPES_H */
