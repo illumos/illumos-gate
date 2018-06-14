@@ -490,6 +490,7 @@ mlsetup(struct regs *rp)
 	 * Fill out cpu_ucode_info.  Update microcode if necessary.
 	 */
 	ucode_check(CPU);
+	cpuid_pass_ucode(CPU, x86_featureset);
 
 	if (workaround_errata(CPU) != 0)
 		panic("critical workaround(s) missing for boot cpu");

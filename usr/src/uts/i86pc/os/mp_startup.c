@@ -1755,22 +1755,6 @@ mp_startup_common(boolean_t boot)
 	sti();
 
 	/*
-	 * Do a sanity check to make sure this new CPU is a sane thing
-	 * to add to the collection of processors running this system.
-	 *
-	 * XXX	Clearly this needs to get more sophisticated, if x86
-	 * systems start to get built out of heterogenous CPUs; as is
-	 * likely to happen once the number of processors in a configuration
-	 * gets large enough.
-	 */
-	if (compare_x86_featureset(x86_featureset, new_x86_featureset) ==
-	    B_FALSE) {
-		cmn_err(CE_CONT, "cpu%d: featureset\n", cp->cpu_id);
-		print_x86_featureset(new_x86_featureset);
-		cmn_err(CE_WARN, "cpu%d feature mismatch", cp->cpu_id);
-	}
-
-	/*
 	 * There exists a small subset of systems which expose differing
 	 * MWAIT/MONITOR support between CPUs.  If MWAIT support is absent from
 	 * the boot CPU, but is found on a later CPU, the system continues to
@@ -1875,6 +1859,23 @@ mp_startup_common(boolean_t boot)
 	 * Fill out cpu_ucode_info.  Update microcode if necessary.
 	 */
 	ucode_check(cp);
+	cpuid_pass_ucode(cp, new_x86_featureset);
+
+	/*
+	 * Do a sanity check to make sure this new CPU is a sane thing
+	 * to add to the collection of processors running this system.
+	 *
+	 * XXX	Clearly this needs to get more sophisticated, if x86
+	 * systems start to get built out of heterogenous CPUs; as is
+	 * likely to happen once the number of processors in a configuration
+	 * gets large enough.
+	 */
+	if (compare_x86_featureset(x86_featureset, new_x86_featureset) ==
+	    B_FALSE) {
+		cmn_err(CE_CONT, "cpu%d: featureset\n", cp->cpu_id);
+		print_x86_featureset(new_x86_featureset);
+		cmn_err(CE_WARN, "cpu%d feature mismatch", cp->cpu_id);
+	}
 
 #ifndef __xpv
 	{
