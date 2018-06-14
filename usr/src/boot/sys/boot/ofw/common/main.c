@@ -35,7 +35,6 @@
 struct arch_switch	archsw;		/* MI/MD interface boundary */
 
 extern char end[];
-extern char bootprog_info[];
 
 u_int32_t	acells, scells;
 
