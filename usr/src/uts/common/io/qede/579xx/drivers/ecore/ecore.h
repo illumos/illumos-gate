@@ -111,7 +111,7 @@ enum ecore_nvm_cmd {
 
 #define SET_FIELD(value, name, flag)					\
 do {									\
-	(value) &= ~(name##_MASK << name##_SHIFT);			\
+	(value) &= ~((u64)name##_MASK << (u64)name##_SHIFT);		\
 	(value) |= ((((u64)flag) & (u64)name##_MASK) << (name##_SHIFT));\
 } while (0)
 
