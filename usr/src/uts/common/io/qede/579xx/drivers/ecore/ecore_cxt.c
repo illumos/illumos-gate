@@ -2225,13 +2225,12 @@ enum _ecore_status_t ecore_cxt_set_pf_params(struct ecore_hwfn *p_hwfn,
 	case ECORE_PCI_ETH_RDMA:
 	case ECORE_PCI_ETH_IWARP:
 	case ECORE_PCI_ETH_ROCE:
-	{
 		ecore_rdma_set_pf_params(p_hwfn,
 					 &p_hwfn->pf_params.rdma_pf_params,
 					 rdma_tasks);
 
 		/* no need for break since RoCE coexist with Ethernet */
-	}
+		/* FALLTHROUGH */
 	case ECORE_PCI_ETH:
 	{
 		struct ecore_eth_pf_params *p_params =
