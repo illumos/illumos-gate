@@ -1,152 +1,208 @@
-'\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH CPC 3CPC "Oct 8, 2008"
-.SH NAME
-cpc \- hardware performance counters
-.SH DESCRIPTION
-.sp
-.LP
-Modern microprocessors contain \fIhardware performance counters\fR that allow
+.\" Copyright (c) 2018, Joyent, Inc.
+.Dd June 28, 2018
+.Dt CPC 3CPC
+.Os
+.Sh NAME
+.Nm cpc
+.Nd hardware performance counters
+.Sh DESCRIPTION
+Modern microprocessors contain
+.Em hardware performance counters
+that allow
 the measurement of many different hardware events related to CPU behavior,
 including instruction and data cache misses as well as various internal states
-of the processor. The counters can be configured to count user events, system
-events, or both. Data from the performance counters can be used to analyze and
+of the processor.
+The counters can be configured to count user events, system
+events, or both.
+Data from the performance counters can be used to analyze and
 tune the behavior of software on a particular type of processor.
-.sp
-.LP
+.Pp
 Most processors are able to generate an interrupt on counter overflow, allowing
 the counters to be used for various forms of profiling.
-.sp
-.LP
-This manual page describes a set of APIs that allow Solaris applications to use
-these counters. Applications can measure their own behavior, the behavior of
+.Pp
+This manual page describes a set of APIs that allow illumos applications to use
+these counters.
+Applications can measure their own behavior, the behavior of
 other applications, or the behavior of the whole system.
-.SS "Shared Counters or Private Counters"
-.sp
-.LP
-There are two principal models for using these performance counters. Some users
-of these statistics want to observe system-wide behavior. Other users want to
-view the performance counters as part of the register set exported by each
-\fBLWP\fR. On a machine performing more than one activity, these two models are
+.Ss Shared Counters or Private Counters
+There are two principal models for using these performance counters.
+Some users of these statistics want to observe system-wide behavior.
+Other users want to view the performance counters as part of the register set
+exported by each
+.Sy LWP .
+On a machine performing more than one activity, these two models are
 in conflict because the counters represent a critical hardware resource that
 cannot simultaneously be both shared and private.
-.SS "Configuration Interfaces"
-.sp
-.LP
+.Ss Configuration Interfaces
 The following configuration interfaces are provided:
-.sp
-.ne 2
-.na
-\fB\fBcpc_open\fR(3CPC)\fR
-.ad
-.RS 21n
+.Bl -tag -width Xr
+.It Xr cpc_open 3CPC
 Check the version the application was compiled with against the version of the
-library.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcpc_cciname\fR(3CPC)\fR
-.ad
-.RS 21n
+.It Xr cpc_cciname 3CPC
 Return a printable string to describe the performance counters of the
 processor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcpc_npic\fR(3CPC)\fR
-.ad
-.RS 21n
+.It Xr cpc_npic 3CPC
 Return the number of performance counters on the processor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcpc_cpuref\fR(3CPC)\fR
-.ad
-.RS 21n
+.It cpc_cpuref 3CPC
 Return a reference to documentation that should be consulted to understand how
 to use and interpret data from the performance counters.
-.RE
-
-.SS "Performance Counter Access"
-.sp
-.LP
+.El
+.Ss Performance Counter Access
 Performance counters can be present in hardware but not acccessible because
 either some of the necessary system software components are not available or
-not installed, or the counters might be in use by other processes.  The
-\fBcpc_open\fR(3CPC) function determines the accessibility of the counters and
+not installed, or the counters might be in use by other processes.
+The
+.Xr cpc_open 3CPC
+function determines the accessibility of the counters and
 must be invoked before any attempt to program the counters.
-.SS "Finding Events"
-.sp
-.LP
+.Ss "Finding Events"
 Each different type of processor has its own set of events available for
-measurement. The \fBcpc_walk_events_all\fR(3CPC) and
-\fBcpc_walk_events_pic\fR(3CPC) functions allow an application to determine the
-names of events supported by the underlying processor. A collection of generic,
-platform independent event names are defined by \fBgeneric_events\fR(3CPC).
+measurement.
+The
+.Xr cpc_walk_events_all 3CPC
+and
+.Xr cpc_walk_events_pic 3CPC
+functions allow an application to determine the
+names of events supported by the underlying processor.
+A collection of generic, platform independent event names are defined by
+.Xr generic_events 3CPC .
 Each generic event maps to an underlying hardware event specific to the
-underlying processor and any optional attributes. The
-\fBcpc_walk_generic_events_all\fR(3CPC) and
-\fBcpc_walk_generic_events_pic\fR(3CPC) functions allow an application to
-determine the generic events supported on the underlying platform.
-.SS "Using Attributes"
-.sp
-.LP
+underlying processor and any optional attributes.
+The
+.Xr cpc_walk_generic_events_all 3CPC
+and
+.Xr cpc_walk_generic_events_pic 3CPC
+functions allow an application to determine the generic events supported
+on the underlying platform.
+.Ss Processor Specific Events
+Manual pages specific to events for recent Intel processors are
+available.
+The following manual pages cover the following Intel processor models
+which are listed in hexadecimal:
+.Bl -tag -width Xr
+.It Xr bdw_de_events 3CPC
+Intel Broadwell-DE events; covers model 56h.
+.It Xr bdw_events 3CPC
+Intel Broadwell client events; covers models 3dh and 47h.
+.It Xr bdx_events 3CPC
+Intel Broadwell server events; covers model 4fh.
+.It Xr bnl_events 3CPC
+Intel Atom Bonnell events; covers models 35h, 36h, 27h, 26h, and 1ch.
+.It Xr glm_events 3CPC
+Intel Goldmont SoC events; covers models 5fh and 5ch.
+.It Xr glp_events 3CPC
+Intel Goldmont Plus SoC events; covers model 7ah.
+.It Xr hsw_events 3CPC
+Intel Haswell client events; covers models 46h, 45h, and 3ch.
+.It Xr hsx_events 3CPC
+Intel Haswell server events; covers model 3fh.
+.It Xr ivb_events 3CPC
+Intel Ivy Bridge client events; covers model 3ah.
+.It Xr ivt_events 3CPC
+Intel Ivy Bridge server events; covers model 3eh.
+.It Xr jkt_events 3CPC
+Intel Sandy Bridge server events; covers model 2dh.
+.It Xr nhm_ep_events 3CPC
+Intel Nehalem-EP events; covers models, 1ah, 1fh, and 1eh.
+.It Xr nhm_ex_events 3CPC
+Intel Sandy Bridge server events; covers model 23h.
+.It Xr skl_events 3CPC
+Intel Skylake client events; covers model 9eh, 8eh, 5e, and 4eh.
+.It Xr skx_events 3CPC
+Intel Skylake server events; covers model 55h.
+.It Xr slm_events 3CPC
+Intel Atom Silvermont events; covers models 4ch, 4dh, and 37h.
+.It Xr snb_events 3CPC
+Intel Sandy Bridge Client events; covers model 2ah.
+.It Xr wsm_ep_dp_events 3CPC
+Intel Westmere-EP-DP events; covers model 2ch.
+.It Xr wsm_ep_sp_events 3CPC
+Intel Westmere-EP-SP events; covers model 25h.
+.It Xr wsm_ex_events 3CPC
+Intel Westmere-EX events; covers model 2fh.
+.El
+.Ss Using Attributes
 Some processors have advanced performance counter capabilities that are
-configured with attributes. The \fBcpc_walk_attrs\fR(3CPC) function can be used
-to determine the names of attributes supported by the underlying processor. The
-documentation referenced by \fBcpc_cpuref\fR(3CPC) should be consulted to
-understand the meaning of a processor's performance counter attributes.
-.SS "Performance Counter Context"
-.sp
-.LP
+configured with attributes.
+The
+.Xr cpc_walk_attrs 3CPC
+function can be used to determine the names of attributes supported by
+the underlying processor.
+The documentation referenced by
+.Xr cpc_cpuref 3CPC
+should be consulted to understand the meaning of a processor's performance
+counter attributes.
+.Ss Performance Counter Context
 Each processor on the system possesses its own set of performance counter
-registers. For a single process, it is often desirable to maintain the illusion
+registers.
+For a single process, it is often desirable to maintain the illusion
 that the counters are an intrinsic part of that process (whichever processors
 it runs on), since this allows the events to be directly attributed to the
 process without having to make passive all other activity on the system.
-.sp
-.LP
-To achieve this behavior, the library associates \fIperformance counter
-context\fR with each \fBLWP\fR in the process. The context consists of a small
-amount of kernel memory to hold the counter values when the \fBLWP\fR is not
-running, and some simple kernel functions to save and restore those counter
-values from and to the hardware registers when the \fBLWP\fR performs a normal
-context switch. A process can only observe and manipulate its own copy of the
+.Pp
+To achieve this behavior, the library associates
+.Em performance counter context
+with each
+.Sy LWP
+in the process.
+The context consists of a small amount of kernel memory to hold the counter
+values when the
+.Sy BLWP
+is not running, and some simple kernel functions to save and restore those counter
+values from and to the hardware registers when the
+.Sy LWP
+performs a normal context switch.
+A process can only observe and manipulate its own copy of the
 performance counter control and data registers.
-.SS "Performance Counters In Other Processes"
-.sp
-.LP
+.Ss Performance Counters \&In Other Processes
 Though applications can be modified to instrument themselves as demonstrated
 above, it is frequently useful to be able to examine the behavior of an
-existing application without changing the source code. A separate library,
-\fBlibpctx\fR, provides a simple set of interfaces that use the facilities of
-\fBproc\fR(4) to control a target process, and together with functions in
-\fBlibcpc\fR, allow \fBtruss\fR-like tools to be constructed to measure the
-performance counters in other applications. An example of one such application
-is \fBcputrack\fR(1).
-.sp
-.LP
-The functions in \fBlibpctx\fR are independent of those in \fBlibcpc\fR. These
-functions manage a process using an event-loop paradigm \(em that is, the
+existing application without changing the source code.
+A separate library,
+.Sy libpctx ,
+provides a simple set of interfaces that use the facilities of
+.Xr proc 4
+to control a target process, and together with functions in
+.Sy libcpc ,
+allow
+.Sy truss No -like
+tools to be constructed to measure the performance counters in other
+applications.
+An example of one such application is
+.Xr cputrack 1 .
+.Pp
+The functions in
+.Sy libpctx
+are independent of those in
+.Sy libcpc .
+These functions manage a process using an event-loop paradigm \(em that is, the
 execution of certain system calls by the controlled process cause the library
 to stop the controlled process and execute callback functions in the context of
-the controlling process. These handlers can perform various operations on the
-target process using APIs in \fBlibpctx\fR and \fBlibcpc\fR that consume
-\fBpctx_t\fR handles.
-.SH SEE ALSO
-.sp
-.LP
-\fBcputrack\fR(1), \fBcpustat\fR(1M), \fBcpc_bind_curlwp\fR(3CPC),
-\fBcpc_buf_create\fR(3CPC), \fBcpc_enable\fR(3CPC), \fBcpc_npic\fR(3CPC),
-\fBcpc_open\fR(3CPC), \fBcpc_set_create\fR(3CPC), \fBcpc_seterrhndlr\fR(3CPC),
-\fBgeneric_events\fR(3CPC), \fBlibcpc\fR(3LIB), \fBpctx_capture\fR(3CPC),
-\fBpctx_set_events\fR(3CPC), \fBproc\fR(4)
+the controlling process.
+These handlers can perform various operations on the target process using APIs
+in
+.Sy libpctx
+and
+.Sy libcpc
+that consume
+.Vt pctx_t
+handles.
+.Sh SEE ALSO
+.Xr cputrack 1 ,
+.Xr cpustat 1M ,
+.Xr cpc_bind_curlwp 3CPC ,
+.Xr cpc_buf_create 3CPC ,
+.Xr cpc_enable 3CPC ,
+.Xr cpc_npic 3CPC ,
+.Xr cpc_open 3CPC ,
+.Xr cpc_set_create 3CPC ,
+.Xr cpc_seterrhndlr 3CPC ,
+.Xr generic_events 3CPC ,
+.Xr pctx_capture 3CPC ,
+.Xr pctx_set_events 3CPC ,
+.Xr libcpc 3LIB ,
+.Xr proc 4

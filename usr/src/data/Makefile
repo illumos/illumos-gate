@@ -11,11 +11,13 @@
 
 #
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 COMMON_SUBDIRS=	consfonts \
 		hwdata \
 		locale \
+		perfmon \
 		terminfo \
 		zoneinfo
 

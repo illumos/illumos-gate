@@ -733,16 +733,58 @@ extern "C" {
 
 
 /*
- * Definitions for Intel processor models. Note, these model values can overlap
- * in a given family. Processor models are added here on an as needed basis. The
- * Xeon extension here is to refer to what has been called the EP/EX lines or
- * E5/E7, generally multi-socket capable processors.
+ * Definitions for Intel processor models. These are all for Family 6
+ * processors. This list and the Atom set below it are not exhuastive.
  */
-#define	INTC_MODEL_IVYBRIDGE_XEON	0x3E
-#define	INTC_MODEL_HASWELL_XEON		0x3F
-#define	INTC_MODEL_BROADWELL_XEON	0x4F
+#define	INTC_MODEL_MEROM		0x0f
+#define	INTC_MODEL_PENRYN		0x17
+#define	INTC_MODEL_DUNNINGTON		0x1d
+
+#define	INTC_MODEL_NEHALEM		0x1e
+#define	INTC_MODEL_NEHALEM2		0x1f
+#define	INTC_MODEL_NEHALEM_EP		0x1a
+#define	INTC_MODEL_NEHALEM_EX		0x2e
+
+#define	INTC_MODEL_WESTMERE		0x25
+#define	INTC_MODEL_WESTMERE_EP		0x2c
+#define	INTC_MODEL_WESTMERE_EX		0x2f
+
+#define	INTC_MODEL_SANDYBRIDGE		0x2a
+#define	INTC_MODEL_SANDYBRIDGE_XEON	0x2d
+#define	INTC_MODEL_IVYBRIDGE		0x3a
+#define	INTC_MODEL_IVYBRIDGE_XEON	0x3e
+
+#define	INTC_MODEL_HASWELL		0x3c
+#define	INTC_MODEL_HASWELL_ULT		0x45
+#define	INTC_MODEL_HASWELL_GT3E		0x46
+#define	INTC_MODEL_HASWELL_XEON		0x3f
+
+#define	INTC_MODEL_BROADWELL		0x3d
+#define	INTC_MODEL_BROADELL_2		0x47
+#define	INTC_MODEL_BROADWELL_XEON	0x4f
 #define	INTC_MODEL_BROADWELL_XEON_D	0x56
+
+#define	INCC_MODEL_SKYLAKE_MOBILE	0x4e
 #define	INTC_MODEL_SKYLAKE_XEON		0x55
+#define	INTC_MODEL_SKYLAKE_DESKTOP	0x5e
+
+#define	INTC_MODEL_KABYLAKE_MOBILE	0x8e
+#define	INTC_MODEL_KABYLAKE_DESKTOP	0x9e
+
+/*
+ * Atom Processors
+ */
+#define	INTC_MODEL_SILVERTHORNE		0x1c
+#define	INTC_MODEL_LINCROFT		0x26
+#define	INTC_MODEL_PENWELL		0x27
+#define	INTC_MODEL_CLOVERVIEW		0x35
+#define	INTC_MODEL_CEDARVIEW		0x36
+#define	INTC_MODEL_BAY_TRAIL		0x37
+#define	INTC_MODEL_AVATON		0x4d
+#define	INTC_MODEL_AIRMONT		0x4c
+#define	INTC_MODEL_GOLDMONT		0x5c
+#define	INTC_MODEL_DENVERTON		0x5f
+#define	INTC_MODEL_GEMINI_LAKE		0x7a
 
 /*
  * xgetbv/xsetbv support

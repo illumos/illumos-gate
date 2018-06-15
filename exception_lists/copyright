@@ -128,6 +128,7 @@ usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.descrip
 usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.tmpl
 usr/src/data/ucode/amd/*
 usr/src/data/ucode/intel/*
+usr/src/data/perfmon/*
 usr/src/grub/grub-0.97/stage2/Makefile.am
 usr/src/grub/grub-0.97/stage2/builtins.c
 usr/src/grub/grub-0.97/stage2/disk_io.c

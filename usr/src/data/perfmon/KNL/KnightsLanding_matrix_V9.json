@@ -1,0 +1,275 @@
+[
+  {
+    "MATRIX_REQUEST": "DEMAND_DATA_RD",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000001",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts demand cacheable data and L1 prefetch data reads"
+  },
+  {
+    "MATRIX_REQUEST": "DEMAND_RFO",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000002",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts Demand cacheable data writes"
+  },
+  {
+    "MATRIX_REQUEST": "DEMAND_CODE_RD",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000004",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts demand code reads and prefetch code reads"
+  },
+  {
+    "MATRIX_REQUEST": "PF_L2_RFO",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000020",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts L2 data RFO prefetches (includes PREFETCHW instruction)"
+  },
+  {
+    "MATRIX_REQUEST": "PF_L2_CODE_RD",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000040",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts L2 code HW prefetches"
+  },
+  {
+    "MATRIX_REQUEST": "PARTIAL_READS",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000080",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts Partial reads (UC or WC and is valid only for Outstanding response type)."
+  },
+  {
+    "MATRIX_REQUEST": "PARTIAL_WRITES",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000100",
+    "MATRIX_REGISTER": "1",
+    "DESCRIPTION": "Counts Partial writes (UC or WT or WP and should be programmed on PMC1)"
+  },
+  {
+    "MATRIX_REQUEST": "UC_CODE_READS",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000200",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts UC code reads (valid only for Outstanding response type)"
+  },
+  {
+    "MATRIX_REQUEST": "BUS_LOCKS",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000400",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts Bus locks and split lock requests"
+  },
+  {
+    "MATRIX_REQUEST": "FULL_STREAMING_STORES",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000800",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts Full streaming stores (WC and should be programmed on PMC1)"
+  },
+  {
+    "MATRIX_REQUEST": "PF_SOFTWARE",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000001000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts Software Prefetches"
+  },
+  {
+    "MATRIX_REQUEST": "PF_L1_DATA_RD",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000002000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts L1 data HW prefetches"
+  },
+  {
+    "MATRIX_REQUEST": "PARTIAL_STREAMING_STORES",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000004000",
+    "MATRIX_REGISTER": "1",
+    "DESCRIPTION": "Counts Partial streaming stores (WC and should be programmed on PMC1)"
+  },
+  {
+    "MATRIX_REQUEST": "STREAMING_STORES",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000004800",
+    "MATRIX_REGISTER": "1",
+    "DESCRIPTION": "Counts all streaming stores (WC and should be programmed on PMC1)"
+  },
+  {
+    "MATRIX_REQUEST": "ANY_REQUEST",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000008000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts any request"
+  },
+  {
+    "MATRIX_REQUEST": "ANY_DATA_RD",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000003081",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts Demand cacheable data and L1 prefetch data read requests"
+  },
+  {
+    "MATRIX_REQUEST": "ANY_RFO",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000022",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts Demand cacheable data write requests"
+  },
+  {
+    "MATRIX_REQUEST": "ANY_CODE_RD",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000044",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts Demand code reads and prefetch code read requests"
+  },
+  {
+    "MATRIX_REQUEST": "ANY_READ",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x00000032e7",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts any Read request"
+  },
+  {
+    "MATRIX_REQUEST": "ANY_PF_L2",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0000000060",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts any Prefetch requests"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "ANY_RESPONSE",
+    "MATRIX_VALUE": "0x0000010000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for any response"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "DDR_NEAR",
+    "MATRIX_VALUE": "0x0080800000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for data responses from DRAM Local."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "DDR_FAR",
+    "MATRIX_VALUE": "0x0101000000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for data responses from DRAM Far."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "MCDRAM_NEAR",
+    "MATRIX_VALUE": "0x0080200000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for data responses from MCDRAM Local."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "MCDRAM_FAR",
+    "MATRIX_VALUE": "0x0100400000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for data responses from MCDRAM Far or Other tile L2 hit far."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_NEAR_TILE_E_F",
+    "MATRIX_VALUE": "0x0800080000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses from a snoop request hit with data forwarded from its Near-other tile's L2 in E/F state."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_NEAR_TILE_M",
+    "MATRIX_VALUE": "0x1000080000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses from a snoop request hit with data forwarded from its Near-other tile's L2 in M state."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_FAR_TILE_E_F",
+    "MATRIX_VALUE": "0x0800400000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses from a snoop request hit with data forwarded from its Far(not in the same quadrant as the request)-other tile's L2 in E/F state. Valid only for SNC4 cluster mode."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_FAR_TILE_M",
+    "MATRIX_VALUE": "0x1000400000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses from a snoop request hit with data forwarded from its Far(not in the same quadrant as the request)-other tile's L2 in M state."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "NON_DRAM",
+    "MATRIX_VALUE": "0x2000020000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses from any NON_DRAM system address. This includes MMIO transactions"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "OUTSTANDING",
+    "MATRIX_VALUE": "0x4000000000",
+    "MATRIX_REGISTER": "0",
+    "DESCRIPTION": "outstanding, per weighted cycle, from the time of the request to when any response is received. The oustanding response should be programmed only on PMC0."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "MCDRAM",
+    "MATRIX_VALUE": "0x0180600000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses from MCDRAM (local and far)"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "DDR",
+    "MATRIX_VALUE": "0x0181800000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses from DDR (local and far)"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_THIS_TILE_M",
+    "MATRIX_VALUE": "0x0002000000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses which hit its own tile's L2 with data in M state"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_THIS_TILE_E",
+    "MATRIX_VALUE": "0x0004000000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses which hit its own tile's L2 with data in E state"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_THIS_TILE_S",
+    "MATRIX_VALUE": "0x0008000000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses which hit its own tile's L2 with data in S state"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_THIS_TILE_F",
+    "MATRIX_VALUE": "0x0010000000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for responses which hit its own tile's L2 with data in F state"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_NEAR_TILE",
+    "MATRIX_VALUE": "0x1800180000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for reponses from snoop request hit with data forwarded from its Near-other tile L2 in E/F/M state"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L2_HIT_FAR_TILE",
+    "MATRIX_VALUE": "0x1800400000",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "accounts for reponses from snoop request hit with data forwarded from it Far(not in the same quadrant as the request)-other tile L2 in E/F/M state. Valid only in SNC4 Cluster mode."
+  }
+]
