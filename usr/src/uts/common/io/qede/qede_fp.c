@@ -493,7 +493,7 @@ qede_reg_jumbo_cqe(qede_rx_ring_t *rx_ring,
 	int i;
 	qede_rx_buffer_t *rx_buf, *rx_buffer[ETH_RX_MAX_BUFF_PER_PKT];
 	mblk_t *mp = NULL, *head = NULL, *tail = NULL;
-	uint32_t free_buffer_count;
+	uint32_t free_buffer_count = 0;
 	uint16_t work_length;
 	uint32_t rx_buf_size = rx_ring->rx_buf_size, bd_len;
 	qede_dma_info_t *dma_info;
