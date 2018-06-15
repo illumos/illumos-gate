@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -37,8 +37,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <sys/types.h>
@@ -48,6 +46,7 @@
 #include <strings.h>
 #include <stdlib.h>
 #include <libintl.h>
+#include <limits.h>
 
 #ifdef SYSV
 #define	index	strchr
@@ -150,7 +149,7 @@ static void
 rnetrc(const char *host, char **aname, char **apass)
 {
 	struct ruserdata *d = _ruserdata();
-	char *hdir, buf[BUFSIZ];
+	char *hdir, buf[PATH_MAX];
 	int t;
 	struct stat64 stb;
 
@@ -160,7 +159,17 @@ rnetrc(const char *host, char **aname, char **apass)
 	hdir = getenv("HOME");
 	if (hdir == NULL)
 		hdir = ".";
-	(void) sprintf(buf, "%s/.netrc", hdir);
+	t = snprintf(buf, sizeof (buf), "%s/.netrc", hdir);
+	if (t < 0 || t >= sizeof (buf)) {
+		if (t < 0) {
+			perror(buf);
+		} else {
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+			    "HOME directory name is too long: %s\n"), hdir);
+		}
+		return;
+	}
+
 	d->cfile = fopen(buf, "rF");
 	if (d->cfile == NULL) {
 		if (errno != ENOENT)
