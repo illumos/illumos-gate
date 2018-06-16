@@ -236,12 +236,12 @@
 
 /*
  * Audit rule arch specification
- * See Linux __AUDIT_ARCH_64BIT, __AUDIT_ARCH_LE, EM_X86_64 and EM_386 defs.
+ * See Linux EM_X86_64 and EM_386 defs.
  * -F arch=b64 looks like: 0xc000003e
  * -F arch=b32 looks like: 0x40000003
+ * If no arch is specified (possible with '-S syslog', '-S all', or '-w <file>')
+ * the rule applies to both architectures and LX_RF_AUDIT_ARCH is not passed.
  */
-#define	LX_AUDIT_VAL_B64	0x80000000
-#define	LX_AUDIT_VAL_B32	0x40000000
 #define	LX_AUDIT_ARCH64		0xc000003e
 #define	LX_AUDIT_ARCH32		0x40000003
 
@@ -301,6 +301,7 @@ typedef struct lx_audit_rule_ent {
 	lx_audit_rule_t lxare_rule;
 	char		*lxare_buf;
 	boolean_t	lxare_is32bit;
+	boolean_t	lxare_is64bit;
 	char		*lxare_key;
 } lx_audit_rule_ent_t;
 
@@ -703,15 +704,15 @@ lx_audit_fmt_str(char *dst, char *str, uint_t dlen)
  * Format and enqueue a syscall audit record.
  */
 static void
-lx_audit_syscall_fmt_rcd(int sysnum, long ret, lx_audit_state_t *asp,
-    lx_audit_rule_ent_t *erp, uint64_t seq, timestruc_t *tsp)
+lx_audit_syscall_fmt_rcd(int sysnum, uint32_t arch, long ret,
+    lx_audit_state_t *asp, lx_audit_rule_ent_t *erp, uint64_t seq,
+    timestruc_t *tsp)
 {
 	klwp_t *lwp;
 	proc_t *p;
 	uint32_t items, sessid;
 	lx_lwp_data_t *lwpd;
 	lx_audit_record_t *rp;
-	boolean_t is_32bit = erp->lxare_is32bit;
 	cred_t *cr = CRED();
 	minor_t minor;
 	char key[LX_AUDIT_MAX_KEY_LEN + 6]; /* for key="%s" formatting */
@@ -724,9 +725,10 @@ lx_audit_syscall_fmt_rcd(int sysnum, long ret, lx_audit_state_t *asp,
 		return;
 	}
 
-	if (is_32bit) {
+	if (arch == LX_AUDIT_ARCH32) {
 		items = MIN(4, lx_sysent32[sysnum].sy_narg);
 	} else {
+		ASSERT3U(arch, ==, LX_AUDIT_ARCH64);
 		items = MIN(4, lx_sysent64[sysnum].sy_narg);
 	}
 
@@ -786,7 +788,7 @@ lx_audit_syscall_fmt_rcd(int sysnum, long ret, lx_audit_state_t *asp,
 	    (uint64_t)tsp->tv_sec,			/* zone's timestamp */
 	    (uint64_t)tsp->tv_nsec / 1000000,
 	    seq,					/* serial number */
-	    (is_32bit ? LX_AUDIT_ARCH32 : LX_AUDIT_ARCH64), /* arch */
+	    arch,					/* arch */
 	    sysnum,					/* syscall */
 	    (lwp->lwp_errno == 0 ? "yes" : "no"),	/* success */
 	    ret,					/* exit */
@@ -823,11 +825,9 @@ lx_audit_syscall_fmt_rcd(int sysnum, long ret, lx_audit_state_t *asp,
  * syscall.
  */
 static lx_audit_rule_ent_t *
-lx_audit_next_applicable_rule(int sysnum, lx_audit_state_t *asp,
+lx_audit_next_applicable_rule(int sysnum, uint32_t arch, lx_audit_state_t *asp,
     lx_audit_rule_ent_t *erp)
 {
-	boolean_t is_32bit = erp->lxare_is32bit;
-
 	ASSERT(MUTEX_HELD(&asp->lxast_lock));
 
 	for (erp = list_next(&asp->lxast_rules, erp);
@@ -836,7 +836,9 @@ lx_audit_next_applicable_rule(int sysnum, lx_audit_state_t *asp,
 		lx_audit_rule_t *r = &erp->lxare_rule;
 
 		/* Determine if the rule in the list has the same ARCH. */
-		if (erp->lxare_is32bit != is_32bit)
+		if (arch == LX_AUDIT_ARCH32 && !erp->lxare_is32bit)
+			continue;
+		if (arch == LX_AUDIT_ARCH64 && !erp->lxare_is64bit)
 			continue;
 
 		/* Determine if this rule applies to the relevant syscall. */
@@ -855,7 +857,7 @@ lx_audit_syscall_exit(int sysnum, long ret)
 	uint64_t seq;
 	lx_audit_rule_ent_t *erp;
 	timestruc_t ts;
-	boolean_t is_32bit;
+	uint32_t arch;
 
 	if (lxzd->lxzd_audit_enabled == LXAE_DISABLED)
 		return;
@@ -863,13 +865,18 @@ lx_audit_syscall_exit(int sysnum, long ret)
 	asp = lxzd->lxzd_audit_state;
 	ASSERT(asp != NULL);
 
-	is_32bit = (get_udatamodel() == DATAMODEL_ILP32);
+	if (get_udatamodel() == DATAMODEL_ILP32) {
+		arch = LX_AUDIT_ARCH32;
+	} else {
+		ASSERT(get_udatamodel() == DATAMODEL_LP64);
+		arch = LX_AUDIT_ARCH64;
+	}
 
 	/*
 	 * Fast top-level check to see if we're auditing this syscall.
 	 * We don't take the mutex for this since there is no need.
 	 */
-	if (is_32bit) {
+	if (arch == LX_AUDIT_ARCH32) {
 		if (asp->lxast_sys32_rulep[sysnum] == NULL)
 			return;
 	} else {
@@ -878,7 +885,7 @@ lx_audit_syscall_exit(int sysnum, long ret)
 	}
 
 	mutex_enter(&asp->lxast_lock);
-	if (is_32bit) {
+	if (arch == LX_AUDIT_ARCH32) {
 		erp = asp->lxast_sys32_rulep[sysnum];
 	} else {
 		erp = asp->lxast_sys64_rulep[sysnum];
@@ -909,11 +916,11 @@ lx_audit_syscall_exit(int sysnum, long ret)
 	 * other rules are applicable to this syscall.
 	 */
 	for (; erp != NULL;
-	    erp = lx_audit_next_applicable_rule(sysnum, asp, erp)) {
+	    erp = lx_audit_next_applicable_rule(sysnum, arch, asp, erp)) {
 		if (!lx_audit_syscall_rule_match(erp))
 			continue;
 
-		lx_audit_syscall_fmt_rcd(sysnum, ret, asp, erp, seq, &ts);
+		lx_audit_syscall_fmt_rcd(sysnum, arch, ret, asp, erp, seq, &ts);
 	}
 
 	/*
@@ -945,16 +952,16 @@ lx_enable_syscall_rule(lx_audit_state_t *asp, lx_audit_rule_t *rulep,
     lx_audit_rule_ent_t *rp)
 {
 	uint_t sysnum;
-	boolean_t is_32bit = rp->lxare_is32bit;
 
 	ASSERT(MUTEX_HELD(&asp->lxast_lock));
 
 	for (sysnum = 0; sysnum < LX_NSYSCALLS; sysnum++) {
 		if (BT_TEST32(rulep->lxar_mask, sysnum)) {
-			if (is_32bit) {
+			if (rp->lxare_is32bit) {
 				if (asp->lxast_sys32_rulep[sysnum] == NULL)
 					asp->lxast_sys32_rulep[sysnum] = rp;
-			} else {
+			}
+			if (rp->lxare_is64bit) {
 				if (asp->lxast_sys64_rulep[sysnum] == NULL)
 					asp->lxast_sys64_rulep[sysnum] = rp;
 			}
@@ -970,7 +977,7 @@ lx_audit_append_rule(void *r, uint_t datalen)
 	uint_t i;
 	lx_audit_rule_ent_t *rp;
 	lx_audit_state_t *asp;
-	boolean_t is_32bit = B_FALSE, sys_found = B_FALSE, arch_found = B_FALSE;
+	boolean_t is_32bit = B_TRUE, is_64bit = B_TRUE, sys_found = B_FALSE;
 	char *tdp;
 	char key[LX_AUDIT_MAX_KEY_LEN + 1];
 	uint32_t tlen;
@@ -1017,16 +1024,14 @@ lx_audit_append_rule(void *r, uint_t datalen)
 		if (ftype == LX_RF_AUDIT_ARCH) {
 			if (fop != LX_OF_AUDIT_EQ)
 				return (ENOTSUP);
-			if ((fval & (LX_AUDIT_VAL_B64 | LX_AUDIT_VAL_B32)) == 0)
-				return (ENOTSUP);
-			if (arch_found)
+			if (!is_32bit || !is_64bit)
 				return (EINVAL);
-			arch_found = B_TRUE;
-			/* while we're here, record the arch */
-			if (fval & LX_AUDIT_VAL_B64) {
+			if (fval == LX_AUDIT_ARCH64) {
 				is_32bit = B_FALSE;
+			} else if (fval == LX_AUDIT_ARCH32) {
+				is_64bit = B_FALSE;
 			} else {
-				is_32bit = B_TRUE;
+				return (ENOTSUP);
 			}
 		} else if (ftype == LX_RF_AUDIT_LOGINUID) {
 			if ((fop & LX_OF_AUDIT_ALL) == 0)
@@ -1073,6 +1078,7 @@ lx_audit_append_rule(void *r, uint_t datalen)
 	rp->lxare_buf = kmem_alloc(rulep->lxar_buflen, KM_SLEEP);
 	bcopy(datap, rp->lxare_buf, rulep->lxar_buflen);
 	rp->lxare_is32bit = is_32bit;
+	rp->lxare_is64bit = is_64bit;
 	if (key[0] == '\0') {
 		rp->lxare_key = NULL;
 	} else {
@@ -1099,8 +1105,6 @@ lx_audit_delete_rule(void *r, uint_t datalen)
 	uint_t sysnum;
 	lx_audit_state_t *asp;
 	lx_audit_rule_ent_t *erp;
-	boolean_t is_32bit;
-	uint32_t match_arch = 0;
 
 	if (ztolxzd(curproc->p_zone)->lxzd_audit_enabled == LXAE_LOCKED)
 		return (EPERM);
@@ -1153,10 +1157,6 @@ lx_audit_delete_rule(void *r, uint_t datalen)
 				mtch = B_FALSE;
 				break;
 			}
-
-			/* while we're here, remember the ARCH */
-			if (rulep->lxar_fields[i] == LX_RF_AUDIT_ARCH)
-				match_arch = rulep->lxar_values[i];
 		}
 		if (!mtch)
 			continue;
@@ -1172,12 +1172,6 @@ lx_audit_delete_rule(void *r, uint_t datalen)
 		return (ENOENT);
 	}
 
-	if (match_arch & LX_AUDIT_VAL_B64) {
-		is_32bit = B_FALSE;
-	} else {
-		is_32bit = B_TRUE;
-	}
-
 	/*
 	 * Disable each relevant syscall enabling.
 	 */
@@ -1190,17 +1184,18 @@ lx_audit_delete_rule(void *r, uint_t datalen)
 			 * syscall, or point to the next applicable rule in the
 			 * list.
 			 */
-			if (is_32bit) {
+			if (erp->lxare_is32bit) {
 				if (asp->lxast_sys32_rulep[sysnum] == erp) {
 					asp->lxast_sys32_rulep[sysnum] =
 					    lx_audit_next_applicable_rule(
-					    sysnum, asp, erp);
+					    sysnum, LX_AUDIT_ARCH32, asp, erp);
 				}
-			} else {
+			}
+			if (erp->lxare_is64bit) {
 				if (asp->lxast_sys64_rulep[sysnum] == erp) {
 					asp->lxast_sys64_rulep[sysnum] =
 					    lx_audit_next_applicable_rule(
-					    sysnum, asp, erp);
+					    sysnum, LX_AUDIT_ARCH64, asp, erp);
 				}
 			}
 		}
