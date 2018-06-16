@@ -594,6 +594,8 @@ usr/lib/sparcv9/libfakekernel.so		sparc
 usr/lib/mdb/proc/libfksmbsrv.so
 usr/lib/mdb/proc/amd64/libfksmbsrv.so		i386
 usr/lib/mdb/proc/sparcv9/libfksmbsrv.so		sparc
+usr/lib/mdb/proc/amd64/libmlsvc.so		i386
+usr/lib/mdb/proc/sparcv9/libmlsvc.so		sparc
 usr/lib/smbsrv/bind-helper
 usr/lib/smbsrv/fksmbd
 usr/lib/smbsrv/libfksmbsrv.so
