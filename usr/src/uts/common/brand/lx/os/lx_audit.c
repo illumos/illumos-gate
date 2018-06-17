@@ -402,7 +402,7 @@ lx_audit_worker(void *a)
 
 		err = lx_audit_emit_syscall_event(rp->lxar_type,
 		    asp->lxast_sock, rp->lxar_msg);
-		if (err != ENOMEM) {
+		if (err != ENOMEM && err != ENOSPC) {
 			kmem_free(rp->lxar_msg, LX_AUDIT_MESSAGE_TEXT_MAX);
 			kmem_free(rp, sizeof (lx_audit_record_t));
 		} else {

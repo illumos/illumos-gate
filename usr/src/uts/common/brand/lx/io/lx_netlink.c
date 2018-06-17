@@ -416,6 +416,8 @@ typedef struct lx_netlink_sock {
 	uint32_t lxns_groups;			/* group subscriptions */
 	uint32_t lxns_bufsize;			/* buffer size */
 	uint32_t lxns_flags;			/* socket flags */
+	kmutex_t lxns_flowctl_mtx;		/* protects lxns_flowctrled */
+	boolean_t lxns_flowctrled;		/* sock is flow-controlled */
 } lx_netlink_sock_t;
 
 typedef struct lx_netlink_reply {
@@ -1812,14 +1814,39 @@ lx_netlink_au_emit_cb(void *s, uint_t type, const char *msg, uint_t size)
 		mp->b_wptr += LXNLMSG_ALIGN(size);
 	}
 
+	/* As in lx_netlink_reply_sendup, send as T_UNITDATA_IND message. */
 	if ((mp1 = lx_netlink_alloc_mp1(lxsock)) == NULL) {
 		freeb(mp);
 		return (ENOMEM);
 	}
-	/* As in lx_netlink_reply_sendup, send as T_UNITDATA_IND message. */
 	mp1->b_cont = mp;
+
+	/*
+	 * If the socket is currently flow-controlled, do not allow further
+	 * data to be sent out.  Messages of the NLMSG_DONE type, triggered by
+	 * passing msg == NULL, are excempt from this restriction.
+	 */
+	mutex_enter(&lxsock->lxns_flowctl_mtx);
+	if (lxsock->lxns_flowctrled && msg != NULL) {
+		mutex_exit(&lxsock->lxns_flowctl_mtx);
+		freemsg(mp1);
+		return (ENOSPC);
+	}
+
 	lxsock->lxns_upcalls->su_recv(lxsock->lxns_uphandle, mp1,
 	    msgdsize(mp1), 0, &error, NULL);
+
+	/*
+	 * The socket indicated that it is now flow-controlled.  That said, it
+	 * still queued the last message, so indicated success (but track the
+	 * flow-controlled state).
+	 */
+	if (error == ENOSPC) {
+		lxsock->lxns_flowctrled = B_TRUE;
+		lx_netlink_flowctrld++;
+		error = 0;
+	}
+	mutex_exit(&lxsock->lxns_flowctl_mtx);
 
 	return (error);
 }
@@ -1989,6 +2016,16 @@ lx_netlink_send(sock_lower_handle_t handle, mblk_t *mp,
 	return (rval);
 }
 
+static void
+lx_netlink_clr_flowctrl(sock_lower_handle_t handle)
+{
+	lx_netlink_sock_t *lxsock = (lx_netlink_sock_t *)handle;
+
+	mutex_enter(&lxsock->lxns_flowctl_mtx);
+	lxsock->lxns_flowctrled = B_FALSE;
+	mutex_exit(&lxsock->lxns_flowctl_mtx);
+}
+
 /*ARGSUSED*/
 static int
 lx_netlink_close(sock_lower_handle_t handle, int flags, cred_t *cr)
@@ -2011,6 +2048,7 @@ lx_netlink_close(sock_lower_handle_t handle, int flags, cred_t *cr)
 
 	(void) ldi_close(lxsock->lxns_iphandle, FREAD, kcred);
 	(void) ldi_close(lxsock->lxns_ip6handle, FREAD, kcred);
+	mutex_destroy(&lxsock->lxns_flowctl_mtx);
 	kmem_free(lxsock, sizeof (lx_netlink_sock_t));
 
 	return (0);
@@ -2031,7 +2069,7 @@ static sock_downcalls_t sock_lx_netlink_downcalls = {
 	NULL,				/* sd_recv_uio */
 	NULL,				/* sd_poll */
 	sock_shutdown_notsupp,		/* sd_shutdown */
-	sock_clr_flowctrl_notsupp,	/* sd_setflowctrl */
+	lx_netlink_clr_flowctrl,	/* sd_clr_flowctrl */
 	sock_ioctl_notsupp,		/* sd_ioctl */
 	lx_netlink_close		/* sd_close */
 };
@@ -2085,6 +2123,7 @@ lx_netlink_create(int family, int type, int proto,
 	lxsock->lxns_ip6handle = handle6;
 	lxsock->lxns_bufsize = lx_netlink_bufsize;
 	lxsock->lxns_proto = proto;
+	mutex_init(&lxsock->lxns_flowctl_mtx, NULL, MUTEX_DEFAULT, NULL);
 
 	mutex_enter(&lx_netlink_lock);
 
