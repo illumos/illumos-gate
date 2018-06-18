@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -57,6 +57,20 @@ static uint16_t vxlan_defport = IPPORT_VXLAN;
  * Should we enable UDP source port hashing for fanout.
  */
 boolean_t vxlan_fanout = B_TRUE;
+
+/*
+ * This represents the size in bytes that we want to allocate when allocating a
+ * vxlan header block. This is intended such that lower levels can try and use
+ * the message block that we allocate for the IP and UPD header. The hope is
+ * that even if this is tunneled, that this is enough space.
+ *
+ * The vxlan_noalloc_min value represents the minimum amount of space we need to
+ * consider not allocating a message block and just passing it down the stack in
+ * this form. This number assumes that we have a VLAN tag, so 18 byte Ethernet
+ * header, 20 byte IP header, 8 byte UDP header, and 8 byte VXLAN header.
+ */
+uint_t vxlan_alloc_size = 128;
+uint_t vxlan_noalloc_min = 54;
 
 static const char *vxlan_props[] = {
 	"vxlan/listen_ip",
@@ -150,22 +164,30 @@ vxlan_o_encap(void *arg, mblk_t *mp, ovep_encap_info_t *einfop,
 
 	ASSERT(einfop->ovdi_id < (1 << 24));
 
-	/*
-	 * This allocation could get hot. We may want to have a good way to
-	 * cache and handle this allocation the same way that IP does with
-	 * keeping around a message block per entry, or basically treating this
-	 * as an immutable message block in the system. Basically freemsg() will
-	 * be a nop, but we'll do the right thing with respect to the rest of
-	 * the chain.
-	 */
-	ob = allocb(VXLAN_HDR_LEN, 0);
-	if (ob == NULL)
-		return (ENOMEM);
+	if (DB_REF(mp) != 1 || mp->b_rptr - vxlan_noalloc_min < DB_BASE(mp)) {
+		/*
+		 * This allocation could get hot. We may want to have a good
+		 * way to cache and handle this allocation the same way that IP
+		 * does with keeping around a message block per entry, or
+		 * basically treating this as an immutable message block in the
+		 * system. Basically freemsg() will be a nop, but we'll do the
+		 * right thing with respect to the rest of the chain.
+		 */
+		ob = allocb(vxlan_alloc_size, 0);
+		if (ob == NULL)
+			return (ENOMEM);
+
+		ob->b_wptr = DB_LIM(ob);
+		ob->b_rptr = ob->b_wptr;
+		ob->b_cont = mp;
+	} else {
+		ob = mp;
+	}
+	ob->b_rptr -= VXLAN_HDR_LEN;
 
 	vxh = (vxlan_hdr_t *)ob->b_rptr;
 	vxh->vxlan_flags = ntohl(VXLAN_F_VDI);
 	vxh->vxlan_id = htonl((uint32_t)einfop->ovdi_id << VXLAN_ID_SHIFT);
-	ob->b_wptr += VXLAN_HDR_LEN;
 	*outp = ob;
 
 	return (0);

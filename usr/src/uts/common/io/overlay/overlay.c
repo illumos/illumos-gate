@@ -1095,7 +1095,7 @@ overlay_m_tx(void *arg, mblk_t *mp_chain)
 			goto out;
 		}
 
-		ep->b_cont = mp;
+		ASSERT(ep->b_cont == mp || ep == mp);
 		ret = overlay_mux_tx(odd->odd_mux, &hdr, ep);
 		if (ret != 0)
 			goto out;
