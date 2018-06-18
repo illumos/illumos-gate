@@ -406,7 +406,7 @@ ppt_bar_crawl(struct pptdev *ppt)
 	}
 
 	VERIFY3S(rlen, >, 0);
-	rcount = (rlen * sizeof (int)) / sizeof (pci_regspec_t);
+	rcount = rlen / sizeof (pci_regspec_t);
 	for (i = 0; i < rcount; i++) {
 		pci_regspec_t *reg = &regs[i];
 		struct pptbar *pbar;
