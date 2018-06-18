@@ -14,7 +14,6 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-
 SUBDIRS_i386 = i386
 
 SUBDIRS = poll secflags sigqueue spoof-ras sdevfs sockfs stress timer tmpfs \
