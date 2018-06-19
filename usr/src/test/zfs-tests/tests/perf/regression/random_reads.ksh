@@ -40,30 +40,30 @@
 
 function cleanup
 {
-	log_must zfs destroy $TESTFS
+	recreate_perf_pool
 }
 
-log_assert "Measure IO stats during random read load"
 log_onexit cleanup
 
-export TESTFS=$PERFPOOL/testfs
-recreate_perfpool
-log_must zfs create $PERF_FS_OPTS $TESTFS
+recreate_perf_pool
+populate_perf_filesystems
 
 # Aim to fill the pool to 50% capacity while accounting for a 3x compressratio.
-export TOTAL_SIZE=$(($(get_prop avail $TESTFS) * 3 / 2))
+export TOTAL_SIZE=$(($(get_prop avail $PERFPOOL) * 3 / 2))
 
 # Variables for use by fio.
 if [[ -n $PERF_REGRESSION_WEEKLY ]]; then
 	export PERF_RUNTIME=${PERF_RUNTIME:-$PERF_RUNTIME_WEEKLY}
 	export PERF_RUNTYPE=${PERF_RUNTYPE:-'weekly'}
 	export PERF_NTHREADS=${PERF_NTHREADS:-'8 16 32 64'}
+	export PERF_NTHREADS_PER_FS=${PERF_NTHREADS_PER_FS:-'0'}
 	export PERF_SYNC_TYPES=${PERF_SYNC_TYPES:-'1'}
 	export PERF_IOSIZES=${PERF_IOSIZES:-'8k'}
 elif [[ -n $PERF_REGRESSION_NIGHTLY ]]; then
 	export PERF_RUNTIME=${PERF_RUNTIME:-$PERF_RUNTIME_NIGHTLY}
 	export PERF_RUNTYPE=${PERF_RUNTYPE:-'nightly'}
 	export PERF_NTHREADS=${PERF_NTHREADS:-'16 32'}
+	export PERF_NTHREADS_PER_FS=${PERF_NTHREADS_PER_FS:-'0'}
 	export PERF_SYNC_TYPES=${PERF_SYNC_TYPES:-'1'}
 	export PERF_IOSIZES=${PERF_IOSIZES:-'8k'}
 fi
@@ -73,14 +73,20 @@ fi
 # of the available files.
 export NUMJOBS=$(get_max $PERF_NTHREADS)
 export FILE_SIZE=$((TOTAL_SIZE / NUMJOBS))
+export DIRECTORY=$(get_directory)
 log_must fio $FIO_SCRIPTS/mkfiles.fio
 
 # Set up the scripts and output files that will log performance data.
 lun_list=$(pool_to_lun_list $PERFPOOL)
 log_note "Collecting backend IO stats with lun list $lun_list"
-export collect_scripts=("dtrace -s $PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1"
-    "io" "vmstat 1" "vmstat" "mpstat 1" "mpstat" "iostat -xcnz 1" "iostat"
-    "dtrace -s $PERF_SCRIPTS/profile.d" "profile" "kstat zfs:0 1" "kstat")
+export collect_scripts=(
+    "kstat zfs:0 1"  "kstat"
+    "vmstat 1"       "vmstat"
+    "mpstat 1"       "mpstat"
+    "iostat -xcnz 1" "iostat"
+    "dtrace -Cs $PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1" "io"
+    "dtrace  -s $PERF_SCRIPTS/profile.d"                  "profile"
+)
 
 log_note "Random reads with $PERF_RUNTYPE settings"
 do_fio_run random_reads.fio false true

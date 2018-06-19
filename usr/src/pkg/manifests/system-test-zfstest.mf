@@ -2726,6 +2726,7 @@ file path=opt/zfs-tests/tests/perf/perf.shlib mode=0444
 file path=opt/zfs-tests/tests/perf/regression/random_reads mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_readwrite mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_writes mode=0555
+file path=opt/zfs-tests/tests/perf/regression/random_writes_zil mode=0555
 file path=opt/zfs-tests/tests/perf/regression/sequential_reads mode=0555
 file path=opt/zfs-tests/tests/perf/regression/sequential_reads_arc_cached \
     mode=0555
@@ -2737,8 +2738,10 @@ file path=opt/zfs-tests/tests/perf/regression/sequential_reads_dbuf_cached \
 file path=opt/zfs-tests/tests/perf/regression/sequential_writes mode=0555
 file path=opt/zfs-tests/tests/perf/regression/setup mode=0555
 file path=opt/zfs-tests/tests/perf/scripts/io.d mode=0444
+file path=opt/zfs-tests/tests/perf/scripts/offcpu-profile.d mode=0444
 file path=opt/zfs-tests/tests/perf/scripts/prefetch_io.d mode=0444
 file path=opt/zfs-tests/tests/perf/scripts/profile.d mode=0444
+file path=opt/zfs-tests/tests/perf/scripts/zil.d mode=0444
 file path=opt/zfs-tests/tests/stress/races/remove_file_while_remap mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL

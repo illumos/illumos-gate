@@ -1226,6 +1226,58 @@ function destroy_pool #pool
 	return 0
 }
 
+# Return 0 if created successfully; $? otherwise
+#
+# $1 - dataset name
+# $2-n - dataset options
+
+function create_dataset #dataset dataset_options
+{
+	typeset dataset=$1
+
+	shift
+
+	if [[ -z $dataset ]]; then
+		log_note "Missing dataset name."
+		return 1
+	fi
+
+	if datasetexists $dataset ; then
+		destroy_dataset $dataset
+	fi
+
+	log_must zfs create $@ $dataset
+
+	return 0
+}
+
+# Return 0 if destroy successfully or the dataset exists; $? otherwise
+# Note: In local zones, this function should return 0 silently.
+#
+# $1 - dataset name
+
+function destroy_dataset #dataset
+{
+	typeset dataset=$1
+	typeset mtpt
+
+	if [[ -z $dataset ]]; then
+		log_note "No dataset name given."
+		return 1
+	fi
+
+	if datasetexists "$dataset" ; then
+		mtpt=$(get_prop mountpoint "$dataset")
+		log_must zfs destroy -r $dataset
+		[[ -d $mtpt ]] && log_must rm -rf $mtpt
+	else
+		log_note "Dataset does not exist. ($dataset)"
+		return 1
+	fi
+
+	return 0
+}
+
 #
 # Firstly, create a pool with 5 datasets. Then, create a single zone and
 # export the 5 datasets to it. In addition, we also add a ZFS filesystem

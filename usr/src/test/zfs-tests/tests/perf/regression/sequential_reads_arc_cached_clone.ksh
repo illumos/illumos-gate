@@ -36,15 +36,13 @@
 
 function cleanup
 {
-	log_must zfs destroy $TESTFS
+	recreate_perf_pool
 }
 
-log_assert "Measure IO stats during sequential read load"
 log_onexit cleanup
 
-export TESTFS=$PERFPOOL/testfs
-recreate_perfpool
-log_must zfs create $PERF_FS_OPTS $TESTFS
+recreate_perf_pool
+populate_perf_filesystems
 
 # Make sure the working set can be cached in the arc. Aim for 1/2 of arc.
 export TOTAL_SIZE=$(($(get_max_arc_size) / 2))
@@ -54,12 +52,14 @@ if [[ -n $PERF_REGRESSION_WEEKLY ]]; then
 	export PERF_RUNTIME=${PERF_RUNTIME:-$PERF_RUNTIME_WEEKLY}
 	export PERF_RUNTYPE=${PERF_RUNTYPE:-'weekly'}
 	export PERF_NTHREADS=${PERF_NTHREADS:-'16 64'}
+	export PERF_NTHREADS_PER_FS=${PERF_NTHREADS_PER_FS:-'0'}
 	export PERF_SYNC_TYPES=${PERF_SYNC_TYPES:-'1'}
 	export PERF_IOSIZES=${PERF_IOSIZES:-'64k 128k 1m'}
 elif [[ -n $PERF_REGRESSION_NIGHTLY ]]; then
 	export PERF_RUNTIME=${PERF_RUNTIME:-$PERF_RUNTIME_NIGHTLY}
 	export PERF_RUNTYPE=${PERF_RUNTYPE:-'nightly'}
 	export PERF_NTHREADS=${PERF_NTHREADS:-'64 128'}
+	export PERF_NTHREADS_PER_FS=${PERF_NTHREADS_PER_FS:-'0'}
 	export PERF_SYNC_TYPES=${PERF_SYNC_TYPES:-'1'}
 	export PERF_IOSIZES=${PERF_IOSIZES:-'128k 1m'}
 fi
@@ -69,7 +69,16 @@ fi
 # of the available files.
 export NUMJOBS=$(get_max $PERF_NTHREADS)
 export FILE_SIZE=$((TOTAL_SIZE / NUMJOBS))
+export DIRECTORY=$(get_directory)
 log_must fio $FIO_SCRIPTS/mkfiles.fio
+
+#
+# Only a single filesystem is used by this test. To be defensive, we
+# double check that TESTFS only contains a single filesystem. We
+# wouldn't want to assume this was the case, and have it actually
+# contain multiple filesystem (causing cascading failures later).
+#
+log_must test $(get_nfilesystems) -eq 1
 
 log_note "Creating snapshot, $TESTSNAP, of $TESTFS"
 create_snapshot $TESTFS $TESTSNAP
@@ -77,18 +86,25 @@ log_note "Creating clone, $PERFPOOL/$TESTCLONE, from $TESTFS@$TESTSNAP"
 create_clone $TESTFS@$TESTSNAP $PERFPOOL/$TESTCLONE
 
 #
-# Reset the TESTFS to point to the clone
+# We want to run FIO against the clone we created above, and not the
+# clone's originating filesystem. Thus, we override the default behavior
+# and explicitly set TESTFS to the clone.
 #
 export TESTFS=$PERFPOOL/$TESTCLONE
 
 # Set up the scripts and output files that will log performance data.
 lun_list=$(pool_to_lun_list $PERFPOOL)
 log_note "Collecting backend IO stats with lun list $lun_list"
-export collect_scripts=("dtrace -s $PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1"
-    "io" "dtrace -Cs $PERF_SCRIPTS/prefetch_io.d $PERFPOOL 1" "prefetch"
-    "vmstat 1" "vmstat" "mpstat 1" "mpstat" "iostat -xcnz 1" "iostat"
-    "dtrace -s $PERF_SCRIPTS/profile.d" "profile" "kstat zfs:0 1" "kstat")
+export collect_scripts=(
+    "kstat zfs:0 1"  "kstat"
+    "vmstat 1"       "vmstat"
+    "mpstat 1"       "mpstat"
+    "iostat -xcnz 1" "iostat"
+    "dtrace -Cs $PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1" "io"
+    "dtrace -Cs $PERF_SCRIPTS/prefetch_io.d $PERFPOOL 1"  "prefetch"
+    "dtrace  -s $PERF_SCRIPTS/profile.d"                  "profile"
+)
 
-log_note "Sequential cached reads from $TESTFS with $PERF_RUNTYPE settings"
+log_note "Sequential cached reads from $DIRECTORY with $PERF_RUNTYPE settings"
 do_fio_run sequential_reads.fio false false
 log_pass "Measure IO stats during sequential cached read load"
