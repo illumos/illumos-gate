@@ -1297,15 +1297,12 @@ do_gcc(cw_ictx_t *ctx)
 			case 'O':
 				if (strncmp(arg, "-xO", 3) == 0) {
 					size_t len = strlen(arg);
-					char *s;
+					char *s = NULL;
 					int c = *(arg + 3);
 					int level;
 
 					if (len != 4 || !isdigit(c))
 						error(arg);
-
-					if ((s = malloc(len)) == NULL)
-						nomem();
 
 					level = atoi(arg + 3);
 					if (level > 5)
@@ -1322,7 +1319,8 @@ do_gcc(cw_ictx_t *ctx)
 						 */
 						level = 2;
 					}
-					(void) snprintf(s, len, "-O%d", level);
+					if (asprintf(&s, "-O%d", level) == -1)
+						nomem();
 					newae(ctx->i_ae, s);
 					free(s);
 					break;
