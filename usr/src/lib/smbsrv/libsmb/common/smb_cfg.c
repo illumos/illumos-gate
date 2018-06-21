@@ -1167,10 +1167,13 @@ smb_config_getent(smb_cfg_id_t id)
 }
 
 /*
- * This really should be the latest (SMB_VERS_3_0)
- * but we're being cautious with SMB3 for a while.
+ * The service manifest has empty values by default for min_protocol and
+ * max_protocol. The expectation is that when those values are empty, we don't
+ * constrain the range of supported protocol versions (and allow use of the
+ * whole range that we implement). For that reason, this should usually be the
+ * highest protocol version we implement.
  */
-uint32_t max_protocol_default = SMB_VERS_2_1;
+uint32_t max_protocol_default = SMB_VERS_3_0;
 
 uint32_t
 smb_config_get_max_protocol(void)
