@@ -94,16 +94,16 @@
  * manipulate when dealing with the FPU. These are:
  *
  *   o CR0.ET	The 'extension type' bit. This was used originally to indicate
- *   		that the FPU co-processor was present. Now it is forced on for
- *   		compatibility. This is often used to verify whether or not the
- *   		FPU is present.
+ *		that the FPU co-processor was present. Now it is forced on for
+ *		compatibility. This is often used to verify whether or not the
+ *		FPU is present.
  *
  *   o CR0.NE	The 'native error' bit. Used to indicate that native error
  *		mode should be enabled. This indicates that we should take traps
  *		on FPU errors. The OS enables this early in boot.
  *
  *   o CR0.MP	The 'Monitor Coprocessor' bit. Used to control whether or not
- *   		wait/fwait instructions generate a #NM if CR0.TS is set.
+ *		wait/fwait instructions generate a #NM if CR0.TS is set.
  *
  *   o CR0.EM	The 'Emulation' bit. This is used to cause floating point
  *		operations (x87 through SSE4) to trap with a #UD so they can be
@@ -443,9 +443,6 @@ CTASSERT(sizeof (struct fnsave_state) == 108);
 CTASSERT((offsetof(struct fxsave_state, fx_xmm[0]) & 0xf) == 0);
 CTASSERT(sizeof (struct xsave_state) >= AVX_XSAVE_SIZE);
 
-/*CSTYLED*/
-#pragma	align 16 (sse_initial)
-
 /*
  * Initial kfpu state for SSE/SSE2 used by fpinit()
  */
@@ -468,9 +465,6 @@ const struct fxsave_state sse_initial = {
 	SSE_MXCSR_INIT	/* fx_mxcsr */
 	/* rest of structure is zero */
 };
-
-/*CSTYLED*/
-#pragma	align 64 (avx_initial)
 
 /*
  * Initial kfpu state for AVX used by fpinit()
@@ -962,7 +956,7 @@ fpsimderrflt(struct regs *rp)
 	 * the stored values in the context save area to determine the
 	 * cause of the fault.
 	 */
-	fp_save(fp); 		/* save the FPU state */
+	fp_save(fp);		/* save the FPU state */
 
 	if (fp_save_mech == FP_XSAVE) {
 		mxcsr = fp->fpu_regs.kfpu_u.kfpu_xs->xs_fxsave.fx_mxcsr;
