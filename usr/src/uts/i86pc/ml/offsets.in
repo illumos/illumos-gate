@@ -125,9 +125,6 @@ _kthread	THREAD_SIZE
 	t_copyops
 	t_useracc
 
-ctxop
-	save_op			CTXOP_SAVE
-
 as
 	a_hat
 

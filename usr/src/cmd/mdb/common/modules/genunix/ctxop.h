@@ -27,8 +27,6 @@
 #ifndef	_MDB_CTXOP_H
 #define	_MDB_CTXOP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #ifdef	__cplusplus
