@@ -137,7 +137,7 @@
  * resources between everything, we'll end up just dividing the resources
  * evenly between all of the functions. Longer term, if we don't have to declare
  * to the GLDv3 that these resources are shared, then we'll maintain a pool and
- * hae each PF allocate from the pool in the device, thus if only two of four
+ * have each PF allocate from the pool in the device, thus if only two of four
  * ports are being used, for example, then all of the resources can still be
  * used.
  *
@@ -169,7 +169,7 @@
  * To receieve broadcast traffic, we enable it through the admin queue, rather
  * than use one of our filters for it. For multicast traffic, we reserve a
  * certain number of the hash filters and assign them to a given PF. When we
- * exceed those, we then switch to using promicuous mode for multicast traffic.
+ * exceed those, we then switch to using promiscuous mode for multicast traffic.
  *
  * More specifically, once we exceed the number of filters (indicated because
  * the i40e_t`i40e_resources.ifr_nmcastfilt ==

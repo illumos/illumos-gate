@@ -217,6 +217,7 @@ main(argc, argv)
 				}
 				praliases(b, argc, argv);
 			}
+			/* FALLTHROUGH */
 
 		  default:
 			continue;

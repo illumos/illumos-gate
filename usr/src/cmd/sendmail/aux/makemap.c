@@ -11,8 +11,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sm/gen.h>
 
 SM_IDSTR(copyright,
@@ -23,7 +21,6 @@ SM_IDSTR(copyright,
 	The Regents of the University of California.  All rights reserved.\n")
 
 SM_IDSTR(id, "@(#)$Id: makemap.c,v 8.179 2008/04/14 02:06:16 ca Exp $")
-
 
 #include <sys/types.h>
 #ifndef ISC_UNIX
@@ -290,7 +287,7 @@ main(argc, argv)
 # endif /* UID_MAX */
 				break;
 			}
-
+			/* FALLTHROUGH */
 
 		  default:
 			continue;

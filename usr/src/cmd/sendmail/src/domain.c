@@ -11,8 +11,6 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sendmail.h>
 #include "map.h"
 
@@ -1043,9 +1041,9 @@ nexttype:
 				**  Such MX matches are as good as an A match,
 				**  fall through.
 				*/
-				/* FALLTHROUGH */
 
 # if NETINET6
+				/* FALLTHROUGH */
 			  case T_AAAA:
 # endif /* NETINET6 */
 			  case T_A:

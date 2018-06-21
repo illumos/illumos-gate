@@ -66,7 +66,7 @@
  * -----------------------
  *
  * The x86 FPU has evolved substantially since its days as the x87 coprocessor;
- * however, many aspects of its life as a coprocessor still still around in x86.
+ * however, many aspects of its life as a coprocessor are still around in x86.
  *
  * Today, when we refer to the 'FPU', we don't just mean the original x87 FPU.
  * While that state still exists, there is much more that is covered by the FPU.
