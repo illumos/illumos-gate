@@ -128,9 +128,6 @@ _kthread	THREAD_SIZE
 	t_useracc
 #endif
 
-ctxop
-	save_op			CTXOP_SAVE
-
 as
 	a_hat
 

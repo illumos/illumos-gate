@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_THREAD_H
@@ -71,7 +71,8 @@ typedef struct ctxop {
 	void	(*exit_op)(void *);	/* invoked during {thread,lwp}_exit() */
 	void	(*free_op)(void *, int); /* function which frees the context */
 	void	*arg;		/* argument to above functions, ctx pointer */
-	struct ctxop *next;	/* next context ops */
+	struct ctxop *next;		/* next context ops */
+	struct ctxop *prev;		/* previous context ops */
 	hrtime_t save_ts;		/* timestamp of last save */
 	hrtime_t restore_ts;		/* timestamp of last restore */
 } ctxop_t;
