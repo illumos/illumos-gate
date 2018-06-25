@@ -133,24 +133,6 @@ struct kmem_cache *hio_info_cache;
  */
 extern int use_rrip_inodes;
 
-/*
- * Free behind logic from UFS to tame our thirst for
- * the page cache.
- * See usr/src/uts/common/fs/ufs/ufs_vnops.c for more
- * explanation.
- */
-static int	freebehind = 1;
-static int	smallfile = 0;
-static int	cache_read_ahead = 0;
-static u_offset_t smallfile64 = 32 * 1024;
-#define	SMALLFILE1_D 1000
-#define	SMALLFILE2_D 10
-static u_offset_t smallfile1 = 32 * 1024;
-static u_offset_t smallfile2 = 32 * 1024;
-static clock_t smallfile_update = 0; /* when to recompute */
-static uint_t smallfile1_d = SMALLFILE1_D;
-static uint_t smallfile2_d = SMALLFILE2_D;
-
 static int hsched_deadline_compare(const void *x1, const void *x2);
 static int hsched_offset_compare(const void *x1, const void *x2);
 static void hsched_enqueue_io(struct hsfs *fsp, struct hio *hsio, int ra);
@@ -174,7 +156,6 @@ hsfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 	int error;
 	struct hsnode *hp;
 	uint_t filesize;
-	int dofree;
 
 	hp = VTOH(vp);
 	/*
@@ -241,28 +222,6 @@ hsfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 			return (0);
 		}
 
-		/*
-		 * Freebehind computation taken from:
-		 * usr/src/uts/common/fs/ufs/ufs_vnops.c
-		 */
-		if (drv_hztousec(ddi_get_lbolt()) >= smallfile_update) {
-			uint64_t percpufreeb;
-			if (smallfile1_d == 0) smallfile1_d = SMALLFILE1_D;
-			if (smallfile2_d == 0) smallfile2_d = SMALLFILE2_D;
-			percpufreeb = ptob((uint64_t)freemem) / ncpus_online;
-			smallfile1 = percpufreeb / smallfile1_d;
-			smallfile2 = percpufreeb / smallfile2_d;
-			smallfile1 = MAX(smallfile1, smallfile);
-			smallfile1 = MAX(smallfile1, smallfile64);
-			smallfile2 = MAX(smallfile1, smallfile2);
-			smallfile_update = drv_hztousec(ddi_get_lbolt())
-			    + 1000000;
-		}
-
-		dofree = freebehind &&
-		    hp->hs_prev_offset == uiop->uio_loffset &&
-		    hp->hs_ra_bytes > 0;
-
 		base = segmap_getmapflt(segkmap, vp,
 		    (u_offset_t)uiop->uio_loffset, n, 1, S_READ);
 
@@ -278,13 +237,6 @@ hsfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 				flags = SM_DONTNEED;
 			else
 				flags = 0;
-
-			if (dofree) {
-				flags = SM_FREE | SM_ASYNC;
-				if ((cache_read_ahead == 0) &&
-				    uiop->uio_loffset > smallfile2)
-					flags |=  SM_DONTNEED;
-			}
 
 			error = segmap_release(segkmap, base, flags);
 		} else
