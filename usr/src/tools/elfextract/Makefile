@@ -23,8 +23,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-include		../Makefile.tools
+# Copyright 2018 RackTop Systems.
+#
 
 PROG	= elfextract
 

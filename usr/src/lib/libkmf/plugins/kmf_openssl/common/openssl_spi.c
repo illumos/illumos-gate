@@ -6,6 +6,7 @@
 /*
  * Copyright (c) 2012, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2018 RackTop Systems.
  */
 /*
  * Written by Dr Stephen N Henson (shenson@bigfoot.com) for the OpenSSL
@@ -138,7 +139,7 @@ static uchar_t G[] = { 0x00, 0x62, 0x6d, 0x02, 0x78, 0x39, 0xea, 0x0a,
 /*
  * Declare some new macros for managing stacks of EVP_PKEYS.
  */
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 DECLARE_STACK_OF(EVP_PKEY)
 
 #define	sk_EVP_PKEY_new_null() SKM_sk_new_null(EVP_PKEY)
@@ -300,7 +301,7 @@ KMF_PLUGIN_FUNCLIST openssl_plugin_table =
 	NULL	/* Finalize */
 };
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 static mutex_t *lock_cs;
 static long *lock_count;
 
@@ -321,12 +322,12 @@ thread_id()
 {
 	return ((unsigned long)thr_self());
 }
-#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L || LIBRESSL_VERSION_NUMBER */
 
 KMF_PLUGIN_FUNCLIST *
 KMF_Plugin_Initialize()
 {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	int i;
 #endif
 
@@ -347,7 +348,7 @@ KMF_Plugin_Initialize()
 		(void) OBJ_create("2.5.29.54", "inhibitAnyPolicy",
 		    "X509v3 Inhibit Any-Policy");
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 		/*
 		 * Set up for thread-safe operation.
 		 * This is not required for OpenSSL 1.1
@@ -1791,20 +1792,36 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 		EVP_PKEY *pkey = (EVP_PKEY *)key->keyp;
 		uchar_t *p;
 		int len;
-		if (AlgId == KMF_ALGID_MD5WithRSA)
+		switch (AlgId) {
+#ifndef	OPENSSL_NO_MD5
+		case KMF_ALGID_MD5WithRSA:
 			md = EVP_md5();
-		else if (AlgId == KMF_ALGID_SHA1WithRSA)
+			break;
+#endif
+#ifndef	OPENSSL_NO_SHA
+		case KMF_ALGID_SHA1WithRSA:
 			md = EVP_sha1();
-		else if (AlgId == KMF_ALGID_SHA256WithRSA)
+			break;
+#endif
+#ifndef	OPENSSL_NO_SHA256
+		case KMF_ALGID_SHA256WithRSA:
 			md = EVP_sha256();
-		else if (AlgId == KMF_ALGID_SHA384WithRSA)
+			break;
+#endif
+#ifndef	OPENSSL_NO_SHA512
+		case KMF_ALGID_SHA384WithRSA:
 			md = EVP_sha384();
-		else if (AlgId == KMF_ALGID_SHA512WithRSA)
+			break;
+		case KMF_ALGID_SHA512WithRSA:
 			md = EVP_sha512();
-		else if (AlgId == KMF_ALGID_RSA)
+			break;
+#endif
+		case KMF_ALGID_RSA:
 			md = NULL;
-		else
+			break;
+		default:
 			return (KMF_ERR_BAD_ALGORITHM);
+		}
 
 		if ((md == NULL) && (AlgId == KMF_ALGID_RSA)) {
 			RSA *rsa = EVP_PKEY_get1_RSA((EVP_PKEY *)pkey);
@@ -2123,14 +2140,14 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 	case KMF_CERT_SIGNATURE_ALG:
 	case KMF_CERT_PUBKEY_ALG:
 		{
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 			ASN1_OBJECT *alg = NULL;
 #else
 			const ASN1_OBJECT *alg = NULL;
 #endif
 
 			if (flag == KMF_CERT_SIGNATURE_ALG) {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 				alg = xcert->sig_alg->algorithm;
 #else
 				const X509_ALGOR *sig_alg = NULL;
@@ -2141,7 +2158,7 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 					    sig_alg);
 #endif
 			} else {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 				alg = xcert->cert_info->key->algor->algorithm;
 #else
 				X509_PUBKEY *key = X509_get_X509_PUBKEY(xcert);
@@ -2498,7 +2515,7 @@ static X509 *ocsp_find_signer_sk(STACK_OF(X509) *certs, OCSP_BASICRESP *bs)
 	unsigned char tmphash[SHA_DIGEST_LENGTH], *keyhash;
 	const ASN1_OCTET_STRING *pid;
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	OCSP_RESPID *id = bs->tbsResponseData->responderId;
 
 	if (id->type == V_OCSP_RESPID_NAME)
@@ -2571,7 +2588,7 @@ check_response_signature(KMF_HANDLE_T handle, OCSP_BASICRESP *bs,
 	STACK_OF(X509) *cert_stack = NULL;
 	X509 *signer = NULL;
 	X509 *issuer = NULL;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	EVP_PKEY *skey = NULL;
 #else
 	STACK_OF(X509) *cert_stack2 = NULL;
@@ -2631,7 +2648,7 @@ check_response_signature(KMF_HANDLE_T handle, OCSP_BASICRESP *bs,
 	}
 
 	/* Verify the signature of the response */
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	skey = X509_get_pubkey(signer);
 	if (skey == NULL) {
 		ret = KMF_ERR_OCSP_BAD_SIGNER;
@@ -2672,7 +2689,7 @@ end:
 		X509_free(signer);
 	}
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	if (skey != NULL) {
 		EVP_PKEY_free(skey);
 	}

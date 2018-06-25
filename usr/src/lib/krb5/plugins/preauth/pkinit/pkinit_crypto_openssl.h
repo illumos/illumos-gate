@@ -31,6 +31,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2018 RackTop Systems.
  */
 
 #ifndef _PKINIT_CRYPTO_OPENSSL_H
@@ -50,7 +51,7 @@
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 #include <openssl/asn1_mac.h>
 #else
 #include <openssl/asn1t.h>
@@ -118,7 +119,6 @@ struct _pkinit_plg_crypto_context {
     DH *dh_2048;
     DH *dh_4096;
     ASN1_OBJECT *id_pkinit_authData;
-    ASN1_OBJECT *id_pkinit_authData9;
     ASN1_OBJECT *id_pkinit_DHKeyData;
     ASN1_OBJECT *id_pkinit_rkeyData;
     ASN1_OBJECT *id_pkinit_san;
@@ -285,7 +285,7 @@ wrap_signeddata(unsigned char *data, unsigned int data_len,
 
 /* This handy macro borrowed from crypto/x509v3/v3_purp.c */
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 #define ku_reject(x, usage) \
 	(((x)->ex_flags & EXFLAG_KUSAGE) && !((x)->ex_kusage & (usage)))
 #else
