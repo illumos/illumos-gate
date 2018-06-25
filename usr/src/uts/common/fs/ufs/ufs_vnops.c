@@ -658,76 +658,6 @@ out:
 int stickyhack = 1;
 
 /*
- * Free behind hacks.  The pager is busted.
- * XXX - need to pass the information down to writedone() in a flag like B_SEQ
- * or B_FREE_IF_TIGHT_ON_MEMORY.
- */
-int	freebehind = 1;
-int	smallfile = 0;
-u_offset_t smallfile64 = 32 * 1024;
-
-/*
- * While we should, in most cases, cache the pages for write, we
- * may also want to cache the pages for read as long as they are
- * frequently re-usable.
- *
- * If cache_read_ahead = 1, the pages for read will go to the tail
- * of the cache list when they are released, otherwise go to the head.
- */
-int	cache_read_ahead = 0;
-
-/*
- * Freebehind exists  so that as we read  large files  sequentially we
- * don't consume most of memory with pages  from a few files. It takes
- * longer to re-read from disk multiple small files as it does reading
- * one large one sequentially.  As system  memory grows customers need
- * to retain bigger chunks   of files in  memory.   The advent of  the
- * cachelist opens up of the possibility freeing pages  to the head or
- * tail of the list.
- *
- * Not freeing a page is a bet that the page will be read again before
- * it's segmap slot is needed for something else. If we loose the bet,
- * it means some  other thread is  burdened with the  page free we did
- * not do. If we win we save a free and reclaim.
- *
- * Freeing it at the tail  vs the head of cachelist  is a bet that the
- * page will survive until the next  read.  It's also saying that this
- * page is more likely to  be re-used than a  page freed some time ago
- * and never reclaimed.
- *
- * Freebehind maintains a  range of  file offset [smallfile1; smallfile2]
- *
- *            0 < offset < smallfile1 : pages are not freed.
- *   smallfile1 < offset < smallfile2 : pages freed to tail of cachelist.
- *   smallfile2 < offset              : pages freed to head of cachelist.
- *
- * The range  is  computed  at most  once  per second  and  depends on
- * freemem  and  ncpus_online.  Both parameters  are   bounded to be
- * >= smallfile && >= smallfile64.
- *
- * smallfile1 = (free memory / ncpu) / 1000
- * smallfile2 = (free memory / ncpu) / 10
- *
- * A few examples values:
- *
- *       Free Mem (in Bytes) [smallfile1; smallfile2]  [smallfile1; smallfile2]
- *                                 ncpus_online = 4          ncpus_online = 64
- *       ------------------  -----------------------   -----------------------
- *             1G                   [256K;  25M]               [32K; 1.5M]
- *            10G                   [2.5M; 250M]              [156K; 15M]
- *           100G                    [25M; 2.5G]              [1.5M; 150M]
- *
- */
-
-#define	SMALLFILE1_D 1000
-#define	SMALLFILE2_D 10
-static u_offset_t smallfile1 = 32 * 1024;
-static u_offset_t smallfile2 = 32 * 1024;
-static clock_t smallfile_update = 0; /* lbolt value of when to recompute */
-uint_t smallfile1_d = SMALLFILE1_D;
-uint_t smallfile2_d = SMALLFILE2_D;
-
-/*
  * wrip does the real work of write requests for ufs.
  */
 int
@@ -1350,10 +1280,9 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 	int error = 0;
 	int doupdate = 1;
 	uint_t flags;
-	int dofree, directio_status;
+	int directio_status;
 	krw_t rwtype;
 	o_mode_t type;
-	clock_t	now;
 
 	vp = ITOV(ip);
 
@@ -1420,26 +1349,6 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 			n = (int)diff;
 
 		/*
-		 * We update smallfile2 and smallfile1 at most every second.
-		 */
-		now = ddi_get_lbolt();
-		if (now >= smallfile_update) {
-			uint64_t percpufreeb;
-			if (smallfile1_d == 0) smallfile1_d = SMALLFILE1_D;
-			if (smallfile2_d == 0) smallfile2_d = SMALLFILE2_D;
-			percpufreeb = ptob((uint64_t)freemem) / ncpus_online;
-			smallfile1 = percpufreeb / smallfile1_d;
-			smallfile2 = percpufreeb / smallfile2_d;
-			smallfile1 = MAX(smallfile1, smallfile);
-			smallfile1 = MAX(smallfile1, smallfile64);
-			smallfile2 = MAX(smallfile1, smallfile2);
-			smallfile_update = now + hz;
-		}
-
-		dofree = freebehind &&
-		    ip->i_nextr == (off & PAGEMASK) && off > smallfile1;
-
-		/*
 		 * At this point we can enter ufs_getpage() in one of two
 		 * ways:
 		 * 1) segmap_getmapflt() calls ufs_getpage() when the
@@ -1470,19 +1379,6 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 		flags = 0;
 		if (!error) {
 			/*
-			 * If  reading sequential  we won't need  this
-			 * buffer again  soon.  For  offsets in  range
-			 * [smallfile1,  smallfile2] release the pages
-			 * at   the  tail  of the   cache list, larger
-			 * offsets are released at the head.
-			 */
-			if (dofree) {
-				flags = SM_FREE | SM_ASYNC;
-				if ((cache_read_ahead == 0) &&
-				    (off > smallfile2))
-					flags |=  SM_DONTNEED;
-			}
-			/*
 			 * In POSIX SYNC (FSYNC and FDSYNC) read mode,
 			 * we want to make sure that the page which has
 			 * been read, is written on disk if it is dirty.
@@ -1490,7 +1386,6 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 			 * be flushed out.
 			 */
 			if ((ioflag & FRSYNC) && (ioflag & (FSYNC|FDSYNC))) {
-				flags &= ~SM_ASYNC;
 				flags |= SM_WRITE;
 			}
 			if (vpm_enable) {
