@@ -19,6 +19,7 @@
 #include <sys/list.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/ddi.h>
 #include <sys/sysmacros.h>
 #include <sys/machsystm.h>
 #include <sys/vmsystm.h>
@@ -932,6 +933,39 @@ vm_object_pager_sg(vm_object_t vmo, uintptr_t off, pfn_t *lpfn, uint_t *lvl)
 	return (pfn);
 }
 
+static void
+vm_reserve_pages(size_t npages)
+{
+	uint_t retries = 60;
+	int rc;
+
+	mutex_enter(&freemem_lock);
+	if (availrmem < npages) {
+		mutex_exit(&freemem_lock);
+
+		/*
+		 * Set needfree and wait for the ZFS ARC reap thread to free up
+		 * some memory.
+		 */
+		page_needfree(npages);
+
+		mutex_enter(&freemem_lock);
+		while ((availrmem < npages) && retries-- > 0) {
+			mutex_exit(&freemem_lock);
+			rc = delay_sig(drv_usectohz(1 * MICROSEC));
+			mutex_enter(&freemem_lock);
+
+			if (rc == EINTR)
+				break;
+		}
+		mutex_exit(&freemem_lock);
+
+		page_needfree(-npages);
+	} else {
+		mutex_exit(&freemem_lock);
+	}
+}
+
 vm_object_t
 vm_object_allocate(objtype_t type, vm_pindex_t psize)
 {
@@ -948,6 +982,8 @@ vm_object_allocate(objtype_t type, vm_pindex_t psize)
 
 	switch (type) {
 	case OBJT_DEFAULT: {
+		vm_reserve_pages(psize);
+
 		/* XXXJOY: opt-in to larger pages? */
 		vmo->vmo_data = vmem_alloc(vmm_alloc_arena, size, KM_NOSLEEP);
 		if (vmo->vmo_data == NULL) {
