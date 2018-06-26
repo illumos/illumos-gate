@@ -2324,9 +2324,7 @@ nested_fault(struct vm *vm, int vcpuid, uint64_t info1, uint64_t info2,
 	if (type1 == VM_INTINFO_HWEXCEPTION && vector1 == IDT_DF) {
 		VCPU_CTR2(vm, vcpuid, "triple fault: info1(%#lx), info2(%#lx)",
 		    info1, info2);
-#ifdef	__FreeBSD__
 		vm_suspend(vm, VM_SUSPEND_TRIPLEFAULT);
-#endif
 		*retinfo = 0;
 		return (0);
 	}
