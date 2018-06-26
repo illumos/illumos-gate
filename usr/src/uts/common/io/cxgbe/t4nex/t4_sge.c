@@ -812,6 +812,7 @@ t4_ring_rx(struct sge_rxq *rxq, int budget)
 				panic("%s: line %d.", __func__,
 				    __LINE__);
 			}
+			/* FALLTHROUGH */
 
 		case X_RSPD_TYPE_CPL:
 			ASSERT(rss->opcode < NUM_CPL_CMDS);
@@ -1270,7 +1271,7 @@ init_eq(struct adapter *sc, struct sge_eq *eq, uint16_t eqtype, uint16_t qsize,
 		    (S_QUEUESPERPAGEPF1 - S_QUEUESPERPAGEPF0) * sc->pf;
 		s->s_qpp = r & M_QUEUESPERPAGEPF0;
 	}
- 
+
 	eq->flags = eqtype & EQ_TYPEMASK;
 	eq->tx_chan = tx_chan;
 	eq->iqid = iqid;
@@ -3106,7 +3107,7 @@ ring_tx_db(struct adapter *sc, struct sge_eq *eq)
 			*eq->udb = LE_32(V_QID(eq->udb_qid) | val);
 			break;
 
-		case DOORBELL_WCWR: 
+		case DOORBELL_WCWR:
 			{
 				volatile uint64_t *dst, *src;
 				int i;
@@ -3138,7 +3139,7 @@ ring_tx_db(struct adapter *sc, struct sge_eq *eq)
 			    V_QID(eq->cntxt_id) | val);
 			break;
 	}
- 
+
 	eq->pending = 0;
 }
 

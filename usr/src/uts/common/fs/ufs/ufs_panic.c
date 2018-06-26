@@ -214,7 +214,7 @@ typedef struct uf_state_desc {
 
 /* thread to watch for failures */
 static void	ufsfx_thread_fix_failures(void *);
-static int 	ufsfx_do_failure_q(void);
+static int	ufsfx_do_failure_q(void);
 static void	ufsfx_kill_fix_failure_thread(void *);
 
 /* routines called when failure occurs */
@@ -251,13 +251,13 @@ static sfrc_t	sf_found_lock_fix_cmn(ufs_failure_t *, ufs_failure_states_t);
 static sfrc_t	sf_found_umount(ufs_failure_t *);
 
 /* support routines, called by sf_nonterm_cmn and sf_term_cmn */
-static time_t 	trylock_time_exceeded(ufs_failure_t *);
-static void 	pester_msg(ufs_failure_t *, int);
-static int 	get_lockfs_status(ufs_failure_t *, struct lockfs *);
-static void 	alloc_lockfs_comment(ufs_failure_t *, struct lockfs *);
-static int 	set_lockfs(ufs_failure_t *, struct lockfs *);
-static int 	lockfs_failure(ufs_failure_t *);
-static int 	lockfs_success(ufs_failure_t *);
+static time_t	trylock_time_exceeded(ufs_failure_t *);
+static void	pester_msg(ufs_failure_t *, int);
+static int	get_lockfs_status(ufs_failure_t *, struct lockfs *);
+static void	alloc_lockfs_comment(ufs_failure_t *, struct lockfs *);
+static int	set_lockfs(ufs_failure_t *, struct lockfs *);
+static int	lockfs_failure(ufs_failure_t *);
+static int	lockfs_success(ufs_failure_t *);
 static int	fsck_active(ufs_failure_t *);
 
 /* low-level support routines */
@@ -318,7 +318,7 @@ ufsd_t	state_desc[] =
 #if defined(DEBUG)
 					UF_PANIC |
 #endif /* DEBUG */
-					UF_TRYLCK | UF_LOCKED, 	{ 0, 0, 0 } },
+					UF_TRYLCK | UF_LOCKED,	{ 0, 0, 0 } },
 	{ UF_FIXING,	"being fixed",		sf_nonterm_cmn,
 						UF_LOCKED,	{ 0, 0, 0 } },
 	{ UF_FIXED,	"fixed",		sf_term_cmn,
@@ -336,7 +336,7 @@ ufsd_t	state_desc[] =
 	{ UF_PANIC,	"panicking",		sf_panic,
 		/* XXX make this narrower */	UF_ALLSTATES,	{ 0, 0, 0 } },
 	{ UF_UNDEF,	NULL,			((sfrc_t (*)()) NULL),
-						UF_UNDEF, 	{ 0, 0, 0 } }
+						UF_UNDEF,	{ 0, 0, 0 } }
 };
 
 /* unified collection */
@@ -370,7 +370,7 @@ struct error_description {
 	{ ERESTART,	"ERESTART"		},
 	{ ETIMEDOUT,	"ETIMEDOUT"		},
 	{ NO_ERROR,	"Ok"			},
-	{ EUNK,		NULL 			}
+	{ EUNK,		NULL			}
 };
 
 struct action_description act_desc[] =
@@ -492,12 +492,11 @@ ufs_fault_v(vnode_t *vp, char *fmt, va_list adx)
 		if (!(DEBUG_FLAGS & DBGFLG_FIXWOULDPANIC)) {
 			break;
 		}
-		/* FALLTHROUGH */
-
 #else
 		break;
 
 #endif /* DEBUG */
+		/* FALLTHROUGH */
 
 	case TRIAGE_ATTEND_TO:
 
@@ -2276,7 +2275,7 @@ lockfs_success(ufs_failure_t *f)
 		}
 		break;
 
-	case LOCKFS_ULOCK: 			/* unlock worked */
+	case LOCKFS_ULOCK:	/* unlock worked */
 		/*
 		 * how'd we get here?
 		 * This should be done from fsck's unlock,
