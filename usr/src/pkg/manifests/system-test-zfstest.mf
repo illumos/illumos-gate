@@ -2720,12 +2720,14 @@ file path=opt/zfs-tests/tests/longevity/slop_space_test mode=0555
 file path=opt/zfs-tests/tests/perf/fio/mkfiles.fio mode=0444
 file path=opt/zfs-tests/tests/perf/fio/random_reads.fio mode=0444
 file path=opt/zfs-tests/tests/perf/fio/random_readwrite.fio mode=0444
+file path=opt/zfs-tests/tests/perf/fio/random_readwrite_fixed.fio mode=0444
 file path=opt/zfs-tests/tests/perf/fio/random_writes.fio mode=0444
 file path=opt/zfs-tests/tests/perf/fio/sequential_reads.fio mode=0444
 file path=opt/zfs-tests/tests/perf/fio/sequential_writes.fio mode=0444
 file path=opt/zfs-tests/tests/perf/perf.shlib mode=0444
 file path=opt/zfs-tests/tests/perf/regression/random_reads mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_readwrite mode=0555
+file path=opt/zfs-tests/tests/perf/regression/random_readwrite_fixed mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_writes mode=0555
 file path=opt/zfs-tests/tests/perf/regression/random_writes_zil mode=0555
 file path=opt/zfs-tests/tests/perf/regression/sequential_reads mode=0555
