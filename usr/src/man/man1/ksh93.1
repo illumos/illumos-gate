@@ -2,7 +2,7 @@
 .\" Copyright (c) 1982-2007 AT&T Knowledge Ventures
 .\" To view license terms, see http://www.opensource.org/licenses/cpl1.0.txt
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc.
-.TH KSH93 1 "Sep 10, 2013"
+.TH KSH93 1 "Jun 27, 2018"
 .SH NAME
 ksh93, rksh93 \- Korn Shell, a standard and restricted command and programming
 language
@@ -20,7 +20,6 @@ language
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBksh93\fR is a command and programming language that executes commands read
 from a terminal or a file. \fBrksh93\fR is a restricted version of the command
@@ -31,7 +30,6 @@ standard shell.
 .LP
 See \fBInvocation\fR for the meaning of arguments to the shell.
 .SS "Definitions"
-.sp
 .LP
 A \fImetacharacter\fR is defined as one of the following characters:
 .sp
@@ -72,7 +70,6 @@ environment and built-ins that are found before performing a path search (see
 some of these built-ins behave differently than other built-ins and are called
 special built-ins.
 .SS "Commands"
-.sp
 .LP
 A \fIsimple-command\fR is a list of variable assignments (see \fBVariable
 Assignments\fR) or a sequence of \fIblank\fR-separated words which can be
@@ -391,7 +388,6 @@ first word of a command and are not quoted:
 \fB!\fR
 .in -2
 .SS "Variable Assignments"
-.sp
 .LP
 One or more variable assignments can start a simple command or can be arguments
 to the \fBtypeset\fR, \fBexport\fR, or \fBreadonly\fR special built-in
@@ -478,12 +474,10 @@ that the types are compatible.
 .RE
 
 .SS "Comments"
-.sp
 .LP
 A word beginning with \fB#\fR causes that word and all the following characters
 up to a NEWLINE to be commented, or ignored.
 .SS "Aliasing"
-.sp
 .LP
 The first word of each command is replaced by the text of an alias if an alias
 for this word has been defined. An alias name consists of any number of
@@ -532,7 +526,6 @@ type='whence -v'
 .sp
 
 .SS "Tilde Substitution"
-.sp
 .LP
 After alias substitution is performed, each word is checked to see if it begins
 with an unquoted tilde (\fB~\fR). For tilde substitution, \fIword\fR also
@@ -553,7 +546,6 @@ attempted when the value of the assignment begins with a \fB~\fR, and when a
 \fB~\fR appears after a colon (\fB:\fR). The \fB:\fR also terminates a \fB~\fR
 login name.
 .SS "Command Substitution"
-.sp
 .LP
 The standard output from a command enclosed in parentheses preceded by a dollar
 sign (\fB$\fR) or a pair of grave accents (\fB``\fR) can be used as part or all
@@ -566,13 +558,11 @@ The command substitution \fB$(cat file)\fR can be replaced by the equivalent
 but faster \fB$(<file)\fR. The command substitution \fB$(\fR\fIn\fR\fB<#)\fR
 expands to the current byte offset for file descriptor \fIn\fR.
 .SS "Arithmetic Substitution"
-.sp
 .LP
 An arithmetic expression enclosed in double parentheses preceded by a dollar
 sign ( \fB$((\fR\fIarithmetic_expression\fR\fB))\fR) is replaced by the value
 of the arithmetic expression within the double parentheses.
 .SS "Process Substitution"
-.sp
 .LP
 Process substitution is only available on versions of the UNIX operating system
 that support the \fB/dev/fd\fR directory for naming open files.
@@ -604,7 +594,6 @@ respectively, \fBpaste\fRs the results together, and sends it to the processes
 output. The file, which is passed as an argument to the command, is a UNIX
 \fBpipe\fR(2). Programs that expect to \fBlseek\fR(2) on the file do not work.
 .SS "Parameter Expansion"
-.sp
 .LP
 A parameter is a variable, one or more digits, or any of the characters
 \fB*\fR, \fB@\fR, \fB#\fR, \fB?\fR, \fB-\fR, \fB$\fR, and \fB!\fR. A variable
@@ -1731,7 +1720,6 @@ value of \fBVISUAL\fR overrides the value of \fBEDITOR\fR.
 .RE
 
 .SS "Field Splitting"
-.sp
 .LP
 After parameter expansion and command substitution, the results of
 substitutions are scanned for the field separator characters (those found in
@@ -1776,9 +1764,8 @@ In the remaining forms, a field is created for each number starting at
 \fB%\fR\fIfmt\fR, any format flags, widths and precisions can be specified and
 \fIfmt\fR can end in any of the specifiers \fBcdiouxX\fR. For example,
 \fB{a,z}{1..5..3%02d}{b..c}x\fR expands to the 8 fields, \fBa01bx, a01cx,
-a04bx, a04cx, z01bx, z01cx, z04bx,\fR and \fBz4cx\fR.
+a04bx, a04cx, z01bx, z01cx, z04bx,\fR and \fBz04cx\fR.
 .SS "File Name Generation"
-.sp
 .LP
 Following splitting, each field is scanned for the characters \fB*\fR, \fB?\fR,
 \fB(\fR, and \fB[\fR, unless the \fB-f\fR option has been set. If one of these
@@ -2177,7 +2164,6 @@ options apply only to \fIpattern-list\fR. Otherwise, these options remain in
 effect until they are disabled by a subsequent \fB~(...)\fR or at the end of
 the sub-pattern containing \fB~(...)\fR.
 .SS "Quoting"
-.sp
 .LP
 Each of the metacharacters listed in the \fBDefinitions\fR has a special
 meaning to the shell.
@@ -2280,7 +2266,6 @@ The special meaning of reserved words or aliases can be removed by quoting any
 character of the reserved word. The recognition of function names or built-in
 command names cannot be altered by quoting them.
 .SS "Arithmetic Evaluation"
-.sp
 .LP
 The shell performs arithmetic evaluation for arithmetic substitution, to
 evaluate an arithmetic command, to evaluate an indexed array subscript, and to
@@ -2352,7 +2337,6 @@ variable with the \fB-E\fR, \fB-F\fR, or \fB-i\fR option. Assigning a floating
 point number to a variable whose type is an integer causes the fractional part
 to be truncated.
 .SS "Prompting"
-.sp
 .LP
 When used interactively, the shell prompts with the value of \fBPS1\fR after
 expanding it for parameter expansion, command substitution, and arithmetic
@@ -2362,7 +2346,6 @@ prompt is replaced by the command number. A \fB!!\fR is required to place
 needed to complete a command, then the secondary prompt, that is, the value of
 \fBPS2\fR, is issued.
 .SS "Conditional Expressions"
-.sp
 .LP
 A \fBconditional expression\fR is used with the \fB[[\fR compound command to
 test attributes of files and to compare strings. Field splitting and file name
@@ -2805,7 +2788,6 @@ True, if either \fIexpression1\fR or \fIexpression2\fR is true.
 .RE
 
 .SS "Input and Output"
-.sp
 .LP
 Before a command is executed, its input and output can be redirected using a
 special notation interpreted by the shell. The following can appear anywhere in
@@ -3055,7 +3037,6 @@ input for the command is the empty file \fB/dev/null\fR. Otherwise, the
 environment for the execution of a command contains the file descriptors of the
 invoking shell as modified by input and output specifications.
 .SS "Environment"
-.sp
 .LP
 The \fIenvironment\fR is a list of name-value pairs that is passed to an
 executed program in the same way as a normal argument list. See
@@ -3119,7 +3100,6 @@ echo a=b c
 This feature is intended for use with scripts written for early versions of the
 shell and its use in new scripts is strongly discouraged.
 .SS "Functions"
-.sp
 .LP
 For historical reasons, there are two ways to define functions, the
 \fBname()\fR syntax and the \fBfunction\fR \fBname\fR syntax. These are
@@ -3169,7 +3149,6 @@ Functions that need to be defined across separate invocations of the shell
 should be placed in a directory and the \fBFPATH\fR variable should contain the
 name of this directory. They can also be specified in the \fBENV\fR file.
 .SS "Discipline Functions"
-.sp
 .LP
 Each variable can have zero or more discipline functions associated with it.
 The shell initially understands the discipline names \fBget\fR, \fBset\fR,
@@ -3197,7 +3176,6 @@ variable, and \fB\&.sh.value\fR contains the value being assigned inside the
 \fBset\fR discipline function. For the \fBset\fR discipline, changing
 \fB\&.sh.value\fR changes the value that gets assigned.
 .SS "Jobs"
-.sp
 .LP
 If the monitor option of the \fBset\fR command is turned on, an interactive
 shell associates a job with each pipeline. It keeps a table of current jobs,
@@ -3311,14 +3289,12 @@ does not warn you a second time, and the stopped jobs are terminated. When a
 login shell receives a \fBHUP\fR signal, it sends a \fBHUP\fR signal to each
 job that has not been disowned with the \fBdisown\fR built-in command.
 .SS "Signals"
-.sp
 .LP
 The \fBINT\fR and \fBQUIT\fR signals for an invoked command are ignored if the
 command is followed by \fB&\fR and the \fBmonitor\fR option is not active.
 Otherwise, signals have the values inherited by the shell from its parent. See
 the \fBtrap\fR built-in command.
 .SS "Execution"
-.sp
 .LP
 Each time a command is read, the substitutions are carried out. If the command
 name matches one of the ones in the \fBSpecial Built-in Commands\fR section of
@@ -3380,7 +3356,6 @@ job it is to set up the permissions and execute the shell with the shell
 command file passed down as an open file. A parenthesized command is executed
 in a sub-shell without removing non-exported variables.
 .SS "Command Re-entry"
-.sp
 .LP
 The text of the last \fBHISTSIZE\fR (default 512) commands entered from a
 terminal device is saved in a history file. The file \fB$HOME/.sh_history\fR is
@@ -3403,7 +3378,6 @@ execution. For example, with the preset alias \fBr\fR, which is aliased to
 command which starts with the letter \fBc\fR, replacing the first occurrence of
 the string bad with the string good.
 .SS "Inline Editing Options"
-.sp
 .LP
 Normally, each command line entered from a terminal device is simply typed
 followed by a NEWLINE (RETURN or LINE FEED). If either the \fBemacs\fR,
@@ -3459,7 +3433,6 @@ does not yield a unique match, a subsequent TAB provides a numbered list of
 matching alternatives. A specific selection can be made by entering the
 selection number followed by a TAB.
 .SS "Key Bindings"
-.sp
 .LP
 The \fBKEYBD\fR trap can be used to intercept keys as they are typed and change
 the characters that are actually seen by the shell. This trap is executed after
@@ -3481,7 +3454,6 @@ already in this mode.
 This trap is not invoked for characters entered as arguments to editing
 directives, or while reading input for a character search.
 .SS "\fBemacs\fR Editing Mode"
-.sp
 .LP
 This mode is entered by enabling either the \fBemacs\fR or \fBgmacs\fR option.
 The only difference between these two modes is the way they handle \fB^T\fR. To
@@ -4067,7 +4039,6 @@ deleted.
 .RE
 
 .SS "\fBvi\fR Editing Mode"
-.sp
 .LP
 There are two typing modes. Initially, when you enter a command you are in the
 input mode. To edit, the user enters control mode by typing ESC (033) and moves
@@ -4089,7 +4060,6 @@ If the option \fBviraw\fR is also set, the terminal is always have canonical
 processing disabled. This mode is implicit for systems that do not support two
 alternate end of line delimiters, and might be helpful for certain terminals.
 .SS "Input Edit Commands"
-.sp
 .LP
 By default the editor is in input mode.
 .sp
@@ -4158,7 +4128,6 @@ after SPACE, a TAB is inserted.
 .RE
 
 .SS "Motion Edit Commands"
-.sp
 .LP
 The motion edit commands move the cursor.
 .sp
@@ -4376,7 +4345,6 @@ first.
 .RE
 
 .SS "Search Edit Commands"
-.sp
 .LP
 The search edit commands access your command history.
 .sp
@@ -4507,7 +4475,6 @@ or \fI?\fR.
 .RE
 
 .SS "Text Modification Edit Commands"
-.sp
 .LP
 The following commands modify the line:
 .sp
@@ -4714,7 +4681,6 @@ Command or file name completion as described in this manual page.
 .RE
 
 .SS "Other Edit Commands"
-.sp
 .LP
 The following miscellaneous edit commands are supported:
 .sp
@@ -4865,7 +4831,6 @@ Display version of the shell.
 .RE
 
 .SS "Built-in Commands"
-.sp
 .LP
 The following simple-commands are executed in the shell process. Input and
 output redirection is permitted. Unless otherwise indicated, the output is
@@ -6642,7 +6607,6 @@ the specified name to be reported.
 .RE
 
 .SS "Invocation"
-.sp
 .LP
 If the shell is invoked by \fBexec\fR(2), and the first character of argument
 zero (\fB$0\fR) is \fB-\fR, then the shell is assumed to be a login shell and
@@ -6735,7 +6699,6 @@ read from the standard input. Shell output, except for the output of the
 The remaining options and arguments are described under the \fBset\fR command.
 An optional \fB-\fR as the first argument is ignored.
 .SS "\fBrksh93\fR Only"
-.sp
 .LP
 \fBrksh93\fR is used to set up login names and execution environments whose
 capabilities are more controlled than those of the standard shell.
@@ -6803,13 +6766,11 @@ the user in an appropriate directory (probably not the login directory). The
 system administrator often sets up a directory of commands, for example,
 \fB/usr/rbin\fR, that can be safely invoked by \fBrksh\fR.
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBksh93\fR and
 \fBrksh93\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
 bytes).
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -6845,7 +6806,6 @@ See the \fBksh93 exit\fR command for additional details.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/profile\fR\fR
@@ -6909,11 +6869,9 @@ NULL device.
 .RE
 
 .SH AUTHORS
-.sp
 .LP
 David Korn, \fBdgk@research.att.com\fR
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -6933,7 +6891,6 @@ Interface Stability	See below.
 The scripting interface is Uncommitted. The environment variables,
 \fB\&.paths\fR feature, and editing modes are Volatile.
 .SH SEE ALSO
-.sp
 .LP
 \fBcat\fR(1), \fBcd\fR(1), \fBchmod\fR(1), \fBcut\fR(1), \fBdate\fR(1),
 \fBegrep\fR(1), \fBecho\fR(1), \fBegrep\fR(1), \fBenv\fR(1), \fBfgrep\fR(1),
@@ -6953,7 +6910,6 @@ Programming Language\fR, Prentice Hall, 1995.
 \fIPOSIX-Part 2: Shell and Utilities, IEEE Std 1003.2-1992, ISO/IEC 9945-2\fR,
 IEEE, 1993.
 .SH NOTES
-.sp
 .LP
 \fBksh93\fR scripts should choose shell function names outside the namespace
 used by reserved keywords of the ISO C99, C++ and JAVA languages to avoid
