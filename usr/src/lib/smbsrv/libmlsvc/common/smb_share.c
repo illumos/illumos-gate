@@ -1562,10 +1562,7 @@ smb_shr_load(void *args)
 	char *gstate;
 	boolean_t gdisabled;
 
-	(void) mutex_lock(&smb_shr_exec_mtx);
-	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
-	    MAXPATHLEN);
-	(void) mutex_unlock(&smb_shr_exec_mtx);
+	smb_shr_load_execinfo();
 
 	if ((handle = smb_shr_sa_enter()) == NULL) {
 		syslog(LOG_ERR, "smb_shr_load: load failed");
@@ -1594,6 +1591,15 @@ smb_shr_load(void *args)
 	}
 	smb_shr_sa_exit();
 	return (NULL);
+}
+
+void
+smb_shr_load_execinfo()
+{
+	(void) mutex_lock(&smb_shr_exec_mtx);
+	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
+	    MAXPATHLEN);
+	(void) mutex_unlock(&smb_shr_exec_mtx);
 }
 
 /*

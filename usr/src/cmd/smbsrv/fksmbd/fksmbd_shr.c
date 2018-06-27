@@ -123,3 +123,13 @@ smb_shr_load(void *args)
 
 	return (NULL);
 }
+
+void
+smb_shr_load_execinfo()
+{
+}
+
+void
+smb_shr_unload()
+{
+}
