@@ -407,16 +407,16 @@ topo_spoof_apply(topo_hdl_t *thp, tnode_t *node, tnode_t *facnode,
  * which sensors indicated failure.  The return value is an nvlist of nvlists
  * indexed by sensor name, each entry with the following contents:
  *
- * 	type, state, units, reading
+ *	type, state, units, reading
  *
- * 		Identical to sensor node.
+ *	Identical to sensor node.
  *
- * 	nonrecov
+ *	nonrecov
  *
- * 		Boolean value that is set to indicate that the error is
- * 		non-recoverable (the unit is out of service).  The default is
- * 		critical failure, which indicates a fault but the unit is still
- * 		operating.
+ *		Boolean value that is set to indicate that the error is
+ *		non-recoverable (the unit is out of service).  The default is
+ *		critical failure, which indicates a fault but the unit is still
+ *		operating.
  *
  *	injected
  *

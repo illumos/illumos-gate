@@ -218,10 +218,10 @@ st_check_component(topo_hdl_t *thp, tnode_t *node, void *arg)
 		/*
 		 * We add this FRU to our list under two circumstances:
 		 *
-		 * 	1. This FRU is faulted and needs to be remembered to
+		 *	1. This FRU is faulted and needs to be remembered to
 		 *	   avoid duplicate ereports.
 		 *
-		 * 	2. This is the initial pass, and we want to repair the
+		 *	2. This is the initial pass, and we want to repair the
 		 *	   FRU in case it was repaired while we were offline.
 		 */
 		if (stp->st_first || faulted) {
@@ -435,7 +435,7 @@ static const fmd_prop_t fmd_props[] = {
 static const fmd_hdl_ops_t fmd_ops = {
 	NULL,			/* fmdo_recv */
 	st_timeout,		/* fmdo_timeout */
-	NULL, 			/* fmdo_close */
+	NULL,			/* fmdo_close */
 	NULL,			/* fmdo_stats */
 	NULL,			/* fmdo_gc */
 	NULL,			/* fmdo_send */
