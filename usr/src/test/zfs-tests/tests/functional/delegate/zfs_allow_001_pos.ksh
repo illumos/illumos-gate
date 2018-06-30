@@ -68,6 +68,7 @@ log_note "Create a user called 'everyone'."
 if ! id everyone > /dev/null 2>&1; then
 	user_added="TRUE"
 	log_must useradd everyone
+	log_must passwd -N everyone
 fi
 for dtst in $DATASETS ; do
 	log_must zfs allow everyone $perms $dtst
