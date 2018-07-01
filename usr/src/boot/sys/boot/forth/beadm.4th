@@ -217,7 +217,8 @@ variable page_remainder
 				exit
 			then
 			drop free-memory		\ free type
-			2dup [char] : strchr nip 0= if
+			\ check last char in the name
+			2dup + c@ [char] : <> if
 				\ have dataset and need to get zfs:pool/ROOT/be:
 				dup 5 + allocate if ENOMEM throw then
 				0 s" zfs:" strcat
@@ -288,10 +289,25 @@ variable page_remainder
 		argc 2 = if ( activate be )
 			\ need to set arg list into proper order
 			1+ >R	\ save argc+1 to return stack
-				\ if we have : in name, its device, inject
-				\ empty be name
-			2dup [char] : strchr nip
-			if ( its : in name )
+
+			\ if the prefix is fd, cd, net or disk and we have :
+			\ in the name, it is device and inject empty be name
+			over 2 s" fd" compare 0= >R
+			over 2 s" cd" compare 0= R> or >R
+			over 3 s" net" compare 0= R> or >R
+			over 4 s" disk" compare 0= R> or
+			if ( prefix is fd or cd or net or disk )
+				2dup [char] : strchr nip
+				if ( its : in name )
+					true
+				else
+					false
+				then
+			else
+				false
+			then
+
+			if ( it is device name )
 				0 0 R>
 			else
 				\ add device, swap with be and receive argc
@@ -439,9 +455,9 @@ builtin: beadm
 					\ for chain, use the value as is
 					value_buffer strget
 				else
-					value_buffer strget 2dup
-					[char] : strchr nip
-					0= if
+					\ check last char in the name
+					value_buffer strget 2dup + c@
+					[char] : <> if
 						\ make zfs device name
 						swap drop
 						5 + allocate if
