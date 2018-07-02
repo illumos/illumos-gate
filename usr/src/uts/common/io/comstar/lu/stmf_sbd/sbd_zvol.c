@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014 by Delphix. All rights reserved.
+ * Copyright (c) 2014, 2018 by Delphix. All rights reserved.
  */
 
 #include <sys/conf.h>
@@ -40,6 +40,7 @@
 #include <sys/arc.h>
 #include <sys/zvol.h>
 #include <sys/zfs_rlock.h>
+#include <sys/zil.h>
 
 #include <sys/stmf.h>
 #include <sys/lpif.h>
@@ -74,8 +75,8 @@
  *    dmu_tx_abort(tx)
  *    zil_commit()
  *
- *    zfs_range_lock()
- *    zfs_range_unlock()
+ *    rangelock_enter()
+ *    rangelock_exit()
  *
  *    zvol_log_write()
  *
@@ -87,7 +88,7 @@
  *    zv_flags		- for WCE
  *    zv_objset		- dmu_tx_create
  *    zv_zilog		- zil_commit
- *    zv_znode		- zfs_range_lock
+ *    zv_znode		- rangelock_enter
  *    zv_dn		- dmu_buf_hold_array_by_bonus, dmu_request_arcbuf
  * GLOBAL DATA
  *    zvol_maxphys
@@ -113,7 +114,7 @@ sbd_zvol_get_volume_params(sbd_lu_t *sl)
 	    &sl->sl_zvol_minor_hdl,	/* minor soft state */
 	    &sl->sl_zvol_objset_hdl,	/* dmu_tx_create */
 	    &sl->sl_zvol_zil_hdl,	/* zil_commit */
-	    &sl->sl_zvol_rl_hdl,	/* zfs_range_lock */
+	    &sl->sl_zvol_rl_hdl,	/* locked_range_t */
 	    &sl->sl_zvol_dn_hdl);	/* dmu_buf_hold_array_by_dnode, */
 					/* dmu_request_arcbuf, */
 					/* dmu_assign_arcbuf */
@@ -153,7 +154,7 @@ int
 sbd_zvol_alloc_read_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 {
 	sbd_zvol_io_t	*zvio = dbuf->db_lu_private;
-	rl_t		*rl;
+	locked_range_t	*lr;
 	int		numbufs, error;
 	uint64_t	len = dbuf->db_data_size;
 	uint64_t	offset = zvio->zvio_offset;
@@ -169,13 +170,13 @@ sbd_zvol_alloc_read_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	 * The range lock is only held until the dmu buffers read in and
 	 * held; not during the callers use of the data.
 	 */
-	rl = zfs_range_lock(sl->sl_zvol_rl_hdl, offset, len, RL_READER);
+	lr = rangelock_enter(sl->sl_zvol_rl_hdl, offset, len, RL_READER);
 
 	error = dmu_buf_hold_array_by_dnode(sl->sl_zvol_dn_hdl,
 	    offset, len, TRUE, RDTAG, &numbufs, &dbpp,
 	    DMU_READ_PREFETCH);
 
-	zfs_range_unlock(rl);
+	rangelock_exit(lr);
 
 	if (error == ECKSUM)
 		error = EIO;
@@ -337,7 +338,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	sbd_zvol_io_t	*zvio = dbuf->db_lu_private;
 	dmu_tx_t	*tx;
 	int		sync, i, error;
-	rl_t		*rl;
+	locked_range_t	*lr;
 	arc_buf_t	**abp = zvio->zvio_abp;
 	int		flags = zvio->zvio_flags;
 	uint64_t	toffset, offset = zvio->zvio_offset;
@@ -345,7 +346,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 
 	ASSERT(flags == 0 || flags == ZVIO_COMMIT || flags == ZVIO_ABORT);
 
-	rl = zfs_range_lock(sl->sl_zvol_rl_hdl, offset, len, RL_WRITER);
+	lr = rangelock_enter(sl->sl_zvol_rl_hdl, offset, len, RL_WRITER);
 
 	tx = dmu_tx_create(sl->sl_zvol_objset_hdl);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, offset, (int)len);
@@ -353,7 +354,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 
 	if (error) {
 		dmu_tx_abort(tx);
-		zfs_range_unlock(rl);
+		rangelock_exit(lr);
 		sbd_zvol_rele_write_bufs_abort(sl, dbuf);
 		return (error);
 	}
@@ -377,7 +378,7 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 	zvol_log_write_minor(sl->sl_zvol_minor_hdl, tx, offset,
 	    (ssize_t)len, sync);
 	dmu_tx_commit(tx);
-	zfs_range_unlock(rl);
+	rangelock_exit(lr);
 	kmem_free(zvio->zvio_abp,
 	    sizeof (arc_buf_t *) * dbuf->db_sglist_length);
 	zvio->zvio_abp = NULL;
@@ -393,8 +394,6 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 int
 sbd_zvol_copy_read(sbd_lu_t *sl, uio_t *uio)
 {
-	int		error;
-	rl_t		*rl;
 	uint64_t	len = (uint64_t)uio->uio_resid;
 	uint64_t	offset = (uint64_t)uio->uio_loffset;
 
@@ -404,11 +403,11 @@ sbd_zvol_copy_read(sbd_lu_t *sl, uio_t *uio)
 	if (offset + len  > zvol_get_volume_size(sl->sl_zvol_minor_hdl))
 		return (EIO);
 
-	rl = zfs_range_lock(sl->sl_zvol_rl_hdl, offset, len, RL_READER);
+	locked_range_t *lr = rangelock_enter(sl->sl_zvol_rl_hdl, offset, len,
+	    RL_READER);
+	int error = dmu_read_uio_dnode(sl->sl_zvol_dn_hdl, uio, len);
+	rangelock_exit(lr);
 
-	error = dmu_read_uio_dnode(sl->sl_zvol_dn_hdl, uio, len);
-
-	zfs_range_unlock(rl);
 	if (error == ECKSUM)
 		error = EIO;
 	return (error);
@@ -421,7 +420,6 @@ sbd_zvol_copy_read(sbd_lu_t *sl, uio_t *uio)
 int
 sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags)
 {
-	rl_t		*rl;
 	dmu_tx_t	*tx;
 	int		error, sync;
 	uint64_t	len = (uint64_t)uio->uio_resid;
@@ -435,8 +433,8 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags)
 	if (offset + len  > zvol_get_volume_size(sl->sl_zvol_minor_hdl))
 		return (EIO);
 
-	rl = zfs_range_lock(sl->sl_zvol_rl_hdl, offset, len, RL_WRITER);
-
+	locked_range_t *lr = rangelock_enter(sl->sl_zvol_rl_hdl, offset, len,
+	    RL_WRITER);
 	sync = !zvol_get_volume_wce(sl->sl_zvol_minor_hdl);
 
 	tx = dmu_tx_create(sl->sl_zvol_objset_hdl);
@@ -452,7 +450,8 @@ sbd_zvol_copy_write(sbd_lu_t *sl, uio_t *uio, int flags)
 		}
 		dmu_tx_commit(tx);
 	}
-	zfs_range_unlock(rl);
+	rangelock_exit(lr);
+
 	if (sync && (flags & ZVIO_COMMIT))
 		zil_commit(sl->sl_zvol_zil_hdl, ZVOL_OBJ);
 	if (error == ECKSUM)
