@@ -64,7 +64,7 @@ static Support_list support[LDS_NUM] = {
 uintptr_t
 ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 {
-	void	*handle, (*fptr)();
+	void	*handle, *fptr;
 	uint_t	interface, version = LD_SUP_VERSION1;
 
 	/*
@@ -80,8 +80,7 @@ ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 	for (interface = 0; interface < LDS_NUM; interface++) {
 		Func_list	fl;
 
-		if ((fptr = (void (*)())dlsym(handle,
-		    support[interface].sup_name)) == NULL)
+		if ((fptr = dlsym(handle, support[interface].sup_name)) == NULL)
 			continue;
 
 		DBG_CALL(Dbg_support_load(ofl->ofl_lml, obj,
