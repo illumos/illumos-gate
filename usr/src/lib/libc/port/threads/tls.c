@@ -199,13 +199,13 @@ extern	int	_preexec_exit_handlers();
 extern	void	libc_init();
 
 const Lc_interface tls_rtldinfo[] = {
-	{CI_VERSION,	(int(*)())CI_V_CURRENT},
-	{CI_ATEXIT,	(int(*)())_preexec_exit_handlers},
-	{CI_TLS_MODADD,	(int(*)())__tls_mod_add},
-	{CI_TLS_MODREM,	(int(*)())__tls_mod_remove},
-	{CI_TLS_STATMOD, (int(*)())__tls_static_mods},
-	{CI_THRINIT,	(int(*)())libc_init},
-	{CI_NULL,	(int(*)())NULL}
+	{ .ci_tag = CI_VERSION,	.ci_un.ci_val = CI_V_CURRENT },
+	{ .ci_tag = CI_ATEXIT, .ci_un.ci_func = _preexec_exit_handlers },
+	{ .ci_tag = CI_TLS_MODADD, .ci_un.ci_func = __tls_mod_add },
+	{ .ci_tag = CI_TLS_MODREM, .ci_un.ci_func = __tls_mod_remove },
+	{ .ci_tag = CI_TLS_STATMOD, .ci_un.ci_func = __tls_static_mods },
+	{ .ci_tag = CI_THRINIT,	.ci_un.ci_func = libc_init },
+	{ .ci_tag = CI_NULL, .ci_un.ci_func = NULL }
 };
 
 /*

@@ -195,7 +195,8 @@ thrd_create(thrd_t *thr, thrd_start_t func, void *arg)
 {
 	int ret;
 
-	ret = pthread_create(thr, NULL, (void *(*)(void *))func, arg);
+	ret = pthread_create(thr, NULL,
+	    (void *(*)(void *))(uintptr_t)func, arg);
 	if (ret == 0)
 		return (thrd_success);
 	else if (ret == -1 && errno == EAGAIN)

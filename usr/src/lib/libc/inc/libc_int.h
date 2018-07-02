@@ -74,7 +74,7 @@ extern "C" {
 typedef struct {
 	int	ci_tag;
 	union {
-		int	(*ci_func)();
+		void	*ci_func;
 		long	ci_val;
 		char	*ci_ptr;
 	} ci_un;
