@@ -39,19 +39,20 @@
 void*
 strsearch(const void* tab, size_t num, size_t siz, Strcmp_f comparf, const char* name, void* context)
 {
-	register char*		lo = (char*)tab;
-	register char*		hi = lo + (num - 1) * siz;
-	register char*		mid;
-	register int		v;
+	char*		lo = (char *)tab;
+	char*		hi = lo + (num - 1) * siz;
+	char*		mid;
+	int		v;
+	Strcmp_context_f comparf_c = (Strcmp_context_f)(uintptr_t)comparf;
 
 	while (lo <= hi)
 	{
 		mid = lo + (((hi - lo) / siz) / 2) * siz;
-		if (!(v = context ? (*(Strcmp_context_f)comparf)(name, *((char**)mid), context) : (*comparf)(name, *((char**)mid))))
-			return (void*)mid;
+		if (!(v = context ? (*comparf_c)(name, *((char**)mid), context) : (*comparf)(name, *((char**)mid))))
+			return (mid);
 		else if (v > 0)
 			lo = mid + siz;
 		else hi = mid - siz;
 	}
-	return 0;
+	return (NULL);
 }
