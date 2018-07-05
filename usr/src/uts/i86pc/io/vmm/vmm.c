@@ -760,11 +760,20 @@ vm_alloc_memseg(struct vm *vm, int ident, size_t len, bool sysmem)
 	struct mem_seg *seg;
 	vm_object_t obj;
 
+#ifndef __FreeBSD__
+	extern pgcnt_t get_max_page_get(void);
+#endif
+
 	if (ident < 0 || ident >= VM_MAX_MEMSEGS)
 		return (EINVAL);
 
 	if (len == 0 || (len & PAGE_MASK))
 		return (EINVAL);
+
+#ifndef __FreeBSD__
+	if (len > ptob(get_max_page_get()))
+		return (EINVAL);
+#endif
 
 	seg = &vm->mem_segs[ident];
 	if (seg->object != NULL) {
