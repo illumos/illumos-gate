@@ -35,8 +35,8 @@
 
 extern caller_context_t smb_ct;
 
-static int smb_fsop_create_stream(smb_request_t *, cred_t *, smb_node_t *,
-    char *, char *, int, smb_attr_t *, smb_node_t **);
+static int smb_fsop_create_file_with_stream(smb_request_t *, cred_t *,
+    smb_node_t *, char *, char *, int, smb_attr_t *, smb_node_t **);
 
 static int smb_fsop_create_file(smb_request_t *, cred_t *, smb_node_t *,
     char *, int, smb_attr_t *, smb_node_t **);
@@ -136,6 +136,7 @@ smb_fsop_create_with_sd(smb_request_t *sr, cred_t *cr,
 	boolean_t is_dir;
 
 	ASSERT(fs_sd);
+	ASSERT(ret_snode != NULL);
 
 	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
 		flags = SMB_IGNORE_CASE;
@@ -319,7 +320,7 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
 		sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 		smb_stream_parse_name(name, fname, sname);
 
-		rc = smb_fsop_create_stream(sr, cr, dnode,
+		rc = smb_fsop_create_file_with_stream(sr, cr, dnode,
 		    fname, sname, flags, attr, ret_snode);
 
 		kmem_free(fname, MAXNAMELEN);
@@ -348,16 +349,70 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
 
 
 /*
- * smb_fsop_create_stream
+ * smb_fsop_create_file_with_stream
  *
- * Create NTFS named stream file (sname) on unnamed stream
- * file (fname), creating the unnamed stream file if it
+ * Create named stream (sname) on file (fname), creating the file if it
  * doesn't exist.
- * If we created the unnamed stream file and then creation
- * of the named stream file fails, we delete the unnamed stream.
+ * If we created the file and then creation of the named stream fails,
+ * we delete the file.
  * Since we use the real file name for the smb_vop_remove we
  * clear the SMB_IGNORE_CASE flag to ensure a case sensitive
  * match.
+ *
+ * Note that some stream "types" are "restricted" and only
+ * internal callers (cr == kcred) can create those.
+ */
+static int
+smb_fsop_create_file_with_stream(smb_request_t *sr, cred_t *cr,
+    smb_node_t *dnode, char *fname, char *sname, int flags,
+    smb_attr_t *attr, smb_node_t **ret_snode)
+{
+	smb_node_t	*fnode;
+	cred_t		*kcr = zone_kcred();
+	int		rc = 0;
+	boolean_t	fcreate = B_FALSE;
+
+	ASSERT(ret_snode != NULL);
+
+	if (cr != kcr && smb_strname_restricted(sname))
+		return (EACCES);
+
+	/* Look up / create the unnamed stream, fname */
+	rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
+	    sr->tid_tree->t_snode, dnode, fname, &fnode);
+	if (rc == 0) {
+		if (smb_fsop_access(sr, sr->user_cr, fnode,
+		    sr->sr_open.desired_access) != 0) {
+			smb_node_release(fnode);
+			rc = EACCES;
+		}
+	} else if (rc == ENOENT) {
+		fcreate = B_TRUE;
+		rc = smb_fsop_create_file(sr, cr, dnode, fname, flags,
+		    attr, &fnode);
+	}
+	if (rc != 0)
+		return (rc);
+
+	rc = smb_fsop_create_stream(sr, cr, dnode, fnode, sname, flags, attr,
+	    ret_snode);
+
+	if (rc != 0) {
+		if (fcreate) {
+			flags &= ~SMB_IGNORE_CASE;
+			(void) smb_vop_remove(dnode->vp,
+			    fnode->od_name, flags, cr);
+		}
+	}
+
+	smb_node_release(fnode);
+	return (rc);
+}
+
+/*
+ * smb_fsop_create_stream
+ *
+ * Create named stream (sname) on existing file (fnode).
  *
  * The second parameter of smb_vop_setattr() is set to
  * NULL, even though an unnamed stream exists.  This is
@@ -368,54 +423,33 @@ smb_fsop_create(smb_request_t *sr, cred_t *cr, smb_node_t *dnode,
  * Note that some stream "types" are "restricted" and only
  * internal callers (cr == kcred) can create those.
  */
-static int
+int
 smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
-    smb_node_t *dnode, char *fname, char *sname, int flags,
+    smb_node_t *dnode, smb_node_t *fnode, char *sname, int flags,
     smb_attr_t *attr, smb_node_t **ret_snode)
 {
 	smb_attr_t	fattr;
-	smb_node_t	*fnode;
 	vnode_t		*xattrdvp;
 	vnode_t		*vp;
 	cred_t		*kcr = zone_kcred();
 	int		rc = 0;
-	boolean_t	fcreate = B_FALSE;
+
+	ASSERT(ret_snode != NULL);
 
 	if (cr != kcr && smb_strname_restricted(sname))
 		return (EACCES);
 
-	/* Look up / create the unnamed stream, fname */
-	rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
-	    sr->tid_tree->t_snode, dnode, fname, &fnode);
-	if (rc == 0) {
-		if (smb_fsop_access(sr, sr->user_cr, fnode,
-		    sr->sr_open.desired_access) != 0)
-			rc = EACCES;
-	} else if (rc == ENOENT) {
-		fcreate = B_TRUE;
-		rc = smb_fsop_create_file(sr, cr, dnode, fname, flags,
-		    attr, &fnode);
-	}
-	if (rc != 0)
-		return (rc);
-
+	bzero(&fattr, sizeof (fattr));
 	fattr.sa_mask = SMB_AT_UID | SMB_AT_GID;
 	rc = smb_vop_getattr(fnode->vp, NULL, &fattr, 0, kcr);
 
 	if (rc == 0) {
 		/* create the named stream, sname */
-		rc = smb_vop_stream_create(fnode->vp, sname, attr,
-		    &vp, &xattrdvp, flags, cr);
+		rc = smb_vop_stream_create(fnode->vp, sname,
+		    attr, &vp, &xattrdvp, flags, cr);
 	}
-	if (rc != 0) {
-		if (fcreate) {
-			flags &= ~SMB_IGNORE_CASE;
-			(void) smb_vop_remove(dnode->vp,
-			    fnode->od_name, flags, cr);
-		}
-		smb_node_release(fnode);
+	if (rc != 0)
 		return (rc);
-	}
 
 	attr->sa_vattr.va_uid = fattr.sa_vattr.va_uid;
 	attr->sa_vattr.va_gid = fattr.sa_vattr.va_gid;
@@ -423,14 +457,14 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 
 	rc = smb_vop_setattr(vp, NULL, attr, 0, kcr);
 	if (rc != 0) {
-		smb_node_release(fnode);
+		VN_RELE(xattrdvp);
+		VN_RELE(vp);
 		return (rc);
 	}
 
 	*ret_snode = smb_stream_node_lookup(sr, cr, fnode, xattrdvp,
 	    vp, sname);
 
-	smb_node_release(fnode);
 	VN_RELE(xattrdvp);
 	VN_RELE(vp);
 
@@ -440,7 +474,7 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 	/* notify change to the unnamed stream */
 	if (rc == 0)
 		smb_node_notify_change(dnode,
-		    FILE_ACTION_ADDED_STREAM, fname);
+		    FILE_ACTION_ADDED_STREAM, fnode->od_name);
 
 	return (rc);
 }
@@ -456,6 +490,8 @@ smb_fsop_create_file(smb_request_t *sr, cred_t *cr,
 	smb_arg_open_t	*op = &sr->sr_open;
 	vnode_t		*vp;
 	int		rc;
+
+	ASSERT(ret_snode != NULL);
 
 #ifdef	_KERNEL
 	smb_fssd_t	fs_sd;
@@ -1744,8 +1780,12 @@ smb_fsop_access(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 /*
  * smb_fsop_lookup_name()
  *
+ * Lookup both the file and stream specified in 'name'.
  * If name indicates that the file is a stream file, perform
  * stream specific lookup, otherwise call smb_fsop_lookup.
+ *
+ * On success, returns the found node in *ret_snode. This will be either a named
+ * or unnamed stream node, depending on the name specified.
  *
  * Return an error if the looked-up file is in outside the tree.
  * (Required when invoked from open path.)
@@ -1768,18 +1808,64 @@ smb_fsop_lookup_name(
     char	*name,
     smb_node_t	**ret_snode)
 {
-	smb_node_t	*fnode;
-	vnode_t		*xattrdirvp;
-	vnode_t		*vp;
-	char		*od_name;
+	char *sname = NULL;
+	int rc;
+	smb_node_t *tmp_node;
+
+	ASSERT(ret_snode != NULL);
+
+	rc = smb_fsop_lookup_file(sr, cr, flags, root_node, dnode, name,
+	    &sname, ret_snode);
+
+	if (rc != 0 || sname == NULL)
+		return (rc);
+
+	tmp_node = *ret_snode;
+	rc = smb_fsop_lookup_stream(sr, cr, flags, root_node, tmp_node, sname,
+	    ret_snode);
+	kmem_free(sname, MAXNAMELEN);
+	smb_node_release(tmp_node);
+
+	return (rc);
+}
+
+/*
+ * smb_fsop_lookup_file()
+ *
+ * Look up of the file portion of 'name'. If a Stream is specified,
+ * return the stream name in 'sname', which this allocates.
+ * The caller must free 'sname'.
+ *
+ * Return an error if the looked-up file is outside the tree.
+ * (Required when invoked from open path.)
+ *
+ * Case sensitivity flags (SMB_IGNORE_CASE, SMB_CASE_SENSITIVE):
+ * if SMB_CASE_SENSITIVE is set, the SMB_IGNORE_CASE flag will NOT be set
+ * based on the tree's case sensitivity. However, if the SMB_IGNORE_CASE
+ * flag is set in the flags value passed as a parameter, a case insensitive
+ * lookup WILL be done (regardless of whether SMB_CASE_SENSITIVE is set
+ * or not).
+ */
+
+int
+smb_fsop_lookup_file(
+    smb_request_t *sr,
+    cred_t	*cr,
+    int		flags,
+    smb_node_t	*root_node,
+    smb_node_t	*dnode,
+    char	*name,
+    char	**sname,
+    smb_node_t	**ret_snode)
+{
 	char		*fname;
-	char		*sname;
 	int		rc;
 
 	ASSERT(cr);
 	ASSERT(dnode);
 	ASSERT(dnode->n_magic == SMB_NODE_MAGIC);
 	ASSERT(dnode->n_state != SMB_NODE_STATE_DESTROYING);
+	ASSERT(ret_snode != NULL);
 
 	/*
 	 * The following check is required for streams processing, below
@@ -1790,11 +1876,11 @@ smb_fsop_lookup_name(
 			flags |= SMB_IGNORE_CASE;
 	}
 
-	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-
+	*sname = NULL;
 	if (smb_is_stream_name(name)) {
-		smb_stream_parse_name(name, fname, sname);
+		*sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+		smb_stream_parse_name(name, fname, *sname);
 
 		/*
 		 * Look up the unnamed stream (i.e. fname).
@@ -1802,49 +1888,8 @@ smb_fsop_lookup_name(
 		 * as well as any link target.
 		 */
 		rc = smb_fsop_lookup(sr, cr, flags, root_node, dnode,
-		    fname, &fnode);
-
-		if (rc != 0) {
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (rc);
-		}
-
-		od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-
-		/*
-		 * od_name is the on-disk name of the stream, except
-		 * without the prepended stream prefix (SMB_STREAM_PREFIX)
-		 */
-
-		/*
-		 * XXX
-		 * What permissions NTFS requires for stream lookup if any?
-		 */
-		rc = smb_vop_stream_lookup(fnode->vp, sname, &vp, od_name,
-		    &xattrdirvp, flags, root_node->vp, cr);
-
-		if (rc != 0) {
-			smb_node_release(fnode);
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			kmem_free(od_name, MAXNAMELEN);
-			return (rc);
-		}
-
-		*ret_snode = smb_stream_node_lookup(sr, cr, fnode, xattrdirvp,
-		    vp, od_name);
-
-		kmem_free(od_name, MAXNAMELEN);
-		smb_node_release(fnode);
-		VN_RELE(xattrdirvp);
-		VN_RELE(vp);
-
-		if (*ret_snode == NULL) {
-			kmem_free(fname, MAXNAMELEN);
-			kmem_free(sname, MAXNAMELEN);
-			return (ENOMEM);
-		}
+		    fname, ret_snode);
+		kmem_free(fname, MAXNAMELEN);
 	} else {
 		rc = smb_fsop_lookup(sr, cr, flags, root_node, dnode, name,
 		    ret_snode);
@@ -1859,8 +1904,66 @@ smb_fsop_lookup_name(
 		}
 	}
 
-	kmem_free(fname, MAXNAMELEN);
-	kmem_free(sname, MAXNAMELEN);
+	if (rc != 0 && *sname != NULL) {
+		kmem_free(*sname, MAXNAMELEN);
+		*sname = NULL;
+	}
+	return (rc);
+}
+
+/*
+ * smb_fsop_lookup_stream
+ *
+ * The file exists, see if the stream exists.
+ */
+int
+smb_fsop_lookup_stream(
+    smb_request_t *sr,
+    cred_t *cr,
+    int flags,
+    smb_node_t *root_node,
+    smb_node_t *fnode,
+    char *sname,
+    smb_node_t **ret_snode)
+{
+	char		*od_name;
+	vnode_t		*xattrdirvp;
+	vnode_t		*vp;
+	int rc;
+
+	/*
+	 * The following check is required for streams processing, below
+	 */
+
+	if (!(flags & SMB_CASE_SENSITIVE)) {
+		if (SMB_TREE_IS_CASEINSENSITIVE(sr))
+			flags |= SMB_IGNORE_CASE;
+	}
+
+	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+
+	/*
+	 * od_name is the on-disk name of the stream, except
+	 * without the prepended stream prefix (SMB_STREAM_PREFIX)
+	 */
+
+	rc = smb_vop_stream_lookup(fnode->vp, sname, &vp, od_name,
+	    &xattrdirvp, flags, root_node->vp, cr);
+
+	if (rc != 0) {
+		kmem_free(od_name, MAXNAMELEN);
+		return (rc);
+	}
+
+	*ret_snode = smb_stream_node_lookup(sr, cr, fnode, xattrdirvp,
+	    vp, od_name);
+
+	kmem_free(od_name, MAXNAMELEN);
+	VN_RELE(xattrdirvp);
+	VN_RELE(vp);
+
+	if (*ret_snode == NULL)
+		return (ENOMEM);
 
 	return (rc);
 }
