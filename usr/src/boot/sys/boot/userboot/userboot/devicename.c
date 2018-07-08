@@ -32,10 +32,7 @@
 #include "bootstrap.h"
 #include "disk.h"
 #include "libuserboot.h"
-
-#if defined(USERBOOT_ZFS_SUPPORT)
-#include "../zfs/libzfs.h"
-#endif
+#include "libzfs.h"
 
 static int	userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **path);
 
@@ -144,14 +141,10 @@ userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **p
 	break;
 
     case DEVT_ZFS:
-#if defined(USERBOOT_ZFS_SUPPORT)
 	    err = zfs_parsedev((struct zfs_devdesc *)idev, np, path);
 	    if (err != 0)
 		    goto fail;
 	    break;
-#else
-	    /* FALLTHROUGH */
-#endif
 
     default:
 	err = EINVAL;
@@ -194,12 +187,7 @@ userboot_fmtdev(void *vdev)
 	break;
 
     case DEVT_ZFS:
-#if defined(USERBOOT_ZFS_SUPPORT)
 	return (zfs_fmtdev(vdev));
-#else
-	sprintf(buf, "%s%d:", dev->dd.d_dev->dv_name, dev->dd.d_unit);
-#endif
-	break;
     }
     return(buf);
 }

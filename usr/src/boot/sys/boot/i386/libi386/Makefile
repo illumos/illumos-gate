@@ -16,8 +16,11 @@
 
 include $(SRC)/Makefile.master
 
-CFLAGS= -Os -I../../../../include -I../../..
-CPPFLAGS= -D_STANDALONE -DLOADER_ZFS_SUPPORT
+CFLAGS= -Os
+CPPFLAGS= -nostdinc -I../../../../include -I../../..
+CPPFLAGS += -I../../../../lib/libz
+CPPFLAGS += -I../../zfs
+CPPFLAGS += -D_STANDALONE
 
 all install: libi386.a
 

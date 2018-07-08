@@ -30,7 +30,7 @@
 
 #include "bootstrap.h"
 #include "libofw.h"
-#include "../zfs/libzfs.h"
+#include "libzfs.h"
 
 static int ofw_parsedev(struct ofw_devdesc **, const char *, const char **);
 
