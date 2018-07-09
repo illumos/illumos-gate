@@ -151,7 +151,7 @@ comc_probe(struct console *cp)
 	struct serial *port;
 	char name[20];
 	char value[20];
-	char *cons, *env;
+	char *env;
 	EFI_HANDLE *handles = NULL;	/* array of handles */
 	int nhandles = 0;		/* number of handles in array */
 
