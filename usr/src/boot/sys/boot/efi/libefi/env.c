@@ -402,6 +402,7 @@ efi_memory_type(EFI_MEMORY_TYPE type)
 	    "PalCode",
 	    "PersistentMemory"
 	};
+
 	switch (type) {
 	case EfiReservedMemoryType:
 	case EfiLoaderCode:
@@ -419,8 +420,9 @@ efi_memory_type(EFI_MEMORY_TYPE type)
 	case EfiPalCode:
 	case EfiPersistentMemory:
 		return (types[type]);
+	default:
+		return ("Unknown");
 	}
-	return ("Unknown");
 }
 
 /* Print memory type table. */
