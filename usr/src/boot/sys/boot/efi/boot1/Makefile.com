@@ -31,6 +31,9 @@ OBJS=	multiboot.o boot1.o self_reloc.o start.o ufs_module.o zfs_module.o \
 
 CFLAGS= -O2
 CPPFLAGS=	-nostdinc -D_STANDALONE
+
+zfs_module.o := CFLAGS += -Wno-unused-function
+
 CPPFLAGS +=	-I.
 CPPFLAGS +=	-I../../include
 CPPFLAGS +=	-I../../include/$(MACHINE)
