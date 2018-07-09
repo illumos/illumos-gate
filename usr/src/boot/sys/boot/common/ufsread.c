@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2002 McAfee, Inc.
  * All rights reserved.
  *
@@ -179,11 +179,9 @@ static uint8_t
 inode_type(ufs_ino_t inode)
 {
 	char *blkbuf;
-	void *indbuf;
 	size_t n;
 
 	blkbuf = dmadat->blkbuf;
-	indbuf = dmadat->indbuf;
 
 	if (!inode)
 		return (0);
