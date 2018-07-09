@@ -1,42 +1,54 @@
-'\" te
+.\"  Copyright 2018, Joyent, Inc.
 .\"  Copyright 1989 AT&T
 .\"  Copyright (c) 1997, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AIO_REQ 9S "Mar 28, 1997"
-.SH NAME
-aio_req \- asynchronous I/O request structure
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/uio.h>
-#include <sys/aio_req.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 9, 2018
+.Dt AIO_REQ 9S
+.Os
+.Sh NAME
+.Nm aio_req
+.Nd asynchronous I/O request structure
+.Sh SYNOPSIS
+.In sys/uio.h
+.In sys/aio_req.h
+.In sys/ddi.h
+.In sys/sunddi.h
+.Sh INTERFACE LEVEL
 Solaris DDI specific (Solaris DDI)
-.SH DESCRIPTION
-.sp
-.LP
-An  \fBaio_req\fR structure describes an asynchronous \fBI/O \fRrequest.
-.SH STRUCTURE MEMBERS
-.sp
-.in +2
-.nf
-struct uio*aio_uio;   /* uio structure describing the I/O request */
-.fi
-.in -2
-
-.sp
-.LP
-The \fBaio_uio\fR member is a pointer to a \fBuio\fR(9S) structure, describing
-the \fBI/O \fRtransfer request.
-.SH SEE ALSO
-.sp
-.LP
-\fBaread\fR(9E), \fBawrite\fR(9E), \fBaphysio\fR(9F), \fBuio\fR(9S)
+.Sh DESCRIPTION
+An
+.Vt aio_req
+structure describes an asynchronous
+.Sy I/O
+request.
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset 2n
+struct uio *aio_uio;   /* uio structure describing the I/O request */
+.Ed
+.Pp
+The
+.Fa aio_uio
+member is a pointer to a
+.Xr uio 9S
+structure, describing
+the
+.Sy I/O
+transfer request.
+.Sh SEE ALSO
+.Xr aread 9E ,
+.Xr awrite 9E ,
+.Xr aphysio 9F ,
+.Xr uio 9S

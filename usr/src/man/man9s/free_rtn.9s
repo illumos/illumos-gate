@@ -1,45 +1,56 @@
-'\" te
+.\" Copyright 2018, Joyent, Inc.
 .\" Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FREE_RTN 9S "Nov 13, 1996"
-.SH NAME
-free_rtn \- structure that specifies a driver's message-freeing routine
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/stream.h>
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 9, 2018
+.Dt FREE_RTN 9S
+.Os
+.Sh NAME
+.Nm free_rtn
+.Nd structure that specifies a driver's message-freeing routine
+.Sh SYNOPSIS
+.In sys/stream.h
+.Sh INTERFACE LEVEL
 Architecture independent level 1 (DDI/DKI).
-.SH DESCRIPTION
-.sp
-.LP
-The  \fBfree_rtn\fR structure is referenced by the  \fBdatab\fR structure. When
-\fBfreeb\fR(9F) is called to free the message, the driver's message-freeing
-routine (referenced through the  \fBfree_rtn\fR structure) is called, with
-arguments, to free the data buffer.
-.SH STRUCTURE MEMBERS
-.sp
-.in +2
-.nf
+.Sh DESCRIPTION
+The
+.Vt free_rtn
+structure is referenced by the
+.Vt datab
+structure.
+When
+.Xr freeb 9F
+is called to free the message, the driver's message-freeing
+routine (referenced through the
+.Vt free_rtn
+structure) is called, with arguments, to free the data buffer.
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset 2n
 void     (*free_func)()      /* user's freeing routine */
 char     *free_arg           /* arguments to free_func() */
-.fi
-.in -2
-
-.sp
-.LP
-The  \fBfree_rtn\fR structure is defined as type  \fBfrtn_t\fR.
-.SH SEE ALSO
-.sp
-.LP
-\fBesballoc\fR(9F), \fBfreeb\fR(9F), \fBdatab\fR(9S)
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
+.Ed
+.Pp
+The
+.Vt free_rtn
+structure is defined as type
+.Vt frtn_t .
+.Sh SEE ALSO
+.Xr esballoc 9F ,
+.Xr freeb 9F ,
+.Xr datab 9S
+.Rs
+.%T STREAMS Programming Guide
+.Re

@@ -1,42 +1,46 @@
-'\" te
+.\" Copyright 2018, Joyent, Inc.
 .\" Copyright (c) 2000, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IOVEC 9S "Apr 11, 1991"
-.SH NAME
-iovec \- data storage structure for I/O using uio
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/uio.h>
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 9, 2018
+.Dt IOVEC 9S
+.Os
+.Sh NAME
+.Nm iovec
+.Nd data storage structure for I/O using uio
+.Sh SYNOPSIS
+.In sys/uio.h
+.Sh INTERFACE LEVEL
 Architecture independent level 1 (DDI/DKI).
-.SH DESCRIPTION
-.sp
-.LP
-An  \fBiovec\fR structure describes a data storage area for transfer in a
-\fBuio\fR(9S) structure.  Conceptually, it can be thought of as a base address
+.Sh DESCRIPTION
+An
+.Vt iovec
+structure describes a data storage area for transfer in a
+.Xr uio 9S
+structure.
+Conceptually, it can be thought of as a base address
 and length specification.
-.SH STRUCTURE MEMBERS
-.sp
-.in +2
-.nf
+.Sh STRUCTURE MEMBERS
+.Bd -literal -offset 2n
 caddr_t    iov_base;  /* base address of the data storage area */
                       /* represented by the iovec structure */
 int        iov_len;   /* size of the data storage area in bytes */
-.fi
-.in -2
-
-.SH SEE ALSO
-.sp
-.LP
-\fBuio\fR(9S)
-.sp
-.LP
-\fIWriting Device Drivers\fR
+.Ed
+.Sh SEE ALSO
+.Xr uio 9S
+.Rs
+.%T Writing Device Drivers
+.Re
