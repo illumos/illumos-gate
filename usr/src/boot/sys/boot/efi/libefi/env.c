@@ -652,7 +652,8 @@ efi_print_var(CHAR16 *varnamearg, EFI_GUID *matchguid, int lflag)
 	UINTN		datasz;
 	EFI_STATUS	status;
 	UINT32		attr;
-	char		*str, *data;
+	char		*str;
+	uint8_t		*data;
 	int		rv = CMD_OK;
 
 	str = NULL;
