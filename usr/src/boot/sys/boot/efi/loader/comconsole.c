@@ -124,6 +124,7 @@ efi_serial_init(EFI_HANDLE **handlep, int *nhandles)
 	 * get buffer size
 	 */
 	*nhandles = 0;
+	handles = NULL;
 	status = BS->LocateHandle(ByProtocol, &serial, NULL, &bufsz, handles);
 	if (status != EFI_BUFFER_TOO_SMALL)
 		return (status);
