@@ -514,7 +514,6 @@ comc_pcidev_handle(struct console *cp, uint32_t locator)
 	return (CMD_ERROR);
 #else
 	struct serial *sp = cp->c_private;
-	char intbuf[64];
 	uint32_t port;
 
 	if (biospci_read_config(locator & 0xffff,
