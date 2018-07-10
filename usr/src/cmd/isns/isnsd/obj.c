@@ -1325,6 +1325,7 @@ assign_attr(
 				return (1);
 			}
 		}
+		/* FALLTHROUGH */
 	case ISNS_PORTAL_NAME_ATTR_ID:
 	case ISNS_ISCSI_NAME_ATTR_ID:
 	case ISNS_ISCSI_ALIAS_ATTR_ID:
@@ -1373,6 +1374,7 @@ assign_attr(
 		if (attr->value.ui != 0) {
 			break;
 		}
+		/* FALLTHROUGH */
 	case ISNS_ENTITY_PROTOCOL_ATTR_ID:
 	case ISNS_VERSION_RANGE_ATTR_ID:
 
@@ -1485,11 +1487,13 @@ extract_attr(
 	switch (tlv->attr_id) {
 	case ISNS_EID_ATTR_ID:
 		min_len = 0;
+		/* FALLTHROUGH */
 	case ISNS_PORTAL_NAME_ATTR_ID:
 	case ISNS_ISCSI_ALIAS_ATTR_ID:
 	case ISNS_DD_SET_NAME_ATTR_ID:
 	case ISNS_DD_NAME_ATTR_ID:
 		max_len = 256;
+		/* FALLTHROUGH */
 	case ISNS_ISCSI_NAME_ATTR_ID:
 	case ISNS_PG_ISCSI_NAME_ATTR_ID:
 		if (tlv->attr_len < min_len || tlv->attr_len > max_len) {
@@ -1537,6 +1541,7 @@ extract_attr(
 			ec = ISNS_RSP_MSG_FORMAT_ERROR;
 			break;
 		}
+		/* FALLTHROUGH */
 	case ISNS_PG_TAG_ATTR_ID:
 		attr->tag = tlv->attr_id;
 		attr->len = tlv->attr_len;
@@ -1571,6 +1576,7 @@ extract_attr(
 			}
 			break;
 		}
+		/* FALLTHROUGH */
 	case ISNS_ENTITY_INDEX_ATTR_ID:
 	case ISNS_TIMESTAMP_ATTR_ID:
 	default:
@@ -2369,6 +2375,7 @@ reg_get_obj(
 			case 4:
 				pg_tag = ntohl(*(uint32_t *)
 				    &(*op)->attr_value[0]);
+				/* FALLTHROUGH */
 			case 0:
 				pgt[2].value.ui = pg_tag;
 				break;

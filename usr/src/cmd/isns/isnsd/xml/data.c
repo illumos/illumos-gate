@@ -410,7 +410,7 @@ convert_attr2xml(
 			} else {
 				node = child;
 			}
-			/* LINTED E_CASE_FALLTHRU */
+			/* FALLTHROUGH */
 		case 3: /* set content */
 			if (node) {
 				xmlNodeSetContent(node, value);

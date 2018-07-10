@@ -879,15 +879,24 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 	char be_run_cmd_outbuf[BUFSIZ];
 	char diskname[MAXPATHLEN];
 	char *vname;
-	char *path, *dsk_ptr;
+	char *path, *type, *dsk_ptr;
 	char *flag = "";
 	int ret;
 	vdev_stat_t *vs;
 	uint_t vsc;
 
+	if (nvlist_lookup_string(child, ZPOOL_CONFIG_TYPE, &type) != 0) {
+		be_print_err(gettext("%s: failed to get device type\n"),
+		    __func__);
+		return (BE_ERR_NODEV);
+	}
+	/* Skip indirect devices. */
+	if (strcmp(type, VDEV_TYPE_INDIRECT) == 0)
+		return (BE_ERR_NOTSUP);
+
 	if (nvlist_lookup_string(child, ZPOOL_CONFIG_PATH, &path) != 0) {
-		be_print_err(gettext("be_do_installboot: "
-		    "failed to get device path\n"));
+		be_print_err(gettext("%s: failed to get device path\n"),
+		    __func__);
 		return (BE_ERR_NODEV);
 	}
 
@@ -898,9 +907,9 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 		 * Don't try to run installgrub on a vdev that is not ONLINE
 		 * or DEGRADED. Try to print a warning for each such vdev.
 		 */
-		be_print_err(gettext("be_do_installboot: "
-		    "vdev %s is %s, can't install boot loader\n"),
-		    path, zpool_state_to_name(vs->vs_state, vs->vs_aux));
+		be_print_err(gettext("%s: vdev %s is %s, can't install "
+		    "boot loader\n"), __func__, path,
+		    zpool_state_to_name(vs->vs_state, vs->vs_aux));
 		return (BE_SUCCESS);
 	}
 
@@ -924,9 +933,8 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 
 	vname = zpool_vdev_name(g_zfs, zphp, child, B_FALSE);
 	if (vname == NULL) {
-		be_print_err(gettext("be_do_installboot: "
-		    "failed to get device name: %s\n"),
-		    libzfs_error_description(g_zfs));
+		be_print_err(gettext("%s: failed to get device name: %s\n"),
+		    __func__, libzfs_error_description(g_zfs));
 		return (zfs_err_to_be_err(g_zfs));
 	}
 
@@ -965,8 +973,8 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 		(void) snprintf(install_cmd, sizeof (install_cmd),
 		    "%s %s %s %s", BE_INSTALL_BOOT, flag, stage2, diskname);
 	} else {
-		be_print_err(gettext("be_do_installboot: unsupported "
-		    "architecture.\n"));
+		be_print_err(gettext("%s: unsupported architecture.\n"),
+		    __func__);
 		return (BE_ERR_BOOTFILE_INST);
 	}
 
@@ -977,8 +985,8 @@ be_do_installboot_helper(zpool_handle_t *zphp, nvlist_t *child, char *stage1,
 	    be_run_cmd_outbuf, BUFSIZ);
 
 	if (ret != BE_SUCCESS) {
-		be_print_err(gettext("be_do_installboot: install "
-		    "failed for device %s.\n"), vname);
+		be_print_err(gettext("%s: install failed for device %s.\n"),
+		    __func__, vname);
 		ret = BE_ERR_BOOTFILE_INST;
 	}
 
@@ -1033,17 +1041,17 @@ be_do_copy_grub_cap(be_transaction_data_t *bt)
 	 */
 	if ((zhp = zfs_open(g_zfs, bt->obe_root_ds, ZFS_TYPE_FILESYSTEM)) ==
 	    NULL) {
-		be_print_err(gettext("be_do_copy_grub_cap: failed to "
-		    "open BE root dataset (%s): %s\n"), bt->obe_root_ds,
-		    libzfs_error_description(g_zfs));
+		be_print_err(gettext("%s: failed to "
+		    "open BE root dataset (%s): %s\n"), __func__,
+		    bt->obe_root_ds, libzfs_error_description(g_zfs));
 		return (zfs_err_to_be_err(g_zfs));
 	}
 
 	if (!zfs_is_mounted(zhp, &tmp_mntpnt)) {
 		if ((ret = _be_mount(bt->obe_name, &tmp_mntpnt,
 		    BE_MOUNT_FLAG_NO_ZONES)) != BE_SUCCESS) {
-			be_print_err(gettext("be_do_copy_grub_cap: failed to "
-			    "mount BE (%s)\n"), bt->obe_name);
+			be_print_err(gettext("%s: failed to "
+			    "mount BE (%s)\n"), __func__, bt->obe_name);
 			ZFS_CLOSE(zhp);
 			goto done;
 		}
@@ -1058,8 +1066,8 @@ be_do_copy_grub_cap(be_transaction_data_t *bt)
 	/* get pool root dataset mountpoint */
 	zhp = zfs_open(g_zfs, bt->obe_zpool, ZFS_TYPE_FILESYSTEM);
 	if (zhp == NULL) {
-		be_print_err(gettext("be_do_copy_grub_cap: zfs_open "
-		    "failed: %s\n"), libzfs_error_description(g_zfs));
+		be_print_err(gettext("%s: zfs_open failed: %s\n"),
+		    __func__, libzfs_error_description(g_zfs));
 		ret = zfs_err_to_be_err(g_zfs);
 		goto done;
 	}
@@ -1070,8 +1078,8 @@ be_do_copy_grub_cap(be_transaction_data_t *bt)
 	 */
 	if ((ret = be_mount_pool(zhp, &tmp_mntpnt,
 	    &orig_mntpnt, &pool_mounted)) != BE_SUCCESS) {
-		be_print_err(gettext("be_do_copy_grub_cap: pool dataset "
-		    "(%s) could not be mounted\n"), bt->obe_zpool);
+		be_print_err(gettext("%s: pool dataset "
+		    "(%s) could not be mounted\n"), __func__, bt->obe_zpool);
 		ZFS_CLOSE(zhp);
 		goto done;
 	}
@@ -1081,9 +1089,10 @@ be_do_copy_grub_cap(be_transaction_data_t *bt)
 	 * NOTE: zhp must be kept for _be_unmount_pool()
 	 */
 	if (!zfs_is_mounted(zhp, &pool_mntpnt)) {
-		be_print_err(gettext("be_do_copy_grub_cap: pool "
+		be_print_err(gettext("%s: pool "
 		    "dataset (%s) is not mounted. Can't check the grub "
-		    "version from the grub capability file.\n"), bt->obe_zpool);
+		    "version from the grub capability file.\n"), __func__,
+		    bt->obe_zpool);
 		ret = BE_ERR_NO_MENU;
 		goto done;
 	}
@@ -1094,15 +1103,15 @@ be_do_copy_grub_cap(be_transaction_data_t *bt)
 
 	if ((cap_fp = fopen(cap_file, "r")) == NULL) {
 		err = errno;
-		be_print_err(gettext("be_do_copy_grub_cap: failed to open grub "
-		    "capability file\n"));
+		be_print_err(gettext("%s: failed to open grub "
+		    "capability file\n"), __func__);
 		ret = errno_to_be_err(err);
 		goto done;
 	}
 	if ((zpool_cap_fp = fopen(zpool_cap_file, "w")) == NULL) {
 		err = errno;
-		be_print_err(gettext("be_do_copy_grub_cap: failed to open new "
-		    "grub capability file\n"));
+		be_print_err(gettext("%s: failed to open new "
+		    "grub capability file\n"), __func__);
 		ret = errno_to_be_err(err);
 		(void) fclose(cap_fp);
 		goto done;
@@ -1192,6 +1201,61 @@ be_is_install_needed(be_transaction_data_t *bt, boolean_t *update)
 	return (ret);
 }
 
+static int
+be_do_installboot_walk(zpool_handle_t *zphp, nvlist_t *nv, char *stage1,
+    char *stage2, uint16_t flags)
+{
+	boolean_t verbose = do_print;
+	nvlist_t **child;
+	uint_t children = 0;
+	int ret = -1;
+
+	/* It is OK to have no children. */
+	(void) nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN, &child,
+	    &children);
+
+	for (int c = 0; c < children; c++) {
+		char *vname;
+		int rv;
+
+		/* ensure update on child status */
+		vname = zpool_vdev_name(g_zfs, zphp, child[c], verbose);
+		if (vname == NULL) {
+			be_print_err(gettext("%s: "
+			    "failed to get device name: %s\n"), __func__,
+			    libzfs_error_description(g_zfs));
+			return (zfs_err_to_be_err(g_zfs));
+		} else {
+			be_print_err(gettext("%s: child %d of %d device %s\n"),
+			    __func__, c, children, vname);
+		}
+
+		rv = be_do_installboot_walk(zphp, child[c], stage1, stage2,
+		    flags);
+		switch (rv) {
+		case BE_ERR_NOTSUP:
+			/* ignore unsupported devices */
+			be_print_err(
+			    gettext("%s: device %s is not supported\n"),
+			    __func__, vname);
+			break;
+		case BE_SUCCESS:
+			/* catch at least one success */
+			ret = rv;
+			break;
+		default:
+			if (ret == -1)
+				ret = rv;
+			break;
+		}
+		free(vname);
+	}
+
+	if (children > 0)
+		return (ret == -1? BE_ERR_NOTSUP : ret);
+	return (be_do_installboot_helper(zphp, nv, stage1, stage2, flags));
+}
+
 /*
  * Function:	be_do_installboot
  * Description:	This function runs installgrub/installboot using the boot
@@ -1213,16 +1277,13 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 {
 	zpool_handle_t  *zphp = NULL;
 	zfs_handle_t	*zhp = NULL;
-	nvlist_t **child, *nv, *config;
-	uint_t c, children = 0;
+	nvlist_t *nv, *config;
 	char *tmp_mntpt = NULL;
 	char stage1[MAXPATHLEN];
 	char stage2[MAXPATHLEN];
-	char *vname;
 	int ret = BE_SUCCESS;
 	boolean_t be_mounted = B_FALSE;
 	boolean_t update = B_FALSE;
-	boolean_t verbose = B_FALSE;
 
 	/*
 	 * check versions. This call is to support detached
@@ -1234,21 +1295,20 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 		if (ret != BE_SUCCESS || update == B_FALSE)
 			return (ret);
 	}
-	verbose = do_print;
 
 	if ((zhp = zfs_open(g_zfs, bt->obe_root_ds, ZFS_TYPE_FILESYSTEM)) ==
 	    NULL) {
-		be_print_err(gettext("be_do_installboot: failed to "
-		    "open BE root dataset (%s): %s\n"), bt->obe_root_ds,
-		    libzfs_error_description(g_zfs));
+		be_print_err(gettext("%s: failed to "
+		    "open BE root dataset (%s): %s\n"), __func__,
+		    bt->obe_root_ds, libzfs_error_description(g_zfs));
 		ret = zfs_err_to_be_err(g_zfs);
 		return (ret);
 	}
 	if (!zfs_is_mounted(zhp, &tmp_mntpt)) {
 		if ((ret = _be_mount(bt->obe_name, &tmp_mntpt,
 		    BE_MOUNT_FLAG_NO_ZONES)) != BE_SUCCESS) {
-			be_print_err(gettext("be_do_installboot: failed to "
-			    "mount BE (%s)\n"), bt->obe_name);
+			be_print_err(gettext("%s: failed to "
+			    "mount BE (%s)\n"), __func__, bt->obe_name);
 			ZFS_CLOSE(zhp);
 			return (ret);
 		}
@@ -1272,8 +1332,8 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 		char *platform = be_get_platform();
 
 		if (platform == NULL) {
-			be_print_err(gettext("be_do_installboot: "
-			    "failed to detect system platform name\n"));
+			be_print_err(gettext("%s: failed to detect system "
+			    "platform name\n"), __func__);
 			if (be_mounted)
 				(void) _be_unmount(bt->obe_name, 0);
 			free(tmp_mntpt);
@@ -1284,14 +1344,14 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 		    "%s/usr/platform/%s%s", tmp_mntpt,
 		    platform, BE_SPARC_BOOTBLK);
 	} else {
-		be_print_err(gettext("be_do_installboot: unsupported "
-		    "architecture.\n"));
+		be_print_err(gettext("%s: unsupported architecture.\n"),
+		    __func__);
 		return (BE_ERR_BOOTFILE_INST);
 	}
 
 	if ((zphp = zpool_open(g_zfs, bt->obe_zpool)) == NULL) {
-		be_print_err(gettext("be_do_installboot: failed to open "
-		    "pool (%s): %s\n"), bt->obe_zpool,
+		be_print_err(gettext("%s: failed to open "
+		    "pool (%s): %s\n"), __func__, bt->obe_zpool,
 		    libzfs_error_description(g_zfs));
 		ret = zfs_err_to_be_err(g_zfs);
 		if (be_mounted)
@@ -1301,8 +1361,8 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 	}
 
 	if ((config = zpool_get_config(zphp, NULL)) == NULL) {
-		be_print_err(gettext("be_do_installboot: failed to get zpool "
-		    "configuration information. %s\n"),
+		be_print_err(gettext("%s: failed to get zpool "
+		    "configuration information. %s\n"), __func__,
 		    libzfs_error_description(g_zfs));
 		ret = zfs_err_to_be_err(g_zfs);
 		goto done;
@@ -1312,81 +1372,13 @@ be_do_installboot(be_transaction_data_t *bt, uint16_t flags)
 	 * Get the vdev tree
 	 */
 	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &nv) != 0) {
-		be_print_err(gettext("be_do_installboot: failed to get vdev "
-		    "tree: %s\n"), libzfs_error_description(g_zfs));
+		be_print_err(gettext("%s: failed to get vdev "
+		    "tree: %s\n"), __func__, libzfs_error_description(g_zfs));
 		ret = zfs_err_to_be_err(g_zfs);
 		goto done;
 	}
 
-	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN, &child,
-	    &children) != 0) {
-		be_print_err(gettext("be_do_installboot: failed to traverse "
-		    "the vdev tree: %s\n"), libzfs_error_description(g_zfs));
-		ret = zfs_err_to_be_err(g_zfs);
-		goto done;
-	}
-	for (c = 0; c < children; c++) {
-		uint_t i, nchildren = 0;
-		nvlist_t **nvchild;
-
-		/* ensure update on child status */
-		vname = zpool_vdev_name(g_zfs, zphp, child[c], verbose);
-		if (vname == NULL) {
-			be_print_err(gettext(
-			    "be_do_installboot: "
-			    "failed to get device name: %s\n"),
-			    libzfs_error_description(g_zfs));
-			ret = zfs_err_to_be_err(g_zfs);
-			goto done;
-		} else if (verbose == B_TRUE) {
-			be_print_err(gettext("be_do_installboot: "
-			    "device %s\n"), vname);
-		}
-		free(vname);
-
-		ret = nvlist_lookup_nvlist_array(child[c],
-		    ZPOOL_CONFIG_CHILDREN, &nvchild, &nchildren);
-		if (ret != 0) {
-			if (ret != ENOENT) {
-				be_print_err(gettext("be_do_installboot: "
-				    "failed to traverse the vdev tree: %s\n"),
-				    libzfs_error_description(g_zfs));
-				ret = zfs_err_to_be_err(g_zfs);
-				goto done;
-			}
-			nchildren = 0;	/* This is leaf device. */
-		}
-
-		if (nchildren != 0) {
-			for (i = 0; i < nchildren; i++) {
-				/* ensure update on child status */
-				vname = zpool_vdev_name(g_zfs, zphp,
-				    nvchild[i], verbose);
-				if (vname == NULL) {
-					be_print_err(gettext(
-					    "be_do_installboot: "
-					    "failed to get device name: %s\n"),
-					    libzfs_error_description(g_zfs));
-					ret = zfs_err_to_be_err(g_zfs);
-					goto done;
-				} else if (verbose == B_TRUE) {
-					be_print_err(gettext(
-					    "be_do_installboot: device %s\n"),
-					    vname);
-				}
-				free(vname);
-				ret = be_do_installboot_helper(zphp, nvchild[i],
-				    stage1, stage2, flags);
-				if (ret != BE_SUCCESS)
-					goto done;
-			}
-		} else {
-			ret = be_do_installboot_helper(zphp, child[c], stage1,
-			    stage2, flags);
-			if (ret != BE_SUCCESS)
-				goto done;
-		}
-	}
+	ret = be_do_installboot_walk(zphp, nv, stage1, stage2, flags);
 
 	if (be_has_grub()) {
 		ret = be_do_copy_grub_cap(bt);

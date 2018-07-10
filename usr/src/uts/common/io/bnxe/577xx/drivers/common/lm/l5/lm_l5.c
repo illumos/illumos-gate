@@ -1715,7 +1715,7 @@ lm_sc_service_eq_intr(
             cid = SW_CID(kcqe->iscsi_conn_context_id);
 
             lm_sc_handle_tcp_event(pdev, cid, kcqe->op_code);
-            /* Fast path events, no break on purpose */
+            /* FALLTHROUGH */
         default:
             if (l5_kcqe_start == NULL)
             {

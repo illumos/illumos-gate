@@ -92,7 +92,7 @@ struct bcache_devdata
 /*
  * Modular console support.
  */
-struct console 
+struct console
 {
     const char	*c_name;
     const char	*c_desc;
@@ -117,7 +117,7 @@ void		cons_mode(int);
 /*
  * Plug-and-play enumerator/configurator interface.
  */
-struct pnphandler 
+struct pnphandler
 {
     const char	*pp_name;		/* handler/bus name */
     void	(* pp_enumerate)(void);	/* enumerate PnP devices, add to chain */
@@ -159,12 +159,17 @@ char			*pnp_eisaformat(u_int8_t *data);
 extern int			isapnp_readport;
 
 /*
+ * Version information
+ */
+extern char bootprog_info[];
+
+/*
  * Preloaded file metadata header.
  *
  * Metadata are allocated on our heap, and copied into kernel space
  * before executing the kernel.
  */
-struct file_metadata 
+struct file_metadata
 {
     size_t			md_size;
     u_int16_t			md_type;
@@ -259,9 +264,9 @@ int	elf32_load_modmetadata(struct preloaded_file *, uint64_t);
 #endif
 
 /*
- * Support for commands 
+ * Support for commands
  */
-struct bootblk_command 
+struct bootblk_command
 {
     const char		*c_name;
     const char		*c_desc;
@@ -275,7 +280,7 @@ struct bootblk_command
 
 SET_DECLARE(Xcommand_set, struct bootblk_command);
 
-/* 
+/*
  * The intention of the architecture switch is to provide a convenient
  * encapsulation of the interface between the bootstrap MI and MD code.
  * MD code may selectively populate the switch at runtime based on the

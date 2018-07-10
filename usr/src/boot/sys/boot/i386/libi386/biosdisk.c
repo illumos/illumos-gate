@@ -49,8 +49,6 @@
 #include "disk.h"
 #include "libi386.h"
 
-CTASSERT(sizeof (struct i386_devdesc) >= sizeof (struct disk_devdesc));
-
 #define	BIOS_NUMDRIVES		0x475
 #define	BIOSDISK_SECSIZE	512
 #define	BUFSIZE			(1 * BIOSDISK_SECSIZE)

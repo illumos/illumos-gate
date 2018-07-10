@@ -1,6 +1,6 @@
 /*	$NetBSD: nfs.c,v 1.2 1998/01/24 12:43:09 drochner Exp $	*/
 
-/*-
+/*
  *  Copyright (c) 1993 John Brezak
  *  All rights reserved.
  *
@@ -248,7 +248,7 @@ int
 nfs_lookupfh(struct nfs_iodesc *d, const char *name, struct nfs_iodesc *newfd)
 {
 	void *pkt = NULL;
-	int len, rlen, pos;
+	int len, pos;
 	struct args {
 		uint32_t fhsize;
 		uint32_t fhplusname[1 +
@@ -462,27 +462,26 @@ int
 nfs_open(const char *upath, struct open_file *f)
 {
 	struct iodesc *desc;
-	struct nfs_iodesc *currfd;
+	struct nfs_iodesc *currfd = NULL;
 	char buf[2 * NFS_V3MAXFHSIZE + 3];
 	u_char *fh;
 	char *cp;
 	int i;
-	struct nfs_iodesc *newfd;
-	struct nfsv3_fattrs *fa;
+	struct nfs_iodesc *newfd = NULL;
 	char *ncp;
 	int c;
 	char namebuf[NFS_MAXPATHLEN + 1];
 	char linkbuf[NFS_MAXPATHLEN + 1];
 	int nlinks = 0;
 	int error;
-	char *path;
+	char *path = NULL;
 
 	if (netproto != NET_NFS)
 		return (EINVAL);
 
 #ifdef NFS_DEBUG
- 	if (debug)
- 	    printf("nfs_open: %s (rootpath=%s)\n", upath, rootpath);
+	if (debug)
+		printf("nfs_open: %s (rootpath=%s)\n", upath, rootpath);
 #endif
 	if (!rootpath[0]) {
 		printf("no rootpath, no nfs\n");

@@ -2346,6 +2346,7 @@ static lm_status_t lm_get_shmem_mf_mac_info(lm_device_t *pdev)
                 break;
             }
         }
+	/* FALLTHROUGH */
     case MULTI_FUNCTION_SI:
     case MULTI_FUNCTION_AFEX:
         lm_get_shmem_ext_mac_addresses(pdev);
