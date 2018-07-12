@@ -455,6 +455,14 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	 */
 	len = VM_MMAP_GUARD_SIZE + objsize + VM_MMAP_GUARD_SIZE;
 	flags = MAP_PRIVATE | MAP_ANON | MAP_NOCORE | MAP_ALIGNED_SUPER;
+#ifndef __FreeBSD__
+	/*
+	 * There is no need to reserve swap for the guest physical memory and
+	 * guard regions. Actual memory is allocated and mapped later through
+	 * vm_alloc_memseg() and setup_memory_segment().
+	 */
+	flags |= MAP_NORESERVE;
+#endif
 	ptr = mmap(NULL, len, PROT_NONE, flags, -1, 0);
 	if (ptr == MAP_FAILED)
 		return (-1);
