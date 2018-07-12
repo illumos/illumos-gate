@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2018 RackTop Systems.
+#
 
 FMADIR = $(SRC)/cmd/fm
 EVERDIR = $(FMADIR)/eversholt
@@ -78,12 +80,9 @@ escparse.o: $(EVERCMNSRC)/escparse.y
 	$(COMPILE.c) -DYYDEBUG -c -o $@ y.tab.c
 	$(CTFCONVO)
 
-$(ROOT)/usr/lib/fm:
+$(ROOTPDIR):
 	$(INS.dir)
 
-$(ROOTPDIR): $(ROOT)/usr/lib/fm
-	$(INS.dir)
-
-$(ROOTPDIR)/%: %
+$(ROOTPDIR)/%: % $(ROOTPDIR)
 	$(INS.file)
 
