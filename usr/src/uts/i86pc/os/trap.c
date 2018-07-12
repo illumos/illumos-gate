@@ -2068,6 +2068,7 @@ dump_ttrace(void)
 #endif
 	/* Define format for the TYPE and VC fields */
 	const char fmt2[] = "%4s %3x";
+	const char fmt2s[] = "%4s %3s";
 	char data2[9];	/* length of string formatted by fmt2 + 1 */
 	/*
 	 * Define format for the HANDLER field. Width is arbitrary, but should
@@ -2157,6 +2158,14 @@ dump_ttrace(void)
 				break;
 
 			case TT_INTERRUPT:
+				if (rec->ttr_regs.r_trapno == T_SOFTINT) {
+					(void) snprintf(data2, sizeof (data2),
+					    fmt2s, "intr", "-");
+					(void) snprintf(data3, sizeof (data3),
+					    fmt3s, "(fakesoftint)");
+					break;
+				}
+
 				(void) snprintf(data2, sizeof (data2), fmt2,
 				    "intr", rec->ttr_vector);
 				if (get_intr_handler != NULL)

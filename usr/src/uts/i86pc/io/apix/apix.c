@@ -355,7 +355,7 @@ apix_get_intr_handler(int cpu, short vec)
 	apix_vector_t *apix_vector;
 
 	ASSERT(cpu < apic_nproc && vec < APIX_NVECTOR);
-	if (cpu >= apic_nproc)
+	if (cpu >= apic_nproc || vec >= APIX_NVECTOR)
 		return (NULL);
 
 	apix_vector = apixs[cpu]->x_vectbl[vec];
