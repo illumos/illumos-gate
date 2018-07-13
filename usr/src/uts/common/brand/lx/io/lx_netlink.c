@@ -923,6 +923,23 @@ lx_netlink_reply_done(lx_netlink_reply_t *reply)
 		hdr->lxnh_seq = reply->lxnr_hdr.lxnh_seq;
 		hdr->lxnh_pid = lxsock->lxns_port;
 	} else {
+		uint32_t status = 0;
+
+		/*
+		 * More recent versions of the iproute2 utils expect a status
+		 * value after the header, even in the absence of errors.
+		 */
+		lx_netlink_reply_add(reply, &status, sizeof (status));
+
+		/*
+		 * "done" is also the most minimal response possible.  If
+		 * lx_netlink_reply_msg() does not set lxnr_errno, we should
+		 * be guaranteed enough room to hold this (i.e. our
+		 * lx_netlink_reply_add() call should never end up setting
+		 * lxnr_errno).
+		 */
+		VERIFY0(reply->lxnr_errno);
+
 		mp = reply->lxnr_mp;
 		VERIFY(mp != NULL);
 		reply->lxnr_mp = NULL;
