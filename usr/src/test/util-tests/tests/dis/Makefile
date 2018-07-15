@@ -10,94 +10,37 @@
 #
 
 #
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/dis
-ARCHS = i386 sparc
+ARCHS = i386 risc-v risc-v-c sparc
 
 PROG = distest
 
-SPARC_TESTS = \
-	tst.regs
+I386_FILES :sh= (cd i386; print *)
+RISCV_FILES :sh= (cd risc-v; print *)
+RISCV_C_FILES :sh= (cd risc-v-c; print *)
+SPARC_FILES :sh= (cd sparc; print *)
 
-I386_TESTS =		\
-	32.adx 		\
-	32.avx		\
-	32.avx2		\
-	32.avx512	\
-	32.aes 		\
-	32.bmi1 	\
-	32.bmi2 	\
-	32.f16c 	\
-	32.fma-pd 	\
-	32.fma-ps 	\
-	32.fma-sd 	\
-	32.fma-ss 	\
-	32.lzcnt 	\
-	32.movbe	\
-	32.opmask	\
-	32.pclmulqdq	\
-	32.popcnt 	\
-	32.sha		\
-	32.sse-3	\
-	32.sse-4.1 	\
-	32.sse-4.2 	\
-	32.ssse3 	\
-	32.xsave 	\
-	64.avx		\
-	64.avx2		\
-	64.avx512	\
-	64.adx 		\
-	64.aes 		\
-	64.bmi1 	\
-	64.bmi2 	\
-	64.ept 		\
-	64.f16c 	\
-	64.fma-pd 	\
-	64.fma-ps 	\
-	64.fma-sd 	\
-	64.fma-ss 	\
-	64.lzcnt 	\
-	64.movbe	\
-	64.opmask	\
-	64.pclmulqdq	\
-	64.popcnt 	\
-	64.random 	\
-	64.sha		\
-	64.sse-3	\
-	64.sse-4.1 	\
-	64.sse-4.2 	\
-	64.ssse3 	\
-	64.vmx 		\
-	64.xsave 	\
-	tst.cpuid	\
-	tst.fence	\
-	tst.msr		\
-	tst.mwait 	\
-	tst.random	\
-	tst.smap	\
-	tst.sep		\
-	tst.tsc		\
-	tst.vmx
-
-I386_FILES = $(I386_TESTS:%=%.s) $(I386_TESTS:%=%.out)
-ROOTI386 = $(I386_FILES:%=$(TESTDIR)/i386/%)
-
-SPARC_FILES = $(SPARC_TESTS:%=%.s) $(SPARC_TESTS:%=%.out)
-ROOTSPARC = $(SPARC_FILES:%=$(TESTDIR)/sparc/%)
+ROOTFILES = \
+	$(I386_FILES:%=$(TESTDIR)/i386/%)		\
+	$(RISCV_FILES:%=$(TESTDIR)/risc-v/%)		\
+	$(RISCV_C_FILES:%=$(TESTDIR)/risc-v-c/%)	\
+	$(SPARC_FILES:%=$(TESTDIR)/sparc/%)
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
 ARCHDIRS = $(ARCHS:%=$(TESTDIR)/%)
 CMDS = $(PROG:%=$(TESTDIR)/%)
+FILEMODE=0444
 $(CMDS) := FILEMODE = 0555
 
-install: $(CMDS) $(ROOTI386) $(ROOTSPARC)
+install: $(CMDS) $(ROOTFILES)
 
 lint:
 
@@ -105,7 +48,7 @@ clobber: clean
 
 clean:
 
-$(CMDS) $(ROOTI386) $(ROOTSPARC): $(TESTDIR) $(ARCHDIRS)
+$(CMDS) $(ROOTFILES): $(TESTDIR) $(ARCHDIRS)
 
 $(TESTDIR) $(ARCHDIRS):
 	$(INS.dir)

@@ -26,6 +26,7 @@
  * Copyright 2011 Jason King.  All rights reserved.
  * Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2015 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <ctype.h>
@@ -575,6 +576,29 @@ dis_file(const char *filename)
 
 			if (ehdr.e_ident[EI_DATA] != ELFDATA2MSB) {
 				warn("invalid E_IDENT field for S390 object");
+				return;
+			}
+			break;
+
+		case EM_RISCV:
+			/*
+			 * RISC-V is defined to be litle endian. The current ISA
+			 * makes it clear that the 64-bit instructions can
+			 * co-exist with the 32-bit ones and therefore we don't
+			 * need a separate elf class at this time.
+			 */
+			if (ehdr.e_ident[EI_DATA] != ELFDATA2LSB) {
+				warn("invalid EI_DATA field for RISC-V object");
+				return;
+			}
+
+			if (ehdr.e_ident[EI_CLASS] == ELFCLASS32) {
+				g_flags |= DIS_RISCV_32;
+			} else if (ehdr.e_ident[EI_CLASS] == ELFCLASS64) {
+				g_flags |= DIS_RISCV_64;
+			} else {
+				warn("invalid EI_CLASS field for RISC-V "
+				    "object");
 				return;
 			}
 			break;

@@ -1,0 +1,60 @@
+    libdis_test:      b7 00 00 00        lui ra,0x0
+    libdis_test+0x4:  b7 30 02 00        lui ra,0x23
+    libdis_test+0x8:  b7 f0 ff ff        lui ra,0xfffff
+    libdis_test+0xc:  97 00 00 00        auipc ra,0x0
+    libdis_test+0x10: 97 30 02 00        auipc ra,0x23
+    libdis_test+0x14: 97 f0 ff ff        auipc ra,0xfffff
+    libdis_test+0x18: 03 84 f4 7f        lb s0,0x7ff(s1)
+    libdis_test+0x1c: 83 84 04 00        lb s1,0x0(s1)
+    libdis_test+0x20: 03 89 04 80        lb s2,-0x800(s1)
+    libdis_test+0x24: 83 99 f4 7f        lh s3,0x7ff(s1)
+    libdis_test+0x28: 03 9a 04 00        lh s4,0x0(s1)
+    libdis_test+0x2c: 83 9a 04 80        lh s5,-0x800(s1)
+    libdis_test+0x30: 03 ab f4 7f        lw s6,0x7ff(s1)
+    libdis_test+0x34: 83 ab 04 00        lw s7,0x0(s1)
+    libdis_test+0x38: 03 ac 04 80        lw s8,-0x800(s1)
+    libdis_test+0x3c: 83 cb f4 7f        lbu s7,0x7ff(s1)
+    libdis_test+0x40: 03 cb 04 00        lbu s6,0x0(s1)
+    libdis_test+0x44: 83 ca 04 80        lbu s5,-0x800(s1)
+    libdis_test+0x48: 03 da f4 7f        lhu s4,0x7ff(s1)
+    libdis_test+0x4c: 83 d9 04 00        lhu s3,0x0(s1)
+    libdis_test+0x50: 03 d9 04 80        lhu s2,-0x800(s1)
+    libdis_test+0x54: a3 0f 53 7e        sb t0,0x7ff(t1)
+    libdis_test+0x58: 23 80 63 00        sb t1,0x0(t2)
+    libdis_test+0x5c: 23 00 7e 80        sb t2,-0x800(t3)
+    libdis_test+0x60: a3 1f c3 7f        sh t3,0x7ff(t1)
+    libdis_test+0x64: 23 90 d3 01        sh t4,0x0(t2)
+    libdis_test+0x68: 23 10 ee 81        sh t5,-0x800(t3)
+    libdis_test+0x6c: a3 2f d3 7f        sw t4,0x7ff(t1)
+    libdis_test+0x70: 23 a0 c3 01        sw t3,0x0(t2)
+    libdis_test+0x74: 23 20 7e 80        sw t2,-0x800(t3)
+    libdis_test+0x78: 93 80 42 00        addi ra,t0,0x4
+    libdis_test+0x7c: 93 80 c2 ff        addi ra,t0,-0x4
+    libdis_test+0x80: 93 a0 42 00        slti ra,t0,0x4
+    libdis_test+0x84: 93 a0 c2 ff        slti ra,t0,-0x4
+    libdis_test+0x88: 93 b0 42 00        sltiu ra,t0,0x4
+    libdis_test+0x8c: 93 b0 c2 ff        sltiu ra,t0,-0x4
+    libdis_test+0x90: 93 c0 42 00        xori ra,t0,0x4
+    libdis_test+0x94: 93 c0 c2 ff        xori ra,t0,-0x4
+    libdis_test+0x98: 93 e0 42 00        ori ra,t0,0x4
+    libdis_test+0x9c: 93 e0 c2 ff        ori ra,t0,-0x4
+    libdis_test+0xa0: 93 f0 42 00        andi ra,t0,0x4
+    libdis_test+0xa4: 93 f0 c2 ff        andi ra,t0,-0x4
+    libdis_test+0xa8: 93 1e 2f 01        slli t4,t5,0x12
+    libdis_test+0xac: 93 5e 3f 01        srli t4,t5,0x13
+    libdis_test+0xb0: 93 5e 4f 41        srai t4,t5,0x14
+    libdis_test+0xb4: 33 84 24 01        add s0,s1,s2
+    libdis_test+0xb8: b3 04 39 41        sub s1,s2,s3
+    libdis_test+0xbc: b3 19 5a 01        sll s3,s4,s5
+    libdis_test+0xc0: 33 aa 6a 01        slt s4,s5,s6
+    libdis_test+0xc4: 33 b5 15 00        sltu a0,a1,ra
+    libdis_test+0xc8: b3 4a 7b 01        xor s5,s6,s7
+    libdis_test+0xcc: 33 db 8b 01        srl s6,s7,s8
+    libdis_test+0xd0: b3 5b 9c 41        sra s7,s8,s9
+    libdis_test+0xd4: 33 ec ac 01        or s8,s9,s10
+    libdis_test+0xd8: b3 7c bd 01        and s9,s10,s11
+    libdis_test+0xdc: 0f 00 f0 0f        fence
+    libdis_test+0xe0: 0f 00 a0 05        fence ow, ir
+    libdis_test+0xe4: 0f 00 50 0a        fence ir, ow
+    libdis_test+0xe8: 0f 00 f0 0e        fence ior, iorw
+    libdis_test+0xec: 0f 10 00 00        fence.i

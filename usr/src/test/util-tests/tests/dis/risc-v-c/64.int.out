@@ -1,0 +1,5 @@
+    libdis_test:     fd 24              c.addiw s1,0x1f
+    libdis_test+0x2: 8d 24              c.addiw s1,0x3
+    libdis_test+0x4: 81 34              c.addiw s1,-0x20
+    libdis_test+0x6: b1 9d              c.addw a1,a2
+    libdis_test+0x8: 15 9c              c.subw s0,a3
