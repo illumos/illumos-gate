@@ -1,0 +1,5 @@
+    libdis_test:      3b 84 24 03        mulw s0,s1,s2
+    libdis_test+0x4:  3b ca 6a 03        divw s4,s5,s6
+    libdis_test+0x8:  bb 5a 7b 03        divuw s5,s6,s7
+    libdis_test+0xc:  3b eb 8b 03        remw s6,s7,s8
+    libdis_test+0x10: bb 7b 9c 03        remuw s7,s8,s9

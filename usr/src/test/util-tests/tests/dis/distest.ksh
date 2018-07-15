@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 #
@@ -78,6 +78,7 @@ Usage: $dt_arg0  [-n] [ -p platform=pathtoas ]... [ test ]...
 				either be an absolute path or a command on the
 				path.
 USAGE
+	exit 2
 }
 
 #
@@ -196,6 +197,7 @@ test_one()
 run_single_file()
 {
 	typeset sfile base cmpfile prefix arch gas p flags
+	typeset asflags32 asflags64
 	sfile=$1
 
 	base=${sfile##*/}
@@ -207,16 +209,31 @@ run_single_file()
 	gas=${dt_platforms[$arch]}
 	[[ -n $gas ]] || fatal "encountered test $sfile, but missing assembler"
 
+	case "$arch" in
+	"risc-v")
+		asflags32="-march=rv32g"
+		asflags64="-march=rv64g"
+		;;
+	"risc-v-c")
+		asflags32="-march=rv32gc"
+		asflags64="-march=rv64gc"
+		;;
+	*)
+		asflags32="-32"
+		asflags64="-64"
+		;;
+	esac
+
 	case "$prefix" in
 	32)
-		test_one "-32" $sfile $cmpfile
+		test_one $asflags32 $sfile $cmpfile
 		;;
 	64)
-		test_one "-64" $sfile $cmpfile
+		test_one $asflags64 $sfile $cmpfile
 		;;
 	tst)
-		test_one "-32" $sfile $cmpfile "(32-bit)"
-		test_one "-64" $sfile $cmpfile "(64-bit)"
+		test_one $asflags32 $sfile $cmpfile "(32-bit)"
+		test_one $asflags64 $sfile $cmpfile "(64-bit)"
 		;;
 	esac
 }
@@ -270,9 +287,10 @@ while getopts ":np:" c $@; do
 		dt_nodefault="y"
 		;;
 	p)
+		OLDIFS=$IFS
 		IFS="="
 		set -A split $OPTARG
-		IFS=" "
+		IFS=$OLDIFS
 		[[ ${#split[@]} -eq 2 ]] || usage "malformed -p option: $OPTARG"
 		dt_platforms[${split[0]}]=${split[1]}
 		;;

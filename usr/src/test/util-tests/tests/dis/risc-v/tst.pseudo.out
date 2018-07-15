@@ -1,0 +1,26 @@
+    libdis_test:      13 00 00 00        nop
+    libdis_test+0x4:  67 80 00 00        ret
+    libdis_test+0x8:  0f 00 f0 0f        fence
+    libdis_test+0xc:  f3 22 20 c0        rdinstret t0
+    libdis_test+0x10: 73 23 00 c0        rdcycle t1
+    libdis_test+0x14: f3 23 10 c0        rdtime t2
+    libdis_test+0x18: 73 23 00 00        csrr t1,ustatus
+    libdis_test+0x1c: 73 10 03 00        csrw ustatus,t1
+    libdis_test+0x20: 73 a0 03 00        csrs ustatus,t2
+    libdis_test+0x24: 73 30 0e 00        csrc ustatus,t3
+    libdis_test+0x28: 73 50 42 00        csrwi uie,0x4
+    libdis_test+0x2c: 73 e0 42 00        csrsi uie,0x5
+    libdis_test+0x30: 73 70 43 00        csrci uie,0x6
+    libdis_test+0x34: 73 24 30 00        frcsr s0
+    libdis_test+0x38: 73 94 34 00        fscsr s0,s1
+    libdis_test+0x3c: 73 90 34 00        fscsr s1
+    libdis_test+0x40: 73 25 20 00        frrm a0
+    libdis_test+0x44: 73 95 25 00        fsrm a0,a1
+    libdis_test+0x48: 73 90 25 00        fsrm a1
+    libdis_test+0x4c: f3 52 22 00        fsrmi t0,0x4
+    libdis_test+0x50: 73 d0 22 00        fsrmi 0x5
+    libdis_test+0x54: 73 25 10 00        frflags a0
+    libdis_test+0x58: 73 95 15 00        fsflags a0,a1
+    libdis_test+0x5c: 73 90 15 00        fsflags a1
+    libdis_test+0x60: f3 52 12 00        fsflagsi t0,0x4
+    libdis_test+0x64: 73 d0 12 00        fsflagsi 0x5

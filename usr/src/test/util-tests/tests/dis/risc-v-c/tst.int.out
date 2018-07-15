@@ -1,0 +1,30 @@
+    libdis_test:      d5 40              c.li ra,0x15
+    libdis_test+0x2:  b5 5d              c.li s11,-0x13
+    libdis_test+0x4:  89 64              c.lui s1,0x2
+    libdis_test+0x6:  cd 64              c.lui s1,0x13
+    libdis_test+0x8:  fd 04              c.addi s1,0x1f
+    libdis_test+0xa:  8d 04              c.addi s1,0x3
+    libdis_test+0xc:  81 14              c.addi s1,-0x20
+    libdis_test+0xe:  45 61              c.addi16sp sp,0x30
+    libdis_test+0x10: 39 71              c.addi16sp sp,-0x40
+    libdis_test+0x12: 0c 08              c.addi4spn a1,sp,0x10
+    libdis_test+0x14: 6c 10              c.addi4spn a1,sp,0x2c
+    libdis_test+0x16: 16 0d              c.slli s10,0x5
+    libdis_test+0x18: ce 0e              c.slli t4,0x13
+    libdis_test+0x1a: 0a 04              c.slli s0,0x2
+    libdis_test+0x1c: 11 82              c.srli a2,0x4
+    libdis_test+0x1e: d5 80              c.srli s1,0x15
+    libdis_test+0x20: 91 86              c.srai a3,0x4
+    libdis_test+0x22: e5 87              c.srai a5,0x19
+    libdis_test+0x24: 0d 8b              c.andi a4,0x3
+    libdis_test+0x26: e5 9a              c.andi a3,-0x7
+    libdis_test+0x28: ba 84              c.mv s1,a4
+    libdis_test+0x2a: 3e 85              c.mv a0,a5
+    libdis_test+0x2c: b6 95              c.add a1,a3
+    libdis_test+0x2e: 32 96              c.add a2,a2
+    libdis_test+0x30: 6d 8d              c.and a0,a1
+    libdis_test+0x32: d1 8d              c.or a1,a2
+    libdis_test+0x34: 35 8e              c.xor a2,a3
+    libdis_test+0x36: 99 8e              c.sub a3,a4
+    libdis_test+0x38: 01 00              c.nop
+    libdis_test+0x3a: 02 90              c.ebreak

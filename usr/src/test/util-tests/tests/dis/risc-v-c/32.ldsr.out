@@ -1,0 +1,7 @@
+    libdis_test:     04 61              c.flw fs1,0x0(a0)
+    libdis_test+0x2: b4 62              c.flw fa3,0x40(a3)
+    libdis_test+0x4: 82 64              c.flwsp fs1,0x0(sp)
+    libdis_test+0x6: 06 6e              c.flwsp ft8,0x40(sp)
+    libdis_test+0x8: d2 77              c.flwsp fa5,0x34(sp)
+    libdis_test+0xa: 0a e0              c.fswsp ft2,0x0(sp)
+    libdis_test+0xc: 36 f0              c.fswsp fa3,0x20(sp)

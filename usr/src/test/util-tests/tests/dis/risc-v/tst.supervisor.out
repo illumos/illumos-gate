@@ -1,0 +1,7 @@
+    libdis_test:      73 00 00 00        ecall
+    libdis_test+0x4:  73 00 10 00        ebreak
+    libdis_test+0x8:  73 00 20 00        uret
+    libdis_test+0xc:  73 00 20 10        sret
+    libdis_test+0x10: 73 00 20 30        mret
+    libdis_test+0x14: 73 00 50 10        wfi
+    libdis_test+0x18: 73 80 62 12        sfence.vma t0,t1

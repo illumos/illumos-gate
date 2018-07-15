@@ -1,0 +1,8 @@
+    libdis_test:      33 84 24 03        mul s0,s1,s2
+    libdis_test+0x4:  b3 14 39 03        mulh s1,s2,s3
+    libdis_test+0x8:  33 a9 49 03        mulhsu s2,s3,s4
+    libdis_test+0xc:  b3 39 5a 03        mulhu s3,s4,s5
+    libdis_test+0x10: 33 ca 6a 03        div s4,s5,s6
+    libdis_test+0x14: b3 5a 7b 03        divu s5,s6,s7
+    libdis_test+0x18: 33 eb 8b 03        rem s6,s7,s8
+    libdis_test+0x1c: b3 7b 9c 03        remu s7,s8,s9
