@@ -1551,7 +1551,7 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 int
 vmm_do_vm_destroy(vmm_softc_t *sc, boolean_t clean_zsd)
 {
-	int 		err;
+	int		err;
 
 	mutex_enter(&vmmdev_mtx);
 	mutex_enter(&vmm_mtx);
@@ -1921,8 +1921,16 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	/* Ensure that all resources have been cleaned up */
-	mutex_enter(&vmmdev_mtx);
+	/*
+	 * Ensure that all resources have been cleaned up.
+	 *
+	 * To prevent a deadlock with iommu_cleanup() we'll fail the detach if
+	 * vmmdev_mtx is already held. We can't wait for vmmdev_mtx with our
+	 * devinfo locked as iommu_cleanup() tries to recursively lock each
+	 * devinfo, including our own, while holding vmmdev_mtx.
+	 */
+	if (mutex_tryenter(&vmmdev_mtx) == 0)
+		return (DDI_FAILURE);
 
 	if (vmmdev_inst_count != 0) {
 		mutex_exit(&vmmdev_mtx);
