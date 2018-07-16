@@ -1899,14 +1899,14 @@ mp_startup_common(boolean_t boot)
 	if (boothowto & RB_DEBUG)
 		kdi_cpu_init();
 
+	(void) mach_cpu_create_device_node(cp, NULL);
+
 	/*
 	 * Setting the bit in cpu_ready_set must be the last operation in
 	 * processor initialization; the boot CPU will continue to boot once
 	 * it sees this bit set for all active CPUs.
 	 */
 	CPUSET_ATOMIC_ADD(cpu_ready_set, cp->cpu_id);
-
-	(void) mach_cpu_create_device_node(cp, NULL);
 
 	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_idstr);
 	cmn_err(CE_CONT, "?cpu%d: %s\n", cp->cpu_id, cp->cpu_brandstr);
