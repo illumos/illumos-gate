@@ -247,6 +247,7 @@ VMM_OBJS += vmm.o \
 	vmm_stat.o \
 	vmm_util.o \
 	x86.o \
+	iommu.o \
 	vdev.o \
 	vatpic.o \
 	vatpit.o \
@@ -260,14 +261,14 @@ VMM_OBJS += vmm.o \
 	vmx_msr.o \
 	vmx.o \
 	vmx_support.o \
+	vtd.o \
+	vtd_sol.o \
 	svm.o \
 	svm_msr.o \
 	npt.o \
 	vmcb.o \
 	svm_support.o \
 	amdv.o \
-	sol_iommu.o \
-	sol_ppt.o \
 	gipt.o \
 	vmm_sol_vm.o \
 	vmm_sol_glue.o \
@@ -281,6 +282,8 @@ VIONA_OBJS += viona_main.o \
 	viona_rx.o \
 	viona_tx.o \
 	viona_hook.o \
+
+PPT_OBJS += ppt.o
 
 #
 #	Build up defines and paths.

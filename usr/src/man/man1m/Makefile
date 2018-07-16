@@ -547,6 +547,7 @@ i386_MANFILES=				\
 		acpidump.1m		\
 		acpixtract.1m		\
 		nvmeadm.1m		\
+		pptadm.1m		\
 		rdmsr.1m
 
 sparc_MANFILES=	dcs.1m			\

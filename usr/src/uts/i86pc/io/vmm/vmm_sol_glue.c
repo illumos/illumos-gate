@@ -55,6 +55,8 @@
 #include <sys/modhash.h>
 #include <sys/hma.h>
 
+#include <sys/x86_archext.h>
+
 #include <machine/cpufunc.h>
 #include <machine/fpu.h>
 #include <machine/md_var.h>
@@ -90,6 +92,19 @@ u_char const bin2bcd_data[] = {
 	0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89,
 	0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99
 };
+
+void
+pmap_invalidate_cache(void)
+{
+	cpuset_t cpuset;
+
+	kpreempt_disable();
+	cpuset_all_but(&cpuset, CPU->cpu_id);
+	xc_call((xc_arg_t)NULL, (xc_arg_t)NULL, (xc_arg_t)NULL,
+	    CPUSET2BV(cpuset), (xc_func_t)invalidate_cache);
+	invalidate_cache();
+	kpreempt_enable();
+}
 
 vm_paddr_t
 pmap_kextract(vm_offset_t va)

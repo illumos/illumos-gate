@@ -42,6 +42,7 @@
 #include <vm/vm.h>
 #include <vm/seg_dev.h>
 
+#include "io/ppt.h"
 #include "io/vatpic.h"
 #include "io/vioapic.h"
 #include "io/vrtc.h"
@@ -564,7 +565,6 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		break;
 	}
 
-	/* XXXJOY: punt on these for now */
 	case VM_PPTDEV_MSI: {
 		struct vm_pptdev_msi pptmsi;
 
@@ -572,7 +572,9 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		return (ENOTTY);
+		error = ppt_setup_msi(sc->vmm_vm, pptmsi.vcpu, pptmsi.pptfd,
+		    pptmsi.addr, pptmsi.msg, pptmsi.numvec);
+		break;
 	}
 	case VM_PPTDEV_MSIX: {
 		struct vm_pptdev_msix pptmsix;
@@ -581,7 +583,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		return (ENOTTY);
+		error = ppt_setup_msix(sc->vmm_vm, pptmsix.vcpu, pptmsix.pptfd,
+		    pptmsix.idx, pptmsix.addr, pptmsix.msg,
+		    pptmsix.vector_control);
+		break;
 	}
 	case VM_MAP_PPTDEV_MMIO: {
 		struct vm_pptdev_mmio pptmmio;
@@ -590,9 +595,20 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		return (ENOTTY);
+		error = ppt_map_mmio(sc->vmm_vm, pptmmio.pptfd, pptmmio.gpa,
+		    pptmmio.len, pptmmio.hpa);
+		break;
 	}
-	case VM_BIND_PPTDEV:
+	case VM_BIND_PPTDEV: {
+		struct vm_pptdev pptdev;
+
+		if (ddi_copyin(datap, &pptdev, sizeof (pptdev), md)) {
+			error = EFAULT;
+			break;
+		}
+		error = vm_assign_pptdev(sc->vmm_vm, pptdev.pptfd);
+		break;
+	}
 	case VM_UNBIND_PPTDEV: {
 		struct vm_pptdev pptdev;
 
@@ -600,12 +616,27 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			error = EFAULT;
 			break;
 		}
-		return (ENOTTY);
+		error = vm_unassign_pptdev(sc->vmm_vm, pptdev.pptfd);
+		break;
 	}
+	case VM_GET_PPTDEV_LIMITS: {
+		struct vm_pptdev_limits pptlimits;
 
+		if (ddi_copyin(datap, &pptlimits, sizeof (pptlimits), md)) {
+			error = EFAULT;
+			break;
+		}
+		error = ppt_get_limits(sc->vmm_vm, pptlimits.pptfd,
+		    &pptlimits.msi_limit, &pptlimits.msix_limit);
+		if (error == 0 &&
+		    ddi_copyout(&pptlimits, datap, sizeof (pptlimits), md)) {
+			error = EFAULT;
+			break;
+		}
+		break;
+	}
 	case VM_INJECT_EXCEPTION: {
 		struct vm_exception vmexc;
-
 		if (ddi_copyin(datap, &vmexc, sizeof (vmexc), md)) {
 			error = EFAULT;
 			break;
@@ -2091,8 +2122,16 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	/* Ensure that all resources have been cleaned up */
-	mutex_enter(&vmmdev_mtx);
+	/*
+	 * Ensure that all resources have been cleaned up.
+	 *
+	 * To prevent a deadlock with iommu_cleanup() we'll fail the detach if
+	 * vmmdev_mtx is already held. We can't wait for vmmdev_mtx with our
+	 * devinfo locked as iommu_cleanup() tries to recursively lock each
+	 * devinfo, including our own, while holding vmmdev_mtx.
+	 */
+	if (mutex_tryenter(&vmmdev_mtx) == 0)
+		return (DDI_FAILURE);
 
 	mutex_enter(&vmm_mtx);
 	if (!list_is_empty(&vmm_list) || !list_is_empty(&vmm_destroy_list)) {

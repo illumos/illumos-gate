@@ -186,6 +186,7 @@ SUBDIRS +=				\
 	libpkg		\
 	libpool		\
 	libpp		\
+	libppt		\
 	libproc		\
 	libproject	\
 	libpthread	\
@@ -446,6 +447,7 @@ HDRSUBDIRS=				\
 	libpicltree	\
 	libpool		\
 	libpp		\
+	libppt		\
 	libproc		\
 	libraidcfg	\
 	librcm		\
@@ -657,6 +659,7 @@ libpctx:	libproc
 libpkg:		libscf libadm
 libpool:	libscf libexacct
 libpp:		libast
+libppt:		libpcidb libdevinfo libcmdutils
 libproc:	../cmd/sgs/librtld_db ../cmd/sgs/libelf libctf
 $(INTEL_BLD)libproc: libsaveargs
 libproject:	libpool libproc libsecdb

@@ -127,6 +127,7 @@ struct vm_capability {
 	int		allcpus;
 };
 
+#ifdef __FreeBSD__
 struct vm_pptdev {
 	int		bus;
 	int		slot;
@@ -162,6 +163,49 @@ struct vm_pptdev_msix {
 	uint32_t	vector_control;
 	uint64_t	addr;
 };
+
+struct vm_pptdev_limits {
+	int		bus;
+	int		slot;
+	int		func;
+	int		msi_limit;
+	int		msix_limit;
+};
+#else /* __FreeBSD__ */
+struct vm_pptdev {
+	int		pptfd;
+};
+
+struct vm_pptdev_mmio {
+	int		pptfd;
+	vm_paddr_t	gpa;
+	vm_paddr_t	hpa;
+	size_t		len;
+};
+
+struct vm_pptdev_msi {
+	int		vcpu;
+	int		pptfd;
+	int		numvec;		/* 0 means disabled */
+	uint64_t	msg;
+	uint64_t	addr;
+};
+
+struct vm_pptdev_msix {
+	int		vcpu;
+	int		pptfd;
+	int		idx;
+	uint64_t	msg;
+	uint32_t	vector_control;
+	uint64_t	addr;
+};
+
+struct vm_pptdev_limits {
+	int		pptfd;
+	int		msi_limit;
+	int		msix_limit;
+};
+#endif /* __FreeBSD__ */
 
 struct vm_nmi {
 	int		cpuid;
@@ -307,6 +351,7 @@ enum {
 	IOCNUM_MAP_PPTDEV_MMIO = 42,
 	IOCNUM_PPTDEV_MSI = 43,
 	IOCNUM_PPTDEV_MSIX = 44,
+	IOCNUM_GET_PPTDEV_LIMITS = 45,
 
 	/* statistics */
 	IOCNUM_VM_STATS = 50, 
@@ -410,6 +455,8 @@ enum {
 	_IOW('v', IOCNUM_PPTDEV_MSI, struct vm_pptdev_msi)
 #define	VM_PPTDEV_MSIX \
 	_IOW('v', IOCNUM_PPTDEV_MSIX, struct vm_pptdev_msix)
+#define	VM_GET_PPTDEV_LIMITS \
+	_IOR('v', IOCNUM_GET_PPTDEV_LIMITS, struct vm_pptdev_limits)
 #define VM_INJECT_NMI \
 	_IOW('v', IOCNUM_INJECT_NMI, struct vm_nmi)
 #define	VM_STATS_IOC \

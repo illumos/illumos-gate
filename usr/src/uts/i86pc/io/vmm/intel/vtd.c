@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmparam.h>
 #include <contrib/dev/acpica/include/acpi.h>
 
+#include <sys/sunndi.h>
+
 #include "io/iommu.h"
 
 /*
@@ -120,6 +122,9 @@ static int		drhd_num;
 static struct vtdmap	*vtdmaps[DRHD_MAX_UNITS];
 static int		max_domains;
 typedef int		(*drhd_ident_func_t)(void);
+#ifndef __FreeBSD__
+static dev_info_t	*vtddips[DRHD_MAX_UNITS];
+#endif
 
 static uint64_t root_table[PAGE_SIZE / sizeof(uint64_t)] __aligned(4096);
 static uint64_t ctx_tables[256][PAGE_SIZE / sizeof(uint64_t)] __aligned(4096);
@@ -237,19 +242,63 @@ vtd_translation_disable(struct vtdmap *vtdmap)
 		;
 }
 
+static void *
+vtd_map(dev_info_t *dip)
+{
+	caddr_t regs;
+	ddi_acc_handle_t hdl;
+	int error;
+
+	static ddi_device_acc_attr_t regs_attr = {
+		DDI_DEVICE_ATTR_V0,
+		DDI_NEVERSWAP_ACC,
+		DDI_STRICTORDER_ACC,
+	};
+
+	error = ddi_regs_map_setup(dip, 0, &regs, 0, PAGE_SIZE, &regs_attr,
+	    &hdl);
+
+	if (error != DDI_SUCCESS)
+		return (NULL);
+
+	ddi_set_driver_private(dip, hdl);
+
+	return (regs);
+}
+
+static void
+vtd_unmap(dev_info_t *dip)
+{
+	ddi_acc_handle_t hdl = ddi_get_driver_private(dip);
+
+	if (hdl != NULL)
+		ddi_regs_map_free(&hdl);
+}
+
+#ifndef __FreeBSD__
+/*
+ * This lives in vtd_sol.c for license reasons.
+ */
+extern dev_info_t *vtd_get_dip(ACPI_DMAR_HARDWARE_UNIT *, int);
+#endif
+
 static int
 vtd_init(void)
 {
 	int i, units, remaining;
 	struct vtdmap *vtdmap;
 	vm_paddr_t ctx_paddr;
-	char *end, envname[32];
+	char *end;
+#ifdef __FreeBSD__
+	char envname[32];
 	unsigned long mapaddr;
+#endif
 	ACPI_STATUS status;
 	ACPI_TABLE_DMAR *dmar;
 	ACPI_DMAR_HEADER *hdr;
 	ACPI_DMAR_HARDWARE_UNIT *drhd;
 
+#ifdef __FreeBSD__
 	/*
 	 * Allow the user to override the ACPI DMAR table by specifying the
 	 * physical address of each remapping unit.
@@ -268,7 +317,9 @@ vtd_init(void)
 
 	if (units > 0)
 		goto skip_dmar;
-
+#else
+	units = 0;
+#endif
 	/* Search for DMAR table. */
 	status = AcpiGetTable(ACPI_SIG_DMAR, 0, (ACPI_TABLE_HEADER **)&dmar);
 	if (ACPI_FAILURE(status))
@@ -291,7 +342,15 @@ vtd_init(void)
 			break;
 
 		drhd = (ACPI_DMAR_HARDWARE_UNIT *)hdr;
+#ifdef __FreeBSD__
 		vtdmaps[units++] = (struct vtdmap *)PHYS_TO_DMAP(drhd->Address);
+#else
+		vtddips[units] = vtd_get_dip(drhd, units);
+		vtdmaps[units] = (struct vtdmap *)vtd_map(vtddips[units]);
+		if (vtdmaps[units] == NULL)
+			goto fail;
+		units++;
+#endif
 		if (units >= DRHD_MAX_UNITS)
 			break;
 		remaining -= hdr->Length;
@@ -300,7 +359,9 @@ vtd_init(void)
 	if (units <= 0)
 		return (ENXIO);
 
+#ifdef __FreeBSD__
 skip_dmar:
+#endif
 	drhd_num = units;
 	vtdmap = vtdmaps[0];
 
@@ -321,11 +382,36 @@ skip_dmar:
 	}
 
 	return (0);
+
+#ifndef __FreeBSD__
+fail:
+	for (i = 0; i <= units; i++)
+		vtd_unmap(vtddips[i]);
+	return (ENXIO);
+#endif
 }
 
 static void
 vtd_cleanup(void)
 {
+#ifndef __FreeBSD__
+	int i;
+
+	KASSERT(SLIST_EMPTY(&domhead), ("domain list not empty"));
+
+	bzero(root_table, sizeof (root_table));
+
+	for (i = 0; i <= drhd_num; i++) {
+		vtdmaps[i] = NULL;
+		/*
+		 * Unmap the vtd registers. Note that the devinfo nodes
+		 * themselves aren't removed, they are considered system state
+		 * and can be reused when the module is reloaded.
+		 */
+		if (vtddips[i] != NULL)
+			vtd_unmap(vtddips[i]);
+	}
+#endif
 }
 
 static void
@@ -619,6 +705,7 @@ vtd_create_domain(vm_paddr_t maxaddr)
 	if ((uintptr_t)dom->ptp & PAGE_MASK)
 		panic("vtd_create_domain: ptp (%p) not page aligned", dom->ptp);
 
+#ifdef __FreeBSD__
 #ifdef notyet
 	/*
 	 * XXX superpage mappings for the iommu do not work correctly.
@@ -633,6 +720,18 @@ vtd_create_domain(vm_paddr_t maxaddr)
 	 *
 	 * There is not any code to deal with the demotion at the moment
 	 * so we disable superpage mappings altogether.
+	 */
+	dom->spsmask = VTD_CAP_SPS(vtdmap->cap);
+#endif
+#else
+	/*
+	 * On illumos we decidedly do not remove memory mapped to a VM's domain
+	 * from the host_domain, so we don't have to deal with page demotion and
+	 * can just use large pages.
+	 *
+	 * Since VM memory is currently allocated as 4k pages and mapped into
+	 * the VM domain page by page, the use of large pages is essentially
+	 * limited to the host_domain.
 	 */
 	dom->spsmask = VTD_CAP_SPS(vtdmap->cap);
 #endif

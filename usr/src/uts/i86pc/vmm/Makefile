@@ -104,11 +104,12 @@ CFLAGS		+= -_gcc=-Wno-format
 # enable collection of VMM statistics
 CFLAGS		+= -DVMM_KEEP_STATS
 
-LDFLAGS         += -Nfs/dev
-
 $(OBJS_DIR)/vmm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
 $(OBJS_DIR)/svm.o := CERRWARN += -_gcc=-Wno-pointer-sign -_gcc=-Wno-type-limits
+$(OBJS_DIR)/vmx.o := CERRWARN += -_gcc=-Wno-unused-variable
+$(OBJS_DIR)/iommu.o := CERRWARN += -_gcc=-Wno-unused-variable
 
+LDFLAGS         += -N misc/acpica -N misc/pcie -N fs/dev
 LDFLAGS         += -z type=kmod -M $(MAPFILE)
 
 OFFSETS_VMX	= $(CONF_SRCDIR)/intel/offsets.in
