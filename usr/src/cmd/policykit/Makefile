@@ -38,6 +38,7 @@ CPPFLAGS +=	-DPACKAGE_VERSION=\"$(POLICYKIT_VERSION)\"
 CSTD =	$(CSTD_GNU99)
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
+CERRWARN +=	-_gcc=-Wno-unused-function
 
 ROOTUSRSBINPROG =	$(PROG:%=$(ROOTUSRSBIN)/%)
 
