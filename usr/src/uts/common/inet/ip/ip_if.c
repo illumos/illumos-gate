@@ -1380,16 +1380,33 @@ ill_capability_probe(ill_t *ill)
 	ill->ill_dlpi_capab_state = IDCS_PROBE_SENT;
 }
 
-static void
+static boolean_t
 ill_capability_wait(ill_t *ill)
 {
-	while (ill->ill_capab_pending_cnt != 0) {
+	/*
+	 * I'm in this ill's squeue, aka a writer.  The ILL_CONDEMNED flag can
+	 * only be set by someone who is the writer.  Since we
+	 * drop-and-reacquire the squeue in this loop, we need to check for
+	 * ILL_CONDEMNED, which if set means nothing can signal our capability
+	 * condition variable.
+	 */
+	ASSERT(IAM_WRITER_ILL(ill));
+
+	while (ill->ill_capab_pending_cnt != 0 &&
+	    (ill->ill_state_flags & ILL_CONDEMNED) == 0) {
 		mutex_enter(&ill->ill_dlpi_capab_lock);
 		ipsq_exit(ill->ill_phyint->phyint_ipsq);
 		cv_wait(&ill->ill_dlpi_capab_cv, &ill->ill_dlpi_capab_lock);
 		mutex_exit(&ill->ill_dlpi_capab_lock);
-		VERIFY(ipsq_enter(ill, B_FALSE, CUR_OP) == B_TRUE);
+		/*
+		 * If ipsq_enter() fails, someone set ILL_CONDEMNED
+		 * while we dropped the squeue. Indicate such to the caller.
+		 */
+		if (!ipsq_enter(ill, B_FALSE, CUR_OP))
+			return (B_FALSE);
 	}
+
+	return ((ill->ill_state_flags & ILL_CONDEMNED) == 0);
 }
 
 void
@@ -12790,8 +12807,11 @@ ill_dl_down(ill_t *ill)
 		ill_capability_reset(ill, B_FALSE);
 		ill_dlpi_send(ill, mp);
 
-		/* Wait for the capability reset to finish */
-		ill_capability_wait(ill);
+		/*
+		 * Wait for the capability reset to finish.
+		 * In this case, it doesn't matter WHY or HOW it finished.
+		 */
+		(void) ill_capability_wait(ill);
 	}
 }
 
@@ -14727,8 +14747,13 @@ ill_dl_up(ill_t *ill, ipif_t *ipif)
 	ill_dlpi_send(ill, bind_mp);
 	/* Send down link-layer capabilities probe if not already done. */
 	ill_capability_probe(ill);
-	/* Wait for DLPI to be bound and the capability probe to finish */
-	ill_capability_wait(ill);
+	/*
+	 * Wait for DLPI to be bound and the capability probe to finish.
+	 * The call drops-and-reacquires the squeue. If it couldn't because
+	 * ILL_CONDEMNED got set, bail.
+	 */
+	if (!ill_capability_wait(ill))
+		return (ENXIO);
 
 	/* DLPI failed to bind. Return the saved error */
 	if (!ill->ill_dl_up) {
