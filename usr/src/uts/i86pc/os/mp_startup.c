@@ -2084,6 +2084,8 @@ cpu_sep_enable(void)
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
 	wrmsr(MSR_INTC_SEP_CS, (uint64_t)(uintptr_t)KCS_SEL);
+
+	CPU->cpu_m.mcpu_fast_syscall_state |= FSS_SEP_ENABLED;
 }
 
 static void
@@ -2097,6 +2099,8 @@ cpu_sep_disable(void)
 	 * the sysenter or sysexit instruction to trigger a #gp fault.
 	 */
 	wrmsr(MSR_INTC_SEP_CS, 0);
+
+	CPU->cpu_m.mcpu_fast_syscall_state &= ~FSS_SEP_ENABLED;
 }
 
 static void
@@ -2107,6 +2111,8 @@ cpu_asysc_enable(void)
 
 	wrmsr(MSR_AMD_EFER, rdmsr(MSR_AMD_EFER) |
 	    (uint64_t)(uintptr_t)AMD_EFER_SCE);
+
+	CPU->cpu_m.mcpu_fast_syscall_state |= FSS_ASYSC_ENABLED;
 }
 
 static void
@@ -2121,4 +2127,6 @@ cpu_asysc_disable(void)
 	 */
 	wrmsr(MSR_AMD_EFER, rdmsr(MSR_AMD_EFER) &
 	    ~((uint64_t)(uintptr_t)AMD_EFER_SCE));
+
+	CPU->cpu_m.mcpu_fast_syscall_state &= ~FSS_ASYSC_ENABLED;
 }

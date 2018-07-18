@@ -81,6 +81,12 @@ struct xen_evt_data {
 	ulong_t		evt_affinity[sizeof (ulong_t) * 8]; /* service on cpu */
 };
 
+enum fast_syscall_state {
+	FSS_DISABLED		= 0,
+	FSS_ASYSC_ENABLED	= (1 << 0),
+	FSS_SEP_ENABLED		= (1 << 1)
+};
+
 struct kpti_frame {
 	uint64_t	kf_lower_redzone;
 
@@ -203,6 +209,8 @@ struct	machcpu {
 	void (*mcpu_idle_cpu)(void);	/* idle function */
 	uint16_t mcpu_idle_type;	/* CPU next idle type */
 	uint16_t max_cstates;		/* supported max cstates */
+
+	enum fast_syscall_state	mcpu_fast_syscall_state;
 
 	struct cpu_ucode_info	*mcpu_ucode_info;
 
