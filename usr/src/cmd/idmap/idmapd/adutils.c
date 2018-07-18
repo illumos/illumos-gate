@@ -21,6 +21,8 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -59,7 +61,7 @@
 #define	UIDNUMBERFILTER	"(&(objectclass=user)(uidNumber=%u))"
 #define	GIDNUMBERFILTER	"(&(objectclass=group)(gidNumber=%u))"
 #define	SANFILTER	"(sAMAccountName=%s)"
-#define	OBJSIDFILTER	"(objectSid=%s)"
+#define	OBJSIDFILTER	"(|(objectSid=%s)(sIDHistory=%s))"
 
 void	idmap_ldap_res_search_cb(LDAP *ld, LDAPMessage **res, int rc,
 		int qid, void *argp);
@@ -792,7 +794,7 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 		return (IDMAP_ERR_SID);
 
 	/* Assemble filter */
-	(void) asprintf(&filter, OBJSIDFILTER, cbinsid);
+	(void) asprintf(&filter, OBJSIDFILTER, cbinsid, cbinsid);
 	if (filter == NULL)
 		return (IDMAP_ERR_MEMORY);
 
