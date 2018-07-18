@@ -43,8 +43,9 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2018 Jason King
 .\"
-.TH GETOPT 3C "Oct 16, 2007"
+.TH GETOPT 3C "July 17, 2018"
 .SH NAME
 getopt \- command option parsing
 .SH SYNOPSIS
@@ -454,6 +455,6 @@ Standard	See below.
 For the Basic Utility Command syntax is Standard, see \fBstandards\fR(5).
 .SH SEE ALSO
 .LP
-\fBIntro\fR(1), \fBgetopt\fR(1), \fBgetopts\fR(1), \fBgetsubopt\fR(3C),
-\fBgettext\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5), \fBenviron\fR(5),
-\fBstandards\fR(5)
+\fBIntro\fR(1), \fBgetopt\fR(1), \fBgetopts\fR(1), \fBgetopt_long\fR(3C),
+\fBgetsubopt\fR(3C), \fBgettext\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
+\fBenviron\fR(5), \fBstandards\fR(5)

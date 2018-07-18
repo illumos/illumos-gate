@@ -14,6 +14,8 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2018 Jason King
+# Copyright 2018, Joyent, Inc.
 #
 
 file path=usr/share/man/man3c/__fbufsize.3c
@@ -172,6 +174,7 @@ file path=usr/share/man/man3c/getlogin.3c
 file path=usr/share/man/man3c/getmntent.3c
 file path=usr/share/man/man3c/getnetgrent.3c
 file path=usr/share/man/man3c/getopt.3c
+file path=usr/share/man/man3c/getopt_long.3c
 file path=usr/share/man/man3c/getpagesize.3c
 file path=usr/share/man/man3c/getpagesizes.3c
 file path=usr/share/man/man3c/getpass.3c
@@ -854,6 +857,8 @@ link path=usr/share/man/man3c/gethrvtime.3c target=gethrtime.3c
 link path=usr/share/man/man3c/getlogin_r.3c target=getlogin.3c
 link path=usr/share/man/man3c/getmntany.3c target=getmntent.3c
 link path=usr/share/man/man3c/getnetgrent_r.3c target=getnetgrent.3c
+link path=usr/share/man/man3c/getopt_long_clip.3c target=getopt_long.3c
+link path=usr/share/man/man3c/getopt_long_only.3c target=getopt_long.3c
 link path=usr/share/man/man3c/getpassphrase.3c target=getpass.3c
 link path=usr/share/man/man3c/getpwent.3c target=getpwnam.3c
 link path=usr/share/man/man3c/getpwent_r.3c target=getpwnam.3c

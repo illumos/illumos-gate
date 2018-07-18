@@ -14,7 +14,8 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
+# Copyright 2018 Jason King
 #
 
 include		$(SRC)/Makefile.master
@@ -177,6 +178,7 @@ MANFILES=	__fbufsize.3c					\
 		getmntent.3c					\
 		getnetgrent.3c					\
 		getopt.3c					\
+		getopt_long.3c					\
 		getpagesize.3c					\
 		getpagesizes.3c					\
 		getpass.3c					\
@@ -853,6 +855,8 @@ MANLINKS=	FD_CLR.3c				\
 		getlogin_r.3c				\
 		getmntany.3c				\
 		getnetgrent_r.3c			\
+		getopt_long_only.3c			\
+		getopt_long_clip.3c			\
 		getpassphrase.3c			\
 		getpwent.3c				\
 		getpwent_r.3c				\
@@ -1828,6 +1832,9 @@ innetgr.3c				:= LINKSRC = getnetgrent.3c
 setnetgrent.3c				:= LINKSRC = getnetgrent.3c
 
 get_nprocs_conf.3c			:= LINKSRC = get_nprocs.3c
+
+getopt_long_clip.3c			:= LINKSRC = getopt_long.3c
+getopt_long_only.3c			:= LINKSRC = getopt_long.3c
 
 getpassphrase.3c			:= LINKSRC = getpass.3c
 
