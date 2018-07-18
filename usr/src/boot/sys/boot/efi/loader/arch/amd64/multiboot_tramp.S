@@ -59,20 +59,20 @@ multiboot_tramp:
 		movq	%rax, %rbx		/* MBI */
 		popq	%rsi			/* entry to rsi */
 		popq	%rdi			/* restore magic */
-		movq	gdt@GOTPCREL(%rip), %rax
-		movq	gdtaddr@GOTPCREL(%rip), %rdx
+		lea	gdt(%rip), %rax
+		lea	gdtaddr(%rip), %rdx
 		movq	%rax, (%rdx)
-		movq	gdtdesc@GOTPCREL(%rip), %rax
+		lea	gdtdesc(%rip), %rax
 		lgdt	(%rax)
 
 		/* record the address */
-		movq	multiboot_tramp_2@GOTPCREL(%rip), %rcx
+		lea	multiboot_tramp_2(%rip), %rcx
 		movq	%rsp, %rax
 		pushq	$SEL_SDATA
 		pushq	%rax
 		pushf
 		pushq	$SEL_SCODE
-		movq	multiboot_tramp_1@GOTPCREL(%rip), %rax
+		lea	multiboot_tramp_1(%rip), %rax
 		pushq	%rax
 		iretq
 

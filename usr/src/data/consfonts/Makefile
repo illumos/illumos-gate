@@ -25,9 +25,6 @@ GALLANT_SRC=	Gallant19.bdf
 8x16_FNT=	8x16.fnt
 8x16_SRC=	ter-u16n.bdf ter-u16b.bdf
 
-8x16_FNT=	8x16.fnt
-8x16_SRC=	ter-u16n.bdf ter-u16b.bdf
-
 10x18_FNT=	10x18.fnt
 10x18_SRC=	ter-u18n.bdf ter-u18b.bdf
 
