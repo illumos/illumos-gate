@@ -64,6 +64,8 @@ CORE_OBJS +=			\
 	hardclk.o		\
 	hat_i86.o		\
 	hat_kdi.o		\
+	hma.o			\
+	hma_asm.o		\
 	hma_fpu.o		\
 	hment.o			\
 	hold_page.o		\
@@ -100,7 +102,6 @@ CORE_OBJS +=			\
 	memscrub.o		\
 	mpcore.o		\
 	notes.o			\
-	pc_hvm.o		\
 	pci_bios.o		\
 	pci_cfgacc.o		\
 	pci_cfgacc_x86.o	\

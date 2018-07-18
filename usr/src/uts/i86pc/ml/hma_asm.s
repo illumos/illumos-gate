@@ -10,26 +10,33 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 
-#ifndef _PC_HVM_H
-#define	_PC_HVM_H
+#include <sys/asm_linkage.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#if defined(__lint)
 
-#if defined(_KERNEL)
-
-extern boolean_t hvm_excl_hold(const char *);
-extern void hvm_excl_rele(const char *);
-
-#endif /* defined(_KERNEL) */
-
-#ifdef __cplusplus
+int
+hma_vmx_vmxon(uintptr_t arg)
+{
+	return (0);
 }
-#endif
 
-#endif /* _PC_HVM_H */
+#else	/* __lint */
+	ENTRY_NP(hma_vmx_vmxon)
+	push	%rbp
+	movq	%rsp, %rbp
+	pushq	%rdi
+
+	xorl	%eax, %eax
+	vmxon	-0x8(%rbp)
+	ja	1f	/* CF=0, ZF=0 (success) */
+	incl	%eax
+1:
+
+	leave
+	ret
+	SET_SIZE(hma_vmx_vmxon)
+#endif	/* __lint */

@@ -320,58 +320,6 @@ critical_exit(void)
 	kpreempt_enable();
 }
 
-struct unrhdr;
-static kmutex_t unr_lock;
-static uint_t unr_idx;
-
-/*
- * Allocate a new unrheader set.
- *
- * Highest and lowest valid values given as parameters.
- */
-struct unrhdr *
-new_unrhdr(int low, int high, struct mtx *mtx)
-{
-	id_space_t *ids;
-	char name[] = "vmm_unr_00000000";
-
-	ASSERT(mtx == NULL);
-
-	mutex_enter(&unr_lock);
-	/* Get a unique name for the id space */
-	(void) snprintf(name, sizeof (name), "vmm_unr_%08X", unr_idx);
-	VERIFY(++unr_idx != UINT_MAX);
-	mutex_exit(&unr_lock);
-
-	ids = id_space_create(name, low, high);
-
-	return ((struct unrhdr *)ids);
-}
-
-void
-delete_unrhdr(struct unrhdr *uh)
-{
-	id_space_t *ids = (id_space_t *)uh;
-
-	id_space_destroy(ids);
-}
-
-int
-alloc_unr(struct unrhdr *uh)
-{
-	id_space_t *ids = (id_space_t *)uh;
-
-	return (id_alloc(ids));
-}
-
-void
-free_unr(struct unrhdr *uh, u_int item)
-{
-	id_space_t *ids = (id_space_t *)uh;
-
-	id_free(ids, item);
-}
-
 
 static void
 vmm_glue_callout_handler(void *arg)
@@ -571,7 +519,6 @@ vmm_sol_glue_init(void)
 {
 	vmm_alloc_init();
 	vmm_cpuid_init();
-	unr_idx = 0;
 }
 
 void

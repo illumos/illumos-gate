@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/x86_archext.h>
 #include <sys/smp_impldefs.h>
 #include <sys/ht.h>
+#include <sys/hma.h>
 #endif
 
 #include <vm/vm.h>
@@ -159,9 +160,10 @@ static MALLOC_DEFINE(M_VLAPIC, "vlapic", "vlapic");
 SYSCTL_DECL(_hw_vmm);
 SYSCTL_NODE(_hw_vmm, OID_AUTO, vmx, CTLFLAG_RW, NULL, NULL);
 
+#ifdef __FreeBSD__
 int vmxon_enabled[MAXCPU];
 static char vmxon_region[MAXCPU][PAGE_SIZE] __aligned(PAGE_SIZE);
-static char *vmxon_region_pa[MAXCPU];
+#endif /*__FreeBSD__ */
 
 static uint32_t pinbased_ctls, procbased_ctls, procbased_ctls2;
 static uint32_t exit_ctls, entry_ctls;
@@ -510,7 +512,11 @@ vpid_free(int vpid)
 	 */
 
 	if (vpid > VM_MAXCPU)
+#ifdef __FreeBSD__
 		free_unr(vpid_unr, vpid);
+#else
+		hma_vmx_vpid_free((uint16_t)vpid);
+#endif
 }
 
 static void
@@ -535,7 +541,14 @@ vpid_alloc(uint16_t *vpid, int num)
 	 * Allocate a unique VPID for each vcpu from the unit number allocator.
 	 */
 	for (i = 0; i < num; i++) {
+#ifdef __FreeBSD__
 		x = alloc_unr(vpid_unr);
+#else
+		uint16_t tmp;
+
+		tmp = hma_vmx_vpid_alloc();
+		x = (tmp == 0) ? -1 : tmp;
+#endif
 		if (x == -1)
 			break;
 		else
@@ -564,6 +577,7 @@ vpid_alloc(uint16_t *vpid, int num)
 	}
 }
 
+#ifdef __FreeBSD__
 static void
 vpid_init(void)
 {
@@ -604,10 +618,8 @@ vmx_disable(void *arg __unused)
 static int
 vmx_cleanup(void)
 {
-#ifdef __FreeBSD__
 	if (pirvec >= 0)
 		lapic_ipi_free(pirvec);
-#endif
 
 	if (vpid_unr != NULL) {
 		delete_unrhdr(vpid_unr);
@@ -636,11 +648,7 @@ vmx_enable(void *arg __unused)
 	load_cr4(rcr4() | CR4_VMXE);
 
 	*(uint32_t *)vmxon_region[curcpu] = vmx_revision();
-#ifdef __FreeBSD__
 	error = vmxon(vmxon_region[curcpu]);
-#else
-	error = vmxon(vmxon_region_pa[curcpu]);
-#endif
 	if (error == 0)
 		vmxon_enabled[curcpu] = 1;
 }
@@ -652,12 +660,30 @@ vmx_restore(void)
 	if (vmxon_enabled[curcpu])
 		vmxon(vmxon_region[curcpu]);
 }
+#else /* __FreeBSD__ */
+static int
+vmx_cleanup(void)
+{
+	/* This is taken care of by the hma registration */
+	return (0);
+}
+
+static void
+vmx_restore(void)
+{
+	/* No-op on illumos */
+}
+#endif /* __FreeBSD__ */
 
 static int
 vmx_init(int ipinum)
 {
 	int error, use_tpr_shadow;
+#ifdef __FreeBSD__
 	uint64_t basic, fixed0, fixed1, feature_control;
+#else
+	uint64_t fixed0, fixed1;
+#endif
 	uint32_t tmp, procbased2_vid_bits;
 
 #ifdef __FreeBSD__
@@ -666,13 +692,6 @@ vmx_init(int ipinum)
 		printf("vmx_init: processor does not support VMX operation\n");
 		return (ENXIO);
 	}
-#else
-	if (!is_x86_feature(x86_featureset, X86FSET_VMX)) {
-		cmn_err(CE_WARN,
-		    "vmx_init: processor does not support VMX operation\n");
-		return (ENXIO);
-	}
-#endif
 
 	/*
 	 * Verify that MSR_IA32_FEATURE_CONTROL lock and VMXON enable bits
@@ -695,6 +714,7 @@ vmx_init(int ipinum)
 		    "capabilities\n");
 		return (EINVAL);
 	}
+#endif /* __FreeBSD__ */
 
 	/* Check support for primary processor-based VM-execution controls */
 	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
@@ -890,23 +910,16 @@ vmx_init(int ipinum)
 	cr4_ones_mask = fixed0 & fixed1;
 	cr4_zeros_mask = ~fixed0 & ~fixed1;
 
+#ifdef __FreeBSD__
 	vpid_init();
+#endif
 
 	vmx_msr_init();
 
-#ifndef __FreeBSD__
-	/*
-	 * Since vtophys requires locks to complete, cache the physical
-	 * addresses to the vmxon pages now, rather than attempting the
-	 * translation in the sensitive cross-call context.
-	 */
-	for (uint_t i = 0; i < MAXCPU; i++) {
-		vmxon_region_pa[i] = (char *)vtophys(vmxon_region[i]);
-	}
-#endif /* __FreeBSD__ */
-
+#ifdef __FreeBSD__
 	/* enable VMX operation */
 	smp_rendezvous(NULL, vmx_enable, NULL, NULL);
+#endif
 
 	vmx_initialized = 1;
 
@@ -4006,37 +4019,12 @@ struct vmm_ops vmm_ops_intel = {
 #ifndef __FreeBSD__
 /* Side-effect free HW validation derived from checks in vmx_init. */
 int
-vmx_x86_supported(char **msg)
+vmx_x86_supported(const char **msg)
 {
 	int error;
-	uint64_t basic, feature_control;
 	uint32_t tmp;
 
-	if (!is_x86_feature(x86_featureset, X86FSET_VMX)) {
-		*msg = "processor does not support VMX operation";
-		return (ENXIO);
-	}
-
-	/*
-	 * Verify that MSR_IA32_FEATURE_CONTROL lock and VMXON enable bits
-	 * are set (bits 0 and 2 respectively).
-	 */
-	feature_control = rdmsr(MSR_IA32_FEATURE_CONTROL);
-	if ((feature_control & IA32_FEATURE_CONTROL_LOCK) == 1 &&
-	    (feature_control & IA32_FEATURE_CONTROL_VMX_EN) == 0) {
-		*msg = "VMX operation disabled by BIOS";
-		return (ENXIO);
-	}
-
-	/*
-	 * Verify capabilities MSR_VMX_BASIC:
-	 * - bit 54 indicates support for INS/OUTS decoding
-	 */
-	basic = rdmsr(MSR_VMX_BASIC);
-	if ((basic & (1UL << 54)) == 0) {
-		*msg = "processor does not support desired basic capabilities";
-		return (EINVAL);
-	}
+	ASSERT(msg != NULL);
 
 	/* Check support for primary processor-based VM-execution controls */
 	error = vmx_set_ctlreg(MSR_VMX_PROCBASED_CTLS,
