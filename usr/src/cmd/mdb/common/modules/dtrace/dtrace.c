@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -2517,8 +2517,15 @@ static struct dtrace_options {
 	{ "aggsortkey", dtrace_options_numtostr },
 	{ "aggsortrev", dtrace_options_numtostr },
 	{ "aggsortpos", dtrace_options_numtostr },
-	{ "aggsortkeypos", dtrace_options_numtostr }
+	{ "aggsortkeypos", dtrace_options_numtostr },
+	{ "temporal", dtrace_options_numtostr },
+	{ "agghist", dtrace_options_numtostr },
+	{ "aggpack", dtrace_options_numtostr },
+	{ "aggzoom", dtrace_options_numtostr },
+	{ "zone", dtrace_options_numtostr }
 };
+
+CTASSERT(ARRAY_SIZE(_dtrace_options) == DTRACEOPT_MAX);
 
 static void
 dtrace_options_help(void)
