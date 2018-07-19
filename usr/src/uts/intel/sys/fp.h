@@ -227,7 +227,7 @@ struct fxsave_state {
 	upad128_t	fx_xmm[8];	/* 128-bit registers */
 	upad128_t	__fx_ign2[14];
 #endif
-};	/* 512 bytes */
+} __aligned(16);	/* 512 bytes */
 
 /*
  * This structure is written to memory by one of the 'xsave' instruction
@@ -271,7 +271,7 @@ struct xsave_state {
 	uint64_t		xs_xcomp_bv;	/* 520-527 */
 	uint64_t		xs_reserved[6];	/* 528-575 end xsave header */
 	upad128_t		xs_ymm[16];	/* 576 AVX component */
-};
+} __aligned(64);
 
 /*
  * Kernel's FPU save area
