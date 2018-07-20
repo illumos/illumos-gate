@@ -555,6 +555,9 @@ typedef struct smb_powersup {
 #define	SMB_PSU_CHARS_STATUS(x)		(((x) >> 7) & 0x7)
 #define	SMB_PSU_CHARS_TYPE(x)		(((x) >> 10) & 0xf)
 
+/*
+ * SMBIOS implementation structure for SMB_TYPE_OBDEVEXT.
+ */
 typedef struct smb_obdev_ext {
 	smb_header_t smbobe_hdr;	/* structure header */
 	uint8_t smbobe_name;		/* reference designation */

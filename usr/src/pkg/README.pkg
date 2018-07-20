@@ -218,7 +218,7 @@ These are the PKGMOG_DEFINES in usr/src/pkg/Makefile.
 	$(ARCH32)
 	$(ARCH64)
 	$(PKGVERS), which is set to
-	   $(PKGVERS_COMPONENT),$(PKGVERS_BUILTON)-0.$(PKGVERS_BRANCH)
+	   $(PKGVERS_COMPONENT),$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 
 pkgmogrify(1) also allows us to include a set of default transformations.
 The definitions for these transforms are in usr/src/pkg/transforms/.  An

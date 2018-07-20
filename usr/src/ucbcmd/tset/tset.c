@@ -268,6 +268,7 @@
 #define	oldintr oldmodes.c_cc[VINTR]
 
 #include	<stdio.h>
+#include	<stdlib.h>
 #include	<termio.h>
 #include	<signal.h>
 
@@ -321,8 +322,6 @@
 #define	OLDPLUGBOARD	"sp"
 
 #define	DEFTYPE		"unknown"
-
-#define	NOTTY		'x'
 
 /*
  * Baud Rate Conditionals
@@ -390,7 +389,6 @@ char	Kill_char;		/* new kill character */
 char	Intr_char;		/* new interrupt character */
 char	Specialerase;	/* set => Erase_char only on terminals with backspace */
 
-char	Ttyid = NOTTY;		/* terminal identifier */
 char	*TtyType;		/* type of terminal */
 char	*DefType;		/* default type if none other computed */
 char	*NewType;		/* mapping identifier based on old flags */
@@ -559,6 +557,7 @@ main(int argc, char *argv[])
 				/* special erase: operate on all but TTY33 */
 				Specialerase = YES;
 				/* explicit fall-through to -e case */
+				/* FALLTHROUGH */
 
 			case 'e':	/* erase character */
 				if (*p == NULL)
@@ -775,14 +774,11 @@ mapold:				Map->Ident = NewType;
 	if (bufp && *bufp != '/')
 		(void) strcpy(bufp-8, "NOTHING"); /* overwrite only "TERMCAP" */
 	/* get current idea of terminal type from environment */
-	if (!Dash_h && TtyType == 0)
+	if (!Dash_h && TtyType == NULL)
 		TtyType = getenv("TERM");
 
-	if (!RepOnly && Ttyid == NOTTY && (TtyType == 0 || !Dash_h))
-		Ttyid = ttyname(FILEDES);
-
 	/* If still undefined, use DEFTYPE */
-	if (TtyType == 0) {
+	if (TtyType == NULL) {
 		TtyType = DEFTYPE;
 	}
 

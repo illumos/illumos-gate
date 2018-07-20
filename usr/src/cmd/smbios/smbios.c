@@ -1019,21 +1019,21 @@ print_vprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 	desc_printf(smbios_vprobe_status_desc(vp.smbvp_status),
 	    fp, "  Status: %u", vp.smbvp_status);
 
-	if (vp.smbvp_maxval != 0x8000) {
+	if (vp.smbvp_maxval != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Maximum Possible Voltage: %u mV\n",
 		    vp.smbvp_maxval);
 	} else {
 		oprintf(fp, "  Maximum Possible Voltage: unknown\n");
 	}
 
-	if (vp.smbvp_minval != 0x8000) {
+	if (vp.smbvp_minval != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Minimum Possible Voltage: %u mV\n",
 		    vp.smbvp_minval);
 	} else {
 		oprintf(fp, "  Minimum Possible Voltage: unknown\n");
 	}
 
-	if (vp.smbvp_resolution != 0x8000) {
+	if (vp.smbvp_resolution != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Resolution: %u.%u mV\n",
 		    vp.smbvp_resolution / 10,
 		    vp.smbvp_resolution % 10);
@@ -1041,14 +1041,14 @@ print_vprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 		oprintf(fp, "  Probe Resolution: unknown\n");
 	}
 
-	if (vp.smbvp_tolerance != 0x8000) {
+	if (vp.smbvp_tolerance != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Tolerance: +/-%u mV\n",
 		    vp.smbvp_tolerance);
 	} else {
 		oprintf(fp, "  Probe Tolerance: unknown\n");
 	}
 
-	if (vp.smbvp_accuracy != 0x8000) {
+	if (vp.smbvp_accuracy != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Accuracy: +/-%u.%02u%%\n",
 		    vp.smbvp_accuracy / 100,
 		    vp.smbvp_accuracy % 100);
@@ -1058,7 +1058,7 @@ print_vprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "  OEM- or BIOS- defined value: 0x%x\n", vp.smbvp_oem);
 
-	if (vp.smbvp_nominal != 0x8000) {
+	if (vp.smbvp_nominal != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Nominal Value: %u mV\n", vp.smbvp_nominal);
 	} else {
 		oprintf(fp, "  Probe Nominal Value: unknown\n");
@@ -1076,14 +1076,14 @@ print_cooldev(smbios_hdl_t *shp, id_t id, FILE *fp)
 		return;
 	}
 
-	oprintf(fp, "  Temperature Probe Handle: %u\n", cd.smbcd_tprobe);
+	id_printf(fp, "  Temperature Probe Handle: ", cd.smbcd_tprobe);
 	desc_printf(smbios_cooldev_type_desc(cd.smbcd_type),
 	    fp, "  Device Type: %u", cd.smbcd_type);
 	desc_printf(smbios_cooldev_status_desc(cd.smbcd_status),
 	    fp, "  Status: %u", cd.smbcd_status);
 	oprintf(fp, "  Cooling Unit Group: %u\n", cd.smbcd_group);
 	oprintf(fp, "  OEM- or BIOS- defined data: 0x%x\n", cd.smbcd_oem);
-	if (cd.smbcd_nominal != 0x8000) {
+	if (cd.smbcd_nominal != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Nominal Speed: %u RPM\n", cd.smbcd_nominal);
 	} else {
 		oprintf(fp, "  Nominal Speed: unknown\n");
@@ -1112,21 +1112,21 @@ print_tprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 	desc_printf(smbios_tprobe_status_desc(tp.smbtp_status),
 	    fp, "  Status: %u", tp.smbtp_status);
 
-	if (tp.smbtp_maxval != 0x8000) {
+	if (tp.smbtp_maxval != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Maximum Possible Temperature: %u.%u C\n",
 		    tp.smbtp_maxval / 10, tp.smbtp_maxval % 10);
 	} else {
 		oprintf(fp, "  Maximum Possible Temperature: unknown\n");
 	}
 
-	if (tp.smbtp_minval != 0x8000) {
+	if (tp.smbtp_minval != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Minimum Possible Temperature: %u.%u C\n",
 		    tp.smbtp_minval / 10, tp.smbtp_minval % 10);
 	} else {
 		oprintf(fp, "  Minimum Possible Temperature: unknown\n");
 	}
 
-	if (tp.smbtp_resolution != 0x8000) {
+	if (tp.smbtp_resolution != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Resolution: %u.%03u C\n",
 		    tp.smbtp_resolution / 1000,
 		    tp.smbtp_resolution % 1000);
@@ -1134,14 +1134,14 @@ print_tprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 		oprintf(fp, "  Probe Resolution: unknown\n");
 	}
 
-	if (tp.smbtp_tolerance != 0x8000) {
+	if (tp.smbtp_tolerance != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Tolerance: +/-%u.%u C\n",
 		    tp.smbtp_tolerance / 10, tp.smbtp_tolerance % 10);
 	} else {
 		oprintf(fp, "  Probe Tolerance: unknown\n");
 	}
 
-	if (tp.smbtp_accuracy != 0x8000) {
+	if (tp.smbtp_accuracy != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Accuracy: +/-%u.%02u%%\n",
 		    tp.smbtp_accuracy / 100,
 		    tp.smbtp_accuracy % 100);
@@ -1151,8 +1151,8 @@ print_tprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "  OEM- or BIOS- defined value: 0x%x\n", tp.smbtp_oem);
 
-	if (tp.smbtp_nominal != 0x8000) {
-		oprintf(fp, "  Probe Nominal Value: %u C\n",
+	if (tp.smbtp_nominal != SMB_PROBE_UNKNOWN_VALUE) {
+		oprintf(fp, "  Probe Nominal Value: %u.%u C\n",
 		    tp.smbtp_nominal / 10, tp.smbtp_nominal % 10);
 	} else {
 		oprintf(fp, "  Probe Nominal Value: unknown\n");
@@ -1176,21 +1176,21 @@ print_iprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 	desc_printf(smbios_iprobe_status_desc(ip.smbip_status),
 	    fp, "  Status: %u", ip.smbip_status);
 
-	if (ip.smbip_maxval != 0x8000) {
+	if (ip.smbip_maxval != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Maximum Possible Current: %u mA\n",
 		    ip.smbip_maxval);
 	} else {
 		oprintf(fp, "  Maximum Possible Current: unknown\n");
 	}
 
-	if (ip.smbip_minval != 0x8000) {
+	if (ip.smbip_minval != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Minimum Possible Current: %u mA\n",
 		    ip.smbip_minval);
 	} else {
 		oprintf(fp, "  Minimum Possible Current: unknown\n");
 	}
 
-	if (ip.smbip_resolution != 0x8000) {
+	if (ip.smbip_resolution != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Resolution: %u.%u mA\n",
 		    ip.smbip_resolution / 10,
 		    ip.smbip_resolution % 10);
@@ -1198,14 +1198,14 @@ print_iprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 		oprintf(fp, "  Probe Resolution: unknown\n");
 	}
 
-	if (ip.smbip_tolerance != 0x8000) {
+	if (ip.smbip_tolerance != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Tolerance: +/-%u mA\n",
 		    ip.smbip_tolerance);
 	} else {
 		oprintf(fp, "  Probe Tolerance: unknown\n");
 	}
 
-	if (ip.smbip_accuracy != 0x8000) {
+	if (ip.smbip_accuracy != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Accuracy: +/-%u.%02u%%\n",
 		    ip.smbip_accuracy / 100,
 		    ip.smbip_accuracy % 100);
@@ -1215,7 +1215,7 @@ print_iprobe(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "  OEM- or BIOS- defined value: 0x%x\n", ip.smbip_oem);
 
-	if (ip.smbip_nominal != 0x8000) {
+	if (ip.smbip_nominal != SMB_PROBE_UNKNOWN_VALUE) {
 		oprintf(fp, "  Probe Nominal Value: %u mA\n", ip.smbip_nominal);
 	} else {
 		oprintf(fp, "  Probe Nominal Value: unknown\n");

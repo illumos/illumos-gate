@@ -1298,6 +1298,11 @@ typedef struct smbios_hwsec {
 #define	SMB_HWSEC_PS_UNKNOWN	0x03	/* password status unknown */
 
 /*
+ * This value is used to represent a probe that has an unknown value.
+ */
+#define	SMB_PROBE_UNKNOWN_VALUE	0x8000
+
+/*
  * SMBIOS Voltage Probe.  See DSP0134 Section 7.27 for more information.
  * Please see the specification for the units of each value.
  */

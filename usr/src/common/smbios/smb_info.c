@@ -1348,7 +1348,7 @@ smbios_info_vprobe(smbios_hdl_t *shp, id_t id, smbios_vprobe_t *vprobe)
 	if (stp->smbst_hdr->smbh_len >= SMB_VPROBE_NOMINAL_MINLEN) {
 		vprobe->smbvp_nominal = vp.smbvpr_nominal;
 	} else {
-		vprobe->smbvp_nominal = 0x8000;
+		vprobe->smbvp_nominal = SMB_PROBE_UNKNOWN_VALUE;
 	}
 
 	return (0);
@@ -1380,7 +1380,7 @@ smbios_info_cooldev(smbios_hdl_t *shp, id_t id, smbios_cooldev_t *cooldev)
 	if (stp->smbst_hdr->smbh_len >= SMB_COOLDEV_NOMINAL_MINLEN) {
 		cooldev->smbcd_nominal = cd.smbcdev_nominal;
 	} else {
-		cooldev->smbcd_nominal = 0x8000;
+		cooldev->smbcd_nominal = SMB_PROBE_UNKNOWN_VALUE;
 	}
 
 	/*
@@ -1430,7 +1430,7 @@ smbios_info_tprobe(smbios_hdl_t *shp, id_t id, smbios_tprobe_t *tprobe)
 	if (stp->smbst_hdr->smbh_len >= SMB_TPROBE_NOMINAL_MINLEN) {
 		tprobe->smbtp_nominal = tp.smbtpr_nominal;
 	} else {
-		tprobe->smbtp_nominal = 0x8000;
+		tprobe->smbtp_nominal = SMB_PROBE_UNKNOWN_VALUE;
 	}
 
 	return (0);
@@ -1465,7 +1465,7 @@ smbios_info_iprobe(smbios_hdl_t *shp, id_t id, smbios_iprobe_t *iprobe)
 	if (sip->smbst_hdr->smbh_len >= SMB_IPROBE_NOMINAL_MINLEN) {
 		iprobe->smbip_nominal = ip.smbipr_nominal;
 	} else {
-		iprobe->smbip_nominal = 0x8000;
+		iprobe->smbip_nominal = SMB_PROBE_UNKNOWN_VALUE;
 	}
 
 	return (0);

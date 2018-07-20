@@ -58,7 +58,7 @@ if [[ -n $PERF_REGRESSION_WEEKLY ]]; then
 	export PERF_NTHREADS=${PERF_NTHREADS:-'8 16 32 64'}
 	export PERF_NTHREADS_PER_FS=${PERF_NTHREADS_PER_FS:-'0'}
 	export PERF_SYNC_TYPES=${PERF_SYNC_TYPES:-'1'}
-	export PERF_IOSIZES=${PERF_IOSIZES:-'64k 128k 1m'}
+	export PERF_IOSIZES=${PERF_IOSIZES:-'8k 64k 128k'}
 elif [[ -n $PERF_REGRESSION_NIGHTLY ]]; then
 	export PERF_RUNTIME=${PERF_RUNTIME:-$PERF_RUNTIME_NIGHTLY}
 	export PERF_RUNTYPE=${PERF_RUNTYPE:-'nightly'}
@@ -81,9 +81,9 @@ lun_list=$(pool_to_lun_list $PERFPOOL)
 log_note "Collecting backend IO stats with lun list $lun_list"
 export collect_scripts=(
     "kstat zfs:0 1"  "kstat"
-    "vmstat 1"       "vmstat"
-    "mpstat 1"       "mpstat"
-    "iostat -xcnz 1" "iostat"
+    "vmstat -T d 1"       "vmstat"
+    "mpstat -T d 1"       "mpstat"
+    "iostat -T d -xcnz 1" "iostat"
     "dtrace -Cs $PERF_SCRIPTS/io.d $PERFPOOL $lun_list 1" "io"
     "dtrace -Cs $PERF_SCRIPTS/prefetch_io.d $PERFPOOL 1"  "prefetch"
     "dtrace  -s $PERF_SCRIPTS/profile.d"                  "profile"
