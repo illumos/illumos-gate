@@ -22,9 +22,6 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/nsswitch/nis/Makefile.com
 
 LIBRARY =	libnss_nis.a
 VERS =		.1
@@ -60,5 +57,5 @@ include ../../../Makefile.rootfs
 LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 LINTFLAGS64 +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 
-LDLIBS +=	-lnsl -lsocket
+LDLIBS +=	-lnsl
 DYNLIB1 =	nss_nis.so$(VERS)

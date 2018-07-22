@@ -293,7 +293,6 @@ COMMON_SUBDIRS = \
 	cmd/tabs \
 	cmd/tail \
 	cmd/th_tools \
-	cmd/tip \
 	cmd/touch \
 	cmd/tr \
 	cmd/truss \

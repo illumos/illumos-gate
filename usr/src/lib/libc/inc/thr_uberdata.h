@@ -22,8 +22,10 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+
 /*
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 #ifndef _THR_UBERDATA_H
@@ -681,6 +683,7 @@ typedef struct ulwp {
 #endif
 	tumem_t		ul_tmem;	/* used only by umem */
 	uint_t		ul_ptinherit;	/* pthreads sched inherit value */
+	char		ul_ntoabuf[18];	/* thread-specific inet_ntoa buffer */
 } ulwp_t;
 
 #define	ul_cursig	ul_cp.s.cursig		/* deferred signal number */
@@ -863,7 +866,7 @@ typedef struct {
 typedef void (*_exithdlr_func_t) (void*);
 
 typedef struct _exthdlr {
-	struct _exthdlr 	*next;	/* next in handler list */
+	struct _exthdlr		*next;	/* next in handler list */
 	_exithdlr_func_t	hdlr;	/* handler itself */
 	void			*arg;	/* argument to handler */
 	void			*dso;	/* DSO associated with handler */
@@ -901,7 +904,7 @@ typedef struct {
 typedef void (*_quick_exithdlr_func_t)(void);
 
 typedef struct _qexthdlr {
-	struct _qexthdlr 	*next;	/* next in handler list */
+	struct _qexthdlr	*next;	/* next in handler list */
 	_quick_exithdlr_func_t	hdlr;	/* handler itself */
 } _qexthdlr_t;
 

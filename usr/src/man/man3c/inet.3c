@@ -1,0 +1,440 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2018 Nexenta Systems, Inc.
+.\"
+.Dd July 22, 2018
+.Dt INET 3C
+.Os
+.Sh NAME
+.Nm inet ,
+.Nm inet6 ,
+.Nm inet_ntop ,
+.Nm inet_pton ,
+.Nm inet_aton ,
+.Nm inet_addr ,
+.Nm inet_network ,
+.Nm inet_makeaddr ,
+.Nm inet_lnaof ,
+.Nm inet_netof ,
+.Nm inet_ntoa
+.Nd Internet address manipulation
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In sys/types.h
+.In sys/socket.h
+.In netinet/in.h
+.In arpa/inet.h
+.Ft const char *
+.Fo inet_ntop
+.Fa "int af"
+.Fa "const void *addr"
+.Fa "char *cp"
+.Fa "size_t size"
+.Fc
+.Ft int
+.Fo inet_pton
+.Fa "int af"
+.Fa "const char *cp"
+.Fa "void *addr"
+.Fc
+.Ft int
+.Fo inet_aton
+.Fa "const char *cp"
+.Fa "struct in_addr *addr"
+.Fc
+.Ft in_addr_t
+.Fo inet_addr
+.Fa "const char *cp"
+.Fc
+.Ft in_addr_t
+.Fo inet_network
+.Fa "const char *cp"
+.Fc
+.Ft struct in_addr
+.Fo inet_makeaddr
+.Fa "const int net"
+.Fa "const int lna"
+.Fc
+.Ft in_addr_t
+.Fo inet_lnaof
+.Fa "const struct in_addr in"
+.Fc
+.Ft in_addr_t
+.Fo inet_netof
+.Fa "const struct in_addr in"
+.Fc
+.Ft char *
+.Fo inet_ntoa
+.Fa "const struct in_addr in"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn inet_ntop
+and
+.Fn inet_pton
+functions can manipulate both IPv4 and IPv6 addresses.
+The
+.Fn inet_aton ,
+.Fn inet_addr ,
+.Fn inet_network ,
+.Fn inet_makeaddr ,
+.Fn inet_lnaof ,
+.Fn inet_netof ,
+and
+.Fn inet_ntoa
+functions can only manipulate IPv4 addresses.
+.Pp
+The
+.Fn inet_ntop
+function converts a numeric address into a string suitable for presentation.
+The
+.Fa af
+argument specifies the family of the address which can be
+.Dv AF_INET
+or
+.Dv AF_INET6 .
+The
+.Fa addr
+argument points to a buffer that holds an IPv4 address if the
+.Fa af
+argument is
+.Dv AF_INET .
+The
+.Fa addr
+argument points to a buffer that holds an IPv6 address if the
+.Fa af
+argument is
+.Dv AF_INET6 .
+The address must be in network byte order.
+The
+.Fa cp
+argument points to a buffer where the function stores the resulting string.
+The application must specify a non-NULL
+.Fa cp
+argument.
+The
+.Fa size
+argument specifies the size of this buffer.
+For IPv6 addresses, the buffer must be at least 46-octets.
+For IPv4 addresses, the buffer must be at least 16-octets.
+To allow applications to easily declare buffers of the proper size to store IPv4
+and IPv6 addresses in string form, the following two constants are defined in
+.In netinet/in.h :
+.Bd -literal
+#define INET_ADDRSTRLEN    16
+#define INET6_ADDRSTRLEN   46
+.Ed
+.Pp
+The
+.Fn inet_pton
+function converts the standard text presentation form of a function to the
+numeric binary form.
+The
+.Fa af
+argument specifies the family of the address.
+Currently, the
+.Dv AF_INET
+and
+.Dv AF_INET6
+address families are supported.
+The
+.Fa cp
+argument points to the string being passed in.
+The
+.Fa addr
+argument points to a buffer where the function stores the numeric address.
+The calling application must ensure that the buffer referred to by
+.Fa addr
+is large enough to hold the numeric address, at least 4 bytes for
+.Dv AF_INET
+or 16 bytes for
+.Dv AF_INET6 .
+.Pp
+The
+.Fn inet_aton ,
+.Fn inet_addr ,
+and
+.Fn inet_network
+functions interpret character strings that represent numbers expressed in the
+IPv4 standard
+.Ql \&.
+notation, returning numbers suitable for use as IPv4 addresses and IPv4 network
+numbers, respectively.
+The
+.Fn inet_makeaddr
+function uses an IPv4 network number and a local network address to construct
+an IPv4 address.
+The
+.Fn inet_netof
+and
+.Fn inet_lnaof
+functions break apart IPv4 host addresses, then return the network number and
+local network address, respectively.
+.Pp
+The
+.Fn inet_ntoa
+function returns a pointer to a string in the base 256 notation
+.Ql d.d.d.d .
+See the following section on IPv4 addresses.
+.Pp
+Internet addresses are returned in network order, bytes ordered from left to
+right.
+Network numbers and local address parts are returned as machine format integer
+values.
+.Ss IPv6 Addresses
+There are three conventional forms for representing IPv6 addresses as strings:
+.Bl -enum
+.It
+The preferred form is
+.Ql x:x:x:x:x:x:x:x ,
+where the
+.Li x No 's
+are the
+hexadecimal values of the eight 16-bit pieces of the address.
+For example,
+.Ql 1080:0:0:0:8:800:200C:417A .
+.Pp
+It is not necessary to write the leading zeros in an individual field.
+There must be at least one numeral in every field, except when the special
+syntax described in the following is used.
+.It
+It is common for addresses to contain long strings of zero bits in some
+methods used to allocate certain IPv6 address styles.
+A special syntax is available to compress the zeros.
+The use of
+.Ql ::
+indicates multiple groups of 16 bits of zeros.
+The
+.Ql ::
+may only appear once in an address.
+The
+.Ql ::
+can also be used to compress the leading and trailing zeros in an address.
+For example,
+.Ql 1080::8:800:200C:417A .
+.It
+The alternative form
+.Ql x:x:x:x:x:x:d.d.d.d
+is sometimes more convenient when dealing with a mixed environment of IPv4 and
+IPv6 nodes.
+The
+.Li x No 's
+in this form represent the hexadecimal values of the six high-order 16-bit
+pieces of the address.
+The
+.Li d No 's
+represent the decimal values of the four low-order 8-bit pieces of the standard
+IPv4 address.
+For example:
+.Bd -literal
+::FFFF:129.144.52.38 .
+::129.144.52.38
+.Ed
+.Pp
+The
+.Ql ::FFFF:d.d.d.d
+and
+.Ql ::d.d.d.d
+pieces are the general forms of an IPv4-mapped IPv6 address and an
+IPv4-compatible IPv6 address.
+.Pp
+The IPv4 portion must be in the
+.Ql d.d.d.d
+form.
+The following forms are invalid:
+.Bd -literal
+::FFFF:d.d.d
+::FFFF:d.d
+::d.d.d
+::d.d
+.Ed
+.Pp
+The
+.Ql ::FFFF:d
+form is a valid but unconventional representation of the IPv4-compatible IPv6
+address
+.Ql ::255.255.0.d .
+.Pp
+The
+.Ql ::d
+form corresponds to the general IPv6 address
+.Ql 0:0:0:0:0:0:0:d .
+.El
+.Ss IPv4 Addresses
+Values specified using
+.Ql \&.
+notation take one of the following forms:
+.Bd -literal
+d.d.d.d
+d.d.d
+d.d
+d
+.Ed
+.Pp
+When four parts are specified, each part is interpreted as a byte of data and
+assigned from left to right to the four bytes of an IPv4 address.
+.Pp
+When a three-part address is specified, the last part is interpreted as a
+16-bit quantity and placed in the right most two bytes of the network address.
+The three part address format is convenient for specifying Class B network
+addresses such as
+.Ql 128.net.host .
+.Pp
+When a two-part address is supplied, the last part is interpreted as a 24-bit
+quantity and placed in the right most three bytes of the network address.
+The two part address format is convenient for specifying Class A network
+addresses such as
+.Ql net.host .
+.Pp
+When only one part is given, the value is stored directly in the network
+address without any byte rearrangement.
+.Pp
+With the exception of
+.Fn inet_pton ,
+numbers supplied as parts in
+.Ql \&.
+notation may be decimal, octal, or hexadecimal, as specified in C language.
+For example, a leading
+.Ql 0x
+or
+.Ql 0X
+implies hexadecimal.
+A leading
+.Ql 0
+implies octal.
+Otherwise, the number is interpreted as decimal.
+.Pp
+For IPv4 addresses,
+.Fn inet_pton
+accepts only a string in standard IPv4 dot notation
+.Ql d.d.d.d .
+.Pp
+Each number has one to three digits with a decimal value between 0 and 255.
+.Pp
+The
+.Fn inet_addr
+function has been obsoleted by
+.Fn inet_aton .
+.Sh RETURN VALUES
+The
+.Fn inet_aton
+function returns nonzero if the address is valid,
+.Li 0
+if the address is invalid.
+.Pp
+The
+.Fn inet_ntop
+function returns a pointer to the buffer that contains a string if the
+conversion succeeds.
+Otherwise,
+.Dv NULL
+is returned.
+Upon failure,
+.Va errno
+is set to
+.Er EAFNOSUPPORT
+if the
+.Fa af
+argument is invalid or
+.Er ENOSPC
+if the size of the result buffer is inadequate.
+.Pp
+The
+.Fn inet_pton
+function returns
+.Li 1
+if the conversion succeeds,
+.Li 0
+if the input is not a valid IPv4 dotted-decimal string or a valid IPv6
+address string.
+The function returns
+.Li -1
+with
+.Va errno
+set to
+.Er EAFNOSUPPORT
+if the
+.Fa af
+argument is unknown.
+.Pp
+The value
+.Dv INADDR_NONE ,
+which is equivalent to
+.Li (in_addr_t)(-1) ,
+is returned by
+.Fn inet_addr
+and
+.Fn inet_network
+for malformed requests.
+.Pp
+The functions
+.Fn inet_netof
+and
+.Fn inet_lnaof
+break apart IPv4 host addresses, returning the network number and local network
+address part, respectively.
+.Pp
+The function
+.Fn inet_ntoa
+returns a pointer to a string in the base 256 notation
+.Ql d.d.d.d ,
+described in the section on IPv4 addresses.
+.Sh MT-LEVEL
+.Sy Safe
+.Sh INTERFACE STABILITY
+The
+.Fn inet_ntop ,
+.Fn inet_pton ,
+.Fn inet_aton ,
+.Fn inet_addr ,
+and
+.Fn inet_network
+functions are
+.Sy Committed .
+The
+.Fn inet_lnaof ,
+.Fn inet_makeaddr ,
+.Fn inet_netof ,
+and
+.Fn inet_network
+functions are
+.Sy Obsolete Committed .
+.Sh SEE ALSO
+.Xr inet.h 3HEAD ,
+.Xr gethostbyname 3NSL ,
+.Xr getipnodebyname 3SOCKET ,
+.Xr getnetbyname 3SOCKET ,
+.Xr hosts 4 ,
+.Xr networks 4 ,
+.Xr attributes 5
+.Sh NOTES
+The return value from
+.Fn inet_ntoa
+points to a buffer which is overwritten on each call.
+This buffer is implemented as thread-specific data in multithreaded
+applications.
+.Pp
+IPv4-mapped addresses are not recommended.
+.Sh BUGS
+The problem of host byte ordering versus network byte ordering is confusing.
+.Pp
+A simple way to specify Class C network addresses in a manner similar to that
+for Class B and Class A is needed.

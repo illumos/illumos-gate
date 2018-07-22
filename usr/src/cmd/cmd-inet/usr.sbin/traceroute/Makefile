@@ -4,7 +4,7 @@
 #
 
 #  Copyright (c) 1988, 1989, 1990, 1991, 1992, 1995, 1996, 1997
-# 	The Regents of the University of California.  All rights reserved.
+#	The Regents of the University of California.  All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that: (1) source code distributions
@@ -22,7 +22,6 @@
 #  WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 #  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 #
-# @(#) $Header: Makefile.in,v 1.24 97/04/22 13:31:20 leres Exp $ (LBL)
 
 PROG=		traceroute
 OBJS=		traceroute.o traceroute_aux.o traceroute_aux6.o
@@ -34,10 +33,10 @@ $(ROOTUSRSBIN)/traceroute	:=	FILEMODE= 04555
 
 # Traceroute uses the ancillary data feature which is available only through
 # UNIX 98 standards version of Socket interface. This interface is supposed to
-# be accessed by -lxnet. In addition -lsocket and -lnsl are used to
+# be accessed by -lxnet. In addition -lsocket is used to
 # capture new not-yet-standard interfaces. Someday -lxnet alone should be enough
 # when IPv6 inspired new interfaces are part of standards.
-LDLIBS +=	-lxnet -lsocket -lnsl -linetutil
+LDLIBS +=	-lxnet -lsocket -linetutil
 
 # These #defines are required to use UNIX 98 interfaces
 CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
@@ -65,7 +64,7 @@ $(PROG): $(OBJS)
 
 install: all $(ROOTUSRSBINPROG)
 
-clean:	
+clean:
 	$(RM) $(OBJS)
 
 lint:	lint_SRCS

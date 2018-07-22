@@ -206,7 +206,7 @@ The member
 is the four byte IPv4 address.
 It is also stored in network byte order.
 The common way to write out the address is to use the function
-.Xr inet_pton 3SOCKET
+.Xr inet_pton 3C
 which converts between a human readable IP address such as "10.1.2.3"
 and the corresponding representation.
 .Lp
@@ -271,7 +271,7 @@ The member
 .Em sin6_addr
 describes the 16-byte IPv6 address.
 In addition to the function
-.Xr inet_pton 3SOCKET ,
+.Xr inet_pton 3C ,
 the header file
 .In netinet/in.h
 defines many macros for manipulating and testing IPv6 addresses.

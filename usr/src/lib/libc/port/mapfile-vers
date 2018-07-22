@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2016 Joyent, Inc.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
@@ -52,21 +52,6 @@ $mapfile_version 2
 # items and for the members of the malloc() family.
 #
 
-#
-# README README README README README README: how to update this file
-#   1) each version of Solaris/OpenSolaris gets a version number.
-#      (Actually since Solaris is actually a series of OpenSolaris releases
-#	we'll just use OpenSolaris for this exercise.)
-#	OpenSolaris 2008.11 gets 1.23
-#	OpenSolaris 2009.04 gets 1.24
-#	etc.
-#   2) each project integration uses a unique version number.
-#	PSARC/2008/123 gets 1.24.1
-#	PSARC/2008/456 gets 1.24.2
-#	etc.
-#
-
-
 # Mnemonic conditional input identifiers:
 #
 # - amd64, i386, sparc32, sparcv9: Correspond to ISA subdirectories used to
@@ -91,6 +76,20 @@ $endif
 $if _x86 && _ELF64
 $add amd64
 $endif
+
+SYMBOL_VERSION ILLUMOS_0.25 {	# inet_* moved from libnsl/libsocket
+    protected:
+	inet_addr;
+	inet_aton;
+	inet_lnaof;
+	inet_makeaddr;
+	inet_netof;
+	inet_network;
+	inet_ntoa;
+	inet_ntoa_r;
+	inet_ntop;
+	inet_pton;
+} ILLUMOS_0.24;
 
 SYMBOL_VERSION ILLUMOS_0.24 {	# openbsd compat
     protected:
@@ -1021,7 +1020,7 @@ $if i386
 	# Note: atomic_add_64_nv is also defined above. Here, we add the
 	# NODYNSORT attribute to it. On this platform, it is an aliases for
 	# atomic_add_64. If that is changed, this line should be removed.
-	atomic_add_64_nv 	{ FLAGS = NODYNSORT };
+	atomic_add_64_nv	{ FLAGS = NODYNSORT };
 $endif
 
 $if amd64
@@ -2778,7 +2777,7 @@ $endif
 $if amd64
 } SYSVABI_1.3;
 
-SYMBOL_VERSION SYSVABI_1.3 { 
+SYMBOL_VERSION SYSVABI_1.3 {
 $endif
     global:
 $if !_sparc
@@ -2919,7 +2918,7 @@ $endif
 	attr_to_data_type;
 	attr_to_name;
 	attr_to_option;
-	attr_to_xattr_view;	
+	attr_to_xattr_view;
 	_autofssys;
 	_bufsync;
 	_cladm;

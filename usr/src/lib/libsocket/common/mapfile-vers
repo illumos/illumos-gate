@@ -18,10 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-#
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.
+#
 
 #
 # MAPFILE HEADER START
@@ -45,9 +47,9 @@ SYMBOL_VERSION ILLUMOS_0.2 {	# reentrant ethers(3SOCKET)
 	ether_ntoa_r;
 } ILLUMOS_0.1;
 
-SYMBOL_VERSION ILLUMOS_0.1 {    # Illumos additions
+SYMBOL_VERSION ILLUMOS_0.1 {    # illumos additions
     global:
-        accept4;
+	accept4;
 } SUNW_1.7;
 
 SYMBOL_VERSION SUNW_1.7 {
@@ -183,9 +185,9 @@ $endif
 	getservbyport;
 	getsockname;
 	getsockopt;
-	inet_lnaof;
-	inet_makeaddr;
-	inet_network;
+	inet_lnaof		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_makeaddr		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_network		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	listen;
 	recv;
 	recvfrom;
@@ -203,7 +205,7 @@ $endif
 
 SYMBOL_VERSION SUNWprivate_1.3 {
     global:
-        _accept4;
+	_accept4;
 	_link_aton;
 	_link_ntoa;
 	_nss_initf_ethers;

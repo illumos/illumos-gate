@@ -18,13 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/cmd-inet/usr.lib/in.ripngd/Makefile
 #
 
 SVCMETHOD=	svc-ripng
@@ -48,10 +45,10 @@ LINTFLAGS +=	$(_D_UNIX98_EXTN)
 
 # in.ripngd uses the ancillary data feature which is available only through
 # UNIX 98 standards version of Socket interface. This interface is supposed to
-# be accessed by -lxnet. In addition, -lsocket and -lnsl are used to
+# be accessed by -lxnet. In addition, -lsocket is used to
 # capture new not-yet-standard interfaces. Someday -lxnet alone should be enough
 # when IPv6 inspired new interfaces are part of standards.
-LDLIBS +=	-lxnet -lsocket -lnsl
+LDLIBS +=	-lxnet -lsocket
 
 .KEEP_STATE:
 

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2013 Gary Mills
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
@@ -171,6 +171,8 @@
 #include <stack_unwind.h>
 #endif
 #include <xlocale.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 /*
  * This really comes from the crt*.s startup modules.
@@ -1429,7 +1431,6 @@ int pset_assign_forced(psetid_t pset, processorid_t cpu, psetid_t *opset);
 int pset_info(psetid_t pset, int *type, u_int *numcpus, processorid_t *cpulist);
 int pset_bind(psetid_t pset, idtype_t idtype, id_t id, psetid_t *opset);
 int pset_bind_lwp(psetid_t pset, id_t id, pid_t, psetid_t *opset);
-  
 
 /* rctlsys.c */
 int getrctl(const char *name, rctlblk_t *old_rblk, rctlblk_t *new_rblk,
@@ -1440,7 +1441,6 @@ int setrctl(const char *name, rctlblk_t *old_rblk, rctlblk_t *new_rblk,
 int setprojrctl(const char *name, rctlblk_t *new_rblk, size_t size, int flags);
 int rctlctl(const char *, rctlblk_t *, int);
 size_t rctllist(char *, size_t);
-
 
 /* semsys.c */
 int semctl(int semid, int semnum, int cmd, ...);
@@ -1532,7 +1532,7 @@ size_t wcsxfrm(wchar_t *_RESTRICT_KYWD s1, const wchar_t *_RESTRICT_KYWD s2,
 int wcscoll(const wchar_t *s1, const wchar_t *s2);
 
 /* wcsftime.c */
-#if !defined(__amd64) 		/* XX64 - fix me */
+#if !defined(__amd64)		/* XX64 - fix me */
 size_t wcsftime(wchar_t *wcs, size_t maxsize,
 	const char *format, const struct tm *timeptr);
 #endif	/* __amd64 */
@@ -1631,7 +1631,7 @@ long double wcstold(const wchar_t *_RESTRICT_KYWD cp,
 double wstod(const wchar_t *cp, wchar_t **ptr);
 
 /* wstok.c */
-#if !defined(__amd64) 		/* XX64 - fix me */
+#if !defined(__amd64)		/* XX64 - fix me */
 wchar_t *wcstok(wchar_t *string, const wchar_t *sepset);
 wchar_t *wstok(wchar_t *string, const wchar_t *sepset);
 #endif	/* __amd64 */
@@ -1848,3 +1848,15 @@ extern size_t u8_textprep_str(char *, size_t *, char *, size_t *, int, size_t,
 /* private locale interfaces */
 wint_t __nextwctype(wint_t, wctype_t);
 int __iswrune(wint_t);
+
+/* inet_ntop.c */
+const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
+
+/* inet_pton.c */
+int inet_pton(int af, const char *src, void *dst);
+
+/* inet_ntoa.c */
+char *inet_ntoa_r(struct in_addr in, char b[]);
+char *inet_ntoa(struct in_addr in);
+in_addr_t inet_addr(const char *cp);
+in_addr_t inet_netof(struct in_addr in);

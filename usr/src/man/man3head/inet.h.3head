@@ -53,7 +53,6 @@ inet.h, inet \- definitions for internet operations
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The <\fBarpa/inet.h\fR> header defines the type \fBin_port_t\fR, the type
 \fBin_addr_t\fR, and the \fBin_addr\fR structure, as described in
@@ -78,7 +77,6 @@ char            *inet_ntoa(struct in_addr);
 .in -2
 
 .SS "Default"
-.sp
 .LP
 For applications that do not require standard-conforming behavior (those that
 use the socket interfaces described in section 3N of the reference manual; see
@@ -95,7 +93,6 @@ uint16_t    ntohs(uint16_t);
 .in -2
 
 .SS "Standard conforming"
-.sp
 .LP
 For applications that require standard-conforming behavior (those that use the
 socket interfaces described in section 3XN of the reference manual; see
@@ -112,7 +109,6 @@ in_port_t    ntohs(in_port_t);
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -128,8 +124,7 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBIntro\fR(3), \fBhtonl\fR(3SOCKET), \fBhtonl\fR(3XNET),
-\fBinet_addr\fR(3SOCKET), \fBinet_addr\fR(3XNET), \fBin.h\fR(3HEAD),
+\fBIntro\fR(3), \fBhtonl\fR(3C), \fBhtonl\fR(3XNET),
+\fBinet_addr\fR(3C), \fBinet_addr\fR(3XNET), \fBin.h\fR(3HEAD),
 \fBattributes\fR(5), \fBstandards\fR(5)

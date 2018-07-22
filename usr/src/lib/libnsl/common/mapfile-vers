@@ -18,9 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 #
@@ -39,7 +40,7 @@
 
 $mapfile_version 2
 
-SYMBOL_VERSION ILLUMOS_0.1 {    # Illumos additions
+SYMBOL_VERSION ILLUMOS_0.1 {    # illumos additions
     global:
 	svc_tp_create_addr;
 } SUNW_1.10;
@@ -51,7 +52,7 @@ SYMBOL_VERSION SUNW_1.10 {	# SunOS 5.11 (Solaris 11)
 
 SYMBOL_VERSION SUNW_1.9.1 {	# SunOS 5.10 (Solaris 10 update 5)
     global:
-	inet_aton;
+	inet_aton		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 } SUNW_1.9;
 
 SYMBOL_VERSION SUNW_1.9 {	# SunOS 5.10 (Solaris 10)
@@ -77,8 +78,8 @@ SYMBOL_VERSION SUNW_1.7 {	# SunOS 5.8 (Solaris 8)
 	freehostent;
 	getipnodebyaddr;
 	getipnodebyname;
-	inet_ntop;
-	inet_pton;
+	inet_ntop		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_pton		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 } SUNW_1.6;
 
 SYMBOL_VERSION SUNW_1.6 {	# SunOS 5.7 (Solaris 7)
@@ -234,16 +235,16 @@ SYMBOL_VERSION SUNW_0.7 {	# SunOS 5.3 (Solaris 2.3)
 	getrpcent;
 	getrpcent_r;
 	h_errno			{ FLAGS = NODIRECT };
-	inet_ntoa_r;
+	inet_ntoa_r		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	key_secretkey_is_set;
 	maxbno;
 	nc_sperror;
 	netdir_perror;
 	netdir_sperror;
 	nextkey;
-        nis_clone_object;
-        nis_destroy_object;	
-        nis_dir_cmp;
+	nis_clone_object;
+	nis_destroy_object;
+	nis_dir_cmp;
 	nis_domain_of;
 	nis_leaf_of;
 	nis_leaf_of_r;
@@ -317,9 +318,9 @@ SYMBOL_VERSION SISCD_2.3 {
 $endif
 	gethostbyaddr;
 	gethostbyname;
-	inet_addr;
-	inet_netof;
-	inet_ntoa;
+	inet_addr		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_netof		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_ntoa		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	_null_auth;
 	rpc_broadcast_exp;
 	svc_fdset;
@@ -578,8 +579,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__getnetnamebyuid;
 	__getpublickey_cached;
 	__getpublickey_cached_g;
-        __getpublickey_flush;
-        __getpublickey_flush_g;
+	__getpublickey_flush;
+	__getpublickey_flush_g;
 	getpublickey_g;
 	getsecretkey_g;
 	hashinc;
@@ -619,17 +620,17 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	__nis_get_mechanism_library;
 	__nis_get_mechanisms;
 	__nis_get_mechanism_symbol;
-        nis_get_static_storage;
+	nis_get_static_storage;
 	__nis_gssprin2netname;
 	__nis_keyalg2authtype;
 	__nis_keyalg2mechalias;
 	__nis_mechalias2authtype;
 	__nis_mechname2alias;
-        nis_read_obj;
+	nis_read_obj;
 	__nis_release_mechanisms;
 	__nis_rpc_domain;
 	__nis_translate_mechanism;
-        nis_write_obj;
+	nis_write_obj;
 	__nsl_dom;
 	__nss2herrno;
 	nss_ioctl;

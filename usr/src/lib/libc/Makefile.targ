@@ -183,6 +183,11 @@ pics/%.o %.o: $(LIBCBASE)/../port/gen/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
+# inet rules
+pics/%.o %.o: $(LIBCBASE)/../port/inet/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
 # locale rules
 pics/%.o %.o: $(LIBCBASE)/../port/locale/%.c
 	$(COMPILE.c) -o $@ $<

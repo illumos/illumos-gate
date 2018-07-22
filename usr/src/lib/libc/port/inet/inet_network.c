@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -37,11 +37,13 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include "lint.h"
 
 #include <sys/types.h>
-#include <ctype.h>
+
 #include <netinet/in.h>
+
+#include <ctype.h>
 
 /*
  * Internet network address interpretation routine.
@@ -69,7 +71,7 @@ again:
 	while ((c = *cp) != NULL) {
 		if (isdigit(c)) {
 			if ((c - '0') >= base)
-			    break;
+				break;
 			val = (val * base) + (c - '0');
 			cp++;
 			continue;

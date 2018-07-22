@@ -25,7 +25,7 @@
 # Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 LIBCDIR=	$(SRC)/lib/libc
@@ -615,6 +615,14 @@ PORTGEN=			\
 	xpg4.o			\
 	xpg6.o
 
+PORTINET=			\
+	inet_lnaof.o		\
+	inet_makeaddr.o		\
+	inet_network.o		\
+	inet_ntoa.o		\
+	inet_ntop.o		\
+	inet_pton.o
+
 PORTPRINT_W=			\
 	doprnt_w.o
 
@@ -975,6 +983,7 @@ MOSTOBJS=			\
 	$(PORTGEN64)		\
 	$(PORTI18N)		\
 	$(PORTI18N_COND)	\
+	$(PORTINET)		\
 	$(PORTLOCALE)		\
 	$(PORTPRINT)		\
 	$(PORTPRINT_W)		\
@@ -1112,6 +1121,7 @@ SRCS=							\
 	$(PORTFP:%.o=$(LIBCDIR)/port/fp/%.c)		\
 	$(PORTGEN:%.o=$(LIBCDIR)/port/gen/%.c)		\
 	$(PORTI18N:%.o=$(LIBCDIR)/port/i18n/%.c)	\
+	$(PORTINET:%.o=$(LIBCDIR)/port/inet/%.c)	\
 	$(PORTLOCALE:%.o=$(LIBCDIR)/port/locale/%.c)	\
 	$(PORTPRINT:%.o=$(LIBCDIR)/port/print/%.c)	\
 	$(PORTREGEX:%.o=$(LIBCDIR)/port/regex/%.c)	\

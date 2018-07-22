@@ -44,7 +44,7 @@ $(NATIVE_BUILD)VERS =
 $(NATIVE_BUILD)LIBS = $(DYNLIB)
 
 LDLIBS_i386 += -lsmbios
-LDLIBS +=	-luutil -lc -lgen -lnsl -lnvpair
+LDLIBS +=	-luutil -lc -lgen -lnvpair
 LDLIBS +=	$(LDLIBS_$(MACH))
 
 SRCDIR =	../common

@@ -31,7 +31,7 @@ include ../../Makefile.lib
 SRCDIR =	../common
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lc -lnsl
+LDLIBS +=	-lc
 CFLAGS +=	$(CCVERBOSE)
 
 .KEEP_STATE:

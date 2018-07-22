@@ -11,15 +11,15 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2013, OmniTI Computer Consulting, Inc.
 #
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3socket
+MANSECT=	3socket
 
-MANFILES= 	accept.3socket		\
+MANFILES=	accept.3socket		\
 		bind.3socket		\
 		byteorder.3socket	\
 		connect.3socket		\
@@ -36,7 +36,6 @@ MANFILES= 	accept.3socket		\
 		getsourcefilter.3socket \
 		icmp6_filter.3socket	\
 		if_nametoindex.3socket	\
-		inet.3socket		\
 		inet6_opt.3socket	\
 		inet6_rth.3socket	\
 		listen.3socket		\
@@ -97,7 +96,6 @@ MANLINKS=	accept4.3socket			\
 		if_freenameindex.3socket	\
 		if_indextoname.3socket		\
 		if_nameindex.3socket		\
-		inet6.3socket			\
 		inet6_opt_append.3socket	\
 		inet6_opt_find.3socket		\
 		inet6_opt_finish.3socket	\
@@ -111,15 +109,6 @@ MANLINKS=	accept4.3socket			\
 		inet6_rth_reverse.3socket	\
 		inet6_rth_segments.3socket	\
 		inet6_rth_space.3socket		\
-		inet_addr.3socket		\
-		inet_aton.3socket		\
-		inet_lnaof.3socket		\
-		inet_makeaddr.3socket		\
-		inet_netof.3socket		\
-		inet_network.3socket		\
-		inet_ntoa.3socket		\
-		inet_ntop.3socket		\
-		inet_pton.3socket		\
 		ntohl.3socket			\
 		ntohll.3socket			\
 		ntohs.3socket			\
@@ -206,17 +195,6 @@ setsourcefilter.3socket		:= LINKSRC = getsourcefilter.3socket
 if_freenameindex.3socket	:= LINKSRC = if_nametoindex.3socket
 if_indextoname.3socket		:= LINKSRC = if_nametoindex.3socket
 if_nameindex.3socket		:= LINKSRC = if_nametoindex.3socket
-
-inet6.3socket			:= LINKSRC = inet.3socket
-inet_addr.3socket		:= LINKSRC = inet.3socket
-inet_aton.3socket		:= LINKSRC = inet.3socket
-inet_lnaof.3socket		:= LINKSRC = inet.3socket
-inet_makeaddr.3socket		:= LINKSRC = inet.3socket
-inet_netof.3socket		:= LINKSRC = inet.3socket
-inet_network.3socket		:= LINKSRC = inet.3socket
-inet_ntoa.3socket		:= LINKSRC = inet.3socket
-inet_ntop.3socket		:= LINKSRC = inet.3socket
-inet_pton.3socket		:= LINKSRC = inet.3socket
 
 inet6_opt_append.3socket	:= LINKSRC = inet6_opt.3socket
 inet6_opt_find.3socket		:= LINKSRC = inet6_opt.3socket

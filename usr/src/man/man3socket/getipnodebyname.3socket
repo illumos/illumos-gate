@@ -29,7 +29,6 @@ getipnodebyname, getipnodebyaddr, freehostent \- get IP node entry
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIaf\fR\fR
@@ -93,7 +92,6 @@ Pointer to \fBhostent\fR structure
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetipnodebyname()\fR function searches the \fBipnodes\fR database from
 the beginning. The function finds the first \fBh_name\fR member that matches
@@ -254,7 +252,7 @@ The special flags value, \fBAI_DEFAULT\fR, is defined as
 .LP
 The \fBgetipnodebyname()\fR function allows the \fIname\fR argument to be a
 node name or a literal address string: a dotted-decimal IPv4 address or an IPv6
-hex address. Applications do not have to call \fBinet_pton\fR(3SOCKET) to
+hex address. Applications do not have to call \fBinet_pton\fR(3C) to
 handle literal address strings.
 .sp
 .LP
@@ -310,7 +308,6 @@ terminated by a \fINULL\fR pointer.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBgetipnodebyname()\fR and \fBgetipnodebyaddr()\fR
 return a \fBhostent\fR structure. Otherwise they return \fINULL\fR.
@@ -489,7 +486,6 @@ hostname.
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -507,13 +503,11 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetaddrinfo\fR(3SOCKET), \fBgethostbyname\fR(3NSL), \fBhtonl\fR(3SOCKET),
 \fBinet\fR(3SOCKET), \fBnetdb.h\fR(3HEAD), \fBhosts\fR(4),
 \fBnsswitch.conf\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 No enumeration functions are provided for IPv6. Existing enumeration functions
 such as \fBsethostent\fR(3NSL) do not work in combination with the
@@ -544,6 +538,6 @@ addresses.
 The form for an address of type \fBAF_INET\fR is a \fBstruct in_addr\fR defined
 in <\fBnetinet/in.h\fR>. The form for an address of type \fBAF_INET6\fR is a
 \fBstruct in6_addr\fR, also defined in <\fBnetinet/in.h\fR>. The functions
-described in \fBinet_ntop\fR(3SOCKET) and \fBinet_pton\fR(3SOCKET) that are
+described in \fBinet_ntop\fR(3C) and \fBinet_pton\fR(3C) that are
 illustrated in the EXAMPLES section are helpful in constructing and
 manipulating addresses in either of these forms.

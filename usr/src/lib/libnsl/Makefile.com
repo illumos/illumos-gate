@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc. All rights reserved.
 #
 
 LIBRARY= libnsl.a
@@ -43,7 +43,7 @@ NETDIR=		netdir.o
 NSS= \
 gethostbyname_r.o gethostent.o gethostent_r.o gethostent6.o gethostby_door.o \
 getipnodeby_door.o getipnodeby.o getrpcent.o  getrpcent_r.o inet_matchaddr.o \
-inet_pton.o inet_ntop.o netdir_inet.o netdir_inet_sundry.o \
+netdir_inet.o netdir_inet_sundry.o \
 parse.o getauthattr.o getprofattr.o getexecattr.o getuserattr.o getauuser.o
 
 NETSELECT= netselect.o
@@ -55,7 +55,7 @@ t_connect.o     t_error.o	t_free.o        t_getinfo.o     t_getname.o \
 t_getstate.o    t_listen.o	t_look.o        t_open.o        t_optmgmt.o \
 t_rcv.o         t_rcvconnect.o	t_rcvdis.o      t_rcvrel.o      t_rcvudata.o \
 t_rcvuderr.o    t_snd.o		t_snddis.o      t_sndrel.o      t_sndudata.o \
-t_sndv.o	t_sndreldata.o  t_rcvv.o 	t_rcvreldata.o  t_sysconf.o \
+t_sndv.o	t_sndreldata.o	t_rcvv.o	t_rcvreldata.o	t_sysconf.o \
 t_sndvudata.o	t_rcvvudata.o   t_sync.o        t_unbind.o	t_strerror.o \
 xti_wrappers.o
 
@@ -67,7 +67,7 @@ auth_des.o	auth_none.o	auth_sys.o	auth_time.o	authdes_prot.o \
 authsys_prot.o	can_use_af.o \
 clnt_bcast.o	clnt_dg.o	clnt_door.o	clnt_generic.o	clnt_perror.o \
 clnt_raw.o	clnt_simple.o	clnt_vc.o	fdsync.o	getdname.o \
-inet_ntoa.o	key_call.o	key_prot.o	mt_misc.o \
+key_call.o	key_prot.o	mt_misc.o \
 netname.o	netnamer.o	pmap_clnt.o	pmap_prot.o \
 rpc_callmsg.o	rpc_comdata.o	rpc_generic.o	rpc_prot.o rpc_sel2poll.o \
 rpc_soc.o	rpc_td.o	rpcb_clnt.o	rpcb_prot.o \
@@ -83,7 +83,7 @@ SAF= checkver.o  doconfig.o
 YP=  \
 dbm.o           yp_all.o        yp_b_clnt.o     yp_b_xdr.o      yp_bind.o  \
 yp_enum.o       yp_master.o     yp_match.o      yp_order.o      yp_update.o \
-yperr_string.o  yp_xdr.o        ypprot_err.o    ypupd.o 	\
+yperr_string.o	yp_xdr.o	ypprot_err.o	ypupd.o	\
 yp_rsvd.o \
 yppasswd_xdr.o
 

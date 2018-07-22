@@ -1,9 +1,4 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * Copyright (c) 1996 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -20,19 +15,25 @@
  * SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-#include "mt.h"
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
-#include <strings.h>
-#include <netdb.h>
-#include <stdio.h>
+#include "lint.h"
+
+#include <sys/socket.h>
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
+
+#include <ctype.h>
 #include <errno.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 
 static int	inet_pton4(const char *src, uchar_t *dst);
 static int	inet_pton6(const char *src, uchar_t *dst);
@@ -131,13 +132,11 @@ inet_pton4(const char *src, uchar_t *dst)
  *	inspired by Mark Andrews.
  *
  */
-
-
 static int
 inet_pton6(const char *src, uchar_t *dst)
 {
-	static const char xdigits_l[] = "0123456789abcdef",
-			xdigits_u[] = "0123456789ABCDEF";
+	static const char xdigits_l[] = "0123456789abcdef";
+	static const char xdigits_u[] = "0123456789ABCDEF";
 	uchar_t tmp[IN6ADDRSZ], *tp, *endp, *colonp;
 	const char *xdigits, *curtok;
 	int ch, saw_xdigit;

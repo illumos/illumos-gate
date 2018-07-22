@@ -37,7 +37,7 @@ include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-LDLIBS +=	-lc -lnsl -lgen -linetutil -ldlpi
+LDLIBS +=	-lc -lgen -linetutil -ldlpi
 
 SRCDIR =	../common
 SRCS =		$(LOCOBJS:%.o=$(SRCDIR)/%.c) $(COMOBJS:%.o=$(COMDIR)/%.c)

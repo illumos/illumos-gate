@@ -1,9 +1,4 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * Copyright (c) 1996 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -20,19 +15,25 @@
  * SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-#include "mt.h"
-#include <stdlib.h>
-#include <ctype.h>
-#include <string.h>
-#include <strings.h>
-#include <netdb.h>
-#include <stdio.h>
+#include "lint.h"
+
+#include <sys/socket.h>
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include <sys/socket.h>
+
+#include <ctype.h>
 #include <errno.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 
 static const char *inet_ntop4(const uchar_t *, char *, socklen_t);
 static const char *inet_ntop6(const uchar_t *, char *, socklen_t);
@@ -70,20 +71,13 @@ inet_ntop(int af, const void *src, char *dst, socklen_t size)
  *	(2) takes a uchar_t* not an in_addr as input
  */
 
-#ifdef SPRINTF_CHAR
-/* CSTYLED */
-#define	SPRINTF(x) strlen(sprintf/**/x)
-#else
-#define	SPRINTF(x) ((size_t)sprintf x)
-#endif
-
 static const char *
 inet_ntop4(const uchar_t *src, char *dst, socklen_t size)
 {
 	static const char fmt[] = "%u.%u.%u.%u";
 	char tmp[sizeof ("255.255.255.255")];
 
-	if (SPRINTF((tmp, fmt, src[0], src[1], src[2], src[3])) > size) {
+	if (sprintf(tmp, fmt, src[0], src[1], src[2], src[3]) > size) {
 		errno = ENOSPC;
 		return (NULL);
 	}
@@ -168,7 +162,7 @@ inet_ntop6(const uchar_t *src, char *dst, socklen_t size)
 			tp += strlen(tp);
 			break;
 		}
-		tp += SPRINTF((tp, "%x", words[i]));
+		tp += sprintf(tp, "%x", words[i]);
 	}
 	/* Was it a trailing run of 0x00's? */
 	if (best.base != -1 && (best.base + best.len) == (IN6ADDRSZ / INT16SZ))
