@@ -1252,6 +1252,9 @@ i40e_stats_trqpair_init(i40e_trqpair_t *itrq)
 	kstat_named_init(&tsp->itxs_lso_nohck, "tx_lso_nohck",
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_lso_nohck.value.ui64 = 0;
+	kstat_named_init(&tsp->itxs_bind_fails, "tx_bind_fails",
+	    KSTAT_DATA_UINT64);
+	tsp->itxs_bind_fails.value.ui64 = 0;
 	kstat_named_init(&tsp->itxs_err_notcb, "tx_err_notcb",
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_err_notcb.value.ui64 = 0;

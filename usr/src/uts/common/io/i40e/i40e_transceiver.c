@@ -2071,10 +2071,11 @@ i40e_tx_cleanup_ring(i40e_trqpair_t *itrq)
 		i40e_tx_control_block_t *tcb;
 
 		tcb = itrq->itrq_tcb_work_list[index];
-		VERIFY(tcb != NULL);
-		itrq->itrq_tcb_work_list[index] = NULL;
-		i40e_tcb_reset(tcb);
-		i40e_tcb_free(itrq, tcb);
+		if (tcb != NULL) {
+			itrq->itrq_tcb_work_list[index] = NULL;
+			i40e_tcb_reset(tcb);
+			i40e_tcb_free(itrq, tcb);
+		}
 
 		bzero(&itrq->itrq_desc_ring[index], sizeof (i40e_tx_desc_t));
 		index = i40e_next_desc(index, 1, itrq->itrq_tx_ring_size);
@@ -2218,10 +2219,11 @@ i40e_tx_bind_fragment(i40e_trqpair_t *itrq, const mblk_t *mp,
 	else
 		dma_handle = tcb->tcb_dma_handle;
 
-	dmaflags = DDI_DMA_RDWR | DDI_DMA_STREAMING;
+	dmaflags = DDI_DMA_WRITE | DDI_DMA_STREAMING;
 	if (ddi_dma_addr_bind_handle(dma_handle, NULL,
 	    (caddr_t)mp->b_rptr, MBLKL(mp), dmaflags, DDI_DMA_DONTWAIT, NULL,
 	    &dma_cookie, &ncookies) != DDI_DMA_MAPPED) {
+		txs->itxs_bind_fails.value.ui64++;
 		goto bffail;
 	}
 	tcb->tcb_bind_ncookies = ncookies;
