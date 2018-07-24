@@ -10,6 +10,7 @@
  */
 /*
  * Copyright (c) 2014, Joyent, Inc.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <stdio.h>
@@ -461,8 +462,10 @@ nvlist_do_json(nvlist_t *nvl, char **bufp, size_t *blen, off_t *offp)
 		}
 
 		case DATA_TYPE_UNKNOWN:
+		case DATA_TYPE_DONTCARE:
 			return (-1);
 		}
+
 	}
 
 	FPRINTF(bufp, blen, offp, "}");
