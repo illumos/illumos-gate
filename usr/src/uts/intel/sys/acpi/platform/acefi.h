@@ -4,9 +4,117 @@
  *
  *****************************************************************************/
 
-/*
- * Copyright (C) 2000 - 2016, Intel Corp.
+/******************************************************************************
+ *
+ * 1. Copyright Notice
+ *
+ * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
  * All rights reserved.
+ *
+ * 2. License
+ *
+ * 2.1. This is your license from Intel Corp. under its intellectual property
+ * rights. You may have additional license terms from the party that provided
+ * you this software, covering your right to use that party's intellectual
+ * property rights.
+ *
+ * 2.2. Intel grants, free of charge, to any person ("Licensee") obtaining a
+ * copy of the source code appearing in this file ("Covered Code") an
+ * irrevocable, perpetual, worldwide license under Intel's copyrights in the
+ * base code distributed originally by Intel ("Original Intel Code") to copy,
+ * make derivatives, distribute, use and display any portion of the Covered
+ * Code in any form, with the right to sublicense such rights; and
+ *
+ * 2.3. Intel grants Licensee a non-exclusive and non-transferable patent
+ * license (with the right to sublicense), under only those claims of Intel
+ * patents that are infringed by the Original Intel Code, to make, use, sell,
+ * offer to sell, and import the Covered Code and derivative works thereof
+ * solely to the minimum extent necessary to exercise the above copyright
+ * license, and in no event shall the patent license extend to any additions
+ * to or modifications of the Original Intel Code. No other license or right
+ * is granted directly or by implication, estoppel or otherwise;
+ *
+ * The above copyright and patent license is granted only if the following
+ * conditions are met:
+ *
+ * 3. Conditions
+ *
+ * 3.1. Redistribution of Source with Rights to Further Distribute Source.
+ * Redistribution of source code of any substantial portion of the Covered
+ * Code or modification with rights to further distribute source must include
+ * the above Copyright Notice, the above License, this list of Conditions,
+ * and the following Disclaimer and Export Compliance provision. In addition,
+ * Licensee must cause all Covered Code to which Licensee contributes to
+ * contain a file documenting the changes Licensee made to create that Covered
+ * Code and the date of any change. Licensee must include in that file the
+ * documentation of any changes made by any predecessor Licensee. Licensee
+ * must include a prominent statement that the modification is derived,
+ * directly or indirectly, from Original Intel Code.
+ *
+ * 3.2. Redistribution of Source with no Rights to Further Distribute Source.
+ * Redistribution of source code of any substantial portion of the Covered
+ * Code or modification without rights to further distribute source must
+ * include the following Disclaimer and Export Compliance provision in the
+ * documentation and/or other materials provided with distribution. In
+ * addition, Licensee may not authorize further sublicense of source of any
+ * portion of the Covered Code, and must include terms to the effect that the
+ * license from Licensee to its licensee is limited to the intellectual
+ * property embodied in the software Licensee provides to its licensee, and
+ * not to intellectual property embodied in modifications its licensee may
+ * make.
+ *
+ * 3.3. Redistribution of Executable. Redistribution in executable form of any
+ * substantial portion of the Covered Code or modification must reproduce the
+ * above Copyright Notice, and the following Disclaimer and Export Compliance
+ * provision in the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * 3.4. Intel retains all right, title, and interest in and to the Original
+ * Intel Code.
+ *
+ * 3.5. Neither the name Intel nor any other trademark owned or controlled by
+ * Intel shall be used in advertising or otherwise to promote the sale, use or
+ * other dealings in products derived from or relating to the Covered Code
+ * without prior written authorization from Intel.
+ *
+ * 4. Disclaimer and Export Compliance
+ *
+ * 4.1. INTEL MAKES NO WARRANTY OF ANY KIND REGARDING ANY SOFTWARE PROVIDED
+ * HERE. ANY SOFTWARE ORIGINATING FROM INTEL OR DERIVED FROM INTEL SOFTWARE
+ * IS PROVIDED "AS IS," AND INTEL WILL NOT PROVIDE ANY SUPPORT, ASSISTANCE,
+ * INSTALLATION, TRAINING OR OTHER SERVICES. INTEL WILL NOT PROVIDE ANY
+ * UPDATES, ENHANCEMENTS OR EXTENSIONS. INTEL SPECIFICALLY DISCLAIMS ANY
+ * IMPLIED WARRANTIES OF MERCHANTABILITY, NONINFRINGEMENT AND FITNESS FOR A
+ * PARTICULAR PURPOSE.
+ *
+ * 4.2. IN NO EVENT SHALL INTEL HAVE ANY LIABILITY TO LICENSEE, ITS LICENSEES
+ * OR ANY OTHER THIRD PARTY, FOR ANY LOST PROFITS, LOST DATA, LOSS OF USE OR
+ * COSTS OF PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, OR FOR ANY INDIRECT,
+ * SPECIAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THIS AGREEMENT, UNDER ANY
+ * CAUSE OF ACTION OR THEORY OF LIABILITY, AND IRRESPECTIVE OF WHETHER INTEL
+ * HAS ADVANCE NOTICE OF THE POSSIBILITY OF SUCH DAMAGES. THESE LIMITATIONS
+ * SHALL APPLY NOTWITHSTANDING THE FAILURE OF THE ESSENTIAL PURPOSE OF ANY
+ * LIMITED REMEDY.
+ *
+ * 4.3. Licensee shall not export, either directly or indirectly, any of this
+ * software or system incorporating such software without first obtaining any
+ * required license or other approval from the U. S. Department of Commerce or
+ * any other agency or department of the United States Government. In the
+ * event Licensee exports any such software from the United States or
+ * re-exports any such software from a foreign destination, Licensee shall
+ * ensure that the distribution and export/re-export of the software is in
+ * compliance with all laws, regulations, orders, or other restrictions of the
+ * U.S. Export Administration Regulations. Licensee agrees that neither it nor
+ * any of its subsidiaries will export/re-export any technical data, process,
+ * software, or service, directly or indirectly, to any country for which the
+ * United States government or any agency thereof requires an export license,
+ * other governmental approval, or letter of assurance, without first obtaining
+ * such license, approval or letter.
+ *
+ *****************************************************************************
+ *
+ * Alternatively, you may choose to be licensed under the terms of the
+ * following license:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,31 +131,46 @@
  *    of any contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
  *
- * Alternatively, this software may be distributed under the terms of the
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Alternatively, you may choose to be licensed under the terms of the
  * GNU General Public License ("GPL") version 2 as published by the Free
  * Software Foundation.
  *
- * NO WARRANTY
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
- * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGES.
- */
+ *****************************************************************************/
 
 #ifndef __ACEFI_H__
 #define __ACEFI_H__
 
-#include <stdarg.h>
-#if defined(_GNU_EFI)
-#include <stdint.h>
-#include <unistd.h>
+/*
+ * Single threaded environment where Mutex/Event/Sleep are fake. This model is
+ * sufficient for pre-boot AcpiExec.
+ */
+#ifndef DEBUGGER_THREADING
+#define DEBUGGER_THREADING          DEBUGGER_SINGLE_THREADED
+#endif /* !DEBUGGER_THREADING */
+
+/* EDK2 EFI environemnt */
+
+#if defined(_EDK2_EFI)
+
+#ifdef USE_STDLIB
+#define ACPI_USE_STANDARD_HEADERS
+#define ACPI_USE_SYSTEM_CLIBRARY
+#define ACPI_USE_NATIVE_DIVIDE
+#define ACPI_USE_NATIVE_MATH64
+#endif
+
 #endif
 
 #if defined(__x86_64__)
@@ -57,22 +180,12 @@
 #endif
 
 #ifdef _MSC_EXTENSIONS
-#define EFIAPI __cdecl
+#define ACPI_EFI_API __cdecl
 #elif USE_MS_ABI
-#define EFIAPI __attribute__((ms_abi))
+#define ACPI_EFI_API __attribute__((ms_abi))
 #else
-#define EFIAPI
+#define ACPI_EFI_API
 #endif
-
-typedef uint8_t     UINT8;
-typedef uint16_t    UINT16;
-typedef int16_t     INT16;
-typedef uint32_t    UINT32;
-typedef int32_t     INT32;
-typedef uint64_t    UINT64;
-typedef int64_t     INT64;
-typedef uint8_t     BOOLEAN;
-typedef uint16_t    CHAR16;
 
 #define VOID        void
 
@@ -94,23 +207,27 @@ typedef uint16_t    CHAR16;
 
 #endif
 
-typedef uint64_t    UINTN;
-typedef int64_t     INTN;
+#ifndef USE_STDLIB
+#define UINTN       uint64_t
+#define INTN        int64_t
+#endif
 
-#define EFIERR(a)           (0x8000000000000000 | a)
+#define ACPI_EFI_ERR(a)             (0x8000000000000000 | a)
 
 #else
 
 #define ACPI_MACHINE_WIDTH          32
-#define ACPI_USE_NATIVE_DIVIDE
 
-typedef uint32_t UINTN;
-typedef int32_t INTN;
+#ifndef USE_STDLIB
+#define UINTN       uint32_t
+#define INTN        int32_t
+#endif
 
-#define EFIERR(a)           (0x80000000 | a)
+#define ACPI_EFI_ERR(a)             (0x80000000 | a)
 
 #endif
 
+#define CHAR16      uint16_t
 
 #ifdef USE_EFI_FUNCTION_WRAPPER
 #define __VA_NARG__(...)                        \
@@ -226,50 +343,81 @@ UINT64 efi_call10(void *func, UINT64 arg1, UINT64 arg2, UINT64 arg3,
 #endif
 
 
-/* GNU EFI definitions */
+/* EFI math64 definitions */
 
-#if defined(_GNU_EFI)
-
-/* Using GCC for GNU EFI */
-
-#include "acgcc.h"
-
-#undef ACPI_USE_SYSTEM_CLIBRARY
-#undef ACPI_USE_STANDARD_HEADERS
-#undef ACPI_USE_NATIVE_DIVIDE
-#define ACPI_USE_SYSTEM_INTTYPES
-
+#if defined(_GNU_EFI) || defined(_EDK2_EFI)
 /*
- * Math helpers
+ * Math helpers, GNU EFI provided a platform independent 64-bit math
+ * support.
  */
-#define ACPI_DIV_64_BY_32(n_hi, n_lo, d32, q32, r32) \
+#ifndef ACPI_DIV_64_BY_32
+#define ACPI_DIV_64_BY_32(n_hi, n_lo, d32, q32, r32)         \
+    do {                                                     \
+        UINT64 __n = ((UINT64) n_hi) << 32 | (n_lo);         \
+        (q32) = (UINT32) DivU64x32 ((__n), (d32), &(r32));   \
+    } while (0)
+#endif
+
+#ifndef ACPI_MUL_64_BY_32
+#define ACPI_MUL_64_BY_32(n_hi, n_lo, m32, p32, c32) \
     do {                                             \
         UINT64 __n = ((UINT64) n_hi) << 32 | (n_lo); \
-        (q32) = DivU64x32 ((__n), (d32), &(r32));    \
+        UINT64 __p = MultU64x32 (__n, (m32));        \
+        (p32) = (UINT32) __p;                        \
+        (c32) = (UINT32) (__p >> 32);                \
     } while (0)
+#endif
 
+#ifndef ACPI_SHIFT_LEFT_64_by_32
+#define ACPI_SHIFT_LEFT_64_BY_32(n_hi, n_lo, s32)    \
+    do {                                             \
+        UINT64 __n = ((UINT64) n_hi) << 32 | (n_lo); \
+        UINT64 __r = LShiftU64 (__n, (s32));         \
+        (n_lo) = (UINT32) __r;                       \
+        (n_hi) = (UINT32) (__r >> 32);               \
+    } while (0)
+#endif
+
+#ifndef ACPI_SHIFT_RIGHT_64_BY_32
+#define ACPI_SHIFT_RIGHT_64_BY_32(n_hi, n_lo, s32)   \
+    do {                                             \
+        UINT64 __n = ((UINT64) n_hi) << 32 | (n_lo); \
+        UINT64 __r = RShiftU64 (__n, (s32));         \
+        (n_lo) = (UINT32) __r;                       \
+        (n_hi) = (UINT32) (__r >> 32);               \
+    } while (0)
+#endif
+
+#ifndef ACPI_SHIFT_RIGHT_64
 #define ACPI_SHIFT_RIGHT_64(n_hi, n_lo) \
     do {                                \
         (n_lo) >>= 1;                   \
         (n_lo) |= (((n_hi) & 1) << 31); \
         (n_hi) >>= 1;                   \
     } while (0)
-
-
+#endif
 #endif
 
-struct _SIMPLE_TEXT_OUTPUT_INTERFACE;
-struct _SIMPLE_INPUT_INTERFACE;
-struct _EFI_FILE_IO_INTERFACE;
-struct _EFI_FILE_HANDLE;
-struct _EFI_BOOT_SERVICES;
-struct _EFI_SYSTEM_TABLE;
+struct _ACPI_SIMPLE_TEXT_OUTPUT_INTERFACE;
+struct _ACPI_SIMPLE_INPUT_INTERFACE;
+struct _ACPI_EFI_FILE_IO_INTERFACE;
+struct _ACPI_EFI_FILE_HANDLE;
+struct _ACPI_EFI_BOOT_SERVICES;
+struct _ACPI_EFI_RUNTIME_SERVICES;
+struct _ACPI_EFI_SYSTEM_TABLE;
+struct _ACPI_EFI_PCI_IO;
 
-extern struct _EFI_SYSTEM_TABLE         *ST;
-extern struct _EFI_BOOT_SERVICES        *BS;
+extern struct _ACPI_EFI_SYSTEM_TABLE        *ST;
+extern struct _ACPI_EFI_BOOT_SERVICES       *BS;
+extern struct _ACPI_EFI_RUNTIME_SERVICES    *RT;
 
-#define ACPI_FILE           struct _SIMPLE_TEXT_OUTPUT_INTERFACE *
-#define ACPI_FILE_OUT       ST->ConOut
-#define ACPI_FILE_ERR       ST->ConOut
+#ifndef USE_STDLIB
+typedef union acpi_efi_file ACPI_EFI_FILE;
+#define FILE                ACPI_EFI_FILE
+
+extern FILE                 *stdin;
+extern FILE                 *stdout;
+extern FILE                 *stderr;
+#endif
 
 #endif /* __ACEFI_H__ */

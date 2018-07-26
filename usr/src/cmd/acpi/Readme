@@ -11,38 +11,24 @@ Copyright (c) 2018, Joyent, Inc.
 
 ---
 
-The ACPI utilities are based on the Intel ACPI source code drops.  Aside from
-notes in Readme.resync files, no changes are made to Intel-provided source code.
-Most of the ACPI source code lives in
-the following directories:
+The ACPI code is currently based on 'joyent/20180629', which is based on
+the '20180629' release.
+
+The ACPI utilities are based on the Intel ACPI source code drops.  Most
+of the ACPI source code lives in the following directories:
 
    usr/src/uts/common/acpica		Common to kernel and commands
    usr/src/uts/intel/io/acpica		Kernel
    usr/src/uts/intel/sys/acpi		Headers
    usr/src/cmd/acpi			Commands
 
-The acpica-update script in this directory can serve as a guide for performing
-updates.  It is expected that it will need to be tweaked as the upstream acpica
-software evolves.
+We maintain an ACPI repository that has the tools to sync up the ACPI
+data in illumos. The repository README has more information on the
+repository. It has the following information:
 
-The expected workflow for updating is
+1. Branches with all of our modification on top of our data.
 
-1. Clone the appropriate acpica workspace from github.  Until such a time
-   as Joyent's changes to acpica are in the Intel distribution, this probably
-   means:
+2. Instructions and tools with all of our updates.
 
-     git clone -b smartos git@github.com:joyent/acpica.git
-
-2. Do any required development work in the workspace checked out in step 1.
-   This probably includes rebasing Joyent's changes on the latest release.
-   Don't forget to push these to github and submit a pull request if
-   appropriate.
-
-3. Build and test the modified acpica disto as described in the documentation
-   in that workspace.
-
-4. Run acpica-update from within an illumos workspace.  That is:
-
-     ./acpica-update ~/acpica
-
-5. Build, test, code review, etc.
+3. The tool 'tools/acpica-update' in the repository can be used to
+update the ACPI source code in illumos.

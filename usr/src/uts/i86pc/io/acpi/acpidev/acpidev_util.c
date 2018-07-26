@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -60,13 +61,14 @@ acpidev_query_device_status(ACPI_HANDLE hdl)
 		return (0);
 	}
 
-	if (ACPI_FAILURE(acpica_eval_int(hdl, METHOD_NAME__STA, &status))) {
+	if (ACPI_FAILURE(acpica_get_object_status(hdl, &status))) {
 		/*
-		 * Set the default value according to ACPI3.0b sec 6.3.7:
-		 * If a device object (including the processor object) does
-		 * not have an _STA object, then OSPM assumes that all of the
-		 * above bits are set (in other words, the device is present,
-		 * enabled, shown in the UI, and functioning).
+		 * When the object status is not present, it will generally be
+		 * set to the default value as per the ACPI specification (6.3.7
+		 * _STA (Status)).  However, there are other possible cases of
+		 * ACPI failures. As this code is not aware of them and has
+		 * always treated all failures like the not-present set. Do the
+		 * same for the time being.
 		 */
 		status = 0xF;
 	}
@@ -162,6 +164,7 @@ acpidev_get_device_callback(ACPI_HANDLE hdl, UINT32 level, void *arg,
 	ACPI_STATUS rc;
 	ACPI_DEVICE_INFO *infop;
 	struct acpidev_get_device_arg *argp;
+	int status;
 
 	argp = (struct acpidev_get_device_arg *)arg;
 	ASSERT(argp != NULL);
@@ -175,13 +178,15 @@ acpidev_get_device_callback(ACPI_HANDLE hdl, UINT32 level, void *arg,
 		return (AE_CTRL_DEPTH);
 	}
 
+	rc = acpica_get_object_status(hdl, &status);
+
 	/*
 	 * Skip scanning of children if the device is neither PRESENT nor
 	 * FUNCTIONING.
 	 * Please refer to ACPI Spec3.0b Sec 6.3.1 and 6.5.1.
 	 */
-	if (argp->skip_non_exist && (infop->Valid & ACPI_VALID_STA) &&
-	    !acpidev_check_device_present(infop->CurrentStatus)) {
+	if (argp->skip_non_exist && rc == AE_OK &&
+	    !acpidev_check_device_present(status)) {
 		rc = AE_CTRL_DEPTH;
 	/* Call user callback if matched. */
 	} else if (acpidev_match_device_id(infop, argp->device_ids,

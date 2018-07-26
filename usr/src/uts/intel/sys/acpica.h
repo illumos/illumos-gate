@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -200,6 +201,8 @@ extern void acpica_set_devcfg_feature(uint64_t);
 extern void acpica_clear_devcfg_feature(uint64_t);
 
 void scan_d2a_map(void);
+
+extern ACPI_STATUS acpica_get_object_status(ACPI_HANDLE, int *);
 
 #ifdef __cplusplus
 }

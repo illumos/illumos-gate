@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -44,6 +44,11 @@ extern "C" {
 #include <ctype.h>
 #include <strings.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
 #endif
 
 /* Function name used for debug output. */
@@ -65,12 +70,6 @@ uint32_t acpi_strtoul(const char *, char **, int);
 
 #define	ACPI_CAST_PTHREAD_T(pthread)	((ACPI_THREAD_ID) (pthread))
 
-/*
- * We should use acgcc.h, but lint does not like it. Until lint is removed
- * we need to have private definitions here.
- */
-#define	ACPI_PRINTF_LIKE(c)	__PRINTFLIKE(c)
-#define	ACPI_UNUSED_VAR		__unused
 #define	ACPI_USE_NATIVE_DIVIDE
 #define	ACPI_FLUSH_CPU_CACHE()	(__acpi_wbinvd())
 
@@ -92,17 +91,17 @@ uint32_t acpi_strtoul(const char *, char **, int);
 #define	ACPI_INTERNAL_XFACE
 #define	ACPI_INTERNAL_VAR_XFACE
 
-#ifdef _KERNEL
-#define	strtoul(s, r, b)	acpi_strtoul(s, r, b)
-#define	toupper(x)		(islower(x) ? (x) - 'a' + 'A' : (x))
-#define	tolower(x)		(isupper(x) ? (x) - 'A' + 'a' : (x))
-
 /*
  * The ACPI headers shipped from Intel defines a bunch of functions which are
  * already provided by the kernel.  The variable below prevents those from
  * being loaded as part of accommon.h.
  */
 #define	ACPI_USE_SYSTEM_CLIBRARY
+
+#ifdef _KERNEL
+#define	strtoul(s, r, b)	acpi_strtoul(s, r, b)
+#define	toupper(x)		(islower(x) ? (x) - 'a' + 'A' : (x))
+#define	tolower(x)		(isupper(x) ? (x) - 'A' + 'a' : (x))
 #endif
 
 #define	ACPI_ASM_MACROS
