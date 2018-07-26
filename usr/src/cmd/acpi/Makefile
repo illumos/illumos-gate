@@ -8,12 +8,12 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 include ../Makefile.cmd
 
-SUBDIRS= acpidump acpixtract
+SUBDIRS= acpidump acpixtract iasl
 
 all:=		TARGET= all
 install:=	TARGET= install
@@ -39,10 +39,7 @@ clobber: $(SUBDIRS)
 
 lint:
 
-$(SUBDIRS): common FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
-
-common: FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 
 FRC:

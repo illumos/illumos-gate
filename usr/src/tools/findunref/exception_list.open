@@ -209,13 +209,6 @@
 ./usr/src/common/bignum/mont_mulf.c
 
 #
-# Ignore uttrack.c.  It is provided as part of the standard
-# ACPI CA source code but provides optional resource tracking
-# functionality which is not used.
-#
-./usr/src/uts/intel/io/acpica/utilities/uttrack.c
-
-#
 # Ignore any files that get used during a gcc build only.
 #
 ./usr/src/cmd/sgs/rtld/common/mapfile-order-gcc

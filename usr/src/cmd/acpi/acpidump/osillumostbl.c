@@ -43,7 +43,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdarg.h>
@@ -1001,57 +1001,6 @@ OslTableNameFromFile(char *Filename, char *Signature, UINT32 *Instance)
 
 	ACPI_MOVE_NAME(Signature, Filename);
 	return (AE_OK);
-}
-
-UINT32
-CmGetFileSize(ACPI_FILE File)
-{
-	int fd;
-	struct stat sb;
-
-	fd = fileno(File);
-	if (fstat(fd, &sb) != 0)
-		return (ACPI_UINT32_MAX);
-	return ((UINT32)sb.st_size);
-}
-
-void *
-AcpiOsAllocateZeroed(ACPI_SIZE Size)
-{
-	return (calloc(1, Size));
-}
-
-void
-AcpiOsFree(void *p)
-{
-	free(p);
-}
-
-ACPI_FILE
-AcpiOsOpenFile(const char *Path, UINT8 Modes)
-{
-	char mode[3];
-
-	bzero(mode, sizeof (mode));
-	if ((Modes & ACPI_FILE_READING) != 0)
-		(void) strlcat(mode, "r", sizeof (mode));
-
-	if ((Modes & ACPI_FILE_WRITING) != 0)
-		(void) strlcat(mode, "w", sizeof (mode));
-
-	return (fopen(Path, mode));
-}
-
-void
-AcpiOsCloseFile(ACPI_FILE File)
-{
-	fclose(File);
-}
-
-int
-AcpiOsReadFile(ACPI_FILE File, void *Buffer, ACPI_SIZE Size, ACPI_SIZE Count)
-{
-	return (fread(Buffer, Size, Count, File));
 }
 
 void *

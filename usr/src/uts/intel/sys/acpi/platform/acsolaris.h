@@ -74,7 +74,9 @@ uint32_t acpi_strtoul(const char *, char **, int);
 #define	ACPI_USE_NATIVE_DIVIDE
 #define	ACPI_FLUSH_CPU_CACHE()	(__acpi_wbinvd())
 
+#ifndef ACPI_DISASSEMBLER
 #define	ACPI_DISASSEMBLER
+#endif
 #define	ACPI_PACKED_POINTERS_NOT_SUPPORTED
 
 /*

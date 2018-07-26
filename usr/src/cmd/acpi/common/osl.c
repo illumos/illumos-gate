@@ -10,55 +10,60 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
-#include <stdio.h>
+#include <fcntl.h>
 #include <stdarg.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #include "acpi.h"
 #include "accommon.h"
 
-ACPI_STATUS
-AcpiOsInitialize(void)
+UINT32
+CmGetFileSize(ACPI_FILE File)
 {
-	return (AE_OK);
-}
+	int fd;
+	struct stat sb;
 
-/*
- * The locking functions are no-ops because the application tools that use
- * these are all single threaded. However, due to the common code base that we
- * pull in from Intel, these functions are also called when the software is
- * compiled into the kernel, where it does need to do locking.
- */
-ACPI_CPU_FLAGS
-AcpiOsAcquireLock(ACPI_HANDLE Handle)
-{
-	return (AE_OK);
-}
-
-void
-AcpiOsReleaseLock(ACPI_HANDLE Handle, ACPI_CPU_FLAGS Flags)
-{
-}
-
-void
-AcpiOsVprintf(const char *Format, va_list Args)
-{
-	vprintf(Format, Args);
-}
-
-void ACPI_INTERNAL_VAR_XFACE
-AcpiOsPrintf(const char *Format, ...)
-{
-	va_list ap;
-
-	va_start(ap, Format);
-	AcpiOsVprintf(Format, ap);
-	va_end(ap);
+	fd = fileno(File);
+	if (fstat(fd, &sb) != 0)
+		return (ACPI_UINT32_MAX);
+	return ((UINT32)sb.st_size);
 }
 
 int
 AcpiOsWriteFile(ACPI_FILE File, void *Buffer, ACPI_SIZE Size, ACPI_SIZE Count)
 {
 	return (fwrite(Buffer, Size, Count, File));
+}
+
+ACPI_FILE
+AcpiOsOpenFile(const char *Path, UINT8 Modes)
+{
+	char mode[3];
+
+	bzero(mode, sizeof (mode));
+	if ((Modes & ACPI_FILE_READING) != 0)
+		(void) strlcat(mode, "r", sizeof (mode));
+
+	if ((Modes & ACPI_FILE_WRITING) != 0)
+		(void) strlcat(mode, "w", sizeof (mode));
+
+	return (fopen(Path, mode));
+}
+
+void
+AcpiOsCloseFile(ACPI_FILE File)
+{
+	fclose(File);
+}
+
+int
+AcpiOsReadFile(ACPI_FILE File, void *Buffer, ACPI_SIZE Size, ACPI_SIZE Count)
+{
+	return (fread(Buffer, Size, Count, File));
 }

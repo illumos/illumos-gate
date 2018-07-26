@@ -219,8 +219,8 @@ ACPICA_OBJS	+= \
 		   utclib.o utcopy.o utdebug.o utdecode.o utdelete.o \
 		   uterror.o uteval.o utexcep.o utglobal.o uthex.o utids.o \
 		   utinit.o utlock.o utmath.o utmisc.o utmutex.o utnonansi.o \
-		   utobject.o utosi.o utownerid.o utpredef.o utprint.o \
-		   utresrc.o utstate.o utstring.o uttrack.o utuuid.o utxface.o \
+		   utobject.o utosi.o utownerid.o utpredef.o utresrc.o \
+		   utstate.o utstring.o uttrack.o utuuid.o utxface.o \
 		   utxferror.o utxfinit.o utxfmutex.o \
 		   \
 		   acpi_enum.o acpica_ec.o acpica.o ahids.o master_ops.o \

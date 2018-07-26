@@ -102,47 +102,43 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/%.s
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/debugger/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/events/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/events/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/hardware/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/hardware/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/dispatcher/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/dispatcher/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/executer/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/executer/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/parser/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/parser/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/namespace/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/namespace/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/resources/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/resources/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/tables/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/tables/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/utilities/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/utilities/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/acpica/disassembler/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/acpica/disassembler/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -357,37 +353,34 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/%.s
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/debugger/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/events/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/events/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/hardware/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/hardware/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/dispatcher/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/dispatcher/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/executer/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/executer/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/parser/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/parser/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/namespace/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/namespace/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/resources/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/resources/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/tables/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/tables/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/utilities/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/utilities/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/acpica/disassembler/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/acpica/disassembler/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/agpgart/%.c

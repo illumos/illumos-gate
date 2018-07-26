@@ -8,7 +8,7 @@
 # source.  A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 # Copyright 2016 RackTop Systems.
 #
 
@@ -17,8 +17,12 @@ PROG=		acpixtract
 include ../../Makefile.cmd
 include ../../Makefile.ctf
 
-OBJS= axmain.o acpixtract.o axutils.o
+OBJS =	axmain.o acpixtract.o axutils.o osunixxf.o utglobal.o getopt.o \
+	utdebug.o utprint.o osl.o utascii.o utmath.o utxferror.o utnonansi.o \
+	utexcep.o
 SRCS = $(OBJS:.o=.c)
+
+VPATH = ../common:$(SRC)/common/acpica/utilities
 
 CERRWARN += -_gcc=-Wno-unused-function
 
@@ -29,13 +33,13 @@ CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_XTRACT_APP
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) ../common/acpi.a $(LDLIBS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTUSRSBINPROG)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(PROG)
 
 lint:	lint_SRCS
 
