@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -1150,6 +1150,13 @@ AcpiOsPrintf(const char *Format, ...)
 	va_start(ap, Format);
 	AcpiOsVprintf(Format, ap);
 	va_end(ap);
+}
+
+/*ARGSUSED*/
+ACPI_STATUS
+AcpiOsEnterSleep(UINT8 SleepState, UINT32 Rega, UINT32 Regb)
+{
+	return (AE_OK);
 }
 
 /*
@@ -2370,4 +2377,44 @@ acpi_strtoul(const char *str, char **ep, int base)
 	}
 
 	return ((uint32_t)v);
+}
+
+/*
+ * In prior versions of ACPI, the AcpiGetObjectInfo() function would provide
+ * information about the status of the object via the _STA method. This has been
+ * removed and this function is used to replace.
+ *
+ * Not every ACPI object has a _STA method. In cases where it is not found, then
+ * the OSPM (aka us) is supposed to interpret that as though it indicates that
+ * the device is present, enabled, shown in the UI, and functioning. This is the
+ * value 0xF.
+ */
+ACPI_STATUS
+acpica_get_object_status(ACPI_HANDLE obj, int *statusp)
+{
+	ACPI_STATUS status;
+	int ival;
+
+	status = acpica_eval_int(obj, METHOD_NAME__STA, &ival);
+	if (ACPI_FAILURE(status)) {
+		if (status == AE_NOT_FOUND) {
+			*statusp = 0xf;
+			return (AE_OK);
+		}
+
+		return (status);
+	}
+
+	/*
+	 * This should not be a negative value. However, firmware is often the
+	 * enemy. If it does, complain and treat that as a hard failure.
+	 */
+	if (ival < 0) {
+		cmn_err(CE_WARN, "!acpica_get_object_status: encountered "
+		    "negative _STA value on obj %p", obj);
+		return (AE_ERROR);
+	}
+
+	*statusp = ival;
+	return (AE_OK);
 }

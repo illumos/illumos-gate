@@ -20,8 +20,9 @@
  */
 
 /*
- *  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- *  Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -649,27 +650,13 @@ pciehpc_acpi_power_off_slot(pcie_hp_ctrl_t *ctrl_p)
 static ACPI_STATUS
 pciehpc_acpi_get_dev_state(ACPI_HANDLE obj, int *statusp)
 {
-	ACPI_DEVICE_INFO *info;
-	int ret = AE_OK;
+	int status;
+	ACPI_STATUS ret;
 
-	/*
-	 * Get device info object
-	 */
-	if ((ret = AcpiGetObjectInfo(obj, &info)) != AE_OK)
-		return (ret);
-
-	if (info->Valid & ACPI_VALID_STA) {
-		*statusp = info->CurrentStatus;
-	} else {
-		/*
-		 * no _STA present; assume the device status is normal
-		 * (i.e present, enabled, shown in UI and functioning).
-		 * See section 6.3.7 of ACPI 3.0 spec.
-		 */
-		*statusp = STATUS_NORMAL;
+	ret = acpica_get_object_status(obj, &status);
+	if (ACPI_SUCCESS(ret)) {
+		*statusp = status;
 	}
-
-	AcpiOsFree(info);
 
 	return (ret);
 }

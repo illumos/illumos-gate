@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2018, Joyent, Inc.
  * Copyright (c) 2012 Gary Mills
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -791,6 +791,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	device_id_t	*d, *device_ids = NULL;
 	const master_rec_t	*m;
 	int		compatible_present = 0;
+	int		status;
 
 	/*
 	 * get full ACPI pathname for object
@@ -816,23 +817,23 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 	 * If device isn't present, we don't enumerate
 	 * NEEDSWORK: what about docking bays and the like?
 	 */
-	if (info->Valid & ACPI_VALID_STA) {
-		/*
-		 * CA 6.3.6 _STA method
-		 * Bit 0 -- device is present
-		 * Bit 1 -- device is enabled
-		 * Bit 2 -- device is shown in UI
-		 */
-		if (!((info->CurrentStatus & 0x7) == 7)) {
-			if (acpi_enum_debug & DEVICES_NOT_ENUMED) {
-				cmn_err(CE_NOTE, "!parse_resources() "
-				    "Bad status 0x%x for %s",
-				    info->CurrentStatus, path);
-			}
-			goto done;
-		}
-	} else {
+	if (ACPI_FAILURE(acpica_get_object_status(ObjHandle, &status))) {
 		cmn_err(CE_WARN, "!acpi_enum: no _STA for %s", path);
+		goto done;
+	}
+
+	/*
+	 * CA 6.3.6 _STA method
+	 * Bit 0 -- device is present
+	 * Bit 1 -- device is enabled
+	 * Bit 2 -- device is shown in UI
+	 */
+	if ((status & 0x7) != 0x7) {
+		if (acpi_enum_debug & DEVICES_NOT_ENUMED) {
+			cmn_err(CE_NOTE, "!parse_resources() "
+			    "Bad status 0x%x for %s",
+			    status, path);
+		}
 		goto done;
 	}
 

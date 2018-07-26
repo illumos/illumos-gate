@@ -185,6 +185,7 @@ ACPICA_OBJS	+= \
 		   dsargs.o dscontrol.o dsdebug.o dsfield.o dsinit.o \
 		   dsmethod.o dsmthdat.o dsobject.o dsopcode.o dsutils.o \
 		   dswexec.o dswload.o dswload2.o dswscope.o dswstate.o \
+		   dspkginit.o \
 		   \
 		   evevent.o evglock.o evgpe.o evgpeblk.o evgpeinit.o \
 		   evgpeutil.o evhandler.o evmisc.o evregion.o evrgnini.o \
@@ -221,7 +222,8 @@ ACPICA_OBJS	+= \
 		   utinit.o utlock.o utmath.o utmisc.o utmutex.o utnonansi.o \
 		   utobject.o utosi.o utownerid.o utpredef.o utresrc.o \
 		   utstate.o utstring.o uttrack.o utuuid.o utxface.o \
-		   utxferror.o utxfinit.o utxfmutex.o \
+		   utxferror.o utxfinit.o utxfmutex.o utresdecode.o \
+		   utstrsuppt.o utstrtoul64.o \
 		   \
 		   acpi_enum.o acpica_ec.o acpica.o ahids.o master_ops.o \
 		   osl_ml.o osl.o

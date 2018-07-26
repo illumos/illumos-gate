@@ -4,9 +4,117 @@
  *
  *****************************************************************************/
 
-/*
- * Copyright (C) 2000 - 2016, Intel Corp.
+/******************************************************************************
+ *
+ * 1. Copyright Notice
+ *
+ * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
  * All rights reserved.
+ *
+ * 2. License
+ *
+ * 2.1. This is your license from Intel Corp. under its intellectual property
+ * rights. You may have additional license terms from the party that provided
+ * you this software, covering your right to use that party's intellectual
+ * property rights.
+ *
+ * 2.2. Intel grants, free of charge, to any person ("Licensee") obtaining a
+ * copy of the source code appearing in this file ("Covered Code") an
+ * irrevocable, perpetual, worldwide license under Intel's copyrights in the
+ * base code distributed originally by Intel ("Original Intel Code") to copy,
+ * make derivatives, distribute, use and display any portion of the Covered
+ * Code in any form, with the right to sublicense such rights; and
+ *
+ * 2.3. Intel grants Licensee a non-exclusive and non-transferable patent
+ * license (with the right to sublicense), under only those claims of Intel
+ * patents that are infringed by the Original Intel Code, to make, use, sell,
+ * offer to sell, and import the Covered Code and derivative works thereof
+ * solely to the minimum extent necessary to exercise the above copyright
+ * license, and in no event shall the patent license extend to any additions
+ * to or modifications of the Original Intel Code. No other license or right
+ * is granted directly or by implication, estoppel or otherwise;
+ *
+ * The above copyright and patent license is granted only if the following
+ * conditions are met:
+ *
+ * 3. Conditions
+ *
+ * 3.1. Redistribution of Source with Rights to Further Distribute Source.
+ * Redistribution of source code of any substantial portion of the Covered
+ * Code or modification with rights to further distribute source must include
+ * the above Copyright Notice, the above License, this list of Conditions,
+ * and the following Disclaimer and Export Compliance provision. In addition,
+ * Licensee must cause all Covered Code to which Licensee contributes to
+ * contain a file documenting the changes Licensee made to create that Covered
+ * Code and the date of any change. Licensee must include in that file the
+ * documentation of any changes made by any predecessor Licensee. Licensee
+ * must include a prominent statement that the modification is derived,
+ * directly or indirectly, from Original Intel Code.
+ *
+ * 3.2. Redistribution of Source with no Rights to Further Distribute Source.
+ * Redistribution of source code of any substantial portion of the Covered
+ * Code or modification without rights to further distribute source must
+ * include the following Disclaimer and Export Compliance provision in the
+ * documentation and/or other materials provided with distribution. In
+ * addition, Licensee may not authorize further sublicense of source of any
+ * portion of the Covered Code, and must include terms to the effect that the
+ * license from Licensee to its licensee is limited to the intellectual
+ * property embodied in the software Licensee provides to its licensee, and
+ * not to intellectual property embodied in modifications its licensee may
+ * make.
+ *
+ * 3.3. Redistribution of Executable. Redistribution in executable form of any
+ * substantial portion of the Covered Code or modification must reproduce the
+ * above Copyright Notice, and the following Disclaimer and Export Compliance
+ * provision in the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * 3.4. Intel retains all right, title, and interest in and to the Original
+ * Intel Code.
+ *
+ * 3.5. Neither the name Intel nor any other trademark owned or controlled by
+ * Intel shall be used in advertising or otherwise to promote the sale, use or
+ * other dealings in products derived from or relating to the Covered Code
+ * without prior written authorization from Intel.
+ *
+ * 4. Disclaimer and Export Compliance
+ *
+ * 4.1. INTEL MAKES NO WARRANTY OF ANY KIND REGARDING ANY SOFTWARE PROVIDED
+ * HERE. ANY SOFTWARE ORIGINATING FROM INTEL OR DERIVED FROM INTEL SOFTWARE
+ * IS PROVIDED "AS IS," AND INTEL WILL NOT PROVIDE ANY SUPPORT, ASSISTANCE,
+ * INSTALLATION, TRAINING OR OTHER SERVICES. INTEL WILL NOT PROVIDE ANY
+ * UPDATES, ENHANCEMENTS OR EXTENSIONS. INTEL SPECIFICALLY DISCLAIMS ANY
+ * IMPLIED WARRANTIES OF MERCHANTABILITY, NONINFRINGEMENT AND FITNESS FOR A
+ * PARTICULAR PURPOSE.
+ *
+ * 4.2. IN NO EVENT SHALL INTEL HAVE ANY LIABILITY TO LICENSEE, ITS LICENSEES
+ * OR ANY OTHER THIRD PARTY, FOR ANY LOST PROFITS, LOST DATA, LOSS OF USE OR
+ * COSTS OF PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES, OR FOR ANY INDIRECT,
+ * SPECIAL OR CONSEQUENTIAL DAMAGES ARISING OUT OF THIS AGREEMENT, UNDER ANY
+ * CAUSE OF ACTION OR THEORY OF LIABILITY, AND IRRESPECTIVE OF WHETHER INTEL
+ * HAS ADVANCE NOTICE OF THE POSSIBILITY OF SUCH DAMAGES. THESE LIMITATIONS
+ * SHALL APPLY NOTWITHSTANDING THE FAILURE OF THE ESSENTIAL PURPOSE OF ANY
+ * LIMITED REMEDY.
+ *
+ * 4.3. Licensee shall not export, either directly or indirectly, any of this
+ * software or system incorporating such software without first obtaining any
+ * required license or other approval from the U. S. Department of Commerce or
+ * any other agency or department of the United States Government. In the
+ * event Licensee exports any such software from the United States or
+ * re-exports any such software from a foreign destination, Licensee shall
+ * ensure that the distribution and export/re-export of the software is in
+ * compliance with all laws, regulations, orders, or other restrictions of the
+ * U.S. Export Administration Regulations. Licensee agrees that neither it nor
+ * any of its subsidiaries will export/re-export any technical data, process,
+ * software, or service, directly or indirectly, to any country for which the
+ * United States government or any agency thereof requires an export license,
+ * other governmental approval, or letter of assurance, without first obtaining
+ * such license, approval or letter.
+ *
+ *****************************************************************************
+ *
+ * Alternatively, you may choose to be licensed under the terms of the
+ * following license:
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,23 +131,23 @@
  *    of any contributors may be used to endorse or promote products derived
  *    from this software without specific prior written permission.
  *
- * Alternatively, this software may be distributed under the terms of the
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Alternatively, you may choose to be licensed under the terms of the
  * GNU General Public License ("GPL") version 2 as published by the Free
  * Software Foundation.
  *
- * NO WARRANTY
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
- * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
- * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGES.
- */
+ *****************************************************************************/
 
 #include "aslcompiler.h"
 #include "aslcompiler.y.h"
@@ -130,6 +238,97 @@ UtQueryForOverwrite (
 
 /*******************************************************************************
  *
+ * FUNCTION:    UtNodeIsDescendantOf
+ *
+ * PARAMETERS:  Node1                   - Child node
+ *              Node2                   - Possible parent node
+ *
+ * RETURN:      Boolean
+ *
+ * DESCRIPTION: Returns TRUE if Node1 is a descendant of Node2. Otherwise,
+ *              return FALSE. Note, we assume a NULL Node2 element to be the
+ *              topmost (root) scope. All nodes are descendants of the root.
+ *              Note: Nodes at the same level (siblings) are not considered
+ *              descendants.
+ *
+ ******************************************************************************/
+
+BOOLEAN
+UtNodeIsDescendantOf (
+    ACPI_NAMESPACE_NODE     *Node1,
+    ACPI_NAMESPACE_NODE     *Node2)
+{
+
+    if (Node1 == Node2)
+    {
+        return (FALSE);
+    }
+
+    if (!Node2)
+    {
+        return (TRUE); /* All nodes descend from the root */
+    }
+
+    /* Walk upward until the root is reached or parent is found */
+
+    while (Node1)
+    {
+        if (Node1 == Node2)
+        {
+            return (TRUE);
+        }
+
+        Node1 = Node1->Parent;
+    }
+
+    return (FALSE);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    UtGetParentMethod
+ *
+ * PARAMETERS:  Node                    - Namespace node for any object
+ *
+ * RETURN:      Namespace node for the parent method
+ *              NULL - object is not within a method
+ *
+ * DESCRIPTION: Find the parent (owning) method node for a namespace object
+ *
+ ******************************************************************************/
+
+void *
+UtGetParentMethod (
+    ACPI_NAMESPACE_NODE     *Node)
+{
+    ACPI_NAMESPACE_NODE     *ParentNode;
+
+
+    if (!Node)
+    {
+        return (NULL);
+    }
+
+    /* Walk upward until a method is found, or the root is reached */
+
+    ParentNode = Node->Parent;
+    while (ParentNode)
+    {
+        if (ParentNode->Type == ACPI_TYPE_METHOD)
+        {
+            return (ParentNode);
+        }
+
+        ParentNode = ParentNode->Parent;
+    }
+
+    return (NULL); /* Object is not within a control method */
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    UtDisplaySupportedTables
  *
  * PARAMETERS:  None
@@ -155,7 +354,7 @@ UtDisplaySupportedTables (
     /* All ACPI tables with the common table header */
 
     printf ("\n  Supported ACPI tables:\n");
-    for (TableData = AcpiSupportedTables, i = 1;
+    for (TableData = Gbl_AcpiSupportedTables, i = 1;
          TableData->Signature; TableData++, i++)
     {
         printf ("%8u) %s    %s\n", i,
@@ -192,45 +391,6 @@ UtDisplayConstantOpcodes (
             printf ("%s\n", AcpiGbl_AmlOpInfo[i].Name);
         }
     }
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    UtLocalCalloc
- *
- * PARAMETERS:  Size                - Bytes to be allocated
- *
- * RETURN:      Pointer to the allocated memory. Guaranteed to be valid.
- *
- * DESCRIPTION: Allocate zero-initialized memory. Aborts the compile on an
- *              allocation failure, on the assumption that nothing more can be
- *              accomplished.
- *
- ******************************************************************************/
-
-void *
-UtLocalCalloc (
-    UINT32                  Size)
-{
-    void                    *Allocated;
-
-
-    Allocated = ACPI_ALLOCATE_ZEROED (Size);
-    if (!Allocated)
-    {
-        AslCommonError (ASL_ERROR, ASL_MSG_MEMORY_ALLOCATION,
-            Gbl_CurrentLineNumber, Gbl_LogicalLineNumber,
-            Gbl_InputByteCount, Gbl_CurrentColumn,
-            Gbl_Files[ASL_FILE_INPUT].Filename, NULL);
-
-        CmCleanupAndExit ();
-        exit (1);
-    }
-
-    TotalAllocations++;
-    TotalAllocated += Size;
-    return (Allocated);
 }
 
 
@@ -353,7 +513,7 @@ UtSetParseOpName (
     ACPI_PARSE_OBJECT       *Op)
 {
 
-    strncpy (Op->Asl.ParseOpName, UtGetOpName (Op->Asl.ParseOpcode),
+    AcpiUtSafeStrncpy (Op->Asl.ParseOpName, UtGetOpName (Op->Asl.ParseOpcode),
         ACPI_MAX_PARSEOP_NAME);
 }
 
@@ -381,8 +541,8 @@ UtDisplaySummary (
     {
         /* Compiler name and version number */
 
-        FlPrintFile (FileId, "%s version %X%s [%s]\n\n",
-            ASL_COMPILER_NAME, (UINT32) ACPI_CA_VERSION, ACPI_WIDTH, __DATE__);
+        FlPrintFile (FileId, "%s version %X [%s]\n\n",
+            ASL_COMPILER_NAME, (UINT32) ACPI_CA_VERSION, __DATE__);
     }
 
     /* Summary of main input and output files */
@@ -523,175 +683,6 @@ UtCheckIntegerRange (
 
 /*******************************************************************************
  *
- * FUNCTION:    UtStringCacheCalloc
- *
- * PARAMETERS:  Length              - Size of buffer requested
- *
- * RETURN:      Pointer to the buffer. Aborts on allocation failure
- *
- * DESCRIPTION: Allocate a string buffer. Bypass the local
- *              dynamic memory manager for performance reasons (This has a
- *              major impact on the speed of the compiler.)
- *
- ******************************************************************************/
-
-char *
-UtStringCacheCalloc (
-    UINT32                  Length)
-{
-    char                    *Buffer;
-    ASL_CACHE_INFO          *Cache;
-    UINT32                  CacheSize = ASL_STRING_CACHE_SIZE;
-
-
-    if (Length > CacheSize)
-    {
-        CacheSize = Length;
-
-        if (Gbl_StringCacheList)
-        {
-            Cache = UtLocalCalloc (sizeof (Cache->Next) + CacheSize);
-
-            /* Link new cache buffer just following head of list */
-
-            Cache->Next = Gbl_StringCacheList->Next;
-            Gbl_StringCacheList->Next = Cache;
-
-            /* Leave cache management pointers alone as they pertain to head */
-
-            Gbl_StringCount++;
-            Gbl_StringSize += Length;
-
-            return (Cache->Buffer);
-        }
-    }
-
-    if ((Gbl_StringCacheNext + Length) >= Gbl_StringCacheLast)
-    {
-        /* Allocate a new buffer */
-
-        Cache = UtLocalCalloc (sizeof (Cache->Next) + CacheSize);
-
-        /* Link new cache buffer to head of list */
-
-        Cache->Next = Gbl_StringCacheList;
-        Gbl_StringCacheList = Cache;
-
-        /* Setup cache management pointers */
-
-        Gbl_StringCacheNext = Cache->Buffer;
-        Gbl_StringCacheLast = Gbl_StringCacheNext + CacheSize;
-    }
-
-    Gbl_StringCount++;
-    Gbl_StringSize += Length;
-
-    Buffer = Gbl_StringCacheNext;
-    Gbl_StringCacheNext += Length;
-    return (Buffer);
-}
-
-
-/******************************************************************************
- *
- * FUNCTION:    UtExpandLineBuffers
- *
- * PARAMETERS:  None. Updates global line buffer pointers.
- *
- * RETURN:      None. Reallocates the global line buffers
- *
- * DESCRIPTION: Called if the current line buffer becomes filled. Reallocates
- *              all global line buffers and updates Gbl_LineBufferSize. NOTE:
- *              Also used for the initial allocation of the buffers, when
- *              all of the buffer pointers are NULL. Initial allocations are
- *              of size ASL_DEFAULT_LINE_BUFFER_SIZE
- *
- *****************************************************************************/
-
-void
-UtExpandLineBuffers (
-    void)
-{
-    UINT32                  NewSize;
-
-
-    /* Attempt to double the size of all line buffers */
-
-    NewSize = Gbl_LineBufferSize * 2;
-    if (Gbl_CurrentLineBuffer)
-    {
-        DbgPrint (ASL_DEBUG_OUTPUT,
-            "Increasing line buffer size from %u to %u\n",
-            Gbl_LineBufferSize, NewSize);
-    }
-
-    Gbl_CurrentLineBuffer = realloc (Gbl_CurrentLineBuffer, NewSize);
-    Gbl_LineBufPtr = Gbl_CurrentLineBuffer;
-    if (!Gbl_CurrentLineBuffer)
-    {
-        goto ErrorExit;
-    }
-
-    Gbl_MainTokenBuffer = realloc (Gbl_MainTokenBuffer, NewSize);
-    if (!Gbl_MainTokenBuffer)
-    {
-        goto ErrorExit;
-    }
-
-    Gbl_MacroTokenBuffer = realloc (Gbl_MacroTokenBuffer, NewSize);
-    if (!Gbl_MacroTokenBuffer)
-    {
-        goto ErrorExit;
-    }
-
-    Gbl_ExpressionTokenBuffer = realloc (Gbl_ExpressionTokenBuffer, NewSize);
-    if (!Gbl_ExpressionTokenBuffer)
-    {
-        goto ErrorExit;
-    }
-
-    Gbl_LineBufferSize = NewSize;
-    return;
-
-
-    /* On error above, simply issue error messages and abort, cannot continue */
-
-ErrorExit:
-    printf ("Could not increase line buffer size from %u to %u\n",
-        Gbl_LineBufferSize, Gbl_LineBufferSize * 2);
-
-    AslError (ASL_ERROR, ASL_MSG_BUFFER_ALLOCATION,
-        NULL, NULL);
-    AslAbort ();
-}
-
-
-/******************************************************************************
- *
- * FUNCTION:    UtFreeLineBuffers
- *
- * PARAMETERS:  None
- *
- * RETURN:      None
- *
- * DESCRIPTION: Free all line buffers
- *
- *****************************************************************************/
-
-void
-UtFreeLineBuffers (
-    void)
-{
-
-    free (Gbl_CurrentLineBuffer);
-    free (Gbl_MainTokenBuffer);
-    free (Gbl_MacroTokenBuffer);
-    free (Gbl_ExpressionTokenBuffer);
-}
-
-
-/*******************************************************************************
- *
  * FUNCTION:    UtInternalizeName
  *
  * PARAMETERS:  ExternalName        - Name to convert
@@ -724,11 +715,7 @@ UtInternalizeName (
 
     /* We need a segment to store the internal name */
 
-    Info.InternalName = UtStringCacheCalloc (Info.Length);
-    if (!Info.InternalName)
-    {
-        return (AE_NO_MEMORY);
-    }
+    Info.InternalName = UtLocalCacheCalloc (Info.Length);
 
     /* Build the name */
 
@@ -889,11 +876,11 @@ UtAttachNamepathToOwner (
  *
  * FUNCTION:    UtDoConstant
  *
- * PARAMETERS:  String              - Hex, Octal, or Decimal string
+ * PARAMETERS:  String              - Hex/Decimal/Octal
  *
  * RETURN:      Converted Integer
  *
- * DESCRIPTION: Convert a string to an integer, with error checking.
+ * DESCRIPTION: Convert a string to an integer, with overflow/error checking.
  *
  ******************************************************************************/
 
@@ -902,80 +889,20 @@ UtDoConstant (
     char                    *String)
 {
     ACPI_STATUS             Status;
-    UINT64                  Converted;
+    UINT64                  ConvertedInteger;
     char                    ErrBuf[64];
 
 
-    Status = AcpiUtStrtoul64 (String, ACPI_ANY_BASE,
-        ACPI_MAX64_BYTE_WIDTH, &Converted);
-
+    Status = AcpiUtStrtoul64 (String, &ConvertedInteger);
     if (ACPI_FAILURE (Status))
     {
-        sprintf (ErrBuf, "%s %s\n", "Conversion error:",
+        sprintf (ErrBuf, "While creating 64-bit constant: %s\n",
             AcpiFormatException (Status));
-        AslCompilererror (ErrBuf);
+
+        AslCommonError (ASL_ERROR, ASL_MSG_SYNTAX, Gbl_CurrentLineNumber,
+            Gbl_LogicalLineNumber, Gbl_CurrentLineOffset,
+            Gbl_CurrentColumn, Gbl_Files[ASL_FILE_INPUT].Filename, ErrBuf);
     }
 
-    return (Converted);
+    return (ConvertedInteger);
 }
-
-
-#ifdef _OBSOLETE_FUNCTIONS
-/* Removed 01/2016 */
-
-/*******************************************************************************
- *
- * FUNCTION:    UtConvertByteToHex
- *
- * PARAMETERS:  RawByte             - Binary data
- *              Buffer              - Pointer to where the hex bytes will be
- *                                    stored
- *
- * RETURN:      Ascii hex byte is stored in Buffer.
- *
- * DESCRIPTION: Perform hex-to-ascii translation. The return data is prefixed
- *              with "0x"
- *
- ******************************************************************************/
-
-void
-UtConvertByteToHex (
-    UINT8                   RawByte,
-    UINT8                   *Buffer)
-{
-
-    Buffer[0] = '0';
-    Buffer[1] = 'x';
-
-    Buffer[2] = (UINT8) AcpiUtHexToAsciiChar (RawByte, 4);
-    Buffer[3] = (UINT8) AcpiUtHexToAsciiChar (RawByte, 0);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    UtConvertByteToAsmHex
- *
- * PARAMETERS:  RawByte             - Binary data
- *              Buffer              - Pointer to where the hex bytes will be
- *                                    stored
- *
- * RETURN:      Ascii hex byte is stored in Buffer.
- *
- * DESCRIPTION: Perform hex-to-ascii translation. The return data is prefixed
- *              with '0', and a trailing 'h' is added.
- *
- ******************************************************************************/
-
-void
-UtConvertByteToAsmHex (
-    UINT8                   RawByte,
-    UINT8                   *Buffer)
-{
-
-    Buffer[0] = '0';
-    Buffer[1] = (UINT8) AcpiUtHexToAsciiChar (RawByte, 4);
-    Buffer[2] = (UINT8) AcpiUtHexToAsciiChar (RawByte, 0);
-    Buffer[3] = 'h';
-}
-#endif /* OBSOLETE_FUNCTIONS */

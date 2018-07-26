@@ -867,11 +867,7 @@ acpidev_process_object(acpidev_walk_info_t *infop, int flags)
 	 */
 	if ((datap->aod_iflag & ACPIDEV_ODF_STATUS_VALID) == 0 ||
 	    (flags & ACPIDEV_PROCESS_FLAG_SYNCSTATUS)) {
-		if (adip->Valid & ACPI_VALID_STA) {
-			datap->aod_status = adip->CurrentStatus;
-		} else {
-			datap->aod_status = acpidev_query_device_status(hdl);
-		}
+		datap->aod_status = acpidev_query_device_status(hdl);
 		datap->aod_iflag |= ACPIDEV_ODF_STATUS_VALID;
 	}
 	if (!acpidev_check_device_enabled(datap->aod_status)) {
