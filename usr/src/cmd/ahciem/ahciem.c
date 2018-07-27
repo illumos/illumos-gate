@@ -65,7 +65,7 @@ ahciem_usage(const char *fmt, ...)
 }
 
 static const char *
-ahciem_led_to_string(ahci_em_led_state_t led)
+ahciem_led_to_string(uint_t led)
 {
 	switch (led) {
 	case AHCI_EM_LED_IDENT_ENABLE:
