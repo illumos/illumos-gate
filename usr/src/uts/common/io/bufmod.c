@@ -22,9 +22,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * STREAMS Buffering module
@@ -1016,15 +1015,15 @@ sbaddmsg(queue_t *rq, mblk_t *mp)
 
 		pad = Align(hp.sbh_totlen);
 		hp.sbh_totlen += sizeof (hp);
-		hp.sbh_totlen += pad;
+
+		/* We can't fit this message on the current chunk. */
+		if ((sbp->sb_mlen + hp.sbh_totlen) > sbp->sb_chunk)
+			sbclosechunk(sbp);
 
 		/*
-		 * Would the inclusion of this message overflow the current
-		 * chunk? If so close the chunk off and start a new one.
+		 * If we closed it (just now or during a previous
+		 * call) then allocate the head of a new chunk.
 		 */
-		if ((hp.sbh_totlen + sbp->sb_mlen) > sbp->sb_chunk)
-				sbclosechunk(sbp);
-
 		if (sbp->sb_head == NULL) {
 			/* Allocate leading header of new chunk */
 			sbp->sb_head = allocb(sizeof (hp), BPRI_MED);
@@ -1044,34 +1043,39 @@ sbaddmsg(queue_t *rq, mblk_t *mp)
 		}
 
 		/*
-		 * Copy header into message
+		 * Set the header values and join the message to the
+		 * chunk. The header values are copied into the chunk
+		 * after we adjust for padding below.
 		 */
 		hp.sbh_drops = sbp->sb_drops;
 		hp.sbh_origlen = origlen;
-		(void) memcpy(sbp->sb_head->b_wptr, (char *)&hp, sizeof (hp));
-		sbp->sb_head->b_wptr += sizeof (hp);
-
-		ASSERT(sbp->sb_head->b_wptr <= sbp->sb_head->b_datap->db_lim);
-
-		/*
-		 * Join message to the chunk
-		 */
 		linkb(sbp->sb_head, mp);
-
 		sbp->sb_mcount++;
 		sbp->sb_mlen += hp.sbh_totlen;
 
 		/*
-		 * If the first message alone is too big for the chunk close
-		 * the chunk now.
-		 * If the next message would immediately cause the chunk to
-		 * overflow we may as well close the chunk now. The next
-		 * message is certain to be at least SMALLEST_MESSAGE size.
+		 * There's no chance to fit another message on the
+		 * chunk -- forgo the padding and close the chunk.
 		 */
-		if (hp.sbh_totlen + SMALLEST_MESSAGE > sbp->sb_chunk) {
+		if ((sbp->sb_mlen + pad + SMALLEST_MESSAGE) > sbp->sb_chunk) {
+			(void) memcpy(sbp->sb_head->b_wptr, (char *)&hp,
+			    sizeof (hp));
+			sbp->sb_head->b_wptr += sizeof (hp);
+			ASSERT(sbp->sb_head->b_wptr <=
+			    sbp->sb_head->b_datap->db_lim);
 			sbclosechunk(sbp);
 			return;
 		}
+
+		/*
+		 * We may add another message to this chunk -- adjust
+		 * the headers for padding to be added below.
+		 */
+		hp.sbh_totlen += pad;
+		(void) memcpy(sbp->sb_head->b_wptr, (char *)&hp, sizeof (hp));
+		sbp->sb_head->b_wptr += sizeof (hp);
+		ASSERT(sbp->sb_head->b_wptr <= sbp->sb_head->b_datap->db_lim);
+		sbp->sb_mlen += pad;
 
 		/*
 		 * Find space for the wrapper. The wrapper consists of:
@@ -1086,7 +1090,6 @@ sbaddmsg(queue_t *rq, mblk_t *mp)
 		 * of the message, but only if we 'own' the data. If the dblk
 		 * has been shared through dupmsg() we mustn't alter it.
 		 */
-
 		wrapperlen = (sizeof (hp) + pad);
 
 		/* Is there space for the wrapper beyond the message's data ? */
