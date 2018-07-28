@@ -21,7 +21,7 @@ OBJS=	btx.o
 
 AS=	$(GNU_ROOT)/bin/gas
 LD=	$(GNU_ROOT)/bin/gld
-CC=	$(GCC_ROOT)/bin/gcc
+CC=	$(GNUC_ROOT)/bin/gcc
 
 #.if defined(BOOT_BTX_NOHANG)
 #BOOT_BTX_FLAGS=0x1

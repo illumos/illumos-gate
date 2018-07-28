@@ -32,8 +32,8 @@ BASEDIR = ../..
 include $(BASEDIR)/ufs/Makefile.ufs
 
 
-CC		= $(GCC_ROOT)/bin/gcc
-ASFLAGS		= -B$(GCC_ROOT)/bin/ -fno-builtin -nostdinc
+CC		= $(GNUC_ROOT)/bin/gcc
+ASFLAGS		= -B$(GNUC_ROOT)/bin/ -fno-builtin -nostdinc
 CPPFLAGS	=
 
 LD		= $(GNU_ROOT)/bin/gld

@@ -21,7 +21,7 @@ include $(SRC)/boot/Makefile.version
 
 AS=	$(GNU_ROOT)/bin/gas
 LD=	$(GNU_ROOT)/bin/gld
-CC=	$(GCC_ROOT)/bin/gcc
+CC=	$(GNUC_ROOT)/bin/gcc
 OBJCOPY=	$(GNU_ROOT)/bin/gobjcopy
 
 PROG=		gptzfsboot

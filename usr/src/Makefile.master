@@ -125,9 +125,9 @@ JAVA_ROOT=	/usr/java
 BLD_JAVA_6=	$(POUND_SIGN)
 BLD_JAVA_8=	$(POUND_SIGN)
 
-GCC_ROOT=	/opt/gcc/4.4.4
-GCCLIBDIR=	$(GCC_ROOT)/lib
-GCCLIBDIR64=	$(GCC_ROOT)/lib/$(MACH64)
+GNUC_ROOT=	/opt/gcc/4.4.4
+GCCLIBDIR=	$(GNUC_ROOT)/lib
+GCCLIBDIR64=	$(GNUC_ROOT)/lib/$(MACH64)
 
 DOCBOOK_XSL_ROOT=	/usr/share/sgml/docbook/xsl-stylesheets
 
@@ -172,7 +172,7 @@ LEX=		/usr/ccs/bin/lex
 FLEX=		/usr/bin/flex
 YACC=		/usr/ccs/bin/yacc
 CPP=		/usr/lib/cpp
-ANSI_CPP=	$(GCC_ROOT)/bin/cpp
+ANSI_CPP=	$(GNUC_ROOT)/bin/cpp
 JAVAC=		$(JAVA_ROOT)/bin/javac
 JAVAH=		$(JAVA_ROOT)/bin/javah
 JAVADOC=	$(JAVA_ROOT)/bin/javadoc

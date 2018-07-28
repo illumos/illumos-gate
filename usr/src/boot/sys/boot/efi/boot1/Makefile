@@ -17,7 +17,7 @@
 include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
 
-CC=	$(GCC_ROOT)/bin/gcc
+CC=	$(GNUC_ROOT)/bin/gcc
 LD=	$(GNU_ROOT)/bin/gld
 OBJCOPY= $(GNU_ROOT)/bin/gobjcopy
 OBJDUMP= $(GNU_ROOT)/bin/gobjdump

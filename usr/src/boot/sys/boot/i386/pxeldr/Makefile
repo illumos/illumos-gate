@@ -17,7 +17,7 @@ include $(SRC)/Makefile.master
 
 ROOT_BOOT = $(ROOT)/boot
 
-CC=	$(GCC_ROOT)/bin/gcc
+CC=	$(GNUC_ROOT)/bin/gcc
 LD=	$(GNU_ROOT)/bin/gld
 DD=	/usr/bin/dd
 CFLAGS= -O2 -I../../..

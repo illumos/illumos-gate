@@ -32,8 +32,8 @@ include ../Makefile.tools
 # Bootstrap problem -- we have to build cw before we can use it
 i386_CC=		$(SPRO_VROOT)/bin/cc
 sparc_CC=		$(SPRO_VROOT)/bin/cc
-$(__GNUC)i386_CC=	$(GCC_ROOT)/bin/gcc
-$(__GNUC)sparc_CC=	$(GCC_ROOT)/bin/gcc
+$(__GNUC)i386_CC=	$(GNUC_ROOT)/bin/gcc
+$(__GNUC)sparc_CC=	$(GNUC_ROOT)/bin/gcc
 
 CFLAGS += $(CCVERBOSE)
 
@@ -48,9 +48,9 @@ $(__GNUC)LDLIBS +=	-lc
 $(__GNUC)LDFLAGS= 	$(MAPFILE.NES:%=-Wl,-M%)
 
 CPPFLAGS += -DDEFAULT_CC_DIR='"$(SPRO_VROOT)/bin"'
-CPPFLAGS += -DDEFAULT_GCC_DIR='"$(GCC_ROOT)/bin"'
+CPPFLAGS += -DDEFAULT_GCC_DIR='"$(GNUC_ROOT)/bin"'
 CPPFLAGS += -DDEFAULT_CPLUSPLUS_DIR='"$(SPRO_VROOT)/bin"'
-CPPFLAGS += -DDEFAULT_GPLUSPLUS_DIR='"$(GCC_ROOT)/bin"'
+CPPFLAGS += -DDEFAULT_GPLUSPLUS_DIR='"$(GNUC_ROOT)/bin"'
 
 $(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=      644
 

@@ -21,7 +21,7 @@
 .\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.TH CW 1ONBLD "Mar 22, 2010"
+.TH CW 1ONBLD "August 16, 2018"
 .SH NAME
 .I cw
 \- invoke one or more compilers with argument translation
@@ -197,18 +197,22 @@ will be used.
 If these variables are set in the environment, they specify the full
 pathname for the GNU C and C++ compilers, respectively.
 .TP 4
-.B CW_GCC_DIR, CW_GPLUSPLUS_DIR, GNU_ROOT
+.B CW_GCC_DIR, CW_GPLUSPLUS_DIR, GNUC_ROOT
 If CW_GCC or CW_GPLUSPLUS are not set,
 these variables alter the search path for GNU compilers in a manner
 similar to that described above for the Studio compilers.  Specifically:
-.B
+.LP
 If CW_GCC_DIR is set, the GNU C compiler in \fI$CW_GCC_DIR\fP
 will be used.  Likewise, if CW_GPLUSPLUS_DIR is set, the GNU C++
 compiler in \fI$CW_GPLUSPLUS_DIR\fP will be used.
-Otherwise, if GNU_ROOT is set, the GNU C and C++ compilers
-in \fI$GCC_ROOT/bin\fP will be used.
-Otherwise, the GNU compilers in a predefined default location
-will be used.
+Otherwise, if GNUC_ROOT is set, the GNU C and C++ compilers
+in \fI$GNUC_ROOT/bin\fP will be used. Previously \fI$GCC_ROOT\fP was
+used to in place of \fI$GNUC_ROOT\fP; however, because that environment
+variable has special meaning to gcc, if it is encountered in bldenv or
+nightly(1ONBLD), it will be translated to \fI$GNUC_ROOT\fP.
+.LP
+If none of the aforementioned environment variables are set, the GNU
+compilers in a predefined default location will be used.
 .SH EXIT STATUS
 .LP
 The following exit status values are returned:

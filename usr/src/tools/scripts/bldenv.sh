@@ -302,6 +302,16 @@ fi
 
 export DMAKE_MODE=${DMAKE_MODE:-parallel}
 
+#
+# Work around folks who have historically used GCC_ROOT and convert it to
+# GNUC_ROOT. We leave GCC_ROOT in the environment for now (though this could
+# mess up the case where multiple different gcc versions are being used to
+# shadow).
+#
+if [[ -n "${GCC_ROOT}" ]]; then
+	export GNUC_ROOT=${GCC_ROOT}
+fi
+
 DEF_STRIPFLAG="-s"
 
 TMPDIR="/tmp"
