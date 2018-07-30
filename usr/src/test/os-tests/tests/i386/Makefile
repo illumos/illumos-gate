@@ -16,28 +16,29 @@
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-PROG +=	ldt
+PROGS += ldt badseg
 
 ROOTOPTPKG = $(ROOT)/opt/os-tests
 TESTDIR = $(ROOTOPTPKG)/tests/i386
+ROOTOPTPROGS = $(PROGS:%=$(TESTDIR)/%)
 
 CSTD = $(CSTD_GNU99)
 
-CMDS = $(PROG:%=$(TESTDIR)/%)
-$(CMDS) := FILEMODE = 0555
+# for badseg
+COPTFLAG =
 
-all: $(PROG)
+all: $(PROGS)
 
-install: all $(CMDS)
+install: all $(ROOTOPTPROGS)
 
 lint:
 
 clobber: clean
-	-$(RM) $(PROG)
+	-$(RM) $(PROGS)
 
 clean:
 
-$(CMDS): $(TESTDIR) $(PROG)
+$(ROOTOPTPROGS): $(TESTDIR) $(PROGS)
 
 $(TESTDIR):
 	$(INS.dir)

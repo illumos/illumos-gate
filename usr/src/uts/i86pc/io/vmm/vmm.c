@@ -1932,7 +1932,7 @@ vm_localize_resources(struct vm *vm, struct vcpu *vcpu)
 	vcpu->lastloccpu = curcpu;
 }
 
-void
+static void
 vmm_savectx(void *arg)
 {
 	vm_thread_ctx_t *vtc = arg;
@@ -1955,7 +1955,7 @@ vmm_savectx(void *arg)
 	}
 }
 
-void
+static void
 vmm_restorectx(void *arg)
 {
 	vm_thread_ctx_t *vtc = arg;
@@ -1984,6 +1984,15 @@ vmm_restorectx(void *arg)
 		ops->vmrestorectx(vm->cookie, vcpuid);
 	}
 
+}
+
+/*
+ * If we're in removectx(), we might still have state to tidy up.
+ */
+static void
+vmm_freectx(void *arg, int isexec)
+{
+	vmm_savectx(arg);
 }
 
 #endif /* __FreeBSD */
@@ -2030,7 +2039,7 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	vtc.vtc_status = 0;
 
 	installctx(curthread, &vtc, vmm_savectx, vmm_restorectx, NULL, NULL,
-	    NULL, NULL);
+	    NULL, vmm_freectx);
 #endif
 
 restart:
@@ -2147,21 +2156,8 @@ restart:
 		goto restart;
 
 #ifndef	__FreeBSD__
-	/*
-	 * Before returning to userspace, explicitly restore the host FPU state
-	 * (saving the guest state).  This is done with kpreempt disabled to
-	 * ensure it is not interrupted, potentially confusing the soon-to-be
-	 * removed savectx/restorectx handlers.
-	 */
-	kpreempt_disable();
-	if ((vtc.vtc_status & VTCS_FPU_RESTORED) != 0) {
-		save_guest_fpustate(vcpu);
-		vtc.vtc_status &= ~VTCS_FPU_RESTORED;
-	}
-	kpreempt_enable();
-
 	removectx(curthread, &vtc, vmm_savectx, vmm_restorectx, NULL, NULL,
-	    NULL, NULL);
+	    NULL, vmm_freectx);
 #endif
 
 	VCPU_CTR2(vm, vcpuid, "retu %d/%d", error, vme->exitcode);

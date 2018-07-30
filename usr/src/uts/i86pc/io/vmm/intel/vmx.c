@@ -3942,6 +3942,8 @@ vmx_savectx(void *arg, int vcpu)
 		VERIFY3U(vmclear(vmcs), ==, 0);
 		vmx_msr_guest_exit(vmx, vcpu);
 	}
+
+	reset_gdtr_limit();
 }
 
 static void
