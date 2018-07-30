@@ -32,7 +32,7 @@ SRCS = $(OBJS:%.o=%.c)
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
-LDLIBS += -lsmbios
+LDLIBS += -lsmbios -ljedec
 
 FILEMODE = 0555
 STRIPFLAG =

@@ -40,6 +40,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <ctype.h>
+#include <libjedec.h>
 
 #define	SMBIOS_SUCCESS	0
 #define	SMBIOS_ERROR	1
@@ -54,6 +55,17 @@ static int opt_O;
 static int opt_s;
 static int opt_t = -1;
 static int opt_x;
+
+static boolean_t
+smbios_vergteq(smbios_version_t *v, uint_t major, uint_t minor)
+{
+	if (v->smbv_major > major)
+		return (B_TRUE);
+	if (v->smbv_major == major &&
+	    v->smbv_minor >= minor)
+		return (B_TRUE);
+	return (B_FALSE);
+}
 
 /*PRINTFLIKE2*/
 static void
@@ -156,6 +168,22 @@ id_printf(FILE *fp, const char *s, id_t id)
 		break;
 	default:
 		oprintf(fp, "%s%u\n", s, (uint_t)id);
+	}
+}
+
+static void
+jedec_print(FILE *fp, const char *desc, uint_t id)
+{
+	const char *name;
+	uint_t cont, vendor;
+
+	vendor = id & 0xff;
+	cont = (id >> 8) & 0xff;
+	name = libjedec_vendor_string(cont, vendor);
+	if (name == NULL) {
+		oprintf(fp, "  %s: 0x%x\n", desc, id);
+	} else {
+		oprintf(fp, "  %s: 0x%x (%s)\n", desc, id, name);
 	}
 }
 
@@ -676,12 +704,41 @@ print_slot(smbios_hdl_t *shp, id_t id, FILE *fp)
 	    s.smbl_ch2, sizeof (s.smbl_ch2) * NBBY,
 	    smbios_slot_ch2_name, smbios_slot_ch2_desc);
 
-	if (check_oem(shp) != 0 && (v.smbv_major < 2 || v.smbv_minor < 6))
+	if (check_oem(shp) != 0 && !smbios_vergteq(&v, 2, 6))
 		return;
 
 	oprintf(fp, "  Segment Group: %u\n", s.smbl_sg);
 	oprintf(fp, "  Bus Number: %u\n", s.smbl_bus);
-	oprintf(fp, "  Device/Function Number: %u\n", s.smbl_df);
+	oprintf(fp, "  Device/Function Number: %u/%u\n", s.smbl_df >> 3,
+	    s.smbl_df & 0x7);
+
+	if (s.smbl_dbw != 0) {
+		oprintf(fp, "  Data Bus Width: %d\n", s.smbl_dbw);
+	}
+
+	if (s.smbl_npeers > 0) {
+		smbios_slot_peer_t *peer;
+		uint_t i, npeers;
+
+		if (smbios_info_slot_peers(shp, id, &npeers, &peer) != 0) {
+			smbios_warn(shp, "failed to read slot peer "
+			    "information");
+			return;
+		}
+
+		for (i = 0; i < npeers; i++) {
+			oprintf(fp, "  Slot Peer %u:\n", i);
+			oprintf(fp, "    Segment group: %u\n",
+			    peer[i].smblp_group);
+			oprintf(fp, "    Bus/Device/Function: %u/%u/%u",
+			    peer[i].smblp_bus, peer[i].smblp_device,
+			    peer[i].smblp_function);
+			oprintf(fp, "    Electrical width: %u\n",
+			    peer[i].smblp_data_width);
+		}
+
+		smbios_info_slot_peers_free(shp, npeers, peer);
+	}
 }
 
 static void
@@ -950,6 +1007,68 @@ print_memdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
 		    md.smbmd_confvolt / 1000.0);
 	} else {
 		oprintf(fp, "  Configured Voltage: Unknown\n");
+	}
+
+	if (md.smbmd_memtech != 0) {
+		desc_printf(smbios_memdevice_memtech_desc(md.smbmd_memtech),
+		    fp, "  Memory Technology: %u", md.smbmd_memtech);
+	}
+
+	if (md.smbmd_opcap_flags != 0) {
+		flag_printf(fp, "  Operating Mode Capabilities",
+		    md.smbmd_opcap_flags, sizeof (md.smbmd_opcap_flags) * NBBY,
+		    smbios_memdevice_op_capab_name,
+		    smbios_memdevice_op_capab_desc);
+	}
+
+	if (md.smbmd_firmware_rev[0] != '\0') {
+		oprintf(fp, "  Firmware Revision: %s\n", md.smbmd_firmware_rev);
+	}
+
+	if (md.smbmd_modmfg_id != 0) {
+		jedec_print(fp, "Module Manufacturer ID", md.smbmd_modmfg_id);
+	}
+
+	if (md.smbmd_modprod_id  != 0) {
+		jedec_print(fp, "Module Product ID", md.smbmd_modprod_id);
+	}
+
+	if (md.smbmd_cntrlmfg_id != 0) {
+		jedec_print(fp, "Memory Subsystem Controller Manufacturer ID",
+		    md.smbmd_cntrlmfg_id);
+	}
+
+	if (md.smbmd_cntrlprod_id != 0) {
+		jedec_print(fp, "Memory Subsystem Controller Product ID",
+		    md.smbmd_cntrlprod_id);
+	}
+
+	if (md.smbmd_nvsize == UINT64_MAX) {
+		oprintf(fp, "  Non-volatile Size: Unknown\n");
+	} else if (md.smbmd_nvsize != 0) {
+		oprintf(fp, "  Non-volatile Size: %llu bytes\n",
+		    (u_longlong_t)md.smbmd_nvsize);
+	}
+
+	if (md.smbmd_volatile_size == UINT64_MAX) {
+		oprintf(fp, "  Volatile Size: Unknown\n");
+	} else if (md.smbmd_volatile_size != 0) {
+		oprintf(fp, "  Volatile Size: %llu bytes\n",
+		    (u_longlong_t)md.smbmd_volatile_size);
+	}
+
+	if (md.smbmd_cache_size == UINT64_MAX) {
+		oprintf(fp, "  Volatile Size: Unknown\n");
+	} else if (md.smbmd_cache_size != 0) {
+		oprintf(fp, "  Volatile Size: %llu bytes\n",
+		    (u_longlong_t)md.smbmd_cache_size);
+	}
+
+	if (md.smbmd_logical_size == UINT64_MAX) {
+		oprintf(fp, "  Volatile Size: Unknown\n");
+	} else if (md.smbmd_logical_size != 0) {
+		oprintf(fp, "  Volatile Size: %llu bytes\n",
+		    (u_longlong_t)md.smbmd_logical_size);
 	}
 }
 

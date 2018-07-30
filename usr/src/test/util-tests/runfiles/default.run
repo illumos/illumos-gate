@@ -31,6 +31,8 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/vnic-mtu]
 [/opt/util-tests/tests/bunyan/bunyan]
 [/opt/util-tests/tests/libsff/libsff]
+[/opt/util-tests/tests/libjedec_test]
+[/opt/util-tests/tests/smbios]
 
 [/opt/util-tests/tests/xargs_test]
 

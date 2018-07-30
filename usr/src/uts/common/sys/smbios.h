@@ -526,6 +526,10 @@ typedef struct smbios_processor {
 #define	SMB_PRU_LGA36471	0x36	/* LGA3647-1 */
 #define	SMB_PRU_SP3		0x37	/* socket SP3 */
 #define	SMB_PRU_SP3r2		0x38	/* socket SP3r2 */
+#define	SMB_PRU_LGA2066		0x39	/* Socket LGA2066 */
+#define	SMB_PRU_BGA1392		0x3A	/* Socket BGA1392 */
+#define	SMB_PRU_BGA1510		0x3B	/* Socket BGA1510 */
+#define	SMB_PRU_BGA1528		0x3C	/* Socket BGA1528 */
 
 #define	SMB_PRC_RESERVED	0x0001	/* reserved */
 #define	SMB_PRC_UNKNOWN		0x0002	/* unknown */
@@ -707,6 +711,7 @@ typedef struct smbios_processor {
 #define	SMB_PRF_ZARCH		0xCC	/* z/Architecture */
 #define	SMB_PRF_CORE_I5		0xCD	/* Intel Core i5 */
 #define	SMB_PRF_CORE_I3		0xCE	/* Intel Core i3 */
+#define	SMB_PRF_CORE_I9		0xCF	/* Intel Core i9 */
 #define	SMB_PRF_C7M		0xD2	/* VIA C7-M */
 #define	SMB_PRF_C7D		0xD3	/* VIA C7-D */
 #define	SMB_PRF_C7		0xD4	/* VIA C7 */
@@ -872,6 +877,7 @@ typedef struct smbios_port {
 #define	SMB_POC_BNC		0x20		/* BNC */
 #define	SMB_POC_1394		0x21		/* 1394 */
 #define	SMB_POC_SATA		0x22		/* SAS/SATA plug receptacle */
+#define	SMB_POC_USB_C		0x23		/* USB Type-C receptacle */
 #define	SMB_POC_PC98		0xA0		/* PC-98 */
 #define	SMB_POC_PC98HR		0xA1		/* PC-98Hireso */
 #define	SMB_POC_PCH98		0xA2		/* PC-H98 */
@@ -913,6 +919,8 @@ typedef struct smbios_port {
 #define	SMB_POT_NETWORK		0x1F		/* Network port */
 #define	SMB_POT_SATA		0x20		/* SATA */
 #define	SMB_POT_SAS		0x21		/* SAS */
+#define	SMB_POT_MFDP		0x22	/* MFDP (Multi-Function Display Port) */
+#define	SMB_POT_THUNDERBOLT	0x23		/* Thunderbolt */
 #define	SMB_POT_8251		0xA0		/* 8251 compatible */
 #define	SMB_POT_8251F		0xA1		/* 8251 FIFO compatible */
 #define	SMB_POT_OTHER		0xFF		/* other */
@@ -933,6 +941,8 @@ typedef struct smbios_slot {
 	uint16_t smbl_sg;		/* segment group number */
 	uint8_t smbl_bus;		/* bus number */
 	uint8_t smbl_df;		/* device/function number */
+	uint8_t smbl_dbw;		/* data bus width */
+	uint8_t smbl_npeers;		/* PCIe bifurcation peers */
 } smbios_slot_t;
 
 #define	SMB_SLT_OTHER		0x01	/* other */
@@ -1036,6 +1046,21 @@ typedef struct smbios_slot {
 #define	SMB_SLCH2_PME		0x01	/* slot supports PME# signal */
 #define	SMB_SLCH2_HOTPLUG	0x02	/* slot supports hot-plug devices */
 #define	SMB_SLCH2_SMBUS		0x04	/* slot supports SMBus signal */
+#define	SMB_SLCH2_BIFUR		0x08	/* slot supports PCIe bifurcation */
+
+/*
+ * SMBIOS 7.10.9 Slot Peer Devices
+ *
+ * This structure represents an optional peer device that may be part of an
+ * SMBIOS 3.2 slot.
+ */
+typedef struct smbios_slot_peer {
+	uint16_t smblp_group;		/* peer segment group number */
+	uint8_t smblp_bus;		/* peer bus number */
+	uint8_t smblp_device;		/* peer device number */
+	uint8_t smblp_function;		/* peer function number */
+	uint8_t	smblp_data_width;	/* peer data bus width */
+} smbios_slot_peer_t;
 
 /*
  * SMBIOS On-Board Device Information.  See DSP0134 Section 7.11 for more
@@ -1189,6 +1214,17 @@ typedef struct smbios_memdevice {
 	uint16_t smbmd_minvolt;		/* minimum voltage */
 	uint16_t smbmd_maxvolt;		/* maximum voltage */
 	uint16_t smbmd_confvolt;	/* configured voltage */
+	uint8_t smbmd_memtech;		/* memory technology */
+	uint32_t smbmd_opcap_flags;	/* operating mode capability */
+	const char *smbmd_firmware_rev;	/* firmware rev */
+	uint16_t smbmd_modmfg_id;	/* JEDEC module mfg id */
+	uint16_t smbmd_modprod_id;	/* JEDEC module product id */
+	uint16_t smbmd_cntrlmfg_id;	/* JEDEC controller mfg id */
+	uint16_t smbmd_cntrlprod_id;	/* JEDEC controller prod id */
+	uint64_t smbmd_nvsize;		/* non-volatile size in bytes */
+	uint64_t smbmd_volatile_size;	/* volatile size in bytes */
+	uint64_t smbmd_cache_size;	/* cache size in bytes */
+	uint64_t smbmd_logical_size;	/* logical size in bytes */
 } smbios_memdevice_t;
 
 #define	SMB_MDFF_OTHER		0x01	/* other */
@@ -1234,6 +1270,7 @@ typedef struct smbios_memdevice {
 #define	SMB_MDT_LPDDR2		0x1C	/* LPDDR2 */
 #define	SMB_MDT_LPDDR3		0x1D	/* LPDDR3 */
 #define	SMB_MDT_LPDDR4		0x1E	/* LPDDR4 */
+#define	SMB_MDT_LOGNV		0x1F	/* Logical non-volatile device */
 
 #define	SMB_MDF_OTHER		0x0002	/* other */
 #define	SMB_MDF_UNKNOWN		0x0004	/* unknown */
@@ -1255,6 +1292,20 @@ typedef struct smbios_memdevice {
 #define	SMB_MDR_DUAL		0x02	/* dual */
 #define	SMB_MDR_QUAD		0x04	/* quad */
 #define	SMB_MDR_OCTAL		0x08	/* octal */
+
+#define	SMB_MTECH_OTHER		0x01	/* other */
+#define	SMB_MTECH_UNKNOWN	0x02	/* unknown */
+#define	SMB_MTECH_DRAM		0x03	/* DRAM */
+#define	SMB_MTECH_NVDIMM_N	0x04	/* NVDIMM-N */
+#define	SMB_MTECH_NVDIMM_F	0x05	/* NVDIMM-F */
+#define	SMB_MTECH_NVDIMM_P	0x06	/* NVDIMM-P */
+#define	SMB_MTECH_INTCPM	0x07	/* Intel persistent memory */
+
+#define	SMB_MOMC_OTHER		0x01	/* other */
+#define	SMB_MOMC_UNKNOWN	0x02	/* unknown */
+#define	SMB_MOMC_VOLATILE	0x04	/* Volatile memory */
+#define	SMB_MOMC_BYTE_PM	0x08	/* Byte-accessible persistent memory */
+#define	SMB_MOMC_BLOCK_PM	0x10	/* Block-accessible persistent memory */
 
 /*
  * SMBIOS Memory Array Mapped Address.  See DSP0134 Section 7.20 for more
@@ -1626,7 +1677,8 @@ typedef struct smbios_memdevice_ext {
 #define	SMB_VERSION_28	0x0208		/* SMBIOS encoding for DMTF spec 2.8 */
 #define	SMB_VERSION_30	0x0300		/* SMBIOS encoding for DMTF spec 3.0 */
 #define	SMB_VERSION_31	0x0301		/* SMBIOS encoding for DMTF spec 3.1 */
-#define	SMB_VERSION	SMB_VERSION_31	/* SMBIOS latest version definitions */
+#define	SMB_VERSION_32	0x0302		/* SMBIOS encoding for DMTF spec 3.2 */
+#define	SMB_VERSION	SMB_VERSION_32	/* SMBIOS latest version definitions */
 
 #define	SMB_O_NOCKSUM	0x1		/* do not verify header checksums */
 #define	SMB_O_NOVERS	0x2		/* do not verify header versions */
@@ -1686,6 +1738,10 @@ extern int smbios_info_cache(smbios_hdl_t *, id_t, smbios_cache_t *);
 extern int smbios_info_port(smbios_hdl_t *, id_t, smbios_port_t *);
 extern int smbios_info_extport(smbios_hdl_t *, id_t, smbios_port_ext_t *);
 extern int smbios_info_slot(smbios_hdl_t *, id_t, smbios_slot_t *);
+extern int smbios_info_slot_peers(smbios_hdl_t *, id_t, uint_t *,
+    smbios_slot_peer_t **);
+extern void smbios_info_slot_peers_free(smbios_hdl_t *, uint_t,
+    smbios_slot_peer_t *);
 extern int smbios_info_obdevs(smbios_hdl_t *, id_t, int, smbios_obdev_t *);
 extern int smbios_info_obdevs_ext(smbios_hdl_t *, id_t, smbios_obdev_ext_t *);
 extern int smbios_info_strtab(smbios_hdl_t *, id_t, int, const char *[]);
@@ -1785,6 +1841,9 @@ extern const char *smbios_memdevice_type_desc(uint_t);
 extern const char *smbios_memdevice_flag_name(uint_t);
 extern const char *smbios_memdevice_flag_desc(uint_t);
 extern const char *smbios_memdevice_rank_desc(uint_t);
+extern const char *smbios_memdevice_memtech_desc(uint_t);
+extern const char *smbios_memdevice_op_capab_name(uint_t);
+extern const char *smbios_memdevice_op_capab_desc(uint_t);
 
 extern const char *smbios_onboard_type_desc(uint_t);
 

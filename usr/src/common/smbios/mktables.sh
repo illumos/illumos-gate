@@ -22,7 +22,7 @@
 #
 #
 # Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -49,9 +49,10 @@ SMB_CAF_	smbios_cache_flag_name		uint_t
 SMB_EVFL_	smbios_evlog_flag_name		uint_t
 SMB_IPMI_F_	smbios_ipmi_flag_name		uint_t
 SMB_POWERSUP_F_	smbios_powersup_flag_name	uint_t
+SMB_MOMC_	smbios_memdevice_op_capab_name	uint_t
 SMB_MDF_	smbios_memdevice_flag_name	uint_t
 SMB_PRC_	smbios_processor_core_flag_name	uint_t
-SMB_TYPE_ 	smbios_type_name		uint_t
+SMB_TYPE_	smbios_type_name		uint_t
 SMB_SLCH1_	smbios_slot_ch1_name		uint_t
 SMB_SLCH2_	smbios_slot_ch2_name		uint_t
 '
@@ -93,6 +94,8 @@ SMB_MDF_	smbios_memdevice_flag_desc	uint_t
 SMB_MDFF_	smbios_memdevice_form_desc	uint_t
 SMB_MDT_	smbios_memdevice_type_desc	uint_t
 SMB_MDR_	smbios_memdevice_rank_desc	uint_t
+SMB_MTECH_	smbios_memdevice_memtech_desc	uint_t
+SMB_MOMC_	smbios_memdevice_op_capab_desc	uint_t
 SMB_OBT_	smbios_onboard_type_desc	uint_t
 SMB_POC_	smbios_port_conn_desc		uint_t
 SMB_POT_	smbios_port_type_desc		uint_t
@@ -109,7 +112,7 @@ SMB_SLU_	smbios_slot_usage_desc		uint_t
 SMB_SLW_	smbios_slot_width_desc		uint_t
 SMB_TPROBE_L_	smbios_tprobe_loc_desc		uint_t
 SMB_TPROBE_S_	smbios_tprobe_status_desc	uint_t
-SMB_TYPE_ 	smbios_type_desc		uint_t
+SMB_TYPE_	smbios_type_desc		uint_t
 SMB_VPROBE_L_	smbios_vprobe_loc_desc		uint_t
 SMB_VPROBE_S_	smbios_vprobe_status_desc	uint_t
 SMB_WAKEUP_	smbios_system_wakeup_desc	uint_t

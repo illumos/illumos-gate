@@ -23,6 +23,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -64,10 +65,11 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	smbios_hdl_t *shp = NULL;
 	smbios_entry_t *ep;
 	caddr_t stbuf, bios, p, q;
+	caddr_t smb2, smb3;
 	uint64_t startaddr, startoff = 0;
 	size_t bioslen;
 	uint_t smbe_stlen;
-	smbios_entry_point_t ep_type = SMBIOS_ENTRY_POINT_21;
+	smbios_entry_point_t ep_type;
 	uint8_t smbe_major, smbe_minor;
 	int err;
 
@@ -96,24 +98,60 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	 */
 	p = bios + startoff;
 	q = bios + bioslen - startoff;
+	smb2 = smb3 = NULL;
 	while (p < q) {
-		err = strncmp(p, SMB3_ENTRY_EANCHOR, SMB3_ENTRY_EANCHORLEN);
-		if (err == 0) {
-			ep_type = SMBIOS_ENTRY_POINT_30;
+		if (smb2 != NULL && smb3 != NULL)
 			break;
+
+		if (smb3 == NULL && strncmp(p, SMB3_ENTRY_EANCHOR,
+		    SMB3_ENTRY_EANCHORLEN) == 0) {
+			smb3 = p;
+		} else if (smb2 == NULL && strncmp(p, SMB_ENTRY_EANCHOR,
+		    SMB_ENTRY_EANCHORLEN) == 0) {
+			smb2 = p;
 		}
 
-		if (strncmp(p, SMB_ENTRY_EANCHOR, SMB_ENTRY_EANCHORLEN) == 0)
-			break;
 		p += SMB_SCAN_STEP;
 	}
 
-	if (p >= q) {
+	if (smb2 == NULL && smb3 == NULL) {
 		psm_unmap_phys(bios, bioslen);
 		return (smb_open_error(shp, errp, ESMB_NOTFOUND));
 	}
 
+	/*
+	 * While they're not supposed to (as per the SMBIOS 3.2 spec), some
+	 * vendors end up having a newer version in one of the two entry points
+	 * than the other. If we found multiple tables then we will prefer the
+	 * one with the newer version. If they're equivalent, we prefer the
+	 * 32-bit version. If only one is present, then we use that.
+	 */
 	ep = smb_alloc(SMB_ENTRY_MAXLEN);
+	if (smb2 != NULL && smb3 != NULL) {
+		uint8_t smb2maj, smb2min, smb3maj, smb3min;
+
+		bcopy(smb2, ep, sizeof (smbios_entry_t));
+		smb2maj = ep->ep21.smbe_major;
+		smb2min = ep->ep21.smbe_minor;
+		bcopy(smb3, ep, sizeof (smbios_entry_t));
+		smb3maj = ep->ep30.smbe_major;
+		smb3min = ep->ep30.smbe_minor;
+
+		if (smb3maj > smb2maj ||
+		    (smb3maj == smb2maj && smb3min > smb2min)) {
+			ep_type = SMBIOS_ENTRY_POINT_30;
+			p = smb3;
+		} else {
+			ep_type = SMBIOS_ENTRY_POINT_21;
+			p = smb2;
+		}
+	} else if (smb3 != NULL) {
+		ep_type = SMBIOS_ENTRY_POINT_30;
+		p = smb3;
+	} else if (smb2 != NULL) {
+		ep_type = SMBIOS_ENTRY_POINT_21;
+		p = smb2;
+	}
 	bcopy(p, ep, sizeof (smbios_entry_t));
 	if (ep_type == SMBIOS_ENTRY_POINT_21) {
 		ep->ep21.smbe_elen = MIN(ep->ep21.smbe_elen, SMB_ENTRY_MAXLEN);

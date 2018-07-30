@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -67,6 +67,7 @@
 
 #include <sys/smbios_impl.h>
 #include <sys/byteorder.h>
+#include <sys/debug.h>
 
 #ifdef _KERNEL
 #include <sys/sunddi.h>
@@ -603,12 +604,14 @@ smbios_info_cache(smbios_hdl_t *shp, id_t id, smbios_cache_t *cap)
 		cap->smba_flags |= SMB_CAF_SOCKETED;
 
 	if (smb_libgteq(shp, SMB_VERSION_31)) {
-		if (smb_gteq(shp, SMB_VERSION_31)) {
-			cap->smba_maxsize2 =
-			    SMB_CACHE_EXT_SIZE(c.smbca_maxsize2);
-			cap->smba_size2 = SMB_CACHE_EXT_SIZE(c.smbca_size2);
-		} else {
+		cap->smba_maxsize2 = SMB_CACHE_EXT_SIZE(c.smbca_maxsize2);
+		cap->smba_size2 = SMB_CACHE_EXT_SIZE(c.smbca_size2);
+
+		if (cap->smba_maxsize2 == 0) {
 			cap->smba_maxsize2 = cap->smba_maxsize;
+		}
+
+		if (cap->smba_size2 == 0) {
 			cap->smba_size2 = cap->smba_size;
 		}
 	}
@@ -654,7 +657,7 @@ smbios_info_slot(smbios_hdl_t *shp, id_t id, smbios_slot_t *sp)
 		return (smb_set_errno(shp, ESMB_TYPE));
 
 	smb_info_bcopy(stp->smbst_hdr, &s, sizeof (s));
-	bzero(sp, sizeof (smbios_slot_t));
+	bzero(sp, sizeof (smb_base_slot_t));
 
 	sp->smbl_name = smb_strptr(stp, s.smbsl_name);
 	sp->smbl_type = s.smbsl_type;
@@ -667,6 +670,77 @@ smbios_info_slot(smbios_hdl_t *shp, id_t id, smbios_slot_t *sp)
 	sp->smbl_sg = s.smbsl_sg;
 	sp->smbl_bus = s.smbsl_bus;
 	sp->smbl_df = s.smbsl_df;
+
+	if (smb_libgteq(shp, SMB_VERSION_32)) {
+		sp->smbl_dbw = s.smbsl_dbw;
+		sp->smbl_npeers = s.smbsl_npeers;
+	}
+
+	return (0);
+}
+
+void
+smbios_info_slot_peers_free(smbios_hdl_t *shp, uint_t npeers,
+    smbios_slot_peer_t *peer)
+{
+	size_t sz = npeers * sizeof (smbios_slot_peer_t);
+
+	if (npeers == 0) {
+		ASSERT3P(peer, ==, NULL);
+		return;
+	}
+
+	smb_free(peer, sz);
+}
+
+int
+smbios_info_slot_peers(smbios_hdl_t *shp, id_t id, uint_t *npeers,
+    smbios_slot_peer_t **peerp)
+{
+	const smb_struct_t *stp = smb_lookup_id(shp, id);
+	const smb_slot_t *slotp = (const smb_slot_t *)stp->smbst_hdr;
+	smbios_slot_peer_t *peer;
+	size_t minlen;
+	uint_t i;
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_type != SMB_TYPE_SLOT)
+		return (smb_set_errno(shp, ESMB_TYPE));
+
+	if (stp->smbst_hdr->smbh_len <= offsetof(smb_slot_t, smbsl_npeers) ||
+	    slotp->smbsl_npeers == 0) {
+		*npeers = 0;
+		*peerp = NULL;
+		return (0);
+	}
+
+	/*
+	 * Make sure that the size of the structure makes sense for the number
+	 * of peers reported.
+	 */
+	minlen = slotp->smbsl_npeers * sizeof (smb_slot_peer_t) +
+	    offsetof(smb_slot_t, smbsl_npeers);
+	if (stp->smbst_hdr->smbh_len < minlen) {
+		return (smb_set_errno(shp, ESMB_SHORT));
+	}
+
+	if ((peer = smb_alloc(slotp->smbsl_npeers *
+	    sizeof (smbios_slot_peer_t))) == NULL) {
+		return (smb_set_errno(shp, ESMB_NOMEM));
+	}
+
+	for (i = 0; i < slotp->smbsl_npeers; i++) {
+		peer[i].smblp_group = slotp->smbsl_peers[i].smbspb_group_no;
+		peer[i].smblp_bus = slotp->smbsl_peers[i].smbspb_bus;
+		peer[i].smblp_device = slotp->smbsl_peers[i].smbspb_df >> 3;
+		peer[i].smblp_function = slotp->smbsl_peers[i].smbspb_df & 0x7;
+		peer[i].smblp_data_width = slotp->smbsl_peers[i].smbspb_width;
+	}
+
+	*npeers = slotp->smbsl_npeers;
+	*peerp = peer;
 
 	return (0);
 }
@@ -921,6 +995,21 @@ smbios_info_memdevice(smbios_hdl_t *shp, id_t id, smbios_memdevice_t *mdp)
 		mdp->smbmd_minvolt = m.smbmdev_minvolt;
 		mdp->smbmd_maxvolt = m.smbmdev_maxvolt;
 		mdp->smbmd_confvolt = m.smbmdev_confvolt;
+	}
+
+	if (smb_libgteq(shp, SMB_VERSION_32)) {
+		mdp->smbmd_memtech = m.smbmdev_memtech;
+		mdp->smbmd_opcap_flags = m.smbmdev_opmode;
+		mdp->smbmd_firmware_rev = smb_strptr(stp,
+		    m.smbmdev_fwver);
+		mdp->smbmd_modmfg_id = m.smbmdev_modulemfgid;
+		mdp->smbmd_modprod_id = m.smbmdev_moduleprodid;
+		mdp->smbmd_cntrlmfg_id = m.smbmdev_memsysmfgid;
+		mdp->smbmd_cntrlprod_id = m.smbmdev_memsysprodid;
+		mdp->smbmd_nvsize = m.smbmdev_nvsize;
+		mdp->smbmd_volatile_size = m.smbmdev_volsize;
+		mdp->smbmd_cache_size = m.smbmdev_cachesize;
+		mdp->smbmd_logical_size = m.smbmdev_logicalsize;
 	}
 
 	return (0);

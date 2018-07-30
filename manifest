@@ -5092,6 +5092,7 @@ f usr/lib/amd64/libiscsit.so.1 0755 root bin
 s usr/lib/amd64/libiscsit.so=libiscsit.so.1
 f usr/lib/amd64/libjdns_sd.so.1 0755 root bin
 s usr/lib/amd64/libjdns_sd.so=libjdns_sd.so.1
+f usr/lib/amd64/libjedec.so.1 0755 root bin
 s usr/lib/amd64/libkmfberder.so.1=../../../lib/amd64/libkmfberder.so.1
 s usr/lib/amd64/libkmfberder.so=../../../lib/amd64/libkmfberder.so.1
 f usr/lib/amd64/libkrb5.so.1 0755 root bin
@@ -6533,6 +6534,7 @@ f usr/lib/libiscsit.so.1 0755 root bin
 s usr/lib/libiscsit.so=libiscsit.so.1
 f usr/lib/libjdns_sd.so.1 0755 root bin
 s usr/lib/libjdns_sd.so=libjdns_sd.so.1
+f usr/lib/libjedec.so.1 0755 root bin
 s usr/lib/libkcfd.so.1=../../lib/libkcfd.so.1
 s usr/lib/libkcfd.so=../../lib/libkcfd.so.1
 s usr/lib/libkmf.so.1=../../lib/libkmf.so.1

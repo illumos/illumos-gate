@@ -10,15 +10,9 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
-# Copyright 2018 Joyent, Inc.
+# Copyright (c) 2018 Joyent, Inc.
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs bunyan \
-	 mergeq workq grep_xpg4 awk smbios libjedec
-SUBDIRS += demangle
+include ../Makefile.com
 
-include $(SRC)/test/Makefile.com
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

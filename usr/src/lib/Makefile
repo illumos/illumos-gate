@@ -156,6 +156,7 @@ SUBDIRS +=				\
 	libipp		\
 	libipsecutil	\
 	libiscsit	\
+	libjedec	\
 	libkmf		\
 	libkrb5		\
 	libkstat	\
