@@ -159,7 +159,7 @@ _locore_start(struct boot_syscalls *sysp, ulong_t rsi, struct bootops *bop)
 	 * %rdi = boot services (should die someday)
 	 * %rdx = bootops
 	 * end
-	 */	
+	 */
 
 	leaq	edata(%rip), %rbp	/* reference edata for ksyms */
 	movq	$0, (%rbp)		/* limit stack back trace */
@@ -178,7 +178,7 @@ _locore_start(struct boot_syscalls *sysp, ulong_t rsi, struct bootops *bop)
 #endif
 	/*
 	 * Save call back for special x86 boot services vector
-	 */	
+	 */
 	movq	%rdi, sysp(%rip)
 
 	movq	%rdx, bootops(%rip)		/* save bootops */
@@ -208,7 +208,7 @@ _locore_start(struct boot_syscalls *sysp, ulong_t rsi, struct bootops *bop)
 #endif	/* __xpv */
 
 	/*
-	 * (We just assert this works by virtue of being here) 
+	 * (We just assert this works by virtue of being here)
 	 */
 	bts	$X86FSET_CPUID, x86_featureset(%rip)
 
@@ -268,7 +268,7 @@ _locore_start(struct boot_syscalls *sysp, struct bootops *bop)
 	/*
 	 *	%ecx = boot services (should die someday)
 	 *	%ebx = bootops
-	 */	
+	 */
 	mov	$edata, %ebp		/ edata needs to be defined for ksyms
 	movl	$0, (%ebp)		/ limit stack back trace
 
@@ -283,14 +283,14 @@ _locore_start(struct boot_syscalls *sysp, struct bootops *bop)
 	 */
 	mov	%ecx, sysp		/ save call back for boot services
 
- 	mov	%ebx, bootops		/ save bootops
+	mov	%ebx, bootops		/ save bootops
 	movl	$bootops, bootopsp
 
 
 	/*
 	 * Save all registers and flags
 	 */
-	pushal	
+	pushal
 	pushfl
 
 #if !defined(__xpv)
@@ -443,7 +443,7 @@ port_22_free:
 	 * cycle. If the CCR index was not valid for this Cyrix model, we may
 	 * have performed an external I/O cycle as well. In these cases and
 	 * if the motherboard/chipset vendor ignores I/O address line A1,
-	 * then the PIC will have IRQ3 set at the lowest priority as a side	
+	 * then the PIC will have IRQ3 set at the lowest priority as a side
 	 * effect of the above outb. We are reasonalbly confident that there
 	 * is not an unknown device on I/O port 0x22, so there should have been
 	 * no unpredictable side-effect of the above outb.
@@ -892,7 +892,7 @@ likelyM3:
 	 * now we will call anything with a DIR0 of 0x80 or higher an MIII.
 	 * The MIII is supposed to support large pages, but we will believe
 	 * it when we see it. For now we just enable and test for MII features.
-	 */	
+	 */
 	movl	$X86_TYPE_VIA_CYRIX_III, x86_type
 	jmp	likeMII
 
@@ -930,7 +930,7 @@ coma_bug:
  * fixed this bug sometime late in 1997 and no other exploits other than
  * xchgl have been discovered is good indication that this workaround is
  * reasonable.
- */	
+ */
 
 	.set	CYRIX_DBR0, 0x30	/ Debug Register 0
 	.set	CYRIX_DBR1, 0x31	/ Debug Register 1
@@ -939,7 +939,7 @@ coma_bug:
 	.set	CYRIX_DOR, 0x3c		/ Debug Opcode Register
 
 	/*
- 	 * What is known about DBR1, DBR2, DBR3, and DOR is that for normal
+	 * What is known about DBR1, DBR2, DBR3, and DOR is that for normal
 	 * cpu execution DBR1, DBR2, and DBR3 are set to 0. To obtain opcode
 	 * serialization, DBR1, DBR2, and DBR3 are loaded with 0xb8, 0x7f,
 	 * and 0xff. Then, DOR is loaded with the one byte opcode.
@@ -999,7 +999,7 @@ coma_bug:
 	/*
 	 * write DBR1
 	 */
-	movb	$CYRIX_DBR1, %al 
+	movb	$CYRIX_DBR1, %al
 	outb	$CYRIX_CRI
 	movb	$0xf8, %al
 	outb	$CYRIX_CRD
@@ -1201,6 +1201,7 @@ cmntrap()
 	leaq	dtrace_badtrap(%rip), %rdi
 	xorl	%eax, %eax
 	call	panic
+	SET_SIZE(cmntrap_pushed)
 	SET_SIZE(cmntrap)
 	SET_SIZE(_cmntrap)
 

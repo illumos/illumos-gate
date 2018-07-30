@@ -452,8 +452,8 @@
 
 	pushq	%rdi
 	call	kdi_trap_pass
-	cmpq	$1, %rax
-	je	kdi_pass_to_kernel
+	testq	%rax, %rax
+	jnz	kdi_pass_to_kernel
 	popq	%rax /* cpusave in %rax */
 
 	SAVE_IDTGDT
@@ -569,17 +569,9 @@
 	/*NOTREACHED*/
 	SET_SIZE(kdi_resume)
 
-	ENTRY_NP(kdi_pass_to_kernel)
-
-	popq	%rdi /* cpusave */
-
-	movq	$KDI_CPU_STATE_NONE, KRS_CPU_STATE(%rdi)
 
 	/*
-	 * Find the trap and vector off the right kernel handler.  The trap
-	 * handler will expect the stack to be in trap order, with %rip being
-	 * the last entry, so we'll need to restore all our regs.  On i86xpv
-	 * we'll need to compensate for XPV_TRAP_POP.
+	 * We took a trap that should be handled by the kernel, not KMDB.
 	 *
 	 * We're hard-coding the three cases where KMDB has installed permanent
 	 * handlers, since after we KDI_RESTORE_REGS(), we don't have registers
@@ -587,15 +579,53 @@
 	 * through here at the same time.
 	 *
 	 * Note that we handle T_DBGENTR since userspace might have tried it.
+	 *
+	 * The trap handler will expect the stack to be in trap order, with %rip
+	 * being the last entry, so we'll need to restore all our regs.  On
+	 * i86xpv we'll need to compensate for XPV_TRAP_POP.
+	 *
+	 * %rax on entry is either 1 or 2, which is from kdi_trap_pass().
+	 * kdi_cmnint stashed the original %cr3 into KDIREG_CR3, then (probably)
+	 * switched us to the CPU's kf_kernel_cr3. But we're about to call, for
+	 * example:
+	 *
+	 * dbgtrap->trap()->tr_iret_kernel
+	 *
+	 * which, unlike, tr_iret_kdi, doesn't restore the original %cr3, so
+	 * we'll do so here if needed.
+	 *
+	 * This isn't just a matter of tidiness: for example, consider:
+	 *
+	 * hat_switch(oldhat=kas.a_hat, newhat=prochat)
+	 *  setcr3()
+	 *  reset_kpti()
+	 *   *brktrap* due to fbt on reset_kpti:entry
+	 *
+	 * Here, we have the new hat's %cr3, but we haven't yet updated
+	 * kf_kernel_cr3 (so its currently kas's). So if we don't restore here,
+	 * we'll stay on kas's cr3 value on returning from the trap: not good if
+	 * we fault on a userspace address.
 	 */
+	ENTRY_NP(kdi_pass_to_kernel)
+
+	popq	%rdi /* cpusave */
+	movq	$KDI_CPU_STATE_NONE, KRS_CPU_STATE(%rdi)
 	movq	KRS_GREGS(%rdi), %rsp
+
+	cmpq	$2, %rax
+	jne	no_restore_cr3
+	movq	REG_OFF(KDIREG_CR3)(%rsp), %r11
+	movq	%r11, %cr3
+
+no_restore_cr3:
 	movq	REG_OFF(KDIREG_TRAPNO)(%rsp), %rdi
+
 	cmpq	$T_SGLSTP, %rdi
-	je	1f
+	je	kdi_pass_dbgtrap
 	cmpq	$T_BPTFLT, %rdi
-	je	2f
+	je	kdi_pass_brktrap
 	cmpq	$T_DBGENTR, %rdi
-	je	3f
+	je	kdi_pass_invaltrap
 	/*
 	 * Hmm, unknown handler.  Somebody forgot to update this when they
 	 * added a new trap interposition... try to drop back into kmdb.
@@ -609,13 +639,13 @@
 	XPV_TRAP_PUSH; \
 	jmp	%cs:name
 
-1:
+kdi_pass_dbgtrap:
 	CALL_TRAP_HANDLER(dbgtrap)
 	/*NOTREACHED*/
-2:
+kdi_pass_brktrap:
 	CALL_TRAP_HANDLER(brktrap)
 	/*NOTREACHED*/
-3:
+kdi_pass_invaltrap:
 	CALL_TRAP_HANDLER(invaltrap)
 	/*NOTREACHED*/
 

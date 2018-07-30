@@ -164,8 +164,8 @@ struct idt_description {
 	{ T_GPFLT, 0,		kdi_traperr13, NULL },
 	{ T_PGFLT, 0,		kdi_traperr14, NULL },
 	{ 15, 0,		kdi_invaltrap, NULL },
-	{ T_EXTERRFLT, 0, 	kdi_trap16, NULL },
-	{ T_ALIGNMENT, 0, 	kdi_traperr17, NULL },
+	{ T_EXTERRFLT, 0,	kdi_trap16, NULL },
+	{ T_ALIGNMENT, 0,	kdi_traperr17, NULL },
 	{ T_MCE, 0,		kdi_trap18, NULL },
 	{ T_SIMDFPE, 0,		kdi_trap19, NULL },
 	{ T_DBGENTR, 0,		kdi_trap20, NULL },
@@ -366,14 +366,16 @@ kdi_deactivate(void)
 }
 
 /*
- * We receive all breakpoints and single step traps.  Some of them,
- * including those from userland and those induced by DTrace providers,
- * are intended for the kernel, and must be processed there.  We adopt
- * this ours-until-proven-otherwise position due to the painful
- * consequences of sending the kernel an unexpected breakpoint or
- * single step.  Unless someone can prove to us that the kernel is
- * prepared to handle the trap, we'll assume there's a problem and will
- * give the user a chance to debug it.
+ * We receive all breakpoints and single step traps.  Some of them, including
+ * those from userland and those induced by DTrace providers, are intended for
+ * the kernel, and must be processed there.  We adopt this
+ * ours-until-proven-otherwise position due to the painful consequences of
+ * sending the kernel an unexpected breakpoint or single step.  Unless someone
+ * can prove to us that the kernel is prepared to handle the trap, we'll assume
+ * there's a problem and will give the user a chance to debug it.
+ *
+ * If we return 2, then the calling code should restore the trap-time %cr3: that
+ * is, it really is a kernel-originated trap.
  */
 int
 kdi_trap_pass(kdi_cpusave_t *cpusave)
@@ -390,7 +392,7 @@ kdi_trap_pass(kdi_cpusave_t *cpusave)
 
 	if (tt == T_BPTFLT && kdi_dtrace_get_state() ==
 	    KDI_DTSTATE_DTRACE_ACTIVE)
-		return (1);
+		return (2);
 
 	/*
 	 * See the comments in the kernel's T_SGLSTP handler for why we need to
