@@ -251,6 +251,11 @@ kpti_kbase:
  * This is used for all interrupts that can plausibly be taken inside another
  * interrupt and are using a kpti_frame stack (so #BP, #DB, #GP, #PF, #SS).
  *
+ * We also use this for #NP, even though it uses the standard IST: the
+ * additional %rsp checks below will catch when we get an exception doing an
+ * iret to userspace with a bad %cs/%ss.  This appears as a kernel trap, and
+ * only later gets redirected via kern_gpfault().
+ *
  * We check for whether we took the interrupt while in another trampoline, in
  * which case we need to use the kthread stack.
  */
@@ -649,7 +654,7 @@ tr_intr_ret_end:
 	MK_INTR_TRAMPOLINE_NOERR(invoptrap)
 	MK_INTR_TRAMPOLINE_NOERR(ndptrap)
 	MK_INTR_TRAMPOLINE(invtsstrap)
-	MK_INTR_TRAMPOLINE(segnptrap)
+	MK_DBG_INTR_TRAMPOLINE(segnptrap)
 	MK_DBG_INTR_TRAMPOLINE(stktrap)
 	MK_DBG_INTR_TRAMPOLINE(gptrap)
 	MK_DBG_INTR_TRAMPOLINE(pftrap)
