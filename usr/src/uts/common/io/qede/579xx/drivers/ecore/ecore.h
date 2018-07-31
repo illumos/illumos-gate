@@ -111,7 +111,7 @@ enum ecore_nvm_cmd {
 
 #define SET_FIELD(value, name, flag)					\
 do {									\
-	(value) &= ~(name##_MASK << name##_SHIFT);			\
+	(value) &= ~((u64)name##_MASK << (u64)name##_SHIFT);		\
 	(value) |= ((((u64)flag) & (u64)name##_MASK) << (name##_SHIFT));\
 } while (0)
 
@@ -124,9 +124,10 @@ do {									\
 
 #define ECORE_MFW_SET_FIELD(name, field, value)				\
 do {									\
-	(name) &= ~((field ## _MASK) << (field ## _SHIFT));		\
+	(name) &= ~(((u64)field ## _MASK) << ((u64)field ## _SHIFT));	\
 	(name) |= (((value) << (field ## _SHIFT)) & (field ## _MASK));	\
 } while (0)
+
 
 static OSAL_INLINE u32 DB_ADDR(u32 cid, u32 DEMS)
 {

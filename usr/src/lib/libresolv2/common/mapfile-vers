@@ -46,7 +46,7 @@ SYMBOL_VERSION SUNW_2.3 {	# SunOS 5.11 (Solaris 11)
 
 SYMBOL_VERSION SUNW_2.2.2 {	# SunOS 5.10 (Solaris 10 Update 5)
     global:
-	inet_aton		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	inet_aton		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 } SUNW_2.2.1;
 
 SYMBOL_VERSION SUNW_2.2.1 {	# SunOS 5.10 (Solaris 10 Update 4)

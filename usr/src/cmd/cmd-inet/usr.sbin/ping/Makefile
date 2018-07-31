@@ -33,10 +33,10 @@ $(ROOTUSRSBIN)/ping	:=	FILEMODE= 04555
 
 # Ping uses the ancillary data feature which is available only through
 # UNIX 98 standards version of Socket interface. This interface is supposed to
-# be accessed by -lxnet. In addition -lsocket and -lnsl are used to
+# be accessed by -lxnet. In addition -lsocket and is used to
 # capture new not-yet-standard interfaces. Someday -lxnet alone should be enough
 # when IPv6 inspired new interfaces are part of standards.
-LDLIBS +=	-lxnet -lsocket -lnsl -lm -linetutil
+LDLIBS +=	-lxnet -lsocket -lm -linetutil
 
 # These #defines are required to use SUSv3 interfaces
 CPPFLAGS += -D_XOPEN_SOURCE=600 -D__EXTENSIONS__
@@ -62,7 +62,7 @@ $(PROG): $(OBJS)
 
 install: all $(ROOTUSRSBINPROG)
 
-clean:	
+clean:
 	$(RM) $(OBJS)
 
 lint:	lint_SRCS

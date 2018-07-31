@@ -13,14 +13,13 @@ ncaport.conf \- ncaport configuration file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBncaport.conf\fR file is used to configure the IP addresses and ports
 that the Solaris Network Cache and Acceleration (NCA) kernel module services.
 The file contains two fields, key and value, in the format of
 \fBncaport=\fIipaddress\fR/\fIport\fR\fR. IPv4 addresses must be in the dot
 notation \fId\fR.\fId\fR.\fId\fR.\fId\fR. IPv6 addresses must be in one of the
-three conventional forms (see \fBinet_pton\fR(3SOCKET)). If an asterisk
+three conventional forms (see \fBinet_pton\fR(3C)). If an asterisk
 (\fB*\fR) is used for an IP address, it is interpreted as \fBINADDR_ANY\fR,
 which matches any IP address.
 .sp
@@ -54,12 +53,10 @@ ncaport=*/9000
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
-\fBnca\fR(1), \fBbind\fR(3SOCKET), \fBinet_pton\fR(3SOCKET),
+\fBnca\fR(1), \fBbind\fR(3SOCKET), \fBinet_pton\fR(3C),
 \fBncad_addr\fR(4), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 For those web servers that use \fBAF_NCA\fR sockets, the NCA port configuration
 described here has no effect.

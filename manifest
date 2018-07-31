@@ -13358,6 +13358,17 @@ f usr/share/man/man3c/iconv_open.3c 0444 root bin
 f usr/share/man/man3c/imaxabs.3c 0444 root bin
 f usr/share/man/man3c/imaxdiv.3c 0444 root bin
 f usr/share/man/man3c/index.3c 0444 root bin
+f usr/share/man/man3c/inet.3c 0444 root bin
+s usr/share/man/man3c/inet6.3c=inet.3c
+s usr/share/man/man3c/inet_addr.3c=inet.3c
+s usr/share/man/man3c/inet_aton.3c=inet.3c
+s usr/share/man/man3c/inet_lnaof.3c=inet.3c
+s usr/share/man/man3c/inet_makeaddr.3c=inet.3c
+s usr/share/man/man3c/inet_netof.3c=inet.3c
+s usr/share/man/man3c/inet_network.3c=inet.3c
+s usr/share/man/man3c/inet_ntoa.3c=inet.3c
+s usr/share/man/man3c/inet_ntop.3c=inet.3c
+s usr/share/man/man3c/inet_pton.3c=inet.3c
 f usr/share/man/man3c/initgroups.3c 0444 root bin
 s usr/share/man/man3c/initstate.3c=random.3c
 f usr/share/man/man3c/inotify_init.3c 0444 root bin
@@ -17872,8 +17883,6 @@ s usr/share/man/man3socket/if_freenameindex.3socket=if_nametoindex.3socket
 s usr/share/man/man3socket/if_indextoname.3socket=if_nametoindex.3socket
 s usr/share/man/man3socket/if_nameindex.3socket=if_nametoindex.3socket
 f usr/share/man/man3socket/if_nametoindex.3socket 0444 root bin
-f usr/share/man/man3socket/inet.3socket 0444 root bin
-s usr/share/man/man3socket/inet6.3socket=inet.3socket
 f usr/share/man/man3socket/inet6_opt.3socket 0444 root bin
 s usr/share/man/man3socket/inet6_opt_append.3socket=inet6_opt.3socket
 s usr/share/man/man3socket/inet6_opt_find.3socket=inet6_opt.3socket
@@ -17889,15 +17898,6 @@ s usr/share/man/man3socket/inet6_rth_init.3socket=inet6_rth.3socket
 s usr/share/man/man3socket/inet6_rth_reverse.3socket=inet6_rth.3socket
 s usr/share/man/man3socket/inet6_rth_segments.3socket=inet6_rth.3socket
 s usr/share/man/man3socket/inet6_rth_space.3socket=inet6_rth.3socket
-s usr/share/man/man3socket/inet_addr.3socket=inet.3socket
-s usr/share/man/man3socket/inet_aton.3socket=inet.3socket
-s usr/share/man/man3socket/inet_lnaof.3socket=inet.3socket
-s usr/share/man/man3socket/inet_makeaddr.3socket=inet.3socket
-s usr/share/man/man3socket/inet_netof.3socket=inet.3socket
-s usr/share/man/man3socket/inet_network.3socket=inet.3socket
-s usr/share/man/man3socket/inet_ntoa.3socket=inet.3socket
-s usr/share/man/man3socket/inet_ntop.3socket=inet.3socket
-s usr/share/man/man3socket/inet_pton.3socket=inet.3socket
 f usr/share/man/man3socket/listen.3socket 0444 root bin
 s usr/share/man/man3socket/ntohl.3socket=byteorder.3socket
 s usr/share/man/man3socket/ntohll.3socket=byteorder.3socket

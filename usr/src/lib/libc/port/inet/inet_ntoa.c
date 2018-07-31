@@ -46,8 +46,8 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- * 	This product includes software developed by the University of
- * 	California, Berkeley and its contributors.
+ *	This product includes software developed by the University of
+ *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -102,8 +102,6 @@
  * SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Convert network-format internet address
  * to base 256 d.d.d.d representation.
@@ -111,44 +109,34 @@
  * Reentrant interface
  */
 
-#include "mt.h"
-#include "rpc_mt.h"
-#include <errno.h>
+#include "lint.h"
+#include "thr_uberdata.h"
+
 #include <sys/types.h>
-#include <ctype.h>
+
 #include <netinet/in.h>
+
+#include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-
 char *
-inet_ntoa_r(in, b)
-	struct in_addr in;
-	char	b[];	/* Assumed >= 18 bytes */
+inet_ntoa_r(struct in_addr in, char b[])
 {
 	char	*p;
 
 	p = (char *)&in;
 #define	UC(b)	(((int)b)&0xff)
 	(void) sprintf(b, "%d.%d.%d.%d",
-				UC(p[0]), UC(p[1]), UC(p[2]), UC(p[3]));
+	    UC(p[0]), UC(p[1]), UC(p[2]), UC(p[3]));
 	return (b);
 }
 
 char *
-inet_ntoa(in)
-	struct in_addr in;
+inet_ntoa(struct in_addr in)
 {
-	char *b;
-	static char b_main[18];
-	static pthread_key_t ntoa_key = PTHREAD_ONCE_KEY_NP;
-
-	if (thr_main())
-		b = b_main;
-	else if ((b = thr_get_storage(&ntoa_key, 18, free)) == NULL)
-		b = b_main;
-
-	return (inet_ntoa_r(in, b));
+	return (inet_ntoa_r(in, curthread->ul_ntoabuf));
 }
 
 /*
@@ -166,7 +154,6 @@ inet_aton(const char *cp, struct in_addr *addr)
 	char c;
 	unsigned int parts[4];
 	unsigned int *pp = parts;
-
 
 	c = *cp;
 	for (;;) {
@@ -273,7 +260,7 @@ inet_addr(const char *cp)
  * Return the network number from an internet
  * address; handles class a/b/c network #'s.
  */
-uint_t
+in_addr_t
 inet_netof(struct in_addr in)
 {
 	uint32_t i = ntohl(in.s_addr);

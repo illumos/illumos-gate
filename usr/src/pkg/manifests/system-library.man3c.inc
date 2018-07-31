@@ -11,7 +11,7 @@
 
 #
 # Copyright 2011, Richard Lowe
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2013 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
@@ -205,6 +205,7 @@ file path=usr/share/man/man3c/iconv_open.3c
 file path=usr/share/man/man3c/imaxabs.3c
 file path=usr/share/man/man3c/imaxdiv.3c
 file path=usr/share/man/man3c/index.3c
+file path=usr/share/man/man3c/inet.3c
 file path=usr/share/man/man3c/initgroups.3c
 file path=usr/share/man/man3c/insque.3c
 file path=usr/share/man/man3c/is_system_labeled.3c
@@ -884,6 +885,16 @@ link path=usr/share/man/man3c/htobe64.3c target=endian.3c
 link path=usr/share/man/man3c/htole16.3c target=endian.3c
 link path=usr/share/man/man3c/htole32.3c target=endian.3c
 link path=usr/share/man/man3c/htole64.3c target=endian.3c
+link path=usr/share/man/man3c/inet6.3c target=inet.3c
+link path=usr/share/man/man3c/inet_addr.3c target=inet.3c
+link path=usr/share/man/man3c/inet_aton.3c target=inet.3c
+link path=usr/share/man/man3c/inet_lnaof.3c target=inet.3c
+link path=usr/share/man/man3c/inet_makeaddr.3c target=inet.3c
+link path=usr/share/man/man3c/inet_netof.3c target=inet.3c
+link path=usr/share/man/man3c/inet_network.3c target=inet.3c
+link path=usr/share/man/man3c/inet_ntoa.3c target=inet.3c
+link path=usr/share/man/man3c/inet_ntop.3c target=inet.3c
+link path=usr/share/man/man3c/inet_pton.3c target=inet.3c
 link path=usr/share/man/man3c/initstate.3c target=random.3c
 link path=usr/share/man/man3c/innetgr.3c target=getnetgrent.3c
 link path=usr/share/man/man3c/isalnum.3c target=ctype.3c

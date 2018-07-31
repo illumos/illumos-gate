@@ -2218,13 +2218,13 @@ enum _ecore_status_t ecore_hw_init(struct ecore_dev *p_dev,
 					     p_hwfn->hw_info.hw_mode);
 			if (rc != ECORE_SUCCESS)
 				break;
-			/* Fall into */
+			/* FALLTHROUGH */
 		case FW_MSG_CODE_DRV_LOAD_PORT:
 			rc = ecore_hw_init_port(p_hwfn, p_hwfn->p_main_ptt,
 						p_hwfn->hw_info.hw_mode);
 			if (rc != ECORE_SUCCESS)
 				break;
-			/* Fall into */
+			/* FALLTHROUGH */
 		case FW_MSG_CODE_DRV_LOAD_FUNCTION:
 			rc = ecore_hw_init_pf(p_hwfn, p_hwfn->p_main_ptt,
 					      p_params->p_tunn,

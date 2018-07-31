@@ -48,8 +48,8 @@ SYMBOL_VERSION SUNW_1.3.1 {
 	freeaddrinfo		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
 	getaddrinfo		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
 	getnameinfo		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
-	inet_ntop		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
-	inet_pton		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
+	inet_ntop		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_pton		{ TYPE = FUNCTION; FILTER = libc.so.1 };
 } SUNW_1.3;
 
 SYMBOL_VERSION SUNW_1.3 {
@@ -144,13 +144,13 @@ SYMBOL_VERSION SUNW_1.1 {
 	};
 	htonl			{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	htons			{ TYPE = FUNCTION; FILTER = libc.so.1 };
-	inet_addr		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
-	inet_lnaof		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
-	inet_makeaddr		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
-	inet_netof		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
-	inet_network		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
-	inet_ntoa		{ TYPE = FUNCTION; FILTER = libnsl.so.1 };
-	listen	 		{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
+	inet_addr		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_lnaof		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_makeaddr		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_netof		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_network		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	inet_ntoa		{ TYPE = FUNCTION; FILTER = libc.so.1 };
+	listen			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };
 	ntohl			{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	ntohs			{ TYPE = FUNCTION; FILTER = libc.so.1 };
 	recv			{ TYPE = FUNCTION; FILTER = libsocket.so.1 };

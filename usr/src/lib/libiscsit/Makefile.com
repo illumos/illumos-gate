@@ -41,7 +41,7 @@ INCS += -I$(SRCDIR)
 
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
-LDLIBS +=	-lc -lnvpair -lstmf -luuid -lnsl -lscf
+LDLIBS +=	-lc -lnvpair -lstmf -luuid -lscf
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 CERRWARN +=	-_gcc=-Wno-parentheses
 

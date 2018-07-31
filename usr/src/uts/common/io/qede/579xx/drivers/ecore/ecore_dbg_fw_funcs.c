@@ -5444,12 +5444,13 @@ enum dbg_status ecore_dbg_bus_add_constraint(struct ecore_hwfn *p_hwfn,
 		if (!data_mask)
 			return DBG_STATUS_INVALID_ARGS;
 
-		for (lsb = 0; lsb < 32 && !(data_mask & 1); lsb++, data_mask >>= 1);
-		for (width = 0;
-		width < 32 - lsb && (data_mask & 1);
-			width++, data_mask >>= 1);
-			if (data_mask)
-				return DBG_STATUS_INVALID_ARGS;
+		for (lsb = 0; lsb < 32 && !(data_mask & 1); lsb++)
+			data_mask >>= 1;
+
+		for (width = 0; width < 32 - lsb && (data_mask & 1); width++)
+			data_mask >>= 1;
+		if (data_mask)
+			return DBG_STATUS_INVALID_ARGS;
 		range = (lsb << 5) | (width - 1);
 	}
 

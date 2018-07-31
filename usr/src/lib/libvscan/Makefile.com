@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY= libvscan.a
 VERS= .1
@@ -39,7 +37,7 @@ $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 # Reset the Makefile.lib macro ROOTLIBDIR to refer to usr/lib/vscan
 ROOTLIBDIR = $(ROOT)/usr/lib/vscan
 
-LDLIBS += -lc -lscf -lsecdb -lnsl -lm
+LDLIBS += -lc -lscf -lsecdb -lm
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I$(SRCDIR)
 

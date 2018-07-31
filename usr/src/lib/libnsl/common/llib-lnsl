@@ -22,8 +22,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2016 Nexenta Systems, Inc.
+ */
+
+/*
+ * Copyright 2018 Nexenta Systems, Inc.
  */
 
 
@@ -442,12 +444,6 @@ struct rpcent *getrpcent_r(struct rpcent *result, char *buffer, int buflen);
 /* inet_matchaddr.c */
 int inet_matchaddr(const void *, const char *);
 
-/* inet_ntop.c */
-const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
-
-/* inet_pton.c */
-int inet_pton(int af, const char *src, void *dst);
-
 /* netdir_inet.c */
 int _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 				struct nss_netdirbyname_in *args,
@@ -567,12 +563,6 @@ int setdomainname(char *domain, int len);
 
 /* gethostname.c */
 int gethostname(char *hname, int hlen);
-
-/* inet_ntoa.c */
-char *inet_ntoa_r(struct in_addr in, char b[]);
-char *inet_ntoa(struct in_addr in);
-in_addr_t inet_addr(const char *cp);
-in_addr_t inet_netof(struct in_addr in);
 
 /* key_call.c */
 int key_setsecret(const char *secretkey);

@@ -13,7 +13,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lnsl\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Functions in this library provide routines that provide a transport-level
 interface to networking services for applications, facilities for
@@ -27,7 +26,6 @@ example is the set of symbols beginning with the \fB_xti\fR prefix. Those
 symbols are used in implementing the X/Open Transport Interface (\fBXTI)\fR
 interfaces documented in \fBlibxnet\fR. See \fBlibxnet\fR(3LIB).
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibnsl.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -97,9 +95,6 @@ l l .
 \fBgetrpcent\fR	\fBgetrpcent_r\fR
 \fBgetrpcport\fR	\fBgetsecretkey\fR
 \fBh_errno\fR	\fBhost2netname\fR
-\fBinet_addr\fR	\fBinet_netof\fR
-\fBinet_ntoa\fR	\fBinet_ntoa_r\fR
-\fBinet_ntop\fR	\fBinet_pton\fR
 \fBkey_decryptsession\fR	\fBkey_encryptsession\fR
 \fBkey_gendes\fR	\fBkey_secretkey_is_set\fR
 \fBkey_setsecret\fR	\fBmaxbno\fR
@@ -234,7 +229,7 @@ l l .
 \fByp_match\fR	\fByp_next\fR
 \fByp_order\fR	\fByp_unbind\fR
 \fByp_update\fR	\fByperr_string\fR
-\fBypprot_err\fR	
+\fBypprot_err\fR
 .TE
 
 .sp
@@ -245,11 +240,10 @@ The following interface is unique to the 32-bit version of this library:
 .sp
 .TS
 l l .
-\fB_new_svc_fdset\fR	
+\fB_new_svc_fdset\fR
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libnsl.so.1\fR\fR
@@ -268,7 +262,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -284,7 +277,6 @@ MT-Level	Safe with exceptions
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpvs\fR(1), \fBIntro\fR(2), \fBIntro\fR(3), \fBlibxnet\fR(3LIB),
 \fBattributes\fR(5)

@@ -32,7 +32,7 @@ OBJECTS=	$(LIB_OBJS) $(XML_OBJS)
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lsocket -lnsl -luuid -lnvpair -lsysevent -lsec -lbrand \
+LDLIBS +=	-lc -lsocket -luuid -lnvpair -lsysevent -lsec -lbrand \
 		-lpool -lscf -lproc -luutil -lbsm -lsecdb
 # DYNLIB libraries do not have lint libs and are not linted
 $(DYNLIB) :=	LDLIBS += -lxml2
