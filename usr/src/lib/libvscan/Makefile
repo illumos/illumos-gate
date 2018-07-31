@@ -42,7 +42,7 @@ MSGFILES =	common/libvscan.c
 
 .KEEP_STATE:
 
-all clean clobber install lint _msg : $(SUBDIRS)
+all clean clobber install lint: $(SUBDIRS)
 
 $(POFILE):	$(MSGFILES)
 	$(BUILDPO.msgfiles)
