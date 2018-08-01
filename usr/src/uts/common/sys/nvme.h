@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _SYS_NVME_H
@@ -122,14 +123,22 @@ typedef struct {
 	uint8_t	psd_rsvd5:3;
 	uint8_t psd_rwl:5;		/* Relative Write Latency */
 	uint8_t psd_rsvd6:3;
-	uint8_t psd_rsvd7[16];
+	uint16_t psd_idlp;		/* Idle Power (1.2) */
+	uint8_t psd_rsvd7:6;
+	uint8_t psd_ips:2;		/* Idle Power Scale (1.2) */
+	uint8_t psd_rsvd8;
+	uint16_t psd_actp;		/* Active Power (1.2) */
+	uint8_t psd_apw:3;		/* Active Power Workload (1.2) */
+	uint8_t psd_rsvd9:3;
+	uint8_t psd_aps:2;		/* Active Power Scale */
+	uint8_t psd_rsvd10[9];
 } nvme_idctl_psd_t;
 
 /* NVMe Identify Controller Data Structure */
 typedef struct {
 	/* Controller Capabilities & Features */
 	uint16_t id_vid;		/* PCI vendor ID */
-	uint16_t id_ssvid; 		/* PCI subsystem vendor ID */
+	uint16_t id_ssvid;		/* PCI subsystem vendor ID */
 	char id_serial[20];		/* Serial Number */
 	char id_model[40];		/* Model Number */
 	char id_fwrev[8];		/* Firmware Revision */
@@ -143,7 +152,18 @@ typedef struct {
 	} id_mic;
 	uint8_t	id_mdts;		/* Maximum Data Transfer Size */
 	uint16_t id_cntlid;		/* Unique Controller Identifier (1.1) */
-	uint8_t id_rsvd_cc[256 - 80];
+	/* Added in NVMe 1.2 */
+	uint32_t id_ver;		/* Version */
+	uint32_t id_rtd3r;		/* RTD3 Resume Latency */
+	uint32_t id_rtd3e;		/* RTD3 Entry Latency */
+	uint32_t id_oaes;		/* Optional Asynchronous Events */
+	/* Added in NVMe 1.3 */
+	uint32_t id_ctratt;		/* Controller Attributes */
+	uint8_t id_rsvd_cc[12];
+	uint8_t id_frguid[16];		/* FRU GUID */
+	uint8_t id_rsvd2_cc[240 - 128];
+	uint8_t id_rsvd_nvmemi[255 - 240];
+	uint8_t id_mec;			/* Management Endpiont Capabilities */
 
 	/* Admin Command Set Attributes */
 	struct {			/* Optional Admin Command Support */
@@ -173,12 +193,30 @@ typedef struct {
 		uint8_t ap_sup:1;	/* APST supported (1.1) */
 		uint8_t ap_rsvd:7;
 	} id_apsta;
-	uint8_t id_rsvd_ac[256 - 10];
+	/* Added in NVMe 1.2 */
+	uint16_t ap_wctemp;		/* Warning Composite Temperature */
+	uint16_t ap_cctemp;		/* Critical Composite Temperature */
+	uint16_t ap_mtfa;		/* Maximum Firmware Activation Time */
+	uint32_t ap_hmpre;		/* Host Memory Buffer Preferred Size */
+	uint32_t ap_hmmin;		/* Host Memory Buffer Min Size */
+	uint8_t ap_tnvmcap[16];		/* Total NVM Capacity in Bytes */
+	uint8_t ap_unvmcap[16];		/* Unallocated NVM Capacity */
+	uint32_t ap_rpmbs;		/* Replay Protected Memory Block */
+	/* Added in NVMe 1.3 */
+	uint16_t ap_edstt;		/* Extended Device Self-test time */
+	uint8_t ap_dsto;		/* Device Self-test Options */
+	uint8_t ap_fwug;		/* Firmware Update Granularity */
+	uint16_t ap_kas;		/* Keep Alive Support */
+	uint16_t ap_hctma;		/* Host Thermal Management */
+	uint16_t ap_mntmt;		/* Minimum Thermal Temperature */
+	uint16_t ap_mxtmt;		/* Maximum Thermal Temperature */
+	uint32_t ap_sanitize;		/* Sanitize Caps */
+	uint8_t id_rsvd_ac[512 - 332];
 
 	/* NVM Command Set Attributes */
 	nvme_idctl_qes_t id_sqes;	/* Submission Queue Entry Size */
 	nvme_idctl_qes_t id_cqes;	/* Completion Queue Entry Size */
-	uint16_t id_rsvd_nc_1;
+	uint16_t id_maxcmd;		/* Max Outstanding Commands (1.3) */
 	uint32_t id_nn;			/* Number of Namespaces */
 	struct {			/* Optional NVM Command Support */
 		uint16_t on_compare:1;	/* Compare */
@@ -218,10 +256,12 @@ typedef struct {
 		uint16_t sgl_bucket:1;	/* SGL Bit Bucket supported (1.1) */
 		uint16_t sgl_rsvd2:15;
 	} id_sgls;
-	uint8_t id_rsvd_nc_4[192 - 28];
+	uint8_t id_rsvd_nc_4[768 - 540];
 
 	/* I/O Command Set Attributes */
-	uint8_t id_rsvd_ioc[1344];
+	uint8_t id_subnqn[1024 - 768];	/* Subsystem Qualified Name (1.2.1+) */
+	uint8_t id_rsvd_ioc[1792 - 1024];
+	uint8_t id_nvmof[2048 - 1792];	/* NVMe over Fabrics */
 
 	/* Power State Descriptors */
 	nvme_idctl_psd_t id_psd[32];
@@ -285,15 +325,47 @@ typedef struct {
 		uint8_t rc_excl_a:1;	/* Excl Acc - All Registrants (1.1) */
 		uint8_t rc_rsvd:1;
 	} id_rescap;
-	uint8_t id_rsvd1[120 - 32];
+	uint8_t id_fpi;			/* Format Progress Indicator (1.2) */
+	uint8_t id_dfleat;		/* Deallocate Log. Block (1.3) */
+	uint16_t id_nawun;		/* Atomic Write Unit Normal (1.2) */
+	uint16_t id_nawupf;		/* Atomic Write Unit Power Fail (1.2) */
+	uint16_t id_nacwu;		/* Atomic Compare & Write Unit (1.2) */
+	uint16_t id_nabsn;		/* Atomic Boundary Size Normal (1.2) */
+	uint16_t id_nbao;		/* Atomic Boundary Offset (1.2) */
+	uint16_t id_nabspf;		/* Atomic Boundary Size Fail (1.2) */
+	uint16_t id_noiob;		/* Optimal I/O Bondary (1.3) */
+	uint8_t id_nvmcap[16];		/* NVM Capacity */
+	uint8_t id_rsvd1[104 - 64];
+	uint8_t id_nguid[16];		/* Namespace GUID (1.2) */
 	uint8_t id_eui64[8];		/* IEEE Extended Unique Id (1.1) */
 	nvme_idns_lbaf_t id_lbaf[16];	/* LBA Formats */
 
-	uint8_t id_rsvd2[192];
+	uint8_t id_rsvd2[384 - 192];
 
-	uint8_t id_vs[3712];		/* Vendor Specific */
+	uint8_t id_vs[4096 - 384];	/* Vendor Specific */
 } nvme_identify_nsid_t;
 
+/* NVMe Identify Primary Controller Capabilities */
+typedef struct {
+	uint16_t	nipc_cntlid;	/* Controller ID */
+	uint16_t	nipc_portid;	/* Port Identifier */
+	uint8_t		nipc_crt;	/* Controller Resource Types */
+	uint8_t		nipc_rsvd0[32 - 5];
+	uint32_t	nipc_vqfrt;	/* VQ Resources Flexible Total */
+	uint32_t	nipc_vqrfa;	/* VQ Resources Flexible Assigned */
+	uint16_t	nipc_vqrfap;	/* VQ Resources to Primary */
+	uint16_t	nipc_vqprt;	/* VQ Resources Private Total */
+	uint16_t	nipc_vqfrsm;	/* VQ Resources Secondary Max */
+	uint16_t	nipc_vqgran;	/* VQ Flexible Resource Gran */
+	uint8_t		nipc_rvsd1[64 - 48];
+	uint32_t	nipc_vifrt;	/* VI Flexible total */
+	uint32_t	nipc_virfa;	/* VI Flexible Assigned */
+	uint16_t	nipc_virfap;	/* VI Flexible Allocatd to Primary */
+	uint16_t	nipc_viprt;	/* VI Resources Private Total */
+	uint16_t	nipc_vifrsm;	/* VI Resources Secondary Max */
+	uint16_t	nipc_vigran;	/* VI Flexible Granularity */
+	uint8_t		nipc_rsvd2[4096 - 80];
+} nvme_identify_primary_caps_t;
 
 /*
  * NVMe completion queue entry status field

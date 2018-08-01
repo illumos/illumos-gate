@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Nexenta Systems, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 
@@ -20,6 +21,7 @@ OBJS= nvmeadm.o nvmeadm_dev.o nvmeadm_print.o
 SRCS= $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 .KEEP_STATE:
 
@@ -32,6 +34,10 @@ all: $(PROG)
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
+
+%.o: %.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
 
 install: all $(ROOTUSRSBINPROG)
 
