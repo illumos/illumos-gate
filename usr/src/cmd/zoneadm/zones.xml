@@ -54,6 +54,19 @@
 		<service_fmri value='svc:/milestone/multi-user-server' />
 	</dependency>
 
+	<!--
+	    Until overlay device creation is moved out of the zone
+	    state-change script, zones must be dependent on varpd's
+	    successful launch.
+	-->
+	<dependency
+		name='varpd'
+		type='service'
+		grouping='require_all'
+		restart_on='none'>
+		<service_fmri value='svc:/network/varpd' />
+	</dependency>
+
 	<dependency
 		name='metadata'
 		type='service'
