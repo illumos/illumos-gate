@@ -13,7 +13,7 @@
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2016 Tegile Systems, Inc. All rights reserved.
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -196,7 +196,7 @@
  * The following driver properties can be changed to control some aspects of the
  * drivers operation:
  * - strict-version: can be set to 0 to allow devices conforming to newer
- *   versions or namespaces with EUI64 to be used
+ *   major versions to be used
  * - ignore-unknown-vendor-status: can be set to 1 to not handle any vendor
  *   specific command status as a fatal error leading device faulting
  * - admin-queue-len: the maximum length of the admin queue (16-4096)
@@ -258,10 +258,31 @@
 #include "nvme_reg.h"
 #include "nvme_var.h"
 
+/*
+ * Assertions to make sure that we've properly captured various aspects of the
+ * packed structures and haven't broken them during updates.
+ */
+CTASSERT(sizeof (nvme_identify_ctrl_t) == 0x1000);
+CTASSERT(offsetof(nvme_identify_ctrl_t, id_oacs) == 256);
+CTASSERT(offsetof(nvme_identify_ctrl_t, id_sqes) == 512);
+CTASSERT(offsetof(nvme_identify_ctrl_t, id_subnqn) == 768);
+CTASSERT(offsetof(nvme_identify_ctrl_t, id_nvmof) == 1792);
+CTASSERT(offsetof(nvme_identify_ctrl_t, id_psd) == 2048);
+CTASSERT(offsetof(nvme_identify_ctrl_t, id_vs) == 3072);
+
+CTASSERT(sizeof (nvme_identify_nsid_t) == 0x1000);
+CTASSERT(offsetof(nvme_identify_nsid_t, id_fpi) == 32);
+CTASSERT(offsetof(nvme_identify_nsid_t, id_nguid) == 104);
+CTASSERT(offsetof(nvme_identify_nsid_t, id_lbaf) == 128);
+CTASSERT(offsetof(nvme_identify_nsid_t, id_vs) == 384);
+
+CTASSERT(sizeof (nvme_identify_primary_caps_t) == 0x1000);
+CTASSERT(offsetof(nvme_identify_primary_caps_t, nipc_vqfrt) == 32);
+CTASSERT(offsetof(nvme_identify_primary_caps_t, nipc_vifrt) == 64);
+
 
 /* NVMe spec version supported */
 static const int nvme_version_major = 1;
-static const int nvme_version_minor = 2;
 
 /* tunable for admin command timeout in seconds, default is 1s */
 int nvme_admin_cmd_timeout = 1;
@@ -2265,10 +2286,9 @@ nvme_init(nvme_t *nvme)
 	dev_err(nvme->n_dip, CE_CONT, "?NVMe spec version %d.%d",
 	    nvme->n_version.v_major, nvme->n_version.v_minor);
 
-	if (NVME_VERSION_HIGHER(&nvme->n_version,
-	    nvme_version_major, nvme_version_minor)) {
-		dev_err(nvme->n_dip, CE_WARN, "!no support for version > %d.%d",
-		    nvme_version_major, nvme_version_minor);
+	if (nvme->n_version.v_major > nvme_version_major) {
+		dev_err(nvme->n_dip, CE_WARN, "!no support for version > %d.x",
+		    nvme_version_major);
 		if (nvme->n_strict_version)
 			goto fail;
 	}

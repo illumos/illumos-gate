@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -47,6 +48,11 @@ extern "C" {
 #define	NVME_REG_AQA	0x24		/* Admin Queue Attributes */
 #define	NVME_REG_ASQ	0x28		/* Admin Submission Queue */
 #define	NVME_REG_ACQ	0x30		/* Admin Completion Qeueu */
+#define	NVME_REG_CMBLOC	0x38		/* Controller Memory Buffer Location */
+#define	NVME_REG_CMBSZ	0x3C		/* Controller Memory Buffer Size */
+#define	NVME_REG_BPINFO	0x40		/* Boot Partition Information */
+#define	NVME_REG_BPRSEL	0x44		/* Boot Partition Read Select */
+#define	NVME_REG_BPMBL	0x48		/* Boot Partition Memory Buffer Loc */
 #define	NVME_REG_SQTDBL(nvme, n) \
 	(0x1000 + ((2 * (n)) * nvme->n_doorbell_stride))
 #define	NVME_REG_CQHDBL(nvme, n) \
@@ -66,7 +72,8 @@ typedef union {
 		uint16_t cap_dstrd:4;	/* Doorbell Stride */
 		uint16_t cap_nssrs:1;	/* NVM Subsystem Reset Supported */
 		uint16_t cap_css:8;	/* Command Sets Supported */
-		uint16_t cap_rsvd2:3;
+		uint16_t cap_rsvd2:2;
+		uint8_t cap_bps:1;	/* Boot Partition Support */
 		uint8_t cap_mpsmin:4;	/* Memory Page Size Minimum */
 		uint8_t cap_mpsmax:4;	/* Memory Page Size Maximum */
 		uint8_t cap_rsvd3;
@@ -113,7 +120,8 @@ typedef union {
 		uint32_t csts_cfs:1;	/* Controller Fatal Status */
 		uint32_t csts_shst:2;	/* Shutdown Status */
 		uint32_t csts_nssro:1;	/* NVM Subsystem Reset Occured */
-		uint32_t csts_rsvd:27;
+		uint32_t csts_pp:1;	/* Processing Paused */
+		uint32_t csts_rsvd:26;
 	} b;
 	uint32_t r;
 } nvme_reg_csts_t;
@@ -144,6 +152,57 @@ typedef uint64_t nvme_reg_asq_t;	/* Admin Submission Queue Base */
 
 /* ACQ -- Admin Completion Queue Base Address */
 typedef uint64_t nvme_reg_acq_t;	/* Admin Completion Queue Base */
+
+/* CMBLOC - Controller Memory Buffer Location */
+typedef union {
+	struct {
+		uint32_t cmbloc_bir:3;		/* Base Indicator Register */
+		uint32_t cmbloc_rsvd:9;
+		uint32_t cmbloc_ofst:20;	/* Offset */
+	} b;
+	uint32_t r;
+} nvme_reg_cmbloc_t;
+
+/* CMBSZ - Controller Memory Buffer Size */
+typedef union {
+	struct {
+		uint32_t cmbsz_sqs:1;	/* Submission Queue Support */
+		uint32_t cmbsz_cqs:1;	/* Completion Queue Support */
+		uint32_t cmbsz_lists:1;	/* PRP SGL List Support */
+		uint32_t cmbsz_rds:1;	/* Read Data Support */
+		uint32_t cmbsz_wds:1;	/* Write Data Support */
+		uint32_t cmbsz_rsvd:3;
+		uint32_t cmbsz_szu:4;	/* Size Units */
+		uint32_t cmbsz_sz:20;	/* Size */
+	} b;
+	uint32_t r;
+} nvme_reg_cmbsz_t;
+
+/* BPINFO - Boot Partition Information */
+typedef union {
+	struct {
+		uint32_t bpinfo_bpsz:15;	/* Boot Partition Size */
+		uint32_t bpinfo_rsvd:9;
+		uint32_t bpinfo_brs:2;		/* Boot Read Status */
+		uint32_t bpinfo_rsvd2:5;
+		uint32_t bpinfo_abpid:1;	/* Active Boot Partition ID */
+	} b;
+	uint32_t r;
+} nvme_reg_bpinfo_t;
+
+/* BPRSEL - Boot Partition Read Select */
+typedef union {
+	struct {
+		uint32_t bprsel_bprsz:10;	/* Boot Partition Read Size */
+		uint32_t bprsel_bprof:20;	/* Boot Partition Read Offset */
+		uint32_t bprsel_rsvd:1;
+		uint32_t bprsel_bpid:1;		/* Boot Partition Identifier */
+	} b;
+	uint32_t r;
+} nvme_reg_bprsel_t;
+
+/* BPMBL - Boot Partition Memory Location Buffer Location */
+typedef uint64_t nvme_reg_bpbml_t;	/* Memory Buffer Base Address */
 
 /* SQyTDBL -- Submission Queue y Tail Doorbell */
 typedef union {
@@ -219,8 +278,18 @@ typedef struct {
 #define	NVME_OPC_SET_FEATURES	0x9
 #define	NVME_OPC_GET_FEATURES	0xa
 #define	NVME_OPC_ASYNC_EVENT	0xc
+#define	NVME_OPC_NS_MGMT	0xd	/* 1.2 */
 #define	NVME_OPC_FW_ACTIVATE	0x10
 #define	NVME_OPC_FW_IMAGE_LOAD	0x11
+#define	NVME_OPC_SELF_TEST	0x14	/* 1.3 */
+#define	NVME_OPC_NS_ATTACH	0x15	/* 1.2 */
+#define	NVME_OPC_KEEP_ALIVE	0x18	/* 1.3 */
+#define	NVME_OPC_DIRECTIVE_SEND	0x19	/* 1.3 */
+#define	NVME_OPC_DIRECTIVE_RECV	0x1A	/* 1.3 */
+#define	NVME_OPC_VIRT_MGMT	0x1C	/* 1.3 */
+#define	NVME_OPC_NVMEMI_SEND	0x1D	/* 1.3 */
+#define	NVME_OPC_NVMEMI_RECV	0x1E	/* 1.3 */
+#define	NVME_OPC_DB_CONFIG	0x7C	/* 1.3 */
 
 /* NVMe NVM command set specific admin command opcodes */
 #define	NVME_OPC_NVM_FORMAT	0x80
@@ -351,7 +420,7 @@ typedef union {
 typedef union {
 	struct {
 		uint16_t q_qid;			/* Queue Identifier */
-		uint16_t q_qsize; 		/* Queue Size */
+		uint16_t q_qsize;		/* Queue Size */
 	} b;
 	uint32_t r;
 } nvme_create_queue_dw10_t;
@@ -385,6 +454,11 @@ typedef union {
 #define	NVME_IDENTIFY_CTRL	0x1	/* Identify Controller */
 #define	NVME_IDENTIFY_LIST	0x2	/* Identify List Namespaces */
 
+#define	NVME_IDENTIFY_NSID_ALLOC_LIST	0x10	/* List Allocated NSID */
+#define	NVME_IDENTIFY_NSID_ALLOC	0x11	/* Identify Allocated NSID */
+#define	NVME_IDENTIFY_NSID_CTRL_LIST	0x12	/* List Controllers on NSID */
+#define	NVME_IDENTIFY_CTRL_LIST		0x13	/* Controller List */
+#define	NVME_IDENTIFY_PRIMARY_CAPS	0x14	/* Primary Controller Caps */
 
 /*
  * NVMe Abort Command

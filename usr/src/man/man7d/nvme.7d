@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright (c) 2018, Joyent, Inc.
 .\"
-.Dd Mar 30, 2017
+.Dd July 31, 2018
 .Dt NVME 7D
 .Os
 .Sh NAME
@@ -23,7 +24,7 @@ The
 driver uses the
 .Xr blkdev 7D
 framework to provide access to
-.Tn Intel
+Intel
 NVMe compliant solid-state storage devices.
 .Lp
 NVMe devices supporting multiple namespaces will present each
@@ -48,7 +49,7 @@ to attach to devices supporting newer version of the NVMe
 specification.
 The default value is 1, limiting
 .Nm
-to work with devices up to specification version 1.2.
+to work with devices that support major version 1.
 .It Va ignore-unknown-vendor-status
 This can be set to 1 to allow
 .Nm
