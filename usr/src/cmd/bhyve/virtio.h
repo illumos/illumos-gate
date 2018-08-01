@@ -31,6 +31,8 @@
 #ifndef	_VIRTIO_H_
 #define	_VIRTIO_H_
 
+#include <pthread_np.h>
+
 /*
  * These are derived from several virtio specifications.
  *
@@ -438,11 +440,25 @@ vq_interrupt(struct virtio_softc *vs, struct vqueue_info *vq)
 	if (pci_msix_enabled(vs->vs_pi))
 		pci_generate_msix(vs->vs_pi, vq->vq_msix_idx);
 	else {
+#ifndef __FreeBSD__
+		boolean_t unlock = B_FALSE;
+
+		if (vs->vs_mtx && !pthread_mutex_isowned_np(vs->vs_mtx)) {
+			unlock = B_TRUE;
+			pthread_mutex_lock(vs->vs_mtx);
+		}
+#else
 		VS_LOCK(vs);
+#endif
 		vs->vs_isr |= VTCFG_ISR_QUEUES;
 		pci_generate_msi(vs->vs_pi, 0);
 		pci_lintr_assert(vs->vs_pi);
+#ifndef __FreeBSD__
+		if (unlock)
+			pthread_mutex_unlock(vs->vs_mtx);
+#else
 		VS_UNLOCK(vs);
+#endif
 	}
 }
 
