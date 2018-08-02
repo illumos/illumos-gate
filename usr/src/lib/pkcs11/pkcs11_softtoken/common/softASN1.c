@@ -50,7 +50,7 @@ static uchar_t	DH942_OID[] = {
 	0x2A, 0x86, 0x48, 0xCE, 0x3E, 0x01
 };
 
-#define	MAX_DSA_KEY	MAX_DSA_KEY_LEN 	/* bytes in DSA key */
+#define	MAX_DSA_KEY	MAX_DSA_KEY_LEN		/* bytes in DSA key */
 static uchar_t	DSA_OID[] = {
 	/* DSA algorithm OID:  1 . 2 . 840 . 10040 . 4 . 1  */
 	0x2A, 0x86, 0x48, 0xCE, 0x38, 0x04, 0x01

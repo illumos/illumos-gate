@@ -206,7 +206,7 @@ kernel_merge_object(kernel_object_t *old_object, kernel_object_t *new_object)
  */
 CK_RV
 kernel_add_object(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
-	CK_ULONG *objecthandle_p, kernel_session_t *sp)
+    CK_ULONG *objecthandle_p, kernel_session_t *sp)
 {
 	CK_RV rv = CKR_OK;
 	kernel_object_t *new_objp = NULL;

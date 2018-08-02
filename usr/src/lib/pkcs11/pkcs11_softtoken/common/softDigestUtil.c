@@ -47,7 +47,7 @@
  *
  * Description:
  *	called by C_DigestInit(). This function allocates space for
- *  	context, then calls the corresponding software provided digest
+ *	context, then calls the corresponding software provided digest
  *	init routine based on the mechanism.
  *
  * Returns:
@@ -167,7 +167,7 @@ soft_digest_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism)
  */
 CK_RV
 soft_digest_common(soft_session_t *session_p, CK_BYTE_PTR pData,
-	CK_ULONG ulDataLen, CK_BYTE_PTR pDigest, CK_ULONG_PTR pulDigestLen)
+    CK_ULONG ulDataLen, CK_BYTE_PTR pDigest, CK_ULONG_PTR pulDigestLen)
 {
 
 	CK_ULONG digestLen = 0;
@@ -334,7 +334,7 @@ soft_digest_common(soft_session_t *session_p, CK_BYTE_PTR pData,
  */
 CK_RV
 soft_digest(soft_session_t *session_p, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
-	CK_BYTE_PTR pDigest, CK_ULONG_PTR pulDigestLen)
+    CK_BYTE_PTR pDigest, CK_ULONG_PTR pulDigestLen)
 {
 
 	return (soft_digest_common(session_p, pData, ulDataLen,
@@ -360,7 +360,7 @@ soft_digest(soft_session_t *session_p, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
  */
 CK_RV
 soft_digest_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
-	CK_ULONG ulPartLen)
+    CK_ULONG ulPartLen)
 {
 
 	switch (session_p->digest.mech.mechanism) {
@@ -418,7 +418,7 @@ soft_digest_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
  */
 CK_RV
 soft_digest_final(soft_session_t *session_p, CK_BYTE_PTR pDigest,
-	CK_ULONG_PTR pulDigestLen)
+    CK_ULONG_PTR pulDigestLen)
 {
 
 	return (soft_digest_common(session_p, NULL, 0,
@@ -434,8 +434,8 @@ soft_digest_final(soft_session_t *session_p, CK_BYTE_PTR pDigest,
  * its mutex taken.
  */
 CK_RV
-soft_digest_init_internal(soft_session_t *session_p, CK_MECHANISM_PTR
-	pMechanism)
+soft_digest_init_internal(soft_session_t *session_p,
+    CK_MECHANISM_PTR pMechanism)
 {
 
 	CK_RV rv;

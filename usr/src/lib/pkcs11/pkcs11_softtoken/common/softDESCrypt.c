@@ -816,7 +816,7 @@ des_cbc_ctx_init(void *key_sched, size_t size, uint8_t *ivec, CK_KEY_TYPE type)
  */
 CK_RV
 soft_des_sign_verify_init_common(soft_session_t *session_p,
-	CK_MECHANISM_PTR pMechanism, soft_object_t *key_p, boolean_t sign_op)
+    CK_MECHANISM_PTR pMechanism, soft_object_t *key_p, boolean_t sign_op)
 {
 	soft_des_ctx_t	*soft_des_ctx;
 	CK_MECHANISM	encrypt_mech;
@@ -902,8 +902,8 @@ soft_des_sign_verify_init_common(soft_session_t *session_p,
  */
 CK_RV
 soft_des_sign_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
-	CK_ULONG ulDataLen, CK_BYTE_PTR pSigned, CK_ULONG_PTR pulSignedLen,
-	boolean_t sign_op, boolean_t Final)
+    CK_ULONG ulDataLen, CK_BYTE_PTR pSigned, CK_ULONG_PTR pulSignedLen,
+    boolean_t sign_op, boolean_t Final)
 {
 	soft_des_ctx_t		*soft_des_ctx_sign_verify;
 	soft_des_ctx_t		*soft_des_ctx_encrypt;
@@ -1050,7 +1050,7 @@ clean_exit:
  */
 CK_RV
 soft_des_mac_sign_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
-	CK_ULONG ulPartLen)
+    CK_ULONG ulPartLen)
 {
 	/*
 	 * The DES MAC is calculated by taking the specified number of

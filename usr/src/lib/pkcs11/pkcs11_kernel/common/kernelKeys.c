@@ -1752,7 +1752,7 @@ C_UnwrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	CK_MECHANISM_INFO	info;
 	uint32_t		k_mi_flags;
 	CK_BYTE			*clear_key_val = NULL;
-	CK_ULONG 		ulDataLen;
+	CK_ULONG		ulDataLen;
 	CK_ATTRIBUTE_PTR	newTemplate = NULL;
 	crypto_mech_type_t	k_mech_type;
 	crypto_object_unwrap_key_t obj_unwrapkey;

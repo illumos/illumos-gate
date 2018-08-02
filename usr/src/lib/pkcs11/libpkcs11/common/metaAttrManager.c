@@ -33,7 +33,7 @@
 
 static void
 find_attribute(CK_ATTRIBUTE_TYPE attrtype, generic_attr_t *attributes,
-	size_t num_attributes, generic_attr_t **found_attribute);
+    size_t num_attributes, generic_attr_t **found_attribute);
 
 /*
  * get_master_attributes_by_object
@@ -381,7 +381,7 @@ get_master_template_by_type(CK_OBJECT_CLASS class, CK_ULONG subtype,
  */
 CK_RV
 get_master_attributes_by_type(CK_OBJECT_CLASS class, CK_ULONG subtype,
-	generic_attr_t **attributes, size_t *num_attributes)
+    generic_attr_t **attributes, size_t *num_attributes)
 {
 	CK_RV rv;
 	generic_attr_t *master_template = NULL;
@@ -546,7 +546,7 @@ dealloc_attributes(generic_attr_t *attributes, size_t num_attributes)
  */
 CK_RV
 attribute_set_value(CK_ATTRIBUTE *new_attr,
-	generic_attr_t *attributes, size_t num_attributes)
+    generic_attr_t *attributes, size_t num_attributes)
 {
 	generic_attr_t *attr = NULL;
 
@@ -620,7 +620,7 @@ attribute_set_value(CK_ATTRIBUTE *new_attr,
  */
 static void
 find_attribute(CK_ATTRIBUTE_TYPE attrtype, generic_attr_t *attributes,
-	size_t num_attributes, generic_attr_t **found_attribute)
+    size_t num_attributes, generic_attr_t **found_attribute)
 {
 	generic_attr_t *attr;
 	boolean_t found = B_FALSE;
@@ -646,7 +646,7 @@ find_attribute(CK_ATTRIBUTE_TYPE attrtype, generic_attr_t *attributes,
  */
 boolean_t
 get_template_ulong(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
-	CK_ULONG num_attributes, CK_ULONG *result)
+    CK_ULONG num_attributes, CK_ULONG *result)
 {
 	boolean_t found = B_FALSE;
 	CK_ULONG i;
@@ -673,7 +673,7 @@ get_template_ulong(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
  */
 boolean_t
 get_template_boolean(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
-	CK_ULONG num_attributes, boolean_t *result)
+    CK_ULONG num_attributes, boolean_t *result)
 {
 	boolean_t found = B_FALSE;
 	CK_ULONG i;
@@ -710,7 +710,7 @@ get_template_boolean(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
  */
 int
 set_template_boolean(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
-	CK_ULONG num_attributes, boolean_t local, CK_BBOOL *value)
+    CK_ULONG num_attributes, boolean_t local, CK_BBOOL *value)
 {
 	int i;
 

@@ -1359,7 +1359,7 @@ soft_unpack_object(soft_object_t *objp, uchar_t *buf)
 	biginteger_t	expo1;
 	biginteger_t	expo2;
 	biginteger_t	coef;
-	CK_RV 		rv = CKR_OK;
+	CK_RV		rv = CKR_OK;
 	ulong_t offset = 0;
 	uint64_t tmp_val;
 
@@ -2264,7 +2264,7 @@ soft_destroy_token_session(void)
  */
 CK_RV
 soft_keystore_crypt(soft_object_t *key_p, uchar_t *ivec, boolean_t encrypt,
-	CK_BYTE_PTR in, CK_ULONG in_len, CK_BYTE_PTR out, CK_ULONG_PTR out_len)
+    CK_BYTE_PTR in, CK_ULONG in_len, CK_BYTE_PTR out, CK_ULONG_PTR out_len)
 {
 	CK_MECHANISM	mech;
 	soft_aes_ctx_t *soft_aes_ctx;
@@ -2376,7 +2376,7 @@ soft_keystore_crypt(soft_object_t *key_p, uchar_t *ivec, boolean_t encrypt,
  */
 CK_RV
 soft_keystore_hmac(soft_object_t *key_p, boolean_t sign,
-	CK_BYTE_PTR in, CK_ULONG in_len, CK_BYTE_PTR out, CK_ULONG_PTR out_len)
+    CK_BYTE_PTR in, CK_ULONG in_len, CK_BYTE_PTR out, CK_ULONG_PTR out_len)
 {
 	CK_MECHANISM mech;
 	CK_RV rv;

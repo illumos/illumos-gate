@@ -473,8 +473,7 @@ soft_decrypt(soft_session_t *session_p, CK_BYTE_PTR pEncryptedData,
  */
 CK_RV
 soft_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedPart,
-	CK_ULONG ulEncryptedPartLen, CK_BYTE_PTR pPart,
-	CK_ULONG_PTR pulPartLen)
+    CK_ULONG ulEncryptedPartLen, CK_BYTE_PTR pPart, CK_ULONG_PTR pulPartLen)
 {
 	CK_MECHANISM_TYPE mechanism = session_p->decrypt.mech.mechanism;
 
@@ -522,7 +521,7 @@ soft_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedPart,
  */
 CK_RV
 soft_decrypt_final(soft_session_t *session_p, CK_BYTE_PTR pLastPart,
-	CK_ULONG_PTR pulLastPartLen)
+    CK_ULONG_PTR pulLastPartLen)
 {
 
 	CK_MECHANISM_TYPE mechanism = session_p->decrypt.mech.mechanism;

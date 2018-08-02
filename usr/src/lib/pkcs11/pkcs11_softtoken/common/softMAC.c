@@ -108,7 +108,7 @@ soft_hmac_sign_verify_init_common(soft_session_t *session_p,
 		if ((pMechanism->ulParameterLen !=
 		    sizeof (CK_MAC_GENERAL_PARAMS)) &&
 		    (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
-			MD5_HASH_SIZE)) {
+		    MD5_HASH_SIZE)) {
 				free(hmac_ctx);
 				return (CKR_MECHANISM_PARAM_INVALID);
 			}
@@ -121,7 +121,7 @@ soft_hmac_sign_verify_init_common(soft_session_t *session_p,
 		if ((pMechanism->ulParameterLen !=
 		    sizeof (CK_MAC_GENERAL_PARAMS)) &&
 		    (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
-			SHA1_HASH_SIZE)) {
+		    SHA1_HASH_SIZE)) {
 			free(hmac_ctx);
 			return (CKR_MECHANISM_PARAM_INVALID);
 		}
@@ -133,7 +133,7 @@ soft_hmac_sign_verify_init_common(soft_session_t *session_p,
 		if ((pMechanism->ulParameterLen !=
 		    sizeof (CK_MAC_GENERAL_PARAMS)) &&
 		    (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
-			SHA256_DIGEST_LENGTH)) {
+		    SHA256_DIGEST_LENGTH)) {
 			free(hmac_ctx);
 			return (CKR_MECHANISM_PARAM_INVALID);
 		}
@@ -146,7 +146,7 @@ soft_hmac_sign_verify_init_common(soft_session_t *session_p,
 		if ((pMechanism->ulParameterLen !=
 		    sizeof (CK_MAC_GENERAL_PARAMS)) &&
 		    (*(CK_MAC_GENERAL_PARAMS *)pMechanism->pParameter >
-			SHA512_DIGEST_LENGTH)) {
+		    SHA512_DIGEST_LENGTH)) {
 			free(hmac_ctx);
 			return (CKR_MECHANISM_PARAM_INVALID);
 		}
@@ -579,7 +579,7 @@ clean_exit:
  */
 CK_RV
 soft_hmac_sign_verify_update(soft_session_t *session_p, CK_BYTE_PTR pPart,
-	CK_ULONG ulPartLen, boolean_t sign_op)
+    CK_ULONG ulPartLen, boolean_t sign_op)
 {
 
 	soft_hmac_ctx_t	*hmac_ctx;

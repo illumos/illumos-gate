@@ -520,8 +520,8 @@ is_inode_same(int fd, char *fname, boolean_t *same)
 }
 
 static int
-acquire_file_lock(int *fd, char *fname, mode_t mode) {
-
+acquire_file_lock(int *fd, char *fname, mode_t mode)
+{
 	boolean_t read_lock = B_TRUE, same_inode;
 
 	if ((mode == O_RDWR) || (mode == O_WRONLY)) {
@@ -929,8 +929,8 @@ soft_keystore_readlock(boolean_t set_lock)
  *	FUNCTION: soft_keystore_writelock
  *
  *	ARGUMENTS:
- * 		set_lock: TRUE to set writelock on the keystore description file
- *		        FALSE to remove write lock on keystore description file.
+ *		set_lock: TRUE to set writelock on the keystore description file
+ *			FALSE to remove write lock on keystore description file.
  *
  *	RETURN VALUE:
  *
@@ -954,7 +954,7 @@ soft_keystore_writelock(boolean_t set_lock)
  *	ARGUMENTS:
  *
  *		ks_handle: handle of the keystore object file to be accessed.
- * 		read_lock: TRUE to set readlock on the keystore object file,
+ *		read_lock: TRUE to set readlock on the keystore object file,
  *			  FALSE to set writelock on keystore object file.
  *
  *	RETURN VALUE:
@@ -1243,8 +1243,8 @@ read_obj_data(int old_fd, char **buf, ssize_t *bytes_read)
  */
 static int
 reencrypt_obj(soft_object_t *new_enc_key, soft_object_t *new_hmac_key,
-    char *orig_obj_name, char *new_obj_name) {
-
+    char *orig_obj_name, char *new_obj_name)
+{
 	int old_fd, new_fd, version, ret_val = -1;
 	CK_BYTE iv[OBJ_IV_SIZE], old_iv[OBJ_IV_SIZE];
 	ssize_t nread;

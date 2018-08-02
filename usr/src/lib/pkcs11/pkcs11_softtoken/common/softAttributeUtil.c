@@ -264,7 +264,7 @@ soft_lookup_attr(CK_ATTRIBUTE_TYPE type)
  */
 CK_RV
 soft_validate_attr(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
-	CK_OBJECT_CLASS *class)
+    CK_OBJECT_CLASS *class)
 {
 
 	CK_ULONG i;
@@ -487,7 +487,7 @@ soft_add_extra_attr(CK_ATTRIBUTE_PTR template, soft_object_t *object_p)
 
 CK_RV
 soft_copy_certificate(certificate_obj_t *oldcert, certificate_obj_t **newcert,
-		CK_CERTIFICATE_TYPE type)
+    CK_CERTIFICATE_TYPE type)
 {
 	CK_RV rv = CKR_OK;
 	certificate_obj_t	*cert;
@@ -641,7 +641,7 @@ get_extra_attr_from_object(soft_object_t *object_p, CK_ATTRIBUTE_PTR template)
  */
 CK_RV
 set_extra_attr_to_object(soft_object_t *object_p, CK_ATTRIBUTE_TYPE type,
-	CK_ATTRIBUTE_PTR template)
+    CK_ATTRIBUTE_PTR template)
 {
 
 	CK_ATTRIBUTE_INFO_PTR extra_attr;
@@ -767,7 +767,7 @@ get_bigint_attr_from_object(biginteger_t *big, CK_ATTRIBUTE_PTR template)
  */
 CK_RV
 get_bool_attr_from_object(soft_object_t *object_p, CK_ULONG bool_flag,
-	CK_ATTRIBUTE_PTR template)
+    CK_ATTRIBUTE_PTR template)
 {
 
 	if (template->pValue == NULL) {
@@ -803,7 +803,7 @@ get_bool_attr_from_object(soft_object_t *object_p, CK_ULONG bool_flag,
  */
 CK_RV
 set_bool_attr_to_object(soft_object_t *object_p, CK_ULONG bool_flag,
-	CK_ATTRIBUTE_PTR template)
+    CK_ATTRIBUTE_PTR template)
 {
 
 	if (*(CK_BBOOL *)template->pValue)
@@ -1271,13 +1271,13 @@ soft_parse_common_attrs(CK_ATTRIBUTE_PTR template, uchar_t *object_type)
  */
 CK_RV
 soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
-	soft_object_t *new_object, CK_ULONG mode, CK_KEY_TYPE key_type)
+    soft_object_t *new_object, CK_ULONG mode, CK_KEY_TYPE key_type)
 {
 
 	ulong_t		i;
 	CK_KEY_TYPE	keytype = (CK_KEY_TYPE)~0UL;
 	uint64_t	attr_mask = PUBLIC_KEY_DEFAULT;
-	CK_RV 		rv = CKR_OK;
+	CK_RV		rv = CKR_OK;
 	int		isLabel = 0;
 	/* Must set flags */
 	int		isModulus = 0;
@@ -1837,12 +1837,12 @@ fail_cleanup:
  */
 CK_RV
 soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
-	soft_object_t *new_object, CK_ULONG mode, CK_KEY_TYPE key_type)
+    soft_object_t *new_object, CK_ULONG mode, CK_KEY_TYPE key_type)
 {
 	ulong_t		i;
 	CK_KEY_TYPE	keytype = (CK_KEY_TYPE)~0UL;
 	uint64_t	attr_mask = PRIVATE_KEY_DEFAULT;
-	CK_RV 		rv = CKR_OK;
+	CK_RV		rv = CKR_OK;
 	int		isLabel = 0;
 	int		isECParam = 0;
 	/* Must set flags unless mode == SOFT_UNWRAP_KEY */
@@ -2505,14 +2505,14 @@ fail_cleanup:
  */
 CK_RV
 soft_build_secret_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
-	soft_object_t *new_object, CK_ULONG mode, CK_ULONG key_len,
-	CK_KEY_TYPE key_type)
+    soft_object_t *new_object, CK_ULONG mode, CK_ULONG key_len,
+    CK_KEY_TYPE key_type)
 {
 
 	ulong_t		i;
 	CK_KEY_TYPE	keytype = (CK_KEY_TYPE)~0UL;
 	uint64_t	attr_mask = SECRET_KEY_DEFAULT;
-	CK_RV 		rv = CKR_OK;
+	CK_RV		rv = CKR_OK;
 	int		isLabel = 0;
 	/* Must set flags if mode != SOFT_UNWRAP_KEY, else must not set */
 	int		isValue = 0;
@@ -3160,12 +3160,12 @@ fail_cleanup:
  */
 CK_RV
 soft_build_domain_parameters_object(CK_ATTRIBUTE_PTR template,
-	CK_ULONG ulAttrNum, soft_object_t *new_object)
+    CK_ULONG ulAttrNum, soft_object_t *new_object)
 {
 
 	ulong_t		i;
 	CK_KEY_TYPE	keytype = (CK_KEY_TYPE)~0UL;
-	CK_RV 		rv = CKR_OK;
+	CK_RV		rv = CKR_OK;
 	int		isLabel = 0;
 	/* Must set flags */
 	int		isPrime = 0;
@@ -3386,11 +3386,11 @@ fail_cleanup:
  */
 static CK_RV
 soft_build_certificate_object(CK_ATTRIBUTE_PTR template,
-	CK_ULONG ulAttrNum, soft_object_t *new_object,
-	CK_CERTIFICATE_TYPE cert_type)
+    CK_ULONG ulAttrNum, soft_object_t *new_object,
+    CK_CERTIFICATE_TYPE cert_type)
 {
 	uint64_t	attr_mask = 0;
-	CK_RV 		rv = CKR_OK;
+	CK_RV		rv = CKR_OK;
 	CK_ULONG	i;
 	int		owner_set = 0;
 	int		value_set = 0;
@@ -3581,11 +3581,11 @@ fail_cleanup:
  */
 CK_RV
 soft_build_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
-	soft_object_t *new_object)
+    soft_object_t *new_object)
 {
 
 	CK_OBJECT_CLASS class = (CK_OBJECT_CLASS)~0UL;
-	CK_RV 		rv = CKR_OK;
+	CK_RV		rv = CKR_OK;
 
 	if (template == NULL) {
 		return (CKR_ARGUMENTS_BAD);
@@ -3649,11 +3649,11 @@ soft_build_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
  */
 CK_RV
 soft_build_key(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
-	soft_object_t *new_object, CK_OBJECT_CLASS class, CK_KEY_TYPE key_type,
-	CK_ULONG key_len, CK_ULONG mode)
+    soft_object_t *new_object, CK_OBJECT_CLASS class, CK_KEY_TYPE key_type,
+    CK_ULONG key_len, CK_ULONG mode)
 {
 
-	CK_RV 		rv = CKR_OK;
+	CK_RV		rv = CKR_OK;
 	CK_OBJECT_CLASS temp_class = (CK_OBJECT_CLASS)~0UL;
 
 	/* Validate the attribute type in the template. */
@@ -3852,7 +3852,7 @@ soft_get_common_key_attrs(soft_object_t *object_p, CK_ATTRIBUTE_PTR template)
  */
 CK_RV
 soft_get_public_key_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template)
+    CK_ATTRIBUTE_PTR template)
 {
 
 	CK_RV		rv = CKR_OK;
@@ -4025,7 +4025,7 @@ soft_get_public_key_attribute(soft_object_t *object_p,
  */
 CK_RV
 soft_get_private_key_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template)
+    CK_ATTRIBUTE_PTR template)
 {
 
 	CK_RV		rv = CKR_OK;
@@ -4295,7 +4295,7 @@ soft_get_private_key_attribute(soft_object_t *object_p,
  */
 CK_RV
 soft_get_secret_key_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template)
+    CK_ATTRIBUTE_PTR template)
 {
 
 	CK_RV		rv = CKR_OK;
@@ -4409,7 +4409,7 @@ soft_get_secret_key_attribute(soft_object_t *object_p,
  */
 CK_RV
 soft_get_domain_parameters_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template)
+    CK_ATTRIBUTE_PTR template)
 {
 
 	CK_RV		rv = CKR_OK;
@@ -4527,7 +4527,7 @@ soft_get_domain_parameters_attribute(soft_object_t *object_p,
  */
 CK_RV
 soft_get_certificate_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template)
+    CK_ATTRIBUTE_PTR template)
 {
 	CK_CERTIFICATE_TYPE certtype = object_p->cert_type;
 	cert_attr_t src;
@@ -4582,7 +4582,7 @@ soft_get_certificate_attribute(soft_object_t *object_p,
 
 CK_RV
 soft_set_certificate_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template, boolean_t copy)
+    CK_ATTRIBUTE_PTR template, boolean_t copy)
 {
 	CK_CERTIFICATE_TYPE certtype = object_p->cert_type;
 
@@ -4682,7 +4682,7 @@ soft_get_attribute(soft_object_t *object_p, CK_ATTRIBUTE_PTR template)
 
 CK_RV
 soft_set_common_storage_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template, boolean_t copy)
+    CK_ATTRIBUTE_PTR template, boolean_t copy)
 {
 
 	CK_RV rv = CKR_OK;
@@ -4758,7 +4758,7 @@ soft_set_common_storage_attribute(soft_object_t *object_p,
  */
 CK_RV
 soft_set_common_key_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template, boolean_t copy)
+    CK_ATTRIBUTE_PTR template, boolean_t copy)
 {
 
 	switch (template->type) {
@@ -4809,7 +4809,7 @@ soft_set_common_key_attribute(soft_object_t *object_p,
  */
 CK_RV
 soft_set_public_key_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template, boolean_t copy)
+    CK_ATTRIBUTE_PTR template, boolean_t copy)
 {
 	CK_KEY_TYPE	keytype = object_p->key_type;
 
@@ -4881,7 +4881,7 @@ soft_set_public_key_attribute(soft_object_t *object_p,
  */
 CK_RV
 soft_set_private_key_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template, boolean_t copy)
+    CK_ATTRIBUTE_PTR template, boolean_t copy)
 {
 	CK_KEY_TYPE	keytype = object_p->key_type;
 
@@ -4989,7 +4989,7 @@ soft_set_private_key_attribute(soft_object_t *object_p,
  */
 CK_RV
 soft_set_secret_key_attribute(soft_object_t *object_p,
-	CK_ATTRIBUTE_PTR template, boolean_t copy)
+    CK_ATTRIBUTE_PTR template, boolean_t copy)
 {
 	CK_KEY_TYPE	keytype = object_p->key_type;
 
