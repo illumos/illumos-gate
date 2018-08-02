@@ -132,7 +132,7 @@ copy_component_quoting(char *dest, const krb5_data *src, int flags)
 		*q++ = *cp;
 		break;
 	    }
-	/*LINTED*/
+	/* FALLTHROUGH */
 	case COMPONENT_SEP:
 	case '\\':
 	    *q++ = '\\';

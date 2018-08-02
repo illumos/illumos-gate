@@ -500,6 +500,7 @@ kg_unseal_v1(context, minor_status, ctx, ptr, bodysize, message_buffer,
 
 	code = memcmp(md5cksum.contents, ptr+14, 8);
 	/* Falls through to defective-token??  */
+	/* FALLTHROUGH */
 
     default:
 	*minor_status = 0;
