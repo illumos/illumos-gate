@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_MACHSYSTM_H
@@ -231,6 +232,7 @@ extern page_t *page_get_high_mfn(mfn_t);
 #endif
 
 extern hrtime_t tsc_gethrtime_tick_delta(void);
+extern hrtime_t tsc_gethrtime_params(uint64_t *, uint32_t *, uint8_t *);
 
 #endif /* _KERNEL */
 
