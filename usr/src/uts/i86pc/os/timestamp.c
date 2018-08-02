@@ -25,7 +25,7 @@
  *
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -280,10 +280,64 @@ tsc_gethrtime_tick_delta(void)
 	return (hrt);
 }
 
+/* Calculate the hrtime while exposing the parameters of that calculation. */
+hrtime_t
+tsc_gethrtime_params(uint64_t *tscp, uint32_t *scalep, uint8_t *shiftp)
+{
+	uint32_t old_hres_lock, scale;
+	hrtime_t tsc, last, base;
+
+	do {
+		old_hres_lock = hres_lock;
+
+		if (gethrtimef == tsc_gethrtime_delta) {
+			ulong_t flags;
+
+			flags = clear_int_flag();
+			tsc = tsc_read() + tsc_sync_tick_delta[CPU->cpu_id];
+			restore_int_flag(flags);
+		} else {
+			tsc = tsc_read();
+		}
+
+		last = tsc_last;
+		base = tsc_hrtime_base;
+		scale = nsec_scale;
+
+	} while ((old_hres_lock & ~1) != hres_lock);
+
+	/* See comments in tsc_gethrtime() above */
+	if (tsc >= last) {
+		tsc -= last;
+	} else if (tsc >= last - 2 * tsc_max_delta) {
+		tsc = 0;
+	} else {
+		tsc = tsc_protect(tsc);
+	}
+
+	TSC_CONVERT_AND_ADD(tsc, base, nsec_scale);
+
+	if (tscp != NULL) {
+		/*
+		 * Do not simply communicate the delta applied to the hrtime
+		 * base, but rather the effective TSC measurement.
+		 */
+		*tscp = tsc + last;
+	}
+	if (scalep != NULL) {
+		*scalep = scale;
+	}
+	if (shiftp != NULL) {
+		*shiftp = NSEC_SHIFT;
+	}
+
+	return (base);
+}
+
 /*
- * This is similar to the above, but it cannot actually spin on hres_lock.
- * As a result, it caches all of the variables it needs; if the variables
- * don't change, it's done.
+ * This is similar to tsc_gethrtime_delta, but it cannot actually spin on
+ * hres_lock.  As a result, it caches all of the variables it needs; if the
+ * variables don't change, it's done.
  */
 hrtime_t
 dtrace_gethrtime(void)
