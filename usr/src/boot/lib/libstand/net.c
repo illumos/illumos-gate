@@ -57,6 +57,20 @@
 #include "net.h"
 
 /*
+ * Maximum wait time for sending and receiving before we give up and timeout.
+ * If set to 0, operations will eventually timeout completely, but send/recv
+ * timeouts must progress exponentially from MINTMO to MAXTMO before final
+ * timeout is hit.
+ */
+#ifndef MAXWAIT
+#define	MAXWAIT 0	/* seconds */
+#endif
+
+#if MAXWAIT < 0
+#error MAXWAIT must not be a negative number
+#endif
+
+/*
  * Send a packet and wait for a reply, with exponential backoff.
  *
  * The send routine must return the actual number of bytes written,
@@ -76,6 +90,7 @@ sendrecv(struct iodesc *d,
 {
 	ssize_t cc;
 	time_t t, tmo, tlast;
+	time_t tref;
 	long tleft;
 
 #ifdef NET_DEBUG
@@ -86,12 +101,17 @@ sendrecv(struct iodesc *d,
 	tmo = MINTMO;
 	tlast = 0;
 	tleft = 0;
+	tref = getsecs();
 	t = getsecs();
 	for (;;) {
+		if (MAXWAIT > 0 && (getsecs() - tref) >= MAXWAIT) {
+			errno = ETIMEDOUT;
+			return (-1);
+		}
 		if (tleft <= 0) {
 			if (tmo >= MAXTMO) {
 				errno = ETIMEDOUT;
-				return -1;
+				return (-1);
 			}
 			cc = (*sproc)(d, sbuf, ssize);
 			if (cc != -1 && cc < ssize)
@@ -134,11 +154,11 @@ sendrecv(struct iodesc *d,
 n_long
 inet_addr(char *cp)
 {
-	u_long val;
+	unsigned long val;
 	int n;
 	char c;
-	u_int parts[4];
-	u_int *pp = parts;
+	unsigned int parts[4];
+	unsigned int *pp = parts;
 
 	for (;;) {
 		/*
@@ -204,7 +224,7 @@ inet_addr(char *cp)
 	}
 
 	return (htonl(val));
- bad:
+bad:
 	return (htonl(INADDR_NONE));
 }
 
@@ -219,12 +239,12 @@ char *
 intoa(n_long addr)
 {
 	char *cp;
-	u_int byte;
+	unsigned int byte;
 	int n;
 	static char buf[17];	/* strlen(".255.255.255.255") + 1 */
 
 	addr = ntohl(addr);
-	cp = &buf[sizeof buf];
+	cp = &buf[sizeof (buf)];
 	*--cp = '\0';
 
 	n = 4;
@@ -250,33 +270,33 @@ number(char *s, int *n)
 {
 	for (*n = 0; isdigit(*s); s++)
 		*n = (*n * 10) + *s - '0';
-	return s;
+	return (s);
 }
 
 n_long
 ip_convertaddr(char *p)
 {
-#define IP_ANYADDR	0
+#define	IP_ANYADDR	0
 	n_long addr = 0, n;
 
-	if (p == (char *)0 || *p == '\0')
-		return IP_ANYADDR;
+	if (p == NULL || *p == '\0')
+		return (IP_ANYADDR);
 	p = number(p, &n);
 	addr |= (n << 24) & 0xff000000;
 	if (*p == '\0' || *p++ != '.')
-		return IP_ANYADDR;
+		return (IP_ANYADDR);
 	p = number(p, &n);
 	addr |= (n << 16) & 0xff0000;
 	if (*p == '\0' || *p++ != '.')
-		return IP_ANYADDR;
+		return (IP_ANYADDR);
 	p = number(p, &n);
 	addr |= (n << 8) & 0xff00;
 	if (*p == '\0' || *p++ != '.')
-		return IP_ANYADDR;
+		return (IP_ANYADDR);
 	p = number(p, &n);
 	addr |= n & 0xff;
 	if (*p != '\0')
-		return IP_ANYADDR;
+		return (IP_ANYADDR);
 
-	return htonl(addr);
+	return (htonl(addr));
 }
