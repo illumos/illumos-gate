@@ -546,7 +546,8 @@ krb5int_setpw_result_code_string( krb5_context context, int result_code, const c
       *code_string = "Initial password required";
       break;
    case 0:
-	  *code_string = "Success";
+      *code_string = "Success";
+      break;
    default:
       *code_string = "Password change failed";
       break;
