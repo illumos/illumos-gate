@@ -504,7 +504,7 @@ MT-Level	Safe
 
 .SH SEE ALSO
 .LP
-\fBgetaddrinfo\fR(3SOCKET), \fBgethostbyname\fR(3NSL), \fBhtonl\fR(3SOCKET),
+\fBgetaddrinfo\fR(3SOCKET), \fBgethostbyname\fR(3NSL), \fBhtonl\fR(3C),
 \fBinet\fR(3SOCKET), \fBnetdb.h\fR(3HEAD), \fBhosts\fR(4),
 \fBnsswitch.conf\fR(4), \fBattributes\fR(5)
 .SH NOTES

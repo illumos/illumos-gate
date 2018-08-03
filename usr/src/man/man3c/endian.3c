@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd January 30, 2016
+.Dd August 2, 2018
 .Dt ENDIAN 3C
 .Os
 .Sh NAME
@@ -177,7 +177,7 @@ To better support extant software, both are provided.
 While these functions are common across multiple platforms, they have
 not been standardized.
 Portable applications should instead use the functions defined in
-.Xr byteorder 3SOCKET .
+.Xr byteorder 3C .
 .Sh RETURN VALUES
 The functions always succeed and return a value that has been properly
 converted.
@@ -186,7 +186,7 @@ converted.
 .Sh MT-LEVEL
 .Sy MT-Safe
 .Sh SEE ALSO
+.Xr byteorder 3C ,
 .Xr endian.h 3HEAD ,
-.Xr byteorder 3SOCKET ,
 .Xr attributes 5 ,
 .Xr byteorder 5

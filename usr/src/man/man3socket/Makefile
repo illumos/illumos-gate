@@ -21,7 +21,6 @@ MANSECT=	3socket
 
 MANFILES=	accept.3socket		\
 		bind.3socket		\
-		byteorder.3socket	\
 		connect.3socket		\
 		ethers.3socket		\
 		getaddrinfo.3socket	\
@@ -90,9 +89,6 @@ MANLINKS=	accept4.3socket			\
 		getservbyport_r.3socket		\
 		getservent.3socket		\
 		getservent_r.3socket		\
-		htonl.3socket			\
-		htonll.3socket			\
-		htons.3socket			\
 		if_freenameindex.3socket	\
 		if_indextoname.3socket		\
 		if_nameindex.3socket		\
@@ -109,9 +105,6 @@ MANLINKS=	accept4.3socket			\
 		inet6_rth_reverse.3socket	\
 		inet6_rth_segments.3socket	\
 		inet6_rth_space.3socket		\
-		ntohl.3socket			\
-		ntohll.3socket			\
-		ntohs.3socket			\
 		rcmd_af.3socket			\
 		recvfrom.3socket		\
 		recvmsg.3socket			\
@@ -137,13 +130,6 @@ MANLINKS=	accept4.3socket			\
 		sockaddr_un.3socket
 
 accept4.3socket			:= LINKSRC = accept.3socket
-
-htonl.3socket			:= LINKSRC = byteorder.3socket
-htonll.3socket			:= LINKSRC = byteorder.3socket
-htons.3socket			:= LINKSRC = byteorder.3socket
-ntohl.3socket			:= LINKSRC = byteorder.3socket
-ntohll.3socket			:= LINKSRC = byteorder.3socket
-ntohs.3socket			:= LINKSRC = byteorder.3socket
 
 ether_aton.3socket		:= LINKSRC = ethers.3socket
 ether_aton_r.3socket		:= LINKSRC = ethers.3socket

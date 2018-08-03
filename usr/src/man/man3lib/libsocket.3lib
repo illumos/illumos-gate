@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBSOCKET 3LIB "Nov 2, 2004"
+.TH LIBSOCKET 3LIB "Aug 2, 2018"
 .SH NAME
 libsocket \- sockets library
 .SH SYNOPSIS
@@ -13,12 +13,10 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lsocket\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Functions in this library provide the socket internetworking interface,
 primarily used with the TCP/IP protocol suite.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibsocket.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -51,14 +49,12 @@ l l .
 \fBgetservbyname_r\fR	\fBgetservbyport\fR
 \fBgetservbyport_r\fR	\fBgetservent\fR
 \fBgetservent_r\fR	\fBgetsockname\fR
-\fBgetsockopt\fR	\fBhtonl\fR
-\fBhtons\fR	\fBif_freenameindex\fR
+\fBgetsockopt\fR	\fBif_freenameindex\fR
 \fBif_indextoname\fR	\fBif_nameindex\fR
 \fBif_nametoindex\fR	\fBin6addr_any\fR
 \fBin6addr_loopback\fR	\fBinet_lnaof\fR
 \fBinet_makeaddr\fR	\fBinet_network\fR
-\fBlisten\fR	\fBntohl\fR
-\fBntohs\fR	\fBrcmd\fR
+\fBlisten\fR	\fBrcmd\fR
 \fBrcmd_af\fR	\fBrecv\fR
 \fBrecvfrom\fR	\fBrecvmsg\fR
 \fBrexec\fR	\fBrexec_af\fR
@@ -68,11 +64,10 @@ l l .
 \fBsetnetent\fR	\fBsetprotoent\fR
 \fBsetservent\fR	\fBsetsockopt\fR
 \fBshutdown\fR	\fBsocket\fR
-\fBsocketpair\fR	
+\fBsocketpair\fR
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libsocket.so.1\fR\fR
@@ -91,7 +86,6 @@ shared object
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -107,7 +101,6 @@ MT-Level	See the manual page for each interface.
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpvs\fR(1), \fBIntro\fR(2), \fBIntro\fR(3), \fBsocket.h\fR(3HEAD),
 \fBattributes\fR(5)

@@ -198,9 +198,9 @@ is always stored in
 .Sy Network Byte Order .
 On many systems, this differs from the native host byte order.
 Applications should read from the member with the function
-.Xr ntohs 3SOCKET
+.Xr ntohs 3C
 and write to the member with the function
-.Xr htons 3SOCKET .
+.Xr htons 3C .
 The member
 .Em sin_addr
 is the four byte IPv4 address.
@@ -264,9 +264,9 @@ byte order.
 The member
 .Em sin6_port
 describes the IPv6 port and should be manipulated with the functions
-.Xr ntohs 3SOCKET
+.Xr ntohs 3C
 and
-.Xr htons 3SOCKET .
+.Xr htons 3C .
 The member
 .Em sin6_addr
 describes the 16-byte IPv6 address.
@@ -426,9 +426,9 @@ For example, when capturing Ethernet frames the value of
 .Em sll_protocol
 is the Ethertype.
 This member is written in network byte order and applications should use
-.Xr htons 3SOCKET
+.Xr htons 3C
 and
-.Xr ntohs 3SOCKET
+.Xr ntohs 3C
 to read and write the member.
 .Lp
 The member
