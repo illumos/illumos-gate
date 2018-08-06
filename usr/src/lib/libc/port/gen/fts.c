@@ -38,6 +38,19 @@
 #include <string.h>
 #include <unistd.h>
 
+#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
+#define	fts_alloc		fts_alloc64
+#define	fts_build		fts_build64
+#define	fts_lfree		fts_lfree64
+#define	fts_load		fts_load64
+#define	fts_maxarglen		fts_maxarglen64
+#define	fts_padjust		fts_padjust64
+#define	fts_palloc		fts_palloc64
+#define	fts_sort		fts_sort64
+#define	fts_stat		fts_stat64
+#define	fts_safe_changedir	fts_safe_changedir64
+#endif
+
 #define	MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
 
 #define	ALIGNBYTES	_POINTER_ALIGNMENT
