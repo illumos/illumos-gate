@@ -83,8 +83,8 @@
  * NVMe devices can have multiple namespaces, each being a independent data
  * store. The driver supports multiple namespaces and creates a blkdev interface
  * for each namespace found. Namespaces can have various attributes to support
- * thin provisioning and protection information. This driver does not support
- * any of this and ignores namespaces that have these attributes.
+ * protection information. This driver does not support any of this and ignores
+ * namespaces that have these attributes.
  *
  * As of NVMe 1.1 namespaces can have an 64bit Extended Unique Identifier
  * (EUI64). This driver uses the EUI64 if present to generate the devid and
@@ -2223,16 +2223,13 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 
 	/*
 	 * We currently don't support namespaces that use either:
-	 * - thin provisioning
 	 * - protection information
 	 * - illegal block size (< 512)
 	 */
-	if (idns->id_nsfeat.f_thin ||
-	    idns->id_dps.dp_pinfo) {
+	if (idns->id_dps.dp_pinfo) {
 		dev_err(nvme->n_dip, CE_WARN,
-		    "!ignoring namespace %d, unsupported features: "
-		    "thin = %d, pinfo = %d", nsid,
-		    idns->id_nsfeat.f_thin, idns->id_dps.dp_pinfo);
+		    "!ignoring namespace %d, unsupported feature: "
+		    "pinfo = %d", nsid, idns->id_dps.dp_pinfo);
 		ns->ns_ignore = B_TRUE;
 	} else if (ns->ns_block_size < 512) {
 		dev_err(nvme->n_dip, CE_WARN,

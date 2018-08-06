@@ -13,6 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018, Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/cryptotest@$(PKGVERS)
@@ -25,6 +26,9 @@ dir path=opt/crypto-tests
 dir path=opt/crypto-tests/bin
 dir path=opt/crypto-tests/runfiles
 dir path=opt/crypto-tests/tests
+dir path=opt/crypto-tests/tests/digest
+dir path=opt/crypto-tests/tests/digest/kcf
+dir path=opt/crypto-tests/tests/digest/pkcs
 dir path=opt/crypto-tests/tests/kcf
 dir path=opt/crypto-tests/tests/kcf/aes
 dir path=opt/crypto-tests/tests/pkcs
@@ -32,6 +36,14 @@ dir path=opt/crypto-tests/tests/pkcs/aes
 file path=opt/crypto-tests/README mode=0444
 file path=opt/crypto-tests/bin/cryptotest mode=0555
 file path=opt/crypto-tests/runfiles/default.run mode=0444
+file path=opt/crypto-tests/tests/digest/kcf/sha1 mode=0555
+file path=opt/crypto-tests/tests/digest/kcf/sha256 mode=0555
+file path=opt/crypto-tests/tests/digest/kcf/sha384 mode=0555
+file path=opt/crypto-tests/tests/digest/kcf/sha512 mode=0555
+file path=opt/crypto-tests/tests/digest/pkcs/sha1 mode=0555
+file path=opt/crypto-tests/tests/digest/pkcs/sha256 mode=0555
+file path=opt/crypto-tests/tests/digest/pkcs/sha384 mode=0555
+file path=opt/crypto-tests/tests/digest/pkcs/sha512 mode=0555
 file path=opt/crypto-tests/tests/kcf/aes/aes_cbc mode=0555
 file path=opt/crypto-tests/tests/kcf/aes/aes_ccm mode=0555
 file path=opt/crypto-tests/tests/kcf/aes/aes_cmac mode=0555
