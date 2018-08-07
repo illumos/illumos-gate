@@ -17830,7 +17830,6 @@ d usr/share/man/man3socket 0755 root bin
 f usr/share/man/man3socket/accept.3socket 0444 root bin
 s usr/share/man/man3socket/accept4.3socket=accept.3socket
 f usr/share/man/man3socket/bind.3socket 0444 root bin
-f usr/share/man/man3socket/byteorder.3socket 0444 root bin
 f usr/share/man/man3socket/connect.3socket 0444 root bin
 s usr/share/man/man3socket/endnetent.3socket=getnetbyname.3socket
 s usr/share/man/man3socket/endprotoent.3socket=getprotobyname.3socket
@@ -17875,9 +17874,6 @@ s usr/share/man/man3socket/getservent_r.3socket=getservbyname.3socket
 f usr/share/man/man3socket/getsockname.3socket 0444 root bin
 f usr/share/man/man3socket/getsockopt.3socket 0444 root bin
 f usr/share/man/man3socket/getsourcefilter.3socket 0444 root bin
-s usr/share/man/man3socket/htonl.3socket=byteorder.3socket
-s usr/share/man/man3socket/htonll.3socket=byteorder.3socket
-s usr/share/man/man3socket/htons.3socket=byteorder.3socket
 f usr/share/man/man3socket/icmp6_filter.3socket 0444 root bin
 s usr/share/man/man3socket/if_freenameindex.3socket=if_nametoindex.3socket
 s usr/share/man/man3socket/if_indextoname.3socket=if_nametoindex.3socket
@@ -17899,9 +17895,6 @@ s usr/share/man/man3socket/inet6_rth_reverse.3socket=inet6_rth.3socket
 s usr/share/man/man3socket/inet6_rth_segments.3socket=inet6_rth.3socket
 s usr/share/man/man3socket/inet6_rth_space.3socket=inet6_rth.3socket
 f usr/share/man/man3socket/listen.3socket 0444 root bin
-s usr/share/man/man3socket/ntohl.3socket=byteorder.3socket
-s usr/share/man/man3socket/ntohll.3socket=byteorder.3socket
-s usr/share/man/man3socket/ntohs.3socket=byteorder.3socket
 f usr/share/man/man3socket/rcmd.3socket 0444 root bin
 s usr/share/man/man3socket/rcmd_af.3socket=rcmd.3socket
 f usr/share/man/man3socket/recv.3socket 0444 root bin
