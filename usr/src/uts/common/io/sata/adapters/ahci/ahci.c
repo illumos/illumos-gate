@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1143,7 +1143,7 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  */
 static int
 ahci_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
-		    void *arg, void **result)
+    void *arg, void **result)
 {
 #ifndef __lock_lint
 	_NOTE(ARGUNUSED(dip))
@@ -1815,15 +1815,19 @@ ahci_do_sync_start(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 		    drv_usectohz((clock_t)spkt->satapkt_time * 1000000);
 
 		while (spkt->satapkt_reason == SATA_PKT_BUSY) {
-			mutex_exit(&ahci_portp->ahciport_mutex);
-
 			/* Simulate the interrupt */
+			mutex_exit(&ahci_portp->ahciport_mutex);
 			ahci_port_intr(ahci_ctlp, ahci_portp, port);
-
-			drv_usecwait(AHCI_10MS_USECS);
-
 			mutex_enter(&ahci_portp->ahciport_mutex);
-			pkt_timeout_ticks -= AHCI_10MS_TICKS;
+
+			if (spkt->satapkt_reason != SATA_PKT_BUSY)
+				break;
+
+			mutex_exit(&ahci_portp->ahciport_mutex);
+			drv_usecwait(AHCI_1MS_USECS);
+			mutex_enter(&ahci_portp->ahciport_mutex);
+
+			pkt_timeout_ticks -= AHCI_1MS_TICKS;
 			if (pkt_timeout_ticks < 0) {
 				cmn_err(CE_WARN, "!ahci%d: ahci_do_sync_start "
 				    "port %d satapkt 0x%p timed out\n",
@@ -1835,6 +1839,7 @@ ahci_do_sync_start(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 				mutex_enter(&ahci_portp->ahciport_mutex);
 			}
 		}
+
 		ahci_portp->ahciport_flags &= ~AHCI_PORT_FLAG_POLLING;
 		return (AHCI_SUCCESS);
 
