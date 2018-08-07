@@ -1,171 +1,179 @@
-'\" te
-.\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SEMAPHORE 9F "May 7, 1997"
-.SH NAME
-semaphore, sema_init, sema_destroy, sema_p, sema_p_sig, sema_v, sema_tryp \-
-semaphore functions
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/ksynch.h>
-
-
-
-\fBvoid\fR \fBsema_init\fR(\fBksema_t *\fR\fIsp\fR, \fBuint_t\fR \fIval\fR, \fBchar *\fR\fIname\fR, \fBksema_type_t\fR \fItype\fR,
-      \fBvoid *\fR\fIarg\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBsema_destroy\fR(\fBksema_t *\fR\fIsp\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBsema_p\fR(\fBksema_t *\fR\fIsp\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBsema_v\fR(\fBksema_t *\fR\fIsp\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBsema_p_sig\fR(\fBksema_t *\fR\fIsp\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBsema_tryp\fR(\fBksema_t *\fR\fIsp\fR);
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
-Solaris \fBDDI\fR specific (Solaris \fBDDI\fR).
-.SH PARAMETERS
-.sp
-.ne 2
-.na
-\fB\fIsp\fR\fR
-.ad
-.RS 8n
-A pointer to a semaphore, type \fBksema_t\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIval\fR\fR
-.ad
-.RS 8n
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2018 Nexenta Systems, Inc.
+.\"
+.Dd July 30, 2018
+.Dt SEMAPHORE 9F
+.Os
+.Sh NAME
+.Nm semaphore ,
+.Nm sema_init ,
+.Nm sema_destroy ,
+.Nm sema_p ,
+.Nm sema_p_sig ,
+.Nm sema_v ,
+.Nm sema_tryp
+.Nd semaphore functions
+.Sh SYNOPSIS
+.In sys/ksynch.h
+.Ft void
+.Fo sema_init
+.Fa "ksema_t *sp"
+.Fa "uint_t val"
+.Fa "char *name"
+.Fa "ksema_type_t type"
+.Fa "void *arg"
+.Fc
+.Ft void
+.Fo sema_destroy
+.Fa "ksema_t *sp"
+.Fc
+.Ft void
+.Fo sema_p
+.Fa "ksema_t *sp"
+.Fc
+.Ft void
+.Fo sema_v
+.Fa "ksema_t *sp"
+.Fc
+.Ft int
+.Fo sema_p_sig
+.Fa "ksema_t *sp"
+.Fc
+.Ft int
+.Fo sema_tryp
+.Fa "ksema_t *sp"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific (illumos DDI).
+.Sh PARAMETERS
+.Bl -tag -width Ds
+.It Fa sp
+A pointer to a semaphore, type
+.Vt ksema_t .
+.It Fa val
 Initial value for semaphore.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIname\fR\fR
-.ad
-.RS 8n
-Descriptive string. This is obsolete and should be \fINULL\fR. (Non-\fINULL\fR
-strings are legal, but they are a waste of kernel memory.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fItype\fR\fR
-.ad
-.RS 8n
-Variant type of the semaphore. Currently, only \fBSEMA_DRIVER\fR is supported.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIarg\fR\fR
-.ad
-.RS 8n
-Type-specific argument; should be \fINULL\fR.
-.RE
-
-.SH DESCRIPTION
-.sp
-.LP
-These functions implement counting semaphores as described by Dijkstra. A
-semaphore has a value which is atomically decremented by \fBsema_p()\fR and
-atomically incremented by \fBsema_v()\fR. The value must always be greater than
-or equal to zero. If \fBsema_p()\fR is called and the value is zero, the
-calling thread is blocked until another thread performs a \fBsema_v()\fR
+.It Fa name
+Descriptive string.
+This is obsolete and should be
+.Dv NULL .
+.Po Non- Ns
+.Dv NULL
+strings are legal, but they are a waste of kernel memory.
+.Pc
+.It Fa type
+Variant type of the semaphore.
+Currently, only
+.Dv SEMA_DRIVER
+is supported.
+.It Fa arg
+Type-specific argument; should be
+.Dv NULL .
+.El
+.Sh DESCRIPTION
+These functions implement counting semaphores as described by Dijkstra.
+A semaphore has a value which is atomically decremented by
+.Fn sema_p
+and atomically incremented by
+.Fn sema_v .
+The value must always be greater than or equal to zero.
+If
+.Fn sema_p
+is called and the value is zero, the calling thread is blocked until another
+thread performs a
+.Fn sema_v
 operation on the semaphore.
-.sp
-.LP
-Semaphores are initialized by calling \fBsema_init()\fR. The argument,
-\fBval\fR, gives the initial value for the semaphore. The semaphore storage is
-provided by the caller but more may be dynamically allocated, if necessary, by
-\fBsema_init()\fR. For this reason, \fBsema_destroy()\fR should be called
-before deallocating the storage containing the semaphore.
-.sp
-.LP
-The \fBsema_p_sig()\fR function decrements the semaphore, as does
-\fBsema_p()\fR. However, if the semaphore value is zero, \fBsema_p_sig()\fR
-will return without decrementing the value if a signal (that is, from
-\fBkill\fR(2)) is pending for the thread.
-.sp
-.LP
-The \fBsema_tryp()\fR function will decrement the semaphore value only if it is
-greater than zero, and will not block.
-.SH RETURN VALUES
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 5n
-\fBsema_tryp()\fR could not decrement the semaphore value because it was zero.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB1\fR\fR
-.ad
-.RS 5n
-\fBsema_p_sig()\fR was not able to decrement the semaphore value and detected a
-pending signal.
-.RE
-
-.SH CONTEXT
-.sp
-.LP
+.Pp
+Semaphores are initialized by calling
+.Fn sema_init .
+The argument,
+.Fa val ,
+gives the initial value for the semaphore.
+The semaphore storage is provided by the caller but more may be dynamically
+allocated, if necessary, by
+.Fn sema_init .
+For this reason,
+.Fn sema_destroy
+should be called before deallocating the storage containing the semaphore.
+.Pp
+The
+.Fn sema_p_sig
+function decrements the semaphore, as does
+.Fn sema_p .
+However, if the semaphore value is zero,
+.Fn sema_p_sig
+will return without decrementing the value if a signal
+.Po that is, from
+.Xr kill 2
+.Pc
+is pending for the thread.
+.Pp
+The
+.Fn sema_tryp
+function will decrement the semaphore value only if it is greater than zero, and
+will not block.
+.Sh CONTEXT
 These functions can be called from user, interrupt, or kernel context, except
-for \fBsema_init()\fR and \fBsema_destroy()\fR, which can be called from user
-or kernel context only. None of these functions can be called from a high-level
-interrupt context. In most cases, \fBsema_v()\fR and \fBsema_p()\fR should not
-be called from any interrupt context.
-.sp
-.LP
-If \fBsema_p()\fR is used from interrupt context, lower-priority interrupts
-will not be serviced during the wait. This means that if the thread that will
-eventually perform the \fBsema_v()\fR becomes blocked on anything that requires
-the lower-priority interrupt, the system will hang.
-.sp
-.LP
-For example, the thread that will perform the \fBsema_v()\fR may need to first
-allocate memory. This memory allocation may require waiting for paging
-\fBI/O\fR to complete, which may require a lower-priority disk or network
-interrupt to be serviced. In general, situations like this are hard to predict,
-so it is advisable to avoid waiting on semaphores or condition variables in an
-interrupt context.
-.SH SEE ALSO
-.sp
-.LP
-\fBkill\fR(2), \fBcondvar\fR(9F), \fBmutex\fR(9F)
-.sp
-.LP
-\fIWriting Device Drivers\fR
+for
+.Fn sema_init
+and
+.Fn sema_destroy ,
+which can be called from user or kernel context only.
+None of these functions can be called from a high-level interrupt context.
+In most cases,
+.Fn sema_v
+and
+.Fn sema_p
+should not be called from any interrupt context.
+.Pp
+If
+.Fn sema_p
+is used from interrupt context, lower-priority interrupts will not be serviced
+during the wait.
+This means that if the thread that will eventually perform the
+.Fn sema_v
+becomes blocked on anything that requires the lower-priority interrupt, the
+system will hang.
+.Pp
+For example, the thread that will perform the
+.Fn sema_v
+may need to first allocate memory.
+This memory allocation may require waiting for paging I/O to complete, which may
+require a lower-priority disk or network interrupt to be serviced.
+In general, situations like this are hard to predict, so it is advisable to
+avoid waiting on semaphores or condition variables in an interrupt context.
+.Pp
+Similar to many other synchronization mechanisms, semaphores should not be used
+in any code path that requires synchronization while handling system panic, at
+which time many of the semaphore operations become no-ops.
+.Sh RETURN VALUES
+.Bl -tag -width Ds
+.It Li 0
+.Fn sema_tryp
+could not decrement the semaphore value because it was zero.
+.It Li 1
+.Fn sema_p_sig
+was not able to decrement the semaphore value and detected a pending signal.
+.El
+.Sh SEE ALSO
+.Xr kill 2 ,
+.Xr condvar 9F ,
+.Xr mutex 9F
+.Pp
+.Em Writing Device Drivers

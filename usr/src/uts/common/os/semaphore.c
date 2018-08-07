@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
+ */
 
 /*
  * This file contains the semaphore operations.
@@ -227,15 +229,15 @@ sema_p(ksema_t *sp)
 	sema_impl_t	*s;
 	disp_lock_t	*sqlp;
 
+	/* no-op during panic */
+	if (panicstr)
+		return;
+
 	s = (sema_impl_t *)sp;
 	sqlp = &SQHASH(s)->sq_lock;
 	disp_lock_enter(sqlp);
 	ASSERT(s->s_count >= 0);
 	while (s->s_count == 0) {
-		if (panicstr) {
-			disp_lock_exit(sqlp);
-			return;
-		}
 		thread_lock_high(curthread);
 		SEMA_BLOCK(s, sqlp);
 		thread_unlock_nopreempt(curthread);
@@ -329,17 +331,17 @@ sema_p_sig(ksema_t *sp)
 void
 sema_v(ksema_t *sp)
 {
-	sema_impl_t 	*s;
-	kthread_t 	*sq, *tp;
+	sema_impl_t	*s;
+	kthread_t	*sq, *tp;
 	disp_lock_t	*sqlp;
+
+	/* no-op during panic */
+	if (panicstr)
+		return;
 
 	s = (sema_impl_t *)sp;
 	sqlp = &SQHASH(s)->sq_lock;
 	disp_lock_enter(sqlp);
-	if (panicstr) {
-		disp_lock_exit(sqlp);
-		return;
-	}
 	s->s_count++;
 	sq = s->s_slpq;
 	if (sq != NULL) {
@@ -373,6 +375,10 @@ sema_tryp(ksema_t *sp)
 
 	int	gotit = 0;
 
+	/* no-op during panic */
+	if (panicstr)
+		return (1);
+
 	s = (sema_impl_t *)sp;
 	sqh = SQHASH(s);
 	disp_lock_enter(&sqh->sq_lock);
@@ -389,10 +395,10 @@ sema_held(ksema_t *sp)
 {
 	sema_impl_t	*s;
 
-
-	s = (sema_impl_t *)sp;
+	/* no-op during panic */
 	if (panicstr)
 		return (1);
-	else
-		return (s->s_count <= 0);
+
+	s = (sema_impl_t *)sp;
+	return (s->s_count <= 0);
 }
