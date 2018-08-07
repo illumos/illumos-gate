@@ -38,10 +38,12 @@ PROGS = \
 	endian \
 	env-7076 \
 	fnmatch \
+	memset_s \
 	printf-9511 \
 	psignal-5097 \
 	quick_exit_order \
 	quick_exit_status \
+	set_constraint_handler_s \
 	strcoll-strxfrm-6907 \
 	timespec_get \
 	wcsncasecmp \
@@ -61,6 +63,11 @@ PROGS64 = \
 
 aligned_alloc.32 :=	LDLIBS += -lproc
 aligned_alloc.64 :=	LDLIBS64 += -lproc
+
+memset_s.32 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
+memset_s.64 :=	CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
+set_constraint_handler_s.32 := CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
+set_constraint_handler_s.64 := CPPFLAGS += -D__STDC_WANT_LIB_EXT1__=1
 
 ROOTOPTDIR = $(ROOT)/opt/libc-tests/tests
 ROOTOPTPROGS = $(PROGS32:%=$(ROOTOPTDIR)/%) \

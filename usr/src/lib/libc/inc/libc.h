@@ -316,6 +316,16 @@ extern wint_t	__ungetwc_xpg5(wint_t, FILE *);
  */
 extern char *current_locale(locale_t, int);
 
+/*
+ * defined in set_constraint_handler_s.c.
+ */
+extern void __throw_constraint_handler_s(const char *_RESTRICT_KYWD, int);
+
+/*
+ * defined in assfail.c.
+ */
+extern void common_panic(const char *, const char *);
+
 #ifdef	__cplusplus
 }
 #endif

@@ -95,7 +95,7 @@ Abort(const char *msg)
  * Write a panic message w/o grabbing any locks other than assert_lock.
  * We have no idea what locks are held at this point.
  */
-static void
+void
 common_panic(const char *head, const char *why)
 {
 	char msg[400];	/* no panic() message in the library is this long */

@@ -84,7 +84,7 @@ extern "C" {
  *
  * _STDC_C11		Like _STDC_C99 except that the value of __STDC_VERSION__
  *                      is 201112L indicating a compiler that compiles with
- *                      ISO/IEXC 9899:2011, otherwise known as the C11 standard.
+ *                      ISO/IEC 9899:2011, otherwise known as the C11 standard.
  *
  * _STRICT_SYMBOLS	Used in cases where symbol visibility is restricted
  *                      by the standards, and the user has not explicitly
@@ -130,7 +130,7 @@ extern "C" {
  * cc -Xs (K&R C)		    undefined	      undefined
  *
  * gcc (default)			1	      undefined
- * gcc -ansi, -std={c89, c99,...)  	1              defined
+ * gcc -ansi, -std={c89, c99,...)	1               defined
  * gcc -traditional (K&R)	    undefined	      undefined
  *
  * The default compilation modes for Sun C compilers versus GNU C compilers
@@ -191,7 +191,7 @@ extern "C" {
  *	of _POSIX_SOURCE nor _XOPEN_SOURCE is defined and the value of
  *	__STDC__ does not imply standards conformance).
  *    -	Extended system interfaces are explicitly requested (__EXTENSIONS__
- * 	is defined).
+ *	is defined).
  *    -	Access to in-kernel interfaces is requested (_KERNEL or _KMEMUSER is
  *	defined).  (Note that this dependency is an artifact of the current
  *	kernel implementation and may change in future releases.)
@@ -436,6 +436,21 @@ extern "C" {
 #define	_NORETURN_KYWD
 #endif
 
+/* ISO/IEC 9899:2011 Annex K */
+#if !defined(_STRICT_SYMBOLS)
+#define	__EXT1_VISIBLE	1
+#else
+#define	__EXT1_VISIBLE	0
+#endif
+
+#if defined(__STDC_WANT_LIB_EXT1__)
+#undef	__EXT1_VISIBLE
+#if __STDC_WANT_LIB_EXT1__
+#define	__EXT1_VISIBLE		1
+#else
+#define	__EXT1_VISIBLE		0
+#endif
+#endif /* __STDC_WANT_LIB_EXT1__ */
 
 /*
  * The following macro indicates header support for the ANSI C++
@@ -450,10 +465,16 @@ extern "C" {
 #define	_ISO_C_9899_1999
 
 /*
- * The following macro indicates header support for the C99 standard,
+ * The following macro indicates header support for the C11 standard,
  * ISO/IEC 9899:2011, Programming Languages - C.
  */
 #define	_ISO_C_9899_2011
+
+/*
+ * The following macro indicates header support for the C11 standard,
+ * ISO/IEC 9899:2011 Annex K, Programming Languages - C.
+ */
+#undef	__STDC_LIB_EXT1__
 
 /*
  * The following macro indicates header support for DTrace. The value is an

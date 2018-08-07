@@ -1,0 +1,133 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018 Nexenta Systems, Inc.
+.\"
+.Dd August 12, 2017
+.Dt SET_CONSTRAINT_HANDLER_S 3C
+.Os
+.Sh NAME
+.Nm set_constraint_handler_s ,
+.Nm abort_handler_s ,
+.Nm ignore_handler_s
+.Nd runtime-constraint handling
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.Fd #define __STDC_WANT_LIB_EXT1__ 1
+.In stdlib.h
+.Ft constraint_handler_t
+.Fo set_constraint_handler_s
+.Fa "constraint_handler_t handler"
+.Fc
+.Ft void
+.Fo abort_handler_s
+.Fa "const char *restrict msg"
+.Fa "void *restrict ptr"
+.Fa "errno_t error"
+.Fc
+.Ft void
+.Fo ignore_handler_s
+.Fa "const char *restrict msg"
+.Fa "void *restrict ptr"
+.Fa "errno_t error"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn set_constraint_handler_s
+function sets the runtime-constraint handler to be
+.Fa handler .
+.Pp
+The runtime-constraint handler is the callback function invoked when a library
+function detects a runtime-constraint violation, having the following prototype:
+.Bd -literal -offset indent
+void (*constraint_handler_t)(const char *restrict msg,
+    void *restrict ptr, errno_t error);
+.Ed
+.Pp
+The arguments are as follows:
+.Bl -tag -width "error"
+.It Fa msg
+A pointer to a character string describing the runtime-constraint violation.
+.It Fa ptr
+A
+.Dv NULL
+pointer.
+.It Fa error
+If the function calling the handler has a return type declared as
+.Vt errno_t ,
+the return value of the function is passed.
+Otherwise, a positive value of type
+.Vt errno_t
+is passed.
+.El
+.Pp
+Only the most recent handler registered with
+.Fn set_constraint_handler_s
+is called when a runtime-constraint violation occurs.
+.Pp
+The implementation has a default constraint handler that is used if no calls to
+the
+.Fn set_constraint_handler_s
+function have been made.
+If the
+.Fa handler
+argument to
+.Fn set_constraint_handler_s
+is a
+.Dv NULL
+pointer, the default handler becomes the current constraint handler.
+.Pp
+The
+.Fn abort_handler_s
+and
+.Fn ignore_handler_s
+are the standard-defined runtime-constraint handlers provided by the C library.
+.Pp
+The
+.Fn abort_handler_s
+function writes the error message including the
+.Fa msg
+to
+.Dv stderr
+and calls the
+.Xr abort 3C
+function.
+The
+.Fn abort_handler_s
+is currently the default runtime-constraint handler.
+.Pp
+The
+.Fn ignore_handler_s
+simply returns to its caller.
+.Sh RETURN VALUES
+The
+.Fn set_constraint_handler_s
+function returns a pointer to the previously registered handler, or
+.Dv NULL
+if none was previously registered.
+.Pp
+The
+.Fn abort_handler_s
+function does not return to its caller.
+.Pp
+The
+.Fn ignore_handler_s
+function returns no value.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy Safe
+.Sh STANDARDS
+The
+.Fn set_constraint_handler_s
+function conforms to
+.St -isoC-2011 .

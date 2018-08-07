@@ -1,0 +1,104 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018 Nexenta Systems, Inc.
+.\"
+.Dd August 12, 2017
+.Dt MEMSET_S 3C
+.Os
+.Sh NAME
+.Nm memset_s
+.Nd copy a value to all bytes of a memory buffer
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.Fd #define __STDC_WANT_LIB_EXT1__ 1
+.In string.h
+.Ft errno_t
+.Fo memset_s
+.Fa "void *s"
+.Fa "rsize_t smax"
+.Fa "int c"
+.Fa "rsize_t n"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn memset_s
+function copies the value of
+.Fa c
+.Po converted to an
+.Vt unsigned char
+.Pc
+into each of the first
+.Fa n
+bytes of the memory buffer pointed to by
+.Fa s .
+.Pp
+Unlike the
+.Xr memset 3C ,
+.Fn memset_s
+is guaranteed to never be optimized away by the compiler.
+.Pp
+The
+.Fn memset_s
+function detects the following runtime-constraint violations:
+.Bl -enum
+.It
+.Fa s
+is a
+.Dv NULL
+pointer.
+.It
+.Fa smax
+or
+.Fa n
+is greater than
+.Dv RSIZE_MAX .
+.It
+.Fa n
+is greater than
+.Fa smax
+.Pq buffer overflow .
+.El
+.Pp
+If runtime-constraint violation is detected, and if
+.Fa s
+and
+.Fa smax
+are valid, the
+.Fn memset_s
+function copies the value of
+.Fa c
+.Po converted to an
+.Vt unsigned char
+.Pc
+into each of the first
+.Fa smax
+bytes of the memory buffer pointed to by
+.Fa s
+before calling the runtime-constraint handler.
+.Sh RETURN VALUES
+The
+.Fn memset_s
+function returns 0 if there was no runtime-constraint violation.
+Otherwise, a non-zero value is returned.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr memset 3C ,
+.Xr set_constraint_handler 3C
+.Sh STANDARDS
+The
+.Fn memset_s
+function conforms to
+.St -isoC-2011 .

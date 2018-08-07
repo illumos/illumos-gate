@@ -89,6 +89,19 @@ typedef	_MAX_ALIGNMENT_TYPE max_align_t;
 #endif /* !_STRICT_SYMBOLS || _STDC_C11 */
 #endif	/* _MAX_ALIGN_T */
 
+#if __EXT1_VISIBLE
+/* ISO/IEC 9899:2011 K.3.3.2 */
+#ifndef	_RSIZE_T_DEFINED
+#define	_RSIZE_T_DEFINED
+typedef size_t rsize_t;
+#endif
+/* ISO/IEC 9899:2011 K.3.2.2 */
+#ifndef	_ERRNO_T_DEFINED
+#define	_ERRNO_T_DEFINED
+typedef int errno_t;
+#endif
+#endif	/* __EXT1_VISIBLE */
+
 #ifdef	__cplusplus
 }
 #endif

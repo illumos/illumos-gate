@@ -236,6 +236,7 @@ file path=usr/share/man/man3c/mbstowcs.3c
 file path=usr/share/man/man3c/mbtowc.3c
 file path=usr/share/man/man3c/membar_ops.3c
 file path=usr/share/man/man3c/memory.3c
+file path=usr/share/man/man3c/memset_s.3c
 file path=usr/share/man/man3c/mkfifo.3c
 file path=usr/share/man/man3c/mkstemp.3c
 file path=usr/share/man/man3c/mktemp.3c
@@ -405,6 +406,7 @@ file path=usr/share/man/man3c/sem_timedwait.3c
 file path=usr/share/man/man3c/sem_unlink.3c
 file path=usr/share/man/man3c/sem_wait.3c
 file path=usr/share/man/man3c/semaphore.3c
+file path=usr/share/man/man3c/set_constraint_handler_s.3c
 file path=usr/share/man/man3c/setbuf.3c
 file path=usr/share/man/man3c/setbuffer.3c
 file path=usr/share/man/man3c/setcat.3c
@@ -573,6 +575,8 @@ link path=usr/share/man/man3c/_etext.3c target=end.3c
 link path=usr/share/man/man3c/_exithandle.3c target=exit.3c
 link path=usr/share/man/man3c/_flushlbf.3c target=__fbufsize.3c
 link path=usr/share/man/man3c/_setjmp.3c target=_longjmp.3c
+link path=usr/share/man/man3c/abort_handler_s.3c \
+    target=set_constraint_handler_s.3c
 link path=usr/share/man/man3c/addrtosymstr.3c target=walkcontext.3c
 link path=usr/share/man/man3c/aiowrite.3c target=aioread.3c
 link path=usr/share/man/man3c/alloca.3c target=malloc.3c
@@ -889,6 +893,8 @@ link path=usr/share/man/man3c/htole64.3c target=endian.3c
 link path=usr/share/man/man3c/htonl.3c target=byteorder.3c
 link path=usr/share/man/man3c/htonll.3c target=byteorder.3c
 link path=usr/share/man/man3c/htons.3c target=byteorder.3c
+link path=usr/share/man/man3c/ignore_handler_s.3c \
+    target=set_constraint_handler_s.3c
 link path=usr/share/man/man3c/inet6.3c target=inet.3c
 link path=usr/share/man/man3c/inet_addr.3c target=inet.3c
 link path=usr/share/man/man3c/inet_aton.3c target=inet.3c
