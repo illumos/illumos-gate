@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -71,6 +72,7 @@
 #include <vm/seg_kmem.h>
 #include <sys/clock_impl.h>
 #include <sys/hold_page.h>
+#include <sys/cpu.h>
 
 #include <bzip2/bzlib.h>
 
@@ -440,6 +442,15 @@ typedef struct dumpbuf {
 dumpbuf_t dumpbuf;		/* I/O buffer */
 
 /*
+ * For parallel dump, defines maximum time main task thread will wait
+ * for at least one helper to register in dumpcfg.helpermap, before
+ * assuming there are no helpers and falling back to serial mode.
+ * Value is chosen arbitrary and provides *really* long wait for any
+ * available helper to register.
+ */
+#define	DUMP_HELPER_MAX_WAIT	1000	/* millisec */
+
+/*
  * The dump I/O buffer must be at least one page, at most xfer_size
  * bytes, and should scale with physmem in between.  The transfer size
  * passed in will either represent a global default (maxphys) or the
@@ -491,8 +502,8 @@ dumpbuf_resize(void)
 
 /*
  * dump_update_clevel is called when dumpadm configures the dump device.
- * 	Calculate number of helpers and buffers.
- * 	Allocate the minimum configuration for now.
+ *	Calculate number of helpers and buffers.
+ *	Allocate the minimum configuration for now.
  *
  * When the dump file is configured we reserve a minimum amount of
  * memory for use at crash time. But we reserve VA for all the memory
@@ -512,15 +523,15 @@ dumpbuf_resize(void)
  * The actual values are defined via DUMP_PLAT_*_MINCPU macros.
  *
  * Architecture		Threshold	Algorithm
- * sun4u       		<  51		parallel lzjb
- * sun4u       		>= 51		parallel bzip2(*)
- * sun4u OPL   		<  8		parallel lzjb
- * sun4u OPL   		>= 8		parallel bzip2(*)
- * sun4v       		<  128		parallel lzjb
- * sun4v       		>= 128		parallel bzip2(*)
+ * sun4u		<  51		parallel lzjb
+ * sun4u		>= 51		parallel bzip2(*)
+ * sun4u OPL		<  8		parallel lzjb
+ * sun4u OPL		>= 8		parallel bzip2(*)
+ * sun4v		<  128		parallel lzjb
+ * sun4v		>= 128		parallel bzip2(*)
  * x86			< 11		parallel lzjb
  * x86			>= 11		parallel bzip2(*)
- * 32-bit      		N/A		single-threaded lzjb
+ * 32-bit		N/A		single-threaded lzjb
  *
  * (*) bzip2 is only chosen if there is sufficient available
  * memory for buffers at dump time. See dumpsys_get_maxmem().
@@ -2301,28 +2312,46 @@ dumpsys_main_task(void *arg)
 	cbuf_t *cp;
 	pgcnt_t baseoff, pfnoff;
 	pfn_t base, pfn;
-	int i, dumpserial;
+	boolean_t dumpserial;
+	int i;
 
 	/*
 	 * Fall back to serial mode if there are no helpers.
 	 * dump_plat_mincpu can be set to 0 at any time.
 	 * dumpcfg.helpermap must contain at least one member.
+	 *
+	 * It is possible that the helpers haven't registered
+	 * in helpermap yet; wait up to DUMP_HELPER_MAX_WAIT for
+	 * at least one helper to register.
 	 */
-	dumpserial = 1;
-
+	dumpserial = B_TRUE;
 	if (dump_plat_mincpu != 0 && dumpcfg.clevel != 0) {
-		for (i = 0; i < BT_BITOUL(NCPU); ++i) {
-			if (dumpcfg.helpermap[i] != 0) {
-				dumpserial = 0;
+		hrtime_t hrtmax = MSEC2NSEC(DUMP_HELPER_MAX_WAIT);
+		hrtime_t hrtstart = gethrtime();
+
+		for (;;) {
+			for (i = 0; i < BT_BITOUL(NCPU); ++i) {
+				if (dumpcfg.helpermap[i] != 0) {
+					dumpserial = B_FALSE;
+					break;
+				}
+			}
+
+			if ((!dumpserial) ||
+			    ((gethrtime() - hrtstart) >= hrtmax)) {
 				break;
 			}
-		}
-	}
 
-	if (dumpserial) {
-		dumpcfg.clevel = 0;
-		if (dumpcfg.helper[0].lzbuf == NULL)
-			dumpcfg.helper[0].lzbuf = dumpcfg.helper[1].page;
+			SMT_PAUSE();
+		}
+
+		if (dumpserial) {
+			dumpcfg.clevel = 0;
+			if (dumpcfg.helper[0].lzbuf == NULL) {
+				dumpcfg.helper[0].lzbuf =
+				    dumpcfg.helper[1].page;
+			}
+		}
 	}
 
 	dump_init_memlist_walker(&mlw);
@@ -2467,11 +2496,10 @@ dumpsys_main_task(void *arg)
 			 */
 			if (dumpserial) {
 				dumpsys_lzjb_page(dumpcfg.helper, cp);
-				break;
+			} else {
+				/* pass mapped pages to a helper */
+				CQ_PUT(helperq, cp, CBUF_INREADY);
 			}
-
-			/* pass mapped pages to a helper */
-			CQ_PUT(helperq, cp, CBUF_INREADY);
 
 			/* the last page was done */
 			if (bitnum >= dumpcfg.bitmapsize)
@@ -2577,8 +2605,12 @@ dumpsys_metrics(dumpsync_t *ds, char *buf, size_t size)
 	P("Found small pages,%ld\n", cfg->foundsm);
 
 	P("Compression level,%d\n", cfg->clevel);
-	P("Compression type,%s %s\n", cfg->clevel == 0 ? "serial" : "parallel",
+	P("Compression type,%s %s", cfg->clevel == 0 ? "serial" : "parallel",
 	    cfg->clevel >= DUMP_CLEVEL_BZIP2 ? "bzip2" : "lzjb");
+	if (cfg->clevel >= DUMP_CLEVEL_BZIP2)
+		P(" (level %d)\n", dump_bzip2_level);
+	else
+		P("\n");
 	P("Compression ratio,%d.%02d\n", compress_ratio / 100, compress_ratio %
 	    100);
 	P("nhelper_used,%d\n", cfg->nhelper_used);
