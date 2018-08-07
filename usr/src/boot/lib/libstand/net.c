@@ -266,7 +266,7 @@ intoa(n_long addr)
 }
 
 static char *
-number(char *s, int *n)
+number(char *s, uint32_t *n)
 {
 	for (*n = 0; isdigit(*s); s++)
 		*n = (*n * 10) + *s - '0';
@@ -277,7 +277,7 @@ n_long
 ip_convertaddr(char *p)
 {
 #define	IP_ANYADDR	0
-	n_long addr = 0, n;
+	uint32_t addr = 0, n;
 
 	if (p == NULL || *p == '\0')
 		return (IP_ANYADDR);
