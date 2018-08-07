@@ -532,7 +532,7 @@ Standard	See \fBstandards\fR(5).
 .SH SEE ALSO
 .LP
 \fBipaddrsel\fR(1M), \fBgethostbyname\fR(3NSL), \fBgetipnodebyname\fR(3SOCKET),
-\fBhtonl\fR(3SOCKET), \fBinet\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
+\fBhtonl\fR(3C), \fBinet\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
 \fBnetdb.h\fR(3HEAD), \fBsocket\fR(3SOCKET), \fBhosts\fR(4),
 \fBnsswitch.conf\fR(4), \fBattributes\fR(5), \fBstandards\fR(5), \fBinet6\fR(7P)
 .sp

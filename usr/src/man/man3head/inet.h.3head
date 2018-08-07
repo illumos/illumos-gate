@@ -125,6 +125,6 @@ Interface Stability	Standard
 
 .SH SEE ALSO
 .LP
-\fBIntro\fR(3), \fBhtonl\fR(3C), \fBhtonl\fR(3XNET),
+\fBIntro\fR(3), \fBhtonl\fR(3C),
 \fBinet_addr\fR(3C), \fBinet_addr\fR(3XNET), \fBin.h\fR(3HEAD),
 \fBattributes\fR(5), \fBstandards\fR(5)

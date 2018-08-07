@@ -25,7 +25,6 @@ rexec, rexec_af \- return stream to a remote command
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBrexec()\fR and \fBrexec_af()\fR functions look up the host \fIahost\fR
 using \fBgetaddrinfo\fR(3SOCKET) and return \fB\(mi1\fR if the host does not
@@ -47,7 +46,7 @@ connectivity to the remote host.
 .LP
 The port \fIinport\fR specifies which \fBDARPA\fR Internet port to use for the
 connection. The port number used must be in network byte order, as supplied by
-a call to \fBhtons\fR(3XNET). The protocol for connection is described in
+a call to \fBhtons\fR(3C). The protocol for connection is described in
 detail in \fBin.rexecd\fR(1M).
 .sp
 .LP
@@ -67,7 +66,6 @@ out-of-band data.
 There is no way to specify options to the \fBsocket()\fR call made by the
 \fBrexec()\fR or \fBrexec_af()\fRfunctions.
 .SH RETURN VALUES
-.sp
 .LP
 If \fBrexec()\fR succeeds, a file descriptor number is returned of the socket
 type \fBSOCK_STREAM\fR and the address family \fBAF_INET\fR. The parameter
@@ -83,7 +81,6 @@ the socket type \fBSOCK_STREAM\fR in the address family \fBAF_INET\fR or
 .LP
 If either \fBrexec()\fR or \fBrexec_af()\fR fails, \fB\(mi1\fR is returned.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -103,8 +100,7 @@ MT-Level	Unsafe
 This interface is Unsafe in multithreaded applications. Unsafe interfaces
 should be called only from the main thread.
 .SH SEE ALSO
-.sp
 .LP
 \fBin.rexecd\fR(1M), \fBgetaddrinfo\fR(3SOCKET), \fBgethostbyname\fR(3NSL),
-\fBgetservbyname\fR(3SOCKET), \fBhtonl\fR(3XNET), \fBsocket\fR(3SOCKET),
+\fBgetservbyname\fR(3SOCKET), \fBhtonl\fR(3C), \fBsocket\fR(3SOCKET),
 \fBattributes\fR(5)

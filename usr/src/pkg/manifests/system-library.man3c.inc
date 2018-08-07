@@ -54,6 +54,7 @@ file path=usr/share/man/man3c/bsd_signal.3c
 file path=usr/share/man/man3c/bsearch.3c
 file path=usr/share/man/man3c/bstring.3c
 file path=usr/share/man/man3c/btowc.3c
+file path=usr/share/man/man3c/byteorder.3c
 file path=usr/share/man/man3c/call_once.3c
 file path=usr/share/man/man3c/catgets.3c
 file path=usr/share/man/man3c/catopen.3c
@@ -885,6 +886,9 @@ link path=usr/share/man/man3c/htobe64.3c target=endian.3c
 link path=usr/share/man/man3c/htole16.3c target=endian.3c
 link path=usr/share/man/man3c/htole32.3c target=endian.3c
 link path=usr/share/man/man3c/htole64.3c target=endian.3c
+link path=usr/share/man/man3c/htonl.3c target=byteorder.3c
+link path=usr/share/man/man3c/htonll.3c target=byteorder.3c
+link path=usr/share/man/man3c/htons.3c target=byteorder.3c
 link path=usr/share/man/man3c/inet6.3c target=inet.3c
 link path=usr/share/man/man3c/inet_addr.3c target=inet.3c
 link path=usr/share/man/man3c/inet_aton.3c target=inet.3c
@@ -1032,6 +1036,9 @@ link path=usr/share/man/man3c/nftw.3c target=ftw.3c
 link path=usr/share/man/man3c/ngettext.3c target=gettext.3c
 link path=usr/share/man/man3c/nl_langinfo_l.3c target=nl_langinfo.3c
 link path=usr/share/man/man3c/nrand48.3c target=drand48.3c
+link path=usr/share/man/man3c/ntohl.3c target=byteorder.3c
+link path=usr/share/man/man3c/ntohll.3c target=byteorder.3c
+link path=usr/share/man/man3c/ntohs.3c target=byteorder.3c
 link path=usr/share/man/man3c/openlog.3c target=syslog.3c
 link path=usr/share/man/man3c/pclose.3c target=popen.3c
 link path=usr/share/man/man3c/port_dissociate.3c target=port_associate.3c

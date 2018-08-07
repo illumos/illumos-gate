@@ -1,0 +1,86 @@
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2018 Nexenta Systems, Inc.
+.\"
+.Dd August 2, 2018
+.Dt BYTEORDER 3C
+.Os
+.Sh NAME
+.Nm byteorder ,
+.Nm htonl ,
+.Nm htonll ,
+.Nm htons ,
+.Nm ntohl ,
+.Nm ntohll ,
+.Nm ntohs
+.Nd convert values between host and network byte order
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In sys/types.h
+.In netinet/in.h
+.In inttypes.h
+.Ft uint32_t
+.Fo htonl
+.Fa "uint32_t hostlong"
+.Fc
+.Ft uint64_t
+.Fo htonll
+.Fa "uint64_t hostlonglong"
+.Fc
+.Ft uint16_t
+.Fo htons
+.Fa "uint16_t hostshort"
+.Fc
+.Ft uint32_t
+.Fo ntohl
+.Fa "uint32_t netlong"
+.Fc
+.Ft uint64_t
+.Fo ntohll
+.Fa "uint64_t netlonglong"
+.Fc
+.Ft uint16_t
+.Fo ntohs
+.Fa "uint16_t netshort"
+.Fc
+.Sh DESCRIPTION
+These functions convert 16-bit, 32-bit, and 64-bit quantities between network
+byte order and host byte order.
+On some architectures these routines are defined as
+.Dv NULL
+macros in the include file
+.In netinet/in.h .
+On other architectures, the routines are functional when the host byte order is
+different from network byte order.
+.Pp
+These functions are most often used in conjunction with Internet addresses and
+ports as returned by
+.Xr gethostent 3NSL
+and
+.Xr getservent 3NSL .
+.Sh MT-LEVEL
+.Sy Safe
+.Sh SEE ALSO
+.Xr inet.h 3HEAD ,
+.Xr gethostent 3NSL ,
+.Xr getservent 3NSL ,
+.Xr attributes 5 ,
+.Xr byteorder 5

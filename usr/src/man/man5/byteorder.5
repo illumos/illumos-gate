@@ -11,7 +11,7 @@
 .\"
 .\" Copyright 2016 Joyent, Inc.
 .\"
-.Dd January 31, 2016
+.Dd August 2, 2018
 .Dt BYTEORDER 5
 .Os
 .Sh NAME
@@ -202,12 +202,12 @@ check the byte order and convert it appropriately.
 The system provides two different sets of functions to convert values
 between big-endian and little-endian.
 They are defined in
-.Xr byteorder 3SOCKET
+.Xr byteorder 3C
 and
 .Xr endian 3C .
 .Pp
 The
-.Xr byteorder 3SOCKET
+.Xr byteorder 3C
 family of functions convert data between the host's native byte order
 and big- or little-endian.
 The functions operate on either 16-bit, 32-bit, or 64-bit values.
@@ -219,23 +219,23 @@ order, begin with
 .Sy hton .
 For example, to convert a 32-bit value, a long, from network byte order
 to the host's, one would use the function
-.Xr ntohl 3SOCKET .
+.Xr ntohl 3C .
 .Pp
 These functions have been standardized by POSIX.
 However, the 64-bit variants,
-.Xr ntohll 3SOCKET
+.Xr ntohll 3C
 and
-.Xr htonll 3SOCKET
+.Xr htonll 3C
 are not standardized and may not be found on other systems.
 For more information on these functions, see
-.Xr byteorder 3SOCKET .
+.Xr byteorder 3C .
 .Pp
 The second family of functions,
 .Xr endian 3C ,
 provide a means to convert between the host's byte order
 and big-endian and little-endian specifically.
 While these functions are similar to those in
-.Xr byteorder 3SOCKET ,
+.Xr byteorder 3C ,
 they more explicitly cover different data conversions.
 Like them, these functions operate on either 16-bit, 32-bit, or 64-bit values.
 When converting from big-endian, to the host's endianness, the functions
@@ -254,17 +254,17 @@ to little-endian respectively.
 These functions are not standardized and the header they appear in varies
 between the BSDs and GNU/Linux.
 Applications that wish to be portable, shoulda instead use the
-.Xr byteorder 3SOCKET
+.Xr byteorder 3C
 functions.
 .Pp
 All of these functions in both families simply return their input when
 the host's native byte order is the same as the desired order.
 For example, when calling
-.Xr htonl 3SOCKET
+.Xr htonl 3C
 on a big-endian system the original data is returned with no conversion
 or modification.
 .Sh SEE ALSO
+.Xr byteorder 3C ,
 .Xr endian 3C ,
 .Xr endian.h 3HEAD ,
-.Xr inet 3HEAD ,
-.Xr byteorder 3SOCKET
+.Xr inet 3HEAD

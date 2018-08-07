@@ -84,7 +84,7 @@ Get interface network mask.
 .LP
 \fBIP\fR addresses are four byte quantities, stored in network byte order.
 \fBIP\fR addresses should be manipulated using the byte order conversion
-routines. See  \fBbyteorder\fR(3SOCKET).
+routines. See  \fBbyteorder\fR(3C).
 .sp
 .LP
 Addresses in the Internet protocol family use the  \fBsockaddr_in\fR structure,
@@ -153,7 +153,7 @@ numbers. These semantics apply when Internet family protocols are used using
 the \fBTLI\fR.
 .SH SEE ALSO
 .LP
-\fBioctl\fR(2), \fBbind\fR(3SOCKET), \fBbyteorder\fR(3SOCKET),
+\fBioctl\fR(2), \fBbind\fR(3SOCKET), \fBbyteorder\fR(3C),
 \fBconnect\fR(3SOCKET), \fBgethostbyname\fR(3NSL), \fBgetnetbyname\fR(3SOCKET),
 \fBgetprotobyname\fR(3SOCKET), \fBgetservbyname\fR(3SOCKET),
 \fBgetsockopt\fR(3SOCKET), \fBsend\fR(3SOCKET), \fBsockaddr\fR(3SOCKET),
