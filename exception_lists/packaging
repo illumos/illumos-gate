@@ -24,7 +24,7 @@
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2017 RackTop Systems.
 #
@@ -654,8 +654,6 @@ usr/lib/sparcv9/libds.so		sparc
 usr/lib/llib-lds			sparc
 usr/lib/llib-lds.ln			sparc
 usr/lib/sparcv9/llib-lds.ln		sparc
-usr/lib/libdscfg.so
-usr/lib/llib-ldscfg.ln
 usr/platform/sun4v/include/sys/libds.h	sparc
 usr/platform/sun4v/include/sys/vlds.h	sparc
 #
@@ -849,23 +847,6 @@ usr/lib/llib-lHBAAPI
 usr/lib/llib-lHBAAPI.ln
 usr/lib/amd64/llib-lHBAAPI.ln	i386
 usr/lib/sparcv9/llib-lHBAAPI.ln	sparc
-#
-usr/bin/dscfgcli
-usr/bin/sd_diag
-usr/bin/sd_stats
-usr/include/nsctl.h
-usr/include/sys/ncall
-usr/include/sys/nsc_ddi.h
-usr/include/sys/nsc_thread.h
-usr/include/sys/nsctl
-usr/include/sys/nskernd.h
-usr/include/sys/unistat
-usr/lib/libnsctl.so
-usr/lib/librdc.so
-usr/lib/libunistat.so
-usr/lib/llib-lnsctl.ln
-usr/lib/llib-lrdc.ln
-usr/lib/llib-lunistat.ln
 #
 # These files are used by the iSCSI initiator only.
 # No reason to ship them.

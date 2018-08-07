@@ -23,7 +23,7 @@
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011, 2014 by Delphix. All rights reserved.
 # Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2017, Joyent, Inc.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
@@ -864,72 +864,6 @@ SCSA1394_OBJS += hba.o sbp2_driver.o sbp2_bus.o
 SBP2_OBJS += cfgrom.o sbp2.o
 
 PMODEM_OBJS += pmodem.o pmodem_cis.o cis.o cis_callout.o cis_handlers.o cis_params.o
-
-DSW_OBJS +=	dsw.o dsw_dev.o ii_tree.o
-
-NCALL_OBJS +=	ncall.o \
-		ncall_stub.o
-
-RDC_OBJS +=	rdc.o \
-		rdc_dev.o \
-		rdc_io.o \
-		rdc_clnt.o \
-		rdc_prot_xdr.o \
-		rdc_svc.o \
-		rdc_bitmap.o \
-		rdc_health.o \
-		rdc_subr.o \
-		rdc_diskq.o
-
-RDCSRV_OBJS +=	rdcsrv.o
-
-RDCSTUB_OBJS += rdc_stub.o
-
-SDBC_OBJS +=	sd_bcache.o \
-		sd_bio.o \
-		sd_conf.o \
-		sd_ft.o \
-		sd_hash.o \
-		sd_io.o \
-		sd_misc.o \
-		sd_pcu.o \
-		sd_tdaemon.o \
-		sd_trace.o \
-		sd_iob_impl0.o \
-		sd_iob_impl1.o \
-		sd_iob_impl2.o \
-		sd_iob_impl3.o \
-		sd_iob_impl4.o \
-		sd_iob_impl5.o \
-		sd_iob_impl6.o \
-		sd_iob_impl7.o \
-		safestore.o \
-		safestore_ram.o
-
-NSCTL_OBJS +=	nsctl.o \
-		nsc_cache.o \
-		nsc_disk.o \
-		nsc_dev.o \
-		nsc_freeze.o \
-		nsc_gen.o \
-		nsc_mem.o \
-		nsc_ncallio.o \
-		nsc_power.o \
-		nsc_resv.o \
-		nsc_rmspin.o \
-		nsc_solaris.o \
-		nsc_trap.o \
-		nsc_list.o
-UNISTAT_OBJS +=	spuni.o \
-		spcs_s_k.o
-
-NSKERN_OBJS +=	nsc_ddi.o \
-		nsc_proc.o \
-		nsc_raw.o \
-		nsc_thread.o \
-		nskernd.o
-
-SV_OBJS +=	sv.o
 
 PMCS_OBJS += pmcs_attach.o pmcs_ds.o pmcs_intr.o pmcs_nvram.o pmcs_sata.o \
 		pmcs_scsa.o pmcs_smhba.o pmcs_subr.o pmcs_fwlog.o

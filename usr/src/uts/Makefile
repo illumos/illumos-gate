@@ -18,11 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.
 #
-# include global definitions
+
 include ../Makefile.master
 
 #
@@ -131,8 +132,7 @@ $(PMTMO_FILE) pmtmo_file: $(PATCH_MAKEUP_TABLE)
 # the architecture/machine dependent subdirectories are in completely
 # isomorphic locations.
 #
-COMMON_HDRDIRS= common/avs \
-		common/c2 \
+COMMON_HDRDIRS= common/c2 \
 		common/des \
 		common/fs \
 		common/gssapi \
@@ -163,10 +163,9 @@ COMMON_HDRDIRS= common/avs \
 # Subset of COMMON_HDRDIRS in which at least one header is generated
 # at runtime (e.g., rpcgen), and in which "make clean" should run.
 # Other directories should be included here, but do not yet have the
-# necessary Makefile support (make clean).  See 6414855.
+# necessary Makefile support (make clean).
 #
-DYNHDRDIRS =	common/avs \
-		common/gssapi \
+DYNHDRDIRS =	common/gssapi \
 		common/idmap \
 		common/io/fibre-channel/fca/qlc \
 		common/klm \

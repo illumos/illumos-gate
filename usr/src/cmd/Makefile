@@ -26,7 +26,7 @@
 # Copyright (c) 2013 DEY Storage Systems, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2018 Gary Mills
 #
 
@@ -68,7 +68,6 @@ COMMON_SUBDIRS=		\
 	audio		\
 	auths		\
 	autopush	\
-	avs		\
 	awk		\
 	awk_xpg4	\
 	backup		\
@@ -519,7 +518,6 @@ MSGSUBDIRS=		\
 	auditset	\
 	auths		\
 	autopush	\
-	avs		\
 	awk		\
 	awk_xpg4	\
 	backup		\

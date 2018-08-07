@@ -14,7 +14,7 @@
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2017, Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -70,7 +70,6 @@ _MANFILES=	aac.7d		\
 		ibtl.7d		\
 		ieee1394.7d	\
 		igb.7d		\
-		ii.7d		\
 		ipnet.7d	\
 		iscsi.7d	\
 		iser.7d		\
@@ -121,7 +120,6 @@ _MANFILES=	aac.7d		\
 		sgen.7d		\
 		srpt.7d		\
 		st.7d		\
-		sv.7d		\
 		sysmsg.7d	\
 		systrace.7d	\
 		ticlts.7d	\

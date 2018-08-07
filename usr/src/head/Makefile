@@ -128,7 +128,6 @@ HDRS=   $($(MACH)_HDRS)	\
 	nl_types.h	\
 	nlist.h		\
 	note.h		\
-	nsctl.h		\
 	nsswitch.h	\
 	nss_common.h	\
 	nss_dbdefs.h	\

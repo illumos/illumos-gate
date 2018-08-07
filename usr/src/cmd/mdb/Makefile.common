@@ -70,7 +70,6 @@ COMMON_MODULES_KVM = \
 	hook \
 	neti \
 	idm \
-	ii \
 	ip \
 	ipc \
 	ipp \
@@ -82,18 +81,15 @@ COMMON_MODULES_KVM = \
 	mpt_sas \
 	mr_sas \
 	nca \
-	nsctl \
 	nsmb \
 	pmcs \
 	ptm \
 	qlc \
 	random \
-	rdc \
 	s1394 \
 	scsi_vhci \
 	sctp \
 	sd \
-	sdbc \
 	smbfs \
 	smbsrv \
 	sockfs \
@@ -102,7 +98,6 @@ COMMON_MODULES_KVM = \
 	srpt \
 	stmf \
 	stmf_sbd \
-	sv \
 	ufs \
 	usba \
 	zfs
