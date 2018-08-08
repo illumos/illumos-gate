@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -32,27 +32,29 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_rrip.h	8.2 (Berkeley) 12/5/94
- * $FreeBSD$
  */
 
+#ifndef	CD9660_RRIP_H
+#define	CD9660_RRIP_H
+
 typedef struct {
-	char   type			[ISODCL (  0,    1)];
-	u_char length			[ISODCL (  2,    2)]; /* 711 */
-	u_char version			[ISODCL (  3,    3)];
+	char   type			[ISODCL(0,    1)];
+	uchar_t length			[ISODCL(2,    2)]; /* 711 */
+	uchar_t version			[ISODCL(3,    3)];
 } ISO_SUSP_HEADER;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	char mode			[ISODCL (  4,   11)]; /* 733 */
-	char links			[ISODCL ( 12,   19)]; /* 733 */
-	char uid			[ISODCL ( 20,   27)]; /* 733 */
-	char gid			[ISODCL ( 28,   35)]; /* 733 */
+	char mode			[ISODCL(4,   11)]; /* 733 */
+	char links			[ISODCL(12,   19)]; /* 733 */
+	char uid			[ISODCL(20,   27)]; /* 733 */
+	char gid			[ISODCL(28,   35)]; /* 733 */
 } ISO_RRIP_ATTR;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	char dev_t_high			[ISODCL (  4,   11)]; /* 733 */
-	char dev_t_low			[ISODCL ( 12,   19)]; /* 733 */
+	char dev_t_high			[ISODCL(4,   11)]; /* 733 */
+	char dev_t_low			[ISODCL(12,   19)]; /* 733 */
 } ISO_RRIP_DEVICE;
 
 #define	ISO_SUSP_CFLAG_CONTINUE	0x01
@@ -63,31 +65,31 @@ typedef struct {
 #define	ISO_SUSP_CFLAG_HOST	0x20
 
 typedef struct {
-	u_char cflag			[ISODCL (  1,    1)];
-	u_char clen			[ISODCL (  2,    2)];
-	u_char name			[1];			/* XXX */
+	uchar_t cflag			[ISODCL(1,    1)];
+	uchar_t clen			[ISODCL(2,    2)];
+	uchar_t name			[1];			/* XXX */
 } ISO_RRIP_SLINK_COMPONENT;
 #define	ISO_RRIP_SLSIZ	2
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	u_char flags			[ISODCL (  4,	 4)];
-	u_char component		[ISODCL (  5,	 5)];
+	uchar_t flags			[ISODCL(4,	 4)];
+	uchar_t component		[ISODCL(5,	 5)];
 } ISO_RRIP_SLINK;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	char flags			[ISODCL (  4,	 4)];
+	char flags			[ISODCL(4,	 4)];
 } ISO_RRIP_ALTNAME;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	char dir_loc			[ISODCL (  4,	 11)]; /* 733 */
+	char dir_loc			[ISODCL(4,	 11)]; /* 733 */
 } ISO_RRIP_CLINK;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	char dir_loc			[ISODCL (  4,	 11)]; /* 733 */
+	char dir_loc			[ISODCL(4,	 11)]; /* 733 */
 } ISO_RRIP_PLINK;
 
 typedef struct {
@@ -106,32 +108,34 @@ typedef struct {
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	u_char flags			[ISODCL (  4,    4)];
-	u_char time			[ISODCL (  5,    5)];
+	uchar_t flags			[ISODCL(4,    4)];
+	uchar_t time			[ISODCL(5,    5)];
 } ISO_RRIP_TSTAMP;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	u_char flags			[ISODCL (  4,    4)];
+	uchar_t flags			[ISODCL(4,    4)];
 } ISO_RRIP_IDFLAG;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	char len_id			[ISODCL (  4,	 4)];
-	char len_des			[ISODCL (  5,	 5)];
-	char len_src			[ISODCL (  6,	 6)];
-	char version			[ISODCL (  7,	 7)];
+	char len_id			[ISODCL(4,	 4)];
+	char len_des			[ISODCL(5,	 5)];
+	char len_src			[ISODCL(6,	 6)];
+	char version			[ISODCL(7,	 7)];
 } ISO_RRIP_EXTREF;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	char check			[ISODCL (  4,	 5)];
-	char skip			[ISODCL (  6,	 6)];
+	char check			[ISODCL(4,	 5)];
+	char skip			[ISODCL(6,	 6)];
 } ISO_RRIP_OFFSET;
 
 typedef struct {
 	ISO_SUSP_HEADER			h;
-	u_char location			[ISODCL (  4,	11)];
-	u_char offset			[ISODCL ( 12,	19)];
-	u_char length			[ISODCL ( 20,	27)];
+	uchar_t location			[ISODCL(4,	11)];
+	uchar_t offset			[ISODCL(12,	19)];
+	uchar_t length			[ISODCL(20,	27)];
 } ISO_RRIP_CONT;
+
+#endif	/* CD9660_RRIP_H */

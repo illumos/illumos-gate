@@ -55,10 +55,10 @@
 
 typedef struct {
 	ISO_SUSP_HEADER		h;
-	u_char signature	[ISODCL (  5,    6)];
-	u_char len_skp		[ISODCL (  7,    7)]; /* 711 */
+	uchar_t signature	[ISODCL(5,    6)];
+	uchar_t len_skp		[ISODCL(7,    7)]; /* 711 */
 } ISO_SUSP_PRESENT;
-	
+
 static int	buf_read_file(struct open_file *f, char **buf_p,
 		    size_t *size_p);
 static int	cd9660_open(const char *path, struct open_file *f);
@@ -79,14 +79,14 @@ static ISO_SUSP_HEADER *susp_lookup_record(struct open_file *f,
 		    int lenskip);
 
 struct fs_ops cd9660_fsops = {
-	"cd9660",
-	cd9660_open,
-	cd9660_close,
-	cd9660_read,
-	null_write,
-	cd9660_seek,
-	cd9660_stat,
-	cd9660_readdir
+	.fs_name = "cd9660",
+	.fo_open = cd9660_open,
+	.fo_close = cd9660_close,
+	.fo_read = cd9660_read,
+	.fo_write = null_write,
+	.fo_seek = cd9660_seek,
+	.fo_stat = cd9660_stat,
+	.fo_readdir = cd9660_readdir
 };
 
 #define	F_ISDIR		0x0001		/* Directory */
@@ -94,20 +94,20 @@ struct fs_ops cd9660_fsops = {
 #define	F_RR		0x0004		/* Rock Ridge on this volume */
 
 struct file {
-	int 		f_flags;	/* file flags */
-	off_t 		f_off;		/* Current offset within file */
-	daddr_t 	f_bno;		/* Starting block number */
-	off_t 		f_size;		/* Size of file */
-	daddr_t		f_buf_blkno;	/* block number of data block */	
+	int		f_flags;	/* file flags */
+	off_t		f_off;		/* Current offset within file */
+	daddr_t		f_bno;		/* Starting block number */
+	off_t		f_size;		/* Size of file */
+	daddr_t		f_buf_blkno;	/* block number of data block */
 	char		*f_buf;		/* buffer for data block */
 	int		f_susp_skip;	/* len_skip for SUSP records */
 };
 
 struct ptable_ent {
-	char namlen	[ISODCL( 1, 1)];	/* 711 */
-	char extlen	[ISODCL( 2, 2)];	/* 711 */
-	char block	[ISODCL( 3, 6)];	/* 732 */
-	char parent	[ISODCL( 7, 8)];	/* 722 */
+	char namlen	[ISODCL(1, 1)];	/* 711 */
+	char extlen	[ISODCL(2, 2)];	/* 711 */
+	char block	[ISODCL(3, 6)];	/* 732 */
+	char parent	[ISODCL(7, 8)];	/* 722 */
 	char name	[1];
 };
 #define	PTFIXSZ		8
@@ -205,7 +205,7 @@ rrip_check(struct open_file *f, struct iso_directory_record *dp, int *lenskip)
 	sp = (ISO_SUSP_PRESENT *)p;
 	if (bcmp(sp->h.type, SUSP_PRESENT, 2) != 0)
 		return (0);
-	if (isonum_711(sp->h.length) != sizeof(ISO_SUSP_PRESENT))
+	if (isonum_711(sp->h.length) != sizeof (ISO_SUSP_PRESENT))
 		return (0);
 	if (sp->signature[0] != 0xbe || sp->signature[1] != 0xef)
 		return (0);
@@ -247,10 +247,10 @@ dirmatch(struct open_file *f, const char *path, struct iso_directory_record *dp,
 			continue;
 		if (!icase && toupper(*path) == *cp)
 			continue;
-		return 0;
+		return (0);
 	}
 	if (*path && *path != '/')
-		return 0;
+		return (0);
 	/*
 	 * Allow stripping of trailing dots and the version number.
 	 * Note that this will find the first instead of the last version
@@ -259,12 +259,12 @@ dirmatch(struct open_file *f, const char *path, struct iso_directory_record *dp,
 	if (i >= 0 && (*cp == ';' || *cp == '.')) {
 		/* This is to prevent matching of numeric extensions */
 		if (*cp == '.' && cp[1] != ';')
-			return 0;
+			return (0);
 		while (--i >= 0)
 			if (*++cp != ';' && (*cp < '0' || *cp > '9'))
-				return 0;
+				return (0);
 	}
-	return 1;
+	return (1);
 }
 
 static int
@@ -282,7 +282,7 @@ cd9660_open(const char *path, struct open_file *f)
 	/* First find the volume descriptor */
 	buf = malloc(buf_size = ISO_DEFAULT_BLOCK_SIZE);
 	vd = buf;
-	for (bno = 16;; bno++) {
+	for (bno = 16; ; bno++) {
 		twiddle(1);
 		rc = f->f_dev->dv_strategy(f->f_devdata, F_READ, cdb2devb(bno),
 		    ISO_DEFAULT_BLOCK_SIZE, buf, &read);
@@ -293,7 +293,7 @@ cd9660_open(const char *path, struct open_file *f)
 			goto out;
 		}
 		rc = EINVAL;
-		if (bcmp(vd->id, ISO_STANDARD_ID, sizeof vd->id) != 0)
+		if (bcmp(vd->id, ISO_STANDARD_ID, sizeof (vd->id)) != 0)
 			goto out;
 		if (isonum_711(vd->type) == ISO_VD_END)
 			goto out;
@@ -317,11 +317,10 @@ cd9660_open(const char *path, struct open_file *f)
 		while (off < dsize) {
 			if ((off % ISO_DEFAULT_BLOCK_SIZE) == 0) {
 				twiddle(1);
-				rc = f->f_dev->dv_strategy
-					(f->f_devdata, F_READ,
-					 cdb2devb(bno + boff),
-					 ISO_DEFAULT_BLOCK_SIZE,
-					 buf, &read);
+				rc = f->f_dev->dv_strategy(f->f_devdata, F_READ,
+				    cdb2devb(bno + boff),
+				    ISO_DEFAULT_BLOCK_SIZE,
+				    buf, &read);
 				if (rc)
 					goto out;
 				if (read != ISO_DEFAULT_BLOCK_SIZE) {
@@ -329,12 +328,12 @@ cd9660_open(const char *path, struct open_file *f)
 					goto out;
 				}
 				boff++;
-				dp = (struct iso_directory_record *) buf;
+				dp = (struct iso_directory_record *)buf;
 			}
 			if (isonum_711(dp->length) == 0) {
-			    /* skip to next block, if any */
-			    off = boff * ISO_DEFAULT_BLOCK_SIZE;
-			    continue;
+				/* skip to next block, if any */
+				off = boff * ISO_DEFAULT_BLOCK_SIZE;
+				continue;
 			}
 
 			/* See if RRIP is in use. */
@@ -342,14 +341,14 @@ cd9660_open(const char *path, struct open_file *f)
 				use_rrip = rrip_check(f, dp, &lenskip);
 
 			if (dirmatch(f, path, dp, use_rrip,
-				first ? 0 : lenskip)) {
+			    first ? 0 : lenskip)) {
 				first = 0;
 				break;
 			} else
 				first = 0;
 
 			dp = (struct iso_directory_record *)
-				((char *) dp + isonum_711(dp->length));
+			    ((char *)dp + isonum_711(dp->length));
 			/* If the new block has zero length, it is padding. */
 			if (isonum_711(dp->length) == 0) {
 				/* Skip to next block, if any. */
@@ -370,8 +369,8 @@ cd9660_open(const char *path, struct open_file *f)
 	}
 
 	/* allocate file system specific data structure */
-	fp = malloc(sizeof(struct file));
-	bzero(fp, sizeof(struct file));
+	fp = malloc(sizeof (struct file));
+	bzero(fp, sizeof (struct file));
 	f->f_fsdata = (void *)fp;
 
 	if ((isonum_711(rec.flags) & 2) != 0) {
@@ -403,14 +402,14 @@ cd9660_open(const char *path, struct open_file *f)
 	fp->f_size = isonum_733(rec.size);
 	free(buf);
 
-	return 0;
+	return (0);
 
 out:
 	if (fp)
 		free(fp);
 	free(buf);
 
-	return rc;
+	return (rc);
 }
 
 static int
@@ -421,7 +420,7 @@ cd9660_close(struct open_file *f)
 	f->f_fsdata = NULL;
 	free(fp);
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -508,7 +507,7 @@ again:
 
 	if (isonum_711(ep->length) == 0) {
 		daddr_t blkno;
-		
+
 		/* skip to next block, if any */
 		blkno = fp->f_off / ISO_DEFAULT_BLOCK_SIZE;
 		fp->f_off = (blkno + 1) * ISO_DEFAULT_BLOCK_SIZE;
@@ -535,7 +534,7 @@ again:
 			}
 		}
 	}
-	reclen = sizeof(struct dirent) - (MAXNAMLEN+1) + namelen + 1;
+	reclen = sizeof (struct dirent) - (MAXNAMLEN+1) + namelen + 1;
 	reclen = (reclen + 3) & ~3;
 
 	d->d_fileno = isonum_733(ep->extent);
@@ -569,9 +568,9 @@ cd9660_seek(struct open_file *f, off_t offset, int where)
 		fp->f_off = fp->f_size - offset;
 		break;
 	default:
-		return -1;
+		return (-1);
 	}
-	return fp->f_off;
+	return (fp->f_off);
 }
 
 static int
@@ -587,5 +586,5 @@ cd9660_stat(struct open_file *f, struct stat *sb)
 		sb->st_mode |= S_IFREG;
 	sb->st_uid = sb->st_gid = 0;
 	sb->st_size = fp->f_size;
-	return 0;
+	return (0);
 }
