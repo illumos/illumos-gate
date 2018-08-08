@@ -325,7 +325,7 @@ static int
 zf_stat(struct open_file *f, struct stat *sb)
 {
     struct z_file	*zf = (struct z_file *)f->f_fsdata;
-    int			result, res;
+    int			result;
     off_t		pos1, pos2;
     uint32_t		size;
 
