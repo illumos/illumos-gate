@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 RackTop Systems.
  */
 
 #include "libscf_impl.h"
@@ -2601,6 +2602,13 @@ scf_read_propvec(const char *fmri, const char *pgname, boolean_t running,
 	scf_propvec_t *prop;
 	int error = 0;
 
+	for (prop = properties; prop->pv_prop != NULL; prop++) {
+		if (prop->pv_type == SCF_TYPE_OPAQUE)
+			((scf_opaque_t *)prop->pv_ptr)->so_addr = NULL;
+		else if (scf_true_base_type(prop->pv_type) == SCF_TYPE_ASTRING)
+			*((char **)prop->pv_ptr) = NULL;
+	}
+
 	if (h == NULL || s == NULL || i == NULL || (running && snap == NULL) ||
 	    pg == NULL || p == NULL || v == NULL)
 		goto scferror;
@@ -2628,13 +2636,6 @@ scf_read_propvec(const char *fmri, const char *pgname, boolean_t running,
 	if ((instance ? scf_instance_get_pg_composed(i, snap, pgname, pg) :
 	    scf_service_get_pg(s, pgname, pg)) == -1)
 		goto scferror;
-
-	for (prop = properties; prop->pv_prop != NULL; prop++) {
-		if (prop->pv_type == SCF_TYPE_OPAQUE)
-			((scf_opaque_t *)prop->pv_ptr)->so_addr = NULL;
-		else if (scf_true_base_type(prop->pv_type) == SCF_TYPE_ASTRING)
-			*((char **)prop->pv_ptr) = NULL;
-	}
 
 	for (prop = properties; prop->pv_prop != NULL; prop++) {
 		int ret = 0;
