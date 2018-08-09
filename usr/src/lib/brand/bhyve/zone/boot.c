@@ -43,12 +43,12 @@
 
 typedef enum {
 	PCI_SLOT_HOSTBRIDGE = 0,	/* Not used here, but reserved */
-	PCI_SLOT_LPC,
-	PCI_SLOT_CD,
+	PCI_SLOT_CD = 3,		/* Windows ahci allows slots 3 - 6 */
 	PCI_SLOT_BOOT_DISK,
 	PCI_SLOT_OTHER_DISKS,
 	PCI_SLOT_NICS,
 	PCI_SLOT_FBUF = 30,
+	PCI_SLOT_LPC = 31,		/* Windows requires lpc in slot 31 */
 } pci_slot_t;
 
 static boolean_t debug;
