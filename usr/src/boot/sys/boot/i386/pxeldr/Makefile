@@ -49,7 +49,7 @@ FILEMODE=0444
 
 CFLAGS +=-I../common
 
-LOADERBIN= ../loader/zfsloader.bin
+LOADERBIN= ../loader/loader.bin
 
 CLEANFILES += ${BOOT}.tmp
 

@@ -5,7 +5,7 @@ MK_SSP=		no
 MAN=
 
 PROG?=		loader
-NEWVERSWHAT?=	"bootstrap loader" sparc64
+NEWVERSWHAT?=	"ZFS enabled bootstrap loader" sparc64
 INSTALLFLAGS=	-b
 
 # Architecture-specific loader code

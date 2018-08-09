@@ -228,10 +228,22 @@ main(void)
      */
 
     if (auto_boot && !*kname) {
-	memcpy(kname, PATH_LOADER_ZFS, sizeof(PATH_LOADER_ZFS));
+	memcpy(kname, PATH_LOADER, sizeof(PATH_LOADER));
 	if (!keyhit(3)) {
 	    load();
 	    auto_boot = 0;
+	    /*
+	     * Try to fall back to /boot/zfsloader.
+	     * This fallback should be eventually removed.
+	     * Created: 08/03/2018
+	     */
+#define	PATH_ZFSLOADER "/boot/zfsloader"
+	    memcpy(kname, PATH_ZFSLOADER, sizeof(PATH_ZFSLOADER));
+	    load();
+	    /*
+	     * Still there? restore default loader name for prompt.
+	     */
+	    memcpy(kname, PATH_LOADER, sizeof(PATH_LOADER));
 	}
     }
 

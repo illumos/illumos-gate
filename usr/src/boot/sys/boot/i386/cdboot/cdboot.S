@@ -597,6 +597,6 @@ msg_lookupfail:	.asciz  "File not found\r\n"
 msg_load2big:	.asciz  "File too big\r\n"
 msg_failed:	.asciz	"Boot failed\r\n"
 twiddle_chars:	.ascii	"|/-\\"
-loader_paths:	.asciz  "/BOOT/ZFSLOADER"
-		.asciz	"/boot/zfsloader"
+loader_paths:	.asciz  "/BOOT/LOADER"
+		.asciz	"/boot/loader"
 		.byte 0

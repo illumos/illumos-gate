@@ -144,8 +144,7 @@ i386_MANFILES=	brand.4th.5		\
 		menu.4th.5		\
 		menusets.4th.5		\
 		pxeboot.5		\
-		version.4th.5		\
-		zfsloader.5
+		version.4th.5
 
 MANLINKS=	ANSI.5		\
 		C++.5		\

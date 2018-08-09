@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Apr 21, 2017
+.Dd July 20, 2018
 .Dt GPTZFSBOOT 5
 .Os
 .Sh NAME
@@ -77,14 +77,14 @@ If the
 .Cm bootfs
 property is not set, then the root filesystem of the pool is used as
 the default.
-.Xr zfsloader 5
+.Xr loader 5
 is loaded from the boot filesystem.
 If
 .Pa /boot/config
 is present in the boot filesystem, boot options are read from it.
 .Pp
 The ZFS GUIDs of the boot pool and boot file system are made available to
-.Xr zfsloader 5 .
+.Xr loader 5 .
 .Ss USAGE
 Normally
 .Nm
@@ -95,7 +95,7 @@ interact with
 through a prompt.
 .Pp
 The filesystem specification and the path to
-.Xr zfsloader 5
+.Xr loader 5
 is specified as
 .Pp
 .Sm off
@@ -105,7 +105,7 @@ is specified as
 Both the filesystem and the path can be specified.
 If only a path is specified, then the default filesystem is used.
 If only a pool and filesystem are specified, then
-.Pa /boot/zfsloader
+.Pa /boot/loader
 is used as a path.
 .Pp
 Additionally, the
@@ -121,7 +121,7 @@ The output format for ZFS pools is similar to that of
 .Pp
 The configured or automatically determined ZFS boot filesystem is
 stored in the
-.Xr zfsloader 5
+.Xr loader 5
 .Cm loaddev
 variable, and also set as the initial value of the
 .Cm currdev
@@ -154,4 +154,4 @@ installboot /boot/pmbr /boot/gptzfsboot /dev/rdsk/c0t0d0s0
 .Xr installboot 1M ,
 .Xr zpool 1M ,
 .Xr loader 5 ,
-.Xr zfsloader 5
+.Xr loader 5
