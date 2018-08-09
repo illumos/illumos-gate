@@ -2074,6 +2074,8 @@ f platform/i86pc/ucode/GenuineIntel/00020661-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00020661-02 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206A7-02 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206A7-10 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000206C2-01 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000206C2-02 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206D6-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206D6-04 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206D6-08 0444 root sys
@@ -2084,6 +2086,7 @@ f platform/i86pc/ucode/GenuineIntel/000206D7-04 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206D7-08 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206D7-20 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206D7-40 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000206E6-04 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206F2-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000206F2-04 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000306A9-02 0444 root sys
@@ -2151,12 +2154,16 @@ f platform/i86pc/ucode/GenuineIntel/00050662-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00050663-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00050664-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/00050665-10 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000506C2-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000506C9-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000506C9-02 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000506CA-01 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000506CA-02 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000506E3-02 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000506E3-04 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000506E3-10 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000506E3-20 0444 root sys
+f platform/i86pc/ucode/GenuineIntel/000506F1-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000706A1-01 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000806E9-40 0444 root sys
 f platform/i86pc/ucode/GenuineIntel/000806E9-80 0444 root sys
