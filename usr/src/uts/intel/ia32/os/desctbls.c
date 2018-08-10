@@ -1290,6 +1290,28 @@ init_desctbls(void)
 
 #endif	/* __xpv */
 
+#ifndef __xpv
+/*
+ * As per Intel Vol 3 27.5.2, the GDTR limit is reset to 64Kb on a VM exit, so
+ * we have to manually fix it up ourselves.
+ *
+ * The caller may still need to make sure that it can't go off-CPU with the
+ * incorrect limit, before calling this (such as disabling pre-emption).
+ */
+void
+reset_gdtr_limit(void)
+{
+	ulong_t flags = intr_clear();
+	desctbr_t gdtr;
+
+	rd_gdtr(&gdtr);
+	gdtr.dtr_limit = (sizeof (user_desc_t) * NGDT) - 1;
+	wr_gdtr(&gdtr);
+
+	intr_restore(flags);
+}
+#endif /* __xpv */
+
 /*
  * In the early kernel, we need to set up a simple GDT to run on.
  *

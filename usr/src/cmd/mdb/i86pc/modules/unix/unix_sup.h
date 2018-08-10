@@ -21,6 +21,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/segments.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +31,7 @@ extern ulong_t kmdb_unix_getcr0(void);
 extern ulong_t kmdb_unix_getcr2(void);
 extern ulong_t kmdb_unix_getcr3(void);
 extern ulong_t kmdb_unix_getcr4(void);
+extern void kmdb_unix_getgdtr(desctbr_t *);
 
 #ifdef __cplusplus
 }

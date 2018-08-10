@@ -904,9 +904,11 @@ x86_featureset_cmd(uintptr_t addr, uint_t flags, int argc,
 #ifdef _KMDB
 /* ARGSUSED */
 static int
-crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+sysregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ulong_t cr0, cr2, cr3, cr4;
+	desctbr_t gdtr;
+
 	static const mdb_bitmask_t cr0_flag_bits[] = {
 		{ "PE",		CR0_PE,		CR0_PE },
 		{ "MP",		CR0_MP,		CR0_MP },
@@ -953,6 +955,9 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	cr2 = kmdb_unix_getcr2();
 	cr3 = kmdb_unix_getcr3();
 	cr4 = kmdb_unix_getcr4();
+
+	kmdb_unix_getgdtr(&gdtr);
+
 	mdb_printf("%%cr0 = 0x%lx <%b>\n", cr0, cr0, cr0_flag_bits);
 	mdb_printf("%%cr2 = 0x%lx <%a>\n", cr2, cr2);
 
@@ -965,6 +970,9 @@ crregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf("%%cr4 = 0x%lx <%b>\n", cr4, cr4, cr4_flag_bits);
+
+	mdb_printf("%%gdtr.base = 0x%lx, %%gdtr.limit = 0x%hx\n",
+	    gdtr.dtr_base, gdtr.dtr_limit);
 
 	return (DCMD_OK);
 }
@@ -997,7 +1005,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "x86_featureset", NULL, "dump the x86_featureset vector",
 		x86_featureset_cmd },
 #ifdef _KMDB
-	{ "crregs", NULL, "dump control registers", crregs_dcmd },
+	{ "sysregs", NULL, "dump system registers", sysregs_dcmd },
 #endif
 	{ NULL }
 };

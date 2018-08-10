@@ -66,4 +66,4 @@ tests = ['acquire-compare', 'acquire-spray']
 [/opt/os-tests/tests/i386]
 user = root
 arch = i86pc
-tests = ['ldt']
+tests = ['ldt', 'badseg']

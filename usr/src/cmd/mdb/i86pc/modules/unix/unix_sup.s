@@ -13,35 +13,20 @@
  * Copyright 2018 Joyent, Inc.
  */
 
-#if !defined(__lint)
-	.file	"unix_sup.s"
-#endif /* __lint */
-
 /*
  * Support routines for the unix kmdb module
  */
-
-#include <sys/asm_linkage.h>
 
 #if defined(__lint)
 
 #include <sys/types.h>
 
-ulong_t
-kmdb_unix_getcr0(void)
-{ return (0); }
+#else
 
-ulong_t
-kmdb_unix_getcr3(void)
-{ return (0); }
+#include <sys/asm_linkage.h>
 
-ulong_t
-kmdb_unix_getcr4(void)
-{ return (0); }
+	.file	"unix_sup.s"
 
-#else	/* __lint */
-
-#if defined(__amd64)
 	ENTRY(kmdb_unix_getcr0)
 	movq %cr0, %rax
 	ret
@@ -62,27 +47,9 @@ kmdb_unix_getcr4(void)
 	ret
 	SET_SIZE(kmdb_unix_getcr4)
 
-#elif defined (__i386)
-	ENTRY(kmdb_unix_getcr0)
-	movl %cr0, %eax
+	ENTRY(kmdb_unix_getgdtr)
+	sgdt (%rdi)
 	ret
-	SET_SIZE(kmdb_unix_getcr0)
+	SET_SIZE(kmdb_unix_getgdtr)
 
-	ENTRY(kmdb_unix_getcr2)
-	movl %cr2, %eax
-	ret
-	SET_SIZE(kmdb_unix_getcr2)
-
-	ENTRY(kmdb_unix_getcr3)
-	movl %cr3, %eax
-	ret
-	SET_SIZE(kmdb_unix_getcr3)
-
-	ENTRY(kmdb_unix_getcr4)
-	movl %cr4, %eax
-	ret
-	SET_SIZE(kmdb_unix_getcr4)
-
-#endif	/* __i386 */
-
-#endif /* __lint */
+#endif /* !__lint */

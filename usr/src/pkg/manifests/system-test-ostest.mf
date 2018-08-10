@@ -41,6 +41,7 @@ file path=opt/os-tests/tests/file-locking/acquire-lock.32 mode=0555
 file path=opt/os-tests/tests/file-locking/acquire-lock.64 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.32 mode=0555
 file path=opt/os-tests/tests/file-locking/runtests.64 mode=0555
+$(i386_ONLY)file path=opt/os-tests/tests/i386/badseg mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/i386/ldt mode=0555
 file path=opt/os-tests/tests/pf_key/acquire-compare mode=0555
 file path=opt/os-tests/tests/pf_key/acquire-spray mode=0555

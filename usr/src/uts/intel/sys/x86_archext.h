@@ -891,6 +891,10 @@ extern void enable_pcid(void);
 
 extern void xsave_setup_msr(struct cpu *);
 
+#if !defined(__xpv)
+extern void reset_gdtr_limit(void);
+#endif
+
 /*
  * Hypervisor signatures
  */
