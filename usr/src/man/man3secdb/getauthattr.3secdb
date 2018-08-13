@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETAUTHATTR 3SECDB "Feb 20, 2009"
+.TH GETAUTHATTR 3SECDB "Aug 13, 2018"
 .SH NAME
 getauthattr, getauthnam, free_authattr, setauthattr, endauthattr, chkauthattr
 \- get authorization entry
@@ -43,7 +43,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lsecdb  -lsocket  -lnsl  [ \fIlibrary\fR... 
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetauthattr()\fR and \fBgetauthnam()\fR functions each return an
 \fBauth_attr\fR(4) entry. Entries can come from any of the sources specified in
@@ -95,7 +94,7 @@ any of the profiles specified in the \fBCONSOLE_USER\fR keyword, then reads the
 given authorization is in any profiles specified with the \fBPROFS_GRANTED\fR
 keyword. If a match is not found from the default authorizations and default
 profiles, \fBchkauthattr()\fR reads the \fBuser_attr\fR(4) database. If it does
-not find a match in  \fBuser_attr\fR, it reads the \fBprof_attr\fR(4) database,
+not find a match in \fBuser_attr\fR, it reads the \fBprof_attr\fR(4) database,
 using the list of profiles assigned to the user, and checks if any of the
 profiles assigned to the user has the given authorization.  The
 \fBchkauthattr()\fR function returns 0 if it does not find a match in any of
@@ -109,14 +108,14 @@ following are true:
 .ie t \(bu
 .el o
 The authorization name matches exactly any authorization assigned in the
-\fBuser_attr\fR or  \fBprof_attr\fR databases (authorization names are
+\fBuser_attr\fR or \fBprof_attr\fR databases (authorization names are
 case-sensitive).
 .RE
 .RS +4
 .TP
 .ie t \(bu
 .el o
-The authorization name suffix is not the key word  \fBgrant\fR and the
+The authorization name suffix is not the key word \fBgrant\fR and the
 authorization name matches any authorization up to the asterisk (*) character
 assigned in the \fBuser_attr\fR or \fBprof_attr\fR databases.
 .RE
@@ -131,9 +130,8 @@ user is assigned an authorization.
 box;
 c | c | c
 c | c | c .
-	\f(CW/etc/security/policy.conf\fR or	Is user
-_
-\fBAuthorization name\fR	\fBuser_attr\fR or \fB\fR \fBprof_attr\fR entry	authorized?
+	\fB/etc/security/policy.conf\fR or	Is user
+\fBAuthorization name\fR	\fBuser_attr\fR or \fBprof_attr\fR entry	authorized?
 _
 solaris.printer.postscript	solaris.printer.postscript	Yes
 solaris.printer.postscript	solaris.printer.*	Yes
@@ -143,23 +141,21 @@ solaris.printer.grant	solaris.printer.*	No
 .sp
 .LP
 The \fBfree_authattr()\fR function releases memory allocated by the
-\fBgetauthnam()\fR and  \fBgetauthattr()\fR functions.
+\fBgetauthnam()\fR and \fBgetauthattr()\fR functions.
 .SH RETURN VALUES
-.sp
 .LP
-The \fBgetauthattr()\fR function returns a pointer to an  \fBauthattr_t\fR if
+The \fBgetauthattr()\fR function returns a pointer to an \fBauthattr_t\fR if
 it successfully enumerates an entry; otherwise it returns \fINULL\fR,
 indicating the end of the enumeration.
 .sp
 .LP
-The \fBgetauthnam()\fR function returns a pointer to an  \fBauthattr_t\fR if it
+The \fBgetauthnam()\fR function returns a pointer to an \fBauthattr_t\fR if it
 successfully locates the requested entry; otherwise it returns \fINULL\fR.
 .sp
 .LP
 The \fBchkauthattr()\fR function returns 1 if the user is authorized and 0 if
 the user does not exist or is not authorized.
 .SH USAGE
-.sp
 .LP
 The \fBgetauthattr()\fR and \fBgetauthnam()\fR functions both allocate memory
 for the pointers they return. This memory should be deallocated with the
@@ -169,18 +165,16 @@ for the pointers they return. This memory should be deallocated with the
 Individual attributes in the \fBattr\fR structure can be referred to by calling
 the \fBkva_match\fR(3SECDB) function.
 .SH WARNINGS
-.sp
 .LP
-Because the list of legal keys is likely to expand, code  must be written to
+Because the list of legal keys is likely to expand, code must be written to
 ignore unknown key-value pairs without error.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 29n
-configuration file lookup information for the name server switch
+configuration file lookup information for the name service switch
 .RE
 
 .sp
@@ -220,7 +214,6 @@ profile information
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -236,8 +229,8 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBgetexecattr\fR(3SECDB), \fBgetprofattr\fR(3SECDB),
-\fBgetuserattr\fR(3SECDB), \fBauth_attr\fR(4), \fBnsswitch.conf\fR(4),
-\fBprof_attr\fR(4), \fBuser_attr\fR(4), \fBattributes\fR(5), \fBrbac\fR(5)
+\fBgetexecattr\fR(3SECDB), \fBgetprofattr\fR(3SECDB), \fBgetuserattr\fR(3SECDB),
+\fBkva_match\fR(3SECDB), \fBauth_attr\fR(4), \fBnsswitch.conf\fR(4),
+\fBpolicy.conf\fR(4), \fBprof_attr\fR(4), \fBuser_attr\fR(4),
+\fBattributes\fR(5), \fBrbac\fR(5)
