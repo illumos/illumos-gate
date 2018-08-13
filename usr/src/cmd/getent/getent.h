@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2018 Peter Tribble.
  * Copyright (c) 2014 Gary Mills
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -51,6 +52,10 @@ extern int dogetproto(const char **);
 extern int dogetethers(const char **);
 extern int dogetnetmask(const char **);
 extern int dogetproject(const char **);
+extern int dogetauthattr(const char **);
+extern int dogetexecattr(const char **);
+extern int dogetprofattr(const char **);
+extern int dogetuserattr(const char **);
 
 #ifdef	__cplusplus
 }

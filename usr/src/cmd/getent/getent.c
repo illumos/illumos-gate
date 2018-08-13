@@ -20,6 +20,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright (c) 2018 Peter Tribble.
  * Copyright (c) 2014 Gary Mills
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -51,6 +52,10 @@ static struct table t[] = {
 	{ "networks",	dogetnet },
 	{ "netmasks",	dogetnetmask },
 	{ "project",	dogetproject },
+	{ "auth_attr",	dogetauthattr },
+	{ "exec_attr",	dogetexecattr },
+	{ "prof_attr",	dogetprofattr },
+	{ "user_attr",	dogetuserattr },
 	{ NULL,		NULL }
 };
 

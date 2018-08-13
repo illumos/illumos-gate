@@ -1,243 +1,275 @@
-'\" te
-.\" Copyright (c) 2014 Gary Mills
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
 .\" Copyright (C) 1999, Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETENT 1M "Mar 14, 2014"
-.SH NAME
-getent \- get entries from administrative database
-.SH SYNOPSIS
-.LP
-.nf
-\fBgetent\fR \fIdatabase\fR [\fIkey\fR]...
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-\fBgetent\fR gets a list of entries from the administrative database specified
-by \fIdatabase\fR. The information generally comes from one or more of the
-sources that are specified for the \fIdatabase\fR in \fB/etc/nsswitch.conf\fR.
-.sp
-.LP
-\fIdatabase\fR is the name of the database to be examined. This can be
-\fBpasswd\fR, \fBshadow\fR, \fBgroup\fR, \fBhosts\fR, \fBipnodes\fR, \fBservices\fR,
-\fBprotocols\fR, \fBethers\fR, \fBproject\fR, \fBnetworks\fR, or
-\fBnetmasks\fR. For each of these databases, \fBgetent\fR uses the appropriate
-library routines described in \fBgetpwnam\fR(3C), \fBgetspnam\fR(3C), \fBgetgrnam\fR(3C),
-\fBgethostbyaddr\fR(3NSL), \fBgethostbyname\fR(3NSL),
-\fBgetipnodebyaddr\fR(3SOCKET), \fBgetipnodebyname\fR(3SOCKET),
-\fBgetservbyname\fR(3SOCKET), \fBgetprotobyname\fR(3SOCKET),
-\fBethers\fR(3SOCKET), \fBgetprojbyname\fR(3PROJECT) and
-\fBgetnetbyname\fR(3SOCKET), respectively.
-.sp
-.LP
-Each \fIkey\fR must be in a format appropriate for searching on the respective
-database. For example, it can be a \fIusername\fR or \fInumeric-uid\fR for
-\fBpasswd\fR; \fIhostname\fR or \fIIP\fR \fIaddress\fR for \fBhosts\fR; or
-\fIservice\fR, \fIservice/protocol\fR, \fIport\fR, or \fIport/proto\fR for
-\fBservices\fR.
-.sp
-.LP
-\fBgetent\fR prints out the database entries that match each of the supplied
-keys, one per line, in the format of the matching administrative file:
-\fBpasswd\fR(4), \fBshadow\fR(4), \fBgroup\fR(4), \fBproject\fR(4), \fBhosts\fR(4),
-\fBservices\fR(4), \fBprotocols\fR(4), \fBethers\fR(3SOCKET),
-\fBnetworks\fR(4), or \fBnetmasks\fR(4). If no key is given, all entries
-returned by the corresponding enumeration library routine, for example,
-\fBgetpwent()\fR or \fBgethostent()\fR, are printed. Enumeration is not
-supported on \fBipnodes\fR.
-.SS "Key Interpretation for \fBpasswd\fR and \fBgroup\fR Databases"
-.sp
-.LP
-When \fBgetent\fR is invoked with database set to \fBpasswd\fR, each key value
-is processed as follows:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If the key value consists only of numeric characters, \fBgetent\fR assumes that
-the key value is a numeric user ID and searches the user database for a
-matching user ID.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If the user ID is not found in the user database or if the key value contains
-any non-numeric characters, \fBgetent\fR assumes the key value is a user name
-and searches the user database for a matching user name.
-.RE
-.sp
-.LP
-Similarly, when \fBgetent\fR is invoked with database set to \fBgroup\fR, each
-key value is processed as follows:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If the key value consists only of numeric characters, \fBgetent\fR assumes that
-the key value is a numeric group ID and searches the group database for a
-matching group ID.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-If the group ID is not found in the \fBgroup\fR database or if the key value
-contains any non-numeric characters, \fBgetent\fR assumes the key value is a
-group name and searches the \fBgroup\fR database for a matching group name.
-.RE
-.SH EXIT STATUS
-.sp
-.LP
+.\" Copyright (c) 2014 Gary Mills
+.\" Copyright (c) 2018 Peter Tribble
+.\"
+.Dd August 13, 2018
+.Dt GETENT 1M
+.Os
+.Sh NAME
+.Nm getent
+.Nd get entries from administrative database
+.Sh SYNOPSIS
+.Nm
+.Ar database
+.Oo Ar key Oc Ns ...
+.Sh DESCRIPTION
+.Nm
+gets a list of entries from the administrative database specified by
+.Ar database .
+The information generally comes from one or more of the sources that are
+specified for the
+.Ar database
+in
+.Pa /etc/nsswitch.conf .
+.Pp
+.Ar database
+is the name of the database to be examined.
+This can be
+.Cm passwd ,
+.Cm shadow ,
+.Cm group ,
+.Cm hosts ,
+.Cm ipnodes ,
+.Cm services ,
+.Cm protocols ,
+.Cm ethers ,
+.Cm project ,
+.Cm networks ,
+.Cm netmasks ,
+.Cm auth_attr ,
+.Cm exec_attr ,
+.Cm prof_attr ,
+or
+.Cm user_attr .
+For each of these databases,
+.Nm
+uses the appropriate library routines described in
+.Xr getpwnam 3C ,
+.Xr getspnam 3C ,
+.Xr getgrnam 3C ,
+.Xr gethostbyaddr 3NSL ,
+.Xr gethostbyname 3NSL ,
+.Xr getipnodebyaddr 3SOCKET ,
+.Xr getipnodebyname 3SOCKET ,
+.Xr getservbyname 3SOCKET ,
+.Xr getprotobyname 3SOCKET ,
+.Xr ethers 3SOCKET ,
+.Xr getprojbyname 3PROJECT ,
+.Xr getnetbyname 3SOCKET ,
+.Xr getauthattr 3SECDB ,
+.Xr getexecattr 3SECDB ,
+.Xr getprofattr 3SECDB ,
+and
+.Xr getuserattr 3SECDB
+respectively.
+.Pp
+Each
+.Ar key
+must be in a format appropriate for searching on the respective database.
+For example, it can be a username or numeric-uid for
+.Cm passwd ;
+hostname or IP address for
+.Cm hosts ;
+or service, service/protocol, port, or port/proto for
+.Cm services .
+.Pp
+.Nm
+prints out the database entries that match each of the supplied keys, one per
+line, in the format of the matching administrative file:
+.Xr passwd 4 ,
+.Xr shadow 4 ,
+.Xr group 4 ,
+.Xr project 4 ,
+.Xr hosts 4 ,
+.Xr services 4 ,
+.Xr protocols 4 ,
+.Xr ethers 4 ,
+.Xr networks 4 ,
+.Xr netmasks 4 ,
+.Xr auth_attr 4 ,
+.Xr exec_attr 4 ,
+.Xr prof_attr 4 ,
+or
+.Xr user_attr 4 .
+If no key is given, all entries returned by the corresponding enumeration
+library routine, for example,
+.Xr getpwent 3C
+or
+.Xr gethostent 3NSL ,
+are printed.
+Enumeration is not supported on
+.Cm ipnodes ,
+.Cm ethers ,
+or
+.Cm netmasks .
+.Ss Key Interpretation for passwd, group, and user_attr Databases
+When
+.Nm
+is invoked with
+.Ar database
+set to
+.Cm passwd ,
+each key value is processed as follows:
+.Bl -bullet
+.It
+If the key value consists only of numeric characters,
+.Nm
+assumes that the key value is a numeric user ID and searches the
+.Cm passwd
+database for a matching user ID.
+.It
+If the user ID is not found in the
+.Cm passwd
+database or if the key value contains any non-numeric characters,
+.Nm
+assumes the key value is a user name and searches the
+.Cm passwd
+database for a matching user name.
+.El
+.Pp
+When
+.Nm
+is invoked with
+.Ar database
+set to
+.Cm group ,
+each key value is processed as follows:
+.Bl -bullet
+.It
+If the key value consists only of numeric characters,
+.Nm
+assumes that the key value is a numeric group ID and searches the
+.Cm group
+database for a matching group ID.
+.It
+If the group ID is not found in the
+.Cm group
+database or if the key value contains any non-numeric characters,
+.Nm
+assumes the key value is a group name and searches the
+.Cm group
+database for a matching group name.
+.El
+.Pp
+When
+.Nm
+is invoked with
+.Ar database
+set to
+.Cm user_attr ,
+each key value is processed as follows:
+.Bl -bullet
+.It
+If the key value consists only of numeric characters,
+.Nm
+assumes that the key value is a numeric user ID and searches the
+.Cm passwd
+database for a matching user name, which is then used as the key for
+.Cm user_attr .
+.It
+If the user ID is not found in the
+.Cm passwd
+database or if the key value contains any non-numeric characters,
+.Nm
+assumes the key value is a user name and searches the
+.Cm user_attr
+database for a matching entry.
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /etc/nsswitch.conf
+name service switch configuration file
+.It Pa /etc/passwd
+password file
+.It Pa /etc/shadow
+shadowed password file
+.It Pa /etc/group
+group file
+.It Pa /etc/inet/hosts
+IPv4 and IPv6 host name database
+.It Pa /etc/services
+Internet services and aliases
+.It Pa /etc/project
+project file
+.It Pa /etc/protocols
+protocol name database
+.It Pa /etc/ethers
+Ethernet address to hostname database or domain
+.It Pa /etc/networks
+network name database
+.It Pa /etc/netmasks
+network mask database
+.It Pa /etc/user_attr
+extended user attributes database
+.It Pa /etc/security/auth_attr
+authorization description database
+.It Pa /etc/security/exec_attr
+execution profiles database
+.It Pa /etc/security/prof_attr
+profile description database
+.El
+.Sh EXIT STATUS
 The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 5n
+.Pp
+.Bl -tag -width Ds -compact
+.It Sy 0
 Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB1\fR\fR
-.ad
-.RS 5n
+.It Sy 1
 Command syntax was incorrect, an invalid option was used, or an internal error
 occurred.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB2\fR\fR
-.ad
-.RS 5n
+.It Sy 2
 At least one of the specified entry names was not found in the database.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB3\fR\fR
-.ad
-.RS 5n
+.It Sy 3
 There is no support for enumeration on this database.
-.RE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/etc/nsswitch.conf\fR\fR
-.ad
-.RS 22n
-name service switch configuration file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/passwd\fR\fR
-.ad
-.RS 22n
-password file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/shadow\fR\fR
-.ad
-.RS 22n
-shadowed password file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/group\fR\fR
-.ad
-.RS 22n
-group file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/inet/hosts\fR\fR
-.ad
-.RS 22n
-IPv4 and IPv6 host name database
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/services\fR\fR
-.ad
-.RS 22n
-Internet services and aliases
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/project\fR\fR
-.ad
-.RS 22n
-project file
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/protocols\fR\fR
-.ad
-.RS 22n
-protocol name database
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/ethers\fR\fR
-.ad
-.RS 22n
-Ethernet address to hostname database or domain
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/networks\fR\fR
-.ad
-.RS 22n
-network name database
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/netmasks\fR\fR
-.ad
-.RS 22n
-network mask database
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBethers\fR(3SOCKET), \fBgetgrnam\fR(3C), \fBgethostbyaddr\fR(3NSL),
-\fBgethostbyname\fR(3NSL), \fBgethostent\fR(3NSL),
-\fBgetipnodebyaddr\fR(3SOCKET), \fBgetipnodebyname\fR(3SOCKET),
-\fBgetnetbyname\fR(3SOCKET), \fBgetprojbyname\fR(3PROJECT),
-\fBgetprotobyname\fR(3SOCKET), \fBgetpwnam\fR(3C),
-\fBgetservbyname\fR(3SOCKET), \fBgroup\fR(4), \fBhosts\fR(4),
-\fBnetmasks\fR(4), \fBnetworks\fR(4), \fBnsswitch.conf\fR(4), \fBpasswd\fR(4),
-\fBproject\fR(4), \fBprotocols\fR(4), \fBservices\fR(4), \fBattributes\fR(5)
+.El
+.Sh SEE ALSO
+.Xr getgrnam 3C ,
+.Xr getpwnam 3C ,
+.Xr getspnam 3C ,
+.Xr gethostbyaddr 3NSL ,
+.Xr gethostbyname 3NSL ,
+.Xr gethostent 3NSL ,
+.Xr getprojbyname 3PROJECT ,
+.Xr getauthattr 3SECDB ,
+.Xr getexecattr 3SECDB ,
+.Xr getprofattr 3SECDB ,
+.Xr getuserattr 3SECDB ,
+.Xr ethers 3SOCKET ,
+.Xr getipnodebyaddr 3SOCKET ,
+.Xr getipnodebyname 3SOCKET ,
+.Xr getnetbyname 3SOCKET ,
+.Xr getprotobyname 3SOCKET ,
+.Xr getservbyname 3SOCKET ,
+.Xr auth_attr 4 ,
+.Xr ethers 4 ,
+.Xr exec_attr 4 ,
+.Xr group 4 ,
+.Xr hosts 4 ,
+.Xr netmasks 4 ,
+.Xr networks 4 ,
+.Xr nsswitch.conf 4 ,
+.Xr passwd 4 ,
+.Xr prof_attr 4 ,
+.Xr project 4 ,
+.Xr protocols 4 ,
+.Xr services 4 ,
+.Xr shadow 4 ,
+.Xr user_attr 4 ,
+.Xr attributes 5
