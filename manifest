@@ -954,7 +954,6 @@ f kernel/kmdb/amd64/genunix 0555 root sys
 f kernel/kmdb/amd64/hook 0555 root sys
 f kernel/kmdb/amd64/i40e 0555 root sys
 f kernel/kmdb/amd64/idm 0555 root sys
-f kernel/kmdb/amd64/ii 0555 root sys
 f kernel/kmdb/amd64/ip 0555 root sys
 f kernel/kmdb/amd64/ipc 0555 root sys
 f kernel/kmdb/amd64/ipp 0555 root sys
@@ -970,24 +969,20 @@ f kernel/kmdb/amd64/mr_sas 0555 root sys
 f kernel/kmdb/amd64/nca 0555 root sys
 f kernel/kmdb/amd64/neti 0555 root sys
 f kernel/kmdb/amd64/nfs 0555 root sys
-f kernel/kmdb/amd64/nsctl 0555 root sys
 f kernel/kmdb/amd64/ptm 0555 root sys
 f kernel/kmdb/amd64/qlc 0555 root sys
 f kernel/kmdb/amd64/random 0555 root sys
-f kernel/kmdb/amd64/rdc 0555 root sys
 f kernel/kmdb/amd64/s1394 0555 root sys
 f kernel/kmdb/amd64/sata 0555 root sys
 f kernel/kmdb/amd64/scsi_vhci 0555 root sys
 f kernel/kmdb/amd64/sctp 0555 root sys
 f kernel/kmdb/amd64/sd 0555 root sys
-f kernel/kmdb/amd64/sdbc 0555 root sys
 f kernel/kmdb/amd64/sockfs 0555 root sys
 f kernel/kmdb/amd64/specfs 0555 root sys
 f kernel/kmdb/amd64/sppp 0555 root sys
 f kernel/kmdb/amd64/srpt 0555 root sys
 f kernel/kmdb/amd64/stmf 0555 root sys
 f kernel/kmdb/amd64/stmf_sbd 0555 root sys
-f kernel/kmdb/amd64/sv 0555 root sys
 f kernel/kmdb/amd64/ufs 0555 root sys
 f kernel/kmdb/amd64/uhci 0555 root sys
 f kernel/kmdb/amd64/usba 0555 root sys
@@ -1666,11 +1661,6 @@ f lib/svc/manifest/system/logadm-upgrade.xml 0444 root sys
 f lib/svc/manifest/system/manifest-import.xml 0444 root sys
 f lib/svc/manifest/system/name-service-cache.xml 0444 root sys
 f lib/svc/manifest/system/ndmp.xml 0444 root sys
-f lib/svc/manifest/system/nws_ii.xml 0444 root sys
-f lib/svc/manifest/system/nws_rdc.xml 0444 root sys
-f lib/svc/manifest/system/nws_rdcsyncd.xml 0444 root sys
-f lib/svc/manifest/system/nws_scm.xml 0444 root sys
-f lib/svc/manifest/system/nws_sv.xml 0444 root sys
 f lib/svc/manifest/system/pfexecd.xml 0444 root sys
 f lib/svc/manifest/system/picl.xml 0444 root sys
 f lib/svc/manifest/system/poold.xml 0444 root sys
@@ -1751,7 +1741,6 @@ f lib/svc/method/svc-fcoet 0555 root sys
 f lib/svc/method/svc-forwarding 0555 root bin
 f lib/svc/method/svc-hostid 0555 root bin
 f lib/svc/method/svc-hotplug 0555 root bin
-f lib/svc/method/svc-ii 0744 root sys
 f lib/svc/method/svc-intrd 0555 root sys
 f lib/svc/method/svc-labeld 0555 root sys
 f lib/svc/method/svc-legacy-routing 0555 root bin
@@ -1762,18 +1751,14 @@ f lib/svc/method/svc-poold 0555 root sys
 f lib/svc/method/svc-pools 0555 root sys
 f lib/svc/method/svc-power 0555 root sys
 f lib/svc/method/svc-rbac 0555 root bin
-f lib/svc/method/svc-rdc 0744 root sys
-f lib/svc/method/svc-rdcsyncd 0744 root sys
 f lib/svc/method/svc-rdisc 0555 root bin
 f lib/svc/method/svc-resource-mgmt 0555 root sys
 f lib/svc/method/svc-ripng 0555 root bin
 f lib/svc/method/svc-route 0555 root bin
 f lib/svc/method/svc-scheduler 0555 root sys
-f lib/svc/method/svc-scm 0744 root sys
 f lib/svc/method/svc-sockfilter 0555 root bin
 f lib/svc/method/svc-srpt 0555 root sys
 f lib/svc/method/svc-stmf 0555 root sys
-f lib/svc/method/svc-sv 0744 root sys
 f lib/svc/method/svc-syseventd 0555 root sys
 f lib/svc/method/svc-tnd 0555 root sys
 f lib/svc/method/svc-utmpd 0555 root bin
@@ -5515,7 +5500,6 @@ f usr/lib/dl/dlled 0555 root bin
 f usr/lib/dl/dlrecv 0555 root bin
 f usr/lib/dl/dlsend 0555 root bin
 f usr/lib/dl/dltraninfo 0555 root bin
-f usr/lib/dscfglockd 0555 root bin
 d usr/lib/dtrace 0755 root bin
 d usr/lib/dtrace/64 0755 root bin
 f usr/lib/dtrace/64/drti.o 0644 root bin
@@ -6509,8 +6493,6 @@ s usr/lib/libdns_sd.so=libdns_sd.so.1
 s usr/lib/libdoor.so.1=../../lib/libdoor.so.1
 s usr/lib/libdoor.so=../../lib/libdoor.so.1
 s usr/lib/libdwarf.so.1=../../lib/libdwarf.so.1
-f usr/lib/libdscfg.so.1 0755 root bin
-s usr/lib/libdscfg.so=libdscfg.so.1
 f usr/lib/libdtrace.so.1 0755 root bin
 s usr/lib/libdtrace.so=libdtrace.so.1
 f usr/lib/libdtrace_jni.so.1 0755 root bin
@@ -6640,8 +6622,6 @@ f usr/lib/libnisdb.so.2 0755 root bin
 s usr/lib/libnisdb.so=libnisdb.so.2
 f usr/lib/libnls.so.1 0755 root bin
 s usr/lib/libnls.so=libnls.so.1
-f usr/lib/libnsctl.so.1 0755 root bin
-s usr/lib/libnsctl.so=libnsctl.so.1
 s usr/lib/libnsl.so.1=../../lib/libnsl.so.1
 s usr/lib/libnsl.so=../../lib/libnsl.so.1
 f usr/lib/libnvfru.so.1 0755 root bin
@@ -6684,8 +6664,6 @@ f usr/lib/libraidcfg.so.1 0755 root bin
 s usr/lib/libraidcfg.so=libraidcfg.so.1
 s usr/lib/librcm.so.1=../../lib/librcm.so.1
 s usr/lib/librcm.so=../../lib/librcm.so.1
-f usr/lib/librdc.so.1 0755 root bin
-s usr/lib/librdc.so=librdc.so.1
 f usr/lib/librename.so.1 0755 root bin
 f usr/lib/libreparse.so.1 0755 root bin
 s usr/lib/libreparse.so=libreparse.so.1
@@ -6784,8 +6762,6 @@ s usr/lib/libtsol.so.2=../../lib/libtsol.so.2
 s usr/lib/libtsol.so=../../lib/libtsol.so.2
 s usr/lib/libumem.so.1=../../lib/libumem.so.1
 s usr/lib/libumem.so=../../lib/libumem.so.1
-f usr/lib/libunistat.so.1 0755 root bin
-s usr/lib/libunistat.so=libunistat.so.1
 s usr/lib/libuuid.so.1=../../lib/libuuid.so.1
 s usr/lib/libuuid.so=../../lib/libuuid.so.1
 s usr/lib/libuutil.so.1=../../lib/libuutil.so.1
@@ -9861,7 +9837,6 @@ f usr/lib/mdb/kvm/amd64/genunix.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/hook.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/i40e.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/idm.so 0555 root sys
-f usr/lib/mdb/kvm/amd64/ii.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ip.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ipc.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ipp.so 0555 root sys
@@ -9878,19 +9853,16 @@ f usr/lib/mdb/kvm/amd64/mr_sas.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/nca.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/neti.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/nfs.so 0555 root sys
-f usr/lib/mdb/kvm/amd64/nsctl.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/nsmb.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/pmcs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ptm.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/qlc.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/random.so 0555 root sys
-f usr/lib/mdb/kvm/amd64/rdc.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/s1394.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sata.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/scsi_vhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sctp.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sd.so 0555 root sys
-f usr/lib/mdb/kvm/amd64/sdbc.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/smbfs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/smbsrv.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/sockfs.so 0555 root sys
@@ -9899,7 +9871,6 @@ f usr/lib/mdb/kvm/amd64/sppp.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/srpt.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/stmf.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/stmf_sbd.so 0555 root sys
-f usr/lib/mdb/kvm/amd64/sv.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/ufs.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/uhci.so 0555 root sys
 f usr/lib/mdb/kvm/amd64/usba.so 0555 root sys
@@ -9947,7 +9918,6 @@ f usr/lib/more.help 0644 root bin
 f usr/lib/mpss.so.1 0755 root bin
 f usr/lib/ncad_addr.so.1 0755 root bin
 s usr/lib/ncad_addr.so=ncad_addr.so.1
-f usr/lib/ncalladm 0555 root bin
 d usr/lib/ndmp 0755 root bin
 f usr/lib/ndmp/ndmpd 0555 root bin
 d usr/lib/netsvc 0755 root sys
@@ -9993,7 +9963,6 @@ f usr/lib/nfs/nfslogd 0555 root bin
 f usr/lib/nfs/nfsmapid 0555 root bin
 f usr/lib/nfs/rquotad 0555 root bin
 f usr/lib/nfs/statd 0555 root bin
-f usr/lib/nskernd 0555 root bin
 f usr/lib/nss_ad.so.1 0755 root bin
 s usr/lib/nss_compat.so.1=../../lib/nss_compat.so.1
 s usr/lib/nss_dns.so.1=../../lib/nss_dns.so.1
@@ -10316,8 +10285,6 @@ d usr/lib/smtp/sendmail 0555 root bin
 f usr/lib/smtp/sendmail/mailq 4555 root bin
 s usr/lib/smtp/sendmail/newaliases=sendmail
 f usr/lib/smtp/sendmail/sendmail 2555 root smmsp
-f usr/lib/sndrd 0555 root bin
-f usr/lib/sndrsyncd 0555 root bin
 d usr/lib/snmp 0755 root bin
 d usr/lib/spell 0755 root bin
 f usr/lib/spell/compress 0555 root bin
@@ -18650,7 +18617,6 @@ f usr/share/man/man4/dialups.4 0444 root bin
 s usr/share/man/man4/dir.4=dir_ufs.4
 f usr/share/man/man4/dir_ufs.4 0444 root bin
 f usr/share/man/man4/driver.conf.4 0444 root bin
-f usr/share/man/man4/ds.log.4 0444 root bin
 s usr/share/man/man4/dumpdates.4=ufsdump.4
 f usr/share/man/man4/ethers.4 0444 root bin
 f usr/share/man/man4/exec_attr.4 0444 root bin
@@ -18767,7 +18733,6 @@ f usr/share/man/man4/publickey.4 0444 root bin
 s usr/share/man/man4/qop.4=mech.4
 f usr/share/man/man4/queuedefs.4 0444 root bin
 f usr/share/man/man4/rcmscript.4 0444 root bin
-f usr/share/man/man4/rdc.cf.4 0444 root bin
 f usr/share/man/man4/remote.4 0444 root bin
 f usr/share/man/man4/resolv.conf.4 0444 root bin
 s usr/share/man/man4/rhosts.4=hosts.equiv.4
@@ -18791,7 +18756,6 @@ f usr/share/man/man4/smb.4 0444 root bin
 f usr/share/man/man4/smbautohome.4 0444 root bin
 f usr/share/man/man4/smhba.conf.4 0444 root bin
 s usr/share/man/man4/snapshot_cache.4=devices.4
-f usr/share/man/man4/sndr.4 0444 root bin
 f usr/share/man/man4/sock2path.d.4 0444 root bin
 f usr/share/man/man4/space.4 0444 root bin
 s usr/share/man/man4/submit.cf.4=sendmail.4
@@ -18971,7 +18935,6 @@ f usr/share/man/man5/threads.5 0444 root bin
 f usr/share/man/man5/timerfd.5 0444 root bin
 f usr/share/man/man5/version.4th.5 0444 root bin
 f usr/share/man/man5/vgrindefs.5 0444 root bin
-f usr/share/man/man5/zfsloader.5 0444 root bin
 f usr/share/man/man5/zones.5 0444 root bin
 f usr/share/man/man5/zpool-features.5 0444 root bin
 d usr/share/man/man7 0755 root bin

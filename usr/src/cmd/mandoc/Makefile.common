@@ -76,8 +76,11 @@ OBJS=		att.o		\
 
 OBJS +=		compat_ohash.o
 
+# XXX gcc 4.4.4 false positive
+roff.o :=	CERRWARN += -_gcc=-Wno-uninitialized
+
 CFLAGS +=	$(CC_VERBOSE)
-CSTD =	$(CSTD_GNU99)
+CSTD=		$(CSTD_GNU99)
 
 CPPFLAGS +=	-DOSNAME="\"illumos\"" -D_FILE_OFFSET_BITS=64
 

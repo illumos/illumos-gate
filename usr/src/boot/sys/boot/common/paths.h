@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2016 M. Warner Losh <imp@freebsd.org>
  * All rights reserved.
  *
@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
 #ifndef _PATHS_H_
@@ -33,7 +31,6 @@
 #define PATH_CONFIG	"/boot/config"
 #define PATH_LOADER	"/boot/loader"
 #define PATH_LOADER_EFI	"/boot/loader.efi"
-#define PATH_LOADER_ZFS	"/boot/zfsloader"
 #define PATH_KERNEL	"/boot/kernel/kernel"
 
 #endif /* _PATHS_H_ */

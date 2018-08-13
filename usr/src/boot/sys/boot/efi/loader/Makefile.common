@@ -1,4 +1,4 @@
-# $FreeBSD$
+#
 
 SRCS +=	boot.c commands.c console.c devopen.c interp.c
 SRCS +=	interp_backslash.c interp_parse.c ls.c misc.c
@@ -25,12 +25,6 @@ CFLAGS += -DLOADER_MBR_SUPPORT
 SRCS +=  bcache.c
 OBJS +=  bcache.o
 
-#SRCS +=	isapnp.c
-#SRCS +=	pnp.c
-
 # Forth interpreter
 SRCS +=	interp_forth.c
 OBJS +=	interp_forth.o
-
-MAN +=	loader.8
-MAN +=	zfsloader.8

@@ -23,13 +23,6 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-set name=pkg.fmri \
-    value=pkg:/storage/avs@0.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
-set name=pkg.summary value="Availability Suite"
-set name=info.classification \
-    value=org.opensolaris.category.2008:Drivers/Storage
+set name=pkg.fmri value=pkg:/storage/avs@$(PKGVERS)
+set name=pkg.obsolete value=true
 set name=variant.arch value=$(ARCH)
-depend fmri=driver/storage/sv type=require
-depend fmri=service/storage/avs/cache-management type=require
-depend fmri=storage/avs/point-in-time-copy type=require
-depend fmri=storage/avs/remote-mirror type=require

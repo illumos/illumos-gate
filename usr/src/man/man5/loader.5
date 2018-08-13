@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd Apr 20, 2017
+.Dd July 24, 2018
 .Dt LOADER 5
 .Os
 .Sh NAME
@@ -38,7 +38,7 @@ The actual name for the stage depends on the platform.
 On IA32 (i386) architectures with BIOS firmware, it is a
 .Pa BTX
 client and named
-.Nm zfsloader .
+.Nm loader .
 It is linked statically to libstand and usually located in the directory
 .Pa /boot .
 .Pp
@@ -250,15 +250,27 @@ is specified, file sizes will be shown too.
 .Pp
 .It Ic lsdev Op Fl v
 Lists all of the devices from which it may be possible to load modules.
+In addition to disks and partitions, ZFS pools are also listed.
 If
 .Fl v
 is specified, more details are printed.
+For ZFS pools the output resembles
+.Nm zpool Cm status
+output.
 .Pp
 .It Ic lsmod Op Fl v
 Displays loaded modules.
 If
 .Fl v
 is specified, more details are shown.
+.Pp
+.It Ic lszfs Ar filesystem
+A ZFS extended command that can be used to explore the ZFS filesystem
+hierarchy in a pool.
+Lists the immediate children of the
+.Ar filesystem .
+The filesystem hierarchy is rooted at a filesystem with the same name
+as the pool.
 .Pp
 .It Ic more Ar file Op Ar
 Display the files specified, with a pause at each
@@ -304,6 +316,19 @@ from the environment.
 .It Ic \&?
 Lists available commands.
 .El
+.Ss ZFS Features
+.Nm
+supports the following format for specifying ZFS filesystems which
+can be used wherever
+.Nm
+refers to a device specification:
+.Pp
+.Ar zfs:pool/filesystem:
+.Pp
+where
+.Pa pool/filesystem
+is a ZFS filesystem name as described in
+.Xr zfs 1M .
 .Ss Builtin Environment Variables
 The
 .Nm
@@ -733,7 +758,7 @@ Extra builtin-like words.
 .It Pa /boot/forth/support.4th
 .Pa loader.conf
 processing words.
-.It Pa /boot/zfsloader
+.It Pa /boot/loader
 .Nm
 itself.
 .El
@@ -751,6 +776,19 @@ load /platform/i86pc/kernel/amd64/unix
 load -t rootfs /platform/i86pc/amd64/boot_archive
 autoboot 5
 .Ed
+.Pp
+Set the default device used for loading a kernel from a ZFS filesystem:
+.Bd -literal -offset indent
+set currdev=zfs:rpool/ROOT/knowngood:
+.Ed
+.Sh NOTES
+Although setting the
+.Va currdev
+as shown in the example above is supported, it is advisable to use loader
+beadm command or boot environment menu instead.
+The reason is, the beadm or menu selection will also instruct loader to clean up
+the currently set configuration and load configuration from the new boot
+environment.
 .Sh SEE ALSO
 .Xr boot 1M ,
 .Xr btxld 1onbld ,

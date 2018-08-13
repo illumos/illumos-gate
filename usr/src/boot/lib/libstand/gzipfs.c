@@ -39,7 +39,7 @@ struct z_file
     int			zf_rawfd;
     off_t		zf_dataoffset;
     z_stream		zf_zstream;
-    char		zf_buf[Z_BUFSIZE];
+    unsigned char	zf_buf[Z_BUFSIZE];
     int			zf_endseen;
 };
 
@@ -325,7 +325,7 @@ static int
 zf_stat(struct open_file *f, struct stat *sb)
 {
     struct z_file	*zf = (struct z_file *)f->f_fsdata;
-    int			result, res;
+    int			result;
     off_t		pos1, pos2;
     uint32_t		size;
 

@@ -6,7 +6,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BOOT 1M "Feb 07, 2018"
+.TH BOOT 1M "Jul 20, 2018"
 .SH NAME
 boot \- start the system kernel or a standalone program
 .SH SYNOPSIS
@@ -888,7 +888,7 @@ from the partition specified at the boot loader installation time.
 Once \fBstage2\fR is running, it will load and start the third stage boot
 program from root file system. Boot loader supports loading from the ZFS,
 UFS and PCFS file systems. The stage3 boot program defaults to be
-\fB/boot/zfsloader\fR, and implements a user interface to load and boot the
+\fB/boot/loader\fR, and implements a user interface to load and boot the
 unix kernel.
 .sp
 .LP
