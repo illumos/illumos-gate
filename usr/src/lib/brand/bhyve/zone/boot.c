@@ -424,7 +424,7 @@ add_lpc(int *argc, char **argv)
 				val = DEFAULT_BOOTROM_CSM;
 			} else if (strcmp(val, "uefi") == 0) {
 				val = DEFAULT_BOOTROM;
-                        }
+			}
 		}
 		if (snprintf(conf, sizeof (conf), "%s,%s", lpcdevs[i], val) >=
 		    sizeof (conf)) {
