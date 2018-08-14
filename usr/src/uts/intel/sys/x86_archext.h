@@ -956,6 +956,8 @@ extern uint_t pentiumpro_bug4046376;
 
 extern const char CyrixInstead[];
 
+extern void (*spec_l1d_flush)(void);
+
 #endif
 
 #if defined(_KERNEL)

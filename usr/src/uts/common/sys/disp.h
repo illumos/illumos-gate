@@ -23,6 +23,8 @@
  * Use is subject to license terms.
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -63,11 +65,11 @@ typedef struct _disp {
 	/*
 	 * Priorities:
 	 *	disp_maxrunpri is the maximum run priority of runnable threads
-	 * 	on this queue.  It is -1 if nothing is runnable.
+	 *	on this queue.  It is -1 if nothing is runnable.
 	 *
 	 *	disp_max_unbound_pri is the maximum run priority of threads on
 	 *	this dispatch queue but runnable by any CPU.  This may be left
-	 * 	artificially high, then corrected when some CPU tries to take
+	 *	artificially high, then corrected when some CPU tries to take
 	 *	an unbound thread.  It is -1 if nothing is runnable.
 	 */
 	pri_t		disp_maxrunpri;	/* maximum run priority */
@@ -151,8 +153,7 @@ extern void		dq_srundec(kthread_t *);
 extern void		cpu_rechoose(kthread_t *);
 extern void		cpu_surrender(kthread_t *);
 extern void		kpreempt(int);
-extern struct cpu	*disp_lowpri_cpu(struct cpu *, struct lgrp_ld *, pri_t,
-			    struct cpu *);
+extern struct cpu	*disp_lowpri_cpu(struct cpu *, kthread_t *, pri_t);
 extern int		disp_bound_threads(struct cpu *, int);
 extern int		disp_bound_anythreads(struct cpu *, int);
 extern int		disp_bound_partition(struct cpu *, int);
@@ -166,6 +167,8 @@ extern void		resume_from_zombie(kthread_t *)
 				__NORETURN;
 extern void		disp_swapped_enq(kthread_t *);
 extern int		disp_anywork(void);
+
+extern struct cpu	*disp_choose_best_cpu(void);
 
 #define	KPREEMPT_SYNC		(-1)
 #define	kpreempt_disable()				\
@@ -182,6 +185,8 @@ extern int		disp_anywork(void);
 	}
 
 #endif	/* _KERNEL */
+
+#define	CPU_IDLE_PRI (-1)
 
 #ifdef	__cplusplus
 }

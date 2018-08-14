@@ -29,7 +29,7 @@
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -72,6 +72,7 @@ INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs/lua
 INC_PATH	+= -I$(SRC)/common
 INC_PATH	+= -I$(COMMONBASE)/zfs
+INC_PATH	+= -I$(UTSBASE)/i86pc
 
 C99LMODE=	-Xc99=%all
 

@@ -20,6 +20,8 @@
  */
 /*
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -325,7 +327,7 @@ cpupart_move_cpu(cpu_t *cp, cpupart_t *newpp, int forced)
 	kthread_t *t;
 	int	move_threads = 1;
 	lgrp_id_t lgrpid;
-	proc_t 	*p;
+	proc_t	*p;
 	int lgrp_diff_lpl;
 	lpl_t	*cpu_lpl;
 	int	ret;
@@ -570,8 +572,8 @@ again:
 				/* Update CPU last ran on if it was this CPU */
 				if (t->t_cpu == cp && t->t_cpupart == oldpp &&
 				    t->t_bound_cpu != cp) {
-					t->t_cpu = disp_lowpri_cpu(ncp,
-					    t->t_lpl, t->t_pri, NULL);
+					t->t_cpu = disp_lowpri_cpu(ncp, t,
+					    t->t_pri);
 				}
 				t = t->t_forw;
 			} while (t != p->p_tlist);
@@ -623,8 +625,8 @@ again:
 			/* Update CPU last ran on if it was this CPU */
 			if (t->t_cpu == cp && t->t_cpupart == oldpp &&
 			    t->t_bound_cpu != cp) {
-				t->t_cpu = disp_lowpri_cpu(ncp, t->t_lpl,
-				    t->t_pri, NULL);
+				t->t_cpu = disp_lowpri_cpu(ncp, t,
+				    t->t_pri);
 			}
 
 			t = t->t_next;
@@ -879,7 +881,7 @@ cpupart_create(psetid_t *psid)
 static int
 cpupart_unbind_threads(cpupart_t *pp, boolean_t unbind_all)
 {
-	void 	*projbuf, *zonebuf;
+	void	*projbuf, *zonebuf;
 	kthread_t *t;
 	proc_t	*p;
 	int	err = 0;

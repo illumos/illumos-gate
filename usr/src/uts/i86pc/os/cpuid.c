@@ -2121,6 +2121,19 @@ cpuid_amd_getids(cpu_t *cpu, uchar_t *features)
 }
 
 static void
+spec_l1d_flush_noop(void)
+{
+}
+
+static void
+spec_l1d_flush_msr(void)
+{
+	wrmsr(MSR_IA32_FLUSH_CMD, IA32_FLUSH_CMD_L1D);
+}
+
+void (*spec_l1d_flush)(void) = spec_l1d_flush_noop;
+
+static void
 cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 {
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
@@ -2205,6 +2218,43 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_FLUSH_CMD)
 			add_x86_feature(featureset, X86FSET_FLUSH_CMD);
 	}
+
+	if (cpu->cpu_id != 0)
+		return;
+
+	/*
+	 * We're the boot CPU, so let's figure out our L1TF status.
+	 *
+	 * First, if this is a RDCL_NO CPU, then we are not vulnerable: we don't
+	 * need to exclude with ht_acquire(), and we don't need to flush.
+	 */
+	if (is_x86_feature(featureset, X86FSET_RDCL_NO)) {
+		extern int ht_exclusion;
+		ht_exclusion = 0;
+		spec_l1d_flush = spec_l1d_flush_noop;
+		membar_producer();
+		return;
+	}
+
+	/*
+	 * If HT is enabled, we will need HT exclusion, as well as the flush on
+	 * VM entry.  If HT isn't enabled, we still need at least the flush for
+	 * the L1TF sequential case.
+	 *
+	 * However, if X86FSET_L1D_VM_NO is set, we're most likely running
+	 * inside a VM ourselves, and we don't need the flush.
+	 *
+	 * If we don't have the FLUSH_CMD available at all, we'd better just
+	 * hope HT is disabled.
+	 */
+	if (is_x86_feature(featureset, X86FSET_FLUSH_CMD) &&
+	    !is_x86_feature(featureset, X86FSET_L1D_VM_NO)) {
+		spec_l1d_flush = spec_l1d_flush_msr;
+	} else {
+		spec_l1d_flush = spec_l1d_flush_noop;
+	}
+
+	membar_producer();
 }
 
 /*

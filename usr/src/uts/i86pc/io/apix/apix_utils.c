@@ -29,6 +29,7 @@
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2013 Pluribus Networks, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/processor.h>
@@ -66,6 +67,7 @@
 #include <sys/x_call.h>
 #include <sys/reboot.h>
 #include <sys/apix.h>
+#include <sys/ht.h>
 
 static int apix_get_avail_vector_oncpu(uint32_t, int, int);
 static apix_vector_t *apix_init_vector(processorid_t, uchar_t);
@@ -803,6 +805,9 @@ apix_insert_av(apix_vector_t *vecp, void *intr_id, avfunc f, caddr_t arg1,
 
 	vecp->v_share++;
 	vecp->v_pri = (ipl > vecp->v_pri) ? ipl : vecp->v_pri;
+
+	ht_intr_alloc_pil(vecp->v_pri);
+
 	if (vecp->v_autovect == NULL) {	/* Nothing on list - put it at head */
 		vecp->v_autovect = mem;
 		return;
@@ -1468,7 +1473,7 @@ apix_rebind(apix_vector_t *vecp, processorid_t newcpu, int count)
 	if (!apix_is_cpu_enabled(newcpu))
 		return (NULL);
 
-	if (vecp->v_cpuid == newcpu) 	/* rebind to the same cpu */
+	if (vecp->v_cpuid == newcpu)	/* rebind to the same cpu */
 		return (vecp);
 
 	APIX_ENTER_CPU_LOCK(oldcpu);
