@@ -354,6 +354,8 @@ typedef struct _kthread {
 	kmutex_t	t_wait_mutex;	/* used in CV wait functions */
 
 	char		*t_name;	/* thread name */
+
+	uint64_t	t_unsafe;	/* unsafe to run with HT VCPU thread */
 } kthread_t;
 
 /*
@@ -417,6 +419,7 @@ typedef struct _kthread {
 #define	TS_SIGNALLED	0x0010	/* thread was awakened by cv_signal() */
 #define	TS_PROJWAITQ	0x0020	/* thread is on its project's waitq */
 #define	TS_ZONEWAITQ	0x0040	/* thread is on its zone's waitq */
+#define	TS_VCPU		0x0080	/* thread will enter guest context */
 #define	TS_CSTART	0x0100	/* setrun() by continuelwps() */
 #define	TS_UNPAUSE	0x0200	/* setrun() by unpauselwps() */
 #define	TS_XSTART	0x0400	/* setrun() by SIGCONT */

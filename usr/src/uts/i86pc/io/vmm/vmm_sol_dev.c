@@ -28,6 +28,7 @@
 #include <sys/cpuset.h>
 #include <sys/id_space.h>
 #include <sys/fs/sdev_plugin.h>
+#include <sys/ht.h>
 
 #include <sys/kernel.h>
 
@@ -374,6 +375,10 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			break;
 		}
 		vmrun.cpuid = vcpu;
+
+		if (!(curthread->t_schedflag & TS_VCPU))
+			ht_mark_as_vcpu();
+
 		error = vm_run(sc->vmm_vm, &vmrun);
 		/*
 		 * XXXJOY: I think it's necessary to do copyout, even in the

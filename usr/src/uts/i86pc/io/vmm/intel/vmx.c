@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #ifndef __FreeBSD__
 #include <sys/x86_archext.h>
 #include <sys/smp_impldefs.h>
+#include <sys/ht.h>
 #endif
 
 #include <vm/vm.h>
@@ -3052,10 +3053,29 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			break;
 		}
 
+#ifndef __FreeBSD__
+		if ((rc = ht_acquire()) != 1) {
+			enable_intr();
+			vmexit->rip = rip;
+			vmexit->inst_length = 0;
+			if (rc == -1) {
+				vmexit->exitcode = VM_EXITCODE_HT;
+			} else {
+				vmexit->exitcode = VM_EXITCODE_BOGUS;
+				handled = HANDLED;
+			}
+			break;
+		}
+#endif
+
 		vmx_run_trace(vmx, vcpu);
 		vmx_dr_enter_guest(vmxctx);
 		rc = vmx_enter_guest(vmxctx, vmx, launched);
 		vmx_dr_leave_guest(vmxctx);
+
+#ifndef __FreeBSD__
+		ht_release();
+#endif
 
 		/* Collect some information for VM exit processing */
 		vmexit->rip = rip = vmcs_guest_rip();

@@ -23,7 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
  */
 
@@ -540,11 +540,17 @@ extern struct cpu *curcpup(void);
 #endif
 
 /*
- * CPU_CURRENT indicates to thread_affinity_set to use CPU->cpu_id
- * as the target and to grab cpu_lock instead of requiring the caller
- * to grab it.
+ * CPU_CURRENT indicates to thread_affinity_set() to use whatever curthread's
+ * current CPU is; holding cpu_lock is not required.
  */
 #define	CPU_CURRENT	-3
+
+/*
+ * CPU_BEST can be used by thread_affinity_set() callers to set affinity to a
+ * good CPU (in particular, an ht_acquire()-friendly choice); holding cpu_lock
+ * is not required.
+ */
+#define	CPU_BEST	-4
 
 /*
  * Per-CPU statistics

@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-# uts/sun4v/sys/Makefile
+# Copyright 2018 Joyent, Inc.
 #
 # include global definitions
 UTSBASE	= ../..
@@ -42,16 +41,17 @@ SUN4_HDRS=			\
 	clock.h			\
 	cmp.h			\
 	cpc_ultra.h		\
-	cpu_sgnblk_defs.h 	\
+	cpu_sgnblk_defs.h	\
 	ddi_subrdefs.h		\
 	dvma.h			\
 	eeprom.h		\
 	fcode.h			\
+	ht.h			\
 	idprom.h		\
 	intr.h			\
 	intreg.h		\
 	ivintr.h		\
-	memlist_plat.h	 	\
+	memlist_plat.h		\
 	memnode.h		\
 	nexusdebug.h		\
 	prom_debug.h		\

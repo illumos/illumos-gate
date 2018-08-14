@@ -68,6 +68,7 @@ CORE_OBJS +=			\
 	hment.o			\
 	hold_page.o		\
 	hrtimers.o		\
+	ht.o			\
 	htable.o		\
 	hypercall.o		\
 	hypersubr.o		\
@@ -293,7 +294,7 @@ INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/common/xen
 # since only C headers are included when #defined(__lint) is true.
 #
 
-ASSYM_DEPS      += 		\
+ASSYM_DEPS      +=		\
 	copy.o			\
 	desctbls_asm.o		\
 	ddi_i86_asm.o		\

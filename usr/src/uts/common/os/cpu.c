@@ -400,6 +400,9 @@ force_thread_migrate(kthread_id_t tp)
  * CPUs prior to a successful return, it should take extra precautions (such as
  * their own call to kpreempt_disable) to ensure that safety.
  *
+ * CPU_BEST can be used to pick a "best" CPU to migrate to, including
+ * potentially the current CPU.
+ *
  * A CPU affinity reference count is maintained by thread_affinity_set and
  * thread_affinity_clear (incrementing and decrementing it, respectively),
  * maintaining CPU affinity while the count is non-zero, and allowing regions
@@ -416,6 +419,10 @@ thread_affinity_set(kthread_id_t t, int cpu_id)
 		VERIFY3P(t, ==, curthread);
 		kpreempt_disable();
 		cp = CPU;
+	} else if (cpu_id == CPU_BEST) {
+		VERIFY3P(t, ==, curthread);
+		kpreempt_disable();
+		cp = disp_choose_best_cpu();
 	} else {
 		/*
 		 * We should be asserting that cpu_lock is held here, but
@@ -453,9 +460,8 @@ thread_affinity_set(kthread_id_t t, int cpu_id)
 		thread_unlock(t);
 	}
 
-	if (cpu_id == CPU_CURRENT) {
+	if (cpu_id == CPU_CURRENT || cpu_id == CPU_BEST)
 		kpreempt_enable();
-	}
 }
 
 /*
@@ -1490,8 +1496,8 @@ again:	for (loop_count = 0; (*bound_func)(cp, 0); loop_count++) {
 				 * Update CPU last ran on if it was this CPU
 				 */
 				if (t->t_cpu == cp && t->t_bound_cpu != cp)
-					t->t_cpu = disp_lowpri_cpu(ncp,
-					    t->t_lpl, t->t_pri, NULL);
+					t->t_cpu = disp_lowpri_cpu(ncp, t,
+					    t->t_pri);
 				ASSERT(t->t_cpu != cp || t->t_bound_cpu == cp ||
 				    t->t_weakbound_cpu == cp);
 
@@ -1533,10 +1539,9 @@ again:	for (loop_count = 0; (*bound_func)(cp, 0); loop_count++) {
 			 * Update CPU last ran on if it was this CPU
 			 */
 
-			if (t->t_cpu == cp && t->t_bound_cpu != cp) {
-				t->t_cpu = disp_lowpri_cpu(ncp,
-				    t->t_lpl, t->t_pri, NULL);
-			}
+			if (t->t_cpu == cp && t->t_bound_cpu != cp)
+				t->t_cpu = disp_lowpri_cpu(ncp, t, t->t_pri);
+
 			ASSERT(t->t_cpu != cp || t->t_bound_cpu == cp ||
 			    t->t_weakbound_cpu == cp);
 			t = t->t_next;

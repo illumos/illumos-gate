@@ -587,6 +587,9 @@ enum vm_exitcode {
 	VM_EXITCODE_SVM,
 	VM_EXITCODE_REQIDLE,
 	VM_EXITCODE_DEBUG,
+#ifndef	__FreeBSD__
+	VM_EXITCODE_HT,
+#endif
 	VM_EXITCODE_MAX
 };
 

@@ -36,7 +36,7 @@
 /*         All Rights Reserved						*/
 
 /*
- * Copyright (c) 2017 Joyent, Inc.
+ * Copyright (c) 2018 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -866,8 +866,8 @@ bcopy_patch_start:
 bcopy_patch_end:
 
 	.p2align 4
-	.globl bcopy_ck_size
-bcopy_ck_size:
+	ALTENTRY(bcopy_ck_size)
+
 	cmpq	$BCOPY_DFLT_REP, %rdx
 	jae	L(use_rep)
 
@@ -956,6 +956,7 @@ L(use_rep):
 	jnz	L(do_remainder)
 	ret
 #undef	L
+	SET_SIZE(bcopy_ck_size)
 
 #ifdef DEBUG
 	/*

@@ -21,7 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 # uts/i86pc/sys/Makefile
 #
@@ -44,8 +44,9 @@ CHKHDRS=  \
 	clock.h		\
 	cram.h		\
 	ddi_subrdefs.h	\
-	debug_info.h 	\
+	debug_info.h	\
 	fastboot.h	\
+	ht.h		\
 	mach_mmu.h	\
 	machclock.h	\
 	machcpuvar.h	\

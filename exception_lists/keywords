@@ -22,6 +22,7 @@
 # Copyright 2017 Nexenta Systems, Inc.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2018 Joyent, Inc.
 #
 
 syntax: glob
@@ -36,6 +37,8 @@ usr/src/data/locale/data/zh_SG.UTF-8.src
 usr/src/data/locale/data/zh_TW.UTF-8.src
 usr/src/data/terminfo/termcap.src
 usr/src/data/terminfo/terminfo.src
+usr/src/data/ucode/amd/*
+usr/src/data/ucode/intel/*
 usr/src/test/zfs-tests/tests/functional/cli_root/zpool_upgrade/blockfiles/zfs-pool-v15.dat.bz2
 usr/src/test/zfs-tests/tests/functional/delegate/delegate_common.kshlib
 usr/src/test/test-runner/cmd/run

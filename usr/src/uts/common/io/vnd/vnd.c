@@ -830,6 +830,7 @@
 #include <sys/disp.h>
 #include <sys/random.h>
 #include <sys/gsqueue.h>
+#include <sys/ht.h>
 
 #include <inet/ip.h>
 #include <inet/ip6.h>
@@ -3716,6 +3717,12 @@ vnd_squeue_tx_drain(void *arg, mblk_t *drain_mp, gsqueue_t *gsp, void *dummy)
 	bsize = vsp->vns_bsize;
 	mutex_exit(&vsp->vns_lock);
 
+	/*
+	 * We're potentially going deep into the networking layer; make sure the
+	 * guest can't run concurrently.
+	 */
+	ht_begin_unsafe();
+
 	nmps = 0;
 	mptot = 0;
 	blocked = B_FALSE;
@@ -3735,6 +3742,8 @@ vnd_squeue_tx_drain(void *arg, mblk_t *drain_mp, gsqueue_t *gsp, void *dummy)
 			break;
 		}
 	}
+
+	ht_end_unsafe();
 
 	empty = vnd_dq_is_empty(&vsp->vns_dq_write);
 

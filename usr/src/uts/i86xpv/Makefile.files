@@ -61,6 +61,7 @@ CORE_OBJS +=			\
 	hment.o			\
 	hold_page.o		\
 	hrtimers.o		\
+	ht.o			\
 	htable.o		\
 	i86_mmu.o		\
 	ibft.o			\
@@ -110,7 +111,7 @@ CORE_OBJS += $(SMBIOS_OBJS)
 
 #
 # These get compiled twice:
-# - once in the dboot (direct boot) identity mapped code 
+# - once in the dboot (direct boot) identity mapped code
 # - once for use during early startup in unix
 #
 BOOT_DRIVER_OBJS =		\
@@ -161,7 +162,7 @@ SPECIAL_OBJS_64 +=		\
 	locore.o		\
 	fast_trap_asm.o		\
 	interrupt.o		\
-	syscall_asm_amd64.o 	\
+	syscall_asm_amd64.o	\
 	kpti_trampolines.o
 
 SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
@@ -234,7 +235,7 @@ INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/i86pc -I$(SRC)/common \
 # since only C headers are included when #defined(__lint) is true.
 #
 
-ASSYM_DEPS      += 		\
+ASSYM_DEPS      +=		\
 	copy.o			\
 	desctbls_asm.o		\
 	ddi_i86_asm.o		\

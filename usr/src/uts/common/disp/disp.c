@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -60,6 +60,7 @@
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
 #include <sys/archsystm.h>
+#include <sys/ht.h>
 
 #include <vm/as.h>
 
@@ -1135,15 +1136,13 @@ swtch_to(kthread_t *next)
 	 */
 }
 
-#define	CPU_IDLING(pri)	((pri) == -1)
-
 static void
 cpu_resched(cpu_t *cp, pri_t tpri)
 {
 	int	call_poke_cpu = 0;
 	pri_t   cpupri = cp->cpu_dispatch_pri;
 
-	if (!CPU_IDLING(cpupri) && (cpupri < tpri)) {
+	if (cpupri != CPU_IDLE_PRI && cpupri < tpri) {
 		TRACE_2(TR_FAC_DISP, TR_CPU_RESCHED,
 		    "CPU_RESCHED:Tpri %d Cpupri %d", tpri, cpupri);
 		if (tpri >= upreemptpri && cp->cpu_runrun == 0) {
@@ -1239,17 +1238,17 @@ setbackdq(kthread_t *tp)
 		/*
 		 * We'll generally let this thread continue to run where
 		 * it last ran...but will consider migration if:
-		 * - We thread probably doesn't have much cache warmth.
+		 * - The thread probably doesn't have much cache warmth.
+		 * - HT exclusion would prefer us to run elsewhere
 		 * - The CPU where it last ran is the target of an offline
 		 *   request.
-		 * - The thread last ran outside it's home lgroup.
+		 * - The thread last ran outside its home lgroup.
 		 */
 		if ((!THREAD_HAS_CACHE_WARMTH(tp)) ||
-		    (tp->t_cpu == cpu_inmotion)) {
-			cp = disp_lowpri_cpu(tp->t_cpu, tp->t_lpl, tpri, NULL);
-		} else if (!LGRP_CONTAINS_CPU(tp->t_lpl->lpl_lgrp, tp->t_cpu)) {
-			cp = disp_lowpri_cpu(tp->t_cpu, tp->t_lpl, tpri,
-			    self ? tp->t_cpu : NULL);
+		    !ht_should_run(tp, tp->t_cpu) ||
+		    (tp->t_cpu == cpu_inmotion) ||
+		    !LGRP_CONTAINS_CPU(tp->t_lpl->lpl_lgrp, tp->t_cpu)) {
+			cp = disp_lowpri_cpu(tp->t_cpu, tp, tpri);
 		} else {
 			cp = tp->t_cpu;
 		}
@@ -1278,7 +1277,8 @@ setbackdq(kthread_t *tp)
 					newcp = cp->cpu_next_part;
 				}
 
-				if (RUNQ_LEN(newcp, tpri) < qlen) {
+				if (ht_should_run(tp, newcp) &&
+				    RUNQ_LEN(newcp, tpri) < qlen) {
 					DTRACE_PROBE3(runq__balance,
 					    kthread_t *, tp,
 					    cpu_t *, cp, cpu_t *, newcp);
@@ -1289,8 +1289,8 @@ setbackdq(kthread_t *tp)
 			/*
 			 * Migrate to a cpu in the new partition.
 			 */
-			cp = disp_lowpri_cpu(tp->t_cpupart->cp_cpulist,
-			    tp->t_lpl, tp->t_pri, NULL);
+			cp = disp_lowpri_cpu(tp->t_cpupart->cp_cpulist, tp,
+			    tp->t_pri);
 		}
 		ASSERT((cp->cpu_flags & CPU_QUIESCED) == 0);
 	} else {
@@ -1427,7 +1427,7 @@ setfrontdq(kthread_t *tp)
 			/*
 			 * We'll generally let this thread continue to run
 			 * where it last ran, but will consider migration if:
-			 * - The thread last ran outside it's home lgroup.
+			 * - The thread last ran outside its home lgroup.
 			 * - The CPU where it last ran is the target of an
 			 *   offline request (a thread_nomigrate() on the in
 			 *   motion CPU relies on this when forcing a preempt).
@@ -1435,21 +1435,18 @@ setfrontdq(kthread_t *tp)
 			 *   it last ran, and it is considered not likely to
 			 *   have significant cache warmth.
 			 */
-			if ((!LGRP_CONTAINS_CPU(tp->t_lpl->lpl_lgrp, cp)) ||
-			    (cp == cpu_inmotion)) {
-				cp = disp_lowpri_cpu(tp->t_cpu, tp->t_lpl, tpri,
-				    (tp == curthread) ? cp : NULL);
-			} else if ((tpri < cp->cpu_disp->disp_maxrunpri) &&
-			    (!THREAD_HAS_CACHE_WARMTH(tp))) {
-				cp = disp_lowpri_cpu(tp->t_cpu, tp->t_lpl, tpri,
-				    NULL);
+			if (!LGRP_CONTAINS_CPU(tp->t_lpl->lpl_lgrp, cp) ||
+			    cp == cpu_inmotion ||
+			    (tpri < cp->cpu_disp->disp_maxrunpri &&
+			    !THREAD_HAS_CACHE_WARMTH(tp))) {
+				cp = disp_lowpri_cpu(tp->t_cpu, tp, tpri);
 			}
 		} else {
 			/*
 			 * Migrate to a cpu in the new partition.
 			 */
 			cp = disp_lowpri_cpu(tp->t_cpupart->cp_cpulist,
-			    tp->t_lpl, tp->t_pri, NULL);
+			    tp, tp->t_pri);
 		}
 		ASSERT((cp->cpu_flags & CPU_QUIESCED) == 0);
 	} else {
@@ -1600,7 +1597,7 @@ setkpdq(kthread_t *tp, int borf)
 		/* migrate to a cpu in the new partition */
 		cp = tp->t_cpupart->cp_cpulist;
 	}
-	cp = disp_lowpri_cpu(cp, tp->t_lpl, tp->t_pri, NULL);
+	cp = disp_lowpri_cpu(cp, tp, tp->t_pri);
 	disp_lock_enter_high(&cp->cpu_disp->disp_lock);
 	ASSERT((cp->cpu_flags & CPU_QUIESCED) == 0);
 
@@ -2573,80 +2570,85 @@ disp_cpu_inactive(cpu_t *cp)
 }
 
 /*
- * disp_lowpri_cpu - find CPU running the lowest priority thread.
- *	The hint passed in is used as a starting point so we don't favor
- *	CPU 0 or any other CPU.  The caller should pass in the most recently
- *	used CPU for the thread.
+ * Return a score rating this CPU for running this thread: lower is better.
  *
- *	The lgroup and priority are used to determine the best CPU to run on
- *	in a NUMA machine.  The lgroup specifies which CPUs are closest while
- *	the thread priority will indicate whether the thread will actually run
- *	there.  To pick the best CPU, the CPUs inside and outside of the given
- *	lgroup which are running the lowest priority threads are found.  The
- *	remote CPU is chosen only if the thread will not run locally on a CPU
- *	within the lgroup, but will run on the remote CPU. If the thread
- *	cannot immediately run on any CPU, the best local CPU will be chosen.
+ * If curthread is looking for a new CPU, then we ignore cpu_dispatch_pri for
+ * curcpu (as that's our own priority).
  *
- *	The lpl specified also identifies the cpu partition from which
- *	disp_lowpri_cpu should select a CPU.
+ * If a cpu is the target of an offline request, then try to avoid it.
  *
- *	curcpu is used to indicate that disp_lowpri_cpu is being called on
- *      behalf of the current thread. (curthread is looking for a new cpu)
- *      In this case, cpu_dispatch_pri for this thread's cpu should be
- *      ignored.
+ * Otherwise we'll use double the effective dispatcher priority for the CPU.
  *
- *      If a cpu is the target of an offline request then try to avoid it.
+ * We do this so ht_adjust_cpu_score() can increment the score if needed,
+ * without ending up over-riding a dispatcher priority.
+ */
+static pri_t
+cpu_score(cpu_t *cp, kthread_t *tp)
+{
+	pri_t score;
+
+	if (tp == curthread && cp == curthread->t_cpu)
+		score = 2 * CPU_IDLE_PRI;
+	else if (cp == cpu_inmotion)
+		score = SHRT_MAX;
+	else
+		score = 2 * cp->cpu_dispatch_pri;
+
+	if (2 * cp->cpu_disp->disp_maxrunpri > score)
+		score = 2 * cp->cpu_disp->disp_maxrunpri;
+	if (2 * cp->cpu_chosen_level > score)
+		score = 2 * cp->cpu_chosen_level;
+
+	return (ht_adjust_cpu_score(tp, cp, score));
+}
+
+/*
+ * disp_lowpri_cpu - find a suitable CPU to run the given thread.
  *
- *	This function must be called at either high SPL, or with preemption
- *	disabled, so that the "hint" CPU cannot be removed from the online
- *	CPU list while we are traversing it.
+ * We are looking for a CPU with an effective dispatch priority lower than the
+ * thread's, so that the thread will run immediately rather than be enqueued.
+ * For NUMA locality, we prefer "home" CPUs within the thread's ->t_lpl group.
+ * If we don't find an available CPU there, we will expand our search to include
+ * wider locality levels. (Note these groups are already divided by CPU
+ * partition.)
+ *
+ * If the thread cannot immediately run on *any* CPU, we'll enqueue ourselves on
+ * the best home CPU we found.
+ *
+ * The hint passed in is used as a starting point so we don't favor CPU 0 or any
+ * other CPU.  The caller should pass in the most recently used CPU for the
+ * thread; it's of course possible that this CPU isn't in the home lgroup.
+ *
+ * This function must be called at either high SPL, or with preemption disabled,
+ * so that the "hint" CPU cannot be removed from the online CPU list while we
+ * are traversing it.
  */
 cpu_t *
-disp_lowpri_cpu(cpu_t *hint, lpl_t *lpl, pri_t tpri, cpu_t *curcpu)
+disp_lowpri_cpu(cpu_t *hint, kthread_t *tp, pri_t tpri)
 {
 	cpu_t	*bestcpu;
 	cpu_t	*besthomecpu;
 	cpu_t   *cp, *cpstart;
 
-	pri_t   bestpri;
-	pri_t   cpupri;
-
 	klgrpset_t	done;
-	klgrpset_t	cur_set;
 
 	lpl_t		*lpl_iter, *lpl_leaf;
-	int		i;
 
-	/*
-	 * Scan for a CPU currently running the lowest priority thread.
-	 * Cannot get cpu_lock here because it is adaptive.
-	 * We do not require lock on CPU list.
-	 */
 	ASSERT(hint != NULL);
-	ASSERT(lpl != NULL);
-	ASSERT(lpl->lpl_ncpu > 0);
+	ASSERT(tp->t_lpl->lpl_ncpu > 0);
 
-	/*
-	 * First examine local CPUs. Note that it's possible the hint CPU
-	 * passed in in remote to the specified home lgroup. If our priority
-	 * isn't sufficient enough such that we can run immediately at home,
-	 * then examine CPUs remote to our home lgroup.
-	 * We would like to give preference to CPUs closest to "home".
-	 * If we can't find a CPU where we'll run at a given level
-	 * of locality, we expand our search to include the next level.
-	 */
 	bestcpu = besthomecpu = NULL;
 	klgrpset_clear(done);
-	/* start with lpl we were passed */
 
-	lpl_iter = lpl;
+	lpl_iter = tp->t_lpl;
 
 	do {
+		pri_t best = SHRT_MAX;
+		klgrpset_t cur_set;
 
-		bestpri = SHRT_MAX;
 		klgrpset_clear(cur_set);
 
-		for (i = 0; i < lpl_iter->lpl_nrset; i++) {
+		for (int i = 0; i < lpl_iter->lpl_nrset; i++) {
 			lpl_leaf = lpl_iter->lpl_rset[i];
 			if (klgrpset_ismember(done, lpl_leaf->lpl_lgrpid))
 				continue;
@@ -2659,34 +2661,25 @@ disp_lowpri_cpu(cpu_t *hint, lpl_t *lpl, pri_t tpri, cpu_t *curcpu)
 				cp = cpstart = lpl_leaf->lpl_cpus;
 
 			do {
-				if (cp == curcpu)
-					cpupri = -1;
-				else if (cp == cpu_inmotion)
-					cpupri = SHRT_MAX;
-				else
-					cpupri = cp->cpu_dispatch_pri;
-				if (cp->cpu_disp->disp_maxrunpri > cpupri)
-					cpupri = cp->cpu_disp->disp_maxrunpri;
-				if (cp->cpu_chosen_level > cpupri)
-					cpupri = cp->cpu_chosen_level;
-				if (cpupri < bestpri) {
-					if (CPU_IDLING(cpupri)) {
-						ASSERT((cp->cpu_flags &
-						    CPU_QUIESCED) == 0);
-						return (cp);
-					}
+				pri_t score = cpu_score(cp, tp);
+
+				if (score < best) {
+					best = score;
 					bestcpu = cp;
-					bestpri = cpupri;
+
+					/* An idle CPU: we're done. */
+					if (score / 2 == CPU_IDLE_PRI)
+						goto out;
 				}
 			} while ((cp = cp->cpu_next_lpl) != cpstart);
 		}
 
-		if (bestcpu && (tpri > bestpri)) {
-			ASSERT((bestcpu->cpu_flags & CPU_QUIESCED) == 0);
-			return (bestcpu);
-		}
+		if (bestcpu != NULL && tpri > (best / 2))
+			goto out;
+
 		if (besthomecpu == NULL)
 			besthomecpu = bestcpu;
+
 		/*
 		 * Add the lgrps we just considered to the "done" set
 		 */
@@ -2698,8 +2691,11 @@ disp_lowpri_cpu(cpu_t *hint, lpl_t *lpl, pri_t tpri, cpu_t *curcpu)
 	 * The specified priority isn't high enough to run immediately
 	 * anywhere, so just return the best CPU from the home lgroup.
 	 */
-	ASSERT((besthomecpu->cpu_flags & CPU_QUIESCED) == 0);
-	return (besthomecpu);
+	bestcpu = besthomecpu;
+
+out:
+	ASSERT((bestcpu->cpu_flags & CPU_QUIESCED) == 0);
+	return (bestcpu);
 }
 
 /*
@@ -2718,4 +2714,20 @@ generic_idle_cpu(void)
 static void
 generic_enq_thread(cpu_t *cpu, int bound)
 {
+}
+
+cpu_t *
+disp_choose_best_cpu(void)
+{
+	kthread_t *t = curthread;
+	cpu_t *curcpu = CPU;
+
+	ASSERT(t->t_preempt > 0);
+	ASSERT(t->t_state == TS_ONPROC);
+	ASSERT(t->t_schedflag & TS_VCPU);
+
+	if (ht_should_run(t, curcpu))
+		return (curcpu);
+
+	return (disp_lowpri_cpu(curcpu, t, t->t_pri));
 }

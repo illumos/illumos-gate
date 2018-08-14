@@ -140,6 +140,15 @@ struct kpti_frame {
 	uint64_t	kf_upper_redzone;
 };
 
+typedef struct cpu_ht {
+	lock_t ch_lock;
+	char ch_pad[56];
+	struct cpu *ch_sib;
+	volatile uint64_t ch_intr_depth;
+	volatile uint64_t ch_state;
+	volatile uint64_t ch_sibstate;
+} cpu_ht_t;
+
 /*
  * This first value, MACHCPU_SIZE is the size of all the members in the cpu_t
  * AND struct machcpu, before we get to the mcpu_pad and the kpti area.
@@ -147,9 +156,9 @@ struct kpti_frame {
  * page-tables, and hence must be page-aligned and page-sized. See
  * hat_pcp_setup().
  *
- * There is a CTASSERT in os/intr.c that checks these numbers.
+ * There are CTASSERTs in os/intr.c that verify this all works out.
  */
-#define	MACHCPU_SIZE	(572 + 1584)
+#define	MACHCPU_SIZE	(1568 + 688)
 #define	MACHCPU_PAD	(MMU_PAGESIZE - MACHCPU_SIZE)
 #define	MACHCPU_PAD2	(MMU_PAGESIZE - 16 - 3 * sizeof (struct kpti_frame))
 
@@ -226,6 +235,8 @@ struct	machcpu {
 	 * The low order bits will be incremented on every interrupt.
 	 */
 	volatile uint32_t	mcpu_istamp;
+
+	cpu_ht_t		mcpu_ht;
 
 	char			mcpu_pad[MACHCPU_PAD];
 

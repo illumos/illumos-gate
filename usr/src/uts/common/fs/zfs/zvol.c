@@ -25,8 +25,8 @@
  *
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -90,6 +90,7 @@
 #include <sys/zfeature.h>
 #include <sys/zio_checksum.h>
 #include <sys/zil_impl.h>
+#include <sys/ht.h>
 
 #include "zfs_namecheck.h"
 
@@ -1281,6 +1282,8 @@ zvol_strategy(buf_t *bp)
 	    (zv->zv_objset->os_sync == ZFS_SYNC_ALWAYS)) &&
 	    !doread && !is_dumpified;
 
+	ht_begin_unsafe();
+
 	/*
 	 * There must be no buffer changes when doing a dmu_sync() because
 	 * we can't change the data whilst calculating the checksum.
@@ -1327,6 +1330,8 @@ zvol_strategy(buf_t *bp)
 	if (sync)
 		zil_commit(zv->zv_zilog, ZVOL_OBJ);
 	biodone(bp);
+
+	ht_end_unsafe();
 
 	return (0);
 }
@@ -1409,6 +1414,8 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 		return (error);
 	}
 
+	ht_begin_unsafe();
+
 	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 0);
 
 	mutex_enter(&zonep->zone_vfs_lock);
@@ -1469,6 +1476,8 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 	DTRACE_PROBE4(zvol__uio__done, dev_t, dev, uio_t *, uio, int, 0, int,
 	    error);
 
+	ht_end_unsafe();
+
 	return (error);
 }
 
@@ -1500,6 +1509,8 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 		    zvol_minphys, uio);
 		return (error);
 	}
+
+	ht_begin_unsafe();
 
 	DTRACE_PROBE3(zvol__uio__start, dev_t, dev, uio_t *, uio, int, 1);
 
@@ -1548,6 +1559,8 @@ zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 
 	DTRACE_PROBE4(zvol__uio__done, dev_t, dev, uio_t *, uio, int, 1, int,
 	    error);
+
+	ht_end_unsafe();
 
 	mutex_enter(&zonep->zone_vfs_lock);
 	zonep->zone_vfs_rwstats.writes++;
@@ -1818,11 +1831,17 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	case DKIOCFLUSHWRITECACHE:
 		dkc = (struct dk_callback *)arg;
 		mutex_exit(&zfsdev_state_lock);
+
+		ht_begin_unsafe();
+
 		zil_commit(zv->zv_zilog, ZVOL_OBJ);
 		if ((flag & FKIOCTL) && dkc != NULL && dkc->dkc_callback) {
 			(*dkc->dkc_callback)(dkc->dkc_cookie, error);
 			error = 0;
 		}
+
+		ht_end_unsafe();
+
 		return (error);
 
 	case DKIOCGETWCE:
@@ -1847,7 +1866,9 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		} else {
 			zv->zv_flags &= ~ZVOL_WCE;
 			mutex_exit(&zfsdev_state_lock);
+			ht_begin_unsafe();
 			zil_commit(zv->zv_zilog, ZVOL_OBJ);
+			ht_end_unsafe();
 		}
 		return (0);
 	}
@@ -1900,6 +1921,8 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 
 		mutex_exit(&zfsdev_state_lock);
 
+		ht_begin_unsafe();
+
 		rl = zfs_range_lock(&zv->zv_znode, df.df_start, df.df_length,
 		    RL_WRITER);
 		tx = dmu_tx_create(zv->zv_objset);
@@ -1931,6 +1954,8 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		    (df.df_flags & DF_WAIT_SYNC))) {
 			zil_commit(zv->zv_zilog, ZVOL_OBJ);
 		}
+
+		ht_end_unsafe();
 
 		return (error);
 	}

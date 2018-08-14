@@ -74,6 +74,7 @@
 #include <sys/waitq.h>
 #include <sys/cpucaps.h>
 #include <sys/kiconv.h>
+#include <sys/ht.h>
 
 #ifndef	STACK_GROWTH_DOWN
 #error Stacks do not grow downward; 3b2 zombie attack detected!
@@ -507,8 +508,8 @@ thread_create(
 	if (CPU->cpu_part == &cp_default)
 		t->t_cpu = CPU;
 	else
-		t->t_cpu = disp_lowpri_cpu(cp_default.cp_cpulist, t->t_lpl,
-		    t->t_pri, NULL);
+		t->t_cpu = disp_lowpri_cpu(cp_default.cp_cpulist, t,
+		    t->t_pri);
 
 	t->t_disp_queue = t->t_cpu->cpu_disp;
 	kpreempt_enable();
@@ -1421,6 +1422,8 @@ thread_unpin()
 
 	itp = t->t_intr;		/* interrupted thread */
 	t->t_intr = NULL;		/* clear interrupt ptr */
+
+	ht_end_intr();
 
 	/*
 	 * Get state from interrupt thread for the one
