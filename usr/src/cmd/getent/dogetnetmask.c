@@ -19,9 +19,9 @@
  *
  * CDDL HEADER END
  */
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
+ * Copyright (c) 2018 Peter Tribble.
  * Copyright (c) 1994-1996, by Sun Microsystems, Inc.
  * All rights reserved.
  */
@@ -34,6 +34,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <libsocket_priv.h>
 #include "getent.h"
 
 extern char *inet_nettoa(struct in_addr in);
@@ -41,7 +42,6 @@ extern char *inet_nettoa(struct in_addr in);
 static int
 putnetmask(const struct in_addr key, const struct in_addr netmask, FILE *fp)
 {
-	char **p;
 	int rc = 0;
 	struct in_addr net;
 

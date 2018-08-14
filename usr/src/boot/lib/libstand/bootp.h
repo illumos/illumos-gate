@@ -18,10 +18,10 @@
  * without express or implied warranty.
  */
 
-#include <netinet/in.h>
-
 #ifndef _BOOTP_H_
 #define	_BOOTP_H_
+
+#include <netinet/in.h>
 
 struct bootp {
 	unsigned char	bp_op;		/* packet opcode type */
@@ -39,11 +39,11 @@ struct bootp {
 	unsigned char	bp_sname[64];	/* server host name */
 	char	bp_file[128];		/* boot file name */
 #ifdef SUPPORT_DHCP
-#define BOOTP_VENDSIZE 312
+#define	BOOTP_VENDSIZE 312
 #else
-#define BOOTP_VENDSIZE 64
+#define	BOOTP_VENDSIZE 64
 #endif
-	unsigned char	bp_vend[BOOTP_VENDSIZE];	/* vendor-specific area */
+	unsigned char	bp_vend[BOOTP_VENDSIZE]; /* vendor-specific area */
 };
 
 /*
@@ -52,73 +52,71 @@ struct bootp {
 #define	IPPORT_BOOTPS		67
 #define	IPPORT_BOOTPC		68
 
-#define BOOTREPLY		2
-#define BOOTREQUEST		1
+#define	BOOTREPLY		2
+#define	BOOTREQUEST		1
 
 
 /*
  * Vendor magic cookie (v_magic) for CMU
  */
-#define VM_CMU		"CMU"
+#define	VM_CMU		"CMU"
 
 /*
  * Vendor magic cookie (v_magic) for RFC1048
  */
-#define VM_RFC1048	{ 99, 130, 83, 99 }
-
-
+#define	VM_RFC1048	{ 99, 130, 83, 99 }
 
 /*
  * RFC1048 tag values used to specify what information is being supplied in
  * the vendor field of the packet.
  */
 
-#define TAG_PAD			((unsigned char)   0)
-#define TAG_SUBNET_MASK		((unsigned char)   1)
-#define TAG_TIME_OFFSET		((unsigned char)   2)
-#define TAG_GATEWAY		((unsigned char)   3)
-#define TAG_TIME_SERVER		((unsigned char)   4)
-#define TAG_NAME_SERVER		((unsigned char)   5)
-#define TAG_DOMAIN_SERVER	((unsigned char)   6)
-#define TAG_LOG_SERVER		((unsigned char)   7)
-#define TAG_COOKIE_SERVER	((unsigned char)   8)
-#define TAG_LPR_SERVER		((unsigned char)   9)
-#define TAG_IMPRESS_SERVER	((unsigned char)  10)
-#define TAG_RLP_SERVER		((unsigned char)  11)
-#define TAG_HOSTNAME		((unsigned char)  12)
-#define TAG_BOOTSIZE		((unsigned char)  13)
-#define TAG_DUMPFILE		((unsigned char)  14)
-#define TAG_DOMAINNAME		((unsigned char)  15)
-#define TAG_SWAPSERVER		((unsigned char)  16)
-#define TAG_ROOTPATH		((unsigned char)  17)
+#define	TAG_PAD			((unsigned char)   0)
+#define	TAG_SUBNET_MASK		((unsigned char)   1)
+#define	TAG_TIME_OFFSET		((unsigned char)   2)
+#define	TAG_GATEWAY		((unsigned char)   3)
+#define	TAG_TIME_SERVER		((unsigned char)   4)
+#define	TAG_NAME_SERVER		((unsigned char)   5)
+#define	TAG_DOMAIN_SERVER	((unsigned char)   6)
+#define	TAG_LOG_SERVER		((unsigned char)   7)
+#define	TAG_COOKIE_SERVER	((unsigned char)   8)
+#define	TAG_LPR_SERVER		((unsigned char)   9)
+#define	TAG_IMPRESS_SERVER	((unsigned char)  10)
+#define	TAG_RLP_SERVER		((unsigned char)  11)
+#define	TAG_HOSTNAME		((unsigned char)  12)
+#define	TAG_BOOTSIZE		((unsigned char)  13)
+#define	TAG_DUMPFILE		((unsigned char)  14)
+#define	TAG_DOMAINNAME		((unsigned char)  15)
+#define	TAG_SWAPSERVER		((unsigned char)  16)
+#define	TAG_ROOTPATH		((unsigned char)  17)
 #define	TAG_INTF_MTU		((unsigned char)  26)
 
 #ifdef SUPPORT_DHCP
-#define TAG_REQ_ADDR		((unsigned char)  50)
-#define TAG_LEASETIME		((unsigned char)  51)
-#define TAG_OVERLOAD		((unsigned char)  52)
-#define TAG_DHCP_MSGTYPE	((unsigned char)  53)
-#define TAG_SERVERID		((unsigned char)  54)
-#define TAG_PARAM_REQ		((unsigned char)  55)
-#define TAG_MSG			((unsigned char)  56)
-#define TAG_MAXSIZE		((unsigned char)  57)
-#define TAG_T1			((unsigned char)  58)
-#define TAG_T2			((unsigned char)  59)
-#define TAG_CLASSID		((unsigned char)  60)
-#define TAG_CLIENTID		((unsigned char)  61)
-#define TAG_USER_CLASS		((unsigned char)  77)
+#define	TAG_REQ_ADDR		((unsigned char)  50)
+#define	TAG_LEASETIME		((unsigned char)  51)
+#define	TAG_OVERLOAD		((unsigned char)  52)
+#define	TAG_DHCP_MSGTYPE	((unsigned char)  53)
+#define	TAG_SERVERID		((unsigned char)  54)
+#define	TAG_PARAM_REQ		((unsigned char)  55)
+#define	TAG_MSG			((unsigned char)  56)
+#define	TAG_MAXSIZE		((unsigned char)  57)
+#define	TAG_T1			((unsigned char)  58)
+#define	TAG_T2			((unsigned char)  59)
+#define	TAG_CLASSID		((unsigned char)  60)
+#define	TAG_CLIENTID		((unsigned char)  61)
+#define	TAG_USER_CLASS		((unsigned char)  77)
 #endif
 
-#define TAG_END			((unsigned char) 255)
+#define	TAG_END			((unsigned char) 255)
 
 #ifdef SUPPORT_DHCP
-#define DHCPDISCOVER 1
-#define DHCPOFFER 2
-#define DHCPREQUEST 3
-#define DHCPDECLINE 4
-#define DHCPACK 5
-#define DHCPNAK 6
-#define DHCPRELEASE 7
+#define	DHCPDISCOVER 1
+#define	DHCPOFFER 2
+#define	DHCPREQUEST 3
+#define	DHCPDECLINE 4
+#define	DHCPACK 5
+#define	DHCPNAK 6
+#define	DHCPRELEASE 7
 #endif
 
 /*
@@ -138,7 +136,7 @@ struct cmu_vend {
 
 
 /* v_flags values */
-#define VF_SMASK	1	/* Subnet mask field contains valid data */
+#define	VF_SMASK	1	/* Subnet mask field contains valid data */
 
 /* cached bootp response/dhcp ack */
 extern struct bootp *bootp_response;

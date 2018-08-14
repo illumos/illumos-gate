@@ -42,14 +42,14 @@
 
 #include <string.h>
 
-#define BOOTP_DEBUGxx
-#define SUPPORT_DHCP
+#define	BOOTP_DEBUGxx
+#define	SUPPORT_DHCP
 
 #define	DHCP_ENV_NOVENDOR	1	/* do not parse vendor options */
 #define	DHCP_ENV_PXE		10	/* assume pxe vendor options */
 #define	DHCP_ENV_FREEBSD	11	/* assume freebsd vendor options */
 /* set DHCP_ENV to one of the values above to export dhcp options to kenv */
-#define DHCP_ENV		DHCP_ENV_NO_VENDOR
+#define	DHCP_ENV		DHCP_ENV_NO_VENDOR
 
 #include "stand.h"
 #include "net.h"
@@ -69,16 +69,16 @@ static	char vm_cmu[4] = VM_CMU;
 /* Local forwards */
 static	ssize_t bootpsend(struct iodesc *, void *, size_t);
 static	ssize_t bootprecv(struct iodesc *, void **, void **, time_t, void *);
-static	int vend_rfc1048(u_char *, u_int);
+static	int vend_rfc1048(uchar_t *, uint_t);
 #ifdef BOOTP_VEND_CMU
-static	void vend_cmu(u_char *);
+static	void vend_cmu(uchar_t *);
 #endif
 
 #ifdef DHCP_ENV		/* export the dhcp response to kenv */
 struct dhcp_opt;
-static void setenv_(u_char *cp,  u_char *ep, struct dhcp_opt *opts);
+static void setenv_(uchar_t *cp,  uchar_t *ep, struct dhcp_opt *opts);
 #else
-#define setenv_(a, b, c)
+#define	setenv_(a, b, c)
 #endif
 
 #ifdef SUPPORT_DHCP
@@ -125,37 +125,37 @@ bootp(int sock)
 	struct iodesc *d;
 	struct bootp *bp;
 	struct {
-		u_char header[HEADER_SIZE];
+		uchar_t header[HEADER_SIZE];
 		struct bootp wbootp;
 	} wbuf;
 	struct bootp *rbootp;
 
 #ifdef BOOTP_DEBUG
- 	if (debug)
+	if (debug)
 		printf("bootp: socket=%d\n", sock);
 #endif
 	if (!bot)
 		bot = getsecs();
-	
+
 	if (!(d = socktodesc(sock))) {
 		printf("bootp: bad socket. %d\n", sock);
 		return;
 	}
 #ifdef BOOTP_DEBUG
- 	if (debug)
+	if (debug)
 		printf("bootp: d=%lx\n", (long)d);
 #endif
 
 	bp = &wbuf.wbootp;
-	bzero(bp, sizeof(*bp));
+	bzero(bp, sizeof (*bp));
 
 	bp->bp_op = BOOTREQUEST;
 	bp->bp_htype = 1;		/* 10Mb Ethernet (48 bits) */
 	bp->bp_hlen = 6;
 	bp->bp_xid = htonl(d->xid);
 	MACPY(d->myea, bp->bp_chaddr);
-	strncpy(bp->bp_file, bootfile, sizeof(bp->bp_file));
-	bcopy(vm_rfc1048, bp->bp_vend, sizeof(vm_rfc1048));
+	strncpy(bp->bp_file, bootfile, sizeof (bp->bp_file));
+	bcopy(vm_rfc1048, bp->bp_vend, sizeof (vm_rfc1048));
 #ifdef SUPPORT_DHCP
 	bp->bp_vend[4] = TAG_DHCP_MSGTYPE;
 	bp->bp_vend[5] = 1;
@@ -175,16 +175,15 @@ bootp(int sock)
 	dhcp_ok = 0;
 #endif
 
-	if(sendrecv(d,
-		    bootpsend, bp, sizeof(*bp),
-		    bootprecv, &pkt, (void **)&rbootp, NULL) == -1) {
-	    printf("bootp: no reply\n");
-	    return;
+	if (sendrecv(d, bootpsend, bp, sizeof (*bp),
+	    bootprecv, &pkt, (void **)&rbootp, NULL) == -1) {
+		printf("bootp: no reply\n");
+		return;
 	}
 
 #ifdef SUPPORT_DHCP
-	if(dhcp_ok) {
-		u_int32_t leasetime;
+	if (dhcp_ok) {
+		uint32_t leasetime;
 		bp->bp_vend[6] = DHCPREQUEST;
 		bp->bp_vend[7] = TAG_REQ_ADDR;
 		bp->bp_vend[8] = 4;
@@ -201,9 +200,8 @@ bootp(int sock)
 		expected_dhcpmsgtype = DHCPACK;
 
 		free(pkt);
-		if(sendrecv(d,
-			    bootpsend, bp, sizeof(*bp),
-			    bootprecv, &pkt, (void **)&rbootp, NULL) == -1) {
+		if (sendrecv(d, bootpsend, bp, sizeof (*bp),
+		    bootprecv, &pkt, (void **)&rbootp, NULL) == -1) {
 			printf("DHCPREQUEST failed\n");
 			return;
 		}
@@ -214,8 +212,8 @@ bootp(int sock)
 	servip = rbootp->bp_siaddr;
 	if (rootip.s_addr == INADDR_ANY)
 		rootip = servip;
-	bcopy(rbootp->bp_file, bootfile, sizeof(bootfile));
-	bootfile[sizeof(bootfile) - 1] = '\0';
+	bcopy(rbootp->bp_file, bootfile, sizeof (bootfile));
+	bootfile[sizeof (bootfile) - 1] = '\0';
 
 	if (!netmask) {
 		if (IN_CLASSA(ntohl(myip.s_addr)))
@@ -269,7 +267,7 @@ bootpsend(struct iodesc *d, void *pkt, size_t len)
 #endif
 
 	bp = pkt;
-	bp->bp_secs = htons((u_short)(getsecs() - bot));
+	bp->bp_secs = htons((ushort_t)(getsecs() - bot));
 
 #ifdef BOOTP_DEBUG
 	if (debug)
@@ -294,7 +292,7 @@ bootprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft,
 
 	ptr = NULL;
 	n = readudp(d, &ptr, (void **)&bp, tleft);
-	if (n == -1 || n < sizeof(struct bootp) - BOOTP_VENDSIZE)
+	if (n == -1 || n < sizeof (struct bootp) - BOOTP_VENDSIZE)
 		goto bad;
 
 #ifdef BOOTP_DEBUG
@@ -317,10 +315,10 @@ bootprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft,
 #endif
 
 	/* Suck out vendor info */
-	if (bcmp(vm_rfc1048, bp->bp_vend, sizeof(vm_rfc1048)) == 0) {
+	if (bcmp(vm_rfc1048, bp->bp_vend, sizeof (vm_rfc1048)) == 0) {
 		int vsize = n - offsetof(struct bootp, bp_vend);
-		if(vend_rfc1048(bp->bp_vend, vsize) != 0)
-		    goto bad;
+		if (vend_rfc1048(bp->bp_vend, vsize) != 0)
+			goto bad;
 
 		/* Save copy of bootp reply or DHCP ACK message */
 		if (bp->bp_op == BOOTREPLY &&
@@ -335,7 +333,7 @@ bootprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft,
 		}
 	}
 #ifdef BOOTP_VEND_CMU
-	else if (bcmp(vm_cmu, bp->bp_vend, sizeof(vm_cmu)) == 0)
+	else if (bcmp(vm_cmu, bp->bp_vend, sizeof (vm_cmu)) == 0)
 		vend_cmu(bp->bp_vend);
 #endif
 	else
@@ -343,7 +341,7 @@ bootprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft,
 
 	*pkt = ptr;
 	*payload = bp;
-	return(n);
+	return (n);
 bad:
 	free(ptr);
 	errno = 0;
@@ -351,11 +349,11 @@ bad:
 }
 
 static int
-vend_rfc1048(u_char *cp, u_int len)
+vend_rfc1048(uchar_t *cp, uint_t len)
 {
-	u_char *ep;
+	uchar_t *ep;
 	int size;
-	u_char tag;
+	uchar_t tag;
 	const char *val;
 
 #ifdef BOOTP_DEBUG
@@ -365,7 +363,7 @@ vend_rfc1048(u_char *cp, u_int len)
 	ep = cp + len;
 
 	/* Step over magic cookie */
-	cp += sizeof(int);
+	cp += sizeof (int);
 
 	setenv_(cp, ep, NULL);
 
@@ -376,24 +374,24 @@ vend_rfc1048(u_char *cp, u_int len)
 			break;
 
 		if (tag == TAG_SUBNET_MASK) {
-			bcopy(cp, &netmask, sizeof(netmask));
+			bcopy(cp, &netmask, sizeof (netmask));
 		}
 		if (tag == TAG_GATEWAY) {
-			bcopy(cp, &gateip.s_addr, sizeof(gateip.s_addr));
+			bcopy(cp, &gateip.s_addr, sizeof (gateip.s_addr));
 		}
 		if (tag == TAG_SWAPSERVER) {
 			/* let it override bp_siaddr */
-			bcopy(cp, &rootip.s_addr, sizeof(rootip.s_addr));
+			bcopy(cp, &rootip.s_addr, sizeof (rootip.s_addr));
 		}
 		if (tag == TAG_ROOTPATH) {
 			if ((val = getenv("dhcp.root-path")) == NULL)
 				val = (const char *)cp;
-			strlcpy(rootpath, val, sizeof(rootpath));
+			strlcpy(rootpath, val, sizeof (rootpath));
 		}
 		if (tag == TAG_HOSTNAME) {
 			if ((val = getenv("dhcp.host-name")) == NULL)
 				val = (const char *)cp;
-			strlcpy(hostname, val, sizeof(hostname));
+			strlcpy(hostname, val, sizeof (hostname));
 		}
 		if (tag == TAG_INTF_MTU) {
 			intf_mtu = 0;
@@ -414,7 +412,7 @@ vend_rfc1048(u_char *cp, u_int len)
 					    "ignoring\n",
 					    "dhcp.interface-mtu", val);
 				} else {
-					intf_mtu = (u_int)tmp;
+					intf_mtu = (uint_t)tmp;
 				}
 			}
 			if (intf_mtu == 0)
@@ -422,23 +420,23 @@ vend_rfc1048(u_char *cp, u_int len)
 		}
 #ifdef SUPPORT_DHCP
 		if (tag == TAG_DHCP_MSGTYPE) {
-			if(*cp != expected_dhcpmsgtype)
-			    return(-1);
+			if (*cp != expected_dhcpmsgtype)
+				return (-1);
 			dhcp_ok = 1;
 		}
 		if (tag == TAG_SERVERID) {
 			bcopy(cp, &dhcp_serverip.s_addr,
-			      sizeof(dhcp_serverip.s_addr));
+			    sizeof (dhcp_serverip.s_addr));
 		}
 #endif
 		cp += size;
 	}
-	return(0);
+	return (0);
 }
 
 #ifdef BOOTP_VEND_CMU
 static void
-vend_cmu(u_char *cp)
+vend_cmu(uchar_t *cp)
 {
 	struct cmu_vend *vp;
 
@@ -632,144 +630,150 @@ static struct dhcp_opt dhcp_opt[] = {
  * to the list of selected tags.
  */
 static void
-setenv_(u_char *cp,  u_char *ep, struct dhcp_opt *opts)
+setenv_(uchar_t *cp,  uchar_t *ep, struct dhcp_opt *opts)
 {
-    u_char	*ncp;
-    u_char	tag;
-    char	tags[512], *tp;	/* the list of tags */
+	uchar_t	*ncp;
+	uchar_t	tag;
+	char	tags[512], *tp;	/* the list of tags */
 
-#define FLD_SEP	','	/* separator in list of elements */
-    ncp = cp;
-    tp = tags;
-    if (opts == NULL)
-	opts = dhcp_opt;
+#define	FLD_SEP	','	/* separator in list of elements */
+	ncp = cp;
+	tp = tags;
+	if (opts == NULL)
+		opts = dhcp_opt;
 
-    while (ncp < ep) {
-	unsigned int	size;		/* option size */
-	char *vp, *endv, buf[256];	/* the value buffer */
-	struct dhcp_opt *op;
+	while (ncp < ep) {
+		unsigned int	size;		/* option size */
+		char *vp, *endv, buf[256];	/* the value buffer */
+		struct dhcp_opt *op;
 
-	tag = *ncp++;			/* extract tag and size */
-	size = *ncp++;
-	cp = ncp;			/* current payload */
-	ncp += size;			/* point to the next option */
+		tag = *ncp++;			/* extract tag and size */
+		size = *ncp++;
+		cp = ncp;			/* current payload */
+		ncp += size;			/* point to the next option */
 
-	if (tag == TAG_END)
-	    break;
-	if (tag == 0)
-	    continue;
+		if (tag == TAG_END)
+			break;
+		if (tag == 0)
+			continue;
 
-	for (op = opts+1; op->tag && op->tag != tag; op++)
-		;
-	/* if not found we end up on the default entry */
+		for (op = opts+1; op->tag && op->tag != tag; op++)
+			;
+		/* if not found we end up on the default entry */
 
-	/*
-	 * Copy data into the buffer. libstand does not have snprintf so we
-	 * need to be careful with sprintf(). With strings, the source is
-	 * always <256 char so shorter than the buffer so we are safe; with
-	 * other arguments, the longest string is inet_ntoa which is 16 bytes
-	 * so we make sure to have always enough room in the string before
-	 * trying an sprint.
-	 */
-	vp = buf;
-	*vp = '\0';
-	endv = buf + sizeof(buf) - 1 - 16;	/* last valid write position */
+		/*
+		 * Copy data into the buffer. libstand does not have snprintf
+		 * so we need to be careful with sprintf(). With strings, the
+		 * source is always <256 char so shorter than the buffer so we
+		 * are safe; with other arguments, the longest string is
+		 * inet_ntoa which is 16 bytes so we make sure to have always
+		 * enough room in the string before trying an sprint.
+		 */
+		vp = buf;
+		*vp = '\0';
+		/* last valid write position */
+		endv = buf + sizeof (buf) - 1 - 16;
 
-	switch(op->fmt) {
-	case __NONE:
-	    break;	/* should not happen */
+		switch (op->fmt) {
+		case __NONE:
+			break;	/* should not happen */
 
-	case __VE: /* recurse, vendor specific */
-	    setenv_(cp, cp+size, vndr_opt);
-	    break;
+		case __VE: /* recurse, vendor specific */
+			setenv_(cp, cp+size, vndr_opt);
+			break;
 
-	case __IP:	/* ip address */
-	    for (; size > 0 && vp < endv; size -= 4, cp += 4) {
-		struct	in_addr in_ip;		/* ip addresses */
-		if (vp != buf)
-		    *vp++ = FLD_SEP;
-		bcopy(cp, &in_ip.s_addr, sizeof(in_ip.s_addr));
-		sprintf(vp, "%s", inet_ntoa(in_ip));
-		vp += strlen(vp);
-	    }
-	    break;
+		case __IP:	/* ip address */
+			for (; size > 0 && vp < endv; size -= 4, cp += 4) {
+				struct	in_addr in_ip;	/* ip addresses */
+				if (vp != buf)
+					*vp++ = FLD_SEP;
+				bcopy(cp, &in_ip.s_addr, sizeof (in_ip.s_addr));
+				sprintf(vp, "%s", inet_ntoa(in_ip));
+				vp += strlen(vp);
+			}
+			break;
 
-	case __BYTES:	/* opaque byte string */
-	    for (; size > 0 && vp < endv; size -= 1, cp += 1) {
-		sprintf(vp, "%02x", *cp);
-		vp += strlen(vp);
-	    }
-	    break;
+		case __BYTES:	/* opaque byte string */
+			for (; size > 0 && vp < endv; size -= 1, cp += 1) {
+				sprintf(vp, "%02x", *cp);
+				vp += strlen(vp);
+			}
+			break;
 
-	case __TXT:
-	    bcopy(cp, buf, size);	/* cannot overflow */
-	    buf[size] = 0;
-	    break;
+		case __TXT:
+			bcopy(cp, buf, size);	/* cannot overflow */
+			buf[size] = 0;
+			break;
 
-	case __32:
-	case __16:
-	case __8:	/* op->fmt is also the length of each field */
-	    for (; size > 0 && vp < endv; size -= op->fmt, cp += op->fmt) {
-		uint32_t v;
-		if (op->fmt == __32)
-			v = (cp[0]<<24) + (cp[1]<<16) + (cp[2]<<8) + cp[3];
-		else if (op->fmt == __16)
-			v = (cp[0]<<8) + cp[1];
-		else
-			v = cp[0];
-		if (vp != buf)
-		    *vp++ = FLD_SEP;
-		sprintf(vp, "%u", v);
-		vp += strlen(vp);
-	    }
-	    break;
+		case __32:
+		case __16:
+		case __8:	/* op->fmt is also the length of each field */
+			for (; size > 0 && vp < endv;
+			    size -= op->fmt, cp += op->fmt) {
+				uint32_t v;
+				if (op->fmt == __32)
+					v = (cp[0]<<24) + (cp[1]<<16) +
+					    (cp[2]<<8) + cp[3];
+				else if (op->fmt == __16)
+					v = (cp[0]<<8) + cp[1];
+				else
+					v = cp[0];
+				if (vp != buf)
+					*vp++ = FLD_SEP;
+				sprintf(vp, "%u", v);
+				vp += strlen(vp);
+			}
+			break;
 
-	case __INDIR:	/* name=value */
-	case __ILIST:	/* name=value;name=value... */
-	    bcopy(cp, buf, size);	/* cannot overflow */
-	    buf[size] = '\0';
-	    for (endv = buf; endv; endv = vp) {
-		char *s = NULL;	/* semicolon ? */
+		case __INDIR:	/* name=value */
+		case __ILIST:	/* name=value;name=value... */
+			bcopy(cp, buf, size);	/* cannot overflow */
+			buf[size] = '\0';
+			for (endv = buf; endv; endv = vp) {
+				char *s = NULL;	/* semicolon ? */
 
-		/* skip leading whitespace */
-		while (*endv && strchr(" \t\n\r", *endv))
-		    endv++;
-		vp = strchr(endv, '=');	/* find name=value separator */
-		if (!vp)
-		    break;
-		*vp++ = 0;
-		if (op->fmt == __ILIST && (s = strchr(vp, ';')))
-		    *s++ = '\0';
-		setenv(endv, vp, 1);
-		vp = s;	/* prepare for next round */
-	    }
-	    buf[0] = '\0';	/* option already done */
+				/* skip leading whitespace */
+				while (*endv && strchr(" \t\n\r", *endv))
+					endv++;
+				/* find name=value separator */
+				vp = strchr(endv, '=');
+				if (!vp)
+					break;
+				*vp++ = 0;
+				if (op->fmt == __ILIST && (s = strchr(vp, ';')))
+					*s++ = '\0';
+				setenv(endv, vp, 1);
+				vp = s;	/* prepare for next round */
+			}
+			buf[0] = '\0';	/* option already done */
+		}
+
+		if (tp - tags < sizeof (tags) - 5) {
+			/* add tag to the list */
+			if (tp != tags)
+				*tp++ = FLD_SEP;
+			sprintf(tp, "%d", tag);
+			tp += strlen(tp);
+		}
+		if (buf[0]) {
+			char	env[128];	/* the string name */
+
+			if (op->tag == 0)
+				sprintf(env, op->desc, opts[0].desc, tag);
+			else
+				sprintf(env, "%s%s", opts[0].desc, op->desc);
+			/*
+			 * Do not replace existing values in the environment,
+			 * so that locally-obtained values can override
+			 * server-provided values.
+			 */
+			setenv(env, buf, 0);
+		}
 	}
-
-	if (tp - tags < sizeof(tags) - 5) {	/* add tag to the list */
-	    if (tp != tags)
-		*tp++ = FLD_SEP;
-	    sprintf(tp, "%d", tag);
-	    tp += strlen(tp);
+	if (tp != tags) {
+		char	env[128];	/* the string name */
+		sprintf(env, "%stags", opts[0].desc);
+		setenv(env, tags, 1);
 	}
-	if (buf[0]) {
-	    char	env[128];	/* the string name */
-
-	    if (op->tag == 0)
-		sprintf(env, op->desc, opts[0].desc, tag);
-	    else
-		sprintf(env, "%s%s", opts[0].desc, op->desc);
-	    /*
-	     * Do not replace existing values in the environment, so that
-	     * locally-obtained values can override server-provided values.
-	     */
-	    setenv(env, buf, 0);
-	}
-    }
-    if (tp != tags) {
-	char	env[128];	/* the string name */
-	sprintf(env, "%stags", opts[0].desc);
-	setenv(env, tags, 1);
-    }
 }
 #endif /* additional dhcp */

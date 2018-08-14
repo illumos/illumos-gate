@@ -112,6 +112,22 @@ typedef struct _ftsent {
 	char fts_name[1];		/* file name */
 } FTSENT;
 
+#if !defined(_LP64) && _FILE_OFFSET_BITS == 64
+#ifdef __PRAGMA_REDEFINE_EXTNAME
+#pragma	redefine_extname	fts_children	fts_children64
+#pragma	redefine_extname	fts_close	fts_close64
+#pragma	redefine_extname	fts_open	fts_open64
+#pragma	redefine_extname	fts_read	fts_read64
+#pragma	redefine_extname	fts_set		fts_set64
+#else
+#define	fts_children	fts_children64
+#define	fts_close	fts_close64
+#define	fts_open	fts_open64
+#define	fts_read	fts_read64
+#define	fts_set		fts_set64
+#endif /* __PRAGMA_REDEFINE_EXTNAME */
+#endif /* !_LP64 && _FILE_OFFSET_BITS == 64 */
+
 FTSENT	*fts_children(FTS *, int);
 int	 fts_close(FTS *);
 FTS	*fts_open(char * const *, int,

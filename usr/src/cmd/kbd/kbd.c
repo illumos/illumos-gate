@@ -864,6 +864,7 @@ set_layout(int kbd, int layout_num)
 		perror("ioctl (set kbd layout)");
 		return (1);
 	}
+	(void) system("/usr/bin/loadkeys");
 
 	return (0);
 }

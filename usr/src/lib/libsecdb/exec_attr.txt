@@ -28,7 +28,7 @@
 #
 All:suser:cmd:::*:
 Audit Control:solaris:cmd:::/usr/sbin/audit:privs=proc_owner,sys_audit
-Audit Configuration:solaris:::/usr/sbin/auditconfig:privs=sys_audit
+Audit Configuration:solaris:cmd:::/usr/sbin/auditconfig:privs=sys_audit
 Audit Review:solaris:cmd:::/usr/sbin/auditreduce:euid=0
 Audit Review:solaris:cmd:::/usr/sbin/auditstat:privs=proc_audit
 Audit Review:solaris:cmd:::/usr/sbin/praudit:privs=file_dac_read

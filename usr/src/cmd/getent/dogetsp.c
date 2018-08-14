@@ -20,6 +20,7 @@
  */
 
 /*
+ * Copyright (c) 2018 Peter Tribble.
  * Copyright (c) 2014 Gary Mills
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
@@ -40,8 +41,6 @@ dogetsp(const char **list)
 {
 	struct spwd *sp;
 	int rc = EXC_SUCCESS;
-	char *ptr;
-	uid_t uid;
 
 
 	if (list == NULL || *list == NULL) {

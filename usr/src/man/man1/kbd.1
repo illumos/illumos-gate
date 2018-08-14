@@ -31,14 +31,12 @@ change the default keyboard abort sequence effect
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBkbd\fR utility manipulates the state of the keyboard, or displays the
 keyboard type, or allows the default keyboard abort sequence effect to be
 changed. The abort sequence also applies to serial console devices. The
 \fBkbd\fR utility sets the \fB/dev/kbd\fR default keyboard device.
 .SH EXTENDED DESCRIPTION
-.sp
 .LP
 The \fB-i\fR option reads and processes default values for the keyclick and
 keyboard abort settings from the \fB/etc/default/kbd\fR keyboard default file.
@@ -211,7 +209,7 @@ LAYOUT=Spanish
 .sp
 .LP
 Next, run the \fBkbd\fR \fB-i\fR to change the setting. When Solaris reboots,
-the Spanish key table is loaded into kernel. These layouts are valid for
+the Spanish key table is loaded into the kernel. These layouts are valid for
 \fBusb\fR and \fBps/2\fR keyboards.
 .sp
 .LP
@@ -246,7 +244,6 @@ CONSOLE_BEEPER_FREQ=900
 To change the current settings of keyboard beeper frequency and console beeper
 frequency, run \fBkbd\fR \fB-i\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -430,11 +427,12 @@ Sets the autorepeat rate in milliseconds.
 .ad
 .sp .6
 .RS 4n
-Sets the keyboard layout into kernel.
+Sets the keyboard layout into the kernel.
 .sp
-If \fIlanguage\fR is specified, the layout is set to \fIlanguage\fR. If
-\fIlanguage\fR is not specified, a list of available layouts are presented,
-prompting for the user to specify the \fIlanguage\fR. See \fBOPERANDS\fR.
+If \fIlanguage\fR is specified, the layout is set to \fIlanguage\fR, and
+\fBloadkeys\fR(1) runs implicitly. If \fIlanguage\fR is not specified, a list
+of available layouts are presented, prompting for the user to specify the
+\fIlanguage\fR. See \fBOPERANDS\fR.
 .RE
 
 .sp
@@ -448,7 +446,6 @@ Returns the type of the keyboard being used.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -612,7 +609,6 @@ example%
 .sp
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/kbd\fR\fR
@@ -631,14 +627,12 @@ Keyboard default file containing software defaults for keyboard configurations.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBloadkeys\fR(1), \fBsvcs\fR(1), \fBinetd\fR(1M), \fBinetadm\fR(1M),
 \fBkadb\fR(1M), \fBsvcadm\fR(1M), \fBpppd\fR(1M), \fBkeytables\fR(4),
 \fBattributes\fR(5), \fBsmf\fR(5), \fBkb\fR(7M), \fBzs\fR(7D), \fBse\fR(7D),
 \fBasy\fR(7D), \fBvirtualkm\fR(7D)
 .SH NOTES
-.sp
 .LP
 Some server systems have key switches with a \fBsecure\fR key position that can
 be read by system software. This key position overrides the normal default of

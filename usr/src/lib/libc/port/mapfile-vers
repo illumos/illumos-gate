@@ -77,6 +77,17 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.26 {	# fts(3) LFS
+$if lf64
+    protected:
+	fts_children64;
+	fts_close64;
+	fts_open64;
+	fts_read64;
+	fts_set64;
+$endif
+} ILLUMOS_0.25;
+
 SYMBOL_VERSION ILLUMOS_0.25 {	# inet_* moved from libnsl/libsocket
     protected:
 	inet_addr;

@@ -339,6 +339,7 @@ SYSOBJS=			\
 PORTGEN64=			\
 	_xftw64.o		\
 	attropen64.o		\
+	fts64.o			\
 	ftw64.o			\
 	mkstemp64.o		\
 	nftw64.o		\
