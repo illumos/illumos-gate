@@ -406,6 +406,7 @@
 	movq	%rax, REG_OFF(KDIREG_CR3)(%rsp)
 
 	movq	REG_OFF(KDIREG_SS)(%rsp), %rax
+	movq	%rax, REG_OFF(KDIREG_SAVPC)(%rsp)
 	xchgq	REG_OFF(KDIREG_RIP)(%rsp), %rax
 	movq	%rax, REG_OFF(KDIREG_SS)(%rsp)
 
@@ -426,6 +427,11 @@
 
 	movq	REG_OFF(KDIREG_RIP)(%rsp), %rcx
 	ADD_CRUMB(%rax, KRM_PC, %rcx, %rdx)
+	movq	REG_OFF(KDIREG_RSP)(%rsp), %rcx
+	ADD_CRUMB(%rax, KRM_SP, %rcx, %rdx)
+	ADD_CRUMB(%rax, KRM_TRAPNO, $-1, %rdx)
+
+	movq    $KDI_CPU_STATE_SLAVE, KRS_CPU_STATE(%rax)
 
 	pushq	%rax
 	jmp	kdi_save_common_state
