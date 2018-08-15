@@ -187,7 +187,16 @@ extern "C" {
 /*
  * AMD uses %ebx for some of their features (extended function 0x80000008).
  */
-#define	CPUID_AMD_EBX_ERR_PTR_ZERO	0x00000004 /* AMD: FP Err. Ptr. Zero */
+#define	CPUID_AMD_EBX_ERR_PTR_ZERO	0x000000004 /* AMD: FP Err. Ptr. Zero */
+#define	CPUID_AMD_EBX_IBPB		0x000001000 /* AMD: IBPB */
+#define	CPUID_AMD_EBX_IBRS		0x000004000 /* AMD: IBRS */
+#define	CPUID_AMD_EBX_STIBP		0x000008000 /* AMD: STIBP */
+#define	CPUID_AMD_EBX_IBRS_ALL		0x000010000 /* AMD: Enhanced IBRS */
+#define	CPUID_AMD_EBX_STIBP_ALL		0x000020000 /* AMD: STIBP ALL */
+#define	CPUID_AMD_EBX_PREFER_IBRS	0x000040000 /* AMD: Don't retpoline */
+#define	CPUID_AMD_EBX_SSBD		0x001000000 /* AMD: SSBD */
+#define	CPUID_AMD_EBX_VIRT_SSBD		0x002000000 /* AMD: VIRT SSBD */
+#define	CPUID_AMD_EBX_SSB_NO		0x004000000 /* AMD: SSB Fixed */
 
 /*
  * Intel now seems to have claimed part of the "extended" function
@@ -243,6 +252,10 @@ extern "C" {
 
 #define	CPUID_INTC_EDX_7_0_AVX5124NNIW	0x00000004	/* AVX512 4NNIW */
 #define	CPUID_INTC_EDX_7_0_AVX5124FMAPS	0x00000008	/* AVX512 4FMAPS */
+#define	CPUID_INTC_EDX_7_0_SPEC_CTRL	0x04000000	/* Spec, IBPB, IBRS */
+#define	CPUID_INTC_EDX_7_0_STIBP	0x08000000	/* STIBP */
+#define	CPUID_INTC_EDX_7_0_ARCH_CAPS	0x20000000	/* IA32_ARCH_CAPS */
+#define	CPUID_INTC_EDX_7_0_SSBD		0x80000000	/* SSBD */
 
 #define	CPUID_INTC_EDX_7_0_ALL_AVX512 \
 	(CPUID_INTC_EDX_7_0_AVX5124NNIW | CPUID_INTC_EDX_7_0_AVX5124FMAPS)
@@ -333,6 +346,26 @@ extern "C" {
 #define	MSR_PRP4_LBSTK_TO_13	0x6cd
 #define	MSR_PRP4_LBSTK_TO_14	0x6ce
 #define	MSR_PRP4_LBSTK_TO_15	0x6cf
+
+/*
+ * Intel IA32_ARCH_CAPABILITIES MSR.
+ */
+#define	MSR_IA32_ARCH_CAPABILITIES	0x10a
+#define	IA32_ARCH_CAP_RDCL_NO		0x0001
+#define	IA32_ARCH_CAP_IBRS_ALL		0x0002
+#define	IA32_ARCH_CAP_RSBA		0x0004
+#define	IA32_ARCH_CAP_SSB_NO		0x0010
+
+/*
+ * Intel Speculation related MSRs
+ */
+#define	MSR_IA32_SPEC_CTRL	0x48
+#define	IA32_SPEC_CTRL_IBRS	0x01
+#define	IA32_SPEC_CTRL_STIBP	0x02
+#define	IA32_SPEC_CTRL_SSBD	0x04
+
+#define	MSR_IA32_PRED_CMD	0x49
+#define	IA32_PRED_CMD_IBPB	0x01
 
 #define	MCI_CTL_VALUE		0xffffffff
 
@@ -436,6 +469,16 @@ extern "C" {
 #define	X86FSET_OSPKE		68
 #define	X86FSET_PCID		69
 #define	X86FSET_INVPCID		70
+#define	X86FSET_IBRS		71
+#define	X86FSET_IBPB		72
+#define	X86FSET_STIBP		73
+#define	X86FSET_SSBD		74
+#define	X86FSET_SSBD_VIRT	75
+#define	X86FSET_RDCL_NO		76
+#define	X86FSET_IBRS_ALL	77
+#define	X86FSET_RSBA		78
+#define	X86FSET_SSB_NO		79
+#define	X86FSET_STIBP_ALL	80
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -705,7 +748,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	71
+#define	NUM_X86_FEATURES	81
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -818,6 +861,8 @@ extern void cpuid_pass3(struct cpu *);
 extern void cpuid_pass4(struct cpu *, uint_t *);
 extern void cpuid_set_cpu_properties(void *, processorid_t,
     struct cpuid_info *);
+extern void cpuid_pass_ucode(struct cpu *, uchar_t *);
+extern void cpuid_post_ucodeadm(void);
 
 extern void cpuid_get_addrsize(struct cpu *, uint_t *, uint_t *);
 extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);

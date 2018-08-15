@@ -59,6 +59,7 @@
 #include <sys/pci_cfgspace.h>
 #include <sys/comm_page.h>
 #include <sys/mach_mmu.h>
+#include <sys/ucode.h>
 #include <sys/tsc.h>
 
 #ifdef __xpv
@@ -207,6 +208,16 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"ospke",
 	"pcid",
 	"invpcid",
+	"ibrs",
+	"ibpb",
+	"stibp",
+	"ssbd",
+	"ssbd_virt",
+	"rdcl_no",
+	"ibrs_all",
+	"rsba",
+	"ssb_no",
+	"stibp_all"
 };
 
 boolean_t
@@ -970,6 +981,86 @@ cpuid_amd_getids(cpu_t *cpu)
 	    cpi->cpi_procnodeid / cpi->cpi_procnodes_per_pkg;
 }
 
+static void
+cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	if (cpi->cpi_vendor == X86_VENDOR_AMD &&
+	    cpi->cpi_xmaxeax >= 0x80000008) {
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_IBPB)
+			add_x86_feature(featureset, X86FSET_IBPB);
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_IBRS)
+			add_x86_feature(featureset, X86FSET_IBRS);
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_STIBP)
+			add_x86_feature(featureset, X86FSET_STIBP);
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_IBRS_ALL)
+			add_x86_feature(featureset, X86FSET_IBRS_ALL);
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_STIBP_ALL)
+			add_x86_feature(featureset, X86FSET_STIBP_ALL);
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_PREFER_IBRS)
+			add_x86_feature(featureset, X86FSET_RSBA);
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_SSBD)
+			add_x86_feature(featureset, X86FSET_SSBD);
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_VIRT_SSBD)
+			add_x86_feature(featureset, X86FSET_SSBD_VIRT);
+		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_SSB_NO)
+			add_x86_feature(featureset, X86FSET_SSB_NO);
+	} else if (cpi->cpi_vendor == X86_VENDOR_Intel &&
+	    cpi->cpi_maxeax >= 7) {
+		struct cpuid_regs *ecp;
+		ecp = &cpi->cpi_std[7];
+
+		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_SPEC_CTRL) {
+			add_x86_feature(featureset, X86FSET_IBRS);
+			add_x86_feature(featureset, X86FSET_IBPB);
+		}
+
+		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_STIBP) {
+			add_x86_feature(featureset, X86FSET_STIBP);
+		}
+
+		/*
+		 * Don't read the arch caps MSR on xpv where we lack the
+		 * on_trap().
+		 */
+#ifndef __xpv
+		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_ARCH_CAPS) {
+			on_trap_data_t otd;
+
+			/*
+			 * Be paranoid and assume we'll get a #GP.
+			 */
+			if (!on_trap(&otd, OT_DATA_ACCESS)) {
+				uint64_t reg;
+
+				reg = rdmsr(MSR_IA32_ARCH_CAPABILITIES);
+				if (reg & IA32_ARCH_CAP_RDCL_NO) {
+					add_x86_feature(featureset,
+					    X86FSET_RDCL_NO);
+				}
+				if (reg & IA32_ARCH_CAP_IBRS_ALL) {
+					add_x86_feature(featureset,
+					    X86FSET_IBRS_ALL);
+				}
+				if (reg & IA32_ARCH_CAP_RSBA) {
+					add_x86_feature(featureset,
+					    X86FSET_RSBA);
+				}
+				if (reg & IA32_ARCH_CAP_SSB_NO) {
+					add_x86_feature(featureset,
+					    X86FSET_SSB_NO);
+				}
+			}
+			no_trap();
+		}
+#endif	/* !__xpv */
+
+		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_SSBD)
+			add_x86_feature(featureset, X86FSET_SSBD);
+	}
+}
+
 /*
  * Setup XFeature_Enabled_Mask register. Required by xsave feature.
  */
@@ -1292,6 +1383,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		ecp->cp_eax = 7;
 		ecp->cp_ecx = 0;
 		(void) __cpuid_insn(ecp);
+
 		/*
 		 * If XSAVE has been disabled, just ignore all of the
 		 * extended-save-area dependent flags here.
@@ -1914,6 +2006,11 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		}
 	}
 
+	/*
+	 * Check the processor leaves that are used for security features.
+	 */
+	cpuid_scan_security(cpu, featureset);
+
 pass1_done:
 	cpi->cpi_pass = 1;
 }
@@ -1951,6 +2048,12 @@ cpuid_pass2(cpu_t *cpu)
 		cp->cp_eax = n;
 
 		/*
+		 * n == 7 was handled in pass 1
+		 */
+		if (n == 7)
+			continue;
+
+		/*
 		 * CPUID function 4 expects %ecx to be initialized
 		 * with an index which indicates which cache to return
 		 * information about. The OS is expected to call function 4
@@ -1964,10 +2067,8 @@ cpuid_pass2(cpu_t *cpu)
 		 *
 		 * Note: we need to explicitly initialize %ecx here, since
 		 * function 4 may have been previously invoked.
-		 *
-		 * The same is all true for CPUID function 7.
 		 */
-		if (n == 4 || n == 7)
+		if (n == 4)
 			cp->cp_ecx = 0;
 
 		(void) __cpuid_insn(cp);
@@ -5243,4 +5344,147 @@ cpuid_get_ext_topo(uint_t vendor, uint_t *core_nbits, uint_t *strand_nbits)
 			}
 		}
 	}
+}
+
+void
+cpuid_pass_ucode(cpu_t *cpu, uchar_t *fset)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+	struct cpuid_regs cp;
+
+	/*
+	 * Reread the CPUID portions that we need for various security
+	 * information.
+	 */
+	if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+		/*
+		 * Check if we now have leaf 7 available to us.
+		 */
+		if (cpi->cpi_maxeax < 7) {
+			bzero(&cp, sizeof (cp));
+			cp.cp_eax = 0;
+			cpi->cpi_maxeax = __cpuid_insn(&cp);
+			if (cpi->cpi_maxeax < 7)
+				return;
+		}
+
+		bzero(&cp, sizeof (cp));
+		cp.cp_eax = 7;
+		cp.cp_ecx = 0;
+		(void) __cpuid_insn(&cp);
+		cpi->cpi_std[7] = cp;
+	} else if (cpi->cpi_vendor == X86_VENDOR_AMD) {
+		/* No xcpuid support */
+		if (cpi->cpi_family < 5 ||
+		    (cpi->cpi_family == 5 && cpi->cpi_model < 1))
+			return;
+
+		if (cpi->cpi_xmaxeax < 0x80000008) {
+			bzero(&cp, sizeof (cp));
+			cp.cp_eax = 0x80000000;
+			cpi->cpi_xmaxeax = __cpuid_insn(&cp);
+			if (cpi->cpi_xmaxeax < 0x80000008) {
+				return;
+			}
+		}
+
+		bzero(&cp, sizeof (cp));
+		cp.cp_eax = 0x80000008;
+		(void) __cpuid_insn(&cp);
+		platform_cpuid_mangle(cpi->cpi_vendor, 0x80000008, &cp);
+		cpi->cpi_extd[8] = cp;
+	} else {
+		/*
+		 * Nothing to do here. Return an empty set which has already
+		 * been zeroed for us.
+		 */
+		return;
+	}
+	cpuid_scan_security(cpu, fset);
+}
+
+/* ARGSUSED */
+static int
+cpuid_post_ucodeadm_xc(xc_arg_t arg0, xc_arg_t arg1, xc_arg_t arg2)
+{
+	uchar_t *fset;
+
+	fset = (uchar_t *)(arg0 + sizeof (x86_featureset) * CPU->cpu_id);
+	cpuid_pass_ucode(CPU, fset);
+
+	return (0);
+}
+
+/*
+ * After a microcode update where the version has changed, then we need to
+ * rescan CPUID. To do this we check every CPU to make sure that they have the
+ * same microcode. Then we perform a cross call to all such CPUs. It's the
+ * caller's job to make sure that no one else can end up doing an update while
+ * this is going on.
+ *
+ * We assume that the system is microcode capable if we're called.
+ */
+void
+cpuid_post_ucodeadm(void)
+{
+	uint32_t rev;
+	int i;
+	struct cpu *cpu;
+	cpuset_t cpuset;
+	void *argdata;
+	uchar_t *f0;
+
+	argdata = kmem_zalloc(sizeof (x86_featureset) * NCPU, KM_SLEEP);
+
+	mutex_enter(&cpu_lock);
+	cpu = cpu_get(0);
+	rev = cpu->cpu_m.mcpu_ucode_info->cui_rev;
+	CPUSET_ONLY(cpuset, 0);
+	for (i = 1; i < max_ncpus; i++) {
+		if ((cpu = cpu_get(i)) == NULL)
+			continue;
+
+		if (cpu->cpu_m.mcpu_ucode_info->cui_rev != rev) {
+			panic("post microcode update CPU %d has differing "
+			    "microcode revision (%u) from CPU 0 (%u)",
+			    i, cpu->cpu_m.mcpu_ucode_info->cui_rev, rev);
+		}
+		CPUSET_ADD(cpuset, i);
+	}
+
+	kpreempt_disable();
+	xc_sync((xc_arg_t)argdata, 0, 0, CPUSET2BV(cpuset),
+	    cpuid_post_ucodeadm_xc);
+	kpreempt_enable();
+
+	/*
+	 * OK, now look at each CPU and see if their feature sets are equal.
+	 */
+	f0 = argdata;
+	for (i = 1; i < max_ncpus; i++) {
+		uchar_t *fset;
+		if (!CPU_IN_SET(cpuset, i))
+			continue;
+
+		fset = (uchar_t *)((uintptr_t)argdata +
+		    sizeof (x86_featureset) * i);
+
+		if (!compare_x86_featureset(f0, fset)) {
+			panic("Post microcode update CPU %d has "
+			    "differing security feature (%p) set from CPU 0 "
+			    "(%p), not appending to feature set", i,
+			    (void *)fset, (void *)f0);
+		}
+	}
+
+	mutex_exit(&cpu_lock);
+
+	for (i = 0; i < NUM_X86_FEATURES; i++) {
+		cmn_err(CE_CONT, "?post-ucode x86_feature: %s\n",
+		    x86_feature_names[i]);
+		if (is_x86_feature(f0, i)) {
+			add_x86_feature(x86_featureset, i);
+		}
+	}
+	kmem_free(argdata, sizeof (x86_featureset) * NCPU);
 }

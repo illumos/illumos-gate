@@ -1145,8 +1145,11 @@ ucode_update(uint8_t *ucodep, int size)
 
 	mutex_exit(&cpu_lock);
 
-	if (!found)
+	if (!found) {
 		rc = search_rc;
+	} else if (rc == EM_OK) {
+		cpuid_post_ucodeadm();
+	}
 
 	return (rc);
 }
