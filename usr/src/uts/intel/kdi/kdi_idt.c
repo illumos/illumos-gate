@@ -88,6 +88,9 @@
 #define	KDI_IDT_DTYPE_KERNEL	0
 #define	KDI_IDT_DTYPE_BOOT	1
 
+/* Solely to keep kdiregs_t in the CTF, otherwise unused. */
+kdiregs_t kdi_regs;
+
 kdi_cpusave_t *kdi_cpusave;
 int kdi_ncpusave;
 

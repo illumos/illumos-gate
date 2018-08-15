@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The main CPU-control loops, used to control masters and slaves.
@@ -248,7 +247,7 @@ kaif_slave_loop(kaif_cpusave_t *cpusave)
 		} else if (slavecmd == KAIF_SLAVE_CMD_ACK) {
 			cpusave->krs_cpu_acked = 1;
 		} else if (cpusave->krs_cpu_acked &&
-			slavecmd == KAIF_SLAVE_CMD_SPIN) {
+		    slavecmd == KAIF_SLAVE_CMD_SPIN) {
 			cpusave->krs_cpu_acked = 0;
 #endif
 		}
@@ -292,13 +291,31 @@ kaif_main_loop(kaif_cpusave_t *cpusave)
 	int cmd;
 
 	if (kaif_master_cpuid == KAIF_MASTER_CPUID_UNSET) {
+
+		/*
+		 * Special case: Unload requested before first debugger entry.
+		 * Don't stop the world, as there's nothing to clean up that
+		 * can't be handled by the running kernel.
+		 */
 		if (!kmdb_dpi_resume_requested &&
 		    kmdb_kdi_get_unload_request()) {
-			/*
-			 * Special case: Unload requested before first debugger
-			 * entry.  Don't stop the world, as there's nothing to
-			 * clean up that can't be handled by the running kernel.
-			 */
+			cpusave->krs_cpu_state = KAIF_CPU_STATE_NONE;
+			return (KAIF_CPU_CMD_RESUME);
+		}
+
+		/*
+		 * We're a slave with no master, so just resume.  This can
+		 * happen if, prior to this, two CPUs both raced through
+		 * kdi_cmnint() - for example, a breakpoint on a frequently
+		 * called function.  The loser will be redirected to the slave
+		 * loop; note that the event itself is lost at this point.
+		 *
+		 * The winner will then cross-call that slave, but it won't
+		 * actually be received until the slave returns to the kernel
+		 * and enables interrupts.  We'll then come back in via
+		 * kdi_slave_entry() and hit this path.
+		 */
+		if (cpusave->krs_cpu_state == KAIF_CPU_STATE_SLAVE) {
 			cpusave->krs_cpu_state = KAIF_CPU_STATE_NONE;
 			return (KAIF_CPU_CMD_RESUME);
 		}
