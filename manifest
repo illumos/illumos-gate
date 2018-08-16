@@ -1764,7 +1764,6 @@ f lib/svc/method/svc-stmf 0555 root sys
 f lib/svc/method/svc-syseventd 0555 root sys
 f lib/svc/method/svc-tnd 0555 root sys
 f lib/svc/method/svc-utmpd 0555 root bin
-f lib/svc/method/svc-varpd 0555 root sys
 f lib/svc/method/svc-vrrp 0555 root sys
 f lib/svc/method/svc-zones 0555 root sys
 f lib/svc/method/system-log 0555 root bin

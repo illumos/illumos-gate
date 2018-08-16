@@ -16,7 +16,6 @@
 PROG= varpd
 OBJS = varpd.o
 SRCS = $(OBJS:%.o=../%.c)
-SVCMETHOD = svc-varpd
 MANIFEST = varpd.xml
 ROOTLIBVARPD = $(ROOTLIB)/varpd
 ROOTLIBVARPDPROG=	$(PROG:%=$(ROOTLIBVARPD)/%)
@@ -63,7 +62,7 @@ check: $(CHKMANIFEST)
 clobber: clean
 	$(RM) $(PROG)
 
-install: $(PROG) $(ROOTLIBVARPDPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+install: $(PROG) $(ROOTLIBVARPDPROG) $(ROOTMANIFEST)
 
 $(ROOTLIBVARPD):
 	$(INS.dir)

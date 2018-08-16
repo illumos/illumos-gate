@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015 Joyent, Inc.
+ * Copyright (c) 2018 Joyent, Inc.
  */
 
 /*
@@ -60,9 +60,9 @@
 #include <priv.h>
 #include <libscf.h>
 
-#define	VARPD_EXIT_REQUESTED	0
-#define	VARPD_EXIT_FATAL	1
-#define	VARPD_EXIT_USAGE	2
+#define	VARPD_EXIT_REQUESTED	SMF_EXIT_OK
+#define	VARPD_EXIT_FATAL	SMF_EXIT_ERR_FATAL
+#define	VARPD_EXIT_USAGE	SMF_EXIT_ERR_CONFIG
 
 #define	VARPD_RUNDIR	"/var/run/varpd"
 #define	VARPD_DEFAULT_DOOR	"/var/run/varpd/varpd.door"

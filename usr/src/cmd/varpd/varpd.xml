@@ -10,7 +10,7 @@ A full copy of the text of the CDDL should have accompanied this
 source.  A copy of the CDDL is also available via the Internet at
 http://www.illumos.org/license/CDDL.
 
-Copyright 2015, Joyent, Inc.
+Copyright 2018, Joyent, Inc.
 -->
 
 <service_bundle type="manifest" name="illumos:varpd" >
@@ -28,10 +28,17 @@ Copyright 2015, Joyent, Inc.
 			<service_fmri value="svc:/network/physical:default" />
 		</dependency>
 
+		<dependency name="varpd-device-local"
+			grouping="require_all"
+			restart_on="none"
+			type="service">
+			<service_fmri value="svc:/system/device/local:default" />
+		</dependency>
+
 		<exec_method
 			type="method"
 			name="start"
-			exec="/lib/svc/method/svc-varpd"
+			exec="/usr/lib/varpd/varpd"
 			timeout_seconds="60" />
 
 		<exec_method
