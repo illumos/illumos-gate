@@ -43,7 +43,7 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH SENDTO 3XNET "Nov 1, 2003"
+.TH SENDTO 3XNET "Aug 16, 2018"
 .SH NAME
 sendto \- send a message on a socket
 .SH SYNOPSIS
@@ -142,6 +142,16 @@ Terminates a record (if supported by the protocol)
 .RS 11n
 Sends out-of-band data on sockets that support out-of-band data. The
 significance and semantics of out-of-band data are protocol-specific.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBMSG_NOSIGNAL\fR\fR
+.ad
+.RS 11n
+Don't generate the \fBSIGPIPE\fR signal when a stream-oriented socket is no
+longer connected.
 .RE
 
 .RE
@@ -281,7 +291,8 @@ or more of the values set in \fIflags\fR.
 .RS 16n
 The socket is shut down for writing, or the socket is connection-mode and is no
 longer connected. In the latter case, and if the socket is of type
-\fBSOCK_STREAM\fR, the \fBSIGPIPE\fR signal is generated to the calling thread.
+\fBSOCK_STREAM\fR, the \fBSIGPIPE\fR signal is generated to the calling thread
+unless the \fBMSG_NOSIGNAL\fR flag is set.
 .RE
 
 .sp
