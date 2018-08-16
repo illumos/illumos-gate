@@ -91,6 +91,8 @@ static int nbdinfo = 0;
 
 #define	BD(dev)		(bdinfo[(dev)->dd.d_unit])
 
+static void bd_io_workaround(struct disk_devdesc *dev);
+
 static int bd_io(struct disk_devdesc *, daddr_t, int, caddr_t, int);
 static int bd_int13probe(struct bdinfo *bd);
 
@@ -648,6 +650,14 @@ bd_chs_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 	return (0);
 }
 
+static void
+bd_io_workaround(struct disk_devdesc *dev)
+{
+	uint8_t buf[8 * 1024];
+
+	bd_edd_io(dev, 0xffffffff, 1, (caddr_t)buf, 0);
+}
+
 static int
 bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
     int dowrite)
@@ -659,9 +669,18 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 		return (-1);
 
 	/*
+	 * Workaround for a problem with some HP ProLiant BIOS failing to work
+	 * out the boot disk after installation. hrs and kuriyama discovered
+	 * this problem with an HP ProLiant DL320e Gen 8 with a 3TB HDD, and
+	 * discovered that an int13h call seems to cause a buffer overrun in
+	 * the bios. The problem is alleviated by doing an extra read before
+	 * the buggy read. It is not immediately known whether other models
+	 * are similarly affected.
 	 * Loop retrying the operation a couple of times.  The BIOS
 	 * may also retry.
 	 */
+	if (dowrite == 0 && dblk >= 0x100000000)
+		bd_io_workaround(dev);
 	for (retry = 0; retry < 3; retry++) {
 		/* if retrying, reset the drive */
 		if (retry > 0) {
