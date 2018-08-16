@@ -13417,8 +13417,8 @@ s usr/share/man/man3c/mbsnrtowcs.3c=mbsrtowcs.3c
 s usr/share/man/man3c/mbsnrtowcs_l.3c=mbsrtowcs.3c
 f usr/share/man/man3c/mbsrtowcs.3c 0444 root bin
 s usr/share/man/man3c/mbsrtowcs_l.3c=mbsrtowcs.3c
-s usr/share/man/man3c/mbstowcs.3c=mbsrtowcs.3c
-s usr/share/man/man3c/mbstowcs_l.3c=mbsrtowcs.3c
+f usr/share/man/man3c/mbstowcs.3c 0444 root bin
+s usr/share/man/man3c/mbstowcs_l.3c=mbstowcs.3c
 f usr/share/man/man3c/mbtowc.3c 0444 root bin
 s usr/share/man/man3c/mbtowc_l.3c=mbtowc.3c
 s usr/share/man/man3c/memalign.3c=malloc.3c
