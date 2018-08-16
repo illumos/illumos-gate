@@ -301,9 +301,8 @@ bd_print(int verbose)
 		    ('C' + bdinfo[i].bd_unit - 0x80),
 		    (uintmax_t)bdinfo[i].bd_sectors,
 		    bdinfo[i].bd_sectorsize);
-		ret = pager_output(line);
-		if (ret != 0)
-			return (ret);
+		if ((ret = pager_output(line)) != 0)
+			break;
 
 		dev.dd.d_dev = &biosdisk;
 		dev.dd.d_unit = i;
@@ -312,11 +311,11 @@ bd_print(int verbose)
 		if (disk_open(&dev,
 		    bdinfo[i].bd_sectorsize * bdinfo[i].bd_sectors,
 		    bdinfo[i].bd_sectorsize) == 0) {
-			sprintf(line, "    disk%d", i);
+			snprintf(line, sizeof (line), "    disk%d", i);
 			ret = disk_print(&dev, line, verbose);
 			disk_close(&dev);
 			if (ret != 0)
-				return (ret);
+				break;
 		}
 	}
 	return (ret);
@@ -437,7 +436,6 @@ bd_strategy(void *devdata, int rw, daddr_t dblk, size_t size,
 	bcd.dv_strategy = bd_realstrategy;
 	bcd.dv_devdata = devdata;
 	bcd.dv_cache = BD(dev).bd_bcache;
-
 	return (bcache_strategy(&bcd, rw, dblk + dev->d_offset, size,
 	    buf, rsize));
 }
