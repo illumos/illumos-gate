@@ -475,7 +475,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 	 * while translating block count to bytes.
 	 */
 	if (size > INT_MAX) {
-		DEBUG("requested read: %zu too large", size);
+		DEBUG("too large I/O: %zu bytes", size);
 		return (EIO);
 	}
 
@@ -511,7 +511,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 	if (dblk + blks >= dev->d_offset + disk_blocks) {
 		blks = dev->d_offset + disk_blocks - dblk;
 		size = blks * BD(dev).bd_sectorsize;
-		DEBUG("short read %d", blks);
+		DEBUG("short I/O %d", blks);
 	}
 
 	if (V86_IO_BUFFER_SIZE / BD(dev).bd_sectorsize == 0)
