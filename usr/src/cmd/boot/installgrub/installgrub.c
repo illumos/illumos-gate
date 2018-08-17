@@ -741,8 +741,8 @@ get_start_sector(ig_device_t *device)
 
 		device->start_sector = vtoc->efi_parts[device->slice].p_start;
 		/* GPT doesn't use traditional slice letters */
+		device->partition = device->slice;
 		device->slice = 0xff;
-		device->partition = 0;
 
 		efi_free(vtoc);
 		goto found_part;
