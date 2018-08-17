@@ -57,36 +57,36 @@ tputcfent(struct cfent *ept, FILE *fp)
 	(void) fprintf(fp, pkg_gt("Type: "));
 
 	switch (ept->ftype) {
-	    case 'f':
+	case 'f':
 		(void) fputs(pkg_gt("regular file\n"), fp);
 		break;
 
-	    case 'd':
+	case 'd':
 		(void) fputs(pkg_gt("directory\n"), fp);
 		break;
 
-	    case 'x':
+	case 'x':
 		(void) fputs(pkg_gt("exclusive directory\n"), fp);
 		break;
 
-	    case 'v':
+	case 'v':
 		(void) fputs(pkg_gt("volatile file\n"), fp);
 		break;
 
-	    case 'e':
+	case 'e':
 		(void) fputs(pkg_gt("editted file\n"), fp);
 		break;
 
-	    case 'p':
+	case 'p':
 		(void) fputs(pkg_gt("named pipe\n"), fp);
 		break;
 
-	    case 'i':
+	case 'i':
 		(void) fputs(pkg_gt("installation file\n"), fp);
 		break;
 
-	    case 'c':
-	    case 'b':
+	case 'c':
+	case 'b':
 		(void) fprintf(fp, pkg_gt("%s special device\n"),
 		    (ept->ftype == 'b') ? pkg_gt("block") :
 		    pkg_gt("character"));
@@ -107,21 +107,21 @@ tputcfent(struct cfent *ept, FILE *fp)
 
 		break;
 
-	    case 'l':
+	case 'l':
 		(void) fputs(pkg_gt("linked file\n"), fp);
 		pt = (ept->ainfo.local ? ept->ainfo.local :
 		    (char *)pkg_gt("(unknown)"));
 		(void) fprintf(fp, pkg_gt("Source of link: %s\n"), pt);
 		break;
 
-	    case 's':
+	case 's':
 		(void) fputs(pkg_gt("symbolic link\n"), fp);
 		pt = (ept->ainfo.local ? ept->ainfo.local :
 		    (char *)pkg_gt("(unknown)"));
 		(void) fprintf(fp, pkg_gt("Source of link: %s\n"), pt);
 		break;
 
-	    default:
+	default:
 		(void) fputs(pkg_gt("unknown\n"), fp);
 		break;
 	}
@@ -174,7 +174,7 @@ tputcfent(struct cfent *ept, FILE *fp)
 			 */
 			if (pinfo->status == '!')
 				status++;
-			(void) fprintf(fp, "%-15s", pinfo->pkg);
+			(void) fprintf(fp, "%-14s ", pinfo->pkg);
 			if ((++count % 5) == 0) {
 				(void) fputc('\n', fp);
 				(void) fputc('\t', fp);
