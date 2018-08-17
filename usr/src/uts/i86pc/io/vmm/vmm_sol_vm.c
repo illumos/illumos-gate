@@ -966,6 +966,15 @@ vm_reserve_pages(size_t npages)
 	}
 }
 
+void
+vm_object_clear(vm_object_t vmo)
+{
+	ASSERT(vmo->vmo_type == OBJT_DEFAULT);
+
+	/* XXXJOY: Better zeroing approach? */
+	bzero(vmo->vmo_data, vmo->vmo_size);
+}
+
 vm_object_t
 vm_object_allocate(objtype_t type, vm_pindex_t psize)
 {
@@ -991,8 +1000,7 @@ vm_object_allocate(objtype_t type, vm_pindex_t psize)
 			kmem_free(vmo, sizeof (*vmo));
 			return (NULL);
 		}
-		/* XXXJOY: Better zeroing approach? */
-		bzero(vmo->vmo_data, size);
+		vm_object_clear(vmo);
 		vmo->vmo_pager = vm_object_pager_heap;
 	}
 		break;
