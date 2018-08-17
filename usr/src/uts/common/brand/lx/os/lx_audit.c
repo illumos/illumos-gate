@@ -862,6 +862,9 @@ lx_audit_syscall_exit(int sysnum, long ret)
 	if (lxzd->lxzd_audit_enabled == LXAE_DISABLED)
 		return;
 
+	if (sysnum >= LX_NSYSCALLS)
+		return;
+
 	asp = lxzd->lxzd_audit_state;
 	ASSERT(asp != NULL);
 
