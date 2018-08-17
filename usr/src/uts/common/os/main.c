@@ -24,10 +24,10 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved		*/
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -145,13 +145,14 @@ char initargs[BOOTARGS_MAX] = "";		/* also referenced by zone0 */
 int
 exec_init(const char *initpath, const char *args)
 {
-	caddr32_t ucp;
-	caddr32_t *uap;
-	caddr32_t *argv;
-	caddr32_t exec_fnamep;
+	uintptr_t ucp;
+	uintptr_t uap;
+	uintptr_t *argv;
+	uintptr_t exec_fnamep;
 	char *scratchargs;
 	int i, sarg;
 	size_t argvlen, alen;
+	size_t wlen = sizeof (uintptr_t);
 	boolean_t in_arg;
 	int argc = 0;
 	int error = 0, count = 0;
@@ -181,7 +182,7 @@ exec_init(const char *initpath, const char *args)
 			in_arg = B_TRUE;
 		}
 	}
-	argvlen = sizeof (caddr32_t) * (argc + 1);
+	argvlen = sizeof (uintptr_t) * (argc + 1);
 	argv = kmem_zalloc(argvlen, KM_SLEEP);
 
 	/*
@@ -199,7 +200,7 @@ exec_init(const char *initpath, const char *args)
 	 *	-0x05 -  <------. |
 	 *	-0x06 \0	| |
 	 *	-0x07 t		| |
-	 *	-0x08 i 	| |
+	 *	-0x08 i		| |
 	 *	-0x09 n		| |
 	 *	-0x0a i  <---.  | |
 	 *	-0x10 NULL   |  | |	(argv[3])
@@ -213,7 +214,7 @@ exec_init(const char *initpath, const char *args)
 	 * stack ptr, and sarg is the string index of the start of the
 	 * argument.
 	 */
-	ucp = (caddr32_t)(uintptr_t)p->p_usrstack;
+	ucp = (uintptr_t)p->p_usrstack;
 
 	argc = 0;
 	in_arg = B_FALSE;
@@ -231,13 +232,33 @@ exec_init(const char *initpath, const char *args)
 			sarg = i;
 		}
 	}
-	ucp -= alen;
-	error |= copyout(scratchargs, (caddr_t)(uintptr_t)ucp, alen);
 
-	uap = (caddr32_t *)P2ALIGN((uintptr_t)ucp, sizeof (caddr32_t));
-	uap--;	/* advance to be below the word we're in */
-	uap -= (argc + 1);	/* advance argc words down, plus one for NULL */
-	error |= copyout(argv, uap, argvlen);
+	exec_fnamep = argv[0];
+
+	ucp -= alen;
+	error |= copyout(scratchargs, (caddr_t)ucp, alen);
+
+	if (p->p_model == DATAMODEL_ILP32) {
+		uintptr32_t *argv32;
+
+		argv32 = kmem_zalloc(argvlen / 2, KM_SLEEP);
+
+		for (i = 0; i < argc; i++)
+			argv32[i] = (uintptr32_t)argv[i];
+
+		kmem_free(argv, argvlen);
+		argv = (uintptr_t *)argv32;
+		argvlen /= 2;
+
+		wlen = sizeof (uintptr32_t);
+	}
+
+	uap = P2ALIGN(ucp, wlen);
+	/* advance to be below the word we're in */
+	uap -= wlen;
+	/* advance argc words down, plus one for NULL */
+	uap -= (argc + 1) * wlen;
+	error |= copyout(argv, (caddr_t)uap, argvlen);
 
 	if (error != 0) {
 		zcmn_err(p->p_zone->zone_id, CE_WARN,
@@ -247,7 +268,6 @@ exec_init(const char *initpath, const char *args)
 		return (EFAULT);
 	}
 
-	exec_fnamep = argv[0];
 	kmem_free(argv, argvlen);
 	kmem_free(scratchargs, alen);
 
@@ -255,8 +275,8 @@ exec_init(const char *initpath, const char *args)
 	 * Point at the arguments.
 	 */
 	lwp->lwp_ap = lwp->lwp_arg;
-	lwp->lwp_arg[0] = (uintptr_t)exec_fnamep;
-	lwp->lwp_arg[1] = (uintptr_t)uap;
+	lwp->lwp_arg[0] = exec_fnamep;
+	lwp->lwp_arg[1] = uap;
 	lwp->lwp_arg[2] = NULL;
 	curthread->t_post_sys = 1;
 	curthread->t_sysnum = SYS_execve;
@@ -270,8 +290,8 @@ exec_init(const char *initpath, const char *args)
 
 	brand_action = ZONE_IS_BRANDED(p->p_zone) ? EBA_BRAND : EBA_NONE;
 again:
-	error = exec_common((const char *)(uintptr_t)exec_fnamep,
-	    (const char **)(uintptr_t)uap, NULL, brand_action);
+	error = exec_common((const char *)exec_fnamep,
+	    (const char **)uap, NULL, brand_action);
 
 	/*
 	 * Normally we would just set lwp_argsaved and t_post_sys and
