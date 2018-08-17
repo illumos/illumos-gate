@@ -76,6 +76,7 @@ LINK		= $(CCLD) $(LINKFLAGS) $(LDFLAGS)
 
 DEFS		= -DHAVE_CONFIG_H -DSOLARIS_NETBOOT
 OPTFLAGS	= -falign-jumps=1 -falign-loops=1 -falign-functions=1
+OPTFLAGS	+= -fno-reorder-functions
 #WARNFLAGS	= -Wall -Wmissing-prototypes -Wunused -Wshadow \
 #		  -Wpointer-arith -Wundef
 
