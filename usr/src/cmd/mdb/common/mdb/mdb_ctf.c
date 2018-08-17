@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <mdb/mdb_ctf.h>
@@ -1236,8 +1236,9 @@ member_cb(const char *name, mdb_ctf_id_t modmid, ulong_t modoff, void *data)
 	    "member %s of type %s", name, mp->m_tgtname);
 
 	if (mdb_ctf_member_info(mp->m_tgtid, name, &tgtoff, &tgtmid) != 0) {
-		mdb_ctf_warn(mp->m_flags,
-		    "could not find %s\n", tgtname);
+		if (mp->m_flags & MDB_CTF_VREAD_IGNORE_ABSENT)
+			return (0);
+		mdb_ctf_warn(mp->m_flags, "could not find %s\n", tgtname);
 		return (set_errno(EMDB_CTFNOMEMB));
 	}
 
@@ -1612,12 +1613,11 @@ vread_helper(mdb_ctf_id_t modid, char *modbuf,
  * Warning: it will therefore only work with enums are only used to store
  * legitimate enum values (not several values or-ed together).
  *
- * By default, if mdb_ctf_vread() can not find any members or enum values,
- * it will print a descriptive message (with mdb_warn()) and fail.
- * Passing MDB_CTF_VREAD_QUIET in 'flags' will suppress the warning message.
- * Additional flags can be used to ignore specific types of translation
- * failure, but should be used with caution, because they will silently leave
- * the caller's buffer uninitialized.
+ * Flags values:
+ *
+ * MDB_CTF_VREAD_QUIET: keep quiet about failures
+ * MDB_CTF_VREAD_IGNORE_ABSENT: ignore any member that couldn't be found in the
+ * target struct; be careful not to use an uninitialized result.
  */
 int
 mdb_ctf_vread(void *modbuf, const char *target_typename,
@@ -1630,6 +1630,7 @@ mdb_ctf_vread(void *modbuf, const char *target_typename,
 	mdb_ctf_id_t tgtid;
 	mdb_ctf_id_t modid;
 	mdb_module_t *mod;
+	int ret;
 
 	if ((mod = mdb_get_module()) == NULL || (mfp = mod->mod_ctfp) == NULL) {
 		mdb_ctf_warn(flags, "no ctf data found for mdb module %s\n",
@@ -1662,15 +1663,20 @@ mdb_ctf_vread(void *modbuf, const char *target_typename,
 		return (-1); /* errno is set for us */
 	}
 
-	tgtbuf = mdb_alloc(size, UM_SLEEP | UM_GC);
+	tgtbuf = mdb_alloc(size, UM_SLEEP);
 
 	if (mdb_vread(tgtbuf, size, addr) < 0) {
 		mdb_ctf_warn(flags, "couldn't read %s from %p\n",
 		    target_typename, addr);
+		mdb_free(tgtbuf, size);
 		return (-1); /* errno is set for us */
 	}
 
-	return (vread_helper(modid, modbuf, tgtid, tgtbuf, NULL, flags));
+	ret = vread_helper(modid, modbuf, tgtid, tgtbuf, NULL, flags);
+
+	mdb_free(tgtbuf, size);
+
+	return (ret);
 }
 
 /*

@@ -24,7 +24,7 @@
  */
 /*
  * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_MDB_CTF_H
@@ -142,6 +142,7 @@ extern ssize_t mdb_ctf_offset_to_name(mdb_ctf_id_t, ulong_t, char *, size_t,
     int, mdb_ctf_id_t *, ulong_t *);
 
 #define	MDB_CTF_VREAD_QUIET		0x100
+#define	MDB_CTF_VREAD_IGNORE_ABSENT	0x200
 
 extern int mdb_ctf_vread(void *, const char *, const char *,
     uintptr_t, uint_t);
