@@ -244,6 +244,7 @@ MANFILES=	__fbufsize.3c					\
 		mbtowc.3c					\
 		membar_ops.3c					\
 		memory.3c					\
+		memset_s.3c					\
 		mkfifo.3c					\
 		mkstemp.3c					\
 		mktemp.3c					\
@@ -413,6 +414,7 @@ MANFILES=	__fbufsize.3c					\
 		sem_unlink.3c					\
 		sem_wait.3c					\
 		semaphore.3c					\
+		set_constraint_handler_s.3c			\
 		setbuf.3c					\
 		setbuffer.3c					\
 		setcat.3c					\
@@ -562,7 +564,7 @@ MANFILES=	__fbufsize.3c					\
 		wordexp.3c					\
 		wsprintf.3c					\
 		wsscanf.3c					\
-		wstring.3c					\
+		wstring.3c
 
 MANLINKS=	FD_CLR.3c				\
 		FD_ISSET.3c				\
@@ -582,6 +584,7 @@ MANLINKS=	FD_CLR.3c				\
 		_exithandle.3c				\
 		_flushlbf.3c				\
 		_setjmp.3c				\
+		abort_handler_s.3c			\
 		addrtosymstr.3c				\
 		aiowrite.3c				\
 		alloca.3c				\
@@ -892,6 +895,7 @@ MANLINKS=	FD_CLR.3c				\
 		htonl.3c				\
 		htonll.3c				\
 		htons.3c				\
+		ignore_handler_s.3c			\
 		inet6.3c				\
 		inet_addr.3c				\
 		inet_aton.3c				\
@@ -2283,6 +2287,9 @@ sema_init.3c				:= LINKSRC = semaphore.3c
 sema_post.3c				:= LINKSRC = semaphore.3c
 sema_trywait.3c				:= LINKSRC = semaphore.3c
 sema_wait.3c				:= LINKSRC = semaphore.3c
+
+abort_handler_s.3c			:= LINKSRC = set_constraint_handler_s.3c
+ignore_handler_s.3c			:= LINKSRC = set_constraint_handler_s.3c
 
 setvbuf.3c				:= LINKSRC = setbuf.3c
 

@@ -12784,6 +12784,7 @@ s usr/share/man/man3c/_setjmp.3c=_longjmp.3c
 f usr/share/man/man3c/_stack_grow.3c 0444 root bin
 f usr/share/man/man3c/a64l.3c 0444 root bin
 f usr/share/man/man3c/abort.3c 0444 root bin
+s usr/share/man/man3c/abort_handler_s.3c=set_constraint_handler_s.3c
 f usr/share/man/man3c/abs.3c 0444 root bin
 s usr/share/man/man3c/addrtosymstr.3c=walkcontext.3c
 f usr/share/man/man3c/addsev.3c 0444 root bin
@@ -13278,6 +13279,7 @@ s usr/share/man/man3c/htons.3c=byteorder.3c
 f usr/share/man/man3c/iconv.3c 0444 root bin
 f usr/share/man/man3c/iconv_close.3c 0444 root bin
 f usr/share/man/man3c/iconv_open.3c 0444 root bin
+s usr/share/man/man3c/ignore_handler_s.3c=set_constraint_handler_s.3c
 f usr/share/man/man3c/imaxabs.3c 0444 root bin
 f usr/share/man/man3c/imaxdiv.3c 0444 root bin
 f usr/share/man/man3c/index.3c 0444 root bin
@@ -13435,6 +13437,7 @@ s usr/share/man/man3c/memmem.3c=memory.3c
 s usr/share/man/man3c/memmove.3c=memory.3c
 f usr/share/man/man3c/memory.3c 0444 root bin
 s usr/share/man/man3c/memset.3c=memory.3c
+f usr/share/man/man3c/memset_s.3c 0444 root bin
 s usr/share/man/man3c/minor.3c=makedev.3c
 s usr/share/man/man3c/mkdtemp.3c=mkstemp.3c
 f usr/share/man/man3c/mkfifo.3c 0444 root bin
@@ -13786,6 +13789,7 @@ s usr/share/man/man3c/setattrat.3c=fgetattr.3c
 f usr/share/man/man3c/setbuf.3c 0444 root bin
 f usr/share/man/man3c/setbuffer.3c 0444 root bin
 f usr/share/man/man3c/setcat.3c 0444 root bin
+f usr/share/man/man3c/set_constraint_handler_s.3c 0444 root bin
 f usr/share/man/man3c/setenv.3c 0444 root bin
 s usr/share/man/man3c/setgrent.3c=getgrnam.3c
 s usr/share/man/man3c/sethostname.3c=gethostname.3c

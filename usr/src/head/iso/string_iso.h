@@ -143,6 +143,22 @@ extern char *strrchr(const char *, int);
 extern char *strstr(const char *, const char *);
 #endif /* __cplusplus >= 199711L */
 
+#if __EXT1_VISIBLE
+
+#ifndef	_RSIZE_T_DEFINED
+#define	_RSIZE_T_DEFINED
+typedef size_t rsize_t;
+#endif
+
+#ifndef	_ERRNO_T_DEFINED
+#define	_ERRNO_T_DEFINED
+typedef int errno_t;
+#endif
+
+/* ISO/IEC 9899:2011 K.3.7.4.1.1 */
+extern errno_t memset_s(void *, rsize_t, int, rsize_t);
+#endif	/* __EXT1_VISIBLE */
+
 #if __cplusplus >= 199711L
 }
 #endif /* end of namespace std */

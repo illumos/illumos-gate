@@ -31,22 +31,26 @@ PROG=	getent
 include ../Makefile.cmd
 
 OBJECTS= \
+	dogetauthattr.o	\
 	dogetethers.o	\
+	dogetexecattr.o	\
 	dogetgr.o	\
 	dogethost.o	\
 	dogetipnodes.o	\
 	dogetnet.o	\
 	dogetnetmask.o	\
+	dogetprofattr.o	\
 	dogetproject.o	\
 	dogetproto.o	\
 	dogetpw.o	\
 	dogetsp.o	\
 	dogetserv.o	\
+	dogetuserattr.o	\
 	getent.o
 
 SRCS=	$(OBJECTS:.o=.c)
 
-LDLIBS	+= -lsocket -lnsl -lproject
+LDLIBS	+= -lsecdb -lsocket -lnsl -lproject
 
 #
 # for message catalog

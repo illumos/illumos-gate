@@ -207,7 +207,7 @@ struct iwn_softc {
 #define	IWN_FLAG_LAZY_RESUME	(1 << 23)
 #define	IWN_FLAG_STOP_CALIB_TO	(1 << 24)
 
-	uint8_t 		hw_type;
+	uint8_t			hw_type;
 
 	struct iwn_ops		ops;
 	const char		*fwname;
@@ -244,7 +244,7 @@ struct iwn_softc {
 	struct iwn_rx_ring	rxq;
 
 	ddi_acc_handle_t	sc_regh;
-	void 			*sc_ih;
+	void			*sc_ih;
 	ddi_acc_handle_t	sc_pcih;
 	uint_t			sc_intr_pri;
 	int			sc_intr_cap;
@@ -400,7 +400,7 @@ struct iwn_ks_txpower {
 		struct {
 			kstat_named_t	rf_gain;
 			kstat_named_t	dsp_gain;
-		} rate[IWN_RIDX_MAX];
+		} rate[IWN_RIDX_MAX + 1];
 	} txchain[2];
 };
 

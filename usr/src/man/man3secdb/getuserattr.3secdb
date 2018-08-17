@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH GETUSERATTR 3SECDB "Mar 31, 2005"
+.TH GETUSERATTR 3SECDB "Aug 13, 2018"
 .SH NAME
 getuserattr, getusernam, getuseruid, free_userattr, setuserattr, enduserattr,
 fgetuserattr \- get user_attr entry
@@ -47,7 +47,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lsecdb  -lsocket  -lnsl [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetuserattr()\fR, \fBgetusernam()\fR, and \fBgetuseruid()\fR functions
 each return a \fBuser_attr\fR(4) entry. Entries can come from any of the
@@ -93,7 +92,6 @@ The \fBenduserattr()\fR function may be called to indicate that \fBuser_attr\fR
 processing is complete; the library may then close any open \fBuser_attr\fR
 file, deallocate any internal storage, and so forth.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetuserattr()\fR function returns a pointer to a \fBuserattr_t\fR if it
 successfully enumerates an entry; otherwise it returns \fINULL\fR, indicating
@@ -103,7 +101,6 @@ the end of the enumeration.
 The \fBgetusernam()\fR function returns a pointer to a \fBuserattr_t\fR if it
 successfully locates the requested entry; otherwise it returns \fINULL\fR.
 .SH USAGE
-.sp
 .LP
 The \fBgetuserattr()\fR and \fBgetusernam()\fR functions both allocate memory
 for the pointers they return. This memory should be deallocated with the
@@ -112,13 +109,11 @@ for the pointers they return. This memory should be deallocated with the
 .LP
 Individual attributes can be referenced in the \fBattr\fR structure by calling
 the \fBkva_match\fR(3SECDB) function.
-.SH WARININGS
-.sp
+.SH WARNINGS
 .LP
-Because the list of legal keys is likely to expand, code  must be written to
+Because the list of legal keys is likely to expand, code must be written to
 ignore unknown key-value pairs without error.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/user_attr\fR\fR
@@ -133,11 +128,10 @@ extended user attributes
 \fB\fB/etc/nsswitch.conf\fR\fR
 .ad
 .RS 22n
-configuration file lookup information for the name server switch
+configuration file lookup information for the name service switch
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -153,7 +147,7 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBgetauthattr\fR(3SECDB), \fBgetexecattr\fR(3SECDB),
-\fBgetprofattr\fR(3SECDB), \fBuser_attr\fR(4), \fBattributes\fR(5)
+\fBgetprofattr\fR(3SECDB), \fBkva_match\fR(3SECDB), \fBuser_attr\fR(4),
+\fBattributes\fR(5)

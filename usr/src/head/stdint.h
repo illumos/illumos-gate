@@ -35,4 +35,11 @@
 
 #include <sys/stdint.h>
 
+#if __EXT1_VISIBLE
+/* ISO/IEC 9899:2011 K.3.4.4 */
+#ifndef	RSIZE_MAX
+#define	RSIZE_MAX (SIZE_MAX >> 1)
+#endif
+#endif	/* __EXT1_VISIBLE */
+
 #endif	/* _STDINT_H */
