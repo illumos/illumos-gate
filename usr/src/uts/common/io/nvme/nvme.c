@@ -324,13 +324,14 @@ static inline int nvme_check_cmd_status(nvme_cmd_t *);
 
 static int nvme_abort_cmd(nvme_cmd_t *, uint_t);
 static void nvme_async_event(nvme_t *);
-static int nvme_format_nvm(nvme_t *, uint32_t, uint8_t, boolean_t, uint8_t,
-    boolean_t, uint8_t);
-static int nvme_get_logpage(nvme_t *, void **, size_t *, uint8_t, ...);
-static int nvme_identify(nvme_t *, uint32_t, void **);
-static int nvme_set_features(nvme_t *, uint32_t, uint8_t, uint32_t,
+static int nvme_format_nvm(nvme_t *, boolean_t, uint32_t, uint8_t, boolean_t,
+    uint8_t, boolean_t, uint8_t);
+static int nvme_get_logpage(nvme_t *, boolean_t, void **, size_t *, uint8_t,
+    ...);
+static int nvme_identify(nvme_t *, boolean_t, uint32_t, void **);
+static int nvme_set_features(nvme_t *, boolean_t, uint32_t, uint8_t, uint32_t,
     uint32_t *);
-static int nvme_get_features(nvme_t *, uint32_t, uint8_t, uint32_t *,
+static int nvme_get_features(nvme_t *, boolean_t, uint32_t, uint8_t, uint32_t *,
     void **, size_t *);
 static int nvme_write_cache_set(nvme_t *, boolean_t);
 static int nvme_set_nqueues(nvme_t *, uint16_t *);
@@ -1494,8 +1495,8 @@ nvme_async_event_task(void *arg)
 	switch (event.b.ae_type) {
 	case NVME_ASYNC_TYPE_ERROR:
 		if (event.b.ae_logpage == NVME_LOGPAGE_ERROR) {
-			(void) nvme_get_logpage(nvme, (void **)&error_log,
-			    &logsize, event.b.ae_logpage);
+			(void) nvme_get_logpage(nvme, B_FALSE,
+			    (void **)&error_log, &logsize, event.b.ae_logpage);
 		} else {
 			dev_err(nvme->n_dip, CE_WARN, "!wrong logpage in "
 			    "async event reply: %d", event.b.ae_logpage);
@@ -1545,8 +1546,9 @@ nvme_async_event_task(void *arg)
 
 	case NVME_ASYNC_TYPE_HEALTH:
 		if (event.b.ae_logpage == NVME_LOGPAGE_HEALTH) {
-			(void) nvme_get_logpage(nvme, (void **)&health_log,
-			    &logsize, event.b.ae_logpage, -1);
+			(void) nvme_get_logpage(nvme, B_FALSE,
+			    (void **)&health_log, &logsize, event.b.ae_logpage,
+			    -1);
 		} else {
 			dev_err(nvme->n_dip, CE_WARN, "!wrong logpage in "
 			    "async event reply: %d", event.b.ae_logpage);
@@ -1623,8 +1625,8 @@ nvme_async_event(nvme_t *nvme)
 }
 
 static int
-nvme_format_nvm(nvme_t *nvme, uint32_t nsid, uint8_t lbaf, boolean_t ms,
-    uint8_t pi, boolean_t pil, uint8_t ses)
+nvme_format_nvm(nvme_t *nvme, boolean_t user, uint32_t nsid, uint8_t lbaf,
+    boolean_t ms, uint8_t pi, boolean_t pil, uint8_t ses)
 {
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
 	nvme_format_nvm_t format_nvm = { 0 };
@@ -1648,6 +1650,12 @@ nvme_format_nvm(nvme_t *nvme, uint32_t nsid, uint8_t lbaf, boolean_t ms,
 	 */
 	if (nsid == (uint32_t)-1)
 		cmd->nc_dontpanic = B_TRUE;
+	/*
+	 * If this format request was initiated by the user, then don't allow a
+	 * programmer error to panic the system.
+	 */
+	if (user)
+		cmd->nc_dontpanic = B_TRUE;
 
 	nvme_admin_cmd(cmd, nvme_format_cmd_timeout);
 
@@ -1662,8 +1670,8 @@ nvme_format_nvm(nvme_t *nvme, uint32_t nsid, uint8_t lbaf, boolean_t ms,
 }
 
 static int
-nvme_get_logpage(nvme_t *nvme, void **buf, size_t *bufsize, uint8_t logpage,
-    ...)
+nvme_get_logpage(nvme_t *nvme, boolean_t user, void **buf, size_t *bufsize,
+    uint8_t logpage, ...)
 {
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
 	nvme_getlogpage_t getlogpage = { 0 };
@@ -1675,6 +1683,9 @@ nvme_get_logpage(nvme_t *nvme, void **buf, size_t *bufsize, uint8_t logpage,
 	cmd->nc_sqid = 0;
 	cmd->nc_callback = nvme_wakeup_cmd;
 	cmd->nc_sqe.sqe_opc = NVME_OPC_GET_LOG_PAGE;
+
+	if (user)
+		cmd->nc_dontpanic = B_TRUE;
 
 	getlogpage.b.lp_lid = logpage;
 
@@ -1756,7 +1767,7 @@ fail:
 }
 
 static int
-nvme_identify(nvme_t *nvme, uint32_t nsid, void **buf)
+nvme_identify(nvme_t *nvme, boolean_t user, uint32_t nsid, void **buf)
 {
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
 	int ret;
@@ -1794,6 +1805,9 @@ nvme_identify(nvme_t *nvme, uint32_t nsid, void **buf)
 		    cmd->nc_dma->nd_cookie.dmac_laddress;
 	}
 
+	if (user)
+		cmd->nc_dontpanic = B_TRUE;
+
 	nvme_admin_cmd(cmd, nvme_admin_cmd_timeout);
 
 	if ((ret = nvme_check_cmd_status(cmd)) != 0) {
@@ -1813,8 +1827,8 @@ fail:
 }
 
 static int
-nvme_set_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t val,
-    uint32_t *res)
+nvme_set_features(nvme_t *nvme, boolean_t user, uint32_t nsid, uint8_t feature,
+    uint32_t val, uint32_t *res)
 {
 	_NOTE(ARGUNUSED(nsid));
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
@@ -1827,6 +1841,9 @@ nvme_set_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t val,
 	cmd->nc_sqe.sqe_opc = NVME_OPC_SET_FEATURES;
 	cmd->nc_sqe.sqe_cdw10 = feature;
 	cmd->nc_sqe.sqe_cdw11 = val;
+
+	if (user)
+		cmd->nc_dontpanic = B_TRUE;
 
 	switch (feature) {
 	case NVME_FEAT_WRITE_CACHE:
@@ -1859,8 +1876,8 @@ fail:
 }
 
 static int
-nvme_get_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t *res,
-    void **buf, size_t *bufsize)
+nvme_get_features(nvme_t *nvme, boolean_t user, uint32_t nsid, uint8_t feature,
+    uint32_t *res, void **buf, size_t *bufsize)
 {
 	nvme_cmd_t *cmd = nvme_alloc_cmd(nvme, KM_SLEEP);
 	int ret = EINVAL;
@@ -1928,6 +1945,9 @@ nvme_get_features(nvme_t *nvme, uint32_t nsid, uint8_t feature, uint32_t *res,
 	default:
 		goto fail;
 	}
+
+	if (user)
+		cmd->nc_dontpanic = B_TRUE;
 
 	if (bufsize != NULL && *bufsize != 0) {
 		if (nvme_zalloc_dma(nvme, *bufsize, DDI_DMA_READ,
@@ -2011,8 +2031,8 @@ nvme_write_cache_set(nvme_t *nvme, boolean_t enable)
 	if (enable)
 		nwc.b.wc_wce = 1;
 
-	return (nvme_set_features(nvme, 0, NVME_FEAT_WRITE_CACHE, nwc.r,
-	    &nwc.r));
+	return (nvme_set_features(nvme, B_FALSE, 0, NVME_FEAT_WRITE_CACHE,
+	    nwc.r, &nwc.r));
 }
 
 static int
@@ -2023,7 +2043,8 @@ nvme_set_nqueues(nvme_t *nvme, uint16_t *nqueues)
 
 	nq.b.nq_nsq = nq.b.nq_ncq = *nqueues - 1;
 
-	ret = nvme_set_features(nvme, 0, NVME_FEAT_NQUEUES, nq.r, &nq.r);
+	ret = nvme_set_features(nvme, B_FALSE, 0, NVME_FEAT_NQUEUES, nq.r,
+	    &nq.r);
 
 	if (ret == 0) {
 		/*
@@ -2188,7 +2209,7 @@ nvme_init_ns(nvme_t *nvme, int nsid)
 
 	ns->ns_nvme = nvme;
 
-	if (nvme_identify(nvme, nsid, (void **)&idns) != 0) {
+	if (nvme_identify(nvme, B_FALSE, nsid, (void **)&idns) != 0) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to identify namespace %d", nsid);
 		return (DDI_FAILURE);
@@ -2444,7 +2465,7 @@ nvme_init(nvme_t *nvme)
 	/*
 	 * Identify Controller
 	 */
-	if (nvme_identify(nvme, 0, (void **)&nvme->n_idctl) != 0) {
+	if (nvme_identify(nvme, B_FALSE, 0, (void **)&nvme->n_idctl) != 0) {
 		dev_err(nvme->n_dip, CE_WARN,
 		    "!failed to identify controller");
 		goto fail;
@@ -3544,7 +3565,7 @@ nvme_ioctl_identify(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nioc->n_len < NVME_IDENTIFY_BUFSIZE)
 		return (EINVAL);
 
-	if ((rv = nvme_identify(nvme, nsid, (void **)&idctl)) != 0)
+	if ((rv = nvme_identify(nvme, B_TRUE, nsid, (void **)&idctl)) != 0)
 		return (rv);
 
 	if (ddi_copyout(idctl, (void *)nioc->n_buf, NVME_IDENTIFY_BUFSIZE, mode)
@@ -3620,7 +3641,7 @@ nvme_ioctl_get_logpage(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 		return (EINVAL);
 	}
 
-	if (nvme_get_logpage(nvme, &log, &bufsize, nioc->n_arg, nsid)
+	if (nvme_get_logpage(nvme, B_TRUE, &log, &bufsize, nioc->n_arg, nsid)
 	    != DDI_SUCCESS)
 		return (EIO);
 
@@ -3712,7 +3733,8 @@ nvme_ioctl_get_features(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc,
 		return (EINVAL);
 	}
 
-	rv = nvme_get_features(nvme, nsid, feature, &res, &buf, &bufsize);
+	rv = nvme_get_features(nvme, B_TRUE, nsid, feature, &res, &buf,
+	    &bufsize);
 	if (rv != 0)
 		return (rv);
 
@@ -3819,8 +3841,8 @@ nvme_ioctl_format(nvme_t *nvme, int nsid, nvme_ioctl_t *nioc, int mode,
 	if (nsid == 0)
 		nsid = (uint32_t)-1;
 
-	return (nvme_format_nvm(nvme, nsid, frmt.b.fm_lbaf, B_FALSE, 0, B_FALSE,
-	    frmt.b.fm_ses));
+	return (nvme_format_nvm(nvme, B_TRUE, nsid, frmt.b.fm_lbaf, B_FALSE, 0,
+	    B_FALSE, frmt.b.fm_ses));
 }
 
 static int
