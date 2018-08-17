@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_SYS_X_CALL_H
@@ -32,6 +33,14 @@ extern "C" {
 #endif
 
 #ifndef _ASM
+
+#define	XC_MSG_FREE	(0)	/* msg in xc_free queue */
+#define	XC_MSG_ASYNC	(1)	/* msg in slave xc_msgbox */
+#define	XC_MSG_CALL	(2)	/* msg in slave xc_msgbox */
+#define	XC_MSG_SYNC	(3)	/* msg in slave xc_msgbox */
+#define	XC_MSG_WAITING	(4)	/* msg in master xc_msgbox or xc_waiters */
+#define	XC_MSG_RELEASED	(5)	/* msg in slave xc_msgbox */
+#define	XC_MSG_DONE	(6)	/* msg in master xc_msgbox */
 
 typedef uintptr_t xc_arg_t;
 typedef int (*xc_func_t)(xc_arg_t, xc_arg_t, xc_arg_t);
@@ -52,13 +61,8 @@ typedef struct xc_data {
  */
 typedef struct xc_msg {
 	uint8_t		xc_command;
-#ifdef __amd64
 	uint16_t	xc_master;
 	uint16_t	xc_slave;
-#else
-	uint8_t		xc_master;
-	uint8_t		xc_slave;
-#endif
 	struct xc_msg	*xc_next;
 } xc_msg_t;
 

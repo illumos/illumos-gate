@@ -22,12 +22,12 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 
 MODULE = unix.so
 MDBTGT = kvm
 
-MODSRCS = unix.c i86mmu.c
+MODSRCS = unix.c i86mmu.c xcall.c
 MODASMSRCS = unix_sup.s
 
 include ../../../../../Makefile.cmd

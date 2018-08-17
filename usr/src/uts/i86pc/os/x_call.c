@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -79,6 +80,20 @@
  * on a different Virtual Address at the same time. The old code required
  * N squared IPIs. With this method, depending on timing, it could happen
  * with just N IPIs.
+ *
+ * Here are the normal transitions for XC_MSG_* values in ->xc_command. A
+ * transition of "->" happens in the slave cpu and "=>" happens in the master
+ * cpu as the messages are passed back and forth.
+ *
+ * FREE => ASYNC ->                       DONE => FREE
+ * FREE => CALL ->                        DONE => FREE
+ * FREE => SYNC -> WAITING => RELEASED -> DONE => FREE
+ *
+ * The interesting one above is ASYNC. You might ask, why not go directly
+ * to FREE, instead of DONE? If it did that, it might be possible to exhaust
+ * the master's xc_free list if a master can generate ASYNC messages faster
+ * then the slave can process them. That could be handled with more complicated
+ * handling. However since nothing important uses ASYNC, I've not bothered.
  */
 
 /*
@@ -90,42 +105,12 @@ uint64_t xc_total_cnt = 0;	/* total #IPIs sent for cross calls */
 uint64_t xc_multi_cnt = 0;	/* # times we piggy backed on another IPI */
 
 /*
- * Values for message states. Here are the normal transitions. A transition
- * of "->" happens in the slave cpu and "=>" happens in the master cpu as
- * the messages are passed back and forth.
- *
- * FREE => ASYNC ->                       DONE => FREE
- * FREE => CALL ->                        DONE => FREE
- * FREE => SYNC -> WAITING => RELEASED -> DONE => FREE
- *
- * The interesing one above is ASYNC. You might ask, why not go directly
- * to FREE, instead of DONE. If it did that, it might be possible to exhaust
- * the master's xc_free list if a master can generate ASYNC messages faster
- * then the slave can process them. That could be handled with more complicated
- * handling. However since nothing important uses ASYNC, I've not bothered.
- */
-#define	XC_MSG_FREE	(0)	/* msg in xc_free queue */
-#define	XC_MSG_ASYNC	(1)	/* msg in slave xc_msgbox */
-#define	XC_MSG_CALL	(2)	/* msg in slave xc_msgbox */
-#define	XC_MSG_SYNC	(3)	/* msg in slave xc_msgbox */
-#define	XC_MSG_WAITING	(4)	/* msg in master xc_msgbox or xc_waiters */
-#define	XC_MSG_RELEASED	(5)	/* msg in slave xc_msgbox */
-#define	XC_MSG_DONE	(6)	/* msg in master xc_msgbox */
-
-/*
  * We allow for one high priority message at a time to happen in the system.
  * This is used for panic, kmdb, etc., so no locking is done.
  */
 static volatile cpuset_t xc_priority_set_store;
 static volatile ulong_t *xc_priority_set = CPUSET2BV(xc_priority_set_store);
 static xc_data_t xc_priority_data;
-
-/*
- * Wrappers to avoid C compiler warnings due to volatile. The atomic bit
- * operations don't accept volatile bit vectors - which is a bit silly.
- */
-#define	XC_BT_SET(vector, b)	BT_ATOMIC_SET((ulong_t *)(vector), (b))
-#define	XC_BT_CLEAR(vector, b)	BT_ATOMIC_CLEAR((ulong_t *)(vector), (b))
 
 /*
  * Decrement a CPU's work count
@@ -190,6 +175,20 @@ xc_extract(xc_msg_t **queue)
 	    old_head);
 	old_head->xc_next = NULL;
 	return (old_head);
+}
+
+/*
+ * Extract the next message from the CPU's queue, and place the message in
+ * .xc_curmsg.  The latter is solely to make debugging (and ::xcall) more
+ * useful.
+ */
+static xc_msg_t *
+xc_get(void)
+{
+	struct machcpu *mcpup = &CPU->cpu_m;
+	xc_msg_t *msg = xc_extract(&mcpup->xc_msgbox);
+	mcpup->xc_curmsg = msg;
+	return (msg);
 }
 
 /*
@@ -328,8 +327,7 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 		/*
 		 * We may have to wait for a message to arrive.
 		 */
-		for (msg = NULL; msg == NULL;
-		    msg = xc_extract(&mcpup->xc_msgbox)) {
+		for (msg = NULL; msg == NULL; msg = xc_get()) {
 
 			/*
 			 * Alway check for and handle a priority message.
@@ -339,7 +337,7 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 				a1 = xc_priority_data.xc_a1;
 				a2 = xc_priority_data.xc_a2;
 				a3 = xc_priority_data.xc_a3;
-				XC_BT_CLEAR(xc_priority_set, CPU->cpu_id);
+				BT_ATOMIC_CLEAR(xc_priority_set, CPU->cpu_id);
 				xc_decrement(mcpup);
 				func(a1, a2, a3);
 				if (mcpup->xc_work_cnt == 0)
@@ -443,6 +441,8 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 			panic("bad message 0x%p in msgbox", (void *)msg);
 			break;
 		}
+
+		CPU->cpu_m.xc_curmsg = NULL;
 	}
 	return (rc);
 }
@@ -581,7 +581,7 @@ xc_priority_common(
 		 * ahead.
 		 */
 		if (BT_TEST(xc_priority_set, c)) {
-			XC_BT_CLEAR(xc_priority_set, c);
+			BT_ATOMIC_CLEAR(xc_priority_set, c);
 			if (cpup->cpu_m.xc_work_cnt > 0)
 				xc_decrement(&cpup->cpu_m);
 		}
@@ -607,7 +607,7 @@ xc_priority_common(
 		    cpup == CPU)
 			continue;
 		(void) xc_increment(&cpup->cpu_m);
-		XC_BT_SET(xc_priority_set, c);
+		BT_ATOMIC_SET(xc_priority_set, c);
 		send_dirint(c, XC_HI_PIL);
 		for (i = 0; i < 10; ++i) {
 			(void) atomic_cas_ptr(&cpup->cpu_m.xc_msgbox,

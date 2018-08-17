@@ -152,7 +152,7 @@ typedef struct cpu_smt {
  *
  * There are CTASSERTs in os/intr.c that verify this all works out.
  */
-#define	MACHCPU_SIZE	(1568 + 688)
+#define	MACHCPU_SIZE	(1568 + 696)
 #define	MACHCPU_PAD	(MMU_PAGESIZE - MACHCPU_SIZE)
 #define	MACHCPU_PAD2	(MMU_PAGESIZE - 16 - 3 * sizeof (struct kpti_frame))
 
@@ -161,6 +161,7 @@ struct	machcpu {
 	 * x_call fields - used for interprocessor cross calls
 	 */
 	struct xc_msg	*xc_msgbox;
+	struct xc_msg	*xc_curmsg;
 	struct xc_msg	*xc_free;
 	xc_data_t	xc_data;
 	uint32_t	xc_wait_cnt;
