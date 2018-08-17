@@ -35,7 +35,7 @@ $(PROG): $(OBJS)
 %.o: $(SRC)/lib/json_nvlist/%.c
 	$(COMPILE.c) $<
 
-%.o: $(SRC)/lib/libcmdutils/common/%.c
+%.o: $(SRC)/lib/libcustr/common/%.c
 	$(COMPILE.c) $<
 
 clean:
