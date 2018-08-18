@@ -57,17 +57,19 @@ static void
 resetseg(uint_t seg)
 {
 	ucontext_t ucp;
-	int done = 0;
+	volatile int done = 0;
 
 	int rc = getcontext(&ucp);
 	if (done) {
-		rc = getcontext(&ucp);
+		(void) getcontext(&ucp);
 		return;
 	}
 
-	done = 1;
-	ucp.uc_mcontext.gregs[seg] = selector;
-	setcontext(&ucp);
+	if (rc == 0) {
+		done = 1;
+		ucp.uc_mcontext.gregs[seg] = selector;
+		setcontext(&ucp);
+	}
 	abort();
 }
 
