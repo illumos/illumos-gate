@@ -19,9 +19,9 @@
  *
  * CDDL HEADER END
  */
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
+ * Copyright (c) 2018 Peter Tribble.
  * Copyright (c) 1994-1999, by Sun Microsystems, Inc.
  */
 
@@ -56,7 +56,7 @@ puthostent(const struct hostent *hp, FILE *fp)
 		if (hp->h_addrtype == AF_INET6) {
 			if (IN6_IS_ADDR_V4MAPPED((struct in6_addr *)*p)) {
 				IN6_V4MAPPED_TO_INADDR((struct in6_addr *)*p,
-							&in4);
+				    &in4);
 				af = AF_INET;
 				addr = &in4;
 			} else {
@@ -99,8 +99,7 @@ dogetipnodes(const char **list)
 	int err_ret;
 
 	if (list == NULL || *list == NULL) {
-		(void) fprintf(stdout,
-				"Enumeration not supported on ipnodes\n");
+		rc = EXC_ENUM_NOT_SUPPORTED;
 	} else {
 		for (; *list != NULL; list++) {
 			if (strchr(*list, ':') != 0) {
@@ -115,11 +114,8 @@ dogetipnodes(const char **list)
 			if (inet_pton(af, *list, addr) == 1)
 				hp = getipnodebyaddr(addr, len, af, &err_ret);
 			else
-				hp = getipnodebyname(
-						*list,
-						AF_INET6,
-						AI_V4MAPPED|AI_ALL,
-						&err_ret);
+				hp = getipnodebyname(*list, AF_INET6,
+				    AI_V4MAPPED|AI_ALL, &err_ret);
 			if (hp == NULL)
 				rc = EXC_NAME_NOT_FOUND;
 			else
