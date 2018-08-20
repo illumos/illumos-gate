@@ -106,7 +106,7 @@ EOF
 enclosure=1
 bay=0
 slot=0
-devctl0='/devices/pci@7c,0/pci8086,2030@0/pci15d9,808@0:devctl'
+devctl0='/devices/pci@7d,0/pci8086,2030@0/pci15d9,808@0:devctl'
 while (( slot <= 7 )); do
   do_sas_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
   (( bay = bay + 1 ))
@@ -114,7 +114,7 @@ while (( slot <= 7 )); do
 done
 
 slot=0
-devctl0='/devices/pci@cc,0/pci8086,2030@0/pci15d9,808@0:devctl'
+devctl0='/devices/pci@cd,0/pci8086,2030@0/pci15d9,808@0:devctl'
 while (( slot <= 7 )); do
   do_sas_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
   (( bay = bay + 1 ))
@@ -122,7 +122,7 @@ while (( slot <= 7 )); do
 done
 
 slot=0
-devctl0='/devices/pci@55,0/pci8086,2030@0/pci15d9,808@0:devctl'
+devctl0='/devices/pci@56,0/pci8086,2030@0/pci15d9,808@0:devctl'
 while (( slot <= 7 )); do
   do_sas_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
   (( bay = bay + 1 ))
