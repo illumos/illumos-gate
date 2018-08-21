@@ -550,7 +550,7 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 		return (-1);
 	}
 
-	if (dnode->ddn_devid != NULL &&
+	if (dnode != NULL && dnode->ddn_devid != NULL &&
 	    disk_add_temp_sensor(mod, dtn, dnode->ddn_devid) != 0) {
 		topo_mod_dprintf(mod, "disk_tnode_create: failed to create "
 		    "temperature sensor node on bay=%d/disk=0",
