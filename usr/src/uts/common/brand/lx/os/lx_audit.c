@@ -1234,6 +1234,9 @@ lx_audit_emit_user_msg(uint_t mtype, uint_t len, char *datap)
 	    lxzd->lxzd_audit_state == NULL)
 		return;
 
+	if (len >= sizeof (msg))
+		len = sizeof (msg) - 1;
+
 	mutex_enter(&p->p_splock);
 	sessid = p->p_sessp->s_sid;
 	mutex_exit(&p->p_splock);
