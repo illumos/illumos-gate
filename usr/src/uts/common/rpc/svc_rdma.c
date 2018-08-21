@@ -22,6 +22,8 @@
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2012 Marcel Telka <marcel@telka.sk>
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -82,7 +84,7 @@ uint32_t rdma_bufs_granted = RDMA_BUFS_GRANT;
  * RDMA transport specific data associated with SVCMASTERXPRT
  */
 struct rdma_data {
-	SVCMASTERXPRT 	*rd_xprt;	/* back ptr to SVCMASTERXPRT */
+	SVCMASTERXPRT	*rd_xprt;	/* back ptr to SVCMASTERXPRT */
 	struct rdma_svc_data rd_data;	/* rdma data */
 	rdma_mod_t	*r_mod;		/* RDMA module containing ops ptr */
 };
@@ -148,7 +150,9 @@ struct svc_ops rdma_svc_ops = {
 	svc_rdma_kclone_destroy,	/* Destroy a clone xprt */
 	svc_rdma_kstart,	/* Tell `ready-to-receive' to rpcmod */
 	svc_rdma_kclone_xprt,	/* Transport specific clone xprt */
-	svc_rdma_ktattrs	/* Get Transport Attributes */
+	svc_rdma_ktattrs,	/* Get Transport Attributes */
+	NULL,			/* Increment transport reference count */
+	NULL			/* Decrement transport reference count */
 };
 
 /*

@@ -24,12 +24,14 @@
  */
 /*
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2012 Marcel Telka <marcel@telka.sk>
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  * Kernel RPC filtering module
@@ -570,7 +572,6 @@ rmm_close(queue_t *q, int flag, cred_t *crp)
 	return ((*((struct temp_slot *)q->q_ptr)->ops->xo_close)(q, flag, crp));
 }
 
-static void rpcmod_release(queue_t *, mblk_t *, bool_t);
 /*
  * rpcmodopen -	open routine gets called when the module gets pushed
  *		onto the stream.
@@ -581,17 +582,7 @@ rpcmodopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 {
 	struct rpcm *rmp;
 
-	extern void (*rpc_rele)(queue_t *, mblk_t *, bool_t);
-
 	TRACE_0(TR_FAC_KRPC, TR_RPCMODOPEN_START, "rpcmodopen_start:");
-
-	/*
-	 * Initialize entry points to release a rpcmod slot (and an input
-	 * message if supplied) and to send an output message to the module
-	 * below rpcmod.
-	 */
-	if (rpc_rele == NULL)
-		rpc_rele = rpcmod_release;
 
 	/*
 	 * Only sufficiently privileged users can use this module, and it
@@ -950,9 +941,20 @@ rpcmodwsrv(queue_t *q)
 	}
 }
 
-/* ARGSUSED */
-static void
-rpcmod_release(queue_t *q, mblk_t *bp, bool_t enable)
+void
+rpcmod_hold(queue_t *q)
+{
+	struct rpcm *rmp = (struct rpcm *)q->q_ptr;
+
+	mutex_enter(&rmp->rm_lock);
+	rmp->rm_ref++;
+	mutex_exit(&rmp->rm_lock);
+}
+
+void
+rpcmod_release(queue_t *q, mblk_t *bp,
+    /* LINTED E_FUNC_ARG_UNUSED */
+    bool_t enable __unused)
 {
 	struct rpcm *rmp;
 
@@ -1005,7 +1007,6 @@ rpcmod_release(queue_t *q, mblk_t *bp, bool_t enable)
 static int	mir_clnt_dup_request(queue_t *q, mblk_t *mp);
 static void	mir_rput_proto(queue_t *q, mblk_t *mp);
 static int	mir_svc_policy_notify(queue_t *q, int event);
-static void	mir_svc_release(queue_t *wq, mblk_t *mp, bool_t);
 static void	mir_svc_start(queue_t *wq);
 static void	mir_svc_idle_start(queue_t *, mir_t *);
 static void	mir_svc_idle_stop(queue_t *, mir_t *);
@@ -1020,7 +1021,6 @@ static	void	mir_disconnect(queue_t *, mir_t *ir);
 static	int	mir_check_len(queue_t *, mblk_t *);
 static	void	mir_timer(void *);
 
-extern void	(*mir_rele)(queue_t *, mblk_t *, bool_t);
 extern void	(*mir_start)(queue_t *);
 extern void	(*clnt_stop_idle)(queue_t *);
 
@@ -1259,8 +1259,6 @@ mir_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	RPCLOG(32, "rpcmod: mir_open of q 0x%p\n", (void *)q);
 	/* Set variables used directly by kRPC. */
-	if (!mir_rele)
-		mir_rele = mir_svc_release;
 	if (!mir_start)
 		mir_start = mir_svc_start;
 	if (!clnt_stop_idle)
@@ -2019,11 +2017,21 @@ mir_svc_start_close(queue_t *wq, mir_t *mir)
 	qenable(wq);
 }
 
+void
+mir_svc_hold(queue_t *wq)
+{
+	mir_t *mir = (mir_t *)wq->q_ptr;
+
+	mutex_enter(&mir->mir_mutex);
+	mir->mir_ref_cnt++;
+	mutex_exit(&mir->mir_mutex);
+}
+
 /*
  * This routine is called directly by kRPC after a request is completed,
  * whether a reply was sent or the request was dropped.
  */
-static void
+void
 mir_svc_release(queue_t *wq, mblk_t *mp, bool_t enable)
 {
 	mir_t   *mir = (mir_t *)wq->q_ptr;

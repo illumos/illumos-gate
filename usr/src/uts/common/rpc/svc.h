@@ -20,7 +20,9 @@
  */
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2012 Marcel Telka <marcel@telka.sk>
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
@@ -189,7 +191,11 @@ struct svc_ops {
 		/* `ready-to-receive' */
 	void	(*xp_clone_xprt)(SVCXPRT *, SVCXPRT *);
 		/* transport specific clone function */
-	void	(*xp_tattrs) (SVCXPRT *, int, void **);
+	void	(*xp_tattrs)(SVCXPRT *, int, void **);
+		/* transport specific hold function */
+	void	(*xp_hold)(queue_t *);
+		/* transport specific release function */
+	void	(*xp_release)(queue_t *, mblk_t *, bool_t);
 };
 
 #define	SVC_TATTR_ADDRMASK	1
@@ -272,7 +278,7 @@ struct __svcpool {
 	kmutex_t	p_thread_lock;		/* Thread lock		  */
 	int		p_asleep;		/* Asleep threads	  */
 	int		p_drowsy;		/* Drowsy flag		  */
-	kcondvar_t 	p_req_cv;		/* svc_poll() sleep var.  */
+	kcondvar_t	p_req_cv;		/* svc_poll() sleep var.  */
 	clock_t		p_timeout;		/* svc_poll() timeout	  */
 	kmutex_t	p_req_lock;		/* Request lock		  */
 	int		p_reqs;			/* Pending requests	  */
@@ -414,8 +420,8 @@ typedef struct __svcxprt_common {
 #define	xp_netid	xp_xpc.xpc_netid
 
 struct __svcmasterxprt {
-	SVCMASTERXPRT 	*xp_next;	/* Next transport in the list	*/
-	SVCMASTERXPRT 	*xp_prev;	/* Prev transport in the list	*/
+	SVCMASTERXPRT	*xp_next;	/* Next transport in the list	*/
+	SVCMASTERXPRT	*xp_prev;	/* Prev transport in the list	*/
 	__SVCXPRT_COMMON xp_xpc;	/* Fields common with the clone	*/
 	SVCPOOL		*xp_pool;	/* Pointer to the pool		*/
 	mblk_t		*xp_req_head;	/* Request queue head		*/
@@ -531,6 +537,14 @@ struct __svcxprt {
 	if ((src_xprt)->xp_ops->xp_clone_xprt) \
 		(*(src_xprt)->xp_ops->xp_clone_xprt) \
 		    (src_xprt, dst_xprt)
+
+#define	SVC_HOLD(xprt) \
+	if ((xprt)->xp_ops->xp_hold) \
+		(*(xprt)->xp_ops->xp_hold)((xprt)->xp_wq)
+
+#define	SVC_RELE(xprt, mp, enable) \
+	if ((xprt)->xp_ops->xp_release) \
+		(*(xprt)->xp_ops->xp_release)((xprt)->xp_wq, (mp), (enable))
 
 #define	SVC_RECV(clone_xprt, mp, msg) \
 	(*(clone_xprt)->xp_ops->xp_recv)((clone_xprt), (mp), (msg))
@@ -728,6 +742,15 @@ extern void	xprt_unregister();
 #endif /* __STDC__ */
 #endif	/* _KERNEL */
 
+#ifdef _KERNEL
+/*
+ * Transport hold and release.
+ */
+extern void rpcmod_hold(queue_t *);
+extern void rpcmod_release(queue_t *, mblk_t *, bool_t);
+extern void mir_svc_hold(queue_t *);
+extern void mir_svc_release(queue_t *, mblk_t *, bool_t);
+#endif /* _KERNEL */
 
 /*
  * When the service routine is called, it must first check to see if it
@@ -903,7 +926,7 @@ extern int	svc_create(void (*)(struct svc_req *, SVCXPRT *),
 				const rpcprog_t, const rpcvers_t,
 				const char *);
 	/*
-	 * 	void (*dispatch)();		-- dispatch routine
+	 *	void (*dispatch)();		-- dispatch routine
 	 *	const rpcprog_t prognum;	-- program number
 	 *	const rpcvers_t versnum;	-- version number
 	 *	const char *nettype;		-- network type
@@ -976,9 +999,9 @@ extern SVCXPRT	*svc_dg_create(const int, const uint_t, const uint_t);
  */
 extern  SVCXPRT	*svc_fd_create(const int, const uint_t, const uint_t);
 	/*
-	 * 	const int fd;			-- open connection end point
-	 * 	const uint_t sendsize;		-- max send size
-	 * 	const uint_t recvsize;		-- max recv size
+	 *	const int fd;			-- open connection end point
+	 *	const uint_t sendsize;		-- max send size
+	 *	const uint_t recvsize;		-- max recv size
 	 */
 
 /*
@@ -993,7 +1016,7 @@ extern SVCXPRT	*svc_door_create(void (*)(struct svc_req *, SVCXPRT *),
 				const rpcprog_t, const rpcvers_t,
 				const uint_t);
 	/*
-	 * 	void (*dispatch)();		-- dispatch routine
+	 *	void (*dispatch)();		-- dispatch routine
 	 *	const rpcprog_t prognum;	-- program number
 	 *	const rpcvers_t versnum;	-- version number
 	 *	const uint_t sendsize;		-- send buffer size
