@@ -43,7 +43,7 @@
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved.
 .\"
-.TH SENDMSG 3XNET "Nov 1, 2003"
+.TH SENDMSG 3XNET "Aug 16, 2018"
 .SH NAME
 sendmsg \- send a message on a socket using a message structure
 .SH SYNOPSIS
@@ -56,7 +56,6 @@ sendmsg \- send a message on a socket using a message structure
 .fi
 
 .SH PARAMETERS
-.sp
 .LP
 The function takes the following arguments:
 .sp
@@ -107,10 +106,19 @@ Sends out-of-band data on sockets that support out-of-bound data. The
 significance and semantics of out-of-band data are protocol-specific.
 .RE
 
+.sp
+.ne 2
+.na
+\fB\fBMSG_NOSIGNAL\fR\fR
+.ad
+.RS 11n
+Don't generate the \fBSIGPIPE\fR signal when a stream-oriented socket is no
+longer connected.
+.RE
+
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsendmsg()\fR function sends a message through a connection-mode or
 connectionless-mode socket.  If the socket is connectionless-mode, the message
@@ -147,18 +155,15 @@ broadcast address for the socket protocol, \fBsendmsg()\fR will fail if the
 The socket in use may require the process to have appropriate privileges to use
 the \fBsendmsg()\fR function.
 .SH USAGE
-.sp
 .LP
 The \fBselect\fR(3C) and \fBpoll\fR(2) functions can be used to determine when
 it is possible to send more data.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBsendmsg()\fR function returns the number of
 bytes sent.  Otherwise, \(mi1 is returned and \fBerrno\fR is set to indicate
 the error.
 .SH ERRORS
-.sp
 .LP
 The \fBsendmsg()\fR function will fail if:
 .sp
@@ -278,8 +283,9 @@ or more of the values set in \fIflags\fR.
 .ad
 .RS 16n
 The socket is shut down for writing, or the socket is connection-mode and is no
-longer connected. In the latter case, and if the socket is of type SOCK_STREAM,
-the \fBSIGPIPE\fR signal is generated to the calling thread.
+longer connected. In the latter case, and if the socket is of type
+\fBSOCK_STREAM\fR, the \fBSIGPIPE\fR signal is generated to the calling thread
+unless the \fBMSG_NOSIGNAL\fR flag is set.
 .RE
 
 .sp
@@ -447,7 +453,6 @@ length exceeds \fIPATH_MAX\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -465,7 +470,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpoll\fR(2) \fBgetsockopt\fR(3XNET), \fBrecv\fR(3XNET),
 \fBrecvfrom\fR(3XNET), \fBrecvmsg\fR(3XNET), \fBselect\fR(3C),
