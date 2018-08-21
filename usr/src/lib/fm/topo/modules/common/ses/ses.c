@@ -1207,6 +1207,9 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 
 	/*
 	 * Skip devices that are not in a present (and possibly damaged) state.
+	 * Also, skip devices that this expander is either not fully wired to,
+	 * or are hidden due to SAS zoning, as indicated by the
+	 * SES_ESC_NO_ACCESS state.
 	 */
 	if (nvlist_lookup_uint64(props, SES_PROP_STATUS_CODE, &status) != 0)
 		return (0);
@@ -1216,7 +1219,6 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	    status != SES_ESC_CRITICAL &&
 	    status != SES_ESC_NONCRITICAL &&
 	    status != SES_ESC_UNRECOVERABLE &&
-	    status != SES_ESC_NO_ACCESS &&
 	    status != SES_ESC_UNKNOWN)
 		return (0);
 
