@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -89,6 +90,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_method_unregister_all;
 	topo_mod_alloc;
 	topo_mod_auth;
+	topo_mod_clean_str;
 	topo_mod_clrdebug;
 	topo_mod_cpufmri;
 	topo_mod_devfmri;

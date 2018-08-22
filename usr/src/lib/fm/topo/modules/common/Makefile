@@ -22,7 +22,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 SUBDIRS =		\
@@ -32,6 +32,7 @@ SUBDIRS =		\
 	ipmi		\
 	nic		\
 	ses		\
+	smbios		\
 	xfp
 
 ses:	disk

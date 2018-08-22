@@ -87,6 +87,7 @@ extern "C" {
 #define	SHELF		"shelf"
 #define	SCSI_DEVICE	"scsi-device"
 #define	SES_ENCLOSURE	"ses-enclosure"
+#define	SLOT		"slot"
 #define	SMP_DEVICE	"smp-device"
 #define	SP		"sp"
 #define	SUBCHASSIS	"subchassis"
@@ -193,6 +194,27 @@ extern "C" {
  * fac_prov_ipmi module.
  */
 #define	TOPO_PROP_IPMI_ENTITY_LIST	"entity-list"
+
+#define	TOPO_PGROUP_SLOT		"slot"
+#define	TOPO_PROP_SLOT_TYPE		"slot-type"
+
+#define	TOPO_PGROUP_DIMM_SLOT		"dimm-slot"
+#define	TOPO_PROP_DIMM_SLOT_FORM	"form-factor"
+#define	TOPO_DIMM_SLOT_FORM_DIMM	"DIMM"
+#define	TOPO_DIMM_SLOT_FORM_SODIMM	"SODIMM"
+#define	TOPO_DIMM_SLOT_FORM_FBDIMM	"FBDIMM"
+
+#define	TOPO_PGROUP_DIMM_PROPS		"dimm-properties"
+#define	TOPO_PROP_DIMM_TYPE
+#define	TOPO_DIMM_TYPE_UNKNOWN		"UNKNOWN"
+#define	TOPO_DIMM_TYPE_DDR		"DDR"
+#define	TOPO_DIMM_TYPE_DDR2		"DDR2"
+#define	TOPO_DIMM_TYPE_DDR3		"DDR3"
+#define	TOPO_DIMM_TYPE_DDR4		"DDR4"
+#define	TOPO_DIMM_TYPE_LPDDR		"LPDDR"
+#define	TOPO_DIMM_TYPE_LPDDR2		"LPDDR2"
+#define	TOPO_DIMM_TYPE_LPDDR3		"LPDDR3"
+#define	TOPO_DIMM_TYPE_LPDDR4		"LPDDR4"
 
 #ifdef	__cplusplus
 }

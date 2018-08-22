@@ -3,6 +3,8 @@
  Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
+ Copyright (c) 2018, Joyent, Inc.
+
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -62,19 +64,19 @@
 <!--
   propval
 
- 	This element is for a singly valued property within a property group.
+        This element is for a singly valued property within a property group.
 
 	Its attributes are
 
 		name	The name of this property.
 
 		type	The data type for this property.
-		
+
 		value	The value for this property.  Must match type
 			restriction of type attribute.
-			
+
 			This is optional for array types
-			
+
 -->
 
 <!ELEMENT propval (propitem*) >
@@ -89,14 +91,14 @@
 <!--
   propitem
 
- 	This element is an optional child element of propval and is used to
+	This element is an optional child element of propval and is used to
 	specify the values for array elements
 
 	Its attributes are
 
 		value	The value for this property.  Must match type
 			restriction of type attribute.
-			
+
 -->
 
 <!ELEMENT propitem EMPTY >
@@ -172,14 +174,14 @@
 
 <!--
   argval
- 
+
 	A propmethod argument. It has two attributes:
- 
+
 		name    The name of the argument.
 		type    The data type of the argument.
 		value	The value for this argument.  Must match type
 			restriction of type attribute.
-			
+
 			This attribute is optional for array types
 -->
 
@@ -196,14 +198,14 @@
 <!--
   argitem
 
- 	This element is an optional child element of argval and is used to
+	This element is an optional child element of argval and is used to
 	specify the values for array elements
 
 	Its attributes are
 
 		value	The value for this property.  Must match type
 			restriction of type attribute.
-			
+
 -->
 
 <!ELEMENT argitem EMPTY >
@@ -220,9 +222,9 @@
 
 	Its attributes are
 
-      		name		Name of the method
-      		version		Version of the method API
-      		propname	Name of the property to create
+		name		Name of the method
+		version		Version of the method API
+		propname	Name of the property to create
 		proptype	Type of the property to create
 		mutable         optional: default is false (0)
 		nonvolatile     optional: default is false (0)
@@ -244,7 +246,7 @@
 
 	This element describes the enumeration method used to
 	populate a composition of topo nodes for a given range of topology
-	nodes. 
+	nodes.
 
 	Its attributes are
 
@@ -275,22 +277,23 @@
 	( fac-enum?, facility*, propgroup*, set*, enum-method*, dependents? ) >
 
 <!ATTLIST node
-	instance	CDATA #REQUIRED >
+	instance	CDATA #REQUIRED
+	static		(false|true) "false" >
 
 <!--
   dependents
 
 	Ranges may have a number of "dependent" ranges, linked to
-	the original range hierarchically as children or as a list, siblings. 
+	the original range hierarchically as children or as a list, siblings.
 
 	Its attribute is:
 		grouping	children | siblings
 -->
 
-<!ELEMENT dependents 
+<!ELEMENT dependents
 	(( range | xi:include )*, set*) >
 
-<!ATTLIST dependents 
+<!ATTLIST dependents
 	grouping ( children | siblings ) #REQUIRED >
 
 <!--
@@ -366,7 +369,7 @@
 
 	Its attributes are:
 		name	topology name
-		scheme 	( hc | dev  ) 
+                scheme  (hc|dev)
 -->
 
 <!ELEMENT topology

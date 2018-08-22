@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -570,6 +571,7 @@ file path=usr/lib/fm/topo/plugins/fac_prov_mptsas.so mode=0555
 file path=usr/lib/fm/topo/plugins/ipmi.so mode=0555
 file path=usr/lib/fm/topo/plugins/nic.so mode=0555
 file path=usr/lib/fm/topo/plugins/ses.so mode=0555
+file path=usr/lib/fm/topo/plugins/smbios.so mode=0555
 file path=usr/lib/fm/topo/plugins/xfp.so mode=0555
 #
 # Dictionaries, whether they are hardware-specific or not, are

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -907,4 +908,13 @@ topo_mod_walk_init(topo_mod_t *mod, tnode_t *node, topo_mod_walk_cb_t cb_f,
 		return (NULL);
 
 	return (wp);
+}
+
+char *
+topo_mod_clean_str(topo_mod_t *mod, const char *str)
+{
+	if (str == NULL)
+		return (NULL);
+
+	return (topo_cleanup_auth_str(mod->tm_hdl, str));
 }

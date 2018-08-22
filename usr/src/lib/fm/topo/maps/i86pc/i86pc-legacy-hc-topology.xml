@@ -2,7 +2,7 @@
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
 Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright (c) 2013, Joyent, Inc. All rights reserved.
+Copyright (c) 2018, Joyent, Inc. All rights reserved.
 
  CDDL HEADER START
 
@@ -71,37 +71,40 @@ Copyright (c) 2013, Joyent, Inc. All rights reserved.
         </propgroup>
       </set>
     </node>
- 
+
     <dependents grouping='children'>
       <range name='chip' min='0' max='100'>
         <enum-method name='chip' version='1' />
 	<propmap name='chip' />
       </range>
+      <range name='slot' min='0' max='31'>
+        <enum-method name='smbios' version='1' />
+      </range>
       <range name='hostbridge' min='0' max='254'>
         <enum-method name='hostbridge' version='1' />
       </range>
     </dependents>
-    
+
   </range>
 
   <range name='chassis' min='0' max='0'>
     <propmap name='chassis' />
-    
+
     <dependents grouping='children'>
-    
+
     <set type='product'
 		setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4100-M2|Sun-Fire-X4200-M2|Netra-X4200-M2|Sun-Fire-X4140|Sun-Fire-X4240|Sun-Fire-X4440'>
        <range name='psu' min='0' max='100'>
-   	  <enum-method name='ipmi' version='1' />
-   	  <propmap name='psu' />
+	<enum-method name='ipmi' version='1' />
+	<propmap name='psu' />
        </range>
        <range name='fanmodule' min='0' max='100'>
-          <propmap name='fan' />
+	<propmap name='fan' />
        </range>
        <set type='product' setlist='Sun-Fire-X4200-M2'>
-	  <range name='bay' min='0' max='3'>
+	<range name='bay' min='0' max='3'>
              <propmap name='Sun-Fire-X4200-M2-disk' />
-          </range>
+	</range>
        </set>
        <set type='product' setlist='Sun-Fire-X4200-Server'>
 	  <range name='bay' min='0' max='3'>
@@ -122,23 +125,23 @@ Copyright (c) 2013, Joyent, Inc. All rights reserved.
 
     <set type='product' setlist='Sun-Fire-X4500|Sun-Fire-X4540|SUN-FIRE-X4150|SUN-FIRE-X4250|SUN-FIRE-X4450'>
        <range name='psu' min='0' max='100'>
- 	  <propmap name='psu' />
+	<propmap name='psu' />
        </range>
        <range name='fanmodule' min='0' max='100'>
-          <propmap name='fan' />
+	<propmap name='fan' />
        </range>
        <set type='product' setlist='Sun-Fire-X4500'>
-	  <range name='bay' min='0' max='47'>
+	<range name='bay' min='0' max='47'>
               <propmap name='Sun-Fire-X4500-disk' />
-	  </range>
+	</range>
        </set>
        <set type='product' setlist='Sun-Fire-X4540'>
-	  <range name='bay' min='0' max='47'>
+	<range name='bay' min='0' max='47'>
              <propmap name='Sun-Fire-X4540-disk' />
-	  </range>
+	</range>
        </set>
     </set>
-      
+
    <set type='product' setlist='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
        <range name='psu' min='0' max='100'>
           <enum-method name='ipmi' version='1' />
@@ -166,13 +169,13 @@ Copyright (c) 2013, Joyent, Inc. All rights reserved.
 
     <set type='product' setlist='default'>
        <range name='psu' min='0' max='100'>
-   	  <enum-method name='ipmi' version='1' />
+	<enum-method name='ipmi' version='1' />
        </range>
        <range name='fan' min='0' max='100'>
-	  <enum-method name='ipmi' version='1' />
+	<enum-method name='ipmi' version='1' />
        </range>
        <range name='bay' min='0' max='1024'>
-          <enum-method name='ses' version='1' />
+	<enum-method name='ses' version='1' />
        </range>
     </set>
 

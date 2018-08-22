@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
+ */
 
 #ifndef _TOPO_MOD_H
 #define	_TOPO_MOD_H
@@ -225,6 +228,7 @@ extern void topo_mod_setdebug(topo_mod_t *);
 extern void topo_mod_dprintf(topo_mod_t *, const char *, ...);
 extern const char *topo_mod_errmsg(topo_mod_t *);
 extern int topo_mod_errno(topo_mod_t *);
+extern char *topo_mod_clean_str(topo_mod_t *, const char *);
 
 /*
  * Topo node utilities: callable from module enumeration, topo_mod_enumerate()
