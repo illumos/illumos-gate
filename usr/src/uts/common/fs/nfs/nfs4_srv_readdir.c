@@ -102,10 +102,17 @@ static nfs_ftype4 vt_to_nf4[] = {
 	0, NF4REG, NF4DIR, NF4BLK, NF4CHR, NF4LNK, NF4FIFO, 0, 0, NF4SOCK, 0
 };
 
+/*
+ * RFC 7530 Section 8.3.2
+ * Supported attributes for READDIR for the root of an absent filesystem.
+ */
+#define	ABSENT_FS_ATTRS (FATTR4_FS_LOCATIONS_MASK | FATTR4_FSID_MASK | \
+	    FATTR4_MOUNTED_ON_FILEID_MASK | FATTR4_RDATTR_ERROR_MASK)
+
 int
 nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
     struct exportinfo **exi, struct svc_req *req, struct compound_state *cs,
-    int expseudo)
+    int expseudo, bool_t *migrated)
 {
 	int error;
 	int ismntpt;
@@ -121,15 +128,13 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 	    NULL, NULL, NULL))
 		return (error);
 
-	/*
-	 * If the directory is a referral point, don't return the
-	 * attrs, instead set rdattr_error to MOVED.
-	 */
+	/* referral point ? */
 	if (vn_is_nfs_reparse(vp, cs->cr) && !client_is_downrev(req)) {
-		VN_RELE(vp);
 		DTRACE_PROBE2(nfs4serv__func__referral__moved,
 		    vnode_t *, vp, char *, "nfs4_readdir_getvp");
-		return (NFS4ERR_MOVED);
+		*migrated = TRUE;
+		*vpp = vp;
+		return (0);
 	}
 
 	/* Is this object mounted upon? */
@@ -157,13 +162,6 @@ nfs4_readdir_getvp(vnode_t *dvp, char *d_name, vnode_t **vpp,
 			VN_RELE(vp);
 			VN_RELE(pre_tvp);
 			return (error);
-		}
-		if (vn_is_nfs_reparse(vp, cs->cr)) {
-			VN_RELE(vp);
-			VN_RELE(pre_tvp);
-			DTRACE_PROBE2(nfs4serv__func__referral__moved,
-			    vnode_t *, vp, char *, "nfs4_readdir_getvp");
-			return (NFS4ERR_MOVED);
 		}
 	}
 
@@ -355,27 +353,8 @@ rfs4_get_sb_encode(vfs_t *vfsp, rfs4_sb_encode_t *psbe)
 	return (0);
 }
 
-/*
- * Macros to handle if we have don't have enough space for the requested
- * attributes and this is the first entry and the
- * requested attributes are more than the minimal useful
- * set, reset the attributes to the minimal set and
- * retry the encoding. If the client has asked for both
- * mounted_on_fileid and fileid, prefer mounted_on_fileid.
- */
-#define	MINIMAL_RD_ATTRS						\
-	(FATTR4_MOUNTED_ON_FILEID_MASK|					\
-	FATTR4_FILEID_MASK|						\
-	FATTR4_RDATTR_ERROR_MASK)
+extern void rfs4_free_fs_locations4(fs_locations4 *);
 
-#define	MINIMIZE_ATTR_MASK(m) {						\
-	if ((m) & FATTR4_MOUNTED_ON_FILEID_MASK)			\
-	    (m) &= FATTR4_RDATTR_ERROR_MASK|FATTR4_MOUNTED_ON_FILEID_MASK;\
-	else								\
-	    (m) &= FATTR4_RDATTR_ERROR_MASK|FATTR4_FILEID_MASK;		\
-}
-
-#define	IS_MIN_ATTR_MASK(m)	(((m) & ~MINIMAL_RD_ATTRS) == 0)
 /*
  * If readdir only needs to return FILEID, we can take it from the
  * dirent struct and save doing the lookup.
@@ -436,6 +415,7 @@ rfs4_op_readdir(nfs_argop4 *argop, nfs_resop4 *resop, struct svc_req *req,
 	int owner_error, group_error;
 	struct sockaddr *ca;
 	char *name = NULL;
+	nfsstat4 status = NFS4_OK;
 
 	DTRACE_NFSV4_2(op__readdir__start, struct compound_state *, cs,
 	    READDIR4args *, args);
@@ -686,6 +666,7 @@ readagain:
 	no_space = 0;
 	for (dp = (struct dirent64 *)rddir_data;
 	    !no_space && rddir_result_size > 0; dp = nextdp(dp)) {
+		bool_t fs_migrated = FALSE;
 
 		/* reset visp */
 		visp = NULL;
@@ -725,7 +706,7 @@ readagain:
 
 		error = nfs4_readdir_getvp(dvp, dp->d_name,
 		    &vp, &newexi, req, cs,
-		    visp != NULL ? visp->vis_exported : 0);
+		    visp != NULL ? visp->vis_exported : 0, &fs_migrated);
 		if (error == ENOENT) {
 			rddir_next_offset = dp->d_off;
 			continue;
@@ -741,7 +722,7 @@ readagain:
 		 */
 		if (vp &&
 		    (vfs_different = (dvp->v_vfsp != vp->v_vfsp))) {
-			if (ar & (FATTR4_FILES_AVAIL_MASK |
+			if (ae & (FATTR4_FILES_AVAIL_MASK |
 			    FATTR4_FILES_FREE_MASK |
 			    FATTR4_FILES_TOTAL_MASK |
 			    FATTR4_FILES_AVAIL_MASK |
@@ -760,12 +741,12 @@ readagain:
 					rddirattr_error = error;
 				}
 			}
-			if (ar & (FATTR4_MAXFILESIZE_MASK |
+			if (ae & (FATTR4_MAXFILESIZE_MASK |
 			    FATTR4_MAXLINK_MASK |
 			    FATTR4_MAXNAME_MASK)) {
 				if (error = rfs4_get_pc_encode(cs->vp,
-				    &pce, ar, cs->cr)) {
-					ar &= ~(FATTR4_MAXFILESIZE_MASK |
+				    &pce, ae, cs->cr)) {
+					ae &= ~(FATTR4_MAXFILESIZE_MASK |
 					    FATTR4_MAXLINK_MASK |
 					    FATTR4_MAXNAME_MASK);
 					rddirattr_error = error;
@@ -839,12 +820,22 @@ reencode_attrs:
 			if (!vp) {
 				ae = ar & (FATTR4_RDATTR_ERROR_MASK |
 				    FATTR4_MOUNTED_ON_FILEID_MASK);
+			} else if (fs_migrated) {
+				/*
+				 * RFC 7530 Section 8.3.2
+				 * Restrict to actually available attributes in
+				 * case of an absent filesystem.
+				 */
+				ae &= ABSENT_FS_ATTRS;
+
+				if (!(ae & FATTR4_FS_LOCATIONS_MASK))
+					rddirattr_error = NFS4ERR_MOVED;
 			} else {
 				va.va_mask = AT_ALL;
 				rddirattr_error =
 				    VOP_GETATTR(vp, &va, 0, cs->cr, NULL);
 				if (rddirattr_error) {
-					ae = ar & (FATTR4_RDATTR_ERROR_MASK |
+					ae = ae & (FATTR4_RDATTR_ERROR_MASK |
 					    FATTR4_MOUNTED_ON_FILEID_MASK);
 				} else {
 					/*
@@ -855,6 +846,13 @@ reencode_attrs:
 					    client_is_downrev(req))
 						va.va_type = VLNK;
 				}
+			}
+
+			/* RFC 7530 Section 8.3.2 and 16.24.4 */
+			if (rddirattr_error != 0 &&
+			    !(ae & FATTR4_RDATTR_ERROR_MASK)) {
+				status = puterrno4(rddirattr_error);
+				goto out_free;
 			}
 		}
 
@@ -963,7 +961,10 @@ reencode_attrs:
 					struct exportinfo *exi;
 
 					exi = newexi ? newexi : cs->exi;
-					if (exi->exi_volatile_dev) {
+					if (fs_migrated) {
+						major = 1;
+						minor = 0;
+					} else if (exi->exi_volatile_dev) {
 						int *pmaj = (int *)&major;
 
 						pmaj[0] = exi->exi_fsid.val[0];
@@ -992,14 +993,8 @@ reencode_attrs:
 
 				/* Check the redzone boundary */
 				if (ptr > ptr_redzone) {
-					if (nents || IS_MIN_ATTR_MASK(ar)) {
-						no_space = TRUE;
-						continue;
-					}
-					MINIMIZE_ATTR_MASK(ar);
-					ae = ar;
-					ptr = lastentry_ptr;
-					goto reencode_attrs;
+					no_space = TRUE;
+					break;
 				}
 			}
 			/*
@@ -1047,14 +1042,8 @@ reencode_attrs:
 				}
 				/* Check the redzone boundary */
 				if (ptr > ptr_redzone) {
-					if (nents || IS_MIN_ATTR_MASK(ar)) {
-						no_space = TRUE;
-						continue;
-					}
-					MINIMIZE_ATTR_MASK(ar);
-					ae = ar;
-					ptr = lastentry_ptr;
-					goto reencode_attrs;
+					no_space = TRUE;
+					break;
 				}
 			}
 			/*
@@ -1083,15 +1072,8 @@ reencode_attrs:
 					if (!xdr_inline_encode_nfs_fh4(
 					    &ptr, ptr_redzone,
 					    (nfs_fh4_fmt_t *)fh.val)) {
-						if (nents ||
-						    IS_MIN_ATTR_MASK(ar)) {
-							no_space = TRUE;
-							continue;
-						}
-						MINIMIZE_ATTR_MASK(ar);
-						ae = ar;
-						ptr = lastentry_ptr;
-						goto reencode_attrs;
+						no_space = TRUE;
+						break;
 					}
 				}
 				if (ae & FATTR4_FILEID_MASK) {
@@ -1099,33 +1081,20 @@ reencode_attrs:
 				}
 				/* Check the redzone boundary */
 				if (ptr > ptr_redzone) {
-					if (nents || IS_MIN_ATTR_MASK(ar)) {
-						no_space = TRUE;
-						continue;
-					}
-					MINIMIZE_ATTR_MASK(ar);
-					ae = ar;
-					ptr = lastentry_ptr;
-					goto reencode_attrs;
+					no_space = TRUE;
+					break;
 				}
 			}
+
 			/*
 			 * Redzone check is done at the end of this section.
 			 * This particular section will encode a maximum of
-			 * 15 * BYTES_PER_XDR_UNIT of data.
+			 * 6 * BYTES_PER_XDR_UNIT of data.
 			 */
 			if (ae &
 			    (FATTR4_FILES_AVAIL_MASK |
 			    FATTR4_FILES_FREE_MASK |
-			    FATTR4_FILES_TOTAL_MASK |
-			    FATTR4_FS_LOCATIONS_MASK |
-			    FATTR4_HIDDEN_MASK |
-			    FATTR4_HOMOGENEOUS_MASK |
-			    FATTR4_MAXFILESIZE_MASK |
-			    FATTR4_MAXLINK_MASK |
-			    FATTR4_MAXNAME_MASK |
-			    FATTR4_MAXREAD_MASK |
-			    FATTR4_MAXWRITE_MASK)) {
+			    FATTR4_FILES_TOTAL_MASK)) {
 
 				if (ae & FATTR4_FILES_AVAIL_MASK) {
 					IXDR_PUT_HYPER(ptr, sbe.fa);
@@ -1136,9 +1105,64 @@ reencode_attrs:
 				if (ae & FATTR4_FILES_TOTAL_MASK) {
 					IXDR_PUT_HYPER(ptr, sbe.ft);
 				}
-				if (ae & FATTR4_FS_LOCATIONS_MASK) {
-					ASSERT(0);
+
+				/* Check the redzone boundary */
+				if (ptr > ptr_redzone) {
+					no_space = TRUE;
+					break;
 				}
+			}
+
+			/*
+			 * Handle fs_locations separately.
+			 * This can be quite slow for referrals. Usually
+			 * clients don't use this attribute in readdir.
+			 */
+			if (ae & FATTR4_FS_LOCATIONS_MASK) {
+				fs_locations4 *p;
+				fs_locations4 fs;
+				bool_t pushed;
+				XDR xdr;
+
+				(void) memset(&fs, 0, sizeof (fs_locations4));
+
+				ASSERT(vp);
+				p = fetch_referral(vp, cs->cr);
+				if (p != NULL) {
+					fs = *p;
+					kmem_free(p, sizeof (fs_locations4));
+				}
+
+				ASSERT(ptr_redzone >= ptr);
+				ASSERT((uintptr_t)ptr_redzone - (uintptr_t)ptr
+				    <= UINT_MAX);
+				xdrmem_create(&xdr, (caddr_t)ptr,
+				    (uintptr_t)ptr_redzone - (uintptr_t)ptr,
+				    XDR_ENCODE);
+
+				pushed = xdr_fattr4_fs_locations(&xdr, &fs);
+				if (pushed)
+					ptr = (uint32_t *)((char *)ptr +
+					    xdr_getpos(&xdr));
+
+				xdr_destroy(&xdr);
+				rfs4_free_fs_locations4(&fs);
+
+				if (!pushed || ptr > ptr_redzone) {
+					no_space = TRUE;
+					break;
+				}
+			}
+
+			if (ae &
+			    (FATTR4_HIDDEN_MASK |
+			    FATTR4_HOMOGENEOUS_MASK |
+			    FATTR4_MAXFILESIZE_MASK |
+			    FATTR4_MAXLINK_MASK |
+			    FATTR4_MAXNAME_MASK |
+			    FATTR4_MAXREAD_MASK |
+			    FATTR4_MAXWRITE_MASK)) {
+
 				if (ae & FATTR4_HIDDEN_MASK) {
 					ASSERT(0);
 				}
@@ -1162,17 +1186,12 @@ reencode_attrs:
 				}
 				/* Check the redzone boundary */
 				if (ptr > ptr_redzone) {
-					if (nents || IS_MIN_ATTR_MASK(ar)) {
-						no_space = TRUE;
-						continue;
-					}
-					MINIMIZE_ATTR_MASK(ar);
-					ae = ar;
-					ptr = lastentry_ptr;
-					goto reencode_attrs;
+					no_space = TRUE;
+					break;
 				}
 			}
 		}
+
 		if (ae & 0x00000000ffffffff) {
 			/*
 			 * Redzone check is done at the end of this section.
@@ -1200,14 +1219,8 @@ reencode_attrs:
 				}
 				/* Check the redzone boundary */
 				if (ptr > ptr_redzone) {
-					if (nents || IS_MIN_ATTR_MASK(ar)) {
-						no_space = TRUE;
-						continue;
-					}
-					MINIMIZE_ATTR_MASK(ar);
-					ae = ar;
-					ptr = lastentry_ptr;
-					goto reencode_attrs;
+					no_space = TRUE;
+					break;
 				}
 			}
 			/*
@@ -1242,15 +1255,8 @@ reencode_attrs:
 					    (owner.utf8string_len /
 					    BYTES_PER_XDR_UNIT)
 					    + 2) > ptr_redzone) {
-						if (nents ||
-						    IS_MIN_ATTR_MASK(ar)) {
-							no_space = TRUE;
-							continue;
-						}
-						MINIMIZE_ATTR_MASK(ar);
-						ae = ar;
-						ptr = lastentry_ptr;
-						goto reencode_attrs;
+						no_space = TRUE;
+						break;
 					}
 					/* encode the LENGTH of owner string */
 					IXDR_PUT_U_INT32(ptr,
@@ -1299,15 +1305,8 @@ reencode_attrs:
 					    (group.utf8string_len /
 					    BYTES_PER_XDR_UNIT)
 					    + 2) > ptr_redzone) {
-						if (nents ||
-						    IS_MIN_ATTR_MASK(ar)) {
-							no_space = TRUE;
-							continue;
-						}
-						MINIMIZE_ATTR_MASK(ar);
-						ae = ar;
-						ptr = lastentry_ptr;
-						goto reencode_attrs;
+						no_space = TRUE;
+						break;
 					}
 					/* encode the LENGTH of owner string */
 					IXDR_PUT_U_INT32(ptr,
@@ -1378,14 +1377,8 @@ reencode_attrs:
 				}
 				/* Check the redzone boundary */
 				if (ptr > ptr_redzone) {
-					if (nents || IS_MIN_ATTR_MASK(ar)) {
-						no_space = TRUE;
-						continue;
-					}
-					MINIMIZE_ATTR_MASK(ar);
-					ae = ar;
-					ptr = lastentry_ptr;
-					goto reencode_attrs;
+					no_space = TRUE;
+					break;
 				}
 			}
 			/*
@@ -1451,14 +1444,8 @@ reencode_attrs:
 				}
 				/* Check the redzone boundary */
 				if (ptr > ptr_redzone) {
-					if (nents || IS_MIN_ATTR_MASK(ar)) {
-						no_space = TRUE;
-						continue;
-					}
-					MINIMIZE_ATTR_MASK(ar);
-					ae = ar;
-					ptr = lastentry_ptr;
-					goto reencode_attrs;
+					no_space = TRUE;
+					break;
 				}
 			}
 		}
@@ -1507,8 +1494,6 @@ reencode_attrs:
 	if (!no_space && nents == 0 && !iseofdir)
 		goto readagain;
 
-	*cs->statusp = resp->status = NFS4_OK;
-
 	/*
 	 * If no_space is set then we terminated prematurely,
 	 * rewind to the last entry and this can never be EOF.
@@ -1534,11 +1519,17 @@ reencode_attrs:
 		resp->data_len = (char *)ptr - (char *)beginning_ptr;
 		resp->mblk->b_wptr += resp->data_len;
 	} else {
+		status = NFS4ERR_TOOSMALL;
+	}
+
+out_free:
+	if (status != NFS4_OK) {
 		freeb(mp);
 		resp->mblk = NULL;
 		resp->data_len = 0;
-		*cs->statusp = resp->status = NFS4ERR_TOOSMALL;
 	}
+
+	*cs->statusp = resp->status = status;
 
 	kmem_free((caddr_t)rddir_data, rddir_data_len);
 	if (vp)
