@@ -26,6 +26,7 @@ extern "C" {
 struct cpu;
 
 extern void ht_init(void);
+extern void ht_intr_alloc_pil(uint_t);
 
 extern int ht_acquire(void);
 extern void ht_release(void);

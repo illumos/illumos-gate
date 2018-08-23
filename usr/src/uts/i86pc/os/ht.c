@@ -138,6 +138,8 @@ CTASSERT(CM_POISONED < (1 << CS_SHIFT));
 CTASSERT(CM_POISONED > CM_VCPU);
 CTASSERT(CM_VCPU > CM_UNSAFE);
 
+static uint_t empty_pil = XC_CPUPOKE_PIL;
+
 /*
  * If disabled, no HT exclusion is performed, and system is potentially
  * vulnerable to L1TF if hyper-threading is enabled, and we don't have the "not
@@ -209,6 +211,23 @@ ht_init(void)
 	} while ((cp = cp->cpu_next_onln) != scp);
 
 	mutex_exit(&cpu_lock);
+}
+
+/*
+ * We're adding an interrupt handler of some kind at the given PIL.  If this
+ * happens to be the same PIL as XC_CPUPOKE_PIL, then we need to disable our
+ * pil_needs_kick() optimization, as there is now potentially an unsafe
+ * interrupt handler at that PIL.  This typically won't occur, so we're not that
+ * careful about what's actually getting added, which CPU it's on, or if it gets
+ * removed.  This also presumes that softints can't cover our empty_pil.
+ */
+void
+ht_intr_alloc_pil(uint_t pil)
+{
+	ASSERT(pil <= PIL_MAX);
+
+	if (empty_pil == pil)
+		empty_pil = PIL_MAX + 1;
 }
 
 /*
@@ -370,41 +389,36 @@ ht_kick(cpu_ht_t *ht, zoneid_t zoneid)
 
 	poke_cpu(ht->ch_sib->cpu_id);
 
+	membar_consumer();
+	sibstate = ht->ch_sibstate;
+
+	if (CS_MARK(sibstate) != CM_POISONED || CS_ZONE(sibstate) == zoneid)
+		return;
+
+	lock_clear(&ht->ch_lock);
+
+	/*
+	 * Spin until we can see the sibling has been kicked out or is otherwise
+	 * OK.
+	 */
 	for (;;) {
 		membar_consumer();
 		sibstate = ht->ch_sibstate;
 
 		if (CS_MARK(sibstate) != CM_POISONED ||
 		    CS_ZONE(sibstate) == zoneid)
-			return;
+			break;
 
-		lock_clear(&ht->ch_lock);
-
-		for (;;) {
-			membar_consumer();
-			sibstate = ht->ch_sibstate;
-
-			if (CS_MARK(sibstate) != CM_POISONED ||
-			    CS_ZONE(sibstate) == zoneid) {
-				lock_set(&ht->ch_lock);
-				return;
-			}
-
-			SMT_PAUSE();
-		}
-
-		lock_set(&ht->ch_lock);
+		SMT_PAUSE();
 	}
+
+	lock_set(&ht->ch_lock);
 }
 
-/*
- * FIXME: do we need a callback in case somebody installs a handler at this PIL
- * ever?
- */
 static boolean_t
 pil_needs_kick(uint_t pil)
 {
-	return (pil != XC_CPUPOKE_PIL);
+	return (pil != empty_pil);
 }
 
 void
@@ -412,6 +426,8 @@ ht_begin_intr(uint_t pil)
 {
 	ulong_t flags;
 	cpu_ht_t *ht;
+
+	ASSERT(pil <= PIL_MAX);
 
 	flags = intr_clear();
 	ht = &CPU->cpu_m.mcpu_ht;
@@ -581,8 +597,6 @@ ht_should_run(kthread_t *t, cpu_t *cp)
 pri_t
 ht_adjust_cpu_score(kthread_t *t, struct cpu *cp, pri_t score)
 {
-	cpu_t *sib;
-
 	if (ht_should_run(t, cp))
 		return (score);
 

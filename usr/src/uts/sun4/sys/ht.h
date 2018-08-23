@@ -27,8 +27,9 @@ extern "C" {
 
 #define	ht_should_run(t, c) (B_TRUE)
 #define	ht_adjust_cpu_score(t, c, p) (p)
-#define	ht_mark_safe(void) {}
-#define	ht_mark_unsafe(void) {}
+#define	ht_begin_unsafe(void) {}
+#define	ht_end_unsafe(void) {}
+#define	ht_end_intr(void) {}
 
 #ifdef	__cplusplus
 }
