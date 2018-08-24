@@ -1,0 +1,591 @@
+.\"
+.\" Copyright (c) 1988, 1991, 1993
+.\"	The Regents of the University of California.  All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the University nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"
+.\" Copyright 2018 Jason King
+.\" Copyright 2018, Joyent, Inc.
+.\"
+.Dd July 17, 2018
+.Dt GETOPT_LONG 3C
+.Os
+.Sh NAME
+.Nm getopt_long ,
+.Nm getopt_long_only
+.Nd get long options from command line argument list
+.Sh SYNOPSIS
+.In getopt.h
+.Vt extern char *optarg ;
+.Vt extern int optind ;
+.Vt extern int optopt ;
+.Vt extern int opterr ;
+.Ft int
+.Fo getopt_long
+.Fa "int argc"
+.Fa "char * const *argv"
+.Fa "const char *optstring"
+.Fa "const struct option *longopts"
+.Fa "int *longindex"
+.Fc
+.Ft int
+.Fo getopt_long_only
+.Fa "int argc"
+.Fa "char * const *argv"
+.Fa "const char *optstring"
+.Fa "const struct option *longopts"
+.Fa "int *longindex"
+.Fc
+.Ft int
+.Fo getopt_long_clip
+.Fa "int argc"
+.Fa "char * const *argv"
+.Fa "const char *optstring"
+.Fa "const struct option *longopts"
+.Fa "int *longindex"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn getopt_long
+function is similar to
+.Xr getopt 3C
+but it accepts options in two forms: words and characters.
+The
+.Fn getopt_long
+function provides a superset of the functionality of
+.Xr getopt 3C .
+The
+.Fn getopt_long
+function
+can be used in two ways.
+.Pp
+In the first way, every long option understood
+by the program has a corresponding short option, and the option
+structure is only used to translate from long options to short
+options.
+When used in this fashion,
+.Fn getopt_long
+behaves identically to
+.Xr getopt 3C .
+This is a good way to add long option processing to an existing program
+with the minimum of rewriting.
+.Pp
+In the second mechanism, a long option sets a flag in the
+.Vt option
+structure passed, or will store a pointer to the command line argument
+in the
+.Vt option
+structure passed to it for options that take arguments.
+Additionally,
+the long option's argument may be specified as a single argument with
+an equal sign, e.g.,
+.Pp
+.Dl "myprogram --myoption=somevalue"
+.Pp
+When a long option is processed, the call to
+.Fn getopt_long
+will return 0.
+For this reason, long option processing without
+shortcuts is not backwards compatible with
+.Xr getopt 3C .
+.Pp
+It is possible to combine these methods, providing for long options
+processing with short option equivalents for some options.
+Less
+frequently used options would be processed as long options only.
+.Pp
+In
+.Fn getopt_long
+and
+.Fn getopt_long_only ,
+.Fa optstring
+acts similar to
+.Fa optstring
+in
+.Xr getopt 3C .
+In addition,
+.Fa optstring
+can begin with
+.Ql +
+or
+.Ql - .
+If
+.Fa optstring
+begins with
+.Ql + ,
+the first non-option terminates option processing.
+This is equivalent to setting the environment variable
+.Ev POSIXLY_CORRECT .
+If
+.Fa optstring
+begins with
+.Ql - ,
+non-options are treated as options to the argument
+.Ql \e1 .
+.Pp
+If
+.Fa optstring
+does not begin with
+.Ql +
+and
+.Ev POSIXLY_CORRECT
+is not set, if
+.Ql W\&;
+appears in
+.Fa optstring ,
+.Ql "-W myoption"
+is treated the same as
+.Ql "--myoption"
+and
+.Va optarg
+is set to
+.Ql myoption .
+.Pp
+In
+.Fn getopt_long_clip ,
+.Ql +
+and
+.Ql -
+are ignored at the beginning of a string.
+.Pp
+The
+.Fn getopt_long ,
+.Fn getopt_long_only ,
+and
+.Fn getopt_long_clip
+functions require a structure to be initialized describing the long
+options.
+The structure is:
+.Bd -literal -offset indent
+struct option {
+	char *name;
+	int has_arg;
+	int *flag;
+	int val;
+};
+.Ed
+.Pp
+The
+.Fa name
+field should contain the option name without the leading double dash.
+.Pp
+The
+.Fa has_arg
+field should be one of:
+.Pp
+.Bl -tag -width ".Dv optional_argument" -offset indent -compact
+.It Dv no_argument
+no argument to the option is expected
+.It Dv required_argument
+an argument to the option is required
+.It Dv optional_argument
+an argument to the option may be presented
+.El
+.Pp
+If
+.Fa flag
+is not
+.Dv NULL ,
+then the integer pointed to by it will be set to the
+value in the
+.Fa val
+field and
+.Va optopt
+will be set to
+.Sy 0 .
+If the
+.Fa flag
+field is
+.Dv NULL ,
+then the
+.Fa val
+field will be returned and
+.Va optopt
+is set to the value in the
+.Fa val
+field.
+Setting
+.Fa flag
+to
+.Dv NULL
+and setting
+.Fa val
+to the corresponding short option will make this function act just
+like
+.Xr getopt 3C .
+.Pp
+If the
+.Fa longindex
+field is not
+.Dv NULL ,
+then the integer pointed to by it will be set to the index of the long
+option relative to
+.Fa longopts .
+.Pp
+The last element of the
+.Fa longopts
+array has to be filled with zeroes.
+.Pp
+The
+.Fn getopt_long_only
+function behaves identically to
+.Fn getopt_long
+with the exception that long options may start with
+.Ql -
+in addition to
+.Ql -- .
+If an option starting with
+.Ql -
+does not match a long option but does match a single-character option,
+the single-character option is returned.
+.Pp
+The
+.Fn getopt_long_clip
+function is a variation of
+.Fn getopt_long
+except that options must also adhere to the Sun CLIP specification.
+Specifically, the major differences from
+.Fn getopt_long
+are:
+.Bl -bullet -offset indent
+.It
+All option arguments are required
+.Po
+.Dv optional_argument
+is treated the same as
+.Dv required_argument
+.Pc .
+.It
+Long options cannot be abbreviated on the command line.
+.It
+Long options must use a double dash
+.Pq Ql -- .
+.It
+Option processing stops at the first non-option.
+.It
+All long options must have an eqivalent short option (single character) and
+vice-versa.
+.It
+A leading
+.Ql +
+or
+.Ql -
+in
+.Fa optstring
+is ignored.
+.Fa optstring
+is treated as if it began after the leading
+.Ql +
+or
+.Ql - .
+.El
+.Pp
+On each call to
+.Fn getopt_long ,
+.Fn getopt_long_only ,
+or
+.Fn getopt_long ,
+.Va optind
+is set to the
+.Va argv
+index of the
+.Em next
+argument to be processed.
+.Va optind
+is initialized to
+.Sy 1
+prior to the first invocation of
+.Fn getopt_long ,
+.Fn getopt_long_only ,
+or
+.Fn getopt_long_clip .
+.Pp
+If
+.Va opterr
+is set to a non-zero value and
+.Fa optstring
+does not start with
+.Ql \&: ,
+.Fn getopt_long ,
+.Fn getopt_long_only ,
+and
+.Fn getopt_long_clip
+will print an error message to
+.Sy stderr
+when an error or invalid option is encountered.
+.Sh RETURN VALUES
+If the
+.Fa flag
+field in
+.Vt "struct option"
+is
+.Dv NULL ,
+.Fn getopt_long
+and
+.Fn getopt_long_only
+return the value specified in the
+.Fa val
+field, which is usually just the corresponding short option.
+If
+.Fa flag
+is not
+.Dv NULL ,
+these functions return 0 and store
+.Fa val
+in the location pointed to by
+.Fa flag .
+These functions return
+.Ql \&:
+if there was a missing option argument,
+.Ql \&?
+if the user specified an unknown or ambiguous option, and
+\-1 when the argument list has been exhausted.
+.Pp
+If a long option to
+.Fn getopt_long_clip
+is missing its equivalent short option (or vice-versa),\-1 is returned on the
+first call to
+.Fn getopt_long_clip ,
+and
+.Dv errno
+is set to
+.Er EINVAL .
+If
+.Va opterr
+is set to a non-zero value and
+.Fa optstring
+does not start with
+.Ql \&: ,
+an error message will be written to
+.Sy stderr .
+.Pp
+If
+.Fa optstring
+does not start with
+.Ql \&:
+and
+.Fn getopt_long ,
+.Fn getopt_long_only ,
+or
+.Fn getopt_long_clip
+return
+.Ql \&:
+or
+.Ql \&? ,
+if
+.Va opterr
+is set to a non-zero value, an error message is written to
+.Dv stderr .
+.Sh ENVIRONMENT
+The following environment variables can effect the execution of
+.Nm getopt_long ,
+.Nm getopt_long_only ,
+and
+.Nm getopt_long_clip :
+.Ev LANG ,
+.Ev LC_ALL ,
+.Ev LC_MESSAGES .
+See
+.Xr environ 5 .
+.Bl -tag -width ".Ev POSIXLY_CORRECT"
+.It Ev POSIXLY_CORRECT
+If set, option processing stops when the first non-option is found and
+a leading
+.Ql -
+or
+.Ql +
+in the
+.Fa optstring
+is ignored.
+.El
+.Sh USAGE
+Similar to
+.Xr getopt 3C ,
+since there is no unambiguous way to detect a missing option-argument except when the
+option is the last option on the command line, the
+.Fn getopt_long ,
+.Fn getopt_long_only ,
+and
+.Fn getopt_long_clip
+functions cannot fully check for mandatory arguments.
+For example, the option string
+.Ql ho\&:
+with an input of
+.Ql Fl o Fl h
+will assume that
+.Ql Fl h
+is the required argument to
+.Fl o
+instead of assuming that
+.Fl o
+is missing its option-argument.
+.Pp
+Like
+.Xr getopt 3C ,
+grouping options taking or requiring arguments with other options is a violation of the
+Basic Utility Command syntax standard (see
+.Xr Intro 1 ) .
+For example, given the option string
+.Ql cde\&: ,
+running:
+.Pp
+.Dl cmd Fl cde Ar ieio
+.Pp
+is incorrect.
+Current versions of
+.Nm getopt_long ,
+.Nm getopt_long_only ,
+and
+.Nm getopt_long_clip
+accept this, however future versions may not support this.
+The correct invocation would be:
+.Pp
+.Dl cmd Fl cd Fl e Ar ieio
+.Sh EXAMPLES
+.Bd -literal -compact
+int bflag, ch, fd;
+int daggerset;
+
+/* options descriptor */
+static struct option longopts[] = {
+	{ "buffy",	no_argument,		NULL,		'b' },
+	{ "fluoride",	required_argument,	NULL,		'f' },
+	{ "daggerset",	no_argument,		\*[Am]daggerset,	1 },
+	{ NULL,		0,			NULL,		0 }
+};
+
+bflag = 0;
+while ((ch = getopt_long(argc, argv, "bf:", longopts, NULL)) != -1) {
+	switch (ch) {
+	case 'b':
+		bflag = 1;
+		break;
+	case 'f':
+		if ((fd = open(optarg, O_RDONLY, 0)) == -1)
+			err(1, "unable to open %s", optarg);
+		break;
+	case 0:
+		if (daggerset) {
+			fprintf(stderr,"Buffy will use her dagger to "
+			    "apply fluoride to dracula's teeth\en");
+		}
+		break;
+	default:
+		usage();
+	}
+}
+argc -= optind;
+argv += optind;
+.Ed
+.Sh ERRORS
+The
+.Fn getopt_long_clip
+function will fail if:
+.Bl -tag -width EINVAL
+.It Er EINVAL
+A short option is missing a corresponding long option, or vice-versa.
+.El
+.Pp
+There are no errors defined for
+.Fn getopt_long
+and
+.Fn getopt_long_only .
+.Sh IMPLEMENTATION DIFFERENCES
+While the illumos implementations of
+.Nm getopt_long
+and
+.Nm getopt_long_only
+are broadly compatible with other implementations, the following edge cases
+have historically been known to vary among implementations:
+.Bl -bullet
+.It
+The setting of
+.Va optopt
+for long options with
+.Fa flag
+!=
+.Dv NULL
+in
+.Vt struct option .
+In illumos,
+.Va optopt
+is set to 0 (since
+.Fa val
+would never be returned).
+.It
+The setting of
+.Va optarg
+for long options without an argument that are
+invoked via
+.Ql -W
+.Ql ( W\&;
+in
+.Fa optstring ) .
+illumos sets
+.Va optarg
+to the option name (the argument of
+.Ql -W ) .
+.It
+The handling of
+.Ql -W
+with an argument that is not (a prefix to) a known
+long option
+.Ql ( W\&;
+in
+.Fa optstring ) .
+illumos treats this as an error (unknown option) and returns
+.Ql \&?
+with
+.Va optopt
+set to 0 and
+.Va optarg
+set to
+.Dv NULL .
+.It
+illumos
+may not permute the argument vector at the same points in
+the calling sequence as other implementations.
+The aspects normally used by
+the caller (ordering after \-1 is returned, the value of
+.Va optind
+relative
+to current positions) are the same, though.
+(We often do fewer variable swaps.)
+.El
+.Sh INTERFACE STABILITY
+Committed
+.Sh MT-LEVEL
+Unsafe
+.Sh SEE ALSO
+.Xr getopt 3C
+.Sh BUGS
+The
+.Fa argv
+argument is not really
+.Vt const
+as its elements may be permuted (unless
+.Ev POSIXLY_CORRECT
+is set).
