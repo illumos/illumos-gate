@@ -1374,10 +1374,10 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 	platform_cpuid_mangle(cpi->cpi_vendor, 1, cp);
 
 	/*
-	 * In addition to ecx and edx, Intel is storing a bunch of instruction
-	 * set extensions in leaf 7's ebx, ecx, and edx.
+	 * In addition to ecx and edx, Intel and AMD are storing a bunch of
+	 * instruction set extensions in leaf 7's ebx, ecx, and edx.
 	 */
-	if (cpi->cpi_vendor == X86_VENDOR_Intel && cpi->cpi_maxeax >= 7) {
+	if (cpi->cpi_maxeax >= 7) {
 		struct cpuid_regs *ecp;
 		ecp = &cpi->cpi_std[7];
 		ecp->cp_eax = 7;
@@ -1401,30 +1401,29 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_SMEP)
 			add_x86_feature(featureset, X86FSET_SMEP);
 
-		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_INVPCID) {
-			add_x86_feature(featureset, X86FSET_INVPCID);
-		}
-
 		/*
 		 * We check disable_smap here in addition to in startup_smap()
 		 * to ensure CPUs that aren't the boot CPU don't accidentally
 		 * include it in the feature set and thus generate a mismatched
-		 * x86 feature set across CPUs. Note that at this time we only
-		 * enable SMAP for the 64-bit kernel.
+		 * x86 feature set across CPUs.
 		 */
-#if defined(__amd64)
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_SMAP &&
 		    disable_smap == 0)
 			add_x86_feature(featureset, X86FSET_SMAP);
-#endif
-		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_MPX)
-			add_x86_feature(featureset, X86FSET_MPX);
 
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_RDSEED)
 			add_x86_feature(featureset, X86FSET_RDSEED);
 
 		if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_ADX)
 			add_x86_feature(featureset, X86FSET_ADX);
+
+		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+			if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_INVPCID)
+				add_x86_feature(featureset, X86FSET_INVPCID);
+
+			if (ecp->cp_ebx & CPUID_INTC_EBX_7_0_MPX)
+				add_x86_feature(featureset, X86FSET_MPX);
+		}
 	}
 
 	/*
@@ -1554,8 +1553,9 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 					    X86FSET_AVX2);
 			}
 
-			if (cpi->cpi_std[7].cp_ebx &
-			    CPUID_INTC_EBX_7_0_AVX512F) {
+			if (cpi->cpi_vendor == X86_VENDOR_Intel &&
+			    (cpi->cpi_std[7].cp_ebx &
+			    CPUID_INTC_EBX_7_0_AVX512F) != 0) {
 				add_x86_feature(featureset, X86FSET_AVX512F);
 
 				if (cpi->cpi_std[7].cp_ebx &
@@ -1680,8 +1680,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		cpi->cpi_ncpu_per_chip = 1;
 	}
 
-	if (cpi->cpi_vendor == X86_VENDOR_Intel && cpi->cpi_maxeax >= 0xD &&
-	    !xsave_force_disable) {
+	if (cpi->cpi_maxeax >= 0xD && !xsave_force_disable) {
 		struct cpuid_regs r, *ecp;
 
 		ecp = &r;
@@ -3703,15 +3702,13 @@ cpuid_get_xsave_size()
  * floating point error pointer exception handling. In the past, this has been
  * true for all AMD K7 & K8 CPUs, although newer AMD CPUs have been changed to
  * behave the same as Intel. This is checked via the CPUID_AMD_EBX_ERR_PTR_ZERO
- * feature bit and is reflected in the cpi_fp_amd_save member. Once this has
- * been confirmed on hardware which supports that feature, this test should be
- * narrowed. In the meantime, we always follow the existing behavior on any AMD
- * CPU.
+ * feature bit and is reflected in the cpi_fp_amd_save member.
  */
 boolean_t
 cpuid_need_fp_excp_handling()
 {
-	return (cpuid_info0.cpi_vendor == X86_VENDOR_AMD);
+	return (cpuid_info0.cpi_vendor == X86_VENDOR_AMD &&
+	    cpuid_info0.cpi_fp_amd_save != 0);
 }
 
 /*
