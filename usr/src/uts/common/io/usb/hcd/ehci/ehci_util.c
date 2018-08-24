@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -834,8 +835,7 @@ skip_intr:
  * Register FIXED or MSI interrupts.
  */
 static int
-ehci_add_intrs(ehci_state_t	*ehcip,
-		int		intr_type)
+ehci_add_intrs(ehci_state_t *ehcip, int intr_type)
 {
 	int	actual, avail, intr_size, count = 0;
 	int	i, flag, ret;
@@ -1232,8 +1232,7 @@ ehci_init_check_status(ehci_state_t	*ehcip)
  * Initialize the Host Controller (HC).
  */
 int
-ehci_init_ctlr(ehci_state_t	*ehcip,
-		int		init_type)
+ehci_init_ctlr(ehci_state_t *ehcip, int init_type)
 {
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl, "ehci_init_ctlr:");
 
@@ -1406,6 +1405,19 @@ ehci_take_control(ehci_state_t *ehcip)
 		extended_cap = pci_config_get32(ehcip->ehci_config_handle,
 		    extended_cap_offset);
 
+		/*
+		 * It's possible that we'll receive an invalid PCI read here due
+		 * to something going wrong due to platform firmware. This has
+		 * been observed in the wild depending on the version of ACPI in
+		 * use. If this happens, we'll assume that the capability does
+		 * not exist and that we do not need to take control from the
+		 * BIOS.
+		 */
+		if (extended_cap == PCI_EINVAL32) {
+			extended_cap_id = EHCI_EX_CAP_ID_RESERVED;
+			break;
+		}
+
 		/* Get the capability ID */
 		extended_cap_id = (extended_cap & EHCI_EX_CAP_ID) >>
 		    EHCI_EX_CAP_ID_SHIFT;
@@ -1418,6 +1430,7 @@ ehci_take_control(ehci_state_t *ehcip)
 		/* Get the offset of the next capability */
 		extended_cap_offset = (extended_cap & EHCI_EX_CAP_NEXT_PTR) >>
 		    EHCI_EX_CAP_NEXT_PTR_SHIFT;
+
 	}
 
 	/*
@@ -2976,7 +2989,8 @@ ehci_lattice_parent(uint_t node)
  * Based on the "real" array leaf node and interval, get the periodic node.
  */
 static uint_t
-ehci_find_periodic_node(uint_t leaf, int interval) {
+ehci_find_periodic_node(uint_t leaf, int interval)
+{
 	uint_t	lattice_leaf;
 	uint_t	height = ehci_lattice_height(interval);
 	uint_t	pnode;

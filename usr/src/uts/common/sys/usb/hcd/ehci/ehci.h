@@ -280,6 +280,7 @@ typedef volatile struct ehci_regs {
 #define	EHCI_EX_CAP_NEXT_PTR_SHIFT	8
 #define	EHCI_EX_CAP_ID			0x000000FF
 #define	EHCI_EX_CAP_ID_SHIFT		0
+#define	EHCI_EX_CAP_ID_RESERVED		0
 #define	EHCI_EX_CAP_ID_BIOS_HANDOFF	1
 
 #define	EHCI_LEGSUP_OS_OWNED_SEM	0x01000000
