@@ -388,6 +388,10 @@ static const elfcap_desc_t hw2_386[ELFCAP_NUM_HW2_386] = {
 		AV_386_2_AVX512_4FMAPS, STRDESC("AV_386_2_AVX512_4FMAPS"),
 		STRDESC("AVX512_4FMAPS"), STRDESC("avx512_4fmaps"),
 	},
+	{						/* 0x00100000 */
+		AV_386_2_SHA, STRDESC("AV_386_2_SHA"),
+		STRDESC("SHA"), STRDESC("sha"),
+	}
 };
 
 /*
