@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _ELFCAP_DOT_H
@@ -115,7 +115,7 @@ typedef enum {
 #define	ELFCAP_NUM_SF1			3
 #define	ELFCAP_NUM_HW1_SPARC		17
 #define	ELFCAP_NUM_HW1_386		32
-#define	ELFCAP_NUM_HW2_386		20
+#define	ELFCAP_NUM_HW2_386		21
 
 
 /*

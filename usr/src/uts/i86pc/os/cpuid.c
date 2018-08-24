@@ -3221,6 +3221,8 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 			hwcap_flags_2 |= AV_386_2_ADX;
 		if (*ebx & CPUID_INTC_EBX_7_0_RDSEED)
 			hwcap_flags_2 |= AV_386_2_RDSEED;
+		if (*ebx & CPUID_INTC_EBX_7_0_SHA)
+			hwcap_flags_2 |= AV_386_2_SHA;
 
 	}
 
