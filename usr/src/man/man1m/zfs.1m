@@ -26,7 +26,7 @@
 .\" Copyright (c) 2014, Joyent, Inc. All rights reserved.
 .\" Copyright (c) 2014 by Adam Stevko. All rights reserved.
 .\" Copyright (c) 2014 Integros [integros.com]
-.\" Copyright 2017 Nexenta Systems, Inc.
+.\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright 2018 Joyent, Inc.
 .\"
 .Dd Feb 10, 2018
@@ -3142,7 +3142,8 @@ for more information.
 .Ar perm Ns | Ns @ Ns Ar setname Ns Oo , Ns Ar perm Ns | Ns @ Ns
 .Ar setname Oc Ns ...
 .Ar filesystem Ns | Ns Ar volume
-.br
+.Xc
+.It Xo
 .Nm
 .Cm allow
 .Op Fl dl
@@ -3316,7 +3317,8 @@ and can be no more than 64 characters long.
 .Oo Ar perm Ns | Ns @ Ns Ar setname Ns Oo , Ns Ar perm Ns | Ns @ Ns
 .Ar setname Oc Ns ... Oc
 .Ar filesystem Ns | Ns Ar volume
-.br
+.Xc
+.It Xo
 .Nm
 .Cm unallow
 .Op Fl dlr
@@ -3324,7 +3326,8 @@ and can be no more than 64 characters long.
 .Oo Ar perm Ns | Ns @ Ns Ar setname Ns Oo , Ns Ar perm Ns | Ns @ Ns
 .Ar setname Oc Ns ... Oc
 .Ar filesystem Ns | Ns Ar volume
-.br
+.Xc
+.It Xo
 .Nm
 .Cm unallow
 .Op Fl r
