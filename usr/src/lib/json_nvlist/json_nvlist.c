@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -331,7 +331,7 @@ hdlr_bareword(state_t *s)
 /* ARGSUSED */
 static int
 collect_number(state_t *s, boolean_t *isint, int32_t *result,
-    double *fresult __unused)
+    double *fresult)
 {
 	boolean_t neg = B_FALSE;
 	int t;
