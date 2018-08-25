@@ -27,6 +27,8 @@
  * Copyright 2018 Nexenta Systems, Inc.
  */
 
+#define	__STDC_WANT_LIB_EXT1__	1
+
 #include "lint.h"
 
 #include <sys/types.h>

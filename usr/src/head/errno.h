@@ -60,6 +60,14 @@ extern int errno;
 #endif
 #endif	/* defined(_REENTRANT) || defined(_TS_ERRNO) */
 
+#if __EXT1_VISIBLE
+/* ISO/IEC 9899:2011 K.3.2.2 */
+#ifndef	_ERRNO_T_DEFINED
+#define	_ERRNO_T_DEFINED
+typedef int errno_t;
+#endif
+#endif	/* __EXT1_VISIBLE */
+
 #ifdef	__cplusplus
 }
 #endif
