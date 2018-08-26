@@ -34,13 +34,23 @@ include		$(SRC)/lib/Makefile.rootfs
 include		$(SRC)/lib/Makefile.lib.64
 include		../Makefile.com
 
+CAPFILES =	pics/sha1-ni.o \
+		pics/sha256-ni.o
+
 EXTPICS =	pics/md5_amd64.o \
-		pics/sha1-x86_64.o \
 		pics/sha512-x86_64.o \
-		pics/sha256-x86_64.o
+		pics/sha256-x86_64.o \
+		pics/sha1-x86_64.o \
+		$(CAPFILES:%.o=%.o.symcap)
 
 CLEANFILES +=	$(EXTPICS) \
-		$(EXTPICS:pics/%.o=%.s)
+		$(EXTPICS:pics/%.o=%.s) \
+		$(CAPFILES) \
+		$(CAPFILES:%.o=%.o.objcap) \
+		$(CAPFILES:%.o=%.o.symcap)
+
+pics/sha1-ni.o.objcap		:= CAPFILE = capabilities/sha.cap
+pics/sha256-ni.o.objcap		:= CAPFILE = capabilities/sha.cap
 
 # This prevents <sys/asm_linkage.h> from including C source:
 AS_CPPFLAGS += -D_ASM
@@ -56,6 +66,21 @@ lint:		lintcheck
 pics/%.o: %.s
 		$(COMPILE.s) -o $@ ${@F:.o=.s}
 		$(POST_PROCESS_O)
+
+pics/%.o: $(SRC)/common/crypto/sha1/amd64/%.s
+		$(COMPILE.s) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%.o: $(SRC)/common/crypto/sha2/amd64/%.s
+		$(COMPILE.s) -o $@ $<
+		$(POST_PROCESS_O)
+
+pics/%.o.objcap: pics/%.o
+		$(LD) -r -o $@ -M$(CAPFILE) -Breduce $<
+		$(POST_PROCESS_O)
+
+pics/%.o.symcap: pics/%.o.objcap
+		$(LD) -r -o $@ -z symbolcap $<
 
 md5_amd64.s: $(COMDIR)/md5/amd64/md5_amd64.pl
 		$(PERL) $? $@

@@ -1,0 +1,29 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2018 Joyent, Inc.
+#
+
+$mapfile_version 2
+
+CAPABILITY shani {
+	MACHINE = i86pc;
+	HW_1 = SSE2 SSSE3 SSE4.1;
+	#
+	# To avoid a chicken and egg problem with ld, we refer to the
+	# SHA hardware cap value by its numeric value rather than the name.
+	# This allows us to deal with the fact that we're almost
+	# certainly building this on a system before the capability was
+	# known.
+	#
+	HW_2 = 0x100000;
+};
