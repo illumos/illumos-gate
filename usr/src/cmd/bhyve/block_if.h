@@ -53,12 +53,12 @@
 #endif
 
 struct blockif_req {
-	struct iovec	br_iov[BLOCKIF_IOV_MAX];
 	int		br_iovcnt;
 	off_t		br_offset;
 	ssize_t		br_resid;
 	void		(*br_callback)(struct blockif_req *req, int err);
 	void		*br_param;
+	struct iovec	br_iov[BLOCKIF_IOV_MAX];
 };
 
 struct blockif_ctxt;

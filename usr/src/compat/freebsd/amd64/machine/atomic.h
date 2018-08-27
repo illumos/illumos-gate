@@ -18,6 +18,17 @@
 #define	_COMPAT_FREEBSD_AMD64_MACHINE_ATOMIC_H_
 
 static __inline u_int
+atomic_load_acq_short(volatile u_short *p)
+{
+	u_short res;
+
+	res = *p;
+	__asm volatile("" : : : "memory");
+
+	return (res);
+}
+
+static __inline u_int
 atomic_load_acq_int(volatile u_int *p)
 {
 	u_int res;
@@ -93,6 +104,23 @@ atomic_cmpset_long(volatile u_long *dst, u_long expect, u_long src)
 	  "+a" (expect)			/* 2 */
 	: "r" (src)			/* 3 */
 	: "memory", "cc");
+	return (res);
+}
+
+static __inline int
+atomic_testandset_int(volatile u_int *p, u_int v)
+{
+	u_char res;
+
+	__asm __volatile(
+	"	lock ;			"
+	"	btsl	%2,%1 ;		"
+	"	setc	%0 ;		"
+	"# atomic_testandset_int"
+	: "=q" (res),		/* 0 */
+	"+m" (*p)		/* 1 */
+	: "Ir" (v & 0x1f)	/* 2 */
+	: "cc");
 	return (res);
 }
 
@@ -187,6 +215,13 @@ atomic_swap_long(volatile u_long *p, u_long v)
 	  "+m" (*p));			/* 1 */
 	return (v);
 }
+
+
+#define	atomic_store_short(p, v)	\
+	    (*(volatile u_short *)(p) = (u_short)(v))
+#define	atomic_store_int(p, v)		\
+	    (*(volatile u_int *)(p) = (u_int)(v))
+
 
 #define	atomic_readandclear_int(p)	atomic_swap_int(p, 0)
 #define	atomic_readandclear_long(p)	atomic_swap_long(p, 0)

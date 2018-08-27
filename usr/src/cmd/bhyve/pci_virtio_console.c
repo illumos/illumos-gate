@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2016 iXsystems Inc.
  * All rights reserved.
  *
@@ -316,7 +318,7 @@ pci_vtcon_sock_add(struct pci_vtcon_softc *sc, const char *name,
 	sun.sun_family = AF_UNIX;
 	sun.sun_len = sizeof(struct sockaddr_un);
 	strcpy(pathcopy, path);
-	strncpy(sun.sun_path, basename(pathcopy), sizeof(sun.sun_path));
+	strlcpy(sun.sun_path, basename(pathcopy), sizeof(sun.sun_path));
 	free(pathcopy);
 
 	if (bindat(fd, s, (struct sockaddr *)&sun, sun.sun_len) < 0) {
@@ -326,7 +328,7 @@ pci_vtcon_sock_add(struct pci_vtcon_softc *sc, const char *name,
 #else /* __FreeBSD__ */
 	/* Do a simple bind rather than the FreeBSD bindat() */
 	addr.sun_family = AF_UNIX;
-	(void) strncpy(addr.sun_path, path, sizeof (addr.sun_path));
+	(void) strlcpy(addr.sun_path, path, sizeof (addr.sun_path));
 	if (bind(fd, (struct sockaddr *)&addr, sizeof (addr)) < 0) {
 		error = -1;
 		goto out;
@@ -594,22 +596,15 @@ pci_vtcon_notify_tx(void *vsc, struct vqueue_info *vq)
 	struct pci_vtcon_softc *sc;
 	struct pci_vtcon_port *port;
 	struct iovec iov[1];
-#ifdef __FreeBSD__
 	uint16_t idx, n;
-#else
-	uint16_t idx;
-#endif
 	uint16_t flags[8];
 
 	sc = vsc;
 	port = pci_vtcon_vq_to_port(sc, vq);
 
 	while (vq_has_descs(vq)) {
-#ifdef __FreeBSD__
 		n = vq_getchain(vq, &idx, iov, 1, flags);
-#else
-		vq_getchain(vq, &idx, iov, 1, flags);
-#endif
+		assert(n >= 1);
 		if (port != NULL)
 			port->vsp_cb(port, port->vsp_arg, iov, 1);
 
@@ -681,7 +676,7 @@ pci_vtcon_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 
 	while ((opt = strsep(&opts, ",")) != NULL) {
 		portname = strsep(&opt, "=");
-		portpath = strdup(opt);
+		portpath = opt;
 
 		/* create port */
 		if (pci_vtcon_sock_add(sc, portname, portpath) < 0) {

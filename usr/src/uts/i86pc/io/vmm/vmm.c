@@ -991,8 +991,8 @@ sysmem_mapping(struct vm *vm, struct mem_map *mm)
 		return (false);
 }
 
-static vm_paddr_t
-sysmem_maxaddr(struct vm *vm)
+vm_paddr_t
+vmm_sysmem_maxaddr(struct vm *vm)
 {
 	struct mem_map *mm;
 	vm_paddr_t maxaddr;
@@ -1127,7 +1127,7 @@ vm_assign_pptdev(struct vm *vm, int pptfd)
 	if (ppt_assigned_devices(vm) == 0) {
 		KASSERT(vm->iommu == NULL,
 		    ("vm_assign_pptdev: iommu must be NULL"));
-		maxaddr = sysmem_maxaddr(vm);
+		maxaddr = vmm_sysmem_maxaddr(vm);
 		vm->iommu = iommu_create_domain(maxaddr);
 		if (vm->iommu == NULL)
 			return (ENXIO);
@@ -2190,6 +2190,7 @@ restart:
 			break;
 		case VM_EXITCODE_MONITOR:
 		case VM_EXITCODE_MWAIT:
+		case VM_EXITCODE_VMINSN:
 			vm_inject_ud(vm, vcpuid);
 			break;
 #ifndef __FreeBSD__

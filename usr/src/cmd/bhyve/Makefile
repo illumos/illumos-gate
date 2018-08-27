@@ -51,6 +51,7 @@ SRCS =	acpi.c			\
 	pci_hostbridge.c	\
 	pci_irq.c		\
 	pci_lpc.c		\
+	pci_nvme.c		\
 	pci_passthru.c		\
 	pci_uart.c		\
 	pci_virtio_block.c	\
@@ -76,7 +77,15 @@ SRCS =	acpi.c			\
 	vmm_instruction_emul.c	\
 	xmsr.c			\
 	spinup_ap.c		\
+	iov.c			\
 	bhyve_sol_glue.c
+
+# The virtio-scsi driver appears to include  a slew of materials from FreeBSD's
+# native SCSI implementation.  We will omit that complexity for now.
+	#ctl_util.c		\
+	#ctl_scsi_all.c		\
+	#pci_virtio_scsi.c	\
+
 
 OBJS = $(SRCS:.c=.o)
 
@@ -108,6 +117,13 @@ CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
 
 # Disable the crypto code until it is wired up
 CPPFLAGS +=	-DNO_OPENSSL
+
+pci_nvme.o := CERRWARN += -_gcc=-Wno-pointer-sign
+
+# Force c99 for everything
+CSTD=		$(CSTD_GNU99)
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
 
 $(PROG) := LDLIBS += -lsocket -lnsl -ldlpi -ldladm -lmd -luuid -lvmmapi -lz
 $(ZHYVE_PROG) := LDLIBS += -lnvpair

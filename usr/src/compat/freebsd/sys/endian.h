@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_ENDIAN_H_
@@ -121,5 +122,15 @@ le64enc(void *pp, uint64_t u)
 	le32enc(p, (uint32_t)(u & 0xffffffffU));
 	le32enc(p + 4, (uint32_t)(u >> 32));
 }
+
+#ifdef _LITTLE_ENDIAN
+#define	htole16(x)	((uint16_t)(x))
+#define	htole32(x)	((uint32_t)(x))
+#define	htole64(x)	((uint64_t)(x))
+
+#define	le16toh(x)	((uint16_t)(x))
+#define	le32toh(x)	((uint32_t)(x))
+#define	le64toh(x)	((uint64_t)(x))
+#endif
 
 #endif	/* _COMPAT_FREEBSD_SYS_ENDIAN_H_ */

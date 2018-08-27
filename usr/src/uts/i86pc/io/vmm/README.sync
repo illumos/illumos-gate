@@ -1,22 +1,18 @@
 The bhyve kernel module and its associated userland consumers have been updated
 to the latest upstream FreeBSD sources as of:
 
-commit 0fac2150fc0f1befa5803ca010ed63a6335847ad
-Author: grehan <grehan@FreeBSD.org>
-Date:   Fri May 4 01:36:49 2018 +0000
+commit f81459bd8363602ed5e436f10288320419e80ccf
+Author: andrew <andrew@FreeBSD.org>
+Date:   Thu Sep 27 11:16:19 2018 +0000
 
-    Allow arbitrary numbers of columns for VNC server screen resolution.
+    Handle a guest executing a vm instruction by trapping and raising an
+    undefined instruction exception. Previously we would exit the guest,
+    however an unprivileged user could execute these.
 
-    The prior code only allowed multiples of 32 for the
-    numbers of columns. Remove this restriction to allow
-    a forthcoming UEFI firmware update to allow arbitrary
-    x,y resolutions.
+    Found with:     syzkaller
+    Reviewed by:    araujo, tychon (previous version)
+    Approved by:    re (kib)
+    MFC after:      1 week
+    Differential Revision:  https://reviews.freebsd.org/D17192
 
-    (the code for handling rows already supported non mult-32 values)
-
-    Reviewed by:    Leon Dang (original author)
-    MFC after:      3 weeks
-    Differential Revision:  https://reviews.freebsd.org/D15274
-
-
-Which corresponds to SVN revision: 333235
+Which corresponds to SVN revision: 338957

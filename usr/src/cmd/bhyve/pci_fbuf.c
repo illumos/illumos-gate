@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2015 Nahanni Systems, Inc.
  * Copyright 2018 Joyent, Inc.
  * All rights reserved.

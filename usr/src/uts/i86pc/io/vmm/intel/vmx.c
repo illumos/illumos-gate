@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/psl.h>
 #include <machine/cpufunc.h>
 #include <machine/md_var.h>
+#include <machine/reg.h>
 #include <machine/segments.h>
 #include <machine/smp.h>
 #include <machine/specialreg.h>
@@ -227,6 +228,15 @@ static u_int vpid_alloc_failed;
 SYSCTL_UINT(_hw_vmm_vmx, OID_AUTO, vpid_alloc_failed, CTLFLAG_RD,
 	    &vpid_alloc_failed, 0, NULL);
 
+static int guest_l1d_flush;
+SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush, CTLFLAG_RD,
+    &guest_l1d_flush, 0, NULL);
+static int guest_l1d_flush_sw;
+SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush_sw, CTLFLAG_RD,
+    &guest_l1d_flush_sw, 0, NULL);
+
+static struct msr_entry msr_load_list[1] __aligned(16);
+
 /*
  * The definitions of SDT probes for VMX.
  */
@@ -295,6 +305,9 @@ SDT_PROBE_DEFINE3(vmm, vmx, exit, monitor,
     "struct vmx *", "int", "struct vm_exit *");
 
 SDT_PROBE_DEFINE3(vmm, vmx, exit, mwait,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, vminsn,
     "struct vmx *", "int", "struct vm_exit *");
 
 SDT_PROBE_DEFINE4(vmm, vmx, exit, unknown,
@@ -627,6 +640,9 @@ vmx_cleanup(void)
 		vpid_unr = NULL;
 	}
 
+	if (nmi_flush_l1d_sw == 1)
+		nmi_flush_l1d_sw = 0;
+
 	smp_rendezvous(NULL, vmx_disable, NULL, NULL);
 
 	return (0);
@@ -886,6 +902,36 @@ vmx_init(int ipinum)
 		return (error);
 	}
 
+#ifdef __FreeBSD__
+	guest_l1d_flush = (cpu_ia32_arch_caps & IA32_ARCH_CAP_RDCL_NO) == 0;
+	TUNABLE_INT_FETCH("hw.vmm.l1d_flush", &guest_l1d_flush);
+
+	/*
+	 * L1D cache flush is enabled.  Use IA32_FLUSH_CMD MSR when
+	 * available.  Otherwise fall back to the software flush
+	 * method which loads enough data from the kernel text to
+	 * flush existing L1D content, both on VMX entry and on NMI
+	 * return.
+	 */
+	if (guest_l1d_flush) {
+		if ((cpu_stdext_feature3 & CPUID_STDEXT3_L1D_FLUSH) == 0) {
+			guest_l1d_flush_sw = 1;
+			TUNABLE_INT_FETCH("hw.vmm.l1d_flush_sw",
+			    &guest_l1d_flush_sw);
+		}
+		if (guest_l1d_flush_sw) {
+			if (nmi_flush_l1d_sw <= 1)
+				nmi_flush_l1d_sw = 1;
+		} else {
+			msr_load_list[0].index = MSR_IA32_FLUSH_CMD;
+			msr_load_list[0].val = IA32_FLUSH_CMD_L1D;
+		}
+	}
+#else
+	/* L1D flushing is taken care of by ht_acquire() and friends */
+	guest_l1d_flush = 0;
+#endif /* __FreeBSD__ */
+
 	/*
 	 * Stash the cr0 and cr4 bits that must be fixed to 0 or 1
 	 */
@@ -1109,6 +1155,15 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 #endif
 		error += vmwrite(VMCS_VPID, vpid[i]);
 
+		if (guest_l1d_flush && !guest_l1d_flush_sw) {
+			vmcs_write(VMCS_ENTRY_MSR_LOAD, pmap_kextract(
+			    (vm_offset_t)&msr_load_list[0]));
+			vmcs_write(VMCS_ENTRY_MSR_LOAD_COUNT,
+			    nitems(msr_load_list));
+			vmcs_write(VMCS_EXIT_MSR_STORE, 0);
+			vmcs_write(VMCS_EXIT_MSR_STORE_COUNT, 0);
+		}
+
 		/* exception bitmap */
 		if (vcpu_trace_exceptions(vm, i))
 			exc_bitmap = 0xffffffff;
@@ -1116,8 +1171,8 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 			exc_bitmap = 1 << IDT_MC;
 		error += vmwrite(VMCS_EXCEPTION_BITMAP, exc_bitmap);
 
-		vmx->ctx[i].guest_dr6 = 0xffff0ff0;
-		error += vmwrite(VMCS_GUEST_DR7, 0x400);
+		vmx->ctx[i].guest_dr6 = DBREG_DR6_RESERVED1;
+		error += vmwrite(VMCS_GUEST_DR7, DBREG_DR7_RESERVED1);
 
 		if (virtual_interrupt_delivery) {
 			error += vmwrite(VMCS_APIC_ACCESS, APIC_ACCESS_ADDRESS);
@@ -2975,6 +3030,19 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	case EXIT_REASON_MWAIT:
 		SDT_PROBE3(vmm, vmx, exit, mwait, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_MWAIT;
+		break;
+	case EXIT_REASON_VMCALL:
+	case EXIT_REASON_VMCLEAR:
+	case EXIT_REASON_VMLAUNCH:
+	case EXIT_REASON_VMPTRLD:
+	case EXIT_REASON_VMPTRST:
+	case EXIT_REASON_VMREAD:
+	case EXIT_REASON_VMRESUME:
+	case EXIT_REASON_VMWRITE:
+	case EXIT_REASON_VMXOFF:
+	case EXIT_REASON_VMXON:
+		SDT_PROBE3(vmm, vmx, exit, vminsn, vmx, vcpu, vmexit);
+		vmexit->exitcode = VM_EXITCODE_VMINSN;
 		break;
 	default:
 		SDT_PROBE4(vmm, vmx, exit, unknown,

@@ -868,7 +868,7 @@ get_all_registers(struct vmctx *ctx, int vcpu)
 		if (error == 0)
 			printf("rflags[%d]\t0x%016lx\n", vcpu, rflags);
 	}
-	
+
 	return (error);
 }
 
@@ -1135,7 +1135,7 @@ get_misc_vmcs(struct vmctx *ctx, int vcpu)
 				vcpu, u64);
 		}
 	}
-	
+
 	if (!error && (get_tpr_threshold || get_all)) {
 		uint64_t threshold;
 		error = vm_get_vmcs_field(ctx, vcpu, VMCS_TPR_THRESHOLD,
@@ -1153,7 +1153,7 @@ get_misc_vmcs(struct vmctx *ctx, int vcpu)
 				vcpu, insterr);
 		}
 	}
-	
+
 	if (!error && (get_exit_ctls || get_all)) {
 		error = vm_get_vmcs_field(ctx, vcpu, VMCS_EXIT_CTLS, &ctl);
 		if (error == 0)
@@ -1201,7 +1201,7 @@ get_misc_vmcs(struct vmctx *ctx, int vcpu)
 		if (error == 0)
 			printf("host_rsp[%d]\t\t0x%016lx\n", vcpu, rsp);
 	}
-	
+
 	if (!error && (get_vmcs_link || get_all)) {
 		error = vm_get_vmcs_field(ctx, vcpu, VMCS_LINK_POINTER, &addr);
 		if (error == 0)

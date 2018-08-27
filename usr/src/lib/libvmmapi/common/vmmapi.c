@@ -77,8 +77,11 @@ __FBSDID("$FreeBSD$");
 
 #ifndef __FreeBSD__
 /* shim to no-op for now */
-#define MAP_NOCORE 0
-#define MAP_ALIGNED_SUPER 0
+#define	MAP_NOCORE		0
+#define	MAP_ALIGNED_SUPER	0
+
+/* Rely on PROT_NONE for guard purposes */
+#define	MAP_GUARD		(MAP_PRIVATE | MAP_ANON | MAP_NORESERVE)
 #endif
 
 /*
@@ -135,19 +138,19 @@ vm_do_ctl(int cmd, const char *name)
 static int
 vm_device_open(const char *name)
 {
-        int fd, len;
-        char *vmfile;
+	int fd, len;
+	char *vmfile;
 
 	len = strlen("/dev/vmm/") + strlen(name) + 1;
 	vmfile = malloc(len);
 	assert(vmfile != NULL);
 	snprintf(vmfile, len, "/dev/vmm/%s", name);
 
-        /* Open the device file */
-        fd = open(vmfile, O_RDWR, 0);
+	/* Open the device file */
+	fd = open(vmfile, O_RDWR, 0);
 
 	free(vmfile);
-        return (fd);
+	return (fd);
 }
 
 int
@@ -425,7 +428,7 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	size_t objsize, len;
 	vm_paddr_t gpa;
 	char *baseaddr, *ptr;
-	int error, flags;
+	int error;
 
 	assert(vms == VM_MMAP_ALL);
 
@@ -454,16 +457,7 @@ vm_setup_memory(struct vmctx *ctx, size_t memsize, enum vm_mmap_style vms)
 	 * and the adjoining guard regions.
 	 */
 	len = VM_MMAP_GUARD_SIZE + objsize + VM_MMAP_GUARD_SIZE;
-	flags = MAP_PRIVATE | MAP_ANON | MAP_NOCORE | MAP_ALIGNED_SUPER;
-#ifndef __FreeBSD__
-	/*
-	 * There is no need to reserve swap for the guest physical memory and
-	 * guard regions. Actual memory is allocated and mapped later through
-	 * vm_alloc_memseg() and setup_memory_segment().
-	 */
-	flags |= MAP_NORESERVE;
-#endif
-	ptr = mmap(NULL, len, PROT_NONE, flags, -1, 0);
+	ptr = mmap(NULL, len, PROT_NONE, MAP_GUARD | MAP_ALIGNED_SUPER, -1, 0);
 	if (ptr == MAP_FAILED)
 		return (-1);
 
@@ -607,8 +601,8 @@ vm_create_devmem(struct vmctx *ctx, int segid, const char *name, size_t len)
 	 * adjoining guard regions.
 	 */
 	len2 = VM_MMAP_GUARD_SIZE + len + VM_MMAP_GUARD_SIZE;
-	flags = MAP_PRIVATE | MAP_ANON | MAP_NOCORE | MAP_ALIGNED_SUPER;
-	base = mmap(NULL, len2, PROT_NONE, flags, -1, 0);
+	base = mmap(NULL, len2, PROT_NONE, MAP_GUARD | MAP_ALIGNED_SUPER, -1,
+	    0);
 	if (base == MAP_FAILED)
 		goto done;
 
@@ -997,7 +991,7 @@ vm_set_capability(struct vmctx *ctx, int vcpu, enum vm_cap_type cap, int val)
 	vmcap.cpuid = vcpu;
 	vmcap.captype = cap;
 	vmcap.capval = val;
-	
+
 	return (ioctl(ctx->fd, VM_SET_CAPABILITY, &vmcap));
 }
 
@@ -1801,4 +1795,3 @@ vm_get_ioctls(size_t *len)
 	return (NULL);
 }
 #endif /* __FreeBSD__ */
-
