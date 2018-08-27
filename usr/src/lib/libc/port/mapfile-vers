@@ -599,6 +599,11 @@ $if lf64
 	posix_fadvise64;
 	posix_fallocate64;
 $endif
+} SUNW_1.22.7;
+
+SYMBOL_VERSION SUNW_1.22.7 {   # s10u10 - SunOS 5.10 (Solaris 10) patch additions
+    protected:
+	SUNW_1.22.7;
 } SUNW_1.22.6;
 
 SYMBOL_VERSION SUNW_1.22.6 {	# s10u9 - SunOS 5.10 (Solaris 10) patch additions

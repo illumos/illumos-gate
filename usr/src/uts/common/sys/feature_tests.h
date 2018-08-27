@@ -437,19 +437,14 @@ extern "C" {
 #endif
 
 /* ISO/IEC 9899:2011 Annex K */
-#if !defined(_STRICT_SYMBOLS)
-#define	__EXT1_VISIBLE	1
-#else
-#define	__EXT1_VISIBLE	0
-#endif
-
 #if defined(__STDC_WANT_LIB_EXT1__)
-#undef	__EXT1_VISIBLE
 #if __STDC_WANT_LIB_EXT1__
 #define	__EXT1_VISIBLE		1
 #else
 #define	__EXT1_VISIBLE		0
 #endif
+#else
+#define	__EXT1_VISIBLE		0
 #endif /* __STDC_WANT_LIB_EXT1__ */
 
 /*
