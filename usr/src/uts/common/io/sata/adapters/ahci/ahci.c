@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1182,7 +1183,7 @@ ahci_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
 static int
 ahci_register_sata_hba_tran(ahci_ctl_t *ahci_ctlp, uint32_t cap_status)
 {
-	struct 	sata_hba_tran	*sata_hba_tran;
+	struct	sata_hba_tran	*sata_hba_tran;
 
 	AHCIDBG(AHCIDBG_INIT|AHCIDBG_ENTRY, ahci_ctlp,
 	    "ahci_register_sata_hba_tran enter", NULL);
@@ -1884,8 +1885,8 @@ ahci_do_sync_start(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
  *
  * NOTE: it will always return slot 0 for following commands to simplify the
  * algorithm.
- * 	1. REQUEST SENSE or READ LOG EXT command during error recovery process
- * 	2. READ/WRITE PORTMULT command
+ *	1. REQUEST SENSE or READ LOG EXT command during error recovery process
+ *	2. READ/WRITE PORTMULT command
  */
 static int
 ahci_claim_free_slot(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
@@ -2041,7 +2042,7 @@ out:
  * Builds the Command Table for the sata packet and delivers it to controller.
  *
  * Returns:
- * 	slot number if we can obtain a slot successfully
+ *	slot number if we can obtain a slot successfully
  *	otherwise, return AHCI_FAILURE
  */
 static int
@@ -2160,17 +2161,17 @@ ahci_deliver_satapkt(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	case 0:
 		/*
 		 * satacmd_addr_type will be 0 for the commands below:
-		 * 	ATAPI command
-		 * 	SATAC_IDLE_IM
-		 * 	SATAC_STANDBY_IM
-		 * 	SATAC_DOWNLOAD_MICROCODE
-		 * 	SATAC_FLUSH_CACHE
-		 * 	SATAC_SET_FEATURES
-		 * 	SATAC_SMART
-		 * 	SATAC_ID_PACKET_DEVICE
-		 * 	SATAC_ID_DEVICE
-		 * 	SATAC_READ_PORTMULT
-		 * 	SATAC_WRITE_PORTMULT
+		 *	ATAPI command
+		 *	SATAC_IDLE_IM
+		 *	SATAC_STANDBY_IM
+		 *	SATAC_DOWNLOAD_MICROCODE
+		 *	SATAC_FLUSH_CACHE
+		 *	SATAC_SET_FEATURES
+		 *	SATAC_SMART
+		 *	SATAC_ID_PACKET_DEVICE
+		 *	SATAC_ID_DEVICE
+		 *	SATAC_READ_PORTMULT
+		 *	SATAC_WRITE_PORTMULT
 		 */
 		/* FALLTHRU */
 
@@ -6738,10 +6739,10 @@ ahci_intr(caddr_t arg1, caddr_t arg2)
  * AHCI_INTR_STATUS_DHRS means a D2H Register FIS has been received
  * with the 'I' bit set. And the following commands will send thus
  * FIS with 'I' bit set upon the successful completion:
- * 	1. Non-data commands
- * 	2. DMA data-in command
- * 	3. DMA data-out command
- * 	4. PIO data-out command
+ *	1. Non-data commands
+ *	2. DMA data-in command
+ *	3. DMA data-out command
+ *	4. PIO data-out command
  *	5. PACKET non-data commands
  *	6. PACKET PIO data-in command
  *	7. PACKET PIO data-out command
@@ -6751,7 +6752,7 @@ ahci_intr(caddr_t arg1, caddr_t arg2)
  * AHCI_INTR_STATUS_PSS means a PIO Setup FIS has been received
  * with the 'I' bit set. And the following commands will send this
  * FIS upon the successful completion:
- * 	1. PIO data-in command
+ *	1. PIO data-in command
  */
 static int
 ahci_intr_cmd_cmplt(ahci_ctl_t *ahci_ctlp,
@@ -7705,7 +7706,7 @@ out:
  * HBA, and the respective PxSERR register bit will be set. And PxIS.IFS
  * (fatal) or PxIS.INFS (non-fatal) will be set. The conditions that
  * causes PxIS.IFS/PxIS.INFS to be set are
- * 	1. in PxSERR.ERR, P bit is set to '1'
+ *	1. in PxSERR.ERR, P bit is set to '1'
  *	2. in PxSERR.DIAG, C or H bit is set to '1'
  *	3. PhyRdy drop unexpectly, N bit is set to '1'
  * If the error occurred during a non-data FIS, the FIS must be
@@ -8406,7 +8407,7 @@ ahci_put_port_into_notrunning_state(ahci_ctl_t *ahci_ctlp,
  * the process.
  *
  * The routine will be called under following scenarios:
- * 	+ To reset the HBA
+ *	+ To reset the HBA
  *	+ To abort the packet(s)
  *	+ To reset the port
  *	+ To activate the port
@@ -9478,8 +9479,8 @@ out:
 
 /*
  * Used to recovery a PMULT pmport fatal error under FIS-based switching.
- * 	1. device specific.PxFBS.SDE=1
- * 	2. Non-Deivce specific.
+ *	1. device specific.PxFBS.SDE=1
+ *	2. Non Device specific.
  * Nothing will be done when Command-based switching is employed.
  *
  * Currently code is neither completed nor tested.
@@ -9993,23 +9994,24 @@ ahci_dump_commands(ahci_ctl_t *ahci_ctlp, uint8_t port,
 		}
 
 		spkt = ahci_portp->ahciport_slot_pkts[tmp_slot];
-		ASSERT(spkt != NULL);
-		cmd = spkt->satapkt_cmd;
+		if (spkt != NULL) {
+			cmd = spkt->satapkt_cmd;
 
-		cmn_err(CE_WARN, "!satapkt 0x%p: cmd_reg = 0x%x "
-		    "features_reg = 0x%x sec_count_msb = 0x%x "
-		    "lba_low_msb = 0x%x lba_mid_msb = 0x%x "
-		    "lba_high_msb = 0x%x sec_count_lsb = 0x%x "
-		    "lba_low_lsb = 0x%x lba_mid_lsb = 0x%x "
-		    "lba_high_lsb = 0x%x device_reg = 0x%x "
-		    "addr_type = 0x%x cmd_flags = 0x%x", (void *)spkt,
-		    cmd.satacmd_cmd_reg, cmd.satacmd_features_reg,
-		    cmd.satacmd_sec_count_msb, cmd.satacmd_lba_low_msb,
-		    cmd.satacmd_lba_mid_msb, cmd.satacmd_lba_high_msb,
-		    cmd.satacmd_sec_count_lsb, cmd.satacmd_lba_low_lsb,
-		    cmd.satacmd_lba_mid_lsb, cmd.satacmd_lba_high_lsb,
-		    cmd.satacmd_device_reg, cmd.satacmd_addr_type,
-		    *((uint32_t *)&(cmd.satacmd_flags)));
+			cmn_err(CE_WARN, "!satapkt 0x%p: cmd_reg = 0x%x "
+			    "features_reg = 0x%x sec_count_msb = 0x%x "
+			    "lba_low_msb = 0x%x lba_mid_msb = 0x%x "
+			    "lba_high_msb = 0x%x sec_count_lsb = 0x%x "
+			    "lba_low_lsb = 0x%x lba_mid_lsb = 0x%x "
+			    "lba_high_lsb = 0x%x device_reg = 0x%x "
+			    "addr_type = 0x%x cmd_flags = 0x%x", (void *)spkt,
+			    cmd.satacmd_cmd_reg, cmd.satacmd_features_reg,
+			    cmd.satacmd_sec_count_msb, cmd.satacmd_lba_low_msb,
+			    cmd.satacmd_lba_mid_msb, cmd.satacmd_lba_high_msb,
+			    cmd.satacmd_sec_count_lsb, cmd.satacmd_lba_low_lsb,
+			    cmd.satacmd_lba_mid_lsb, cmd.satacmd_lba_high_lsb,
+			    cmd.satacmd_device_reg, cmd.satacmd_addr_type,
+			    *((uint32_t *)&(cmd.satacmd_flags)));
+		}
 
 		CLEAR_BIT(slot_tags, tmp_slot);
 	}
