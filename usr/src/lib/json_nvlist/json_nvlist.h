@@ -17,7 +17,7 @@
 #define	_JSON_NVLIST_H
 
 #include <libnvpair.h>
-#include <libcmdutils.h>
+#include <libcustr.h>
 
 #ifdef __cplusplus
 extern "C" {

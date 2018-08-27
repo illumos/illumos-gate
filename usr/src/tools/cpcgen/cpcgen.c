@@ -30,6 +30,9 @@
 #include <sys/param.h>
 #include <assert.h>
 #include <ctype.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <json_nvlist.h>
 

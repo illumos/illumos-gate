@@ -19,7 +19,7 @@ OBJS	= cpcgen.o json_nvlist.o custr.o
 include ../Makefile.tools
 
 LDLIBS	+= -lnvpair
-CPPFLAGS += -I$(SRC)/lib/json_nvlist/
+CPPFLAGS += -I$(SRC)/lib/json_nvlist/ -I$(SRC)/lib/libcustr/common
 
 all: $(PROG)
 
