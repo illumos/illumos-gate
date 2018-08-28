@@ -11,7 +11,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -25,7 +25,7 @@ self int trace;
 self int mask;
 
 /*
- * The smbd_authsvc_work() function is a good place to start tracing
+ * The pipesvc_worker() function is a good place to start tracing
  * to watch RPC service actions.  This worker handles all activity
  * for a given named pipe instance, including the payload from all
  * SMB read/write requests on this endpoint.
@@ -40,7 +40,7 @@ pid$target:*smbd:pipesvc_worker:entry
  */
 pid$target:*smbd::entry,
 pid$target:libmlsvc.so.1::entry,
-pid$target:libmlrpc.so.1::entry,
+pid$target:libmlrpc.so.2::entry,
 pid$target:libsmbns.so.1::entry,
 pid$target:libsmb.so.1::entry
 /self->trace > 0 && self->mask == 0/
@@ -92,7 +92,7 @@ pid$target::smb_wcequiv_strlen:return
 
 pid$target:*smbd::return,
 pid$target:libmlsvc.so.1::return,
-pid$target:libmlrpc.so.1::return,
+pid$target:libmlrpc.so.2::return,
 pid$target:libsmbns.so.1::return,
 pid$target:libsmb.so.1::return
 /self->trace > 0 && self->mask == 0/
@@ -104,7 +104,7 @@ pid$target:libsmb.so.1::return
  * This function in libmlrpc prints out lots of internal state.
  * Comment it out if you don't want that noise.
  */
-pid$target:libmlrpc.so.1:ndo_trace:entry
+pid$target:libmlrpc.so.2:ndo_trace:entry
 /self->trace > 0 && self->mask == 0/
 {
 	printf("ndo_trace: %s", copyinstr(arg0));

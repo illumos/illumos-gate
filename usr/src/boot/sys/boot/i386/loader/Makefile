@@ -32,7 +32,7 @@ LIBI386=        ../libi386/libi386.a
 # loader.help build needs better awk
 AWK=		/usr/xpg4/bin/awk
 LD=		$(GNU_ROOT)/bin/gld
-CC=		$(GCC_ROOT)/bin/gcc
+CC=		$(GNUC_ROOT)/bin/gcc
 OBJCOPY=	$(GNU_ROOT)/bin/gobjcopy
 GSTRIP=		$(GNU_ROOT)/bin/gstrip
 ROOT_BOOT=	$(ROOT)/boot

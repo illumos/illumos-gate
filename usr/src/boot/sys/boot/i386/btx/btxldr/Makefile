@@ -21,7 +21,7 @@ OBJS=	btxldr.o
 
 AS=	$(GNU_ROOT)/bin/gas
 LD=	$(GNU_ROOT)/bin/gld
-CC=	$(GCC_ROOT)/bin/gcc
+CC=	$(GNUC_ROOT)/bin/gcc
 
 LOADER_ADDRESS=0x200000
 CPPFLAGS=

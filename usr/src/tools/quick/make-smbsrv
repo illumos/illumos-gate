@@ -262,6 +262,8 @@ do_tags() {
 	find head -name '*.h' -print |sort
 	find lib/smbsrv -name '*.[ch]' -print |sort
 	find lib/libsmbfs -name '*.[ch]' -print |sort
+	find lib/libmlrpc -name '*.ndl' -print |sort
+	find lib/libmlrpc -name '*.[ch]' -print |sort
 	find lib/libads -name '*.[ch]' -print |sort
 	find lib/libgss -name '*.[ch]' -print |sort
 	find cmd/smbsrv -name '*.[ch]' -print |sort

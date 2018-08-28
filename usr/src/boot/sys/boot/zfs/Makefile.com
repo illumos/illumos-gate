@@ -25,7 +25,7 @@ clean: clobber
 clobber:
 	$(RM) machine x86 $(OBJS) libzfsboot.a
 
-CC=     $(GCC_ROOT)/bin/gcc
+CC=     $(GNUC_ROOT)/bin/gcc
 CPPFLAGS=
 
 SRCS +=		../zfs.c ../gzip.c

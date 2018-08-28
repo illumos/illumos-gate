@@ -17,7 +17,7 @@ include $(SRC)/Makefile.master
 
 AS=	$(GNU_ROOT)/bin/gas
 LD=	$(GNU_ROOT)/bin/gld
-CC=	$(GCC_ROOT)/bin/gcc
+CC=	$(GNUC_ROOT)/bin/gcc
 
 CPPFLAGS= -I./../../common
 CFLAGS=	-O2 -march=i386 -ffreestanding -mno-mmx -mno-3dnow -mno-sse -mno-sse2

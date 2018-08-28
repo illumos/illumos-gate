@@ -227,7 +227,7 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 		 */
 		dst_fnode = dst_fqi->fq_fnode;
 
-		if (!(sr->arg.dirop.flags && SMB_RENAME_FLAG_OVERWRITE)) {
+		if ((sr->arg.dirop.flags & SMB_RENAME_FLAG_OVERWRITE) == 0) {
 			smb_rename_release_src(sr);
 			smb_node_release(dst_fnode);
 			smb_node_release(dst_dnode);

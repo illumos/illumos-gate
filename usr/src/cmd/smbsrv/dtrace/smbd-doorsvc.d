@@ -11,7 +11,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -37,7 +37,7 @@ pid$target:*smbd:smbd_door_dispatch_op:entry
  */
 pid$target:*smbd::entry,
 pid$target:libmlsvc.so.1::entry,
-pid$target:libmlrpc.so.1::entry,
+pid$target:libmlrpc.so.2::entry,
 pid$target:libsmbns.so.1::entry,
 pid$target:libsmb.so.1::entry,
 pid$target:libsmbfs.so.1::entry
@@ -80,7 +80,7 @@ pid$target::smb_wcequiv_strlen:return
 
 pid$target:*smbd::return,
 pid$target:libmlsvc.so.1::return,
-pid$target:libmlrpc.so.1::return,
+pid$target:libmlrpc.so.2::return,
 pid$target:libsmbns.so.1::return,
 pid$target:libsmb.so.1::return,
 pid$target:libsmbfs.so.1::return

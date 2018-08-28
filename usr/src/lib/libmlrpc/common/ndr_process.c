@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1984,7 +1984,8 @@ ndr_s_wchar(ndr_ref_t *encl_ref)
 	 */
 	if (nds->m_op == NDR_M_OP_UNMARSHALL) {
 		wcs[wlen] = 0;
-		slen = ndr__wcstombs(valp, wcs, wlen);
+		slen = encl_ref->size_is * NDR_MB_CHAR_MAX;
+		slen = ndr__wcstombs(valp, wcs, slen);
 		if (slen == (size_t)-1)
 			return (0);
 		valp[slen] = '\0';

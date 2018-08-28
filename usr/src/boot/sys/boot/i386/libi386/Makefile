@@ -26,7 +26,7 @@ clobber:
 	$(RM) machine x86 $(OBJS) libi386.a
 
 AS=	$(GNU_ROOT)/bin/gas
-CC=	$(GCC_ROOT)/bin/gcc
+CC=	$(GNUC_ROOT)/bin/gcc
 OBJCOPY= $(GNU_ROOT)/bin/gobjcopy
 AS_FLAGS=--32
 ASFLAGS=-m32
