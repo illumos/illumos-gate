@@ -66,7 +66,12 @@ __FBSDID("$FreeBSD$");
 #define BLOCKIF_SIG	0xb109b109
 
 #define BLOCKIF_NUMTHR	8
+#ifdef __FreeBSD__
 #define BLOCKIF_MAXREQ	(64 + BLOCKIF_NUMTHR)
+#else
+/* Enlarge to keep pace with the virtio-block ring size */
+#define BLOCKIF_MAXREQ	(128 + BLOCKIF_NUMTHR)
+#endif
 
 enum blockop {
 	BOP_READ,
