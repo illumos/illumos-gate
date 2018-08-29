@@ -24,12 +24,12 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
 	file.
+
+ Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 -->
 
 <service_bundle type='manifest' name='SUNWcsr:boot-archive'>
@@ -69,6 +69,10 @@
 
 	<property_group name='startd' type='framework'>
 		<propval name='duration' type='astring' value='transient' />
+	</property_group>
+
+	<property_group name='config' type='application'>
+		<propval name='format' type='astring' value='cpio' />
 	</property_group>
 
 	<stability value='Unstable' />
