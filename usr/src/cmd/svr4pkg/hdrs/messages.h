@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2017 Peter Tribble.
+ * Copyright (c) 2018 Peter Tribble.
  */
 
 /*
@@ -412,7 +412,6 @@ extern "C" {
 #define	ERR_ALLZONES_AND_IN_LZ		gettext("The package <%s> may only be installed by the global zone administrator")
 #define	ERR_ALLZONES_AND_IN_LZ_PKGRM	gettext("The package <%s> may only be removed by the global zone administrator")
 #define	ERR_ALLZONES_AND_THISZONE	gettext("The package <%s> has <%s> = true and <%s> = true: the package may set either parameter to true, but may not set both parameters to true. NOTE: if the package contains a request script, it is treated as though it has <SUNW_PKG_THISZONE> = true")
-#define	ERR_ALLZONES_AND_Z_USED		gettext("The -Z option (extend packages installed in the global zone to all non-global zones) may not be used with the package <%s> which may only be installed in all zones by the global zone administrator")
 #define	ERR_ARG				gettext("URL <%s> is not valid")
 #define	ERR_BADULIMIT  			gettext("cannot process invalid ULIMIT value of <%s>.")
 #define	ERR_BADUSER			gettext("unable to find user <%s> or <%s>.")
@@ -485,12 +484,7 @@ extern "C" {
 #define ERR_INVALID_O_OPTION            gettext("option <%s> passed to -O is not recognized: option ignored")
 #define	ERR_IN_GZ_AND_ALLZONES_AND_INSTALLED	gettext("The package <%s> is currently installed on\nthe system in the global zone only.  When this package was last installed\nthe -G option was used (install package in the global zone only).  The new\ninstance of this package to be installed may only be installed in all zones.\nBefore you can install the latest version of this package, you must first\nremove all instances of this package from the global zone (via pkgrm).")
 #define	ERR_IN_GZ_AND_NOT_INSTALLED		gettext("WARNING: The package <%s> is marked as being installed in the\nglobal zone only. The package is NOT installed on the system. This condition\nis not possible. The file <%s> must be edited\nand the line for this package removed.")
-
-#ifdef Z_OPTION_IS_SUPPORTED
-#define	ERR_IN_GZ_AND_NO_G_USED		gettext("The package <%s> is currently installed on the\nsystem in the global zone. To install the new instance of this package in the\nglobal zone only, you must specify the -G option. To install the new instance\nof this package in all zones you must first run pkgadd on the current package\nwith the -Z option so that the existing instance of this package is installed\nin all zones first. You may optionally remove the existing instance of this\npackage from the global zone first (via pkgrm) and then install the new\ninstance of this package in all zones.")
-#else
 #define	ERR_IN_GZ_AND_NO_G_USED		gettext("The package <%s> is currently installed on the system in the\nglobal zone. To install the new instance of this package in the global\nzone only, you must specify the -G option. To install the new instance\nof this package in all zones you must first remove the existing instance\nof this package from the global zone first (via pkgrm) and then install\nthe new instance of this package in all zones.")
-#endif
 
 #define	ERR_LINK			gettext("unable to link <%s> to <%s>: %s")
 #define	ERR_LIVE_CONTINUE_NOT_SUPPORTED	gettext("live continue mode is not supported")
@@ -521,7 +515,6 @@ extern "C" {
 #define	ERR_NOREQUEST  			gettext("package does not contain an interactive request script")
 #define	ERR_NORESP			gettext("response file <%s> must not exist")
 #define	ERR_NOTABLE			gettext("unable to open %s table <%s>: %s")
-#define	ERR_NOT_IN_GZ_AND_Z_USED	gettext("The package <%s> is not currently installed\nin the global zone only; you may not specify the -Z option to install the\npackage in all non-global zones until the package is first install in the\nglobal zone only. You may optionally install the package without the -Z option\nto install the package in all zones.")
 #define	ERR_NOT_ROOT			gettext("You must be \"root\" for %s to execute properly.")
 #define	ERR_NOW_ALLZONES_AND_HOLLOW	gettext("The package <%s> has <%s> = false and <%s> = true: a hollow package must also be set to install in all zones")
 #define	ERR_NO_LIVE_MODE		gettext("live continue mode is not supported")
@@ -630,7 +623,6 @@ extern "C" {
 #define	ERR_STREAMDIR			gettext("unable to make temporary directory to unpack datastream: %s")
 #define	ERR_STREAM_UNAVAILABLE		gettext("unable to open stream <%s> for package <%s>: %s")
 #define	ERR_SYSINFO			gettext("unable to process installed package information, errno=%d")
-#define	ERR_THISZONE_AND_Z_USED		gettext("The package <%s> has <%s> = true: the -Z option may not be used to extend this type of package to all non-global zones")
 #define	ERR_TMPFILE			gettext("unable to establish temporary file")
 #define	ERR_TMPFILE_CHK			gettext("unable to create temporary checkinstall script")
 #define	ERR_TMPRESP			gettext("unable to create temporary response file")
@@ -642,12 +634,7 @@ extern "C" {
 #define	ERR_UNPACK_FMKDIR		gettext("unable to create temporary package area <%s>: %s")
 #define	ERR_UNSUCC			gettext("(A previous attempt may have been unsuccessful.)")
 
-#ifdef Z_OPTION_IS_SUPPORTED
-#define	ERR_USAGE_PKGADD_GLOBALZONE	gettext("usage:\n\t%s [-nv] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-G|-Z] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-G|-Z] [-Y category[,category ...] | pkg [pkg ...]]\n")
-#else
 #define	ERR_USAGE_PKGADD_GLOBALZONE	gettext("usage:\n\t%s [-nv] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-G] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-G] [-Y category[,category ...] | pkg [pkg ...]]\n")
-#endif
-
 #define	ERR_USAGE_PKGADD_NONGLOBALZONE	gettext("usage:\n\t%s [-nv] [-d device] [[-M] -R host_path] [-V fs_file] [-a admin_file] [-r response] [-Y category[,category ...] | pkg [pkg ...]]\n\t%s -s dir [-d device] [-Y category[,category ...] | pkg [pkg ...]]\n")
 #define	ERR_USAGE_PKGASK		gettext("usage: %s -r response [-d device]  [-R host_path] [-Y category[,category ...]] | [pkg [pkg ...]]\n")
 #define	ERR_USAGE_PKGINSTALL  		gettext("usage:\n\tpkginstall [-o] [-n] [-d device] [-m mountpt [-f fstype]] [-v] [[-M] -R host_path] [-V fs_file] [-b bindir] [-a admin_file] [-r resp_file] [-N calling_prog] directory pkginst\n")

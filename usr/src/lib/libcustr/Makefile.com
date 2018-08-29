@@ -19,8 +19,9 @@ OBJECTS =	custr.o
 
 include $(SRC)/lib/Makefile.lib
 
-# Things out of /sbin like dladm require custr, so it should go into /lib so
-# they can work in case /usr is split
+# On some illumos distributions (e.g. SmartOS), utilities in /sbin require
+# custr.  Place libcustr in /lib so such distros can work even if /usr is
+# split onto its own filesystem.
 include $(SRC)/lib/Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
@@ -28,6 +29,7 @@ LDLIBS +=	-lc
 CPPFLAGS +=	-D__EXTENSIONS__
 
 SRCDIR =	../common
+$(LINTLIB)	:= SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 

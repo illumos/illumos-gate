@@ -16,4 +16,5 @@
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 
+#include <sys/debug.h>
 #include <libcustr.h>

@@ -81,6 +81,7 @@ efi_getsmap(void)
 	int type = -1;
 
 	size = 0;
+	efi_mmap = NULL;
 	status = BS->GetMemoryMap(&size, efi_mmap, &key, &desc_size, NULL);
 	efi_mmap = malloc(size);
 	status = BS->GetMemoryMap(&size, efi_mmap, &key, &desc_size, NULL);

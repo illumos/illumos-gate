@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2017 Peter Tribble.
+ * Copyright (c) 2018 Peter Tribble.
  */
 
 /*
@@ -349,7 +349,7 @@ main(int argc, char **argv)
 	 */
 
 	while ((c = getopt(argc, argv,
-	    "?Aa:b:B:Cc:D:d:GhIMnO:R:r:Ss:tV:vY:zZ")) != EOF) {
+	    "?Aa:b:B:Cc:D:d:GhIMnO:R:r:Ss:tV:vY:z")) != EOF) {
 		switch (c) {
 
 		/*
@@ -2303,7 +2303,6 @@ usage(void)
  *			under which the package is to be installed:
  *				CAF_IN_GLOBAL_ZONE - in global zone
  *				CAF_SCOPE_GLOBAL - -G specified
- *				CAF_SCOPE_NONGLOBAL - -Z specified
  * Returns:	boolean_t
  *			B_TRUE - the package can be installed
  *			B_FALSE - the package can not be installed
@@ -2537,13 +2536,6 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 		return (B_FALSE);
 	}
 
-	/* pkg ALLZONES=true && -Z specified */
-
-	if (all_zones && (a_flags & CAF_SCOPE_NONGLOBAL)) {
-		progerr(ERR_ALLZONES_AND_Z_USED, a_pkgInst);
-		return (B_FALSE);
-	}
-
 	/* pkg ALLZONES=true & not running in global zone (#2/#3) */
 
 	if (all_zones && (!(a_flags & CAF_IN_GLOBAL_ZONE))) {
@@ -2577,21 +2569,6 @@ check_applicability(char *a_packageDir, char *a_pkgInst, char *a_rootPath,
 
 	if ((!this_zone) && in_gz_only && (!(a_flags & CAF_SCOPE_GLOBAL))) {
 		progerr(ERR_IN_GZ_AND_NO_G_USED, a_pkgInst);
-		return (B_FALSE);
-	}
-
-	/* pkg "NOT in gz only" & -Z specified */
-
-	if ((!in_gz_only) && (a_flags & CAF_SCOPE_NONGLOBAL)) {
-		progerr(ERR_NOT_IN_GZ_AND_Z_USED, a_pkgInst);
-		return (B_FALSE);
-	}
-
-	/* pkg "this zone" && -Z specified */
-
-	if (this_zone && (a_flags & CAF_SCOPE_NONGLOBAL)) {
-		progerr(ERR_THISZONE_AND_Z_USED, PKG_THISZONE_VARIABLE,
-		    a_pkgInst);
 		return (B_FALSE);
 	}
 

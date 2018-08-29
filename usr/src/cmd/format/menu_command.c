@@ -1554,9 +1554,9 @@ c_label()
 	 */
 	if (expert_mode) {
 #if defined(_SUNOS_VTOC_8)
-		int 		i;
+		int		i;
 #endif
-		int 		choice;
+		int		choice;
 		u_ioparam_t		ioparam;
 		struct extvtoc	vtoc;
 		struct dk_label	label;
@@ -2086,7 +2086,7 @@ c_verify_efi()
 	fmt_print("\n");
 
 	fmt_print("bytes/sector	=  %d\n", cur_blksz);
-	fmt_print("sectors = %llu\n", cur_parts->etoc->efi_last_lba);
+	fmt_print("sectors = %llu\n", cur_parts->etoc->efi_last_lba + 1);
 	fmt_print("accessible sectors = %llu\n",
 	    cur_parts->etoc->efi_last_u_lba);
 

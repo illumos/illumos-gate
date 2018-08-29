@@ -803,6 +803,7 @@ multiboot2_exec(struct preloaded_file *fp)
 	i386_getdev((void **)(&rootdev), NULL, NULL);
 #endif
 
+	mbi = NULL;
 	error = EINVAL;
 	if (rootdev == NULL) {
 		printf("can't determine root device\n");

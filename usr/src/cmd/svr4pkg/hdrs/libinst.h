@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2017 Peter Tribble.
+ * Copyright (c) 2018 Peter Tribble.
  */
 
 /*
@@ -65,7 +65,6 @@ typedef unsigned long CAF_T;
 
 #define	CAF_IN_GLOBAL_ZONE	0x00000001	/* in global zone */
 #define	CAF_SCOPE_GLOBAL	0x00000002	/* -G specified */
-#define	CAF_SCOPE_NONGLOBAL	0x00000004	/* -Z specified */
 
 /* path to the request file in the package directory */
 

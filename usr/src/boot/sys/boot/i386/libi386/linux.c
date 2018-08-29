@@ -408,7 +408,6 @@ static int
 linux_loadinitrd(char *filename, uint64_t dest, struct preloaded_file **result)
 {
 	struct preloaded_file *mfp;
-	vm_offset_t mem;
 
 	if (filename == NULL)
 		return (EFTYPE);
