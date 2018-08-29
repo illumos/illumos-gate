@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -1582,18 +1583,10 @@ main(int argc, char *argv[])
 	 * handle a SIGTERM and clean up properly.
 	 */
 	if (cmd != A_DUMP) {
-		int	start, end, delta;
-
-		(void) kill(-1, SIGTERM);
-		start = time(NULL);
-
 		if (zoneid == GLOBAL_ZONEID && !nosync)
 			do_archives_update(fast_reboot);
-
-		end = time(NULL);
-		delta = end - start;
-		if (delta < 5)
-			(void) sleep(5 - delta);
+		(void) kill(-1, SIGTERM);
+		(void) sleep(5);
 	}
 
 	(void) signal(SIGINT, SIG_IGN);

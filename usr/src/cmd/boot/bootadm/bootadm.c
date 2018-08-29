@@ -31,7 +31,7 @@
 /*
  * bootadm(1M) is a new utility for managing bootability of
  * Solaris *Newboot* environments. It has two primary tasks:
- * 	- Allow end users to manage bootability of Newboot Solaris instances
+ *	- Allow end users to manage bootability of Newboot Solaris instances
  *	- Provide services to other subsystems in Solaris (primarily Install)
  */
 
@@ -125,6 +125,11 @@ typedef enum {
 #define	UFS_SIGNATURE_LIST	"/var/run/grub_ufs_signatures"
 #define	ZFS_LEGACY_MNTPT	"/tmp/bootadm_mnt_zfs_legacy"
 
+/* SMF */
+#define	BOOT_ARCHIVE_FMRI	"system/boot-archive:default"
+#define	SCF_PG_CONFIG		"config"
+#define	SCF_PROPERTY_FORMAT	"format"
+
 /* BE defaults */
 #define	BE_DEFAULTS		"/etc/default/be"
 #define	BE_DFLT_BE_HAS_GRUB	"BE_HAS_GRUB="
@@ -184,6 +189,17 @@ char *menu_cmds[] = {
 	NULL
 };
 
+char *bam_formats[] = {
+	"hsfs",
+	"ufs",
+	"cpio",
+	"ufs-nocompress",
+	NULL
+};
+#define	BAM_FORMAT_UNSET -1
+#define	BAM_FORMAT_HSFS 0
+short bam_format = BAM_FORMAT_UNSET;
+
 #define	OPT_ENTRY_NUM	"entry"
 
 /*
@@ -208,6 +224,7 @@ typedef struct {
 int bam_verbose;
 int bam_force;
 int bam_debug;
+int bam_skip_lock;
 static char *prog;
 static subcmd_t bam_cmd;
 char *bam_root;
@@ -309,29 +326,27 @@ static subcmd_defn_t inst_subcmds[] = {
 	NULL,			0,		NULL, 0	/* must be last */
 };
 
-enum dircache_copy_opt {
-	FILE32 = 0,
-	FILE64,
-	CACHEDIR_NUM
-};
+#define	build_path(buf, len, root, prefix, suffix) \
+    snprintf((buf), (len), "%s%s%s%s%s", (root), (prefix), get_machine(), \
+    is_flag_on(IS_SPARC_TARGET) ? "" : "/amd64", (suffix))
 
 /*
  * Directory specific flags:
  * NEED_UPDATE : the specified archive needs to be updated
- * NO_MULTI : don't extend the specified archive, but recreate it
+ * NO_EXTEND   : don't extend the specified archive, but recreate it
  */
 #define	NEED_UPDATE		0x00000001
-#define	NO_MULTI		0x00000002
+#define	NO_EXTEND		0x00000002
 
-#define	set_dir_flag(id, f)	(walk_arg.dirinfo[id].flags |= f)
-#define	unset_dir_flag(id, f)	(walk_arg.dirinfo[id].flags &= ~f)
-#define	is_dir_flag_on(id, f)	(walk_arg.dirinfo[id].flags & f ? 1 : 0)
+#define	set_dir_flag(f)		(walk_arg.dirinfo.flags |= (f))
+#define	unset_dir_flag(f)	(walk_arg.dirinfo.flags &= ~(f))
+#define	is_dir_flag_on(f)	(walk_arg.dirinfo.flags & (f) ? 1 : 0)
 
-#define	get_cachedir(id)	(walk_arg.dirinfo[id].cdir_path)
-#define	get_updatedir(id)	(walk_arg.dirinfo[id].update_path)
-#define	get_count(id)		(walk_arg.dirinfo[id].count)
-#define	has_cachedir(id)	(walk_arg.dirinfo[id].has_dir)
-#define	set_dir_present(id)	(walk_arg.dirinfo[id].has_dir = 1)
+#define	get_cachedir()		(walk_arg.dirinfo.cdir_path)
+#define	get_updatedir()		(walk_arg.dirinfo.update_path)
+#define	get_count()		(walk_arg.dirinfo.count)
+#define	has_cachedir()		(walk_arg.dirinfo.has_dir)
+#define	set_dir_present()	(walk_arg.dirinfo.has_dir = 1)
 
 /*
  * dirinfo_t (specific cache directory information):
@@ -375,11 +390,11 @@ typedef struct _dirinfo {
  * sparcfile: list of file paths for mkisofs -path-list (SPARC only)
  */
 static struct {
-	int 		update_flags;
-	nvlist_t 	*new_nvlp;
-	nvlist_t 	*old_nvlp;
-	FILE 		*sparcfile;
-	dirinfo_t	dirinfo[CACHEDIR_NUM];
+	int		update_flags;
+	nvlist_t	*new_nvlp;
+	nvlist_t	*old_nvlp;
+	FILE		*sparcfile;
+	dirinfo_t	dirinfo;
 } walk_arg;
 
 struct safefile {
@@ -418,7 +433,7 @@ struct iso_pdesc {
 /*
  * COUNT_MAX:	maximum number of changed files to justify a multisession update
  * BA_SIZE_MAX:	maximum size of the boot_archive to justify a multisession
- * 		update
+ *		update
  */
 #define	COUNT_MAX		50
 #define	BA_SIZE_MAX		(50 * 1024 * 1024)
@@ -434,7 +449,8 @@ usage(void)
 
 	/* archive usage */
 	(void) fprintf(stderr,
-	    "\t%s update-archive [-vn] [-R altroot [-p platform]]\n", prog);
+	    "\t%s update-archive [-vnf] [-R altroot [-p platform]] "
+	    "[-F format]\n", prog);
 	(void) fprintf(stderr,
 	    "\t%s list-archive [-R altroot [-p platform]]\n", prog);
 #if defined(_OBP)
@@ -619,7 +635,7 @@ parse_args(int argc, char *argv[])
  * The internal syntax and the corresponding functionality are:
  *	-a update			-- update-archive
  *	-a list				-- list-archive
- *	-a update-all			-- (reboot to sync all mnted OS archive)
+ *	-a update_all			-- (reboot to sync all mnted OS archive)
  *	-i install_bootloader		-- install-bootloader
  *	-m update_entry			-- update-menu
  *	-m list_entry			-- list-menu
@@ -630,20 +646,21 @@ parse_args(int argc, char *argv[])
  *	-m list_setting [entry] [value]	-- list_setting
  *
  * A set of private flags is there too:
- *	-F		-- purge the cache directories and rebuild them
+ *	-Q		-- purge the cache directories and rebuild them
  *	-e		-- use the (faster) archive update approach (used by
  *			   reboot)
+ *	-L		-- skip locking
  */
 static void
 parse_args_internal(int argc, char *argv[])
 {
-	int c, error;
+	int c, i, error;
 	extern char *optarg;
 	extern int optind, opterr;
 #if defined(_OBP)
-	const char *optstring = "a:d:fi:m:no:veFCR:p:P:XZ";
+	const char *optstring = "a:d:fF:i:m:no:veQCLR:p:P:XZ";
 #else
-	const char *optstring = "a:d:fi:m:no:veFCMR:p:P:XZ";
+	const char *optstring = "a:d:fF:i:m:no:veQCMLR:p:P:XZ";
 #endif
 
 	/* Suppress error message from getopt */
@@ -673,7 +690,29 @@ parse_args_internal(int argc, char *argv[])
 			bam_force = 1;
 			break;
 		case 'F':
+			if (bam_format != BAM_FORMAT_UNSET) {
+				error = 1;
+				bam_error(
+				    _("multiple formats specified: -%c\n"), c);
+			}
+			for (i = 0; bam_formats[i] != NULL; i++) {
+				if (strcmp(bam_formats[i], optarg) == 0) {
+					bam_format = i;
+					break;
+				}
+			}
+			if (bam_format == BAM_FORMAT_UNSET) {
+				error = 1;
+				bam_error(
+				    _("unknown format specified: -%c %s\n"),
+				    c, optarg);
+			}
+			break;
+		case 'Q':
 			bam_purge = 1;
+			break;
+		case 'L':
+			bam_skip_lock = 1;
 			break;
 		case 'i':
 			if (bam_cmd) {
@@ -1648,6 +1687,9 @@ bam_lock(void)
 	struct flock lock;
 	pid_t pid;
 
+	if (bam_skip_lock)
+		return;
+
 	bam_lock_fd = open(BAM_LOCK_FILE, O_CREAT|O_RDWR, LOCK_FILE_PERMS);
 	if (bam_lock_fd < 0) {
 		/*
@@ -1706,6 +1748,9 @@ static void
 bam_unlock(void)
 {
 	struct flock unlock;
+
+	if (bam_skip_lock)
+		return;
 
 	/*
 	 * NOP if we don't hold the lock
@@ -1910,7 +1955,7 @@ list2file(char *root, char *tmp, char *final, line_t *start)
 static int
 setup_path(char *path)
 {
-	char 		*p;
+	char		*p;
 	int		ret;
 	struct stat	sb;
 
@@ -2047,19 +2092,19 @@ cache_close(cachefile cf)
 }
 
 static int
-dircache_updatefile(const char *path, int what)
+dircache_updatefile(const char *path)
 {
-	int 		ret, exitcode;
-	char 		buf[4096 * 4];
-	FILE 		*infile;
-	cachefile 	outfile, outupdt;
+	int		ret, exitcode;
+	char		buf[4096 * 4];
+	FILE		*infile;
+	cachefile	outfile, outupdt;
 
 	if (bam_nowrite()) {
-		set_dir_flag(what, NEED_UPDATE);
+		set_dir_flag(NEED_UPDATE);
 		return (BAM_SUCCESS);
 	}
 
-	if (!has_cachedir(what))
+	if (!has_cachedir())
 		return (BAM_SUCCESS);
 
 	if ((infile = fopen(path, "rb")) == NULL) {
@@ -2068,15 +2113,15 @@ dircache_updatefile(const char *path, int what)
 		return (BAM_ERROR);
 	}
 
-	ret = setup_file(get_cachedir(what), path, &outfile);
+	ret = setup_file(get_cachedir(), path, &outfile);
 	if (ret == BAM_ERROR) {
 		exitcode = BAM_ERROR;
 		goto out;
 	}
-	if (!is_dir_flag_on(what, NO_MULTI)) {
-		ret = setup_file(get_updatedir(what), path, &outupdt);
+	if (!is_dir_flag_on(NO_EXTEND)) {
+		ret = setup_file(get_updatedir(), path, &outupdt);
 		if (ret == BAM_ERROR)
-			set_dir_flag(what, NO_MULTI);
+			set_dir_flag(NO_EXTEND);
 	}
 
 	while ((ret = fread(buf, 1, sizeof (buf), infile)) > 0) {
@@ -2084,21 +2129,21 @@ dircache_updatefile(const char *path, int what)
 			exitcode = BAM_ERROR;
 			goto out;
 		}
-		if (!is_dir_flag_on(what, NO_MULTI))
+		if (!is_dir_flag_on(NO_EXTEND))
 			if (cache_write(outupdt, buf, ret) == BAM_ERROR)
-				set_dir_flag(what, NO_MULTI);
+				set_dir_flag(NO_EXTEND);
 	}
 
-	set_dir_flag(what, NEED_UPDATE);
-	get_count(what)++;
-	if (get_count(what) > COUNT_MAX)
-		set_dir_flag(what, NO_MULTI);
+	set_dir_flag(NEED_UPDATE);
+	get_count()++;
+	if (get_count() > COUNT_MAX)
+		set_dir_flag(NO_EXTEND);
 	exitcode = BAM_SUCCESS;
 out:
 	(void) fclose(infile);
 	if (cache_close(outfile) == BAM_ERROR)
 		exitcode = BAM_ERROR;
-	if (!is_dir_flag_on(what, NO_MULTI) &&
+	if (!is_dir_flag_on(NO_EXTEND) &&
 	    cache_close(outupdt) == BAM_ERROR)
 		exitcode = BAM_ERROR;
 	if (exitcode == BAM_ERROR)
@@ -2107,7 +2152,7 @@ out:
 }
 
 static int
-dircache_updatedir(const char *path, int what, int updt)
+dircache_updatedir(const char *path, int updt)
 {
 	int		ret;
 	char		dpath[PATH_MAX];
@@ -2117,7 +2162,7 @@ dircache_updatedir(const char *path, int what, int updt)
 	strip = (char *)path + strlen(rootbuf);
 
 	ret = snprintf(dpath, sizeof (dpath), "%s/%s", updt ?
-	    get_updatedir(what) : get_cachedir(what), strip);
+	    get_updatedir() : get_cachedir(), strip);
 
 	if (ret >= sizeof (dpath)) {
 		bam_error(_("unable to create path on mountpoint %s, "
@@ -2130,9 +2175,9 @@ dircache_updatedir(const char *path, int what, int updt)
 		return (BAM_SUCCESS);
 
 	if (updt) {
-		if (!is_dir_flag_on(what, NO_MULTI))
+		if (!is_dir_flag_on(NO_EXTEND))
 			if (!bam_nowrite() && mkdirp(dpath, DIR_PERMS) == -1)
-				set_dir_flag(what, NO_MULTI);
+				set_dir_flag(NO_EXTEND);
 	} else {
 		if (!bam_nowrite() && mkdirp(dpath, DIR_PERMS) == -1) {
 			set_flag(UPDATE_ERROR);
@@ -2140,7 +2185,7 @@ dircache_updatedir(const char *path, int what, int updt)
 		}
 	}
 
-	set_dir_flag(what, NEED_UPDATE);
+	set_dir_flag(NEED_UPDATE);
 	return (BAM_SUCCESS);
 }
 
@@ -2190,51 +2235,33 @@ update_dircache(const char *path, int flags)
 		}
 		(void) close(fd);
 
-		/*
-		 * If the file is not an executable and is not inside an amd64
-		 * directory, we copy it in both the cache directories,
-		 * otherwise, we only copy it inside the 64-bit one.
-		 */
 		if (memcmp(elf.e_ident, ELFMAG, 4) != 0) {
-			if (strstr(path, "/amd64")) {
-				rc = dircache_updatefile(path, FILE64);
-			} else {
-				rc = dircache_updatefile(path, FILE32);
-				if (rc == BAM_SUCCESS)
-					rc = dircache_updatefile(path, FILE64);
-			}
+			/* Not an ELF file, include in archive */
+			rc = dircache_updatefile(path);
 		} else {
-			/*
-			 * Based on the ELF class we copy the file in the 32-bit
-			 * or the 64-bit cache directory.
-			 */
-			if (elf.e_ident[EI_CLASS] == ELFCLASS32) {
-				rc = dircache_updatefile(path, FILE32);
-			} else if (elf.e_ident[EI_CLASS] == ELFCLASS64) {
-				rc = dircache_updatefile(path, FILE64);
-			} else {
-				bam_print(_("WARNING: file %s is neither a "
-				    "32-bit nor a 64-bit ELF\n"), path);
-				/* paranoid */
-				rc  = dircache_updatefile(path, FILE32);
-				if (rc == BAM_SUCCESS)
-					rc = dircache_updatefile(path, FILE64);
+			/* Include 64-bit ELF files only */
+			switch (elf.e_ident[EI_CLASS]) {
+			case ELFCLASS32:
+				bam_print(_("WARNING: ELF file %s is 32-bit "
+				    "and will be excluded\n"), path);
+				break;
+			case ELFCLASS64:
+				rc = dircache_updatefile(path);
+				break;
+			default:
+				bam_print(_("WARNING: ELF file %s is neither "
+				    "32-bit nor 64-bit\n"), path);
+				break;
 			}
 		}
 		break;
 		}
 	case FTW_D:
-		if (strstr(path, "/amd64") == NULL) {
-			rc = dircache_updatedir(path, FILE32, DO_UPDATE_DIR);
-			if (rc == BAM_SUCCESS)
-				rc = dircache_updatedir(path, FILE32,
-				    DO_CACHE_DIR);
-		} else {
-			if (has_cachedir(FILE64)) {
-				rc = dircache_updatedir(path, FILE64,
-				    DO_UPDATE_DIR);
+		if (strstr(path, "/amd64") != NULL) {
+			if (has_cachedir()) {
+				rc = dircache_updatedir(path, DO_UPDATE_DIR);
 				if (rc == BAM_SUCCESS)
-					rc = dircache_updatedir(path, FILE64,
+					rc = dircache_updatedir(path,
 					    DO_CACHE_DIR);
 			}
 		}
@@ -2255,13 +2282,13 @@ cmpstat(
 	int flags,
 	struct FTW *ftw)
 {
-	uint_t 		sz;
-	uint64_t 	*value;
-	uint64_t 	filestat[2];
-	int 		error, ret, status;
+	uint_t		sz;
+	uint64_t	*value;
+	uint64_t	filestat[2];
+	int		error, ret, status;
 
 	struct safefile *safefilep;
-	FILE 		*fp;
+	FILE		*fp;
 	struct stat	sb;
 	regex_t re;
 
@@ -2347,7 +2374,7 @@ cmpstat(
 			bam_print(_("    new     %s\n"), file);
 
 		if (is_flag_on(IS_SPARC_TARGET)) {
-			set_dir_flag(FILE64, NEED_UPDATE);
+			set_dir_flag(NEED_UPDATE);
 			return (0);
 		}
 
@@ -2371,7 +2398,7 @@ cmpstat(
 			return (0);
 
 		if (is_flag_on(IS_SPARC_TARGET)) {
-			set_dir_flag(FILE64, NEED_UPDATE);
+			set_dir_flag(NEED_UPDATE);
 		} else {
 			ret = update_dircache(file, flags);
 			if (ret == BAM_ERROR) {
@@ -2391,7 +2418,7 @@ cmpstat(
 	 * iso image. We just need to know if we are going to rebuild it or not
 	 */
 	if (is_flag_on(IS_SPARC_TARGET) &&
-	    is_dir_flag_on(FILE64, NEED_UPDATE) && !bam_nowrite())
+	    is_dir_flag_on(NEED_UPDATE) && !bam_nowrite())
 		return (0);
 	/*
 	 * File exists in old archive. Check if file has changed
@@ -2422,7 +2449,7 @@ cmpstat(
 		}
 
 		if (is_flag_on(IS_SPARC_TARGET)) {
-			set_dir_flag(FILE64, NEED_UPDATE);
+			set_dir_flag(NEED_UPDATE);
 		} else {
 			ret = update_dircache(file, flags);
 			if (ret == BAM_ERROR) {
@@ -2449,10 +2476,10 @@ cmpstat(
 static int
 rmdir_r(char *path)
 {
-	struct dirent 	*d = NULL;
-	DIR 		*dir = NULL;
-	char 		tpath[PATH_MAX];
-	struct stat 	sb;
+	struct dirent	*d = NULL;
+	DIR		*dir = NULL;
+	char		tpath[PATH_MAX];
+	struct stat	sb;
 
 	if ((dir = opendir(path)) == NULL)
 		return (-1);
@@ -2480,105 +2507,93 @@ rmdir_r(char *path)
  * If the user requested a 'purge', always recreate the directory from scratch.
  */
 static int
-set_cache_dir(char *root, int what)
+set_cache_dir(char *root)
 {
 	struct stat	sb;
 	int		ret = 0;
 
-	ret = snprintf(get_cachedir(what), sizeof (get_cachedir(what)),
-	    "%s%s%s%s%s", root, ARCHIVE_PREFIX, get_machine(), what == FILE64 ?
-	    "/amd64" : "", CACHEDIR_SUFFIX);
+	ret = build_path(get_cachedir(), sizeof (get_cachedir()),
+	    root, ARCHIVE_PREFIX, CACHEDIR_SUFFIX);
 
-	if (ret >= sizeof (get_cachedir(what))) {
+	if (ret >= sizeof (get_cachedir())) {
 		bam_error(_("unable to create path on mountpoint %s, "
 		    "path too long\n"), rootbuf);
 		return (BAM_ERROR);
 	}
 
 	if (bam_purge || is_flag_on(INVALIDATE_CACHE))
-		(void) rmdir_r(get_cachedir(what));
+		(void) rmdir_r(get_cachedir());
 
-	if (stat(get_cachedir(what), &sb) != 0 || !(S_ISDIR(sb.st_mode))) {
+	if (stat(get_cachedir(), &sb) != 0 || !(S_ISDIR(sb.st_mode))) {
 		/* best effort unlink attempt, mkdir will catch errors */
-		(void) unlink(get_cachedir(what));
+		(void) unlink(get_cachedir());
 
 		if (bam_verbose)
 			bam_print(_("archive cache directory not found: %s\n"),
-			    get_cachedir(what));
-		ret = mkdir(get_cachedir(what), DIR_PERMS);
+			    get_cachedir());
+		ret = mkdir(get_cachedir(), DIR_PERMS);
 		if (ret < 0) {
 			bam_error(_("mkdir of %s failed: %s\n"),
-			    get_cachedir(what), strerror(errno));
-			get_cachedir(what)[0] = '\0';
+			    get_cachedir(), strerror(errno));
+			get_cachedir()[0] = '\0';
 			return (ret);
 		}
 		set_flag(NEED_CACHE_DIR);
-		set_dir_flag(what, NO_MULTI);
+		set_dir_flag(NO_EXTEND);
 	}
 
 	return (BAM_SUCCESS);
 }
 
 static int
-set_update_dir(char *root, int what)
+set_update_dir(char *root)
 {
 	struct stat	sb;
 	int		ret;
 
-	if (is_dir_flag_on(what, NO_MULTI))
+	if (is_dir_flag_on(NO_EXTEND))
 		return (BAM_SUCCESS);
 
 	if (!bam_extend) {
-		set_dir_flag(what, NO_MULTI);
+		set_dir_flag(NO_EXTEND);
 		return (BAM_SUCCESS);
 	}
 
-	if (what == FILE64 && !is_flag_on(IS_SPARC_TARGET))
-		ret = snprintf(get_updatedir(what),
-		    sizeof (get_updatedir(what)), "%s%s%s/amd64%s", root,
-		    ARCHIVE_PREFIX, get_machine(), UPDATEDIR_SUFFIX);
-	else
-		ret = snprintf(get_updatedir(what),
-		    sizeof (get_updatedir(what)), "%s%s%s%s", root,
-		    ARCHIVE_PREFIX, get_machine(), UPDATEDIR_SUFFIX);
+	ret = build_path(get_updatedir(), sizeof (get_updatedir()),
+	    root, ARCHIVE_PREFIX, UPDATEDIR_SUFFIX);
 
-	if (ret >= sizeof (get_updatedir(what))) {
+	if (ret >= sizeof (get_updatedir())) {
 		bam_error(_("unable to create path on mountpoint %s, "
 		    "path too long\n"), rootbuf);
 		return (BAM_ERROR);
 	}
 
-	if (stat(get_updatedir(what), &sb) == 0) {
+	if (stat(get_updatedir(), &sb) == 0) {
 		if (S_ISDIR(sb.st_mode))
-			ret = rmdir_r(get_updatedir(what));
+			ret = rmdir_r(get_updatedir());
 		else
-			ret = unlink(get_updatedir(what));
+			ret = unlink(get_updatedir());
 
 		if (ret != 0)
-			set_dir_flag(what, NO_MULTI);
+			set_dir_flag(NO_EXTEND);
 	}
 
-	if (mkdir(get_updatedir(what), DIR_PERMS) < 0)
-		set_dir_flag(what, NO_MULTI);
+	if (mkdir(get_updatedir(), DIR_PERMS) < 0)
+		set_dir_flag(NO_EXTEND);
 
 	return (BAM_SUCCESS);
 }
 
 static int
-is_valid_archive(char *root, int what)
+is_valid_archive(char *root)
 {
-	char 		archive_path[PATH_MAX];
+	char		archive_path[PATH_MAX];
 	char		timestamp_path[PATH_MAX];
-	struct stat 	sb, timestamp;
-	int 		ret;
+	struct stat	sb, timestamp;
+	int		ret;
 
-	if (what == FILE64 && !is_flag_on(IS_SPARC_TARGET))
-		ret = snprintf(archive_path, sizeof (archive_path),
-		    "%s%s%s/amd64%s", root, ARCHIVE_PREFIX, get_machine(),
-		    ARCHIVE_SUFFIX);
-	else
-		ret = snprintf(archive_path, sizeof (archive_path), "%s%s%s%s",
-		    root, ARCHIVE_PREFIX, get_machine(), ARCHIVE_SUFFIX);
+	ret = build_path(archive_path, sizeof (archive_path),
+	    root, ARCHIVE_PREFIX, ARCHIVE_SUFFIX);
 
 	if (ret >= sizeof (archive_path)) {
 		bam_error(_("unable to create path on mountpoint %s, "
@@ -2589,8 +2604,7 @@ is_valid_archive(char *root, int what)
 	if (stat(archive_path, &sb) != 0) {
 		if (bam_verbose && !bam_check)
 			bam_print(_("archive not found: %s\n"), archive_path);
-		set_dir_flag(what, NEED_UPDATE);
-		set_dir_flag(what, NO_MULTI);
+		set_dir_flag(NEED_UPDATE | NO_EXTEND);
 		return (BAM_SUCCESS);
 	}
 
@@ -2630,8 +2644,7 @@ is_valid_archive(char *root, int what)
 		}
 
 		set_flag(INVALIDATE_CACHE);
-		set_dir_flag(what, NEED_UPDATE);
-		set_dir_flag(what, NO_MULTI);
+		set_dir_flag(NEED_UPDATE | NO_EXTEND);
 		return (BAM_SUCCESS);
 	}
 
@@ -2642,7 +2655,7 @@ is_valid_archive(char *root, int what)
 		if (bam_verbose && !bam_check)
 			bam_print(_("archive %s is bigger than %d bytes and "
 			    "will be rebuilt\n"), archive_path, BA_SIZE_MAX);
-		set_dir_flag(what, NO_MULTI);
+		set_dir_flag(NO_EXTEND);
 	}
 
 	return (BAM_SUCCESS);
@@ -2659,80 +2672,62 @@ static int
 check_flags_and_files(char *root)
 {
 
-	struct stat 	sb;
-	int 		ret;
+	struct stat	sb;
+	int		ret;
 
 	/*
 	 * If archive is missing, create archive
 	 */
-	if (is_flag_on(IS_SPARC_TARGET)) {
-		ret = is_valid_archive(root, FILE64);
-		if (ret == BAM_ERROR)
-			return (BAM_ERROR);
-	} else {
-		int	what = FILE32;
-		do {
-			ret = is_valid_archive(root, what);
-			if (ret == BAM_ERROR)
-				return (BAM_ERROR);
-			what++;
-		} while (bam_direct == BAM_DIRECT_DBOOT && what < CACHEDIR_NUM);
-	}
+	ret = is_valid_archive(root);
+	if (ret == BAM_ERROR)
+		return (BAM_ERROR);
 
 	if (bam_nowrite())
 		return (BAM_SUCCESS);
-
 
 	/*
 	 * check if cache directories exist on x86.
 	 * check (and always open) the cache file on SPARC.
 	 */
 	if (is_sparc()) {
-		ret = snprintf(get_cachedir(FILE64),
-		    sizeof (get_cachedir(FILE64)), "%s%s%s/%s", root,
+		ret = snprintf(get_cachedir(),
+		    sizeof (get_cachedir()), "%s%s%s/%s", root,
 		    ARCHIVE_PREFIX, get_machine(), CACHEDIR_SUFFIX);
 
-		if (ret >= sizeof (get_cachedir(FILE64))) {
+		if (ret >= sizeof (get_cachedir())) {
 			bam_error(_("unable to create path on mountpoint %s, "
 			    "path too long\n"), rootbuf);
 			return (BAM_ERROR);
 		}
 
-		if (stat(get_cachedir(FILE64), &sb) != 0) {
+		if (stat(get_cachedir(), &sb) != 0) {
 			set_flag(NEED_CACHE_DIR);
-			set_dir_flag(FILE64, NEED_UPDATE);
+			set_dir_flag(NEED_UPDATE);
 		}
 
-		walk_arg.sparcfile = fopen(get_cachedir(FILE64), "w");
+		walk_arg.sparcfile = fopen(get_cachedir(), "w");
 		if (walk_arg.sparcfile == NULL) {
 			bam_error(_("failed to open file: %s: %s\n"),
-			    get_cachedir(FILE64), strerror(errno));
+			    get_cachedir(), strerror(errno));
 			return (BAM_ERROR);
 		}
 
-		set_dir_present(FILE64);
+		set_dir_present();
 	} else {
-		int	what = FILE32;
+		if (set_cache_dir(root) != 0)
+			return (BAM_ERROR);
 
-		do {
-			if (set_cache_dir(root, what) != 0)
-				return (BAM_ERROR);
+		set_dir_present();
 
-			set_dir_present(what);
-
-			if (set_update_dir(root, what) != 0)
-				return (BAM_ERROR);
-			what++;
-		} while (bam_direct == BAM_DIRECT_DBOOT && what < CACHEDIR_NUM);
+		if (set_update_dir(root) != 0)
+			return (BAM_ERROR);
 	}
 
 	/*
 	 * if force, create archive unconditionally
 	 */
 	if (bam_force) {
-		if (!is_sparc())
-			set_dir_flag(FILE32, NEED_UPDATE);
-		set_dir_flag(FILE64, NEED_UPDATE);
+		set_dir_flag(NEED_UPDATE);
 		if (bam_verbose)
 			bam_print(_("forced update of archive requested\n"));
 		return (BAM_SUCCESS);
@@ -2744,10 +2739,10 @@ check_flags_and_files(char *root)
 static error_t
 read_one_list(char *root, filelist_t  *flistp, char *filelist)
 {
-	char 		path[PATH_MAX];
-	FILE 		*fp;
-	char 		buf[BAM_MAXLINE];
-	const char 	*fcn = "read_one_list()";
+	char		path[PATH_MAX];
+	FILE		*fp;
+	char		buf[BAM_MAXLINE];
+	const char	*fcn = "read_one_list()";
 
 	(void) snprintf(path, sizeof (path), "%s%s", root, filelist);
 
@@ -2774,11 +2769,11 @@ read_one_list(char *root, filelist_t  *flistp, char *filelist)
 static error_t
 read_list(char *root, filelist_t  *flistp)
 {
-	char 		path[PATH_MAX];
-	char 		cmd[PATH_MAX];
-	struct stat 	sb;
-	int 		n, rval;
-	const char 	*fcn = "read_list()";
+	char		path[PATH_MAX];
+	char		cmd[PATH_MAX];
+	struct stat	sb;
+	int		n, rval;
+	const char	*fcn = "read_list()";
 
 	flistp->head = flistp->tail = NULL;
 
@@ -2855,10 +2850,10 @@ read_list(char *root, filelist_t  *flistp)
 static void
 getoldstat(char *root)
 {
-	char 		path[PATH_MAX];
-	int 		fd, error;
-	struct stat 	sb;
-	char 		*ostat;
+	char		path[PATH_MAX];
+	int		fd, error;
+	struct stat	sb;
+	char		*ostat;
 
 	(void) snprintf(path, sizeof (path), "%s%s", root, FILE_STAT);
 	fd = open(path, O_RDONLY);
@@ -2904,26 +2899,24 @@ getoldstat(char *root)
 out_err:
 	if (fd != -1)
 		(void) close(fd);
-	if (!is_flag_on(IS_SPARC_TARGET))
-		set_dir_flag(FILE32, NEED_UPDATE);
-	set_dir_flag(FILE64, NEED_UPDATE);
+	set_dir_flag(NEED_UPDATE);
 }
 
 /* Best effort stale entry removal */
 static void
-delete_stale(char *file, int what)
+delete_stale(char *file)
 {
 	char		path[PATH_MAX];
 	struct stat	sb;
 
-	(void) snprintf(path, sizeof (path), "%s/%s", get_cachedir(what), file);
+	(void) snprintf(path, sizeof (path), "%s/%s", get_cachedir(), file);
 	if (!bam_check && stat(path, &sb) == 0) {
 		if (sb.st_mode & S_IFDIR)
 			(void) rmdir_r(path);
 		else
 			(void) unlink(path);
 
-		set_dir_flag(what, (NEED_UPDATE | NO_MULTI));
+		set_dir_flag(NEED_UPDATE | NO_EXTEND);
 	}
 }
 
@@ -2938,7 +2931,7 @@ check4stale(char *root)
 {
 	nvpair_t	*nvp;
 	nvlist_t	*nvlp;
-	char 		*file;
+	char		*file;
 	char		path[PATH_MAX];
 
 	/*
@@ -2966,17 +2959,14 @@ check4stale(char *root)
 		(void) snprintf(path, sizeof (path), "%s/%s",
 		    root, file);
 		if (access(path, F_OK) < 0) {
-			int	what;
-
 			if (bam_verbose)
 				bam_print(_("    stale %s\n"), path);
 
 			if (is_flag_on(IS_SPARC_TARGET)) {
-				set_dir_flag(FILE64, NEED_UPDATE);
+				set_dir_flag(NEED_UPDATE);
 			} else {
-				for (what = FILE32; what < CACHEDIR_NUM; what++)
-					if (has_cachedir(what))
-						delete_stale(file, what);
+				if (has_cachedir())
+					delete_stale(file);
 			}
 		}
 	}
@@ -3058,11 +3048,11 @@ update_timestamp(char *root)
 static void
 savenew(char *root)
 {
-	char 	path[PATH_MAX];
-	char 	path2[PATH_MAX];
-	size_t 	sz;
-	char 	*nstat;
-	int 	fd, wrote, error;
+	char	path[PATH_MAX];
+	char	path2[PATH_MAX];
+	size_t	sz;
+	char	*nstat;
+	int	fd, wrote, error;
 
 	nstat = NULL;
 	sz = 0;
@@ -3131,11 +3121,11 @@ clear_walk_args(void)
 static int
 update_required(char *root)
 {
-	struct stat 	sb;
-	char 		path[PATH_MAX];
-	filelist_t 	flist;
-	filelist_t 	*flistp = &flist;
-	int 		ret;
+	struct stat	sb;
+	char		path[PATH_MAX];
+	filelist_t	flist;
+	filelist_t	*flistp = &flist;
+	int		ret;
 
 	flistp->head = flistp->tail = NULL;
 
@@ -3189,7 +3179,7 @@ update_required(char *root)
 	create_newstat();
 	/*
 	 * This walk does 2 things:
-	 *  	- gets new stat data for every file
+	 *	- gets new stat data for every file
 	 *	- (optional) compare old and new stat data
 	 */
 	ret = walk_list(root, &flist);
@@ -3213,8 +3203,7 @@ update_required(char *root)
 
 	/* If nothing was updated, discard newstat. */
 
-	if (!is_dir_flag_on(FILE32, NEED_UPDATE) &&
-	    !is_dir_flag_on(FILE64, NEED_UPDATE)) {
+	if (!is_dir_flag_on(NEED_UPDATE)) {
 		clear_walk_args();
 		return (0);
 	}
@@ -3346,14 +3335,61 @@ is_be(char *root)
 }
 
 /*
- * Returns 1 if mkiso is in the expected PATH, 0 otherwise
+ * Returns B_TRUE if mkiso is in the expected PATH and should be used,
+ * B_FALSE otherwise
  */
-static int
-is_mkisofs()
+static boolean_t
+use_mkisofs()
 {
-	if (access(MKISOFS_PATH, X_OK) == 0)
-		return (1);
-	return (0);
+	scf_simple_prop_t *prop;
+	char *format = NULL;
+	boolean_t ret;
+
+	/* Check whether the mkisofs binary is in the expected location */
+	if (access(MKISOFS_PATH, X_OK) != 0) {
+		if (bam_verbose)
+			bam_print("mkisofs not found\n");
+		return (B_FALSE);
+	}
+
+	if (bam_format == BAM_FORMAT_HSFS) {
+		if (bam_verbose)
+			bam_print("-F specified HSFS");
+		return (B_TRUE);
+	}
+
+	/* If working on an alt-root, do not use HSFS unless asked via -F */
+	if (bam_alt_root)
+		return (B_FALSE);
+
+	/*
+	 * Then check that the system/boot-archive config/format property
+	 * is "hsfs" or empty.
+	 */
+	if ((prop = scf_simple_prop_get(NULL, BOOT_ARCHIVE_FMRI, SCF_PG_CONFIG,
+	    SCF_PROPERTY_FORMAT)) == NULL) {
+		/* Could not find property, use mkisofs */
+		if (bam_verbose) {
+			bam_print(
+			    "%s does not have %s/%s property, using mkisofs\n",
+			    BOOT_ARCHIVE_FMRI, SCF_PG_CONFIG,
+			    SCF_PROPERTY_FORMAT);
+		}
+		return (B_TRUE);
+	}
+	if (scf_simple_prop_numvalues(prop) < 0 ||
+	    (format = scf_simple_prop_next_astring(prop)) == NULL)
+		ret = B_TRUE;
+	else
+		ret = strcmp(format, "hsfs") == 0 ? B_TRUE : B_FALSE;
+	if (bam_verbose) {
+		if (ret)
+			bam_print("Creating hsfs boot archive\n");
+		else
+			bam_print("Creating %s boot archive\n", format);
+	}
+	scf_simple_prop_free(prop);
+	return (ret);
 }
 
 #define	MKISO_PARAMS	" -quiet -graft-points -dlrDJN -relaxed-filenames "
@@ -3668,37 +3704,31 @@ create_x86_archive(char *archive, char *tempname, char *update_dir)
 }
 
 static int
-mkisofs_archive(char *root, int what)
+mkisofs_archive(char *root)
 {
 	int		ret;
+	char		suffix[20];
 	char		temp[PATH_MAX];
-	char 		bootblk[PATH_MAX];
+	char		bootblk[PATH_MAX];
 	char		boot_archive[PATH_MAX];
 
-	if (what == FILE64 && !is_flag_on(IS_SPARC_TARGET))
-		ret = snprintf(temp, sizeof (temp),
-		    "%s%s%s/amd64/archive-new-%d", root, ARCHIVE_PREFIX,
-		    get_machine(), getpid());
-	else
-		ret = snprintf(temp, sizeof (temp), "%s%s%s/archive-new-%d",
-		    root, ARCHIVE_PREFIX, get_machine(), getpid());
+	ret = snprintf(suffix, sizeof (suffix), "/archive-new-%d", getpid());
+	if (ret >= sizeof (suffix))
+		goto out_path_err;
+
+	ret = build_path(temp, sizeof (temp), root, ARCHIVE_PREFIX, suffix);
 
 	if (ret >= sizeof (temp))
 		goto out_path_err;
 
-	if (what == FILE64 && !is_flag_on(IS_SPARC_TARGET))
-		ret = snprintf(boot_archive, sizeof (boot_archive),
-		    "%s%s%s/amd64%s", root, ARCHIVE_PREFIX, get_machine(),
-		    ARCHIVE_SUFFIX);
-	else
-		ret = snprintf(boot_archive, sizeof (boot_archive),
-		    "%s%s%s%s", root, ARCHIVE_PREFIX, get_machine(),
-		    ARCHIVE_SUFFIX);
+	ret = build_path(boot_archive, sizeof (boot_archive), root,
+	    ARCHIVE_PREFIX, ARCHIVE_SUFFIX);
 
 	if (ret >= sizeof (boot_archive))
 		goto out_path_err;
 
-	bam_print("updating %s\n", boot_archive);
+	bam_print("updating %s (HSFS)\n",
+	    boot_archive[1] == '/' ? boot_archive + 1 : boot_archive);
 
 	if (is_flag_on(IS_SPARC_TARGET)) {
 		ret = snprintf(bootblk, sizeof (bootblk),
@@ -3707,21 +3737,21 @@ mkisofs_archive(char *root, int what)
 			goto out_path_err;
 
 		ret = create_sparc_archive(boot_archive, temp, bootblk,
-		    get_cachedir(what));
+		    get_cachedir());
 	} else {
-		if (!is_dir_flag_on(what, NO_MULTI)) {
+		if (!is_dir_flag_on(NO_EXTEND)) {
 			if (bam_verbose)
 				bam_print("Attempting to extend x86 archive: "
 				    "%s\n", boot_archive);
 
 			ret = extend_iso_archive(boot_archive, temp,
-			    get_updatedir(what));
+			    get_updatedir());
 			if (ret == BAM_SUCCESS) {
 				if (bam_verbose)
 					bam_print("Successfully extended %s\n",
 					    boot_archive);
 
-				(void) rmdir_r(get_updatedir(what));
+				(void) rmdir_r(get_updatedir());
 				return (BAM_SUCCESS);
 			}
 		}
@@ -3739,12 +3769,12 @@ mkisofs_archive(char *root, int what)
 			bam_print("Unable to extend %s... rebuilding archive\n",
 			    boot_archive);
 
-		if (get_updatedir(what)[0] != '\0')
-			(void) rmdir_r(get_updatedir(what));
+		if (get_updatedir()[0] != '\0')
+			(void) rmdir_r(get_updatedir());
 
 
 		ret = create_x86_archive(boot_archive, temp,
-		    get_cachedir(what));
+		    get_cachedir());
 	}
 
 	if (digest_archive(boot_archive) == BAM_ERROR && bam_verbose)
@@ -3767,27 +3797,25 @@ create_ramdisk(char *root)
 	char *cmdline, path[PATH_MAX];
 	size_t len;
 	struct stat sb;
-	int ret, what, status = BAM_SUCCESS;
+	int ret, status = BAM_SUCCESS;
 
-	/* If there is mkisofs, use it to create the required archives */
-	if (is_mkisofs()) {
-		for (what = FILE32; what < CACHEDIR_NUM; what++) {
-			if (has_cachedir(what) && is_dir_flag_on(what,
-			    NEED_UPDATE)) {
-				ret = mkisofs_archive(root, what);
-				if (ret != 0)
-					status = BAM_ERROR;
-			}
+	/* If mkisofs should be used, use it to create the required archives */
+	if (use_mkisofs()) {
+		if (has_cachedir() && is_dir_flag_on(NEED_UPDATE)) {
+			ret = mkisofs_archive(root);
+			if (ret != 0)
+				status = BAM_ERROR;
 		}
 		return (status);
+	} else if (bam_format == BAM_FORMAT_HSFS) {
+		bam_error(_("cannot create hsfs archive\n"));
+		return (BAM_ERROR);
 	}
 
 	/*
-	 * Else setup command args for create_ramdisk.ksh for the UFS archives
+	 * Else setup command args for create_ramdisk.ksh for the archive
 	 * Note: we will not create hash here, CREATE_RAMDISK should create it.
 	 */
-	if (bam_verbose)
-		bam_print("mkisofs not found, creating UFS archive\n");
 
 	(void) snprintf(path, sizeof (path), "%s/%s", root, CREATE_RAMDISK);
 	if (stat(path, &sb) != 0) {
@@ -3801,7 +3829,9 @@ create_ramdisk(char *root)
 
 	len = strlen(path) + strlen(root) + 10;	/* room for space + -R */
 	if (bam_alt_platform)
-		len += strlen(bam_platform) + strlen("-p ");
+		len += strlen(bam_platform) + strlen(" -p ");
+	if (bam_format != BAM_FORMAT_UNSET)
+		len += strlen(bam_formats[bam_format]) + strlen(" -f ");
 	cmdline = s_calloc(1, len);
 
 	if (bam_alt_platform) {
@@ -3816,6 +3846,15 @@ create_ramdisk(char *root)
 		cmdline[strlen(cmdline) - 1] = '\0';
 	} else
 		(void) snprintf(cmdline, len, "%s", path);
+
+	if (bam_format != BAM_FORMAT_UNSET) {
+		if (strlcat(cmdline, " -f ", len) >= len ||
+		    strlcat(cmdline, bam_formats[bam_format], len) >= len) {
+			bam_error(_("boot-archive command line too long\n"));
+			free(cmdline);
+			return (BAM_ERROR);
+		}
+	}
 
 	if (exec_cmd(cmdline, NULL) != 0) {
 		bam_error(_("boot-archive creation FAILED, command: '%s'\n"),
@@ -5812,7 +5851,7 @@ get_mountpoint(char *special, char *fstype)
 /*
  * Mounts a "legacy" top dataset (if needed)
  * Returns:	The mountpoint of the legacy top dataset or NULL on error
- * 		mnted returns one of the above values defined for zfs_mnted_t
+ *		mnted returns one of the above values defined for zfs_mnted_t
  */
 static char *
 mount_legacy_dataset(char *pool, zfs_mnted_t *mnted)
@@ -5906,7 +5945,7 @@ mount_legacy_dataset(char *pool, zfs_mnted_t *mnted)
 /*
  * Mounts the top dataset (if needed)
  * Returns:	The mountpoint of the top dataset or NULL on error
- * 		mnted returns one of the above values defined for zfs_mnted_t
+ *		mnted returns one of the above values defined for zfs_mnted_t
  */
 char *
 mount_top_dataset(char *pool, zfs_mnted_t *mnted)
@@ -6349,7 +6388,7 @@ search_hash(mhash_t *mhp, char *special, char **mntpt)
 {
 	int		idx;
 	mcache_t	*mcp;
-	const char 	*fcn = "search_hash()";
+	const char	*fcn = "search_hash()";
 
 	assert(mntpt);
 
@@ -7754,7 +7793,7 @@ get_special(char *mountp)
 	struct mnttab	mpref = {0};
 	int		error;
 	int		ret;
-	const char 	*fcn = "get_special()";
+	const char	*fcn = "get_special()";
 
 	INJECT_ERROR1("GET_SPECIAL_MNTPT", mountp = NULL);
 	if (mountp == NULL) {

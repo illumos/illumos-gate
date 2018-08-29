@@ -4,13 +4,15 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright 2016 Toomas Soome <tsoome@me.com>
-.TH BOOTADM 1M "Aug 18, 2016"
+.\" Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+.TH BOOTADM 1M "Jul 05, 2018"
 .SH NAME
 bootadm \- manage bootability of the operating system
 .SH SYNOPSIS
 .LP
 .nf
-\fB/sbin/bootadm\fR update-archive [\fB-vn\fR] [\fB-R\fR \fIaltroot\fR [\fB-p\fR \fIplatform\fR]]
+\fB/sbin/bootadm\fR update-archive [\fB-vnf\fR] [\fB-R\fR \fIaltroot\fR [\fB-p\fR \fIplatform\fR]]
+     [\fB-F \fIformat\fR]
 .fi
 
 .LP
@@ -87,7 +89,68 @@ The \fBbootadm\fR command has the following subcommands:
 .sp .6
 .RS 4n
 Updates current boot archive if required. Applies to both SPARC and x86
-platforms.
+platforms. The boot archive can be created in a number of different formats;
+the default format is an IEEE/P1003 Data Interchange Standard cpio archive.
+The format is configured through the following service management facility
+(\fBsmf\fR(5)) property:
+.sp
+.in +2
+.nf
+svc:/system/boot-archive:default/config/format
+.fi
+.in -2
+
+.sp
+.LP
+This property takes one of the following values:
+.RS 8n
+
+.sp
+.ne 2
+.na
+\fBcpio\fR
+.ad
+.sp .6
+.RS 4n
+IEEE/P1003 Data Interchange Standard cpio archive (default).
+.RE
+
+.sp
+.ne 2
+.na
+\fBhsfs\fR
+.ad
+.sp .6
+.RS 4n
+ISO 9660 filesystem image (only supported if \fI/usr/bin/mkisofs\fR is
+available).
+.RE
+
+.sp
+.ne 2
+.na
+\fBufs\fR
+.ad
+.sp .6
+.RS 4n
+UFS filesystem in which the files within are compressed using gzip if
+\fI/usr/bin/gzip\fR is available.
+.RE
+
+.sp
+.ne 2
+.na
+\fBufs-nocompress\fR
+.ad
+.sp .6
+.RS 4n
+UFS filesystem. The files within are not compressed but the resulting overall
+boot archive will still be compressed if \fI/usr/bin/gzip\fR is available.
+.RE
+.RE
+
+See \fBEXAMPLES\fR for how to change this value.
+
 .RE
 
 .sp
@@ -163,6 +226,7 @@ title of each entry. Applies to x86 platforms only.
 .SH OPTIONS
 .LP
 The \fBbootadm\fR command has the following options:
+
 .sp
 .ne 2
 .na
@@ -170,8 +234,23 @@ The \fBbootadm\fR command has the following options:
 .ad
 .sp .6
 .RS 4n
+In an \fBupdate-archive\fR operation, force re-generation of the boot-archive
+even if no files have changed.
+
 In an \fBinstall-bootloader\fR operation, override the boot loader versioning
 constraints.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-F \fIformat\fR\fR
+.ad
+.sp .6
+.RS 4n
+In an \fBupdate-archive\fR operation, select the desired archive format. The
+format can be any of the values shown above for the
+svc:/system/boot-archive:default/config/format property.
 .RE
 
 .sp
@@ -367,7 +446,22 @@ user selects test-183 (item 1).
 .in -2
 
 .LP
-\fBExample 5 \fRDetailed information about menu entry.
+\fBExample 5 \fRChanging archive format
+.sp
+.LP
+The following command changes the boot archive format to \fIufs\fR
+
+.sp
+.in +2
+.nf
+# svccfg -s system/boot-archive:default setprop config/format = ufs
+# svcadm refresh system/boot-archive:default
+# bootadm update-archive -f
+.fi
+.in -2
+
+.LP
+\fBExample 6 \fRDetailed information about menu entry.
 .sp
 .LP
 The following command lists more detailed information about a boot menu entry:
