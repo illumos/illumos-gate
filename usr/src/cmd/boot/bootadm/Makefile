@@ -24,6 +24,7 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG= bootadm
@@ -43,7 +44,7 @@ POFILE= bootadm_cmd.po
 
 LDLIBS_i386= -lfdisk
 LDLIBS += -lficl-sys -lmd -lcryptoutil -lnvpair -lgen -ladm -lefi
-LDLIBS += -lz -lbe -lzfs -lofmt $(LDLIBS_$(MACH))
+LDLIBS += -lscf -lz -lbe -lzfs -lofmt $(LDLIBS_$(MACH))
 
 # Writing into string literals is incorrect.  We need to match gcc's
 # behavior, which causes us to take SIGSEGV on such a write.
