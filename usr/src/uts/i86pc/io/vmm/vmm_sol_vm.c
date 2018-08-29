@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -38,73 +38,6 @@
 #define	VMMAP_TO_VMSPACE(vmmap)	((struct vmspace *)		\
 	((caddr_t)(vmmap) - offsetof(struct vmspace, vm_map)))
 
-/* Similar to htable, but without the bells and whistles */
-struct eptable {
-	struct eptable	*ept_next;
-	uintptr_t	ept_vaddr;
-	pfn_t		ept_pfn;
-	int16_t		ept_level;
-	int16_t		ept_valid_cnt;
-	uint32_t	_ept_pad2;
-	struct eptable	*ept_prev;
-	struct eptable	*ept_parent;
-	void		*ept_kva;
-};
-typedef struct eptable eptable_t;
-
-struct eptable_map {
-	kmutex_t		em_lock;
-	eptable_t		*em_root;
-	eptable_t		**em_hash;
-	size_t			em_table_cnt;
-	size_t			em_wired;
-
-	/* Protected by eptable_map_lock */
-	struct eptable_map	*em_next;
-	struct eptable_map	*em_prev;
-};
-typedef struct eptable_map eptable_map_t;
-
-#define	EPTABLE_HASH(va, lvl, sz)				\
-	((((va) >> LEVEL_SHIFT(1)) + ((va) >> 28) + (lvl))	\
-	& ((sz) - 1))
-
-#define	EPTABLE_VA2IDX(tbl, va)					\
-	(((va) - (tbl)->ept_vaddr) >>				\
-	LEVEL_SHIFT((tbl)->ept_level))
-
-#define	EPTABLE_IDX2VA(tbl, idx)				\
-	((tbl)->ept_vaddr +					\
-	((idx) << LEVEL_SHIFT((tbl)->ept_level)))
-
-#define	EPT_R		(0x1 << 0)
-#define	EPT_W		(0x1 << 1)
-#define	EPT_X		(0x1 << 2)
-#define	EPT_RWX		(EPT_R|EPT_W|EPT_X)
-#define	EPT_LGPG	(0x1 << 7)
-
-#define	EPT_PAT(attr)	(((attr) & 0x7) << 3)
-
-#define	EPT_PADDR	(0x000ffffffffff000ull)
-
-#define	EPT_IS_ABSENT(pte)	(((pte) & EPT_RWX) == 0)
-#define	EPT_PTE_PFN(pte)	mmu_btop((pte) & EPT_PADDR)
-#define	EPT_PTE_PROT(pte)	((pte) & EPT_RWX)
-#define	EPT_MAPS_PAGE(lvl, pte)				\
-	((lvl) == 0 || ((pte) & EPT_LGPG))
-
-#define	EPT_PTE_ASSIGN_TABLE(pfn)			\
-	((pfn_to_pa(pfn) & EPT_PADDR) | EPT_RWX)
-
-/*
- * We only assign EPT_LGPG for levels higher than 0: although this bit is
- * defined as being ignored at level 0, some versions of VMWare fail to honor
- * this and report such a PTE as an EPT mis-configuration.
- */
-#define	EPT_PTE_ASSIGN_PAGE(lvl, pfn, prot, attr)	\
-	((pfn_to_pa(pfn) & EPT_PADDR) |			\
-	(((lvl) != 0) ? EPT_LGPG : 0) |			\
-	EPT_PAT(attr) | ((prot) & EPT_RWX))
 
 struct vmspace_mapping {
 	list_node_t	vmsm_node;
@@ -123,25 +56,9 @@ typedef struct vmspace_mapping vmspace_mapping_t;
 
 /* Private glue interfaces */
 static void pmap_free(pmap_t);
-static eptable_t *eptable_alloc(void);
-static void eptable_free(eptable_t *);
-static void eptable_init(eptable_map_t *);
-static void eptable_fini(eptable_map_t *);
-static eptable_t *eptable_hash_lookup(eptable_map_t *, uintptr_t, level_t);
-static void eptable_hash_insert(eptable_map_t *, eptable_t *);
-static void eptable_hash_remove(eptable_map_t *, eptable_t *);
-static eptable_t *eptable_walk(eptable_map_t *, uintptr_t, level_t, uint_t *,
-    boolean_t);
-static pfn_t eptable_mapin(eptable_map_t *, uintptr_t, pfn_t, uint_t, uint_t,
-    vm_memattr_t);
-static void eptable_mapout(eptable_map_t *, uintptr_t);
-static int eptable_find(eptable_map_t *, uintptr_t, pfn_t *, uint_t *);
 static vmspace_mapping_t *vm_mapping_find(struct vmspace *, uintptr_t, size_t,
     boolean_t);
 static void vm_mapping_remove(struct vmspace *, vmspace_mapping_t *);
-
-static kmutex_t eptable_map_lock;
-static struct eptable_map *eptable_map_head = NULL;
 
 static vmem_t *vmm_alloc_arena = NULL;
 
@@ -250,109 +167,28 @@ vmspace_find_kva(struct vmspace *vms, uintptr_t addr, size_t size)
 }
 
 static int
-vmspace_pmap_wire(struct vmspace *vms, uintptr_t addr, pfn_t pfn, uint_t lvl,
-    uint_t prot, vm_memattr_t attr)
-{
-	enum pmap_type type = vms->vms_pmap.pm_type;
-
-	ASSERT(MUTEX_HELD(&vms->vms_lock));
-
-	switch (type) {
-	case PT_EPT: {
-		eptable_map_t *map = (eptable_map_t *)vms->vms_pmap.pm_map;
-
-		(void) eptable_mapin(map, addr, pfn, lvl, prot, attr);
-
-		vms->vms_pmap.pm_eptgen++;
-		return (0);
-	}
-	case PT_RVI:
-		/* RVI support not yet implemented */
-	default:
-		panic("unsupported pmap type: %x", type);
-		/* NOTREACHED */
-		break;
-	}
-	return (0);
-}
-
-static int
 vmspace_pmap_iswired(struct vmspace *vms, uintptr_t addr, uint_t *prot)
 {
-	enum pmap_type type = vms->vms_pmap.pm_type;
+	pmap_t pmap = &vms->vms_pmap;
+	int rv;
 
 	ASSERT(MUTEX_HELD(&vms->vms_lock));
 
-	switch (type) {
-	case PT_EPT: {
-		eptable_map_t *map = (eptable_map_t *)vms->vms_pmap.pm_map;
-		pfn_t pfn;
-
-		return (eptable_find(map, addr, &pfn, prot));
-	}
-	case PT_RVI:
-		/* RVI support not yet implemented */
-	default:
-		panic("unsupported pmap type: %x", type);
-		/* NOTREACHED */
-		break;
-	}
-	return (-1);
-}
-
-static int
-vmspace_pmap_unmap(struct vmspace *vms, uintptr_t addr, size_t size)
-{
-	enum pmap_type type = vms->vms_pmap.pm_type;
-
-	ASSERT(MUTEX_HELD(&vms->vms_lock));
-
-	switch (type) {
-	case PT_EPT: {
-		eptable_map_t *map = (eptable_map_t *)vms->vms_pmap.pm_map;
-		uintptr_t maddr = (uintptr_t)addr;
-		const ulong_t npages = btop(size);
-		ulong_t idx;
-
-		/* XXXJOY: punt on large pages for now */
-		for (idx = 0; idx < npages; idx++, maddr += PAGESIZE) {
-			eptable_mapout(map, maddr);
-		}
-		vms->vms_pmap.pm_eptgen++;
-		return (0);
-	}
-		break;
-	case PT_RVI:
-		/* RVI support not yet implemented */
-	default:
-		panic("unsupported pmap type: %x", type);
-		/* NOTREACHED */
-		break;
-	}
-	return (0);
+	rv = pmap->pm_ops->vpo_is_wired(pmap->pm_impl, addr, prot);
+	return (rv);
 }
 
 static void
 pmap_free(pmap_t pmap)
 {
-	switch (pmap->pm_type) {
-	case PT_EPT: {
-		eptable_map_t *map = (eptable_map_t *)pmap->pm_map;
+	void *pmi = pmap->pm_impl;
+	struct vmm_pt_ops *ops = pmap->pm_ops;
 
-		pmap->pm_pml4 = NULL;
-		pmap->pm_map = NULL;
+	pmap->pm_pml4 = NULL;
+	pmap->pm_impl = NULL;
+	pmap->pm_ops = NULL;
 
-		eptable_fini(map);
-		kmem_free(map, sizeof (*map));
-		return;
-	}
-	case PT_RVI:
-		/* RVI support not yet implemented */
-	default:
-		panic("unsupported pmap type: %x", pmap->pm_type);
-		/* NOTREACHED */
-		break;
-	}
+	ops->vpo_free(pmi);
 }
 
 int
@@ -362,45 +198,34 @@ pmap_pinit_type(pmap_t pmap, enum pmap_type type, int flags)
 	pmap->pm_type = type;
 	switch (type) {
 	case PT_EPT: {
-		eptable_map_t *map;
+		struct vmm_pt_ops *ops = &ept_ops;
+		void *pml4, *pmi;
 
-		map = kmem_zalloc(sizeof (*map), KM_SLEEP);
-		eptable_init(map);
+		pmi = ops->vpo_init((uintptr_t *)&pml4);
 
-		pmap->pm_map = map;
-		pmap->pm_pml4 = map->em_root->ept_kva;
+		pmap->pm_ops = ops;
+		pmap->pm_impl = pmi;
+		pmap->pm_pml4 = pml4;
 		return (1);
 	}
 	case PT_RVI:
 		/* RVI support not yet implemented */
-		return (0);
 	default:
 		panic("unsupported pmap type: %x", type);
-		/* NOTREACHED */
 		break;
 	}
 
-	/* XXXJOY: finish */
 	return (1);
 }
 
 long
 pmap_wired_count(pmap_t pmap)
 {
-	enum pmap_type type = pmap->pm_type;
-	long val = 0L;
+	long val;
 
-	switch (type) {
-	case PT_EPT:
-		val = ((eptable_map_t *)pmap->pm_map)->em_wired;
-		break;
-	case PT_RVI:
-		/* RVI support not yet implemented */
-	default:
-		panic("unsupported pmap type: %x", type);
-		/* NOTREACHED */
-		break;
-	}
+	val = pmap->pm_ops->vpo_wired_cnt(pmap->pm_impl);
+	VERIFY3S(val, >=, 0);
+
 	return (val);
 }
 
@@ -412,361 +237,6 @@ pmap_emulate_accessed_dirty(pmap_t pmap, vm_offset_t va, int ftype)
 }
 
 
-static eptable_t *
-eptable_alloc(void)
-{
-	eptable_t *ept;
-	caddr_t page;
-
-	ept = kmem_zalloc(sizeof (*ept), KM_SLEEP);
-	page = kmem_zalloc(PAGESIZE, KM_SLEEP);
-	ept->ept_kva = page;
-	ept->ept_pfn = hat_getpfnum(kas.a_hat, page);
-
-	return (ept);
-}
-
-static void
-eptable_free(eptable_t *ept)
-{
-	void *page = ept->ept_kva;
-
-	ASSERT(ept->ept_pfn != PFN_INVALID);
-	ASSERT(ept->ept_kva != NULL);
-
-	ept->ept_pfn = PFN_INVALID;
-	ept->ept_kva = NULL;
-
-	kmem_free(page, PAGESIZE);
-	kmem_free(ept, sizeof (*ept));
-}
-
-static void
-eptable_init(eptable_map_t *map)
-{
-	eptable_t *root;
-
-	VERIFY0(mmu.hash_cnt & (mmu.hash_cnt - 1));
-
-	map->em_table_cnt = mmu.hash_cnt;
-	map->em_hash = kmem_zalloc(sizeof (eptable_t *) * map->em_table_cnt,
-	    KM_SLEEP);
-
-	root = eptable_alloc();
-	root->ept_level = mmu.max_level;
-	map->em_root = root;
-
-	/* Insert into global tracking list of eptable maps */
-	mutex_enter(&eptable_map_lock);
-	map->em_next = eptable_map_head;
-	map->em_prev = NULL;
-	if (eptable_map_head != NULL) {
-		eptable_map_head->em_prev = map;
-	}
-	eptable_map_head = map;
-	mutex_exit(&eptable_map_lock);
-}
-
-static void
-eptable_fini(eptable_map_t *map)
-{
-	const uint_t cnt = map->em_table_cnt;
-
-	/* Remove from global tracking list of eptable maps */
-	mutex_enter(&eptable_map_lock);
-	if (map->em_next != NULL) {
-		map->em_next->em_prev = map->em_prev;
-	}
-	if (map->em_prev != NULL) {
-		map->em_prev->em_next = map->em_next;
-	} else {
-		eptable_map_head = map->em_next;
-	}
-	mutex_exit(&eptable_map_lock);
-
-	mutex_enter(&map->em_lock);
-	/* XXJOY: Should we expect to need this clean-up? */
-	for (uint_t i = 0; i < cnt; i++) {
-		eptable_t *ept = map->em_hash[i];
-
-		while (ept != NULL) {
-			eptable_t *next = ept->ept_next;
-
-			eptable_hash_remove(map, ept);
-			eptable_free(ept);
-			ept = next;
-		}
-	}
-
-	kmem_free(map->em_hash, sizeof (eptable_t *) * cnt);
-	eptable_free(map->em_root);
-
-	mutex_exit(&map->em_lock);
-	mutex_destroy(&map->em_lock);
-}
-
-static eptable_t *
-eptable_hash_lookup(eptable_map_t *map, uintptr_t va, level_t lvl)
-{
-	const uint_t hash = EPTABLE_HASH(va, lvl, map->em_table_cnt);
-	eptable_t *ept;
-
-	ASSERT(MUTEX_HELD(&map->em_lock));
-
-	for (ept = map->em_hash[hash]; ept != NULL; ept = ept->ept_next) {
-		if (ept->ept_vaddr == va && ept->ept_level == lvl)
-			break;
-	}
-	return (ept);
-}
-
-static void
-eptable_hash_insert(eptable_map_t *map, eptable_t *ept)
-{
-	const uintptr_t va = ept->ept_vaddr;
-	const uint_t lvl = ept->ept_level;
-	const uint_t hash = EPTABLE_HASH(va, lvl, map->em_table_cnt);
-
-	ASSERT(MUTEX_HELD(&map->em_lock));
-	ASSERT(eptable_hash_lookup(map, va, lvl) == NULL);
-
-	ept->ept_prev = NULL;
-	if (map->em_hash[hash] == NULL) {
-		ept->ept_next = NULL;
-	} else {
-		eptable_t *chain = map->em_hash[hash];
-
-		ept->ept_next = chain;
-		chain->ept_prev = ept;
-	}
-	map->em_hash[hash] = ept;
-}
-
-static void
-eptable_hash_remove(eptable_map_t *map, eptable_t *ept)
-{
-	const uintptr_t va = ept->ept_vaddr;
-	const uint_t lvl = ept->ept_level;
-	const uint_t hash = EPTABLE_HASH(va, lvl, map->em_table_cnt);
-
-	ASSERT(MUTEX_HELD(&map->em_lock));
-
-	if (ept->ept_prev == NULL) {
-		ASSERT(map->em_hash[hash] == ept);
-
-		map->em_hash[hash] = ept->ept_next;
-	} else {
-		ept->ept_prev->ept_next = ept->ept_next;
-	}
-	if (ept->ept_next != NULL) {
-		ept->ept_next->ept_prev = ept->ept_prev;
-	}
-	ept->ept_next = NULL;
-	ept->ept_prev = NULL;
-}
-
-static eptable_t *
-eptable_walk(eptable_map_t *map, uintptr_t va, level_t tgtlvl, uint_t *idxp,
-    boolean_t do_create)
-{
-	eptable_t *ept = map->em_root;
-	level_t lvl = ept->ept_level;
-	uint_t idx = UINT_MAX;
-
-	ASSERT(MUTEX_HELD(&map->em_lock));
-
-	while (lvl >= tgtlvl) {
-		x86pte_t *ptes, entry;
-		const uintptr_t masked_va = va & LEVEL_MASK((uint_t)lvl);
-		eptable_t *newept = NULL;
-
-		idx = EPTABLE_VA2IDX(ept, va);
-		if (lvl == tgtlvl || lvl == 0) {
-			break;
-		}
-
-		ptes = (x86pte_t *)ept->ept_kva;
-		entry = ptes[idx];
-		if (EPT_IS_ABSENT(entry)) {
-			if (!do_create) {
-				break;
-			}
-
-			newept = eptable_alloc();
-			newept->ept_level = lvl - 1;
-			newept->ept_vaddr = masked_va;
-			newept->ept_parent = ept;
-
-			eptable_hash_insert(map, newept);
-			entry = EPT_PTE_ASSIGN_TABLE(newept->ept_pfn);
-			ptes[idx] = entry;
-			ept->ept_valid_cnt++;
-		} else if (!EPT_MAPS_PAGE(lvl, entry)) {
-			/* Do lookup in next level of page table */
-			newept = eptable_hash_lookup(map, masked_va, lvl - 1);
-
-			VERIFY(newept);
-			VERIFY3P(pfn_to_pa(newept->ept_pfn), ==,
-			    (entry & EPT_PADDR));
-		} else {
-			/*
-			 * There is a (large) page mapped here.  Since support
-			 * for non-PAGESIZE pages is not yet present, this is a
-			 * surprise.
-			 */
-			panic("unexpected large page in pte %p", &ptes[idx]);
-		}
-		ept = newept;
-		lvl--;
-	}
-
-	VERIFY(lvl >= 0 && idx != UINT_MAX);
-	*idxp = idx;
-	return (ept);
-}
-
-static pfn_t
-eptable_mapin(eptable_map_t *map, uintptr_t va, pfn_t pfn, uint_t lvl,
-    uint_t prot, vm_memattr_t attr)
-{
-	uint_t idx;
-	eptable_t *ept;
-	x86pte_t *ptes, entry;
-	const size_t pgsize = (size_t)LEVEL_SIZE(lvl);
-	pfn_t oldpfn = PFN_INVALID;
-
-	CTASSERT(EPT_R == PROT_READ);
-	CTASSERT(EPT_W == PROT_WRITE);
-	CTASSERT(EPT_X == PROT_EXEC);
-	ASSERT((prot & EPT_RWX) != 0 && (prot & ~EPT_RWX) == 0);
-
-	/* XXXJOY: punt on large pages for now */
-	VERIFY(lvl == 0);
-
-	mutex_enter(&map->em_lock);
-	ept = eptable_walk(map, va, (level_t)lvl, &idx, B_TRUE);
-	ptes = (x86pte_t *)ept->ept_kva;
-	entry = ptes[idx];
-
-	if (!EPT_IS_ABSENT(entry)) {
-		if (!EPT_MAPS_PAGE(lvl, entry)) {
-			panic("unexpected PT link %lx in %p[%d]",
-			    entry, ept, idx);
-		}
-
-		/*
-		 * XXXJOY: Just clean the entry for now. Assume(!) that
-		 * invalidation is going to occur anyways.
-		 */
-		oldpfn = EPT_PTE_PFN(ptes[idx]);
-		ept->ept_valid_cnt--;
-		ptes[idx] = (x86pte_t)0;
-		map->em_wired -= (pgsize >> PAGESHIFT);
-	}
-
-	entry = EPT_PTE_ASSIGN_PAGE(lvl, pfn, prot, attr);
-	ptes[idx] = entry;
-	ept->ept_valid_cnt++;
-	map->em_wired += (pgsize >> PAGESHIFT);
-	mutex_exit(&map->em_lock);
-
-	return (oldpfn);
-}
-
-static void
-eptable_mapout(eptable_map_t *map, uintptr_t va)
-{
-	eptable_t *ept;
-	uint_t idx;
-	x86pte_t *ptes, entry;
-
-	mutex_enter(&map->em_lock);
-	/* Find the lowest level entry at this VA */
-	ept = eptable_walk(map, va, -1, &idx, B_FALSE);
-
-	ptes = (x86pte_t *)ept->ept_kva;
-	entry = ptes[idx];
-
-	if (EPT_IS_ABSENT(entry)) {
-		/*
-		 * There is nothing here to free up.  If this was a sparsely
-		 * wired mapping, the absence is no concern.
-		 */
-		mutex_exit(&map->em_lock);
-		return;
-	} else {
-		const size_t pagesize = LEVEL_SIZE((uint_t)ept->ept_level);
-
-		if (!EPT_MAPS_PAGE(ept->ept_level, entry)) {
-			panic("unexpected PT link %lx in %p[%d]",
-			    entry, ept, idx);
-		}
-
-		/*
-		 * XXXJOY: Just clean the entry for now. Assume(!) that
-		 * invalidation is going to occur anyways.
-		 */
-		ept->ept_valid_cnt--;
-		ptes[idx] = (x86pte_t)0;
-		map->em_wired -= (pagesize >> PAGESHIFT);
-	}
-
-	while (ept->ept_valid_cnt == 0 && ept->ept_parent != NULL) {
-		eptable_t *next = ept->ept_parent;
-
-		idx = EPTABLE_VA2IDX(next, va);
-		ptes = (x86pte_t *)next->ept_kva;
-
-		entry = ptes[idx];
-		ASSERT(!EPT_MAPS_PAGE(next->ept_level, entry));
-		ASSERT(EPT_PTE_PFN(entry) == ept->ept_pfn);
-
-		ptes[idx] = (x86pte_t)0;
-		next->ept_valid_cnt--;
-		eptable_hash_remove(map, ept);
-		ept->ept_parent = NULL;
-		eptable_free(ept);
-
-		ept = next;
-	}
-	mutex_exit(&map->em_lock);
-}
-
-static int
-eptable_find(eptable_map_t *map, uintptr_t va, pfn_t *pfn, uint_t *prot)
-{
-	eptable_t *ept;
-	uint_t idx;
-	x86pte_t *ptes, entry;
-	int err = -1;
-
-	mutex_enter(&map->em_lock);
-	/* Find the lowest level entry at this VA */
-	ept = eptable_walk(map, va, -1, &idx, B_FALSE);
-
-	/* XXXJOY: Until large pages are supported, this check is easy */
-	if (ept->ept_level != 0) {
-		mutex_exit(&map->em_lock);
-		return (-1);
-	}
-
-	ptes = (x86pte_t *)ept->ept_kva;
-	entry = ptes[idx];
-
-	if (!EPT_IS_ABSENT(entry)) {
-		if (!EPT_MAPS_PAGE(ept->ept_level, entry)) {
-			panic("unexpected PT link %lx in %p[%d]",
-			    entry, ept, idx);
-		}
-
-		*pfn = EPT_PTE_PFN(entry);
-		*prot = EPT_PTE_PROT(entry);
-		err = 0;
-	}
-
-	mutex_exit(&map->em_lock);
-	return (err);
-}
 
 struct sglist_ent {
 	vm_paddr_t	sge_pa;
@@ -852,7 +322,6 @@ static pfn_t
 vm_object_pager_none(vm_object_t vmo, uintptr_t off, pfn_t *lpfn, uint_t *lvl)
 {
 	panic("bad vm_object pager");
-	/* NOTREACHED */
 	return (PFN_INVALID);
 }
 
@@ -1169,6 +638,8 @@ int
 vm_fault(vm_map_t map, vm_offset_t off, vm_prot_t type, int flag)
 {
 	struct vmspace *vms = VMMAP_TO_VMSPACE(map);
+	pmap_t pmap = &vms->vms_pmap;
+	void *pmi = pmap->pm_impl;
 	const uintptr_t addr = off;
 	vmspace_mapping_t *vmsm;
 	struct vm_object *vmo;
@@ -1181,7 +652,7 @@ vm_fault(vm_map_t map, vm_offset_t off, vm_prot_t type, int flag)
 		int err = 0;
 
 		/*
-		 * It is possible that multiple will vCPUs race to fault-in a
+		 * It is possible that multiple vCPUs will race to fault-in a
 		 * given address.  In such cases, the race loser(s) will
 		 * encounter the already-mapped page, needing to do nothing
 		 * more than consider it a success.
@@ -1211,11 +682,12 @@ vm_fault(vm_map_t map, vm_offset_t off, vm_prot_t type, int flag)
 	VERIFY(pfn != PFN_INVALID);
 
 	/*
-	 * If pmap failure is to be handled, the previously
-	 * acquired page locks would need to be released.
+	 * If pmap failure is to be handled, the previously acquired page locks
+	 * would need to be released.
 	 */
-	VERIFY0(vmspace_pmap_wire(vms, map_addr, pfn, map_lvl, prot,
+	VERIFY0(pmap->pm_ops->vpo_map(pmi, map_addr, pfn, map_lvl, prot,
 	    vmo->vmo_attr));
+	pmap->pm_eptgen++;
 
 	mutex_exit(&vms->vms_lock);
 	return (0);
@@ -1331,10 +803,11 @@ int
 vm_map_remove(vm_map_t map, vm_offset_t start, vm_offset_t end)
 {
 	struct vmspace *vms = VMMAP_TO_VMSPACE(map);
+	pmap_t pmap = &vms->vms_pmap;
+	void *pmi = pmap->pm_impl;
 	const uintptr_t addr = start;
 	const size_t size = (size_t)(end - start);
 	vmspace_mapping_t *vmsm;
-	objtype_t type;
 
 	ASSERT(start < end);
 
@@ -1348,17 +821,8 @@ vm_map_remove(vm_map_t map, vm_offset_t start, vm_offset_t end)
 		return (ENOENT);
 	}
 
-	type = vmsm->vmsm_object->vmo_type;
-	switch (type) {
-	case OBJT_DEFAULT:
-	case OBJT_SG:
-		VERIFY0(vmspace_pmap_unmap(vms, addr, size));
-		break;
-	default:
-		panic("unsupported object type: %x", type);
-		/* NOTREACHED */
-		break;
-	}
+	(void) pmap->pm_ops->vpo_unmap(pmi, addr, end);
+	pmap->pm_eptgen++;
 
 	vm_mapping_remove(vms, vmsm);
 	vms->vms_map_changing = B_FALSE;
@@ -1370,6 +834,8 @@ int
 vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 {
 	struct vmspace *vms = VMMAP_TO_VMSPACE(map);
+	pmap_t pmap = &vms->vms_pmap;
+	void *pmi = pmap->pm_impl;
 	const uintptr_t addr = start;
 	const size_t size = end - start;
 	vmspace_mapping_t *vmsm;
@@ -1397,8 +863,10 @@ vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 		map_addr = P2ALIGN(pos, pg_size);
 		VERIFY(pfn != PFN_INVALID);
 
-		VERIFY0(vmspace_pmap_wire(vms, map_addr, pfn, map_lvl, prot,
-		    vmo->vmo_attr));
+		VERIFY0(pmap->pm_ops->vpo_map(pmi, map_addr, pfn, map_lvl,
+		    prot, vmo->vmo_attr));
+		vms->vms_pmap.pm_eptgen++;
+
 		pos += pg_size;
 	}
 

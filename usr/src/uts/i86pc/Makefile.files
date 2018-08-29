@@ -23,7 +23,7 @@
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2010, Intel Corporation.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 #	This Makefile defines file modules in the directory uts/i86pc
 #	and its children. These are the source files which are i86pc
@@ -275,8 +275,10 @@ VMM_OBJS += vmm.o \
 	vmcb.o \
 	svm_support.o \
 	amdv.o \
+	gipt.o \
 	vmm_sol_vm.o \
 	vmm_sol_glue.o \
+	vmm_sol_ept.o \
 	vmm_zsd.o
 
 VIONA_OBJS += viona.o
