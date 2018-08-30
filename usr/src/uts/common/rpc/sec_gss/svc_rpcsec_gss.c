@@ -23,6 +23,8 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2012 Marcel Telka <marcel@telka.sk>
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -374,10 +376,7 @@ rpc_gss_cleanup(SVCXPRT *clone_xprt)
  * Shift the array arr of length arrlen right by nbits bits.
  */
 static void
-shift_bits(arr, arrlen, nbits)
-	uint_t	*arr;
-	int	arrlen;
-	int	nbits;
+shift_bits(uint_t *arr, int arrlen, int nbits)
 {
 	int	i, j;
 	uint_t	lo, hi;
@@ -407,10 +406,7 @@ shift_bits(arr, arrlen, nbits)
  * Check that the received sequence number seq_num is valid.
  */
 static bool_t
-check_seq(cl, seq_num, kill_context)
-	svc_rpc_gss_data	*cl;
-	uint_t			seq_num;
-	bool_t			*kill_context;
+check_seq(svc_rpc_gss_data *cl, uint_t seq_num, bool_t *kill_context)
 {
 	int			i, j;
 	uint_t			bit;
@@ -431,7 +427,7 @@ check_seq(cl, seq_num, kill_context)
 	 */
 	if (seq_num > cl->seq_num) {
 		(void) shift_bits(cl->seq_bits, SEQ_ARR_SIZE,
-				(int)(seq_num - cl->seq_num));
+		    (int)(seq_num - cl->seq_num));
 		cl->seq_bits[0] |= SEQ_HI_BIT;
 		cl->seq_num = seq_num;
 		return (TRUE);
@@ -465,8 +461,7 @@ check_seq(cl, seq_num, kill_context)
  * Set server callback.
  */
 bool_t
-rpc_gss_set_callback(cb)
-	rpc_gss_callback_t	*cb;
+rpc_gss_set_callback(rpc_gss_callback_t *cb)
 {
 	rpc_gss_cblist_t		*cbl, *tmp;
 
@@ -508,9 +503,7 @@ rpc_gss_set_callback(cb)
  * the incoming context.
  */
 static bool_t
-do_callback(req, client_data)
-	struct svc_req		*req;
-	svc_rpc_gss_data	*client_data;
+do_callback(struct svc_req *req, svc_rpc_gss_data *client_data)
 {
 	rpc_gss_cblist_t		*cbl;
 	bool_t			ret = TRUE, found = FALSE;
@@ -519,13 +512,13 @@ do_callback(req, client_data)
 	mutex_enter(&cb_mutex);
 	for (cbl = rpc_gss_cblist; cbl != NULL; cbl = cbl->next) {
 		if (req->rq_prog != cbl->cb.program ||
-					req->rq_vers != cbl->cb.version)
+		    req->rq_vers != cbl->cb.version)
 			continue;
 		found = TRUE;
 		lock.locked = FALSE;
 		lock.raw_cred = &client_data->raw_cred;
 		ret = (*cbl->cb.callback)(req, client_data->deleg,
-			client_data->context, &lock, &client_data->cookie);
+		    client_data->context, &lock, &client_data->cookie);
 		req->rq_xprt->xp_cookie = client_data->cookie;
 
 		if (ret) {
@@ -537,7 +530,7 @@ do_callback(req, client_data)
 	if (!found) {
 		if (client_data->deleg != GSS_C_NO_CREDENTIAL) {
 			(void) kgss_release_cred(&minor, &client_data->deleg,
-					crgetuid(CRED()));
+			    crgetuid(CRED()));
 			client_data->deleg = GSS_C_NO_CREDENTIAL;
 		}
 	}
@@ -549,11 +542,8 @@ do_callback(req, client_data)
  * Get caller credentials.
  */
 bool_t
-rpc_gss_getcred(req, rcred, ucred, cookie)
-	struct svc_req		*req;
-	rpc_gss_rawcred_t	**rcred;
-	rpc_gss_ucred_t		**ucred;
-	void			**cookie;
+rpc_gss_getcred(struct svc_req *req, rpc_gss_rawcred_t **rcred,
+    rpc_gss_ucred_t **ucred, void **cookie)
 {
 	SVCAUTH			*svcauth;
 	svc_rpc_gss_data	*client_data;
@@ -573,38 +563,45 @@ rpc_gss_getcred(req, rcred, ucred, cookie)
 
 		if (client_data->u_cred_set == 0 ||
 		    client_data->u_cred_set < gethrestime_sec()) {
-		    if (client_data->u_cred_set == 0) {
-			if ((gssstat = kgsscred_expname_to_unix_cred(
-			    &client_data->client_name,
-			    &client_data->u_cred.uid,
-			    &client_data->u_cred.gid,
-			    &client_data->u_cred.gidlist,
-			    &gidlen, crgetuid(CRED()))) != GSS_S_COMPLETE) {
-				RPCGSS_LOG(1, "rpc_gss_getcred: "
-				    "kgsscred_expname_to_unix_cred failed %x\n",
-				    gssstat);
-				*ucred = NULL;
-			} else {
-				client_data->u_cred.gidlen = (short)gidlen;
-				client_data->u_cred_set =
-				    gethrestime_sec() + svc_rpcgss_gid_timeout;
+			if (client_data->u_cred_set == 0) {
+				if ((gssstat = kgsscred_expname_to_unix_cred(
+				    &client_data->client_name,
+				    &client_data->u_cred.uid,
+				    &client_data->u_cred.gid,
+				    &client_data->u_cred.gidlist,
+				    &gidlen, crgetuid(CRED())))
+				    != GSS_S_COMPLETE) {
+					RPCGSS_LOG(1, "rpc_gss_getcred: "
+					    "kgsscred_expname_to_unix_cred "
+					    "failed %x\n", gssstat);
+					*ucred = NULL;
+				} else {
+					client_data->u_cred.gidlen =
+					    (short)gidlen;
+					client_data->u_cred_set =
+					    gethrestime_sec() +
+					    svc_rpcgss_gid_timeout;
+				}
+			} else if (client_data->u_cred_set
+			    < gethrestime_sec()) {
+				if ((gssstat = kgss_get_group_info(
+				    client_data->u_cred.uid,
+				    &client_data->u_cred.gid,
+				    &client_data->u_cred.gidlist,
+				    &gidlen, crgetuid(CRED())))
+				    != GSS_S_COMPLETE) {
+					RPCGSS_LOG(1, "rpc_gss_getcred: "
+					    "kgss_get_group_info failed %x\n",
+					    gssstat);
+					*ucred = NULL;
+				} else {
+					client_data->u_cred.gidlen =
+					    (short)gidlen;
+					client_data->u_cred_set =
+					    gethrestime_sec() +
+					    svc_rpcgss_gid_timeout;
+				}
 			}
-		    } else if (client_data->u_cred_set < gethrestime_sec()) {
-			if ((gssstat = kgss_get_group_info(
-			    client_data->u_cred.uid,
-			    &client_data->u_cred.gid,
-			    &client_data->u_cred.gidlist,
-			    &gidlen, crgetuid(CRED()))) != GSS_S_COMPLETE) {
-				RPCGSS_LOG(1, "rpc_gss_getcred: "
-				    "kgss_get_group_info failed %x\n",
-				    gssstat);
-				*ucred = NULL;
-			} else {
-				client_data->u_cred.gidlen = (short)gidlen;
-				client_data->u_cred_set =
-				    gethrestime_sec() + svc_rpcgss_gid_timeout;
-			}
-		    }
 		}
 	}
 
@@ -694,7 +691,7 @@ do_gss_accept(
 	gss_buffer_desc		output_token;
 	OM_uint32		gssstat, minor, minor_stat, time_rec;
 	int			ret_flags, ret;
-	gss_OID 		mech_type = GSS_C_NULL_OID;
+	gss_OID			mech_type = GSS_C_NULL_OID;
 	int			free_mech_type = 1;
 	struct svc_req		r, *rqst;
 
@@ -909,6 +906,7 @@ svcrpcsec_gss_taskq_func(void *svcrpcsecgss_taskq_arg)
 		    retval);
 	}
 	rpc_msg_free(&arg->msg, MAX_AUTH_BYTES);
+	SVC_RELE(arg->rq_xprt, NULL, FALSE);
 	svc_clone_unlink(arg->rq_xprt);
 	svc_clone_free(arg->rq_xprt);
 	xdr_free(__xdr_rpc_gss_init_arg, (caddr_t)arg->rpc_call_arg);
@@ -974,6 +972,11 @@ rpcsec_gss_init(
 	svc_clone_link(rqst->rq_xprt->xp_master, arg->rq_xprt, rqst->rq_xprt);
 	arg->rq_xprt->xp_xid = rqst->rq_xprt->xp_xid;
 
+	/*
+	 * Increment the reference count on the rpcmod slot so that is not
+	 * freed before the task has finished.
+	 */
+	SVC_HOLD(arg->rq_xprt);
 
 	/* set the appropriate wrap/unwrap routine for RPCSEC_GSS */
 	arg->rq_xprt->xp_auth.svc_ah_ops = svc_rpc_gss_ops;
@@ -993,6 +996,7 @@ rpcsec_gss_init(
 		cmn_err(CE_NOTE, "rpcsec_gss_init: taskq dispatch fail");
 		ret = RPCSEC_GSS_FAILED;
 		rpc_msg_free(&arg->msg, MAX_AUTH_BYTES);
+		SVC_RELE(arg->rq_xprt, NULL, FALSE);
 		svc_clone_unlink(arg->rq_xprt);
 		svc_clone_free(arg->rq_xprt);
 		kmem_free(arg, sizeof (*arg));
@@ -1473,11 +1477,8 @@ check_verf(struct rpc_msg *msg, gss_ctx_id_t context, int *qop_state, uid_t uid)
  * (e.g. sequence number or sequence window)
  */
 static bool_t
-set_response_verf(rqst, msg, cl, num)
-	struct svc_req		*rqst;
-	struct rpc_msg		*msg;
-	svc_rpc_gss_data	*cl;
-	uint_t			num;
+set_response_verf(struct svc_req *rqst, struct rpc_msg *msg,
+    svc_rpc_gss_data *cl, uint_t num)
 {
 	OM_uint32		minor;
 	gss_buffer_desc		in_buf, out_buf;
@@ -1488,8 +1489,8 @@ set_response_verf(rqst, msg, cl, num)
 	in_buf.value = (char *)&num_net;
 /* XXX uid ? */
 
-	if ((kgss_sign(&minor, cl->context, cl->qop, &in_buf,
-				&out_buf)) != GSS_S_COMPLETE)
+	if ((kgss_sign(&minor, cl->context, cl->qop, &in_buf, &out_buf))
+	    != GSS_S_COMPLETE)
 		return (FALSE);
 
 	rqst->rq_xprt->xp_verf.oa_flavor = RPCSEC_GSS;
@@ -1564,8 +1565,7 @@ create_client()
  * Insert client context into hash list and LRU list.
  */
 static void
-insert_client(client_data)
-	svc_rpc_gss_data	*client_data;
+insert_client(svc_rpc_gss_data *client_data)
 {
 	svc_rpc_gss_data	*cl;
 	int			index = HASH(client_data->key);
@@ -1593,8 +1593,7 @@ insert_client(client_data)
  * top of the LRU list since this is the most recently used context.
  */
 static svc_rpc_gss_data *
-get_client(ctx_handle)
-	gss_buffer_t		ctx_handle;
+get_client(gss_buffer_t ctx_handle)
 {
 	uint_t			key = *(uint_t *)ctx_handle->value;
 	svc_rpc_gss_data	*cl;
@@ -1636,8 +1635,7 @@ get_client(ctx_handle)
  * Don't change its LRU state since it may not be used.
  */
 static svc_rpc_gss_data *
-find_client(key)
-	uint_t			key;
+find_client(uint_t key)
 {
 	int			index = HASH(key);
 	svc_rpc_gss_data	*cl = NULL;
@@ -1655,8 +1653,7 @@ find_client(key)
  * Destroy a client context.
  */
 static void
-destroy_client(client_data)
-	svc_rpc_gss_data	*client_data;
+destroy_client(svc_rpc_gss_data *client_data)
 {
 	OM_uint32		minor;
 	int			index = HASH(client_data->key);
@@ -1690,20 +1687,20 @@ destroy_client(client_data)
 	 */
 	if (client_data->context != GSS_C_NO_CONTEXT) {
 		(void) kgss_delete_sec_context(&minor, &client_data->context,
-					NULL);
+		    NULL);
 
 		common_client_data_free(client_data);
 
 		if (client_data->deleg != GSS_C_NO_CREDENTIAL) {
-		    (void) kgss_release_cred(&minor, &client_data->deleg,
-				crgetuid(CRED()));
+			(void) kgss_release_cred(&minor, &client_data->deleg,
+			    crgetuid(CRED()));
 		}
 	}
 
 	if (client_data->u_cred.gidlist != NULL) {
-	    kmem_free((char *)client_data->u_cred.gidlist,
-			client_data->u_cred.gidlen * sizeof (gid_t));
-	    client_data->u_cred.gidlist = NULL;
+		kmem_free((char *)client_data->u_cred.gidlist,
+		    client_data->u_cred.gidlen * sizeof (gid_t));
+		client_data->u_cred.gidlist = NULL;
 	}
 	if (client_data->retrans_data != NULL)
 		retrans_del(client_data);
@@ -1773,11 +1770,8 @@ sweep_clients(bool_t from_reclaim)
  * and write the result to xdrs.
  */
 static bool_t
-svc_rpc_gss_wrap(auth, out_xdrs, xdr_func, xdr_ptr)
-	SVCAUTH			*auth;
-	XDR			*out_xdrs;
-	bool_t			(*xdr_func)();
-	caddr_t			xdr_ptr;
+svc_rpc_gss_wrap(SVCAUTH *auth, XDR *out_xdrs, bool_t (*xdr_func)(),
+    caddr_t xdr_ptr)
 {
 	svc_rpc_gss_parms_t	*gss_parms = SVCAUTH_GSSPARMS(auth);
 	bool_t ret;
@@ -1787,15 +1781,14 @@ svc_rpc_gss_wrap(auth, out_xdrs, xdr_func, xdr_ptr)
 	 * privacy service is used, don't wrap - just XDR encode.
 	 * Otherwise, wrap data using service and QOP parameters.
 	 */
-	if (!gss_parms->established ||
-				gss_parms->service == rpc_gss_svc_none)
+	if (!gss_parms->established || gss_parms->service == rpc_gss_svc_none)
 		return ((*xdr_func)(out_xdrs, xdr_ptr));
 
 	ret = __rpc_gss_wrap_data(gss_parms->service,
-				(OM_uint32)gss_parms->qop_rcvd,
-				(gss_ctx_id_t)gss_parms->context,
-				gss_parms->seq_num,
-				out_xdrs, xdr_func, xdr_ptr);
+	    (OM_uint32)gss_parms->qop_rcvd,
+	    (gss_ctx_id_t)gss_parms->context,
+	    gss_parms->seq_num,
+	    out_xdrs, xdr_func, xdr_ptr);
 	return (ret);
 }
 
@@ -1803,11 +1796,8 @@ svc_rpc_gss_wrap(auth, out_xdrs, xdr_func, xdr_ptr)
  * Decrypt the serialized arguments and XDR decode them.
  */
 static bool_t
-svc_rpc_gss_unwrap(auth, in_xdrs, xdr_func, xdr_ptr)
-	SVCAUTH			*auth;
-	XDR			*in_xdrs;
-	bool_t			(*xdr_func)();
-	caddr_t			xdr_ptr;
+svc_rpc_gss_unwrap(SVCAUTH *auth, XDR *in_xdrs, bool_t (*xdr_func)(),
+    caddr_t xdr_ptr)
 {
 	svc_rpc_gss_parms_t	*gss_parms = SVCAUTH_GSSPARMS(auth);
 
@@ -1816,15 +1806,14 @@ svc_rpc_gss_unwrap(auth, in_xdrs, xdr_func, xdr_ptr)
 	 * privacy service is used, don't unwrap - just XDR decode.
 	 * Otherwise, unwrap data.
 	 */
-	if (!gss_parms->established ||
-				gss_parms->service == rpc_gss_svc_none)
+	if (!gss_parms->established || gss_parms->service == rpc_gss_svc_none)
 		return ((*xdr_func)(in_xdrs, xdr_ptr));
 
 	return (__rpc_gss_unwrap_data(gss_parms->service,
-				(gss_ctx_id_t)gss_parms->context,
-				gss_parms->seq_num,
-				gss_parms->qop_rcvd,
-				in_xdrs, xdr_func, xdr_ptr));
+	    (gss_ctx_id_t)gss_parms->context,
+	    gss_parms->seq_num,
+	    gss_parms->qop_rcvd,
+	    in_xdrs, xdr_func, xdr_ptr));
 }
 
 

@@ -21,12 +21,14 @@
 
 /*
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- *  Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2012 Marcel Telka <marcel@telka.sk>
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -101,7 +103,9 @@ struct svc_ops svc_clts_op = {
 	svc_clts_kclone_destroy, /* Destroy a clone xprt */
 	svc_clts_kstart,	/* Tell `ready-to-receive' to rpcmod */
 	svc_clts_kclone_xprt,	/* transport specific clone xprt function */
-	svc_clts_ktattrs	/* Transport specific attributes. */
+	svc_clts_ktattrs,	/* Transport specific attributes */
+	rpcmod_hold,		/* Increment transport reference count */
+	rpcmod_release		/* Decrement transport reference count */
 };
 
 /*
