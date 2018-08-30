@@ -864,3 +864,19 @@ out:
 	nvlist_free(rsrc);
 	return (set_retnvl(mod, out, TOPO_METH_REPLACED_RET, ret));
 }
+
+const char *
+get_chip_brand(topo_mod_t *mod, kstat_ctl_t *kc, int32_t chipid)
+{
+	kstat_t *ksp;
+	kstat_named_t *ks;
+
+	if ((ksp = kstat_lookup(kc, "cpu_info", chipid, NULL)) == NULL ||
+	    kstat_read(kc, ksp, NULL) == -1 ||
+	    (ks = kstat_data_lookup(ksp, "brand")) == NULL) {
+		topo_mod_dprintf(mod, "failed to read stat cpu_info:%d:brand",
+		    chipid);
+		return (NULL);
+	}
+	return (topo_mod_strdup(mod, ks->value.str.addr.ptr));
+}

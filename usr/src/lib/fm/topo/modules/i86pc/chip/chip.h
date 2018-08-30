@@ -70,11 +70,12 @@ extern "C" {
 /*
  * chip-properties
  */
-#define	CHIP_VENDOR_ID		"vendor_id"
+#define	CHIP_BRAND		"brand"
 #define	CHIP_FAMILY		"family"
 #define	CHIP_MODEL		"model"
-#define	CHIP_STEPPING		"stepping"
 #define	CHIP_NCORE		"ncore_per_chip"
+#define	CHIP_STEPPING		"stepping"
+#define	CHIP_VENDOR_ID		"vendor_id"
 
 /*
  * memory-controller-properties
@@ -157,6 +158,7 @@ extern int mkrsrc(topo_mod_t *, tnode_t *, const char *, int,
     nvlist_t *, nvlist_t **);
 extern nvlist_t *cpu_fmri_create(topo_mod_t *, uint32_t, char *, uint8_t);
 extern boolean_t is_xpv();
+extern const char *get_chip_brand(topo_mod_t *, kstat_ctl_t *, int32_t);
 
 /*
  * topo methods
