@@ -31,7 +31,7 @@ MODULESRCS = chip.c chip_label.c chip_subr.c chip_amd.c chip_intel.c\
 chip_serial.c chip_smbios.c
 
 include ../../Makefile.plugin
-LDLIBS += -lipmi -lfmd_agent -lumem -lsmbios
+LDLIBS += -lipmi -lfmd_agent -lumem -lsmbios -lkstat
 
 # not linted
 SMATCH=off
