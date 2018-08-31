@@ -1,0 +1,4 @@
+$AWK: syntax error at source line 1
+ context is
+	BEGIN { $i++ >>>  = <<<  3 ; print i }
+$AWK: illegal statement at source line 1

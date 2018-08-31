@@ -1,0 +1,4 @@
+$AWK: syntax error at source line 11
+ context is
+	function >>>  split <<< (x) { return x }
+$AWK: bailing out at source line 11

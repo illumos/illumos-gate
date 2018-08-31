@@ -1,0 +1,428 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+TEMP3=$WORKDIR/test.temp.3
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.misc: miscellaneous buglets now watched for
+
+rm -f core
+
+echo 'The big brown over the lazy doe
+The big brown over the lazy dog
+x
+The big brown over the lazy dog' > $TEMP0
+echo 'failed
+succeeded
+failed
+succeeded' > $TEMP1
+$AWK '{ if (match($0, /^The big brown over the lazy dog/) == 0) {
+		printf("failed\n")
+	} else {
+		printf("succeeded\n")
+	}
+} ' $TEMP0 > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc ghosh RE bug'
+
+echo '123
+1234567890
+12345678901' > $TEMP0
+echo '12345678901' > $TEMP1
+$AWK 'length($0) > 10' $TEMP0 > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc last number bug'
+
+# check some \ sequences in strings (ascii)
+echo HIJKL > $TEMP1
+echo $TEMP0 | $AWK '{ print "H\x49\x4a\x4BL" }' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc hex string cvt'
+
+echo 012x45 > $TEMP1
+$AWK 'BEGIN { print "0\061\62x\0645" }' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc oct string cvt'
+
+# $i++ means ($i)++
+echo 3 5 | $AWK '{ i = 1; print $i++ ; print $1, i }' > $TEMP1
+echo '3
+4 1' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc bad field increment'
+
+# makes sure that fields are recomputed even if self-assignment
+echo 'a b c
+s p q r
+x y' > $TEMP0
+echo 'a
+s p
+x' > $TEMP1
+$AWK '{ NF -= 2; $1 = $1; print }' < $TEMP0 > $TEMP2
+diff $TEMP1 $TEMP2 || fail "BAD: T.misc bad field self-assignment"
+
+echo '1
+1' > $TEMP1
+$AWK 'BEGIN {x = 1; print x; x = x; print x}' > $TEMP2
+diff $TEMP1 $TEMP2 || fail "BAD: T.misc bad self-assignment"
+
+echo 573109312 | $AWK '{print $1*4}' > $TEMP1
+echo 2292437248 > $TEMP2
+diff $TEMP1 $TEMP2 || fail "BAD: T.misc bad overflow"
+
+# note that there are 8-bit characters in the echo
+# some shells will probably screw this up.
+echo '#
+code  1
+code  2' |
+$AWK '/^#/' > $TEMP1
+echo '#' > $TEMP2
+diff $TEMP1 $TEMP2 || fail "BAD: T.misc bad match of 8-bit char"
+
+echo hello |
+$AWK 'BEGIN	{ FILENAME = "/etc/passwd" }
+	{ print $0 }' >/dev/null
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc /etc/passwd dropped core"; fi
+
+echo '2
+10' |
+$AWK '{ x[NR] = $0 }	# test whether $0 is NUM as well as STR
+END { if (x[1] > x[2]) print "BAD: T.misc: $0 is not NUM" }'
+
+
+$AWK 'BEGIN {
+	npad = substr("alexander" "           ",1,15)
+	print npad
+	}' > $TEMP0
+grep '\\' $TEMP0 && fail "BAD: T.misc alexander fails"
+
+# This should give an error about function arguments
+$AWK '
+function foo(x) { print "x is" x }
+BEGIN { foo(foo) }
+' 2> $TEMP0
+grep "can't use function foo" $TEMP0 >/dev/null || fail "BAD: T.misc fcn args"
+
+
+# gawk defref test; should give error about undefined function
+$AWK 'BEGIN { foo() }' 2> $TEMP0
+grep "calling undefined function foo" $TEMP0 >/dev/null || fail "BAD: T.misc undefined function"
+
+
+# gawk arrayparm test; should give error about function 
+$AWK '
+BEGIN {
+    foo[1]=1;
+    foo[2]=2;
+    bug1(foo);
+}
+function bug1(i) {
+    for (i in foo) {
+	bug2(i);
+	delete foo[i];
+	print i,1,bot[1];
+    }
+}
+function bug2(arg) {
+    bot[arg]=arg;
+}
+' 2> $TEMP0
+grep "can.t assign to foo" $TEMP0 >/dev/null || fail "BAD: T.misc foo bug"
+
+
+# This should print bbb
+$AWK '
+BEGIN { up[1] = "a"
+	for (i in up) gsub("a", "A", x)
+	print x x "bbb"
+	exit
+      }
+' > $TEMP0
+grep bbb $TEMP0 >/dev/null || fail "BAD: T.misc gsub failed"
+
+echo yes |
+$AWK '
+BEGIN {
+	printf "push return" >"/dev/null"
+	getline ans <"/dev/null"
+} '
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc getline ans dropped core"; fi
+
+$AWK 'BEGIN { unireghf() }
+function unireghf(hfeed) { hfeed[1] = 0 }'
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc unireghf dropped core"; fi
+
+echo x | $AWK '/[/]/' 2> $TEMP0
+grep 'nonterminated character class' $TEMP0 >/dev/null || error 'BAD: T.misc nonterminated fails'
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc nonterminated dropped core"; fi
+
+$AWK '
+function f() { return 12345 }
+BEGIN { printf "<%s>\n", f() }
+' > $TEMP0
+grep '<12345>' $TEMP0 >/dev/null || fail 'BAD: T.misc <12345> fails'
+
+echo 'abc
+def
+
+ghi
+jkl' > $TEMP0
+$AWK '
+BEGIN {	RS = ""
+	while (getline <"'$TEMP0'")
+		print
+}' > $TEMP1
+$AWK 'END {print NR}' $TEMP1 | grep 4 >/dev/null || fail 'BAD: T.misc abcdef fails'
+
+
+# The following should not produce a warning about changing a constant
+# nor about a curdled tempcell list
+$AWK 'function f(x) { x = 2 }
+BEGIN { f(1) }' > $TEMP0
+grep '^' $TEMP0 && fail 'BAD: test constant change fails'
+
+# The following should not produce a warning about a curdled tempcell list
+$AWK 'function f(x) { x }
+BEGIN { f(1) }' > $TEMP0
+grep '^' $TEMP0 && fail 'BAD: test tempcell list fails'
+
+$AWK 'BEGIN { print 9, a=10, 11; print a; exit }' > $TEMP1
+echo '9 10 11
+10' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.misc (embedded expression)'
+
+echo "abc defgh ijkl" | $AWK '
+  { $1 = ""; line = $0; print line; print $0; $0 = line; print $0 }' > $TEMP1
+echo " defgh ijkl
+ defgh ijkl
+ defgh ijkl" > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.misc (assignment to $0)'
+
+$AWK '
+function min(a, b)
+{
+	if (a < b)
+		return a
+	else
+		return b
+}
+BEGIN { exit }
+'
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc function min dropped core"; fi
+
+# The following should not give a syntax error message:
+$AWK '
+function expand(chart) {
+	getline chart < "CHAR.ticks"
+}
+' > $TEMP0
+grep '^' $TEMP0 >/dev/null && fail 'BAD: T.misc expand error'
+
+$AWK 'BEGIN { print 1e40 }' >/dev/null
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc 1E40 dropped core"; fi
+
+# The following syntax error should not dump core:
+$AWK '
+$NF==3	{first=1}
+$NF==2 && first==0 && (abs($1-o1)>120||abs($2-o2)>120)	{print $0}
+$NF==2	{o1=%1; o2=$2; first=0}
+' 2>/dev/null
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc first/abs dropped core"; fi
+
+# The following syntax error should not dump core:
+$AWK '{ n = split($1, address, !); print address[1] }' 2> $TEMP0
+grep 'illegal statement' $TEMP0 >/dev/null || fail 'BAD: T.misc split error'
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc split! dropped core"; fi
+
+# The following should cause a syntax error message
+$AWK 'BEGIN {"hello"}' 2> $TEMP0
+grep 'illegal statement' $TEMP0 >/dev/null || fail 'BAD: T.misc hello error'
+
+# The following should give a syntax error message:
+$AWK '
+function pile(c,     r) {
+	r = ++pile[c]
+}
+
+{ pile($1) }
+' 2> $TEMP0
+grep 'context is' $TEMP0 >/dev/null || fail 'BAD: T.misc pile error'
+
+# This should complain about missing atan2 argument:
+$AWK 'BEGIN { atan2(1) }' 2> $TEMP0
+grep 'requires two arg' $TEMP0 >/dev/null || fail 'BAD: T.misc atan2 error'
+
+# This should not core dump:
+$AWK 'BEGIN { f() }
+function f(A) { delete A[1] }
+'
+if [[ $? -eq 139 ]]; then fail "BAD: T.misc delete dropped core"; fi
+
+# nasty one:  should not be able to overwrite constants
+$AWK 'BEGIN { gsub(/ana/,"anda","banana")
+		printf "the monkey ate a %s\n", "banana" }
+' >/dev/null 2> $TEMP0
+grep 'syntax error' $TEMP0 >/dev/null || fail 'BAD: T.misc gsub banana error'
+
+# nasty one:  should not be able to overwrite constants
+$AWK 'BEGIN { sub(/ana/,"anda","banana")
+		printf "the monkey ate a %s\n", "banana" }
+' >/dev/null 2> $TEMP0
+grep 'syntax error' $TEMP0 >/dev/null || fail 'BAD: T.misc sub banana error'
+
+# line numbers used to double-count comments
+$AWK '#
+#
+#
+/x
+' >/dev/null 2> $TEMP0
+grep 'line [45]' $TEMP0 >/dev/null || fail 'BAD: T.misc lineno'
+
+echo 'x\y' > $TEMP1
+$AWK 'BEGIN { print "x\f\r\b\v\a\\y" }' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc weird chars'
+
+echo 0 > $TEMP1
+$AWK '	BEGIN { exit }
+	{ print }
+	END { print NR }' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc BEGIN exit'
+
+echo 1 > $TEMP1
+$AWK '	{ exit }
+	END { print NR }' /etc/passwd > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit'
+
+echo 1 > $TEMP1
+$AWK '	{i = 1; while (i <= NF) {if (i == NF) exit; i++ } }
+	END { print NR }' /etc/passwd > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit 2'
+
+echo 1 > $TEMP1
+$AWK '	function f() {
+		i = 1; while (i <= NF) {if (i == NF) return NR; i++ }
+	}
+	{ if (f() == 1) exit }
+	END { print NR }' /etc/passwd > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc while return'
+
+echo 1 > $TEMP1
+$AWK '	function f() {
+		split("a b c", arr)
+		for (i in arr) {if (i == 3) return NR; i++ }
+	}
+	{ if (f() == 1) exit }
+	END { print NR }' /etc/passwd > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc while return'
+
+echo 1 > $TEMP1
+$AWK '	{i = 1; do { if (i == NF) exit; i++ } while (i <= NF) }
+	END { print NR }' /etc/passwd > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit 3'
+
+echo 1 > $TEMP1
+$AWK '	function f() {
+		i = 1; do { if (i == NF) return NR; i++ } while (i <= NF)
+	}
+	{ if (f() == 1) exit }
+	END { print NR }' /etc/passwd > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc do return'
+
+echo 1 > $TEMP1
+$AWK '	{i = 1; do { if (i == NF) break; i++ } while (i <= NF); exit }
+	END { print NR }' /etc/passwd > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit 4'
+
+echo 1 > $TEMP1
+$AWK '	{ n = split($0, x)
+	  for (i in x) {
+	 	if (i == 1)
+			exit } }
+	END { print NR }' /etc/passwd > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc immmediate exit 5'
+
+echo XXXXXXXX > $TEMP1
+$AWK 'BEGIN { s = "ab\fc\rd\be"
+	t = s; 	gsub("[" s "]", "X", t); print t }' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc weird escapes in char class'
+
+$AWK '{}' /etc/passwd glop/glop > $TEMP0 2> $TEMP2
+grep "can't open.*glop" $TEMP2 >/dev/null || fail "BAD: T.misc can't open"
+
+echo '
+
+
+a
+aa
+
+b
+
+
+c
+
+' > $TEMP0
+echo 3 > $TEMP1
+$AWK 'BEGIN { RS = "" }; END { print NR }' $TEMP0 > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc RS botch'
+
+$AWK 'BEGIN \
+	{
+		print "hello, world"
+	}
+}}}' > $TEMP1 2> $TEMP2
+grep 'source line 5' $TEMP2 >/dev/null 2>&1 || fail 'BAD: T.misc continuation line number'
+
+
+echo 111 222 333 > $TEMP0
+$AWK '{ f[1]=1; f[2]=2; print $f[1], $f[1]++, $f[2], f[1], f[2] }' $TEMP0 > $TEMP2
+echo 111 111 222 2 2 > $TEMP1
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc $f[1]++'
+
+
+# These should be syntax errors
+$AWK . 2> $TEMP0
+grep "syntax error" $TEMP0 >/dev/null || fail "BAD: T.misc syntax error . fails"
+
+$AWK .. 2> $TEMP0
+grep "syntax error" $TEMP0 >/dev/null || fail "BAD: T.misc syntax error .. fails"
+
+$AWK .E. 2> $TEMP0
+grep "syntax error" $TEMP0 >/dev/null || fail "BAD: T.misc syntax error .E. fails"
+
+$AWK .++. 2> $TEMP0
+grep "syntax error" $TEMP0 >/dev/null || fail "BAD: T.misc syntax error .++. fails"
+
+
+# next several were infinite loops, found by brian tsang.
+# this is his example:
+
+$AWK 'BEGIN {
+    switch (substr("x",1,1)) {
+    case /ask.com/:
+	break
+    case "google":
+	break
+    }
+}' > $TEMP0 2>&1
+grep "illegal statement" $TEMP0 >/dev/null || fail "BAD: T.misc looping syntax error 1"
+
+$AWK 'BEGIN { s { c /./ } }' > $TEMP0 2>&1
+grep "illegal statement" $TEMP0 >/dev/null || fail "BAD: T.misc looping syntax error 2"
+
+$AWK 'BEGIN { s { c /../ } }' > $TEMP0 2>&1
+grep "illegal statement" $TEMP0 >/dev/null || fail "BAD: T.misc looping syntax error 3"
+
+echo '' > $TEMP0
+$AWK 'END { print NF, $0 }' $TEMP0 > $TEMP1
+awk '{ print NF, $0 }' $TEMP0| tail -1 > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.misc END must preserve $0'
+
+exit $RESULT

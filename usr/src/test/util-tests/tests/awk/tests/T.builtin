@@ -1,0 +1,72 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.builtin: test miscellaneous builtin functions
+
+$AWK 'BEGIN { print index(123, substr(123, 2)) }' > $TEMP1
+echo 2 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.builtin (index/substr)'
+
+$AWK 'BEGIN {
+	pi = 2 * atan2(1, 0)
+	printf("%.5f %.3f %.3f %.5f %.3f\n",
+		pi, sin(pi), cos(pi/2), exp(log(pi)), log(exp(10)))
+}' > $TEMP1
+echo '3.14159 0.000 0.000 3.14159 10.000' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.builtin (sin/cos)'
+
+$AWK 'BEGIN {
+	s = srand(1)	# set a real random start
+	for (i = 1; i <= 10; i++)
+		print rand() >"'$TEMP1'"
+	srand(s)	# reset it
+	for (i = 1; i <= 10; i++)
+		print rand() >"'$TEMP2'"
+}'
+diff $TEMP1 $TEMP2 || fail 'BAD: T.builtin (rand)'
+
+echo 'hello, WORLD!' |
+$AWK '{ printf("%s|%s|%s\n", tolower($0), toupper($0), $0)}' > $TEMP1
+echo 'hello, world!|HELLO, WORLD!|hello, WORLD!' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.builtin (toupper/tolower)'
+
+$AWK 'BEGIN {
+	j = 1; sprintf("%d", 99, ++j)	# does j get incremented?
+	if (j != 2)
+		print "BAD: T.builtin (printf arg list not evaluated)"
+}'
+
+$AWK 'BEGIN {
+	j = 1; substr("", 1, ++j)	# does j get incremented?
+	if (j != 2)
+		print "BAD: T.builtin (substr arg list not evaluated)"
+}'
+
+$AWK 'BEGIN {
+	j = 1; sub(/1/, ++j, z)	# does j get incremented?
+	if (j != 2)
+		print "BAD: T.builtin (sub() arg list not evaluated)"
+}'
+
+$AWK 'BEGIN {
+	j = 1; length("zzzz", ++j, ++j)	# does j get incremented?
+	if (j != 3)
+		print "BAD: T.builtin (excess length args not evaluated)"
+}' 2> $TEMP1
+grep 'too many arg' $TEMP1 >/dev/null || fail 'T.bad: too many args not caught'
+
+exit $RESULT

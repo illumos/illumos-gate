@@ -1,0 +1,50 @@
+#!/bin/bash
+
+if [[ -z "$AWK" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.main: misc tests of arguments in main
+
+rm -f core
+
+# test -d option
+
+
+
+echo hello | $AWK -d '{print}' > $TEMP1
+if [[ $? -eq 139 ]]; then fail "BAD: T.main awk -d dropped core"; fi
+
+echo 'a::b::c' > $TEMP0
+$AWK -F:: '{print NF}' $TEMP0 > $TEMP1
+echo '3' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'bad: awk -F::'
+
+echo 'a::b::c' > $TEMP0
+$AWK -F :: '{print NF}' $TEMP0 > $TEMP1
+echo '3' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'bad: awk -F ::'
+
+echo 'a	b	c' > $TEMP0
+$AWK -F t '{print NF}' $TEMP0 > $TEMP1
+echo '3' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'bad: awk -F (tab)'
+
+echo 'atabbtabc' > $TEMP0
+$AWK -F tab '{print NF}' $TEMP0 > $TEMP1
+echo '3' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'bad: awk -F tab'
+
+exit $RESULT

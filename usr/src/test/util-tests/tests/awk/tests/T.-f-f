@@ -1,0 +1,44 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.-f-f: check multiple -f arguments
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+TEMP3=$WORKDIR/test.temp.3
+TEMP4=$WORKDIR/test.temp.4
+TEMP5=$WORKDIR/test.temp.5
+
+echo 'begin
+end' > $TEMP0
+echo 'BEGIN { print "begin" }' > $TEMP1
+echo 'END { print "end" }' > $TEMP2
+echo xxx | $AWK -f $TEMP1 -f $TEMP2 > $TEMP3
+diff $TEMP0 $TEMP3 || fail 'BAD: T.-f-f multiple -fs'
+
+
+echo '/a/' | $AWK -f - /etc/passwd > $TEMP1
+$AWK '/a/' /etc/passwd > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.-f-f  -f -'
+
+
+cp /etc/passwd $TEMP1
+echo '/./ {' > $TEMP2
+echo 'print' > $TEMP3
+echo '}' > $TEMP4
+$AWK -f $TEMP2 -f $TEMP3 -f $TEMP4 /etc/passwd > $TEMP5
+diff $TEMP1 $TEMP5 || fail 'BAD: T.-f-f 3 files'
+
+exit $RESULT

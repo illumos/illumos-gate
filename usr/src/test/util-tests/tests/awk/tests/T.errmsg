@@ -1,0 +1,198 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMPLS=$WORKDIR/test.temp.ls
+TEMPSH=$WORKDIR/test.temp.sh
+TEMPOUT=$WORKDIR/test.temp.out
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.errmsg: check some error messages
+
+ls > $TEMPLS
+$AWK '
+$1 ~ /^#/ {
+	next
+}
+{	pat = $0
+	prog = ""
+	while (getline x > 0 && x != "")
+		prog = prog "\n" x
+	print sprintf("\n%s '"'"'%s'"'"' < '$TEMPLS' >> /dev/null 2> '$TEMPOUT'",
+		ENVIRON["AWK"], prog)
+	print sprintf("grep '"'"'%s'"'"' '$TEMPOUT' >> /dev/null || fail '"'"'BAD: %s'"'"' failed", pat, pat)
+}
+' > $TEMPSH <<\!!!!
+illegal primary in regular expression
+/(/
+
+nonterminated character class
+/[[/
+
+nonterminated character class
+BEGIN { s = "[x"; if (1 ~ s) print "foo"}
+
+syntax error in regular expression
+BEGIN { if ("x" ~ /$^/) print "ugh" }
+
+syntax error in regular expression
+/((.)/
+
+division by zero
+BEGIN { print 1/0 }
+
+division by zero in /=
+BEGIN { x = 1; print x /= 0 }
+
+division by zero in %=
+BEGIN { x = 1; print x %= 0 }
+
+division by zero in mod
+BEGIN { print 1%0 }
+
+can.t read value.* array name.
+BEGIN { x[1] = 0; split("a b c", y, x) }
+
+can.t read value.* function
+function f(){}; {split($0, x, f)}
+
+can.t assign.* a function
+function f(){}; {f = split($0, x)}
+
+can.t assign to x; it.s an array name.
+{x = split($0, x)}
+
+is a function, not an array
+function f(){}; {split($0, f)}
+
+function f called with 1 args, uses only 0
+BEGIN { f(f) }
+function f() { print "x" }
+
+can.t use function f as argument in f
+BEGIN { f(f) }
+function f() { print "x" }
+
+x is an array, not a function
+{ split($0, x) }; function x() {}
+
+illegal nested function
+function x() { function g() {} }
+
+return not in function
+{ return }
+
+illegal field $(foo)
+BEGIN { print $"foo" }
+
+next is illegal inside a function
+BEGIN { f() }
+function f() { next }
+
+not enough args in printf(%s)
+BEGIN { printf("%s") }
+
+function f has .* arguments, limit .*
+function f(a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,
+	c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,
+	e1,e2,e3,e4,e5,e6,e7,e8,e9,e10,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10) {}
+BEGIN { f(123) }
+
+bailing out
+])}
+
+bailing out
+{ print }}
+
+bailing out
+{ print }}}
+
+bailing out
+]
+
+bailing out
+[
+
+bailing out
+a & b
+
+extra )
+{ x = 1) }
+
+illegal statement
+{ print ))}
+
+illegal statement
+{{ print }
+
+illegal statement
+{{{ print }
+
+illegal .*next.* from BEGIN
+BEGIN { next }
+
+illegal .*next.* from END
+END {	next; print NR }
+
+can.t open file /etc/passwd
+BEGIN { print "abc" >"/etc/passwd" }
+
+you can.t define function f more than once
+function f() { print 1 }
+function f() { print 2 }
+
+function mp called with 1 args, uses only 0
+function mp(){ cnt++;}
+BEGIN {	mp(xx) }
+
+index.*doesn.t permit regular expressions
+BEGIN { index("abc", /a/) }
+
+log argument out of domain
+BEGIN { print log(-1) }
+
+exp result out of range
+BEGIN {print exp(1000)}
+
+null file name in print or getline
+BEGIN { print >foo }
+
+function has too many arguments
+BEGIN { length("abc", "def") }
+
+calling undefined function foo
+BEGIN { foo() }
+
+# I am pretty certain that this test is _meant_ to fail,
+# to allow checking whether anything is happening. Uncomment
+# below to check whether the script then fails:
+#
+# this should print a BAD message
+# BEGIN { print }
+!!!!
+
+
+echo '	running tests in test.temp.sh'
+source $TEMPSH
+
+[[ $? -eq 139 ]] && fail 'BAD: someone dropped core' 1>&2
+
+echo xxx > $TEMP0
+$AWK '{print x}' x='a
+b' $TEMP0 > $TEMP1 2> $TEMP2
+grep 'newline in string' $TEMP2 >/dev/null || fail 'BAD: T.errmsg newline in string'
+
+exit $RESULT

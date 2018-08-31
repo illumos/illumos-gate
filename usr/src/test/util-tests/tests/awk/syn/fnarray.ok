@@ -1,0 +1,3 @@
+$AWK: foo is a function, not an array at source line 5
+ context is
+	  Num = >>>  foo[c] <<< 

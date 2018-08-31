@@ -16,6 +16,6 @@
 #
 
 SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs bunyan \
-	 mergeq workq grep_xpg4
+	 mergeq workq grep_xpg4 awk
 
 include $(SRC)/test/Makefile.com

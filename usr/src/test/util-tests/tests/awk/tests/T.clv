@@ -1,0 +1,153 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.clv: check command-line variables
+
+rm -f core
+
+# stdin only, no cmdline asgn
+echo 'hello
+goodbye' | $AWK '
+BEGIN { x=0; print x; getline; print x, $0 }
+' > $TEMP1
+echo '0
+0 hello' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (stdin only)'
+
+# cmdline asgn then stdin
+echo 'hello
+goodbye' | $AWK '
+BEGIN { x=0; print x; getline; print x, $0 }
+' x=1 > $TEMP1
+echo '0
+1 hello' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=1 only)'
+
+# several cmdline asgn, then stdin
+echo 'hello
+goodbye' | $AWK '
+BEGIN { x=0; print x; getline; print x, $0 }
+' x=1 x=2 x=3 > $TEMP1
+echo '0
+3 hello' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=3 only)'
+
+# several cmdline asgn, then file
+echo 'hello
+goodbye' > $TEMP0
+$AWK '
+BEGIN { x=0; print x; getline; print x, $0 }
+' x=1 x=2 x=3 $TEMP0 > $TEMP1
+echo '0
+3 hello' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=3 only)'
+
+# cmdline asgn then file
+echo 4 > $TEMP1
+$AWK 'BEGIN { getline; print x}' x=4 /dev/null > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=4 /dev/null)'
+
+#cmdline asgn then file but no read of it
+echo 0 > $TEMP1
+$AWK 'BEGIN { x=0; getline <"/dev/null"; print x}' x=5 /dev/null > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=5 /dev/null)'
+
+#cmdline asgn then file then read
+echo 'xxx
+yyy
+zzz' > $TEMP0
+echo '6
+end' > $TEMP1
+$AWK 'BEGIN { x=0; getline; print x}
+      END { print x }' x=6 $TEMP0 x=end > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=6 /dev/null)'
+
+#cmdline asgn then file then read
+echo '0
+end' > $TEMP1
+$AWK 'BEGIN { x=0; getline <"/dev/null"; print x}
+      END { print x }' x=7 /dev/null x=end > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=7 /dev/null)'
+
+#cmdline asgn then file then read; _ in commandname
+echo '0
+end' > $TEMP1
+$AWK 'BEGIN { _=0; getline <"/dev/null"; print _}
+      END { print _ }' _=7A /dev/null _=end > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (_=7A /dev/null)'
+
+# illegal varname in commandname
+$AWK '{ print }' 99_=$TEMP0 /dev/null > $TEMP0 2> $TEMP2
+grep "can't open.*test.temp.0" $TEMP2 >/dev/null 2>&1 || fail 'BAD: T.clv (7B: illegal varname)'
+
+# these test the new -v option:  awk ... -v a=1 -v b=2 'prog' does before BEGIN
+
+echo 123 > $TEMP1
+$AWK -v x=123 'BEGIN { print x }' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=11)'
+
+echo 123 abc 10.99 > $TEMP1
+$AWK -v x=123 -v y=abc -v z1=10.99 'BEGIN { print x, y, z1 }' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=12)'
+
+echo 123 abc 10.99 > $TEMP1
+$AWK -v x=123 -v y=abc -v z1=10.99 -- 'BEGIN { print x, y, z1 }' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=12a)'
+
+echo 'BEGIN { print x, y, z1 }' > $TEMP0
+echo 123 abc 10.99 > $TEMP1
+$AWK -v x=123 -v y=abc -f $TEMP0 -v z1=10.99 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=13)'
+
+echo 'BEGIN { print x, y, z1 }' > $TEMP0
+echo 123 abc 10.99 > $TEMP1
+$AWK -f $TEMP0 -v x=123 -v y=abc -v z1=10.99 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=14)'
+
+echo 'BEGIN { print x, y, z1 }
+END { print x }' > $TEMP0
+echo '123 abc 10.99
+4567' > $TEMP1
+$AWK -f $TEMP0 -v x=123 -v y=abc -v z1=10.99 /dev/null x=4567 /dev/null > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=15)'
+
+echo 'BEGIN { print x, y, z1 }
+NR==1 { print x }' > $TEMP0
+echo '123 abc 10.99
+4567' > $TEMP1
+$AWK -v x=123 -v y=abc -v z1=10.99 -f $TEMP0 x=4567 /etc/passwd > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=16)'
+
+# special chars in commandline assigned value;
+# have to use local echo to avoid quoting problems.
+
+echo 'a\\b\z' > $TEMP1
+echo 'hello' | $AWK '{print x}' x='\141\\\\\142\\z' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=17)'
+
+echo "a
+z" > $TEMP1
+echo 'hello' | $AWK '{print x}' x='a\nz' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=18)'
+
+# a bit circular here...
+$AWK 'BEGIN { printf("a%c%c%cz\n", "\b", "\r", "\f") }' > $TEMP1
+echo 'hello' | $AWK '{print x}' x='a\b\r\fz' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=19)'
+
+exit $RESULT

@@ -1,0 +1,4 @@
+$AWK: syntax error at source line 47
+ context is
+	BEGIN { sprintf("%s", >>>  $) <<<  }
+$AWK: illegal statement at source line 47

@@ -1,0 +1,63 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+TEMP3=$WORKDIR/test.temp.3
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.lilly: miscellaneous RE tests from Bruce Lilly
+
+cat > $TEMP0 <<EOF
+foo=bar
+foo==bar
+foo+bar
+foo+=bar
+foo-=bar
+foo*=bar
+foo/=bar
+foo^=bar
+foo%=bar
+foo!=bar
+foo<=bar
+foo>=bar
+foo bar
+foo/bar
+foo=bar=fribble
+=foo=bar
+EOF
+
+rm -f $TEMP3
+awk '
+/./ {
+	print $0 >"'$TEMP3'"
+	print "###", NR, $0
+	system(ENVIRON["AWK"] " -f '$TEMP3' <\"'$TEMP0'\" ")
+	close "test.temp"
+}' < lilly.progs > $TEMP1 2>&1
+
+rm -f $TEMP3
+$AWK '
+/./ {
+	print $0 >"'$TEMP3'"
+	print "###", NR, $0
+	system(ENVIRON["AWK"] " -f '$TEMP3' <\"'$TEMP0'\" ")
+	close "test.temp"
+}' < lilly.progs > $TEMP2 2>&1
+
+echo `wc -l lilly.progs` tests
+
+diff $TEMP1 $TEMP2 > $WORKDIR/lilly.diff || fail 'bad: T.lilly is different'
+
+exit $RESULT

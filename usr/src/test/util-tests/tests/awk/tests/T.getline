@@ -1,0 +1,98 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.getline: test getline function
+
+who > $TEMP1
+cat $TEMP1 | $AWK '
+BEGIN {
+	while (getline)
+		print
+	exit
+}
+' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.getline (bare getline)'
+
+who > $TEMP1
+cat $TEMP1 | $AWK '
+BEGIN {
+	while (getline xxx)
+		print xxx
+	exit
+}
+' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.getline (getline xxx)'
+
+$AWK '
+BEGIN {
+	while (getline <"/etc/passwd")
+		print
+	exit
+}
+' > $TEMP1
+cmp -s /etc/passwd $TEMP1 || fail 'BAD: T.getline (getline <file)'
+
+cat /etc/passwd | $AWK '
+BEGIN {
+	while (getline <"-")	# stdin
+		print
+	exit
+}
+' > $TEMP1
+cmp -s /etc/passwd $TEMP1 || fail 'BAD: T.getline (getline <"-")'
+
+$AWK '
+BEGIN {
+	while (getline <ARGV[1])
+		print
+	exit
+}
+' /etc/passwd > $TEMP1
+cmp -s /etc/passwd $TEMP1 || fail 'BAD: T.getline (getline <arg)'
+
+$AWK '
+BEGIN {
+	while (getline x <ARGV[1])
+		print x
+	exit
+}
+' /etc/passwd > $TEMP1
+cmp -s /etc/passwd $TEMP1 || fail 'BAD: T.getline (getline x <arg)'
+
+$AWK '
+BEGIN {
+	while (("cat " ARGV[1]) | getline)
+		print
+	exit
+}
+' /etc/passwd > $TEMP1
+cmp -s /etc/passwd $TEMP1 || fail 'BAD: T.getline (cat arg | getline)'
+
+$AWK '
+BEGIN {
+	while (("cat " ARGV[1]) | getline x)
+		print x
+	exit
+}
+' /etc/passwd > $TEMP1
+cmp -s /etc/passwd $TEMP1 || fail 'BAD: T.getline (cat arg | getline x)'
+
+$AWK ' BEGIN { print getline <"/glop/glop/glop" } ' > $TEMP1
+echo '-1' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.getline (non-existent file)'
+
+exit $RESULT

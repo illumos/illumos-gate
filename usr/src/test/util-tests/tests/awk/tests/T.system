@@ -1,0 +1,32 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.system: test system built-in
+
+rm -f $TEMP1 $TEMP2
+$AWK 'BEGIN {
+	n = system("exit 3")
+	print n
+	exit n+1
+}
+' > $TEMP1
+echo $? >> $TEMP1
+echo "3
+4" > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.system (1)'
+
+exit $RESULT

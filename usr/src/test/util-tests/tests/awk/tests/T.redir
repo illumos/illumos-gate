@@ -1,0 +1,55 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.redir: test redirections
+
+$AWK '{ print >"'$TEMP1'" }' /etc/passwd
+diff $TEMP1 /etc/passwd || fail 'BAD: T.redir (print >"test.temp.1")'
+
+rm -f $TEMP1
+$AWK '{ print >>"'$TEMP1'" }' /etc/passwd
+diff $TEMP1 /etc/passwd || fail 'BAD: T.redir (print >>"test.temp.1")'
+
+rm -f $TEMP1
+$AWK 'NR%2 == 1 { print >>"'$TEMP1'" }
+      NR%2 == 0 { print >"'$TEMP1'" }' /etc/passwd
+diff $TEMP1 /etc/passwd || fail 'BAD: T.redir (print > and >>"test.temp.1")'
+
+rm -f $TEMP1
+$AWK '{ print | "cat > '$TEMP1'" }' /etc/passwd
+diff $TEMP1 /etc/passwd || fail 'BAD: T.redir (print | "cat > test.temp.1")'
+
+# tests flush of stdout before opening pipe
+echo '   head
+1
+2' > $TEMP1
+$AWK 'BEGIN { print "   head"
+	for (i = 1; i < 3; i++)
+		print i | "sort" }' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.redir (buffering)'
+
+rm -f $TEMP1 $TEMP2
+$AWK '{ print >"/dev/stderr" }' /etc/passwd 1> $TEMP1 2> $TEMP2
+diff $TEMP2 /etc/passwd || fail 'BAD: T.redir (print >"/dev/stderr")'
+diff $TEMP1 /dev/null  || fail 'BAD: T.redir (print >"/dev/stderr")'
+
+rm -f $TEMP1 $TEMP2
+$AWK '{ print >"/dev/stdout" }' /etc/passwd 1> $TEMP1 2> $TEMP2
+diff $TEMP1 /etc/passwd || fail 'BAD: T.redir (print >"/dev/stdout")'
+diff $TEMP2 /dev/null  || fail 'BAD: T.redir (print >"/dev/stderr")'
+
+exit $RESULT

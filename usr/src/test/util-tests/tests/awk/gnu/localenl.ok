@@ -1,0 +1,4 @@
+LC_ALL=C passed
+LC_ALL=POSIX passed
+LC_ALL=en_US.ISO8859-1 passed
+LC_ALL=en_US.UTF-8 passed

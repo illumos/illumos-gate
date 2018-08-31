@@ -1,0 +1,20 @@
+The following tests come from Brian Kernighan's tests collection:
+
+- data/ contains sample data used as input
+- examples/ contains example AWK programs
+    - p.* files are examples from The Awk Programming Environment (TAPE)
+    - t.* files are Kernighan's collection of useful examples
+- re/ contains tests for regular expressions
+- sub/ contains substitution tests
+- benchmarks/ contains benchmark programs
+
+The tests in gnu/ and syn/ were gathered tests from gawk's "basic" and
+"unix-tests" targets (SHA 682b4299a9fd3023211e9db09f8e258d0ffd07e6).
+Tests for the following were removed, since they aren't relevant to nawk:
+
+- Tested gawk's --lint behaviour
+- Differences between passing --traditional and not passing it
+- GNU-specific functions (like gensub, asort, asorti, and strftime)
+- GNU-specific builtins (like PROCINFO)
+- GNU-specific special variables (IGNORECASE)
+- Features that nawk doesn't support yet (like setting RS to a regex)

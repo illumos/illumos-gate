@@ -1,0 +1,2 @@
+$AWK: can't assign to foo; it's an array name.
+ source line number 13

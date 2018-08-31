@@ -1,0 +1,34 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK must be set\n' >&2
+    exit 1
+fi
+
+TEMP1=$WORKDIR/test.temp.1
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.flags: test some commandline flags
+
+$AWK > $TEMP1 2>&1
+grep '[Uu]sage' $TEMP1 >/dev/null || fail 'T.flags: bad usage'
+
+$AWK -f > $TEMP1 2>&1
+grep 'no program' $TEMP1 >/dev/null || fail 'T.flags: bad no program'
+
+$AWK -f glop/glop > $TEMP1 2>&1
+grep 'can.t open' $TEMP1 >/dev/null || fail 'T.flags: bad can.t open program'
+
+$AWK -zz 'BEGIN{}' > $TEMP1 2>&1
+grep 'unknown option' $TEMP1 >/dev/null || fail 'T.flags: bad unknown option'
+
+$AWK -F  > $TEMP1 2>&1
+grep 'field separator.*empty' $TEMP1 >/dev/null || fail 'T.flags: bad null field separator'
+
+exit $RESULT

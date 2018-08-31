@@ -1,0 +1,5 @@
+$AWK: syntax error at source line 1
+ context is
+	BEGIN { >>>  toupper(substr* <<< line,1,12)) }
+$AWK: illegal statement at source line 1
+	extra )

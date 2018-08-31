@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.chem: test chem.awk
+
+for i in lsd1.p penicil.p res.p
+do
+	$AWK -f chem.awk $i > $TEMP1
+	awk -f chem.awk $i > $TEMP2
+	diff $TEMP1 $TEMP2 || fail "BAD: T.chem on $i"
+done
+
+exit $RESULT
