@@ -188,6 +188,7 @@ VGATEXT_OBJS += vgatext.o vgasubr.o
 KRTLD_OBJS +=		\
 	bootfsops.o	\
 	bootrd.o	\
+	bootrd_cpio.o	\
 	ufsops.o	\
 	hsfs.o		\
 	doreloc.o	\
@@ -365,7 +366,7 @@ LX_BRAND_OBJS  =		\
 #
 #	special files
 #
-MODSTUB_OBJ +=	 	\
+MODSTUB_OBJ +=		\
 	modstubs.o
 
 BOOTDEV_OBJS +=		\

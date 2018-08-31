@@ -37,12 +37,14 @@
 extern void (*_kobj_printf)(void *, const char *fmt, ...);
 extern int get_weakish_int(int *);
 extern struct bootops *ops;
-extern struct boot_fs_ops bufs_ops, bhsfs_ops, bbootfs_ops;
+extern struct boot_fs_ops bufs_ops, bhsfs_ops, bbootfs_ops, bcpio_ops;
 extern int kmem_ready;
 
 static uint64_t rd_start, rd_end;
 struct boot_fs_ops *bfs_ops;
-struct boot_fs_ops *bfs_tab[] = {&bufs_ops, &bhsfs_ops, &bbootfs_ops, NULL};
+struct boot_fs_ops *bfs_tab[] = {
+	&bufs_ops, &bhsfs_ops, &bbootfs_ops, &bcpio_ops, NULL,
+};
 
 static uintptr_t scratch_max = 0;
 
@@ -176,11 +178,15 @@ kobj_boot_mountroot()
 	    "ramdisk range: 0x%llx-%llx\n", rd_start, rd_end);
 #endif
 
+	/*
+	 * We have a range of virtual addresses which are the boot archive.
+	 */
 	for (i = 0; bfs_tab[i] != NULL; i++) {
 		bfs_ops = bfs_tab[i];
 		if (BRD_MOUNTROOT(bfs_ops, "dummy") == 0)
 			return (0);
 	}
+
 	_kobj_printf(ops, "failed to mount ramdisk from boot\n");
 	return (-1);
 }
