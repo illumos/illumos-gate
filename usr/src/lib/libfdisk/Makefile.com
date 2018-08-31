@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2018 Joyent, Inc.
 #
 
 LIBRARY= libfdisk.a
@@ -48,6 +49,8 @@ CFLAGS += -D_LARGEFILE64_SOURCE
 CFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS64 += -D_LARGEFILE64_SOURCE
 CFLAGS64 += -D_FILE_OFFSET_BITS=64
+
+CSTD =	$(CSTD_GNU99)
 
 LINTFLAGS +=    -erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=    -erroff=E_BAD_PTR_CAST_ALIGN

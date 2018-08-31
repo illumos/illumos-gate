@@ -160,6 +160,7 @@ GENUNIX_OBJS +=	\
 		devid_smp.o	\
 		devpolicy.o	\
 		disp_lock.o	\
+		dkioc_free_util.o \
 		dnlc.o		\
 		driver.o	\
 		dumpsubr.o	\

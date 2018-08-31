@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2018 Joyent, Inc.
+#
 LIBRARY=	libdevid.a
 VERS=		.1
 OBJECTS=	deviceid.o devid.o devid_scsi.o devid_smp.o
@@ -40,6 +42,8 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-ldevinfo -lc
 
 CFLAGS +=	$(CCVERBOSE)
+
+CSTD =	$(CSTD_GNU99)
 
 .KEEP_STATE:
 

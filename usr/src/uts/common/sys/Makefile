@@ -26,7 +26,7 @@
 # Copyright 2015, Joyent, Inc. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
-# Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
@@ -189,6 +189,7 @@ CHKHDRS=			\
 	disp.h			\
 	dkbad.h			\
 	dkio.h			\
+	dkioc_free_util.h	\
 	dklabel.h		\
 	dl.h			\
 	dlpi.h			\

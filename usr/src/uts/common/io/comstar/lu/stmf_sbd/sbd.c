@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -318,7 +318,7 @@ sbd_close(dev_t dev, int flag, int otype, cred_t *credp)
 /* ARGSUSED */
 static int
 stmf_sbd_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
-	cred_t *credp, int *rval)
+    cred_t *credp, int *rval)
 {
 	stmf_iocdata_t		*iocd;
 	void			*ibuf	= NULL;
@@ -3689,22 +3689,26 @@ out:
 
 /*
  * Unmap a region in a volume.  Currently only supported for zvols.
+ * The list of extents to be freed is passed in a dkioc_free_list_t
+ * which the caller is responsible for destroying.
  */
 int
-sbd_unmap(sbd_lu_t *sl, uint64_t offset, uint64_t length)
+sbd_unmap(sbd_lu_t *sl, dkioc_free_list_t *dfl)
 {
 	vnode_t *vp;
 	int unused;
-	dkioc_free_t df;
 
-	/* Right now, we only support UNMAP on zvols. */
-	if (!(sl->sl_flags & SL_ZFS_META))
-		return (EIO);
+	/* Nothing to do */
+	if (dfl->dfl_num_exts == 0)
+		return (0);
 
-	df.df_flags = (sl->sl_flags & SL_WRITEBACK_CACHE_DISABLE) ?
+	/*
+	 * TODO: unmap performance may be improved by not doing the synchronous
+	 * removal of the blocks and writing of the metadata.  The
+	 * transaction is in the zil so the state should be stable.
+	 */
+	dfl->dfl_flags = (sl->sl_flags & SL_WRITEBACK_CACHE_DISABLE) ?
 	    DF_WAIT_SYNC : 0;
-	df.df_start = offset;
-	df.df_length = length;
 
 	/* Use the data vnode we have to send a fop_ioctl(). */
 	vp = sl->sl_data_vp;
@@ -3713,6 +3717,6 @@ sbd_unmap(sbd_lu_t *sl, uint64_t offset, uint64_t length)
 		return (EIO);
 	}
 
-	return (VOP_IOCTL(vp, DKIOCFREE, (intptr_t)(&df), FKIOCTL, kcred,
+	return (VOP_IOCTL(vp, DKIOCFREE, (intptr_t)dfl, FKIOCTL, kcred,
 	    &unused, NULL));
 }

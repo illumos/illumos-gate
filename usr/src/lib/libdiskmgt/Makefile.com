@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 LIBRARY =	libdiskmgt.a
@@ -64,6 +65,8 @@ CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libdiskmgt/common
+
+CSTD =	$(CSTD_GNU99)
 
 .KEEP_STATE:
 
