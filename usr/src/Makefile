@@ -25,7 +25,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -237,47 +237,12 @@ cscope.out tags: FRC
 
 FRC:
 
-#
-# Targets for reporting compiler versions; nightly uses these.
-#
-
+# used by nightly
 cc-version:
-	@if $($(MACH)_CC) -_versions >/dev/null 2>/dev/null; then \
-		$(ECHO) 32-bit compiler;			\
-		$(ECHO) $($(MACH)_CC);				\
-		$($(MACH)_CC) -_versions 2>&1 |			\
-		    $(EGREP) '^(cw|cc|gcc|primary|shadow)';	\
-	else							\
-		__COMPILER=`$($(MACH)_CC) -_compiler 2>/dev/null || $(TRUE)`;\
-		if [ -z "$$__COMPILER" ]; then			\
-			$(ECHO) No 32-bit compiler found;	\
-			exit 1;					\
-		else						\
-			$(ECHO) 32-bit compiler;		\
-			$(ECHO) $($(MACH)_CC);			\
-			$(ECHO) $$__COMPILER;			\
-			$($(MACH)_CC) -V 2>&1 | head -1;	\
-		fi;						\
-	fi
+	@$(CW) --versions $(CW_CC_COMPILERS) 2>&1
 
+# for older nightlies
 cc64-version:
-	@if $($(MACH64)_CC) -_versions >/dev/null 2>/dev/null; then \
-		$(ECHO) 64-bit compiler;			\
-		$(ECHO) $($(MACH64)_CC);			\
-		$($(MACH64)_CC) -_versions 2>&1 |		\
-		    $(EGREP) '^(cw|cc|gcc|primary|shadow)';	\
-	else							\
-		__COMPILER=`$($(MACH64)_CC) -_compiler 2>/dev/null || $(TRUE)`;\
-		if [ -z "$$__COMPILER" ]; then			\
-			$(ECHO) No 64-bit compiler found;	\
-			exit 1;					\
-		else						\
-			$(ECHO) 64-bit compiler;		\
-			$(ECHO) $($(MACH64)_CC);		\
-			$(ECHO) $$__COMPILER;			\
-			$($(MACH64)_CC) -V 2>&1 | head -1;	\
-		fi;						\
-	fi
 
 java-version:
 	@if [ -x "$(JAVAC)" ]; then			\

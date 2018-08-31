@@ -40,7 +40,7 @@
 #       checks for changes in ELF runpaths (-r)
 #       build and use this workspace's tools in $SRC/tools (-t)
 #
-# - This file is sourced by "bldenv.sh" and "nightly.sh" and should not 
+# - This file is sourced by "bldenv.sh" and "nightly.sh" and should not
 #   be executed directly.
 # - This script is only interpreted by ksh93 and explicitly allows the
 #   use of ksh93 language extensions.
@@ -61,7 +61,7 @@ function maxjobs
 
 	ncpu=$(builtin getconf ; getconf 'NPROCESSORS_ONLN')
 	(( maxjobs=ncpu + 2 ))
-	
+
 	# Throttle number of parallel jobs launched by dmake to a value which
 	# gurantees that all jobs have enough memory. This was added to avoid
 	# excessive paging/swapping in cases of virtual machine installations
@@ -76,7 +76,7 @@ function maxjobs
 		# the value matched by ([[:digit:]]+), i.e. the amount of
 		# memory installed
 		physical_memory="10#${.sh.match[1]}"
-		
+
 		((
 			max_jobs_per_memory=round(physical_memory/min_mem_per_job) ,
 			maxjobs=fmax(2, fmin(maxjobs, max_jobs_per_memory))
@@ -196,8 +196,33 @@ export BUILD_TOOLS='/opt'
 export SPRO_ROOT='/opt/SUNWspro'
 export SPRO_VROOT="$SPRO_ROOT"
 
-# Disable shadow compilation by default.
-export CW_NO_SHADOW='1'
+# Compilers may be specified using the following variables:
+# PRIMARY_CC	- primary C compiler
+# PRIMARY_CCC	- primary C++ compiler
+#
+# SHADOW_CCS    - list of shadow C compilers
+# SHADOW_CCCS	- list of shadow C++ compilers
+#
+# Each entry has the form <name>,<path to binary>,<style> where name is a
+# free-form name (possibly used in the makefiles to guard options), path is
+# the path to the executable.  style is the 'style' of command line taken by
+# the compiler, currently either gnu (or gcc) or sun (or cc), which is also
+# used by Makefiles to guard options.
+#
+# __SUNC and __GNUC must still be set to reflect the style of the primary
+# compiler (and to influence the default primary, otherwise)
+#
+# for example:
+# export PRIMARY_CC=gcc4,/opt/gcc/4.4.4/bin/gcc,gnu
+# export PRIMARY_CCC=gcc4,/opt/gcc/4.4.4/bin/g++,gnu
+# export SHADOW_CCS=studio12,/opt/SUNWspro/bin/cc,sun
+# export SHADOW_CCCS=studio12,/opt/SUNWspro/bin/CC,sun
+#
+# There can be several space-separated entries in SHADOW_* to run multiple
+# shadow compilers.
+#
+# To disable shadow compilation, unset SHADOW_* or set them to the empty string.
+#
 
 # This goes along with lint - it is a series of the form "A [y|n]" which
 # means "go to directory A and run 'make lint'" Then mail me (y) the

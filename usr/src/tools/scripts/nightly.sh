@@ -1673,7 +1673,7 @@ if [[ ! -f $SRC/Makefile ]]; then
 fi
 
 ( cd $SRC
-  for target in cc-version cc64-version java-version openssl-version; do
+  for target in cc-version java-version openssl-version; do
 	echo
 	#
 	# Put statefile somewhere we know we can write to rather than trip

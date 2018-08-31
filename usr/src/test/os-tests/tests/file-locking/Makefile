@@ -16,7 +16,7 @@
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-UTILS = util.c
+OBJECTS=util.o runtests.32.o runtests.64.o acquire-lock.32.o acquire-lock.64.o
 
 PROGS = \
 	runtests \
@@ -24,7 +24,7 @@ PROGS = \
 
 CSTD = $(CSTD_GNU99)
 
-SRCS = $(PROGS:%=%.c) $(UTILS)
+SRCS = $(PROGS:%=%.c) $(UTILS:%.o=%.c)
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = $(PROGS:%=%.64)
 
@@ -61,12 +61,18 @@ $(ROOTOPTDIR)/%: %.ksh
 %.ln: %.c
 	$(LINT.c) $< $(UTILS) $(LDLIBS)
 
-%.64: %.c
-	$(LINK64.c) -o $@ $< $(UTILS) $(LDLIBS64)
+%.64.o: %.c
+	$(COMPILE64.c) $< -o $@
+
+%.32.o: %.c
+	$(COMPILE.c) $< -o $@
+
+%.64: %.64.o util.64.o
+	$(LINK64.c) -o $@ $< util.64.o $(LDLIBS64)
 	$(POST_PROCESS)
 
-%.32: %.c
-	$(LINK.c) -o $@ $< $(UTILS) $(LDLIBS)
+%.32: %.32.o util.32.o
+	$(LINK.c) -o $@ $< util.32.o $(LDLIBS)
 	$(POST_PROCESS)
 
 clobber:
