@@ -46,7 +46,7 @@
 	    Export rendezvous files for global zone services including
 	    Xorg, nscd, and labeld.
 	-->
- 	<global_mount special="/var/tsol/doors"
+	<global_mount special="/var/tsol/doors"
 	    directory="/var/tsol/doors" type="lofs"/>
 
 	<!-- Local filesystems to mount when booting the zone -->
@@ -66,6 +66,7 @@
 	<device match="dsk" />
 	<device match="dtrace/*" />
 	<device match="dtrace/provider/*" />
+	<device match="eventfd" />
 	<device match="fd" />
 	<device match="full" />
 	<device match="ipnet" />
