@@ -179,13 +179,10 @@ reservedport(int proto, int port)
  * See TFTP interpreter.
  */
 #define	MAXTRANS 64
-static struct ttable {
-	int t_port;
-	int (*t_proc)(int, char *, int);
-} transients [MAXTRANS];
+static struct ttable transients [MAXTRANS];
 
 int
-add_transient(int port, int (*proc)(int, char *, int))
+add_transient(int port, int (*proc)(int, void *, int))
 {
 	static struct ttable *next = transients;
 
@@ -198,7 +195,7 @@ add_transient(int port, int (*proc)(int, char *, int))
 	return (1);
 }
 
-static struct ttable *
+struct ttable *
 is_transient(int port)
 {
 	struct ttable *p;

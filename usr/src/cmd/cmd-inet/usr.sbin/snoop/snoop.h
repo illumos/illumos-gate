@@ -69,6 +69,19 @@ extern "C" {
 #define	MAXLINE		(1088)		/* max len of detail line */
 
 /*
+ * Transient port structure. See TFTP interpreter.
+ */
+struct ttable {
+	int t_port;
+	int blksize;
+	int (*t_proc)(int, void *, int);
+};
+
+extern int add_transient(int port, int (*proc)(int, void *, int));
+extern struct ttable *is_transient(int port);
+extern void del_transient(int port);
+
+/*
  * The RPC XID cache structure.
  * When analyzing RPC protocols we
  * have to cache the xid of the RPC
@@ -243,14 +256,14 @@ struct dhcp;
 extern int interpret_dhcp(int, struct dhcp *, int);
 extern int interpret_dhcpv6(int, const uint8_t *, int);
 struct tftphdr;
-extern int interpret_tftp(int, struct tftphdr *, int);
+extern int interpret_tftp(int, void *, int);
 extern int interpret_http(int, char *, int);
 struct ntpdata;
 extern int interpret_ntp(int, struct ntpdata *, int);
 extern void interpret_netbios_ns(int, uchar_t *, int);
 extern void interpret_netbios_datagram(int, uchar_t *, int);
 extern void interpret_netbios_ses(int, uchar_t *, int);
-extern void interpret_slp(int, char *, int);
+extern void interpret_slp(int, void *, int);
 struct rip;
 extern int interpret_rip(int, struct rip *, int);
 struct rip6;
@@ -293,7 +306,7 @@ typedef uint_t (headerlen_fn_t)(char *, size_t);
 typedef struct interface {
 	uint_t		mac_type;
 	uint_t		mtu_size;
-	uint_t  	network_type_offset;
+	uint_t		network_type_offset;
 	size_t		network_type_len;
 	uint_t		network_type_ip;
 	uint_t		network_type_ipv6;
