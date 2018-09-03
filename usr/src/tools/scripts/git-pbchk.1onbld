@@ -12,85 +12,72 @@
 .\"
 .\" Copyright 2011 Richard Lowe.
 .\" Copyright 2015 Elysium Digital, L.L.C.
+.\" Copyright 2018 Joyent, Inc.
 .\"
 
-.TH "GIT\-PBCHK" "1ONBLD" "April 23, 2015" "" ""
+.TH "GIT\-PBCHK" "1ONBLD" "September 4, 2018" "" ""
 
 .SH "NAME"
 \fBgit\-pbchk\fR \- nits and pre\-putback checks for git
 
 .SH "SYNOPSIS"
-git\-pbchk [\-b \fIbranch\fR]
+git\-pbchk [\-c \fIcheck\fR] [\-p \fIbranch\fR] [file...]
 
 .P
-git\-nits [\-b \fIbranch\fR]
-
-.SH "DESCRIPTION"
-Check your workspace for common nits and putback\-ending mistakes, a simple set of checks are run over various parts of your workspace and errors encountered are reported, all of which should, generally, be fixed\.
-
-.TP
-Comment format
-Check that putback comments follow the prescribed format (only run for pbchk)
-
-.TP
-Copyrights
-Check that each source file contains a copyright notice for the current
-year\. You don't need to fix this if you, the potential new copyright holder, chooses not to
-
-.TP
-C style
-Check that C source files conform to the Illumos C style rules
-
-.TP
-Header check
-Check that C header files conform to the Illumos header style rules (in addition to the general C rules)
-
-.TP
-Java style
-Check that Java source files conform to the Illumos Java style rules (which differ from the traditionally recommended Java style)
-
-.TP
-SCCS Keywords
-Check that no source files contain unexpanded SCCS keywords\. It is possible that this check may false positive on certain inputs\. It is generally obvious when this is the case\.
-
-.IP
-This check does not check for expanded SCCS keywords, though the common \'ident\'\-style lines should be removed regardless of whether they are expanded\.
-
-.TP
-Mapfile check
-Check that linker mapfiles contain a comment directing anyone editing to read the directions in \fBusr/lib/README\.mapfiles\fR\.
+git\-nits [\-c \fIcheck\fR] [\-p \fIbranch\fR] [file...]
 
 .SH "OPTIONS"
 
 .TP
-\fB\-b branch\fR:
-
+\fB\-c check\fR:
 .IP
-Compare the current workspace to /branch/ for the purposes of generating file and comment lists\.
-
+Run the specific \fIcheck\fR, as named below.
+In this mode, individual files can be provided to check.
+.TP
+\fB\-p branch\fR:
+.IP
+Compare the current workspace to the parent \fIbranch\fR for the purposes of generating file and comment lists\.
 .IP
 If this option is not specified an attempt is made to determine this automatically, if the git branch configuration contains this information\.
-
 .IP
 If no branch is specified and none can be determined automatically \fBorigin/master\fR is used\.
-
+.SH "DESCRIPTION"
+Check your workspace for common nits and putback\-ending mistakes, a simple set of checks are run over various parts of your workspace and errors encountered are reported, all of which should, generally, be fixed\.
+.TP
+Comment format [comchk]
+Check that putback comments follow the prescribed format (only run for pbchk)
+.TP
+Copyrights [copyright]
+Check that each source file contains a copyright notice for the current
+year\. You don't need to fix this if you, the potential new copyright holder, chooses not to
+.TP
+C style [cstyle]
+Check that C source files conform to the Illumos C style rules
+.TP
+Header check [hdrchk]
+Check that C header files conform to the Illumos header style rules (in addition to the general C rules)
+.TP
+Java style [jstyle]
+Check that Java source files conform to the Illumos Java style rules (which differ from the traditionally recommended Java style)
+.TP
+SCCS Keywords [keywords]
+Check that no source files contain unexpanded SCCS keywords\. It is possible that this check may false positive on certain inputs\. It is generally obvious when this is the case\.
+.IP
+This check does not check for expanded SCCS keywords, though the common \'ident\'\-style lines should be removed regardless of whether they are expanded\.
+.TP
+Man page check [manlint]
+Check for problems with man pages.
+.TP
+Mapfile check [mapfilechk]
+Check that linker mapfiles contain a comment directing anyone editing to read the directions in \fBusr/lib/README\.mapfiles\fR\.
+.TP
+Whitespace check [wscheck]
+Check for whitespace issues such as mixed tabs/spaces in source files.
 .SH "FILES"
-\fBgit nits\fR and \fBgit pbchk\fR support NOT files of the form used by Cadmium with Mercurial\. These are looked for in \fB$CODEMGR_WS/\.git/\fR and in \fB$CODEMGR_WS/exception_lists/\fR as normal\. The files are named after the check from which they exclude files\.
-
-.IP "\(bu" 4
-\fBcopyright\.NOT\fR: exclude files listed from copyright checking
-
-.IP "\(bu" 4
-\fBcstyle\.NOT\fR: exclude files from the C style check
-
-.IP "\(bu" 4
-\fBhdrchk\.NOT\fR: exclude files from the C header style check
-
-.IP "\(bu" 4
-\fBkeywords\.NOT\fR: exclude files from the SCCS keywords check
-
-.IP "\(bu" 4
-\fBmapfilechk\.NOT\fR: exclude files from the linker mapfile check
+Exception lists can be used to exclude certain files from checking, named after
+the specific check.
+They can be found in \fB$CODEMGR_WS/exception_lists/\fR, or optionally under
+\fB$CODEMGR_WS/\.git/\fR, where they must be suffixed \fB.NOT\fR.
 
 .IP "" 0
 
