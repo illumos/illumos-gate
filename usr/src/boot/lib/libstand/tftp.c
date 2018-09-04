@@ -162,7 +162,7 @@ tftp_senderr(struct tftp_handle *h, u_short errcode, const char *msg)
 }
 
 static void
-tftp_sendack(struct tftp_handle *h)
+tftp_sendack(struct tftp_handle *h, ushort_t block)
 {
 	struct {
 		u_char header[HEADER_SIZE];
@@ -172,7 +172,7 @@ tftp_sendack(struct tftp_handle *h)
 
 	wbuf.t.th_opcode = htons((u_short) ACK);
 	wtail = (char *) &wbuf.t.th_block;
-	wbuf.t.th_block = htons((u_short) h->currblock);
+	wbuf.t.th_block = htons(block);
 	wtail += 2;
 
 	sendudp(h->iodesc, &wbuf.t, wtail - (char *) &wbuf.t);
@@ -204,9 +204,17 @@ recvtftp(struct iodesc *d, void **pkt, void **payload, time_t tleft,
 	case DATA: {
 		int got;
 
+		if (htons(t->th_block) < (ushort_t) d->xid) {
+			/*
+			 * Apparently our ACK was missed, re-send.
+			 */
+			tftp_sendack(h, htons(t->th_block));
+			free(ptr);
+			return (-1);
+		}
 		if (htons(t->th_block) != (u_short) d->xid) {
 			/*
-			 * Expected block?
+			 * Packet from the future, drop this.
 			 */
 			free(ptr);
 			return (-1);
@@ -218,7 +226,7 @@ recvtftp(struct iodesc *d, void **pkt, void **payload, time_t tleft,
 			struct udphdr *uh;
 			uh = (struct udphdr *) t - 1;
 			d->destport = uh->uh_sport;
-		} /* else check uh_sport has not changed??? */
+		}
 		got = len - (t->th_data - (char *)t);
 		*pkt = ptr;
 		*payload = t;
@@ -363,7 +371,7 @@ tftp_makereq(struct tftp_handle *h)
 			h->islastblock = 0;
 			if (res < h->tftp_blksize) {
 				h->islastblock = 1;	/* very short file */
-				tftp_sendack(h);
+				tftp_sendack(h, h->currblock);
 			}
 			return (0);
 		}
