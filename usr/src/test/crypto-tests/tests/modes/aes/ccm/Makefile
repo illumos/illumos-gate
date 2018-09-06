@@ -14,7 +14,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-PROG = aes_ccm
+BASEPROG = aes_ccm
 
 include $(SRC)/cmd/Makefile.cmd
 include ../Makefile.subdirs

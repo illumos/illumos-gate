@@ -20,9 +20,15 @@ include $(SRC)/cmd/Makefile.ctf
 ALGS = sha1 sha256 sha384 sha512
 CRYPTO = pkcs kcf
 
-PROGS_pkcs = $(ALGS:%=%_pkcs)
-PROGS_kcf = $(ALGS:%=%_kcf)
-PROGS = $(PROGS_pkcs) $(PROGS_kcf)
+PROGS_pkcs_32 = $(ALGS:%=%_32_pkcs)
+PROGS_pkcs_64 = $(ALGS:%=%_64_pkcs)
+PROGS_kcf_32 = $(ALGS:%=%_32_kcf)
+PROGS_kcf_64 = $(ALGS:%=%_64_kcf)
+PROGS_pkcs = $(PROGS_pkcs_32) $(PROGS_pkcs_64)
+PROGS_kcf = $(PROGS_kcf_32) $(PROGS_kcf_64)
+PROGS_32 = $(PROGS_pkcs_32) $(PROGS_kcf_32)
+PROGS_64 = $(PROGS_pkcs_64) $(PROGS_kcf_64)
+PROGS = $(PROGS_32) $(PROGS_64)
 
 ROOTOPTPKG = $(ROOT)/opt/crypto-tests
 TESTROOT = $(ROOTOPTPKG)/tests/digest
@@ -31,15 +37,22 @@ TESTDIR_kcf = $(TESTROOT)/kcf
 
 COMMONDIR = ../common
 
-$(CRYPTO:%=sha1_%)	:= OBJS = sha1.o
-$(CRYPTO:%=sha256_%)	:= OBJS = sha256.o
-$(CRYPTO:%=sha384_%)	:= OBJS = sha384.o
-$(CRYPTO:%=sha512_%)	:= OBJS = sha512.o
+$(CRYPTO:%=sha1_32_%)	:= OBJS = sha1.32.o
+$(CRYPTO:%=sha256_32_%)	:= OBJS = sha256.32.o
+$(CRYPTO:%=sha384_32_%)	:= OBJS = sha384.32.o
+$(CRYPTO:%=sha512_32_%)	:= OBJS = sha512.32.o
 
-OBJS_COMMON	= $(COMMONDIR)/testfuncs.o
-$(PROGS_pkcs)	:= OBJS_COMMON += $(COMMONDIR)/cryptotest_pkcs.o
-$(PROGS_kcf)	:= OBJS_COMMON += $(COMMONDIR)/cryptotest_kcf.o
-$(PROGS)	:= OBJS += main.o
+$(CRYPTO:%=sha1_64_%)	:= OBJS = sha1.64.o
+$(CRYPTO:%=sha256_64_%)	:= OBJS = sha256.64.o
+$(CRYPTO:%=sha384_64_%)	:= OBJS = sha384.64.o
+$(CRYPTO:%=sha512_64_%)	:= OBJS = sha512.64.o
+
+$(PROGS_32)		:= OBJS_COMMON = main.32.o $(COMMONDIR)/testfuncs.32.o
+$(PROGS_64)		:= OBJS_COMMON = main.64.o $(COMMONDIR)/testfuncs.64.o
+$(PROGS_pkcs_32)	:= OBJS_COMMON += $(COMMONDIR)/cryptotest_pkcs.32.o
+$(PROGS_pkcs_64)	:= OBJS_COMMON += $(COMMONDIR)/cryptotest_pkcs.64.o
+$(PROGS_kcf_32)		:= OBJS_COMMON += $(COMMONDIR)/cryptotest_kcf.32.o
+$(PROGS_kcf_64)		:= OBJS_COMMON += $(COMMONDIR)/cryptotest_kcf.64.o
 
 CSTD = $(CSTD_GNU99)
 
@@ -51,28 +64,40 @@ LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 
 $(PROGS_pkcs) := LDLIBS += -lpkcs11 -lcryptoutil
 
-CMDS_pkcs = $(ALGS:%=$(TESTDIR_pkcs)/%)
-CMDS_kcf = $(ALGS:%=$(TESTDIR_kcf)/%)
+CMDS_pkcs = $(PROGS_pkcs:%_pkcs=$(TESTDIR_pkcs)/%)
+CMDS_kcf = $(PROGS_kcf:%_kcf=$(TESTDIR_kcf)/%)
 CMDS = $(CMDS_pkcs) $(CMDS_kcf)
 
 $(CMDS) := FILEMODE = 0555
 
 all: $(PROGS)
 
-$(COMMONDIR)/%.o:
-$(PROGS): main.o
+$(PROGS): main.32.o main.64.o
 
-%_pkcs: %.o
+%_32_pkcs: %.32.o
 	$(LINK.c) -o $@ $(OBJS) $(OBJS_COMMON) $(LDLIBS)
 	$(POST_PROCESS)
 
-%_kcf: %.o
+%_64_pkcs: %.64.o
+	$(LINK64.c) -o $@ $(OBJS) $(OBJS_COMMON) $(LDLIBS)
+	$(POST_PROCESS)
+
+%_32_kcf: %.32.o
 	$(LINK.c) -o $@ $(OBJS) $(OBJS_COMMON) $(LDLIBS)
 	$(POST_PROCESS)
 
-%.o: %.c
+%_64_kcf: %.64.o
+	$(LINK64.c) -o $@ $(OBJS) $(OBJS_COMMON) $(LDLIBS)
+	$(POST_PROCESS)
+
+%.32.o: %.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
+
+%.64.o: %.c
+	$(COMPILE64.c) -o $@ $<
+	$(POST_PROCESS_O)
+
 
 install: all $(CMDS)
 
@@ -90,16 +115,21 @@ clobber: clean
 	-$(RM) $(PROGS)
 
 clean:
-	-$(RM) $(ALGS:%=%.o) main.o
+	-$(RM) $(ALGS:%=%.32.o) $(ALGS:%=%.64.o) main.32.o main.64.o
 
 $(CMDS): $(TESTDIR_pkcs) $(TESTDIR_kcf) $(PROGS)
 
 $(TESTDIR_pkcs) $(TESTDIR_kcf):
 	$(INS.dir)
-	@echo Cmds: $(CMDS)
 
-$(TESTROOT)/pkcs/%: %_pkcs
+$(TESTDIR_pkcs)/%_32: %_32_pkcs
 	$(INS.rename)
 
-$(TESTROOT)/kcf/%: %_kcf
+$(TESTDIR_pkcs)/%_64: %_64_pkcs
+	$(INS.rename)
+
+$(TESTDIR_kcf)/%_32: %_32_kcf
+	$(INS.rename)
+
+$(TESTDIR_kcf)/%_64: %_64_kcf
 	$(INS.rename)

@@ -49,7 +49,7 @@ typedef struct test_fg {
 	testfunc_t update;
 } test_fg_t;
 
-#define	CRYPTO_INVALID_SESSION ((size_t)-1)
+#define	CRYPTO_INVALID_SESSION ((crypto_session_id_t)-1)
 typedef struct crypto_op crypto_op_t;
 
 int run_test(cryptotest_t *args, uint8_t *cmp, size_t cmplen, test_fg_t *funcs);

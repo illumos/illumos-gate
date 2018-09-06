@@ -23,20 +23,28 @@ timeout = 60
 post =
 outputdir = /var/tmp/test_results
 
-[/opt/crypto-tests/tests/pkcs/aes]
-tests = ['aes_cbc', 'aes_ccm', 'aes_cmac', 'aes_ctr', 'aes_ecb', 'aes_gcm']
+[/opt/crypto-tests/tests/aes/pkcs]
+tests = ['aes_cbc_32', 'aes_ccm_32', 'aes_cmac_32',
+         'aes_ctr_32', 'aes_ecb_32', 'aes_gcm_32',
+         'aes_cbc_64', 'aes_ccm_64', 'aes_cmac_64',
+         'aes_ctr_64', 'aes_ecb_64', 'aes_gcm_64']
 
-[/opt/crypto-tests/tests/kcf/aes]
+[/opt/crypto-tests/tests/aes/kcf]
 pre = setup
 user = root
-tests = ['aes_cbc', 'aes_ccm', 'aes_cmac', 'aes_ctr', 'aes_ecb', 'aes_gcm']
+tests = ['aes_cbc_32', 'aes_ccm_32', 'aes_cmac_32',
+         'aes_ctr_32', 'aes_ecb_32', 'aes_gcm_32',
+         'aes_cbc_64', 'aes_ccm_64', 'aes_cmac_64',
+         'aes_ctr_64', 'aes_ecb_64', 'aes_gcm_64']
 post = cleanup
 
 [/opt/crypto-tests/tests/digest/pkcs]
-tests = ['sha1', 'sha256', 'sha384', 'sha512']
+tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32',
+         'sha1_64', 'sha256_64', 'sha384_64', 'sha512_64' ]
 
 [/opt/crypto-tests/tests/digest/kcf]
 pre = setup
 user = root
-tests = ['sha1', 'sha256', 'sha384', 'sha512']
+tests = ['sha1_32', 'sha256_32', 'sha384_32', 'sha512_32',
+         'sha1_64', 'sha256_64', 'sha384_64', 'sha512_64' ]
 post = cleanup

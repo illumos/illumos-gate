@@ -12,20 +12,25 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-OBJS = testfuncs.o cryptotest_pkcs.o cryptotest_kcf.o
+BASEOBJS = testfuncs.o cryptotest_pkcs.o cryptotest_kcf.o
+OBJS = $(BASEOBJS:%.o=%.32.o) $(BASEOBJS:%.o=%.64.o)
 SRCS = $(OBJS:%.o=%.c)
 
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -I$(SRC)/common/crypto/
 
 all install: $(OBJS)
 
-%.o: %.c
+%.32.o: %.c
 	$(COMPILE.c) -o $@ $<
+
+%.64.o: %.c
+	$(COMPILE64.c) -o $@ $<
 
 lint:
 

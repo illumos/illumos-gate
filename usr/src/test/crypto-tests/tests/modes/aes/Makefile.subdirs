@@ -12,29 +12,43 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+include $(SRC)/cmd/Makefile.ctf
 
 CRYPTO = pkcs kcf
-PROGS = $(CRYPTO:%=$(PROG)_%)
+PROGS_32 = $(CRYPTO:%=$(BASEPROG)_32_%)
+PROGS_64 = $(CRYPTO:%=$(BASEPROG)_64_%)
+PROGS = $(PROGS_32) $(PROGS_64)
+PROGS_pkcs = $(BASEPROG:%=%_32_pkcs) $(BASEPROG:%=%_64_pkcs)
+PROGS_kcf = $(BASEPROG:%=%_32_kcf) $(BASEPROG:%=%_64_kcf)
+
 ROOTOPTPKG = $(ROOT)/opt/crypto-tests
-TESTROOT = $(ROOTOPTPKG)/tests/#$(SUFFIX)/aes
-TESTDIR = $(CRYPTO:%=$(TESTROOT)/%/aes)
+TESTROOT = $(ROOTOPTPKG)/tests/aes
+TESTDIR_pkcs = $(TESTROOT)/pkcs
+TESTDIR_kcf = $(TESTROOT)/kcf
 
 COMMONDIR = ../../../common
-OBJS_COMMON = testfuncs.o
-OBJS_COMDIR = $(OBJS_COMMON:%=$(COMMONDIR)/%)
-OBJS_LOCAL = $(PROG:%=%.o)
-OBJS = $(OBJS_LOCAL) $(OBJS_COMDIR)
-OBJS_PKCS = $(OBJS_LOCAL) $(OBJS_COMDIR) $(COMMONDIR)/cryptotest_pkcs.o
-OBJS_KCF = $(OBJS_LOCAL) $(OBJS_COMDIR) $(COMMONDIR)/cryptotest_kcf.o
-SRCS = $(OBJS:%.o=%.c)
-PKCSLIBS = -lpkcs11 -lcryptoutil
+$(PROGS_32)	:= OBJS += $(COMMONDIR)/testfuncs.32.o
+$(PROGS_64)	:= OBJS += $(COMMONDIR)/testfuncs.64.o
+$(PROGS_32)	:= OBJS += $(BASEPROG:%=%.32.o)
+$(PROGS_64)	:= OBJS += $(BASEPROG:%=%.64.o)
+$(BASEPROG)_32_pkcs	:= OBJS += $(COMMONDIR)/cryptotest_pkcs.32.o
+$(BASEPROG)_64_pkcs	:= OBJS += $(COMMONDIR)/cryptotest_pkcs.64.o
+$(BASEPROG)_32_kcf	:= OBJS += $(COMMONDIR)/cryptotest_kcf.32.o
+$(BASEPROG)_64_kcf	:= OBJS += $(COMMONDIR)/cryptotest_kcf.64.o
+
+$(PROGS_pkcs)	:= LDLIBS += -lpkcs11 -lcryptoutil
 
 CSTD = $(CSTD_GNU99)
 
-CMDS = $(TESTDIR:%=%/$(PROG))
+CMDS_pkcs = $(PROGS_pkcs:%_pkcs=$(TESTDIR_pkcs)/%)
+CMDS_kcf = $(PROGS_kcf:%_kcf=$(TESTDIR_kcf)/%)
+CMDS = $(CMDS_pkcs) $(CMDS_kcf)
+
 $(CMDS) := FILEMODE = 0555
 
 LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
@@ -44,39 +58,60 @@ CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -I$(COMMONDIR) -I$(SRC)/c
 
 all: $(PROGS)
 
-$(PROG)_kcf: $(OBJS_KCF)
-	$(LINK.c) $(OBJS_KCF) -o $@ $(LDLIBS)
+%_32_pkcs: %.32.o
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(PROG)_pkcs: $(OBJS_PKCS)
-	$(LINK.c) $(OBJS_PKCS) -o $@ $(LDLIBS) $(PKCSLIBS)
+%_64_pkcs: %.64.o
+	$(LINK64.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
+%_32_kcf: %.32.o
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
-$(COMMONDIR)/%.o:
+%_64_kcf: %.64.o
+	$(LINK64.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
-%.o: %.c
+%.32.o: %.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+%.64.o: %.c
+	$(COMPILE64.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+	echo $(CMDS_kcf)
 
 install: all $(CMDS)
 
 lint: $(CRYPTO:%=lint_%)
 
 lint_pkcs:
-	$(LINT.c) $(OBJS_PKCS:%.o=%.c) $(LDLIBS) $(PKCSLIBS)
+	$(LINT.c) $(OBJS_PKCS_23:%.o=%.c) $(LDLIBS) $(PKCSLIBS)
 
 lint_kcf:
-	$(LINT.c) $(OBJS_KCF:%.o=%.c) $(LDLIBS)
+	$(LINT.c) $(OBJS_KCF_32:%.o=%.c) $(LDLIBS)
 clobber: clean
 	-$(RM) $(PROGS)
 
 clean:
-	-$(RM) $(OBJS_LOCAL)
+	-$(RM) *.o
 
-$(CMDS): $(TESTDIR) $(PROGS)
+$(CMDS): $(TESTDIR_pkcs) $(TESTDIR_kcf) $(PROGS)
 
-$(TESTDIR):
+$(TESTDIR_pkcs) $(TESTDIR_kcf):
 	$(INS.dir)
 
-$(TESTROOT)/%/aes/$(PROG): $(PROG)_%
+$(TESTDIR_pkcs)/%_32: %_32_pkcs
+	$(INS.rename)
+
+$(TESTDIR_pkcs)/%_64: %_64_pkcs
+	$(INS.rename)
+
+$(TESTDIR_kcf)/%_32: %_32_kcf
+	$(INS.rename)
+
+$(TESTDIR_kcf)/%_64: %_64_kcf
 	$(INS.rename)

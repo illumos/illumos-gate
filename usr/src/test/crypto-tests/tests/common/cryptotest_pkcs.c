@@ -49,7 +49,7 @@ cryptotest_error(char *name, CK_RV rv)
 }
 
 crypto_op_t *
-cryptotest_init(cryptotest_t *arg, size_t fg)
+cryptotest_init(cryptotest_t *arg, crypto_func_group_t fg)
 {
 	crypto_op_t *op = malloc(sizeof (*op));
 
