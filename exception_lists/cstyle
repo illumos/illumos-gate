@@ -37,6 +37,7 @@ usr/src/cmd/cmd-inet/usr.lib/mdnsd/anonymous.[ch]
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/dnssec.h
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/uDNS.[ch]
 usr/src/cmd/cmd-inet/usr.lib/mdnsd/uds_daemon.[ch]
+usr/src/cmd/hal/tools/hal_set_property.c
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c
 usr/src/cmd/krb5/kadmin/cli/kadmin.c
 usr/src/cmd/krb5/kadmin/cli/kadmin.h
