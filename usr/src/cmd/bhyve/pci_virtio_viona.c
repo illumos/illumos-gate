@@ -779,6 +779,9 @@ pci_viona_read(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 		assert(size == 1);
 		value = sc->vsc_isr;
 		sc->vsc_isr = 0;	/* a read clears this flag */
+		if (value != 0) {
+			pci_lintr_deassert(pi);
+		}
 		break;
 	case VTCFG_R_CFGVEC:
 		assert(size == 2);
