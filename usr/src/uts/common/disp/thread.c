@@ -479,15 +479,9 @@ thread_create(
 	curthread->t_prev = t;
 
 	/*
-	 * Threads should never have a NULL t_cpu pointer so assign it
-	 * here.  If the thread is being created with state TS_RUN a
-	 * better CPU may be chosen when it is placed on the run queue.
-	 *
-	 * We need to keep kernel preemption disabled when setting all
-	 * three fields to keep them in sync.  Also, always create in
-	 * the default partition since that's where kernel threads go
-	 * (if this isn't a kernel thread, t_cpupart will be changed
-	 * in lwp_create before setting the thread runnable).
+	 * We'll always create in the default partition since that's where
+	 * kernel threads go (we'll change this later if needed, in
+	 * lwp_create()).
 	 */
 	t->t_cpupart = &cp_default;
 
@@ -496,20 +490,23 @@ thread_create(
 	 * Since the kernel does not (presently) allocate its memory
 	 * in a locality aware fashion, the root is an appropriate home.
 	 * If this thread is later associated with an lwp, it will have
-	 * it's lgroup re-assigned at that time.
+	 * its lgroup re-assigned at that time.
 	 */
 	lgrp_move_thread(t, &cp_default.cp_lgrploads[LGRP_ROOTID], 1);
 
 	/*
-	 * Inherit the current cpu.  If this cpu isn't part of the chosen
-	 * lgroup, a new cpu will be chosen by cpu_choose when the thread
-	 * is ready to run.
+	 * If the current CPU is in the default cpupart, use it.  Otherwise,
+	 * pick one that is; before entering the dispatcher code, we'll
+	 * make sure to keep the invariant that ->t_cpu is set.  (In fact, we
+	 * rely on this, in ht_should_run(), in the call tree of
+	 * disp_lowpri_cpu().)
 	 */
-	if (CPU->cpu_part == &cp_default)
+	if (CPU->cpu_part == &cp_default) {
 		t->t_cpu = CPU;
-	else
-		t->t_cpu = disp_lowpri_cpu(cp_default.cp_cpulist, t,
-		    t->t_pri);
+	} else {
+		t->t_cpu = cp_default.cp_cpulist;
+		t->t_cpu = disp_lowpri_cpu(t->t_cpu, t, t->t_pri);
+	}
 
 	t->t_disp_queue = t->t_cpu->cpu_disp;
 	kpreempt_enable();
@@ -865,12 +862,12 @@ thread_zone_destroy(zoneid_t zoneid, void *unused)
 
 	/*
 	 * Guard against race condition in mutex_owner_running:
-	 * 	thread=owner(mutex)
-	 * 	<interrupt>
-	 * 				thread exits mutex
-	 * 				thread exits
-	 * 				thread reaped
-	 * 				thread struct freed
+	 *	thread=owner(mutex)
+	 *	<interrupt>
+	 *				thread exits mutex
+	 *				thread exits
+	 *				thread reaped
+	 *				thread struct freed
 	 * cpu = thread->t_cpu <- BAD POINTER DEREFERENCE.
 	 * A cross call to all cpus will cause the interrupt handler
 	 * to reset the PC if it is in mutex_owner_running, refreshing
@@ -927,12 +924,12 @@ thread_reaper()
 
 		/*
 		 * Guard against race condition in mutex_owner_running:
-		 * 	thread=owner(mutex)
-		 * 	<interrupt>
-		 * 				thread exits mutex
-		 * 				thread exits
-		 * 				thread reaped
-		 * 				thread struct freed
+		 *	thread=owner(mutex)
+		 *	<interrupt>
+		 *				thread exits mutex
+		 *				thread exits
+		 *				thread reaped
+		 *				thread struct freed
 		 * cpu = thread->t_cpu <- BAD POINTER DEREFERENCE.
 		 * A cross call to all cpus will cause the interrupt handler
 		 * to reset the PC if it is in mutex_owner_running, refreshing
@@ -1521,7 +1518,7 @@ thread_create_intr(struct cpu *cp)
 static kmutex_t		tsd_mutex;	 /* linked list spin lock */
 static uint_t		tsd_nkeys;	 /* size of destructor array */
 /* per-key destructor funcs */
-static void 		(**tsd_destructor)(void *);
+static void		(**tsd_destructor)(void *);
 /* list of tsd_thread's */
 static struct tsd_thread	*tsd_list;
 
