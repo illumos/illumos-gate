@@ -21,10 +21,12 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include "lint.h"
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <sys/types.h>
 
@@ -38,7 +40,10 @@ strndup(const char *s1, size_t n)
 	char *s2;
 
 	n = strnlen(s1, n);
-	if ((s2 = malloc(n + 1)) != NULL)
-		(void) strlcpy(s2, s1, n + 1);
+	if ((s2 = malloc(n + 1)) != NULL) {
+		bcopy(s1, s2, n);
+		s2[n] = '\0';
+	}
+
 	return (s2);
 }
