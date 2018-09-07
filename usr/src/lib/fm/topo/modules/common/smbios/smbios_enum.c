@@ -37,7 +37,7 @@ typedef struct smb_enum_data {
 /*
  * This function serves two purposes.  It filters out memory devices that
  * don't have a formfactor that represents a reasonably modern DIMM-like
- * device (and hence not a device we're insterested in enumerating).  It also
+ * device (and hence not a device we're interested in enumerating).  It also
  * converts the numeric SMBIOS type representation to a more generic TOPO dimm
  * type.
  *
@@ -90,7 +90,7 @@ static boolean_t
 is_valid_string(const char *str)
 {
 	if (strcmp(str, SMB_DEFAULT1) != 0 && strcmp(str, SMB_DEFAULT2) != 0 &&
-	    strcmp(str, SMB_DEFAULT3) != 0 && strlen(str) > 0)
+	    strlen(str) > 0)
 		return (B_TRUE);
 
 	return (B_FALSE);
@@ -121,9 +121,9 @@ smbios_make_slot(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 		/* errno set */
 		return (NULL);
 	}
+	nvlist_free(auth);
 	if ((slotnode = topo_node_bind(mod, smed->sme_pnode, SLOT,
 	    smed->sme_slot_inst, fmri)) == NULL) {
-		nvlist_free(auth);
 		nvlist_free(fmri);
 		topo_mod_dprintf(mod, "topo_node_bind() failed: %s",
 		    topo_mod_errmsg(mod));
@@ -132,10 +132,6 @@ smbios_make_slot(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 	}
 	nvlist_free(fmri);
 	fmri = NULL;
-
-	/* Create authority and system pgroups */
-	topo_pgroup_hcset(slotnode, auth);
-	nvlist_free(auth);
 
 	if (topo_node_label_set(slotnode, (char *)smb_md->smbmd_dloc, &err) !=
 	    0) {
@@ -230,21 +226,17 @@ smbios_make_dimm(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 		/* errno set */
 		goto err;
 	}
+	nvlist_free(auth);
 
 	if (topo_node_range_create(mod, slotnode, DIMM, 0, 0) < 0 ||
 	    (dimmnode = topo_node_bind(mod, slotnode, DIMM, 0, fmri)) ==
 	    NULL) {
-		nvlist_free(auth);
 		nvlist_free(fmri);
 		topo_mod_dprintf(mod, "failed to bind dimm node: %s",
 		    topo_mod_errmsg(mod));
 		/* errno set */
 		goto err;
 	}
-
-	/* Create authority and system pgroups */
-	topo_pgroup_hcset(dimmnode, auth);
-	nvlist_free(auth);
 
 	if (topo_node_fru_set(dimmnode, fmri, NULL, &err) != 0) {
 		topo_mod_dprintf(mod, "failed to set FRU on %s: %s",
@@ -535,7 +527,7 @@ err:
 }
 
 /*
- * A system with a functional memory controller driver will have one  mc device
+ * A system with a functional memory controller driver will have one mc device
  * node per chip instance, starting at instance 0.  The driver provides an
  * ioctl interface for retrieving a snapshot of the system's memory topology.
  * If we're able to issue this ioctl on one of the mc device nodes then we'll

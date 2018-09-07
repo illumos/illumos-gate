@@ -195,7 +195,7 @@ linux_loadkernel(char *filename, uint64_t dest, struct preloaded_file **result)
 		error = EFBIG;
 		goto end;
 	}
-	printf("   [Linux-%s, setup=0x%x, size=0x%x]\n",
+	printf("   [Linux-%s, setup=0x%lx, size=0x%lx]\n",
 	    (linux_big ? "bzImage" : "zImage"), data, text);
 
 	/* copy real mode part to place */
