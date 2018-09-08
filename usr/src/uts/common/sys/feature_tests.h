@@ -386,22 +386,6 @@ extern "C" {
 #endif
 
 /*
- * It is invalid to compile an XPG3, XPG4, XPG4v2, or XPG5 application
- * using c99.  The same is true for POSIX.1-1990, POSIX.2-1992, POSIX.1b,
- * and POSIX.1c applications. Likewise, it is invalid to compile an XPG6
- * or a POSIX.1-2001 application with anything other than a c99 or later
- * compiler.  Therefore, we force an error in both cases.
- */
-#if defined(_STDC_C99) && (defined(__XOPEN_OR_POSIX) && !defined(_XPG6))
-#error "Compiler or options invalid for pre-UNIX 03 X/Open applications \
-	and pre-2001 POSIX applications"
-#elif !defined(_STDC_C99) && \
-	(defined(__XOPEN_OR_POSIX) && defined(_XPG6))
-#error "Compiler or options invalid; UNIX 03 and POSIX.1-2001 applications \
-	require the use of c99"
-#endif
-
-/*
  * The following macro defines a value for the ISO C99 restrict
  * keyword so that _RESTRICT_KYWD resolves to "restrict" if
  * an ISO C99 compiler is used, "__restrict" for c++ and "" (null string)
