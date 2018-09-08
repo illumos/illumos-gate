@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -42,6 +43,42 @@
  * handled these conditions, and blocked these requests. For the detailed
  * information, please check with sdopen, sdclose and sdioctl routines.
  *
+ *
+ * Enclosure Management Support
+ * ----------------------------
+ *
+ * The ahci driver has basic support for AHCI Enclosure Management (EM)
+ * services. The AHCI specification provides an area in the primary ahci BAR for
+ * posting data to send out to the enclosure management and provides a register
+ * that provides both information and control about this. While the
+ * specification allows for multiple forms of enclosure management, the only
+ * supported, and commonly found form, is the AHCI specified LED format. The LED
+ * format is often implemented as a one-way communication mechanism. Software
+ * can write out what it cares about into the aforementioned data buffer and
+ * then we wait for the transmission to be sent.
+ *
+ * This has some drawbacks. It means that we cannot know whether or not it has
+ * succeeded. This means we cannot ask hardware what it thinks the LEDs are
+ * set to. There's also the added unfortunate reality that firmware on the
+ * microcontroller driving this will often not show the LEDs if no drive is
+ * present and that actions taken may potentially cause this to get out of sync
+ * with what we expect it to be. For example, the specification does not
+ * describe what should happen if a drive is removed from the enclosure while
+ * this is set and what should happen when it returns. We can only infer that it
+ * should be the same.
+ *
+ * Because only a single command can be sent at any time and we don't want to
+ * interfere with controller I/O, we create a taskq dedicated to this that has a
+ * single thread. Both resets (which occur on attach and resume) and normal
+ * changes to the LED state will be driven through this taskq. Because the taskq
+ * has a single thread, this guarantees serial processing.
+ *
+ * Each userland-submitted task (basically not resets) has a reference counted
+ * task structure. This allows the thread that called it to be cancelled and
+ * have the system clean itself up. The user thread in ioctl blocks on a CV that
+ * can receive signals as it waits for completion.  Note, there is no guarantee
+ * provided by the kernel that the first thread to enter the kernel will be the
+ * first one to change state.
  */
 
 #include <sys/note.h>
@@ -59,6 +96,17 @@
 #include <sys/fm/protocol.h>
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
+
+/*
+ * EM Control header files
+ */
+#include <sys/types.h>
+#include <sys/file.h>
+#include <sys/errno.h>
+#include <sys/open.h>
+#include <sys/cred.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 /*
  * This is the string displayed by modinfo, etc.
@@ -222,6 +270,12 @@ static	void ahci_log_serror_message(ahci_ctl_t *, uint8_t, uint32_t, int);
 static	void ahci_log(ahci_ctl_t *, uint_t, char *, ...);
 #endif
 
+static	boolean_t ahci_em_init(ahci_ctl_t *);
+static	void ahci_em_fini(ahci_ctl_t *);
+static	void ahci_em_suspend(ahci_ctl_t *);
+static	void ahci_em_resume(ahci_ctl_t *);
+static	int ahci_em_ioctl(dev_info_t *, int, intptr_t);
+
 
 /*
  * DMA attributes for the data buffer
@@ -316,7 +370,6 @@ static ddi_device_acc_attr_t accattr = {
 	DDI_DEFAULT_ACC
 };
 
-
 static struct dev_ops ahcictl_dev_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* refcnt  */
@@ -326,7 +379,7 @@ static struct dev_ops ahcictl_dev_ops = {
 	ahci_attach,		/* attach */
 	ahci_detach,		/* detach */
 	nodev,			/* no reset */
-	(struct cb_ops *)0,	/* driver operations */
+	NULL,			/* driver operations */
 	NULL,			/* bus operations */
 	NULL,			/* power */
 	ahci_quiesce,		/* quiesce */
@@ -410,6 +463,15 @@ boolean_t sb600_buf_64bit_dma_disable = B_TRUE;
  * please change the below value to enable it.
  */
 boolean_t sbxxx_commu_64bit_dma_disable = B_TRUE;
+
+/*
+ * These values control the default delay and default number of times to wait
+ * for an enclosure message to complete.
+ */
+uint_t	ahci_em_reset_delay_ms = 1;
+uint_t	ahci_em_reset_delay_count = 1000;
+uint_t	ahci_em_tx_delay_ms = 1;
+uint_t	ahci_em_tx_delay_count = 1000;
 
 
 /*
@@ -581,6 +643,11 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 
+		/*
+		 * Reset the enclosure services.
+		 */
+		ahci_em_resume(ahci_ctlp);
+
 		mutex_enter(&ahci_ctlp->ahcictl_mutex);
 		ahci_ctlp->ahcictl_flags &= ~AHCI_SUSPEND;
 		mutex_exit(&ahci_ctlp->ahcictl_mutex);
@@ -713,6 +780,16 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
 		    "hba capabilities extended = 0x%x", cap2_status);
+	}
+
+	if (cap_status & AHCI_HBA_CAP_EMS) {
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_EMS;
+		ahci_ctlp->ahcictl_em_loc =
+		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_GLOBAL_EM_LOC(ahci_ctlp));
+		ahci_ctlp->ahcictl_em_ctl =
+		    ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_GLOBAL_EM_CTL(ahci_ctlp));
 	}
 
 #if AHCI_DEBUG
@@ -966,6 +1043,13 @@ intr_done:
 
 	attach_state |= AHCI_ATTACH_STATE_TIMEOUT_ENABLED;
 
+	if (!ahci_em_init(ahci_ctlp)) {
+		cmn_err(CE_WARN, "!ahci%d: failed to initialize enclosure "
+		    "services", instance);
+		goto err_out;
+	}
+	attach_state |= AHCI_ATTACH_STATE_ENCLOSURE;
+
 	if (ahci_register_sata_hba_tran(ahci_ctlp, cap_status)) {
 		cmn_err(CE_WARN, "!ahci%d: sata hba tran registration failed",
 		    instance);
@@ -989,6 +1073,10 @@ err_out:
 	/* FMA message */
 	ahci_fm_ereport(ahci_ctlp, DDI_FM_DEVICE_NO_RESPONSE);
 	ddi_fm_service_impact(ahci_ctlp->ahcictl_dip, DDI_SERVICE_LOST);
+
+	if (attach_state & AHCI_ATTACH_STATE_ENCLOSURE) {
+		ahci_em_fini(ahci_ctlp);
+	}
 
 	if (attach_state & AHCI_ATTACH_STATE_TIMEOUT_ENABLED) {
 		mutex_enter(&ahci_ctlp->ahcictl_mutex);
@@ -1064,6 +1152,8 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			return (DDI_FAILURE);
 		}
 
+		ahci_em_fini(ahci_ctlp);
+
 		mutex_enter(&ahci_ctlp->ahcictl_mutex);
 
 		/* stop the watchdog handler */
@@ -1112,6 +1202,8 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 
 		ahci_ctlp->ahcictl_flags |= AHCI_SUSPEND;
+
+		ahci_em_suspend(ahci_ctlp);
 
 		/* stop the watchdog handler */
 		if (ahci_ctlp->ahcictl_timeout_id) {
@@ -1263,7 +1355,7 @@ ahci_register_sata_hba_tran(ahci_ctl_t *ahci_ctlp, uint32_t cap_status)
 	 * pwrmgt_ops needs to be updated
 	 */
 	sata_hba_tran->sata_tran_pwrmgt_ops = NULL;
-	sata_hba_tran->sata_tran_ioctl = NULL;
+	sata_hba_tran->sata_tran_ioctl = ahci_em_ioctl;
 
 	ahci_ctlp->ahcictl_sata_hba_tran = sata_hba_tran;
 
@@ -10211,7 +10303,10 @@ ahci_log(ahci_ctl_t *ahci_ctlp, uint_t level, char *fmt, ...)
  *
  * This function is called when the system is single-threaded at high
  * PIL with preemption disabled. Therefore, this function must not be
- * blocked.
+ * blocked. Because no taskqs are running, there is no need for us to
+ * take any action for enclosure services which are running in the
+ * taskq context, especially as no interrupts are generated by it nor
+ * are any messages expected to come in.
  *
  * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
  * DDI_FAILURE indicates an error condition and should almost never happen.
@@ -10328,4 +10423,466 @@ ahci_flush_doneq(ahci_port_t *ahci_portp)
 
 		mutex_enter(&ahci_portp->ahciport_mutex);
 	}
+}
+
+/*
+ * Sets the state for the specified port on the controller to desired state.
+ * This must be run in the context of the enclosure taskq which ensures that
+ * only one event is outstanding at any time.
+ */
+static boolean_t
+ahci_em_set_led(ahci_ctl_t *ahci_ctlp, uint8_t port, ahci_em_led_state_t desire)
+{
+	ahci_em_led_msg_t msg;
+	ahci_em_msg_hdr_t hdr;
+	uint32_t msgval, hdrval;
+	uint_t i, max_delay = ahci_em_tx_delay_count;
+
+	msg.alm_hba = port;
+	msg.alm_pminfo = 0;
+	msg.alm_value = 0;
+
+	if (desire & AHCI_EM_LED_IDENT_ENABLE) {
+		msg.alm_value |= AHCI_LED_ON << AHCI_LED_IDENT_OFF;
+	}
+
+	if (desire & AHCI_EM_LED_FAULT_ENABLE) {
+		msg.alm_value |= AHCI_LED_ON << AHCI_LED_FAULT_OFF;
+	}
+
+	if ((ahci_ctlp->ahcictl_em_ctl & AHCI_HBA_EM_CTL_ATTR_ALHD) == 0 &&
+	    (desire & AHCI_EM_LED_ACTIVITY_DISABLE) == 0) {
+		msg.alm_value |= AHCI_LED_ON << AHCI_LED_ACTIVITY_OFF;
+	}
+
+	hdr.aemh_rsvd = 0;
+	hdr.aemh_mlen = sizeof (ahci_em_led_msg_t);
+	hdr.aemh_dlen = 0;
+	hdr.aemh_mtype = AHCI_EM_MSG_TYPE_LED;
+
+	bcopy(&msg, &msgval, sizeof (msgval));
+	bcopy(&hdr, &hdrval, sizeof (hdrval));
+
+	/*
+	 * First, make sure we can transmit. We should not have been placed in a
+	 * situation where an outstanding transmission is going on.
+	 */
+	for (i = 0; i < max_delay; i++) {
+		uint32_t val;
+
+		val = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_GLOBAL_EM_CTL(ahci_ctlp));
+		if ((val & AHCI_HBA_EM_CTL_CTL_TM) == 0)
+			break;
+
+		delay(drv_usectohz(ahci_em_tx_delay_ms * 1000));
+	}
+
+	if (i == max_delay)
+		return (B_FALSE);
+
+	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)ahci_ctlp->ahcictl_em_tx_off, hdrval);
+	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)(ahci_ctlp->ahcictl_em_tx_off + 4), msgval);
+	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_GLOBAL_EM_CTL(ahci_ctlp), AHCI_HBA_EM_CTL_CTL_TM);
+
+	for (i = 0; i < max_delay; i++) {
+		uint32_t val;
+
+		val = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_GLOBAL_EM_CTL(ahci_ctlp));
+		if ((val & AHCI_HBA_EM_CTL_CTL_TM) == 0)
+			break;
+
+		delay(drv_usectohz(ahci_em_tx_delay_ms * 1000));
+	}
+
+	if (i == max_delay)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+typedef struct ahci_em_led_task_arg {
+	ahci_ctl_t		*aelta_ctl;
+	uint8_t			aelta_port;
+	uint_t			aelta_op;
+	ahci_em_led_state_t	aelta_state;
+	uint_t			aelta_ret;
+	kcondvar_t		aelta_cv;
+	uint_t			aelta_ref;
+} ahci_em_led_task_arg_t;
+
+static void
+ahci_em_led_task_free(ahci_em_led_task_arg_t *task)
+{
+	ASSERT3U(task->aelta_ref, ==, 0);
+	cv_destroy(&task->aelta_cv);
+	kmem_free(task, sizeof (*task));
+}
+
+static void
+ahci_em_led_task(void *arg)
+{
+	boolean_t ret, cleanup = B_FALSE;
+	ahci_em_led_task_arg_t *led = arg;
+	ahci_em_led_state_t state;
+
+	mutex_enter(&led->aelta_ctl->ahcictl_mutex);
+	if (led->aelta_ctl->ahcictl_em_flags != AHCI_EM_USABLE) {
+		led->aelta_ret = EIO;
+		mutex_exit(&led->aelta_ctl->ahcictl_mutex);
+		return;
+	}
+
+	state = led->aelta_ctl->ahcictl_em_state[led->aelta_port];
+	mutex_exit(&led->aelta_ctl->ahcictl_mutex);
+
+	switch (led->aelta_op) {
+	case AHCI_EM_IOC_SET_OP_ADD:
+		state |= led->aelta_state;
+		break;
+	case AHCI_EM_IOC_SET_OP_REM:
+		state &= ~led->aelta_state;
+		break;
+	case AHCI_EM_IOC_SET_OP_SET:
+		state = led->aelta_state;
+		break;
+	default:
+		led->aelta_ret = ENOTSUP;
+		return;
+	}
+
+	ret = ahci_em_set_led(led->aelta_ctl, led->aelta_port, state);
+
+	mutex_enter(&led->aelta_ctl->ahcictl_mutex);
+	if (ret) {
+		led->aelta_ctl->ahcictl_em_state[led->aelta_port] =
+		    led->aelta_state;
+		led->aelta_ret = 0;
+	} else {
+		led->aelta_ret = EIO;
+		led->aelta_ctl->ahcictl_em_flags |= AHCI_EM_TIMEOUT;
+	}
+	led->aelta_ref--;
+	if (led->aelta_ref > 0) {
+		cv_signal(&led->aelta_cv);
+	} else {
+		cleanup = B_TRUE;
+	}
+	mutex_exit(&led->aelta_ctl->ahcictl_mutex);
+
+	if (cleanup) {
+		ahci_em_led_task_free(led);
+	}
+}
+
+static void
+ahci_em_reset(void *arg)
+{
+	uint_t i, max_delay = ahci_em_reset_delay_count;
+	ahci_ctl_t *ahci_ctlp = arg;
+
+	/*
+	 * We've been asked to reset the device. The caller should have set the
+	 * resetting flag. Make sure that we don't have a request to quiesce.
+	 */
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	ASSERT(ahci_ctlp->ahcictl_em_flags & AHCI_EM_RESETTING);
+	if (ahci_ctlp->ahcictl_em_flags & AHCI_EM_QUIESCE) {
+		ahci_ctlp->ahcictl_em_flags &= ~AHCI_EM_RESETTING;
+		mutex_exit(&ahci_ctlp->ahcictl_mutex);
+		return;
+	}
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+	ddi_put32(ahci_ctlp->ahcictl_ahci_acc_handle,
+	    (uint32_t *)AHCI_GLOBAL_EM_CTL(ahci_ctlp), AHCI_HBA_EM_CTL_CTL_RST);
+	for (i = 0; i < max_delay; i++) {
+		uint32_t val;
+
+		val = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_GLOBAL_EM_CTL(ahci_ctlp));
+		if ((val & AHCI_HBA_EM_CTL_CTL_RST) == 0)
+			break;
+
+		delay(drv_usectohz(ahci_em_reset_delay_ms * 1000));
+	}
+
+	if (i == max_delay) {
+		mutex_enter(&ahci_ctlp->ahcictl_mutex);
+		ahci_ctlp->ahcictl_em_flags &= ~AHCI_EM_RESETTING;
+		ahci_ctlp->ahcictl_em_flags |= AHCI_EM_TIMEOUT;
+		mutex_exit(&ahci_ctlp->ahcictl_mutex);
+		cmn_err(CE_WARN, "!ahci%d: enclosure timed out resetting",
+		    ddi_get_instance(ahci_ctlp->ahcictl_dip));
+		return;
+	}
+
+	for (i = 0; i < ahci_ctlp->ahcictl_num_ports; i++) {
+
+		if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, i))
+			continue;
+
+		/*
+		 * Try to flush all the LEDs as part of reset. If it fails,
+		 * drive on.
+		 */
+		if (!ahci_em_set_led(ahci_ctlp, i,
+		    ahci_ctlp->ahcictl_em_state[i])) {
+			mutex_enter(&ahci_ctlp->ahcictl_mutex);
+			ahci_ctlp->ahcictl_em_flags &= ~AHCI_EM_RESETTING;
+			ahci_ctlp->ahcictl_em_flags |= AHCI_EM_TIMEOUT;
+			mutex_exit(&ahci_ctlp->ahcictl_mutex);
+			cmn_err(CE_WARN, "!ahci%d: enclosure timed out "
+			    "setting port %u",
+			    ddi_get_instance(ahci_ctlp->ahcictl_dip), i);
+			return;
+		}
+	}
+
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	ahci_ctlp->ahcictl_em_flags &= ~AHCI_EM_RESETTING;
+	ahci_ctlp->ahcictl_em_flags |= AHCI_EM_READY;
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+}
+
+static boolean_t
+ahci_em_init(ahci_ctl_t *ahci_ctlp)
+{
+	char name[128];
+
+	/*
+	 * First make sure we actually have enclosure services and if so, that
+	 * we have the hardware support that we care about for this.
+	 */
+	if (ahci_ctlp->ahcictl_em_loc == 0 ||
+	    (ahci_ctlp->ahcictl_em_ctl & AHCI_HBA_EM_CTL_SUPP_LED) == 0)
+		return (B_TRUE);
+
+	/*
+	 * Next, make sure that the buffer is large enough for us. We need two
+	 * dwords or 8 bytes. The location register is stored in dwords.
+	 */
+	if ((ahci_ctlp->ahcictl_em_loc & AHCI_HBA_EM_LOC_SZ_MASK) <
+	    AHCI_EM_BUFFER_MIN) {
+		return (B_TRUE);
+	}
+
+	ahci_ctlp->ahcictl_em_flags |= AHCI_EM_PRESENT;
+
+	ahci_ctlp->ahcictl_em_tx_off = ((ahci_ctlp->ahcictl_em_loc &
+	    AHCI_HBA_EM_LOC_OFST_MASK) >> AHCI_HBA_EM_LOC_OFST_SHIFT) * 4;
+	ahci_ctlp->ahcictl_em_tx_off += ahci_ctlp->ahcictl_ahci_addr;
+
+	bzero(ahci_ctlp->ahcictl_em_state,
+	    sizeof (ahci_ctlp->ahcictl_em_state));
+
+	(void) snprintf(name, sizeof (name), "ahcti_em_taskq%d",
+	    ddi_get_instance(ahci_ctlp->ahcictl_dip));
+	if ((ahci_ctlp->ahcictl_em_taskq =
+	    ddi_taskq_create(ahci_ctlp->ahcictl_dip, name, 1,
+	    TASKQ_DEFAULTPRI, 0)) == NULL) {
+		cmn_err(CE_WARN, "!ahci%d: ddi_tasq_create failed for em "
+		    "services", ddi_get_instance(ahci_ctlp->ahcictl_dip));
+		return (B_FALSE);
+	}
+
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	ahci_ctlp->ahcictl_em_flags |= AHCI_EM_RESETTING;
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+	(void) ddi_taskq_dispatch(ahci_ctlp->ahcictl_em_taskq, ahci_em_reset,
+	    ahci_ctlp, DDI_SLEEP);
+
+	return (B_TRUE);
+}
+
+static int
+ahci_em_ioctl_get(ahci_ctl_t *ahci_ctlp, intptr_t arg)
+{
+	int i;
+	ahci_ioc_em_get_t get;
+
+	bzero(&get, sizeof (get));
+	get.aiemg_nports = ahci_ctlp->ahcictl_ports_implemented;
+	if ((ahci_ctlp->ahcictl_em_ctl & AHCI_HBA_EM_CTL_ATTR_ALHD) == 0) {
+		get.aiemg_flags |= AHCI_EM_FLAG_CONTROL_ACTIVITY;
+	}
+
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	for (i = 0; i < ahci_ctlp->ahcictl_num_ports; i++) {
+		if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, i)) {
+			continue;
+		}
+		get.aiemg_status[i] = ahci_ctlp->ahcictl_em_state[i];
+	}
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+	if (ddi_copyout(&get, (void *)arg, sizeof (get), 0) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+static int
+ahci_em_ioctl_set(ahci_ctl_t *ahci_ctlp, intptr_t arg)
+{
+	int ret;
+	ahci_ioc_em_set_t set;
+	ahci_em_led_task_arg_t *task;
+	boolean_t signal, cleanup;
+
+	if (ddi_copyin((void *)arg, &set, sizeof (set), 0) != 0)
+		return (EFAULT);
+
+	if (set.aiems_port > ahci_ctlp->ahcictl_num_ports)
+		return (EINVAL);
+
+	if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, set.aiems_port)) {
+		return (EINVAL);
+	}
+
+	if ((set.aiems_leds & ~(AHCI_EM_LED_IDENT_ENABLE |
+	    AHCI_EM_LED_FAULT_ENABLE |
+	    AHCI_EM_LED_ACTIVITY_DISABLE)) != 0) {
+		return (EINVAL);
+	}
+
+	switch (set.aiems_op) {
+	case AHCI_EM_IOC_SET_OP_ADD:
+	case AHCI_EM_IOC_SET_OP_REM:
+	case AHCI_EM_IOC_SET_OP_SET:
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	if ((set.aiems_leds & AHCI_EM_LED_ACTIVITY_DISABLE) != 0 &&
+	    ((ahci_ctlp->ahcictl_em_ctl & AHCI_HBA_EM_CTL_ATTR_ALHD) != 0)) {
+		return (ENOTSUP);
+	}
+
+	task = kmem_alloc(sizeof (*task), KM_NOSLEEP | KM_NORMALPRI);
+	if (task == NULL) {
+		return (ENOMEM);
+	}
+
+	task->aelta_ctl = ahci_ctlp;
+	task->aelta_port = (uint8_t)set.aiems_port;
+	task->aelta_op = set.aiems_op;
+	task->aelta_state = set.aiems_leds;
+
+	cv_init(&task->aelta_cv, NULL, CV_DRIVER, NULL);
+
+	/*
+	 * Initialize the reference count to two. One for us and one for the
+	 * taskq. This will be used in case we get canceled.
+	 */
+	task->aelta_ref = 2;
+
+	/*
+	 * Once dispatched, the task state is protected by our global mutex.
+	 */
+	(void) ddi_taskq_dispatch(ahci_ctlp->ahcictl_em_taskq,
+	    ahci_em_led_task, task, DDI_SLEEP);
+
+	signal = B_FALSE;
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	while (task->aelta_ref > 1) {
+		if (cv_wait_sig(&task->aelta_cv, &ahci_ctlp->ahcictl_mutex) ==
+		    0) {
+			signal = B_TRUE;
+			break;
+		}
+	}
+
+	/*
+	 * Remove our reference count. If we were woken up because of a signal
+	 * then the taskq may still be dispatched. In which case we shouldn't
+	 * free this memory until it is done. In that case, the taskq will take
+	 * care of it.
+	 */
+	task->aelta_ref--;
+	cleanup = (task->aelta_ref == 0);
+	if (signal) {
+		ret = EINTR;
+	} else {
+		ret = task->aelta_ret;
+	}
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+	if (cleanup) {
+		ahci_em_led_task_free(task);
+	}
+
+	return (ret);
+}
+
+static int
+ahci_em_ioctl(dev_info_t *dip, int cmd, intptr_t arg)
+{
+	int inst;
+	ahci_ctl_t *ahci_ctlp;
+
+	inst = ddi_get_instance(dip);
+	if ((ahci_ctlp = ddi_get_soft_state(ahci_statep, inst)) == NULL) {
+		return (ENXIO);
+	}
+
+	switch (cmd) {
+	case AHCI_EM_IOC_GET:
+		return (ahci_em_ioctl_get(ahci_ctlp, arg));
+	case AHCI_EM_IOC_SET:
+		return (ahci_em_ioctl_set(ahci_ctlp, arg));
+	default:
+		return (ENOTTY);
+	}
+
+}
+
+static void
+ahci_em_quiesce(ahci_ctl_t *ahci_ctlp)
+{
+	ASSERT(ahci_ctlp->ahcictl_em_flags & AHCI_EM_PRESENT);
+
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	ahci_ctlp->ahcictl_em_flags |= AHCI_EM_QUIESCE;
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+	ddi_taskq_wait(ahci_ctlp->ahcictl_em_taskq);
+}
+
+static void
+ahci_em_suspend(ahci_ctl_t *ahci_ctlp)
+{
+	ahci_em_quiesce(ahci_ctlp);
+
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	ahci_ctlp->ahcictl_em_flags &= ~AHCI_EM_READY;
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+}
+
+static void
+ahci_em_resume(ahci_ctl_t *ahci_ctlp)
+{
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	ahci_ctlp->ahcictl_em_flags |= AHCI_EM_RESETTING;
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+	(void) ddi_taskq_dispatch(ahci_ctlp->ahcictl_em_taskq, ahci_em_reset,
+	    ahci_ctlp, DDI_SLEEP);
+}
+
+static void
+ahci_em_fini(ahci_ctl_t *ahci_ctlp)
+{
+	if ((ahci_ctlp->ahcictl_em_flags & AHCI_EM_PRESENT) == 0) {
+		return;
+	}
+
+	ahci_em_quiesce(ahci_ctlp);
+	ddi_taskq_destroy(ahci_ctlp->ahcictl_em_taskq);
+	ahci_ctlp->ahcictl_em_taskq = NULL;
 }

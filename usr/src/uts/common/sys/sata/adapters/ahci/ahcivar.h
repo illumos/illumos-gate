@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 
@@ -31,6 +32,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <sys/sata/adapters/ahci/ahciem.h>
 
 /*
  * AHCI address qualifier flags (in qual field of ahci_addr struct).
@@ -364,6 +367,16 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 	else								\
 		AHCIPORT_PMSTATE(portp, addrp) = state;
 
+typedef enum ahci_em_flags {
+	AHCI_EM_PRESENT		= 1 << 0,
+	AHCI_EM_RESETTING	= 1 << 1,
+	AHCI_EM_TIMEOUT		= 1 << 2,
+	AHCI_EM_QUIESCE		= 1 << 3,
+	AHCI_EM_READY		= 1 << 4,
+} ahci_em_flags_t;
+
+#define	AHCI_EM_USABLE		(AHCI_EM_PRESENT | AHCI_EM_READY)
+
 typedef struct ahci_ctl {
 	dev_info_t		*ahcictl_dip;
 
@@ -440,6 +453,16 @@ typedef struct ahci_ctl {
 
 	/* FMA capabilities */
 	int			ahcictl_fm_cap;
+
+	/*
+	 * Enclosure information
+	 */
+	uint32_t		ahcictl_em_loc;
+	uint32_t		ahcictl_em_ctl;
+	uintptr_t		ahcictl_em_tx_off;
+	ahci_em_flags_t		ahcictl_em_flags;
+	ddi_taskq_t		*ahcictl_em_taskq;
+	ahci_em_led_state_t	ahcictl_em_state[AHCI_MAX_PORTS];
 } ahci_ctl_t;
 
 /* Warlock annotation */
@@ -492,6 +515,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_CAP_PMULT_FBSS		0x400
 /* Software Reset FIS cannot set pmport with 0xf for direct access device */
 #define	AHCI_CAP_SRST_NO_HOSTPORT	0x800
+/* Enclosure Management Services available */
+#define	AHCI_CAP_EMS			0x1000
 
 /* Flags controlling the restart port behavior */
 #define	AHCI_PORT_RESET		0x0001	/* Reset the port */
@@ -531,6 +556,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_ATTACH_STATE_PORT_ALLOC		(0x1 << 7)
 #define	AHCI_ATTACH_STATE_HW_INIT		(0x1 << 8)
 #define	AHCI_ATTACH_STATE_TIMEOUT_ENABLED	(0x1 << 9)
+#define	AHCI_ATTACH_STATE_ENCLOSURE		(0x1 << 10)
 
 /* Interval used for delay */
 #define	AHCI_10MS_TICKS	(drv_usectohz(10000))	/* ticks in 10 ms */
@@ -610,6 +636,43 @@ extern uint32_t ahci_debug_flags;
 
 #endif /* DEBUG */
 
+/*
+ * Minimum size required for the enclosure message buffer. This value is in
+ * 4-byte quantities. So we need to multiply it by two.
+ */
+#define	AHCI_EM_BUFFER_MIN	2
+
+/*
+ * Enclosure Management LED message format values
+ */
+#define	AHCI_LED_OFF	0
+#define	AHCI_LED_ON	1
+
+#define	AHCI_LED_ACTIVITY_OFF	0
+#define	AHCI_LED_IDENT_OFF	3
+#define	AHCI_LED_FAULT_OFF	6
+
+#define	AHCI_LED_MASK	0x7
+
+#define	AHCI_EM_MSG_TYPE_LED	0
+#define	AHCI_EM_MSG_TYPE_SAFTE	1
+#define	AHCI_EM_MSG_TYPE_SES	2
+#define	AHCI_EM_MSG_TYPE_SGPIO	3
+
+#pragma pack(1)
+typedef struct ahci_em_led_msg {
+	uint8_t		alm_hba;
+	uint8_t		alm_pminfo;
+	uint16_t	alm_value;
+} ahci_em_led_msg_t;
+
+typedef struct ahci_em_msg_hdr {
+	uint8_t		aemh_rsvd;
+	uint8_t		aemh_mlen;
+	uint8_t		aemh_dlen;
+	uint8_t		aemh_mtype;
+} ahci_em_msg_hdr_t;
+#pragma pack()
 
 #ifdef	__cplusplus
 }
