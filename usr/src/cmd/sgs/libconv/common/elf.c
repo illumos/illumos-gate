@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -265,7 +266,7 @@ ehdr_mach_strings(Conv_fmt_flags_t fmt_flags)
 	    CONV_DS_MSG_INIT(EM_V800, mach_36_63_dmp) };
 
 
-	static const Msg mach_66_94_cf[] = {
+	static const Msg mach_66_120_cf[] = {
 		MSG_EM_FX66_CF,		MSG_EM_ST9PLUS_CF,
 		MSG_EM_ST7_CF,		MSG_EM_68HC16_CF,
 		MSG_EM_68HC11_CF,	MSG_EM_68HC08_CF,
@@ -280,9 +281,22 @@ ehdr_mach_strings(Conv_fmt_flags_t fmt_flags)
 		MSG_EM_M32R_CF,		MSG_EM_MN10300_CF,
 		MSG_EM_MN10200_CF,	MSG_EM_PJ_CF,
 		MSG_EM_OPENRISC_CF,	MSG_EM_ARC_A5_CF,
-		MSG_EM_XTENSA_CF
+		MSG_EM_XTENSA_CF,	MSG_EM_VIDEOCORE_CF,
+		MSG_EM_TMM_GPP_CF,	MSG_EM_NS32K_CF,
+		MSG_EM_TPC_CF,		MSG_EM_SNP1K_CF,
+		MSG_EM_ST200_CF,	MSG_EM_IP2K_CF,
+		MSG_EM_MAX_CF,		MSG_EM_CR_CF,
+		MSG_EM_F2MC16_CF,	MSG_EM_MSP430_CF,
+		MSG_EM_BLACKFIN_CF,	MSG_EM_SE_C33_CF,
+		MSG_EM_SEP_CF,		MSG_EM_ARCA_CF,
+		MSG_EM_UNICORE_CF,	MSG_EM_EXCESS_CF,
+		MSG_EM_DXP_CF,		MSG_EM_ALTERA_NIOS2_CF,
+		MSG_EM_CRX_CF,		MSG_EM_XGATE_CF,
+		MSG_EM_C166_CF,		MSG_EM_M16C_CF,
+		MSG_EM_DSPIC30F_CF,	MSG_EM_CE_CF,
+		MSG_EM_M32C_CF
 	};
-	static const Msg mach_66_94_nf[] = {
+	static const Msg mach_66_120_nf[] = {
 		MSG_EM_FX66_NF,		MSG_EM_ST9PLUS_NF,
 		MSG_EM_ST7_NF,		MSG_EM_68HC16_NF,
 		MSG_EM_68HC11_NF,	MSG_EM_68HC08_NF,
@@ -297,9 +311,28 @@ ehdr_mach_strings(Conv_fmt_flags_t fmt_flags)
 		MSG_EM_M32R_NF,		MSG_EM_MN10300_NF,
 		MSG_EM_MN10200_NF,	MSG_EM_PJ_NF,
 		MSG_EM_OPENRISC_NF,	MSG_EM_ARC_A5_NF,
-		MSG_EM_XTENSA_NF
+		MSG_EM_XTENSA_NF,	MSG_EM_VIDEOCORE_NF,
+		MSG_EM_TMM_GPP_NF,	MSG_EM_NS32K_NF,
+		MSG_EM_TPC_NF,		MSG_EM_SNP1K_NF,
+		MSG_EM_ST200_NF,	MSG_EM_IP2K_NF,
+		MSG_EM_MAX_NF,		MSG_EM_CR_NF,
+		MSG_EM_F2MC16_NF,	MSG_EM_MSP430_NF,
+		MSG_EM_BLACKFIN_NF,	MSG_EM_SE_C33_NF,
+		MSG_EM_SEP_NF,		MSG_EM_ARCA_NF,
+		MSG_EM_UNICORE_NF,	MSG_EM_EXCESS_NF,
+		MSG_EM_DXP_NF,		MSG_EM_ALTERA_NIOS2_NF,
+		MSG_EM_CRX_NF,		MSG_EM_XGATE_NF,
+		MSG_EM_C166_NF,		MSG_EM_M16C_NF,
+		MSG_EM_DSPIC30F_NF,	MSG_EM_CE_NF,
+		MSG_EM_TSK3000_NF,	MSG_EM_RS08_NF,
+		MSG_EM_SHARC_NF,	MSG_EM_ECOG2_NF,
+		MSG_EM_SCORE7_NF,	MSG_EM_DSP24_NF,
+		MSG_EM_VIDEOCORE3_NF,	MSG_EM_LATTICEMICO32_NF,
+		MSG_EM_SE_C17_NF,	MSG_EM_TI_C6000_NF,
+		MSG_EM_TI_C2000_NF,	MSG_EM_TI_C5500_NF,
+		MSG_EM_TI_ARP32_NF,	MSG_EM_TI_PRU_NF
 	};
-	static const Msg mach_66_94_dmp[] = {
+	static const Msg mach_66_120_dmp[] = {
 		MSG_EM_FX66_CF,		MSG_EM_ST9PLUS_CF,
 		MSG_EM_ST7_CF,		MSG_EM_68HC16_CF,
 		MSG_EM_68HC11_CF,	MSG_EM_68HC08_CF,
@@ -314,34 +347,256 @@ ehdr_mach_strings(Conv_fmt_flags_t fmt_flags)
 		MSG_EM_M32R_CF,		MSG_EM_MN10300_CF,
 		MSG_EM_MN10200_CF,	MSG_EM_PJ_CF,
 		MSG_EM_OPENRISC_CF,	MSG_EM_ARC_A5_CF,
-		MSG_EM_XTENSA_CF
+		MSG_EM_XTENSA_CF,	MSG_EM_VIDEOCORE_CF,
+		MSG_EM_TMM_GPP_CF,	MSG_EM_NS32K_CF,
+		MSG_EM_TPC_CF,		MSG_EM_SNP1K_CF,
+		MSG_EM_ST200_CF,	MSG_EM_IP2K_CF,
+		MSG_EM_MAX_CF,		MSG_EM_CR_CF,
+		MSG_EM_F2MC16_CF,	MSG_EM_MSP430_CF,
+		MSG_EM_BLACKFIN_CF,	MSG_EM_SE_C33_CF,
+		MSG_EM_SEP_CF,		MSG_EM_ARCA_CF,
+		MSG_EM_UNICORE_CF,	MSG_EM_EXCESS_CF,
+		MSG_EM_DXP_CF,		MSG_EM_ALTERA_NIOS2_CF,
+		MSG_EM_CRX_CF,		MSG_EM_XGATE_CF,
+		MSG_EM_C166_CF,		MSG_EM_M16C_CF,
+		MSG_EM_DSPIC30F_CF,	MSG_EM_CE_CF,
+		MSG_EM_M32C_CF
 	};
-#if	(EM_NUM != (EM_XTENSA + 1))
+
+	static const conv_ds_msg_t ds_mach_66_120_cf = {
+	    CONV_DS_MSG_INIT(EM_FX66, mach_66_120_cf) };
+	static const conv_ds_msg_t ds_mach_66_120_nf = {
+	    CONV_DS_MSG_INIT(EM_FX66, mach_66_120_nf) };
+	static const conv_ds_msg_t ds_mach_66_120_dmp = {
+	    CONV_DS_MSG_INIT(EM_FX66, mach_66_120_dmp) };
+
+	static const Msg mach_131_144_cf[] = {
+		MSG_EM_TSK3000_CF,	MSG_EM_RS08_CF,
+		MSG_EM_SHARC_CF,	MSG_EM_ECOG2_CF,
+		MSG_EM_SCORE7_CF,	MSG_EM_DSP24_CF,
+		MSG_EM_VIDEOCORE3_CF,	MSG_EM_LATTICEMICO32_CF,
+		MSG_EM_SE_C17_CF,	MSG_EM_TI_C6000_CF,
+		MSG_EM_TI_C2000_CF,	MSG_EM_TI_C5500_CF,
+		MSG_EM_TI_ARP32_CF,	MSG_EM_TI_PRU_CF
+	};
+	static const Msg mach_131_144_nf[] = {
+		MSG_EM_TSK3000_NF,	MSG_EM_RS08_NF,
+		MSG_EM_SHARC_NF,	MSG_EM_ECOG2_NF,
+		MSG_EM_SCORE7_NF,	MSG_EM_DSP24_NF,
+		MSG_EM_VIDEOCORE3_NF,	MSG_EM_LATTICEMICO32_NF,
+		MSG_EM_SE_C17_NF,	MSG_EM_TI_C6000_NF,
+		MSG_EM_TI_C2000_NF,	MSG_EM_TI_C5500_NF,
+		MSG_EM_TI_ARP32_NF,	MSG_EM_TI_PRU_NF
+	};
+	static const Msg mach_131_144_dmp[] = {
+		MSG_EM_TSK3000_CF,	MSG_EM_RS08_CF,
+		MSG_EM_SHARC_CF,	MSG_EM_ECOG2_CF,
+		MSG_EM_SCORE7_CF,	MSG_EM_DSP24_CF,
+		MSG_EM_VIDEOCORE3_CF,	MSG_EM_LATTICEMICO32_CF,
+		MSG_EM_SE_C17_CF,	MSG_EM_TI_C6000_CF,
+		MSG_EM_TI_C2000_CF,	MSG_EM_TI_C5500_CF,
+		MSG_EM_TI_ARP32_CF,	MSG_EM_TI_PRU_CF
+	};
+	static const conv_ds_msg_t ds_mach_131_144_cf = {
+	    CONV_DS_MSG_INIT(EM_TSK3000, mach_131_144_cf) };
+	static const conv_ds_msg_t ds_mach_131_144_nf = {
+	    CONV_DS_MSG_INIT(EM_TSK3000, mach_131_144_nf) };
+	static const conv_ds_msg_t ds_mach_131_144_dmp = {
+	    CONV_DS_MSG_INIT(EM_TSK3000, mach_131_144_dmp) };
+
+	static const Msg mach_160_181_cf[] = {
+		MSG_EM_MMDSP_PLUS_CF,	MSG_EM_CYPRESS_M8C_CF,
+		MSG_EM_R32C_CF,		MSG_EM_TRIMEDIA_CF,
+		MSG_EM_QDSP6_CF,	MSG_EM_8051_CF,
+		MSG_EM_STXP7X_CF,	MSG_EM_NDS32_CF,
+		MSG_EM_ECOG1_CF,	MSG_EM_MAXQ30_CF,
+		MSG_EM_XIMO16_CF,	MSG_EM_MANIK_CF,
+		MSG_EM_CRAYNV2_CF,	MSG_EM_RX_CF,
+		MSG_EM_METAG_CF,	MSG_EM_MCST_ELBRUS_CF,
+		MSG_EM_ECOG16_CF,	MSG_EM_CR16_CF,
+		MSG_EM_ETPU_CF,		MSG_EM_SLE9X_CF,
+		MSG_EM_L10M_CF,		MSG_EM_K10M_CF,
+	};
+	static const Msg mach_160_181_nf[] = {
+		MSG_EM_MMDSP_PLUS_NF,	MSG_EM_CYPRESS_M8C_NF,
+		MSG_EM_R32C_NF,		MSG_EM_TRIMEDIA_NF,
+		MSG_EM_QDSP6_NF,	MSG_EM_8051_NF,
+		MSG_EM_STXP7X_NF,	MSG_EM_NDS32_NF,
+		MSG_EM_ECOG1_NF,	MSG_EM_MAXQ30_NF,
+		MSG_EM_XIMO16_NF,	MSG_EM_MANIK_NF,
+		MSG_EM_CRAYNV2_NF,	MSG_EM_RX_NF,
+		MSG_EM_METAG_NF,	MSG_EM_MCST_ELBRUS_NF,
+		MSG_EM_ECOG16_NF,	MSG_EM_CR16_NF,
+		MSG_EM_ETPU_NF,		MSG_EM_SLE9X_NF,
+		MSG_EM_L10M_NF,		MSG_EM_K10M_NF,
+	};
+	static const Msg mach_160_181_dmp[] = {
+		MSG_EM_MMDSP_PLUS_CF,	MSG_EM_CYPRESS_M8C_CF,
+		MSG_EM_R32C_CF,		MSG_EM_TRIMEDIA_CF,
+		MSG_EM_QDSP6_CF,	MSG_EM_8051_CF,
+		MSG_EM_STXP7X_CF,	MSG_EM_NDS32_CF,
+		MSG_EM_ECOG1_CF,	MSG_EM_MAXQ30_CF,
+		MSG_EM_XIMO16_CF,	MSG_EM_MANIK_CF,
+		MSG_EM_CRAYNV2_CF,	MSG_EM_RX_CF,
+		MSG_EM_METAG_CF,	MSG_EM_MCST_ELBRUS_CF,
+		MSG_EM_ECOG16_CF,	MSG_EM_CR16_CF,
+		MSG_EM_ETPU_CF,		MSG_EM_SLE9X_CF,
+		MSG_EM_L10M_CF,		MSG_EM_K10M_CF,
+	};
+	static const conv_ds_msg_t ds_mach_160_181_cf = {
+	    CONV_DS_MSG_INIT(EM_MMDSP_PLUS, mach_160_181_cf) };
+	static const conv_ds_msg_t ds_mach_160_181_nf = {
+	    CONV_DS_MSG_INIT(EM_MMDSP_PLUS, mach_160_181_nf) };
+	static const conv_ds_msg_t ds_mach_160_181_dmp = {
+	    CONV_DS_MSG_INIT(EM_MMDSP_PLUS, mach_160_181_dmp) };
+
+	static const Msg mach_183_cf[] = {
+		MSG_EM_AARCH64_CF
+	};
+	static const Msg mach_183_nf[] = {
+		MSG_EM_AARCH64_NF
+	};
+	static const Msg mach_183_dmp[] = {
+		MSG_EM_AARCH64_CF
+	};
+	static const conv_ds_msg_t ds_mach_183_cf = {
+	    CONV_DS_MSG_INIT(EM_AARCH64, mach_183_cf) };
+	static const conv_ds_msg_t ds_mach_183_nf = {
+	    CONV_DS_MSG_INIT(EM_AARCH64, mach_183_nf) };
+	static const conv_ds_msg_t ds_mach_183_dmp = {
+	    CONV_DS_MSG_INIT(EM_AARCH64, mach_183_dmp) };
+
+	static const Msg mach_185_224_cf[] = {
+		MSG_EM_AVR32_CF,	MSG_EM_STM8_CF,
+		MSG_EM_TILE64_CF,	MSG_EM_TILEPRO_CF,
+		MSG_EM_MICROBLAZE_CF,	MSG_EM_CUDA_CF,
+		MSG_EM_TILEGX_CF,	MSG_EM_CLOUDSHIELD_CF,
+		MSG_EM_COREA_1ST_CF,	MSG_EM_COREA_2ND_CF,
+		MSG_EM_ARC_COMPACT2_CF,	MSG_EM_OPEN8_CF,
+		MSG_EM_RL78_CF,		MSG_EM_VIDEOCORE5_CF,
+		MSG_EM_78KOR_CF,	MSG_EM_56800EX_CF,
+		MSG_EM_BA1_CF,		MSG_EM_BA2_CF,
+		MSG_EM_XCORE_CF,	MSG_EM_MCHP_PIC_CF,
+		MSG_EM_INTEL205_CF,	MSG_EM_INTEL206_CF,
+		MSG_EM_INTEL207_CF,	MSG_EM_INTEL208_CF,
+		MSG_EM_INTEL209_CF,	MSG_EM_KM32_CF,
+		MSG_EM_KMX32_CF,	MSG_EM_KMX16_CF,
+		MSG_EM_KMX8_CF,		MSG_EM_KVARC_CF,
+		MSG_EM_CDP_CF,		MSG_EM_COGE_CF,
+		MSG_EM_COOL_CF,		MSG_EM_NORC_CF,
+		MSG_EM_CSR_KALIMBA_CF,	MSG_EM_Z80_CF,
+		MSG_EM_VISIUM_CF,	MSG_EM_FT32_CF,
+		MSG_EM_MOXIE_CF,	MSG_EM_AMDGPU_CF
+	};
+	static const Msg mach_185_224_nf[] = {
+		MSG_EM_AVR32_NF,	MSG_EM_STM8_NF,
+		MSG_EM_TILE64_NF,	MSG_EM_TILEPRO_NF,
+		MSG_EM_MICROBLAZE_NF,	MSG_EM_CUDA_NF,
+		MSG_EM_TILEGX_NF,	MSG_EM_CLOUDSHIELD_NF,
+		MSG_EM_COREA_1ST_NF,	MSG_EM_COREA_2ND_NF,
+		MSG_EM_ARC_COMPACT2_NF,	MSG_EM_OPEN8_NF,
+		MSG_EM_RL78_NF,		MSG_EM_VIDEOCORE5_NF,
+		MSG_EM_78KOR_NF,	MSG_EM_56800EX_NF,
+		MSG_EM_BA1_NF,		MSG_EM_BA2_NF,
+		MSG_EM_XCORE_NF,	MSG_EM_MCHP_PIC_NF,
+		MSG_EM_INTEL205_NF,	MSG_EM_INTEL206_NF,
+		MSG_EM_INTEL207_NF,	MSG_EM_INTEL208_NF,
+		MSG_EM_INTEL209_NF,	MSG_EM_KM32_NF,
+		MSG_EM_KMX32_NF,	MSG_EM_KMX16_NF,
+		MSG_EM_KMX8_NF,		MSG_EM_KVARC_NF,
+		MSG_EM_CDP_NF,		MSG_EM_COGE_NF,
+		MSG_EM_COOL_NF,		MSG_EM_NORC_NF,
+		MSG_EM_CSR_KALIMBA_NF,	MSG_EM_Z80_NF,
+		MSG_EM_VISIUM_NF,	MSG_EM_FT32_NF,
+		MSG_EM_MOXIE_NF,	MSG_EM_AMDGPU_NF
+	};
+	static const Msg mach_185_224_dmp[] = {
+		MSG_EM_AVR32_CF,	MSG_EM_STM8_CF,
+		MSG_EM_TILE64_CF,	MSG_EM_TILEPRO_CF,
+		MSG_EM_MICROBLAZE_CF,	MSG_EM_CUDA_CF,
+		MSG_EM_TILEGX_CF,	MSG_EM_CLOUDSHIELD_CF,
+		MSG_EM_COREA_1ST_CF,	MSG_EM_COREA_2ND_CF,
+		MSG_EM_ARC_COMPACT2_CF,	MSG_EM_OPEN8_CF,
+		MSG_EM_RL78_CF,		MSG_EM_VIDEOCORE5_CF,
+		MSG_EM_78KOR_CF,	MSG_EM_56800EX_CF,
+		MSG_EM_BA1_CF,		MSG_EM_BA2_CF,
+		MSG_EM_XCORE_CF,	MSG_EM_MCHP_PIC_CF,
+		MSG_EM_INTEL205_CF,	MSG_EM_INTEL206_CF,
+		MSG_EM_INTEL207_CF,	MSG_EM_INTEL208_CF,
+		MSG_EM_INTEL209_CF,	MSG_EM_KM32_CF,
+		MSG_EM_KMX32_CF,	MSG_EM_KMX16_CF,
+		MSG_EM_KMX8_CF,		MSG_EM_KVARC_CF,
+		MSG_EM_CDP_CF,		MSG_EM_COGE_CF,
+		MSG_EM_COOL_CF,		MSG_EM_NORC_CF,
+		MSG_EM_CSR_KALIMBA_CF,	MSG_EM_Z80_CF,
+		MSG_EM_VISIUM_CF,	MSG_EM_FT32_CF,
+		MSG_EM_MOXIE_CF,	MSG_EM_AMDGPU_CF
+	};
+
+	static const conv_ds_msg_t ds_mach_185_224_cf = {
+	    CONV_DS_MSG_INIT(EM_AVR32, mach_185_224_cf) };
+	static const conv_ds_msg_t ds_mach_185_224_nf = {
+	    CONV_DS_MSG_INIT(EM_AVR32, mach_185_224_nf) };
+	static const conv_ds_msg_t ds_mach_185_224_dmp = {
+	    CONV_DS_MSG_INIT(EM_AVR32, mach_185_224_dmp) };
+
+
+	static const Msg mach_243_cf[] = {
+		MSG_EM_RISCV_CF
+	};
+	static const Msg mach_243_nf[] = {
+		MSG_EM_RISCV_NF
+	};
+	static const Msg mach_243_dmp[] = {
+		MSG_EM_RISCV_CF
+	};
+
+	static const conv_ds_msg_t ds_mach_243_cf = {
+	    CONV_DS_MSG_INIT(EM_RISCV, mach_243_cf) };
+	static const conv_ds_msg_t ds_mach_243_nf = {
+	    CONV_DS_MSG_INIT(EM_RISCV, mach_243_nf) };
+	static const conv_ds_msg_t ds_mach_243_dmp = {
+	    CONV_DS_MSG_INIT(EM_RISCV, mach_243_dmp) };
+
+#if	(EM_NUM != (EM_RISCV + 1))
 #error	"EM_NUM has grown"
 #endif
-	static const conv_ds_msg_t ds_mach_66_94_cf = {
-	    CONV_DS_MSG_INIT(EM_FX66, mach_66_94_cf) };
-	static const conv_ds_msg_t ds_mach_66_94_nf = {
-	    CONV_DS_MSG_INIT(EM_FX66, mach_66_94_nf) };
-	static const conv_ds_msg_t ds_mach_66_94_dmp = {
-	    CONV_DS_MSG_INIT(EM_FX66, mach_66_94_dmp) };
-
-
 	/* Build NULL terminated return arrays for each string style */
 	static const conv_ds_t	*ds_cf[] = {
-		CONV_DS_ADDR(ds_mach_0_11_cf), CONV_DS_ADDR(ds_mach_15_22_cf),
-		CONV_DS_ADDR(ds_mach_36_63_cf), CONV_DS_ADDR(ds_mach_66_94_cf),
+		CONV_DS_ADDR(ds_mach_0_11_cf),
+		CONV_DS_ADDR(ds_mach_15_22_cf),
+		CONV_DS_ADDR(ds_mach_36_63_cf),
+		CONV_DS_ADDR(ds_mach_66_120_cf),
+		CONV_DS_ADDR(ds_mach_131_144_cf),
+		CONV_DS_ADDR(ds_mach_160_181_cf),
+		CONV_DS_ADDR(ds_mach_183_cf),
+		CONV_DS_ADDR(ds_mach_185_224_cf),
+		CONV_DS_ADDR(ds_mach_243_cf),
 		NULL
 	};
 	static const conv_ds_t	*ds_nf[] = {
-		CONV_DS_ADDR(ds_mach_0_11_nf), CONV_DS_ADDR(ds_mach_15_22_nf),
-		CONV_DS_ADDR(ds_mach_36_63_nf), CONV_DS_ADDR(ds_mach_66_94_nf),
+		CONV_DS_ADDR(ds_mach_0_11_nf),
+		CONV_DS_ADDR(ds_mach_15_22_nf),
+		CONV_DS_ADDR(ds_mach_36_63_nf),
+		CONV_DS_ADDR(ds_mach_66_120_nf),
+		CONV_DS_ADDR(ds_mach_131_144_nf),
+		CONV_DS_ADDR(ds_mach_160_181_nf),
+		CONV_DS_ADDR(ds_mach_183_nf),
+		CONV_DS_ADDR(ds_mach_185_224_nf),
+		CONV_DS_ADDR(ds_mach_243_nf),
 		NULL
 	};
 	static const conv_ds_t	*ds_dmp[] = {
-		CONV_DS_ADDR(ds_mach_0_11_dmp), CONV_DS_ADDR(ds_mach_15_22_dmp),
+		CONV_DS_ADDR(ds_mach_0_11_dmp),
+		CONV_DS_ADDR(ds_mach_15_22_dmp),
 		CONV_DS_ADDR(ds_mach_36_63_dmp),
-		CONV_DS_ADDR(ds_mach_66_94_dmp), NULL
+		CONV_DS_ADDR(ds_mach_66_120_dmp),
+		CONV_DS_ADDR(ds_mach_131_144_dmp),
+		CONV_DS_ADDR(ds_mach_160_181_dmp),
+		CONV_DS_ADDR(ds_mach_183_dmp),
+		CONV_DS_ADDR(ds_mach_185_224_dmp),
+		CONV_DS_ADDR(ds_mach_243_dmp),
+		NULL
 	};
 
 
@@ -753,33 +1008,39 @@ ehdr_osabi_strings(Conv_fmt_flags_t fmt_flags)
 	    CONV_DS_MSG_INIT(ELFOSABI_NONE, osabi_0_3_dmp) };
 
 
-	static const Msg osabi_6_15_cf[] = {
+	static const Msg osabi_6_18_cf[] = {
 		MSG_OSABI_SOLARIS_CF,	MSG_OSABI_AIX_CF,
 		MSG_OSABI_IRIX_CF,	MSG_OSABI_FREEBSD_CF,
 		MSG_OSABI_TRU64_CF,	MSG_OSABI_MODESTO_CF,
 		MSG_OSABI_OPENBSD_CF,	MSG_OSABI_OPENVMS_CF,
-		MSG_OSABI_NSK_CF,	MSG_OSABI_AROS_CF
+		MSG_OSABI_NSK_CF,	MSG_OSABI_AROS_CF,
+		MSG_OSABI_FENIXOS_CF,	MSG_OSABI_CLOUDABI_CF,
+		MSG_OSABI_OPENVOS_CF
 	};
-	static const Msg osabi_6_15_nf[] = {
+	static const Msg osabi_6_18_nf[] = {
 		MSG_OSABI_SOLARIS_NF,	MSG_OSABI_AIX_NF,
 		MSG_OSABI_IRIX_NF,	MSG_OSABI_FREEBSD_NF,
 		MSG_OSABI_TRU64_NF,	MSG_OSABI_MODESTO_NF,
 		MSG_OSABI_OPENBSD_NF,	MSG_OSABI_OPENVMS_NF,
-		MSG_OSABI_NSK_NF,	MSG_OSABI_AROS_NF
+		MSG_OSABI_NSK_NF,	MSG_OSABI_AROS_NF,
+		MSG_OSABI_FENIXOS_NF,	MSG_OSABI_CLOUDABI_NF,
+		MSG_OSABI_OPENVOS_NF
 	};
-	static const Msg osabi_6_15_dmp[] = {
+	static const Msg osabi_6_18_dmp[] = {
 		MSG_OSABI_SOLARIS_DMP,	MSG_OSABI_AIX_DMP,
 		MSG_OSABI_IRIX_DMP,	MSG_OSABI_FREEBSD_DMP,
 		MSG_OSABI_TRU64_DMP,	MSG_OSABI_MODESTO_DMP,
 		MSG_OSABI_OPENBSD_DMP,	MSG_OSABI_OPENVMS_DMP,
-		MSG_OSABI_NSK_DMP,	MSG_OSABI_AROS_DMP
+		MSG_OSABI_NSK_DMP,	MSG_OSABI_AROS_DMP,
+		MSG_OSABI_FENIXOS_DMP,	MSG_OSABI_CLOUDABI_DMP,
+		MSG_OSABI_OPENVOS_DMP
 	};
-	static const conv_ds_msg_t ds_osabi_6_15_cf = {
-	    CONV_DS_MSG_INIT(ELFOSABI_SOLARIS, osabi_6_15_cf) };
-	static const conv_ds_msg_t ds_osabi_6_15_nf = {
-	    CONV_DS_MSG_INIT(ELFOSABI_SOLARIS, osabi_6_15_nf) };
-	static const conv_ds_msg_t ds_osabi_6_15_dmp = {
-	    CONV_DS_MSG_INIT(ELFOSABI_SOLARIS, osabi_6_15_dmp) };
+	static const conv_ds_msg_t ds_osabi_6_18_cf = {
+	    CONV_DS_MSG_INIT(ELFOSABI_SOLARIS, osabi_6_18_cf) };
+	static const conv_ds_msg_t ds_osabi_6_18_nf = {
+	    CONV_DS_MSG_INIT(ELFOSABI_SOLARIS, osabi_6_18_nf) };
+	static const conv_ds_msg_t ds_osabi_6_18_dmp = {
+	    CONV_DS_MSG_INIT(ELFOSABI_SOLARIS, osabi_6_18_dmp) };
 
 
 	static const Val_desc osabi_misc_cf[] = {
@@ -806,13 +1067,13 @@ ehdr_osabi_strings(Conv_fmt_flags_t fmt_flags)
 
 	/* Build NULL terminated return arrays for each string style */
 	static const conv_ds_t	*ds_cf[] = {
-		CONV_DS_ADDR(ds_osabi_0_3_cf), CONV_DS_ADDR(ds_osabi_6_15_cf),
+		CONV_DS_ADDR(ds_osabi_0_3_cf), CONV_DS_ADDR(ds_osabi_6_18_cf),
 		CONV_DS_ADDR(ds_osabi_misc_cf), NULL };
 	static const conv_ds_t	*ds_nf[] = {
-		CONV_DS_ADDR(ds_osabi_0_3_nf), CONV_DS_ADDR(ds_osabi_6_15_nf),
+		CONV_DS_ADDR(ds_osabi_0_3_nf), CONV_DS_ADDR(ds_osabi_6_18_nf),
 		CONV_DS_ADDR(ds_osabi_misc_nf), NULL };
 	static const conv_ds_t	*ds_dmp[] = {
-		CONV_DS_ADDR(ds_osabi_0_3_dmp), CONV_DS_ADDR(ds_osabi_6_15_dmp),
+		CONV_DS_ADDR(ds_osabi_0_3_dmp), CONV_DS_ADDR(ds_osabi_6_18_dmp),
 		CONV_DS_ADDR(ds_osabi_misc_dmp), NULL };
 
 	/* Select the strings to use */
