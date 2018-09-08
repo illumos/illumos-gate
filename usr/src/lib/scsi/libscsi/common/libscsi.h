@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #ifndef	_LIBSCSI_H
@@ -125,8 +126,11 @@ extern libscsi_errno_t libscsi_errcode(const char *);
 
 extern libscsi_action_t *libscsi_action_alloc(libscsi_hdl_t *, spc3_cmd_t,
     uint_t, void *, size_t);
+extern libscsi_action_t *libscsi_action_alloc_vendor(libscsi_hdl_t *,
+    spc3_cmd_t, size_t, uint_t, void *, size_t);
 extern sam4_status_t libscsi_action_get_status(const libscsi_action_t *);
 extern void libscsi_action_set_timeout(libscsi_action_t *, uint32_t);
+extern size_t libscsi_action_get_cdblen(const libscsi_action_t *);
 extern uint32_t libscsi_action_get_timeout(const libscsi_action_t *);
 extern uint_t libscsi_action_get_flags(const libscsi_action_t *);
 extern uint8_t *libscsi_action_get_cdb(const libscsi_action_t *);

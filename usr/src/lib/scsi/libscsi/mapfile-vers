@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017, Joyent, Inc.
 #
 
 #
@@ -46,11 +47,13 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 		libscsi_open;
 		libscsi_close;
 		libscsi_action_alloc;
+		libscsi_action_alloc_vendor;
 		libscsi_action_get_status;
 		libscsi_action_set_status;
 		libscsi_action_get_timeout;
 		libscsi_action_set_timeout;
 		libscsi_action_get_cdb;
+		libscsi_action_get_cdblen;
 		libscsi_action_get_flags;
 		libscsi_action_get_buffer;
 		libscsi_action_get_sense;

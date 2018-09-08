@@ -22,9 +22,9 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2017, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/scsi/impl/uscsi.h>
@@ -150,7 +150,7 @@ uscsi_exec(libscsi_hdl_t *hp, void *private, libscsi_action_t *ap)
 	cmd.uscsi_timeout = (short)libscsi_action_get_timeout(ap);
 
 	cmd.uscsi_cdb = (caddr_t)cp;
-	cmd.uscsi_cdblen = libscsi_cmd_cdblen(hp, *cp);
+	cmd.uscsi_cdblen = libscsi_action_get_cdblen(ap);
 	if (cmd.uscsi_cdblen == 0)
 		return (-1);
 
