@@ -6,18 +6,18 @@
 #
 # A full copy of the text of the CDDL should have accompanied this
 # source.  A copy of the CDDL is also available via the Internet at
-# http://www.illumos.org/license/CDDL.
+# http://www.illumos.c.org/license/CDDL.
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
 # Copyright 2019 Joyent, Inc.
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown ctf
+TEST =		test-merge-weak
 
-include $(SRC)/test/Makefile.com
+OBJS_C_32 =	$(BUILDDIR)/test-merge-weak.32.c.o
+OBJS_C_64 =	$(BUILDDIR)/test-merge-weak.64.c.o
+OBJS_M_32 =	$(BUILDDIR)/test-merge-weak.32.m.o
+OBJS_M_64 =	$(BUILDDIR)/test-merge-weak.64.m.o
+
+include ../Makefile.ctftest.com
