@@ -1,0 +1,23 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.c.org/license/CDDL.
+#
+
+#
+# Copyright 2019 Joyent, Inc.
+#
+
+TEST =		test-merge-weak
+
+OBJS_C_32 =	$(BUILDDIR)/test-merge-weak.32.c.o
+OBJS_C_64 =	$(BUILDDIR)/test-merge-weak.64.c.o
+OBJS_M_32 =	$(BUILDDIR)/test-merge-weak.32.m.o
+OBJS_M_64 =	$(BUILDDIR)/test-merge-weak.64.m.o
+
+include ../Makefile.ctftest.com
