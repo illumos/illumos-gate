@@ -794,11 +794,6 @@ extern "C" {
 #define	MSG_VERIFYING			gettext("Verifying signer <%s>")
 #define	MSG_VERIFYING_CLASS		gettext("[ verifying class <%s> ]")
 
-#define	SPECIAL_ACCESS			gettext("unable to maintain package contents text due to an access failure: %s")
-#define	SPECIAL_INPUT			gettext("unable to maintain package contents text: alternate root path too long")
-#define	SPECIAL_MALLOC			gettext("unable to maintain package contents text due to insufficient memory: %s")
-#define	SPECIAL_MAP			gettext("unable to maintain package contents text due to a failure to map the database into memory: %S")
-
 #define	WRN_BAD_FORK			gettext("WARNING: bad fork(), errno=%d: %s")
 #define	WRN_BAD_WAIT			gettext("WARNING: wait for process %ld failed, pid <%ld> status <0x%08lx> errno <%d> (%s)")
 #define	WRN_CHKINSTALL 			gettext("checkinstall script suspends")
