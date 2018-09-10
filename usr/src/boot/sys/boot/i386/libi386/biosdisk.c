@@ -90,6 +90,8 @@ static struct bdinfo
 static int nbdinfo = 0;
 
 #define	BD(dev)		(bdinfo[(dev)->dd.d_unit])
+#define	BD_RD		0
+#define	BD_WR		1
 
 static void bd_io_workaround(struct disk_devdesc *dev);
 
@@ -532,7 +534,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 			if (rest < bsize)
 				bsize = rest;
 
-			if ((rc = bd_io(dev, dblk, x, bbuf, 0)) != 0)
+			if ((rc = bd_io(dev, dblk, x, bbuf, BD_RD)) != 0)
 				return (EIO);
 
 			bcopy(bbuf + blkoff, buf, bsize);
@@ -547,7 +549,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 				x = 1;
 				bsize = BD(dev).bd_sectorsize - blkoff;
 				bsize = min(bsize, rest);
-				rc = bd_io(dev, dblk, x, bbuf, 0);
+				rc = bd_io(dev, dblk, x, bbuf, BD_RD);
 			} else if (rest < BD(dev).bd_sectorsize) {
 				/*
 				 * The remaining block is not full
@@ -555,7 +557,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 				 */
 				x = 1;
 				bsize = rest;
-				rc = bd_io(dev, dblk, x, bbuf, 0);
+				rc = bd_io(dev, dblk, x, bbuf, BD_RD);
 			} else {
 				/* We can write full sector(s). */
 				bsize = BD(dev).bd_sectorsize * x;
@@ -565,7 +567,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size,
 			 * Put your Data In, and shake it all about
 			 */
 			bcopy(buf, bbuf + blkoff, bsize);
-			if ((rc = bd_io(dev, dblk, x, bbuf, 1)) != 0)
+			if ((rc = bd_io(dev, dblk, x, bbuf, BD_WR)) != 0)
 				return (EIO);
 
 			break;
@@ -600,7 +602,7 @@ bd_edd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 	v86.ctl = V86_FLAGS;
 	v86.addr = 0x13;
 	/* Should we Write with verify ?? 0x4302 ? */
-	if (dowrite)
+	if (dowrite == BD_WR)
 		v86.eax = 0x4300;
 	else
 		v86.eax = 0x4200;
@@ -636,7 +638,7 @@ bd_chs_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 
 	v86.ctl = V86_FLAGS;
 	v86.addr = 0x13;
-	if (dowrite)
+	if (dowrite == BD_WR)
 		v86.eax = 0x300 | blks;
 	else
 		v86.eax = 0x200 | blks;
@@ -655,7 +657,7 @@ bd_io_workaround(struct disk_devdesc *dev)
 {
 	uint8_t buf[8 * 1024];
 
-	bd_edd_io(dev, 0xffffffff, 1, (caddr_t)buf, 0);
+	bd_edd_io(dev, 0xffffffff, 1, (caddr_t)buf, BD_RD);
 }
 
 static int
@@ -679,7 +681,7 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 	 * Loop retrying the operation a couple of times.  The BIOS
 	 * may also retry.
 	 */
-	if (dowrite == 0 && dblk >= 0x100000000)
+	if (dowrite == BD_RD && dblk >= 0x100000000)
 		bd_io_workaround(dev);
 	for (retry = 0; retry < 3; retry++) {
 		/* if retrying, reset the drive */
@@ -705,7 +707,7 @@ bd_io(struct disk_devdesc *dev, daddr_t dblk, int blks, caddr_t dest,
 	 * media is not present.
 	 */
 	if (result != 0 && result != 0x20) {
-		if (dowrite != 0) {
+		if (dowrite == BD_WR) {
 			printf("%s%d: Write %d sector(s) from %p (0x%x) "
 			    "to %lld: 0x%x\n", dev->dd.d_dev->dv_name,
 			    dev->dd.d_unit, blks, dest, VTOP(dest), dblk,

@@ -402,6 +402,7 @@ efi_memory_type(EFI_MEMORY_TYPE type)
 	    "PalCode",
 	    "PersistentMemory"
 	};
+
 	switch (type) {
 	case EfiReservedMemoryType:
 	case EfiLoaderCode:
@@ -419,8 +420,9 @@ efi_memory_type(EFI_MEMORY_TYPE type)
 	case EfiPalCode:
 	case EfiPersistentMemory:
 		return (types[type]);
+	default:
+		return ("Unknown");
 	}
-	return ("Unknown");
 }
 
 /* Print memory type table. */
@@ -517,13 +519,11 @@ efi_print_global(const CHAR16 *varnamearg, uint8_t *data, UINTN datasz)
 	    strncmp("Driver", var, 5) == 0 ||
 	    strncmp("SysPrep", var, 7) == 0 ||
 	    strncmp("OsRecovery", var, 10) == 0) {
-		UINT32 attr;
 		UINT16 filepathlistlen;
 		CHAR16 *text;
 		int desclen;
 		EFI_DEVICE_PATH *dp;
 
-		attr = *(uint32_t *)data;
 		data += sizeof(UINT32);
 		filepathlistlen = *(uint16_t *)data;
 		data += sizeof (UINT16);
