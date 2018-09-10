@@ -782,7 +782,6 @@ int
 stackinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	kthread_t t;
-	proc_t p;
 	uint64_t *ptr;  /* pattern pointer */
 	caddr_t	start;	/* kernel stack start */
 	caddr_t end;	/* kernel stack end */
