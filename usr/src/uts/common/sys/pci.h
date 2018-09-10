@@ -488,23 +488,23 @@ extern "C" {
 /*
  * Programming interfaces for class 0xC / subclass 0x0 (Firewire)
  */
-#define	PCI_SERIAL_FIRE_WIRE  		0x00	/* IEEE 1394 (Firewire) */
-#define	PCI_SERIAL_FIRE_1394_HCI 	0x10	/* 1394 OpenHCI Host Cntrlr */
+#define	PCI_SERIAL_FIRE_WIRE		0x00	/* IEEE 1394 (Firewire) */
+#define	PCI_SERIAL_FIRE_1394_HCI	0x10	/* 1394 OpenHCI Host Cntrlr */
 
 /*
  * Programming interfaces for class 0xC / subclass 0x3 (USB controller)
  */
-#define	PCI_SERIAL_USB_IF_UHCI 		0x00	/* UHCI Compliant */
-#define	PCI_SERIAL_USB_IF_OHCI 		0x10	/* OHCI Compliant */
-#define	PCI_SERIAL_USB_IF_EHCI 		0x20	/* EHCI Compliant */
-#define	PCI_SERIAL_USB_IF_GENERIC 	0x80	/* no specific HCD */
-#define	PCI_SERIAL_USB_IF_DEVICE 	0xFE	/* not a HCD */
+#define	PCI_SERIAL_USB_IF_UHCI		0x00	/* UHCI Compliant */
+#define	PCI_SERIAL_USB_IF_OHCI		0x10	/* OHCI Compliant */
+#define	PCI_SERIAL_USB_IF_EHCI		0x20	/* EHCI Compliant */
+#define	PCI_SERIAL_USB_IF_GENERIC	0x80	/* no specific HCD */
+#define	PCI_SERIAL_USB_IF_DEVICE	0xFE	/* not a HCD */
 
 /*
  * Programming interfaces for class 0xC / subclass 0x7 (IPMI controller)
  */
-#define	PCI_SERIAL_IPMI_IF_SMIC 	0x0	/* SMIC Interface */
-#define	PCI_SERIAL_IPMI_IF_KBD 		0x1	/* Keyboard Ctrl Style Intfc */
+#define	PCI_SERIAL_IPMI_IF_SMIC		0x0	/* SMIC Interface */
+#define	PCI_SERIAL_IPMI_IF_KBD		0x1	/* Keyboard Ctrl Style Intfc */
 #define	PCI_SERIAL_IPMI_IF_BTI		0x2	/* Block Transfer Interface */
 
 /*
@@ -522,8 +522,8 @@ extern "C" {
 /*
  * Programming interfaces for class 0xD / subclass 0x1 (Consumer IR controller)
  */
-#define	PCI_WIRELESS_IR_CONSUMER 	0x00	/* Consumer IR Controller */
-#define	PCI_WIRELESS_IR_UWB_RC 		0x10	/* UWB Radio Controller */
+#define	PCI_WIRELESS_IR_CONSUMER	0x00	/* Consumer IR Controller */
+#define	PCI_WIRELESS_IR_UWB_RC		0x10	/* UWB Radio Controller */
 
 /*
  * PCI Sub-class codes - base class 0xE (Intelligent I/O controllers)

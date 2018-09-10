@@ -881,9 +881,9 @@ list_is_vga_only(struct memlist *l, enum io_mem io)
 /*
  * Assign valid resources to unconfigured pci(e) bridges. We are trying
  * to reprogram the bridge when its
- * 		i)   SECBUS == SUBBUS	||
- * 		ii)  IOBASE > IOLIM	||
- * 		iii) MEMBASE > MEMLIM
+ *		i)   SECBUS == SUBBUS	||
+ *		ii)  IOBASE > IOLIM	||
+ *		iii) MEMBASE > MEMLIM
  * This must be done after one full pass through the PCI tree to collect
  * all BIOS-configured resources, so that we know what resources are
  * free and available to assign to the unconfigured PPBs.
@@ -1362,11 +1362,11 @@ pci_reprogram(void)
 		 * 3. Exclude <1M address range here in case below reserved
 		 * ranges for BIOS data area, ROM area etc are wrongly reported
 		 * in ACPI resource producer entries for PCI root bus.
-		 * 	00000000 - 000003FF	RAM
-		 * 	00000400 - 000004FF	BIOS data area
-		 * 	00000500 - 0009FFFF	RAM
-		 * 	000A0000 - 000BFFFF	VGA RAM
-		 * 	000C0000 - 000FFFFF	ROM area
+		 *	00000000 - 000003FF	RAM
+		 *	00000400 - 000004FF	BIOS data area
+		 *	00000500 - 0009FFFF	RAM
+		 *	000A0000 - 000BFFFF	VGA RAM
+		 *	000C0000 - 000FFFFF	ROM area
 		 */
 		(void) memlist_remove(&pci_bus_res[bus].mem_avail, 0, 0x100000);
 		(void) memlist_remove(&pci_bus_res[bus].pmem_avail,

@@ -111,15 +111,15 @@ struct bus_ops ppb_bus_ops = {
 	0,			/* (*bus_remove_eventcall)();	*/
 	0,			/* (*bus_post_event)();		*/
 	0,			/* (*bus_intr_ctl)();		*/
-	0,			/* (*bus_config)(); 		*/
-	0,			/* (*bus_unconfig)(); 		*/
-	ppb_fm_init,		/* (*bus_fm_init)(); 		*/
-	NULL,			/* (*bus_fm_fini)(); 		*/
-	NULL,			/* (*bus_fm_access_enter)(); 	*/
-	NULL,			/* (*bus_fm_access_exit)(); 	*/
-	NULL,			/* (*bus_power)(); 	*/
-	ppb_intr_ops,		/* (*bus_intr_op)(); 		*/
-	pcie_hp_common_ops	/* (*bus_hp_op)(); 		*/
+	0,			/* (*bus_config)();		*/
+	0,			/* (*bus_unconfig)();		*/
+	ppb_fm_init,		/* (*bus_fm_init)();		*/
+	NULL,			/* (*bus_fm_fini)();		*/
+	NULL,			/* (*bus_fm_access_enter)();	*/
+	NULL,			/* (*bus_fm_access_exit)();	*/
+	NULL,			/* (*bus_power)();	*/
+	ppb_intr_ops,		/* (*bus_intr_op)();		*/
+	pcie_hp_common_ops	/* (*bus_hp_op)();		*/
 };
 
 /*
@@ -448,7 +448,7 @@ ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 /*ARGSUSED*/
 static int
 ppb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-	off_t offset, off_t len, caddr_t *vaddrp)
+    off_t offset, off_t len, caddr_t *vaddrp)
 {
 	dev_info_t *pdip;
 	ppb_devstate_t *ppb = ddi_get_soft_state(ppb_state,
@@ -471,7 +471,7 @@ ppb_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 /*ARGSUSED*/
 static int
 ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t ctlop, void *arg, void *result)
+    ddi_ctl_enum_t ctlop, void *arg, void *result)
 {
 	pci_regspec_t *drv_regp;
 	int	reglen;
@@ -979,7 +979,7 @@ ppb_close(dev_t dev, int flags, int otyp, cred_t *credp)
 /* ARGSUSED */
 static int
 ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
 	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
