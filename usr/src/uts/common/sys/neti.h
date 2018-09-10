@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef _SYS_NETI_H
@@ -48,6 +50,7 @@ struct msgb;	/* avoiding sys/stream.h here */
 #define	NHF_ARP		"NHF_ARP"
 #define	NHF_VND_INET	"NHF_VND_INET"
 #define	NHF_VND_INET6	"NHF_VND_INET6"
+#define	NHF_VIONA	"NHF_VIONA"
 
 /*
  * Event identification
@@ -63,7 +66,7 @@ struct msgb;	/* avoiding sys/stream.h here */
 /*
  * Network NIC hardware checksum capability
  */
-#define	NET_HCK_NONE   	0x00
+#define	NET_HCK_NONE	0x00
 #define	NET_HCK_L3_FULL	0x01
 #define	NET_HCK_L3_PART	0x02
 #define	NET_HCK_L4_FULL	0x10
