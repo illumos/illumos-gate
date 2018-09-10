@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <libxml/parser.h>
@@ -128,6 +128,27 @@ xmlattr_to_int(topo_mod_t *mp,
 	return (0);
 }
 
+int
+xmlattr_to_double(topo_mod_t *mp,
+    xmlNodePtr n, const char *propname, double *value)
+{
+	xmlChar *str;
+	xmlChar *estr;
+
+	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML,
+	    "xmlattr_to_double(propname=%s)\n", propname);
+	if ((str = xmlGetProp(n, (xmlChar *)propname)) == NULL)
+		return (topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR));
+	*value = strtod((char *)str, (char **)&estr);
+	if (estr == str || *estr != '\0') {
+		/* full or partial conversion failure */
+		xmlFree(str);
+		return (topo_mod_seterrno(mp, ETOPO_PRSR_BADNUM));
+	}
+	xmlFree(str);
+	return (0);
+}
+
 static int
 xmlattr_to_fmri(topo_mod_t *mp,
     xmlNodePtr xn, const char *propname, nvlist_t **rnvl)
@@ -169,6 +190,8 @@ xmlattr_to_type(topo_mod_t *mp, xmlNodePtr xn, xmlChar *attr)
 		rv = TOPO_TYPE_FMRI;
 	} else if (xmlStrcmp(str, (xmlChar *)String) == 0) {
 		rv = TOPO_TYPE_STRING;
+	} else if (xmlStrcmp(str, (xmlChar *)Double) == 0) {
+		rv = TOPO_TYPE_DOUBLE;
 	} else if (xmlStrcmp(str, (xmlChar *)Int32_Arr) == 0) {
 		rv = TOPO_TYPE_INT32_ARRAY;
 	} else if (xmlStrcmp(str, (xmlChar *)UInt32_Arr) == 0) {
@@ -194,10 +217,11 @@ xmlattr_to_type(topo_mod_t *mp, xmlNodePtr xn, xmlChar *attr)
 
 static int
 xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
-const char *name)
+    const char *name)
 {
 	int rv;
 	uint64_t ui;
+	double dbl;
 	uint_t i = 0, nelems = 0;
 	nvlist_t *fmri;
 	xmlChar *str;
@@ -227,6 +251,11 @@ const char *name)
 		if (xmlattr_to_int(mp, xn, Value, &ui) < 0)
 			return (-1);
 		rv = nvlist_add_uint64(nvl, name, ui);
+		break;
+	case TOPO_TYPE_DOUBLE:
+		if (xmlattr_to_double(mp, xn, Value, &dbl) < 0)
+			return (-1);
+		rv = nvlist_add_double(nvl, name, dbl);
 		break;
 	case TOPO_TYPE_FMRI:
 		if (xmlattr_to_fmri(mp, xn, Value, &fmri) < 0)
@@ -511,6 +540,7 @@ prop_create(topo_mod_t *mp,
 	uint64_t ui64, *ui64arr;
 	int32_t i32, *i32arr;
 	int64_t i64, *i64arr;
+	double dbl;
 	uint_t nelem;
 	char *str, **strarr;
 	int err, e;
@@ -529,6 +559,9 @@ prop_create(topo_mod_t *mp,
 		break;
 	case TOPO_TYPE_UINT64:
 		e = nvlist_lookup_uint64(pfmri, INV_PVAL, &ui64);
+		break;
+	case TOPO_TYPE_DOUBLE:
+		e = nvlist_lookup_double(pfmri, INV_PVAL, &dbl);
 		break;
 	case TOPO_TYPE_FMRI:
 		e = nvlist_lookup_nvlist(pfmri, INV_PVAL, &fmri);
@@ -579,6 +612,9 @@ prop_create(topo_mod_t *mp,
 		break;
 	case TOPO_TYPE_UINT64:
 		e = topo_prop_set_uint64(ptn, gnm, pnm, flag, ui64, &err);
+		break;
+	case TOPO_TYPE_DOUBLE:
+		e = topo_prop_set_double(ptn, gnm, pnm, flag, dbl, &err);
 		break;
 	case TOPO_TYPE_FMRI:
 		e = topo_prop_set_fmri(ptn, gnm, pnm, flag, fmri, &err);

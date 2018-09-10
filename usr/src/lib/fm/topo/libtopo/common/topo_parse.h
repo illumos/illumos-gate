@@ -23,6 +23,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
+ */
 
 #ifndef _TOPO_PARSE_H
 #define	_TOPO_PARSE_H
@@ -134,6 +137,7 @@ typedef struct tf_info {
 #define	Argval "argval"
 #define	Children "children"
 #define	Dependents "dependents"
+#define	Double	"double"
 #define	Facility	"facility"
 #define	FMRI "fmri"
 #define	FMRI_Arr "fmri_array"
