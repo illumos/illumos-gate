@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 
 LIBRARY =	libefi.a
@@ -40,6 +41,7 @@ LDLIBS +=	-luuid -lsmbios -lc
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 
+CSTD =		$(CSTD_GNU99)
 LINTFLAGS64 +=	-errchk=longptr64
 
 .KEEP_STATE:

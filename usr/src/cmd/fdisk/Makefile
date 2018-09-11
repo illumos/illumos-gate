@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 #
 
@@ -42,6 +43,7 @@ i386_CFLAGS += -D_LARGEFILE64_SOURCE
 i386_CFLAGS += -D_FILE_OFFSET_BITS=64
 
 LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_NAME_DEF_NOT_USED2
+C99LMODE= -Xc99=%all
 
 all:	$(ROOTFS_PROG)
 

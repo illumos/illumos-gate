@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG = iostat
@@ -32,6 +33,7 @@ include $(SRC)/cmd/stat/Makefile.stat
 
 LDLIBS += -lkstat -ldevinfo -lavl
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
+C99LMODE=	-Xc99=%all
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses

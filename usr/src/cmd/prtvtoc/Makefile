@@ -20,6 +20,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 # cmd/prtvtoc/Makefile
 #
@@ -34,6 +35,8 @@ LDLIBS +=	-ladm -lefi
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 

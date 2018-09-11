@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG = fsstat
@@ -36,6 +37,7 @@ COMMON_SRCS = $(COMMON_OBJS:%.o=$(STATCOMMONDIR)/%.c)
 LDLIBS += -lkstat -lcmdutils
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
 CERRWARN += -_gcc=-Wno-parentheses
+C99LMODE=	-Xc99=%all
 FILEMODE= 0555
 
 lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)

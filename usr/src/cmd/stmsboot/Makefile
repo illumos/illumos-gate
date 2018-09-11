@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 
 MANIFEST = mpxio-upgrade.xml
@@ -41,6 +42,7 @@ ROOTFSLIB_MPXIO = $(ROOT)/lib/mpxio
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEMDEVICE)
 LDLIBS += -ldevinfo -ldevid -lnvpair -lumem
 CERRWARN += -_gcc=-Wno-uninitialized
+C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 

@@ -22,6 +22,7 @@
 #
 # Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG= ramdiskadm
@@ -33,6 +34,8 @@ include ../Makefile.cmd
 
 LDLIBS	+= -ldevinfo
 CERRWARN += -_gcc=-Wno-uninitialized
+
+C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 

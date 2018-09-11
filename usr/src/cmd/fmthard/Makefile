@@ -20,6 +20,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 # cmd/fmthard/Makefile
 #
@@ -32,6 +33,7 @@ RELUSRSBIN=     ../usr/sbin
 ROOTSYMLINK=    $(ROOTETC)/$(PROG)
 LDLIBS +=	-ladm -lefi
 lint := LINTFLAGS = -u -erroff=E_BAD_FORMAT_ARG_TYPE2
+C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 

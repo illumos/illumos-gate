@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG=		eject
@@ -31,6 +32,7 @@ LDLIBS += -lvolmgt -ladm
 CFLAGS += $(CCVERBOSE)
 
 LINTFLAGS += -um
+C99LMODE= -Xc99=%all
 
 .KEEP_STATE:
 
