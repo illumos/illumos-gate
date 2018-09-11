@@ -42,7 +42,7 @@
 #define	DEFAULT_BOOTROM_CSM	"/usr/share/bhyve/uefi-csm-rom.bin"
 
 typedef enum {
-	PCI_SLOT_HOSTBRIDGE = 0,	/* Not used here, but reserved */
+	PCI_SLOT_HOSTBRIDGE = 0,
 	PCI_SLOT_CD = 3,		/* Windows ahci allows slots 3 - 6 */
 	PCI_SLOT_BOOT_DISK,
 	PCI_SLOT_OTHER_DISKS,
@@ -449,6 +449,43 @@ add_lpc(int *argc, char **argv)
 }
 
 static int
+add_hostbridge(int *argc, char **argv)
+{
+	char conf[MAXPATHLEN];
+	char *model = NULL;
+	boolean_t raw_config = B_FALSE;
+
+	if ((model = get_zcfg_var("attr", "hostbridge", NULL)) != NULL) {
+		/* Easy bypass for doing testing */
+		if (strcmp("none", model) == 0) {
+			return (0);
+		}
+
+		if (strchr(model, '=') != NULL) {
+			/*
+			 * If the attribute contains '=', assume the creator
+			 * wants total control over the config.  Do not prepend
+			 * the value with 'model='.
+			 */
+			raw_config = B_TRUE;
+		}
+	}
+
+	/* Default to Natoma if nothing else is specified */
+	if (model == NULL) {
+		model = "i440fx";
+	}
+
+	(void) snprintf(conf, sizeof (conf), "%d,hostbridge,%s%s",
+	    PCI_SLOT_HOSTBRIDGE, raw_config ? "" : "model=", model);
+	if (add_arg(argc, argv, "-s") != 0 ||
+	    add_arg(argc, argv, conf) != 0) {
+		return (-1);
+	}
+	return (0);
+}
+
+static int
 add_bhyve_extra_opts(int *argc, char **argv)
 {
 	char *val;
@@ -624,6 +661,7 @@ main(int argc, char **argv)
 
 	if (add_smbios(&zhargc, (char **)&zhargv) != 0 ||
 	    add_lpc(&zhargc, (char **)&zhargv) != 0 ||
+	    add_hostbridge(&zhargc, (char **)&zhargv) != 0 ||
 	    add_cpu(&zhargc, (char **)&zhargv) != 0 ||
 	    add_ram(&zhargc, (char **)&zhargv) != 0 ||
 	    add_devices(&zhargc, (char **)&zhargv) != 0 ||
