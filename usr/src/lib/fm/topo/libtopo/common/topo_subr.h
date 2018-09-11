@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _TOPO_SUBR_H
@@ -124,7 +125,7 @@ extern int topo_version_str2num(const char *, topo_version_t);
 extern int topo_version_defined(topo_version_t);
 
 extern void topo_dprintf(topo_hdl_t *, int, const char *, ...);
-extern void topo_vdprintf(topo_hdl_t *, int, const char *, const char *,
+extern void topo_vdprintf(topo_hdl_t *, const char *, const char *,
     va_list);
 
 extern tnode_t *topo_hdl_root(topo_hdl_t *, const char *);

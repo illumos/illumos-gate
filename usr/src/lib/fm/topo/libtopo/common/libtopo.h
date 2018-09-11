@@ -448,10 +448,13 @@ void topo_sensor_state_name(uint32_t sensor_type, uint8_t state, char *buf,
 
 /*
  * Sensor unit types.  We're using the unit types and corresponding
- * codes described in the IPMI 2.0 spec as a reference as it seems to be a
- * reasonably comprehensive list.  This also simplifies the IPMI provider code
- * since the unit type codes will map exactly to what libtopo uses (so no
- * conversion necessary).
+ * codes described in section 43.17 of the IPMI 2.0 as a reference as it seems
+ * to be a reasonably comprehensive list.  This also simplifies the IPMI
+ * facility provider code since the unit type codes will map exactly to what
+ * libtopo uses (so no conversion necessary).  To allow for future growth if
+ * new unit types are added to IPMI in the future, while still allowing unit
+ * types not supported by IPMI to be represented, we include a gap between
+ * the last IPMI unit type and the first non-IPMI unit type.
  */
 typedef enum topo_sensor_unit {
 	TOPO_SENSOR_UNITS_UNSPECIFIED = 0,
@@ -551,7 +554,9 @@ typedef enum topo_sensor_unit {
 	TOPO_SENSOR_UNITS_CE,
 	TOPO_SENSOR_UNITS_UE,
 	TOPO_SENSOR_UNITS_FATAL_ERROR,
-	TOPO_SENSOR_UNITS_GRAMS
+	TOPO_SENSOR_UNITS_GRAMS,
+
+	TOPO_SENSOR_UNITS_PERCENT = 512
 } topo_sensor_unit_t;
 
 /*
@@ -569,10 +574,11 @@ typedef enum topo_sensor_unit {
  * These are used to decode the type and state properties in the facility
  * propgroup on facility nodes of type sensor.
  *
- * Again we're basically using the same defines as for IPMI as it's serves
- * as a good starting point and simplifies the IPMI provider code.  Of course
- * other facility providers will need to convert from their native codes
- * to the topo code when they set the type and state properties.
+ * Again we're basically using the same defines as listed in the IPMI
+ * specification (see section 42) as it's serves as a good starting point and
+ * simplifies the IPMI provider code.  Of course other facility providers will
+ * need to convert from their native codes to the topo code when they set the
+ * type and state properties.
  */
 #define	TOPO_SENSOR_TYPE_RESERVED			0x0000
 #define	TOPO_SENSOR_TYPE_TEMP				0x0001

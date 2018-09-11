@@ -755,14 +755,14 @@ topo_mod_clrdebug(topo_mod_t *mod)
 void
 topo_mod_dprintf(topo_mod_t *mod, const char *format, ...)
 {
+	topo_hdl_t *thp = mod->tm_hdl;
 	va_list alist;
 
-	if (mod->tm_debug == 0)
+	if (mod->tm_debug == 0 || !(thp->th_debug & TOPO_DBG_MOD))
 		return;
 
 	va_start(alist, format);
-	topo_vdprintf(mod->tm_hdl, TOPO_DBG_MOD, (const char *)mod->tm_name,
-	    format, alist);
+	topo_vdprintf(mod->tm_hdl, (const char *)mod->tm_name, format, alist);
 	va_end(alist);
 }
 
