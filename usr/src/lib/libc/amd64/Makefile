@@ -21,10 +21,10 @@
 
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2017, Joyent, Inc.
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 LIBCBASE=	.
@@ -1258,19 +1258,7 @@ ASSYMDEP_OBJS=			\
 
 $(ASSYMDEP_OBJS:%=pics/%): assym.h
 
-# assym.h build rules
-
-GENASSYM_C = genassym.c
-
-genassym: $(GENASSYM_C)
-	$(NATIVECC) $(NATIVE_CFLAGS) -Iinc -I$(LIBCDIR)/inc $(CPPFLAGS.native) \
-		-o $@ $(GENASSYM_C)
-
-OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
-
-assym.h: $(OFFSETS) genassym
-	$(OFFSETS_CREATE) <$(OFFSETS) >$@
-	./genassym >>$@
+GENASSYM_C = $(LIBCDIR)/$(MACH64)/genassym.c
 
 # derived C source and related explicit dependencies
 $(LIBCDIR)/port/gen/errlst.c + \

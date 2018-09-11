@@ -21,7 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 #
 
@@ -317,5 +317,23 @@ $(CHACHAOBJS:%=pics/%): $(SRC)/common/crypto/chacha/$$(@F:.o=.c)
 pics/%.o: $(LIBCBASE)/../port/threads/%.d $(THREADSOBJS:%=pics/%)
 	$(COMPILE.d) -C -xlazyload -s $< -o $@ $(THREADSOBJS:%=pics/%)
 	$(POST_PROCESS_O)
+
+# assym rules
+
+#
+# genassym is a funny fish: it's run on the build machine, so should use the
+# native compilers, but its job is to reflect the proto area header definitions,
+# so we need to use $(CPPFLAGS) not $(CPPFLAGS.native) to make sure we pick up
+# those headers.
+#
+genassym: $(GENASSYM_C)
+	$(NATIVECC) $(NATIVE_CFLAGS) $(CPPFLAGS) -o $@ $(GENASSYM_C)
+
+# shared between 32- and 64-bit
+OFFSETS = $(LIBCDIR)/$(MACH)/offsets.in
+
+assym.h: $(OFFSETS) genassym
+	$(OFFSETS_CREATE) <$(OFFSETS) >$@
+	./genassym >>$@
 
 include $(SRC)/lib/Makefile.targ
