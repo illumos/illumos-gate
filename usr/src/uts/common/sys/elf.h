@@ -429,10 +429,10 @@ typedef struct {
 #define	ELFOSABI_OPENVMS	13	/* Open VMS */
 #define	ELFOSABI_NSK		14	/* Hewlett-Packard Non-Stop Kernel */
 #define	ELFOSABI_AROS		15	/* Amiga Research OS */
-#define	ELFOSABI_FENIXOS	16	/* The FenixOS highly scalable */
+#define	ELFOSABI_FENIXOS 	16 	/* The FenixOS highly scalable */
 					/* multi-core OS */
-#define	ELFOSABI_CLOUDABI	17	/* Nuxi CloudABI */
-#define	ELFOSABI_OPENVOS	18	/* Stratus Technologies OpenVOS */
+#define	ELFOSABI_CLOUDABI 	17 	/* Nuxi CloudABI */
+#define	ELFOSABI_OPENVOS 	18 	/* Stratus Technologies OpenVOS */
 #define	ELFOSABI_ARM		97	/* ARM */
 #define	ELFOSABI_STANDALONE	255	/* standalone (embedded) application */
 
@@ -820,7 +820,7 @@ typedef struct {
 #define	ELF32_R_INFO(sym, type)	(((sym)<<8)+(unsigned char)(type))
 
 #define	ELF64_R_SYM(info)	((info)>>32)
-#define	ELF64_R_TYPE(info)	((Elf64_Word)(info))
+#define	ELF64_R_TYPE(info)    	((Elf64_Word)(info))
 #define	ELF64_R_INFO(sym, type)	(((Elf64_Xword)(sym)<<32)+(Elf64_Xword)(type))
 
 
@@ -867,7 +867,7 @@ typedef struct {
 #if defined(_LP64) || defined(_LONGLONG_TYPE)
 typedef struct {
 	Elf32_Lword	m_value;	/* symbol value */
-	Elf32_Word	m_info;		/* size + index */
+	Elf32_Word 	m_info;		/* size + index */
 	Elf32_Word	m_poffset;	/* symbol offset */
 	Elf32_Half	m_repeat;	/* repeat count */
 	Elf32_Half	m_stride;	/* stride info */
@@ -886,7 +886,7 @@ typedef struct {
 
 typedef struct {
 	Elf64_Lword	m_value;	/* symbol value */
-	Elf64_Xword	m_info;		/* size + index */
+	Elf64_Xword 	m_info;		/* size + index */
 	Elf64_Xword	m_poffset;	/* symbol offset */
 	Elf64_Half	m_repeat;	/* repeat count */
 	Elf64_Half	m_stride;	/* stride info */
@@ -945,7 +945,7 @@ typedef	Elf64_Word	Elf64_Capchain;
  *	info = ELF64_C_INFO(sym, grp)
  */
 #define	ELF64_C_SYM(info)	((info)>>32)
-#define	ELF64_C_GROUP(info)	((Elf64_Word)(info))
+#define	ELF64_C_GROUP(info)    	((Elf64_Word)(info))
 #define	ELF64_C_INFO(sym, grp)	(((Elf64_Xword)(sym)<<32)+(Elf64_Xword)(grp))
 
 #endif	/* defined(_LP64) || defined(_LONGLONG_TYPE) */
@@ -1014,11 +1014,10 @@ typedef	Elf64_Word	Elf64_Capchain;
 #define	NT_PRPRIVINFO	19	/* priv_impl_info_t <sys/priv.h>	*/
 #define	NT_CONTENT	20	/* core_content_t <sys/corectl.h>	*/
 #define	NT_ZONENAME	21	/* string from getzonenamebyid(3C)	*/
-#define	NT_FDINFO	22	/* open fd info				*/
+#define	NT_FDINFO	22	/* open fd info 			*/
 #define	NT_SPYMASTER	23	/* psinfo_t for agent LWP spymaster	*/
 #define	NT_SECFLAGS	24	/* process security-flags */
-#define	NT_LWPNAME	25	/* prlwpname_t */
-#define	NT_NUM		25
+#define	NT_NUM		24
 
 
 #ifdef _KERNEL

@@ -874,8 +874,15 @@ rfb_handle(struct rfb_softc *rc, int cfd)
 	rfb_send_screen(rc, cfd, 1);
 
 	perror = pthread_create(&tid, NULL, rfb_wr_thr, rc);
+#ifdef __FreeBSD__
 	if (perror == 0)
 		pthread_set_name_np(tid, "rfbout");
+#else
+	/*
+	 * While pthread_set_name_np() remains a no-op, skip this to avoid
+	 * compiler warnings about an empty if-statement.
+	 */
+#endif
 
         /* Now read in client requests. 1st byte identifies type */
 	for (;;) {

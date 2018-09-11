@@ -57,7 +57,6 @@
 #include <sys/priocntl.h>
 #include <thread_db.h>
 #include <setjmp.h>
-#include <sys/thread.h>
 #include "libc_int.h"
 #include "tdb_agent.h"
 #include "thr_debug.h"
@@ -1238,7 +1237,6 @@ typedef	struct	_thrattr {
 	int	policy;
 	int	inherit;
 	size_t	guardsize;
-	char	name[THREAD_NAME_MAX];
 } thrattr_t;
 
 typedef	struct	_rwlattr {
@@ -1499,7 +1497,7 @@ extern	int	rw_read_held(rwlock_t *);
 extern	int	rw_write_held(rwlock_t *);
 
 extern	int	_thrp_create(void *, size_t, void *(*)(void *), void *, long,
-			thread_t *, size_t, const char *);
+			thread_t *, size_t);
 extern	int	_thrp_suspend(thread_t, uchar_t);
 extern	int	_thrp_continue(thread_t, uchar_t);
 

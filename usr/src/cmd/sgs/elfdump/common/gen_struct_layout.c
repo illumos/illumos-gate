@@ -24,13 +24,11 @@
  * Use is subject to license terms.
  *
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- *
- * Copyright 2018 Joyent, Inc.
  */
 
 /*
  * This program is used to generate the contents of the
- * struct_layout_XXX.c files that contain per-architecture
+ * struct_layout_XXX.c files that contain per-archtecture
  * structure layout information.
  *
  * Although not part of elfdump, it is built by the makefile
@@ -601,15 +599,6 @@ gen_prsecflags(void)
 	END;
 }
 
-static void
-gen_prlwpname(void)
-{
-	START(prlwpname, prlwpname_t);
-	SCALAR_FIELD(prlwpname_t, pr_lwpid, 0);
-	ARRAY_FIELD(prlwpname_t, pr_lwpname, 0);
-	END;
-}
-
 /*ARGSUSED*/
 int
 main(int argc, char *argv[])
@@ -651,7 +640,6 @@ main(int argc, char *argv[])
 	gen_utsname();
 	gen_prfdinfo();
 	gen_prsecflags();
-	gen_prlwpname();
 
 	/*
 	 * Generate the full arch_layout description
@@ -680,7 +668,6 @@ main(int argc, char *argv[])
 	(void) printf(fmt, "utsname");
 	(void) printf(fmt, "prfdinfo");
 	(void) printf(fmt, "prsecflags");
-	(void) printf(fmt, "prlwpname");
 	(void) printf("};\n");
 
 	/*

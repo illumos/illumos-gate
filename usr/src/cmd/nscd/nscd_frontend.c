@@ -22,7 +22,6 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2018 Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -90,8 +89,6 @@ server_tsd_bind(void *arg)
 {
 	static void *value = 0;
 
-	(void) pthread_setname_np(pthread_self(), "server_tsd_bind");
-
 	/* disable cancellation to avoid hangs if server threads disappear */
 	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 	(void) thr_setspecific(server_key, value);
@@ -135,8 +132,7 @@ server_destroy(void *arg)
  * get clearance
  */
 int
-_nscd_get_clearance(sema_t *sema)
-{
+_nscd_get_clearance(sema_t *sema) {
 	if (sema_trywait(&common_sema) == 0) {
 		(void) thr_setspecific(lookup_state_key, NULL);
 		return (0);
@@ -155,8 +151,7 @@ _nscd_get_clearance(sema_t *sema)
  * release clearance
  */
 int
-_nscd_release_clearance(sema_t *sema)
-{
+_nscd_release_clearance(sema_t *sema) {
 	int	which;
 
 	(void) thr_getspecific(lookup_state_key, (void**)&which);
@@ -202,7 +197,7 @@ _nscd_restart_if_cfgfile_changed()
 	static timestruc_t	last_nsswitch_modified = { 0 };
 	static timestruc_t	last_resolv_modified = { -1, 0 };
 	static mutex_t		restarting_lock = DEFAULTMUTEX;
-	static int		restarting = 0;
+	static int 		restarting = 0;
 	int			restart = 0;
 	time_t			now = time(NULL);
 	char			*me = "_nscd_restart_if_cfgfile_changed";
@@ -1481,8 +1476,6 @@ rts_mon(void)
 	} mbuf;
 	struct ifa_msghdr *ifam = &mbuf.ifam;
 	char	*me = "rts_mon";
-
-	(void) pthread_setname_np(pthread_self(), me);
 
 	rt_sock = socket(PF_ROUTE, SOCK_RAW, 0);
 	if (rt_sock < 0) {

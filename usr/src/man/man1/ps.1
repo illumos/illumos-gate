@@ -44,9 +44,9 @@
 .\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright (c) 2013 Gary Mills
-.\" Copyright (c) 2018, Joyent, Inc.
+.\" Copyright (c) 2017, Joyent, Inc.
 .\"
-.TH PS 1 "August 22, 2018"
+.TH PS 1 "Jun 13, 2017"
 .SH NAME
 ps \- report process status
 .SH SYNOPSIS
@@ -1052,16 +1052,6 @@ one line to be printed for each lwp in the process.
 .sp
 .ne 2
 .na
-\fB\fBlwpname\fR\fR
-.ad
-.RS 11n
-The name of the lwp, if set. Requesting this formatting option causes
-one line to be printed for each lwp in the process.
-.RE
-
-.sp
-.ne 2
-.na
 \fB\fBnlwp\fR\fR
 .ad
 .RS 11n
@@ -1186,8 +1176,8 @@ The data model of the process, printed in the same manner as via
 
 .sp
 .LP
-Only \fBcomm\fR, \fBlwpname\fR, and \fBargs\fR are allowed to contain blank
-characters; all others, including the Solaris implementation variables, are not.
+Only \fBcomm\fR and \fBargs\fR are allowed to contain blank characters; all
+others, including the Solaris implementation variables, are not.
 .sp
 .LP
 The following table specifies the default header to be used in the POSIX locale
@@ -1209,7 +1199,7 @@ group	GROUP	time	TIME
 nice	NI	tty	TT
 pcpu	%CPU	user	USER
 pgid	PGID	vsz	VSZ
-pid	PID
+pid	PID		
 .TE
 
 .sp
@@ -1234,13 +1224,12 @@ fname	COMMAND	rss	RSS
 gid	GID	ruid	RUID
 lgrp	LGRP	s	S
 lwp	LWP	sid	SID
-lwpname	LWPNAME	stime	STIME
-nlwp	NLWP	taskid	TASKID
-opri	PRI	uid	UID
-osz	SZ	wchan	WCHAN
-pmem	%MEM	zone	ZONE
-pri	PRI	zoneid	ZONEID
-ctid	CTID
+nlwp	NLWP	stime	STIME
+opri	PRI	taskid	TASKID
+osz	SZ	uid	UID
+pmem	%MEM	wchan	WCHAN
+pri	PRI	zone	ZONE
+ctid	CTID	zoneid	ZONEID
 .TE
 
 .SH EXAMPLES

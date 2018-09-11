@@ -21,8 +21,6 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2018 Joyent, Inc.
  */
 
 #ifdef SLP
@@ -541,11 +539,8 @@ done:
  * parameter 'r' should be a pointer to an unsigned int containing
  * the requested interval at which the network should be queried.
  */
-void
-discover(void *r) {
+void discover(void *r) {
 	unsigned short reqrefresh = *((unsigned int *)r);
-
-	(void) pthread_setname_np(pthread_self(), "discover");
 
 	for (;;) {
 	    find_all_contexts("ldap",

@@ -303,7 +303,6 @@ file path=usr/share/man/man3c/pthread_attr_get_np.3c
 file path=usr/share/man/man3c/pthread_attr_getdetachstate.3c
 file path=usr/share/man/man3c/pthread_attr_getguardsize.3c
 file path=usr/share/man/man3c/pthread_attr_getinheritsched.3c
-file path=usr/share/man/man3c/pthread_attr_getname_np.3c
 file path=usr/share/man/man3c/pthread_attr_getschedparam.3c
 file path=usr/share/man/man3c/pthread_attr_getschedpolicy.3c
 file path=usr/share/man/man3c/pthread_attr_getscope.3c
@@ -329,7 +328,6 @@ file path=usr/share/man/man3c/pthread_detach.3c
 file path=usr/share/man/man3c/pthread_equal.3c
 file path=usr/share/man/man3c/pthread_exit.3c
 file path=usr/share/man/man3c/pthread_getconcurrency.3c
-file path=usr/share/man/man3c/pthread_getname_np.3c
 file path=usr/share/man/man3c/pthread_getschedparam.3c
 file path=usr/share/man/man3c/pthread_getspecific.3c
 file path=usr/share/man/man3c/pthread_join.3c
@@ -474,7 +472,6 @@ file path=usr/share/man/man3c/termios.3c
 file path=usr/share/man/man3c/thr_create.3c
 file path=usr/share/man/man3c/thr_exit.3c
 file path=usr/share/man/man3c/thr_getconcurrency.3c
-file path=usr/share/man/man3c/thr_getname.3c
 file path=usr/share/man/man3c/thr_getprio.3c
 file path=usr/share/man/man3c/thr_join.3c
 file path=usr/share/man/man3c/thr_keycreate.3c
@@ -1112,8 +1109,6 @@ link path=usr/share/man/man3c/pthread_attr_setguardsize.3c \
     target=pthread_attr_getguardsize.3c
 link path=usr/share/man/man3c/pthread_attr_setinheritsched.3c \
     target=pthread_attr_getinheritsched.3c
-link path=usr/share/man/man3c/pthread_attr_setname_np.3c \
-    target=pthread_attr_getname_np.3c
 link path=usr/share/man/man3c/pthread_attr_setschedparam.3c \
     target=pthread_attr_getschedparam.3c
 link path=usr/share/man/man3c/pthread_attr_setschedpolicy.3c \
@@ -1186,8 +1181,6 @@ link path=usr/share/man/man3c/pthread_rwlockattr_setpshared.3c \
     target=pthread_rwlockattr_getpshared.3c
 link path=usr/share/man/man3c/pthread_setconcurrency.3c \
     target=pthread_getconcurrency.3c
-link path=usr/share/man/man3c/pthread_setname_np.3c \
-    target=pthread_getname_np.3c
 link path=usr/share/man/man3c/pthread_setschedparam.3c \
     target=pthread_getschedparam.3c
 link path=usr/share/man/man3c/pthread_setspecific.3c \
@@ -1372,8 +1365,6 @@ link path=usr/share/man/man3c/thr_getspecific.3c target=thr_keycreate.3c
 link path=usr/share/man/man3c/thr_keycreate_once.3c target=thr_keycreate.3c
 link path=usr/share/man/man3c/thr_setconcurrency.3c \
     target=thr_getconcurrency.3c
-link path=usr/share/man/man3c/thr_setname.3c \
-    target=thr_getname.3c
 link path=usr/share/man/man3c/thr_setprio.3c target=thr_getprio.3c
 link path=usr/share/man/man3c/thr_setspecific.3c target=thr_keycreate.3c
 link path=usr/share/man/man3c/thrd_sleep.3c target=nanosleep.3c

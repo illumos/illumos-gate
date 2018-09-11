@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2015 Joyent, Inc.
 #
 
 file path=usr/share/man/man3proc/proc_service.3proc
@@ -81,7 +81,6 @@ file path=usr/share/man/man3proc/Plmid.3proc
 file path=usr/share/man/man3proc/Plookup_by_addr.3proc
 file path=usr/share/man/man3proc/Plwp_getasrs.3proc
 file path=usr/share/man/man3proc/Plwp_getgwindows.3proc
-file path=usr/share/man/man3proc/Plwp_getname.3proc
 file path=usr/share/man/man3proc/Plwp_getpsinfo.3proc
 file path=usr/share/man/man3proc/Plwp_getregs.3proc
 file path=usr/share/man/man3proc/Plwp_getspymaster.3proc

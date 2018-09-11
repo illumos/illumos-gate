@@ -22,7 +22,6 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2018 Joyent Inc.
  */
 
 #include <stdio.h>
@@ -45,7 +44,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <libscf.h>
-#include <pthread.h>
 #include "nscd_door.h"
 #include "nscd_config.h"
 #include "nscd_log.h"
@@ -426,8 +424,6 @@ forker_monitor(
 	pid_t		fpid;
 	char		*fmri;
 	char		*me = "forker_monitor";
-
-	(void) pthread_setname_np(pthread_self(), me);
 
 	/* wait until forker exits */
 	fpid = forker_pid;
@@ -1420,7 +1416,7 @@ check_uid(char *pid_name)
 	static uid_t	uid = 0;
 	static uid_t	euid = 0;
 	int		pfd; /* file descriptor for /proc/<pid>/psinfo */
-	psinfo_t	info;  /* process information from /proc */
+	psinfo_t 	info;  /* process information from /proc */
 
 	if (uid == 0)  {
 		pid = getpid();
@@ -1469,8 +1465,6 @@ check_user_process(void *arg)
 	struct dirent	*ep;
 	int		found;
 	char		*me = "check_user_process";
-
-	(void) pthread_setname_np(pthread_self(), me);
 
 	for (;;) {
 		(void) sleep(60);

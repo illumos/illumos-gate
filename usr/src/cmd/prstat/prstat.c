@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2009 Chad Mynhier
- * Copyright 2018 Joyent, Inc.  All rights reserved.
+ * Copyright 2017 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -87,13 +87,13 @@
 #define	PSINFO_HEADER_PROC_LGRP \
 "   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU LGRP PROCESS/NLWP  "
 #define	PSINFO_HEADER_LWP \
-"   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU PROCESS/LWP        "
+"   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU PROCESS/LWPID      "
 #define	PSINFO_HEADER_LWP_LGRP \
-"   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU LGRP PROCESS/LWP   "
+"   PID USERNAME  SIZE   RSS STATE  PRI NICE      TIME  CPU LGRP PROCESS/LWPID "
 #define	USAGE_HEADER_PROC \
 "   PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/NLWP  "
 #define	USAGE_HEADER_LWP \
-"   PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/LWP   "
+"   PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/LWPID "
 #define	USER_HEADER_PROC \
 " NPROC USERNAME  SWAP   RSS MEMORY      TIME  CPU                             "
 #define	USER_HEADER_LWP \
@@ -111,12 +111,12 @@
 #define	ZONE_HEADER_LWP \
 "ZONEID     NLWP  SWAP   RSS MEMORY      TIME  CPU ZONE                        "
 #define	PSINFO_LINE \
-"%6d %-8s %5s %5s %-6s %3s  %3s %9s %3.3s%% %s"
+"%6d %-8s %5s %5s %-6s %3s  %3s %9s %3.3s%% %-.16s/%d"
 #define	PSINFO_LINE_LGRP \
-"%6d %-8s %5s %5s %-6s %3s  %3s %9s %3.3s%% %4d %s"
+"%6d %-8s %5s %5s %-6s %3s  %3s %9s %3.3s%% %4d %-.16s/%d"
 #define	USAGE_LINE \
 "%6d %-8s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s %3.3s "\
-"%3.3s %3.3s %s"
+"%3.3s %3.3s %-.12s/%d"
 #define	USER_LINE \
 "%6d %-8s %5.5s %5.5s   %3.3s%% %9s %3.3s%%"
 #define	TASK_LINE \
@@ -150,8 +150,8 @@ static table_t	prj_tbl = {0, 0, NULL};		/* selected projects */
 static table_t	tsk_tbl = {0, 0, NULL};		/* selected tasks */
 static table_t	lgr_tbl = {0, 0, NULL};		/* selected lgroups */
 static zonetbl_t zone_tbl = {0, 0, NULL};	/* selected zones */
-static uidtbl_t euid_tbl = {0, 0, NULL};	/* selected effective users */
-static uidtbl_t ruid_tbl = {0, 0, NULL};	/* selected real users */
+static uidtbl_t euid_tbl = {0, 0, NULL}; 	/* selected effective users */
+static uidtbl_t ruid_tbl = {0, 0, NULL}; 	/* selected real users */
 
 static uint_t	total_procs;			/* total number of procs */
 static uint_t	total_lwps;			/* total number of lwps */
@@ -173,7 +173,7 @@ static long pagesize;
 
 /* default settings */
 
-optdesc_t opts = {
+static optdesc_t opts = {
 	5,			/* interval between updates, seconds */
 	15,			/* number of lines in top part */
 	5,			/* number of lines in bottom part */
@@ -389,12 +389,11 @@ list_print(list_t *list)
 	char psize[6], prssize[6], pmem[6], pcpu[6], ptime[12];
 	char pstate[7], pnice[4], ppri[4];
 	char pname[LOGNAME_MAX+1];
-	char name[PRFNSZ + THREAD_NAME_MAX + 2];
 	char projname[PROJNAME_MAX+1];
 	char zonename[ZONENAME_MAX+1];
 	float cpu, mem;
 	double loadavg[3] = {0, 0, 0};
-	int i, n;
+	int i, lwpid;
 
 	if (list->l_size == 0)
 		return;
@@ -414,58 +413,53 @@ list_print(list_t *list)
 		(void) putchar('\r');
 	(void) putp(t_ulon);
 
-	n = opts.o_cols;
 	switch (list->l_type) {
 	case LT_PROJECTS:
 		if (opts.o_outpmode & OPT_LWPS)
-			n = printf(PROJECT_HEADER_LWP);
+			(void) printf(PROJECT_HEADER_LWP);
 		else
-			n = printf(PROJECT_HEADER_PROC);
+			(void) printf(PROJECT_HEADER_PROC);
 		break;
 	case LT_TASKS:
 		if (opts.o_outpmode & OPT_LWPS)
-			n = printf(TASK_HEADER_LWP);
+			(void) printf(TASK_HEADER_LWP);
 		else
-			n = printf(TASK_HEADER_PROC);
+			(void) printf(TASK_HEADER_PROC);
 		break;
 	case LT_ZONES:
 		if (opts.o_outpmode & OPT_LWPS)
-			n = printf(ZONE_HEADER_LWP);
+			(void) printf(ZONE_HEADER_LWP);
 		else
-			n = printf(ZONE_HEADER_PROC);
+			(void) printf(ZONE_HEADER_PROC);
 		break;
 	case LT_USERS:
 		if (opts.o_outpmode & OPT_LWPS)
-			n = printf(USER_HEADER_LWP);
+			(void) printf(USER_HEADER_LWP);
 		else
-			n = printf(USER_HEADER_PROC);
+			(void) printf(USER_HEADER_PROC);
 		break;
 	case LT_LWPS:
 		if (opts.o_outpmode & OPT_LWPS) {
 			if (opts.o_outpmode & OPT_PSINFO) {
 				if (opts.o_outpmode & OPT_LGRP)
-					n = printf(PSINFO_HEADER_LWP_LGRP);
+					(void) printf(PSINFO_HEADER_LWP_LGRP);
 				else
-					n = printf(PSINFO_HEADER_LWP);
+					(void) printf(PSINFO_HEADER_LWP);
 			}
 			if (opts.o_outpmode & OPT_MSACCT)
-				n = printf(USAGE_HEADER_LWP);
+				(void) printf(USAGE_HEADER_LWP);
 		} else {
 			if (opts.o_outpmode & OPT_PSINFO) {
 				if (opts.o_outpmode & OPT_LGRP)
-					n = printf(PSINFO_HEADER_PROC_LGRP);
+					(void) printf(PSINFO_HEADER_PROC_LGRP);
 				else
-					n = printf(PSINFO_HEADER_PROC);
+					(void) printf(PSINFO_HEADER_PROC);
 			}
 			if (opts.o_outpmode & OPT_MSACCT)
-				n = printf(USAGE_HEADER_PROC);
+				(void) printf(USAGE_HEADER_PROC);
 		}
 		break;
 	}
-
-	/* Pad out the header line so the underline spans the whole width */
-	if ((opts.o_outpmode & OPT_TERMCAP) && n < opts.o_cols)
-		(void) printf("%*s", (int)(opts.o_cols - n), "");
 
 	(void) putp(t_uloff);
 	(void) putp(t_eol);
@@ -533,14 +527,15 @@ list_print(list_t *list)
 			break;
 		case LT_LWPS:
 			lwp = list->l_ptrs[i];
-
-			format_name(lwp, name, sizeof (name));
-
+			if (opts.o_outpmode & OPT_LWPS)
+				lwpid = lwp->li_info.pr_lwp.pr_lwpid;
+			else
+				lwpid = lwp->li_info.pr_nlwp +
+				    lwp->li_info.pr_nzomb;
 			pwd_getname(lwp->li_info.pr_uid, pname, sizeof (pname),
 			    opts.o_outpmode & OPT_NORESOLVE,
 			    opts.o_outpmode & (OPT_TERMCAP|OPT_TRUNC),
 			    LOGIN_WIDTH);
-
 			if (opts.o_outpmode & OPT_PSINFO) {
 				Format_size(psize, lwp->li_info.pr_size, 6);
 				Format_size(prssize, lwp->li_info.pr_rssize, 6);
@@ -569,17 +564,21 @@ list_print(list_t *list)
 					    lwp->li_info.pr_time.tv_sec, 10);
 				if (opts.o_outpmode & OPT_TTY)
 					(void) putchar('\r');
+				stripfname(lwp->li_info.pr_fname);
 				if (opts.o_outpmode & OPT_LGRP) {
 					(void) printf(PSINFO_LINE_LGRP,
 					    (int)lwp->li_info.pr_pid, pname,
 					    psize, prssize, pstate,
 					    ppri, pnice, ptime, pcpu,
-					    lwp->li_info.pr_lwp.pr_lgrp, name);
+					    (int)lwp->li_info.pr_lwp.pr_lgrp,
+					    lwp->li_info.pr_fname, lwpid);
 				} else {
 					(void) printf(PSINFO_LINE,
 					    (int)lwp->li_info.pr_pid, pname,
-					    psize, prssize, pstate, ppri, pnice,
-					    ptime, pcpu, name);
+					    psize, prssize,
+					    pstate, ppri, pnice,
+					    ptime, pcpu,
+					    lwp->li_info.pr_fname, lwpid);
 				}
 				(void) putp(t_eol);
 				(void) putchar('\n');
@@ -599,11 +598,12 @@ list_print(list_t *list)
 				Format_pct(lat, lwp->li_lat, 4);
 				if (opts.o_outpmode & OPT_TTY)
 					(void) putchar('\r');
+				stripfname(lwp->li_info.pr_fname);
 				(void) printf(USAGE_LINE,
 				    (int)lwp->li_info.pr_pid, pname,
 				    usr, sys, trp, tfl, dfl, lck,
 				    slp, lat, vcx, icx, scl, sig,
-				    name);
+				    lwp->li_info.pr_fname, lwpid);
 				(void) putp(t_eol);
 				(void) putchar('\n');
 			}
@@ -905,27 +905,6 @@ add_proc(psinfo_t *psinfo)
 }
 
 static void
-get_lwpname(pid_t pid, id_t lwpid, char *buf, size_t bufsize)
-{
-	char *path = NULL;
-	int fd;
-
-	buf[0] = '\0';
-
-	if (asprintf(&path, "/proc/%d/lwp/%d/lwpname",
-	    (int)pid, (int)lwpid) == -1)
-		return;
-
-	if ((fd = open(path, O_RDONLY)) != -1) {
-		(void) read(fd, buf, bufsize);
-		buf[bufsize - 1] = '\0';
-		(void) close(fd);
-	}
-
-	free(path);
-}
-
-static void
 add_lwp(psinfo_t *psinfo, lwpsinfo_t *lwpsinfo, int flags)
 {
 	lwp_info_t *lwp;
@@ -940,7 +919,6 @@ add_lwp(psinfo_t *psinfo, lwpsinfo_t *lwpsinfo, int flags)
 	(void) memcpy(&lwp->li_info, psinfo,
 	    sizeof (psinfo_t) - sizeof (lwpsinfo_t));
 	(void) memcpy(&lwp->li_info.pr_lwp, lwpsinfo, sizeof (lwpsinfo_t));
-	get_lwpname(pid, lwpid, lwp->li_lwpname, sizeof (lwp->li_lwpname));
 }
 
 static void
@@ -1163,7 +1141,7 @@ list_refresh(list_t *list)
 }
 
 static void
-curses_on(void)
+curses_on()
 {
 	if ((opts.o_outpmode & OPT_TERMCAP) && (is_curses_on == FALSE)) {
 		(void) initscr();
@@ -1174,7 +1152,7 @@ curses_on(void)
 }
 
 static void
-curses_off(void)
+curses_off()
 {
 	if ((is_curses_on == TRUE) && (opts.o_outpmode & OPT_TERMCAP)) {
 		(void) putp(t_rmcup);
@@ -1185,40 +1163,26 @@ curses_off(void)
 }
 
 static int
-nlines(int *linesp, int *colsp)
+nlines()
 {
 	struct winsize ws;
 	char *envp;
 	int n;
-
-	*linesp = -1;
-	*colsp = -1;
 	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) {
 		if (ws.ws_row > 0)
-			*linesp = ws.ws_row;
-		if (ws.ws_col > 0)
-			*colsp = ws.ws_col;
-		if (ws.ws_row > 0 && ws.ws_col > 0)
-			return (0);
+			return (ws.ws_row);
 	}
-
-	if ((envp = getenv("LINES")) != NULL) {
+	if (envp = getenv("LINES")) {
 		if ((n = Atoi(envp)) > 0) {
 			opts.o_outpmode &= ~OPT_USEHOME;
-			*linesp = n;
+			return (n);
 		}
 	}
-	if ((envp = getenv("COLUMNS")) != NULL) {
-		if ((n = Atoi(envp)) > 0) {
-			*colsp = n;
-		}
-	}
-
-	return ((*linesp > 0 && *colsp > 0) ? 0 : -1);
+	return (-1);
 }
 
 static void
-setmovecur(void)
+setmovecur()
 {
 	int i, n;
 	if ((opts.o_outpmode & OPT_FULLSCREEN) &&
@@ -1248,19 +1212,17 @@ setmovecur(void)
 }
 
 static int
-setsize(void)
+setsize()
 {
 	static int oldn = 0;
-	int cols, n, ret;
+	int n;
 
 	if (opts.o_outpmode & OPT_FULLSCREEN) {
-		ret = nlines(&n, &cols);
-		if (ret != -1)
-			opts.o_cols = cols;
+		n = nlines();
 		if (n == oldn)
 			return (0);
 		oldn = n;
-		if (ret == -1) {
+		if (n == -1) {
 			opts.o_outpmode &= ~OPT_USEHOME;
 			setmovecur();		/* set default window size */
 			return (1);

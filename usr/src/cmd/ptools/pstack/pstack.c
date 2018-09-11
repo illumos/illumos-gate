@@ -21,8 +21,6 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/isa_defs.h>
@@ -139,7 +137,7 @@ static	int	thr_stack(const td_thrhandle_t *, void *);
 static	void	free_threadinfo(void);
 static	struct threadinfo *find_thread(id_t);
 static	int	all_call_stacks(pstack_handle_t *, int);
-static	void	tlhead(id_t, id_t, const char *);
+static	void	tlhead(id_t, id_t);
 static	int	print_frame(void *, prgregset_t, uint_t, const long *);
 static	void	print_zombie(struct ps_prochandle *, struct threadinfo *);
 static	void	print_syscall(const lwpstatus_t *, prgregset_t);
@@ -382,7 +380,6 @@ static int
 thread_call_stack(void *data, const lwpstatus_t *psp,
     const lwpsinfo_t *pip)
 {
-	char lwpname[THREAD_NAME_MAX] = "";
 	pstack_handle_t *h = data;
 	lwpstatus_t lwpstatus;
 	struct threadinfo *tip;
@@ -394,10 +391,7 @@ thread_call_stack(void *data, const lwpstatus_t *psp,
 	if ((tip = find_thread(pip->pr_lwpid)) == NULL)
 		return (0);
 
-	(void) Plwp_getname(h->proc, pip->pr_lwpid,
-	    lwpname, sizeof (lwpname));
-
-	tlhead(tip->threadid, pip->pr_lwpid, lwpname);
+	tlhead(tip->threadid, pip->pr_lwpid);
 	tip->threadid = 0;	/* finish eliminating tid */
 	if (psp)
 		call_stack(h, psp);
@@ -416,19 +410,15 @@ thread_call_stack(void *data, const lwpstatus_t *psp,
 
 static int
 lwp_call_stack(void *data,
-    const lwpstatus_t *psp, const lwpsinfo_t *pip)
+	const lwpstatus_t *psp, const lwpsinfo_t *pip)
 {
-	char lwpname[THREAD_NAME_MAX] = "";
 	pstack_handle_t *h = data;
 
 	if (!proc_lwp_in_set(h->lwps, pip->pr_lwpid))
 		return (0);
 	h->count++;
 
-	(void) Plwp_getname(h->proc, pip->pr_lwpid,
-	    lwpname, sizeof (lwpname));
-
-	tlhead(0, pip->pr_lwpid, lwpname);
+	tlhead(0, pip->pr_lwpid);
 	if (psp)
 		call_stack(h, psp);
 	else
@@ -472,7 +462,7 @@ all_call_stacks(pstack_handle_t *h, int dothreads)
 			if ((tid = tip->threadid) != 0) {
 				(void) memcpy(lwpstatus.pr_reg, tip->regs,
 				    sizeof (prgregset_t));
-				tlhead(tid, tip->lwpid, NULL);
+				tlhead(tid, tip->lwpid);
 				if (tip->state == TD_THR_ZOMBIE)
 					print_zombie(Pr, tip);
 				else
@@ -485,49 +475,23 @@ all_call_stacks(pstack_handle_t *h, int dothreads)
 	return (0);
 }
 
-/* The width of the header */
-#define	HEAD_WIDTH	(62)
 static void
-tlhead(id_t threadid, id_t lwpid, const char *name)
+tlhead(id_t threadid, id_t lwpid)
 {
-	char buf[128] = { 0 };
-	char num[16];
-	ssize_t amt = 0;
-	int i;
-
 	if (threadid == 0 && lwpid == 0)
 		return;
 
-	if (lwpid > 0) {
-		(void) snprintf(num, sizeof (num), "%d", (int)lwpid);
-		(void) strlcat(buf, "thread# ", sizeof (buf));
-		(void) strlcat(buf, num, sizeof (buf));
-	}
+	(void) printf("-----------------");
 
-	if (threadid > 0) {
-		(void) snprintf(num, sizeof (num), "%d", (int)threadid);
-		if (lwpid > 0)
-			(void) strlcat(buf, " / ", sizeof (buf));
-		(void) strlcat(buf, "lwp# ", sizeof (buf));
-		(void) strlcat(buf, num, sizeof (buf));
-	}
+	if (threadid && lwpid)
+		(void) printf("  lwp# %d / thread# %d  ",
+		    (int)lwpid, (int)threadid);
+	else if (threadid)
+		(void) printf("---------  thread# %d  ", (int)threadid);
+	else if (lwpid)
+		(void) printf("  lwp# %d  ------------", (int)lwpid);
 
-	if (name != NULL && strlen(name) > 0) {
-		(void) strlcat(buf, " [", sizeof (buf));
-		(void) strlcat(buf, name, sizeof (buf));
-		(void) strlcat(buf, "]", sizeof (buf));
-	}
-
-	amt = (HEAD_WIDTH - strlen(buf) - 2);
-	if (amt < 4)
-		amt = 4;
-
-	for (i = 0; i < amt / 2; i++)
-		(void) putc('-', stdout);
-	(void) printf(" %s ", buf);
-	for (i = 0; i < (amt / 2) + (amt % 2); i++)
-		(void) putc('-', stdout);
-	(void) putc('\n', stdout);
+	(void) printf("--------------------\n");
 }
 
 /*ARGSUSED*/

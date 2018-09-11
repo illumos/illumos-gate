@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2012 Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1134,8 +1134,6 @@ method_thread(void *arg)
 	int r, exit_code;
 	boolean_t retryable;
 	restarter_str_t reason;
-
-	(void) pthread_setname_np(pthread_self(), "method");
 
 	assert(0 <= info->sf_method_type && info->sf_method_type <= 2);
 

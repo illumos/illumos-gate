@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
@@ -3539,25 +3539,6 @@ dtrace_dif_variable(dtrace_mstate_t *mstate, dtrace_state_t *state, uint64_t v,
 
 		return ((uint64_t)lwp->lwp_errno);
 	}
-
-	case DIF_VAR_THREADNAME:
-		/*
-		 * See comment in DIF_VAR_PID.
-		 */
-		if (DTRACE_ANCHORED(mstate->dtms_probe) && CPU_ON_INTR(CPU))
-			return (0);
-
-		if (curthread->t_name == NULL)
-			return (0);
-
-		/*
-		 * Once set, ->t_name itself is never changed: any updates are
-		 * made to the same buffer that we are pointing out.  So we are
-		 * safe to dereference it here.
-		 */
-		return (dtrace_dif_varstr((uintptr_t)curthread->t_name,
-		    state, mstate));
-
 	default:
 		DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
 		return (0);
@@ -5582,7 +5563,7 @@ next:
 			 * Stringify using RFC 1884 convention 2 - 16 bit
 			 * hexadecimal values with a zero-run compression.
 			 * Lower case hexadecimal digits are used.
-			 *	eg, fe80::214:4fff:fe0b:76c8.
+			 * 	eg, fe80::214:4fff:fe0b:76c8.
 			 * The IPv4 embedded form is returned for inet_ntop,
 			 * just the IPv4 string is returned for inet_ntoa6.
 			 */
@@ -5766,7 +5747,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 	 */
 	mstate->dtms_difo = difo;
 
-	regs[DIF_REG_R0] = 0;		/* %r0 is fixed at zero */
+	regs[DIF_REG_R0] = 0; 		/* %r0 is fixed at zero */
 
 	while (pc < textlen && !(*flags & CPU_DTRACE_FAULT)) {
 		opc = pc;

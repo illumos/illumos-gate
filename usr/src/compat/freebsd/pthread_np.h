@@ -11,7 +11,6 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_PTHREAD_NP_H_
@@ -21,9 +20,8 @@
 #include <sys/cpuset.h>
 
 #include <synch.h>
-#include <pthread.h>
 
-#define	pthread_set_name_np pthread_setname_np
+#define	pthread_set_name_np(thread, name)
 
 #define	pthread_mutex_isowned_np(x)	_mutex_held(x)
 

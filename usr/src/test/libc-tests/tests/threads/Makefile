@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2016 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -18,7 +18,7 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/libc-tests
 TESTDIR = $(ROOTOPTPKG)/tests
 
-PROGS = pthread_attr_get_np thread_name
+PROGS = pthread_attr_get_np
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com

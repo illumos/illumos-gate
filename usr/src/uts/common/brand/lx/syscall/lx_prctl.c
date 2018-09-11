@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 #include <sys/systm.h>
@@ -175,9 +175,7 @@ lx_prctl(int opt, uintptr_t data)
 		}
 		name[LX_PR_SET_NAME_NAMELEN - 1] = '\0';
 
-		if ((ret = thread_setname(t, name)) != 0) {
-			return (set_errno(ret));
-		}
+		thread_setname(t, name);
 
 		/*
 		 * In Linux, PR_SET_NAME sets the name of the thread, not the

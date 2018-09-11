@@ -22,7 +22,6 @@
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
-# Copyright 2018 Joyent, Inc.
 #
 
 @ _START_
@@ -470,7 +469,6 @@
 @ MSG_CNOTE_DESC_STRUCT_UTSNAME		"desc: (struct utsname)"
 @ MSG_CNOTE_DESC_PRFDINFO_T		"desc: (prfdinfo_t)"
 @ MSG_CNOTE_DESC_PRSECFLAGS_T		"desc: (prsecflags_t)"
-@ MSG_CNOTE_DESC_PRLWPNAME_T		"desc: (prlwpname_t)"
 
 @ MSG_CNOTE_FMT_LINE		"%*s%-*s%s"
 @ MSG_CNOTE_FMT_LINE_2UP	"%*s%-*s%-*s%-*s%s"
@@ -537,7 +535,6 @@
 @ MSG_CNOTE_T_PR_LWP			"pr_lwp:"
 @ MSG_CNOTE_T_PR_LWPHOLD		"pr_lwphold:"
 @ MSG_CNOTE_T_PR_LWPID			"pr_lwpid:"
-@ MSG_CNOTE_T_PR_LWPNAME		"pr_lwpname:"
 @ MSG_CNOTE_T_PR_LWPPEND		"pr_lwppend:"
 @ MSG_CNOTE_T_PR_NAME			"pr_name:"
 @ MSG_CNOTE_T_PR_NGROUPS		"pr_ngroups:"

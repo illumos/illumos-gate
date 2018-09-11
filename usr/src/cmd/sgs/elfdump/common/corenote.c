@@ -1256,20 +1256,6 @@ dump_prstatus(note_state_t *state, const char *title)
 }
 
 
-static void
-dump_lwpname(note_state_t *state, const char *title)
-{
-	const sl_prlwpname_layout_t *layout = state->ns_arch->prlwpname;
-
-	indent_enter(state, title, &layout->pr_lwpid);
-
-	PRINT_DEC(MSG_ORIG(MSG_CNOTE_T_PR_LWPID), pr_lwpid);
-	PRINT_STRBUF(MSG_ORIG(MSG_CNOTE_T_PR_LWPNAME), pr_lwpname);
-
-	indent_exit(state);
-}
-
-
 /*
  * Print percent from 16-bit binary fraction [0 .. 1]
  * Round up .01 to .1 to indicate some small percentage (the 0x7000 below).
@@ -1922,11 +1908,6 @@ corenote(Half mach, int do_swap, Word type,
 		state.ns_t2col = 41;
 		state.ns_v2col = 54;
 		dump_secflags(&state, MSG_ORIG(MSG_CNOTE_DESC_PRSECFLAGS_T));
-		return (CORENOTE_R_OK);
-
-	case NT_LWPNAME:
-		state.ns_vcol = 20;
-		dump_lwpname(&state, MSG_ORIG(MSG_CNOTE_DESC_PRLWPNAME_T));
 		return (CORENOTE_R_OK);
 	}
 

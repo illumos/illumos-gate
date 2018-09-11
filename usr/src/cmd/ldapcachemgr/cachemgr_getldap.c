@@ -20,8 +20,6 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- *
- * Copyright 2018 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -1633,8 +1631,6 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 	static time_t		prev_refresh = 0, next_refresh = 0;
 	ns_server_status_t		changed = 0;
 
-	(void) pthread_setname_np(pthread_self(), "getldap_serverinfo");
-
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_serverInfo_op()...\n");
 	}
@@ -2546,8 +2542,6 @@ getldap_refresh()
 	int		sig_done = 0;
 	int		dbg_level;
 
-	(void) pthread_setname_np(pthread_self(), "getldap_refresh");
-
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_refresh()...\n");
 	}
@@ -2897,8 +2891,6 @@ remove_server_thread(void *arg)
 	char *addr = (char *)arg, *out = NULL;
 	int up;
 	rm_svr_t rms;
-
-	(void) pthread_setname_np(pthread_self(), "remove_server");
 
 	up = contact_server(addr);
 

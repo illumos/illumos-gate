@@ -607,8 +607,7 @@ extern disp_lock_t stop_lock;		/* lock protecting stopped threads */
 
 caddr_t	thread_stk_init(caddr_t);	/* init thread stack */
 
-int thread_setname(kthread_t *, const char *);
-int thread_vsetname(kthread_t *, const char *, ...);
+void	thread_setname(kthread_t *, const char *);
 
 extern int default_binding_mode;
 extern int default_stksize;

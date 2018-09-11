@@ -27,7 +27,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2016 Joyent, Inc.
  */
 
 #ifndef _SYS_PROC_PRDATA_H
@@ -137,7 +137,6 @@ typedef enum prnodetype {
 	PR_LWPDIR,		/* /proc/<pid>/lwp			*/
 	PR_LWPIDDIR,		/* /proc/<pid>/lwp/<lwpid>		*/
 	PR_LWPCTL,		/* /proc/<pid>/lwp/<lwpid>/lwpctl	*/
-	PR_LWPNAME,		/* /proc/<pid>/lwp/<lwpid>/lwpname	*/
 	PR_LWPSTATUS,		/* /proc/<pid>/lwp/<lwpid>/lwpstatus	*/
 	PR_LWPSINFO,		/* /proc/<pid>/lwp/<lwpid>/lwpsinfo	*/
 	PR_LWPUSAGE,		/* /proc/<pid>/lwp/<lwpid>/lwpusage	*/
@@ -364,7 +363,7 @@ extern	void	prgetaction(proc_t *, user_t *, uint_t, struct sigaction *);
 extern	void	prgetusage(kthread_t *, struct prhusage *);
 extern	void	praddusage(kthread_t *, struct prhusage *);
 extern	void	prcvtusage(struct prhusage *, prusage_t *);
-extern	void	prscaleusage(prhusage_t *);
+extern	void 	prscaleusage(prhusage_t *);
 extern	kthread_t *prchoose(proc_t *);
 extern	void	allsetrun(proc_t *);
 extern	int	setisempty(uint32_t *, uint_t);

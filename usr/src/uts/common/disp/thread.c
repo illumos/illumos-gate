@@ -74,7 +74,6 @@
 #include <sys/waitq.h>
 #include <sys/cpucaps.h>
 #include <sys/kiconv.h>
-#include <sys/ctype.h>
 #include <sys/ht.h>
 
 #ifndef	STACK_GROWTH_DOWN
@@ -2335,7 +2334,7 @@ stkinfo_percent(caddr_t t_stk, caddr_t t_stkbase, caddr_t sp)
  * It is also expected callers on behalf of userland clients have done
  * any necessary permission checks.
  */
-int
+void
 thread_setname(kthread_t *t, const char *name)
 {
 	char *buf = NULL;
@@ -2356,11 +2355,6 @@ thread_setname(kthread_t *t, const char *name)
 	 * usage in highly constrained situations (e.g. dtrace).
 	 */
 	if (name != NULL && name[0] != '\0') {
-		for (size_t i = 0; name[i] != '\0'; i++) {
-			if (!isprint(name[i]))
-				return (EINVAL);
-		}
-
 		buf = kmem_zalloc(THREAD_NAME_MAX, KM_SLEEP);
 		(void) strlcpy(buf, name, THREAD_NAME_MAX);
 	}
@@ -2377,25 +2371,4 @@ thread_setname(kthread_t *t, const char *name)
 		}
 	}
 	mutex_exit(&ttoproc(t)->p_lock);
-	return (0);
-}
-
-int
-thread_vsetname(kthread_t *t, const char *fmt, ...)
-{
-	char name[THREAD_NAME_MAX];
-	va_list va;
-	int rc;
-
-	va_start(va, fmt);
-	rc = vsnprintf(name, sizeof (name), fmt, va);
-	va_end(va);
-
-	if (rc < 0)
-		return (EINVAL);
-
-	if (rc >= sizeof (name))
-		return (ENAMETOOLONG);
-
-	return (thread_setname(t, name));
 }

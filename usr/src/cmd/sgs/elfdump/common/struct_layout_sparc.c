@@ -26,10 +26,6 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  */
-/*
- * Copyright 2018 Joyent, Inc.
- */
-
 #include <struct_layout.h>
 
 
@@ -390,13 +386,6 @@ static const sl_prsecflags_layout_t prsecflags_layout = {
 };
 
 
-static const sl_prlwpname_layout_t prlwpname_layout = {
-	{ 0,	40,	0,	0 },		/* sizeof (prlwpname_t) */
-	{ 0,	8,	0,	0 },		/* pr_lwpid */
-	{ 8,	1,	32,	0 },		/* pr_lwpname[] */
-};
-
-
 
 
 static const sl_arch_layout_t layout_sparc = {
@@ -421,7 +410,6 @@ static const sl_arch_layout_t layout_sparc = {
 	&utsname_layout,
 	&prfdinfo_layout,
 	&prsecflags_layout,
-	&prlwpname_layout,
 };
 
 
