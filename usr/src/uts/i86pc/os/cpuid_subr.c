@@ -33,6 +33,7 @@
 /*
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+ * Copyright 2018, Joyent, Inc.
  */
 
 /*
@@ -75,10 +76,16 @@
  *		5 for family 0x14
  *		6 for family 0x15, models 00 - 0f
  *		7 for family 0x15, models 10 - 1f
+ *		8 for family 0x15, models 30 - 3f
+ *		9 for family 0x15, models 60 - 6f
+ *		10 for family 0x15, models 70 - 7f
+ *		11 for family 0x16, models 00 - 0f
+ *		12 for family 0x16, models 30 - 3f
+ *		13 for family 0x17, models 00 - 0f
  * Second index by (model & 0x3) for family 0fh,
  * CPUID pkg bits (Fn8000_0001_EBX[31:28]) for later families.
  */
-static uint32_t amd_skts[8][8] = {
+static uint32_t amd_skts[14][8] = {
 	/*
 	 * Family 0xf revisions B through E
 	 */
@@ -197,13 +204,103 @@ static uint32_t amd_skts[8][8] = {
 		X86_SOCKET_UNKNOWN	/* 0b111 */
 	},
 
+	/*
+	 * Family 0x15 models 30-3f
+	 */
+#define	A_SKTS_8			8
+	{
+		X86_SOCKET_FP3,		/* 0b000 */
+		X86_SOCKET_FM2R2,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x15 models 60-6f
+	 */
+#define	A_SKTS_9			9
+	{
+		X86_SOCKET_FP4,		/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_AM4,		/* 0b010 */
+		X86_SOCKET_FM2R2,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x15 models 70-7f
+	 */
+#define	A_SKTS_10			10
+	{
+		X86_SOCKET_FP4,		/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_AM4,		/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_FT4,		/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x16 models 00-0f
+	 */
+#define	A_SKTS_11			11
+	{
+		X86_SOCKET_FT3,		/* 0b000 */
+		X86_SOCKET_FS1B,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x16 models 30-3f
+	 */
+#define	A_SKTS_12			12
+	{
+		X86_SOCKET_FT3B,	/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_UNKNOWN,	/* 0b010 */
+		X86_SOCKET_FP4,		/* 0b011 */
+		X86_SOCKET_UNKNOWN,	/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_UNKNOWN	/* 0b111 */
+	},
+
+	/*
+	 * Family 0x17 models 00-0f
+	 */
+#define	A_SKTS_13			13
+	{
+		X86_SOCKET_UNKNOWN,	/* 0b000 */
+		X86_SOCKET_UNKNOWN,	/* 0b001 */
+		X86_SOCKET_AM4,		/* 0b010 */
+		X86_SOCKET_UNKNOWN,	/* 0b011 */
+		X86_SOCKET_SP3,		/* 0b100 */
+		X86_SOCKET_UNKNOWN,	/* 0b101 */
+		X86_SOCKET_UNKNOWN,	/* 0b110 */
+		X86_SOCKET_SP3R2	/* 0b111 */
+	},
+
 };
 
 struct amd_sktmap_s {
 	uint32_t	skt_code;
 	char		sktstr[16];
 };
-static struct amd_sktmap_s amd_sktmap[23] = {
+static struct amd_sktmap_s amd_sktmap[X86_NUM_SOCKETS_AMD + 1] = {
 	{ X86_SOCKET_754,	"754" },
 	{ X86_SOCKET_939,	"939" },
 	{ X86_SOCKET_940,	"940" },
@@ -225,6 +322,16 @@ static struct amd_sktmap_s amd_sktmap[23] = {
 	{ X86_SOCKET_FP2,	"FP2" },
 	{ X86_SOCKET_FS1R2,	"FS1r2" },
 	{ X86_SOCKET_FM2,	"FM2" },
+	{ X86_SOCKET_FP3,	"FP3" },
+	{ X86_SOCKET_FM2R2,	"FM2r2" },
+	{ X86_SOCKET_FP4,	"FP4" },
+	{ X86_SOCKET_AM4,	"AM4" },
+	{ X86_SOCKET_FT3,	"FT3" },
+	{ X86_SOCKET_FT4,	"FT4" },
+	{ X86_SOCKET_FS1B,	"FS1b" },
+	{ X86_SOCKET_FT3B,	"FT3b" },
+	{ X86_SOCKET_SP3,	"SP3" },
+	{ X86_SOCKET_SP3R2,	"SP3r2" },
 	{ X86_SOCKET_UNKNOWN,	"Unknown" }
 };
 
@@ -346,10 +453,40 @@ static const struct amd_rev_mapent {
 	/*
 	 * =============== AuthenticAMD Family 0x15 ===============
 	 */
-	{ 0x15, 0x01, 0x01, 0x2, 0x2, X86_CHIPREV_AMD_15OR_REV_B2, "B2",
+	{ 0x15, 0x01, 0x01, 0x2, 0x2, X86_CHIPREV_AMD_15OR_REV_B2, "OR-B2",
 	    A_SKTS_6 },
-	{ 0x15, 0x10, 0x10, 0x1, 0x1, X86_CHIPREV_AMD_15TN_REV_A1, "A1",
+	{ 0x15, 0x02, 0x02, 0x0, 0x0, X86_CHIPREV_AMD_150R_REV_C0, "OR-C0",
+	    A_SKTS_6 },
+	{ 0x15, 0x10, 0x10, 0x1, 0x1, X86_CHIPREV_AMD_15TN_REV_A1, "TN-A1",
 	    A_SKTS_7 },
+	{ 0x15, 0x30, 0x30, 0x1, 0x1, X86_CHIPREV_AMD_15KV_REV_A1, "KV-A1",
+	    A_SKTS_8 },
+	/*
+	 * There is no Family 15 Models 60-6f revision guide available, so at
+	 * least get the socket information.
+	 */
+	{ 0x15, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_15F60, "??",
+	    A_SKTS_9 },
+	{ 0x15, 0x70, 0x70, 0x0, 0x0, X86_CHIPREV_AMD_15ST_REV_A0, "ST-A0",
+	    A_SKTS_10 },
+
+	/*
+	 * =============== AuthenticAMD Family 0x16 ===============
+	 */
+	{ 0x16, 0x00, 0x00, 0x1, 0x1, X86_CHIPREV_AMD_16_KB_A1, "KB-A1",
+	    A_SKTS_11 },
+	{ 0x16, 0x30, 0x30, 0x1, 0x1, X86_CHIPREV_AMD_16_ML_A1, "ML-A1",
+	    A_SKTS_12 },
+
+	/*
+	 * =============== AuthenticAMD Family 0x17 ===============
+	 */
+	{ 0x17, 0x01, 0x01, 0x1, 0x1, X86_CHIPREV_AMD_17_ZP_B1, "ZP-B1",
+	    A_SKTS_13 },
+	{ 0x17, 0x01, 0x01, 0x2, 0x2, X86_CHIPREV_AMD_17_ZP_B2, "ZP-B2",
+	    A_SKTS_13 },
+	{ 0x17, 0x01, 0x01, 0x1, 0x1, X86_CHIPREV_AMD_17_PiR_B2, "PiR-B2",
+	    A_SKTS_13 },
 };
 
 static void
