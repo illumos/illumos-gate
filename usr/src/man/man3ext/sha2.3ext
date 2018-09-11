@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SHA2 3EXT "Nov 13, 2007"
+.TH SHA2 3EXT "Sep 10, 2018"
 .SH NAME
 sha2, SHA2Init, SHA2Update, SHA2Final, SHA256Init, SHA256Update, SHA256Final,
 SHA384Init, SHA384Update, SHA384Final, SHA512Init, SHA512Update, SHA512Final \-
@@ -77,15 +78,15 @@ SHA2 digest functions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBSHA2Init()\fR, \fBSHA2Update()\fR, \fBSHA2Final()\fR functions implement
-the \fBSHA256\fR, \fBSHA384\fR and \fBSHA512\fR message-digest algorithms. The
-algorithms take as input a message of arbitrary length and produces a 200-bit
-"fingerprint" or "message digest" as output. The \fBSHA2\fR message-digest
-algorithms are intended for digital signature applications in which large files
-are "compressed" in a secure manner before being encrypted with a private
-(secret) key under a public-key cryptosystem such as RSA.
+the \fBSHA256\fR, \fBSHA384\fR, \fBSHA512\fR, \fBSHA512/224\fR and
+\fBSHA512/256\fR message-digest algorithms. The algorithms take as input a
+message of arbitrary length and produce a 200-bit "fingerprint" or "message
+digest" as output. The \fBSHA2\fR message-digest algorithms are intended for
+digital signature applications in which large files are "compressed" in a
+secure manner before being encrypted with a private (secret) key under a
+public-key cryptosystem such as RSA.
 .sp
 .ne 2
 .na
@@ -103,7 +104,7 @@ consists of calls to \fBSHA2\fR functions in the following order: one call to
 .sp
 The \fBSHA2Init()\fR function initializes the SHA2 context structure pointed to
 by \fIcontext\fR. The \fImech\fR argument is one of \fBSHA256\fR, \fBSHA512\fR,
-\fBSHA384\fR.
+\fBSHA384\fR, \fBSHA512_224\fR, \fBSHA512_256\fR.
 .sp
 The \fBSHA2Update()\fR function computes a partial \fBSHA2\fR digest on the
 \fIinlen\fR-byte message block pointed to by \fIinput\fR, and updates the
@@ -133,7 +134,6 @@ argument as it is implicit in the function names.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 These functions do not return a value.
 .SH EXAMPLES
@@ -211,7 +211,6 @@ AuthenticateMsg(unsigned char *auth_buffer, struct iovec
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -229,7 +228,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibmd\fR(3LIB)
 .sp

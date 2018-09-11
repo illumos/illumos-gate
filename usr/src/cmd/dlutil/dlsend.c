@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -31,23 +31,13 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <endian.h>
+#include <err.h>
 
 #include "dlsend.h"
 
 static uint_t dlsend_sap = DLSEND_SAP;
 static const char *dlsend_msg = DLSEND_MSG;
 static const char *dlsend_prog;
-
-static void
-dlsend_warn(const char *fmt, ...)
-{
-	va_list ap;
-
-	(void) fprintf(stderr, "%s: ", dlsend_prog);
-	va_start(ap, fmt);
-	(void) vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
 
 static void
 dlsend_usage(const char *fmt, ...)
@@ -112,30 +102,30 @@ main(int argc, char *argv[])
 	}
 
 	if ((mac = _link_aton(argv[1], &maclen)) == NULL) {
-		dlsend_warn("failed to convert target address %s\n", argv[1]);
+		warnx("failed to convert target address %s\n", argv[1]);
 		return (1);
 	}
 
 	if (gethostname(host, sizeof (host)) != 0) {
-		dlsend_warn("failed to obtain the system hostname: %s\n",
+		warnx("failed to obtain the system hostname: %s\n",
 		    strerror(errno));
 		(void) strlcpy(host, "<unknown host>", sizeof (host));
 	}
 
 	if ((ret = dlpi_open(argv[0], &dh, 0)) != DLPI_SUCCESS) {
-		dlsend_warn("failed to open %s: %s\n", argv[0],
+		warnx("failed to open %s: %s\n", argv[0],
 		    dlpi_strerror(ret));
 		exit(1);
 	}
 
 	if ((ret = dlpi_bind(dh, dlsend_sap, &bind_sap)) != DLPI_SUCCESS) {
-		dlsend_warn("failed to bind to sap 0x%x: %s\n", dlsend_sap,
+		warnx("failed to bind to sap 0x%x: %s\n", dlsend_sap,
 		    dlpi_strerror(ret));
 		exit(1);
 	}
 
 	if (bind_sap != dlsend_sap) {
-		dlsend_warn("failed to bind to requested sap 0x%x, bound to "
+		warnx("failed to bind to requested sap 0x%x, bound to "
 		    "0x%x\n", dlsend_sap, bind_sap);
 		exit(1);
 	}
@@ -151,13 +141,14 @@ main(int argc, char *argv[])
 		(void) strlcpy(msg.dm_mesg, dlsend_msg, sizeof (msg.dm_mesg));
 		ret = dlpi_send(dh, mac, maclen, &msg, sizeof (msg), NULL);
 		if (ret != DLPI_SUCCESS) {
-			dlsend_warn("failed to send message: %s\n",
+			warnx("failed to send message: %s\n",
 			    dlpi_strerror(ret));
 			exit(1);
 		}
 
-		sleep(1);
+		(void) sleep(1);
 	}
 
+	/* LINTED: E_STMT_NOT_REACHED */
 	return (0);
 }

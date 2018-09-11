@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -32,23 +32,13 @@
 #include <stdint.h>
 #include <endian.h>
 #include <ctype.h>
+#include <err.h>
 
 #include "dlsend.h"
 
 
 static uint_t dlrecv_sap = DLSEND_SAP;
 static const char *dlrecv_prog;
-
-static void
-dlrecv_warn(const char *fmt, ...)
-{
-	va_list ap;
-
-	(void) fprintf(stderr, "%s: ", dlrecv_prog);
-	va_start(ap, fmt);
-	(void) vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
 
 static void
 dlrecv_usage(const char *fmt, ...)
@@ -77,7 +67,7 @@ dlrecv_isvalid(dlsend_msg_t *msg)
 	for (i = 0; i < sizeof (msg->dm_host); i++) {
 		if (!isprint(msg->dm_host[i]) &&
 		    msg->dm_host[i] != '\0') {
-			dlrecv_warn("Encountered bad byte in dm_host[%d]\n",
+			warnx("Encountered bad byte in dm_host[%d]\n",
 			    i);
 			return (B_FALSE);
 		}
@@ -87,7 +77,7 @@ dlrecv_isvalid(dlsend_msg_t *msg)
 	}
 
 	if (!nul) {
-		dlrecv_warn("Missing NUL in dm_host\n");
+		warnx("Missing NUL in dm_host\n");
 		return (B_FALSE);
 	}
 
@@ -95,7 +85,7 @@ dlrecv_isvalid(dlsend_msg_t *msg)
 	for (i = 0; i < sizeof (msg->dm_mesg); i++) {
 		if (!isprint(msg->dm_mesg[i]) &&
 		    msg->dm_mesg[i] != '\0') {
-			dlrecv_warn("Encountered bad byte in dm_mesg[%d]\n",
+			warnx("Encountered bad byte in dm_mesg[%d]\n",
 			    i);
 			return (B_FALSE);
 		}
@@ -105,12 +95,12 @@ dlrecv_isvalid(dlsend_msg_t *msg)
 	}
 
 	if (!nul) {
-		dlrecv_warn("Missing NUL in dm_mesg\n");
+		warnx("Missing NUL in dm_mesg\n");
 		return (B_FALSE);
 	}
 
 	if (strcmp(msg->dm_mesg, DLSEND_MSG) != 0) {
-		dlrecv_warn("Missing expected message (%s)\n", DLSEND_MSG);
+		warnx("Missing expected message (%s)\n", DLSEND_MSG);
 		return (B_FALSE);
 	}
 
@@ -122,7 +112,8 @@ dlrecv_print(dlsend_msg_t *msg, dlpi_recvinfo_t *rinfo, boolean_t invalid)
 {
 	uint_t i;
 
-	printf("Received %s from ", invalid ? "invalid message" : "Elbereth");
+	(void) printf("Received %s from ", invalid ?
+	    "invalid message" : "Elbereth");
 
 	for (i = 0; i < rinfo->dri_destaddrlen; i++) {
 		(void) printf("%02x", rinfo->dri_destaddr[i]);
@@ -134,7 +125,7 @@ dlrecv_print(dlsend_msg_t *msg, dlpi_recvinfo_t *rinfo, boolean_t invalid)
 		return;
 	}
 
-	printf(" seq=%" PRIu64 " host=%s\n", betoh64(msg->dm_count),
+	(void) printf(" seq=%" PRIu64 " host=%s\n", betoh64(msg->dm_count),
 	    msg->dm_host);
 }
 
@@ -181,19 +172,19 @@ main(int argc, char *argv[])
 	}
 
 	if ((ret = dlpi_open(argv[0], &dh, 0)) != DLPI_SUCCESS) {
-		dlrecv_warn("failed to open %s: %s\n", argv[0],
+		warnx("failed to open %s: %s\n", argv[0],
 		    dlpi_strerror(ret));
 		exit(1);
 	}
 
 	if ((ret = dlpi_bind(dh, dlrecv_sap, &bind_sap)) != DLPI_SUCCESS) {
-		dlrecv_warn("failed to bind to sap 0x%x: %s\n", dlrecv_sap,
+		warnx("failed to bind to sap 0x%x: %s\n", dlrecv_sap,
 		    dlpi_strerror(ret));
 		exit(1);
 	}
 
 	if (bind_sap != dlrecv_sap) {
-		dlrecv_warn("failed to bind to requested sap 0x%x, bound to "
+		warnx("failed to bind to requested sap 0x%x, bound to "
 		    "0x%x\n", dlrecv_sap, bind_sap);
 		exit(1);
 	}
@@ -207,20 +198,20 @@ main(int argc, char *argv[])
 		msglen = sizeof (msg);
 		ret = dlpi_recv(dh, NULL, NULL, &msg, &msglen, -1, &rinfo);
 		if (ret != DLPI_SUCCESS) {
-			dlrecv_warn("failed to receive data: %s\n",
+			warnx("failed to receive data: %s\n",
 			    dlpi_strerror(ret));
 			continue;
 		}
 
 		if (msglen != rinfo.dri_totmsglen) {
-			dlrecv_warn("message truncated: expected %ld bytes, "
+			warnx("message truncated: expected %ld bytes, "
 			    "got %ld\n", sizeof (dlsend_msg_t),
 			    rinfo.dri_totmsglen);
 			invalid = B_TRUE;
 		}
 
 		if (msglen != sizeof (msg)) {
-			dlrecv_warn("message too short: expected %ld bytes, "
+			warnx("message too short: expected %ld bytes, "
 			    "got %ld\n", sizeof (dlsend_msg_t),
 			    msglen);
 			invalid = B_TRUE;
@@ -233,5 +224,6 @@ main(int argc, char *argv[])
 		dlrecv_print(&msg, &rinfo, invalid);
 	}
 
+	/* LINTED: E_STMT_NOT_REACHED */
 	return (0);
 }

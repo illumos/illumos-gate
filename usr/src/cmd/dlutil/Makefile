@@ -23,10 +23,13 @@ CFLAGS += $(CCVERBOSE)
 
 dltraninfo :=   LDLIBS += -ldladm -lsff -lnvpair
 dlled :=	LDLIBS += -ldladm
+dlsend :=	LDLIBS += -ldlpi -lsocket
+dlrecv :=	LDLIBS += -ldlpi
+
 dltraninfo.ln :=   LDLIBS += -ldladm -lsff -lnvpair
 dlled.ln :=	LDLIBS += -ldladm
-dlsend :=	LDLIBS += -ldlpi -lsocket -lmd
-dlrecv :=	LDLIBS += -ldlpi
+dlsend.ln :=	LDLIBS += -ldlpi -lsocket
+dlrecv.ln :=	LDLIBS += -ldlpi
 
 ROOTLIBDLFILES = $(PROG:%=$(ROOTLIB)/dl/%)
 

@@ -84,6 +84,8 @@ file path=sbin/flowadm mode=0555
 file path=sbin/flowstat mode=0555
 file path=sbin/ipadm mode=0555
 file path=usr/lib/dl/dlled mode=0555
+file path=usr/lib/dl/dlrecv mode=0555
+file path=usr/lib/dl/dlsend mode=0555
 file path=usr/lib/dl/dltraninfo mode=0555
 file path=usr/share/man/man1m/dladm.1m
 file path=usr/share/man/man1m/flowadm.1m
