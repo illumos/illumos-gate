@@ -23,7 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -1452,9 +1452,9 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp, tnode_t *pnode,
 	/*
 	 * For the node label, we look for the following in order:
 	 *
-	 * 	<ses-description>
-	 * 	<ses-class-description> <instance>
-	 * 	<default-type-label> <instance>
+	 * <ses-description>
+	 * <ses-class-description> <instance>
+	 * <default-type-label> <instance>
 	 */
 	if (nvlist_lookup_string(props, SES_PROP_DESCRIPTION, &desc) != 0 ||
 	    desc[0] == '\0') {
@@ -2837,9 +2837,9 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	/*
 	 * We use the following property mappings:
 	 *
-	 * 	manufacturer		vendor-id
-	 * 	model			product-id
-	 * 	serial-number		libses-chassis-serial
+	 * manufacturer		vendor-id
+	 * model		product-id
+	 * serial-number	libses-chassis-serial
 	 */
 	verify(nvlist_lookup_string(props, SES_EN_PROP_VID,
 	    &raw_manufacturer) == 0);
@@ -2854,9 +2854,9 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	 * 'product-id', we use a concatenation of 'manufacturer-model'.  We
 	 * also take the numerical serial number and convert it to a string.
 	 */
-	if ((manufacturer = disk_auth_clean(mod, raw_manufacturer)) == NULL ||
-	    (model = disk_auth_clean(mod, raw_model)) == NULL ||
-	    (revision = disk_auth_clean(mod, raw_revision)) == NULL) {
+	if ((manufacturer = topo_mod_clean_str(mod, raw_manufacturer)) ==
+	    NULL || (model = topo_mod_clean_str(mod, raw_model)) == NULL ||
+	    (revision = topo_mod_clean_str(mod, raw_revision)) == NULL) {
 		goto error;
 	}
 
