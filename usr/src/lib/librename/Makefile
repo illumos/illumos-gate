@@ -30,7 +30,7 @@ lint :=		TARGET = lint
 
 all clean clobber lint: $(SUBDIRS)
 
-install: 	$(SUBDIRS) $(VARPD_MAPFILES) install_h
+install: 	$(SUBDIRS) install_h
 
 install_h: 	$(ROOTHDRS)
 
