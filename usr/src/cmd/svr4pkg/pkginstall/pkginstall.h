@@ -20,6 +20,10 @@
  */
 
 /*
+ * Copyright (c) 2018 Peter Tribble.
+ */
+
+/*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -94,9 +98,6 @@ extern char	*getinst __P((int *updatingExisting, struct pkginfo *info,
 			int npkgs, boolean_t a_preinstallCheck));
 extern int	is_samepkg __P((void));
 extern int	dockspace __P((char *spacefile));
-
-extern int	special_contents_add(int, struct cfextra **, const char *);
-extern boolean_t	rm_all_pkg_entries(char *, char *);
 
 #ifdef __cplusplus
 }

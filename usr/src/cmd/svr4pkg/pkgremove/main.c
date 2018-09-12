@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright (c) 2017 Peter Tribble.
+ * Copyright (c) 2018 Peter Tribble.
  */
 
 /*
@@ -224,8 +224,8 @@ main(int argc, char *argv[])
 		 * a shared area from a reference client.
 		 */
 		case 'A':
-		    pkgrmremote++;
-		    break;
+			pkgrmremote++;
+			break;
 
 		/*
 		 * Same as pkgrm: Use the installation
@@ -238,8 +238,8 @@ main(int argc, char *argv[])
 		 * administration file.
 		 */
 		case 'a':
-		    admnfile = flex_device(optarg, 0);
-		    break;
+			admnfile = flex_device(optarg, 0);
+			break;
 
 		/*
 		 * Same as pkgrm: location where package executables
@@ -267,8 +267,8 @@ main(int argc, char *argv[])
 		 * upgrade process.
 		 */
 		case 'F':
-		    nodelete++;
-		    break;
+			nodelete++;
+			break;
 
 		/*
 		 * Same as pkgrm: Instruct pkgrm not to use the
@@ -279,16 +279,16 @@ main(int argc, char *argv[])
 		 * releases.
 		 */
 		case 'M':
-		    map_client = 0;
-		    break;
+			map_client = 0;
+			break;
 
 		/*
 		 * Different from pkgrm: specify program name to use
 		 * for messages.
 		 */
 		case 'N':
-		    (void) set_prog_name(optarg);
-		    break;
+			(void) set_prog_name(optarg);
+			break;
 
 		/*
 		 * Same as pkgrm: package removal occurs in
@@ -296,9 +296,9 @@ main(int argc, char *argv[])
 		 * removed files. The default mode is interactive.
 		 */
 		case 'n':
-		    nointeract++;
-		    (void) echoSetFlag(B_FALSE);
-		    break;
+			nointeract++;
+			(void) echoSetFlag(B_FALSE);
+			break;
 
 		/*
 		 * Almost same as pkgrm: the -O option allows the behavior
@@ -323,7 +323,7 @@ main(int argc, char *argv[])
 		 */
 		case 'O':
 			for (p = strtok(optarg, ","); p != (char *)NULL;
-				p = strtok(NULL, ",")) {
+			    p = strtok(NULL, ",")) {
 
 				/* process debug option */
 
@@ -343,7 +343,7 @@ main(int argc, char *argv[])
 				/* process enable-hollow-package-support opt */
 
 				if (strcmp(p,
-					"enable-hollow-package-support") == 0) {
+				    "enable-hollow-package-support") == 0) {
 					set_depend_pkginfo_DB(B_TRUE);
 					continue;
 				}
@@ -369,7 +369,7 @@ main(int argc, char *argv[])
 				/* process parent-zone-name option */
 
 				if (strncmp(p, PARENTZONENAME,
-						PARENTZONENAME_LEN) == 0) {
+				    PARENTZONENAME_LEN) == 0) {
 					parentZoneName = p+PARENTZONENAME_LEN;
 					continue;
 				}
@@ -377,7 +377,7 @@ main(int argc, char *argv[])
 				/* process parent-zone-type option */
 
 				if (strncmp(p, PARENTZONETYPE,
-						PARENTZONETYPE_LEN) == 0) {
+				    PARENTZONETYPE_LEN) == 0) {
 					parentZoneType = p+PARENTZONETYPE_LEN;
 					continue;
 				}
@@ -400,8 +400,8 @@ main(int argc, char *argv[])
 		 */
 
 		case 'o':
-		    script_in = PROC_XSTDIN;
-		    break;
+			script_in = PROC_XSTDIN;
+			break;
 
 		/*
 		 * Same as pkgrm: defines the full path name of a
@@ -411,20 +411,20 @@ main(int argc, char *argv[])
 		 * specified root_path.
 		 */
 		case 'R':
-		    if (!set_inst_root(optarg)) {
-			    progerr(ERR_ROOT_CMD);
-			    exit(1);
-		    }
-		    break;
+			if (!set_inst_root(optarg)) {
+				progerr(ERR_ROOT_CMD);
+				exit(1);
+			}
+			break;
 
 		/*
 		 * Same as pkgrm: allow admin to establish the client
 		 * filesystem using a vfstab-like file of stable format.
 		 */
 		case 'V':
-		    vfstab_file = flex_device(optarg, 2);
-		    map_client = 1;
-		    break;
+			vfstab_file = flex_device(optarg, 2);
+			map_client = 1;
+			break;
 
 		/*
 		 * Same as pkgrm: trace all of the scripts that
@@ -434,27 +434,27 @@ main(int argc, char *argv[])
 		 * scripts.
 		 */
 		case 'v':
-		    pkgverbose++;
-		    break;
+			pkgverbose++;
+			break;
 
 		/*
 		 * Different from pkgrm: process this package using
 		 * old non-ABI symlinks
 		 */
 		case 'y':
-		    set_nonABI_symlinks();
-		    break;
+			set_nonABI_symlinks();
+			break;
 
 		default:
-		    usage();
-		    /*NOTREACHED*/
-		    /*
-		     * Although usage() calls a noreturn function,
-		     * needed to add return (1);  so that main() would
-		     * pass compilation checks. The statement below
-   		     * should never be executed.
-		     */
-		    return (1);
+			usage();
+			/*NOTREACHED*/
+			/*
+			 * Although usage() calls a noreturn function,
+			 * needed to add return (1);  so that main() would
+			 * pass compilation checks. The statement below
+			 * should never be executed.
+			 */
+			return (1);
 		}
 	}
 
@@ -471,7 +471,7 @@ main(int argc, char *argv[])
 		echoDebug(DBG_ENTRY_IN_GZ, prog_full_name);
 	} else {
 		echoDebug(DBG_ENTRY_IN_LZ, prog_full_name, getzoneid(),
-			z_get_zonename());
+		    z_get_zonename());
 	}
 
 	/* establish cmdbin path */
@@ -591,13 +591,13 @@ main(int argc, char *argv[])
 	if (preremoveCheck == B_TRUE) {
 		(void) echoSetFlag(B_FALSE);
 		echoDebug(DBG_PKGREMOVE_PRERMCHK, pkginst ? pkginst : "",
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 		rcksetPreremoveCheck(B_TRUE);
 		rcksetZoneName(zoneName);
 	}
 
 	(void) snprintf(pkgloc, sizeof (pkgloc), "%s/%s", get_PKGLOC(),
-			pkginst);
+	    pkginst);
 	(void) snprintf(pkgbin, sizeof (pkgbin), "%s/install", pkgloc);
 	(void) snprintf(rlockfile, sizeof (rlockfile), "%s/!R-Lock!", pkgloc);
 
@@ -616,7 +616,7 @@ main(int argc, char *argv[])
 	if (access(rlockfile, F_OK) == 0) {
 		echo(ERR_UNSUCC);
 		echoDebug(DBG_PKGINSTALL_HAS_LOCKFILE, pkginst, rlockfile,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	}
 
 	/*
@@ -910,7 +910,7 @@ main(int argc, char *argv[])
 	} else {
 		echo(MSG_PKGREMOVE_PROCPKG_LZ, zoneName);
 		echoDebug(DBG_PKGREMOVE_PROCPKG_LZ, pkginst, rlockfile,
-			zoneName);
+		    zoneName);
 	}
 	if (delmap(0, pkginst, &pkgserver, &tmpfp) != 0) {
 		progerr(ERR_DB_QUERY, pkginst);
@@ -931,15 +931,15 @@ main(int argc, char *argv[])
 	if (access(script, F_OK) != 0) {
 		/* no script present */
 		echoDebug(DBG_PKGREMOVE_POC_NONE, pkginst,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	} else if (nodelete) {
 		/* not deleting files: skip preremove script */
 		echoDebug(DBG_PKGREMOVE_POC_NODEL, pkginst, script,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	} else if (is_depend_pkginfo_DB()) {
 		/* updating db only: skip preremove script */
 		echoDebug(DBG_PKGREMOVE_POC_DBUPD, pkginst, script,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	} else {
 		/* script present and ok to run: run the script */
 		set_ulimit("preremove", ERR_PREREMOVE);
@@ -949,17 +949,17 @@ main(int argc, char *argv[])
 		} else {
 			echo(MSG_PKGREMOVE_EXEPOC_LZ, zoneName);
 			echoDebug(DBG_PKGREMOVE_EXEPOC_LZ, pkginst, script,
-				zoneName);
+			    zoneName);
 		}
 		putparam("PKG_PROC_SCRIPT", "preremove");
 		if (pkgverbose) {
 			ckreturn(pkgexecl(script_in, PROC_STDOUT,
-				PROC_USER, PROC_GRP, SHELL, "-x",
-				script, NULL), ERR_PREREMOVE);
+			    PROC_USER, PROC_GRP, SHELL, "-x",
+			    script, NULL), ERR_PREREMOVE);
 		} else {
 			ckreturn(pkgexecl(script_in, PROC_STDOUT,
-				PROC_USER, PROC_GRP, SHELL, script,
-				NULL), ERR_PREREMOVE);
+			    PROC_USER, PROC_GRP, SHELL, script,
+			    NULL), ERR_PREREMOVE);
 		}
 		clr_ulimit();
 	}
@@ -969,14 +969,6 @@ main(int argc, char *argv[])
 	lockupd("remove");
 
 	/*
-	 * Ensure that the contents file is updated even if the db has
-	 * been upgraded, in the case that there are relevant entries
-	 * in a special_contents file.  The return value is ignored
-	 * since we do not want special_contents operation to prevent
-	 * pkgremove from succeeding.  We do report errors to stderr.
-	 */
-
-	/*
 	 * Remove all components belonging to this package.
 	 * Don't remove components if only updating the DB.
 	 * Don't remove components if files are not being deleted.
@@ -984,13 +976,13 @@ main(int argc, char *argv[])
 
 	if (nodelete) {
 		echoDebug(DBG_PKGREMOVE_REM_NODEL, pkginst,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	} else if (is_depend_pkginfo_DB()) {
 		echoDebug(DBG_PKGREMOVE_REM_DBUPD, pkginst,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	} else {
 		echoDebug(DBG_PKGREMOVE_REM, pkginst,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 		/*
 		 * remove package one class at a time
 		 */
@@ -1019,15 +1011,15 @@ main(int argc, char *argv[])
 	if (access(script, F_OK) != 0) {
 		/* no script present */
 		echoDebug(DBG_PKGREMOVE_PIC_NONE, pkginst,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	} else if (nodelete) {
 		/* not deleting files: skip postremove script */
 		echoDebug(DBG_PKGREMOVE_PIC_NODEL, pkginst, script,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	} else if (is_depend_pkginfo_DB()) {
 		/* updating db only: skip postremove script */
 		echoDebug(DBG_PKGREMOVE_PIC_DBUPD, pkginst, script,
-			zoneName ? zoneName : "global");
+		    zoneName ? zoneName : "global");
 	} else {
 		/* script present and ok to run: run the script */
 		set_ulimit("postremove", ERR_POSTREMOVE);
@@ -1037,7 +1029,7 @@ main(int argc, char *argv[])
 		} else {
 			echo(MSG_PKGREMOVE_EXEPIC_LZ, zoneName);
 			echoDebug(DBG_PKGREMOVE_EXEPIC_LZ, pkginst, script,
-				zoneName);
+			    zoneName);
 		}
 		putparam("PKG_PROC_SCRIPT", "postremove");
 		putparam("TMPDIR", tmpdir);
@@ -1071,7 +1063,7 @@ main(int argc, char *argv[])
 	}
 
 	if ((z_running_in_global_zone() == B_TRUE) &&
-		(pkgIsPkgInGzOnly(get_inst_root(), pkginst) == B_TRUE)) {
+	    (pkgIsPkgInGzOnly(get_inst_root(), pkginst) == B_TRUE)) {
 		boolean_t	b;
 
 		b = pkgRemovePackageFromGzonlyList(get_inst_root(), pkginst);
@@ -1135,7 +1127,7 @@ rmclass(char *aclass, int rm_remote, char *a_zoneName)
 		for (i = 0; i < eptnum; i++) {
 			if (eptlist[i] != NULL) {
 				rmclass(eptlist[i]->pkg_class,
-					rm_remote, a_zoneName);
+				    rm_remote, a_zoneName);
 			}
 		}
 		return;
@@ -1303,45 +1295,45 @@ static void
 ckreturn(int retcode, char *msg)
 {
 	switch (retcode) {
-	    case 2:
-	    case 12:
-	    case 22:
+	case 2:
+	case 12:
+	case 22:
 		warnflag++;
 		if (msg)
 			progerr(msg);
 		/* FALLTHROUGH */
-	    case 10:
-	    case 20:
+	case 10:
+	case 20:
 		if (retcode >= 10)
 			dreboot++;
 		if (retcode >= 20)
 			ireboot++;
 		/* FALLTHROUGH */
-	    case 0:
+	case 0:
 		break; /* okay */
 
-	    case -1:
+	case -1:
 		retcode = 99;
 		/* FALLTHROUGH */
-	    case 99:
-	    case 1:
-	    case 11:
-	    case 21:
-	    case 4:
-	    case 14:
-	    case 24:
-	    case 5:
-	    case 15:
-	    case 25:
+	case 99:
+	case 1:
+	case 11:
+	case 21:
+	case 4:
+	case 14:
+	case 24:
+	case 5:
+	case 15:
+	case 25:
 		if (msg)
 			progerr(msg);
 		/* FALLTHROUGH */
-	    case 3:
-	    case 13:
-	    case 23:
+	case 3:
+	case 13:
+	case 23:
 		quit(retcode);
 		/* NOT REACHED */
-	    default:
+	default:
 		if (msg)
 			progerr(msg);
 		quit(1);
