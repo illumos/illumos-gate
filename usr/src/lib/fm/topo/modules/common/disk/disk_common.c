@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -38,6 +38,7 @@
 #include <ctype.h>
 #include <strings.h>
 #include <libdevinfo.h>
+#include <libdiskmgt.h>
 #include <devid.h>
 #include <sys/libdevid.h>
 #include <pthread.h>
@@ -86,6 +87,20 @@ static const topo_method_t disk_methods[] = {
 	{ NULL }
 };
 
+static int disk_temp_reading(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+
+#define	TOPO_METH_DISK_TEMP		"disk_temp_reading"
+#define	TOPO_METH_DISK_TEMP_DESC	"Disk Temperature Reading"
+#define	TOPO_METH_DISK_TEMP_VERSION	0
+
+static const topo_method_t disk_fac_methods[] = {
+	{ TOPO_METH_DISK_TEMP, TOPO_METH_DISK_TEMP_DESC,
+	    TOPO_METH_DISK_TEMP_VERSION, TOPO_STABILITY_INTERNAL,
+	    disk_temp_reading },
+	{ NULL }
+};
+
 static const topo_pgroup_info_t io_pgroup = {
 	TOPO_PGROUP_IO,
 	TOPO_STABILITY_PRIVATE,
@@ -125,9 +140,11 @@ static int
 disk_set_props(topo_mod_t *mod, tnode_t *parent,
     tnode_t *dtn, dev_di_node_t *dnode)
 {
-	nvlist_t	*asru = NULL;
+	nvlist_t	*asru = NULL, *drive_attrs;
 	char		*label = NULL;
 	nvlist_t	*fmri = NULL;
+	dm_descriptor_t drive_descr = NULL;
+	uint32_t	rpm;
 	int		err;
 
 	/* pull the label property down from our parent 'bay' node */
@@ -265,9 +282,29 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 		    "set cap error %s\n", topo_strerror(err));
 		goto error;
 	}
+
+	if (dnode->ddn_devid == NULL ||
+	    (drive_descr = dm_get_descriptor_by_name(DM_DRIVE,
+	    dnode->ddn_devid, &err)) == NULL ||
+	    (drive_attrs = dm_get_attributes(drive_descr, &err)) == NULL)
+		goto out;
+
+	if (nvlist_lookup_boolean(drive_attrs, DM_SOLIDSTATE) == 0 ||
+	    nvlist_lookup_uint32(drive_attrs, DM_RPM, &rpm) != 0)
+		goto out;
+
+	if (topo_prop_set_uint32(dtn, TOPO_PGROUP_STORAGE, TOPO_STORAGE_RPM,
+	    TOPO_PROP_IMMUTABLE, rpm, &err) != 0) {
+		topo_mod_dprintf(mod, "disk_set_props: "
+		    "set rpm error %s\n", topo_strerror(err));
+		dm_free_descriptor(drive_descr);
+		goto error;
+	}
 	err = 0;
 
 out:
+	if (drive_descr != NULL)
+		dm_free_descriptor(drive_descr);
 	nvlist_free(fmri);
 	if (label)
 		topo_mod_strfree(mod, label);
@@ -307,26 +344,134 @@ disk_trim_whitespace(topo_mod_t *mod, const char *begin)
 	return (buf);
 }
 
-/*
- * Manufacturing strings can contain characters that are invalid for use in hc
- * authority names.  This trims leading and trailing whitespace, and
- * substitutes any characters known to be bad.
- */
-char *
-disk_auth_clean(topo_mod_t *mod, const char *str)
+/*ARGSUSED*/
+static int
+disk_temp_reading(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
+    nvlist_t *in, nvlist_t **out)
 {
-	char *buf, *p;
+	char *devid;
+	uint32_t temp;
+	dm_descriptor_t drive_descr = NULL;
+	nvlist_t *drive_stats, *pargs, *nvl;
+	int err;
 
-	if (str == NULL)
-		return (NULL);
+	if (vers > TOPO_METH_DISK_TEMP_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
 
-	if ((buf = topo_mod_strdup(mod, str)) == NULL)
-		return (NULL);
+	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &pargs) != 0 ||
+	    nvlist_lookup_string(pargs, TOPO_IO_DEVID, &devid) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup %s arg",
+		    TOPO_IO_DEVID);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
 
-	while ((p = strpbrk(buf, " :=")) != NULL)
-		*p = '-';
+	if ((drive_descr = dm_get_descriptor_by_name(DM_DRIVE, devid,
+	    &err)) == NULL) {
+		topo_mod_dprintf(mod, "failed to get drive decriptor for %s",
+		    devid);
+		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+	}
 
-	return (buf);
+	if ((drive_stats = dm_get_stats(drive_descr, DM_DRV_STAT_TEMPERATURE,
+	    &err)) == NULL ||
+	    nvlist_lookup_uint32(drive_stats, DM_TEMPERATURE, &temp) != 0) {
+		topo_mod_dprintf(mod, "failed to read disk temp for %s",
+		    devid);
+		dm_free_descriptor(drive_descr);
+		return (topo_mod_seterrno(mod, EMOD_UNKNOWN));
+	}
+	dm_free_descriptor(drive_descr);
+
+	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
+	    nvlist_add_string(nvl, TOPO_PROP_VAL_NAME,
+	    TOPO_SENSOR_READING) != 0 ||
+	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_TYPE, TOPO_TYPE_DOUBLE) !=
+	    0 || nvlist_add_double(nvl, TOPO_PROP_VAL_VAL, (double)temp) != 0) {
+		topo_mod_dprintf(mod, "Failed to allocate 'out' nvlist\n");
+		nvlist_free(nvl);
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	}
+	*out = nvl;
+
+	return (0);
+}
+
+static int
+disk_add_temp_sensor(topo_mod_t *mod, tnode_t *pnode, const char *devid)
+{
+	tnode_t *fnode;
+	topo_pgroup_info_t pgi;
+	nvlist_t *arg_nvl = NULL;
+	int err;
+
+	if ((fnode = topo_node_facbind(mod, pnode, "temp",
+	    TOPO_FAC_TYPE_SENSOR)) == NULL) {
+		topo_mod_dprintf(mod, "failed to bind facility node");
+		/* errno set */
+		return (-1);
+	}
+
+	/*
+	 * Set props:
+	 * - facility/sensor-class
+	 * - facility/sensor-type
+	 * - facility/units
+	 */
+	pgi.tpi_name = TOPO_PGROUP_FACILITY;
+	pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
+	pgi.tpi_datastab = TOPO_STABILITY_PRIVATE;
+	pgi.tpi_version = 1;
+	if (topo_pgroup_create(fnode, &pgi, &err) != 0) {
+		if (err != ETOPO_PROP_DEFD) {
+			topo_mod_dprintf(mod,  "pgroups create failure (%s)\n",
+			    topo_strerror(err));
+			/* errno set */
+			goto err;
+		}
+	}
+	if (topo_prop_set_string(fnode, TOPO_PGROUP_FACILITY,
+	    TOPO_SENSOR_CLASS, TOPO_PROP_IMMUTABLE,
+	    TOPO_SENSOR_CLASS_THRESHOLD, &err) != 0 ||
+	    topo_prop_set_uint32(fnode, TOPO_PGROUP_FACILITY,
+	    TOPO_FACILITY_TYPE, TOPO_PROP_IMMUTABLE, TOPO_SENSOR_TYPE_TEMP,
+	    &err) != 0 ||
+	    topo_prop_set_uint32(fnode, TOPO_PGROUP_FACILITY,
+	    TOPO_SENSOR_UNITS, TOPO_PROP_IMMUTABLE,
+	    TOPO_SENSOR_UNITS_DEGREES_C, &err) != 0) {
+		topo_mod_dprintf(mod, "Failed to set props on facnode (%s)",
+		    topo_strerror(err));
+		/* errno set */
+		goto err;
+	}
+
+	/*
+	 * Register a property method for facility/reading
+	 */
+	if (topo_method_register(mod, fnode, disk_fac_methods) < 0) {
+		topo_mod_dprintf(mod, "failed to register facility methods");
+		goto err;
+	}
+	if (topo_mod_nvalloc(mod, &arg_nvl, NV_UNIQUE_NAME) < 0 ||
+	    nvlist_add_string(arg_nvl, TOPO_IO_DEVID, devid) != 0) {
+		topo_mod_dprintf(mod, "Failed build arg nvlist\n");
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		goto err;
+	}
+	if (topo_prop_method_register(fnode, TOPO_PGROUP_FACILITY,
+	    TOPO_SENSOR_READING, TOPO_TYPE_DOUBLE, "disk_temp_reading",
+	    arg_nvl, &err) != 0) {
+		topo_mod_dprintf(mod, "Failed to register %s propmeth "
+		    "on fac node %s (%s)\n", TOPO_SENSOR_READING,
+		    topo_node_name(fnode), topo_strerror(err));
+		/* errno set */
+		goto err;
+	}
+	nvlist_free(arg_nvl);
+	return (0);
+err:
+	topo_node_unbind(fnode);
+	nvlist_free(arg_nvl);
+	return (-1);
 }
 
 /* create the disk topo node */
@@ -343,10 +488,10 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 
 	*rval = NULL;
 	if (dnode != NULL) {
-		mfg = disk_auth_clean(mod, dnode->ddn_mfg);
-		model = disk_auth_clean(mod, dnode->ddn_model);
-		firm = disk_auth_clean(mod, dnode->ddn_firm);
-		serial = disk_auth_clean(mod, dnode->ddn_serial);
+		mfg = topo_mod_clean_str(mod, dnode->ddn_mfg);
+		model = topo_mod_clean_str(mod, dnode->ddn_model);
+		firm = topo_mod_clean_str(mod, dnode->ddn_firm);
+		serial = topo_mod_clean_str(mod, dnode->ddn_serial);
 	} else {
 		mfg = model = firm = serial = NULL;
 	}
@@ -403,6 +548,13 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 		    name, i, topo_strerror(topo_mod_errno(mod)));
 		topo_node_unbind(dtn);
 		return (-1);
+	}
+
+	if (dnode->ddn_devid != NULL &&
+	    disk_add_temp_sensor(mod, dtn, dnode->ddn_devid) != 0) {
+		topo_mod_dprintf(mod, "disk_tnode_create: failed to create "
+		    "temperature sensor node on bay=%d/disk=0",
+		    topo_node_instance(parent));
 	}
 	*rval = dtn;
 	return (0);
@@ -624,7 +776,7 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	char		lentry[MAXPATHLEN];
 	int		pathcount;
 	int		*inq_dtype, itype;
-	int 		i;
+	int		i;
 
 	if (devid) {
 		/*

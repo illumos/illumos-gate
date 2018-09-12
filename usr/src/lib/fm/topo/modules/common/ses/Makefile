@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 MODULE = ses
@@ -34,6 +35,6 @@ include ../../Makefile.plugin
 CPPFLAGS += -I../disk
 
 LDLIBS += -L$(ROOTLIBDIR)/scsi -R/usr/lib/scsi -lses
-LDLIBS += -ldevinfo -ldevid -ldiskstatus -lcontract -lsysevent
+LDLIBS += -ldevinfo -ldevid -ldiskstatus -lcontract -lsysevent -ldiskmgt
 
 CLOBBERFILES += disk_common.ln

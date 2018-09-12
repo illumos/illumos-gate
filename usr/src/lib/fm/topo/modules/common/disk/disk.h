@@ -23,7 +23,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #ifndef _DISK_H
@@ -50,6 +50,7 @@ extern "C" {
 #define	TOPO_STORAGE_SERIAL_NUM		"serial-number"
 #define	TOPO_STORAGE_FIRMWARE_REV	"firmware-revision"
 #define	TOPO_STORAGE_CAPACITY		"capacity-in-bytes"
+#define	TOPO_STORAGE_RPM		"speed-in-rpm"
 
 /*
  * Properties for binding group: The binding group required in platform

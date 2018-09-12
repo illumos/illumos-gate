@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 
 MODULE = disk
 CLASS = common
@@ -32,5 +34,5 @@ include ../../Makefile.plugin
 
 CPPFLAGS += -I$(SRC)/uts/common
 
-LDLIBS += -ldevinfo -ldevid -lcfgadm -ldiskstatus
+LDLIBS += -ldevinfo -ldevid -lcfgadm -ldiskstatus -ldiskmgt
 
