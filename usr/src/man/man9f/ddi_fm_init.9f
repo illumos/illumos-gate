@@ -1,185 +1,164 @@
-'\" te
+.\"
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_FM_INIT 9F "May 14, 2007"
-.SH NAME
-ddi_fm_init, ddi_fm_fini, ddi_fm_capable \- initialize and get the FM
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" Copyright (c) 2018, Joyent, INc.
+.\"
+.Dd September 13, 2018
+.Dt DDI_FM_INIT 9F
+.Os
+.Sh NAME
+.Nm ddi_fm_init ,
+.Nm ddi_fm_fini ,
+.Nm ddi_fm_capable
+.Nd initialize and get the FM capabilities for a device instance
 capabilities for a device instance
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/ddifm.h>
-
-\fBvoid\fR \fBddi_fm_init\fR(\fBdev_info_t\fR *\fIdip\fR, \fBint\fR *\fIfm_capability\fR,
-     \fBddi_iblock_cookie_t\fR *\fIibcp\fR);
-.fi
-
-.LP
-.nf
-\fBvoid\fR \fBddi_fm_fini\fR(\fBdev_info_t\fR *\fIdip\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBddi_fm_capable\fR(\fBdev_info_t\fR *\fIdip\fR, \fBint\fR *\fIfm_capability\fR);
-.fi
-
-.SH INTERFACE LEVEL
-.sp
-.LP
-Solaris DDI specific (Solaris DDI)
-.SH PARAMETERS
-.sp
-.LP
-\fBddi_fm_init()\fR
-.sp
-.ne 2
-.na
-\fB\fIdip\fR\fR
-.ad
-.RS 17n
-Pointer to the \fBdev_info\fR structure
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIfm_capability\fR\fR
-.ad
-.RS 17n
+.Sh SYNOPSIS
+.In sys/ddifm.h
+.Ft void
+.Fo ddi_fm_init
+.Fa "dev_info_t *dip"
+.Fa "int *fm_capability"
+.Fa "ddi_iblock_cookie_t *ibcp"
+.Fc
+.Ft void
+.Fo ddi_fm_fini
+.Fa "dev_info_t *dip"
+.Fc
+.Ft int
+.Fo ddi_fm_capable
+.Fa "dev_info_t *dip"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Committed -
+illumos DDI specific
+.Sh Parameters
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to the driver's
+.Sy dev_info
+structure.
+.It Fa fm_capability
 Fault Management capability bit mask
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIibcp\fR\fR
-.ad
-.RS 17n
+.It Fa ibcp
 Pointer to where the interrupt block cookie should be returned.
-.RE
-
-.SH DESCRIPTION
-.sp
-.LP
-A device driver can declare its fault management capabilities to the \fBI/O\fR
-Fault Management framework by calling \fBddi_fm_init()\fR. The
-\fBddi_fm_init()\fR function allocates and initializes resources according to
+.El
+.Sh DESCRIPTION
+A device driver can declare its fault management capabilities to the I/O
+Fault Management framework by calling the
+.Fn ddi_fm_init
+function.
+The
+.Fn ddi_fm_init
+function allocates and initializes resources according to
 the bitwise-inclusive-OR of the fault management capabilities, described in the
 following and supported by the driver's immediate nexus parent.
-.sp
-.ne 2
-.na
-\fB\fBDDI_FM_NOT_CAPABLE\fR\fR
-.ad
-.RS 26n
-The driver does not support any \fBFMA\fR features. This is the default value
-assigned to device drivers.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDDI_FM_EREPORT_CAPABLE\fR\fR
-.ad
-.RS 26n
-The driver generates \fBFMA\fR protocol error events (\fBereports\fR) upon the
-detection of an error condition.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDDI_FM_ACCCHK_CAPABLE\fR\fR
-.ad
-.RS 26n
+.Bl -tag -width Vt
+.It Vt DDI_FM_NOT_CAPABLE
+The driver does not support any FMA features.
+This is the default value assigned to device drivers.
+.Pp
+If the value of the capability bits is equal to
+.Vt DDI_FM_NOT_CAPABLE ,
+then no capability bits will be set.
+Conversely, if a capability bit is set, then the capability value will
+not be equal to
+.Vt DDI_FM_NOT_CAPABLE .
+.It Vt DDI_FM_EREPORT_CAPABLE
+The driver generates FMA protocol error events
+.Pq Sy ereports
+upon the detection of an error condition.
+.It Vt DDI_FM_ACCCHK_CAPABLE
 The driver checks for errors upon the completion of one or more access
-\fBI/O\fR transactions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDDI_FM_DMACHK_CAPABLE\fR\fR
-.ad
-.RS 26n
-The driver checks for errors upon the completion of one or more \fBDMA\fR
-\fBI/O\fR transactions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBDDI_FM_ERRCB_CAPABLE\fR\fR
-.ad
-.RS 26n
+I/O transactions.
+.It Vt DDI_FM_DMACHK_CAPABLE
+The driver checks for errors upon the completion of one or more DMA
+I/O transactions.
+.It Vt DDI_FM_ERRCB_CAPABLE
 The driver is capable of error handler callback registration.
-.RE
-
-.sp
-.LP
+.El
+.Pp
 If the parent nexus is not capable of supporting any one of the requested
 capabilities, the associated bit will not be set and returned as such to the
-driver. Before returning from \fBddi_fm_init()\fR, the \fBI/O\fR Fault
-Management framework creates a set of fault management capability properties:
-\fBfm-ereport-capable\fR, \fBfm-errcb-capable\fR, \fBfm-accchk-capable\fR, and
-\fBfm-dmachk-capable\fR. The current supported fault management capability
-levels are observable via \fBprtconf\fR(1M).
-.sp
-.LP
+driver.
+Before returning from
+.Fn ddi_fm_init ,
+the I/O Fault Management framework creates a set of fault management capability
+properties:
+.Sy fm-ereport-capable ,
+.Sy fm-errcb-capable ,
+.Sy fm-accchk-capable ,
+and
+.Sy fm-dmachk-capable .
+The current supported fault management capability levels are observable via
+.Xr prtconf 1M .
+.Pp
 A driver can support the administrative selection of fault management
 capabilities by exporting and setting a fault management capability level
-property in its \fBdriver.conf\fR(4) file to the values described above. The
-\fBfm_capable\fR properties must be set and read prior to calling
-\fBddi_fm_init()\fR with the desired capability list.
-.sp
-.ne 2
-.na
-\fB\fBddi_fm_fini()\fR\fR
-.ad
-.RS 17n
-This function cleans up resources allocated to support fault management for the
-\fIdip\fR structure.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBddi_fm_capable()\fR\fR
-.ad
-.RS 20n
-This function returns the capability bit mask currently set for the \fIdip\fR
-structure.
-.RE
-
-.SH CONTEXT
-.sp
-.LP
-These functions can be called from kernel context in a driver \fBattach\fR(9E)
-or \fBdetach\fR(9E) operation.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBprtconf\fR(1M), \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBattach\fR(9E),
-\fBdetach\fR(9E)
-.sp
-.LP
-\fIWriting Device Drivers\fR
+property in its
+.Xr driver.conf 4
+file to the values described above.
+The
+.Sy fm_capable
+properties must be set and read prior to calling
+.Fn ddi_fm_init
+with the desired capability list.
+.Pp
+The
+.Fn ddi_fm_fini
+function cleans up the kernel infrastructure set up during a call to the
+.Fn ddi_fm_init
+function.
+If the driver did not call
+.Fn ddi_fm_init
+or the capability returned in
+.Fa fm_capability
+was
+.Vt DDI_FM_NOT_CAPABLE
+then the driver must not call
+.Fn ddi_fm_fini .
+.Pp
+The
+.Fn ddi_fm_capable
+function returns the capability bit mask currently set for the device
+instance identified by
+.Fa dip .
+.Sh CONTEXT
+The
+.Fn ddi_fm_init
+and
+.Fn ddi_fm_fini
+functions may only be called from kernel context during a driver's
+.Xr attach 9E
+and
+.Xr detach 9E
+entry points.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn ddi_fm_capable
+function returns the FM capability bit mask currently in use.
+If no capabilities are in use then
+.Vt DDI_FM_NOT_CAPABLE
+is returned.
+.Sh SEE ALSO
+.Xr prtconf 1M ,
+.Xr driver.conf 4 ,
+.Xr attach 9E ,
+.Xr detach 9E
+.Pp
+.Rs
+.%B Writing Device Drivers
+.Re
