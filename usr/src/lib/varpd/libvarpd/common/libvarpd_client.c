@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -113,7 +113,7 @@ libvarpd_c_destroy(varpd_client_handle_t *chp)
 		libvarpd_panic("failed to close door fd %d: %d",
 		    client->vcl_doorfd, errno);
 
-	umem_free(chp, sizeof (varpd_client_handle_t *));
+	umem_free(chp, sizeof (varpd_client_t));
 }
 
 int
