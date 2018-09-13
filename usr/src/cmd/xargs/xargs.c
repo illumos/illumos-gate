@@ -21,7 +21,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2012 DEY Storage Systems, Inc.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  *
  * Portions of this file developed by DEY Storage Systems, Inc. are licensed
  * under the terms of the Common Development and Distribution License (CDDL)
@@ -163,7 +163,7 @@ int
 main(int argc, char **argv)
 {
 	int	j;
-	unsigned long	l;
+	long	l;
 	struct inserts *psave;
 	int c;
 	int	initsize;
@@ -316,10 +316,16 @@ main(int argc, char **argv)
 
 		case 'P':	/* -P maxprocs: # of child processses	*/
 			errno = 0;
-			l = strtoul(optarg, &eptr, 10);
+			l = strtol(optarg, &eptr, 10);
 			if (*eptr != '\0' || errno != 0) {
 				ermsg(_("failed to parse maxprocs (-P): %s\n"),
 				    optarg);
+				break;
+			}
+
+			if (l < 0) {
+				ermsg(_("maximum number of processes (-P) "
+				    "cannot be negative\n"));
 				break;
 			}
 

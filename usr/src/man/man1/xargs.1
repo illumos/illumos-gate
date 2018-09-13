@@ -43,8 +43,9 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Portions Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright (c) 2018, Joyent, Inc.
 .\"
-.TH XARGS 1 "May 28, 2017"
+.TH XARGS 1 "September 13, 2018"
 .SH NAME
 xargs \- construct argument lists and invoke utility
 .SH SYNOPSIS
@@ -211,7 +212,9 @@ otherwise, that particular invocation of \fIutility\fR is skipped.
 .ad
 .RS 15n
 Invokes \fIutility\fR using at most \fImaxprocs\fR (a positive decimal integer)
-parallel child processes.
+parallel child processes. If \fImaxprocs\fR is zero, then the system
+will set a large upper bound to try and run as many processes as
+possible.
 .RE
 
 .sp
