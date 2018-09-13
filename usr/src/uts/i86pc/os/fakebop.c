@@ -1314,6 +1314,42 @@ process_boot_environment(struct boot_modules *benv)
 		if (do_bsys_getproplen(NULL, name) >= 0)
 			continue;
 
+		/* Translate netboot variables */
+		if (strcmp(name, "boot.netif.gateway") == 0) {
+			bsetprops(BP_ROUTER_IP, value);
+			continue;
+		}
+		if (strcmp(name, "boot.netif.hwaddr") == 0) {
+			bsetprops(BP_BOOT_MAC, value);
+			continue;
+		}
+		if (strcmp(name, "boot.netif.ip") == 0) {
+			bsetprops(BP_HOST_IP, value);
+			continue;
+		}
+		if (strcmp(name, "boot.netif.netmask") == 0) {
+			bsetprops(BP_SUBNET_MASK, value);
+			continue;
+		}
+		if (strcmp(name, "boot.netif.server") == 0) {
+			bsetprops(BP_SERVER_IP, value);
+			continue;
+		}
+		if (strcmp(name, "boot.netif.server") == 0) {
+			if (do_bsys_getproplen(NULL, BP_SERVER_IP) < 0)
+				bsetprops(BP_SERVER_IP, value);
+			continue;
+		}
+		if (strcmp(name, "boot.nfsroot.server") == 0) {
+			if (do_bsys_getproplen(NULL, BP_SERVER_IP) < 0)
+				bsetprops(BP_SERVER_IP, value);
+			continue;
+		}
+		if (strcmp(name, "boot.nfsroot.path") == 0) {
+			bsetprops(BP_SERVER_PATH, value);
+			continue;
+		}
+
 		if (name_is_blacklisted(name) == B_TRUE)
 			continue;
 
