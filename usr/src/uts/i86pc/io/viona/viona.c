@@ -230,6 +230,8 @@
 #include <sys/mac_client_priv.h>
 #include <sys/vlan.h>
 #include <inet/ip.h>
+#include <inet/ip_impl.h>
+#include <inet/tcp.h>
 
 #include <sys/vmm_drv.h>
 #include <sys/viona_io.h>
@@ -241,6 +243,8 @@
 #define	VIONA_NAME		"Virtio Network Accelerator"
 #define	VIONA_CTL_MINOR		0
 #define	VIONA_CLI_NAME		"viona"		/* MAC client name */
+#define VIONA_MAX_HDRS_LEN	(sizeof (struct ether_vlan_header) + \
+	IP_MAX_HDR_LENGTH + TCP_MAX_HDR_LENGTH)
 
 #define	VTNET_MAXSEGS		32
 
@@ -446,6 +450,7 @@ struct viona_desb {
 	uint_t			d_ref;
 	uint32_t		d_len;
 	uint16_t		d_cookie;
+	uchar_t			*d_headers;
 };
 
 typedef struct viona_soft_state {
@@ -1027,6 +1032,19 @@ viona_ring_alloc(viona_link_t *link, viona_vring_t *ring)
 }
 
 static void
+viona_ring_desb_free(viona_vring_t *ring)
+{
+	viona_desb_t *dp = ring->vr_desb;
+
+	for (uint_t i = 0; i < ring->vr_size; i++, dp++) {
+		kmem_free(dp->d_headers, VIONA_MAX_HDRS_LEN);
+	}
+
+	kmem_free(ring->vr_desb, sizeof (viona_desb_t) * ring->vr_size);
+	ring->vr_desb = NULL;
+}
+
+static void
 viona_ring_free(viona_vring_t *ring)
 {
 	mutex_destroy(&ring->vr_lock);
@@ -1136,16 +1154,17 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 
 	/* Allocate desb handles for TX ring if packet copying not disabled */
 	if (kri.ri_index == VIONA_VQ_TX && !viona_force_copy_tx_mblks) {
-		viona_desb_t *desb, *dp;
+		viona_desb_t *dp;
 
-		desb = kmem_zalloc(sizeof (viona_desb_t) * cnt, KM_SLEEP);
-		dp = desb;
+		dp = kmem_zalloc(sizeof (viona_desb_t) * cnt, KM_SLEEP);
+		ring->vr_desb = dp;
 		for (uint_t i = 0; i < cnt; i++, dp++) {
 			dp->d_frtn.free_func = viona_desb_release;
 			dp->d_frtn.free_arg = (void *)dp;
 			dp->d_ring = ring;
+			dp->d_headers = kmem_zalloc(VIONA_MAX_HDRS_LEN,
+			    KM_SLEEP);
 		}
-		ring->vr_desb = desb;
 	}
 
 	/* Zero out MSI-X configuration */
@@ -1168,8 +1187,7 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 
 fail:
 	if (ring->vr_desb != NULL) {
-		kmem_free(ring->vr_desb, sizeof (viona_desb_t) * cnt);
-		ring->vr_desb = NULL;
+		viona_ring_desb_free(ring);
 	}
 	ring->vr_size = 0;
 	ring->vr_mask = 0;
@@ -1414,8 +1432,7 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 
 	/* Free any desb resources before the ring is completely stopped */
 	if (ring->vr_desb != NULL) {
-		kmem_free(ring->vr_desb, sizeof (viona_desb_t) * ring->vr_size);
-		ring->vr_desb = NULL;
+		viona_ring_desb_free(ring);
 	}
 }
 
@@ -1463,8 +1480,7 @@ cleanup:
 	/* Free any desb resources before the ring is completely stopped */
 	if (ring->vr_desb != NULL) {
 		VERIFY(ring->vr_xfer_outstanding == 0);
-		kmem_free(ring->vr_desb, sizeof (viona_desb_t) * ring->vr_size);
-		ring->vr_desb = NULL;
+		viona_ring_desb_free(ring);
 	}
 
 	ring->vr_cur_aidx = 0;
@@ -2324,8 +2340,9 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 {
 	struct iovec		iov[VTNET_MAXSEGS];
 	uint16_t		cookie;
-	int			n;
-	uint32_t		len;
+	int			i, n;
+	uint32_t		len, base_off = 0;
+	uint32_t		min_copy = VIONA_MAX_HDRS_LEN;
 	mblk_t			*mp_head, *mp_tail, *mp;
 	viona_desb_t		*dp = NULL;
 	mac_client_handle_t	link_mch = link->l_mch;
@@ -2340,6 +2357,14 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 		return;
 	}
 
+	/* Grab the header and ensure it is of adequate length */
+	hdr = (const struct virtio_net_hdr *)iov[0].iov_base;
+	len = iov[0].iov_len;
+	if (len < sizeof (struct virtio_net_hdr)) {
+		goto drop_fail;
+	}
+
+	/* Make sure the packet headers are always in the first mblk. */
 	if (ring->vr_desb != NULL) {
 		dp = &ring->vr_desb[cookie];
 
@@ -2354,42 +2379,87 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 			dp = NULL;
 			goto drop_fail;
 		}
+
 		dp->d_cookie = cookie;
+		mp_head = desballoc(dp->d_headers, VIONA_MAX_HDRS_LEN, 0,
+		    &dp->d_frtn);
+
+		/* Account for the successful desballoc. */
+		if (mp_head != NULL)
+			dp->d_ref++;
+	} else {
+		mp_head = allocb(VIONA_MAX_HDRS_LEN, 0);
 	}
 
-	/* Grab the header and ensure it is of adequate length */
-	hdr = (const struct virtio_net_hdr *)iov[0].iov_base;
-	len = iov[0].iov_len;
-	if (len < sizeof (struct virtio_net_hdr)) {
+	if (mp_head == NULL)
 		goto drop_fail;
+
+	mp_tail = mp_head;
+
+	/*
+	 * We always copy enough of the guest data to cover the
+	 * headers. This protects us from TOCTOU attacks and allows
+	 * message block length assumptions to be made in subsequent
+	 * code. In many cases, this means copying more data than
+	 * strictly necessary. That's okay, as it is the larger packets
+	 * (such as LSO) that really benefit from desballoc().
+	 */
+	for (i = 1; i < n; i++) {
+		const uint32_t to_copy = MIN(min_copy, iov[i].iov_len);
+
+		bcopy(iov[i].iov_base, mp_head->b_wptr, to_copy);
+		mp_head->b_wptr += to_copy;
+		len += to_copy;
+		min_copy -= to_copy;
+
+		/*
+		 * We've met the minimum copy requirement. The rest of
+		 * the guest data can be referenced.
+		 */
+		if (min_copy == 0) {
+			/*
+			 * If we copied all contents of this
+			 * descriptor then move onto the next one.
+			 * Otherwise, record how far we are into the
+			 * current descriptor.
+			 */
+			if (iov[i].iov_len == to_copy)
+				i++;
+			else
+				base_off = to_copy;
+
+			break;
+		}
 	}
 
-	for (uint_t i = 1; i < n; i++) {
+	ASSERT3P(mp_head, !=, NULL);
+	ASSERT3P(mp_tail, !=, NULL);
+
+	for (; i < n; i++) {
+		uintptr_t base = (uintptr_t)iov[i].iov_base + base_off;
+		uint32_t chunk = iov[i].iov_len - base_off;
+
+		ASSERT3U(base_off, <, iov[i].iov_len);
+		ASSERT3U(chunk, >, 0);
+
 		if (dp != NULL) {
-			mp = desballoc((uchar_t *)iov[i].iov_base,
-			    iov[i].iov_len, BPRI_MED, &dp->d_frtn);
+			mp = desballoc((uchar_t *)base, chunk, 0, &dp->d_frtn);
 			if (mp == NULL) {
 				goto drop_fail;
 			}
 			dp->d_ref++;
 		} else {
-			mp = allocb(iov[i].iov_len, BPRI_MED);
+			mp = allocb(chunk, BPRI_MED);
 			if (mp == NULL) {
 				goto drop_fail;
 			}
-			bcopy((uchar_t *)iov[i].iov_base, mp->b_wptr,
-			    iov[i].iov_len);
+			bcopy((uchar_t *)base, mp->b_wptr, chunk);
 		}
 
-		len += iov[i].iov_len;
-		mp->b_wptr += iov[i].iov_len;
-		if (mp_head == NULL) {
-			ASSERT(mp_tail == NULL);
-			mp_head = mp;
-		} else {
-			ASSERT(mp_tail != NULL);
-			mp_tail->b_cont = mp;
-		}
+		base_off = 0;
+		len += chunk;
+		mp->b_wptr += chunk;
+		mp_tail->b_cont = mp;
 		mp_tail = mp;
 	}
 
@@ -2460,7 +2530,7 @@ drop_fail:
 		dp->d_ref = 0;
 	}
 
-	VIONA_PROBE3(tx_drop, viona_vring_t *, ring, uint_t, len,
+	VIONA_PROBE3(tx_drop, viona_vring_t *, ring, uint32_t, len,
 	    uint16_t, cookie);
 	viona_tx_done(ring, len, cookie);
 }
