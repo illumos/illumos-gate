@@ -73,7 +73,7 @@ usage (int argc, char *argv[])
  "           (--int <value> | --string <value> | --bool <value> |\n"
  "            --strlist-pre <value> | --strlist-post <value> |\n"
  "            --strlist-rem <value> | --double <value> | --remove)\n"
- "           [--help] [--version]\n");
+ "           [--direct] [--help] [--version]\n");
 	fprintf (stderr,
  "\n" "        --udi            Unique Device Id\n"
  "        --key            Key of the property to set\n"
@@ -88,6 +88,7 @@ usage (int argc, char *argv[])
  "        --strlist-post   Append a string to a list\n"
  "        --strlist-rem    Remove a string from a list\n"
  "        --remove         Indicates that the property should be removed\n"
+ "        --direct         Use direct HAL connection\n"
  "        --version        Show version and exit\n"
  "        --help           Show this information and exit\n"
  "\n"
@@ -119,6 +120,7 @@ main (int argc, char *argv[])
 	dbus_bool_t udi_exists = FALSE;
 	int type = PROP_INVALID;
 	DBusError error;
+	dbus_bool_t direct = FALSE;
 
 	if (argc <= 1) {
 		usage (argc, argv);
@@ -140,12 +142,13 @@ main (int argc, char *argv[])
 			{"strlist-pre", 1, NULL, 0},
 			{"strlist-post", 1, NULL, 0},
 			{"strlist-rem", 1, NULL, 0},
+			{"direct", 0, NULL, 0},
 			{"remove", 0, NULL, 0},
 			{"version", 0, NULL, 0},
 			{"help", 0, NULL, 0},
 			{NULL, 0, NULL, 0}
 		};
-		
+
 		c = getopt_long (argc, argv, "",
 				 long_options, &option_index);
 		if (c == -1)
@@ -193,6 +196,8 @@ main (int argc, char *argv[])
 				type = PROP_STRLIST_REM;
 			} else if (strcmp (opt, "remove") == 0) {
 				remove = TRUE;
+			} else if (strcmp (opt, "direct") == 0) {
+				direct = TRUE;
 			} else if (strcmp (opt, "udi") == 0) {
 				udi = strdup (optarg);
 			} else if (strcmp (opt, "version") == 0) {
@@ -217,27 +222,35 @@ main (int argc, char *argv[])
 		usage (argc, argv);
 		return 1;
 	}
-	
+
 	fprintf (stderr, "\n");
-	
-	dbus_error_init (&error);	
-	if ((hal_ctx = libhal_ctx_new ()) == NULL) {
-		fprintf (stderr, "error: libhal_ctx_new\n");
-		return 1;
-	}
-	if (!libhal_ctx_set_dbus_connection (hal_ctx, dbus_bus_get (DBUS_BUS_SYSTEM, &error))) {
-		fprintf (stderr, "error: libhal_ctx_set_dbus_connection: %s: %s\n", error.name, error.message);
-		LIBHAL_FREE_DBUS_ERROR (&error);
-		return 1;
-	}
-	if (!libhal_ctx_init (hal_ctx, &error)) {
-		if (dbus_error_is_set(&error)) {
-			fprintf (stderr, "error: libhal_ctx_init: %s: %s\n", error.name, error.message);
+
+	dbus_error_init (&error);
+	if (direct) {
+		if ((hal_ctx = libhal_ctx_init_direct (&error)) == NULL) {
+			fprintf (stderr, "error: libhal_ctx_init_direct\n");
 			LIBHAL_FREE_DBUS_ERROR (&error);
+			return 1;
 		}
-		fprintf (stderr, "Could not initialise connection to hald.\n"
-				 "Normally this means the HAL daemon (hald) is not running or not ready.\n");
-		return 1;
+	} else {
+		if ((hal_ctx = libhal_ctx_new ()) == NULL) {
+			fprintf (stderr, "error: libhal_ctx_new\n");
+			return 1;
+		}
+		if (!libhal_ctx_set_dbus_connection (hal_ctx, dbus_bus_get (DBUS_BUS_SYSTEM, &error))) {
+			fprintf (stderr, "error: libhal_ctx_set_dbus_connection: %s: %s\n", error.name, error.message);
+			LIBHAL_FREE_DBUS_ERROR (&error);
+			return 1;
+		}
+		if (!libhal_ctx_init (hal_ctx, &error)) {
+			if (dbus_error_is_set(&error)) {
+				fprintf (stderr, "error: libhal_ctx_init: %s: %s\n", error.name, error.message);
+				LIBHAL_FREE_DBUS_ERROR (&error);
+			}
+			fprintf (stderr, "Could not initialise connection to hald.\n"
+					 "Normally this means the HAL daemon (hald) is not running or not ready.\n");
+			return 1;
+		}
 	}
 
 	 /* check UDI exists */
@@ -249,7 +262,7 @@ main (int argc, char *argv[])
 	if (dbus_error_is_set(&error)) {
 		fprintf (stderr, "error: libhal_device_exists: %s: %s\n", error.name, error.message);
 		dbus_error_free (&error);
-		return 1;   
+		return 1;
 	}
 
 	if (remove) {
@@ -300,7 +313,7 @@ main (int argc, char *argv[])
 			return 1;
 		}
 	}
-	    
+
 	return rc ? 0 : 1;
 }
 
