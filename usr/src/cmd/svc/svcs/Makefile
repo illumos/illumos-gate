@@ -21,20 +21,20 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 2011, Joyent, Inc. All rights reserved.
+# Copyright (c) 2019, Joyent, Inc. All rights reserved.
 #
 
 PROG =		svcs
 OBJS =		svcs.o explain.o
 MYOBJS =	notify_params.o
 SRCS =		$(OBJS:%.o=%.c) $(MYOBJS:%.o=../common/%.c)
-POFILES = 	$(OBJS:.o=.po)
+POFILES =	$(OBJS:.o=.po)
 
 include ../../Makefile.cmd
 include ../../Makefile.ctf
 
 POFILE =	$(PROG)_all.po
-LDLIBS +=	-lcontract -lscf -luutil -lumem -lnvpair -lzonecfg -lsasl
+LDLIBS +=	-lcontract -lscf -luutil -lumem -lnvpair -lzonecfg -lsasl -lproc
 CPPFLAGS += -I ../common
 
 lint := LINTFLAGS = -mux

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
  */
 
@@ -72,8 +72,8 @@
 #include <libscf_priv.h>
 #include <libuutil.h>
 #include <libnvpair.h>
+#include <libproc.h>
 #include <locale.h>
-#include <procfs.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,6 +92,13 @@
 #define	EMPTY_OK	0x01
 #define	MULTI_OK	0x02
 
+/*
+ * Per proc(4) when pr_nlwp, pr_nzomb, and pr_lwp.pr_lwpid are all 0,
+ * the process is a zombie.
+ */
+#define	IS_ZOMBIE(_psip) \
+	((_psip)->pr_nlwp == 0 && (_psip)->pr_nzomb == 0 && \
+	(_psip)->pr_lwp.pr_lwpid == 0)
 
 /*
  * An AVL-storable node for output lines and the keys to sort them by.
@@ -960,28 +967,6 @@ instance_processes(scf_instance_t *inst, const char *fmri,
 
 	return (ret);
 }
-
-static int
-get_psinfo(pid_t pid, psinfo_t *psip)
-{
-	char path[100];
-	int fd;
-
-	(void) snprintf(path, sizeof (path), "/proc/%lu/psinfo", pid);
-
-	fd = open64(path, O_RDONLY);
-	if (fd < 0)
-		return (-1);
-
-	if (read(fd, psip, sizeof (*psip)) < 0)
-		uu_die(gettext("Could not read info for process %lu"), pid);
-
-	(void) close(fd);
-
-	return (0);
-}
-
-
 
 /*
  * Column sprint and sortkey functions
@@ -2079,7 +2064,7 @@ detailed_list_processes(scf_walkinfo_t *wip)
 		(void) printf("%-*s%lu", DETAILED_WIDTH, gettext("process"),
 		    pids[i]);
 
-		if (get_psinfo(pids[i], &psi) == 0)
+		if (proc_get_psinfo(pids[i], &psi) == 0 && !IS_ZOMBIE(&psi))
 			(void) printf(" %.*s", PRARGSZ, psi.pr_psargs);
 
 		(void) putchar('\n');
@@ -2955,7 +2940,7 @@ add_processes(scf_walkinfo_t *wip, char *line, scf_propertygroup_t *lpg)
 		struct tm *tm;
 		int len = 1 + 15 + 8 + 3 + 6 + 1 + PRFNSZ;
 
-		if (get_psinfo(pids[i], &psi) != 0)
+		if (proc_get_psinfo(pids[i], &psi) != 0 || IS_ZOMBIE(&psi))
 			continue;
 
 		line = realloc(line, strlen(line) + len);
