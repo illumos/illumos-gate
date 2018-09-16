@@ -15,7 +15,6 @@ pset_bind \- bind LWPs to a set of processors
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpset_bind()\fR function binds the \fBLWP\fR or set of \fBLWPs\fR
 specified by \fIidtype\fR and \fIid\fR to the processor set specified by
@@ -77,12 +76,10 @@ binding is later removed, the processor set binding becomes effective.
 .LP
 Processor set bindings are inherited across \fBfork\fR(2) and \fBexec\fR(2).
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, 0 is returned. Otherwise, \(mi1 is returned and
 \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBpset_bind()\fR function will fail if:
 .sp
@@ -136,7 +133,7 @@ Binding a system process to a processor set is not supported.
 \fB\fBEPERM\fR\fR
 .ad
 .RS 11n
-The {\fBPRIV_PROC_OWNER\fR} is not asserted in the effecive set of the calling
+The {\fBPRIV_PROC_OWNER\fR} is not asserted in the effective set of the calling
 process and either the real or effective user ID of the calling process does
 not match the real or effective user \fBID\fR of one of the LWPs being bound,
 or the processor set from which one or more of the LWPs are being unbound has
@@ -156,7 +153,6 @@ by \fIidtype\fR and \fIid\fR.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -174,7 +170,6 @@ MT-Level	Async-Signal-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpbind\fR(1M), \fBpooladm\fR(1M), \fBpoolbind\fR(1M), \fBpsrset\fR(1M),
 \fBexec\fR(2), \fBfork\fR(2), \fBprocessor_bind\fR(2), \fBpset_create\fR(2),

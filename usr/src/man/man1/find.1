@@ -61,7 +61,6 @@ find \- find files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfind\fR utility recursively descends the directory hierarchy for each
 \fIpath\fR seeking files that match a Boolean \fIexpression\fR written in the
@@ -76,7 +75,6 @@ by the application exceeds \fIPATH_MAX\fR requirements).
 \fBfind\fR detects infinite loops; that is, entering a previously visited
 directory that is an ancestor of the last file encountered.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -119,7 +117,6 @@ Specifying more than one of the mutually-exclusive options \fB-H\fR and
 \fB-L\fR is not considered an error. The last option specified determines the
 behavior of the utility.
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -172,7 +169,6 @@ less than \fIn\fR
 .RE
 
 .SS "Expressions"
-.sp
 .LP
 Valid expressions are:
 .sp
@@ -721,7 +717,6 @@ True if the file has extended attributes.
 .RE
 
 .SS "Complex Expressions"
-.sp
 .LP
 The primaries can be combined using the following operators (in order of
 decreasing precedence):
@@ -788,7 +783,6 @@ The \fB-user\fR, \fB-group\fR, and \fB-newer\fR primaries each evaluate their
 respective arguments only once. Invocation of \fIcommand\fR specified by
 \fB-exec\fR or \fB-ok\fR does not affect subsequent primaries on the same file.
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBfind\fR when
 encountering files greater than or equal to 2 Gbyte (2^31 bytes).
@@ -816,7 +810,7 @@ They both write out the entire directory hierarchy from the current directory.
 \fBExample 2 \fRRemoving Files
 .sp
 .LP
-The following comand removes all files in your home directory named \fBa.out\fR
+The following command removes all files in your home directory named \fBa.out\fR
 or \fB*.o\fR that have not been accessed for a week:
 
 .sp
@@ -963,7 +957,6 @@ example% \fBfind . -xattr\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBfind\fR: \fBLANG\fR, \fBLC_ALL\fR,
@@ -989,7 +982,6 @@ in \fBLC_CTYPE\fR determines the locale for interpretation of sequences of
 bytes of text data a characters, the behavior of character classes used in the
 expression defined for the \fByesexpr\fR. See \fBlocale\fR(5).
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -1011,7 +1003,6 @@ An error occurred.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/etc/passwd\fR\fR
@@ -1039,7 +1030,6 @@ File that registers distributed file system packages
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1059,14 +1049,12 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBchmod\fR(1), \fBcpio\fR(1), \fBsh\fR(1), \fBtest\fR(1), \fBls\fR(1B),
 \fBacl\fR(5), \fBregex\fR(5), \fBstat\fR(2), \fBumask\fR(2),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBfsattr\fR(5), \fBlargefile\fR(5),
 \fBlocale\fR(5), \fBstandards\fR(5)
 .SH WARNINGS
-.sp
 .LP
 The following options are obsolete and will not be supported in future
 releases:
@@ -1091,7 +1079,6 @@ format (5120-byte records).
 .RE
 
 .SH NOTES
-.sp
 .LP
 When using \fBfind\fR to determine files modified within a range of time, use
 the \fB-mtime\fR argument \fBbefore\fR the \fB-print\fR argument. Otherwise,

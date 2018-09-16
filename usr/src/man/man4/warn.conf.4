@@ -14,7 +14,6 @@ warn.conf \- Kerberos warning configuration file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBwarn.conf\fR file contains configuration information specifying how
 users will be warned by the \fBktkt_warnd\fR daemon about ticket expiration. In
@@ -91,7 +90,7 @@ file has been removed.
 \fB\fBlog\fR\fR
 .ad
 .RS 15n
-Same as specifing both \fBlog-success\fR and \fBlog-failure\fR.
+Same as specifying both \fBlog-success\fR and \fBlog-failure\fR.
 .RE
 
 .LP
@@ -207,7 +206,6 @@ myname@ACME.COM: your kerberos credentials have been renewed
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/krb5/ktkt_warnd\fR\fR
@@ -217,7 +215,6 @@ Kerberos warning daemon
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -233,12 +230,10 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkinit\fR(1), \fBkdestroy\fR(1), \fBktkt_warnd\fR(1M), \fBsyslog.conf\fR(4),
 \fButmpx\fR(4), \fBattributes\fR(5), \fBkerberos\fR(5), \fBpam_krb5\fR(5)
 .SH NOTES
-.sp
 .LP
 The auto-renew of the TGT is attempted only if the user is logged-in, as
 determined by examining \fButmpx\fR(4).

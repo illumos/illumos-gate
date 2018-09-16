@@ -24,7 +24,6 @@ DAT_RETURN
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIep_handle\fR\fR
@@ -93,7 +92,6 @@ CompletionNotification Suppression.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdat_ep_post_recv()\fR function requests the receive of the data over the
 connection of the \fIep_handle\fR Endpoint of the incoming message into the
@@ -132,7 +130,7 @@ behavior and also specify its support in Provider attributes. This behavior
 allows Consumer full control of the \fIlocal_iov\fR content after
 \fBdat_ep_post_recv()\fR returns. Because this behavior is not guaranteed by
 all Providers, portable Consumers should not rely on this behavior. Consumers
-shouldnot rely on the Provider copying \fIlocal_iov\fR information.
+should not rely on the Provider copying \fIlocal_iov\fR information.
 .sp
 .LP
 The \fBDAT_SUCCESS\fR return of the \fBdat_ep_post_recv()\fR is at least the
@@ -155,7 +153,6 @@ state. The operation on the Endpoint in \fBDAT_EP_STATE_DISCONNECTED\fR is
 allowed. If the operation returns successfully, the posted Recv is immediately
 flushed to \fIrecv_evd_handle\fR.
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDAT_SUCCESS\fR\fR
@@ -214,14 +211,12 @@ Privileges violation for local or remote memory access. One of the LMRs used in
 .RE
 
 .SH USAGE
-.sp
 .LP
 For best Recv operation performance, the Consumer should align each buffer
 segment of \fIlocal_iov\fR to the Optimal Buffer Alignment attribute of the
 Provider. For portable applications, the Consumer should align each buffer
 segment of \fIlocal_iov\fR to the \fBDAT_OPTIMAL_ALIGNMENT\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -239,6 +234,5 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibdat\fR(3LIB), \fBattributes\fR(5)

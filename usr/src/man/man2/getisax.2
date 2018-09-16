@@ -15,7 +15,6 @@ getisax \- extract valid instruction set extensions
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBgetisax()\fR function sets the vector \fIarray\fR of \fIn\fR 32-bit
 integers to contain the bits from the \fBAV\fR_\fIxxx\fR_\fIyyy\fR namespace of
@@ -29,7 +28,6 @@ associated descriptions, can be found in \fB<sys/auxv_SPARC.h>\fR.
 Values for \fBAV\fR_\fIxxx\fR_\fIyyy\fR for i386 and AMD64, and their
 associated descriptions, can be found in \fB<sys/auxv_386.h>\fR.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBgetisax()\fR function returns the number of array elements that contain
 non-zero values.
@@ -40,7 +38,7 @@ present.
 .sp
 .LP
 In the following example, if the message is written, the SSE2 instruction set
-is present and fully supportred by the operating system.
+is present and fully supported by the operating system.
 
 .sp
 .in +2
@@ -55,7 +53,6 @@ if (ui & AV_386_SSE2)
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -73,7 +70,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBisainfo\fR(1), \fBld\fR(1), \fBpargs\fR(1), \fBattributes\fR(5)
 .sp

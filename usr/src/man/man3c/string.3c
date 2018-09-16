@@ -358,8 +358,8 @@ passed to \fBfree()\fR. The space for the new string is obtained using
 \fBmalloc\fR(3C). If the new string cannot be created, a null pointer is
 returned and \fBerrno\fR may be set to \fBENOMEM\fR to indicate that the
 storage space available is insufficient. The \fBstrndup()\fR function is
-identical to \fBstrdup()\fR, execept it copies at most \fIn\fR bytes from
-\fBs1\fR and ensures the copied string is awlays null terminated.
+identical to \fBstrdup()\fR, except it copies at most \fIn\fR bytes from
+\fBs1\fR and ensures the copied string is always null terminated.
 .LP
 The functions \fBstrdupa()\fR and \fBstrndupa()\fR behave identically to
 \fBstrdup()\fR and \fBstrndup()\fR respectively; however, instead of allocating

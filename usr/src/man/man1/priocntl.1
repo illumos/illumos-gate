@@ -31,7 +31,6 @@ priocntl \- display or set scheduling parameters of specified process(es)
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpriocntl\fR command displays or sets scheduling parameters of the
 specified process(es). It can also be used to display the current configuration
@@ -171,7 +170,6 @@ specified on the command line (\fIarguments\fR are the arguments to the
 command). If the \fB-c\fR \fIclass\fR option is omitted the command is run in
 the user's current class.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -496,7 +494,6 @@ Sets the user priority of the specified process(es) to \fIfxupri\fR.
 
 .SH USAGE
 .SS "Real-Time Class"
-.sp
 .LP
 The real-time class provides a fixed priority preemptive scheduling policy for
 those processes requiring fast and deterministic response and absolute
@@ -611,10 +608,9 @@ The real-time priority, time quantum, and time quantum signal are inherited
 across the \fBfork\fR(2) and \fBexec\fR(2) system calls. When using the time
 quantum signal with a user defined signal handler across the \fBexec\fR(2)
 system call, the new image must install an appropriate user defined signal
-handler before the time quantum expires. Otherwise, unpredicable behavior would
+handler before the time quantum expires. Otherwise, unpredictable behavior would
 result.
 .SS "Time-Sharing Class"
-.sp
 .LP
 The time-sharing scheduling policy provides for a fair and effective allocation
 of the \fBCPU\fR resource among processes with varying \fBCPU\fR consumption
@@ -700,7 +696,6 @@ parameter is set to a default value. The default value for \fItsuprilim\fR is
 The time-sharing user priority and user priority limit are inherited across the
 \fBfork\fR(2) and \fBexec\fR(2) system calls.
 .SS "Inter-Active Class"
-.sp
 .LP
 The inter-active scheduling policy provides for a fair and effective allocation
 of the \fBCPU\fR resource among processes with varying \fBCPU\fR consumption
@@ -724,7 +719,6 @@ every time a process's priority is adjusted. This feature is used by the X
 windowing system, which sets this bit for those processes that run inside of
 the current active window to give them a higher priority.
 .SS "Fair-Share Class"
-.sp
 .LP
 The fair-share scheduling policy provides a fair allocation of system \fBCPU\fR
 resources among projects, independent of the number of processes they own.
@@ -750,7 +744,6 @@ compared to other projects.
 The priorities of processes in the fair-share class can be changed in the same
 manner as those in the time-share class.
 .SS "Fixed-Priority Class"
-.sp
 .LP
 The fixed-priority class provides a fixed priority preemptive scheduling policy
 for those processes requiring that the scheduling priorities do not get
@@ -833,7 +826,6 @@ in the same manner as those in the real-time class.
 The fixed-priority user priority, user priority limit, and time quantum are
 inherited across the \fBfork\fR(2) and \fBexec\fR(2) system calls.
 .SH EXAMPLES
-.sp
 .LP
 The following are real-time class examples:
 .LP
@@ -939,7 +931,6 @@ example% \fBpriocntl -e -c FX -m 20 -p 10 -t 250 command\fR
 .sp
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -980,7 +971,6 @@ Command could not be executed at the specified priority.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -996,7 +986,6 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkill\fR(1), \fBnice\fR(1), \fBps\fR(1), \fBdispadmin\fR(1M), \fBexec\fR(2),
 \fBfork\fR(2), \fBpriocntl\fR(2), \fBfx_dptbl\fR(4), \fBprocess\fR(4),
@@ -1005,7 +994,6 @@ CSI	Enabled
 .LP
 \fISystem Administration Guide: Basic Administration\fR
 .SH DIAGNOSTICS
-.sp
 .LP
 \fBpriocntl\fR prints the following error messages:
 .sp

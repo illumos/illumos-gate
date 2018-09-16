@@ -48,9 +48,6 @@
 .SH NAME
 cancellation \- overview of concepts related to POSIX thread cancellation
 .SH DESCRIPTION
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -68,7 +65,6 @@ T}
 .TE
 
 .SS "Cancellation"
-.sp
 .LP
 Thread cancellation allows a thread to terminate the execution of  any
 application thread in the process. Cancellation is useful when further
@@ -83,7 +79,6 @@ search for the solution, one of the threads might solve the puzzle while the
 others continue to operate. Since they are serving no purpose at that point,
 they should all be canceled.
 .SS "Planning Steps"
-.sp
 .LP
 Planning and programming for most cancellations follow this pattern:
 .RS +4
@@ -127,7 +122,6 @@ performing those cancellations if they are found. Push and pop cleanup handlers
 around the cancellation point, if necessary (see Step 3, above).
 .RE
 .SS "Cancellation Points"
-.sp
 .LP
 The system defines certain points at which cancellation can occur (cancellation
 points), and you can create additional cancellation points in your application
@@ -182,7 +176,6 @@ thread might leave a mutex in a locked state, leading to a deadlock. Or it
 might leave a region of memory allocated with no way to identify it and
 therefore no way to free it.
 .SS "Cleanup Handlers"
-.sp
 .LP
 When a thread is canceled, it should release resources and clean up the state
 that is shared with other threads. So, whenever a thread that might be canceled
@@ -217,7 +210,6 @@ The effect of the use of \fBreturn\fR, \fBbreak\fR, \fBcontinue\fR, and
 \fBpthread_cleanup_push()\fR and \fBpthread_cleanup_pop()\fR function calls is
 undefined.
 .SS "Cancellation State"
-.sp
 .LP
 Most programmers will use only the default cancellation state of
 \fBPTHREAD_CANCEL_ENABLE\fR, but can choose to change the state by using
@@ -237,7 +229,6 @@ You might want to disable cancellation before a call to a cancel-unsafe
 library, restoring the old cancel state when the call returns from the library.
 See  \fBCancel-Safe\fR for explanations of cancel safety.
 .SS "Cancellation Type"
-.sp
 .LP
 A thread's cancellation \fBtype\fR is set with \fBpthread_setcanceltype\fR(3C),
 and determines whether the thread can be canceled anywhere in its execution or
@@ -275,12 +266,13 @@ T}
 Asynchronous	T{
 Receipt of a \fBpthread_cancel()\fR call causes immediate cancellation.
 T}	T{
-All cancellation requests to the target thread are held pending; as soon as cancellation is re-enabled, pending cancellations are executedimmediately.
+All cancellation requests to the target thread are held pending; as
+soon as cancellation is re-enabled, pending cancellations are executed
+immediately.
 T}
 .TE
 
 .SS "Cancel-Safe"
-.sp
 .LP
 With the arrival of POSIX cancellation, the Cancel-Safe level has been added to
 the list of MT-Safety levels. See \fBattributes\fR(5). An application or
@@ -296,7 +288,6 @@ It is easier to arrange for deferred cancel safety, as this requires system and
 program state protection only around cancellation points. In general, expect
 that most applications and libraries are not Asynchronous-Cancel-Safe.
 .SS "POSIX Threads Only"
-.sp
 .LP
 The cancellation functions described in this manual page are available for
 POSIX threads, only (the Solaris threads interfaces do not provide cancellation
@@ -414,7 +405,6 @@ main()
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -430,7 +420,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBread\fR(2), \fBsigwait\fR(2), \fBwrite\fR(2), \fBIntro\fR(3),
 \fBcondition\fR(5), \fBpthread_cleanup_pop\fR(3C),

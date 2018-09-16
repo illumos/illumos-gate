@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DRIVER.CONF 4 "Jan 5, 2007"
+.TH DRIVER.CONF 4 "Sep 16, 2018"
 .SH NAME
 driver.conf \- driver configuration files
 .SH SYNOPSIS
@@ -13,7 +13,6 @@ driver.conf \- driver configuration files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Driver configuration files provide values for device properties. The values
 override values provided by the devices themselves. Most modern devices provide
@@ -23,7 +22,7 @@ enough property values to make a driver configuration file unnecessary.
 The system associates a driver with its configuration file by name. For
 example, a driver in \fB/usr/kernel/drv\fR called \fBwombat\fR has the driver
 configuration file \fBwombat.conf\fR, also stored in \fB/usr/kernel/drv\fR,
-associated with it. On systems capable of support 64-bit drivers, the driver
+associated with it. On systems that support 64-bit drivers, the driver
 configuration file should be placed in the directory in which the 32-bit driver
 is (or would be) located, even if only a 64-bit version is provided. For
 example, a 64-bit driver stored in \fB/usr/kernel/drv/sparcv9\fR stores its
@@ -202,7 +201,6 @@ the second node retrieves the value of the global \fBdebug-level\fR property
 (3).
 
 .SH SEE ALSO
-.sp
 .LP
 \fBadd_drv\fR(1M), \fBpci\fR(4), \fBpseudo\fR(4), \fBsbus\fR(4), \fBscsi\fR(4),
 \fBprobe\fR(9E), \fBddi_getlongprop\fR(9F), \fBddi_getprop\fR(9F),
@@ -212,16 +210,12 @@ the second node retrieves the value of the global \fBdebug-level\fR property
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
 .LP
 To avoid namespace collisions between multiple driver vendors, it is strongly
 recommended that the \fIname\fR property of the driver should begin with a
 vendor-unique string. A reasonably compact and unique choice is the vendor
 over-the-counter stock symbol.
 .SH NOTES
-.sp
 .LP
 The \fBupdate_drv\fR(1M) command should be used to prompt the kernel to reread
-\fBdriver.conf\fR files. Using \fBmodunload\fR(1M) to update \fBdriver.conf\fR
-continues to work in release 9 of the Solaris operating environment, but the
-behavior will change in a future release.
+\fBdriver.conf\fR files.

@@ -63,7 +63,6 @@ sem_timedwait, sem_reltimedwait_np \- lock a semaphore
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsem_timedwait()\fR function locks the semaphore referenced by \fIsem\fR
 as in the \fBsem_wait\fR(3C) function. However, if the semaphore cannot be
@@ -99,7 +98,6 @@ Under no circumstance does the function fail with a timeout if the semaphore
 can be locked immediately. The validity of the \fIabs_timeout\fR need not be
 checked if the semaphore can be locked immediately.
 .SH RETURN VALUES
-.sp
 .LP
 The \fBsem_timedwait()\fR and \fBsem_reltimedwait_np()\fR functions return 0 if
 the calling process successfully performed the semaphore lock operation on the
@@ -107,7 +105,6 @@ semaphore designated by \fIsem\fR. If the call was unsuccessful, the state of
 the semaphore is be unchanged and the function returns -1 and sets \fBerrno\fR
 to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBsem_timedwait()\fR and \fBsem_reltimedwait_np()\fR functions will fail
 if:
@@ -163,7 +160,6 @@ A signal interrupted this function.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -175,7 +171,7 @@ c | c
 l | l .
 ATTRIBUTE TYPE	ATTRIBUTE VALUE
 _
-Interface Stability	Commmitted
+Interface Stability	Committed
 _
 MT-Level	MT-Safe
 _
@@ -186,7 +182,6 @@ Standard	See below.
 .LP
 For \fBsem_timedwait()\fR, see \fBstandards\fR(5).
 .SH SEE ALSO
-.sp
 .LP
 \fBsemctl\fR(2), \fBsemget\fR(2), \fBsemop\fR(2), \fBtime\fR(2),
 \fBsem_post\fR(3C), \fBsem_trywait\fR(3C), \fBsem_wait\fR(3C),

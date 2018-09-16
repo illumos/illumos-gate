@@ -16,7 +16,6 @@ crypt_genhash_impl \- generate encrypted password
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBcrypt_genhash_impl()\fR function is called by \fBcrypt\fR(3C) to
 generate the encrypted password \fIplaintext\fR.
@@ -33,20 +32,18 @@ The \fIparams\fR argument is an \fIargv\fR-like null-terminated vector of type
 \fBchar *\fR. The first element of \fIparams\fR represents the mechanism token
 name from \fBcrypt.conf\fR(4). The remaining elements of \fIparams\fR represent
 strings of the form <\fBparameter\fR>[=<\fBvalue\fR>] to allow passing in
-additional information from the \fBcrypt.conf\fR entry, such as specifing
+additional information from the \fBcrypt.conf\fR entry, such as specifying
 rounds information "\fBrounds=4096\fR".
 .sp
 .LP
 The \fBcrypt_genhash_impl()\fR function must not \fBfree\fR(3C) \fIctbufflen\fR
 on error.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBcrypt_genhash_impl()\fR returns a pointer to the
 encoded version of \fIplaintext\fR. Otherwise a null pointer is returned and
 \fBerrno\fR is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBcrypt_genhash_impl()\fR function will fail if:
 .sp
@@ -77,7 +74,6 @@ There is insufficient memory to perform hashing.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -95,7 +91,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpasswd\fR(1), \fBcrypt\fR(3C), \fBcrypt_gensalt_impl\fR(3C), \fBfree\fR(3C),
 \fBgetpassphrase\fR(3C), \fBcrypt.conf\fR(4), \fBpasswd\fR(4),

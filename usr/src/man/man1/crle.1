@@ -15,7 +15,6 @@ crle \- configure runtime linking environment
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBcrle\fR utility provides for the creation and display of a runtime
 linking configuration file. The configuration file is read and interpreted by
@@ -48,7 +47,7 @@ appropriate class of process, is recommended.
 .LP
 Creating an incorrect configuration file in the standard location,
 \fB/var/ld\fR, can prevent programs from running, and can therefore be
-difficult to recover from. To guard against this situation, it is recommented
+difficult to recover from. To guard against this situation, it is recommended
 that new configuration files first be created in a temporary location. Then set
 the appropriate \fBLD_CONFIG\fR environment variable to this new configuration
 file. This setting causes the new configuration file to be used by the runtime
@@ -183,7 +182,6 @@ alternate object is created in the directory specified by the preceding
 is created. The flags used by \fBdldump()\fR are specified using the \fB-f\fR
 option, or default to \fBRTLD_REL_RELATIVE\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported.
 .sp
@@ -794,13 +792,11 @@ together with a permanent preload object which becomes appended to the process
 environment definition.
 
 .SH EXIT STATUS
-.sp
 .LP
 The creation or display of a configuration file results in a \fB0\fR being
 returned. Otherwise, any error condition is accompanied with a diagnostic
 message and a non-zero value being returned.
 .SH NOTES
-.sp
 .LP
 The ability to tag an alternative application to use an application-specific
 configuration file, is possible if the original application contains one of the
@@ -848,7 +844,6 @@ When processing an update (\fB-u\fR) operation for an older file that lacks
 system information, \fBcrle\fR does not add system identification information
 to the result.
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/ld/ld.config\fR\fR
@@ -919,7 +914,6 @@ Audit library that is employed to \fBdldump\fR(3C) 64-bit objects.
 .RE
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 There are no environment variables that are referenced by \fBcrle\fR. However,
 several environment variables affect the runtime linkers behavior in regard to
@@ -975,7 +969,6 @@ Disable alternative object processing from a configuration file.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes.
 .sp
@@ -991,7 +984,6 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfile\fR(1), \fBld\fR(1), \fBld.so.1\fR(1), \fBdldump\fR(3C),
 \fBtempnam\fR(3C), \fBattributes\fR(5)

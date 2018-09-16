@@ -25,7 +25,6 @@ DAT_RETURN
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIia_handle\fR\fR
@@ -82,7 +81,6 @@ attributes.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBdat_ia_query()\fR functions provides the Consumer with the IA
 parameters, as well as the IA and Provider attributes. Consumers pass in
@@ -95,7 +93,6 @@ Consumer to specify which attributes to query. The Provider returns values for
 requested attributes. The Provider can also return values for any of the other
 attributes.
 .SS "Interface Adapter Attributes"
-.sp
 .LP
 The IA attributes are common to all open instances of the IA. DAT defines a
 method to query the IA attributes but does not define a method to modify them.
@@ -393,7 +390,6 @@ as a string.
 .RE
 
 .SS "DAPL Provider Attributes"
-.sp
 .LP
 The provider attributes are specific to the open instance of the IA. DAT
 defines a method to query Provider attributes but does not define a method to
@@ -588,8 +584,8 @@ Indicator of what kind of protection the Provider's PZ provides.
 .sp .6
 .RS 4n
 Local and remote DTO buffer alignment for optimal performance on the Platform.
-The \fBDAT_OPTIMAL_ALIGMNEMT\fR must be divisible by this attribute value. The
-maximum allowed value is \fBDAT_OPTIMAL_ALIGMNEMT\fR, or 256.
+The \fBDAT_OPTIMAL_ALIGNMENT\fR must be divisible by this attribute value. The
+maximum allowed value is \fBDAT_OPTIMAL_ALIGNMENT\fR, or 256.
 .RE
 
 .sp
@@ -636,7 +632,6 @@ as a string.
 .RE
 
 .SH RETURN VALUES
-.sp
 .ne 2
 .na
 \fB\fBDAT_SUCCESS\fR\fR
@@ -664,7 +659,6 @@ Invalid DAT handle; ia_handle is invalid.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -682,6 +676,5 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibdat\fR(3LIB), \fBattributes\fR(5)
