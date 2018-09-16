@@ -838,6 +838,7 @@ static int
 member_info_cb(const char *name, mdb_ctf_id_t id, ulong_t off, void *data)
 {
 	mbr_info_t *mbrp = data;
+	int kind, ret;
 
 	if (strcmp(name, mbrp->mbr_member) == 0) {
 		if (mbrp->mbr_offp != NULL)
@@ -848,7 +849,46 @@ member_info_cb(const char *name, mdb_ctf_id_t id, ulong_t off, void *data)
 		return (1);
 	}
 
-	return (0);
+	/*
+	 * C11 as well as earlier GNU extensions allow an embedded struct
+	 * or union to be unnamed as long as there are no unambiguous member
+	 * names.  If we encounter a SOU member with a 0-length name,
+	 * recurse into it and see if any of them match.
+	 */
+	if (strlen(name) != 0)
+		return (0);
+
+	kind = mdb_ctf_type_kind(id);
+	if (kind == CTF_ERR)
+		return (-1);
+	if (kind != CTF_K_STRUCT && kind != CTF_K_UNION)
+		return (0);
+
+	/*
+	 * Search the unnamed SOU for mbrp->mbr_member, possibly recursing if
+	 * it also contains unnamed members.  If the desired member is found.
+	 * *mbrp->mbr_offp will contain the offset of the member relative to
+	 * this unnamed SOU (if the offset was requested) -- i.e.
+	 * we effectively have *mbrp->mbr_offp == offsetof("", member). We want
+	 * unnamed SOUs to act as members of the enclosing SOUs, so we need to
+	 * return the offset as relative to the outer SOU.  Since 'off' is
+	 * the offset of the unnamed SOU relative to the enclosing SOU (i.e.
+	 * off == offsetof(outer, "")), we add the two together to produce the
+	 * desired offset.  This can recurse as necessary -- the compiler
+	 * prevents any ambiguities from occurring (or else it wouldn't be
+	 * able to compile the code), and the result will be relative to
+	 * the start of the SOU given in the mdb_ctf_member_info() call.
+	 */
+	ret = mdb_ctf_member_iter(id, member_info_cb, mbrp);
+	if (ret == -1)
+		return (-1);
+	if (ret == 0)
+		return (0);
+
+	if (mbrp->mbr_offp != NULL)
+		*(mbrp->mbr_offp) += off;
+
+	return (1);
 }
 
 int
@@ -856,10 +896,21 @@ mdb_ctf_member_info(mdb_ctf_id_t id, const char *member, ulong_t *offp,
     mdb_ctf_id_t *typep)
 {
 	mbr_info_t mbr;
+	/*
+	 * We want the resulting offset (if requested -- offp != NULL) to
+	 * be relative to the start of _this_ SOU.  If we have to search any
+	 * embedded unnamed SOUs, instead of merely assigning the resulting
+	 * offset value to mbr_offp, we will have to add the offsets of
+	 * any nested SOUs along the way (see comments in member_info_cb()).
+	 * Therefore, initialize off to 0 here so we do not need to worry about
+	 * recursion depth in member_info_cb (otherwise we would need to set
+	 * mbr_offp when depth = 1, and add when depth > 1).
+	 */
+	ulong_t off = 0;
 	int rc;
 
 	mbr.mbr_member = member;
-	mbr.mbr_offp = offp;
+	mbr.mbr_offp = &off;
 	mbr.mbr_typep = typep;
 
 	rc = mdb_ctf_member_iter(id, member_info_cb, &mbr);
@@ -871,6 +922,9 @@ mdb_ctf_member_info(mdb_ctf_id_t id, const char *member, ulong_t *offp,
 	/* not a member */
 	if (rc == 0)
 		return (set_errno(EMDB_CTFNOMEMB));
+
+	if (offp != NULL)
+		*offp = off;
 
 	return (0);
 }
