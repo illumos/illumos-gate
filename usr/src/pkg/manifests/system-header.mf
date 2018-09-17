@@ -920,6 +920,7 @@ file path=usr/include/sys/dirent.h
 file path=usr/include/sys/disp.h
 file path=usr/include/sys/dkbad.h
 file path=usr/include/sys/dkio.h
+file path=usr/include/sys/dkioc_free_util.h
 file path=usr/include/sys/dklabel.h
 $(sparc_ONLY)file path=usr/include/sys/dkmpio.h
 $(i386_ONLY)file path=usr/include/sys/dktp/altsctr.h
