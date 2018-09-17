@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2018 Joyent, Inc.
 #
 
 PROG= format
@@ -64,7 +63,6 @@ LDLIBS_sparc=
 LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair -ldevid -ldevinfo $(LDLIBS_$(MACH))
 
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
-C99LMODE=	-Xc99=%all
 CPPFLAGS    += -D_EXTVTOC
 
 .KEEP_STATE:

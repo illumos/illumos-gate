@@ -537,11 +537,11 @@ typedef struct dkioc_free_list_s {
 	uint64_t		dfl_flags;
 	uint64_t		dfl_num_exts;
 	uint64_t		dfl_offset;
-	dkioc_free_list_ext_t	dfl_exts[];
+	dkioc_free_list_ext_t	dfl_exts[1];
 } dkioc_free_list_t;
 #define	DFL_SZ(num_exts) \
 	(sizeof (dkioc_free_list_t) + \
-	(num_exts) * sizeof (dkioc_free_list_ext_t))
+	(num_exts - 1) * sizeof (dkioc_free_list_ext_t))
 
 #ifdef	__cplusplus
 }

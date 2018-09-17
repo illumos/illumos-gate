@@ -21,7 +21,6 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
 
 PROG =	rpc.smserverd
@@ -49,7 +48,6 @@ CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-unused-variable
 LINTFLAGS += -u
-C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 

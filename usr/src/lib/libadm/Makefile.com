@@ -20,7 +20,6 @@
 #
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018 Joyent, Inc.
 #
 
 LIBRARY=	libadm.a
@@ -43,7 +42,6 @@ LIBS=		$(DYNLIB) $(LINTLIB)
 SRCDIR=		../common
 
 CPPFLAGS +=	-I ../inc
-CSTD =		$(CSTD_GNU99)
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized

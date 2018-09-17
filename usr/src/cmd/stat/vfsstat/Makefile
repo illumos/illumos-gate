@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 2018, Joyent, Inc. All rights reserved.
+# Copyright (c) 2011, Joyent, Inc. All rights reserved.
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -26,8 +26,6 @@ include $(SRC)/cmd/Makefile.cmd
 PROG=	vfsstat
 
 .KEEP_STATE:
-
-C99LMODE=	-Xc99=%all
 
 all: $(PROG)
 

@@ -21,7 +21,6 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
 
 PROG = vmstat
@@ -33,7 +32,6 @@ include $(SRC)/cmd/stat/Makefile.stat
 
 LDLIBS += -ldevinfo -lkstat -lavl
 CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR}
-C99LMODE=	-Xc99=%all
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-parentheses

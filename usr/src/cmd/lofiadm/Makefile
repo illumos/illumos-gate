@@ -22,7 +22,6 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
 
 PROG= lofiadm
@@ -42,7 +41,6 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
-C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 

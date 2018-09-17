@@ -20,7 +20,6 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
 
 # This target builds both a command (daemon) and various shared objects.  This
@@ -95,8 +94,6 @@ CFLAGS += $(CCVERBOSE) $(C_PICFLAGS)
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
-
-C99LMODE=	-Xc99=%all
 
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-char-subscripts

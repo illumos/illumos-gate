@@ -43,8 +43,6 @@ LDLIBS +=	-ldevinfo -lc
 
 CFLAGS +=	$(CCVERBOSE)
 
-CSTD =	$(CSTD_GNU99)
-
 .KEEP_STATE:
 
 all: $(LIBS)

@@ -66,8 +66,6 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libdiskmgt/common
 
-CSTD =	$(CSTD_GNU99)
-
 .KEEP_STATE:
 
 all: $(LIBS)

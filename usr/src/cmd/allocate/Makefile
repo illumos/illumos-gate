@@ -21,7 +21,6 @@
 
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018 Joyent, Inc.
 #
 
 ETCTSOLFILES =	devalloc_defaults
@@ -183,11 +182,7 @@ clean :
 		$(RM) $(PROG) $(RTLCKS) $(OBJS) \
 		$(SCRIPTS) $(ALLSCRIPTS) $(POFILE) $(POFILES)
 
-lint :
-		$(LINT.c) allocate.c allocate3.c $(LDLIBS)
-		$(LINT.c) -Xc99=%all mkdevalloc.c $(LDLIBS)
-		$(LINT.c) dminfo.c $(LDLIBS)
-		$(LINT.c) add_allocatable.c $(LDLIBS)
+lint :		lint_SRCS
 
 strip :
 		$(STRIP) $(PROG)

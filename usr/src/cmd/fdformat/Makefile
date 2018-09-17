@@ -21,7 +21,6 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
 # cmd/fdformat/Makefile
 #
@@ -32,7 +31,6 @@ include ../Makefile.cmd
 
 LDLIBS +=	-lvolmgt
 LINTFLAGS +=    -um
-C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 

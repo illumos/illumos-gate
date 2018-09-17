@@ -21,7 +21,6 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
 
 PROG= cdrw
@@ -42,7 +41,6 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
 CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(HAL_DBUS_CPPFLAGS)
 LINTFLAGS += 	-um
-C99LMODE=	-Xc99=%all
 
 $(ROOTBIN)/cdrw := FILEMODE = 04755
 

@@ -56,8 +56,6 @@ CFLAGS64 +=	$(CCVERBOSE)
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
 
-CSTD =	$(CSTD_GNU99)
-
 LDLIBS +=	-lnsl -lc
 
 .KEEP_STATE:

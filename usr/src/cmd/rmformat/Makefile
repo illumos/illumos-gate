@@ -22,7 +22,6 @@
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
 
 PROG= rmformat
@@ -38,7 +37,6 @@ LDLIBS +=	-lsmedia -lvolmgt -ladm -lefi
 CERRWARN += -_gcc=-Wno-uninitialized
 
 LINTFLAGS += -u
-C99LMODE=	-Xc99=%all
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 $(ROOTBIN)/rmformat := FILEMODE = 04555

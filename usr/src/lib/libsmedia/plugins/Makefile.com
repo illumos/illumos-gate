@@ -21,8 +21,8 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBS =		$(DYNLIB)
@@ -43,7 +43,6 @@ CLEANFILES=	$(LINTOUT) $(LINTPLUGIN)
 
 SRCDIR =	../common
 
-CSTD =		$(CSTD_GNU99)
 LINTFLAGS += -xu
 LINTFLAGS64 += -xu
 $(LINTPLUGIN) :=	SRCS=$(OBJECTS:%.o=../common/%.c)

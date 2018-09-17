@@ -22,7 +22,6 @@
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
 #
 # cmd/devinfo/Makefile
 #
@@ -34,7 +33,6 @@ include ../Makefile.cmd
 LDLIBS += -ladm -lefi
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
-C99LMODE=	-Xc99=%all
 
 .KEEP_STATE:
 
