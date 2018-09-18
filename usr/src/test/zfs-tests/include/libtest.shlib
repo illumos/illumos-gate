@@ -1869,6 +1869,7 @@ function add_user #<group_name> <user_name> <basedir>
 	fi
 
 	log_must useradd -g $gname -d $basedir/$uname -m $uname
+	log_must passwd -N $uname
 
 	return 0
 }
