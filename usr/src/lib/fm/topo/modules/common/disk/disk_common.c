@@ -551,6 +551,7 @@ disk_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	}
 
 	if (dnode != NULL && dnode->ddn_devid != NULL &&
+	if (dnode->ddn_devid != NULL &&
 	    disk_add_temp_sensor(mod, dtn, dnode->ddn_devid) != 0) {
 		topo_mod_dprintf(mod, "disk_tnode_create: failed to create "
 		    "temperature sensor node on bay=%d/disk=0",
@@ -776,7 +777,7 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	char		lentry[MAXPATHLEN];
 	int		pathcount;
 	int		*inq_dtype, itype;
-	int 		i;
+	int		i;
 
 	if (devid) {
 		/*

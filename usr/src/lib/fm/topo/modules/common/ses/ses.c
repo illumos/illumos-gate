@@ -1454,9 +1454,9 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp, tnode_t *pnode,
 	/*
 	 * For the node label, we look for the following in order:
 	 *
-	 * 	<ses-description>
-	 * 	<ses-class-description> <instance>
-	 * 	<default-type-label> <instance>
+	 * <ses-description>
+	 * <ses-class-description> <instance>
+	 * <default-type-label> <instance>
 	 */
 	if (nvlist_lookup_string(props, SES_PROP_DESCRIPTION, &desc) != 0 ||
 	    desc[0] == '\0') {
@@ -2850,9 +2850,9 @@ ses_create_chassis(ses_enum_data_t *sdp, tnode_t *pnode, ses_enum_chassis_t *cp)
 	/*
 	 * We use the following property mappings:
 	 *
-	 * 	manufacturer		vendor-id
-	 * 	model			product-id
-	 * 	serial-number		libses-chassis-serial
+	 * manufacturer		vendor-id
+	 * model		product-id
+	 * serial-number	libses-chassis-serial
 	 */
 	verify(nvlist_lookup_string(props, SES_EN_PROP_VID,
 	    &raw_manufacturer) == 0);

@@ -1201,11 +1201,38 @@ cacheinit(void)
 		if (doptp == NULL)
 			doptp = pl->opts[CD_ROOT_PATH];
 		if (doptp != NULL) {
-			int len;
+			int len, size;
+			uint8_t c, *source;
+
 			str = NULL;
-			for (len = 0; len < doptp->len; len++) {
-				if (doptp->value[len] == ':') {
-					str = (char *)(&doptp->value[++len]);
+			source = doptp->value;
+			size = doptp->len;
+			c = ':';
+
+			/*
+			 * We have to consider three cases for root path:
+			 * "nfs://server_ip/path"
+			 * "server_ip:/path"
+			 * "/path"
+			 */
+			if (bcmp(source, "nfs://", 6) == 0) {
+				source += 6;
+				size -= 6;
+				c = '/';
+			}
+			/*
+			 * Search for next char after ':' or first '/'.
+			 * Note, the '/' is part of the path, but we do
+			 * not need to preserve the ':'.
+			 */
+			for (len = 0; len < size; len++) {
+				if (source[len] == c) {
+					if (c == ':') {
+						str = (char *)(&source[++len]);
+					} else {
+						str = (char *)(&source[len++]);
+						size++;
+					}
 					break;
 				}
 			}
@@ -1213,7 +1240,7 @@ cacheinit(void)
 				/* Do not override server_ip from property. */
 				if ((*(uint_t *)server_ip) == 0) {
 					char *ip = kmem_alloc(len, KM_SLEEP);
-					bcopy(doptp->value, ip, len);
+					bcopy(source, ip, len);
 					ip[len - 1] = '\0';
 					if (inet_aton((ip), server_ip) != 0) {
 						cmn_err(CE_NOTE,
@@ -1228,7 +1255,7 @@ cacheinit(void)
 						    server_ip));
 					}
 				}
-				len = doptp->len - len;
+				len = size - len;
 			} else {
 				str = (char *)doptp->value;
 				len = doptp->len;
