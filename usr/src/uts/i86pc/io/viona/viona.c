@@ -408,6 +408,7 @@ typedef struct viona_vring {
 		uint64_t	rs_indir_bad_next;
 		uint64_t	rs_no_space;
 		uint64_t	rs_too_many_desc;
+		uint64_t	rs_desc_bad_len;
 
 		uint64_t	rs_bad_ring_addr;
 
@@ -1599,6 +1600,13 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, int niov, uint16_t *cookie)
 
 		vdir = ring->vr_descr[next];
 		if ((vdir.vd_flags & VRING_DESC_F_INDIRECT) == 0) {
+			if (vdir.vd_len == 0) {
+				VIONA_PROBE2(desc_bad_len,
+				    viona_vring_t *, ring,
+				    uint32_t, vdir.vd_len);
+				VIONA_RING_STAT_INCR(ring, desc_bad_len);
+				goto bail;
+			}
 			buf = viona_gpa2kva(link, vdir.vd_addr, vdir.vd_len);
 			if (buf == NULL) {
 				VIONA_PROBE_BAD_RING_ADDR(ring, vdir.vd_addr);
@@ -1643,6 +1651,13 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, int niov, uint16_t *cookie)
 					    viona_vring_t *, ring);
 					VIONA_RING_STAT_INCR(ring,
 					    indir_bad_nest);
+					goto bail;
+				} else if (vp.vd_len == 0) {
+					VIONA_PROBE2(desc_bad_len,
+					    viona_vring_t *, ring,
+					    uint32_t, vp.vd_len);
+					VIONA_RING_STAT_INCR(ring,
+					    desc_bad_len);
 					goto bail;
 				}
 				buf = viona_gpa2kva(link, vp.vd_addr,
