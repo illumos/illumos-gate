@@ -199,7 +199,7 @@ void ecore_ptt_set_win(struct ecore_hwfn *p_hwfn,
 
 	REG_WR(p_hwfn,
 	       ecore_ptt_config_addr(p_ptt) +
-	       OFFSETOF(struct pxp_ptt_entry, offset),
+	       offsetof(struct pxp_ptt_entry, offset),
 	       OSAL_LE32_TO_CPU(p_ptt->pxp.offset));
 }
 
@@ -394,7 +394,7 @@ void ecore_fid_pretend(struct ecore_hwfn *p_hwfn,
 
 	REG_WR(p_hwfn,
 	       ecore_ptt_config_addr(p_ptt) +
-	       OFFSETOF(struct pxp_ptt_entry, pretend),
+	       offsetof(struct pxp_ptt_entry, pretend),
 	       *(u32 *)&p_ptt->pxp.pretend);
 }
 
@@ -410,7 +410,7 @@ void ecore_port_pretend(struct ecore_hwfn *p_hwfn,
 
 	REG_WR(p_hwfn,
 	       ecore_ptt_config_addr(p_ptt) +
-	       OFFSETOF(struct pxp_ptt_entry, pretend),
+	       offsetof(struct pxp_ptt_entry, pretend),
 	       *(u32 *)&p_ptt->pxp.pretend);
 }
 
@@ -427,7 +427,7 @@ void ecore_port_unpretend(struct ecore_hwfn *p_hwfn,
 
 	REG_WR(p_hwfn,
 	       ecore_ptt_config_addr(p_ptt) +
-	       OFFSETOF(struct pxp_ptt_entry, pretend),
+	       offsetof(struct pxp_ptt_entry, pretend),
 	       *(u32 *)&p_ptt->pxp.pretend);
 }
 

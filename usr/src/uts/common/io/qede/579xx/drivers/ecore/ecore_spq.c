@@ -579,7 +579,7 @@ void ecore_spq_setup(struct ecore_hwfn *p_hwfn)
 	OSAL_SPIN_LOCK_INIT(&p_spq->lock);
 
 	/* SPQ empty pool */
-	p_phys = p_spq->p_phys + OFFSETOF(struct ecore_spq_entry, ramrod);
+	p_phys = p_spq->p_phys + offsetof(struct ecore_spq_entry, ramrod);
 	p_virt = p_spq->p_virt;
 
 	capacity = ecore_chain_get_capacity(&p_spq->chain);

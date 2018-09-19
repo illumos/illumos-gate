@@ -3310,8 +3310,8 @@ ecore_hw_get_nvm_info(struct ecore_hwfn *p_hwfn,
 	nvm_cfg1_offset = ecore_rd(p_hwfn, p_ptt, nvm_cfg_addr + 4);
 
 	addr = MCP_REG_SCRATCH  + nvm_cfg1_offset +
-		   OFFSETOF(struct nvm_cfg1, glob) +
-		   OFFSETOF(struct nvm_cfg1_glob, core_cfg);
+		   offsetof(struct nvm_cfg1, glob) +
+		   offsetof(struct nvm_cfg1_glob, core_cfg);
 
 	core_cfg = ecore_rd(p_hwfn, p_ptt, addr);
 
@@ -3358,10 +3358,10 @@ ecore_hw_get_nvm_info(struct ecore_hwfn *p_hwfn,
 
 	/* Read DCBX configuration */
 	port_cfg_addr = MCP_REG_SCRATCH + nvm_cfg1_offset +
-			OFFSETOF(struct nvm_cfg1, port[MFW_PORT(p_hwfn)]);
+			offsetof(struct nvm_cfg1, port[MFW_PORT(p_hwfn)]);
 	dcbx_mode = ecore_rd(p_hwfn, p_ptt,
 			     port_cfg_addr +
-			     OFFSETOF(struct nvm_cfg1_port, generic_cont0));
+			     offsetof(struct nvm_cfg1_port, generic_cont0));
 	dcbx_mode = (dcbx_mode & NVM_CFG1_PORT_DCBX_MODE_MASK)
 		>> NVM_CFG1_PORT_DCBX_MODE_OFFSET;
 	switch (dcbx_mode) {
@@ -3382,17 +3382,17 @@ ecore_hw_get_nvm_info(struct ecore_hwfn *p_hwfn,
 	link = &p_hwfn->mcp_info->link_input;
 	p_caps = &p_hwfn->mcp_info->link_capabilities;
 	port_cfg_addr = MCP_REG_SCRATCH + nvm_cfg1_offset +
-			OFFSETOF(struct nvm_cfg1, port[MFW_PORT(p_hwfn)]);
+			offsetof(struct nvm_cfg1, port[MFW_PORT(p_hwfn)]);
 	link_temp = ecore_rd(p_hwfn, p_ptt,
 			     port_cfg_addr +
-			     OFFSETOF(struct nvm_cfg1_port, speed_cap_mask));
+			     offsetof(struct nvm_cfg1_port, speed_cap_mask));
 	link_temp &= NVM_CFG1_PORT_DRV_SPEED_CAPABILITY_MASK_MASK;
 	link->speed.advertised_speeds = link_temp;
 	p_caps->speed_capabilities = link->speed.advertised_speeds;
 
 	link_temp = ecore_rd(p_hwfn, p_ptt,
 				 port_cfg_addr +
-				 OFFSETOF(struct nvm_cfg1_port, link_settings));
+				 offsetof(struct nvm_cfg1_port, link_settings));
 	switch ((link_temp & NVM_CFG1_PORT_DRV_LINK_SPEED_MASK) >>
 		NVM_CFG1_PORT_DRV_LINK_SPEED_OFFSET) {
 	case NVM_CFG1_PORT_DRV_LINK_SPEED_AUTONEG:
@@ -3436,7 +3436,7 @@ ecore_hw_get_nvm_info(struct ecore_hwfn *p_hwfn,
 
 	if (p_hwfn->mcp_info->capabilities & FW_MB_PARAM_FEATURE_SUPPORT_EEE) {
 		link_temp = ecore_rd(p_hwfn, p_ptt, port_cfg_addr +
-				     OFFSETOF(struct nvm_cfg1_port, ext_phy));
+				     offsetof(struct nvm_cfg1_port, ext_phy));
 		link_temp &= NVM_CFG1_PORT_EEE_POWER_SAVING_MODE_MASK;
 		link_temp >>= NVM_CFG1_PORT_EEE_POWER_SAVING_MODE_OFFSET;
 		p_caps->default_eee = ECORE_MCP_EEE_ENABLED;
@@ -3474,8 +3474,8 @@ ecore_hw_get_nvm_info(struct ecore_hwfn *p_hwfn,
 
 	/* Read Multi-function information from shmem */
 	addr = MCP_REG_SCRATCH + nvm_cfg1_offset +
-		   OFFSETOF(struct nvm_cfg1, glob) +
-		   OFFSETOF(struct nvm_cfg1_glob, generic_cont0);
+		   offsetof(struct nvm_cfg1, glob) +
+		   offsetof(struct nvm_cfg1_glob, generic_cont0);
 
 	generic_cont0 = ecore_rd(p_hwfn, p_ptt, addr);
 
@@ -3498,8 +3498,8 @@ ecore_hw_get_nvm_info(struct ecore_hwfn *p_hwfn,
 
 	/* Read Multi-function information from shmem */
 	addr = MCP_REG_SCRATCH + nvm_cfg1_offset +
-		   OFFSETOF(struct nvm_cfg1, glob) +
-		   OFFSETOF(struct nvm_cfg1_glob, device_capabilities);
+		   offsetof(struct nvm_cfg1, glob) +
+		   offsetof(struct nvm_cfg1_glob, device_capabilities);
 
 	device_capabilities = ecore_rd(p_hwfn, p_ptt, addr);
 	if (device_capabilities & NVM_CFG1_GLOB_DEVICE_CAPABILITIES_ETHERNET)
