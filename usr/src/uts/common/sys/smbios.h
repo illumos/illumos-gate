@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -178,6 +178,7 @@ typedef union {
  */
 #define	SMB_DEFAULT1	"To Be Filled By O.E.M."
 #define	SMB_DEFAULT2	"Not Available"
+#define	SMB_DEFAULT3	"Default string"
 
 /*
  * SMBIOS Common Information.  These structures do not correspond to anything

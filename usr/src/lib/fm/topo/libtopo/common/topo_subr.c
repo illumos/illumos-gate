@@ -22,6 +22,9 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <alloca.h>
 #include <ctype.h>
@@ -29,6 +32,9 @@
 #include <syslog.h>
 #include <strings.h>
 #include <unistd.h>
+#include <sys/fm/protocol.h>
+#include <sys/systeminfo.h>
+#include <sys/utsname.h>
 
 #include <topo_error.h>
 #include <topo_subr.h>
@@ -394,7 +400,7 @@ topo_led_state_name(uint8_t type, char *buf, size_t len)
 
 void
 topo_sensor_state_name(uint32_t sensor_type, uint8_t state, char *buf,
-size_t len)
+    size_t len)
 {
 	topo_name_trans_t *ntp;
 
@@ -537,4 +543,80 @@ size_t len)
 	}
 
 	(void) snprintf(buf, len, "0x%02x", state);
+}
+
+static const topo_pgroup_info_t sys_pgroup = {
+	TOPO_PGROUP_SYSTEM,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+static const topo_pgroup_info_t auth_pgroup = {
+	FM_FMRI_AUTHORITY,
+	TOPO_STABILITY_PRIVATE,
+	TOPO_STABILITY_PRIVATE,
+	1
+};
+
+void
+topo_pgroup_hcset(tnode_t *node, nvlist_t *auth)
+{
+	int err;
+	char isa[MAXNAMELEN];
+	struct utsname uts;
+	char *prod, *psn, *csn, *server;
+
+	if (auth == NULL)
+		return;
+
+	if (topo_pgroup_create(node, &auth_pgroup, &err) != 0) {
+		if (err != ETOPO_PROP_DEFD)
+			return;
+	}
+
+	/*
+	 * Inherit if we can, it saves memory
+	 */
+	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_PRODUCT,
+	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
+		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT, &prod) ==
+		    0)
+			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_PRODUCT, TOPO_PROP_IMMUTABLE, prod,
+			    &err);
+	}
+	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_PRODUCT_SN,
+	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
+		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT_SN, &psn) ==
+		    0)
+			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_PRODUCT_SN, TOPO_PROP_IMMUTABLE, psn,
+			    &err);
+	}
+	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_CHASSIS,
+	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
+		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &csn) == 0)
+			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_CHASSIS, TOPO_PROP_IMMUTABLE, csn,
+			    &err);
+	}
+	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_SERVER,
+	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
+		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_SERVER, &server) ==
+		    0)
+			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
+			    FM_FMRI_AUTH_SERVER, TOPO_PROP_IMMUTABLE, server,
+			    &err);
+	}
+
+	if (topo_pgroup_create(node, &sys_pgroup, &err) != 0)
+		return;
+
+	if (sysinfo(SI_ARCHITECTURE, isa, sizeof (isa)) != -1)
+		(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM,
+		    TOPO_PROP_ISA, TOPO_PROP_IMMUTABLE, isa, &err);
+
+	if (uname(&uts) != -1)
+		(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM,
+		    TOPO_PROP_MACHINE, TOPO_PROP_IMMUTABLE, uts.machine, &err);
 }

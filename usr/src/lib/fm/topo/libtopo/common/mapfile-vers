@@ -151,6 +151,7 @@ SYMBOL_VERSION SUNWprivate {
 	topo_pgroup_create;
 	topo_pgroup_destroy;
 	topo_pgroup_info;
+	topo_pgroup_hcset;
 	topo_prop_get_fmri;
 	topo_prop_get_int32;
 	topo_prop_get_int64;

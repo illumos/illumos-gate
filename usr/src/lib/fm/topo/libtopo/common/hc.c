@@ -233,84 +233,6 @@ hc_fini(topo_mod_t *mod)
 	topo_mod_unregister(mod);
 }
 
-
-static const topo_pgroup_info_t sys_pgroup = {
-	TOPO_PGROUP_SYSTEM,
-	TOPO_STABILITY_PRIVATE,
-	TOPO_STABILITY_PRIVATE,
-	1
-};
-
-static const topo_pgroup_info_t auth_pgroup = {
-	FM_FMRI_AUTHORITY,
-	TOPO_STABILITY_PRIVATE,
-	TOPO_STABILITY_PRIVATE,
-	1
-};
-
-static void
-hc_prop_set(tnode_t *node, nvlist_t *auth)
-{
-	int err;
-	char isa[MAXNAMELEN];
-	struct utsname uts;
-	char *prod, *psn, *csn, *server;
-
-	if (auth == NULL)
-		return;
-
-	if (topo_pgroup_create(node, &auth_pgroup, &err) != 0) {
-		if (err != ETOPO_PROP_DEFD)
-			return;
-	}
-
-	/*
-	 * Inherit if we can, it saves memory
-	 */
-	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_PRODUCT,
-	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
-		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT, &prod)
-		    == 0)
-			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
-			    FM_FMRI_AUTH_PRODUCT, TOPO_PROP_IMMUTABLE, prod,
-			    &err);
-	}
-	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_PRODUCT_SN,
-	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
-		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_PRODUCT_SN, &psn)
-		    == 0)
-			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
-			    FM_FMRI_AUTH_PRODUCT_SN, TOPO_PROP_IMMUTABLE, psn,
-			    &err);
-	}
-	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_CHASSIS,
-	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
-		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_CHASSIS, &csn) == 0)
-			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
-			    FM_FMRI_AUTH_CHASSIS, TOPO_PROP_IMMUTABLE, csn,
-			    &err);
-	}
-	if ((topo_prop_inherit(node, FM_FMRI_AUTHORITY, FM_FMRI_AUTH_SERVER,
-	    &err) != 0) && (err != ETOPO_PROP_DEFD)) {
-		if (nvlist_lookup_string(auth, FM_FMRI_AUTH_SERVER, &server)
-		    == 0)
-			(void) topo_prop_set_string(node, FM_FMRI_AUTHORITY,
-			    FM_FMRI_AUTH_SERVER, TOPO_PROP_IMMUTABLE, server,
-			    &err);
-	}
-
-	if (topo_pgroup_create(node, &sys_pgroup, &err) != 0)
-		return;
-
-	isa[0] = '\0';
-	(void) sysinfo(SI_ARCHITECTURE, isa, sizeof (isa));
-	(void) uname(&uts);
-	(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM, TOPO_PROP_ISA,
-	    TOPO_PROP_IMMUTABLE, isa, &err);
-	(void) topo_prop_set_string(node, TOPO_PGROUP_SYSTEM, TOPO_PROP_MACHINE,
-	    TOPO_PROP_IMMUTABLE, uts.machine, &err);
-}
-
 /*ARGSUSED*/
 int
 hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
@@ -364,7 +286,7 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 	if (strcmp(name, MOTHERBOARD) == 0)
 		(void) topo_node_fru_set(node, nvl, 0, &err);
 
-	hc_prop_set(node, auth);
+	topo_pgroup_hcset(node, auth);
 	nvlist_free(nvl);
 	nvlist_free(auth);
 

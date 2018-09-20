@@ -216,6 +216,14 @@ extern "C" {
 #define	TOPO_DIMM_TYPE_LPDDR3		"LPDDR3"
 #define	TOPO_DIMM_TYPE_LPDDR4		"LPDDR4"
 
+#define	TOPO_PGROUP_MOTHERBOARD		"motherboard-properties"
+#define	TOPO_PROP_MB_MANUFACTURER	"manufacturer"
+#define	TOPO_PROP_MB_PRODUCT		"product-id"
+#define	TOPO_PROP_MB_ASSET		"asset-tag"
+#define	TOPO_PROP_MB_FIRMWARE_VENDOR	"firmware-vendor"
+#define	TOPO_PROP_MB_FIRMWARE_REV	"firmware-revision"
+#define	TOPO_PROP_MB_FIRMWARE_RELDATE	"firmware-release-date"
+
 #ifdef	__cplusplus
 }
 #endif
