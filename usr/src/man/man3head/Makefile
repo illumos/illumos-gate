@@ -61,7 +61,6 @@ MANFILES=	acct.h.3head		\
 	 	poll.h.3head		\
 	 	pthread.h.3head		\
 	 	pwd.h.3head		\
-		queue.h.3head		\
 	 	regex.h.3head		\
 	 	resource.h.3head	\
 	 	sched.h.3head		\
@@ -110,97 +109,7 @@ MANFILES=	acct.h.3head		\
 	 	wordexp.h.3head		\
 	 	xlocale.h.3head
 
-MANLINKS=	\
-		LIST_CLASS_ENTRY.3head \
-		LIST_CLASS_HEAD.3head \
-		LIST_CONCAT.3head \
-		LIST_EMPTY.3head \
-		LIST_ENTRY.3head \
-		LIST_FIRST.3head \
-		LIST_FOREACH.3head \
-		LIST_FOREACH_FROM.3head \
-		LIST_FOREACH_FROM_SAFE.3head \
-		LIST_FOREACH_SAFE.3head \
-		LIST_HEAD.3head \
-		LIST_HEAD_INITIALIZER.3head \
-		LIST_INIT.3head \
-		LIST_INSERT_AFTER.3head \
-		LIST_INSERT_BEFORE.3head \
-		LIST_INSERT_HEAD.3head \
-		LIST_NEXT.3head \
-		LIST_PREV.3head \
-		LIST_REMOVE.3head \
-		LIST_SWAP.3head \
-		SLIST_CLASS_ENTRY.3head \
-		SLIST_CLASS_HEAD.3head \
-		SLIST_CONCAT.3head \
-		SLIST_EMPTY.3head \
-		SLIST_ENTRY.3head \
-		SLIST_FIRST.3head \
-		SLIST_FOREACH.3head \
-		SLIST_FOREACH_FROM.3head \
-		SLIST_FOREACH_FROM_SAFE.3head \
-		SLIST_FOREACH_SAFE.3head \
-		SLIST_HEAD.3head \
-		SLIST_HEAD_INITIALIZER.3head \
-		SLIST_INIT.3head \
-		SLIST_INSERT_AFTER.3head \
-		SLIST_INSERT_HEAD.3head \
-		SLIST_NEXT.3head \
-		SLIST_REMOVE.3head \
-		SLIST_REMOVE_AFTER.3head \
-		SLIST_REMOVE_HEAD.3head \
-		SLIST_SWAP.3head \
-		STAILQ_CLASS_ENTRY.3head \
-		STAILQ_CLASS_HEAD.3head \
-		STAILQ_CONCAT.3head \
-		STAILQ_EMPTY.3head \
-		STAILQ_ENTRY.3head \
-		STAILQ_FIRST.3head \
-		STAILQ_FOREACH.3head \
-		STAILQ_FOREACH_FROM.3head \
-		STAILQ_FOREACH_FROM_SAFE.3head \
-		STAILQ_FOREACH_SAFE.3head \
-		STAILQ_HEAD.3head \
-		STAILQ_HEAD_INITIALIZER.3head \
-		STAILQ_INIT.3head \
-		STAILQ_INSERT_AFTER.3head \
-		STAILQ_INSERT_HEAD.3head \
-		STAILQ_INSERT_TAIL.3head \
-		STAILQ_LAST.3head \
-		STAILQ_NEXT.3head \
-		STAILQ_REMOVE.3head \
-		STAILQ_REMOVE_AFTER.3head \
-		STAILQ_REMOVE_HEAD.3head \
-		STAILQ_SWAP.3head \
-		TAILQ_CLASS_ENTRY.3head \
-		TAILQ_CLASS_HEAD.3head \
-		TAILQ_CONCAT.3head \
-		TAILQ_EMPTY.3head \
-		TAILQ_ENTRY.3head \
-		TAILQ_FIRST.3head \
-		TAILQ_FOREACH.3head \
-		TAILQ_FOREACH_FROM.3head \
-		TAILQ_FOREACH_FROM_SAFE.3head \
-		TAILQ_FOREACH_REVERSE.3head \
-		TAILQ_FOREACH_REVERSE_FROM.3head \
-		TAILQ_FOREACH_REVERSE_FROM_SAFE.3head \
-		TAILQ_FOREACH_REVERSE_SAFE.3head \
-		TAILQ_FOREACH_SAFE.3head \
-		TAILQ_HEAD.3head \
-		TAILQ_HEAD_INITIALIZER.3head \
-		TAILQ_INIT.3head \
-		TAILQ_INSERT_AFTER.3head \
-		TAILQ_INSERT_BEFORE.3head \
-		TAILQ_INSERT_HEAD.3head \
-		TAILQ_INSERT_TAIL.3head \
-		TAILQ_LAST.3head \
-		TAILQ_NEXT.3head \
-		TAILQ_PREV.3head \
-		TAILQ_REMOVE.3head \
-		TAILQ_SWAP.3head
-
-MANLINKS +=	acct.3head		\
+MANLINKS=	acct.3head		\
 		aio.3head		\
 		ar.3head		\
 		archives.3head		\
@@ -288,95 +197,6 @@ MANLINKS +=	acct.3head		\
 		wctype.3head		\
 		wordexp.3head		\
 		xlocale.3head
-
-LIST_CLASS_ENTRY.3head := LINKSRC = queue.h.3head
-LIST_CLASS_HEAD.3head := LINKSRC = queue.h.3head
-LIST_CONCAT.3head := LINKSRC = queue.h.3head
-LIST_EMPTY.3head := LINKSRC = queue.h.3head
-LIST_ENTRY.3head := LINKSRC = queue.h.3head
-LIST_FIRST.3head := LINKSRC = queue.h.3head
-LIST_FOREACH.3head := LINKSRC = queue.h.3head
-LIST_FOREACH_FROM.3head := LINKSRC = queue.h.3head
-LIST_FOREACH_FROM_SAFE.3head := LINKSRC = queue.h.3head
-LIST_FOREACH_SAFE.3head := LINKSRC = queue.h.3head
-LIST_HEAD.3head := LINKSRC = queue.h.3head
-LIST_HEAD_INITIALIZER.3head := LINKSRC = queue.h.3head
-LIST_INIT.3head := LINKSRC = queue.h.3head
-LIST_INSERT_AFTER.3head := LINKSRC = queue.h.3head
-LIST_INSERT_BEFORE.3head := LINKSRC = queue.h.3head
-LIST_INSERT_HEAD.3head := LINKSRC = queue.h.3head
-LIST_NEXT.3head := LINKSRC = queue.h.3head
-LIST_PREV.3head := LINKSRC = queue.h.3head
-LIST_REMOVE.3head := LINKSRC = queue.h.3head
-LIST_SWAP.3head := LINKSRC = queue.h.3head
-SLIST_CLASS_ENTRY.3head := LINKSRC = queue.h.3head
-SLIST_CLASS_HEAD.3head := LINKSRC = queue.h.3head
-SLIST_CONCAT.3head := LINKSRC = queue.h.3head
-SLIST_EMPTY.3head := LINKSRC = queue.h.3head
-SLIST_ENTRY.3head := LINKSRC = queue.h.3head
-SLIST_FIRST.3head := LINKSRC = queue.h.3head
-SLIST_FOREACH.3head := LINKSRC = queue.h.3head
-SLIST_FOREACH_FROM.3head := LINKSRC = queue.h.3head
-SLIST_FOREACH_FROM_SAFE.3head := LINKSRC = queue.h.3head
-SLIST_FOREACH_SAFE.3head := LINKSRC = queue.h.3head
-SLIST_HEAD.3head := LINKSRC = queue.h.3head
-SLIST_HEAD_INITIALIZER.3head := LINKSRC = queue.h.3head
-SLIST_INIT.3head := LINKSRC = queue.h.3head
-SLIST_INSERT_AFTER.3head := LINKSRC = queue.h.3head
-SLIST_INSERT_HEAD.3head := LINKSRC = queue.h.3head
-SLIST_NEXT.3head := LINKSRC = queue.h.3head
-SLIST_REMOVE.3head := LINKSRC = queue.h.3head
-SLIST_REMOVE_AFTER.3head := LINKSRC = queue.h.3head
-SLIST_REMOVE_HEAD.3head := LINKSRC = queue.h.3head
-SLIST_SWAP.3head := LINKSRC = queue.h.3head
-STAILQ_CLASS_ENTRY.3head := LINKSRC = queue.h.3head
-STAILQ_CLASS_HEAD.3head := LINKSRC = queue.h.3head
-STAILQ_CONCAT.3head := LINKSRC = queue.h.3head
-STAILQ_EMPTY.3head := LINKSRC = queue.h.3head
-STAILQ_ENTRY.3head := LINKSRC = queue.h.3head
-STAILQ_FIRST.3head := LINKSRC = queue.h.3head
-STAILQ_FOREACH.3head := LINKSRC = queue.h.3head
-STAILQ_FOREACH_FROM.3head := LINKSRC = queue.h.3head
-STAILQ_FOREACH_FROM_SAFE.3head := LINKSRC = queue.h.3head
-STAILQ_FOREACH_SAFE.3head := LINKSRC = queue.h.3head
-STAILQ_HEAD.3head := LINKSRC = queue.h.3head
-STAILQ_HEAD_INITIALIZER.3head := LINKSRC = queue.h.3head
-STAILQ_INIT.3head := LINKSRC = queue.h.3head
-STAILQ_INSERT_AFTER.3head := LINKSRC = queue.h.3head
-STAILQ_INSERT_HEAD.3head := LINKSRC = queue.h.3head
-STAILQ_INSERT_TAIL.3head := LINKSRC = queue.h.3head
-STAILQ_LAST.3head := LINKSRC = queue.h.3head
-STAILQ_NEXT.3head := LINKSRC = queue.h.3head
-STAILQ_REMOVE.3head := LINKSRC = queue.h.3head
-STAILQ_REMOVE_AFTER.3head := LINKSRC = queue.h.3head
-STAILQ_REMOVE_HEAD.3head := LINKSRC = queue.h.3head
-STAILQ_SWAP.3head := LINKSRC = queue.h.3head
-TAILQ_CLASS_ENTRY.3head := LINKSRC = queue.h.3head
-TAILQ_CLASS_HEAD.3head := LINKSRC = queue.h.3head
-TAILQ_CONCAT.3head := LINKSRC = queue.h.3head
-TAILQ_EMPTY.3head := LINKSRC = queue.h.3head
-TAILQ_ENTRY.3head := LINKSRC = queue.h.3head
-TAILQ_FIRST.3head := LINKSRC = queue.h.3head
-TAILQ_FOREACH.3head := LINKSRC = queue.h.3head
-TAILQ_FOREACH_FROM.3head := LINKSRC = queue.h.3head
-TAILQ_FOREACH_FROM_SAFE.3head := LINKSRC = queue.h.3head
-TAILQ_FOREACH_REVERSE.3head := LINKSRC = queue.h.3head
-TAILQ_FOREACH_REVERSE_FROM.3head := LINKSRC = queue.h.3head
-TAILQ_FOREACH_REVERSE_FROM_SAFE.3head := LINKSRC = queue.h.3head
-TAILQ_FOREACH_REVERSE_SAFE.3head := LINKSRC = queue.h.3head
-TAILQ_FOREACH_SAFE.3head := LINKSRC = queue.h.3head
-TAILQ_HEAD.3head := LINKSRC = queue.h.3head
-TAILQ_HEAD_INITIALIZER.3head := LINKSRC = queue.h.3head
-TAILQ_INIT.3head := LINKSRC = queue.h.3head
-TAILQ_INSERT_AFTER.3head := LINKSRC = queue.h.3head
-TAILQ_INSERT_BEFORE.3head := LINKSRC = queue.h.3head
-TAILQ_INSERT_HEAD.3head := LINKSRC = queue.h.3head
-TAILQ_INSERT_TAIL.3head := LINKSRC = queue.h.3head
-TAILQ_LAST.3head := LINKSRC = queue.h.3head
-TAILQ_NEXT.3head := LINKSRC = queue.h.3head
-TAILQ_PREV.3head := LINKSRC = queue.h.3head
-TAILQ_REMOVE.3head := LINKSRC = queue.h.3head
-TAILQ_SWAP.3head := LINKSRC = queue.h.3head
 
 acct.3head		:= LINKSRC = acct.h.3head
 aio.3head		:= LINKSRC = aio.h.3head
