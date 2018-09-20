@@ -64,7 +64,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \(milproject [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions are used to obtain entries describing user projects. Entries
 can come from any of the sources for a project specified in the
@@ -167,7 +166,6 @@ project database. The \fBinproj()\fR, \fBgetprojbyname()\fR,
 \fBgetprojbyid()\fR, and \fBgetdefaultproj()\fR functions leave the enumeration
 position in an indeterminate state.
 .SH RETURN VALUES
-.sp
 .LP
 Project entries are represented by the \fBstruct project\fR structure defined
 in <\fBproject.h\fR>.
@@ -199,7 +197,7 @@ it successfully enumerates an entry; otherwise it returns \fINULL\fR,
 indicating the end of the enumeration.
 .sp
 .LP
-The \fBgetprojidbyname()\fR function returns the project ID if the requsted
+The \fBgetprojidbyname()\fR function returns the project ID if the requested
 entry is found; otherwise it returns \(mi1 and sets errno to indicate the
 error.
 .sp
@@ -211,7 +209,6 @@ the \fIproj\fR pointer that was supplied by the caller.
 .LP
 Upon failure, \fBNULL\fR is returned and errno is set to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBgetprojent()\fR, \fBgetprojbyname()\fR, \fBgetprojbyid()\fR,
 \fBinproj()\fR, \fBgetprojidbyname()\fR, \fBfgetprojent()\fR, and
@@ -267,13 +264,12 @@ the data to be referenced by the resulting \fBproject\fR structure.
 .LP
 These functions can also fail if the name service switch does not specify valid
 \fBproject\fR(4) name service sources. In the case of an incompletely
-configurated name service switch configuration, \fBgetprojbyid()\fR and other
+configured name service switch configuration, \fBgetprojbyid()\fR and other
 functions can return error values other than those documented above. These
 conditions usually occur when the \fBnsswitch.conf\fR file indicates that one
 or more name services is providing entries for the project database when that
 name service does not actually make a project table available.
 .SH USAGE
-.sp
 .LP
 When compiling multithreaded applications, see \fBIntro\fR(3), Notes On
 Multithreaded Applications.
@@ -284,7 +280,6 @@ is supported for the project file, NIS, and LDAP but in general is not
 efficient. The semantics of enumeration are discussed further in
 \fBnsswitch.conf\fR(4).
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -302,7 +297,6 @@ MT-Level	See Description.
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(3), \fBlibproject\fR(3LIB), \fBproject_walk\fR(3PROJECT),
 \fBsysconf\fR(3C), \fBnsswitch.conf\fR(4), \fBproject\fR(4),

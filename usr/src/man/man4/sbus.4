@@ -8,7 +8,6 @@
 .SH NAME
 sbus \- configuration files for SBus device drivers
 .SH DESCRIPTION
-.sp
 .LP
 The \fBSBus\fR is a geographically addressed peripheral bus present on many
 \fBSPARC\fR hardware platforms. \fBSBus\fR devices are \fIself-identifying\fR
@@ -85,7 +84,7 @@ resource on the \fBSBus.\fR
 The first integer of each tuple should be set to \fB\(mi1\fR, specifying that
 any SBus slot may be matched. The second integer of each 3-tuple specifies the
 offset in the slot address space identified by the first element.  The third
-integer of each 3-tuple specifies the size in bytes of the mappable resoure.
+integer of each 3-tuple specifies the size in bytes of the mappable resource.
 .sp
 The \fBregisters\fR property can only be used to augment an incompletely
 specified \fBreg\fR property with information from a driver configuration file.
@@ -158,7 +157,6 @@ name="SUNW,netboard" class="sbus"
 .sp
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -174,7 +172,6 @@ Architecture	SPARC
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdriver.conf\fR(4), \fBattributes\fR(5), \fBddi_add_intr\fR(9F),
 \fBddi_map_regs\fR(9F), \fBddi_prop_op\fR(9F)
@@ -182,7 +179,6 @@ Architecture	SPARC
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
 .LP
 The wildcarding mechanism of the \fBregisters\fR property matches every
 instance of the particular device attached to the system. This may not always

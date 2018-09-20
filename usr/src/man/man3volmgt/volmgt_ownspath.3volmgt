@@ -9,14 +9,13 @@ volmgt_ownspath \- check volume management name space for path
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc\fR [flag]\&.\|.\|. \fIfile\fR\&.\|.\|. \fB\(mil\fRvolgmt [library]\&.\|.\|.
+\fBcc\fR [flag]\&.\|.\|. \fIfile\fR\&.\|.\|. \fB\(mil\fRvolmgt [library]\&.\|.\|.
 #include <volmgt.h>
 
 \fBint\fR \fBvolmgt_ownspath\fR(\fBchar *\fR\fIpath\fR);
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIpath\fR\fR
@@ -26,7 +25,6 @@ A string containing the path.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 This function is obsolete. The management of removable media by the Volume
 Management feature, including \fBvold\fR, has been replaced by software that
@@ -40,7 +38,6 @@ contained in the volume management name space. This is achieved by comparing
 the beginning of the supplied path name with the output from
 \fBvolmgt_root\fR(3VOLMGT)
 .SH RETURN VALUES
-.sp
 .LP
 The return from this function is undefined.
 .SH EXAMPLES
@@ -69,7 +66,6 @@ if (volmgt_running()) {
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -87,7 +83,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBvolmgt_root\fR(3VOLMGT), \fBvolmgt_running\fR(3VOLMGT), \fBattributes\fR(5),
 \fBhal\fR(5)

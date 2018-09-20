@@ -9,7 +9,7 @@ media_getid \- return the id of a piece of media
 .SH SYNOPSIS
 .LP
 .nf
-\fBcc \fR[flag \&.\|.\|.] \fIfile \fR\&.\|.\|.\fB\(mil\fRvolgmt [library \&.\|.\|.]
+\fBcc \fR[flag \&.\|.\|.] \fIfile \fR\&.\|.\|.\fB\(mil\fRvolmgt [library \&.\|.\|.]
 
 #include <volmgt.h>
 
@@ -19,7 +19,6 @@ media_getid \- return the id of a piece of media
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This function is obsolete. The management of removable media by the Volume
 Management feature, including \fBvold\fR, has been replaced by software that
@@ -31,7 +30,6 @@ through the HAL APIs, which are documented on the HAL web site. See
 \fBmedia_getid()\fR returns the \fIid\fR of a piece of media. Volume management
 must be running. See \fBvolmgt_running\fR(3VOLMGT).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIvol_path\fR\fR
@@ -41,7 +39,6 @@ Path to the block or character special device.
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 The return from this function is undefined.
 .SH EXAMPLES
@@ -77,7 +74,6 @@ it could mean that either volume management does not have \fIpath\fR in its
 name space, or volume management is not running.
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -95,7 +91,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBvolmgt_ownspath\fR(3VOLMGT), \fBvolmgt_running\fR(3VOLMGT),
 \fBattributes\fR(5), \fBhal\fR(5)
