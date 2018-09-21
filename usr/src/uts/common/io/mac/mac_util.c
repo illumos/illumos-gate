@@ -48,6 +48,74 @@
 #include <inet/sadb.h>
 #include <inet/ipsecesp.h>
 #include <inet/ipsecah.h>
+#include <inet/tcp.h>
+#include <inet/udp_impl.h>
+
+/*
+ * The next two functions are used for dropping packets or chains of
+ * packets, respectively. We could use one function for both but
+ * separating the use cases allows us to specify intent and prevent
+ * dropping more data than intended.
+ *
+ * The purpose of these functions is to aid the debugging effort,
+ * especially in production. Rather than use freemsg()/freemsgchain(),
+ * it's preferable to use these functions when dropping a packet in
+ * the MAC layer. These functions should only be used during
+ * unexpected conditions. That is, any time a packet is dropped
+ * outside of the regular, successful datapath. Consolidating all
+ * drops on these functions allows the user to trace one location and
+ * determine why the packet was dropped based on the msg. It also
+ * allows the user to inspect the packet before it is freed. Finally,
+ * it allows the user to avoid tracing freemsg()/freemsgchain() thus
+ * keeping the hot path running as efficiently as possible.
+ *
+ * NOTE: At this time not all MAC drops are aggregated on these
+ * functions; but that is the plan. This comment should be erased once
+ * completed.
+ */
+
+/*PRINTFLIKE2*/
+void
+mac_drop_pkt(mblk_t *mp, const char *fmt, ...)
+{
+	va_list adx;
+	char msg[128];
+	char *msgp = msg;
+
+	ASSERT3P(mp->b_next, ==, NULL);
+
+	va_start(adx, fmt);
+	(void) vsnprintf(msgp, sizeof (msg), fmt, adx);
+	va_end(adx);
+
+	DTRACE_PROBE2(mac__drop, mblk_t *, mp, char *, msgp);
+	freemsg(mp);
+}
+
+/*PRINTFLIKE2*/
+void
+mac_drop_chain(mblk_t *chain, const char *fmt, ...)
+{
+	va_list adx;
+	char msg[128];
+	char *msgp = msg;
+
+	va_start(adx, fmt);
+	(void) vsnprintf(msgp, sizeof (msg), fmt, adx);
+	va_end(adx);
+
+	/*
+	 * We could use freemsgchain() for the actual freeing but
+	 * since we are already walking the chain to fire the dtrace
+	 * probe we might as well free the msg here too.
+	 */
+	for (mblk_t *mp = chain, *next; mp != NULL; ) {
+		next = mp->b_next;
+		DTRACE_PROBE2(mac__drop, mblk_t *, mp, char *, msgp);
+		freemsg(mp);
+		mp = next;
+	}
+}
 
 /*
  * Copy an mblk, preserving its hardware checksum flags.
@@ -89,274 +157,1121 @@ mac_copymsgchain_cksum(mblk_t *mp)
 }
 
 /*
- * Process the specified mblk chain for proper handling of hardware
- * checksum offload. This routine is invoked for loopback traffic
- * between MAC clients.
- * The function handles a NULL mblk chain passed as argument.
+ * Perform software checksum on a single message, if needed. The
+ * emulation performed is determined by an intersection of the mblk's
+ * flags and the emul flags requested. The emul flags are documented
+ * in mac.h.
  */
-mblk_t *
-mac_fix_cksum(mblk_t *mp_chain)
+static mblk_t *
+mac_sw_cksum(mblk_t *mp, mac_emul_t emul)
 {
-	mblk_t *mp, *prev = NULL, *new_chain = mp_chain, *mp1;
+	mblk_t *orig = mp, *skipped_hdr = NULL;
 	uint32_t flags, start, stuff, end, value;
+	uint16_t len;
+	uint32_t offset;
+	uint16_t etype;
+	struct ether_header *ehp;
 
-	for (mp = mp_chain; mp != NULL; prev = mp, mp = mp->b_next) {
-		uint16_t len;
-		uint32_t offset;
-		struct ether_header *ehp;
-		uint16_t sap;
-		mblk_t *skipped_hdr = NULL;
+	/*
+	 * This function should only be called from mac_hw_emul()
+	 * which handles mblk chains and the shared ref case.
+	 */
+	ASSERT3P(mp->b_next, ==, NULL);
 
-		mac_hcksum_get(mp, &start, &stuff, &end, &value, &flags);
-		if (flags == 0)
-			continue;
+	mac_hcksum_get(mp, &start, &stuff, &end, &value, NULL);
 
-		/*
-		 * Since the processing of checksum offload for loopback
-		 * traffic requires modification of the packet contents,
-		 * ensure sure that we are always modifying our own copy.
-		 */
-		if (DB_REF(mp) > 1) {
-			mp1 = copymsg(mp);
-			if (mp1 == NULL)
-				continue;
-			mp1->b_next = mp->b_next;
-			mp->b_next = NULL;
-			freemsg(mp);
-			if (prev != NULL)
-				prev->b_next = mp1;
-			else
-				new_chain = mp1;
-			mp = mp1;
+	/*
+	 * We use DB_CKSUMFLAGS (instead of mac_hcksum_get()) because
+	 * we don't want to mask-out the HW_LOCAL_MAC flag.
+	 */
+	flags = DB_CKSUMFLAGS(mp);
+
+	/* Why call this if checksum emulation isn't needed? */
+	ASSERT3U(flags & (HCK_FLAGS), !=, 0);
+
+	/*
+	 * Ethernet, and optionally VLAN header. mac_hw_emul() has
+	 * already verified we have enough data to read the L2 header.
+	 */
+	ehp = (struct ether_header *)mp->b_rptr;
+	if (ntohs(ehp->ether_type) == VLAN_TPID) {
+		struct ether_vlan_header *evhp;
+
+		evhp = (struct ether_vlan_header *)mp->b_rptr;
+		etype = ntohs(evhp->ether_type);
+		offset = sizeof (struct ether_vlan_header);
+	} else {
+		etype = ntohs(ehp->ether_type);
+		offset = sizeof (struct ether_header);
+	}
+
+	/*
+	 * If this packet isn't IPv4, then leave it alone. We still
+	 * need to add IPv6 support and we don't want to affect non-IP
+	 * traffic like ARP.
+	 */
+	if (etype != ETHERTYPE_IP)
+		return (mp);
+
+	ASSERT3U(MBLKL(mp), >=, offset);
+
+	/*
+	 * If the first mblk of this packet contains only the ethernet
+	 * header, skip past it for now. Packets with their data
+	 * contained in only a single mblk can then use the fastpaths
+	 * tuned to that possibility.
+	 */
+	if (MBLKL(mp) == offset) {
+		offset -= MBLKL(mp);
+		/* This is guaranteed by mac_hw_emul(). */
+		ASSERT3P(mp->b_cont, !=, NULL);
+		skipped_hdr = mp;
+		mp = mp->b_cont;
+	}
+
+	/*
+	 * Both full and partial checksum rely on finding the IP
+	 * header in the current mblk. Our native TCP stack honors
+	 * this assumption but it's prudent to guard our future
+	 * clients that might not honor this contract.
+	 */
+	ASSERT3U(MBLKL(mp), >=, offset + sizeof (ipha_t));
+	if (MBLKL(mp) < (offset + sizeof (ipha_t))) {
+		mac_drop_pkt(mp, "mblk doesn't contain IP header");
+		return (NULL);
+	}
+
+	/*
+	 * We are about to modify the header mblk; make sure we are
+	 * modifying our own copy. The code that follows assumes that
+	 * the IP/ULP headers exist in this mblk (and drops the
+	 * message if they don't).
+	 */
+	if (DB_REF(mp) > 1) {
+		mblk_t *tmp = copyb(mp);
+
+		if (tmp == NULL) {
+			mac_drop_pkt(mp, "copyb failed");
+			return (NULL);
 		}
 
-		/*
-		 * Ethernet, and optionally VLAN header.
-		 */
-		/* LINTED: improper alignment cast */
-		ehp = (struct ether_header *)mp->b_rptr;
-		if (ntohs(ehp->ether_type) == VLAN_TPID) {
-			struct ether_vlan_header *evhp;
+		tmp->b_cont = mp->b_cont;
+		freeb(mp);
+		mp = tmp;
+	}
 
-			ASSERT(MBLKL(mp) >= sizeof (struct ether_vlan_header));
-			/* LINTED: improper alignment cast */
-			evhp = (struct ether_vlan_header *)mp->b_rptr;
-			sap = ntohs(evhp->ether_type);
-			offset = sizeof (struct ether_vlan_header);
-		} else {
-			sap = ntohs(ehp->ether_type);
-			offset = sizeof (struct ether_header);
-		}
+	if (flags & (HCK_FULLCKSUM | HCK_IPV4_HDRCKSUM)) {
+		ipha_t *ipha = (ipha_t *)(mp->b_rptr + offset);
 
-		/*
-		 * If the first mblk in the chain for this packet contains only
-		 * the ethernet header, skip past it for now.  Packets with
-		 * their data contained in only a single mblk can then use the
-		 * fastpaths tuned to that possibility.
-		 */
-		if (MBLKL(mp) <= offset) {
-			offset -= MBLKL(mp);
-			if (mp->b_cont == NULL) {
-				/* corrupted packet, skip it */
-				if (prev != NULL)
-					prev->b_next = mp->b_next;
-				else
-					new_chain = mp->b_next;
-				mp1 = mp->b_next;
-				mp->b_next = NULL;
-				freemsg(mp);
-				mp = mp1;
-				continue;
-			}
-			skipped_hdr = mp;
-			mp = mp->b_cont;
-		}
 
-		if (flags & (HCK_FULLCKSUM | HCK_IPV4_HDRCKSUM)) {
-			ipha_t *ipha = NULL;
+		if ((flags & HCK_FULLCKSUM) && (emul & MAC_HWCKSUM_EMUL)) {
+			ipaddr_t src, dst;
+			uint32_t cksum;
+			uint16_t *up;
+			uint8_t proto;
 
 			/*
-			 * In order to compute the full and header
-			 * checksums, we need to find and parse
-			 * the IP and/or ULP headers.
+			 * This code assumes a "simple" IP header (20
+			 * bytes, no options). IPv4 options are mostly
+			 * a historic artifact. The one slight
+			 * exception is Router Alert, but we don't
+			 * expect such a packet to land here.
 			 */
+			proto = ipha->ipha_protocol;
+			ASSERT(ipha->ipha_version_and_hdr_length ==
+			    IP_SIMPLE_HDR_VERSION);
+			if (ipha->ipha_version_and_hdr_length !=
+			    IP_SIMPLE_HDR_VERSION) {
+				mac_drop_pkt(mp, "not simple IP header");
+				return (NULL);
+			}
 
-			sap = (sap < ETHERTYPE_802_MIN) ? 0 : sap;
+			/* Get a pointer to the ULP checksum. */
+			switch (proto) {
+			case IPPROTO_TCP:
+				ASSERT3U(MBLKL(mp), >=,
+				    (offset + sizeof (ipha_t) +
+					sizeof (tcph_t)));
+				if (MBLKL(mp) < (offset + sizeof (ipha_t) +
+				    sizeof (tcph_t))) {
+					mac_drop_pkt(mp,
+					    "mblk doesn't contain TCP header");
+					return (NULL);
+				}
+
+				/* LINTED: improper alignment cast */
+				up = IPH_TCPH_CHECKSUMP(ipha,
+				    IP_SIMPLE_HDR_LENGTH);
+				break;
+
+			case IPPROTO_UDP:
+				ASSERT3U(MBLKL(mp), >=,
+				    (offset + sizeof (ipha_t) +
+					sizeof (udpha_t)));
+				if (MBLKL(mp) < (offset + sizeof (ipha_t) +
+				    sizeof (udpha_t))) {
+					mac_drop_pkt(mp,
+					    "mblk doesn't contain UDP header");
+					return (NULL);
+				}
+
+				/* LINTED: improper alignment cast */
+				up = IPH_UDPH_CHECKSUMP(ipha,
+				    IP_SIMPLE_HDR_LENGTH);
+				break;
+
+			default:
+				mac_drop_pkt(orig, "unexpected protocol: %d",
+				    proto);
+				return (NULL);
+			}
+
+			/* Pseudo-header checksum. */
+			src = ipha->ipha_src;
+			dst = ipha->ipha_dst;
+			len = ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH;
+
+			cksum = (dst >> 16) + (dst & 0xFFFF) +
+			    (src >> 16) + (src & 0xFFFF);
+			cksum += htons(len);
 
 			/*
-			 * IP header.
+			 * The checksum value stored in the packet
+			 * needs to be correct. Compute it here.
 			 */
-			if (sap != ETHERTYPE_IP)
-				continue;
-
-			ASSERT(MBLKL(mp) >= offset + sizeof (ipha_t));
-			/* LINTED: improper alignment cast */
-			ipha = (ipha_t *)(mp->b_rptr + offset);
-
-			if (flags & HCK_FULLCKSUM) {
-				ipaddr_t src, dst;
-				uint32_t cksum;
-				uint16_t *up;
-				uint8_t proto;
-
-				/*
-				 * Pointer to checksum field in ULP header.
-				 */
-				proto = ipha->ipha_protocol;
-				ASSERT(ipha->ipha_version_and_hdr_length ==
-				    IP_SIMPLE_HDR_VERSION);
-
-				switch (proto) {
-				case IPPROTO_TCP:
-					/* LINTED: improper alignment cast */
-					up = IPH_TCPH_CHECKSUMP(ipha,
-					    IP_SIMPLE_HDR_LENGTH);
-					break;
-
-				case IPPROTO_UDP:
-					/* LINTED: improper alignment cast */
-					up = IPH_UDPH_CHECKSUMP(ipha,
-					    IP_SIMPLE_HDR_LENGTH);
-					break;
-
-				default:
-					cmn_err(CE_WARN, "mac_fix_cksum: "
-					    "unexpected protocol: %d", proto);
-					continue;
-				}
-
-				/*
-				 * Pseudo-header checksum.
-				 */
-				src = ipha->ipha_src;
-				dst = ipha->ipha_dst;
-				len = ntohs(ipha->ipha_length) -
-				    IP_SIMPLE_HDR_LENGTH;
-
-				cksum = (dst >> 16) + (dst & 0xFFFF) +
-				    (src >> 16) + (src & 0xFFFF);
-				cksum += htons(len);
-
-				/*
-				 * The checksum value stored in the packet needs
-				 * to be correct. Compute it here.
-				 */
-				*up = 0;
-				cksum += (((proto) == IPPROTO_UDP) ?
-				    IP_UDP_CSUM_COMP : IP_TCP_CSUM_COMP);
-				cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH +
-				    offset, cksum);
-				*(up) = (uint16_t)(cksum ? cksum : ~cksum);
-
-				/*
-				 * Flag the packet so that it appears
-				 * that the checksum has already been
-				 * verified by the hardware.
-				 */
-				flags &= ~HCK_FULLCKSUM;
-				flags |= HCK_FULLCKSUM_OK;
-				value = 0;
-			}
-
-			if (flags & HCK_IPV4_HDRCKSUM) {
-				ASSERT(ipha != NULL);
-				ipha->ipha_hdr_checksum =
-				    (uint16_t)ip_csum_hdr(ipha);
-				flags &= ~HCK_IPV4_HDRCKSUM;
-				flags |= HCK_IPV4_HDRCKSUM_OK;
-
-			}
-		}
-
-		if (flags & HCK_PARTIALCKSUM) {
-			uint16_t *up, partial, cksum;
-			uchar_t *ipp; /* ptr to beginning of IP header */
-			mblk_t *old_mp = NULL;
-
-			if (mp->b_cont != NULL) {
-				mblk_t *new_mp;
-
-				new_mp = msgpullup(mp, offset + end);
-				if (new_mp == NULL) {
-					continue;
-				}
-				old_mp = mp;
-				mp = new_mp;
-			}
-
-			ipp = mp->b_rptr + offset;
-			/* LINTED: cast may result in improper alignment */
-			up = (uint16_t *)((uchar_t *)ipp + stuff);
-			partial = *up;
 			*up = 0;
+			cksum += (((proto) == IPPROTO_UDP) ?
+			    IP_UDP_CSUM_COMP : IP_TCP_CSUM_COMP);
+			cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH +
+			    offset, cksum);
+			*(up) = (uint16_t)(cksum ? cksum : ~cksum);
 
-			cksum = IP_BCSUM_PARTIAL(mp->b_rptr + offset + start,
-			    end - start, partial);
-			cksum = ~cksum;
-			*up = cksum ? cksum : ~cksum;
+		}
 
-			/*
-			 * Since we already computed the whole checksum,
-			 * indicate to the stack that it has already
-			 * been verified by the hardware.
-			 */
-			flags &= ~HCK_PARTIALCKSUM;
+		/* We always update the ULP checksum flags. */
+		if ((flags & HCK_FULLCKSUM) && (emul & MAC_HWCKSUM_EMULS)) {
+			flags &= ~HCK_FULLCKSUM;
 			flags |= HCK_FULLCKSUM_OK;
 			value = 0;
-
-			/*
-			 * If 'mp' is the result of a msgpullup(), it needs to
-			 * be properly reattached into the existing chain of
-			 * messages before continuing.
-			 */
-			if (old_mp != NULL) {
-				if (skipped_hdr != NULL) {
-					/*
-					 * If the ethernet header was cast
-					 * aside before checksum calculation,
-					 * prepare for it to be reattached to
-					 * the pulled-up mblk.
-					 */
-					skipped_hdr->b_cont = mp;
-				} else {
-					/* Link the new mblk into the chain. */
-					mp->b_next = old_mp->b_next;
-
-					if (prev != NULL)
-						prev->b_next = mp;
-					else
-						new_chain = mp;
-				}
-
-				old_mp->b_next = NULL;
-				freemsg(old_mp);
-			}
 		}
 
-		mac_hcksum_set(mp, start, stuff, end, value, flags);
-
 		/*
-		 * If the header was skipped over, we must seek back to it,
-		 * since it is that mblk that is part of any packet chain.
+		 * Out of paranoia, and for the sake of correctness,
+		 * we won't calulate the IP header checksum if it's
+		 * already populated. While unlikely, it's possible to
+		 * write code that might end up calling mac_sw_cksum()
+		 * twice on the same mblk (performing both LSO and
+		 * checksum emualtion in a single mblk chain loop --
+		 * the LSO emulation inserts a new chain into the
+		 * existing chain and then the loop iterates back over
+		 * the new segments and emulates the checksum a second
+		 * time). Normally this wouldn't be a problem, because
+		 * the HCK_*_OK flags are supposed to indicate that we
+		 * don't need to do peform the work. But
+		 * HCK_IPV4_HDRCKSUM and HCK_IPV4_HDRCKSUM_OK have the
+		 * same value; so we cannot use these flags to
+		 * determine if the IP header checksum has already
+		 * been calculated or not. Luckily, if IP requests
+		 * HCK_IPV4_HDRCKSUM, then the IP header checksum will
+		 * be zero. So this test works just as well as
+		 * checking the flag. However, in the future, we
+		 * should fix the HCK_* flags.
 		 */
-		if (skipped_hdr != NULL) {
-			ASSERT3P(skipped_hdr->b_cont, ==, mp);
-
-			/*
-			 * Duplicate the HCKSUM data into the header mblk.
-			 * This mimics mac_add_vlan_tag which ensures that both
-			 * the first mblk _and_ the first data bearing mblk
-			 * possess the HCKSUM information.  Consumers like IP
-			 * will end up discarding the ether_header mblk, so for
-			 * now, it is important that the data be available in
-			 * both places.
-			 */
-			mac_hcksum_clone(mp, skipped_hdr);
-			mp = skipped_hdr;
+		if ((flags & HCK_IPV4_HDRCKSUM) && (emul & MAC_HWCKSUM_EMULS) &&
+		    ipha->ipha_hdr_checksum == 0) {
+			ipha->ipha_hdr_checksum = (uint16_t)ip_csum_hdr(ipha);
+			flags &= ~HCK_IPV4_HDRCKSUM;
+			flags |= HCK_IPV4_HDRCKSUM_OK;
 		}
 	}
 
-	return (new_chain);
+	if ((flags & HCK_PARTIALCKSUM) && (emul & MAC_HWCKSUM_EMUL)) {
+		uint16_t *up, partial, cksum;
+		uchar_t *ipp; /* ptr to beginning of IP header */
+
+		ASSERT3U(MBLKL(mp), >=,
+		    (offset + sizeof (ipha_t) + sizeof (tcph_t)));
+		if (MBLKL(mp) < (offset + sizeof (ipha_t) + sizeof (tcph_t))) {
+			mac_drop_pkt(mp, "mblk doesn't contain TCP header");
+			return (NULL);
+		}
+
+		ipp = mp->b_rptr + offset;
+		/* LINTED: cast may result in improper alignment */
+		up = (uint16_t *)((uchar_t *)ipp + stuff);
+		partial = *up;
+		*up = 0;
+
+		ASSERT3S(end, >, start);
+		cksum = ~IP_CSUM_PARTIAL(mp, offset + start, partial);
+		*up = cksum != 0 ? cksum : ~cksum;
+	}
+
+	/* We always update the ULP checksum flags. */
+	if ((flags & HCK_PARTIALCKSUM) && (emul & MAC_HWCKSUM_EMULS)) {
+		flags &= ~HCK_PARTIALCKSUM;
+		flags |= HCK_FULLCKSUM_OK;
+		value = 0;
+	}
+
+	mac_hcksum_set(mp, start, stuff, end, value, flags);
+
+	/* Don't forget to reattach the header. */
+	if (skipped_hdr != NULL) {
+		ASSERT3P(skipped_hdr->b_cont, ==, mp);
+
+		/*
+		 * Duplicate the HCKSUM data into the header mblk.
+		 * This mimics mac_add_vlan_tag which ensures that
+		 * both the first mblk _and_ the first data bearing
+		 * mblk possess the HCKSUM information. Consumers like
+		 * IP will end up discarding the ether_header mblk, so
+		 * for now, it is important that the data be available
+		 * in both places.
+		 */
+		mac_hcksum_clone(mp, skipped_hdr);
+		mp = skipped_hdr;
+	}
+
+	return (mp);
+}
+
+/*
+ * Build a single data segment from an LSO packet. The mblk chain
+ * returned, seg_head, represents the data segment and is always
+ * exactly seg_len bytes long. The lso_mp and offset input/output
+ * parameters track our position in the LSO packet. This function
+ * exists solely as a helper to mac_sw_lso().
+ *
+ * Case A
+ *
+ *     The current lso_mp is larger than the requested seg_len. The
+ *     beginning of seg_head may start at the beginning of lso_mp or
+ *     offset into it. In either case, a single mblk is returned, and
+ *     *offset is updated to reflect our new position in the current
+ *     lso_mp.
+ *
+ *          +----------------------------+
+ *          |  in *lso_mp / out *lso_mp  |
+ *          +----------------------------+
+ *          ^                        ^
+ *          |                        |
+ *          |                        |
+ *          |                        |
+ *          +------------------------+
+ *          |        seg_head        |
+ *          +------------------------+
+ *          ^                        ^
+ *          |                        |
+ *   in *offset = 0        out *offset = seg_len
+ *
+ *          |------   seg_len    ----|
+ *
+ *
+ *       +------------------------------+
+ *       |   in *lso_mp / out *lso_mp   |
+ *       +------------------------------+
+ *          ^                        ^
+ *          |                        |
+ *          |                        |
+ *          |                        |
+ *          +------------------------+
+ *          |        seg_head        |
+ *          +------------------------+
+ *          ^                        ^
+ *          |                        |
+ *   in *offset = N        out *offset = N + seg_len
+ *
+ *          |------   seg_len    ----|
+ *
+ *
+ *
+ * Case B
+ *
+ *    The requested seg_len consumes exactly the rest of the lso_mp.
+ *    I.e., the seg_head's b_wptr is equivalent to lso_mp's b_wptr.
+ *    The seg_head may start at the beginning of the lso_mp or at some
+ *    offset into it. In either case we return a single mblk, reset
+ *    *offset to zero, and walk to the next lso_mp.
+ *
+ *          +------------------------+           +------------------------+
+ *          |       in *lso_mp       |---------->|      out *lso_mp       |
+ *          +------------------------+           +------------------------+
+ *          ^                        ^           ^
+ *          |                        |           |
+ *          |                        |    out *offset = 0
+ *          |                        |
+ *          +------------------------+
+ *          |        seg_head        |
+ *          +------------------------+
+ *          ^
+ *          |
+ *   in *offset = 0
+ *
+ *          |------   seg_len    ----|
+ *
+ *
+ *
+ *      +----------------------------+           +------------------------+
+ *      |         in *lso_mp         |---------->|      out *lso_mp       |
+ *      +----------------------------+           +------------------------+
+ *          ^                        ^           ^
+ *          |                        |           |
+ *          |                        |    out *offset = 0
+ *          |                        |
+ *          +------------------------+
+ *          |        seg_head        |
+ *          +------------------------+
+ *          ^
+ *          |
+ *   in *offset = N
+ *
+ *          |------   seg_len    ----|
+ *
+ *
+ * Case C
+ *
+ *    The requested seg_len is greater than the current lso_mp. In
+ *    this case we must consume LSO mblks until we have enough data to
+ *    satisfy either case (A) or (B) above. We will return multiple
+ *    mblks linked via b_cont, offset will be set based on the cases
+ *    above, and lso_mp will walk forward at least one mblk, but maybe
+ *    more.
+ *
+ *    N.B. This digram is not exhaustive. The seg_head may start on
+ *    the beginning of an lso_mp. The seg_tail may end exactly on the
+ *    boundary of an lso_mp. And there may be two (in this case the
+ *    middle block wouldn't exist), three, or more mblks in the
+ *    seg_head chain. This is meant as one example of what might
+ *    happen. The main thing to remember is that the seg_tail mblk
+ *    must be one of case (A) or (B) above.
+ *
+ *  +------------------+    +----------------+    +------------------+
+ *  |    in *lso_mp    |--->|    *lso_mp     |--->|   out *lso_mp    |
+ *  +------------------+    +----------------+    +------------------+
+ *        ^            ^    ^                ^    ^            ^
+ *        |            |    |                |    |            |
+ *        |            |    |                |    |            |
+ *        |            |    |                |    |            |
+ *        |            |    |                |    |            |
+ *        +------------+    +----------------+    +------------+
+ *        |  seg_head  |--->|                |--->|  seg_tail  |
+ *        +------------+    +----------------+    +------------+
+ *        ^                                                    ^
+ *        |                                                    |
+ *  in *offset = N                          out *offset = MBLKL(seg_tail)
+ *
+ *        |-------------------   seg_len    -------------------|
+ *
+ */
+static mblk_t *
+build_data_seg(mblk_t **lso_mp, uint32_t *offset, uint32_t seg_len)
+{
+	mblk_t *seg_head, *seg_tail, *seg_mp;
+
+	ASSERT3P(*lso_mp, !=, NULL);
+	ASSERT3U((*lso_mp)->b_rptr + *offset, <, (*lso_mp)->b_wptr);
+
+	seg_mp = dupb(*lso_mp);
+	if (seg_mp == NULL)
+		return (NULL);
+
+	seg_head = seg_mp;
+	seg_tail = seg_mp;
+
+	/* Continue where we left off from in the lso_mp. */
+	seg_mp->b_rptr += *offset;
+
+last_mblk:
+	/* Case (A) */
+	if ((seg_mp->b_rptr + seg_len) < seg_mp->b_wptr) {
+		*offset += seg_len;
+		seg_mp->b_wptr = seg_mp->b_rptr + seg_len;
+		return (seg_head);
+	}
+
+	/* Case (B) */
+	if ((seg_mp->b_rptr + seg_len) == seg_mp->b_wptr) {
+		*offset = 0;
+		*lso_mp = (*lso_mp)->b_cont;
+		return (seg_head);
+	}
+
+	/* Case (C) */
+	ASSERT3U(seg_mp->b_rptr + seg_len, >, seg_mp->b_wptr);
+
+	/*
+	 * The current LSO mblk doesn't have enough data to satisfy
+	 * seg_len -- continue peeling off LSO mblks to build the new
+	 * segment message. If allocation fails we free the previously
+	 * allocated segment mblks and return NULL.
+	 */
+	while ((seg_mp->b_rptr + seg_len) > seg_mp->b_wptr) {
+		ASSERT3U(MBLKL(seg_mp), <=, seg_len);
+		seg_len -= MBLKL(seg_mp);
+		*offset = 0;
+		*lso_mp = (*lso_mp)->b_cont;
+		seg_mp = dupb(*lso_mp);
+
+		if (seg_mp == NULL) {
+			freemsgchain(seg_head);
+			return (NULL);
+		}
+
+		seg_tail->b_cont = seg_mp;
+		seg_tail = seg_mp;
+	}
+
+	/*
+	 * We've walked enough LSO mblks that we can now satisfy the
+	 * remaining seg_len. At this point we need to jump back to
+	 * determine if we have arrived at case (A) or (B).
+	 */
+
+	/* Just to be paranoid that we didn't underflow. */
+	ASSERT3U(seg_len, <, IP_MAXPACKET);
+	ASSERT3U(seg_len, >, 0);
+	goto last_mblk;
+}
+
+/*
+ * Perform software segmentation of a single LSO message. Take an LSO
+ * message as input and return head/tail pointers as output. This
+ * function should not be invoked directly but instead through
+ * mac_hw_emul().
+ *
+ * The resulting chain is comprised of multiple (nsegs) MSS sized
+ * segments. Each segment will consist of two or more mblks joined by
+ * b_cont: a header and one or more data mblks. The header mblk is
+ * allocated anew for each message. The first segment's header is used
+ * as a template for the rest with adjustments made for things such as
+ * ID, sequence, length, TCP flags, etc. The data mblks reference into
+ * the existing LSO mblk (passed in as omp) by way of dupb(). Their
+ * b_rptr/b_wptr values are adjusted to reference only the fraction of
+ * the LSO message they are responsible for. At the successful
+ * completion of this function the original mblk (omp) is freed,
+ * leaving the newely created segment chain as the only remaining
+ * reference to the data.
+ */
+static void
+mac_sw_lso(mblk_t *omp, mac_emul_t emul, mblk_t **head, mblk_t **tail,
+    uint_t *count)
+{
+	uint32_t ocsum_flags, ocsum_start, ocsum_stuff;
+	uint32_t mss;
+	uint32_t oehlen, oiphlen, otcphlen, ohdrslen, opktlen, odatalen;
+	uint32_t oleft;
+	uint_t nsegs, seg;
+	int len;
+
+	struct ether_vlan_header *oevh;
+	const ipha_t *oiph;
+	const tcph_t *otcph;
+	ipha_t *niph;
+	tcph_t *ntcph;
+	uint16_t ip_id;
+	uint32_t tcp_seq, tcp_sum, otcp_sum;
+
+	uint32_t offset;
+	mblk_t *odatamp;
+	mblk_t *seg_chain, *prev_nhdrmp, *next_nhdrmp, *nhdrmp, *ndatamp;
+	mblk_t *tmptail;
+
+	ASSERT3P(head, !=, NULL);
+	ASSERT3P(tail, !=, NULL);
+	ASSERT3P(count, !=, NULL);
+	ASSERT3U((DB_CKSUMFLAGS(omp) & HW_LSO), !=, 0);
+
+	/* Assume we are dealing with a single LSO message. */
+	ASSERT3P(omp->b_next, ==, NULL);
+
+	/*
+	 * XXX: This is a hack to deal with mac_add_vlan_tag().
+	 *
+	 * When VLANs are in play, mac_add_vlan_tag() creates a new
+	 * mblk with just the ether_vlan_header and tacks it onto the
+	 * front of 'omp'. This breaks the assumptions made below;
+	 * namely that the TCP/IP headers are in the first mblk. In
+	 * this case, since we already have to pay the cost of LSO
+	 * emulation, we simply pull up everything. While this might
+	 * seem irksome, keep in mind this will only apply in a couple
+	 * of scenarios: a) an LSO-capable VLAN client sending to a
+	 * non-LSO-capable client over the "MAC/bridge loopback"
+	 * datapath or b) an LSO-capable VLAN client is sending to a
+	 * client that, for whatever reason, doesn't have DLS-bypass
+	 * enabled. Finally, we have to check for both a tagged and
+	 * untagged sized mblk depending on if the mblk came via
+	 * mac_promisc_dispatch() or mac_rx_deliver().
+	 *
+	 * In the future, two things should be done:
+	 *
+	 * 1. This function should make use of some yet to be
+	 *    implemented "mblk helpers". These helper functions would
+	 *    perform all the b_cont walking for us and guarantee safe
+	 *    access to the mblk data.
+	 *
+	 * 2. We should add some slop to the mblks so that
+	 *    mac_add_vlan_tag() can just edit the first mblk instead
+	 *    of allocating on the hot path.
+	 */
+	if (MBLKL(omp) == sizeof (struct ether_vlan_header) ||
+	    MBLKL(omp) == sizeof (struct ether_header)) {
+		mblk_t *tmp = msgpullup(omp, -1);
+
+		if (tmp == NULL) {
+			mac_drop_pkt(omp, "failed to pull up");
+			goto fail;
+		}
+
+		mac_hcksum_clone(omp, tmp);
+		freemsg(omp);
+		omp = tmp;
+	}
+
+	mss = DB_LSOMSS(omp);
+	ASSERT3U(msgsize(omp), <=, IP_MAXPACKET +
+	    sizeof (struct ether_vlan_header));
+	opktlen = msgsize(omp);
+
+	/*
+	 * First, get references to the IP and TCP headers and
+	 * determine the total TCP length (header + data).
+	 *
+	 * Thanks to mac_hw_emul() we know that the first mblk must
+	 * contain (at minimum) the full L2 header. However, this
+	 * function assumes more than that. It assumes the L2/L3/L4
+	 * headers are all contained in the first mblk of a message
+	 * (i.e., no b_cont walking for headers). While this is a
+	 * current reality (our native TCP stack and viona both
+	 * enforce this) things may become more nuanced in the future
+	 * (e.g. when introducing encap support or adding new
+	 * clients). For now we guard against this case by dropping
+	 * the packet.
+	 */
+	oevh = (struct ether_vlan_header *)omp->b_rptr;
+	if (oevh->ether_tpid == htons(ETHERTYPE_VLAN))
+		oehlen = sizeof (struct ether_vlan_header);
+	else
+		oehlen = sizeof (struct ether_header);
+
+	ASSERT3U(MBLKL(omp), >=, (oehlen + sizeof (ipha_t) + sizeof (tcph_t)));
+	if (MBLKL(omp) < (oehlen + sizeof (ipha_t) + sizeof (tcph_t))) {
+		mac_drop_pkt(omp, "mblk doesn't contain TCP/IP headers");
+		goto fail;
+	}
+
+	oiph = (ipha_t *)(omp->b_rptr + oehlen);
+	oiphlen = IPH_HDR_LENGTH(oiph);
+	otcph = (tcph_t *)(omp->b_rptr + oehlen + oiphlen);
+	otcphlen = TCP_HDR_LENGTH(otcph);
+
+	/*
+	 * Currently we only support LSO for TCP/IPv4.
+	 */
+	if (IPH_HDR_VERSION(oiph) != IPV4_VERSION) {
+		mac_drop_pkt(omp, "LSO unsupported IP version: %uhh",
+		    IPH_HDR_VERSION(oiph));
+		goto fail;
+	}
+
+	if (oiph->ipha_protocol != IPPROTO_TCP) {
+		mac_drop_pkt(omp, "LSO unsupported protocol: %uhh",
+		    oiph->ipha_protocol);
+		goto fail;
+	}
+
+	if (otcph->th_flags[0] & (TH_SYN | TH_RST | TH_URG)) {
+		mac_drop_pkt(omp, "LSO packet has SYN|RST|URG set");
+		goto fail;
+	}
+
+	ohdrslen = oehlen + oiphlen + otcphlen;
+	if ((len = MBLKL(omp)) < ohdrslen) {
+		mac_drop_pkt(omp, "LSO packet too short: %d < %u", len,
+		    ohdrslen);
+		goto fail;
+	}
+
+	/*
+	 * Either we have data in the first mblk or it's just the
+	 * header. In either case, we need to set rptr to the start of
+	 * the TCP data.
+	 */
+	if (len > ohdrslen) {
+		odatamp = omp;
+		offset = ohdrslen;
+	} else {
+		ASSERT3U(len, ==, ohdrslen);
+		odatamp = omp->b_cont;
+		offset = 0;
+	}
+
+	/* Make sure we still have enough data. */
+	ASSERT3U(msgsize(odatamp), >=, opktlen - ohdrslen);
+
+	/*
+	 * If a MAC negotiated LSO then it must negotioate both
+	 * HCKSUM_IPHDRCKSUM and either HCKSUM_INET_FULL_V4 or
+	 * HCKSUM_INET_PARTIAL; because both the IP and TCP headers
+	 * change during LSO segmentation (only the 3 fields of the
+	 * pseudo header checksum don't change: src, dst, proto). Thus
+	 * we would expect these flags (HCK_IPV4_HDRCKSUM |
+	 * HCK_PARTIALCKSUM | HCK_FULLCKSUM) to be set and for this
+	 * function to emulate those checksums in software. However,
+	 * that assumes a world where we only expose LSO if the
+	 * underlying hardware exposes LSO. Moving forward the plan is
+	 * to assume LSO in the upper layers and have MAC perform
+	 * software LSO when the underlying provider doesn't support
+	 * it. In such a world, if the provider doesn't support LSO
+	 * but does support hardware checksum offload, then we could
+	 * simply perform the segmentation and allow the hardware to
+	 * calculate the checksums. To the hardware it's just another
+	 * chain of non-LSO packets.
+	 */
+	ASSERT3S(DB_TYPE(omp), ==, M_DATA);
+	ocsum_flags = DB_CKSUMFLAGS(omp);
+	ASSERT3U(ocsum_flags & HCK_IPV4_HDRCKSUM, !=, 0);
+	ASSERT3U(ocsum_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM), !=, 0);
+
+	/*
+	 * If hardware only provides partial checksum then software
+	 * must supply the pseudo-header checksum. In the case of LSO
+	 * we leave the TCP length at zero to be filled in by
+	 * hardware. This function must handle two scenarios.
+	 *
+	 * 1. Being called by a MAC client on the Rx path to segment
+	 *    an LSO packet and calculate the checksum.
+	 *
+	 * 2. Being called by a MAC provider to segment an LSO packet.
+	 *    In this case the LSO segmentation is performed in
+	 *    software (by this routine) but the MAC provider should
+	 *    still calculate the TCP/IP checksums in hardware.
+	 *
+	 *  To elaborate on the second case: we cannot have the
+	 *  scenario where IP sends LSO packets but the underlying HW
+	 *  doesn't support checksum offload -- because in that case
+	 *  TCP/IP would calculate the checksum in software (for the
+	 *  LSO packet) but then MAC would segment the packet and have
+	 *  to redo all the checksum work. So IP should never do LSO
+	 *  if HW doesn't support both IP and TCP checksum.
+	 */
+	if (ocsum_flags & HCK_PARTIALCKSUM) {
+		ocsum_start = (uint32_t)DB_CKSUMSTART(omp);
+		ocsum_stuff = (uint32_t)DB_CKSUMSTUFF(omp);
+	}
+
+	odatalen = opktlen - ohdrslen;
+
+	/*
+	 * Subtract one to account for the case where the data length
+	 * is evenly divisble by the MSS. Add one to account for the
+	 * fact that the division will always result in one less
+	 * segment than needed.
+	 */
+	nsegs = ((odatalen - 1) / mss) + 1;
+	if (nsegs < 2) {
+		mac_drop_pkt(omp, "LSO not enough segs: %u", nsegs);
+		goto fail;
+	}
+
+	DTRACE_PROBE6(sw__lso__start, mblk_t *, omp, void_ip_t *, oiph,
+	    __dtrace_tcp_tcph_t *, otcph, uint_t, odatalen, uint_t, mss, uint_t,
+	    nsegs);
+
+	seg_chain = NULL;
+	tmptail = seg_chain;
+	oleft = odatalen;
+
+	for (uint_t i = 0; i < nsegs; i++) {
+		boolean_t last_seg = ((i + 1) == nsegs);
+		uint32_t seg_len;
+
+		/*
+		 * If we fail to allocate, then drop the partially
+		 * allocated chain as well as the LSO packet. Let the
+		 * sender deal with the fallout.
+		 */
+		if ((nhdrmp = allocb(ohdrslen, 0)) == NULL) {
+			freemsgchain(seg_chain);
+			mac_drop_pkt(omp, "failed to alloc segment header");
+			goto fail;
+		}
+		ASSERT3P(nhdrmp->b_cont, ==, NULL);
+
+		if (seg_chain == NULL) {
+			seg_chain = nhdrmp;
+		} else {
+			ASSERT3P(tmptail, !=, NULL);
+			tmptail->b_next = nhdrmp;
+		}
+
+		tmptail = nhdrmp;
+
+		/*
+		 * Calculate this segment's lengh. It's either the MSS
+		 * or whatever remains for the last segment.
+		 */
+		seg_len = last_seg ? oleft : mss;
+		ASSERT3U(seg_len, <=, mss);
+		ndatamp = build_data_seg(&odatamp, &offset, seg_len);
+
+		if (ndatamp == NULL) {
+			freemsgchain(seg_chain);
+			mac_drop_pkt(omp, "LSO failed to segment data");
+			goto fail;
+		}
+
+		/* Attach data mblk to header mblk. */
+		nhdrmp->b_cont = ndatamp;
+		DB_CKSUMFLAGS(ndatamp) &= ~HW_LSO;
+		ASSERT3U(seg_len, <=, oleft);
+		oleft -= seg_len;
+	}
+
+	/* We should have consumed entire LSO msg. */
+	ASSERT3S(oleft, ==, 0);
+	ASSERT3P(odatamp, ==, NULL);
+
+	/*
+	 * All seg data mblks are referenced by the header mblks, null
+	 * out this pointer to catch any bad derefs.
+	 */
+	ndatamp = NULL;
+
+	/*
+	 * Set headers and checksum for first segment.
+	 */
+	nhdrmp = seg_chain;
+	bcopy(omp->b_rptr, nhdrmp->b_rptr, ohdrslen);
+	nhdrmp->b_wptr = nhdrmp->b_rptr + ohdrslen;
+	niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
+	ASSERT3U(msgsize(nhdrmp->b_cont), ==, mss);
+	niph->ipha_length = htons(oiphlen + otcphlen + mss);
+	niph->ipha_hdr_checksum = 0;
+	ip_id = ntohs(niph->ipha_ident);
+	ntcph = (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen);
+	tcp_seq = BE32_TO_U32(ntcph->th_seq);
+	tcp_seq += mss;
+
+	/*
+	 * The first segment shouldn't:
+	 *
+	 *	o indicate end of data transmission (FIN),
+	 *	o indicate immediate handling of the data (PUSH).
+	 */
+	ntcph->th_flags[0] &= ~(TH_FIN | TH_PUSH);
+	DB_CKSUMFLAGS(nhdrmp) = (uint16_t)(ocsum_flags & ~HW_LSO);
+
+	/*
+	 * If the underlying HW provides partial checksum, then make
+	 * sure to correct the pseudo header checksum before calling
+	 * mac_sw_cksum(). The native TCP stack doesn't include the
+	 * length field in the pseudo header when LSO is in play -- so
+	 * we need to calculate it here.
+	 */
+	if (ocsum_flags & HCK_PARTIALCKSUM) {
+		DB_CKSUMSTART(nhdrmp) = ocsum_start;
+		DB_CKSUMEND(nhdrmp) = ntohs(niph->ipha_length);
+		DB_CKSUMSTUFF(nhdrmp) = ocsum_stuff;
+		tcp_sum = BE16_TO_U16(ntcph->th_sum);
+		otcp_sum = tcp_sum;
+		tcp_sum += mss + otcphlen;
+		tcp_sum = (tcp_sum >> 16) + (tcp_sum & 0xFFFF);
+		U16_TO_BE16(tcp_sum, ntcph->th_sum);
+	}
+
+	if ((ocsum_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) &&
+	    (emul & MAC_HWCKSUM_EMULS)) {
+		next_nhdrmp = nhdrmp->b_next;
+		nhdrmp->b_next = NULL;
+		nhdrmp = mac_sw_cksum(nhdrmp, emul);
+		nhdrmp->b_next = next_nhdrmp;
+		next_nhdrmp = NULL;
+
+		/*
+		 * We may have freed the nhdrmp argument during
+		 * checksum emulation, make sure that seg_chain
+		 * references a valid mblk.
+		 */
+		seg_chain = nhdrmp;
+	}
+
+	ASSERT3P(nhdrmp, !=, NULL);
+
+	seg = 1;
+	DTRACE_PROBE5(sw__lso__seg, mblk_t *, nhdrmp, void_ip_t *,
+	    (ipha_t *)(nhdrmp->b_rptr + oehlen), __dtrace_tcp_tcph_t *,
+	    (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen), uint_t, mss,
+	    uint_t, seg);
+	seg++;
+
+	/* There better be at least 2 segs. */
+	ASSERT3P(nhdrmp->b_next, !=, NULL);
+	prev_nhdrmp = nhdrmp;
+	nhdrmp = nhdrmp->b_next;
+
+	/*
+	 * Now adjust the headers of the middle segments. For each
+	 * header we need to adjust the following.
+	 *
+	 *	o IP ID
+	 *	o IP length
+	 *	o TCP sequence
+	 *	o TCP flags
+	 *	o cksum flags
+	 *	o cksum values (if MAC_HWCKSUM_EMUL is set)
+	 */
+	for (; seg < nsegs; seg++) {
+		/*
+		 * We use seg_chain as a reference to the first seg
+		 * header mblk -- this first header is a template for
+		 * the rest of the segments. This copy will include
+		 * the now updated checksum values from the first
+		 * header. We must reset these checksum values to
+		 * their original to make sure we produce the correct
+		 * value.
+		 */
+		bcopy(seg_chain->b_rptr, nhdrmp->b_rptr, ohdrslen);
+		nhdrmp->b_wptr = nhdrmp->b_rptr + ohdrslen;
+		niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
+		niph->ipha_ident = htons(++ip_id);
+		ASSERT3P(msgsize(nhdrmp->b_cont), ==, mss);
+		niph->ipha_length = htons(oiphlen + otcphlen + mss);
+		niph->ipha_hdr_checksum = 0;
+		ntcph = (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen);
+		U32_TO_BE32(tcp_seq, ntcph->th_seq);
+		tcp_seq += mss;
+		/*
+		 * Just like the first segment, the middle segments
+		 * shouldn't have these flags set.
+		 */
+		ntcph->th_flags[0] &= ~(TH_FIN | TH_PUSH);
+		DB_CKSUMFLAGS(nhdrmp) = (uint16_t)(ocsum_flags & ~HW_LSO);
+
+		if (ocsum_flags & HCK_PARTIALCKSUM) {
+			/*
+			 * First and middle segs have same
+			 * pseudo-header checksum.
+			 */
+			U16_TO_BE16(tcp_sum, ntcph->th_sum);
+			DB_CKSUMSTART(nhdrmp) = ocsum_start;
+			DB_CKSUMEND(nhdrmp) = ntohs(niph->ipha_length);
+			DB_CKSUMSTUFF(nhdrmp) = ocsum_stuff;
+		}
+
+		if ((ocsum_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) &&
+		    (emul & MAC_HWCKSUM_EMULS)) {
+			next_nhdrmp = nhdrmp->b_next;
+			nhdrmp->b_next = NULL;
+			nhdrmp = mac_sw_cksum(nhdrmp, emul);
+			nhdrmp->b_next = next_nhdrmp;
+			next_nhdrmp = NULL;
+			/* We may have freed the original nhdrmp. */
+			prev_nhdrmp->b_next = nhdrmp;
+		}
+
+		DTRACE_PROBE5(sw__lso__seg, mblk_t *, nhdrmp, void_ip_t *,
+		    (ipha_t *)(nhdrmp->b_rptr + oehlen), __dtrace_tcp_tcph_t *,
+		    (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen),
+		    uint_t, mss, uint_t, seg);
+
+		ASSERT3P(nhdrmp->b_next, !=, NULL);
+		prev_nhdrmp = nhdrmp;
+		nhdrmp = nhdrmp->b_next;
+	}
+
+	/* Make sure we are on the last segment. */
+	ASSERT3U(seg, ==, nsegs);
+	ASSERT3P(nhdrmp->b_next, ==, NULL);
+
+	/*
+	 * Now we set the last segment header. The difference being
+	 * that FIN/PSH/RST flags are allowed.
+	 */
+	bcopy(seg_chain->b_rptr, nhdrmp->b_rptr, ohdrslen);
+	nhdrmp->b_wptr = nhdrmp->b_rptr + ohdrslen;
+	niph = (ipha_t *)(nhdrmp->b_rptr + oehlen);
+	niph->ipha_ident = htons(++ip_id);
+	len = msgsize(nhdrmp->b_cont);
+	ASSERT3S(len, >, 0);
+	niph->ipha_length = htons(oiphlen + otcphlen + len);
+	niph->ipha_hdr_checksum = 0;
+	ntcph = (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen);
+	U32_TO_BE32(tcp_seq, ntcph->th_seq);
+
+	DB_CKSUMFLAGS(nhdrmp) = (uint16_t)(ocsum_flags & ~HW_LSO);
+	if (ocsum_flags & HCK_PARTIALCKSUM) {
+		DB_CKSUMSTART(nhdrmp) = ocsum_start;
+		DB_CKSUMEND(nhdrmp) = ntohs(niph->ipha_length);
+		DB_CKSUMSTUFF(nhdrmp) = ocsum_stuff;
+		tcp_sum = otcp_sum;
+		tcp_sum += len + otcphlen;
+		tcp_sum = (tcp_sum >> 16) + (tcp_sum & 0xFFFF);
+		U16_TO_BE16(tcp_sum, ntcph->th_sum);
+	}
+
+	if ((ocsum_flags & (HCK_PARTIALCKSUM | HCK_FULLCKSUM)) &&
+	    (emul & MAC_HWCKSUM_EMULS)) {
+		/* This should be the last mblk. */
+		ASSERT3P(nhdrmp->b_next, ==, NULL);
+		nhdrmp = mac_sw_cksum(nhdrmp, emul);
+		prev_nhdrmp->b_next = nhdrmp;
+	}
+
+	DTRACE_PROBE5(sw__lso__seg, mblk_t *, nhdrmp, void_ip_t *,
+	    (ipha_t *)(nhdrmp->b_rptr + oehlen), __dtrace_tcp_tcph_t *,
+	    (tcph_t *)(nhdrmp->b_rptr + oehlen + oiphlen), uint_t, len,
+	    uint_t, seg);
+
+	/*
+	 * Free the reference to the original LSO message as it is
+	 * being replaced by seg_cahin.
+	 */
+	freemsg(omp);
+	*head = seg_chain;
+	*tail = nhdrmp;
+	*count = nsegs;
+	return;
+
+fail:
+	*head = NULL;
+	*tail = NULL;
+	*count = 0;
+}
+
+#define	HCK_NEEDED	(HCK_IPV4_HDRCKSUM | HCK_PARTIALCKSUM | HCK_FULLCKSUM)
+
+/*
+ * Emulate various hardware offload features in software. Take a chain
+ * of packets as input and emulate the hardware features specified in
+ * 'emul'. The resulting chain's head pointer replaces the 'mp_chain'
+ * pointer given as input, and its tail pointer is written to
+ * '*otail'. The number of packets in the new chain is written to
+ * '*ocount'. The 'otail' and 'ocount' arguments are optional and thus
+ * may be NULL. The 'mp_chain' argument may point to a NULL chain; in
+ * which case 'mp_chain' will simply stay a NULL chain.
+ *
+ * While unlikely, it is technically possible that this function could
+ * receive a non-NULL chain as input and return a NULL chain as output
+ * ('*mp_chain' and '*otail' would be NULL and '*ocount' would be
+ * zero). This could happen if all the packets in the chain are
+ * dropped or if we fail to allocate new mblks. In this case, there is
+ * nothing for the caller to free. In any event, the caller shouldn't
+ * assume that '*mp_chain' is non-NULL on return.
+ *
+ * This function was written with two main use cases in mind.
+ *
+ * 1. A way for MAC clients to emulate hardware offloads when they
+ *    can't directly handle LSO packets or packets without fully
+ *    calculated checksums.
+ *
+ * 2. A way for MAC providers (drivers) to offer LSO even when the
+ *    underlying HW can't or won't supply LSO offload.
+ *
+ * At the time of this writing no provider is making use of this
+ * function. However, the plan for the future is to always assume LSO
+ * is available and then add SW LSO emulation to all providers that
+ * don't support it in HW.
+ */
+void
+mac_hw_emul(mblk_t **mp_chain, mblk_t **otail, uint_t *ocount, mac_emul_t emul)
+{
+	mblk_t *head = NULL, *tail = NULL;
+	uint_t count = 0;
+
+	ASSERT3S(~(MAC_HWCKSUM_EMULS | MAC_LSO_EMUL) & emul, ==, 0);
+	ASSERT3P(mp_chain, !=, NULL);
+
+	for (mblk_t *mp = *mp_chain; mp != NULL; ) {
+		mblk_t *tmp, *next, *tmphead, *tmptail;
+		struct ether_header *ehp;
+		uint32_t flags;
+		uint_t len = MBLKL(mp), l2len;
+
+		/* Perform LSO/cksum one message at a time. */
+		next = mp->b_next;
+		mp->b_next = NULL;
+
+		/*
+		 * For our sanity the first mblk should contain at
+		 * least the full L2 header.
+		 */
+		if (len < sizeof (struct ether_header)) {
+			mac_drop_pkt(mp, "packet too short (A): %u", len);
+			mp = next;
+			continue;
+		}
+
+		ehp = (struct ether_header *)mp->b_rptr;
+		if (ntohs(ehp->ether_type) == VLAN_TPID)
+			l2len = sizeof (struct ether_vlan_header);
+		else
+			l2len = sizeof (struct ether_header);
+
+		/*
+		 * If the first mblk is solely the L2 header, then
+		 * there better be more data.
+		 */
+		if (len < l2len || (len == l2len && mp->b_cont == NULL)) {
+			mac_drop_pkt(mp, "packet too short (C): %u", len);
+			mp = next;
+			continue;
+		}
+
+		DTRACE_PROBE2(mac__emul, mblk_t *, mp, mac_emul_t, emul);
+
+		/*
+		 * We use DB_CKSUMFLAGS (instead of mac_hcksum_get())
+		 * because we don't want to mask-out the LSO flag.
+		 */
+		flags = DB_CKSUMFLAGS(mp);
+
+		if ((flags & HW_LSO) && (emul & MAC_LSO_EMUL)) {
+			uint_t tmpcount = 0;
+
+			/*
+			 * LSO fix-up handles checksum emulation
+			 * inline (if requested). It also frees mp.
+			 */
+			mac_sw_lso(mp, emul, &tmphead, &tmptail,
+			    &tmpcount);
+			count += tmpcount;
+		} else if ((flags & HCK_NEEDED) && (emul & MAC_HWCKSUM_EMULS)) {
+			tmp = mac_sw_cksum(mp, emul);
+			tmphead = tmp;
+			tmptail = tmp;
+			count++;
+		} else {
+			/* There is nothing to emulate. */
+			tmp = mp;
+			tmphead = tmp;
+			tmptail = tmp;
+			count++;
+		}
+
+		/*
+		 * The tmp mblk chain is either the start of the new
+		 * chain or added to the tail of the new chain.
+		 */
+		if (head == NULL) {
+			head = tmphead;
+			tail = tmptail;
+		} else {
+			/* Attach the new mblk to the end of the new chain. */
+			tail->b_next = tmphead;
+			tail = tmptail;
+		}
+
+		mp = next;
+	}
+
+	*mp_chain = head;
+
+	if (otail != NULL)
+		*otail = tail;
+
+	if (ocount != NULL)
+		*ocount = count;
 }
 
 /*
@@ -501,16 +1416,9 @@ mac_strip_vlan_tag_chain(mblk_t *mp_chain)
  */
 /* ARGSUSED */
 void
-mac_pkt_drop(void *arg, mac_resource_handle_t resource, mblk_t *mp,
+mac_rx_def(void *arg, mac_resource_handle_t resource, mblk_t *mp,
     boolean_t loopback)
 {
-	mblk_t	*mp1 = mp;
-
-	while (mp1 != NULL) {
-		mp1->b_prev = NULL;
-		mp1->b_queue = NULL;
-		mp1 = mp1->b_next;
-	}
 	freemsgchain(mp);
 }
 

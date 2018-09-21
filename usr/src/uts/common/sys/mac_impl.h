@@ -345,7 +345,7 @@ struct mac_group_s {
 	if ((src_mcip)->mci_state_flags & MCIS_SHARE_BOUND)		\
 		rhandle = (mip)->mi_default_tx_ring;			\
 	if (mip->mi_promisc_list != NULL)				\
-		mac_promisc_dispatch(mip, mp, src_mcip, B_TRUE);	\
+		mac_promisc_dispatch(mip, mp, src_mcip);		\
 	/*								\
 	 * Grab the proper transmit pointer and handle. Special 	\
 	 * optimization: we can test mi_bridge_link itself atomically,	\
@@ -743,12 +743,23 @@ typedef struct mac_client_impl_s mac_client_impl_t;
 extern void	mac_init(void);
 extern int	mac_fini(void);
 
+/*
+ * MAC packet/chain drop functions to aggregate all dropped-packet
+ * debugging to a single surface.
+ */
+/*PRINTFLIKE2*/
+extern void	mac_drop_pkt(mblk_t *, const char *, ...)
+    __KPRINTFLIKE(2);
+
+/*PRINTFLIKE2*/
+extern void	mac_drop_chain(mblk_t *, const char *, ...)
+    __KPRINTFLIKE(2);
+
 extern void	mac_ndd_ioctl(mac_impl_t *, queue_t *, mblk_t *);
 extern boolean_t mac_ip_hdr_length_v6(ip6_t *, uint8_t *, uint16_t *,
     uint8_t *, ip6_frag_t **);
 
 extern mblk_t *mac_copymsgchain_cksum(mblk_t *);
-extern mblk_t *mac_fix_cksum(mblk_t *);
 extern void mac_packet_print(mac_handle_t, mblk_t *);
 extern void mac_rx_deliver(void *, mac_resource_handle_t, mblk_t *,
     mac_header_info_t *);
@@ -853,7 +864,7 @@ extern void mac_flow_set_name(flow_entry_t *, const char *);
 extern mblk_t *mac_add_vlan_tag(mblk_t *, uint_t, uint16_t);
 extern mblk_t *mac_add_vlan_tag_chain(mblk_t *, uint_t, uint16_t);
 extern mblk_t *mac_strip_vlan_tag_chain(mblk_t *);
-extern void mac_pkt_drop(void *, mac_resource_handle_t, mblk_t *, boolean_t);
+extern void mac_rx_def(void *, mac_resource_handle_t, mblk_t *, boolean_t);
 extern mblk_t *mac_rx_flow(mac_handle_t, mac_resource_handle_t, mblk_t *);
 
 extern void i_mac_share_alloc(mac_client_impl_t *);
