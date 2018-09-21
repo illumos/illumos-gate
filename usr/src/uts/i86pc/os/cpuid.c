@@ -3286,7 +3286,6 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 			hwcap_flags_2 |= AV_386_2_RDSEED;
 		if (*ebx & CPUID_INTC_EBX_7_0_SHA)
 			hwcap_flags_2 |= AV_386_2_SHA;
-
 	}
 
 	/* Detect systems with a potential CPUID limit  */
