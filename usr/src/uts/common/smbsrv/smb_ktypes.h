@@ -958,6 +958,7 @@ typedef struct smb_user {
 	struct smb_server	*u_server;
 	smb_session_t		*u_session;
 	ksocket_t		u_authsock;
+	timeout_id_t		u_auth_tmo;
 	uint16_t		u_name_len;
 	char			*u_name;
 	uint16_t		u_domain_len;
