@@ -14,6 +14,7 @@
 # Copyright 2015, 2016 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2018 Joyent, Inc.
+# Copyright (c) 2018 Datto Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/zfstest@$(PKGVERS)
@@ -53,6 +54,7 @@ dir path=opt/zfs-tests/tests/functional/cli_root/zfs_destroy
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_get
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_inherit
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_mount
+dir path=opt/zfs-tests/tests/functional/cli_root/zfs_program
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_promote
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_property
 dir path=opt/zfs-tests/tests/functional/cli_root/zfs_receive
@@ -878,6 +880,11 @@ file path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_all_fail \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_mount/zfs_mount_all_mountpoints \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_program/cleanup \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_program/setup mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zfs_program/zfs_program_json \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_promote/cleanup \
     mode=0555
