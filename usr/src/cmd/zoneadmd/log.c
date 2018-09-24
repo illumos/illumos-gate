@@ -634,6 +634,7 @@ escape_json(const char *sbuf, int slen, char *dbuf, int dlen, int *scntp,
 			if (flushp != NULL) {
 				*flushp = B_TRUE;
 			}
+			break;
 		} else {
 			sbuf++;
 			i += len;
