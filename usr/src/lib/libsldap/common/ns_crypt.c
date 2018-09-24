@@ -83,8 +83,8 @@ static int
 unhex(char c)
 {
 	return (c >= '0' && c <= '9' ? c - '0'
-		: c >= 'A' && c <= 'F' ? c - 'A' + 10
-		: c - 'a' + 10);
+	    : c >= 'A' && c <= 'F' ? c - 'A' + 10
+	    : c - 'a' + 10);
 }
 
 
@@ -98,7 +98,7 @@ ascii2hex(char *anHexaStr, int *aResLen)
 		return (NULL);
 	while (isxdigit(*anHexaStr)) {
 		theRes[theLen] = unhex(*anHexaStr) << 4;
-		if (++anHexaStr != '\0') {
+		if (*(++anHexaStr) != '\0') {
 			theRes[theLen] += unhex(*anHexaStr);
 			anHexaStr++;
 		}
@@ -169,18 +169,20 @@ modvalue(char *str, int len, int *mod_len)
 	n2 = 0;
 	if ((s = (char *)malloc(2 * len + 1)) != NULL) {
 		while (i < len) {
-		    s[i] = t2[(t3[(t1[(str[i]+n1)&MASK]+n2)&MASK]-n2)&MASK]-n1;
-		    i++;
-		    n1++;
-		    if (n1 == ROTORSIZE) {
-			n1 = 0;
-			n2++;
-			if (n2 == ROTORSIZE) n2 = 0;
-		    }
+			s[i] =
+			    t2[(t3[(t1[(str[i]+n1)&MASK]+n2)&MASK]-n2)&MASK]-n1;
+			i++;
+			n1++;
+			if (n1 == ROTORSIZE) {
+				n1 = 0;
+				n2++;
+				if (n2 == ROTORSIZE)
+					n2 = 0;
+			}
 		}
 		s[i] = '\0';
 		if (mod_len != NULL)
-		    *mod_len = i;
+			*mod_len = i;
 	}
 	return (s);
 }
