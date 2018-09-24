@@ -10771,6 +10771,7 @@ ahci_em_ioctl_set(ahci_ctl_t *ahci_ctlp, intptr_t arg)
 
 	task->aelta_ctl = ahci_ctlp;
 	task->aelta_port = set.aiems_port;
+	task->aelta_port = (uint8_t)set.aiems_port;
 	task->aelta_op = set.aiems_op;
 	task->aelta_state = set.aiems_leds;
 

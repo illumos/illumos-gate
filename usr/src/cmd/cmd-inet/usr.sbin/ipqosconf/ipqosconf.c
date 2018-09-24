@@ -249,7 +249,7 @@ static int readuser(char *str, uid_t *uid);
  * macros to call list functions with the more complex list element type
  * cast to the skeletal type iqpos_list_el_t.
  */
-#define	GET_LIST_END(list, end)\
+#define	LIST_END(list, end)\
 	list_end((ipqos_list_el_t **)list,  (ipqos_list_el_t ***)end)
 #define	ADD_TO_LIST(list, el)\
 	add_to_list((ipqos_list_el_t **)list, (ipqos_list_el_t *)el)
@@ -9247,7 +9247,7 @@ ipqos_conf_action_t *actions)
 	for (act = actions; act != NULL; act = act->next) {
 
 		/* store start of new resolved filters */
-		GET_LIST_END(&act->filters, &new_filters);
+		LIST_END(&act->filters, &new_filters);
 
 		/*
 		 * do name resolution on retry list adding resolved filters

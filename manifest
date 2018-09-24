@@ -15608,26 +15608,6 @@ s usr/share/man/man3head/libintl.3head=libintl.h.3head
 f usr/share/man/man3head/libintl.h.3head 0444 root bin
 s usr/share/man/man3head/limits.3head=limits.h.3head
 f usr/share/man/man3head/limits.h.3head 0444 root bin
-s usr/share/man/man3head/LIST_CLASS_ENTRY.3head=queue.h.3head
-s usr/share/man/man3head/LIST_CLASS_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/LIST_CONCAT.3head=queue.h.3head
-s usr/share/man/man3head/LIST_EMPTY.3head=queue.h.3head
-s usr/share/man/man3head/LIST_ENTRY.3head=queue.h.3head
-s usr/share/man/man3head/LIST_FIRST.3head=queue.h.3head
-s usr/share/man/man3head/LIST_FOREACH.3head=queue.h.3head
-s usr/share/man/man3head/LIST_FOREACH_FROM.3head=queue.h.3head
-s usr/share/man/man3head/LIST_FOREACH_FROM_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/LIST_FOREACH_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/LIST_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/LIST_HEAD_INITIALIZER.3head=queue.h.3head
-s usr/share/man/man3head/LIST_INIT.3head=queue.h.3head
-s usr/share/man/man3head/LIST_INSERT_AFTER.3head=queue.h.3head
-s usr/share/man/man3head/LIST_INSERT_BEFORE.3head=queue.h.3head
-s usr/share/man/man3head/LIST_INSERT_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/LIST_NEXT.3head=queue.h.3head
-s usr/share/man/man3head/LIST_PREV.3head=queue.h.3head
-s usr/share/man/man3head/LIST_REMOVE.3head=queue.h.3head
-s usr/share/man/man3head/LIST_SWAP.3head=queue.h.3head
 s usr/share/man/man3head/locale.3head=locale.h.3head
 f usr/share/man/man3head/locale.h.3head 0444 root bin
 s usr/share/man/man3head/math.3head=math.h.3head
@@ -15652,7 +15632,6 @@ s usr/share/man/man3head/pthread.3head=pthread.h.3head
 f usr/share/man/man3head/pthread.h.3head 0444 root bin
 s usr/share/man/man3head/pwd.3head=pwd.h.3head
 f usr/share/man/man3head/pwd.h.3head 0444 root bin
-f usr/share/man/man3head/queue.h.3head 0444 root bin
 s usr/share/man/man3head/regex.3head=regex.h.3head
 f usr/share/man/man3head/regex.h.3head 0444 root bin
 s usr/share/man/man3head/resource.3head=resource.h.3head
@@ -15675,52 +15654,10 @@ s usr/share/man/man3head/siginfo.3head=siginfo.h.3head
 f usr/share/man/man3head/siginfo.h.3head 0444 root bin
 s usr/share/man/man3head/signal.3head=signal.h.3head
 f usr/share/man/man3head/signal.h.3head 0444 root bin
-s usr/share/man/man3head/SLIST_CLASS_ENTRY.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_CLASS_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_CONCAT.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_EMPTY.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_ENTRY.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_FIRST.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_FOREACH.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_FOREACH_FROM.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_FOREACH_FROM_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_FOREACH_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_HEAD_INITIALIZER.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_INIT.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_INSERT_AFTER.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_INSERT_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_NEXT.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_REMOVE.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_REMOVE_AFTER.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_REMOVE_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/SLIST_SWAP.3head=queue.h.3head
 s usr/share/man/man3head/socket.3head=socket.h.3head
 f usr/share/man/man3head/socket.h.3head 0444 root bin
 s usr/share/man/man3head/spawn.3head=spawn.h.3head
 f usr/share/man/man3head/spawn.h.3head 0444 root bin
-s usr/share/man/man3head/STAILQ_CLASS_ENTRY.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_CLASS_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_CONCAT.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_EMPTY.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_ENTRY.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_FIRST.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_FOREACH.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_FOREACH_FROM.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_FOREACH_FROM_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_FOREACH_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_HEAD_INITIALIZER.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_INIT.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_INSERT_AFTER.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_INSERT_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_INSERT_TAIL.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_LAST.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_NEXT.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_REMOVE.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_REMOVE_AFTER.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_REMOVE_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/STAILQ_SWAP.3head=queue.h.3head
 s usr/share/man/man3head/stat.3head=stat.h.3head
 f usr/share/man/man3head/stat.h.3head 0444 root bin
 s usr/share/man/man3head/statvfs.3head=statvfs.h.3head
@@ -15743,32 +15680,6 @@ s usr/share/man/man3head/stropts.3head=stropts.h.3head
 f usr/share/man/man3head/stropts.h.3head 0444 root bin
 s usr/share/man/man3head/syslog.3head=syslog.h.3head
 f usr/share/man/man3head/syslog.h.3head 0444 root bin
-s usr/share/man/man3head/TAILQ_CLASS_ENTRY.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_CLASS_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_CONCAT.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_EMPTY.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_ENTRY.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FIRST.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FOREACH.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FOREACH_FROM.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FOREACH_FROM_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FOREACH_REVERSE.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FOREACH_REVERSE_FROM.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FOREACH_REVERSE_FROM_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FOREACH_REVERSE_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_FOREACH_SAFE.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_HEAD_INITIALIZER.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_INIT.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_INSERT_AFTER.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_INSERT_BEFORE.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_INSERT_HEAD.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_INSERT_TAIL.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_LAST.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_NEXT.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_PREV.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_REMOVE.3head=queue.h.3head
-s usr/share/man/man3head/TAILQ_SWAP.3head=queue.h.3head
 s usr/share/man/man3head/tar.3head=tar.h.3head
 f usr/share/man/man3head/tar.h.3head 0444 root bin
 s usr/share/man/man3head/tcp.3head=tcp.h.3head

@@ -30,6 +30,10 @@ UTSBASE = ..
 
 include Makefile.intel
 
+# Unset BINARY for clobber.targ because otherwise it will try to remove
+# a directory under uts/intel.
+BINARY=
+
 LINT_KMODS_X1	= $(LINT_KMODS:nsmb=)
 LINT_KMODS_X2	= $(LINT_KMODS_X1:smbfs=)
 LINT_KMODS_X3	= $(LINT_KMODS_X2:e1000g=)

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -39,11 +40,13 @@ set name=variant.arch value=i386
 dir path=kernel group=sys
 dir path=kernel/drv group=sys
 dir path=kernel/drv/$(ARCH64) group=sys
+dir path=usr/lib/ahci
 dir path=usr/share/man
 dir path=usr/share/man/man7d
 driver name=ahci alias=pciclass,010601 class=scsi-self-identifying \
     perms="* 0644 root sys"
 file path=kernel/drv/$(ARCH64)/ahci group=sys
+file path=usr/lib/ahci/ahciem mode=0555
 file path=usr/share/man/man7d/ahci.7d
 legacy pkg=SUNWahci \
     desc="Advanced Host Controller Interface (AHCI) SATA HBA Driver" \

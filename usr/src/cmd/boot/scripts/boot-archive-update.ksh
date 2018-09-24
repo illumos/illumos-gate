@@ -22,6 +22,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 . /lib/svc/share/smf_include.sh
@@ -31,14 +32,18 @@ UPDATEFILE=/etc/svc/volatile/boot_archive_safefile_update
 
 smf_is_globalzone || exit $SMF_EXIT_OK
 
-# on x86 get rid of transient reboot entry in the GRUB menu
-#
 if [ `uname -p` = "i386" ]; then
+	# on x86 get rid of transient reboot entry in the GRUB menu
 	if [ -f /stubboot/boot/grub/menu.lst ]; then
 		/sbin/bootadm -m update_temp -R /stubboot
 	else
 		/sbin/bootadm -m update_temp
 	fi
+	# Remove old 32-bit archives if present.
+	plat=/platform/`uname -i`
+	[ -f $plat/boot_archive ] && rm -f $plat/boot_archive
+	[ -f $plat/boot_archive.hash ] && rm -f $plat/boot_archive.hash
+	[ -d $plat/archive_cache ] && rm -rf $plat/archive_cache
 fi
 
 if [ -f $UPDATEFILE ] || [ -f /reconfigure ]; then
