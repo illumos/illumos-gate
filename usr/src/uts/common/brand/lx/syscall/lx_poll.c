@@ -26,6 +26,12 @@
 #include <sys/schedctl.h>
 #include <sys/lx_signal.h>
 
+/*
+ * Max number of FDs that can be given to poll() or select() before we return
+ * EINVAL (the Linux man page documents this value as {OPEN_MAX}, and defaults
+ * it to this value).
+ */
+int lx_poll_max_fds = 1048576;
 
 /* From uts/common/syscall/poll.c */
 extern int poll_copyin(pollstate_t *, pollfd_t *, nfds_t);
@@ -172,11 +178,12 @@ lx_poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	 * Initialize pollstate and copy in pollfd data if present.
 	 */
 	if (nfds != 0) {
-		if (nfds > p->p_fno_ctl) {
-			mutex_enter(&p->p_lock);
-			(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
-			    p->p_rctls, p, RCA_SAFE);
-			mutex_exit(&p->p_lock);
+		/*
+		 * Cap the number of FDs they can give us so we don't go
+		 * allocating a huge chunk of memory. Note that this is *not*
+		 * the RLIMIT_NOFILE rctl.
+		 */
+		if (nfds > lx_poll_max_fds) {
 			error = EINVAL;
 			goto pollout;
 		}
@@ -587,11 +594,12 @@ lx_select_common(int nfds, long *rfds, long *wfds, long *efds,
 	 * Initialize pollstate and copy in pollfd data if present.
 	 */
 	if (nfds != 0) {
-		if (nfds > p->p_fno_ctl) {
-			mutex_enter(&p->p_lock);
-			(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
-			    p->p_rctls, p, RCA_SAFE);
-			mutex_exit(&p->p_lock);
+		/*
+		 * Cap the number of FDs they can give us so we don't go
+		 * allocating a huge chunk of memory. Note that this is *not*
+		 * the RLIMIT_NOFILE rctl.
+		 */
+		if (nfds > lx_poll_max_fds) {
 			error = EINVAL;
 			goto out;
 		}
