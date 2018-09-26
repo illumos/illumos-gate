@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_param.h>
@@ -52,7 +52,8 @@ char *zone_status_names[] = {
 	"empty",		/* ZONE_IS_EMPTY */
 	"down",			/* ZONE_IS_DOWN */
 	"dying",		/* ZONE_IS_DYING */
-	"dead"			/* ZONE_IS_DEAD */
+	"dead",			/* ZONE_IS_DEAD */
+	"free"			/* ZONE_IS_FREE */
 };
 
 static int

@@ -106,14 +106,16 @@
  *   removed from the list of active zones.  zone_destroy() returns, and
  *   the zone can be recreated.
  *
- *   ZONE_IS_FREE (internal state): zone_ref goes to 0, ZSD destructor
- *   callbacks are executed, and all memory associated with the zone is
- *   freed.
+ *   ZONE_IS_FREE (internal state): All references have been dropped and
+ *   the zone_t is no longer in the zone_active nor zone_deathrow lists.
+ *   The zone_t is in the process of being freed.  This state exists
+ *   only for publishing a sysevent to indicate that the zone by this
+ *   name can be booted again.
  *
- *   Threads can wait for the zone to enter a requested state by using
- *   zone_status_wait() or zone_status_timedwait() with the desired
- *   state passed in as an argument.  Zone state transitions are
- *   uni-directional; it is not possible to move back to an earlier state.
+ *   Threads can wait for the zone to enter a requested state (other than
+ *   ZONE_IS_FREE) by using zone_status_wait() or zone_status_timedwait()
+ *   with the desired state passed in as an argument.  Zone state transitions
+ *   are uni-directional; it is not possible to move back to an earlier state.
  *
  *
  *   Zone-Specific Data:
@@ -170,7 +172,7 @@
  *
  *   Ordering requirements:
  *       pool_lock --> cpu_lock --> zonehash_lock --> zone_status_lock -->
- *       	zone_lock --> zsd_key_lock --> pidlock --> p_lock
+ *		zone_lock --> zsd_key_lock --> pidlock --> p_lock
  *
  *   When taking zone_mem_lock or zone_nlwps_lock, the lock ordering is:
  *	zonehash_lock --> a_lock --> pidlock --> p_lock --> zone_mem_lock
@@ -353,6 +355,7 @@ const char  *zone_status_table[] = {
 	ZONE_EVENT_SHUTTING_DOWN,	/* down */
 	ZONE_EVENT_SHUTTING_DOWN,	/* dying */
 	ZONE_EVENT_UNINITIALIZED,	/* dead */
+	ZONE_EVENT_FREE,		/* free */
 };
 
 /*
@@ -396,6 +399,7 @@ static int zone_remove_datalink(zoneid_t, datalink_id_t);
 static int zone_list_datalink(zoneid_t, int *, datalink_id_t *);
 static int zone_set_network(zoneid_t, zone_net_data_t *);
 static int zone_get_network(zoneid_t, zone_net_data_t *);
+static void zone_status_set(zone_t *, zone_status_t);
 
 typedef boolean_t zsd_applyfn_t(kmutex_t *, boolean_t, zone_t *, zone_key_t);
 
@@ -2917,6 +2921,15 @@ zone_free(zone_t *zone)
 	}
 	list_destroy(&zone->zone_dl_list);
 
+	/*
+	 * This zone_t can no longer inhibit creation of another zone_t
+	 * with the same name or debug ID.  Generate a sysevent so that
+	 * userspace tools know it is safe to carry on.
+	 */
+	mutex_enter(&zone_status_lock);
+	zone_status_set(zone, ZONE_IS_FREE);
+	mutex_exit(&zone_status_lock);
+
 	if (zone->zone_rootvp != NULL)
 		VN_RELE(zone->zone_rootvp);
 	if (zone->zone_rootpath)
@@ -2964,8 +2977,8 @@ zone_status_set(zone_t *zone, zone_status_t status)
 
 	nvlist_t *nvl = NULL;
 	ASSERT(MUTEX_HELD(&zone_status_lock));
-	ASSERT(status > ZONE_MIN_STATE && status <= ZONE_MAX_STATE &&
-	    status >= zone_status_get(zone));
+	ASSERT((status > ZONE_MIN_STATE && status <= ZONE_MAX_STATE ||
+	    status == ZONE_IS_FREE) && status >= zone_status_get(zone));
 
 	/* Current time since Jan 1 1970 but consumers expect NS */
 	gethrestime(&now);

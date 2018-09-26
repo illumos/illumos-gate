@@ -137,6 +137,7 @@ extern "C" {
 #define	ZONE_EVENT_READY		"ready"
 #define	ZONE_EVENT_RUNNING		"running"
 #define	ZONE_EVENT_SHUTTING_DOWN	"shutting_down"
+#define	ZONE_EVENT_FREE			"free"
 
 #define	ZONE_CB_NAME		"zonename"
 #define	ZONE_CB_NEWSTATE	"newstate"
@@ -244,7 +245,8 @@ typedef enum {
 	ZONE_IS_EMPTY,
 	ZONE_IS_DOWN,
 	ZONE_IS_DYING,
-	ZONE_IS_DEAD
+	ZONE_IS_DEAD,
+	ZONE_IS_FREE		/* transient state for zone sysevent */
 } zone_status_t;
 #define	ZONE_MIN_STATE		ZONE_IS_UNINITIALIZED
 #define	ZONE_MAX_STATE		ZONE_IS_DEAD
