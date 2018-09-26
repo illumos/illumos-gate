@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pstack_iter
 .Nd iterate process stack frames
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pstack_iter

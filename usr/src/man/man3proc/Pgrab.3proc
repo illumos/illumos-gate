@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pgrab
 .Nd grab and control a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "struct ps_prochandle *"
 .Fo Pgrab

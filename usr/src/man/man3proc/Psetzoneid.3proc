@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Psetzoneid
 .Nd change processes zone id
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Psetzoneid

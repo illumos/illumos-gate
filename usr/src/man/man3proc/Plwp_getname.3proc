@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Plwp_getname
 .Nd get thread name
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Plwp_getname

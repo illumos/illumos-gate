@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pgetauxval
 .Nd obtain auxiliary vector value
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pgetauxval

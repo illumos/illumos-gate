@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pcreate_error
 .Nd get Pcreate, Pxcreate error message string
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const char *"
 .Fo Pcreate_error

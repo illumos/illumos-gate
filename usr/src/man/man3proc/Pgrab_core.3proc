@@ -18,8 +18,9 @@
 .Nm Pgrab_core ,
 .Nm Pfgrab_core
 .Nd grab a core file
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "struct ps_prochandle *"
 .Fo Pgrab_core

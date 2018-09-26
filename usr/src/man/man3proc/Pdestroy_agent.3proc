@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pdestroy_agent
 .Nd destroy the agent LWP
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Pdestroy_agent

@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pdelbkpt
 .Nd clear a breakpoint in a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pdelbkpt

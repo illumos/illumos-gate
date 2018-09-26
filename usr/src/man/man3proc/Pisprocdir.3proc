@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pisprocdir
 .Nd determine if a directory is the /proc directory
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pisprocdir

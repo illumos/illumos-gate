@@ -19,8 +19,9 @@
 .Nm Pzoneroot ,
 .Nm Pzonepath
 .Nd get zone name, root, and full object path
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft char *
 .Fo Pzonename

@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pasfd
 .Nd obtain the process address space file descriptor
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pasfd

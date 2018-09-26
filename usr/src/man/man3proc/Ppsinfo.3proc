@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Ppsinfo
 .Nd get process ps information
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const psinfo_t *"
 .Fo Ppsinfo

@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pplatform
 .Nd get platform string
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "char *"
 .Fo Pplatform

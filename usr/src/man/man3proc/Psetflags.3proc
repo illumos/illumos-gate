@@ -18,8 +18,9 @@
 .Nm Psetflags ,
 .Nm Punsetflags
 .Nd set and unset process flags
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Psetflags

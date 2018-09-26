@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pfault
 .Nd enable and disable the tracing of faults
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "int"
 .Fo Pfault

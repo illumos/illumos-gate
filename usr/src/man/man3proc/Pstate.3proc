@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pstate
 .Nd obtain process handle state
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pstate

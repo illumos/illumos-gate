@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Preset_maps
 .Nd reset memory mapping data after exec
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Preset_maps

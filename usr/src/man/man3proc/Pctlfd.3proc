@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pctlfd
 .Nd obtain the process control file descriptor
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pctlfd

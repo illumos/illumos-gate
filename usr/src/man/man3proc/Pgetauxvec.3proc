@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pgetauxvec
 .Nd obtain process auxiliary vector
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const auxv_t *"
 .Fo Pgetauxvec

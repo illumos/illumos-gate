@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pstatus
 .Nd obtain process status structure
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const pstatus_t *"
 .Fo Pstatus

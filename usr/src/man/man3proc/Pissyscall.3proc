@@ -18,8 +18,9 @@
 .Nm Pissyscall ,
 .Nm Pissyscall_prev
 .Nd determine if instructions are system call instructions
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pissyscall

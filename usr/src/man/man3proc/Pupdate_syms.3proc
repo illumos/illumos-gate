@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pupdate_syms
 .Nd update cached symbol tables
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Pupdate_syms

@@ -18,8 +18,9 @@
 .Nm Pclearfault ,
 .Nm Lclearfault
 .Nd clear process and thread faults
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pclearfault

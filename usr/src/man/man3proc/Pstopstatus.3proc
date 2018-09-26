@@ -23,8 +23,9 @@
 .Nm Lstop ,
 .Nm Lwait
 .Nd process and thread stop operations
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pdstop

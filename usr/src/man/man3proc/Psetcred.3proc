@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Psetcred
 .Nd set process credentials
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Psetcred

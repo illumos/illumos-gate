@@ -19,8 +19,9 @@
 .Nm Plmid_to_ctf ,
 .Nm Pname_to_ctf
 .Nd lookup CTF data
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "ctf_file_t *"
 .Fo Paddr_to_ctf

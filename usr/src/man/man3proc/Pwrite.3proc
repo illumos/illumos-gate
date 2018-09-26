@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pwrite
 .Nd write data to the address space of a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft ssize_t
 .Fo Pwrite

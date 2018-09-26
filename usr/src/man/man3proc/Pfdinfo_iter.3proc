@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pfdinfo_iter
 .Nd iterate open files in a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pfdinfo_iter

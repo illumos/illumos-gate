@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Psetbkpt
 .Nd set a breakpoint trap in a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Psetbkpt

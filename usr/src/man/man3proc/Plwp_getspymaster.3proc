@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Plwp_getspymaster
 .Nd get agent LWP spy master information
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Plwp_getspymaster

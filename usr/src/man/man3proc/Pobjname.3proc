@@ -18,8 +18,9 @@
 .Nm Pobjname ,
 .Nm Pobjname_resolved
 .Nd turn a virtual address into its mapped object
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "char *"
 .Fo Pobjname
