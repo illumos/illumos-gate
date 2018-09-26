@@ -89,7 +89,7 @@ SRCS_library=		$(SRCS_common) \
 			$(SRCS_i386) \
 			$(SRCS_sparc) \
 			$(SRCS_s390x) \
-			$(SRCS_riscv) \
+			$(SRCS_riscv)
 SRCS_standalone=	$(SRCS_common) \
 			$(SRCS_$(MACH))
 SRCS=			$(SRCS_$(CURTYPE))

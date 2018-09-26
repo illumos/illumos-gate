@@ -584,7 +584,7 @@ dis_file(const char *filename)
 			/*
 			 * RISC-V is defined to be litle endian. The current ISA
 			 * makes it clear that the 64-bit instructions can
-			 * co-eixst with the 32-bit ones and therefore we don't
+			 * co-exist with the 32-bit ones and therefore we don't
 			 * need a separate elf class at this time.
 			 */
 			if (ehdr.e_ident[EI_DATA] != ELFDATA2LSB) {

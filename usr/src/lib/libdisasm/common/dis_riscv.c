@@ -25,7 +25,7 @@
 
 #include <stdio.h>
 
-extern size_t strcmp(const char *, const char *);
+extern int strcmp(const char *, const char *);
 
 /*
  * Register names based on their ABI name.
@@ -53,9 +53,9 @@ static const char *dis_riscv_c_fpregs[8] = {
 };
 
 /*
- * RM names have the leading comma in them because the last value represents that
- * the hardware register decides the rounding mode and therefore nothing should
- * be appended to the instruction.
+ * RM names have the leading comma in them because the last value represents
+ * that the hardware register decides the rounding mode and therefore nothing
+ * should be appended to the instruction.
  */
 static const char *dis_riscv_rm[8] = {
 	",rne", ",rtz", ",rdn", ",rup", ",rmm", ",???", ",???", ""
@@ -322,6 +322,7 @@ typedef struct dis_riscv_instr {
 	uint_t			drv_funct2;
 } dis_riscv_instr_t;
 
+/*ARGSUSED*/
 static void
 dis_riscv_rtype_32(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -407,6 +408,7 @@ dis_riscv_stype_32(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	}
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_utype_32(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -474,6 +476,7 @@ dis_riscv_shift_64(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	}
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_csr(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -638,6 +641,7 @@ dis_riscv_csri(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 #define	DIS_RISCV_FENCE_W	0x1
 #define	DIS_RISCV_FENCE_IORW	0xf
 
+/*ARGSUSED*/
 static void
 dis_riscv_fence(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -669,6 +673,7 @@ dis_riscv_fence(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	    succ & DIS_RISCV_FENCE_W ? "w" : "");
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_name(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -676,6 +681,7 @@ dis_riscv_name(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	(void) dis_snprintf(buf, buflen, "%s", table->drv_name);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_rs1_rs2(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -685,6 +691,7 @@ dis_riscv_rs1_rs2(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	    dis_riscv_regs[DIS_RISCV_RS2(instr)]);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_rv32a_load(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_instr_t *table, char *buf, size_t buflen)
@@ -704,6 +711,7 @@ dis_riscv_rv32a_load(dis_handle_t *dhp, uint32_t instr,
 	    dis_riscv_regs[DIS_RISCV_RS1(instr)]);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_rv32a(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -761,6 +769,7 @@ dis_riscv_fp_store(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	}
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_fp_r(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -774,6 +783,7 @@ dis_riscv_fp_r(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 /*
  * Variant of fp_r type that goes to integer destination registers.
  */
+/*ARGSUSED*/
 static void
 dis_riscv_fp_r_fpi(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -784,7 +794,7 @@ dis_riscv_fp_r_fpi(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	    dis_riscv_fpregs[DIS_RISCV_RS2(instr)]);
 }
 
-
+/*ARGSUSED*/
 static void
 dis_riscv_fp_r4(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -797,6 +807,7 @@ dis_riscv_fp_r4(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	    dis_riscv_rm[DIS_RISCV_FUNCT3(instr)]);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_fp_rs2_fp(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
     char *buf, size_t buflen)
@@ -807,6 +818,7 @@ dis_riscv_fp_rs2_fp(dis_handle_t *dhp, uint32_t instr, dis_riscv_instr_t *table,
 	    dis_riscv_rm[DIS_RISCV_FUNCT3(instr)]);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_fp_rs2_fp_nr(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_instr_t *table, char *buf, size_t buflen)
@@ -816,7 +828,7 @@ dis_riscv_fp_rs2_fp_nr(dis_handle_t *dhp, uint32_t instr,
 	    dis_riscv_fpregs[DIS_RISCV_RS1(instr)]);
 }
 
-
+/*ARGSUSED*/
 static void
 dis_riscv_fp_rs2_fpi(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_instr_t *table, char *buf, size_t buflen)
@@ -827,6 +839,7 @@ dis_riscv_fp_rs2_fpi(dis_handle_t *dhp, uint32_t instr,
 	    dis_riscv_rm[DIS_RISCV_FUNCT3(instr)]);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_fp_rs2_ifp(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_instr_t *table, char *buf, size_t buflen)
@@ -837,6 +850,7 @@ dis_riscv_fp_rs2_ifp(dis_handle_t *dhp, uint32_t instr,
 	    dis_riscv_rm[DIS_RISCV_FUNCT3(instr)]);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_fp_rs2_fpi_nr(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_instr_t *table, char *buf, size_t buflen)
@@ -846,6 +860,7 @@ dis_riscv_fp_rs2_fpi_nr(dis_handle_t *dhp, uint32_t instr,
 	    dis_riscv_fpregs[DIS_RISCV_RS1(instr)]);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_fp_rs2_ifp_nr(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_instr_t *table, char *buf, size_t buflen)
@@ -856,6 +871,7 @@ dis_riscv_fp_rs2_ifp_nr(dis_handle_t *dhp, uint32_t instr,
 }
 
 
+/*ARGSUSED*/
 static void
 dis_riscv_fp_rm(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_instr_t *table, char *buf, size_t buflen)
@@ -1340,6 +1356,7 @@ typedef struct dis_riscv_c_instr {
 #define	DIS_RISCV_C_A4_2(x)	(((x) & 0x0040) >> 4)
 #define	DIS_RISCV_C_A4_3(x)	(((x) & 0x0020) >> 2)
 
+/*ARGSUSED*/
 static void
 dis_riscv_c_name(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_c_instr_t *table, char *buf, size_t buflen)
@@ -1528,6 +1545,7 @@ dis_riscv_c_j(dis_handle_t *dhp, uint32_t instr,
 	}
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_c_jr(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_c_instr_t *table, char *buf, size_t buflen)
@@ -1639,6 +1657,7 @@ dis_riscv_c_zext_immint(dis_handle_t *dhp, uint32_t instr,
 	    dis_riscv_c_regs[DIS_RISCV_C_RS1P(instr)], "", imm, buf, buflen);
 }
 
+/*ARGSUSED*/
 static void
 dis_riscv_c_bigint(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_c_instr_t *table, char *buf, size_t buflen)
@@ -1649,6 +1668,7 @@ dis_riscv_c_bigint(dis_handle_t *dhp, uint32_t instr,
 }
 
 
+/*ARGSUSED*/
 static void
 dis_riscv_c_int(dis_handle_t *dhp, uint32_t instr,
     dis_riscv_c_instr_t *table, char *buf, size_t buflen)
@@ -1935,12 +1955,14 @@ dis_riscv_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf,
 	return (0);
 }
 
+/*ARGSUSED*/
 static int
 dis_riscv_min_instrlen(dis_handle_t *dhp)
 {
 	return (2);
 }
 
+/*ARGSUSED*/
 static int
 dis_riscv_max_instrlen(dis_handle_t *dhp)
 {
