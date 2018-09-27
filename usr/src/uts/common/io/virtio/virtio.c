@@ -985,7 +985,6 @@ virtio_register_intx(struct virtio_softc *sc,
     struct virtio_int_handler vq_handlers[])
 {
 	int vq_handler_count;
-	int config_handler_count = 0;
 	int actual;
 	struct virtio_handler_container *vhc;
 	size_t vhc_sz;
@@ -996,9 +995,6 @@ virtio_register_intx(struct virtio_softc *sc,
 	    vq_handlers && vq_handlers[vq_handler_count].vh_func;
 	    vq_handler_count++)
 		;
-
-	if (config_handler != NULL)
-		config_handler_count = 1;
 
 	vhc_sz = sizeof (struct virtio_handler_container) +
 	    sizeof (struct virtio_int_handler) * vq_handler_count;

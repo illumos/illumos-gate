@@ -21,6 +21,8 @@
 .\"
 .\" CDDL HEADER END
 .\"
+.\" Copyright 2018 Joyent, Inc.
+.\"
 .TH INSTALL 1ONBLD "Jan 14, 2010"
 .SH NAME
 Install \- install a kernel from an ON workspace
@@ -285,7 +287,6 @@ In order to use the most convenient form of
 .BR Install " (``" "Install -t machine:/" "''),"
 you will need to do the following on the target machine:
 .LP
-.br
 .nf
 	(1) add your machine name to the /etc/hosts.equiv file
 .fi

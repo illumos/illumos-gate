@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_PCI_IMPL_H
@@ -37,7 +38,7 @@ extern "C" {
 
 /*
  * There are two ways to access the PCI configuration space on X86
- * 	Access method 2 is the older method
+ *	Access method 2 is the older method
  *	Access method 1 is the newer method and is preferred because
  *	  of the problems in trying to lock the configuration space
  *	  for MP machines using method 2.  See PCI Local BUS Specification
@@ -50,7 +51,7 @@ extern "C" {
 #define	PCI_MECHANISM_UNKNOWN		-1
 #define	PCI_MECHANISM_NONE		0
 #if defined(__i386) || defined(__amd64)
-#define	PCI_MECHANISM_1 		1
+#define	PCI_MECHANISM_1			1
 #define	PCI_MECHANISM_2			2
 #else
 #error "Unknown processor type"
@@ -82,7 +83,7 @@ extern "C" {
 #define	PCI_CADDR2(device, indx) \
 		(0xc000 | (((device) & 0xf) <<  8) | (indx))
 
-typedef struct 	pci_acc_cfblk {
+typedef struct	pci_acc_cfblk {
 	uchar_t	c_busnum;		/* bus number */
 	uchar_t c_devnum;		/* device number */
 	uchar_t c_funcnum;		/* function number */

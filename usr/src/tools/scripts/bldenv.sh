@@ -24,6 +24,7 @@
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2018 Joyent, Inc.
 #
 # Uses supplied "env" file, based on /opt/onbld/etc/env, to set shell variables
 # before spawning a shell for doing a release-style builds interactively
@@ -69,7 +70,8 @@ typeset -r USAGE=$'+
 [c?force the use of csh, regardless of the  value  of $SHELL.]
 [f?invoke csh with the -f (fast-start) option. This option is valid
     only if $SHELL is unset or if it points to csh.]
-[d?set up environment for doing DEBUG builds (default is non-DEBUG)]
+[d?set up environment for doing DEBUG builds. The default is non-DEBUG,
+    unless the -F flag is specified in the nightly file.]
 [t?set up environment to use the tools in usr/src/tools (this is the
     default, use +t to use the tools from /opt/onbld)]
 
@@ -127,21 +129,22 @@ typeset flags=(
 		typeset d=false
 		typeset o=false
 	)
+	typeset d_set=false
+	typeset DF_build=false
 )
 
 typeset progname="$(basename -- "${0}")"
 
 OPTIND=1
-SUFFIX="-nd"
 
-while getopts -a "${progname}" "${USAGE}" OPT ; do 
+while getopts -a "${progname}" "${USAGE}" OPT ; do
     case ${OPT} in
 	  c)	flags.c=true  ;;
 	  +c)	flags.c=false ;;
 	  f)	flags.f=true  ;;
 	  +f)	flags.f=false ;;
-	  d)	flags.d=true  SUFFIX=""    ;;
-	  +d)	flags.d=false SUFFIX="-nd" ;;
+	  d)	flags.d=true ; flags.d_set=true ;;
+	  +d)	flags.d=false ; flags.d_set=true ;;
 	  t)	flags.t=true  ;;
 	  +t)	flags.t=false ;;
 	  \?)	usage ;;
@@ -235,9 +238,17 @@ do
 	case "$FLAG" in
 	  t)	flags.t=true  ;;
 	  +t)	flags.t=false ;;
+	  F)	flags.DF_build=true ;;
 	  *)	;;
 	esac
 done
+
+# DEBUG is a little bit complicated.  First, bldenv -d/+d over-rides
+# the env file.  Otherwise, we'll default to DEBUG iff we are *not*
+# building non-DEBUG bits at all.
+if [ "${flags.d_set}" != "true" ] && "${flags.DF_build}"; then
+	flags.d=true
+fi
 
 POUND_SIGN="#"
 # have we set RELEASE_DATE in our env file?
@@ -252,12 +263,14 @@ export DEV_CM RELEASE_DATE POUND_SIGN
 print 'Build type   is  \c'
 if ${flags.d} ; then
 	print 'DEBUG'
+	SUFFIX=""
 	unset RELEASE_BUILD
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
 else
 	# default is a non-DEBUG build
 	print 'non-DEBUG'
+	SUFFIX="-nd"
 	export RELEASE_BUILD=
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
@@ -266,18 +279,18 @@ fi
 # update build-type variables
 PKGARCHIVE="${PKGARCHIVE}${SUFFIX}"
 
-# 	Set PATH for a build
+#	Set PATH for a build
 PATH="/opt/onbld/bin:/opt/onbld/bin/${MACH}:/opt/SUNWspro/bin:/usr/ccs/bin:/usr/bin:/usr/sbin:/usr/ucb:/usr/etc:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
-if [[ "${SUNWSPRO}" != "" ]]; then 
-	export PATH="${SUNWSPRO}/bin:$PATH" 
-fi 
+if [[ "${SUNWSPRO}" != "" ]]; then
+	export PATH="${SUNWSPRO}/bin:$PATH"
+fi
 
 if [[ -n "${MAKE}" ]]; then
 	if [[ -x "${MAKE}" ]]; then
 		export PATH="$(dirname -- "${MAKE}"):$PATH"
 	else
 		print "\$MAKE (${MAKE}) is not a valid executible"
-		exit 1	
+		exit 1
 	fi
 fi
 

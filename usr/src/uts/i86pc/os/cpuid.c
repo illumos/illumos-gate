@@ -4188,7 +4188,7 @@ static const char sl3_cache_str[] = "sectored-l3-cache";
 static const char sh_l2_tlb4k_str[] = "shared-l2-tlb-4k";
 
 static const struct cachetab {
-	uint8_t		ct_code;
+	uint8_t	ct_code;
 	uint8_t		ct_assoc;
 	uint16_t	ct_line_size;
 	size_t		ct_size;
