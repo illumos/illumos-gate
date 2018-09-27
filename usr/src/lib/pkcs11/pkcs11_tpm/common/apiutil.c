@@ -289,6 +289,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Gary Mills
  */
 
 #include <alloca.h>
@@ -301,23 +303,30 @@ extern  API_Proc_Struct_t  *Anchor;
 extern int logging;
 
 void logit(int, char *, ...);
+#ifdef DEBUG
 static int enabled = 0;
+#endif /* DEBUG */
 
 void
-loginit() {
+loginit()
+{
+#ifdef DEBUG
 	if (!enabled) {
 		enabled = 1;
 		openlog("tpmtoken", LOG_PID | LOG_NDELAY, LOG_DAEMON);
 		(void) setlogmask(LOG_UPTO(LOG_DEBUG));
 		logit(LOG_DEBUG, "Logging enabled %d enabled", enabled);
 	}
+#endif /* DEBUG */
 }
 
 void
 logterm()
 {
+#ifdef DEBUG
 	closelog();
 	enabled = 0;
+#endif /* DEBUG */
 }
 
 /*ARGSUSED*/
@@ -343,8 +352,7 @@ logit(int type, char *fmt, ...)
 }
 
 void
-AddToSessionList(pSess)
-	Session_Struct_t *pSess;
+AddToSessionList(Session_Struct_t *pSess)
 {
 	Session_Struct_t *pCur;
 
@@ -370,8 +378,7 @@ AddToSessionList(pSess)
 }
 
 void
-RemoveFromSessionList(pSess)
-	Session_Struct_t *pSess;
+RemoveFromSessionList(Session_Struct_t *pSess)
 {
 	Session_Struct_t *pCur, *pTmp;
 
