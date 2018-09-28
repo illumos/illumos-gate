@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2015, Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 include $(SRC)/lib/libctf/Makefile.shared.com
@@ -23,6 +23,9 @@ include ../../Makefile.ctf
 LDLIBS += \
 	-L$(ROOTONBLDLIBMACH) \
 	'-R$$ORIGIN/../../lib/$(MACH)' \
+
+CSTD = $(CSTD_GNU99)
+C99LMODE = -Xc99=%all
 
 CPPFLAGS +=	-I$(SRC)/lib/libctf/common/ \
 		-I$(SRC)/lib/libdwarf/common/ \

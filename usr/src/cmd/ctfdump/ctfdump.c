@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -29,21 +29,25 @@
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/note.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
+
+#define	MAX_NAMELEN (512)
 
 typedef enum ctfdump_arg {
-	CTFDUMP_OBJECTS =	0x01,
-	CTFDUMP_FUNCTIONS =	0x02,
-	CTFDUMP_HEADER =	0x04,
-	CTFDUMP_LABELS = 	0x08,
-	CTFDUMP_STRINGS =	0x10,
-	CTFDUMP_STATS = 	0x20,
-	CTFDUMP_TYPES =		0x40,
-	CTFDUMP_DEFAULT =	0x7f,
-	CTFDUMP_OUTPUT =	0x80,
-	CTFDUMP_ALL =		0xff
+	CTFDUMP_OBJECTS =	0x001,
+	CTFDUMP_FUNCTIONS =	0x002,
+	CTFDUMP_HEADER =	0x004,
+	CTFDUMP_LABELS =	0x008,
+	CTFDUMP_STRINGS =	0x010,
+	CTFDUMP_STATS =		0x020,
+	CTFDUMP_TYPES =		0x040,
+	CTFDUMP_DEFAULT =	0x07f,
+	CTFDUMP_OUTPUT =	0x080,
+	CTFDUMP_SOURCE =	0x100,
 } ctfdump_arg_t;
 
 typedef struct ctfdump_stat {
@@ -67,6 +71,14 @@ typedef struct ctfdump_stat {
 	ulong_t		cs_strmax;		/* longest string */
 } ctfdump_stat_t;
 
+typedef struct {
+	char ci_name[MAX_NAMELEN];
+	ctf_id_t ci_id;
+	ulong_t ci_symidx;
+	ctf_funcinfo_t ci_funcinfo;
+} ctf_idname_t;
+
+static ctf_idname_t *idnames;
 static const char *g_progname;
 static ctfdump_arg_t g_dump;
 static ctf_file_t *g_fp;
@@ -106,7 +118,7 @@ ctfdump_printf(ctfdump_arg_t arg, const char *fmt, ...)
 		return;
 
 	va_start(ap, fmt);
-	vfprintf(stdout, fmt, ap);
+	(void) vfprintf(stdout, fmt, ap);
 	va_end(ap);
 }
 
@@ -117,7 +129,7 @@ ctfdump_warn(const char *fmt, ...)
 
 	(void) fprintf(stderr, "%s: ", g_progname);
 	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
+	(void) vfprintf(stderr, fmt, ap);
 	va_end(ap);
 }
 
@@ -128,7 +140,7 @@ ctfdump_fatal(const char *fmt, ...)
 
 	(void) fprintf(stderr, "%s: ", g_progname);
 	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
+	(void) vfprintf(stderr, fmt, ap);
 	va_end(ap);
 
 	exit(1);
@@ -145,9 +157,10 @@ ctfdump_usage(const char *fmt, ...)
 		va_end(ap);
 	}
 
-	(void) fprintf(stderr, "Usage: %s [-dfhlsSt] [-p parent] [-u outfile] "
+	(void) fprintf(stderr, "Usage: %s [-cdfhlsSt] [-p parent] [-u outfile] "
 	    "file\n"
 	    "\n"
+	    "\t-c  dump C-style output\n"
 	    "\t-d  dump object data\n"
 	    "\t-f  dump function data\n"
 	    "\t-h  dump the CTF header\n"
@@ -172,6 +185,8 @@ ctfdump_title(ctfdump_arg_t arg, const char *header)
 static int
 ctfdump_objects_cb(const char *name, ctf_id_t id, ulong_t symidx, void *arg)
 {
+	_NOTE(ARGUNUSED(arg));
+
 	int len;
 
 	len = snprintf(NULL, 0, "  [%u] %u", g_stats.cs_ndata, id);
@@ -208,6 +223,7 @@ static int
 ctfdump_functions_cb(const char *name, ulong_t symidx, ctf_funcinfo_t *ctc,
     void *arg)
 {
+	_NOTE(ARGUNUSED(arg));
 	int i;
 
 	if (ctc->ctc_argc != 0) {
@@ -284,6 +300,7 @@ ctfdump_header(void)
 static int
 ctfdump_labels_cb(const char *name, const ctf_lblinfo_t *li, void *arg)
 {
+	_NOTE(ARGUNUSED(arg));
 	ctfdump_printf(CTFDUMP_LABELS, "  %5lu %s\n", li->ctb_typeidx, name);
 	return (0);
 }
@@ -496,9 +513,10 @@ ctfdump_enum_cb(const char *name, int value, void *arg)
 static int
 ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 {
+	_NOTE(ARGUNUSED(arg));
 	int kind, i, count;
 	ctf_id_t ref;
-	char name[512], ienc[128];
+	char name[MAX_NAMELEN], ienc[128];
 	const char *encn;
 	ctf_funcinfo_t ctc;
 	ctf_arinfo_t ar;
@@ -662,10 +680,379 @@ ctfdump_types(void)
 	ctfdump_title(CTFDUMP_TYPES, "Types");
 
 	if (ctf_type_iter(g_fp, B_TRUE, ctfdump_types_cb, NULL) == CTF_ERR) {
-		ctfdump_warn("failed to dump labels: %s\n",
+		ctfdump_warn("failed to dump types: %s\n",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
+}
+
+/*
+ * C-style output. This is designed mainly for comparison purposes, and doesn't
+ * produce directly valid C:
+ *
+ * - the declarations are sorted alphabetically not semantically
+ * - anonymous enums without other users are elided (e.g. IDCS_PROBE_SENT)
+ * - doubly-pointed-to functions are wrong (e.g. in kiconv_ops_t)
+ * - anon unions declared within SOUs aren't expanded
+ * - function arguments aren't expanded recursively
+ */
+
+static void
+ctfsrc_refname(ctf_id_t id, char *buf, size_t bufsize)
+{
+	ctf_id_t ref;
+
+	if ((ref = ctf_type_reference(g_fp, id)) == CTF_ERR) {
+		ctfdump_fatal("failed to get reference type for %ld: "
+		    "%s\n", id, ctf_errmsg(ctf_errno(g_fp)));
+	}
+
+	(void) ctf_type_name(g_fp, ref, buf, bufsize);
+}
+
+static int
+ctfsrc_member_cb(const char *member, ctf_id_t type, ulong_t off, void *arg)
+{
+	_NOTE(ARGUNUSED(arg));
+	char name[MAX_NAMELEN];
+
+	if (ctf_type_cname(g_fp, type, name, sizeof (name), member) == NULL) {
+		if (ctf_errno(g_fp) != ECTF_NOPARENT) {
+			ctfdump_fatal("type %lu missing name: %s\n", type,
+			    ctf_errmsg(ctf_errno(g_fp)));
+		}
+
+		(void) snprintf(name, sizeof (name), "unknown_t %s", member);
+	}
+
+	/*
+	 * A byte offset is friendlier, but we'll print bits too if it's not
+	 * aligned (i.e. a bitfield).
+	 */
+	if (off % NBBY != 0) {
+		(void) printf("\t%s; /* offset: %lu bytes (%lu bits) */\n",
+		    name, off / NBBY, off);
+	} else {
+		(void) printf("\t%s; /* offset: %lu bytes */\n",
+		    name, off / NBBY);
+	}
+	return (0);
+}
+
+static int
+ctfsrc_enum_cb(const char *name, int value, void *arg)
+{
+	_NOTE(ARGUNUSED(arg));
+	(void) printf("\t%s = %d,\n", name, value);
+	return (0);
+}
+
+static int
+is_anon_refname(const char *refname)
+{
+	return ((strcmp(refname, "struct ") == 0 ||
+	    strcmp(refname, "union ") == 0 ||
+	    strcmp(refname, "enum ") == 0));
+}
+
+static int
+ctfsrc_collect_types_cb(ctf_id_t id, boolean_t root, void *arg)
+{
+	_NOTE(ARGUNUSED(root, arg));
+	(void) ctf_type_name(g_fp, id, idnames[id].ci_name,
+	    sizeof (idnames[id].ci_name));
+	idnames[id].ci_id = id;
+	return (0);
+}
+
+static void
+ctfsrc_type(ctf_id_t id, const char *name)
+{
+	char refname[MAX_NAMELEN];
+	ctf_id_t ref;
+	ssize_t size;
+	int kind;
+
+	if ((kind = ctf_type_kind(g_fp, id)) == CTF_ERR) {
+		ctfdump_fatal("encountered malformed ctf, type %s does not "
+		    "have a kind: %s\n", name, ctf_errmsg(ctf_errno(g_fp)));
+	}
+
+	switch (kind) {
+	case CTF_K_STRUCT:
+	case CTF_K_UNION:
+		/*
+		 * Delay printing anonymous SOUs; a later typedef will usually
+		 * pick them up.
+		 */
+		if (is_anon_refname(name))
+			break;
+
+		if ((size = ctf_type_size(g_fp, id)) == CTF_ERR) {
+			ctfdump_fatal("failed to get size of %s: %s\n", name,
+			    ctf_errmsg(ctf_errno(g_fp)));
+		}
+
+		(void) printf("%s { /* 0x%x bytes */\n", name, size);
+
+		if (ctf_member_iter(g_fp, id, ctfsrc_member_cb, NULL) != 0) {
+			ctfdump_fatal("failed to iterate members of %s: %s\n",
+			    name, ctf_errmsg(ctf_errno(g_fp)));
+		}
+
+		(void) printf("};\n\n");
+		break;
+	case CTF_K_ENUM:
+		/*
+		 * This will throw away any anon enum that isn't followed by a
+		 * typedef...
+		 */
+		if (is_anon_refname(name))
+			break;
+
+		(void) printf("%s {\n", name);
+
+		if (ctf_enum_iter(g_fp, id, ctfsrc_enum_cb, NULL) != 0) {
+			ctfdump_fatal("failed to iterate enumerators of %s: "
+			    "%s\n", name, ctf_errmsg(ctf_errno(g_fp)));
+		}
+
+		(void) printf("};\n\n");
+		break;
+	case CTF_K_TYPEDEF:
+		ctfsrc_refname(id, refname, sizeof (refname));
+
+		if (!is_anon_refname(refname)) {
+			(void) ctf_type_cname(g_fp,
+			    ctf_type_reference(g_fp, id), refname,
+			    sizeof (refname), name);
+
+			(void) printf("typedef %s;\n\n", refname);
+			break;
+		}
+
+		ref = ctf_type_reference(g_fp, id);
+
+		if (ctf_type_kind(g_fp, ref) == CTF_K_ENUM) {
+			(void) printf("typedef enum {\n");
+
+			if (ctf_enum_iter(g_fp, ref,
+			    ctfsrc_enum_cb, NULL) != 0) {
+				ctfdump_fatal("failed to iterate enumerators "
+				    "of %s: %s\n", refname,
+				    ctf_errmsg(ctf_errno(g_fp)));
+			}
+
+			(void) printf("} %s;\n\n", name);
+		} else {
+			if ((size = ctf_type_size(g_fp, ref)) == CTF_ERR) {
+				ctfdump_fatal("failed to get size of %s: %s\n",
+				    refname, ctf_errmsg(ctf_errno(g_fp)));
+			}
+
+			(void) printf("typedef %s{ /* 0x%x bytes */\n",
+			    refname, size);
+
+			if (ctf_member_iter(g_fp, ref,
+			    ctfsrc_member_cb, NULL) != 0) {
+				ctfdump_fatal("failed to iterate members "
+				    "of %s: %s\n", refname,
+				    ctf_errmsg(ctf_errno(g_fp)));
+			}
+
+			(void) printf("} %s;\n\n", name);
+		}
+
+		break;
+	case CTF_K_FORWARD:
+		(void) printf("%s;\n\n", name);
+		break;
+	case CTF_K_UNKNOWN:
+	case CTF_K_INTEGER:
+	case CTF_K_FLOAT:
+	case CTF_K_POINTER:
+	case CTF_K_ARRAY:
+	case CTF_K_FUNCTION:
+	case CTF_K_VOLATILE:
+	case CTF_K_CONST:
+	case CTF_K_RESTRICT:
+		break;
+	default:
+		ctfdump_fatal("encountered unknown kind for type %s: %d\n",
+		    name, kind);
+		break;
+	}
+}
+
+static int
+ctfsrc_collect_objects_cb(const char *name, ctf_id_t id,
+    ulong_t symidx, void *arg)
+{
+	size_t *count = arg;
+
+	/* local static vars can have an unknown ID */
+	if (id == 0)
+		return (0);
+
+	(void) strlcpy(idnames[*count].ci_name, name,
+	    sizeof (idnames[*count].ci_name));
+	idnames[*count].ci_id = id;
+	idnames[*count].ci_symidx = symidx;
+	*count = *count + 1;
+	return (0);
+}
+
+static void
+ctfsrc_object(ctf_id_t id, const char *name)
+{
+	char tname[MAX_NAMELEN];
+
+	if (ctf_type_cname(g_fp, id, tname, sizeof (tname), name) == NULL) {
+		if (ctf_errno(g_fp) != ECTF_NOPARENT) {
+			ctfdump_fatal("type %ld missing name: %s\n", id,
+			    ctf_errmsg(ctf_errno(g_fp)));
+		}
+		(void) snprintf(tname, sizeof (tname), "unknown_t %s", name);
+	}
+
+	(void) printf("extern %s;\n", tname);
+}
+
+static int
+ctfsrc_collect_functions_cb(const char *name, ulong_t symidx,
+    ctf_funcinfo_t *ctc, void *arg)
+{
+	size_t *count = arg;
+
+	(void) strlcpy(idnames[*count].ci_name, name,
+	    sizeof (idnames[*count].ci_name));
+	bcopy(ctc, &idnames[*count].ci_funcinfo, sizeof (*ctc));
+	idnames[*count].ci_id = 0;
+	idnames[*count].ci_symidx = symidx;
+	*count = *count + 1;
+	return (0);
+}
+
+static void
+ctfsrc_function(ctf_idname_t *idn)
+{
+	ctf_funcinfo_t *cfi = &idn->ci_funcinfo;
+	char name[MAX_NAMELEN] = "unknown_t";
+
+	(void) ctf_type_name(g_fp, cfi->ctc_return, name, sizeof (name));
+
+	(void) printf("extern %s %s(", name, idn->ci_name);
+
+	if (cfi->ctc_argc != 0) {
+		ctfdump_fargs_grow(cfi->ctc_argc);
+		if (ctf_func_args(g_fp, idn->ci_symidx,
+		    g_nfargc, g_fargc) == CTF_ERR) {
+			ctfdump_fatal("failed to get arguments for function "
+			    "%s: %s\n", idn->ci_name,
+			    ctf_errmsg(ctf_errno(g_fp)));
+		}
+
+		for (size_t i = 0; i < cfi->ctc_argc; i++) {
+			ctf_id_t aid = g_fargc[i];
+
+			name[0] = '\0';
+
+			(void) ctf_type_name(g_fp, aid, name, sizeof (name));
+
+			(void) printf("%s%s", name,
+			    i + 1 == cfi->ctc_argc ? "" : ", ");
+		}
+	} else {
+		if (!(cfi->ctc_flags & CTF_FUNC_VARARG))
+			(void) printf("void");
+	}
+
+	if (cfi->ctc_flags & CTF_FUNC_VARARG)
+		(void) printf("%s...", cfi->ctc_argc == 0 ? "" : ", ");
+
+	(void) printf(");\n");
+}
+
+static int
+idname_compare(const void *lhs, const void *rhs)
+{
+	return (strcmp(((ctf_idname_t *)lhs)->ci_name,
+	    ((ctf_idname_t *)rhs)->ci_name));
+}
+
+static void
+ctfdump_source(void)
+{
+	ulong_t nr_syms = ctf_nr_syms(g_fp);
+	ctf_id_t max_id = ctf_max_id(g_fp);
+	size_t count = 0;
+
+	(void) printf("/* Types */\n\n");
+
+	if ((idnames = calloc(max_id + 1, sizeof (idnames[0]))) == NULL) {
+		ctfdump_fatal("failed to alloc idnames: %s\n",
+		    strerror(errno));
+	}
+
+	if (ctf_type_iter(g_fp, B_FALSE, ctfsrc_collect_types_cb,
+	    idnames) == CTF_ERR) {
+		ctfdump_warn("failed to collect types: %s\n",
+		    ctf_errmsg(ctf_errno(g_fp)));
+		g_exit = 1;
+	}
+
+	qsort(idnames, max_id, sizeof (ctf_idname_t), idname_compare);
+
+	for (size_t i = 0; i < max_id; i++) {
+		if (idnames[i].ci_id != 0)
+			ctfsrc_type(idnames[i].ci_id, idnames[i].ci_name);
+	}
+
+	free(idnames);
+
+	(void) printf("\n\n/* Data Objects */\n\n");
+
+	if ((idnames = calloc(nr_syms, sizeof (idnames[0]))) == NULL) {
+		ctfdump_fatal("failed to alloc idnames: %s\n",
+		    strerror(errno));
+	}
+
+	if (ctf_object_iter(g_fp, ctfsrc_collect_objects_cb,
+	    &count) == CTF_ERR) {
+		ctfdump_warn("failed to collect objects: %s\n",
+		    ctf_errmsg(ctf_errno(g_fp)));
+		g_exit = 1;
+	}
+
+	qsort(idnames, count, sizeof (ctf_idname_t), idname_compare);
+
+	for (size_t i = 0; i < count; i++)
+		ctfsrc_object(idnames[i].ci_id, idnames[i].ci_name);
+
+	free(idnames);
+
+	(void) printf("\n\n/* Functions */\n\n");
+
+	if ((idnames = calloc(nr_syms, sizeof (idnames[0]))) == NULL) {
+		ctfdump_fatal("failed to alloc idnames: %s\n",
+		    strerror(errno));
+	}
+
+	count = 0;
+
+	if (ctf_function_iter(g_fp, ctfsrc_collect_functions_cb,
+	    &count) == CTF_ERR) {
+		ctfdump_warn("failed to collect functions: %s\n",
+		    ctf_errmsg(ctf_errno(g_fp)));
+		g_exit = 1;
+	}
+
+	qsort(idnames, count, sizeof (ctf_idname_t), idname_compare);
+
+	for (size_t i = 0; i < count; i++)
+		ctfsrc_function(&idnames[i]);
+
+	free(idnames);
 }
 
 static void
@@ -689,7 +1076,7 @@ ctfdump_output(const char *out)
 		else if (ret == -1)
 			ctfdump_fatal("failed to write to %s: %s\n", out,
 			    strerror(errno));
-		data += ret;
+		data = ((char *)data) + ret;
 		len -= ret;
 	}
 
@@ -709,8 +1096,11 @@ main(int argc, char *argv[])
 	const char *ufile = NULL, *parent = NULL;
 
 	g_progname = basename(argv[0]);
-	while ((c = getopt(argc, argv, ":dfhlp:sStu:")) != -1) {
+	while ((c = getopt(argc, argv, ":cdfhlp:sStu:")) != -1) {
 		switch (c) {
+		case 'c':
+			g_dump |= CTFDUMP_SOURCE;
+			break;
 		case 'd':
 			g_dump |= CTFDUMP_OBJECTS;
 			break;
@@ -752,8 +1142,13 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
+	if ((g_dump & CTFDUMP_SOURCE) && !!(g_dump & ~CTFDUMP_SOURCE)) {
+		ctfdump_usage("-c must be specified on its own\n");
+		return (2);
+	}
+
 	/*
-	 * Dump all information by default.
+	 * Dump all information except C source by default.
 	 */
 	if (g_dump == 0)
 		g_dump = CTFDUMP_DEFAULT;
@@ -781,6 +1176,11 @@ main(int argc, char *argv[])
 		if (ctf_import(g_fp, pfp) != 0)
 			ctfdump_fatal("failed to import parent %s: %s\n",
 			    parent, ctf_errmsg(ctf_errno(g_fp)));
+	}
+
+	if (g_dump & CTFDUMP_SOURCE) {
+		ctfdump_source();
+		return (0);
 	}
 
 	/*
