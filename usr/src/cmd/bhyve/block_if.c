@@ -28,6 +28,10 @@
  * $FreeBSD$
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -276,8 +280,8 @@ blockif_proc(struct blockif_ctxt *bc, struct blockif_elem *be, uint8_t *buf)
 #ifndef __FreeBSD__
 	case BOP_WRITE_SYNC:
 		sync = B_TRUE;
-		/* FALLTHROUGH */
 #endif
+		/* FALLTHROUGH */
 	case BOP_WRITE:
 		if (bc->bc_rdonly) {
 			err = EROFS;

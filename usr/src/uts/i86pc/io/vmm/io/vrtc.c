@@ -283,25 +283,33 @@ rtc_to_secs(struct vrtc *vrtc)
 	struct clocktime ct;
 	struct timespec ts;
 	struct rtcdev *rtc;
+#ifdef __FreeBSD__
 	struct vm *vm;
+#endif
 	int century, error, hour, pm, year;
 
 	KASSERT(VRTC_LOCKED(vrtc), ("%s: vrtc not locked", __func__));
 
+#ifdef __FreeBSD__
 	vm = vrtc->vm;
+#endif
 	rtc = &vrtc->rtcdev;
 
 	bzero(&ct, sizeof(struct clocktime));
 
 	error = rtcget(rtc, rtc->sec, &ct.sec);
 	if (error || ct.sec < 0 || ct.sec > 59) {
+#ifdef __FreeBSD__
 		VM_CTR2(vm, "Invalid RTC sec %#x/%d", rtc->sec, ct.sec);
+#endif
 		goto fail;
 	}
 
 	error = rtcget(rtc, rtc->min, &ct.min);
 	if (error || ct.min < 0 || ct.min > 59) {
+#ifdef __FreeBSD__
 		VM_CTR2(vm, "Invalid RTC min %#x/%d", rtc->min, ct.min);
+#endif
 		goto fail;
 	}
 
@@ -331,14 +339,18 @@ rtc_to_secs(struct vrtc *vrtc)
 			if (pm)
 				ct.hour += 12;
 		} else {
+#ifdef __FreeBSD__
 			VM_CTR2(vm, "Invalid RTC 12-hour format %#x/%d",
 			    rtc->hour, ct.hour);
+#endif
 			goto fail;
 		}
 	}
 
 	if (error || ct.hour < 0 || ct.hour > 23) {
+#ifdef __FreeBSD__
 		VM_CTR2(vm, "Invalid RTC hour %#x/%d", rtc->hour, ct.hour);
+#endif
 		goto fail;
 	}
 
@@ -352,37 +364,47 @@ rtc_to_secs(struct vrtc *vrtc)
 
 	error = rtcget(rtc, rtc->day_of_month, &ct.day);
 	if (error || ct.day < 1 || ct.day > 31) {
+#ifdef __FreeBSD__
 		VM_CTR2(vm, "Invalid RTC mday %#x/%d", rtc->day_of_month,
 		    ct.day);
+#endif
 		goto fail;
 	}
 
 	error = rtcget(rtc, rtc->month, &ct.mon);
 	if (error || ct.mon < 1 || ct.mon > 12) {
+#ifdef __FreeBSD__
 		VM_CTR2(vm, "Invalid RTC month %#x/%d", rtc->month, ct.mon);
+#endif
 		goto fail;
 	}
 
 	error = rtcget(rtc, rtc->year, &year);
 	if (error || year < 0 || year > 99) {
+#ifdef __FreeBSD__
 		VM_CTR2(vm, "Invalid RTC year %#x/%d", rtc->year, year);
+#endif
 		goto fail;
 	}
 
 	error = rtcget(rtc, rtc->century, &century);
 	ct.year = century * 100 + year;
 	if (error || ct.year < POSIX_BASE_YEAR) {
+#ifdef __FreeBSD__
 		VM_CTR2(vm, "Invalid RTC century %#x/%d", rtc->century,
 		    ct.year);
+#endif
 		goto fail;
 	}
 
 	error = clock_ct_to_ts(&ct, &ts);
 	if (error || ts.tv_sec < 0) {
+#ifdef __FreeBSD__
 		VM_CTR3(vm, "Invalid RTC clocktime.date %04d-%02d-%02d",
 		    ct.year, ct.mon, ct.day);
 		VM_CTR3(vm, "Invalid RTC clocktime.time %02d:%02d:%02d",
 		    ct.hour, ct.min, ct.sec);
+#endif
 		goto fail;
 	}
 	return (ts.tv_sec);		/* success */
@@ -391,7 +413,9 @@ fail:
 	 * Stop updating the RTC if the date/time fields programmed by
 	 * the guest are invalid.
 	 */
+#ifdef __FreeBSD__
 	VM_CTR0(vrtc->vm, "Invalid RTC date/time programming detected");
+#endif
 	return (VRTC_BROKEN_TIME);
 }
 
@@ -399,7 +423,9 @@ static int
 vrtc_time_update(struct vrtc *vrtc, time_t newtime, sbintime_t newbase)
 {
 	struct rtcdev *rtc;
+#ifdef __FreeBSD__
 	sbintime_t oldbase;
+#endif
 	time_t oldtime;
 	uint8_t alarm_sec, alarm_min, alarm_hour;
 
@@ -414,9 +440,11 @@ vrtc_time_update(struct vrtc *vrtc, time_t newtime, sbintime_t newbase)
 	VM_CTR2(vrtc->vm, "Updating RTC secs from %#lx to %#lx",
 	    oldtime, newtime);
 
+#ifdef __FreeBSD__
 	oldbase = vrtc->base_uptime;
 	VM_CTR2(vrtc->vm, "Updating RTC base uptime from %#lx to %#lx",
 	    oldbase, newbase);
+#endif
 	vrtc->base_uptime = newbase;
 
 	if (newtime == oldtime)

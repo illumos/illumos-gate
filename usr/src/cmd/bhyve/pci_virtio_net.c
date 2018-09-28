@@ -38,7 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2013 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -975,7 +975,9 @@ pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	const char *env_msi;
 	char *devname;
 	char *vtopts;
+#ifdef __FreeBSD__
 	int mac_provided;
+#endif
 	int use_msix;
 
 	sc = calloc(1, sizeof(struct pci_vtnet_softc));
@@ -1007,8 +1009,8 @@ pci_vtnet_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	 * Attempt to open the tap device and read the MAC address
 	 * if specified
 	 */
-	mac_provided = 0;
 #ifdef	__FreeBSD__
+	mac_provided = 0;
 	sc->vsc_tapfd = -1;
 #endif
 	sc->vsc_nmd = NULL;

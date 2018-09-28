@@ -38,6 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -222,8 +223,8 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id,
 			/* XXXJOY: Wire up with our own TSC logic */
 			if (tsc_is_invariant && smp_tsc)
 				regs[3] |= AMDPM_TSC_INVARIANT;
-			break;
 #endif /* __FreeBSD__ */
+			break;
 
 		case CPUID_0000_0001:
 			do_cpuid(1, regs);

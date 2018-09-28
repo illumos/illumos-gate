@@ -1175,9 +1175,13 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 static int
 vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
 {
+#ifdef __FreeBSD__
 	int handled, func;
 	
 	func = vmxctx->guest_rax;
+#else
+	int handled;
+#endif
 
 	handled = x86_emulate_cpuid(vm, vcpu,
 				    (uint32_t*)(&vmxctx->guest_rax),

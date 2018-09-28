@@ -28,6 +28,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -590,14 +594,22 @@ pci_vtcon_notify_tx(void *vsc, struct vqueue_info *vq)
 	struct pci_vtcon_softc *sc;
 	struct pci_vtcon_port *port;
 	struct iovec iov[1];
+#ifdef __FreeBSD__
 	uint16_t idx, n;
+#else
+	uint16_t idx;
+#endif
 	uint16_t flags[8];
 
 	sc = vsc;
 	port = pci_vtcon_vq_to_port(sc, vq);
 
 	while (vq_has_descs(vq)) {
+#ifdef __FreeBSD__
 		n = vq_getchain(vq, &idx, iov, 1, flags);
+#else
+		vq_getchain(vq, &idx, iov, 1, flags);
+#endif
 		if (port != NULL)
 			port->vsp_cb(port, port->vsp_arg, iov, 1);
 

@@ -694,7 +694,6 @@ eptable_mapout(eptable_map_t *map, uintptr_t va)
 		mutex_exit(&map->em_lock);
 		return;
 	} else {
-		pfn_t oldpfn;
 		const size_t pagesize = LEVEL_SIZE((uint_t)ept->ept_level);
 
 		if (!EPT_MAPS_PAGE(ept->ept_level, entry)) {
@@ -706,7 +705,6 @@ eptable_mapout(eptable_map_t *map, uintptr_t va)
 		 * XXXJOY: Just clean the entry for now. Assume(!) that
 		 * invalidation is going to occur anyways.
 		 */
-		oldpfn = EPT_PTE_PFN(ptes[idx]);
 		ept->ept_valid_cnt--;
 		ptes[idx] = (x86pte_t)0;
 		map->em_wired -= (pagesize >> PAGESHIFT);

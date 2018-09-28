@@ -996,7 +996,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		 * If they want a ulong_t or less, make sure they receive the
 		 * low bits with all the useful information.
 		 */
-		if (size <= tempset.cpub[0]) {
+		if (size <= sizeof (tempset.cpub[0])) {
 			srcp = &tempset.cpub[0];
 		}
 
@@ -1012,7 +1012,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 
 		ASSERT(size > 0 && size <= sizeof (tempset));
 		if (error == 0 &&
-		    ddi_copyout(&tempset, vm_cpuset.cpus, size, md)) {
+		    ddi_copyout(srcp, vm_cpuset.cpus, size, md)) {
 			error = EFAULT;
 			break;
 		}

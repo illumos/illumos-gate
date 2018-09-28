@@ -39,7 +39,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -99,6 +99,7 @@ enum {
 #define	VIE_OP_F_NO_MODRM	(1 << 3)
 #define	VIE_OP_F_NO_GLA_VERIFICATION (1 << 4)
 
+#ifdef _KERNEL
 static const struct vie_op two_byte_opcodes[256] = {
 	[0xB6] = {
 		.op_byte = 0xB6,
@@ -230,6 +231,7 @@ static const struct vie_op one_byte_opcodes[256] = {
 		.op_type = VIE_OP_TYPE_PUSH,
 	}
 };
+#endif
 
 /* struct vie.mod */
 #define	VIE_MOD_INDIRECT		0

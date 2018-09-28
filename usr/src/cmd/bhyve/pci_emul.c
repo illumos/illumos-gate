@@ -38,7 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -652,7 +652,11 @@ pci_emul_alloc_pbar(struct pci_devinst *pdi, int idx, uint64_t hostbase,
 		break;
 	default:
 		printf("pci_emul_alloc_base: invalid bar type %d\n", type);
+#ifdef FreeBSD
 		assert(0);
+#else
+		abort();
+#endif
 	}
 
 	if (baseptr != NULL) {

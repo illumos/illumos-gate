@@ -1015,7 +1015,11 @@ vm_iommu_modify(struct vm *vm, boolean_t map)
 	int i, sz;
 	vm_paddr_t gpa, hpa;
 	struct mem_map *mm;
+#ifdef __FreeBSD__
 	void *vp, *cookie, *host_domain;
+#else
+	void *vp, *cookie, *host_domain __unused;
+#endif
 
 	sz = PAGE_SIZE;
 	host_domain = iommu_host_domain();
@@ -1531,7 +1535,11 @@ static int
 vm_handle_hlt(struct vm *vm, int vcpuid, bool intr_disabled, bool *retu)
 {
 	struct vcpu *vcpu;
+#ifdef __FreeBSD__
 	const char *wmesg;
+#else
+	const char *wmesg __unused;
+#endif
 	int t, vcpu_halted, vm_halted;
 
 	KASSERT(!CPU_ISSET(vcpuid, &vm->halted_cpus), ("vcpu already halted"));
@@ -1743,10 +1751,15 @@ vm_handle_inst_emul(struct vm *vm, int vcpuid, bool *retu)
 static int
 vm_handle_suspend(struct vm *vm, int vcpuid, bool *retu)
 {
+#ifdef __FreeBSD__
 	int i, done;
 	struct vcpu *vcpu;
 
 	done = 0;
+#else
+	int i;
+	struct vcpu *vcpu;
+#endif
 	vcpu = &vm->vcpu[vcpuid];
 
 	CPU_SET_ATOMIC(vcpuid, &vm->suspended_cpus);
