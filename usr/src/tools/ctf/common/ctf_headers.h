@@ -22,6 +22,7 @@
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _CTF_HEADERS_H
@@ -32,7 +33,7 @@
  * the tools need to include the headers installed on the build system,
  * rather than those in the ON source tree. However, some of the headers
  * required by the tools are part of the ON source tree, but not delivered
- * as part of Solaris.  These include the following:
+ * as part of illumos.  These include the following:
  *
  * $(SRC)/lib/libctf/common/libctf.h
  * $(SRC)/lib/libctf/common/libctf_impl.h
@@ -62,12 +63,22 @@
  *    This last -I include is needed in order to prevent a build failure
  *    when <sys/ctf_api.h> is included via a nested #include rather than
  *    an explicit path #include.
+ *
+ * We'll also include the local ccompile.h - older build systems often lack
+ * useful definitions like __unused.  Finally, we'll also define ARRAY_SIZE:
+ * unfortunately, older systems sysmacros.h only have this defined for the
+ * kernel, and we can't easily pick it up otherwise.
  */
 
+#include <uts/common/sys/ccompile.h>
 #include <uts/common/sys/ctf.h>
 #include <uts/common/sys/ctf_api.h>
 #include <common/ctf/ctf_impl.h>
 #include <lib/libctf/common/libctf.h>
 #include <lib/libctf/common/libctf_impl.h>
+
+#if !defined(ARRAY_SIZE)
+#define	ARRAY_SIZE(x)	(sizeof (x) / sizeof (x[0]))
+#endif
 
 #endif /* _CTF_HEADERS_H */

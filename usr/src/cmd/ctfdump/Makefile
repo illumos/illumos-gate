@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2015, Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG= ctfdump
@@ -19,6 +19,9 @@ include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
 LDLIBS += -lctf
+
+CSTD = $(CSTD_GNU99)
+C99LMODE = -Xc99=%all
 
 .KEEP_STATE:
 

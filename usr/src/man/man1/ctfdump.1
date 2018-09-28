@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright (c) 2015, Joyent, Inc.
+.\" Copyright 2018, Joyent, Inc.
 .\"
-.Dd Oct 4, 2014
+.Dd Oct 2, 2018
 .Dt CTFDUMP 1
 .Os
 .Sh NAME
@@ -19,7 +19,7 @@
 .Nd dump parts of ctf data from files
 .Sh SYNOPSIS
 .Nm ctfdump
-.Op Fl dfhlsSt
+.Op Fl cdfhlsSt
 .Op Fl p Ar parent
 .Op Fl u Ar outfile
 .Ar file
@@ -69,9 +69,15 @@ data can be inspected using
 and other tools such as
 .Xr mdb 1 .
 .Lp
+.Nm
+in
+.Fl c
+mode will generate C-style output, which can be used for comparison.
+Note that this output is not directly compilable.
+.Lp
 When no options are specified,
 .Nm
-displays all information.
+displays all information, except the C-style output.
 However, when the
 .Fl u
 option is used, then no information is displayed by default, unless
@@ -79,6 +85,10 @@ requested through the appropriate option.
 .Sh OPTIONS
 The following options are supported:
 .Bl -hang -width Ds
+.It Fl c
+.Bd -filled -compact
+Generate C-style output.
+.Ed
 .It Fl d
 .Bd -filled -compact
 Dump the types of symbols that correspond to objects.
@@ -406,6 +416,22 @@ $ mdb ./ctf.out
     cth_stroff = 0x12964
     cth_strlen = 0x7c9c
 }
+.Ed
+.Lp
+.Sy Example 3
+Dumping C-style output
+.Bd -literal -offset 6n
+$ ctfdump -c ./genunix | more
+/* Types */
+
+typedef Elf64_Addr Addr;
+
+typedef unsigned char Bool;
+
+typedef struct CK_AES_CCM_PARAMS CK_AES_CCM_PARAMS;
+
+typedef struct CK_AES_GCM_PARAMS CK_AES_GCM_PARAMS;
+\&...
 .Ed
 .Sh INTERFACE STABILITY
 The command syntax is
