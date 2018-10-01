@@ -67,6 +67,7 @@ cryptotest_init(cryptotest_t *arg, crypto_func_group_t fg)
 	op->mechname = arg->mechname;
 
 	op->hsession = CK_INVALID_HANDLE;
+	op->keyt = CK_INVALID_HANDLE;
 	op->fg = fg;
 
 	if (op->out == NULL)
@@ -88,7 +89,9 @@ cryptotest_close_session(CK_SESSION_HANDLE hsession)
 int
 cryptotest_close(crypto_op_t *op)
 {
-	(void) C_DestroyObject(op->hsession, op->keyt);
+	if (op->keyt != CK_INVALID_HANDLE)
+		(void) C_DestroyObject(op->hsession, op->keyt);
+
 	if (op->hsession != CK_INVALID_HANDLE)
 		(void) cryptotest_close_session(op->hsession);
 	free(op);
