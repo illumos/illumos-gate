@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/processor.h>
 #include <sys/pset.h>
@@ -287,6 +291,21 @@ main(int argc, char *argv[])
 
 	cpc_setgrp_reset(opts->master);
 	(void) setvbuf(stdout, NULL, _IOLBF, 0);
+
+	/*
+	 * By design, cpustat (regrettably) has multiple threads racing in
+	 * write(2) to generate output.  As there are no guarantees made with
+	 * respect to the atomicity of concurrent writes on non-O_APPEND file
+	 * descriptors, we must set O_APPEND on stdout to assure that no output
+	 * is lost.  If cpustat is rearchitected such that only one thread is
+	 * generating output (which would also assure that the output is always
+	 * in a consistent order), this code should be removed.
+	 */
+	if (fcntl(1, F_SETFL, fcntl(1, F_GETFL) | O_APPEND) == -1) {
+		(void) fprintf(stderr, gettext("%s: cannot set output to be "
+		    "append-only - %s\n"), opts->pgmname, strerror(errno));
+		return (1);
+	}
 
 	/*
 	 * If no system-mode only sets were created, no soaker threads will be
