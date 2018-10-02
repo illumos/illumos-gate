@@ -103,7 +103,7 @@ extern "C" {
 #define	B_STORE_ARGS		137
 #define	B_GETPID		138
 #define	B_JUMP_TO_LINUX		139
-/* formerly B_SET_THUNK_PID	140 */
+#define	B_ALL_SIGS_BLOCKED	140
 #define	B_EXIT_AS_SIG		141
 /* formerly B_HELPER_WAITID	142 */
 #define	B_HELPER_CLONE		143

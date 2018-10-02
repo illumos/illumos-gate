@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2017, Joyent, Inc. All rights reserved.
+ * Copyright 2018, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -1889,6 +1889,16 @@ lx_brandsys(int cmd, int64_t *rval, uintptr_t arg1, uintptr_t arg2,
 			pd->l_block_all_signals--;
 			result = 0;
 		}
+		mutex_exit(&p->p_lock);
+		return (result);
+	}
+
+	case B_ALL_SIGS_BLOCKED: {
+		uint_t result;
+
+		mutex_enter(&p->p_lock);
+		pd = ptolxproc(p);
+		result = pd->l_block_all_signals;
 		mutex_exit(&p->p_lock);
 		return (result);
 	}
