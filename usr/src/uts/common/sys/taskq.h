@@ -83,6 +83,7 @@ extern taskqid_t taskq_dispatch(taskq_t *, task_func_t, void *, uint_t);
 extern void	nulltask(void *);
 extern void	taskq_destroy(taskq_t *);
 extern void	taskq_wait(taskq_t *);
+void	taskq_wait_id(taskq_t *, taskqid_t);
 extern boolean_t taskq_empty(taskq_t *);
 extern void	taskq_suspend(taskq_t *);
 extern int	taskq_suspended(taskq_t *);
