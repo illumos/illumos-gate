@@ -522,7 +522,7 @@ optim_disable(struct aelist *h, int level)
 
 /* ARGSUSED */
 static void
-Xamode(struct aelist __unused *h)
+Xamode(struct aelist *h __attribute__((__unused__)))
 {
 }
 
