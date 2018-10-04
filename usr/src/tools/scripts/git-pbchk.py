@@ -198,20 +198,21 @@ def gen_files(root, parent, paths, exclude):
         if not select:
             select = lambda x: True
 
-        for f in git_file_list(parent, paths):
-            f = relpath(f, '.')
+        for abspath in git_file_list(parent, paths):
+            path = relpath(abspath, '.')
             try:
-                res = git("diff %s HEAD %s" % (parent, f))
+                res = git("diff %s HEAD %s" % (parent, path))
             except GitError, e:
-                # This ignores all the errors that can be thrown. Usually, this means
-                # that git returned non-zero because the file doesn't exist, but it
-                # could also fail if git can't create a new file or it can't be
-                # executed.  Such errors are 1) unlikely, and 2) will be caught by other
-                # invocations of git().
+                # This ignores all the errors that can be thrown. Usually, this
+                # means that git returned non-zero because the file doesn't
+                # exist, but it could also fail if git can't create a new file
+                # or it can't be executed.  Such errors are 1) unlikely, and 2)
+                # will be caught by other invocations of git().
                 continue
             empty = not res.readline()
-            if (os.path.isfile(f) and not empty and select(f) and not exclude(f)):
-                yield f
+            if (os.path.isfile(path) and not empty and
+                select(path) and not exclude(abspath)):
+                yield path
     return ret
 
 
