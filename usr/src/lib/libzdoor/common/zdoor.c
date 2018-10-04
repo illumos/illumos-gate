@@ -19,11 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
-
-#pragma ident "%Z%%M% %I% %E% SMI"
 
 #include <alloca.h>
 #include <door.h>
@@ -47,8 +44,8 @@
 
 extern void *
 zonecfg_notify_bind(int(*func)(const char *zonename, zoneid_t zid,
-		    const char *newstate, const char *oldstate,
-		    hrtime_t when, void *p), void *p);
+    const char *newstate, const char *oldstate, hrtime_t when,
+    void *p), void *p);
 
 extern void
 zonecfg_notify_unbind(void *handle);
@@ -69,7 +66,7 @@ zonecfg_notify_unbind(void *handle);
  */
 static void
 _callback(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
-	uint_t n_desc)
+    uint_t n_desc)
 {
 	zdoor_result_t *result = NULL;
 	void *door_response = NULL;
@@ -97,7 +94,7 @@ _callback(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 		if (door_response != NULL) {
 			size = result->zdr_size;
 			(void) memcpy(door_response,
-				(void *) result->zdr_data, size);
+			    (void *) result->zdr_data, size);
 		}
 	}
 
@@ -145,7 +142,6 @@ zdoor_create(dtree_entry_t *entry)
 {
 	int status = ZDOOR_OK;
 	zoneid_t zid = -1;
-	zdoor_handle_t handle = NULL;
 
 	if (entry == NULL) {
 		zdoor_debug("zdoor_create: NULL arguments");
@@ -154,8 +150,6 @@ zdoor_create(dtree_entry_t *entry)
 
 	zdoor_debug("zdoor_create: entry=%p, zone=%s, service=%s",
 	    entry, entry->dte_parent->zte_zonename, entry->dte_service);
-
-	handle = entry->dte_parent->zte_parent;
 
 	zid = getzoneidbyname(entry->dte_parent->zte_zonename);
 	if (zid < 0) {
@@ -225,7 +219,7 @@ zdoor_visitor(dtree_entry_t *entry)
  */
 static int
 zone_monitor(const char *zonename, zoneid_t zid, const char *newstate,
-	const char *oldstate, hrtime_t when, void *p)
+    const char *oldstate, hrtime_t when, void *p)
 {
 	zdoor_handle_t handle = (zdoor_handle_t)p;
 	ztree_entry_t *entry = NULL;
@@ -310,7 +304,7 @@ zdoor_handle_destroy(zdoor_handle_t handle)
  */
 int
 zdoor_open(zdoor_handle_t handle, const char *zonename, const char *service,
-	void *biscuit, zdoor_callback callback)
+    void *biscuit, zdoor_callback callback)
 {
 	zdoor_cookie_t *zdoor_cookie = NULL;
 	int rc = -1;

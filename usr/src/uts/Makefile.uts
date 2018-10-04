@@ -24,7 +24,7 @@
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
-# Copyright 2015 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
 
@@ -44,7 +44,7 @@ include $(SRC)/Makefile.master
 DTEXTDOM =
 
 #
-# 	Keep references to $(SRC)/common relative.
+#	Keep references to $(SRC)/common relative.
 COMMONBASE=	$(UTSBASE)/../common
 
 #
@@ -184,7 +184,7 @@ LINT_MODULE=	$(MODULE)
 #
 #	Build the compile/assemble lines:
 #
-EXTRA_OPTIONS		= 
+EXTRA_OPTIONS		=
 AS_DEFS			= -D_ASM -D__STDC__=0
 
 ALWAYS_DEFS_32		= -D_KERNEL -D_SYSCALL32 -D_DDI_STRICT
@@ -215,7 +215,6 @@ AS_CPPFLAGS	= $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS) $(AS_DEFS) \
 
 # Override the default, the kernel is squeaky clean
 CERRWARN = -errtags=yes -errwarn=%all
-$(__GNUC4)CERRWARN += -_gcc=-Wno-address
 
 CERRWARN += -_gcc=-Wno-missing-braces
 CERRWARN += -_gcc=-Wno-sign-compare
@@ -326,7 +325,7 @@ CTFMERGE_GUDIR_sparc	= sun4u
 CTFMERGE_GUDIR_i386	= intel
 CTFMERGE_GUDIR		= $(CTFMERGE_GUDIR_$(MACH))
 
-CTFMERGE_GENUNIX 	= \
+CTFMERGE_GENUNIX	= \
 	$(UTSBASE)/$(CTFMERGE_GUDIR)/genunix/$(OBJS_DIR)/genunix
 
 #

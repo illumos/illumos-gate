@@ -28,7 +28,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -225,7 +225,7 @@ typedef struct ctf_dwmap {
 
 typedef struct ctf_dwvar {
 	ctf_list_t	cdv_list;
-	char 		*cdv_name;
+	char		*cdv_name;
 	ctf_id_t	cdv_type;
 	boolean_t	cdv_global;
 } ctf_dwvar_t;
@@ -1445,15 +1445,12 @@ ctf_dwarf_create_array(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 	Dwarf_Die tdie, rdie;
 	ctf_id_t tid;
 	Dwarf_Half rtag;
-	ctf_arinfo_t ar;
 
 	if ((ret = ctf_dwarf_refdie(cdp, die, DW_AT_type, &tdie)) != 0)
 		return (ret);
 	if ((ret = ctf_dwarf_convert_type(cdp, tdie, &tid,
 	    CTF_ADD_NONROOT)) != 0)
 		return (ret);
-
-	ar.ctr_contents = tid;
 
 	if ((ret = ctf_dwarf_child(cdp, die, &rdie)) != 0)
 		return (ret);

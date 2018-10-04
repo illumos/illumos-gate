@@ -9,8 +9,8 @@
  * Author:
  *		Arun Chandrashekhar
  *		Manju R
- *        	Rajesh Prabhakaran
- *        	Seokmann Ju
+ *		Rajesh Prabhakaran
+ *		Seokmann Ju
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -43,6 +43,10 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -80,7 +84,7 @@
  * Local static data
  */
 static void	*drsas_state = NULL;
-static int 	debug_level_g = CL_NONE;
+static int	debug_level_g = CL_NONE;
 
 #pragma weak scsi_hba_open
 #pragma weak scsi_hba_close
@@ -251,7 +255,7 @@ drsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	uint8_t		create_scsi_node_f = 0;
 	uint8_t		create_ioc_node_f = 0;
 	uint8_t		tran_alloc_f = 0;
-	uint8_t 	irq;
+	uint8_t		irq;
 	uint16_t	vendor_id;
 	uint16_t	device_id;
 	uint16_t	subsysvid;
@@ -1067,7 +1071,7 @@ drsas_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 /*ARGSUSED*/
 static int
 drsas_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
-		scsi_hba_tran_t *tran, struct scsi_device *sd)
+    scsi_hba_tran_t *tran, struct scsi_device *sd)
 {
 	struct drsas_instance *instance;
 	uint16_t tgt = sd->sd_address.a_target;
@@ -1171,8 +1175,8 @@ drsas_name_node(dev_info_t *dip, char *name, int len)
 
 static struct scsi_pkt *
 drsas_tran_init_pkt(struct scsi_address *ap, register struct scsi_pkt *pkt,
-	struct buf *bp, int cmdlen, int statuslen, int tgtlen,
-	int flags, int (*callback)(), caddr_t arg)
+    struct buf *bp, int cmdlen, int statuslen, int tgtlen,
+    int flags, int (*callback)(), caddr_t arg)
 {
 	struct scsa_cmd	*acmd;
 	struct drsas_instance	*instance;
@@ -1243,7 +1247,7 @@ drsas_tran_init_pkt(struct scsi_address *ap, register struct scsi_pkt *pkt,
 static int
 drsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 {
-	uchar_t 	cmd_done = 0;
+	uchar_t cmd_done = 0;
 
 	struct drsas_instance	*instance = ADDR2MR(ap);
 	struct drsas_cmd	*cmd;
@@ -1639,7 +1643,7 @@ drsas_isr(struct drsas_instance *instance)
 static struct drsas_cmd *
 get_mfi_pkt(struct drsas_instance *instance)
 {
-	mlist_t 		*head = &instance->cmd_pool_list;
+	mlist_t			*head = &instance->cmd_pool_list;
 	struct drsas_cmd	*cmd = NULL;
 
 	mutex_enter(&instance->cmd_pool_mtx);
@@ -3271,13 +3275,13 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 {
 	uint16_t	flags = 0;
 	uint32_t	i;
-	uint32_t 	context;
+	uint32_t	context __unused;
 	uint32_t	sge_bytes;
 	ddi_acc_handle_t acc_handle;
 	struct drsas_cmd		*cmd;
 	struct drsas_sge64		*mfi_sgl;
 	struct scsa_cmd			*acmd = PKT2CMD(pkt);
-	struct drsas_pthru_frame 	*pthru;
+	struct drsas_pthru_frame	*pthru;
 	struct drsas_io_frame		*ldio;
 
 	/* find out if this is logical or physical drive command.  */
@@ -3326,7 +3330,7 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 
 	/*
 	 * case SCMD_SYNCHRONIZE_CACHE:
-	 * 	flush_cache(instance);
+	 *	flush_cache(instance);
 	 *	return_mfi_pkt(instance, cmd);
 	 *	*cmd_done = 1;
 	 *
@@ -3423,7 +3427,7 @@ build_cmd(struct drsas_instance *instance, struct scsi_address *ap,
 
 			break;
 		}
-		/* fall through For all non-rd/wr cmds */
+		/* fall through */
 	default:
 
 		switch (pkt->pkt_cdbp[0]) {
@@ -4651,7 +4655,7 @@ issue_cmd_in_poll_mode_ppc(struct drsas_instance *instance,
 	ddi_put8(cmd->frame_dma_obj.acc_handle, &frame_hdr->cmd_status,
 	    MFI_CMD_STATUS_POLL_MODE);
 	flags = ddi_get16(cmd->frame_dma_obj.acc_handle, &frame_hdr->flags);
-	flags 	|= MFI_FRAME_DONT_POST_IN_REPLY_QUEUE;
+	flags |= MFI_FRAME_DONT_POST_IN_REPLY_QUEUE;
 
 	ddi_put16(cmd->frame_dma_obj.acc_handle, &frame_hdr->flags, flags);
 
@@ -4699,7 +4703,7 @@ enable_intr_ppc(struct drsas_instance *instance)
 static void
 disable_intr_ppc(struct drsas_instance *instance)
 {
-	uint32_t	mask;
+	uint32_t	mask __unused;
 
 	con_log(CL_ANN1, (CE_NOTE, "disable_intr_ppc: called"));
 
@@ -5452,7 +5456,7 @@ static int
 drsas_mode_sense_build(struct scsi_pkt *pkt)
 {
 	union scsi_cdb		*cdbp;
-	uint16_t 		page_code;
+	uint16_t		page_code;
 	struct scsa_cmd		*acmd;
 	struct buf		*bp;
 	struct mode_header	*modehdrp;
