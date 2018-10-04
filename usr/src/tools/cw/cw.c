@@ -1,3 +1,4 @@
+
 /*
  * CDDL HEADER START
  *
@@ -20,7 +21,7 @@
  */
 
 /*
- * Copyright 2011, Richard Lowe.
+ * Copyright 2018, Richard Lowe.
  */
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -36,7 +37,7 @@
  */
 
 /* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"1.30"
+#define	CW_VERSION	"2.0"
 
 /*
  * -#		Verbose mode
@@ -291,20 +292,21 @@
  * -YS,<dir>			error
  */
 
-#include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
 #include <ctype.h>
-#include <fcntl.h>
+#include <err.h>
 #include <errno.h>
-#include <stdarg.h>
-#include <sys/utsname.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include <sys/param.h>
-#include <sys/isa_defs.h>
-#include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
+#include <sys/wait.h>
 
 #define	CW_F_CXX	0x01
 #define	CW_F_SHADOW	0x02
@@ -312,29 +314,6 @@
 #define	CW_F_ECHO	0x08
 #define	CW_F_XLATE	0x10
 #define	CW_F_PROG	0x20
-
-typedef enum cw_compiler {
-	CW_C_CC = 0,
-	CW_C_GCC
-} cw_compiler_t;
-
-static const char *cmds[] = {
-	"cc", "CC",
-	"gcc", "g++"
-};
-
-static char default_dir[2][MAXPATHLEN] = {
-	DEFAULT_CC_DIR,
-	DEFAULT_GCC_DIR,
-};
-
-#define	CC(ctx) \
-	(((ctx)->i_flags & CW_F_SHADOW) ? \
-	    ((ctx)->i_compiler == CW_C_CC ? CW_C_GCC : CW_C_CC) : \
-	    (ctx)->i_compiler)
-
-#define	CIDX(compiler, flags)	\
-	((int)(compiler) << 1) + ((flags) & CW_F_CXX ? 1 : 0)
 
 typedef enum cw_op {
 	CW_O_NONE = 0,
@@ -351,8 +330,20 @@ struct aelist {
 	int ael_argc;
 };
 
+typedef enum {
+	GNU,
+	SUN
+} compiler_style_t;
+
+typedef struct {
+	char *c_name;
+	char *c_path;
+	compiler_style_t c_style;
+} cw_compiler_t;
+
 typedef struct cw_ictx {
-	cw_compiler_t	i_compiler;
+	struct cw_ictx	*i_next;
+	cw_compiler_t	*i_compiler;
 	struct aelist	*i_ae;
 	uint32_t	i_flags;
 	int		i_oldargc;
@@ -390,7 +381,7 @@ typedef struct xarch_table {
  */
 static const xarch_table_t xtbl[] = {
 #if defined(__x86)
-	{ "generic",	SS11 },
+	{ "generic",	SS11, {NULL} },
 	{ "generic64",	(SS11|M64), { "-m64", "-mtune=opteron" } },
 	{ "amd64",	(SS11|M64), { "-m64", "-mtune=opteron" } },
 	{ "386",	SS11,	{ "-march=i386" } },
@@ -416,8 +407,6 @@ static const xarch_table_t xtbl[] = {
 };
 
 static int xtbl_size = sizeof (xtbl) / sizeof (xarch_table_t);
-
-static const char *progname;
 
 static const char *xchip_tbl[] = {
 #if defined(__x86)
@@ -464,23 +453,7 @@ static const char *xregs_tbl[] = {
 static void
 nomem(void)
 {
-	(void) fprintf(stderr, "%s: error: out of memory\n", progname);
-	exit(1);
-}
-
-static void
-cw_perror(const char *fmt, ...)
-{
-	va_list ap;
-	int saved_errno = errno;
-
-	(void) fprintf(stderr, "%s: error: ", progname);
-
-	va_start(ap, fmt);
-	(void) vfprintf(stderr, fmt, ap);
-	va_end(ap);
-
-	(void) fprintf(stderr, " (%s)\n", strerror(saved_errno));
+	errx(1, "out of memory");
 }
 
 static void
@@ -515,9 +488,7 @@ newictx(void)
 static void
 error(const char *arg)
 {
-	(void) fprintf(stderr,
-	    "%s: error: mapping failed at or near arg '%s'\n", progname, arg);
-	exit(2);
+	errx(2, "error: mapping failed at or near arg '%s'", arg);
 }
 
 /*
@@ -551,7 +522,7 @@ optim_disable(struct aelist *h, int level)
 
 /* ARGSUSED */
 static void
-Xamode(struct aelist *h)
+Xamode(struct aelist __unused *h)
 {
 }
 
@@ -582,9 +553,15 @@ Xsmode(struct aelist *h)
 static void
 usage()
 {
+	extern char *__progname;
 	(void) fprintf(stderr,
-	    "usage: %s { -_cc | -_gcc | -_CC | -_g++ } [ -_compiler | ... ]\n",
-	    progname);
+	    "usage: %s [-C] [--versions] --primary <compiler> "
+	    "[--shadow <compiler>]... -- cflags...\n",
+	    __progname);
+	(void) fprintf(stderr, "compilers take the form: name,path,style\n"
+	    " - name: a unique name usable in flag specifiers\n"
+	    " - path: path to the compiler binary\n"
+	    " - style: the style of flags expected: either sun or gnu\n");
 	exit(2);
 }
 
@@ -643,6 +620,7 @@ do_gcc(cw_ictx_t *ctx)
 	int in_output = 0, seen_o = 0, c_files = 0;
 	cw_op_t op = CW_O_LINK;
 	char *model = NULL;
+	char *nameflag;
 	int	mflag = 0;
 
 	if (ctx->i_flags & CW_F_PROG) {
@@ -679,10 +657,12 @@ do_gcc(cw_ictx_t *ctx)
 	 */
 	newae(ctx->i_ae, "-D__sun");
 
+	if (asprintf(&nameflag, "-_%s=", ctx->i_compiler->c_name) == -1)
+		nomem();
+
 	/*
 	 * Walk the argument list, translating as we go ..
 	 */
-
 	while (--ctx->i_oldargc > 0) {
 		char *arg = *++ctx->i_oldargv;
 		size_t arglen = strlen(arg);
@@ -718,6 +698,10 @@ do_gcc(cw_ictx_t *ctx)
 		}
 
 		if (ctx->i_flags & CW_F_CXX) {
+			if (strncmp(arg, "-_g++=", 6) == 0) {
+				newae(ctx->i_ae, strchr(arg, '=') + 1);
+				continue;
+			}
 			if (strncmp(arg, "-compat=", 8) == 0) {
 				/* discard -compat=4 and -compat=5 */
 				continue;
@@ -772,16 +756,11 @@ do_gcc(cw_ictx_t *ctx)
 
 		switch ((c = arg[1])) {
 		case '_':
-			if (strcmp(arg, "-_noecho") == 0)
-				ctx->i_flags &= ~CW_F_ECHO;
-			else if (strncmp(arg, "-_cc=", 5) == 0 ||
-			    strncmp(arg, "-_CC=", 5) == 0)
-				/* EMPTY */;
-			else if (strncmp(arg, "-_gcc=", 6) == 0 ||
-			    strncmp(arg, "-_g++=", 6) == 0)
-				newae(ctx->i_ae, arg + 6);
-			else
-				error(arg);
+			if ((strncmp(arg, nameflag, strlen(nameflag)) == 0) ||
+			    (strncmp(arg, "-_gcc=", 6) == 0) ||
+			    (strncmp(arg, "-_gnu=", 6) == 0)) {
+				newae(ctx->i_ae, strchr(arg, '=') + 1);
+			}
 			break;
 		case '#':
 			if (arglen == 1) {
@@ -1421,11 +1400,12 @@ do_gcc(cw_ictx_t *ctx)
 		}
 	}
 
+	free(nameflag);
+
 	if (c_files > 1 && (ctx->i_flags & CW_F_SHADOW) &&
 	    op != CW_O_PREPROCESS) {
-		(void) fprintf(stderr, "%s: error: multiple source files are "
-		    "allowed only with -E or -P\n", progname);
-		exit(2);
+		errx(2, "multiple source files are "
+		    "allowed only with -E or -P");
 	}
 
 	/*
@@ -1434,9 +1414,8 @@ do_gcc(cw_ictx_t *ctx)
 	 * used.
 	 */
 	if ((mflag & (SS11|SS12)) == (SS11|SS12)) {
-		(void) fprintf(stderr,
+		errx(2,
 		    "Conflicting \"-xarch=\" flags (both Studio 11 and 12)\n");
-		exit(2);
 	}
 
 	switch (mflag) {
@@ -1491,7 +1470,9 @@ do_gcc(cw_ictx_t *ctx)
 		    "Incompatible -xarch= and/or -m32/-m64 options used.\n");
 		exit(2);
 	}
-	if (op == CW_O_LINK && (ctx->i_flags & CW_F_SHADOW))
+
+	if ((op == CW_O_LINK || op == CW_O_PREPROCESS) &&
+	    (ctx->i_flags & CW_F_SHADOW))
 		exit(0);
 
 	if (model && !pic)
@@ -1509,14 +1490,23 @@ do_cc(cw_ictx_t *ctx)
 {
 	int in_output = 0, seen_o = 0;
 	cw_op_t op = CW_O_LINK;
+	char *nameflag;
 
 	if (ctx->i_flags & CW_F_PROG) {
 		newae(ctx->i_ae, "-V");
 		return;
 	}
 
+	if (asprintf(&nameflag, "-_%s=", ctx->i_compiler->c_name) == -1)
+		nomem();
+
 	while (--ctx->i_oldargc > 0) {
 		char *arg = *++ctx->i_oldargv;
+
+		if (strncmp(arg, "-_CC=", 5) == 0) {
+			newae(ctx->i_ae, strchr(arg, '=') + 1);
+			continue;
+		}
 
 		if (*arg != '-') {
 			if (in_output == 0 || !(ctx->i_flags & CW_F_SHADOW)) {
@@ -1529,19 +1519,13 @@ do_cc(cw_ictx_t *ctx)
 		}
 		switch (*(arg + 1)) {
 		case '_':
-			if (strcmp(arg, "-_noecho") == 0) {
-				ctx->i_flags &= ~CW_F_ECHO;
-			} else if (strncmp(arg, "-_cc=", 5) == 0 ||
-			    strncmp(arg, "-_CC=", 5) == 0) {
-				newae(ctx->i_ae, arg + 5);
-			} else if (strncmp(arg, "-_gcc=", 6) != 0 &&
-			    strncmp(arg, "-_g++=", 6) != 0) {
-				(void) fprintf(stderr,
-				    "%s: invalid argument '%s'\n", progname,
-				    arg);
-				exit(2);
+			if ((strncmp(arg, nameflag, strlen(nameflag)) == 0) ||
+			    (strncmp(arg, "-_cc=", 5) == 0) ||
+			    (strncmp(arg, "-_sun=", 6) == 0)) {
+				newae(ctx->i_ae, strchr(arg, '=') + 1);
 			}
 			break;
+
 		case 'V':
 			ctx->i_flags &= ~CW_F_ECHO;
 			newae(ctx->i_ae, arg);
@@ -1574,6 +1558,8 @@ do_cc(cw_ictx_t *ctx)
 		}
 	}
 
+	free(nameflag);
+
 	if ((op == CW_O_LINK || op == CW_O_PREPROCESS) &&
 	    (ctx->i_flags & CW_F_SHADOW))
 		exit(0);
@@ -1587,55 +1573,22 @@ do_cc(cw_ictx_t *ctx)
 static void
 prepctx(cw_ictx_t *ctx)
 {
-	const char *dir = NULL, *cmd;
-	char *program = NULL;
-	size_t len;
-
-	switch (CIDX(CC(ctx), ctx->i_flags)) {
-		case CIDX(CW_C_CC, 0):
-			program = getenv("CW_CC");
-			dir = getenv("CW_CC_DIR");
-			break;
-		case CIDX(CW_C_CC, CW_F_CXX):
-			program = getenv("CW_CPLUSPLUS");
-			dir = getenv("CW_CPLUSPLUS_DIR");
-			break;
-		case CIDX(CW_C_GCC, 0):
-			program = getenv("CW_GCC");
-			dir = getenv("CW_GCC_DIR");
-			break;
-		case CIDX(CW_C_GCC, CW_F_CXX):
-			program = getenv("CW_GPLUSPLUS");
-			dir = getenv("CW_GPLUSPLUS_DIR");
-			break;
-	}
-
-	if (program == NULL) {
-		if (dir == NULL)
-			dir = default_dir[CC(ctx)];
-		cmd = cmds[CIDX(CC(ctx), ctx->i_flags)];
-		len = strlen(dir) + strlen(cmd) + 2;
-		if ((program = malloc(len)) == NULL)
-			nomem();
-		(void) snprintf(program, len, "%s/%s", dir, cmd);
-	}
-
-	newae(ctx->i_ae, program);
+	newae(ctx->i_ae, ctx->i_compiler->c_path);
 
 	if (ctx->i_flags & CW_F_PROG) {
 		(void) printf("%s: %s\n", (ctx->i_flags & CW_F_SHADOW) ?
-		    "shadow" : "primary", program);
+		    "shadow" : "primary", ctx->i_compiler->c_path);
 		(void) fflush(stdout);
 	}
 
 	if (!(ctx->i_flags & CW_F_XLATE))
 		return;
 
-	switch (CC(ctx)) {
-	case CW_C_CC:
+	switch (ctx->i_compiler->c_style) {
+	case SUN:
 		do_cc(ctx);
 		break;
-	case CW_C_GCC:
+	case GNU:
 		do_gcc(ctx);
 		break;
 	}
@@ -1672,19 +1625,22 @@ invoke(cw_ictx_t *ctx)
 		return (0);
 
 	/*
-	 * We must fix up the environment here so that the
-	 * dependency files are not trampled by the shadow compiler.
+	 * We must fix up the environment here so that the dependency files are
+	 * not trampled by the shadow compiler. Also take care of GCC
+	 * environment variables that will throw off gcc. This assumes a primary
+	 * gcc.
 	 */
 	if ((ctx->i_flags & CW_F_SHADOW) &&
 	    (unsetenv("SUNPRO_DEPENDENCIES") != 0 ||
-	    unsetenv("DEPENDENCIES_OUTPUT") != 0)) {
+	    unsetenv("DEPENDENCIES_OUTPUT") != 0 ||
+	    unsetenv("GCC_ROOT") != 0)) {
 		(void) fprintf(stderr, "error: environment setup failed: %s\n",
 		    strerror(errno));
 		return (-1);
 	}
 
 	(void) execv(newargv[0], newargv);
-	cw_perror("couldn't run %s", newargv[0]);
+	warn("couldn't run %s", newargv[0]);
 
 	return (-1);
 }
@@ -1704,7 +1660,7 @@ reap(cw_ictx_t *ctx)
 
 	do {
 		if (waitpid(ctx->i_pid, &status, 0) < 0) {
-			cw_perror("cannot reap child");
+			warn("cannot reap child");
 			return (-1);
 		}
 		if (status != 0) {
@@ -1721,7 +1677,7 @@ reap(cw_ictx_t *ctx)
 	(void) unlink(ctx->i_discard);
 
 	if (stat(ctx->i_stderr, &s) < 0) {
-		cw_perror("stat failed on child cleanup");
+		warn("stat failed on child cleanup");
 		return (-1);
 	}
 	if (s.st_size != 0) {
@@ -1774,26 +1730,23 @@ exec_ctx(cw_ictx_t *ctx, int block)
 		(void) fclose(stderr);
 		if ((fd = open(ctx->i_stderr, O_WRONLY | O_CREAT | O_EXCL,
 		    0666)) < 0) {
-			cw_perror("open failed for standard error");
-			exit(1);
+			err(1, "open failed for standard error");
 		}
 		if (dup2(fd, 2) < 0) {
-			cw_perror("dup2 failed for standard error");
-			exit(1);
+			err(1, "dup2 failed for standard error");
 		}
 		if (fd != 2)
 			(void) close(fd);
 		if (freopen("/dev/fd/2", "w", stderr) == NULL) {
-			cw_perror("freopen failed for /dev/fd/2");
-			exit(1);
+			err(1, "freopen failed for /dev/fd/2");
 		}
+
 		prepctx(ctx);
 		exit(invoke(ctx));
 	}
 
 	if (ctx->i_pid < 0) {
-		cw_perror("fork failed");
-		return (1);
+		err(1, "fork failed");
 	}
 
 	if (block)
@@ -1802,115 +1755,169 @@ exec_ctx(cw_ictx_t *ctx, int block)
 	return (0);
 }
 
+static void
+parse_compiler(const char *spec, cw_compiler_t *compiler)
+{
+	char *tspec, *token;
+
+	if ((tspec = strdup(spec)) == NULL)
+		nomem();
+
+	if ((token = strsep(&tspec, ",")) == NULL)
+		errx(1, "Compiler is missing a name: %s", spec);
+	compiler->c_name = token;
+
+	if ((token = strsep(&tspec, ",")) == NULL)
+		errx(1, "Compiler is missing a path: %s", spec);
+	compiler->c_path = token;
+
+	if ((token = strsep(&tspec, ",")) == NULL)
+		errx(1, "Compiler is missing a style: %s", spec);
+
+	if ((strcasecmp(token, "gnu") == 0) ||
+	    (strcasecmp(token, "gcc") == 0))
+		compiler->c_style = GNU;
+	else if ((strcasecmp(token, "sun") == 0) ||
+	    (strcasecmp(token, "cc") == 0))
+		compiler->c_style = SUN;
+	else
+		errx(1, "unknown compiler style: %s", token);
+
+	if (tspec != NULL)
+		errx(1, "Excess tokens in compiler: %s", spec);
+}
+
 int
 main(int argc, char **argv)
 {
-	cw_ictx_t *ctx = newictx();
-	cw_ictx_t *ctx_shadow = newictx();
-	const char *dir;
-	int do_serial, do_shadow;
+	int ch;
+	cw_compiler_t primary = { NULL, NULL, 0 };
+	cw_compiler_t shadows[10];
+	int nshadows = 0;
 	int ret = 0;
+	boolean_t do_serial = B_FALSE;
+	boolean_t do_exec = B_FALSE;
+	boolean_t vflg = B_FALSE;
+	boolean_t Cflg = B_FALSE;
+	boolean_t cflg = B_FALSE;
+	boolean_t nflg = B_FALSE;
 
-	if ((progname = strrchr(argv[0], '/')) == NULL)
-		progname = argv[0];
-	else
-		progname++;
+	cw_ictx_t *main_ctx;
 
-	if (ctx == NULL || ctx_shadow == NULL)
+	static struct option longopts[] = {
+		{ "compiler", no_argument, NULL, 'c' },
+		{ "noecho", no_argument, NULL, 'n' },
+		{ "primary", required_argument, NULL, 'p' },
+		{ "shadow", required_argument, NULL, 's' },
+		{ "versions", no_argument, NULL, 'v' },
+		{ NULL, 0, NULL, 0 },
+	};
+
+
+	if ((main_ctx = newictx()) == NULL)
 		nomem();
 
-	ctx->i_flags = CW_F_ECHO|CW_F_XLATE;
+	while ((ch = getopt_long(argc, argv, "C", longopts, NULL)) != -1) {
+		switch (ch) {
+		case 'c':
+			cflg = B_TRUE;
+			break;
+		case 'C':
+			Cflg = B_TRUE;
+			break;
+		case 'n':
+			nflg = B_TRUE;
+			break;
+		case 'p':
+			if (primary.c_path != NULL) {
+				warnx("Only one primary compiler may "
+				    "be specified");
+				usage();
+			}
 
-	/*
-	 * Figure out where to get our tools from.  This depends on
-	 * the environment variables set at run time.
-	 */
-	if ((dir = getenv("SPRO_VROOT")) != NULL) {
-		(void) snprintf(default_dir[CW_C_CC], MAXPATHLEN,
-		    "%s/bin", dir);
-	} else if ((dir = getenv("SPRO_ROOT")) != NULL) {
-		(void) snprintf(default_dir[CW_C_CC], MAXPATHLEN,
-		    "%s/SS12/bin", dir);
-	} else if ((dir = getenv("BUILD_TOOLS")) != NULL) {
-		(void) snprintf(default_dir[CW_C_CC], MAXPATHLEN,
-		    "%s/SUNWspro/SS12/bin", dir);
+			parse_compiler(optarg, &primary);
+			break;
+		case 's':
+			if (nshadows >= 10)
+				errx(1, "May only use 10 shadows at "
+				    "the moment");
+			parse_compiler(optarg, &shadows[nshadows]);
+			nshadows++;
+			break;
+		case 'v':
+			vflg = B_TRUE;
+			break;
+		default:
+			(void) fprintf(stderr, "Did you forget '--'?\n");
+			usage();
+		}
 	}
 
-	if ((dir = getenv("GNUC_ROOT")) != NULL) {
-		(void) snprintf(default_dir[CW_C_GCC], MAXPATHLEN,
-		    "%s/bin", dir);
-	}
-
-	do_shadow = (getenv("CW_NO_SHADOW") ? 0 : 1);
-	do_serial = (getenv("CW_SHADOW_SERIAL") ? 1 : 0);
-
-	if (getenv("CW_NO_EXEC") == NULL)
-		ctx->i_flags |= CW_F_EXEC;
-
-	/*
-	 * The first argument must be one of "-_cc", "-_gcc", "-_CC", or "-_g++"
-	 */
-	if (argc == 1)
+	if (primary.c_path == NULL) {
+		warnx("A primary compiler must be specified");
 		usage();
-	argc--;
-	argv++;
-	if (strcmp(argv[0], "-_cc") == 0) {
-		ctx->i_compiler = CW_C_CC;
-	} else if (strcmp(argv[0], "-_gcc") == 0) {
-		ctx->i_compiler = CW_C_GCC;
-	} else if (strcmp(argv[0], "-_CC") == 0) {
-		ctx->i_compiler = CW_C_CC;
-		ctx->i_flags |= CW_F_CXX;
-	} else if (strcmp(argv[0], "-_g++") == 0) {
-		ctx->i_compiler = CW_C_GCC;
-		ctx->i_flags |= CW_F_CXX;
-	} else {
-		/* assume "-_gcc" by default */
-		argc++;
-		argv--;
-		ctx->i_compiler = CW_C_GCC;
 	}
 
-	/*
-	 * -_compiler - tell us the path to the primary compiler only
-	 */
-	if (argc > 1 && strcmp(argv[1], "-_compiler") == 0) {
-		ctx->i_flags &= ~CW_F_XLATE;
-		prepctx(ctx);
-		(void) printf("%s\n", ctx->i_ae->ael_head->ae_arg);
-		return (0);
+	do_serial = (getenv("CW_SHADOW_SERIAL") == NULL) ? B_FALSE : B_TRUE;
+	do_exec = (getenv("CW_NO_EXEC") == NULL) ? B_TRUE : B_FALSE;
+
+	/* Leave room for argv[0] */
+	argc -= (optind - 1);
+	argv += (optind - 1);
+
+	main_ctx->i_oldargc = argc;
+	main_ctx->i_oldargv = argv;
+	main_ctx->i_flags = CW_F_XLATE;
+	if (nflg == 0)
+		main_ctx->i_flags |= CW_F_ECHO;
+	if (do_exec)
+		main_ctx->i_flags |= CW_F_EXEC;
+	if (Cflg)
+		main_ctx->i_flags |= CW_F_CXX;
+	main_ctx->i_compiler = &primary;
+
+	if (cflg) {
+		(void) fputs(primary.c_path, stdout);
 	}
 
-	/*
-	 * -_versions - tell us the cw version, paths to all compilers, and
-	 *		ask each for its version if we know how.
-	 */
-	if (argc > 1 && strcmp(argv[1], "-_versions") == 0) {
-		(void) printf("cw version %s", CW_VERSION);
-		if (!do_shadow)
-			(void) printf(" (SHADOW MODE DISABLED)");
-		(void) printf("\n");
+	if (vflg) {
+		(void) printf("cw version %s\n", CW_VERSION);
 		(void) fflush(stdout);
-		ctx->i_flags &= ~CW_F_ECHO;
-		ctx->i_flags |= CW_F_PROG|CW_F_EXEC;
-		argc--;
-		argv++;
+		main_ctx->i_flags &= ~CW_F_ECHO;
+		main_ctx->i_flags |= CW_F_PROG | CW_F_EXEC;
 		do_serial = 1;
 	}
 
-	ctx->i_oldargc = argc;
-	ctx->i_oldargv = argv;
+	ret |= exec_ctx(main_ctx, do_serial);
 
-	ret |= exec_ctx(ctx, do_serial);
+	for (int i = 0; i < nshadows; i++) {
+		int r;
+		cw_ictx_t *shadow_ctx;
 
-	if (do_shadow) {
-		(void) memcpy(ctx_shadow, ctx, sizeof (cw_ictx_t));
-		ctx_shadow->i_flags |= CW_F_SHADOW;
-		ret |= exec_ctx(ctx_shadow, 1);
+		if ((shadow_ctx = newictx()) == NULL)
+			nomem();
+
+		memcpy(shadow_ctx, main_ctx, sizeof (cw_ictx_t));
+
+		shadow_ctx->i_flags |= CW_F_SHADOW;
+		shadow_ctx->i_compiler = &shadows[i];
+
+		r = exec_ctx(shadow_ctx, do_serial);
+		if (r == 0) {
+			shadow_ctx->i_next = main_ctx->i_next;
+			main_ctx->i_next = shadow_ctx;
+		}
+		ret |= r;
 	}
 
-	if (!do_serial)
-		ret |= reap(ctx);
+	if (!do_serial) {
+		cw_ictx_t *next = main_ctx;
+		while (next != NULL) {
+			cw_ictx_t *toreap = next;
+			next = next->i_next;
+			ret |= reap(toreap);
+		}
+	}
 
 	return (ret);
 }

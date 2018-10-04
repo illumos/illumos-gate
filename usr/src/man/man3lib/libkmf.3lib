@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBKMF 3LIB "Feb 7, 2008"
+.TH LIBKMF 3LIB "Mar 21, 2018"
 .SH NAME
 libkmf \- Key Management Framework library
 .SH SYNOPSIS
@@ -14,7 +15,6 @@ cc [ \fIflag\fR... ] \fIfile\fR... \fB-lkmf\fR [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions comprise the Key Management Framework library.  They are
 intended to be used by applications that need to perform operations involving
@@ -22,7 +22,6 @@ the creation and management of public key objects such as public/private key
 pairs, certificates, certificate signing requests, certificate validation,
 certificate revocation lists, and OCSP response processing.
 .SH INTERFACES
-.sp
 .LP
 The shared object \fBlibkmf.so.1\fR provides the public interfaces defined
 below. See \fBIntro\fR(3) for additional information on shared object
@@ -43,70 +42,69 @@ l l .
 \fBkmf_decrypt\fR	\fBkmf_delete_cert_from_keystore\fR
 \fBkmf_delete_crl\fR	\fBkmf_delete_key_from_keystore\fR
 \fBkmf_delete_policy_from_db\fR	\fBkmf_der_to_pem\fR
-\fBkmf_dn_parser\fR	\fBkmf_download_cert\fR
-\fBkmf_download_crl\fR	\fBkmf_ekuname_to_oid\fR
-\fBkmf_encode_cert_record\fR	\fBkmf_encrypt\fR
-\fBkmf_export_pk12\fR	\fBkmf_finalize\fR
-\fBkmf_find_attr\fR	\fBkmf_find_cert\fR
-\fBkmf_find_cert_in_crl\fR	\fBkmf_find_crl\fR
-\fBkmf_find_key\fR	\fBkmf_find_prikey_by_cert\fR
-\fBkmf_free_algoid\fR	\fBkmf_free_bigint\fR
-\fBkmf_free_crl_dist_pts\fR	\fBkmf_free_data\fR
-\fBkmf_free_dn\fR	\fBkmf_free_eku\fR
-\fBkmf_free_eku_policy\fR	\fBkmf_free_extn\fR
-\fBkmf_free_kmf_cert\fR	\fBkmf_free_kmf_key\fR
-\fBkmf_free_policy_record\fR	\fBkmf_free_raw_key\fR
-\fBkmf_free_raw_sym_key\fR	\fBkmf_free_signed_cert\fR
-\fBkmf_free_signed_csr\fR	\fBkmf_free_spki\fR
-\fBkmf_free_str\fR	\fBkmf_free_tbs_cert\fR
-\fBkmf_free_tbs_csr\fR	\fBkmf_get_attr\fR
-\fBkmf_get_attr_ptr\fR	\fBkmf_get_cert_auth_info_access\fR
-\fBkmf_get_cert_basic_constraint\fR	\fBkmf_get_cert_crl_dist_pts\fR
-\fBkmf_get_cert_eku\fR	\fBkmf_get_cert_email_str\fR
-\fBkmf_get_cert_end_date_str\fR	\fBkmf_get_cert_extn\fR
-\fBkmf_get_cert_extn_str\fR	\fBkmf_get_cert_id_data\fR
-\fBkmf_get_cert_id_str\fR	\fBkmf_get_cert_issuer_str\fR
-\fBkmf_get_cert_ku\fR	\fBkmf_get_cert_policies\fR
-\fBkmf_get_cert_pubkey_alg_str\fR	\fBkmf_get_cert_pubkey_str\fR
-\fBkmf_get_cert_serial_str\fR	\fBkmf_get_cert_sig_alg_str\fR
-\fBkmf_get_cert_start_date_str\fR	\fBkmf_get_cert_subject_str\fR
-\fBkmf_get_cert_validity\fR	\fBkmf_get_cert_version_str\fR
-\fBkmf_get_data_format\fR	\fBkmf_get_encoded_ocsp_response\fR
-\fBkmf_get_file_format\fR	\fBkmf_get_kmf_error_str\fR
-\fBkmf_get_ocsp_for_cert\fR	\fBkmf_get_ocsp_status_for_cert\fR
-\fBkmf_get_pk11_handle\fR	\fBkmf_get_plugin_error_str\fR
-\fBkmf_get_policy\fR	\fBkmf_get_string_attr\fR
-\fBkmf_get_sym_key_value\fR	\fBkmf_hexstr_to_bytes\fR
-\fBkmf_import_crl\fR	\fBkmf_import_cert\fR
-\fBkmf_import_objects\fR	\fBkmf_initialize\fR
-\fBkmf_is_cert_data\fR	\fBkmf_is_cert_file\fR
-\fBkmf_is_crl_file\fR	\fBkmf_ku_to_string\fR
-\fBkmf_list_crl\fR	\fBkmf_oid_to_ekuname\fR
-\fBkmf_oid_to_string\fR	\fBkmf_pem_to_der\fR
-\fBkmf_pk11_token_lookup\fR	\fBkmf_read_input_file\fR
-\fBkmf_select_token\fR	\fBkmf_set_attr\fR
-\fBkmf_set_attr_at_index\fR	\fBkmf_set_cert_basic_constraint\fR
-\fBkmf_set_cert_extn\fR	\fBkmf_set_cert_issuer\fR
-\fBkmf_set_cert_issuer_altname\fR	\fBkmf_set_cert_ku\fR
-\fBkmf_set_cert_pubkey\fR	\fBkmf_set_cert_serial\fR
-\fBkmf_set_cert_sig_alg\fR	\fBkmf_set_cert_subject\fR
-\fBkmf_set_cert_subject_altname\fR	\fBkmf_set_cert_validity\fR
-\fBkmf_set_cert_version\fR	\fBkmf_set_csr_extn\fR
-\fBkmf_set_csr_ku\fR	\fBkmf_set_csr_pubkey\fR
-\fBkmf_set_csr_sig_alg\fR	\fBkmf_set_csr_subject\fR
-\fBkmf_set_csr_subject_altname\fR	\fBkmf_set_csr_version\fR
-\fBkmf_set_policy\fR	\fBkmf_set_token_pin\fR
-\fBkmf_sign_cert\fR	\fBkmf_sign_csr\fR
-\fBkmf_sign_data\fR	\fBkmf_store_cert\fR
-\fBkmf_store_key\fR	\fBkmf_string_to_ku\fR
-\fBkmf_string_to_oid\fR	\fBkmf_validate_cert\fR
-\fBkmf_verify_cert\fR	\fBkmf_verify_crl_file\fR
-\fBkmf_verify_csr\fR	\fBkmf_verify_data\fR
-\fBkmf_verify_policy\fR	
+\fBkmf_dn_parser\fR	\fBkmf_dn_to_string\fR
+\fBkmf_download_cert\fR	\fBkmf_download_crl\fR
+\fBkmf_ekuname_to_oid\fR	\fBkmf_encode_cert_record\fR
+\fBkmf_encrypt\fR	\fBkmf_export_pk12\fR
+\fBkmf_finalize\fR	\fBkmf_find_attr\fR
+\fBkmf_find_cert\fR	\fBkmf_find_cert_in_crl\fR
+\fBkmf_find_crl\fR	\fBkmf_find_key\fR
+\fBkmf_find_prikey_by_cert\fR	\fBkmf_free_algoid\fR
+\fBkmf_free_bigint\fR	\fBkmf_free_crl_dist_pts\fR
+\fBkmf_free_data\fR	\fBkmf_free_dn\fR
+\fBkmf_free_eku\fR	\fBkmf_free_eku_policy\fR
+\fBkmf_free_extn\fR	\fBkmf_free_kmf_cert\fR
+\fBkmf_free_kmf_key\fR	\fBkmf_free_policy_record\fR
+\fBkmf_free_raw_key\fR	\fBkmf_free_raw_sym_key\fR
+\fBkmf_free_signed_cert\fR	\fBkmf_free_signed_csr\fR
+\fBkmf_free_spki\fR	\fBkmf_free_str\fR
+\fBkmf_free_tbs_cert\fR	\fBkmf_free_tbs_csr\fR
+\fBkmf_get_attr\fR	\fBkmf_get_attr_ptr\fR
+\fBkmf_get_cert_auth_info_access\fR	\fBkmf_get_cert_basic_constraint\fR
+\fBkmf_get_cert_crl_dist_pts\fR	\fBkmf_get_cert_eku\fR
+\fBkmf_get_cert_email_str\fR	\fBkmf_get_cert_end_date_str\fR
+\fBkmf_get_cert_extn\fR	\fBkmf_get_cert_extn_str\fR
+\fBkmf_get_cert_id_data\fR	\fBkmf_get_cert_id_str\fR
+\fBkmf_get_cert_issuer_str\fR	\fBkmf_get_cert_ku\fR
+\fBkmf_get_cert_policies\fR	\fBkmf_get_cert_pubkey_alg_str\fR
+\fBkmf_get_cert_pubkey_str\fR	\fBkmf_get_cert_serial_str\fR
+\fBkmf_get_cert_sig_alg_str\fR	\fBkmf_get_cert_start_date_str\fR
+\fBkmf_get_cert_subject_str\fR	\fBkmf_get_cert_validity\fR
+\fBkmf_get_cert_version_str\fR	\fBkmf_get_data_format\fR
+\fBkmf_get_encoded_ocsp_response\fR	\fBkmf_get_file_format\fR
+\fBkmf_get_kmf_error_str\fR	\fBkmf_get_ocsp_for_cert\fR
+\fBkmf_get_ocsp_status_for_cert\fR	\fBkmf_get_pk11_handle\fR
+\fBkmf_get_plugin_error_str\fR	\fBkmf_get_policy\fR
+\fBkmf_get_string_attr\fR	\fBkmf_get_sym_key_value\fR
+\fBkmf_hexstr_to_bytes\fR	\fBkmf_import_crl\fR
+\fBkmf_import_cert\fR	\fBkmf_import_objects\fR
+\fBkmf_initialize\fR	\fBkmf_is_cert_data\fR
+\fBkmf_is_cert_file\fR	\fBkmf_is_crl_file\fR
+\fBkmf_ku_to_string\fR	\fBkmf_list_crl\fR
+\fBkmf_oid_to_ekuname\fR	\fBkmf_oid_to_string\fR
+\fBkmf_pem_to_der\fR	\fBkmf_pk11_token_lookup\fR
+\fBkmf_read_input_file\fR	\fBkmf_select_token\fR
+\fBkmf_set_attr\fR	\fBkmf_set_attr_at_index\fR
+\fBkmf_set_cert_basic_constraint\fR	\fBkmf_set_cert_extn\fR
+\fBkmf_set_cert_issuer\fR	\fBkmf_set_cert_issuer_altname\fR
+\fBkmf_set_cert_ku\fR	\fBkmf_set_cert_pubkey\fR
+\fBkmf_set_cert_serial\fR	\fBkmf_set_cert_sig_alg\fR
+\fBkmf_set_cert_subject\fR	\fBkmf_set_cert_subject_altname\fR
+\fBkmf_set_cert_validity\fR	\fBkmf_set_cert_version\fR
+\fBkmf_set_csr_extn\fR	\fBkmf_set_csr_ku\fR
+\fBkmf_set_csr_pubkey\fR	\fBkmf_set_csr_sig_alg\fR
+\fBkmf_set_csr_subject\fR	\fBkmf_set_csr_subject_altname\fR
+\fBkmf_set_csr_version\fR	\fBkmf_set_policy\fR
+\fBkmf_set_token_pin\fR	\fBkmf_sign_cert\fR
+\fBkmf_sign_csr\fR	\fBkmf_sign_data\fR
+\fBkmf_store_cert\fR	\fBkmf_store_key\fR
+\fBkmf_string_to_ku\fR	\fBkmf_string_to_oid\fR
+\fBkmf_validate_cert\fR	\fBkmf_verify_cert\fR
+\fBkmf_verify_crl_file\fR	\fBkmf_verify_csr\fR
+\fBkmf_verify_data\fR	\fBkmf_verify_policy\fR
 .TE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/lib/libkmf.so.1\fR\fR
@@ -143,7 +141,6 @@ KMF structures and types.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -160,7 +157,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBkmfcfg\fR(1), \fBpktool\fR(1), \fBattributes\fR(5)
 .sp

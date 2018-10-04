@@ -510,15 +510,13 @@ CTF_FLAGS	= $(CTF_FLAGS_32)
 #
 # Flags used with genoffsets
 #
-GOFLAGS = -_noecho \
-	$(CALLSYMS) \
-	$(CDWARFSTR)
+GOFLAGS = $(CALLSYMS) $(CDWARFSTR)
 
 OFFSETS_CREATE = $(GENOFFSETS) -s $(CTFSTABS) -r $(CTFCONVERT) \
-	$(CC) $(GOFLAGS) $(CFLAGS) $(CPPFLAGS)
+	$(CW) --noecho $(CW_CC_COMPILERS) -- $(GOFLAGS) $(CFLAGS) $(CPPFLAGS)
 
 OFFSETS_CREATE64 = $(GENOFFSETS) -s $(CTFSTABS) -r $(CTFCONVERT) \
-	$(CC) $(GOFLAGS) $(CFLAGS64) $(CPPFLAGS)
+	$(CW) --noecho $(CW_CC_COMPILERS) -- $(GOFLAGS) $(CFLAGS64) $(CPPFLAGS)
 
 #
 # tradeoff time for space (smaller is better)
@@ -713,7 +711,7 @@ MAPFILE.INT =		mapfile-intf
 #
 LDLIBS32 =	$(ENVLDLIBS1) $(ENVLDLIBS2) $(ENVLDLIBS3)
 LDLIBS32 +=	$(ADJUNCT_PROTO:%=-L%/usr/lib -L%/lib)
-LDLIBS.cmd = 	$(LDLIBS32)
+LDLIBS.cmd =	$(LDLIBS32)
 LDLIBS.lib =	$(LDLIBS32)
 
 LDLIBS64 =	$(ENVLDLIBS1:%=%/$(MACH64)) \
@@ -806,6 +804,15 @@ SPRO_ROOT=		$(BUILD_TOOLS)/SUNWspro
 SPRO_VROOT=		$(SPRO_ROOT)/SS12
 GNU_ROOT=		/usr
 
+$(__GNUC)PRIMARY_CC=	gcc4,$(GNUC_ROOT)/bin/gcc,gnu
+$(__SUNC)PRIMARY_CC=	studio12,$(SPRO_VROOT)/bin/cc,sun
+$(__GNUC)PRIMARY_CCC=	gcc4,$(GNUC_ROOT)/bin/g++,gnu
+$(__SUNC)PRIMARY_CCC=	studio12,$(SPRO_VROOT)/bin/CC,sun
+
+CW_CC_COMPILERS=	$(PRIMARY_CC:%=--primary %) $(SHADOW_CCS:%=--shadow %)
+CW_CCC_COMPILERS=	$(PRIMARY_CCC:%=--primary %) $(SHADOW_CCCS:%=--shadow %)
+
+
 # Till SS12u1 formally becomes the NV CBE, LINT is hard
 # coded to be picked up from the $SPRO_ROOT/sunstudio12.1/
 # location. Impacted variables are sparc_LINT, sparcv9_LINT,
@@ -816,42 +823,31 @@ GNU_ROOT=		/usr
 # Specify platform compiler versions for languages
 # that we use (currently only c and c++).
 #
-sparc_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
-$(__GNUC)sparc_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
-sparc_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
-$(__GNUC)sparc_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
-sparc_CPP=		/usr/ccs/lib/cpp
+CW=			$(ONBLD_TOOLS)/bin/$(MACH)/cw
+
+BUILD_CC=		$(CW) $(CW_CC_COMPILERS) --
+BUILD_CCC=		$(CW) -C $(CW_CCC_COMPILERS) --
+BUILD_CPP=		/usr/ccs/lib/cpp
+BUILD_LD=		/usr/ccs/bin/ld
+BUILD_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
+
+$(MACH)_CC=		$(BUILD_CC)
+$(MACH)_CCC=		$(BUILD_CCC)
+$(MACH)_CPP=		$(BUILD_CPP)
+$(MACH)_LD=		$(BUILD_LD)
+$(MACH)_LINT=		$(BUILD_LINT)
+$(MACH64)_CC=		$(BUILD_CC)
+$(MACH64)_CCC=		$(BUILD_CCC)
+$(MACH64)_CPP=		$(BUILD_CPP)
+$(MACH64)_LD=		$(BUILD_LD)
+$(MACH64)_LINT=		$(BUILD_LINT)
+
 sparc_AS=		/usr/ccs/bin/as -xregsym=no
-sparc_LD=		/usr/ccs/bin/ld
-sparc_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
+sparcv9_AS=		$($(MACH)_AS)
 
-sparcv9_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
-$(__GNUC64)sparcv9_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
-sparcv9_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
-$(__GNUC64)sparcv9_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
-sparcv9_CPP=		/usr/ccs/lib/cpp
-sparcv9_AS=		/usr/ccs/bin/as -xregsym=no
-sparcv9_LD=		/usr/ccs/bin/ld
-sparcv9_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
-
-i386_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
-$(__GNUC)i386_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
-i386_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
-$(__GNUC)i386_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
-i386_CPP=		/usr/ccs/lib/cpp
 i386_AS=		/usr/ccs/bin/as
 $(__GNUC)i386_AS=	$(ONBLD_TOOLS)/bin/$(MACH)/aw
-i386_LD=		/usr/ccs/bin/ld
-i386_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
-
-amd64_CC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_cc
-$(__GNUC64)amd64_CC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
-amd64_CCC=		$(ONBLD_TOOLS)/bin/$(MACH)/cw -_CC
-$(__GNUC64)amd64_CCC=	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_g++
-amd64_CPP=		/usr/ccs/lib/cpp
 amd64_AS=		$(ONBLD_TOOLS)/bin/$(MACH)/aw
-amd64_LD=		/usr/ccs/bin/ld
-amd64_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
 NATIVECC=		$($(NATIVE_MACH)_CC)
 NATIVECCC=		$($(NATIVE_MACH)_CCC)
@@ -869,12 +865,6 @@ CPP=			$(NATIVECPP)
 AS=			$(NATIVEAS)
 LD=			$(NATIVELD)
 LINT=			$(NATIVELINT)
-
-# The real compilers used for this build
-CW_CC_CMD=		$(CC) -_compiler
-CW_CCC_CMD=		$(CCC) -_compiler
-REAL_CC=		$(CW_CC_CMD:sh)
-REAL_CCC=		$(CW_CCC_CMD:sh)
 
 # Pass -Y flag to cpp (method of which is release-dependent)
 CCYFLAG=		-Y I,
@@ -931,8 +921,8 @@ C_BIGPICFLAGS64 =	$($(MACH64)_C_BIGPICFLAGS)
 # CC requires there to be no space between '-K' and 'pic' or 'PIC'.
 sparc_CC_PICFLAGS =	-Kpic
 sparcv9_CC_PICFLAGS =	-KPIC
-i386_CC_PICFLAGS = 	-Kpic
-amd64_CC_PICFLAGS = 	-Kpic
+i386_CC_PICFLAGS =	-Kpic
+amd64_CC_PICFLAGS =	-Kpic
 CC_PICFLAGS =		$($(MACH)_CC_PICFLAGS)
 CC_PICFLAGS64 =		$($(MACH64)_CC_PICFLAGS)
 
@@ -992,7 +982,7 @@ CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 # The following list of macros are used in the definition of RELEASE_CM
 # which is used to label all binaries in the build:
 #
-# 	RELEASE		Specific release of the build, eg: 5.2
+#	RELEASE		Specific release of the build, eg: 5.2
 #	RELEASE_MAJOR	Major version number part of $(RELEASE)
 #	RELEASE_MINOR	Minor version number part of $(RELEASE)
 #	VERSION		Version of the build (alpha, beta, Generic)
@@ -1019,7 +1009,7 @@ $(RELEASE_BUILD)PROCESS_COMMENT=   @?${MCS} -d -a $(RELEASE_CM)
 STRIP_STABS=			   $(STRIP) -x $@
 $(SRCDBGBLD)STRIP_STABS=	   :
 
-POST_PROCESS_O=	
+POST_PROCESS_O=
 POST_PROCESS_A=
 POST_PROCESS_SO=	$(PROCESS_COMMENT) $@ ; $(STRIP_STABS) ; \
 			$(ELFSIGN_OBJECT)
@@ -1118,8 +1108,8 @@ PKGPUBLISHER_NONREDIST=	on-extra
 # build the catalogue with awk(1).
 
 .sh.po .ksh.po:
-	$(SED) -n -e ":a" 				\
-		  -e "h" 					\
+	$(SED) -n -e ":a"					\
+		  -e "h"					\
 		  -e "s/.*gettext *\(\"[^\"]*\"\).*/\1/p"	\
 		  -e "x"					\
 		  -e "s/\(.*\)gettext *\"[^\"]*\"\(.*\)/\1\2/"	\

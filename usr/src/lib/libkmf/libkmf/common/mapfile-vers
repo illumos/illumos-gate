@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018, Joyent, Inc.
 #
 #
 # MAPFILE HEADER START
@@ -401,6 +402,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	GetIDFromSPKI;
 	IsEqualOid;
 	kmf_create_pk11_session;
+	kmf_dn_to_string;
 	kmf_select_token;
 	parsePolicyElement;
 	PKCS_DigestData;

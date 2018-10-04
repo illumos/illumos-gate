@@ -36,7 +36,8 @@
  * It's for your own good. :)
  */
 
-/* It seems that intel didn't think about ABI,
+/*
+ * It seems that intel didn't think about ABI,
  * either that or 16bit ABI != 32bit ABI (which seems reasonable)
  * I have to thank Intel for the hair loss I incurred trying to figure
  * out why PXE was mis-reading structures I was passing it (at least
@@ -48,7 +49,7 @@
  */
 #define	PACKED		__packed
 
-#define	S_SIZE(s)	s, sizeof(s) - 1
+#define	S_SIZE(s)	s, sizeof (s) - 1
 
 #define	PXENFSROOTPATH	"/pxeroot"
 
@@ -92,8 +93,8 @@ typedef struct {
 	uint16_t	UNDIDataSize;	/* UNDI Data segment size (bytes) */
 	SEGSEL_t	UNDICodeSeg;	/* UNDI Code segment address */
 	uint16_t	UNDICodeSize;	/* UNDI Code segment size (bytes) */
-	SEGOFF16_t	PXEPtr;		/* SEG:OFF to !PXE struct, 
-					   only present when Version > 2.1 */
+	/* SEG:OFF to !PXE struct, only present when Version > 2.1 */
+	SEGOFF16_t	PXEPtr;
 } PACKED pxenv_t;
 
 /* !PXE */
@@ -143,7 +144,8 @@ typedef struct {
 #define	PXENV_UNDI_INITIALIZE		0x0003
 typedef struct {
 	PXENV_STATUS_t	Status;
-	ADDR32_t	ProtocolIni;	/* Phys addr of a copy of the driver module */
+	/* Phys addr of a copy of the driver module */
+	ADDR32_t	ProtocolIni;
 	uint8_t		reserved[8];
 } PACKED t_PXENV_UNDI_INITIALIZE;
 
@@ -155,7 +157,7 @@ typedef struct {
 	MAC_ADDR	McastAddr[MAXNUM_MCADDR];
 } PACKED t_PXENV_UNDI_MCAST_ADDRESS;
 
-#define	PXENV_UNDI_RESET_ADAPTER	0x0004		
+#define	PXENV_UNDI_RESET_ADAPTER	0x0004
 typedef struct {
 	PXENV_STATUS_t	Status;
 	t_PXENV_UNDI_MCAST_ADDRESS R_Mcast_Buf;
@@ -171,10 +173,10 @@ typedef struct {
 	PXENV_STATUS_t	Status;
 	uint16_t	OpenFlag;
 	uint16_t	PktFilter;
-#	define FLTR_DIRECTED	0x0001
-#	define FLTR_BRDCST	0x0002
-#	define FLTR_PRMSCS	0x0004
-#	define FLTR_SRC_RTG	0x0008
+#define	FLTR_DIRECTED	0x0001
+#define	FLTR_BRDCST	0x0002
+#define	FLTR_PRMSCS	0x0004
+#define	FLTR_SRC_RTG	0x0008
 
 	t_PXENV_UNDI_MCAST_ADDRESS R_Mcast_Buf;
 } PACKED t_PXENV_UNDI_OPEN;
@@ -188,14 +190,14 @@ typedef struct {
 typedef struct {
 	PXENV_STATUS_t	Status;
 	uint8_t		Protocol;
-#	define P_UNKNOWN	0
-#	define P_IP		1
-#	define P_ARP		2
-#	define P_RARP		3
+#define	P_UNKNOWN	0
+#define	P_IP		1
+#define	P_ARP		2
+#define	P_RARP		3
 
 	uint8_t		XmitFlag;
-#	define XMT_DESTADDR	0x0000
-#	define XMT_BROADCAST	0x0001
+#define	XMT_DESTADDR	0x0000
+#define	XMT_BROADCAST	0x0001
 
 	SEGOFF16_t	DestAddr;
 	SEGOFF16_t	TBD;
@@ -236,30 +238,30 @@ typedef struct {
 #define	PXENV_UNDI_GET_INFORMATION	0x000C
 typedef struct {
 	PXENV_STATUS_t	Status;
-	uint16_t	BaseIo;			/* Adapter base I/O address */
-	uint16_t	IntNumber;		/* Adapter IRQ number */
-	uint16_t	MaxTranUnit;		/* Adapter maximum transmit unit */
-	uint16_t	HwType;			/* Type of protocol at the hardware addr */
-#	define ETHER_TYPE	1
-#	define EXP_ETHER_TYPE	2
-#	define IEEE_TYPE	6
-#	define ARCNET_TYPE	7
+	uint16_t BaseIo;		/* Adapter base I/O address */
+	uint16_t IntNumber;		/* Adapter IRQ number */
+	uint16_t MaxTranUnit;		/* Adapter maximum transmit unit */
+	uint16_t HwType;	/* Type of protocol at the hardware addr */
+#define	ETHER_TYPE	1
+#define	EXP_ETHER_TYPE	2
+#define	IEEE_TYPE	6
+#define	ARCNET_TYPE	7
 
-	uint16_t	HwAddrLen;		/* Length of hardware address */
-	MAC_ADDR	CurrentNodeAddress;	/* Current hardware address */
-	MAC_ADDR	PermNodeAddress;	/* Permanent hardware address */
-	SEGSEL_t	ROMAddress;		/* Real mode ROM segment address */
-	uint16_t	RxBufCt;		/* Receive queue length */
-	uint16_t	TxBufCt;		/* Transmit queue length */
+	uint16_t HwAddrLen;		/* Length of hardware address */
+	MAC_ADDR CurrentNodeAddress;	/* Current hardware address */
+	MAC_ADDR PermNodeAddress;	/* Permanent hardware address */
+	SEGSEL_t ROMAddress;		/* Real mode ROM segment address */
+	uint16_t RxBufCt;		/* Receive queue length */
+	uint16_t TxBufCt;		/* Transmit queue length */
 } PACKED t_PXENV_UNDI_GET_INFORMATION;
 
 #define	PXENV_UNDI_GET_STATISTICS	0x000D
 typedef struct {
 	PXENV_STATUS_t	Status;
-	uint32_t	XmitGoodFrames;		/* Number of successful transmissions */
-	uint32_t	RcvGoodFrames;		/* Number of good frames received */
-	uint32_t	RcvCRCErrors;		/* Number of frames with CRC errors */
-	uint32_t	RcvResourceErrors;	/* Number of frames dropped */
+	uint32_t XmitGoodFrames;	/* Number of successful transmissions */
+	uint32_t RcvGoodFrames;		/* Number of good frames received */
+	uint32_t RcvCRCErrors;		/* Number of frames with CRC errors */
+	uint32_t RcvResourceErrors;	/* Number of frames dropped */
 } PACKED t_PXENV_UNDI_GET_STATISTICS;
 
 #define	PXENV_UNDI_CLEAR_STATISTICS	0x000E
@@ -288,9 +290,9 @@ typedef struct {
 typedef struct {
 	PXENV_STATUS_t	Status;
 	uint8_t		NicType;		/* Type of NIC */
-#	define PCI_NIC		2
-#	define PnP_NIC		3
-#	define CardBus_NIC	4
+#define	PCI_NIC		2
+#define	PnP_NIC		3
+#define	CardBus_NIC	4
 
 	union {
 		struct {
@@ -326,29 +328,29 @@ typedef struct {
 #define	PXENV_UNDI_ISR			0x0014
 typedef struct {
 	PXENV_STATUS_t	Status;
-	uint16_t	FuncFlag;		/* PXENV_UNDI_ISR_OUT_xxx */
-	uint16_t	BufferLength;		/* Length of Frame */
-	uint16_t	FrameLength;		/* Total length of receiver frame */
-	uint16_t	FrameHeaderLength;	/* Length of the media header in Frame */
-	SEGOFF16_t	Frame;			/* receive buffer */
-	uint8_t		ProtType;		/* Protocol type */
-	uint8_t		PktType;		/* Packet Type */
-#	define PXENV_UNDI_ISR_IN_START		1
-#	define PXENV_UNDI_ISR_IN_PROCESS	2
-#	define PXENV_UNDI_ISR_IN_GET_NEXT	3
+	uint16_t FuncFlag;		/* PXENV_UNDI_ISR_OUT_xxx */
+	uint16_t BufferLength;		/* Length of Frame */
+	uint16_t FrameLength;		/* Total length of receiver frame */
+	uint16_t FrameHeaderLength; /* Length of the media header in Frame */
+	SEGOFF16_t Frame;		/* receive buffer */
+	uint8_t	ProtType;		/* Protocol type */
+	uint8_t	PktType;		/* Packet Type */
+#define	PXENV_UNDI_ISR_IN_START		1
+#define	PXENV_UNDI_ISR_IN_PROCESS	2
+#define	PXENV_UNDI_ISR_IN_GET_NEXT	3
 
 	/* one of these will be returned for PXENV_UNDI_ISR_IN_START */
-#	define PXENV_UNDI_ISR_OUT_OURS		0
-#	define PXENV_UNDI_ISR_OUT_NOT_OUTS	1
+#define	PXENV_UNDI_ISR_OUT_OURS		0
+#define	PXENV_UNDI_ISR_OUT_NOT_OUTS	1
 
 	/*
 	 * one of these will be returned for PXEND_UNDI_ISR_IN_PROCESS
 	 * and PXENV_UNDI_ISR_IN_GET_NEXT
 	 */
-#	define PXENV_UNDI_ISR_OUT_DONE		0
-#	define PXENV_UNDI_ISR_OUT_TRANSMIT	2
-#	define PXENV_UNDI_ISR_OUT_RECEIVE	3
-#	define PXENV_UNDI_ISR_OUT_BUSY		4
+#define	PXENV_UNDI_ISR_OUT_DONE		0
+#define	PXENV_UNDI_ISR_OUT_TRANSMIT	2
+#define	PXENV_UNDI_ISR_OUT_RECEIVE	3
+#define	PXENV_UNDI_ISR_OUT_BUSY		4
 } PACKED t_PXENV_UNDI_ISR;
 
 #define	PXENV_STOP_UNDI			0x0015
@@ -417,12 +419,12 @@ typedef struct {
 #define	PXENV_UDP_READ			0x0032
 typedef struct {
 	PXENV_STATUS_t	status;
-	IP4_t		src_ip;		/* IP of sender */
-	IP4_t		dest_ip;	/* Only accept packets sent to this IP */
-	UDP_PORT_t	s_port;		/* UDP source port of sender */
-	UDP_PORT_t	d_port;		/* Only accept packets sent to this port */
-	uint16_t	buffer_size;	/* Size of the packet buffer */
-	SEGOFF16_t	buffer;		/* SEG:OFF to the packet buffer */
+	IP4_t	src_ip;		/* IP of sender */
+	IP4_t	dest_ip;	/* Only accept packets sent to this IP */
+	UDP_PORT_t s_port;	/* UDP source port of sender */
+	UDP_PORT_t d_port;	/* Only accept packets sent to this port */
+	uint16_t buffer_size;	/* Size of the packet buffer */
+	SEGOFF16_t buffer;	/* SEG:OFF to the packet buffer */
 } PACKED t_PXENV_UDP_READ;
 
 #define	PXENV_UDP_WRITE			0x0033
@@ -446,53 +448,55 @@ typedef struct {
 #define	PXENV_GET_CACHED_INFO		0x0071
 typedef struct {
 	PXENV_STATUS_t	Status;
-	uint16_t	PacketType;	/* type (defined right here) */
-#	define PXENV_PACKET_TYPE_DHCP_DISCOVER  1
-#	define PXENV_PACKET_TYPE_DHCP_ACK       2
-#	define PXENV_PACKET_TYPE_BINL_REPLY     3
-	uint16_t	BufferSize;	/* max to copy, leave at 0 for pointer */
-	SEGOFF16_t	Buffer;		/* copy to, leave at 0 for pointer */
-	uint16_t	BufferLimit;	/* max size of buffer in BC dataseg ? */
+	uint16_t PacketType;	/* type (defined right here) */
+#define	PXENV_PACKET_TYPE_DHCP_DISCOVER	1
+#define	PXENV_PACKET_TYPE_DHCP_ACK	2
+#define	PXENV_PACKET_TYPE_BINL_REPLY	3
+	uint16_t BufferSize;	/* max to copy, leave at 0 for pointer */
+	SEGOFF16_t Buffer;	/* copy to, leave at 0 for pointer */
+	uint16_t BufferLimit;	/* max size of buffer in BC dataseg ? */
 } PACKED t_PXENV_GET_CACHED_INFO;
 
 
-/* structure filled in by PXENV_GET_CACHED_INFO 
+/*
+ * structure filled in by PXENV_GET_CACHED_INFO
  * (how we determine which IP we downloaded the initial bootstrap from)
  * words can't describe...
  */
 typedef struct {
-	uint8_t		opcode;
-#	define BOOTP_REQ	1
-#	define BOOTP_REP	2
-	uint8_t		Hardware;	/* hardware type */
-	uint8_t		Hardlen;	/* hardware addr len */
-	uint8_t		Gatehops;	/* zero it */
-	uint32_t	ident;		/* random number chosen by client */
-	uint16_t	seconds;	/* seconds since did initial bootstrap */
-	uint16_t	Flags;		/* seconds since did initial bootstrap */
-#	define BOOTP_BCAST	0x8000		/* ? */
-	IP4_t		cip;		/* Client IP */
-	IP4_t		yip;		/* Your IP */
-	IP4_t		sip;		/* IP to use for next boot stage */
-	IP4_t		gip;		/* Relay IP ? */
-	MAC_ADDR	CAddr;		/* Client hardware address */
-	uint8_t		Sname[64];	/* Server's hostname (Optional) */
-	uint8_t		bootfile[128];	/* boot filename */
+	uint8_t	 opcode;
+#define	BOOTP_REQ	1
+#define	BOOTP_REP	2
+	uint8_t Hardware;	/* hardware type */
+	uint8_t Hardlen;	/* hardware addr len */
+	uint8_t Gatehops;	/* zero it */
+	uint32_t ident;		/* random number chosen by client */
+	uint16_t seconds;	/* seconds since did initial bootstrap */
+	uint16_t Flags;		/* seconds since did initial bootstrap */
+#define	BOOTP_BCAST	0x8000	/* ? */
+	IP4_t	cip;		/* Client IP */
+	IP4_t	yip;		/* Your IP */
+	IP4_t	sip;		/* IP to use for next boot stage */
+	IP4_t	gip;		/* Relay IP ? */
+	MAC_ADDR CAddr;		/* Client hardware address */
+	uint8_t	Sname[64];	/* Server's hostname (Optional) */
+	uint8_t	bootfile[128];	/* boot filename */
 	union {
-#		if 1
-#		define BOOTP_DHCPVEND  1024    /* DHCP extended vendor field size */
-#		else
-#		define BOOTP_DHCPVEND  312	/* DHCP standard vendor field size */
-#		endif
-		uint8_t		d[BOOTP_DHCPVEND];	/* raw array of vendor/dhcp options */
+#if 1
+#define	BOOTP_DHCPVEND  1024    /* DHCP extended vendor field size */
+#else
+#define	BOOTP_DHCPVEND  312	/* DHCP standard vendor field size */
+#endif
+		/* raw array of vendor/dhcp options */
+		uint8_t d[BOOTP_DHCPVEND];
 		struct {
-			uint8_t		magic[4];	/* DHCP magic cookie */
-#			ifndef		VM_RFC1048
-#			define		VM_RFC1048	0x63825363L	/* ? */
-#			endif
-			uint32_t	flags;		/* bootp flags/opcodes */
-			uint8_t		pad[56];	/* I don't think intel knows what a
-							   union does... */
+			uint8_t magic[4]; /* DHCP magic cookie */
+#ifndef	VM_RFC1048
+#define	VM_RFC1048	0x63825363L	/* ? */
+#endif
+			uint32_t flags;	/* bootp flags/opcodes */
+			/* I don't think intel knows what a union does... */
+			uint8_t pad[56];
 		} v;
 	} vendor;
 } PACKED BOOTPLAYER;

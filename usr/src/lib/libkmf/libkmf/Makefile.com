@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018, Joyent, Inc.
 #
 
 LIBRARY= libkmf.a
@@ -56,8 +57,8 @@ LIBS=	$(DYNLIB) $(LINTLIB)
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
-LDLIBS	+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lmd -lpkcs11 -lnsl -lsocket -lc 
-LDLIBS6	+=	$(BERDERLIB64) $(CRYPTOUTILLIB64) -lmd -lpkcs11 -lnsl -lsocket -lc 
+LDLIBS	+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lmd -lpkcs11 -lnsl -lsocket -lc
+LDLIBS	+=	-lcustr
 
 # DYNLIB libraries do not have lint libs and are not linted
 $(DYNLIB) :=    LDLIBS += -lxml2

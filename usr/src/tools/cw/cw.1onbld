@@ -21,215 +21,201 @@
 .\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.TH CW 1ONBLD "August 16, 2018"
-.SH NAME
-.I cw
-\- invoke one or more compilers with argument translation
-.SH SYNOPSIS
-\fBcw {-_cc|-_gcc|-_CC|-_g++} [options] [compiler args...]\fP
-.SH DESCRIPTION
-.LP
-.I cw
-is a facility for invoking one or more compilers, providing
-translation from Sun Studio arguments as appropriate.  This allows
-the use of arbitrary compilers without the need to alter large
-numbers of makefiles.  A mode called shadow compilation, the default,
-invokes two different compilers so that warnings and errors may be
-obtained from both.  See SHADOW COMPILATION for details.  This version
-of cw supports Sun Studio 10 and 11 and gcc 3.4.3 as shipped in
-Solaris.
-.SH ARGUMENTS
-.LP
-Exactly one of the following arguments is required, and must appear
-immediately following \fBcw\fP in the argument list:
-.TP 4
-.B \-_cc
-Select Sun Studio C (cc) as the primary compiler.
-.TP 4
-.B \-_gcc
-Select GNU C (gcc) as the primary compiler.
-.TP 4
-.B \-_CC
-Select Sun Studio C++ (CC) as the primary compiler.
-.TP 4
-.B \-_g++
-Select GNU C++ (g++) as the primary compiler.
-.SH OPTIONS
-.LP
-The following options are supported:
-.TP 4
-.B \-_compiler
-Do not invoke any compiler; instead, write to standard output the
-full path to the primary compiler that would be invoked.  If this
-option is given, it must appear immediately following the compiler
-selection argument, and all other options will be disregarded.
-.TP 4
-.B \-_versions
-Print the cw version, followed in turn by the path to and versions
-of each compiler which would be invoked.  If this option is given,
-it must appear immediately following the compiler selection argument,
-and all other options will be disregarded.
-.TP 4
-.B \-_noecho
-Normally, cw writes to standard error the actual compiler commands
-invoked, each prefixed with '+'.  This option suppresses these
-messages.
-.TP 4
-.B \-_cc=,\-_gcc=,\-_CC=,\-g++=
-Pass compiler-dependent options.  See ARGUMENT TRANSLATION.
-.SH SHADOW COMPILATION
-.LP
-Unless otherwise directed by environment variables (see ENVIRONMENT),
-\fBcw\fP will invoke both the compiler specified by its first argument
-(primary) and a designated alternate compiler (shadow).  The primary
-compiler will be invoked with the arguments given to cw, translated
-as described in ARGUMENT TRANSLATION.  The secondary compiler will be
-invoked in parallel with the primary (but see ENVIRONMENT); its
-arguments will likewise be translated.  However, the shadow compiler's
-arguments will also be modified as follows:
-.TP 4
-.B 1.
-If none of \fI-c\fP, \fI-E\fP, \fI-P\fP, or \fI-S\fP appears in the
-argument list (that is, linking is attempted), the shadow compiler
-will not be invoked.  This is because the objects built with that
-compiler which would be linked have been previously discarded.
-.TP 4
-.B 2.
-If an option of the form \fI-ofilename\fP was provided, it will be
-replaced by two options of the form \fI-o\fP \fItempfile\fP.
-.TP 4
-.B 3.
-If the option \fI-o\fP was provided, its following argument will be
-replaced by \fItempfile\fP.
-.TP 4
-.B 4.
-If neither of the above options was provided, two options of the
-form \fI-o\fP \fItempfile\fP will be added to the end of the argument
-list used to invoke the shadow compiler.
-.LP
-In all three cases, \fItempfile\fP is the name of a temporary file
-which will be removed by \fBcw\fP before it terminates.
-.LP
-When shadow compilation is in effect, \fBcw\fP writes to standard error
-each compiler's standard error output following its argument list.
-Messages from the two compilers will not be interleaved.  If \fBcw\fP
+.\" Copyright 2018 Joyent, Inc.
+.\"
+.Dd September 4, 2018
+.Dt CW 1ONBLD
+.Os
+.Sh NAME
+.Nm cw
+.Nd invoke one or more compilers with argument translation
+.Sh SYNOPSIS
+.Nm cw
+.Op Fl C
+.Op Fl -versions
+.Op Fl -noecho
+.Fl -primary Ar compiler
+.Op Fl -shadow Ar compiler ...
+.Fl -
+.Ar compiler args ...
+.Sh DESCRIPTION
+.Nm cw
+is a facility for invoking one or more compilers, providing translation from
+Sun style arguments as appropriate.
+This allows the use of arbitrary compilers without the need to alter large
+numbers of makefiles.
+A mode called shadow compilation invokes multiple compilers so that warnings
+and errors may be obtained from all of them.
+See
+.Sx SHADOW COMPILATION
+for details.
+This version of cw supports compilers with both Sun Studio 12 and GCC-style
+command lines.
+.Sh ARGUMENTS
+Both the
+.Fl -primary
+and
+.Fl -shadow
+parameters take a
+.Em compiler specification .
+This is a comma-separated list of the form
+.Ar name,executable,style
+Where
+.Ar name
+is a name for the compiler,
+.Ar executable
+is the full path to the compiler executable, and
+.Ar style
+is the style of command-line options the compiler expects, either
+.Em sun
+or
+.Em gnu .
+.Bl -tag -width indent
+.It Fl -primary Ar compiler
+Specify the compiler to be used primarily (that which is used for link-editing
+and pre-processing, and whos objects we deliver).
+.It Fl -shadow Ar compiler
+Specify a shadow compiler, which builds sources for the sake of checking code
+quality and compatibility, but has its output discarded.
+.It Fl -noecho
+Do not echo the actual command line of any compilers invoked.
+.It Fl -versions
+Request from each configured primary and shadow compiler its version
+information.
+.It Fl C
+The sources being compiled are C++.  This is necessary as it affects the
+translation of compiler arguments.
+.It Fl -
+Arguments intended for the compilers themselves must be separated from those
+of
+.Nm cw
+by a
+.Fl - .
+.It Fl _name=
+.It Fl _style=
+Parameters intended for the compiler be guarded with options of the form
+.Fl _name=
+and
+.Fl _style=
+Where
+.Em name
+and
+.Em style
+are those passed to
+.Fl -primary
+and
+.Fl -shadow
+this allows certain flags to be passed only to certain classes of compiler.
+.Pp
+For historical reasons, the
+.Fl _style=
+option is also translated such that a style of
+.Em sun
+may use the flag
+.Fl _cc=
+and a style of
+.Em gnu
+may use the flag
+.Fl _gcc= ,
+and when the
+.Fl C
+option is given and C++ is in use the style of
+.Em sun
+may use the flag
+.Fl _CC=
+and the style of
+.Em gnu
+may use the flag
+.Fl _g++= .
+.El
+.Sh SHADOW COMPILATION
+If
+.Fl -shadow
+compilers are specified
+.Nm cw
+will invoke each shadow compiler, with the outputs modified (as well as any
+translation for compiler style) as follows:
+.Bl -enum
+.It
+If neither of
+.Fl c ,
+.Fl S
+appears in the argument list (that is, linking is attempted or only the
+pre-processor is invoked), the shadow compilers will not be invoked.
+.It
+If the
+.Fl o Ar filename
+option was provided, with or without a separating space, it will be replaced with
+.Fl o Ar tempfile
+.It
+If the option
+.Fl o
+was not provided,
+.Fl o Ar tempfile
+will be added to the end of the argument list used to invoke
+the shadow compilers.
+.El
+When shadow compilation is in effect,
+.Nm cw
+writes to standard error each compiler's standard error output following its
+argument list.
+Messages from the compilers will not be interleaved.
+If
+.Nm cw
 is used to invoke the preprocessor and no output location is specified,
-\fBcw\fP will write to standard output the primary compiler's
-standard output, and the secondary compiler's standard output will
-be discarded.
-.LP
-Because the Studio compilers write intermediate objects to fixed
+.Nm cw
+will write to standard output the primary compiler's standard output.
+.Pp
+Because the Sun compilers write intermediate objects to fixed
 filenames in the current directory when instructed to compile and
 link multiple source files via a single command line, it would be
-unsafe to invoke more than one compiler in this fashion.  Therefore
-\fBcw\fP does not accept multiple source files unless the
-preprocessor is to be invoked.  An attempt to invoke \fBcw\fP in
-this manner will result in an error.
-.SH ARGUMENT TRANSLATION
-.LP
-The arguments provided to \fBcw\fP will be passed through to each
-compiler invoked, altered as follows:
-.TP 4
-.B 1.
-Options intended for \fBcw\fP itself are removed.
-.TP 4
-.B 2.
-The shadow compiler's arguments are modified as described in
-SHADOW COMPILATION so that its output is discarded.
-.TP 4
-.B 3.
-If the compiler to be invoked is a GNU C or C++ compiler, a set of
+unsafe to invoke more than one compiler in this fashion.
+Therefore
+.Nm cw
+does not accept multiple source files unless the preprocessor is to be
+invoked.
+An attempt to invoke
+.Nm cw
+in this manner will result in an error.
+.Sh ARGUMENT TRANSLATION
+If the compiler to be invoked is a GNU-style C or C++ compiler, a set of
 default flags is added to the beginning of the argument list, and the
 remaining arguments are translated to their closest appropriate
 semantic equivalents and passed in the same order as their
-counterparts given to \fBcw\fP.  Arguments which begin with
-\fI-_gcc=\fP or \fI-_g++=\fP will be passed in place with the
-leading portion removed.  Arguments which begin with \fI-_cc=\fP or
-\fI-_CC=\fP will be discarded.  See the comments at the head of
-\fIusr/src/tools/cw/cw.c\fP for a detailed list of translations.
-.TP 4
-.B 4.
-If the compiler to be invoked is a Studio C or C++ compiler, the
-remaining arguments are passed unmodified and in the same order as
-given to \fBcw\fP.  Arguments which begin with \fI-_cc=\fP or
-\fI-_CC=\fP will be passed in place with the leading portion removed.
-Arguments which begin with \fI-_gcc=\fP or \fI-_g++=\fP will be
-discarded.
-.SH ENVIRONMENT
-.TP 4
-.B CW_NO_SHADOW
-If this variable is set in the environment, invoke only the
-primary compiler.
-.TP 4
-.B CW_SHADOW_SERIAL
-If this variable is set in the environment, invoke the primary compiler,
-wait for it to complete, then invoke the shadow compiler.  Normally
-the two compilers are invoked in parallel.  If CW_NO_SHADOW is set,
-this has no effect.
-.TP 4
-.B CW_NO_EXEC
-If this variable is set in the environment, write the usual output to
-standard error but do not actually invoke any compiler.  This is
-useful for debugging the translation engine.
-.TP 4
-.B CW_CC, CW_CPLUSPLUS
-If these variables are set in the environment, they specify the full
-pathname for the Studio C and C++ compilers, respectively.
-.TP 4
-.B CW_CC_DIR, CW_CPLUSPLUS_DIR, SPRO_VROOT, SPRO_ROOT, BUILD_TOOLS
-If CW_CC or CW_CPLUSPLUS are not set,
-these variables define the search path for Studio compilers as
-follows:
-.B
-If CW_CC_DIR is set, the Studio C compiler in \fI$CW_CC_DIR\fP
-will be used.  Likewise, if CW_CPLUSPLUS_DIR is set, the Studio C++
-compiler in \fI$CW_CPLUSPLUS_DIR\fP will be used.
-Otherwise, if SPRO_VROOT is set, the Studio C and C++ compilers
-in \fI$SPRO_VROOT/bin\fP will be used.
-Otherwise, if SPRO_ROOT is set, the Studio C and C++ compilers
-in \fI$SPRO_ROOT/SS12/bin\fP will be used.
-Otherwise, if BUILD_TOOLS is set, the Studio C and C++ compilers
-in \fI$BUILD_TOOLS/SUNWspro/SS12/bin\fP will be used.
-Otherwise, the Studio compilers in a predefined default location
-will be used.
-.TP 4
-.B CW_GCC, CW_GPLUSPLUS
-If these variables are set in the environment, they specify the full
-pathname for the GNU C and C++ compilers, respectively.
-.TP 4
-.B CW_GCC_DIR, CW_GPLUSPLUS_DIR, GNUC_ROOT
-If CW_GCC or CW_GPLUSPLUS are not set,
-these variables alter the search path for GNU compilers in a manner
-similar to that described above for the Studio compilers.  Specifically:
-.LP
-If CW_GCC_DIR is set, the GNU C compiler in \fI$CW_GCC_DIR\fP
-will be used.  Likewise, if CW_GPLUSPLUS_DIR is set, the GNU C++
-compiler in \fI$CW_GPLUSPLUS_DIR\fP will be used.
-Otherwise, if GNUC_ROOT is set, the GNU C and C++ compilers
-in \fI$GNUC_ROOT/bin\fP will be used. Previously \fI$GCC_ROOT\fP was
-used to in place of \fI$GNUC_ROOT\fP; however, because that environment
-variable has special meaning to gcc, if it is encountered in bldenv or
-nightly(1ONBLD), it will be translated to \fI$GNUC_ROOT\fP.
-.LP
-If none of the aforementioned environment variables are set, the GNU
-compilers in a predefined default location will be used.
-.SH EXIT STATUS
-.LP
+counterparts given to
+.Nm cw .
+See the comments at the head of
+.Pa usr/src/tools/cw/cw.c
+for a detailed list of translations.
+.Sh ENVIRONMENT
+.Bl -tag -width indent
+.It CW_SHADOW_SERIAL
+If this variable is set in the environment, invoke the primary compiler, wait
+for it to complete, then invoke the shadow compilers.
+Normally the primary and shadow compilers are invoked in parallel.
+.It CW_NO_EXEC
+f this variable is set in the environment, write the usual output to
+standard error but do not actually invoke any compiler.
+This is useful for debugging the translation engine.
+.El
+.Sh EXIT STATUS
 The following exit status values are returned:
-.IP "\fB0\fR" 4
-The primary compiler, and shadow compiler if invoked, both completed
+.Bl -tag -width indent
+.It 0
+The primary compiler, and shadow compilers if invoked, all completed
 successfully.
-.IP "\fB>0\fR" 4
+.It >0
 A usage error occurred, or one or more compilers returned a nonzero
 exit status.
-.SH BUGS
-.LP
-The translations provided for gcc are not always exact and in some
-cases reflect local ON policy rather than actual equivalence.
-.LP
+.El
+.Sh SEE ALSO
+.Xr cc 1 ,
+.Xr CC 1 ,
+.Xr gcc 1
+.Sh BUGS
+The translations provided for gcc are not always exact and in some cases
+reflect local policy rather than actual equivalence.
+.Pp
 Additional compiler types should be supported.
-.LP
+.Pp
 The translation engine is hacky.
-.SH SEE ALSO
-.LP
-cc(1), CC(1), gcc(1)

@@ -57,8 +57,6 @@ sysevent/tst.post_chan.exe := LDLIBS += -lsysevent
 
 ustack/tst.bigstack.exe := COPTFLAG += -xO1
 
-GCC = $(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc
-
 nfs/%.o: $(SNOOPDIR)/%.c
 	$(COMPILE.c) -o $@ $< -I$(SNOOPDIR)
 	$(POST_PROCESS_O)
@@ -73,10 +71,6 @@ nfs/$(RPCSVCOBJS): $(RPCSVCDIR)/$(RPCSVCSRCS)
 nfs/tst.call3.exe: nfs/tst.call3.o nfs/$(RPCSVCOBJS)
 	$(LINK.c) -o $@ nfs/tst.call3.o nfs/$(RPCSVCOBJS) \
 	$(LDLIBS) -lnsl -lrpcsvc
-	$(POST_PROCESS) ; $(STRIP_STABS)
-
-pid/tst.gcc.exe: pid/tst.gcc.c
-	$(GCC) -o pid/tst.gcc.exe pid/tst.gcc.c $(LDFLAGS) $(LDLIBS)
 	$(POST_PROCESS) ; $(STRIP_STABS)
 
 json/tst.usdt.o: json/usdt.h
