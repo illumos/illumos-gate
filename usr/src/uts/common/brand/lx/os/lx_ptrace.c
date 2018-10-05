@@ -1937,10 +1937,30 @@ lx_ptrace_exit_tracer(proc_t *p, lx_lwp_data_t *lwpd,
 }
 
 static void
-lx_ptrace_exit_tracee(proc_t *p, lx_lwp_data_t *lwpd,
-    lx_ptrace_accord_t *accord)
+lx_ptrace_exit_tracee(proc_t *p, lx_lwp_data_t *lwpd)
 {
-	VERIFY(MUTEX_NOT_HELD(&p->p_lock));
+	lx_ptrace_accord_t *accord;
+
+	VERIFY(MUTEX_HELD(&p->p_lock));
+
+	/*
+	 * Be careful in the face of detaching and attaching tracers.
+	 * lwpd->br_ptrace_tracer is modified only when p->p_lock is held.  Lock
+	 * ordering says that accord->lxpa_tracees_lock must be taken prior to
+	 * p->p_lock, so we have to get a reference to the accord and hold it
+	 * across dropping p->p_lock.
+	 *
+	 * In the face of a tracer going away and a new one coming in, we may
+	 * take a lap.
+	 */
+again:
+	if ((accord = lwpd->br_ptrace_tracer) == NULL) {
+		return;
+	}
+	lx_ptrace_accord_enter(accord);
+	lx_ptrace_accord_hold(accord);
+	lx_ptrace_accord_exit(accord);
+	mutex_exit(&p->p_lock);
 
 	/*
 	 * We are the tracee LWP.  Lock the accord tracee list and then our
@@ -1950,10 +1970,26 @@ lx_ptrace_exit_tracee(proc_t *p, lx_lwp_data_t *lwpd,
 	mutex_enter(&p->p_lock);
 
 	/*
+	 * Be sure that the accord currently associated with the lwp is the one
+	 * for which we are holding lxpa_tracees_lock.
+	 */
+	if (lwpd->br_ptrace_tracer != accord) {
+		mutex_exit(&p->p_lock);
+		mutex_exit(&accord->lxpa_tracees_lock);
+
+		lx_ptrace_accord_enter(accord);
+		lx_ptrace_accord_rele(accord);
+		lx_ptrace_accord_exit(accord);
+
+		mutex_enter(&p->p_lock);
+
+		goto again;
+	}
+
+	/*
 	 * Remove our reference to the accord.  We will release our hold
 	 * later.
 	 */
-	VERIFY(lwpd->br_ptrace_tracer == accord);
 	lwpd->br_ptrace_attach = LX_PTA_NONE;
 	lwpd->br_ptrace_tracer = NULL;
 
@@ -1986,11 +2022,15 @@ lx_ptrace_exit_tracee(proc_t *p, lx_lwp_data_t *lwpd,
 	mutex_exit(&pidlock);
 
 	/*
-	 * Release our hold on the accord.
+	 * Release the holds on the accord.  One is the hold taken earlier in
+	 * this function and the other is lwpd's hold.
 	 */
 	lx_ptrace_accord_enter(accord);
 	lx_ptrace_accord_rele(accord);
+	lx_ptrace_accord_rele(accord);
 	lx_ptrace_accord_exit(accord);
+
+	mutex_enter(&p->p_lock);
 }
 
 /*
@@ -2014,13 +2054,12 @@ lx_ptrace_exit(proc_t *p, klwp_t *lwp)
 	VERIFY0(lwpd->br_ptrace_flags & LX_PTF_EXITING);
 	lwpd->br_ptrace_flags |= LX_PTF_EXITING;
 
-	if ((accord = lwpd->br_ptrace_tracer) != NULL) {
+	if (lwpd->br_ptrace_tracer != NULL) {
 		/*
 		 * We are traced by another LWP and must detach ourselves.
 		 */
-		mutex_exit(&p->p_lock);
-		lx_ptrace_exit_tracee(p, lwpd, accord);
-		mutex_enter(&p->p_lock);
+		lx_ptrace_exit_tracee(p, lwpd);
+		VERIFY(MUTEX_HELD(&p->p_lock));
 	}
 
 	if ((accord = lwpd->br_ptrace_accord) != NULL) {
