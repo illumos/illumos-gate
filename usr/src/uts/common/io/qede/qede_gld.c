@@ -33,6 +33,9 @@
 * limitations under the License.
 */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
 
 #include "qede.h"
 
@@ -1263,7 +1266,7 @@ static lb_property_t loopmodes[] = {
 static enum ioc_reply
 qede_set_loopback_mode(qede_t *qede, uint32_t mode)
 {
-	int ret, i = 0;
+	int i = 0;
 	struct ecore_dev *edev = &qede->edev;
 	struct ecore_hwfn *hwfn;
 	struct ecore_ptt *ptt = NULL;
@@ -1290,7 +1293,7 @@ qede_set_loopback_mode(qede_t *qede, uint32_t mode)
 
 		link_params->loopback_mode = ETH_LOOPBACK_NONE;
 		qede->loop_back_mode = QEDE_LOOP_NONE;
-		ret = ecore_mcp_set_link(hwfn, ptt, 1);
+		(void) ecore_mcp_set_link(hwfn, ptt, 1);
 		ecore_ptt_release(hwfn, ptt);
 
 		while (!qede->params.link_state && i < 5000) {
@@ -1311,7 +1314,7 @@ qede_set_loopback_mode(qede_t *qede, uint32_t mode)
 		i = 0;
 		link_params->loopback_mode = ETH_LOOPBACK_INT_PHY;
 		qede->loop_back_mode = QEDE_LOOP_INTERNAL;
-		ret = ecore_mcp_set_link(hwfn, ptt, 1);
+		(void) ecore_mcp_set_link(hwfn, ptt, 1);
 		ecore_ptt_release(hwfn, ptt);
 
 		while(!qede->params.link_state && i < 5000) {
@@ -1464,7 +1467,7 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 	qede_nvram_data_t *data1 = (qede_nvram_data_t *)(mp->b_cont->b_rptr); 
 	qede_nvram_data_t *data2, *next_data;
 	struct ecore_dev *edev = &qede->edev;
-	uint32_t ret = 0, hdr_size = 24, bytes_to_copy, copy_len = 0;
+	uint32_t hdr_size = 24, bytes_to_copy, copy_len = 0;
 	uint32_t copy_len1 = 0;
 	uint32_t addr = data1->off;
 	uint32_t size = data1->size, i, buf_size;
@@ -1482,14 +1485,13 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 			" in nvram read ioctl\n");
 			return (DDI_FAILURE);
 		}
-		ret = ecore_mcp_nvm_read(edev, addr, buf, data1->size);
+		(void) ecore_mcp_nvm_read(edev, addr, buf, data1->size);
 
 		copy_len = (MBLKL(mp->b_cont)) - hdr_size;
 		if(copy_len > size) {
 			(void) memcpy(data1->uabc, buf, size);
 			kmem_free(buf, size);
 			//OSAL_FREE(edev, buf);
-			ret = 0;
 			break;
 		}
 		(void) memcpy(data1->uabc, buf, copy_len);
@@ -1529,7 +1531,6 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 		addr = data1->off;
 		buf_size =  size; //data1->buf_size;
 		//buf_size =  data1->buf_size;
-		ret = 0;
 
 		switch(cmd2){
 		case START_NVM_WRITE:
@@ -1547,7 +1548,6 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 			qede->nvm_buf = buf;
 			qede->copy_len = 0;
 			//tmp_buf = buf + addr;
-			ret = 0;
 			break;
 			
 		case ACCUMULATE_NVM_BUF:
@@ -1569,7 +1569,6 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 				//qede->copy_len = qede->copy_len + buf_size;
 				cmn_err(CE_NOTE, 
 				    "buf_size from app = %x\n", copy_len);
-				ret = 0;
 				break;
 			}
 			(void) memcpy(tmp_buf, data1->uabc, copy_len);
@@ -1590,7 +1589,6 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 					    bytes_to_copy);
 					qede->copy_len = qede->copy_len + 
 					    bytes_to_copy;
-					ret = 0;
 					break;
 				}
 				(void) memcpy(tmp_buf, next_data->uabc, 
@@ -1602,12 +1600,10 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 				mp1 = mp1->b_cont;
 			}
 			qede->nvm_buf = tmp_buf;
-			ret = 0;
 			break;
 
 		case STOP_NVM_WRITE:
 			//qede->nvm_buf = tmp_buf;
-			ret = 0;
 			break;
 		case READ_BUF:
 			tmp_buf = (uint8_t *)qede->nvm_buf_start;
@@ -1616,13 +1612,12 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 				    "buff (%d) : %d\n", i, *tmp_buf);
 				tmp_buf ++;
 			}
-			ret = 0;
 			break;
 		}
 		break;
 	case QEDE_NVRAM_CMD_PUT_FILE_DATA:
 		tmp_buf = qede->nvm_buf_start;	
-		ret = ecore_mcp_nvm_write(edev, ECORE_PUT_FILE_DATA,
+		(void) ecore_mcp_nvm_write(edev, ECORE_PUT_FILE_DATA,
 			  addr, tmp_buf, size);
 		kmem_free(qede->nvm_buf_start, size);
 		//OSAL_FREE(edev, tmp_buf);
@@ -1631,24 +1626,23 @@ qede_ioctl_rd_wr_nvram(qede_t *qede, mblk_t *mp)
 		tmp_buf = NULL;
 		qede->nvm_buf = NULL;
 		qede->nvm_buf_start = NULL;
-		ret = 0;
 		break;
 
 	case QEDE_NVRAM_CMD_SET_SECURE_MODE:
-		ret = ecore_mcp_nvm_set_secure_mode(edev, addr);
+		(void) ecore_mcp_nvm_set_secure_mode(edev, addr);
 		break;
 
 	case QEDE_NVRAM_CMD_DEL_FILE:
-		ret = ecore_mcp_nvm_del_file(edev, addr);
+		(void) ecore_mcp_nvm_del_file(edev, addr);
 		break;
 
 	case QEDE_NVRAM_CMD_PUT_FILE_BEGIN:
-		ret = ecore_mcp_nvm_put_file_begin(edev, addr);
+		(void) ecore_mcp_nvm_put_file_begin(edev, addr);
 		break;
 
 	case QEDE_NVRAM_CMD_GET_NVRAM_RESP:
 		buf = kmem_zalloc(size, KM_SLEEP);
-		ret = ecore_mcp_nvm_resp(edev, buf);
+		(void) ecore_mcp_nvm_resp(edev, buf);
 		(void)memcpy(data1->uabc, buf, size);
 		kmem_free(buf, size);
 		break;
