@@ -90,7 +90,7 @@ static boolean_t
 is_valid_string(const char *str)
 {
 	if (strcmp(str, SMB_DEFAULT1) != 0 && strcmp(str, SMB_DEFAULT2) != 0 &&
-	    strlen(str) > 0)
+	    strcmp(str, SMB_DEFAULT3) != 0 && strlen(str) > 0)
 		return (B_TRUE);
 
 	return (B_FALSE);
@@ -121,9 +121,9 @@ smbios_make_slot(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 		/* errno set */
 		return (NULL);
 	}
-	nvlist_free(auth);
 	if ((slotnode = topo_node_bind(mod, smed->sme_pnode, SLOT,
 	    smed->sme_slot_inst, fmri)) == NULL) {
+		nvlist_free(auth);
 		nvlist_free(fmri);
 		topo_mod_dprintf(mod, "topo_node_bind() failed: %s",
 		    topo_mod_errmsg(mod));
@@ -132,6 +132,10 @@ smbios_make_slot(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 	}
 	nvlist_free(fmri);
 	fmri = NULL;
+
+	/* Create authority and system pgroups */
+	topo_pgroup_hcset(slotnode, auth);
+	nvlist_free(auth);
 
 	if (topo_node_label_set(slotnode, (char *)smb_md->smbmd_dloc, &err) !=
 	    0) {
@@ -226,17 +230,21 @@ smbios_make_dimm(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 		/* errno set */
 		goto err;
 	}
-	nvlist_free(auth);
 
 	if (topo_node_range_create(mod, slotnode, DIMM, 0, 0) < 0 ||
 	    (dimmnode = topo_node_bind(mod, slotnode, DIMM, 0, fmri)) ==
 	    NULL) {
+		nvlist_free(auth);
 		nvlist_free(fmri);
 		topo_mod_dprintf(mod, "failed to bind dimm node: %s",
 		    topo_mod_errmsg(mod));
 		/* errno set */
 		goto err;
 	}
+
+	/* Create authority and system pgroups */
+	topo_pgroup_hcset(dimmnode, auth);
+	nvlist_free(auth);
 
 	if (topo_node_fru_set(dimmnode, fmri, NULL, &err) != 0) {
 		topo_mod_dprintf(mod, "failed to set FRU on %s: %s",

@@ -37,7 +37,7 @@
  */
 
 /* If you modify this file, you must increment CW_VERSION */
-#define	CW_VERSION	"2.0"
+#define	CW_VERSION	"3.0"
 
 /*
  * -#		Verbose mode
@@ -56,8 +56,6 @@
  *		as errors
  * -fast	Optimize using a selection of options
  * -fd		Report old-style function definitions and declarations
- * -features=zla	Allow zero-length arrays
- * -flags	Show this summary of compiler options
  * -fnonstd	Initialize floating-point hardware to non-standard preferences
  * -fns[=<yes|no>] Select non-standard floating point mode
  * -fprecision=<p> Set FP rounding precision mode p(single, double, extended)
@@ -84,17 +82,12 @@
  * -native	Find available processor, generate code accordingly
  * -nofstore	Do not force floating pt. values to target precision
  *		on assignment
- * -nolib	Same as -xnolib
- * -noqueue	Disable queuing of compiler license requests
  * -norunpath	Do not build in a runtime path for shared libraries
  * -O		Use default optimization level (-xO2 or -xO3. Check man page.)
  * -o <outputfile> Set name of output file to <outputfile>
  * -P		Compile source through preprocessor only, output to .i  file
- * -PIC		Alias for -KPIC or -xcode=pic32
  * -p		Compile for profiling with prof
- * -pic		Alias for -Kpic or -xcode=pic13
  * -Q[y|n]	Emit/don't emit identification info to output file
- * -qp		Compile for profiling with prof
  * -R<dir[:dir]> Build runtime search path list into executable
  * -S		Compile and only generate assembly code (.s)
  * -s		Strip symbol table from the executable file
@@ -106,16 +99,12 @@
  * -w		Suppress compiler warning messages
  * -Xa		Compile assuming ANSI C conformance, allow K & R extensions
  *		(default mode)
- * -Xc		Compile assuming strict ANSI C conformance
  * -Xs		Compile assuming (pre-ANSI) K & R C style code
  * -Xt		Compile assuming K & R conformance, allow ANSI C
- * -x386	Generate code for the 80386 processor
- * -x486	Generate code for the 80486 processor
  * -xarch=<a>	Specify target architecture instruction set
  * -xbuiltin[=<b>] When profitable inline, or substitute intrinisic functions
  *		for system functions, b={%all,%none}
  * -xCC		Accept C++ style comments
- * -xchar_byte_order=<o> Specify multi-char byte order <o> (default, high, low)
  * -xchip=<c>	Specify the target processor for use by the optimizer
  * -xcode=<c>	Generate different code for forming addresses
  * -xcrossfile[=<n>] Enable optimization and inlining across source files,
@@ -133,15 +122,9 @@
  * -xlibmil	Inline selected libm math routines for optimization
  * -xlic_lib=sunperf	Link in the Sun supplied performance libraries
  * -xlicinfo	Show license server information
- * -xM		Generate makefile dependencies
- * -xM1		Generate makefile dependencies, but exclude /usr/include
  * -xmaxopt=[off,1,2,3,4,5] maximum optimization level allowed on #pragma opt
- * -xnolib	Do not link with default system libraries
- * -xnolibmil	Cancel -xlibmil on command line
  * -xO<n>	Generate optimized code (n={1|2|3|4|5})
  * -xP		Print prototypes for function definitions
- * -xpentium	Generate code for the pentium processor
- * -xpg		Compile for profiling with gprof
  * -xprofile=<p> Collect data for a profile or use a profile to optimize
  *		<p>={{collect,use}[:<path>],tcov}
  * -xregs=<r>	Control register allocation
@@ -155,8 +138,6 @@
  * -xtarget=<t>	Specify target system for optimization
  * -xtemp=<dir>	Set directory for temporary files to <dir>
  * -xtime	Report the execution time for each compilation phase
- * -xtransition	Emit warnings for differences between K&R C and ANSI C
- * -xtrigraphs[=<yes|no>] Enable|disable trigraph translation
  * -xunroll=n	Enable unrolling loops n times where possible
  * -Y<c>,<dir>	Specify <dir> for location of component <c> (a,l,m,p,0,h,i,u)
  * -YA,<dir>	Change default directory searched for components
@@ -184,8 +165,6 @@
  * -errwarn=%all		-Werror else -Wno-error
  * -fast			error
  * -fd				error
- * -features=zla		ignore
- * -flags			--help
  * -fnonstd			error
  * -fns[=<yes|no>]		error
  * -fprecision=<p>		error
@@ -212,16 +191,12 @@
  * -native			error
  * -nofstore			error
  * -nolib			-nodefaultlibs
- * -noqueue			ignore
  * -norunpath			ignore
  * -O				-O1 (Check the man page to be certain)
  * -o <outputfile>		pass-thru
  * -P				-E -o filename.i (or error)
- * -PIC				-fPIC (C++ only)
  * -p				pass-thru
- * -pic				-fpic (C++ only)
  * -Q[y|n]			error
- * -qp				-p
  * -R<dir[:dir]>		pass-thru
  * -S				pass-thru
  * -s				-Wl,-s
@@ -233,20 +208,15 @@
  * -Wp,<arg>			pass-thru except -xc99=<a>
  * -Wl,<arg>			pass-thru
  * -W{m,0,2,h,i,u>		error/ignore
- * -Wu,-xmodel=kernel		-ffreestanding -mcmodel=kernel -mno-red-zone
  * -xmodel=kernel		-ffreestanding -mcmodel=kernel -mno-red-zone
  * -Wu,-save_args		-msave-args
  * -w				pass-thru
  * -Xa				-std=iso9899:199409 or -ansi
- * -Xc				-ansi -pedantic
  * -Xt				error
  * -Xs				-traditional -std=c89
- * -x386			-march=i386 (x86 only)
- * -x486			-march=i486 (x86 only)
  * -xarch=<a>			table
  * -xbuiltin[=<b>]		-fbuiltin (-fno-builtin otherwise)
  * -xCC				ignore
- * -xchar_byte_order=<o>	error
  * -xchip=<c>			table
  * -xcode=<c>			table
  * -xdebugformat=<format>	ignore (always use dwarf-2 for gcc)
@@ -260,15 +230,9 @@
  * -xlibmieee			error
  * -xlibmil			error
  * -xlic_lib=sunperf		error
- * -xM				-M
- * -xM1				-MM
  * -xmaxopt=[...]		error
- * -xnolib			-nodefaultlibs
- * -xnolibmil			error
  * -xO<n>			-O<n>
  * -xP				error
- * -xpentium			-march=pentium (x86 only)
- * -xpg				error
  * -xprofile=<p>		error
  * -xregs=<r>			table
  * -xs				error
@@ -281,7 +245,6 @@
  * -xtemp=<dir>			error
  * -xtime			error
  * -xtransition			-Wtransition
- * -xtrigraphs=<yes|no>		-trigraphs -notrigraphs
  * -xunroll=n			error
  * -W0,-xdbggen=no%usedonly	-fno-eliminate-unused-debug-symbols
  *				-fno-eliminate-unused-debug-types
@@ -527,18 +490,6 @@ Xamode(struct aelist *h __attribute__((__unused__)))
 }
 
 static void
-Xcmode(struct aelist *h)
-{
-	static int xconce;
-
-	if (xconce++)
-		return;
-
-	newae(h, "-ansi");
-	newae(h, "-pedantic-errors");
-}
-
-static void
 Xsmode(struct aelist *h)
 {
 	static int xsonce;
@@ -719,23 +670,6 @@ do_gcc(cw_ictx_t *ctx)
 				newae(ctx->i_ae, "-Werror");
 				continue;
 			}
-			if (strcmp(arg, "-noex") == 0) {
-				/* no exceptions */
-				newae(ctx->i_ae, "-fno-exceptions");
-				/* no run time type descriptor information */
-				newae(ctx->i_ae, "-fno-rtti");
-				continue;
-			}
-			if (strcmp(arg, "-pic") == 0) {
-				newae(ctx->i_ae, "-fpic");
-				pic = 1;
-				continue;
-			}
-			if (strcmp(arg, "-PIC") == 0) {
-				newae(ctx->i_ae, "-fPIC");
-				pic = 1;
-				continue;
-			}
 			if (strcmp(arg, "-norunpath") == 0) {
 				/* gcc has no corresponding option */
 				continue;
@@ -874,20 +808,6 @@ do_gcc(cw_ictx_t *ctx)
 			}
 			error(arg);
 			break;
-		case 'f':
-			if (strcmp(arg, "-flags") == 0) {
-				newae(ctx->i_ae, "--help");
-				break;
-			}
-			if (strncmp(arg, "-features=zla", 13) == 0) {
-				/*
-				 * Accept but ignore this -- gcc allows
-				 * zero length arrays.
-				 */
-				break;
-			}
-			error(arg);
-			break;
 		case 'G':
 			newae(ctx->i_ae, "-shared");
 			nolibc = 1;
@@ -964,15 +884,6 @@ do_gcc(cw_ictx_t *ctx)
 				free(s);
 			}
 			break;
-		case 'n':
-			if (strcmp(arg, "-noqueue") == 0) {
-				/*
-				 * Horrid license server stuff - n/a
-				 */
-				break;
-			}
-			error(arg);
-			break;
 		case 'O':
 			if (arglen == 1) {
 				newae(ctx->i_ae, "-O");
@@ -991,13 +902,6 @@ do_gcc(cw_ictx_t *ctx)
 			newae(ctx->i_ae, "-E");
 			op = CW_O_PREPROCESS;
 			nolibc = 1;
-			break;
-		case 'q':
-			if (strcmp(arg, "-qp") == 0) {
-				newae(ctx->i_ae, "-p");
-				break;
-			}
-			error(arg);
 			break;
 		case 's':
 			if (arglen == 1) {
@@ -1042,18 +946,6 @@ do_gcc(cw_ictx_t *ctx)
 				newae(ctx->i_ae, arg);
 				break;
 			}
-			if (strcmp(arg, "-W0,-xc99=pragma") == 0) {
-				/* (undocumented) enables _Pragma */
-				break;
-			}
-			if (strcmp(arg, "-W0,-xc99=%none") == 0) {
-				/*
-				 * This is a polite way of saying
-				 * "no c99 constructs allowed!"
-				 * For now, just accept and ignore this.
-				 */
-				break;
-			}
 			if (strcmp(arg, "-W0,-noglobal") == 0 ||
 			    strcmp(arg, "-W0,-xglobalstatic") == 0) {
 				/*
@@ -1081,13 +973,6 @@ do_gcc(cw_ictx_t *ctx)
 				 * Use the legacy behaviour (pre-SS11)
 				 * for integer wrapping.
 				 * gcc does not need this.
-				 */
-				break;
-			}
-			if (strcmp(arg, "-W2,-Rcond_elim") == 0) {
-				/*
-				 * Elimination and expansion of conditionals;
-				 * gcc has no direct equivalent.
 				 */
 				break;
 			}
@@ -1120,13 +1005,6 @@ do_gcc(cw_ictx_t *ctx)
 				break;
 			}
 #if defined(__x86)
-			if (strcmp(arg, "-Wu,-xmodel=kernel") == 0) {
-				newae(ctx->i_ae, "-ffreestanding");
-				newae(ctx->i_ae, "-mno-red-zone");
-				model = "-mcmodel=kernel";
-				nolibc = 1;
-				break;
-			}
 			if (strcmp(arg, "-Wu,-save_args") == 0) {
 				newae(ctx->i_ae, "-msave-args");
 				break;
@@ -1140,10 +1018,6 @@ do_gcc(cw_ictx_t *ctx)
 				Xamode(ctx->i_ae);
 				break;
 			}
-			if (strcmp(arg, "-Xc") == 0) {
-				Xcmode(ctx->i_ae);
-				break;
-			}
 			if (strcmp(arg, "-Xs") == 0) {
 				Xsmode(ctx->i_ae);
 				break;
@@ -1154,22 +1028,6 @@ do_gcc(cw_ictx_t *ctx)
 			if (arglen == 1)
 				error(arg);
 			switch (arg[2]) {
-#if defined(__x86)
-			case '3':
-				if (strcmp(arg, "-x386") == 0) {
-					newae(ctx->i_ae, "-march=i386");
-					break;
-				}
-				error(arg);
-				break;
-			case '4':
-				if (strcmp(arg, "-x486") == 0) {
-					newae(ctx->i_ae, "-march=i486");
-					break;
-				}
-				error(arg);
-				break;
-#endif	/* __x86 */
 			case 'a':
 				if (strncmp(arg, "-xarch=", 7) == 0) {
 					mflag |= xlate_xtb(ctx->i_ae, arg + 7);
@@ -1210,15 +1068,11 @@ do_gcc(cw_ictx_t *ctx)
 						pic = 1;
 					break;
 				}
-				if (strncmp(arg, "-xcache=", 8) == 0)
-					break;
 				if (strncmp(arg, "-xcrossfile", 11) == 0)
 					break;
 				error(arg);
 				break;
 			case 'd':
-				if (strcmp(arg, "-xdepend") == 0)
-					break;
 				if (strncmp(arg, "-xdebugformat=", 14) == 0)
 					break;
 				error(arg);
@@ -1255,24 +1109,6 @@ do_gcc(cw_ictx_t *ctx)
 				error(arg);
 				break;
 #endif	/* __x86 */
-			case 'M':
-				if (strcmp(arg, "-xM") == 0) {
-					newae(ctx->i_ae, "-M");
-					break;
-				}
-				if (strcmp(arg, "-xM1") == 0) {
-					newae(ctx->i_ae, "-MM");
-					break;
-				}
-				error(arg);
-				break;
-			case 'n':
-				if (strcmp(arg, "-xnolib") == 0) {
-					nolibc = 1;
-					break;
-				}
-				error(arg);
-				break;
 			case 'O':
 				if (strncmp(arg, "-xO", 3) == 0) {
 					size_t len = strlen(arg);
@@ -1306,17 +1142,6 @@ do_gcc(cw_ictx_t *ctx)
 				}
 				error(arg);
 				break;
-			case 'p':
-				if (strcmp(arg, "-xpentium") == 0) {
-					newae(ctx->i_ae, "-march=pentium");
-					break;
-				}
-				if (strcmp(arg, "-xpg") == 0) {
-					newae(ctx->i_ae, "-pg");
-					break;
-				}
-				error(arg);
-				break;
 			case 'r':
 				if (strncmp(arg, "-xregs=", 7) == 0) {
 					xlate(ctx->i_ae, arg + 7, xregs_tbl);
@@ -1332,18 +1157,6 @@ do_gcc(cw_ictx_t *ctx)
 				error(arg);
 				break;
 			case 't':
-				if (strcmp(arg, "-xtransition") == 0) {
-					newae(ctx->i_ae, "-Wtransition");
-					break;
-				}
-				if (strcmp(arg, "-xtrigraphs=yes") == 0) {
-					newae(ctx->i_ae, "-trigraphs");
-					break;
-				}
-				if (strcmp(arg, "-xtrigraphs=no") == 0) {
-					newae(ctx->i_ae, "-notrigraphs");
-					break;
-				}
 				if (strncmp(arg, "-xtarget=", 9) == 0) {
 					xlate(ctx->i_ae, arg + 9, xtarget_tbl);
 					break;

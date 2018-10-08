@@ -240,7 +240,7 @@ extern "C" {
 #define	TOPO_PGROUP_MOTHERBOARD		"motherboard-properties"
 #define	TOPO_PROP_MB_MANUFACTURER	"manufacturer"
 #define	TOPO_PROP_MB_PRODUCT		"product-id"
-#define	TOPO_PROP_MB_ASSET		"assert-tag"
+#define	TOPO_PROP_MB_ASSET		"asset-tag"
 #define	TOPO_PROP_MB_FIRMWARE_VENDOR	"firmware-vendor"
 #define	TOPO_PROP_MB_FIRMWARE_REV	"firmware-revision"
 #define	TOPO_PROP_MB_FIRMWARE_RELDATE	"firmware-release-date"

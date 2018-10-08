@@ -70,8 +70,6 @@ CERRWARN +=	-_gcc=-Wno-type-limits
 LDFLAGS +=	$(ZINTERPOSE)
 
 # TCOV_FLAG=	-ql
-# GPROF_FLAG=	-xpg
-# DEBUG_FLAG=	-g
 
 PROGLIBS=	$(LDLIBS) -lresolv -lnsl -lsocket -lumem -lscf -lavl
 
@@ -91,7 +89,7 @@ lint:
 	$(LINT.c) ${SRCS} ${PROGLIBS}
 
 cstyle:
-	${CSTYLE} ${SRCS} 
+	${CSTYLE} ${SRCS}
 
 install: all $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 

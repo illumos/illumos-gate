@@ -44,9 +44,9 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORKLDAP)
 
 OBJS=	cachemgr.o cachemgr_getldap.o cachemgr_parse.o cachemgr_change.o
 
-SRCS=	${OBJS:%.o=%.c} 
+SRCS=	${OBJS:%.o=%.c}
 
-CPPFLAGS += 	-D_REENTRANT -DSUN_THREADS \
+CPPFLAGS +=	-D_REENTRANT -DSUN_THREADS \
 		-I$(SRC)/lib/libsldap/common \
 		-I$(SRC)/lib/libldap5/include/ldap \
 		-I$(SRC)/lib/libc/port/gen
@@ -62,10 +62,8 @@ POFILES=	${OBJS:%.o=%.po}
 LINTOUT=        lint.out
 
 # TCOV_FLAG=	-ql
-# GPROF_FLAG=	-xpg
-# DEBUG_FLAG=	-g
 
-LDLIBS += 	-lumem -lsldap
+LDLIBS +=	-lumem -lsldap
 
 # install macros and rule
 #
