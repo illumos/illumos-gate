@@ -20,8 +20,9 @@
 .Nm Lgetareg ,
 .Nm Lputareg
 .Nd set and get a register from a stopped process or thread
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pgetareg

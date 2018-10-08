@@ -18,8 +18,9 @@
 .Nm Pread ,
 .Nm Pread_string
 .Nd read data from a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft ssize_t
 .Fo Pread

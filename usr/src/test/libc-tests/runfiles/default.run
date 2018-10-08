@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2017 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -88,6 +88,7 @@ timeout = 600
 [/opt/libc-tests/tests/set_constraint_handler_s.32]
 [/opt/libc-tests/tests/set_constraint_handler_s.64]
 [/opt/libc-tests/tests/strerror]
+[/opt/libc-tests/tests/thread_name]
 [/opt/libc-tests/tests/timespec_get.32]
 [/opt/libc-tests/tests/timespec_get.64]
 

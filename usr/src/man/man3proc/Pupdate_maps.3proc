@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pupdate_maps
 .Nd update address space mappings
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Pupdate_maps

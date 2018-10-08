@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Psetfault
 .Nd set fault tracing flags
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Psetfault

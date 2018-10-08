@@ -27,11 +27,11 @@
  */
 
 /*
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * ps -- print things about processes.
@@ -108,6 +108,7 @@ enum fname {	/* enumeration of field names */
 	F_SID,		/* session id */
 	F_PSR,		/* bound processor */
 	F_LWP,		/* lwp-id */
+	F_LWPNAME,	/* lwp name */
 	F_NLWP,		/* number of lwps */
 	F_OPRI,		/* old priority (obsolete) */
 	F_PRI,		/* new priority */
@@ -177,6 +178,7 @@ static struct def_field fname[] = {
 	{ "sid",	"SID",		5,	5	},
 	{ "psr",	"PSR",		3,	2	},
 	{ "lwp",	"LWP",		6,	2	},
+	{ "lwpname",	"LWPNAME",	32,	8	},
 	{ "nlwp",	"NLWP",		4,	2	},
 	{ "opri",	"PRI",		3,	2	},
 	{ "pri",	"PRI",		3,	2	},
@@ -211,8 +213,8 @@ static struct def_field fname[] = {
 	{ "zone",	"ZONE",		8,	8	},
 	{ "zoneid",	"ZONEID",	5,	5	},
 	{ "ctid",	"CTID",		5,	5	},
-	{ "lgrp",	"LGRP",		4,	2 	},
-	{ "dmodel",	"DMODEL",	6,	6 	},
+	{ "lgrp",	"LGRP",		4,	2	},
+	{ "dmodel",	"DMODEL",	6,	6	},
 };
 
 #define	NFIELDS	(sizeof (fname) / sizeof (fname[0]))
@@ -803,6 +805,7 @@ stdmain(int argc, char **argv)
 					(void) printf("%-*s",
 					    f->width, f->header);
 					break;
+				case F_LWPNAME:
 				case F_FNAME:
 				case F_COMM:
 				case F_ARGS:
@@ -1178,7 +1181,8 @@ parse_format(char *arg)
 	}
 	for (df = &fname[0]; df < &fname[NFIELDS]; df++)
 		if (strcmp(name, df->fname) == 0) {
-			if (strcmp(name, "lwp") == 0)
+			if (strcmp(name, "lwp") == 0 ||
+			    strcmp(name, "lwpname") == 0)
 				Lflg++;
 			break;
 		}
@@ -1754,6 +1758,27 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 	case F_LWP:
 		(void) printf("%*d", width, (int)psinfo->pr_lwp.pr_lwpid);
 		break;
+	case F_LWPNAME: {
+		char lwpname[THREAD_NAME_MAX] = "";
+		char *path = NULL;
+		int fd;
+
+		if (asprintf(&path, "%s/%d/lwp/%d/lwpname", procdir,
+		    (int)psinfo->pr_pid, (int)psinfo->pr_lwp.pr_lwpid) != -1 &&
+		    (fd = open(path, O_RDONLY)) != -1) {
+			(void) read(fd, lwpname, sizeof (lwpname));
+			lwpname[THREAD_NAME_MAX - 1] = '\0';
+			(void) close(fd);
+		}
+
+		free(path);
+
+		if (f->next != NULL)
+			(void) printf("%-*s", width, lwpname);
+		else
+			(void) printf("%s", lwpname);
+		break;
+	}
 	case F_NLWP:
 		(void) printf("%*d", width, psinfo->pr_nlwp + psinfo->pr_nzomb);
 		break;
@@ -2077,7 +2102,7 @@ print_zombie_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 
 static void
 pr_fields(psinfo_t *psinfo, const char *ttyp,
-	void (*print_fld)(psinfo_t *, struct field *, const char *))
+    void (*print_fld)(psinfo_t *, struct field *, const char *))
 {
 	struct field *f;
 
@@ -2367,7 +2392,7 @@ przom(psinfo_t *psinfo)
 	}
 	if (fflg) {
 		int width = fname[F_STIME].width;
-		(void) printf(" %*.*s", width, width, "-"); 	/* STIME */
+		(void) printf(" %*.*s", width, width, "-");	/* STIME */
 	}
 	(void) printf(" %-8.14s", "?");				/* TTY */
 
@@ -2447,9 +2472,9 @@ delta_secs(const timestruc_t *start)
 /*
  * Returns the following:
  *
- * 	0	No error
- * 	EINVAL	Invalid number
- * 	ERANGE	Value exceeds (min, max) range
+ *	0	No error
+ *	EINVAL	Invalid number
+ *	ERANGE	Value exceeds (min, max) range
  */
 static int
 str2id(const char *p, pid_t *val, long min, long max)
@@ -2484,9 +2509,9 @@ str2id(const char *p, pid_t *val, long min, long max)
 /*
  * Returns the following:
  *
- * 	0	No error
- * 	EINVAL	Invalid number
- * 	ERANGE	Value exceeds (min, max) range
+ *	0	No error
+ *	EINVAL	Invalid number
+ *	ERANGE	Value exceeds (min, max) range
  */
 static int
 str2uid(const char *p, uid_t *val, unsigned long min, unsigned long max)

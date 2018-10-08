@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pgetenv
 .Nd get process environment variable
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "char *"
 .Fo Pgetenv

@@ -18,8 +18,9 @@
 .Nm Plwp_getasrs ,
 .Nm Plwp_setasrs
 .Nd get and set SPARCv9 ancillary state registers
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Plwp_getasrs

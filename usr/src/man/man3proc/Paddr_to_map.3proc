@@ -20,8 +20,9 @@
 .Nm Plmid_to_map ,
 .Nm Pname_to_map
 .Nd lookup memory map information
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const prmap_t *"
 .Fo Paddr_to_map

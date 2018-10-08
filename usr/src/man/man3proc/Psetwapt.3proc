@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Psetwapt
 .Nd set a watchpoint in a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Psetwapt

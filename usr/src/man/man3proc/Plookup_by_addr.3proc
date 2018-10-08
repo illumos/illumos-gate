@@ -21,8 +21,9 @@
 .Nm Plookup_by_name ,
 .Nm Pxlookup_by_name
 .Nd lookup symbols in a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Plookup_by_addr

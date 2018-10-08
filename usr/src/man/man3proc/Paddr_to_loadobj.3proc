@@ -19,8 +19,9 @@
 .Nm Plmid_to_loadobj ,
 .Nm Pname_to_loadobj
 .Nd lookup loaded object information
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const rd_loadobj_t *"
 .Fo Paddr_to_loadobj

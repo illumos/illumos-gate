@@ -25,6 +25,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2009 Chad Mynhier
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef	_PRUTIL_H
@@ -54,7 +55,7 @@ extern int Setrlimit();
 extern void Priocntl(char *);
 extern void getprojname(projid_t, char *, size_t, int, int, size_t);
 extern void getzonename(projid_t, char *, size_t, int, size_t);
-extern void stripfname(char *);
+extern void format_name(lwp_info_t *, char *, size_t);
 
 #ifdef	__cplusplus
 }

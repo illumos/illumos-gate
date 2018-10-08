@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pconent
 .Nd obtain process content types available
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "core_content_t"
 .Fo Pcontent

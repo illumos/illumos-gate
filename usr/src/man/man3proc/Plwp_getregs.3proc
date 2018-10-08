@@ -20,8 +20,9 @@
 .Nm Plwp_getregs ,
 .Nm Plwp_setregs
 .Nd get and set thread registers
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Plwp_getfpregs

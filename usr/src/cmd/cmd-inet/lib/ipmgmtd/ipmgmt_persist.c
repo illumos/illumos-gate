@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  * Copyright 2016 Argo Technologie SA.
  * Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
  */
@@ -457,6 +458,7 @@ ipmgmt_db_walk(db_wfunc_t *db_walk_func, void *db_warg, ipadm_db_op_t db_op)
 		(void) pthread_attr_init(&attr);
 		(void) pthread_attr_setdetachstate(&attr,
 		    PTHREAD_CREATE_DETACHED);
+		(void) pthread_attr_setname_np(&attr, "db_restore");
 		err = pthread_create(&tid, &attr, ipmgmt_db_restore_thread,
 		    NULL);
 		(void) pthread_attr_destroy(&attr);
@@ -1124,7 +1126,7 @@ ipmgmt_aobjmap_init(void *arg, nvlist_t *db_nvl, char *buf, size_t buflen,
 {
 	nvpair_t		*nvp = NULL;
 	char			*name, *strval = NULL;
-	ipmgmt_aobjmap_t 	node;
+	ipmgmt_aobjmap_t	node;
 	struct sockaddr_in6	*in6;
 
 	*errp = 0;

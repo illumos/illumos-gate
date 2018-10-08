@@ -20,8 +20,9 @@
 .Nm Pobject_iter ,
 .Nm Pobject_iter_resolved
 .Nd iterate over process mappings and objects
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pmapping_iter

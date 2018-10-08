@@ -12,12 +12,12 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2015 Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	3proc
+MANSECT=	3proc
 
 MANFILES=					\
 		Lctlfd.3proc			\
@@ -64,6 +64,7 @@ MANFILES=					\
 		Plookup_by_addr.3proc		\
 		Plwp_getasrs.3proc		\
 		Plwp_getgwindows.3proc		\
+		Plwp_getname.3proc		\
 		Plwp_getpsinfo.3proc		\
 		Plwp_getregs.3proc		\
 		Plwp_getspymaster.3proc		\
@@ -160,10 +161,10 @@ MANFILES=					\
 		Pwrite.3proc			\
 		Pxecbkpt.3proc			\
 		Pzonename.3proc			\
-	 	ps_lgetregs.3proc		\
-	 	ps_pglobal_lookup.3proc		\
-	 	ps_pread.3proc			\
-	 	ps_pstop.3proc
+		ps_lgetregs.3proc		\
+		ps_pglobal_lookup.3proc		\
+		ps_pread.3proc			\
+		ps_pstop.3proc
 
 
 MANLINKS=					\
@@ -265,7 +266,7 @@ MANLINKS=					\
 		Pxlookup_by_name.3proc		\
 		Pxsymbol_iter.3proc		\
 		Pzonepath.3proc			\
-		Pzoneroot.3proc			
+		Pzoneroot.3proc
 
 
 ps_lgetfpregs.3proc		:= LINKSRC = ps_lgetregs.3proc

@@ -18,8 +18,9 @@
 .Nm Psysentry ,
 .Nm Psysexit
 .Nd set system call entry and exit actions
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Psysentry

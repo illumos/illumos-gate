@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Psetsignal
 .Nd set signal tracing flags
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Psetsignal

@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Ppltdest
 .Nd determine PLT destination symbol
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const char *"
 .Fo Ppltdest

@@ -19,8 +19,9 @@
 .Nm Pxcreate ,
 .Nm Pcreate_callback
 .Nd create and control a process
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "struct ps_prochandle *"
 .Fo Pcreate

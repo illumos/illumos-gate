@@ -18,8 +18,9 @@
 .Nm Psetsysentry ,
 .Nm Psetsysexit
 .Nd set system call tracing flags
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Psetsysentry

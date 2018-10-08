@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Psetpriv
 .Nd set process privileges
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Psetpriv

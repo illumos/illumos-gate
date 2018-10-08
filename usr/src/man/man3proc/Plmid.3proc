@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Plmid
 .Nd get the link-map identifier of an address
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Plmid

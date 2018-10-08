@@ -18,8 +18,9 @@
 .Nm Psetrun ,
 .Nm Lsetrun
 .Nd run a stopped process or thread
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Psetrun

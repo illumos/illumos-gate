@@ -18,8 +18,9 @@
 .Nm Plwp_getxregs ,
 .Nm Plwp_setxregs
 .Nd get and set extended register state
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Plwp_getxregs

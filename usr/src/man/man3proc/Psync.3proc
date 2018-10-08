@@ -18,8 +18,9 @@
 .Nm Psync ,
 .Nm Lsync
 .Nd synchronize cached tracing flags and modifications
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Psync

@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pexecname
 .Nd obtain full path to process executable
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "char *"
 .Fo Pexecname

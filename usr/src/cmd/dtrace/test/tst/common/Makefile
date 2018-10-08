@@ -26,8 +26,8 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 
 #
@@ -56,6 +56,8 @@ sysevent/tst.post.exe := LDLIBS += -lsysevent
 sysevent/tst.post_chan.exe := LDLIBS += -lsysevent
 
 ustack/tst.bigstack.exe := COPTFLAG += -xO1
+
+CSTD = $(CSTD_GNU99)
 
 nfs/%.o: $(SNOOPDIR)/%.c
 	$(COMPILE.c) -o $@ $< -I$(SNOOPDIR)

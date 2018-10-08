@@ -22,6 +22,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -1817,8 +1818,10 @@ init_cache_ctx(int i) {
 static void
 revalidate(nsc_ctx_t *ctx)
 {
+	(void) thr_setname(thr_self(), "revalidate");
+
 	for (;;) {
-		int 		i, slp, interval, count;
+		int i, slp, interval, count;
 
 		(void) rw_rdlock(&ctx->cfg_rwlp);
 		slp = ctx->cfg.pos_ttl;
@@ -1961,6 +1964,8 @@ static void
 do_update(nsc_lookup_args_t *in) {
 	nss_pheader_t	*phdr = (nss_pheader_t *)in->buffer;
 
+	(void) thr_setname(thr_self(), "do_update");
+
 	/* update the length of the data buffer */
 	phdr->data_len = phdr->pbufsiz - phdr->data_off;
 
@@ -2017,7 +2022,7 @@ nsc_invalidate(nsc_ctx_t *ctx, char *dbname, nsc_ctx_t **ctxs)
 static void
 ctx_invalidate(nsc_ctx_t *ctx)
 {
-	int 		i;
+	int		i;
 	nsc_entry_t	*entry;
 	char		*me = "ctx_invalidate";
 
@@ -2189,6 +2194,8 @@ reaper(nsc_ctx_t *ctx)
 	uint_t		nodes_per_interval, seconds_per_interval;
 	ulong_t		nsc_entries;
 	char		*me = "reaper";
+
+	(void) thr_setname(thr_self(), me);
 
 	for (;;) {
 		(void) mutex_lock(&ctx->stats_mutex);

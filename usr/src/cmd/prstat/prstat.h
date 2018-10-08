@@ -26,6 +26,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2009 Chad Mynhier
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_PRSTAT_H
@@ -113,6 +114,7 @@ typedef struct lwp_info {
 	ulong_t		li_icx;		/* involuntary context switches */
 	ulong_t		li_scl;		/* system calls */
 	ulong_t		li_sig;		/* received signals */
+	char		li_lwpname[THREAD_NAME_MAX];
 	struct lwp_info *li_next;	/* pointer to next lwp */
 	struct lwp_info *li_prev;	/* pointer to previous lwp */
 } lwp_info_t;
@@ -167,7 +169,10 @@ typedef	struct optdesc {
 	int		o_count;	/* number of iterations */
 	int		o_outpmode;	/* selected output mode */
 	int		o_sortorder;	/* +1 ascending, -1 descending */
+	int		o_cols;		/* number of columns */
 } optdesc_t;
+
+extern optdesc_t opts;
 
 #ifdef	__cplusplus
 }

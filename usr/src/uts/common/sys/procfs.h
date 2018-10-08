@@ -25,6 +25,7 @@
  */
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_PROCFS_H
@@ -65,6 +66,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/param.h>
 #include <sys/secflags.h>
+#include <sys/thread.h>
 
 /*
  * System call interfaces for /proc.
@@ -344,7 +346,7 @@ typedef struct prxmap {
 	int	pr_shmid;	/* SysV shmid, -1 if not SysV shared memory */
 	dev_t	pr_dev;	/* st_dev from stat64() of mapped object, or PRNODEV */
 	uint64_t pr_ino; /* st_ino from stat64() of mapped object, if any */
-	size_t	pr_rss; 	/* pages of resident memory */
+	size_t	pr_rss;		/* pages of resident memory */
 	size_t	pr_anon;	/* pages of resident anonymous memory */
 	size_t	pr_locked;	/* pages of locked memory */
 	size_t	pr_pad;		/* currently unused */
@@ -533,6 +535,16 @@ typedef struct prfdinfo {
 
 	char		pr_path[MAXPATHLEN];
 } prfdinfo_t;
+
+/*
+ * Representation of LWP name in core files.  In /proc, we use a simple char
+ * array, but in core files we need to make it easy to correlate the note back
+ * to the right LWP.  For simplicity, we'll use 32/64 consistent types.
+ */
+typedef struct prlwpname {
+	uint64_t pr_lwpid;
+	char pr_lwpname[THREAD_NAME_MAX];
+} prlwpname_t;
 
 /*
  * Header for /proc/<pid>/lstatus /proc/<pid>/lpsinfo /proc/<pid>/lusage

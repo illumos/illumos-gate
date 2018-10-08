@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include "lint.h"
@@ -128,7 +128,7 @@ pthread_create(pthread_t *thread, const pthread_attr_t *attr,
 
 	flag = ap->scope | ap->detachstate | ap->daemonstate | THR_SUSPENDED;
 	error = _thrp_create(ap->stkaddr, ap->stksize, start_routine, arg,
-	    flag, &tid, ap->guardsize);
+	    flag, &tid, ap->guardsize, ap->name);
 	if (error == 0) {
 		/*
 		 * Record the original inheritence value for

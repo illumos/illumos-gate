@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -74,6 +74,7 @@
 #include <sys/waitq.h>
 #include <sys/cpucaps.h>
 #include <sys/kiconv.h>
+#include <sys/ctype.h>
 
 struct kmem_cache *thread_cache;	/* cache of free threads */
 struct kmem_cache *lwp_cache;		/* cache of free lwps */
@@ -790,6 +791,11 @@ thread_free(kthread_t *t)
 	mutex_enter(&pidlock);
 	nthread--;
 	mutex_exit(&pidlock);
+
+	if (t->t_name != NULL) {
+		kmem_free(t->t_name, THREAD_NAME_MAX);
+		t->t_name = NULL;
+	}
 
 	/*
 	 * Free thread, lwp and stack.  This needs to be done carefully, since
@@ -2126,4 +2132,76 @@ stkinfo_percent(caddr_t t_stk, caddr_t t_stkbase, caddr_t sp)
 		percent = 100;
 	}
 	return (percent);
+}
+
+/*
+ * NOTE: This will silently truncate a name > THREAD_NAME_MAX - 1 characters
+ * long.  It is expected that callers (acting on behalf of userland clients)
+ * will perform any required checks to return the correct error semantics.
+ * It is also expected callers on behalf of userland clients have done
+ * any necessary permission checks.
+ */
+int
+thread_setname(kthread_t *t, const char *name)
+{
+	char *buf = NULL;
+
+	/*
+	 * We optimistically assume that a thread's name will only be set
+	 * once and so allocate memory in preparation of setting t_name.
+	 * If it turns out a name has already been set, we just discard (free)
+	 * the buffer we just allocated and reuse the current buffer
+	 * (as all should be THREAD_NAME_MAX large).
+	 *
+	 * Such an arrangement means over the lifetime of a kthread_t, t_name
+	 * is either NULL or has one value (the address of the buffer holding
+	 * the current thread name).   The assumption is that most kthread_t
+	 * instances will not have a name assigned, so dynamically allocating
+	 * the memory should minimize the footprint of this feature, but by
+	 * having the buffer persist for the life of the thread, it simplifies
+	 * usage in highly constrained situations (e.g. dtrace).
+	 */
+	if (name != NULL && name[0] != '\0') {
+		for (size_t i = 0; name[i] != '\0'; i++) {
+			if (!isprint(name[i]))
+				return (EINVAL);
+		}
+
+		buf = kmem_zalloc(THREAD_NAME_MAX, KM_SLEEP);
+		(void) strlcpy(buf, name, THREAD_NAME_MAX);
+	}
+
+	mutex_enter(&ttoproc(t)->p_lock);
+	if (t->t_name == NULL) {
+		t->t_name = buf;
+	} else {
+		if (buf != NULL) {
+			(void) strlcpy(t->t_name, name, THREAD_NAME_MAX);
+			kmem_free(buf, THREAD_NAME_MAX);
+		} else {
+			bzero(t->t_name, THREAD_NAME_MAX);
+		}
+	}
+	mutex_exit(&ttoproc(t)->p_lock);
+	return (0);
+}
+
+int
+thread_vsetname(kthread_t *t, const char *fmt, ...)
+{
+	char name[THREAD_NAME_MAX];
+	va_list va;
+	int rc;
+
+	va_start(va, fmt);
+	rc = vsnprintf(name, sizeof (name), fmt, va);
+	va_end(va);
+
+	if (rc < 0)
+		return (EINVAL);
+
+	if (rc >= sizeof (name))
+		return (ENAMETOOLONG);
+
+	return (thread_setname(t, name));
 }

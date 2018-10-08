@@ -25,6 +25,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright 2009 Chad Mynhier
+ * Copyright 2018 Joyent, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -324,13 +325,15 @@ getzonename(zoneid_t zoneid, char *str, size_t len, int trunc, size_t width)
 /*
  * Remove all unprintable characters from process name
  */
-void
-stripfname(char *buf)
+static void
+stripfname(char *buf, size_t bufsize, const char *pname)
 {
 	int bytesleft = PRFNSZ;
 	wchar_t wchar;
 	int length;
 	char *cp;
+
+	(void) strlcpy(buf, pname, bufsize);
 
 	buf[bytesleft - 1] = '\0';
 
@@ -350,4 +353,72 @@ stripfname(char *buf)
 		}
 		bytesleft -= length;
 	}
+}
+
+
+/*
+ * prstat has always implicitly wanted a terminal width of at least 80 columns
+ * (when a TTY is present).  If run in a terminal narrower than 80 columns,
+ * prstat output may wrap.  For wider terminals, we allow the last column to use
+ * the additional space.
+ *
+ * We never truncate if using -c, or not outputting to a TTY.
+ */
+static int
+format_namewidth(void)
+{
+	int prefixlen = 0;
+
+	if (opts.o_cols == 0 || !(opts.o_outpmode & (OPT_TERMCAP | OPT_TRUNC)))
+		return (0);
+
+	if (opts.o_outpmode & OPT_PSINFO) {
+		if (opts.o_outpmode & OPT_LGRP)
+			prefixlen = 64;
+		else
+			prefixlen = 59;
+	} else if (opts.o_outpmode & OPT_MSACCT) {
+		prefixlen = 64;
+	}
+
+	return (opts.o_cols - prefixlen);
+}
+
+void
+format_name(lwp_info_t *lwp, char *buf, size_t buflen)
+{
+	int pname_width = PRFNSZ;
+	char nr_suffix[20];
+	char pname[PRFNSZ];
+	int width;
+	int n;
+
+	stripfname(pname, sizeof (pname), lwp->li_info.pr_fname);
+
+	if (opts.o_outpmode & OPT_LWPS) {
+		n = snprintf(nr_suffix, sizeof (nr_suffix), "%d",
+		    lwp->li_info.pr_lwp.pr_lwpid);
+	} else {
+		n = snprintf(nr_suffix, sizeof (nr_suffix), "%d",
+		    lwp->li_info.pr_nlwp + lwp->li_info.pr_nzomb);
+	}
+
+	width = format_namewidth();
+
+	/* If we're over budget, truncate the process name not the LWP part. */
+	if (strlen(pname) > (width - n - 1)) {
+		pname_width = width - n - 1;
+		pname[pname_width - 1] = '*';
+	}
+
+	if ((opts.o_outpmode & OPT_LWPS) && lwp->li_lwpname[0] != '\0') {
+		n = snprintf(buf, buflen, "%.*s/%s [%s]", pname_width,
+		    pname, nr_suffix, lwp->li_lwpname);
+	} else {
+		n = snprintf(buf, buflen, "%.*s/%s", pname_width,
+		    pname, nr_suffix);
+	}
+
+	if (width > 0 && strlen(buf) > width)
+		buf[width] = '\0';
 }

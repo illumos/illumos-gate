@@ -18,8 +18,9 @@
 .Nm Prelease ,
 .Nm Pfree
 .Nd release a process control handle
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft void
 .Fo Prelease

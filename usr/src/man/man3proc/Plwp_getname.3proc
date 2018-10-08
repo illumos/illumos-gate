@@ -1,0 +1,95 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018 Joyent, Inc.
+.\"
+.Dd August 31, 2018
+.Dt PLWP_GETNAME 3PROC
+.Os
+.Sh NAME
+.Nm Plwp_getname
+.Nd get thread name
+.Sh LIBRARY
+.Lb libproc
+.Sh SYNOPSIS
+.In libproc.h
+.Ft int
+.Fo Plwp_getname
+.Fa "struct ps_prochandle *P"
+.Fa "lwpid_t lwpid"
+.Fa "char *buf"
+.Fa "size_t bufsize"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn Plwp_getname
+function returns the thread name in the supplied buffer, from the
+thread
+.Fa lwpid
+in the process handle
+.Fa P .
+.Pp
+If no thread name is set, the buffer is set to the empty string.
+The buffer should be at least
+.Dv THREAD_NAME_MAX
+in size.
+.Pp
+The
+.Fn Plwp_getname
+function only works on process handles that refer to active processes
+and core files, it does not work on process handles that refer to
+individual files.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn Plwp_getname
+function returns 0.
+Otherwise,
+.Sy -1
+is returned,
+.Sy errno
+is set to indicate the error.
+The buffer may be modified even if an error is returned.
+.Sh ERRORS
+For a full list of possible errors also see the
+.Sy DIAGNOSTICS
+section in
+.Xr proc 4 .
+.Pp
+The
+.Fn Plwp_getname
+function will fail if:
+.Bl -tag -width Er
+.It Er ENODATA
+.Fa P
+refers to a file handle obtained through
+.Xr Pgrab_file 3PROC .
+.It Er EINVAL
+The process handle
+.Fa P
+refers to a core file and the specified thread does not exist.
+.It Er ENOENT
+The process handle
+.Fa P
+refers to an active process and the specified thread does not exist.
+.Fa P
+.It Er ENAMETOOLONG
+The buffer is not sufficient to hold the thread name.
+.El
+.Sh INTERFACE STABILITY
+.Sy Uncommitted
+.Sh MT-LEVEL
+See
+.Sy LOCKING
+in
+.Xr libproc 3LIB .
+.Sh SEE ALSO
+.Xr libproc 3LIB ,
+.Xr proc 4

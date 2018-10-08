@@ -18,8 +18,9 @@
 .Nm Pclearsig ,
 .Nm Lclearsig
 .Nd clear process signals
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Pclearsig

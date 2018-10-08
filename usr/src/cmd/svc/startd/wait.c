@@ -21,7 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012, Joyent, Inc.  All rights reserved.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -252,6 +253,8 @@ wait_register(pid_t pid, const char *inst_fmri, int am_parent, int direct)
 void *
 wait_thread(void *args)
 {
+	(void) pthread_setname_np(pthread_self(), "wait");
+
 	for (;;) {
 		port_event_t pe;
 		int fd;

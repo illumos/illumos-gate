@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Pgrab_error
 .Nd get Pgrab error message string
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "const char *"
 .Fo Pgrab_error

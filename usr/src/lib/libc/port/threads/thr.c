@@ -25,7 +25,7 @@
  * Copyright (c) 2017 by The MathWorks, Inc. All rights reserved.
  */
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include "lint.h"
@@ -560,7 +560,7 @@ find_lwp(thread_t tid)
 
 int
 _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
-    long flags, thread_t *new_thread, size_t guardsize)
+    long flags, thread_t *new_thread, size_t guardsize, const char *name)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
@@ -715,6 +715,9 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 
 	exit_critical(self);
 
+	if (name != NULL)
+		(void) pthread_setname_np(tid, name);
+
 	if (!(flags & THR_SUSPENDED))
 		(void) _thrp_continue(tid, TSTP_REGULAR);
 
@@ -725,7 +728,8 @@ int
 thr_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
     long flags, thread_t *new_thread)
 {
-	return (_thrp_create(stk, stksize, func, arg, flags, new_thread, 0));
+	return (_thrp_create(stk, stksize, func, arg, flags, new_thread, 0,
+	    NULL));
 }
 
 /*
@@ -2396,6 +2400,87 @@ int
 __nthreads(void)
 {
 	return (curthread->ul_uberdata->nthreads);
+}
+
+/* "/proc/self/lwp/%u/lwpname" w/o stdio */
+static void
+lwpname_path(pthread_t tid, char *buf, size_t bufsize)
+{
+	(void) strlcpy(buf, "/proc/self/lwp/", bufsize);
+	ultos((uint64_t)tid, 10, buf + strlen(buf));
+	(void) strlcat(buf, "/lwpname", bufsize);
+}
+
+#pragma weak pthread_setname_np = thr_setname
+int
+thr_setname(pthread_t tid, const char *name)
+{
+	extern ssize_t __write(int, const void *, size_t);
+	char path[PATH_MAX];
+	int saved_errno;
+	size_t len;
+	ssize_t n;
+	int fd;
+
+	if (name == NULL)
+		name = "";
+
+	len = strlen(name) + 1;
+	if (len > THREAD_NAME_MAX)
+		return (ERANGE);
+
+	lwpname_path(tid, path, sizeof (path));
+
+	if ((fd = __open(path, O_WRONLY, 0)) < 0) {
+		if (errno == ENOENT)
+			errno = ESRCH;
+		return (errno);
+	}
+
+	n = __write(fd, name, len);
+	saved_errno = errno;
+	(void) __close(fd);
+
+	if (n < 0)
+		return (saved_errno);
+	if (n != len)
+		return (EFAULT);
+	return (0);
+}
+
+#pragma weak pthread_getname_np = thr_getname
+int
+thr_getname(pthread_t tid, char *buf, size_t bufsize)
+{
+	extern ssize_t __read(int, void *, size_t);
+	char name[THREAD_NAME_MAX];
+	char path[PATH_MAX];
+	int saved_errno;
+	ssize_t n;
+	int fd;
+
+	if (buf == NULL)
+		return (EINVAL);
+
+	lwpname_path(tid, path, sizeof (path));
+
+	if ((fd = __open(path, O_RDONLY, 0)) < 0) {
+		if (errno == ENOENT)
+			errno = ESRCH;
+		return (errno);
+	}
+
+	n = __read(fd, name, sizeof (name));
+	saved_errno = errno;
+	(void) __close(fd);
+
+	if (n < 0)
+		return (saved_errno);
+	if (n != sizeof (name))
+		return (EFAULT);
+	if (strlcpy(buf, name, bufsize) >= bufsize)
+		return (ERANGE);
+	return (0);
 }
 
 /*

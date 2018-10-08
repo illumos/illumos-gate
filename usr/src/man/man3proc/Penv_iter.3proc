@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Penv_iter
 .Nd iterate process environment
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft int
 .Fo Penv_iter

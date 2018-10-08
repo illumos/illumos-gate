@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018, Joyent, Inc.
 #
 # cmd/prstat/Makefile.com
 #
@@ -31,6 +32,7 @@ SRCS = $(OBJS:%.o=../%.c)
 
 include ../../Makefile.cmd
 
+CSTD = $(CSTD_GNU99)
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -lcurses -lproject

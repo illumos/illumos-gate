@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #include <strings.h>
@@ -33,6 +35,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <procfs.h>
+#include <pthread.h>
 #include "cachemgr.h"
 
 extern admin_t	current_admin;
@@ -534,6 +537,8 @@ chg_cleanup_waiting_threads(void *arg)
 	cleanup_type_t type = 0;
 	pid_t	pid;
 	int	always = 1, waiting;
+
+	(void) pthread_setname_np(pthread_self(), "chg_cleanup_thr");
 
 	if (op == NULL) {
 		waiting = 1;

@@ -17,8 +17,9 @@
 .Sh NAME
 .Nm Prd_agent
 .Nd get librtld_db agent
-.Sh SYNOPSIS
+.Sh LIBRARY
 .Lb libproc
+.Sh SYNOPSIS
 .In libproc.h
 .Ft "rd_agent_t *"
 .Fo Prd_agent

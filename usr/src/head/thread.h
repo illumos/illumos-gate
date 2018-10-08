@@ -24,6 +24,8 @@
  *
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_THREAD_H
@@ -87,6 +89,8 @@ extern int thr_keycreate_once(thread_key_t *, void(*)(void *));
 extern int thr_setspecific(thread_key_t, void *);
 extern int thr_getspecific(thread_key_t, void **);
 extern size_t thr_min_stack(void);
+extern int thr_getname(thread_t, char *, size_t);
+extern int thr_setname(thread_t, const char *);
 
 #endif /* _ASM */
 

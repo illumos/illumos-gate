@@ -21,7 +21,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -164,14 +164,19 @@ ps_threadprint(uintptr_t addr, const void *data, void *private)
 	if (prt_flags & PS_PRTTHREADS)
 		mdb_printf("\tT  %?a <%b>\n", addr, t->t_state, t_state_bits);
 
-	if (prt_flags & PS_PRTLWPS)
-		mdb_printf("\tL  %?a ID: %u\n", t->t_lwp, t->t_tid);
+	if (prt_flags & PS_PRTLWPS) {
+		char desc[128] = "";
+
+		(void) thread_getdesc(addr, B_FALSE, desc, sizeof (desc));
+
+		mdb_printf("\tL  %?a ID: %s\n", t->t_lwp, desc);
+	}
 
 	return (WALK_NEXT);
 }
 
 typedef struct mdb_pflags_proc {
-	struct pid 	*p_pidp;
+	struct pid	*p_pidp;
 	ushort_t	p_pidflag;
 	uint_t		p_proc_flag;
 	uint_t		p_flag;
@@ -261,8 +266,8 @@ pflags(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 typedef struct mdb_ps_proc {
 	char		p_stat;
-	struct pid 	*p_pidp;
-	struct pid 	*p_pgidp;
+	struct pid	*p_pidp;
+	struct pid	*p_pgidp;
 	struct cred	*p_cred;
 	struct sess	*p_sessp;
 	struct task	*p_task;
