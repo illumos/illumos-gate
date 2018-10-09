@@ -1013,17 +1013,8 @@ pci_nvme_append_iov_req(struct pci_nvme_softc *sc, struct pci_nvme_ioreq *req,
 					err = blockif_read(sc->nvstore.ctx,
 					                   &req->io_req);
 				else
-#ifdef __FreeBSD__
 					err = blockif_write(sc->nvstore.ctx,
 					                    &req->io_req);
-#else
-					err = blockif_write(sc->nvstore.ctx,
-					    &req->io_req, B_FALSE);
-				/*
-				 * XXX: Is a follow-up needed for proper sync
-				 * detection here or later flush behavior?
-				 */
-#endif
 
 				/* wait until req completes before cont */
 				if (err == 0)
@@ -1368,13 +1359,7 @@ iodone:
 			err = blockif_read(sc->nvstore.ctx, &req->io_req);
 			break;
 		case NVME_OPC_WRITE:
-#ifdef __FreeBSD__
 			err = blockif_write(sc->nvstore.ctx, &req->io_req);
-#else
-			/* XXX: Should this be sync? */
-			err = blockif_write(sc->nvstore.ctx, &req->io_req,
-			    B_FALSE);
-#endif
 			break;
 		default:
 			WPRINTF(("%s unhandled io command 0x%x\r\n",

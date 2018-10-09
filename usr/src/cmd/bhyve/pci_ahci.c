@@ -738,16 +738,7 @@ ahci_handle_rw(struct ahci_port *p, int slot, uint8_t *cfis, uint32_t done)
 	if (readop)
 		err = blockif_read(p->bctx, breq);
 	else
-#ifdef __FreeBSD__
 		err = blockif_write(p->bctx, breq);
-#else
-		/*
-		 * XXX: We currently don't handle disabling of the write cache.
-		 * Once this is fixed we need to revisit this code to do sync
-		 * writes when the cache is disabled.
-		 */
-		err = blockif_write(p->bctx, breq, B_FALSE);
-#endif
 	assert(err == 0);
 }
 
@@ -2375,6 +2366,17 @@ pci_ahci_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts, int atapi)
 		sc->port[p].pr_sc = sc;
 		sc->port[p].port = p;
 		sc->port[p].atapi = atapi;
+
+#ifndef __FreeBSD__
+		/*
+		 * Attempt to enable the write cache for this device, as the
+		 * guest will issue FLUSH commands when it requires durability.
+		 *
+		 * Failure here is fine, since an always-sync device will not
+		 * have an impact on correctness.
+		 */
+		(void) blockif_set_wce(bctxt, 1);
+#endif
 
 		/*
 		 * Create an identifier for the backing file.
