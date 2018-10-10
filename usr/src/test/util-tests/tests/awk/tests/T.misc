@@ -401,6 +401,23 @@ $AWK .++. 2> $TEMP0
 grep "syntax error" $TEMP0 >/dev/null || fail "BAD: T.misc syntax error .++. fails"
 
 
+
+# These should be syntax errors
+$AWK '$' 2> $TEMP0
+grep "unexpected" $TEMP0 >/dev/null || fail "BAD: T.misc syntax error $ fails"
+
+$AWK '{print $' 2> $TEMP0
+grep "unexpected" $TEMP0 >/dev/null || fail "BAD: T.misc syntax error \$2 fails"
+
+$AWK '"' 2> $TEMP0
+grep "non-terminated" $TEMP0 >/dev/null || fail "BAD: T.misc bare quote fails"
+
+
+# non-terminated RE
+
+$AWK /xyz > $TEMP0 2>&1
+grep "non-terminated" $TEMP0 >/dev/null || fail "BAD: T.misc non-terminated RE"
+
 # next several were infinite loops, found by brian tsang.
 # this is his example:
 

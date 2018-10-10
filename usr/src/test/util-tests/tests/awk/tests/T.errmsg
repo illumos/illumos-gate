@@ -43,6 +43,12 @@ nonterminated character class
 /[[/
 
 nonterminated character class
+/[]/
+
+nonterminated character class
+/[\
+
+nonterminated character class
 BEGIN { s = "[x"; if (1 ~ s) print "foo"}
 
 syntax error in regular expression
@@ -94,6 +100,10 @@ function x() { function g() {} }
 
 return not in function
 { return }
+
+non-terminated string
+{ print "abc
+}
 
 illegal field $(foo)
 BEGIN { print $"foo" }

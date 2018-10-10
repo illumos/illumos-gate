@@ -1,4 +1,4 @@
-$AWK: syntax error at source line 47
+$AWK: syntax error at source line 47 source file synerr2.awk
  context is
 	BEGIN { sprintf("%s", >>>  $) <<<  }
-$AWK: illegal statement at source line 47
+$AWK: illegal statement at source line 47 source file synerr2.awk

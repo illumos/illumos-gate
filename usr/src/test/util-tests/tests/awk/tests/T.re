@@ -55,6 +55,12 @@ a	~	a
 	!~	""
 		x
 		xxxxx
+=	~	=
+		b=
+		b=b
+	!~	""
+		x
+		xxxxx
 .	~	x
 		xxx
 	!~	""			

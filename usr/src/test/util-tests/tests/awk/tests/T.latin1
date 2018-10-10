@@ -32,6 +32,10 @@ $AWK '{ gsub(/\351/, "\370"); print }' latin1 > $TEMP0
 $AWK '{ gsub(/é/, "ø"); print }' latin1 > $TEMP1
 diff $TEMP0 $TEMP1 || fail 'BAD: T.latin1 3'
 
+$AWK '{ gsub(/[^\300-\370]/, ""); print }' latin1 > $TEMP0
+$AWK '{ gsub(/[^À-ø]/, ""); print } ' latin1 > $TEMP1
+diff $TEMP0 $TEMP1 || fail 'BAD: T.latin1 4'
+
 echo  '/á/' > $TEMP1
 $AWK -f $TEMP1 $TEMP1 > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.latin1 5'

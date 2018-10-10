@@ -1,5 +1,5 @@
-$AWK: syntax error at source line 1
+$AWK: syntax error at source line 1 source file parseme.awk
  context is
 	BEGIN { >>>  toupper(substr* <<< line,1,12)) }
-$AWK: illegal statement at source line 1
+$AWK: illegal statement at source line 1 source file parseme.awk
 	extra )

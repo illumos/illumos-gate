@@ -1,5 +1,29 @@
 %{
 /*
+ * Copyright (C) Lucent Technologies 1997
+ * All Rights Reserved
+ *
+ * Permission to use, copy, modify, and distribute this software and
+ * its documentation for any purpose and without fee is hereby
+ * granted, provided that the above copyright notice appear in all
+ * copies and that both that the copyright notice and this
+ * permission notice and warranty disclaimer appear in supporting
+ * documentation, and that the name Lucent Technologies or any of
+ * its entities not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.
+ *
+ * LUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.
+ * IN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY
+ * SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
+ * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+ * THIS SOFTWARE.
+ */
+
+/*
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -30,30 +54,25 @@
 /*	  All Rights Reserved  	*/
 
 %{
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 2.10	*/
-%}
-
-%{
 #include "awk.h"
 int yywrap(void) { return(1); }
-#ifndef	DEBUG
-#	define	PUTS(x)
-#endif
-Node	*beginloc = 0, *endloc = 0;
-int	infunc	= 0;	/* = 1 if in arglist or body of func */
-uchar	*curfname = 0;
-Node	*arglist = 0;	/* list of args for current function */
+
+Node	*beginloc = NULL;
+Node	*endloc = NULL;
+int	infunc	= 0;	        /* = 1 if in arglist or body of func */
+char	*curfname = NULL;	/* current function name */
+Node	*arglist = NULL;	/* list of args for current function */
 static void	setfname(Cell *);
 static int	constnode(Node *);
-static uchar	*strnode(Node *);
-static Node	*notnull();
+static char	*strnode(Node *);
+static Node	*notnull(Node *);
 %}
 
 %union {
 	Node	*p;
 	Cell	*cp;
 	int	i;
-	uchar	*s;
+	char	*s;
 }
 
 %token	<i>	FIRSTTOKEN	/* must be first */
@@ -63,14 +82,14 @@ static Node	*notnull();
 %token	<i>	MATCH NOTMATCH MATCHOP
 %token	<i>	FINAL DOT ALL CCL NCCL CHAR OR STAR QUEST PLUS
 %token	<i>	AND BOR APPEND EQ GE GT LE LT NE IN
-%token	<i>	ARG BLTIN BREAK CLOSE CONTINUE DELETE DO EXIT FOR FUNC 
+%token	<i>	ARG BLTIN BREAK CLOSE CONTINUE DELETE DO EXIT FOR FUNC
 %token	<i>	SUB GSUB IF INDEX LSUBSTR MATCHFCN NEXT
 %token	<i>	ADD MINUS MULT DIVIDE MOD
 %token	<i>	ASSIGN ASGNOP ADDEQ SUBEQ MULTEQ DIVEQ MODEQ POWEQ
 %token	<i>	PRINT PRINTF SPRINTF
 %token	<p>	ELSE INTEST CONDEXPR
 %token	<i>	POSTINCR PREINCR POSTDECR PREDECR
-%token	<cp>	VAR IVAR VARNF CALL NUMBER STRING FIELD
+%token	<cp>	VAR IVAR VARNF CALL NUMBER STRING
 %token	<s>	REGEXPR
 
 %type	<p>	pas pattern ppattern plist pplist patlist prarg term
@@ -89,7 +108,7 @@ static Node	*notnull();
 %left	AND
 %left	GETLINE
 %nonassoc APPEND EQ GE GT LE LT NE MATCHOP IN '|'
-%left	ARG BLTIN BREAK CALL CLOSE CONTINUE DELETE DO EXIT FOR FIELD FUNC 
+%left	ARG BLTIN BREAK CALL CLOSE CONTINUE DELETE DO EXIT FOR FUNC
 %left	GSUB IF INDEX LSUBSTR MATCHFCN NEXT NUMBER
 %left	PRINT PRINTF RETURN SPLIT SPRINTF STRING SUB SUBSTR
 %left	REGEXPR VAR VARNF IVAR WHILE '('
@@ -107,7 +126,7 @@ static Node	*notnull();
 program:
 	  pas	{ if (errorflag==0)
 			winner = (Node *)stat3(PROGRAM, beginloc, $1, endloc); }
-	| error	{ yyclearin; bracecheck(); ERROR "bailing out" SYNTAX; }
+	| error	{ yyclearin; bracecheck(); SYNTAX("bailing out"); }
 	;
 
 and:
@@ -202,13 +221,13 @@ pa_stats:
 
 patlist:
 	  pattern
-	| patlist comma pattern	{ $$ = linkum($1, $3); }
+	| patlist comma pattern		{ $$ = linkum($1, $3); }
 	;
 
 ppattern:
 	  var ASGNOP ppattern		{ $$ = op2($2, $1, $3); }
 	| ppattern '?' ppattern ':' ppattern %prec '?'
-	 	{ $$ = op3(CONDEXPR, notnull($1), $3, $5); }
+		{ $$ = op3(CONDEXPR, notnull($1), $3, $5); }
 	| ppattern bor ppattern %prec BOR
 		{ $$ = op2(BOR, notnull($1), notnull($3)); }
 	| ppattern and ppattern %prec AND
@@ -232,13 +251,13 @@ ppattern:
 pattern:
 	  var ASGNOP pattern		{ $$ = op2($2, $1, $3); }
 	| pattern '?' pattern ':' pattern %prec '?'
-	 	{ $$ = op3(CONDEXPR, notnull($1), $3, $5); }
+		{ $$ = op3(CONDEXPR, notnull($1), $3, $5); }
 	| pattern bor pattern %prec BOR
 		{ $$ = op2(BOR, notnull($1), notnull($3)); }
 	| pattern and pattern %prec AND
 		{ $$ = op2(AND, notnull($1), notnull($3)); }
 	| NOT pattern
-		{ $$ = op1(NOT, op2(NE,$2,valtonode(lookup((uchar *)"$zero&null",symtab),CCON))); }
+		{ $$ = op1(NOT, op2(NE,$2,celltonode(lookup("$zero&null",symtab),CCON))); }
 	| pattern EQ pattern		{ $$ = op2($2, $1, $3); }
 	| pattern GE pattern		{ $$ = op2($2, $1, $3); }
 	| pattern GT pattern		{ $$ = op2($2, $1, $3); }
@@ -269,6 +288,7 @@ plist:
 pplist:
 	  ppattern
 	| pplist comma ppattern		{ $$ = linkum($1, $3); }
+	;
 
 prarg:
 	  /* empty */			{ $$ = rectonode(); }
@@ -302,13 +322,14 @@ simple_stmt:
 	| print prarg GT term		{ $$ = stat3($1, $2, (Node *) $3, $4); }
 	| print prarg			{ $$ = stat3($1, $2, NIL, NIL); }
 	| DELETE varname '[' patlist ']' { $$ = stat2(DELETE, makearr($2), $4); }
-	| DELETE varname		{ yyclearin; ERROR "you can only delete array[element]" SYNTAX; $$ = stat1(DELETE, $2); }
+	| DELETE varname		{ yyclearin; SYNTAX("you can only delete array[element]"); $$ = stat1(DELETE, $2); }
 	| pattern			{ $$ = exptostat($1); }
-	| error				{ yyclearin; ERROR "illegal statement" SYNTAX; }
+	| error				{ yyclearin; SYNTAX("illegal statement"); }
 	;
 
 st:
-	  nl | ';' opt_nl
+	  nl
+	| ';' opt_nl
 	;
 
 stmt:
@@ -324,7 +345,7 @@ stmt:
 	| if stmt		{ $$ = stat3(IF, $1, $2, NIL); }
 	| lbrace stmtlist rbrace { $$ = $2; }
 	| NEXT st	{ if (infunc)
-				ERROR "next is illegal inside a function" SYNTAX;
+				SYNTAX("next is illegal inside a function");
 			  $$ = stat1(NEXT, NIL); }
 	| RETURN pattern st	{ $$ = stat1(RETURN, $2); }
 	| RETURN st		{ $$ = stat1(RETURN, NIL); }
@@ -343,7 +364,8 @@ subop:
 	;
 
 term:
-	  term '+' term			{ $$ = op2(ADD, $1, $3); }
+	  term '/' ASGNOP term		{ $$ = op2(DIVEQ, $1, $4); }
+	| term '+' term			{ $$ = op2(ADD, $1, $3); }
 	| term '-' term			{ $$ = op2(MINUS, $1, $3); }
 	| term '*' term			{ $$ = op2(MULT, $1, $3); }
 	| term '/' term			{ $$ = op2(DIVIDE, $1, $3); }
@@ -351,23 +373,23 @@ term:
 	| term POWER term		{ $$ = op2(POWER, $1, $3); }
 	| '-' term %prec UMINUS		{ $$ = op1(UMINUS, $2); }
 	| '+' term %prec UMINUS		{ $$ = $2; }
-	| BLTIN '(' ')'			{ $$ = op2(BLTIN, (Node *) $1, rectonode()); }
-	| BLTIN '(' patlist ')'		{ $$ = op2(BLTIN, (Node *) $1, $3); }
-	| BLTIN				{ $$ = op2(BLTIN, (Node *) $1, rectonode()); }
-	| CALL '(' ')'			{ $$ = op2(CALL, valtonode($1,CVAR), NIL); }
-	| CALL '(' patlist ')'		{ $$ = op2(CALL, valtonode($1,CVAR), $3); }
+	| BLTIN '(' ')'			{ $$ = op2(BLTIN, itonp($1), rectonode()); }
+	| BLTIN '(' patlist ')'		{ $$ = op2(BLTIN, itonp($1), $3); }
+	| BLTIN				{ $$ = op2(BLTIN, itonp($1), rectonode()); }
+	| CALL '(' ')'			{ $$ = op2(CALL, celltonode($1,CVAR), NIL); }
+	| CALL '(' patlist ')'		{ $$ = op2(CALL, celltonode($1,CVAR), $3); }
 	| DECR var			{ $$ = op1(PREDECR, $2); }
 	| INCR var			{ $$ = op1(PREINCR, $2); }
 	| var DECR			{ $$ = op1(POSTDECR, $1); }
 	| var INCR			{ $$ = op1(POSTINCR, $1); }
-	| GETLINE var LT term		{ $$ = op3(GETLINE, $2, (Node *)$3, $4); }
-	| GETLINE LT term		{ $$ = op3(GETLINE, NIL, (Node *)$2, $3); }
+	| GETLINE var LT term		{ $$ = op3(GETLINE, $2, itonp($3), $4); }
+	| GETLINE LT term		{ $$ = op3(GETLINE, NIL, itonp($2), $3); }
 	| GETLINE var			{ $$ = op3(GETLINE, $2, NIL, NIL); }
 	| GETLINE			{ $$ = op3(GETLINE, NIL, NIL, NIL); }
 	| INDEX '(' pattern comma pattern ')'
 		{ $$ = op2(INDEX, $3, $5); }
 	| INDEX '(' pattern comma reg_expr ')'
-		{ ERROR "index() doesn't permit regular expressions" SYNTAX;
+		{ SYNTAX("index() doesn't permit regular expressions");
 		  $$ = op2(INDEX, $3, (Node*)$5); }
 	| '(' pattern ')'		{ $$ = $2; }
 	| MATCHFCN '(' pattern comma reg_expr ')'
@@ -377,7 +399,7 @@ term:
 			$$ = op3(MATCHFCN, NIL, $3, (Node*)makedfa(strnode($5), 1));
 		  else
 			$$ = op3(MATCHFCN, (Node *)1, $3, $5); }
-	| NUMBER			{ $$ = valtonode($1, CCON); }
+	| NUMBER			{ $$ = celltonode($1, CCON); }
 	| SPLIT '(' pattern comma varname comma pattern ')'     /* string */
 		{ $$ = op4(SPLIT, $3, makearr($5), $7, (Node*)STRING); }
 	| SPLIT '(' pattern comma varname comma reg_expr ')'    /* const /regexp/ */
@@ -385,7 +407,7 @@ term:
 	| SPLIT '(' pattern comma varname ')'
 		{ $$ = op4(SPLIT, $3, makearr($5), NIL, (Node*)STRING); }  /* default */
 	| SPRINTF '(' patlist ')'	{ $$ = op1($1, $3); }
-	| STRING	 		{ $$ = valtonode($1, CCON); }
+	| STRING			{ $$ = celltonode($1, CCON); }
 	| subop '(' reg_expr comma pattern ')'
 		{ $$ = op4($1, NIL, (Node*)makedfa($3, 1), $5, rectonode()); }
 	| subop '(' pattern comma pattern ')'
@@ -410,20 +432,19 @@ term:
 var:
 	  varname
 	| varname '[' patlist ']'	{ $$ = op2(ARRAY, makearr($1), $3); }
-	| FIELD				{ $$ = valtonode($1, CFLD); }
-	| IVAR				{ $$ = op1(INDIRECT, valtonode($1, CVAR)); }
-	| INDIRECT term	 		{ $$ = op1(INDIRECT, $2); }
-	;	
+	| IVAR				{ $$ = op1(INDIRECT, celltonode($1, CVAR)); }
+	| INDIRECT term			{ $$ = op1(INDIRECT, $2); }
+	;
 
 varlist:
 	  /* nothing */		{ arglist = $$ = 0; }
-	| VAR			{ arglist = $$ = valtonode($1,CVAR); }
-	| varlist comma VAR	{ arglist = $$ = linkum($1,valtonode($3,CVAR)); }
+	| VAR			{ arglist = $$ = celltonode($1,CVAR); }
+	| varlist comma VAR	{ arglist = $$ = linkum($1,celltonode($3,CVAR)); }
 	;
 
 varname:
-	  VAR			{ $$ = valtonode($1, CVAR); }
-	| ARG 			{ $$ = op1(ARG, (Node *) $1); }
+	  VAR			{ $$ = celltonode($1, CVAR); }
+	| ARG			{ $$ = op1(ARG, itonp($1)); }
 	| VARNF			{ $$ = op1(VARNF, (Node *) $1); }
 	;
 
@@ -438,20 +459,19 @@ static void
 setfname(Cell *p)
 {
 	if (isarr(p))
-		ERROR "%s is an array, not a function", p->nval SYNTAX;
-	else if (isfunc(p))
-		ERROR "you can't define function %s more than once", p->nval SYNTAX;
+		SYNTAX("%s is an array, not a function", p->nval);
+	else if (isfcn(p))
+		SYNTAX("you can't define function %s more than once", p->nval);
 	curfname = p->nval;
 }
-
 
 static int
 constnode(Node *p)
 {
-	return p->ntype == NVALUE && ((Cell *) (p->narg[0]))->csub == CCON;
+	return isvalue(p) && ((Cell *) (p->narg[0]))->csub == CCON;
 }
 
-static uchar *
+static char *
 strnode(Node *p)
 {
 	return ((Cell *)(p->narg[0]))->sval;

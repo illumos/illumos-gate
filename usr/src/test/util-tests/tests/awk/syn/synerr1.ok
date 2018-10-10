@@ -1,4 +1,4 @@
-$AWK: syntax error at source line 4
+$AWK: syntax error at source line 4 source file synerr1.awk
  context is
 	 >>> print <<<  "hi"
 $AWK: bailing out at source line 4

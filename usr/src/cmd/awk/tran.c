@@ -1,4 +1,28 @@
 /*
+ * Copyright (C) Lucent Technologies 1997
+ * All Rights Reserved
+ *
+ * Permission to use, copy, modify, and distribute this software and
+ * its documentation for any purpose and without fee is hereby
+ * granted, provided that the above copyright notice appear in all
+ * copies and that both that the copyright notice and this
+ * permission notice and warranty disclaimer appear in supporting
+ * documentation, and that the name Lucent Technologies or any of
+ * its entities not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.
+ *
+ * LUCENT DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.
+ * IN NO EVENT SHALL LUCENT OR ANY OF ITS ENTITIES BE LIABLE FOR ANY
+ * SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER
+ * IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ * ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+ * THIS SOFTWARE.
+ */
+
+/*
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -27,13 +51,12 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	DEBUG
 #include <stdio.h>
-#include <stdlib.h>
+#include <math.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 #include "awk.h"
 #include "y.tab.h"
 
@@ -42,17 +65,17 @@
 
 Array	*symtab;	/* main symbol table */
 
-uchar	**FS;		/* initial field sep */
-uchar	**RS;		/* initial record sep */
-uchar	**OFS;		/* output field sep */
-uchar	**ORS;		/* output record sep */
-uchar	**OFMT;		/* output format for numbers */
+char	**FS;		/* initial field sep */
+char	**RS;		/* initial record sep */
+char	**OFS;		/* output field sep */
+char	**ORS;		/* output record sep */
+char	**OFMT;		/* output format for numbers */
 Awkfloat *NF;		/* number of fields in current record */
 Awkfloat *NR;		/* number of current record */
 Awkfloat *FNR;		/* number of current record in current file */
-uchar	**FILENAME;	/* current filename argument */
+char	**FILENAME;	/* current filename argument */
 Awkfloat *ARGC;		/* number of arguments from command line */
-uchar	**SUBSEP;	/* subscript separator for a[i,j,k]; default \034 */
+char	**SUBSEP;	/* subscript separator for a[i,j,k]; default \034 */
 Awkfloat *RSTART;	/* start of re matched with ~; origin 1 (!) */
 Awkfloat *RLENGTH;	/* length of same */
 
@@ -66,83 +89,80 @@ Cell	*rstartloc;	/* RSTART */
 Cell	*rlengthloc;	/* RLENGTH */
 Cell	*symtabloc;	/* SYMTAB */
 
-Cell	*nullloc;
+Cell	*nullloc;	/* a guaranteed empty cell */
 Node	*nullnode;	/* zero&null, converted into a node for comparisons */
 
 static	void	rehash(Array *);
 
 void
-syminit(void)
+syminit(void)	/* initialize symbol table with builtin vars */
 {
-	init_buf(&record, &record_size, LINE_INCR);
+	init_buf(&record, &recsize, LINE_INCR);
 
 	/* initialize $0 */
 	recloc = getfld(0);
-	recloc->nval = (uchar *)"$0";
+	recloc->nval = "$0";
 	recloc->sval = record;
 	recloc->tval = REC|STR|DONTFREE;
 
 	symtab = makesymtab(NSYMTAB);
-	(void) setsymtab((uchar *)"0", (uchar *)"0", 0.0,
+	(void) setsymtab("0", "0", 0.0,
 	    NUM|STR|CON|DONTFREE, symtab);
 	/* this is used for if(x)... tests: */
-	nullloc = setsymtab((uchar *)"$zero&null", (uchar *)"", 0.0,
+	nullloc = setsymtab("$zero&null", "", 0.0,
 	    NUM|STR|CON|DONTFREE, symtab);
-	nullnode = valtonode(nullloc, CCON);
-	FS = &setsymtab((uchar *)"FS", (uchar *)" ", 0.0,
+	nullnode = celltonode(nullloc, CCON);
+
+	FS = &setsymtab("FS", " ", 0.0,
 	    STR|DONTFREE, symtab)->sval;
-	RS = &setsymtab((uchar *)"RS", (uchar *)"\n", 0.0,
+	RS = &setsymtab("RS", "\n", 0.0,
 	    STR|DONTFREE, symtab)->sval;
-	OFS = &setsymtab((uchar *)"OFS", (uchar *)" ", 0.0,
+	OFS = &setsymtab("OFS", " ", 0.0, STR|DONTFREE, symtab)->sval;
+	ORS = &setsymtab("ORS", "\n", 0.0,
 	    STR|DONTFREE, symtab)->sval;
-	ORS = &setsymtab((uchar *)"ORS", (uchar *)"\n", 0.0,
+	OFMT = &setsymtab("OFMT", "%.6g", 0.0,
 	    STR|DONTFREE, symtab)->sval;
-	OFMT = &setsymtab((uchar *)"OFMT", (uchar *)"%.6g", 0.0,
+	FILENAME = &setsymtab("FILENAME", "-", 0.0,
 	    STR|DONTFREE, symtab)->sval;
-	FILENAME = &setsymtab((uchar *)"FILENAME", (uchar *)"-", 0.0,
-	    STR|DONTFREE, symtab)->sval;
-	nfloc = setsymtab((uchar *)"NF", (uchar *)"", 0.0, NUM, symtab);
+	nfloc = setsymtab("NF", "", 0.0, NUM, symtab);
 	NF = &nfloc->fval;
-	nrloc = setsymtab((uchar *)"NR", (uchar *)"", 0.0, NUM, symtab);
+	nrloc = setsymtab("NR", "", 0.0, NUM, symtab);
 	NR = &nrloc->fval;
-	fnrloc = setsymtab((uchar *)"FNR", (uchar *)"", 0.0, NUM, symtab);
+	fnrloc = setsymtab("FNR", "", 0.0, NUM, symtab);
 	FNR = &fnrloc->fval;
-	SUBSEP = &setsymtab((uchar *)"SUBSEP", (uchar *)"\034", 0.0,
+	SUBSEP = &setsymtab("SUBSEP", "\034", 0.0,
 	    STR|DONTFREE, symtab)->sval;
-	rstartloc = setsymtab((uchar *)"RSTART", (uchar *)"", 0.0,
-	    NUM, symtab);
+	rstartloc = setsymtab("RSTART", "", 0.0, NUM, symtab);
 	RSTART = &rstartloc->fval;
-	rlengthloc = setsymtab((uchar *)"RLENGTH", (uchar *)"", 0.0,
-	    NUM, symtab);
+	rlengthloc = setsymtab("RLENGTH", "", 0.0, NUM, symtab);
 	RLENGTH = &rlengthloc->fval;
-	symtabloc = setsymtab((uchar *)"SYMTAB", (uchar *)"", 0.0, ARR, symtab);
-	symtabloc->sval = (uchar *)symtab;
+	symtabloc = setsymtab("SYMTAB", "", 0.0, ARR, symtab);
+	symtabloc->sval = (char *)symtab;
 }
 
 void
-arginit(int ac, uchar *av[])
+arginit(int ac, char **av)	/* set up ARGV and ARGC */
 {
 	Cell *cp;
 	int i;
-	uchar temp[11];
+	char temp[50];
 
 	/* first make FILENAME first real argument */
 	for (i = 1; i < ac; i++) {
 		if (!isclvar(av[i])) {
-			(void) setsval(lookup((uchar *)"FILENAME", symtab),
+			(void) setsval(lookup("FILENAME", symtab),
 			    av[i]);
 			break;
 		}
 	}
-	ARGC = &setsymtab((uchar *)"ARGC", (uchar *)"", (Awkfloat)ac,
-	    NUM, symtab)->fval;
-	cp = setsymtab((uchar *)"ARGV", (uchar *)"", 0.0, ARR, symtab);
+	ARGC = &setsymtab("ARGC", "", (Awkfloat)ac, NUM, symtab)->fval;
+	cp = setsymtab("ARGV", "", 0.0, ARR, symtab);
 	ARGVtab = makesymtab(NSYMTAB);	/* could be (int) ARGC as well */
-	cp->sval = (uchar *) ARGVtab;
+	cp->sval = (char *)ARGVtab;
 	for (i = 0; i < ac; i++) {
-		(void) sprintf((char *)temp, "%d", i);
+		(void) sprintf(temp, "%d", i);
 		if (is_number(*av)) {
-			(void) setsymtab(temp, *av, atof((const char *)*av),
+			(void) setsymtab(temp, *av, atof(*av),
 			    STR|NUM, ARGVtab);
 		} else {
 			(void) setsymtab(temp, *av, 0.0, STR, ARGVtab);
@@ -152,20 +172,20 @@ arginit(int ac, uchar *av[])
 }
 
 void
-envinit(uchar *envp[])
+envinit(char **envp)	/* set up ENVIRON variable */
 {
 	Cell *cp;
-	uchar *p;
+	char *p;
 
-	cp = setsymtab((uchar *)"ENVIRON", (uchar *)"", 0.0, ARR, symtab);
+	cp = setsymtab("ENVIRON", "", 0.0, ARR, symtab);
 	ENVtab = makesymtab(NSYMTAB);
-	cp->sval = (uchar *) ENVtab;
+	cp->sval = (char *)ENVtab;
 	for (; *envp; envp++) {
-		if ((p = (uchar *)strchr((char *)*envp, '=')) == NULL)
+		if ((p = strchr(*envp, '=')) == NULL)
 			continue;
 		*p++ = 0;	/* split into two strings at = */
 		if (is_number(p)) {
-			(void) setsymtab(*envp, p, atof((const char *)p),
+			(void) setsymtab(*envp, p, atof(p),
 			    STR|NUM, ENVtab);
 		} else {
 			(void) setsymtab(*envp, p, 0.0, STR, ENVtab);
@@ -176,7 +196,7 @@ envinit(uchar *envp[])
 }
 
 Array *
-makesymtab(int n)
+makesymtab(int n)	/* make a new symbol table */
 {
 	Array *ap;
 	Cell **tp;
@@ -184,7 +204,7 @@ makesymtab(int n)
 	ap = (Array *)malloc(sizeof (Array));
 	tp = (Cell **)calloc(n, sizeof (Cell *));
 	if (ap == NULL || tp == NULL)
-		ERROR "out of space in makesymtab" FATAL;
+		FATAL("out of space in makesymtab");
 	ap->nelem = 0;
 	ap->size = n;
 	ap->tab = tp;
@@ -192,9 +212,9 @@ makesymtab(int n)
 }
 
 void
-freesymtab(Cell *ap)	/* free symbol table */
+freesymtab(Cell *ap)	/* free a symbol table */
 {
-	Cell *cp, *next;
+	Cell *cp, *temp;
 	Array *tp;
 	int i;
 
@@ -205,20 +225,26 @@ freesymtab(Cell *ap)	/* free symbol table */
 	if (tp == NULL)
 		return;
 	for (i = 0; i < tp->size; i++) {
-		for (cp = tp->tab[i]; cp != NULL; cp = next) {
-			next = cp->cnext;
+		for (cp = tp->tab[i]; cp != NULL; cp = temp) {
 			xfree(cp->nval);
 			if (freeable(cp))
 				xfree(cp->sval);
+			temp = cp->cnext;	/* avoids freeing then using */
 			free(cp);
+			tp->nelem--;
 		}
+		tp->tab[i] = 0;
+	}
+	if (tp->nelem != 0) {
+		WARNING("can't happen: inconsistent element count freeing %s",
+		    ap->nval);
 	}
 	free(tp->tab);
 	free(tp);
 }
 
 void
-freeelem(Cell *ap, uchar *s)		/* free elem s from ap (i.e., ap["s"] */
+freeelem(Cell *ap, const char *s)	/* free elem s from ap (i.e., ap["s"] */
 {
 	Array *tp;
 	Cell *p, *prev = NULL;
@@ -228,7 +254,7 @@ freeelem(Cell *ap, uchar *s)		/* free elem s from ap (i.e., ap["s"] */
 	tp = (Array *)ap->sval;
 	h = hash(s, tp->size);
 	for (p = tp->tab[h]; p != NULL; prev = p, p = p->cnext)
-		if (strcmp((char *)s, (char *)p->nval) == 0) {
+		if (strcmp(s, p->nval) == 0) {
 			if (prev == NULL)	/* 1st one */
 				tp->tab[h] = p->cnext;
 			else			/* middle somewhere */
@@ -243,25 +269,24 @@ freeelem(Cell *ap, uchar *s)		/* free elem s from ap (i.e., ap["s"] */
 }
 
 Cell *
-setsymtab(uchar *n, uchar *s, Awkfloat f, unsigned int t, Array *tp)
+setsymtab(const char *n, const char *s, Awkfloat f, unsigned int t, Array *tp)
 {
-	register int h;
-	register Cell *p;
+	int h;
+	Cell *p;
 
 	if (n != NULL && (p = lookup(n, tp)) != NULL) {
-		dprintf(("setsymtab found %p: n=%s", (void *)p, p->nval));
-		dprintf((" s=\"%s\" f=%g t=%p\n",
-		    p->sval, p->fval, (void *)p->tval));
+		dprintf(("setsymtab found %p: n=%s s=\"%s\" f=%g t=%o\n",
+		    (void *)p, NN(p->nval), NN(p->sval), p->fval, p->tval));
 		return (p);
 	}
 	p = (Cell *)malloc(sizeof (Cell));
 	if (p == NULL)
-		ERROR "symbol table overflow at %s", n FATAL;
+		FATAL("out of space for symbol table at %s", n);
 	p->nval = tostring(n);
-	p->sval = s ? tostring(s) : tostring((uchar *)"");
+	p->sval = s ? tostring(s) : tostring("");
 	p->fval = f;
 	p->tval = t;
-	p->csub = 0;
+	p->csub = CUNK;
 
 	tp->nelem++;
 	if (tp->nelem > FULLTAB * tp->size)
@@ -269,15 +294,15 @@ setsymtab(uchar *n, uchar *s, Awkfloat f, unsigned int t, Array *tp)
 	h = hash(n, tp->size);
 	p->cnext = tp->tab[h];
 	tp->tab[h] = p;
-	dprintf(("setsymtab set %p: n=%s", (void *)p, p->nval));
-	dprintf((" s=\"%s\" f=%g t=%p\n", p->sval, p->fval, (void *)p->tval));
+	dprintf(("setsymtab set %p: n=%s s=\"%s\" f=%g t=%o\n",
+	    (void *)p, p->nval, p->sval, p->fval, p->tval));
 	return (p);
 }
 
 int
-hash(uchar *s, int n)	/* form hash value for string s */
+hash(const char *s, int n)	/* form hash value for string s */
 {
-	register unsigned hashval;
+	unsigned int hashval;
 
 	for (hashval = 0; *s != '\0'; s++)
 		hashval = (*s + 31 * hashval);
@@ -292,10 +317,10 @@ rehash(Array *tp)	/* rehash items in small table into big one */
 
 	nsz = GROWTAB * tp->size;
 	np = (Cell **)calloc(nsz, sizeof (Cell *));
-	if (np == NULL)
-		ERROR "out of space in rehash" FATAL;
+	if (np == NULL)		/* can't do it, but can keep running. */
+		return;		/* someone else will run out later. */
 	for (i = 0; i < tp->size; i++) {
-		for (cp = tp->tab[i]; cp; cp = op) {
+		for (cp = tp->tab[i]; cp != NULL; cp = op) {
 			op = cp->cnext;
 			nh = hash(cp->nval, nsz);
 			cp->cnext = np[nh];
@@ -308,69 +333,70 @@ rehash(Array *tp)	/* rehash items in small table into big one */
 }
 
 Cell *
-lookup(uchar *s, Array *tp)	/* look for s in tp */
+lookup(const char *s, Array *tp)	/* look for s in tp */
 {
-	register Cell *p;
+	Cell *p;
 	int h;
 
 	h = hash(s, tp->size);
 	for (p = tp->tab[h]; p != NULL; p = p->cnext) {
-		if (strcmp((char *)s, (char *)p->nval) == 0)
+		if (strcmp(s, p->nval) == 0)
 			return (p);	/* found it */
 	}
 	return (NULL);			/* not found */
 }
 
 Awkfloat
-setfval(Cell *vp, Awkfloat f)
+setfval(Cell *vp, Awkfloat f)	/* set float val of a Cell */
 {
 	int	i;
 
 	if ((vp->tval & (NUM | STR)) == 0)
 		funnyvar(vp, "assign to");
-	if (vp->tval & FLD) {
+	if (isfld(vp)) {
 		donerec = 0;	/* mark $0 invalid */
 		i = fldidx(vp);
 		if (i > *NF)
 			newfld(i);
 		dprintf(("setting field %d to %g\n", i, f));
-	} else if (vp->tval & REC) {
+	} else if (isrec(vp)) {
 		donefld = 0;	/* mark $1... invalid */
 		donerec = 1;
 	}
 	vp->tval &= ~STR;	/* mark string invalid */
 	vp->tval |= NUM;	/* mark number ok */
-	dprintf(("setfval %p: %s = %g, t=%p\n", (void *)vp,
-	    vp->nval ? vp->nval : (unsigned char *)"NULL",
-	    f, (void *)vp->tval));
+	dprintf(("setfval %p: %s = %g, t=%o\n", (void *)vp,
+	    NN(vp->nval), f, vp->tval));
 	return (vp->fval = f);
 }
 
 void
-funnyvar(Cell *vp, char *rw)
+funnyvar(Cell *vp, const char *rw)
 {
-	if (vp->tval & ARR)
-		ERROR "can't %s %s; it's an array name.", rw, vp->nval FATAL;
-	if (vp->tval & FCN)
-		ERROR "can't %s %s; it's a function.", rw, vp->nval FATAL;
-	ERROR "funny variable %o: n=%s s=\"%s\" f=%g t=%o",
-	    vp, vp->nval, vp->sval, vp->fval, vp->tval CONT;
+	if (isarr(vp))
+		FATAL("can't %s %s; it's an array name.", rw, vp->nval);
+	if (isfcn(vp))
+		FATAL("can't %s %s; it's a function.", rw, vp->nval);
+	WARNING("funny variable %p: n=%s s=\"%s\" f=%g t=%o",
+	    vp, vp->nval, vp->sval, vp->fval, vp->tval);
 }
 
-uchar *
-setsval(Cell *vp, uchar *s)
+char *
+setsval(Cell *vp, const char *s)	/* set string val of a Cell */
 {
 	int	i;
 
+	dprintf(("starting setsval %p: %s = \"%s\", t=%o, r,f=%d,%d\n",
+	    (void *)vp, NN(vp->nval), s, vp->tval, donerec, donefld));
 	if ((vp->tval & (NUM | STR)) == 0)
 		funnyvar(vp, "assign to");
-	if (vp->tval & FLD) {
+	if (isfld(vp)) {
 		donerec = 0;	/* mark $0 invalid */
 		i = fldidx(vp);
 		if (i > *NF)
 			newfld(i);
 		dprintf(("setting field %d to %s\n", i, s));
-	} else if (vp->tval & REC) {
+	} else if (isrec(vp)) {
 		donefld = 0;	/* mark $1... invalid */
 		donerec = 1;
 	}
@@ -388,74 +414,68 @@ setsval(Cell *vp, uchar *s)
 }
 
 Awkfloat
-r_getfval(Cell *vp)
+r_getfval(Cell *vp)	/* get float val of a Cell */
 {
 	if ((vp->tval & (NUM | STR)) == 0)
 		funnyvar(vp, "read value of");
-	if ((vp->tval & FLD) && donefld == 0)
+	if (isfld(vp) && donefld == 0)
 		fldbld();
-	else if ((vp->tval & REC) && donerec == 0)
+	else if (isrec(vp) && donerec == 0)
 		recbld();
 	if (!isnum(vp)) {	/* not a number */
-		vp->fval = atof((const char *)vp->sval);	/* best guess */
+		vp->fval = atof(vp->sval);	/* best guess */
 		if (is_number(vp->sval) && !(vp->tval&CON))
 			vp->tval |= NUM;	/* make NUM only sparingly */
 	}
 	dprintf(("getfval %p: %s = %g, t=%p\n",
-	    (void *)vp, vp->nval, vp->fval, (void *)vp->tval));
+	    (void *)vp, NN(vp->nval), vp->fval, (void *)vp->tval));
 	return (vp->fval);
 }
 
-uchar *
+char *
 r_getsval(Cell *vp)
 {
-	uchar s[256];
+	char s[256];
 
 	if ((vp->tval & (NUM | STR)) == 0)
 		funnyvar(vp, "read value of");
-	if ((vp->tval & FLD) && donefld == 0)
+	if (isfld(vp) && donefld == 0)
 		fldbld();
-	else if ((vp->tval & REC) && donerec == 0)
+	else if (isrec(vp) && donerec == 0)
 		recbld();
-	if ((vp->tval & STR) == 0) {
-		if (!(vp->tval&DONTFREE))
+	if (isstr(vp) == 0) {
+		if (freeable(vp))
 			xfree(vp->sval);
 		if ((long long)vp->fval == vp->fval) {
-			(void) snprintf((char *)s, sizeof (s),
+			(void) snprintf(s, sizeof (s),
 			    "%.20g", vp->fval);
 		} else {
 			/*LINTED*/
-			(void) snprintf((char *)s, sizeof (s),
+			(void) snprintf(s, sizeof (s),
 			    (char *)*OFMT, vp->fval);
 		}
 		vp->sval = tostring(s);
 		vp->tval &= ~DONTFREE;
 		vp->tval |= STR;
 	}
-	dprintf(("getsval %p: %s = \"%s\", t=%p\n",
-	    (void *)vp,
-	    vp->nval ? (char *)vp->nval : "",
-	    vp->sval ? (char *)vp->sval : "",
-	    (void *)vp->tval));
+	dprintf(("getsval %p: %s = \"%s (%p)\", t=%o\n",
+	    (void *)vp, NN(vp->nval), vp->sval, (void *)vp->sval, vp->tval));
 	return (vp->sval);
 }
 
-uchar *
-tostring(uchar *s)
+char *
+tostring(const char *s)	/* make a copy of string s */
 {
-	register uchar *p;
-
-	p = (uchar *)malloc(strlen((char *)s)+1);
+	char *p = strdup(s);
 	if (p == NULL)
-		ERROR "out of space in tostring on %s", s FATAL;
-	(void) strcpy((char *)p, (char *)s);
+		FATAL("out of space in tostring on %s", s);
 	return (p);
 }
 
-uchar *
-qstring(uchar *s, int delim)	/* collect string up to delim */
+char *
+qstring(const char *s, int delim)	/* collect string up to delim */
 {
-	uchar *cbuf, *ret;
+	char *cbuf, *ret;
 	int c, n;
 	size_t	cbufsz, cnt;
 
@@ -463,7 +483,7 @@ qstring(uchar *s, int delim)	/* collect string up to delim */
 
 	for (cnt = 0; (c = *s) != delim; s++) {
 		if (c == '\n') {
-			ERROR "newline in string %.10s...", cbuf SYNTAX;
+			SYNTAX("newline in string %.10s...", cbuf);
 		} else if (c != '\\') {
 			expand_buf(&cbuf, &cbufsz, cnt);
 			cbuf[cnt++] = c;
