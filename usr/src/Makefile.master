@@ -345,9 +345,16 @@ CC32BITCALLERS=		-_gcc=-massume-32bit-callers
 # Additionally, we wish to prevent optimisations which cause GCC to clone
 # functions -- in particular, these may cause unhelpful symbols to be
 # emitted instead of function names
-CCNOAUTOINLINE= -_gcc=-fno-inline-small-functions \
+CCNOAUTOINLINE= \
+	-_gcc=-fno-inline-small-functions \
 	-_gcc=-fno-inline-functions-called-once \
-	-_gcc=-fno-ipa-cp
+	-_gcc=-fno-ipa-cp \
+	-_gcc6=-fno-ipa-icf \
+	-_gcc7=-fno-ipa-icf \
+	-_gcc8=-fno-ipa-icf \
+	-_gcc6=-fno-clone-functions \
+	-_gcc7=-fno-clone-functions \
+	-_gcc8=-fno-clone-functions
 
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo
