@@ -201,16 +201,13 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 		token->tkn_audit_sid = entry->sa_audit_sid;
 	}
 
-	if (buf != NULL)
-		free(buf);
+	free(buf);
 
 	return (token);
 
 errout:
-	if (buf != NULL)
-		free(buf);
-	if (ah != NULL)
-		(void) adt_end_session(ah);
+	free(buf);
+	(void) adt_end_session(ah);
 	smb_token_destroy(token);
 	return (NULL);
 }
