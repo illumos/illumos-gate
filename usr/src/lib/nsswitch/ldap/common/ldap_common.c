@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include "ldap_common.h"
@@ -105,6 +105,7 @@ switch_err(int rc, ns_ldap_error_t *error)
 		return (NSS_SUCCESS);
 
 	case NS_LDAP_NOTFOUND:
+		errno = 0;
 		return (NSS_NOTFOUND);
 
 	case NS_LDAP_PARTIAL:
@@ -124,10 +125,10 @@ switch_err(int rc, ns_ldap_error_t *error)
 /* ARGSUSED */
 nss_status_t
 _nss_ldap_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
-		char *database, char *searchfilter, char *domain,
-		int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
-		char **realfilter, const void *userdata),
-		const void *userdata)
+    char *database, char *searchfilter, char *domain,
+    int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+    char **realfilter, const void *userdata),
+    const void *userdata)
 {
 	int		callbackstat = 0;
 	ns_ldap_error_t	*error = NULL;
@@ -247,10 +248,10 @@ error_out:
 /* ARGSUSED */
 nss_status_t
 _nss_ldap_nocb_lookup(ldap_backend_ptr be, nss_XbyY_args_t *argp,
-		char *database, char *searchfilter, const char * const *attrs,
-		int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
-		char **realfilter, const void *userdata),
-		const void *userdata)
+    char *database, char *searchfilter, const char * const *attrs,
+    int (*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+    char **realfilter, const void *userdata),
+    const void *userdata)
 {
 	ns_ldap_error_t	*error = NULL;
 	int		rc;
@@ -535,7 +536,7 @@ error_out:
 
 nss_backend_t *
 _nss_ldap_constr(ldap_backend_op_t ops[], int nops, char *tablename,
-		const char **attrs, fnf ldapobj2str)
+    const char **attrs, fnf ldapobj2str)
 {
 	ldap_backend_ptr	be;
 
