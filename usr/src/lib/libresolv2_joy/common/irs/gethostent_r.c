@@ -15,10 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: gethostent_r.c,v 1.9 2005/09/03 12:41:37 marka Exp $";
-#endif /* LIBC_SCCS and not lint */
-
 #include <port_before.h>
 #if !defined(_REENTRANT) || !defined(DO_PTHREADS)
 	static int gethostent_r_not_required = 0;

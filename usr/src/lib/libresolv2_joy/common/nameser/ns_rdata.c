@@ -20,10 +20,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef lint
-static const char rcsid[] = "$Id: ns_rdata.c,v 1.2 2009/01/23 23:49:15 tbox Exp $";
-#endif
-
 #include "port_before.h"
 
 #if __OpenBSD__

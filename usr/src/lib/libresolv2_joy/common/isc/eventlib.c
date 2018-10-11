@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1995-1999 by Internet Software Consortium
+ * Copyright 2018 Joyent, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,10 +19,6 @@
 /* eventlib.c - implement glue for the eventlib
  * vix 09sep95 [initial]
  */
-
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: eventlib.c,v 1.10 2006/03/09 23:57:56 marka Exp $";
-#endif
 
 #include "port_before.h"
 #include "fd_setsize.h"
@@ -737,7 +734,7 @@ pselect(int nfds, void *rfds, void *wfds, void *efds,
 	struct timespec *tsp,
 	const sigset_t *sigmask)
 {
-	struct timeval tv, *tvp;
+	struct timeval tv;
 	sigset_t sigs;
 	int n;
 #ifdef USE_POLL
@@ -747,16 +744,18 @@ pselect(int nfds, void *rfds, void *wfds, void *efds,
 	nfds_t		pnfds;
 
 	UNUSED(nfds);
+#else
+	struct timeval *tvp = NULL;
 #endif /* USE_POLL */
 
 	if (tsp) {
-		tvp = &tv;
 		tv = evTimeVal(*tsp);
 #ifdef USE_POLL
 		polltimeout = 1000 * tv.tv_sec + tv.tv_usec / 1000;
+#else
+		tvp = &tv;
 #endif /* USE_POLL */
-	} else
-		tvp = NULL;
+	}
 	if (sigmask)
 		sigprocmask(SIG_SETMASK, sigmask, &sigs);
 #ifndef USE_POLL

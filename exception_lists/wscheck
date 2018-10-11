@@ -14,6 +14,8 @@ syntax: glob
 
 usr/src/data/ucode/amd/*
 usr/src/data/ucode/intel/*
+usr/src/lib/libresolv2/common/*
+usr/src/lib/libresolv2_joy/common/*
 
 # bhyve sources
 usr/src/cmd/bhyve/acpi.[ch]

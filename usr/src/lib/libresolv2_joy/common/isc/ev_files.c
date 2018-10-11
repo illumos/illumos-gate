@@ -19,10 +19,6 @@
  * vix 11sep95 [initial]
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: ev_files.c,v 1.8 2005/07/28 06:51:48 marka Exp $";
-#endif
-
 #include "port_before.h"
 #include "fd_setsize.h"
 

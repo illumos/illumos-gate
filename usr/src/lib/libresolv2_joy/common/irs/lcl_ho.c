@@ -51,10 +51,6 @@
 /* from gethostnamadr.c	8.1 (Berkeley) 6/4/93 */
 /* BIND Id: gethnamaddr.c,v 8.15 1996/05/22 04:56:30 vixie Exp $ */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: lcl_ho.c,v 1.5 2006/03/09 23:57:56 marka Exp $";
-#endif /* LIBC_SCCS and not lint */
-
 /* Imports. */
 
 #include "port_before.h"

@@ -19,10 +19,6 @@
  * vix 05dec95 [initial]
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: ev_waits.c,v 1.4 2005/04/27 04:56:36 sra Exp $";
-#endif
-
 #include "port_before.h"
 #include "fd_setsize.h"
 

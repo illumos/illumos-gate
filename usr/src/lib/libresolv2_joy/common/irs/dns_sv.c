@@ -15,10 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: dns_sv.c,v 1.5 2005/04/27 04:56:23 sra Exp $";
-#endif
-
 /* Imports */
 
 #include "port_before.h"

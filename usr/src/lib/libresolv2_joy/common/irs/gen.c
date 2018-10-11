@@ -21,10 +21,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: gen.c,v 1.7 2005/04/27 04:56:23 sra Exp $";
-#endif
-
 /*! \file
  * \brief
  * this is the top level dispatcher

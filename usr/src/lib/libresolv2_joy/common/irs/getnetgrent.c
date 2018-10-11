@@ -15,10 +15,6 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: getnetgrent.c,v 1.6 2008/11/14 02:36:51 marka Exp $";
-#endif /* LIBC_SCCS and not lint */
-
 /* Imports */
 
 #include "port_before.h"

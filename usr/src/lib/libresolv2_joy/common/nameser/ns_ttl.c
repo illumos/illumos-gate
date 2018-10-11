@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996,1999 by Internet Software Consortium.
+ * Copyright 2018 Joyent, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,12 +15,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#ifndef lint
-static const char rcsid[] = "$Id: ns_ttl.c,v 1.4 2005/07/28 06:51:49 marka Exp $";
-#endif
-
-/* Import. */
 
 #include "port_before.h"
 
@@ -117,9 +112,13 @@ ns_parse_ttl(const char *src, u_long *dst) {
 			ch = toupper(ch);
 		switch (ch) {
 		case 'W':  tmp *= 7;
+			/* FALLTHROUGH */
 		case 'D':  tmp *= 24;
+			/* FALLTHROUGH */
 		case 'H':  tmp *= 60;
+			/* FALLTHROUGH */
 		case 'M':  tmp *= 60;
+			/* FALLTHROUGH */
 		case 'S':  break;
 		default:   goto einval;
 		}

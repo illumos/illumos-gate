@@ -15,10 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: dns.c,v 1.5 2006/03/09 23:57:56 marka Exp $";
-#endif
-
 /*! \file
  * \brief
  * dns.c --- this is the top-level accessor function for the dns

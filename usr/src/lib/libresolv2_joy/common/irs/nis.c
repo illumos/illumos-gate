@@ -15,12 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: nis.c,v 1.3 2005/04/27 04:56:32 sra Exp $";
-#endif
-
-/* Imports */
-
 #include "port_before.h"
 
 #ifdef WANT_IRS_NIS

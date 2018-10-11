@@ -15,10 +15,6 @@
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: gen_sv.c,v 1.3 2005/04/27 04:56:24 sra Exp $";
-#endif
-
 /* Imports */
 
 #include "port_before.h"

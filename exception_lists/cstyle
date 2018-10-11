@@ -689,6 +689,7 @@ usr/src/lib/libdns_sd/common/dns_sd.h
 usr/src/lib/libdns_sd/java/common/JNISupport.c
 usr/src/lib/libgss/g_glue.c
 usr/src/lib/libresolv2/common
+usr/src/lib/libresolv2_joy/common
 usr/src/lib/librstp/common/base.h
 usr/src/lib/librstp/common/choose.h
 usr/src/lib/librstp/common/edge.c

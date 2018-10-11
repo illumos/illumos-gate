@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996-1999 by Internet Software Consortium.
+ * Copyright 2018 Joyent, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,12 +15,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
  * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#ifndef lint
-static const char rcsid[] = "$Id: ns_print.c,v 1.12 2009/03/03 05:29:58 each Exp $";
-#endif
-
-/* Import. */
 
 #include "port_before.h"
 
@@ -900,6 +895,7 @@ ns_sprintrrf(const u_char *msg, size_t msglen,
 			if (len > 15)
 				T(addstr(" )", 2, &buf, &buflen));
 		}
+		break;
 	}
 
 	case ns_t_ipseckey: {
@@ -991,6 +987,7 @@ ns_sprintrrf(const u_char *msg, size_t msglen,
 			if (len > 15)
 				T(addstr(" )", 2, &buf, &buflen));
 		}
+		break;
 	}
 
 	case ns_t_hip: {
