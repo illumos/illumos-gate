@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996-1999 by Internet Software Consortium.
+ * Copyright 2018 Joyent, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -894,8 +895,8 @@ ns_sprintrrf(const u_char *msg, size_t msglen,
 			if (len > 15)
 				T(addstr(" )", 2, &buf, &buflen));
 		}
+		break;
 	}
-	/* FALLTHROUGH */
 
 	case ns_t_ipseckey: {
 		int n;
@@ -986,8 +987,8 @@ ns_sprintrrf(const u_char *msg, size_t msglen,
 			if (len > 15)
 				T(addstr(" )", 2, &buf, &buflen));
 		}
+		break;
 	}
-	/* FALLTHROUGH */
 
 	case ns_t_hip: {
 		unsigned int i, hip_len, algorithm, key_len;
