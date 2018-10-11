@@ -33,6 +33,10 @@
 * limitations under the License.
 */
 
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
+
 #include "bcm_osal.h"
 #include "ecore.h"
 #include "reg_addr.h"
@@ -626,7 +630,7 @@ static int ecore_ah_e5_phy_mac_stat(struct ecore_hwfn *p_hwfn,
 				    struct ecore_ptt *p_ptt, u32 port,
 				    char *p_phy_result_buf)
 {
-	u32 length, reg_id, addr, data_hi, data_lo;
+	u32 length, reg_id, addr, data_hi __unused, data_lo;
 
 	length = OSAL_SPRINTF(p_phy_result_buf,
 			       "MAC stats for port %d (only non-zero)\n", port);
