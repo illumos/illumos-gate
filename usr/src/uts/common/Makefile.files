@@ -1494,8 +1494,8 @@ KLMOPS_OBJS +=	klmops.o
 
 TLIMOD_OBJS +=	tlimod.o	t_kalloc.o	t_kbind.o	t_kclose.o \
 		t_kconnect.o	t_kfree.o	t_kgtstate.o	t_kopen.o \
-		t_krcvudat.o	t_ksndudat.o	t_kspoll.o	t_kunbind.o \
-		t_kutil.o
+		t_koptmgmt.o	t_krcvudat.o	t_ksndudat.o	t_kspoll.o \
+		t_kunbind.o	t_kutil.o
 
 RLMOD_OBJS += rlmod.o
 

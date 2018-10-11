@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -81,9 +81,9 @@ static smb_audit_t *smbd_audit_unlink(uint32_t);
 smb_token_t *
 smbd_user_auth_logon(smb_logon_t *user_info)
 {
-	smb_token_t *token;
+	smb_token_t *token = NULL;
 	smb_audit_t *entry;
-	adt_session_data_t *ah;
+	adt_session_data_t *ah = NULL;
 	adt_event_data_t *event;
 	smb_logon_t tmp_user;
 	au_tid_addr_t termid;
@@ -95,6 +95,8 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 	char *sid;
 	int status;
 	int retval;
+	char *p;
+	char *buf = NULL;
 
 	if (user_info->lg_username == NULL ||
 	    user_info->lg_domain == NULL ||
@@ -109,7 +111,20 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 	} else {
 		tmp_user.lg_e_username = tmp_user.lg_username;
 	}
-	tmp_user.lg_e_domain = tmp_user.lg_domain;
+
+	/* Handle user@domain format. */
+	if (tmp_user.lg_domain[0] == '\0' &&
+	    (p = strchr(tmp_user.lg_e_username, '@')) != NULL) {
+		buf = strdup(tmp_user.lg_e_username);
+		if (buf == NULL)
+			goto errout;
+		p = buf + (p - tmp_user.lg_e_username);
+		*p = '\0';
+		tmp_user.lg_e_domain = p + 1;
+		tmp_user.lg_e_username = buf;
+	} else {
+		tmp_user.lg_e_domain = tmp_user.lg_domain;
+	}
 
 	if ((token = smb_logon(&tmp_user)) == NULL) {
 		uid = ADT_NO_ATTRIB;
@@ -132,16 +147,13 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 
 	if (adt_start_session(&ah, NULL, 0)) {
 		syslog(LOG_AUTH | LOG_ALERT, "adt_start_session: %m");
-		smb_token_destroy(token);
-		return (NULL);
+		goto errout;
 	}
 
 	if ((event = adt_alloc_event(ah, ADT_smbd_session)) == NULL) {
 		syslog(LOG_AUTH | LOG_ALERT,
 		    "adt_alloc_event(ADT_smbd_session): %m");
-		(void) adt_end_session(ah);
-		smb_token_destroy(token);
-		return (NULL);
+		goto errout;
 	}
 
 	(void) memset(&termid, 0, sizeof (au_tid_addr_t));
@@ -160,9 +172,7 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 	if (adt_set_user(ah, uid, gid, uid, gid, NULL, ADT_NEW)) {
 		syslog(LOG_AUTH | LOG_ALERT, "adt_set_user: %m");
 		adt_free_event(event);
-		(void) adt_end_session(ah);
-		smb_token_destroy(token);
-		return (NULL);
+		goto errout;
 	}
 
 	event->adt_smbd_session.domain = domain;
@@ -177,9 +187,7 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 	if (token) {
 		if ((entry = malloc(sizeof (smb_audit_t))) == NULL) {
 			syslog(LOG_ERR, "smbd_user_auth_logon: %m");
-			(void) adt_end_session(ah);
-			smb_token_destroy(token);
-			return (NULL);
+			goto errout;
 		}
 
 		entry->sa_handle = ah;
@@ -193,7 +201,15 @@ smbd_user_auth_logon(smb_logon_t *user_info)
 		token->tkn_audit_sid = entry->sa_audit_sid;
 	}
 
+	free(buf);
+
 	return (token);
+
+errout:
+	free(buf);
+	(void) adt_end_session(ah);
+	smb_token_destroy(token);
+	return (NULL);
 }
 
 /*
