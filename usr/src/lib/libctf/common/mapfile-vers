@@ -23,7 +23,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -91,7 +91,6 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_label_info;
 	ctf_label_iter;
 	ctf_label_topmost;
-	ctf_max_id;
 	ctf_member_info;
 	ctf_merge_add;
 	ctf_merge_dedup;
@@ -101,7 +100,6 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_merge_merge;
 	ctf_merge_set_nthreads;
 	ctf_merge_uniquify;
-	ctf_nr_syms;
 	ctf_object_iter;
 	ctf_parent_file;
 	ctf_parent_label;
@@ -113,7 +111,6 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_symbol_name;
 	ctf_type_align;
 	ctf_type_cmp;
-	ctf_type_cname;
 	ctf_type_compat;
 	ctf_type_pointer;
 	ctf_update;

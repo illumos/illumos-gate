@@ -22,8 +22,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2018 Joyent, Inc.
-#
 
 UTSBASE	= ../..
 
@@ -37,8 +35,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-
-C99LMODE=	-Xc99=%all
 
 CPPFLAGS	+= -I$(SRC)/common/ctf -DCTF_OLD_VERSIONS
 LDFLAGS		+= $(BREDUCE) -M$(UTSBASE)/common/ctf/mapfile -dy

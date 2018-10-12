@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright (c) 2015, Joyent, Inc.
  */
 
 /*
@@ -233,9 +233,6 @@ extern uint_t ctf_flags(ctf_file_t *);
 extern const char *ctf_errmsg(int);
 extern int ctf_version(int);
 
-extern ctf_id_t ctf_max_id(ctf_file_t *);
-extern ulong_t ctf_nr_syms(ctf_file_t *);
-
 extern int ctf_func_info(ctf_file_t *, ulong_t, ctf_funcinfo_t *);
 extern int ctf_func_info_by_id(ctf_file_t *, ctf_id_t, ctf_funcinfo_t *);
 extern int ctf_func_args(ctf_file_t *, ulong_t, uint_t, ctf_id_t *);
@@ -250,8 +247,6 @@ extern ctf_id_t ctf_type_resolve(ctf_file_t *, ctf_id_t);
 extern ssize_t ctf_type_lname(ctf_file_t *, ctf_id_t, char *, size_t);
 extern char *ctf_type_name(ctf_file_t *, ctf_id_t, char *, size_t);
 extern char *ctf_type_qname(ctf_file_t *, ctf_id_t, char *, size_t,
-    const char *);
-extern char *ctf_type_cname(ctf_file_t *, ctf_id_t, char *, size_t,
     const char *);
 extern ssize_t ctf_type_size(ctf_file_t *, ctf_id_t);
 extern ssize_t ctf_type_align(ctf_file_t *, ctf_id_t);

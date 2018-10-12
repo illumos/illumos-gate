@@ -469,7 +469,7 @@ ctf_dwarf_refdie(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
 	Dwarf_Off off;
 	Dwarf_Error derr;
 
-	if ((ret = ctf_dwarf_ref(cdp, die, name, &off)) != 0)
+	if ((ret = ctf_dwarf_ref(cdp, die, DW_AT_type, &off)) != 0)
 		return (ret);
 
 	off += cdp->cd_cuoff;
@@ -628,17 +628,6 @@ ctf_dwarf_offset(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Off *offsetp)
 	    "failed to get die offset: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
-}
-
-/* simpler variant for debugging output */
-static Dwarf_Off
-ctf_die_offset(Dwarf_Die die)
-{
-	Dwarf_Off off = -1;
-	Dwarf_Error derr;
-
-	(void) dwarf_dieoffset(die, &off, &derr);
-	return (off);
 }
 
 static int
@@ -1558,6 +1547,7 @@ ctf_dwarf_create_enum(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 	if ((ret = ctf_dwmap_add(cdp, id, die, B_FALSE)) != 0)
 		return (ret);
 
+
 	if ((ret = ctf_dwarf_child(cdp, die, &child)) != 0) {
 		if (ret == ENOENT)
 			ret = 0;
@@ -1584,34 +1574,26 @@ ctf_dwarf_create_enum(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 			continue;
 		}
 
+		if ((ret = ctf_dwarf_signed(cdp, arg, DW_AT_const_value,
+		    &sval)) == 0) {
+			eval = sval;
+		} else if (ret != ENOENT) {
+			return (ret);
+		} else if ((ret = ctf_dwarf_unsigned(cdp, arg,
+		    DW_AT_const_value, &uval)) == 0) {
+			eval = (int)uval;
+		} else {
+			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+			    "encountered enumration without constant value\n");
+			return (ECTF_CONVBKERR);
+		}
+
 		/*
 		 * DWARF v4 section 5.7 tells us we'll always have names.
 		 */
-		if ((ret = ctf_dwarf_string(cdp, arg, DW_AT_name, &name)) != 0)
+		if ((ret = ctf_dwarf_string(cdp, arg, DW_AT_name,
+		    &name)) != 0)
 			return (ret);
-
-		/*
-		 * We have to be careful here: newer GCCs generate DWARF where
-		 * an unsigned value will happily pass ctf_dwarf_signed().
-		 * Since negative values will fail ctf_dwarf_unsigned(), we try
-		 * that first to make sure we get the right value.
-		 */
-		if ((ret = ctf_dwarf_unsigned(cdp, arg, DW_AT_const_value,
-		    &uval)) == 0) {
-			eval = (int)uval;
-		} else if ((ret = ctf_dwarf_signed(cdp, arg, DW_AT_const_value,
-		    &sval)) == 0) {
-			eval = sval;
-		}
-
-		if (ret != 0) {
-			if (ret != ENOENT)
-				return (ret);
-
-			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
-			    "encountered enumeration without constant value\n");
-			return (ECTF_CONVBKERR);
-		}
 
 		ret = ctf_add_enumerator(cdp->cd_ctfp, id, name, eval);
 		if (ret == CTF_ERR) {
@@ -2013,31 +1995,11 @@ ctf_dwarf_convert_variable(ctf_die_t *cdp, Dwarf_Die die)
 	ctf_id_t id;
 	ctf_dwvar_t *cdv;
 
-	/* Skip "Non-Defining Declarations" */
-	if ((ret = ctf_dwarf_boolean(cdp, die, DW_AT_declaration, &b)) == 0) {
-		if (b != 0)
-			return (0);
-	} else if (ret != ENOENT) {
-		return (ret);
-	}
-
-	/*
-	 * If we find a DIE of "Declarations Completing Non-Defining
-	 * Declarations", we will use the referenced type's DIE.  This isn't
-	 * quite correct, e.g. DW_AT_decl_line will be the forward declaration
-	 * not this site.  It's sufficient for what we need, however: in
-	 * particular, we should find DW_AT_external as needed there.
-	 */
-	if ((ret = ctf_dwarf_refdie(cdp, die, DW_AT_specification,
-	    &tdie)) == 0) {
-		Dwarf_Off offset;
-		if ((ret = ctf_dwarf_offset(cdp, tdie, &offset)) != 0)
+	if ((ret = ctf_dwarf_boolean(cdp, die, DW_AT_declaration, &b)) != 0) {
+		if (ret != ENOENT)
 			return (ret);
-		ctf_dprintf("die 0x%llx DW_AT_specification -> die 0x%llx\n",
-		    ctf_die_offset(die), ctf_die_offset(tdie));
-		die = tdie;
-	} else if (ret != ENOENT) {
-		return (ret);
+	} else if (b != 0) {
+		return (0);
 	}
 
 	if ((ret = ctf_dwarf_string(cdp, die, DW_AT_name, &name)) != 0 &&

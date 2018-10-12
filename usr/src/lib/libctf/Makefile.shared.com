@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 #
 
 #
@@ -69,16 +69,16 @@ SRCS = \
 	$(LIB_OBJS:%.o=$(SRC)/lib/libctf/common/%.c) \
 	$(LIST_OBJS:%.o=$(SRC)/common/list/%.c) \
 	$(MERGEQ_OBJS:%.o=$(SRC)/lib/mergeq/%.c)
-
+	
 LIBS = $(DYNLIB) $(LINTLIB)
 LDLIBS += -lc -lelf -ldwarf -lavl
 
-CSTD = $(CSTD_GNU99)
-C99LMODE = -Xc99=%all
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
 
 SRCDIR = $(SRC)/lib/libctf/common
 
-CPPFLAGS +=	-I$(SRC)/lib/libctf/common	\
+CPPFLAGS +=	-I$(SRC)/lib/libctf/common 	\
 		-I$(SRC)/common/ctf		\
 		-I$(SRC)/lib/libdwarf/common	\
 		-I$(SRC)/lib/mergeq		\

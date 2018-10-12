@@ -22,12 +22,12 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_CTF_H
 #define	_CTF_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -220,13 +220,11 @@ typedef struct ctf_type {
 #define	CTF_TYPE_NAME(stid, offset) \
 	(((stid) << 31) | ((offset) & 0x7fffffff))
 
-#define	CTF_CHILD_START		(0x8000)
-#define	CTF_TYPE_ISPARENT(id)	((id) < CTF_CHILD_START)
-#define	CTF_TYPE_ISCHILD(id)	((id) >= CTF_CHILD_START)
+#define	CTF_TYPE_ISPARENT(id)	((id) < 0x8000)
+#define	CTF_TYPE_ISCHILD(id)	((id) > 0x7fff)
 
-#define	CTF_TYPE_TO_INDEX(id)		((id) & (CTF_CHILD_START - 1))
-#define	CTF_INDEX_TO_TYPE(id, child) \
-	((child) ? ((id) | CTF_CHILD_START) : (id))
+#define	CTF_TYPE_TO_INDEX(id)		((id) & 0x7fff)
+#define	CTF_INDEX_TO_TYPE(id, child)	((child) ? ((id) | 0x8000) : (id))
 #define	CTF_PARENT_SHIFT	15
 
 #define	CTF_STRTAB_0	0	/* symbolic define for string table id 0 */
