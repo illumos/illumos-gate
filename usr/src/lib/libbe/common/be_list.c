@@ -55,6 +55,8 @@ typedef struct list_callback_data {
 	char *be_name;
 	be_node_list_t *be_nodes_head;
 	be_node_list_t *be_nodes;
+	be_dataset_list_t **be_datasets_tail;
+	be_snapshot_list_t **be_snapshots_tail;
 	char current_be[MAXPATHLEN];
 	struct be_defaults be_defaults;
 } list_callback_data_t;
@@ -82,6 +84,7 @@ static int be_qsort_compare_BEs_space_rev(const void *, const void *);
 static int be_qsort_compare_snapshots(const void *x, const void *y);
 static int be_qsort_compare_datasets(const void *x, const void *y);
 static void *be_list_alloc(int *, size_t);
+static int be_allocate_callback_nodes(list_callback_data_t *);
 
 /*
  * Private data.
@@ -384,13 +387,9 @@ be_get_zone_be_list(char *zone_be_name, char *zone_be_container_ds,
 
 	(void) strcpy(be_container_ds, zone_be_container_ds);
 
-	if (cb.be_nodes_head == NULL) {
-		if ((cb.be_nodes_head = be_list_alloc(&ret,
-		    sizeof (be_node_list_t))) == NULL) {
-			ZFS_CLOSE(zhp);
-			goto cleanup;
-		}
-		cb.be_nodes = cb.be_nodes_head;
+	if ((ret = be_allocate_callback_nodes(&cb)) != BE_SUCCESS) {
+		ZFS_CLOSE(zhp);
+		goto cleanup;
 	}
 	if (ret == 0) {
 		be_get_defaults(&cb.be_defaults);
@@ -491,14 +490,10 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 	 * within the pool
 	 */
 	if (cb->be_name != NULL) {
-		if (cb->be_nodes_head == NULL) {
-			if ((cb->be_nodes_head = be_list_alloc(&ret,
-			    sizeof (be_node_list_t))) == NULL) {
-				ZFS_CLOSE(zhp);
-				zpool_close(zlp);
-				return (ret);
-			}
-			cb->be_nodes = cb->be_nodes_head;
+		if ((ret = be_allocate_callback_nodes(cb)) != BE_SUCCESS) {
+			ZFS_CLOSE(zhp);
+			zpool_close(zlp);
+			return (ret);
 		}
 
 		if ((ret = be_get_node_data(zhp, cb->be_nodes, cb->be_name,
@@ -517,6 +512,38 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 
 	zpool_close(zlp);
 	return (ret);
+}
+
+/*
+ * Function:	be_allocate_callback_nodes
+ * Description:	Function to create the be_nodes list in the callback data
+ *		structure, and set up tail pointers to the dataset and
+ *		snapshot lists.
+ * Parameters:
+ *		data - pointer to the callback data.
+ * Returns:
+ *		0 - Success
+ *		be_errno_t - Failure
+ * Scope:
+ *		Private
+ */
+static int
+be_allocate_callback_nodes(list_callback_data_t *cb)
+{
+	int ret = BE_SUCCESS;
+
+	if (cb->be_nodes_head != NULL)
+		return (BE_SUCCESS);
+
+	if ((cb->be_nodes_head = be_list_alloc(&ret, sizeof (be_node_list_t)))
+	    == NULL)
+		return (ret);
+
+	cb->be_nodes = cb->be_nodes_head;
+	cb->be_snapshots_tail = &cb->be_nodes->be_node_snapshots;
+	cb->be_datasets_tail = &cb->be_nodes->be_node_datasets;
+
+	return (BE_SUCCESS);
 }
 
 /*
@@ -554,54 +581,32 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
 			return (BE_SUCCESS);
 	}
 
-	if (cb->be_nodes_head == NULL) {
-		if ((cb->be_nodes_head = be_list_alloc(&ret,
-		    sizeof (be_node_list_t))) == NULL) {
-			ZFS_CLOSE(zhp);
-			return (ret);
-		}
-		cb->be_nodes = cb->be_nodes_head;
+	if (cb->be_nodes_head == NULL &&
+	    (ret = be_allocate_callback_nodes(cb)) != BE_SUCCESS) {
+		ZFS_CLOSE(zhp);
+		return (ret);
 	}
 
 	if (zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT && !zone_be) {
-		be_snapshot_list_t *snapshots = NULL;
-		if (cb->be_nodes->be_node_snapshots == NULL) {
-			if ((cb->be_nodes->be_node_snapshots =
-			    be_list_alloc(&ret, sizeof (be_snapshot_list_t)))
-			    == NULL || ret != BE_SUCCESS) {
-				ZFS_CLOSE(zhp);
-				return (ret);
-			}
-			cb->be_nodes->be_node_snapshots->be_next_snapshot =
-			    NULL;
-			snapshots = cb->be_nodes->be_node_snapshots;
-		} else {
-			for (snapshots = cb->be_nodes->be_node_snapshots;
-			    snapshots != NULL;
-			    snapshots = snapshots->be_next_snapshot) {
-				if (snapshots->be_next_snapshot != NULL)
-					continue;
-				/*
-				 * We're at the end of the list add the
-				 * new snapshot.
-				 */
-				if ((snapshots->be_next_snapshot =
-				    be_list_alloc(&ret,
-				    sizeof (be_snapshot_list_t))) == NULL ||
-				    ret != BE_SUCCESS) {
-					ZFS_CLOSE(zhp);
-					return (ret);
-				}
-				snapshots = snapshots->be_next_snapshot;
-				snapshots->be_next_snapshot = NULL;
-				break;
-			}
-		}
-		if ((ret = be_get_ss_data(zhp, str, snapshots,
-		    cb->be_nodes)) != BE_SUCCESS) {
+		be_snapshot_list_t *snapshot;
+
+		if ((snapshot = be_list_alloc(&ret,
+		    sizeof (be_snapshot_list_t))) == NULL ||
+		    ret != BE_SUCCESS) {
 			ZFS_CLOSE(zhp);
 			return (ret);
 		}
+
+		if ((ret = be_get_ss_data(zhp, str, snapshot,
+		    cb->be_nodes)) != BE_SUCCESS) {
+			free(snapshot);
+			ZFS_CLOSE(zhp);
+			return (ret);
+		}
+
+		snapshot->be_next_snapshot = NULL;
+		*cb->be_snapshots_tail = snapshot;
+		cb->be_snapshots_tail = &snapshot->be_next_snapshot;
 	} else if (strchr(str, '/') == NULL) {
 		if (cb->be_nodes->be_node_name != NULL) {
 			if ((cb->be_nodes->be_next_node =
@@ -631,44 +636,25 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
 			return (ret);
 		}
 	} else if (strchr(str, '/') != NULL && !zone_be) {
-		be_dataset_list_t *datasets = NULL;
-		if (cb->be_nodes->be_node_datasets == NULL) {
-			if ((cb->be_nodes->be_node_datasets =
-			    be_list_alloc(&ret, sizeof (be_dataset_list_t)))
-			    == NULL || ret != BE_SUCCESS) {
-				ZFS_CLOSE(zhp);
-				return (ret);
-			}
-			cb->be_nodes->be_node_datasets->be_next_dataset = NULL;
-			datasets = cb->be_nodes->be_node_datasets;
-		} else {
-			for (datasets = cb->be_nodes->be_node_datasets;
-			    datasets != NULL;
-			    datasets = datasets->be_next_dataset) {
-				if (datasets->be_next_dataset != NULL)
-					continue;
-				/*
-				 * We're at the end of the list add
-				 * the new dataset.
-				 */
-				if ((datasets->be_next_dataset =
-				    be_list_alloc(&ret,
-				    sizeof (be_dataset_list_t)))
-				    == NULL || ret != BE_SUCCESS) {
-					ZFS_CLOSE(zhp);
-					return (ret);
-				}
-				datasets = datasets->be_next_dataset;
-				datasets->be_next_dataset = NULL;
-				break;
-			}
-		}
+		be_dataset_list_t *dataset;
 
-		if ((ret = be_get_ds_data(zhp, str,
-		    datasets, cb->be_nodes)) != BE_SUCCESS) {
+		if ((dataset = be_list_alloc(&ret,
+		    sizeof (be_dataset_list_t))) == NULL ||
+		    ret != BE_SUCCESS) {
 			ZFS_CLOSE(zhp);
 			return (ret);
 		}
+
+		if ((ret = be_get_ds_data(zhp, str,
+		    dataset, cb->be_nodes)) != BE_SUCCESS) {
+			free(dataset);
+			ZFS_CLOSE(zhp);
+			return (ret);
+		}
+
+		dataset->be_next_dataset = NULL;
+		*cb->be_datasets_tail = dataset;
+		cb->be_datasets_tail = &dataset->be_next_dataset;
 	}
 	ret = zfs_iter_children(zhp, be_add_children_callback, cb);
 	if (ret != 0) {
