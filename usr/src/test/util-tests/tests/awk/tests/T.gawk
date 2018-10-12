@@ -59,6 +59,28 @@ $AWK '{	x = y = $0
 diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk backgsub'
 
 
+# backgsub2:
+echo 'x\y
+x\\y
+x\\\y' > $TEMP0
+echo '	x\y
+	x\y
+	x\y
+	x\y
+	x\\y
+	x\\\y
+	x\\y
+	x\\\y
+	x\\\\y' > $TEMP1
+$AWK '{	w = x = y = z = $0
+        gsub( /\\\\/, "\\", w); print "	" w
+        gsub( /\\\\/, "\\\\", x); print "	" x
+        gsub( /\\\\/, "\\\\\\", y); print "	" y
+}
+' $TEMP0 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk backgsub2'
+
+
 # backgsub3:
 echo 'xax
 xaax' > $TEMP0
@@ -111,6 +133,21 @@ $AWK '{	w = x = y = z = z1 = z2 = $0
 }
 ' $TEMP0 > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk backsub3'
+
+
+# backsub:
+echo 'x\y
+x\\y' > $TEMP0
+echo 'x\y
+x\\y
+x\\y
+x\\\y' > $TEMP1
+$AWK '{	x = y = $0
+        sub( /\\\\/, "\\\\", x); print x
+        sub( "\\\\", "\\\\", y); print y
+}' $TEMP0 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk backsub'
+
 
 
 

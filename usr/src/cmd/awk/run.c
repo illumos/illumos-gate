@@ -97,6 +97,8 @@ Node	*curnode = NULL;	/* the node being executed, for debugging */
 static	void	tfree(Cell *);
 static	void	closeall(void);
 static	double	ipow(double, int);
+static	void	backsub(char **pb_ptr, char **sptr_ptr);
+
 
 /*
  * buffer memory management
@@ -2046,12 +2048,11 @@ flush_all(void)
 Cell *
 sub(Node **a, int nnn)	/* substitute command */
 {
-	char *sptr;
+	char *sptr, *pb, *q;
 	Cell *x, *y, *result;
 	char *t, *buf;
 	fa *pfa;
 	size_t bufsz = recsize;
-	size_t cnt = 0, len;
 
 	if ((buf = (char *)malloc(bufsz)) == NULL)
 		FATAL("out of memory in sub");
@@ -2068,38 +2069,39 @@ sub(Node **a, int nnn)	/* substitute command */
 	result = False;
 	if (pmatch(pfa, t)) {
 		sptr = t;
-		len = patbeg - sptr;
-		if (len > 0) {
-			(void) adjbuf(&buf, &bufsz, cnt + len,
-			    recsize, NULL, "sub");
-			(void) memcpy(buf, sptr, len);
-			cnt += len;
-		}
+		(void) adjbuf(&buf, &bufsz,
+		    1 + patbeg - sptr, recsize, 0, "sub");
+		pb = buf;
+		while (sptr < patbeg)
+			*pb++ = *sptr++;
 		sptr = getsval(y);
 		while (*sptr != '\0') {
-			(void) adjbuf(&buf, &bufsz, 1 + cnt + patlen,
-			    recsize, NULL, "sub");
-			if (*sptr == '\\' &&
-			    (*(sptr+1) == '&' || *(sptr+1) == '\\')) {
-				sptr++;		/* skip \, */
-				buf[cnt++] = *sptr++; /* add & or \ */
+			(void) adjbuf(&buf, &bufsz, 5 + pb - buf,
+			    recsize, &pb, "sub");
+			if (*sptr == '\\') {
+				backsub(&pb, &sptr);
 			} else if (*sptr == '&') {
 				sptr++;
-				(void) memcpy(&buf[cnt], patbeg, patlen);
-				cnt += patlen;
+				(void) adjbuf(&buf, &bufsz,
+				    1 + patlen + pb - buf, recsize, &pb, "sub");
+				for (q = patbeg; q < patbeg+patlen; )
+					*pb++ = *q++;
 			} else {
-				buf[cnt++] = *sptr++;
+				*pb++ = *sptr++;
 			}
 		}
+		*pb = '\0';
+		if (pb > buf + bufsz)
+			FATAL("sub result1 %.30s too big; can't happen", buf);
 		sptr = patbeg + patlen;
 		if ((patlen == 0 && *patbeg) || (patlen && *(sptr-1))) {
-			len = strlen(sptr);
-			(void) adjbuf(&buf, &bufsz, 1 + cnt + len,
-			    recsize, NULL, "sub");
-			(void) memcpy(&buf[cnt], sptr, len);
-			cnt += len;
+			(void) adjbuf(&buf, &bufsz,
+			    1 + strlen(sptr) + pb - buf, 0, &pb, "sub");
+			while ((*pb++ = *sptr++) != '\0')
+				;
 		}
-		buf[cnt] = '\0';
+		if (pb > buf + bufsz)
+			FATAL("sub result2 %.30s too big; can't happen", buf);
 		(void) setsval(x, buf);	/* BUG: should be able to avoid copy */
 		result = True;
 	}
@@ -2114,12 +2116,11 @@ Cell *
 gsub(Node **a, int nnn)	/* global substitute */
 {
 	Cell *x, *y;
-	char *rptr, *sptr, *t;
+	char *rptr, *sptr, *t, *pb, *q;
 	char *buf;
 	fa *pfa;
 	int mflag, tempstat, num;
 	size_t bufsz = recsize;
-	size_t cnt, len;
 
 	if ((buf = (char *)malloc(bufsz)) == NULL)
 		FATAL("out of memory in gsub");
@@ -2138,8 +2139,8 @@ gsub(Node **a, int nnn)	/* global substitute */
 	if (pmatch(pfa, t)) {
 		tempstat = pfa->initstat;
 		pfa->initstat = 2;
+		pb = buf;
 		rptr = getsval(y);
-		cnt = 0;
 		do {
 			if (patlen == 0 && *patbeg != '\0') {
 				/* matched empty string */
@@ -2148,80 +2149,86 @@ gsub(Node **a, int nnn)	/* global substitute */
 					sptr = rptr;
 					while (*sptr != '\0') {
 						(void) adjbuf(&buf, &bufsz,
-						    1 + cnt, recsize,
-						    NULL, "gsub");
-						if (*sptr == '\\' &&
-						    (*(sptr+1) == '&' ||
-						    *(sptr+1) == '\\')) {
-							sptr++;
-							buf[cnt++] = *sptr++;
+						    5 + pb - buf, recsize,
+						    &pb, "gsub");
+						if (*sptr == '\\') {
+							backsub(&pb, &sptr);
 						} else if (*sptr == '&') {
+							sptr++;
 							(void) adjbuf(&buf,
 							    &bufsz,
-							    1 + cnt + patlen,
+							    1+patlen+pb-buf,
 							    recsize,
-							    NULL, "gsub");
-							sptr++;
-							(void) memcpy(&buf[cnt],
-							    patbeg, patlen);
-							cnt += patlen;
+							    &pb, "gsub");
+							for (
+							    q = patbeg;
+							    q < patbeg+patlen;
+							    *pb++ = *q++)
+								;
 						} else {
-							buf[cnt++] = *sptr++;
+							*pb++ = *sptr++;
 						}
 					}
 				}
 				if (*t == '\0')	/* at end */
 					goto done;
-				(void) adjbuf(&buf, &bufsz, 1 + cnt,
-				    recsize, NULL, "gsub");
-				buf[cnt++] = *t++;
+				(void) adjbuf(&buf, &bufsz,
+				    2 + pb - buf, recsize, &pb, "gsub");
+				*pb++ = *t++;
+				/* BUG: not sure of this test */
+				if (pb > buf + bufsz)
+					FATAL("gsub result0 %.30s too big; "
+					    "can't happen", buf);
 				mflag = 0;
 			} else {	/* matched nonempty string */
 				num++;
 				sptr = t;
-				len = patbeg - sptr;
-				if (len > 0) {
-					(void) adjbuf(&buf, &bufsz,
-					    1 + cnt + len, recsize,
-					    NULL, "gsub");
-					(void) memcpy(&buf[cnt], sptr, len);
-					cnt += len;
-				}
+				(void) adjbuf(&buf, &bufsz,
+				    1 + (patbeg - sptr) + pb - buf,
+				    recsize, &pb, "gsub");
+				while (sptr < patbeg)
+					*pb++ = *sptr++;
 				sptr = rptr;
 				while (*sptr != '\0') {
-					(void) adjbuf(&buf, &bufsz, 1 + cnt,
-					    recsize, NULL, "gsub");
-					if (*sptr == '\\' &&
-					    (*(sptr+1) == '&' ||
-					    *(sptr+1) == '\\')) {
-						sptr++;
-						buf[cnt++] = *sptr++;
+					(void) adjbuf(&buf, &bufsz,
+					    5 + pb - buf, recsize, &pb, "gsub");
+					if (*sptr == '\\') {
+						backsub(&pb, &sptr);
 					} else if (*sptr == '&') {
 						sptr++;
 						(void) adjbuf(&buf, &bufsz,
-						    1 + cnt + patlen, recsize,
-						    NULL, "gsub");
-						(void) memcpy(&buf[cnt],
-						    patbeg, patlen);
-						cnt += patlen;
+						    1 + patlen + pb - buf,
+						    recsize, &pb, "gsub");
+						for (
+						    q = patbeg;
+						    q < patbeg+patlen;
+						    *pb++ = *q++)
+							;
 					} else {
-						buf[cnt++] = *sptr++;
+						*pb++ = *sptr++;
 					}
 				}
 				t = patbeg + patlen;
-				if ((*(t-1) == '\0') || (*t == '\0'))
+				if (patlen == 0 || *(t-1) == '\0' || *t == '\0')
 					goto done;
+				if (pb > buf + bufsz)
+					FATAL("gsub result1 %.30s too big; "
+					    "can't happen", buf);
 				mflag = 1;
 			}
 		} while (pmatch(pfa, t));
 		sptr = t;
-		len = strlen(sptr);
-		(void) adjbuf(&buf, &bufsz, 1 + len + cnt,
-		    recsize, NULL, "gsub");
-		(void) memcpy(&buf[cnt], sptr, len);
-		cnt += len;
+		(void) adjbuf(&buf, &bufsz,
+		    1 + strlen(sptr) + pb - buf, 0, &pb, "gsub");
+		while ((*pb++ = *sptr++) != '\0')
+			;
 	done:
-		buf[cnt] = '\0';
+		if (pb < buf + bufsz)
+			*pb = '\0';
+		else if (*(pb-1) != '\0')
+			FATAL("gsub result2 %.30s truncated; "
+			    "can't happen", buf);
+		/* BUG: should be able to avoid copy + free */
 		(void) setsval(x, buf);
 		pfa->initstat = tempstat;
 	}
@@ -2232,4 +2239,34 @@ gsub(Node **a, int nnn)	/* global substitute */
 	x->fval = num;
 	free(buf);
 	return (x);
+}
+
+/*
+ * handle \\& variations; sptr[0] == '\\'
+ */
+static void
+backsub(char **pb_ptr, char **sptr_ptr)
+{
+	char *pb = *pb_ptr, *sptr = *sptr_ptr;
+
+	if (sptr[1] == '\\') {
+		if (sptr[2] == '\\' && sptr[3] == '&') { /* \\\& -> \& */
+			*pb++ = '\\';
+			*pb++ = '&';
+			sptr += 4;
+		} else if (sptr[2] == '&') {	/* \\& -> \ + matched */
+			*pb++ = '\\';
+			sptr += 2;
+		} else {			/* \\x -> \\x */
+			*pb++ = *sptr++;
+			*pb++ = *sptr++;
+		}
+	} else if (sptr[1] == '&') {	/* literal & */
+		sptr++;
+		*pb++ = *sptr++;
+	} else				/* literal \ */
+		*pb++ = *sptr++;
+
+	*pb_ptr = pb;
+	*sptr_ptr = sptr;
 }

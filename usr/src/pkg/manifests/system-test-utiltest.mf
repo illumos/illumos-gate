@@ -657,6 +657,8 @@ file path=opt/util-tests/tests/awk/gnu/funsemnl.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/funstack.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/funstack.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/funstack.ok mode=0444
+file path=opt/util-tests/tests/awk/gnu/gawksub.awk mode=0444
+file path=opt/util-tests/tests/awk/gnu/gawksub.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/getline2.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/getline2.sh mode=0555
 file path=opt/util-tests/tests/awk/gnu/getline3.awk mode=0444
@@ -816,8 +818,6 @@ file path=opt/util-tests/tests/awk/gnu/pipeio1.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/pipeio2.awk mode=0444
 file path=opt/util-tests/tests/awk/gnu/pipeio2.in mode=0444
 file path=opt/util-tests/tests/awk/gnu/pipeio2.ok mode=0444
-file path=opt/util-tests/tests/awk/gnu/posix2008sub.awk mode=0444
-file path=opt/util-tests/tests/awk/gnu/posix2008sub.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/poundbang.ok mode=0444
 file path=opt/util-tests/tests/awk/gnu/poundbang.sh mode=0555
 file path=opt/util-tests/tests/awk/gnu/prdupval.awk mode=0444
