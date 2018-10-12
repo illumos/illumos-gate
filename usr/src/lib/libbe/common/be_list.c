@@ -28,6 +28,7 @@
  * Copyright 2015 Toomas Soome <tsoome@me.com>
  * Copyright 2015 Gary Mills
  * Copyright (c) 2016 Martin Matuska. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <assert.h>
@@ -55,6 +56,7 @@ typedef struct list_callback_data {
 	be_node_list_t *be_nodes_head;
 	be_node_list_t *be_nodes;
 	char current_be[MAXPATHLEN];
+	struct be_defaults be_defaults;
 } list_callback_data_t;
 
 /*
@@ -220,12 +222,11 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 	int sret;
 	zpool_handle_t *zphp;
 	char *rpool = NULL;
-	struct be_defaults be_defaults;
 
 	if (be_nodes == NULL)
 		return (BE_ERR_INVAL);
 
-	be_get_defaults(&be_defaults);
+	be_get_defaults(&cb.be_defaults);
 
 	if (be_find_current_be(&bt) != BE_SUCCESS) {
 		/*
@@ -247,7 +248,7 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 	if (be_name != NULL)
 		cb.be_name = strdup(be_name);
 
-	if (be_defaults.be_deflt_rpool_container && rpool != NULL) {
+	if (cb.be_defaults.be_deflt_rpool_container && rpool != NULL) {
 		if ((zphp = zpool_open(g_zfs, rpool)) == NULL) {
 			be_print_err(gettext("be_list: failed to "
 			    "open rpool (%s): %s\n"), rpool,
@@ -391,8 +392,10 @@ be_get_zone_be_list(char *zone_be_name, char *zone_be_container_ds,
 		}
 		cb.be_nodes = cb.be_nodes_head;
 	}
-	if (ret == 0)
+	if (ret == 0) {
+		be_get_defaults(&cb.be_defaults);
 		ret = zfs_iter_filesystems(zhp, be_add_children_callback, &cb);
+	}
 	ZFS_CLOSE(zhp);
 
 	*zbe_nodes = cb.be_nodes_head;
@@ -538,9 +541,6 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
 	list_callback_data_t	*cb = (list_callback_data_t *)data;
 	char			*str = NULL, *ds_path = NULL;
 	int			ret = 0;
-	struct be_defaults be_defaults;
-
-	be_get_defaults(&be_defaults);
 
 	ds_path = str = strdup(zfs_get_name(zhp));
 
@@ -548,7 +548,7 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
 	 * get past the end of the container dataset plus the trailing "/"
 	 */
 	str = str + (strlen(be_container_ds) + 1);
-	if (be_defaults.be_deflt_rpool_container) {
+	if (cb->be_defaults.be_deflt_rpool_container) {
 		/* just skip if invalid */
 		if (!be_valid_be_name(str))
 			return (BE_SUCCESS);
@@ -1335,7 +1335,7 @@ be_get_ss_data(
  *		size - The size of memory to allocate.
  * Returns:
  *		Success - A pointer to the allocated memory
- * 		Failure - NULL
+ *		Failure - NULL
  * Scope:
  *		Private
  */
