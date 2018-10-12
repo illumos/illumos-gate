@@ -26,6 +26,7 @@
  * Copyright 2015 Gary Mills
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2017 Jason King
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1147,7 +1148,8 @@ be_do_list(int argc, char **argv)
 	if (argc == 1)
 		be_name = argv[0];
 
-	err = be_list(be_name, &be_nodes);
+	err = be_list(be_name, &be_nodes,
+	    snaps ? BE_LIST_SNAPSHOTS : BE_LIST_DEFAULT);
 
 	switch (err) {
 	case BE_SUCCESS:

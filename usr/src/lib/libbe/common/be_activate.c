@@ -26,6 +26,7 @@
 /*
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <assert.h>
@@ -275,7 +276,8 @@ _be_activate(char *be_name)
 		}
 	}
 
-	if ((ret = _be_list(cb.obe_name, &be_nodes)) != BE_SUCCESS) {
+	if ((ret = _be_list(cb.obe_name, &be_nodes, BE_LIST_DEFAULT))
+	    != BE_SUCCESS) {
 		return (ret);
 	}
 
@@ -445,7 +447,7 @@ be_is_active_on_boot(char *be_name)
 		return (B_FALSE);
 	}
 
-	if (_be_list(be_name, &be_node) != BE_SUCCESS) {
+	if (_be_list(be_name, &be_node, BE_LIST_DEFAULT) != BE_SUCCESS) {
 		return (B_FALSE);
 	}
 

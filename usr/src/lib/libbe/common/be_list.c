@@ -59,6 +59,7 @@ typedef struct list_callback_data {
 	be_snapshot_list_t **be_snapshots_tail;
 	char current_be[MAXPATHLEN];
 	struct be_defaults be_defaults;
+	uint64_t flags;
 } list_callback_data_t;
 
 /*
@@ -120,7 +121,7 @@ static boolean_t zone_be = B_FALSE;
  *		Public
  */
 int
-be_list(char *be_name, be_node_list_t **be_nodes)
+be_list(char *be_name, be_node_list_t **be_nodes, uint64_t flags)
 {
 	int	ret = BE_SUCCESS;
 
@@ -137,7 +138,7 @@ be_list(char *be_name, be_node_list_t **be_nodes)
 		}
 	}
 
-	ret = _be_list(be_name, be_nodes);
+	ret = _be_list(be_name, be_nodes, flags);
 
 	be_zfs_fini();
 
@@ -217,7 +218,7 @@ be_sort(be_node_list_t **be_nodes, int order)
  *		Semi-private (library wide use only)
  */
 int
-_be_list(char *be_name, be_node_list_t **be_nodes)
+_be_list(char *be_name, be_node_list_t **be_nodes, uint64_t flags)
 {
 	list_callback_data_t cb = { 0 };
 	be_transaction_data_t bt = { 0 };
@@ -230,6 +231,7 @@ _be_list(char *be_name, be_node_list_t **be_nodes)
 		return (BE_ERR_INVAL);
 
 	be_get_defaults(&cb.be_defaults);
+	cb.flags = flags;
 
 	if (be_find_current_be(&bt) != BE_SUCCESS) {
 		/*
@@ -502,8 +504,9 @@ be_get_list_callback(zpool_handle_t *zlp, void *data)
 			zpool_close(zlp);
 			return (ret);
 		}
-		ret = zfs_iter_snapshots(zhp, B_FALSE, be_add_children_callback,
-		    cb);
+		if (cb->flags & BE_LIST_SNAPSHOTS)
+			ret = zfs_iter_snapshots(zhp, B_FALSE,
+			    be_add_children_callback, cb);
 	}
 
 	if (ret == 0)
@@ -656,7 +659,10 @@ be_add_children_callback(zfs_handle_t *zhp, void *data)
 		*cb->be_datasets_tail = dataset;
 		cb->be_datasets_tail = &dataset->be_next_dataset;
 	}
-	ret = zfs_iter_children(zhp, be_add_children_callback, cb);
+	if (cb->flags & BE_LIST_SNAPSHOTS)
+		ret = zfs_iter_children(zhp, be_add_children_callback, cb);
+	else
+		ret = zfs_iter_filesystems(zhp, be_add_children_callback, cb);
 	if (ret != 0) {
 		be_print_err(gettext("be_add_children_callback: "
 		    "encountered error: %s\n"),
