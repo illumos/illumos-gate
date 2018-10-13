@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 """This module implements the "zfs allow" and "zfs unallow" subcommands.
@@ -146,7 +147,7 @@ def args_to_perms(parser, options, who, perms):
 		baseperms = None
 
 	d = dict()
-	
+
 	def storeperm(typechr, inheritchr, arg):
 		assert typechr in "ugecs"
 		assert inheritchr in "ld-"
@@ -251,20 +252,20 @@ def canonicalized_perm(permname):
 	except KeyError:
 		raise zfs.util.ZFSError(errno.EINVAL, permname,
 		    _("invalid permission"))
-		
+
 def print_perms():
 	"""Print the set of supported permissions."""
 	print(_("\nThe following permissions are supported:\n"))
 	fmt = "%-16s %-14s\t%s"
 	print(fmt % (_("NAME"), _("TYPE"), _("NOTES")))
 
-	for (name, note) in sorted(perms_subcmd.iteritems()):
+	for (name, note) in sorted(perms_subcmd.items()):
 		print(fmt % (name, _("subcommand"), note))
 
-	for (name, note) in sorted(perms_other.iteritems()):
+	for (name, note) in sorted(perms_other.items()):
 		print(fmt % (name, _("other"), note))
 
-	for (name, prop) in sorted(zfs.dataset.proptable.iteritems()):
+	for (name, prop) in sorted(zfs.dataset.proptable.items()):
 		if prop.visible and prop.delegatable():
 			print(fmt % (name, _("property"), ""))
 
@@ -335,7 +336,6 @@ def do_allow():
 			print(s + "-" * (70-len(s)))
 			print(p[fs])
 		return
-	
 
 	(options, args) = parser.parse_args(sys.argv[2:])
 

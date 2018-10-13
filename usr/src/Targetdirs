@@ -28,6 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -64,6 +65,29 @@ sparc_64ONLY= $(POUND_SIGN)
 64ONLY=  $($(MACH)_64ONLY)
 
 $(64ONLY) MACH32_DIRS=/usr/ucb/$(MACH32)
+
+PYTHON2_DIRS=
+PYTHON2_64DIRS=
+PYTHON3_DIRS=
+
+$(BUILDPY2)PYTHON2_DIRS += \
+	/usr/lib/python$(PYTHON_VERSION) \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/solaris \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs
+
+$(BUILDPY2)PYTHON2_64DIRS += \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/64 \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/solaris/64 \
+	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/64
+
+$(BUILDPY3)PYTHON3_DIRS += \
+	/usr/lib/python$(PYTHON3_VERSION) \
+	/usr/lib/python$(PYTHON3_VERSION)/vendor-packages \
+	/usr/lib/python$(PYTHON3_VERSION)/vendor-packages/solaris \
+	/usr/lib/python$(PYTHON3_VERSION)/vendor-packages/solaris/__pycache__ \
+	/usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs \
+	/usr/lib/python$(PYTHON3_VERSION)/vendor-packages/zfs/__pycache__
 
 DIRS= \
 	/boot \
@@ -282,12 +306,7 @@ DIRS= \
 	/usr/net \
 	/usr/net/servers \
 	/usr/lib/pool \
-	/usr/lib/python$(PYTHON_VERSION) \
-	/usr/lib/python$(PYTHON_VERSION)/vendor-packages \
-	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/64 \
-	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/solaris \
-	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs \
-	/usr/lib/python$(PYTHON_VERSION)/vendor-packages/beadm \
+	$(PYTHON2_DIRS) \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
 	/usr/lib/sa  \
@@ -456,6 +475,8 @@ DIRS64= \
 	/usr/lib/lwp/$(MACH64) \
 	/usr/lib/mdb/kvm/$(MACH64) \
 	/usr/lib/mdb/proc/$(MACH64) \
+	$(PYTHON2_64DIRS) \
+	$(PYTHON3_DIRS) \
 	/usr/lib/rcap/$(MACH64) \
 	/usr/lib/sasl/$(MACH64) \
 	/usr/lib/scsi/$(MACH64) \
@@ -640,28 +661,28 @@ $(DIRLINKS:%=$(ROOT)%):= \
 # Special symlinks to populate usr/ccs/lib, whose objects
 # have actually been moved to usr/lib
 # Rather than adding another set of rules, we add usr/lib/lwp files here
-$(ROOT)/usr/ccs/lib/libcurses.so:= 	REALPATH=../../../lib/libcurses.so.1
-$(ROOT)/usr/ccs/lib/llib-lcurses:= 	REALPATH=../../../lib/llib-lcurses
-$(ROOT)/usr/ccs/lib/llib-lcurses.ln:= 	REALPATH=../../../lib/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/libcurses.so:=	REALPATH=../../../lib/libcurses.so.1
+$(ROOT)/usr/ccs/lib/llib-lcurses:=	REALPATH=../../../lib/llib-lcurses
+$(ROOT)/usr/ccs/lib/llib-lcurses.ln:=	REALPATH=../../../lib/llib-lcurses.ln
 $(ROOT)/usr/ccs/lib/libform.so:=	REALPATH=../../lib/libform.so.1
-$(ROOT)/usr/ccs/lib/llib-lform:= 	REALPATH=../../lib/llib-lform
-$(ROOT)/usr/ccs/lib/llib-lform.ln:= 	REALPATH=../../lib/llib-lform.ln
+$(ROOT)/usr/ccs/lib/llib-lform:=	REALPATH=../../lib/llib-lform
+$(ROOT)/usr/ccs/lib/llib-lform.ln:=	REALPATH=../../lib/llib-lform.ln
 $(ROOT)/usr/ccs/lib/libgen.so:=		REALPATH=../../../lib/libgen.so.1
-$(ROOT)/usr/ccs/lib/llib-lgen:= 	REALPATH=../../../lib/llib-lgen
-$(ROOT)/usr/ccs/lib/llib-lgen.ln:= 	REALPATH=../../../lib/llib-lgen.ln
+$(ROOT)/usr/ccs/lib/llib-lgen:=		REALPATH=../../../lib/llib-lgen
+$(ROOT)/usr/ccs/lib/llib-lgen.ln:=	REALPATH=../../../lib/llib-lgen.ln
 $(ROOT)/usr/ccs/lib/libmalloc.so:=	REALPATH=../../lib/libmalloc.so.1
 $(ROOT)/usr/ccs/lib/libmenu.so:=	REALPATH=../../lib/libmenu.so.1
-$(ROOT)/usr/ccs/lib/llib-lmenu:= 	REALPATH=../../lib/llib-lmenu
-$(ROOT)/usr/ccs/lib/llib-lmenu.ln:= 	REALPATH=../../lib/llib-lmenu.ln
+$(ROOT)/usr/ccs/lib/llib-lmenu:=	REALPATH=../../lib/llib-lmenu
+$(ROOT)/usr/ccs/lib/llib-lmenu.ln:=	REALPATH=../../lib/llib-lmenu.ln
 $(ROOT)/usr/ccs/lib/libpanel.so:=	REALPATH=../../lib/libpanel.so.1
-$(ROOT)/usr/ccs/lib/llib-lpanel:= 	REALPATH=../../lib/llib-lpanel
-$(ROOT)/usr/ccs/lib/llib-lpanel.ln:= 	REALPATH=../../lib/llib-lpanel.ln
+$(ROOT)/usr/ccs/lib/llib-lpanel:=	REALPATH=../../lib/llib-lpanel
+$(ROOT)/usr/ccs/lib/llib-lpanel.ln:=	REALPATH=../../lib/llib-lpanel.ln
 $(ROOT)/usr/ccs/lib/libtermlib.so:=	REALPATH=../../../lib/libcurses.so.1
-$(ROOT)/usr/ccs/lib/llib-ltermlib:= 	REALPATH=../../../lib/llib-lcurses
-$(ROOT)/usr/ccs/lib/llib-ltermlib.ln:= 	REALPATH=../../../lib/llib-lcurses.ln
+$(ROOT)/usr/ccs/lib/llib-ltermlib:=	REALPATH=../../../lib/llib-lcurses
+$(ROOT)/usr/ccs/lib/llib-ltermlib.ln:=	REALPATH=../../../lib/llib-lcurses.ln
 $(ROOT)/usr/ccs/lib/libtermcap.so:=	REALPATH=../../../lib/libtermcap.so.1
-$(ROOT)/usr/ccs/lib/llib-ltermcap:= 	REALPATH=../../../lib/llib-ltermcap
-$(ROOT)/usr/ccs/lib/llib-ltermcap.ln:= 	REALPATH=../../../lib/llib-ltermcap.ln
+$(ROOT)/usr/ccs/lib/llib-ltermcap:=	REALPATH=../../../lib/llib-ltermcap
+$(ROOT)/usr/ccs/lib/llib-ltermcap.ln:=	REALPATH=../../../lib/llib-ltermcap.ln
 $(ROOT)/usr/ccs/lib/values-Xa.o:=	REALPATH=../../lib/values-Xa.o
 $(ROOT)/usr/ccs/lib/values-Xc.o:=	REALPATH=../../lib/values-Xc.o
 $(ROOT)/usr/ccs/lib/values-Xs.o:=	REALPATH=../../lib/values-Xs.o
@@ -669,9 +690,9 @@ $(ROOT)/usr/ccs/lib/values-Xt.o:=	REALPATH=../../lib/values-Xt.o
 $(ROOT)/usr/ccs/lib/values-xpg4.o:=	REALPATH=../../lib/values-xpg4.o
 $(ROOT)/usr/ccs/lib/values-xpg6.o:=	REALPATH=../../lib/values-xpg6.o
 $(ROOT)/usr/ccs/lib/libl.so:=		REALPATH=../../lib/libl.so.1
-$(ROOT)/usr/ccs/lib/llib-ll.ln:= 	REALPATH=../../lib/llib-ll.ln
+$(ROOT)/usr/ccs/lib/llib-ll.ln:=	REALPATH=../../lib/llib-ll.ln
 $(ROOT)/usr/ccs/lib/liby.so:=		REALPATH=../../lib/liby.so.1
-$(ROOT)/usr/ccs/lib/llib-ly.ln:= 	REALPATH=../../lib/llib-ly.ln
+$(ROOT)/usr/ccs/lib/llib-ly.ln:=	REALPATH=../../lib/llib-ly.ln
 $(ROOT)/usr/lib/lwp/libthread.so.1:=	REALPATH=../libthread.so.1
 $(ROOT)/usr/lib/lwp/libthread_db.so.1:=	REALPATH=../libthread_db.so.1
 
@@ -1683,7 +1704,7 @@ SYM.USRLIB= \
 	/usr/lib/fm/llib-lfmevent \
 	/usr/lib/fm/llib-lfmevent.ln
 
-sparcv9_SYM.USRLIB64= 
+sparcv9_SYM.USRLIB64=
 
 amd64_SYM.USRLIB64=	\
 	/usr/lib/amd64/libfdisk.so	\

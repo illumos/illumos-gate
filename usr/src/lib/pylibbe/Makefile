@@ -22,12 +22,15 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include	../Makefile.lib
 
-SUBDIRS=	$(MACH)
-$(BUILD64)SUBDIRS += $(MACH64)
+SUBDIRS=
+$(BUILDPY2)SUBDIRS += $(MACH)
+$(BUILD64)$(BUILDPY2)SUBDIRS += $(MACH64)
+$(BUILD64)$(BUILDPY3)SUBDIRS += py3
 XGETTEXT=	$(GNUXGETTEXT)
 XGETFLAGS=	$(GNUXGETFLAGS)
 

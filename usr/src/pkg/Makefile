@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include $(SRC)/Makefile.master
@@ -189,7 +190,11 @@ PKGMOG_DEFINES= \
 	PERL_VERSION=$(PERL_VERSION) \
 	PERL_PKGVERS=$(PERL_PKGVERS) \
 	PYTHON_VERSION=$(PYTHON_VERSION) \
+	PYTHON3_VERSION=$(PYTHON3_VERSION) \
 	PYTHON_PKGVERS=$(PYTHON_PKGVERS) \
+	PYTHON3_PKGVERS=$(PYTHON3_PKGVERS) \
+	python2_ONLY=$(BUILDPY2) \
+	python3_ONLY=$(BUILDPY3) \
 	JAVA_8_ONLY=$(JAVA_8_ONLY) \
 	JAVA_7_ONLY=$(JAVA_7_ONLY)
 
@@ -230,7 +235,28 @@ CLOBBERFILES= $(PDIR) proto_list_$(PKGMACH) install-$(PKGMACH).out \
 # build environment and then reference (implicitly or explicitly) the all
 # or install targets.
 #
-MANIFESTS :sh= (cd manifests; print *.mf)
+# We want some manifests to optionally build based on environment options, so
+# those are excluded when generating the list of manifests and added back in if
+# necessary. We also want a relatively easy way to add files to the list of
+# manifests given special treatment. Add any other special ones to the
+# SPECIAL_MANIFESTS variable. It can contain wildcards in regexp form, i.e.
+# SUNW.* as one useful example.
+#
+SPECIAL_MANIFESTS = system-library-python-.*
+LIST_MANIFESTS_CMD = (cd manifests ; /usr/bin/ls -1 *.mf |\
+	$(SED) $(SPECIAL_MANIFESTS:%=-e '/^%$$/d') )
+MANIFESTS = $(LIST_MANIFESTS_CMD:sh)
+
+# Conditionally add back python modules
+$(BUILDPY2) MANIFESTS += \
+	system-library-python-libbe-2.mf \
+	system-library-python-solaris-2.mf \
+	system-library-python-zfs-2.mf
+$(BUILDPY3) MANIFESTS += \
+	system-library-python-libbe-3.mf \
+	system-library-python-solaris-3.mf \
+	system-library-python-zfs-3.mf
+
 PKGS= $(MANIFESTS:%.mf=%)
 DEP_PKGS= $(PKGS:%=$(PDIR)/%.dep)
 PROC_PKGS= $(PKGS:%=$(PDIR)/%.mog)
@@ -269,9 +295,9 @@ PUB_PKGS= $(SYNTH_PKGS:%=$(PDIR)/%.pub) $(PKGS:%=$(PDIR)/%.pub)
 #
 # The meanings of each package status are as follows:
 #
-# 	PKGSTAT		meaning
-# 	----------	----------------------------------------------------
-# 	noincorp	Do not include in incorporation or group package
+#	PKGSTAT		meaning
+#	----------	----------------------------------------------------
+#	noincorp	Do not include in incorporation or group package
 #	obsolete	Include in incorporation, but not group package
 #	renamed		Include in incorporation, but not group package
 #	current		Include in incorporation and group package
@@ -310,7 +336,7 @@ PKGLISTS= \
 #		| use pkgsend to publish the package
 #		|
 #	placeholder to indicate successful publication (mypkg.pub)
-#	
+#
 # * This may be suppressed via SUPPRESSPKGDEP.  The resulting
 #   packages will install correctly, but care must be taken to
 #   install all dependencies, because pkg will not have the input
@@ -350,16 +376,16 @@ PKGLISTS= \
 #		 |		|
 #		 |		| pkgsend publish
 #		 |		|
-#	  repositories 	    resolved dependencies
+#	  repositories	    resolved dependencies
 #		 |			|
 # pkgsend	 |			| pkgdepend resolve
-# create-repository	 	 	|
+# create-repository			|
 #		 |		generated dependencies
 #	 repo directories		|
 #					| pkgdepend
 #					|
 #				processed manifests
-# 
+#
 
 ALL_TARGETS= $(PROC_SYNTH_PKGS) proto_list_$(PKGMACH)
 
@@ -685,7 +711,7 @@ protocmp: makesilent
 
 pmodes: makesilent
 	@validate_pkg -a $(PKGMACH) -M -m $(PDIR) \
-		-e $(CODEMGR_WS)/exception_lists/pmodes 
+		-e $(CODEMGR_WS)/exception_lists/pmodes
 
 check: protocmp pmodes
 

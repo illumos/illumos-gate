@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 # Note, we want SIGINT (control-c) to exit the process quietly, to mimic
@@ -65,11 +66,11 @@ try:
 
 	try:
 		subfunc()
-	except zfs.util.ZFSError, e:
+	except zfs.util.ZFSError as e:
 		print(e)
 		sys.exit(1)
 
-except IOError, e:
+except IOError as e:
 	import errno
 	import sys
 

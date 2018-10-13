@@ -19,36 +19,29 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
-include	../Makefile.lib
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
 
-SUBDIRS=
-$(BUILDPY2)SUBDIRS += $(MACH)
-$(BUILD64)$(BUILDPY2)SUBDIRS += $(MACH64)
-$(BUILD64)$(BUILDPY3)SUBDIRS += py3
+$mapfile_version 2
 
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-
-PYCFIND =	$(FIND) . -name '*.pyc'
-PYCFILES =	$(PYCFIND:sh)
-
-.KEEP_STATE:
-
-all install clean lint: $(SUBDIRS)
-clobber: $(SUBDIRS)
-	$(RM) $(PYCFILES)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-include ../../Makefile.msg.targ
+SYMBOL_VERSION SUNWprivate {
+    global:
+	PyInit_ioctl;
+    local:
+	*;
+};

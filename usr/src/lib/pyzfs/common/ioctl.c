@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <Python.h>
@@ -131,7 +132,7 @@ dict2nvl(PyObject *d)
 	nvlist_t *nvl;
 	int err;
 	PyObject *key, *value;
-	int pos = 0;
+	Py_ssize_t pos = 0;
 
 	if (!PyDict_Check(d)) {
 		PyErr_SetObject(PyExc_ValueError, d);
@@ -142,7 +143,11 @@ dict2nvl(PyObject *d)
 	assert(err == 0);
 
 	while (PyDict_Next(d, &pos, &key, &value)) {
+#if PY_MAJOR_VERSION >= 3
+		char *keystr = PyBytes_AsString(key);
+#else
 		char *keystr = PyString_AsString(key);
+#endif
 		if (keystr == NULL) {
 			PyErr_SetObject(PyExc_KeyError, key);
 			nvlist_free(nvl);
@@ -155,11 +160,19 @@ dict2nvl(PyObject *d)
 			nvlist_free(valnvl);
 		} else if (value == Py_None) {
 			err = nvlist_add_boolean(nvl, keystr);
+#if PY_MAJOR_VERSION >= 3
+		} else if (PyBytes_Check(value)) {
+#else
 		} else if (PyString_Check(value)) {
+#endif
+#if PY_MAJOR_VERSION >= 3
+			char *valstr = PyBytes_AsString(value);
+#else
 			char *valstr = PyString_AsString(value);
+#endif
 			err = nvlist_add_string(nvl, keystr, valstr);
-		} else if (PyInt_Check(value)) {
-			uint64_t valint = PyInt_AsUnsignedLongLongMask(value);
+		} else if (PyLong_Check(value)) {
+			uint64_t valint = PyLong_AsUnsignedLongLongMask(value);
 			err = nvlist_add_uint64(nvl, keystr, valint);
 		} else if (PyBool_Check(value)) {
 			boolean_t valbool = value == Py_True ? B_TRUE : B_FALSE;
@@ -525,19 +538,49 @@ static PyMethodDef zfsmethods[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-void
-initioctl(void)
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef zfs_module = {
+	PyModuleDef_HEAD_INIT,
+	"zfs.ioctl",
+	NULL,
+	-1,
+	zfsmethods
+};
+#endif
+
+static PyObject *
+moduleinit()
 {
-	PyObject *zfs_ioctl = Py_InitModule("zfs.ioctl", zfsmethods);
-	PyObject *zfs_util = PyImport_ImportModule("zfs.util");
-	PyObject *devfile;
+	PyObject *zfs_ioctl, *zfs_util, *devfile;
+#if PY_MAJOR_VERSION >= 3
+	zfs_ioctl = PyModule_Create(&zfs_module);
+#else
+	zfs_ioctl = Py_InitModule("zfs.ioctl", zfsmethods);
+#endif
+	zfs_util = PyImport_ImportModule("zfs.util");
 
 	if (zfs_util == NULL)
-		return;
+		return (NULL);
 
 	ZFSError = PyObject_GetAttrString(zfs_util, "ZFSError");
 	devfile = PyObject_GetAttrString(zfs_util, "dev");
 	zfsdevfd = PyObject_AsFileDescriptor(devfile);
 
 	zfs_prop_init();
+
+	return (zfs_ioctl);
 }
+
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC
+PyInit_ioctl(void)
+{
+	return (moduleinit());
+}
+#else
+PyMODINIT_FUNC
+initioctl(void)
+{
+	(void) moduleinit();
+}
+#endif

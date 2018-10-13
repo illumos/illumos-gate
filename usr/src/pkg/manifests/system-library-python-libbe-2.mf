@@ -19,36 +19,23 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
-include	../Makefile.lib
-
-SUBDIRS=
-$(BUILDPY2)SUBDIRS += $(MACH)
-$(BUILD64)$(BUILDPY2)SUBDIRS += $(MACH64)
-$(BUILD64)$(BUILDPY3)SUBDIRS += py3
-
-all :=		TARGET= all
-install :=	TARGET= install
-clean :=	TARGET= clean
-clobber :=	TARGET= clobber
-lint :=		TARGET= lint
-
-PYCFIND =	$(FIND) . -name '*.pyc'
-PYCFILES =	$(PYCFIND:sh)
-
-.KEEP_STATE:
-
-all install clean lint: $(SUBDIRS)
-clobber: $(SUBDIRS)
-	$(RM) $(PYCFILES)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-include ../../Makefile.msg.targ
+set name=pkg.fmri \
+    value=pkg:/system/library/python/libbe$(PYTHON_PKGVERS)@$(PKGVERS)
+set name=pkg.description value="Boot Environment Management Python2 Module"
+set name=pkg.summary value="py_libbe module, python2"
+set name=variant.arch value=$(ARCH)
+dir path=usr group=sys
+dir path=usr/lib
+$(python2_ONLY)dir path=usr/lib/python$(PYTHON_VERSION)
+$(python2_ONLY)dir path=usr/lib/python$(PYTHON_VERSION)/vendor-packages
+$(python2_ONLY)dir path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/64
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/64/libbe_py.so
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/libbe_py.so
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+$(python2_ONLY)depend fmri=runtime/python$(PYTHON_PKGVERS) type=require

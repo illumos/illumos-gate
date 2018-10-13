@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 """Implements the Dataset class, providing methods for manipulating ZFS
@@ -69,7 +70,7 @@ class Property(object):
 		return self.attr != "readonly"
 
 proptable = dict()
-for name, t in zfs.ioctl.get_proptable().iteritems():
+for name, t in zfs.ioctl.get_proptable().items():
 	proptable[name] = Property(t)
 del name, t
 
@@ -79,7 +80,7 @@ def getpropobj(name):
 	try:
 		return proptable[name]
 	except KeyError:
-		for p in proptable.itervalues():
+		for p in proptable.values():
 			if p.colname and p.colname.lower() == name:
 				return p
 		raise
@@ -90,7 +91,7 @@ class Dataset(object):
 	Generally, this class provides interfaces to the C functions in
 	zfs.ioctl which actually interface with the kernel to manipulate
 	datasets.
-	
+
 	Unless otherwise noted, any method can raise a ZFSError to
 	indicate failure."""
 
@@ -101,7 +102,7 @@ class Dataset(object):
 	    types=("filesystem", "volume"), snaps=True):
 		"""Open the named dataset, checking that it exists and
 		is of the specified type.
-		
+
 		name is the string name of this dataset.
 
 		props is the property settings dict from zfs.ioctl.next_dataset.
@@ -137,7 +138,7 @@ class Dataset(object):
 
 		Currently only works for native properties (those with a
 		Property object.)
-		
+
 		Raises KeyError if propname does not specify a native property.
 		Does not raise ZFSError.
 		"""
@@ -165,7 +166,7 @@ class Dataset(object):
 			yield ds
 			for child in ds.descendents():
 				yield child
-	
+
 	def userspace(self, prop):
 		"""A generator function which iterates over a
 		userspace-type property.
@@ -177,14 +178,14 @@ class Dataset(object):
 		"""
 
 		d = zfs.ioctl.userspace_many(self.name, prop)
-		for ((domain, rid), space) in d.iteritems():
+		for ((domain, rid), space) in d.items():
 			yield (domain, rid, space)
 
 	def userspace_upgrade(self):
 		"""Initialize the accounting information for
 		userused@... and groupused@... properties."""
 		return zfs.ioctl.userspace_upgrade(self.name)
-	
+
 	def set_fsacl(self, un, d):
 		"""Add to the "zfs allow"-ed permissions on this Dataset.
 
@@ -219,7 +220,7 @@ def snapshots_fromcmdline(dsnames, recursive):
 		try:
 			ds = Dataset(dsname)
 			yield ds
-		except zfs.util.ZFSError, e:
+		except zfs.util.ZFSError as e:
 			if not recursive or e.errno != errno.ENOENT:
 				raise
 		if recursive:
@@ -229,6 +230,6 @@ def snapshots_fromcmdline(dsnames, recursive):
 				try:
 					yield Dataset(child.name + "@" +
 					    snapname)
-				except zfs.util.ZFSError, e:
+				except zfs.util.ZFSError as e:
 					if e.errno != errno.ENOENT:
 						raise
