@@ -85,6 +85,11 @@ slist_t	ptag_choices[] = {
 	{ "reserved",	"",	V_RESERVED	},
 	{ "system",	"",	V_SYSTEM	},
 	{ "BIOS_boot",	"",	V_BIOS_BOOT	},
+	{ "FreeBSD boot", "",	V_FREEBSD_BOOT	},
+	{ "FreeBSD swap", "",	V_FREEBSD_SWAP	},
+	{ "FreeBSD UFS", "",	V_FREEBSD_UFS	},
+	{ "FreeBSD ZFS", "",	V_FREEBSD_ZFS	},
+
 	{ NULL }
 };
 
