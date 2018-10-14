@@ -210,11 +210,12 @@ cpp_demangle(const char *src, sysdem_ops_t *ops)
 
 	if (nlen(&db) > 0) {
 		str_t *s = TOP_L(&db);
-		result = zalloc(ops, s->str_len + 1);
-		if (result == NULL)
+		char *res = zalloc(ops, s->str_len + 1);
+		if (res == NULL)
 			goto done;
 
-		(void) memcpy(result, s->str_s, s->str_len);
+		(void) memcpy(res, s->str_s, s->str_len);
+		result = res;
 	}
 
 done:
