@@ -86,7 +86,7 @@ typedef struct mtb_s {
 	clock_t		mtb_time_left;
 } MTB, *MTBP;
 
-static int mi_timer_fire(MTBP);
+static void mi_timer_fire(void *);
 static int mi_iprintf(char *, va_list, pfi_t, char *);
 static void mi_tpi_addr_and_opt(MBLKP, char *, t_scalar_t, char *, t_scalar_t);
 static MBLKP mi_tpi_trailer_alloc(MBLKP, size_t, t_scalar_t);
@@ -202,10 +202,10 @@ mi_close_free(IDP ptr)
 void
 mi_copyin(queue_t *q, MBLKP mp, char *uaddr, size_t len)
 {
-	struct 	iocblk *iocp = (struct iocblk *)mp->b_rptr;
-	struct 	copyreq *cq = (struct copyreq *)mp->b_rptr;
-	struct 	copyresp *cp = (struct copyresp *)mp->b_rptr;
-	int    	err;
+	struct	iocblk *iocp = (struct iocblk *)mp->b_rptr;
+	struct	copyreq *cq = (struct copyreq *)mp->b_rptr;
+	struct	copyresp *cp = (struct copyresp *)mp->b_rptr;
+	int	err;
 	MBLKP	mp1;
 
 	ASSERT(mp->b_datap->db_type == M_IOCTL && !uaddr);
@@ -293,7 +293,7 @@ err_ret:
 void
 mi_copyin_n(queue_t *q, MBLKP mp, size_t offset, size_t len)
 {
-	struct 	copyreq *cq = (struct copyreq *)mp->b_rptr;
+	struct	copyreq *cq = (struct copyreq *)mp->b_rptr;
 
 	ASSERT(mp->b_datap->db_type == M_IOCDATA);
 
@@ -1124,7 +1124,7 @@ mi_timer(queue_t *q, MBLKP mp, clock_t tim)
 			}
 		}
 		mtb->mtb_state = TB_RUNNING;
-		mtb->mtb_tid = timeout((pfv_t)mi_timer_fire, mtb, tim);
+		mtb->mtb_tid = timeout(mi_timer_fire, mtb, tim);
 		return;
 	}
 	switch (tim) {
@@ -1172,12 +1172,14 @@ mi_timer_alloc(size_t size)
  * it has fired then mi_timer() and mi_timer_valid() will clean
  * things up.
  */
-static int
-mi_timer_fire(MTBP mtb)
+static void
+mi_timer_fire(void *ptr)
 {
+	MTBP mtb = ptr;
+
 	ASSERT(mtb == (MTBP)mtb->mtb_mp->b_datap->db_base);
 	ASSERT(mtb->mtb_mp->b_datap->db_type == M_PCSIG);
-	return (putq(mtb->mtb_q, mtb->mtb_mp));
+	(void) putq(mtb->mtb_q, mtb->mtb_mp);
 }
 
 /*
@@ -1253,7 +1255,7 @@ mi_timer_move(queue_t *q, MBLKP mp)
 		}
 		mtb->mtb_q = q;
 		mtb->mtb_state = TB_RUNNING;
-		mtb->mtb_tid = timeout((pfv_t)mi_timer_fire, mtb, tim);
+		mtb->mtb_tid = timeout(mi_timer_fire, mtb, tim);
 	} else if (mtb->mtb_state != TB_IDLE) {
 		ASSERT(mtb->mtb_state != TB_TO_BE_FREED);
 		/*
@@ -1340,7 +1342,7 @@ mi_timer_valid(MBLKP mp)
 			 * the timer was restarted with.
 			 */
 			mtb->mtb_state = TB_RUNNING;
-			mtb->mtb_tid = timeout((pfv_t)mi_timer_fire,
+			mtb->mtb_tid = timeout(mi_timer_fire,
 			    mtb, mtb->mtb_time_left);
 			return (B_FALSE);
 		}
