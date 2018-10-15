@@ -266,23 +266,11 @@ int
 cmd_demangle(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	mdb_demangler_t *dmp = mdb.m_demangler;
-	const char *path;
-	char buf[MAXPATHLEN];
 
 	if (argc > 0)
 		return (DCMD_USAGE);
 
-	if (argc > 0) {
-		if (dmp != NULL)
-			mdb_dem_unload(mdb.m_demangler);
-		path = argv->a_un.a_str;
-	} else {
-		(void) snprintf(buf, MAXPATHLEN,
-		    "%s/%s", mdb.m_root, LIB_DEMANGLE);
-		path = buf;
-	}
-
-	if (dmp != NULL && argc == 0 && !(mdb.m_flags & MDB_FL_DEMANGLE)) {
+	if (dmp != NULL && !(mdb.m_flags & MDB_FL_DEMANGLE)) {
 		mdb_printf("C++ symbol demangling enabled\n");
 		mdb.m_flags |= MDB_FL_DEMANGLE;
 
