@@ -183,7 +183,7 @@ typedef struct mac_srs_rx_s {
 	 */
 	mac_direct_rx_t		sr_func;	/* srs_lock */
 	void			*sr_arg1;	/* srs_lock */
-	mac_resource_handle_t 	sr_arg2;	/* srs_lock */
+	mac_resource_handle_t	sr_arg2;	/* srs_lock */
 	mac_rx_func_t		sr_lower_proc;	/* Atomically changed */
 	uint32_t		sr_poll_pkt_cnt;
 	uint32_t		sr_poll_thres;
@@ -386,7 +386,7 @@ struct mac_soft_ring_set_s {
 /*
  * type flags - combination allowed to process and drain the queue
  */
-#define	ST_RING_WORKER_ONLY  	0x0001	/* Worker thread only */
+#define	ST_RING_WORKER_ONLY	0x0001	/* Worker thread only */
 #define	ST_RING_ANY		0x0002	/* Any thread can process the queue */
 #define	ST_RING_TCP		0x0004
 #define	ST_RING_UDP		0x0008
@@ -540,7 +540,7 @@ extern struct dls_kstats dls_kstat;
 }
 
 #define	MAC_COUNT_CHAIN(mac_srs, head, tail, cnt, sz)	{	\
-	mblk_t 		*tmp;		       			\
+	mblk_t		*tmp;					\
 	boolean_t	bw_ctl = B_FALSE;			\
 								\
 	ASSERT((head) != NULL);					\
@@ -579,12 +579,12 @@ extern struct dls_kstats dls_kstat;
 	ASSERT(MUTEX_HELD(&(mac_srs)->srs_lock));			\
 									\
 	srs_rx->sr_poll_pkt_cnt -= cnt;					\
-	if ((srs_rx->sr_poll_pkt_cnt <= srs_rx->sr_poll_thres) && 	\
-		(((mac_srs)->srs_state &				\
-		(SRS_POLLING|SRS_PROC|SRS_GET_PKTS)) == SRS_POLLING))	\
+	if ((srs_rx->sr_poll_pkt_cnt <= srs_rx->sr_poll_thres) &&	\
+	    (((mac_srs)->srs_state &					\
+	    (SRS_POLLING|SRS_PROC|SRS_GET_PKTS)) == SRS_POLLING))	\
 	{								\
 		(mac_srs)->srs_state |= (SRS_PROC|SRS_GET_PKTS);	\
-		cv_signal(&(mac_srs)->srs_cv); 				\
+		cv_signal(&(mac_srs)->srs_cv);				\
 		srs_rx->sr_below_hiwat++;				\
 	}								\
 }
@@ -639,7 +639,7 @@ extern void mac_fanout_setup(mac_client_impl_t *, flow_entry_t *,
 
 extern void mac_soft_ring_worker_wakeup(mac_soft_ring_t *);
 extern void mac_soft_ring_blank(void *, time_t, uint_t, int);
-extern mblk_t *mac_soft_ring_poll(mac_soft_ring_t *, int);
+extern mblk_t *mac_soft_ring_poll(mac_soft_ring_t *, size_t);
 extern void mac_soft_ring_destroy(mac_soft_ring_t *);
 extern void mac_soft_ring_dls_bypass(void *, mac_direct_rx_t, void *);
 
