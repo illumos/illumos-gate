@@ -317,7 +317,7 @@ struct arch_switch
     /*
      * Interface to release the load address.
      */
-    void	(*arch_free_loadaddr)(uint64_t addr, uint64_t pages);
+    void	(*arch_free_loadaddr)(vm_offset_t addr, size_t pages);
 
     /*
      * Interface to inform MD code about a loaded (ELF) segment. This

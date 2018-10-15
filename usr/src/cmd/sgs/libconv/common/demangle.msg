@@ -23,8 +23,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2018 Jason King
 #
 
-@ MSG_DEM_SYM		"cplus_demangle"
-@ MSG_DEM_LIB		"libdemangle.so.1"
+@ MSG_DEM_SYM		"sysdemangle"
+@ MSG_DEM_LIB		"libdemangle-sys.so.1"

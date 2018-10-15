@@ -11,23 +11,18 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright 2016 RackTop Systems.
 #
 
 
 CC=		$(GNUC_ROOT)/bin/gcc
 FICLDIR=	$(SRC)/common/ficl
 
-all: lib
-
-CPPFLAGS= -D_STANDALONE -I. -I.. -I../../../../include
+CPPFLAGS= -nostdinc -D_STANDALONE -I. -I.. -I../../../../include
 CPPFLAGS += -I../../../../lib/libstand
 CPPFLAGS += -I../../..  -I$(FICLDIR) -I../../common
-CFLAGS= -O2 -Wall -nostdinc
 
-CFLAGS +=	-ffreestanding
-CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3 -msoft-float
-CFLAGS +=	-std=gnu99
+CFLAGS=		-O2 -fPIC -Wall -ffreestanding -mno-mmx -mno-3dnow -mno-sse
+CFLAGS +=	-mno-sse2 -mno-sse3 -msoft-float -std=gnu99
 
 OBJECTS= dictionary.o system.o fileaccess.o float.o double.o prefix.o search.o
 OBJECTS += softcore.o stack.o tools.o vm.o primitives.o unix.o utility.o
@@ -51,8 +46,6 @@ machine:
 x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
-
-$(OBJECTS): machine x86
 
 %.o:	../softcore/%.c $(HEADERS)
 	$(COMPILE.c) $<

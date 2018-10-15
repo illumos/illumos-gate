@@ -53,7 +53,7 @@ HDRS=		com.h writer.h probe.h
 ROOTHDRDIR=	$(ROOT)/usr/include/tnf
 ROOTHDRS=	$(HDRS:%=$(ROOTHDRDIR)/%)
 CHECKHDRS=	$(HDRS:%.h=%.check)
-$(ROOTHDRS) := 	FILEMODE = 0644
+$(ROOTHDRS) :=	FILEMODE = 0644
 CHECKHDRS =	$(HDRS:%.h=%.check)
 
 # Include .. first to pick up tnf_trace.h in current dir, Include UFSDIR to
@@ -87,7 +87,7 @@ $(ROOTLIBDIR) $(ROOTHDRDIR):
 $(ROOTHDRDIR)/% : %
 	$(INS.file)
 
-#ASFLAGS=	-K pic -P -D_SYS_SYS_S -D_LOCORE -D_ASM -DPIC -DLOCORE $(CPPFLAGS)
+#ASFLAGS=	$(AS_PICFLAGS) -P -D_SYS_SYS_S -D_LOCORE -D_ASM -DPIC -DLOCORE $(CPPFLAGS)
 ASFLAGS=	-P -D_SYS_SYS_S -D_LOCORE -D_ASM -DPIC -DLOCORE $(CPPFLAGS)
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 

@@ -1131,7 +1131,7 @@ MAPFILES =	$(LIBCDIR)/port/mapfile-vers
 CFLAGS +=	$(EXTN_CFLAGS)
 CPPFLAGS=	-D_REENTRANT -Dsparc $(EXTN_CPPFLAGS) $(THREAD_DEBUG) \
 		-I$(LIBCBASE)/inc -I$(LIBCDIR)/inc $(CPPFLAGS.master)
-ASFLAGS=	$(EXTN_ASFLAGS) -K pic -P -D__STDC__ -D_ASM $(CPPFLAGS) $(sparc_AS_XARCH)
+ASFLAGS=	$(EXTN_ASFLAGS) $(AS_PICFLAGS) -P -D__STDC__ -D_ASM $(CPPFLAGS) $(sparc_AS_XARCH)
 
 # As a favor to the dtrace syscall provider, libc still calls the
 # old syscall traps that have been obsoleted by the *at() interfaces.
@@ -1383,7 +1383,7 @@ $(STRETS:%=pics/%): $(LIBCBASE)/crt/stret.s
 	$(POST_PROCESS_O)
 
 $(LIBCBASE)/crt/_rtbootld.s:	$(LIBCBASE)/crt/_rtboot.s $(LIBCBASE)/crt/_rtld.c
-	$(CC) $(CPPFLAGS) $(CTF_FLAGS) -O -S -K pic \
+	$(CC) $(CPPFLAGS) $(CTF_FLAGS) -O -S $(C_PICFLAGS) \
 	    $(LIBCBASE)/crt/_rtld.c -o $(LIBCBASE)/crt/_rtld.s
 	$(CAT) $(LIBCBASE)/crt/_rtboot.s $(LIBCBASE)/crt/_rtld.s > $@
 	$(RM) $(LIBCBASE)/crt/_rtld.s

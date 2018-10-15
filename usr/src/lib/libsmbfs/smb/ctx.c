@@ -910,7 +910,7 @@ sectype_table[] = {
 	{ "ntlm",	SMB_AT_NTLM1 },
 	{ "ntlm2",	SMB_AT_NTLM2 },
 	{ "krb5",	SMB_AT_KRB5 },
-	{ NULL, 	0 },
+	{ NULL,		0 },
 };
 int
 smb_parse_secopts(struct smb_ctx *ctx, const char *arg)
@@ -1211,11 +1211,6 @@ smb_ctx_get_ssn(struct smb_ctx *ctx)
 
 	if ((ctx->ct_flags & SMBCF_RESOLVED) == 0)
 		return (EINVAL);
-
-	if (ctx->ct_dev_fd < 0) {
-		if ((err = smb_ctx_gethandle(ctx)))
-			return (err);
-	}
 
 	/*
 	 * Check whether the driver already has a VC

@@ -50,3 +50,6 @@ tests = [ 'runtests.sh' ]
 
 [/opt/util-tests/tests/grep_test]
 [/opt/util-tests/tests/date_test]
+
+[/opt/util-tests/tests/demangle]
+tests = ['afl-fast', 'gcc-libstdc++', 'llvm-stdcxxabi']

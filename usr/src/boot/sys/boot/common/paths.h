@@ -30,7 +30,7 @@
 #define PATH_DOTCONFIG	"/boot.config"
 #define PATH_CONFIG	"/boot/config"
 #define PATH_LOADER	"/boot/loader"
-#define PATH_LOADER_EFI	"/boot/loader.efi"
+#define PATH_LOADER_EFI	"/boot/" LOADER_EFI
 #define PATH_KERNEL	"/boot/kernel/kernel"
 
 #endif /* _PATHS_H_ */

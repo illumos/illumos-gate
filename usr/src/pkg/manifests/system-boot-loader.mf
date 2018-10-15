@@ -43,7 +43,8 @@ $(i386_ONLY)dir path=usr/share/man
 $(i386_ONLY)dir path=usr/share/man/man3
 $(i386_ONLY)dir path=usr/share/man/man4
 $(i386_ONLY)dir path=usr/share/man/man5
-$(i386_ONLY)file path=boot/boot1.efi group=sys mode=0555
+$(i386_ONLY)file path=boot/bootia32.efi group=sys mode=0555
+$(i386_ONLY)file path=boot/bootx64.efi group=sys mode=0555
 $(i386_ONLY)file path=boot/cdboot group=sys mode=0444
 $(i386_ONLY)file path=boot/defaults/loader.conf group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/beadm.4th group=sys mode=0444
@@ -73,9 +74,10 @@ $(i386_ONLY)file path=boot/forth/support.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/version.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/gptzfsboot group=sys mode=0444
 $(i386_ONLY)file path=boot/loader group=sys mode=0444
-$(i386_ONLY)file path=boot/loader.efi group=sys mode=0555
 $(i386_ONLY)file path=boot/loader.help group=sys mode=0444
 $(i386_ONLY)file path=boot/loader.rc group=sys mode=0444
+$(i386_ONLY)file path=boot/loader32.efi group=sys mode=0555
+$(i386_ONLY)file path=boot/loader64.efi group=sys mode=0555
 $(i386_ONLY)file path=boot/pmbr group=sys mode=0444
 $(i386_ONLY)file path=boot/pxeboot group=sys mode=0444
 $(i386_ONLY)file path=usr/share/man/man4/loader.conf.4

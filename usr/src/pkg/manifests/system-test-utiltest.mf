@@ -14,6 +14,7 @@
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2017 Joyent, Inc.
+# Copyright 2017 Jason King.
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -26,6 +27,7 @@ dir path=opt/util-tests
 dir path=opt/util-tests/bin
 dir path=opt/util-tests/runfiles
 dir path=opt/util-tests/tests
+dir path=opt/util-tests/tests/demangle
 dir path=opt/util-tests/tests/dis
 dir path=opt/util-tests/tests/dis/i386
 dir path=opt/util-tests/tests/dis/risc-v
@@ -1116,6 +1118,9 @@ file path=opt/util-tests/tests/awk/tests/T.split mode=0555
 file path=opt/util-tests/tests/awk/tests/T.sub mode=0555
 file path=opt/util-tests/tests/awk/tests/T.system mode=0555
 file path=opt/util-tests/tests/date_test mode=0555
+file path=opt/util-tests/tests/demangle/afl-fast mode=0555
+file path=opt/util-tests/tests/demangle/gcc-libstdc++ mode=0555
+file path=opt/util-tests/tests/demangle/llvm-stdcxxabi mode=0555
 file path=opt/util-tests/tests/dis/distest mode=0555
 file path=opt/util-tests/tests/dis/i386/32.adx.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.adx.s mode=0444
@@ -1400,5 +1405,7 @@ file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555
 license lic_CDDL license=lic_CDDL
+license usr/src/lib/libdemangle/THIRDPARTYLICENSE \
+    license=usr/src/lib/libdemangle/THIRDPARTYLICENSE
 depend fmri=system/library/iconv/utf-8 type=require
 depend fmri=system/test/testrunner type=require

@@ -41,7 +41,7 @@ LIBBC=		../../lib/libbc/sparc/libc.so.1.9
 LIBUCB=		../../ucblib/libucb/sparc/libucb.so.1
 
 # need libc/sparc/inc for PIC.h
-ASFLAGS=	-P -D_ASM -DPIC -K pic
+ASFLAGS=	-P -D_ASM -DPIC $(AS_PICFLAGS)
 LDFLAGS=	-R /usr/4lib:/usr/ucblib -e _start -G -t \
 		$(BLOCAL) $(ZNOVERSION) $(ZDEFS) $(ZTEXT) \
 		-I/usr/lib/ld.so.1

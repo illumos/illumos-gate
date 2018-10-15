@@ -44,7 +44,7 @@ utime.o
 
 COMPAT4.1=\
 ftime.o     nice.o      rand.o      vlimit.o    vtimes.o    getpw.o times.o
- 
+
 COMPATSYS5=\
 nice.o      rand.o      getpw.o     times.o
 
@@ -97,14 +97,14 @@ calloc.o malloc.o \
 getpass.o localtime.o ttyslot.o
 
 GENCOMSPARC=\
-alloca.o   ffs.o insque.o    remque.o    isinf.o     base_conv.o 
+alloca.o   ffs.o insque.o    remque.o    isinf.o     base_conv.o
 
 GEN4.2=\
 nlist.o     timezone.o  sleep.o  system.o
 
 GENSYS5=\
 assert.o    nlist.o     sgetl.o    sleep.o      sputl.o     system.o \
-sighold.o   
+sighold.o
 
 STDIOCOM=\
 clrerr.o    ctermid.o   cuserid.o   doprnt.o    doscan.o    fdopen.o \
@@ -150,7 +150,7 @@ creat.o     execve.o    getpgrp.o   link.o      mkdir.o  \
 mknod.o     open.o      readlink.o  rename.o    rmdir.o  \
 setpgrp.o   stat.o      symlink.o   truncate.o  unlink.o     \
 statfs.o    fcntl.o     read.o      write.o     readv.o \
-writev.o    setjmp.o	mount.o 
+writev.o    setjmp.o	mount.o
 
 SYS4.2SPARC=\
 getgroups.o setgroups.o
@@ -340,9 +340,9 @@ CERRWARN += -_gcc=-Wno-address
 $(DYNLIB4X) :=	SONAME = $(DYNLIB4X)
 $(DYNLIBS5) :=	SONAME = $(DYNLIBS5)
 
-pics/%.o:= ASFLAGS += -K pic -DPIC
-pics/%.o:= CPPFLAGS += -K pic -DPIC
-s5pics/%.o:= ASFLAGS += -K pic -DPIC
+pics/%.o:= ASFLAGS += $(AS_PICFLAGS) -DPIC
+pics/%.o:= CPPFLAGS += $(C_PICFLAGS) -DPIC
+s5pics/%.o:= ASFLAGS += $(AS_PICFLAGS) -DPIC
 DYNFLAGS += $(ZINTERPOSE)
 
 BUILD.s=  $(AS) $(ASFLAGS) $< -o $@
@@ -352,14 +352,14 @@ BUILD.AR= $(RM) $@ ; \
 	$(AR) q $@ $(OBJECTS:%=$(DIR)/%)
 
 # the TXTS macro is used for NSE bootstrapping.
-TXTS=	inc/SYS.h inc/PIC.h inc/machine/asm_linkage.h 
+TXTS=	inc/SYS.h inc/PIC.h inc/machine/asm_linkage.h
 
 LIBS = $(DYNLIB4X) $(DYNLIBS5)
 
 OBJECTS= $(COMPATCOM) $(COMPAT4.1) $(CRTSPARC) $(GENCOM) \
 $(GENCOMSPARC) $(GEN4.2) $(STDIOCOM) $(STDIO4.2) \
 $(INET) $(NET) $(NETSPARC) $(YP) \
-$(SYSCOM) $(SYSCOMSPARC) $(SYS4.2) 
+$(SYSCOM) $(SYSCOMSPARC) $(SYS4.2)
 
 #
 # Since this library is strictly for binary compability with ancient
@@ -381,7 +381,7 @@ CLEANFILES= ../libc/yp/ypupdate_prot.c ../inc/include/rpcsvc/ypupdate_prot.h \
 CLOBBERFILES= ../libc/compat/sys5/mkepoch
 
 # conditional assignments
-s5pics/%.o:= CPPFLAGS = -Dsparc -DS5EMUL -K pic -DPIC -I. -Iinc \
+s5pics/%.o:= CPPFLAGS = -Dsparc -DS5EMUL $(C_PICFLAGS) -DPIC -I. -Iinc \
 	-I../inc/5include -I../inc/include -I../inc/include/sys \
 	$(CPPFLAGS.master)
 
@@ -414,7 +414,7 @@ s5pics:
 
 # special cases
 PSEUDO_POBJS= $(PSEUDO_SRCS:%.s=pics/%.o)
-PSEUDO_PS5OBJS= $(PSEUDO_SRCS:%.s=s5pics/%.o) 
+PSEUDO_PS5OBJS= $(PSEUDO_SRCS:%.s=s5pics/%.o)
 
 $(PSEUDO_POBJS) $(PSEUDO_PS5OBJS):
 	@(echo '#include "SYS.h"'; \
@@ -451,7 +451,7 @@ s5pics/yp_update.o : ../inc/include/rpcsvc/ypupdate_prot.h ../libc/yp/yp_update.
 	$(POST_PROCESS_O)
 
 pics/ypupdate_prot.o s5pics/ypupdate_prot.o : ../inc/include/rpcsvc/ypupdate_prot.h\
-				../libc/yp/ypupdate_prot.c 
+				../libc/yp/ypupdate_prot.c
 	$(COMPILE.c) -o $@ ../libc/yp/ypupdate_prot.c
 	$(POST_PROCESS_O)
 

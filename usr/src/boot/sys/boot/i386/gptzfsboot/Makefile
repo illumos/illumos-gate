@@ -63,8 +63,8 @@ CFLAGS +=	-fno-reorder-functions
 
 LD_FLAGS=-static -N --gc-sections
 CCASFLAGS=-Wa,--divide
-LIBSTAND=	../../libstand/i386/libstand.a
-LIBZFSBOOT=	../../zfs/i386/libzfsboot.a
+LIBSTAND=	../../libstand/$(MACH)/libstand.a
+LIBZFSBOOT=	../../zfs/$(MACH)/libzfsboot.a
 
 include ../Makefile.inc
 

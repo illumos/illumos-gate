@@ -11,20 +11,28 @@
 
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright 2016 RackTop Systems.
 #
+
+MACHINE=	$(MACH)
+LIBRARY=	libstand.a
+
+all install:	$(LIBRARY)
 
 include ../Makefile.com
 
-MACHINE=	$(MACH)
+CFLAGS +=	-m32
+ASFLAGS +=	-m32
 
-CFLAGS +=	-m32 -fno-reorder-functions
-CFLAGS +=	-mpreferred-stack-boundary=2
+CLEANFILES += x86
 
 # _setjmp/_longjmp
 SRCS += $(LIBSTAND_SRC)/i386/_setjmp.S
 OBJS += _setjmp.o
 
 $(LIBRARY): $(SRCS) $(OBJS)
+
+$(OBJS): machine x86
 
 %.o: $(LIBSTAND_SRC)/i386/%.S
 	$(COMPILE.S) $<

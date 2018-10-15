@@ -38,7 +38,7 @@ IFLAGS =	-I$(SRC)/uts/$(GEN_PLATFORM) \
 
 AS_CPPFLAGS +=	-D__STDC__ -D_ASM -DPIC -D_REENTRANT -D$(MACH) $(IFLAGS) \
 		-DNIAGARA2_IMPL
-ASFLAGS =	-P -K pic
+ASFLAGS =	-P $(AS_PICFLAGS)
 
 # memcpy.s provides __align_cpy_1 as an alias for memcpy.  However, this isn't
 # a WEAK symbol, and hence ld(1)'s ability to cull duplicate local symbols with

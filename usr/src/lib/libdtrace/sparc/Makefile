@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 
-ASFLAGS += -D_ASM -K PIC -P
+ASFLAGS += -D_ASM $(AS_BIGPICFLAGS) -P
 
 include ../Makefile.com
 

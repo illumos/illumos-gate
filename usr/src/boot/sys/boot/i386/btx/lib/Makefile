@@ -31,7 +31,7 @@ OBJS=	btxcsu.o btxsys.o btxv86.o
 
 LDFLAGS=-Wl,-r -nostdlib
 
-all: $(PROG)
+all install: $(PROG)
 
 $(PROG): $(OBJS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS)

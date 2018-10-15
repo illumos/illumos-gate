@@ -40,11 +40,11 @@ P_MACHOBJS=	sparc_elf.o	_setup.o
 
 CP_MACHOBJS=	common_sparc.o
 
-S_MACHOBJS=	
+S_MACHOBJS=
 
 P_ASOBJS=	boot.o		boot_elf.o	caller.o
 
-S_ASOBJS=	
+S_ASOBJS=
 
 CRTSRCS=	../../../../lib/crt/sparc
 CRTI=		pics/crti.o
@@ -68,7 +68,7 @@ include		$(SRC)/lib/Makefile.lib.64
 
 CPPFLAGS +=	-I../../../../uts/sparc/krtld
 CFLAGS +=	-xregs=no%appl
-ASFLAGS +=	-s -K pic -D__sparcv9 -D_ELF64 $(sparcv9_XARCH)
+ASFLAGS +=	-s $(AS_PICFLAGS) -D__sparcv9 -D_ELF64 $(sparcv9_XARCH)
 ADBGENFLAGS +=	-mlp64
 ADBGENCFLAGS +=	-erroff=%all
 ADBSUB=		$(ADBSUB64)

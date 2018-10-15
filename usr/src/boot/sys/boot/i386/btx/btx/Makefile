@@ -48,7 +48,7 @@ ORG=	0x9000
 
 LDFLAGS=-e start -Ttext ${ORG} -N -S --oformat binary
 
-all:	$(PROG)
+all install:	$(PROG)
 
 $(PROG): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)

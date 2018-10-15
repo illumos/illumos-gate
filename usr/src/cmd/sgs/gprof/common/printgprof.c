@@ -22,9 +22,10 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Jason King
+ * Copyright 2018, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <string.h>
@@ -34,7 +35,7 @@
 #include "gprof.h"
 
 void print_demangled_name(int, nltype *);
-void striped_name(char *, nltype **);
+static void stripped_name(char **, size_t *, nltype **);
 
 extern long hz;
 
@@ -65,7 +66,7 @@ printprof(void)
 	nltype	*np;
 	nltype	**sortednlp;
 	int	i, index;
-	int 	print_count = number_funcs_toprint;
+	int	print_count = number_funcs_toprint;
 	bool	print_flag = TRUE;
 	mod_info_t	*mi;
 
@@ -293,7 +294,7 @@ printgprof(nltype **timesortnlp)
 {
 	int	index;
 	nltype	*parentp;
-	int 	print_count = number_funcs_toprint;
+	int	print_count = number_funcs_toprint;
 	bool	count_flag = TRUE;
 
 	/*
@@ -500,10 +501,7 @@ printname(nltype *selfp)
 	c = demangled_name(selfp);
 
 	if (selfp->name != 0) {
-		if (!Cflag)
-			(void) printf("%s", selfp->name);
-		else
-			(void) printf("%s", c);
+		(void) printf("%s", c);
 
 #ifdef DEBUG
 		if (debug & DFNDEBUG)
@@ -523,24 +521,26 @@ printname(nltype *selfp)
 		else
 			(void) printf(" (%d)", selfp->index);
 	}
+
+	if (c != selfp->name)
+		free((void *)c);
 }
 
 void
 print_demangled_name(int n, nltype *selfp)
 {
-	char *c;
+	char *c = (char *)demangled_name(selfp);
 	int i;
 
-	c = selfp->name;
-
-	if (strcmp(c, demangled_name(selfp)) == 0)
+	if (c == selfp->name)
 		return;
-	else {
-		(void) printf("\n");
-		for (i = 1; i < n; i++)
-			(void) printf(" ");
-		(void) printf("[%s]", selfp->name);
-	}
+
+	(void) printf("\n");
+	for (i = 1; i < n; i++)
+		(void) printf(" ");
+	(void) printf("[%s]", selfp->name);
+
+	free(c);
 }
 
 void
@@ -862,8 +862,6 @@ printblurb(char *blurbname)
 	(void) fclose(blurbfile);
 }
 
-char *s1, *s2;
-
 static int
 namecmp(const void *arg1, const void *arg2)
 {
@@ -873,20 +871,50 @@ namecmp(const void *arg1, const void *arg2)
 	if (!Cflag)
 		return (strcmp((*npp1)->name, (*npp2)->name));
 	else {
-		striped_name(s1, npp1);
-		striped_name(s2, npp2);
+		static char *s1 = NULL, *s2 = NULL;
+		static size_t s1len = 0, s2len = 0;
+
+		stripped_name(&s1, &s1len, npp1);
+		stripped_name(&s2, &s2len, npp2);
 		return (strcmp(s1, s2));
 	}
 }
 
-void
-striped_name(char *s, nltype **npp)
+#define	NAME_CHUNK 512
+#define	ROUNDLEN(x) (((x) + NAME_CHUNK - 1) / NAME_CHUNK * NAME_CHUNK)
+static void
+adjust_size(char **pp, size_t *lenp, const char *name)
 {
-	const char *d;
+	void *newp;
+	size_t nlen = strlen(name);
+	size_t buflen;
+
+	if (*lenp > nlen) {
+		(void) memset(*pp, '\0', *lenp);
+		return;
+	}
+
+	buflen = ROUNDLEN(nlen + 1);
+	if ((newp = realloc(*pp, buflen)) == NULL) {
+		(void) fprintf(stderr,
+		    "gprof: out of memory comparing names\n");
+		exit(EXIT_FAILURE);
+	}
+	(void) memset(newp, '\0', buflen);
+
+	*lenp = buflen;
+	*pp = newp;
+}
+
+static void
+stripped_name(char **sp, size_t *slenp, nltype **npp)
+{
+	const char *name, *d;
 	char *c;
 
-	c = (char *)s;
-	d = demangled_name(*npp);
+	name = d = demangled_name(*npp);
+	adjust_size(sp, slenp, name);
+	c = *sp;
 
 	while ((*d != '(') && (*d != '\0')) {
 		if (*d != ':')
@@ -895,6 +923,9 @@ striped_name(char *s, nltype **npp)
 			d++;
 	}
 	*c = '\0';
+
+	if ((*npp)->name != name)
+		free((void *)name);
 }
 
 /*
@@ -972,11 +1003,6 @@ printindex()
 		}
 	}
 
-	if (Cflag) {
-		s1 = malloc(500 * sizeof (char));
-		s2 = malloc(500 * sizeof (char));
-	}
-
 	qsort(namesortnlp, nnames, sizeof (nltype *), namecmp);
 
 	for (index = 1, todo = nnames; index <= ncycle; index++)
@@ -1038,13 +1064,16 @@ printindex()
 				if (does_clash(namesortnlp, i, nnames)) {
 					(void) printf("%6.6s %d:%s\n",
 					    peterbuffer, nlp->module->id, d);
-				} else
+				} else {
 					(void) printf("%6.6s %s\n", peterbuffer,
 					    d);
+				}
 
-				if (d != nlp->name)
+				if (d != nlp->name) {
 					(void) printf("%6.6s   [%s]", "",
 					    nlp->name);
+					free((void *)d);
+				}
 			} else {
 				(void) printf("%6.6s ", peterbuffer);
 				(void) sprintf(peterbuffer, "<cycle %d>",

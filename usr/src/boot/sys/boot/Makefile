@@ -18,7 +18,7 @@
 include $(SRC)/Makefile.master
 
 INSTDIRS = i386 efi
-SUBDIRS = libstand ficl zfs $(INSTDIRS)
+SUBDIRS = libstand libficl zfs $(INSTDIRS)
 
 all	:=	TARGET = all
 clean	:=	TARGET = clean

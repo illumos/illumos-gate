@@ -30,6 +30,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
 # Copyright 2017 RackTop Systems.
+# Copyirght 2018 Jason King
 #
 
 include ../Makefile.master
@@ -107,6 +108,7 @@ SUBDIRS +=				\
 	libctf		\
 	libcurses	\
 	libcustr	\
+	libdemangle	\
 	libdevice	\
 	libdevid	\
 	libdevinfo	\
@@ -389,6 +391,7 @@ HDRSUBDIRS=				\
 	libctf		\
 	libcurses	\
 	libcustr	\
+	libdemangle	\
 	libdevice	\
 	libdevid	\
 	libdevinfo	\

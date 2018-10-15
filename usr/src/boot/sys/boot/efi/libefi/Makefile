@@ -10,86 +10,25 @@
 #
 
 #
-# Copyright 2015 Toomas Soome <tsoome@me.com>
-# Copyright 2016 RackTop Systems.
+# Copyright 2016 Toomas Soome <tsoome@me.com>
 #
+
+.KEEP_STATE:
 
 include $(SRC)/Makefile.master
 
-CC=     $(GNUC_ROOT)/bin/gcc
+SUBDIRS = $(MACH) $(MACH64)
 
-LIB=	efi
+all	:=	TARGET = all
+clean	:=	TARGET = clean
+clobber	:=	TARGET = clobber
+install	:=	TARGET = install
 
-all:	lib$(LIB).a
+all clean clobber: $(SUBDIRS)
 
-install:
+install: all
 
-SRCS=	delay.c \
-	devicename.c \
-	devpath.c \
-	efi_console.c \
-	efi_driver_utils.c \
-	efichar.c \
-	efienv.c \
-	efinet.c \
-	efipart.c \
-	efizfs.c \
-	env.c \
-	errno.c \
-	handles.c \
-	libefi.c \
-	time.c \
-	wchar.c
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 
-#.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
-#SRCS +=	time.c
-#.elif ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm"
-#SRCS+=	time_event.c
-#.endif
-
-OBJS=	$(SRCS:%.c=%.o)
-
-CPPFLAGS= -D_STANDALONE
-CFLAGS = -O2
-
-#.if ${MACHINE_CPUARCH} == "aarch64"
-#CFLAGS+=	-msoft-float -mgeneral-regs-only
-#.endif
-#.if ${MACHINE_ARCH} == "amd64"
-CFLAGS += -fPIC
-#.endif
-
-CFLAGS += -nostdinc -I. -I../../../../include -I../../..
-CFLAGS += -I$(SRC)/common/ficl -I../../ficl
-CFLAGS += -I../include
-CFLAGS += -I../include/${MACH64}
-CFLAGS += -I../../../../lib/libstand
-CFLAGS += -I./../../zfs
-CFLAGS += -I./../../../cddl/boot/zfs
-
-# Pick up the bootstrap header for some interface items
-CFLAGS += -I../../common
-
-# Handle FreeBSD specific %b and %D printf format specifiers
-# CFLAGS+= ${FORMAT_EXTENSIONS}
-# CFLAGS += -D__printf__=__freebsd_kprintf__
-CFLAGS += -DTERM_EMU
-
-include ../Makefile.inc
-
-lib$(LIB).a: $(SRCS) $(OBJS)
-	$(AR) $(ARFLAGS) $@ $(OBJS)
-
-clean: clobber
-clobber:
-	$(RM) $(CLEANFILES) $(OBJS) machine x86 lib$(LIB).a
-
-machine:
-	$(RM) machine
-	$(SYMLINK) ../../../amd64/include machine
-
-x86:
-	$(RM) x86
-	$(SYMLINK) ../../../x86/include x86
-
-$(OBJS): machine x86
+FRC:

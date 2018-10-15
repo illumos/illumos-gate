@@ -535,11 +535,9 @@ command_memmap(int argc __unused, char *argv[] __unused)
 
 	for (i = 0, p = map; i < ndesc;
 	     i++, p = NextMemoryDescriptor(p, dsz)) {
-		snprintf(line, 80, "%23s %012lx %012lx %08lx ",
-		    efi_memory_type(p->Type),
-		    p->PhysicalStart,
-		    p->VirtualStart,
-		    p->NumberOfPages);
+		snprintf(line, 80, "%23s %012jx %012jx %08jx ",
+		    efi_memory_type(p->Type), p->PhysicalStart,
+		    p->VirtualStart, p->NumberOfPages);
 		rv = pager_output(line);
 		if (rv)
 			break;

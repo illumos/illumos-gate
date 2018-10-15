@@ -22,12 +22,12 @@
 /*
  * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Jason King.
  */
 
 #ifndef	_MDB_DEMANGLE_H
 #define	_MDB_DEMANGLE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -38,11 +38,10 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/param.h>
 #include <mdb/mdb_modapi.h>
+#include <demangle-sys.h>
 
 typedef struct mdb_demangler {
-	char dm_pathname[MAXPATHLEN];	/* pathname of demangling library */
-	void *dm_handle;		/* rtld handle to demangling library */
-	int (*dm_convert)(const char *, char *, size_t);	/* demangler */
+	sysdem_lang_t dm_lang;		/* language to demangle */
 	char *dm_buf;			/* demangling buffer */
 	size_t dm_len;			/* size of dm_buf in bytes */
 	char *dm_dem;			/* start of demangled string (in buf) */
@@ -55,7 +54,7 @@ typedef struct mdb_demangler {
 #define	MDB_DM_MANGLED	0x8		/* show mangled name */
 #define	MDB_DM_ALL	0xf		/* mask of all valid flags */
 
-extern mdb_demangler_t *mdb_dem_load(const char *);
+extern mdb_demangler_t *mdb_dem_load(void);
 extern void mdb_dem_unload(mdb_demangler_t *);
 extern const char *mdb_dem_convert(mdb_demangler_t *, const char *);
 

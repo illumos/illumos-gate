@@ -25,6 +25,7 @@
  * All Rights Reserved
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Jason King
  */
 
 #include <stdio.h>
@@ -260,7 +261,7 @@ main(int argc, char *argv[], char *envp[])
 					    "%s: -u or -e set, -g ignored\n"),
 					    prog_name);
 				break;
-		case 'r': 	if (R_flag) {
+		case 'r':	if (R_flag) {
 					R_flag = 0;
 					(void) fprintf(stderr, gettext(
 					    "%s: -r set, -R ignored\n"),
@@ -666,7 +667,7 @@ static void print_with_otherflags(int, Elf *, unsigned int,
  */
 static void
 print_symtab(Elf *elf_file, unsigned int shstrndx,
-	Elf_Scn *p_sd, GElf_Shdr *shdr, char *filename)
+    Elf_Scn *p_sd, GElf_Shdr *shdr, char *filename)
 {
 
 	Elf_Data * sd;
@@ -781,7 +782,7 @@ is_bss_section(unsigned int shndx, Elf * elf_file, unsigned int shstrndx)
  */
 static SYM *
 readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
-	unsigned int link, unsigned int symscnndx)
+    unsigned int link, unsigned int symscnndx)
 {
 	SYM		*s, *buf;
 	GElf_Sym	sym;
@@ -805,15 +806,15 @@ readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
 		if (sym.st_name == 0)
 			buf->name = "";
 		else if (C_flag) {
-			const char *dn;
+			const char *dn = NULL;
 			char *name = (char *)elf_strptr(elf, link, sym.st_name);
+
 			dn = conv_demangle_name(name);
-			if (strcmp(dn, name) == 0) {	/* Not demangled */
-				if (exotic(name)) {
-					name = FormatName(name, d_buf);
-				}
-			} else {  /* name demangled */
+			if (dn != name) {
 				name = FormatName(name, dn);
+				free((void *)dn);
+			} else if (exotic(name)) {
+				name = FormatName(name, d_buf);
 			}
 			buf->name = name;
 		}
@@ -1014,10 +1015,7 @@ is_sym_print(SYM *sym_data)
  * -u flag specified
  */
 static void
-print_with_uflag(
-	SYM *sym_data,
-	char *filename
-)
+print_with_uflag(SYM *sym_data, char *filename)
 {
 	if ((sym_data->shndx == SHN_UNDEF) && (strlen(sym_data->name))) {
 		if (!r_flag) {
@@ -1094,18 +1092,13 @@ print_brief_sym_type(Elf *elf_file, unsigned int shstrndx, SYM *sym_data)
  * -p flag specified
  */
 static void
-print_with_pflag(
-	int ndigits,
-	Elf *elf_file,
-	unsigned int shstrndx,
-	SYM *sym_data,
-	char *filename
-)
+print_with_pflag(int ndigits, Elf *elf_file, unsigned int shstrndx,
+    SYM *sym_data, char *filename)
 {
 	const char * const fmt[] = {
-		"%.*llu ",	/* FMT_T_DEC */
-		"0x%.*llx ",	/* FMT_T_HEX */
-		"0%.*llo "	/* FMT_T_OCT */
+	    "%.*llu ",	/* FMT_T_DEC */
+	    "0x%.*llx ",	/* FMT_T_HEX */
+	    "0%.*llo "	/* FMT_T_OCT */
 	};
 
 	if (is_sym_print(sym_data) != 1)
@@ -1148,12 +1141,8 @@ print_with_pflag(
  * -P flag specified
  */
 static void
-print_with_Pflag(
-	int ndigits,
-	Elf *elf_file,
-	unsigned int shstrndx,
-	SYM *sym_data
-)
+print_with_Pflag(int ndigits, Elf *elf_file, unsigned int shstrndx,
+    SYM *sym_data)
 {
 #define	SYM_LEN 10
 	char sym_name[SYM_LEN+1];
@@ -1200,13 +1189,8 @@ print_with_Pflag(
  * other flags specified
  */
 static void
-print_with_otherflags(
-	int ndigits,
-	Elf *elf_file,
-	unsigned int shstrndx,
-	SYM *sym_data,
-	char *filename
-)
+print_with_otherflags(int ndigits, Elf *elf_file, unsigned int shstrndx,
+    SYM *sym_data, char *filename)
 {
 	const char * const fmt_value_size[] = {
 		"%*llu|%*lld|",		/* FMT_T_DEC */

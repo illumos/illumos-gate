@@ -29,8 +29,7 @@ include ../../../Makefile.lib.64
 # With the adition of BIND 8.3.3, the symbol table for 64 bit went over
 # the limit for Kpic, so we add -KPIC here, for just the 64 bit SPARC
 # library. This avoids compiling the 32-bit library with PIC unnecessarily.
-sparcv9_C_PICFLAGS =	-K PIC
-sparcv9_CC_PICFLAGS =	-KPIC
+sparcv9_C_PICFLAGS =	$(sparcv9_C_BIGPICFLAGS)
 
 $(ROOTLIBDIR64):
 	$(INS.dir)

@@ -38,7 +38,7 @@ OBJDIRS = \
 include ../Makefile.com
 include ../../Makefile.lib.64
 
-# Use -KPIC since libast is too big for -Kpic on 64bit
+# Use big PIC since libast is too big for pic on 64bit
 # (and on 32bit it is close to the barrier)
 amd64_C_PICFLAGS = $(C_BIGPICFLAGS)
 

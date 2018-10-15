@@ -910,30 +910,31 @@ CCMT=		-mt
 # Handle different PIC models on different ISAs
 # (May be overridden by lower-level Makefiles)
 
-sparc_C_PICFLAGS =	-K pic
-sparcv9_C_PICFLAGS =	-K pic
-i386_C_PICFLAGS =	-K pic
-amd64_C_PICFLAGS =	-K pic
+sparc_C_PICFLAGS =	-fpic
+sparcv9_C_PICFLAGS =	-fpic
+i386_C_PICFLAGS =	-fpic
+amd64_C_PICFLAGS =	-fpic
 C_PICFLAGS =		$($(MACH)_C_PICFLAGS)
 C_PICFLAGS64 =		$($(MACH64)_C_PICFLAGS)
 
-sparc_C_BIGPICFLAGS =	-K PIC
-sparcv9_C_BIGPICFLAGS =	-K PIC
-i386_C_BIGPICFLAGS =	-K PIC
-amd64_C_BIGPICFLAGS =	-K PIC
+sparc_C_BIGPICFLAGS =	-fPIC
+sparcv9_C_BIGPICFLAGS =	-fPIC
+i386_C_BIGPICFLAGS =	-fPIC
+amd64_C_BIGPICFLAGS =	-fPIC
 C_BIGPICFLAGS =		$($(MACH)_C_BIGPICFLAGS)
 C_BIGPICFLAGS64 =	$($(MACH64)_C_BIGPICFLAGS)
 
 # CC requires there to be no space between '-K' and 'pic' or 'PIC'.
-sparc_CC_PICFLAGS =	-Kpic
-sparcv9_CC_PICFLAGS =	-KPIC
-i386_CC_PICFLAGS =	-Kpic
-amd64_CC_PICFLAGS =	-Kpic
+# and does not support -f
+sparc_CC_PICFLAGS =	-_cc=-Kpic -_gcc=-fpic
+sparcv9_CC_PICFLAGS =	-_cc=-KPIC -_gcc=-fPIC
+i386_CC_PICFLAGS =	-_cc=-Kpic -_gcc=-fpic
+amd64_CC_PICFLAGS =	-_cc=-Kpic -_gcc=-fpic
 CC_PICFLAGS =		$($(MACH)_CC_PICFLAGS)
 CC_PICFLAGS64 =		$($(MACH64)_CC_PICFLAGS)
 
-AS_PICFLAGS=		$(C_PICFLAGS)
-AS_BIGPICFLAGS=		$(C_BIGPICFLAGS)
+AS_PICFLAGS=		-K pic
+AS_BIGPICFLAGS=		-K PIC
 
 #
 # Default label for CTF sections

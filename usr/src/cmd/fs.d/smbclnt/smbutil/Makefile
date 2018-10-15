@@ -32,7 +32,7 @@
 
 PROG=		smbutil
 
-OBJS=   smbutil.o info.o login.o lookup.o print.o status.o view.o \
+OBJS=   smbutil.o discon.o info.o login.o lookup.o print.o status.o view.o \
 	shares_rap.o shares_rpc.o srvsvc1_clnt.o srvsvc1_ndr.o
 
 SRCS=	$(OBJS:%.o=%.c)

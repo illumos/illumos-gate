@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Jason King
  */
 
 #include	"msg.h"
@@ -342,16 +344,35 @@ Dbg_util_nl(Lm_list *lml, int flag)
 const char *
 Dbg_demangle_name(const char *name)
 {
+	static char *buf = NULL;
+
 	if (DBG_NOTCLASS(DBG_C_DEMANGLE))
 		return (name);
 
-	return (conv_demangle_name(name));
+	free(buf);
+	buf = (char *)conv_demangle_name(name);
+	if (buf == name) {
+		buf = NULL;
+		return (name);
+	}
+
+	return (buf);
 }
 
 const char *
 Elf_demangle_name(const char *name)
 {
-	if (DBG_ISDEMANGLE())
-		return (conv_demangle_name(name));
-	return (name);
+	static char *buf = NULL;
+
+	if (!DBG_ISDEMANGLE())
+		return (name);
+
+	free(buf);
+	buf = (char *)conv_demangle_name(name);
+	if (buf == name) {
+		buf = NULL;
+		return (name);
+	}
+
+	return (buf);
 }

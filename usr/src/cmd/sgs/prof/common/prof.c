@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Jason King
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -32,7 +33,7 @@
  *
  *	Usage:
  *
- * 	prof [-ChsVz] [-a | c | n | t]  [-o  |  x]   [-g  |  l]
+ *	prof [-ChsVz] [-a | c | n | t]  [-o  |  x]   [-g  |  l]
  *	    [-m mdata] [prog]
  *
  *	Where "prog" is the program that was profiled; "a.out" by default.
@@ -136,7 +137,7 @@ char *aformat = "%8o ";
 int gflag = 0;			/*  replaces gmatch and gmask */
 int Cflag = 0;
 
-PROF_FILE	*ldptr; 		/* For program ("a.out") file. */
+PROF_FILE	*ldptr;		/* For program ("a.out") file. */
 
 FILE	*mon_iop;		/* For profile (MON_OUT) file. */
 char	*sym_fn = "a.out";	/* Default program file name. */
@@ -197,7 +198,7 @@ struct snymEntry {
 	char	*sym_addr;	/* address which has a synonym */
 	int	howMany;	/* # of synonyms for this symbol */
 	int	snymReported;	/* 'was printed in a report line already'  */
-				/* 	flag, */
+				/*	flag, */
 				/*   > 0 report line printed for these syns. */
 				/*  == 0 not printed yet. */
 	long	tot_sl_count;	/* total subr calls for these snyms */
@@ -1311,9 +1312,7 @@ demangled_name(char *s)
 	const char *name;
 	size_t	len;
 
-	name = conv_demangle_name(s);
-
-	if (strcmp(name, s) == 0)
+	if ((name = conv_demangle_name(s)) == s)
 		return (s);
 
 	if (format_buf != NULL)
@@ -1324,6 +1323,7 @@ demangled_name(char *s)
 	if (format_buf == NULL)
 		return (s);
 	(void) snprintf(format_buf, len, FORMAT_BUF, name, s);
+	free((void *)name);
 	return (format_buf);
 }
 
