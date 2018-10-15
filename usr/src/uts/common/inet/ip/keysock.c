@@ -144,7 +144,7 @@ static	keysockparam_t	lcl_param_arr[] = {
 #define	ks2dbg(keystack, a)	if (keystack->keystack_debug > 1) printf a
 #define	ks3dbg(keystack, a)	if (keystack->keystack_debug > 2) printf a
 
-static int keysock_close(queue_t *);
+static int keysock_close(queue_t *, int, cred_t *);
 static int keysock_open(queue_t *, dev_t *, int, int, cred_t *);
 static void keysock_wput(queue_t *, mblk_t *);
 static void keysock_rput(queue_t *, mblk_t *);
@@ -471,8 +471,9 @@ keysock_stack_fini(netstackid_t stackid, void *arg)
 /*
  * Close routine for keysock.
  */
+/* ARGSUSED */
 static int
-keysock_close(queue_t *q)
+keysock_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	keysock_t *ks;
 	keysock_consumer_t *kc;
@@ -710,7 +711,7 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		 */
 		if (!ipsec_loader_wait(q,
 		    keystack->keystack_netstack->netstack_ipsec)) {
-			(void) keysock_close(q);
+			(void) keysock_close(q, 0, credp);
 			return (EPFNOSUPPORT);
 		}
 	}

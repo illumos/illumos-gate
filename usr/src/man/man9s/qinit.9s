@@ -1,54 +1,71 @@
-'\" te
-.\"  Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH QINIT 9S "Apr 11, 1991"
-.SH NAME
-qinit \- STREAMS queue processing procedures structure
-.SH SYNOPSIS
-.LP
-.nf
-#include <sys/stream.h>
-.fi
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions and
+.\" limitations under the License.
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd Oct 17, 2018
+.Dt QINIT 9S
+.Os
+.Sh NAME
+.Nm qinit
+.Nd STREAMS queue processing procedures structure
+.Sh SYNOPSIS
+.In sys/stream.h
+.Sh INTERFACE LEVEL
+.Sy Architecture independent level 1 (DDI/DKI)
+.Sh DESCRIPTION
+The
+.Nm
+structure contains pointers to processing procedures for a
+.Sy QUEUE .
+The
+.Sy streamtab
+structure for the module or driver contains
+pointers to one
+.Xr queue 9S
+structure for both upstream and downstream processing.
+.Sh STRUCTURE MEMBERS
+The
+.Nm
+structure includes the following members:
+.Bd -literal -offset indent
 
-.SH INTERFACE LEVEL
-.sp
-.LP
-Architecture independent level 1 (DDI/DKI)
-.SH DESCRIPTION
-.sp
-.LP
-The  \fBqinit\fR structure contains pointers to processing procedures for a
-\fBQUEUE\fR. The \fBstreamtab\fR structure for the module or driver contains
-pointers to one \fBqueue\fR(9S) structure for both upstream and downstream
-processing.
-.SH STRUCTURE MEMBERS
-.sp
-.in +2
-.nf
-int                 (*qi_putp)();      /* put procedure */
-int                 (*qi_srvp)();      /* service procedure */
-int                 (*qi_qopen)();     /* open procedure */
-int                 (*qi_qclose)();    /* close procedure */
-int                 (*qi_qadmin)();    /* unused */
-struct module_info  *qi_minfo;         /* module parameters */
-struct module_stat  *qi_mstat;         /* module statistics */
-.fi
-.in -2
+typedef int (*qi_putp_t)(queue_t *, mblk_t *);
+typedef int (*qi_srvp_t)(queue_t *);
+typedef int (*qi_qopen_t)(queue_t *, dev_t *, int, int, cred_t *);
+typedef int (*qi_qclose_t)(queue_t *, int, cred_t *);
+typedef int (*qi_qadmin_t)(void);
+typedef int (*qi_rwp_t)(queue_t *, struiod_t *);
+typedef int (*qi_infop_t)(queue_t *, infod_t *);
 
-.SH SEE ALSO
-.sp
-.LP
-\fBqueue\fR(9S), \fBstreamtab\fR(9S)
-.sp
-.LP
-\fIWriting Device Drivers\fR
-.sp
-.LP
-\fISTREAMS Programming Guide\fR
-.SH NOTES
-.sp
-.LP
+struct qinit {
+    qi_putp_t       qi_putp;       /* put procedure */
+    qi_srvp_t       qi_srvp;       /* service procedure */
+    qi_qopen_t      qi_qopen;      /* called on startup */
+    qi_qclose_t     qi_qclose;     /* called on finish */
+    qi_qadmin_t     qi_qadmin;     /* for future use */
+    struct module_info *qi_minfo;  /* module information */
+    struct module_stat *qi_mstat;  /* module statistics */
+    qi_rwp_t        qi_rwp;        /* r/w procedure */
+    qi_infop_t      qi_infop;      /* information procedure */
+    int             qi_struiot;    /* stream uio type for struio() */
+};
+.Ed
+.Sh SEE ALSO
+.Xr queue 9S ,
+.Xr streamtab 9S
+.Pp
+.Xr Writing Device Drivers
+.Pp
+.Xr STREAMS Programming Guide
+.Sh NOTES
 This release includes no support for module statistics.

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * STREAMS Packet Filter Module
  *
@@ -86,7 +84,7 @@ struct packdesc {
  * Function prototypes.
  */
 static	int	pfopen(queue_t *, dev_t *, int, int, cred_t *);
-static	int	pfclose(queue_t *);
+static	int	pfclose(queue_t *, int, cred_t *);
 static void	pfioctl(queue_t *wq, mblk_t *mp);
 static	int	FilterPacket(struct packdesc *, struct epacketfilt *);
 /*
@@ -189,8 +187,9 @@ pfopen(queue_t *rq, dev_t *dev, int oflag, int sflag, cred_t *crp)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
-pfclose(queue_t	*rq)
+pfclose(queue_t	*rq, int flags __unused, cred_t *credp __unused)
 {
 	struct	epacketfilt	*pfp = (struct epacketfilt *)rq->q_ptr;
 

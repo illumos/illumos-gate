@@ -666,7 +666,6 @@ static void	icmp_send_reply_v4(mblk_t *, ipha_t *, icmph_t *,
 mblk_t		*ip_dlpi_alloc(size_t, t_uscalar_t);
 char		*ip_dot_addr(ipaddr_t, char *);
 mblk_t		*ip_carve_mp(mblk_t **, ssize_t);
-int		ip_close(queue_t *, int);
 static char	*ip_dot_saddr(uchar_t *, char *);
 static void	ip_lrput(queue_t *, mblk_t *);
 ipaddr_t	ip_net_mask(ipaddr_t);
@@ -4236,7 +4235,7 @@ ip_quiesce_conn(conn_t *connp)
 
 /* ARGSUSED */
 int
-ip_close(queue_t *q, int flags)
+ip_close(queue_t *q, int flags, cred_t *credp __unused)
 {
 	conn_t		*connp;
 
@@ -5938,7 +5937,7 @@ ip_modopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	mutex_exit(&ipst->ips_ip_mi_lock);
 fail:
 	if (err) {
-		(void) ip_close(q, 0);
+		(void) ip_close(q, 0, credp);
 		return (err);
 	}
 	return (0);

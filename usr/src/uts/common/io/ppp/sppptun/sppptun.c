@@ -110,7 +110,7 @@ static const char *tcl_kstats_list[] = { TCL_KSTATS_NAMES };
 #define	KCDECR(vn)	KDECR(tcl, tcl_kstats, vn)
 
 static int	sppptun_open(queue_t *, dev_t *, int, int, cred_t *);
-static int	sppptun_close(queue_t *);
+static int	sppptun_close(queue_t *, int, cred_t *);
 static void	sppptun_urput(queue_t *, mblk_t *);
 static void	sppptun_uwput(queue_t *, mblk_t *);
 static int	sppptun_ursrv(queue_t *);
@@ -623,8 +623,9 @@ tclvm_remove_tll(void *arg, void *firstv, size_t numv)
  * Description:
  *    Common close procedure for module and driver.
  */
+/* ARGSUSED */
 static int
-sppptun_close(queue_t *q)
+sppptun_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	int err;
 	void *qptr;

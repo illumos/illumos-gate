@@ -132,7 +132,7 @@ static int	rts_stream_open(queue_t *q, dev_t *devp, int flag, int sflag,
 		    cred_t *credp);
 static conn_t	*rts_open(int flag, cred_t *credp);
 
-static int	rts_stream_close(queue_t *q);
+static int	rts_stream_close(queue_t *, int, cred_t *);
 static int	rts_close(sock_lower_handle_t proto_handle, int flags,
 		    cred_t *cr);
 
@@ -237,8 +237,9 @@ rts_common_close(queue_t *q, conn_t *connp)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
-rts_stream_close(queue_t *q)
+rts_stream_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	conn_t  *connp = Q_TO_CONN(q);
 

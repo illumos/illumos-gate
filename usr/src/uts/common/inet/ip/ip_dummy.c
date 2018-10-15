@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
@@ -39,7 +37,7 @@
  * MIB information comes from IP.
  */
 
-static int	dummy_modclose(queue_t *q);
+static int	dummy_modclose(queue_t *, int, cred_t *);
 static int	dummy_modopen(queue_t *q, dev_t *devp, int flag,
 		    int sflag, cred_t *credp);
 
@@ -66,8 +64,9 @@ struct streamtab dummymodinfo = {
 	&dummyrmodinit, &dummywmodinit
 };
 
+/* ARGSUSED */
 static int
-dummy_modclose(queue_t *q)
+dummy_modclose(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	qprocsoff(q);
 	return (0);

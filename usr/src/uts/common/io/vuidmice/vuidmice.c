@@ -48,15 +48,13 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-static int vuidmice_open(queue_t *const, const dev_t *const,
-	const int, const int, const cred_t *const);
-static int vuidmice_close(queue_t *const, const int, const cred_t *const);
-static int vuidmice_rput(queue_t *const, mblk_t *);
-static int vuidmice_rsrv(queue_t *const);
-static int vuidmice_wput(queue_t *const, mblk_t *);
-static void vuidmice_miocdata(queue_t *const, mblk_t *);
-static int vuidmice_handle_wheel_resolution_ioctl(queue_t *const,
-	mblk_t *, int);
+static int vuidmice_open(queue_t *, dev_t *, int, int, cred_t *);
+static int vuidmice_close(queue_t *, int, cred_t *);
+static int vuidmice_rput(queue_t *, mblk_t *);
+static int vuidmice_rsrv(queue_t *);
+static int vuidmice_wput(queue_t *, mblk_t *);
+static void vuidmice_miocdata(queue_t *, mblk_t *);
+static int vuidmice_handle_wheel_resolution_ioctl(queue_t *, mblk_t *, int);
 
 static int vuidmice_service_wheel_info(mblk_t *);
 static int vuidmice_service_wheel_state(queue_t *, mblk_t *, uint_t);
@@ -177,8 +175,7 @@ _info(struct modinfo *modinfop)
 
 /* ARGSUSED1 */
 static int
-vuidmice_open(queue_t *const qp, const dev_t *const devp,
-	const int oflag, const int sflag, const cred_t *const crp)
+vuidmice_open(queue_t *qp, dev_t *devp, int oflag, int sflag, cred_t *crp)
 {
 	if (qp->q_ptr != NULL)
 		return (0);	 /* reopen */
@@ -223,7 +220,7 @@ vuidmice_open(queue_t *const qp, const dev_t *const devp,
 
 /* ARGSUSED1 */
 static int
-vuidmice_close(queue_t *const qp, const int flag, const cred_t *const crp)
+vuidmice_close(queue_t *qp, int flag, cred_t *crp)
 {
 	ASSERT(qp != NULL);
 

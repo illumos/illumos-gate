@@ -379,8 +379,9 @@ dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 /*
  * qi_qclose: close(9e)
  */
+/* ARGSUSED */
 int
-dld_close(queue_t *rq)
+dld_close(queue_t *rq, int flags __unused, cred_t *credp __unused)
 {
 	/*
 	 * Disable the queue srv(9e) routine.

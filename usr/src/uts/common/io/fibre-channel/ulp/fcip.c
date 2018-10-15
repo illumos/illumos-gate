@@ -145,7 +145,7 @@ static void fcip_proto(queue_t *, mblk_t *);
 static void fcip_ioctl(queue_t *, mblk_t *);
 static int fcip_open(queue_t *wq, dev_t *devp, int flag,
 		int sflag, cred_t *credp);
-static int fcip_close(queue_t *rq, int flag, int otyp, cred_t *credp);
+static int fcip_close(queue_t *rq, int flag, cred_t *credp);
 static int fcip_start(queue_t *wq, mblk_t *mp, struct fcip *fptr,
     struct fcip_dest *fdestp, int flags);
 static void fcip_sendup(struct fcip *fptr, mblk_t *mp,
@@ -3571,7 +3571,7 @@ done:
  */
 /* ARGSUSED */
 static int
-fcip_close(queue_t *rq, int flag, int otyp, cred_t *credp)
+fcip_close(queue_t *rq, int flag, cred_t *credp)
 {
 	struct fcipstr *slp;
 	struct fcipstr **prevslp;

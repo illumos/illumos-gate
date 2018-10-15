@@ -44,7 +44,7 @@ static int softmac_cmn_open(queue_t *, dev_t *, int, int, cred_t *);
  * The following softmac_mod_xxx() functions are (9E) entry point functions for
  * the softmac module.
  */
-static int softmac_mod_close(queue_t *);
+static int softmac_mod_close(queue_t *, int, cred_t *);
 static void softmac_mod_rput(queue_t *, mblk_t *);
 static void softmac_mod_wput(queue_t *, mblk_t *);
 static void softmac_mod_wsrv(queue_t *);
@@ -54,7 +54,7 @@ static void softmac_mod_wsrv(queue_t *);
  * the softmac driver.
  */
 static int softmac_drv_open(queue_t *, dev_t *, int, int, cred_t *);
-static int softmac_drv_close(queue_t *);
+static int softmac_drv_close(queue_t *, int, cred_t *);
 static void softmac_drv_wput(queue_t *, mblk_t *);
 static void softmac_drv_wsrv(queue_t *);
 
@@ -276,8 +276,9 @@ softmac_cmn_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 	return (softmac_drv_open(rq, devp, flag, sflag, credp));
 }
 
+/* ARGSUSED */
 static int
-softmac_mod_close(queue_t *rq)
+softmac_mod_close(queue_t *rq, int flags __unused, cred_t *credp __unused)
 {
 	softmac_lower_t	*slp = rq->q_ptr;
 
@@ -562,8 +563,9 @@ fail:
 	return (err);
 }
 
+/* ARGSUSED */
 static int
-softmac_drv_close(queue_t *rq)
+softmac_drv_close(queue_t *rq, int flags __unused, cred_t *credp __unused)
 {
 	softmac_upper_t	*sup = dld_str_private(rq);
 	softmac_t	*softmac = sup->su_softmac;

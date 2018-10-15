@@ -100,7 +100,7 @@ static void	icmp_bind_proto(icmp_t *icmp);
 static int	icmp_build_hdr_template(conn_t *, const in6_addr_t *,
     const in6_addr_t *, uint32_t);
 static void	icmp_capability_req(queue_t *q, mblk_t *mp);
-static int	icmp_close(queue_t *q, int flags);
+static int	icmp_close(queue_t *q, int flags, cred_t *);
 static void	icmp_close_free(conn_t *);
 static void	icmp_tpi_connect(queue_t *q, mblk_t *mp);
 static void	icmp_tpi_disconnect(queue_t *q, mblk_t *mp);
@@ -979,8 +979,9 @@ rawip_do_close(conn_t *connp)
 	ipcl_conn_destroy(connp);
 }
 
+/* ARGSUSED */
 static int
-icmp_close(queue_t *q, int flags)
+icmp_close(queue_t *q, int flags, cred_t *credp __unused)
 {
 	conn_t  *connp;
 

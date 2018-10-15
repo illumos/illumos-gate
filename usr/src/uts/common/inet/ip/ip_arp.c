@@ -58,7 +58,7 @@ typedef struct arp_m_s {
 	uint32_t	arp_mac_hw_addr_length;
 } arp_m_t;
 
-static int arp_close(queue_t *, int);
+static int arp_close(queue_t *, int, cred_t *);
 static void arp_rput(queue_t *, mblk_t *);
 static void arp_wput(queue_t *, mblk_t *);
 static arp_m_t	*arp_m_lookup(t_uscalar_t mac_type);
@@ -1801,7 +1801,7 @@ arp_ll_down(ill_t *ill)
 
 /* ARGSUSED */
 int
-arp_close(queue_t *q, int flags)
+arp_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	if (WR(q)->q_next != NULL) {
 		/* This is a module close */
@@ -2384,7 +2384,7 @@ arp_modopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	mutex_exit(&ipst->ips_ip_mi_lock);
 fail:
 	if (err) {
-		(void) arp_close(q, 0);
+		(void) arp_close(q, 0, credp);
 		return (err);
 	}
 	return (0);

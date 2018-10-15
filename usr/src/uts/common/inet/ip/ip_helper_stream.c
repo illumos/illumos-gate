@@ -42,7 +42,7 @@
 
 void ip_helper_wput(queue_t *q, mblk_t *mp);
 
-static int ip_helper_stream_close(queue_t *, int);
+static int ip_helper_stream_close(queue_t *, int, cred_t *);
 
 static struct module_info ip_helper_stream_info =  {
 	0, "iphelper", IP_MOD_MINPSZ, IP_MOD_MAXPSZ, IP_MOD_HIWAT, IP_MOD_LOWAT
@@ -153,9 +153,9 @@ ip_helper_stream_setup(queue_t *q, dev_t *devp, int flag, int sflag,
 	return (0);
 }
 
-/* ARGSUSED1 */
+/* ARGSUSED */
 static int
-ip_helper_stream_close(queue_t *q, int flag)
+ip_helper_stream_close(queue_t *q, int flag __unused, cred_t *credp __unused)
 {
 	ip_helper_minfo_t *ip_minfop;
 
