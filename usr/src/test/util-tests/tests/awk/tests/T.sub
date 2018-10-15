@@ -200,6 +200,11 @@ a?b?c?	x	""	x	x
 		pq	xyzpq	xyzpxyzqxyz
 		""	xyz	xyz
 
+""	<&>	abc	<>abc	<>a<>b<>c<>	fixed 2/07, we think
+""	<\&>	abc	<&>abc	<&>a<&>b<&>c<&>
+""	<&&>	abc	<>abc	<>a<>b<>c<>
+""	<&>	""	<>	<>
+
 d?abc	<&>	abc	<abc>	<abc>
 d?	<&>	abc	<>abc	<>a<>b<>c<>
 

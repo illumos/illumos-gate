@@ -1,0 +1,5 @@
+$AWK: duplicate argument b at source line 3 in function foo source file paramdup.awk
+ context is
+	function foo(a, b, c, >>>  b <<< , a)
+$AWK: syntax error at source line 3 in function foo source file paramdup.awk
+$AWK: bailing out at source line 3 in function foo

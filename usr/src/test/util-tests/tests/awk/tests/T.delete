@@ -1,0 +1,39 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.delete: misc tests of array deletion
+
+echo '1 2 3 4
+1 2 3
+1
+' > $TEMP0
+echo '4 3 0
+3 2 0
+1 0 0
+0 0 0' > $TEMP2
+$AWK '
+{	n = split($0, x)
+	delete x[1]
+	n1 = 0;	for (i in x) n1++
+	delete x; 
+	n2 = 0; for (i in x) n2++
+	print n, n1, n2
+}' $TEMP0 > $TEMP1
+diff $TEMP1 $TEMP2 || fail 'BAD: T.delete (1)'
+
+exit $RESULT

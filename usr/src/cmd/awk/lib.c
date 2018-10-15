@@ -51,6 +51,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*	Copyright (c) Lucent Technologies 1997	*/
+/*	  All Rights Reserved  	*/
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -63,23 +66,24 @@
 static FILE	*infile	= NULL;
 static char	*file	= "";
 char	*record;
-size_t	recsize;
+size_t	recsize	= RECSIZE;
 static char	*fields;
-static size_t	fieldssize = LINE_INCR;
+static size_t	fieldssize = RECSIZE;
+
+Cell	**fldtab;	/* pointers to Cells */
+char	inputFS[100] = " ";
+
+#define	MAXFLD	2
+int	nfields	= MAXFLD;	/* last allocated slot for $i */
 
 int	donefld;	/* 1 = implies rec broken into fields */
 int	donerec;	/* 1 = record is valid (no flds have changed) */
 
-static struct fldtab_chunk {
-	struct fldtab_chunk	*next;
-	Cell			fields[FLD_INCR];
-} *fldtab_head, *fldtab_tail;
-
-static	size_t	fldtab_maxidx;
-
-
-static int	maxfld	= 0;	/* last used field */
+static int	lastfld	= 0;	/* last used field */
 static int	argno	= 1;	/* current input argument number */
+
+static Cell dollar0 = { OCELL, CFLD, NULL, "", 0.0, REC|STR|DONTFREE };
+static Cell dollar1 = { OCELL, CFLD, NULL, "", 0.0, FLD|STR|DONTFREE };
 
 static	char	*getargv(int);
 static	void	cleanfld(int, int);
@@ -88,6 +92,36 @@ static	void	bcheck2(int, int, int);
 static	void	eprint(void);
 static	void	bclass(int);
 
+void
+recinit(unsigned int n)
+{
+	if ((record = (char *)malloc(n)) == NULL ||
+	    (fields = (char *)malloc(n+2)) == NULL ||
+	    (fldtab = (Cell **)malloc((nfields+1) * sizeof (Cell *))) == NULL ||
+	    (fldtab[0] = (Cell *)malloc(sizeof (Cell))) == NULL)
+		FATAL("out of space for $0 and fields");
+	*fldtab[0] = dollar0;
+	fldtab[0]->sval = record;
+	fldtab[0]->nval = tostring("0");
+	makefields(1, nfields);
+}
+
+void
+makefields(int n1, int n2)		/* create $n1..$n2 inclusive */
+{
+	char temp[50];
+	int i;
+
+	for (i = n1; i <= n2; i++) {
+		fldtab[i] = (Cell *)malloc(sizeof (Cell));
+		if (fldtab[i] == NULL)
+			FATAL("out of space in makefields %d", i);
+		*fldtab[i] = dollar1;
+		(void) sprintf(temp, "%d", i);
+		fldtab[i]->nval = tostring(temp);
+	}
+}
+
 static void
 initgetrec(void)
 {
@@ -95,21 +129,34 @@ initgetrec(void)
 	char *p;
 
 	for (i = 1; i < *ARGC; i++) {
-		if (!isclvar(p = getargv(i)))	/* find 1st real filename */
+		p = getargv(i); /* find 1st real filename */
+		if (p == NULL || *p == '\0') {  /* deleted or zapped */
+			argno++;
+			continue;
+		}
+		if (!isclvar(p)) {
+			(void) setsval(lookup("FILENAME", symtab), p);
 			return;
+		}
 		setclvar(p);	/* a commandline assignment before filename */
 		argno++;
 	}
 	infile = stdin;		/* no filenames, so use stdin */
 }
 
+static int firsttime = 1;
+
+/*
+ * get next input record
+ * note: cares whether buf == record
+ */
 int
-getrec(char **bufp, size_t *bufsizep)
+getrec(char **pbuf, size_t *pbufsize, int isrecord)
 {
 	int c;
-	static int firsttime = 1;
-	char	*buf, *nbuf;
-	size_t	len;
+	char *buf = *pbuf;
+	uschar saveb0;
+	size_t bufsize = *pbufsize, savebufsize = bufsize;
 
 	if (firsttime) {
 		firsttime = 0;
@@ -117,17 +164,23 @@ getrec(char **bufp, size_t *bufsizep)
 	}
 	dprintf(("RS=<%s>, FS=<%s>, ARGC=%f, FILENAME=%s\n",
 	    *RS, *FS, *ARGC, *FILENAME));
-	donefld = 0;
-	donerec = 1;
+	if (isrecord) {
+		donefld = 0;
+		donerec = 1;
+	}
+	saveb0 = buf[0];
+	buf[0] = '\0';
 	while (argno < *ARGC || infile == stdin) {
 		dprintf(("argno=%d, file=|%s|\n", argno, file));
 		if (infile == NULL) {	/* have to open a new file */
 			file = getargv(argno);
-			if (*file == '\0') {	/* it's been zapped */
+			if (file == NULL || *file == '\0') {
+				/* deleted or zapped */
 				argno++;
 				continue;
 			}
-			if (isclvar(file)) {	/* a var=value arg */
+			if (isclvar(file)) {
+				/* a var=value arg */
 				setclvar(file);
 				argno++;
 				continue;
@@ -136,22 +189,17 @@ getrec(char **bufp, size_t *bufsizep)
 			dprintf(("opening file %s\n", file));
 			if (*file == '-' && *(file+1) == '\0')
 				infile = stdin;
-			else if ((infile = fopen(file, "r")) == NULL)
+			else if ((infile = fopen(file, "rF")) == NULL)
 				FATAL("can't open file %s", file);
 			(void) setfval(fnrloc, 0.0);
 		}
-		c = readrec(&nbuf, &len, infile);
-		expand_buf(bufp, bufsizep, len);
-		buf = *bufp;
-		(void) memcpy(buf, nbuf, len);
-		buf[len] = '\0';
-		free(nbuf);
+		c = readrec(&buf, &bufsize, infile);
 
 		if (c != 0 || buf[0] != '\0') {	/* normal record */
-			if (bufp == &record) {
+			if (isrecord) {
 				if (freeable(recloc))
 					xfree(recloc->sval);
-				recloc->sval = record;
+				recloc->sval = buf;	/* buf == record */
 				recloc->tval = REC | STR | DONTFREE;
 				if (is_number(recloc->sval)) {
 					recloc->fval =
@@ -161,6 +209,8 @@ getrec(char **bufp, size_t *bufsizep)
 			}
 			(void) setfval(nrloc, nrloc->fval+1);
 			(void) setfval(fnrloc, fnrloc->fval+1);
+			*pbuf = buf;
+			*pbufsize = bufsize;
 			return (1);
 		}
 		/* EOF arrived on this file; set up next */
@@ -169,19 +219,33 @@ getrec(char **bufp, size_t *bufsizep)
 		infile = NULL;
 		argno++;
 	}
+	buf[0] = saveb0;
+	*pbuf = buf;
+	*pbufsize = savebufsize;
 	return (0);	/* true end of file */
 }
 
+void
+nextfile(void)
+{
+	if (infile != NULL && infile != stdin)
+		(void) fclose(infile);
+	infile = NULL;
+	argno++;
+}
+
 int
-readrec(char **bufp, size_t *sizep, FILE *inf)	/* read one record into buf */
+readrec(char **pbuf, size_t *pbufsize, FILE *inf)	/* read one record into buf */
 {
 	int sep, c;
-	char	*buf;
-	int	count;
-	size_t	bufsize;
+	char *rr, *buf = *pbuf;
+	size_t bufsize = *pbufsize;
+	char *rs = getsval(rsloc);
 
-	init_buf(&buf, &bufsize, LINE_INCR);
-	if ((sep = **RS) == 0) {
+	if (strlen(getsval(fsloc)) >= sizeof (inputFS))
+		FATAL("field separator %.10s... is too long", *FS);
+	(void) strcpy(inputFS, *FS);	/* for subsequent field splitting */
+	if ((sep = *rs) == 0) {
 		sep = '\n';
 		/* skip leading \n's */
 		while ((c = getc(inf)) == '\n' && c != EOF)
@@ -189,26 +253,30 @@ readrec(char **bufp, size_t *sizep, FILE *inf)	/* read one record into buf */
 		if (c != EOF)
 			(void) ungetc(c, inf);
 	}
-	count = 0;
-	for (;;) {
+	for (rr = buf; ; ) {
 		while ((c = getc(inf)) != sep && c != EOF) {
-			expand_buf(&buf, &bufsize, count);
-			buf[count++] = c;
+			if (rr-buf+1 > bufsize)
+				if (!adjbuf(&buf, &bufsize, 1+rr-buf, recsize, &rr, "readrec 1"))
+					FATAL("input record `%.30s...' too long", buf);
+			*rr++ = c;
 		}
-		if (**RS == sep || c == EOF)
+		if (*rs == sep || c == EOF)
 			break;
 		if ((c = getc(inf)) == '\n' || c == EOF) /* 2 in a row */
 			break;
-		expand_buf(&buf, &bufsize, count + 1);
-		buf[count++] = '\n';
-		buf[count++] = c;
+		if (!adjbuf(&buf, &bufsize, 2+rr-buf, recsize, &rr, "readrec 2"))
+			FATAL("input record `%.30s...' too long", buf);
+		*rr++ = '\n';
+		*rr++ = c;
 	}
-	buf[count] = '\0';
+	if (!adjbuf(&buf, &bufsize, 1+rr-buf, recsize, &rr, "readrec 3"))
+		FATAL("input record `%.30s...' too long", buf);
+	*rr = '\0';
 	dprintf(("readrec saw <%s>, returns %d\n",
-	    buf, c == EOF && count == 0 ? 0 : 1));
-	*bufp = buf;
-	*sizep = count;
-	return (c == EOF && count == 0 ? 0 : 1);
+	    buf, c == EOF && rr == buf ? 0 : 1));
+	*pbuf = buf;
+	*pbufsize = bufsize;
+	return (c == EOF && rr == buf ? 0 : 1);
 }
 
 /* get ARGV[n] */
@@ -220,6 +288,8 @@ getargv(int n)
 	extern Array *ARGVtab;
 
 	(void) sprintf(temp, "%d", n);
+	if (lookup(temp, ARGVtab) == NULL)
+		return (NULL);
 	x = setsymtab(temp, "", 0.0, STR, ARGVtab);
 	s = getsval(x);
 	dprintf(("getargv(%d) returns |%s|\n", n, s));
@@ -249,62 +319,89 @@ setclvar(char *s)	/* set var=value from s */
 void
 fldbld(void)	/* create fields from current record */
 {
+	/* this relies on having fields[] the same length as $0 */
+	/* the fields are all stored in this one array with \0's */
+	/* possibly with a final trailing \0 not associated with any field */
 	char *r, *fr, sep;
 	Cell *p;
-	int i;
-	size_t	len;
+	int i, j, n;
 
 	if (donefld)
 		return;
-	if (!isstr(recloc))
-		(void) getsval(recloc);
-	r = recloc->sval;	/* was record! */
-
-	/* make sure fields is always allocated */
-	adjust_buf(&fields, fieldssize);
-
-	/*
-	 * make sure fields has enough size. We don't expand the buffer
-	 * in the middle of the loop, since p->sval has already pointed
-	 * the address in the fields.
-	 */
-	len = strlen(r) + 1;
-	expand_buf(&fields, &fieldssize, len);
+	if (!isstr(fldtab[0]))
+		(void) getsval(fldtab[0]);
+	r = fldtab[0]->sval;
+	n = strlen(r);
+	if (n > fieldssize) {
+		xfree(fields);
+		/* possibly 2 final \0s */
+		if ((fields = (char *)malloc(n + 2)) == NULL)
+			FATAL("out of space for fields in fldbld %d", n);
+		fieldssize = n;
+	}
 	fr = fields;
 
 	i = 0;	/* number of fields accumulated here */
-	if (strlen(*FS) > 1) {	/* it's a regular expression */
-		i = refldbld(r, *FS);
-	} else if ((sep = **FS) == ' ') {
+	if (strlen(getsval(fsloc)) >= sizeof (inputFS))
+		FATAL("field separator %.10s... is too long", *FS);
+	(void) strcpy(inputFS, *FS);
+	if (strlen(inputFS) > 1) {	/* it's a regular expression */
+		i = refldbld(r, inputFS);
+	} else if ((sep = *inputFS) == ' ') {	/* default whitespace */
 		for (i = 0; ; ) {
 			while (*r == ' ' || *r == '\t' || *r == '\n')
 				r++;
 			if (*r == '\0')
 				break;
 			i++;
-			p = getfld(i);
-			if (freeable(p))
-				xfree(p->sval);
-			p->sval = fr;
-			p->tval = FLD | STR | DONTFREE;
+			if (i > nfields)
+				growfldtab(i);
+			if (freeable(fldtab[i]))
+				xfree(fldtab[i]->sval);
+			fldtab[i]->sval = fr;
+			fldtab[i]->tval = FLD | STR | DONTFREE;
 			do
 				*fr++ = *r++;
 			while (*r != ' ' && *r != '\t' && *r != '\n' &&
 			    *r != '\0')
 				;
-			*fr++ = 0;
+			*fr++ = '\0';
 		}
-		*fr = 0;
+		*fr = '\0';
+	} else if ((sep = *inputFS) == '\0') {
+		/* new: FS="" => 1 char/field */
+		for (i = 0; *r != '\0'; r++) {
+			char buf[2];
+			i++;
+			if (i > nfields)
+				growfldtab(i);
+			if (freeable(fldtab[i]))
+				xfree(fldtab[i]->sval);
+			buf[0] = *r;
+			buf[1] = '\0';
+			fldtab[i]->sval = tostring(buf);
+			fldtab[i]->tval = FLD | STR;
+		}
+		*fr = '\0';
 	} else if (*r != '\0') {	/* if 0, it's a null field */
+		/*
+		 * subtlecase : if length(FS) == 1 && length(RS > 0)
+		 * \n is NOT a field separator (cf awk book 61,84).
+		 * this variable is tested in the inner while loop.
+		 */
+		int rtest = '\n';  /* normal case */
+		if (strlen(*RS) > 0)
+			rtest = '\0';
 		for (;;) {
 			i++;
-			p = getfld(i);
-			if (freeable(p))
-				xfree(p->sval);
-			p->sval = fr;
-			p->tval = FLD | STR | DONTFREE;
+			if (i > nfields)
+				growfldtab(i);
+			if (freeable(fldtab[i]))
+				xfree(fldtab[i]->sval);
+			fldtab[i]->sval = fr;
+			fldtab[i]->tval = FLD | STR | DONTFREE;
 			/* \n is always a separator */
-			while (*r != sep && *r != '\n' && *r != '\0')
+			while (*r != sep && *r != rtest && *r != '\0')
 				*fr++ = *r++;
 			*fr++ = '\0';
 			if (*r++ == '\0')
@@ -312,35 +409,39 @@ fldbld(void)	/* create fields from current record */
 		}
 		*fr = '\0';
 	}
+	if (i > nfields)
+		FATAL("record `%.30s...' has too many fields; can't happen", r);
 	/* clean out junk from previous record */
-	cleanfld(i, maxfld);
-	maxfld = i;
+	cleanfld(i+1, lastfld);
+	lastfld = i;
 	donefld = 1;
-	for (i = 1; i <= maxfld; i++) {
-		p = getfld(i);
+	for (j = 1; j <= lastfld; j++) {
+		p = fldtab[j];
 		if (is_number(p->sval)) {
 			p->fval = atof(p->sval);
 			p->tval |= NUM;
 		}
 	}
-
-	(void) setfval(nfloc, (Awkfloat) maxfld);
+	(void) setfval(nfloc, (Awkfloat)lastfld);
+	donerec = 1; /* restore */
 	if (dbg) {
-		for (i = 0; i <= maxfld; i++) {
-			p = getfld(i);
-			(void) printf("field %d: |%s|\n", i, p->sval);
+		for (j = 0; j <= lastfld; j++) {
+			p = fldtab[j];
+			(void) printf("field %d (%s): |%s|\n",
+			    j, p->nval, p->sval);
 		}
 	}
 }
 
+/* clean out fields n1 .. n2 inclusive; nvals remain intact */
 static void
-cleanfld(int n1, int n2)	/* clean out fields n1..n2 inclusive */
+cleanfld(int n1, int n2)
 {
 	Cell *p;
 	int i;
 
-	for (i = n2; i > n1; i--) {
-		p = getfld(i);
+	for (i = n1; i <= n2; i++) {
+		p = fldtab[i];
 		if (freeable(p))
 			xfree(p->sval);
 		p->sval = "";
@@ -349,121 +450,91 @@ cleanfld(int n1, int n2)	/* clean out fields n1..n2 inclusive */
 }
 
 void
-newfld(int n)	/* add field n (after end) */
+newfld(int n)	/* add field n after end of existing lastfld */
 {
-	if (n < 0)
-		FATAL("accessing invalid field", record);
-	(void) getfld(n);
-	cleanfld(maxfld, n);
-	maxfld = n;
+	if (n > nfields)
+		growfldtab(n);
+	cleanfld(lastfld+1, n);
+	lastfld = n;
 	(void) setfval(nfloc, (Awkfloat)n);
 }
 
-/*
- * allocate field table. We don't reallocate the table since there
- * might be somewhere recording the address of the table.
- */
-static void
-morefld(void)
+void
+setlastfld(int n)	/* set lastfld cleaning fldtab cells if necessary */
 {
-	int	i;
-	struct fldtab_chunk *fldcp;
-	Cell	*newfld;
+	if (n < 0)
+		FATAL("cannot set NF to a negative value");
+	if (n > nfields)
+		growfldtab(n);
 
-	if ((fldcp = calloc(sizeof (struct fldtab_chunk), 1)) == NULL)
-		FATAL("out of space in morefld");
-
-	newfld = &fldcp->fields[0];
-	for (i = 0; i < FLD_INCR; i++) {
-		newfld[i].ctype = OCELL;
-		newfld[i].csub = CFLD;
-		newfld[i].nval = NULL;
-		newfld[i].sval = "";
-		newfld[i].fval = 0.0;
-		newfld[i].tval = FLD|STR|DONTFREE;
-		newfld[i].cnext = NULL;
-	}
-	/*
-	 * link this field chunk
-	 */
-	if (fldtab_head == NULL)
-		fldtab_head = fldcp;
+	if (lastfld < n)
+		cleanfld(lastfld+1, n);
 	else
-		fldtab_tail->next = fldcp;
-	fldtab_tail = fldcp;
-	fldcp->next = NULL;
+		cleanfld(n+1, lastfld);
 
-	fldtab_maxidx += FLD_INCR;
+	lastfld = n;
 }
 
 Cell *
-getfld(int idx)
+fieldadr(int n)	/* get nth field */
 {
-	struct fldtab_chunk *fldcp;
-	int	cbase;
-
-	if (idx < 0)
-		FATAL("trying to access field %d", idx);
-	while (idx >= fldtab_maxidx)
-		morefld();
-	cbase = 0;
-	for (fldcp = fldtab_head; fldcp != NULL; fldcp = fldcp->next) {
-		if (idx < (cbase + FLD_INCR))
-			return (&fldcp->fields[idx - cbase]);
-		cbase += FLD_INCR;
-	}
-	/* should never happen */
-	FATAL("trying to access invalid field %d", idx);
+	if (n < 0)
+		FATAL("trying to access out of range field %d", n);
+	if (n > nfields)	/* fields after NF are empty */
+		growfldtab(n);	/* but does not increase NF */
+	return (fldtab[n]);
 }
 
-int
-fldidx(Cell *vp)
+void
+growfldtab(int n)	/* make new fields up to at least $n */
 {
-	struct fldtab_chunk *fldcp;
-	Cell	*tbl;
-	int	cbase;
+	int nf = 2 * nfields;
+	size_t s;
 
-	cbase = 0;
-	for (fldcp = fldtab_head; fldcp != NULL; fldcp = fldcp->next) {
-		tbl = &fldcp->fields[0];
-		if (vp >= tbl && vp < (tbl + FLD_INCR))
-			return (cbase + (vp - tbl));
-		cbase += FLD_INCR;
-	}
-	/* should never happen */
-	FATAL("trying to access unknown field");
+	if (n > nf)
+		nf = n;
+	s = (nf+1) * (sizeof (Cell *));  /* freebsd: how much do we need? */
+	if (s / sizeof (Cell *) - 1 == nf) /* didn't overflow */
+		fldtab = (Cell **)realloc(fldtab, s);
+	else					/* overflow sizeof int */
+		xfree(fldtab);	/* make it null */
+	if (fldtab == NULL)
+		FATAL("out of space creating %d fields", nf);
+	makefields(nfields+1, nf);
+	nfields = nf;
 }
 
 /* build fields from reg expr in FS */
 static int
 refldbld(const char *rec, const char *fs)
 {
+	/* this relies on having fields[] the same length as $0 */
+	/* the fields are all stored in this one array with \0's */
 	char *fr;
-	int i, tempstat;
+	int i, tempstat, n;
 	fa *pfa;
-	Cell	*p;
-	size_t	len;
 
-	/* make sure fields is allocated */
-	adjust_buf(&fields, fieldssize);
+	n = strlen(rec);
+	if (n > fieldssize) {
+		xfree(fields);
+		if ((fields = (char *)malloc(n+1)) == NULL)
+			FATAL("out of space for fields in refldbld %d", n);
+		fieldssize = n;
+	}
 	fr = fields;
 	*fr = '\0';
 	if (*rec == '\0')
 		return (0);
-
-	len = strlen(rec) + 1;
-	expand_buf(&fields, &fieldssize, len);
-	fr = fields;
-
 	pfa = makedfa(fs, 1);
 	dprintf(("into refldbld, rec = <%s>, pat = <%s>\n", rec, fs));
 	tempstat = pfa->initstat;
 	for (i = 1; ; i++) {
-		p = getfld(i);
-		if (freeable(p))
-			xfree(p->sval);
-		p->tval = FLD | STR | DONTFREE;
-		p->sval = fr;
+		if (i > nfields)
+			growfldtab(i);
+		if (freeable(fldtab[i]))
+			xfree(fldtab[i]->sval);
+		fldtab[i]->tval = FLD | STR | DONTFREE;
+		fldtab[i]->sval = fr;
 		dprintf(("refldbld: i=%d\n", i));
 		if (nematch(pfa, rec)) {
 			pfa->initstat = 2;	/* horrible coupling to b.c */
@@ -488,39 +559,32 @@ recbld(void)	/* create $0 from $1..$NF if necessary */
 	int i;
 	char *p;
 	size_t cnt, len, olen;
+	char *sep = getsval(ofsloc);
 
 	if (donerec == 1)
 		return;
 	cnt = 0;
-	olen = strlen(*OFS);
+	olen = strlen(sep);
 	for (i = 1; i <= *NF; i++) {
-		p = getsval(getfld(i));
+		p = getsval(fldtab[i]);
 		len = strlen(p);
 		expand_buf(&record, &recsize, cnt + len + olen);
 		(void) memcpy(&record[cnt], p, len);
 		cnt += len;
 		if (i < *NF) {
-			(void) memcpy(&record[cnt], *OFS, olen);
+			(void) memcpy(&record[cnt], sep, olen);
 			cnt += olen;
 		}
 	}
 	record[cnt] = '\0';
-	dprintf(("in recbld FS=%o, recloc=%p\n", **FS, (void *)recloc));
+	dprintf(("in recbld inputFS=%s, recloc=%p\n", inputFS, (void *)recloc));
 	if (freeable(recloc))
 		xfree(recloc->sval);
 	recloc->tval = REC | STR | DONTFREE;
 	recloc->sval = record;
-	dprintf(("in recbld FS=%o, recloc=%p\n", **FS, (void *)recloc));
+	dprintf(("in recbld inputFS=%s, recloc=%p\n", inputFS, (void *)recloc));
 	dprintf(("recbld = |%s|\n", record));
 	donerec = 1;
-}
-
-Cell *
-fieldadr(int n)
-{
-	if (n < 0)
-		FATAL("trying to access field %d", n);
-	return (getfld(n));
 }
 
 int	errorflag	= 0;
@@ -739,82 +803,22 @@ isclvar(const char *s)	/* is s of form var=something ? */
 	return (0);
 }
 
-#define	MAXEXPON	38	/* maximum exponent for fp number */
-
+#include <math.h>
 int
 is_number(const char *s)
 {
-	int d1, d2;
-	int point;
-	const char *es;
-	extern char	radixpoint;
-
-	d1 = d2 = point = 0;
-	while (*s == ' ' || *s == '\t' || *s == '\n')
-		s++;
-	if (*s == '\0')
-		return (0);	/* empty stuff isn't number */
-	if (*s == '+' || *s == '-')
-		s++;
-	if (!isdigit(*s) && *s != radixpoint)
+	double r;
+	char *ep;
+	errno = 0;
+	r = strtod(s, &ep);
+	if (ep == s || r == HUGE_VAL || errno == ERANGE)
 		return (0);
-	if (isdigit(*s)) {
-		do {
-			d1++;
-			s++;
-		} while (isdigit(*s));
-	}
-	if (d1 >= MAXEXPON)
-		return (0);	/* too many digits to convert */
-	if (*s == radixpoint) {
-		point++;
-		s++;
-	}
-	if (isdigit(*s)) {
-		d2++;
-		do {
-			s++;
-		} while (isdigit(*s));
-	}
-	if (!(d1 || point && d2))
-		return (0);
-	if (*s == 'e' || *s == 'E') {
-		s++;
-		if (*s == '+' || *s == '-')
-			s++;
-		if (!isdigit(*s))
-			return (0);
-		es = s;
-		do {
-			s++;
-		} while (isdigit(*s));
-		if (s - es > 2) {
-			return (0);
-		} else if (s - es == 2 &&
-		    (int)(10 * (*es-'0') + *(es+1)-'0') >= MAXEXPON) {
-			return (0);
-		}
-	}
-	while (*s == ' ' || *s == '\t' || *s == '\n')
-		s++;
-	if (*s == '\0')
+	while (*ep == ' ' || *ep == '\t' || *ep == '\n')
+		ep++;
+	if (*ep == '\0')
 		return (1);
 	else
 		return (0);
-}
-
-void
-init_buf(char **optr, size_t *sizep, size_t amt)
-{
-	char	*nptr = NULL;
-
-	if ((nptr = malloc(amt)) == NULL)
-		FATAL("out of space in init_buf");
-	/* initial buffer should have NULL terminated */
-	*nptr = '\0';
-	if (sizep != NULL)
-		*sizep = amt;
-	*optr = nptr;
 }
 
 void
@@ -834,15 +838,5 @@ r_expand_buf(char **optr, size_t *sizep, size_t req)
 	if (size == 0)
 		*nptr = '\0';
 	*sizep += amt;
-	*optr = nptr;
-}
-
-void
-adjust_buf(char **optr, size_t size)
-{
-	char	*nptr;
-
-	if ((nptr = realloc(*optr, size)) == NULL)
-		FATAL("out of space in adjust_buf");
 	*optr = nptr;
 }

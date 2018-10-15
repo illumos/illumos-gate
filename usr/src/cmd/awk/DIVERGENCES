@@ -1,0 +1,5 @@
+The illumos nawk(1) is slightly divergent from upstream:
+- We allow an unlimited number of input program files
+- We allow an unlimited number of "/pat/, /pat/" expressions
+- Some of the code has been altered to track the length of strings
+  better so that we can avoid repeatedly calling strlen(3C)

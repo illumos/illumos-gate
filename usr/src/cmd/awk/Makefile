@@ -55,7 +55,7 @@ XGETFLAGS += -a -x awk.xcl
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 YFLAGS += -d
-LDLIBS += -lm
+LDLIBS += -lm -lumem
 LINTFLAGS += -u
 CLEANFILES= maketab proctab.c awk.g.c y.tab.h
 

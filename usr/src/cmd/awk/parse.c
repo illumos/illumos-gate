@@ -221,7 +221,8 @@ celltonode(Cell *a, int b)
 Node *
 rectonode(void)	/* make $0 into a Node */
 {
-	return (celltonode(recloc, CFLD));
+	extern Cell *literal0;
+	return (op1(INDIRECT, celltonode(literal0, CUNK)));
 }
 
 Node *
@@ -283,6 +284,10 @@ defn(Cell *v, Node *vl, Node *st)
 
 	if (isarr(v)) {
 		SYNTAX("`%s' is an array name and a function name", v->nval);
+		return;
+	}
+	if (isarg(v->nval) != -1) {
+		SYNTAX("`%s' is both function name and argument name", v->nval);
 		return;
 	}
 

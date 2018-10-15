@@ -1,2 +1,2 @@
-$AWK: arr is not an array
- source line number 2
+$AWK: can't read value of arr; it's an array name.
+ source line number 4

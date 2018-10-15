@@ -66,21 +66,22 @@
 char	*version = "version Oct 11, 1989";
 
 int	dbg	= 0;
+Awkfloat	srand_seed = 1;
 char	*cmdname;	/* gets argv[0] for error messages */
 char	*lexprog;	/* points to program argument if it exists */
 int	compile_time = 2;	/* for error printing: */
 				/* 2 = cmdline, 1 = compile, 0 = running */
-char	radixpoint = '.';
 
 static char	**pfile = NULL;	/* program filenames from -f's */
 static int	npfile = 0;	/* number of filenames */
 static int	curpfile = 0;	/* current filename */
 
+int	safe	= 0;	/* 1 => "safe" mode */
+
 int
 main(int argc, char *argv[], char *envp[])
 {
 	const char *fs = NULL;
-	char	*nl_radix;
 	/*
 	 * At this point, numbers are still scanned as in
 	 * the POSIX locale.
@@ -100,9 +101,19 @@ main(int argc, char *argv[], char *envp[])
 		exit(1);
 	}
 	(void) signal(SIGFPE, fpecatch);
+
+	srand_seed = 1;
+	srand((unsigned int)srand_seed);
+
 	yyin = NULL;
-	syminit();
+	symtab = makesymtab(NSYMTAB/NSYMTAB);
 	while (argc > 1 && argv[1][0] == '-' && argv[1][1] != '\0') {
+		if (strcmp(argv[1], "-version") == 0 ||
+		    strcmp(argv[1], "--version") == 0) {
+			(void) printf("awk %s\n", version);
+			exit(0);
+			break;
+		}
 		if (strcmp(argv[1], "--") == 0) {
 			/* explicit end of args */
 			argc--;
@@ -110,15 +121,27 @@ main(int argc, char *argv[], char *envp[])
 			break;
 		}
 		switch (argv[1][1]) {
+		case 's':
+			if (strcmp(argv[1], "-safe") == 0)
+				safe = 1;
+			break;
 		case 'f':	/* next argument is program filename */
-			argc--;
-			argv++;
-			if (argc <= 1)
-				FATAL("no program filename");
-			pfile = realloc(pfile, sizeof (char *) * (npfile + 1));
-			if (pfile == NULL)
-				FATAL("out of space in main");
-			pfile[npfile++] = argv[1];
+			if (argv[1][2] != 0) {  /* arg is -fsomething */
+				pfile = realloc(pfile,
+				    sizeof (char *) * (npfile + 1));
+				if (pfile == NULL)
+					FATAL("out of space in main");
+				pfile[npfile++] = &argv[1][2];
+			} else {		/* arg is -f something */
+				argc--; argv++;
+				if (argc <= 1)
+					FATAL("no program filename");
+				pfile = realloc(pfile,
+				    sizeof (char *) * (npfile + 1));
+				if (pfile == NULL)
+					FATAL("out of space in main");
+				pfile[npfile++] = argv[1];
+			}
 			break;
 		case 'F':	/* set field separator */
 			if (argv[1][2] != 0) {	/* arg is -Fsomething */
@@ -142,9 +165,22 @@ main(int argc, char *argv[], char *envp[])
 				WARNING("field separator FS is empty");
 			break;
 		case 'v':	/* -v a=1 to be done NOW.  one -v for each */
-			if (argv[1][2] == '\0' && --argc > 1 &&
-			    isclvar((++argv)[1]))
-				setclvar(argv[1]);
+			if (argv[1][2] != 0) {  /* arg is -vsomething */
+				if (isclvar(&argv[1][2]))
+					setclvar(&argv[1][2]);
+				else
+					FATAL("invalid -v option argument: %s",
+					    &argv[1][2]);
+			} else {		/* arg is -v something */
+				argc--; argv++;
+				if (argc <= 1)
+					FATAL("no variable name");
+				if (isclvar(argv[1]))
+					setclvar(argv[1]);
+				else
+					FATAL("invalid -v option argument: %s",
+					    argv[1]);
+			}
 			break;
 		case 'd':
 			dbg = atoi(&argv[1][2]);
@@ -171,11 +207,14 @@ main(int argc, char *argv[], char *envp[])
 		argc--;
 		argv++;
 	}
+	recinit(recsize);
+	syminit();
 	compile_time = 1;
 	argv[0] = cmdname;	/* put prog name at front of arglist */
 	dprintf(("argc=%d, argv[0]=%s\n", argc, argv[0]));
 	arginit(argc, argv);
-	envinit(envp);
+	if (!safe)
+		envinit(envp);
 	(void) yyparse();
 	if (fs)
 		*FS = qstring(fs, '\0');
@@ -184,9 +223,6 @@ main(int argc, char *argv[], char *envp[])
 	 * done parsing, so now activate the LC_NUMERIC
 	 */
 	(void) setlocale(LC_ALL, "");
-	nl_radix = nl_langinfo(RADIXCHAR);
-	if (nl_radix)
-		radixpoint = *nl_radix;
 
 	if (errorflag == 0) {
 		compile_time = 0;
@@ -206,7 +242,7 @@ pgetc(void)		/* get 1 character from awk program */
 			if (curpfile >= npfile)
 				return (EOF);
 			yyin = (strcmp(pfile[curpfile], "-") == 0) ?
-			    stdin : fopen(pfile[curpfile], "r");
+			    stdin : fopen(pfile[curpfile], "rF");
 			if (yyin == NULL) {
 				FATAL("can't open file %s", pfile[curpfile]);
 			}
@@ -214,7 +250,8 @@ pgetc(void)		/* get 1 character from awk program */
 		}
 		if ((c = getc(yyin)) != EOF)
 			return (c);
-		(void) fclose(yyin);
+		if (yyin != stdin)
+			(void) fclose(yyin);
 		yyin = NULL;
 		curpfile++;
 	}

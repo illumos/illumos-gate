@@ -204,4 +204,10 @@ BEGIN {	n = 10
 ' > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.func (multi-dim subscript)'
 
+echo '<> 0' > $TEMP1
+$AWK '
+function foo() { i = 0 }
+        BEGIN { x = foo(); printf "<%s> %d\n", x, x }' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.func (fall off end)'
+
 exit $RESULT

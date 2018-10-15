@@ -1,6 +1,2 @@
-$AWK: you can only delete array[element] at source line 3 in function f source file aryprm2.awk
- context is
-		delete a >>> 
- <<< 
-$AWK: syntax error at source line 3 in function f source file aryprm2.awk
-$AWK: illegal statement at source line 3 in function f source file aryprm2.awk
+$AWK: can't read value of arr; it's an array name.
+ source line number 3

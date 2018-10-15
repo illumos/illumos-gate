@@ -1,0 +1,3 @@
+$AWK: cannot set NF to a negative value
+ source line number 1
+EXIT CODE: 2

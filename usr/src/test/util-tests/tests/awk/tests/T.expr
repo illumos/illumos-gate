@@ -110,6 +110,25 @@ abc	abc
 try { x = $1++++$2; print $1, x }
 1	3	2 14
 
+# do we get the precedence of ! right?
+try $1 !$2
+0	0	0\t0
+0	1	0\t1
+1	0	1\t0
+1	1	1\t1
+
+# another ava special
+try { print ($1~/abc/ !$2) }
+0	0	01
+0	1	00
+abc	0	11
+xabcd	1	10
+
+try { print !$1 + $2 }
+1	3	3
+0	3	4
+-1	3	3
+
 # aside:  !$1 = $2 is now a syntax error
 
 # the definition of "number" changes with isnumber.
@@ -129,6 +148,7 @@ try { print ($1 == $2) }
 2e-10	2e-10	1
 2e10	2e-10	0
 2e10	20e9	1
+2e100	2.000e100	1
 2e1000	2.0e1000	0
 
 # this one (3 & 4) may "fail" if a negative 0 is printed as -0,
@@ -137,6 +157,8 @@ try { print ($1 == $2) }
 try { print $1, +$1, -$1, - -$1 }
 1	1 1 -1 1
 -1	-1 -1 1 -1
+0	0 0 0 0
+x	x 0 0 0
 
 try { printf("a%*sb\n", $1, $2) }
 1	x	axb
@@ -171,20 +193,26 @@ try { printf("%x %lx\n", $1, $1) }
 try { if ($1 ~ $2) print 1; else print 0 }
 a	\141	1
 a	\142	0
+a	\x61	1
 a	\x061	0
 a	\x62	0
 0	\060	1
 0	\60	1
 0	\0060	0
+Z	\x5a	1
+Z	\x5A	1
 
 try { print $1 ~ $2 }
 a	\141	1
 a	\142	0
+a	\x61	1
 a	\x061	0
 a	\x62	0
 0	\060	1
 0	\60	1
 0	\0060	0
+Z	\x5a	1
+Z	\x5A	1
 
 try { print $1 || $2 }
 		0

@@ -57,6 +57,7 @@ Keyword keywords[] = {	/* keep sorted: binary searched */
 	{ "else",	ELSE,		ELSE },
 	{ "exit",	EXIT,		EXIT },
 	{ "exp",	FEXP,		BLTIN },
+	{ "fflush",	FFLUSH,		BLTIN },
 	{ "for",	FOR,		FOR },
 	{ "func",	FUNC,		FUNC },
 	{ "function",	FUNC,		FUNC },
@@ -70,6 +71,7 @@ Keyword keywords[] = {	/* keep sorted: binary searched */
 	{ "log",	FLOG,		BLTIN },
 	{ "match",	MATCHFCN,	MATCHFCN },
 	{ "next",	NEXT,		NEXT },
+	{ "nextfile",	NEXTFILE,	NEXTFILE },
 	{ "print",	PRINT,		PRINT },
 	{ "printf",	PRINTF,		PRINTF },
 	{ "rand",	FRAND,		BLTIN },
@@ -511,6 +513,8 @@ word(char *w)
 		yylval.i = kp->sub;
 		switch (kp->type) {	/* special handling */
 		case BLTIN:
+			if (kp->sub == FSYSTEM && safe)
+				SYNTAX("system is unsafe");
 			RET(kp->type);
 		case FUNC:
 			if (infunc)

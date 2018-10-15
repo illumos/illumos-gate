@@ -101,9 +101,17 @@ echo 123 > $TEMP1
 $AWK -v x=123 'BEGIN { print x }' > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=11)'
 
+echo 123 > $TEMP1
+$AWK -vx=123 'BEGIN { print x }' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=11a)'
+
 echo 123 abc 10.99 > $TEMP1
 $AWK -v x=123 -v y=abc -v z1=10.99 'BEGIN { print x, y, z1 }' > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=12)'
+
+echo 123 abc 10.99 > $TEMP1
+$AWK -vx=123 -vy=abc -vz1=10.99 'BEGIN { print x, y, z1 }' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=12a)'
 
 echo 123 abc 10.99 > $TEMP1
 $AWK -v x=123 -v y=abc -v z1=10.99 -- 'BEGIN { print x, y, z1 }' > $TEMP2
@@ -116,8 +124,18 @@ diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=13)'
 
 echo 'BEGIN { print x, y, z1 }' > $TEMP0
 echo 123 abc 10.99 > $TEMP1
+$AWK -vx=123 -vy=abc -f $TEMP0 -vz1=10.99 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=13a)'
+
+echo 'BEGIN { print x, y, z1 }' > $TEMP0
+echo 123 abc 10.99 > $TEMP1
 $AWK -f $TEMP0 -v x=123 -v y=abc -v z1=10.99 > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=14)'
+
+echo 'BEGIN { print x, y, z1 }' > $TEMP0
+echo 123 abc 10.99 > $TEMP1
+$AWK -f $TEMP0 -vx=123 -vy=abc -vz1=10.99 > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=14a)'
 
 echo 'BEGIN { print x, y, z1 }
 END { print x }' > $TEMP0
@@ -127,11 +145,27 @@ $AWK -f $TEMP0 -v x=123 -v y=abc -v z1=10.99 /dev/null x=4567 /dev/null > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=15)'
 
 echo 'BEGIN { print x, y, z1 }
+END { print x }' > $TEMP0
+echo '123 abc 10.99
+4567' > $TEMP1
+$AWK -f $TEMP0 -vx=123 -vy=abc -vz1=10.99 /dev/null x=4567 /dev/null > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=15a)'
+
+echo 'BEGIN { print x, y, z1 }
 NR==1 { print x }' > $TEMP0
 echo '123 abc 10.99
 4567' > $TEMP1
 $AWK -v x=123 -v y=abc -v z1=10.99 -f $TEMP0 x=4567 /etc/passwd > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=16)'
+
+echo 'BEGIN { print x, y, z1 }
+NR==1 { print x }' > $TEMP0
+echo '123 abc 10.99
+4567' > $TEMP1
+$AWK -vx=123 -vy=abc -vz1=10.99 -f $TEMP0 x=4567 /etc/passwd > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=16a)'
+
+
 
 # special chars in commandline assigned value;
 # have to use local echo to avoid quoting problems.
@@ -149,5 +183,19 @@ diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=18)'
 $AWK 'BEGIN { printf("a%c%c%cz\n", "\b", "\r", "\f") }' > $TEMP1
 echo 'hello' | $AWK '{print x}' x='a\b\r\fz' > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=19)'
+
+echo '\' > $TEMP1
+$AWK -v 'x=\' 'BEGIN { print x; }' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.clv (x=\)'
+
+### newer -v tests
+
+
+$AWK -vx 'BEGIN {print x}' > $TEMP1 2>&1
+grep 'invalid -v option argument: x' $TEMP1 >/dev/null || fail 'BAD: T.clv (x=20)'
+
+$AWK -v x 'BEGIN {print x}' > $TEMP1 2>&1
+grep 'invalid -v option argument: x' $TEMP1 >/dev/null || fail 'BAD: T.clv (x=20a)'
+
 
 exit $RESULT

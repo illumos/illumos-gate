@@ -335,6 +335,17 @@ echo 'a::c:d
 $AWK '{ OFS = ":"; $2 = ""; print $0; print NF }' $TEMP0 > $TEMP2
 diff $TEMP1 $TEMP2 || fail 'BAD: T.gawk fldchgnf'
 
+# OFMT from arnold robbins 6/02:
+#	5.7 with OFMT = %0.f is 6
+echo '6' > $TEMP1
+$AWK 'BEGIN {
+	OFMT = "%.0f"
+	print 5.7
+}' > $TEMP2
+cmp -s $TEMP1 $TEMP2 || fail 'BAD: T.gawk ofmt'
+
+
+### don't know what this is supposed to do now.
 ### # convfmt:  
 ### echo 'a = 123.46
 ### a = 123.456
