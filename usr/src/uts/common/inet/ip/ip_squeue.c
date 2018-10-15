@@ -508,7 +508,7 @@ ip_squeue_add_ring(ill_t *ill, void *mrp)
 	}
 
 	bzero(rx_ring, sizeof (ill_rx_ring_t));
-	rx_ring->rr_rx = (ip_mac_rx_t)mrfp->mrf_receive;
+	rx_ring->rr_rx = mrfp->mrf_receive;
 	/* XXX: Hard code it to tcp accept for now */
 	rx_ring->rr_ip_accept = (ip_accept_t)ip_accept_tcp;
 
@@ -683,7 +683,7 @@ ip_squeue_clean_all(ill_t *ill)
 squeue_t *
 ip_squeue_get(ill_rx_ring_t *ill_rx_ring)
 {
-	squeue_t 	*sqp;
+	squeue_t	*sqp;
 
 	if ((ill_rx_ring == NULL) || ((sqp = ill_rx_ring->rr_sqp) == NULL))
 		return (IP_SQUEUE_GET(CPU_PSEUDO_RANDOM()));

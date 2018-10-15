@@ -108,7 +108,7 @@ extern sock_downcalls_t sock_tcp_downcalls;
 /* TCP timers related data structures.  Refer to tcp_timers.c. */
 typedef struct tcp_timer_s {
 	conn_t	*connp;
-	void 	(*tcpt_proc)(void *);
+	void	(*tcpt_proc)(void *);
 	callout_id_t   tcpt_tid;
 } tcp_timer_t;
 
@@ -626,7 +626,7 @@ extern void	tcp_ipsec_cleanup(tcp_t *);
 extern int	tcp_maxpsz_set(tcp_t *, boolean_t);
 extern void	tcp_mss_set(tcp_t *, uint32_t);
 extern void	tcp_reinput(conn_t *, mblk_t *, ip_recv_attr_t *, ip_stack_t *);
-extern void	tcp_rsrv(queue_t *);
+extern int	tcp_rsrv(queue_t *);
 extern uint_t	tcp_rwnd_reopen(tcp_t *);
 extern int	tcp_rwnd_set(tcp_t *, uint32_t);
 extern int	tcp_set_destination(tcp_t *);
@@ -676,10 +676,10 @@ extern void	tcp_send_synack(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_shutdown_output(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_ss_rexmit(tcp_t *);
 extern void	tcp_update_xmit_tail(tcp_t *, uint32_t);
-extern void	tcp_wput(queue_t *, mblk_t *);
+extern int	tcp_wput(queue_t *, mblk_t *);
 extern void	tcp_wput_data(tcp_t *, mblk_t *, boolean_t);
-extern void	tcp_wput_sock(queue_t *, mblk_t *);
-extern void	tcp_wput_fallback(queue_t *, mblk_t *);
+extern int	tcp_wput_sock(queue_t *, mblk_t *);
+extern int	tcp_wput_fallback(queue_t *, mblk_t *);
 extern void	tcp_xmit_ctl(char *, tcp_t *, uint32_t, uint32_t, int);
 extern void	tcp_xmit_listeners_reset(mblk_t *, ip_recv_attr_t *,
 		    ip_stack_t *i, conn_t *);
@@ -734,7 +734,7 @@ extern void	tcp_err_ack_prim(tcp_t *, mblk_t *, int, int, int);
 extern void	tcp_info_req(tcp_t *, mblk_t *);
 extern void	tcp_send_conn_ind(void *, mblk_t *, void *);
 extern void	tcp_send_pending(void *, mblk_t *, void *, ip_recv_attr_t *);
-extern void	tcp_tpi_accept(queue_t *, mblk_t *);
+extern int	tcp_tpi_accept(queue_t *, mblk_t *);
 extern void	tcp_tpi_bind(tcp_t *, mblk_t *);
 extern int	tcp_tpi_close(queue_t *, int, cred_t *);
 extern int	tcp_tpi_close_accept(queue_t *, int, cred_t *);

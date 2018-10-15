@@ -784,12 +784,12 @@ static mblk_t *
 tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
     ip_recv_attr_t *ira)
 {
-	tcp_t 		*ltcp = lconnp->conn_tcp;
+	tcp_t		*ltcp = lconnp->conn_tcp;
 	tcp_t		*tcp = connp->conn_tcp;
 	mblk_t		*tpi_mp;
 	ipha_t		*ipha;
 	ip6_t		*ip6h;
-	sin6_t 		sin6;
+	sin6_t		sin6;
 	uint_t		ifindex = ira->ira_ruifindex;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
@@ -881,7 +881,7 @@ static mblk_t *
 tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, mblk_t *mp,
     ip_recv_attr_t *ira)
 {
-	tcp_t 		*ltcp = lconnp->conn_tcp;
+	tcp_t		*ltcp = lconnp->conn_tcp;
 	tcp_t		*tcp = connp->conn_tcp;
 	sin_t		sin;
 	mblk_t		*tpi_mp = NULL;
@@ -987,7 +987,7 @@ boolean_t
 tcp_eager_blowoff(tcp_t	*listener, t_scalar_t seqnum)
 {
 	tcp_t	*eager;
-	mblk_t 	*mp;
+	mblk_t	*mp;
 
 	eager = listener;
 	mutex_enter(&listener->tcp_eager_lock);
@@ -1157,7 +1157,7 @@ tcp_eager_unlink(tcp_t *tcp)
  *
  * incoming SYN (listener perimeter)	-> tcp_input_listener()
  *
- * incoming SYN-ACK-ACK (eager perim) 	-> tcp_input_data()
+ * incoming SYN-ACK-ACK (eager perim)	-> tcp_input_data()
  * send T_CONN_IND (listener perim)	-> tcp_send_conn_ind()
  *
  * Sockfs ACCEPT Path:
@@ -1268,7 +1268,7 @@ tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 	conn_t		*econnp = NULL;
 	squeue_t	*new_sqp;
 	mblk_t		*mp1;
-	uint_t 		ip_hdr_len;
+	uint_t		ip_hdr_len;
 	conn_t		*lconnp = (conn_t *)arg;
 	tcp_t		*listener = lconnp->conn_tcp;
 	tcp_stack_t	*tcps = listener->tcp_tcps;
@@ -5456,7 +5456,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
  * TCP, we have no data to send out of here.  What we do is clear the receive
  * window, and send out a window update.
  */
-void
+int
 tcp_rsrv(queue_t *q)
 {
 	conn_t		*connp = Q_TO_CONN(q);
@@ -5473,7 +5473,7 @@ tcp_rsrv(queue_t *q)
 	mutex_enter(&tcp->tcp_rsrv_mp_lock);
 	if ((mp = tcp->tcp_rsrv_mp) == NULL) {
 		mutex_exit(&tcp->tcp_rsrv_mp_lock);
-		return;
+		return (0);
 	}
 	tcp->tcp_rsrv_mp = NULL;
 	mutex_exit(&tcp->tcp_rsrv_mp_lock);
@@ -5481,6 +5481,7 @@ tcp_rsrv(queue_t *q)
 	CONN_INC_REF(connp);
 	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_rsrv_input, connp,
 	    NULL, SQ_PROCESS, SQTAG_TCP_RSRV);
+	return (0);
 }
 
 /* At minimum we need 8 bytes in the TCP header for the lookup */

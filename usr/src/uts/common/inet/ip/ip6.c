@@ -3083,7 +3083,7 @@ ip_process_rthdr(mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 /*
  * Read side put procedure for IPv6 module.
  */
-void
+int
 ip_rput_v6(queue_t *q, mblk_t *mp)
 {
 	ill_t		*ill;
@@ -3104,7 +3104,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		if ((mp->b_datap->db_type != M_PCPROTO) ||
 		    (dl->dl_primitive == DL_UNITDATA_IND)) {
 			inet_freemsg(mp);
-			return;
+			return (0);
 		}
 	}
 	if (DB_TYPE(mp) == M_DATA) {
@@ -3115,6 +3115,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 	} else {
 		ip_rput_notdata(ill, mp);
 	}
+	return (0);
 }
 
 /*
@@ -4828,9 +4829,9 @@ void
 	kstat_t *ksp;
 
 	ip6_stat_t template = {
-		{ "ip6_udp_fannorm", 	KSTAT_DATA_UINT64 },
-		{ "ip6_udp_fanmb", 	KSTAT_DATA_UINT64 },
-		{ "ip6_recv_pullup", 		KSTAT_DATA_UINT64 },
+		{ "ip6_udp_fannorm",	KSTAT_DATA_UINT64 },
+		{ "ip6_udp_fanmb",	KSTAT_DATA_UINT64 },
+		{ "ip6_recv_pullup",		KSTAT_DATA_UINT64 },
 		{ "ip6_db_ref",			KSTAT_DATA_UINT64 },
 		{ "ip6_notaligned",		KSTAT_DATA_UINT64 },
 		{ "ip6_multimblk",		KSTAT_DATA_UINT64 },

@@ -286,7 +286,7 @@ static void	tcp_iss_init(tcp_t *tcp);
 static void	tcp_reinit(tcp_t *tcp);
 static void	tcp_reinit_values(tcp_t *tcp);
 
-static void	tcp_wsrv(queue_t *q);
+static int	tcp_wsrv(queue_t *q);
 static void	tcp_update_lso(tcp_t *tcp, ip_xmit_attr_t *ixa);
 static void	tcp_update_zcopy(tcp_t *tcp);
 static void	tcp_notify(void *, ip_xmit_attr_t *, ixa_notify_type_t,
@@ -316,25 +316,25 @@ static struct module_info tcp_winfo =  {
  * We have separate open functions for the /dev/tcp and /dev/tcp6 devices.
  */
 struct qinit tcp_rinitv4 = {
-	NULL, (pfi_t)tcp_rsrv, tcp_openv4, tcp_tpi_close, NULL, &tcp_rinfo
+	NULL, tcp_rsrv, tcp_openv4, tcp_tpi_close, NULL, &tcp_rinfo
 };
 
 struct qinit tcp_rinitv6 = {
-	NULL, (pfi_t)tcp_rsrv, tcp_openv6, tcp_tpi_close, NULL, &tcp_rinfo
+	NULL, tcp_rsrv, tcp_openv6, tcp_tpi_close, NULL, &tcp_rinfo
 };
 
 struct qinit tcp_winit = {
-	(pfi_t)tcp_wput, (pfi_t)tcp_wsrv, NULL, NULL, NULL, &tcp_winfo
+	tcp_wput, tcp_wsrv, NULL, NULL, NULL, &tcp_winfo
 };
 
 /* Initial entry point for TCP in socket mode. */
 struct qinit tcp_sock_winit = {
-	(pfi_t)tcp_wput_sock, (pfi_t)tcp_wsrv, NULL, NULL, NULL, &tcp_winfo
+	tcp_wput_sock, tcp_wsrv, NULL, NULL, NULL, &tcp_winfo
 };
 
 /* TCP entry point during fallback */
 struct qinit tcp_fallback_sock_winit = {
-	(pfi_t)tcp_wput_fallback, NULL, NULL, NULL, NULL, &tcp_winfo
+	tcp_wput_fallback, NULL, NULL, NULL, NULL, &tcp_winfo
 };
 
 /*
@@ -343,11 +343,11 @@ struct qinit tcp_fallback_sock_winit = {
  * been created.
  */
 struct qinit tcp_acceptor_rinit = {
-	NULL, (pfi_t)tcp_rsrv, NULL, tcp_tpi_close_accept, NULL, &tcp_winfo
+	NULL, tcp_rsrv, NULL, tcp_tpi_close_accept, NULL, &tcp_winfo
 };
 
 struct qinit tcp_acceptor_winit = {
-	(pfi_t)tcp_tpi_accept, NULL, NULL, NULL, NULL, &tcp_winfo
+	tcp_tpi_accept, NULL, NULL, NULL, NULL, &tcp_winfo
 };
 
 /* For AF_INET aka /dev/tcp */
@@ -1037,7 +1037,7 @@ void
 tcp_close_common(conn_t *connp, int flags)
 {
 	tcp_t		*tcp = connp->conn_tcp;
-	mblk_t 		*mp = &tcp->tcp_closemp;
+	mblk_t		*mp = &tcp->tcp_closemp;
 	boolean_t	conn_ioctl_cleanup_reqd = B_FALSE;
 	mblk_t		*bp;
 
@@ -1474,7 +1474,7 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps)
 	tcp_t			*tcp = NULL;
 	conn_t			*connp = NULL;
 	squeue_t		*sqp = (squeue_t *)arg;
-	tcp_squeue_priv_t 	*tcp_time_wait;
+	tcp_squeue_priv_t	*tcp_time_wait;
 	netstack_t		*ns;
 	mblk_t			*tcp_rsrv_mp = NULL;
 
@@ -1554,8 +1554,8 @@ static int
 tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
     uint_t srcid)
 {
-	ipaddr_t 	dstaddr = *dstaddrp;
-	uint16_t 	lport;
+	ipaddr_t	dstaddr = *dstaddrp;
+	uint16_t	lport;
 	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	int		error;
@@ -1643,7 +1643,7 @@ static int
 tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
     uint32_t flowinfo, uint_t srcid, uint32_t scope_id)
 {
-	uint16_t 	lport;
+	uint16_t	lport;
 	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	int		error;
@@ -2054,8 +2054,7 @@ tcp_reinit(tcp_t *tcp)
  * structure!
  */
 static void
-tcp_reinit_values(tcp)
-	tcp_t *tcp;
+tcp_reinit_values(tcp_t *tcp)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	conn_t		*connp = tcp->tcp_connp;
@@ -3415,12 +3414,13 @@ tcp_notify(void *arg, ip_xmit_attr_t *ixa, ixa_notify_type_t ntype,
  * The TCP write service routine should never be called...
  */
 /* ARGSUSED */
-static void
+static int
 tcp_wsrv(queue_t *q)
 {
 	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	TCP_STAT(tcps, tcp_wsrv_called);
+	return (0);
 }
 
 /*

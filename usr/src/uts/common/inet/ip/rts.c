@@ -120,10 +120,10 @@ static int	rts_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t rts_param_register(IDP *ndp, rtsparam_t *rtspa, int cnt);
 static int	rts_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
     cred_t *cr);
-static void	rts_rsrv(queue_t *q);
+static int	rts_rsrv(queue_t *q);
 static void	*rts_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	rts_stack_fini(netstackid_t stackid, void *arg);
-static void	rts_wput(queue_t *q, mblk_t *mp);
+static int	rts_wput(queue_t *q, mblk_t *mp);
 static void	rts_wput_iocdata(queue_t *q, mblk_t *mp);
 static void	rts_wput_other(queue_t *q, mblk_t *mp);
 static int	rts_wrw(queue_t *q, struiod_t *dp);
@@ -141,13 +141,13 @@ static struct module_info rts_mod_info = {
 };
 
 static struct qinit rtsrinit = {
-	NULL, (pfi_t)rts_rsrv, rts_stream_open, rts_stream_close, NULL,
+	NULL, rts_rsrv, rts_stream_open, rts_stream_close, NULL,
 	&rts_mod_info
 };
 
 static struct qinit rtswinit = {
-	(pfi_t)rts_wput, NULL, NULL, NULL, NULL, &rts_mod_info,
-	NULL, (pfi_t)rts_wrw, NULL, STRUIOT_STANDARD
+	rts_wput, NULL, NULL, NULL, NULL, &rts_mod_info,
+	NULL, rts_wrw, NULL, STRUIOT_STANDARD
 };
 
 struct streamtab rtsinfo = {
@@ -817,9 +817,10 @@ rts_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
  * of a thread in qwait.
  */
 /*ARGSUSED*/
-static void
+static int
 rts_rsrv(queue_t *q)
 {
+	return (0);
 }
 
 /*
@@ -919,7 +920,7 @@ err_ret:
  * a message. The data messages that go down are wrapped in an IOCTL
  * message.
  */
-static void
+static int
 rts_wput(queue_t *q, mblk_t *mp)
 {
 	uchar_t	*rptr = mp->b_rptr;
@@ -938,7 +939,7 @@ rts_wput(queue_t *q, mblk_t *mp)
 				mp1 = mp->b_cont;
 				freeb(mp);
 				if (mp1 == NULL)
-					return;
+					return (0);
 				mp = mp1;
 				break;
 			}
@@ -946,7 +947,7 @@ rts_wput(queue_t *q, mblk_t *mp)
 		/* FALLTHRU */
 	default:
 		rts_wput_other(q, mp);
-		return;
+		return (0);
 	}
 
 
@@ -960,9 +961,10 @@ rts_wput(queue_t *q, mblk_t *mp)
 			rts->rts_error = ENOMEM;
 			rts->rts_flag &= ~RTS_WPUT_PENDING;
 		}
-		return;
+		return (0);
 	}
 	ip_wput_nondata(q, mp1);
+	return (0);
 }
 
 

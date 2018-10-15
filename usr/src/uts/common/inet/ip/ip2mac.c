@@ -336,7 +336,7 @@ typedef struct ip2mac_cancel_data_s {
  * to an active nce_cb_t in the ncec's callback list, we want to remove
  * the callback (if there are no walkers) or return EBUSY to the caller
  */
-static int
+static void
 ip2mac_cancel_callback(ncec_t *ncec, void *arg)
 {
 	ip2mac_cancel_data_t *ip2m_wdata = arg;
@@ -344,12 +344,12 @@ ip2mac_cancel_callback(ncec_t *ncec, void *arg)
 	ncec_cb_t *ncec_cb;
 
 	if (ip2m_nce_cb->ncec_cb_id != ncec)
-		return (0);
+		return;
 
 	mutex_enter(&ncec->ncec_lock);
 	if (list_is_empty(&ncec->ncec_cb)) {
 		mutex_exit(&ncec->ncec_lock);
-		return (0);
+		return;
 	}
 	/*
 	 * IP does not hold internal locks like nce_lock across calls to
@@ -375,7 +375,6 @@ ip2mac_cancel_callback(ncec_t *ncec, void *arg)
 		break;
 	}
 	mutex_exit(&ncec->ncec_lock);
-	return (0);
 }
 
 /*

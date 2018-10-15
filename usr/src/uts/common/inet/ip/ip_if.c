@@ -194,8 +194,8 @@ static ip_v6mapinfo_func_t ip_ether_v6_mapping;
 static ip_v4mapinfo_func_t ip_ib_v4_mapping;
 static ip_v6mapinfo_func_t ip_ib_v6_mapping;
 static ip_v4mapinfo_func_t ip_mbcast_mapping;
-static void 	ip_cgtp_bcast_add(ire_t *, ip_stack_t *);
-static void 	ip_cgtp_bcast_delete(ire_t *, ip_stack_t *);
+static void	ip_cgtp_bcast_add(ire_t *, ip_stack_t *);
+static void	ip_cgtp_bcast_delete(ire_t *, ip_stack_t *);
 static void	phyint_free(phyint_t *);
 
 static void ill_capability_dispatch(ill_t *, mblk_t *, dl_capability_sub_t *);
@@ -2207,7 +2207,7 @@ ill_capability_dld_disable(ill_t *ill)
  *
  * state		next state		event, action
  *
- * IDCS_UNKNOWN 	IDCS_PROBE_SENT		ill_capability_probe
+ * IDCS_UNKNOWN		IDCS_PROBE_SENT		ill_capability_probe
  * IDCS_PROBE_SENT	IDCS_OK			ill_capability_ack
  * IDCS_PROBE_SENT	IDCS_FAILED		ip_rput_dlpi_writer (nack)
  * IDCS_OK		IDCS_RENEG		Receipt of DL_NOTE_CAPAB_RENEG
@@ -2227,7 +2227,7 @@ void
 ill_taskq_dispatch(ip_stack_t *ipst)
 {
 	callb_cpr_t cprinfo;
-	char 	name[64];
+	char	name[64];
 	mblk_t	*mp;
 
 	(void) snprintf(name, sizeof (name), "ill_taskq_dispatch_%d",
@@ -3140,10 +3140,10 @@ ill_alloc_ppa(ill_if_t *ifp, ill_t *ill)
 			ill->ill_ppa = --ppa;
 		} else {
 			ppa = (int)(uintptr_t)vmem_xalloc(ifp->illif_ppa_arena,
-			    1, 		/* size */
-			    1, 		/* align/quantum */
-			    0, 		/* phase */
-			    0, 		/* nocross */
+			    1,		/* size */
+			    1,		/* align/quantum */
+			    0,		/* phase */
+			    0,		/* nocross */
 			    (void *)(uintptr_t)(ill->ill_ppa + 1), /* minaddr */
 			    (void *)(uintptr_t)(ill->ill_ppa + 2), /* maxaddr */
 			    VM_NOSLEEP|VM_FIRSTFIT);
@@ -4408,13 +4408,13 @@ ipif_comp_multi(ipif_t *old_ipif, ipif_t *new_ipif, boolean_t isv6)
  * condemned, not an underlying interface in an IPMP group, and
  * not a VNI interface.  Order of preference:
  *
- * 	1a. normal
- * 	1b. normal, but deprecated
- * 	2a. point to point
- * 	2b. point to point, but deprecated
- * 	3a. link local
- * 	3b. link local, but deprecated
- * 	4. loopback.
+ *	1a. normal
+ *	1b. normal, but deprecated
+ *	2a. point to point
+ *	2b. point to point, but deprecated
+ *	3a. link local
+ *	3b. link local, but deprecated
+ *	4. loopback.
  */
 static ipif_t *
 ipif_lookup_multicast(ip_stack_t *ipst, zoneid_t zoneid, boolean_t isv6)
@@ -4943,7 +4943,7 @@ ipif_ill_refrele_tail(ill_t *ill)
 	ASSERT(ipx->ipx_pending_mp != NULL && ipx->ipx_pending_ipif != NULL);
 
 	ipif = ipx->ipx_pending_ipif;
-	if (ipif->ipif_ill != ill) 	/* wait is for another ill; bail */
+	if (ipif->ipif_ill != ill)	/* wait is for another ill; bail */
 		goto unlock;
 
 	switch (ipx->ipx_waitfor) {
@@ -5382,7 +5382,7 @@ ip_mcast_mapping(ill_t *ill, uchar_t *addr, uchar_t *hwaddr)
  *
  * The netmask can be verified to be contiguous with 32 shifts and or
  * operations. Take the contiguous mask (in host byte order) and compute
- * 	mask | mask << 1 | mask << 2 | ... | mask << 31
+ *	mask | mask << 1 | mask << 2 | ... | mask << 31
  * the result will be the same as the 'mask' for contiguous mask.
  */
 static boolean_t
@@ -7867,7 +7867,7 @@ ip_sioctl_ip6addrpolicy(queue_t *q, mblk_t *mp)
 static void
 ip_sioctl_dstinfo(queue_t *q, mblk_t *mp)
 {
-	mblk_t 		*data_mp;
+	mblk_t		*data_mp;
 	struct dstinforeq	*dir;
 	uint8_t		*end, *cur;
 	in6_addr_t	*daddr, *saddr;
@@ -8618,7 +8618,7 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
     struct linkblk *li)
 {
 	int		err = 0;
-	ill_t  		*ill;
+	ill_t		*ill;
 	queue_t		*ipwq, *dwq;
 	const char	*name;
 	struct qinit	*qinfo;
@@ -8637,12 +8637,12 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 		qinfo = ipwq->q_qinfo;
 		name = qinfo->qi_minfo->mi_idname;
 		if (name != NULL && strcmp(name, ip_mod_info.mi_idname) == 0 &&
-		    qinfo->qi_putp != (pfi_t)ip_lwput && ipwq->q_next != NULL) {
+		    qinfo->qi_putp != ip_lwput && ipwq->q_next != NULL) {
 			is_ip = B_TRUE;
 			break;
 		}
 		if (name != NULL && strcmp(name, arp_mod_info.mi_idname) == 0 &&
-		    qinfo->qi_putp != (pfi_t)ip_lwput && ipwq->q_next != NULL) {
+		    qinfo->qi_putp != ip_lwput && ipwq->q_next != NULL) {
 			break;
 		}
 	}
@@ -9286,7 +9286,7 @@ ip_sioctl_addif(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 	struct lifreq *lifr;
 	boolean_t	isv6;
 	boolean_t	exists;
-	char 	*name;
+	char	*name;
 	char	*endp;
 	char	*cp;
 	int	namelen;
@@ -10186,7 +10186,7 @@ ip_sioctl_flags_onoff(ipif_t *ipif, uint64_t flags, uint64_t *onp,
     uint64_t *offp)
 {
 	ill_t		*ill = ipif->ipif_ill;
-	phyint_t 	*phyi = ill->ill_phyint;
+	phyint_t	*phyi = ill->ill_phyint;
 	uint64_t	cantchange_flags, intf_flags;
 	uint64_t	turn_on, turn_off;
 
@@ -12170,7 +12170,7 @@ ipif_arp_down(ipif_t *ipif)
  * basic DAD related initialization for IPv6. Honors ILLF_NOARP.
  *
  * The enumerated value res_act tunes the behavior:
- * 	* Res_act_initial: set up all the resolver structures for a new
+ *	* Res_act_initial: set up all the resolver structures for a new
  *	  IP address.
  *	* Res_act_defend: tell ARP that it needs to send a single gratuitous
  *	  ARP message in defense of the address.
@@ -14332,7 +14332,7 @@ int
 ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp)
 {
 	ill_t		*ill = ipif->ipif_ill;
-	boolean_t 	isv6 = ipif->ipif_isv6;
+	boolean_t	isv6 = ipif->ipif_isv6;
 	int		err = 0;
 	boolean_t	success;
 	uint_t		ipif_orig_id;
@@ -15288,8 +15288,8 @@ ipif_good_addr(ill_t *ill, zoneid_t zoneid)
  */
 typedef enum {
 	IPIF_NONE,
-	IPIF_DIFFNET_DEPRECATED, 	/* deprecated and different subnet */
-	IPIF_SAMENET_DEPRECATED, 	/* deprecated and same subnet */
+	IPIF_DIFFNET_DEPRECATED,	/* deprecated and different subnet */
+	IPIF_SAMENET_DEPRECATED,	/* deprecated and same subnet */
 	IPIF_DIFFNET_ALLZONES,		/* allzones and different subnet */
 	IPIF_SAMENET_ALLZONES,		/* allzones and same subnet */
 	IPIF_DIFFNET,			/* normal and different subnet */
@@ -15614,7 +15614,7 @@ if_unitsel(ipif_t *dummy_ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *dummy_ifreq)
 {
 	queue_t		*q1 = q;
-	char 		*cp;
+	char		*cp;
 	char		interf_name[LIFNAMSIZ];
 	uint_t		ppa = *(uint_t *)mp->b_cont->b_cont->b_rptr;
 
@@ -17398,7 +17398,7 @@ ip_ipmp_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 	zone_t		*zp;
 	uint8_t		*addr;
 	uchar_t		hash[16];
-	ulong_t 	hostid;
+	ulong_t		hostid;
 	MD5_CTX		ctx;
 	ipmp_ifcookie_t	ic = { 0 };
 
@@ -18498,8 +18498,8 @@ arp_up_done:
 int
 ipif_arp_up(ipif_t *ipif, enum ip_resolver_action res_act, boolean_t was_dup)
 {
-	int 		err = 0;
-	ill_t 		*ill = ipif->ipif_ill;
+	int		err = 0;
+	ill_t		*ill = ipif->ipif_ill;
 	boolean_t	first_interface, wait_for_dlpi = B_FALSE;
 
 	DTRACE_PROBE3(ipif__downup, char *, "ipif_arp_up",
@@ -18996,8 +18996,7 @@ ipif_nce_down(ipif_t *ipif)
 	 * is going away.
 	 */
 	if (ill->ill_ipif_up_count == 0) {
-		ncec_walk(ill, (pfi_t)ncec_delete_per_ill,
-		    (uchar_t *)ill, ill->ill_ipst);
+		ncec_walk(ill, ncec_delete_per_ill, ill, ill->ill_ipst);
 		if (IS_UNDER_IPMP(ill))
 			nce_flush(ill, B_TRUE);
 	}
