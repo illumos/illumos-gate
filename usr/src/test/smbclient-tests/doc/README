@@ -1,0 +1,144 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+#
+
+
+Contents:
+
+1. Introduction
+2. How to configure SMB client
+3. How to configure native SMB server
+4. How to configure Windows 2003/2008 server (manual)
+5. How to run the tests
+6. How to get test result and logs
+
+
+1. Introduction
+
+This test suite is designed for SMB client testing. It needs
+two machines (a test client and a SMB server) and the test suite runs
+on the client machine.
+
+Server machine can be one of the following systems:
+
+   1. Native SMB Server
+   2. Windows 2003
+   3. Windows 2008
+
+User must run the test suite as an ordinary user (not root)
+and that user must be able to "sudo" without a password.
+
+This testsuite also uses filebench, a framework of file system
+workloads for measuring and comparing file system performance.
+This testsuite uses the default configuration of filebench.
+
+
+2. How to configure SMB client
+
+   - Install the "expect" package
+
+     # pkg install shell/expect
+
+   - Install the "Test Runner" package
+
+     # pkg install system/test/testrunner
+
+   - Create test directory, owned by whoever will run these tests.
+
+     # mkdir /var/tmp/smbclnt
+     # chown $USER /var/tmp/smbclnt
+
+   - Create additional test users: smbusera, smbuserb, smbuserc
+
+     # useradd -u 20100 -g 1 -d /export/home/smbusera smbusera
+     # useradd -u 20101 -g 1 -d /export/home/smbuserb smbuserb
+     # useradd -u 20102 -g 1 -d /export/home/smbuserc smbuserc
+
+     Set passwords on those accounts, i.e.
+
+     # echo A_nex_123 | passwd smbusera
+     # echo B_nex_123 | passwd smbuserb
+     # echo C_nex_123 | passwd smbuserc
+
+     Make sure those account names and passwords agree with the
+     variable settings in ../include/default_cfg.ksh
+     The accounts, UIDs, and passwords can be whatever you like,
+     but must be consistent with default_cfg.ksh
+
+3. How to configure native SMB server
+
+   - Do as described in step 4 (windows server)
+
+
+4. How to configure Windows 2003/2008 server (manual)
+
+   - Create test users (listed names and passwords are the default
+     ones, check config/config file to see/change them)
+     - Create user smbusera and use "A_nex_123" as its password
+     - Create user smbuserb and use "B_nex_123" as its password
+     - Create user smbuserc and use "C_nex_123" as its password
+
+   - Create test directories
+     - Create three windows share directories in a partition which has
+       more than 4G free space. The directory names are public,
+       a_share and b_share.
+
+   - Set permissions
+     - Assign read/write permission for the "public" share directory
+       to the following users: smbusera, smbuserb, smbuserc
+     - Assign read/write permission for the "a_share" share directory
+       to the following user: smbusera.
+     - Assign read/write permission for the "b_share" share directory
+       to the following user: smbuserb.
+
+   - Disable firewall
+
+
+5. How to run the tests
+
+   - Prerequisites: configure client and server (see above).
+
+   - Install an "exepct" package, i.e. with IPS
+	pkg install shell/expect
+
+   - Export the environment variables:
+
+     # export SRV=servername
+
+   - To run the all test cases, use the following command
+
+     # /opt/smbclient-tests/bin/smbclienttest
+
+   - To run a single test case, create a custom "run file"
+     based on: /opt/smbclient-tests/runfiles/default.run
+     and specify that run file via:
+
+     # /opt/smbclient-tests/bin/smbclienttest -c custom.run
+
+
+6. How to get the test result and logs
+
+Test results are saved in a directory under /var/tmp, e.g.
+/var/tmp/test_results/{date_stamp}

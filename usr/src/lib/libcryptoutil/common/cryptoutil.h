@@ -108,7 +108,7 @@ typedef struct uentry {
 	boolean_t	flag_metaslot_auto_key_migrate;
 	CK_UTF8CHAR	metaslot_ks_slot[SLOT_DESCRIPTION_SIZE + 1];
 	CK_UTF8CHAR	metaslot_ks_token[TOKEN_LABEL_SIZE + 1];
-	int 		count;
+	int		count;
 	boolean_t	flag_fips_enabled;
 } uentry_t;
 

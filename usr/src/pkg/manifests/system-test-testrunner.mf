@@ -29,8 +29,11 @@ dir path=opt/test-runner/stf/contrib/include
 dir path=opt/test-runner/stf/include
 file path=opt/test-runner/bin/run mode=0555
 file path=opt/test-runner/man/man1/run.1 mode=0444
+file path=opt/test-runner/stf/contrib/include/ctiutils.shlib mode=0555
 file path=opt/test-runner/stf/contrib/include/logapi.shlib mode=0555
 file path=opt/test-runner/stf/include/stf.shlib mode=0555
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/test/test-runner/stf/contrib/LICENSE.Artistic \
+    license=usr/src/test/test-runner/stf/contrib/LICENSE.Artistic
 depend fmri=security/sudo type=require

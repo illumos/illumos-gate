@@ -19,7 +19,7 @@ include $(SRC)/test/Makefile.com
 ROOTOPTPKG = $(ROOT)/opt/test-runner
 INCLUDEDIR = $(ROOTOPTPKG)/stf/contrib/include
 
-PROGS = logapi.shlib
+PROGS = logapi.shlib ctiutils.shlib
 
 CMDS = $(PROGS:%=$(INCLUDEDIR)/%)
 $(CMDS) := FILEMODE = 0555
