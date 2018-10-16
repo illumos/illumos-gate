@@ -5248,8 +5248,8 @@ fcip_udreq(queue_t *wq, mblk_t *mp)
 
 	if (fdestp == NULL) {
 		FCIP_DEBUG(FCIP_DEBUG_DLPI, (CE_NOTE,
-		    "udreq - couldn't find dest struct for remote port");
-		dluderrorind(wq, mp, (mp->b_rptr + off), len, DL_BADDATA, 0));
+		    "udreq - couldn't find dest struct for remote port"));
+		dluderrorind(wq, mp, (mp->b_rptr + off), len, DL_BADDATA, 0);
 		return;
 	}
 
