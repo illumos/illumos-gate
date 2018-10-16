@@ -47,7 +47,7 @@
 #include <sys/sdt.h>
 
 int aphysio(int (*)(), int (*)(), dev_t, int, void (*)(), struct aio_req *);
-void aio_done(struct buf *);
+int aio_done(struct buf *);
 void aphysio_unlock(aio_req_t *);
 void aio_cleanup(int);
 void aio_cleanup_exit(void);
@@ -131,7 +131,7 @@ aphysio(
 	 * b_proc fields to cluster-specifc values.
 	 */
 	if (bp->b_iodone == NULL) {
-		bp->b_iodone = (int (*)()) aio_done;
+		bp->b_iodone = aio_done;
 		/* b_forw points at an aio_req_t structure */
 		bp->b_forw = (struct buf *)reqp;
 		bp->b_proc = curproc;
@@ -188,7 +188,7 @@ anocancel(struct buf *bp)
  * by clustering s/w as contract private interface.
  */
 
-void
+int
 aio_done(struct buf *bp)
 {
 	proc_t *p;
@@ -256,7 +256,7 @@ aio_done(struct buf *bp)
 			port_send_event(pkevp);
 			if (portevpend == 0)
 				cv_broadcast(&aiop->aio_portcv);
-			return;
+			return (0);
 		}
 
 		if (aiop->aio_flags & AIO_CLEANUP) {
@@ -271,7 +271,7 @@ aio_done(struct buf *bp)
 			mutex_exit(&as->a_contents);
 			mutex_exit(&aiop->aio_mutex);
 			mutex_exit(&aiop->aio_portq_mutex);
-			return;
+			return (0);
 		}
 
 		aio_deq(&aiop->aio_portpending, reqp);
@@ -336,7 +336,7 @@ aio_done(struct buf *bp)
 				aiop->aio_flags &= ~AIO_DONE_ACTIVE;
 				mutex_exit(&aiop->aio_mutex);
 			}
-			return;
+			return (0);
 		}
 
 		/*
@@ -425,6 +425,8 @@ aio_done(struct buf *bp)
 		aio_sigev_send(p, lio_sigev);
 	if (lio_pkevp)
 		port_send_event(lio_pkevp);
+
+	return (0);
 }
 
 /*
