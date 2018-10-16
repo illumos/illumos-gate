@@ -408,7 +408,7 @@ fdb_iosetup(fdbuffer_t *fdb, u_offset_t off, size_t len, struct vnode *vp,
 	};
 
 	bp = bioclone(fdb->fd_parentbp, off, len, 0, 0,
-	    (b_flags & B_ASYNC) ? (int (*)())fdb_iodone : NULL,
+	    (b_flags & B_ASYNC) ? fdb_iodone : NULL,
 	    NULL, KM_SLEEP);
 
 	bp->b_forw = (struct buf *)fdb;
@@ -459,7 +459,7 @@ fdb_ioerrdone(fdbuffer_t *fdb, int error)
 	fdb->fd_iofunc(fdb, fdb->fd_iargp, NULL);
 }
 
-void
+int
 fdb_iodone(buf_t *bp)
 {
 	fdbuffer_t *fdb = (fdbuffer_t *)bp->b_forw;
@@ -525,4 +525,5 @@ fdb_iodone(buf_t *bp)
 	}
 
 	freerbuf(bp);
+	return (0);
 }
