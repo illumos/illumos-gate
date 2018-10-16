@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Toomas Soome <tsoome@me.com>
  */
 
 #include <sys/types.h>
@@ -110,7 +111,7 @@ static rtsparam_t	lcl_param_arr[] = {
 #define	rtss_recv_hiwat		rtss_params[2].rts_param_value
 #define	rtss_max_buf		rtss_params[3].rts_param_value
 
-static void 	rts_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error,
+static void	rts_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error,
     int sys_error);
 static void	rts_input(void *, mblk_t *, void *, ip_recv_attr_t *);
 static void	rts_icmp_input(void *, mblk_t *, void *, ip_recv_attr_t *);
@@ -124,7 +125,7 @@ static void	*rts_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	rts_stack_fini(netstackid_t stackid, void *arg);
 static void	rts_wput(queue_t *q, mblk_t *mp);
 static void	rts_wput_iocdata(queue_t *q, mblk_t *mp);
-static void 	rts_wput_other(queue_t *q, mblk_t *mp);
+static void	rts_wput_other(queue_t *q, mblk_t *mp);
 static int	rts_wrw(queue_t *q, struiod_t *dp);
 
 static int	rts_stream_open(queue_t *q, dev_t *devp, int flag, int sflag,
@@ -667,7 +668,7 @@ rts_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
     uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
     void *thisdg_attrs, cred_t *cr)
 {
-	boolean_t 	checkonly = B_FALSE;
+	boolean_t	checkonly = B_FALSE;
 
 	if (optset_context) {
 		switch (optset_context) {
@@ -676,9 +677,9 @@ rts_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			/*
 			 * Note: Implies T_CHECK semantics for T_OPTCOM_REQ
 			 * inlen != 0 implies value supplied and
-			 * 	we have to "pretend" to set it.
+			 *	we have to "pretend" to set it.
 			 * inlen == 0 implies that there is no value part
-			 * 	in T_CHECK request and just validation
+			 *	in T_CHECK request and just validation
 			 * done elsewhere should be enough, we just return here.
 			 */
 			if (inlen == 0) {
@@ -1063,6 +1064,7 @@ rts_wput_other(queue_t *q, mblk_t *mp)
 		default:
 			break;
 		}
+		break;
 	case M_IOCDATA:
 		rts_wput_iocdata(q, mp);
 		return;
@@ -1349,7 +1351,7 @@ static int
 rts_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
     void *optvalp, socklen_t *optlen, cred_t *cr)
 {
-	conn_t  	*connp = (conn_t *)proto_handle;
+	conn_t		*connp = (conn_t *)proto_handle;
 	rts_t		*rts = connp->conn_rts;
 	int		error;
 	t_uscalar_t	max_optbuf_len;
