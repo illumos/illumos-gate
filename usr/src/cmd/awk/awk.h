@@ -338,6 +338,7 @@ extern	void	FATAL(const char *, ...) __attribute__((__noreturn__));
 extern	void	WARNING(const char *, ...);
 extern	void	error(void);
 extern	void	nextfile(void);
+extern	void	savefs(void);
 
 extern	int	isclvar(const char *);
 extern	int	is_number(const char *);

@@ -144,6 +144,23 @@ initgetrec(void)
 	infile = stdin;		/* no filenames, so use stdin */
 }
 
+/*
+ * POSIX specifies that fields are supposed to be evaluated as if they were
+ * split using the value of FS at the time that the record's value ($0) was
+ * read.
+ *
+ * Since field-splitting is done lazily, we save the current value of FS
+ * whenever a new record is read in (implicitly or via getline), or when
+ * a new value is assigned to $0.
+ */
+void
+savefs(void)
+{
+	if (strlen(getsval(fsloc)) >= sizeof (inputFS))
+		FATAL("field separator %.10s... is too long", *FS);
+	(void) strcpy(inputFS, *FS);
+}
+
 static int firsttime = 1;
 
 /*
@@ -167,6 +184,7 @@ getrec(char **pbuf, size_t *pbufsize, int isrecord)
 	if (isrecord) {
 		donefld = 0;
 		donerec = 1;
+		savefs();
 	}
 	saveb0 = buf[0];
 	buf[0] = '\0';
@@ -242,9 +260,6 @@ readrec(char **pbuf, size_t *pbufsize, FILE *inf)	/* read one record into buf */
 	size_t bufsize = *pbufsize;
 	char *rs = getsval(rsloc);
 
-	if (strlen(getsval(fsloc)) >= sizeof (inputFS))
-		FATAL("field separator %.10s... is too long", *FS);
-	(void) strcpy(inputFS, *FS);	/* for subsequent field splitting */
 	if ((sep = *rs) == 0) {
 		sep = '\n';
 		/* skip leading \n's */
@@ -342,9 +357,6 @@ fldbld(void)	/* create fields from current record */
 	fr = fields;
 
 	i = 0;	/* number of fields accumulated here */
-	if (strlen(getsval(fsloc)) >= sizeof (inputFS))
-		FATAL("field separator %.10s... is too long", *FS);
-	(void) strcpy(inputFS, *FS);
 	if (strlen(inputFS) > 1) {	/* it's a regular expression */
 		i = refldbld(r, inputFS);
 	} else if ((sep = *inputFS) == ' ') {	/* default whitespace */
