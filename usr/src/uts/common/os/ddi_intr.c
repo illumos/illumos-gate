@@ -1333,7 +1333,9 @@ ddi_add_intr(dev_info_t *dip, uint_t inumber,
 	size_t			hdl_sz;
 	int			actual, ret;
 	uint_t			pri;
+	ddi_intr_handler_t	*handler;
 
+	handler = (ddi_intr_handler_t *)(uintptr_t)int_handler;
 	DDI_INTR_APIDBG((CE_CONT, "ddi_add_intr: name=%s%d dip=0x%p "
 	    "inum=0x%x\n", ddi_driver_name(dip), ddi_get_instance(dip),
 	    (void *)dip, inumber));
@@ -1357,8 +1359,8 @@ ddi_add_intr(dev_info_t *dip, uint_t inumber,
 		return (DDI_FAILURE);
 	}
 
-	if ((ret = ddi_intr_add_handler(hdl_p[inumber], (ddi_intr_handler_t *)
-	    int_handler, int_handler_arg, NULL)) != DDI_SUCCESS) {
+	if ((ret = ddi_intr_add_handler(hdl_p[inumber], handler,
+	    int_handler_arg, NULL)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_add_intr: "
 		    "ddi_intr_add_handler failed, ret 0x%x\n", ret));
 		(void) ddi_intr_free(hdl_p[inumber]);
@@ -1469,7 +1471,9 @@ ddi_add_softintr(dev_info_t *dip, int preference, ddi_softintr_t *idp,
 	ddi_softint_handle_t	*hdl_p;
 	uint64_t		softpri;
 	int			ret;
+	ddi_intr_handler_t	*handler;
 
+	handler = (ddi_intr_handler_t *)(uintptr_t)int_handler;
 	DDI_INTR_APIDBG((CE_CONT, "ddi_add_softintr: name=%s%d dip=0x%p "
 	    "pref=0x%x\n", ddi_driver_name(dip), ddi_get_instance(dip),
 	    (void *)dip, preference));
@@ -1492,8 +1496,7 @@ ddi_add_softintr(dev_info_t *dip, int preference, ddi_softintr_t *idp,
 
 	hdl_p = kmem_zalloc(sizeof (ddi_softint_handle_t), KM_SLEEP);
 	if ((ret = ddi_intr_add_softint(dip, hdl_p, softpri,
-	    (ddi_intr_handler_t *)int_handler, int_handler_arg)) !=
-	    DDI_SUCCESS) {
+	    handler, int_handler_arg)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_add_softintr: "
 		    "ddi_intr_add_softint failed, ret 0x%x\n", ret));
 
