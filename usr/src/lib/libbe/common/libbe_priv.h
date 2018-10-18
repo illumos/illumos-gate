@@ -24,6 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2015 by Delphix. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_LIBBE_PRIV_H
@@ -89,7 +90,7 @@ typedef struct be_transaction_data {
 	char		*obe_zpool;	/* Original BE pool */
 	char		*obe_snap_name;	/* Original BE snapshot name */
 	char		*obe_altroot;	/* Original BE altroot */
-	char 		*nbe_name;	/* New BE name */
+	char		*nbe_name;	/* New BE name */
 	char		*nbe_root_ds;	/* New BE root dataset */
 	char		*nbe_zpool;	/* New BE pool */
 	char		*nbe_desc;	/* New BE description */
@@ -151,7 +152,7 @@ int be_set_uuid(char *);
 int be_get_uuid(const char *, uuid_t *);
 
 /* be_list.c */
-int _be_list(char *, be_node_list_t **);
+int _be_list(char *, be_node_list_t **, uint64_t);
 int be_get_zone_be_list(char *, char *, be_node_list_t **);
 
 /* be_mount.c */

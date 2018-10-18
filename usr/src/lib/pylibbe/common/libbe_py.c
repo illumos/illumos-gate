@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <Python.h>
@@ -49,7 +50,7 @@ enum {
 
 PyObject *beCreateSnapshot(PyObject *, PyObject *);
 PyObject *beCopy(PyObject *, PyObject *);
-PyObject *beList(PyObject *, PyObject *);
+PyObject *beList(PyObject *, PyObject *, PyObject *);
 PyObject *beActivate(PyObject *, PyObject *);
 PyObject *beDestroy(PyObject *, PyObject *);
 PyObject *beDestroySnapshot(PyObject *, PyObject *);
@@ -269,7 +270,8 @@ beCopy(PyObject *self, PyObject *args)
  *              to gather information about Boot Environments
  * Parameters:
  *   args -     pointer to a python object containing:
- *     beName - The name of the BE to list (optional)
+ *     bename  - The name of the BE to list (optional)
+ *     nosnaps - boolean indicating whether to exclude snapshots (optional)
  *
  * Returns a pointer to a python object. That Python object will consist of
  * the return code and a list of Dicts or NULL.
@@ -280,14 +282,18 @@ beCopy(PyObject *self, PyObject *args)
  */
 /* ARGSUSED */
 PyObject *
-beList(PyObject *self, PyObject *args)
+beList(PyObject *self, PyObject *args, PyObject *keywds)
 {
 	char	*beName = NULL;
+	int	noSnaps = 0;
 	int	ret = BE_PY_SUCCESS;
 	be_node_list_t *list = NULL;
 	be_node_list_t *be = NULL;
 	PyObject *dict = NULL;
 	PyObject *listOfDicts = NULL;
+	uint64_t listopts = BE_LIST_SNAPSHOTS;
+
+	static char *kwlist[] = {"bename", "nosnaps", NULL};
 
 	if ((listOfDicts = PyList_New(0)) == NULL) {
 		ret = BE_PY_ERR_DICT;
@@ -295,12 +301,16 @@ beList(PyObject *self, PyObject *args)
 		goto done;
 	}
 
-	if (!PyArg_ParseTuple(args, "|z", &beName)) {
+	if (!PyArg_ParseTupleAndKeywords(args, keywds, "|zi",
+	    kwlist, &beName, &noSnaps)) {
 		ret = BE_PY_ERR_PARSETUPLE;
 		goto done;
 	}
 
-	if ((ret = be_list(beName, &list)) != BE_SUCCESS) {
+	if (noSnaps)
+		listopts &= ~BE_LIST_SNAPSHOTS;
+
+	if ((ret = be_list(beName, &list, listopts)) != BE_SUCCESS) {
 		goto done;
 	}
 
@@ -641,7 +651,7 @@ beMount(PyObject *self, PyObject *args)
 PyObject *
 beUnmount(PyObject *self, PyObject *args)
 {
-	char 		*beName = NULL;
+	char		*beName = NULL;
 	int		force_unmount = 0;
 	int		unmount_flags = 0;
 	int		ret = BE_PY_SUCCESS;
@@ -1079,7 +1089,8 @@ static struct PyMethodDef libbeMethods[] = {
 	    "Destroy a snapshot."},
 	{"beMount", (PyCFunction)beMount, METH_VARARGS, "Mount a BE."},
 	{"beUnmount", (PyCFunction)beUnmount, METH_VARARGS, "Unmount a BE."},
-	{"beList", (PyCFunction)beList, METH_VARARGS, "List BE info."},
+	{"beList", (PyCFunction)beList, METH_VARARGS | METH_KEYWORDS,
+	    "List BE info."},
 	{"beRename", (PyCFunction)beRename, METH_VARARGS, "Rename a BE."},
 	{"beActivate", (PyCFunction)beActivate, METH_VARARGS, "Activate a BE."},
 	{"beRollback", (PyCFunction)beRollback, METH_VARARGS, "Rollback a BE."},

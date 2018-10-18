@@ -1137,7 +1137,7 @@ install_bootloader(void)
 			goto done;
 		}
 
-		if (be_list(NULL, &be_nodes) != BE_SUCCESS) {
+		if (be_list(NULL, &be_nodes, BE_LIST_DEFAULT) != BE_SUCCESS) {
 			bam_error(_("No BE's found\n"));
 			goto done;
 		}
@@ -1197,7 +1197,7 @@ install_bootloader(void)
 		}
 	}
 
-	if (be_list(NULL, &be_nodes) != BE_SUCCESS) {
+	if (be_list(NULL, &be_nodes, BE_LIST_DEFAULT) != BE_SUCCESS) {
 		bam_error(_("No BE's found\n"));
 		ret = BAM_ERROR;
 		goto done;
@@ -3312,7 +3312,7 @@ is_be(char *root)
 	/*
 	 * Check if the current dataset is BE
 	 */
-	if (be_list(NULL, &be_nodes) == BE_SUCCESS) {
+	if (be_list(NULL, &be_nodes, BE_LIST_DEFAULT) == BE_SUCCESS) {
 		for (cur_be = be_nodes; cur_be != NULL;
 		    cur_be = cur_be->be_next_node) {
 

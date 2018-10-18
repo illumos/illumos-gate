@@ -27,6 +27,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2015 Gary Mills
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _LIBBE_H
@@ -103,7 +104,7 @@ enum {
 	BE_ERR_INVALMOUNTPOINT,	/* Unexpected mountpoint */
 	BE_ERR_MOUNT,		/* mount failed */
 	BE_ERR_MOUNTED,		/* already mounted */
-	BE_ERR_NAMETOOLONG, 	/* name > BUFSIZ */
+	BE_ERR_NAMETOOLONG,	/* name > BUFSIZ */
 	BE_ERR_NOENT,		/* Doesn't exist */
 	BE_ERR_POOL_NOENT,	/* No such pool */
 	BE_ERR_NODEV,		/* No such device */
@@ -213,6 +214,11 @@ typedef struct be_node_list {
 #define	BE_INSTALLBOOT_FLAG_FORCE	0x00000002
 #define	BE_INSTALLBOOT_FLAG_VERBOSE	0x00000004
 
+/* Flags for be_list() */
+#define	BE_LIST_DEFAULT			0x00000000
+#define	BE_LIST_SNAPSHOTS		0x00000001
+#define	BE_LIST_ALL			BE_LIST_SNAPSHOTS
+
 /* sort rules for be_sort() */
 typedef enum {
 	BE_SORT_UNSPECIFIED = -1,
@@ -247,7 +253,7 @@ int be_rollback(nvlist_t *);
 /*
  * Functions for listing and getting information about existing BEs.
  */
-int be_list(char *, be_node_list_t **);
+int be_list(char *, be_node_list_t **, uint64_t);
 void be_free_list(be_node_list_t *);
 int be_max_avail(char *, uint64_t *);
 char *be_err_to_str(int);
