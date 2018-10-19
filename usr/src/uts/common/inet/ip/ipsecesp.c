@@ -107,7 +107,8 @@ static	ipsecespparam_t	lcl_param_arr[] = {
 
 static int ipsecesp_open(queue_t *, dev_t *, int, int, cred_t *);
 static int ipsecesp_close(queue_t *, int, cred_t *);
-static void ipsecesp_wput(queue_t *, mblk_t *);
+static int ipsecesp_rput(queue_t *, mblk_t *);
+static int ipsecesp_wput(queue_t *, mblk_t *);
 static void	*ipsecesp_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecesp_stack_fini(netstackid_t stackid, void *arg);
 
@@ -132,12 +133,12 @@ static struct module_info info = {
 };
 
 static struct qinit rinit = {
-	(pfi_t)putnext, NULL, ipsecesp_open, ipsecesp_close, NULL, &info,
+	ipsecesp_rput, NULL, ipsecesp_open, ipsecesp_close, NULL, &info,
 	NULL
 };
 
 static struct qinit winit = {
-	(pfi_t)ipsecesp_wput, NULL, ipsecesp_open, ipsecesp_close, NULL, &info,
+	ipsecesp_wput, NULL, ipsecesp_open, ipsecesp_close, NULL, &info,
 	NULL
 };
 
@@ -1801,7 +1802,7 @@ esp_crypto_failed(mblk_t *data_mp, boolean_t is_inbound, int kef_rc,
 		(data)->cd_offset = off;				\
 	} else {							\
 		(data)->cd_format = CRYPTO_DATA_MBLK;			\
-		(data)->cd_mp = mp;			       		\
+		(data)->cd_mp = mp;					\
 		(data)->cd_offset = off;				\
 	}								\
 	(data)->cd_length = len;					\
@@ -3839,9 +3840,19 @@ esp_keysock_no_socket(mblk_t *mp, ipsecesp_stack_t *espstack)
 }
 
 /*
+ * ESP module read put routine.
+ */
+static int
+ipsecesp_rput(queue_t *q, mblk_t *mp)
+{
+	putnext(q, mp);
+	return (0);
+}
+
+/*
  * ESP module write put routine.
  */
-static void
+static int
 ipsecesp_wput(queue_t *q, mblk_t *mp)
 {
 	ipsec_info_t *ii;
@@ -3891,7 +3902,7 @@ ipsecesp_wput(queue_t *q, mblk_t *mp)
 		case ND_GET:
 			if (nd_getset(q, espstack->ipsecesp_g_nd, mp)) {
 				qreply(q, mp);
-				return;
+				return (0);
 			} else {
 				iocp->ioc_error = ENOENT;
 			}
@@ -3905,7 +3916,7 @@ ipsecesp_wput(queue_t *q, mblk_t *mp)
 			iocp->ioc_count = 0;
 			mp->b_datap->db_type = M_IOCACK;
 			qreply(q, mp);
-			return;
+			return (0);
 		}
 	default:
 		esp3dbg(espstack,
@@ -3913,6 +3924,7 @@ ipsecesp_wput(queue_t *q, mblk_t *mp)
 		    mp->b_datap->db_type));
 		putnext(q, mp);
 	}
+	return (0);
 }
 
 /*
