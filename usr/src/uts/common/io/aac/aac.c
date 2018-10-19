@@ -255,8 +255,8 @@ static int aac_add_intrs(struct aac_softstate *);
 static void aac_remove_intrs(struct aac_softstate *);
 static int aac_enable_intrs(struct aac_softstate *);
 static int aac_disable_intrs(struct aac_softstate *);
-static uint_t aac_intr_old(caddr_t);
-static uint_t aac_intr_new(caddr_t);
+static uint_t aac_intr_old(caddr_t, caddr_t);
+static uint_t aac_intr_new(caddr_t, caddr_t);
 static uint_t aac_softintr(caddr_t);
 
 /*
@@ -1416,7 +1416,7 @@ aac_process_intr_new(struct aac_softstate *softs)
 }
 
 static uint_t
-aac_intr_new(caddr_t arg)
+aac_intr_new(caddr_t arg, caddr_t arg1 __unused)
 {
 	struct aac_softstate *softs = (void *)arg;
 	uint_t rval;
@@ -1555,7 +1555,7 @@ aac_process_intr_old(struct aac_softstate *softs)
 }
 
 static uint_t
-aac_intr_old(caddr_t arg)
+aac_intr_old(caddr_t arg, caddr_t arg1 __unused)
 {
 	struct aac_softstate *softs = (void *)arg;
 	int rval;
@@ -1674,7 +1674,7 @@ aac_add_intrs(struct aac_softstate *softs)
 	ddi_intr_handler_t *aac_intr;
 
 	actual = softs->intr_cnt;
-	aac_intr = (ddi_intr_handler_t *)((softs->flags & AAC_FLAGS_NEW_COMM) ?
+	aac_intr = ((softs->flags & AAC_FLAGS_NEW_COMM) ?
 	    aac_intr_new : aac_intr_old);
 
 	/* Call ddi_intr_add_handler() */
