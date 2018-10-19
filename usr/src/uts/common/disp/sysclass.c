@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVr4.0 1.12 */
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -67,6 +65,7 @@ static int	sys_doprio(kthread_t *, cred_t *, int, int *);
 static void	sys_forkret(kthread_t *, kthread_t *);
 static void	sys_nullsys();
 static pri_t	sys_swappri(kthread_t *, int);
+static pri_t	sys_globpri(kthread_t *);
 static int	sys_alloc(void **, int);
 
 struct classfuncs sys_classfuncs = {
@@ -104,7 +103,7 @@ struct classfuncs sys_classfuncs = {
 		sys_nullsys,	/* tick */
 		setbackdq,	/* wakeup */
 		sys_donice,
-		(pri_t (*)())sys_nosys,	/* globpri */
+		sys_globpri,	/* globpri */
 		sys_nullsys,	/* set_process_group */
 		sys_nullsys,	/* yield */
 		sys_doprio,
@@ -199,6 +198,13 @@ static pri_t
 sys_swappri(t, flags)
 	kthread_t	*t;
 	int		flags;
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+static pri_t
+sys_globpri(kthread_t *t __unused)
 {
 	return (-1);
 }
