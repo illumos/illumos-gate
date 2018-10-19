@@ -146,9 +146,9 @@ static	keysockparam_t	lcl_param_arr[] = {
 
 static int keysock_close(queue_t *, int, cred_t *);
 static int keysock_open(queue_t *, dev_t *, int, int, cred_t *);
-static void keysock_wput(queue_t *, mblk_t *);
-static void keysock_rput(queue_t *, mblk_t *);
-static void keysock_rsrv(queue_t *);
+static int keysock_wput(queue_t *, mblk_t *);
+static int keysock_rput(queue_t *, mblk_t *);
+static int keysock_rsrv(queue_t *);
 static void keysock_passup(mblk_t *, sadb_msg_t *, minor_t,
     keysock_consumer_t *, boolean_t, keysock_stack_t *);
 static void *keysock_stack_init(netstackid_t stackid, netstack_t *ns);
@@ -159,12 +159,12 @@ static struct module_info info = {
 };
 
 static struct qinit rinit = {
-	(pfi_t)keysock_rput, (pfi_t)keysock_rsrv, keysock_open, keysock_close,
+	keysock_rput, keysock_rsrv, keysock_open, keysock_close,
 	NULL, &info
 };
 
 static struct qinit winit = {
-	(pfi_t)keysock_wput, NULL, NULL, NULL, NULL, &info
+	keysock_wput, NULL, NULL, NULL, NULL, &info
 };
 
 struct streamtab keysockinfo = {
@@ -1916,7 +1916,7 @@ keysock_parse(queue_t *q, mblk_t *mp)
  * as PF_KEY sockets are concerned.  I do some conversion, but not as much
  * as IP/rts does.
  */
-static void
+static int
 keysock_wput(queue_t *q, mblk_t *mp)
 {
 	uchar_t *rptr = mp->b_rptr;
@@ -1937,7 +1937,7 @@ keysock_wput(queue_t *q, mblk_t *mp)
 		ks1dbg(keystack, ("Huh?  wput for an consumer instance (%d)?\n",
 		    kc->kc_sa_type));
 		putnext(q, mp);
-		return;
+		return (0);
 	}
 	ks = (keysock_t *)q->q_ptr;
 	keystack = ks->keysock_keystack;
@@ -1951,7 +1951,7 @@ keysock_wput(queue_t *q, mblk_t *mp)
 		 */
 		ks2dbg(keystack, ("raw M_DATA in keysock.\n"));
 		freemsg(mp);
-		return;
+		return (0);
 	case M_PROTO:
 	case M_PCPROTO:
 		if ((mp->b_wptr - rptr) >= sizeof (struct T_data_req)) {
@@ -1961,7 +1961,7 @@ keysock_wput(queue_t *q, mblk_t *mp)
 					ks2dbg(keystack,
 					    ("No data after DATA_REQ.\n"));
 					freemsg(mp);
-					return;
+					return (0);
 				}
 				freeb(mp);
 				mp = mp1;
@@ -1974,11 +1974,12 @@ keysock_wput(queue_t *q, mblk_t *mp)
 		ks3dbg(keystack, ("In default wput case (%d %d).\n",
 		    mp->b_datap->db_type, ((union T_primitives *)rptr)->type));
 		keysock_wput_other(q, mp);
-		return;
+		return (0);
 	}
 
 	/* I now have a PF_KEY message in an M_DATA block, pointed to by mp. */
 	keysock_parse(q, mp);
+	return (0);
 }
 
 /* BELOW THIS LINE ARE ROUTINES INCLUDING AND RELATED TO keysock_rput(). */
@@ -2329,7 +2330,7 @@ error:
  * Keysock's read service procedure is there only for PF_KEY reply
  * messages that really need to reach the top.
  */
-static void
+static int
 keysock_rsrv(queue_t *q)
 {
 	mblk_t *mp;
@@ -2339,9 +2340,10 @@ keysock_rsrv(queue_t *q)
 			putnext(q, mp);
 		} else {
 			(void) putbq(q, mp);
-			return;
+			return (0);
 		}
 	}
+	return (0);
 }
 
 /*
@@ -2349,7 +2351,7 @@ keysock_rsrv(queue_t *q)
  * ESP, AH, etc.  I should only see KEYSOCK_OUT and KEYSOCK_HELLO_ACK
  * messages on my read queues.
  */
-static void
+static int
 keysock_rput(queue_t *q, mblk_t *mp)
 {
 	keysock_consumer_t *kc = (keysock_consumer_t *)q->q_ptr;
@@ -2374,7 +2376,7 @@ keysock_rput(queue_t *q, mblk_t *mp)
 		    ("Hmmm, a non M_CTL (%d, 0x%x) on keysock_rput.\n",
 		    mp->b_datap->db_type, mp->b_datap->db_type));
 		putnext(q, mp);
-		return;
+		return (0);
 	}
 
 	ii = (ipsec_info_t *)mp->b_rptr;
@@ -2418,7 +2420,7 @@ keysock_rput(queue_t *q, mblk_t *mp)
 				    ("One flush/dump message back from %d,"
 				    " more to go.\n", samsg->sadb_msg_satype));
 				freemsg(mp1);
-				return;
+				return (0);
 			}
 
 			samsg->sadb_msg_errno =
@@ -2429,18 +2431,19 @@ keysock_rput(queue_t *q, mblk_t *mp)
 		}
 		keysock_passup(mp1, samsg, serial, kc,
 		    (samsg->sadb_msg_type == SADB_DUMP), keystack);
-		return;
+		return (0);
 	case KEYSOCK_HELLO_ACK:
 		/* Aha, now we can link in the consumer! */
 		ksa = (keysock_hello_ack_t *)ii;
 		keysock_link_consumer(ksa->ks_hello_satype, kc);
 		freemsg(mp);
-		return;
+		return (0);
 	default:
 		ks1dbg(keystack, ("Hmmm, an IPsec info I'm not used to, 0x%x\n",
 		    ii->ipsec_info_type));
 		putnext(q, mp);
 	}
+	return (0);
 }
 
 /*
