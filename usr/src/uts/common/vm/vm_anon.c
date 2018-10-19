@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -512,9 +512,8 @@ anon_set_ptr(struct anon_hdr *ahp, ulong_t an_idx, struct anon *ap, int flags)
  * Copy anon array into a given new anon array
  */
 int
-anon_copy_ptr(struct anon_hdr *sahp, ulong_t s_idx,
-	struct anon_hdr *dahp, ulong_t d_idx,
-	pgcnt_t npages, int flags)
+anon_copy_ptr(struct anon_hdr *sahp, ulong_t s_idx, struct anon_hdr *dahp,
+    ulong_t d_idx, pgcnt_t npages, int flags)
 {
 	void **sapp, **dapp;
 	void *ap;
@@ -770,9 +769,9 @@ set_anoninfo(void)
  * reserve swap space, we need to check memory-based as well
  * as disk-backed (physical) swap.  The following algorithm
  * is used:
- * 	Check the space on physical swap
- * 		i.e. amount needed < ani_max - ani_phys_resv
- * 	If we are swapping on swapfs check
+ *	Check the space on physical swap
+ *		i.e. amount needed < ani_max - ani_phys_resv
+ *	If we are swapping on swapfs check
  *		amount needed < (availrmem - swapfs_minfree)
  * Since the algorithm to check for the quantity of swap space is
  * almost the same as that for reserving it, we'll just use anon_resvmem
@@ -1273,7 +1272,8 @@ anon_decref_pages(
 					if (ap->an_pvp != NULL &&
 					    !vn_matchopval(ap->an_pvp,
 					    VOPNAME_DISPOSE,
-					    (fs_generic_func_p)fs_dispose))
+					    (fs_generic_func_p)(uintptr_t)
+					    fs_dispose))
 						dispose = 1;
 				}
 				for (j = i; j < i + curpgcnt; j++) {
@@ -1339,7 +1339,7 @@ anon_decref_pages(
  */
 void
 anon_dup(struct anon_hdr *old, ulong_t old_idx, struct anon_hdr *new,
-			ulong_t new_idx, size_t size)
+    ulong_t new_idx, size_t size)
 {
 	spgcnt_t npages;
 	kmutex_t *ahm;
@@ -3205,7 +3205,7 @@ anon_map_demotepages(
 	pgcnt_t		i, pg_idx;
 	ulong_t		an_idx;
 	caddr_t		vaddr;
-	int 		err;
+	int		err;
 	int		retry = 0;
 	uint_t		vpprot;
 
@@ -3453,7 +3453,7 @@ anonmap_free(struct anon_map *amp)
  */
 int
 non_anon(struct anon_hdr *ahp, ulong_t anon_idx, u_offset_t *offp,
-				size_t *lenp)
+    size_t *lenp)
 {
 	ulong_t i, el;
 	ssize_t low, high;
@@ -3571,7 +3571,7 @@ ulong_t *
 anon_get_slot(struct anon_hdr *ahp, ulong_t an_idx)
 {
 	struct anon	**app;
-	void 		**ppp;
+	void		**ppp;
 
 	ASSERT(an_idx < ahp->size);
 
@@ -3630,7 +3630,7 @@ anon_array_enter(struct anon_map *amp, ulong_t an_idx, anon_sync_obj_t *sobj)
 
 int
 anon_array_try_enter(struct anon_map *amp, ulong_t an_idx,
-			anon_sync_obj_t *sobj)
+    anon_sync_obj_t *sobj)
 {
 	ulong_t		*ap_slot;
 	kmutex_t	*mtx;
