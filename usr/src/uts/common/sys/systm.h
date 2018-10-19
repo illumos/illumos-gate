@@ -327,11 +327,11 @@ extern void param_check(void);
 /*
  * Structure of the system-entry table.
  *
- * 	Changes to struct sysent should maintain binary compatibility with
+ *	Changes to struct sysent should maintain binary compatibility with
  *	loadable system calls, although the interface is currently private.
  *
  *	This means it should only be expanded on the end, and flag values
- * 	should not be reused.
+ *	should not be reused.
  *
  *	It is desirable to keep the size of this struct a power of 2 for quick
  *	indexing.
@@ -355,14 +355,14 @@ extern struct sysent	sysent32[];
 
 extern struct sysent	nosys_ent;	/* entry for invalid system call */
 
-#define	NSYSCALL 	256		/* number of system calls */
+#define	NSYSCALL	256		/* number of system calls */
 
 #define	LOADABLE_SYSCALL(s)	(s->sy_flags & SE_LOADABLE)
 #define	LOADED_SYSCALL(s)	(s->sy_flags & SE_LOADED)
 
 /*
  * sy_flags values
- * 	Values 1, 2, and 4 were used previously for SETJUMP, ASYNC, and IOSYS.
+ *	Values 1, 2, and 4 were used previously for SETJUMP, ASYNC, and IOSYS.
  */
 #define	SE_32RVAL1	0x0		/* handler returns int32_t in rval1 */
 #define	SE_32RVAL2	0x1		/* handler returns int32_t in rval2 */
@@ -408,6 +408,7 @@ extern uint_t set_errno(uint_t error);
 extern int64_t syscall_ap(void);
 extern int64_t loadable_syscall(long, long, long, long, long, long, long, long);
 extern int64_t nosys(void);
+extern int nosys32(void);
 
 extern void swtch(void);
 
