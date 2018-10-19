@@ -220,8 +220,8 @@ static struct qinit bridge_dld_rinit = {
 };
 
 static struct qinit bridge_dld_winit = {
-	(int (*)())dld_wput,	/* qi_putp */
-	(int (*)())dld_wsrv,	/* qi_srvp */
+	dld_wput,		/* qi_putp */
+	dld_wsrv,		/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -3303,7 +3303,7 @@ bridge_ioctl(queue_t *wq, mblk_t *mp)
 		miocnak(wq, mp, 0, rc);
 }
 
-static void
+static int
 bridge_wput(queue_t *wq, mblk_t *mp)
 {
 	switch (DB_TYPE(mp)) {
@@ -3322,6 +3322,7 @@ bridge_wput(queue_t *wq, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
+	return (0);
 }
 
 /*
@@ -3425,7 +3426,7 @@ bridge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 /* ARGSUSED */
 static int
 bridge_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
 	int	rc;
 

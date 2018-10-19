@@ -394,7 +394,7 @@ dld_close(queue_t *rq, int flags __unused, cred_t *credp __unused)
 /*
  * qi_qputp: put(9e)
  */
-void
+int
 dld_wput(queue_t *wq, mblk_t *mp)
 {
 	dld_str_t *dsp = (dld_str_t *)wq->q_ptr;
@@ -463,17 +463,19 @@ dld_wput(queue_t *wq, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
+	return (0);
 }
 
 /*
  * qi_srvp: srv(9e)
  */
-void
+int
 dld_wsrv(queue_t *wq)
 {
 	dld_str_t	*dsp = wq->q_ptr;
 
 	DLD_CLRQFULL(dsp);
+	return (0);
 }
 
 void
