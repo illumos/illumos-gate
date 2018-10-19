@@ -27,7 +27,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -145,7 +145,7 @@ static uint_t		vsd_nkeys;	 /* size of destructor array */
 /* list of vsd_node's */
 static list_t *vsd_list = NULL;
 /* per-key destructor funcs */
-static void 		(**vsd_destructor)(void *);
+static void		(**vsd_destructor)(void *);
 
 /*
  * The following is the common set of actions needed to update the
@@ -303,8 +303,8 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 	    fs_rwlock, fs_rwlock,
 
 	VOPNAME_RWUNLOCK, offsetof(struct vnodeops, vop_rwunlock),
-	    (fs_generic_func_p) fs_rwunlock,
-	    (fs_generic_func_p) fs_rwunlock,	/* no errors allowed */
+	    (fs_generic_func_p)(uintptr_t)fs_rwunlock,
+	    (fs_generic_func_p)(uintptr_t)fs_rwunlock,	/* no errors allowed */
 
 	VOPNAME_SEEK, offsetof(struct vnodeops, vop_seek),
 	    fs_nosys, fs_nosys,
@@ -354,8 +354,8 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 	    fs_nosys, fs_nosys,
 
 	VOPNAME_DISPOSE, offsetof(struct vnodeops, vop_dispose),
-	    (fs_generic_func_p) fs_dispose,
-	    (fs_generic_func_p) fs_nodispose,
+	    (fs_generic_func_p)(uintptr_t)fs_dispose,
+	    (fs_generic_func_p)(uintptr_t)fs_nodispose,
 
 	VOPNAME_SETSECATTR, offsetof(struct vnodeops, vop_setsecattr),
 	    fs_nosys, fs_nosys,
