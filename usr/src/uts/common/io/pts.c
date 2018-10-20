@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 
@@ -128,9 +128,9 @@ int pts_debug = 0;
 
 static int ptsopen(queue_t *, dev_t *, int, int, cred_t *);
 static int ptsclose(queue_t *, int, cred_t *);
-static void ptswput(queue_t *, mblk_t *);
-static void ptsrsrv(queue_t *);
-static void ptswsrv(queue_t *);
+static int ptswput(queue_t *, mblk_t *);
+static int ptsrsrv(queue_t *);
+static int ptswsrv(queue_t *);
 
 /*
  * Slave Stream Pseudo Terminal Module: stream data structure definitions
@@ -146,7 +146,7 @@ static struct module_info pts_info = {
 
 static struct qinit ptsrint = {
 	NULL,
-	(int (*)()) ptsrsrv,
+	ptsrsrv,
 	ptsopen,
 	ptsclose,
 	NULL,
@@ -155,8 +155,8 @@ static struct qinit ptsrint = {
 };
 
 static struct qinit ptswint = {
-	(int (*)()) ptswput,
-	(int (*)()) ptswsrv,
+	ptswput,
+	ptswsrv,
 	NULL,
 	NULL,
 	NULL,
@@ -504,7 +504,7 @@ ptsclose(queue_t *rqp, int flag, cred_t *credp)
  * All other messages are queued and the write side
  * service procedure sends them off to the master side.
  */
-static void
+static int
 ptswput(queue_t *qp, mblk_t *mp)
 {
 	struct pt_ttys *ptsp;
@@ -530,7 +530,7 @@ ptswput(queue_t *qp, mblk_t *mp)
 		} else
 			freemsg(mp);
 		PT_EXIT_READ(ptsp);
-		return;
+		return (0);
 	}
 
 	if (type >= QPCTL) {
@@ -606,7 +606,7 @@ ptswput(queue_t *qp, mblk_t *mp)
 		break;
 		}
 		PT_EXIT_READ(ptsp);
-		return;
+		return (0);
 	}
 
 	switch (type) {
@@ -637,9 +637,9 @@ ptswput(queue_t *qp, mblk_t *mp)
 			iocp->ioc_count = 0;
 			qreply(qp, mp);
 			PT_EXIT_READ(ptsp);
-			return;
+			return (0);
 		}
-
+		/* FALLTHROUGH */
 	default:
 		/*
 		 * send other messages to the master
@@ -651,6 +651,7 @@ ptswput(queue_t *qp, mblk_t *mp)
 
 	PT_EXIT_READ(ptsp);
 	DBG(("return from ptswput()\n"));
+	return (0);
 }
 
 
@@ -659,7 +660,7 @@ ptswput(queue_t *qp, mblk_t *mp)
  * master to send any messages queued on its write side to
  * the read side of this slave.
  */
-static void
+static int
 ptsrsrv(queue_t *qp)
 {
 	struct pt_ttys *ptsp;
@@ -672,11 +673,12 @@ ptsrsrv(queue_t *qp)
 	if (ptsp->ptm_rdq == NULL) {
 		DBG(("in read srv proc but no master\n"));
 		PT_EXIT_READ(ptsp);
-		return;
+		return (0);
 	}
 	qenable(WR(ptsp->ptm_rdq));
 	PT_EXIT_READ(ptsp);
 	DBG(("leaving ptsrsrv\n"));
+	return (0);
 }
 
 /*
@@ -685,7 +687,7 @@ ptsrsrv(queue_t *qp)
  * cannot be sent, leave them on this queue. If priority
  * messages on this queue, send them to master no matter what.
  */
-static void
+static int
 ptswsrv(queue_t *qp)
 {
 	struct pt_ttys *ptsp;
@@ -715,7 +717,7 @@ ptswsrv(queue_t *qp)
 				freemsg(mp);
 		}
 		PT_EXIT_READ(ptsp);
-		return;
+		return (0);
 	} else {
 		ptm_rdq = ptsp->ptm_rdq;
 	}
@@ -743,4 +745,5 @@ ptswsrv(queue_t *qp)
 	}
 	DBG(("leaving ptswsrv\n"));
 	PT_EXIT_READ(ptsp);
+	return (0);
 }
