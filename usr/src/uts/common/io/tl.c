@@ -404,9 +404,9 @@
 #define		TL_TICLTS	2	/* connectionless transport */
 #define		TL_UNUSED	3
 #define		TL_SOCKET	4	/* Socket */
-#define		TL_SOCK_COTS	(TL_SOCKET|TL_TICOTS)
-#define		TL_SOCK_COTSORD	(TL_SOCKET|TL_TICOTSORD)
-#define		TL_SOCK_CLTS	(TL_SOCKET|TL_TICLTS)
+#define		TL_SOCK_COTS	(TL_SOCKET | TL_TICOTS)
+#define		TL_SOCK_COTSORD	(TL_SOCKET | TL_TICOTSORD)
+#define		TL_SOCK_CLTS	(TL_SOCKET | TL_TICLTS)
 
 #define		TL_MINOR_MASK	0x7
 #define		TL_MINOR_START	(TL_TICLTS + 1)
@@ -430,9 +430,9 @@ extern	char	ti_statetbl[TE_NOEVENTS][TS_NOSTATES];
  */
 static int tl_open(queue_t *, dev_t *, int, int, cred_t *);
 static int tl_close(queue_t *, int, cred_t *);
-static void tl_wput(queue_t *, mblk_t *);
-static void tl_wsrv(queue_t *);
-static void tl_rsrv(queue_t *);
+static int tl_wput(queue_t *, mblk_t *);
+static int tl_wsrv(queue_t *);
+static int tl_rsrv(queue_t *);
 
 static int tl_attach(dev_info_t *, ddi_attach_cmd_t);
 static int tl_detach(dev_info_t *, ddi_detach_cmd_t);
@@ -709,7 +709,7 @@ static	struct	module_info	tl_minfo = {
 
 static	struct	qinit	tl_rinit = {
 	NULL,			/* qi_putp */
-	(int (*)())tl_rsrv,	/* qi_srvp */
+	tl_rsrv,		/* qi_srvp */
 	tl_open,		/* qi_qopen */
 	tl_close,		/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -718,8 +718,8 @@ static	struct	qinit	tl_rinit = {
 };
 
 static	struct	qinit	tl_winit = {
-	(int (*)())tl_wput,	/* qi_putp */
-	(int (*)())tl_wsrv,	/* qi_srvp */
+	tl_wput,		/* qi_putp */
+	tl_wsrv,		/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -757,8 +757,8 @@ static struct modlinkage modlinkage = {
  * Check sanity of unlimited connect data etc.
  */
 
-#define		TL_CLTS_PROVIDER_FLAG	(XPG4_1|SENDZERO)
-#define		TL_COTS_PROVIDER_FLAG	(XPG4_1|SENDZERO)
+#define		TL_CLTS_PROVIDER_FLAG	(XPG4_1 | SENDZERO)
+#define		TL_COTS_PROVIDER_FLAG	(XPG4_1 | SENDZERO)
 
 static struct T_info_ack tl_cots_info_ack =
 	{
@@ -832,7 +832,7 @@ static void tl_do_proto(mblk_t *, tl_endpt_t *);
 static void tl_do_ioctl(mblk_t *, tl_endpt_t *);
 static void tl_do_ioctl_ser(mblk_t *, tl_endpt_t *);
 static void tl_error_ack(queue_t *, mblk_t *, t_scalar_t, t_scalar_t,
-	t_scalar_t);
+    t_scalar_t);
 static void tl_bind(mblk_t *, tl_endpt_t *);
 static void tl_bind_ser(mblk_t *, tl_endpt_t *);
 static void tl_ok_ack(queue_t *, mblk_t  *mp, t_scalar_t);
@@ -1123,7 +1123,7 @@ tl_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		break;
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)0;
+		*result = NULL;
 		retcode = DDI_SUCCESS;
 		break;
 
@@ -1189,7 +1189,7 @@ tl_free(tl_endpt_t *tep)
 	ASSERT(tep->te_wq == NULL);
 	ASSERT(tep->te_ser != NULL);
 	ASSERT(tep->te_ser_count == 0);
-	ASSERT(! (tep->te_flag & TL_ADDRHASHED));
+	ASSERT(!(tep->te_flag & TL_ADDRHASHED));
 
 	if (IS_SOCKET(tep)) {
 		ASSERT(tep->te_alen == TL_SOUX_ADDRLEN);
@@ -1376,7 +1376,7 @@ tl_hash_cmp_addr(mod_hash_key_t key1, mod_hash_key_t key2)
 	ASSERT(ap2->ta_alen > 0);
 #endif
 
-	return (! tl_eqaddr((tl_addr_t *)key1, (tl_addr_t *)key2));
+	return (!tl_eqaddr((tl_addr_t *)key1, (tl_addr_t *)key2));
 }
 
 /*
@@ -1389,7 +1389,7 @@ tl_noclose(tl_endpt_t *tep)
 	boolean_t rc = B_FALSE;
 
 	mutex_enter(&tep->te_closelock);
-	if (! tep->te_closing) {
+	if (!tep->te_closing) {
 		ASSERT(tep->te_closewait == 0);
 		tep->te_closewait++;
 		rc = B_TRUE;
@@ -1543,7 +1543,7 @@ tl_close(queue_t *rq, int flag,	cred_t *credp)
 	ASSERT(rc == 0 && tep == elp);
 	if ((rc != 0) || (tep != elp)) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_close:inconsistency in AI hash"));
 	}
 
@@ -1719,7 +1719,7 @@ tl_close_finish_ser(mblk_t *mp, tl_endpt_t *tep)
  *
  * The T_CONN_REQ is processed outside of serializer.
  */
-static void
+static int
 tl_wput(queue_t *wq, mblk_t *mp)
 {
 	tl_endpt_t		*tep = (tl_endpt_t *)wq->q_ptr;
@@ -1732,10 +1732,10 @@ tl_wput(queue_t *wq, mblk_t *mp)
 		/* Only valid for connection-oriented transports */
 		if (IS_CLTS(tep)) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_wput:M_DATA invalid for ticlts driver"));
 			tl_merror(wq, mp, EPROTO);
-			return;
+			return (0);
 		}
 		tl_proc = tl_wput_data_ser;
 		break;
@@ -1753,7 +1753,7 @@ tl_wput(queue_t *wq, mblk_t *mp)
 
 		default:
 			miocnak(wq, mp, 0, EINVAL);
-			return;
+			return (0);
 		}
 		break;
 
@@ -1771,15 +1771,15 @@ tl_wput(queue_t *wq, mblk_t *mp)
 		} else {
 			freemsg(mp);
 		}
-		return;
+		return (0);
 
 	case M_PROTO:
 		if (msz < sizeof (prim->type)) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_wput:M_PROTO data too short"));
 			tl_merror(wq, mp, EPROTO);
-			return;
+			return (0);
 		}
 		switch (prim->type) {
 		case T_OPTMGMT_REQ:
@@ -1796,7 +1796,7 @@ tl_wput(queue_t *wq, mblk_t *mp)
 			 * and is consistent with BSD socket behavior).
 			 */
 			tl_optmgmt(wq, mp);
-			return;
+			return (0);
 		case O_T_BIND_REQ:
 		case T_BIND_REQ:
 			tl_proc = tl_bind_ser;
@@ -1804,10 +1804,10 @@ tl_wput(queue_t *wq, mblk_t *mp)
 		case T_CONN_REQ:
 			if (IS_CLTS(tep)) {
 				tl_merror(wq, mp, EPROTO);
-				return;
+				return (0);
 			}
 			tl_conn_req(wq, mp);
-			return;
+			return (0);
 		case T_DATA_REQ:
 		case T_OPTDATA_REQ:
 		case T_EXDATA_REQ:
@@ -1818,7 +1818,7 @@ tl_wput(queue_t *wq, mblk_t *mp)
 			if (IS_COTS(tep) ||
 			    (msz < sizeof (struct T_unitdata_req))) {
 				tl_merror(wq, mp, EPROTO);
-				return;
+				return (0);
 			}
 			if ((tep->te_state == TS_IDLE) && !wq->q_first) {
 				tl_proc = tl_unitdata_ser;
@@ -1847,15 +1847,15 @@ tl_wput(queue_t *wq, mblk_t *mp)
 		 */
 		if (msz < sizeof (prim->type)) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_wput:M_PCROTO data too short"));
 			tl_merror(wq, mp, EPROTO);
-			return;
+			return (0);
 		}
 		switch (prim->type) {
 		case T_CAPABILITY_REQ:
 			tl_capability_req(mp, tep);
-			return;
+			return (0);
 		case T_INFO_REQ:
 			tl_proc = tl_info_req_ser;
 			break;
@@ -1865,17 +1865,17 @@ tl_wput(queue_t *wq, mblk_t *mp)
 
 		default:
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_wput:unknown TPI msg primitive"));
 			tl_merror(wq, mp, EPROTO);
-			return;
+			return (0);
 		}
 		break;
 	default:
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_wput:default:unexpected Streams message"));
 		freemsg(mp);
-		return;
+		return (0);
 	}
 
 	/*
@@ -1884,6 +1884,7 @@ tl_wput(queue_t *wq, mblk_t *mp)
 	ASSERT(tl_proc != NULL);
 	tl_refhold(tep);
 	tl_serializer_enter(tep, tl_proc, mp);
+	return (0);
 }
 
 /*
@@ -1989,7 +1990,7 @@ tl_wput_data_ser(mblk_t *mp, tl_endpt_t *tep)
  * messages that need processing may have arrived, so tl_wsrv repeats until
  * queue is empty or te_nowsrv is set.
  */
-static void
+static int
 tl_wsrv(queue_t *wq)
 {
 	tl_endpt_t *tep = (tl_endpt_t *)wq->q_ptr;
@@ -2012,6 +2013,7 @@ tl_wsrv(queue_t *wq)
 		cv_signal(&tep->te_srv_cv);
 		mutex_exit(&tep->te_srv_lock);
 	}
+	return (0);
 }
 
 /*
@@ -2060,7 +2062,7 @@ tl_wsrv_ser(mblk_t *ser_mp, tl_endpt_t *tep)
  * is possible that two instances of tl_rsrv will be running reusing the same
  * rsrv mblk.
  */
-static void
+static int
 tl_rsrv(queue_t *rq)
 {
 	tl_endpt_t *tep = (tl_endpt_t *)rq->q_ptr;
@@ -2079,6 +2081,7 @@ tl_rsrv(queue_t *rq)
 	}
 	cv_signal(&tep->te_srv_cv);
 	mutex_exit(&tep->te_srv_lock);
+	return (0);
 }
 
 /* ARGSUSED */
@@ -2173,7 +2176,7 @@ tl_do_proto(mblk_t *mp, tl_endpt_t *tep)
 		break;
 
 	case T_ORDREL_REQ:
-		if (! IS_COTSORD(tep)) {
+		if (!IS_COTSORD(tep)) {
 			tl_merror(tep->te_wq, mp, EPROTO);
 			break;
 		}
@@ -2201,7 +2204,7 @@ tl_do_proto(mblk_t *mp, tl_endpt_t *tep)
 static void
 tl_do_ioctl_ser(mblk_t *mp, tl_endpt_t *tep)
 {
-	if (! tep->te_closing)
+	if (!tep->te_closing)
 		tl_do_ioctl(mp, tep);
 	else
 		freemsg(mp);
@@ -2286,7 +2289,7 @@ tl_error_ack(queue_t *wq, mblk_t *mp, t_scalar_t tli_err,
 	    M_PCPROTO, T_ERROR_ACK);
 
 	if (ackmp == NULL) {
-		(void) (STRLOG(TL_ID, 0, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, 0, 1, SL_TRACE | SL_ERROR,
 		    "tl_error_ack:out of mblk memory"));
 		tl_merror(wq, NULL, ENOSR);
 		return;
@@ -2334,7 +2337,7 @@ tl_ok_ack(queue_t *wq, mblk_t *mp, t_scalar_t type)
 static void
 tl_bind_ser(mblk_t *mp, tl_endpt_t *tep)
 {
-	if (! tep->te_closing)
+	if (!tep->te_closing)
 		tl_bind(mp, tep);
 	else
 		freemsg(mp);
@@ -2366,7 +2369,7 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 
 	if (tep->te_state != TS_UNBND) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:bind_request:out of state, state=%d",
 		    tep->te_state));
 		tli_err = TOUTSTATE;
@@ -2374,7 +2377,8 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 	}
 
 	if (msz < sizeof (struct T_bind_req)) {
-		tli_err = TSYSERR; unix_err = EINVAL;
+		tli_err = TSYSERR;
+		unix_err = EINVAL;
 		goto error;
 	}
 
@@ -2401,7 +2405,8 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 	    ((tep->te_flag & TL_ADDRHASHED) == 0) &&
 	    mod_hash_reserve_nosleep(tep->te_addrhash,
 	    &tep->te_hash_hndl) != 0) {
-		tli_err = TSYSERR; unix_err = ENOSR;
+		tli_err = TSYSERR;
+		unix_err = ENOSR;
 		goto error;
 	}
 
@@ -2415,10 +2420,11 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 		    (aoff < 0) ||
 		    (aoff + alen > msz)) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: invalid socket addr"));
 			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
-			tli_err = TSYSERR; unix_err = EINVAL;
+			tli_err = TSYSERR;
+			unix_err = EINVAL;
 			goto error;
 		}
 		/* Copy address from message to local buffer. */
@@ -2429,28 +2435,31 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 		if ((ux_addr.soua_magic != SOU_MAGIC_EXPLICIT) &&
 		    (ux_addr.soua_magic != SOU_MAGIC_IMPLICIT)) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: invalid socket magic"));
 			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
-			tli_err = TSYSERR; unix_err = EINVAL;
+			tli_err = TSYSERR;
+			unix_err = EINVAL;
 			goto error;
 		}
 		if ((ux_addr.soua_magic == SOU_MAGIC_IMPLICIT) &&
 		    (ux_addr.soua_vp != NULL)) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: implicit addr non-empty"));
 			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
-			tli_err = TSYSERR; unix_err = EINVAL;
+			tli_err = TSYSERR;
+			unix_err = EINVAL;
 			goto error;
 		}
 		if ((ux_addr.soua_magic == SOU_MAGIC_EXPLICIT) &&
 		    (ux_addr.soua_vp == NULL)) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: explicit addr empty"));
 			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
-			tli_err = TSYSERR; unix_err = EINVAL;
+			tli_err = TSYSERR;
+			unix_err = EINVAL;
 			goto error;
 		}
 	} else {
@@ -2458,15 +2467,16 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 		    ((ssize_t)(aoff + alen) > msz) ||
 		    ((aoff + alen) < 0))) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: invalid message"));
 			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
-			tli_err = TSYSERR; unix_err = EINVAL;
+			tli_err = TSYSERR;
+			unix_err = EINVAL;
 			goto error;
 		}
 		if ((alen < 0) || (alen > (msz - sizeof (struct T_bind_req)))) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind: bad addr in  message"));
 			tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
 			tli_err = TBADADDR;
@@ -2475,13 +2485,13 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 #ifdef DEBUG
 		/*
 		 * Mild form of ASSERT()ion to detect broken TPI apps.
-		 * if (! assertion)
+		 * if (!assertion)
 		 *	log warning;
 		 */
-		if (! ((alen == 0 && aoff == 0) ||
+		if (!((alen == 0 && aoff == 0) ||
 			(aoff >= (t_scalar_t)(sizeof (struct T_bind_req))))) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-				    3, SL_TRACE|SL_ERROR,
+				    3, SL_TRACE | SL_ERROR,
 				    "tl_bind: addr overlaps TPI message"));
 		}
 #endif
@@ -2525,10 +2535,11 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 				 * other than supplied one for explicit binds.
 				 */
 				(void) (STRLOG(TL_ID, tep->te_minor, 1,
-				    SL_TRACE|SL_ERROR,
+				    SL_TRACE | SL_ERROR,
 				    "tl_bind:requested addr %p is busy",
 				    ux_addr.soua_vp));
-				tli_err = TADDRBUSY; unix_err = 0;
+				tli_err = TADDRBUSY;
+				unix_err = 0;
 				goto error;
 			}
 			tep->te_uxaddr = ux_addr;
@@ -2539,12 +2550,13 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 		/*
 		 * assign any free address
 		 */
-		if (! tl_get_any_addr(tep, NULL)) {
+		if (!tl_get_any_addr(tep, NULL)) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_bind:failed to get buffer for any "
 			    "address"));
-			tli_err = TSYSERR; unix_err = ENOSR;
+			tli_err = TSYSERR;
+			unix_err = ENOSR;
 			goto error;
 		}
 	} else {
@@ -2554,7 +2566,8 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 
 		tep->te_abuf = kmem_zalloc((size_t)alen, KM_NOSLEEP);
 		if (tep->te_abuf == NULL) {
-			tli_err = TSYSERR; unix_err = ENOSR;
+			tli_err = TSYSERR;
+			unix_err = ENOSR;
 			goto error;
 		}
 		bcopy(addr_req.ta_abuf, tep->te_abuf, addr_req.ta_alen);
@@ -2570,9 +2583,10 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 				 * requested is busy
 				 */
 				(void) (STRLOG(TL_ID, tep->te_minor, 1,
-				    SL_TRACE|SL_ERROR,
+				    SL_TRACE | SL_ERROR,
 				    "tl_bind:requested addr is busy"));
-				tli_err = TADDRBUSY; unix_err = 0;
+				tli_err = TADDRBUSY;
+				unix_err = 0;
 				goto error;
 			}
 
@@ -2580,11 +2594,12 @@ tl_bind(mblk_t *mp, tl_endpt_t *tep)
 			 * O_T_BIND_REQ semantics say if address if requested
 			 * address is busy, bind to any available free address
 			 */
-			if (! tl_get_any_addr(tep, &addr_req)) {
+			if (!tl_get_any_addr(tep, &addr_req)) {
 				(void) (STRLOG(TL_ID, tep->te_minor, 1,
-				    SL_TRACE|SL_ERROR,
+				    SL_TRACE | SL_ERROR,
 				    "tl_bind:unable to get any addr buf"));
-				tli_err = TSYSERR; unix_err = ENOMEM;
+				tli_err = TSYSERR;
+				unix_err = ENOMEM;
 				goto error;
 			}
 		} else {
@@ -2602,7 +2617,7 @@ skip_addr_bind:
 	basize = sizeof (struct T_bind_ack) + tep->te_alen;
 	bamp = reallocb(mp, basize, 0);
 	if (bamp == NULL) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_wput:tl_bind: allocb failed"));
 		/*
 		 * roll back state changes
@@ -2686,7 +2701,7 @@ tl_unbind(mblk_t *mp, tl_endpt_t *tep)
 	 */
 	if (tep->te_state != TS_IDLE) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:T_UNBIND_REQ:out of state, state=%d",
 		    tep->te_state));
 		tl_error_ack(wq, ackmp, TOUTSTATE, 0, T_UNBIND_REQ);
@@ -2701,7 +2716,7 @@ tl_unbind(mblk_t *mp, tl_endpt_t *tep)
 	 */
 	(void) putnextctl1(RD(wq), M_FLUSH, FLUSHRW);
 
-	if (! IS_SOCKET(tep) || !IS_CLTS(tep) || tep->te_qlen != 0 ||
+	if (!IS_SOCKET(tep) || !IS_CLTS(tep) || tep->te_qlen != 0 ||
 	    tep->te_magic != SOU_MAGIC_EXPLICIT) {
 
 		/*
@@ -2765,14 +2780,14 @@ tl_optmgmt(queue_t *wq, mblk_t *mp)
 		 * tests this TLI (mis)feature using this device driver.
 		 */
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:T_SVR4_OPTMGMT_REQ:out of state, state=%d",
 		    tep->te_state));
 		/*
 		 * preallocate memory for T_ERROR_ACK
 		 */
 		ackmp = allocb(sizeof (struct T_error_ack), BPRI_MED);
-		if (! ackmp) {
+		if (ackmp == NULL) {
 			tl_memrecover(wq, mp, sizeof (struct T_error_ack));
 			return;
 		}
@@ -2828,7 +2843,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 	 * 2. max of T_DISCON_IND and T_CONN_IND
 	 */
 	ackmp = allocb(sizeof (struct T_error_ack), BPRI_MED);
-	if (! ackmp) {
+	if (ackmp == NULL) {
 		tl_memrecover(wq, mp, sizeof (struct T_error_ack));
 		return;
 	}
@@ -2839,7 +2854,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 
 	if (tep->te_state != TS_IDLE) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:T_CONN_REQ:out of state, state=%d",
 		    tep->te_state));
 		tl_error_ack(wq, ackmp, TOUTSTATE, 0, T_CONN_REQ);
@@ -2853,7 +2868,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 	 * after validating the message length.
 	 */
 	if (msz < sizeof (struct T_conn_req)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_conn_req:invalid message length"));
 		tl_error_ack(wq, ackmp, TSYSERR, EINVAL, T_CONN_REQ);
 		freemsg(mp);
@@ -2872,7 +2887,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 		    (aoff + alen > msz) ||
 		    (alen > msz - sizeof (struct T_conn_req))) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-				    1, SL_TRACE|SL_ERROR,
+				    1, SL_TRACE | SL_ERROR,
 				    "tl_conn_req: invalid socket addr"));
 			tl_error_ack(wq, ackmp, TSYSERR, EINVAL, T_CONN_REQ);
 			freemsg(mp);
@@ -2882,7 +2897,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 		if ((ux_addr.soua_magic != SOU_MAGIC_IMPLICIT) &&
 		    (ux_addr.soua_magic != SOU_MAGIC_EXPLICIT)) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_conn_req: invalid socket magic"));
 			tl_error_ack(wq, ackmp, TSYSERR, EINVAL, T_CONN_REQ);
 			freemsg(mp);
@@ -2894,7 +2909,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 		    ooff + olen < 0)) ||
 		    olen < 0 || ooff < 0) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_conn_req:invalid message"));
 			tl_error_ack(wq, ackmp, TSYSERR, EINVAL, T_CONN_REQ);
 			freemsg(mp);
@@ -2904,7 +2919,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 		if (alen <= 0 || aoff < 0 ||
 		    (ssize_t)alen > msz - sizeof (struct T_conn_req)) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-				    SL_TRACE|SL_ERROR,
+				    SL_TRACE | SL_ERROR,
 				    "tl_conn_req:bad addr in message, "
 				    "alen=%d, msz=%ld",
 				    alen, msz));
@@ -2915,12 +2930,12 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 #ifdef DEBUG
 		/*
 		 * Mild form of ASSERT()ion to detect broken TPI apps.
-		 * if (! assertion)
+		 * if (!assertion)
 		 *	log warning;
 		 */
-		if (! (aoff >= (t_scalar_t)sizeof (struct T_conn_req))) {
+		if (!(aoff >= (t_scalar_t)sizeof (struct T_conn_req))) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_conn_req: addr overlaps TPI message"));
 		}
 #endif
@@ -2930,7 +2945,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 			 * supported in this provider except for sockets.
 			 */
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_conn_req:options not supported "
 			    "in message"));
 			tl_error_ack(wq, ackmp, TBADOPT, 0, T_CONN_REQ);
@@ -2942,8 +2957,8 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 	/*
 	 * Prevent tep from closing on us.
 	 */
-	if (! tl_noclose(tep)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+	if (!tl_noclose(tep)) {
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_conn_req:endpoint is closing"));
 		tl_error_ack(wq, ackmp, TOUTSTATE, 0, T_CONN_REQ);
 		freemsg(mp);
@@ -2968,7 +2983,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 	    tl_find_peer(tep, &dst));
 
 	if (peer_tep == NULL) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_conn_req:no one at connect address"));
 		err = ECONNREFUSED;
 	} else if (peer_tep->te_nicon >= peer_tep->te_qlen)  {
@@ -3100,7 +3115,7 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * calculate length of T_CONN_IND message
 	 */
-	if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED)) {
+	if (peer_tep->te_flag & (TL_SETCRED | TL_SETUCRED)) {
 		cr = msg_getcred(mp, &cpid);
 		ASSERT(cr != NULL);
 		if (peer_tep->te_flag & TL_SETCRED) {
@@ -3148,7 +3163,7 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 		 * are isomorphic.
 		 */
 		confmp = copyb(mp);
-		if (! confmp) {
+		if (confmp == NULL) {
 			/*
 			 * roll back state changes
 			 */
@@ -3226,8 +3241,8 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	 * in the returned mblk
 	 */
 	cimp = tl_resizemp(indmp, size);
-	if (! cimp) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE|SL_ERROR,
+	if (cimp == NULL) {
+		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_conn_req:con_ind:allocb failure"));
 		tl_merror(wq, indmp, ENOMEM);
 		TL_UNCONNECT(tep->te_oconp);
@@ -3356,7 +3371,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 * 2. max of T_DISCON_IND and T_CONN_CON
 	 */
 	ackmp = allocb(sizeof (struct T_error_ack), BPRI_MED);
-	if (! ackmp) {
+	if (ackmp == NULL) {
 		tl_memrecover(wq, mp, sizeof (struct T_error_ack));
 		return;
 	}
@@ -3373,7 +3388,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 */
 	if (tep->te_state != TS_WRES_CIND) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:T_CONN_RES:out of state, state=%d",
 		    tep->te_state));
 		tl_error_ack(wq, ackmp, TOUTSTATE, 0, prim);
@@ -3387,7 +3402,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 * after validating the message length.
 	 */
 	if (msz < sizeof (struct T_conn_res)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:invalid message length"));
 		tl_error_ack(wq, ackmp, TSYSERR, EINVAL, prim);
 		freemsg(mp);
@@ -3396,7 +3411,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	olen = cres->OPT_length;
 	ooff = cres->OPT_offset;
 	if (((olen > 0) && ((ooff + olen) > msz))) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:invalid message"));
 		tl_error_ack(wq, ackmp, TSYSERR, EINVAL, prim);
 		freemsg(mp);
@@ -3407,7 +3422,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 		 * no opts in connect res
 		 * supported in this provider
 		 */
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:options not supported in message"));
 		tl_error_ack(wq, ackmp, TBADOPT, 0, prim);
 		freemsg(mp);
@@ -3419,7 +3434,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 
 	if (cres->SEQ_number < TL_MINOR_START &&
 	    cres->SEQ_number >= BADSEQNUM) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:remote endpoint sequence number bad"));
 		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
 		tl_error_ack(wq, ackmp, TBADSEQ, 0, prim);
@@ -3433,7 +3448,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	if (mod_hash_find_cb(tep->te_transport->tr_ai_hash,
 	    (mod_hash_key_t)(uintptr_t)cres->ACCEPTOR_id,
 	    (mod_hash_val_t *)&acc_ep, tl_find_callback) != 0) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:bad accepting endpoint"));
 		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
 		tl_error_ack(wq, ackmp, TBADF, 0, prim);
@@ -3444,8 +3459,8 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * Prevent acceptor from closing.
 	 */
-	if (! tl_noclose(acc_ep)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE|SL_ERROR,
+	if (!tl_noclose(acc_ep)) {
+		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:bad accepting endpoint"));
 		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
 		tl_error_ack(wq, ackmp, TBADF, 0, prim);
@@ -3462,7 +3477,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 * TROUBLE in XPG4 !!?
 	 */
 	if ((tep != acc_ep) && (acc_ep->te_state != TS_IDLE)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:accepting endpoint has no address bound,"
 		    "state=%d", acc_ep->te_state));
 		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
@@ -3479,7 +3494,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 */
 
 	if ((tep == acc_ep) && (tep->te_nicon > 1)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_conn_res: > 1 conn_ind on listener-acceptor"));
 		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
 		tl_error_ack(wq, ackmp, TBADF, 0, prim);
@@ -3497,7 +3512,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 */
 	tip = tl_icon_find(tep, cres->SEQ_number);
 	if (tip == NULL) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE | SL_ERROR,
 		    "tl_conn_res:no client in listener list"));
 		tep->te_state = NEXTSTATE(TE_ERROR_ACK, tep->te_state);
 		tl_error_ack(wq, ackmp, TBADSEQ, 0, prim);
@@ -3579,9 +3594,9 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 		 * ack validity of request (T_OK_ACK) after memory committed
 		 */
 
-		if (err)
+		if (err) {
 			size = sizeof (struct T_discon_ind);
-		else {
+		} else {
 			/*
 			 * calculate length of T_CONN_CON message
 			 */
@@ -3620,8 +3635,9 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 			tep->te_state = NEXTSTATE(TE_OK_ACK2, tep->te_state);
 		else
 			tep->te_state = NEXTSTATE(TE_OK_ACK3, tep->te_state);
-	} else
+	} else {
 		tep->te_state = NEXTSTATE(TE_OK_ACK4, tep->te_state);
+	}
 
 	/*
 	 * send T_DISCON_IND now if client state validation failed earlier
@@ -3634,9 +3650,9 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 		(void) putnextctl1(acc_ep->te_rq, M_FLUSH, FLUSHR);
 
 		dimp = tl_resizemp(respmp, size);
-		if (! dimp) {
+		if (dimp == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_conn_res:con_ind:allocb failure"));
 			tl_merror(wq, respmp, ENOMEM);
 			tl_closeok(acc_ep);
@@ -3711,12 +3727,12 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	 * allocate the message - original data blocks
 	 * retained in the returned mblk
 	 */
-	if (! IS_SOCKET(cl_ep) || tl_disable_early_connect) {
+	if (!IS_SOCKET(cl_ep) || tl_disable_early_connect) {
 		ccmp = tl_resizemp(respmp, size);
 		if (ccmp == NULL) {
 			tl_ok_ack(wq, ackmp, prim);
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_conn_res:conn_con:allocb failure"));
 			tl_merror(wq, respmp, ENOMEM);
 			tl_closeok(acc_ep);
@@ -3733,7 +3749,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 		cc->RES_length = acc_ep->te_alen;
 		addr_startp = ccmp->b_rptr + cc->RES_offset;
 		bcopy(acc_ep->te_abuf, addr_startp, acc_ep->te_alen);
-		if (cl_ep->te_flag & (TL_SETCRED|TL_SETUCRED)) {
+		if (cl_ep->te_flag & (TL_SETCRED | TL_SETUCRED)) {
 			cc->OPT_offset = (t_scalar_t)T_ALIGN(cc->RES_offset +
 			    cc->RES_length);
 			cc->OPT_length = olen;
@@ -3815,7 +3831,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * link queues so that I_SENDFD will work
 	 */
-	if (! IS_SOCKET(tep)) {
+	if (!IS_SOCKET(tep)) {
 		acc_ep->te_wq->q_next = cl_ep->te_rq;
 		cl_ep->te_wq->q_next = acc_ep->te_rq;
 	}
@@ -3890,7 +3906,7 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 	 * 2. for  T_DISCON_IND
 	 */
 	ackmp = allocb(sizeof (struct T_error_ack), BPRI_MED);
-	if (! ackmp) {
+	if (ackmp == NULL) {
 		tl_memrecover(wq, mp, sizeof (struct T_error_ack));
 		return;
 	}
@@ -3906,10 +3922,10 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 	 * validate the state
 	 */
 	save_state = new_state = tep->te_state;
-	if (! (save_state >= TS_WCON_CREQ && save_state <= TS_WRES_CIND) &&
-	    ! (save_state >= TS_DATA_XFER && save_state <= TS_WREQ_ORDREL)) {
+	if (!(save_state >= TS_WCON_CREQ && save_state <= TS_WRES_CIND) &&
+	    !(save_state >= TS_DATA_XFER && save_state <= TS_WREQ_ORDREL)) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:T_DISCON_REQ:out of state, state=%d",
 		    tep->te_state));
 		tl_error_ack(wq, ackmp, TOUTSTATE, 0, T_DISCON_REQ);
@@ -3924,7 +3940,7 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 
 	/* validate the message */
 	if (msz < sizeof (struct T_discon_req)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_discon_req:invalid message"));
 		tep->te_state = NEXTSTATE(TE_ERROR_ACK, new_state);
 		tl_error_ack(wq, ackmp, TSYSERR, EINVAL, T_DISCON_REQ);
@@ -3944,7 +3960,7 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 		tip = tl_icon_find(tep, dr->SEQ_number);
 		if (tip == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 2,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_discon_req:no disconnect endpoint"));
 			tep->te_state = NEXTSTATE(TE_ERROR_ACK, new_state);
 			tl_error_ack(wq, ackmp, TBADSEQ, 0, T_DISCON_REQ);
@@ -3975,13 +3991,14 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * prepare message to ack validity of request
 	 */
-	if (tep->te_nicon == 0)
+	if (tep->te_nicon == 0) {
 		new_state = NEXTSTATE(TE_OK_ACK1, new_state);
-	else
+	} else {
 		if (tep->te_nicon == 1)
 			new_state = NEXTSTATE(TE_OK_ACK2, new_state);
 		else
 			new_state = NEXTSTATE(TE_OK_ACK4, new_state);
+	}
 
 	/*
 	 * Flushing queues according to TPI. Using the old state.
@@ -4005,7 +4022,7 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 			 */
 			if ((dimp = tl_resizemp(respmp, size)) == NULL) {
 				(void) (STRLOG(TL_ID, tep->te_minor, 2,
-				    SL_TRACE|SL_ERROR,
+				    SL_TRACE | SL_ERROR,
 				    "tl_discon_req: reallocb failed"));
 				tep->te_state = new_state;
 				tl_merror(wq, respmp, ENOMEM);
@@ -4036,7 +4053,7 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 
 		if ((dimp = tl_resizemp(respmp, size)) == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 2,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_discon_req: reallocb failed"));
 			tep->te_state = new_state;
 			tl_merror(wq, respmp, ENOMEM);
@@ -4094,7 +4111,7 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 	} else if ((peer_tep = tep->te_conp) != NULL) { /* connected! */
 		if ((dimp = tl_resizemp(respmp, size)) == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 2,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_discon_req: reallocb failed"));
 			tep->te_state = new_state;
 			tl_merror(wq, respmp, ENOMEM);
@@ -4143,7 +4160,7 @@ tl_discon_req(mblk_t *mp, tl_endpt_t *tep)
 	putnext(peer_tep->te_rq, dimp);
 done:
 	if (tep->te_conp) {	/* disconnect pointers if connected */
-		ASSERT(! peer_tep->te_closing);
+		ASSERT(!peer_tep->te_closing);
 
 		/*
 		 * Messages may be queued on peer's write queue
@@ -4158,7 +4175,7 @@ done:
 			TL_QENABLE(peer_tep);
 		ASSERT(peer_tep != NULL && peer_tep->te_conp != NULL);
 		TL_UNCONNECT(peer_tep->te_conp);
-		if (! IS_SOCKET(tep)) {
+		if (!IS_SOCKET(tep)) {
 			/*
 			 * unlink the streams
 			 */
@@ -4215,7 +4232,7 @@ tl_addr_req(mblk_t *mp, tl_endpt_t *tep)
 		ackmp = reallocb(mp, ack_sz, 0);
 		if (ackmp == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_addr_req: reallocb failed"));
 			tl_memrecover(wq, mp, ack_sz);
 			return;
@@ -4278,7 +4295,7 @@ tl_connected_cots_addr_req(mblk_t *mp, tl_endpt_t *tep)
 
 	ackmp = tpi_ack_alloc(mp, ack_sz, M_PCPROTO, T_ADDR_ACK);
 	if (ackmp == NULL) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_connected_cots_addr_req: reallocb failed"));
 		tl_memrecover(tep->te_wq, mp, ack_sz);
 		return;
@@ -4344,7 +4361,7 @@ tl_capability_req(mblk_t *mp, tl_endpt_t *tep)
 	ackmp = tpi_ack_alloc(mp, sizeof (struct T_capability_ack),
 	    M_PCPROTO, T_CAPABILITY_ACK);
 	if (ackmp == NULL) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_capability_req: reallocb failed"));
 		tl_memrecover(tep->te_wq, mp,
 		    sizeof (struct T_capability_ack));
@@ -4370,7 +4387,7 @@ tl_capability_req(mblk_t *mp, tl_endpt_t *tep)
 static void
 tl_info_req_ser(mblk_t *mp, tl_endpt_t *tep)
 {
-	if (! tep->te_closing)
+	if (!tep->te_closing)
 		tl_info_req(mp, tep);
 	else
 		freemsg(mp);
@@ -4387,7 +4404,7 @@ tl_info_req(mblk_t *mp, tl_endpt_t *tep)
 	ackmp = tpi_ack_alloc(mp, sizeof (struct T_info_ack),
 	    M_PCPROTO, T_INFO_ACK);
 	if (ackmp == NULL) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_info_req: reallocb failed"));
 		tl_memrecover(tep->te_wq, mp, sizeof (struct T_info_ack));
 		return;
@@ -4420,7 +4437,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 
 	if (IS_CLTS(tep)) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 2,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:clts:unattached M_DATA"));
 		if (!closing) {
 			tl_merror(wq, mp, EPROTO);
@@ -4446,7 +4463,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 		if (prim->type == T_DATA_REQ &&
 		    msz < sizeof (struct T_data_req)) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-				SL_TRACE|SL_ERROR,
+				SL_TRACE | SL_ERROR,
 				"tl_data:T_DATA_REQ:invalid message"));
 			if (!closing) {
 				tl_merror(wq, mp, EPROTO);
@@ -4457,7 +4474,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 		} else if (prim->type == T_OPTDATA_REQ &&
 		    (msz < sizeof (struct T_optdata_req) || !IS_SOCKET(tep))) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_data:T_OPTDATA_REQ:invalid message"));
 			if (!closing) {
 				tl_merror(wq, mp, EPROTO);
@@ -4477,7 +4494,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 		 * Other end not here - do nothing.
 		 */
 		freemsg(mp);
-		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_data:cots with endpoint idle"));
 		return;
 
@@ -4505,7 +4522,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 		 */
 		if (!closing) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_data: ocon"));
 			TL_PUTBQ(tep, mp);
 			return;
@@ -4533,7 +4550,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 			 */
 			freemsg(mp);
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_data: WREQ_ORDREL and no peer"));
 			tl_discon_ind(tep, 0);
 			return;
@@ -4542,7 +4559,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 
 	default:
 		/* invalid state for event TE_DATA_REQ */
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_data:cots:out of state"));
 		tl_merror(wq, mp, EPROTO);
 		return;
@@ -4585,7 +4602,7 @@ tl_data(mblk_t *mp, tl_endpt_t *tep)
 		/* valid states */
 		break;
 	default:
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_data:rx side:invalid state"));
 		tl_merror(peer_tep->te_wq, mp, EPROTO);
 		return;
@@ -4620,7 +4637,7 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 	boolean_t		closing = tep->te_closing;
 
 	if (msz < sizeof (struct T_exdata_req)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_exdata:invalid message"));
 		if (!closing) {
 			tl_merror(wq, mp, EPROTO);
@@ -4651,7 +4668,7 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 		 * Other end not here - do nothing.
 		 */
 		freemsg(mp);
-		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_exdata:cots with endpoint idle"));
 		return;
 
@@ -4679,12 +4696,12 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 		 */
 		if (!closing) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_exdata: ocon"));
 			TL_PUTBQ(tep, mp);
 			return;
 		}
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_exdata: closing socket ocon"));
 		prim->type = T_EXDATA_IND;
 		tl_icon_queuemsg(tep->te_oconp, tep->te_seqno, mp);
@@ -4699,7 +4716,7 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 			 */
 			freemsg(mp);
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_exdata: WREQ_ORDREL and no peer"));
 			tl_discon_ind(tep, 0);
 			return;
@@ -4708,7 +4725,7 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 
 	default:
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:T_EXDATA_REQ:out of state, state=%d",
 		    tep->te_state));
 		tl_merror(wq, mp, EPROTO);
@@ -4751,7 +4768,7 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 		/* valid states */
 		break;
 	default:
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_exdata:rx side:invalid state"));
 		tl_merror(peer_tep->te_wq, mp, EPROTO);
 		return;
@@ -4776,7 +4793,7 @@ tl_exdata(mblk_t *mp, tl_endpt_t *tep)
 static void
 tl_ordrel(mblk_t *mp, tl_endpt_t *tep)
 {
-	queue_t			*wq =  tep->te_wq;
+	queue_t			*wq = tep->te_wq;
 	union T_primitives	*prim = (union T_primitives *)mp->b_rptr;
 	ssize_t			msz = MBLKL(mp);
 	tl_endpt_t		*peer_tep;
@@ -4784,7 +4801,7 @@ tl_ordrel(mblk_t *mp, tl_endpt_t *tep)
 	boolean_t		closing = tep->te_closing;
 
 	if (msz < sizeof (struct T_ordrel_req)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_ordrel:invalid message"));
 		if (!closing) {
 			tl_merror(wq, mp, EPROTO);
@@ -4818,12 +4835,12 @@ tl_ordrel(mblk_t *mp, tl_endpt_t *tep)
 		 */
 		if (!closing) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_ordlrel: ocon"));
 			TL_PUTBQ(tep, mp);
 			return;
 		}
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_ordlrel: closing socket ocon"));
 		prim->type = T_ORDREL_IND;
 		(void) tl_icon_queuemsg(tep->te_oconp, tep->te_seqno, mp);
@@ -4831,7 +4848,7 @@ tl_ordrel(mblk_t *mp, tl_endpt_t *tep)
 
 	default:
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:T_ORDREL_REQ:out of state, state=%d",
 		    tep->te_state));
 		if (!closing) {
@@ -4861,7 +4878,7 @@ tl_ordrel(mblk_t *mp, tl_endpt_t *tep)
 	 * Note: Messages already on queue when we are closing is bounded
 	 * so we can ignore flow control.
 	 */
-	if (! canputnext(peer_rq) && !closing) {
+	if (!canputnext(peer_rq) && !closing) {
 		TL_PUTBQ(tep, mp);
 		return;
 	}
@@ -4875,7 +4892,7 @@ tl_ordrel(mblk_t *mp, tl_endpt_t *tep)
 		/* valid states */
 		break;
 	default:
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_ordrel:rx side:invalid state"));
 		tl_merror(peer_tep->te_wq, mp, EPROTO);
 		return;
@@ -4923,8 +4940,8 @@ tl_uderr(queue_t *wq, mblk_t *mp, t_scalar_t err)
 		err_sz += olen;
 
 	err_mp = allocb(err_sz, BPRI_MED);
-	if (! err_mp) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE|SL_ERROR,
+	if (err_mp == NULL) {
+		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_uderr:allocb failure"));
 		/*
 		 * Note: no rollback of state needed as it does
@@ -4946,7 +4963,7 @@ tl_uderr(queue_t *wq, mblk_t *mp, t_scalar_t err)
 	} else {
 		uderr->DEST_offset =
 		    (t_scalar_t)sizeof (struct T_uderror_ind);
-		addr_startp  = mp->b_rptr + udreq->DEST_offset;
+		addr_startp = mp->b_rptr + udreq->DEST_offset;
 		bcopy(addr_startp, err_mp->b_rptr + uderr->DEST_offset,
 		    (size_t)alen);
 	}
@@ -4956,7 +4973,7 @@ tl_uderr(queue_t *wq, mblk_t *mp, t_scalar_t err)
 		uderr->OPT_offset =
 		    (t_scalar_t)T_ALIGN(sizeof (struct T_uderror_ind) +
 		    uderr->DEST_length);
-		addr_startp  = mp->b_rptr + udreq->OPT_offset;
+		addr_startp = mp->b_rptr + udreq->OPT_offset;
 		bcopy(addr_startp, err_mp->b_rptr+uderr->OPT_offset,
 		    (size_t)olen);
 	}
@@ -4977,10 +4994,12 @@ tl_unitdata_ser(mblk_t *mp, tl_endpt_t *tep)
 
 	if (!tep->te_closing && (wq->q_first != NULL)) {
 		TL_PUTQ(tep, mp);
-	} else if (tep->te_rq != NULL)
-		tl_unitdata(mp, tep);
-	else
-		freemsg(mp);
+	} else {
+		if (tep->te_rq != NULL)
+			tl_unitdata(mp, tep);
+		else
+			freemsg(mp);
+	}
 
 	tl_serializer_exit(tep);
 	tl_refrele(tep);
@@ -5015,7 +5034,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 	 */
 	if (tep->te_state != TS_IDLE) {
 		(void) (STRLOG(TL_ID, tep->te_minor, 1,
-		    SL_TRACE|SL_ERROR,
+		    SL_TRACE | SL_ERROR,
 		    "tl_wput:T_CONN_REQ:out of state"));
 		tl_merror(wq, mp, EPROTO);
 		return;
@@ -5031,7 +5050,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 	 * after validating the message length.
 	 */
 	if (msz < sizeof (struct T_unitdata_req)) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_unitdata:invalid message length"));
 		tl_merror(wq, mp, EINVAL);
 		return;
@@ -5050,7 +5069,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		    (olen < 0) || (ooff < 0) ||
 		    ((olen > 0) && ((ooff + olen) > msz))) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_unitdata_req: invalid socket addr "
 			    "(msz=%d, al=%d, ao=%d, ol=%d, oo = %d)",
 			    (int)msz, alen, aoff, olen, ooff));
@@ -5062,7 +5081,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		if ((ux_addr.soua_magic != SOU_MAGIC_IMPLICIT) &&
 		    (ux_addr.soua_magic != SOU_MAGIC_EXPLICIT)) {
 			(void) (STRLOG(TL_ID, tep->te_minor,
-			    1, SL_TRACE|SL_ERROR,
+			    1, SL_TRACE | SL_ERROR,
 			    "tl_conn_req: invalid socket magic"));
 			tl_error_ack(wq, mp, TSYSERR, EINVAL, T_UNITDATA_REQ);
 			return;
@@ -5078,7 +5097,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		    (ooff < 0) ||
 		    ((ssize_t)olen > (msz - sizeof (struct T_unitdata_req)))) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-				    SL_TRACE|SL_ERROR,
+				    SL_TRACE | SL_ERROR,
 				    "tl_unitdata:invalid unit data message"));
 			tl_merror(wq, mp, EINVAL);
 			return;
@@ -5087,7 +5106,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 
 	/* Options not supported unless it's a socket */
 	if (alen == 0 || (olen != 0 && !IS_SOCKET(tep))) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_unitdata:option use(unsupported) or zero len addr"));
 		tl_uderr(wq, mp, EPROTO);
 		return;
@@ -5095,11 +5114,11 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 #ifdef DEBUG
 	/*
 	 * Mild form of ASSERT()ion to detect broken TPI apps.
-	 * if (! assertion)
+	 * if (!assertion)
 	 *	log warning;
 	 */
-	if (! (aoff >= (t_scalar_t)sizeof (struct T_unitdata_req))) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE|SL_ERROR,
+	if (!(aoff >= (t_scalar_t)sizeof (struct T_unitdata_req))) {
+		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_unitdata:addr overlaps TPI message"));
 	}
 #endif
@@ -5130,7 +5149,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 
 		if (peer_tep == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_unitdata:no one at destination address"));
 			tl_uderr(wq, mp, ECONNRESET);
 			return;
@@ -5146,7 +5165,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 	}
 
 	if (peer_tep->te_state != TS_IDLE) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_unitdata:provider in invalid state"));
 		tl_uderr(wq, mp, EPROTO);
 		return;
@@ -5176,7 +5195,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 	/*
 	 * calculate length of message
 	 */
-	if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED|TL_SOCKUCRED)) {
+	if (peer_tep->te_flag & (TL_SETCRED | TL_SETUCRED | TL_SOCKUCRED)) {
 		cr = msg_getcred(mp, &cpid);
 		ASSERT(cr != NULL);
 
@@ -5218,11 +5237,11 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 	 * avoid allocating a new message block.
 	 */
 	if (msz >= ui_sz && alen >= tep->te_alen &&
-	    !(peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED|TL_SOCKUCRED))) {
+	    !(peer_tep->te_flag & (TL_SETCRED | TL_SETUCRED | TL_SOCKUCRED))) {
 		/*
 		 * Reuse the original mblk. Leave options in place.
 		 */
-		udind =  (struct T_unitdata_ind *)mp->b_rptr;
+		udind = (struct T_unitdata_ind *)mp->b_rptr;
 		udind->PRIM_type = T_UNITDATA_IND;
 		udind->SRC_length = tep->te_alen;
 		addr_startp = mp->b_rptr + udind->SRC_offset;
@@ -5236,13 +5255,14 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		 * option. Reuse the original mblk, leaving existing options in
 		 * place.
 		 */
-		udind =  (struct T_unitdata_ind *)mp->b_rptr;
+		udind = (struct T_unitdata_ind *)mp->b_rptr;
 		udind->PRIM_type = T_UNITDATA_IND;
 		udind->SRC_length = tep->te_alen;
 		addr_startp = mp->b_rptr + udind->SRC_offset;
 		bcopy(tep->te_abuf, addr_startp, tep->te_alen);
 
-		if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED|TL_SOCKUCRED)) {
+		if (peer_tep->te_flag &
+		    (TL_SETCRED | TL_SETUCRED | TL_SOCKUCRED)) {
 			ASSERT(cr != NULL);
 			/*
 			 * We're appending one new option here after the
@@ -5268,7 +5288,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		mblk_t *ui_mp;
 
 		ui_mp = allocb(ui_sz, BPRI_MED);
-		if (! ui_mp) {
+		if (ui_mp == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 4, SL_TRACE,
 			    "tl_unitdata:allocb failure:message queued"));
 			tl_memrecover(wq, mp, ui_sz);
@@ -5280,7 +5300,7 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		 */
 		DB_TYPE(ui_mp) = M_PROTO;
 		ui_mp->b_wptr = ui_mp->b_rptr + ui_sz;
-		udind =  (struct T_unitdata_ind *)ui_mp->b_rptr;
+		udind = (struct T_unitdata_ind *)ui_mp->b_rptr;
 		udind->PRIM_type = T_UNITDATA_IND;
 		udind->SRC_offset = (t_scalar_t)sizeof (struct T_unitdata_ind);
 		udind->SRC_length = tep->te_alen;
@@ -5289,7 +5309,8 @@ tl_unitdata(mblk_t *mp, tl_endpt_t *tep)
 		udind->OPT_offset =
 		    (t_scalar_t)T_ALIGN(udind->SRC_offset + udind->SRC_length);
 		udind->OPT_length = olen;
-		if (peer_tep->te_flag & (TL_SETCRED|TL_SETUCRED|TL_SOCKUCRED)) {
+		if (peer_tep->te_flag &
+		    (TL_SETCRED | TL_SETUCRED | TL_SOCKUCRED)) {
 
 			if (oldolen != 0) {
 				bcopy((void *)((uintptr_t)udreq + ooff),
@@ -5337,7 +5358,7 @@ tl_find_peer(tl_endpt_t *tep, tl_addr_t *ap)
 	int rc = mod_hash_find_cb(tep->te_addrhash, (mod_hash_key_t)ap,
 	    (mod_hash_val_t *)&peer_tep, tl_find_callback);
 
-	ASSERT(! IS_SOCKET(tep));
+	ASSERT(!IS_SOCKET(tep));
 
 	ASSERT(ap != NULL && ap->ta_alen > 0);
 	ASSERT(ap->ta_zoneid == tep->te_zoneid);
@@ -5417,7 +5438,7 @@ tl_get_any_addr(tl_endpt_t *tep, tl_addr_t *req)
 	uint32_t	loopcnt;	/* Limit loop to 2^32 */
 
 	ASSERT(tep->te_hash_hndl != NULL);
-	ASSERT(! IS_SOCKET(tep));
+	ASSERT(!IS_SOCKET(tep));
 
 	if (tep->te_hash_hndl == NULL)
 		return (B_FALSE);
@@ -5513,7 +5534,7 @@ tl_cl_backenable(tl_endpt_t *tep)
 	for (elp = list_head(l); elp != NULL; elp = list_head(l)) {
 		ASSERT(tep->te_ser == elp->te_ser);
 		ASSERT(elp->te_flowq == tep);
-		if (! elp->te_closing)
+		if (!elp->te_closing)
 			TL_QENABLE(elp);
 		elp->te_flowq = NULL;
 		list_remove(l, elp);
@@ -5582,7 +5603,7 @@ tl_co_unconnect(tl_endpt_t *tep)
 				putnext(cl_tep->te_rq, d_mp);
 			} else {
 				(void) (STRLOG(TL_ID, tep->te_minor, 3,
-				    SL_TRACE|SL_ERROR,
+				    SL_TRACE | SL_ERROR,
 				    "tl_co_unconnect:icmng: "
 				    "allocb failure"));
 			}
@@ -5610,7 +5631,7 @@ tl_co_unconnect(tl_endpt_t *tep)
 		}
 		if (d_mp == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_co_unconnect:outgoing:allocb failure"));
 			TL_UNCONNECT(tep->te_oconp);
 			goto discon_peer;
@@ -5675,9 +5696,9 @@ tl_co_unconnect(tl_endpt_t *tep)
 			    peer_tep->te_state,
 			    NEXTSTATE(TE_ORDREL_IND, peer_tep->te_state)));
 			d_mp = tl_ordrel_ind_alloc();
-			if (! d_mp) {
+			if (d_mp == NULL) {
 				(void) (STRLOG(TL_ID, tep->te_minor, 3,
-				    SL_TRACE|SL_ERROR,
+				    SL_TRACE | SL_ERROR,
 				    "tl_co_unconnect:connected:"
 				    "allocb failure"));
 				/*
@@ -5704,13 +5725,13 @@ tl_co_unconnect(tl_endpt_t *tep)
 			 * with error 0 to inform that the peer is gone.
 			 */
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_co_unconnect: discon in state %d",
 			    tep->te_state));
 			tl_discon_ind(peer_tep, 0);
 		} else {
 			(void) (STRLOG(TL_ID, tep->te_minor, 3,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_co_unconnect: state %d", tep->te_state));
 			tl_discon_ind(peer_tep, ECONNRESET);
 		}
@@ -5750,8 +5771,8 @@ tl_discon_ind(tl_endpt_t *tep, uint32_t reason)
 	 * send discon ind
 	 */
 	d_mp = tl_discon_ind_alloc(reason, tep->te_seqno);
-	if (! d_mp) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE|SL_ERROR,
+	if (d_mp == NULL) {
+		(void) (STRLOG(TL_ID, tep->te_minor, 3, SL_TRACE | SL_ERROR,
 		    "tl_discon_ind:allocb failure"));
 		return;
 	}
@@ -5987,7 +6008,7 @@ tl_merror(queue_t *wq, mblk_t *mp, int error)
 	}
 
 	(void) (STRLOG(TL_ID, tep->te_minor, 1,
-	    SL_TRACE|SL_ERROR,
+	    SL_TRACE | SL_ERROR,
 	    "tl_merror: tep=%p, err=%d", (void *)tep, error));
 
 	/*
@@ -6007,9 +6028,9 @@ tl_merror(queue_t *wq, mblk_t *mp, int error)
 	if ((MBLKSIZE(mp) < 1) || (DB_REF(mp) > 1)) {
 		freemsg(mp);
 		mp = allocb(1, BPRI_HI);
-		if (!mp) {
+		if (mp == NULL) {
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_merror:M_PROTO: out of memory"));
 			return;
 		}
@@ -6092,7 +6113,7 @@ tl_get_opt(queue_t *wq, int level, int name, uchar_t *ptr)
 
 	switch (level) {
 	case SOL_SOCKET:
-		if (! IS_SOCKET(tep))
+		if (!IS_SOCKET(tep))
 			break;
 		switch (name) {
 		case SO_RECVUCRED:
@@ -6123,17 +6144,9 @@ tl_get_opt(queue_t *wq, int level, int name, uchar_t *ptr)
 
 /* ARGSUSED */
 static int
-tl_set_opt(
-	queue_t		*wq,
-	uint_t		mgmt_flags,
-	int		level,
-	int		name,
-	uint_t		inlen,
-	uchar_t		*invalp,
-	uint_t		*outlenp,
-	uchar_t		*outvalp,
-	void		*thisdg_attrs,
-	cred_t		*cr)
+tl_set_opt(queue_t *wq, uint_t mgmt_flags, int level, int name, uint_t inlen,
+    uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp, void *thisdg_attrs,
+    cred_t *cr)
 {
 	int error;
 	tl_endpt_t *tep;
@@ -6148,7 +6161,7 @@ tl_set_opt(
 
 	switch (level) {
 	case SOL_SOCKET:
-		if (! IS_SOCKET(tep)) {
+		if (!IS_SOCKET(tep)) {
 			error = EINVAL;
 			break;
 		}
@@ -6163,7 +6176,7 @@ tl_set_opt(
 			 * getpeerucred handles the connection oriented
 			 * transports.
 			 */
-			if (! IS_CLTS(tep)) {
+			if (!IS_CLTS(tep)) {
 				error = EINVAL;
 				break;
 			}
@@ -6189,7 +6202,7 @@ tl_set_opt(
 			 * option.
 			 */
 			(void) (STRLOG(TL_ID, tep->te_minor, 1,
-			    SL_TRACE|SL_ERROR,
+			    SL_TRACE | SL_ERROR,
 			    "tl_set_opt: option is not supported"));
 			error = EPROTO;
 			break;
@@ -6252,12 +6265,13 @@ tl_memrecover(queue_t *wq, mblk_t *mp, size_t size)
 	(void) insq(wq, wq->q_first, mp);
 
 	if (tep->te_bufcid || tep->te_timoutid) {
-		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE|SL_ERROR,
+		(void) (STRLOG(TL_ID, tep->te_minor, 1, SL_TRACE | SL_ERROR,
 		    "tl_memrecover:recover %p pending", (void *)wq));
 		return;
 	}
 
-	if (!(tep->te_bufcid = qbufcall(wq, size, BPRI_MED, tl_buffer, wq))) {
+	tep->te_bufcid = qbufcall(wq, size, BPRI_MED, tl_buffer, wq);
+	if (tep->te_bufcid == NULL) {
 		tep->te_timoutid = qtimeout(wq, tl_timer, wq,
 		    drv_usectohz(TL_BUFWAIT));
 	}
