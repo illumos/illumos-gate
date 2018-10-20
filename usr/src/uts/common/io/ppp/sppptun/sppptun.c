@@ -111,12 +111,12 @@ static const char *tcl_kstats_list[] = { TCL_KSTATS_NAMES };
 
 static int	sppptun_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	sppptun_close(queue_t *, int, cred_t *);
-static void	sppptun_urput(queue_t *, mblk_t *);
-static void	sppptun_uwput(queue_t *, mblk_t *);
+static int	sppptun_urput(queue_t *, mblk_t *);
+static int	sppptun_uwput(queue_t *, mblk_t *);
 static int	sppptun_ursrv(queue_t *);
 static int	sppptun_uwsrv(queue_t *);
-static void	sppptun_lrput(queue_t *, mblk_t *);
-static void	sppptun_lwput(queue_t *, mblk_t *);
+static int	sppptun_lrput(queue_t *, mblk_t *);
+static int	sppptun_lwput(queue_t *, mblk_t *);
 
 /*
  * This is the hash table of clients.  Clients are the programs that
@@ -171,7 +171,7 @@ static struct module_info sppptun_modinfo = {
 };
 
 static struct qinit sppptun_urinit = {
-	(int (*)())sppptun_urput, /* qi_putp */
+	sppptun_urput,		/* qi_putp */
 	sppptun_ursrv,		/* qi_srvp */
 	sppptun_open,		/* qi_qopen */
 	sppptun_close,		/* qi_qclose */
@@ -1635,7 +1635,7 @@ sppptun_inner_mctl(queue_t *q, mblk_t *mp)
  * Description:
  *	Regular output data and controls pass through here.
  */
-static void
+static int
 sppptun_uwput(queue_t *q, mblk_t *mp)
 {
 	queue_t *nextq;
@@ -1672,6 +1672,7 @@ sppptun_uwput(queue_t *q, mblk_t *mp)
 			putnext(q, mp);
 		break;
 	}
+	return (0);
 }
 
 /*
@@ -1827,7 +1828,7 @@ sppptun_uwsrv(queue_t *q)
  *    Lower write-side put procedure.  Nothing should be sending
  *    packets down this stream.
  */
-static void
+static int
 sppptun_lwput(queue_t *q, mblk_t *mp)
 {
 	switch (MTYPE(mp)) {
@@ -1838,6 +1839,7 @@ sppptun_lwput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
+	return (0);
 }
 
 /*
@@ -1849,7 +1851,7 @@ sppptun_lwput(queue_t *q, mblk_t *mp)
  * Description:
  *    Lower read-side put procedure.  Nothing should arrive here.
  */
-static void
+static int
 sppptun_lrput(queue_t *q, mblk_t *mp)
 {
 	tuncl_t *tcl;
@@ -1857,7 +1859,7 @@ sppptun_lrput(queue_t *q, mblk_t *mp)
 	switch (MTYPE(mp)) {
 	case M_IOCTL:
 		miocnak(q, mp, 0, EINVAL);
-		return;
+		return (0);
 	case M_FLUSH:
 		if (*mp->b_rptr & FLUSHR) {
 			flushq(q, FLUSHDATA);
@@ -1868,7 +1870,7 @@ sppptun_lrput(queue_t *q, mblk_t *mp)
 		} else {
 			freemsg(mp);
 		}
-		return;
+		return (0);
 	}
 	/*
 	 * Try to forward the message to the put procedure for the upper
@@ -1877,7 +1879,7 @@ sppptun_lrput(queue_t *q, mblk_t *mp)
 	 */
 	if ((tcl = (tuncl_t *)q->q_ptr) == NULL || tcl->tcl_rq == NULL) {
 		freemsg(mp);
-		return;
+		return (0);
 	}
 	if (queclass(mp) == QPCTL ||
 	    (q->q_first == NULL && canput(tcl->tcl_rq))) {
@@ -1886,6 +1888,7 @@ sppptun_lrput(queue_t *q, mblk_t *mp)
 		if (!putq(q, mp))
 			freemsg(mp);
 	}
+	return (0);
 }
 
 /*
@@ -2256,7 +2259,7 @@ sppptun_recv(queue_t *q, mblk_t **mpp, const void *srcaddr)
  *    lower stream driver arrive here.  See sppptun_recv for the
  *    demultiplexing logic.
  */
-static void
+static int
 sppptun_urput(queue_t *q, mblk_t *mp)
 {
 	union DL_primitives *dlprim;
@@ -2320,11 +2323,11 @@ sppptun_urput(queue_t *q, mblk_t *mp)
 				if (nextq != NULL)
 					putnext(nextq, mpnext);
 				freeb(mp);
-				return;
+				return (0);
 
 			default:
 				urput_dlpi(q, mp);
-				return;
+				return (0);
 			}
 			break;
 		}
@@ -2335,6 +2338,7 @@ sppptun_urput(queue_t *q, mblk_t *mp)
 		freemsg(mp);
 		break;
 	}
+	return (0);
 }
 
 /*
@@ -2396,7 +2400,7 @@ tcl_destructor(void *maddr, void *arg)
 /*
  * Clear all bits of x except the highest bit
  */
-#define	truncate(x) 	((x) <= 2 ? (x) : (1 << (highbit(x) - 1)))
+#define	truncate(x)	((x) <= 2 ? (x) : (1 << (highbit(x) - 1)))
 
 /*
  * This function initializes some well-known global variables inside
