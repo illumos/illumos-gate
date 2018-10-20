@@ -2066,6 +2066,7 @@ iscsi_login_failure_str(uchar_t status_class, uchar_t status_detail)
 		default:
 			break;
 		}
+		break;
 	case 0x01:
 		switch (status_detail) {
 		case 0x01:
@@ -2077,6 +2078,7 @@ iscsi_login_failure_str(uchar_t status_class, uchar_t status_detail)
 		default:
 			break;
 		}
+		break;
 	case 0x02:
 		switch (status_detail) {
 		case 0x00:
@@ -2116,6 +2118,7 @@ iscsi_login_failure_str(uchar_t status_class, uchar_t status_detail)
 		default:
 			break;
 		}
+		break;
 	case 0x03:
 		switch (status_detail) {
 		case 0x00:
@@ -2129,6 +2132,7 @@ iscsi_login_failure_str(uchar_t status_class, uchar_t status_detail)
 		default:
 			break;
 		}
+		break;
 	}
 	return ("Unknown login response received.");
 }
