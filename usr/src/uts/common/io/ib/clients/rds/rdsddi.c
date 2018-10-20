@@ -868,7 +868,7 @@ done:
 	return (error);
 }
 
-static void
+static int
 rds_rsrv(queue_t *q)
 {
 	rds_t	*rds = (rds_t *)q->q_ptr;
@@ -884,6 +884,7 @@ rds_rsrv(queue_t *q)
 
 	/* No more messages in the q, unstall the socket */
 	rds_transport_ops->rds_transport_resume_port(ntohs(rds->rds_port));
+	return (0);
 }
 
 int
@@ -949,11 +950,11 @@ static struct module_info info = {
 };
 
 static struct qinit rinit = {
-	NULL, (pfi_t)rds_rsrv, rds_open, rds_close, NULL, &info
+	NULL, rds_rsrv, rds_open, rds_close, NULL, &info
 };
 
 static struct qinit winit = {
-	(pfi_t)rds_wput, NULL, rds_open, rds_close, NULL, &info,
+	rds_wput, NULL, rds_open, rds_close, NULL, &info,
 	NULL, rds_wrw, NULL, STRUIOT_STANDARD
 };
 
