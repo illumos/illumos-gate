@@ -1049,7 +1049,7 @@ iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 	itp->t_arg = icp;
 	itp->t_blocking = B_FALSE;
 	if (ddi_taskq_dispatch(isp->sess_login_taskq,
-	    (void(*)())iscsi_login_start, itp, DDI_SLEEP) !=
+	    iscsi_login_cb, itp, DDI_SLEEP) !=
 	    DDI_SUCCESS) {
 		kmem_free(itp, sizeof (iscsi_task_t));
 		cmn_err(CE_WARN, "iscsi connection(%u) failure - "
@@ -1068,8 +1068,7 @@ iscsi_conn_retry(iscsi_sess_t *isp, iscsi_conn_t *icp)
 }
 
 void
-iscsi_conn_update_state(iscsi_conn_t *icp, iscsi_conn_state_t
-			    next_state)
+iscsi_conn_update_state(iscsi_conn_t *icp, iscsi_conn_state_t next_state)
 {
 	mutex_enter(&icp->conn_state_mutex);
 	(void) iscsi_conn_update_state_locked(icp, next_state);
@@ -1077,8 +1076,7 @@ iscsi_conn_update_state(iscsi_conn_t *icp, iscsi_conn_state_t
 }
 
 void
-iscsi_conn_update_state_locked(iscsi_conn_t *icp,
-	    iscsi_conn_state_t next_state)
+iscsi_conn_update_state_locked(iscsi_conn_t *icp, iscsi_conn_state_t next_state)
 {
 	ASSERT(mutex_owned(&icp->conn_state_mutex));
 	next_state = (next_state > ISCSI_CONN_STATE_MAX) ?
