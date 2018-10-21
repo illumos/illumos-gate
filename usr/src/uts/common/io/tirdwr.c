@@ -25,10 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* from S5R4 1.4 */
+/*	  All Rights Reserved	*/
 
 /*
  * Transport Interface Library read/write module - issue 1
@@ -76,8 +73,8 @@ static	int check_strhead(queue_t *q);
  * To save instructions, since STREAMS ignores the return value
  * from these functions, they are defined as void here. Kind of icky, but...
  */
-static void tirdwrrput(queue_t *q, mblk_t *mp);
-static void tirdwrwput(queue_t *q, mblk_t *mp);
+static int tirdwrrput(queue_t *q, mblk_t *mp);
+static int tirdwrwput(queue_t *q, mblk_t *mp);
 
 static struct module_info tirdwr_info = {
 	TIRDWR_ID,
@@ -89,8 +86,8 @@ static struct module_info tirdwr_info = {
 };
 
 static struct qinit tirdwrrinit = {
-	(int (*)())tirdwrrput,
-	(int (*)())NULL,
+	tirdwrrput,
+	NULL,
 	tirdwropen,
 	tirdwrclose,
 	nulldev,
@@ -99,8 +96,8 @@ static struct qinit tirdwrrinit = {
 };
 
 static struct qinit tirdwrwinit = {
-	(int (*)())tirdwrwput,
-	(int (*)())NULL,
+	tirdwrwput,
+	NULL,
 	tirdwropen,
 	tirdwrclose,
 	nulldev,
@@ -241,7 +238,7 @@ tirdwrclose(queue_t *q, int flag, cred_t *cr)
  *		driver downstream.
  */
 
-static void
+static int
 tirdwrrput(queue_t *q, mblk_t *mp)
 {
 	union T_primitives *pptr;
@@ -254,7 +251,7 @@ tirdwrrput(queue_t *q, mblk_t *mp)
 
 	if ((trwptr->trw_flags & FATAL) && !(trwptr->trw_flags & WAITACK)) {
 		freemsg(mp);
-		return;
+		return (0);
 	}
 
 	switch (mp->b_datap->db_type) {
@@ -317,6 +314,7 @@ tirdwrrput(queue_t *q, mblk_t *mp)
 			break;
 		}
 	}
+	return (0);
 }
 
 
@@ -325,7 +323,7 @@ tirdwrrput(queue_t *q, mblk_t *mp)
  *		This is called from the module or
  *		stream head upstream.
  */
-static void
+static int
 tirdwrwput(queue_t *q, mblk_t *mp)
 {
 	struct trw_trw *trwptr;
@@ -336,7 +334,7 @@ tirdwrwput(queue_t *q, mblk_t *mp)
 
 	if (trwptr->trw_flags & FATAL) {
 		freemsg(mp);
-		return;
+		return (0);
 	}
 
 	switch (mp->b_datap->db_type) {
@@ -353,6 +351,7 @@ tirdwrwput(queue_t *q, mblk_t *mp)
 		send_fatal(q, mp);
 		break;
 	}
+	return (0);
 }
 
 
