@@ -91,7 +91,7 @@ enum {
         }
 
 
-#define IDLE_CHK_CHIP_MASK_CHK(chip_mask) \
+#define IDLE_CHK_CHIP_MASK_CHK(chip_mask) { \
         b_test_chip=0; \
         var_chip_mask = 0; \
         val = REG_RD(pdev, MISC_REG_CHIP_NUM); \
@@ -110,7 +110,8 @@ enum {
         } \
         if (var_chip_mask & chip_mask) { \
             b_test_chip = 1;\
-        }
+        } \
+}
 
 /* read one reg and check the condition */
 #define IDLE_CHK_1(chip_mask, offset, condition, severity, fail_msg) \
