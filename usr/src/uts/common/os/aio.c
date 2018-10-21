@@ -143,7 +143,7 @@ static int aio_port_callback(void *, int *, pid_t, int, void *);
 static struct sysent kaio_sysent = {
 	6,
 	SE_NOUNLOAD | SE_64RVAL | SE_ARGC,
-	(int (*)())kaioc
+	(int (*)())(uintptr_t)kaioc
 };
 
 #ifdef _SYSCALL32_IMPL
