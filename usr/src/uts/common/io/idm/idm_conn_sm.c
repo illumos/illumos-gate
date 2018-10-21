@@ -1477,7 +1477,7 @@ idm_conn_sm_validate_pdu(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx,
 		case CS_S8_CLEANUP:
 		case CS_S10_IN_CLEANUP:
 			action = CA_DROP;
-			break;
+			goto validate_pdu_done;
 		default:
 			action = ((event_ctx->iec_pdu_event_type == CT_TX_PDU) ?
 			    CA_TX_PROTOCOL_ERROR : CA_RX_PROTOCOL_ERROR);
@@ -1503,7 +1503,7 @@ idm_conn_sm_validate_pdu(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx,
 		case CS_S8_CLEANUP:
 		case CS_S10_IN_CLEANUP:
 			action = CA_DROP;
-			break;
+			goto validate_pdu_done;
 		default:
 			action = ((event_ctx->iec_pdu_event_type == CT_TX_PDU) ?
 			    CA_TX_PROTOCOL_ERROR : CA_RX_PROTOCOL_ERROR);
@@ -1523,7 +1523,7 @@ idm_conn_sm_validate_pdu(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx,
 		case CS_S8_CLEANUP:
 		case CS_S10_IN_CLEANUP:
 			action = CA_DROP;
-			break;
+			goto validate_pdu_done;
 		default:
 			action = ((event_ctx->iec_pdu_event_type == CT_TX_PDU) ?
 			    CA_TX_PROTOCOL_ERROR : CA_RX_PROTOCOL_ERROR);
