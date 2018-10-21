@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -132,7 +132,7 @@ static struct sysent ipcmsg_sysent = {
 #else
 	SE_ARGC | SE_NOUNLOAD | SE_32RVAL1,
 #endif
-	(int (*)())msgsys
+	(int (*)())(uintptr_t)msgsys
 };
 
 #ifdef	_SYSCALL32_IMPL
@@ -142,7 +142,7 @@ static ssize32_t msgsys32(int opcode, uint32_t a0, uint32_t a1, uint32_t a2,
 static struct sysent ipcmsg_sysent32 = {
 	6,
 	SE_ARGC | SE_NOUNLOAD | SE_32RVAL1,
-	(int (*)())msgsys32
+	msgsys32
 };
 #endif	/* _SYSCALL32_IMPL */
 
@@ -179,7 +179,7 @@ static struct modlsys modlsys32 = {
  *			   but the type was not present.  The entries are
  *			   hashed into a bucket in an attempt to keep
  *			   any list search relatively short.
- * 		b) msg_wait_snd_ngt: handles all receivers that have designated
+ *		b) msg_wait_snd_ngt: handles all receivers that have designated
  *		   a negative message type. Unlike msg_wait_snd, the hash bucket
  *		   serves a range of negative message types (-1 to -5, -6 to -10
  *		   and so forth), where the last bucket is reserved for all the
@@ -242,7 +242,7 @@ static struct modlsys modlsys32 = {
  *
  *
  *   6) Whenever a message is found that matches the message type designated,
- * 	but is being copied out we have to block on the copyout queue.
+ *	but is being copied out we have to block on the copyout queue.
  *	After process copying finishes the copy out, it  must wakeup (either
  *	directly or indirectly) all receivers who blocked on its copyout,
  *	so they are guaranteed a chance to examine the remaining messages.
@@ -501,7 +501,7 @@ msgctl(int msgid, int cmd, void *arg)
 			qp->msg_perm.ipc_mode |= MSG_WWAIT;
 		ipcperm_stat(&STRUCT_BUF(ds)->msg_perm, &qp->msg_perm, mdl);
 		qp->msg_perm.ipc_mode &= ~(MSG_RWAIT|MSG_WWAIT);
-		STRUCT_FSETP(ds, msg_first, NULL); 	/* kernel addr */
+		STRUCT_FSETP(ds, msg_first, NULL);	/* kernel addr */
 		STRUCT_FSETP(ds, msg_last, NULL);
 		STRUCT_FSET(ds, msg_cbytes, qp->msg_cbytes);
 		STRUCT_FSET(ds, msg_qnum, qp->msg_qnum);
@@ -879,7 +879,7 @@ msg_copyout(kmsqid_t *qp, long msgtyp, kmutex_t **lock, size_t *xtsz_ret,
 static struct msg *
 msgrcv_lookup(kmsqid_t *qp, long msgtyp)
 {
-	struct msg 		*smp = NULL;
+	struct msg		*smp = NULL;
 	long			qp_low;
 	struct msg		*mp;	/* ptr to msg on q */
 	long			low_msgtype;
@@ -1442,7 +1442,7 @@ msg_rcvq_wakeup_all(list_t *q_ptr)
  */
 static ssize_t
 msgsys(int opcode, uintptr_t a1, uintptr_t a2, uintptr_t a3,
-	uintptr_t a4, uintptr_t a5)
+    uintptr_t a4, uintptr_t a5)
 {
 	ssize_t error;
 
@@ -1481,7 +1481,6 @@ msgsys(int opcode, uintptr_t a1, uintptr_t a2, uintptr_t a3,
  */
 static void
 msg_wakeup_senders(kmsqid_t *qp)
-
 {
 	struct msgq_wakeup *ptr, *optr;
 	size_t avail, smallest;
@@ -1548,7 +1547,7 @@ msg_wakeup_senders(kmsqid_t *qp)
  */
 static ssize32_t
 msgsys32(int opcode, uint32_t a1, uint32_t a2, uint32_t a3,
-	uint32_t a4, uint32_t a5)
+    uint32_t a4, uint32_t a5)
 {
 	ssize_t error;
 
