@@ -505,8 +505,8 @@ ibt_cisco_embedded_sm_rereg_fix(void *arg)
 	hca_guid = hca_devp->hd_hca_attr->hca_node_guid;
 	mutex_exit(&ibtl_clnt_list_mutex);
 
-	ibt_status = ((ibtl_node_info_cb_t)mgrp->mgr_async_handler)(hca_guid,
-	    port, sm_lid, &node_info);
+	ibt_status = ((ibtl_node_info_cb_t)(uintptr_t)
+	    mgrp->mgr_async_handler)(hca_guid, port, sm_lid, &node_info);
 	if (ibt_status == IBT_SUCCESS) {
 		if ((node_info.n_vendor_id == IBT_VENDOR_CISCO) &&
 		    (node_info.n_node_type == IBT_NODE_TYPE_SWITCH)) {
@@ -740,7 +740,7 @@ ibtl_do_hca_asyncs(ibtl_hca_devinfo_t *hca_devp)
 		if ((code == IBT_PORT_CHANGE_EVENT) &&
 		    eventp->ev_port_flags & IBT_PORT_CHANGE_SM_LID)
 			ibtl_cm_get_node_info(hca_devp,
-			    (ibt_async_handler_t)ibtl_node_info_cb);
+			    (ibt_async_handler_t)(uintptr_t)ibtl_node_info_cb);
 		/* wait for node info task to complete */
 		while (hca_devp->hd_async_task_cnt != 0)
 			cv_wait(&hca_devp->hd_async_task_cv,
