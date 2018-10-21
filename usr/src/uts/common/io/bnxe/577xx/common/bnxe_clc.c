@@ -4779,9 +4779,9 @@ static void elink_sfp_e3_set_transmitter(struct elink_params *params,
 		elink_set_cfg_pin(cb, cfg_pin + 3, tx_en ^ 1);
 }
 
-static void elink_warpcore_config_init(struct elink_phy *phy,
-				       struct elink_params *params,
-				       struct elink_vars *vars)
+static elink_status_t
+elink_warpcore_config_init(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u32 serdes_net_if;
@@ -4859,7 +4859,7 @@ static void elink_warpcore_config_init(struct elink_phy *phy,
 		case PORT_HW_CFG_NET_SERDES_IF_DXGXS:
 			if (vars->line_speed != ELINK_SPEED_20000) {
 				ELINK_DEBUG_P0(cb, "Speed not supported yet\n");
-				return;
+				return (ELINK_STATUS_ERROR);
 			}
 			ELINK_DEBUG_P0(cb, "Setting 20G DXGXS\n");
 			elink_warpcore_set_20G_DXGXS(cb, phy, lane);
@@ -4882,13 +4882,14 @@ static void elink_warpcore_config_init(struct elink_phy *phy,
 			ELINK_DEBUG_P1(cb,
 			   "Unsupported Serdes Net Interface 0x%x\n",
 			   serdes_net_if);
-			return;
+			return (ELINK_STATUS_ERROR);
 		}
 	}
 
 	/* Take lane out of reset after configuration is finished */
 	elink_warpcore_reset_lane(cb, phy, 0);
 	ELINK_DEBUG_P0(cb, "Exit config init\n");
+	return (ELINK_STATUS_OK);
 }
 
 static void elink_warpcore_link_reset(struct elink_phy *phy,
@@ -6257,9 +6258,9 @@ static elink_status_t elink_get_link_speed_duplex(struct elink_phy *phy,
 }
 
 #ifndef EXCLUDE_XGXS
-static elink_status_t elink_link_settings_status(struct elink_phy *phy,
-				      struct elink_params *params,
-				      struct elink_vars *vars)
+static elink_status_t
+elink_link_settings_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 
@@ -6333,9 +6334,9 @@ static elink_status_t elink_link_settings_status(struct elink_phy *phy,
 #endif // EXCLUDE_XGXS
 
 #ifndef EXCLUDE_WARPCORE
-static elink_status_t elink_warpcore_read_status(struct elink_phy *phy,
-				     struct elink_params *params,
-				     struct elink_vars *vars)
+static elink_status_t
+elink_warpcore_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u8 lane;
@@ -6571,9 +6572,9 @@ static void elink_set_preemphasis(struct elink_phy *phy,
 	}
 }
 
-static void elink_xgxs_config_init(struct elink_phy *phy,
-				   struct elink_params *params,
-				   struct elink_vars *vars)
+static elink_status_t
+elink_xgxs_config_init(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 #ifdef ELINK_DEBUG
 	struct elink_dev *cb = params->cb;
@@ -6620,6 +6621,7 @@ static void elink_xgxs_config_init(struct elink_phy *phy,
 
 		elink_initialize_sgmii_process(phy, params, vars);
 	}
+	return (ELINK_STATUS_OK);
 }
 
 static elink_status_t elink_prepare_xgxs(struct elink_phy *phy,
@@ -6818,7 +6820,8 @@ static void elink_link_int_ack(struct elink_params *params,
 }
 
 #if !defined(ELINK_EMUL_ONLY) && (!defined(EXCLUDE_BCM8727_BCM8073) || !defined(EXCLUDE_SFX7101) || !defined(EXCLUDE_BCM8705) || !defined(EXCLUDE_BCM87x6))
-static elink_status_t elink_format_ver(u32 num, u8 *str, u16 *len)
+static elink_status_t
+elink_format_ver(u32 num, u8 *str, u16 *len)
 {
 #ifdef ELINK_ENHANCEMENTS
 	u8 *str_ptr = str;
@@ -6861,7 +6864,8 @@ static elink_status_t elink_format_ver(u32 num, u8 *str, u16 *len)
 
 
 #ifndef EXCLUDE_BCM8705
-static elink_status_t elink_null_format_ver(u32 spirom_ver, u8 *str, u16 *len)
+static elink_status_t
+elink_null_format_ver(u32 spirom_ver, u8 *str, u16 *len)
 {
 #ifdef ELINK_ENHANCEMENTS
 	str[0] = '\0';
@@ -8257,9 +8261,9 @@ static elink_status_t elink_8073_config_init(struct elink_phy *phy,
 	return ELINK_STATUS_OK;
 }
 
-static u8 elink_8073_read_status(struct elink_phy *phy,
-				 struct elink_params *params,
-				 struct elink_vars *vars)
+static elink_status_t
+elink_8073_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u8 link_up = 0;
@@ -8453,9 +8457,9 @@ static elink_status_t elink_8705_config_init(struct elink_phy *phy,
 	return ELINK_STATUS_OK;
 }
 
-static u8 elink_8705_read_status(struct elink_phy *phy,
-				 struct elink_params *params,
-				 struct elink_vars *vars)
+static elink_status_t
+elink_8705_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	u8 link_up = 0;
 	u16 val1, rx_sd;
@@ -9749,9 +9753,9 @@ static u8 elink_8706_8726_read_status(struct elink_phy *phy,
 /******************************************************************/
 /*			BCM8706 PHY SECTION			  */
 /******************************************************************/
-static u8 elink_8706_config_init(struct elink_phy *phy,
-				 struct elink_params *params,
-				 struct elink_vars *vars)
+static elink_status_t
+elink_8706_config_init(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	u32 tx_en_mode;
 	u16 cnt, val, tmp1;
@@ -9855,9 +9859,9 @@ static u8 elink_8706_config_init(struct elink_phy *phy,
 	return ELINK_STATUS_OK;
 }
 
-static elink_status_t elink_8706_read_status(struct elink_phy *phy,
-				  struct elink_params *params,
-				  struct elink_vars *vars)
+static elink_status_t
+elink_8706_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	return elink_8706_8726_read_status(phy, params, vars);
 }
@@ -9911,9 +9915,9 @@ static void elink_8726_external_rom_boot(struct elink_phy *phy,
 	elink_save_bcm_spirom_ver(cb, phy, params->port);
 }
 
-static u8 elink_8726_read_status(struct elink_phy *phy,
-				 struct elink_params *params,
-				 struct elink_vars *vars)
+static elink_status_t
+elink_8726_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u16 val1;
@@ -9932,9 +9936,9 @@ static u8 elink_8726_read_status(struct elink_phy *phy,
 }
 
 
-static elink_status_t elink_8726_config_init(struct elink_phy *phy,
-				  struct elink_params *params,
-				  struct elink_vars *vars)
+static elink_status_t
+elink_8726_config_init(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	ELINK_DEBUG_P0(cb, "Initializing BCM8726\n");
@@ -10154,9 +10158,9 @@ static void elink_8727_config_speed(struct elink_phy *phy,
 	}
 }
 
-static elink_status_t elink_8727_config_init(struct elink_phy *phy,
-				  struct elink_params *params,
-				  struct elink_vars *vars)
+static elink_status_t
+elink_8727_config_init(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	u32 tx_en_mode;
 	u16 tmp1, mod_abs, tmp2;
@@ -10325,10 +10329,9 @@ static void elink_8727_handle_mod_abs(struct elink_phy *phy,
 	/* No need to check link status in case of module plugged in/out */
 }
 
-static u8 elink_8727_read_status(struct elink_phy *phy,
-				 struct elink_params *params,
-				 struct elink_vars *vars)
-
+static elink_status_t
+elink_8727_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u8 link_up = 0;
@@ -10798,9 +10801,9 @@ static elink_status_t elink_848xx_cmn_config_init(struct elink_phy *phy,
 
 #ifndef EXCLUDE_BCM8481
 #ifndef EXCLUDE_NON_COMMON_INIT
-static elink_status_t elink_8481_config_init(struct elink_phy *phy,
-				  struct elink_params *params,
-				  struct elink_vars *vars)
+static elink_status_t
+elink_8481_config_init(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	/* Restore normal power mode*/
@@ -10946,7 +10949,8 @@ static u8 elink_84833_get_reset_gpios(struct elink_dev *cb,
 }
 
 #ifndef EXCLUDE_NON_COMMON_INIT
-static elink_status_t elink_84833_hw_reset_phy(struct elink_phy *phy,
+static void
+elink_84833_hw_reset_phy(struct elink_phy *phy,
 				struct elink_params *params)
 {
 	struct elink_dev *cb = params->cb;
@@ -10977,8 +10981,6 @@ static elink_status_t elink_84833_hw_reset_phy(struct elink_phy *phy,
 	ELINK_DEBUG_P1(cb, "84833 hw reset on pin values 0x%x\n",
 		reset_gpios);
 #endif // EDEBUG
-
-	return ELINK_STATUS_OK;
 }
 #endif // EXCLUDE_NON_COMMON_INIT
 #endif // #ifndef EXCLUDE_BCM84833
@@ -11031,9 +11033,9 @@ static elink_status_t elink_8483x_enable_eee(struct elink_phy *phy,
 
 #if !defined(EXCLUDE_BCM8481) || !defined(EXCLUDE_BCM84833)
 #define PHY84833_CONSTANT_LATENCY 1193
-static elink_status_t elink_848x3_config_init(struct elink_phy *phy,
-				   struct elink_params *params,
-				   struct elink_vars *vars)
+static elink_status_t
+elink_848x3_config_init(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u8 port, initialize = 1;
@@ -11215,9 +11217,9 @@ static elink_status_t elink_848x3_config_init(struct elink_phy *phy,
 	return rc;
 }
 
-static u8 elink_848xx_read_status(struct elink_phy *phy,
-				  struct elink_params *params,
-				  struct elink_vars *vars)
+static elink_status_t
+elink_848xx_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u16 val, val1, val2;
@@ -11361,7 +11363,8 @@ static u8 elink_848xx_read_status(struct elink_phy *phy,
 	return link_up;
 }
 
-static elink_status_t elink_848xx_format_ver(u32 raw_ver, u8 *str, u16 *len)
+static elink_status_t
+elink_848xx_format_ver(u32 raw_ver, u8 *str, u16 *len)
 {
 	elink_status_t status = ELINK_STATUS_OK;
 #ifdef ELINK_ENHANCEMENTS
@@ -11766,9 +11769,9 @@ static void elink_54618se_specific_func(struct elink_phy *phy,
 	}
 }
 
-static elink_status_t elink_54618se_config_init(struct elink_phy *phy,
-					       struct elink_params *params,
-					       struct elink_vars *vars)
+static elink_status_t
+elink_54618se_config_init(struct elink_phy *phy,
+    struct elink_params *params, struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u8 port;
@@ -12053,9 +12056,9 @@ static void elink_54618se_link_reset(struct elink_phy *phy,
 	elink_set_cfg_pin(cb, cfg_pin, 0);
 }
 
-static u8 elink_54618se_read_status(struct elink_phy *phy,
-				    struct elink_params *params,
-				    struct elink_vars *vars)
+static elink_status_t
+elink_54618se_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u16 val;
@@ -12256,9 +12259,9 @@ static elink_status_t elink_7101_config_init(struct elink_phy *phy,
 	return ELINK_STATUS_OK;
 }
 
-static u8 elink_7101_read_status(struct elink_phy *phy,
-				 struct elink_params *params,
-				 struct elink_vars *vars)
+static elink_status_t
+elink_7101_read_status(struct elink_phy *phy, struct elink_params *params,
+    struct elink_vars *vars)
 {
 	struct elink_dev *cb = params->cb;
 	u8 link_up;
@@ -12296,7 +12299,8 @@ static u8 elink_7101_read_status(struct elink_phy *phy,
 	return link_up;
 }
 
-static elink_status_t elink_7101_format_ver(u32 spirom_ver, u8 *str, u16 *len)
+static elink_status_t
+elink_7101_format_ver(u32 spirom_ver, u8 *str, u16 *len)
 {
 	if (*len < 5)
 		return ELINK_STATUS_ERROR;
@@ -12427,9 +12431,9 @@ static const struct elink_phy phy_serdes = {
 	/*.speed_cap_mask = */0,
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
-	/*.config_init	= */(config_init_t)elink_xgxs_config_init,
-	/*.read_status	= */(read_status_t)elink_link_settings_status,
-	/*.link_reset	= */(link_reset_t)elink_int_link_reset,
+	/*.config_init	= */elink_xgxs_config_init,
+	/*.read_status	= */elink_link_settings_status,
+	/*.link_reset	= */elink_int_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
 	/*.format_fw_ver	= */(format_fw_ver_t)NULL,
 	/*.hw_reset	= */(hw_reset_t)NULL,
@@ -12466,14 +12470,14 @@ static const struct elink_phy phy_xgxs = {
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_xgxs_config_init,
-	/*.read_status	= */(read_status_t)elink_link_settings_status,
-	/*.link_reset	= */(link_reset_t)elink_int_link_reset,
-	/*.config_loopback = */(config_loopback_t)elink_set_xgxs_loopback,
+	/*.config_init	= */elink_xgxs_config_init,
+	/*.read_status	= */elink_link_settings_status,
+	/*.link_reset	= */elink_int_link_reset,
+	/*.config_loopback = */elink_set_xgxs_loopback,
 	/*.format_fw_ver= */(format_fw_ver_t)NULL,
 	/*.hw_reset	= */(hw_reset_t)NULL,
 	/*.set_link_led = */(set_link_led_t)NULL,
-	/*.phy_specific_func = */(phy_specific_func_t)elink_xgxs_specific_func
+	/*.phy_specific_func = */elink_xgxs_specific_func
 #endif
 };
 #endif
@@ -12506,12 +12510,12 @@ static const struct elink_phy phy_warpcore = {
 	/* req_duplex = */0,
 	/* rsrv = */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_warpcore_config_init,
-	/*.read_status	= */(read_status_t)elink_warpcore_read_status,
-	/*.link_reset	= */(link_reset_t)elink_warpcore_link_reset,
-	/*.config_loopback = */(config_loopback_t)elink_set_warpcore_loopback,
+	/*.config_init	= */elink_warpcore_config_init,
+	/*.read_status	= */elink_warpcore_read_status,
+	/*.link_reset	= */elink_warpcore_link_reset,
+	/*.config_loopback = */elink_set_warpcore_loopback,
 	/*.format_fw_ver= */(format_fw_ver_t)NULL,
-	/*.hw_reset = */(hw_reset_t)elink_warpcore_hw_reset,
+	/*.hw_reset = */elink_warpcore_hw_reset,
 	/*.set_link_led = */(set_link_led_t)NULL,
 	/*.phy_specific_func = */(phy_specific_func_t)NULL
 #endif
@@ -12541,13 +12545,13 @@ static const struct elink_phy phy_7101 = {
 	/*.speed_cap_mask = */0,
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
-	/*.config_init	= */(config_init_t)elink_7101_config_init,
-	/*.read_status	= */(read_status_t)elink_7101_read_status,
-	/*.link_reset	= */(link_reset_t)elink_common_ext_link_reset,
-	/*.config_loopback = */(config_loopback_t)elink_7101_config_loopback,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_7101_format_ver,
-	/*.hw_reset	= */(hw_reset_t)elink_7101_hw_reset,
-	/*.set_link_led = */(set_link_led_t)elink_7101_set_link_led,
+	/*.config_init	= */elink_7101_config_init,
+	/*.read_status	= */elink_7101_read_status,
+	/*.link_reset	= */elink_common_ext_link_reset,
+	/*.config_loopback = */elink_7101_config_loopback,
+	/*.format_fw_ver= */elink_7101_format_ver,
+	/*.hw_reset	= */elink_7101_hw_reset,
+	/*.set_link_led = */elink_7101_set_link_led,
 	/*.phy_specific_func = */(phy_specific_func_t)NULL
 };
 #endif /* EXCLUDE_SFX7101 */
@@ -12575,14 +12579,14 @@ static const struct elink_phy phy_8073 = {
 	/*.req_duplex	= */0,
 	/*.rsrv		= */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_8073_config_init,
-	/*.read_status	= */(read_status_t)elink_8073_read_status,
-	/*.link_reset	= */(link_reset_t)elink_8073_link_reset,
+	/*.config_init	= */elink_8073_config_init,
+	/*.read_status	= */elink_8073_read_status,
+	/*.link_reset	= */elink_8073_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_format_ver,
+	/*.format_fw_ver= */elink_format_ver,
 	/*.hw_reset	= */(hw_reset_t)NULL,
 	/*.set_link_led = */(set_link_led_t)NULL,
-	/*.phy_specific_func = */(phy_specific_func_t)elink_8073_specific_func
+	/*.phy_specific_func = */elink_8073_specific_func
 #endif
 };
 #endif
@@ -12606,11 +12610,11 @@ static const struct elink_phy phy_8705 = {
 	/*.speed_cap_mask = */0,
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
-	/*.config_init	= */(config_init_t)elink_8705_config_init,
-	/*.read_status	= */(read_status_t)elink_8705_read_status,
-	/*.link_reset	= */(link_reset_t)elink_common_ext_link_reset,
+	/*.config_init	= */elink_8705_config_init,
+	/*.read_status	= */elink_8705_read_status,
+	/*.link_reset	= */elink_common_ext_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_null_format_ver,
+	/*.format_fw_ver= */elink_null_format_ver,
 	/*.hw_reset	= */(hw_reset_t)NULL,
 	/*.set_link_led = */(set_link_led_t)NULL,
 	/*.phy_specific_func = */(phy_specific_func_t)NULL
@@ -12637,11 +12641,11 @@ static const struct elink_phy phy_8706 = {
 	/*.speed_cap_mask = */0,
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
-	/*.config_init	= */(config_init_t)elink_8706_config_init,
-	/*.read_status	= */(read_status_t)elink_8706_read_status,
-	/*.link_reset	= */(link_reset_t)elink_common_ext_link_reset,
+	/*.config_init	= */elink_8706_config_init,
+	/*.read_status	= */elink_8706_read_status,
+	/*.link_reset	= */elink_common_ext_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_format_ver,
+	/*.format_fw_ver= */elink_format_ver,
 	/*.hw_reset	= */(hw_reset_t)NULL,
 	/*.set_link_led = */(set_link_led_t)NULL,
 	/*.phy_specific_func = */(phy_specific_func_t)NULL
@@ -12669,11 +12673,11 @@ static const struct elink_phy phy_8726 = {
 	/*.speed_cap_mask = */0,
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
-	/*.config_init	= */(config_init_t)elink_8726_config_init,
-	/*.read_status	= */(read_status_t)elink_8726_read_status,
-	/*.link_reset	= */(link_reset_t)elink_8726_link_reset,
-	/*.config_loopback = */(config_loopback_t)elink_8726_config_loopback,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_format_ver,
+	/*.config_init	= */elink_8726_config_init,
+	/*.read_status	= */elink_8726_read_status,
+	/*.link_reset	= */elink_8726_link_reset,
+	/*.config_loopback = */elink_8726_config_loopback,
+	/*.format_fw_ver= */elink_format_ver,
 	/*.hw_reset	= */(hw_reset_t)NULL,
 	/*.set_link_led = */(set_link_led_t)NULL,
 	/*.phy_specific_func = */(phy_specific_func_t)NULL
@@ -12703,14 +12707,14 @@ static const struct elink_phy phy_8727 = {
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_8727_config_init,
-	/*.read_status	= */(read_status_t)elink_8727_read_status,
-	/*.link_reset	= */(link_reset_t)elink_8727_link_reset,
+	/*.config_init	= */elink_8727_config_init,
+	/*.read_status	= */elink_8727_read_status,
+	/*.link_reset	= */elink_8727_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_format_ver,
-	/*.hw_reset	= */(hw_reset_t)elink_8727_hw_reset,
-	/*.set_link_led = */(set_link_led_t)elink_8727_set_link_led,
-	/*.phy_specific_func = */(phy_specific_func_t)elink_8727_specific_func
+	/*.format_fw_ver= */elink_format_ver,
+	/*.hw_reset	= */elink_8727_hw_reset,
+	/*.set_link_led = */elink_8727_set_link_led,
+	/*.phy_specific_func = */elink_8727_specific_func
 #endif
 };
 #endif
@@ -12742,13 +12746,13 @@ static const struct elink_phy phy_8481 = {
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_8481_config_init,
-	/*.read_status	= */(read_status_t)elink_848xx_read_status,
-	/*.link_reset	= */(link_reset_t)elink_8481_link_reset,
+	/*.config_init	= */elink_8481_config_init,
+	/*.read_status	= */elink_848xx_read_status,
+	/*.link_reset	= */elink_8481_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_848xx_format_ver,
-	/*.hw_reset	= */(hw_reset_t)elink_8481_hw_reset,
-	/*.set_link_led = */(set_link_led_t)elink_848xx_set_link_led,
+	/*.format_fw_ver= */elink_848xx_format_ver,
+	/*.hw_reset	= */elink_8481_hw_reset,
+	/*.set_link_led = */elink_848xx_set_link_led,
 	/*.phy_specific_func = */(phy_specific_func_t)NULL
 #endif
 };
@@ -12781,14 +12785,14 @@ static const struct elink_phy phy_84823 = {
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_848x3_config_init,
-	/*.read_status	= */(read_status_t)elink_848xx_read_status,
-	/*.link_reset	= */(link_reset_t)elink_848x3_link_reset,
+	/*.config_init	= */elink_848x3_config_init,
+	/*.read_status	= */elink_848xx_read_status,
+	/*.link_reset	= */elink_848x3_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_848xx_format_ver,
+	/*.format_fw_ver= */elink_848xx_format_ver,
 	/*.hw_reset	= */(hw_reset_t)NULL,
-	/*.set_link_led = */(set_link_led_t)elink_848xx_set_link_led,
-	/*.phy_specific_func = */(phy_specific_func_t)elink_848xx_specific_func
+	/*.set_link_led = */elink_848xx_set_link_led,
+	/*.phy_specific_func = */elink_848xx_specific_func
 #endif // #ifndef EXCLUDE_NON_COMMON_INIT
 };
 #endif /* EXCLUDE_BCM8481 */
@@ -12821,14 +12825,14 @@ static const struct elink_phy phy_84833 = {
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_848x3_config_init,
-	/*.read_status	= */(read_status_t)elink_848xx_read_status,
-	/*.link_reset	= */(link_reset_t)elink_848x3_link_reset,
+	/*.config_init	= */elink_848x3_config_init,
+	/*.read_status	= */elink_848xx_read_status,
+	/*.link_reset	= */elink_848x3_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_848xx_format_ver,
-	/*.hw_reset	= */(hw_reset_t)elink_84833_hw_reset_phy,
-	/*.set_link_led = */(set_link_led_t)elink_848xx_set_link_led,
-	/*.phy_specific_func = */(phy_specific_func_t)elink_848xx_specific_func
+	/*.format_fw_ver= */elink_848xx_format_ver,
+	/*.hw_reset	= */elink_84833_hw_reset_phy,
+	/*.set_link_led = */elink_848xx_set_link_led,
+	/*.phy_specific_func = */elink_848xx_specific_func
 #endif
 };
 
@@ -12857,14 +12861,14 @@ static const struct elink_phy phy_84834 = {
 	/*.req_duplex = */0,
 	/*.rsrv = */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_848x3_config_init,
-	/*.read_status	= */(read_status_t)elink_848xx_read_status,
-	/*.link_reset	= */(link_reset_t)elink_848x3_link_reset,
+	/*.config_init	= */elink_848x3_config_init,
+	/*.read_status	= */elink_848xx_read_status,
+	/*.link_reset	= */elink_848x3_link_reset,
 	/*.config_loopback = */(config_loopback_t)NULL,
-	/*.format_fw_ver= */(format_fw_ver_t)elink_848xx_format_ver,
-	/*.hw_reset	= */(hw_reset_t)elink_84833_hw_reset_phy,
-	/*.set_link_led = */(set_link_led_t)elink_848xx_set_link_led,
-	/*.phy_specific_func = */(phy_specific_func_t)elink_848xx_specific_func
+	/*.format_fw_ver= */elink_848xx_format_ver,
+	/*.hw_reset	= */elink_84833_hw_reset_phy,
+	/*.set_link_led = */elink_848xx_set_link_led,
+	/*.phy_specific_func = */elink_848xx_specific_func
 #endif
 };
 #endif // #ifndef EXCLUDE_BCM84833
@@ -12895,14 +12899,14 @@ static const struct elink_phy phy_54618se = {
 	/* req_duplex = */0,
 	/* rsrv = */0,
 #ifndef EXCLUDE_NON_COMMON_INIT
-	/*.config_init	= */(config_init_t)elink_54618se_config_init,
-	/*.read_status	= */(read_status_t)elink_54618se_read_status,
-	/*.link_reset	= */(link_reset_t)elink_54618se_link_reset,
-	/*.config_loopback = */(config_loopback_t)elink_54618se_config_loopback,
+	/*.config_init	= */elink_54618se_config_init,
+	/*.read_status	= */elink_54618se_read_status,
+	/*.link_reset	= */elink_54618se_link_reset,
+	/*.config_loopback = */elink_54618se_config_loopback,
 	/*.format_fw_ver= */(format_fw_ver_t)NULL,
 	/*.hw_reset	= */(hw_reset_t)NULL,
-	/*.set_link_led = */(set_link_led_t)elink_5461x_set_link_led,
-	/*.phy_specific_func = */(phy_specific_func_t)elink_54618se_specific_func
+	/*.set_link_led = */elink_5461x_set_link_led,
+	/*.phy_specific_func = */elink_54618se_specific_func
 #endif
 };
 #endif
