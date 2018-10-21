@@ -309,8 +309,8 @@ clnt_clts_stats_fini(zoneid_t zoneid, struct rpc_clts_client **statsp)
 /* ARGSUSED */
 int
 clnt_clts_kcreate(struct knetconfig *config, struct netbuf *addr,
-	rpcprog_t pgm, rpcvers_t vers, int retrys, struct cred *cred,
-	CLIENT **cl)
+    rpcprog_t pgm, rpcvers_t vers, int retrys, struct cred *cred,
+    CLIENT **cl)
 {
 	CLIENT *h;
 	struct cku_private *p;
@@ -418,8 +418,8 @@ clnt_clts_kinit(CLIENT *h, struct netbuf *addr, int retrys, cred_t *cred)
  */
 static int
 clnt_clts_ksettimers(CLIENT *h, struct rpc_timers *t, struct rpc_timers *all,
-	int minimum, void (*feedback)(int, int, caddr_t), caddr_t arg,
-	uint32_t xid)
+    int minimum, void (*feedback)(int, int, caddr_t), caddr_t arg,
+    uint32_t xid)
 {
 	/* LINTED pointer alignment */
 	struct cku_private *p = htop(h);
@@ -460,8 +460,8 @@ clnt_clts_ksettimers(CLIENT *h, struct rpc_timers *t, struct rpc_timers *all,
  */
 enum clnt_stat
 clnt_clts_kcallit_addr(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
-	caddr_t argsp, xdrproc_t xdr_results, caddr_t resultsp,
-	struct timeval wait, struct netbuf *sin)
+    caddr_t argsp, xdrproc_t xdr_results, caddr_t resultsp,
+    struct timeval wait, struct netbuf *sin)
 {
 	/* LINTED pointer alignment */
 	struct cku_private *p = htop(h);
@@ -1004,8 +1004,8 @@ done:
 
 static enum clnt_stat
 clnt_clts_kcallit(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
-	caddr_t argsp, xdrproc_t xdr_results, caddr_t resultsp,
-	struct timeval wait)
+    caddr_t argsp, xdrproc_t xdr_results, caddr_t resultsp,
+    struct timeval wait)
 {
 	return (clnt_clts_kcallit_addr(h, procnum, xdr_args, argsp,
 	    xdr_results, resultsp, wait, NULL));
@@ -2005,7 +2005,7 @@ endpnt_repossess(void *a)
 	 */
 	if (endpnt_taskq != NULL)
 		(void) taskq_dispatch(endpnt_taskq,
-		    (task_func_t *)endpnt_reclaim, (void *)ALL_ZONES,
+		    (task_func_t *)(uintptr_t)endpnt_reclaim, (void *)ALL_ZONES,
 		    TQ_NOSLEEP);
 }
 

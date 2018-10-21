@@ -212,10 +212,10 @@ int rmm_close(queue_t *, int, cred_t *);
  * To save instructions, since STREAMS ignores the return value
  * from these functions, they are defined as void here. Kind of icky, but...
  */
-void rmm_rput(queue_t *, mblk_t *);
-void rmm_wput(queue_t *, mblk_t *);
-void rmm_rsrv(queue_t *);
-void rmm_wsrv(queue_t *);
+int rmm_rput(queue_t *, mblk_t *);
+int rmm_wput(queue_t *, mblk_t *);
+int rmm_rsrv(queue_t *);
+int rmm_wsrv(queue_t *);
 
 int rpcmodopen(queue_t *, dev_t *, int, int, cred_t *);
 int rpcmodclose(queue_t *, int, cred_t *);
@@ -237,8 +237,8 @@ static struct module_info rpcmod_info =
 	{RPCMOD_ID, "rpcmod", 0, INFPSZ, 256*1024, 1024};
 
 static struct qinit rpcmodrinit = {
-	(int (*)())rmm_rput,
-	(int (*)())rmm_rsrv,
+	rmm_rput,
+	rmm_rsrv,
 	rmm_open,
 	rmm_close,
 	nulldev,
@@ -252,8 +252,8 @@ static struct qinit rpcmodrinit = {
  * synchronize with flow control.
  */
 static struct qinit rpcmodwinit = {
-	(int (*)())rmm_wput,
-	(int (*)())rmm_wsrv,
+	rmm_wput,
+	rmm_wsrv,
 	rmm_open,
 	rmm_close,
 	nulldev,
@@ -542,28 +542,32 @@ out:
 	return (error);
 }
 
-void
+int
 rmm_rput(queue_t *q, mblk_t  *mp)
 {
 	(*((struct temp_slot *)q->q_ptr)->ops->xo_rput)(q, mp);
+	return (0);
 }
 
-void
+int
 rmm_rsrv(queue_t *q)
 {
 	(*((struct temp_slot *)q->q_ptr)->ops->xo_rsrv)(q);
+	return (0);
 }
 
-void
+int
 rmm_wput(queue_t *q, mblk_t *mp)
 {
 	(*((struct temp_slot *)q->q_ptr)->ops->xo_wput)(q, mp);
+	return (0);
 }
 
-void
+int
 rmm_wsrv(queue_t *q)
 {
 	(*((struct temp_slot *)q->q_ptr)->ops->xo_wsrv)(q);
+	return (0);
 }
 
 int
