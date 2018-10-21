@@ -4744,7 +4744,7 @@ pcic_set_interrupt(dev_info_t *dip, set_irq_handler_t *handler)
 		}
 
 		pcic->irq_current->intr =
-		    (ddi_intr_handler_t *)handler->handler;
+		    (ddi_intr_handler_t *)(uintptr_t)handler->handler;
 		pcic->irq_current->handler_id = handler->handler_id;
 		pcic->irq_current->arg1 = handler->arg1;
 		pcic->irq_current->arg2 = handler->arg2;
@@ -4757,7 +4757,7 @@ pcic_set_interrupt(dev_info_t *dip, set_irq_handler_t *handler)
 		break;
 
 	default:
-		intr->intr = (ddi_intr_handler_t *)handler->handler;
+		intr->intr = (ddi_intr_handler_t *)(uintptr_t)handler->handler;
 		intr->handler_id = handler->handler_id;
 		intr->arg1 = handler->arg1;
 		intr->arg2 = handler->arg2;
