@@ -30,6 +30,7 @@
 
 #include <sys/stropts.h>
 #include <sys/strsun.h>
+#include <sys/systm.h>
 #include <sys/vuid_event.h>
 #include <sys/vuid_wheel.h>
 #include <sys/termios.h>
@@ -104,82 +105,46 @@ _info(struct modinfo *modinfop)
 
 
 /* Function prototypes */
-static void		usbms_reioctl(void *);
-static void		usbms_ioctl(queue_t *, mblk_t *);
-static int		usbms_open();
-static int		usbms_close();
-static int		usbms_wput();
-static void		usbms_rput();
-static void		usbms_mctl_receive(
-				register queue_t	*q,
-				register mblk_t		*mp);
+static void usbms_reioctl(void *);
+static void usbms_ioctl(queue_t *, mblk_t *);
+static int usbms_open(queue_t *, dev_t *, int, int, cred_t *);
+static int usbms_close(queue_t *, int, cred_t *);
+static int usbms_wput(queue_t *, mblk_t *);
+static int usbms_rput(queue_t *, mblk_t *);
+static void usbms_mctl_receive(queue_t *, mblk_t *);
 
-static void		usbms_rserv(queue_t		*q);
-static void		usbms_miocdata(
-				register queue_t 	*q,
-				register mblk_t 	*mp);
+static int usbms_rserv(queue_t *);
+static void usbms_miocdata(queue_t *, mblk_t *);
 
-static void		usbms_resched(void *);
+static void usbms_resched(void *);
 
-static int		usbms_getparms(
-				register Ms_parms	*data,
-				usbms_state_t		*usbmsp);
+static int usbms_getparms(Ms_parms *, usbms_state_t *);
 
-static int		usbms_setparms(
-				register Ms_parms	*data,
-				usbms_state_t		*usbmsp);
+static int usbms_setparms(Ms_parms *, usbms_state_t *);
 
-static int		usbms_get_screen_parms(
-				register queue_t	*q,
-				register mblk_t		*datap);
+static int usbms_get_screen_parms(queue_t *q, mblk_t *);
 
-static void		usbms_flush(usbms_state_t	*usbmsp);
+static void usbms_flush(usbms_state_t *);
 
-static void		usbms_incr(void *);
-static void		usbms_input(
-				usbms_state_t		*usbmsp,
-				mblk_t			*mp);
-static void		usbms_rserv_vuid_button(
-				queue_t			*q,
-				struct usbmouseinfo	*mi,
-				mblk_t			**bpaddr);
+static void usbms_incr(void *);
+static void usbms_input(usbms_state_t *, mblk_t	*);
+static void usbms_rserv_vuid_button(queue_t *, struct usbmouseinfo *,
+    mblk_t **);
 
-static void		usbms_rserv_vuid_event_y(
-				queue_t			*q,
-				struct usbmouseinfo	*mi,
-				mblk_t			**bpaddr);
-static void		usbms_rserv_vuid_event_x(
-				queue_t			*q,
-				struct usbmouseinfo	*mi,
-				mblk_t			**bpaddr);
-static void 		usbms_rserv_vuid_event_wheel(
-				queue_t *,
-				struct usbmouseinfo *,
-				mblk_t **,
-				ushort_t id);
-static int		usbms_check_for_wheels(usbms_state_t *);
-static int		usbms_make_copyreq(
-				mblk_t 	*,
-				uint_t 	pvtsize,
-				uint_t	state,
-				uint_t	reqsize,
-				uint_t	contsize,
-				uint_t	copytype);
-static int		usbms_service_wheel_info(
-				queue_t	*,
-				mblk_t	*);
-static int		usbms_service_wheel_state(
-				queue_t	*,
-				mblk_t	*,
-				uint_t	cmd);
-static void		usbms_ack_ioctl(mblk_t	*);
-static int		usbms_read_input_data_format(usbms_state_t *);
-static mblk_t		*usbms_setup_abs_mouse_event();
-static int		usbms_get_coordinate(
-				uint_t			pos,
-				uint_t			len,
-				mblk_t			*mp);
-extern void		uniqtime32();
+static void usbms_rserv_vuid_event_y(queue_t *, struct usbmouseinfo *,
+    mblk_t **);
+static void usbms_rserv_vuid_event_x(queue_t *, struct usbmouseinfo *,
+    mblk_t **);
+static void usbms_rserv_vuid_event_wheel(queue_t *, struct usbmouseinfo *,
+    mblk_t **, ushort_t);
+static int usbms_check_for_wheels(usbms_state_t *);
+static int usbms_make_copyreq(mblk_t *, uint_t, uint_t, uint_t, uint_t, uint_t);
+static int usbms_service_wheel_info(queue_t *, mblk_t *);
+static int usbms_service_wheel_state(queue_t *, mblk_t *, uint_t);
+static void usbms_ack_ioctl(mblk_t *);
+static int usbms_read_input_data_format(usbms_state_t *);
+static mblk_t *usbms_setup_abs_mouse_event(void);
+static int usbms_get_coordinate(uint_t, uint_t, mblk_t *);
 
 /*
  * Device driver qinit functions
@@ -195,8 +160,8 @@ static struct module_info usbms_mod_info = {
 
 /* read side queue information structure */
 static struct qinit rinit = {
-	(int (*)())usbms_rput,	/* put procedure not needed */
-	(int (*)())usbms_rserv, /* service procedure */
+	usbms_rput,		/* put procedure not needed */
+	usbms_rserv,		/* service procedure */
 	usbms_open,		/* called on startup */
 	usbms_close,		/* called on finish */
 	NULL,			/* for future use */
@@ -249,15 +214,10 @@ static uint16_t			usbms_buf_bytes = USBMS_BUF_BYTES;
  */
 /*ARGSUSED*/
 static int
-usbms_open(queue_t			*q,
-	dev_t				*devp,
-	int				flag,
-	int				sflag,
-	cred_t				*credp)
-
+usbms_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
-	register struct usbmousebuf	*mousebufp;
-	register struct ms_softc	*msd_soft;
+	struct usbmousebuf	*mousebufp;
+	struct ms_softc	*msd_soft;
 	usbms_state_t			*usbmsp;
 	struct iocblk			mctlmsg;
 	mblk_t				*mctl_ptr;
@@ -304,15 +264,13 @@ usbms_open(queue_t			*q,
 	 * Allocate buffer and initialize data.
 	 */
 	msd_soft->ms_bufbytes = usbms_buf_bytes;
-	mousebufp = kmem_zalloc((uint_t)msd_soft->ms_bufbytes,
-				KM_SLEEP);
+	mousebufp = kmem_zalloc(msd_soft->ms_bufbytes, KM_SLEEP);
 
 	/* Truncation  will happen */
 	mousebufp->mb_size = (uint16_t)((msd_soft->ms_bufbytes -
-				    sizeof (struct usbmousebuf)) /
-				    sizeof (struct usbmouseinfo));
+	    sizeof (struct usbmousebuf)) / sizeof (struct usbmouseinfo));
 	mousebufp->mb_info = (struct usbmouseinfo *)((char *)mousebufp +
-				    sizeof (struct usbmousebuf));
+	    sizeof (struct usbmousebuf));
 	usbmsp->usbms_buf = mousebufp;
 	msd_soft->ms_vuidaddr = VKEY_FIRST;
 	usbmsp->usbms_jittertimeout = JITTER_TIMEOUT;
@@ -351,32 +309,32 @@ usbms_open(queue_t			*q,
 
 	if (usbmsp->usbms_report_descr_handle != NULL) {
 		if (hidparser_get_usage_attribute(
-				usbmsp->usbms_report_descr_handle,
-				0,
-				HIDPARSER_ITEM_INPUT,
-				USBMS_USAGE_PAGE_BUTTON,
-				0,
-				HIDPARSER_ITEM_REPORT_COUNT,
-				(int32_t *)&usbmsp->usbms_num_buttons) ==
-				HIDPARSER_SUCCESS) {
+		    usbmsp->usbms_report_descr_handle,
+		    0,
+		    HIDPARSER_ITEM_INPUT,
+		    USBMS_USAGE_PAGE_BUTTON,
+		    0,
+		    HIDPARSER_ITEM_REPORT_COUNT,
+		    (int32_t *)&usbmsp->usbms_num_buttons) ==
+		    HIDPARSER_SUCCESS) {
 			if (usbmsp->usbms_num_buttons > USB_MS_MAX_BUTTON_NO)
 				usbmsp->usbms_num_buttons =
-					USB_MS_MAX_BUTTON_NO;
+				    USB_MS_MAX_BUTTON_NO;
 			USB_DPRINTF_L2(PRINT_MASK_ALL,
-				usbms_log_handle, "Num of buttons is : %d",
-				usbmsp->usbms_num_buttons);
+			    usbms_log_handle, "Num of buttons is : %d",
+			    usbmsp->usbms_num_buttons);
 		} else {
 			USB_DPRINTF_L3(PRINT_MASK_OPEN,
-				usbms_log_handle,
-				"hidparser_get_usage_attribute failed : "
-				"Set to default number of buttons(3).");
+			    usbms_log_handle,
+			    "hidparser_get_usage_attribute failed : "
+			    "Set to default number of buttons(3).");
 
 			usbmsp->usbms_num_buttons = USB_MS_DEFAULT_BUTTON_NO;
 		}
 	} else {
 		USB_DPRINTF_L1(PRINT_MASK_ALL,
-			usbms_log_handle, "Invalid HID "
-			"Descriptor Tree. Set to default value(3 buttons).");
+		    usbms_log_handle, "Invalid HID "
+		    "Descriptor Tree. Set to default value(3 buttons).");
 		usbmsp->usbms_num_buttons = USB_MS_DEFAULT_BUTTON_NO;
 	}
 
@@ -416,12 +374,10 @@ usbms_open(queue_t			*q,
  */
 /*ARGSUSED*/
 static int
-usbms_close(queue_t			*q,
-	int 				flag,
-	cred_t 				*credp)
+usbms_close(queue_t *q, int flag, cred_t *credp)
 {
 	usbms_state_t			*usbmsp = q->q_ptr;
-	register struct	ms_softc	*ms = &usbmsp->usbms_softc;
+	struct	ms_softc	*ms = &usbmsp->usbms_softc;
 
 	USB_DPRINTF_L3(PRINT_MASK_CLOSE, usbms_log_handle,
 	    "usbms_close entering");
@@ -476,7 +432,7 @@ usbms_close(queue_t			*q,
  *	Read queue service routine.
  *	Turn buffered mouse events into stream messages.
  */
-static void
+static int
 usbms_rserv(queue_t		*q)
 {
 	usbms_state_t		*usbmsp = q->q_ptr;
@@ -484,7 +440,7 @@ usbms_rserv(queue_t		*q)
 	struct usbmousebuf	*b;
 	struct usbmouseinfo	*mi;
 	mblk_t			*bp;
-	ushort_t 		i, loop;
+	ushort_t		i, loop;
 	uchar_t			nbutt = (uchar_t)usbmsp->usbms_num_buttons;
 
 	ms = &usbmsp->usbms_softc;
@@ -498,14 +454,14 @@ usbms_rserv(queue_t		*q)
 		switch (ms->ms_readformat) {
 
 		case MS_3BYTE_FORMAT: {
-			register char	*cp;
+			char	*cp;
 
 			if ((usbmsp->usbms_idf).xlen != 1) {
 				USB_DPRINTF_L3(PRINT_MASK_SERV,
 				    usbms_log_handle,
 				    "Can't set to 3 byte format. Length != 1");
 
-				return;
+				return (0);
 			}
 			if ((bp = allocb(3, BPRI_HI)) != NULL) {
 				cp = (char *)bp->b_wptr;
@@ -532,7 +488,7 @@ usbms_rserv(queue_t		*q)
 				    (void *) usbmsp);
 				if (usbmsp->usbms_resched_id == 0)
 
-					return;	/* try again later */
+					return (0);	/* try again later */
 				/* bufcall failed; just pitch this event */
 				/* or maybe flush queue? */
 			}
@@ -612,6 +568,7 @@ usbms_rserv(queue_t		*q)
 	}
 	USB_DPRINTF_L3(PRINT_MASK_SERV, usbms_log_handle,
 	    "usbms_rserv exiting");
+	return (0);
 }
 
 
@@ -620,10 +577,8 @@ usbms_rserv(queue_t		*q)
  *	convert wheel data to firm events
  */
 static void
-usbms_rserv_vuid_event_wheel(queue_t		*q,
-			struct usbmouseinfo	*mi,
-			mblk_t			**bpaddr,
-			ushort_t 		id)
+usbms_rserv_vuid_event_wheel(queue_t *q, struct usbmouseinfo *mi,
+    mblk_t **bpaddr, ushort_t id)
 {
 	Firm_event *fep;
 	mblk_t *tmp;
@@ -671,9 +626,7 @@ usbms_rserv_vuid_event_wheel(queue_t		*q,
  *	Process a VUID button event
  */
 static void
-usbms_rserv_vuid_button(queue_t			*q,
-			struct usbmouseinfo	*mi,
-			mblk_t			**bpaddr)
+usbms_rserv_vuid_button(queue_t *q, struct usbmouseinfo	*mi, mblk_t **bpaddr)
 {
 	usbms_state_t		*usbmsp = q->q_ptr;
 	struct ms_softc	*ms;
@@ -782,13 +735,11 @@ usbms_rserv_vuid_button(queue_t			*q,
  *	Process a VUID y-event
  */
 static void
-usbms_rserv_vuid_event_y(register queue_t		*q,
-			register struct usbmouseinfo	*mi,
-			mblk_t				**bpaddr)
+usbms_rserv_vuid_event_y(queue_t *q, struct usbmouseinfo *mi, mblk_t **bpaddr)
 {
 	usbms_state_t			*usbmsp = q->q_ptr;
-	register struct ms_softc	*ms;
-	register Firm_event		*fep;
+	struct ms_softc	*ms;
+	Firm_event		*fep;
 	mblk_t				*bp;
 
 	ms = &usbmsp->usbms_softc;
@@ -873,13 +824,11 @@ usbms_rserv_vuid_event_y(register queue_t		*q,
  *	Process a VUID x-event
  */
 static void
-usbms_rserv_vuid_event_x(register queue_t		*q,
-			register struct usbmouseinfo	*mi,
-			mblk_t				**bpaddr)
+usbms_rserv_vuid_event_x(queue_t *q, struct usbmouseinfo *mi, mblk_t **bpaddr)
 {
 	usbms_state_t			*usbmsp = q->q_ptr;
-	register struct ms_softc	*ms;
-	register Firm_event		*fep;
+	struct ms_softc	*ms;
+	Firm_event		*fep;
 	mblk_t				*bp;
 
 	ms = &usbmsp->usbms_softc;
@@ -962,10 +911,10 @@ usbms_rserv_vuid_event_x(register queue_t		*q,
  *	enables the queue.
  */
 static void
-usbms_resched(void 	* usbmsp)
+usbms_resched(void *usbmsp)
 {
-	register queue_t	*q;
-	register usbms_state_t	*tmp_usbmsp = (usbms_state_t *)usbmsp;
+	queue_t	*q;
+	usbms_state_t	*tmp_usbmsp = (usbms_state_t *)usbmsp;
 
 	tmp_usbmsp->usbms_resched_id = 0;
 	if ((q = tmp_usbmsp->usbms_rq_ptr) != 0)
@@ -978,8 +927,7 @@ usbms_resched(void 	* usbmsp)
  *	Module below : hid, module above : consms
  */
 static int
-usbms_wput(queue_t		*q,
-	mblk_t			*mp)
+usbms_wput(queue_t *q, mblk_t *mp)
 {
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
 	    "usbms_wput entering");
@@ -1021,18 +969,17 @@ usbms_wput(queue_t		*q,
  *	Process ioctls we recognize and own.  Otherwise, NAK.
  */
 static void
-usbms_ioctl(register queue_t		*q,
-		register mblk_t		*mp)
+usbms_ioctl(queue_t *q, mblk_t *mp)
 {
 	usbms_state_t *usbmsp = (usbms_state_t *)q->q_ptr;
-	register struct ms_softc 	*ms;
-	register struct iocblk 		*iocp;
-	Vuid_addr_probe			*addr_probe;
-	uint_t				ioctlrespsize;
-	int				err = 0;
-	mblk_t				*datap;
-	ushort_t			transparent = 0;
-	boolean_t			report_abs = B_FALSE;
+	struct ms_softc		*ms;
+	struct iocblk		*iocp;
+	Vuid_addr_probe		*addr_probe;
+	uint_t			ioctlrespsize;
+	int			err = 0;
+	mblk_t			*datap;
+	ushort_t		transparent = 0;
+	boolean_t		report_abs = B_FALSE;
 	mblk_t	*mb;
 
 	USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbms_log_handle,
@@ -1330,8 +1277,7 @@ allocfailure:
  * VUIDGWHEELSTATE, VUIDSWHEELSTATE & MSIOSRESOLUTION.
  */
 static void
-usbms_miocdata(register 	queue_t *q,
-		register 	mblk_t  *mp)
+usbms_miocdata(queue_t *q, mblk_t *mp)
 {
 	struct copyresp *copyresp;
 	struct iocblk *iocbp;
@@ -1467,8 +1413,8 @@ static void
 usbms_reioctl(void	* usbms_addr)
 {
 	usbms_state_t *usbmsp = (usbms_state_t *)usbms_addr;
-	register queue_t 	*q;
-	register mblk_t 	*mp;
+	queue_t	*q;
+	mblk_t	*mp;
 
 	q = usbmsp->usbms_wq_ptr;
 	if ((mp = usbmsp->usbms_iocpending) != NULL) {
@@ -1484,8 +1430,7 @@ usbms_reioctl(void	* usbms_addr)
  *	values.
  */
 static int
-usbms_getparms(register Ms_parms	*data,
-		usbms_state_t		*usbmsp)
+usbms_getparms(Ms_parms	*data, usbms_state_t *usbmsp)
 {
 	data->jitter_thresh = usbmsp->usbms_jitter_thresh;
 	data->speed_law = usbmsp->usbms_speedlaw;
@@ -1502,8 +1447,7 @@ usbms_getparms(register Ms_parms	*data,
  *	values.
  */
 static int
-usbms_setparms(register Ms_parms	*data,
-		usbms_state_t		*usbmsp)
+usbms_setparms(Ms_parms	*data, usbms_state_t *usbmsp)
 {
 	usbmsp->usbms_jitter_thresh = data->jitter_thresh;
 	usbmsp->usbms_speedlaw = data->speed_law;
@@ -1518,10 +1462,10 @@ usbms_setparms(register Ms_parms	*data,
  *	and sends M_FLUSH above.
  */
 static void
-usbms_flush(usbms_state_t		*usbmsp)
+usbms_flush(usbms_state_t *usbmsp)
 {
-	register struct ms_softc *ms = &usbmsp->usbms_softc;
-	register queue_t		*q;
+	struct ms_softc *ms = &usbmsp->usbms_softc;
+	queue_t		*q;
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
 	    "usbms_flush entering");
@@ -1544,9 +1488,8 @@ usbms_flush(usbms_state_t		*usbmsp)
  * usbms_rput() :
  *	Put procedure for input from driver end of stream (read queue).
  */
-static void
-usbms_rput(queue_t		*q,
-		mblk_t		*mp)
+static int
+usbms_rput(queue_t *q, mblk_t *mp)
 {
 	usbms_state_t *usbmsp = q->q_ptr;
 	mblk_t	*tmp_mp;
@@ -1558,7 +1501,7 @@ usbms_rput(queue_t		*q,
 	if (usbmsp == 0) {
 		freemsg(mp);	/* nobody's listening */
 
-		return;
+		return (0);
 	}
 
 	switch (mp->b_datap->db_type) {
@@ -1570,7 +1513,7 @@ usbms_rput(queue_t		*q,
 			flushq(q, FLUSHDATA);
 		freemsg(mp);
 
-		return;
+		return (0);
 
 	case M_BREAK:
 		/*
@@ -1580,20 +1523,20 @@ usbms_rput(queue_t		*q,
 
 		freemsg(mp);
 
-		return;
+		return (0);
 
 	case M_DATA:
 		if (!(usbmsp->usbms_flags & USBMS_OPEN)) {
 			freemsg(mp);	/* not ready to listen */
 
-			return;
+			return (0);
 		}
 		break;
 
 	case M_CTL:
 		usbms_mctl_receive(q, mp);
 
-		return;
+		return (0);
 
 	case M_ERROR:
 		usbmsp->usbms_protoerr = 1;
@@ -1604,11 +1547,11 @@ usbms_rput(queue_t		*q,
 			freemsg(mp);
 		}
 
-		return;
+		return (0);
 	default:
 		putnext(q, mp);
 
-		return;
+		return (0);
 	}
 
 	/*
@@ -1618,14 +1561,14 @@ usbms_rput(queue_t		*q,
 	if ((MBLKL(tmp_mp) < limit) || ((MBLKL(tmp_mp) == limit) &&
 	    (usbmsp->usbms_rptid != HID_REPORT_ID_UNDEFINED))) {
 		freemsg(mp);
-		return;
+		return (0);
 	}
 	do {
 		if (usbmsp->usbms_rptid != HID_REPORT_ID_UNDEFINED) {
 			if (*(tmp_mp->b_rptr) != usbmsp->usbms_rptid) {
 				freemsg(mp);
 
-				return;
+				return (0);
 			} else {
 				/* We skip the report id prefix. */
 				tmp_mp->b_rptr++;
@@ -1636,6 +1579,7 @@ usbms_rput(queue_t		*q,
 	} while ((tmp_mp = tmp_mp->b_cont) != NULL);   /* next block, if any */
 
 	freemsg(mp);
+	return (0);
 }
 
 
@@ -1645,8 +1589,7 @@ usbms_rput(queue_t		*q,
  *	we don't understand the command, free message.
  */
 static void
-usbms_mctl_receive(register queue_t		*q,
-			register mblk_t		*mp)
+usbms_mctl_receive(queue_t *q, mblk_t *mp)
 {
 	usbms_state_t *usbmsd = (usbms_state_t *)q->q_ptr;
 	struct iocblk				*iocp;
@@ -1703,13 +1646,12 @@ usbms_mctl_receive(register queue_t		*q,
  *	Watch out for overflow!
  */
 static void
-usbms_input(usbms_state_t		*usbmsp,
-		mblk_t			*mp)
+usbms_input(usbms_state_t *usbmsp, mblk_t *mp)
 {
-	register struct usbmousebuf	*b;
-	register struct usbmouseinfo	*mi;
-	register int			jitter_radius;
-	register int32_t		nbutt;
+	struct usbmousebuf	*b;
+	struct usbmouseinfo	*mi;
+	int			jitter_radius;
+	int32_t		nbutt;
 	ushort_t			i;
 	char				c;
 
@@ -1885,13 +1827,13 @@ static void
 usbms_incr(void				*arg)
 {
 	usbms_state_t			*usbmsp = arg;
-	register struct ms_softc	*ms = &usbmsp->usbms_softc;
-	register struct usbmousebuf	*b;
-	register struct usbmouseinfo	*mi;
-	register int			xc, yc, zc;
-	register int			wake;
-	register int			speedl = usbmsp->usbms_speedlimit;
-	register int			xabs, yabs;
+	struct ms_softc	*ms = &usbmsp->usbms_softc;
+	struct usbmousebuf	*b;
+	struct usbmouseinfo	*mi;
+	int			xc, yc, zc;
+	int			wake;
+	int			speedl = usbmsp->usbms_speedlimit;
+	int			xabs, yabs;
 
 	/*
 	 * No longer waiting for jitter timeout
@@ -2023,12 +1965,8 @@ usbms_check_for_wheels(usbms_state_t *usbmsp)
  *	helper function for usbms ioctls
  */
 static int
-usbms_make_copyreq(mblk_t 	*mp,
-		    uint_t 	pvtsize,
-		    uint_t 	state,
-		    uint_t 	reqsize,
-		    uint_t 	contsize,
-		    uint_t 	copytype)
+usbms_make_copyreq(mblk_t *mp, uint_t pvtsize, uint_t state, uint_t reqsize,
+    uint_t contsize, uint_t copytype)
 {
 
 	struct copyreq		*cq;
@@ -2065,7 +2003,7 @@ usbms_make_copyreq(mblk_t 	*mp,
 		 * overlaps iocp->ioc_count. If user address (cq_addr)
 		 * is invalid, it would cause panic later in
 		 * usbms_miocdata:
-		 * 	freemsg((mblk_t *)copyresp->cp_private);
+		 *	freemsg((mblk_t *)copyresp->cp_private);
 		 */
 		cq->cq_private = NULL;
 		}
@@ -2099,7 +2037,7 @@ usbms_make_copyreq(mblk_t 	*mp,
 
 
 static int
-usbms_service_wheel_info(register queue_t *q, register mblk_t	*datap)
+usbms_service_wheel_info(queue_t *q, mblk_t	*datap)
 {
 
 	wheel_info		*wi;
@@ -2125,9 +2063,7 @@ usbms_service_wheel_info(register queue_t *q, register mblk_t	*datap)
 
 
 static int
-usbms_service_wheel_state(register queue_t	*q,
-			    register mblk_t	*datap,
-			    register uint_t	cmd)
+usbms_service_wheel_state(queue_t *q, mblk_t *datap, uint_t cmd)
 {
 
 	wheel_state	*ws;
@@ -2173,8 +2109,7 @@ usbms_service_wheel_state(register queue_t	*q,
  *	current screen height/width params from X.
  */
 static int
-usbms_get_screen_parms(register queue_t	*q,
-			    register mblk_t	*datap)
+usbms_get_screen_parms(queue_t *q, mblk_t *datap)
 {
 
 	usbms_state_t	*usbmsp = (usbms_state_t *)q->q_ptr;
@@ -2190,7 +2125,7 @@ usbms_get_screen_parms(register queue_t	*q,
 
 
 static void
-usbms_ack_ioctl(mblk_t	*mp)
+usbms_ack_ioctl(mblk_t *mp)
 {
 
 	struct iocblk	*iocbp = (struct iocblk *)mp->b_rptr;
@@ -2213,7 +2148,7 @@ usbms_ack_ioctl(mblk_t	*mp)
  *	the absolute mouse type firm event.
  */
 static mblk_t *
-usbms_setup_abs_mouse_event()
+usbms_setup_abs_mouse_event(void)
 {
 	mblk_t	*mb;
 	Firm_event *fep;
@@ -2254,7 +2189,7 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 	usbms_idf *idf = &(usbmsp->usbms_idf);
 	Ms_screen_resolution *res = &(usbmsp->usbms_resolution);
 	mblk_t *mb;
-	register queue_t 	*q;
+	queue_t	*q;
 	int	rval;
 
 	usbmsp->usbms_rpt_abs = B_FALSE;
