@@ -634,7 +634,7 @@ ACPI_OSD_HANDLER acpi_isr;
 void *acpi_isr_context;
 
 uint_t
-acpi_wrapper_isr(char *arg)
+acpi_wrapper_isr(char *arg, char *arg1 __unused)
 {
 	_NOTE(ARGUNUSED(arg))
 
@@ -676,7 +676,7 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
 	cmn_err(CE_NOTE, "!acpica: attaching SCI %d", sci_vect);
 #endif
 
-	retval = add_avintr(NULL, SCI_IPL, (avfunc)acpi_wrapper_isr,
+	retval = add_avintr(NULL, SCI_IPL, acpi_wrapper_isr,
 	    "ACPI SCI", sci_vect, NULL, NULL, NULL, NULL);
 	if (retval) {
 		acpi_intr_hooked = 1;
@@ -695,7 +695,7 @@ AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber,
 	cmn_err(CE_NOTE, "!acpica: detaching SCI %d", InterruptNumber);
 #endif
 	if (acpi_intr_hooked) {
-		rem_avintr(NULL, LOCK_LEVEL - 1, (avfunc)acpi_wrapper_isr,
+		rem_avintr(NULL, LOCK_LEVEL - 1, acpi_wrapper_isr,
 		    InterruptNumber);
 		acpi_intr_hooked = 0;
 	}
