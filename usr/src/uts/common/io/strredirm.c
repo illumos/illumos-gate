@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Redirection STREAMS module.
  *
@@ -56,6 +54,7 @@
 static int	wcmopen(queue_t	*, dev_t *, int, int, cred_t *);
 static int	wcmclose(queue_t *, int, cred_t *);
 static int	wcmrput(queue_t *, mblk_t *);
+static int	wcmwput(queue_t *, mblk_t *);
 
 static struct module_info	wcminfo = {
 	STRREDIR_MODID,
@@ -77,7 +76,7 @@ static struct qinit	wcmrinit = {
 };
 
 static struct qinit	wcmwinit = {
-	(int (*)())putnext,	/* put */
+	wcmwput,		/* put */
 	NULL,			/* service */
 	wcmopen,		/* open */
 	wcmclose,		/* close */
@@ -156,6 +155,13 @@ wcmrput(queue_t *q, mblk_t *mp)
 	if (DB_TYPE(mp) == M_HANGUP)
 		/* Don't block waiting for outstanding operations to complete */
 		srpop(q->q_stream->sd_vnode, B_FALSE);
+	putnext(q, mp);
+	return (0);
+}
+
+static int
+wcmwput(queue_t *q, mblk_t *mp)
+{
 	putnext(q, mp);
 	return (0);
 }
