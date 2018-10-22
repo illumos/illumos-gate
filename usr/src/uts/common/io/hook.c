@@ -707,49 +707,64 @@ hook_stack_notify_unregister(netstackid_t stackid, hook_notify_fn_t callback)
 {
 	hook_family_int_t *hfi;
 	hook_stack_t *hks;
-	boolean_t canrun;
 	char buffer[16];
 	void *arg;
 	int error;
 
 	mutex_enter(&hook_stack_lock);
 	hks = hook_stack_get(stackid);
-	if (hks != NULL) {
-		CVW_ENTER_WRITE(&hks->hks_lock);
-		canrun = (hook_wait_setflag(&hks->hks_waiter, FWF_ADD_WAIT_MASK,
-		    FWF_ADD_WANTED, FWF_ADD_ACTIVE) != -1);
-
-		error = hook_notify_unregister(&hks->hks_nhead, callback, &arg);
-		CVW_EXIT_WRITE(&hks->hks_lock);
-	} else {
-		error = ESRCH;
+	if (hks == NULL) {
+		mutex_exit(&hook_stack_lock);
+		return (ESRCH);
 	}
+
+	CVW_ENTER_WRITE(&hks->hks_lock);
+	/*
+	 * If hook_wait_setflag returns -1, another thread has flagged that it
+	 * is attempting to destroy this hook stack.  Before it can flag that
+	 * it's destroying the hook stack, it must first verify (with
+	 * hook_stack_lock held) that the hook stack is empty.  If we
+	 * encounter this, it means we should have nothing to do and we
+	 * just snuck in.
+	 */
+	if (hook_wait_setflag(&hks->hks_waiter, FWF_DEL_WAIT_MASK,
+	    FWF_DEL_WANTED, FWF_DEL_ACTIVE) == -1) {
+		VERIFY(TAILQ_EMPTY(&hks->hks_nhead));
+		CVW_EXIT_WRITE(&hks->hks_lock);
+		mutex_exit(&hook_stack_lock);
+		return (ESRCH);
+	}
+
+	error = hook_notify_unregister(&hks->hks_nhead, callback, &arg);
+	CVW_EXIT_WRITE(&hks->hks_lock);
 	mutex_exit(&hook_stack_lock);
 
 	if (error == 0) {
-		if (canrun) {
-			/*
-			 * Generate fake unregister event for callback that
-			 * is being removed, letting it know everything that
-			 * currently exists is now "disappearing."
-			 */
-			(void) snprintf(buffer, sizeof (buffer), "%u",
-			    hks->hks_netstackid);
+		/*
+		 * Generate fake unregister event for callback that
+		 * is being removed, letting it know everything that
+		 * currently exists is now "disappearing."
+		 */
+		(void) snprintf(buffer, sizeof (buffer), "%u",
+		    hks->hks_netstackid);
 
-			SLIST_FOREACH(hfi, &hks->hks_familylist, hfi_entry) {
-				callback(HN_UNREGISTER, arg, buffer, NULL,
-				    hfi->hfi_family.hf_name);
-			}
-
-			hook_wait_unsetflag(&hks->hks_waiter, FWF_ADD_ACTIVE);
+		SLIST_FOREACH(hfi, &hks->hks_familylist, hfi_entry) {
+			callback(HN_UNREGISTER, arg, buffer, NULL,
+			    hfi->hfi_family.hf_name);
 		}
-
-		mutex_enter(&hook_stack_lock);
-		hks = hook_stack_get(stackid);
-		if ((error == 0) && (hks->hks_shutdown == 2))
-			hook_stack_remove(hks);
-		mutex_exit(&hook_stack_lock);
+	} else {
+		/*
+		 * hook_notify_register() should only fail if the callback has
+		 * already been deleted (ESRCH).
+		 */
+		VERIFY3S(error, ==, ESRCH);
 	}
+
+	mutex_enter(&hook_stack_lock);
+	hook_wait_unsetflag(&hks->hks_waiter, FWF_DEL_ACTIVE);
+	if (hks->hks_shutdown == 2)
+		hook_stack_remove(hks);
+	mutex_exit(&hook_stack_lock);
 
 	return (error);
 }
