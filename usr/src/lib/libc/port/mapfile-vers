@@ -3107,11 +3107,7 @@ $endif
 	pset_bind_lwp;
 	_psignal;
 	pthread_attr_getdaemonstate_np;
-	pthread_attr_getname_np;
 	pthread_attr_setdaemonstate_np;
-	pthread_attr_setname_np;
-	pthread_getname_np;
-	pthread_setname_np;
 	_pthread_setcleanupinit;
 	__putwchar_xpg5;
 	__putwc_xpg5;
@@ -3190,7 +3186,6 @@ $endif
 	_thr_continue_allmutators;
 	thr_continue_mutator;
 	_thr_continue_mutator;
-	thr_getname;
 	thr_getstate;
 	_thr_getstate;
 	thr_mutators_barrier;
@@ -3199,7 +3194,6 @@ $endif
 	_thr_schedctl;
 	thr_setmutator;
 	_thr_setmutator;
-	thr_setname;
 	thr_setstate;
 	_thr_setstate;
 	thr_sighndlrinfo;
