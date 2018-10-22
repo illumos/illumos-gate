@@ -4860,10 +4860,6 @@ prgetnode(vnode_t *dp, prnodetype_t type)
 		pnp->pr_mode = 0600;	/* read-write by owner only */
 		break;
 
-	case PR_LWPNAME:
-		pnp->pr_mode = 0644;	/* readable by all + owner can write */
-		break;
-
 	case PR_PSINFO:
 	case PR_LWPNAME:
 		pnp->pr_mode = 0644;	/* readable by all + owner can write */
