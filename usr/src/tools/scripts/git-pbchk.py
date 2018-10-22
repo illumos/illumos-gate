@@ -375,27 +375,25 @@ def main(cmd, args):
     checkname = None
 
     try:
-        opts, args = getopt.getopt(args, 'c:p:')
+        opts, args = getopt.getopt(args, 'b:c:p:')
     except getopt.GetoptError, e:
         sys.stderr.write(str(e) + '\n')
         sys.stderr.write("Usage: %s [-c check] [-p branch] [path...]\n" % cmd)
         sys.exit(1)
 
     for opt, arg in opts:
-        # backwards compatibility
-        if opt == '-b':
+        # We accept "-b" as an alias of "-p" for backwards compatibility.
+        if opt == '-p' or opt == '-b':
             parent_branch = arg
         elif opt == '-c':
             checkname = arg
-        elif opt == '-p':
-            parent_branch = arg
 
     if not parent_branch:
         parent_branch = git_parent_branch(git_branch())
 
     if checkname is None:
         if cmd == 'git-pbchk':
-            checkname= 'pbchk'
+            checkname = 'pbchk'
         else:
             checkname = 'nits'
 
