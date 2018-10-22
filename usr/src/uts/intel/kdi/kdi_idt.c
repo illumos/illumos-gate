@@ -298,7 +298,8 @@ kdi_cpu_init(void)
  * loaded at boot.
  */
 static int
-kdi_cpu_activate(void)
+kdi_cpu_activate(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
+    xc_arg_t arg3 __unused)
 {
 	kdi_idt_gates_install(KCS_SEL, KDI_IDT_SAVE);
 	return (0);
@@ -346,13 +347,13 @@ kdi_activate(kdi_main_t main, kdi_cpusave_t *cpusave, uint_t ncpusave)
 	if (boothowto & RB_KMDB) {
 		kdi_idt_gates_install(KMDBCODE_SEL, KDI_IDT_NOSAVE);
 	} else {
-		xc_call(0, 0, 0, CPUSET2BV(cpuset),
-		    (xc_func_t)kdi_cpu_activate);
+		xc_call(0, 0, 0, CPUSET2BV(cpuset), kdi_cpu_activate);
 	}
 }
 
 static int
-kdi_cpu_deactivate(void)
+kdi_cpu_deactivate(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
+    xc_arg_t arg3 __unused)
 {
 	kdi_idt_gates_restore();
 	return (0);
@@ -364,7 +365,7 @@ kdi_deactivate(void)
 	cpuset_t cpuset;
 	CPUSET_ALL(cpuset);
 
-	xc_call(0, 0, 0, CPUSET2BV(cpuset), (xc_func_t)kdi_cpu_deactivate);
+	xc_call(0, 0, 0, CPUSET2BV(cpuset), kdi_cpu_deactivate);
 	kdi_nmemranges = 0;
 }
 

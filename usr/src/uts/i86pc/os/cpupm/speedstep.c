@@ -126,9 +126,11 @@ write_ctrl(cpu_acpi_handle_t handle, uint32_t ctrl)
 /*
  * Transition the current processor to the requested state.
  */
-void
-speedstep_pstate_transition(uint32_t req_state)
+int
+speedstep_pstate_transition(xc_arg_t arg1, xc_arg_t arg2 __unused,
+    xc_arg_t arg3 __unused)
 {
+	uint32_t req_state = (uint32_t)arg1;
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)CPU->cpu_m.mcpu_pm_mach_state;
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
@@ -152,6 +154,7 @@ speedstep_pstate_transition(uint32_t req_state)
 
 	mach_state->ms_pstate.cma_state.pstate = req_state;
 	cpu_set_curr_clock(((uint64_t)CPU_ACPI_FREQ(req_pstate) * 1000000));
+	return (0);
 }
 
 static void
@@ -164,12 +167,12 @@ speedstep_power(cpuset_t set, uint32_t req_state)
 	 */
 	kpreempt_disable();
 	if (CPU_IN_SET(set, CPU->cpu_id)) {
-		speedstep_pstate_transition(req_state);
+		(void) speedstep_pstate_transition(req_state, 0, 0);
 		CPUSET_DEL(set, CPU->cpu_id);
 	}
 	if (!CPUSET_ISNULL(set)) {
 		xc_call((xc_arg_t)req_state, 0, 0, CPUSET2BV(set),
-		    (xc_func_t)speedstep_pstate_transition);
+		    speedstep_pstate_transition);
 	}
 	kpreempt_enable();
 }

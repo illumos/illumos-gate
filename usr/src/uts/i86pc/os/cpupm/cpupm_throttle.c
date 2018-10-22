@@ -153,9 +153,11 @@ read_status(cpu_acpi_handle_t handle, uint32_t *stat)
 /*
  * Transition the current processor to the requested throttling state.
  */
-static void
-cpupm_tstate_transition(uint32_t req_state)
+static int
+cpupm_tstate_transition(xc_arg_t arg1, xc_arg_t arg2 __unused,
+    xc_arg_t arg3 __unused)
 {
+	uint32_t req_state = arg1;
 	cpupm_mach_state_t *mach_state =
 	    (cpupm_mach_state_t *)CPU->cpu_m.mcpu_pm_mach_state;
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
@@ -174,7 +176,7 @@ cpupm_tstate_transition(uint32_t req_state)
 	 */
 	ctrl = CPU_ACPI_TSTATE_CTRL(req_tstate);
 	if (write_ctrl(handle, ctrl) != 0) {
-		return;
+		return (0);
 	}
 
 	/*
@@ -182,7 +184,7 @@ cpupm_tstate_transition(uint32_t req_state)
 	 * no status value comparison is required.
 	 */
 	if (CPU_ACPI_TSTATE_STAT(req_tstate) == 0) {
-		return;
+		return (0);
 	}
 
 	/* Wait until switch is complete, but bound the loop just in case. */
@@ -197,11 +199,14 @@ cpupm_tstate_transition(uint32_t req_state)
 	if (CPU_ACPI_TSTATE_STAT(req_tstate) != stat) {
 		DTRACE_PROBE(throttle_transition_incomplete);
 	}
+	return (0);
 }
 
 static void
 cpupm_throttle(cpuset_t set,  uint32_t throtl_lvl)
 {
+	xc_arg_t xc_arg = (xc_arg_t)throtl_lvl;
+
 	/*
 	 * If thread is already running on target CPU then just
 	 * make the transition request. Otherwise, we'll need to
@@ -209,12 +214,12 @@ cpupm_throttle(cpuset_t set,  uint32_t throtl_lvl)
 	 */
 	kpreempt_disable();
 	if (CPU_IN_SET(set, CPU->cpu_id)) {
-		cpupm_tstate_transition(throtl_lvl);
+		cpupm_tstate_transition(xc_arg, 0, 0);
 		CPUSET_DEL(set, CPU->cpu_id);
 	}
 	if (!CPUSET_ISNULL(set)) {
-		xc_call((xc_arg_t)throtl_lvl, 0, 0,
-		    CPUSET2BV(set), (xc_func_t)cpupm_tstate_transition);
+		xc_call(xc_arg, 0, 0,
+		    CPUSET2BV(set), cpupm_tstate_transition);
 	}
 	kpreempt_enable();
 }

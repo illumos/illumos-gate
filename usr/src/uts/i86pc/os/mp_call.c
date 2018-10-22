@@ -37,7 +37,7 @@
 
 /*
  * Interrupt another CPU.
- * 	This is useful to make the other CPU go through a trap so that
+ *	This is useful to make the other CPU go through a trap so that
  *	it recognizes an address space trap (AST) for preempting a thread.
  *
  *	It is possible to be preempted here and be resumed on the CPU
@@ -87,7 +87,7 @@ cpu_call(cpu_t *cp, cpu_call_func_t func, uintptr_t arg1, uintptr_t arg2)
 	} else {
 		CPUSET_ONLY(set, cp->cpu_id);
 		xc_call((xc_arg_t)arg1, (xc_arg_t)arg2, 0, CPUSET2BV(set),
-		    (xc_func_t)func);
+		    (xc_func_t)(uintptr_t)func);
 	}
 	kpreempt_enable();
 }

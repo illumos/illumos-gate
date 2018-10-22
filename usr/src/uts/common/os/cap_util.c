@@ -1298,7 +1298,7 @@ static void
 cu_cpu_kstat_create(pghw_t *pg, cu_cntr_info_t *cntr_info)
 {
 	kstat_t		*ks;
-	char 		*sharing = pghw_type_string(pg->pghw_hw);
+	char		*sharing = pghw_type_string(pg->pghw_hw);
 	char		name[KSTAT_STRLEN + 1];
 
 	/*
@@ -1417,7 +1417,7 @@ cu_cpu_run(cpu_t *cp, cu_cpu_func_t func, uintptr_t arg)
 	 * cpu_call() will call func on the CPU specified with given argument
 	 * and return func's return value in last argument
 	 */
-	cpu_call(cp, (cpu_call_func_t)func, arg, (uintptr_t)&error);
+	cpu_call(cp, (cpu_call_func_t)(uintptr_t)func, arg, (uintptr_t)&error);
 	return (error);
 }
 
@@ -1471,7 +1471,7 @@ cu_cpu_update(struct cpu *cp, boolean_t move_to)
 	 */
 	retval = 0;
 	if (move_to)
-		(void) cu_cpu_run(cp, (cu_cpu_func_t)kcpc_read,
+		(void) cu_cpu_run(cp, (cu_cpu_func_t)(uintptr_t)kcpc_read,
 		    (uintptr_t)cu_cpu_update_stats);
 	else {
 		retval = kcpc_read((kcpc_update_func_t)cu_cpu_update_stats);
