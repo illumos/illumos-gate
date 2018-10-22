@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018, Joyent, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 LIBRARY =	libconv.a
@@ -124,8 +124,8 @@ $(LINTOUT64)	:= LDLIBS += -ldemangle-sys
 
 SGSMSGTARG=	$(BLTOBJS:%_msg.o=../common/%.msg)
 
-LINTFLAGS +=	-u
-LINTFLAGS64 +=	-u
+LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
+LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
 
 CLEANFILES +=	$(BLTDATA) $(LINTOUTS) bld_vernote vernote.s
 CLOBBERFILES +=	$(LINTLIBS)

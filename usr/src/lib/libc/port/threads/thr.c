@@ -2411,14 +2411,11 @@ __nthreads(void)
 	return (curthread->ul_uberdata->nthreads);
 }
 
-/* "/native/proc/self/lwp/%u/lwpname" w/o stdio */
+/* "/proc/self/lwp/%u/lwpname" w/o stdio */
 static void
 lwpname_path(pthread_t tid, char *buf, size_t bufsize)
 {
-	char *brand_root = curthread->ul_uberdata->ub_broot;
-
-	(void) strlcpy(buf, brand_root == NULL ? "" : brand_root, bufsize);
-	(void) strlcat(buf, "/proc/self/lwp/", bufsize);
+	(void) strlcpy(buf, "/proc/self/lwp/", bufsize);
 	ultos((uint64_t)tid, 10, buf + strlen(buf));
 	(void) strlcat(buf, "/lwpname", bufsize);
 }

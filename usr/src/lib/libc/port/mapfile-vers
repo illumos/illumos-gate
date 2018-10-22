@@ -77,6 +77,16 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.28 {
+    protected:
+	pthread_attr_getname_np;
+	pthread_attr_setname_np;
+	pthread_getname_np;
+	pthread_setname_np;
+	thr_getname;
+	thr_setname;
+} ILLUMOS_0.27;
+
 SYMBOL_VERSION ILLUMOS_0.27 {	# memset_s(3C) and set_constraint_handler_s(3C)
     protected:
 	abort_handler_s;

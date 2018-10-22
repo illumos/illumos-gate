@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -46,9 +46,7 @@
 #include <smbsrv/smb_token.h>
 #include <mlsvc.h>
 
-#define	NETLOGON_ATTEMPTS	2
-
-static uint32_t netlogon_logon(smb_logon_t *, smb_token_t *);
+static uint32_t netlogon_logon(smb_logon_t *, smb_token_t *, smb_domainex_t *);
 static uint32_t netr_server_samlogon(mlsvc_handle_t *, netr_info_t *, char *,
     smb_logon_t *, smb_token_t *);
 static void netr_invalidate_chain(void);
@@ -176,12 +174,19 @@ smb_logon_abort(void)
  * If the user is successfully authenticated, we build an
  * access token and the status will be NT_STATUS_SUCCESS.
  * Otherwise, the token contents are invalid.
+ *
+ * This will retry a few times for errors indicating that the
+ * current DC might have gone off-line or become too busy etc.
+ * With such errors, smb_ddiscover_bad_dc is called and then
+ * the smb_domain_getinfo call here waits for new DC info.
  */
+int smb_netr_logon_retries = 3;
 void
 smb_logon_domain(smb_logon_t *user_info, smb_token_t *token)
 {
+	smb_domainex_t	di;
 	uint32_t	status;
-	int		i;
+	int		retries = smb_netr_logon_retries;
 
 	if (user_info->lg_secmode != SMB_SECMODE_DOMAIN)
 		return;
@@ -189,21 +194,28 @@ smb_logon_domain(smb_logon_t *user_info, smb_token_t *token)
 	if (user_info->lg_domain_type == SMB_DOMAIN_LOCAL)
 		return;
 
-	for (i = 0; i < NETLOGON_ATTEMPTS; ++i) {
+	while (--retries > 0) {
+
+		if (!smb_domain_getinfo(&di)) {
+			syslog(LOG_ERR, "logon DC getinfo failed");
+			status = NT_STATUS_NO_LOGON_SERVERS;
+			goto out;
+		}
+
 		(void) mutex_lock(&netlogon_mutex);
 		while (netlogon_busy && !netlogon_abort)
 			(void) cond_wait(&netlogon_cv, &netlogon_mutex);
 
 		if (netlogon_abort) {
 			(void) mutex_unlock(&netlogon_mutex);
-			user_info->lg_status = NT_STATUS_REQUEST_ABORTED;
-			return;
+			status = NT_STATUS_REQUEST_ABORTED;
+			goto out;
 		}
 
 		netlogon_busy = B_TRUE;
 		(void) mutex_unlock(&netlogon_mutex);
 
-		status = netlogon_logon(user_info, token);
+		status = netlogon_logon(user_info, token, &di);
 
 		(void) mutex_lock(&netlogon_mutex);
 		netlogon_busy = B_FALSE;
@@ -212,71 +224,160 @@ smb_logon_domain(smb_logon_t *user_info, smb_token_t *token)
 		(void) cond_signal(&netlogon_cv);
 		(void) mutex_unlock(&netlogon_mutex);
 
-		if (status != NT_STATUS_CANT_ACCESS_DOMAIN_INFO)
+		switch (status) {
+		case NT_STATUS_BAD_NETWORK_PATH:
+		case NT_STATUS_BAD_NETWORK_NAME:
+		case RPC_NT_SERVER_TOO_BUSY:
+			/*
+			 * May retry with a new DC, or if we're
+			 * out of retries, will return...
+			 */
+			status = NT_STATUS_NO_LOGON_SERVERS;
 			break;
+		default:
+			goto out;
+		}
 	}
 
+out:
 	if (status != NT_STATUS_SUCCESS)
 		syslog(LOG_INFO, "logon[%s\\%s]: %s", user_info->lg_e_domain,
 		    user_info->lg_e_username, xlate_nt_status(status));
-
 	user_info->lg_status = status;
 }
 
+/*
+ * Run a netr_server_samlogon call, dealing with the possible need to
+ * re-establish the NetLogon credential chain.  If that fails, return
+ * NT_STATUS_DOMAIN_TRUST_INCONSISTENT indicating the machine account
+ * needs it's password reset (or whatever).  Other errors are from the
+ * netr_server_samlogon() call including the many possibilities listed
+ * above that function.
+ */
 static uint32_t
-netlogon_logon(smb_logon_t *user_info, smb_token_t *token)
+netlogon_logon(smb_logon_t *user_info, smb_token_t *token, smb_domainex_t *di)
 {
-	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char server[MAXHOSTNAMELEN];
 	mlsvc_handle_t netr_handle;
-	smb_domainex_t di;
 	uint32_t status;
-	int retries = 0;
+	boolean_t did_reauth = B_FALSE;
 
-	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
-
-	/* Avoid interfering with DC discovery. */
-	if (smb_ddiscover_wait() != 0 ||
-	    !smb_domain_getinfo(&di)) {
-		netr_invalidate_chain();
-		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+	/*
+	 * This netr_open call does the work to connect to the DC,
+	 * get the IPC share, open the named pipe, RPC bind, etc.
+	 */
+	status = netr_open(di->d_dci.dc_name, di->d_primary.di_nbname,
+	    &netr_handle);
+	if (status != 0) {
+		syslog(LOG_ERR, "netlogon remote open failed (%s)",
+		    xlate_nt_status(status));
+		return (status);
 	}
 
-	do {
-		if (netr_open(di.d_dci.dc_name, di.d_primary.di_nbname,
-		    &netr_handle) != 0)
-			return (NT_STATUS_OPEN_FAILED);
+	if (di->d_dci.dc_name[0] != '\0' &&
+	    (*netr_global_info.server != '\0')) {
+		(void) snprintf(server, sizeof (server),
+		    "\\\\%s", di->d_dci.dc_name);
+		if (strncasecmp(netr_global_info.server,
+		    server, strlen(server)) != 0)
+			netr_invalidate_chain();
+	}
 
-		if (di.d_dci.dc_name[0] != '\0' &&
-		    (*netr_global_info.server != '\0')) {
-			(void) snprintf(server, sizeof (server),
-			    "\\\\%s", di.d_dci.dc_name);
-			if (strncasecmp(netr_global_info.server,
-			    server, strlen(server)) != 0)
-				netr_invalidate_chain();
+reauth:
+	if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
+	    !smb_match_netlogon_seqnum()) {
+		/*
+		 * This does netr_server_req_challenge() and
+		 * netr_server_authenticate2(), updating the
+		 * current netlogon sequence number.
+		 */
+		status = netlogon_auth(di->d_dci.dc_name, &netr_handle,
+		    NETR_FLG_NULL);
+
+		if (status != 0) {
+			syslog(LOG_ERR, "netlogon remote auth failed (%s)",
+			    xlate_nt_status(status));
+			(void) netr_close(&netr_handle);
+			return (NT_STATUS_DOMAIN_TRUST_INCONSISTENT);
 		}
 
-		if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
-		    !smb_match_netlogon_seqnum()) {
-			status = netlogon_auth(di.d_dci.dc_name, &netr_handle,
-			    NETR_FLG_NULL);
+		netr_global_info.flags |= NETR_FLG_VALID;
+	}
 
-			if (status != 0) {
-				(void) netr_close(&netr_handle);
-				return (NT_STATUS_LOGON_FAILURE);
-			}
+	status = netr_server_samlogon(&netr_handle,
+	    &netr_global_info, di->d_dci.dc_name, user_info, token);
 
+	if (status == NT_STATUS_INSUFFICIENT_LOGON_INFO) {
+		if (!did_reauth) {
+			/* Call netlogon_auth() again, just once. */
+			did_reauth = B_TRUE;
+			goto reauth;
+		}
+		status = NT_STATUS_DOMAIN_TRUST_INCONSISTENT;
+	}
+
+	(void) netr_close(&netr_handle);
+
+	return (status);
+}
+
+/*
+ * Helper for mlsvc_netlogon
+ *
+ * Call netlogon_auth with appropriate locks etc.
+ * Serialize like smb_logon_domain does for
+ * netlogon_logon / netlogon_auth
+ */
+uint32_t
+smb_netlogon_check(char *server, char *domain)
+{
+	mlsvc_handle_t netr_handle;
+	uint32_t	status;
+
+	(void) mutex_lock(&netlogon_mutex);
+	while (netlogon_busy)
+		(void) cond_wait(&netlogon_cv, &netlogon_mutex);
+
+	netlogon_busy = B_TRUE;
+	(void) mutex_unlock(&netlogon_mutex);
+
+	/*
+	 * This section like netlogon_logon(), but only does
+	 * one pass and no netr_server_samlogon call.
+	 */
+
+	status = netr_open(server, domain,
+	    &netr_handle);
+	if (status != 0) {
+		syslog(LOG_ERR, "netlogon remote open failed (%s)",
+		    xlate_nt_status(status));
+		goto unlock_out;
+	}
+
+	if ((netr_global_info.flags & NETR_FLG_VALID) == 0 ||
+	    !smb_match_netlogon_seqnum()) {
+		/*
+		 * This does netr_server_req_challenge() and
+		 * netr_server_authenticate2(), updating the
+		 * current netlogon sequence number.
+		 */
+		status = netlogon_auth(server, &netr_handle,
+		    NETR_FLG_NULL);
+		if (status != 0) {
+			syslog(LOG_ERR, "netlogon remote auth failed (%s)",
+			    xlate_nt_status(status));
+		} else {
 			netr_global_info.flags |= NETR_FLG_VALID;
 		}
+	}
 
-		status = netr_server_samlogon(&netr_handle,
-		    &netr_global_info, di.d_dci.dc_name, user_info, token);
+	(void) netr_close(&netr_handle);
 
-		(void) netr_close(&netr_handle);
-	} while (status == NT_STATUS_INSUFFICIENT_LOGON_INFO && retries++ < 3);
-
-	if (retries >= 3)
-		status = NT_STATUS_LOGON_FAILURE;
+unlock_out:
+	(void) mutex_lock(&netlogon_mutex);
+	netlogon_busy = B_FALSE;
+	(void) cond_signal(&netlogon_cv);
+	(void) mutex_unlock(&netlogon_mutex);
 
 	return (status);
 }

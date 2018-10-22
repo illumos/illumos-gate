@@ -6822,6 +6822,8 @@ repository_event_thread(void *unused)
 
 	(void) pthread_setname_np(pthread_self(), "repository_event");
 
+	(void) pthread_setname_np(pthread_self(), "repository_event");
+
 	h = libscf_handle_create_bound_loop();
 
 	pg = safe_scf_pg_create(h);

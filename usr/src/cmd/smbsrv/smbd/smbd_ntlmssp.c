@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -36,8 +36,8 @@
 #define	letohl(x)	((uint32_t)(x))
 #else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
 /* little-endian values on big-endian (swap) */
-#define	letohl(x) 	BSWAP_32(x)
-#define	htolel(x) 	BSWAP_32(x)
+#define	letohl(x)	BSWAP_32(x)
+#define	htolel(x)	BSWAP_32(x)
 #endif	/* (BYTE_ORDER == LITTLE_ENDIAN) */
 
 typedef struct ntlmssp_backend {
@@ -256,7 +256,7 @@ smbd_ntlmssp_negotiate(authsvc_context_t *ctx)
 	    NTLMSSP_MSGTYPE_CHALLENGE,	/* 8: type	(l) */
 	    0, 0, 0,	/* filled later:   12: target name (wwl) */
 	    be->srv_flags,		/* 20: flags	(l) */
-	    be->srv_challenge,		/* 24: 		(8c) */
+	    be->srv_challenge,		/* 24:		(8c) */
 	    0, 0,			/* 32: reserved (ll) */
 	    0, 0, 0);	/* filled later:   40: target info (wwl) */
 #define	TARGET_NAME_OFFSET	12
@@ -489,7 +489,9 @@ smbd_ntlmssp_authenticate(authsvc_context_t *ctx)
 	 */
 	token = smbd_user_auth_logon(&user_info);
 	if (token == NULL) {
-		status = NT_STATUS_ACCESS_DENIED;
+		status = user_info.lg_status;
+		if (status == 0) /* should not happen */
+			status = NT_STATUS_INTERNAL_ERROR;
 		goto errout;
 	}
 

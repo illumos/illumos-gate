@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -549,8 +549,12 @@ smbd_authsvc_oldreq(authsvc_context_t *ctx)
 
 	token = smbd_user_auth_logon(&user_info);
 	xdr_free(smb_logon_xdr, (char *)&user_info);
-	if (token == NULL)
-		return (NT_STATUS_ACCESS_DENIED);
+	if (token == NULL) {
+		rc = user_info.lg_status;
+		if (rc == 0) /* should not happen */
+			rc = NT_STATUS_INTERNAL_ERROR;
+		return (rc);
+	}
 
 	ctx->ctx_token = token;
 

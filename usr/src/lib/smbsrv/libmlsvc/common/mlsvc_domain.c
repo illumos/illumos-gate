@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <syslog.h>
@@ -51,6 +51,9 @@
  */
 #define	SMB_DCLOCATOR_TIMEOUT	45	/* seconds */
 #define	SMB_IS_FQDN(domain)	(strchr(domain, '.') != NULL)
+
+/* How long to pause after a failure to find any domain controllers. */
+int smb_ddiscover_failure_pause = 5; /* sec. */
 
 typedef struct smb_dclocator {
 	smb_dcinfo_t	sdl_dci; /* .dc_name .dc_addr */
@@ -89,6 +92,14 @@ smb_dclocator_init(void)
 {
 	pthread_attr_t tattr;
 	int rc;
+
+	/*
+	 * We need the smb_ddiscover_service to run on startup,
+	 * so it will enter smb_ddiscover_main() and put the
+	 * SMB "domain cache" into "updating" state so clients
+	 * trying to logon will wait while we're finding a DC.
+	 */
+	smb_dclocator.sdl_locate = B_TRUE;
 
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
@@ -241,6 +252,7 @@ smb_ddiscover_bad_dc(char *bad_dc)
 	 */
 	syslog(LOG_INFO, "smb_ddiscover, bad DC: %s", bad_dc);
 	smb_dclocator.sdl_bad_dc = B_TRUE;
+	smb_domain_bad_dc();
 
 	/* In-line smb_ddiscover_kick */
 	if (!smb_dclocator.sdl_locate) {
@@ -250,29 +262,6 @@ smb_ddiscover_bad_dc(char *bad_dc)
 
 out:
 	(void) mutex_unlock(&smb_dclocator.sdl_mtx);
-}
-
-/*
- * If domain discovery is running, wait for it to finish.
- */
-int
-smb_ddiscover_wait(void)
-{
-	timestruc_t to;
-	int rc = 0;
-
-	(void) mutex_lock(&smb_dclocator.sdl_mtx);
-
-	if (smb_dclocator.sdl_locate) {
-		to.tv_sec = SMB_DCLOCATOR_TIMEOUT;
-		to.tv_nsec = 0;
-		rc = cond_reltimedwait(&smb_dclocator.sdl_cv,
-		    &smb_dclocator.sdl_mtx, &to);
-	}
-
-	(void) mutex_unlock(&smb_dclocator.sdl_mtx);
-
-	return (rc);
 }
 
 
@@ -354,10 +343,19 @@ smb_ddiscover_service(void *arg)
 		status = smb_ddiscover_main(sdl->sdl_domain, &dxi);
 		if (status == 0)
 			smb_domain_save();
+
 		(void) mutex_lock(&sdl->sdl_mtx);
+
 		sdl->sdl_status = status;
-		if (status == 0)
+		if (status == 0) {
 			sdl->sdl_dci = dxi.d_dci;
+		} else {
+			syslog(LOG_DEBUG, "smb_ddiscover_service "
+			    "retry after STATUS_%s",
+			    xlate_nt_status(status));
+			(void) sleep(smb_ddiscover_failure_pause);
+			goto find_again;
+		}
 
 		/*
 		 * Run again if either of cfg_chg or bad_dc
@@ -405,11 +403,6 @@ smb_ddiscover_main(char *domain, smb_domainex_t *dxi)
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
-	if (smb_domain_start_update() != SMB_DOMAIN_SUCCESS) {
-		syslog(LOG_DEBUG, "smb_ddiscover_main can't get lock");
-		return (NT_STATUS_INTERNAL_ERROR);
-	}
-
 	status = smb_ads_lookup_msdcs(domain, &dxi->d_dci);
 	if (status != 0) {
 		syslog(LOG_DEBUG, "smb_ddiscover_main can't find DC (%s)",
@@ -425,11 +418,15 @@ smb_ddiscover_main(char *domain, smb_domainex_t *dxi)
 		goto out;
 	}
 
-	smb_domain_update(dxi);
+	if (smb_domain_start_update() != SMB_DOMAIN_SUCCESS) {
+		syslog(LOG_DEBUG, "smb_ddiscover_main can't get lock");
+		status = NT_STATUS_INTERNAL_ERROR;
+	} else {
+		smb_domain_update(dxi);
+		smb_domain_end_update();
+	}
 
 out:
-	smb_domain_end_update();
-
 	/* Don't need the trusted domain list anymore. */
 	smb_domainex_free(dxi);
 

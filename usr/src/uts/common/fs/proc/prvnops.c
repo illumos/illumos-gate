@@ -2919,7 +2919,7 @@ pr_write_lwpname(prnode_t *pnp, uio_t *uiop)
 	VERIFY3U(lwpname[THREAD_NAME_MAX - 1], ==, '\0');
 
 	for (size_t i = 0; lwpname[i] != '\0'; i++) {
-		if (!isprint(lwpname[i])) {
+		if (!ISPRINT(lwpname[i])) {
 			kmem_free(lwpname, THREAD_NAME_MAX);
 			return (EINVAL);
 		}
@@ -4858,6 +4858,10 @@ prgetnode(vnode_t *dp, prnodetype_t type)
 	case PR_PIDFILE:
 	case PR_LWPIDFILE:
 		pnp->pr_mode = 0600;	/* read-write by owner only */
+		break;
+
+	case PR_LWPNAME:
+		pnp->pr_mode = 0644;	/* readable by all + owner can write */
 		break;
 
 	case PR_PSINFO:

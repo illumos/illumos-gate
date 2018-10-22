@@ -885,14 +885,14 @@ is a version of the argument list as it was passed to the command when it
 started, or is a version of the arguments as they might have been modified by
 the application. Applications cannot depend on being able to modify their
 argument list and having that modification be reflected in the output of
-\fBps\fR. The Solaris implementation limits the string to 80 bytes; the string
+\fBps\fR. The illumos implementation limits the string to 80 bytes; the string
 is the version of the argument list as it was passed to the command when it
 started.
 .RE
 
 .sp
 .LP
-The following names are recognized in the Solaris implementation:
+The following names are recognized in the illumos implementation:
 .sp
 .ne 2
 .na
@@ -1187,7 +1187,7 @@ The data model of the process, printed in the same manner as via
 .sp
 .LP
 Only \fBcomm\fR, \fBlwpname\fR, and \fBargs\fR are allowed to contain blank
-characters; all others, including the Solaris implementation variables, are not.
+characters; all others, including the illumos implementation variables, are not.
 .sp
 .LP
 The following table specifies the default header to be used in the POSIX locale
@@ -1214,7 +1214,7 @@ pid	PID
 
 .sp
 .LP
-The following table lists the Solaris implementation format specifiers and the
+The following table lists the illumos implementation format specifiers and the
 default header used with each.
 .sp
 

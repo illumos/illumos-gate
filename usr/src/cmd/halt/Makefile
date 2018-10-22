@@ -21,6 +21,7 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 Joyent, Inc.
 #
 
 PROG = halt
@@ -60,10 +61,10 @@ install :=	TARGET = install
 clean   :=	TARGET = clean
 clobber :=	TARGET = clobber
 lint    :=	TARGET = lint
-lint	:=	LINTFLAGS = -u
+lint	:=	LINTFLAGS += -u
 
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG) $(ROOTLINKS) $(ROOTSYMLINKS) $(SUBDIRS)
 

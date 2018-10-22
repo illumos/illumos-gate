@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBMLSVC_H
@@ -66,7 +66,6 @@ extern boolean_t smb_locate_dc(char *, smb_domainex_t *);
 uint32_t smb_ddiscover_dns(char *, smb_domainex_t *);
 extern void smb_ddiscover_bad_dc(char *);
 extern void smb_ddiscover_refresh(void);
-extern int smb_ddiscover_wait(void);
 
 extern int dssetup_check_service(void);
 extern void dssetup_clear_domain_info(void);
