@@ -23,6 +23,7 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -31,6 +32,7 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_help.h>
 #include <mdb/mdb.h>
+#include <regex.h>
 
 const char _mdb_help[] =
 "\nEach debugger command in %s is structured as follows:\n\n"
@@ -138,47 +140,234 @@ cmd_dmods(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-/*ARGSUSED*/
-static int
-print_wdesc(mdb_var_t *v, void *ignored)
-{
-	mdb_iwalker_t *iwp = mdb_nv_get_cookie(mdb_nv_get_cookie(v));
+#define	FILTER_NAMEONLY	0x1
 
-	if (iwp->iwlk_descr != NULL)
-		mdb_printf("%-24s - %s\n", mdb_nv_get_name(v), iwp->iwlk_descr);
+typedef struct filter_data {
+	const char *pattern;
+	int flags;
+#ifndef _KMDB
+	regex_t reg;
+#endif
+} filter_data_t;
+
+static void
+filter_help(void)
+{
+	mdb_printf("Options:\n"
+	    "    -n       Match only the name, not the description.\n"
+#ifdef _KMDB
+	    "    pattern  Substring to match against name/description."
+#else
+	    "    pattern  RE to match against name/description."
+#endif
+	    "\n");
+}
+
+void
+cmd_dcmds_help(void)
+{
+	mdb_printf(
+	    "List all of the dcmds that are currently available. If a pattern\n"
+	    "is provided then list only the commands that\n"
+#ifdef _KMDB
+	    "contain the provided substring."
+#else
+	    "match the provided regular expression."
+#endif
+	    "\n");
+	filter_help();
+}
+
+void
+cmd_walkers_help(void)
+{
+	mdb_printf(
+	    "List all of the walkers that are currently available. If a\n"
+	    "pattern is provided then list only the walkers that\n"
+#ifdef _KMDB
+	    "contain the provided substring."
+#else
+	    "match the provided regular expression."
+#endif
+	    "\n");
+	filter_help();
+}
+
+static int
+print_wdesc(mdb_var_t *v, void *data)
+{
+	filter_data_t *f = data;
+	mdb_iwalker_t *iwp = mdb_nv_get_cookie(mdb_nv_get_cookie(v));
+	const char *name = mdb_nv_get_name(v);
+	boolean_t output = FALSE;
+
+	if (name == NULL || iwp->iwlk_descr == NULL)
+		return (0);
+
+	if (f->pattern == NULL) {
+		output = TRUE;
+	} else {
+#ifdef _KMDB
+		/*
+		 * kmdb doesn't have access to the reg* functions, so we fall
+		 * back to strstr.
+		 */
+		if (strstr(name, f->pattern) != NULL ||
+		    (!(f->flags & FILTER_NAMEONLY) &&
+		    strstr(iwp->iwlk_descr, f->pattern) != NULL))
+			output = TRUE;
+#else
+		regmatch_t pmatch;
+
+		if (regexec(&f->reg, name, 1, &pmatch, 0) == 0 ||
+		    (!(f->flags & FILTER_NAMEONLY) &&
+		    regexec(&f->reg, iwp->iwlk_descr, 1, &pmatch, 0) == 0))
+			output = TRUE;
+#endif
+
+	}
+
+	if (output)
+		mdb_printf("%-24s - %s\n", name, iwp->iwlk_descr);
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-cmd_walkers(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+cmd_walkers(uintptr_t addr __unused, uint_t flags, int argc,
+    const mdb_arg_t *argv)
 {
-	if ((flags & DCMD_ADDRSPEC) || argc != 0)
+	filter_data_t f;
+	int i;
+#ifndef _KMDB
+	int err;
+#endif
+
+	if (flags & DCMD_ADDRSPEC)
 		return (DCMD_USAGE);
 
-	mdb_nv_sort_iter(&mdb.m_walkers, print_wdesc, NULL, UM_SLEEP | UM_GC);
+	f.pattern = NULL;
+	f.flags = 0;
+
+	i = mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, FILTER_NAMEONLY, &f.flags,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
+	if (argc == 1) {
+		if (argv->a_type != MDB_TYPE_STRING)
+			return (DCMD_USAGE);
+		f.pattern = argv->a_un.a_str;
+
+#ifndef _KMDB
+		if ((err = regcomp(&f.reg, f.pattern, REG_EXTENDED)) != 0) {
+			size_t nbytes;
+			char *buf;
+
+			nbytes = regerror(err, &f.reg, NULL, 0);
+			buf = mdb_alloc(nbytes + 1, UM_SLEEP | UM_GC);
+			(void) regerror(err, &f.reg, buf, nbytes);
+			mdb_warn("%s\n", buf);
+
+			return (DCMD_ERR);
+		}
+#endif
+	} else if (argc != 0) {
+		return (DCMD_USAGE);
+	}
+
+	mdb_nv_sort_iter(&mdb.m_walkers, print_wdesc, &f, UM_SLEEP | UM_GC);
 	return (DCMD_OK);
 }
 
-/*ARGSUSED*/
 static int
-print_ddesc(mdb_var_t *v, void *ignored)
+print_ddesc(mdb_var_t *v, void *data)
 {
+	filter_data_t *f = data;
 	mdb_idcmd_t *idcp = mdb_nv_get_cookie(mdb_nv_get_cookie(v));
+	const char *name = mdb_nv_get_name(v);
+	boolean_t output = FALSE;
 
-	if (idcp->idc_descr != NULL)
-		mdb_printf("%-24s - %s\n", mdb_nv_get_name(v), idcp->idc_descr);
+	if (name == NULL || idcp->idc_descr == NULL)
+		return (0);
+
+	if (f->pattern == NULL) {
+		output = TRUE;
+	} else {
+#ifdef _KMDB
+		/*
+		 * kmdb doesn't have access to the reg* functions, so we fall
+		 * back to strstr.
+		 */
+		if (strstr(name, f->pattern) != NULL ||
+		    (!(f->flags & FILTER_NAMEONLY) &&
+		    strstr(idcp->idc_descr, f->pattern) != NULL))
+			output = TRUE;
+#else
+		regmatch_t pmatch;
+
+		if (regexec(&f->reg, name, 1, &pmatch, 0) == 0 ||
+		    (!(f->flags & FILTER_NAMEONLY) &&
+		    regexec(&f->reg, idcp->idc_descr, 1, &pmatch, 0) == 0))
+			output = TRUE;
+#endif
+
+	}
+
+	if (output)
+		mdb_printf("%-24s - %s\n", name, idcp->idc_descr);
 	return (0);
 }
 
 /*ARGSUSED*/
 int
-cmd_dcmds(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+cmd_dcmds(uintptr_t addr __unused, uint_t flags, int argc,
+    const mdb_arg_t *argv)
 {
-	if ((flags & DCMD_ADDRSPEC) || argc != 0)
+	filter_data_t f;
+	int i;
+#ifndef _KMDB
+	int err;
+#endif
+
+	if (flags & DCMD_ADDRSPEC)
 		return (DCMD_USAGE);
 
-	mdb_nv_sort_iter(&mdb.m_dcmds, print_ddesc, NULL, UM_SLEEP | UM_GC);
+	f.pattern = NULL;
+	f.flags = 0;
+
+	i = mdb_getopts(argc, argv,
+	    'n', MDB_OPT_SETBITS, FILTER_NAMEONLY, &f.flags,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
+	if (argc == 1) {
+		if (argv->a_type != MDB_TYPE_STRING)
+			return (DCMD_USAGE);
+		f.pattern = argv->a_un.a_str;
+
+#ifndef _KMDB
+		if ((err = regcomp(&f.reg, f.pattern, REG_EXTENDED)) != 0) {
+			size_t nbytes;
+			char *buf;
+
+			nbytes = regerror(err, &f.reg, NULL, 0);
+			buf = mdb_alloc(nbytes + 1, UM_SLEEP | UM_GC);
+			(void) regerror(err, &f.reg, buf, nbytes);
+			mdb_warn("%s\n", buf);
+
+			return (DCMD_ERR);
+		}
+#endif
+	} else if (argc != 0) {
+		return (DCMD_USAGE);
+	}
+
+	mdb_nv_sort_iter(&mdb.m_dcmds, print_ddesc, &f, UM_SLEEP | UM_GC);
 	return (DCMD_OK);
 }
 

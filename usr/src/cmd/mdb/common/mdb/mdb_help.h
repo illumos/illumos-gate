@@ -23,6 +23,7 @@
  * Copyright (c) 1998-1999 by Sun Microsystems, Inc.
  * All rights reserved.
  * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_MDB_HELP_H
@@ -43,6 +44,9 @@ extern int cmd_formats(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_help(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int cmd_help_tab(mdb_tab_cookie_t *, uint_t, int, const mdb_arg_t *);
 extern int cmd_which(uintptr_t, uint_t, int, const mdb_arg_t *);
+
+extern void cmd_dcmds_help(void);
+extern void cmd_walkers_help(void);
 
 #endif	/* _MDB */
 
