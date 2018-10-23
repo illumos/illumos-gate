@@ -88,6 +88,7 @@ Cell	*fnrloc;	/* FNR */
 Cell	*ofsloc;	/* OFS */
 Cell	*orsloc;	/* ORS */
 Cell	*rsloc;		/* RS */
+Cell	*rtloc;		/* RT */
 Array	*ARGVtab;	/* symbol table containing ARGV[...] */
 Array	*ENVtab;	/* symbol table containing ENVIRON[...] */
 Cell	*rstartloc;	/* RSTART */
@@ -132,6 +133,7 @@ syminit(void)	/* initialize symbol table with builtin vars */
 	FS = &fsloc->sval;
 	rsloc = setsymtab("RS", "\n", 0.0, STR|DONTFREE, symtab);
 	RS = &rsloc->sval;
+	rtloc = setsymtab("RT", "", 0.0, STR|DONTFREE, symtab);
 	ofsloc = setsymtab("OFS", " ", 0.0, STR|DONTFREE, symtab);
 	OFS = &ofsloc->sval;
 	orsloc = setsymtab("ORS", "\n", 0.0, STR|DONTFREE, symtab);

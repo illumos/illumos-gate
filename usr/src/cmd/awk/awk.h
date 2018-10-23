@@ -149,6 +149,7 @@ extern Cell	*nfloc;		/* NF */
 extern Cell	*ofsloc;	/* OFS */
 extern Cell	*orsloc;	/* ORS */
 extern Cell	*rsloc;		/* RS */
+extern Cell	*rtloc;		/* RT */
 extern Cell	*rstartloc;	/* RSTART */
 extern Cell	*rlengthloc;	/* RLENGTH */
 extern Cell	*subseploc;	/* SUBSEP */

@@ -711,6 +711,20 @@ The subscript separator string for multi-dimensional arrays. The default value
 is \fB\e034\fR\&.
 .RE
 
+.SS "/usr/bin/nawk"
+.LP
+The following variable is supported for \fB/usr/bin/nawk\fR only:
+.sp
+.ne 2
+.na
+\fB\fBRT\fR\fR
+.ad
+.RS 12n
+The record terminator for the most recent record read. For most records this
+will be the same value as \fBRS\fR. At the end of a file with no trailing
+separator value, though, this will be set to the empty string (\fB""\fR).
+.RE
+
 .SS "Regular Expressions"
 .LP
 The \fBnawk\fR utility makes use of the extended regular expression notation

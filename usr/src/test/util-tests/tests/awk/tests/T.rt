@@ -1,0 +1,99 @@
+#!/bin/bash
+
+if [[ -z "$AWK" || -z "$WORKDIR" ]]; then
+    printf '$AWK and $WORKDIR must be set\n' >&2
+    exit 1
+fi
+
+TEMP0=$WORKDIR/test.temp.0
+TEMP1=$WORKDIR/test.temp.1
+TEMP2=$WORKDIR/test.temp.2
+
+RESULT=0
+
+fail() {
+	echo "$1" >&2
+	RESULT=1
+}
+
+echo T.rt: tests for the RT variable
+
+$AWK 'BEGIN { print (RT == "" ? "true" : "false"); }' > $TEMP1
+printf 'true\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "" in BEGIN'
+
+printf 'a\n' > $TEMP0
+$AWK '{ print (RT == "\n" ? "true" : "false"); }' $TEMP0 > $TEMP1
+printf 'true\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "\n"'
+
+printf 'a' > $TEMP0
+$AWK '{ print (RT == "" ? "true" : "false"); }' $TEMP0 > $TEMP1
+printf 'true\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to ""'
+
+$AWK 'BEGIN { "echo hello" | getline; print (RT == "\n" ? "true" : "false"); }' > $TEMP1
+printf 'true\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "\n" (getline)'
+
+$AWK 'BEGIN { "printf a" | getline; print (RT == "" ? "true" : "false"); }' > $TEMP1
+printf 'true\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "" (getline)'
+
+$AWK 'BEGIN { "echo hello" | getline v; print (RT == "\n" ? "true" : "false"); }' > $TEMP1
+printf 'true\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "\n" (getline var)'
+
+$AWK 'BEGIN {
+	RT = "foo";
+	getline < "/etc/passwd";
+	print (RT == "\n" ? "true" : "false");
+}' > $TEMP1
+printf 'true\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "\n" (getline < file)'
+
+$AWK 'BEGIN {
+	RT = "foo";
+	getline v < "/etc/passwd";
+	print (RT == "\n" ? "true" : "false");
+}' > $TEMP1
+printf 'true\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "\n" (getline var < file)'
+
+# Single newline at end
+printf '\n\n\n\n\na\n\na b\na b c d\nq r s t u\n\n\n\n\nv w x y z\n' > $TEMP0
+$AWK 'BEGIN { RS = ""; } { print NF, length(RT); }' $TEMP0 > $TEMP1
+printf '1 2\n11 5\n5 1\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt empty RS variable (1 newline at end)'
+
+# Two newlines at end
+printf '\n\n\n\n\na\n\na b\na b c d\nq r s t u\n\n\n\n\nv w x y z\n\n' > $TEMP0
+$AWK 'BEGIN { RS = ""; } { print NF, length(RT); }' $TEMP0 > $TEMP1
+printf '1 2\n11 5\n5 2\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt empty RS variable (2 newlines at end)'
+
+# Multiple newlines at end
+printf 'a\n\na b\na b c d\nq r s t u\n\n\n\n\nv w x y z\n\n\n\n' > $TEMP0
+$AWK 'BEGIN { RS = ""; } { print NF, length(RT); }' $TEMP0 > $TEMP1
+printf '1 2\n11 5\n5 4\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt empty RS variable (many newlines at end)'
+
+# No newlines at end
+printf 'a\n\na b\na b c d\nq r s t u\n\n\n\n\nv w x y z' > $TEMP0
+$AWK 'BEGIN { RS = ""; } { print NF, length(RT); }' $TEMP0 > $TEMP1
+printf '1 2\n11 5\n5 0\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt empty RS variable (no ending newline)'
+
+# Non-newline separators
+
+printf 'a\036' > $TEMP0
+$AWK 'BEGIN { RS="\036" } { print (RT == "\036" ? "true" : "false"), length(RS); }' $TEMP0 > $TEMP1
+printf 'true 1\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "\036" (RS="\036")'
+
+printf 'a' > $TEMP0
+$AWK 'BEGIN { RS="\036" } { print (RT == "" ? "true" : "false"), length(RS); }' $TEMP0 > $TEMP1
+printf 'true 1\n' > $TEMP2
+diff $TEMP1 $TEMP2 || fail 'BAD: T.rt RT is set to "" (RS="\036")'
+
+exit $RESULT

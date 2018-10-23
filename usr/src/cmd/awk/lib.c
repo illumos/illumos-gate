@@ -69,6 +69,8 @@ char	*record;
 size_t	recsize	= RECSIZE;
 static char	*fields;
 static size_t	fieldssize = RECSIZE;
+static char	*rtbuf;
+static size_t	rtbufsize = RECSIZE;
 
 Cell	**fldtab;	/* pointers to Cells */
 char	inputFS[100] = " ";
@@ -256,11 +258,17 @@ int
 readrec(char **pbuf, size_t *pbufsize, FILE *inf)	/* read one record into buf */
 {
 	int sep, c;
-	char *rr, *buf = *pbuf;
+	char *rr, *rt, *buf = *pbuf;
 	size_t bufsize = *pbufsize;
 	char *rs = getsval(rsloc);
 
-	if ((sep = *rs) == 0) {
+	if (rtbuf == NULL && (rtbuf = malloc(rtbufsize)) == NULL)
+		FATAL("out of memory in readrec");
+
+	rr = buf;
+	rt = rtbuf;
+
+	if ((sep = *rs) == '\0') {
 		sep = '\n';
 		/* skip leading \n's */
 		while ((c = getc(inf)) == '\n' && c != EOF)
@@ -268,30 +276,67 @@ readrec(char **pbuf, size_t *pbufsize, FILE *inf)	/* read one record into buf */
 		if (c != EOF)
 			(void) ungetc(c, inf);
 	}
-	for (rr = buf; ; ) {
-		while ((c = getc(inf)) != sep && c != EOF) {
-			if (rr-buf+1 > bufsize)
-				if (!adjbuf(&buf, &bufsize, 1+rr-buf, recsize, &rr, "readrec 1"))
-					FATAL("input record `%.30s...' too long", buf);
+	while ((c = getc(inf)) != EOF) {
+		if (c != sep) {
+			if (rr-buf+1 > bufsize) {
+				(void) adjbuf(&buf, &bufsize,
+				    1+rr-buf, recsize, &rr, "readrec1");
+			}
 			*rr++ = c;
+			continue;
 		}
-		if (*rs == sep || c == EOF)
+
+		/*
+		 * Ensure enough space for either a single separator
+		 * character, or at least two '\n' chars (when RS is
+		 * the empty string).
+		 */
+		(void) adjbuf(&rtbuf, &rtbufsize,
+		    2+rt-rtbuf, recsize, &rt, "readrec2");
+
+		if (*rs == sep) {
+			*rt++ = sep;
 			break;
-		if ((c = getc(inf)) == '\n' || c == EOF) /* 2 in a row */
+		}
+
+		if ((c = getc(inf)) == '\n') { /* 2 in a row */
+			*rt++ = '\n';
+			*rt++ = '\n';
+			while ((c = getc(inf)) == '\n' && c != EOF) {
+				/* Read any further \n's and add them to RT. */
+				(void) adjbuf(&rtbuf, &rtbufsize,
+				    1+rt-rtbuf, recsize, &rt, "readrec3");
+				*rt++ = '\n';
+			}
+			if (c != EOF)
+				(void) ungetc(c, inf);
 			break;
-		if (!adjbuf(&buf, &bufsize, 2+rr-buf, recsize, &rr, "readrec 2"))
-			FATAL("input record `%.30s...' too long", buf);
+		}
+
+		if (c == EOF) {
+			*rt++ = '\n';
+			break;
+		}
+
+		(void) adjbuf(&buf, &bufsize,
+		    2+rr-buf, recsize, &rr, "readrec4");
 		*rr++ = '\n';
 		*rr++ = c;
 	}
-	if (!adjbuf(&buf, &bufsize, 1+rr-buf, recsize, &rr, "readrec 3"))
-		FATAL("input record `%.30s...' too long", buf);
+	(void) adjbuf(&buf, &bufsize, 1+rr-buf, recsize, &rr, "readrec5");
+	(void) adjbuf(&rtbuf, &rtbufsize, 1+rt-rtbuf, recsize, &rt, "readrec6");
 	*rr = '\0';
+	*rt = '\0';
 	dprintf(("readrec saw <%s>, returns %d\n",
 	    buf, c == EOF && rr == buf ? 0 : 1));
 	*pbuf = buf;
 	*pbufsize = bufsize;
-	return (c == EOF && rr == buf ? 0 : 1);
+	if (c == EOF && rr == buf) {
+		return (0);
+	} else {
+		(void) setsval(rtloc, rtbuf);
+		return (1);
+	}
 }
 
 /* get ARGV[n] */

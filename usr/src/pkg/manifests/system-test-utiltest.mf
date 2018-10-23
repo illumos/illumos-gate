@@ -1066,6 +1066,7 @@ file path=opt/util-tests/tests/awk/tests/T.overflow mode=0555
 file path=opt/util-tests/tests/awk/tests/T.re mode=0555
 file path=opt/util-tests/tests/awk/tests/T.recache mode=0555
 file path=opt/util-tests/tests/awk/tests/T.redir mode=0555
+file path=opt/util-tests/tests/awk/tests/T.rt mode=0555
 file path=opt/util-tests/tests/awk/tests/T.split mode=0555
 file path=opt/util-tests/tests/awk/tests/T.sub mode=0555
 file path=opt/util-tests/tests/awk/tests/T.system mode=0555
