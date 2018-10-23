@@ -21,7 +21,6 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef	_INET_IP_IMPL_H
@@ -160,27 +159,9 @@ extern "C" {
 #define	ILL_DIRECT_CAPABLE(ill)						\
 	(((ill)->ill_capabilities & ILL_CAPAB_DLD_DIRECT) != 0)
 
-/*
- * Determine if a mblk needs to take the "slow path", aka OTH
- * softring. There are multiple reasons why a mblk might take the slow
- * path.
- *
- * o The mblk is not a data message.
- *
- * o There is more than one outstanding reference to the mblk and it
- *   does not originate from a local MAC client. If the mblk does
- *   originate from a local MAC then allow it to pass through with
- *   more than one reference and leave the copying up to the consumer.
- *
- * o The IP header is not aligned (we assume alignment in the checksum
- *   routine).
- *
- * o The mblk doesn't contain enough data to populate a simple IP header.
- */
+/* This macro is used by the mac layer */
 #define	MBLK_RX_FANOUT_SLOWPATH(mp, ipha)				\
-	(DB_TYPE(mp) != M_DATA ||					\
-	(DB_REF(mp) != 1 && ((DB_CKSUMFLAGS(mp) & HW_LOCAL_MAC) == 0)) || \
-	!OK_32PTR(ipha) ||						\
+	(DB_TYPE(mp) != M_DATA || DB_REF(mp) != 1 || !OK_32PTR(ipha) || \
 	(((uchar_t *)ipha + IP_SIMPLE_HDR_LENGTH) >= (mp)->b_wptr))
 
 /*

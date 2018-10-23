@@ -968,7 +968,6 @@
 
 #include <sys/types.h>
 #include <sys/callb.h>
-#include <sys/pattr.h>
 #include <sys/sdt.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
@@ -1328,7 +1327,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 			 * b_prev may be set to the fanout hint		\
 			 * hence can't use freemsg directly		\
 			 */						\
-			mac_drop_chain(mp_chain, "SRS Tx max queue");	\
+			mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);	\
 			DTRACE_PROBE1(tx_queued_hiwat,			\
 			    mac_soft_ring_set_t *, srs);		\
 			enqueue = 0;					\
@@ -1347,11 +1346,11 @@ int mac_srs_worker_wakeup_ticks = 0;
 	if (!(srs->srs_type & SRST_TX))					\
 		mutex_exit(&srs->srs_bw->mac_bw_lock);
 
-#define	MAC_TX_SRS_DROP_MESSAGE(srs, chain, cookie, s) {	\
-	mac_drop_pkt((chain), (s));				\
+#define	MAC_TX_SRS_DROP_MESSAGE(srs, mp, cookie) {		\
+	mac_pkt_drop(NULL, NULL, mp, B_FALSE);			\
 	/* increment freed stats */				\
-	(srs)->srs_tx.st_stat.mts_sdrops++;			\
-	(cookie) = (mac_tx_cookie_t)(srs);			\
+	mac_srs->srs_tx.st_stat.mts_sdrops++;			\
+	cookie = (mac_tx_cookie_t)srs;				\
 }
 
 #define	MAC_TX_SET_NO_ENQUEUE(srs, mp_chain, ret_mp, cookie) {		\
@@ -2322,7 +2321,7 @@ check_again:
 				if (smcip->mci_mip->mi_promisc_list != NULL) {
 					mutex_exit(lock);
 					mac_promisc_dispatch(smcip->mci_mip,
-					    head, NULL);
+					    head, NULL, B_FALSE);
 					mutex_enter(lock);
 				}
 			}
@@ -2894,7 +2893,7 @@ again:
 		mac_srs->srs_bw->mac_bw_sz -= sz;
 		mac_srs->srs_bw->mac_bw_drop_bytes += sz;
 		mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
-		mac_drop_chain(head, "Rx no bandwidth");
+		mac_pkt_drop(NULL, NULL, head, B_FALSE);
 		goto leave_poll;
 	} else {
 		mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
@@ -3276,10 +3275,9 @@ mac_rx_srs_subflow_process(void *arg, mac_resource_handle_t srs,
 }
 
 /*
- * MAC SRS receive side routine. If the data is coming from the
- * network (i.e. from a NIC) then this is called in interrupt context.
- * If the data is coming from a local sender (e.g. mac_tx_send() or
- * bridge_forward()) then this is not called in interrupt context.
+ * mac_rx_srs_process
+ *
+ * Receive side routine called from the interrupt path.
  *
  * loopback is set to force a context switch on the loopback
  * path between MAC clients.
@@ -3339,7 +3337,7 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 			mac_bw->mac_bw_drop_bytes += sz;
 			mutex_exit(&mac_bw->mac_bw_lock);
 			mutex_exit(&mac_srs->srs_lock);
-			mac_drop_chain(mp_chain, "Rx no bandwidth");
+			mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);
 			return;
 		} else {
 			if ((mac_bw->mac_bw_sz + sz) <=
@@ -3461,8 +3459,7 @@ mac_tx_srs_no_desc(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 
 	ASSERT(tx_mode == SRS_TX_DEFAULT || tx_mode == SRS_TX_BW);
 	if (flag & MAC_DROP_ON_NO_DESC) {
-		MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
-		    "Tx no desc");
+		MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
 	} else {
 		if (mac_srs->srs_first != NULL)
 			wakeup_worker = B_FALSE;
@@ -3525,8 +3522,7 @@ mac_tx_srs_enqueue(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 	MAC_COUNT_CHAIN(mac_srs, mp_chain, tail, cnt, sz);
 	if (flag & MAC_DROP_ON_NO_DESC) {
 		if (mac_srs->srs_count > mac_srs->srs_tx.st_hiwat) {
-			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
-			    "Tx SRS hiwat");
+			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
 		} else {
 			MAC_TX_SRS_ENQUEUE_CHAIN(mac_srs,
 			    mp_chain, tail, cnt, sz);
@@ -3899,8 +3895,7 @@ mac_tx_bw_mode(mac_soft_ring_set_t *mac_srs, mblk_t *mp_chain,
 			cookie = (mac_tx_cookie_t)mac_srs;
 			*ret_mp = mp_chain;
 		} else {
-			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie,
-			    "Tx no bandwidth");
+			MAC_TX_SRS_DROP_MESSAGE(mac_srs, mp_chain, cookie);
 		}
 		mutex_exit(&mac_srs->srs_lock);
 		return (cookie);
@@ -4346,14 +4341,6 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			obytes += (mp->b_cont == NULL ? MBLKL(mp) :
 			    msgdsize(mp));
 
-			/*
-			 * Mark all packets as local so that a
-			 * receiver can determine if a packet arrived
-			 * from a local source or from the network.
-			 * This allows some consumers to avoid
-			 * unecessary work like checksum computation.
-			 */
-			DB_CKSUMFLAGS(mp) |= HW_LOCAL_MAC;
 			CHECK_VID_AND_ADD_TAG(mp);
 			MAC_TX(mip, ring, mp, src_mcip);
 
@@ -4386,6 +4373,7 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 		flow_entry_t *dst_flow_ent;
 		void *flow_cookie;
 		size_t	pkt_size;
+		mblk_t *mp1;
 
 		next = mp->b_next;
 		mp->b_next = NULL;
@@ -4395,25 +4383,49 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 		CHECK_VID_AND_ADD_TAG(mp);
 
 		/*
-		 * Mark all packets as local so that a receiver can
-		 * determine if a packet arrived from a local source
-		 * or from the network. This allows some consumers to
-		 * avoid unecessary work like checksum computation.
-		 */
-		DB_CKSUMFLAGS(mp) |= HW_LOCAL_MAC;
-
-		/*
 		 * Find the destination.
 		 */
 		dst_flow_ent = mac_tx_classify(mip, mp);
 
 		if (dst_flow_ent != NULL) {
+			size_t	hdrsize;
+			int	err = 0;
+
+			if (mip->mi_info.mi_nativemedia == DL_ETHER) {
+				struct ether_vlan_header *evhp =
+				    (struct ether_vlan_header *)mp->b_rptr;
+
+				if (ntohs(evhp->ether_tpid) == ETHERTYPE_VLAN)
+					hdrsize = sizeof (*evhp);
+				else
+					hdrsize = sizeof (struct ether_header);
+			} else {
+				mac_header_info_t	mhi;
+
+				err = mac_header_info((mac_handle_t)mip,
+				    mp, &mhi);
+				if (err == 0)
+					hdrsize = mhi.mhi_hdrsize;
+			}
+
 			/*
 			 * Got a matching flow. It's either another
 			 * MAC client, or a broadcast/multicast flow.
+			 * Make sure the packet size is within the
+			 * allowed size. If not drop the packet and
+			 * move to next packet.
 			 */
+			if (err != 0 ||
+			    (pkt_size - hdrsize) > mip->mi_sdu_max) {
+				oerrors++;
+				DTRACE_PROBE2(loopback__drop, size_t, pkt_size,
+				    mblk_t *, mp);
+				freemsg(mp);
+				mp = next;
+				FLOW_REFRELE(dst_flow_ent);
+				continue;
+			}
 			flow_cookie = mac_flow_get_client_cookie(dst_flow_ent);
-
 			if (flow_cookie != NULL) {
 				/*
 				 * The vnic_bcast_send function expects
@@ -4431,7 +4443,6 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 				 * bypass is set.
 				 */
 				boolean_t do_switch;
-
 				mac_client_impl_t *dst_mcip =
 				    dst_flow_ent->fe_mcip;
 
@@ -4448,18 +4459,20 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 				 * macro.
 				 */
 				if (mip->mi_promisc_list != NULL) {
-					mac_promisc_dispatch(mip, mp, src_mcip);
+					mac_promisc_dispatch(mip, mp, src_mcip,
+					    B_TRUE);
 				}
 
 				do_switch = ((src_mcip->mci_state_flags &
 				    dst_mcip->mci_state_flags &
 				    MCIS_CLIENT_POLL_CAPABLE) != 0);
 
-				(dst_flow_ent->fe_cb_fn)(
-				    dst_flow_ent->fe_cb_arg1,
-				    dst_flow_ent->fe_cb_arg2,
-				    mp, do_switch);
-
+				if ((mp1 = mac_fix_cksum(mp)) != NULL) {
+					(dst_flow_ent->fe_cb_fn)(
+					    dst_flow_ent->fe_cb_arg1,
+					    dst_flow_ent->fe_cb_arg2,
+					    mp1, do_switch);
+				}
 			}
 			FLOW_REFRELE(dst_flow_ent);
 		} else {
@@ -4816,7 +4829,7 @@ mac_tx_sring_enqueue(mac_soft_ring_t *ringp, mblk_t *mp_chain, uint16_t flag,
 	ASSERT(MUTEX_HELD(&ringp->s_ring_lock));
 	MAC_COUNT_CHAIN(mac_srs, mp_chain, tail, cnt, sz);
 	if (flag & MAC_DROP_ON_NO_DESC) {
-		mac_drop_chain(mp_chain, "Tx softring no desc");
+		mac_pkt_drop(NULL, NULL, mp_chain, B_FALSE);
 		/* increment freed stats */
 		ringp->s_ring_drops += cnt;
 		cookie = (mac_tx_cookie_t)ringp;
@@ -4860,8 +4873,8 @@ mac_tx_sring_enqueue(mac_soft_ring_t *ringp, mblk_t *mp_chain, uint16_t flag,
 					 * b_prev may be set to the fanout hint
 					 * hence can't use freemsg directly
 					 */
-					mac_drop_chain(mp_chain,
-					    "Tx softring max queue");
+					mac_pkt_drop(NULL, NULL,
+					    mp_chain, B_FALSE);
 					DTRACE_PROBE1(tx_queued_hiwat,
 					    mac_soft_ring_t *, ringp);
 					enqueue = B_FALSE;

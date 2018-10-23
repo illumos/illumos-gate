@@ -21,7 +21,6 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
  */
 
 #ifndef _SYS_PATTR_H
@@ -105,25 +104,6 @@ typedef struct pattr_hcksum_s {
 					/* On Receive: N/A */
 
 #define	HW_LSO_FLAGS		HW_LSO	/* All LSO flags, currently only one */
-
-/*
- * The packet originates from a MAC on the same machine as the
- * receiving MAC. There are two ways this can happen.
- *
- * 1. MAC loopback: When a packet is destined for a MAC client on the
- *                  same MAC as the sender. This datapath is taken in
- *                  max_tx_send().
- *
- * 2. Bridge Fwd: When a packet is destined for a MAC client on the
- *                same bridge as the sender. This datapath is taken in
- *                bridge_forward().
- *
- * Presented with this flag, a receiver can then decide whether or not
- * it needs to emulate some or all of the HW offloads that the NIC
- * would have performed otherwise -- or whether it should accept the
- * packet as-is.
- */
-#define	HW_LOCAL_MAC		0x100
 
 /*
  * Structure used for zerocopy attribute.

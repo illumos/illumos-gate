@@ -23,7 +23,6 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -42,7 +41,6 @@
 #include <sys/modctl.h>
 #include <sys/note.h>
 #include <sys/param.h>
-#include <sys/pattr.h>
 #include <sys/policy.h>
 #include <sys/sdt.h>
 #include <sys/stat.h>
@@ -1694,8 +1692,7 @@ bridge_learn(bridge_link_t *blp, const uint8_t *saddr, uint16_t ingress_nick,
  * The passed-in tci is the "impossible" value 0xFFFF when no tag is present.
  */
 static mblk_t *
-reform_vlan_header(mblk_t *mp, uint16_t vlanid, uint16_t tci, uint16_t pvid,
-    boolean_t keep_flags)
+reform_vlan_header(mblk_t *mp, uint16_t vlanid, uint16_t tci, uint16_t pvid)
 {
 	boolean_t source_has_tag = (tci != 0xFFFF);
 	mblk_t *mpcopy;
@@ -1707,13 +1704,8 @@ reform_vlan_header(mblk_t *mp, uint16_t vlanid, uint16_t tci, uint16_t pvid,
 	if (mp == NULL)
 		return (mp);
 
-	/*
-	 * A forwarded packet cannot have HW offloads enabled unless
-	 * the destination is known to be local to the host and HW
-	 * offloads haven't been emulated.
-	 */
-	if (!keep_flags)
-		DB_CKSUMFLAGS(mp) = 0;
+	/* No forwarded packet can have hardware checksum enabled */
+	DB_CKSUMFLAGS(mp) = 0;
 
 	/* Get the no-modification cases out of the way first */
 	if (!source_has_tag && vlanid == pvid)		/* 1a */
@@ -1914,46 +1906,17 @@ bridge_forward(bridge_link_t *blp, mac_header_info_t *hdr_info, mblk_t *mp,
 				blp->bl_trillthreads++;
 				mutex_exit(&blp->bl_trilllock);
 				update_header(mp, hdr_info, B_FALSE);
-
-				if (is_xmit) {
-					mac_hw_emul(&mp, NULL, NULL,
-					    MAC_HWCKSUM_EMUL | MAC_LSO_EMUL);
-
-					if (mp == NULL) {
-						KIINCR(bki_drops);
-						goto done;
-					}
+				if (is_xmit)
+					mp = mac_fix_cksum(mp);
+				/* all trill data frames have Inner.VLAN */
+				mp = reform_vlan_header(mp, vlanid, tci, 0);
+				if (mp == NULL) {
+					KIINCR(bki_drops);
+					fwd_unref(bfp);
+					return (NULL);
 				}
-
-				while (mp != NULL) {
-					mblk_t *next = mp->b_next;
-
-					mp->b_next = NULL;
-
-					/*
-					 * All trill data frames have
-					 * Inner.VLAN.
-					 */
-					mp = reform_vlan_header(mp, vlanid, tci,
-					    0, B_FALSE);
-
-					if (mp == NULL) {
-						/*
-						 * Make sure to free
-						 * any remaining
-						 * segments.
-						 */
-						freemsgchain(next);
-						KIINCR(bki_drops);
-						goto done;
-					}
-
-					trill_encap_fn(tdp, blp, hdr_info, mp,
-					    bfp->bf_trill_nick);
-					mp = next;
-				}
-
-done:
+				trill_encap_fn(tdp, blp, hdr_info, mp,
+				    bfp->bf_trill_nick);
 				mutex_enter(&blp->bl_trilllock);
 				if (--blp->bl_trillthreads == 0 &&
 				    blp->bl_trilldata == NULL)
@@ -1995,68 +1958,31 @@ done:
 				mpsend = copymsg(mp);
 			}
 
-			/*
-			 * If the destination is not local to the host
-			 * then we need to emulate HW offloads because
-			 * we can't guarantee the forwarding
-			 * destination provides them.
-			 */
-			if (!from_trill && is_xmit &&
-			    !(bfp->bf_flags & BFF_LOCALADDR)) {
-				mac_hw_emul(&mpsend, NULL, NULL,
-				    MAC_HWCKSUM_EMUL | MAC_LSO_EMUL);
+			if (!from_trill && is_xmit)
+				mpsend = mac_fix_cksum(mpsend);
 
-				if (mpsend == NULL) {
-					KIINCR(bki_drops);
-					continue;
-				}
+			mpsend = reform_vlan_header(mpsend, vlanid, tci,
+			    blpsend->bl_pvid);
+			if (mpsend == NULL) {
+				KIINCR(bki_drops);
+				continue;
 			}
 
-			/*
-			 * The HW emulation above may have segmented
-			 * an LSO mblk.
-			 */
-			while ((mpsend != NULL) &&
-			    !(bfp->bf_flags & BFF_LOCALADDR)) {
-				mblk_t *next = mpsend->b_next;
-
-				mpsend->b_next = NULL;
-				mpsend = reform_vlan_header(mpsend, vlanid, tci,
-				    blpsend->bl_pvid, B_FALSE);
-
-				if (mpsend == NULL) {
-					KIINCR(bki_drops);
-					mpsend = next;
-					continue;
-				}
-
-				KIINCR(bki_forwards);
-				KLPINCR(blpsend, bkl_xmit);
-				MAC_RING_TX(blpsend->bl_mh, NULL, mpsend,
-				    mpsend);
-				freemsg(mpsend);
-				mpsend = next;
-			}
-
+			KIINCR(bki_forwards);
 			/*
 			 * No need to bump up the link reference count, as
 			 * the forwarding entry itself holds a reference to
 			 * the link.
 			 */
 			if (bfp->bf_flags & BFF_LOCALADDR) {
-				mpsend = reform_vlan_header(mpsend, vlanid, tci,
-				    blpsend->bl_pvid, B_TRUE);
-
-				if (mpsend == NULL) {
-					KIINCR(bki_drops);
-					continue;
-				}
-
-				KIINCR(bki_forwards);
 				mac_rx_common(blpsend->bl_mh, NULL, mpsend);
+			} else {
+				KLPINCR(blpsend, bkl_xmit);
+				MAC_RING_TX(blpsend->bl_mh, NULL, mpsend,
+				    mpsend);
+				freemsg(mpsend);
 			}
 		}
-
 		/*
 		 * Handle a special case: if we're transmitting to the original
 		 * link, then check whether the localaddr flag is set.  If it
@@ -2092,7 +2018,7 @@ done:
 					 * Inner.VLAN
 					 */
 					mpsend = reform_vlan_header(mpsend,
-					    vlanid, tci, 0, B_FALSE);
+					    vlanid, tci, 0);
 					if (mpsend == NULL) {
 						KIINCR(bki_drops);
 					} else {
@@ -2143,57 +2069,25 @@ done:
 				mpsend = copymsg(mp);
 			}
 
-			/*
-			 * In this case, send to all links connected
-			 * to the bridge. Some of these destinations
-			 * may not provide HW offload -- so just
-			 * emulate it here.
-			 */
-			if (!from_trill && is_xmit) {
-				mac_hw_emul(&mpsend, NULL, NULL,
-				    MAC_HWCKSUM_EMUL | MAC_LSO_EMUL);
+			if (!from_trill && is_xmit)
+				mpsend = mac_fix_cksum(mpsend);
 
-				if (mpsend == NULL) {
-					KIINCR(bki_drops);
-					continue;
-				}
+			mpsend = reform_vlan_header(mpsend, vlanid, tci,
+			    blpsend->bl_pvid);
+			if (mpsend == NULL) {
+				KIINCR(bki_drops);
+				continue;
 			}
 
-			/*
-			 * The HW emulation above may have segmented
-			 * an LSO mblk.
-			 */
-			while (mpsend != NULL) {
-				mblk_t *next = mpsend->b_next;
-
-				mpsend->b_next = NULL;
-				mpsend = reform_vlan_header(mpsend, vlanid, tci,
-				    blpsend->bl_pvid, B_FALSE);
-
-				if (mpsend == NULL) {
-					KIINCR(bki_drops);
-					mpsend = next;
-					continue;
-				}
-
-				if (hdr_info->mhi_dsttype ==
-				    MAC_ADDRTYPE_UNICAST)
-					KIINCR(bki_unknown);
-				else
-					KIINCR(bki_mbcast);
-
-				KLPINCR(blpsend, bkl_xmit);
-				if ((mpcopy = copymsg(mpsend)) != NULL) {
-					mac_rx_common(blpsend->bl_mh, NULL,
-					    mpcopy);
-				}
-
-				MAC_RING_TX(blpsend->bl_mh, NULL, mpsend,
-				    mpsend);
-				freemsg(mpsend);
-				mpsend = next;
-			}
-
+			if (hdr_info->mhi_dsttype == MAC_ADDRTYPE_UNICAST)
+				KIINCR(bki_unknown);
+			else
+				KIINCR(bki_mbcast);
+			KLPINCR(blpsend, bkl_xmit);
+			if ((mpcopy = copymsg(mpsend)) != NULL)
+				mac_rx_common(blpsend->bl_mh, NULL, mpcopy);
+			MAC_RING_TX(blpsend->bl_mh, NULL, mpsend, mpsend);
+			freemsg(mpsend);
 			link_unref(blpsend);
 		}
 	}

@@ -242,7 +242,7 @@ mac_soft_ring_free(mac_soft_ring_t *softring)
 	ASSERT((softring->s_ring_state &
 	    (S_RING_CONDEMNED | S_RING_CONDEMNED_DONE | S_RING_PROC)) ==
 	    (S_RING_CONDEMNED | S_RING_CONDEMNED_DONE));
-	mac_drop_chain(softring->s_ring_first, "softring free");
+	mac_pkt_drop(NULL, NULL, softring->s_ring_first, B_FALSE);
 	softring->s_ring_tx_arg2 = NULL;
 	mac_soft_ring_stat_delete(softring);
 	mac_callback_free(softring->s_ring_notify_cb_list);

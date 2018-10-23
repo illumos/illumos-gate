@@ -21,8 +21,6 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -794,6 +792,12 @@ simnet_m_tx(void *arg, mblk_t *mp_chain)
 		if (!pullupmsg(mp, -1)) {
 			sdev->sd_stats.xmit_errors++;
 			freemsg(mp);
+			continue;
+		}
+
+		/* Fix mblk checksum as the pkt dest is local */
+		if ((mp = mac_fix_cksum(mp)) == NULL) {
+			sdev->sd_stats.xmit_errors++;
 			continue;
 		}
 

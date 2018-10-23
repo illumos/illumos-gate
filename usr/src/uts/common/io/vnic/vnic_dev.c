@@ -456,20 +456,6 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 		} else {
 			vnic->vn_hcksum_txflags = 0;
 		}
-
-		/*
-		 * Check for LSO capabilities. LSO implementations
-		 * depend on hardware checksumming, so the same
-		 * requirement is enforced here.
-		 */
-		if (vnic->vn_hcksum_txflags != 0) {
-			if (!mac_capab_get(vnic->vn_lower_mh, MAC_CAPAB_LSO,
-			    &vnic->vn_cap_lso)) {
-				vnic->vn_cap_lso.lso_flags = 0;
-			}
-		} else {
-			vnic->vn_cap_lso.lso_flags = 0;
-		}
 	}
 
 	/* register with the MAC module */
@@ -838,15 +824,6 @@ vnic_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 		*hcksum_txflags = vnic->vn_hcksum_txflags &
 		    (HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM |
 		    HCKSUM_INET_PARTIAL);
-		break;
-	}
-	case MAC_CAPAB_LSO: {
-		mac_capab_lso_t *cap_lso = cap_data;
-
-		if (vnic->vn_cap_lso.lso_flags == 0) {
-			return (B_FALSE);
-		}
-		*cap_lso = vnic->vn_cap_lso;
 		break;
 	}
 	case MAC_CAPAB_VNIC: {

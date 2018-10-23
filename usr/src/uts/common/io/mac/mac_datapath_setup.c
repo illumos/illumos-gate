@@ -3496,7 +3496,7 @@ mac_srs_free(mac_soft_ring_set_t *mac_srs)
 	ASSERT((mac_srs->srs_state & (SRS_CONDEMNED | SRS_CONDEMNED_DONE |
 	    SRS_PROC | SRS_PROC_FAST)) == (SRS_CONDEMNED | SRS_CONDEMNED_DONE));
 
-	mac_drop_chain(mac_srs->srs_first, "SRS free");
+	mac_pkt_drop(NULL, NULL, mac_srs->srs_first, B_FALSE);
 	mac_srs_ring_free(mac_srs);
 	mac_srs_soft_rings_free(mac_srs);
 	mac_srs_fanout_list_free(mac_srs);

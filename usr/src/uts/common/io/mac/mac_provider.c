@@ -688,7 +688,7 @@ mac_trill_snoop(mac_handle_t mh, mblk_t *mp)
 	mac_impl_t *mip = (mac_impl_t *)mh;
 
 	if (mip->mi_promisc_list != NULL)
-		mac_promisc_dispatch(mip, mp, NULL);
+		mac_promisc_dispatch(mip, mp, NULL, B_FALSE);
 }
 
 /*
@@ -708,7 +708,7 @@ mac_rx_common(mac_handle_t mh, mac_resource_handle_t mrh, mblk_t *mp_chain)
 	 * this MAC, pass them a copy if appropriate.
 	 */
 	if (mip->mi_promisc_list != NULL)
-		mac_promisc_dispatch(mip, mp_chain, NULL);
+		mac_promisc_dispatch(mip, mp_chain, NULL, B_FALSE);
 
 	if (mr != NULL) {
 		/*
@@ -1541,22 +1541,15 @@ mac_hcksum_clone(const mblk_t *src, mblk_t *dst)
 	ASSERT3U(DB_TYPE(dst), ==, M_DATA);
 
 	/*
-	 * Do these assignments unconditionally, rather than only when
-	 * flags is non-zero. This protects a situation where zeroed
-	 * hcksum data does not make the jump onto an mblk_t with
-	 * stale data in those fields. It's important to copy all
-	 * possible flags (HCK_* as well as HW_*) and not just the
-	 * checksum specific flags. Dropping flags during a clone
-	 * could result in dropped packets. If the caller has good
-	 * reason to drop those flags then it should do it manually,
-	 * after the clone.
+	 * Do these assignments unconditionally, rather than only when flags is
+	 * non-zero.  This protects a situation where zeroed hcksum data does
+	 * not make the jump onto an mblk_t with stale data in those fields.
 	 */
-	DB_CKSUMFLAGS(dst) = DB_CKSUMFLAGS(src);
+	DB_CKSUMFLAGS(dst) = (DB_CKSUMFLAGS(src) & HCK_FLAGS);
 	DB_CKSUMSTART(dst) = DB_CKSUMSTART(src);
 	DB_CKSUMSTUFF(dst) = DB_CKSUMSTUFF(src);
 	DB_CKSUMEND(dst) = DB_CKSUMEND(src);
 	DB_CKSUM16(dst) = DB_CKSUM16(src);
-	DB_LSOMSS(dst) = DB_LSOMSS(src);
 }
 
 void
