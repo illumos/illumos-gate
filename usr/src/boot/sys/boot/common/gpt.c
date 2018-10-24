@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2010 Pawel Jakub Dawidek <pjd@FreeBSD.org>
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/gpt.h>
@@ -34,7 +33,7 @@ __FBSDID("$FreeBSD$");
 #error gpt.c works only for little endian architectures
 #endif
 
-#include "crc32.h"
+#include "zlib.h"
 #include "drv.h"
 #include "util.h"
 #include "gpt.h"
@@ -78,9 +77,11 @@ gptupdate(const char *which, struct dsk *dskp, struct gpt_hdr *hdr,
 		    BOOTPROG, which);
 		return;
 	}
-	hdr->hdr_crc_table = crc32(table, hdr->hdr_entries * hdr->hdr_entsz);
-	hdr->hdr_crc_self = 0;
-	hdr->hdr_crc_self = crc32(hdr, hdr->hdr_size);
+	hdr->hdr_crc_table = crc32(0, Z_NULL, 0);
+	hdr->hdr_crc_table = crc32(hdr->hdr_crc_table, table,
+	    hdr->hdr_entries * hdr->hdr_entsz);
+	hdr->hdr_crc_self = crc32(0, Z_NULL, 0);
+	hdr->hdr_crc_self = crc32(hdr->hdr_crc_self, hdr, hdr->hdr_size);
 	bzero(secbuf, DEV_BSIZE);
 	bcopy(hdr, secbuf, hdr->hdr_size);
 	if (drvwrite(dskp, secbuf, hdr->hdr_lba_self, 1)) {
@@ -101,7 +102,7 @@ gptfind(const uuid_t *uuid, struct dsk *dskp, int part)
 			return (-1);
 		}
 		ent = &gpttable[part - 1];
-		if (bcmp(&ent->ent_type, uuid, sizeof(uuid_t)) != 0) {
+		if (bcmp(&ent->ent_type, uuid, sizeof (uuid_t)) != 0) {
 			printf("%s: specified partition is not UFS\n",
 			    BOOTPROG);
 			return (-1);
@@ -123,7 +124,7 @@ gptfind(const uuid_t *uuid, struct dsk *dskp, int part)
 		 */
 		for (; curent < gpthdr->hdr_entries; curent++) {
 			ent = &gpttable[curent];
-			if (bcmp(&ent->ent_type, uuid, sizeof(uuid_t)) != 0)
+			if (bcmp(&ent->ent_type, uuid, sizeof (uuid_t)) != 0)
 				continue;
 			if (!(ent->ent_attr & GPT_ENT_ATTR_BOOTME))
 				continue;
@@ -137,7 +138,7 @@ gptfind(const uuid_t *uuid, struct dsk *dskp, int part)
 	}
 	for (; curent < gpthdr->hdr_entries; curent++) {
 		ent = &gpttable[curent];
-		if (bcmp(&ent->ent_type, uuid, sizeof(uuid_t)) != 0)
+		if (bcmp(&ent->ent_type, uuid, sizeof (uuid_t)) != 0)
 			continue;
 		if (!(ent->ent_attr & GPT_ENT_ATTR_BOOTME))
 			continue;
@@ -153,7 +154,7 @@ gptfind(const uuid_t *uuid, struct dsk *dskp, int part)
 		 */
 		for (curent = 0; curent < gpthdr->hdr_entries; curent++) {
 			ent = &gpttable[curent];
-			if (bcmp(&ent->ent_type, uuid, sizeof(uuid_t)) != 0)
+			if (bcmp(&ent->ent_type, uuid, sizeof (uuid_t)) != 0)
 				continue;
 			/* Ok, found one. */
 			goto found;
@@ -191,17 +192,17 @@ gptread_hdr(const char *which, struct dsk *dskp, struct gpt_hdr *hdr,
 		printf("%s: unable to read %s GPT header\n", BOOTPROG, which);
 		return (-1);
 	}
-	bcopy(secbuf, hdr, sizeof(*hdr));
-	if (bcmp(hdr->hdr_sig, GPT_HDR_SIG, sizeof(hdr->hdr_sig)) != 0 ||
+	bcopy(secbuf, hdr, sizeof (*hdr));
+	if (bcmp(hdr->hdr_sig, GPT_HDR_SIG, sizeof (hdr->hdr_sig)) != 0 ||
 	    hdr->hdr_lba_self != hdrlba || hdr->hdr_revision < 0x00010000 ||
-	    hdr->hdr_entsz < sizeof(struct gpt_ent) ||
+	    hdr->hdr_entsz < sizeof (struct gpt_ent) ||
 	    hdr->hdr_entries > MAXTBLENTS || DEV_BSIZE % hdr->hdr_entsz != 0) {
 		printf("%s: invalid %s GPT header\n", BOOTPROG, which);
 		return (-1);
 	}
 	crc = hdr->hdr_crc_self;
-	hdr->hdr_crc_self = 0;
-	if (crc32(hdr, hdr->hdr_size) != crc) {
+	hdr->hdr_crc_self = crc32(0, Z_NULL, 0);
+	if (crc32(hdr->hdr_crc_self, hdr, hdr->hdr_size) != crc) {
 		printf("%s: %s GPT header checksum mismatch\n", BOOTPROG,
 		    which);
 		return (-1);
@@ -241,8 +242,8 @@ gptbootconv(const char *which, struct dsk *dskp, struct gpt_hdr *hdr,
 	table_updated = 0;
 	entries_per_sec = DEV_BSIZE / hdr->hdr_entsz;
 	for (nent = 0, slba = hdr->hdr_lba_table;
-	     slba < hdr->hdr_lba_table + hdr->hdr_entries / entries_per_sec;
-	     slba++, nent += entries_per_sec) {
+	    slba < hdr->hdr_lba_table + hdr->hdr_entries / entries_per_sec;
+	    slba++, nent += entries_per_sec) {
 		sector_updated = 0;
 		for (part = 0; part < entries_per_sec; part++) {
 			ent = &table[nent + part];
@@ -267,9 +268,11 @@ gptbootconv(const char *which, struct dsk *dskp, struct gpt_hdr *hdr,
 	}
 	if (!table_updated)
 		return;
-	hdr->hdr_crc_table = crc32(table, hdr->hdr_entries * hdr->hdr_entsz);
-	hdr->hdr_crc_self = 0;
-	hdr->hdr_crc_self = crc32(hdr, hdr->hdr_size);
+	hdr->hdr_crc_table = crc32(0, Z_NULL, 0);
+	hdr->hdr_crc_table = crc32(hdr->hdr_crc_table, table,
+	    hdr->hdr_entries * hdr->hdr_entsz);
+	hdr->hdr_crc_self = crc32(0, Z_NULL, 0);
+	hdr->hdr_crc_self = crc32(hdr->hdr_crc_self, hdr, hdr->hdr_size);
 	bzero(secbuf, DEV_BSIZE);
 	bcopy(hdr, secbuf, hdr->hdr_size);
 	if (drvwrite(dskp, secbuf, hdr->hdr_lba_self, 1))
@@ -299,7 +302,7 @@ gptread_table(const char *which, const uuid_t *uuid, struct dsk *dskp,
 		}
 		ent = (struct gpt_ent *)secbuf;
 		for (part = 0; part < entries_per_sec; part++, ent++) {
-			bcopy(ent, &table[nent], sizeof(table[nent]));
+			bcopy(ent, &table[nent], sizeof (table[nent]));
 			if (++nent >= hdr->hdr_entries)
 				break;
 		}
@@ -307,7 +310,7 @@ gptread_table(const char *which, const uuid_t *uuid, struct dsk *dskp,
 			break;
 		slba++;
 	}
-	if (crc32(table, nent * hdr->hdr_entsz) != hdr->hdr_crc_table) {
+	if (crc32(0, table, nent * hdr->hdr_entsz) != hdr->hdr_crc_table) {
 		printf("%s: %s GPT table checksum mismatch\n", BOOTPROG, which);
 		return (-1);
 	}

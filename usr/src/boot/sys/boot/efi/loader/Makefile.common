@@ -17,8 +17,6 @@ OBJS += load_elf32.o load_elf32_obj.o reloc_elf32.o \
 SRCS +=	disk.c part.c dev_net.c
 OBJS += disk.o part.o dev_net.o
 CFLAGS += -DLOADER_DISK_SUPPORT
-SRCS +=	crc32.c
-OBJS +=	crc32.o
 CFLAGS += -DLOADER_GPT_SUPPORT
 CFLAGS += -DLOADER_MBR_SUPPORT
 
