@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 """This module implements the "zfs holds" subcommand.
@@ -59,12 +60,12 @@ def do_holds():
 
 	fields = ("name", "tag", "timestamp")
 	rjustfields = ()
-	printing = False 
+	printing = False
 	gotone = False
-	t = zfs.table.Table(fields, rjustfields) 
+	t = zfs.table.Table(fields, rjustfields)
 	for ds in zfs.dataset.snapshots_fromcmdline(args, options.recursive):
 		gotone = True
-		for tag, tm in ds.get_holds().iteritems():
+		for tag, tm in ds.get_holds().items():
 			val = {"name": ds.name, "tag": tag,
 			    "timestamp": time.ctime(tm)}
 			t.addline(ds.name, val)

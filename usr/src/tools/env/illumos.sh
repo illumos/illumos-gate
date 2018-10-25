@@ -22,6 +22,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 # Configuration variables for the runtime environment of the nightly
@@ -245,8 +246,8 @@ export ENABLE_SMB_PRINTING=
 
 # If your distro uses certain versions of Perl, make sure either Makefile.master
 # contains your new defaults OR your .env file sets them.
-# These are how you would override for building on OmniOS r151012, for example.
-#export PERL_VERSION=5.16.1
+# These are how you would override for building on OmniOS r151028, for example.
+#export PERL_VERSION=5.28
 #export PERL_ARCH=i86pc-solaris-thread-multi-64int
 #export PERL_PKGVERS=-5161
 
@@ -255,3 +256,17 @@ export ENABLE_SMB_PRINTING=
 # proto area, that we then fail the build.
 #
 export LD_TOXIC_PATH="$ROOT/lib:$ROOT/usr/lib"
+
+# If your distro uses certain versions of Python, make sure either
+# Makefile.master contains your new defaults OR your .env file sets them.
+#export PYTHON_VERSION=2.7
+#export PYTHON_PKGVERS=-27
+#export PYTHON_SUFFIX=
+#export PYTHON3_VERSION=3.5
+#export PYTHON3_PKGVERS=-35
+#export PYTHON3_SUFFIX=m
+
+# To disable building with either Python2 or Python 3 (or both), uncomment
+# these lines:
+#export BUILDPY2='#'
+#export BUILDPY3='#'

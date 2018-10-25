@@ -1,0 +1,79 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri \
+    value=pkg:/system/library/python/zfs$(PYTHON_PKGVERS)@$(PKGVERS)
+set name=pkg.description value="ZFS Python2 Module"
+set name=pkg.summary value="zfs module, python2"
+set name=variant.arch value=$(ARCH)
+dir path=usr group=sys
+dir path=usr/lib
+$(python2_ONLY)dir path=usr/lib/python$(PYTHON_VERSION)
+$(python2_ONLY)dir path=usr/lib/python$(PYTHON_VERSION)/vendor-packages
+$(python2_ONLY)dir path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs
+$(python2_ONLY)dir path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/64
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/64/ioctl.so
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/__init__.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/__init__.pyc
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/allow.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/allow.pyc
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/dataset.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/dataset.pyc
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/groupspace.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/groupspace.pyc
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/holds.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/holds.pyc
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/ioctl.so
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/table.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/table.pyc
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/unallow.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/unallow.pyc
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/userspace.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/userspace.pyc
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/util.py
+$(python2_ONLY)file \
+    path=usr/lib/python$(PYTHON_VERSION)/vendor-packages/zfs/util.pyc
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+$(python2_ONLY)depend fmri=runtime/python$(PYTHON_PKGVERS) type=require

@@ -20,8 +20,10 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include ../Makefile.com
 
-install: all $(ROOTLIBS)
+all: $(PBOJECT) $(LIBS)
+install: all $(ROOTPYZFSFILES) $(ROOTLIBS)

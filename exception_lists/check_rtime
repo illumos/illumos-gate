@@ -23,6 +23,7 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2018 Joyent, Inc.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 # This file provides exceptions to the usual rules applied to ELF objects by
@@ -121,6 +122,7 @@ UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libssl3\.so
 UNUSED_RPATH	/usr/lib.*\ from\ .*/usr/lib/mps
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/libpython2\..
 UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython2\..
+UNUSED_RPATH	/usr/gnu/lib.*\ from\ .*/usr/lib/64/libpython3\..
 UNUSED_RPATH	/usr/snadm/lib.*\ from\ .*/usr/snadm/lib/libspmicommon\.so\.1
 UNUSED_RPATH	/usr/gcc/.*/lib.*\ from\ .*
 
@@ -153,6 +155,7 @@ UNREF_OBJ	/lib.*\ of\ .*libpq\.so\.4
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.4\.so\.1\.0
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.6\.so\.1\.0
 UNREF_OBJ	/lib.*\ of\ .*libpython2\.7\.so\.1\.0
+UNREF_OBJ	/lib.*\ of\ .*libpython3\.[567]m?\.so\.1\.0
 UNREF_OBJ	/libgcc_s.*\ of\ .*libstdc\+\+\.so\.6
 UNREF_OBJ	/libgcc_s.*\ of\ .*libgmodule-2\.0\.so\.0
 

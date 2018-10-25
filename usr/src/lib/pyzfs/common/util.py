@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 """This module provides utility functions for ZFS.
@@ -54,11 +55,11 @@ def default_repr(self):
 		return "<%s %s>" % \
 		    (self.__class__.__name__, repr(self.__dict__))
 
-class ZFSError(StandardError):
+class ZFSError(Exception):
 	"""This exception class represents a potentially user-visible
 	ZFS error.  If uncaught, it will be printed and the process will
 	exit with exit code 1.
-	
+
 	errno -- the error number (eg, from ioctl(2))."""
 
 	__slots__ = "why", "task", "errno"

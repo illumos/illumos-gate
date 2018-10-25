@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 import zfs.util
@@ -34,7 +35,7 @@ class Table:
 		self.rjustfields = rjustfields
 		self.maxfieldlen = dict.fromkeys(fields, 0)
 		self.lines = list()
-	
+
 	def __updatemax(self, k, v):
 		self.maxfieldlen[k] = max(self.maxfieldlen.get(k, None), v)
 
@@ -46,6 +47,8 @@ class Table:
 			v = str(values[f])
 			va.append(v)
 			self.__updatemax(f, len(v))
+		if sortkey == None:
+			sortkey = []
 		self.lines.append((sortkey, va))
 
 	def printme(self, headers=True):

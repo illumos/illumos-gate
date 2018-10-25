@@ -1520,15 +1520,40 @@ initterm(void)
             dumb++; ul_opt = 0;
         }
         else {
+	    int row, col;
+	    struct winsize w;
+	    char *s;
+
 	    reset_shell_mode();
-            if (((Lpp = lines) < 0) || hard_copy) {
+	    row = col = -1;
+	    if (ioctl(fileno(stdout), TIOCGWINSZ, &w) == 0) {
+		if (w.ws_row > 0)
+		    row = w.ws_row;
+		if (w.ws_col > 0)
+		    col = w.ws_col;
+	    }
+	    if (row < 0) {
+		if ((s = getenv("LINES")) != NULL)
+		    row = atoi(s);
+	    }
+	    if (col < 0) {
+		if ((s = getenv("COLUMNS")) != NULL)
+		    col = atoi(s);
+	    }
+
+	    if (row > 0)
+		Lpp = row;
+	    else if (((Lpp = lines) < 0) || hard_copy) {
                 hard++; /* Hard copy terminal */
                 Lpp = 24;
             }
+	    if (col > 0)
+		Mcol = col;
+	    else if ((Mcol = columns) < 0)
+                Mcol = 80;
+
             if (tailequ(fnames[0], "page") || !hard && (scroll_forward == NULL))
                 noscroll++;
-            if ((Mcol = columns) < 0)
-                Mcol = 80;
             Wrap = tigetflag("am");
             /*
              *  Set up for underlining:  some terminals don't need it;

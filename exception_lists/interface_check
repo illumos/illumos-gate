@@ -21,6 +21,7 @@
 
 
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 
 # This file provides exceptions to the usual rules applied to shared
 # objects by interface_check. All strings are Perl regular expressions
@@ -57,6 +58,7 @@ PLUGIN		^usr/lib/mdb
 PLUGIN		^usr/lib/pci
 PLUGIN		^usr/lib/picl/plugins
 PLUGIN		^usr/lib/python2.[467]
+PLUGIN		^usr/lib/python3.[567]
 PLUGIN		^usr/lib/rcm/modules
 PLUGIN		^usr/lib/scsi/plugins
 PLUGIN		^usr/lib/sysevent/modules
