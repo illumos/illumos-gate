@@ -1009,7 +1009,7 @@ stol_cmsgs_copyout(void *input, socklen_t inlen, void *addr,
 		goto finish;
 	}
 
-	VERIFY(inlen > sizeof (struct cmsghdr));
+	VERIFY(inlen >= sizeof (struct cmsghdr));
 
 	/*
 	 * First determine how much space we need for the conversion and
