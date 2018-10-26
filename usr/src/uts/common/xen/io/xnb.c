@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Joyent, Inc.
  */
 
 #ifdef DEBUG
@@ -251,8 +252,8 @@ xnb_software_csum(xnb_t *xnbp, mblk_t *mp)
 	 * because it doesn't cover all of the interesting cases :-(
 	 */
 	mac_hcksum_set(mp, 0, 0, 0, 0, HCK_FULLCKSUM);
-
-	return (mac_fix_cksum(mp));
+	mac_hw_emul(&mp, NULL, NULL, MAC_HWCKSUM_EMUL);
+	return (mp);
 }
 
 mblk_t *

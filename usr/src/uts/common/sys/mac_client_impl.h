@@ -411,8 +411,7 @@ extern	int	mac_tx_percpu_cnt;
 extern void mac_promisc_client_dispatch(mac_client_impl_t *, mblk_t *);
 extern void mac_client_init(void);
 extern void mac_client_fini(void);
-extern void mac_promisc_dispatch(mac_impl_t *, mblk_t *,
-    mac_client_impl_t *, boolean_t);
+extern void mac_promisc_dispatch(mac_impl_t *, mblk_t *, mac_client_impl_t *);
 
 extern int mac_validate_props(mac_impl_t *, mac_resource_props_t *);
 
