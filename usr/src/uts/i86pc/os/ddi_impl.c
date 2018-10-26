@@ -1842,7 +1842,7 @@ get_boot_properties(void)
 	extern char hw_provider[];
 	dev_info_t *devi;
 	char *name;
-	int length;
+	int length, flags;
 	char property_name[50], property_val[50];
 	void *bop_staging_area;
 
@@ -1873,7 +1873,7 @@ get_boot_properties(void)
 		}
 
 		length = BOP_GETPROPLEN(bootops, property_name);
-		if (length == 0)
+		if (length < 0)
 			continue;
 		if (length > MMU_PAGESIZE) {
 			cmn_err(CE_NOTE,
@@ -1882,6 +1882,7 @@ get_boot_properties(void)
 			continue;
 		}
 		BOP_GETPROP(bootops, property_name, bop_staging_area);
+		flags = do_bsys_getproptype(bootops, property_name);
 
 		/*
 		 * special properties:
@@ -1896,54 +1897,67 @@ get_boot_properties(void)
 		if (strcmp(name, "si-machine") == 0) {
 			(void) strncpy(utsname.machine, bop_staging_area,
 			    SYS_NMLN);
-			utsname.machine[SYS_NMLN - 1] = (char)NULL;
-		} else if (strcmp(name, "si-hw-provider") == 0) {
+			utsname.machine[SYS_NMLN - 1] = '\0';
+			continue;
+		}
+		if (strcmp(name, "si-hw-provider") == 0) {
 			(void) strncpy(hw_provider, bop_staging_area, SYS_NMLN);
-			hw_provider[SYS_NMLN - 1] = (char)NULL;
-		} else if (strcmp(name, "bios-boot-device") == 0) {
+			hw_provider[SYS_NMLN - 1] = '\0';
+			continue;
+		}
+		if (strcmp(name, "bios-boot-device") == 0) {
 			copy_boot_str(bop_staging_area, property_val, 50);
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, devi,
 			    property_name, property_val);
-		} else if (strcmp(name, "acpi-root-tab") == 0) {
-			(void) ndi_prop_update_int64(DDI_DEV_T_NONE, devi,
-			    property_name, *((int64_t *)bop_staging_area));
-		} else if (strcmp(name, "smbios-address") == 0) {
-			(void) ndi_prop_update_int64(DDI_DEV_T_NONE, devi,
-			    property_name, *((int64_t *)bop_staging_area));
-		} else if (strcmp(name, "efi-systab") == 0) {
-			(void) ndi_prop_update_int64(DDI_DEV_T_NONE, devi,
-			    property_name, *((int64_t *)bop_staging_area));
-		} else if (strcmp(name, "efi-systype") == 0) {
-			copy_boot_str(bop_staging_area, property_val, 50);
-			(void) ndi_prop_update_string(DDI_DEV_T_NONE, devi,
-			    property_name, property_val);
-		} else if (strcmp(name, "stdout") == 0) {
+			continue;
+		}
+		if (strcmp(name, "stdout") == 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, devi,
 			    property_name, *((int *)bop_staging_area));
-		} else if (strcmp(name, "boot-args") == 0) {
-			copy_boot_str(bop_staging_area, property_val, 50);
+			continue;
+		}
+
+		/* Boolean property */
+		if (length == 0) {
+			(void) e_ddi_prop_create(DDI_DEV_T_NONE, devi,
+			    DDI_PROP_CANSLEEP, property_name, NULL, 0);
+			continue;
+		}
+
+		/* Now anything else based on type. */
+		switch (flags) {
+		case DDI_PROP_TYPE_INT:
+			if (length == sizeof (int)) {
+				(void) e_ddi_prop_update_int(DDI_DEV_T_NONE,
+				    devi, property_name,
+				    *((int *)bop_staging_area));
+			} else {
+				(void) e_ddi_prop_update_int_array(
+				    DDI_DEV_T_NONE, devi, property_name,
+				    bop_staging_area, length / sizeof (int));
+			}
+			break;
+		case DDI_PROP_TYPE_STRING:
 			(void) e_ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-			    property_name, property_val);
-		} else if (strcmp(name, "bootargs") == 0) {
-			copy_boot_str(bop_staging_area, property_val, 50);
-			(void) e_ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-			    property_name, property_val);
-		} else if (strcmp(name, "bootp-response") == 0) {
+			    property_name, bop_staging_area);
+			break;
+		case DDI_PROP_TYPE_BYTE:
 			(void) e_ddi_prop_update_byte_array(DDI_DEV_T_NONE,
 			    devi, property_name, bop_staging_area, length);
-		} else if (strcmp(name, "ramdisk_start") == 0) {
-			(void) e_ddi_prop_update_int64(DDI_DEV_T_NONE, devi,
-			    property_name, *((int64_t *)bop_staging_area));
-		} else if (strcmp(name, "ramdisk_end") == 0) {
-			(void) e_ddi_prop_update_int64(DDI_DEV_T_NONE, devi,
-			    property_name, *((int64_t *)bop_staging_area));
-		} else if (strncmp(name, "module-addr-", 12) == 0) {
-			(void) e_ddi_prop_update_int64(DDI_DEV_T_NONE, devi,
-			    property_name, *((int64_t *)bop_staging_area));
-		} else if (strncmp(name, "module-size-", 12) == 0) {
-			(void) e_ddi_prop_update_int64(DDI_DEV_T_NONE, devi,
-			    property_name, *((int64_t *)bop_staging_area));
-		} else {
+			break;
+		case DDI_PROP_TYPE_INT64:
+			if (length == sizeof (int64_t)) {
+				(void) e_ddi_prop_update_int64(DDI_DEV_T_NONE,
+				    devi, property_name,
+				    *((int64_t *)bop_staging_area));
+			} else {
+				(void) e_ddi_prop_update_int64_array(
+				    DDI_DEV_T_NONE, devi, property_name,
+				    bop_staging_area,
+				    length / sizeof (int64_t));
+			}
+			break;
+		default:
 			/* Property type unknown, use old prop interface */
 			(void) e_ddi_prop_create(DDI_DEV_T_NONE, devi,
 			    DDI_PROP_CANSLEEP, property_name, bop_staging_area,
