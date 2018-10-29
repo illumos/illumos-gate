@@ -13,10 +13,11 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2014 Joyent, Inc. All rights reserved.
 # Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2018.5,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2018.7,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
