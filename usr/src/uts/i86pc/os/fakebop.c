@@ -859,20 +859,26 @@ done:
 /*
  * print formatted output
  */
-/*PRINTFLIKE2*/
 /*ARGSUSED*/
 void
-bop_printf(bootops_t *bop, const char *fmt, ...)
+vbop_printf(void *ptr, const char *fmt, va_list ap)
 {
-	va_list	ap;
-
 	if (have_console == 0)
 		return;
 
-	va_start(ap, fmt);
 	(void) vsnprintf(buffer, BUFFERSIZE, fmt, ap);
-	va_end(ap);
 	PUT_STRING(buffer);
+}
+
+/*PRINTFLIKE2*/
+void
+bop_printf(void *bop, const char *fmt, ...)
+{
+	va_list	ap;
+
+	va_start(ap, fmt);
+	vbop_printf(bop, fmt, ap);
+	va_end(ap);
 }
 
 /*

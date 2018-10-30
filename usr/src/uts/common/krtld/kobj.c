@@ -297,7 +297,7 @@ int standalone = 1;			/* an unwholey kernel? */
 int use_iflush;				/* iflush after relocations */
 
 /*
- * _kobj_printf()
+ * _kobj_printf() and _vkobj_printf()
  *
  * Common printf function pointer. Can handle only one conversion
  * specification in the format string. Some of the functions invoked
@@ -305,6 +305,7 @@ int use_iflush;				/* iflush after relocations */
  * specification in the format string.
  */
 void (*_kobj_printf)(void *, const char *, ...);	/* printf routine */
+void (*_vkobj_printf)(void *, const char *, va_list);	/* vprintf routine */
 
 /*
  * Standalone function pointers for use within krtld.

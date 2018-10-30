@@ -35,6 +35,7 @@
 #include <sys/reboot.h>
 
 extern void (*_kobj_printf)(void *, const char *fmt, ...);
+extern void (*_vkobj_printf)(void *, const char *fmt, va_list);
 extern int get_weakish_int(int *);
 extern struct bootops *ops;
 extern struct boot_fs_ops bufs_ops, bhsfs_ops, bbootfs_ops, bcpio_ops;
@@ -244,6 +245,6 @@ kobj_printf(char *fmt, ...)
 	va_list adx;
 
 	va_start(adx, fmt);
-	_kobj_printf(ops, fmt, adx);
+	_vkobj_printf(ops, fmt, adx);
 	va_end(adx);
 }

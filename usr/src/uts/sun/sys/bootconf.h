@@ -61,7 +61,7 @@ struct bsys_mem {
 	struct memlist *physinstalled;	/* amt of physmem installed */
 	struct memlist *physavail;	/* amt of physmem avail for use */
 	struct memlist *virtavail;	/* amt of virtmem avail for use */
-	uint_t		extent; 	/* number of bytes in the space */
+	uint_t		extent;		/* number of bytes in the space */
 };
 
 #define	BO_VERSION	9		/* bootops interface revision # */
@@ -110,6 +110,7 @@ extern void bop_enter_mon(void);
 extern void bop_fini(void);
 
 extern void bop_printf(void *ops, const char *fmt, ...);
+extern void vbop_printf(void *ops, const char *fmt, va_list);
 extern void bop_putsarg(const char *fmt, char *arg);
 extern void bop_panic(const char *s);
 

@@ -39,6 +39,7 @@
 #include <sys/dirent.h>			/* for struct dirent */
 #include <sys/memlist.h>
 #include <sys/obpdefs.h>
+#include <sys/varargs.h>
 #include <net/if.h>			/* for IFNAMSIZ */
 
 #ifdef __cplusplus
@@ -83,7 +84,7 @@ struct bsys_mem {
 	struct memlist	*physavail;	/* amt of physmem avail for use */
 	struct memlist	*virtavail;	/* amt of virtmem avail for use */
 	struct memlist	*pcimem;	/* amt of pcimem avail for use */
-	uint_t		extent; 	/* number of bytes in the space */
+	uint_t		extent;		/* number of bytes in the space */
 };
 
 /*
@@ -103,7 +104,7 @@ typedef struct bootops {
 	/*
 	 * the area containing boot's memlists
 	 */
-	struct 	bsys_mem *boot_mem;
+	struct	bsys_mem *boot_mem;
 
 	/*
 	 * have boot allocate size bytes at virthint
@@ -136,7 +137,7 @@ typedef struct bootops {
 	/*
 	 * print formatted output
 	 */
-	void	(*bsys_printf)(struct bootops *, const char *, ...);
+	void	(*bsys_printf)(void *, const char *, ...);
 
 	/*
 	 * Do a real mode interrupt
@@ -230,8 +231,9 @@ extern char *netdev_path;
 extern void bop_no_more_mem(void);
 
 /*PRINTFLIKE2*/
-extern void bop_printf(struct bootops *, const char *, ...)
+extern void bop_printf(void *, const char *, ...)
     __KPRINTFLIKE(2);
+extern void vbop_printf(void *, const char *, va_list);
 
 /*PRINTFLIKE1*/
 extern void bop_panic(const char *, ...)
