@@ -44,39 +44,48 @@
 #include <sys/byteorder.h>
 #include <sys/ddi.h>
 
+/*
+ * The original conversion array used simple array index, but since
+ * we do need to take account of VTOC tag numbers from other systems,
+ * we need to provide tag values too, or the array will grow too large.
+ *
+ * Still we will fabricate the missing p_tag values.
+ */
 static struct uuid_to_ptag {
 	struct uuid	uuid;
+	ushort_t	p_tag;
 } conversion_array[] = {
-	{ EFI_UNUSED },
-	{ EFI_BOOT },
-	{ EFI_ROOT },
-	{ EFI_SWAP },
-	{ EFI_USR },
-	{ EFI_BACKUP },
-	{ 0 },			/* STAND is never used */
-	{ EFI_VAR },
-	{ EFI_HOME },
-	{ EFI_ALTSCTR },
-	{ 0 },			/* CACHE is never used */
-	{ EFI_RESERVED },
-	{ EFI_SYSTEM },
-	{ EFI_LEGACY_MBR },
-	{ EFI_SYMC_PUB },
-	{ EFI_SYMC_CDS },
-	{ EFI_MSFT_RESV },
-	{ EFI_DELL_BASIC },
-	{ EFI_DELL_RAID },
-	{ EFI_DELL_SWAP },
-	{ EFI_DELL_LVM },
-	{ EFI_DELL_RESV },
-	{ EFI_AAPL_HFS },
-	{ EFI_AAPL_UFS },
-	{ EFI_BIOS_BOOT },
-	{ EFI_FREEBSD_BOOT },
-	{ EFI_FREEBSD_SWAP },
-	{ EFI_FREEBSD_UFS },
-	{ EFI_FREEBSD_VINUM },
-	{ EFI_FREEBSD_ZFS }
+	{ EFI_UNUSED, V_UNASSIGNED },
+	{ EFI_BOOT, V_BOOT },
+	{ EFI_ROOT, V_ROOT },
+	{ EFI_SWAP, V_SWAP },
+	{ EFI_USR, V_USR },
+	{ EFI_BACKUP, V_BACKUP },
+	{ EFI_VAR, V_VAR },
+	{ EFI_HOME, V_HOME },
+	{ EFI_ALTSCTR, V_ALTSCTR },
+	{ EFI_RESERVED, V_RESERVED },
+	{ EFI_SYSTEM, V_SYSTEM },		/* V_SYSTEM is 0xc */
+	{ EFI_LEGACY_MBR, 0x10 },
+	{ EFI_SYMC_PUB, 0x11 },
+	{ EFI_SYMC_CDS, 0x12 },
+	{ EFI_MSFT_RESV, 0x13 },
+	{ EFI_DELL_BASIC, 0x14 },
+	{ EFI_DELL_RAID, 0x15 },
+	{ EFI_DELL_SWAP, 0x16 },
+	{ EFI_DELL_LVM, 0x17 },
+	{ EFI_DELL_RESV, 0x19 },
+	{ EFI_AAPL_HFS, 0x1a },
+	{ EFI_AAPL_UFS, 0x1b },
+	{ EFI_AAPL_ZFS, 0x1c },
+	{ EFI_AAPL_APFS, 0x1d },
+	{ EFI_BIOS_BOOT, V_BIOS_BOOT },		/* V_BIOS_BOOT is 0x18 */
+	{ EFI_FREEBSD_BOOT,  V_FREEBSD_BOOT },
+	{ EFI_FREEBSD_SWAP, V_FREEBSD_SWAP },
+	{ EFI_FREEBSD_UFS, V_FREEBSD_UFS },
+	{ EFI_FREEBSD_VINUM, V_FREEBSD_VINUM },
+	{ EFI_FREEBSD_ZFS, V_FREEBSD_ZFS },
+	{ EFI_FREEBSD_NANDFS, V_FREEBSD_NANDFS }
 };
 
 /*
@@ -563,7 +572,8 @@ efi_read(int fd, struct dk_gpt *vtoc)
 			if (bcmp(&vtoc->efi_parts[i].p_guid,
 			    &conversion_array[j].uuid,
 			    sizeof (struct uuid)) == 0) {
-				vtoc->efi_parts[i].p_tag = j;
+				vtoc->efi_parts[i].p_tag =
+				    conversion_array[j].p_tag;
 				break;
 			}
 		}
@@ -1037,7 +1047,8 @@ efi_write(int fd, struct dk_gpt *vtoc)
 		    j < sizeof (conversion_array) /
 		    sizeof (struct uuid_to_ptag); j++) {
 
-			if (vtoc->efi_parts[i].p_tag == j) {
+			if (vtoc->efi_parts[i].p_tag ==
+			    conversion_array[j].p_tag) {
 				UUID_LE_CONVERT(
 				    efi_parts[i].efi_gpe_PartitionTypeGUID,
 				    conversion_array[j].uuid);

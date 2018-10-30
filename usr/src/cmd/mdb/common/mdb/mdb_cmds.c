@@ -29,6 +29,7 @@
  * Copyright (c) 2018 Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2017 by Delphix. All rights reserved.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/elf.h>
@@ -3100,7 +3101,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    "address", cmd_array },
 	{ "bp", "?[+/-dDestT] [-c cmd] [-n count] sym ...", "breakpoint at the "
 	    "specified addresses or symbols", cmd_bp, bp_help },
-	{ "dcmds", NULL, "list available debugger commands", cmd_dcmds },
+	{ "dcmds", "[[-n] pattern]",
+	    "list available debugger commands", cmd_dcmds, cmd_dcmds_help },
 	{ "delete", "?[id|all]", "delete traced software events", cmd_delete },
 	{ "dis", "?[-abfw] [-n cnt] [addr]", "disassemble near addr", cmd_dis },
 	{ "disasms", NULL, "list available disassemblers", cmd_disasms },
@@ -3168,7 +3170,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	    cmd_vtop },
 	{ "walk", "?name [variable]", "walk data structure", cmd_walk, NULL,
 	    cmd_walk_tab },
-	{ "walkers", NULL, "list available walkers", cmd_walkers },
+	{ "walkers", "[[-n] pattern]", "list available walkers",
+	    cmd_walkers, cmd_walkers_help },
 	{ "whatis", ":[-aikqv]", "given an address, return information",
 	    cmd_whatis, whatis_help },
 	{ "whence", "[-v] name ...", "show source of walk or dcmd", cmd_which },
