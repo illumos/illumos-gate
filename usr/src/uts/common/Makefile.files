@@ -51,6 +51,7 @@ COMMON_CORE_OBJS +=		\
 		cmt.o		\
 		cmt_policy.o	\
 		cpu.o		\
+		cpu_uarray.o	\
 		cpu_event.o	\
 		cpu_intr.o	\
 		cpu_pm.o	\

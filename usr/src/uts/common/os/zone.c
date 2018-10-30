@@ -2364,20 +2364,26 @@ zone_misc_kstat_update(kstat_t *ksp, int rw)
 {
 	zone_t *zone = ksp->ks_private;
 	zone_misc_kstat_t *zmp = ksp->ks_data;
-	hrtime_t tmp;
+	hrtime_t hrtime;
+	uint64_t tmp;
 
 	if (rw == KSTAT_WRITE)
 		return (EACCES);
 
-	tmp = zone->zone_utime;
-	scalehrtime(&tmp);
-	zmp->zm_utime.value.ui64 = tmp;
-	tmp = zone->zone_stime;
-	scalehrtime(&tmp);
-	zmp->zm_stime.value.ui64 = tmp;
-	tmp = zone->zone_wtime;
-	scalehrtime(&tmp);
-	zmp->zm_wtime.value.ui64 = tmp;
+	tmp = cpu_uarray_sum(zone->zone_ustate, ZONE_USTATE_STIME);
+	hrtime = UINT64_OVERFLOW_TO_INT64(tmp);
+	scalehrtime(&hrtime);
+	zmp->zm_stime.value.ui64 = hrtime;
+
+	tmp = cpu_uarray_sum(zone->zone_ustate, ZONE_USTATE_UTIME);
+	hrtime = UINT64_OVERFLOW_TO_INT64(tmp);
+	scalehrtime(&hrtime);
+	zmp->zm_utime.value.ui64 = hrtime;
+
+	tmp = cpu_uarray_sum(zone->zone_ustate, ZONE_USTATE_WTIME);
+	hrtime = UINT64_OVERFLOW_TO_INT64(tmp);
+	scalehrtime(&hrtime);
+	zmp->zm_wtime.value.ui64 = hrtime;
 
 	zmp->zm_avenrun1.value.ui32 = zone->zone_avenrun[0];
 	zmp->zm_avenrun5.value.ui32 = zone->zone_avenrun[1];
@@ -2572,9 +2578,6 @@ zone_zsd_init(void)
 	zone0.zone_swapresv_kstat = NULL;
 	zone0.zone_physmem_kstat = NULL;
 	zone0.zone_nprocs_kstat = NULL;
-	zone0.zone_stime = 0;
-	zone0.zone_utime = 0;
-	zone0.zone_wtime = 0;
 
 	zone_pdata[0].zpers_zfsp = &zone0_zp_zfs;
 	zone_pdata[0].zpers_zfsp->zpers_zfs_io_pri = 1;
@@ -2819,6 +2822,8 @@ zone_init(void)
 	 */
 	rw_init(&zone0.zone_mntfs_db_lock, NULL, RW_DEFAULT, NULL);
 
+	zone0.zone_ustate = cpu_uarray_zalloc(ZONE_USTATE_MAX, KM_SLEEP);
+
 	mutex_enter(&zonehash_lock);
 	zone_uniqid(&zone0);
 	ASSERT(zone0.zone_uniqid == GLOBAL_ZONEUNIQID);
@@ -2929,6 +2934,8 @@ zone_free(zone_t *zone)
 	mutex_enter(&zone_status_lock);
 	zone_status_set(zone, ZONE_IS_FREE);
 	mutex_exit(&zone_status_lock);
+
+	cpu_uarray_free(zone->zone_ustate);
 
 	if (zone->zone_rootvp != NULL)
 		VN_RELE(zone->zone_rootvp);
@@ -3750,12 +3757,13 @@ zone_find_by_path(const char *path)
  * Based on loadavg_update(), genloadavg() and calcloadavg() from clock.c.
  */
 void
-zone_loadavg_update()
+zone_loadavg_update(void)
 {
 	zone_t *zp;
 	zone_status_t status;
 	struct loadavg_s *lavg;
 	hrtime_t zone_total;
+	uint64_t tmp;
 	int i;
 	hrtime_t hr_avg;
 	int nrun;
@@ -3780,7 +3788,9 @@ zone_loadavg_update()
 		 */
 		lavg = &zp->zone_loadavg;
 
-		zone_total = zp->zone_utime + zp->zone_stime + zp->zone_wtime;
+		tmp = cpu_uarray_sum_all(zp->zone_ustate);
+		zone_total = UINT64_OVERFLOW_TO_INT64(tmp);
+
 		scalehrtime(&zone_total);
 
 		/* The zone_total should always be increasing. */
@@ -4835,8 +4845,8 @@ zone_set_privset(zone_t *zone, const priv_set_t *zone_privs,
  * Where each element of the nvpair_list_array is of the form:
  *
  * [(name = "privilege", value = RCPRIV_PRIVILEGED),
- * 	(name = "limit", value = uint64_t),
- * 	(name = "action", value = (RCTL_LOCAL_NOACTION || RCTL_LOCAL_DENY))]
+ *	(name = "limit", value = uint64_t),
+ *	(name = "action", value = (RCTL_LOCAL_NOACTION || RCTL_LOCAL_DENY))]
  */
 static int
 parse_rctls(caddr_t ubuf, size_t buflen, nvlist_t **nvlp)
@@ -5131,10 +5141,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone->zone_bootargs = NULL;
 	zone->zone_fs_allowed = NULL;
 
-	secflags_zero(&zone0.zone_secflags.psf_lower);
-	secflags_zero(&zone0.zone_secflags.psf_effective);
-	secflags_zero(&zone0.zone_secflags.psf_inherit);
-	secflags_fullset(&zone0.zone_secflags.psf_upper);
+	psecflags_default(&zone->zone_secflags);
 
 	zone->zone_initname =
 	    kmem_alloc(strlen(zone_default_initname) + 1, KM_SLEEP);
@@ -5156,6 +5163,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone_pdata[zoneid].zpers_zfsp =
 	    kmem_zalloc(sizeof (zone_zfs_io_t), KM_SLEEP);
 	zone_pdata[zoneid].zpers_zfsp->zpers_zfs_io_pri = 1;
+
+	zone->zone_ustate = cpu_uarray_zalloc(ZONE_USTATE_MAX, KM_SLEEP);
 
 	/*
 	 * Zsched initializes the rctls.

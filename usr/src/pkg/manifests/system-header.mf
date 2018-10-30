@@ -26,6 +26,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -854,6 +855,7 @@ file path=usr/include/sys/corectl.h
 file path=usr/include/sys/cpc_impl.h
 file path=usr/include/sys/cpc_pcbe.h
 file path=usr/include/sys/cpr.h
+file path=usr/include/sys/cpu_uarray.h
 file path=usr/include/sys/cpu.h
 file path=usr/include/sys/cpucaps.h
 file path=usr/include/sys/cpucaps_impl.h

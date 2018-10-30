@@ -3783,6 +3783,7 @@ f usr/include/sys/corectl.h 0644 root bin
 f usr/include/sys/cpc_impl.h 0644 root bin
 f usr/include/sys/cpc_pcbe.h 0644 root bin
 f usr/include/sys/cpr.h 0644 root bin
+f usr/include/sys/cpu_uarray.h 0644 root bin
 f usr/include/sys/cpu.h 0644 root bin
 f usr/include/sys/cpucaps.h 0644 root bin
 f usr/include/sys/cpucaps_impl.h 0644 root bin
