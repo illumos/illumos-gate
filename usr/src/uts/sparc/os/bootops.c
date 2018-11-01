@@ -427,12 +427,18 @@ bop_getprop(const char *name, void *value)
  */
 /*ARGSUSED*/
 void
+vbop_printf(void *ptr, const char *fmt, va_list ap)
+{
+	prom_vprintf(fmt, ap);
+}
+
+void
 bop_printf(void *ops, const char *fmt, ...)
 {
 	va_list adx;
 
 	va_start(adx, fmt);
-	prom_vprintf(fmt, adx);
+	vbop_printf(ops, fmt, adx);
 	va_end(adx);
 }
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,15 +42,22 @@
  * vector so that krtld may simply refer to bzero etc.
  * as usual.  See kobj_impl.h.
  */
+extern void vprintf(const char *, va_list);
 
 /*ARGSUSED*/
+static void
+vkprintf(void *op, const char *fmt, va_list adx)
+{
+	vprintf(fmt, adx);
+}
+
 static void
 kprintf(void *op, const char *fmt, ...)
 {
 	va_list adx;
 
 	va_start(adx, fmt);
-	vprintf(fmt, adx);
+	vkprintf(op, fmt, adx);
 	va_end(adx);
 }
 
@@ -109,14 +114,15 @@ stand_strlcat(char *dst, const char *src, size_t dstsize)
 void
 kobj_setup_standalone_vectors()
 {
-	_kobj_printf = (void (*)(void *, const char *, ...))bop_printf;
+	_kobj_printf = bop_printf;
+	_vkobj_printf = vbop_printf;
 	kobj_bcopy = stand_bcopy;
 	kobj_bzero = stand_bzero;
 	kobj_strlcat = stand_strlcat;
 }
 
 /*
- * Restore the kprintf/bcopy/bzero kobj vectors.
+ * Restore the kprintf/vkprintf/bcopy/bzero kobj vectors.
  * We need to undefine the override macros to
  * accomplish this.
  *
@@ -132,6 +138,7 @@ void
 kobj_restore_vectors()
 {
 	_kobj_printf = kprintf;
+	_vkobj_printf = vkprintf;
 	kobj_bcopy = bcopy;
 	kobj_bzero = bzero;
 	kobj_strlcat = strlcat;

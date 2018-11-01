@@ -30,10 +30,9 @@
 #ifndef	_SYS_KOBJ_IMPL_H
 #define	_SYS_KOBJ_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/kdi.h>
 #include <sys/kobj.h>
+#include <sys/varargs.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -186,6 +185,7 @@ extern void mach_modpath(char *, const char *);
 extern void kobj_setup_standalone_vectors(void);
 extern void kobj_restore_vectors(void);
 extern void (*_kobj_printf)(void *, const char *fmt, ...);
+extern void (*_vkobj_printf)(void *, const char *fmt, va_list);
 extern void (*kobj_bcopy)(const void *, void *, size_t);
 extern void (*kobj_bzero)(void *, size_t);
 extern size_t (*kobj_strlcat)(char *, const char *, size_t);
