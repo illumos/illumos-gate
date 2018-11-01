@@ -47,7 +47,6 @@
 #include <netinet/if_ether.h>
 #include <netinet/in_systm.h>
 
-#include <netinet/in_pcb.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/udp.h>
@@ -65,7 +64,7 @@ sendudp(struct iodesc *d, void *pkt, size_t len)
 	struct udphdr *uh;
 
 #ifdef NET_DEBUG
- 	if (debug) {
+	if (debug) {
 		printf("sendudp: d=%lx called.\n", (long)d);
 		if (d) {
 			printf("saddr: %s:%d",
@@ -171,7 +170,7 @@ readudp(struct iodesc *d, void **pkt, void **payload, time_t tleft)
 		return (-1);
 	}
 
-	n = (n > (ntohs(uh->uh_ulen) - sizeof(*uh))) ? 
+	n = (n > (ntohs(uh->uh_ulen) - sizeof(*uh))) ?
 	    ntohs(uh->uh_ulen) - sizeof(*uh) : n;
 	*pkt = ptr;
 	*payload = (void *)((uintptr_t)uh + sizeof(*uh));
