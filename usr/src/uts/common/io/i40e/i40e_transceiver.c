@@ -455,7 +455,7 @@ static const ddi_dma_attr_t i40e_g_txbind_dma_attr = {
 	DMA_ATTR_V0,			/* version number */
 	0x0000000000000000ull,		/* low address */
 	0xFFFFFFFFFFFFFFFFull,		/* high address */
-	I40E_MAX_TX_BUFSZ,		/* dma counter max */
+	I40E_MAX_TX_BUFSZ - 1,		/* dma counter max */
 	I40E_DMA_ALIGNMENT,		/* alignment */
 	0x00000FFF,			/* burst sizes */
 	0x00000001,			/* minimum transfer size */
@@ -470,7 +470,7 @@ static const ddi_dma_attr_t i40e_g_txbind_lso_dma_attr = {
 	DMA_ATTR_V0,			/* version number */
 	0x0000000000000000ull,		/* low address */
 	0xFFFFFFFFFFFFFFFFull,		/* high address */
-	I40E_MAX_TX_BUFSZ,		/* dma counter max */
+	I40E_MAX_TX_BUFSZ - 1,		/* dma counter max */
 	I40E_DMA_ALIGNMENT,		/* alignment */
 	0x00000FFF,			/* burst sizes */
 	0x00000001,			/* minimum transfer size */
@@ -2278,6 +2278,13 @@ i40e_tx_set_data_desc(i40e_trqpair_t *itrq, i40e_tx_context_t *tctx,
 		cmd |= I40E_TX_DESC_CMD_EOP;
 		cmd |= I40E_TX_DESC_CMD_RS;
 	}
+
+	/*
+	 * Per the X710 manual, section 8.4.2.1.1, the buffer size
+	 * must be a value from 1 to 16K minus 1, inclusive.
+	 */
+	ASSERT3U(dbi->dbi_len, >=, 1);
+	ASSERT3U(dbi->dbi_len, <=, I40E_MAX_TX_BUFSZ - 1);
 
 	txdesc->buffer_addr = CPU_TO_LE64((uintptr_t)dbi->dbi_paddr);
 	txdesc->cmd_type_offset_bsz =
