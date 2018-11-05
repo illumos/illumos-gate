@@ -327,7 +327,6 @@ static int vmx_getdesc(void *arg, int vcpu, int reg, struct seg_desc *desc);
 static int vmx_getreg(void *arg, int vcpu, int reg, uint64_t *retval);
 static int vmxctx_setreg(struct vmxctx *vmxctx, int reg, uint64_t val);
 static void vmx_inject_pir(struct vlapic *vlapic);
-static void vmx_flush_pir_prio(struct vlapic *vlapic);
 #ifndef __FreeBSD__
 static int vmx_apply_tsc_adjust(struct vmx *, int);
 #endif /* __FreeBSD__ */
@@ -3409,10 +3408,6 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 	if (!handled)
 		vmm_stat_incr(vm, vcpu, VMEXIT_USERSPACE, 1);
 
-	if (virtual_interrupt_delivery) {
-		vmx_flush_pir_prio(vlapic);
-	}
-
 	VCPU_CTR1(vm, vcpu, "returning from vmx_run: exitcode %d",
 	    vmexit->exitcode);
 
@@ -3833,7 +3828,10 @@ struct vlapic_vtx {
 	struct vlapic	vlapic;
 	struct pir_desc	*pir_desc;
 	struct vmx	*vmx;
+	uint_t pending_prio;
 };
+
+#define VPR_PRIO_BIT(vpr)	(1 << ((vpr) >> 4))
 
 #define	VMX_CTR_PIR(vm, vcpuid, pir_desc, notify, vector, level, msg)	\
 do {									\
@@ -3847,12 +3845,6 @@ do {									\
 } while (0)
 
 /*
- * The least significant bit in the 'pending' field of the PIR descriptor
- * indicates to the CPU that interrupts are pending in the 'pir' fields.
- */
-#define	PIR_MASK_PENDING	0x1
-
-/*
  * vlapic->ops handlers that utilize the APICv hardware assist described in
  * Chapter 29 of the Intel SDM.
  */
@@ -3861,14 +3853,8 @@ vmx_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
 {
 	struct vlapic_vtx *vlapic_vtx;
 	struct pir_desc *pir_desc;
-	uint64_t mask, old;
-	int idx, notify;
-	const uint_t prio = (vector & 0xf0) >> 4;
-	const uint64_t prio_mask = (1 << prio) | PIR_MASK_PENDING;
-
-#ifndef __FreeBSD__
-	ASSERT(vector >= 0x10 && vector <= 0xff);
-#endif
+	uint64_t mask;
+	int idx, notify = 0;
 
 	vlapic_vtx = (struct vlapic_vtx *)vlapic;
 	pir_desc = vlapic_vtx->pir_desc;
@@ -3883,52 +3869,34 @@ vmx_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
 	atomic_set_long(&pir_desc->pir[idx], mask);
 
 	/*
-	 * Deciding if vCPU notification is required when using PIR is
-	 * complicated by interrupt priorities.  It is not enough to simply
-	 * notify when 'pending' makes the 0->1 transition.  If an interrupt
-	 * with a higher priority class than those already present is queued,
-	 * its arrival necessitates a notification in case the vCPU is blocked
-	 * in HLT with a PPR higher than the existing interrupts.
+	 * A notification is required whenever the 'pending' bit makes a
+	 * transition from 0->1.
 	 *
-	 * The priority classes of pending interrupts is cached as a bitfield
-	 * in the higher order bits of the 'pending' field of pir_desc.  The
-	 * Intel manual states those bits are reserved for software and we are
-	 * free to use them.
+	 * Even if the 'pending' bit is already asserted, notification about
+	 * the incoming interrupt may still be necessary.  For example, if a
+	 * vCPU is HLTed with a high PPR, a low priority interrupt would cause
+	 * the 0->1 'pending' transition with a notification, but the vCPU
+	 * would ignore the interrupt for the time being.  The same vCPU would
+	 * need to then be notified if a high-priority interrupt arrived which
+	 * satisfied the PPR.
 	 *
-	 * Those priority bits will be left unchanged, becoming effectively
-	 * stale, when the CPU delivers the posted interrupts to the guest and
-	 * clears the 'pending' bit.  The presence of those stale bits is
-	 * harmless when the CPU is in guest context, since 0->1 transitions of
-	 * the 'pending' bit ensure reliable notifications.  They are cleared
-	 * by vmx_flush_pir_prio() prior to leaving vmx_run(), since accurate
-	 * priority information is necessary to prevent eliding necessary
-	 * wake-ups.
-	 *
-	 * When vmx_inject_pir() is called to inject any interrupts which were
-	 * posted while the CPU was outside VMX context, it will also clear the
-	 * priority bitfield as part of querying the 'pending' field.
+	 * The priorities of interrupts injected while 'pending' is asserted
+	 * are tracked in a custom bitfield 'pending_prio'.  Should the
+	 * to-be-injected interrupt exceed the priorities already present, the
+	 * notification is sent.  The priorities recorded in 'pending_prio' are
+	 * cleared whenever the 'pending' bit makes another 0->1 transition.
 	 */
-	old = pir_desc->pending;
-	if (atomic_cmpset_long(&pir_desc->pending, old, old | prio_mask) != 0) {
-		/*
-		 * If there was no race in updating the pending field
-		 * (including the priority bitfield), then a notification is
-		 * only needed if the incoming priority class is higher than
-		 * any existing ones.
-		 *
-		 * This will also cover the case where the 'pending' bit has
-		 * been cleared by the CPU as it delivered interrupts posted in
-		 * the structure.
-		 */
-		notify = ((old & PIR_MASK_PENDING) == 0 || prio_mask > old);
-	} else {
-		/*
-		 * In the case of racing updates to the pending field, the
-		 * priority and pending bit are atomically set and the
-		 * notification is unconditionally requested.
-		 */
-		atomic_set_long(&pir_desc->pending, prio_mask);
+	if (atomic_cmpset_long(&pir_desc->pending, 0, 1) != 0) {
 		notify = 1;
+		vlapic_vtx->pending_prio = 0;
+	} else {
+		const uint_t old_prio = vlapic_vtx->pending_prio;
+		const uint_t prio_bit = VPR_PRIO_BIT(vector & APIC_TPR_INT);
+
+		if ((old_prio & prio_bit) == 0 && prio_bit > old_prio) {
+			atomic_set_int(&vlapic_vtx->pending_prio, prio_bit);
+			notify = 1;
+		}
 	}
 
 	VMX_CTR_PIR(vlapic->vm, vlapic->vcpuid, pir_desc, notify, vector,
@@ -3955,8 +3923,8 @@ vmx_pending_intr(struct vlapic *vlapic, int *vecptr)
 	vlapic_vtx = (struct vlapic_vtx *)vlapic;
 	pir_desc = vlapic_vtx->pir_desc;
 
-	pending = pir_desc->pending;
-	if ((pending & PIR_MASK_PENDING) == 0) {
+	pending = atomic_load_acq_long(&pir_desc->pending);
+	if (!pending) {
 		/*
 		 * While a virtual interrupt may have already been
 		 * processed the actual delivery maybe pending the
@@ -3993,14 +3961,30 @@ vmx_pending_intr(struct vlapic *vlapic, int *vecptr)
 	VCPU_CTR1(vlapic->vm, vlapic->vcpuid, "HLT with non-zero PPR %d",
 	    lapic->ppr);
 
+	vpr = 0;
 	for (i = 3; i >= 0; i--) {
 		pirval = pir_desc->pir[i];
 		if (pirval != 0) {
 			vpr = (i * 64 + flsl(pirval) - 1) & APIC_TPR_INT;
-			return (vpr > ppr);
+			break;
 		}
 	}
-	return (0);
+	/*
+	 * If the highest-priority pending interrupt falls short of the
+	 * processor priority of this vCPU, ensure that 'pending_prio' does not
+	 * have any stale bits which would preclude a higher-priority interrupt
+	 * from incurring a notification later.
+	 */
+	if (vpr <= ppr) {
+		const uint_t prio_bit = VPR_PRIO_BIT(vpr);
+		const uint_t old = vlapic_vtx->pending_prio;
+
+		if (old > prio_bit && (old & prio_bit) == 0) {
+			vlapic_vtx->pending_prio = prio_bit;
+		}
+		return (0);
+	}
+	return (1);
 }
 
 static void
@@ -4100,15 +4084,13 @@ vmx_inject_pir(struct vlapic *vlapic)
 	struct vlapic_vtx *vlapic_vtx;
 	struct pir_desc *pir_desc;
 	struct LAPIC *lapic;
-	uint64_t val, pirval, pending;
+	uint64_t val, pirval;
 	int rvi, pirbase = -1;
 	uint16_t intr_status_old, intr_status_new;
 
 	vlapic_vtx = (struct vlapic_vtx *)vlapic;
 	pir_desc = vlapic_vtx->pir_desc;
-
-	pending = atomic_readandclear_long(&pir_desc->pending);
-	if ((pending & PIR_MASK_PENDING) == 0) {
+	if (atomic_cmpset_long(&pir_desc->pending, 1, 0) == 0) {
 		VCPU_CTR0(vlapic->vm, vlapic->vcpuid, "vmx_inject_pir: "
 		    "no posted interrupt pending");
 		return;
@@ -4184,26 +4166,6 @@ vmx_inject_pir(struct vlapic *vlapic)
 			    intr_status_old, intr_status_new);
 		}
 	}
-}
-
-static void
-vmx_flush_pir_prio(struct vlapic *vlapic)
-{
-	struct vlapic_vtx *vlapic_vtx;
-	struct pir_desc *pir_desc;
-
-	vlapic_vtx = (struct vlapic_vtx *)vlapic;
-	pir_desc = vlapic_vtx->pir_desc;
-
-	/*
-	 * Clear all the reserved bits caching interrupt priority, leaving the
-	 * 'pending' bit, from the PIR descriptor.  Stale priority bits
-	 * representing interrupts which were posted to the guest while in the
-	 * VMX context must be cleared to ensure that priority-conditional
-	 * interrupt notification occurs properly until another VMX entry is
-	 * made.
-	 */
-	atomic_clear_long(&pir_desc->pending, ~PIR_MASK_PENDING);
 }
 
 static struct vlapic *
