@@ -354,12 +354,20 @@ CCNOAUTOINLINE= \
 	-_gcc=-fno-inline-small-functions \
 	-_gcc=-fno-inline-functions-called-once \
 	-_gcc=-fno-ipa-cp \
-	-_gcc6=-fno-ipa-icf \
 	-_gcc7=-fno-ipa-icf \
 	-_gcc8=-fno-ipa-icf \
-	-_gcc6=-fno-clone-functions \
 	-_gcc7=-fno-clone-functions \
 	-_gcc8=-fno-clone-functions
+
+# GCC may put functions in different named sub-sections of .text based on
+# their presumed calling frequency.  At least in the kernel, where we actually
+# deliver relocatable objects, we don't want this to happen.
+#
+# Since at present we don't benefit from this even in userland, we disable it globally,
+# but the application of this may move into usr/src/uts/ in future.
+CCNOREORDER=	\
+	-_gcc7=-fno-reorder-functions \
+	-_gcc8=-fno-reorder-functions
 
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo
@@ -587,12 +595,12 @@ $(SRCDBGBLD)CCSOURCEDEBUGFLAGS	= -g -xs
 
 CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(CSTD) $(CCUNBOUND) $(IROPTFLAG) \
-		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CSOURCEDEBUGFLAGS) \
-		$(CUSERFLAGS)
+		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CCNOREORDER) \
+		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS)
 CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
 		$(ILDOFF) $(CERRWARN) $(CSTD) $(CCUNBOUND) $(IROPTFLAG64) \
-		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CSOURCEDEBUGFLAGS) \
-		$(CUSERFLAGS64)
+		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CCNOREORDER) \
+		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS64)
 #
 # Flags that are used to build parts of the code that are subsequently
 # run on the build machine (also known as the NATIVE_BUILD).
@@ -600,7 +608,7 @@ CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
 NATIVE_CFLAGS=	$(COPTFLAG) $($(NATIVE_MACH)_CFLAGS) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(CSTD) $($(NATIVE_MACH)_CCUNBOUND) \
 		$(IROPTFLAG) $(CGLOBALSTATIC) $(CCNOAUTOINLINE) \
-		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS)
+		$(CCNOREORDER) $(CSOURCEDEBUGFLAGS) $(CUSERFLAGS)
 
 DTEXTDOM=-DTEXT_DOMAIN=\"$(TEXT_DOMAIN)\"	# For messaging.
 DTS_ERRNO=-D_TS_ERRNO

@@ -63,7 +63,7 @@ prefetch_read_many(void *addr)
 }
 
 extern __GNU_INLINE void
-refetch_read_once(void *addr)
+prefetch_read_once(void *addr)
 {
 #if defined(__amd64)
 	__asm__(
