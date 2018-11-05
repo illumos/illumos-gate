@@ -7109,7 +7109,20 @@ sdpower(dev_info_t *devi, int component, int level)
 			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 	}
 
-	if (un->un_f_power_condition_supported) {
+	/*
+	 * We've encountered certain classes of drives that pass a TUR, but fail
+	 * the START STOP UNIT when using power conditions, or worse leave the
+	 * drive in an unusable state despite passing SSU. Strictly speaking,
+	 * for SPC-4 or greater, no additional actions are required to make the
+	 * drive operational when a TUR passes. If we have something that
+	 * matches this condition, we continue on and presume the drive is
+	 * successfully powered on.
+	 */
+	if (un->un_f_power_condition_supported &&
+	    SD_SCSI_VERS_IS_GE_SPC_4(un) && SD_PM_IS_IO_CAPABLE(un, level) &&
+	    level == SD_SPINDLE_ACTIVE && tursval == 0) {
+		sval = 0;
+	} else if (un->un_f_power_condition_supported) {
 		char *pm_condition_name[] = {"STOPPED", "STANDBY",
 		    "IDLE", "ACTIVE"};
 		SD_TRACE(SD_LOG_IO_PM, un,
@@ -7130,20 +7143,6 @@ sdpower(dev_info_t *devi, int component, int level)
 		else
 			sd_ssc_assessment(ssc, SD_FMT_IGNORE);
 
-	}
-
-	/*
-	 * We've encountered certain classes of drives that pass a TUR, but fail
-	 * the START STOP UNIT when using power conditions. Strictly speaking,
-	 * for SPC-4 or greater, no additional actions are required to make the
-	 * drive operational when a TUR passes. If we have something that
-	 * matches this condition, we continue on and presume the drive is
-	 * successfully powered on.
-	 */
-	if (un->un_f_power_condition_supported && sval == ENOTSUP &&
-	    SD_SCSI_VERS_IS_GE_SPC_4(un) && SD_PM_IS_IO_CAPABLE(un, level) &&
-	    level == SD_SPINDLE_ACTIVE && tursval == 0) {
-		sval = 0;
 	}
 
 	/* Command failed, check for media present. */
