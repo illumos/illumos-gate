@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2001 Doug Rabson
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <efi.h>
 #include <efilib.h>
@@ -35,15 +34,5 @@ void delay(int);
 void
 delay(int usecs)
 {
-	static EFI_EVENT ev = 0;
-	UINTN junk;
-
-	if (!ev) {
-		if (BS->CreateEvent(EVT_TIMER, TPL_APPLICATION, 0, 0, &ev)
-		    != EFI_SUCCESS)
-			return;
-	}
-
-	BS->SetTimer(ev, TimerRelative, usecs * 10);
-	BS->WaitForEvent(1, &ev, &junk);
+	BS->Stall(usecs);
 }
