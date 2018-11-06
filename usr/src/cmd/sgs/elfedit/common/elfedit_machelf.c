@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -229,15 +230,16 @@ elfedit32_init_obj_state(const char *file, int fd, Elf *elf)
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
 	obj_state->os_secarr = (elfedit_section_t *)
 	    ((char *)obj_state + os_size);
-	if (obj_state->os_symtabnum == 0)
+	if (obj_state->os_symtabnum == 0) {
 		obj_state->os_symtab = NULL;
-	else
+	} else {
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
 		obj_state->os_symtab = (elfedit_symtab_t *)
 		    ((char *)obj_state->os_secarr + secarr_size);
-	obj_state->os_file =
-	    (char *)(obj_state->os_symtab + tstate.os_symtabnum);
-	(void) strncpy((char *)obj_state->os_file, tstate.os_file, len);
+		obj_state->os_file =
+		    (char *)(obj_state->os_symtab + tstate.os_symtabnum);
+		(void) strncpy((char *)obj_state->os_file, tstate.os_file, len);
+	}
 
 	/*
 	 * Fill in obj_state->os_secarr with information for each section.
