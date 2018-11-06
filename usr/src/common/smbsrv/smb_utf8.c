@@ -22,32 +22,12 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
- * Multibyte/wide-char conversion routines. Wide-char encoding provides
- * a fixed size character encoding that maps to the Unicode 16-bit
- * (UCS-2) character set standard. Multibyte or UCS transformation
- * format (UTF) encoding is a variable length character encoding scheme
- * that s compatible with existing ASCII characters and guarantees that
- * the resultant strings do not contain embedded null characters. Both
- * types of encoding provide a null terminator: single byte for UTF-8
- * and a wide-char null for Unicode. See RFC 2044.
- *
- * The table below illustrates the UTF-8 encoding scheme. The letter x
- * indicates bits available for encoding the character value.
- *
- *	UCS-2			UTF-8 octet sequence (binary)
- *	0x0000-0x007F	0xxxxxxx
- *	0x0080-0x07FF	110xxxxx 10xxxxxx
- *	0x0800-0xFFFF	1110xxxx 10xxxxxx 10xxxxxx
- *
- * RFC 2044
- * UTF-8,a transformation format of UNICODE and ISO 10646
- * F. Yergeau
- * Alis Technologies
- * October 1996
+ * Multibyte/wide-char conversion routines. SMB uses UTF-16 on the wire
+ * (smb_wchar_t) and we use UTF-8 internally (our multi-byte, or mbs).
  */
 
 #if defined(_KERNEL) || defined(_FAKE_KERNEL)
@@ -60,6 +40,7 @@
 #include <iconv.h>
 #include <assert.h>
 #endif	/* _KERNEL || _FAKE_KERNEL */
+#include <sys/u8_textprep.h>
 #include <smbsrv/string.h>
 
 
@@ -76,26 +57,37 @@
  * multibyte character is encountered.
  */
 size_t
-smb_mbstowcs(smb_wchar_t *wcstring, const char *mbstring, size_t nwchars)
+smb_mbstowcs(smb_wchar_t *wcs, const char *mbs, size_t nwchars)
 {
-	int len;
-	smb_wchar_t	*start = wcstring;
+	size_t mbslen, wcslen;
+	int err;
 
-	while (nwchars--) {
-		len = smb_mbtowc(wcstring, mbstring, MTS_MB_CHAR_MAX);
-		if (len < 0) {
-			*wcstring = 0;
-			return ((size_t)-1);
-		}
-
-		if (*mbstring == 0)
-			break;
-
-		++wcstring;
-		mbstring += len;
+	/* NULL or empty input is allowed. */
+	if (mbs == NULL || *mbs == '\0') {
+		if (wcs != NULL && nwchars > 0)
+			*wcs = 0;
+		return (0);
 	}
 
-	return (wcstring - start);
+	/*
+	 * Traditional mbstowcs(3C) allows wcs==NULL to get the length.
+	 * SMB never calls it that way, but let's future-proof.
+	 */
+	if (wcs == NULL) {
+		return ((size_t)-1);
+	}
+
+	mbslen = strlen(mbs);
+	wcslen = nwchars;
+	err = uconv_u8tou16((const uchar_t *)mbs, &mbslen,
+	    wcs, &wcslen, UCONV_OUT_LITTLE_ENDIAN);
+	if (err != 0)
+		return ((size_t)-1);
+
+	if (wcslen < nwchars)
+		wcs[wcslen] = 0;
+
+	return (wcslen);
 }
 
 
@@ -114,49 +106,36 @@ smb_mbstowcs(smb_wchar_t *wcstring, const char *mbstring, size_t nwchars)
  * states.  Otherwise it should be return 0.
  *
  * If mbchar is non-null, returns the number of bytes processed in
- * mbchar.  If mbchar is invalid, returns -1.
+ * mbchar.  If mbchar is null, convert the null (wcharp=0) but
+ * return length zero.  If mbchar is invalid, returns -1.
  */
 int /*ARGSUSED*/
-smb_mbtowc(smb_wchar_t *wcharp, const char *mbchar, size_t nbytes)
+smb_mbtowc(uint32_t *wcharp, const char *mbchar, size_t nbytes)
 {
-	unsigned char mbyte;
-	smb_wchar_t wide_char;
-	int count;
-	int bytes_left;
+	uint32_t wide_char;
+	int count, err;
+	size_t mblen;
+	size_t wclen;
 
 	if (mbchar == NULL)
 		return (0); /* no shift states */
 
-	/* 0xxxxxxx -> 1 byte ASCII encoding */
-	if (((mbyte = *mbchar++) & 0x80) == 0) {
-		if (wcharp)
-			*wcharp = (smb_wchar_t)mbyte;
-
-		return (mbyte ? 1 : 0);
-	}
-
-	/* 10xxxxxx -> invalid first byte */
-	if ((mbyte & 0x40) == 0)
+	/*
+	 * How many bytes in this symbol?
+	 */
+	count = u8_validate((char *)mbchar, nbytes, NULL, 0, &err);
+	if (count < 0)
 		return (-1);
 
-	wide_char = mbyte;
-	if ((mbyte & 0x20) == 0) {
-		wide_char &= 0x1f;
-		bytes_left = 1;
-	} else if ((mbyte & 0x10) == 0) {
-		wide_char &= 0x0f;
-		bytes_left = 2;
-	} else {
+	mblen = count;
+	wclen = 1;
+	err = uconv_u8tou32((const uchar_t *)mbchar, &mblen,
+	    &wide_char, &wclen, UCONV_OUT_SYSTEM_ENDIAN);
+	if (err != 0)
 		return (-1);
-	}
-
-	count = 1;
-	while (bytes_left--) {
-		if (((mbyte = *mbchar++) & 0xc0) != 0x80)
-			return (-1);
-
-		count++;
-		wide_char = (wide_char << 6) | (mbyte & 0x3f);
+	if (wclen == 0) {
+		wide_char = 0;
+		count = 0;
 	}
 
 	if (wcharp)
@@ -174,25 +153,27 @@ smb_mbtowc(smb_wchar_t *wcharp, const char *mbchar, size_t nbytes)
  * mbchar must be large enough to accommodate the multibyte character.
  *
  * Returns the numberof bytes written to mbchar.
+ * Note: handles null like any 1-byte char.
  */
 int
-smb_wctomb(char *mbchar, smb_wchar_t wchar)
+smb_wctomb(char *mbchar, uint32_t wchar)
 {
-	if ((wchar & ~0x7f) == 0) {
-		*mbchar = (char)wchar;
-		return (1);
-	}
+	char junk[MTS_MB_CUR_MAX+1];
+	size_t mblen;
+	size_t wclen;
+	int err;
 
-	if ((wchar & ~0x7ff) == 0) {
-		*mbchar++ = (wchar >> 6) | 0xc0;
-		*mbchar = (wchar & 0x3f) | 0x80;
-		return (2);
-	}
+	if (mbchar == NULL)
+		mbchar = junk;
 
-	*mbchar++ = (wchar >> 12) | 0xe0;
-	*mbchar++ = ((wchar >> 6) & 0x3f) | 0x80;
-	*mbchar = (wchar & 0x3f) | 0x80;
-	return (3);
+	mblen = MTS_MB_CUR_MAX;
+	wclen = 1;
+	err = uconv_u32tou8(&wchar, &wclen, (uchar_t *)mbchar, &mblen,
+	    UCONV_IN_SYSTEM_ENDIAN | UCONV_IGNORE_NULL);
+	if (err != 0)
+		return (-1);
+
+	return ((int)mblen);
 }
 
 
@@ -206,46 +187,46 @@ smb_wctomb(char *mbchar, smb_wchar_t wchar)
  * terminated if there is room.
  *
  * Returns the number of bytes converted, not counting the terminating
- * null byte.
+ * null byte. Returns -1 if an invalid WC sequence is encountered.
  */
 size_t
-smb_wcstombs(char *mbstring, const smb_wchar_t *wcstring, size_t nbytes)
+smb_wcstombs(char *mbs, const smb_wchar_t *wcs, size_t nbytes)
 {
-	char *start = mbstring;
-	const smb_wchar_t *wcp = wcstring;
-	smb_wchar_t wide_char = 0;
-	char buf[4];
-	size_t len;
+	size_t mbslen, wcslen;
+	int err;
 
-	if ((mbstring == NULL) || (wcstring == NULL))
+	/* NULL or empty input is allowed. */
+	if (wcs == NULL || *wcs == 0) {
+		if (mbs != NULL && nbytes > 0)
+			*mbs = '\0';
 		return (0);
-
-	while (nbytes > MTS_MB_CHAR_MAX) {
-		wide_char = *wcp++;
-		len = smb_wctomb(mbstring, wide_char);
-
-		if (wide_char == 0)
-			/*LINTED E_PTRDIFF_OVERFLOW*/
-			return (mbstring - start);
-
-		mbstring += len;
-		nbytes -= len;
 	}
 
-	while (wide_char && nbytes) {
-		wide_char = *wcp++;
-		if ((len = smb_wctomb(buf, wide_char)) > nbytes) {
-			*mbstring = 0;
-			break;
-		}
-
-		bcopy(buf, mbstring, len);
-		mbstring += len;
-		nbytes -= len;
+	/*
+	 * Traditional wcstombs(3C) allows mbs==NULL to get the length.
+	 * SMB never calls it that way, but let's future-proof.
+	 */
+	if (mbs == NULL) {
+		return ((size_t)-1);
 	}
 
-	/*LINTED E_PTRDIFF_OVERFLOW*/
-	return (mbstring - start);
+	/*
+	 * Compute wcslen
+	 */
+	wcslen = 0;
+	while (wcs[wcslen] != 0)
+		wcslen++;
+
+	mbslen = nbytes;
+	err = uconv_u16tou8(wcs, &wcslen,
+	    (uchar_t *)mbs, &mbslen, UCONV_IN_LITTLE_ENDIAN);
+	if (err != 0)
+		return ((size_t)-1);
+
+	if (mbslen < nbytes)
+		mbs[mbslen] = '\0';
+
+	return (mbslen);
 }
 
 
@@ -257,7 +238,7 @@ smb_wcstombs(char *mbstring, const smb_wchar_t *wcstring, size_t nbytes)
 size_t
 smb_wcequiv_strlen(const char *mbs)
 {
-	smb_wchar_t	wide_char;
+	uint32_t	wide_char;
 	size_t bytes;
 	size_t len = 0;
 
@@ -265,9 +246,15 @@ smb_wcequiv_strlen(const char *mbs)
 		bytes = smb_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
 		if (bytes == ((size_t)-1))
 			return ((size_t)-1);
+		mbs += bytes;
 
 		len += sizeof (smb_wchar_t);
-		mbs += bytes;
+		if (bytes > 3) {
+			/*
+			 * Extended unicode, so TWO smb_wchar_t
+			 */
+			len += sizeof (smb_wchar_t);
+		}
 	}
 
 	return (len);
@@ -277,27 +264,37 @@ smb_wcequiv_strlen(const char *mbs)
 /*
  * Returns the number of bytes that would be written if the multi-
  * byte string mbs was converted to an OEM character string,
- * not counting the terminating null character.
+ * (smb_mbstooem) not counting the terminating null character.
  */
 size_t
 smb_sbequiv_strlen(const char *mbs)
 {
-	smb_wchar_t	wide_char;
 	size_t nbytes;
 	size_t len = 0;
 
 	while (*mbs) {
-		nbytes = smb_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
+		nbytes = smb_mbtowc(NULL, mbs, MTS_MB_CHAR_MAX);
 		if (nbytes == ((size_t)-1))
 			return ((size_t)-1);
+		if (nbytes == 0)
+			break;
 
-		/*
-		 * Assume OEM characters are 1-byte (for now).
-		 * That's true for cp850, which is the only
-		 * codeset this currently supports.  See:
-		 * smb_oem.c : smb_oem_codeset
-		 */
-		++len;
+		if (nbytes == 1) {
+			/* ASCII */
+			len++;
+		} else if (nbytes < 8) {
+			/* Compute OEM length */
+			char mbsbuf[8];
+			uint8_t oembuf[8];
+			int oemlen;
+			(void) strlcpy(mbsbuf, mbs, nbytes+1);
+			oemlen = smb_mbstooem(oembuf, mbsbuf, 8);
+			if (oemlen < 0)
+				return ((size_t)-1);
+			len += oemlen;
+		} else {
+			return ((size_t)-1);
+		}
 
 		mbs += nbytes;
 	}

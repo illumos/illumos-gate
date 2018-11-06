@@ -1587,7 +1587,7 @@ smb_vop_catia_v5tov4(char *name, char *buf, int buflen)
 {
 	int v4_idx, numbytes, inc;
 	int space_left = buflen - 1; /* one byte reserved for null */
-	smb_wchar_t wc;
+	uint32_t wc;
 	char mbstring[MTS_MB_CHAR_MAX];
 	char *p, *src = name, *dst = buf;
 
@@ -1644,7 +1644,7 @@ smb_vop_catia_v4tov5(char *name, char *buf, int buflen)
 {
 	int v5_idx, numbytes;
 	int space_left = buflen - 1; /* one byte reserved for null */
-	smb_wchar_t wc;
+	uint32_t wc;
 	char mbstring[MTS_MB_CHAR_MAX];
 	char *src = name, *dst = buf;
 
