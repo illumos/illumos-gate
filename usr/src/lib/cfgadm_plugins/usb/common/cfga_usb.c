@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -36,7 +37,7 @@ extern cfga_usb_ret_t	usb_rcm_online(const char *, char **, char *,
 extern cfga_usb_ret_t	usb_rcm_remove(const char *, char **, char *,
 			    cfga_flags_t);
 static int		usb_confirm(struct cfga_confirm *, char *);
-static char 		*usb_get_devicepath(const char *);
+static char		*usb_get_devicepath(const char *);
 
 /*
  * This file contains the entry points to the plugin as defined in the
@@ -621,7 +622,7 @@ device_connected(devctl_hdl_t hdl, nvlist_t *list, ap_ostate_t *ostate)
  */
 cfga_usb_ret_t
 do_control_ioctl(const char *ap_id, uint_t subcommand, uint_t arg,
-	void **descrp, size_t *sizep)
+    void **descrp, size_t *sizep)
 {
 	int			fd = -1;
 	uint_t			port;
@@ -1224,7 +1225,7 @@ cfga_private_func(
 	char			*msg;
 	nvlist_t		*list = NULL;
 	ap_ostate_t		ostate;
-	devctl_hdl_t 		hdl = NULL;
+	devctl_hdl_t		hdl = NULL;
 	cfga_usb_ret_t		rv;
 	usb_dev_descr_t		*dev_descrp = NULL;
 	char			*driver = NULL;
@@ -1474,14 +1475,12 @@ cfga_list_ext(
 	DPRINTF("cfga_list_ext:\n");
 
 	if ((rv = verify_params(ap_id, options, errstring)) != CFGA_USB_OK) {
-		(void) cfga_help(NULL, options, flags);
 		goto bailout;
 	}
 
 	if (ap_id_list == NULL || nlistp == NULL) {
 		DPRINTF("cfga_list_ext: list = NULL or nlistp = NULL\n");
 		rv = CFGA_USB_INTERNAL_ERROR;
-		(void) cfga_help(NULL, options, flags);
 		goto bailout;
 	}
 

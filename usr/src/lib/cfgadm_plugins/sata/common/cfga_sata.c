@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/param.h>
@@ -570,7 +571,7 @@ cfga_change_state(
     cfga_flags_t flags)
 {
 	int		ret;
-	int 		len;
+	int		len;
 	char		*msg;
 	char		*devpath;
 	nvlist_t	*nvl = NULL;
@@ -922,7 +923,7 @@ cfga_private_func(
     cfga_flags_t flags)
 {
 	int			len;
-	char 			*msg;
+	char			*msg;
 	nvlist_t		*list = NULL;
 	ap_ostate_t		ostate;
 	ap_rstate_t		rstate;
@@ -1430,7 +1431,6 @@ cfga_list_ext(
 
 
 	if ((rv = verify_params(ap_id, options, errstring)) != CFGA_SATA_OK) {
-		(void) cfga_help(NULL, options, flags);
 		goto bailout;
 	}
 	/* We do not care here about dynamic AP name component */
@@ -1440,7 +1440,6 @@ cfga_list_ext(
 
 	if (ap_id_list == NULL || nlistp == NULL) {
 		rv = CFGA_SATA_DATA_ERROR;
-		(void) cfga_help(NULL, options, flags);
 		goto bailout;
 	}
 

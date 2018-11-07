@@ -754,7 +754,7 @@ hook_stack_notify_unregister(netstackid_t stackid, hook_notify_fn_t callback)
 		}
 	} else {
 		/*
-		 * hook_notify_register() should only fail if the callback has
+		 * hook_notify_unregister() should only fail if the callback has
 		 * already been deleted (ESRCH).
 		 */
 		VERIFY3S(error, ==, ESRCH);
