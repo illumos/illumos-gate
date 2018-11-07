@@ -304,7 +304,7 @@ comc_ischar(struct console *cp)
 	if (EFI_ERROR(status))
 		return (0);
 
-	return (!(status & EFI_SERIAL_INPUT_BUFFER_EMPTY));
+	return (!(control & EFI_SERIAL_INPUT_BUFFER_EMPTY));
 }
 
 static char *
