@@ -37,13 +37,14 @@ include ../Makefile.master
 BOOT_SUBDIRS= \
 	cw \
 	.WAIT \
-	install.bin
+	install.bin \
+	.WAIT \
+	ctf
 
 COMMON_SUBDIRS= \
 	codereview \
 	codesign \
 	cscope-fast \
-	ctf \
 	env \
 	findunref \
 	lintdump \
@@ -160,7 +161,5 @@ $(ROOTDIRS):
 
 $(ROOTONBLDLIBPY): $(ROOTDIRS)
 	$(RM) -r $@; $(SYMLINK) python$(PYTHON_VERSION) $@
-
-make: ctf
 
 FRC:
