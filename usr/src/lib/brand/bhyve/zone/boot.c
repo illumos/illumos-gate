@@ -181,35 +181,82 @@ add_ram(int *argc, char **argv)
 }
 
 static int
+parse_pcislot(const char *pcislot, uint_t *busp, uint_t *devp, uint_t *funcp)
+{
+	char junk;
+
+	switch (sscanf(pcislot, "%u:%u:%u%c", busp, devp, funcp, &junk)) {
+	case 3:
+		break;
+	case 2:
+	case 1:
+		*funcp = *devp;
+		*devp = *busp;
+		*busp = 0;
+		break;
+	default:
+		(void) printf("Error: device %d has illegal PCI slot: %s\n",
+		    *devp, pcislot);
+		return (-1);
+	}
+
+	if (*busp > 255 || *devp > 31 || *funcp > 7) {
+		(void) printf("Error: device %d has illegal PCI slot: %s\n",
+		    *devp, pcislot);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * In the initial implementation, slot assignment was dynamic on every boot.
+ * Now, each device resource can have a pci_slot property that will override
+ * dynamic assignment.  The original behavior is preserved, but no effort is
+ * made to detect or avoid conflicts between legacy behavior and new behavior.
+ * When used with vmadm, this is not an issue, as it will update the zone
+ * config at boot time to contain static assignments.
+ */
+static int
 add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
 {
 	static char *boot = NULL;
 	static int next_cd = 0;
 	static int next_other = 0;
 	const char *model = "virtio-blk";
-	int pcislot;
-	int pcifn;
+	uint_t pcibus = 0, pcidev = 0, pcifn = 0;
+	const char *slotstr;
+	boolean_t isboot;
 
-	/* Allow at most one "primary" disk */
-	if (is_env_true("device", disk, "boot")) {
+	isboot = is_env_true("device", disk, "boot");
+	if (isboot) {
+		/* Allow at most one "primary" disk */
 		if (boot != NULL) {
 			(void) printf("Error: multiple boot disks: %s %s\n",
 			    boot, path);
 			return (-1);
 		}
 		boot = path;
-		pcislot = PCI_SLOT_BOOT_DISK;
-		pcifn = 0;
-	} else if (is_env_string("device", disk, "media", "cdrom")) {
-		pcislot = PCI_SLOT_CD;
-		pcifn = next_cd;
-		next_cd++;
-	} else {
-		pcislot = PCI_SLOT_OTHER_DISKS;
-		pcifn = next_other;
-		next_other++;
 	}
 
+	if ((slotstr = get_zcfg_var("device", disk, "pci_slot")) != NULL) {
+		if (parse_pcislot(slotstr, &pcibus, &pcidev, &pcifn) != 0) {
+			return (-1);
+		}
+	} else {
+		if (isboot) {
+			pcidev = PCI_SLOT_BOOT_DISK;
+			pcifn = 0;
+		} else if (is_env_string("device", disk, "media", "cdrom")) {
+			pcidev = PCI_SLOT_CD;
+			pcifn = next_cd;
+			next_cd++;
+		} else {
+			pcidev = PCI_SLOT_OTHER_DISKS;
+			pcifn = next_other;
+			next_other++;
+		}
+	}
 
 	if (is_env_string("device", disk, "model", "virtio")) {
 		model = "virtio-blk";
@@ -224,8 +271,8 @@ add_disk(char *disk, char *path, char *slotconf, size_t slotconf_len)
 		return (-1);
 	}
 
-	if (snprintf(slotconf, slotconf_len, "%d:%d,%s,%s",
-	    pcislot, pcifn, model, path) >= slotconf_len) {
+	if (snprintf(slotconf, slotconf_len, "%u:%u:%u,%s,%s",
+	    pcibus, pcidev, pcifn, model, path) >= slotconf_len) {
 		(void) printf("Error: disk path '%s' too long\n", path);
 		return (-1);
 	}
@@ -239,7 +286,7 @@ add_ppt(int *argc, char **argv, char *ppt, char *path, char *slotconf,
 {
 	static boolean_t wired = B_FALSE;
 	static boolean_t acpi = B_FALSE;
-	unsigned int bus = 0, dev = 0, func = 0;
+	uint_t bus = 0, dev = 0, func = 0;
 	char *pcislot;
 
 	pcislot = get_zcfg_var("device", ppt, "pci_slot");
@@ -249,24 +296,7 @@ add_ppt(int *argc, char **argv, char *ppt, char *path, char *slotconf,
 		return (-1);
 	}
 
-	switch (sscanf(pcislot, "%u:%u:%u", &bus, &dev, &func)) {
-	case 3:
-		break;
-	case 2:
-	case 1:
-		func = dev;
-		dev = bus;
-		bus = 0;
-		break;
-	default:
-		(void) printf("Error: device %d has illegal PCI slot: %s\n",
-		    dev, pcislot);
-		return (-1);
-	}
-
-	if (bus > 255 || dev > 31 || func > 7) {
-		(void) printf("Error: device %d has illegal PCI slot: %s\n",
-		    dev, pcislot);
+	if (parse_pcislot(pcislot, &bus, &dev, &func) != 0) {
 		return (-1);
 	}
 
