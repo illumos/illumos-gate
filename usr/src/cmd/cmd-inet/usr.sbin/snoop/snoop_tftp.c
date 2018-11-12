@@ -24,22 +24,32 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fcntl.h>
 #include <arpa/tftp.h>
 #include "snoop.h"
 
+struct tftp_options {
+	int blksize;
+	int tsize;
+};
+
 extern char *dlc_header;
-char *tftperror();
-char *show_type();
+static char *tftperror(unsigned short);
+static char *show_type(int);
+static char *tftp_parse_oack(char *, size_t, struct tftp_options *);
 
 int
-interpret_tftp(int flags, struct tftphdr *tftp, int fraglen)
+interpret_tftp(int flags, void *data, int fraglen)
 {
 	char *name, *mode;
 	extern int src_port, dst_port;
 	int blocksize = fraglen - 4;
+	struct tftp_options opts;
+	struct ttable *tt;
+	struct tftphdr *tftp = data;
+
+	opts.tsize = 0;
+	opts.blksize = 512;
 
 	switch (ntohs(tftp->th_opcode)) {
 	case RRQ:
@@ -49,6 +59,18 @@ interpret_tftp(int flags, struct tftphdr *tftp, int fraglen)
 	case ERROR:
 		del_transient(src_port);
 		break;
+	case OACK:
+		tt = is_transient(dst_port);
+		if (tt != NULL)
+			tt->blksize = opts.blksize;
+		break;
+	case DATA:
+		tt = is_transient(dst_port);
+		if (tt != NULL)
+			opts.blksize = tt->blksize;
+		break;
+	default:
+		break;
 	}
 
 	if (flags & F_SUM) {
@@ -57,94 +79,102 @@ interpret_tftp(int flags, struct tftphdr *tftp, int fraglen)
 			name = (char *)&tftp->th_stuff;
 			mode = name + (strlen(name) + 1);
 			(void) sprintf(get_sum_line(),
-				"TFTP Read \"%s\" (%s)", name, mode);
+			    "TFTP Read \"%s\" (%s)", name, mode);
 			break;
 		case WRQ:
 			name = (char *)&tftp->th_stuff;
 			mode = name + (strlen(name) + 1);
 			(void) sprintf(get_sum_line(),
-				"TFTP Write \"%s\" (%s)", name, mode);
+			    "TFTP Write \"%s\" (%s)", name, mode);
 			break;
 		case DATA:
 			(void) sprintf(get_sum_line(),
-				"TFTP Data block %d (%d bytes)%s",
-				ntohs(tftp->th_block),
-				blocksize,
-				blocksize < 512 ? " (last block)":"");
+			    "TFTP Data block %u (%d bytes)%s",
+			    ntohs(tftp->th_block), blocksize,
+			    blocksize < opts.blksize ? " (last block)":"");
 			break;
 		case ACK:
-			(void) sprintf(get_sum_line(),
-				"TFTP Ack  block %d",
-				ntohs(tftp->th_block));
+			(void) sprintf(get_sum_line(), "TFTP Ack block %d",
+			    ntohs(tftp->th_block));
 			break;
 		case ERROR:
-			(void) sprintf(get_sum_line(),
-				"TFTP Error: %s",
-				tftperror(ntohs(tftp->th_code)));
+			(void) sprintf(get_sum_line(), "TFTP Error: %s",
+			    tftperror(ntohs(tftp->th_code)));
+			break;
+		case OACK:
+			(void) sprintf(get_sum_line(), "TFTP OACK: %s",
+			    tftp_parse_oack((char *)&tftp->th_stuff,
+			    fraglen - sizeof (tftp->th_opcode), &opts));
+			if (tt != NULL)
+				tt->blksize = opts.blksize;
 			break;
 		}
 	}
 
 	if (flags & F_DTAIL) {
+		show_header("TFTP:  ", "Trivial File Transfer Protocol",
+		    fraglen);
+		show_space();
+		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_opcode -
+		    dlc_header, 2), "Opcode = %d (%s)", ntohs(tftp->th_opcode),
+		    show_type(ntohs(tftp->th_opcode)));
 
-	show_header("TFTP:  ", "Trivial File Transfer Protocol", fraglen);
-	show_space();
-	(void) sprintf(get_line((char *)(uintptr_t)tftp->th_opcode -
-		dlc_header, 2),
-		"Opcode = %d (%s)",
-		ntohs(tftp->th_opcode),
-		show_type(ntohs(tftp->th_opcode)));
+		switch (ntohs(tftp->th_opcode)) {
+		case RRQ:
+		case WRQ:
+			name = (char *)&tftp->th_stuff;
+			mode = name + (strlen(name) + 1);
+			(void) sprintf(
+			    get_line(name - dlc_header, strlen(name) + 1),
+			    "File name = \"%s\"", name);
+			(void) sprintf(
+			    get_line(mode - dlc_header, strlen(mode) + 1),
+			    "Transfer mode = %s", mode);
+			break;
 
-	switch (ntohs(tftp->th_opcode)) {
-	case RRQ:
-	case WRQ:
-		name = (char *)&tftp->th_stuff;
-		mode = name + (strlen(name) + 1);
-		(void) sprintf(
-			get_line(name - dlc_header, strlen(name) + 1),
-			"File name = \"%s\"",
-			name);
-		(void) sprintf(
-			get_line(mode - dlc_header, strlen(mode) + 1),
-			"Transfer mode = %s",
-			mode);
-		break;
+		case DATA:
+			(void) sprintf(get_line(
+			    (char *)(uintptr_t)tftp->th_block - dlc_header, 2),
+			    "Data block = %d%s", ntohs(tftp->th_block),
+			    blocksize < opts.blksize ? " (last block)" : "");
+			(void) sprintf(get_line(
+			    (char *)(uintptr_t)tftp->th_data - dlc_header,
+			    blocksize), "[ %d bytes of data ]", blocksize);
+			break;
 
-	case DATA:
-		(void) sprintf(
-			get_line((char *)(uintptr_t)tftp->th_block -
-			dlc_header, 2),	"Data block = %d%s",
-			ntohs(tftp->th_block),
-			blocksize < 512 ? " (last block)":"");
-		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_data -
-			dlc_header, blocksize),
-			"[ %d bytes of data ]",
-			blocksize);
-		break;
+		case ACK:
+			(void) sprintf(get_line(
+			    (char *)(uintptr_t)tftp->th_block - dlc_header, 2),
+			    "Acknowledge block = %d", ntohs(tftp->th_block));
+			break;
 
-	case ACK:
-		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_block -
-			dlc_header, 2),	"Acknowledge block = %d",
-			ntohs(tftp->th_block));
-		break;
-
-	case ERROR:
-		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_code -
-			dlc_header, 2),	"Error = %d (%s)",
-			ntohs(tftp->th_code),
-			tftperror(ntohs(tftp->th_code)));
-		(void) sprintf(get_line((char *)(uintptr_t)tftp->th_data -
-			dlc_header, strlen(tftp->th_data) + 1),
-			"Error string = \"%s\"", tftp->th_data);
-	}
+		case ERROR:
+			(void) sprintf(get_line(
+			    (char *)(uintptr_t)tftp->th_code - dlc_header, 2),
+			    "Error = %d (%s)", ntohs(tftp->th_code),
+			    tftperror(ntohs(tftp->th_code)));
+			(void) sprintf(get_line(
+			    (char *)(uintptr_t)tftp->th_data -
+			    dlc_header, strlen(tftp->th_data) + 1),
+			    "Error string = \"%s\"", tftp->th_data);
+			break;
+		case OACK:
+			(void) sprintf(get_line(
+			    (char *)(uintptr_t)tftp->th_code - dlc_header, 2),
+			    "TFTP OACK: %s",
+			    tftp_parse_oack((char *)&tftp->th_stuff,
+			    fraglen - sizeof (tftp->th_opcode), &opts));
+			if (tt != NULL)
+				tt->blksize = opts.blksize;
+			break;
+		}
 	}
 
 	return (fraglen);
 }
 
-char *
-show_type(t)
-	int t;
+static char *
+show_type(int t)
 {
 	switch (t) {
 	case RRQ:	return ("read request");
@@ -152,13 +182,13 @@ show_type(t)
 	case DATA:	return ("data packet");
 	case ACK:	return ("acknowledgement");
 	case ERROR:	return ("error");
+	case OACK:	return ("option acknowledgement");
 	}
 	return ("?");
 }
 
-char *
-tftperror(code)
-    unsigned short code;
+static char *
+tftperror(unsigned short code)
 {
 	static char buf[128];
 
@@ -175,4 +205,66 @@ tftperror(code)
 	(void) sprintf(buf, "%d", code);
 
 	return (buf);
+}
+
+static char *
+tftp_parse_oack(char *buf, size_t size, struct tftp_options *opts)
+{
+	static char tftp_options[128];
+	int i, idx;
+
+	tftp_options[0] = '\0';
+	idx = 0;
+
+	while (size > 0 && idx < sizeof (tftp_options)) {
+		if (idx > 0) {
+			tftp_options[idx++] = ' ';
+			tftp_options[idx] = '\0';
+		}
+
+		/* get name */
+		if (idx + strnlen(buf, size) + 1 > sizeof (tftp_options))
+			break;
+		for (i = 0; i < size; i++) {
+			tftp_options[idx] = buf[i];
+			if (tftp_options[idx] == '\0') {
+				i++;
+				break;
+			}
+			idx++;
+		}
+		size -= i;
+		/*
+		 * RFC 2348 requires this case in-sensitive.
+		 */
+		if (strcasecmp(buf, "blksize") == 0) {
+			int blksize = strtol(buf + i, NULL, 0);
+
+			if (blksize >= 8)
+				opts->blksize = blksize;
+		}
+		buf += i;
+
+		/* can we store separator? */
+		if (idx + 3 > sizeof (tftp_options))
+			break;
+		strcat(tftp_options, ": ");
+		idx += 2;
+
+		/* get value */
+		if (idx + strnlen(buf, size) + 1 > sizeof (tftp_options))
+			break;
+
+		for (i = 0; i < size; i++) {
+			tftp_options[idx] = buf[i];
+			if (tftp_options[idx] == '\0') {
+				i++;
+				break;
+			}
+			idx++;
+		}
+		size -= i;
+		buf += i;
+	}
+	return (tftp_options);
 }

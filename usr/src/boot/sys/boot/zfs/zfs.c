@@ -40,6 +40,7 @@
 #include <string.h>
 #include <stand.h>
 #include <bootstrap.h>
+#include <inttypes.h>
 
 #include "libzfs.h"
 
@@ -724,8 +725,11 @@ zfs_bootfs(void *zdev)
 	}
 
 	/* Set the environment. */
-	snprintf(buf, sizeof (buf), "%s/%llu", spa->spa_name,
-	    (unsigned long long)objnum);
+	snprintf(buf, sizeof (buf), "%" PRIu64, dev->pool_guid);
+	setenv("zfs-bootpool", buf, 1);
+	snprintf(buf, sizeof (buf), "%" PRIu64, spa->spa_boot_vdev->v_guid);
+	setenv("zfs-bootvdev", buf, 1);
+	snprintf(buf, sizeof (buf), "%s/%" PRIu64, spa->spa_name, objnum);
 	setenv("zfs-bootfs", buf, 1);
 	if (spa->spa_boot_vdev->v_phys_path != NULL)
 		setenv("bootpath", spa->spa_boot_vdev->v_phys_path, 1);
@@ -737,8 +741,8 @@ zfs_bootfs(void *zdev)
 	 * the environment and we can stop caring about old kernels,
 	 * we can remove this part.
 	 */
-	snprintf(buf, sizeof(buf), "zfs-bootfs=%s/%llu", spa->spa_name,
-	    (unsigned long long)objnum);
+	snprintf(buf, sizeof(buf), "zfs-bootfs=%s/%" PRIu64, spa->spa_name,
+	    objnum);
 	n = strlen(buf);
 	if (spa->spa_boot_vdev->v_phys_path != NULL) {
 		snprintf(buf+n, sizeof (buf) - n, ",bootpath=\"%s\"",

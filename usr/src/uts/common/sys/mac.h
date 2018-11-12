@@ -406,7 +406,7 @@ typedef enum {
 typedef void		(*mac_notify_t)(void *, mac_notify_type_t);
 typedef void		(*mac_rx_t)(void *, mac_resource_handle_t, mblk_t *,
 			    boolean_t);
-typedef	mblk_t		*(*mac_receive_t)(void *, int);
+typedef	mblk_t		*(*mac_receive_t)(void *, size_t);
 
 /*
  * MAC resource types
@@ -673,7 +673,7 @@ extern uint_t			mac_addr_len(mac_handle_t);
 extern int			mac_type(mac_handle_t);
 extern int			mac_nativetype(mac_handle_t);
 
-extern void 			mac_unicst_update(mac_handle_t,
+extern void			mac_unicst_update(mac_handle_t,
 				    const uint8_t *);
 extern void			mac_capab_update(mac_handle_t);
 extern int			mac_pdata_update(mac_handle_t, void *,
