@@ -539,7 +539,7 @@ typedef void dmu_buf_evict_func_t(void *user_ptr);
  * their private data.  This allows conversions between the two types
  * with a simple cast.  Since the DMU buf user API never needs access
  * to the private data, other strategies can be employed if necessary
- * or convenient for the client (e.g. using container_of() to do the
+ * or convenient for the client (e.g. using __containerof() to do the
  * conversion for private data that cannot have the dmu_buf_user_t as
  * its first member).
  *

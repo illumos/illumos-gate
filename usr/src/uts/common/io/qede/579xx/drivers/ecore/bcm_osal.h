@@ -49,6 +49,7 @@
 #include <sys/dditypes.h>
 #include <sys/list_impl.h>
 #include <sys/byteorder.h>
+#include <sys/containerof.h>
 
 #include "qede_types.h"
 #include "qede_list.h"
@@ -373,10 +374,6 @@ void qede_osal_link_update(struct ecore_hwfn *hwfn);
  * and general Link list API's
  * for driver
  */
-#ifndef container_of
-#define	container_of(ptr, type, member) \
-	(type *)((char *)(ptr) - OFFSETOF(type, member))
-#endif
 
 typedef u64 osal_size_t; 
 typedef u64 osal_int_ptr_t;       
@@ -389,7 +386,7 @@ typedef u64 osal_int_ptr_t;
 	QEDE_LIST_ADD_TAIL(_entry_at_end_, _head_)
 
 #define	qede_list_entry(_entry_ptr_, _type_, _member_) \
-	container_of(_entry_ptr_, _type_, _member_)
+	__containerof(_entry_ptr_, _type_, _member_)
 
 #define	qede_list_first_entry(_head_, _type_, _member_) \
 	qede_list_entry((_head_)->next, _type_, _member_)

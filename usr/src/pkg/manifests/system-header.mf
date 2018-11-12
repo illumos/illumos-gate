@@ -841,6 +841,7 @@ file path=usr/include/sys/conf.h
 file path=usr/include/sys/consdev.h
 file path=usr/include/sys/console.h
 file path=usr/include/sys/consplat.h
+file path=usr/include/sys/containerof.h
 file path=usr/include/sys/contract.h
 file path=usr/include/sys/contract/device.h
 file path=usr/include/sys/contract/device_impl.h

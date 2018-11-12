@@ -48,6 +48,7 @@
 #include <sys/ib/clients/rdsv3/ib.h>
 #include <sys/ib/clients/rdsv3/rdma.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
+#include <sys/containerof.h>
 
 #define	DMA_TO_DEVICE 0
 #define	DMA_FROM_DEVICE 1
@@ -83,7 +84,7 @@ rdsv3_pages_in_vec(struct rds_iovec *vec)
 
 static struct rdsv3_mr *
 rdsv3_mr_tree_walk(struct avl_tree *root, uint32_t key,
-	struct rdsv3_mr *insert)
+    struct rdsv3_mr *insert)
 {
 	struct rdsv3_mr *mr;
 	avl_index_t where;
@@ -147,7 +148,7 @@ rdsv3_rdma_drop_keys(struct rdsv3_sock *rs)
 	/* Release any MRs associated with this socket */
 	mutex_enter(&rs->rs_rdma_lock);
 	while ((node = avl_first(&rs->rs_rdma_keys))) {
-		mr = container_of(node, struct rdsv3_mr, r_rb_node);
+		mr = __containerof(node, struct rdsv3_mr, r_rb_node);
 		if (mr->r_trans == rs->rs_transport)
 			mr->r_invalidate = 0;
 		avl_remove(&rs->rs_rdma_keys, &mr->r_rb_node);
@@ -165,7 +166,7 @@ rdsv3_rdma_drop_keys(struct rdsv3_sock *rs)
 
 static int
 __rdsv3_rdma_map(struct rdsv3_sock *rs, struct rds_get_mr_args *args,
-	uint64_t *cookie_ret, struct rdsv3_mr **mr_ret)
+    uint64_t *cookie_ret, struct rdsv3_mr **mr_ret)
 {
 	struct rdsv3_mr *mr = NULL, *found;
 	void *trans_private;
@@ -583,7 +584,7 @@ out:
  */
 int
 rdsv3_cmsg_rdma_args(struct rdsv3_sock *rs, struct rdsv3_message *rm,
-	struct cmsghdr *cmsg)
+    struct cmsghdr *cmsg)
 {
 	struct rdsv3_rdma_op *op;
 	/* uint64_t alignment on the buffer */
@@ -612,7 +613,7 @@ rdsv3_cmsg_rdma_args(struct rdsv3_sock *rs, struct rdsv3_message *rm,
  */
 int
 rdsv3_cmsg_rdma_dest(struct rdsv3_sock *rs, struct rdsv3_message *rm,
-	struct cmsghdr *cmsg)
+    struct cmsghdr *cmsg)
 {
 	struct rdsv3_mr *mr;
 	uint32_t r_key;
@@ -656,7 +657,7 @@ rdsv3_cmsg_rdma_dest(struct rdsv3_sock *rs, struct rdsv3_message *rm,
  */
 int
 rdsv3_cmsg_rdma_map(struct rdsv3_sock *rs, struct rdsv3_message *rm,
-	struct cmsghdr *cmsg)
+    struct cmsghdr *cmsg)
 {
 	/* uint64_t alignment on the buffer */
 	uint64_t buf[CEIL(CMSG_LEN(sizeof (struct rds_get_mr_args)),

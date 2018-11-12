@@ -66,7 +66,7 @@
 #include <sys/strsun.h>
 
 #include <sys/random.h>
-#include <sys/sysmacros.h>
+#include <sys/containerof.h>
 #include <sys/stream.h>
 
 #include <sys/mac.h>
@@ -1589,7 +1589,7 @@ uint_t
 vioif_rx_handler(caddr_t arg1, caddr_t arg2)
 {
 	struct virtio_softc *vsc = (void *) arg1;
-	struct vioif_softc *sc = container_of(vsc,
+	struct vioif_softc *sc = __containerof(vsc,
 	    struct vioif_softc, sc_virtio);
 
 	/*
@@ -1608,7 +1608,7 @@ uint_t
 vioif_tx_handler(caddr_t arg1, caddr_t arg2)
 {
 	struct virtio_softc *vsc = (void *)arg1;
-	struct vioif_softc *sc = container_of(vsc,
+	struct vioif_softc *sc = __containerof(vsc,
 	    struct vioif_softc, sc_virtio);
 
 	/*

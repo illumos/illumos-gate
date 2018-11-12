@@ -42,7 +42,7 @@
 #include <sys/modctl.h>
 #include <sys/debug.h>
 #include <sys/pci.h>
-#include <sys/sysmacros.h>
+#include <sys/containerof.h>
 #include "virtiovar.h"
 #include "virtioreg.h"
 
@@ -641,7 +641,7 @@ uint_t
 vioblk_int_handler(caddr_t arg1, caddr_t arg2)
 {
 	struct virtio_softc *vsc = (void *)arg1;
-	struct vioblk_softc *sc = container_of(vsc,
+	struct vioblk_softc *sc = __containerof(vsc,
 	    struct vioblk_softc, sc_virtio);
 	struct vq_entry *ve;
 	uint32_t len;

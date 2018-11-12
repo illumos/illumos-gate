@@ -42,6 +42,7 @@
  *
  */
 #include <sys/rds.h>
+#include <sys/containerof.h>
 
 #include <sys/ib/clients/rdsv3/rdsv3.h>
 #include <sys/ib/clients/rdsv3/loop.h>
@@ -106,7 +107,7 @@ rdsv3_loop_xmit(struct rdsv3_connection *conn, struct rdsv3_message *rm,
 static void
 rdsv3_loop_inc_free(struct rdsv3_incoming *inc)
 {
-	struct rdsv3_message *rm = container_of(inc, struct rdsv3_message,
+	struct rdsv3_message *rm = __containerof(inc, struct rdsv3_message,
 	    m_inc);
 	rdsv3_message_put(rm);
 }
