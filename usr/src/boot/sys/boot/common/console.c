@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include <string.h>
@@ -115,16 +114,23 @@ cons_mode(int raw)
 int
 getchar(void)
 {
-    int		cons;
-    int		rv;
+	int	cons;
+	int	flags = C_PRESENTIN | C_ACTIVEIN;
+	int	rv;
 
-    /* Loop forever polling all active consoles */
-    for(;;)
-	for (cons = 0; consoles[cons] != NULL; cons++)
-	    if ((consoles[cons]->c_flags & (C_PRESENTIN | C_ACTIVEIN)) ==
-		(C_PRESENTIN | C_ACTIVEIN) &&
-		((rv = consoles[cons]->c_in(consoles[cons])) != -1))
-		return(rv);
+	/*
+	 * Loop forever polling all active consoles.  Somewhat strangely,
+	 * this code expects all ->c_in() implementations to effectively do an
+	 * ischar() check first, returning -1 if there's not a char ready.
+	 */
+	for(;;) {
+		for (cons = 0; consoles[cons] != NULL; cons++) {
+			if ((consoles[cons]->c_flags & flags) == flags &&
+			    ((rv = consoles[cons]->c_in(consoles[cons])) != -1))
+				return(rv);
+		}
+		delay(30 * 1000);	/* delay 30ms */
+	}
 }
 
 int

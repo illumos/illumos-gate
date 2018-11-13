@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <sys/mkdev.h>
 #include <sys/queue.h>
+#include <sys/containerof.h>
 
 #include "version.h"
 #include "common/common.h"
@@ -57,7 +58,7 @@ struct cb_ops t4_cb_ops = {
 	.cb_open =		t4_cb_open,
 	.cb_close =		t4_cb_close,
 	.cb_strategy =		nodev,
-	.cb_print = 		nodev,
+	.cb_print =		nodev,
 	.cb_dump =		nodev,
 	.cb_read =		nodev,
 	.cb_write =		nodev,
@@ -295,7 +296,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC,
 		.devacc_attr_dataorder = DDI_MERGING_OK_ACC
 	};
- 
+
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 
@@ -368,7 +369,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	for (i = 0; i < ARRAY_SIZE(sc->fw_msg_handler); i++) {
 		sc->fw_msg_handler[i] = fw_msg_not_handled;
 	}
- 
+
 	for (i = 0; i < NCHAN; i++) {
 		(void) snprintf(name, sizeof (name), "%s-%d",
 				"reclaim", i);
@@ -1210,7 +1211,7 @@ prep_firmware(struct adapter *sc)
 	unsigned char *fw_data;
 	struct fw_info *fw_info;
 	struct fw_hdr *card_fw;
-	
+
 	struct driver_properties *p = &sc->props;
 
 	/* Contact firmware, request master */
@@ -1261,7 +1262,7 @@ prep_firmware(struct adapter *sc)
 		kmem_free(card_fw, sizeof(*card_fw));
 		return EINVAL;
 	}
-		
+
 	rc = -t4_prep_fw(sc, fw_info, fw_data, fw_size, card_fw,
 			 p->t4_fw_install, state, &reset);
 
@@ -1438,7 +1439,7 @@ upload_config_file(struct adapter *sc, uint32_t *mt, uint32_t *ma)
 	default:
 		cxgb_printf(sc->dip, CE_WARN,
 			    "Invalid Adapter detected\n");
-		return EINVAL; 
+		return EINVAL;
 	}
 
 	if (cflen > FLASH_CFG_MAX_SIZE) {
@@ -1792,7 +1793,7 @@ position_memwin(struct adapter *sc, int n, uint32_t addr)
 
 	return (addr - start);
 }
- 
+
 
 /*
  * Reads the named property and fills up the "data" array (which has at least
@@ -1911,7 +1912,7 @@ init_driver_props(struct adapter *sc, struct driver_properties *p)
 	    data, SGE_NCOUNTERS);
 
 	/*
-	 * Maximum # of tx and rx queues to use for each 
+	 * Maximum # of tx and rx queues to use for each
 	 * 100G, 40G, 25G, 10G and 1G port.
 	 */
 	p->max_ntxq_10g = prop_lookup_int(sc, "max-ntxq-10G-port", 8);
@@ -2731,7 +2732,9 @@ t4_register_cpl_handler(struct adapter *sc, int opcode, cpl_handler_t h)
 static int
 fw_msg_not_handled(struct adapter *sc, const __be64 *data)
 {
-	struct cpl_fw6_msg *cpl = container_of(data, struct cpl_fw6_msg, data);
+	struct cpl_fw6_msg *cpl;
+
+	cpl = __containerof((void *)data, struct cpl_fw6_msg, data);
 
 	cxgb_printf(sc->dip, CE_WARN, "%s fw_msg type %d", __func__, cpl->type);
 	return (0);

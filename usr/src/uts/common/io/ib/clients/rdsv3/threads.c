@@ -43,6 +43,7 @@
  */
 #include <sys/rds.h>
 #include <sys/sunddi.h>
+#include <sys/containerof.h>
 
 #include <sys/ib/clients/rdsv3/rdsv3.h>
 #include <sys/ib/clients/rdsv3/rdsv3_debug.h>
@@ -167,7 +168,7 @@ rdsv3_queue_reconnect(struct rdsv3_connection *conn)
 void
 rdsv3_connect_worker(struct rdsv3_work_s *work)
 {
-	struct rdsv3_connection *conn = container_of(work,
+	struct rdsv3_connection *conn = __containerof(work,
 	    struct rdsv3_connection, c_conn_w.work);
 	int ret;
 
@@ -205,7 +206,7 @@ rdsv3_connect_worker(struct rdsv3_work_s *work)
 void
 rdsv3_send_worker(struct rdsv3_work_s *work)
 {
-	struct rdsv3_connection *conn = container_of(work,
+	struct rdsv3_connection *conn = __containerof(work,
 	    struct rdsv3_connection, c_send_w.work);
 	int ret;
 
@@ -233,7 +234,7 @@ rdsv3_send_worker(struct rdsv3_work_s *work)
 void
 rdsv3_recv_worker(struct rdsv3_work_s *work)
 {
-	struct rdsv3_connection *conn = container_of(work,
+	struct rdsv3_connection *conn = __containerof(work,
 	    struct rdsv3_connection, c_recv_w.work);
 	int ret;
 
@@ -261,7 +262,7 @@ rdsv3_recv_worker(struct rdsv3_work_s *work)
 void
 rdsv3_shutdown_worker(struct rdsv3_work_s *work)
 {
-	struct rdsv3_connection *conn = container_of(work,
+	struct rdsv3_connection *conn = __containerof(work,
 	    struct rdsv3_connection, c_down_w);
 	rdsv3_conn_shutdown(conn);
 }
@@ -271,7 +272,7 @@ rdsv3_shutdown_worker(struct rdsv3_work_s *work)
 void
 rdsv3_reaper_worker(struct rdsv3_work_s *work)
 {
-	struct rdsv3_connection *conn = container_of(work,
+	struct rdsv3_connection *conn = __containerof(work,
 	    struct rdsv3_connection, c_reap_w.work);
 
 	if (rdsv3_conn_state(conn) != RDSV3_CONN_UP &&

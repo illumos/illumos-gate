@@ -24,6 +24,7 @@
  * Copyright 2015 Joyent, Inc.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -159,7 +160,7 @@ struct snaplevel {
  */
 struct export_args {
 	const char	*filename;
-	int 		flags;
+	int		flags;
 };
 
 /*
@@ -168,7 +169,7 @@ struct export_args {
  * in a set of given directories.
  */
 typedef struct service_manifest {
-	const char 	*servicename;
+	const char	*servicename;
 	uu_list_t	*mfstlist;
 	size_t	mfstlist_sz;
 
@@ -3891,7 +3892,7 @@ commit:
  * If the new file name is in the list return
  * If not then add the file to the list.
  * As we process the list check to see if the files in the old list exist
- * 	if not then remove the file from the list.
+ *	if not then remove the file from the list.
  * Commit the list of manifest file names.
  *
  */
@@ -16564,7 +16565,7 @@ create_manifest_tree(void)
  * one of the supported directories.
  *
  * Return Values :
- * 	-1 - if there's error reading manifest history file
+ *	-1 - if there's error reading manifest history file
  *	 1 - if the service is not found
  *	 0 - if the service is found
  */
@@ -16943,7 +16944,7 @@ upgrade_svc_mfst_connection(scf_service_t *svc, const char *svcname)
 int
 lscf_service_cleanup(void *act, scf_walkinfo_t *wip)
 {
-	struct mpg_mfile	*mpntov;
+	struct mpg_mfile	*mpntov = NULL;
 	struct mpg_mfile	**mpvarry = NULL;
 	scf_service_t		*svc;
 	scf_propertygroup_t	*mpg;
@@ -16954,8 +16955,8 @@ lscf_service_cleanup(void *act, scf_walkinfo_t *wip)
 	uu_list_walk_t		*insts;
 	uu_list_t		*instances = NULL;
 	boolean_t		activity = (boolean_t)act;
-	char			*mpnbuf;
-	char			*mpvbuf;
+	char			*mpnbuf = NULL;
+	char			*mpvbuf = NULL;
 	char			*pgpropbuf;
 	int			mfstcnt, rminstct, instct, mfstmax;
 	int			index;

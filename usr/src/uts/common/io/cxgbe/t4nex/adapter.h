@@ -27,6 +27,7 @@
 #include <sys/mac_provider.h>
 #include <sys/ethernet.h>
 #include <sys/queue.h>
+#include <sys/containerof.h>
 
 #include "offload.h"
 #include "firmware/t4fw_interface.h"
@@ -718,7 +719,7 @@ is_10G_port(const struct port_info *pi)
 static inline struct sge_rxq *
 iq_to_rxq(struct sge_iq *iq)
 {
-	return (container_of(iq, struct sge_rxq, iq));
+	return (__containerof(iq, struct sge_rxq, iq));
 }
 
 static inline bool

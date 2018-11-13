@@ -45,6 +45,7 @@
 #include <sys/kmem.h>
 #include <sys/cpuvar.h>
 #include <sys/rds.h>
+#include <sys/containerof.h>
 
 #include <sys/ib/clients/rdsv3/rdsv3.h>
 #include <sys/ib/clients/rdsv3/ib.h>
@@ -316,7 +317,7 @@ rdsv3_ib_inc_free(struct rdsv3_incoming *inc)
 
 	RDSV3_DPRINTF4("rdsv3_ib_inc_free", "inc: %p", inc);
 
-	ibinc = container_of(inc, struct rdsv3_ib_incoming, ii_inc);
+	ibinc = __containerof(inc, struct rdsv3_ib_incoming, ii_inc);
 	/* save af_thr in a local as ib_inc might be freed at mutex_exit */
 	af_thr = ibinc->ii_ibdev->inc_soft_cq;
 
@@ -340,7 +341,7 @@ rdsv3_ib_inc_copy_to_user(struct rdsv3_incoming *inc, uio_t *uiop,
 	int ret;
 	uint32_t len;
 
-	ibinc = container_of(inc, struct rdsv3_ib_incoming, ii_inc);
+	ibinc = __containerof(inc, struct rdsv3_ib_incoming, ii_inc);
 	frag = list_head(&ibinc->ii_frags);
 	len = ntohl(inc->i_hdr.h_len);
 

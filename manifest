@@ -3769,6 +3769,7 @@ f usr/include/sys/conf.h 0644 root bin
 f usr/include/sys/consdev.h 0644 root bin
 f usr/include/sys/console.h 0644 root bin
 f usr/include/sys/consplat.h 0644 root bin
+f usr/include/sys/containerof.h 0644 root bin
 d usr/include/sys/contract 0755 root bin
 f usr/include/sys/contract.h 0644 root bin
 f usr/include/sys/contract/device.h 0644 root bin

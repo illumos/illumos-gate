@@ -63,6 +63,7 @@ void efi_free_loadaddr(vm_offset_t, size_t);
 void * efi_translate(vm_offset_t);
 vm_offset_t efi_physaddr(multiboot_tag_module_t *, vm_offset_t,
     EFI_MEMORY_DESCRIPTOR *, size_t, UINTN, size_t);
+void bi_isadir(void);
 
 multiboot2_info_header_t *efi_copy_finish(struct relocator *);
 void multiboot_tramp(uint32_t, struct relocator *, uint64_t);

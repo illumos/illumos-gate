@@ -79,6 +79,9 @@ OBJS =	multiboot.o zfsboot.o sio.o cons.o panic.o devopen.o \
 	part.o biosmem.o smbios.o biosdisk.o devicename.o disk.o bcache.o \
 	time.o
 
+smbios.o := CPPFLAGS += -DSMBIOS_SERIAL_NUMBERS
+smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
+
 CLEANFILES=	gptzfsboot $(OBJS)
 
 gptzfsboot: gptldr.bin gptzfsboot.bin ${BTXKERN}
@@ -125,9 +128,7 @@ biosmem.o: ../libi386/biosmem.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ ../libi386/$*.c
 
 smbios.o: ../libi386/smbios.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) \
-		-DSMBIOS_SERIAL_NUMBERS -DSMBIOS_LITTLE_ENDIAN_UUID \
-		-c -o $@ ../libi386/$*.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ ../libi386/$*.c
 
 devicename.o: ../libi386/devicename.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ ../libi386/$*.c

@@ -30,6 +30,7 @@
 #include <sys/stream.h>
 #include <sys/strsun.h>
 #include <sys/ethernet.h>
+#include <sys/containerof.h>
 #include <inet/ip.h>
 #include <inet/ipclassifier.h>
 #include <inet/tcp.h>
@@ -102,10 +103,6 @@ jhash_2words(u32 a, u32 b, u32 initval)
 {
 	return (jhash_3words(a, b, 0, initval));
 }
-
-#ifndef container_of
-#define	container_of(p, s, f) ((s *)(((uint8_t *)(p)) - offsetof(s, f)))
-#endif
 
 #if defined(__GNUC__)
 #define	likely(x)	__builtin_expect((x), 1)
@@ -238,7 +235,7 @@ t4_init_l2t(struct adapter *sc)
 		return (NULL);
 
 	d->l2t_size = l2t_size;
- 
+
 	d->rover = d->l2tab;
 	(void) atomic_swap_uint(&d->nfree, l2t_size);
 	rw_init(&d->lock, NULL, RW_DRIVER, NULL);
@@ -421,7 +418,7 @@ t4_l2e_free(struct l2t_entry *e)
 	}
 	mutex_exit(&e->lock);
 
-	d = container_of(e, struct l2t_data, l2tab[e->idx]);
+	d = __containerof(e, struct l2t_data, l2tab[e->idx]);
 	atomic_inc_uint(&d->nfree);
 
 }

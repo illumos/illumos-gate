@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2000 Doug Rabson
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <efi.h>
 #include <efilib.h>
@@ -42,6 +41,9 @@ static SIMPLE_INPUT_INTERFACE		*conin;
 #define	MAXARGS	8
 #define	KEYBUFSZ 10
 static unsigned keybuf[KEYBUFSZ];      /* keybuf for extended codes */
+
+static int pending;
+
 static int args[MAXARGS], argc;
 static int fg_c, bg_c;
 static UINTN curx, cury;
@@ -497,7 +499,6 @@ efi_cons_getchar(struct console *cp __attribute((unused)))
 {
 	EFI_INPUT_KEY key;
 	EFI_STATUS status;
-	UINTN junk;
 	int i, c;
 
 	for (i = 0; i < KEYBUFSZ; i++) {
@@ -508,12 +509,11 @@ efi_cons_getchar(struct console *cp __attribute((unused)))
 		}
 	}
 
-	/* Try to read a key stroke. We wait for one if none is pending. */
+	pending = 0;
+
 	status = conin->ReadKeyStroke(conin, &key);
-	if (status == EFI_NOT_READY) {
-		BS->WaitForEvent(1, &conin->WaitForKey, &junk);
-		status = conin->ReadKeyStroke(conin, &key);
-	}
+	if (status == EFI_NOT_READY)
+		return (-1);
 
 	switch (key.ScanCode) {
 	case 0x1: /* UP */
@@ -550,8 +550,13 @@ efi_cons_poll(struct console *cp __attribute((unused)))
 			return (1);
 	}
 
+	if (pending)
+		return (1);
+
 	/* This can clear the signaled state. */
-	return (BS->CheckEvent(conin->WaitForKey) == EFI_SUCCESS);
+	pending = BS->CheckEvent(conin->WaitForKey) == EFI_SUCCESS;
+
+	return (pending);
 }
 
 /* Plain direct access to EFI OutputString(). */

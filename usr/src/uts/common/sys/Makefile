@@ -130,6 +130,7 @@ CHKHDRS=			\
 	vt.h			\
 	vtdaemon.h		\
 	kd.h			\
+	containerof.h		\
 	contract.h		\
 	contract_impl.h		\
 	copyops.h		\
