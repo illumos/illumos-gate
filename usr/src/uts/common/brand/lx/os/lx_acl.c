@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -191,6 +191,9 @@ lx_acl_getxattr(vnode_t *vp, enum lx_acl_type atype, void *data, size_t slen,
 		err = (err == ENOENT) ? ENODATA : err;
 		return (err);
 	}
+
+	if (vsattr.vsa_aclentp != NULL)
+		kmem_free(vsattr.vsa_aclentp, vsattr.vsa_aclentsz);
 
 	return (ENODATA);
 }
