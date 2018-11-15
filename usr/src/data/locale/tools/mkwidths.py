@@ -16,6 +16,10 @@ Scratch script to produce the widths.cm content from the widths text
 files.  It converts numeric unicode to symbolic forms.
 """
 
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+
+from __future__ import print_function
+
 SYMBOLS = {}
 
 
@@ -66,13 +70,13 @@ def do_width_file(width, filename):
                 sym = SYMBOLS.get(key, None)
                 if sym == None:
                     continue
-                print "%s\t%d" % (sym, width)
+                print("%s\t%d" % (sym, width))
             vals = vals[2:]
 
 
 if __name__ == "__main__":
-    print "WIDTH"
+    print("WIDTH")
     load_utf8()
     do_width_file(0, "widths-0.txt")
     do_width_file(2, "widths-2.txt")
-    print "END WIDTH"
+    print("END WIDTH")

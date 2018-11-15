@@ -26,11 +26,14 @@ CDDL HEADER END
 # Use is subject to license terms.
 #
 
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+
 #
 # Check that source files contain a valid CDDL block
 #
 
-import sys, CmtBlk
+import sys
+from onbld.Checks import CmtBlk
 
 # scmtest has a test for cddlchk that depends on the variable
 # Cddl.CmntChrs. However, that variable has been refactored into
@@ -43,7 +46,7 @@ CmntChrs = CmtBlk.CmntChrs
 # The CDDL string above contains the block guards so that the text will
 # be tested by cddlchk. However, we don't want to include the initial
 # \n or the block guards in the text passed in.
-# 
+#
 CDDL = CDDL.splitlines()[3:-2]
 
 def cddlchk(fh, filename=None, lenient=False, verbose=False, output=sys.stderr):

@@ -1,4 +1,4 @@
-#!@PYTHON@
+#!@TOOLS_PYTHON@
 #
 # CDDL HEADER START
 #
@@ -22,13 +22,14 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
 # Check for valid SMI copyright notices in source files.
 #
 
-import sys, os
+import sys, os, io
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
                                 "python%d.%d" % sys.version_info[:2]))
@@ -41,13 +42,12 @@ from onbld.Checks.Copyright import copyright
 ret = 0
 for filename in sys.argv[1:]:
 	try:
-		fin = open(filename, 'r')
-	except IOError, e:
+		with io.open(filename, encoding='utf-8',
+		    errors='replace') as fin:
+			ret |= copyright(fin, output=sys.stdout)
+	except IOError as e:
 		sys.stderr.write("failed to open '%s': %s\n" %
 				 (e.filename, e.strerror))
 		continue
-
-	ret |= copyright(fin, output=sys.stdout)
-	fin.close()
 
 sys.exit(ret)
