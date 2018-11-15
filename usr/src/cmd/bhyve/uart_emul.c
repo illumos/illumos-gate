@@ -53,10 +53,6 @@ __FBSDID("$FreeBSD$");
 #include <capsicum_helpers.h>
 #endif
 
-#ifndef	__FreeBSD__
-#include <sys/socket.h>
-#include <sys/stat.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -70,9 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <pthread.h>
 #include <sysexits.h>
 #ifndef	__FreeBSD__
-#include <errno.h>
-#include <fcntl.h>
-#include <poll.h>
+#include <sys/socket.h>
 #endif
 
 #include "mevent.h"
@@ -150,6 +144,7 @@ struct uart_softc {
 	struct {
 		int	clifd;		/* console client unix domain socket */
 		int	servfd;		/* console server unix domain socket */
+		struct mevent *servmev;	/* mevent for server socket */
 	} usc_sock;
 #endif
 
@@ -161,7 +156,6 @@ struct uart_softc {
 };
 
 static void uart_drain(int fd, enum ev_type ev, void *arg);
-static int uart_sock_drain(struct uart_softc *sc);
 
 static void
 ttyclose(void)
@@ -242,6 +236,19 @@ rxfifo_reset(struct uart_softc *sc, int size)
 		error = mevent_enable(sc->mev);
 		assert(error == 0);
 	}
+#ifndef	__FreeBSD__
+	if (sc->sock && sc->usc_sock.clifd != -1) {
+		/* Flush any unread input from the socket buffer. */
+		do {
+			nread = read(sc->usc_sock.clifd, flushbuf,
+			    sizeof (flushbuf));
+		} while (nread == sizeof (flushbuf));
+
+		/* Enable mevent to trigger when new data available on sock */
+		error = mevent_enable(sc->mev);
+		assert(error == 0);
+	}
+#endif /* __FreeBSD__ */
 }
 
 static int
@@ -273,6 +280,15 @@ rxfifo_putchar(struct uart_softc *sc, uint8_t ch)
 				error = mevent_disable(sc->mev);
 				assert(error == 0);
 			}
+#ifndef	__FreeBSD__
+			if (sc->sock && sc->usc_sock.clifd != -1) {
+				/*
+				 * Disable mevent callback if the FIFO is full.
+				 */
+				error = mevent_disable(sc->mev);
+				assert(error == 0);
+			}
+#endif /* __FreeBSD__ */
 		}
 		return (0);
 	} else
@@ -298,6 +314,12 @@ rxfifo_getchar(struct uart_softc *sc)
 				error = mevent_enable(sc->mev);
 				assert(error == 0);
 			}
+#ifndef	__FreeBSD__
+			if (sc->sock && sc->usc_sock.clifd != -1) {
+				error = mevent_enable(sc->mev);
+				assert(error == 0);
+			}
+#endif /* __FreeBSD__ */
 		}
 		return (c);
 	} else
@@ -434,47 +456,6 @@ uart_drain(int fd, enum ev_type ev, void *arg)
 	}
 
 	pthread_mutex_unlock(&sc->mtx);
-}
-
-static int
-uart_sock_drain(struct uart_softc *sc)
-{
-	char ch;
-	int nbytes;
-	int ret = 0;
-
-	/*
-	 * Take the softc lock to protect against concurrent
-	 * access from a vCPU i/o exit
-	 */
-	pthread_mutex_lock(&sc->mtx);
-
-	if ((sc->mcr & MCR_LOOPBACK) != 0) {
-		(void) read(sc->usc_sock.clifd, &ch, 1);
-	} else {
-		while (rxfifo_available(sc)) {
-			nbytes = read(sc->usc_sock.clifd, &ch, 1);
-			if (nbytes == 0) {
-				ret = 1;
-				break;
-			}
-			if (nbytes == -1 &&
-			    errno != EINTR && errno != EAGAIN) {
-				ret = -1;
-				break;
-			}
-			if (nbytes == -1) {
-				break;
-			}
-
-			rxfifo_putchar(sc, ch);
-		}
-		uart_toggle_intr(sc);
-	}
-
-	pthread_mutex_unlock(&sc->mtx);
-
-	return (ret);
 }
 
 void
@@ -695,131 +676,88 @@ done:
 }
 
 #ifndef	__FreeBSD__
-static int
-uart_sock_accept_client(struct uart_softc *sc)
+static void
+uart_sock_drain(int fd, enum ev_type ev, void *arg)
 {
-	int connfd;
-	struct sockaddr_un cliaddr;
-	socklen_t clilen;
+	struct uart_softc *sc = arg;
+	char ch;
 
-	clilen = sizeof (cliaddr);
-	connfd = accept(sc->usc_sock.servfd, (struct sockaddr *)&cliaddr,
-	    &clilen);
+	/*
+	 * Take the softc lock to protect against concurrent
+	 * access from a vCPU i/o exit
+	 */
+	pthread_mutex_lock(&sc->mtx);
+
+	if ((sc->mcr & MCR_LOOPBACK) != 0) {
+		(void) read(sc->usc_sock.clifd, &ch, 1);
+	} else {
+		bool err_close = false;
+
+		while (rxfifo_available(sc)) {
+			int res;
+
+			res = read(sc->usc_sock.clifd, &ch, 1);
+			if (res == 0) {
+				err_close = true;
+				break;
+			} else if (res == -1) {
+				if (errno != EAGAIN && errno != EINTR) {
+					err_close = true;
+				}
+				break;
+			}
+
+			rxfifo_putchar(sc, ch);
+		}
+		uart_toggle_intr(sc);
+
+		if (err_close) {
+			(void) fprintf(stderr, "uart: closing client conn\n");
+			(void) shutdown(sc->usc_sock.clifd, SHUT_RDWR);
+			mevent_delete_close(sc->mev);
+			sc->mev = NULL;
+			sc->usc_sock.clifd = -1;
+		}
+	}
+
+	pthread_mutex_unlock(&sc->mtx);
+}
+
+static void
+uart_sock_accept(int fd, enum ev_type ev, void *arg)
+{
+	struct uart_softc *sc = arg;
+	int connfd;
+
+	connfd = accept(sc->usc_sock.servfd, NULL, NULL);
 	if (connfd == -1) {
-		return (-1);
-	}
-	if (fcntl(connfd, F_SETFL, O_NONBLOCK) < 0) {
-		(void) shutdown(connfd, SHUT_RDWR);
-		(void) close(connfd);
-		return (-1);
-	}
-
-	sc->usc_sock.clifd = connfd;
-
-	return (0);
-}
-
-static void
-uart_sock_reject_client(struct uart_softc *sc)
-{
-	int connfd;
-	struct sockaddr_un cliaddr;
-	socklen_t clilen;
-
-	clilen = sizeof (cliaddr);
-	connfd = accept(sc->usc_sock.servfd,
-			(struct sockaddr *)&cliaddr, &clilen);
-
-	(void) fprintf(stderr, "Shutting down unexpected client connection\n");
-	(void) shutdown(connfd, SHUT_RDWR);
-	(void) close(connfd);
-}
-
-static void
-uart_sock_client_event(struct uart_softc *sc)
-{
-	int res;
-
-	res = uart_sock_drain(sc);
-	if (res < 0)
 		return;
-
-	if (res > 0) {
-		fprintf(stderr, "Closing connection with bhyve socket\n");
-		(void) shutdown(sc->usc_sock.clifd, SHUT_RDWR);
-		(void) close(sc->usc_sock.clifd);
-		sc->usc_sock.clifd = -1;
 	}
-}
 
-static void
-uart_sock_server_event(struct uart_softc *sc)
-{
+	/*
+	 * Do client connection management under protection of the softc lock
+	 * to avoid racing with concurrent UART events.
+	 */
+	pthread_mutex_lock(&sc->mtx);
+
 	if (sc->usc_sock.clifd != -1) {
 		/* we're already handling a client */
-		uart_sock_reject_client(sc);
-		return;
-	}
-
-	uart_sock_accept_client(sc);
-}
-
-static void *
-uart_sock_thread(void *param)
-{
-	struct uart_softc *sc = param;
-	struct pollfd pollfds[2];
-	int res;
-
-	/* read from client and write to vm */
-	pollfds[0].events = POLLIN | POLLRDNORM | POLLRDBAND |
-	    POLLPRI | POLLERR | POLLHUP;
-
-	/* the server socket; watch for events (new connections) */
-	pollfds[1].events = pollfds[0].events;
-
-	for (;;) {
-		pollfds[0].fd = sc->usc_sock.clifd;
-		pollfds[1].fd = sc->usc_sock.servfd;
-		pollfds[0].revents = pollfds[1].revents = 0;
-
-		res = poll(pollfds,
-		    sizeof (pollfds) / sizeof (struct pollfd), -1);
-
-		if (res == -1 && errno != EINTR) {
-			perror("poll failed");
-			/* we are hosed, close connection */
-			break;
-		}
-
-		/* event from client side */
-		if (pollfds[0].revents) {
-			if (pollfds[0].revents &
-			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				uart_sock_client_event(sc);
-			} else {
-				break;
-			}
-		}
-
-		/* event from server socket */
-		if (pollfds[1].revents) {
-			if (pollfds[1].revents & (POLLIN | POLLRDNORM)) {
-				uart_sock_server_event(sc);
-			} else {
-				break;
-			}
+		(void) fprintf(stderr, "uart: unexpected client conn\n");
+		(void) shutdown(connfd, SHUT_RDWR);
+		(void) close(connfd);
+	} else {
+		if (fcntl(connfd, F_SETFL, O_NONBLOCK) < 0) {
+			perror("uart: fcntl(O_NONBLOCK)");
+			(void) shutdown(connfd, SHUT_RDWR);
+			(void) close(connfd);
+		} else {
+			sc->usc_sock.clifd = connfd;
+			sc->mev = mevent_add(sc->usc_sock.clifd, EVF_READ,
+			    uart_sock_drain, sc);
 		}
 	}
 
-	if (sc->usc_sock.clifd != -1) {
-		fprintf(stderr, "Closing connection with bhyve console\n");
-		(void) shutdown(sc->usc_sock.clifd, SHUT_RDWR);
-		(void) close(sc->usc_sock.clifd);
-		sc->usc_sock.clifd = -1;
-	}
-
-	return (NULL);
+	pthread_mutex_unlock(&sc->mtx);
 }
 
 static int
@@ -833,28 +771,28 @@ init_sock(const char *path)
 
 	if (strlcpy(servaddr.sun_path, path, sizeof (servaddr.sun_path)) >=
 	    sizeof (servaddr.sun_path)) {
-		(void) fprintf(stderr, "bhyve socket setup: path '%s' "
-		    "too long\n", path);
+		(void) fprintf(stderr, "uart: path '%s' too long\n",
+		    path);
 		return (-1);
 	}
 
 	if ((servfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-		(void) fprintf(stderr, "bhyve socket setup: "
-		    "could not create socket: %s\n", strerror(errno));
+		(void) fprintf(stderr, "uart: socket() error - %s\n",
+		    strerror(errno));
 		return (-1);
 	}
 	(void) unlink(servaddr.sun_path);
 
 	if (bind(servfd, (struct sockaddr *)&servaddr,
 	    sizeof (servaddr)) == -1) {
-		fprintf(stderr, "bhyve socket setup: "
-		    "could not bind to socket: %s\n", strerror(errno));
+		(void) fprintf(stderr, "uart: bind() error - %s\n",
+		    strerror(errno));
 		goto out;
         }
 
         if (listen(servfd, 1) == -1) {
-		fprintf(stderr, "bhyve console setup: "
-		    "could not listen on socket: %s\n", strerror(errno));
+		(void) fprintf(stderr, "uart: listen() error - %s\n",
+		    strerror(errno));
 		goto out;
         }
         return (servfd);
@@ -925,7 +863,6 @@ uart_sock_backend(struct uart_softc *sc, const char *inopts)
 	char *opt;
 	char *nextopt;
 	char *path = NULL;
-	int error;
 
 	if (strncmp(inopts, "socket,", 7) != 0) {
 		return (-1);
@@ -951,16 +888,14 @@ uart_sock_backend(struct uart_softc *sc, const char *inopts)
 
 	sc->usc_sock.clifd = -1;
 	if ((sc->usc_sock.servfd = init_sock(path)) == -1) {
-		fprintf(stderr, "bhyve serial setup: socket initialization "
-		    "of '%s' failed\n", path);
 		free(opts);
 		return (-1);
 	}
-	error = pthread_create(NULL, NULL, uart_sock_thread, sc);
-	assert(error == 0);
-
 	sc->sock = true;
 	sc->tty.fd = -1;
+	sc->usc_sock.servmev = mevent_add(sc->usc_sock.servfd, EVF_READ,
+	    uart_sock_accept, sc);
+	assert(sc->usc_sock.servmev != NULL);
 
 	return (0);
 }
