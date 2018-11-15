@@ -1,4 +1,4 @@
-#!@PYTHON@
+#!@TOOLS_PYTHON@
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License version 2
@@ -21,16 +21,23 @@
 # Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2018 Joyent, Inc.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
+from __future__ import print_function
+
 import getopt
+import io
 import os
 import re
 import subprocess
 import sys
 import tempfile
 
-from cStringIO import StringIO
+if sys.version_info[0] < 3:
+    from cStringIO import StringIO
+else:
+    from io import StringIO
 
 #
 # Adjust the load path based on our location and the version of python into
@@ -51,7 +58,6 @@ from onbld.Scm import Ignore
 from onbld.Checks import Comments, Copyright, CStyle, HdrChk, WsCheck
 from onbld.Checks import JStyle, Keywords, ManLint, Mapfile, SpellCheck
 
-
 class GitError(Exception):
     pass
 
@@ -65,15 +71,15 @@ def git(command):
     command = ["git"] + command
 
     try:
-        tmpfile = tempfile.TemporaryFile(prefix="git-nits")
-    except EnvironmentError, e:
+        tmpfile = tempfile.TemporaryFile(prefix="git-nits", mode="w+b")
+    except EnvironmentError as e:
         raise GitError("Could not create temporary file: %s\n" % e)
 
     try:
         p = subprocess.Popen(command,
                              stdout=tmpfile,
                              stderr=subprocess.PIPE)
-    except OSError, e:
+    except OSError as e:
         raise GitError("could not execute %s: %s\n" % (command, e))
 
     err = p.wait()
@@ -81,37 +87,29 @@ def git(command):
         raise GitError(p.stderr.read())
 
     tmpfile.seek(0)
-    return tmpfile
-
+    lines = []
+    for l in tmpfile:
+        lines.append(l.decode('utf-8', 'replace'))
+    return lines
 
 def git_root():
     """Return the root of the current git workspace"""
 
     p = git('rev-parse --git-dir')
+    dir = p[0]
 
-    if not p:
-        sys.stderr.write("Failed finding git workspace\n")
-        sys.exit(err)
-
-    return os.path.abspath(os.path.join(p.readlines()[0],
-                                        os.path.pardir))
-
+    return os.path.abspath(os.path.join(dir, os.path.pardir))
 
 def git_branch():
     """Return the current git branch"""
 
     p = git('branch')
 
-    if not p:
-        sys.stderr.write("Failed finding git branch\n")
-        sys.exit(err)
-
     for elt in p:
         if elt[0] == '*':
             if elt.endswith('(no branch)'):
                 return None
             return elt.split()[1]
-
 
 def git_parent_branch(branch):
     """Return the parent of the current git branch.
@@ -137,7 +135,6 @@ def git_parent_branch(branch):
                 return remote
     return 'origin/master'
 
-
 def git_comments(parent):
     """Return a list of any checkin comments on this git branch"""
 
@@ -147,8 +144,7 @@ def git_comments(parent):
         sys.stderr.write("Failed getting git comments\n")
         sys.exit(err)
 
-    return [x.strip() for x in p.readlines() if x != ':SEP:\n']
-
+    return [x.strip() for x in p if x != ':SEP:\n']
 
 def git_file_list(parent, paths=None):
     """Return the set of files which have ever changed on this branch.
@@ -170,16 +166,14 @@ def git_file_list(parent, paths=None):
 
     return ret
 
-
 def not_check(root, cmd):
     """Return a function which returns True if a file given as an argument
     should be excluded from the check named by 'cmd'"""
 
-    ignorefiles = filter(os.path.exists,
+    ignorefiles = list(filter(os.path.exists,
                          [os.path.join(root, ".git", "%s.NOT" % cmd),
-                          os.path.join(root, "exception_lists", cmd)])
+                          os.path.join(root, "exception_lists", cmd)]))
     return Ignore.ignore(root, ignorefiles)
-
 
 def gen_files(root, parent, paths, exclude):
     """Return a function producing file names, relative to the current
@@ -202,19 +196,18 @@ def gen_files(root, parent, paths, exclude):
             path = relpath(abspath, '.')
             try:
                 res = git("diff %s HEAD %s" % (parent, path))
-            except GitError, e:
+            except GitError as e:
                 # This ignores all the errors that can be thrown. Usually, this
                 # means that git returned non-zero because the file doesn't
                 # exist, but it could also fail if git can't create a new file
                 # or it can't be executed.  Such errors are 1) unlikely, and 2)
                 # will be caught by other invocations of git().
                 continue
-            empty = not res.readline()
+            empty = not res
             if (os.path.isfile(path) and not empty and
                 select(path) and not exclude(abspath)):
                 yield path
     return ret
-
 
 def comchk(root, parent, flist, output):
     output.write("Comments:\n")
@@ -243,81 +236,68 @@ def mapfilechk(root, parent, flist, output):
 
     for f in flist(lambda x: MapfileRE.match(x) and not
                    NotMapSuffixRE.match(x)):
-        fh = open(f, 'r')
-        ret |= Mapfile.mapfilechk(fh, output=output)
-        fh.close()
+        with io.open(f, encoding='utf-8', errors='replace') as fh:
+            ret |= Mapfile.mapfilechk(fh, output=output)
     return ret
-
 
 def copyright(root, parent, flist, output):
     ret = 0
     output.write("Copyrights:\n")
     for f in flist():
-        fh = open(f, 'r')
-        ret |= Copyright.copyright(fh, output=output)
-        fh.close()
+        with io.open(f, encoding='utf-8', errors='replace') as fh:
+            ret |= Copyright.copyright(fh, output=output)
     return ret
-
 
 def hdrchk(root, parent, flist, output):
     ret = 0
     output.write("Header format:\n")
     for f in flist(lambda x: x.endswith('.h')):
-        fh = open(f, 'r')
-        ret |= HdrChk.hdrchk(fh, lenient=True, output=output)
-        fh.close()
+        with io.open(f, encoding='utf-8', errors='replace') as fh:
+            ret |= HdrChk.hdrchk(fh, lenient=True, output=output)
     return ret
-
 
 def cstyle(root, parent, flist, output):
     ret = 0
     output.write("C style:\n")
     for f in flist(lambda x: x.endswith('.c') or x.endswith('.h')):
-        fh = open(f, 'r')
-        ret |= CStyle.cstyle(fh, output=output, picky=True,
+        with io.open(f, encoding='utf-8', errors='replace') as fh:
+            ret |= CStyle.cstyle(fh, output=output, picky=True,
                              check_posix_types=True,
                              check_continuation=True)
-        fh.close()
     return ret
-
 
 def jstyle(root, parent, flist, output):
     ret = 0
     output.write("Java style:\n")
     for f in flist(lambda x: x.endswith('.java')):
-        fh = open(f, 'r')
-        ret |= JStyle.jstyle(fh, output=output, picky=True)
-        fh.close()
+        with io.open(f, encoding='utf-8', errors='replace') as fh:
+            ret |= JStyle.jstyle(fh, output=output, picky=True)
     return ret
-
 
 def manlint(root, parent, flist, output):
     ret = 0
     output.write("Man page format/spelling:\n")
     ManfileRE = re.compile(r'.*\.[0-9][a-z]*$', re.IGNORECASE)
     for f in flist(lambda x: ManfileRE.match(x)):
-        fh = open(f, 'r')
-        ret |= ManLint.manlint(fh, output=output, picky=True)
-        ret |= SpellCheck.spellcheck(fh, output=output)
-        fh.close()
+        with io.open(f, encoding='utf-8', errors='replace') as fh:
+            ret |= ManLint.manlint(fh, output=output, picky=True)
+            ret |= SpellCheck.spellcheck(fh, output=output)
     return ret
 
 def keywords(root, parent, flist, output):
     ret = 0
     output.write("SCCS Keywords:\n")
     for f in flist():
-        fh = open(f, 'r')
-        ret |= Keywords.keywords(fh, output=output)
-        fh.close()
+        with io.open(f, encoding='utf-8', errors='replace') as fh:
+            ret |= Keywords.keywords(fh, output=output)
     return ret
 
 def wscheck(root, parent, flist, output):
     ret = 0
     output.write("white space nits:\n")
     for f in flist():
-        fh = open(f, 'r')
-        ret |= WsCheck.wscheck(fh, output=output)
-        fh.close()
+        with io.open(f, encoding='utf-8', errors='replace') as fh:
+            ret |= WsCheck.wscheck(fh, output=output)
     return ret
 
 def run_checks(root, parent, cmds, paths='', opts={}):
@@ -334,16 +314,15 @@ def run_checks(root, parent, cmds, paths='', opts={}):
     for cmd in cmds:
         s = StringIO()
 
-        exclude = not_check(root, cmd.func_name)
+        exclude = not_check(root, cmd.__name__)
         result = cmd(root, parent, gen_files(root, parent, paths, exclude),
                      output=s)
         ret |= result
 
         if result != 0:
-            print s.getvalue()
+            print(s.getvalue())
 
     return ret
-
 
 def nits(root, parent, paths):
     cmds = [copyright,
@@ -353,9 +332,8 @@ def nits(root, parent, paths):
             keywords,
             manlint,
             mapfilechk,
-	    wscheck]
+            wscheck]
     run_checks(root, parent, cmds, paths)
-
 
 def pbchk(root, parent, paths):
     cmds = [comchk,
@@ -366,9 +344,8 @@ def pbchk(root, parent, paths):
             keywords,
             manlint,
             mapfilechk,
-	    wscheck]
+            wscheck]
     run_checks(root, parent, cmds)
-
 
 def main(cmd, args):
     parent_branch = None
@@ -376,7 +353,7 @@ def main(cmd, args):
 
     try:
         opts, args = getopt.getopt(args, 'b:c:p:')
-    except getopt.GetoptError, e:
+    except getopt.GetoptError as e:
         sys.stderr.write(str(e) + '\n')
         sys.stderr.write("Usage: %s [-c check] [-p branch] [path...]\n" % cmd)
         sys.exit(1)
@@ -410,6 +387,6 @@ def main(cmd, args):
 if __name__ == '__main__':
     try:
         main(os.path.basename(sys.argv[0]), sys.argv[1:])
-    except GitError, e:
+    except GitError as e:
         sys.stderr.write("failed to run git:\n %s\n" % str(e))
         sys.exit(1)

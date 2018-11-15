@@ -23,8 +23,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 
 #
 # Wrap a command-line check tool in a pythonic API
@@ -46,8 +46,8 @@ def processcheck(command, args, inpt, output):
 	# don't deadlock with the child if both pipes fill.
 	#
 	try:
-		tmpfile = tempfile.TemporaryFile(prefix=command)
-	except EnvironmentError, e:
+		tmpfile = tempfile.TemporaryFile(prefix=command, mode="w+b")
+	except EnvironmentError as e:
 		output.write("Could not create temporary file: %s\n" % e)
 		return (3, None)
 
@@ -55,7 +55,7 @@ def processcheck(command, args, inpt, output):
 		p = subprocess.Popen([command] + args,
 				     stdin=subprocess.PIPE, stdout=tmpfile,
 				     stderr=subprocess.STDOUT, close_fds=False)
-	except OSError, e:
+	except OSError as e:
 		output.write("Could not execute %s: %s\n" % (command, e))
 		return (3, None)
 

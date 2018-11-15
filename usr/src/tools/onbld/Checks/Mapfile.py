@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -38,7 +39,8 @@ You should not be making modifications here until you've read the most current
 copy of that file. If you need help, contact a gatekeeper for guidance.
 '''
 
-import re, sys, CmtBlk
+import re, sys
+from onbld.Checks import CmtBlk
 
 MAPFILE = MAPFILE.splitlines()[1:]		# Don't include initial \n
 
@@ -51,9 +53,9 @@ def mapfilechk(fh, filename=None, verbose=False, output=sys.stderr):
 	# Verify that the mapfile is using version 2 syntax. Read and discard
 	# comment and empty lines until the first non-empty line is seen.
 	# This line must be '$mapfile_version 2'.
-        CmtRE = re.compile(r'#.*$')
-        LeadingWSRE = re.compile(r'^\s+')
-        VersionRE = re.compile(r'^\$mapfile_version\s+2\s*$')
+	CmtRE = re.compile(r'#.*$')
+	LeadingWSRE = re.compile(r'^\s+')
+	VersionRE = re.compile(r'^\$mapfile_version\s+2\s*$')
 	for line in fh:
 		line = CmtRE.sub(r'', line)
 		line = LeadingWSRE.sub(r'', line)
@@ -68,13 +70,12 @@ def mapfilechk(fh, filename=None, verbose=False, output=sys.stderr):
 
 		# We have verified version 2 syntax. Exit the loop
 		break
-		
 
 	# If the mapfile contains a SYMBOL_VERSION directive, the file
 	# must include a copy of the MAPFILE warning comment above. The
 	# comment is specific to symbol versioning, so we don't harrass
 	# the authors of mapfiles used exclusively for other purposes.
-        SymVerRE = re.compile(r'^\s*symbol_version\s+', re.IGNORECASE)
+	SymVerRE = re.compile(r'^\s*symbol_version\s+', re.IGNORECASE)
 	for line in fh:
 		# If we find a SYMBOL_VERSION, then verify that the comment
 		# is present. The comment usually precedes the mapfile_version

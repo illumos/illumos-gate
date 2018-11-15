@@ -1,4 +1,4 @@
-#!@PYTHON@
+#!@TOOLS_PYTHON@
 #
 # CDDL HEADER START
 #
@@ -22,13 +22,14 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
 # Check for valid CDDL blocks in source files.
 #
 
-import sys, os, getopt, fnmatch
+import sys, os, io, getopt, fnmatch
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
                                 "python%d.%d" % sys.version_info[:2]))
@@ -48,7 +49,7 @@ class ExceptionList(object):
 		fh = None
 		try:
 			fh = open(exfile, 'r')
-		except IOError, e:
+		except IOError as e:
 			sys.stderr.write('Failed to open exception list: '
 					 '%s: %s\n' % (e.filename, e.strerror))
 			sys.exit(2)
@@ -91,15 +92,15 @@ def usage():
 
 def check(filename, opts):
 	try:
-		fh = open(filename, 'r')
-	except IOError, e:
+		with io.open(filename, encoding='utf-8',
+		    errors='replace') as fh:
+			return cddlchk(fh, verbose=opts['verbose'],
+			       lenient=opts['lenient'],
+			       output=sys.stdout)
+	except IOError as e:
 		sys.stderr.write("failed to open '%s': %s\n" %
 				 (e.filename, e.strerror))
 		return 1
-	else:
-		return cddlchk(fh, verbose=opts['verbose'],
-			       lenient=opts['lenient'],
-			       output=sys.stdout)
 
 def walker(opts, dirname, fnames):
 	for f in fnames:

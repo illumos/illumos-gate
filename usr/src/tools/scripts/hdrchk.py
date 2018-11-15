@@ -1,4 +1,4 @@
-#!@PYTHON@
+#!@TOOLS_PYTHON@
 #
 # CDDL HEADER START
 #
@@ -22,13 +22,14 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
 # Check header files conform to ON standards.
 #
 
-import sys, os, getopt
+import sys, os, io, getopt
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
                                 "python%d.%d" % sys.version_info[:2]))
@@ -59,11 +60,10 @@ for opt, arg in opts:
 ret = 0
 for filename in args:
 	try:
-		fh = open(filename, 'r')
-	except IOError, e:
+		with io.open(filename, encoding='utf-8',
+		    errors='replace') as fh:
+			ret |= hdrchk(fh, lenient=lenient, output=sys.stderr)
+	except IOError as e:
 		sys.stderr.write("failed to open '%s': %s\n" %
 				 (e.filename, e.strerror))
-	else:
-		ret |= hdrchk(fh, lenient=lenient, output=sys.stderr)
-		fh.close()
 sys.exit(ret)

@@ -25,6 +25,7 @@
 #
 
 # Copyright 2010, Richard Lowe
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 
 #
 # Various database lookup classes/methods, i.e.:
@@ -33,10 +34,13 @@
 #     * redmine (illumos.org)
 #
 
-import htmllib
 import re
-import urllib
-import urllib2
+try:
+	from urllib.request import urlopen, Request
+	from urllib.error import HTTPError
+except ImportError:
+	# Python 2
+	from urllib2 import Request, urlopen, HTTPError
 
 try:				# Python >= 2.5
 	from xml.etree import ElementTree
@@ -72,17 +76,17 @@ class BugDB(object):
 		"""
 		for database in priority:
 			if database not in self.VALID_DBS:
-				raise BugDBException, database
+				raise BugDBException(database)
 		self.__priority = priority
 
 
 	def __illbug(self, cr):
 		url = "http://illumos.org/issues/%s.xml" % cr
-		req = urllib2.Request(url)
+		req = Request(url)
 
 		try:
-			data = urllib2.urlopen(req)
-		except urllib2.HTTPError, e:
+			data = urlopen(req)
+		except HTTPError as e:
 			if e.code == 404:
 				raise NonExistentBug(cr)
 			else:

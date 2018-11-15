@@ -24,8 +24,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 
 #
 # Mercurial (lack of) keyword checks
@@ -39,7 +39,7 @@ ident = re.compile(r'((\%Z\%(\%M\%)\s+\%I\%|\%W\%)\s+\%E\% SMI)')
 #
 # Absolutely anything that appears to be an SCCS keyword.
 # It's impossible to programatically differentiate between these
-# and other, legitimate, uses of matching strings. 
+# and other, legitimate, uses of matching strings.
 #
 anykword = re.compile(r'%[A-ILMP-UWYZ]%')
 
@@ -56,14 +56,14 @@ def keywords(fh, filename=None, lenient=False, verbose=False,
 
     ret = 0
     lineno = 0
-    
+
     for line in fh:
         line = line.rstrip('\r\n')
         lineno += 1
-        
+
         if lenient and ident.search(line):
             continue
-        
+
         match = anykword.findall(line)
         if match:
             ret = 1
