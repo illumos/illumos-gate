@@ -650,6 +650,7 @@ static int linenoiseEdit(char *buf, size_t buflen, const char *prompt)
             buf[0] = '\0';
             l.pos = l.len = 0;
             refreshLine(&l);
+	    break;
         case BACKSPACE:   /* backspace */
         case 8:     /* ctrl-h */
             linenoiseEditBackspace(&l);
