@@ -17,7 +17,7 @@
 
 include $(SRC)/Makefile.master
 
-SUBDIRS = libefi boot1 loader
+SUBDIRS = libefi loader
 
 #.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm"
 #.if ${MK_FDT} != "no"
