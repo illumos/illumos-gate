@@ -618,6 +618,13 @@ bcons_init(struct xboot_info *xbi)
 	extern int post_fastreboot;
 #endif
 
+	if (xbi == NULL) {
+		/* This is very early dboot console, set up ttya. */
+		console = CONS_TTY;
+		serial_init();
+		return;
+	}
+
 	/* Set up data to fetch properties from commad line and boot env. */
 	boot_line = (char *)(uintptr_t)xbi->bi_cmdline;
 	bcons_init_env(xbi);
