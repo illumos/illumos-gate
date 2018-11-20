@@ -114,14 +114,12 @@ kctl_pcache_create(int *nprops)
 		    ttymode);
 	}
 
-	/*
-	 * console is defined by "console" property, with
-	 * fallback on the old "input-device" property.
-	 */
 	(void) strcpy(inputdev, "text");	/* default to screen */
-	if (!preader("console", inputdev, sizeof ((&pnv[0])->kanv_val)))
+	if (!preader("diag-device", inputdev, sizeof ((&pnv[0])->kanv_val)) &&
+	    !preader("console", inputdev, sizeof ((&pnv[0])->kanv_val))) {
 		(void) preader("input-device", inputdev,
 		    sizeof ((&pnv[0])->kanv_val));
+	}
 
 	if (strncmp(inputdev, "tty", 3) == 0 &&
 	    inputdev[4] == '\0' &&
