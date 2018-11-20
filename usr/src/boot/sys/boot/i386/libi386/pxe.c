@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2000 Alfred Perlstein <alfred@freebsd.org>
  * Copyright (c) 2000 Paul Saab <ps@freebsd.org>
  * Copyright (c) 2000 John Baldwin <jhb@freebsd.org>
@@ -52,15 +52,15 @@
 
 /*
  * Allocate the PXE buffers statically instead of sticking grimy fingers into
- * BTX's private data area.  The scratch buffer is used to send information to
+ * BTX's private data area. The scratch buffer is used to send information to
  * the PXE BIOS, and the data buffer is used to receive data from the PXE BIOS.
  */
 #define	PXE_BUFFER_SIZE		0x2000
 static char	scratch_buffer[PXE_BUFFER_SIZE];
 static char	data_buffer[PXE_BUFFER_SIZE];
 
-static pxenv_t	*pxenv_p = NULL;        /* PXENV+ */
-static pxe_t	*pxe_p   = NULL;	/* !PXE */
+static pxenv_t	*pxenv_p = NULL;	/* PXENV+ */
+static pxe_t	*pxe_p	 = NULL;	/* !PXE */
 
 #ifdef PXE_DEBUG
 static int 	pxe_debug = 0;
@@ -92,8 +92,8 @@ extern u_int16_t		__pxenvoff;
 extern void			__pxenventry(void);
 
 struct netif_dif pxe_ifs[] = {
-/*      dif_unit        dif_nsel        dif_stats       dif_private     */
-	{0,             1,              &pxe_st[0],     0}
+/*	dif_unit	dif_nsel	dif_stats	dif_private	*/
+	{0,		1,		&pxe_st[0],	0}
 };
 
 struct netif_stats pxe_st[nitems(pxe_ifs)];
@@ -137,13 +137,13 @@ pxe_enable(void *pxeinfo)
 {
 	pxenv_p  = (pxenv_t *)pxeinfo;
 	pxe_p    = (pxe_t *)PTOV(pxenv_p->PXEPtr.segment * 16 +
-				 pxenv_p->PXEPtr.offset);
+	    pxenv_p->PXEPtr.offset);
 	pxe_call = NULL;
 }
 
-/* 
+/*
  * return true if pxe structures are found/initialized,
- * also figures out our IP information via the pxe cached info struct 
+ * also figures out our IP information via the pxe cached info struct
  */
 static int
 pxe_init(void)
@@ -154,7 +154,7 @@ pxe_init(void)
 	uint8_t *checkptr;
 	extern struct devsw netdev;
 
-	if(pxenv_p == NULL)
+	if (pxenv_p == NULL)
 		return (0);
 
 	/*  look for "PXENV+" */
@@ -164,18 +164,18 @@ pxe_init(void)
 	}
 
 	/* make sure the size is something we can handle */
-	if (pxenv_p->Length > sizeof(*pxenv_p)) {
-	  	printf("PXENV+ structure too large, ignoring\n");
+	if (pxenv_p->Length > sizeof (*pxenv_p)) {
+		printf("PXENV+ structure too large, ignoring\n");
 		pxenv_p = NULL;
 		return (0);
 	}
 
-	/* 
+	/*
 	 * do byte checksum:
 	 * add up each byte in the structure, the total should be 0
 	 */
-	checksum = 0;	
-	checkptr = (uint8_t *) pxenv_p;
+	checksum = 0;
+	checkptr = (uint8_t *)pxenv_p;
 	for (counter = 0; counter < pxenv_p->Length; counter++)
 		checksum += *checkptr++;
 	if (checksum != 0) {
@@ -198,8 +198,9 @@ pxe_init(void)
 			checksum = 0;
 			checkptr = (uint8_t *)pxe_p;
 			for (counter = 0; counter < pxe_p->StructLength;
-			     counter++)
+			    counter++) {
 				checksum += *checkptr++;
+			}
 			if (checksum != 0) {
 				pxe_p = NULL;
 				break;
@@ -214,18 +215,19 @@ pxe_init(void)
 	pxedisk.dv_strategy = netdev.dv_strategy;
 
 	printf("\nPXE version %d.%d, real mode entry point ",
-	       (uint8_t) (pxenv_p->Version >> 8),
-	       (uint8_t) (pxenv_p->Version & 0xFF));
-	if (pxe_call == bangpxe_call)
+	    (uint8_t)(pxenv_p->Version >> 8),
+	    (uint8_t)(pxenv_p->Version & 0xFF));
+	if (pxe_call == bangpxe_call) {
 		printf("@%04x:%04x\n",
-		       pxe_p->EntryPointSP.segment,
-		       pxe_p->EntryPointSP.offset);
-	else
+		    pxe_p->EntryPointSP.segment,
+		    pxe_p->EntryPointSP.offset);
+	} else {
 		printf("@%04x:%04x\n",
-		       pxenv_p->RMEntry.segment, pxenv_p->RMEntry.offset);
+		    pxenv_p->RMEntry.segment, pxenv_p->RMEntry.offset);
+	}
 
 	gci_p = (t_PXENV_GET_CACHED_INFO *) scratch_buffer;
-	bzero(gci_p, sizeof(*gci_p));
+	bzero(gci_p, sizeof (*gci_p));
 	gci_p->PacketType = PXENV_PACKET_TYPE_BINL_REPLY;
 	pxe_call(PXENV_GET_CACHED_INFO);
 	if (gci_p->Status != 0) {
@@ -278,12 +280,12 @@ pxe_cleanup(void)
 #ifdef PXE_DEBUG
 	if (pxe_debug && undi_shutdown_p->Status != 0)
 		printf("pxe_cleanup: UNDI_SHUTDOWN failed %x\n",
-		       undi_shutdown_p->Status);
+		    undi_shutdown_p->Status);
 #endif
 
 	pxe_call(PXENV_UNLOAD_STACK);
 
-#ifdef PXE_DEBUG	
+#ifdef PXE_DEBUG
 	if (pxe_debug && unload_stack_p->Status != 0)
 		printf("pxe_cleanup: UNLOAD_STACK failed %x\n",
 		    unload_stack_p->Status);
@@ -293,7 +295,6 @@ pxe_cleanup(void)
 void
 pxe_perror(int err)
 {
-	return;
 }
 
 void
@@ -303,13 +304,13 @@ pxenv_call(int func)
 	if (pxe_debug)
 		printf("pxenv_call %x\n", func);
 #endif
-	
-	bzero(&v86, sizeof(v86));
-	bzero(data_buffer, sizeof(data_buffer));
+
+	bzero(&v86, sizeof (v86));
+	bzero(data_buffer, sizeof (data_buffer));
 
 	__pxenvseg = pxenv_p->RMEntry.segment;
 	__pxenvoff = pxenv_p->RMEntry.offset;
-	
+
 	v86.ctl  = V86_ADDR | V86_CALLF | V86_FLAGS;
 	v86.es   = VTOPSEG(scratch_buffer);
 	v86.edi  = VTOPOFF(scratch_buffer);
@@ -326,13 +327,13 @@ bangpxe_call(int func)
 	if (pxe_debug)
 		printf("bangpxe_call %x\n", func);
 #endif
-	
-	bzero(&v86, sizeof(v86));
-	bzero(data_buffer, sizeof(data_buffer));
+
+	bzero(&v86, sizeof (v86));
+	bzero(data_buffer, sizeof (data_buffer));
 
 	__bangpxeseg = pxe_p->EntryPointSP.segment;
 	__bangpxeoff = pxe_p->EntryPointSP.offset;
-	
+
 	v86.ctl  = V86_ADDR | V86_CALLF | V86_FLAGS;
 	v86.edx  = VTOPSEG(scratch_buffer);
 	v86.eax  = VTOPOFF(scratch_buffer);
@@ -365,7 +366,7 @@ pxe_netif_end(struct netif *nif)
 	t_PXENV_UNDI_CLOSE *undi_close_p;
 
 	undi_close_p = (t_PXENV_UNDI_CLOSE *)scratch_buffer;
-	bzero(undi_close_p, sizeof(*undi_close_p));
+	bzero(undi_close_p, sizeof (*undi_close_p));
 	pxe_call(PXENV_UNDI_CLOSE);
 	if (undi_close_p->Status != 0)
 		printf("undi close failed: %x\n", undi_close_p->Status);
@@ -380,7 +381,7 @@ pxe_netif_init(struct iodesc *desc, void *machdep_hint)
 	int i, len;
 
 	undi_info_p = (t_PXENV_UNDI_GET_INFORMATION *)scratch_buffer;
-	bzero(undi_info_p, sizeof(*undi_info_p));
+	bzero(undi_info_p, sizeof (*undi_info_p));
 	pxe_call(PXENV_UNDI_GET_INFORMATION);
 	if (undi_info_p->Status != 0) {
 		printf("undi get info failed: %x\n", undi_info_p->Status);
@@ -414,7 +415,7 @@ pxe_netif_init(struct iodesc *desc, void *machdep_hint)
 		desc->xid = 0;
 
 	undi_open_p = (t_PXENV_UNDI_OPEN *)scratch_buffer;
-	bzero(undi_open_p, sizeof(*undi_open_p));
+	bzero(undi_open_p, sizeof (*undi_open_p));
 	undi_open_p->PktFilter = FLTR_DIRECTED | FLTR_BRDCST;
 	pxe_call(PXENV_UNDI_OPEN);
 	if (undi_open_p->Status != 0)
@@ -424,40 +425,30 @@ pxe_netif_init(struct iodesc *desc, void *machdep_hint)
 static int
 pxe_netif_receive(void **pkt)
 {
-	t_PXENV_UNDI_ISR *isr = (t_PXENV_UNDI_ISR *)scratch_buffer;
+	t_PXENV_UNDI_ISR *isr;
 	char *buf, *ptr, *frame;
 	size_t size, rsize;
 
-	bzero(isr, sizeof(*isr));
+	isr = (t_PXENV_UNDI_ISR *)scratch_buffer;
+	bzero(isr, sizeof (*isr));
+
 	isr->FuncFlag = PXENV_UNDI_ISR_IN_START;
 	pxe_call(PXENV_UNDI_ISR);
 	if (isr->Status != 0)
 		return (-1);
 
-	bzero(isr, sizeof(*isr));
+	bzero(isr, sizeof (*isr));
 	isr->FuncFlag = PXENV_UNDI_ISR_IN_PROCESS;
 	pxe_call(PXENV_UNDI_ISR);
 	if (isr->Status != 0)
 		return (-1);
-
-	while (isr->FuncFlag == PXENV_UNDI_ISR_OUT_TRANSMIT) {
-		/*
-		 * Wait till transmit is done.
-		 */
-		bzero(isr, sizeof(*isr));
-		isr->FuncFlag = PXENV_UNDI_ISR_IN_GET_NEXT;
-		pxe_call(PXENV_UNDI_ISR);
-		if (isr->Status != 0 ||
-		    isr->FuncFlag == PXENV_UNDI_ISR_OUT_DONE)
-			return (-1);
-	}
 
 	while (isr->FuncFlag != PXENV_UNDI_ISR_OUT_RECEIVE) {
 		if (isr->Status != 0 ||
 		    isr->FuncFlag == PXENV_UNDI_ISR_OUT_DONE) {
 			return (-1);
 		}
-		bzero(isr, sizeof(*isr));
+		bzero(isr, sizeof (*isr));
 		isr->FuncFlag = PXENV_UNDI_ISR_IN_GET_NEXT;
 		pxe_call(PXENV_UNDI_ISR);
 	}
@@ -476,7 +467,7 @@ pxe_netif_receive(void **pkt)
 		ptr += isr->BufferLength;
 		rsize += isr->BufferLength;
 
-		bzero(isr, sizeof(*isr));
+		bzero(isr, sizeof (*isr));
 		isr->FuncFlag = PXENV_UNDI_ISR_IN_GET_NEXT;
 		pxe_call(PXENV_UNDI_ISR);
 		if (isr->Status != 0) {
@@ -518,13 +509,19 @@ pxe_netif_put(struct iodesc *desc, void *pkt, size_t len)
 	t_PXENV_UNDI_TRANSMIT *trans_p;
 	t_PXENV_UNDI_TBD *tbd_p;
 	char *data;
+	size_t datasz;
 
 	trans_p = (t_PXENV_UNDI_TRANSMIT *)scratch_buffer;
-	bzero(trans_p, sizeof(*trans_p));
-	tbd_p = (t_PXENV_UNDI_TBD *)(scratch_buffer + sizeof(*trans_p));
-	bzero(tbd_p, sizeof(*tbd_p));
+	datasz = sizeof (*trans_p);
+	tbd_p = (t_PXENV_UNDI_TBD *)(scratch_buffer + datasz);
+	datasz += sizeof (*tbd_p);
+	bzero(scratch_buffer, datasz);
 
-	data = scratch_buffer + sizeof(*trans_p) + sizeof(*tbd_p);
+	data = scratch_buffer + datasz;
+	datasz = sizeof (scratch_buffer) - datasz;
+
+	if (len > datasz)
+		return (-1);
 
 	trans_p->TBD.segment = VTOPSEG(tbd_p);
 	trans_p->TBD.offset  = VTOPOFF(tbd_p);
