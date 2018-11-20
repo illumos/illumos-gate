@@ -281,6 +281,7 @@ struct sge_fl {
 
 	uint64_t copied_up;	/* # of frames copied into mblk and handed up */
 	uint64_t passed_up;	/* # of frames wrapped in mblk and handed up */
+	uint64_t allocb_fail;	/* # of mblk allocation failures */
 
 	TAILQ_ENTRY(sge_fl) link; /* All starving freelists */
 };

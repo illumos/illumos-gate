@@ -775,10 +775,8 @@ t4_ring_rx(struct sge_rxq *rxq, int budget)
 					goto done;
 
 				m = get_fl_payload(sc, fl, lq, &fl_bufs_used);
-				if (m == NULL) {
-					panic("%s: line %d.", __func__,
-					    __LINE__);
-				}
+				if (m == NULL)
+					goto done;
 
 				iq->intr_next = iq->intr_params;
 				m->b_rptr += sc->sge.pktshift;
@@ -808,10 +806,8 @@ t4_ring_rx(struct sge_rxq *rxq, int budget)
 			}
 
 			m = get_fl_payload(sc, fl, lq, &fl_bufs_used);
-			if (m == NULL) {
-				panic("%s: line %d.", __func__,
-				    __LINE__);
-			}
+			if (m == NULL)
+				goto done;
 			/* FALLTHROUGH */
 
 		case X_RSPD_TYPE_CPL:
@@ -861,6 +857,7 @@ service_iq(struct sge_iq *iq, int budget)
 	int ndescs = 0, limit, fl_bufs_used = 0;
 	int rsp_type;
 	uint32_t lq;
+	int starved;
 	mblk_t *m;
 	STAILQ_HEAD(, sge_iq) iql = STAILQ_HEAD_INITIALIZER(iql);
 
@@ -887,8 +884,23 @@ service_iq(struct sge_iq *iq, int budget)
 
 				m = get_fl_payload(sc, fl, lq, &fl_bufs_used);
 				if (m == NULL) {
-					panic("%s: line %d.", __func__,
-					    __LINE__);
+					/*
+					 * Rearm the iq with a
+					 * longer-than-default timer
+					 */
+					t4_write_reg(sc, MYPF_REG(A_SGE_PF_GTS), V_CIDXINC(ndescs) |
+							V_INGRESSQID((u32)iq->cntxt_id) |
+							V_SEINTARM(V_QINTR_TIMER_IDX(SGE_NTIMERS-1)));
+					if (fl_bufs_used > 0) {
+						ASSERT(iq->flags & IQ_HAS_FL);
+						FL_LOCK(fl);
+						fl->needed += fl_bufs_used;
+						starved = refill_fl(sc, fl, fl->cap / 8);
+						FL_UNLOCK(fl);
+						if (starved)
+							add_fl_to_sfl(sc, fl);
+					}
+					return (0);
 				}
 
 			/* FALLTHRU */
@@ -968,7 +980,6 @@ service_iq(struct sge_iq *iq, int budget)
 	    V_INGRESSQID((u32)iq->cntxt_id) | V_SEINTARM(iq->intr_next));
 
 	if (iq->flags & IQ_HAS_FL) {
-		int starved;
 
 		FL_LOCK(fl);
 		fl->needed += fl_bufs_used;
@@ -1253,6 +1264,7 @@ init_fl(struct sge_fl *fl, uint16_t qsize)
 {
 
 	fl->qsize = qsize;
+	fl->allocb_fail = 0;
 }
 
 static inline void
@@ -2331,13 +2343,15 @@ get_fl_payload(struct adapter *sc, struct sge_fl *fl,
 	struct rxbuf *rxb;
 	mblk_t *m = NULL;
 	uint_t nbuf = 0, len, copy, n;
-	uint32_t cidx, offset;
+	uint32_t cidx, offset, rcidx, roffset;
 
 	/*
 	 * The SGE won't pack a new frame into the current buffer if the entire
 	 * payload doesn't fit in the remaining space.  Move on to the next buf
 	 * in that case.
 	 */
+	rcidx = fl->cidx;
+	roffset = fl->offset;
 	if (fl->offset > 0 && len_newbuf & F_RSPD_NEWBUF) {
 		fl->offset = 0;
 		if (++fl->cidx == fl->cap)
@@ -2351,8 +2365,15 @@ get_fl_payload(struct adapter *sc, struct sge_fl *fl,
 	copy = (len <= fl->copy_threshold);
 	if (copy != 0) {
 		frame.head = m = allocb(len, BPRI_HI);
-		if (m == NULL)
+		if (m == NULL) {
+			fl->allocb_fail++;
+			cmn_err(CE_WARN,"%s: mbuf allocation failure "
+					"count = %llu", __func__,
+					(unsigned long long)fl->allocb_fail);
+			fl->cidx = rcidx;
+			fl->offset = roffset;
 			return (NULL);
+		}
 	}
 
 	while (len) {
@@ -2368,7 +2389,15 @@ get_fl_payload(struct adapter *sc, struct sge_fl *fl,
 			m = desballoc((unsigned char *)rxb->va + offset, n,
 			    BPRI_HI, &rxb->freefunc);
 			if (m == NULL) {
-				freemsg(frame.head);
+				fl->allocb_fail++;
+				cmn_err(CE_WARN,
+					"%s: mbuf allocation failure "
+					"count = %llu", __func__,
+					(unsigned long long)fl->allocb_fail);
+				if (frame.head)
+					freemsgchain(frame.head);
+				fl->cidx = rcidx;
+				fl->offset = roffset;
 				return (NULL);
 			}
 			atomic_inc_uint(&rxb->ref_cnt);
