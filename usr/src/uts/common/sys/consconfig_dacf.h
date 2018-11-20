@@ -54,6 +54,7 @@ typedef struct cons_state {
 	char	*cons_mouse_path;	/* Mouse path */
 	char	*cons_stdin_path;	/* Standard input path */
 	char	*cons_stdout_path;	/* Standard output path */
+	char	*cons_diag_path;	/* Diag device path */
 
 	char	*cons_fb_path;		/* Frame Buffer path */
 

@@ -532,6 +532,29 @@ plat_stdoutpath(void)
 	return (plat_fbpath());
 }
 
+char *
+plat_diagpath(void)
+{
+	dev_info_t *root;
+	char *diag;
+	int tty_num = -1;
+
+	root = ddi_root_node();
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, root, DDI_PROP_DONTPASS,
+	    "diag-device", &diag) == DDI_SUCCESS) {
+		if (strlen(diag) == 4 && strncmp(diag, "tty", 3) == 0 &&
+		    diag[3] >= 'a' && diag[3] <= 'd') {
+			tty_num = diag[3] - 'a';
+		}
+		ddi_prop_free(diag);
+	}
+
+	if (tty_num != -1)
+		return (plat_ttypath(tty_num));
+	return (NULL);
+}
+
 /*
  * If VIS_PIXEL mode will be implemented on x86, these following
  * functions should be re-considered. Now these functions are

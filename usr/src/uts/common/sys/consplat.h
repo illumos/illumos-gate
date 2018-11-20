@@ -40,6 +40,7 @@ extern char *plat_fbpath(void);
 extern char *plat_mousepath(void);
 extern char *plat_stdinpath(void);
 extern char *plat_stdoutpath(void);
+extern char *plat_diagpath(void);
 extern int plat_stdin_is_keyboard(void);
 extern int plat_stdout_is_framebuffer(void);
 extern void plat_tem_get_inverses(int *, int *);

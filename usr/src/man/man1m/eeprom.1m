@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EEPROM 1M "Feb 21, 2016"
+.TH EEPROM 1M "Oct 27, 2018"
 .SH NAME
 eeprom \- EEPROM display and load utility
 .SH SYNOPSIS
@@ -109,7 +109,6 @@ the console device falls back to the device specified by \fBinput-device\fR and
 console defaults to the frame buffer and keyboard.
 .RE
 
-.SS "x86 Only"
 .ne 2
 .na
 \fB\fIos_console\fR\fR
@@ -119,6 +118,19 @@ console defaults to the frame buffer and keyboard.
 While \fBconsole\fR controls both boot loader and kernel console, setting
 \fBos_console\fR allows setting console device only for kernel. Values
 are the same as for \fBconsole\fR.
+.RE
+
+.ne 2
+.na
+\fB\fIdiag-device\fR\fR
+.ad
+.sp .6
+.RS 4n
+The \fBdiag-device\fR is currently implemented to support serial port
+as output for system early boot diagnostic messages and input and output
+for \fBkmdb\fR debugger. For early boot, all the console messages are mirrored
+to \fBdiag-device\fR, until the console drivers are loaded.
+After that, only \fBkmdb\fR will continue to use the \fBdiag-device\fR.
 .RE
 
 .SH NVRAM CONFIGURATION PARAMETERS
