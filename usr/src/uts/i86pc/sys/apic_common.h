@@ -167,7 +167,7 @@ extern int	apic_stretch_ISR;	/* IPL of 3 matches nothing now */
 
 extern cyclic_id_t apic_cyclic_id;
 
-extern void apic_nmi_intr(caddr_t arg, struct regs *rp);
+extern uint_t apic_nmi_intr(caddr_t arg, caddr_t);
 extern int	apic_clkinit();
 extern hrtime_t apic_gettime();
 extern hrtime_t apic_gethrtime();
