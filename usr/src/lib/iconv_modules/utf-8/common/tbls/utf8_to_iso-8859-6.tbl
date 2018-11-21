@@ -1,0 +1,116 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
+ * COPYRIGHT AND PERMISSION NOTICE
+ *
+ * Copyright (c) 1991-2005 Unicode, Inc. All rights reserved. Distributed
+ * under the Terms of Use in http://www.unicode.org/copyright.html.
+ *
+ * This file has been modified by Sun Microsystems, Inc.
+ *
+ */
+	{  0x0000C280, 0x80  },
+	{  0x0000C281, 0x81  },
+	{  0x0000C282, 0x82  },
+	{  0x0000C283, 0x83  },
+	{  0x0000C284, 0x84  },
+	{  0x0000C285, 0x85  },
+	{  0x0000C286, 0x86  },
+	{  0x0000C287, 0x87  },
+	{  0x0000C288, 0x88  },
+	{  0x0000C289, 0x89  },
+	{  0x0000C28A, 0x8A  },
+	{  0x0000C28B, 0x8B  },
+	{  0x0000C28C, 0x8C  },
+	{  0x0000C28D, 0x8D  },
+	{  0x0000C28E, 0x8E  },
+	{  0x0000C28F, 0x8F  },
+	{  0x0000C290, 0x90  },
+	{  0x0000C291, 0x91  },
+	{  0x0000C292, 0x92  },
+	{  0x0000C293, 0x93  },
+	{  0x0000C294, 0x94  },
+	{  0x0000C295, 0x95  },
+	{  0x0000C296, 0x96  },
+	{  0x0000C297, 0x97  },
+	{  0x0000C298, 0x98  },
+	{  0x0000C299, 0x99  },
+	{  0x0000C29A, 0x9A  },
+	{  0x0000C29B, 0x9B  },
+	{  0x0000C29C, 0x9C  },
+	{  0x0000C29D, 0x9D  },
+	{  0x0000C29E, 0x9E  },
+	{  0x0000C29F, 0x9F  },
+	{  0x0000C2A0, 0xA0  },
+	{  0x0000C2A4, 0xA4  },
+	{  0x0000C2AD, 0xAD  },
+	{  0x0000D88C, 0xAC  },
+	{  0x0000D89B, 0xBB  },
+	{  0x0000D89F, 0xBF  },
+	{  0x0000D8A1, 0xC1  },
+	{  0x0000D8A2, 0xC2  },
+	{  0x0000D8A3, 0xC3  },
+	{  0x0000D8A4, 0xC4  },
+	{  0x0000D8A5, 0xC5  },
+	{  0x0000D8A6, 0xC6  },
+	{  0x0000D8A7, 0xC7  },
+	{  0x0000D8A8, 0xC8  },
+	{  0x0000D8A9, 0xC9  },
+	{  0x0000D8AA, 0xCA  },
+	{  0x0000D8AB, 0xCB  },
+	{  0x0000D8AC, 0xCC  },
+	{  0x0000D8AD, 0xCD  },
+	{  0x0000D8AE, 0xCE  },
+	{  0x0000D8AF, 0xCF  },
+	{  0x0000D8B0, 0xD0  },
+	{  0x0000D8B1, 0xD1  },
+	{  0x0000D8B2, 0xD2  },
+	{  0x0000D8B3, 0xD3  },
+	{  0x0000D8B4, 0xD4  },
+	{  0x0000D8B5, 0xD5  },
+	{  0x0000D8B6, 0xD6  },
+	{  0x0000D8B7, 0xD7  },
+	{  0x0000D8B8, 0xD8  },
+	{  0x0000D8B9, 0xD9  },
+	{  0x0000D8BA, 0xDA  },
+	{  0x0000D980, 0xE0  },
+	{  0x0000D981, 0xE1  },
+	{  0x0000D982, 0xE2  },
+	{  0x0000D983, 0xE3  },
+	{  0x0000D984, 0xE4  },
+	{  0x0000D985, 0xE5  },
+	{  0x0000D986, 0xE6  },
+	{  0x0000D987, 0xE7  },
+	{  0x0000D988, 0xE8  },
+	{  0x0000D989, 0xE9  },
+	{  0x0000D98A, 0xEA  },
+	{  0x0000D98B, 0xEB  },
+	{  0x0000D98C, 0xEC  },
+	{  0x0000D98D, 0xED  },
+	{  0x0000D98E, 0xEE  },
+	{  0x0000D98F, 0xEF  },
+	{  0x0000D990, 0xF0  },
+	{  0x0000D991, 0xF1  },
+	{  0x0000D992, 0xF2  },

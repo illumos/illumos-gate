@@ -1,0 +1,417 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ *  ICU License - ICU 1.8.1 and later
+ *
+ *  COPYRIGHT AND PERMISSION NOTICE
+ *
+ * Copyright (c) 1995-2005 International Business Machines Corporation and others
+ * All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, and/or sell copies of the Software, and to permit persons
+ * to whom the Software is furnished to do so, provided that the above
+ * copyright notice(s) and this permission notice appear in all copies of
+ * the Software and that both the above copyright notice(s) and this
+ * permission notice appear in supporting documentation.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+ * OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+ * HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL
+ * INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING
+ * FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+ * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Except as contained in this notice, the name of a copyright holder
+ * shall not be used in advertising or otherwise to promote the sale, use
+ * or other dealings in this Software without prior written authorization
+ * of the copyright holder.
+ *
+ * --------------------------------------------------------------------------
+ * All trademarks and registered trademarks mentioned herein are the property
+ * of their respective owners.
+ */
+//
+// Copyright (c) 2000 by Sun Microsystems, Inc.
+// All rights reserved.
+//
+//
+// This file originally came from UTF-8+IBM-871.src and the only significant
+// change made is a re-mapping of Intl Currency Symbol mapping to euro mapping.
+//
+
+#include <sys/errno.h>
+
+UTF-8%IBM-1149 {
+    direction {
+	condition {
+		inputsize >= 1;
+		between 0x0...0x7f;
+	} map {
+		0x00	0x00	// U+0000
+		0x01	0x01	// U+0001
+		0x02	0x02	// U+0002
+		0x03	0x03	// U+0003
+		0x04	0x37	// U+0004
+		0x05	0x2d	// U+0005
+		0x06	0x2e	// U+0006
+		0x07	0x2f	// U+0007
+		0x08	0x16	// U+0008
+		0x09	0x05	// U+0009
+		0x0a	0x25	// U+000a
+		0x0b	0x0b	// U+000B
+		0x0c	0x0c	// U+000c
+		0x0d	0x0d	// U+000d
+		0x0e	0x0e	// U+000E
+		0x0f	0x0f	// U+000F
+		0x10	0x10	// U+0010
+		0x11	0x11	// U+0011
+		0x12	0x12	// U+0012
+		0x13	0x13	// U+0013
+		0x14	0x3c	// U+0014
+		0x15	0x3d	// U+0015
+		0x16	0x32	// U+0016
+		0x17	0x26	// U+0017
+		0x18	0x18	// U+0018
+		0x19	0x19	// U+0019
+		0x1a	0x3f	// U+001A
+		0x1b	0x27	// U+001B
+		0x1c	0x1c	// U+001C
+		0x1d	0x1d	// U+001D
+		0x1e	0x1e	// U+001E
+		0x1f	0x1f	// U+001F
+		0x20	0x40	// U+0020
+		0x21	0x4f	// U+0021
+		0x22	0x7f	// U+0022
+		0x23	0x7b	// U+0023
+		0x24	0x5b	// U+0024
+		0x25	0x6c	// U+0025
+		0x26	0x50	// U+0026
+		0x27	0x7d	// U+0027
+		0x28	0x4d	// U+0028
+		0x29	0x5d	// U+0029
+		0x2a	0x5c	// U+002A
+		0x2b	0x4e	// U+002B
+		0x2c	0x6b	// U+002C
+		0x2d	0x60	// U+002D
+		0x2e	0x4b	// U+002E
+		0x2f	0x61	// U+002F
+		0x30	0xf0	// U+0030
+		0x31	0xf1	// U+0031
+		0x32	0xf2	// U+0032
+		0x33	0xf3	// U+0033
+		0x34	0xf4	// U+0034
+		0x35	0xf5	// U+0035
+		0x36	0xf6	// U+0036
+		0x37	0xf7	// U+0037
+		0x38	0xf8	// U+0038
+		0x39	0xf9	// U+0039
+		0x3a	0x7a	// U+003A
+		0x3b	0x5e	// U+003B
+		0x3c	0x4c	// U+003C
+		0x3d	0x7e	// U+003D
+		0x3e	0x6e	// U+003E
+		0x3f	0x6f	// U+003F
+		0x40	0xac	// U+0040
+		0x41	0xc1	// U+0041
+		0x42	0xc2	// U+0042
+		0x43	0xc3	// U+0043
+		0x44	0xc4	// U+0044
+		0x45	0xc5	// U+0045
+		0x46	0xc6	// U+0046
+		0x47	0xc7	// U+0047
+		0x48	0xc8	// U+0048
+		0x49	0xc9	// U+0049
+		0x4a	0xd1	// U+004A
+		0x4b	0xd2	// U+004B
+		0x4c	0xd3	// U+004C
+		0x4d	0xd4	// U+004D
+		0x4e	0xd5	// U+004E
+		0x4f	0xd6	// U+004F
+		0x50	0xd7	// U+0050
+		0x51	0xd8	// U+0051
+		0x52	0xd9	// U+0052
+		0x53	0xe2	// U+0053
+		0x54	0xe3	// U+0054
+		0x55	0xe4	// U+0055
+		0x56	0xe5	// U+0056
+		0x57	0xe6	// U+0057
+		0x58	0xe7	// U+0058
+		0x59	0xe8	// U+0059
+		0x5a	0xe9	// U+005A
+		0x5b	0xae	// U+005B
+		0x5c	0xbe	// U+005c
+		0x5d	0x9e	// U+005D
+		0x5e	0xec	// U+005E
+		0x5f	0x6d	// U+005F
+		0x60	0x8c	// U+0060
+		0x61	0x81	// U+0061
+		0x62	0x82	// U+0062
+		0x63	0x83	// U+0063
+		0x64	0x84	// U+0064
+		0x65	0x85	// U+0065
+		0x66	0x86	// U+0066
+		0x67	0x87	// U+0067
+		0x68	0x88	// U+0068
+		0x69	0x89	// U+0069
+		0x6a	0x91	// U+006A
+		0x6b	0x92	// U+006B
+		0x6c	0x93	// U+006C
+		0x6d	0x94	// U+006D
+		0x6e	0x95	// U+006E
+		0x6f	0x96	// U+006F
+		0x70	0x97	// U+0070
+		0x71	0x98	// U+0071
+		0x72	0x99	// U+0072
+		0x73	0xa2	// U+0073
+		0x74	0xa3	// U+0074
+		0x75	0xa4	// U+0075
+		0x76	0xa5	// U+0076
+		0x77	0xa6	// U+0077
+		0x78	0xa7	// U+0078
+		0x79	0xa8	// U+0079
+		0x7a	0xa9	// U+007A
+		0x7b	0x8e	// U+007B
+		0x7c	0xbb	// U+007C
+		0x7d	0x9c	// U+007D
+		0x7e	0xcc	// U+007E
+		0x7f	0x07	// U+007F
+
+		default	0x6f
+	};
+
+	condition {
+		inputsize <= 1;
+		between 0xc0...0xfd;
+	} operation {
+		error	EINVAL;
+	};
+
+	condition {
+		inputsize >= 2;
+		between 0xc080...0xdfbf;
+	} map {
+		0xc280	0x20	// U+0080
+		0xc281	0x21	// U+0081
+		0xc282	0x22	// U+0082
+		0xc283	0x23	// U+0083
+		0xc284	0x24	// U+0084
+		0xc285	0x15	// U+0085
+		0xc286	0x06	// U+0086
+		0xc287	0x17	// U+0087
+		0xc288	0x28	// U+0088
+		0xc289	0x29	// U+0089
+		0xc28a	0x2a	// U+008A
+		0xc28b	0x2b	// U+008B
+		0xc28c	0x2c	// U+008C
+		0xc28d	0x09	// U+008D
+		0xc28e	0x0a	// U+008E
+		0xc28f	0x1b	// U+008F
+		0xc290	0x30	// U+0090
+		0xc291	0x31	// U+0091
+		0xc292	0x1a	// U+0092
+		0xc293	0x33	// U+0093
+		0xc294	0x34	// U+0094
+		0xc295	0x35	// U+0095
+		0xc296	0x36	// U+0096
+		0xc297	0x08	// U+0097
+		0xc298	0x38	// U+0098
+		0xc299	0x39	// U+0099
+		0xc29a	0x3a	// U+009A
+		0xc29b	0x3b	// U+009B
+		0xc29c	0x04	// U+009C
+		0xc29d	0x14	// U+009D
+		0xc29e	0x3e	// U+009E
+		0xc29f	0xff	// U+009F
+		0xc2a0	0x41	// U+00A0
+		0xc2a1	0xaa	// U+00A1
+		0xc2a2	0xb0	// U+00A2
+		0xc2a3	0xb1	// U+00A3
+		0xc2a4	0x9f	// U+00A4
+		0xc2a5	0xb2	// U+00A5
+		0xc2a6	0x6a	// U+00A6
+		0xc2a7	0xb5	// U+00A7
+		0xc2a8	0xbd	// U+00A8
+		0xc2a9	0xb4	// U+00A9
+		0xc2aa	0x9a	// U+00AA
+		0xc2ab	0x8a	// U+00AB
+		0xc2ac	0xba	// U+00AC
+		0xc2ad	0xca	// U+00AD
+		0xc2ae	0xaf	// U+00AE
+		0xc2af	0xbc	// U+00AF
+		0xc2b0	0x90	// U+00B0
+		0xc2b1	0x8f	// U+00B1
+		0xc2b2	0xea	// U+00B2
+		0xc2b3	0xfa	// U+00B3
+		0xc2b4	0xe0	// U+00B4
+		0xc2b5	0xa0	// U+00B5
+		0xc2b6	0xb6	// U+00B6
+		0xc2b7	0xb3	// U+00B7
+		0xc2b8	0x9d	// U+00B8
+		0xc2b9	0xda	// U+00B9
+		0xc2ba	0x9b	// U+00BA
+		0xc2bb	0x8b	// U+00BB
+		0xc2bc	0xb7	// U+00BC
+		0xc2bd	0xb8	// U+00BD
+		0xc2be	0xb9	// U+00BE
+		0xc2bf	0xab	// U+00BF
+		0xc380	0x64	// U+00C0
+		0xc381	0x65	// U+00C1
+		0xc382	0x62	// U+00C2
+		0xc383	0x66	// U+00C3
+		0xc384	0x63	// U+00C4
+		0xc385	0x67	// U+00C5
+		0xc386	0x5a	// U+00C6
+		0xc387	0x68	// U+00C7
+		0xc388	0x74	// U+00C8
+		0xc389	0x71	// U+00C9
+		0xc38a	0x72	// U+00CA
+		0xc38b	0x73	// U+00CB
+		0xc38c	0x78	// U+00CC
+		0xc38d	0x75	// U+00CD
+		0xc38e	0x76	// U+00CE
+		0xc38f	0x77	// U+00CF
+		0xc390	0x7c	// U+00D0
+		0xc391	0x69	// U+00D1
+		0xc392	0xed	// U+00D2
+		0xc393	0xee	// U+00D3
+		0xc394	0xeb	// U+00D4
+		0xc395	0xef	// U+00D5
+		0xc396	0x5f	// U+00D6
+		0xc397	0xbf	// U+00D7
+		0xc398	0x80	// U+00D8
+		0xc399	0xfd	// U+00D9
+		0xc39a	0xfe	// U+00DA
+		0xc39b	0xfb	// U+00DB
+		0xc39c	0xfc	// U+00DC
+		0xc39d	0xad	// U+00DD
+		0xc39e	0x4a	// U+00DE
+		0xc39f	0x59	// U+00DF
+		0xc3a0	0x44	// U+00E0
+		0xc3a1	0x45	// U+00E1
+		0xc3a2	0x42	// U+00E2
+		0xc3a3	0x46	// U+00E3
+		0xc3a4	0x43	// U+00E4
+		0xc3a5	0x47	// U+00E5
+		0xc3a6	0xd0	// U+00E6
+		0xc3a7	0x48	// U+00E7
+		0xc3a8	0x54	// U+00E8
+		0xc3a9	0x51	// U+00E9
+		0xc3aa	0x52	// U+00EA
+		0xc3ab	0x53	// U+00EB
+		0xc3ac	0x58	// U+00EC
+		0xc3ad	0x55	// U+00ED
+		0xc3ae	0x56	// U+00EE
+		0xc3af	0x57	// U+00EF
+		0xc3b0	0x79	// U+00F0
+		0xc3b1	0x49	// U+00F1
+		0xc3b2	0xcd	// U+00F2
+		0xc3b3	0xce	// U+00F3
+		0xc3b4	0xcb	// U+00F4
+		0xc3b5	0xcf	// U+00F5
+		0xc3b6	0xa1	// U+00F6
+		0xc3b7	0xe1	// U+00F7
+		0xc3b8	0x70	// U+00F8
+		0xc3b9	0xdd	// U+00F9
+		0xc3ba	0xde	// U+00FA
+		0xc3bb	0xdb	// U+00FB
+		0xc3bc	0xdc	// U+00FC
+		0xc3bd	0x8d	// U+00FD
+		0xc3be	0xc0	// U+00FE
+		0xc3bf	0xdf	// U+00FF
+
+		default	0x6f
+	};
+
+	condition {
+		inputsize <= 2;
+		between 0xe0...0xfd;
+	} operation {
+		error	EINVAL;
+	};
+
+	condition {
+		inputsize >= 3;
+		between 0xe08080...0xecbfbf, 0xed8080...0xed9fbf, 0xee8080...0xefbfbf;
+	} operation {
+		if (input == 0xefbfbe || input == 0xefbfbf) {
+			error EILSEQ;
+		} else if (input == 0xe282ac) { // euro sign?
+			output = 0x9f;
+		} else {
+			output = 0x6f;
+		};
+		discard 3;
+	};
+
+	condition {
+		inputsize <= 3;
+		between 0xf0...0xfd;
+	} operation {
+		error	EINVAL;
+	};
+
+        condition {
+                inputsize >= 4;
+                between 0xf0808080...0xf7bfbfbf;
+        } operation {
+                output = 0x6f;
+                discard 4;
+        };
+
+        condition {
+                inputsize <= 4;
+                between 0xf8...0xfd;
+        } operation {
+                error   EINVAL;
+        };
+
+        condition {
+                inputsize >= 5;
+                between 0xf880808080...0xfbbfbfbfbf;
+        } operation {
+                output = 0x6f;
+                discard 5;
+        };
+
+        condition {
+                inputsize <= 5;
+                between 0xfc...0xfd;
+        } operation {
+                error   EINVAL;
+        };
+
+        condition {
+                inputsize >= 6;
+                between 0xfc8080808080...0xfdbfbfbfbfbf;
+        } operation {
+                output = 0x6f;
+                discard 6;
+        };
+
+    };
+}

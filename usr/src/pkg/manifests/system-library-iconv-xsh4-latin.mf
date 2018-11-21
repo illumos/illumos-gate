@@ -1,0 +1,195 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/library/iconv/xsh4/latin@$(PKGVERS)
+set name=pkg.description value="XSH4 conversion for ISO Latin character sets"
+set name=pkg.summary value="XSH4 conversion for ISO Latin character sets"
+set name=info.classification \
+    value="org.opensolaris.category.2008:System/Text Tools"
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/iconv
+dir path=usr/lib/iconv/$(ARCH64)
+file path=usr/lib/iconv/$(ARCH64)/646%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/646da%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/646de%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/646en%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/646es%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/646fr%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/646it%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/646sv%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%646.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%646da.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%646de.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%646en.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%646es.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%646fr.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%646it.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%646sv.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%IBM-037.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%IBM-500.so
+file path=usr/lib/iconv/$(ARCH64)/8859-1%IBM-850.so
+file path=usr/lib/iconv/$(ARCH64)/8859-16%8859-2.so
+file path=usr/lib/iconv/$(ARCH64)/8859-16%IBM-850.so
+file path=usr/lib/iconv/$(ARCH64)/8859-16%IBM-870.so
+file path=usr/lib/iconv/$(ARCH64)/8859-2%8859-16.so
+file path=usr/lib/iconv/$(ARCH64)/8859-2%CP1250.so
+file path=usr/lib/iconv/$(ARCH64)/8859-2%CP852.so
+file path=usr/lib/iconv/$(ARCH64)/8859-2%dhn.so
+file path=usr/lib/iconv/$(ARCH64)/8859-2%maz.so
+file path=usr/lib/iconv/$(ARCH64)/8859-5%CP1251.so
+file path=usr/lib/iconv/$(ARCH64)/8859-5%KOI8-R.so
+file path=usr/lib/iconv/$(ARCH64)/8859-5%alt.so
+file path=usr/lib/iconv/$(ARCH64)/8859-5%mac.so
+file path=usr/lib/iconv/$(ARCH64)/CP1250%8859-2.so
+file path=usr/lib/iconv/$(ARCH64)/CP1250%CP852.so
+file path=usr/lib/iconv/$(ARCH64)/CP1250%dhn.so
+file path=usr/lib/iconv/$(ARCH64)/CP1250%maz.so
+file path=usr/lib/iconv/$(ARCH64)/CP1251%8859-5.so
+file path=usr/lib/iconv/$(ARCH64)/CP1251%KOI8-R.so
+file path=usr/lib/iconv/$(ARCH64)/CP1251%alt.so
+file path=usr/lib/iconv/$(ARCH64)/CP1251%mac.so
+file path=usr/lib/iconv/$(ARCH64)/CP852%8859-2.so
+file path=usr/lib/iconv/$(ARCH64)/CP852%CP1250.so
+file path=usr/lib/iconv/$(ARCH64)/CP852%dhn.so
+file path=usr/lib/iconv/$(ARCH64)/CP852%maz.so
+file path=usr/lib/iconv/$(ARCH64)/IBM-037%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/IBM-500%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/IBM-850%8859-1.so
+file path=usr/lib/iconv/$(ARCH64)/IBM-850%8859-16.so
+file path=usr/lib/iconv/$(ARCH64)/IBM-870%8859-16.so
+file path=usr/lib/iconv/$(ARCH64)/KOI8-R%8859-5.so
+file path=usr/lib/iconv/$(ARCH64)/KOI8-R%CP1251.so
+file path=usr/lib/iconv/$(ARCH64)/KOI8-R%alt.so
+file path=usr/lib/iconv/$(ARCH64)/KOI8-R%mac.so
+file path=usr/lib/iconv/$(ARCH64)/alt%8859-5.so
+file path=usr/lib/iconv/$(ARCH64)/alt%CP1251.so
+file path=usr/lib/iconv/$(ARCH64)/alt%KOI8-R.so
+file path=usr/lib/iconv/$(ARCH64)/alt%mac.so
+file path=usr/lib/iconv/$(ARCH64)/dhn%8859-2.so
+file path=usr/lib/iconv/$(ARCH64)/dhn%CP1250.so
+file path=usr/lib/iconv/$(ARCH64)/dhn%CP852.so
+file path=usr/lib/iconv/$(ARCH64)/dhn%maz.so
+file path=usr/lib/iconv/$(ARCH64)/mac%8859-5.so
+file path=usr/lib/iconv/$(ARCH64)/mac%CP1251.so
+file path=usr/lib/iconv/$(ARCH64)/mac%KOI8-R.so
+file path=usr/lib/iconv/$(ARCH64)/mac%alt.so
+file path=usr/lib/iconv/$(ARCH64)/maz%8859-2.so
+file path=usr/lib/iconv/$(ARCH64)/maz%CP1250.so
+file path=usr/lib/iconv/$(ARCH64)/maz%CP852.so
+file path=usr/lib/iconv/$(ARCH64)/maz%dhn.so
+file path=usr/lib/iconv/646%8859-1.so
+file path=usr/lib/iconv/646da%8859-1.so
+file path=usr/lib/iconv/646de%8859-1.so
+file path=usr/lib/iconv/646en%8859-1.so
+file path=usr/lib/iconv/646es%8859-1.so
+file path=usr/lib/iconv/646fr%8859-1.so
+file path=usr/lib/iconv/646it%8859-1.so
+file path=usr/lib/iconv/646sv%8859-1.so
+file path=usr/lib/iconv/8859-1%646.so
+file path=usr/lib/iconv/8859-1%646da.so
+file path=usr/lib/iconv/8859-1%646de.so
+file path=usr/lib/iconv/8859-1%646en.so
+file path=usr/lib/iconv/8859-1%646es.so
+file path=usr/lib/iconv/8859-1%646fr.so
+file path=usr/lib/iconv/8859-1%646it.so
+file path=usr/lib/iconv/8859-1%646sv.so
+file path=usr/lib/iconv/8859-1%IBM-037.so
+file path=usr/lib/iconv/8859-1%IBM-500.so
+file path=usr/lib/iconv/8859-1%IBM-850.so
+file path=usr/lib/iconv/8859-16%8859-2.so
+file path=usr/lib/iconv/8859-16%IBM-850.so
+file path=usr/lib/iconv/8859-16%IBM-870.so
+file path=usr/lib/iconv/8859-2%8859-16.so
+file path=usr/lib/iconv/8859-2%CP1250.so
+file path=usr/lib/iconv/8859-2%CP852.so
+file path=usr/lib/iconv/8859-2%dhn.so
+file path=usr/lib/iconv/8859-2%maz.so
+file path=usr/lib/iconv/8859-5%CP1251.so
+file path=usr/lib/iconv/8859-5%KOI8-R.so
+file path=usr/lib/iconv/8859-5%alt.so
+file path=usr/lib/iconv/8859-5%mac.so
+file path=usr/lib/iconv/CP1250%8859-2.so
+file path=usr/lib/iconv/CP1250%CP852.so
+file path=usr/lib/iconv/CP1250%dhn.so
+file path=usr/lib/iconv/CP1250%maz.so
+file path=usr/lib/iconv/CP1251%8859-5.so
+file path=usr/lib/iconv/CP1251%KOI8-R.so
+file path=usr/lib/iconv/CP1251%alt.so
+file path=usr/lib/iconv/CP1251%mac.so
+file path=usr/lib/iconv/CP852%8859-2.so
+file path=usr/lib/iconv/CP852%CP1250.so
+file path=usr/lib/iconv/CP852%dhn.so
+file path=usr/lib/iconv/CP852%maz.so
+file path=usr/lib/iconv/IBM-037%8859-1.so
+file path=usr/lib/iconv/IBM-500%8859-1.so
+file path=usr/lib/iconv/IBM-850%8859-1.so
+file path=usr/lib/iconv/IBM-850%8859-16.so
+file path=usr/lib/iconv/IBM-870%8859-16.so
+file path=usr/lib/iconv/KOI8-R%8859-5.so
+file path=usr/lib/iconv/KOI8-R%CP1251.so
+file path=usr/lib/iconv/KOI8-R%alt.so
+file path=usr/lib/iconv/KOI8-R%mac.so
+file path=usr/lib/iconv/alt%8859-5.so
+file path=usr/lib/iconv/alt%CP1251.so
+file path=usr/lib/iconv/alt%KOI8-R.so
+file path=usr/lib/iconv/alt%mac.so
+file path=usr/lib/iconv/dhn%8859-2.so
+file path=usr/lib/iconv/dhn%CP1250.so
+file path=usr/lib/iconv/dhn%CP852.so
+file path=usr/lib/iconv/dhn%maz.so
+file path=usr/lib/iconv/mac%8859-5.so
+file path=usr/lib/iconv/mac%CP1251.so
+file path=usr/lib/iconv/mac%KOI8-R.so
+file path=usr/lib/iconv/mac%alt.so
+file path=usr/lib/iconv/maz%8859-2.so
+file path=usr/lib/iconv/maz%CP1250.so
+file path=usr/lib/iconv/maz%CP852.so
+file path=usr/lib/iconv/maz%dhn.so
+legacy pkg=SUNWisolc category=system \
+    desc="XSH4 conversion for ISO Latin character sets" \
+    name="XSH4 conversion for ISO Latin character sets" version=1.0,REV=
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+link path=usr/lib/iconv/$(ARCH64)/646%8859-15.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-2.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-4.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-5.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-6.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-7.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-8.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%8859-9.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%CP1251.so target=646%8859-1.so
+link path=usr/lib/iconv/$(ARCH64)/646%KOI8-R.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-15.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-2.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-4.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-5.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-6.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-7.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-8.so target=646%8859-1.so
+link path=usr/lib/iconv/646%8859-9.so target=646%8859-1.so
+link path=usr/lib/iconv/646%CP1251.so target=646%8859-1.so
+link path=usr/lib/iconv/646%KOI8-R.so target=646%8859-1.so
