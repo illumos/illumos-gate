@@ -112,8 +112,8 @@ static int evtchndrv_detach(dev_info_t *, ddi_detach_cmd_t);
 static struct evtsoftdata *port_user[NR_EVENT_CHANNELS];
 static kmutex_t port_user_lock;
 
-void
-evtchn_device_upcall()
+uint_t
+evtchn_device_upcall(caddr_t arg __unused, caddr_t arg1 __unused)
 {
 	struct evtsoftdata *ep;
 	int port;
@@ -154,6 +154,7 @@ evtchn_device_upcall()
 
 done:
 	mutex_exit(&port_user_lock);
+	return (DDI_INTR_CLAIMED);
 }
 
 /* ARGSUSED */
