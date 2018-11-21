@@ -136,7 +136,7 @@ static int	xenconsgetchar(cons_polledio_arg_t);
 static boolean_t	xenconsischar(cons_polledio_arg_t);
 
 static uint_t	xenconsintr(caddr_t);
-static uint_t	xenconsintr_priv(caddr_t);
+static uint_t	xenconsintr_priv(caddr_t, caddr_t);
 /*PRINTFLIKE2*/
 static void	xenconserror(int, const char *, ...) __KPRINTFLIKE(2);
 static void	xencons_soft_state_free(struct xencons *);
@@ -162,7 +162,7 @@ xenconssetup_avintr(struct xencons *xcp, int attach)
 
 	if (attach) {
 		/* Setup our interrupt binding. */
-		(void) add_avintr(NULL, IPL_CONS, (avfunc)xenconsintr_priv,
+		(void) add_avintr(NULL, IPL_CONS, xenconsintr_priv,
 		    "xencons", xcp->console_irq, (caddr_t)xcp, NULL, NULL,
 		    xcp->dip);
 	} else {
@@ -172,7 +172,7 @@ xenconssetup_avintr(struct xencons *xcp, int attach)
 		 * service routine is not currently executing and that it won't
 		 * be invoked again.
 		 */
-		(void) rem_avintr(NULL, IPL_CONS, (avfunc)xenconsintr_priv,
+		(void) rem_avintr(NULL, IPL_CONS, xenconsintr_priv,
 		    xcp->console_irq);
 	}
 
@@ -748,7 +748,7 @@ xenconsintr(caddr_t arg)
  * Console interrupt routine for priviliged domains
  */
 static uint_t
-xenconsintr_priv(caddr_t arg)
+xenconsintr_priv(caddr_t arg, caddr_t arg1 __unused)
 {
 	struct xencons *xcp = (struct xencons *)arg;
 
