@@ -2399,6 +2399,7 @@ zone_misc_kstat_update(kstat_t *ksp, int rw)
 	zmp->zm_nested_intp.value.ui32 = zone->zone_nested_intp;
 
 	zmp->zm_init_pid.value.ui32 = zone->zone_proc_initpid;
+	zmp->zm_init_restarts.value.ui32 = zone->zone_proc_init_restarts;
 	zmp->zm_boot_time.value.ui64 = (uint64_t)zone->zone_boot_time;
 
 	return (0);
@@ -2444,6 +2445,8 @@ zone_misc_kstat_create(zone_t *zone)
 	kstat_named_init(&zmp->zm_nested_intp, "nested_interp",
 	    KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_init_pid, "init_pid", KSTAT_DATA_UINT32);
+	kstat_named_init(&zmp->zm_init_restarts, "init_restarts",
+	    KSTAT_DATA_UINT32);
 	kstat_named_init(&zmp->zm_boot_time, "boot_time", KSTAT_DATA_UINT64);
 
 	ksp->ks_update = zone_misc_kstat_update;
@@ -3004,6 +3007,8 @@ zone_status_set(zone_t *zone, zone_status_t status)
 #ifdef DEBUG
 		(void) printf(
 		    "Failed to allocate and send zone state change event.\n");
+#else
+		/* EMPTY */
 #endif
 	}
 	nvlist_free(nvl);
@@ -3021,6 +3026,38 @@ zone_status_t
 zone_status_get(zone_t *zone)
 {
 	return (zone->zone_status);
+}
+
+/*
+ * Publish a zones-related sysevent for purposes other than zone state changes.
+ * While it is unfortunate that zone_event_chan is associated with
+ * "com.sun:zones:status" (rather than "com.sun:zones") state changes should be
+ * the only ones with class "status" and subclass "change".
+ */
+void
+zone_sysevent_publish(zone_t *zone, const char *class, const char *subclass,
+    nvlist_t *ev_nvl)
+{
+	nvlist_t *nvl = NULL;
+	timestruc_t now;
+	uint64_t t;
+
+	gethrestime(&now);
+	t = (now.tv_sec * NANOSEC) + now.tv_nsec;
+
+	if (nvlist_dup(ev_nvl, &nvl, KM_SLEEP) != 0 ||
+	    nvlist_add_string(nvl, ZONE_CB_NAME, zone->zone_name) != 0 ||
+	    nvlist_add_uint64(nvl, ZONE_CB_ZONEID, zone->zone_id) != 0 ||
+	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, t) != 0 ||
+	    sysevent_evc_publish(zone_event_chan, class, subclass, "sun.com",
+	    "kernel", nvl, EVCH_SLEEP) != 0) {
+#ifdef DEBUG
+		(void) printf("Failed to allocate and send zone misc event.\n");
+#else
+		/* EMPTY */
+#endif
+	}
+	nvlist_free(nvl);
 }
 
 static int

@@ -138,6 +138,27 @@ rexit(int rval)
 }
 
 /*
+ * Bump the init_restarts kstat and let interested parties know about the
+ * restart.
+ */
+static void
+restart_init_notify(zone_t *zone)
+{
+	nvlist_t *nvl = NULL;
+
+	zone->zone_proc_init_restarts++;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0 &&
+	    nvlist_add_uint32(nvl, ZONE_CB_RESTARTS,
+	    zone->zone_proc_init_restarts) == 0) {
+		zone_sysevent_publish(zone, ZONE_EVENT_INIT_CLASS,
+		    ZONE_EVENT_INIT_RESTART_SC, nvl);
+	}
+
+	nvlist_free(nvl);
+}
+
+/*
  * Called by proc_exit() when a zone's init exits, presumably because
  * it failed.  As long as the given zone is still in the "running"
  * state, we will re-exec() init, but first we need to reset things
@@ -259,6 +280,8 @@ restart_init(int what, int why)
 	/* Free the controlling tty.  (freectty() always assumes curproc.) */
 	ASSERT(p == curproc);
 	(void) freectty(B_TRUE);
+
+	restart_init_notify(p->p_zone);
 
 	/*
 	 * Now exec() the new init(1M) on top of the current process.  If we

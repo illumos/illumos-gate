@@ -43,6 +43,7 @@
 #include <sys/secflags.h>
 #include <netinet/in.h>
 #include <sys/cpu_uarray.h>
+#include <sys/nvpair.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -143,8 +144,12 @@ extern "C" {
 #define	ZONE_CB_NAME		"zonename"
 #define	ZONE_CB_NEWSTATE	"newstate"
 #define	ZONE_CB_OLDSTATE	"oldstate"
+#define	ZONE_CB_RESTARTS	"restarts"
 #define	ZONE_CB_TIMESTAMP	"when"
 #define	ZONE_CB_ZONEID		"zoneid"
+
+#define	ZONE_EVENT_INIT_CLASS		"init"
+#define	ZONE_EVENT_INIT_RESTART_SC	"restart"
 
 /*
  * Exit values that may be returned by scripts or programs invoked by various
@@ -486,6 +491,7 @@ typedef struct {
 	kstat_named_t	zm_mfseglim;
 	kstat_named_t	zm_nested_intp;
 	kstat_named_t	zm_init_pid;
+	kstat_named_t	zm_init_restarts;
 	kstat_named_t	zm_boot_time;
 } zone_misc_kstat_t;
 
@@ -581,6 +587,7 @@ typedef struct zone {
 	kcondvar_t	zone_cv;	/* used to signal state changes */
 	struct proc	*zone_zsched;	/* Dummy kernel "zsched" process */
 	pid_t		zone_proc_initpid; /* pid of "init" for this zone */
+	uint_t		zone_proc_init_restarts; /* times init restarted */
 	char		*zone_initname;		/* fs path to 'init' */
 	int		zone_init_status;	/* init's exit status */
 	int		zone_boot_err;  /* for zone_boot() if boot fails */
@@ -1013,6 +1020,10 @@ extern rctl_hndl_t rc_zone_locked_mem;
 extern rctl_hndl_t rc_zone_max_swap;
 extern rctl_hndl_t rc_zone_phys_mem;
 extern rctl_hndl_t rc_zone_max_lofi;
+
+/* For publishing sysevents related to a particular zone */
+extern void zone_sysevent_publish(zone_t *, const char *, const char *,
+    nvlist_t *);
 
 #endif	/* _KERNEL */
 
