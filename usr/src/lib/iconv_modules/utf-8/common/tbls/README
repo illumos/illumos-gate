@@ -1,0 +1,37 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+First created at:						3/4/1999
+Last updated at:						9/13/2004
+
+Files in this directory created by using utilities at ../utils/.
+
+9/13/2004:
+Unlike any other single byte code pages or codesets, the MSFT CP864
+has a mapping between ASCII range character 0x25 and U+066A. Due to
+that, the u*_to_cp864.tbl mapping tables should have mappings for
+that mapping manually after the automatic generation of the above.
+
+There will be inevitable mappings from U+0025 to 0x25 of CP864 by the way.

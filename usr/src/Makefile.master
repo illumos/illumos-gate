@@ -200,6 +200,7 @@ PYTHON3_PKGVERS=	-35
 PYTHON3_SUFFIX=		m
 PYTHON3=		/usr/bin/python$(PYTHON3_VERSION)
 SORT=		/usr/bin/sort
+TR=		/usr/bin/tr
 TOUCH=		/usr/bin/touch
 WC=		/usr/bin/wc
 XARGS=		/usr/bin/xargs

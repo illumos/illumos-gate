@@ -1,0 +1,606 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
+ *  ICU License - ICU 1.8.1 and later
+ *
+ *  COPYRIGHT AND PERMISSION NOTICE
+ *
+ * Copyright (c) 1995-2005 International Business Machines Corporation and others
+ * All rights reserved.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, and/or sell copies of the Software, and to permit persons
+ * to whom the Software is furnished to do so, provided that the above
+ * copyright notice(s) and this permission notice appear in all copies of
+ * the Software and that both the above copyright notice(s) and this
+ * permission notice appear in supporting documentation.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+ * OF THIRD PARTY RIGHTS. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+ * HOLDERS INCLUDED IN THIS NOTICE BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL
+ * INDIRECT OR CONSEQUENTIAL DAMAGES, OR ANY DAMAGES WHATSOEVER RESULTING
+ * FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+ * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * Except as contained in this notice, the name of a copyright holder
+ * shall not be used in advertising or otherwise to promote the sale, use
+ * or other dealings in this Software without prior written authorization
+ * of the copyright holder.
+ *
+ * --------------------------------------------------------------------------
+ * All trademarks and registered trademarks mentioned herein are the property
+ * of their respective owners.
+ */
+
+system%utf8 {
+   direction {
+	@condition {
+		@between 0X0...0X3;
+	} @map {
+		0x00	0x00	// U+0000
+		0x01	0x01	// U+0001
+		0x02	0x02	// U+0002
+		0x03	0x03	// U+0003
+	};
+	@condition {
+		@between 0X4...0X4;
+	} @map {
+		0x04	0xC29C	// U+009C
+	};
+	@condition {
+		@between 0X5...0X5;
+	} @map {
+		0x05	0x09	// U+0009
+	};
+	@condition {
+		@between 0X6...0X6;
+	} @map {
+		0x06	0xC286	// U+0086
+	};
+	@condition {
+		@between 0X7...0X7;
+	} @map {
+		0x07	0x7F	// U+007F
+	};
+	@condition {
+		@between 0X8...0XA;
+	} @map {
+		0x08	0xC297	// U+0097
+		0x09	0xC28D	// U+008D
+		0x0A	0xC28E	// U+008E
+	};
+	@condition {
+		@between 0XB...0X13;
+	} @map {
+		0x0B	0x0B	// U+000B
+		0x0C	0x0C	// U+000C
+		0x0D	0x0D	// U+000D
+		0x0E	0x0E	// U+000E
+		0x0F	0x0F	// U+000F
+		0x10	0x10	// U+0010
+		0x11	0x11	// U+0011
+		0x12	0x12	// U+0012
+		0x13	0x13	// U+0013
+	};
+	@condition {
+		@between 0X14...0X15;
+	} @map {
+		0x14	0xC29D	// U+009D
+		0x15	0xC285	// U+0085
+	};
+	@condition {
+		@between 0X16...0X16;
+	} @map {
+		0x16	0x08	// U+0008
+	};
+	@condition {
+		@between 0X17...0X17;
+	} @map {
+		0x17	0xC287	// U+0087
+	};
+	@condition {
+		@between 0X18...0X19;
+	} @map {
+		0x18	0x18	// U+0018
+		0x19	0x19	// U+0019
+	};
+	@condition {
+		@between 0X1A...0X1B;
+	} @map {
+		0x1A	0xC292	// U+0092
+		0x1B	0xC28F	// U+008F
+	};
+	@condition {
+		@between 0X1C...0X1F;
+	} @map {
+		0x1C	0x1C	// U+001C
+		0x1D	0x1D	// U+001D
+		0x1E	0x1E	// U+001E
+		0x1F	0x1F	// U+001F
+	};
+	@condition {
+		@between 0X20...0X24;
+	} @map {
+		0x20	0xC280	// U+0080
+		0x21	0xC281	// U+0081
+		0x22	0xC282	// U+0082
+		0x23	0xC283	// U+0083
+		0x24	0xC284	// U+0084
+	};
+	@condition {
+		@between 0X25...0X27;
+	} @map {
+		0x25	0x0A	// U+000A
+		0x26	0x17	// U+0017
+		0x27	0x1B	// U+001B
+	};
+	@condition {
+		@between 0X28...0X2C;
+	} @map {
+		0x28	0xC288	// U+0088
+		0x29	0xC289	// U+0089
+		0x2A	0xC28A	// U+008A
+		0x2B	0xC28B	// U+008B
+		0x2C	0xC28C	// U+008C
+	};
+	@condition {
+		@between 0X2D...0X2F;
+	} @map {
+		0x2D	0x05	// U+0005
+		0x2E	0x06	// U+0006
+		0x2F	0x07	// U+0007
+	};
+	@condition {
+		@between 0X30...0X31;
+	} @map {
+		0x30	0xC290	// U+0090
+		0x31	0xC291	// U+0091
+	};
+	@condition {
+		@between 0X32...0X32;
+	} @map {
+		0x32	0x16	// U+0016
+	};
+	@condition {
+		@between 0X33...0X36;
+	} @map {
+		0x33	0xC293	// U+0093
+		0x34	0xC294	// U+0094
+		0x35	0xC295	// U+0095
+		0x36	0xC296	// U+0096
+	};
+	@condition {
+		@between 0X37...0X37;
+	} @map {
+		0x37	0x04	// U+0004
+	};
+	@condition {
+		@between 0X38...0X3B;
+	} @map {
+		0x38	0xC298	// U+0098
+		0x39	0xC299	// U+0099
+		0x3A	0xC29A	// U+009A
+		0x3B	0xC29B	// U+009B
+	};
+	@condition {
+		@between 0X3C...0X3D;
+	} @map {
+		0x3C	0x14	// U+0014
+		0x3D	0x15	// U+0015
+	};
+	@condition {
+		@between 0X3E...0X3E;
+	} @map {
+		0x3E	0xC29E	// U+009E
+	};
+	@condition {
+		@between 0X3F...0X40;
+	} @map {
+		0x3F	0x1A	// U+001A
+		0x40	0x20	// U+0020
+	};
+	@condition {
+		@between 0X41...0X42;
+	} @map {
+		0x41	0xC2A0	// U+00A0
+		0x42	0xC3A2	// U+00E2
+	};
+	@condition {
+		@between 0X43...0X43;
+	} @map {
+		0x43	0x7B	// U+007B
+	};
+	@condition {
+		@between 0X44...0X46;
+	} @map {
+		0x44	0xC3A0	// U+00E0
+		0x45	0xC3A1	// U+00E1
+		0x46	0xC3A3	// U+00E3
+	};
+	@condition {
+		@between 0X47...0X47;
+	} @map {
+		0x47	0x7D	// U+007D
+	};
+	@condition {
+		@between 0X48...0X4A;
+	} @map {
+		0x48	0xC3A7	// U+00E7
+		0x49	0xC3B1	// U+00F1
+		0x4A	0xC2A7	// U+00A7
+	};
+	@condition {
+		@between 0X4B...0X51;
+	} @map {
+		0x4B	0x2E	// U+002E
+		0x4C	0x3C	// U+003C
+		0x4D	0x28	// U+0028
+		0x4E	0x2B	// U+002B
+		0x4F	0x21	// U+0021
+		0x50	0x26	// U+0026
+		0x51	0x60	// U+0060
+	};
+	@condition {
+		@between 0X52...0X5B;
+	} @map {
+		0x52	0xC3AA	// U+00EA
+		0x53	0xC3AB	// U+00EB
+		0x54	0xC3A8	// U+00E8
+		0x55	0xC3AD	// U+00ED
+		0x56	0xC3AE	// U+00EE
+		0x57	0xC3AF	// U+00EF
+		0x58	0xC3AC	// U+00EC
+		0x59	0xC39F	// U+00DF
+		0x5A	0xC2A4	// U+00A4
+		0x5B	0xC385	// U+00C5
+	};
+	@condition {
+		@between 0X5C...0X61;
+	} @map {
+		0x5C	0x2A	// U+002A
+		0x5D	0x29	// U+0029
+		0x5E	0x3B	// U+003B
+		0x5F	0x5E	// U+005E
+		0x60	0x2D	// U+002D
+		0x61	0x2F	// U+002F
+	};
+	@condition {
+		@between 0X62...0X62;
+	} @map {
+		0x62	0xC382	// U+00C2
+	};
+	@condition {
+		@between 0X63...0X63;
+	} @map {
+		0x63	0x23	// U+0023
+	};
+	@condition {
+		@between 0X64...0X66;
+	} @map {
+		0x64	0xC380	// U+00C0
+		0x65	0xC381	// U+00C1
+		0x66	0xC383	// U+00C3
+	};
+	@condition {
+		@between 0X67...0X67;
+	} @map {
+		0x67	0x24	// U+0024
+	};
+	@condition {
+		@between 0X68...0X6A;
+	} @map {
+		0x68	0xC387	// U+00C7
+		0x69	0xC391	// U+00D1
+		0x6A	0xC3B6	// U+00F6
+	};
+	@condition {
+		@between 0X6B...0X6F;
+	} @map {
+		0x6B	0x2C	// U+002C
+		0x6C	0x25	// U+0025
+		0x6D	0x5F	// U+005F
+		0x6E	0x3E	// U+003E
+		0x6F	0x3F	// U+003F
+	};
+	@condition {
+		@between 0X70...0X70;
+	} @map {
+		0x70	0xC3B8	// U+00F8
+	};
+	@condition {
+		@between 0X71...0X71;
+	} @map {
+		0x71	0x5C	// U+005C
+	};
+	@condition {
+		@between 0X72...0X79;
+	} @map {
+		0x72	0xC38A	// U+00CA
+		0x73	0xC38B	// U+00CB
+		0x74	0xC388	// U+00C8
+		0x75	0xC38D	// U+00CD
+		0x76	0xC38E	// U+00CE
+		0x77	0xC38F	// U+00CF
+		0x78	0xC38C	// U+00CC
+		0x79	0xC3A9	// U+00E9
+	};
+	@condition {
+		@between 0X7A...0X7A;
+	} @map {
+		0x7A	0x3A	// U+003A
+	};
+	@condition {
+		@between 0X7B...0X7C;
+	} @map {
+		0x7B	0xC384	// U+00C4
+		0x7C	0xC396	// U+00D6
+	};
+	@condition {
+		@between 0X7D...0X7F;
+	} @map {
+		0x7D	0x27	// U+0027
+		0x7E	0x3D	// U+003D
+		0x7F	0x22	// U+0022
+	};
+	@condition {
+		@between 0X80...0X80;
+	} @map {
+		0x80	0xC398	// U+00D8
+	};
+	@condition {
+		@between 0X81...0X89;
+	} @map {
+		0x81	0x61	// U+0061
+		0x82	0x62	// U+0062
+		0x83	0x63	// U+0063
+		0x84	0x64	// U+0064
+		0x85	0x65	// U+0065
+		0x86	0x66	// U+0066
+		0x87	0x67	// U+0067
+		0x88	0x68	// U+0068
+		0x89	0x69	// U+0069
+	};
+	@condition {
+		@between 0X8A...0X90;
+	} @map {
+		0x8A	0xC2AB	// U+00AB
+		0x8B	0xC2BB	// U+00BB
+		0x8C	0xC5A1	// U+0161
+		0x8D	0xC3BD	// U+00FD
+		0x8E	0xC5BE	// U+017E
+		0x8F	0xC2B1	// U+00B1
+		0x90	0xC2B0	// U+00B0
+	};
+	@condition {
+		@between 0X91...0X99;
+	} @map {
+		0x91	0x6A	// U+006A
+		0x92	0x6B	// U+006B
+		0x93	0x6C	// U+006C
+		0x94	0x6D	// U+006D
+		0x95	0x6E	// U+006E
+		0x96	0x6F	// U+006F
+		0x97	0x70	// U+0070
+		0x98	0x71	// U+0071
+		0x99	0x72	// U+0072
+	};
+	@condition {
+		@between 0X9A...0X9E;
+	} @map {
+		0x9A	0xC2AA	// U+00AA
+		0x9B	0xC2BA	// U+00BA
+		0x9C	0xC3A6	// U+00E6
+		0x9D	0xC2B8	// U+00B8
+		0x9E	0xC386	// U+00C6
+	};
+	@condition {
+		@between 0X9F...0X9F;
+	} @map {
+		0x9F	0x5D	// U+005D
+	};
+	@condition {
+		@between 0XA0...0XA1;
+	} @map {
+		0xA0	0xC2B5	// U+00B5
+		0xA1	0xC3BC	// U+00FC
+	};
+	@condition {
+		@between 0XA2...0XA9;
+	} @map {
+		0xA2	0x73	// U+0073
+		0xA3	0x74	// U+0074
+		0xA4	0x75	// U+0075
+		0xA5	0x76	// U+0076
+		0xA6	0x77	// U+0077
+		0xA7	0x78	// U+0078
+		0xA8	0x79	// U+0079
+		0xA9	0x7A	// U+007A
+	};
+	@condition {
+		@between 0XAA...0XB4;
+	} @map {
+		0xAA	0xC2A1	// U+00A1
+		0xAB	0xC2BF	// U+00BF
+		0xAC	0xC5A0	// U+0160
+		0xAD	0xC39D	// U+00DD
+		0xAE	0xC5BD	// U+017D
+		0xAF	0xC2AE	// U+00AE
+		0xB0	0xC2A2	// U+00A2
+		0xB1	0xC2A3	// U+00A3
+		0xB2	0xC2A5	// U+00A5
+		0xB3	0xC2B7	// U+00B7
+		0xB4	0xC2A9	// U+00A9
+	};
+	@condition {
+		@between 0XB5...0XB5;
+	} @map {
+		0xB5	0x5B	// U+005B
+	};
+	@condition {
+		@between 0XB6...0XBA;
+	} @map {
+		0xB6	0xC2B6	// U+00B6
+		0xB7	0xC2BC	// U+00BC
+		0xB8	0xC2BD	// U+00BD
+		0xB9	0xC2BE	// U+00BE
+		0xBA	0xC2AC	// U+00AC
+	};
+	@condition {
+		@between 0XBB...0XBB;
+	} @map {
+		0xBB	0x7C	// U+007C
+	};
+	@condition {
+		@between 0XBC...0XBC;
+	} @map {
+		0xBC	0xE280BE	// U+203E
+	};
+	@condition {
+		@between 0XBD...0XC0;
+	} @map {
+		0xBD	0xC2A8	// U+00A8
+		0xBE	0xC2B4	// U+00B4
+		0xBF	0xC397	// U+00D7
+		0xC0	0xC3A4	// U+00E4
+	};
+	@condition {
+		@between 0XC1...0XC9;
+	} @map {
+		0xC1	0x41	// U+0041
+		0xC2	0x42	// U+0042
+		0xC3	0x43	// U+0043
+		0xC4	0x44	// U+0044
+		0xC5	0x45	// U+0045
+		0xC6	0x46	// U+0046
+		0xC7	0x47	// U+0047
+		0xC8	0x48	// U+0048
+		0xC9	0x49	// U+0049
+	};
+	@condition {
+		@between 0XCA...0XD0;
+	} @map {
+		0xCA	0xC2AD	// U+00AD
+		0xCB	0xC3B4	// U+00F4
+		0xCC	0xC2A6	// U+00A6
+		0xCD	0xC3B2	// U+00F2
+		0xCE	0xC3B3	// U+00F3
+		0xCF	0xC3B5	// U+00F5
+		0xD0	0xC3A5	// U+00E5
+	};
+	@condition {
+		@between 0XD1...0XD9;
+	} @map {
+		0xD1	0x4A	// U+004A
+		0xD2	0x4B	// U+004B
+		0xD3	0x4C	// U+004C
+		0xD4	0x4D	// U+004D
+		0xD5	0x4E	// U+004E
+		0xD6	0x4F	// U+004F
+		0xD7	0x50	// U+0050
+		0xD8	0x51	// U+0051
+		0xD9	0x52	// U+0052
+	};
+	@condition {
+		@between 0XDA...0XDB;
+	} @map {
+		0xDA	0xC2B9	// U+00B9
+		0xDB	0xC3BB	// U+00FB
+	};
+	@condition {
+		@between 0XDC...0XDC;
+	} @map {
+		0xDC	0x7E	// U+007E
+	};
+	@condition {
+		@between 0XDD...0XE1;
+	} @map {
+		0xDD	0xC3B9	// U+00F9
+		0xDE	0xC3BA	// U+00FA
+		0xDF	0xC3BF	// U+00FF
+		0xE0	0xC389	// U+00C9
+		0xE1	0xC3B7	// U+00F7
+	};
+	@condition {
+		@between 0XE2...0XE9;
+	} @map {
+		0xE2	0x53	// U+0053
+		0xE3	0x54	// U+0054
+		0xE4	0x55	// U+0055
+		0xE5	0x56	// U+0056
+		0xE6	0x57	// U+0057
+		0xE7	0x58	// U+0058
+		0xE8	0x59	// U+0059
+		0xE9	0x5A	// U+005A
+	};
+	@condition {
+		@between 0XEA...0XEB;
+	} @map {
+		0xEA	0xC2B2	// U+00B2
+		0xEB	0xC394	// U+00D4
+	};
+	@condition {
+		@between 0XEC...0XEC;
+	} @map {
+		0xEC	0x40	// U+0040
+	};
+	@condition {
+		@between 0XED...0XEF;
+	} @map {
+		0xED	0xC392	// U+00D2
+		0xEE	0xC393	// U+00D3
+		0xEF	0xC395	// U+00D5
+	};
+	@condition {
+		@between 0XF0...0XF9;
+	} @map {
+		0xF0	0x30	// U+0030
+		0xF1	0x31	// U+0031
+		0xF2	0x32	// U+0032
+		0xF3	0x33	// U+0033
+		0xF4	0x34	// U+0034
+		0xF5	0x35	// U+0035
+		0xF6	0x36	// U+0036
+		0xF7	0x37	// U+0037
+		0xF8	0x38	// U+0038
+		0xF9	0x39	// U+0039
+	};
+	@condition {
+		@between 0XFA...0XFF;
+	} @map {
+		0xFA	0xC2B3	// U+00B3
+		0xFB	0xC39B	// U+00DB
+		0xFC	0xC39C	// U+00DC
+		0xFD	0xC399	// U+00D9
+		0xFE	0xC39A	// U+00DA
+		0xFF	0xC29F	// U+009F
+	}; // for last @map syntax
+    }; // for direction
+} // for conversion name

@@ -1,0 +1,398 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+SRCDIR=			.
+
+# Real modules without .so suffix
+MODULES_all=
+MODULES_base_source= \
+		UTF-8_TO_ISO-2022-JP	ISO-2022-JP_TO_UTF-8 \
+		UTF-8_TO_ISO-2022-JP.RFC1468 \
+		UTF-8-Java_TO_eucJP	eucJP_TO_UTF-8-Java \
+		UTF-8-Java_TO_PCK	PCK_TO_UTF-8-Java \
+		UTF-8_TO_UTF-8-ms932	UTF-8-ms932_TO_UTF-8 \
+		eucJP_TO_PCK		PCK_TO_eucJP \
+		eucJP_TO_ISO-2022-JP	ISO-2022-JP_TO_eucJP \
+		eucJP_TO_ISO-2022-JP.RFC1468 \
+		eucJP_TO_jis		jis_TO_eucJP \
+		PCK_TO_ISO-2022-JP	ISO-2022-JP_TO_PCK \
+		PCK_TO_ISO-2022-JP.RFC1468 \
+		PCK_TO_jis		jis_TO_PCK \
+		$(MODULES_uni)
+
+MODULES_uni= \
+	$(MODULES_uni_locale) \
+	$(MODULES_uni_ms) \
+	$(MODULES_uni_x0213)
+
+MODULES_uni_locale= \
+		eucJP_TO_UTF-8 \
+		eucJP_TO_UTF-16 \
+		eucJP_TO_UTF-16BE \
+		eucJP_TO_UTF-16LE \
+		eucJP_TO_UCS-2 \
+		eucJP_TO_UCS-2BE \
+		eucJP_TO_UCS-2LE \
+		eucJP_TO_UTF-32 \
+		eucJP_TO_UTF-32BE \
+		eucJP_TO_UTF-32LE \
+		UTF-8_TO_eucJP \
+		UTF-16_TO_eucJP \
+		UTF-16BE_TO_eucJP \
+		UTF-16LE_TO_eucJP \
+		UCS-2_TO_eucJP \
+		UCS-2BE_TO_eucJP \
+		UCS-2LE_TO_eucJP \
+		UTF-32_TO_eucJP \
+		UTF-32BE_TO_eucJP \
+		UTF-32LE_TO_eucJP \
+		PCK_TO_UTF-8 \
+		PCK_TO_UTF-16 \
+		PCK_TO_UTF-16BE \
+		PCK_TO_UTF-16LE \
+		PCK_TO_UCS-2 \
+		PCK_TO_UCS-2BE \
+		PCK_TO_UCS-2LE \
+		PCK_TO_UTF-32 \
+		PCK_TO_UTF-32BE \
+		PCK_TO_UTF-32LE \
+		UTF-8_TO_PCK \
+		UTF-16_TO_PCK \
+		UTF-16BE_TO_PCK \
+		UTF-16LE_TO_PCK \
+		UCS-2_TO_PCK \
+		UCS-2BE_TO_PCK \
+		UCS-2LE_TO_PCK \
+		UTF-32_TO_PCK \
+		UTF-32BE_TO_PCK \
+		UTF-32LE_TO_PCK
+
+MODULES_uni_ms= \
+		eucJP-ms_TO_UTF-8 \
+		eucJP-ms_TO_UTF-16 \
+		eucJP-ms_TO_UTF-16BE \
+		eucJP-ms_TO_UTF-16LE \
+		eucJP-ms_TO_UCS-2 \
+		eucJP-ms_TO_UCS-2BE \
+		eucJP-ms_TO_UCS-2LE \
+		eucJP-ms_TO_UTF-32 \
+		eucJP-ms_TO_UTF-32BE \
+		eucJP-ms_TO_UTF-32LE \
+		UTF-8_TO_eucJP-ms \
+		UTF-16_TO_eucJP-ms \
+		UTF-16BE_TO_eucJP-ms \
+		UTF-16LE_TO_eucJP-ms \
+		UCS-2_TO_eucJP-ms \
+		UCS-2BE_TO_eucJP-ms \
+		UCS-2LE_TO_eucJP-ms \
+		UTF-32_TO_eucJP-ms \
+		UTF-32BE_TO_eucJP-ms \
+		UTF-32LE_TO_eucJP-ms \
+		ms932_TO_UTF-8 \
+		ms932_TO_UTF-16 \
+		ms932_TO_UTF-16BE \
+		ms932_TO_UTF-16LE \
+		ms932_TO_UCS-2 \
+		ms932_TO_UCS-2BE \
+		ms932_TO_UCS-2LE \
+		ms932_TO_UTF-32 \
+		ms932_TO_UTF-32BE \
+		ms932_TO_UTF-32LE \
+		UTF-8_TO_ms932 \
+		UTF-16_TO_ms932 \
+		UTF-16BE_TO_ms932 \
+		UTF-16LE_TO_ms932 \
+		UCS-2_TO_ms932 \
+		UCS-2BE_TO_ms932 \
+		UCS-2LE_TO_ms932 \
+		UTF-32_TO_ms932 \
+		UTF-32BE_TO_ms932 \
+		UTF-32LE_TO_ms932
+
+MODULES_uni_x0213= \
+		EUC-JIS-2004_TO_UTF-8 \
+		EUC-JIS-2004_TO_UTF-16 \
+		EUC-JIS-2004_TO_UTF-16BE \
+		EUC-JIS-2004_TO_UTF-16LE \
+		EUC-JIS-2004_TO_UCS-2 \
+		EUC-JIS-2004_TO_UCS-2BE \
+		EUC-JIS-2004_TO_UCS-2LE \
+		EUC-JIS-2004_TO_UTF-32 \
+		EUC-JIS-2004_TO_UTF-32BE \
+		EUC-JIS-2004_TO_UTF-32LE \
+		UTF-8_TO_EUC-JIS-2004 \
+		UTF-16_TO_EUC-JIS-2004 \
+		UTF-16BE_TO_EUC-JIS-2004 \
+		UTF-16LE_TO_EUC-JIS-2004 \
+		UCS-2_TO_EUC-JIS-2004 \
+		UCS-2BE_TO_EUC-JIS-2004 \
+		UCS-2LE_TO_EUC-JIS-2004 \
+		UTF-32_TO_EUC-JIS-2004 \
+		UTF-32BE_TO_EUC-JIS-2004 \
+		UTF-32LE_TO_EUC-JIS-2004 \
+		Shift_JIS-2004_TO_UTF-8 \
+		Shift_JIS-2004_TO_UTF-16 \
+		Shift_JIS-2004_TO_UTF-16BE \
+		Shift_JIS-2004_TO_UTF-16LE \
+		Shift_JIS-2004_TO_UCS-2 \
+		Shift_JIS-2004_TO_UCS-2BE \
+		Shift_JIS-2004_TO_UCS-2LE \
+		Shift_JIS-2004_TO_UTF-32 \
+		Shift_JIS-2004_TO_UTF-32BE \
+		Shift_JIS-2004_TO_UTF-32LE \
+		UTF-8_TO_Shift_JIS-2004 \
+		UTF-16_TO_Shift_JIS-2004 \
+		UTF-16BE_TO_Shift_JIS-2004 \
+		UTF-16LE_TO_Shift_JIS-2004 \
+		UCS-2_TO_Shift_JIS-2004 \
+		UCS-2BE_TO_Shift_JIS-2004 \
+		UCS-2LE_TO_Shift_JIS-2004 \
+		UTF-32_TO_Shift_JIS-2004 \
+		UTF-32BE_TO_Shift_JIS-2004 \
+		UTF-32LE_TO_Shift_JIS-2004 \
+		ISO-2022-JP-2004_TO_UTF-8 \
+		ISO-2022-JP-2004_TO_UTF-16 \
+		ISO-2022-JP-2004_TO_UTF-16BE \
+		ISO-2022-JP-2004_TO_UTF-16LE \
+		ISO-2022-JP-2004_TO_UCS-2 \
+		ISO-2022-JP-2004_TO_UCS-2BE \
+		ISO-2022-JP-2004_TO_UCS-2LE \
+		ISO-2022-JP-2004_TO_UTF-32 \
+		ISO-2022-JP-2004_TO_UTF-32BE \
+		ISO-2022-JP-2004_TO_UTF-32LE \
+		UTF-8_TO_ISO-2022-JP-2004 \
+		UTF-16_TO_ISO-2022-JP-2004 \
+		UTF-16BE_TO_ISO-2022-JP-2004 \
+		UTF-16LE_TO_ISO-2022-JP-2004 \
+		UCS-2_TO_ISO-2022-JP-2004 \
+		UCS-2BE_TO_ISO-2022-JP-2004 \
+		UCS-2LE_TO_ISO-2022-JP-2004 \
+		UTF-32_TO_ISO-2022-JP-2004 \
+		UTF-32BE_TO_ISO-2022-JP-2004 \
+		UTF-32LE_TO_ISO-2022-JP-2004
+
+MODULES_jfp_source=
+
+MODULES32_base_source= $(MODULES_base_source)
+MODULES64_base_source= $(MODULES_base_source)
+MODULES32_jfp_source=  $(MODULES_jfp_source)
+MODULES64_jfp_source=  $(MODULES_jfp_source)
+MODULES=	$(MODULES_all) $(MODULES32_base_source) $(MODULES32_jfp_source)
+MODULES64=	$(MODULES64_base_source) $(MODULES64_jfp_source)
+
+# extra macro definitions (-D) and extra include file search paths (-I)
+
+ICONV_DEFS=
+
+eucJP_TO_UTF-8-Java.o  \
+UTF-8-Java_TO_eucJP.o  \
+PCK_TO_UTF-8-Java.o  \
+UTF-8-Java_TO_PCK.o  \
+	:= ICONV_DEFS +=	-DJAVA_CONV_COMPAT
+
+$(MODULES_uni_ms:%=%.o) \
+	:= ICONV_DEFS +=	-DJFP_ICONV_MS932
+
+UTF-8_TO_ISO-2022-JP.RFC1468.o  \
+eucJP_TO_ISO-2022-JP.RFC1468.o  \
+PCK_TO_ISO-2022-JP.RFC1468.o  \
+	:= ICONV_DEFS +=	-DRFC1468_MODE
+
+UTF-16_TO_eucJP.o  \
+UTF-16_TO_PCK.o  \
+UTF-16_TO_eucJP-ms.o  \
+UTF-16_TO_ms932.o  \
+UTF-16_TO_EUC-JIS-2004.o  \
+UTF-16_TO_Shift_JIS-2004.o  \
+UTF-16_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UTF16
+
+UTF-16BE_TO_eucJP.o  \
+UTF-16BE_TO_PCK.o  \
+UTF-16BE_TO_eucJP-ms.o  \
+UTF-16BE_TO_ms932.o  \
+UTF-16BE_TO_EUC-JIS-2004.o  \
+UTF-16BE_TO_Shift_JIS-2004.o  \
+UTF-16BE_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UTF16BE
+
+UTF-16LE_TO_eucJP.o  \
+UTF-16LE_TO_PCK.o  \
+UTF-16LE_TO_eucJP-ms.o  \
+UTF-16LE_TO_ms932.o  \
+UTF-16LE_TO_EUC-JIS-2004.o  \
+UTF-16LE_TO_Shift_JIS-2004.o  \
+UTF-16LE_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UTF16LE
+
+UCS-2_TO_eucJP.o  \
+UCS-2_TO_PCK.o  \
+UCS-2_TO_eucJP-ms.o  \
+UCS-2_TO_ms932.o  \
+UCS-2_TO_EUC-JIS-2004.o  \
+UCS-2_TO_Shift_JIS-2004.o  \
+UCS-2_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UCS2
+
+UCS-2BE_TO_eucJP.o  \
+UCS-2BE_TO_PCK.o  \
+UCS-2BE_TO_eucJP-ms.o  \
+UCS-2BE_TO_ms932.o  \
+UCS-2BE_TO_EUC-JIS-2004.o  \
+UCS-2BE_TO_Shift_JIS-2004.o  \
+UCS-2BE_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UCS2BE
+
+UCS-2LE_TO_eucJP.o  \
+UCS-2LE_TO_PCK.o  \
+UCS-2LE_TO_eucJP-ms.o  \
+UCS-2LE_TO_ms932.o  \
+UCS-2LE_TO_EUC-JIS-2004.o  \
+UCS-2LE_TO_Shift_JIS-2004.o  \
+UCS-2LE_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UCS2LE
+
+UTF-32_TO_eucJP.o  \
+UTF-32_TO_PCK.o  \
+UTF-32_TO_eucJP-ms.o  \
+UTF-32_TO_ms932.o  \
+UTF-32_TO_EUC-JIS-2004.o  \
+UTF-32_TO_Shift_JIS-2004.o  \
+UTF-32_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UTF32
+
+UTF-32BE_TO_eucJP.o  \
+UTF-32BE_TO_PCK.o  \
+UTF-32BE_TO_eucJP-ms.o  \
+UTF-32BE_TO_ms932.o  \
+UTF-32BE_TO_EUC-JIS-2004.o  \
+UTF-32BE_TO_Shift_JIS-2004.o  \
+UTF-32BE_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UTF32BE
+
+UTF-32LE_TO_eucJP.o  \
+UTF-32LE_TO_PCK.o  \
+UTF-32LE_TO_eucJP-ms.o  \
+UTF-32LE_TO_ms932.o  \
+UTF-32LE_TO_EUC-JIS-2004.o  \
+UTF-32LE_TO_Shift_JIS-2004.o  \
+UTF-32LE_TO_ISO-2022-JP-2004.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_FROMCODE_UTF32LE
+
+eucJP_TO_UTF-16.o  \
+PCK_TO_UTF-16.o  \
+eucJP-ms_TO_UTF-16.o  \
+ms932_TO_UTF-16.o  \
+EUC-JIS-2004_TO_UTF-16.o  \
+Shift_JIS-2004_TO_UTF-16.o  \
+ISO-2022-JP-2004_TO_UTF-16.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UTF16
+
+eucJP_TO_UTF-16BE.o  \
+PCK_TO_UTF-16BE.o  \
+eucJP-ms_TO_UTF-16BE.o  \
+ms932_TO_UTF-16BE.o  \
+EUC-JIS-2004_TO_UTF-16BE.o  \
+Shift_JIS-2004_TO_UTF-16BE.o  \
+ISO-2022-JP-2004_TO_UTF-16BE.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UTF16BE
+
+eucJP_TO_UTF-16LE.o  \
+PCK_TO_UTF-16LE.o  \
+eucJP-ms_TO_UTF-16LE.o  \
+ms932_TO_UTF-16LE.o  \
+EUC-JIS-2004_TO_UTF-16LE.o  \
+Shift_JIS-2004_TO_UTF-16LE.o  \
+ISO-2022-JP-2004_TO_UTF-16LE.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UTF16LE
+
+eucJP_TO_UCS-2.o  \
+PCK_TO_UCS-2.o  \
+eucJP-ms_TO_UCS-2.o  \
+ms932_TO_UCS-2.o  \
+EUC-JIS-2004_TO_UCS-2.o  \
+Shift_JIS-2004_TO_UCS-2.o  \
+ISO-2022-JP-2004_TO_UCS-2.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UCS2
+
+eucJP_TO_UCS-2BE.o  \
+PCK_TO_UCS-2BE.o  \
+eucJP-ms_TO_UCS-2BE.o  \
+ms932_TO_UCS-2BE.o  \
+EUC-JIS-2004_TO_UCS-2BE.o  \
+Shift_JIS-2004_TO_UCS-2BE.o  \
+ISO-2022-JP-2004_TO_UCS-2BE.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UCS2BE
+
+eucJP_TO_UCS-2LE.o  \
+PCK_TO_UCS-2LE.o  \
+eucJP-ms_TO_UCS-2LE.o  \
+ms932_TO_UCS-2LE.o  \
+EUC-JIS-2004_TO_UCS-2LE.o  \
+Shift_JIS-2004_TO_UCS-2LE.o  \
+ISO-2022-JP-2004_TO_UCS-2LE.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UCS2LE
+
+eucJP_TO_UTF-32.o  \
+PCK_TO_UTF-32.o  \
+eucJP-ms_TO_UTF-32.o  \
+ms932_TO_UTF-32.o  \
+EUC-JIS-2004_TO_UTF-32.o  \
+Shift_JIS-2004_TO_UTF-32.o  \
+ISO-2022-JP-2004_TO_UTF-32.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UTF32
+
+eucJP_TO_UTF-32BE.o  \
+PCK_TO_UTF-32BE.o  \
+eucJP-ms_TO_UTF-32BE.o  \
+ms932_TO_UTF-32BE.o  \
+EUC-JIS-2004_TO_UTF-32BE.o  \
+Shift_JIS-2004_TO_UTF-32BE.o  \
+ISO-2022-JP-2004_TO_UTF-32BE.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UTF32BE
+
+eucJP_TO_UTF-32LE.o  \
+PCK_TO_UTF-32LE.o  \
+eucJP-ms_TO_UTF-32LE.o  \
+ms932_TO_UTF-32LE.o  \
+EUC-JIS-2004_TO_UTF-32LE.o  \
+Shift_JIS-2004_TO_UTF-32LE.o  \
+ISO-2022-JP-2004_TO_UTF-32LE.o  \
+	:= ICONV_DEFS +=	-DJFP_ICONV_TOCODE_UTF32LE
+
+DYNOBJS=	$(MODULES:%=%.so)
+DYNOBJS64=	$(MODULES64:%=%.so)
+OBJECTS=	$(MODULES:%=%.o)
+SRCS=		$(MODULES:%=%.c)
+
+LDFLAGS +=	$(GSHARED)
+CFLAGS +=	-D_REENTRANT $(ICONV_DEFS) -I. $(XREGSFLAG)
+CFLAGS64 +=	-D_REENTRANT $(ICONV_DEFS) -I. $(XREGSFLAG64)
+FILEMODE =	755
+
+
+# jfp_iconv_unicode.h contains definition of static functions
+# which are used by some modules, but not all functions are used
+# by all modules
+CERRWARN += -_gcc=-Wno-unused-function
