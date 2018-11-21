@@ -94,7 +94,7 @@ extern void *HYPERVISOR_console_page;
 
 /* -- move these definitions elsewhere -- */
 
-extern int xen_debug_handler(void *);
+extern uint_t xen_debug_handler(caddr_t, caddr_t);
 extern void xen_printf(const char *, ...) __KPRINTFLIKE(1);
 #pragma rarely_called(xen_printf)
 

@@ -1219,7 +1219,7 @@ ec_init_debug_irq()
 	int irq;
 
 	irq = ec_bind_virq_to_irq(VIRQ_DEBUG, 0);
-	(void) add_avintr(NULL, IPL_DEBUG, (avfunc)xen_debug_handler,
+	(void) add_avintr(NULL, IPL_DEBUG, xen_debug_handler,
 	    "debug", irq, NULL, NULL, NULL, NULL);
 
 	mutex_enter(&ec_lock);

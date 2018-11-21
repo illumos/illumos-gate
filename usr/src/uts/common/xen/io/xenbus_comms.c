@@ -54,8 +54,6 @@
  * IN THE SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <vm/hat.h>
 #include <vm/as.h>
@@ -92,9 +90,8 @@ static kmutex_t xb_wait_lock;
 
 #define	xs_domain_interface(ra) ((struct xenstore_domain_interface *)(ra))
 
-/*ARGSUSED*/
 static uint_t
-xenbus_intr(void *unused)
+xenbus_intr(caddr_t arg __unused, caddr_t arg1 __unused)
 {
 	mutex_enter(&xb_wait_lock);
 	cv_broadcast(&xb_wait_cv);
@@ -245,7 +242,7 @@ xb_suspend(void)
 #ifdef XPV_HVM_DRIVER
 	ec_unbind_evtchn(xen_info->store_evtchn);
 #else
-	rem_avintr(NULL, IPL_XENBUS, (avfunc)xenbus_intr, xenbus_irq);
+	rem_avintr(NULL, IPL_XENBUS, xenbus_intr, xenbus_irq);
 #endif
 }
 
@@ -261,7 +258,7 @@ xb_setup_intr(void)
 		cmn_err(CE_WARN, "Couldn't bind xenbus event channel");
 		return;
 	}
-	if (!add_avintr(NULL, IPL_XENBUS, (avfunc)xenbus_intr, "xenbus",
+	if (!add_avintr(NULL, IPL_XENBUS, xenbus_intr, "xenbus",
 	    xenbus_irq, NULL, NULL, NULL, NULL))
 		cmn_err(CE_WARN, "XENBUS add intr failed\n");
 #endif
