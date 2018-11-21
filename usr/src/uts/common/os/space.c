@@ -212,6 +212,7 @@ int ts_dispatch_extended = -1; /* set in ts_getdptbl or set_platform_default */
 dev_t kbddev = NODEV;
 dev_t mousedev = NODEV;
 dev_t stdindev = NODEV;
+dev_t diagdev = NODEV;
 struct vnode *wsconsvp;
 
 dev_t fbdev = NODEV;

@@ -48,9 +48,9 @@
  * From the kernel perspective, there are roughly three different possible
  * console configurations.  Across these three configurations, the following
  * elements are constant:
- * 	wsconsvp = IWSCN_PATH
- * 	rwsconsvp = WC_PATH
- * 	consms -> msdev
+ *	wsconsvp = IWSCN_PATH
+ *	rwsconsvp = WC_PATH
+ *	consms -> msdev
  *
  * The "->" syntax indicates that the streams device on the right is
  * linked under the streams device on the left.
@@ -58,30 +58,30 @@
  * The following lists how the system is configured for different setups:
  *
  * stdin is a local keyboard.  use stdin and stdout as the console.
- * 	sp->cons_input_type = CONSOLE_LOCAL
+ *	sp->cons_input_type = CONSOLE_LOCAL
  *	rconsvp = IWSCN_PATH
  *	wc -> conskbd -> kbddev
  *
  * stdin is not a keyboard and stdin is the same as stdout.
  * assume we running on a tip line and use stdin/stdout as the console.
- * 	sp->cons_input_type = CONSOLE_TIP
+ *	sp->cons_input_type = CONSOLE_TIP
  *	rconsvp = (stdindev/stdoutdev)
  *	wc -> conskbd -> kbddev
  *
  * stdin is not a keyboard device and it's not the same as stdout.
  * assume we have a serial keyboard hooked up and use it along with
  * stdout as the console.
- * 	sp->cons_input_type = CONSOLE_SERIAL_KEYBOARD
+ *	sp->cons_input_type = CONSOLE_SERIAL_KEYBOARD
  *	rconsvp = IWSCN_PATH
  *	wc -> stdindev
  *	conskbd -> kbddev
  *
  * CAVEAT:
- * 	The above is all true except for one possible Intel configuration.
- * 	If stdin is set to a local keyboard but stdout is set to something
- * 	other than the local display (a tip port for example) stdout will
- * 	still go to the local display.  This is an artifact of the console
- * 	implementation on intel.
+ *	The above is all true except for one possible Intel configuration.
+ *	If stdin is set to a local keyboard but stdout is set to something
+ *	other than the local display (a tip port for example) stdout will
+ *	still go to the local display.  This is an artifact of the console
+ *	implementation on intel.
  */
 
 #include <sys/types.h>
@@ -443,6 +443,10 @@ consconfig_print_paths(void)
 	if (path != NULL)
 		DPRINTF(DPRINT_L0, "stdout path = %s\n", path);
 
+	path = plat_diagpath();
+	if (path != NULL)
+		DPRINTF(DPRINT_L0, "diag path = %s\n", path);
+
 	path = plat_fbpath();
 	if (path != NULL)
 		DPRINTF(DPRINT_L0, "fb path = %s\n", path);
@@ -450,12 +454,12 @@ consconfig_print_paths(void)
 
 /*
  * consconfig_kbd_abort_enable:
- * 	Send the CONSSETABORTENABLE ioctl to the lower layers.  This ioctl
- * 	will only be sent to the device if it is the console device.
- * 	This ioctl tells the device to pay attention to abort sequences.
- * 	In the case of kbtrans, this would tell the driver to pay attention
- * 	to the two key abort sequences like STOP-A.  In the case of the
- * 	serial keyboard, it would be an abort sequence like a break.
+ *	Send the CONSSETABORTENABLE ioctl to the lower layers.  This ioctl
+ *	will only be sent to the device if it is the console device.
+ *	This ioctl tells the device to pay attention to abort sequences.
+ *	In the case of kbtrans, this would tell the driver to pay attention
+ *	to the two key abort sequences like STOP-A.  In the case of the
+ *	serial keyboard, it would be an abort sequence like a break.
  */
 static int
 consconfig_kbd_abort_enable(ldi_handle_t lh)
@@ -471,11 +475,11 @@ consconfig_kbd_abort_enable(ldi_handle_t lh)
 
 /*
  * consconfig_kbd_abort_disable:
- * 	Send CONSSETABORTENABLE ioctl to lower layers.  This ioctl
- * 	will only be sent to the device if it is the console device.
- * 	This ioctl tells the physical device to ignore abort sequences,
- * 	and send the sequences up to virtual keyboard(conskbd) so that
- * 	STOP and A (or F1 and A) can be combined.
+ *	Send CONSSETABORTENABLE ioctl to lower layers.  This ioctl
+ *	will only be sent to the device if it is the console device.
+ *	This ioctl tells the physical device to ignore abort sequences,
+ *	and send the sequences up to virtual keyboard(conskbd) so that
+ *	STOP and A (or F1 and A) can be combined.
  */
 static int
 consconfig_kbd_abort_disable(ldi_handle_t lh)
@@ -539,9 +543,9 @@ consconfig_tem_supported(cons_state_t *sp)
 
 /*
  * consconfig_get_polledio:
- * 	Query the console with the CONSPOLLEDIO ioctl.
- * 	The polled I/O routines are used by debuggers to perform I/O while
- * 	interrupts and normal kernel services are disabled.
+ *	Query the console with the CONSPOLLEDIO ioctl.
+ *	The polled I/O routines are used by debuggers to perform I/O while
+ *	interrupts and normal kernel services are disabled.
  */
 static cons_polledio_t *
 consconfig_get_polledio(ldi_handle_t lh)
@@ -584,10 +588,10 @@ consconfig_get_polledio(ldi_handle_t lh)
 
 /*
  * consconfig_setup_polledio:
- * 	This routine does the setup work for polled I/O.  First we get
- * 	the polled_io structure from the lower layers
- * 	and then we register the polled I/O
- * 	callbacks with the debugger that will be using them.
+ *	This routine does the setup work for polled I/O.  First we get
+ *	the polled_io structure from the lower layers
+ *	and then we register the polled I/O
+ *	callbacks with the debugger that will be using them.
  */
 static void
 consconfig_setup_polledio(cons_state_t *sp, dev_t dev)
@@ -657,9 +661,10 @@ consconfig_state_init(void)
 	stdoutdev = NODEV;
 
 	/*
-	 * Find keyboard, mouse, stdin and stdout devices, if they
+	 * Find keyboard, mouse, stdin, stdout and diag devices, if they
 	 * exist on this platform.
 	 */
+	sp->cons_diag_path = plat_diagpath();
 
 	if (consconfig_usb_kb_path != NULL) {
 		sp->cons_keyboard_path = consconfig_usb_kb_path;
@@ -993,7 +998,9 @@ consconfig_load_drivers(cons_state_t *sp)
 	if (sp->cons_keyboard_path != NULL)
 		kbddev = ddi_pathname_to_dev_t(sp->cons_keyboard_path);
 	if (sp->cons_mouse_path != NULL)
-		mousedev =  ddi_pathname_to_dev_t(sp->cons_mouse_path);
+		mousedev = ddi_pathname_to_dev_t(sp->cons_mouse_path);
+	if (sp->cons_diag_path != NULL)
+		diagdev = ddi_pathname_to_dev_t(sp->cons_diag_path);
 
 	/*
 	 * On x86, make sure the fb driver is loaded even if we don't use it
@@ -1006,7 +1013,8 @@ consconfig_load_drivers(cons_state_t *sp)
 #endif
 
 	DPRINTF(DPRINT_L0, "stdindev %lx, stdoutdev %lx, kbddev %lx, "
-	    "mousedev %lx\n", stdindev, stdoutdev, kbddev, mousedev);
+	    "mousedev %lx diagdev %lx\n", stdindev, stdoutdev, kbddev,
+	    mousedev, diagdev);
 }
 
 #if !defined(__x86)
@@ -1075,8 +1083,8 @@ consconfig_init_framebuffer(cons_state_t *sp)
 
 /*
  * consconfig_prepare_dev:
- * 	Flush the stream, push "pushmod" onto the stream.
- * 	for keyboard, issue the KIOCTRANSABLE ioctl, and
+ *	Flush the stream, push "pushmod" onto the stream.
+ *	for keyboard, issue the KIOCTRANSABLE ioctl, and
  *	possible enable abort.
  */
 static void
@@ -1128,13 +1136,13 @@ consconfig_prepare_dev(
 
 /*
  * consconfig_relink_conskbd:
- * 	If new_lh is not NULL it should represent a driver with a
- * 	keyboard module pushed on top of it. The driver is then linked
- * 	underneath conskbd.  the resulting stream will be
+ *	If new_lh is not NULL it should represent a driver with a
+ *	keyboard module pushed on top of it. The driver is then linked
+ *	underneath conskbd.  the resulting stream will be
  *	wc->conskbd->"new_lh driver".
  *
- * 	If new_lh is NULL, then an unlink operation is done on conskbd
- * 	that attempts to unlink the stream specified by *muxid.
+ *	If new_lh is NULL, then an unlink operation is done on conskbd
+ *	that attempts to unlink the stream specified by *muxid.
  *	the resulting stream will be wc->conskbd.
  */
 static int
@@ -1229,13 +1237,13 @@ relink_failed:
 
 /*
  * consconfig_relink_consms:
- * 	If new_lh is not NULL it should represent a driver with a
- * 	mouse module pushed on top of it. The driver is then linked
- * 	underneath consms.  the resulting stream will be
+ *	If new_lh is not NULL it should represent a driver with a
+ *	mouse module pushed on top of it. The driver is then linked
+ *	underneath consms.  the resulting stream will be
  *	consms->"new_lh driver".
  *
- * 	If new_lh is NULL, then an unlink operation is done on consms
- * 	that attempts to unlink the stream specified by *muxid.
+ *	If new_lh is NULL, then an unlink operation is done on consms
+ *	that attempts to unlink the stream specified by *muxid.
  */
 static int
 consconfig_relink_consms(cons_state_t *sp, ldi_handle_t new_lh, int *muxid)
@@ -1477,7 +1485,10 @@ consconfig_init_input(cons_state_t *sp)
 		 */
 		consconfig_setup_polledio(sp, sp->cons_wc_vp->v_rdev);
 	} else {
-		consconfig_setup_polledio(sp, cons_final_dev);
+		if (diagdev != NODEV)
+			consconfig_setup_polledio(sp, diagdev);
+		else
+			consconfig_setup_polledio(sp, cons_final_dev);
 	}
 
 	kadb_uses_kernel();
@@ -1495,6 +1506,7 @@ dynamic_console_config(void)
 	mousedev = NODEV;
 	kbddev = NODEV;
 	fbdev = NODEV;
+	diagdev = NODEV;
 	fbvp = NULL;
 	fbdip = NULL;
 	wsconsvp = NULL;
@@ -1977,7 +1989,7 @@ consconfig_setmodes(dev_t dev, struct termios *termiosp)
 
 	/* Found the baud rate, set it */
 	termiosp->c_cflag |= speedtab[i].code & CBAUD;
-	if (speedtab[i].code > 16) 			/* cfsetospeed! */
+	if (speedtab[i].code > 16)			/* cfsetospeed! */
 		termiosp->c_cflag |= CBAUDEXT;
 
 	/* Set bits per character */
