@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014, Joyent, Inc. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
@@ -138,6 +138,7 @@ CHKHDRS=			\
 	cpc_impl.h		\
 	cpc_pcbe.h		\
 	cpr.h			\
+	cpu_uarray.h		\
 	cpupart.h		\
 	cpuvar.h		\
 	crc32.h			\

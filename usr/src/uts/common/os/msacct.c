@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -416,16 +416,21 @@ syscall_mstate(int fromms, int toms)
 		newtime = curtime - ms->ms_state_start;
 	}
 	*mstimep += newtime;
-	if (fromms == LMS_USER)
-		atomic_add_64(&z->zone_utime, newtime);
-	else if (fromms == LMS_SYSTEM)
-		atomic_add_64(&z->zone_stime, newtime);
 	t->t_mstate = toms;
 	ms->ms_state_start = curtime;
 	ms->ms_prev = fromms;
 	kpreempt_disable(); /* don't change CPU while changing CPU's state */
 	cpu = CPU;
 	ASSERT(cpu == t->t_cpu);
+
+	if (fromms == LMS_USER) {
+		CPU_UARRAY_VAL(z->zone_ustate, cpu->cpu_id,
+		    ZONE_USTATE_UTIME) += newtime;
+	} else if (fromms == LMS_SYSTEM) {
+		CPU_UARRAY_VAL(z->zone_ustate, cpu->cpu_id,
+		    ZONE_USTATE_STIME) += newtime;
+	}
+
 	if ((toms != LMS_USER) && (cpu->cpu_mstate != CMS_SYSTEM)) {
 		NEW_CPU_MSTATE(CMS_SYSTEM);
 	} else if ((toms == LMS_USER) && (cpu->cpu_mstate != CMS_USER)) {
@@ -653,19 +658,6 @@ new_mstate(kthread_t *t, int new_state)
 	    oldtime);
 
 	/*
-	 * When the system boots the initial startup thread will have a
-	 * ms_state_start of 0 which would add a huge system time to the global
-	 * zone.  We want to skip aggregating that initial bit of work.
-	 */
-	if (origstart != 0) {
-		z = ttozone(t);
-		if (state == LMS_USER)
-			atomic_add_64(&z->zone_utime, ztime);
-		else if (state == LMS_SYSTEM)
-			atomic_add_64(&z->zone_stime, ztime);
-	}
-
-	/*
 	 * Remember the previous running microstate.
 	 */
 	if (state != LMS_SLEEP && state != LMS_STOPPED)
@@ -676,7 +668,25 @@ new_mstate(kthread_t *t, int new_state)
 	 */
 
 	kpreempt_disable(); /* MUST disable kpreempt before touching t->cpu */
+
 	ASSERT(t->t_cpu == CPU);
+
+	/*
+	 * When the system boots the initial startup thread will have a
+	 * ms_state_start of 0 which would add a huge system time to the global
+	 * zone.  We want to skip aggregating that initial bit of work.
+	 */
+	if (origstart != 0) {
+		z = ttozone(t);
+		if (state == LMS_USER) {
+			CPU_UARRAY_VAL(z->zone_ustate, t->t_cpu->cpu_id,
+			    ZONE_USTATE_UTIME) += ztime;
+		} else if (state == LMS_SYSTEM) {
+			CPU_UARRAY_VAL(z->zone_ustate, t->t_cpu->cpu_id,
+			    ZONE_USTATE_STIME) += ztime;
+		}
+	}
+
 	if (!CPU_ON_INTR(t->t_cpu) && curthread->t_intr == NULL) {
 		if (new_state == LMS_USER && t->t_cpu->cpu_mstate != CMS_USER)
 			new_cpu_mstate(CMS_USER, curtime);
@@ -783,7 +793,13 @@ restore_mstate(kthread_t *t)
 	z = ttozone(t);
 	waittime = curtime - waitrq;
 	ms->ms_acct[LMS_WAIT_CPU] += waittime;
-	atomic_add_64(&z->zone_wtime, waittime);
+
+	/*
+	 * We are in a disp context where we're not going to migrate CPUs.
+	 */
+	CPU_UARRAY_VAL(z->zone_ustate, CPU->cpu_id,
+	    ZONE_USTATE_WTIME) += waittime;
+
 	CPU->cpu_waitrq += waittime;
 	ms->ms_state_start = curtime;
 }

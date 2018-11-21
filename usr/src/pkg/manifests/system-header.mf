@@ -856,6 +856,7 @@ file path=usr/include/sys/cpc_impl.h
 file path=usr/include/sys/cpc_pcbe.h
 file path=usr/include/sys/cpr.h
 file path=usr/include/sys/cpu.h
+file path=usr/include/sys/cpu_uarray.h
 file path=usr/include/sys/cpucaps.h
 file path=usr/include/sys/cpucaps_impl.h
 file path=usr/include/sys/cpupart.h
