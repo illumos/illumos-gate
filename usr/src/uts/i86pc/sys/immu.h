@@ -130,11 +130,11 @@ typedef struct drhd {
 	kmutex_t	dr_lock;   /* protects the dmar field */
 	struct immu	*dr_immu;
 	dev_info_t	*dr_dip;
-	uint16_t 	dr_seg;
-	uint64_t 	dr_regs;
+	uint16_t	dr_seg;
+	uint64_t	dr_regs;
 	boolean_t	dr_include_all;
-	list_t 		dr_scope_list;
-	list_node_t 	dr_node;
+	list_t		dr_scope_list;
+	list_node_t	dr_node;
 } drhd_t;
 
 typedef struct rmrr {
@@ -638,7 +638,7 @@ typedef struct immu {
  * Enough space to hold the decimal number of any device instance.
  * Used for device/cache names.
  */
-#define	IMMU_ISTRLEN 	11	/* log10(2^31)  + 1 */
+#define	IMMU_ISTRLEN	11	/* log10(2^31)  + 1 */
 
 /* properties that control DVMA */
 #define	DDI_DVMA_MAPTYPE_ROOTNEX_PROP	"immu-dvma-mapping"
@@ -677,7 +677,7 @@ typedef struct domain {
 	/* list node for list of domains off immu */
 	list_node_t		dom_immu_node;
 
-	mod_hash_t 		*dom_cookie_hash;
+	mod_hash_t		*dom_cookie_hash;
 
 	/* topmost device in domain; usually the device itself (non-shared) */
 	dev_info_t		*dom_dip;
@@ -944,7 +944,7 @@ void immu_intrmap_destroy(list_t *immu_list);
 
 /* registers interrupt handler for IOMMU unit */
 void immu_intr_register(immu_t *immu);
-int immu_intr_handler(immu_t *immu);
+uint_t immu_intr_handler(caddr_t, caddr_t);
 
 
 /* immu_qinv.c interfaces */
