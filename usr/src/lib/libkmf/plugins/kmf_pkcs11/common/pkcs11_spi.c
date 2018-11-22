@@ -3245,8 +3245,9 @@ store_raw_key(KMF_HANDLE_T handle,
 	SETATTR(templ, i, CKA_KEY_TYPE, &keytype, sizeof (keytype)); i++;
 	SETATTR(templ, i, CKA_TOKEN, &cktrue, sizeof (cktrue)); i++;
 	SETATTR(templ, i, CKA_PRIVATE, &cktrue, sizeof (cktrue)); i++;
-	if (keytype != CKK_EC)
+	if (keytype != CKK_EC) {
 		SETATTR(templ, i, CKA_DECRYPT, &cktrue, sizeof (cktrue)); i++;
+	}
 
 	cert = kmf_get_attr_ptr(KMF_CERT_DATA_ATTR, attrlist, numattr);
 	if (cert != NULL) {
