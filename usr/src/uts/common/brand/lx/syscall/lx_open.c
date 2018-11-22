@@ -147,7 +147,7 @@ lx_open_postprocess(int fd, int fmode)
 		 * While the O_PATH flag has no direct analog in SunOS, it is
 		 * emulated by removing both FREAD and FWRITE from f_flag.
 		 * This causes read(2) and write(2) result in EBADF and can be
-		 * checked for in other syscalls to tigger the correct behavior
+		 * checked for in other syscalls to trigger the correct behavior
 		 * there.
 		 */
 		mutex_enter(&fp->f_tlock);
@@ -244,6 +244,29 @@ lx_openat(int atfd, char *path, int fmode, int cmode)
 				return (set_errno(ENOTDIR));
 
 			(void) set_errno(oerror);
+		} else if ((fmode & LX_O_NOFOLLOW) && (fmode & LX_O_PATH) &&
+		    ttolwp(curthread)->lwp_errno == ELOOP) {
+			/*
+			 * On Linux, if O_NOFOLLOW and O_PATH are set together
+			 * and the target is a symbolic link, then openat
+			 * should return a file descriptor referring to the
+			 * symbolic link.
+			 *
+			 * This file descriptor can be used with fchownat(2),
+			 * fstatat(2), linkat(2), and readlinkat(2) alongside
+			 * an empty pathname.
+			 *
+			 * We do not have a way to return such a file
+			 * descriptor in illumos so open it without NO_FOLLOW
+			 * and allow the postprocess to emulate O_PATH by
+			 * removing the read and write flags.
+			 * This is enough to keep recent systemd happy
+			 * although any attempt to use the fd for the above
+			 * listed calls without a pathname will fail or modify
+			 * the symlink target.
+			 */
+			return (lx_openat(atfd, path, fmode & ~LX_O_NOFOLLOW,
+			    cmode));
 		}
 
 		if (ttolwp(curthread)->lwp_errno == EINTR)
