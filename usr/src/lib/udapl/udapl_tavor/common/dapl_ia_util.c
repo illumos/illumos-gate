@@ -55,13 +55,13 @@ void dapli_ia_release_hca(
  * alloc and initialize an IA INFO struct
  *
  * Input:
- * 	none
+ *	none
  *
  * Output:
- * 	ia_ptr
+ *	ia_ptr
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 DAPL_IA *
@@ -123,19 +123,18 @@ dapl_ia_alloc(DAT_PROVIDER * provider, DAPL_HCA * hca_ptr)
  * Performs an abrupt close of the IA
  *
  * Input:
- * 	ia_ptr
+ *	ia_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	status
+ *	status
  *
  */
 
 DAT_RETURN
-dapl_ia_abrupt_close(
-	IN DAPL_IA 	*ia_ptr)
+dapl_ia_abrupt_close(IN DAPL_IA *ia_ptr)
 {
 	DAT_RETURN	dat_status;
 	DAPL_EP		*ep_ptr, *next_ep_ptr;
@@ -346,24 +345,23 @@ dapl_ia_abrupt_close(
  * Performs an graceful close of the IA
  *
  * Input:
- * 	ia_ptr
+ *	ia_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	status
+ *	status
  *
  */
 
 DAT_RETURN
-dapl_ia_graceful_close(
-	IN DAPL_IA	*ia_ptr)
+dapl_ia_graceful_close(IN DAPL_IA *ia_ptr)
 {
 	DAT_RETURN		dat_status;
 	DAT_RETURN		cur_dat_status;
 	DAPL_EVD		*evd_ptr;
-	DAPL_LLIST_ENTRY 	*entry;
+	DAPL_LLIST_ENTRY	*entry;
 	DAPL_HCA		*hca_ptr;
 
 	dat_status = DAT_SUCCESS;
@@ -491,13 +489,13 @@ dapli_ia_release_hca(
  * free an IA INFO struct
  *
  * Input:
- * 	ia_ptr
+ *	ia_ptr
  *
  * Output:
- * 	one
+ *	one
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -535,10 +533,10 @@ dapls_ia_free(DAPL_IA *ia_ptr)
  *	ep_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -563,10 +561,10 @@ dapl_ia_link_ep(
  *	ep_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -590,10 +588,10 @@ dapl_ia_unlink_ep(
  *	lmr_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -618,10 +616,10 @@ dapl_ia_link_lmr(
  *	lmr_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -645,10 +643,10 @@ dapl_ia_unlink_lmr(
  *	rmr_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -673,10 +671,10 @@ dapl_ia_link_rmr(
  *	rmr_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -700,10 +698,10 @@ dapl_ia_unlink_rmr(
  *	pz_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -728,10 +726,10 @@ dapl_ia_link_pz(
  *	pz_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -755,10 +753,10 @@ dapl_ia_unlink_pz(
  *	evd_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -783,10 +781,10 @@ dapl_ia_link_evd(
  *	evd_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -810,10 +808,10 @@ dapl_ia_unlink_evd(
  *	cno_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -838,10 +836,10 @@ dapl_ia_link_cno(
  *	cno_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -865,10 +863,10 @@ dapl_ia_unlink_cno(
  *	sp_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -893,10 +891,10 @@ dapl_ia_link_psp(
  *	sp_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -930,10 +928,10 @@ dapls_ia_unlink_sp(
  *	sp_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 DAPL_SP *
@@ -980,10 +978,10 @@ dapls_ia_sp_search(
  *	sp_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -1008,10 +1006,10 @@ dapl_ia_link_rsp(
  *	srq_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -1036,10 +1034,10 @@ dapl_ia_link_srq(
  *	srq_ptr
  *
  * Output:
- * 	none
+ *	none
  *
  * Returns:
- * 	none
+ *	none
  *
  */
 void
@@ -1060,6 +1058,13 @@ dapls_ia_setup_callbacks(
 {
 	DAT_RETURN dat_status = DAT_SUCCESS;
 
+#if 0
+	/*
+	 * Current implementation of dapls_ib_setup_async_callback() does
+	 * nothing and returns DAT_SUCCESS. However, it is declared to expect
+	 * function pointers with different signatures. We do leave the code
+	 * block out till dapls_ib_setup_async_callback() is implemented.
+	 */
 	/* unaffiliated handler */
 	dat_status =
 	    dapls_ib_setup_async_callback(
@@ -1104,8 +1109,8 @@ dapls_ia_setup_callbacks(
 		    dat_status);
 		goto bail;
 	}
-
 bail:
+#endif
 	return (dat_status);
 }
 
