@@ -3,7 +3,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TD_SYNC_GET_INFO 3C_DB "Jun 5, 2007"
+.TH TD_SYNC_GET_INFO 3C_DB "Nov 22, 2018"
 .SH NAME
 td_sync_get_info, td_ta_sync_tracking_enable, td_sync_get_stats,
 td_sync_setstate, td_sync_waiters \- operations on a synchronization object in
@@ -30,7 +30,7 @@ cc [ \fIflag\fR... ] \fIfile\fR... -lc_db [ \fIlibrary\fR... ]
 
 .LP
 .nf
-\fBtd_err_e\fR \fBtd_sync_setstate\fR(\fBconst td_synchandle_t *\fR\fIsh_p\fR);
+\fBtd_err_e\fR \fBtd_sync_setstate\fR(\fBconst td_synchandle_t *\fR\fIsh_p\fR, \fBint\fR \fIvalue\fR);
 .fi
 
 .LP
@@ -243,16 +243,16 @@ structure, depending on the type of the synchronization object.
 .LP
 The \fBtd_sync_setstate\fR function modifies the state of synchronization
 object \fIsi_p\fR, depending on the synchronization object type. For mutexes,
-\fBtd_sync_setstate\fR is unlocked if the value is  \fB0\fR. Otherwise it is
-locked. For semaphores, the semaphore's count is set to the value. For
-reader-writer locks, the reader count set to the value if value is \fB>0\fR.
-The count is set to write-locked if value is \fB-1\fR\&. It is set to unlocked
-if the value is  \fB0\fR. Setting the state of a synchronization object from a
-\fBlibc_db\fR interface may cause the synchronization object's semantics to be
-violated from the point of view of the threads in the target process. For
-example, if a thread holds a mutex, and \fBtd_sync_setstate\fR is used to set
-the mutex to unlocked, then a different thread  will also be able to
-subsequently acquire the same mutex.
+\fBtd_sync_setstate\fR is unlocked if the \fIvalue\fR is \fB0\fR. Otherwise it
+is locked. For semaphores, the semaphore's count is set to the \fIvalue\fR. For
+reader-writer locks, the reader count set to the \fIvalue\fR if \fIvalue\fR is
+\fB>0\fR. The count is set to write-locked if \fIvalue\fR is \fB-1\fR\&.
+It is set to unlocked if the \fIvalue\fR is \fB0\fR. Setting the state of a
+synchronization object from a \fBlibc_db\fR interface may cause the
+synchronization object's semantics to be violated from the point of view of
+the threads in the target process. For example, if a thread holds a mutex,
+and \fBtd_sync_setstate\fR is used to set the mutex to unlocked, then a
+different thread  will also be able to subsequently acquire the same mutex.
 .sp
 .LP
 The \fBtd_sync_waiters\fR function iterates over the set of thread handles of

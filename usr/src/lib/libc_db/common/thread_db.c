@@ -2893,14 +2893,13 @@ out:
  */
 #pragma weak td_sync_setstate = __td_sync_setstate
 td_err_e
-__td_sync_setstate(const td_synchandle_t *sh_p, long lvalue)
+__td_sync_setstate(const td_synchandle_t *sh_p, int value)
 {
 	struct ps_prochandle *ph_p;
 	int		trunc = 0;
 	td_err_e	return_val;
 	td_so_un_t	generic_so;
 	uint32_t	*rwstate;
-	int		value = (int)lvalue;
 
 	if ((ph_p = ph_lock_sh(sh_p, &return_val)) == NULL)
 		return (return_val);
