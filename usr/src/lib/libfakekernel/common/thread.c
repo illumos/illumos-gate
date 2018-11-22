@@ -70,7 +70,7 @@ thread_create(
 		break;
 	}
 
-	thr_func = (void *(*)(void *))func;
+	thr_func = (void *(*)(void *))(uintptr_t)func;
 	rc = thr_create(NULL, 0, thr_func, arg, thr_flags, &newtid);
 	if (rc != 0)
 		cmn_err(CE_PANIC, "thread_create failed, rc=%d", rc);
