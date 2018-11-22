@@ -74,7 +74,7 @@ static int cache_called;
 static cond_t cache_called_cond;
 static mutex_t cache_called_lock = DEFAULTMUTEX;
 static SLPError start_cache_thr();
-static void cache_thr();
+static void *cache_thr(void *);
 
 /* The cache and cache synchronization */
 static void *da_cache;
@@ -90,7 +90,7 @@ typedef struct cache_entry cache_entry_t;
 
 /* cache management and searching */
 static int compare_entries(const void *, const void *);
-static void free_cache_entry(void *, VISIT);
+static void free_cache_entry(void *, VISIT, int, void *);
 
 /*
  * Searches the cache for the reply to 'query'. Returns the reply if
@@ -200,7 +200,9 @@ static int compare_entries(const void *x1, const void *x2) {
 	return (strcasecmp(e1->query, e2->query));
 }
 
-static void free_cache_entry(void *node, VISIT order) {
+static void
+free_cache_entry(void *node, VISIT order, int arg __unused, void *arg1 __unused)
+{
 	if (order == endorder || order == leaf) {
 		cache_entry_t *ce = *(cache_entry_t **)node;
 
@@ -223,9 +225,7 @@ static SLPError start_cache_thr() {
 
 	(void) cond_init(&cache_called_cond, 0, NULL);
 
-	if ((terr = thr_create(
-		0, 0, (void *(*)(void *)) cache_thr,
-		NULL, 0, NULL)) != 0) {
+	if ((terr = thr_create(0, 0, cache_thr, NULL, 0, NULL)) != 0) {
 		slp_err(LOG_CRIT, 0, "start_cache_thr",
 			"could not start thread: %s", strerror(terr));
 		err = SLP_INTERNAL_SYSTEM_ERROR;
@@ -238,7 +238,9 @@ start_done:
 	return (err);
 }
 
-static void cache_thr() {
+static void *
+cache_thr(void *arg __unused)
+{
 	timestruc_t timeout;
 	timeout.tv_nsec = 0;
 
@@ -250,15 +252,13 @@ static void cache_thr() {
 
 		timeout.tv_sec = IDLE_TIMEOUT;
 		err = cond_reltimedwait(&cache_called_cond,
-					&cache_called_lock, &timeout);
+		    &cache_called_lock, &timeout);
 
 		if (err == ETIME) {
 			(void) mutex_lock(&cache_lock);
 			/* free cache */
 			if (da_cache) {
-				slp_twalk(da_cache,
-			(void (*)(void *, VISIT, int, void *))free_cache_entry,
-						0, NULL);
+				slp_twalk(da_cache, free_cache_entry, 0, NULL);
 			}
 			da_cache = NULL;
 			(void) mutex_unlock(&cache_lock);
@@ -269,4 +269,5 @@ static void cache_thr() {
 			cache_called = 0;
 		}
 	}
+	return (NULL);
 }

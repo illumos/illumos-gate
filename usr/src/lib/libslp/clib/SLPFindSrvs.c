@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -95,8 +93,7 @@ SLPError SLPFindSrvs(SLPHandle hSLP, const char *pcServiceType,
 
 	if (err == SLP_OK)
 		err = slp_ua_common(hSLP, pcScope,
-				    (SLPGenericAppCB *) callback, pvUser,
-				    unpack_cb);
+		    (SLPGenericAppCB *)(uintptr_t)callback, pvUser, unpack_cb);
 	if (err != SLP_OK)
 		slp_end_call(hSLP);
 

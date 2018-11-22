@@ -58,7 +58,7 @@ static struct sockaddr_in *local_sin;	/* slpd addr, set on first use */
 static SLPError open_ipc();
 static void close_ipc();
 static void get_localhost_sin();
-static void ipc_manage_thr();
+static void *ipc_manage_thr(void *);
 
 /*
  * Locking should be handled by the caller
@@ -115,10 +115,8 @@ static SLPError open_ipc() {
 
 	/* We now know slpd is reachable; start the management thread */
 	if (!ipc_thr_running) {
-		if ((terr = thr_create(
-			0, 0,
-			(void *(*)(void *)) ipc_manage_thr,
-			NULL, 0, NULL)) != 0) {
+		if ((terr = thr_create(0, 0, ipc_manage_thr,
+		    NULL, 0, NULL)) != 0) {
 			slp_err(LOG_CRIT, 0, "slp_open_ipc",
 				"could not start thread: %s",
 				strerror(terr));
@@ -289,7 +287,9 @@ done:
  * and continues waiting for the next IPC call. After the FD has expired,
  * the thread closes IPC and shuts itself down.
  */
-static void ipc_manage_thr() {
+static void *
+ipc_manage_thr(void *arg __unused)
+{
 	timestruc_t timeout;
 
 	timeout.tv_nsec = 0;
@@ -301,7 +301,7 @@ static void ipc_manage_thr() {
 
 		timeout.tv_sec = IPC_FD_LIFETIME;
 		err = cond_reltimedwait(&ipc_wait_var, &ipc_wait_lock,
-			&timeout);
+		    &timeout);
 
 		if (err == ETIME) {
 			/* shutdown */
@@ -314,4 +314,5 @@ static void ipc_manage_thr() {
 			ipc_used = 0;
 		}
 	}
+	return (NULL);
 }
