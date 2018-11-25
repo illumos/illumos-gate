@@ -79,7 +79,7 @@ extern int _so_getsockname();
  * already bound socket.
  */
 int
-_bind(int sock, struct sockaddr *addr, int addrlen)
+_bind(int sock, struct sockaddr *addr, socklen_t addrlen)
 {
 	return (_so_bind(sock, addr, addrlen, SOV_SOCKBSD));
 }
@@ -103,7 +103,7 @@ _accept4(int sock, struct sockaddr *addr, int *addrlen, int flags)
 }
 
 int
-_connect(int sock, struct sockaddr *addr, int addrlen)
+_connect(int sock, struct sockaddr *addr, socklen_t addrlen)
 {
 	return (_so_connect(sock, addr, addrlen, SOV_DEFAULT));
 }
@@ -114,41 +114,41 @@ _shutdown(int sock, int how)
 	return (_so_shutdown(sock, how, SOV_DEFAULT));
 }
 
-int
-_recv(int sock, char *buf, int len, int flags)
+ssize_t
+_recv(int sock, void *buf, size_t len, int flags)
 {
 	return (_so_recv(sock, buf, len, flags & ~MSG_XPG4_2));
 }
 
-int
-_recvfrom(int sock, char *buf, int len, int flags,
-	struct sockaddr *addr, int *addrlen)
+ssize_t
+_recvfrom(int sock, void *_RESTRICT_KYWD buf, size_t len, int flags,
+    struct sockaddr *_RESTRICT_KYWD addr, void *addrlen)
 {
 	return (_so_recvfrom(sock, buf, len, flags & ~MSG_XPG4_2,
 	    addr, addrlen));
 }
 
-int
+ssize_t
 _recvmsg(int sock, struct msghdr *msg, int flags)
 {
 	return (_so_recvmsg(sock, msg, flags & ~MSG_XPG4_2));
 }
 
-int
-_send(int sock, char *buf, int len, int flags)
+ssize_t
+_send(int sock, const void *buf, size_t len, int flags)
 {
 	return (_so_send(sock, buf, len, flags & ~MSG_XPG4_2));
 }
 
-int
-_sendmsg(int sock, struct msghdr *msg, int flags)
+ssize_t
+_sendmsg(int sock, const struct msghdr *msg, int flags)
 {
 	return (_so_sendmsg(sock, msg, flags & ~MSG_XPG4_2));
 }
 
-int
-_sendto(int sock, char *buf, int len, int flags,
-	struct sockaddr *addr, int *addrlen)
+ssize_t
+_sendto(int sock, const void *buf, size_t len, int flags,
+    const struct sockaddr *addr, socklen_t addrlen)
 {
 	return (_so_sendto(sock, buf, len, flags & ~MSG_XPG4_2,
 	    addr, addrlen));
@@ -211,7 +211,7 @@ _getsockopt(int sock, int level, int optname, char *optval, int *optlen)
 }
 
 int
-_setsockopt(int sock, int level, int optname, char *optval, int optlen)
+_setsockopt(int sock, int level, int optname, char *optval, socklen_t optlen)
 {
 	return (_so_setsockopt(sock, level, optname, optval, optlen,
 	    SOV_DEFAULT));
@@ -250,7 +250,7 @@ __xnet_sendmsg(int sock, const struct msghdr *msg, int flags)
 
 int
 __xnet_sendto(int sock, const void *buf, size_t len, int flags,
-	const struct sockaddr *addr, socklen_t addrlen)
+    const struct sockaddr *addr, socklen_t addrlen)
 {
 	return (_so_sendto(sock, buf, len, flags | MSG_XPG4_2,
 	    addr, addrlen));
@@ -258,7 +258,7 @@ __xnet_sendto(int sock, const void *buf, size_t len, int flags,
 
 int
 __xnet_getsockopt(int sock, int level, int option_name,
-	void *option_value, socklen_t *option_lenp)
+    void *option_value, socklen_t *option_lenp)
 {
 	if (level == IPPROTO_SCTP) {
 		return (_getsockopt(sock, level, option_name, option_value,
