@@ -50,7 +50,7 @@ extern "C" {
  * @param	    responseBuffer User-allocated response buffer
  * @param	    responseSize Size of User-allocated response buffer
  * @param	    scsiStatus User-allocated scsi status byte
- * 
+ *
  * @doc		    This routine will attempt a limited number of retries
  *		    When busy or again errors are encountered.
  */
@@ -87,6 +87,7 @@ Sun_fcScsiReadCapacityV2(HBA_HANDLE handle, HBA_WWN portWWN,
 		return (HBA_STATUS_ERROR);
 	    }
 	}
+	return (HBA_STATUS_ERROR_TRY_AGAIN);
 }
 #ifdef	__cplusplus
 }
