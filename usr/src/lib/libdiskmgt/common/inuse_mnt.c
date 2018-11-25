@@ -63,7 +63,7 @@ static void		free_mnttab(struct mntpnt_list *listp);
 static boolean_t	in_list(struct mntpnt_list *elementp,
 			    struct mntpnt_list *listp);
 static int		load_mnttab(int send_event);
-static void		watch_mnttab();
+static void		*watch_mnttab(void *);
 
 /*
  * Search the list of devices from /etc/mnttab to find the mount point
@@ -89,7 +89,7 @@ inuse_mnt(char *slice, nvlist_t *attrs, int *errp)
 
 	    if (*errp == 0) {
 		/* start a thread to monitor the mnttab */
-		*errp = thr_create(NULL, 0, (void *(*)(void *))watch_mnttab,
+		*errp = thr_create(NULL, 0, watch_mnttab,
 		    NULL, THR_NEW_LWP | THR_DAEMON, &mnttab_thread);
 	    }
 
@@ -357,8 +357,8 @@ load_mnttab(int send_event)
  * that would cause us to flush and reload the cache of mnt entries.  Only
  * changes to /dev devices will cause the cache to be flushed and reloaded.
  */
-static void
-watch_mnttab()
+static void *
+watch_mnttab(void *arg __unused)
 {
 	struct pollfd fds[1];
 	int res;
@@ -382,4 +382,5 @@ watch_mnttab()
 		(void) lseek(fds[0].fd, 0, SEEK_SET);
 	    }
 	}
+	return (NULL);
 }
