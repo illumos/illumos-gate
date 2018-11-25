@@ -171,7 +171,7 @@ md5_open(const Method_t* method, const char* name)
 		lmd->name = name;
 		lmd->datasize = 16;
 		lmd->initf = (Lmd_init_f)MD5Init;
-		lmd->updatef = (Lmd_update_f)MD5Update;
+		lmd->updatef = (Lmd_update_f)(uintptr_t)MD5Update;
 		lmd->finalf = (Lmd_final_f)MD5Final;
 		md5_init((Sum_t*)lmd);
 	}
