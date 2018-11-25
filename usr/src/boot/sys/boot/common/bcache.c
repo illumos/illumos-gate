@@ -85,7 +85,6 @@ static u_int bcache_rablks;
 	((bc)->bcache_ctl[BHASH((bc), (blkno))].bc_blkno != (blkno))
 #define	BCACHE_READAHEAD	256
 #define	BCACHE_MINREADAHEAD	32
-#define	BCACHE_MARKER		0xdeadbeef
 
 static void	bcache_invalidate(struct bcache *bc, daddr_t blkno);
 static void	bcache_insert(struct bcache *bc, daddr_t blkno);
@@ -122,7 +121,6 @@ bcache_allocate(void)
     u_int i;
     struct bcache *bc = malloc(sizeof (struct bcache));
     int disks = bcache_numdev;
-    uint32_t *marker;
 
     if (disks == 0)
 	disks = 1;	/* safe guard */
@@ -141,8 +139,7 @@ bcache_allocate(void)
 
     bc->bcache_nblks = bcache_total_nblks >> i;
     bcache_unit_nblks = bc->bcache_nblks;
-    bc->bcache_data = malloc(bc->bcache_nblks * bcache_blksize +
-	sizeof (uint32_t));
+    bc->bcache_data = malloc(bc->bcache_nblks * bcache_blksize);
     if (bc->bcache_data == NULL) {
 	/* dont error out yet. fall back to 32 blocks and try again */
 	bc->bcache_nblks = 32;
@@ -157,9 +154,6 @@ bcache_allocate(void)
 	errno = ENOMEM;
 	return (NULL);
     }
-    /* Insert cache end marker. */
-    marker = (uint32_t *)(bc->bcache_data + bc->bcache_nblks * bcache_blksize);
-    *marker = BCACHE_MARKER;
 
     /* Flush the cache */
     for (i = 0; i < bc->bcache_nblks; i++) {
@@ -209,7 +203,7 @@ write_strategy(void *devdata, int rw, daddr_t blk, size_t size,
 /*
  * Handle a read request; fill in parts of the request that can
  * be satisfied by the cache, use the supplied strategy routine to do
- * device I/O and then use the I/O results to populate the cache. 
+ * device I/O and then use the I/O results to populate the cache.
  */
 static int
 read_strategy(void *devdata, int rw, daddr_t blk, size_t size,
@@ -221,13 +215,11 @@ read_strategy(void *devdata, int rw, daddr_t blk, size_t size,
     int				result;
     daddr_t			p_blk;
     caddr_t			p_buf;
-    uint32_t			*marker;
 
     if (bc == NULL) {
 	errno = ENODEV;
 	return (-1);
     }
-    marker = (uint32_t *)(bc->bcache_data + bc->bcache_nblks * bcache_blksize);
 
     if (rsize != NULL)
 	*rsize = 0;
@@ -348,19 +340,13 @@ read_strategy(void *devdata, int rw, daddr_t blk, size_t size,
 	result = 0;
     }
 
-    if (*marker != BCACHE_MARKER) {
-	printf("BUG: bcache corruption detected: nblks: %zu p_blk: %lu, "
-	    "p_size: %zu, ra: %zu\n", bc->bcache_nblks,
-	    (long unsigned)BHASH(bc, p_blk), p_size, ra);
-    }
-
  done:
     if ((result == 0) && (rsize != NULL))
 	*rsize = size;
     return(result);
 }
 
-/* 
+/*
  * Requests larger than 1/2 cache size will be bypassed and go
  * directly to the disk.  XXX tune this.
  */
@@ -454,7 +440,7 @@ static void
 bcache_insert(struct bcache *bc, daddr_t blkno)
 {
     u_int	cand;
-    
+
     cand = BHASH(bc, blkno);
 
     DEBUG("insert blk %llu -> %u # %d", blkno, cand, bcache_bcount);
@@ -469,7 +455,7 @@ static void
 bcache_invalidate(struct bcache *bc, daddr_t blkno)
 {
     u_int	i;
-    
+
     i = BHASH(bc, blkno);
     if (bc->bcache_ctl[i].bc_blkno == blkno) {
 	bc->bcache_ctl[i].bc_count = -1;
