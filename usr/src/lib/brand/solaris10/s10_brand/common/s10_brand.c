@@ -1695,7 +1695,7 @@ s10_lwp_private(sysret_t *rval, int cmd, int which, uintptr_t base)
 		 * Manual," Volume 3A for more details.
 		 */
 		brand_sysent_table[SYS_lwp_create].st_callc =
-		    (sysent_cb_t)s10_lwp_create_correct_fs;
+		    (sysent_cb_t)(uintptr_t)s10_lwp_create_correct_fs;
 		return (__systemcall(rval, SYS_brand + 1024,
 		    B_S10_FSREGCORRECTION));
 	}

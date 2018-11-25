@@ -161,7 +161,7 @@ extern "C" {
 #define	brand_assert(ex)	(void)((ex) || \
 				(_brand_abort(0, #ex, __FILE__, __LINE__), 0))
 #define	brand_abort(err, msg)	_brand_abort((err), (msg), __FILE__, __LINE__)
-#define	EMULATE(cb, args)	{ (sysent_cb_t)(cb), (args) }
+#define	EMULATE(cb, args)	{ (sysent_cb_t)(uintptr_t)(cb), (args) }
 #define	NOSYS			EMULATE(brand_unimpl, (0 | RV_DEFAULT))
 
 typedef long (*sysent_cb_t)();
