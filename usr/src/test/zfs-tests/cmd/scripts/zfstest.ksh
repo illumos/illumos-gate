@@ -15,6 +15,7 @@
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2018 Joyent, Inc.
 #
 
 export PATH="/usr/bin"
@@ -70,6 +71,8 @@ function find_runfile
 		distro=openindiana
 	elif [[ 0 -ne $(grep -c OmniOS /etc/release 2>/dev/null) ]]; then
 		distro=omnios
+	elif [[ 0 -ne $(grep -c SmartOS /etc/release 2>/dev/null) ]]; then
+		distro=smartos
 	fi
 
 	[[ -n $distro ]] && echo $STF_SUITE/runfiles/$distro.run
@@ -126,6 +129,18 @@ function constrain_path
 
 	# Special case links
 	ln -s /usr/gnu/bin/dd $PATHDIR/gnu_dd
+
+	# SmartOS does not ship sudo or truncate. Link to them in the
+	# package manager's namespace.
+	if [[ ! -x $PATHDIR/sudo ]]; then
+		rm $PATHDIR/sudo && ln -s /opt/local/bin/sudo $PATHDIR/sudo ||
+			fail "Couldn't link sudo"
+	fi
+	if [[ ! -x $PATHDIR/truncate ]]; then
+		rm $PATHDIR/truncate &&
+			ln -s /opt/local/bin/truncate $PATHDIR/truncate ||
+			fail "Couldn't link truncate"
+	fi
 }
 
 constrain_path

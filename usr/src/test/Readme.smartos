@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2017, Joyent, Inc.
+# Copyright 2018, Joyent, Inc.
 #
 
 I) Introduction
@@ -24,11 +24,7 @@ Although it is possible to run some of the tests within a non-global zone, as a
 user configured within that zone, that approach is not described here.
 
 Some test suites, such as the ZFS tests, assume there are available disks to
-use for the test run. This configuration is not currently available on a
-standard SmartOS installation, where all of the disks are already setup in the
-"zones" zpool, so these tests are not runnable at this time. The ZFS tests
-also are required to run as a non-root user, and that is non-standard for a
-SmartOS global zone, where any user created is lost on reboot.
+use for the test run. For more information on running the ZFS tests, see II.4).
 
 II) Setup to Run the Tests
 
@@ -64,6 +60,40 @@ II) Setup to Run the Tests
    # cd /opt
    # tar xf /zones/opt.tgz
 
+4) (optional) Running the ZFS tests requires a few additional steps.
+   The ZFS test suite must _not_ be run as the root user. Instead we will create
+   a new user called 'ztest' that we will use to run the tests.
+
+   a) Make sure the system has three unused 10GB disks. These disks must not be
+      associated with an existing zpool.
+
+   b) In preparation for installing 'sudo' and adding a user for the ZFS test
+      suite, edit /etc/passwd and /etc/shadow:
+      # echo "cyrus:x:100:1::/home/cyrus:/bin/sh" >> /etc/passwd
+      # echo "ztest:x:101:1::/home/ztest:/bin/sh" >> /etc/passwd
+      # echo "cyrus:*LK*:::::::" >> /etc/shadow
+      # echo "ztest:*LK*:::::::" >> /etc/shadow
+
+      Note: The /etc/passwd modifications will not persist after reboot.
+
+   c) sudo and truncate must be installed. They will later be linked into the
+      appropriate location by the ZFS test suite.
+      # pkgin in sudo
+      # pkgin in coreutils # provides truncate
+
+   d) The ztest user must be able to use sudo without a password:
+      # echo "ztest ALL=(ALL) NOPASSWD: ALL" >> /opt/local/etc/sudoers
+
+   e) Change to the 'ztest' user and set environment variables. In this example
+      DISKS is the list of three unused disks that will be used to run the
+      tests. KEEP is a list of zpools that the tests should _not_ destroy:
+      # su ztest
+      $ export DISKS='c2t1d0 c2t2d0 c2t3d0'
+      $ export KEEP='zones'
+
+      Beware that data loss will occur for any data residing on DISKS and
+      failure to specify a KEEP pool may also lead to data loss.
+
 III) Run the Tests
 
 Now that setup is complete, you can run the tests using the normal procedure.
@@ -72,6 +102,8 @@ For example:
     # /opt/util-tests/bin/utiltest
 or
     # /opt/os-tests/bin/ostest
+or (as 'ztest' user after 4.e above)
+    $ /opt/zfs-tests/bin/zfstest
 
 IV) Running New Tests
 
