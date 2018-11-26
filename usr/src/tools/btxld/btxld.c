@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -60,7 +61,6 @@
 #define F_CNT	3		/* Number of formats */
 
 #define IMPURE	1		/* Writable text */
-#define MAXU32	0xffffffff	/* Maximum unsigned 32-bit quantity */
 
 #define align(x, y) (((x) + (y) - 1) & ~((y) - 1))
 
@@ -94,10 +94,10 @@ static const char *oname =
 static int ppage = -1;		/* First page present */
 static int wpage = -1;		/* First page writable */
 
-static unsigned int format; 	/* Output format */
+static unsigned int format;	/* Output format */
 
-static uint32_t centry; 	/* Client entry address */
-static uint32_t lentry; 	/* Loader entry address */
+static uint32_t centry;		/* Client entry address */
+static uint32_t lentry;		/* Loader entry address */
 
 static int Eflag;		/* Client entry option */
 
@@ -121,7 +121,7 @@ static uint32_t optaddr(const char *);
 static int optpage(const char *, int);
 static void Warn(const char *, const char *, ...);
 static void usage(void);
-extern void add_version(const char *, char *);
+extern void add_version(const char *, const char *, char *);
 
 /*
  * A link editor for BTX clients.
@@ -178,8 +178,20 @@ main(int argc, char *argv[])
     atexit(cleanup);
     if (lname != NULL && bname != NULL)
 	btxld(*argv);
-    if (version != NULL)
-	add_version(oname, version);
+
+    if (version != NULL) {
+	if (tname != NULL) {
+		add_version(tname, oname, version);
+		cleanup();
+	} else {
+		add_version(*argv, oname, version);
+	}
+    } else {
+	if (rename(tname, oname))
+		err(2, "%s: Can't rename to %s", tname, oname);
+	free((void *)(intptr_t)tname);
+	tname = NULL;
+    }
     return 0;
 }
 
@@ -189,8 +201,11 @@ main(int argc, char *argv[])
 static void
 cleanup(void)
 {
-    if (tname)
-	(void) remove(tname);
+	if (tname) {
+		(void) remove(tname);
+		free((void *)(intptr_t)tname);
+		tname = NULL;
+	}
 }
 
 /*
@@ -286,10 +301,6 @@ btxld(const char *iname)
     }
     if (close(fdo))
 	err(2, "%s", tname);
-    if (rename(tname, oname))
-	err(2, "%s: Can't rename to %s", tname, oname);
-    free((void *)(intptr_t)tname);
-    tname = NULL;
     if (verbose) {
 	printf(binfo, btx.btx_majver, btx.btx_minver, btx.btx_textsz,
 	       BTX_ORIGIN(btx), BTX_ENTRY(btx), BTX_MAPPED(btx) *
@@ -335,7 +346,7 @@ gethdr(int fd, struct hdr *hdr)
     memset(hdr, 0, sizeof(*hdr));
     if (fstat(fd, &sb))
 	err(2, "%s", fname);
-    if (sb.st_size > MAXU32)
+    if (sb.st_size > UINT32_MAX)
 	errx(1, "%s: Too big", fname);
     hdr->size = sb.st_size;
     if (!hdr->size)
@@ -525,7 +536,7 @@ optaddr(const char *arg)
 
     errno = 0;
     x = strtoul(arg, &s, 0);
-    if (errno || !*arg || *s || x > MAXU32)
+    if (errno || !*arg || *s || x > UINT32_MAX)
 	errx(1, "%s: Illegal address", arg);
     return x;
 }
