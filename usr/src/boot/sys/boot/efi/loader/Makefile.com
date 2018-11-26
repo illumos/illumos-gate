@@ -30,7 +30,7 @@ SRCS=	autoload.c bootinfo.c conf.c copy.c efi_main.c framebuffer.c main.c \
 OBJS=	autoload.o bootinfo.o conf.o copy.o efi_main.o framebuffer.o main.o \
 	self_reloc.o smbios.o acpi.o vers.o memmap.o multiboot2.o
 
-CFLAGS=	-O2
+CFLAGS=	-Os
 CPPFLAGS= -nostdinc -I../../../../../include -I../../..../
 CPPFLAGS += -I../../../../../lib/libstand
 CPPFLAGS += -I../../../../../lib/libz

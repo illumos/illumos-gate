@@ -27,7 +27,7 @@ CPPFLAGS =	-nostdinc -I../../../../include -I$(LIBSTAND_SRC)
 CPPFLAGS +=	-I../../..  -I../../../sys -I. -I$(SRC)/common/bzip2
 CPPFLAGS +=	-D_STANDALONE
 
-CFLAGS =	-O2 -fPIC -ffreestanding -Wformat
+CFLAGS =	-Os -fPIC -ffreestanding -Wformat
 CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3 -msoft-float
 CFLAGS +=	-Wall -Werror
 

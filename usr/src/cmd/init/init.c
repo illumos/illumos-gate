@@ -413,17 +413,17 @@ static struct	pidlist {
 
 /*
  * The following structure contains a set of modes for /dev/syscon
- * and should match the default contents of /etc/ioctl.syscon.  It should also
- * be kept in-sync with base_termios in uts/common/io/ttcompat.c.
+ * and should match the default contents of /etc/ioctl.syscon.
  */
 static struct termios	dflt_termios = {
-	BRKINT|ICRNL|IXON|IMAXBEL,			/* iflag */
-	OPOST|ONLCR|TAB3,				/* oflag */
-	CS8|CREAD|B9600,				/* cflag */
-	ISIG|ICANON|ECHO|ECHOE|ECHOK|ECHOCTL|ECHOKE|IEXTEN, /* lflag */
-	CINTR, CQUIT, CERASE, CKILL, CEOF, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0
+	.c_iflag = BRKINT|ICRNL|IXON|IMAXBEL,
+	.c_oflag = OPOST|ONLCR|TAB3,
+	.c_cflag = CS8|CREAD|B9600,
+	.c_lflag = ISIG|ICANON|ECHO|ECHOE|ECHOK|ECHOCTL|ECHOKE|IEXTEN,
+	.c_cc = { CINTR, CQUIT, CERASE, CKILL, CEOF, 0, 0, 0,
+	    CSTART, CSTOP, CSWTCH, CDSUSP, CRPRNT, CFLUSH, CWERASE, CLNEXT,
+	    CSTATUS, CERASE2, 0
+	}
 };
 
 static struct termios	stored_syscon_termios;

@@ -317,6 +317,7 @@ t4_devo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&sc->lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&sc->cv, NULL, CV_DRIVER, NULL);
 	mutex_init(&sc->sfl_lock, NULL, MUTEX_DRIVER, NULL);
+	TAILQ_INIT(&sc->sfl);
 
 	mutex_enter(&t4_adapter_list_lock);
 	SLIST_INSERT_HEAD(&t4_adapter_list, sc, link);

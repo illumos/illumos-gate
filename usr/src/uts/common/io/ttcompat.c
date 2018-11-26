@@ -157,21 +157,6 @@ static struct streamtab ttcoinfo = {
 	NULL
 };
 
-/*
- * This is the termios structure that is used to reset terminal settings
- * when the underlying device is an instance of zcons.  It came from
- * cmd/init/init.c and should be kept in-sync with dflt_termios found therein.
- */
-static const struct termios base_termios = {
-	BRKINT|ICRNL|IXON|IMAXBEL,				/* iflag */
-	OPOST|ONLCR|TAB3,					/* oflag */
-	CS8|CREAD|B9600,					/* cflag */
-	ISIG|ICANON|ECHO|ECHOE|ECHOK|ECHOCTL|ECHOKE|IEXTEN,	/* lflag */
-	CINTR, CQUIT, CERASE, CKILL, CEOF, 0, 0, 0, 0, 0, 0, 0,	/* c_cc vals */
-	0, 0, 0, 0, 0, 0, 0
-};
-
-
 static void ttcompat_do_ioctl(ttcompat_state_t *, queue_t *, mblk_t *);
 static void ttcompat_ioctl_ack(queue_t *, mblk_t *);
 static void ttcopyout(queue_t *, mblk_t *);
@@ -187,10 +172,6 @@ static int
 ttcompatopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 {
 	ttcompat_state_t *tp;
-	mblk_t *mp;
-	mblk_t *datamp;
-	struct iocblk *iocb;
-	int error;
 
 	if (q->q_ptr != NULL)  {
 		tp = (ttcompat_state_t *)q->q_ptr;
@@ -202,93 +183,11 @@ ttcompatopen(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		return (0);		/* already attached */
 	}
 	tp = kmem_zalloc(sizeof (ttcompat_state_t), KM_SLEEP);
-	tp->t_iocpending = NULL;
-	tp->t_state = 0;
-	tp->t_iocid = 0;
-	tp->t_ioccmd = 0;
-	tp->t_new_lflags = 0;
-	tp->t_curstate.t_flags = 0;
-	tp->t_curstate.t_ispeed = B0;
-	tp->t_curstate.t_ospeed = B0;
-	tp->t_curstate.t_erase = '\0';
-	tp->t_curstate.t_kill = '\0';
-	tp->t_curstate.t_intrc = '\0';
-	tp->t_curstate.t_quitc = '\0';
-	tp->t_curstate.t_startc = '\0';
-	tp->t_curstate.t_stopc = '\0';
-	tp->t_curstate.t_eofc = '\0';
-	tp->t_curstate.t_brkc = '\0';
-	tp->t_curstate.t_suspc = '\0';
-	tp->t_curstate.t_dsuspc = '\0';
-	tp->t_curstate.t_rprntc = '\0';
-	tp->t_curstate.t_flushc = '\0';
-	tp->t_curstate.t_werasc = '\0';
-	tp->t_curstate.t_lnextc = '\0';
-	tp->t_curstate.t_xflags = 0;
-	tp->t_bufcallid = 0;
-	tp->t_arg = 0;
-
 	q->q_ptr = tp;
 	WR(q)->q_ptr = tp;
 	qprocson(q);
 
-	/*
-	 * Determine if the underlying device is a zcons instance.  If so,
-	 * then issue a termios ioctl to reset the terminal settings.
-	 */
-	if (getmajor(q->q_stream->sd_vnode->v_rdev) !=
-	    ddi_name_to_major("zcons"))
-		return (0);
-
-	/*
-	 * Create the ioctl message.
-	 */
-	if ((mp = mkiocb(TCSETSF)) == NULL) {
-		error = ENOMEM;
-		goto common_error;
-	}
-	if ((datamp = allocb(sizeof (struct termios), BPRI_HI)) == NULL) {
-		freemsg(mp);
-		error = ENOMEM;
-		goto common_error;
-	}
-	iocb = (struct iocblk *)mp->b_rptr;
-	iocb->ioc_count = sizeof (struct termios);
-	bcopy(&base_termios, datamp->b_rptr, sizeof (struct termios));
-	datamp->b_wptr += sizeof (struct termios);
-	mp->b_cont = datamp;
-
-	/*
-	 * Send the ioctl message on its merry way toward the driver.
-	 * Set some state beforehand so we can properly wait for
-	 * an acknowledgement.
-	 */
-	tp->t_state |= TS_IOCWAIT | TS_TIOCNAK;
-	tp->t_iocid = iocb->ioc_id;
-	tp->t_ioccmd = TCSETSF;
-	putnext(WR(q), mp);
-
-	/*
-	 * Wait for an acknowledgement.  A NAK is treated as an error.
-	 * The presence of the TS_TIOCNAK flag indicates that a NAK was
-	 * received.
-	 */
-	while (tp->t_state & TS_IOCWAIT) {
-		if (qwait_sig(q) == 0) {
-			error = EINTR;
-			goto common_error;
-		}
-	}
-	if (!(tp->t_state & TS_TIOCNAK))
-		return (0);
-	error = ENOTTY;
-
-common_error:
-	qprocsoff(q);
-	kmem_free(tp, sizeof (ttcompat_state_t));
-	q->q_ptr = NULL;
-	WR(q)->q_ptr = NULL;
-	return (error);
+	return (0);
 }
 
 /* ARGSUSED1 */

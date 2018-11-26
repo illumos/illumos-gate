@@ -24,7 +24,7 @@ clobber:
 
 CC=     $(GNUC_ROOT)/bin/gcc
 
-CFLAGS=		-O2
+CFLAGS=		-Os
 CFLAGS +=       -fPIC -ffreestanding -msoft-float
 CFLAGS +=       -mno-mmx -mno-3dnow -mno-sse2 -mno-sse3 -mno-sse
 CFLAGS +=       -mno-avx -mno-aes -std=gnu99

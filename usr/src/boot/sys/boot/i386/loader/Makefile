@@ -17,7 +17,7 @@
 include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
 
-CFLAGS=		-O2 -fno-reorder-functions
+CFLAGS=		-Os -fno-reorder-functions
 CPPFLAGS=	-D_STANDALONE -nostdinc -I../../../../include -I../../..
 CPPFLAGS +=	-I$(SRC)/uts/intel/sys/acpi
 CPPFLAGS +=	-I../../../../lib/libz
@@ -65,6 +65,7 @@ LIBFICL=	../../libficl/$(MACH)/libficl.a
 SRCS +=	boot.c commands.c console.c devopen.c interp.c
 SRCS +=	interp_backslash.c interp_parse.c ls.c misc.c
 SRCS +=	module.c panic.c linenoise.c multiboot2.c
+SRCS +=	zfs_cmd.c
 
 SRCS +=	load_elf32.c load_elf32_obj.c reloc_elf32.c
 SRCS +=	load_elf64.c load_elf64_obj.c reloc_elf64.c

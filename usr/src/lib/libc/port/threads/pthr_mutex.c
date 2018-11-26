@@ -226,6 +226,23 @@ pthread_mutex_init(pthread_mutex_t *_RESTRICT_KYWD mutex,
 		    PTHREAD_PRIO_NONE | PTHREAD_MUTEX_STALLED;
 	}
 
+	/*
+	 * POSIX mutexes (this interface) make no guarantee about the state of
+	 * the mutex before pthread_mutex_init(3C) is called.  Sun mutexes, upon
+	 * which these are built and which mutex_init(3C) below represents
+	 * require that a robust mutex be initialized to all 0s _prior_ to
+	 * mutex_init() being called, and that mutex_init() of an initialized
+	 * mutex return EBUSY.
+	 *
+	 * We respect both these behaviors by zeroing the mutex here in the
+	 * POSIX implementation if and only if the mutex magic is incorrect,
+	 * and the mutex is robust.
+	 */
+	if (((type & PTHREAD_MUTEX_ROBUST) != 0) &&
+	    (((mutex_t *)mutex)->mutex_magic != MUTEX_MAGIC)) {
+		(void) memset(mutex, 0, sizeof (*mutex));
+	}
+
 	return (mutex_init((mutex_t *)mutex, type, &prioceiling));
 }
 

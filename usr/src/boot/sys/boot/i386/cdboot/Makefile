@@ -20,7 +20,7 @@ ROOT_BOOT = $(ROOT)/boot
 LD=	$(GNU_ROOT)/bin/gld
 CC=	$(GNUC_ROOT)/bin/gcc
 
-CFLAGS =	-O2 -I../common -march=i386 -ffreestanding -mno-mmx -mno-3dnow
+CFLAGS =	-Os -I../common -march=i386 -ffreestanding -mno-mmx -mno-3dnow
 CFLAGS +=	-mno-sse -mno-sse2 -mno-sse3 -msoft-float -std=gnu99 -m32
 CPPFLAGS=
 CCASFLAGS=	-Wa,--divide
