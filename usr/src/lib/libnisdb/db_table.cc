@@ -1115,6 +1115,7 @@ db_table::dump(char *file)
 	else
 		ret = status;
 	READUNLOCK(this, ret, "ru db_table::dump");
+	return (ret);
 }
 
 /* Constructor that loads in the table from the given file */
