@@ -137,7 +137,8 @@ static struct ldap_error ldap_error_NULL = { LDAP_SUCCESS, NULL, NULL};
 
 /* destructor: free the ldap error data in the thread specific area */
 static void
-ns_mtckey_cleanup(void *key) {
+ns_mtckey_cleanup(void *key)
+{
 	struct ldap_error *le = (struct ldap_error *)key;
 
 	if (le == NULL)
@@ -153,7 +154,8 @@ ns_mtckey_cleanup(void *key) {
 
 /* Free/detach the thread specific data structures */
 static void
-conn_tsd_free() {
+conn_tsd_free(void)
+{
 	void	*tsd = NULL;
 	int	rc;
 
@@ -312,6 +314,12 @@ get_errno(void)
 	return (errno);
 }
 
+static void *
+ltf_threadid(void)
+{
+	return ((void *)(uintptr_t)thr_self());
+}
+
 /* set up an ldap session 'ld' for sharing among multiple threads */
 static int
 setup_mt_conn(LDAP *ld)
@@ -352,7 +360,7 @@ setup_mt_conn(LDAP *ld)
 	 */
 	(void) memset(&extrafns, '\0',
 	    sizeof (struct ldap_extra_thread_fns));
-	extrafns.ltf_threadid_fn = (void * (*)(void))thr_self;
+	extrafns.ltf_threadid_fn = ltf_threadid;
 	extrafns.ltf_mutex_trylock = NULL;
 	extrafns.ltf_sema_alloc = NULL;
 	extrafns.ltf_sema_free = NULL;
@@ -1078,7 +1086,7 @@ del_cm4cmg(ns_conn_mt_t *cm, ns_conn_mgmt_t *cmg)
  */
 static boolean_t
 is_server_cred_matched(const char *server, const ns_cred_t *cred,
-	ns_conn_mt_t *cm)
+    ns_conn_mt_t *cm)
 {
 	Connection	*cp = cm->conn;
 
@@ -1148,7 +1156,8 @@ wait_for_conn_mt(ns_conn_user_t *cu, ns_conn_mt_t *cm)
  */
 static boolean_t
 check_and_close_conn(ns_conn_mgmt_t *cmg, ns_conn_mt_t **cm,
-	ns_conn_user_t *cu) {
+    ns_conn_user_t *cu)
+{
 
 	int rc;
 	int j;
@@ -1265,8 +1274,8 @@ check_and_close_conn(ns_conn_mgmt_t *cmg, ns_conn_mt_t **cm,
  */
 static boolean_t
 match_conn_mt(ns_conn_user_t *cu, ns_conn_mt_t **cmt,
-	ns_conn_mt_state_t st, const char *server,
-	const ns_cred_t *cred)
+    ns_conn_mt_state_t st, const char *server,
+    const ns_cred_t *cred)
 {
 	boolean_t	matched = B_FALSE;
 	boolean_t	drop_conn;
@@ -1379,7 +1388,7 @@ match_conn_mt(ns_conn_user_t *cu, ns_conn_mt_t **cmt,
  */
 int
 __s_api_conn_mt_get(const char *server, const int flags, const ns_cred_t *cred,
-	Connection **session, ns_ldap_error_t **errorp, ns_conn_user_t *cu)
+    Connection **session, ns_ldap_error_t **errorp, ns_conn_user_t *cu)
 {
 	int		rc;
 	int		i;
@@ -1631,7 +1640,8 @@ __s_api_conn_mt_return(ns_conn_user_t *cu)
 
 /* save error info (rc and ns_ldap_error_t) in the conn_mt */
 static void
-err2cm(ns_conn_mt_t *cm, int rc, ns_ldap_error_t **errorp) {
+err2cm(ns_conn_mt_t *cm, int rc, ns_ldap_error_t **errorp)
+{
 	ns_ldap_error_t	*ep;
 
 	cm->ns_rc = rc;
@@ -1647,7 +1657,8 @@ err2cm(ns_conn_mt_t *cm, int rc, ns_ldap_error_t **errorp) {
 
 /* copy error info (rc and ns_ldap_error_t) from conn_mt to conn_user */
 static void
-err_from_cm(ns_conn_user_t *cu, ns_conn_mt_t *cm) {
+err_from_cm(ns_conn_user_t *cu, ns_conn_mt_t *cm)
+{
 	ns_ldap_error_t	*ep;
 
 	cu->ns_rc = cm->ns_rc;
@@ -1665,7 +1676,8 @@ err_from_cm(ns_conn_user_t *cu, ns_conn_mt_t *cm) {
 
 /* copy error info (rc and ns_ldap_error_t) from caller to conn_user */
 static void
-err_from_caller(ns_conn_user_t *cu, int rc, ns_ldap_error_t **errorp) {
+err_from_caller(ns_conn_user_t *cu, int rc, ns_ldap_error_t **errorp)
+{
 
 	cu->ns_rc = rc;
 	if (errorp != NULL) {
@@ -1733,7 +1745,7 @@ __s_api_conn_mt_remove(ns_conn_user_t *cu, int rc, ns_ldap_error_t **errorp)
  */
 int
 __s_api_check_libldap_MT_conn_support(ns_conn_user_t *cu, LDAP *ld,
-	ns_ldap_error_t **ep)
+    ns_ldap_error_t **ep)
 {
 	int		rc;
 	ns_conn_mgmt_t	*cmg;
@@ -1779,7 +1791,7 @@ __s_api_check_libldap_MT_conn_support(ns_conn_user_t *cu, LDAP *ld,
  */
 static int
 close_conn_mt(ns_conn_mt_t *cm, int rc, ns_ldap_error_t **errorp,
-	ns_conn_user_t *cu)
+    ns_conn_user_t *cu)
 {
 	ns_conn_mgmt_t	*cmg = cm->conn_mgmt;
 	ns_conn_mt_t	*m;
@@ -1992,7 +2004,7 @@ proc_server_change(ns_server_status_change_t *chg, ns_conn_mgmt_t  *cmg)
 	int		cnt, i, j, k, n;
 	boolean_t	loop = B_TRUE;
 	boolean_t	cmg_locked = B_FALSE;
-	char 		*s;
+	char		*s;
 	ns_conn_mt_t	*cm;
 	ns_conn_mgmt_t	*ocmg;
 
@@ -2278,8 +2290,8 @@ __s_api_reinit_conn_mgmt_new_config(ns_config_t *new_cfg)
  */
 int
 __s_api_setup_retry_search(ns_conn_user_t **conn_user,
-	ns_conn_user_type_t type, int *try_cnt, int *rc,
-	ns_ldap_error_t **errorp)
+    ns_conn_user_type_t type, int *try_cnt, int *rc,
+    ns_ldap_error_t **errorp)
 {
 	boolean_t	retry;
 	ns_conn_user_t	*cu = *conn_user;
@@ -2329,7 +2341,7 @@ __s_api_setup_retry_search(ns_conn_user_t **conn_user,
 /* prepare to get the next entry for an enumeration */
 int
 __s_api_setup_getnext(ns_conn_user_t *cu, int *ns_err,
-	ns_ldap_error_t **errorp)
+    ns_ldap_error_t **errorp)
 {
 	int rc;
 	ns_conn_mgmt_t	*cmg;
@@ -2616,7 +2628,8 @@ get_server_change(void *arg)
 
 /* start the thread handling the change notification from ldap_cachemgr */
 static void
-start_thread(ns_conn_mgmt_t *cmg) {
+start_thread(ns_conn_mgmt_t *cmg)
+{
 
 	int		errnum;
 
