@@ -102,7 +102,7 @@ static pthread_mutex_t	b_alloc_lock;
 static pthread_mutex_t	b_refcnt_lock;
 
 static void		input(void *, void *, int, door_desc_t *, int);
-static void		process(plugin_t *);
+static void		*process(void *);
 
 static audit_q_t	*qpool_withdraw(plugin_t *);
 static void		qpool_init(plugin_t *, int);
@@ -505,8 +505,7 @@ auditd_thread_init()
 			(void) pthread_cond_init(&(p->plg_cv), NULL);
 			p->plg_waiting = 0;
 
-			if (pthread_create(&(p->plg_tid), NULL,
-			    (void *(*)(void *))process, p)) {
+			if (pthread_create(&(p->plg_tid), NULL, process, p)) {
 				report_error(INTERNAL_SYS_ERROR,
 				    gettext("thread creation failed"),
 				    p->plg_path);
@@ -787,7 +786,7 @@ bpool_return(audit_rec_t *node)
 #if DEBUG
 	audit_rec_t	*copy = node;
 #endif
-	node = audit_release(&b_refcnt_lock, node); 	/* decrement ref cnt */
+	node = audit_release(&b_refcnt_lock, node);	/* decrement ref cnt */
 
 	if (node != NULL) {	/* NULL if ref cnt is not zero */
 		audit_enqueue(&b_pool, node);
@@ -1179,15 +1178,16 @@ input_exit:
 /*
  * process() -- pass a buffer to a plugin
  */
-static void
-process(plugin_t *p)
+static void *
+process(void *arg)
 {
+	plugin_t *p		= arg;
 	int			rc;
 	audit_rec_t		*b_node;
 	audit_q_t		*q_node;
 	auditd_rc_t		plugrc;
 	char			*error_string;
-	struct timespec 	delay;
+	struct timespec		delay;
 	int			sendsignal;
 	int			queue_len;
 	struct sched_param	param;
@@ -1314,4 +1314,5 @@ plugin_removed:
 	(void) pthread_mutex_lock(&plugin_mutex);
 	(void) unload_plugin(p);
 	(void) pthread_mutex_unlock(&plugin_mutex);
+	return (NULL);
 }
