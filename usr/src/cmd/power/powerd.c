@@ -149,13 +149,13 @@ static void set_alarm(time_t);
 static int poweroff(const char *, char **);
 static int is_ok2shutdown(time_t *);
 static int get_prom(int, prom_node_t, char *, char *, size_t);
-static void power_button_monitor(void *);
+static void *power_button_monitor(void *);
 static int open_pidfile(char *);
 static int write_pidfile(int, pid_t);
 static int read_cpr_config(void);
-static void system_activity_monitor(void);
+static void *system_activity_monitor(void *);
 #ifdef __x86
-static void autos3_monitor(void);
+static void *autos3_monitor(void *);
 #endif
 static void do_attach(void);
 static void *attach_devices(void *);
@@ -308,8 +308,7 @@ main(int argc, char *argv[])
 	if ((pb_fd = open(PB, O_RDONLY)) != -1) {
 		if (powerd_debug)
 			logerror("powerd starting power button monitor.");
-		if (thr_create(NULL, 0,
-		    (void *(*)(void *))power_button_monitor, NULL,
+		if (thr_create(NULL, 0, power_button_monitor, NULL,
 		    THR_DAEMON, NULL) != 0) {
 			logerror("Unable to monitor system's power button.");
 		}
@@ -323,8 +322,7 @@ main(int argc, char *argv[])
 	 */
 	if (powerd_debug)
 		logerror("powerd starting system activity monitor.");
-	if (thr_create(NULL, 0,
-	    (void *(*)(void *))system_activity_monitor, NULL,
+	if (thr_create(NULL, 0, system_activity_monitor, NULL,
 	    THR_DAEMON, NULL) != 0) {
 		logerror("Unable to create thread to monitor system activity.");
 	}
@@ -335,8 +333,8 @@ main(int argc, char *argv[])
 	 */
 	if (powerd_debug)
 		logerror("powerd starting autos3 monitor.");
-	if (thr_create(NULL, 0,
-	    (void *(*)(void *))autos3_monitor, NULL, THR_DAEMON, NULL) != 0) {
+	if (thr_create(NULL, 0, autos3_monitor, NULL, THR_DAEMON,
+	    NULL) != 0) {
 		logerror("Unable to create thread to monitor autos3 activity.");
 	}
 #endif
@@ -349,8 +347,8 @@ main(int argc, char *argv[])
 	return (1);
 }
 
-static void
-system_activity_monitor(void)
+static void *
+system_activity_monitor(void *arg __unused)
 {
 	struct sigaction act;
 	sigset_t sigmask;
@@ -392,11 +390,12 @@ system_activity_monitor(void)
 	do {
 		(void) sigsuspend(&sigmask);
 	} while (errno == EINTR);
+	return (NULL);
 }
 
 #ifdef __x86
-static void
-autos3_monitor(void)
+static void *
+autos3_monitor(void *arg __unused)
 {
 	struct pollfd poll_fd;
 	srn_event_info_t srn_event;		/* contains suspend type */
@@ -454,6 +453,7 @@ autos3_monitor(void)
 		(void) poweroff("AutoS3", autoS3_cmd);
 		continue;
 	}
+	return (NULL);
 }
 #endif
 
@@ -1169,7 +1169,7 @@ get_prom(int prom_fd, prom_node_t node_name,
 #define	iseol(ch)	((ch) == '\n' || (ch) == '\r' || (ch) == '\f')
 
 /*ARGSUSED*/
-static void
+static void *
 power_button_monitor(void *arg)
 {
 	struct pollfd pfd;
@@ -1228,6 +1228,7 @@ power_button_monitor(void *arg)
 			thr_exit((void *) 0);
 		}
 	}
+	return (NULL);
 }
 
 static void
