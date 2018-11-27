@@ -423,7 +423,7 @@ static int create_link_common(char *devlink, char *contents, int *exists);
 static char *dequote(char *src);
 static void parse_args(int argc, char *argv[]);
 static void process_devinfo_tree(void);
-static void minor_fini_thread(void *arg);
+static void *minor_fini_thread(void *arg);
 static void *s_realloc(void *ptr, const size_t size);
 static void read_devlinktab_file(void);
 static selector_list_t *create_selector_list(char *selector);
