@@ -1705,8 +1705,8 @@ clean_rsrc_tree()
 	rsrc_walk(rsrc_root, NULL, clean_node);
 }
 
-static void
-db_clean()
+static void *
+db_clean(void *arg __unused)
 {
 	extern barrier_t barrier;
 	extern void clean_dr_list();
@@ -1740,16 +1740,16 @@ db_clean()
 
 		rcmd_set_state(RCMD_NORMAL);
 	}
+	return (NULL);
 }
 
 void
-rcmd_db_clean()
+rcmd_db_clean(void)
 {
 	rcm_log_message(RCM_DEBUG,
 	    "rcm_db_clean(): launch thread to clean database\n");
 
-	if (thr_create(NULL, 0, (void *(*)(void *))db_clean,
-	    NULL, THR_DETACHED, NULL) != 0) {
+	if (thr_create(NULL, 0, db_clean, NULL, THR_DETACHED, NULL) != 0) {
 		rcm_log_message(RCM_WARNING,
 		    gettext("failed to create cleanup thread %s\n"),
 		    strerror(errno));
