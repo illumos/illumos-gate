@@ -143,7 +143,8 @@ tsdtot(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	if (addr == 0 || argc != 0)
 		return (DCMD_USAGE);
-	if (mdb_walk("thread", (mdb_walk_cb_t)tsdthr_match, (void *)addr) == -1)
+	if (mdb_walk("thread", (mdb_walk_cb_t)(uintptr_t)tsdthr_match,
+	    (void *)addr) == -1)
 		return (DCMD_ERR);
 	return (DCMD_OK);
 }

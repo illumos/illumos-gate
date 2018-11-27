@@ -410,7 +410,7 @@ soft_conf_walk_init(mdb_walk_state_t *wsp)
 	}
 	wsp->walk_addr = (uintptr_t)soft;
 	wsp->walk_data = mdb_alloc(sizeof (kcf_soft_conf_entry_t), UM_SLEEP);
-	wsp->walk_callback = (mdb_walk_cb_t)prt_soft_conf_entry;
+	wsp->walk_callback = (mdb_walk_cb_t)(uintptr_t)prt_soft_conf_entry;
 	return (WALK_NEXT);
 }
 
