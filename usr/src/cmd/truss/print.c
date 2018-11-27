@@ -1605,6 +1605,8 @@ prt_pc5(private_t *pri, int raw, long val)
 void
 prt_psflags(private_t *pri, secflagset_t val)
 {
+	size_t len;
+	char *ptr;
 	char str[1024];
 
 	if (val == 0) {
@@ -1628,9 +1630,9 @@ prt_psflags(private_t *pri, secflagset_t val)
 		secflag_clear(&val, PROC_SEC_NOEXECSTACK);
 	}
 
-	if (val != 0)
-		(void) snprintf(str, sizeof (str), "%s|%#x", str, val);
-
+	len = strlen(str);
+	ptr = str + len;
+	(void) snprintf(ptr, sizeof (str) - len, "|%#x", val);
 	outstring(pri, str + 1);
 }
 
