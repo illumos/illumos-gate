@@ -44,6 +44,7 @@ struct vmspace {
 
 	/* Implementation private */
 	kmutex_t	vms_lock;
+	boolean_t	vms_map_changing;
 	struct pmap	vms_pmap;
 	uintptr_t	vms_size;	/* fixed after creation */
 
@@ -53,13 +54,16 @@ struct vmspace {
 typedef pfn_t (*vm_pager_fn_t)(vm_object_t, uintptr_t, pfn_t *, uint_t *);
 
 struct vm_object {
-	kmutex_t	vmo_lock;
-	uint_t		vmo_refcnt;
+	uint_t		vmo_refcnt;	/* manipulated with atomic ops */
+
+	/* This group of fields are fixed at creation time */
 	objtype_t	vmo_type;
 	size_t		vmo_size;
-	vm_memattr_t	vmo_attr;
 	vm_pager_fn_t	vmo_pager;
 	void		*vmo_data;
+
+	kmutex_t	vmo_lock;	/* protects fields below */
+	vm_memattr_t	vmo_attr;
 };
 
 struct vm_page {

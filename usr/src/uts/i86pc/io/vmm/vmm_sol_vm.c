@@ -136,7 +136,8 @@ static pfn_t eptable_mapin(eptable_map_t *, uintptr_t, pfn_t, uint_t, uint_t,
     vm_memattr_t);
 static void eptable_mapout(eptable_map_t *, uintptr_t);
 static int eptable_find(eptable_map_t *, uintptr_t, pfn_t *, uint_t *);
-static vmspace_mapping_t *vm_mapping_find(struct vmspace *, uintptr_t, size_t);
+static vmspace_mapping_t *vm_mapping_find(struct vmspace *, uintptr_t, size_t,
+    boolean_t);
 static void vm_mapping_remove(struct vmspace *, vmspace_mapping_t *);
 
 static kmutex_t eptable_map_lock;
@@ -230,7 +231,7 @@ vmspace_find_kva(struct vmspace *vms, uintptr_t addr, size_t size)
 	void *result = NULL;
 
 	mutex_enter(&vms->vms_lock);
-	vmsm = vm_mapping_find(vms, addr, size);
+	vmsm = vm_mapping_find(vms, addr, size, B_FALSE);
 	if (vmsm != NULL) {
 		struct vm_object *vmo = vmsm->vmsm_object;
 
@@ -1041,11 +1042,10 @@ vm_object_deallocate(vm_object_t vmo)
 {
 	ASSERT(vmo != NULL);
 
-	mutex_enter(&vmo->vmo_lock);
-	VERIFY(vmo->vmo_refcnt);
-	vmo->vmo_refcnt--;
-	if (vmo->vmo_refcnt != 0) {
-		mutex_exit(&vmo->vmo_lock);
+	uint_t ref = atomic_dec_uint_nv(&vmo->vmo_refcnt);
+	/* underflow would be a deadly serious mistake */
+	VERIFY3U(ref, !=, UINT_MAX);
+	if (ref != 0) {
 		return;
 	}
 
@@ -1064,7 +1064,6 @@ vm_object_deallocate(vm_object_t vmo)
 	vmo->vmo_pager = vm_object_pager_none;
 	vmo->vmo_data = NULL;
 	vmo->vmo_size = 0;
-	mutex_exit(&vmo->vmo_lock);
 	mutex_destroy(&vmo->vmo_lock);
 	kmem_free(vmo, sizeof (*vmo));
 }
@@ -1090,20 +1089,31 @@ vm_object_reference(vm_object_t vmo)
 {
 	ASSERT(vmo != NULL);
 
-	mutex_enter(&vmo->vmo_lock);
-	vmo->vmo_refcnt++;
-	mutex_exit(&vmo->vmo_lock);
+	uint_t ref = atomic_inc_uint_nv(&vmo->vmo_refcnt);
+	/* overflow would be a deadly serious mistake */
+	VERIFY3U(ref, !=, 0);
 }
 
 static vmspace_mapping_t *
-vm_mapping_find(struct vmspace *vms, uintptr_t addr, size_t size)
+vm_mapping_find(struct vmspace *vms, uintptr_t addr, size_t size,
+    boolean_t no_lock)
 {
 	vmspace_mapping_t *vmsm;
 	list_t *ml = &vms->vms_maplist;
 	const uintptr_t range_end = addr + size;
 
-	ASSERT(MUTEX_HELD(&vms->vms_lock));
 	ASSERT(addr <= range_end);
+
+	if (no_lock) {
+		/*
+		 * This check should be superflous with the protections
+		 * promised by the bhyve logic which calls into the VM shim.
+		 * All the same, it is cheap to be paranoid.
+		 */
+		VERIFY(!vms->vms_map_changing);
+	} else {
+		VERIFY(MUTEX_HELD(&vms->vms_lock));
+	}
 
 	if (addr >= vms->vms_size) {
 		return (NULL);
@@ -1148,6 +1158,7 @@ vm_mapping_remove(struct vmspace *vms, vmspace_mapping_t *vmsm)
 	list_t *ml = &vms->vms_maplist;
 
 	ASSERT(MUTEX_HELD(&vms->vms_lock));
+	ASSERT(vms->vms_map_changing);
 
 	list_remove(ml, vmsm);
 	vm_object_deallocate(vmsm->vmsm_object);
@@ -1186,7 +1197,7 @@ vm_fault(vm_map_t map, vm_offset_t off, vm_prot_t type, int flag)
 	}
 
 	/* Try to wire up the address */
-	if ((vmsm = vm_mapping_find(vms, addr, 0)) == NULL) {
+	if ((vmsm = vm_mapping_find(vms, addr, 0, B_FALSE)) == NULL) {
 		mutex_exit(&vms->vms_lock);
 		return (FC_NOMAP);
 	}
@@ -1224,10 +1235,26 @@ vm_fault_quick_hold_pages(vm_map_t map, vm_offset_t addr, vm_size_t len,
 	ASSERT(len == PAGESIZE);
 	ASSERT(max_count == 1);
 
-	mutex_enter(&vms->vms_lock);
-	if ((vmsm = vm_mapping_find(vms, vaddr, PAGESIZE)) == NULL ||
+	/*
+	 * Unlike practically all of the other logic that queries or
+	 * manipulates vmspace objects, vm_fault_quick_hold_pages() does so
+	 * without holding vms_lock.  This is safe because bhyve ensures that
+	 * changes to the vmspace map occur only when all other threads have
+	 * been excluded from running.
+	 *
+	 * Since this task can count on vms_maplist remaining static and does
+	 * not need to modify the pmap (like vm_fault might), it can proceed
+	 * without the lock.  The vm_object has independent refcount and lock
+	 * protection, while the vmo_pager methods do not rely on vms_lock for
+	 * safety.
+	 *
+	 * Performing this work without locks is critical in cases where
+	 * multiple vCPUs require simultaneous instruction emulation, such as
+	 * for frequent guest APIC accesses on a host that lacks hardware
+	 * acceleration for that behavior.
+	 */
+	if ((vmsm = vm_mapping_find(vms, vaddr, PAGESIZE, B_TRUE)) == NULL ||
 	    (prot & ~vmsm->vmsm_prot) != 0) {
-		mutex_exit(&vms->vms_lock);
 		return (-1);
 	}
 
@@ -1239,7 +1266,6 @@ vm_fault_quick_hold_pages(vm_map_t map, vm_offset_t addr, vm_size_t len,
 	vmp->vmp_pfn = vmo->vmo_pager(vmo, VMSM_OFFSET(vmsm, vaddr), NULL,
 	    NULL);
 
-	mutex_exit(&vms->vms_lock);
 	*ma = vmp;
 	return (1);
 }
@@ -1275,6 +1301,7 @@ vm_map_find(vm_map_t map, vm_object_t vmo, vm_ooffset_t off, vm_offset_t *addr,
 	vmsm = kmem_alloc(sizeof (*vmsm), KM_SLEEP);
 
 	mutex_enter(&vms->vms_lock);
+	vms->vms_map_changing = B_TRUE;
 	if (!vm_mapping_gap(vms, base, size)) {
 		res = ENOMEM;
 		goto out;
@@ -1292,6 +1319,7 @@ vm_map_find(vm_map_t map, vm_object_t vmo, vm_ooffset_t off, vm_offset_t *addr,
 		*addr = (vm_offset_t)base;
 	}
 out:
+	vms->vms_map_changing = B_FALSE;
 	mutex_exit(&vms->vms_lock);
 	if (res != 0) {
 		kmem_free(vmsm, sizeof (*vmsm));
@@ -1311,9 +1339,11 @@ vm_map_remove(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	ASSERT(start < end);
 
 	mutex_enter(&vms->vms_lock);
+	vms->vms_map_changing = B_TRUE;
 	/* expect to match existing mapping exactly */
-	if ((vmsm = vm_mapping_find(vms, addr, size)) == NULL ||
+	if ((vmsm = vm_mapping_find(vms, addr, size, B_FALSE)) == NULL ||
 	    vmsm->vmsm_addr != addr || vmsm->vmsm_len != size) {
+		vms->vms_map_changing = B_FALSE;
 		mutex_exit(&vms->vms_lock);
 		return (ENOENT);
 	}
@@ -1331,6 +1361,7 @@ vm_map_remove(vm_map_t map, vm_offset_t start, vm_offset_t end)
 	}
 
 	vm_mapping_remove(vms, vmsm);
+	vms->vms_map_changing = B_FALSE;
 	mutex_exit(&vms->vms_lock);
 	return (0);
 }
@@ -1348,7 +1379,7 @@ vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 	mutex_enter(&vms->vms_lock);
 
 	/* For the time being, only exact-match mappings are expected */
-	if ((vmsm = vm_mapping_find(vms, addr, size)) == NULL) {
+	if ((vmsm = vm_mapping_find(vms, addr, size, B_FALSE)) == NULL) {
 		mutex_exit(&vms->vms_lock);
 		return (FC_NOMAP);
 	}
@@ -1424,7 +1455,7 @@ vm_segmap_space(struct vmspace *vms, off_t off, struct as *as, caddr_t *addrp,
 	}
 
 	mutex_enter(&vms->vms_lock);
-	if ((vmsm = vm_mapping_find(vms, addr, size)) == NULL) {
+	if ((vmsm = vm_mapping_find(vms, addr, size, B_FALSE)) == NULL) {
 		mutex_exit(&vms->vms_lock);
 		return (ENXIO);
 	}
