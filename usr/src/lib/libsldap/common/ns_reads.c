@@ -1360,10 +1360,11 @@ get_mapped_filter(ns_ldap_cookie_t *cookie, char **new_filter)
 			    "'%s' not allowed."),
 			    info[i]->from_name, filter);
 			err = strdup(errstr);
-			if (err)
+			if (err) {
 				MKERROR(LOG_WARNING, cookie->errorp,
 				    NS_CONFIG_SYNTAX,
 				    err, NULL);
+			}
 
 			free(filter_c);
 			for (j = 0; j < num_veq; j++) {
