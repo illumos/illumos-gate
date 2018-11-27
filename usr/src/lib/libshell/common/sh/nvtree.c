@@ -428,7 +428,7 @@ void nv_attribute(register Namval_t *np,Sfio_t *out,char *prefix,int noname)
 
 	if ((attr=nv_isattr(np,~NV_NOFREE)) || fp)
 	{
-		if((attr&NV_NOPRINT|NV_INTEGER)==NV_NOPRINT)
+		if((attr&(NV_NOPRINT|NV_INTEGER))==NV_NOPRINT)
 			attr &= ~NV_NOPRINT;
 		if(!attr && !fp)
 			return;
