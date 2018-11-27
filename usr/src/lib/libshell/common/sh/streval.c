@@ -391,7 +391,7 @@ Sfdouble_t	arith_exec(Arith_t *ep)
 			sp--,tp--;
 			fun = *((Math_f*)(ep->code+(int)(*sp)));
 			type = *tp;
-			num = (*((Math_1i_f)fun))(num);
+			num = (*((Math_1i_f)(uintptr_t)fun))(num);
 			break;
 		    case A_CALL2F:
 			sp-=2,tp-=2;
@@ -403,7 +403,7 @@ Sfdouble_t	arith_exec(Arith_t *ep)
 			sp-=2,tp-=2;
 			fun = *((Math_f*)(ep->code+(int)(*sp)));
 			type = *tp;
-			num = (*((Math_2i_f)fun))(sp[1],num);
+			num = (*((Math_2i_f)(uintptr_t)fun))(sp[1],num);
 			break;
 		    case A_CALL3F:
 			sp-=3,tp-=3;
