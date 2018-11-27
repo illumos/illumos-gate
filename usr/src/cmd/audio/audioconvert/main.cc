@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -60,9 +58,8 @@ int		Debug = 0;
 void		init_header(AudioHdr&);
 void		usage();
 
-main(
-	int		argc,
-	char		*argv[])
+int
+main(int argc, char *argv[])
 {
 	AudioUnixfile*	ifp = NULL;	// input & output audio objects
 	AudioUnixfile*	ofp = NULL;
@@ -74,7 +71,7 @@ main(
 	char		*out_fmt = NULL;	// output fmt string
 	AudioError	err;		// for error msgs
 	int		c;		// for getopt
-	int		pflag = 0; 	// in place flag
+	int		pflag = 0;	// in place flag
 	int		fflag = 0;	// ignore header (force conversion)
 	int		stdin_seen = 0;	// already read stdin
 	int		israw = 0;	// once we've seen -i, it's raw data
@@ -278,7 +275,7 @@ main(
 
 			// Create the file and set the info string.
 			char		*infoString;
-			int  		infoStringLen;
+			int		infoStringLen;
 			infoString = ifp->GetInfostring(infoStringLen);
 			ofp = create_output_file(outfile, ohdr, ofmt,
 						    infoString);
@@ -336,7 +333,7 @@ main(
 
 			// Get the input info string.
 			char		*infoString;
-			int  		infoStringLen;
+			int		infoStringLen;
 			infoString = ifp->GetInfostring(infoStringLen);
 			ofp = create_output_file(outfile, ohdr, ofmt,
 						    infoString);
@@ -382,7 +379,7 @@ main(
 		delete(ofp);		// close output file
 	}
 
-	exit(0);		// outta here!
+	return (0);
 }
 
 
