@@ -1211,7 +1211,7 @@ topo_usb_port_properties(topo_mod_t *mod, tnode_t *tn, topo_usb_port_t *port)
 			vers = "3.1";
 			break;
 		default:
-			break;
+			continue;
 		}
 
 		/*
