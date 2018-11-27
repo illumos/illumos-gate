@@ -11,10 +11,10 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 	- Redistributions of source code must retain the above copyright
+ *	- Redistributions of source code must retain the above copyright
  *	  notice, this list of conditions and the following disclaimer.
  *
- * 	- Redistributions in binary form must reproduce the above copyright
+ *	- Redistributions in binary form must reproduce the above copyright
  *	  notice, this list of conditions and the following disclaimer in
  *	  the documentation and/or other materials provided with the
  *	  distribution.
@@ -1466,7 +1466,7 @@ ndmpd_tar_start_backup_v3(ndmpd_session_t *session, char *bu_type,
 	 * client request here.
 	 */
 	err = pthread_create(NULL, NULL,
-	    (funct_t)session->ns_data.dd_module.dm_start_func,
+	    session->ns_data.dd_module.dm_start_func,
 	    params);
 	if (err != 0) {
 		NDMP_LOG(LOG_ERR, "Can't start backup session.");
@@ -1595,7 +1595,7 @@ ndmpd_tar_start_recover_v3(ndmpd_session_t *session,
 	 * client request here.
 	 */
 	err = pthread_create(NULL, NULL,
-	    (funct_t)session->ns_data.dd_module.dm_start_func,
+	    session->ns_data.dd_module.dm_start_func,
 	    params);
 
 	if (err != 0) {
@@ -1692,7 +1692,8 @@ ndmpd_zfs_start_op(ndmpd_session_t *session, ndmp_pval *env_val,
 	}
 
 	err = pthread_create(&tid, NULL,
-	    (funct_t)session->ns_data.dd_module.dm_start_func, ndmpd_zfs_args);
+	    session->ns_data.dd_module.dm_start_func,
+	    ndmpd_zfs_args);
 
 	if (err) {
 		NDMP_LOG(LOG_ERR, "Can't start %s session (errno %d)",
@@ -2185,7 +2186,7 @@ ndmpd_tar_start_backup_v2(ndmpd_session_t *session, char *bu_type,
 	 * client request here.
 	 */
 	(void) pthread_create(NULL, NULL,
-	    (funct_t)session->ns_data.dd_module.dm_start_func,
+	    session->ns_data.dd_module.dm_start_func,
 	    params);
 
 	return (NDMP_NO_ERR);
@@ -2322,7 +2323,7 @@ ndmpd_tar_start_recover_v2(ndmpd_session_t *session, char *bu_type,
 	 * client request here.
 	 */
 	(void) pthread_create(NULL, NULL,
-	    (funct_t)session->ns_data.dd_module.dm_start_func,
+	    session->ns_data.dd_module.dm_start_func,
 	    params);
 
 	return (NDMP_NO_ERR);

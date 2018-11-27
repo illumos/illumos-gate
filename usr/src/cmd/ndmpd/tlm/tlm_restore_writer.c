@@ -11,10 +11,10 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 	- Redistributions of source code must retain the above copyright
+ *	- Redistributions of source code must retain the above copyright
  *	  notice, this list of conditions and the following disclaimer.
  *
- * 	- Redistributions in binary form must reproduce the above copyright
+ *	- Redistributions in binary form must reproduce the above copyright
  *	  notice, this list of conditions and the following disclaimer in
  *	  the documentation and/or other materials provided with the
  *	  distribution.
@@ -286,8 +286,8 @@ tar_getdir(tlm_commands_t *commands,
 	long nm_end, lnk_end;
 	char	*name, *nmp;
 	cstack_t *stp;
-	char 	*bkpath;
-	char 	*parentlnk;
+	char	*bkpath;
+	char	*parentlnk;
 	int dir_dar = 0;
 
 	/*
@@ -987,9 +987,10 @@ tar_getdir(tlm_commands_t *commands,
 /*
  * Main file restore function for tar (should run as a thread)
  */
-int
-tar_getfile(tlm_backup_restore_arg_t *argp)
+void *
+tar_getfile(void *ptr)
 {
+	tlm_backup_restore_arg_t *argp = ptr;
 	tlm_job_stats_t	*job_stats;
 	char	**sels;		/* list of files desired */
 	char	**exls;		/* list of files not wanted */
@@ -1012,7 +1013,7 @@ tar_getfile(tlm_backup_restore_arg_t *argp)
 	if (dir == NULL) {
 		local_commands->tc_reader = TLM_STOP;
 		(void) pthread_barrier_wait(&argp->ba_barrier);
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 	}
 
 	(void) strlcpy(job, argp->ba_job, TLM_MAX_BACKUP_JOB_NAME+1);
@@ -1031,7 +1032,7 @@ tar_getfile(tlm_backup_restore_arg_t *argp)
 		local_commands->tc_reader = TLM_STOP;
 		free(dir);
 		(void) pthread_barrier_wait(&argp->ba_barrier);
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 	}
 
 	sels = argp->ba_sels;
@@ -1039,7 +1040,7 @@ tar_getfile(tlm_backup_restore_arg_t *argp)
 		local_commands->tc_reader = TLM_STOP;
 		free(dir);
 		(void) pthread_barrier_wait(&argp->ba_barrier);
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 	}
 	exls = &list;
 
@@ -1081,7 +1082,7 @@ tar_getfile(tlm_backup_restore_arg_t *argp)
 	local_commands->tc_reader = TLM_STOP;
 	tlm_release_reader_writer_ipc(local_commands);
 	free(dir);
-	return (erc);
+	return ((void *)(uintptr_t)erc);
 }
 
 /*

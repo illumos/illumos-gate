@@ -10,10 +10,10 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 	- Redistributions of source code must retain the above copyright
+ *	- Redistributions of source code must retain the above copyright
  *	  notice, this list of conditions and the following disclaimer.
  *
- * 	- Redistributions in binary form must reproduce the above copyright
+ *	- Redistributions in binary form must reproduce the above copyright
  *	  notice, this list of conditions and the following disclaimer in
  *	  the documentation and/or other materials provided with the
  *	  distribution.
@@ -2222,8 +2222,8 @@ lbrbk_v3(void *arg, fst_node_t *pnp, fst_node_t *enp)
  *   0: on success
  *   != 0: otherwise
  */
-static int
-backup_reader_v3(backup_reader_arg_t *argp)
+static void *
+backup_reader_v3(void *ptr)
 {
 	int rv;
 	tlm_cmd_t *lcmd;
@@ -2234,9 +2234,10 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	char *jname;
 	ndmp_lbr_params_t *nlp;
 	tlm_commands_t *cmds;
+	backup_reader_arg_t *argp = ptr;
 
 	if (!argp)
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 
 	jname = argp->br_jname;
 	nlp = argp->br_nlp;
@@ -2265,7 +2266,7 @@ backup_reader_v3(backup_reader_arg_t *argp)
 
 	bp.bp_tmp = ndmp_malloc(sizeof (char) * TLM_MAX_PATH_NAME);
 	if (!bp.bp_tmp)
-		return (-1);
+		return ((void *)(uintptr_t)-1);
 
 	/*
 	 * Make the checkpointed paths for traversing the
@@ -2277,7 +2278,7 @@ backup_reader_v3(backup_reader_arg_t *argp)
 		bp.bp_chkpnm = ndmp_malloc(sizeof (char) * TLM_MAX_PATH_NAME);
 		if (!bp.bp_chkpnm) {
 			NDMP_FREE(bp.bp_tmp);
-			return (-1);
+			return ((void *)(uintptr_t)-1);
 		}
 		(void) tlm_build_snapshot_name(nlp->nlp_backup_path,
 		    bp.bp_chkpnm, nlp->nlp_jstat->js_job_name);
@@ -2341,8 +2342,7 @@ backup_reader_v3(backup_reader_arg_t *argp)
 	lcmd->tc_writer = TLM_STOP;
 	tlm_release_reader_writer_ipc(lcmd);
 	tlm_un_ref_job_stats(jname);
-	return (rv);
-
+	return ((void *)(uintptr_t)rv);
 }
 
 
@@ -2438,8 +2438,7 @@ tar_backup_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 
 		(void) pthread_barrier_init(&arg.br_barrier, 0, 2);
 
-		err = pthread_create(&rdtp, NULL, (funct_t)backup_reader_v3,
-		    (void *)&arg);
+		err = pthread_create(&rdtp, NULL, backup_reader_v3, &arg);
 		if (err == 0) {
 			(void) pthread_barrier_wait(&arg.br_barrier);
 			(void) pthread_barrier_destroy(&arg.br_barrier);
@@ -2512,9 +2511,10 @@ backup_out:
  * Find the estimate of backup size. This is used to get an estimate
  * of the progress of backup during NDMP backup.
  */
-void
-get_backup_size(ndmp_bkup_size_arg_t *sarg)
+void *
+get_backup_size(void *ptr)
 {
+	ndmp_bkup_size_arg_t *sarg = ptr;
 	fs_traverse_t ft;
 	u_longlong_t bk_size;
 	char spath[PATH_MAX];
@@ -2543,6 +2543,7 @@ get_backup_size(ndmp_bkup_size_arg_t *sarg)
 		    bk_size, bk_size / 1024, bk_size /(1024 * 1024));
 	}
 	sarg->bs_session->ns_data.dd_data_size = bk_size;
+	return (NULL);
 }
 
 /*
@@ -3186,8 +3187,7 @@ ndmpd_dar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		arg.tr_mod_params = params;
 		arg.tr_cmds = cmds;
 
-		err = pthread_create(&rdtp, NULL, (funct_t)ndmp_tar_reader,
-		    (void *)&arg);
+		err = pthread_create(&rdtp, NULL, ndmp_tar_reader, &arg);
 		if (err == 0) {
 			tlm_cmd_wait(cmds->tcs_command, TLM_TAR_READER);
 		} else {
@@ -3445,8 +3445,8 @@ ndmp_plugin_pre_restore(ndmp_context_t *ctxp, ndmpd_module_params_t *params,
  * /link-to-backup-path -> /backup/path
  *
  * Returns:
- * 	Pointer to the new path (allocated)
- * 	NULL if the path doesnt exist
+ *	Pointer to the new path (allocated)
+ *	NULL if the path doesnt exist
  */
 static char *
 get_absolute_path(const char *bkpath)
@@ -3548,8 +3548,7 @@ ndmpd_rs_sar_tar_v3(ndmpd_session_t *session, ndmpd_module_params_t *params,
 		arg.tr_session = session;
 		arg.tr_mod_params = params;
 		arg.tr_cmds = cmds;
-		err = pthread_create(&rdtp, NULL, (funct_t)ndmp_tar_reader,
-		    (void *)&arg);
+		err = pthread_create(&rdtp, NULL, ndmp_tar_reader, &arg);
 		if (err == 0) {
 			tlm_cmd_wait(cmds->tcs_command, TLM_TAR_READER);
 		} else {
@@ -3746,7 +3745,7 @@ ndmp_backup_get_params_v3(ndmpd_session_t *session,
  *   0: on success
  *   != 0: otherwise
  */
-int
+void *
 ndmpd_tar_backup_starter_v3(void *arg)
 {
 	ndmpd_module_params_t *params = arg;
@@ -3780,8 +3779,7 @@ ndmpd_tar_backup_starter_v3(void *arg)
 		sarg.bs_path = nlp->nlp_backup_path;
 
 		/* Get an estimate of the data size */
-		if (pthread_create(&tid, NULL, (funct_t)get_backup_size,
-		    (void *)&sarg) == 0)
+		if (pthread_create(&tid, NULL, get_backup_size, &sarg) == 0)
 			(void) pthread_detach(tid);
 
 		err = ndmp_get_cur_bk_time(nlp, &nlp->nlp_cdate, jname);
@@ -3810,8 +3808,7 @@ ndmpd_tar_backup_starter_v3(void *arg)
 
 	NS_DEC(nbk);
 	ndmp_session_unref(session);
-	return (err);
-
+	return ((void *)(uintptr_t)err);
 }
 
 
@@ -3924,7 +3921,7 @@ ndmp_restore_get_params_v3(ndmpd_session_t *session,
  *   NDMP_NO_ERR: on success
  *   != NDMP_NO_ERR: otherwise
  */
-int
+void *
 ndmpd_tar_restore_starter_v3(void *arg)
 {
 	ndmpd_module_params_t *params = arg;
@@ -3948,8 +3945,7 @@ ndmpd_tar_restore_starter_v3(void *arg)
 	/* nlp_params is allocated in start_recover() */
 	NDMP_FREE(nlp->nlp_params);
 	ndmp_session_unref(session);
-	return (err);
-
+	return ((void *)(uintptr_t)err);
 }
 
 /*
