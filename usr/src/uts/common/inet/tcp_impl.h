@@ -756,8 +756,8 @@ extern void	tcp_send_conn_ind(void *, mblk_t *, void *);
 extern void	tcp_send_pending(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_tpi_accept(queue_t *, mblk_t *);
 extern void	tcp_tpi_bind(tcp_t *, mblk_t *);
-extern int	tcp_tpi_close(queue_t *, int);
-extern int	tcp_tpi_close_accept(queue_t *);
+extern int	tcp_tpi_close(queue_t *, int, cred_t *);
+extern int	tcp_tpi_close_accept(queue_t *, int, cred_t *);
 extern void	tcp_tpi_connect(tcp_t *, mblk_t *);
 extern int	tcp_tpi_opt_get(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
 extern int	tcp_tpi_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,

@@ -134,7 +134,7 @@ static mblk_t *ah_outbound(mblk_t *, ip_xmit_attr_t *);
 static void ah_outbound_finish(mblk_t *, ip_xmit_attr_t *);
 
 static int ipsecah_open(queue_t *, dev_t *, int, int, cred_t *);
-static int ipsecah_close(queue_t *);
+static int ipsecah_close(queue_t *, int, cred_t *);
 static void ipsecah_wput(queue_t *, mblk_t *);
 static boolean_t ah_register_out(uint32_t, uint32_t, uint_t, ipsecah_stack_t *,
     cred_t *);
@@ -491,8 +491,9 @@ ipsecah_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 /*
  * AH module close routine.
  */
+/* ARGSUSED */
 static int
-ipsecah_close(queue_t *q)
+ipsecah_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	ipsecah_stack_t	*ahstack = (ipsecah_stack_t *)q->q_ptr;
 

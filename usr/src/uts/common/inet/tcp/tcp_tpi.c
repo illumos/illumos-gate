@@ -332,8 +332,9 @@ tcp_tpi_unbind(tcp_t *tcp, mblk_t *mp)
 	}
 }
 
+/* ARGSUSED */
 int
-tcp_tpi_close(queue_t *q, int flags)
+tcp_tpi_close(queue_t *q, int flags, cred_t *credp __unused)
 {
 	conn_t		*connp;
 
@@ -376,8 +377,9 @@ done:
 	return (0);
 }
 
+/* ARGSUSED */
 int
-tcp_tpi_close_accept(queue_t *q)
+tcp_tpi_close_accept(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	vmem_t	*minor_arena;
 	dev_t	conn_dev;

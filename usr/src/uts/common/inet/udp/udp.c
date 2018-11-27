@@ -127,7 +127,7 @@ static void	udp_bind_hash_remove(udp_t *udp, boolean_t caller_holds_lock);
 static int	udp_build_hdr_template(conn_t *, const in6_addr_t *,
     const in6_addr_t *, in_port_t, uint32_t);
 static void	udp_capability_req(queue_t *q, mblk_t *mp);
-static int	udp_tpi_close(queue_t *q, int flags);
+static int	udp_tpi_close(queue_t *q, int flags, cred_t *);
 static void	udp_close_free(conn_t *);
 static void	udp_tpi_connect(queue_t *q, mblk_t *mp);
 static void	udp_tpi_disconnect(queue_t *q, mblk_t *mp);
@@ -799,8 +799,9 @@ udp_tpi_connect(queue_t *q, mblk_t *mp)
 	}
 }
 
+/* ARGSUSED */
 static int
-udp_tpi_close(queue_t *q, int flags)
+udp_tpi_close(queue_t *q, int flags, cred_t *credp __unused)
 {
 	conn_t	*connp;
 

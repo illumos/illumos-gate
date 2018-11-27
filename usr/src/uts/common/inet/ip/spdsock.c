@@ -152,7 +152,7 @@ static	spdsockparam_t	lcl_param_arr[] = {
 	(ss)->spdsock_dump_cur_chain = 0; \
 }
 
-static int spdsock_close(queue_t *);
+static int spdsock_close(queue_t *, int, cred_t *);
 static int spdsock_open(queue_t *, dev_t *, int, int, cred_t *);
 static void spdsock_wput(queue_t *, mblk_t *);
 static void spdsock_wsrv(queue_t *);
@@ -3618,8 +3618,9 @@ spdsock_wsrv(queue_t *q)
 	}
 }
 
+/* ARGSUSED */
 static int
-spdsock_close(queue_t *q)
+spdsock_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	spdsock_t *ss = q->q_ptr;
 	spd_stack_t	*spds = ss->spdsock_spds;

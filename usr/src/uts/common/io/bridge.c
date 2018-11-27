@@ -1542,8 +1542,9 @@ bridge_open(queue_t *rq, dev_t *devp, int oflag, int sflag, cred_t *credp)
  * This is used only for bridge control streams.  DLPI goes through dld
  * instead.
  */
+/* ARGSUSED */
 static int
-bridge_close(queue_t *rq)
+bridge_close(queue_t *rq, int flags __unused, cred_t *credp __unused)
 {
 	bridge_stream_t	*bsp = rq->q_ptr;
 	bridge_inst_t *bip;

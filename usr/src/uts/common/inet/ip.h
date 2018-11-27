@@ -3234,7 +3234,7 @@ extern mblk_t	*ip_check_optlen(mblk_t *, ipha_t *, uint_t, uint_t,
     ip_recv_attr_t *);
 extern mblk_t	*ip_fix_dbref(mblk_t *, ip_recv_attr_t *);
 extern uint_t	ip_cksum(mblk_t *, int, uint32_t);
-extern int	ip_close(queue_t *, int);
+extern int	ip_close(queue_t *, int, cred_t *);
 extern uint16_t	ip_csum_hdr(ipha_t *);
 extern void	ip_forward_xmit_v4(nce_t *, ill_t *, mblk_t *, ipha_t *,
     ip_recv_attr_t *, uint32_t, uint32_t);

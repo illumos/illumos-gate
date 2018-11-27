@@ -106,7 +106,7 @@ static	ipsecespparam_t	lcl_param_arr[] = {
 #define	esp3dbg(espstack, a)	if (espstack->ipsecesp_debug > 2) printf a
 
 static int ipsecesp_open(queue_t *, dev_t *, int, int, cred_t *);
-static int ipsecesp_close(queue_t *);
+static int ipsecesp_close(queue_t *, int, cred_t *);
 static void ipsecesp_wput(queue_t *, mblk_t *);
 static void	*ipsecesp_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecesp_stack_fini(netstackid_t stackid, void *arg);
@@ -541,8 +541,9 @@ ipsecesp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 /*
  * ESP module close routine.
  */
+/* ARGSUSED */
 static int
-ipsecesp_close(queue_t *q)
+ipsecesp_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	ipsecesp_stack_t	*espstack = (ipsecesp_stack_t *)q->q_ptr;
 

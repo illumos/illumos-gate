@@ -80,8 +80,9 @@ nca_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
-nca_close(queue_t *q)
+nca_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	qprocsoff(q);
 	RD(q)->q_ptr = NULL;

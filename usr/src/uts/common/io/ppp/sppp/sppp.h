@@ -359,7 +359,7 @@ typedef struct sppa {
 /*
  * Function declarations.
  */
-extern int	sppp_close(queue_t *);
+extern int	sppp_close(queue_t *, int, cred_t *);
 extern mblk_t	*sppp_dladdud(spppstr_t *, mblk_t *, t_scalar_t, boolean_t);
 extern void	sppp_dlpi_pinfoinit(void);
 extern void	sppp_dlprsendup(spppstr_t *, mblk_t *, t_scalar_t, boolean_t);

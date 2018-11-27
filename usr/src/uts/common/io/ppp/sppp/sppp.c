@@ -319,8 +319,9 @@ sppp_create_ppa(uint32_t ppa_id, zoneid_t zoneid)
  * Description:
  *    Common close procedure for module.
  */
+/* ARGSUSED */
 int
-sppp_close(queue_t *q)
+sppp_close(queue_t *q, int flags __unused, cred_t *credp __unused)
 {
 	spppstr_t	*sps;
 	spppstr_t	**nextmn;
