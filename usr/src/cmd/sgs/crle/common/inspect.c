@@ -97,8 +97,8 @@ enteralt(Crle_desc *crle, const char *path, const char *file, Half flags,
 	if (flags & RTC_OBJ_DUMP) {
 		char	_alter[PATH_MAX];
 
-		(void) strcpy(_alter, crle->c_objdir);
-		(void) realpath(_alter, _alter);
+		(void) strlcpy(alter, crle->c_objdir, sizeof (alter));
+		(void) realpath(alter, _alter);
 		(void) snprintf(alter, PATH_MAX, MSG_ORIG(MSG_FMT_PATH),
 		    _alter, file);
 		if (strcmp(alter, obj->o_path) == 0) {
@@ -107,9 +107,10 @@ enteralt(Crle_desc *crle, const char *path, const char *file, Half flags,
 			return (0);
 		}
 		obj->o_flags |= RTC_OBJ_DUMP;
-	} else
+	} else {
 		(void) snprintf(alter, PATH_MAX, MSG_ORIG(MSG_FMT_PATH),
 		    crle->c_objdir, file);
+	}
 	obj->o_flags |= RTC_OBJ_ALTER;
 
 	/*
@@ -119,8 +120,9 @@ enteralt(Crle_desc *crle, const char *path, const char *file, Half flags,
 	if (obj->o_alter) {
 		crle->c_strsize -= strlen(alter) + 1;
 		fmt = MSG_INTL(MSG_DIA_ALTUPDATE);
-	} else
+	} else {
 		fmt = MSG_INTL(MSG_DIA_ALTCREATE);
+	}
 
 	/*
 	 * Allocate the new alternative and update the string table size.
@@ -397,8 +399,9 @@ _enterfile(Crle_desc *crle, const char *file, int off, Hash_ent *fent,
 		if ((nfile = malloc(size)) == NULL)
 			return (0);
 		(void) strcpy(nfile, file);
-	} else
+	} else {
 		nfile = (char *)file;
+	}
 
 	fent->e_key = (Addr)nfile;
 	fent->e_off = off;
@@ -1028,9 +1031,9 @@ inspect(Crle_desc *crle, const char *name, Half flags)
 	} else {
 		size_t	off = file - name;
 
-		if (file == name)
+		if (file == name) {
 			dir = MSG_ORIG(MSG_DIR_ROOT);
-		else {
+		} else {
 			(void) strncpy(_dir, name, off);
 			_dir[off] = '\0';
 			dir = (const char *)_dir;
