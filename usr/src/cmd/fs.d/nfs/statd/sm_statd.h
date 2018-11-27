@@ -30,7 +30,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -203,13 +203,13 @@ extern char	*xmalloc(unsigned);
  * RPC service functions, slightly different here than the
  * generated ones in sm_inter.h
  */
-extern void	nsmaddrproc1_reg(reg1args *, reg1res *);
-extern void	sm_stat_svc(sm_name *namep, sm_stat_res *resp);
-extern void	sm_mon_svc(mon *monp, sm_stat_res *resp);
-extern void	sm_unmon_svc(mon_id *monidp, sm_stat *resp);
-extern void	sm_unmon_all_svc(my_id *myidp, sm_stat *resp);
-extern void	sm_simu_crash_svc(void *myidp);
-extern void	sm_notify_svc(stat_chge *ntfp);
+extern void	nsmaddrproc1_reg(void *, void *);
+extern void	sm_stat_svc(void *, void *);
+extern void	sm_mon_svc(void *, void *);
+extern void	sm_unmon_svc(void *, void *);
+extern void	sm_unmon_all_svc(void *, void *);
+extern void	sm_simu_crash_svc(void *, void *);
+extern void	sm_notify_svc(void *, void *);
 
 extern void	sm_inithash(void);
 extern void	copydir_from_to(char *from_dir, char *to_dir);
