@@ -516,7 +516,7 @@ krb5_get_subtree_info(ldap_context, subtreearr, ntree)
     char                        **subtree=NULL, *realm_cont_dn=NULL;
     char                        **subtarr=NULL;
     char                        *containerref=NULL;
-    char 			**newsubtree=NULL;
+    char			**newsubtree=NULL;
 
     containerref = ldap_context->lrparams->containerref;
     subtree = ldap_context->lrparams->subtree;
@@ -2230,7 +2230,7 @@ populate_krb5_db_entry (krb5_context context,
 	    if ((st=krb5_dbe_lookup_last_pwd_change(context, entry, &last_pw_changed)) != 0)
 		goto cleanup;
 
-	    if ((mask & KDB_PWD_EXPIRE_TIME_ATTR) == 1) {
+	    if ((mask & KDB_PWD_EXPIRE_TIME_ATTR) == KDB_PWD_EXPIRE_TIME_ATTR) {
 		if ((last_pw_changed + pw_max_life) < entry->pw_expiration)
 		    entry->pw_expiration = last_pw_changed + pw_max_life;
 	    } else
