@@ -102,7 +102,7 @@ typedef struct dumpops {
 typedef struct di_args {
 	di_prom_handle_t	prom_hdl;
 	di_devlink_handle_t	devlink_hdl;
-	pcidb_hdl_t 		*pcidb_hdl;
+	pcidb_hdl_t		*pcidb_hdl;
 } di_arg_t;
 
 static const dumpops_t sysprop_dumpops = {
@@ -162,7 +162,8 @@ static int unprintable(char *, int);
 static int promopen(int);
 static void promclose();
 static di_node_t find_target_node(di_node_t);
-static void node_display_set(di_node_t);
+static void node_display_private_set(di_node_t);
+static int node_display_set(di_node_t, void *);
 static int dump_pciid(char *, int, di_node_t, pcidb_hdl_t *);
 
 void
@@ -266,7 +267,7 @@ prtconf_devinfo(void)
 		}
 
 		/* mark the target node so we display it */
-		node_display_set(target_node);
+		node_display_private_set(target_node);
 
 		if (opts.o_ancestors) {
 			/*
@@ -275,7 +276,7 @@ prtconf_devinfo(void)
 			 */
 			node = target_node;
 			while (node = di_parent_node(node))
-				node_display_set(node);
+				node_display_private_set(node);
 		} else {
 			/*
 			 * when we display device tree nodes the indentation
@@ -298,9 +299,7 @@ prtconf_devinfo(void)
 			 * them as well
 			 */
 			(void) di_walk_node(target_node, DI_WALK_CLDFIRST,
-			    (void *)1,
-			    (int (*)(di_node_t, void *))
-			    node_display_set);
+			    (void *)1, node_display_set);
 		}
 	}
 
@@ -381,11 +380,18 @@ node_display(di_node_t node)
 }
 
 static void
-node_display_set(di_node_t node)
+node_display_private_set(di_node_t node)
 {
 	long data = (long)di_node_private_get(node);
 	data |= NODE_DISPLAY;
 	di_node_private_set(node, (void *)data);
+}
+
+static int
+node_display_set(di_node_t node, void *arg __unused)
+{
+	node_display_private_set(node);
+	return (0);
 }
 
 #define	LNODE_DISPLAYED		(1<<0)
