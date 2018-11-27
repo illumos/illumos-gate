@@ -651,7 +651,7 @@ struct stroptions {
 struct struiod {
 	mblk_t		*d_mp;		/* pointer to mblk (chain) */
 	uio_t		d_uio;		/* uio info */
-	iovec_t d_iov[DEF_IOV_MAX];	/* iov referenced by uio */
+	iovec_t		*d_iov;		/* iov referenced by uio */
 };
 
 /*
