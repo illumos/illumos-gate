@@ -109,17 +109,19 @@ ns_printer_match_name(ns_printer_t *printer, const char *name)
 }
 
 
-static void
-_ns_append_printer_name(const char *name, va_list ap)
+static int
+_ns_append_printer_name(void *arg, va_list ap)
 {
+	const char *name = arg;
 	char *buf = va_arg(ap, char *);
 	int bufsize = va_arg(ap, int);
 
 	if (name == NULL)
-		return;
+		return (0);
 
 	(void) strlcat(buf, name, bufsize);
 	(void) strlcat(buf, "|", bufsize);
+	return (0);
 }
 
 /*
@@ -145,7 +147,7 @@ ns_printer_name_list(const ns_printer_t *printer)
 	}
 
 	list_iterate((void **)printer->aliases,
-	    (VFUNC_T)_ns_append_printer_name, buf, sizeof (buf));
+	    _ns_append_printer_name, buf, sizeof (buf));
 
 	buf[strlen(buf) - 1] = '\0';
 

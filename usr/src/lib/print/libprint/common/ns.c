@@ -79,7 +79,7 @@ ns_printer_destroy(ns_printer_t *printer)
 	if (printer != NULL) {
 		if (printer->attributes != NULL) {	/* attributes */
 			list_iterate((void **)printer->attributes,
-			    (VFUNC_T)ns_kvp_destroy);
+			    ns_kvp_destroy);
 			free(printer->attributes);
 		}
 		if (printer->aliases != NULL) {		/* aliases */

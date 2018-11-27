@@ -178,7 +178,7 @@ extern int	  ns_set_value(const char *, const void *, ns_printer_t *);
 extern int	  ns_set_value_from_string(const char *, const char *,
 						ns_printer_t *);
 extern ns_kvp_t	*ns_kvp_create(const char *, const char *);
-extern void ns_kvp_destroy(ns_kvp_t *);
+extern int ns_kvp_destroy(void *, __va_list);
 
 /* for BSD bindings only */
 extern ns_bsd_addr_t *ns_bsd_addr_get_default();
@@ -193,8 +193,6 @@ extern char *value_to_string(const char *, void *);
 extern void *string_to_value(const char *, char *);
 extern char *normalize_ns_name(char *);
 extern char *strncat_escaped(char *, char *, int, char *);
-
-
 
 #ifdef __cplusplus
 }

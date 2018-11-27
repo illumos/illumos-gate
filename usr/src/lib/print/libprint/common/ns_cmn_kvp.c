@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -66,9 +64,11 @@ ns_kvp_create(const char *key, const char *value)
 	return (kvp);
 }
 
-void
-ns_kvp_destroy(ns_kvp_t *kvp)
+int
+ns_kvp_destroy(void *arg, va_list arg1 __unused)
 {
+	ns_kvp_t *kvp = arg;
+
 	if (kvp != NULL) {
 		if (kvp->key != NULL)
 			free(kvp->key);
@@ -76,6 +76,7 @@ ns_kvp_destroy(ns_kvp_t *kvp)
 			free(kvp->value);
 		free(kvp);
 	}
+	return (0);
 }
 
 
@@ -130,7 +131,7 @@ ns_r_get_value(const char *key, const ns_printer_t *printer, int level)
 
 	/* find it right here */
 	if ((kvp = list_locate((void **)printer->attributes,
-			(COMP_T)ns_kvp_match_key, (void *)key)) != NULL) {
+	    (COMP_T)ns_kvp_match_key, (void *)key)) != NULL) {
 		void *value = string_to_value(key, kvp->value);
 
 		/* fill in an empty printer for a bsdaddr */
@@ -153,13 +154,13 @@ ns_r_get_value(const char *key, const ns_printer_t *printer, int level)
 			char **printers;
 
 			for (printers = string_to_value((*attrs)->key,
-						(*attrs)->value);
+			    (*attrs)->value);
 			    printers != NULL && *printers != NULL; printers++) {
 				ns_printer_t *printer =
-					ns_printer_get_name(*printers, NULL);
+				    ns_printer_get_name(*printers, NULL);
 
-				if ((value = ns_r_get_value(key, printer,
-							    level)) != NULL)
+				value = ns_r_get_value(key, printer, level);
+				if (value != NULL)
 					return (value);
 				ns_printer_destroy(printer);
 			}
@@ -167,18 +168,18 @@ ns_r_get_value(const char *key, const ns_printer_t *printer, int level)
 			ns_printer_t **printers;
 
 			for (printers = string_to_value((*attrs)->key,
-						(*attrs)->value);
+			    (*attrs)->value);
 			    printers != NULL && *printers != NULL; printers++) {
-				if ((value = ns_r_get_value(key, *printers,
-							    level)) != NULL)
+				value = ns_r_get_value(key, *printers, level);
+				if (value != NULL)
 					return (value);
 			}
 		} else if (strcmp((*attrs)->key, NS_KEY_USE) == 0) {
 			char *string = NULL;
 			ns_printer_t *printer =
-				ns_printer_get_name((*attrs)->value, NULL);
-			if ((value = ns_r_get_value(key, printer,
-					level)) != NULL)
+			    ns_printer_get_name((*attrs)->value, NULL);
+			value = ns_r_get_value(key, printer, level);
+			if (value != NULL)
 				string = value_to_string(string, value);
 			if (string != NULL)
 				value = string_to_value(key, string);
@@ -223,7 +224,7 @@ int
 ns_set_value(const char *key, const void *value, ns_printer_t *printer)
 {
 	return (ns_set_value_from_string(key,
-			value_to_string(key, (void *)value), printer));
+	    value_to_string(key, (void *)value), printer));
 }
 
 
@@ -233,24 +234,22 @@ ns_set_value(const char *key, const void *value, ns_printer_t *printer)
  */
 int
 ns_set_value_from_string(const char *key, const char *string,
-			ns_printer_t *printer)
+    ns_printer_t *printer)
 {
 	if (printer == NULL)
 		return (-1);
 
-	if (key == NULL)
-		list_iterate((void **)printer->attributes,
-				(VFUNC_T)ns_kvp_destroy);
-	else {
+	if (key == NULL) {
+		list_iterate((void **)printer->attributes, ns_kvp_destroy);
+	} else {
 		ns_kvp_t *kvp;
 
 		if (((kvp = list_locate((void **)printer->attributes,
-					(COMP_T)ns_kvp_match_key,
-					(void *)key)) == NULL) &&
+		    (COMP_T)ns_kvp_match_key, (void *)key)) == NULL) &&
 		    ((kvp = calloc(1, sizeof (*kvp))) != NULL)) {
 			kvp->key = strdup(key);
 			printer->attributes = (ns_kvp_t **)
-				list_append((void **)printer->attributes, kvp);
+			    list_append((void **)printer->attributes, kvp);
 		}
 		if (string != NULL)
 			kvp->value = strdup(string);
