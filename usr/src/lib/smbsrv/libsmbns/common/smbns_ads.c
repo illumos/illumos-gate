@@ -1286,8 +1286,8 @@ smb_ads_getfqhostname(smb_ads_handle_t *ah, char *fqhost, int len)
 	if (smb_gethostname(fqhost, len, SMB_CASE_LOWER) != 0)
 		return (-1);
 
-	(void) snprintf(fqhost, len, "%s.%s", fqhost,
-	    ah->domain);
+	(void) strlcat(fqhost, ".", len);
+	(void) strlcat(fqhost, ah->domain, len);
 
 	return (0);
 }
