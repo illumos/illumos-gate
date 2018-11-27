@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -31,8 +31,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "def.h"
 
@@ -51,7 +49,7 @@
  * command procedures to expect an argument of type void *,
  * the following cast "makes it all work".  Yes, it's ugly.
  */
-#define	C	(int (*)(void *))
+#define	C	(int (*)(void *))(uintptr_t)
 
 const struct cmd cmdtab[] = {
 	"next",		C next,		NDMLIST,	0,	MMNDEL,
@@ -67,7 +65,7 @@ const struct cmd cmdtab[] = {
 	"delete",	C delm,		W|P|MSGLIST,	0,	MMNDEL,
 	"dp",		C deltype,	W|MSGLIST,	0,	MMNDEL,
 	"dt",		C deltype,	W|MSGLIST,	0,	MMNDEL,
-	"undelete",	C undelete,	P|MSGLIST,	MDELETED,MMNDEL,
+	"undelete",	C undelete,	P|MSGLIST,	MDELETED, MMNDEL,
 	"unset",	C unset,	M|RAWLIST,	1,	1000,
 	"mail",		C sendm,	R|M|I|STRLIST,	0,	0,
 	"Mail",		C Sendm,	R|M|I|STRLIST,	0,	0,
@@ -114,7 +112,7 @@ const struct cmd cmdtab[] = {
 	"replysender",	C replysender,	R|I|MSGLIST,	0,	MMNDEL,
 	"edit",		C editor,	I|MSGLIST,	0,	MMNORM,
 	"echo",		C echo,		M|RAWLIST,	0,	1000,
-	"quit",		C edstop,	NOLIST, 	0,	0,
+	"quit",		C edstop,	NOLIST,		0,	0,
 	"list",		C pcmdlist,	M|NOLIST,	0,	0,
 	"load",		C loadmsg,	W|STRLIST,	0,	0,
 	"xit",		C rexit,	M|NOLIST,	0,	0,
