@@ -174,8 +174,8 @@ deliver_event(sysevent_t *ev, int flag)
 	return (0);
 }
 
-void
-subscriber_deliver_thr()
+void *
+subscriber_deliver_thr(void *arg __unused)
 {
 	ev_queue_t *evqp;
 

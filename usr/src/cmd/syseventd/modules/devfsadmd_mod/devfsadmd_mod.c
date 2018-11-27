@@ -211,8 +211,8 @@ devfsadmdeliver_event(sysevent_t *ev, int flag)
 static int cleanup;
 thread_t deliver_thr_id;
 
-void
-devfsadmd_deliver_thr()
+void *
+devfsadmd_deliver_thr(void *arg __unused)
 {
 	int retry = 0;
 	int msg_emitted = 0;
@@ -225,7 +225,7 @@ devfsadmd_deliver_thr()
 			if (cleanup && eventq_head == NULL) {
 				(void) cond_signal(&evq_cv);
 				(void) mutex_unlock(&evq_lock);
-				return;
+				return (NULL);
 			}
 		}
 
@@ -284,7 +284,7 @@ devfsadmd_deliver_thr()
 		if (cleanup) {
 			(void) cond_signal(&evq_cv);
 			(void) mutex_unlock(&evq_lock);
-			return;
+			return (NULL);
 		}
 	}
 
@@ -333,7 +333,7 @@ slm_init()
 	(void) mutex_init(&evq_lock, USYNC_THREAD, NULL);
 	(void) cond_init(&evq_cv, USYNC_THREAD, NULL);
 
-	if (thr_create(NULL, 0, (void *(*)(void *))devfsadmd_deliver_thr,
+	if (thr_create(NULL, 0, devfsadmd_deliver_thr,
 	    NULL, THR_BOUND, &deliver_thr_id) != 0) {
 		(void) mutex_destroy(&evq_lock);
 		(void) cond_destroy(&evq_cv);
