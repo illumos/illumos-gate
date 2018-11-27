@@ -142,18 +142,35 @@ fmd_scheme_fmd_unusable(nvlist_t *nvl)
 	return (rv);
 }
 
-/*ARGSUSED*/
 static nvlist_t *
-fmd_scheme_notranslate(nvlist_t *fmri, nvlist_t *auth)
+fmd_scheme_notranslate(nvlist_t *fmri, nvlist_t *auth __unused)
 {
 	(void) nvlist_xdup(fmri, &fmri, &fmd.d_nva);
 	return (fmri);
 }
 
-static long
-fmd_scheme_notsup(void)
+static ssize_t
+fmd_scheme_notsup_nvl2str(nvlist_t *fmri __unused, char *arg1 __unused,
+    size_t arg2 __unused)
 {
 	return (fmd_set_errno(EFMD_FMRI_NOTSUP));
+}
+
+static int
+fmd_scheme_notsup(nvlist_t *fmri __unused)
+{
+	return (fmd_set_errno(EFMD_FMRI_NOTSUP));
+}
+
+static int
+fmd_scheme_notsup2(nvlist_t *fmri1 __unused, nvlist_t *fmri2 __unused)
+{
+	return (fmd_set_errno(EFMD_FMRI_NOTSUP));
+}
+
+static void
+fmd_scheme_vnop(void)
+{
 }
 
 static int
@@ -167,29 +184,29 @@ fmd_scheme_nop(void)
  * the module, then this operation is implemented using the default function.
  */
 static const fmd_scheme_ops_t _fmd_scheme_default_ops = {
-	(int (*)())fmd_scheme_nop,		/* sop_init */
-	(void (*)())fmd_scheme_nop,		/* sop_fini */
-	(ssize_t (*)())fmd_scheme_notsup,	/* sop_nvl2str */
-	(int (*)())fmd_scheme_nop,		/* sop_expand */
-	(int (*)())fmd_scheme_notsup,		/* sop_present */
-	(int (*)())fmd_scheme_notsup,		/* sop_replaced */
-	(int (*)())fmd_scheme_notsup,		/* sop_service_state */
-	(int (*)())fmd_scheme_notsup,		/* sop_unusable */
-	(int (*)())fmd_scheme_notsup,		/* sop_contains */
-	fmd_scheme_notranslate			/* sop_translate */
+	.sop_init = fmd_scheme_nop,
+	.sop_fini = fmd_scheme_vnop,
+	.sop_nvl2str = fmd_scheme_notsup_nvl2str,
+	.sop_expand = fmd_scheme_notsup,
+	.sop_present = fmd_scheme_notsup,
+	.sop_replaced = fmd_scheme_notsup,
+	.sop_service_state = fmd_scheme_notsup,
+	.sop_unusable = fmd_scheme_notsup,
+	.sop_contains = fmd_scheme_notsup2,
+	.sop_translate = fmd_scheme_notranslate
 };
 
 static const fmd_scheme_ops_t _fmd_scheme_builtin_ops = {
-	(int (*)())fmd_scheme_nop,		/* sop_init */
-	(void (*)())fmd_scheme_nop,		/* sop_fini */
-	fmd_scheme_fmd_nvl2str,			/* sop_nvl2str */
-	(int (*)())fmd_scheme_nop,		/* sop_expand */
-	fmd_scheme_fmd_present,			/* sop_present */
-	fmd_scheme_fmd_replaced,		/* sop_replaced */
-	fmd_scheme_fmd_service_state,		/* sop_service_state */
-	fmd_scheme_fmd_unusable,		/* sop_unusable */
-	(int (*)())fmd_scheme_notsup,		/* sop_contains */
-	fmd_scheme_notranslate			/* sop_translate */
+	.sop_init = fmd_scheme_nop,
+	.sop_fini = fmd_scheme_vnop,
+	.sop_nvl2str = fmd_scheme_fmd_nvl2str,
+	.sop_expand = fmd_scheme_notsup,
+	.sop_present = fmd_scheme_fmd_present,
+	.sop_replaced = fmd_scheme_fmd_replaced,
+	.sop_service_state = fmd_scheme_fmd_service_state,
+	.sop_unusable = fmd_scheme_fmd_unusable,
+	.sop_contains = fmd_scheme_notsup2,
+	.sop_translate = fmd_scheme_notranslate
 };
 
 /*

@@ -36,6 +36,7 @@ extern "C" {
 #include <fmd_list.h>
 #include <fmd_time.h>
 #include <fmd_api.h>
+#include <fmd_trace.h>
 
 struct fmd_conf;			/* see <fmd_conf.h> */
 struct fmd_dispq;			/* see <fmd_dispq.h> */
@@ -89,7 +90,7 @@ typedef struct fmd {
 
 	pthread_mutex_t d_thr_lock;	/* lock for d_thr_list */
 	fmd_list_t d_thr_list;		/* list of all fmd_thread_t's */
-	void (*d_thr_trace)();		/* thread trace buffer function */
+	fmd_tracebuf_f *d_thr_trace;	/* thread trace buffer function */
 	int d_thr_sig;			/* cached copy of client.thrsig */
 
 	pthread_mutex_t d_mod_lock;	/* lock for d_mod_list */

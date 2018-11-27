@@ -208,8 +208,11 @@ trwalk_fini(mdb_walk_state_t *wsp)
 
 /*ARGSUSED*/
 static int
-trprint_msg(uintptr_t addr, const fmd_tracerec_t *trp, uintptr_t tid)
+trprint_msg(uintptr_t addr, const void *arg, void *arg1)
 {
+	const fmd_tracerec_t *trp = arg;
+	uintptr_t tid = (uintptr_t)arg1;
+
 	if (tid == 0)
 		mdb_printf("%3lu ", trp->tr_stack[trp->tr_depth]);
 	else if (trp->tr_stack[trp->tr_depth] != tid)
@@ -223,8 +226,10 @@ trprint_msg(uintptr_t addr, const fmd_tracerec_t *trp, uintptr_t tid)
 
 /*ARGSUSED*/
 static int
-trprint_cpp(uintptr_t addr, const fmd_tracerec_t *trp, uintptr_t tid)
+trprint_cpp(uintptr_t addr, const void *arg, void *arg1)
 {
+	const fmd_tracerec_t *trp = arg;
+	uintptr_t tid = (uintptr_t)arg1;
 	char file[64];
 
 	if (tid == 0)
@@ -254,17 +259,19 @@ trprint_stack(const fmd_tracerec_t *trp)
 }
 
 static int
-trprint_msg_stack(uintptr_t addr, const fmd_tracerec_t *trp, uintptr_t tid)
+trprint_msg_stack(uintptr_t addr, const void *arg, void *arg1)
 {
-	int status = trprint_msg(addr, trp, tid);
+	const fmd_tracerec_t *trp = arg;
+	int status = trprint_msg(addr, trp, arg1);
 	trprint_stack(trp);
 	return (status);
 }
 
 static int
-trprint_cpp_stack(uintptr_t addr, const fmd_tracerec_t *trp, uintptr_t tid)
+trprint_cpp_stack(uintptr_t addr, const void *arg, void *arg1)
 {
-	int status = trprint_cpp(addr, trp, tid);
+	const fmd_tracerec_t *trp = arg;
+	int status = trprint_cpp(addr, trp, arg1);
 	trprint_stack(trp);
 	return (status);
 }
@@ -272,7 +279,7 @@ trprint_cpp_stack(uintptr_t addr, const fmd_tracerec_t *trp, uintptr_t tid)
 static int
 fmd_trace(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	int (*func)(uintptr_t, const fmd_tracerec_t *, uintptr_t);
+	int (*func)(uintptr_t, const void *, void *);
 	uint_t opt_c = FALSE, opt_s = FALSE;
 
 	if (mdb_getopts(argc, argv,
@@ -293,7 +300,7 @@ fmd_trace(uintptr_t tid, uint_t flags, int argc, const mdb_arg_t *argv)
 		func = opt_s ? trprint_msg_stack : trprint_msg;
 	}
 
-	if (mdb_walk("fmd_trace", (mdb_walk_cb_t)func, (void *)tid) == -1) {
+	if (mdb_walk("fmd_trace", func, (void *)tid) == -1) {
 		mdb_warn("failed to walk fmd_trace");
 		return (DCMD_ERR);
 	}

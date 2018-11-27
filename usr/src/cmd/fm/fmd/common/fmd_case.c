@@ -1572,9 +1572,9 @@ fmd_case_rele_locked(fmd_case_t *cp)
 }
 
 int
-fmd_case_insert_principal(fmd_case_t *cp, fmd_event_t *ep)
+fmd_case_insert_principal(void *cp, fmd_event_t *ep)
 {
-	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_case_impl_t *cip = cp;
 	fmd_case_item_t *cit;
 	fmd_event_t *oep;
 	uint_t state;
@@ -1611,9 +1611,9 @@ fmd_case_insert_principal(fmd_case_t *cp, fmd_event_t *ep)
 }
 
 int
-fmd_case_insert_event(fmd_case_t *cp, fmd_event_t *ep)
+fmd_case_insert_event(void *cp, fmd_event_t *ep)
 {
-	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_case_impl_t *cip = cp;
 	fmd_case_item_t *cit;
 	uint_t state;
 	int new;

@@ -41,7 +41,7 @@ fmd_thread_xcreate(fmd_module_t *mp, pthread_t tid)
 	tp->thr_func = NULL;
 	tp->thr_arg = NULL;
 	tp->thr_trdata = fmd_trace_create();
-	tp->thr_trfunc = (fmd_tracebuf_f *)fmd.d_thr_trace;
+	tp->thr_trfunc = fmd.d_thr_trace;
 	tp->thr_errdepth = 0;
 	tp->thr_isdoor = 0;
 
@@ -81,7 +81,7 @@ fmd_thread_create_cmn(fmd_module_t *mp, fmd_thread_f *func, void *arg,
 	tp->thr_func = func;
 	tp->thr_arg = arg;
 	tp->thr_trdata = fmd_trace_create();
-	tp->thr_trfunc = (fmd_tracebuf_f *)fmd.d_thr_trace;
+	tp->thr_trfunc = fmd.d_thr_trace;
 	tp->thr_errdepth = 0;
 	tp->thr_isdoor = isdoor;
 

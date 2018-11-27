@@ -641,8 +641,7 @@ fmd_module_gc(fmd_module_t *mp)
 	fmd_module_lock(mp);
 
 	if ((info = mp->mod_info) != NULL) {
-		fmd_serd_hash_apply(&mp->mod_serds,
-		    (fmd_serd_eng_f *)fmd_serd_eng_gc, NULL);
+		fmd_serd_hash_apply(&mp->mod_serds, fmd_serd_eng_gc, NULL);
 	}
 
 	fmd_module_unlock(mp);
@@ -657,8 +656,7 @@ void
 fmd_module_trygc(fmd_module_t *mp)
 {
 	if (fmd_module_trylock(mp)) {
-		fmd_serd_hash_apply(&mp->mod_serds,
-		    (fmd_serd_eng_f *)fmd_serd_eng_gc, NULL);
+		fmd_serd_hash_apply(&mp->mod_serds, fmd_serd_eng_gc, NULL);
 		fmd_module_unlock(mp);
 	}
 }
@@ -715,7 +713,7 @@ fmd_module_clrdirty(fmd_module_t *mp)
 
 	if (mp->mod_flags & FMD_MOD_MDIRTY) {
 		fmd_serd_hash_apply(&mp->mod_serds,
-		    (fmd_serd_eng_f *)fmd_serd_eng_clrdirty, NULL);
+		    fmd_serd_eng_clrdirty, NULL);
 		fmd_buf_hash_commit(&mp->mod_bufs);
 	}
 
@@ -740,8 +738,7 @@ fmd_module_commit(fmd_module_t *mp)
 	}
 
 	if (mp->mod_flags & FMD_MOD_MDIRTY) {
-		fmd_serd_hash_apply(&mp->mod_serds,
-		    (fmd_serd_eng_f *)fmd_serd_eng_commit, NULL);
+		fmd_serd_hash_apply(&mp->mod_serds, fmd_serd_eng_commit, NULL);
 		fmd_buf_hash_commit(&mp->mod_bufs);
 	}
 

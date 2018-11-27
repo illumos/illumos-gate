@@ -265,9 +265,8 @@ rsrcinfo_update(sunFmResource_update_ctx_t *update_ctx)
 	return (SNMP_ERR_NOERROR);
 }
 
-/*ARGSUSED*/
-static void
-update_thread(void *arg)
+__NORETURN static void *
+update_thread(void *arg __unused)
 {
 	/*
 	 * The current rsrcinfo_update implementation offers minimal savings
@@ -354,8 +353,7 @@ sunFmResourceTable_init(void)
 		return (MIB_REGISTRATION_FAILED);
 	}
 
-	if ((err = pthread_create(NULL, NULL, (void *(*)(void *))update_thread,
-	    NULL)) != 0) {
+	if ((err = pthread_create(NULL, NULL, update_thread, NULL)) != 0) {
 		(void) snmp_log(LOG_ERR, MODNAME_STR ": error creating update "
 		    "thread: %s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);

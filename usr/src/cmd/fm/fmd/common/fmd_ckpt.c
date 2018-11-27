@@ -894,7 +894,7 @@ fmd_ckpt_strptr(fmd_ckpt_t *ckp, fcf_stridx_t sid, const char *defstr)
 
 static void
 fmd_ckpt_restore_events(fmd_ckpt_t *ckp, fcf_secidx_t sid,
-    void (*func)(void *, fmd_event_t *), void *arg)
+    int (*func)(void *, fmd_event_t *), void *arg)
 {
 	const fcf_event_t *fcfe;
 	const fcf_sec_t *sp;
@@ -942,7 +942,7 @@ fmd_ckpt_restore_events(fmd_ckpt_t *ckp, fcf_secidx_t sid,
 		ep = fmd_event_recreate(FMD_EVT_PROTOCOL,
 		    &ftv, NULL, NULL, lp, fcfe->fcfe_offset, 0);
 		fmd_event_hold(ep);
-		func(arg, ep);
+		(void) func(arg, ep);
 		fmd_event_rele(ep);
 
 		fcfe = (fcf_event_t *)((uintptr_t)fcfe + sp->fcfs_entsize);
@@ -1050,10 +1050,10 @@ fmd_ckpt_restore_case(fmd_ckpt_t *ckp, fmd_module_t *mp, const fcf_sec_t *sp)
 	}
 
 	fmd_ckpt_restore_events(ckp, fcfc->fcfc_principal,
-	    (void (*)(void *, fmd_event_t *))fmd_case_insert_principal, cp);
+	    fmd_case_insert_principal, cp);
 
 	fmd_ckpt_restore_events(ckp, fcfc->fcfc_events,
-	    (void (*)(void *, fmd_event_t *))fmd_case_insert_event, cp);
+	    fmd_case_insert_event, cp);
 
 	/*
 	 * Once solved, treat suspects from resource cache as master copy.
@@ -1105,7 +1105,7 @@ fmd_ckpt_restore_serd(fmd_ckpt_t *ckp, fmd_module_t *mp, const fcf_sec_t *sp)
 		fmd_module_lock(mp);
 
 		fmd_ckpt_restore_events(ckp, fcfd->fcfd_events,
-		    (void (*)(void *, fmd_event_t *))fmd_serd_eng_record,
+		    fmd_serd_eng_record,
 		    fmd_serd_eng_lookup(&mp->mod_serds, s));
 
 		fmd_module_unlock(mp);

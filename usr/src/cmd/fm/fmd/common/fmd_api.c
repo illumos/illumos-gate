@@ -1872,7 +1872,7 @@ fmd_doorthr_create(door_info_t *dip, void *(*crf)(void *), void *crarg,
 		return (0);
 	}
 
-	if ((new_tp = fmd_doorthread_create(mp, (fmd_thread_f *)crf,
+	if ((new_tp = fmd_doorthread_create(mp, (fmd_thread_f *)(uintptr_t)crf,
 	    crarg)) != NULL) {
 		tid = new_tp->thr_tid;
 		mp->mod_stats->ms_doorthrtotal.fmds_value.ui32++;
