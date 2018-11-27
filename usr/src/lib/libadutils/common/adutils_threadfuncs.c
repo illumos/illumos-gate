@@ -46,6 +46,7 @@ struct adutils_lderrno {
 	char *le_errmsg;
 };
 
+static void *adutils_threadid(void);
 static void *adutils_mutex_alloc(void);
 static void adutils_mutex_free(void *mutexp);
 static int adutils_get_errno(void);
@@ -70,9 +71,8 @@ static struct ldap_thread_fns thread_fns = {
 };
 
 struct ldap_extra_thread_fns extra_thread_fns = {
-	.ltf_threadid_fn = (void * (*)(void))pthread_self
+	.ltf_threadid_fn = adutils_threadid
 };
-
 
 /*
  * Set up thread management functions for the specified LDAP session.
@@ -110,6 +110,12 @@ adutils_set_thread_functions(LDAP *ld)
 		return (rc);
 	}
 	return (rc);
+}
+
+static void *
+adutils_threadid(void)
+{
+	return ((void *)(uintptr_t)pthread_self());
 }
 
 /*
