@@ -27,8 +27,6 @@
 #ifndef _MULTIMEDIA_AUDIOFILE_H
 #define	_MULTIMEDIA_AUDIOFILE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef NO_EXTERN_C
 
 #ifdef __cplusplus
@@ -55,9 +53,11 @@ public:
 	    { return (type); }
 	inline operator int() {				// Cast to integer
 	    switch (type) {
-	    case NormalAccess: return (MADV_NORMAL);
 	    case RandomAccess: return (MADV_RANDOM);
 	    case SequentialAccess: return (MADV_SEQUENTIAL);
+	    case NormalAccess:
+	    default:
+		return (MADV_NORMAL);
 	    }
 	}
 };
