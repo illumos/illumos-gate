@@ -35,7 +35,6 @@
 #       do not bringover from the parent (-n)
 #       runs 'make check' (-C)
 #       checks for new interfaces in libraries (-A)
-#       runs lint in usr/src (-l plus the LINTDIRS variable)
 #       sends mail on completion (-m and the MAILTO variable)
 #       creates packages for PIT/RE (-p)
 #       checks for changes in ELF runpaths (-r)
@@ -46,7 +45,7 @@
 # - This script is only interpreted by ksh93 and explicitly allows the
 #   use of ksh93 language extensions.
 #
-export NIGHTLY_OPTIONS='-FnCDAlmprt'
+export NIGHTLY_OPTIONS='-FnCDAmprt'
 
 # CODEMGR_WS - where is your workspace at
 #export CODEMGR_WS="$HOME/ws/illumos-gate"
@@ -224,6 +223,8 @@ export SPRO_VROOT="$SPRO_ROOT"
 #
 # To disable shadow compilation, unset SHADOW_* or set them to the empty string.
 #
+export SHADOW_CCS=gcc7,/usr/gcc/7/bin/gcc,gnu
+export SHADOW_CCCS=gcc7,/usr/gcc/7/bin/g++,gnu
 
 # This goes along with lint - it is a series of the form "A [y|n]" which
 # means "go to directory A and run 'make lint'" Then mail me (y) the
