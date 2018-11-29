@@ -107,7 +107,6 @@ static char *heap_top;
 static char *heap_bottom;
 
 static void i386_zfs_probe(void);
-void exit(int);
 static void load(void);
 static int parse_cmd(void);
 
@@ -272,6 +271,7 @@ main(void)
 void
 exit(int x)
 {
+	while (1);
 }
 
 static void
