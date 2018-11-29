@@ -45,6 +45,12 @@ are. DO NOT just blindly copy over new common code. There is more work that
 needs to be done in terms of changed interfaces and expectations for the
 drivers.
 
+# Support for Ice Lake and Cannon Lake
+
+Due to several changes that have been made to the core e1000 code in
+FreeBSD that's specific to changes for iflib, a whole sale update was
+not done and instead support was manually merged based on Intel.
+
 # e1000_defines.h
 
 In e1000_defines.h we add the following three definitions which are not
