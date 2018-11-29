@@ -636,7 +636,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
     sd_flag_t sdflags_u, sd_flag_t sdflags, Ofl_desc *ofl)
 {
 	Sym_desc	*sdp;
-	Sym_desc 	*usdp;
+	Sym_desc	*usdp;
 	Sym		*sym;
 	Word		hash;
 	avl_index_t	where;
@@ -795,7 +795,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
  *
  *  -	the symbol has been defined by an implicitly supplied library, ie. one
  *	which was encounted because it was NEEDED by another library, rather
- * 	than from a command line supplied library which would become the only
+ *	than from a command line supplied library which would become the only
  *	dependency of the output file being produced.
  *
  *  -	the symbol has been defined by a version of a shared object that is
@@ -991,6 +991,9 @@ sym_cap_vis(const char *name, Word hash, Sym *sym, Ofl_desc *ofl)
 	case STV_SINGLETON:
 		sdflags |= FLG_SY_SINGLE;
 		break;
+	case STV_HIDDEN:
+		sdflags |= FLG_SY_HIDDEN;
+		break;
 	}
 
 	/*
@@ -1133,7 +1136,7 @@ ensure_array_local(Ofl_desc *ofl, APlist *apl, const char *str)
  * or modified), validate and count the relevant entries:
  *
  *  -	check and print any undefined symbols remaining.  Note that if a symbol
- *	has been defined by virtue of the inclusion of 	an implicit shared
+ *	has been defined by virtue of the inclusion of	an implicit shared
  *	library, it is still classed as undefined.
  *
  *  -	count the number of global needed symbols together with the size of
@@ -1141,7 +1144,7 @@ ensure_array_local(Ofl_desc *ofl, APlist *apl, const char *str)
  *	symbols may be reduced to locals).
  *
  *  -	establish the size and alignment requirements for the global .bss
- *	section (the alignment of this section is based on the 	first symbol
+ *	section (the alignment of this section is based on the	first symbol
  *	that it will contain).
  */
 uintptr_t
@@ -1516,7 +1519,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if ((sym->st_shndx == SHN_COMMON) &&
 		    (((oflags & FLG_OF_RELOBJ) == 0) ||
-		    (SYM_IS_HIDDEN(sdp) && (oflags & FLG_OF_PROCRED)))) {
+		    ld_sym_reducable(ofl, sdp))) {
 			if ((sdp->sd_move == NULL) ||
 			    ((sdp->sd_flags & FLG_SY_PAREXPN) == 0)) {
 				if (type != STT_TLS) {
@@ -1568,7 +1571,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * hidden requirement and ensures the symbol isn't made globally
 		 * available at runtime.
 		 */
-		if (SYM_IS_HIDDEN(sdp) && (oflags & FLG_OF_PROCRED)) {
+		if (ld_sym_reducable(ofl, sdp)) {
 			/*
 			 * If any reductions are being processed, keep a count
 			 * of eliminated symbols, and if the symbol is being
@@ -1890,7 +1893,7 @@ typedef struct {
  * input sections from this input file have been assigned an input section
  * descriptor which is saved in the `ifl_isdesc' array.
  *
- *  -	local symbols are saved (as is) if the input file is a 	relocatable
+ *  -	local symbols are saved (as is) if the input file is a relocatable
  *	object
  *
  *  -	global symbols are added to the linkers internal symbol table if they
@@ -3132,4 +3135,27 @@ ld_stt_section_sym_name(Is_desc *isp)
 	}
 
 	return (isp->is_sym_name);
+}
+
+/*
+ * If we're producing a relocatable object and the symbol is eligible for
+ * COMDAT section, it shouldn't be reduced in scope as that will break the
+ * COMDAT matching when the output object is later consumed.  Leave it alone,
+ * and any reduction (and COMDAT) processing will occur then.
+ *
+ * Otherwise, any hidden symbol is reduced when reductions are being processed.
+ */
+Boolean
+ld_sym_reducable(Ofl_desc *ofl, Sym_desc *sdp)
+{
+	Is_desc *isc = sdp->sd_isc;
+
+	if (((ofl->ofl_flags & FLG_OF_RELOBJ) != 0) &&
+	    (isc != NULL) &&
+	    ((isc->is_flags & FLG_IS_COMDAT) != 0)) {
+		return (FALSE);
+	} else {
+		return (SYM_IS_HIDDEN(sdp) &&
+		    (ofl->ofl_flags & FLG_OF_PROCRED));
+	}
 }
