@@ -60,7 +60,7 @@ all: $(PROG)
 
 install: all $(ROOTBOOTPROG)
 
-OBJS =	multiboot.o zfsboot.o sio.o cons.o panic.o devopen.o bio.o \
+OBJS =	multiboot.o zfsboot.o sio.o cons.o devopen.o bio.o \
 	part.o biosmem.o smbios.o biosdisk.o devicename.o disk.o bcache.o \
 	time.o zfs_cmd.o
 

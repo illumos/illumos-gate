@@ -56,7 +56,7 @@ LIBFICL=	../../libficl/$(MACH)/libficl.a
 # Always add MI sources
 SRCS +=	boot.c commands.c console.c devopen.c interp.c
 SRCS +=	interp_backslash.c interp_parse.c ls.c misc.c
-SRCS +=	module.c panic.c linenoise.c multiboot2.c
+SRCS +=	module.c linenoise.c multiboot2.c
 SRCS +=	zfs_cmd.c
 SRCS +=	font.c $(FONT).c list.c tem.c
 
