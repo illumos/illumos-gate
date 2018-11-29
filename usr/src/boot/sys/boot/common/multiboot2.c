@@ -1193,7 +1193,7 @@ multiboot2_exec(struct preloaded_file *fp)
 				break;
 		}
 		if (map->PhysicalStart == 0)
-			panic("Could not find memory for relocater\n");
+			panic("Could not find memory for relocater");
 
 		if (keep_bs == 0) {
 			status = BS->ExitBootServices(IH, key);
@@ -1253,7 +1253,7 @@ multiboot2_exec(struct preloaded_file *fp)
 		mp->mb_mod_start = efi_physaddr(module, tmp, map,
 		    map_size / desc_size, desc_size, mp->mb_mod_end);
 		if (mp->mb_mod_start == 0)
-			panic("Could not find memory for module\n");
+			panic("Could not find memory for module");
 
 		mp->mb_mod_end += mp->mb_mod_start;
 		chunk->chunk_paddr = mp->mb_mod_start;

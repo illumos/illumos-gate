@@ -374,7 +374,7 @@ bzf_stat(struct open_file *f, struct stat *sb)
 void
 bz_internal_error(int errorcode)
 {
-	panic("bzipfs: critical error %d in bzip2 library occured\n",
+	panic("bzipfs: critical error %d in bzip2 library occured",
 	    errorcode);
 }
 

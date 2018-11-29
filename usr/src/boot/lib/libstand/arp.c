@@ -118,9 +118,8 @@ arpwhohas(struct iodesc *d, struct in_addr addr)
 	i = sendrecv(d,
 	    arpsend, &wbuf.data, sizeof (wbuf.data),
 	    arprecv, &pkt, (void **)&ah, NULL);
-	if (i == -1) {
-		panic("arp: no response for %s\n", inet_ntoa(addr));
-	}
+	if (i == -1)
+		panic("arp: no response for %s", inet_ntoa(addr));
 
 	/* Store ethernet address in cache */
 #ifdef ARP_DEBUG
