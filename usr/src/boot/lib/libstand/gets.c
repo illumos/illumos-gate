@@ -1,6 +1,6 @@
 /*	$NetBSD: gets.c,v 1.6 1995/10/11 21:16:57 pk Exp $	*/
 
-/*-
+/*
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -32,7 +32,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include "stand.h"
 
@@ -41,76 +40,75 @@ __FBSDID("$FreeBSD$");
 void
 ngets(char *buf, int n)
 {
-    int c;
-    char *lp;
+	int c;
+	char *lp;
 
-    for (lp = buf;;) {
-	c = getchar();
-	if (c == -1)
-	    break;
-	switch (c & 0177) {
-	case '\n':
-	case '\r':
-	    *lp = '\0';
-	    putchar('\n');
-	    return;
-	case '\b':
-	case '\177':
-	    if (lp > buf) {
-		lp--;
-		putchar('\b');
-		putchar(' ');
-		putchar('\b');
-	    }
-	    break;
-	case 'r'&037: {
-	    char *p;
+	for (lp = buf; ; ) {
+		c = getchar();
+		if (c == -1)
+			break;
+		switch (c & 0177) {
+		case '\n':
+		case '\r':
+			*lp = '\0';
+			putchar('\n');
+			return;
+		case '\b':
+		case '\177':
+			if (lp > buf) {
+				lp--;
+				putchar('\b');
+				putchar(' ');
+				putchar('\b');
+			}
+			break;
+		case 'r' & 037: {
+			char *p;
 
-	    putchar('\n');
-	    for (p = buf; p < lp; ++p)
-		putchar(*p);
-	    break;
+			putchar('\n');
+			for (p = buf; p < lp; ++p)
+				putchar(*p);
+			break;
+		}
+		case 'u' & 037:
+		case 'w' & 037:
+			lp = buf;
+			putchar('\n');
+			break;
+		default:
+			if ((n < 1) || ((lp - buf) < n - 1)) {
+				*lp++ = c;
+				putchar(c);
+			}
+		}
 	}
-	case 'u'&037:
-	case 'w'&037:
-	    lp = buf;
-	    putchar('\n');
-	    break;
-	default:
-	    if ((n < 1) || ((lp - buf) < n - 1)) {
-		*lp++ = c;
-		putchar(c);
-	    }
-	}
-    }
-    /*NOTREACHED*/
+	/*NOTREACHED*/
 }
 
 int
 fgetstr(char *buf, int size, int fd)
 {
-    char	c;
-    int		err, len;
-    
-    size--;	/* leave space for terminator */
-    len = 0;
-    while (size != 0) {
-	err = read(fd, &c, sizeof(c));
-	if (err < 0)		/* read error */
-	    return(-1);
-	if (err == 0) {		/* EOF */
-	    if (len == 0)
-		return(-1);	/* nothing to read */
-	    break;
-	}
-	if ((c == '\r') ||	/* line terminators */
-	    (c == '\n'))
-	    break;
-	*buf++ = c;		/* keep char */
-	size--;
-	len++;
-    }
-    *buf = 0;
-    return(len);
-}
+	char	c;
+	int	err, len;
 
+	size--;	/* leave space for terminator */
+	len = 0;
+	while (size != 0) {
+		err = read(fd, &c, sizeof (c));
+		if (err < 0)		/* read error */
+			return (-1);
+		if (err == 0) {		/* EOF */
+			if (len == 0)
+				return (-1);	/* nothing to read */
+			break;
+		}
+		if ((c == '\r') ||	/* line terminators */
+		    (c == '\n'))
+			break;
+		*buf++ = c;		/* keep char */
+		size--;
+		len++;
+	}
+	*buf = 0;
+	return (len);
+}
