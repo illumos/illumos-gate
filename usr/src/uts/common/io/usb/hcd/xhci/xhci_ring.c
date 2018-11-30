@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -288,7 +288,7 @@ xhci_ring_trb_space(xhci_ring_t *xrp, uint_t ntrb)
  */
 void
 xhci_ring_trb_fill(xhci_ring_t *xrp, uint_t trboff, xhci_trb_t *host_trb,
-    boolean_t put_cycle)
+    uint64_t *trb_pap, boolean_t put_cycle)
 {
 	uint_t i;
 	uint32_t flags;
@@ -324,6 +324,20 @@ xhci_ring_trb_fill(xhci_ring_t *xrp, uint_t trboff, xhci_trb_t *host_trb,
 	}
 
 	trb->trb_flags = flags;
+
+	if (trb_pap != NULL) {
+		uint64_t pa;
+
+		/*
+		 * This logic only works if we have a single cookie address.
+		 * However, this is prettty tightly assumed for rings through
+		 * the xhci driver at this time.
+		 */
+		ASSERT3U(xrp->xr_dma.xdb_ncookies, ==, 1);
+		pa = xrp->xr_dma.xdb_cookies[0].dmac_laddress;
+		pa += ((uintptr_t)trb - (uintptr_t)&xrp->xr_trb[0]);
+		*trb_pap = pa;
+	}
 }
 
 /*
@@ -380,7 +394,7 @@ xhci_ring_trb_produce(xhci_ring_t *xrp, uint_t ntrb)
 void
 xhci_ring_trb_put(xhci_ring_t *xrp, xhci_trb_t *trb)
 {
-	xhci_ring_trb_fill(xrp, 0U, trb, B_FALSE);
+	xhci_ring_trb_fill(xrp, 0U, trb, NULL, B_FALSE);
 	xhci_ring_trb_produce(xrp, 1U);
 }
 

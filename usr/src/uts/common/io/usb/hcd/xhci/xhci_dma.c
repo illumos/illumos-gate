@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -268,22 +268,27 @@ xhci_transfer_free(xhci_t *xhcip, xhci_transfer_t *xt)
 	VERIFY(xhcip != NULL);
 	xhci_dma_free(&xt->xt_buffer);
 	if (xt->xt_isoc != NULL) {
-		ASSERT(xt->xt_ntrbs > 0);
+		ASSERT3U(xt->xt_ntrbs, >, 0);
 		kmem_free(xt->xt_isoc, sizeof (usb_isoc_pkt_descr_t) *
 		    xt->xt_ntrbs);
 		xt->xt_isoc = NULL;
 	}
 	if (xt->xt_trbs != NULL) {
-		ASSERT(xt->xt_ntrbs > 0);
+		ASSERT3U(xt->xt_ntrbs, >, 0);
 		kmem_free(xt->xt_trbs, sizeof (xhci_trb_t) * xt->xt_ntrbs);
 		xt->xt_trbs = NULL;
+	}
+	if (xt->xt_trbs_pa != NULL) {
+		ASSERT3U(xt->xt_ntrbs, >, 0);
+		kmem_free(xt->xt_trbs_pa, sizeof (uint64_t) * xt->xt_ntrbs);
+		xt->xt_trbs_pa = NULL;
 	}
 	kmem_free(xt, sizeof (xhci_transfer_t));
 }
 
 xhci_transfer_t *
-xhci_transfer_alloc(xhci_t *xhcip, xhci_endpoint_t *xep, size_t size, int trbs,
-    int usb_flags)
+xhci_transfer_alloc(xhci_t *xhcip, xhci_endpoint_t *xep, size_t size,
+    uint_t trbs, int usb_flags)
 {
 	int kmflags;
 	boolean_t dmawait;
@@ -319,9 +324,17 @@ xhci_transfer_alloc(xhci_t *xhcip, xhci_endpoint_t *xep, size_t size, int trbs,
 		 * off from what ehci and co. have done before. If this becomes
 		 * a technical issue, it's certainly possible to increase the
 		 * SGL entry count.
+		 *
+		 * When we use the larger SGL count, we change our strategy for
+		 * being notified. In such a case we will opt to use an event
+		 * data packet. This helps deal with cases where some
+		 * controllers don't properly generate events for the last entry
+		 * in a TD with IOC when IOSP is set.
 		 */
-		if (xep->xep_type == USB_EP_ATTR_BULK)
+		if (xep->xep_type == USB_EP_ATTR_BULK) {
 			sgl = XHCI_TRANSFER_DMA_SGL;
+			trbs++;
+		}
 
 		xhci_dma_acc_attr(xhcip, &acc);
 		xhci_dma_transfer_attr(xhcip, &attr, sgl);
@@ -346,6 +359,14 @@ xhci_transfer_alloc(xhci_t *xhcip, xhci_endpoint_t *xep, size_t size, int trbs,
 		return (NULL);
 	}
 
+	xt->xt_trbs_pa = kmem_zalloc(sizeof (uint64_t) * trbs, kmflags);
+	if (xt->xt_trbs_pa == NULL) {
+		kmem_free(xt->xt_trbs, sizeof (xhci_trb_t) * trbs);
+		xhci_dma_free(&xt->xt_buffer);
+		kmem_free(xt, sizeof (xhci_transfer_t));
+		return (NULL);
+	}
+
 	/*
 	 * For ISOCH transfers, we need to also allocate the results data.
 	 */
@@ -353,6 +374,7 @@ xhci_transfer_alloc(xhci_t *xhcip, xhci_endpoint_t *xep, size_t size, int trbs,
 		xt->xt_isoc = kmem_zalloc(sizeof (usb_isoc_pkt_descr_t) * trbs,
 		    kmflags);
 		if (xt->xt_isoc == NULL) {
+			kmem_free(xt->xt_trbs_pa, sizeof (uint64_t) * trbs);
 			kmem_free(xt->xt_trbs, sizeof (xhci_trb_t) * trbs);
 			xhci_dma_free(&xt->xt_buffer);
 			kmem_free(xt, sizeof (xhci_transfer_t));
@@ -402,12 +424,12 @@ xhci_transfer_sync(xhci_t *xhcip, xhci_transfer_t *xt, uint_t type)
  * Remain	4608	512	256	0
  * Bytes	4096	4096	256	256
  * Naive TD	9	1	1	0
- * Act TD 	10	2	1	0
+ * Act TD	10	2	1	0
  *
  * This means that the only safe way forward here is to work backwards and see
  * how many we need to work up to this point.
  */
-static int
+static uint_t
 xhci_transfer_get_tdsize(xhci_transfer_t *xt, uint_t off, uint_t mps)
 {
 	int i;
@@ -418,18 +440,16 @@ xhci_transfer_get_tdsize(xhci_transfer_t *xt, uint_t off, uint_t mps)
 	 */
 	ASSERT(xt->xt_buffer.xdb_ncookies > 0);
 	for (i = xt->xt_buffer.xdb_ncookies - 1; i > off; i--) {
-		size_t len;
-
-		/*
-		 * The maximum value we can return is 31 packets. So, in that
-		 * case we short-circuit and return.
-		 */
-		if (npkt >= 31)
-			return (31);
-
-		len = roundup(xt->xt_buffer.xdb_cookies[i].dmac_size, mps);
+		size_t len = roundup(xt->xt_buffer.xdb_cookies[i].dmac_size,
+		    mps);
 		npkt += len / mps;
 	}
+
+	/*
+	 * Make sure to clamp this value otherwise we risk truncation.
+	 */
+	if (npkt >= XHCI_MAX_TDSIZE)
+		return (XHCI_MAX_TDSIZE);
 
 	return (npkt);
 }
@@ -445,6 +465,19 @@ xhci_transfer_trb_fill_data(xhci_endpoint_t *xep, xhci_transfer_t *xt, int off,
 	VERIFY(xep->xep_pipe != NULL);
 	VERIFY(off + xt->xt_buffer.xdb_ncookies <= xt->xt_ntrbs);
 	mps = xep->xep_pipe->p_ep.wMaxPacketSize;
+
+	if (in == B_TRUE) {
+		xt->xt_data_tohost = B_TRUE;
+	}
+
+	/*
+	 * We assume that if we have a non-bulk endpoint, then we should only
+	 * have a single cookie. This falls out from the default SGL length that
+	 * we use for these other device types.
+	 */
+	if (xep->xep_type != USB_EP_ATTR_BULK) {
+		VERIFY3U(xt->xt_buffer.xdb_ncookies, ==, 1);
+	}
 
 	for (i = 0; i < xt->xt_buffer.xdb_ncookies; i++) {
 		uint64_t pa, dmasz;
@@ -462,40 +495,62 @@ xhci_transfer_trb_fill_data(xhci_endpoint_t *xep, xhci_transfer_t *xt, int off,
 		}
 
 		/*
-		 * When reading data in (from the device), we may get shorter
-		 * transfers than the buffer allowed for. To make sure we get
-		 * notified about that and handle that, we need to set the ISP
-		 * flag.
+		 * If we have more than one cookie, then we need to set chaining
+		 * on every TRB and the last TRB will turn into an event data
+		 * TRB. If we only have a single TRB, then we just set interrupt
+		 * on completion (IOC). There's no need to specifically set
+		 * interrupt on short packet (IOSP) in that case, as we'll
+		 * always get the event notification. We still need the chain
+		 * bit set on the last packet, so we can chain into the event
+		 * data. Even if all the data on a bulk endpoint (the only
+		 * endpoint type that uses chaining today) has only one cookie,
+		 * then we'll still schedule an event data block.
 		 */
-		if (in == B_TRUE) {
-			flags |= XHCI_TRB_ISP;
-			xt->xt_data_tohost = B_TRUE;
-		}
-
-		/*
-		 * When we have more than one cookie, we are technically
-		 * chaining together things according to the controllers view,
-		 * hence why we need to set the chain flag.
-		 */
-		if (xt->xt_buffer.xdb_ncookies > 1 &&
-		    i != (xt->xt_buffer.xdb_ncookies - 1)) {
+		if (xep->xep_type == USB_EP_ATTR_BULK ||
+		    xt->xt_buffer.xdb_ncookies > 1) {
 			flags |= XHCI_TRB_CHAIN;
 		}
 
 		/*
-		 * If we have a non-control transfer, then we need to make sure
-		 * that we set ourselves up to be interrupted, which we set for
-		 * the last entry.
+		 * What we set for the last TRB depends on the type of the
+		 * endpoint. If it's a bulk endpoint, then we have to set
+		 * evaluate next trb (ENT) so we successfully process the event
+		 * data TRB we'll set up. Otherwise, we need to make sure that
+		 * we set interrupt on completion, so we get the event. However,
+		 * we don't set the event on control endpoints, as the status
+		 * stage TD will be the one where we get the event. But, we do
+		 * still need an interrupt on short packet, because technically
+		 * the status stage is in its own TD.
 		 */
-		if (i + 1 == xt->xt_buffer.xdb_ncookies &&
-		    xep->xep_type != USB_EP_ATTR_CONTROL) {
-			flags |= XHCI_TRB_IOC;
+		if (i + 1 == xt->xt_buffer.xdb_ncookies) {
+			switch (xep->xep_type) {
+			case USB_EP_ATTR_BULK:
+				flags |= XHCI_TRB_ENT;
+				break;
+			case USB_EP_ATTR_CONTROL:
+				flags |= XHCI_TRB_ISP;
+				break;
+			default:
+				flags |= XHCI_TRB_IOC;
+				break;
+			}
 		}
 
 		xt->xt_trbs[off + i].trb_addr = LE_64(pa);
 		xt->xt_trbs[off + i].trb_status = LE_32(XHCI_TRB_LEN(dmasz) |
 		    XHCI_TRB_TDREM(tdsize) | XHCI_TRB_INTR(0));
 		xt->xt_trbs[off + i].trb_flags = LE_32(flags);
+	}
+
+	/*
+	 * The last TRB in any bulk transfer is the Event Data TRB.
+	 */
+	if (xep->xep_type == USB_EP_ATTR_BULK) {
+		VERIFY(off + xt->xt_buffer.xdb_ncookies + 1 <= xt->xt_ntrbs);
+		xt->xt_trbs[off + i].trb_addr = LE_64((uintptr_t)xt);
+		xt->xt_trbs[off + i].trb_status = LE_32(XHCI_TRB_INTR(0));
+		xt->xt_trbs[off + i].trb_flags = LE_32(XHCI_TRB_TYPE_EVENT |
+		    XHCI_TRB_IOC);
 	}
 }
 

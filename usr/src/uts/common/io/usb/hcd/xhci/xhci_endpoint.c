@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -299,29 +299,29 @@ xhci_endpoint_exponential_interval(usb_ep_descr_t *ep)
  * basically the six different cases we have to consider:
  *
  * Case 1: Non-High Speed Bulk and Control Endpoints
- * 	Always return 0.
+ *	Always return 0.
  *
  * Case 2: Super Speed and High Speed Isoch and Intr endpoints
- * 	Convert from a 2^(x-1) range to a 2^x range.
+ *	Convert from a 2^(x-1) range to a 2^x range.
  *
  * Case 3: Full Speed Isochronous Endpoints
- * 	As case 2, but add 3 as its values are in frames and we need to convert
- * 	to microframes. Adding three to the result is the same as multiplying
- * 	the initial value by 8.
+ *	As case 2, but add 3 as its values are in frames and we need to convert
+ *	to microframes. Adding three to the result is the same as multiplying
+ *	the initial value by 8.
  *
  * Case 4: Full speed and Low Speed Interrupt Endpoints
- * 	These have a 1-255 ms range that we need to convert to a 2^x * 128 us
- * 	range. We use the linear conversion and then add 3 to account for the
- * 	multiplying by 8 conversion from frames to microframes.
+ *	These have a 1-255 ms range that we need to convert to a 2^x * 128 us
+ *	range. We use the linear conversion and then add 3 to account for the
+ *	multiplying by 8 conversion from frames to microframes.
  *
  * Case 5: High Speed Interrupt and Bulk Output
- * 	These are a bit of a weird case. The spec and other implementations make
- * 	it seem that it's similar to case 4, but without the fixed addition as
- * 	its interpreted differently due to NAKs.
+ *	These are a bit of a weird case. The spec and other implementations make
+ *	it seem that it's similar to case 4, but without the fixed addition as
+ *	its interpreted differently due to NAKs.
  *
  * Case 6: Low Speed Isochronous Endpoints
- * 	These are not actually defined; however, like other implementations we
- * 	treat them like case 4.
+ *	These are not actually defined; however, like other implementations we
+ *	treat them like case 4.
  */
 static uint_t
 xhci_endpoint_interval(xhci_device_t *xd, usb_ep_descr_t *ep)
@@ -875,9 +875,11 @@ xhci_endpoint_schedule(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
 		return (USB_NO_RESOURCES);
 
 	for (i = xt->xt_ntrbs - 1; i > 0; i--) {
-		xhci_ring_trb_fill(rp, i, &xt->xt_trbs[i], B_TRUE);
+		xhci_ring_trb_fill(rp, i, &xt->xt_trbs[i], &xt->xt_trbs_pa[i],
+		    B_TRUE);
 	}
-	xhci_ring_trb_fill(rp, 0U, &xt->xt_trbs[0], B_FALSE);
+	xhci_ring_trb_fill(rp, 0U, &xt->xt_trbs[0], &xt->xt_trbs_pa[0],
+	    B_FALSE);
 
 	XHCI_DMA_SYNC(rp->xr_dma, DDI_DMA_SYNC_FORDEV);
 	xhci_ring_trb_produce(rp, xt->xt_ntrbs);
@@ -909,8 +911,10 @@ xhci_endpoint_schedule(xhci_t *xhcip, xhci_device_t *xd, xhci_endpoint_t *xep,
 
 static xhci_transfer_t *
 xhci_endpoint_determine_transfer(xhci_t *xhcip, xhci_endpoint_t *xep,
-    xhci_trb_t *trb, int *offp)
+    xhci_trb_t *trb, uint_t *offp)
 {
+	uint_t i;
+	uint64_t addr;
 	xhci_transfer_t *xt;
 
 	ASSERT(xhcip != NULL);
@@ -922,10 +926,40 @@ xhci_endpoint_determine_transfer(xhci_t *xhcip, xhci_endpoint_t *xep,
 	if ((xt = list_head(&xep->xep_transfers)) == NULL)
 		return (NULL);
 
-	*offp = xhci_ring_trb_valid_range(&xep->xep_ring, LE_64(trb->trb_addr),
-	    xt->xt_ntrbs);
-	if (*offp == -1)
+	addr = LE_64(trb->trb_addr);
+
+	/*
+	 * Check if this is the simple case of an event data. If it is, then all
+	 * we need to do is look and see its data matches the address of the
+	 * transfer.
+	 */
+	if (XHCI_TRB_GET_ED(LE_32(trb->trb_flags)) != 0) {
+		if (LE_64(trb->trb_addr) != (uintptr_t)xt)
+			return (NULL);
+
+		*offp = xt->xt_ntrbs - 1;
+		return (xt);
+	}
+
+	/*
+	 * This represents an error that has occurred. We need to check two
+	 * different things. The first is that the TRB PA maps to one of the
+	 * TRBs in the transfer. Secondly, we need to make sure that it makes
+	 * sense in the context of the ring and our notion of where the tail is.
+	 */
+	for (i = 0; i < xt->xt_ntrbs; i++) {
+		if (xt->xt_trbs_pa[i] == addr)
+			break;
+	}
+
+	if (i == xt->xt_ntrbs)
 		return (NULL);
+
+	if (xhci_ring_trb_valid_range(&xep->xep_ring, LE_64(trb->trb_addr),
+	    xt->xt_ntrbs) == -1)
+		return (NULL);
+
+	*offp = i;
 	return (xt);
 }
 
@@ -995,7 +1029,7 @@ xhci_endpoint_reschedule_periodic(xhci_t *xhcip, xhci_device_t *xd,
  */
 static boolean_t
 xhci_endpoint_control_callback(xhci_t *xhcip, xhci_device_t *xd,
-    xhci_endpoint_t *xep, xhci_transfer_t *xt, int off, xhci_trb_t *trb)
+    xhci_endpoint_t *xep, xhci_transfer_t *xt, uint_t off, xhci_trb_t *trb)
 {
 	int code;
 	usb_ctrl_req_t *ucrp;
@@ -1009,10 +1043,9 @@ xhci_endpoint_control_callback(xhci_t *xhcip, xhci_device_t *xd,
 	/*
 	 * Now that we know what this TRB is for, was it for a data/normal stage
 	 * or is it the status stage. We cheat by looking at the last entry. If
-	 * it's a data stage, then we must have gotten a short write. In that
-	 * case, we should go through and check to make sure it's allowed. If
-	 * not, we need to fail the transfer, try to stop the ring, and make
-	 * callbacks. We'll clean up the xhci transfer at this time.
+	 * it's a data stage, then we must have gotten a short write. We record
+	 * this fact and whether we should consider the transfer fatal for the
+	 * subsequent status stage.
 	 */
 	if (off != xt->xt_ntrbs - 1) {
 		uint_t remain;
@@ -1150,7 +1183,7 @@ xhci_device_lookup_by_slot(xhci_t *xhcip, int slot)
  */
 static boolean_t
 xhci_endpoint_norm_callback(xhci_t *xhcip, xhci_device_t *xd,
-    xhci_endpoint_t *xep, xhci_transfer_t *xt, int off, xhci_trb_t *trb)
+    xhci_endpoint_t *xep, xhci_transfer_t *xt, uint_t off, xhci_trb_t *trb)
 {
 	int code;
 	usb_cr_t cr;
@@ -1167,9 +1200,15 @@ xhci_endpoint_norm_callback(xhci_t *xhcip, xhci_device_t *xd,
 	code = XHCI_TRB_GET_CODE(LE_32(trb->trb_status));
 
 	if (code == XHCI_CODE_SHORT_XFER) {
-		int residue;
+		uint_t residue;
 		residue = XHCI_TRB_REMAIN(LE_32(trb->trb_status));
-		xt->xt_short = xt->xt_buffer.xdb_len - residue;
+
+		if (xep->xep_type == USB_EP_ATTR_BULK) {
+			VERIFY3U(XHCI_TRB_GET_ED(LE_32(trb->trb_flags)), !=, 0);
+			xt->xt_short = residue;
+		} else {
+			xt->xt_short = xt->xt_buffer.xdb_len - residue;
+		}
 	}
 
 	/*
@@ -1238,7 +1277,11 @@ xhci_endpoint_norm_callback(xhci_t *xhcip, xhci_device_t *xd,
 	cr = USB_CR_OK;
 
 out:
-	VERIFY(xhci_ring_trb_consumed(&xep->xep_ring, LE_64(trb->trb_addr)));
+	/*
+	 * Don't use the address from the TRB here. When we're dealing with
+	 * event data that will be entirely wrong.
+	 */
+	VERIFY(xhci_ring_trb_consumed(&xep->xep_ring, xt->xt_trbs_pa[off]));
 	rem = list_remove_head(&xep->xep_transfers);
 	VERIFY3P(rem, ==, xt);
 	mutex_exit(&xhcip->xhci_lock);
@@ -1255,7 +1298,7 @@ out:
 
 static boolean_t
 xhci_endpoint_isoch_callback(xhci_t *xhcip, xhci_device_t *xd,
-    xhci_endpoint_t *xep, xhci_transfer_t *xt, int off, xhci_trb_t *trb)
+    xhci_endpoint_t *xep, xhci_transfer_t *xt, uint_t off, xhci_trb_t *trb)
 {
 	int code;
 	usb_cr_t cr;
@@ -1345,7 +1388,8 @@ boolean_t
 xhci_endpoint_transfer_callback(xhci_t *xhcip, xhci_trb_t *trb)
 {
 	boolean_t ret;
-	int slot, endpoint, code, off;
+	int slot, endpoint, code;
+	uint_t off;
 	xhci_device_t *xd;
 	xhci_endpoint_t *xep;
 	xhci_transfer_t *xt;
@@ -1354,6 +1398,40 @@ xhci_endpoint_transfer_callback(xhci_t *xhcip, xhci_trb_t *trb)
 	endpoint = XHCI_TRB_GET_EP(LE_32(trb->trb_flags));
 	slot = XHCI_TRB_GET_SLOT(LE_32(trb->trb_flags));
 	code = XHCI_TRB_GET_CODE(LE_32(trb->trb_status));
+
+	switch (code) {
+	case XHCI_CODE_RING_UNDERRUN:
+	case XHCI_CODE_RING_OVERRUN:
+		/*
+		 * If we have an ISOC overrun or underrun then there will be no
+		 * valid data pointer in the TRB associated with it. Just drive
+		 * on.
+		 */
+		return (B_TRUE);
+	case XHCI_CODE_UNDEFINED:
+		xhci_error(xhcip, "received transfer trb with undefined fatal "
+		    "error: resetting device");
+		xhci_fm_runtime_reset(xhcip);
+		return (B_FALSE);
+	case XHCI_CODE_XFER_STOPPED:
+	case XHCI_CODE_XFER_STOPINV:
+	case XHCI_CODE_XFER_STOPSHORT:
+		/*
+		 * This causes us to transition the endpoint to a stopped state.
+		 * Each of these indicate a different possible state that we
+		 * have to deal with. Effectively we're going to drop it and
+		 * leave it up to the consumers to figure out what to do. For
+		 * the moment, that's generally okay because stops are only used
+		 * in cases where we're cleaning up outstanding reqs, etc.
+		 *
+		 * We do this before we check for the corresponding transfer as
+		 * this will generally be generated by a command issued that's
+		 * stopping the ring.
+		 */
+		return (B_TRUE);
+	default:
+		break;
+	}
 
 	mutex_enter(&xhcip->xhci_lock);
 	xd = xhci_device_lookup_by_slot(xhcip, slot);
@@ -1381,14 +1459,27 @@ xhci_endpoint_transfer_callback(xhci_t *xhcip, xhci_trb_t *trb)
 	}
 
 	/*
-	 * This TRB should be part of a transfer. If it's not, then we ignore
-	 * it. We also check whether or not it's for the first transfer. Because
-	 * the rings are serviced in order, it should be.
+	 * The TRB that we recieved may be an event data TRB for a bulk
+	 * endpoint, a normal or short completion for any other endpoint or an
+	 * error. In all cases, we need to figure out what transfer this
+	 * corresponds to. If this is an error, then we need to make sure that
+	 * the generating ring has been cleaned up.
+	 *
+	 * TRBs should be delivered in order, based on the ring. If for some
+	 * reason we find something that doesn't add up here, then we need to
+	 * assume that something has gone horribly wrong in the system and issue
+	 * a runtime reset. We issue the runtime reset rather than just trying
+	 * to stop and flush the ring, because it's unclear if we could stop
+	 * the ring in time.
 	 */
 	if ((xt = xhci_endpoint_determine_transfer(xhcip, xep, trb, &off)) ==
 	    NULL) {
+		xhci_error(xhcip, "received transfer trb with code %d, slot "
+		    "%d, and endpoint %d, but does not match current transfer "
+		    "for endpoint: resetting device", code, slot, endpoint);
 		mutex_exit(&xhcip->xhci_lock);
-		return (B_TRUE);
+		xhci_fm_runtime_reset(xhcip);
+		return (B_FALSE);
 	}
 
 	transfer_done = B_FALSE;
@@ -1398,19 +1489,6 @@ xhci_endpoint_transfer_callback(xhci_t *xhcip, xhci_trb_t *trb)
 	case XHCI_CODE_SHORT_XFER:
 		/* Handled by endpoint logic */
 		break;
-	case XHCI_CODE_XFER_STOPPED:
-	case XHCI_CODE_XFER_STOPINV:
-	case XHCI_CODE_XFER_STOPSHORT:
-		/*
-		 * This causes us to transition the endpoint to a stopped state.
-		 * Each of these indicate a different possible state that we
-		 * have to deal with. Effectively we're going to drop it and
-		 * leave it up to the consumers to figure out what to do. For
-		 * the moment, that's generally okay because stops are only used
-		 * in cases where we're cleaning up outstanding reqs, etc.
-		 */
-		mutex_exit(&xhcip->xhci_lock);
-		return (B_TRUE);
 	case XHCI_CODE_STALL:
 		/*
 		 * This causes us to transition to the halted state;
@@ -1432,6 +1510,17 @@ xhci_endpoint_transfer_callback(xhci_t *xhcip, xhci_trb_t *trb)
 		xt->xt_cr = USB_CR_DEV_NOT_RESP;
 		xep->xep_state |= XHCI_ENDPOINT_HALTED;
 		break;
+	case XHCI_CODE_BW_OVERRUN:
+		transfer_done = B_TRUE;
+		xt->xt_cr = USB_CR_DATA_OVERRUN;
+		break;
+	case XHCI_CODE_DATA_BUF:
+		transfer_done = B_TRUE;
+		if (xt->xt_data_tohost)
+			xt->xt_cr = USB_CR_DATA_OVERRUN;
+		else
+			xt->xt_cr = USB_CR_DATA_UNDERRUN;
+		break;
 	default:
 		/*
 		 * Treat these as general unspecified errors that don't cause a
@@ -1441,6 +1530,7 @@ xhci_endpoint_transfer_callback(xhci_t *xhcip, xhci_trb_t *trb)
 		 * quiescing.
 		 */
 		transfer_done = B_TRUE;
+		xt->xt_cr = USB_CR_HC_HARDWARE_ERR;
 		break;
 	}
 
