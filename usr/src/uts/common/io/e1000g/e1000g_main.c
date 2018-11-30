@@ -25,7 +25,7 @@
 /*
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -711,6 +711,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 		}
 		break;
 	case e1000_pch_spt:
+	case e1000_pch_cnp:
 		/*
 		 * On the SPT, the device flash is actually in BAR0, not a
 		 * separate BAR. Therefore we end up setting the
@@ -780,7 +781,7 @@ e1000g_regs_map(struct e1000g *Adapter)
 regs_map_fail:
 	if (osdep->reg_handle != NULL)
 		ddi_regs_map_free(&osdep->reg_handle);
-	if (osdep->ich_flash_handle != NULL && hw->mac.type != e1000_pch_spt)
+	if (osdep->ich_flash_handle != NULL && hw->mac.type < e1000_pch_spt)
 		ddi_regs_map_free(&osdep->ich_flash_handle);
 	return (DDI_FAILURE);
 }
@@ -909,6 +910,7 @@ e1000g_setup_max_mtu(struct e1000g *Adapter)
 	case e1000_pch2lan:
 	case e1000_pch_lpt:
 	case e1000_pch_spt:
+	case e1000_pch_cnp:
 		Adapter->max_mtu = MAXIMUM_MTU_9K;
 		break;
 	/* types with a special limit */
@@ -1147,7 +1149,7 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 		if (Adapter->osdep.reg_handle != NULL)
 			ddi_regs_map_free(&Adapter->osdep.reg_handle);
 		if (Adapter->osdep.ich_flash_handle != NULL &&
-		    Adapter->shared.mac.type != e1000_pch_spt)
+		    Adapter->shared.mac.type < e1000_pch_spt)
 			ddi_regs_map_free(&Adapter->osdep.ich_flash_handle);
 		if (Adapter->osdep.io_reg_handle != NULL)
 			ddi_regs_map_free(&Adapter->osdep.io_reg_handle);
@@ -1486,6 +1488,8 @@ e1000g_init(struct e1000g *Adapter)
 		pba = E1000_PBA_26K;
 	} else if (hw->mac.type == e1000_pch_spt) {
 		pba = E1000_PBA_26K;
+	} else if (hw->mac.type == e1000_pch_cnp) {
+		pba = E1000_PBA_26K;
 	} else {
 		/*
 		 * Total FIFO is 40K
@@ -1712,10 +1716,10 @@ e1000g_link_up(struct e1000g *Adapter)
 	case e1000_media_type_copper:
 		if (hw->mac.get_link_status) {
 			/*
-			 * SPT devices need a bit of extra time before we ask
-			 * them.
+			 * SPT and newer devices need a bit of extra time before
+			 * we ask them.
 			 */
-			if (hw->mac.type == e1000_pch_spt)
+			if (hw->mac.type >= e1000_pch_spt)
 				msec_delay(50);
 			(void) e1000_check_for_link(hw);
 			if ((E1000_READ_REG(hw, E1000_STATUS) &
@@ -2076,7 +2080,7 @@ e1000g_stop(struct e1000g *Adapter, boolean_t global)
 	 * rings are flushed before we do anything else. This must be done
 	 * before we release DMA resources.
 	 */
-	if (Adapter->shared.mac.type == e1000_pch_spt)
+	if (Adapter->shared.mac.type >= e1000_pch_spt)
 		e1000g_flush_desc_rings(Adapter);
 
 	if (global) {
@@ -2536,8 +2540,7 @@ e1000g_init_unicst(struct e1000g *Adapter)
 		 * additional registers are available. If the value is 2-7, only
 		 * that number are available.
 		 */
-		if (hw->mac.type == e1000_pch_lpt ||
-		    hw->mac.type == e1000_pch_spt) {
+		if (hw->mac.type >= e1000_pch_lpt) {
 			uint32_t locked, rar;
 
 			locked = E1000_READ_REG(hw, E1000_FWSM) &
