@@ -985,6 +985,8 @@ only forth definitions also support-functions
 \ find a module name, leave addr on the stack (0 if not found)
 : find-module ( <module> -- ptr | 0 )
   bl parse ( addr len )
+  dup 0= if 2drop then	( parse did not find argument, try stack )
+  depth 2 < if 0 exit then
   module_options @ >r ( store current pointer )
   begin
     r@
