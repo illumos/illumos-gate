@@ -67,7 +67,7 @@ pager_open(void)
 
 	nlines = 24;		/* sensible default */
 	if (ioctl(1, TIOCGWINSZ, &ws) == -1 || ws.ws_row == 0) {
-		if ((cp = getenv("LINES")) != NULL) {
+		if ((cp = getenv("screen-#rows")) != NULL) {
 			nlines = strtol(cp, &lp, 0);
 		}
 	} else

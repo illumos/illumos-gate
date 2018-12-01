@@ -724,7 +724,7 @@ ficlPrimitiveWords(ficlVm *vm)
 	char *pPad;
 	int columns;
 
-	cp = getenv("COLUMNS");
+	cp = getenv("screen-#cols");
 	/*
 	 * using strtol for now. TODO: refactor number conversion from
 	 * ficlPrimitiveToNumber() and use it instead.

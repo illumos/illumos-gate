@@ -50,6 +50,7 @@
 
 #include "bootstrap.h"
 #include <sys/multiboot.h>
+#include "vbe.h"
 #include "libzfs.h"
 #include "libi386.h"
 #include "../btx/lib/btxv86.h"
@@ -428,6 +429,9 @@ multiboot_exec(struct preloaded_file *fp)
 	mb_info->flags |= MULTIBOOT_INFO_CMDLINE;
 	free(cmdline);
 	cmdline = NULL;
+
+	/* make sure we have text mode */
+	bios_set_text_mode(VGA_TEXT_MODE);
 
 	dev_cleanup();
 	__exec((void *)VTOP(multiboot_tramp), MULTIBOOT_BOOTLOADER_MAGIC,

@@ -95,8 +95,8 @@ Then, devices are probed,
 and
 .Va loaddev
 are set, and
-.Va COLUMNS ,
-.Va LINES ,
+.Va screen-#cols ,
+.Va screen-#rows ,
 and
 .Va ISADIR
 are set.
@@ -274,7 +274,7 @@ as the pool.
 .Pp
 .It Ic more Ar file Op Ar
 Display the files specified, with a pause at each
-.Va LINES
+.Va screen-#rows
 displayed.
 .Pp
 .It Ic read Xo
@@ -452,7 +452,7 @@ Syntax for devices is odd.
 Has the value
 .Dq Li ok
 if the Forth's current state is interpreting.
-.It Va LINES
+.It Va screen-#rows
 Define the number of lines on the screen, to be used by the pager.
 .It Va module_path
 Sets the list of directories which will be searched for modules

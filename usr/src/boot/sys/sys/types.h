@@ -294,6 +294,10 @@ typedef	_Bool	bool;
 
 #define offsetof(type, field) __offsetof(type, field)
 
+#else
+/* for illumos compatibility */
+typedef enum boolean { B_FALSE, B_TRUE } boolean_t;
+
 #endif /* !_KERNEL */
 
 /*

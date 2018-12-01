@@ -102,10 +102,10 @@ main(int argc, char **argv)
 
 	clearenv();
 	asprintf(&buffer, "%d", cols);
-	setenv("COLUMNS", buffer, 1);
+	setenv("screen-#cols", buffer, 1);
 	free(buffer);
 	asprintf(&buffer, "%d", rows);
-	setenv("LINES", buffer, 1);
+	setenv("screen-#rows", buffer, 1);
 	free(buffer);
 
 	if (getenv("prompt") == NULL)

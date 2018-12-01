@@ -58,6 +58,7 @@ static int	comc_init(struct console *, int);
 static void	comc_putchar(struct console *, int);
 static int	comc_getchar(struct console *);
 static int	comc_ischar(struct console *);
+static int	comc_ioctl(struct console *, int, void *);
 static void	comc_setup(struct console *);
 static char	*comc_asprint_mode(struct serial *);
 static int	comc_parse_mode(struct serial *, const char *);
@@ -74,6 +75,7 @@ struct console ttya = {
 	.c_out = comc_putchar,
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
+	.c_ioctl = comc_ioctl,
 	.c_private = NULL
 };
 
@@ -86,6 +88,7 @@ struct console ttyb = {
 	.c_out = comc_putchar,
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
+	.c_ioctl = comc_ioctl,
 	.c_private = NULL
 };
 
@@ -98,6 +101,7 @@ struct console ttyc = {
 	.c_out = comc_putchar,
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
+	.c_ioctl = comc_ioctl,
 	.c_private = NULL
 };
 
@@ -110,6 +114,7 @@ struct console ttyd = {
 	.c_out = comc_putchar,
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
+	.c_ioctl = comc_ioctl,
 	.c_private = NULL
 };
 
@@ -305,6 +310,12 @@ comc_ischar(struct console *cp)
 		return (0);
 
 	return (!(control & EFI_SERIAL_INPUT_BUFFER_EMPTY));
+}
+
+static int
+comc_ioctl(struct console *cp __unused, int cmd __unused, void *data __unused)
+{
+	return (ENOTTY);
 }
 
 static char *

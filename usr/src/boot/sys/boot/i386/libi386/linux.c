@@ -27,6 +27,7 @@
 
 #include "linux.h"
 #include "bootstrap.h"
+#include "vbe.h"
 #include "libi386.h"
 #include "btxv86.h"
 
@@ -395,6 +396,8 @@ linux_exec(struct preloaded_file *fp)
 	relocator_a20_enabled = 1;
 	i386_copyin(relocater, 0x600, relocater_size);
 
+	/* Set VGA text mode */
+	bios_set_text_mode(3);
 	dev_cleanup();
 
 	__exec((void *)0x600);

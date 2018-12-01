@@ -73,6 +73,7 @@ static void	comc_putchar(struct console *, int);
 static int	comc_getchar(struct console *);
 static int	comc_getspeed(struct serial *);
 static int	comc_ischar(struct console *);
+static int	comc_ioctl(struct console *, int, void *);
 static uint32_t comc_parse_pcidev(const char *);
 static int	comc_pcidev_set(struct env_var *, int, const void *);
 static int	comc_pcidev_handle(struct console *, uint32_t);
@@ -92,6 +93,7 @@ struct console ttya = {
 	.c_out = comc_putchar,
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
+	.c_ioctl = comc_ioctl,
 	.c_private = NULL
 };
 
@@ -104,6 +106,7 @@ struct console ttyb = {
 	.c_out = comc_putchar,
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
+	.c_ioctl = comc_ioctl,
 	.c_private = NULL
 };
 
@@ -116,6 +119,7 @@ struct console ttyc = {
 	.c_out = comc_putchar,
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
+	.c_ioctl = comc_ioctl,
 	.c_private = NULL
 };
 
@@ -128,6 +132,7 @@ struct console ttyd = {
 	.c_out = comc_putchar,
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
+	.c_ioctl = comc_ioctl,
 	.c_private = NULL
 };
 
@@ -260,6 +265,12 @@ comc_ischar(struct console *cp)
 {
     struct serial *sp = cp->c_private;
     return (inb(sp->ioaddr + com_lsr) & LSR_RXRDY);
+}
+
+static int
+comc_ioctl(struct console *cp __unused, int cmd __unused, void *data __unused)
+{
+	return (ENOTTY);
 }
 
 static char *

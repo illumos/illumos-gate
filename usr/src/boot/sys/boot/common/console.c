@@ -58,13 +58,13 @@ cons_probe(void)
     /* Do all console probes */
     for (cons = 0; consoles[cons] != NULL; cons++) {
 	consoles[cons]->c_flags = 0;
- 	consoles[cons]->c_probe(consoles[cons]);
+	consoles[cons]->c_probe(consoles[cons]);
     }
     /* Now find the first working one */
     active = -1;
     for (cons = 0; consoles[cons] != NULL && active == -1; cons++) {
 	consoles[cons]->c_flags = 0;
- 	consoles[cons]->c_probe(consoles[cons]);
+	consoles[cons]->c_probe(consoles[cons]);
 	if (consoles[cons]->c_flags == (C_PRESENTIN | C_PRESENTOUT))
 	    active = cons;
     }
@@ -270,7 +270,8 @@ cons_change(const char *string)
 
 	    if (active != 0) {
 		/* If no consoles have initialised we wouldn't see this. */
-		printf("console %s failed to initialize\n", consoles[cons]->c_name);
+		printf("console %s failed to initialize\n",
+		    consoles[cons]->c_name);
 	    }
 	}
     }

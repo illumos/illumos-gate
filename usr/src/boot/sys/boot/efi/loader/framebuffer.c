@@ -31,24 +31,36 @@
 #include <stand.h>
 #include <bootstrap.h>
 #include <sys/endian.h>
+#include <sys/consplat.h>
 
 #include <efi.h>
 #include <efilib.h>
 #include <efiuga.h>
 #include <efipciio.h>
+#include <Protocol/EdidActive.h>
+#include <Protocol/EdidDiscovered.h>
 #include <machine/metadata.h>
 
+#include "gfx_fb.h"
 #include "framebuffer.h"
 
 static EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 static EFI_GUID pciio_guid = EFI_PCI_IO_PROTOCOL_GUID;
 static EFI_GUID uga_guid = EFI_UGA_DRAW_PROTOCOL_GUID;
+static EFI_GUID active_edid_guid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
+static EFI_GUID discovered_edid_guid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
 
-static u_int
+/* Saved initial GOP mode. */
+static uint32_t default_mode = (uint32_t)-1;
+
+static uint32_t gop_default_mode(void);
+static int efifb_set_mode(EFI_GRAPHICS_OUTPUT *, u_int);
+
+static uint_t
 efifb_color_depth(struct efi_fb *efifb)
 {
 	uint32_t mask;
-	u_int depth;
+	uint_t depth;
 
 	mask = efifb->fb_mask_red | efifb->fb_mask_green |
 	    efifb->fb_mask_blue | efifb->fb_mask_reserved;
@@ -105,6 +117,8 @@ efifb_from_gop(struct efi_fb *efifb, EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE *mode,
 	efifb->fb_stride = info->PixelsPerScanLine;
 	result = efifb_mask_from_pixfmt(efifb, info->PixelFormat,
 	    &info->PixelInformation);
+	if (efifb->fb_addr == 0)
+		result = 1;
 	return (result);
 }
 
@@ -421,19 +435,109 @@ efifb_from_uga(struct efi_fb *efifb, EFI_UGA_DRAW_PROTOCOL *uga)
 	 * frame buffer.
 	 */
 	efifb->fb_size = efifb->fb_height * efifb->fb_stride * 4;
+	if (efifb->fb_addr == 0)
+		return (1);
 	return (0);
+}
+
+/*
+ * Fetch EDID info. Caller must free the buffer.
+ */
+static struct vesa_edid_info *
+efifb_gop_get_edid(EFI_HANDLE gop)
+{
+	const uint8_t magic[] = EDID_MAGIC;
+	EFI_EDID_ACTIVE_PROTOCOL *edid;
+	struct vesa_edid_info *edid_info;
+	EFI_GUID *guid;
+	EFI_STATUS status;
+	size_t size;
+
+	edid_info = calloc(1, sizeof (*edid_info));
+	if (edid_info == NULL)
+		return (NULL);
+
+	guid = &active_edid_guid;
+	status = BS->OpenProtocol(gop, guid, (VOID **)&edid, IH, NULL,
+	    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (status != EFI_SUCCESS) {
+		guid = &discovered_edid_guid;
+		status = BS->OpenProtocol(gop, guid, (VOID **)&edid, IH, NULL,
+		    EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	}
+	if (status != EFI_SUCCESS)
+		goto error;
+
+	size = edid->SizeOfEdid;
+	if (size > sizeof (*edid_info))
+		size = sizeof (*edid_info);
+
+	memcpy(edid_info, edid->Edid, size);
+	status = BS->CloseProtocol(gop, guid, IH, NULL);
+
+	/* Validate EDID */
+	if (memcmp(edid_info, magic, sizeof(magic)) != 0)
+		goto error;
+
+	if (edid_info->header.version == 1 &&
+	    (edid_info->display.supported_features
+	    & EDID_FEATURE_PREFERRED_TIMING_MODE) &&
+	    edid_info->detailed_timings[0].pixel_clock) {
+		return (edid_info);
+	}
+
+error:
+	free(edid_info);
+	return (NULL);
+}
+
+static int
+efifb_get_edid(UINT32 *pwidth, UINT32 *pheight)
+{
+	extern EFI_GRAPHICS_OUTPUT *gop;
+	struct vesa_edid_info *edid_info;
+	struct edid_detailed_timings *timings;
+	int rv = 1;
+
+	edid_info = efifb_gop_get_edid(gop);
+	if (edid_info != NULL) {
+		timings = edid_info->detailed_timings;
+		*pwidth = timings[0].horizontal_active_lo |
+		    (((int)(timings[0].horizontal_hi & 0xf0)) << 4);
+
+		*pheight = timings[0].vertical_active_lo |
+		    (((int)(timings[0].vertical_hi & 0xf0)) << 4);
+		rv = 0;
+	}
+	free(edid_info);
+	return (rv);
 }
 
 int
 efi_find_framebuffer(struct efi_fb *efifb)
 {
-	EFI_GRAPHICS_OUTPUT *gop;
-	EFI_UGA_DRAW_PROTOCOL *uga;
+	extern EFI_GRAPHICS_OUTPUT *gop;
+	extern EFI_UGA_DRAW_PROTOCOL *uga;
 	EFI_STATUS status;
+	uint32_t mode;
+
+	if (gop != NULL)
+		return (efifb_from_gop(efifb, gop->Mode, gop->Mode->Info));
 
 	status = BS->LocateProtocol(&gop_guid, NULL, (VOID **)&gop);
-	if (status == EFI_SUCCESS)
+	if (status == EFI_SUCCESS) {
+		/* Save default mode. */
+		if (default_mode == (uint32_t)-1) {
+			default_mode = gop->Mode->Mode;
+		}
+		mode = gop_default_mode();
+		if (mode != gop->Mode->Mode)
+			efifb_set_mode(gop, mode);
 		return (efifb_from_gop(efifb, gop->Mode, gop->Mode->Info));
+	}
+
+	if (uga != NULL)
+		return (efifb_from_uga(efifb, uga));
 
 	status = BS->LocateProtocol(&uga_guid, NULL, (VOID **)&uga);
 	if (status == EFI_SUCCESS)
@@ -445,89 +549,264 @@ efi_find_framebuffer(struct efi_fb *efifb)
 static void
 print_efifb(int mode, struct efi_fb *efifb, int verbose)
 {
-	u_int depth;
+	uint_t depth;
+	UINT32 width, height;
 
-	if (mode >= 0)
+	if (verbose == 1) {
+		printf("Framebuffer mode: %s\n",
+		    plat_stdout_is_framebuffer() ? "on" : "off");
+		if (efifb_get_edid(&width, &height) == 0)
+			printf("EDID mode: %dx%d\n\n", width, height);
+	}
+
+	if (mode >= 0) {
+		if (verbose == 1)
+			printf("GOP ");
 		printf("mode %d: ", mode);
+	}
 	depth = efifb_color_depth(efifb);
-	printf("%ux%ux%u, stride=%u", efifb->fb_width, efifb->fb_height,
-	    depth, efifb->fb_stride);
+	printf("%ux%ux%u", efifb->fb_width, efifb->fb_height, depth);
+	if (verbose)
+		printf(", stride=%u", efifb->fb_stride);
 	if (verbose) {
 		printf("\n    frame buffer: address=%jx, size=%jx",
 		    (uintmax_t)efifb->fb_addr, (uintmax_t)efifb->fb_size);
 		printf("\n    color mask: R=%08x, G=%08x, B=%08x\n",
 		    efifb->fb_mask_red, efifb->fb_mask_green,
 		    efifb->fb_mask_blue);
+		if (efifb->fb_addr == 0) {
+			printf("Warning: this mode is not implementing the "
+			    "linear framebuffer. The illumos\n\tconsole is "
+			    "not available with this mode and will default to "
+			    "ttya\n");
+		}
 	}
 }
 
-COMMAND_SET(gop, "gop", "graphics output protocol", command_gop);
+static int
+efifb_set_mode(EFI_GRAPHICS_OUTPUT *gop, u_int mode)
+{
+	EFI_STATUS status;
+
+	status = gop->SetMode(gop, mode);
+	if (EFI_ERROR(status)) {
+		snprintf(command_errbuf, sizeof (command_errbuf),
+		    "Unable to set mode to %u (error=%lu)",
+		    mode, EFI_ERROR_CODE(status));
+		return (CMD_ERROR);
+	}
+	return (CMD_OK);
+}
+
+/*
+ * Verify existance of mode number or find mode by
+ * dimensions. If depth is not given, walk values 32, 24, 16, 8.
+ * Return MaxMode if mode is not found.
+ */
+static int
+efifb_find_mode_xydm(UINT32 x, UINT32 y, int depth, int m)
+{
+	extern EFI_GRAPHICS_OUTPUT *gop;
+	EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info;
+	EFI_STATUS status;
+	UINTN infosz;
+	struct efi_fb fb;
+	UINT32 mode;
+        uint_t d, i;
+
+        if (m != -1)
+                i = 8;
+        else if (depth == -1)
+                i = 32;
+        else
+                i = depth;
+
+        while (i > 0) {
+		for (mode = 0; mode < gop->Mode->MaxMode; mode++) {
+			status = gop->QueryMode(gop, mode, &infosz, &info);
+			if (EFI_ERROR(status))
+				continue;
+
+			if (m != -1) {
+				if ((UINT32)m == mode)
+					return (mode);
+				else
+					continue;
+			}
+
+			efifb_from_gop(&fb, gop->Mode, info);
+			d = efifb_color_depth(&fb);
+			if (x == fb.fb_width && y == fb.fb_height && d == i)
+				return (mode);
+		}
+
+		if (depth != -1)
+			break;
+
+		i -= 8;
+	}
+
+	return (gop->Mode->MaxMode);
+}
+
+static int
+efifb_find_mode(char *str)
+{
+	extern EFI_GRAPHICS_OUTPUT *gop;
+	int x, y, depth;
+
+	if (!gfx_parse_mode_str(str, &x, &y, &depth))
+		return (gop->Mode->MaxMode);
+
+	return (efifb_find_mode_xydm(x, y, depth, -1));
+}
+
+/*
+ * gop_default_mode(). Try to set mode based on EDID.
+ */
+static uint32_t
+gop_default_mode(void)
+{
+	extern EFI_GRAPHICS_OUTPUT *gop;
+	UINT32 mode, width = 0, height = 0;
+
+	mode = gop->Mode->MaxMode;
+	if (efifb_get_edid(&width, &height) == 0)
+		mode = efifb_find_mode_xydm(width, height, -1, -1);
+
+	if (mode == gop->Mode->MaxMode)
+		mode = default_mode;
+
+	return (mode);
+}
+
+COMMAND_SET(framebuffer, "framebuffer", "framebuffer mode management",
+    command_gop);
 
 static int
 command_gop(int argc, char *argv[])
 {
-	struct efi_fb efifb;
-	EFI_GRAPHICS_OUTPUT *gop;
+	extern struct efi_fb efifb;
+	extern EFI_GRAPHICS_OUTPUT *gop;
+	struct efi_fb fb;
 	EFI_STATUS status;
+	char *arg, *cp;
 	u_int mode;
 
-	status = BS->LocateProtocol(&gop_guid, NULL, (VOID **)&gop);
-	if (EFI_ERROR(status)) {
+	if (gop == NULL) {
 		snprintf(command_errbuf, sizeof (command_errbuf),
-		    "%s: Graphics Output Protocol not present (error=%lu)",
-		    argv[0], EFI_ERROR_CODE(status));
+		    "%s: Graphics Output Protocol not present", argv[0]);
 		return (CMD_ERROR);
 	}
 
 	if (argc < 2)
 		goto usage;
 
+	/*
+	 * Note we can not turn the GOP itself off, but instead we instruct
+	 * tem to use text mode.
+	 */
+	if (strcmp(argv[1], "off") == 0) {
+		if (argc != 2)
+			goto usage;
+
+		plat_cons_update_mode(EfiConsoleControlScreenText);
+		return (CMD_OK);
+	}
+
+	/*
+	 * Set GOP to use default mode, then notify tem.
+	 */
+	if (strcmp(argv[1], "on") == 0) {
+		if (argc != 2)
+			goto usage;
+
+		mode = gop_default_mode();
+		if (mode != gop->Mode->Mode)
+			efifb_set_mode(gop, mode);
+
+		plat_cons_update_mode(EfiConsoleControlScreenGraphics);
+		return (CMD_OK);
+	}
+
 	if (!strcmp(argv[1], "set")) {
-		char *cp;
+		int rv;
 
 		if (argc != 3)
 			goto usage;
-		mode = strtol(argv[2], &cp, 0);
-		if (cp[0] != '\0') {
-			sprintf(command_errbuf, "mode is an integer");
-			return (CMD_ERROR);
+
+		arg = argv[2];
+		if (strchr(arg, 'x') == NULL) {
+			errno = 0;
+			mode = strtoul(arg, &cp, 0);
+			if (errno != 0 || *arg == '\0' || cp[0] != '\0') {
+				snprintf(command_errbuf,
+				    sizeof (command_errbuf),
+				    "mode should be an integer");
+				return (CMD_ERROR);
+			}
+			mode = efifb_find_mode_xydm(0, 0, 0, mode);
+		} else {
+			mode = efifb_find_mode(arg);
 		}
-		status = gop->SetMode(gop, mode);
-		if (EFI_ERROR(status)) {
-			snprintf(command_errbuf, sizeof (command_errbuf),
-			    "%s: Unable to set mode to %u (error=%lu)",
-			    argv[0], mode, EFI_ERROR_CODE(status));
-			return (CMD_ERROR);
-		}
-	} else if (!strcmp(argv[1], "get")) {
+
+		if (mode == gop->Mode->MaxMode)
+			mode = gop->Mode->Mode;
+
+		rv = efifb_set_mode(gop, mode);
+		plat_cons_update_mode(EfiConsoleControlScreenGraphics);
+		return (rv);
+	}
+
+	if (!strcmp(argv[1], "get")) {
 		if (argc != 2)
 			goto usage;
-		efifb_from_gop(&efifb, gop->Mode, gop->Mode->Info);
+
 		print_efifb(gop->Mode->Mode, &efifb, 1);
 		printf("\n");
-	} else if (!strcmp(argv[1], "list")) {
+		return (CMD_OK);
+	}
+
+	if (!strcmp(argv[1], "list")) {
 		EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info;
 		UINTN infosz;
+		int depth, d = -1;
 
-		if (argc != 2)
+		if (argc != 2 && argc != 3)
 			goto usage;
+
+		if (argc == 3) {
+			arg = argv[2];
+			errno = 0;
+			d = strtoul(arg, &cp, 0);
+			if (errno != 0 || *arg == '\0' || cp[0] != '\0') {
+				snprintf(command_errbuf,
+				    sizeof (command_errbuf),
+				    "depth should be an integer");
+				return (CMD_ERROR);
+			}
+		}
 		pager_open();
 		for (mode = 0; mode < gop->Mode->MaxMode; mode++) {
 			status = gop->QueryMode(gop, mode, &infosz, &info);
 			if (EFI_ERROR(status))
 				continue;
-			efifb_from_gop(&efifb, gop->Mode, info);
-			print_efifb(mode, &efifb, 0);
+			efifb_from_gop(&fb, gop->Mode, info);
+			depth = efifb_color_depth(&fb);
+			if (d != -1 && d != depth)
+				continue;
+			print_efifb(mode, &fb, 0);
 			if (pager_output("\n"))
 				break;
 		}
 		pager_close();
+		return (CMD_OK);
 	}
-	return (CMD_OK);
 
- usage:
+usage:
 	snprintf(command_errbuf, sizeof (command_errbuf),
-	    "usage: %s [list | get | set <mode>]", argv[0]);
+	    "usage: %s on | off | get | list [depth] | "
+	    "set <display or GOP mode number>", argv[0]);
 	return (CMD_ERROR);
 }
 
@@ -536,22 +815,19 @@ COMMAND_SET(uga, "uga", "universal graphics adapter", command_uga);
 static int
 command_uga(int argc, char *argv[])
 {
-	struct efi_fb efifb;
-	EFI_UGA_DRAW_PROTOCOL *uga;
-	EFI_STATUS status;
+	extern struct efi_fb efifb;
+	extern EFI_UGA_DRAW_PROTOCOL *uga;
 
-	status = BS->LocateProtocol(&uga_guid, NULL, (VOID **)&uga);
-	if (EFI_ERROR(status)) {
+	if (uga == NULL) {
 		snprintf(command_errbuf, sizeof (command_errbuf),
-		    "%s: UGA Protocol not present (error=%lu)",
-		    argv[0], EFI_ERROR_CODE(status));
+		    "%s: UGA Protocol not present", argv[0]);
 		return (CMD_ERROR);
 	}
 
 	if (argc != 1)
 		goto usage;
 
-	if (efifb_from_uga(&efifb, uga) != CMD_OK) {
+	if (efifb.fb_addr == 0) {
 		snprintf(command_errbuf, sizeof (command_errbuf),
 		    "%s: Unable to get UGA information", argv[0]);
 		return (CMD_ERROR);

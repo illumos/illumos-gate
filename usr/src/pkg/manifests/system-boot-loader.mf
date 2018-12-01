@@ -71,6 +71,7 @@ $(i386_ONLY)file path=boot/forth/shortcuts.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/support.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/forth/version.4th group=sys mode=0444
 $(i386_ONLY)file path=boot/gptzfsboot group=sys mode=0444
+$(i386_ONLY)file path=boot/illumos.png group=sys mode=0444
 $(i386_ONLY)file path=boot/loader group=sys mode=0444
 $(i386_ONLY)file path=boot/loader.help group=sys mode=0444
 $(i386_ONLY)file path=boot/loader.rc group=sys mode=0444
@@ -94,3 +95,5 @@ license lic_CDDL license=lic_CDDL
 license usr/src/boot/COPYRIGHT license=usr/src/boot/COPYRIGHT
 license usr/src/boot/sys/boot/common/linenoise/LICENSE \
     license=usr/src/boot/sys/boot/common/linenoise/LICENSE
+license usr/src/common/pnglite/THIRDPARTYLICENSE \
+    license=usr/src/common/pnglite/THIRDPARTYLICENSE

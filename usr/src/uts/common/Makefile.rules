@@ -90,7 +90,7 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/mpi/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o: 		$(COMMONBASE)/acl/%.c
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/acl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -280,6 +280,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/fs/nfs/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(COMMONBASE)/smbsrv/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/vga/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1916,7 +1920,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/ip/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/ipnet/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln: 	     	$(UTSBASE)/common/inet/iptun/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/iptun/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/ipd/%.c

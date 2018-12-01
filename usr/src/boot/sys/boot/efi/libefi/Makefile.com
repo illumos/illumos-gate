@@ -31,13 +31,17 @@ SRCS +=	delay.c \
 	efizfs.c \
 	env.c \
 	errno.c \
+	gfx_fb.c \
 	handles.c \
 	libefi.c \
+	pnglite.c \
 	wchar.c
 
 OBJS=	$(SRCS:%.c=%.o)
 
-CPPFLAGS= -D_STANDALONE
+PNGLITE=$(SRC)/common/pnglite
+
+CPPFLAGS= -D_STANDALONE -DEFI
 CFLAGS  = -Os
 
 CPPFLAGS += -nostdinc -I. -I../../../../../include -I../../../..
@@ -47,12 +51,16 @@ CPPFLAGS += -I../../include/$(MACHINE)
 CPPFLAGS += -I../../../../../lib/libstand
 CPPFLAGS += -I../../../zfs
 CPPFLAGS += -I../../../../cddl/boot/zfs
+CPPFLAGS += -I../../../../../lib/libz
+CPPFLAGS += -I$(PNGLITE)
 
 # Pick up the bootstrap header for some interface items
 CPPFLAGS += -I../../../common
-CPPFLAGS += -DTERM_EMU
 
 include ../../Makefile.inc
+
+# For multiboot2.h, must be last, to avoid conflicts
+CPPFLAGS +=	-I$(SRC)/uts/common
 
 libefi.a: $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
@@ -70,4 +78,10 @@ x86:
 	$(SYMLINK) ../../../../x86/include x86
 
 %.o:	../%.c
+	$(COMPILE.c) $<
+
+%.o:	../../../common/%.c
+	$(COMPILE.c) $<
+
+%.o:	$(PNGLITE)/%.c
 	$(COMPILE.c) $<

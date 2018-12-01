@@ -16,10 +16,14 @@
 
 CC=		$(GNUC_ROOT)/bin/gcc
 FICLDIR=	$(SRC)/common/ficl
+PNGLITE=	$(SRC)/common/pnglite
 
 CPPFLAGS= -nostdinc -D_STANDALONE -I. -I.. -I../../../../include
 CPPFLAGS += -I../../../../lib/libstand
-CPPFLAGS += -I../../..  -I$(FICLDIR) -I../../common
+CPPFLAGS += -I../../..  -I$(FICLDIR) -I../../common -I$(PNGLITE)
+
+# For multiboot2.h, must be last, to avoid conflicts
+CPPFLAGS += -I$(SRC)/uts/common
 
 CFLAGS=		-Os -fPIC -Wall -ffreestanding -mno-mmx -mno-3dnow -mno-sse
 CFLAGS +=	-mno-sse2 -mno-sse3 -msoft-float -std=gnu99
