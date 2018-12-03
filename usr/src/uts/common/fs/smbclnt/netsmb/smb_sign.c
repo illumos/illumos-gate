@@ -142,6 +142,7 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	if (rc != 0)
 		return (rc);
 
+	/* Our caller should ensure mp has a contiguous header */
 	ASSERT(m != NULL);
 	ASSERT(MBLKL(m) >= SMB_HDRLEN);
 
@@ -150,8 +151,6 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	 * fill in the sequence number, and digest.
 	 */
 	size = SMB_HDRLEN;
-	if (MBLKL(m) < size)
-		(void) pullupmsg(m, size);
 	bcopy(m->b_rptr, smbhdr.r.raw, size);
 	smbhdr.s.sig[0] = htolel(seqno);
 	smbhdr.s.sig[1] = 0;
@@ -188,7 +187,7 @@ smb_compute_MAC(struct smb_vc *vcp, mblk_t *mp,
 	 * Finally, store the signature.
 	 * (first 8 bytes of the mac)
 	 */
-	if (signature)
+	if (signature != NULL)
 		bcopy(digest, signature, SMBSIGLEN);
 
 	return (0);
@@ -206,13 +205,10 @@ smb_rq_sign(struct smb_rq *rqp)
 	int status;
 
 	/*
-	 * Our mblk allocation ensures this,
-	 * but just in case...
+	 * smb_rq_new() ensures this,
+	 * but just in case..
 	 */
-	if (MBLKL(mp) < SMB_HDRLEN) {
-		if (!pullupmsg(mp, SMB_HDRLEN))
-			return;
-	}
+	ASSERT(MBLKL(mp) >= SMB_HDRLEN);
 	sigloc = mp->b_rptr + SMBSIGOFF;
 
 	if (vcp->vc_mackey == NULL) {
@@ -265,10 +261,8 @@ smb_rq_verify(struct smb_rq *rqp)
 		SMBSDEBUG("empty reply\n");
 		return (0);
 	}
-	if (MBLKL(mp) < SMB_HDRLEN) {
-		if (!pullupmsg(mp, SMB_HDRLEN))
-			return (0);
-	}
+
+	ASSERT(MBLKL(mp) >= SMB_HDRLEN);
 	sigloc = mp->b_rptr + SMBSIGOFF;
 
 	/*

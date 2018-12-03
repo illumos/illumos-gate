@@ -121,6 +121,7 @@ smb2_compute_MAC(struct smb_vc *vcp, mblk_t *mp, uchar_t *signature)
 	if (rc != 0)
 		return (rc);
 
+	/* Our caller should ensure mp has a contiguous header */
 	ASSERT(m != NULL);
 	ASSERT(MBLKL(m) >= SMB2_HDRLEN);
 
@@ -128,8 +129,6 @@ smb2_compute_MAC(struct smb_vc *vcp, mblk_t *mp, uchar_t *signature)
 	 * Copy of the SMB2 header, zero out the signature, and digest.
 	 */
 	size = SMB2_HDRLEN;
-	if (MBLKL(m) < size)
-		(void) pullupmsg(m, size);
 	bcopy(m->b_rptr, tmp_hdr, size);
 	bzero(tmp_hdr + SMB2_SIG_OFF, SMB2_SIG_LEN);
 	rc = smb2_hmac_update(ctx, tmp_hdr, size);
@@ -157,10 +156,8 @@ smb2_compute_MAC(struct smb_vc *vcp, mblk_t *mp, uchar_t *signature)
 		m = m->b_cont;
 	}
 	rc = smb2_hmac_final(ctx, signature);
-	if (rc != 0)
-		return (rc);
 
-	return (0);
+	return (rc);
 }
 
 /*
@@ -175,13 +172,10 @@ smb2_rq_sign(struct smb_rq *rqp)
 	int rc;
 
 	/*
-	 * Our mblk allocation ensures this,
-	 * but just in case...
+	 * smb_rq_new() ensures this,
+	 * but just in case..
 	 */
-	if (MBLKL(mp) < SMB2_HDRLEN) {
-		if (!pullupmsg(mp, SMB2_HDRLEN))
-			return;
-	}
+	ASSERT(MBLKL(mp) >= SMB2_HDRLEN);
 	sigloc = mp->b_rptr + SMB2_SIG_OFF;
 
 	if (vcp->vc_mackey == NULL)
@@ -227,10 +221,9 @@ smb2_rq_verify(struct smb_rq *rqp)
 		SMBSDEBUG("empty reply\n");
 		return (0);
 	}
-	if (MBLKL(mp) < SMB2_HDRLEN) {
-		if (!pullupmsg(mp, SMB2_HDRLEN))
-			return (0);
-	}
+
+	/* smb2_iod_process ensures this */
+	ASSERT(MBLKL(mp) >= SMB2_HDRLEN);
 	sigloc = mp->b_rptr + SMB2_SIG_OFF;
 
 	/*

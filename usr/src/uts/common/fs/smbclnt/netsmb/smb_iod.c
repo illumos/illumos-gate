@@ -622,6 +622,10 @@ smb1_iod_process(smb_vc_t *vcp, mblk_t *m)
 	uint16_t mid;
 	int err, skip;
 
+	m = m_pullup(m, SMB_HDRLEN);
+	if (m == NULL)
+		return (ENOMEM);
+
 	/*
 	 * Note: Intentionally do NOT md_done(&md)
 	 * because that would free the message and
@@ -736,6 +740,10 @@ smb2_iod_process(smb_vc_t *vcp, mblk_t *m)
 	int err;
 
 top:
+	m = m_pullup(m, SMB2_HDRLEN);
+	if (m == NULL)
+		return (ENOMEM);
+
 	/*
 	 * Note: Intentionally do NOT md_done(&md)
 	 * because that would free the message and

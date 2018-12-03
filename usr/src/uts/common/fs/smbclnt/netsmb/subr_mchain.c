@@ -114,6 +114,9 @@
  */
 #define	MLEN	4096
 
+#if (MLEN < SMB2_HDRLEN)
+#error "MLEN can't fit a contiguous SMB2 header"
+#endif
 
 /*
  * Some UIO routines.
