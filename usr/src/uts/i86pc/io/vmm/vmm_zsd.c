@@ -105,6 +105,7 @@ static void *
 vmm_zsd_create(zoneid_t zid)
 {
 	vmm_zsd_t *zsd;
+	zone_t *zone;
 
 	zsd = kmem_zalloc(sizeof (*zsd), KM_SLEEP);
 
@@ -114,7 +115,20 @@ vmm_zsd_create(zoneid_t zid)
 	zsd->vz_zoneid = zid;
 
 	mutex_init(&zsd->vz_lock, NULL, MUTEX_DEFAULT, NULL);
-	zsd->vz_active = B_TRUE;
+
+	/*
+	 * If the vmm module is loaded while this zone is in the midst of
+	 * shutting down, vmm_zsd_destroy() may be called without
+	 * vmm_zsd_shutdown() ever being called. If it is shutting down, there
+	 * is no sense in letting any in-flight VM creation succeed so set
+	 * vz_active accordingly.
+	 *
+	 * zone_find_by_id_nolock() is used rather than zone_find_by_id()
+	 * so that the zone is returned regardless of state.
+	 */
+	zone = zone_find_by_id_nolock(zid);
+	VERIFY(zone != NULL);
+	zsd->vz_active = zone_status_get(zone) < ZONE_IS_SHUTTING_DOWN;
 
 	mutex_enter(&vmm_zsd_lock);
 	list_insert_tail(&vmm_zsd_list, zsd);
@@ -134,7 +148,11 @@ vmm_zsd_shutdown(zoneid_t zid, void *data)
 	vmm_softc_t *sc;
 
 	mutex_enter(&zsd->vz_lock);
-	ASSERT(zsd->vz_active);
+
+	/*
+	 * This may already be B_FALSE. See comment in vmm_zsd_create(). If it
+	 * is already B_FALSE we will take a quick trip through the empty list.
+	 */
 	zsd->vz_active = B_FALSE;
 
 	for (sc = list_head(&zsd->vz_vmms); sc != NULL;
