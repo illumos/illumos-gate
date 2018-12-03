@@ -211,7 +211,117 @@ font_bit_to_pix8(
 }
 
 /*
- * bit_to_pix24 is for 24-bit frame buffers.  It will write four output bytes
+ * bit_to_pix16 is for 16-bit frame buffers.  It will write two output bytes
+ * for each bit of input bitmap.  It inverts the input bits before
+ * doing the output translation, for reverse video.
+ *
+ * Assuming foreground is 11111111 11111111
+ * and background is 00000000 00000000
+ * An input data byte of 0x53 will output the bit pattern
+ *
+ * 00000000 00000000
+ * 11111111 11111111
+ * 00000000 00000000
+ * 11111111 11111111
+ * 00000000 00000000
+ * 00000000 00000000
+ * 11111111 11111111
+ * 11111111 11111111
+ *
+ */
+
+void
+font_bit_to_pix16(
+    struct font *f,
+    uint16_t *dest,
+    uint8_t c,
+    uint16_t fg_color16,
+    uint16_t bg_color16)
+{
+	int	row;
+	int	byte;
+	int	i;
+	uint8_t	*cp;
+	uint16_t data, d;
+	int	bytes_wide;
+	int	bitsleft, nbits;
+
+	cp = f->char_ptr[c];
+	bytes_wide = (f->width + 7) / 8;
+
+	for (row = 0; row < f->height; row++) {
+		bitsleft = f->width;
+		for (byte = 0; byte < bytes_wide; byte++) {
+			data = *cp++;
+			nbits = MIN(8, bitsleft);
+			bitsleft -= nbits;
+			for (i = 0; i < nbits; i++) {
+				d = ((data << i) & 0x80 ?
+				    fg_color16 : bg_color16);
+				*dest++ = d;
+			}
+		}
+	}
+}
+
+/*
+ * bit_to_pix24 is for 24-bit frame buffers.  It will write three output bytes
+ * for each bit of input bitmap.  It inverts the input bits before
+ * doing the output translation, for reverse video.
+ *
+ * Assuming foreground is 11111111 11111111 11111111
+ * and background is 00000000 00000000 00000000
+ * An input data byte of 0x53 will output the bit pattern
+ *
+ * 00000000 00000000 00000000
+ * 11111111 11111111 11111111
+ * 00000000 00000000 00000000
+ * 11111111 11111111 11111111
+ * 00000000 00000000 00000000
+ * 00000000 00000000 00000000
+ * 11111111 11111111 11111111
+ * 11111111 11111111 11111111
+ *
+ */
+
+void
+font_bit_to_pix24(
+    struct font *f,
+    uint8_t *dest,
+    uint8_t c,
+    uint32_t fg_color32,
+    uint32_t bg_color32)
+{
+	int	row;
+	int	byte;
+	int	i;
+	uint8_t	*cp;
+	uint32_t data, d;
+	int	bytes_wide;
+	int	bitsleft, nbits;
+
+	cp = f->char_ptr[c];
+	bytes_wide = (f->width + 7) / 8;
+
+	for (row = 0; row < f->height; row++) {
+		bitsleft = f->width;
+		for (byte = 0; byte < bytes_wide; byte++) {
+			data = *cp++;
+			nbits = MIN(8, bitsleft);
+			bitsleft -= nbits;
+			for (i = 0; i < nbits; i++) {
+				d = ((data << i) & 0x80 ?
+				    fg_color32 : bg_color32);
+				*dest++ = d & 0xff;
+				*dest++ = (d >> 8) & 0xff;
+				*dest++ = (d >> 16) & 0xff;
+			}
+		}
+	}
+}
+
+/*
+ * bit_to_pix32 is for 32-bit frame buffers.  It will write four output bytes
  * for each bit of input bitmap.  It inverts the input bits before
  * doing the output translation, for reverse video.  Note that each
  * 24-bit RGB value is finally stored in a 32-bit unsigned int, with the
@@ -233,7 +343,7 @@ font_bit_to_pix8(
  */
 
 void
-font_bit_to_pix24(
+font_bit_to_pix32(
     struct font *f,
     uint32_t *dest,
     uint8_t c,
