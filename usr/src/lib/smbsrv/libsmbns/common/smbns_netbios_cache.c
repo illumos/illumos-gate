@@ -484,8 +484,9 @@ smb_netbios_cache_insrefq(name_queue_t *refq, HT_ITEM *item)
 	if (IS_LOCAL(name->attributes)) {
 		if (IS_UNIQUE(name->attributes)) {
 			refent = smb_netbios_name_dup(name, 1);
-			if (refent)
+			if (refent) {
 				QUEUE_INSERT_TAIL(&refq->head, refent)
+			}
 
 			/* next name */
 			return (B_TRUE);
@@ -493,8 +494,9 @@ smb_netbios_cache_insrefq(name_queue_t *refq, HT_ITEM *item)
 	} else {
 		ht_mark_delete(smb_netbios_cache, item);
 		refent = smb_netbios_name_dup(name, 0);
-		if (refent)
+		if (refent) {
 			QUEUE_INSERT_TAIL(&refq->head, refent)
+		}
 
 		/* next name */
 		return (B_TRUE);
@@ -589,8 +591,9 @@ smb_netbios_cache_delete_locals(name_queue_t *delq)
 		if (IS_LOCAL(entry->attributes)) {
 			ht_mark_delete(smb_netbios_cache, item);
 			delent = smb_netbios_name_dup(entry, 1);
-			if (delent)
+			if (delent) {
 				QUEUE_INSERT_TAIL(&delq->head, delent)
+			}
 		}
 
 		(void) mutex_unlock(&entry->mtx);
