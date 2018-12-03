@@ -60,7 +60,7 @@ struct fontlist fonts[] = {
 void
 set_font(struct font *f, short *rows, short *cols, short height, short width)
 {
-	bitmap_data_t	*font_selected = NULL;
+	bitmap_data_t *default_font = NULL, *font_selected = NULL;
 	struct fontlist	*fl;
 	int i;
 
@@ -84,18 +84,22 @@ set_font(struct font *f, short *rows, short *cols, short height, short width)
 			    font_selected->width;
 			break;
 		}
+		default_font = fl->data;
 	}
 	/*
 	 * The minus 2 is to make sure we have at least a 1 pixel
 	 * border around the entire screen.
 	 */
 	if (font_selected == NULL) {
-		if (((*rows * DEFAULT_FONT_DATA.height) > height) ||
-		    ((*cols * DEFAULT_FONT_DATA.width) > width)) {
-			*rows = (height - 2) / DEFAULT_FONT_DATA.height;
-			*cols = (width - 2) / DEFAULT_FONT_DATA.width;
+		if (default_font == NULL)
+			default_font = &DEFAULT_FONT_DATA;
+
+		if (((*rows * default_font->height) > height) ||
+		    ((*cols * default_font->width) > width)) {
+			*rows = (height - 2) / default_font->height;
+			*cols = (width - 2) / default_font->width;
 		}
-		font_selected = &DEFAULT_FONT_DATA;
+		font_selected = default_font;
 	}
 
 	f->width = font_selected->width;
