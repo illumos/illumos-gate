@@ -43,7 +43,7 @@
  */
 
 void
-add_version(char *file, char *version)
+add_version(const char *ifile, const char *ofile, char *version)
 {
 	int fd;
 	int ret;
@@ -56,7 +56,7 @@ add_version(char *file, char *version)
 	char *buf;
 	bblk_hs_t hs;
 
-	fd = open(file, O_RDONLY);
+	fd = open(ifile, O_RDONLY);
 	if (fd == -1) {
 		perror("open");
 		return;
@@ -114,7 +114,7 @@ add_version(char *file, char *version)
 	memset(buf+sb.st_size, 0, buf_size - sb.st_size);
 	add_einfo(buf + extra, version, &hs, avail_space);
 
-	fd = open(file, O_WRONLY | O_TRUNC);
+	fd = open(ofile, O_CREAT | O_WRONLY | O_TRUNC, 0644);
 	if (fd == -1) {
 		perror("open");
 		free(buf);

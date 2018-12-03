@@ -14,7 +14,6 @@ SRCS=		locore.S main.c metadata.c vers.c
 LOADER_DISK_SUPPORT?=	yes
 LOADER_UFS_SUPPORT?=	yes
 LOADER_CD9660_SUPPORT?=	yes
-LOADER_ZFS_SUPPORT?=	no
 LOADER_NET_SUPPORT?=	yes
 LOADER_NFS_SUPPORT?=	yes
 LOADER_TFTP_SUPPORT?=	yes
@@ -34,12 +33,9 @@ CFLAGS+=	-DLOADER_UFS_SUPPORT
 .if ${LOADER_CD9660_SUPPORT} == "yes"
 CFLAGS+=	-DLOADER_CD9660_SUPPORT
 .endif
-.if ${LOADER_ZFS_SUPPORT} == "yes"
-CFLAGS+=	-DLOADER_ZFS_SUPPORT
 CFLAGS+=	-I${.CURDIR}/../../zfs
 CFLAGS+=	-I${.CURDIR}/../../../cddl/boot/zfs
 LIBZFSBOOT=	${.OBJDIR}/../../zfs/libzfsboot.a
-.endif
 .if ${LOADER_GZIP_SUPPORT} == "yes"
 CFLAGS+=	-DLOADER_GZIP_SUPPORT
 .endif

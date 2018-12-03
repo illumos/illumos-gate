@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -25,14 +25,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include <bootstrap.h>
-#include "libi386/libi386.h"
-#if defined(LOADER_ZFS_SUPPORT)
-#include "../zfs/libzfs.h"
-#endif
+#include "libi386.h"
+#include "libzfs.h"
 
 /*
  * We could use linker sets for some or all of these, but
@@ -57,9 +54,7 @@ struct devsw *devsw[] = {
 #if defined(LOADER_FIREWIRE_SUPPORT)
     &fwohci,
 #endif
-#if defined(LOADER_ZFS_SUPPORT)
     &zfs_dev,
-#endif
     NULL
 };
 
@@ -67,9 +62,7 @@ struct fs_ops *file_system[] = {
 #ifdef LOADER_GZIP_SUPPORT
     &gzipfs_fsops,
 #endif
-#if defined(LOADER_ZFS_SUPPORT)
     &zfs_fsops,
-#endif
     &ufs_fsops,
     &dosfs_fsops,
 #if 0
@@ -91,7 +84,7 @@ struct fs_ops *file_system[] = {
 };
 
 /* Exported for i386 only */
-/* 
+/*
  * Sort formats so that those that can detect based on arguments
  * rather than reading the file go first.
  */
@@ -118,8 +111,8 @@ struct file_format *file_formats[] = {
 	NULL
 };
 
-/* 
- * Consoles 
+/*
+ * Consoles
  *
  * We don't prototype these in libi386.h because they require
  * data structures from bootstrap.h as well.

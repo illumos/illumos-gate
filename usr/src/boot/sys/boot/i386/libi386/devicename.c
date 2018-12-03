@@ -32,7 +32,7 @@
 #include "bootstrap.h"
 #include "disk.h"
 #include "libi386.h"
-#include "../zfs/libzfs.h"
+#include "libzfs.h"
 
 static int i386_parsedev(struct i386_devdesc **, const char *, const char **);
 

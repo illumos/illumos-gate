@@ -50,10 +50,8 @@
 #include <sys/linker.h>
 #include <sys/queue.h>
 #include <sys/types.h>
-#ifdef LOADER_ZFS_SUPPORT
 #include <sys/vtoc.h>
-#include "../zfs/libzfs.h"
-#endif
+#include "libzfs.h"
 
 #include <vm/vm.h>
 #include <machine/asi.h>
@@ -139,9 +137,7 @@ static vm_offset_t heapva;
 static char bootpath[64];
 static phandle_t root;
 
-#ifdef LOADER_ZFS_SUPPORT
 static struct zfs_devdesc zfs_currdev;
-#endif
 
 /*
  * Machine dependent structures that the machine independent
@@ -154,9 +150,7 @@ struct devsw *devsw[] = {
 #ifdef LOADER_NET_SUPPORT
 	&netdev,
 #endif
-#ifdef LOADER_ZFS_SUPPORT
 	&zfs_dev,
-#endif
 	NULL
 };
 
@@ -173,9 +167,7 @@ struct file_format *file_formats[] = {
 };
 
 struct fs_ops *file_system[] = {
-#ifdef LOADER_ZFS_SUPPORT
 	&zfs_fsops,
-#endif
 #ifdef LOADER_UFS_SUPPORT
 	&ufs_fsops,
 #endif
@@ -731,7 +723,6 @@ tlb_init_sun4u(void)
 		panic("%s: can't allocate TLB store", __func__);
 }
 
-#ifdef LOADER_ZFS_SUPPORT
 static void
 sparc64_zfs_probe(void)
 {
@@ -809,7 +800,6 @@ sparc64_zfs_probe(void)
 		zfs_currdev.dd.d_dev = &zfs_dev;
 	}
 }
-#endif /* LOADER_ZFS_SUPPORT */
 
 int
 main(int (*openfirm)(void *))
@@ -827,9 +817,7 @@ main(int (*openfirm)(void *))
 	archsw.arch_copyout = ofw_copyout;
 	archsw.arch_readin = sparc64_readin;
 	archsw.arch_autoload = sparc64_autoload;
-#ifdef LOADER_ZFS_SUPPORT
 	archsw.arch_zfs_probe = sparc64_zfs_probe;
-#endif
 
 	if (init_heap() == (vm_offset_t)-1)
 		OF_exit();
@@ -859,13 +847,11 @@ main(int (*openfirm)(void *))
 		if ((*dp)->dv_init != 0)
 			(*dp)->dv_init();
 
-#ifdef LOADER_ZFS_SUPPORT
 	if (zfs_currdev.pool_guid != 0) {
 		(void)strncpy(bootpath, zfs_fmtdev(&zfs_currdev),
 		    sizeof(bootpath) - 1);
 		bootpath[sizeof(bootpath) - 1] = '\0';
 	} else
-#endif
 
 	/*
 	 * Sun compatible bootable CD-ROMs have a disk label placed before

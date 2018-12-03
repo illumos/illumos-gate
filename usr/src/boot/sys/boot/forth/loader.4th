@@ -590,6 +590,12 @@ only forth definitions also support-functions
 
 : show-module ( <module> -- ) find-module ?dup if show-one-module then ;
 
+: set-module-path ( addr len <module> -- )
+  find-module ?dup if
+    module.loadname string=
+  then
+;
+
 \ Words to be used inside configuration files
 
 : retry false ;         \ For use in load error commands

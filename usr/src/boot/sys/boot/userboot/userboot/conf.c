@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1997
  *	Matthias Drochner.  All rights reserved.
  *
@@ -28,19 +28,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$NetBSD: conf.c,v 1.2 1997/03/22 09:03:29 thorpej Exp $	 
+ *	$NetBSD: conf.c,v 1.2 1997/03/22 09:03:29 thorpej Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 
 #include "libuserboot.h"
-
-#if defined(USERBOOT_ZFS_SUPPORT)
-#include "../zfs/libzfs.h"
-#endif
+#include "libzfs.h"
 
 /*
  * We could use linker sets for some or all of these, but
@@ -55,9 +51,7 @@ __FBSDID("$FreeBSD$");
 struct devsw *devsw[] = {
 	&host_dev,
 	&userboot_disk,
-#if defined(USERBOOT_ZFS_SUPPORT)
 	&zfs_dev,
-#endif
 	NULL
 };
 
@@ -65,16 +59,14 @@ struct fs_ops *file_system[] = {
 	&host_fsops,
 	&ufs_fsops,
 	&cd9660_fsops,
-#if defined(USERBOOT_ZFS_SUPPORT)
 	&zfs_fsops,
-#endif
 	&gzipfs_fsops,
 	&bzipfs_fsops,
 	NULL
 };
 
 /* Exported for i386 only */
-/* 
+/*
  * Sort formats so that those that can detect based on arguments
  * rather than reading the file go first.
  */
@@ -91,8 +83,8 @@ struct file_format *file_formats[] = {
     NULL
 };
 
-/* 
- * Consoles 
+/*
+ * Consoles
  *
  * We don't prototype these in libuserboot.h because they require
  * data structures from bootstrap.h as well.

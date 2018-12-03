@@ -25,7 +25,7 @@ LOADER=		loader
 NEWVERSWHAT=	"ZFS enabled bootstrap loader" x86
 
 # Set by loader Makefile
-CPPFLAGS +=	-DLOADER_ZFS_SUPPORT -I../../zfs
+CPPFLAGS +=	-I../../zfs
 CPPFLAGS +=	-I../libi386
 LIBZFSBOOT=	../../zfs/$(MACH)/libzfsboot.a
 LIBI386=        ../libi386/libi386.a

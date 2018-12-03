@@ -34,13 +34,10 @@
 #include "bootstrap.h"
 #include "disk.h"
 #include "libuserboot.h"
-
-#if defined(USERBOOT_ZFS_SUPPORT)
-#include "../zfs/libzfs.h"
+#include "libzfs.h"
 
 static void userboot_zfs_probe(void);
 static int userboot_zfs_found;
-#endif
 
 /* Minimum version required */
 #define	USERBOOT_VERSION	USERBOOT_VERSION_3
@@ -119,9 +116,7 @@ loader_main(struct loader_callbacks *cb, void *arg, int version, int ndisks)
 	archsw.arch_copyin = userboot_copyin;
 	archsw.arch_copyout = userboot_copyout;
 	archsw.arch_readin = userboot_readin;
-#if defined(USERBOOT_ZFS_SUPPORT)
 	archsw.arch_zfs_probe = userboot_zfs_probe;
-#endif
 
 	/*
 	 * March through the device switch probing for things.
@@ -151,7 +146,6 @@ extract_currdev(void)
 
 	//bzero(&dev, sizeof(dev));
 
-#if defined(USERBOOT_ZFS_SUPPORT)
 	if (userboot_zfs_found) {
 		struct zfs_devdesc zdev;
 
@@ -162,10 +156,7 @@ extract_currdev(void)
 
 		dev = *(struct disk_devdesc *)&zdev;
 		init_zfs_bootenv(zfs_fmtdev(&dev));
-	} else
-#endif
-
-	if (userboot_disk_maxunit > 0) {
+	} else if (userboot_disk_maxunit > 0) {
 		dev.dd.d_dev = &userboot_disk;
 		dev.dd.d_unit = 0;
 		dev.d_slice = 0;
@@ -189,7 +180,6 @@ extract_currdev(void)
 	    env_noset, env_nounset);
 }
 
-#if defined(USERBOOT_ZFS_SUPPORT)
 static void
 userboot_zfs_probe(void)
 {
