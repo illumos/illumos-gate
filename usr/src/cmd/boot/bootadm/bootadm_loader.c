@@ -354,7 +354,9 @@ void
 menu_free(struct menu_lst *menu)
 {
 	menu_entry_t *entry;
-	STAILQ_FOREACH(entry, menu, me_next) {
+
+	while (!STAILQ_EMPTY(menu)) {
+		entry = STAILQ_FIRST(menu);
 		STAILQ_REMOVE_HEAD(menu, me_next);
 		free(entry->me_title);
 		free(entry->me_type);
