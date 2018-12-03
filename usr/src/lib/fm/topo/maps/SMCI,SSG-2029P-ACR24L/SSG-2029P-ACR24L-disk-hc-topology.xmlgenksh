@@ -78,8 +78,28 @@ function do_sata_node
 	(( target = bay + 4 ))
 	hpath="/pci@0,0/pci15d9,981@11,5"
 	tpath="/disk@${target},0"
+	devctl="/devices/pci@0,0/pci15d9,981@11,5:devctl"
   cat <<EOF
     <node instance='$bay_inst'>
+      <facility name='fail' type='indicator' provider='fac_prov_ahci' >
+        <propgroup name='facility' version='1' name-stability='Private'
+          data-stability='Private' >
+          <propval name='type' type='uint32' value='0' />
+          <propmethod name='ahci_led_mode' version='0' propname='mode'
+            proptype='uint32' mutable='1'>
+          </propmethod>
+        </propgroup>
+      </facility>
+      <facility name='ident' type='indicator' provider='fac_prov_ahci' >
+        <propgroup name='facility' version='1' name-stability='Private'
+          data-stability='Private' >
+          <propval name='type' type='uint32' value='1' />
+          <propmethod name='ahci_led_mode' version='0' propname='mode'
+            proptype='uint32' mutable='1'>
+          </propmethod>
+        </propgroup>
+      </facility>
+
       <propgroup name='protocol' version='1' name-stability='Private'
         data-stability='Private'>
         <propval name='label' type='string' value='Rear Disk $bay' />
@@ -92,6 +112,9 @@ function do_sata_node
         data-stability='Private'>
         <propval name='occupant-path' type='string'
           value='$hpath$tpath' />
+        <propval name='devctl' type='string'
+          value='$devctl' />
+        <propval name='port' type='uint32' value='$target' />
       </propgroup>
     </node>
 EOF

@@ -128,6 +128,7 @@ extern "C" {
 #define	TOPO_BINDING_DEVCTL	"devctl"
 #define	TOPO_BINDING_ENCLOSURE	"enclosure"
 #define	TOPO_BINDING_SLOT	"slot"
+#define	TOPO_BINDING_PORT	"port"
 
 #define	TOPO_PGROUP_STORAGE	"storage"
 #define	TOPO_STORAGE_INITIATOR_PORT	"initiator-port"

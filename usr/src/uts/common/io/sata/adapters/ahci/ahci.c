@@ -10559,8 +10559,7 @@ ahci_em_led_task(void *arg)
 
 	mutex_enter(&led->aelta_ctl->ahcictl_mutex);
 	if (ret) {
-		led->aelta_ctl->ahcictl_em_state[led->aelta_port] =
-		    led->aelta_state;
+		led->aelta_ctl->ahcictl_em_state[led->aelta_port] = state;
 		led->aelta_ret = 0;
 	} else {
 		led->aelta_ret = EIO;

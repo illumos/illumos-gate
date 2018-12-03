@@ -27,6 +27,7 @@
 
 SUBDIRS =		\
 	disk		\
+	fac_prov_ahci	\
 	fac_prov_ipmi	\
 	fac_prov_mptsas	\
 	ipmi		\
