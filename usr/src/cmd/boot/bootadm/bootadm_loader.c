@@ -907,7 +907,7 @@ list_menu_entry(menu_entry_t *entry, char *setting)
 			if (*setting == '\0') {
 				(void) printf("Kernel:      %s\n",
 				    getenv("bootfile"));
-			} if (strcasecmp(setting, "kernel") == 0) {
+			} else if (strcasecmp(setting, "kernel") == 0) {
 				(void) printf("%s\n", getenv("bootfile"));
 				goto done;
 			}
