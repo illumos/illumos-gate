@@ -1824,10 +1824,6 @@ spa_vdev_remove_log(vdev_t *vd, uint64_t *txg)
 	vdev_metaslab_fini(vd);
 	spa_log_sm_set_blocklimit(spa);
 
-	spa_history_log_internal(spa, "vdev remove", NULL,
-	    "%s vdev %llu (log) %s", spa_name(spa), vd->vdev_id,
-	    (vd->vdev_path != NULL) ? vd->vdev_path : "-");
-
 	/* Make sure these changes are sync'ed */
 	spa_vdev_config_exit(spa, NULL, *txg, 0, FTAG);
 
@@ -2069,9 +2065,10 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 	nvlist_t **spares, **l2cache, *nv;
 	uint64_t txg = 0;
 	uint_t nspares, nl2cache;
-	int error = 0;
+	int error = 0, error_log;
 	boolean_t locked = MUTEX_HELD(&spa_namespace_lock);
 	sysevent_t *ev = NULL;
+	char *vd_type = NULL, *vd_path = NULL;
 
 	ASSERT(spa_writeable(spa));
 
@@ -2100,15 +2097,14 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		 * in this pool.
 		 */
 		if (vd == NULL || unspare) {
-			char *nvstr = fnvlist_lookup_string(nv,
-			    ZPOOL_CONFIG_PATH);
-			spa_history_log_internal(spa, "vdev remove", NULL,
-			    "%s vdev (%s) %s", spa_name(spa),
-			    VDEV_TYPE_SPARE, nvstr);
 			if (vd == NULL)
 				vd = spa_lookup_by_guid(spa, guid, B_TRUE);
 			ev = spa_event_create(spa, vd, NULL,
 			    ESC_ZFS_VDEV_REMOVE_AUX);
+
+			vd_type = VDEV_TYPE_SPARE;
+			vd_path = spa_strdup(fnvlist_lookup_string(
+			    nv, ZPOOL_CONFIG_PATH));
 			spa_vdev_remove_aux(spa->spa_spares.sav_config,
 			    ZPOOL_CONFIG_SPARES, spares, nspares, nv);
 			spa_load_spares(spa);
@@ -2120,9 +2116,9 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 	    nvlist_lookup_nvlist_array(spa->spa_l2cache.sav_config,
 	    ZPOOL_CONFIG_L2CACHE, &l2cache, &nl2cache) == 0 &&
 	    (nv = spa_nvlist_lookup_by_guid(l2cache, nl2cache, guid)) != NULL) {
-		char *nvstr = fnvlist_lookup_string(nv, ZPOOL_CONFIG_PATH);
-		spa_history_log_internal(spa, "vdev remove", NULL,
-		    "%s vdev (%s) %s", spa_name(spa), VDEV_TYPE_L2CACHE, nvstr);
+		vd_type = VDEV_TYPE_L2CACHE;
+		vd_path = spa_strdup(fnvlist_lookup_string(
+		    nv, ZPOOL_CONFIG_PATH));
 		/*
 		 * Cache devices can always be removed.
 		 */
@@ -2134,6 +2130,9 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		spa->spa_l2cache.sav_sync = B_TRUE;
 	} else if (vd != NULL && vd->vdev_islog) {
 		ASSERT(!locked);
+		vd_type = VDEV_TYPE_LOG;
+		vd_path = spa_strdup((vd->vdev_path != NULL) ?
+		    vd->vdev_path : "-");
 		error = spa_vdev_remove_log(vd, &txg);
 	} else if (vd != NULL) {
 		ASSERT(!locked);
@@ -2145,8 +2144,24 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		error = SET_ERROR(ENOENT);
 	}
 
+	error_log = error;
+
 	if (!locked)
 		error = spa_vdev_exit(spa, NULL, txg, error);
+
+	/*
+	 * Logging must be done outside the spa config lock. Otherwise,
+	 * this code path could end up holding the spa config lock while
+	 * waiting for a txg_sync so it can write to the internal log.
+	 * Doing that would prevent the txg sync from actually happening,
+	 * causing a deadlock.
+	 */
+	if (error_log == 0 && vd_type != NULL && vd_path != NULL) {
+		spa_history_log_internal(spa, "vdev remove", NULL,
+		    "%s vdev (%s) %s", spa_name(spa), vd_type, vd_path);
+	}
+	if (vd_path != NULL)
+		spa_strfree(vd_path);
 
 	if (ev != NULL) {
 		if (error != 0) {
