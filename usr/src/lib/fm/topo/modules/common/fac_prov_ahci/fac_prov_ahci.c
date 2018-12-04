@@ -94,7 +94,6 @@ do_led_control(topo_mod_t *mod, const char *devctl, uint32_t port,
 
 	if (set) {
 		ahci_ioc_em_set_t ahci_set;
-		ahci_em_led_state_t led_state;
 		uint32_t led_status = *ledmode;
 		uint_t op, leds;
 
