@@ -191,8 +191,8 @@ typedef struct ss_pn {
  *
  */
 typedef struct rfs4_oldstate {
-	struct rfs4_oldstate 	*next;
-	struct rfs4_oldstate 	*prev;
+	struct rfs4_oldstate	*next;
+	struct rfs4_oldstate	*prev;
 	rfs4_ss_pn_t		*ss_pn;
 	nfs_client_id4		cl_id4;
 } rfs4_oldstate_t;
@@ -471,9 +471,9 @@ nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
  *		says that the use of cleanlocks() on individual files
  *		is not required?
  * can_reclaim - indicates if client is allowed to reclaim after server
- * 		start-up (client had previous state at server)
+ *		start-up (client had previous state at server)
  * ss_remove - indicates that the rfs4_client_destroy function should
- * 		clean up stable storage file.
+ *		clean up stable storage file.
  * forced_expire - set if the sysadmin has used clear_locks for this client.
  * no_referrals - set if the client is Solaris and pre-dates referrals
  * deleg_revoked - how many delegations have been revoked for this client?
@@ -500,7 +500,7 @@ typedef struct rfs4_client {
 	unsigned		rc_need_confirm:1;
 	unsigned		rc_unlksys_completed:1;
 	unsigned		rc_can_reclaim:1;
-	unsigned 		rc_ss_remove:1;
+	unsigned		rc_ss_remove:1;
 	unsigned		rc_forced_expire:1;
 	uint_t			rc_deleg_revoked;
 	struct rfs4_client	*rc_cp_confirmed;
@@ -718,12 +718,12 @@ typedef struct rfs4_dinfo {
  * file_rwlock - lock for serializing the removal of a file while
  *	the state structures are active within the server
  *
- * 	The only requirement for locking file_rwlock is that the
- * 	caller have a reference to the containing rfs4_file.  The dbe
- * 	lock may or may not be held for lock/unlock of file_rwlock.
- * 	As mentioned above, the file_rwlock is used for serialization
- * 	of file removal and more specifically reference to the held
- * 	vnode (e.g. vp).
+ *	The only requirement for locking file_rwlock is that the
+ *	caller have a reference to the containing rfs4_file.  The dbe
+ *	lock may or may not be held for lock/unlock of file_rwlock.
+ *	As mentioned above, the file_rwlock is used for serialization
+ *	of file removal and more specifically reference to the held
+ *	vnode (e.g. vp).
  */
 typedef struct rfs4_file {
 	rfs4_dbe_t	*rf_dbe;
@@ -1009,8 +1009,8 @@ struct nfs_fh4_fmt {
 #define	FH4_ATTRDIR	2
 
 #define	fh4_fsid	fh4_i.fhx_fsid
-#define	fh4_len		fh4_i.fhx_len 	/* fid length */
-#define	fh4_data	fh4_i.fhx_data 	/* fid bytes */
+#define	fh4_len		fh4_i.fhx_len	/* fid length */
+#define	fh4_data	fh4_i.fhx_data	/* fid bytes */
 #define	fh4_xlen	fh4_i.fhx_xlen
 #define	fh4_xdata	fh4_i.fhx_xdata
 typedef struct nfs_fh4_fmt nfs_fh4_fmt_t;
@@ -1042,10 +1042,11 @@ typedef struct nfs_fh4_fmt nfs_fh4_fmt_t;
 /*
  * A few definitions of repeatedly used constructs for nfsv4
  */
-#define	UTF8STRING_FREE(str)					\
+#define	UTF8STRING_FREE(str)	{				\
 	kmem_free((str).utf8string_val,	(str).utf8string_len);	\
 	(str).utf8string_val = NULL;				\
-	(str).utf8string_len = 0;
+	(str).utf8string_len = 0;				\
+}
 
 /*
  * NFS4_VOLATILE_FH yields non-zero if the filesystem uses non-persistent
@@ -1081,27 +1082,27 @@ typedef struct nfs_fh4_fmt nfs_fh4_fmt_t;
 struct compound_state {
 	struct exportinfo *exi;
 	struct exportinfo *saved_exi;	/* export struct for saved_vp */
-	cred_t 		*basecr;	/* UNIX cred:  only RPC request */
-	caddr_t 	principal;
-	int 		nfsflavor;
-	cred_t 		*cr;		/* UNIX cred: RPC request and */
+	cred_t		*basecr;	/* UNIX cred:  only RPC request */
+	caddr_t		principal;
+	int		nfsflavor;
+	cred_t		*cr;		/* UNIX cred: RPC request and */
 					/* target export */
-	bool_t  	cont;
-	uint_t 		access;		/* access perm on vp per request */
-	bool_t 		deleg;		/* TRUE if current fh has */
+	bool_t		cont;
+	uint_t		access;		/* access perm on vp per request */
+	bool_t		deleg;		/* TRUE if current fh has */
 					/* write delegated */
-	vnode_t 	*vp;		/* modified by PUTFH, and by ops that */
+	vnode_t		*vp;		/* modified by PUTFH, and by ops that */
 					/* input to GETFH */
-	bool_t 		mandlock;	/* Is mandatory locking in effect */
+	bool_t		mandlock;	/* Is mandatory locking in effect */
 					/* for vp */
-	vnode_t 	*saved_vp;	/* modified by SAVEFH, copied to */
+	vnode_t		*saved_vp;	/* modified by SAVEFH, copied to */
 					/* vp by RESTOREFH */
-	nfsstat4 	*statusp;
-	nfs_fh4 	fh;		/* ditto. valid only if vp != NULL */
-	nfs_fh4 	saved_fh;	/* ditto. valid only if */
-					/* 	saved_vp != NULL */
+	nfsstat4	*statusp;
+	nfs_fh4		fh;		/* ditto. valid only if vp != NULL */
+	nfs_fh4		saved_fh;	/* ditto. valid only if */
+					/*	saved_vp != NULL */
 	struct svc_req	*req;
-	char 		fhbuf[NFS4_FHSIZE];
+	char		fhbuf[NFS4_FHSIZE];
 };
 
 /*
@@ -1121,9 +1122,9 @@ struct nfs4_svgetit_arg {
 	nfs4_attr_cmd_t op;		/* getit or setit */
 	struct compound_state *cs;
 	struct statvfs64 *sbp;
-	uint_t 		flag;		/* VOP_GETATTR/VOP_SETATTR flag */
-	uint_t 		xattr;		/* object is xattr */
-	bool_t 		rdattr_error_req; /* if readdir & client wants */
+	uint_t		flag;		/* VOP_GETATTR/VOP_SETATTR flag */
+	uint_t		xattr;		/* object is xattr */
+	bool_t		rdattr_error_req; /* if readdir & client wants */
 						/* rdattr_error */
 	nfsstat4	rdattr_error;	/* used for per-entry status */
 					/* (if rdattr_err) */
@@ -1141,22 +1142,22 @@ struct nfs4_svgetit_arg {
 };
 
 struct nfs4_ntov_map {
-	bitmap4		fbit; 		/* FATTR4_XXX_MASKY */
-	uint_t 		vbit; 		/* AT_XXX */
-	bool_t 		vfsstat;
-	bool_t 		mandatory; 	/* attribute mandatory to implement? */
-	uint_t 		nval;
+	bitmap4		fbit;		/* FATTR4_XXX_MASKY */
+	uint_t		vbit;		/* AT_XXX */
+	bool_t		vfsstat;
+	bool_t		mandatory;	/* attribute mandatory to implement? */
+	uint_t		nval;
 	int		xdr_size;	/* Size of XDR'd attr */
-	xdrproc_t 	xfunc;
+	xdrproc_t	xfunc;
 	int (*sv_getit)(nfs4_attr_cmd_t, struct nfs4_svgetit_arg *,
 		union nfs4_attr_u *);	/* subroutine for getting attr. */
-	char 		*prtstr;	/* string attr for printing */
+	char		*prtstr;	/* string attr for printing */
 };
 
 struct nfs4attr_to_vattr {
-	vnode_t 	*vp;
-	vattr_t 	*vap;
-	nfs_fh4   	*fhp;
+	vnode_t		*vp;
+	vattr_t		*vap;
+	nfs_fh4		*fhp;
 	nfsstat4	rdattr_error;
 	uint32_t	flag;
 	fattr4_change	change;
@@ -1224,13 +1225,13 @@ enum lkp4_attr_setup {
  */
 typedef struct lookup4_param {
 	enum lkp4_attr_setup l4_getattrs; /* (in) get attrs in the lookup? */
-	int 		header_len;	/* (in) num ops before first lookup  */
-	int 		trailer_len;	/* (in) num ops after last	*/
+	int		header_len;	/* (in) num ops before first lookup  */
+	int		trailer_len;	/* (in) num ops after last	*/
 					/*	Lookup/Getattr		*/
-	bitmap4 	ga_bits;	/* (in) Which attributes for Getattr */
+	bitmap4		ga_bits;	/* (in) Which attributes for Getattr */
 	COMPOUND4args_clnt *argsp;	/* (in/out) args for compound struct */
 	COMPOUND4res_clnt  *resp;	/* (in/out) res for compound  struct */
-	int 		arglen;		/* (out) argop buffer alloc'd length */
+	int		arglen;		/* (out) argop buffer alloc'd length */
 	struct mntinfo4 *mi;
 } lookup4_param_t;
 
