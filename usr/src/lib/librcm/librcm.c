@@ -72,7 +72,7 @@ rcm_alloc_handle(char *modname, uint_t flag, void *arg, rcm_handle_t **hdp)
 
 	if (modname) {
 		(void) snprintf(namebuf, MAXPATHLEN, "%s%s", modname,
-			RCM_MODULE_SUFFIX);
+		    RCM_MODULE_SUFFIX);
 
 		if ((hd->modname = strdup(namebuf)) == NULL) {
 			free(hd);
@@ -135,8 +135,8 @@ rcm_get_info(rcm_handle_t *hd, char *rsrcname, uint_t flag, rcm_info_t **infop)
 	/*
 	 * rsrcname may be NULL if requesting dr operations or modinfo
 	 */
-	if ((rsrcname == NULL) &&
-	    ((flag & RCM_DR_OPERATION|RCM_MOD_INFO) == 0)) {
+	if (rsrcname == NULL &&
+	    (flag & (RCM_DR_OPERATION | RCM_MOD_INFO)) == 0) {
 		errno = EINVAL;
 		return (RCM_FAILURE);
 	}
@@ -897,7 +897,7 @@ rcm_is_script(char *filename)
 	char *tmp;
 
 	if (((tmp = strstr(filename, RCM_MODULE_SUFFIX)) != NULL) &&
-		(tmp[strlen(RCM_MODULE_SUFFIX)] == '\0'))
+	    (tmp[strlen(RCM_MODULE_SUFFIX)] == '\0'))
 		return (0);
 	else
 		return (1);

@@ -354,7 +354,9 @@ void
 menu_free(struct menu_lst *menu)
 {
 	menu_entry_t *entry;
-	STAILQ_FOREACH(entry, menu, me_next) {
+
+	while (!STAILQ_EMPTY(menu)) {
+		entry = STAILQ_FIRST(menu);
 		STAILQ_REMOVE_HEAD(menu, me_next);
 		free(entry->me_title);
 		free(entry->me_type);
@@ -907,7 +909,7 @@ list_menu_entry(menu_entry_t *entry, char *setting)
 			if (*setting == '\0') {
 				(void) printf("Kernel:      %s\n",
 				    getenv("bootfile"));
-			} if (strcasecmp(setting, "kernel") == 0) {
+			} else if (strcasecmp(setting, "kernel") == 0) {
 				(void) printf("%s\n", getenv("bootfile"));
 				goto done;
 			}

@@ -24,11 +24,35 @@ OBJDUMP=	$(GNU_ROOT)/bin/gobjdump
 PROG=		loader.sym
 
 # architecture-specific loader code
-SRCS=	autoload.c bootinfo.c conf.c copy.c efi_main.c framebuffer.c main.c \
-	self_reloc.c smbios.c acpi.c vers.c memmap.c multiboot2.c
+SRCS=	acpi.c \
+	autoload.c \
+	bootinfo.c \
+	conf.c \
+	copy.c \
+	efi_main.c \
+	framebuffer.c \
+	main.c \
+	memmap.c \
+	multiboot.S \
+	multiboot2.c \
+	self_reloc.c \
+	smbios.c \
+	vers.c
 
-OBJS=	autoload.o bootinfo.o conf.o copy.o efi_main.o framebuffer.o main.o \
-	self_reloc.o smbios.o acpi.o vers.o memmap.o multiboot2.o
+OBJS=	acpi.o \
+	autoload.o \
+	bootinfo.o \
+	conf.o \
+	copy.o \
+	efi_main.o \
+	framebuffer.o \
+	main.o \
+	memmap.o \
+	multiboot.o \
+	multiboot2.o \
+	self_reloc.o \
+	smbios.o \
+	vers.o
 
 CFLAGS=	-Os
 CPPFLAGS= -nostdinc -I../../../../../include -I../../..../
@@ -85,7 +109,7 @@ LDFLAGS =	-nostdlib --eh-frame-hdr
 LDFLAGS +=	-shared --hash-style=both --enable-new-dtags
 LDFLAGS +=	-T$(LDSCRIPT) -Bsymbolic
 
-CLEANFILES=	8x16.c vers.c
+CLEANFILES=	loader.sym loader.bin vers.c
 
 NEWVERSWHAT=	"EFI loader" $(MACHINE)
 
@@ -94,7 +118,10 @@ install: all $(ROOTBOOTFILES)
 vers.c:	../../../common/newvers.sh $(SRC)/boot/Makefile.version
 	$(SH) ../../../common/newvers.sh $(LOADER_VERSION) $(NEWVERSWHAT)
 
-$(EFIPROG): loader.sym
+$(EFIPROG): loader.bin
+	$(BTXLD) -V $(BOOT_VERSION) -o $@ loader.bin
+
+loader.bin: loader.sym
 	if [ `$(OBJDUMP) -t loader.sym | fgrep '*UND*' | wc -l` != 0 ]; then \
 		$(OBJDUMP) -t loader.sym | fgrep '*UND*'; \
 		exit 1; \
@@ -123,7 +150,7 @@ x86:
 	$(SYMLINK) ../../../../x86/include x86
 
 clean clobber:
-	$(RM) $(CLEANFILES) $(OBJS) loader.sym
+	$(RM) $(CLEANFILES) $(OBJS)
 
 %.o:	../%.c
 	$(COMPILE.c) $<
@@ -137,6 +164,9 @@ clean clobber:
 #
 %.o:	../arch/$(MACHINE)/%.S
 	$(COMPILE.S) -Wa,-W $<
+
+%.o:	../../../common/%.S
+	$(COMPILE.S) $<
 
 %.o:	../../../common/%.c
 	$(COMPILE.c) $<
