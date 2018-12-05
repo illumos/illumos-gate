@@ -49,7 +49,8 @@ enum vmm_softc_state {
 	VMM_HELD	= 1,	/* external driver(s) possess hold on VM */
 	VMM_CLEANUP	= 2,	/* request that holds are released */
 	VMM_PURGED	= 4,	/* all hold have been released */
-	VMM_BLOCK_HOOK	= 8	/* mem hook install temporarily blocked */
+	VMM_BLOCK_HOOK	= 8,	/* mem hook install temporarily blocked */
+	VMM_DESTROY	= 16	/* VM is destroyed, softc still around */
 };
 
 struct vmm_softc {

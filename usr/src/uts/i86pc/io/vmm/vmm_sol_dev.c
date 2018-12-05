@@ -1284,7 +1284,7 @@ vmm_drv_hold(file_t *fp, cred_t *cr, vmm_hold_t **holdp)
 	}
 	/* XXXJOY: check cred permissions against instance */
 
-	if ((sc->vmm_flags & (VMM_CLEANUP|VMM_PURGED)) != 0) {
+	if ((sc->vmm_flags & (VMM_CLEANUP|VMM_PURGED|VMM_DESTROY)) != 0) {
 		err = EBUSY;
 		goto out;
 	}
@@ -1474,10 +1474,6 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 	ASSERT(MUTEX_HELD(&vmmdev_mtx));
 	ASSERT(MUTEX_HELD(&vmm_mtx));
 
-	if (sc->vmm_is_open) {
-		return (EBUSY);
-	}
-
 	if (clean_zsd) {
 		vmm_zsd_rem_vm(sc);
 	}
@@ -1489,13 +1485,17 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 	/* Clean up devmem entries */
 	vmmdev_devmem_purge(sc);
 
-	vm_destroy(sc->vmm_vm);
 	list_remove(&vmmdev_list, sc);
 	ddi_remove_minor_node(vmm_dip, sc->vmm_name);
 	minor = sc->vmm_minor;
 	zone_rele(sc->vmm_zone);
-	ddi_soft_state_free(vmm_statep, minor);
-	id_free(vmmdev_minors, minor);
+	if (sc->vmm_is_open) {
+		sc->vmm_flags |= VMM_DESTROY;
+	} else {
+		vm_destroy(sc->vmm_vm);
+		ddi_soft_state_free(vmm_statep, minor);
+		id_free(vmmdev_minors, minor);
+	}
 	(void) devfs_clean(pdip, NULL, DV_CLEAN_FORCE);
 
 	return (0);
@@ -1601,6 +1601,12 @@ vmm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 
 	VERIFY(sc->vmm_is_open);
 	sc->vmm_is_open = B_FALSE;
+
+	if (sc->vmm_flags & VMM_DESTROY) {
+		vm_destroy(sc->vmm_vm);
+		ddi_soft_state_free(vmm_statep, minor);
+		id_free(vmmdev_minors, minor);
+	}
 	mutex_exit(&vmmdev_mtx);
 
 	return (0);
@@ -1668,6 +1674,9 @@ vmm_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	sc = ddi_get_soft_state(vmm_statep, minor);
 	ASSERT(sc);
 
+	if (sc->vmm_flags & VMM_DESTROY)
+		return (ENXIO);
+
 	return (vmmdev_do_ioctl(sc, cmd, arg, mode, credp, rvalp));
 }
 
@@ -1694,6 +1703,9 @@ vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 
 	sc = ddi_get_soft_state(vmm_statep, minor);
 	ASSERT(sc);
+
+	if (sc->vmm_flags & VMM_DESTROY)
+		return (ENXIO);
 
 	/* Get a read lock on the guest memory map by freezing any vcpu. */
 	if ((err = vcpu_lock_all(sc)) != 0) {
