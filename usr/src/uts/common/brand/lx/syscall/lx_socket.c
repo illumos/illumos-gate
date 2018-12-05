@@ -54,6 +54,7 @@
 #include <netinet/tcp.h>
 #include <netinet/igmp.h>
 #include <netinet/icmp6.h>
+#include <inet/cc.h>
 #include <inet/tcp_impl.h>
 #include <lx_errno.h>
 
@@ -2810,7 +2811,7 @@ static const lx_sockopt_map_t ltos_tcp_sockopts[LX_TCP_NOTSENT_LOWAT + 1] = {
 	{ OPTNOTSUP, 0 },			/* TCP_WINDOW_CLAMP - in code */
 	{ OPTNOTSUP, 0 },			/* TCP_INFO		*/
 	{ OPTNOTSUP, 0 },			/* TCP_QUICKACK - in code */
-	{ OPTNOTSUP, 0 },			/* TCP_CONGESTION	*/
+	{ TCP_CONGESTION, CC_ALGO_NAME_MAX },	/* TCP_CONGESTION	*/
 	{ OPTNOTSUP, 0 },			/* TCP_MD5SIG		*/
 	{ OPTNOTSUP, 0 },
 	{ OPTNOTSUP, 0 },			/* TCP_THIN_LINEAR_TIMEOUTS */

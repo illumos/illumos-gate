@@ -21,7 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -37,6 +37,7 @@
 
 #include <sys/cpupart.h>
 #include <sys/cpuvar.h>
+#include <sys/queue.h>
 #include <sys/session.h>
 #include <sys/vmparam.h>
 #include <sys/mman.h>
@@ -70,6 +71,7 @@
 #include <sys/tihdr.h>
 #include <sys/corectl.h>
 #include <sys/rctl_impl.h>
+#include <inet/cc.h>
 #include <inet/ip.h>
 #include <inet/ip_ire.h>
 #include <inet/ip6.h>
@@ -254,6 +256,9 @@ static void lxpr_read_sys_net_ipv4_icmp_eib(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_ip_forward(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *,
     lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_cc_allow(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_cc_avail(lxpr_node_t *, lxpr_uiobuf_t *);
+static void lxpr_read_sys_net_ipv4_tcp_cc_curr(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_ka_int(lxpr_node_t *, lxpr_uiobuf_t *);
 static void lxpr_read_sys_net_ipv4_tcp_ka_tim(lxpr_node_t *, lxpr_uiobuf_t *);
@@ -282,6 +287,8 @@ static int lxpr_write_sys_net_ipv4_icmp_eib(lxpr_node_t *, uio_t *,
     cred_t *, caller_context_t *);
 static int lxpr_write_sys_net_ipv4_ip_lport_range(lxpr_node_t *, uio_t *,
     cred_t *, caller_context_t *);
+static int lxpr_write_sys_net_ipv4_tcp_cc_curr(lxpr_node_t *, uio_t *, cred_t *,
+    caller_context_t *);
 static int lxpr_write_sys_net_ipv4_tcp_fin_to(lxpr_node_t *, uio_t *, cred_t *,
     caller_context_t *);
 static int lxpr_write_sys_net_ipv4_tcp_ka_int(lxpr_node_t *, uio_t *,
@@ -613,6 +620,9 @@ static lxpr_dirent_t sys_net_ipv4dir[] = {
 	{ LXPR_SYS_NET_IPV4_ICMP_EIB,	"icmp_echo_ignore_broadcasts" },
 	{ LXPR_SYS_NET_IPV4_IP_FORWARD, "ip_forward" },
 	{ LXPR_SYS_NET_IPV4_IP_LPORT_RANGE, "ip_local_port_range" },
+	{ LXPR_SYS_NET_IPV4_TCP_CC_ALLOW, "tcp_allowed_congestion_control" },
+	{ LXPR_SYS_NET_IPV4_TCP_CC_AVAIL, "tcp_available_congestion_control" },
+	{ LXPR_SYS_NET_IPV4_TCP_CC_CURR, "tcp_congestion_control" },
 	{ LXPR_SYS_NET_IPV4_TCP_FIN_TO,	"tcp_fin_timeout" },
 	{ LXPR_SYS_NET_IPV4_TCP_KA_INT,	"tcp_keepalive_intvl" },
 	{ LXPR_SYS_NET_IPV4_TCP_KA_TIM,	"tcp_keepalive_time" },
@@ -678,6 +688,9 @@ static wftab_t wr_tab[] = {
 	{LXPR_SYS_NET_IPV4_IP_FORWARD, NULL},
 	{LXPR_SYS_NET_IPV4_IP_LPORT_RANGE,
 	    lxpr_write_sys_net_ipv4_ip_lport_range},
+	{LXPR_SYS_NET_IPV4_TCP_CC_ALLOW, NULL},
+	{LXPR_SYS_NET_IPV4_TCP_CC_AVAIL, NULL},
+	{LXPR_SYS_NET_IPV4_TCP_CC_CURR, lxpr_write_sys_net_ipv4_tcp_cc_curr},
 	{LXPR_SYS_NET_IPV4_TCP_FIN_TO, lxpr_write_sys_net_ipv4_tcp_fin_to},
 	{LXPR_SYS_NET_IPV4_TCP_KA_INT, lxpr_write_sys_net_ipv4_tcp_ka_int},
 	{LXPR_SYS_NET_IPV4_TCP_KA_TIM, lxpr_write_sys_net_ipv4_tcp_ka_tim},
@@ -928,6 +941,9 @@ static void (*lxpr_read_function[LXPR_NFILES])() = {
 	lxpr_read_sys_net_ipv4_icmp_eib, /* .../icmp_echo_ignore_broadcasts */
 	lxpr_read_sys_net_ipv4_ip_forward, /* .../ipv4/ip_forward */
 	lxpr_read_sys_net_ipv4_ip_lport_range, /* ../ipv4/ip_local_port_range */
+	lxpr_read_sys_net_ipv4_tcp_cc_allow, /* .../tcp_allowed_congestion_control */
+	lxpr_read_sys_net_ipv4_tcp_cc_avail, /* .../tcp_available_congestion_control */
+	lxpr_read_sys_net_ipv4_tcp_cc_curr, /* .../tcp_congestion_control */
 	lxpr_read_sys_net_ipv4_tcp_fin_to, /* .../ipv4/tcp_fin_timeout */
 	lxpr_read_sys_net_ipv4_tcp_ka_int, /* .../ipv4/tcp_keepalive_intvl */
 	lxpr_read_sys_net_ipv4_tcp_ka_tim, /* .../ipv4/tcp_keepalive_time */
@@ -5209,6 +5225,49 @@ lxpr_read_sys_net_ipv4_ip_lport_range(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	netstack_rele(ns);
 }
 
+static void
+lxpr_read_sys_net_ipv4_tcp_cc_allow(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	/* For now the set of allowed algos is the same as those available. */
+	return (lxpr_read_sys_net_ipv4_tcp_cc_avail(lxpnp, uiobuf));
+}
+
+static int
+lxpr_uiobuf_printf_ccname(void *cd, struct cc_algo *algo)
+{
+	lxpr_uiobuf_t *uiobuf = cd;
+	lxpr_uiobuf_printf(uiobuf, "%s", algo->name);
+	lxpr_uiobuf_printf(uiobuf,
+	    STAILQ_NEXT(algo, entries) != NULL ? " " : "\n");
+	return (0);
+}
+
+static void
+lxpr_read_sys_net_ipv4_tcp_cc_avail(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	(void) cc_walk_algos(lxpr_uiobuf_printf_ccname, uiobuf);
+}
+
+static void
+lxpr_read_sys_net_ipv4_tcp_cc_curr(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
+{
+	netstack_t *ns;
+	tcp_stack_t	*tcps;
+
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_CC_CURR);
+
+	ns = lxpr_netstack(lxpnp);
+	if (ns == NULL) {
+		lxpr_uiobuf_seterr(uiobuf, ENXIO);
+		return;
+	}
+
+	tcps = ns->netstack_tcp;
+	lxpr_uiobuf_printf(uiobuf, "%s\n",
+	    tcps->tcps_default_cc_algo->name);
+	netstack_rele(ns);
+}
+
 /*
  * tcp_fin_timeout
  *
@@ -7841,6 +7900,15 @@ lxpr_write_sys_net_ipv4_tcp_rwmem(lxpr_node_t *lxpnp, struct uio *uio,
 
 	netstack_rele(ns);
 	return (res);
+}
+
+static int
+lxpr_write_sys_net_ipv4_tcp_cc_curr(lxpr_node_t *lxpnp, struct uio *uio,
+    struct cred *cr, caller_context_t *ct)
+{
+	ASSERT(lxpnp->lxpr_type == LXPR_SYS_NET_IPV4_TCP_CC_CURR);
+	return (lxpr_write_tcp_property(lxpnp, uio, cr, ct,
+	    "congestion_control", NULL));
 }
 
 static int
