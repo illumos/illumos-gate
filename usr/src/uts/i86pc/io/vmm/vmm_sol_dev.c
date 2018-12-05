@@ -969,10 +969,30 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_ACTIVATE_CPU:
 		error = vm_activate_cpu(sc->vmm_vm, vcpu);
 		break;
+
 	case VM_SUSPEND_CPU:
+		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (vcpu < -1 || vcpu >= VM_MAXCPU) {
+			error = EINVAL;
+			break;
+		}
+
 		error = vm_suspend_cpu(sc->vmm_vm, vcpu);
 		break;
+
 	case VM_RESUME_CPU:
+		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
+			error = EFAULT;
+			break;
+		}
+		if (vcpu < -1 || vcpu >= VM_MAXCPU) {
+			error = EINVAL;
+			break;
+		}
+
 		error = vm_resume_cpu(sc->vmm_vm, vcpu);
 		break;
 
