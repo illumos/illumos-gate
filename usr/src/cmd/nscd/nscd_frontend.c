@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Nexenta Systems, Inc.
  */
 
 #include <stdlib.h>
@@ -88,7 +89,7 @@ static thread_key_t	server_key;
 static void *
 server_tsd_bind(void *arg)
 {
-	static void *value = 0;
+	static void *value = "NON-NULL TSD";
 
 	(void) thr_setname(thr_self(), "server_tsd_bind");
 
@@ -129,6 +130,7 @@ server_destroy(void *arg)
 	(void) mutex_lock(&create_lock);
 	num_servers--;
 	(void) mutex_unlock(&create_lock);
+	(void) thr_setspecific(server_key, NULL);
 }
 
 /*
