@@ -216,7 +216,7 @@ typedef struct r4hashq {
  * be held whenever any kind of access of r_size is made.
  *
  * Lock ordering:
- * 	r_rwlock > r_lkserlock > r_os_lock > r_statelock > r_statev4_lock
+ *	r_rwlock > r_lkserlock > r_os_lock > r_statelock > r_statev4_lock
  *	vnode_t::v_lock > r_os_lock
  */
 struct exportinfo;	/* defined in nfs/export.h */
@@ -308,11 +308,11 @@ typedef struct rnode4 {
 					/* delegation has been recalled by */
 					/* the server during open with */
 					/* CLAIM_PREVIOUS */
-	unsigned 	r_deleg_return_pending:1;
+	unsigned	r_deleg_return_pending:1;
 					/* delegreturn is pending, don't use */
 					/* the delegation stateid, set in */
 					/* nfs4_dlistadd */
-	unsigned 	r_deleg_return_inprog:1;
+	unsigned	r_deleg_return_inprog:1;
 					/* delegreturn is in progress, may */
 					/* only be set by nfs4delegreturn. */
 	nfs_rwlock_t    r_deleg_recall_lock;
@@ -440,11 +440,12 @@ extern void	nfs4_clear_open_streams(rnode4_t *);
  *
  * The caller must not be holding the rnode r_statelock mutex.
  */
-#define	PURGE_ATTRCACHE4_LOCKED(rp)				\
+#define	PURGE_ATTRCACHE4_LOCKED(rp)	{			\
 	rp->r_time_attr_inval = gethrtime();			\
 	rp->r_time_attr_saved = rp->r_time_attr_inval;		\
 	rp->r_pathconf.pc4_xattr_valid = 0;			\
-	rp->r_pathconf.pc4_cache_valid = 0;
+	rp->r_pathconf.pc4_cache_valid = 0;			\
+}
 
 #define	PURGE_ATTRCACHE4(vp)	{				\
 	rnode4_t *rp = VTOR4(vp);				\

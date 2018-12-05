@@ -33,13 +33,14 @@
 
 #include <kmfapi.h>
 
-#define	SET_VALUE(f, s) \
-	kmfrv = f; \
-	if (kmfrv != KMF_OK) { \
-		cryptoerror(LOG_STDERR, \
-			gettext("Failed to set %s: 0x%02x\n"), \
-			s, kmfrv); \
-		goto cleanup; \
+#define	SET_VALUE(f, s) { \
+		kmfrv = f; \
+		if (kmfrv != KMF_OK) { \
+			cryptoerror(LOG_STDERR, \
+				gettext("Failed to set %s: 0x%02x\n"), \
+				s, kmfrv); \
+			goto cleanup; \
+		} \
 	}
 
 static int

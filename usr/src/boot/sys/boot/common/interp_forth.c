@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -81,7 +81,7 @@ bf_command(ficlVm *vm)
 
     /* Get the name of the current word */
     name = vm->runningWord->name;
-    
+
     /* Find our command structure */
     cmd = NULL;
     SET_FOREACH(cmdp, Xcommand_set) {
@@ -117,8 +117,9 @@ bf_command(ficlVm *vm)
 	/* Get remainder of invocation */
 	tail = ficlVmGetInBuf(vm);
 
-	for (cp = tail, len = 0; cp != vm->tib.end && *cp != 0 && *cp != '\n'; cp++, len++)
-	    ;
+	len = 0;
+	for (cp = tail; cp != vm->tib.end && *cp != 0 && *cp != '\n'; cp++)
+		len++;
 
 	line = malloc(strlen(name) + len + 2);
 	strcpy(line, name);
@@ -136,12 +137,13 @@ bf_command(ficlVm *vm)
 	result = (cmd)(argc, argv);
 	free(argv);
     } else {
-	result=BF_PARSE;
+	result = BF_PARSE;
     }
 
     switch (result) {
     case CMD_CRIT:
 	printf("%s\n", command_errmsg);
+	command_errmsg = NULL;
 	break;
     case CMD_FATAL:
 	panic("%s\n", command_errmsg);
