@@ -45,7 +45,6 @@ $(i386_ONLY)file path=boot/solaris/bootenv.rc group=sys \
 $(i386_ONLY)file path=boot/solaris/devicedb/master group=sys \
     original_name=SUNWrmod:boot/solaris/devicedb/master preserve=true
 $(i386_ONLY)file path=boot/splashimage.xpm group=sys
-$(i386_ONLY)file path=usr/lib/fs/ufs/mboot mode=0444
 $(i386_ONLY)hardlink path=boot/solaris.xpm target=splashimage.xpm
 $(i386_ONLY)legacy pkg=SUNWrmodr desc="Realmode Modules, (Root)" \
     name="Realmode Modules, (Root)"

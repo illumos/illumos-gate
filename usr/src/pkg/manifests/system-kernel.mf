@@ -295,7 +295,6 @@ driver name=wc perms="* 0600 root sys"
 $(i386_ONLY)file path=boot/solaris/bin/create_diskmap group=sys mode=0555
 file path=boot/solaris/bin/create_ramdisk group=sys mode=0555
 file path=boot/solaris/bin/extract_boot_filelist group=sys mode=0555
-$(i386_ONLY)file path=boot/solaris/bin/mbr group=sys mode=0555
 $(i386_ONLY)file path=boot/solaris/bin/symdef group=sys mode=0555
 $(i386_ONLY)file path=boot/solaris/bin/update_grub group=sys mode=0555
 file path=boot/solaris/filelist.ramdisk group=sys

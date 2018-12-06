@@ -35,7 +35,6 @@ COMMON_SUBDIRS=		\
 
 i386_SUBDIRS=		\
 	installgrub	\
-	mbr		\
 	symdef
 
 sparc_SUBDIRS=
