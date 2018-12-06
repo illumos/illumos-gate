@@ -423,11 +423,12 @@ i_ilb_fillin_srvdata(ilb_handle_t h, ilb_server_data_t *srv, const char *sgname,
 
 	sgs = &sg_info->sg_servers[0];
 
-	if (cmd == ILBD_SRV_ID2ADDR)
+	if (cmd == ILBD_SRV_ID2ADDR) {
 		(void) strlcpy(sgs->sgs_srvID, srv->sd_srvID,
 		    sizeof (sgs->sgs_srvID));
-	else
+	} else {
 		IP_COPY_CLI_2_IMPL(&srv->sd_addr, &sgs->sgs_addr);
+	}
 
 	rc = i_ilb_do_comm(h, ic, ic_sz, rbuf, &rbufsz);
 	if (rc != ILB_STATUS_OK)

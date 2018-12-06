@@ -1033,8 +1033,9 @@ openssl_load_key(KMF_HANDLE_T handle, const char *file)
 	}
 
 end:
-	if (pkey == NULL)
+	if (pkey == NULL) {
 		SET_ERROR(kmfh, ERR_get_error());
+	}
 
 	if (keyfile != NULL)
 		(void) BIO_free(keyfile);
