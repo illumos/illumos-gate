@@ -86,7 +86,8 @@
 
 #define	T_LINE "[1;1H[0K"
 
-#define	DEFAULT_PATH	"/dev/rdsk/"
+#define	DEFAULT_PATH			"/dev/rdsk/"
+#define	DEFAULT_MASTER_BOOT_FILE	"/boot/pmbr"
 
 #define	DK_MAX_2TB	UINT32_MAX	/* Max # of sectors in 2TB */
 
@@ -274,7 +275,7 @@ static off_t	io_size = 0;		/* size in sectors (-s size) */
 
 /* Partition table flags */
 static int	v_flag = 0;		/* virtual geometry-HBA flag (-v) */
-static int 	stdo_flag = 0;		/* stdout flag (-W -) */
+static int	stdo_flag = 0;		/* stdout flag (-W -) */
 static int	io_fdisk = 0;		/* do fdisk operation */
 static int	io_ifdisk = 0;		/* interactive partition */
 static int	io_nifdisk = 0;		/* non-interactive partition (-n) */
@@ -1327,9 +1328,9 @@ read_geom(char *sgeom)
 
 	/* Read a line from the file */
 	while (fgets(line, sizeof (line) - 1, fp)) {
-		if (line[0] == '\0' || line[0] == '\n' || line[0] == '*')
+		if (line[0] == '\0' || line[0] == '\n' || line[0] == '*') {
 			continue;
-		else {
+		} else {
 			line[strlen(line)] = '\0';
 			if (sscanf(line, "%hu %hu %hu %hu %hu %hu %d",
 			    &disk_geom.dkg_pcyl,
@@ -1400,7 +1401,7 @@ dev_mboot_read(void)
 static void
 dev_mboot_write(off_t sect, char *buff, int bootsiz)
 {
-	int 	new_pt, old_pt, error;
+	int	new_pt, old_pt, error;
 	int	clr_efi = -1;
 
 	if (io_readonly)
@@ -1540,29 +1541,32 @@ mboot_read(void)
 	int mDev, i;
 	struct ipart *part;
 
-#if defined(i386) || defined(sparc)
 	/*
-	 * If the master boot file hasn't been specified, use the
-	 * implementation architecture name to generate the default one.
+	 * If the master boot file hasn't been specified, try to use our
+	 * default.
 	 */
-	if (io_mboot == (char *)0) {
-		/*
-		 * Bug ID 1249035:
-		 *	The mboot file must be delivered on all platforms
-		 *	and installed in a non-platform-dependent
-		 *	directory; i.e., /usr/lib/fs/ufs.
-		 */
-		io_mboot = "/usr/lib/fs/ufs/mboot";
-	}
+	if (io_mboot == NULL) {
+		io_mboot = DEFAULT_MASTER_BOOT_FILE;
 
-	/* First read in the master boot record */
-
-	/* Open the master boot proto file */
-	if ((mDev = open(io_mboot, O_RDONLY, 0666)) == -1) {
-		(void) fprintf(stderr,
-		    "fdisk: Cannot open master boot file %s.\n",
-		    io_mboot);
-		exit(1);
+		if ((mDev = open(io_mboot, O_RDONLY, 0666)) == -1) {
+			/*
+			 * This is not a fault from fdisk's point of view.
+			 * We do not install bootloader with fdisk,
+			 * so just throw away this error and return.
+			 */
+			return;
+		}
+	} else {
+		if ((mDev = open(io_mboot, O_RDONLY, 0666)) == -1) {
+			/*
+			 * The file name was provided by user, provide
+			 * the feedback.
+			 */
+			(void) fprintf(stderr,
+			    "fdisk: Cannot open master boot file '%s' : %s\n",
+			    io_mboot, strerror(errno));
+			exit(1);
+		}
 	}
 
 	/* Read the master boot program */
@@ -1585,9 +1589,6 @@ mboot_read(void)
 	}
 
 	(void) close(mDev);
-#else
-#error	fdisk needs to be ported to new architecture
-#endif
 
 	/* Zero out the partitions part of this record */
 	part = (struct ipart *)BootCod.parts;
@@ -1764,7 +1765,7 @@ load(int funct, char *file)
 	int	startindex = 0;
 	int	tmpindex = 0;
 #ifdef i386
-	int 	ext_part_present = 0;
+	int	ext_part_present = 0;
 	uint32_t	begsec, endsec, relsect;
 	logical_drive_t *temp;
 	int part_count = 0, ldcnt = 0;
@@ -2280,7 +2281,7 @@ Set_Table_CHS_Values(int ti)
 
 /*
  * insert_tbl
- * 	Insert entry into fdisk table. Check all user-supplied values
+ *	Insert entry into fdisk table. Check all user-supplied values
  *	for the entry, but not the validity relative to other table
  *	entries!
  */
@@ -3616,11 +3617,12 @@ rm_blanks(char *s)
 	register int i, j;
 
 	for (i = 0; i < CBUFLEN; i++) {
-		if ((s[i] == ' ') || (s[i] == '\t'))
+		if ((s[i] == ' ') || (s[i] == '\t')) {
 			continue;
-		else
+		} else {
 			/* Found first non-blank character of the string */
 			break;
+		}
 	}
 	for (j = 0; i < CBUFLEN; j++, i++) {
 		if ((s[j] = s[i]) == '\0') {
@@ -3638,8 +3640,8 @@ rm_blanks(char *s)
 static int
 getcyl(void)
 {
-int slen, i, j;
-unsigned int cyl;
+	int slen, i, j;
+	unsigned int cyl;
 	(void) fgets(s, sizeof (s), stdin);
 	rm_blanks(s);
 	slen = strlen(s);
@@ -3998,7 +4000,7 @@ fill_ipart(char *bootptr, struct ipart *partp)
 
 /*
  * getbyte, getlong
- * 	Get a byte, a short, or a long (SPARC only).
+ *	Get a byte, a short, or a long (SPARC only).
  */
 #ifdef sparc
 uchar_t
@@ -4052,7 +4054,7 @@ copy_Table_to_Bootblk(void)
 
 /*
  * TableChanged
- * 	Check for any changes in the partition table.
+ *	Check for any changes in the partition table.
  */
 static int
 TableChanged(void)
@@ -4072,7 +4074,7 @@ TableChanged(void)
 
 /*
  * ffile_write
- * 	Display contents of partition table to standard output or
+ *	Display contents of partition table to standard output or
  *	another file name without writing it to the disk (-W file).
  */
 static void
@@ -4211,7 +4213,7 @@ ffile_write(char *file)
 
 /*
  * fix_slice
- * 	Read the VTOC table on the Solaris partition and check that no
+ *	Read the VTOC table on the Solaris partition and check that no
  *	slices exist that extend past the end of the Solaris partition.
  *	If no Solaris partition exists, nothing is done.
  */
@@ -4409,7 +4411,7 @@ yesno(void)
 
 /*
  * readvtoc
- * 	Read the VTOC from the Solaris partition of the device.
+ *	Read the VTOC from the Solaris partition of the device.
  */
 static int
 readvtoc(void)
@@ -4436,7 +4438,7 @@ readvtoc(void)
 
 /*
  * writevtoc
- * 	Write the VTOC to the Solaris partition on the device.
+ *	Write the VTOC to the Solaris partition on the device.
  */
 static int
 writevtoc(void)
@@ -4574,7 +4576,7 @@ clear_efi(void)
 
 /*
  * clear_vtoc
- * 	Clear the VTOC from the current or previous Solaris partition on the
+ *	Clear the VTOC from the current or previous Solaris partition on the
  *      device.
  */
 static void
@@ -5223,7 +5225,7 @@ ext_read_valid_partition_start(uint32_t *begsec)
  * 6. If size specifies is zero, flag error
  * 7. Check if the size is less than 1 cylinder
  *	a) If yes, default the size FDISK_MIN_PART_SIZE
- * 	b) If no, Check if the size is within endcyl - begcyl
+ *	b) If no, Check if the size is within endcyl - begcyl
  */
 static void
 ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec)
