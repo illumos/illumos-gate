@@ -25,9 +25,9 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  *
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
-	
+
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
@@ -87,7 +87,7 @@ real_mode_stop_cpu_stage2(void)
 	 *	  prefixes need not be used on instructions EXCEPT in the case
 	 *	  of address prefixes for code for which the reference is not
 	 *	  automatically of the default operand size.
-	 */      
+	 */
 	.code16
 	cli
 	movw		%cs, %ax
@@ -116,7 +116,7 @@ real_mode_stop_cpu_stage2(void)
 
 pestart:
 	/*
- 	 * 16-bit protected mode is now active, so prepare to turn on long
+	 * 16-bit protected mode is now active, so prepare to turn on long
 	 * mode.
 	 *
 	 * Note that we currently assume that if we're attempting to run a
@@ -135,14 +135,14 @@ pestart:
 	cpuid
 	cmpl		$0x80000000, %eax	/* check if > 0x80000000 */
 	jbe		no_long_mode		/* nope, no long mode */
-	movl		$0x80000001, %eax	
+	movl		$0x80000001, %eax
 	cpuid					/* get extended feature flags */
 	btl		$29, %edx		/* check for long mode */
 	jnc		no_long_mode		/* long mode not supported */
 #endif
 
 	/*
- 	 * Add any initial cr4 bits
+	 * Add any initial cr4 bits
 	 */
 	movl		%cr4, %eax
 	addr32 orl	CR4OFF, %eax
@@ -198,13 +198,13 @@ long_mode_active:
 	addr32 lidtl	TEMPIDTOFF	/* load temporary IDT */
 
 	/*
- 	 * Do a far transfer to 64-bit mode.  Set the CS selector to a 64-bit
+	 * Do a far transfer to 64-bit mode.  Set the CS selector to a 64-bit
 	 * long mode selector (CS.L=1) in the temporary 32-bit GDT and jump
 	 * to the real mode platter address of long_mode 64 as until the 64-bit
 	 * CS is in place we don't have access to 64-bit instructions and thus
 	 * can't reference a 64-bit %rip.
 	 */
-	pushl 		$TEMP_CS64_SEL
+	pushl		$TEMP_CS64_SEL
 	addr32 pushl	LM64OFF
 	lretl
 
@@ -313,7 +313,7 @@ kernel_cs_code:
 	movq    %rax, %cr0		/* set machine status word */
 
 	/*
-	 * Before going any further, enable usage of page table NX bit if 
+	 * Before going any further, enable usage of page table NX bit if
 	 * that's how our page tables are set up.
 	 */
 	bt	$X86FSET_NX, x86_featureset(%rip)
@@ -328,7 +328,8 @@ kernel_cs_code:
 	 * Complete the rest of the setup and call mp_startup().
 	 */
 	movq	%gs:CPU_THREAD, %rax	/* get thread ptr */
-	call	*T_PC(%rax)		/* call mp_startup_boot */
+	movq	T_PC(%rax), %rax
+	INDIRECT_CALL_REG(rax)		/* call mp_startup_boot */
 	/* not reached */
 	int	$20			/* whoops, returned somehow! */
 
@@ -352,8 +353,8 @@ kernel_cs_code:
 	 */
 	D16 movl	$0xffc, %esp
 
- 	D16 A16 lgdt	%cs:GDTROFF
- 	D16 A16 lidt	%cs:IDTROFF
+	D16 A16 lgdt	%cs:GDTROFF
+	D16 A16 lidt	%cs:IDTROFF
 	D16 A16 movl	%cs:CR4OFF, %eax	/* set up CR4, if desired */
 	D16 andl	%eax, %eax
 	D16 A16 je	no_cr4
@@ -412,7 +413,7 @@ kernel_cs_code:
 	movl    %edx,%cr0		  /* set machine status word */
 
 	/*
-	 * Before going any further, enable usage of page table NX bit if 
+	 * Before going any further, enable usage of page table NX bit if
 	 * that's how our page tables are set up.
 	 */
 	bt	$X86FSET_NX, x86_featureset
@@ -503,7 +504,7 @@ kernel_cs_code:
 	mov	%edx, %cr0		/* set machine status word */
 
 	/*
-	 * Before going any farther, enable usage of page table NX bit if 
+	 * Before going any farther, enable usage of page table NX bit if
 	 * that's how our page tables are set up.  (PCIDE is enabled later on).
 	 */
 	bt	$X86FSET_NX, x86_featureset
@@ -558,7 +559,7 @@ kernel_cs_code:
 	 *	  prefixes need not be used on instructions EXCEPT in the case
 	 *	  of address prefixes for code for which the reference is not
 	 *	  automatically of the default operand size.
-	 */      
+	 */
 	.code16
 	cli
 	movw		%cs, %ax
@@ -607,6 +608,12 @@ real_mode_stop_cpu_stage1_end:
 	 * Jump to the stage 2 code in the rm_platter_va->rm_cpu_halt_code
 	 */
 	movw		$CPUHALTCODEOFF, %ax
+	/*
+	 * The following indirect call is executed as part of starting up a CPU.
+	 * As such nothing else should be running on it or executing in the
+	 * system such that it is a viable Spectre v2 branch target injection
+	 * location. At least, in theory.
+	 */
 	jmp		*%ax
 
 #endif	/* !__GNUC_AS__ */

@@ -153,7 +153,7 @@
 	/*
 	 * At this point the stack looks like this:
 	 *
-	 * (high address) 	r_ss
+	 * (high address)	r_ss
 	 *			r_rsp
 	 *			r_rfl
 	 *			r_cs
@@ -308,7 +308,7 @@
 	call	av_dispatch_nmivect
 
 	INTR_POP
-	call	*x86_md_clear
+	call	x86_md_clear
 	jmp	tr_iret_auto
 	/*NOTREACHED*/
 	SET_SIZE(nmiint)
@@ -1026,7 +1026,8 @@ check_for_user_address:
 	orl	%eax, %eax	/* (zero extend top 32-bits) */
 	leaq	fasttable(%rip), %r11
 	leaq	(%r11, %rax, CLONGSIZE), %r11
-	jmp	*(%r11)
+	movq	(%r11), %r11
+	INDIRECT_JMP_REG(r11)
 1:
 	/*
 	 * Fast syscall number was illegal.  Make it look
@@ -1086,7 +1087,7 @@ check_for_user_address:
 	ENTRY_NP(fast_null)
 	XPV_TRAP_POP
 	orq	$PS_C, 24(%rsp)	/* set carry bit in user flags */
-	call	*x86_md_clear
+	call	x86_md_clear
 	jmp	tr_iret_auto
 	/*NOTREACHED*/
 	SET_SIZE(fast_null)

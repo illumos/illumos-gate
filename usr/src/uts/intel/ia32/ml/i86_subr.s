@@ -755,7 +755,7 @@ i86_mwait(uint32_t data, uint32_t extensions)
 
 	ENTRY_NP(i86_mwait)
 	pushq	%rbp
-	call	*x86_md_clear
+	call	x86_md_clear
 	movq	%rsp, %rbp
 	movq	%rdi, %rax		/* data */
 	movq	%rsi, %rcx		/* extensions */
@@ -1285,7 +1285,7 @@ efi_reset(void)
 #elif defined(__i386)
 	pop	%ebx
 #endif
-	ret	
+	ret
 	SET_SIZE(wait_500ms)
 
 #define	RESET_METHOD_KBC	1
@@ -1683,16 +1683,16 @@ repinsb(int port, uint8_t *addr, int count)
 #if defined(__amd64)
 
 	ENTRY(repinsb)
-	movl	%edx, %ecx	
+	movl	%edx, %ecx
 	movw	%di, %dx
 	movq	%rsi, %rdi
 	rep
 	  insb
-	ret		
+	ret
 	SET_SIZE(repinsb)
 
 #elif defined(__i386)
-	
+
 	/*
 	 * The arguments and saved registers are on the stack in the
 	 *  following order:
@@ -1737,7 +1737,7 @@ repinsd(int port, uint32_t *addr, int count)
 #else	/* __lint */
 
 #if defined(__amd64)
-	
+
 	ENTRY(repinsd)
 	movl	%edx, %ecx
 	movw	%di, %dx
@@ -1783,7 +1783,7 @@ repoutsb(int port, uint8_t *addr, int count)
 	movw	%di, %dx
 	rep
 	  outsb
-	ret	
+	ret
 	SET_SIZE(repoutsb)
 
 #elif defined(__i386)
@@ -1799,7 +1799,7 @@ repoutsb(int port, uint8_t *addr, int count)
 	ret
 	SET_SIZE(repoutsb)
 
-#endif	/* __i386 */	
+#endif	/* __i386 */
 #endif	/* __lint */
 
 /*
@@ -1822,7 +1822,7 @@ repoutsd(int port, uint32_t *addr, int count)
 	movw	%di, %dx
 	rep
 	  outsl
-	ret	
+	ret
 	SET_SIZE(repoutsd)
 
 #elif defined(__i386)
@@ -2283,7 +2283,7 @@ dtrace_interrupt_disable(void)
 	SET_SIZE(dtrace_interrupt_disable)
 
 #elif defined(__i386)
-		
+
 	ENTRY(dtrace_interrupt_disable)
 	pushfl
 	popl	%eax
@@ -2307,7 +2307,7 @@ dtrace_interrupt_disable(void)
 	ret
 	SET_SIZE(dtrace_interrupt_disable)
 
-#endif	/* __i386 */	
+#endif	/* __i386 */
 #endif	/* __lint */
 
 #if defined(__lint)
@@ -2341,7 +2341,7 @@ dtrace_interrupt_enable(dtrace_icookie_t cookie)
 	SET_SIZE(dtrace_interrupt_enable)
 
 #elif defined(__i386)
-		
+
 	ENTRY(dtrace_interrupt_enable)
 	movl	4(%esp), %eax
 	pushl	%eax
@@ -2362,7 +2362,7 @@ dtrace_interrupt_enable(dtrace_icookie_t cookie)
 	ret
 	SET_SIZE(dtrace_interrupt_enable)
 
-#endif	/* __i386 */	
+#endif	/* __i386 */
 #endif	/* __lint */
 
 
@@ -2399,7 +2399,7 @@ threadp(void)
 #else	/* __lint */
 
 #if defined(__amd64)
-	
+
 	ENTRY(threadp)
 	movq	%gs:CPU_THREAD, %rax
 	ret
@@ -2427,7 +2427,7 @@ ip_ocsum(
 	ushort_t *address,	/* ptr to 1st message buffer */
 	int halfword_count,	/* length of data */
 	unsigned int sum)	/* partial checksum */
-{ 
+{
 	int		i;
 	unsigned int	psum = 0;	/* partial sum */
 
@@ -2560,7 +2560,8 @@ ip_ocsum(
 	leaq	(%rdi, %rcx, 8), %rdi
 	xorl	%ecx, %ecx
 	clc
-	jmp 	*(%rdi)
+	movq	(%rdi), %rdi
+	INDIRECT_JMP_REG(rdi)
 
 	.align	8
 .ip_ocsum_jmptbl:
@@ -2671,7 +2672,7 @@ ip_ocsum(
 	lea	(%edi, %ecx, 4), %edi
 	xorl	%ecx, %ecx
 	clc
-	jmp 	*(%edi)
+	jmp	*(%edi)
 	SET_SIZE(ip_ocsum)
 
 	.data
@@ -2682,8 +2683,8 @@ ip_ocsum(
 	.long	.only24, .only28, .only32, .only36, .only40, .only44
 	.long	.only48, .only52, .only56, .only60
 
-	
-#endif	/* __i386 */		
+
+#endif	/* __i386 */
 #endif	/* __lint */
 
 /*
@@ -2707,7 +2708,7 @@ mul32(uint_t a, uint_t b)
 	xorl	%edx, %edx	/* XX64 joe, paranoia? */
 	movl	%edi, %eax
 	mull	%esi
-	shlq	$32, %rdx	
+	shlq	$32, %rdx
 	orq	%rdx, %rax
 	ret
 	SET_SIZE(mul32)
@@ -2854,7 +2855,7 @@ highbit64(uint64_t i)
 	ret
 0:
 	xorl	%eax, %eax
-	ret    
+	ret
 	SET_SIZE(highbit)
 
 	ENTRY(highbit64)
@@ -2908,7 +2909,7 @@ set_xcr(uint_t r, const uint64_t val)
 #define	XMSR_ACCESS_VAL		$0x9c5a203a
 
 #if defined(__amd64)
-	
+
 	ENTRY(rdmsr)
 	movl	%edi, %ecx
 	rdmsr
@@ -2981,7 +2982,7 @@ set_xcr(uint_t r, const uint64_t val)
 	ENTRY(wrmsr)
 	movl	4(%esp), %ecx
 	movl	8(%esp), %eax
-	movl	12(%esp), %edx 
+	movl	12(%esp), %edx
 	wrmsr
 	ret
 	SET_SIZE(wrmsr)
@@ -3003,7 +3004,7 @@ set_xcr(uint_t r, const uint64_t val)
 	movl	%esp, %ebp
 	movl	8(%esp), %ecx
 	movl	12(%esp), %eax
-	movl	16(%esp), %edx 
+	movl	16(%esp), %edx
 	pushl	%edi
 	movl	XMSR_ACCESS_VAL, %edi	/* this value is needed to access MSR */
 	wrmsr
@@ -3202,13 +3203,13 @@ dtrace_panic_trigger(int *tp)
 	lock
 	  xchgl	%edx, (%rdi)
 	cmpl	$0, %edx
-	je	0f 
+	je	0f
 	movl	$0, %eax
 	ret
 0:	movl	$1, %eax
 	ret
 	SET_SIZE(panic_trigger)
-	
+
 	ENTRY_NP(dtrace_panic_trigger)
 	xorl	%eax, %eax
 	movl	$0xdefacedd, %edx
@@ -3284,8 +3285,8 @@ dtrace_vpanic(const char *format, va_list alist)
 #if defined(__amd64)
 
 	ENTRY_NP(vpanic)			/* Initial stack layout: */
-	
-	pushq	%rbp				/* | %rip | 	0x60	*/
+
+	pushq	%rbp				/* | %rip |	0x60	*/
 	movq	%rsp, %rbp			/* | %rbp |	0x58	*/
 	pushfq					/* | rfl  |	0x50	*/
 	pushq	%r11				/* | %r11 |	0x48	*/
@@ -3385,8 +3386,8 @@ vpanic_common:
 	movq	%rcx, REGOFF_SS(%rsp)
 
 	/*
-	 * panicsys(format, alist, rp, on_panic_stack) 
-	 */	
+	 * panicsys(format, alist, rp, on_panic_stack)
+	 */
 	movq	REGOFF_RDI(%rsp), %rdi		/* format */
 	movq	REGOFF_RSI(%rsp), %rsi		/* alist */
 	movq	%rsp, %rdx			/* struct regs */
@@ -3410,7 +3411,7 @@ vpanic_common:
 
 	ENTRY_NP(dtrace_vpanic)			/* Initial stack layout: */
 
-	pushq	%rbp				/* | %rip | 	0x60	*/
+	pushq	%rbp				/* | %rip |	0x60	*/
 	movq	%rsp, %rbp			/* | %rbp |	0x58	*/
 	pushfq					/* | rfl  |	0x50	*/
 	pushq	%r11				/* | %r11 |	0x48	*/
@@ -3466,7 +3467,7 @@ vpanic_common:
 	/*
 	 * Now that we've got everything set up, store the register values as
 	 * they were when we entered vpanic() to the designated location in
-	 * the regs structure we allocated on the stack. 
+	 * the regs structure we allocated on the stack.
 	 */
 #if !defined(__GNUC_AS__)
 	movw	%gs, %edx
@@ -3610,7 +3611,8 @@ hrtime_t hrtime_base;
 	 * At worst, performing this now instead of under CLOCK_LOCK may
 	 * introduce some jitter in pc_gethrestime().
 	 */
-	call	*gethrtimef(%rip)
+	movq	gethrtimef(%rip), %rsi
+	INDIRECT_CALL_REG(rsi)
 	movq	%rax, %r8
 
 	leaq	hres_lock(%rip), %rax
@@ -3638,8 +3640,8 @@ hrtime_t hrtime_base;
 	addq	%r8, hrestime+8(%rip)	/* add interval to hrestime.tv_nsec */
 	/*
 	 * Now that we have CLOCK_LOCK, we can update hres_last_tick
-	 */ 	
-	movq	%r11, (%rax)	
+	 */
+	movq	%r11, (%rax)
 
 	call	__adj_hrestime
 
@@ -3650,7 +3652,7 @@ hrtime_t hrtime_base;
 	leave
 	ret
 	SET_SIZE(hres_tick)
-	
+
 #elif defined(__i386)
 
 	ENTRY_NP(hres_tick)
@@ -3693,13 +3695,13 @@ hrtime_t hrtime_base;
 	movl	%ebx, %edx
 	movl	%esi, %ecx
 
-	subl 	(%eax), %edx
-	sbbl 	4(%eax), %ecx
+	subl	(%eax), %edx
+	sbbl	4(%eax), %ecx
 
 	addl	%edx, hrtime_base	/ add interval to hrtime_base
 	adcl	%ecx, hrtime_base+4
 
-	addl 	%edx, hrestime+4	/ add interval to hrestime.tv_nsec
+	addl	%edx, hrestime+4	/ add interval to hrestime.tv_nsec
 
 	/
 	/ Now that we have CLOCK_LOCK, we can update hres_last_tick.
@@ -3933,9 +3935,9 @@ bcmp(const void *s1, const void *s2, size_t count)
 	movzbl	%dl, %eax
 	ret
 	SET_SIZE(bcmp)
-	
+
 #elif defined(__i386)
-	
+
 #define	ARG_S1		8
 #define	ARG_S2		12
 #define	ARG_LENGTH	16
@@ -4090,7 +4092,7 @@ switch_sp_and_call(void *newsp, void (*func)(uint_t, uint_t), uint_t arg1,
 	movq	%rdx, %rdi		/* pass func arg 1 */
 	movq	%rsi, %r11		/* save function to call */
 	movq	%rcx, %rsi		/* pass func arg 2 */
-	call	*%r11			/* call function */
+	INDIRECT_CALL_REG(r11)		/* call function */
 	leave				/* restore stack */
 	ret
 	SET_SIZE(switch_sp_and_call)
@@ -4140,7 +4142,7 @@ kmdb_enter(void)
 	call	intr_restore
 
 	leave
-	ret	
+	ret
 	SET_SIZE(kmdb_enter)
 
 #elif defined(__i386)
@@ -4164,7 +4166,7 @@ kmdb_enter(void)
 	addl	$4, %esp
 
 	leave
-	ret	
+	ret
 	SET_SIZE(kmdb_enter)
 
 #endif	/* __i386 */
@@ -4261,7 +4263,7 @@ ftrace_interrupt_disable(void)
 	SET_SIZE(ftrace_interrupt_disable)
 
 #elif defined(__i386)
-		
+
 	ENTRY(ftrace_interrupt_disable)
 	pushfl
 	popl	%eax
@@ -4269,7 +4271,7 @@ ftrace_interrupt_disable(void)
 	ret
 	SET_SIZE(ftrace_interrupt_disable)
 
-#endif	/* __i386 */	
+#endif	/* __i386 */
 #endif	/* __lint */
 
 #if defined(__lint)
@@ -4290,7 +4292,7 @@ ftrace_interrupt_enable(ftrace_icookie_t cookie)
 	SET_SIZE(ftrace_interrupt_enable)
 
 #elif defined(__i386)
-		
+
 	ENTRY(ftrace_interrupt_enable)
 	movl	4(%esp), %eax
 	pushl	%eax
@@ -4353,7 +4355,7 @@ mfence_insn(void)
  * depending on magic values in certain registers and modifies some registers
  * as a side effect.
  *
- * References: http://kb.vmware.com/kb/1009458 
+ * References: http://kb.vmware.com/kb/1009458
  */
 
 #if defined(__lint)

@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #ifndef _IA32_SYS_ASM_LINKAGE_H
 #define	_IA32_SYS_ASM_LINKAGE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stack.h>
 #include <sys/trap.h>
@@ -299,6 +301,46 @@ name:
 #define	NWORD	long
 
 #endif  /* __i386 */
+
+/*
+ * These macros should be used when making indirect calls in the kernel. They
+ * will perform a jump or call to the corresponding register in a way that knows
+ * about retpolines and handles whether such mitigations are enabled or not.
+ *
+ * INDIRECT_JMP_REG will jump to named register. INDIRECT_CALL_REG will instead
+ * do a call. These macros cannot be used to dereference a register. For
+ * example, if you need to do something that looks like the following:
+ *
+ *	call	*24(%rdi)
+ *	jmp	*(%r15)
+ *
+ * You must instead first do a movq into the corresponding location. You need to
+ * be careful to make sure that the register that its loaded into is safe to
+ * use. Often that register may be saved or used elsewhere so it may not be safe
+ * to clobber the value. Usually, loading into %rax would be safe. These would
+ * turn into something like:
+ *
+ *	movq 24(%rdi), %rdi; INDIRECT_CALL_REG(rdi)
+ *	movq (%r15), %r15; INDIRECT_JMP_REG(r15)
+ *
+ * If you are trying to call a global function, then use the following pattern
+ * (substituting the register in question):
+ *
+ *	leaq	my_favorite_function(%rip), %rax
+ *	INDIRECT_CALL_REG(rax)
+ *
+ * If you instead have a function pointer (say gethrtimef for example), then you
+ * need to do:
+ *
+ *	movq	my_favorite_function_pointer(%rip), %rax
+ *	INDIRECT_CALL_REG(rax)
+ */
+
+/* CSTYLED */
+#define	INDIRECT_JMP_REG(reg)	jmp	__x86_indirect_thunk_/**/reg;
+
+/* CSTYLED */
+#define	INDIRECT_CALL_REG(reg)	call	__x86_indirect_thunk_/**/reg;
 
 #endif /* _ASM */
 

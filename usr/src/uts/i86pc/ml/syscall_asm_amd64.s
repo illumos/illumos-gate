@@ -199,7 +199,8 @@
 	je	1f							   ;\
 	movq	%r15, 16(%rsp)		/* save the callback pointer	*/ ;\
 	push_userland_ret		/* push the return address	*/ ;\
-	call	*24(%rsp)		/* call callback		*/ ;\
+	movq	24(%rsp), %r15		/* load callback pointer	*/ ;\
+	INDIRECT_CALL_REG(r15)		/* call callback		*/ ;\
 1:	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
 	movq	%gs:CPU_RTMP_RSP, %rsp	/* restore the stack pointer	*/
 
@@ -575,7 +576,8 @@ _syscall_invoke:
 	shll	$SYSENT_SIZE_SHIFT, %eax
 	leaq	sysent(%rax), %rbx
 
-	call	*SY_CALLC(%rbx)
+	movq	SY_CALLC(%rbx), %rax
+	INDIRECT_CALL_REG(rax)
 
 	movq	%rax, %r12
 	movq	%rdx, %r13
@@ -651,7 +653,7 @@ _syscall_invoke:
 	 * potentially the addresses where we stored them. Given the constraints
 	 * of sysret, that's how it has to be.
 	 */
-	call	*x86_md_clear
+	call	x86_md_clear
 
 	/*
 	 * To get back to userland, we need the return %rip in %rcx and
@@ -902,7 +904,8 @@ _syscall32_save:
 	movl	0x20(%rsp), %r8d
 	movl	0x28(%rsp), %r9d
 
-	call	*SY_CALLC(%rbx)
+	movq	SY_CALLC(%rbx), %rax
+	INDIRECT_CALL_REG(rax)
 
 	movq	%rbp, %rsp	/* pop the args */
 
@@ -949,7 +952,7 @@ _syscall32_save:
 	 * potentially the addresses where we stored them. Given the constraints
 	 * of sysret, that's how it has to be.
 	 */
-	call	*x86_md_clear
+	call	x86_md_clear
 
 	/*
 	 * To get back to userland, we need to put the return %rip in %rcx and
@@ -1189,7 +1192,8 @@ sys_sysenter()
 	movl	0x20(%rsp), %r8d
 	movl	0x28(%rsp), %r9d
 
-	call	*SY_CALLC(%rbx)
+	movq	SY_CALLC(%rbx), %rax
+	INDIRECT_CALL_REG(rax)
 
 	movq	%rbp, %rsp	/* pop the args */
 
@@ -1257,7 +1261,7 @@ sys_sysenter()
 	popfq
 	movl	REGOFF_RSP(%rsp), %ecx	/* sysexit: %ecx -> %esp */
         ALTENTRY(sys_sysenter_swapgs_sysexit)
-	call	*x86_md_clear
+	call	x86_md_clear
 	jmp	tr_sysexit
 	SET_SIZE(sys_sysenter_swapgs_sysexit)
 	SET_SIZE(sys_sysenter)
@@ -1314,7 +1318,7 @@ nopop_syscall_int:
 	 * tr_iret_user are done on the user gsbase.
 	 */
 	ALTENTRY(sys_sysint_swapgs_iret)
-	call	*x86_md_clear
+	call	x86_md_clear
 	SWAPGS
 	jmp	tr_iret_user
 	/*NOTREACHED*/

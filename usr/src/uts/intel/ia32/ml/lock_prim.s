@@ -588,7 +588,8 @@ mutex_exit(kmutex_t *lp)
 	pushq	%rbp				/* align stack properly */
 	movq	%rsp, %rbp
 	movl	%eax, %edi
-	call	*lockstat_probe
+	movq	lockstat_probe, %rax
+	INDIRECT_CALL_REG(rax)
 	leave					/* unwind stack */
 1:
 	movq	%gs:CPU_THREAD, %rdx		/* reload thread ptr */
@@ -610,7 +611,8 @@ mutex_exit(kmutex_t *lp)
 	pushq	%rbp				/* align stack properly */
 	movq	%rsp, %rbp
 	movl	%eax, %edi
-	call	*lockstat_probe
+	movq	lockstat_probe, %rax
+	INDIRECT_CALL_REG(rax)
 	leave					/* unwind stack */
 1:
 	movq	%gs:CPU_THREAD, %rdx		/* reload thread ptr */

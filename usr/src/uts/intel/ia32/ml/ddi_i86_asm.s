@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #if defined(lint) || defined(__lint)
 #include <sys/types.h>
@@ -267,7 +269,7 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #else	/* lint */
 
-	
+
 #if defined(__amd64)
 
 	ENTRY(ddi_get8)
@@ -289,7 +291,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	movzbq	(%rsi), %rax
 	ret
 2:
-	jmp	*ACC_GETB(%rdi)
+	movq	ACC_GETB(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_get8)
 	SET_SIZE(ddi_getb)
 	SET_SIZE(ddi_mem_getb)
@@ -351,7 +354,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	movzwq	(%rsi), %rax
 	ret
 4:
-	jmp	*ACC_GETW(%rdi)
+	movq	ACC_GETW(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_get16)
 	SET_SIZE(ddi_getw)
 	SET_SIZE(ddi_mem_getw)
@@ -412,7 +416,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	movl	(%rsi), %eax
 	ret
 6:
-	jmp	*ACC_GETL(%rdi)
+	movq	ACC_GETL(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_get32)
 	SET_SIZE(ddi_getl)
 	SET_SIZE(ddi_mem_getl)
@@ -458,7 +463,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_getll)
 	ALTENTRY(ddi_mem_getll)
 	ALTENTRY(ddi_mem_get64)
-	jmp	*ACC_GETLL(%rdi)
+	movq	ACC_GETLL(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_get64)
 	SET_SIZE(ddi_getll)
 	SET_SIZE(ddi_mem_getll)
@@ -500,7 +506,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	movb	%dl, (%rsi)
 	ret
 8:
-	jmp	*ACC_PUTB(%rdi)
+	movq	ACC_PUTB(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_put8)
 	SET_SIZE(ddi_putb)
 	SET_SIZE(ddi_mem_putb)
@@ -563,7 +570,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	movw	%dx, (%rsi)
 	ret
 9:
-	jmp	*ACC_PUTW(%rdi)
+	movq	ACC_PUTW(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_put16)
 	SET_SIZE(ddi_putw)
 	SET_SIZE(ddi_mem_putw)
@@ -626,7 +634,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	movl	%edx, (%rsi)
 	ret
 9:
-	jmp	*ACC_PUTL(%rdi)
+	movq	ACC_PUTL(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_put32)
 	SET_SIZE(ddi_putl)
 	SET_SIZE(ddi_mem_putl)
@@ -674,7 +683,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_putll)
 	ALTENTRY(ddi_mem_putll)
 	ALTENTRY(ddi_mem_put64)
-	jmp	*ACC_PUTLL(%rdi)
+	movq	ACC_PUTLL(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_put64)
 	SET_SIZE(ddi_putll)
 	SET_SIZE(ddi_mem_putll)
@@ -701,7 +711,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_rep_getb)
 	ALTENTRY(ddi_mem_rep_getb)
 	ALTENTRY(ddi_mem_rep_get8)
-	jmp	*ACC_REP_GETB(%rdi)
+	movq	ACC_REP_GETB(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_get8)
 	SET_SIZE(ddi_rep_getb)
 	SET_SIZE(ddi_mem_rep_getb)
@@ -728,7 +739,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_rep_getw)
 	ALTENTRY(ddi_mem_rep_getw)
 	ALTENTRY(ddi_mem_rep_get16)
-	jmp	*ACC_REP_GETW(%rdi)
+	movq	ACC_REP_GETW(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_get16)
 	SET_SIZE(ddi_rep_getw)
 	SET_SIZE(ddi_mem_rep_getw)
@@ -755,7 +767,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_rep_getl)
 	ALTENTRY(ddi_mem_rep_getl)
 	ALTENTRY(ddi_mem_rep_get32)
-	jmp	*ACC_REP_GETL(%rdi)
+	movq	ACC_REP_GETL(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_get32)
 	SET_SIZE(ddi_rep_getl)
 	SET_SIZE(ddi_mem_rep_getl)
@@ -782,7 +795,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_rep_getll)
 	ALTENTRY(ddi_mem_rep_getll)
 	ALTENTRY(ddi_mem_rep_get64)
-	jmp	*ACC_REP_GETLL(%rdi)
+	movq	ACC_REP_GETLL(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_get64)
 	SET_SIZE(ddi_rep_getll)
 	SET_SIZE(ddi_mem_rep_getll)
@@ -809,7 +823,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_rep_putb)
 	ALTENTRY(ddi_mem_rep_putb)
 	ALTENTRY(ddi_mem_rep_put8)
-	jmp	*ACC_REP_PUTB(%rdi)
+	movq	ACC_REP_PUTB(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_put8)
 	SET_SIZE(ddi_rep_putb)
 	SET_SIZE(ddi_mem_rep_putb)
@@ -836,7 +851,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_rep_putw)
 	ALTENTRY(ddi_mem_rep_putw)
 	ALTENTRY(ddi_mem_rep_put16)
-	jmp	*ACC_REP_PUTW(%rdi)
+	movq	ACC_REP_PUTW(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_put16)
 	SET_SIZE(ddi_rep_putw)
 	SET_SIZE(ddi_mem_rep_putw)
@@ -863,7 +879,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_rep_putl)
 	ALTENTRY(ddi_mem_rep_putl)
 	ALTENTRY(ddi_mem_rep_put32)
-	jmp	*ACC_REP_PUTL(%rdi)
+	movq	ACC_REP_PUTL(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_put32)
 	SET_SIZE(ddi_rep_putl)
 	SET_SIZE(ddi_mem_rep_putl)
@@ -890,7 +907,8 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ALTENTRY(ddi_rep_putll)
 	ALTENTRY(ddi_mem_rep_putll)
 	ALTENTRY(ddi_mem_rep_put64)
-	jmp	*ACC_REP_PUTLL(%rdi)
+	movq	ACC_REP_PUTLL(%rdi), %rax
+	INDIRECT_JMP_REG(rax)
 	SET_SIZE(ddi_rep_put64)
 	SET_SIZE(ddi_rep_putll)
 	SET_SIZE(ddi_mem_rep_putll)
@@ -1336,7 +1354,7 @@ i_ddi_io_rep_get32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 	ret
 
 gb_ioadv:
-	andq	%rcx, %rcx		
+	andq	%rcx, %rcx
 	jz	gb_ioadv_done
 gb_ioadv2:
 	inb	(%dx)
@@ -1363,7 +1381,7 @@ gb_ioadv_done:
 	cmpl	$DDI_DEV_AUTOINCR, 24(%esp)
 	je	gb_ioadv
 
-	rep	
+	rep
 	insb
 	popl	%edi
 	ret
@@ -1395,7 +1413,7 @@ gb_ioadv_done:
 	je	gw_ioadv
 
 	movq	%rsi, %rdi
-	rep	
+	rep
 	insw
 	ret
 
@@ -1426,7 +1444,7 @@ gw_ioadv_done:
 	cmpl	$DDI_DEV_AUTOINCR, 24(%esp)
 	je	gw_ioadv
 
-	rep	
+	rep
 	insw
 	popl	%edi
 	ret
@@ -1457,7 +1475,7 @@ gw_ioadv_done:
 	je	gl_ioadv
 
 	movq	%rsi, %rdi
-	rep	
+	rep
 	insl
 	ret
 
@@ -1490,7 +1508,7 @@ gl_ioadv_done:
 	cmpl	$DDI_DEV_AUTOINCR, 24(%esp)
 	je	gl_ioadv
 
-	rep	
+	rep
 	insl
 	popl	%edi
 	ret
@@ -1557,7 +1575,7 @@ i_ddi_io_rep_put32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
 	je	pb_ioadv
 
 	movq	%rsi, %rdi
-	rep	
+	rep
 	outsb
 	ret
 
@@ -1588,7 +1606,7 @@ pb_ioadv_done:
 	cmpl	$DDI_DEV_AUTOINCR, 24(%esp)
 	je	pb_ioadv
 
-	rep	
+	rep
 	outsb
 	popl	%esi
 	ret
@@ -1619,7 +1637,7 @@ pb_ioadv_done:
 	je	pw_ioadv
 
 	movq	%rsi, %rdi
-	rep	
+	rep
 	outsw
 	ret
 
@@ -1650,7 +1668,7 @@ pw_ioadv_done:
 	cmpl	$DDI_DEV_AUTOINCR, 24(%esp)
 	je	pw_ioadv
 
-	rep	
+	rep
 	outsw
 	popl	%esi
 	ret
@@ -1681,7 +1699,7 @@ pw_ioadv_done:
 	je	pl_ioadv
 
 	movq	%rsi, %rdi
-	rep	
+	rep
 	outsl
 	ret
 
@@ -1712,7 +1730,7 @@ pl_ioadv_done:
 	cmpl	$DDI_DEV_AUTOINCR, 24(%esp)
 	je	pl_ioadv
 
-	rep	
+	rep
 	outsl
 	popl	%esi
 	ret

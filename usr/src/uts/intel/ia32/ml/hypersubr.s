@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/asm_linkage.h>
 #ifndef __xpv
 #include <sys/xpv_support.h>
@@ -34,12 +38,12 @@
  * Hypervisor "system calls"
  *
  * i386
- * 	%eax == call number
- * 	args in registers (%ebx, %ecx, %edx, %esi, %edi)
+ *	%eax == call number
+ *	args in registers (%ebx, %ecx, %edx, %esi, %edi)
  *
  * amd64
- * 	%rax == call number
- * 	args in registers (%rdi, %rsi, %rdx, %r10, %r8, %r9)
+ *	%rax == call number
+ *	args in registers (%rdi, %rsi, %rdx, %r10, %r8, %r9)
  *
  * Note that for amd64 we use %r10 instead of %rcx for passing 4th argument
  * as in C calling convention since the "syscall" instruction clobbers %rcx.
@@ -164,7 +168,7 @@ hypercall_page:
 #define	TRAP_INSTR			\
 	shll	$5, %eax;		\
 	addq	$hypercall_page, %rax;	\
-	jmp	*%rax
+	INDIRECT_JMP_REG(rax);
 #else
 #define	TRAP_INSTR			\
 	shll	$5, %eax;		\
@@ -182,7 +186,7 @@ hypercall_page:
 #endif /* !__xpv */
 
 
-#if defined(__amd64) 
+#if defined(__amd64)
 
 	ENTRY_NP(__hypercall0)
 	ALTENTRY(__hypercall0_int)

@@ -20,8 +20,9 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
-	
+
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
 #include <sys/regset.h>
@@ -339,7 +340,7 @@ pestart:
 #endif
 
 	/*
- 	 * Add any initial cr4 bits
+	 * Add any initial cr4 bits
 	 */
 	movl		%cr4, %eax
 	A16 D16 orl	CR4OFF, %eax
@@ -434,7 +435,7 @@ long_mode_active:
 
 
 	/*
- 	 * Do a far transfer to 64-bit mode.  Set the CS selector to a 64-bit
+	 * Do a far transfer to 64-bit mode.  Set the CS selector to a 64-bit
 	 * long mode selector (CS.L=1) in the temporary 32-bit GDT and jump
 	 * to the real mode platter address of wc_long_mode_64 as until the
 	 * 64-bit CS is in place we don't have access to 64-bit instructions
@@ -453,7 +454,7 @@ long_mode_active:
 	outb    (%dx)
 #endif
 
-	D16 	pushl 	$TEMP_CS64_SEL
+	D16	pushl	$TEMP_CS64_SEL
 	A16 D16 pushl	LM64OFF
 
 	D16 lret
@@ -476,7 +477,7 @@ kbdinit:
  */
 cominit:
 	/ init COM1 & COM2
-	
+
 #if     DEBUG
 /*
  * on debug kernels we need to initialize COM1 & COM2 here, so that
@@ -678,7 +679,7 @@ kernel_wc_code:
 	addq	WC_GDT+2(%rbx), %rax
 	andl	$0xfffffdff, 4(%rax)
 	movq	4(%rax), %rcx
-	ltr	WC_TR(%rbx)		
+	ltr	WC_TR(%rbx)
 
 #if     LED
 	movw        $WC_LED, %dx
@@ -701,7 +702,7 @@ kernel_wc_code:
 	movl    WC_FSBASE(%rbx), %eax
 	movl    WC_FSBASE+4(%rbx), %edx
 	wrmsr
-	
+
 	movq    WC_GS(%rbx), %rcx	/ restore gs register
 	movw    %cx, %gs
 
@@ -760,10 +761,12 @@ kernel_wc_code:
 	 */
 	cmpq	$0, ap_mlsetup
 	je	3f
-	call	*ap_mlsetup
+	leaq	ap_mlsetup, %rax
+	INDIRECT_CALL_REG(rax)
 3:
 
-	call    *cpr_start_cpu_func
+	leaq	cpr_start_cpu_func, %rax
+	INDIRECT_CALL_REG(rax)
 
 / restore %rbx to the value it ahd before we called the functions above
 	movq    rm_platter_va, %rbx
@@ -1058,7 +1061,7 @@ kernel_wc_code:
 	/ At this point we are with kernel's cs and proper eip.
 	/ We will be executing not from the copy in real mode platter,
 	/ but from the original code where boot loaded us.
-	/ By this time GDT and IDT are loaded as is cr0, cr3 and cr4. 
+	/ By this time GDT and IDT are loaded as is cr0, cr3 and cr4.
 	/ %ebx is wc_cpu
 	/ %dx is our ds
 
@@ -1106,7 +1109,7 @@ kernel_wc_code:
 
 	/*
 	 * set the stack pointer to point into the identity mapped page
-	 * temporarily, so we can make function calls 
+	 * temporarily, so we can make function calls
 	 */
 	.globl  rm_platter_va
 	movl    rm_platter_va, %eax
@@ -1142,7 +1145,7 @@ kernel_wc_code:
 	call	*ap_mlsetup
 3:
 
-	call    *cpr_start_cpu_func
+	call	*cpr_start_cpu_func
 
 	pushl	WC_EFLAGS(%ebx)		/ restore flags
 	popfl
