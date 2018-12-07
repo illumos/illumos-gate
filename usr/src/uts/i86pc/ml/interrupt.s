@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -99,7 +100,8 @@ _interrupt(void)
 #endif
 
 	movq	%rsp, %rdi		/* pass struct regs pointer */
-	call	*do_interrupt_common
+	movq	do_interrupt_common, %rax
+	INDIRECT_CALL_REG(rax)
 
 	jmp	_sys_rtt_ints_disabled
 	/*NOTREACHED*/

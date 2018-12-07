@@ -199,7 +199,8 @@
 	je	1f							   ;\
 	movq	%r15, 16(%rsp)		/* save the callback pointer	*/ ;\
 	push_userland_ret		/* push the return address	*/ ;\
-	call	*24(%rsp)		/* call callback		*/ ;\
+	movq	24(%rsp), %r15		/* load callback pointer	*/ ;\
+	INDIRECT_CALL_REG(r15)		/* call callback		*/ ;\
 1:	movq	%gs:CPU_RTMP_R15, %r15	/* restore %r15			*/ ;\
 	movq	%gs:CPU_RTMP_RSP, %rsp	/* restore the stack pointer	*/
 
@@ -567,7 +568,7 @@ noprod_sys_syscall:
 
 	pushq	%rax
 	subq	$8, %rsp	/* align stack for call to C */
-	call	*%rdi
+	INDIRECT_CALL_REG(rdi)
 	addq	$8, %rsp
 
 	/*
@@ -607,7 +608,8 @@ _syscall_invoke:
 	shll	$SYSENT_SIZE_SHIFT, %eax
 	leaq	sysent(%rax), %rbx
 
-	call	*SY_CALLC(%rbx)
+	movq	SY_CALLC(%rbx), %rax
+	INDIRECT_CALL_REG(rax)
 
 	movq	%rax, %r12
 	movq	%rdx, %r13
@@ -685,7 +687,7 @@ _syscall_after_brand:
 	 * potentially the addresses where we stored them. Given the constraints
 	 * of sysret, that's how it has to be.
 	 */
-	call	*x86_md_clear
+	call	x86_md_clear
 
 	/*
 	 * To get back to userland, we need the return %rip in %rcx and
@@ -905,7 +907,7 @@ _syscall32_save:
 	jz	_syscall32_no_brand
 
 	movb	$LWP_SYS, LWP_STATE(%r14)
-	call	*%rax
+	INDIRECT_CALL_REG(rax)
 
 	/*
 	 * If the alternate handler returns non-zero, the normal system call
@@ -975,7 +977,8 @@ _syscall32_no_brand:
 	movl	0x30(%rsp), %r9d	/* arg5 */
 	pushq	%rax			/* arg6 saved to stack */
 
-	call	*SY_CALLC(%rbx)
+	movq	SY_CALLC(%rbx), %rax
+	INDIRECT_CALL_REG(rax)
 
 	movq	%rbp, %rsp	/* pop the args */
 
@@ -1024,7 +1027,7 @@ _syscall32_after_brand:
 	 * potentially the addresses where we stored them. Given the constraints
 	 * of sysret, that's how it has to be.
 	 */
-	call	*x86_md_clear
+	call	x86_md_clear
 
 	/*
 	 * To get back to userland, we need to put the return %rip in %rcx and
@@ -1269,7 +1272,8 @@ sys_sysenter()
 	movl	0x30(%rsp), %r9d	/* arg5 */
 	pushq	%rax			/* arg6 saved to stack */
 
-	call	*SY_CALLC(%rbx)
+	movq	SY_CALLC(%rbx), %rax
+	INDIRECT_CALL_REG(rax)
 
 	movq	%rbp, %rsp	/* pop the args */
 
@@ -1337,7 +1341,7 @@ sys_sysenter()
 	popfq
 	movl	REGOFF_RSP(%rsp), %ecx	/* sysexit: %ecx -> %esp */
         ALTENTRY(sys_sysenter_swapgs_sysexit)
-	call	*x86_md_clear
+	call	x86_md_clear
 	jmp	tr_sysexit
 	SET_SIZE(sys_sysenter_swapgs_sysexit)
 	SET_SIZE(sys_sysenter)
@@ -1462,7 +1466,7 @@ nopop_syscall_int:
 	 * tr_iret_user are done on the user gsbase.
 	 */
 	ALTENTRY(sys_sysint_swapgs_iret)
-	call	*x86_md_clear
+	call	x86_md_clear
 	SWAPGS
 	jmp	tr_iret_user
 	/*NOTREACHED*/

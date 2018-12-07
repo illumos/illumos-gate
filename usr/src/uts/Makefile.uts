@@ -26,7 +26,7 @@
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright 2018 Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -242,6 +242,15 @@ include $(SRC)/Makefile.smatch
 #
 SMOFF += sizeof
 
+#
+# Add specific compiler options that are required based on the
+# architecture in question.
+#
+CFLAGS_uts_i386 += -_gcc7=-mindirect-branch=thunk-extern
+CFLAGS_uts_i386 += -_gcc7=-mindirect-branch-register
+CFLAGS_uts_i386 += -_gcc8=-mindirect-branch=thunk-extern
+CFLAGS_uts_i386 += -_gcc8=-mindirect-branch-register
+
 CSTD = $(CSTD_GNU99)
 
 CFLAGS_uts		=
@@ -258,6 +267,7 @@ CFLAGS_uts		+= $(CGLOBALSTATIC)
 CFLAGS_uts		+= $(EXTRA_CFLAGS)
 CFLAGS_uts		+= $(CSOURCEDEBUGFLAGS)
 CFLAGS_uts		+= $(CUSERFLAGS)
+CFLAGS_uts		+= $(CFLAGS_uts_$(MACH))
 
 #
 #	Declare that $(OBJECTS) and $(LINTS) can be compiled in parallel.

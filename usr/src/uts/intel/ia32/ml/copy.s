@@ -36,7 +36,7 @@
 /*         All Rights Reserved						*/
 
 /*
- * Copyright (c) 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -128,7 +128,7 @@
  * bcopy/kcopy/bzero/kzero operate on small buffers. For best performance for
  * these small sizes unrolled code is used. For medium sizes loops writing
  * 64-bytes per loop are used. Transition points were determined experimentally.
- */ 
+ */
 #define BZERO_USE_REP	(1024)
 #define BCOPY_DFLT_REP	(128)
 #define	BCOPY_NHM_REP	(768)
@@ -179,7 +179,7 @@ kcopy(const void *from, void *to, size_t count)
 	pushq	%rbp
 	movq	%rsp, %rbp
 #ifdef DEBUG
-	cmpq	postbootkernelbase(%rip), %rdi 		/* %rdi = from */
+	cmpq	postbootkernelbase(%rip), %rdi		/* %rdi = from */
 	jb	0f
 	cmpq	postbootkernelbase(%rip), %rsi		/* %rsi = to */
 	jnb	1f
@@ -231,7 +231,7 @@ _kcopy_copyerr:
 1:	popl	%ebp
 #endif
 	lea	_kcopy_copyerr, %eax	/* lofault value */
-	movl	%gs:CPU_THREAD, %edx	
+	movl	%gs:CPU_THREAD, %edx
 
 do_copy_fault:
 	pushl	%ebp
@@ -310,7 +310,7 @@ kcopy_nta(const void *from, void *to, size_t count, int copy_cached)
 	pushq	%rbp
 	movq	%rsp, %rbp
 #ifdef DEBUG
-	cmpq	postbootkernelbase(%rip), %rdi 		/* %rdi = from */
+	cmpq	postbootkernelbase(%rip), %rdi		/* %rdi = from */
 	jb	0f
 	cmpq	postbootkernelbase(%rip), %rsi		/* %rsi = to */
 	jnb	1f
@@ -406,7 +406,7 @@ _kcopy_nta_copyerr:
 	pushl	%esi
 	pushl	%edi
 
-	movl	%gs:CPU_THREAD, %edx	
+	movl	%gs:CPU_THREAD, %edx
 	movl	T_LOFAULT(%edx), %edi
 	pushl	%edi			/* save the current lofault */
 	movl	%eax, T_LOFAULT(%edx)	/* new lofault */
@@ -455,7 +455,7 @@ bcopy(const void *from, void *to, size_t count)
 	jz	1f
 	cmpq	postbootkernelbase(%rip), %rdi		/* %rdi = from */
 	jb	0f
-	cmpq	postbootkernelbase(%rip), %rsi		/* %rsi = to */		
+	cmpq	postbootkernelbase(%rip), %rsi		/* %rsi = to */
 	jnb	1f
 0:	leaq	.bcopy_panic_msg(%rip), %rdi
 	jmp	call_panic		/* setup stack and call panic */
@@ -482,7 +482,7 @@ do_copy:
 	addq	%rdx, %rsi
 	movslq	(%r10,%rdx,4), %rcx
 	leaq	(%rcx,%r10,1), %r10
-	jmpq	*%r10
+	INDIRECT_JMP_REG(r10)
 
 	.p2align 4
 L(fwdPxQx):
@@ -493,7 +493,7 @@ L(fwdPxQx):
 	.int       L(P4Q0)-L(fwdPxQx)
 	.int       L(P5Q0)-L(fwdPxQx)
 	.int       L(P6Q0)-L(fwdPxQx)
-	.int       L(P7Q0)-L(fwdPxQx) 
+	.int       L(P7Q0)-L(fwdPxQx)
 
 	.int       L(P0Q1)-L(fwdPxQx)	/* 8 */
 	.int       L(P1Q1)-L(fwdPxQx)
@@ -502,7 +502,7 @@ L(fwdPxQx):
 	.int       L(P4Q1)-L(fwdPxQx)
 	.int       L(P5Q1)-L(fwdPxQx)
 	.int       L(P6Q1)-L(fwdPxQx)
-	.int       L(P7Q1)-L(fwdPxQx) 
+	.int       L(P7Q1)-L(fwdPxQx)
 
 	.int       L(P0Q2)-L(fwdPxQx)	/* 16 */
 	.int       L(P1Q2)-L(fwdPxQx)
@@ -511,7 +511,7 @@ L(fwdPxQx):
 	.int       L(P4Q2)-L(fwdPxQx)
 	.int       L(P5Q2)-L(fwdPxQx)
 	.int       L(P6Q2)-L(fwdPxQx)
-	.int       L(P7Q2)-L(fwdPxQx) 
+	.int       L(P7Q2)-L(fwdPxQx)
 
 	.int       L(P0Q3)-L(fwdPxQx)	/* 24 */
 	.int       L(P1Q3)-L(fwdPxQx)
@@ -520,7 +520,7 @@ L(fwdPxQx):
 	.int       L(P4Q3)-L(fwdPxQx)
 	.int       L(P5Q3)-L(fwdPxQx)
 	.int       L(P6Q3)-L(fwdPxQx)
-	.int       L(P7Q3)-L(fwdPxQx) 
+	.int       L(P7Q3)-L(fwdPxQx)
 
 	.int       L(P0Q4)-L(fwdPxQx)	/* 32 */
 	.int       L(P1Q4)-L(fwdPxQx)
@@ -529,7 +529,7 @@ L(fwdPxQx):
 	.int       L(P4Q4)-L(fwdPxQx)
 	.int       L(P5Q4)-L(fwdPxQx)
 	.int       L(P6Q4)-L(fwdPxQx)
-	.int       L(P7Q4)-L(fwdPxQx) 
+	.int       L(P7Q4)-L(fwdPxQx)
 
 	.int       L(P0Q5)-L(fwdPxQx)	/* 40 */
 	.int       L(P1Q5)-L(fwdPxQx)
@@ -538,7 +538,7 @@ L(fwdPxQx):
 	.int       L(P4Q5)-L(fwdPxQx)
 	.int       L(P5Q5)-L(fwdPxQx)
 	.int       L(P6Q5)-L(fwdPxQx)
-	.int       L(P7Q5)-L(fwdPxQx) 
+	.int       L(P7Q5)-L(fwdPxQx)
 
 	.int       L(P0Q6)-L(fwdPxQx)	/* 48 */
 	.int       L(P1Q6)-L(fwdPxQx)
@@ -547,7 +547,7 @@ L(fwdPxQx):
 	.int       L(P4Q6)-L(fwdPxQx)
 	.int       L(P5Q6)-L(fwdPxQx)
 	.int       L(P6Q6)-L(fwdPxQx)
-	.int       L(P7Q6)-L(fwdPxQx) 
+	.int       L(P7Q6)-L(fwdPxQx)
 
 	.int       L(P0Q7)-L(fwdPxQx)	/* 56 */
 	.int       L(P1Q7)-L(fwdPxQx)
@@ -556,7 +556,7 @@ L(fwdPxQx):
 	.int       L(P4Q7)-L(fwdPxQx)
 	.int       L(P5Q7)-L(fwdPxQx)
 	.int       L(P6Q7)-L(fwdPxQx)
-	.int       L(P7Q7)-L(fwdPxQx) 
+	.int       L(P7Q7)-L(fwdPxQx)
 
 	.int       L(P0Q8)-L(fwdPxQx)	/* 64 */
 	.int       L(P1Q8)-L(fwdPxQx)
@@ -604,8 +604,8 @@ L(P0Q2):
 L(P0Q1):
 	mov    -0x8(%rdi), %r8
 	mov    %r8, -0x8(%rsi)
-L(P0Q0):                                   
-	ret   
+L(P0Q0):
+	ret
 
 	.p2align 4
 L(P1Q9):
@@ -638,7 +638,7 @@ L(P1Q1):
 L(P1Q0):
 	movzbq -0x1(%rdi), %r8
 	mov    %r8b, -0x1(%rsi)
-	ret   
+	ret
 
 	.p2align 4
 L(P2Q9):
@@ -671,7 +671,7 @@ L(P2Q1):
 L(P2Q0):
 	movzwq -0x2(%rdi), %r8
 	mov    %r8w, -0x2(%rsi)
-	ret   
+	ret
 
 	.p2align 4
 L(P3Q9):
@@ -702,7 +702,7 @@ L(P3Q1):
 	mov    -0xb(%rdi), %r10
 	mov    %r10, -0xb(%rsi)
 	/*
-	 * These trailing loads/stores have to do all their loads 1st, 
+	 * These trailing loads/stores have to do all their loads 1st,
 	 * then do the stores.
 	 */
 L(P3Q0):
@@ -710,7 +710,7 @@ L(P3Q0):
 	movzbq -0x1(%rdi), %r10
 	mov    %r8w, -0x3(%rsi)
 	mov    %r10b, -0x1(%rsi)
-	ret   
+	ret
 
 	.p2align 4
 L(P4Q9):
@@ -743,7 +743,7 @@ L(P4Q1):
 L(P4Q0):
 	mov    -0x4(%rdi), %r8d
 	mov    %r8d, -0x4(%rsi)
-	ret   
+	ret
 
 	.p2align 4
 L(P5Q9):
@@ -778,7 +778,7 @@ L(P5Q0):
 	movzbq -0x1(%rdi), %r10
 	mov    %r8d, -0x5(%rsi)
 	mov    %r10b, -0x1(%rsi)
-	ret   
+	ret
 
 	.p2align 4
 L(P6Q9):
@@ -813,7 +813,7 @@ L(P6Q0):
 	movzwq -0x2(%rdi), %r10
 	mov    %r8d, -0x6(%rsi)
 	mov    %r10w, -0x2(%rsi)
-	ret   
+	ret
 
 	.p2align 4
 L(P7Q9):
@@ -850,7 +850,7 @@ L(P7Q0):
 	mov    %r8d, -0x7(%rsi)
 	mov    %r10w, -0x3(%rsi)
 	mov    %cl, -0x1(%rsi)
-	ret   
+	ret
 
 	/*
 	 * For large sizes rep smovq is fastest.
@@ -938,7 +938,7 @@ L(do_remainder):
 	addq	%rdx, %rsi
 	movslq	(%r10,%rdx,4), %rcx
 	leaq	(%rcx,%r10,1), %r10
-	jmpq	*%r10
+	INDIRECT_JMP_REG(r10)
 
 	/*
 	 * Use rep smovq. Clear remainder via unrolled code
@@ -1052,7 +1052,7 @@ kzero(void *addr, size_t count)
 0:
 #endif
 	/*
-	 * pass lofault value as 3rd argument for fault return 
+	 * pass lofault value as 3rd argument for fault return
 	 */
 	leaq	_kzeroerr(%rip), %rdx
 
@@ -1095,7 +1095,7 @@ _kzeroerr:
 	movl	%esp, %ebp		/* set new stack base */
 	pushl	%edi			/* save %edi */
 
-	mov	%gs:CPU_THREAD, %edx	
+	mov	%gs:CPU_THREAD, %edx
 	movl	T_LOFAULT(%edx), %edi
 	pushl	%edi			/* save the current lofault */
 	movl	%eax, T_LOFAULT(%edx)	/* new lofault */
@@ -1170,7 +1170,7 @@ do_zero:
 	addq	%rsi, %rdi
 	movslq	(%r10,%rsi,4), %rcx
 	leaq	(%rcx,%r10,1), %r10
-	jmpq	*%r10
+	INDIRECT_JMP_REG(r10)
 
 	.p2align 4
 L(setPxQx):
@@ -1181,7 +1181,7 @@ L(setPxQx):
 	.int       L(P4Q0)-L(setPxQx)
 	.int       L(P5Q0)-L(setPxQx)
 	.int       L(P6Q0)-L(setPxQx)
-	.int       L(P7Q0)-L(setPxQx) 
+	.int       L(P7Q0)-L(setPxQx)
 
 	.int       L(P0Q1)-L(setPxQx)	/* 8 */
 	.int       L(P1Q1)-L(setPxQx)
@@ -1190,7 +1190,7 @@ L(setPxQx):
 	.int       L(P4Q1)-L(setPxQx)
 	.int       L(P5Q1)-L(setPxQx)
 	.int       L(P6Q1)-L(setPxQx)
-	.int       L(P7Q1)-L(setPxQx) 
+	.int       L(P7Q1)-L(setPxQx)
 
 	.int       L(P0Q2)-L(setPxQx)	/* 16 */
 	.int       L(P1Q2)-L(setPxQx)
@@ -1199,7 +1199,7 @@ L(setPxQx):
 	.int       L(P4Q2)-L(setPxQx)
 	.int       L(P5Q2)-L(setPxQx)
 	.int       L(P6Q2)-L(setPxQx)
-	.int       L(P7Q2)-L(setPxQx) 
+	.int       L(P7Q2)-L(setPxQx)
 
 	.int       L(P0Q3)-L(setPxQx)	/* 24 */
 	.int       L(P1Q3)-L(setPxQx)
@@ -1208,7 +1208,7 @@ L(setPxQx):
 	.int       L(P4Q3)-L(setPxQx)
 	.int       L(P5Q3)-L(setPxQx)
 	.int       L(P6Q3)-L(setPxQx)
-	.int       L(P7Q3)-L(setPxQx) 
+	.int       L(P7Q3)-L(setPxQx)
 
 	.int       L(P0Q4)-L(setPxQx)	/* 32 */
 	.int       L(P1Q4)-L(setPxQx)
@@ -1217,7 +1217,7 @@ L(setPxQx):
 	.int       L(P4Q4)-L(setPxQx)
 	.int       L(P5Q4)-L(setPxQx)
 	.int       L(P6Q4)-L(setPxQx)
-	.int       L(P7Q4)-L(setPxQx) 
+	.int       L(P7Q4)-L(setPxQx)
 
 	.int       L(P0Q5)-L(setPxQx)	/* 40 */
 	.int       L(P1Q5)-L(setPxQx)
@@ -1226,7 +1226,7 @@ L(setPxQx):
 	.int       L(P4Q5)-L(setPxQx)
 	.int       L(P5Q5)-L(setPxQx)
 	.int       L(P6Q5)-L(setPxQx)
-	.int       L(P7Q5)-L(setPxQx) 
+	.int       L(P7Q5)-L(setPxQx)
 
 	.int       L(P0Q6)-L(setPxQx)	/* 48 */
 	.int       L(P1Q6)-L(setPxQx)
@@ -1235,7 +1235,7 @@ L(setPxQx):
 	.int       L(P4Q6)-L(setPxQx)
 	.int       L(P5Q6)-L(setPxQx)
 	.int       L(P6Q6)-L(setPxQx)
-	.int       L(P7Q6)-L(setPxQx) 
+	.int       L(P7Q6)-L(setPxQx)
 
 	.int       L(P0Q7)-L(setPxQx)	/* 56 */
 	.int       L(P1Q7)-L(setPxQx)
@@ -1244,7 +1244,7 @@ L(setPxQx):
 	.int       L(P4Q7)-L(setPxQx)
 	.int       L(P5Q7)-L(setPxQx)
 	.int       L(P6Q7)-L(setPxQx)
-	.int       L(P7Q7)-L(setPxQx) 
+	.int       L(P7Q7)-L(setPxQx)
 
 	.int       L(P0Q8)-L(setPxQx)	/* 64 */
 	.int       L(P1Q8)-L(setPxQx)
@@ -1274,7 +1274,7 @@ L(P0Q4): mov    %rax, -0x20(%rdi)
 L(P0Q3): mov    %rax, -0x18(%rdi)
 L(P0Q2): mov    %rax, -0x10(%rdi)
 L(P0Q1): mov    %rax, -0x8(%rdi)
-L(P0Q0): 
+L(P0Q0):
 	 ret
 
 	.p2align 4
@@ -1422,14 +1422,14 @@ L(aligned_now):
 L(bzero_loop):
 	leaq	-0x40(%rsi), %rsi
 	cmpq	$0x40, %rsi
-	movq	%rax, (%rdi) 
-	movq	%rax, 0x8(%rdi) 
-	movq	%rax, 0x10(%rdi) 
-	movq	%rax, 0x18(%rdi) 
-	movq	%rax, 0x20(%rdi) 
-	movq	%rax, 0x28(%rdi) 
-	movq	%rax, 0x30(%rdi) 
-	movq	%rax, 0x38(%rdi) 
+	movq	%rax, (%rdi)
+	movq	%rax, 0x8(%rdi)
+	movq	%rax, 0x10(%rdi)
+	movq	%rax, 0x18(%rdi)
+	movq	%rax, 0x20(%rdi)
+	movq	%rax, 0x28(%rdi)
+	movq	%rax, 0x30(%rdi)
+	movq	%rax, 0x38(%rdi)
 	leaq	0x40(%rdi), %rdi
 	jae	L(bzero_loop)
 
@@ -1441,7 +1441,7 @@ L(bzero_loop):
 	addq	%rsi, %rdi
 	movslq	(%r10,%rsi,4), %rcx
 	leaq	(%rcx,%r10,1), %r10
-	jmpq	*%r10
+	INDIRECT_JMP_REG(r10)
 
 	/*
 	 * Use rep sstoq. Clear any remainder via unrolled code
@@ -1564,7 +1564,7 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 
 _copyin_err:
 	SMAP_ENABLE_INSTR(2)
-	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */	
+	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */
 	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
 3:
 	movq	T_COPYOPS(%r9), %rax
@@ -1577,9 +1577,10 @@ _copyin_err:
 	movq	0x8(%rsp), %rsi
 	movq	0x10(%rsp), %rdx
 	leave
-	jmp	*CP_COPYIN(%rax)
+	movq	CP_COPYIN(%rax), %rax
+	INDIRECT_JMP_REG(rax)
 
-2:	movl	$-1, %eax	
+2:	movl	$-1, %eax
 	leave
 	ret
 	SET_SIZE(copyin)
@@ -1680,7 +1681,7 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 6:
 	SMAP_DISABLE_INSTR(1)
 	jmp	do_copy_fault
-	
+
 	/*
 	 * Make sure src and dst are NTA_ALIGN_SIZE aligned,
 	 * count is COUNT_ALIGN_SIZE aligned.
@@ -1691,11 +1692,11 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 	andq	$NTA_ALIGN_MASK, %r10
 	orq	%rdx, %r10
 	andq	$COUNT_ALIGN_MASK, %r10
-	jnz	6b	
+	jnz	6b
 	leaq	_xcopyin_nta_err(%rip), %rcx	/* doesn't set rflags */
 	SMAP_DISABLE_INSTR(2)
 	jmp	do_copy_fault_nta	/* use non-temporal access */
-	
+
 4:
 	movl	$EFAULT, %eax
 	jmp	3f
@@ -1722,7 +1723,8 @@ _xcopyin_nta_err:
 	movq	0x8(%rsp), %rsi
 	movq	0x10(%rsp), %rdx
 	leave
-	jmp	*CP_XCOPYIN(%r8)
+	movq	CP_XCOPYIN(%r8), %r8
+	INDIRECT_JMP_REG(r8)
 
 2:	leave
 	ret
@@ -1755,7 +1757,7 @@ _xcopyin_nta_err:
 	 */
 	cmpl	$XCOPY_MIN_SIZE, ARG_COUNT(%esp)
 	jb	do_copy_fault
-	
+
 	/*
 	 * Make sure src and dst are NTA_ALIGN_SIZE aligned,
 	 * count is COUNT_ALIGN_SIZE aligned.
@@ -1790,7 +1792,7 @@ _xcopyin_err:
 	movl	T_COPYOPS(%edx), %eax
 	jmp	*CP_XCOPYIN(%eax)
 
-2:	rep; 	ret	/* use 2 byte return instruction when branch target */
+2:	rep;	ret	/* use 2 byte return instruction when branch target */
 			/* AMD Software Optimization Guide - Section 6.2 */
 	SET_SIZE(xcopyin_nta)
 
@@ -1865,7 +1867,8 @@ _copyout_err:
 	movq	0x8(%rsp), %rsi
 	movq	0x10(%rsp), %rdx
 	leave
-	jmp	*CP_COPYOUT(%rax)
+	movq	CP_COPYOUT(%rax), %rax
+	INDIRECT_JMP_REG(rax)
 
 2:	movl	$-1, %eax
 	leave
@@ -1893,7 +1896,7 @@ _copyout_err:
 	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
 	jb	do_copy_fault
 	jmp	3f
-	
+
 _copyout_err:
 	popl	%ecx
 	popl	%edi
@@ -1966,7 +1969,7 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 6:
 	SMAP_DISABLE_INSTR(4)
 	jmp	do_copy_fault
-	
+
 	/*
 	 * Make sure src and dst are NTA_ALIGN_SIZE aligned,
 	 * count is COUNT_ALIGN_SIZE aligned.
@@ -1977,7 +1980,7 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 	andq	$NTA_ALIGN_MASK, %r10
 	orq	%rdx, %r10
 	andq	$COUNT_ALIGN_MASK, %r10
-	jnz	6b	
+	jnz	6b
 	leaq	_xcopyout_nta_err(%rip), %rcx
 	SMAP_DISABLE_INSTR(5)
 	call	do_copy_fault_nta
@@ -2010,7 +2013,8 @@ _xcopyout_nta_err:
 	movq	0x8(%rsp), %rsi
 	movq	0x10(%rsp), %rdx
 	leave
-	jmp	*CP_XCOPYOUT(%r8)
+	movq	CP_XCOPYOUT(%r8), %r8
+	INDIRECT_JMP_REG(r8)
 
 2:	leave
 	ret
@@ -2041,7 +2045,7 @@ _xcopyout_nta_err:
 	 */
 	cmpl	$XCOPY_MIN_SIZE, %edx
 	jb	do_copy_fault
-	
+
 	/*
 	 * Make sure src and dst are NTA_ALIGN_SIZE aligned,
 	 * count is COUNT_ALIGN_SIZE aligned.
@@ -2197,7 +2201,7 @@ do_copystr:
 	pushl	%ebx			/* save registers */
 	pushl	%edi
 
-	movl	%gs:CPU_THREAD, %ebx	
+	movl	%gs:CPU_THREAD, %ebx
 	movl	T_LOFAULT(%ebx), %edi
 	pushl	%edi			/* save the current lofault */
 	movl	%eax, T_LOFAULT(%ebx)	/* new lofault */
@@ -2212,7 +2216,7 @@ do_copystr:
 copystr_loop:
 	decl	%ecx
 	movb	(%ebx), %al
-	incl	%ebx	
+	incl	%ebx
 	movb	%al, (%edx)
 	incl	%edx
 	cmpb	$0, %al
@@ -2237,13 +2241,13 @@ copystr_out:
 
 copystr_done:
 	popl	%edi
-	movl	%gs:CPU_THREAD, %ebx	
+	movl	%gs:CPU_THREAD, %ebx
 	movl	%edi, T_LOFAULT(%ebx)	/* restore the original lofault */
 
 	popl	%edi
 	popl	%ebx
 	popl	%ebp
-	ret	
+	ret
 	SET_SIZE(copystr)
 
 #undef	ARG_FROM
@@ -2324,8 +2328,9 @@ _copyinstr_error:
 	movq	0x10(%rsp), %rdx
 	movq	0x18(%rsp), %rcx
 	leave
-	jmp	*CP_COPYINSTR(%rax)
-	
+	movq	CP_COPYINSTR(%rax), %rax
+	INDIRECT_JMP_REG(rax)
+
 2:	movl	$EFAULT, %eax		/* return EFAULT */
 	leave
 	ret
@@ -2355,7 +2360,7 @@ _copyinstr_error:
 
 _copyinstr_error:
 	popl	%edi
-	movl	%gs:CPU_THREAD, %edx	
+	movl	%gs:CPU_THREAD, %edx
 	movl	%edi, T_LOFAULT(%edx)	/* original lofault */
 
 	popl	%edi
@@ -2366,7 +2371,7 @@ _copyinstr_error:
 	cmpl	$0, %eax
 	jz	2f
 	jmp	*CP_COPYINSTR(%eax)
-	
+
 2:	movl	$EFAULT, %eax		/* return EFAULT */
 	ret
 	SET_SIZE(copyinstr)
@@ -2446,13 +2451,14 @@ _copyoutstr_error:
 	movq	0x10(%rsp), %rdx
 	movq	0x18(%rsp), %rcx
 	leave
-	jmp	*CP_COPYOUTSTR(%rax)
-	
+	movq	CP_COPYOUTSTR(%rax), %rax
+	INDIRECT_JMP_REG(rax)
+
 2:	movl	$EFAULT, %eax		/* return EFAULT */
 	leave
 	ret
-	SET_SIZE(copyoutstr)	
-	
+	SET_SIZE(copyoutstr)
+
 #elif defined(__i386)
 
 #define	ARG_KADDR	4
@@ -2477,7 +2483,7 @@ _copyoutstr_error:
 
 _copyoutstr_error:
 	popl	%edi
-	movl	%gs:CPU_THREAD, %edx	
+	movl	%gs:CPU_THREAD, %edx
 	movl	%edi, T_LOFAULT(%edx)	/* restore the original lofault */
 
 	popl	%edi
@@ -2492,7 +2498,7 @@ _copyoutstr_error:
 2:	movl	$EFAULT, %eax		/* return EFAULT */
 	ret
 	SET_SIZE(copyoutstr)
-	
+
 #undef	ARG_KADDR
 #undef	ARG_UADDR
 
@@ -2503,7 +2509,7 @@ _copyoutstr_error:
  * Since all of the fuword() variants are so similar, we have a macro to spit
  * them out.  This allows us to create DTrace-unobservable functions easily.
  */
-	
+
 #if defined(__lint)
 
 #if defined(__amd64)
@@ -2562,12 +2568,13 @@ _flt_/**/NAME:					\
 	movq	T_COPYOPS(%r9), %rax;		\
 	cmpq	$0, %rax;			\
 	jz	2f;				\
-	jmp	*COPYOP(%rax);			\
+	movq	COPYOP(%rax), %rax;		\
+	INDIRECT_JMP_REG(rax);			\
 2:						\
 	movl	$-1, %eax;			\
 	ret;					\
 	SET_SIZE(NAME)
-	
+
 	FUWORD(fuword64, movq, %rax, CP_FUWORD64,8,10,11)
 	FUWORD(fuword32, movl, %eax, CP_FUWORD32,9,12,13)
 	FUWORD(fuword16, movw, %ax, CP_FUWORD16,10,14,15)
@@ -2671,7 +2678,8 @@ _flt_/**/NAME:					\
 	movq	T_COPYOPS(%r9), %rax;		\
 	cmpq	$0, %rax;			\
 	jz	3f;				\
-	jmp	*COPYOP(%rax);			\
+	movq	COPYOP(%rax), %rax;		\
+	INDIRECT_JMP_REG(rax);			\
 3:						\
 	movl	$-1, %eax;			\
 	ret;					\
@@ -3142,7 +3150,7 @@ ucopystr(const char *ufrom, char *uto, size_t umaxlength, size_t *lencopied)
 #ifndef __lint
 
 .data
-.align 	4
+.align	4
 .globl	_smap_enable_patch_count
 .type	_smap_enable_patch_count,@object
 .size	_smap_enable_patch_count, 4

@@ -30,7 +30,7 @@
  * no easy place to save the extra parameters that would be required, so
  * each brand module needs its own copy of this code.  We #include this and
  * use brand-specific #defines to replace the XXX_brand_... definitions.
- */ 
+ */
 
 #ifdef lint
 
@@ -89,7 +89,7 @@ ENTRY(XXX_brand_syscall32_callback)
 	mov	%rcx, SYSCALL_REG; /* save orig return addr in syscall_reg */
 	mov	SCR_REG, %rcx;	/* place new return addr in %rcx */
 	mov	%gs:CPU_RTMP_R15, SCR_REG; /* restore scratch register */
-	call	*x86_md_clear		/* Flush micro-arch state */
+	call	x86_md_clear		/* Flush micro-arch state */
 	mov	V_SSP(SP_REG), SP_REG	/* restore user stack pointer */
 	jmp	nopop_sys_syscall32_swapgs_sysretl
 9:
@@ -109,7 +109,7 @@ ENTRY(XXX_brand_syscall_callback)
 	mov	%rcx, SYSCALL_REG; /* save orig return addr in syscall_reg */
 	mov	SCR_REG, %rcx;	/* place new return addr in %rcx */
 	mov	%gs:CPU_RTMP_R15, SCR_REG; /* restore scratch register */
-	call	*x86_md_clear		/* Flush micro-arch state */
+	call	x86_md_clear		/* Flush micro-arch state */
 	mov	V_SSP(SP_REG), SP_REG	/* restore user stack pointer */
 	jmp	nopop_sys_syscall_swapgs_sysretq
 9:

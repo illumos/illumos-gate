@@ -42,15 +42,17 @@
  *    this are either going to change privilege levels or halt, which makes
  *    these operations safer.
  */
-	ENTRY_NP(x86_md_clear_noop)
-	ret
-	SET_SIZE(x86_md_clear_noop)
 
 	/*
-	 * This uses the microcode based means of flushing state. VERW will
-	 * clobber flags.
+	 * By default, x86_md_clear is disabled until the system determines that
+	 * it both needs MDS related mitigations and we have microcode that
+	 * provides the needed functionality.
+	 *
+	 * The VERW instruction clobbers flags which is why it's important that
+	 * we save and restore them here.
 	 */
-	ENTRY_NP(x86_md_clear_verw)
+	ENTRY_NP(x86_md_clear)
+	ret
 	pushfq
 	subq	$8, %rsp
 	mov	%ds, (%rsp)
@@ -58,4 +60,4 @@
 	addq	$8, %rsp
 	popfq
 	ret
-	SET_SIZE(x86_md_clear_verw)
+	SET_SIZE(x86_md_clear)

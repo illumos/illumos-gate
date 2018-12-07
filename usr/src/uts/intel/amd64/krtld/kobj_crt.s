@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * exit routine from linker/loader to kernel
@@ -64,7 +63,7 @@ exitto(caddr_t entrypoint)
 	movq    (%rax), %rdx
 
 	/ Call destination
-	call   *%r11
+	INDIRECT_CALL_REG(r11)
 
 	SET_SIZE(exitto)
 

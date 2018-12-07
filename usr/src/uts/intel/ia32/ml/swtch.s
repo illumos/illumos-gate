@@ -171,6 +171,14 @@
 	call	smap_enable
 
 	/*
+	 * Take a moment to potentially clear the RSB buffer. This is done to
+	 * prevent various Spectre variant 2 and SpectreRSB attacks. This may
+	 * not be sufficient. Please see uts/intel/ia32/ml/retpoline.s for more
+	 * information about this.
+	 */
+	call	x86_rsb_stuff
+
+	/*
 	 * Save non-volatile registers, and set return address for current
 	 * thread to resume_return.
 	 *
@@ -211,7 +219,7 @@
 	/*
 	 * Temporarily switch to the idle thread's stack
 	 */
-	movq	CPU_IDLE_THREAD(%r15), %rax 	/* idle thread pointer */
+	movq	CPU_IDLE_THREAD(%r15), %rax	/* idle thread pointer */
 
 	/*
 	 * Set the idle thread as the current thread
@@ -246,7 +254,7 @@
 	 */
 .lock_thread_mutex:
 	lock
-	btsl	$0, T_LOCK(%r12) 	/* attempt to lock new thread's mutex */
+	btsl	$0, T_LOCK(%r12)	/* attempt to lock new thread's mutex */
 	jnc	.thread_mutex_locked	/* got it */
 
 .spin_thread_mutex:
@@ -302,8 +310,8 @@
 	movq	%r12, CPU_THREAD(%r13)	/* set CPU's thread pointer */
 	mfence				/* synchronize with mutex_exit() */
 	xorl	%ebp, %ebp		/* make $<threadlist behave better */
-	movq	T_LWP(%r12), %rax 	/* set associated lwp to  */
-	movq	%rax, CPU_LWP(%r13) 	/* CPU's lwp ptr */
+	movq	T_LWP(%r12), %rax	/* set associated lwp to  */
+	movq	%rax, CPU_LWP(%r13)	/* CPU's lwp ptr */
 
 	movq	T_SP(%r12), %rsp	/* switch to outgoing thread's stack */
 	movq	T_PC(%r12), %r13	/* saved return addr */
@@ -481,7 +489,7 @@ resume_from_intr_return:
 	/*
 	 * Remove stack frame created in SAVE_REGS()
 	 */
-	addq 	$CLONGSIZE, %rsp
+	addq	$CLONGSIZE, %rsp
 	ret
 	SET_SIZE(resume_from_intr)
 
@@ -490,7 +498,7 @@ resume_from_intr_return:
 	popq	%rdi		/* arg */
 	popq	%rsi		/* len */
 	movq	%rsp, %rbp
-	call	*%rax
+	INDIRECT_CALL_REG(rax)
 	call	thread_exit	/* destroy thread if it returns. */
 	/*NOTREACHED*/
 	SET_SIZE(thread_start)
@@ -500,7 +508,7 @@ resume_from_intr_return:
 	movq	%rsp, %rbp		/* construct frame */
 	movq	%rdi, %rsp		/* set stack pinter */
 	movq	%rdx, %rdi		/* load arg */
-	call	*%rsi			/* call specified function */
+	INDIRECT_CALL_REG(rsi)		/* call specified function */
 	leave				/* pop base pointer */
 	ret
 	SET_SIZE(thread_splitstack_run)

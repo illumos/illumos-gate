@@ -1191,7 +1191,7 @@ cmntrap()
 	addq	%rax, %r12
 	movq	%r12, REGOFF_RIP(%rbp)
 	INTR_POP
-	call	*x86_md_clear
+	call	x86_md_clear
 	jmp	tr_iret_auto
 	/*NOTREACHED*/
 3:
@@ -1597,7 +1597,7 @@ _lwp_rtt:
 	 */
 	ALTENTRY(sys_rtt_syscall32)
 	USER32_POP
-	call	*x86_md_clear
+	call	x86_md_clear
 	jmp	tr_iret_user
 	/*NOTREACHED*/
 
@@ -1607,7 +1607,7 @@ _lwp_rtt:
 	 */
 	USER_POP
 	ALTENTRY(nopop_sys_rtt_syscall)
-	call	*x86_md_clear
+	call	x86_md_clear
 	jmp	tr_iret_user
 	/*NOTREACHED*/
 	SET_SIZE(nopop_sys_rtt_syscall)

@@ -129,7 +129,7 @@ extern "C" {
 	movq	REGOFF_RDI(%rsp), %rdi;	\
 	addq	$REGOFF_RIP, %rsp
 
-#define	FAST_INTR_RETURN	call *x86_md_clear; jmp tr_iret_user
+#define	FAST_INTR_RETURN	call x86_md_clear; jmp tr_iret_user
 
 #elif defined(__i386)
 

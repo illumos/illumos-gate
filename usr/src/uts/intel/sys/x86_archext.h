@@ -584,6 +584,14 @@ extern "C" {
 #define	IA32_PKG_THERM_INTERRUPT_TR2_IE		0x00800000
 #define	IA32_PKG_THERM_INTERRUPT_PL_NE		0x01000000
 
+/*
+ * This MSR exists on families, 10h, 12h+ for AMD. This controls instruction
+ * decoding. Most notably, for the AMD variant of retpolines, we must improve
+ * the serializability of lfence for the lfence based method to work.
+ */
+#define	MSR_AMD_DECODE_CONFIG			0xc0011029
+#define	AMD_DECODE_CONFIG_LFENCE_DISPATCH	0x02
+
 #define	MCI_CTL_VALUE		0xffffffff
 
 #define	MTRR_TYPE_UC		0
@@ -1015,7 +1023,7 @@ extern "C" {
 #define	INTC_MODEL_BROADWELL_XEON	0x4f
 #define	INTC_MODEL_BROADWELL_XEON_D	0x56
 
-#define	INCC_MODEL_SKYLAKE_MOBILE	0x4e
+#define	INTC_MODEL_SKYLAKE_MOBILE	0x4e
 #define	INTC_MODEL_SKYLAKE_XEON		0x55
 #define	INTC_MODEL_SKYLAKE_DESKTOP	0x5e
 
@@ -1092,20 +1100,17 @@ extern uint_t pentiumpro_bug4046376;
 
 extern const char CyrixInstead[];
 
+/*
+ * These functions are all used to perform various side-channel mitigations.
+ * Please see uts/i86pc/os/cpuid.c for more information.
+ */
 extern void (*spec_uarch_flush)(void);
+extern void x86_rsb_stuff(void);
+extern void x86_md_clear(void);
 
 #endif
 
 #if defined(_KERNEL)
-
-/*
- * x86_md_clear is the main entry point that should be called to deal with
- * clearing u-arch buffers. Implementations are below because they're
- * implemented in ASM. They shouldn't be used.
- */
-extern void (*x86_md_clear)(void);
-extern void x86_md_clear_noop(void);
-extern void x86_md_clear_verw(void);
 
 /*
  * This structure is used to pass arguments and get return values back

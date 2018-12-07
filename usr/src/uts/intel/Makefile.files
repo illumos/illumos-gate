@@ -53,10 +53,14 @@ CORE_OBJS +=		\
 	lock_prim.o	\
 	ovbcopy.o	\
 	polled_io.o	\
+	retpoline.o	\
 	sseblk.o	\
 	sundep.o	\
 	swtch.o		\
 	sysi86.o
+
+DBOOT_OBJS +=		\
+	retpoline.o
 
 #
 # 64-bit multiply/divide compiler helper routines

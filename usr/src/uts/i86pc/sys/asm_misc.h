@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_ASM_MISC_H
@@ -30,6 +30,11 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#define	RET_INSTR	0xc3
+#define	NOP_INSTR	0x90
+#define	STI_INSTR	0xfb
+#define	JMP_INSTR	0x00eb
 
 #ifdef _ASM	/* The remainder of this file is only for assembly files */
 
@@ -41,12 +46,6 @@ extern "C" {
 #define	LOADCPU(reg)			\
 	movl	%gs:CPU_SELF, reg;
 #endif
-
-#define	RET_INSTR	0xc3
-#define	NOP_INSTR	0x90
-#define	STI_INSTR	0xfb
-#define	JMP_INSTR	0x00eb
-
 
 #if defined(__i386)
 

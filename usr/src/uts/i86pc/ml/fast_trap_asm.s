@@ -21,9 +21,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asm_linkage.h>
 #include <sys/asm_misc.h>
@@ -101,7 +100,8 @@ getlgrp(void)
 	.globl	gethrtimef
 	ENTRY_NP(get_hrtime)
 	FAST_INTR_PUSH
-	call	*gethrtimef(%rip)
+	movq	gethrtimef(%rip), %rax
+	INDIRECT_CALL_REG(rax)
 	movq	%rax, %rdx
 	shrq	$32, %rdx			/* high 32-bit in %edx */
 	FAST_INTR_POP
@@ -127,7 +127,8 @@ getlgrp(void)
 	FAST_INTR_PUSH
 	subq	$TIMESPEC_SIZE, %rsp
 	movq	%rsp, %rdi
-	call	*gethrestimef(%rip)
+	movq	gethrestimef(%rip), %rax
+	INDIRECT_CALL_REG(rax)
 	movl	(%rsp), %eax
 	movl	CLONGSIZE(%rsp), %edx
 	addq	$TIMESPEC_SIZE, %rsp

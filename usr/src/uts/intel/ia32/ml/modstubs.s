@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/asm_linkage.h>
@@ -64,7 +64,7 @@ char stubs_base[1], stubs_end[1];
 /*
  * This file uses ansi preprocessor features:
  *
- * 1. 	#define mac(a) extra_ ## a     -->   mac(x) expands to extra_a
+ * 1.   #define mac(a) extra_ ## a     -->   mac(x) expands to extra_a
  * The old version of this is
  *      #define mac(a) extra_/.*.*./a
  * but this fails if the argument has spaces "mac ( x )"
@@ -130,7 +130,8 @@ module/**/_modinfo:			\
 	je	stubs_common_code;			/* not weak */	\
 	testb	$MODS_INSTALLED, MODS_FLAG(%rax);	/* installed? */ \
 	jne	stubs_common_code;		/* yes, do the mod_hold */ \
-	jmp	*MODS_RETFCN(%rax);		/* no, jump to retfcn */ \
+	movq	MODS_RETFCN(%rax), %rax;	/* no, load retfcn */	\
+	INDIRECT_JMP_REG(rax);			/* no, jump to retfcn */ \
 	SET_SIZE(fcnname);						\
 	.data;								\
 	.align	 CPTRSIZE;						\
@@ -148,10 +149,12 @@ fcnname/**/_info:							\
 	leaq	fcnname/**/_info(%rip), %rax;				\
 	testb	$MODS_INSTALLED, MODS_FLAG(%rax); /* installed? */	\
 	je	5f;			/* no */			\
-	jmp	*(%rax);		/* yes, jump to install_fcn */	\
+	movq	MODS_INSTFCN(%rax), %rax; /* yes, load install_fcn */	\
+	INDIRECT_JMP_REG(rax);		/* yes, jump to install_fcn */	\
 5:	testb	$MODS_WEAK, MODS_FLAG(%rax);	/* weak? */		\
 	je	stubs_common_code;	/* no, do mod load */		\
-	jmp	*MODS_RETFCN(%rax);	/* yes, jump to retfcn */	\
+	movq	MODS_RETFCN(%rax), %rax; /* yes, load retfcn */		\
+	INDIRECT_JMP_REG(rax);		/* yes, jump to retfcn */	\
 	SET_SIZE(fcnname);						\
 	.data;								\
 	.align	CPTRSIZE;						\
@@ -190,7 +193,7 @@ fcnname/**/_info:							\
 	cmpl	$-1, %eax		/* error? */
 	jne	.L1
 	movq	0x18(%r15), %rax
-	call	*%rax
+	INDIRECT_CALL_REG(rax)
 	addq	$0x30, %rsp
 	jmp	.L2
 .L1:
@@ -221,7 +224,8 @@ fcnname/**/_info:							\
 	pushq	(%rsp, %r11, 8)
 	pushq	(%rsp, %r11, 8)
 	pushq	(%rsp, %r11, 8)
-	call	*(%r15)			/* call the stub fn(arg, ..) */
+	movq	(%r15), %rax
+	INDIRECT_CALL_REG(rax)		/* call the stub fn(arg, ..) */
 	addq	$0x30, %rsp		/* pop off last 6 args */
 	pushq	%rax			/* save any return values */
 	pushq	%rdx
@@ -235,135 +239,9 @@ fcnname/**/_info:							\
 	ret
 	SET_SIZE(stubs_common_code)
 
-#elif defined(__i386)
-
-/*
- * See the 'struct mod_modinfo' definition to see what this declaration
- * is trying to achieve here.
- */
-#define MODULE(module,namespace)	\
-	.data;				\
-module/**/_modname:			\
-	.string	"namespace/module";	\
-	SET_SIZE(module/**/_modname);	\
-	.align	CPTRSIZE;		\
-	.globl	module/**/_modinfo;	\
-	.type	module/**/_modinfo, @object;	\
-module/**/_modinfo:			\
-	.long	module/**/_modname;	\
-	.long	0	/* storage for modctl pointer */
-
-	/* then mod_stub_info structures follow until a mods_func_adr is 0 */
-
-/* this puts a 0 where the next mods_func_adr would be */
-#define END_MODULE(module)		\
-	.data;				\
-	.align	CPTRSIZE;		\
-	.long 0;			\
-	SET_SIZE(module/**/_modinfo)
-
-/*
- * The data section in the stub_common macro is the
- * mod_stub_info structure for the stub function
- */
-
-/*	
- * The flag MODS_INSTALLED is stored in the stub data and is used to
- * indicate if a module is installed and initialized.  This flag is used
- * instead of the mod_stub_info->mods_modinfo->mod_installed flag
- * to minimize the number of pointer de-references for each function
- * call (and also to avoid possible TLB misses which could be induced
- * by dereferencing these pointers.)
- */	
-
-#define STUB_COMMON(module, fcnname, install_fcn, retfcn, weak)		\
-	ENTRY(fcnname);							\
-	leal	fcnname/**/_info, %eax;					\
-	cmpl	$0, MODS_FLAG(%eax);	/* weak? */			\
-	je	stubs_common_code;	/* not weak */			\
-	testb	$MODS_INSTALLED, MODS_FLAG(%eax); /* installed? */	\
-	jne	stubs_common_code;	/* yes, do the mod_hold */	\
-	jmp	*MODS_RETFCN(%eax);	/* no, just jump to retfcn */	\
-	SET_SIZE(fcnname);						\
-	.data;								\
-	.align	 CPTRSIZE;						\
-	.type	fcnname/**/_info, @object;				\
-fcnname/**/_info:							\
-	.long	install_fcn;						\
-	.long	module/**/_modinfo;					\
-	.long	fcnname;						\
-	.long	retfcn;							\
-	.long   weak;							\
-	SET_SIZE(fcnname/**/_info)
-	
-#define STUB_NO_UNLOADABLE(module, fcnname, install_fcn, retfcn, weak)	\
-	ENTRY(fcnname);							\
-	leal	fcnname/**/_info, %eax;					\
-	testb	$MODS_INSTALLED, MODS_FLAG(%eax); /* installed? */	\
-	je	5f;		/* no */				\
-	jmp	*(%eax);	/* yes, just jump to install_fcn */	\
-5:	testb	$MODS_WEAK, MODS_FLAG(%eax);	/* weak? */		\
-	je	stubs_common_code;	/* no, do mod load */		\
-	jmp	*MODS_RETFCN(%eax);	/* yes, just jump to retfcn */ 	\
-	SET_SIZE(fcnname);						\
-	.data;								\
-	.align	CPTRSIZE;						\
-	.type	fcnname/**/_info, @object;				\
-fcnname/**/_info:							\
-	.long	install_fcn;		/* 0 */				\
-	.long	module/**/_modinfo;	/* 0x4 */			\
-	.long	fcnname;		/* 0x8 */			\
-	.long	retfcn;			/* 0xc */			\
-	.long   weak;			/* 0x10 */			\
-	SET_SIZE(fcnname/**/_info)
-
-/*
- * We branch here with the fcnname_info pointer in %eax
- */
-	ENTRY_NP(stubs_common_code)
-	.globl	mod_hold_stub
-	.globl	mod_release_stub
-	pushl	%esi
-	movl	%eax, %esi		/ save the info pointer
-	pushl	%eax
-	call	mod_hold_stub		/ mod_hold_stub(mod_stub_info *)
-	popl	%ecx
-	cmpl	$-1, %eax		/ error?
-	jne	.L1
-	movl	MODS_RETFCN(%esi), %eax
-	call    *%eax	
-	popl	%esi			/ yes, return error (panic?)
-	ret
-.L1:
-	movl	$MAXNARG+1, %ecx
-	/ copy incoming arguments
-	pushl	(%esp, %ecx, 4)		/ push MAXNARG times
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	pushl	(%esp, %ecx, 4)
-	call	*(%esi)			/ call the stub function(arg1,arg2, ...)
-	add	$_MUL(MAXNARG, 4), %esp	/ pop off MAXNARG arguments
-	pushl	%eax			/ save any return values from the stub
-	pushl	%edx
-	pushl	%esi
-	call	mod_release_stub	/ release hold on module
-	addl	$4, %esp
-	popl	%edx			/ restore return values
-	popl	%eax
-.L2:
-	popl	%esi
-	ret
-	SET_SIZE(stubs_common_code)
-
-#endif	/* __i386 */
+#else
+#error "Trying to build modstubs on an unsupported arch"
+#endif	/* __amd64 */
 
 #define STUB(module, fcnname, retfcn)	\
     STUB_COMMON(module, fcnname, mod_hold_stub, retfcn, 0)
@@ -397,11 +275,11 @@ fcnname/**/_info:							\
 
 /*
  * WARNING WARNING WARNING!!!!!!
- * 
+ *
  * On the MODULE macro you MUST NOT use any spaces!!! They are
  * significant to the preprocessor.  With ansi c there is a way around this
  * but for some reason (yet to be investigated) ansi didn't work for other
- * reasons!  
+ * reasons!
  *
  * When zero is used as the return function, the system will call
  * panic if the stub can't be resolved.
@@ -443,15 +321,15 @@ fcnname/**/_info:							\
 	MODULE(specfs,fs);
 	NO_UNLOAD_STUB(specfs, common_specvp,		nomod_zero);
 	NO_UNLOAD_STUB(specfs, makectty,		nomod_zero);
-	NO_UNLOAD_STUB(specfs, makespecvp,     		nomod_zero);
-	NO_UNLOAD_STUB(specfs, smark,          		nomod_zero);
-	NO_UNLOAD_STUB(specfs, spec_segmap,    		nomod_einval);
-	NO_UNLOAD_STUB(specfs, specfind,       		nomod_zero);
-	NO_UNLOAD_STUB(specfs, specvp,         		nomod_zero);
+	NO_UNLOAD_STUB(specfs, makespecvp,		nomod_zero);
+	NO_UNLOAD_STUB(specfs, smark,			nomod_zero);
+	NO_UNLOAD_STUB(specfs, spec_segmap,		nomod_einval);
+	NO_UNLOAD_STUB(specfs, specfind,		nomod_zero);
+	NO_UNLOAD_STUB(specfs, specvp,			nomod_zero);
 	NO_UNLOAD_STUB(specfs, devi_stillreferenced,	nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_getvnodeops,	nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_char_map,		nomod_zero);
-	NO_UNLOAD_STUB(specfs, specvp_devfs,  		nomod_zero);
+	NO_UNLOAD_STUB(specfs, specvp_devfs,		nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_assoc_vp_with_devi,	nomod_void);
 	NO_UNLOAD_STUB(specfs, spec_hold_devi_by_vp,	nomod_zero);
 	NO_UNLOAD_STUB(specfs, spec_snode_walk,		nomod_void);
@@ -469,38 +347,38 @@ fcnname/**/_info:							\
  */
 #ifndef SOCK_MODULE
 	MODULE(sockfs,fs);
-	NO_UNLOAD_STUB(sockfs, so_socket,  	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, so_socket,	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, so_socketpair,	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, bind,  		nomod_zero);
-	NO_UNLOAD_STUB(sockfs, listen,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, accept,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, connect,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, shutdown,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, recv,  		nomod_zero);
-	NO_UNLOAD_STUB(sockfs, recvfrom,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, recvmsg,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, send,  		nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sendmsg,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sendto,  	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, bind,		nomod_zero);
+	NO_UNLOAD_STUB(sockfs, listen,		nomod_zero);
+	NO_UNLOAD_STUB(sockfs, accept,		nomod_zero);
+	NO_UNLOAD_STUB(sockfs, connect,		nomod_zero);
+	NO_UNLOAD_STUB(sockfs, shutdown,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, recv,		nomod_zero);
+	NO_UNLOAD_STUB(sockfs, recvfrom,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, recvmsg,		nomod_zero);
+	NO_UNLOAD_STUB(sockfs, send,		nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sendmsg,		nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sendto,		nomod_zero);
 #ifdef _SYSCALL32_IMPL
 	NO_UNLOAD_STUB(sockfs, recv32,		nomod_zero);
 	NO_UNLOAD_STUB(sockfs, recvfrom32,	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, send32,		nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sendto32,	nomod_zero);
 #endif	/* _SYSCALL32_IMPL */
-	NO_UNLOAD_STUB(sockfs, getpeername,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, getsockname,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, getsockopt,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, setsockopt,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sockconfig,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sock_getmsg,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sock_putmsg,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sosendfile64,  	nomod_zero);
-	NO_UNLOAD_STUB(sockfs, snf_segmap,  	nomod_einval);
-	NO_UNLOAD_STUB(sockfs, sock_getfasync,  nomod_zero);
-	NO_UNLOAD_STUB(sockfs, nl7c_sendfilev,  nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sotpi_sototpi,  nomod_zero);
-	NO_UNLOAD_STUB(sockfs, socket_sendmblk,  nomod_zero);
+	NO_UNLOAD_STUB(sockfs, getpeername,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, getsockname,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, getsockopt,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, setsockopt,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sockconfig,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sock_getmsg,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sock_putmsg,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sosendfile64,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, snf_segmap,	nomod_einval);
+	NO_UNLOAD_STUB(sockfs, sock_getfasync,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, nl7c_sendfilev,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sotpi_sototpi,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, socket_sendmblk,	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, socket_setsockopt,  nomod_zero);
 	END_MODULE(sockfs);
 #endif
@@ -598,7 +476,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(klmmod, lm_shutdown,	nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_unexport,	nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_cprresume,	nomod_zero);
-	NO_UNLOAD_STUB(klmmod, lm_cprsuspend,	nomod_zero); 
+	NO_UNLOAD_STUB(klmmod, lm_cprsuspend,	nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_safelock, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_safemap, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_has_sleep, nomod_zero);
@@ -606,8 +484,8 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(klmmod, lm_vp_active, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_get_sysid, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_rel_sysid, nomod_zero);
-	NO_UNLOAD_STUB(klmmod, lm_alloc_sysidt, nomod_minus_one); 
-	NO_UNLOAD_STUB(klmmod, lm_free_sysidt, nomod_zero); 
+	NO_UNLOAD_STUB(klmmod, lm_alloc_sysidt, nomod_minus_one);
+	NO_UNLOAD_STUB(klmmod, lm_free_sysidt, nomod_zero);
 	NO_UNLOAD_STUB(klmmod, lm_sysidt, nomod_minus_one);
 	END_MODULE(klmmod);
 #endif
@@ -667,8 +545,8 @@ fcnname/**/_info:							\
  */
 #ifndef DES_MODULE
 	MODULE(des,misc);
-	STUB(des, cbc_crypt, 	 	nomod_zero);
-	STUB(des, ecb_crypt, 		nomod_zero);
+	STUB(des, cbc_crypt,		nomod_zero);
+	STUB(des, ecb_crypt,		nomod_zero);
 	STUB(des, _des_crypt,		nomod_zero);
 	END_MODULE(des);
 #endif
@@ -687,7 +565,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(procfs, prgetcred,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetpriv,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetprivsize,	nomod_zero);
-       	NO_UNLOAD_STUB(procfs, prgetsecflags,	nomod_zero);
+	NO_UNLOAD_STUB(procfs, prgetsecflags,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetstatus,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetlwpstatus,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetpsinfo,	nomod_zero);
@@ -725,7 +603,7 @@ fcnname/**/_info:							\
  */
 #ifndef FIFO_MODULE
 	MODULE(fifofs,fs);
-	NO_UNLOAD_STUB(fifofs, fifovp,      	nomod_zero);
+	NO_UNLOAD_STUB(fifofs, fifovp,		nomod_zero);
 	NO_UNLOAD_STUB(fifofs, fifo_getinfo,	nomod_zero);
 	NO_UNLOAD_STUB(fifofs, fifo_vfastoff,	nomod_zero);
 	END_MODULE(fifofs);
@@ -768,7 +646,7 @@ fcnname/**/_info:							\
  */
 #ifndef NAMEFS_MODULE
 	MODULE(namefs,fs);
-	STUB(namefs, nm_unmountall, 	0);
+	STUB(namefs, nm_unmountall,	0);
 	END_MODULE(namefs);
 #endif
 
@@ -868,13 +746,13 @@ fcnname/**/_info:							\
 	END_MODULE(consconfig);
 #endif
 
-/* 
+/*
  * Stubs for accounting.
  */
 #ifndef SYSACCT_MODULE
 	MODULE(sysacct,sys);
-	NO_UNLOAD_WSTUB(sysacct, acct,  		nomod_zero);
-	NO_UNLOAD_WSTUB(sysacct, acct_fs_in_use, 	nomod_zero);
+	NO_UNLOAD_WSTUB(sysacct, acct,			nomod_zero);
+	NO_UNLOAD_WSTUB(sysacct, acct_fs_in_use,	nomod_zero);
 	END_MODULE(sysacct);
 #endif
 
@@ -961,7 +839,7 @@ fcnname/**/_info:							\
 #ifndef C2AUDIT_MODULE
 	MODULE(c2audit,sys);
 	NO_UNLOAD_STUB(c2audit, audit_init_module,	nomod_zero);
-	NO_UNLOAD_STUB(c2audit, audit_start, 		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, audit_start,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_finish,		nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit,			nomod_zero);
 	NO_UNLOAD_STUB(c2audit, auditdoor,		nomod_zero);
@@ -1013,7 +891,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(rpcsec, sec_svc_control,		nomod_zero);
 	END_MODULE(rpcsec);
 #endif
- 
+
 /*
  * Stubs for rpc RPCSEC_GSS security service module
  */
@@ -1110,7 +988,7 @@ fcnname/**/_info:							\
 
 /*
  * Clustering: stubs for cluster infrastructure.
- */	
+ */
 #ifndef CL_COMM_MODULE
 	MODULE(cl_comm,misc);
 	NO_UNLOAD_STUB(cl_comm, cladmin, nomod_minus_one);
@@ -1412,7 +1290,7 @@ fcnname/**/_info:							\
  */
 #ifndef ELFEXEC_MODULE
 	MODULE(elfexec,exec);
-	STUB(elfexec, elfexec,      	nomod_einval);
+	STUB(elfexec, elfexec,		nomod_einval);
 	STUB(elfexec, mapexec_brand,	nomod_einval);
 #if defined(__amd64)
 	STUB(elfexec, elf32exec,	nomod_einval);
@@ -1447,7 +1325,7 @@ fcnname/**/_info:							\
 	END_MODULE(ppt);
 #endif
 
-/ this is just a marker for the area of text that contains stubs 
+/ this is just a marker for the area of text that contains stubs
 
 	ENTRY_NP(stubs_end)
 	nop
