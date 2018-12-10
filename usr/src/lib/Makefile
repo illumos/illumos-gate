@@ -83,6 +83,7 @@ SUBDIRS +=				\
 	gss_mechs/mech_spnego	\
 	hal		\
 	hbaapi		\
+	iconv_modules	\
 	krb5		\
 	libadm		\
 	libads		\

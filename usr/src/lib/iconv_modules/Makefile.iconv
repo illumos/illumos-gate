@@ -1,0 +1,102 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+# common makefile to handle the most common parts of code: i.e.
+# copying static files from the src dir to the proto dir.
+
+include $(SRC)/Makefile.master
+
+all:=		TARGET= all
+install :=	TARGET= install
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+
+OBJS		= $(SRCS:%.c=%.o)
+PROGS		= $(OBJS:%.o=%.so)
+
+CREATE_LINKS = .links_created
+
+CLEANFILES	= *.o *.so.* *.so $(CREATE_LINKS)
+
+PROTOCLEANFILES = $(ICONV_LIBS) $(ICONV_LIBS_64)
+
+CFLAGS		+= -I../../inc -I. -I../../common $(C_PICFLAGS) $(GSHARED)
+CFLAGS		+= -I$(ADJUNCT_PROTO)/usr/include
+
+DYNFLAGS=	$(GSHARED) $(ZTEXT) $(ZDEFS) $(BDIRECT) \
+		$(MAPFILES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
+
+LDLIBS=		-lc
+
+ICONV_DIR	= $(ROOT)/usr/lib/iconv
+
+ICONV_DIR_64 	= $(ROOT)/usr/lib/iconv/$(MACH64)
+
+ICONV_LIBS	= $(PROGS:%=$(ICONV_DIR)/%)
+
+ICONV_LIBS_64	= $(PROGS:%=$(ICONV_DIR_64)/%)
+
+$(ICONV_LIBS) :=      FILEMODE= 755
+
+$(ICONV_LIBS_64) :=      FILEMODE= 755
+
+$(ICONV_DIR) $(ICONV_DIR_64):
+	$(INS.dir) $@
+
+$(ICONV_DIR)/%: %
+	$(INS.file)
+
+$(ICONV_DIR_64)/%: %
+	$(INS.file)
+
+$(ICONV_DIR)/%: ../%
+	$(INS.file)
+
+%.so: %.o
+	$(CC) $(CFLAGS) $(DYNFLAGS) $(LDLIBS) -o $@ $(@:%.so=%.o)
+	$(POST_PROCESS_SO)
+
+%.o: ../%.c
+	$(CC) $(CFLAGS) -c -o $@ $(@:%.o=../%.c)
+	$(POST_PROCESS_O)
+
+%.o: ../common/%.c
+	$(CC) $(CFLAGS) -c -o $@ $(@:%.o=../common/%.c)
+	$(POST_PROCESS_O)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $(@:%.o=%.c)
+	$(POST_PROCESS_O)
+
+lint: FRC
+
+clean:
+	$(RM) $(CLEANFILES)
+
+clobber: clean
+	$(RM) $(PROTOCLEANFILES)
+
+FRC:

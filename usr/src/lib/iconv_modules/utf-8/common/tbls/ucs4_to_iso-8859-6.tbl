@@ -1,0 +1,116 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+/*
+ * COPYRIGHT AND PERMISSION NOTICE
+ *
+ * Copyright (c) 1991-2005 Unicode, Inc. All rights reserved. Distributed
+ * under the Terms of Use in http://www.unicode.org/copyright.html.
+ *
+ * This file has been modified by Sun Microsystems, Inc.
+ *
+ */
+	{  0x00000080, 0x80  },
+	{  0x00000081, 0x81  },
+	{  0x00000082, 0x82  },
+	{  0x00000083, 0x83  },
+	{  0x00000084, 0x84  },
+	{  0x00000085, 0x85  },
+	{  0x00000086, 0x86  },
+	{  0x00000087, 0x87  },
+	{  0x00000088, 0x88  },
+	{  0x00000089, 0x89  },
+	{  0x0000008A, 0x8A  },
+	{  0x0000008B, 0x8B  },
+	{  0x0000008C, 0x8C  },
+	{  0x0000008D, 0x8D  },
+	{  0x0000008E, 0x8E  },
+	{  0x0000008F, 0x8F  },
+	{  0x00000090, 0x90  },
+	{  0x00000091, 0x91  },
+	{  0x00000092, 0x92  },
+	{  0x00000093, 0x93  },
+	{  0x00000094, 0x94  },
+	{  0x00000095, 0x95  },
+	{  0x00000096, 0x96  },
+	{  0x00000097, 0x97  },
+	{  0x00000098, 0x98  },
+	{  0x00000099, 0x99  },
+	{  0x0000009A, 0x9A  },
+	{  0x0000009B, 0x9B  },
+	{  0x0000009C, 0x9C  },
+	{  0x0000009D, 0x9D  },
+	{  0x0000009E, 0x9E  },
+	{  0x0000009F, 0x9F  },
+	{  0x000000A0, 0xA0  },
+	{  0x000000A4, 0xA4  },
+	{  0x000000AD, 0xAD  },
+	{  0x0000060C, 0xAC  },
+	{  0x0000061B, 0xBB  },
+	{  0x0000061F, 0xBF  },
+	{  0x00000621, 0xC1  },
+	{  0x00000622, 0xC2  },
+	{  0x00000623, 0xC3  },
+	{  0x00000624, 0xC4  },
+	{  0x00000625, 0xC5  },
+	{  0x00000626, 0xC6  },
+	{  0x00000627, 0xC7  },
+	{  0x00000628, 0xC8  },
+	{  0x00000629, 0xC9  },
+	{  0x0000062A, 0xCA  },
+	{  0x0000062B, 0xCB  },
+	{  0x0000062C, 0xCC  },
+	{  0x0000062D, 0xCD  },
+	{  0x0000062E, 0xCE  },
+	{  0x0000062F, 0xCF  },
+	{  0x00000630, 0xD0  },
+	{  0x00000631, 0xD1  },
+	{  0x00000632, 0xD2  },
+	{  0x00000633, 0xD3  },
+	{  0x00000634, 0xD4  },
+	{  0x00000635, 0xD5  },
+	{  0x00000636, 0xD6  },
+	{  0x00000637, 0xD7  },
+	{  0x00000638, 0xD8  },
+	{  0x00000639, 0xD9  },
+	{  0x0000063A, 0xDA  },
+	{  0x00000640, 0xE0  },
+	{  0x00000641, 0xE1  },
+	{  0x00000642, 0xE2  },
+	{  0x00000643, 0xE3  },
+	{  0x00000644, 0xE4  },
+	{  0x00000645, 0xE5  },
+	{  0x00000646, 0xE6  },
+	{  0x00000647, 0xE7  },
+	{  0x00000648, 0xE8  },
+	{  0x00000649, 0xE9  },
+	{  0x0000064A, 0xEA  },
+	{  0x0000064B, 0xEB  },
+	{  0x0000064C, 0xEC  },
+	{  0x0000064D, 0xED  },
+	{  0x0000064E, 0xEE  },
+	{  0x0000064F, 0xEF  },
+	{  0x00000650, 0xF0  },
+	{  0x00000651, 0xF1  },
+	{  0x00000652, 0xF2  },

@@ -48,8 +48,9 @@ extern struct devsw fwohci;
 
 /* Exported for libstand */
 struct devsw *devsw[] = {
+    &biosfd,
     &bioscd,
-    &biosdisk,
+    &bioshd,
     &pxedisk,
 #if defined(LOADER_FIREWIRE_SUPPORT)
     &fwohci,

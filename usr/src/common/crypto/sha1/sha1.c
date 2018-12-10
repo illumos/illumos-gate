@@ -32,6 +32,10 @@
  * and appreciated.
  */
 
+#if defined(_STANDALONE)
+#include <sys/cdefs.h>
+#define	_RESTRICT_KYWD	restrict
+#else
 #if !defined(_KERNEL) && !defined(_BOOT)
 #include <stdint.h>
 #include <strings.h>
@@ -39,6 +43,7 @@
 #include <errno.h>
 #include <sys/systeminfo.h>
 #endif  /* !_KERNEL && !_BOOT */
+#endif	/* _STANDALONE */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -47,10 +52,20 @@
 #include <sys/sha1.h>
 #include <sys/sha1_consts.h>
 
+#if defined(_STANDALONE)
+#include <sys/endian.h>
+#define	HAVE_HTONL
+#if _BYTE_ORDER == _LITTLE_ENDIAN
+#undef _BIG_ENDIAN
+#else
+#undef _LITTLE_ENDIAN
+#endif
+#else
 #ifdef _LITTLE_ENDIAN
 #include <sys/byteorder.h>
 #define	HAVE_HTONL
 #endif
+#endif /* _STANDALONE */
 
 #ifdef	_BOOT
 #define	bcopy(_s, _d, _l)	((void) memcpy((_d), (_s), (_l)))

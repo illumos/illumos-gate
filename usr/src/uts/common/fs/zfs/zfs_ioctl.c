@@ -3724,7 +3724,6 @@ zfs_ioc_pool_discard_checkpoint(const char *poolname, nvlist_t *innvl,
 /*
  * inputs:
  * zc_name		name of dataset to destroy
- * zc_objset_type	type of objset
  * zc_defer_destroy	mark for deferred destroy
  *
  * outputs:		none
@@ -3732,16 +3731,24 @@ zfs_ioc_pool_discard_checkpoint(const char *poolname, nvlist_t *innvl,
 static int
 zfs_ioc_destroy(zfs_cmd_t *zc)
 {
+	objset_t *os;
+	dmu_objset_type_t ost;
 	int err;
 
-	if (zc->zc_objset_type == DMU_OST_ZFS)
+	err = dmu_objset_hold(zc->zc_name, FTAG, &os);
+	if (err != 0)
+		return (err);
+	ost = dmu_objset_type(os);
+	dmu_objset_rele(os, FTAG);
+
+	if (ost == DMU_OST_ZFS)
 		zfs_unmount_snap(zc->zc_name);
 
 	if (strchr(zc->zc_name, '@'))
 		err = dsl_destroy_snapshot(zc->zc_name, zc->zc_defer_destroy);
 	else
 		err = dsl_destroy_head(zc->zc_name);
-	if (zc->zc_objset_type == DMU_OST_ZVOL && err == 0)
+	if (ost == DMU_OST_ZVOL && err == 0)
 		(void) zvol_remove_minor(zc->zc_name);
 	return (err);
 }
@@ -3892,8 +3899,11 @@ recursive_unmount(const char *fsname, void *arg)
 static int
 zfs_ioc_rename(zfs_cmd_t *zc)
 {
+	objset_t *os;
+	dmu_objset_type_t ost;
 	boolean_t recursive = zc->zc_cookie & 1;
 	char *at;
+	int err;
 
 	/* "zfs rename" from and to ...%recv datasets should both fail */
 	zc->zc_name[sizeof (zc->zc_name) - 1] = '\0';
@@ -3903,6 +3913,12 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 	    strchr(zc->zc_name, '%') || strchr(zc->zc_value, '%'))
 		return (SET_ERROR(EINVAL));
 
+	err = dmu_objset_hold(zc->zc_name, FTAG, &os);
+	if (err != 0)
+		return (err);
+	ost = dmu_objset_type(os);
+	dmu_objset_rele(os, FTAG);
+
 	at = strchr(zc->zc_name, '@');
 	if (at != NULL) {
 		/* snaps must be in same fs */
@@ -3911,7 +3927,7 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 		if (strncmp(zc->zc_name, zc->zc_value, at - zc->zc_name + 1))
 			return (SET_ERROR(EXDEV));
 		*at = '\0';
-		if (zc->zc_objset_type == DMU_OST_ZFS) {
+		if (ost == DMU_OST_ZFS) {
 			error = dmu_objset_find(zc->zc_name,
 			    recursive_unmount, at + 1,
 			    recursive ? DS_FIND_CHILDREN : 0);
@@ -3926,7 +3942,7 @@ zfs_ioc_rename(zfs_cmd_t *zc)
 
 		return (error);
 	} else {
-		if (zc->zc_objset_type == DMU_OST_ZVOL)
+		if (ost == DMU_OST_ZVOL)
 			(void) zvol_remove_minor(zc->zc_name);
 		return (dsl_dir_rename(zc->zc_name, zc->zc_value));
 	}

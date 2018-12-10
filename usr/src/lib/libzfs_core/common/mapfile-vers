@@ -37,12 +37,18 @@
 
 $mapfile_version 2
 
+SYMBOL_VERSION ILLUMOS_0.4 {
+	global:
+
+	lzc_destroy;
+	lzc_rename;
+} ILLUMOS_0.3;
+
 SYMBOL_VERSION ILLUMOS_0.3 {
 	global:
 
 	lzc_initialize;
 } ILLUMOS_0.2;
-
 
 SYMBOL_VERSION ILLUMOS_0.2 {
 	global:
@@ -60,7 +66,6 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 	lzc_channel_program;
 	lzc_channel_program_nosync;
 	lzc_clone;
-	lzc_promote;
 	lzc_create;
 	lzc_destroy_bookmarks;
 	lzc_destroy_snaps;
@@ -68,6 +73,7 @@ SYMBOL_VERSION ILLUMOS_0.1 {
 	lzc_get_bookmarks;
 	lzc_get_holds;
 	lzc_hold;
+	lzc_promote;
 	lzc_receive;
 	lzc_receive_resumable;
 	lzc_receive_with_header;

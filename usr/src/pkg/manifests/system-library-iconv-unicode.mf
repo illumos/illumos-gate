@@ -1,0 +1,756 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+#
+
+set name=pkg.fmri value=pkg:/system/library/iconv/unicode@$(PKGVERS)
+set name=pkg.description value="iconv modules for Unicode"
+set name=pkg.summary value="iconv modules for Unicode"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Internationalization
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/iconv
+dir path=usr/lib/iconv/$(ARCH64)
+file path=usr/lib/iconv/$(ARCH64)/BIG5%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/Big5-HKSCS%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UCS-2.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UCS-2BE.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UTF-16.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UTF-16BE.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UTF-16LE.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UTF-32.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UTF-32BE.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UTF-32LE.so
+file path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/GBK%UCS-2BE.so
+file path=usr/lib/iconv/$(ARCH64)/GBK%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/GBK%UCS-4BE.so
+file path=usr/lib/iconv/$(ARCH64)/GBK%UCS-4LE.so
+file path=usr/lib/iconv/$(ARCH64)/HZ-GB-2312%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/IBM-838%IBM-874.so
+file path=usr/lib/iconv/$(ARCH64)/IBM-874%IBM-838.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UCS-2.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UCS-2BE.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UTF-16.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UTF-16BE.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UTF-16LE.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UTF-32.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UTF-32BE.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UTF-32LE.so
+file path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UCS-2.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UCS-2BE.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UTF-16.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UTF-16BE.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UTF-16LE.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UTF-32.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UTF-32BE.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UTF-32LE.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UTF-8-Java.so
+file path=usr/lib/iconv/$(ARCH64)/PCK%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UCS-2.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UCS-2BE.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UTF-16.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UTF-16BE.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UTF-16LE.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UTF-32.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UTF-32BE.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UTF-32LE.so
+file path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2BE%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2BE%GBK.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2BE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2BE%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2BE%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2BE%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2BE%ko_KR-cp949.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2BE%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%BIG5.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%Big5-HKSCS.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%GBK.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%cns11643.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%gb2312.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%ko_KR-cp949.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-2LE%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-4BE%GBK.so
+file path=usr/lib/iconv/$(ARCH64)/UCS-4LE%GBK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16BE%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16BE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16BE%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16BE%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16BE%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16BE%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16LE%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16LE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16LE%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16LE%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16LE%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-16LE%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32BE%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32BE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32BE%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32BE%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32BE%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32BE%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32LE%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32LE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32LE%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32LE%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32LE%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-32LE%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%EUC-JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%HZ-GB-2312.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%ISO-2022-JP.RFC1468.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%ISO-2022-JP.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%Shift_JIS-2004.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%UTF-8-ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%eucJP-ms.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%iscii91.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%ms932.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_CN-cp935.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_CN.euc.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_CN.iso2022-7.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_CN.iso2022-CN.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_HK.hkscs.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW-big5p.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW-cp937.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW-euc.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW-iso2022-7.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8-Java%PCK.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8-Java%eucJP.so
+file path=usr/lib/iconv/$(ARCH64)/UTF-8-ms932%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/cns11643%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP%UTF-8-Java.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UCS-2.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UCS-2BE.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UTF-16.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UTF-16BE.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UTF-16LE.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UTF-32.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UTF-32BE.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UTF-32LE.so
+file path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/gb2312%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/iscii91%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-UTF-8%ko_KR-cp933.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-UTF-8%ko_KR-cp949.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-UTF-8%ko_KR-euc.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-UTF-8%ko_KR-iso2022-7.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-UTF-8%ko_KR-johap.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-UTF-8%ko_KR-johap92.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-cp933%ko_KR-UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-cp949%UCS-2BE.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-cp949%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-cp949%ko_KR-UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-euc%ko_KR-UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-iso2022-7%ko_KR-UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-johap%ko_KR-UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/ko_KR-johap92%ko_KR-UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UCS-2.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UCS-2BE.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UCS-2LE.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UTF-16.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UTF-16BE.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UTF-16LE.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UTF-32.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UTF-32BE.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UTF-32LE.so
+file path=usr/lib/iconv/$(ARCH64)/ms932%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_CN-cp935%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_CN.euc%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_CN.iso2022-7%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_CN.iso2022-CN%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_HK.hkscs%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_TW-big5p%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_TW-cp937%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_TW-euc%UTF-8.so
+file path=usr/lib/iconv/$(ARCH64)/zh_TW-iso2022-7%UTF-8.so
+file path=usr/lib/iconv/BIG5%UCS-2LE.so
+file path=usr/lib/iconv/Big5-HKSCS%UCS-2LE.so
+file path=usr/lib/iconv/EUC-JIS-2004%UCS-2.so
+file path=usr/lib/iconv/EUC-JIS-2004%UCS-2BE.so
+file path=usr/lib/iconv/EUC-JIS-2004%UCS-2LE.so
+file path=usr/lib/iconv/EUC-JIS-2004%UTF-16.so
+file path=usr/lib/iconv/EUC-JIS-2004%UTF-16BE.so
+file path=usr/lib/iconv/EUC-JIS-2004%UTF-16LE.so
+file path=usr/lib/iconv/EUC-JIS-2004%UTF-32.so
+file path=usr/lib/iconv/EUC-JIS-2004%UTF-32BE.so
+file path=usr/lib/iconv/EUC-JIS-2004%UTF-32LE.so
+file path=usr/lib/iconv/EUC-JIS-2004%UTF-8.so
+file path=usr/lib/iconv/GBK%UCS-2BE.so
+file path=usr/lib/iconv/GBK%UCS-2LE.so
+file path=usr/lib/iconv/GBK%UCS-4BE.so
+file path=usr/lib/iconv/GBK%UCS-4LE.so
+file path=usr/lib/iconv/HZ-GB-2312%UTF-8.so
+file path=usr/lib/iconv/IBM-838%IBM-874.so
+file path=usr/lib/iconv/IBM-874%IBM-838.so
+file path=usr/lib/iconv/ISO-2022-JP%UTF-8.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UCS-2.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UCS-2BE.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UCS-2LE.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UTF-16.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UTF-16BE.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UTF-16LE.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UTF-32.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UTF-32BE.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UTF-32LE.so
+file path=usr/lib/iconv/ISO-2022-JP-2004%UTF-8.so
+file path=usr/lib/iconv/PCK%UCS-2.so
+file path=usr/lib/iconv/PCK%UCS-2BE.so
+file path=usr/lib/iconv/PCK%UCS-2LE.so
+file path=usr/lib/iconv/PCK%UTF-16.so
+file path=usr/lib/iconv/PCK%UTF-16BE.so
+file path=usr/lib/iconv/PCK%UTF-16LE.so
+file path=usr/lib/iconv/PCK%UTF-32.so
+file path=usr/lib/iconv/PCK%UTF-32BE.so
+file path=usr/lib/iconv/PCK%UTF-32LE.so
+file path=usr/lib/iconv/PCK%UTF-8-Java.so
+file path=usr/lib/iconv/PCK%UTF-8.so
+file path=usr/lib/iconv/Shift_JIS-2004%UCS-2.so
+file path=usr/lib/iconv/Shift_JIS-2004%UCS-2BE.so
+file path=usr/lib/iconv/Shift_JIS-2004%UCS-2LE.so
+file path=usr/lib/iconv/Shift_JIS-2004%UTF-16.so
+file path=usr/lib/iconv/Shift_JIS-2004%UTF-16BE.so
+file path=usr/lib/iconv/Shift_JIS-2004%UTF-16LE.so
+file path=usr/lib/iconv/Shift_JIS-2004%UTF-32.so
+file path=usr/lib/iconv/Shift_JIS-2004%UTF-32BE.so
+file path=usr/lib/iconv/Shift_JIS-2004%UTF-32LE.so
+file path=usr/lib/iconv/Shift_JIS-2004%UTF-8.so
+file path=usr/lib/iconv/UCS-2%EUC-JIS-2004.so
+file path=usr/lib/iconv/UCS-2%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UCS-2%PCK.so
+file path=usr/lib/iconv/UCS-2%Shift_JIS-2004.so
+file path=usr/lib/iconv/UCS-2%eucJP-ms.so
+file path=usr/lib/iconv/UCS-2%ms932.so
+file path=usr/lib/iconv/UCS-2BE%EUC-JIS-2004.so
+file path=usr/lib/iconv/UCS-2BE%GBK.so
+file path=usr/lib/iconv/UCS-2BE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UCS-2BE%PCK.so
+file path=usr/lib/iconv/UCS-2BE%Shift_JIS-2004.so
+file path=usr/lib/iconv/UCS-2BE%eucJP-ms.so
+file path=usr/lib/iconv/UCS-2BE%ko_KR-cp949.so
+file path=usr/lib/iconv/UCS-2BE%ms932.so
+file path=usr/lib/iconv/UCS-2LE%BIG5.so
+file path=usr/lib/iconv/UCS-2LE%Big5-HKSCS.so
+file path=usr/lib/iconv/UCS-2LE%EUC-JIS-2004.so
+file path=usr/lib/iconv/UCS-2LE%GBK.so
+file path=usr/lib/iconv/UCS-2LE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UCS-2LE%PCK.so
+file path=usr/lib/iconv/UCS-2LE%Shift_JIS-2004.so
+file path=usr/lib/iconv/UCS-2LE%cns11643.so
+file path=usr/lib/iconv/UCS-2LE%eucJP-ms.so
+file path=usr/lib/iconv/UCS-2LE%gb2312.so
+file path=usr/lib/iconv/UCS-2LE%ko_KR-cp949.so
+file path=usr/lib/iconv/UCS-2LE%ms932.so
+file path=usr/lib/iconv/UCS-4BE%GBK.so
+file path=usr/lib/iconv/UCS-4LE%GBK.so
+file path=usr/lib/iconv/UTF-16%EUC-JIS-2004.so
+file path=usr/lib/iconv/UTF-16%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UTF-16%PCK.so
+file path=usr/lib/iconv/UTF-16%Shift_JIS-2004.so
+file path=usr/lib/iconv/UTF-16%eucJP-ms.so
+file path=usr/lib/iconv/UTF-16%ms932.so
+file path=usr/lib/iconv/UTF-16BE%EUC-JIS-2004.so
+file path=usr/lib/iconv/UTF-16BE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UTF-16BE%PCK.so
+file path=usr/lib/iconv/UTF-16BE%Shift_JIS-2004.so
+file path=usr/lib/iconv/UTF-16BE%eucJP-ms.so
+file path=usr/lib/iconv/UTF-16BE%ms932.so
+file path=usr/lib/iconv/UTF-16LE%EUC-JIS-2004.so
+file path=usr/lib/iconv/UTF-16LE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UTF-16LE%PCK.so
+file path=usr/lib/iconv/UTF-16LE%Shift_JIS-2004.so
+file path=usr/lib/iconv/UTF-16LE%eucJP-ms.so
+file path=usr/lib/iconv/UTF-16LE%ms932.so
+file path=usr/lib/iconv/UTF-32%EUC-JIS-2004.so
+file path=usr/lib/iconv/UTF-32%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UTF-32%PCK.so
+file path=usr/lib/iconv/UTF-32%Shift_JIS-2004.so
+file path=usr/lib/iconv/UTF-32%eucJP-ms.so
+file path=usr/lib/iconv/UTF-32%ms932.so
+file path=usr/lib/iconv/UTF-32BE%EUC-JIS-2004.so
+file path=usr/lib/iconv/UTF-32BE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UTF-32BE%PCK.so
+file path=usr/lib/iconv/UTF-32BE%Shift_JIS-2004.so
+file path=usr/lib/iconv/UTF-32BE%eucJP-ms.so
+file path=usr/lib/iconv/UTF-32BE%ms932.so
+file path=usr/lib/iconv/UTF-32LE%EUC-JIS-2004.so
+file path=usr/lib/iconv/UTF-32LE%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UTF-32LE%PCK.so
+file path=usr/lib/iconv/UTF-32LE%Shift_JIS-2004.so
+file path=usr/lib/iconv/UTF-32LE%eucJP-ms.so
+file path=usr/lib/iconv/UTF-32LE%ms932.so
+file path=usr/lib/iconv/UTF-8%EUC-JIS-2004.so
+file path=usr/lib/iconv/UTF-8%HZ-GB-2312.so
+file path=usr/lib/iconv/UTF-8%ISO-2022-JP-2004.so
+file path=usr/lib/iconv/UTF-8%ISO-2022-JP.RFC1468.so
+file path=usr/lib/iconv/UTF-8%ISO-2022-JP.so
+file path=usr/lib/iconv/UTF-8%PCK.so
+file path=usr/lib/iconv/UTF-8%Shift_JIS-2004.so
+file path=usr/lib/iconv/UTF-8%UTF-8-ms932.so
+file path=usr/lib/iconv/UTF-8%eucJP-ms.so
+file path=usr/lib/iconv/UTF-8%iscii91.so
+file path=usr/lib/iconv/UTF-8%ms932.so
+file path=usr/lib/iconv/UTF-8%zh_CN-cp935.so
+file path=usr/lib/iconv/UTF-8%zh_CN.euc.so
+file path=usr/lib/iconv/UTF-8%zh_CN.iso2022-7.so
+file path=usr/lib/iconv/UTF-8%zh_CN.iso2022-CN.so
+file path=usr/lib/iconv/UTF-8%zh_HK.hkscs.so
+file path=usr/lib/iconv/UTF-8%zh_TW-big5p.so
+file path=usr/lib/iconv/UTF-8%zh_TW-cp937.so
+file path=usr/lib/iconv/UTF-8%zh_TW-euc.so
+file path=usr/lib/iconv/UTF-8%zh_TW-iso2022-7.so
+file path=usr/lib/iconv/UTF-8-Java%PCK.so
+file path=usr/lib/iconv/UTF-8-Java%eucJP.so
+file path=usr/lib/iconv/UTF-8-ms932%UTF-8.so
+file path=usr/lib/iconv/cns11643%UCS-2LE.so
+file path=usr/lib/iconv/eucJP%UTF-8-Java.so
+file path=usr/lib/iconv/eucJP-ms%UCS-2.so
+file path=usr/lib/iconv/eucJP-ms%UCS-2BE.so
+file path=usr/lib/iconv/eucJP-ms%UCS-2LE.so
+file path=usr/lib/iconv/eucJP-ms%UTF-16.so
+file path=usr/lib/iconv/eucJP-ms%UTF-16BE.so
+file path=usr/lib/iconv/eucJP-ms%UTF-16LE.so
+file path=usr/lib/iconv/eucJP-ms%UTF-32.so
+file path=usr/lib/iconv/eucJP-ms%UTF-32BE.so
+file path=usr/lib/iconv/eucJP-ms%UTF-32LE.so
+file path=usr/lib/iconv/eucJP-ms%UTF-8.so
+file path=usr/lib/iconv/gb2312%UCS-2LE.so
+file path=usr/lib/iconv/iscii91%UTF-8.so
+file path=usr/lib/iconv/ko_KR-UTF-8%ko_KR-cp933.so
+file path=usr/lib/iconv/ko_KR-UTF-8%ko_KR-cp949.so
+file path=usr/lib/iconv/ko_KR-UTF-8%ko_KR-euc.so
+file path=usr/lib/iconv/ko_KR-UTF-8%ko_KR-iso2022-7.so
+file path=usr/lib/iconv/ko_KR-UTF-8%ko_KR-johap.so
+file path=usr/lib/iconv/ko_KR-UTF-8%ko_KR-johap92.so
+file path=usr/lib/iconv/ko_KR-cp933%ko_KR-UTF-8.so
+file path=usr/lib/iconv/ko_KR-cp949%UCS-2BE.so
+file path=usr/lib/iconv/ko_KR-cp949%UCS-2LE.so
+file path=usr/lib/iconv/ko_KR-cp949%ko_KR-UTF-8.so
+file path=usr/lib/iconv/ko_KR-euc%ko_KR-UTF-8.so
+file path=usr/lib/iconv/ko_KR-iso2022-7%ko_KR-UTF-8.so
+file path=usr/lib/iconv/ko_KR-johap%ko_KR-UTF-8.so
+file path=usr/lib/iconv/ko_KR-johap92%ko_KR-UTF-8.so
+file path=usr/lib/iconv/ms932%UCS-2.so
+file path=usr/lib/iconv/ms932%UCS-2BE.so
+file path=usr/lib/iconv/ms932%UCS-2LE.so
+file path=usr/lib/iconv/ms932%UTF-16.so
+file path=usr/lib/iconv/ms932%UTF-16BE.so
+file path=usr/lib/iconv/ms932%UTF-16LE.so
+file path=usr/lib/iconv/ms932%UTF-32.so
+file path=usr/lib/iconv/ms932%UTF-32BE.so
+file path=usr/lib/iconv/ms932%UTF-32LE.so
+file path=usr/lib/iconv/ms932%UTF-8.so
+file path=usr/lib/iconv/zh_CN-cp935%UTF-8.so
+file path=usr/lib/iconv/zh_CN.euc%UTF-8.so
+file path=usr/lib/iconv/zh_CN.iso2022-7%UTF-8.so
+file path=usr/lib/iconv/zh_CN.iso2022-CN%UTF-8.so
+file path=usr/lib/iconv/zh_HK.hkscs%UTF-8.so
+file path=usr/lib/iconv/zh_TW-big5p%UTF-8.so
+file path=usr/lib/iconv/zh_TW-cp937%UTF-8.so
+file path=usr/lib/iconv/zh_TW-euc%UTF-8.so
+file path=usr/lib/iconv/zh_TW-iso2022-7%UTF-8.so
+legacy pkg=SUNWiconv-unicode category=system,l10n \
+    desc="iconv modules for Unicode" name="iconv modules for Unicode"
+license cr_Sun license=cr_Sun
+license lic_CDDL license=lic_CDDL
+license usr/src/lib/iconv_modules/THIRDPARTYLICENSE.unicode \
+    license=usr/src/lib/iconv_modules/THIRDPARTYLICENSE.unicode
+link path=usr/lib/iconv/$(ARCH64)/5601%UCS-2BE.so \
+    target=./ko_KR-cp949%UCS-2BE.so
+link path=usr/lib/iconv/$(ARCH64)/5601%UCS-2LE.so \
+    target=./ko_KR-cp949%UCS-2LE.so
+link path=usr/lib/iconv/$(ARCH64)/5601%UTF-8.so \
+    target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/BIG5P%UTF-8.so target=./zh_TW-big5p%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/Big5-HKSCS%UTF-8.so \
+    target=./zh_HK.hkscs%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UCS-4.so \
+    target=./EUC-JIS-2004%UTF-32.so
+link path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UCS-4BE.so \
+    target=./EUC-JIS-2004%UTF-32BE.so
+link path=usr/lib/iconv/$(ARCH64)/EUC-JIS-2004%UCS-4LE.so \
+    target=./EUC-JIS-2004%UTF-32LE.so
+link path=usr/lib/iconv/$(ARCH64)/EUC-KR%UTF-8.so \
+    target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/GB18030%UCS-2BE.so target=./GBK%UCS-2BE.so
+link path=usr/lib/iconv/$(ARCH64)/GB18030%UCS-2LE.so target=./GBK%UCS-2LE.so
+link path=usr/lib/iconv/$(ARCH64)/GB18030%UCS-4BE.so target=./GBK%UCS-4BE.so
+link path=usr/lib/iconv/$(ARCH64)/GB18030%UCS-4LE.so target=./GBK%UCS-4LE.so
+link path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UCS-4.so \
+    target=./ISO-2022-JP-2004%UTF-32.so
+link path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UCS-4BE.so \
+    target=./ISO-2022-JP-2004%UTF-32BE.so
+link path=usr/lib/iconv/$(ARCH64)/ISO-2022-JP-2004%UCS-4LE.so \
+    target=./ISO-2022-JP-2004%UTF-32LE.so
+link path=usr/lib/iconv/$(ARCH64)/ISO-2022-KR%UTF-8.so \
+    target=./ko_KR-iso2022-7%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/KSC5601%UTF-8.so \
+    target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/KSX1001%UTF-8.so \
+    target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/PCK%UCS-4.so target=./PCK%UTF-32.so
+link path=usr/lib/iconv/$(ARCH64)/PCK%UCS-4BE.so target=./PCK%UTF-32BE.so
+link path=usr/lib/iconv/$(ARCH64)/PCK%UCS-4LE.so target=./PCK%UTF-32LE.so
+link path=usr/lib/iconv/$(ARCH64)/SJIS%UTF-8.so target=./PCK%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UCS-4.so \
+    target=./Shift_JIS-2004%UTF-32.so
+link path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UCS-4BE.so \
+    target=./Shift_JIS-2004%UTF-32BE.so
+link path=usr/lib/iconv/$(ARCH64)/Shift_JIS-2004%UCS-4LE.so \
+    target=./Shift_JIS-2004%UTF-32LE.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-2BE%5601.so \
+    target=./UCS-2BE%ko_KR-cp949.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-2BE%GB18030.so target=./UCS-2BE%GBK.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-2LE%5601.so \
+    target=./UCS-2LE%ko_KR-cp949.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-2LE%GB18030.so target=./UCS-2LE%GBK.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4%EUC-JIS-2004.so \
+    target=./UTF-32%EUC-JIS-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4%ISO-2022-JP-2004.so \
+    target=./UTF-32%ISO-2022-JP-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4%PCK.so target=./UTF-32%PCK.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4%Shift_JIS-2004.so \
+    target=./UTF-32%Shift_JIS-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4%eucJP-ms.so \
+    target=./UTF-32%eucJP-ms.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4%ms932.so target=./UTF-32%ms932.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%EUC-JIS-2004.so \
+    target=./UTF-32BE%EUC-JIS-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%GB18030.so target=./UCS-4BE%GBK.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%ISO-2022-JP-2004.so \
+    target=./UTF-32BE%ISO-2022-JP-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%PCK.so target=./UTF-32BE%PCK.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%Shift_JIS-2004.so \
+    target=./UTF-32BE%Shift_JIS-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%eucJP-ms.so \
+    target=./UTF-32BE%eucJP-ms.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4BE%ms932.so target=./UTF-32BE%ms932.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%EUC-JIS-2004.so \
+    target=./UTF-32LE%EUC-JIS-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%GB18030.so target=./UCS-4LE%GBK.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%ISO-2022-JP-2004.so \
+    target=./UTF-32LE%ISO-2022-JP-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%PCK.so target=./UTF-32LE%PCK.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%Shift_JIS-2004.so \
+    target=./UTF-32LE%Shift_JIS-2004.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%eucJP-ms.so \
+    target=./UTF-32LE%eucJP-ms.so
+link path=usr/lib/iconv/$(ARCH64)/UCS-4LE%ms932.so target=./UTF-32LE%ms932.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%5601.so \
+    target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%BIG5P.so target=./UTF-8%zh_TW-big5p.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%Big5-HKSCS.so \
+    target=./UTF-8%zh_HK.hkscs.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%EUC-KR.so \
+    target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ISO-2022-KR.so \
+    target=./ko_KR-UTF-8%ko_KR-iso2022-7.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%KSC5601.so \
+    target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%KSX1001.so \
+    target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%SJIS.so target=./UTF-8%PCK.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%cns11643.so \
+    target=./UTF-8%zh_TW-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%gb2312.so target=./UTF-8%zh_CN.euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%iso2022.so \
+    target=./UTF-8%zh_CN.iso2022-7.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR-cp933.so \
+    target=./ko_KR-UTF-8%ko_KR-cp933.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR-cp949.so \
+    target=./ko_KR-UTF-8%ko_KR-cp949.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR-euc.so \
+    target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR-iso2022-7.so \
+    target=./ko_KR-UTF-8%ko_KR-iso2022-7.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR-johap.so \
+    target=./ko_KR-UTF-8%ko_KR-johap.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR-johap92.so \
+    target=./ko_KR-UTF-8%ko_KR-johap92.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR.EUC.so \
+    target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR.cp933.so \
+    target=./ko_KR-UTF-8%ko_KR-cp933.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR.cp949.so \
+    target=./ko_KR-UTF-8%ko_KR-cp949.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR.euc.so \
+    target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR.iso2022-7.so \
+    target=./ko_KR-UTF-8%ko_KR-iso2022-7.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR.johap.so \
+    target=./ko_KR-UTF-8%ko_KR-johap.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%ko_KR.johap92.so \
+    target=./ko_KR-UTF-8%ko_KR-johap92.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_HK-big5hk.so \
+    target=./UTF-8%zh_HK.hkscs.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_HK.big5hk.so \
+    target=./UTF-8%zh_HK.hkscs.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW.big5p.so \
+    target=./UTF-8%zh_TW-big5p.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW.cp937.so \
+    target=./UTF-8%zh_TW-cp937.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW.euc.so \
+    target=./UTF-8%zh_TW-euc.so
+link path=usr/lib/iconv/$(ARCH64)/UTF-8%zh_TW.iso2022-7.so \
+    target=./UTF-8%zh_TW-iso2022-7.so
+link path=usr/lib/iconv/$(ARCH64)/UnifiedHangul%ko_KR-UTF-8.so \
+    target=./ko_KR-cp949%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/cns11643%UTF-8.so \
+    target=./zh_TW-euc%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UCS-4.so \
+    target=./eucJP-ms%UTF-32.so
+link path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UCS-4BE.so \
+    target=./eucJP-ms%UTF-32BE.so
+link path=usr/lib/iconv/$(ARCH64)/eucJP-ms%UCS-4LE.so \
+    target=./eucJP-ms%UTF-32LE.so
+link path=usr/lib/iconv/$(ARCH64)/gb2312%UTF-8.so target=./zh_CN.euc%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/iso2022%UTF-8.so \
+    target=./zh_CN.iso2022-7%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR-UTF-8%UnifiedHangul.so \
+    target=./ko_KR-UTF-8%ko_KR-cp949.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR-cp933%UTF-8.so \
+    target=./ko_KR-cp933%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR-cp949%UTF-8.so \
+    target=./ko_KR-cp949%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR-euc%UTF-8.so \
+    target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR-iso2022-7%UTF-8.so \
+    target=./ko_KR-iso2022-7%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR-johap%UTF-8.so \
+    target=./ko_KR-johap%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR-johap92%UTF-8.so \
+    target=./ko_KR-johap92%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR.EUC%UTF-8.so \
+    target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR.cp933%UTF-8.so \
+    target=./ko_KR-cp933%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR.cp949%UTF-8.so \
+    target=./ko_KR-cp949%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR.euc%UTF-8.so \
+    target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR.iso2022-7%UTF-8.so \
+    target=./ko_KR-iso2022-7%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR.johap%UTF-8.so \
+    target=./ko_KR-johap%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ko_KR.johap92%UTF-8.so \
+    target=./ko_KR-johap92%ko_KR-UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/ms932%UCS-4.so target=./ms932%UTF-32.so
+link path=usr/lib/iconv/$(ARCH64)/ms932%UCS-4BE.so target=./ms932%UTF-32BE.so
+link path=usr/lib/iconv/$(ARCH64)/ms932%UCS-4LE.so target=./ms932%UTF-32LE.so
+link path=usr/lib/iconv/$(ARCH64)/zh_HK-big5hk%UTF-8.so \
+    target=./zh_HK.hkscs%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/zh_HK.big5hk%UTF-8.so \
+    target=./zh_HK.hkscs%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/zh_TW.big5p%UTF-8.so \
+    target=./zh_TW-big5p%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/zh_TW.cp937%UTF-8.so \
+    target=./zh_TW-cp937%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/zh_TW.euc%UTF-8.so \
+    target=./zh_TW-euc%UTF-8.so
+link path=usr/lib/iconv/$(ARCH64)/zh_TW.iso2022-7%UTF-8.so \
+    target=./zh_TW-iso2022-7%UTF-8.so
+link path=usr/lib/iconv/5601%UCS-2BE.so target=./ko_KR-cp949%UCS-2BE.so
+link path=usr/lib/iconv/5601%UCS-2LE.so target=./ko_KR-cp949%UCS-2LE.so
+link path=usr/lib/iconv/5601%UTF-8.so target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/BIG5P%UTF-8.so target=./zh_TW-big5p%UTF-8.so
+link path=usr/lib/iconv/Big5-HKSCS%UTF-8.so target=./zh_HK.hkscs%UTF-8.so
+link path=usr/lib/iconv/EUC-JIS-2004%UCS-4.so target=./EUC-JIS-2004%UTF-32.so
+link path=usr/lib/iconv/EUC-JIS-2004%UCS-4BE.so \
+    target=./EUC-JIS-2004%UTF-32BE.so
+link path=usr/lib/iconv/EUC-JIS-2004%UCS-4LE.so \
+    target=./EUC-JIS-2004%UTF-32LE.so
+link path=usr/lib/iconv/EUC-KR%UTF-8.so target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/GB18030%UCS-2BE.so target=./GBK%UCS-2BE.so
+link path=usr/lib/iconv/GB18030%UCS-2LE.so target=./GBK%UCS-2LE.so
+link path=usr/lib/iconv/GB18030%UCS-4BE.so target=./GBK%UCS-4BE.so
+link path=usr/lib/iconv/GB18030%UCS-4LE.so target=./GBK%UCS-4LE.so
+link path=usr/lib/iconv/ISO-2022-JP-2004%UCS-4.so \
+    target=./ISO-2022-JP-2004%UTF-32.so
+link path=usr/lib/iconv/ISO-2022-JP-2004%UCS-4BE.so \
+    target=./ISO-2022-JP-2004%UTF-32BE.so
+link path=usr/lib/iconv/ISO-2022-JP-2004%UCS-4LE.so \
+    target=./ISO-2022-JP-2004%UTF-32LE.so
+link path=usr/lib/iconv/ISO-2022-KR%UTF-8.so \
+    target=./ko_KR-iso2022-7%ko_KR-UTF-8.so
+link path=usr/lib/iconv/KSC5601%UTF-8.so target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/KSX1001%UTF-8.so target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/PCK%UCS-4.so target=./PCK%UTF-32.so
+link path=usr/lib/iconv/PCK%UCS-4BE.so target=./PCK%UTF-32BE.so
+link path=usr/lib/iconv/PCK%UCS-4LE.so target=./PCK%UTF-32LE.so
+link path=usr/lib/iconv/SJIS%UTF-8.so target=./PCK%UTF-8.so
+link path=usr/lib/iconv/Shift_JIS-2004%UCS-4.so \
+    target=./Shift_JIS-2004%UTF-32.so
+link path=usr/lib/iconv/Shift_JIS-2004%UCS-4BE.so \
+    target=./Shift_JIS-2004%UTF-32BE.so
+link path=usr/lib/iconv/Shift_JIS-2004%UCS-4LE.so \
+    target=./Shift_JIS-2004%UTF-32LE.so
+link path=usr/lib/iconv/UCS-2BE%5601.so target=./UCS-2BE%ko_KR-cp949.so
+link path=usr/lib/iconv/UCS-2BE%GB18030.so target=./UCS-2BE%GBK.so
+link path=usr/lib/iconv/UCS-2LE%5601.so target=./UCS-2LE%ko_KR-cp949.so
+link path=usr/lib/iconv/UCS-2LE%GB18030.so target=./UCS-2LE%GBK.so
+link path=usr/lib/iconv/UCS-4%EUC-JIS-2004.so target=./UTF-32%EUC-JIS-2004.so
+link path=usr/lib/iconv/UCS-4%ISO-2022-JP-2004.so \
+    target=./UTF-32%ISO-2022-JP-2004.so
+link path=usr/lib/iconv/UCS-4%PCK.so target=./UTF-32%PCK.so
+link path=usr/lib/iconv/UCS-4%Shift_JIS-2004.so \
+    target=./UTF-32%Shift_JIS-2004.so
+link path=usr/lib/iconv/UCS-4%eucJP-ms.so target=./UTF-32%eucJP-ms.so
+link path=usr/lib/iconv/UCS-4%ms932.so target=./UTF-32%ms932.so
+link path=usr/lib/iconv/UCS-4BE%EUC-JIS-2004.so \
+    target=./UTF-32BE%EUC-JIS-2004.so
+link path=usr/lib/iconv/UCS-4BE%GB18030.so target=./UCS-4BE%GBK.so
+link path=usr/lib/iconv/UCS-4BE%ISO-2022-JP-2004.so \
+    target=./UTF-32BE%ISO-2022-JP-2004.so
+link path=usr/lib/iconv/UCS-4BE%PCK.so target=./UTF-32BE%PCK.so
+link path=usr/lib/iconv/UCS-4BE%Shift_JIS-2004.so \
+    target=./UTF-32BE%Shift_JIS-2004.so
+link path=usr/lib/iconv/UCS-4BE%eucJP-ms.so target=./UTF-32BE%eucJP-ms.so
+link path=usr/lib/iconv/UCS-4BE%ms932.so target=./UTF-32BE%ms932.so
+link path=usr/lib/iconv/UCS-4LE%EUC-JIS-2004.so \
+    target=./UTF-32LE%EUC-JIS-2004.so
+link path=usr/lib/iconv/UCS-4LE%GB18030.so target=./UCS-4LE%GBK.so
+link path=usr/lib/iconv/UCS-4LE%ISO-2022-JP-2004.so \
+    target=./UTF-32LE%ISO-2022-JP-2004.so
+link path=usr/lib/iconv/UCS-4LE%PCK.so target=./UTF-32LE%PCK.so
+link path=usr/lib/iconv/UCS-4LE%Shift_JIS-2004.so \
+    target=./UTF-32LE%Shift_JIS-2004.so
+link path=usr/lib/iconv/UCS-4LE%eucJP-ms.so target=./UTF-32LE%eucJP-ms.so
+link path=usr/lib/iconv/UCS-4LE%ms932.so target=./UTF-32LE%ms932.so
+link path=usr/lib/iconv/UTF-8%5601.so target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/UTF-8%BIG5P.so target=./UTF-8%zh_TW-big5p.so
+link path=usr/lib/iconv/UTF-8%Big5-HKSCS.so target=./UTF-8%zh_HK.hkscs.so
+link path=usr/lib/iconv/UTF-8%EUC-KR.so target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/UTF-8%ISO-2022-KR.so \
+    target=./ko_KR-UTF-8%ko_KR-iso2022-7.so
+link path=usr/lib/iconv/UTF-8%KSC5601.so target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/UTF-8%KSX1001.so target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/UTF-8%SJIS.so target=./UTF-8%PCK.so
+link path=usr/lib/iconv/UTF-8%cns11643.so target=./UTF-8%zh_TW-euc.so
+link path=usr/lib/iconv/UTF-8%gb2312.so target=./UTF-8%zh_CN.euc.so
+link path=usr/lib/iconv/UTF-8%iso2022.so target=./UTF-8%zh_CN.iso2022-7.so
+link path=usr/lib/iconv/UTF-8%ko_KR-cp933.so \
+    target=./ko_KR-UTF-8%ko_KR-cp933.so
+link path=usr/lib/iconv/UTF-8%ko_KR-cp949.so \
+    target=./ko_KR-UTF-8%ko_KR-cp949.so
+link path=usr/lib/iconv/UTF-8%ko_KR-euc.so target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/UTF-8%ko_KR-iso2022-7.so \
+    target=./ko_KR-UTF-8%ko_KR-iso2022-7.so
+link path=usr/lib/iconv/UTF-8%ko_KR-johap.so \
+    target=./ko_KR-UTF-8%ko_KR-johap.so
+link path=usr/lib/iconv/UTF-8%ko_KR-johap92.so \
+    target=./ko_KR-UTF-8%ko_KR-johap92.so
+link path=usr/lib/iconv/UTF-8%ko_KR.EUC.so target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/UTF-8%ko_KR.cp933.so \
+    target=./ko_KR-UTF-8%ko_KR-cp933.so
+link path=usr/lib/iconv/UTF-8%ko_KR.cp949.so \
+    target=./ko_KR-UTF-8%ko_KR-cp949.so
+link path=usr/lib/iconv/UTF-8%ko_KR.euc.so target=./ko_KR-UTF-8%ko_KR-euc.so
+link path=usr/lib/iconv/UTF-8%ko_KR.iso2022-7.so \
+    target=./ko_KR-UTF-8%ko_KR-iso2022-7.so
+link path=usr/lib/iconv/UTF-8%ko_KR.johap.so \
+    target=./ko_KR-UTF-8%ko_KR-johap.so
+link path=usr/lib/iconv/UTF-8%ko_KR.johap92.so \
+    target=./ko_KR-UTF-8%ko_KR-johap92.so
+link path=usr/lib/iconv/UTF-8%zh_HK-big5hk.so target=./UTF-8%zh_HK.hkscs.so
+link path=usr/lib/iconv/UTF-8%zh_HK.big5hk.so target=./UTF-8%zh_HK.hkscs.so
+link path=usr/lib/iconv/UTF-8%zh_TW.big5p.so target=./UTF-8%zh_TW-big5p.so
+link path=usr/lib/iconv/UTF-8%zh_TW.cp937.so target=./UTF-8%zh_TW-cp937.so
+link path=usr/lib/iconv/UTF-8%zh_TW.euc.so target=./UTF-8%zh_TW-euc.so
+link path=usr/lib/iconv/UTF-8%zh_TW.iso2022-7.so \
+    target=./UTF-8%zh_TW-iso2022-7.so
+link path=usr/lib/iconv/UnifiedHangul%ko_KR-UTF-8.so \
+    target=./ko_KR-cp949%ko_KR-UTF-8.so
+link path=usr/lib/iconv/cns11643%UTF-8.so target=./zh_TW-euc%UTF-8.so
+link path=usr/lib/iconv/eucJP-ms%UCS-4.so target=./eucJP-ms%UTF-32.so
+link path=usr/lib/iconv/eucJP-ms%UCS-4BE.so target=./eucJP-ms%UTF-32BE.so
+link path=usr/lib/iconv/eucJP-ms%UCS-4LE.so target=./eucJP-ms%UTF-32LE.so
+link path=usr/lib/iconv/gb2312%UTF-8.so target=./zh_CN.euc%UTF-8.so
+link path=usr/lib/iconv/iso2022%UTF-8.so target=./zh_CN.iso2022-7%UTF-8.so
+link path=usr/lib/iconv/ko_KR-UTF-8%UnifiedHangul.so \
+    target=./ko_KR-UTF-8%ko_KR-cp949.so
+link path=usr/lib/iconv/ko_KR-cp933%UTF-8.so \
+    target=./ko_KR-cp933%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR-cp949%UTF-8.so \
+    target=./ko_KR-cp949%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR-euc%UTF-8.so target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR-iso2022-7%UTF-8.so \
+    target=./ko_KR-iso2022-7%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR-johap%UTF-8.so \
+    target=./ko_KR-johap%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR-johap92%UTF-8.so \
+    target=./ko_KR-johap92%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR.EUC%UTF-8.so target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR.cp933%UTF-8.so \
+    target=./ko_KR-cp933%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR.cp949%UTF-8.so \
+    target=./ko_KR-cp949%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR.euc%UTF-8.so target=./ko_KR-euc%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR.iso2022-7%UTF-8.so \
+    target=./ko_KR-iso2022-7%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR.johap%UTF-8.so \
+    target=./ko_KR-johap%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ko_KR.johap92%UTF-8.so \
+    target=./ko_KR-johap92%ko_KR-UTF-8.so
+link path=usr/lib/iconv/ms932%UCS-4.so target=./ms932%UTF-32.so
+link path=usr/lib/iconv/ms932%UCS-4BE.so target=./ms932%UTF-32BE.so
+link path=usr/lib/iconv/ms932%UCS-4LE.so target=./ms932%UTF-32LE.so
+link path=usr/lib/iconv/zh_HK-big5hk%UTF-8.so target=./zh_HK.hkscs%UTF-8.so
+link path=usr/lib/iconv/zh_HK.big5hk%UTF-8.so target=./zh_HK.hkscs%UTF-8.so
+link path=usr/lib/iconv/zh_TW.big5p%UTF-8.so target=./zh_TW-big5p%UTF-8.so
+link path=usr/lib/iconv/zh_TW.cp937%UTF-8.so target=./zh_TW-cp937%UTF-8.so
+link path=usr/lib/iconv/zh_TW.euc%UTF-8.so target=./zh_TW-euc%UTF-8.so
+link path=usr/lib/iconv/zh_TW.iso2022-7%UTF-8.so \
+    target=./zh_TW-iso2022-7%UTF-8.so
