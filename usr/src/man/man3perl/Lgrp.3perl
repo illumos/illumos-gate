@@ -526,7 +526,7 @@ process with LWP ID $\fIid\fR if $\fIidtype\fR is \fBP_LWPID\fR. If $\fIid\fR
 is \fBP_MYID\fR, then the current LWP or process is specified.
 .sp
 There are different levels of affinity that can be specified by a thread for a
-particuliar lgroup. The levels of affinity are the following from strongest to
+particular lgroup. The levels of affinity are the following from strongest to
 weakest:
 .sp
 .ne 2

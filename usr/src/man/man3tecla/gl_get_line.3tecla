@@ -682,7 +682,7 @@ system-wide configuration commands from an optional file called
 commands from an optional \fB\&.teclarc\fR file in the user's home directory.
 Note that the arguments are listed in ascending order of priority, with the
 contents of \fIapp_string\fR being potentially over riden by commands in
-\fIapp_file\fR, and commands in \fIapp_file\fR potentially being overriden by
+\fIapp_file\fR, and commands in \fIapp_file\fR potentially being overridden by
 commands in \fIuser_file\fR.
 .sp
 .LP
@@ -955,7 +955,7 @@ preceding the line in the history file. Writing this as a comment allows the
 history file to double as a command file, just in case you wish to replay a
 whole session using it. Since comment prefixes differ in different languages,
 the comment argument is provided for specifying the comment prefix. For
-example, if your application were a UNIX  shell, such as the Bourne shell, you
+example, if your application were a UNIX shell, such as the Bourne shell, you
 would specify "#" here. Whatever you choose for the comment character, you must
 specify the same prefix to \fBgl_load_history()\fR that you used when you
 called \fBgl_save_history()\fR to write the history file.
@@ -2298,7 +2298,7 @@ as the terminal width.
 .sp
 .LP
 The \fIindentation\fR argument specifies the number of characters to use to
-indent each line of ouput. The \fIfill_char\fR argument specifies the character
+indent each line of output. The \fIfill_char\fR argument specifies the character
 that will be used to perform this indentation.
 .sp
 .LP

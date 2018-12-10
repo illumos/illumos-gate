@@ -23,7 +23,6 @@ cc [ \fIflag \&.\|.\|.\fR ] \fIfile\fR\&.\|.\|. \fB-llgrp\fR [ \fIlibrary \&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBlgrp_affinity_get()\fR function returns the affinity that the LWP or set
 of LWPs specified by the \fIidtype\fR and \fIid\fR arguments have for the given
@@ -62,8 +61,8 @@ the strongest affinity that the thread can run on is known as its "home lgroup"
 of where to run the thread and allocate its memory.
 .sp
 .LP
- There are different levels of affinity that can be specified by a thread for a
-particuliar lgroup.  The levels of affinity are the following from strongest to
+There are different levels of affinity that can be specified by a thread for a
+particular lgroup.  The levels of affinity are the following from strongest to
 weakest:
 .sp
 .in +2
@@ -95,11 +94,10 @@ system to change a thread's home lgroup for which it has a weak affinity.
 .sp
 .LP
 The \fBLGRP_AFF_NONE\fR affinity signifies no affinity and can be used to
-remove a thread's affinity for a particuliar lgroup.  Initially, each thread
+remove a thread's affinity for a particular lgroup.  Initially, each thread
 has no affinity to any lgroup.  If a thread has no lgroup affinities set, the
 operating system chooses a home lgroup for the thread with no affinity set.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, \fBlgrp_affinity_get()\fR returns the affinity for
 the given lgroup.
@@ -111,7 +109,6 @@ Upon successful completion, \fBlgrp_affinity_set()\fR return 0.
 Otherwise, both functions return \(mi1 and set \fBerrno\fR to indicate the
 error.
 .SH ERRORS
-.sp
 .LP
 The \fBlgrp_affinity_get()\fR and \fBlgrp_affinity_set()\fR functions will fail
 if:
@@ -145,7 +142,6 @@ The specified lgroup or LWP(s) was not found.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -163,6 +159,5 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlgrp_home\fR(3LGRP), \fBliblgrp\fR(3LIB), \fBattributes\fR(5)
