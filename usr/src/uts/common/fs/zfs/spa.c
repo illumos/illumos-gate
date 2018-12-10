@@ -1825,6 +1825,12 @@ spa_check_for_missing_logs(spa_t *spa)
 		if (idx > 0) {
 			spa_load_failed(spa, "some log devices are missing");
 			vdev_dbgmsg_print_tree(rvd, 2);
+
+			/* Save the timestamp of the last completed txg. */
+			VERIFY(nvlist_add_uint64(spa->spa_load_info,
+			    ZPOOL_CONFIG_LOAD_TIME,
+			    spa->spa_last_ubsync_txg_ts) == 0);
+
 			return (SET_ERROR(ENXIO));
 		}
 	} else {
@@ -1833,10 +1839,21 @@ spa_check_for_missing_logs(spa_t *spa)
 
 			if (tvd->vdev_islog &&
 			    tvd->vdev_state == VDEV_STATE_CANT_OPEN) {
+				nvlist_t *rewind_info = fnvlist_alloc();
+
 				spa_set_log_state(spa, SPA_LOG_CLEAR);
 				spa_load_note(spa, "some log devices are "
 				    "missing, ZIL is dropped.");
 				vdev_dbgmsg_print_tree(rvd, 2);
+
+				VERIFY(nvlist_add_uint64(rewind_info,
+				    ZPOOL_CONFIG_LOAD_TIME,
+				    spa->spa_uberblock.ub_timestamp) == 0);
+
+				VERIFY(nvlist_add_nvlist(spa->spa_load_info,
+				    ZPOOL_CONFIG_REWIND_INFO,
+				    rewind_info) == 0);
+
 				break;
 			}
 		}

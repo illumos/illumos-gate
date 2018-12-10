@@ -2198,6 +2198,8 @@ zpool_do_checkpoint(int argc, char **argv)
  *
  *       -F     Attempt rewind if necessary.
  *
+ *       -m     Allow import with a missing log device.
+ *
  *       -n     See if rewind would work, but don't actually rewind.
  *
  *       -N     Import the pool but don't mount datasets.

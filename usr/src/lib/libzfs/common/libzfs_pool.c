@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  * Copyright (c) 2017 Datto Inc.
@@ -1857,6 +1857,8 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 				    "corrupted, use '-m' to import the pool "
 				    "anyway:\n"));
 				print_vdev_tree(hdl, NULL, missing, 2);
+				zpool_rewind_exclaim(hdl, newname ? origname :
+				    thename, B_TRUE, nv);
 				(void) printf("\n");
 			}
 			(void) zpool_standard_error(hdl, error, desc);
@@ -1890,8 +1892,9 @@ zpool_import_props(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 			ret = -1;
 		else if (zhp != NULL)
 			zpool_close(zhp);
-		if (policy.zlp_rewind &
-		    (ZPOOL_DO_REWIND | ZPOOL_TRY_REWIND)) {
+		if ((policy.zlp_rewind &
+		    (ZPOOL_DO_REWIND | ZPOOL_TRY_REWIND)) ||
+		    (flags & ZFS_IMPORT_MISSING_LOG)) {
 			zpool_rewind_exclaim(hdl, newname ? origname : thename,
 			    ((policy.zlp_rewind & ZPOOL_TRY_REWIND) != 0), nv);
 		}
