@@ -23,6 +23,9 @@
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
+PYVER = $(PYTHON_VERSION)
+PYSUFFIX = $(PYTHON_SUFFIX)
+
 include ../Makefile.com
 
 all: $(PYOBJS) $(LIBS)
