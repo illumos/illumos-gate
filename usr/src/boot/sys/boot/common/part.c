@@ -183,7 +183,7 @@ gpt_checkhdr(struct gpt_hdr *hdr, uint64_t lba_self,
 	}
 	sz = le32toh(hdr->hdr_size);
 	if (sz < 92 || sz > sectorsize) {
-		DEBUG("invalid GPT header size: %d", sz);
+		DEBUG("invalid GPT header size: %u", sz);
 		return (NULL);
 	}
 	crc = le32toh(hdr->hdr_crc_self);
@@ -195,7 +195,7 @@ gpt_checkhdr(struct gpt_hdr *hdr, uint64_t lba_self,
 	hdr->hdr_crc_self = crc;
 	hdr->hdr_revision = le32toh(hdr->hdr_revision);
 	if (hdr->hdr_revision < GPT_HDR_REVISION) {
-		DEBUG("unsupported GPT revision %d", hdr->hdr_revision);
+		DEBUG("unsupported GPT revision %u", hdr->hdr_revision);
 		return (NULL);
 	}
 	hdr->hdr_lba_self = le64toh(hdr->hdr_lba_self);

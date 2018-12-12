@@ -30,6 +30,7 @@
 #include <sys/queue.h>
 #include <stand.h>
 #include <stdarg.h>
+#include <inttypes.h>
 #include <bootstrap.h>
 #include <part.h>
 
@@ -73,7 +74,7 @@ display_size(uint64_t size, uint_t sectorsize)
 		size /= 1024;
 		unit = 'M';
 	}
-	sprintf(buf, "%ld%cB", (long)size, unit);
+	snprintf(buf, sizeof (buf), "%" PRIu64 "%cB", size, unit);
 	return (buf);
 }
 
@@ -246,8 +247,8 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 	od->entrysize = 0;
 	od->mediasize = mediasize;
 	od->sectorsize = sectorsize;
-	DEBUG("%s unit %d, slice %d, partition %d => %p",
-	    disk_fmtdev(dev), dev->d_unit, dev->d_slice, dev->d_partition, od);
+	DEBUG("%s unit %d, slice %d, partition %d => %p", disk_fmtdev(dev),
+	    dev->dd.d_unit, dev->d_slice, dev->d_partition, od);
 
 	/* Determine disk layout. */
 	od->table = ptable_open(dev, mediasize / sectorsize, sectorsize,
@@ -343,8 +344,8 @@ out:
 		/* Save the slice and partition number to the dev */
 		dev->d_slice = slice;
 		dev->d_partition = partition;
-		DEBUG("%s offset %lld => %p", disk_fmtdev(dev),
-		    (long long)dev->d_offset, od);
+		DEBUG("%s offset %" PRIu64 " => %p", disk_fmtdev(dev),
+		    dev->d_offset, od);
 	}
 	return (rc);
 }
