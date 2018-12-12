@@ -390,6 +390,7 @@ enum viona_ring_state {
 enum viona_ring_state_flags {
 	VRSF_REQ_START	= 0x1,	/* start running from INIT state */
 	VRSF_REQ_STOP	= 0x2,	/* stop running, clean up, goto RESET state */
+	VRSF_RENEW	= 0x4,	/* ring renewing lease */
 };
 
 #define	VRING_NEED_BAIL(ring, proc)					\
@@ -410,6 +411,7 @@ typedef struct viona_vring {
 	uint16_t	vr_state_flags;
 	uint_t		vr_xfer_outstanding;
 	kthread_t	*vr_worker_thread;
+	vmm_lease_t	*vr_lease;
 
 	/* ring-sized resources for TX activity */
 	viona_desb_t	*vr_txdesb;
@@ -422,6 +424,7 @@ typedef struct viona_vring {
 	/* Internal ring-related state */
 	kmutex_t	vr_a_mutex;	/* sync consumers of 'avail' */
 	kmutex_t	vr_u_mutex;	/* sync consumers of 'used' */
+	uint64_t	vr_pa;
 	uint16_t	vr_size;
 	uint16_t	vr_mask;	/* cached from vr_size */
 	uint16_t	vr_cur_aidx;	/* trails behind 'avail_idx' */
@@ -579,12 +582,14 @@ static int viona_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 static int viona_ioc_create(viona_soft_state_t *, void *, int, cred_t *);
 static int viona_ioc_delete(viona_soft_state_t *, boolean_t);
 
-static void *viona_gpa2kva(viona_link_t *link, uint64_t gpa, size_t len);
+static void *viona_gpa2kva(viona_vring_t *, uint64_t, size_t);
 
 static void viona_ring_alloc(viona_link_t *, viona_vring_t *);
 static void viona_ring_free(viona_vring_t *);
 static int viona_ring_reset(viona_vring_t *, boolean_t);
 static kthread_t *viona_create_worker(viona_vring_t *);
+static boolean_t viona_ring_map(viona_vring_t *);
+static void viona_ring_unmap(viona_vring_t *);
 
 static int viona_ioc_set_notify_ioport(viona_link_t *, uint_t);
 static int viona_ioc_ring_init(viona_link_t *, void *, int);
@@ -600,6 +605,7 @@ static void viona_desb_release(viona_desb_t *);
 static void viona_rx_classified(void *, mac_resource_handle_t, mblk_t *,
     boolean_t);
 static void viona_rx_mcast(void *, mac_resource_handle_t, mblk_t *, boolean_t);
+static void viona_tx_wait_outstanding(viona_vring_t *);
 static void viona_tx(viona_link_t *, viona_vring_t *);
 
 static viona_neti_t *viona_neti_lookup_by_zid(zoneid_t);
@@ -917,7 +923,7 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 
 	mutex_enter(&ss->ss_lock);
 	if ((link = ss->ss_link) == NULL || link->l_destroyed ||
-	    vmm_drv_expired(link->l_vm_hold)) {
+	    vmm_drv_release_reqd(link->l_vm_hold)) {
 		mutex_exit(&ss->ss_lock);
 		return (ENXIO);
 	}
@@ -1250,9 +1256,75 @@ viona_ioc_delete(viona_soft_state_t *ss, boolean_t on_close)
  * Translate a guest physical address into a kernel virtual address.
  */
 static void *
-viona_gpa2kva(viona_link_t *link, uint64_t gpa, size_t len)
+viona_gpa2kva(viona_vring_t *ring, uint64_t gpa, size_t len)
 {
-	return (vmm_drv_gpa2kva(link->l_vm_hold, gpa, len));
+	ASSERT3P(ring->vr_lease, !=, NULL);
+
+	return (vmm_drv_gpa2kva(ring->vr_lease, gpa, len));
+}
+
+static boolean_t
+viona_ring_lease_expire_cb(void *arg)
+{
+	viona_vring_t *ring = arg;
+
+	cv_broadcast(&ring->vr_cv);
+
+	/* The lease will be broken asynchronously. */
+	return (B_FALSE);
+}
+
+static void
+viona_ring_lease_drop(viona_vring_t *ring)
+{
+	ASSERT(MUTEX_HELD(&ring->vr_lock));
+
+	if (ring->vr_lease != NULL) {
+		vmm_hold_t *hold = ring->vr_link->l_vm_hold;
+
+		ASSERT(hold != NULL);
+
+		/*
+		 * Without an active lease, the ring mappings cannot be
+		 * considered valid.
+		 */
+		viona_ring_unmap(ring);
+
+		vmm_drv_lease_break(hold, ring->vr_lease);
+		ring->vr_lease = NULL;
+	}
+}
+
+static boolean_t
+viona_ring_lease_renew(viona_vring_t *ring)
+{
+	vmm_hold_t *hold = ring->vr_link->l_vm_hold;
+
+	ASSERT(hold != NULL);
+	ASSERT(MUTEX_HELD(&ring->vr_lock));
+
+	viona_ring_lease_drop(ring);
+
+	/*
+	 * Lease renewal will fail if the VM has requested that all holds be
+	 * cleaned up.
+	 */
+	ring->vr_lease = vmm_drv_lease_sign(hold, viona_ring_lease_expire_cb,
+	    ring);
+	if (ring->vr_lease != NULL) {
+		/* A ring undergoing renewal will need valid guest mappings */
+		if (ring->vr_pa != 0 && ring->vr_size != 0) {
+			/*
+			 * If new mappings cannot be established, consider the
+			 * lease renewal a failure.
+			 */
+			if (!viona_ring_map(ring)) {
+				viona_ring_lease_drop(ring);
+				return (B_FALSE);
+			}
+		}
+	}
+	return (ring->vr_lease != NULL);
 }
 
 static void
@@ -1322,8 +1394,70 @@ viona_ring_reset(viona_vring_t *ring, boolean_t heed_signals)
 			}
 		}
 	}
+	viona_ring_lease_drop(ring);
 	mutex_exit(&ring->vr_lock);
 	return (0);
+}
+
+static boolean_t
+viona_ring_map(viona_vring_t *ring)
+{
+	uint64_t pos = ring->vr_pa;
+	const uint16_t qsz = ring->vr_size;
+
+	ASSERT3U(qsz, !=, 0);
+	ASSERT3U(pos, !=, 0);
+	ASSERT(MUTEX_HELD(&ring->vr_lock));
+
+	const size_t desc_sz = qsz * sizeof (struct virtio_desc);
+	ring->vr_descr = viona_gpa2kva(ring, pos, desc_sz);
+	if (ring->vr_descr == NULL) {
+		goto fail;
+	}
+	pos += desc_sz;
+
+	const size_t avail_sz = (qsz + 3) * sizeof (uint16_t);
+	ring->vr_avail_flags = viona_gpa2kva(ring, pos, avail_sz);
+	if (ring->vr_avail_flags == NULL) {
+		goto fail;
+	}
+	ring->vr_avail_idx = ring->vr_avail_flags + 1;
+	ring->vr_avail_ring = ring->vr_avail_flags + 2;
+	ring->vr_avail_used_event = ring->vr_avail_ring + qsz;
+	pos += avail_sz;
+
+	const size_t used_sz = (qsz * sizeof (struct virtio_used)) +
+	    (sizeof (uint16_t) * 3);
+	pos = P2ROUNDUP(pos, VRING_ALIGN);
+	ring->vr_used_flags = viona_gpa2kva(ring, pos, used_sz);
+	if (ring->vr_used_flags == NULL) {
+		goto fail;
+	}
+	ring->vr_used_idx = ring->vr_used_flags + 1;
+	ring->vr_used_ring = (struct virtio_used *)(ring->vr_used_flags + 2);
+	ring->vr_used_avail_event = (uint16_t *)(ring->vr_used_ring + qsz);
+
+	return (B_TRUE);
+
+fail:
+	viona_ring_unmap(ring);
+	return (B_FALSE);
+}
+
+static void
+viona_ring_unmap(viona_vring_t *ring)
+{
+	ASSERT(MUTEX_HELD(&ring->vr_lock));
+
+	ring->vr_descr = NULL;
+	ring->vr_avail_flags = NULL;
+	ring->vr_avail_idx = NULL;
+	ring->vr_avail_ring = NULL;
+	ring->vr_avail_used_event = NULL;
+	ring->vr_used_flags = NULL;
+	ring->vr_used_idx = NULL;
+	ring->vr_used_ring = NULL;
+	ring->vr_used_avail_event = NULL;
 }
 
 static int
@@ -1332,9 +1466,6 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	vioc_ring_init_t kri;
 	viona_vring_t *ring;
 	kthread_t *t;
-	uintptr_t pos;
-	size_t desc_sz, avail_sz, used_sz;
-	uint16_t cnt;
 	int err = 0;
 
 	if (ddi_copyin(udata, &kri, sizeof (kri), md) != 0) {
@@ -1344,8 +1475,8 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	if (kri.ri_index >= VIONA_VQ_MAX) {
 		return (EINVAL);
 	}
-	cnt = kri.ri_qsize;
-	if (cnt == 0 || cnt > VRING_MAX_LEN || (1 << (ffs(cnt) - 1)) != cnt) {
+	const uint16_t qsz = kri.ri_qsize;
+	if (qsz == 0 || qsz > VRING_MAX_LEN || (1 << (ffs(qsz) - 1)) != qsz) {
 		return (EINVAL);
 	}
 
@@ -1357,39 +1488,19 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	}
 	VERIFY(ring->vr_state_flags == 0);
 
-	pos = kri.ri_qaddr;
-	desc_sz = cnt * sizeof (struct virtio_desc);
-	avail_sz = (cnt + 3) * sizeof (uint16_t);
-	used_sz = (cnt * sizeof (struct virtio_used)) + (sizeof (uint16_t) * 3);
+	ring->vr_lease = NULL;
+	if (!viona_ring_lease_renew(ring)) {
+		err = EBUSY;
+		goto fail;
+	}
 
-	ring->vr_size = kri.ri_qsize;
+	ring->vr_size = qsz;
 	ring->vr_mask = (ring->vr_size - 1);
-	ring->vr_descr = viona_gpa2kva(link, pos, desc_sz);
-	if (ring->vr_descr == NULL) {
+	ring->vr_pa = kri.ri_qaddr;
+	if (!viona_ring_map(ring)) {
 		err = EINVAL;
 		goto fail;
 	}
-	pos += desc_sz;
-
-	ring->vr_avail_flags = viona_gpa2kva(link, pos, avail_sz);
-	if (ring->vr_avail_flags == NULL) {
-		err = EINVAL;
-		goto fail;
-	}
-	ring->vr_avail_idx = ring->vr_avail_flags + 1;
-	ring->vr_avail_ring = ring->vr_avail_flags + 2;
-	ring->vr_avail_used_event = ring->vr_avail_ring + cnt;
-	pos += avail_sz;
-
-	pos = P2ROUNDUP(pos, VRING_ALIGN);
-	ring->vr_used_flags = viona_gpa2kva(link, pos, used_sz);
-	if (ring->vr_used_flags == NULL) {
-		err = EINVAL;
-		goto fail;
-	}
-	ring->vr_used_idx = ring->vr_used_flags + 1;
-	ring->vr_used_ring = (struct virtio_used *)(ring->vr_used_flags + 2);
-	ring->vr_used_avail_event = (uint16_t *)(ring->vr_used_ring + cnt);
 
 	/* Initialize queue indexes */
 	ring->vr_cur_aidx = 0;
@@ -1398,9 +1509,9 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	if (kri.ri_index == VIONA_VQ_TX && !link->l_force_tx_copy) {
 		viona_desb_t *dp;
 
-		dp = kmem_zalloc(sizeof (viona_desb_t) * cnt, KM_SLEEP);
+		dp = kmem_zalloc(sizeof (viona_desb_t) * qsz, KM_SLEEP);
 		ring->vr_txdesb = dp;
-		for (uint_t i = 0; i < cnt; i++, dp++) {
+		for (uint_t i = 0; i < qsz; i++, dp++) {
 			dp->d_frtn.free_func = viona_desb_release;
 			dp->d_frtn.free_arg = (void *)dp;
 			dp->d_ring = ring;
@@ -1411,7 +1522,7 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 
 	/* Allocate ring-sized iovec buffers for TX */
 	if (kri.ri_index == VIONA_VQ_TX) {
-		ring->vr_txiov = kmem_alloc(sizeof (struct iovec) * cnt,
+		ring->vr_txiov = kmem_alloc(sizeof (struct iovec) * qsz,
 		    KM_SLEEP);
 	}
 
@@ -1434,18 +1545,10 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	return (0);
 
 fail:
+	viona_ring_lease_drop(ring);
 	viona_ring_misc_free(ring);
 	ring->vr_size = 0;
 	ring->vr_mask = 0;
-	ring->vr_descr = NULL;
-	ring->vr_avail_flags = NULL;
-	ring->vr_avail_idx = NULL;
-	ring->vr_avail_ring = NULL;
-	ring->vr_avail_used_event = NULL;
-	ring->vr_used_flags = NULL;
-	ring->vr_used_idx = NULL;
-	ring->vr_used_ring = NULL;
-	ring->vr_used_avail_event = NULL;
 	mutex_exit(&ring->vr_lock);
 	return (err);
 }
@@ -1591,6 +1694,25 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 	*ring->vr_used_flags |= VRING_USED_F_NO_NOTIFY;
 
 	do {
+		if (vmm_drv_lease_expired(ring->vr_lease)) {
+			/*
+			 * Set the renewal flag, causing incoming traffic to be
+			 * dropped, and issue an RX barrier to ensure any
+			 * threads in the RX callbacks will have finished.
+			 * The vr_lock cannot be held across the barrier as it
+			 * poses a deadlock risk.
+			 */
+			ring->vr_state_flags |= VRSF_RENEW;
+			mutex_exit(&ring->vr_lock);
+			mac_rx_barrier(link->l_mch);
+			mutex_enter(&ring->vr_lock);
+
+			if (!viona_ring_lease_renew(ring)) {
+				break;
+			}
+			ring->vr_state_flags &= ~VRSF_RENEW;
+		}
+
 		/*
 		 * For now, there is little to do in the RX worker as inbound
 		 * data is delivered by MAC via the RX callbacks.  If tap-like
@@ -1617,6 +1739,7 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 
 	for (;;) {
 		boolean_t bail = B_FALSE;
+		boolean_t renew = B_FALSE;
 		uint_t ntx = 0;
 
 		*ring->vr_used_flags |= VRING_USED_F_NO_NOTIFY;
@@ -1644,7 +1767,8 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		 */
 		membar_enter();
 		bail = VRING_NEED_BAIL(ring, p);
-		if (!bail && viona_vr_num_avail(ring)) {
+		renew = vmm_drv_lease_expired(ring->vr_lease);
+		if (!bail && !renew && viona_vr_num_avail(ring)) {
 			continue;
 		}
 
@@ -1653,26 +1777,35 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		}
 
 		mutex_enter(&ring->vr_lock);
-		while (!bail && !viona_vr_num_avail(ring)) {
+
+		while (!bail && !renew && !viona_vr_num_avail(ring)) {
 			(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
 			bail = VRING_NEED_BAIL(ring, p);
+			renew = vmm_drv_lease_expired(ring->vr_lease);
 		}
+
 		if (bail) {
 			break;
+		} else if (renew) {
+			ring->vr_state_flags |= VRSF_RENEW;
+			/*
+			 * When renewing the lease for the ring, no TX
+			 * frames may be outstanding, as they contain
+			 * references to guest memory.
+			 */
+			viona_tx_wait_outstanding(ring);
+
+			if (!viona_ring_lease_renew(ring)) {
+				break;
+			}
+			ring->vr_state_flags &= ~VRSF_RENEW;
 		}
 		mutex_exit(&ring->vr_lock);
 	}
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 
-	while (ring->vr_xfer_outstanding != 0) {
-		/*
-		 * Paying heed to signals is counterproductive here.  This is a
-		 * very tight loop if pending transfers take an extended amount
-		 * of time to be reclaimed while the host process is exiting.
-		 */
-		cv_wait(&ring->vr_cv, &ring->vr_lock);
-	}
+	viona_tx_wait_outstanding(ring);
 }
 
 static void
@@ -1695,6 +1828,16 @@ viona_worker(void *arg)
 	cv_broadcast(&ring->vr_cv);
 
 	while (ring->vr_state_flags == 0) {
+		/*
+		 * Keeping lease renewals timely while waiting for the ring to
+		 * be started is important for avoiding deadlocks.
+		 */
+		if (vmm_drv_lease_expired(ring->vr_lease)) {
+			if (!viona_ring_lease_renew(ring)) {
+				goto cleanup;
+			}
+		}
+
 		(void) cv_wait_sig(&ring->vr_cv, &ring->vr_lock);
 
 		if (VRING_NEED_BAIL(ring, p)) {
@@ -1705,6 +1848,13 @@ viona_worker(void *arg)
 	ASSERT((ring->vr_state_flags & VRSF_REQ_START) != 0);
 	ring->vr_state = VRS_RUN;
 	ring->vr_state_flags &= ~VRSF_REQ_START;
+
+	/* Ensure ring lease is valid first */
+	if (vmm_drv_lease_expired(ring->vr_lease)) {
+		if (!viona_ring_lease_renew(ring)) {
+			goto cleanup;
+		}
+	}
 
 	/* Process actual work */
 	if (ring == &link->l_vrings[VIONA_VQ_RX]) {
@@ -1725,6 +1875,7 @@ cleanup:
 	}
 	viona_ring_misc_free(ring);
 
+	viona_ring_lease_drop(ring);
 	ring->vr_cur_aidx = 0;
 	ring->vr_state = VRS_RESET;
 	ring->vr_state_flags = 0;
@@ -1799,7 +1950,6 @@ viona_ioc_intr_poll(viona_link_t *link, void *udata, int md, int *rv)
 static int
 vq_popchain(viona_vring_t *ring, struct iovec *iov, int niov, uint16_t *cookie)
 {
-	viona_link_t *link = ring->vr_link;
 	uint_t i, ndesc, idx, head, next;
 	struct virtio_desc vdir;
 	void *buf;
@@ -1848,7 +1998,7 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, int niov, uint16_t *cookie)
 				VIONA_RING_STAT_INCR(ring, desc_bad_len);
 				goto bail;
 			}
-			buf = viona_gpa2kva(link, vdir.vd_addr, vdir.vd_len);
+			buf = viona_gpa2kva(ring, vdir.vd_addr, vdir.vd_len);
 			if (buf == NULL) {
 				VIONA_PROBE_BAD_RING_ADDR(ring, vdir.vd_addr);
 				VIONA_RING_STAT_INCR(ring, bad_ring_addr);
@@ -1868,7 +2018,7 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, int niov, uint16_t *cookie)
 				VIONA_RING_STAT_INCR(ring, indir_bad_len);
 				goto bail;
 			}
-			vindir = viona_gpa2kva(link, vdir.vd_addr, vdir.vd_len);
+			vindir = viona_gpa2kva(ring, vdir.vd_addr, vdir.vd_len);
 			if (vindir == NULL) {
 				VIONA_PROBE_BAD_RING_ADDR(ring, vdir.vd_addr);
 				VIONA_RING_STAT_INCR(ring, bad_ring_addr);
@@ -1901,7 +2051,7 @@ vq_popchain(viona_vring_t *ring, struct iovec *iov, int niov, uint16_t *cookie)
 					    desc_bad_len);
 					goto bail;
 				}
-				buf = viona_gpa2kva(link, vp.vd_addr,
+				buf = viona_gpa2kva(ring, vp.vd_addr,
 				    vp.vd_len);
 				if (buf == NULL) {
 					VIONA_PROBE_BAD_RING_ADDR(ring,
@@ -2004,7 +2154,7 @@ viona_intr_ring(viona_vring_t *ring)
 		uint64_t msg = ring->vr_msi_msg;
 
 		mutex_exit(&ring->vr_lock);
-		(void) vmm_drv_msi(ring->vr_link->l_vm_hold, addr, msg);
+		(void) vmm_drv_msi(ring->vr_lease, addr, msg);
 		return;
 	}
 	mutex_exit(&ring->vr_lock);
@@ -2528,8 +2678,9 @@ viona_rx_classified(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 {
 	viona_vring_t *ring = (viona_vring_t *)arg;
 
-	/* Immediately drop traffic if ring is inactive */
-	if (ring->vr_state != VRS_RUN) {
+	/* Drop traffic if ring is inactive or renewing its lease */
+	if (ring->vr_state != VRS_RUN ||
+	    (ring->vr_state_flags & VRSF_RENEW) != 0) {
 		freemsgchain(mp);
 		return;
 	}
@@ -2546,8 +2697,9 @@ viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	mblk_t *mp_mcast_only = NULL;
 	mblk_t **mpp = &mp_mcast_only;
 
-	/* Immediately drop traffic if ring is inactive */
-	if (ring->vr_state != VRS_RUN) {
+	/* Drop traffic if ring is inactive or renewing its lease */
+	if (ring->vr_state != VRS_RUN ||
+	    (ring->vr_state_flags & VRSF_RENEW) != 0) {
 		freemsgchain(mp);
 		return;
 	}
@@ -2649,6 +2801,21 @@ viona_desb_release(viona_desb_t *dp)
 		cv_broadcast(&ring->vr_cv);
 	}
 	mutex_exit(&ring->vr_lock);
+}
+
+static void
+viona_tx_wait_outstanding(viona_vring_t *ring)
+{
+	ASSERT(MUTEX_HELD(&ring->vr_lock));
+
+	while (ring->vr_xfer_outstanding != 0) {
+		/*
+		 * Paying heed to signals is counterproductive here.  This is a
+		 * very tight loop if pending transfers take an extended amount
+		 * of time to be reclaimed while the host process is exiting.
+		 */
+		cv_wait(&ring->vr_cv, &ring->vr_lock);
+	}
 }
 
 static boolean_t

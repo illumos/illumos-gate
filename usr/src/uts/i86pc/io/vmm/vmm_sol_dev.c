@@ -85,11 +85,22 @@ extern int vmx_x86_supported(const char **);
 struct vmm_hold {
 	list_node_t	vmh_node;
 	vmm_softc_t	*vmh_sc;
-	boolean_t	vmh_expired;
+	boolean_t	vmh_release_req;
 	uint_t		vmh_ioport_hook_cnt;
 };
 
+struct vmm_lease {
+	list_node_t		vml_node;
+	struct vm		*vml_vm;
+	boolean_t		vml_expired;
+	boolean_t		(*vml_expire_func)(void *);
+	void			*vml_expire_arg;
+	list_node_t		vml_expire_node;
+	struct vmm_hold		*vml_hold;
+};
+
 static int vmm_drv_block_hook(vmm_softc_t *, boolean_t);
+static void vmm_lease_break_locked(vmm_softc_t *, vmm_lease_t *);
 
 static int
 vmmdev_get_memseg(vmm_softc_t *sc, struct vm_memseg *mseg)
@@ -224,63 +235,164 @@ vmmdev_alloc_memseg(vmm_softc_t *sc, struct vm_memseg *mseg)
 	return (error);
 }
 
+/*
+ * Resource Locking and Exclusion
+ *
+ * Much of bhyve depends on key portions of VM state, such as the guest memory
+ * map, to remain unchanged while the guest is running.  As ported from
+ * FreeBSD, the initial strategy for this resource exclusion hinged on gating
+ * access to the instance vCPUs.  Threads acting on a single vCPU, like those
+ * performing the work of actually running the guest in VMX/SVM, would lock
+ * only that vCPU during ioctl() entry.  For ioctls which would change VM-wide
+ * state, all of the vCPUs would be first locked, ensuring that the
+ * operation(s) could complete without any other threads stumbling into
+ * intermediate states.
+ *
+ * This approach is largely effective for bhyve.  Common operations, such as
+ * running the vCPUs, steer clear of lock contention.  The model begins to
+ * break down for operations which do not occur in the context of a specific
+ * vCPU.  LAPIC MSI delivery, for example, may be initiated from a worker
+ * thread in the bhyve process.  In order to properly protect those vCPU-less
+ * operations from encountering invalid states, additional locking is required.
+ * This was solved by forcing those operations to lock the VM_MAXCPU-1 vCPU.
+ * It does mean that class of operations will be serialized on locking the
+ * specific vCPU and that instances sized at VM_MAXCPU will potentially see
+ * undue contention on the VM_MAXCPU-1 vCPU.
+ *
+ * In order to address the shortcomings of this model, the concept of a
+ * read/write lock has been added to bhyve.  Operations which change
+ * fundamental aspects of a VM (such as the memory map) must acquire the write
+ * lock, which also implies locking all of the vCPUs and waiting for all read
+ * lock holders to release.  While it increases the cost and waiting time for
+ * those few operations, it allows most hot-path operations on the VM (which
+ * depend on its configuration remaining stable) to occur with minimal locking.
+ *
+ * Consumers of the Driver API (see below) are a special case when it comes to
+ * this locking, since they may hold a read lock via the drv_lease mechanism
+ * for an extended period of time.  Rather than forcing those consumers to
+ * continuously poll for a write lock attempt, the lease system forces them to
+ * provide a release callback to trigger their clean-up (and potential later
+ * reacquisition) of the read lock.
+ */
 
-static int
+static void
 vcpu_lock_one(vmm_softc_t *sc, int vcpu)
 {
-	int error;
+	ASSERT(vcpu >= 0 && vcpu < VM_MAXCPU);
 
-	if (vcpu < 0 || vcpu >= vm_get_maxcpus(sc->vmm_vm))
-		return (EINVAL);
-
-	error = vcpu_set_state(sc->vmm_vm, vcpu, VCPU_FROZEN, true);
-	return (error);
+	/*
+	 * Since this state transition is utilizing from_idle=true, it should
+	 * not fail, but rather block until it can be successful.
+	 */
+	VERIFY0(vcpu_set_state(sc->vmm_vm, vcpu, VCPU_FROZEN, true));
 }
 
 static void
 vcpu_unlock_one(vmm_softc_t *sc, int vcpu)
 {
-	enum vcpu_state state;
+	ASSERT(vcpu >= 0 && vcpu < VM_MAXCPU);
 
-	state = vcpu_get_state(sc->vmm_vm, vcpu, NULL);
-	if (state != VCPU_FROZEN) {
-		panic("vcpu %s(%d) has invalid state %d", vm_name(sc->vmm_vm),
-		    vcpu, state);
-	}
-
+	VERIFY3U(vcpu_get_state(sc->vmm_vm, vcpu, NULL), ==, VCPU_FROZEN);
 	vcpu_set_state(sc->vmm_vm, vcpu, VCPU_IDLE, false);
 }
 
-static int
-vcpu_lock_all(vmm_softc_t *sc)
+static void
+vmm_read_lock(vmm_softc_t *sc)
 {
-	int error = 0, vcpu;
-	uint16_t maxcpus;
-
-	maxcpus = vm_get_maxcpus(sc->vmm_vm);
-	for (vcpu = 0; vcpu < maxcpus; vcpu++) {
-		error = vcpu_lock_one(sc, vcpu);
-		if (error)
-			break;
-	}
-
-	if (error) {
-		while (--vcpu >= 0)
-			vcpu_unlock_one(sc, vcpu);
-	}
-
-	return (error);
+	rw_enter(&sc->vmm_rwlock, RW_READER);
 }
 
 static void
-vcpu_unlock_all(vmm_softc_t *sc)
+vmm_read_unlock(vmm_softc_t *sc)
 {
-	int vcpu;
-	uint16_t maxcpus;
+	rw_exit(&sc->vmm_rwlock);
+}
 
+static void
+vmm_write_lock(vmm_softc_t *sc)
+{
+	int maxcpus;
+
+	/* First lock all the vCPUs */
 	maxcpus = vm_get_maxcpus(sc->vmm_vm);
-	for (vcpu = 0; vcpu < maxcpus; vcpu++)
+	for (int vcpu = 0; vcpu < maxcpus; vcpu++) {
+		vcpu_lock_one(sc, vcpu);
+	}
+
+	mutex_enter(&sc->vmm_lease_lock);
+	VERIFY3U(sc->vmm_lease_blocker, !=, UINT_MAX);
+	sc->vmm_lease_blocker++;
+	if (sc->vmm_lease_blocker == 1) {
+		list_t *list = &sc->vmm_lease_list;
+		vmm_lease_t *lease = list_head(list);
+
+		while (lease != NULL) {
+			boolean_t sync_break = B_FALSE;
+
+			if (!lease->vml_expired) {
+				void *arg = lease->vml_expire_arg;
+				lease->vml_expired = B_TRUE;
+				sync_break = lease->vml_expire_func(arg);
+			}
+
+			if (sync_break) {
+				vmm_lease_t *next;
+
+				/*
+				 * These leases which are synchronously broken
+				 * result in vmm_read_unlock() calls from a
+				 * different thread than the corresponding
+				 * vmm_read_lock().  This is acceptable, given
+				 * that the rwlock underpinning the whole
+				 * mechanism tolerates the behavior.  This
+				 * flexibility is _only_ afforded to VM read
+				 * lock (RW_READER) holders.
+				 */
+				next = list_next(list, lease);
+				vmm_lease_break_locked(sc, lease);
+				lease = next;
+			} else {
+				lease = list_next(list, lease);
+			}
+		}
+	}
+	mutex_exit(&sc->vmm_lease_lock);
+
+	rw_enter(&sc->vmm_rwlock, RW_WRITER);
+	/*
+	 * For now, the 'maxcpus' value for an instance is fixed at the
+	 * compile-time constant of VM_MAXCPU at creation.  If this changes in
+	 * the future, allowing for dynamic vCPU resource sizing, acquisition
+	 * of the write lock will need to be wary of such changes.
+	 */
+	VERIFY(maxcpus == vm_get_maxcpus(sc->vmm_vm));
+}
+
+static void
+vmm_write_unlock(vmm_softc_t *sc)
+{
+	int maxcpus;
+
+	mutex_enter(&sc->vmm_lease_lock);
+	VERIFY3U(sc->vmm_lease_blocker, !=, 0);
+	sc->vmm_lease_blocker--;
+	if (sc->vmm_lease_blocker == 0) {
+		cv_broadcast(&sc->vmm_lease_cv);
+	}
+	mutex_exit(&sc->vmm_lease_lock);
+
+	/*
+	 * The VM write lock _must_ be released from the same thread it was
+	 * acquired in, unlike the read lock.
+	 */
+	VERIFY(rw_write_held(&sc->vmm_rwlock));
+	rw_exit(&sc->vmm_rwlock);
+
+	/* Unlock all the vCPUs */
+	maxcpus = vm_get_maxcpus(sc->vmm_vm);
+	for (int vcpu = 0; vcpu < maxcpus; vcpu++) {
 		vcpu_unlock_one(sc, vcpu);
+	}
 }
 
 static int
@@ -289,11 +401,14 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 {
 	int error = 0, vcpu = -1;
 	void *datap = (void *)arg;
-	boolean_t locked_one = B_FALSE, locked_all = B_FALSE;
+	enum vm_lock_type {
+		LOCK_NONE = 0,
+		LOCK_VCPU,
+		LOCK_READ_HOLD,
+		LOCK_WRITE_HOLD
+	} lock_type = LOCK_NONE;
 
-	/*
-	 * Some VMM ioctls can operate only on vcpus that are not running.
-	 */
+	/* Acquire any exclusion resources needed for the operation. */
 	switch (cmd) {
 	case VM_RUN:
 	case VM_GET_REGISTER:
@@ -324,53 +439,52 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
 			return (EFAULT);
 		}
-		if (vcpu < 0 || vcpu >= vm_get_maxcpus(sc->vmm_vm)) {
-			error = EINVAL;
-			goto done;
+		if (vcpu < 0 || vcpu > vm_get_maxcpus(sc->vmm_vm)) {
+			return (EINVAL);
 		}
-
-		error = vcpu_lock_one(sc, vcpu);
-		if (error)
-			goto done;
-		locked_one = B_TRUE;
+		vcpu_lock_one(sc, vcpu);
+		lock_type = LOCK_VCPU;
 		break;
 
-	case VM_MAP_PPTDEV_MMIO:
+	case VM_REINIT:
 	case VM_BIND_PPTDEV:
 	case VM_UNBIND_PPTDEV:
+	case VM_MAP_PPTDEV_MMIO:
 	case VM_ALLOC_MEMSEG:
 	case VM_MMAP_MEMSEG:
-	case VM_REINIT:
-		/*
-		 * All vCPUs must be prevented from running when performing
-		 * operations which act upon the entire VM.
-		 */
-		error = vcpu_lock_all(sc);
-		if (error)
-			goto done;
-		locked_all = B_TRUE;
+	case VM_WRLOCK_CYCLE:
+		vmm_write_lock(sc);
+		lock_type = LOCK_WRITE_HOLD;
 		break;
 
+	case VM_GET_GPA_PMAP:
 	case VM_GET_MEMSEG:
 	case VM_MMAP_GETNEXT:
+	case VM_LAPIC_IRQ:
+	case VM_INJECT_NMI:
+	case VM_IOAPIC_ASSERT_IRQ:
+	case VM_IOAPIC_DEASSERT_IRQ:
+	case VM_IOAPIC_PULSE_IRQ:
+	case VM_LAPIC_MSI:
+	case VM_LAPIC_LOCAL_IRQ:
+	case VM_GET_X2APIC_STATE:
+	case VM_RTC_READ:
+	case VM_RTC_WRITE:
+	case VM_RTC_SETTIME:
+	case VM_RTC_GETTIME:
 #ifndef __FreeBSD__
 	case VM_DEVMEM_GETOFFSET:
 #endif
-		/*
-		 * Lock a vcpu to make sure that the memory map cannot be
-		 * modified while it is being inspected.
-		 */
-		vcpu = vm_get_maxcpus(sc->vmm_vm) - 1;
-		error = vcpu_lock_one(sc, vcpu);
-		if (error)
-			goto done;
-		locked_one = B_TRUE;
+		vmm_read_lock(sc);
+		lock_type = LOCK_READ_HOLD;
 		break;
 
+	case VM_IOAPIC_PINCOUNT:
 	default:
 		break;
 	}
 
+	/* Execute the primary logic for the ioctl. */
 	switch (cmd) {
 	case VM_RUN: {
 		struct vm_run vmrun;
@@ -978,27 +1092,17 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 	case VM_SUSPEND_CPU:
 		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
 			error = EFAULT;
-			break;
+		} else {
+			error = vm_suspend_cpu(sc->vmm_vm, vcpu);
 		}
-		if (vcpu < -1 || vcpu >= vm_get_maxcpus(sc->vmm_vm)) {
-			error = EINVAL;
-			break;
-		}
-
-		error = vm_suspend_cpu(sc->vmm_vm, vcpu);
 		break;
 
 	case VM_RESUME_CPU:
 		if (ddi_copyin(datap, &vcpu, sizeof (vcpu), md)) {
 			error = EFAULT;
-			break;
+		} else {
+			error = vm_resume_cpu(sc->vmm_vm, vcpu);
 		}
-		if (vcpu < -1 || vcpu >= vm_get_maxcpus(sc->vmm_vm)) {
-			error = EINVAL;
-			break;
-		}
-
-		error = vm_resume_cpu(sc->vmm_vm, vcpu);
 		break;
 
 	case VM_GET_CPUS: {
@@ -1167,22 +1271,37 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		}
 		break;
 	}
+	case VM_WRLOCK_CYCLE: {
+		/*
+		 * Present a test mechanism to acquire/release the write lock
+		 * on the VM without any other effects.
+		 */
+		break;
+	}
 #endif
 	default:
 		error = ENOTTY;
 		break;
 	}
 
-	/* Release any vCPUs that were locked for the operation */
-	if (locked_one) {
+	/* Release exclusion resources */
+	switch (lock_type) {
+	case LOCK_NONE:
+		break;
+	case LOCK_VCPU:
 		vcpu_unlock_one(sc, vcpu);
-	} else if (locked_all) {
-		vcpu_unlock_all(sc);
+		break;
+	case LOCK_READ_HOLD:
+		vmm_read_unlock(sc);
+		break;
+	case LOCK_WRITE_HOLD:
+		vmm_write_unlock(sc);
+		break;
+	default:
+		panic("unexpected lock type");
+		break;
 	}
 
-done:
-	/* Make sure that no handler returns a bogus value like ERESTART */
-	KASSERT(error >= 0, ("vmmdev_ioctl: invalid error return %d", error));
 	return (error);
 }
 
@@ -1251,9 +1370,16 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		sc->vmm_minor = minor;
 		list_create(&sc->vmm_devmem_list, sizeof (vmm_devmem_entry_t),
 		    offsetof(vmm_devmem_entry_t, vde_node));
+
 		list_create(&sc->vmm_holds, sizeof (vmm_hold_t),
 		    offsetof(vmm_hold_t, vmh_node));
 		cv_init(&sc->vmm_cv, NULL, CV_DEFAULT, NULL);
+
+		mutex_init(&sc->vmm_lease_lock, NULL, MUTEX_DEFAULT, NULL);
+		list_create(&sc->vmm_lease_list, sizeof (vmm_lease_t),
+		    offsetof(vmm_lease_t, vml_node));
+		cv_init(&sc->vmm_lease_cv, NULL, CV_DEFAULT, NULL);
+		rw_init(&sc->vmm_rwlock, NULL, RW_DEFAULT, NULL);
 
 		sc->vmm_zone = crgetzone(cr);
 		zone_hold(sc->vmm_zone);
@@ -1275,6 +1401,23 @@ fail:
 	return (error);
 }
 
+/*
+ * Bhyve 'Driver' Interface
+ *
+ * While many devices are emulated in the bhyve userspace process, there are
+ * others with performance constraints which require that they run mostly or
+ * entirely in-kernel.  For those not integrated directly into bhyve, an API is
+ * needed so they can query/manipulate the portions of VM state needed to
+ * fulfill their purpose.
+ *
+ * This includes:
+ * - Translating guest-physical addresses to host-virtual pointers
+ * - Injecting MSIs
+ * - Hooking IO port addresses
+ *
+ * The vmm_drv interface exists to provide that functionality to its consumers.
+ * (At this time, 'viona' is the only user)
+ */
 int
 vmm_drv_hold(file_t *fp, cred_t *cr, vmm_hold_t **holdp)
 {
@@ -1311,7 +1454,8 @@ vmm_drv_hold(file_t *fp, cred_t *cr, vmm_hold_t **holdp)
 
 	hold = kmem_zalloc(sizeof (*hold), KM_SLEEP);
 	hold->vmh_sc = sc;
-	hold->vmh_expired = B_FALSE;
+	hold->vmh_release_req = B_FALSE;
+
 	list_insert_tail(&sc->vmm_holds, hold);
 	sc->vmm_flags |= VMM_HELD;
 	*holdp = hold;
@@ -1342,25 +1486,87 @@ vmm_drv_rele(vmm_hold_t *hold)
 }
 
 boolean_t
-vmm_drv_expired(vmm_hold_t *hold)
+vmm_drv_release_reqd(vmm_hold_t *hold)
 {
 	ASSERT(hold != NULL);
 
-	return (hold->vmh_expired);
+	return (hold->vmh_release_req);
+}
+
+vmm_lease_t *
+vmm_drv_lease_sign(vmm_hold_t *hold, boolean_t (*expiref)(void *), void *arg)
+{
+	vmm_softc_t *sc = hold->vmh_sc;
+	vmm_lease_t *lease;
+
+	ASSERT3P(expiref, !=, NULL);
+
+	if (hold->vmh_release_req) {
+		return (NULL);
+	}
+
+	lease = kmem_alloc(sizeof (*lease), KM_SLEEP);
+	list_link_init(&lease->vml_node);
+	lease->vml_expire_func = expiref;
+	lease->vml_expire_arg = arg;
+	lease->vml_expired = B_FALSE;
+	lease->vml_hold = hold;
+	/* cache the VM pointer for one less pointer chase */
+	lease->vml_vm = sc->vmm_vm;
+
+	mutex_enter(&sc->vmm_lease_lock);
+	while (sc->vmm_lease_blocker != 0) {
+		cv_wait(&sc->vmm_lease_cv, &sc->vmm_lease_lock);
+	}
+	list_insert_tail(&sc->vmm_lease_list, lease);
+	vmm_read_lock(sc);
+	mutex_exit(&sc->vmm_lease_lock);
+
+	return (lease);
+}
+
+static void
+vmm_lease_break_locked(vmm_softc_t *sc, vmm_lease_t *lease)
+{
+	ASSERT(MUTEX_HELD(&sc->vmm_lease_lock));
+
+	list_remove(&sc->vmm_lease_list, lease);
+	vmm_read_unlock(sc);
+	kmem_free(lease, sizeof (*lease));
+}
+
+void
+vmm_drv_lease_break(vmm_hold_t *hold, vmm_lease_t *lease)
+{
+	vmm_softc_t *sc = hold->vmh_sc;
+
+	VERIFY3P(hold, ==, lease->vml_hold);
+
+	mutex_enter(&sc->vmm_lease_lock);
+	vmm_lease_break_locked(sc, lease);
+	mutex_exit(&sc->vmm_lease_lock);
+}
+
+boolean_t
+vmm_drv_lease_expired(vmm_lease_t *lease)
+{
+	return (lease->vml_expired);
 }
 
 void *
-vmm_drv_gpa2kva(vmm_hold_t *hold, uintptr_t gpa, size_t sz)
+vmm_drv_gpa2kva(vmm_lease_t *lease, uintptr_t gpa, size_t sz)
 {
-	struct vm *vm;
-	struct vmspace *vmspace;
+	ASSERT(lease != NULL);
 
-	ASSERT(hold != NULL);
+	return (vmspace_find_kva(vm_get_vmspace(lease->vml_vm), gpa, sz));
+}
 
-	vm = hold->vmh_sc->vmm_vm;
-	vmspace = vm_get_vmspace(vm);
+int
+vmm_drv_msi(vmm_lease_t *lease, uint64_t addr, uint64_t msg)
+{
+	ASSERT(lease != NULL);
 
-	return (vmspace_find_kva(vmspace, gpa, sz));
+	return (lapic_intr_msi(lease->vml_vm, addr, msg));
 }
 
 int
@@ -1387,8 +1593,10 @@ vmm_drv_ioport_hook(vmm_hold_t *hold, uint_t ioport, vmm_drv_rmem_cb_t rfunc,
 	hold->vmh_ioport_hook_cnt++;
 	mutex_exit(&vmm_mtx);
 
+	vmm_write_lock(sc);
 	err = vm_ioport_hook(sc->vmm_vm, ioport, (vmm_rmem_cb_t)rfunc,
 	    (vmm_wmem_cb_t)wfunc, arg, cookie);
+	vmm_write_unlock(sc);
 
 	if (err != 0) {
 		mutex_enter(&vmm_mtx);
@@ -1409,22 +1617,13 @@ vmm_drv_ioport_unhook(vmm_hold_t *hold, void **cookie)
 	ASSERT(hold->vmh_ioport_hook_cnt != 0);
 
 	sc = hold->vmh_sc;
+	vmm_write_lock(sc);
 	vm_ioport_unhook(sc->vmm_vm, cookie);
+	vmm_write_unlock(sc);
 
 	mutex_enter(&vmm_mtx);
 	hold->vmh_ioport_hook_cnt--;
 	mutex_exit(&vmm_mtx);
-}
-
-int
-vmm_drv_msi(vmm_hold_t *hold, uint64_t addr, uint64_t msg)
-{
-	struct vm *vm;
-
-	ASSERT(hold != NULL);
-
-	vm = hold->vmh_sc->vmm_vm;
-	return (lapic_intr_msi(vm, addr, msg));
 }
 
 static int
@@ -1438,7 +1637,7 @@ vmm_drv_purge(vmm_softc_t *sc)
 		sc->vmm_flags |= VMM_CLEANUP;
 		for (hold = list_head(&sc->vmm_holds); hold != NULL;
 		    hold = list_next(&sc->vmm_holds, hold)) {
-			hold->vmh_expired = B_TRUE;
+			hold->vmh_release_req = B_TRUE;
 		}
 		while ((sc->vmm_flags & VMM_HELD) != 0) {
 			if (cv_wait_sig(&sc->vmm_cv, &vmm_mtx) <= 0) {
@@ -1730,10 +1929,8 @@ vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 	if (sc->vmm_flags & VMM_DESTROY)
 		return (ENXIO);
 
-	/* Get a read lock on the guest memory map by freezing any vcpu. */
-	if ((err = vcpu_lock_all(sc)) != 0) {
-		return (err);
-	}
+	/* Grab read lock on the VM to prevent any changes to the memory map */
+	vmm_read_lock(sc);
 
 	vm = sc->vmm_vm;
 	vms = vm_get_vmspace(vm);
@@ -1758,7 +1955,7 @@ vmm_segmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 
 
 out:
-	vcpu_unlock_all(sc);
+	vmm_read_unlock(sc);
 	return (err);
 }
 

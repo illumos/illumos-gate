@@ -39,7 +39,10 @@ SYMBOL_VERSION ILLUMOSprivate {
 	# bhyve driver API
 	vmm_drv_hold;
 	vmm_drv_rele;
-	vmm_drv_expired;
+	vmm_drv_release_reqd;
+	vmm_drv_lease_sign;
+	vmm_drv_lease_break;
+	vmm_drv_lease_expired;
 	vmm_drv_gpa2kva;
 	vmm_drv_ioport_hook;
 	vmm_drv_ioport_unhook;

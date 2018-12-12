@@ -148,8 +148,13 @@ vmspace_find_kva(struct vmspace *vms, uintptr_t addr, size_t size)
 	vmspace_mapping_t *vmsm;
 	void *result = NULL;
 
-	mutex_enter(&vms->vms_lock);
-	vmsm = vm_mapping_find(vms, addr, size, B_FALSE);
+	/*
+	 * Since vmspace_find_kva is provided so that vmm_drv consumers can do
+	 * GPA2KVA translations, it is expected to be called when there is a
+	 * read lock preventing vmspace alterations.  As such, it can do the
+	 * lockless vm_mapping_find() lookup.
+	 */
+	vmsm = vm_mapping_find(vms, addr, size, B_TRUE);
 	if (vmsm != NULL) {
 		struct vm_object *vmo = vmsm->vmsm_object;
 
@@ -162,7 +167,6 @@ vmspace_find_kva(struct vmspace *vms, uintptr_t addr, size_t size)
 			break;
 		}
 	}
-	mutex_exit(&vms->vms_lock);
 
 	return (result);
 }

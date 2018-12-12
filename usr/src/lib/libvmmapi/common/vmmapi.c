@@ -38,7 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -1785,6 +1785,17 @@ vm_get_device_fd(struct vmctx *ctx)
 
 	return (ctx->fd);
 }
+
+#ifndef __FreeBSD__
+int
+vm_wrlock_cycle(struct vmctx *ctx)
+{
+	if (ioctl(ctx->fd, VM_WRLOCK_CYCLE, 0) != 0) {
+		return (errno);
+	}
+	return (0);
+}
+#endif /* __FreeBSD__ */
 
 #ifdef __FreeBSD__
 const cap_ioctl_t *

@@ -197,7 +197,6 @@ struct vm {
 	uint16_t	threads;		/* (o) num of threads/core */
 	uint16_t	maxcpus;		/* (o) max pluggable cpus */
 #ifndef __FreeBSD__
-	krwlock_t	ioport_rwlock;
 	list_t		ioport_hooks;
 #endif /* __FreeBSD__ */
 };
@@ -526,7 +525,6 @@ vm_init(struct vm *vm, bool create)
 		vm->vrtc = vrtc_init(vm);
 #ifndef __FreeBSD__
 	if (create) {
-		rw_init(&vm->ioport_rwlock, NULL, RW_DEFAULT, NULL);
 		list_create(&vm->ioport_hooks, sizeof (vm_ioport_hook_t),
 		    offsetof (vm_ioport_hook_t, vmih_node));
 	} else {
@@ -3135,7 +3133,6 @@ vm_ioport_hook(struct vm *vm, uint_t ioport, vmm_rmem_cb_t rfunc,
 		return (EINVAL);
 	}
 
-	rw_enter(&vm->ioport_rwlock, RW_WRITER);
 	/*
 	 * Find the node position in the list which this region should be
 	 * inserted behind to maintain sorted order.
@@ -3143,7 +3140,6 @@ vm_ioport_hook(struct vm *vm, uint_t ioport, vmm_rmem_cb_t rfunc,
 	for (node = list_tail(ih); node != NULL; node = list_prev(ih, node)) {
 		if (ioport == node->vmih_ioport) {
 			/* Reject duplicate port hook  */
-			rw_exit(&vm->ioport_rwlock);
 			return (EEXIST);
 		} else if (ioport > node->vmih_ioport) {
 			break;
@@ -3162,7 +3158,6 @@ vm_ioport_hook(struct vm *vm, uint_t ioport, vmm_rmem_cb_t rfunc,
 	}
 
 	*cookie = (void *)hook;
-	rw_exit(&vm->ioport_rwlock);
 	return (0);
 }
 
@@ -3172,12 +3167,10 @@ vm_ioport_unhook(struct vm *vm, void **cookie)
 	vm_ioport_hook_t *hook;
 	list_t *ih = &vm->ioport_hooks;
 
-	rw_enter(&vm->ioport_rwlock, RW_WRITER);
 	hook = *cookie;
 	list_remove(ih, hook);
 	kmem_free(hook, sizeof (*hook));
 	*cookie = NULL;
-	rw_exit(&vm->ioport_rwlock);
 }
 
 int
@@ -3188,38 +3181,32 @@ vm_ioport_handle_hook(struct vm *vm, int cpuid, bool in, int port, int bytes,
 	list_t *ih = &vm->ioport_hooks;
 	int err = 0;
 
-	rw_enter(&vm->ioport_rwlock, RW_READER);
 	for (hook = list_head(ih); hook != NULL; hook = list_next(ih, hook)) {
 		if (hook->vmih_ioport == port) {
 			break;
 		}
 	}
 	if (hook == NULL) {
-		err = ENOENT;
-		goto bail;
+		return (ENOENT);
 	}
 
 	if (in) {
 		uint64_t tval;
 
 		if (hook->vmih_rmem_cb == NULL) {
-			err = ENOENT;
-			goto bail;
+			return (ENOENT);
 		}
 		err = hook->vmih_rmem_cb(hook->vmih_arg, (uintptr_t)port,
 		    (uint_t)bytes, &tval);
 		*val = (uint32_t)tval;
 	} else {
 		if (hook->vmih_wmem_cb == NULL) {
-			err = ENOENT;
-			goto bail;
+			return (ENOENT);
 		}
 		err = hook->vmih_wmem_cb(hook->vmih_arg, (uintptr_t)port,
 		    (uint_t)bytes, (uint64_t)*val);
 	}
 
-bail:
-	rw_exit(&vm->ioport_rwlock);
 	return (err);
 }
 

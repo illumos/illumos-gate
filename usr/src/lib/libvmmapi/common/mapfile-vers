@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -119,6 +119,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_suspended_cpus;
 		vm_resume_cpu;
 		vm_unassign_pptdev;
+		vm_wrlock_cycle;
 
 	local:
 		*;

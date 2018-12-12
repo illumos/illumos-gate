@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _VMM_IMPL_H_
@@ -46,7 +46,7 @@ typedef struct vmm_devmem_entry vmm_devmem_entry_t;
 typedef struct vmm_zsd vmm_zsd_t;
 
 enum vmm_softc_state {
-	VMM_HELD	= 1,	/* external driver(s) possess hold on VM */
+	VMM_HELD	= 1,	/* external driver(s) possess hold on the VM */
 	VMM_CLEANUP	= 2,	/* request that holds are released */
 	VMM_PURGED	= 4,	/* all hold have been released */
 	VMM_BLOCK_HOOK	= 8,	/* mem hook install temporarily blocked */
@@ -58,11 +58,18 @@ struct vmm_softc {
 	struct vm	*vmm_vm;
 	minor_t		vmm_minor;
 	char		vmm_name[VM_MAX_NAMELEN];
+	list_t		vmm_devmem_list;
+
+	kcondvar_t	vmm_cv;
+	list_t		vmm_holds;
 	uint_t		vmm_flags;
 	boolean_t	vmm_is_open;
-	list_t		vmm_devmem_list;
-	list_t		vmm_holds;
-	kcondvar_t	vmm_cv;
+
+	kmutex_t	vmm_lease_lock;
+	list_t		vmm_lease_list;
+	uint_t		vmm_lease_blocker;
+	kcondvar_t	vmm_lease_cv;
+	krwlock_t	vmm_rwlock;
 
 	/* For zone specific data */
 	list_node_t	vmm_zsd_linkage;

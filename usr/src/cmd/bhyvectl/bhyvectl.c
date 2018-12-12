@@ -40,7 +40,7 @@
 
 /*
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/cdefs.h>
@@ -93,6 +93,9 @@ usage(bool cpu_intel)
 	"       [--cpu=<vcpu_number>]\n"
 	"       [--create]\n"
 	"       [--destroy]\n"
+#ifndef __FreeBSD__
+	"       [--wrlock-cycle]\n"
+#endif
 	"       [--get-all]\n"
 	"       [--get-stats]\n"
 	"       [--set-desc-ds]\n"
@@ -306,6 +309,9 @@ static int unassign_pptdev, bus, slot, func;
 #endif
 static int run;
 static int get_cpu_topology;
+#ifndef __FreeBSD__
+static int wrlock_cycle;
+#endif
 
 /*
  * VMCB specific.
@@ -1479,6 +1485,9 @@ setup_options(bool cpu_intel)
 		{ "get-suspended-cpus", NO_ARG,	&get_suspended_cpus, 	1 },
 		{ "get-intinfo", 	NO_ARG,	&get_intinfo,		1 },
 		{ "get-cpu-topology",	NO_ARG, &get_cpu_topology,	1 },
+#ifndef __FreeBSD__
+		{ "wrlock-cycle",	NO_ARG,	&wrlock_cycle,	1 },
+#endif
 	};
 
 	const struct option intel_opts[] = {
@@ -1902,6 +1911,13 @@ main(int argc, char *argv[])
 			exit (1);
 		}
 	}
+
+#ifndef __FreeBSD__
+	if (!error && wrlock_cycle) {
+		error = vm_wrlock_cycle(ctx);
+		exit(error);
+	}
+#endif /* __FreeBSD__ */
 
 	if (!error && memsize)
 		error = vm_setup_memory(ctx, memsize, VM_MMAP_ALL);
