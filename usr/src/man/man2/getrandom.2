@@ -1,0 +1,134 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018 Joyent, Inc.
+.\"
+.Dd "November 6, 2018"
+.Dt GETRANDOM 2
+.Os
+.Sh NAME
+.Nm getrandom
+.Nd get random numbers
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In sys/random.h
+.Ft ssize_t
+.Fo getrandom
+.Fa "void *bufp"
+.Fa "size_t buflen"
+.Fa "unsigned int flags"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn getrandom
+function is used to retrieve random and pseudo-random numbers from the
+operating system.
+.Pp
+By default, the
+.Fn getrandom
+function will read up to
+.Fa buflen
+bytes of pseudo-random data into
+.Fa bufp .
+Pseudo-random data will be retrieved from the same source that provides
+data to
+.Pa /dev/urandom .
+The
+.Fn getrandom
+function may return less data than was requested in
+.Fa buflen .
+This can happen because of interrupts from signals, availability of
+data, or because the request was too large.
+Callers must always check to see how much data was actually returned.
+.Pp
+The following values may be bitwise-ORed together in the
+.Fa flags
+argument to modify the behavior of the function:
+.Bl -tag -width Dv
+.It Dv GRND_NONBLOCK
+Instead of blocking, return immediately if data is not available.
+If no data was obtained,
+.Er EAGAIN
+will be set in
+.Va errno .
+Otherwise, less data will be returned than requested.
+.It Dv GRND_RANDOM
+Use the same source of random data as reading from
+.Pa /dev/random ,
+instead of
+.Pa /dev/urandom .
+.El
+.Pp
+The
+.Fn getrandom
+function is intended to eliminate the need to explicitly call
+.Xr open 2
+and
+.Xr read 2
+on
+.Pa /dev/random
+or
+.Pa /dev/urandom .
+This eliminates the need to have the character devices available or
+cases where a program may not have an available file descriptor.
+For other uses,
+.Xr arc4random 3C
+may be a better interface.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn getrandom
+function returns the number of bytes written into
+.Fa bufp .
+Otherwise,
+.Sy -1
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh ERRORS
+The
+.Fn getrandom
+function will fail if:
+.Bl -tag -width Er
+.It Er EAGAIN
+The
+.Fn getrandom
+function would have blocked and
+.Dv GRND_NONBLOCK
+flag was set.
+.It Er EFAULT
+The
+.Fa bufp
+argument points to an illegal address.
+.It Er EINAVL
+An invalid value was passed in
+.Fa flags .
+.It Er EINTR
+A signal was caught during the operation and no data was transferred.
+.It Er EIO
+An internal error occurred with the corresponding
+.Xr random 7D
+device.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr open 2 ,
+.Xr read 2 ,
+.Xr arc4random 3C ,
+.Xr random 7D
+.Sh STANDARDS
+The
+.Fn getrandom
+function is non-standard.
+It originally appeared in Linux.

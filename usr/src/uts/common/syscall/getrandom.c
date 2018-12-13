@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -36,8 +36,8 @@
 #define	MAXRANDBYTES	1024
 #define	MAXURANDBYTES	INT_MAX
 
-int
-getrandom(void *bufp, size_t buflen, int flags)
+ssize_t
+getrandom(void *bufp, size_t buflen, unsigned int flags)
 {
 	int out = 0;
 	uint8_t rbytes[128];
