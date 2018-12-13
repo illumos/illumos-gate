@@ -53,29 +53,29 @@
 #include "vm/vm_glue.h"
 
 /*
- * Locking order:
+ * Locking details:
  *
- * vmmdev_mtx (driver holds etc.)
- *  ->sdev_contents (/dev/vmm)
- *   vmm_mtx (VM list)
+ * Driver-wide data (vmmdev_*) , including HMA and sdev registration, is
+ * protected by vmmdev_mtx.  The list of vmm_softc_t instances and related data
+ * (vmm_*) are protected by vmm_mtx.  Actions requiring both locks must acquire
+ * vmmdev_mtx before vmm_mtx.  The sdev plugin functions must not attempt to
+ * acquire vmmdev_mtx, as they could deadlock with plugin unregistration.
  */
 
-static dev_info_t *vmm_dip;
-static void *vmm_statep;
-
 static kmutex_t		vmmdev_mtx;
-static id_space_t	*vmmdev_minors;
-static hma_reg_t	*vmm_hma_reg;
+static dev_info_t	*vmmdev_dip;
+static hma_reg_t	*vmmdev_hma_reg;
+static sdev_plugin_hdl_t vmmdev_sdev_hdl;
+
 static kmutex_t		vmm_mtx;
-static list_t		vmmdev_list;
+static list_t		vmm_list;
+static id_space_t	*vmm_minors;
+static void		*vmm_statep;
 
 static const char *vmmdev_hvm_name = "bhyve";
 
-/*
- * For sdev plugin (/dev)
- */
+/* For sdev plugin (/dev) */
 #define	VMM_SDEV_ROOT "/dev/vmm"
-static sdev_plugin_hdl_t vmm_sdev_hdl;
 
 /* From uts/i86pc/io/vmm/intel/vmx.c */
 extern int vmx_x86_supported(const char **);
@@ -1184,7 +1184,7 @@ done:
 static vmm_softc_t *
 vmm_lookup(const char *name)
 {
-	list_t *vml = &vmmdev_list;
+	list_t *vml = &vmm_list;
 	vmm_softc_t *sc;
 
 	ASSERT(MUTEX_HELD(&vmm_mtx));
@@ -1209,35 +1209,32 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		return (EINVAL);
 	}
 
-	mutex_enter(&vmmdev_mtx);
 	mutex_enter(&vmm_mtx);
 
 	/* Look for duplicates names */
 	if (vmm_lookup(name) != NULL) {
 		mutex_exit(&vmm_mtx);
-		mutex_exit(&vmmdev_mtx);
 		return (EEXIST);
 	}
 
 	/* Allow only one instance per non-global zone. */
 	if (!INGLOBALZONE(curproc)) {
-		for (sc = list_head(&vmmdev_list); sc != NULL;
-		    sc = list_next(&vmmdev_list, sc)) {
+		for (sc = list_head(&vmm_list); sc != NULL;
+		    sc = list_next(&vmm_list, sc)) {
 			if (sc->vmm_zone == curzone) {
 				mutex_exit(&vmm_mtx);
-				mutex_exit(&vmmdev_mtx);
 				return (EINVAL);
 			}
 		}
 	}
 
-	minor = id_alloc(vmmdev_minors);
+	minor = id_alloc(vmm_minors);
 	if (ddi_soft_state_zalloc(vmm_statep, minor) != DDI_SUCCESS) {
 		goto fail;
 	} else if ((sc = ddi_get_soft_state(vmm_statep, minor)) == NULL) {
 		ddi_soft_state_free(vmm_statep, minor);
 		goto fail;
-	} else if (ddi_create_minor_node(vmm_dip, name, S_IFCHR, minor,
+	} else if (ddi_create_minor_node(vmmdev_dip, name, S_IFCHR, minor,
 	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		goto fail;
 	}
@@ -1257,21 +1254,19 @@ vmmdev_do_vm_create(char *name, cred_t *cr)
 		zone_hold(sc->vmm_zone);
 		vmm_zsd_add_vm(sc);
 
-		list_insert_tail(&vmmdev_list, sc);
+		list_insert_tail(&vmm_list, sc);
 		mutex_exit(&vmm_mtx);
-		mutex_exit(&vmmdev_mtx);
 		return (0);
 	}
 
-	ddi_remove_minor_node(vmm_dip, name);
+	ddi_remove_minor_node(vmmdev_dip, name);
 fail:
-	id_free(vmmdev_minors, minor);
+	id_free(vmm_minors, minor);
 	if (sc != NULL) {
 		ddi_soft_state_free(vmm_statep, minor);
 	}
-
 	mutex_exit(&vmm_mtx);
-	mutex_exit(&vmmdev_mtx);
+
 	return (error);
 }
 
@@ -1280,8 +1275,6 @@ vmm_drv_hold(file_t *fp, cred_t *cr, vmm_hold_t **holdp)
 {
 	vnode_t *vp = fp->f_vnode;
 	const dev_t dev = vp->v_rdev;
-	minor_t minor;
-	minor_t major;
 	vmm_softc_t *sc;
 	vmm_hold_t *hold;
 	int err = 0;
@@ -1289,16 +1282,18 @@ vmm_drv_hold(file_t *fp, cred_t *cr, vmm_hold_t **holdp)
 	if (vp->v_type != VCHR) {
 		return (ENXIO);
 	}
-	major = getmajor(dev);
-	minor = getminor(dev);
+	const major_t major = getmajor(dev);
+	const minor_t minor = getminor(dev);
 
 	mutex_enter(&vmmdev_mtx);
-	if (vmm_dip == NULL) {
-		err = ENOENT;
-		goto out;
+	if (vmmdev_dip == NULL || major != ddi_driver_major(vmmdev_dip)) {
+		mutex_exit(&vmmdev_mtx);
+		return (ENOENT);
 	}
-	if (major != ddi_driver_major(vmm_dip) ||
-	    (sc = ddi_get_soft_state(vmm_statep, minor)) == NULL) {
+	mutex_enter(&vmm_mtx);
+	mutex_exit(&vmmdev_mtx);
+
+	if ((sc = ddi_get_soft_state(vmm_statep, minor)) == NULL) {
 		err = ENOENT;
 		goto out;
 	}
@@ -1317,7 +1312,7 @@ vmm_drv_hold(file_t *fp, cred_t *cr, vmm_hold_t **holdp)
 	*holdp = hold;
 
 out:
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 	return (err);
 }
 
@@ -1330,14 +1325,14 @@ vmm_drv_rele(vmm_hold_t *hold)
 	ASSERT(hold->vmh_sc != NULL);
 	VERIFY(hold->vmh_ioport_hook_cnt == 0);
 
-	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 	sc = hold->vmh_sc;
 	list_remove(&sc->vmm_holds, hold);
 	if (list_is_empty(&sc->vmm_holds)) {
 		sc->vmm_flags &= ~VMM_HELD;
 		cv_broadcast(&sc->vmm_cv);
 	}
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 	kmem_free(hold, sizeof (*hold));
 }
 
@@ -1374,10 +1369,10 @@ vmm_drv_ioport_hook(vmm_hold_t *hold, uint_t ioport, vmm_drv_rmem_cb_t rfunc,
 	ASSERT(cookie != NULL);
 
 	sc = hold->vmh_sc;
-	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 	/* Confirm that hook installation is not blocked */
 	if ((sc->vmm_flags & VMM_BLOCK_HOOK) != 0) {
-		mutex_exit(&vmmdev_mtx);
+		mutex_exit(&vmm_mtx);
 		return (EBUSY);
 	}
 	/*
@@ -1385,16 +1380,16 @@ vmm_drv_ioport_hook(vmm_hold_t *hold, uint_t ioport, vmm_drv_rmem_cb_t rfunc,
 	 * from being asserted while the mutex is dropped.
 	 */
 	hold->vmh_ioport_hook_cnt++;
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 
 	err = vm_ioport_hook(sc->vmm_vm, ioport, (vmm_rmem_cb_t)rfunc,
 	    (vmm_wmem_cb_t)wfunc, arg, cookie);
 
 	if (err != 0) {
-		mutex_enter(&vmmdev_mtx);
+		mutex_enter(&vmm_mtx);
 		/* Walk back optimism about the hook installation */
 		hold->vmh_ioport_hook_cnt--;
-		mutex_exit(&vmmdev_mtx);
+		mutex_exit(&vmm_mtx);
 	}
 	return (err);
 }
@@ -1411,9 +1406,9 @@ vmm_drv_ioport_unhook(vmm_hold_t *hold, void **cookie)
 	sc = hold->vmh_sc;
 	vm_ioport_unhook(sc->vmm_vm, cookie);
 
-	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 	hold->vmh_ioport_hook_cnt--;
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 }
 
 int
@@ -1430,7 +1425,7 @@ vmm_drv_msi(vmm_hold_t *hold, uint64_t addr, uint64_t msg)
 static int
 vmm_drv_purge(vmm_softc_t *sc)
 {
-	ASSERT(MUTEX_HELD(&vmmdev_mtx));
+	ASSERT(MUTEX_HELD(&vmm_mtx));
 
 	if ((sc->vmm_flags & VMM_HELD) != 0) {
 		vmm_hold_t *hold;
@@ -1441,7 +1436,7 @@ vmm_drv_purge(vmm_softc_t *sc)
 			hold->vmh_expired = B_TRUE;
 		}
 		while ((sc->vmm_flags & VMM_HELD) != 0) {
-			if (cv_wait_sig(&sc->vmm_cv, &vmmdev_mtx) <= 0) {
+			if (cv_wait_sig(&sc->vmm_cv, &vmm_mtx) <= 0) {
 				return (EINTR);
 			}
 		}
@@ -1458,7 +1453,7 @@ vmm_drv_block_hook(vmm_softc_t *sc, boolean_t enable_block)
 {
 	int err = 0;
 
-	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 	if (!enable_block) {
 		VERIFY((sc->vmm_flags & VMM_BLOCK_HOOK) != 0);
 
@@ -1481,17 +1476,16 @@ vmm_drv_block_hook(vmm_softc_t *sc, boolean_t enable_block)
 	sc->vmm_flags |= VMM_BLOCK_HOOK;
 
 done:
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 	return (err);
 }
 
 static int
 vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 {
-	dev_info_t	*pdip = ddi_get_parent(vmm_dip);
+	dev_info_t	*pdip = ddi_get_parent(vmmdev_dip);
 	minor_t		minor;
 
-	ASSERT(MUTEX_HELD(&vmmdev_mtx));
 	ASSERT(MUTEX_HELD(&vmm_mtx));
 
 	if (clean_zsd) {
@@ -1505,8 +1499,8 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 	/* Clean up devmem entries */
 	vmmdev_devmem_purge(sc);
 
-	list_remove(&vmmdev_list, sc);
-	ddi_remove_minor_node(vmm_dip, sc->vmm_name);
+	list_remove(&vmm_list, sc);
+	ddi_remove_minor_node(vmmdev_dip, sc->vmm_name);
 	minor = sc->vmm_minor;
 	zone_rele(sc->vmm_zone);
 	if (sc->vmm_is_open) {
@@ -1514,7 +1508,7 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 	} else {
 		vm_destroy(sc->vmm_vm);
 		ddi_soft_state_free(vmm_statep, minor);
-		id_free(vmmdev_minors, minor);
+		id_free(vmm_minors, minor);
 	}
 	(void) devfs_clean(pdip, NULL, DV_CLEAN_FORCE);
 
@@ -1526,11 +1520,9 @@ vmm_do_vm_destroy(vmm_softc_t *sc, boolean_t clean_zsd)
 {
 	int		err;
 
-	mutex_enter(&vmmdev_mtx);
 	mutex_enter(&vmm_mtx);
 	err = vmm_do_vm_destroy_locked(sc, clean_zsd);
 	mutex_exit(&vmm_mtx);
-	mutex_exit(&vmmdev_mtx);
 
 	return (err);
 }
@@ -1545,12 +1537,10 @@ vmmdev_do_vm_destroy(const char *name, cred_t *cr)
 	if (crgetuid(cr) != 0)
 		return (EPERM);
 
-	mutex_enter(&vmmdev_mtx);
 	mutex_enter(&vmm_mtx);
 
 	if ((sc = vmm_lookup(name)) == NULL) {
 		mutex_exit(&vmm_mtx);
-		mutex_exit(&vmmdev_mtx);
 		return (ENOENT);
 	}
 	/*
@@ -1559,13 +1549,10 @@ vmmdev_do_vm_destroy(const char *name, cred_t *cr)
 	 */
 	if (!INGLOBALZONE(curproc) && sc->vmm_zone != curzone) {
 		mutex_exit(&vmm_mtx);
-		mutex_exit(&vmmdev_mtx);
 		return (EPERM);
 	}
 	err = vmm_do_vm_destroy_locked(sc, B_TRUE);
-
 	mutex_exit(&vmm_mtx);
-	mutex_exit(&vmmdev_mtx);
 
 	return (err);
 }
@@ -1589,15 +1576,15 @@ vmm_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 		return (0);
 	}
 
-	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 	sc = ddi_get_soft_state(vmm_statep, minor);
 	if (sc == NULL) {
-		mutex_exit(&vmmdev_mtx);
+		mutex_exit(&vmm_mtx);
 		return (ENXIO);
 	}
 
 	sc->vmm_is_open = B_TRUE;
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 
 	return (0);
 }
@@ -1612,10 +1599,10 @@ vmm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	if (minor == VMM_CTL_MINOR)
 		return (0);
 
-	mutex_enter(&vmmdev_mtx);
+	mutex_enter(&vmm_mtx);
 	sc = ddi_get_soft_state(vmm_statep, minor);
 	if (sc == NULL) {
-		mutex_exit(&vmmdev_mtx);
+		mutex_exit(&vmm_mtx);
 		return (ENXIO);
 	}
 
@@ -1625,9 +1612,9 @@ vmm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	if (sc->vmm_flags & VMM_DESTROY) {
 		vm_destroy(sc->vmm_vm);
 		ddi_soft_state_free(vmm_statep, minor);
-		id_free(vmmdev_minors, minor);
+		id_free(vmm_minors, minor);
 	}
-	mutex_exit(&vmmdev_mtx);
+	mutex_exit(&vmm_mtx);
 
 	return (0);
 }
@@ -1796,18 +1783,14 @@ vmm_sdev_filldir(sdev_ctx_t ctx)
 		return (EINVAL);
 	}
 
-	/* Driver not initialized, directory empty. */
-	if (vmm_dip == NULL)
-		return (0);
-
 	mutex_enter(&vmm_mtx);
-
-	for (sc = list_head(&vmmdev_list); sc != NULL;
-	    sc = list_next(&vmmdev_list, sc)) {
+	ASSERT(vmmdev_dip != NULL);
+	for (sc = list_head(&vmm_list); sc != NULL;
+	    sc = list_next(&vmm_list, sc)) {
 		if (INGLOBALZONE(curproc) || sc->vmm_zone == curzone) {
 			ret = sdev_plugin_mknod(ctx, sc->vmm_name,
 			    S_IFCHR | 0600,
-			    makedevice(ddi_driver_major(vmm_dip),
+			    makedevice(ddi_driver_major(vmmdev_dip),
 			    sc->vmm_minor));
 		} else {
 			continue;
@@ -1845,7 +1828,7 @@ vmm_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 
 	switch (cmd) {
 	case DDI_INFO_DEVT2DEVINFO:
-		*result = (void *)vmm_dip;
+		*result = (void *)vmmdev_dip;
 		error = DDI_SUCCESS;
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
@@ -1872,7 +1855,7 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	mutex_enter(&vmmdev_mtx);
 	/* Ensure we are not already attached. */
-	if (vmm_dip != NULL) {
+	if (vmmdev_dip != NULL) {
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
 	}
@@ -1899,9 +1882,9 @@ vmm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	ddi_report_dev(dip);
-	vmm_hma_reg = reg;
-	vmm_sdev_hdl = sph;
-	vmm_dip = dip;
+	vmmdev_hma_reg = reg;
+	vmmdev_sdev_hdl = sph;
+	vmmdev_dip = dip;
 	mutex_exit(&vmmdev_mtx);
 	return (DDI_SUCCESS);
 
@@ -1912,8 +1895,8 @@ fail:
 	if (reg != NULL) {
 		hma_unregister(reg);
 	}
-	vmm_sol_glue_cleanup();
 	vmm_arena_fini();
+	vmm_sol_glue_cleanup();
 	mutex_exit(&vmmdev_mtx);
 	return (DDI_FAILURE);
 }
@@ -1937,28 +1920,29 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	mutex_enter(&vmm_mtx);
-	if (!list_is_empty(&vmmdev_list)) {
+	if (!list_is_empty(&vmm_list)) {
 		mutex_exit(&vmm_mtx);
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
 	}
 	mutex_exit(&vmm_mtx);
 
-	if (vmm_sdev_hdl != NULL && sdev_plugin_unregister(vmm_sdev_hdl) != 0) {
+	VERIFY(vmmdev_sdev_hdl != NULL);
+	if (sdev_plugin_unregister(vmmdev_sdev_hdl) != 0) {
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
 	}
-	vmm_sdev_hdl = NULL;
+	vmmdev_sdev_hdl = NULL;
 
 	/* Remove the control node. */
 	ddi_remove_minor_node(dip, "ctl");
-	vmm_dip = NULL;
+	vmmdev_dip = NULL;
 
 	VERIFY0(vmm_mod_unload());
-	hma_unregister(vmm_hma_reg);
-	vmm_hma_reg = NULL;
-	vmm_sol_glue_cleanup();
+	hma_unregister(vmmdev_hma_reg);
+	vmmdev_hma_reg = NULL;
 	vmm_arena_fini();
+	vmm_sol_glue_cleanup();
 
 	mutex_exit(&vmmdev_mtx);
 
@@ -2017,10 +2001,9 @@ _init(void)
 
 	mutex_init(&vmmdev_mtx, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vmm_mtx, NULL, MUTEX_DRIVER, NULL);
-	list_create(&vmmdev_list, sizeof (vmm_softc_t),
+	list_create(&vmm_list, sizeof (vmm_softc_t),
 	    offsetof(vmm_softc_t, vmm_node));
-	vmmdev_minors = id_space_create("vmm_minors", VMM_CTL_MINOR + 1,
-	    MAXMIN32);
+	vmm_minors = id_space_create("vmm_minors", VMM_CTL_MINOR + 1, MAXMIN32);
 
 	error = ddi_soft_state_init(&vmm_statep, sizeof (vmm_softc_t), 0);
 	if (error) {
