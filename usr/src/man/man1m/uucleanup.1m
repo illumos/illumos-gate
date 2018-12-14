@@ -15,7 +15,6 @@ uucleanup \- uucp spool directory clean-up
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBuucleanup\fR will scan the spool directories for old files and take
 appropriate action to remove them in a useful way:
@@ -55,7 +54,6 @@ unless \fBtime\fR is specifically set.
 This program is typically started by the shell \fBuudemon.cleanup\fR, which
 should be started by \fBcron\fR(1M).
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-C\fR\fBtime\fR\fR
@@ -123,7 +121,7 @@ problem (\fB-m\fR option) (default 1 day).
 \fB\fB-x\fR\fIdebug-level\fR\fR
 .ad
 .RS 17n
-Produce debugging output on standard ouput. \fIdebug-level\fR is a single digit
+Produce debugging output on standard output. \fIdebug-level\fR is a single digit
 between 0 and 9; higher numbers give more detailed debugging information. (This
 option may not be available on all systems.)
 .RE
@@ -141,7 +139,6 @@ processing (default 2 days).
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/lib/uucp\fR\fR
@@ -160,6 +157,5 @@ spool directory
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBuucp\fR(1C), \fBuux\fR(1C), \fBcron\fR(1M), \fBattributes\fR(5)

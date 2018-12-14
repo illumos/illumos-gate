@@ -12,7 +12,6 @@ fsdb_ufs \- ufs file system debugger
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBfsdb_ufs\fR command is an interactive tool that can be used to patch up
 a damaged \fBUFS\fR file system. It has conversions to translate block and
@@ -37,7 +36,6 @@ invoked with the \fBw\fR option.
 Wherever possible, \fBadb-\fRlike syntax was adopted to promote the use of
 \fBfsdb\fR through familiarity.
 .SH OPTIONS
-.sp
 .LP
 The following option is supported:
 .sp
@@ -88,7 +86,6 @@ open for write
 .RE
 
 .SH USAGE
-.sp
 .LP
 Numbers are considered hexadecimal by default. However, the user has control
 over how data is to be displayed or accepted. The \fBbase\fR command will
@@ -201,7 +198,6 @@ will advance to subsequent entries. Note that
 .LP
 is again synonymous.
 .SS "Expressions"
-.sp
 .LP
 The symbols recognized by \fBfsdb\fR are:
 .sp
@@ -244,7 +240,7 @@ information. The default for \fBcount\fR is 1.
 .ad
 .RS 13n
 display in structured style with format specifier \fIf\fR. See
-\fBFormatted\fROutput\fB\&.\fR
+\fBFormatted Output\fR.
 .RE
 
 .sp
@@ -253,8 +249,8 @@ display in structured style with format specifier \fIf\fR. See
 \fB\fB/\fR\fI f\fR\fR
 .ad
 .RS 13n
-display in unstructured style with format specifier \fIf\fR See
-\fBFormatted\fROutput\fB\&.\fR
+display in unstructured style with format specifier \fIf\fR. See
+\fBFormatted Output\fR.
 .RE
 
 .sp
@@ -286,7 +282,7 @@ The default for \fIe\fR is \fB1\fR.
 \fB\fB-\fR\fIe\fR\fR
 .ad
 .RS 13n
-decrement the value of \fBdot\fR by the expression \fIe\fR. See  \fB+\fR.
+decrement the value of \fBdot\fR by the expression \fIe\fR. See \fB+\fR.
 .RE
 
 .sp
@@ -306,7 +302,7 @@ the \fBsizeof(type)\fR to be \fB1\fR.
 \fB\fB%\fR\fIe\fR\fR
 .ad
 .RS 13n
-divide the value of \fBdot\fR by the expression \fIe\fR. See  \fB*\fR.
+divide the value of \fBdot\fR by the expression \fIe\fR. See \fB*\fR.
 .RE
 
 .sp
@@ -335,9 +331,9 @@ digit.
 \fB\fB=\fR\fI f\fR\fR
 .ad
 .RS 13n
-display indicator. If \fIf\fR is a legitimate format specifier. then the value
+display indicator. If \fIf\fR is a legitimate format specifier, then the value
 of \fBdot\fR is displayed using the format specifier \fIf\fR. See
-\fBFormatted\fROutput. Otherwise, assignment is assumed See  \fB=\fR.
+\fBFormatted Output\fR. Otherwise, assignment is assumed. See \fB=\fR.
 .RE
 
 .sp
@@ -373,7 +369,6 @@ decremented by expression \fIe\fR.
 .RE
 
 .SS "Commands"
-.sp
 .LP
 A command must be prefixed by a ':' character. Only enough letters of the
 command to uniquely distinguish it are needed. Multiple commands may be entered
@@ -583,7 +578,7 @@ and the name; use the \fBinode\fR command with '?i' to get more information.
 .ad
 .sp .6
 .RS 4n
-toggle the value of override. Some error conditions may be overriden if
+toggle the value of override. Some error conditions may be overridden if
 override is toggled on.
 .RE
 
@@ -652,7 +647,6 @@ escape to shell
 .RE
 
 .SS "Inode Commands"
-.sp
 .LP
 In addition to the above commands, there are several commands that deal with
 inode fields and operate directly on the current \fBinode\fR (they still
@@ -713,7 +707,7 @@ this result into the \fBblock\fR or \fBfragment\fR command. For example,
 
 would get the contents of data block field 1 from the inode and convert it to a
 block address. 20 longs are then displayed in hexadecimal. See
-\fBFormatted\fROutput\fB\&.\fR
+\fBFormatted Output\fR.
 .RE
 
 .sp
@@ -829,7 +823,6 @@ user id.
 .RE
 
 .SS "Formatted Output"
-.sp
 .LP
 There are two styles and many format types. The two styles are structured and
 unstructured. Structured output is used to display inodes, directories,
@@ -1215,18 +1208,15 @@ associated with the root inode of this file system:
 .sp
 
 .SH SEE ALSO
-.sp
 .LP
 \fBclri\fR(1M), \fBfsck_ufs\fR(1M), \fBdir_ufs\fR(4), \fBattributes\fR(5),
 \fBufs\fR(7FS)
 .SH WARNINGS
-.sp
 .LP
 Since \fBfsdb\fR reads the disk raw, extreme caution is advised in determining
 its availability of \fBfsdb\fR on the system. Suggested permissions are 600 and
 owned by bin.
 .SH NOTES
-.sp
 .LP
 The old command line syntax for clearing i-nodes using the ufs-specific
 \fB\&'-z i-number'\fR option is still supported by the new debugger, though it

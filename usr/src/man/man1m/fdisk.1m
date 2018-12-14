@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH FDISK 1M "Feb 11, 2018"
+.TH FDISK 1M "Dec 06, 2018"
 .SH NAME
 fdisk \- create or modify fixed disk partition table
 .SH SYNOPSIS
@@ -67,7 +67,7 @@ table values. The default partitioning allocates the entire disk for the
 Solaris system and makes the Solaris system partition active. In either case,
 when the initial table is created, \fBfdisk\fR also writes out the first-stage
 bootstrap (x86 only) code along with the partition table. In this mode, (x86
-only) when creating an  entry for a non-EFI partition on a disk that is larger
+only) when creating an entry for a non-EFI partition on a disk that is larger
 than 2 TB (terabytes), \fBfdisk\fR warns that the maximum size of the partition
 is 2 TB. Under these conditions percentages displayed by \fBfdisk\fR are based
 on 2 TB.
@@ -293,7 +293,7 @@ partition if the \fBfdisk\fR table changes.
 .sp .6
 .RS 4n
 Specify the file \fImaster_boot\fR as the master boot program. The default
-master boot program is \fB/usr/lib/fs/ufs/mboot\fR.
+master boot program is \fB/boot/pmbr\fR.
 .RE
 
 .sp
@@ -778,7 +778,7 @@ Raw device associated with the fixed disk.
 .sp
 .ne 2
 .na
-\fB\fB/usr/lib/fs/ufs/mboot\fR\fR
+\fB\fB/boot/pmbr\fR\fR
 .ad
 .RS 25n
 Default master boot program.
