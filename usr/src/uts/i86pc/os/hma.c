@@ -37,22 +37,32 @@ static boolean_t hma_vmx_ready = B_FALSE;
 static const char *hma_vmx_error = NULL;
 static id_space_t *hma_vmx_vpid;
 
-typedef enum vmx_cpu_state {
-	VCS_UNINITIALIZED = 0,
-	VCS_READY,
-	VCS_ERROR
-} vmx_cpu_state_t;
-
 /*
- * The bulk of VMX-related HMA state is protected by cpu_lock, rather than a
+ * The bulk of HMA state (VMX & SVM) is protected by cpu_lock, rather than a
  * mutex specific to the module.  It (cpu_lock) is already required for the
  * state needed to perform setup on all CPUs, so it was a natural fit to
  * protect this data too.
  */
+typedef enum hma_cpu_state {
+	HCS_UNINITIALIZED = 0,
+	HCS_READY,
+	HCS_ERROR
+} hma_cpu_state_t;
+static hma_cpu_state_t hma_cpu_status[NCPU];
+
 static void *hma_vmx_vmxon_page[NCPU];
 static uintptr_t hma_vmx_vmxon_pa[NCPU];
-static vmx_cpu_state_t hma_vmx_status[NCPU];
 static uint32_t hma_vmx_revision;
+
+static boolean_t hma_svm_ready = B_FALSE;
+static const char *hma_svm_error = NULL;
+static uint32_t hma_svm_features;
+static uint32_t hma_svm_max_asid;
+
+static void *hma_svm_hsave_page[NCPU];
+static uintptr_t hma_svm_hsave_pa[NCPU];
+
+static hma_svm_asid_t hma_svm_cpu_asid[NCPU];
 
 
 static int hma_vmx_init(void);
@@ -94,8 +104,7 @@ hma_register(const char *name)
 		is_ready = hma_vmx_ready;
 		break;
 	case X86_VENDOR_AMD:
-		/* Punt on SVM support for now */
-		is_ready = B_FALSE;
+		is_ready = hma_svm_ready;
 		break;
 	default:
 		is_ready = B_FALSE;
@@ -156,9 +165,9 @@ hma_vmx_vpid_free(uint16_t vpid)
 
 extern int hma_vmx_vmxon(uintptr_t);
 
-/* ARGSUSED */
 static int
-hma_vmx_cpu_vmxon(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
+hma_vmx_cpu_vmxon(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
+    xc_arg_t arg3 __unused)
 {
 	uint64_t fctrl;
 	processorid_t id = CPU->cpu_seqid;
@@ -181,9 +190,9 @@ hma_vmx_cpu_vmxon(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 	setcr4(getcr4() | CR4_VMXE);
 
 	if (hma_vmx_vmxon(vmxon_pa) == 0) {
-		hma_vmx_status[id] = VCS_READY;
+		hma_cpu_status[id] = HCS_READY;
 	} else {
-		hma_vmx_status[id] = VCS_ERROR;
+		hma_cpu_status[id] = HCS_ERROR;
 
 		/*
 		 * If VMX has already been marked active and available for the
@@ -198,9 +207,8 @@ hma_vmx_cpu_vmxon(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 	return (0);
 }
 
-/* ARGSUSED2 */
 static int
-hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg)
+hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 {
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(id >= 0 && id < NCPU);
@@ -223,8 +231,8 @@ hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg)
 	}
 
 	/* Perform initialization if it has not been previously attempted. */
-	if (hma_vmx_status[id] != VCS_UNINITIALIZED) {
-		return ((hma_vmx_status[id] == VCS_READY) ? 0 : -1);
+	if (hma_cpu_status[id] != HCS_UNINITIALIZED) {
+		return ((hma_cpu_status[id] == HCS_READY) ? 0 : -1);
 	}
 
 	/* Allocate the VMXON page for this CPU */
@@ -265,7 +273,7 @@ hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg)
 		xc_sync(0, 0, 0, CPUSET2BV(set), hma_vmx_cpu_vmxon);
 	}
 
-	return (hma_vmx_status[id] != VCS_READY);
+	return (hma_cpu_status[id] != HCS_READY);
 }
 
 static int
@@ -329,10 +337,233 @@ bail:
 	return (-1);
 }
 
+#define	VMCB_FLUSH_NOTHING	0x0
+#define	VMCB_FLUSH_ALL		0x1
+#define	VMCB_FLUSH_ASID		0x3
+
+void
+hma_svm_asid_init(hma_svm_asid_t *vcp)
+{
+	/*
+	 * Initialize the generation to 0, forcing an ASID allocation on first
+	 * entry.  Leave the ASID at 0, so if the host forgoes the call to
+	 * hma_svm_asid_update(), SVM will bail on the invalid vcpu state.
+	 */
+	vcp->hsa_gen = 0;
+	vcp->hsa_asid = 0;
+}
+
+uint8_t
+hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
+    boolean_t npt_flush)
+{
+	hma_svm_asid_t *hcp = &hma_svm_cpu_asid[CPU->cpu_seqid];
+
+	ASSERT(curthread->t_preempt != 0);
+
+	/*
+	 * If NPT changes dictate a TLB flush and by-ASID flushing is not
+	 * supported/used, force a fresh ASID allocation.
+	 */
+	if (npt_flush && !flush_by_asid) {
+		vcp->hsa_gen = 0;
+	}
+
+	if (vcp->hsa_gen != hcp->hsa_gen) {
+		hcp->hsa_asid++;
+
+		if (hcp->hsa_asid >= hma_svm_max_asid) {
+			/* Keep the ASID properly constrained */
+			hcp->hsa_asid = 1;
+			hcp->hsa_gen++;
+			if (hcp->hsa_gen == 0) {
+				/*
+				 * Stay clear of the '0' sentinel value for
+				 * generation, if wrapping around.
+				 */
+				hcp->hsa_gen = 1;
+			}
+		}
+		vcp->hsa_gen = hcp->hsa_gen;
+		vcp->hsa_asid = hcp->hsa_asid;
+
+		ASSERT(vcp->hsa_asid != 0);
+		ASSERT3U(vcp->hsa_asid, <, hma_svm_max_asid);
+
+		if (flush_by_asid) {
+			return (VMCB_FLUSH_ASID);
+		}
+		return (VMCB_FLUSH_ALL);
+	} else if (npt_flush) {
+		ASSERT(flush_by_asid);
+		return (VMCB_FLUSH_ASID);
+	}
+	return (VMCB_FLUSH_NOTHING);
+}
+
+static int
+hma_svm_cpu_activate(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
+    xc_arg_t arg3 __unused)
+{
+	const processorid_t id = CPU->cpu_seqid;
+	const uintptr_t hsave_pa = hma_svm_hsave_pa[id];
+	uint64_t efer;
+
+	VERIFY(hsave_pa != 0);
+
+	/* Enable SVM via EFER */
+	efer = rdmsr(MSR_AMD_EFER);
+	efer |= AMD_EFER_SVME;
+	wrmsr(MSR_AMD_EFER, efer);
+
+	/* Setup hsave area */
+	wrmsr(MSR_AMD_VM_HSAVE_PA, hsave_pa);
+
+	hma_cpu_status[id] = HCS_READY;
+	return (0);
+}
+
+static int
+hma_svm_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
+{
+	ASSERT(MUTEX_HELD(&cpu_lock));
+	ASSERT(id >= 0 && id < NCPU);
+
+	switch (what) {
+	case CPU_CONFIG:
+	case CPU_ON:
+	case CPU_INIT:
+		break;
+	default:
+		/*
+		 * Other events, such as CPU offlining, are of no interest.
+		 * Letting the SVM state linger should not cause any harm.
+		 *
+		 * This logic assumes that any offlining activity is strictly
+		 * administrative in nature and will not alter any existing
+		 * configuration (such as EFER bits previously set).
+		 */
+		return (0);
+	}
+
+	/* Perform initialization if it has not been previously attempted. */
+	if (hma_cpu_status[id] != HCS_UNINITIALIZED) {
+		return ((hma_cpu_status[id] == HCS_READY) ? 0 : -1);
+	}
+
+	/* Allocate the hsave page for this CPU */
+	if (hma_svm_hsave_page[id] == NULL) {
+		caddr_t va;
+		pfn_t pfn;
+
+		va = kmem_alloc(PAGESIZE, KM_SLEEP);
+		VERIFY0((uintptr_t)va & PAGEOFFSET);
+		hma_svm_hsave_page[id] = va;
+
+		/*
+		 * Cache the physical address of the hsave page rather than
+		 * looking it up later when the potential blocking of
+		 * hat_getpfnum would be less acceptable.
+		 */
+		pfn = hat_getpfnum(kas.a_hat, va);
+		hma_svm_hsave_pa[id] = (pfn << PAGESHIFT);
+	} else {
+		VERIFY(hma_svm_hsave_pa[id] != 0);
+	}
+
+	kpreempt_disable();
+	if (CPU->cpu_seqid == id) {
+		/* Perform svm setup directly if this CPU is the target */
+		(void) hma_svm_cpu_activate(0, 0, 0);
+		kpreempt_enable();
+	} else {
+		cpuset_t set;
+
+		/* Use a cross-call if a remote CPU is the target */
+		kpreempt_enable();
+		cpuset_zero(&set);
+		cpuset_add(&set, id);
+		xc_sync(0, 0, 0, CPUSET2BV(set), hma_svm_cpu_activate);
+	}
+
+	return (hma_cpu_status[id] != HCS_READY);
+}
 
 static int
 hma_svm_init(void)
 {
-	/* punt on AMD for now */
-	return (ENOTSUP);
+	uint64_t msr;
+	const char *msg = NULL;
+	struct cpuid_regs regs;
+	cpu_t *cp;
+
+	if (!is_x86_feature(x86_featureset, X86FSET_SVM)) {
+		msg = "CPU does not support SVM";
+		goto bail;
+	}
+
+	msr = rdmsr(MSR_AMD_VM_CR);
+	if ((msr & AMD_VM_CR_SVMDIS) != 0) {
+		msg = "SVM disabled by BIOS";
+		goto bail;
+	}
+
+	regs.cp_eax = 0x8000000a;
+	(void) cpuid_insn(NULL, &regs);
+	const uint32_t nasid = regs.cp_ebx;
+	const uint32_t feat = regs.cp_edx;
+
+	if (nasid == 0) {
+		msg = "Not enough ASIDs for guests";
+		goto bail;
+	}
+	if ((feat & CPUID_AMD_EDX_NESTED_PAGING) == 0) {
+		msg = "CPU does not support nested paging";
+		goto bail;
+	}
+	if ((feat & CPUID_AMD_EDX_NRIPS) == 0) {
+		msg = "CPU does not support NRIP save";
+		goto bail;
+	}
+
+	hma_svm_features = feat;
+	hma_svm_max_asid = nasid;
+
+	mutex_enter(&cpu_lock);
+	/* Perform SVM configuration for already-online CPUs. */
+	cp = cpu_active;
+	do {
+		int err = hma_svm_cpu_setup(CPU_ON, cp->cpu_seqid, NULL);
+		if (err != 0) {
+			msg = "failure during SVM setup";
+			mutex_exit(&cpu_lock);
+			goto bail;
+		}
+	} while ((cp = cp->cpu_next_onln) != cpu_active);
+
+	/*
+	 * Register callback for later-onlined CPUs and perform other remaining
+	 * resource allocation.
+	 */
+	register_cpu_setup_func(hma_svm_cpu_setup, NULL);
+	mutex_exit(&cpu_lock);
+
+	/* Initialize per-CPU ASID state. */
+	for (uint_t i = 0; i < NCPU; i++) {
+		/*
+		 * Skip past sentinel 0 value for generation.  Doing so for
+		 * ASID is unneeded, since it will be incremented during the
+		 * first allocation.
+		 */
+		hma_svm_cpu_asid[i].hsa_gen = 1;
+		hma_svm_cpu_asid[i].hsa_asid = 0;
+	}
+
+	hma_svm_ready = B_TRUE;
+	return (0);
+
+bail:
+	hma_svm_error = msg;
+	cmn_err(CE_NOTE, "hma_svm_init: %s", msg);
+	return (-1);
 }

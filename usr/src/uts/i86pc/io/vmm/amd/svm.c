@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 
 #ifndef __FreeBSD__
 #include <sys/x86_archext.h>
+#include <sys/trap.h>
 #endif
 
 #include <vm/vm.h>
@@ -123,6 +124,7 @@ static int disable_npf_assist;
 SYSCTL_INT(_hw_vmm_svm, OID_AUTO, disable_npf_assist, CTLFLAG_RWTUN,
     &disable_npf_assist, 0, NULL);
 
+#ifdef __FreeBSD__
 /* Maximum ASIDs supported by the processor */
 static uint32_t nasid;
 SYSCTL_UINT(_hw_vmm_svm, OID_AUTO, num_asids, CTLFLAG_RDTUN, &nasid, 0,
@@ -135,6 +137,7 @@ static struct asid asid[MAXCPU];
  * SVM host state saved area of size 4KB for each core.
  */
 static uint8_t hsave[MAXCPU][PAGE_SIZE] __aligned(PAGE_SIZE);
+#endif /* __FreeBSD__ */
 
 static VMM_STAT_AMD(VCPU_EXITINTINFO, "VM exits during event delivery");
 static VMM_STAT_AMD(VCPU_INTINFO_INJECTED, "Events pending at VM entry");
@@ -156,6 +159,7 @@ decode_assist(void)
 	return (svm_feature & AMD_CPUID_SVM_DECODE_ASSIST);
 }
 
+#ifdef __FreeBSD__
 static void
 svm_disable(void *arg __unused)
 {
@@ -298,6 +302,31 @@ svm_restore(void)
 
 	svm_enable(NULL);
 }		
+#else /* __FreeBSD__ */
+static int
+svm_cleanup(void)
+{
+	/* This is taken care of by the hma registration */
+	return (0);
+}
+
+static int
+svm_init(int ipinum)
+{
+	vmcb_clean &= VMCB_CACHE_DEFAULT;
+
+	svm_msr_init();
+	svm_npt_init(ipinum);
+
+	return (0);
+}
+
+static void
+svm_restore(void)
+{
+	/* No-op on illumos */
+}
+#endif /* __FreeBSD__ */
 
 /* Pentium compatible MSRs */
 #define MSR_PENTIUM_START 	0	
@@ -1309,7 +1338,11 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 	struct svm_regctx *ctx;
 	uint64_t code, info1, info2, val;
 	uint32_t eax, ecx, edx;
+#ifdef __FreeBSD__
 	int error, errcode_valid, handled, idtvec, reflect;
+#else
+	int error, errcode_valid = 0, handled, idtvec, reflect;
+#endif
 	bool retu;
 
 	ctx = svm_get_guest_regctx(svm_sc, vcpu);
@@ -1380,8 +1413,11 @@ svm_vmexit(struct svm_softc *svm_sc, int vcpu, struct vm_exit *vmexit)
 			 */
 			reflect = 0;
 			VCPU_CTR0(svm_sc->vm, vcpu, "Vectoring to MCE handler");
-			/* XXXJOY: we will need equivalent of vmx_call_trap */
+#ifdef __FreeBSD__
 			__asm __volatile("int $18");
+#else
+			vmm_call_trap(T_MCE);
+#endif
 			break;
 		case IDT_PF:
 			error = svm_setreg(svm_sc, vcpu, VM_REG_GUEST_CR2,
@@ -1772,11 +1808,14 @@ restore_host_tss(void)
 	tss_sd->sd_type = SDT_SYSTSS;
 	ltr(GSEL(GPROC0_SEL, SEL_KPL));
 #else
-	/* XXXJOY: Add logic to restore TSS for us */
-	panic("SVM Restore system TSS");
+	system_desc_t *tss = (system_desc_t *)&CPU->cpu_gdt[GDT_KTSS];
+
+	tss->ssd_type = SDT_SYSTSS;
+	wr_tsr(KTSS_SEL);
 #endif
 }
 
+#ifdef __FreeBSD__
 static void
 check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 {
@@ -1879,6 +1918,27 @@ check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
 	KASSERT(ctrl->asid == vcpustate->asid.num,
 	    ("ASID mismatch: %u/%u", ctrl->asid, vcpustate->asid.num));
 }
+#else /* __FreeBSD__ */
+static void
+check_asid(struct svm_softc *sc, int vcpuid, pmap_t pmap, u_int thiscpu)
+{
+	struct svm_vcpu *vcpustate = svm_get_vcpu(sc, vcpuid);
+	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
+	long eptgen;
+	uint8_t flush;
+
+	eptgen = pmap->pm_eptgen;
+	flush = hma_svm_asid_update(&vcpustate->hma_asid, flush_by_asid(),
+	    vcpustate->eptgen == eptgen);
+
+	if (flush != VMCB_TLB_FLUSH_NOTHING) {
+		ctrl->asid = vcpustate->hma_asid.hsa_asid;
+		svm_set_dirty(sc, vcpuid, VMCB_CACHE_ASID);
+	}
+	ctrl->tlb_ctrl = flush;
+	vcpustate->eptgen = eptgen;
+}
+#endif /* __FreeBSD__ */
 
 static __inline void
 disable_gintr(void)
@@ -1983,7 +2043,11 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		/*
 		 * Force new ASID allocation by invalidating the generation.
 		 */
+#ifdef __FreeBSD__
 		vcpustate->asid.gen = 0;
+#else
+		vcpustate->hma_asid.hsa_gen = 0;
+#endif
 
 		/*
 		 * Invalidate the VMCB state cache by marking all fields dirty.
@@ -2006,10 +2070,25 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 
 	svm_msr_guest_enter(svm_sc, vcpu);
 
+#ifndef __FreeBSD__
+	VERIFY(!vcpustate->loaded && curthread->t_preempt != 0);
+	vcpustate->loaded = B_TRUE;
+#endif
+
 	/* Update Guest RIP */
 	state->rip = rip;
 
 	do {
+#ifndef __FreeBSD__
+		/*
+		 * Interrupt injection may involve mutex contention which, on
+		 * illumos bhyve, are blocking/non-spin.  Doing so with global
+		 * interrupts disabled is a recipe for deadlock, so it is
+		 * performed here.
+		 */
+		svm_inj_interrupts(svm_sc, vcpu, vlapic);
+#endif
+
 		/*
 		 * Disable global interrupts to guarantee atomicity during
 		 * loading of guest state. This includes not only the state
@@ -2059,7 +2138,9 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		 */
 		ldt_sel = sldt();
 
+#ifdef __FreeBSD__
 		svm_inj_interrupts(svm_sc, vcpu, vlapic);
+#endif
 
 		/* Activate the nested pmap on 'curcpu' */
 		CPU_SET_ATOMIC_ACQ(curcpu, &pmap->pm_active);
@@ -2107,6 +2188,11 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 	} while (handled);
 
 	svm_msr_guest_exit(svm_sc, vcpu);
+
+#ifndef __FreeBSD__
+	VERIFY(vcpustate->loaded && curthread->t_preempt != 0);
+	vcpustate->loaded = B_FALSE;
+#endif
 
 	return (0);
 }
@@ -2309,6 +2395,28 @@ svm_vlapic_cleanup(void *arg, struct vlapic *vlapic)
         free(vlapic, M_SVM_VLAPIC);
 }
 
+#ifndef __FreeBSD__
+static void
+svm_savectx(void *arg, int vcpu)
+{
+	struct svm_softc *sc = arg;
+
+	if (sc->vcpu[vcpu].loaded) {
+		svm_msr_guest_exit(sc, vcpu);
+	}
+}
+
+static void
+svm_restorectx(void *arg, int vcpu)
+{
+	struct svm_softc *sc = arg;
+
+	if (sc->vcpu[vcpu].loaded) {
+		svm_msr_guest_enter(sc, vcpu);
+	}
+}
+#endif /* __FreeBSD__ */
+
 struct vmm_ops vmm_ops_amd = {
 	svm_init,
 	svm_cleanup,
@@ -2328,11 +2436,7 @@ struct vmm_ops vmm_ops_amd = {
 	svm_vlapic_cleanup,
 
 #ifndef __FreeBSD__
-	/*
-	 * When SVM support is wired up and tested, it is likely to require
-	 * savectx/restorectx functions similar to VMX.
-	 */
-	NULL,
-	NULL,
+	svm_savectx,
+	svm_restorectx,
 #endif
 };

@@ -232,6 +232,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/vmm/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/vmm/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/vmm/intel/%.s
 	$(COMPILE.s) -o $@ $<
 

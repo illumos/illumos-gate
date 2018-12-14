@@ -93,6 +93,7 @@ struct vmm_pt_ops {
 };
 
 extern struct vmm_pt_ops ept_ops;
+extern struct vmm_pt_ops rvi_ops;
 
 
 #endif /* _VM_GLUE_ */

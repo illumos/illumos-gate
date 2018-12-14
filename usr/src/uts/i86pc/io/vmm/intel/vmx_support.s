@@ -381,44 +381,4 @@ ENTRY_NP(vmx_call_isr)
 	ret
 SET_SIZE(vmx_call_isr)
 
-/*
- * %rdi = trapno
- *
- * This variant is for any explicit exception injection that we need: in this
- * case, we can't just, for example, do a direct "int $2", as that will then
- * trash our %cr3 via tr_nmiint due to KPTI.  So we have to fake a trap frame in
- * a similar fashion to vmx_call_isr().  Both NMIs and MCEs don't push an 'err'
- * into the frame.
- */
-ENTRY_NP(vmx_call_trap)
-	pushq	%rbp
-	movq	%rsp, %rbp
-	movq	%rsp, %r11
-	andq	$~0xf, %rsp	/* align stack */
-	pushq	$KDS_SEL	/* %ss */
-	pushq	%r11		/* %rsp */
-	pushfq			/* %rflags */
-	pushq	$KCS_SEL	/* %cs */
-	leaq	.trap_iret_dest(%rip), %rcx
-	pushq	%rcx		/* %rip */
-	cli
-	cmpq	$T_NMIFLT, %rdi
-	je	nmiint
-	cmpq	$T_MCE, %rdi
-	je	mcetrap
-
-	pushq	%rdi		/* save our bad trapno... */
-	leaq	__vmx_call_bad_trap(%rip), %rdi
-	xorl	%eax, %eax
-	call	panic
-	/*NOTREACHED*/
-
-.trap_iret_dest:
-	popq	%rbp
-	ret
-SET_SIZE(vmx_call_trap)
-
-__vmx_call_bad_trap:
-	.string	"bad trapno for vmx_call_trap()"
-
 #endif /* lint */

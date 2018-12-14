@@ -198,6 +198,18 @@ x86_emulate_cpuid(struct vm *vm, int vcpu_id,
 			/* Hide mwaitx/monitorx capability from the guest */
 			regs[2] &= ~AMDID2_MWAITX;
 
+#ifndef __FreeBSD__
+			/*
+			 * Detection routines for TCE and FFXSR are missing
+			 * from our vm_cpuid_capability() detection logic
+			 * today.  Mask them out until that is remedied.
+			 * They do not appear to be in common usage, so their
+			 * absence should not cause undue trouble.
+			 */
+			regs[2] &= ~AMDID2_TCE;
+			regs[3] &= ~AMDID_FFXSR;
+#endif
+
 			/*
 			 * Hide rdtscp/ia32_tsc_aux until we know how
 			 * to deal with them.

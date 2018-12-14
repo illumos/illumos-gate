@@ -210,6 +210,18 @@ extern "C" {
 #define	CPUID_AMD_EBX_SSB_NO		0x004000000 /* AMD: SSB Fixed */
 
 /*
+ * AMD SVM features (extended function 0x8000000A).
+ */
+#define	CPUID_AMD_EDX_NESTED_PAGING	0x000000001 /* AMD: SVM NP */
+#define	CPUID_AMD_EDX_LBR_VIRT		0x000000002 /* AMD: LBR virt. */
+#define	CPUID_AMD_EDX_SVML		0x000000004 /* AMD: SVM lock */
+#define	CPUID_AMD_EDX_NRIPS		0x000000008 /* AMD: NRIP save */
+#define	CPUID_AMD_EDX_TSC_RATE_MSR	0x000000010 /* AMD: MSR TSC ctrl */
+#define	CPUID_AMD_EDX_VMCB_CLEAN	0x000000020 /* AMD: VMCB clean bits */
+#define	CPUID_AMD_EDX_FLUSH_ASID	0x000000040 /* AMD: flush by ASID */
+#define	CPUID_AMD_EDX_DECODE_ASSISTS	0x000000080 /* AMD: decode assists */
+
+/*
  * Intel now seems to have claimed part of the "extended" function
  * space that we previously for non-Intel implementors to use.
  * More excitingly still, they've claimed bit 20 to mean LAHF/SAHF

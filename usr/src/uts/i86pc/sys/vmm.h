@@ -38,7 +38,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _VMM_H_
@@ -740,6 +740,8 @@ void vmm_sol_glue_cleanup(void);
 
 int vmm_mod_load(void);
 int vmm_mod_unload(void);
+
+void vmm_call_trap(uint64_t);
 
 /*
  * Because of tangled headers, these are mirrored by vmm_drv.h to present the

@@ -1628,10 +1628,19 @@ vmm_is_supported(intptr_t arg)
 	int r;
 	const char *msg;
 
-	if (!vmm_is_intel())
-		return (ENXIO);
+	if (vmm_is_intel()) {
+		r = vmx_x86_supported(&msg);
+	} else if (vmm_is_amd()) {
+		/*
+		 * HMA already ensured that the features necessary for SVM
+		 * operation were present and online during vmm_attach().
+		 */
+		r = 0;
+	} else {
+		r = ENXIO;
+		msg = "Unsupported CPU vendor";
+	}
 
-	r = vmx_x86_supported(&msg);
 	if (r != 0 && arg != NULL) {
 		if (copyoutstr(msg, (char *)arg, strlen(msg), NULL) != 0)
 			return (EFAULT);

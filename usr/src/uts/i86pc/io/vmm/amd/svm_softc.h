@@ -34,10 +34,17 @@
 #define SVM_IO_BITMAP_SIZE	(3 * PAGE_SIZE)
 #define SVM_MSR_BITMAP_SIZE	(2 * PAGE_SIZE)
 
+#ifdef __FreeBSD__
 struct asid {
 	uint64_t	gen;	/* range is [1, ~0UL] */
 	uint32_t	num;	/* range is [1, nasid - 1] */
 };
+#else
+#include <sys/hma.h>
+
+/* This must match HOST_MSR_NUM in svm_msr.c (where it is CTASSERTed) */
+#define SVM_HOST_MSR_NUM	4
+#endif /* __FreeBSD__ */
 
 /*
  * XXX separate out 'struct vmcb' from 'svm_vcpu' to avoid wasting space
@@ -51,7 +58,12 @@ struct svm_vcpu {
         int		lastcpu; /* host cpu that the vcpu last ran on */
 	uint32_t	dirty;	 /* state cache bits that must be cleared */
 	long		eptgen;	 /* pmap->pm_eptgen when the vcpu last ran */
+#ifdef __FreeBSD__
 	struct asid	asid;
+#else
+	hma_svm_asid_t	hma_asid;
+	boolean_t	loaded;
+#endif
 } __aligned(PAGE_SIZE);
 
 /*
@@ -64,6 +76,9 @@ struct svm_softc {
 	uint8_t		*iopm_bitmap;    /* shared by all vcpus */
 	uint8_t		*msr_bitmap;    /* shared by all vcpus */
 	struct vm	*vm;
+#ifndef __FreeBSD__
+	uint64_t	host_msrs[VM_MAXCPU][SVM_HOST_MSR_NUM];
+#endif
 };
 
 CTASSERT((offsetof(struct svm_softc, nptp) & PAGE_MASK) == 0);

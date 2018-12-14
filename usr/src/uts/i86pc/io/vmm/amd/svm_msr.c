@@ -54,6 +54,7 @@ enum {
 	HOST_MSR_NUM		/* must be the last enumeration */
 };
 
+#ifdef __FreeBSD__
 static uint64_t host_msrs[HOST_MSR_NUM];
 
 void
@@ -68,6 +69,19 @@ svm_msr_init(void)
 	host_msrs[IDX_MSR_STAR] = rdmsr(MSR_STAR);
 	host_msrs[IDX_MSR_SF_MASK] = rdmsr(MSR_SF_MASK);
 }
+#else
+
+CTASSERT(HOST_MSR_NUM == SVM_HOST_MSR_NUM);
+
+void
+svm_msr_init(void)
+{
+	/*
+	 * These MSRs do vary between CPUs on illumos, so saving system-wide
+	 * values for them serves no purpose.
+	 */
+}
+#endif /* __FreeBSD__ */
 
 void
 svm_msr_guest_init(struct svm_softc *sc, int vcpu)
@@ -89,11 +103,23 @@ svm_msr_guest_enter(struct svm_softc *sc, int vcpu)
 	/*
 	 * Save host MSRs (if any) and restore guest MSRs (if any).
 	 */
+#ifndef __FreeBSD__
+	uint64_t *host_msrs = sc->host_msrs[vcpu];
+
+	/* Save host MSRs */
+	host_msrs[IDX_MSR_LSTAR] = rdmsr(MSR_LSTAR);
+	host_msrs[IDX_MSR_CSTAR] = rdmsr(MSR_CSTAR);
+	host_msrs[IDX_MSR_STAR] = rdmsr(MSR_STAR);
+	host_msrs[IDX_MSR_SF_MASK] = rdmsr(MSR_SF_MASK);
+#endif /* __FreeBSD__ */
 }
 
 void
 svm_msr_guest_exit(struct svm_softc *sc, int vcpu)
 {
+#ifndef __FreeBSD__
+	uint64_t *host_msrs = sc->host_msrs[vcpu];
+#endif
 	/*
 	 * Save guest MSRs (if any) and restore host MSRs.
 	 */

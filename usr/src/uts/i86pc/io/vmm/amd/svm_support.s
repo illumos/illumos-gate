@@ -25,7 +25,12 @@
  *
  * $FreeBSD$
  */
-#include <machine/asmacros.h>
+
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+#include <sys/asm_linkage.h>
 
 #include "svm_assym.h"
 
@@ -34,26 +39,45 @@
 #if defined(lint)
 
 struct svm_regctx;
-struct pcpu;
+struct cpu;
 
 /*ARGSUSED*/
 void
-svm_launch(uint64_t pa, struct svm_regctx *gctx, struct pcpu *pcpu)
+svm_launch(uint64_t pa, struct svm_regctx *gctx, struct cpu *cpu)
 {}
 
 #else /* lint */
 
-/*
- * Be friendly to DTrace FBT's prologue/epilogue pattern matching.
- *
- * They are also responsible for saving/restoring the host %rbp across VMRUN.
- */
-#define	VENTER  push %rbp ; mov %rsp,%rbp
-#define	VLEAVE  pop %rbp
-
 #define	VMLOAD	.byte 0x0f, 0x01, 0xda
 #define	VMRUN	.byte 0x0f, 0x01, 0xd8
 #define	VMSAVE	.byte 0x0f, 0x01, 0xdb
+
+
+/*
+ * Flush scratch registers to avoid lingering guest state being used for
+ * Spectre v1 attacks when returning from guest entry.
+ */
+#define	SVM_GUEST_FLUSH_SCRATCH						\
+	xorl	%edi, %edi;						\
+	xorl	%esi, %esi;						\
+	xorl	%edx, %edx;						\
+	xorl	%ecx, %ecx;						\
+	xorl	%r8d, %r8d;						\
+	xorl	%r9d, %r9d;						\
+	xorl	%r10d, %r10d;						\
+	xorl	%r11d, %r11d;
+
+/* Stack layout (offset from %rsp) for svm_launch */
+#define	SVMSTK_R15	0x00	/* callee saved %r15			*/
+#define	SVMSTK_R14	0x08	/* callee saved %r14			*/
+#define	SVMSTK_R13	0x10	/* callee saved %r13			*/
+#define	SVMSTK_R12	0x18	/* callee saved %r12			*/
+#define	SVMSTK_RBX	0x20	/* callee saved %rbx			*/
+#define	SVMSTK_RDX	0x28	/* save-args %rdx (struct cpu *)	*/
+#define	SVMSTK_RSI	0x30	/* save-args %rsi (struct svm_regctx *)	*/
+#define	SVMSTK_RDI	0x38	/* save-args %rdi (uint64_t vmcb_pa)	*/
+#define	SVMSTK_FP	0x40	/* frame pointer %rbp			*/
+#define	SVMSTKSIZE	SVMSTK_FP
 
 /*
  * svm_launch(uint64_t vmcb, struct svm_regctx *gctx, struct pcpu *pcpu)
@@ -61,88 +85,80 @@ svm_launch(uint64_t pa, struct svm_regctx *gctx, struct pcpu *pcpu)
  * %rsi: pointer to guest context
  * %rdx: pointer to the pcpu data
  */
-ENTRY(svm_launch)
-	VENTER
+ENTRY_NP(svm_launch)
+	pushq	%rbp
+	movq	%rsp, %rbp
+	subq	$SVMSTKSIZE, %rsp
+	movq	%r15, SVMSTK_R15(%rsp)
+	movq	%r14, SVMSTK_R14(%rsp)
+	movq	%r13, SVMSTK_R13(%rsp)
+	movq	%r12, SVMSTK_R12(%rsp)
+	movq	%rbx, SVMSTK_RBX(%rsp)
+	movq	%rdx, SVMSTK_RDX(%rsp)
+	movq	%rsi, SVMSTK_RSI(%rsp)
+	movq	%rdi, SVMSTK_RDI(%rsp)
 
-	/* save pointer to the pcpu data */
-	push %rdx
+	/* VMLOAD and VMRUN expect the VMCB physaddr in %rax */
+	movq	%rdi, %rax
 
-	/*
-	 * Host register state saved across a VMRUN.
-	 *
-	 * All "callee saved registers" except:
-	 * %rsp: because it is preserved by the processor across VMRUN.
-	 * %rbp: because it is saved/restored by the function prologue/epilogue.
-	 */
-	push %rbx
-	push %r12
-	push %r13
-	push %r14
-	push %r15
-
-	/* Save the physical address of the VMCB in %rax */
-	movq %rdi, %rax
-
-	push %rsi		/* push guest context pointer on the stack */
-
-	/*
-	 * Restore guest state.
-	 */
-	movq SCTX_R8(%rsi), %r8
-	movq SCTX_R9(%rsi), %r9
-	movq SCTX_R10(%rsi), %r10
-	movq SCTX_R11(%rsi), %r11
-	movq SCTX_R12(%rsi), %r12
-	movq SCTX_R13(%rsi), %r13
-	movq SCTX_R14(%rsi), %r14
-	movq SCTX_R15(%rsi), %r15
-	movq SCTX_RBP(%rsi), %rbp
-	movq SCTX_RBX(%rsi), %rbx
-	movq SCTX_RCX(%rsi), %rcx
-	movq SCTX_RDX(%rsi), %rdx
-	movq SCTX_RDI(%rsi), %rdi
-	movq SCTX_RSI(%rsi), %rsi	/* %rsi must be restored last */
+	/* Restore guest state. */
+	movq	SCTX_R8(%rsi), %r8
+	movq	SCTX_R9(%rsi), %r9
+	movq	SCTX_R10(%rsi), %r10
+	movq	SCTX_R11(%rsi), %r11
+	movq	SCTX_R12(%rsi), %r12
+	movq	SCTX_R13(%rsi), %r13
+	movq	SCTX_R14(%rsi), %r14
+	movq	SCTX_R15(%rsi), %r15
+	movq	SCTX_RBP(%rsi), %rbp
+	movq	SCTX_RBX(%rsi), %rbx
+	movq	SCTX_RCX(%rsi), %rcx
+	movq	SCTX_RDX(%rsi), %rdx
+	movq	SCTX_RDI(%rsi), %rdi
+	movq	SCTX_RSI(%rsi), %rsi	/* %rsi must be restored last */
 
 	VMLOAD
 	VMRUN
 	VMSAVE
 
-	pop %rax		/* pop guest context pointer from the stack */
+	/* Grab the svm_regctx pointer */
+	movq	SVMSTK_RSI(%rsp), %rax
 
-	/*
-	 * Save guest state.
-	 */
-	movq %r8, SCTX_R8(%rax)
-	movq %r9, SCTX_R9(%rax)
-	movq %r10, SCTX_R10(%rax)
-	movq %r11, SCTX_R11(%rax)
-	movq %r12, SCTX_R12(%rax)
-	movq %r13, SCTX_R13(%rax)
-	movq %r14, SCTX_R14(%rax)
-	movq %r15, SCTX_R15(%rax)
-	movq %rbp, SCTX_RBP(%rax)
-	movq %rbx, SCTX_RBX(%rax)
-	movq %rcx, SCTX_RCX(%rax)
-	movq %rdx, SCTX_RDX(%rax)
-	movq %rdi, SCTX_RDI(%rax)
-	movq %rsi, SCTX_RSI(%rax)
+	/* Save guest state. */
+	movq	%r8, SCTX_R8(%rax)
+	movq	%r9, SCTX_R9(%rax)
+	movq	%r10, SCTX_R10(%rax)
+	movq	%r11, SCTX_R11(%rax)
+	movq	%r12, SCTX_R12(%rax)
+	movq	%r13, SCTX_R13(%rax)
+	movq	%r14, SCTX_R14(%rax)
+	movq	%r15, SCTX_R15(%rax)
+	movq	%rbp, SCTX_RBP(%rax)
+	movq	%rbx, SCTX_RBX(%rax)
+	movq	%rcx, SCTX_RCX(%rax)
+	movq	%rdx, SCTX_RDX(%rax)
+	movq	%rdi, SCTX_RDI(%rax)
+	movq	%rsi, SCTX_RSI(%rax)
 
-	/* Restore host state */
-	pop %r15
-	pop %r14
-	pop %r13
-	pop %r12
-	pop %rbx
+	/* Restore callee-saved registers */
+	movq	SVMSTK_R15(%rsp), %r15
+	movq	SVMSTK_R14(%rsp), %r14
+	movq	SVMSTK_R13(%rsp), %r13
+	movq	SVMSTK_R12(%rsp), %r12
+	movq	SVMSTK_RBX(%rsp), %rbx
 
-	/* Restore %GS.base to point to the host's pcpu data */
-	pop %rdx
-	mov %edx, %eax
-	shr $32, %rdx
-	mov $MSR_GSBASE, %ecx
+	/* Fix %gsbase to point back to the correct 'struct cpu *' */
+	movq	SVMSTK_RDX(%rsp), %rdx
+	movl	%edx, %eax
+	shrq	$32, %rdx
+	movl	$MSR_GSBASE, %ecx
 	wrmsr
 
-	VLEAVE
+	SVM_GUEST_FLUSH_SCRATCH
+
+	addq	$SVMSTKSIZE, %rsp
+	popq	%rbp
 	ret
-END(svm_launch)
+SET_SIZE(svm_launch)
 
 #endif /* lint */

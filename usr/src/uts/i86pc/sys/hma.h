@@ -49,6 +49,15 @@ extern void hma_unregister(hma_reg_t *);
 extern uint16_t hma_vmx_vpid_alloc(void);
 extern void hma_vmx_vpid_free(uint16_t);
 
+struct hma_svm_asid {
+	uint64_t hsa_gen;
+	uint32_t hsa_asid;
+};
+typedef struct hma_svm_asid hma_svm_asid_t;
+
+extern void hma_svm_asid_init(hma_svm_asid_t *);
+extern uint8_t hma_svm_asid_update(hma_svm_asid_t *, boolean_t, boolean_t);
+
 /*
  * FPU related management. These functions provide a set of APIs to manage the
  * FPU state and switch between host and guest management of this state.

@@ -24,6 +24,7 @@
 #include <sys/machsystm.h>
 #include <sys/vmsystm.h>
 #include <sys/malloc.h>
+#include <sys/x86_archext.h>
 #include <vm/as.h>
 #include <vm/seg_vn.h>
 #include <vm/seg_kmem.h>
@@ -208,8 +209,17 @@ pmap_pinit_type(pmap_t pmap, enum pmap_type type, int flags)
 		pmap->pm_pml4 = pml4;
 		return (1);
 	}
-	case PT_RVI:
-		/* RVI support not yet implemented */
+	case PT_RVI: {
+		struct vmm_pt_ops *ops = &rvi_ops;
+		void *pml4, *pmi;
+
+		pmi = ops->vpo_init((uintptr_t *)&pml4);
+
+		pmap->pm_ops = ops;
+		pmap->pm_impl = pmi;
+		pmap->pm_pml4 = pml4;
+		return (1);
+	}
 	default:
 		panic("unsupported pmap type: %x", type);
 		break;
@@ -537,6 +547,8 @@ vm_object_deallocate(vm_object_t vmo)
 	kmem_free(vmo, sizeof (*vmo));
 }
 
+CTASSERT(VM_MEMATTR_UNCACHEABLE == MTRR_TYPE_UC);
+CTASSERT(VM_MEMATTR_WRITE_BACK == MTRR_TYPE_WB);
 int
 vm_object_set_memattr(vm_object_t vmo, vm_memattr_t attr)
 {
