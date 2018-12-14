@@ -1,4 +1,3 @@
-usr/src/boot/*
 usr/src/cmd/acpi/acpidump/acpidump.h
 usr/src/cmd/acpi/acpidump/apdump.c
 usr/src/cmd/acpi/acpidump/apfiles.c

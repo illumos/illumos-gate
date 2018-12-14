@@ -25,7 +25,6 @@
 #
 
 syntax: glob
-usr/src/boot/*
 usr/src/cmd/cmd-inet/usr.bin/dns-sd/dns-sd.c
 usr/src/cmd/boot/common/bblk_einfo.c
 usr/src/cmd/zonestat/zonestat/zonestat.c
