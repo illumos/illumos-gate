@@ -22,10 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libc/i386/Makefile
-#
+# Copyright (c) 2019, Joyent, Inc.
 
 LIBCBASE=../i386
 

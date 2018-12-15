@@ -1,0 +1,40 @@
+/*
+ * The below functions cause smatch to fail with "turning off implications after
+ * 60 seconds" or similar, generally because they're too large for it to handle.
+ *
+ * This will disable analysis altogether.
+ */
+
+/* libast */
+_ast_optget
+_ast_opthelp
+/* libcmd */
+b_uname
+/* libcurses */
+_updateln
+/* libdisasm */
+dtrace_disx86
+/* libld */
+ld32_sym_process
+ld64_sym_process
+update_osym
+/* libsqlite */
+sqliteVdbeExec
+/* cmd/acpi/iasl */
+AslCompilerparse
+/* cmd/fs.d/autofs */
+nfsmount
+/* cmd/pppd */
+lcp_nakci
+
+/* generated code */
+ipf_yyparse
+ipmon_yyparse
+ipnat_yyparse
+ippool_yyparse
+ndr__ndr_hdr
+yyerror
+yylex
+yylook
+yyparse
+yywinput

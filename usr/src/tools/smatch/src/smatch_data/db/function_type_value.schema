@@ -1,0 +1,1 @@
+CREATE TABLE function_type_value (file varchar(128), function varchar(80), type varchar(80), value varchar(80));

@@ -1,0 +1,346 @@
+#!/usr/bin/perl -w
+# -----------------------------------------------------------------------------
+
+my $cc = $ENV{'REAL_CC'} || 'cc';
+my $check = $ENV{'CHECK'} || 'sparse';
+my $ccom = $cc;
+
+my $m32 = 0;
+my $m64 = 0;
+my $has_specs = 0;
+my $gendeps = 0;
+my $do_check = 0;
+my $do_compile = 1;
+my $gcc_base_dir;
+my $multiarch_dir;
+my $verbose = 0;
+
+while (@ARGV) {
+    $_ = shift(@ARGV);
+    # Look for a .c file.  We don't want to run the checker on .o or .so files
+    # in the link run.  (This simplistic check knows nothing about options
+    # with arguments, but it seems to do the job.)
+    $do_check = 1 if /^[^-].*\.c$/;
+
+    # Ditto for stdin.
+    $do_check = 1 if $_ eq '-';
+
+    $m32 = 1 if /^-m32$/;
+    $m64 = 1 if /^-m64$/;
+    $gendeps = 1 if /^-M$/;
+
+    if (/^-target=(.*)$/) {
+	$check .= &add_specs ($1);
+	$has_specs = 1;
+	next;
+    }
+
+    if ($_ eq '-no-compile') {
+	$do_compile = 0;
+	next;
+    }
+
+    if (/^-gcc-base-dir$/) {
+        $gcc_base_dir = shift @ARGV;
+        die ("$0: missing argument for -gcc-base-dir option") if !$gcc_base_dir;
+        next;
+    }
+
+    if (/^-multiarch-dir$/) {
+        $multiarch_dir = shift @ARGV;
+        die ("$0: missing argument for -multiarch-dir option") if !$multiarch_dir;
+        next;
+    }
+
+    # If someone adds "-E", don't pre-process twice.
+    $do_compile = 0 if $_ eq '-E';
+
+    $verbose = 1 if $_ eq '-v';
+
+    my $this_arg = ' ' . &quote_arg ($_);
+    $cc .= $this_arg unless &check_only_option ($_);
+    $check .= $this_arg;
+}
+
+if ($gendeps) {
+    $do_compile = 1;
+    $do_check = 0;
+}
+
+if ($do_check) {
+    if (!$has_specs) {
+	$check .= &add_specs ('host_arch_specs');
+	$check .= &add_specs ('host_os_specs');
+    }
+
+    $gcc_base_dir = qx($ccom -print-file-name=) if !$gcc_base_dir;
+    chomp($gcc_base_dir);  # possibly remove '\n' from compiler
+    $check .= " -gcc-base-dir " . $gcc_base_dir if $gcc_base_dir;
+
+    $multiarch_dir = qx($ccom -print-multiarch) if ! defined $multiarch_dir;
+    chomp($multiarch_dir);  # possibly remove '\n' from compiler
+    $check .= " -multiarch-dir " . $multiarch_dir if $multiarch_dir;
+
+    print "$check\n" if $verbose;
+    if ($do_compile) {
+	system ($check);
+    } else {
+	exec ($check);
+    }
+}
+
+if ($do_compile) {
+    print "$cc\n" if $verbose;
+    exec ($cc);
+}
+
+exit 0;
+
+# -----------------------------------------------------------------------------
+# Check if an option is for "check" only.
+
+sub check_only_option {
+    my ($arg) = @_;
+    return 1 if $arg =~ /^-W(no-?)?(address-space|bitwise|cast-to-as|cast-truncate|context|decl|default-bitfield-sign|designated-init|do-while|enum-mismatch|external-function-has-definition|init-cstring|memcpy-max-count|non-ansi-function-declaration|non-pointer-null|old-initializer|one-bit-signed-bitfield|override-init-all|paren-string|ptr-subtraction-blows|return-void|sizeof-bool|sparse-all|sparse-error|transparent-union|typesign|undef|unknown-attribute)$/;
+    return 1 if $arg =~ /^-v(no-?)?(entry|dead)$/;
+    return 1 if $arg =~ /^-f(dump-linearize|memcpy-max-count)(=\S*)?$/;
+    return 0;
+}
+
+# -----------------------------------------------------------------------------
+# Simple arg-quoting function.  Just adds backslashes when needed.
+
+sub quote_arg {
+    my ($arg) = @_;
+    return "''" if $arg eq '';
+    return join ('',
+		 map {
+		     m|^[-a-zA-Z0-9._/,=]+$| ? $_ : "\\" . $_;
+		 } (split (//, $arg)));
+}
+
+# -----------------------------------------------------------------------------
+
+sub integer_types {
+    my ($char,@dummy) = @_;
+
+    my %pow2m1 =
+	(8 => '127',
+	 16 => '32767',
+	 32 => '2147483647',
+	 64 => '9223372036854775807',
+	 128 => '170141183460469231731687303715884105727',
+	 );
+    my @types = (['SCHAR',''], ['SHRT',''], ['INT',''], ['LONG','L'], ['LONG_LONG','LL'], ['LONG_LONG_LONG','LLL']);
+
+    my $result = " -D__CHAR_BIT__=$char";
+    while (@types && @_) {
+	my $bits = shift @_;
+	my ($name,$suffix) = @{ shift @types };
+	die "$0: weird number of bits." unless exists $pow2m1{$bits};
+	$result .= " -D__${name}_MAX__=" . $pow2m1{$bits} . $suffix;
+    }
+    return $result;
+}
+
+# -----------------------------------------------------------------------------
+
+sub float_types {
+    my ($has_inf,$has_qnan,$dec_dig,@bitsizes) = @_;
+    my $result = " -D__FLT_RADIX__=2";
+    $result .= " -D__FINITE_MATH_ONLY__=" . ($has_inf || $has_qnan ? '0' : '1');
+    $result .= " -D__DECIMAL_DIG__=$dec_dig";
+
+    my %constants =
+	(24 =>
+	 {
+	     'MIN' => '1.17549435e-38',
+	     'MAX' => '3.40282347e+38',
+	     'EPSILON' => '1.19209290e-7',
+	     'DENORM_MIN' => '1.40129846e-45',
+	 },
+	 53 =>
+	 {
+	     'MIN' => '2.2250738585072014e-308',
+	     'MAX' => '1.7976931348623157e+308',
+	     'EPSILON' => '2.2204460492503131e-16',
+	     'DENORM_MIN' => '4.9406564584124654e-324',
+	 },
+	 64 =>
+	 {
+	     'MIN' => '3.36210314311209350626e-4932',
+	     'MAX' => '1.18973149535723176502e+4932',
+	     'EPSILON' => '1.08420217248550443401e-19',
+	     'DENORM_MIN' => '3.64519953188247460253e-4951',
+	 },
+	 113 =>
+	 {
+	     'MIN' => '3.36210314311209350626267781732175260e-4932',
+	     'MAX' => '1.18973149535723176508575932662800702e+4932',
+	     'EPSILON' => '1.92592994438723585305597794258492732e-34',
+	     'DENORM_MIN' => '6.47517511943802511092443895822764655e-4966',
+	 },
+	 );	     
+
+    my @types = (['FLT','F'], ['DBL',''], ['LDBL','L']);
+    while (@types) {
+	my ($mant_bits,$exp_bits) = @{ shift @bitsizes };
+	my ($name,$suffix) = @{ shift @types };
+
+	my $h = $constants{$mant_bits};
+	die "$0: weird number of mantissa bits." unless $h;
+
+	my $mant_dig = int (($mant_bits - 1) * log (2) / log (10));
+	my $max_exp = 1 << ($exp_bits - 1);
+	my $min_exp = 3 - $max_exp;
+	my $max_10_exp = int ($max_exp * log (2) / log (10));
+	my $min_10_exp = -int (-$min_exp * log (2) / log (10));
+
+	$result .= " -D__${name}_MANT_DIG__=$mant_bits";
+	$result .= " -D__${name}_DIG__=$mant_dig";
+	$result .= " -D__${name}_MIN_EXP__='($min_exp)'";
+	$result .= " -D__${name}_MAX_EXP__=$max_exp";
+	$result .= " -D__${name}_MIN_10_EXP__='($min_10_exp)'";
+	$result .= " -D__${name}_MAX_10_EXP__=$max_10_exp";
+	$result .= " -D__${name}_HAS_INFINITY__=" . ($has_inf ? '1' : '0');
+	$result .= " -D__${name}_HAS_QUIET_NAN__=" . ($has_qnan ? '1' : '0');;
+
+	foreach my $inf (sort keys %$h) {
+	    $result .= " -D__${name}_${inf}__=" . $h->{$inf} . $suffix;
+	}
+    }
+    return $result;
+}
+
+# -----------------------------------------------------------------------------
+
+sub define_size_t {
+    my ($text) = @_;
+    # We have to undef in order to override check's internal definition.
+    return ' -U__SIZE_TYPE__ ' . &quote_arg ("-D__SIZE_TYPE__=$text");
+}
+
+# -----------------------------------------------------------------------------
+
+sub add_specs {
+    my ($spec) = @_;
+    if ($spec eq 'sunos') {
+	return &add_specs ('unix') .
+	    ' -D__sun__=1 -D__sun=1 -Dsun=1' .
+	    ' -D__svr4__=1 -DSVR4=1' .
+	    ' -D__STDC__=0' .
+	    ' -D_REENTRANT' .
+	    ' -D_SOLARIS_THREADS' .
+	    ' -DNULL="((void *)0)"';
+    } elsif ($spec eq 'linux') {
+	return &add_specs ('unix') .
+	    ' -D__linux__=1 -D__linux=1 -Dlinux=linux';
+    } elsif ($spec eq 'gnu/kfreebsd') {
+	return &add_specs ('unix') .
+	    ' -D__FreeBSD_kernel__=1';
+    } elsif ($spec eq 'openbsd') {
+	return &add_specs ('unix') .
+	    ' -D__OpenBSD__=1';
+    } elsif ($spec eq 'darwin') {
+	return
+	    ' -D__APPLE__=1 -D__MACH__=1';
+    } elsif ($spec eq 'unix') {
+	return ' -Dunix=1 -D__unix=1 -D__unix__=1';
+    } elsif ( $spec =~ /^cygwin/) {
+	return &add_specs ('unix') .
+	    ' -D__CYGWIN__=1 -D__CYGWIN32__=1' .
+	    " -D'_cdecl=__attribute__((__cdecl__))'" .
+	    " -D'__cdecl=__attribute__((__cdecl__))'" .
+	    " -D'_stdcall=__attribute__((__stdcall__))'" .
+	    " -D'__stdcall=__attribute__((__stdcall__))'" .
+	    " -D'_fastcall=__attribute__((__fastcall__))'" .
+	    " -D'__fastcall=__attribute__((__fastcall__))'" .
+	    " -D'__declspec(x)=__attribute__((x))'";
+    } elsif ($spec eq 'i86') {
+	return (' -D__i386=1 -D__i386__=1' .
+		&integer_types (8, 16, 32, $m64 ? 64 : 32, 64) .
+		&float_types (1, 1, 21, [24,8], [53,11], [64,15]) .
+		&define_size_t ($m64 ? "long unsigned int" : "unsigned int") .
+		' -D__SIZEOF_POINTER__=' . ($m64 ? '8' : '4'));
+    } elsif ($spec eq 'sparc') {
+	return (' -D__sparc=1 -D__sparc__=1' .
+		&integer_types (8, 16, 32, $m64 ? 64 : 32, 64) .
+		&float_types (1, 1, 33, [24,8], [53,11], [113,15]) .
+		&define_size_t ($m64 ? "long unsigned int" : "unsigned int") .
+		' -D__SIZEOF_POINTER__=' . ($m64 ? '8' : '4'));
+    } elsif ($spec eq 'sparc64') {
+	return (' -D__sparc=1 -D__sparc__=1 -D__sparcv9__=1 -D__sparc64__=1 -D__arch64__=1 -D__LP64__=1' .
+		&integer_types (8, 16, 32, 64, 64, 128) .
+		&float_types (1, 1, 33, [24,8], [53,11], [113,15]) .
+		&define_size_t ("long unsigned int") .
+		' -D__SIZEOF_POINTER__=8');
+    } elsif ($spec eq 'x86_64') {
+	return (' -D__x86_64=1 -D__x86_64__=1' . ($m32 ? '' : ' -D__LP64__=1') .
+		&integer_types (8, 16, 32, $m32 ? 32 : 64, 64, 128) .
+		&float_types (1, 1, 33, [24,8], [53,11], [113,15]) .
+		&define_size_t ($m32 ? "unsigned int" : "long unsigned int") .
+		' -D__SIZEOF_POINTER__=' . ($m32 ? '4' : '8'));
+    } elsif ($spec eq 'ppc') {
+	return (' -D__powerpc__=1 -D_BIG_ENDIAN -D_STRING_ARCH_unaligned=1' .
+		&integer_types (8, 16, 32, $m64 ? 64 : 32, 64) .
+		&float_types (1, 1, 21, [24,8], [53,11], [113,15]) .
+		&define_size_t ($m64 ? "long unsigned int" : "unsigned int") .
+		' -D__SIZEOF_POINTER__=' . ($m64 ? '8' : '4'));
+    } elsif ($spec eq 'ppc64') {
+	return (' -D__powerpc__=1 -D__PPC__=1 -D_STRING_ARCH_unaligned=1' .
+		' -D__powerpc64__=1 -D__PPC64__=1' .
+		' -m64' .
+		&float_types (1, 1, 21, [24,8], [53,11], [113,15]));
+    } elsif ($spec eq 's390x') {
+	return (' -D__s390x__ -D__s390__ -D_BIG_ENDIAN' .
+		&integer_types (8, 16, 32, $m64 ? 64 : 32, 64) .
+		&float_types (1, 1, 36, [24,8], [53,11], [113,15]) .
+		&define_size_t ("long unsigned int") .
+		' -D__SIZEOF_POINTER__=' . ($m64 ? '8' : '4'));
+    } elsif ($spec eq 'arm') {
+	chomp (my $gccmachine = `$cc -dumpmachine`);
+	my $cppsymbols = ' -D__arm__=1 -m32';
+
+	if ($gccmachine eq 'arm-linux-gnueabihf') {
+	    $cppsymbols .= ' -D__ARM_PCS_VFP=1';
+	}
+
+	return ($cppsymbols .
+		&float_types (1, 1, 36, [24,8], [53,11], [53, 11]));
+    } elsif ($spec eq 'aarch64') {
+	return (' -D__aarch64__=1 -m64' .
+		&float_types (1, 1, 36, [24,8], [53,11], [113,15]));
+    } elsif ($spec eq 'host_os_specs') {
+	my $os = `uname -s`;
+	chomp $os;
+	return &add_specs (lc $os);
+    } elsif ($spec eq 'host_arch_specs') {
+	my $arch = `uname -m`;
+	chomp $arch;
+	if ($arch =~ /^(i.?86|athlon)$/i) {
+	    return &add_specs ('i86');
+	} elsif ($arch =~ /^(sun4u)$/i) {
+	    return &add_specs ('sparc');
+	} elsif ($arch =~ /^(x86_64)$/i) {
+	    return &add_specs ('x86_64');
+	} elsif ($arch =~ /^(ppc)$/i) {
+	    return &add_specs ('ppc');
+	} elsif ($arch =~ /^(ppc64)$/i) {
+	    return &add_specs ('ppc64') . ' -mbig-endian -D_CALL_ELF=1';
+	} elsif ($arch =~ /^(ppc64le)$/i) {
+	    return &add_specs ('ppc64') . ' -mlittle-endian -D_CALL_ELF=2';
+	} elsif ($arch =~ /^(s390x)$/i) {
+	    return &add_specs ('s390x');
+	} elsif ($arch =~ /^(sparc64)$/i) {
+	    return &add_specs ('sparc64');
+	} elsif ($arch =~ /^arm(?:v[78]l)?$/i) {
+	    return &add_specs ('arm');
+	} elsif ($arch =~ /^(aarch64)$/i) {
+	    return &add_specs ('aarch64');
+	}
+    } else {
+	die "$0: invalid specs: $spec\n";
+    }
+}
+
+# -----------------------------------------------------------------------------

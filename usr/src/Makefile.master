@@ -28,6 +28,7 @@
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -439,6 +440,9 @@ CERRWARN +=	-_gcc=-Wno-array-bounds
 # -nd builds
 $(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused
 $(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-empty-body
+
+CERRWARN += -_smatch=-p=illumos_user
+include $(SRC)/Makefile.smatch
 
 #
 # turn warnings into errors (C++)

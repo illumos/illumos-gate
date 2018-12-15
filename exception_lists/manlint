@@ -10,7 +10,7 @@
 #
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 usr/src/boot/*
 # Not actually a manual page
@@ -24,3 +24,4 @@ usr/src/lib/libbsm/adt_record.dtd.1
 usr/src/lib/libbsm/adt_record.xsl.1
 usr/src/lib/libpool/dtd/rm_pool.dtd.1
 usr/src/lib/libzonecfg/dtd/zonecfg.dtd.1
+usr/src/tools/smatch/src/*

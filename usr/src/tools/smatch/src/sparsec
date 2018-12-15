@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# GCC compatible C compiler based on Sparse LLVM
+
+set +e
+
+SPARSEOPTS=""
+DIRNAME=`dirname $0`
+
+NEED_LINK=1
+
+if [ $# -eq 0 ]; then
+  echo "`basename $0`: no input files"
+  exit 1
+fi
+
+while [ $# -gt 0 ]; do
+	case $1 in
+	'-o')
+		OUTFILE=$2
+		shift
+		;;
+	'-c')
+		NEED_LINK=0
+		;;
+	*)
+		SPARSEOPTS="$SPARSEOPTS $1 " ;;
+	esac
+	shift
+done
+
+TMPLLVM=`mktemp -t tmp.XXXXXX`".llvm"
+TMPFILE=`mktemp -t tmp.XXXXXX`".o"
+
+$DIRNAME/sparse-llvm $SPARSEOPTS > $TMPLLVM
+
+LLC=`"${LLVM_CONFIG:-llvm-config}" --bindir`/llc
+
+$LLC -o - $TMPLLVM | as -o $TMPFILE
+
+if [ $NEED_LINK -eq 1 ]; then
+	if [ -z $OUTFILE ]; then
+		OUTFILE=a.out
+	fi
+	gcc $TMPFILE -o $OUTFILE
+else
+	if [ -z $OUTFILE ]; then
+		echo "`basename $0`: no output file"
+		exit 1
+	fi
+	mv $TMPFILE $OUTFILE
+fi
+
+rm -f $TMPLLVM

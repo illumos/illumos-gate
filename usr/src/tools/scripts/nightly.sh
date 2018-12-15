@@ -26,7 +26,7 @@
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright (c) 2017 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 # Based on the nightly script from the integration folks,
@@ -218,7 +218,7 @@ function build {
 	fi
 
 	echo "\n==== Build warnings ($LABEL) ====\n" >>$mail_msg_file
-	egrep -i warning: $SRC/${INSTALLOG}.out \
+	egrep -i 'warn:|warning:' $SRC/${INSTALLOG}.out \
 		| egrep -v '^tic:' \
 		| egrep -v "symbol (\`|')timezone' has differing types:" \
 		| egrep -v "parameter <PSTAMP> set to" \

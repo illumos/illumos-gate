@@ -1,0 +1,21 @@
+/*
+ * These functions don't return.  Unfortunately, sparse today doesn't correctly
+ * respect __NORETURN, so we have to explicitly list them here for now.
+ */
+__assert_fail
+__builtin_unreachable
+abort
+ctfmerge_fatal
+err
+errx
+_exit
+exit
+_longjmp
+longjmp
+pthread_exit
+reparsed_door_call_error
+siglongjmp
+terminate
+thr_exit
+verr
+verrx

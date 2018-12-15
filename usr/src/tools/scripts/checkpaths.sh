@@ -19,11 +19,10 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2019, Joyent, Inc.
 
 # Quis custodiet ipsos custodies?
 
@@ -73,27 +72,6 @@ do
 		exit 1
 		;;
 	esac
-	if [ -d $ROOT ]; then
-		#
-		# This is the old-style packaging exception list, from
-		# the svr4-specific usr/src/pkgdefs
-		#
-		[ -f $SRC/pkgdefs/etc/exception_list_$arch ] && \
-			validate_paths '-s/\s*'$arch'$//'  \
-			    -e ^usr/include/ike/ -b $ROOT \
-			    $args $SRC/pkgdefs/etc/exception_list_$arch
-		#
-		# These are the new-style packaging exception lists,
-		# from the repository-wide exception_lists/ directory.
-		#
-		e="$CODEMGR_WS/exception_lists/packaging"
-		for f in $e; do
-			if [ -f $f ]; then
-				nawk 'NF == 1 || /[ 	]\+'$arch'$/ { print; }' \
-				    < $f | validate_paths -b $ROOT -n $f
-			fi
-		done
-	fi
 done
 
 # Two entries in the findunref exception_list deal with things created

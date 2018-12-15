@@ -1,0 +1,3 @@
+There are some documents under the Documentation/ directory.
+
+For parsing implicit dependencies, see smatch_scripts/implicit_dependencies.

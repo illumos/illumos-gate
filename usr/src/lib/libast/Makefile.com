@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2019, Joyent, Inc.
 
 SHELL=/usr/bin/ksh93
 
@@ -737,6 +738,8 @@ CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-empty-body
 CERRWARN += -_gcc=-Wno-type-limits
 CERRWARN += -_gcc=-Wno-address
+
+SMATCH=off
 
 pics/$(MACH)/src/lib/libast/conftab.o \
 pics/$(MACH64)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_INIT_DOES_NOT_FIT

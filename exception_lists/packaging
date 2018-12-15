@@ -27,7 +27,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2017 RackTop Systems.
-# Copyright 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 # Copyright 2018 Jason King
 #
 
@@ -1012,3 +1012,9 @@ lib/sparcv9/llib-lcustr.ln	sparc
 lib/libcustr.so
 lib/llib-lcustr
 lib/llib-lcustr.ln
+
+#
+# smatch is delivered and used only with the source tree
+#
+opt/onbld/bin/i386/smatch	i386
+opt/onbld/share/smatch		i386

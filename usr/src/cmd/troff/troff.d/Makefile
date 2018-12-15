@@ -24,6 +24,7 @@
 #
 # cmd/troff/troff.d/Makefile
 #
+# Copyright (c) 2019, Joyent, Inc.
 
 include 	../../Makefile.cmd
 
@@ -49,6 +50,9 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-extra
+
+# "parse error: parsing (i (9223372034707292160-96) >= 65)"
+SMATCH =	off
 
 #
 # For message catalog

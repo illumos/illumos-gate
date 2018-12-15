@@ -1,0 +1,1 @@
+CREATE TABLE sink_info (file varchar(128), static boolean, sink_name varchar(64), type integer, key varchar(256), value varchar(256));

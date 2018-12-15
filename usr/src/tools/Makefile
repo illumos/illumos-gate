@@ -24,6 +24,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 include ../Makefile.master
@@ -35,6 +36,8 @@ include ../Makefile.master
 # Because of somewhat cyclic dependency between them, both cw and install.bin
 # override the way we install binaries in their Makefiles.
 BOOT_SUBDIRS= \
+	smatch \
+	.WAIT \
 	cw \
 	.WAIT \
 	install.bin \

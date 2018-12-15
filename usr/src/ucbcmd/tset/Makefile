@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2019, Joyent, Inc.
 
 PROG= tset
 
@@ -29,7 +30,7 @@ include ../Makefile.ucbcmd
 
 FILEMODE=	755
 
-LDLIBS =  -L$(ROOT)/usr/ucblib -R /usr/ucblib $(LDLIBS.cmd) -lucb -ltermcap
+LDLIBS =  -L$(ROOT)/usr/ucblib -R/usr/ucblib $(LDLIBS.cmd) -lucb -ltermcap
 
 CPPFLAGS = -I$(SRC)/ucbhead $(CPPFLAGS.master)
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
@@ -37,11 +38,14 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-uninitialized
 
+# missing prototypes
+SMATCH=off
+
 ROOTSYMLINK= $(ROOTBIN)/reset
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG):	$(PROG).c
 	$(LINK.c) -o $@ $(PROG).c $(LDLIBS)

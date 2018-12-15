@@ -1,0 +1,6 @@
+CREATE TABLE constraints (
+	id integer primary key,
+	str varchar(256),
+
+	CONSTRAINT constraint_name UNIQUE (str)
+);

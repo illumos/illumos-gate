@@ -1,0 +1,15 @@
+/*
+ * It's pretty common that the return value implies something about a parameter.
+ * This gives you a way to tell Smatch about it.
+ *
+ * The format is:
+ * function "return range" parameter "implied value range list of parameter"
+ *
+ * You have to specify at least two return ranges for a function.  The implied
+ * value is a range list, but the return range is just a range and we only care
+ * about the min and the max.  We start counting the first parameter at zero.
+ *
+ */
+
+rw_verify_area "0-1000000" 3 "0-1000000"
+rw_verify_area "-4095-(-1)" 3 "min-max"

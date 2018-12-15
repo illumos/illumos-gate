@@ -1,0 +1,37 @@
+.\" cgcc manpage by Josh Triplett
+.TH cgcc "1"
+.
+.SH NAME
+cgcc \- Compiler wrapper to run Sparse after compiling
+.
+.SH SYNOPSIS
+.B cgcc
+[\fISPARSE OPTIONS\fR]... [\fICOMPILER OPTIONS\fR]... [\fIINPUT FILES\fR]...
+.br
+.B make CC=cgcc
+.
+.SH DESCRIPTION
+\fBcgcc\fR provides a wrapper around a C compiler (\fBcc\fR by
+default) which also invokes the Sparse static analysis tool.
+.P
+\fBcgcc\fR accepts all Sparse command-line options, such as warning
+options, and passes all other options through to the compiler.
+.P
+By providing the same interface as the C compiler, \fBcgcc\fR allows
+projects to run Sparse as part of their build without modifying their
+build system, by using \fBcgcc\fR as the compiler.  For many projects,
+setting \fBCC=cgcc\fR on the \fBmake\fR command-line will work.
+.
+.SH ENVIRONMENT
+.TP
+.B REAL_CC
+If set, \fBcgcc\fR will use this as the compiler to invoke, rather
+than the default \fBcc\fR.
+.
+.TP
+.B CHECK
+If set, \fBcgcc\fR will use this as the Sparse program to invoke,
+rather than the default \fBsparse\fR.
+.
+.SH SEE ALSO
+.BR sparse (1)

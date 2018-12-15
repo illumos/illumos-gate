@@ -1,0 +1,5 @@
+/*
+ * These macros are actively misleading to smatch so
+ * it's best to ignore them.
+ */
+ok

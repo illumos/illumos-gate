@@ -1,0 +1,70 @@
+Smatch is released under the GPLv2+ license however Smatch includes the Sparse
+source as well which is licensed under the MIT license and cwchash which is
+licensed under the three clause BSD license and avl.[ch] which are MIT licensed.
+
+The line between which files are a part of Sparse and which are a part of Smatch
+is normally pretty clear.  The one thing I will clarify is that there are some
+modifications to Sparse files in the Smatch repository which have not been
+pushed to the Sparse repository.  These are released under the MIT license.  The
+token_store.c file is a Sparse feature and thus released under the MIT license
+despite that it has not been pushed to the Sparse repository.
+
+I will not accept additional Sparse features except under the MIT license.
+
+------  Smatch
+
+License: GPLv2+
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+
+See GPL-2, or <http://www.gnu.org/copyleft/gpl.txt> for the terms of the latest
+version of the GNU General Public License.
+
+------  Sparse
+
+The 'sparse' C parser front-end library is copyrighted by Transmeta Corp
+and other authors and licensed under the "MIT License" as
+obtained from www.opensource.org (and included here-in for easy
+reference).
+
+[ This copy of the license is the flat-text version of original,
+  available in its full glory at
+
+	 http://opensource.org/licenses/MIT
+
+  please refer to there for the authoritative and slightly more
+  pretty-printed version ]
+
+------
+
+			The MIT License (MIT)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

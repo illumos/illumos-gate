@@ -1,0 +1,17 @@
+get_type
+sm_prefix
+add_hook
+strcmp
+snprintf
+get_filename
+get_argument_from_call_expr
+printf
+INT_PTR
+get_function
+free_string
+print_implied_debug_msg
+strip_expr
+get_lineno
+add_function_hook
+is_silenced_function
+fprintf

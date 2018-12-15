@@ -1,0 +1,4 @@
+(struct seq_oss_devinfo)->synths, <, (struct seq_oss_devinfo)->max_synthdev
+(struct hid_report)->field, <, (struct hid_report)->maxfield
+(struct pidff_device)->pid_id, <, (struct ff_device)->max_effects
+(struct usb_mixer_elem_info)->cache_val, <, (struct snd_ctl_elem_id)->index

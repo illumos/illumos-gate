@@ -1,0 +1,7 @@
+CREATE TABLE constraints_required (
+	data varchar(256),
+	op integer,
+	bound varchar(256),
+
+	CONSTRAINT unique_row UNIQUE (data, op, bound)
+);

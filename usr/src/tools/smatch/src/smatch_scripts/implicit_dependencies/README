@@ -1,0 +1,6 @@
+Python module for parsing kernel.implicit_dependencies
+
+`python main.py -h` for usage.
+run `python main.py -v -p` to generate verbose and pretty print.
+
+To generate kernel.implicit_dependencies, run `smatch_scripts/build_kernel_data.sh`

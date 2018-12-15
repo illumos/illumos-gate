@@ -23,7 +23,7 @@
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 # - This file is sourced by "bldenv.sh" and "nightly.sh" and should not
 #   be executed directly.
@@ -80,6 +80,9 @@ export CODEMGR_WS="`git rev-parse --show-toplevel`"
 #
 export SHADOW_CCS=gcc7,/usr/gcc/7/bin/gcc,gnu
 export SHADOW_CCCS=gcc7,/usr/gcc/7/bin/g++,gnu
+
+# uncomment to enable smatch
+#export ENABLE_SMATCH=1
 
 # Comment this out to disable support for SMB printing, i.e. if you
 # don't want to bother providing the CUPS headers this needs.
@@ -273,3 +276,8 @@ export SPRO_VROOT="$SPRO_ROOT"
 # Set this flag to 'n' to disable the use of 'checkpaths'.  The default,
 # if the 'N' option is not specified, is to run this test.
 #CHECK_PATHS='y'
+
+if [[ "$ENABLE_SMATCH" = "1" ]]; then
+	SMATCHBIN=$CODEMGR_WS/usr/src/tools/proto/root_$MACH-nd/opt/onbld/bin/$MACH/smatch
+	export SHADOW_CCS="$SHADOW_CCS smatch,$SMATCHBIN,smatch"
+fi

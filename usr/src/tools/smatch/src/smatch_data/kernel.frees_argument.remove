@@ -1,0 +1,7 @@
+free_cell 0
+free_scq 0
+free_scq 1
+setup_card 0
+krealloc 0
+free_urbs 0
+free_area 0

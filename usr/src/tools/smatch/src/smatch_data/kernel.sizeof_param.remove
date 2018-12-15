@@ -1,0 +1,13 @@
+printk
+find_first_zero_bit
+dvb_usb_generic_rw
+__dynamic_pr_debug
+strncmp
+strncpy 2 1
+strlcpy 2 1
+strncat 2 1
+snprintf
+copy_from_user 2 1
+copy_to_user 2 0
+read_rom 2 3
+skb_pull 1 -1

@@ -1,0 +1,51 @@
+<!ELEMENT parse (symbol+) >
+
+<!ELEMENT symbol (symbol*) >
+
+<!ATTLIST symbol type (uninitialized|preprocessor|basetype|node|pointer|function|array|struct|union|enum|typedef|typeof|member|bitfield|label|restrict|fouled|keyword|bad) #REQUIRED
+                 id ID #REQUIRED
+		 file CDATA #REQUIRED
+		 start-line CDATA #REQUIRED
+		 start-col CDATA #REQUIRED
+		 end-line CDATA #IMPLIED
+		 end-col CDATA #IMPLIED
+		 end-file CDATA #IMPLIED
+
+		 ident CDATA #IMPLIED
+		 base-type IDREF #IMPLIED
+		 base-type-builtin (char|signed char|unsigned char|short|signed short|unsigned short|int|signed int|unsigned int|signed long|long|unsigned long|long long|signed long long|unsigned long long|void|bool|string|float|double|long double|incomplete type|abstract int|abstract fp|label type|bad type) #IMPLIED
+
+		 array-size CDATA #IMPLIED
+
+		 bit-size CDATA #IMPLIED
+		 alignment CDATA #IMPLIED
+		 offset CDATA #IMPLIED
+		 bit-offset CDATA #IMPLIED
+
+		 auto (0|1) #IMPLIED
+		 register (0|1) #IMPLIED
+		 static (0|1) #IMPLIED
+		 extern (0|1) #IMPLIED
+		 const (0|1) #IMPLIED
+		 volatile (0|1) #IMPLIED
+		 signed (0|1) #IMPLIED
+		 unsigned (0|1) #IMPLIED
+		 char (0|1) #IMPLIED
+		 short (0|1) #IMPLIED
+		 long (0|1) #IMPLIED
+		 long-long (0|1) #IMPLIED
+		 typedef (0|1) #IMPLIED
+		 inline (0|1) #IMPLIED
+		 addressable (0|1) #IMPLIED
+		 nocast (0|1) #IMPLIED
+		 noderef (0|1) #IMPLIED
+		 accessed (0|1) #IMPLIED
+		 toplevel (0|1) #IMPLIED
+		 label (0|1) #IMPLIED
+		 assigned (0|1) #IMPLIED
+		 type-type (0|1) #IMPLIED
+		 safe (0|1) #IMPLIED
+		 usertype (0|1) #IMPLIED
+		 force (0|1) #IMPLIED
+		 explicitly-signed (0|1) #IMPLIED
+		 bitwise (0|1) #IMPLIED >

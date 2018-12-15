@@ -1,0 +1,1 @@
+CREATE TABLE common_caller_info (file varchar(128), caller varchar(64), function varchar(64), call_id integer, static boolean, type integer, parameter integer, key varchar(256), value varchar(256));

@@ -1,0 +1,396 @@
+#!/bin/sh
+
+#set -x
+
+cd $(dirname "$0")
+
+default_path=".."
+default_cmd="sparse \$file"
+tests_list=`find . -name '*.c' | sed -e 's#^\./\(.*\)#\1#' | sort`
+prog_name=`basename $0`
+
+if [ ! -x "$default_path/sparse-llvm" ]; then
+	disabled_cmds="sparsec sparsei sparse-llvm"
+fi
+
+# flags:
+#	- some tests gave an unexpected result
+failed=0
+
+# counts:
+#	- tests that have not been converted to test-suite format
+#	- tests that are disabled
+#	- tests that passed
+#	- tests that failed
+#	- tests that failed but are known to fail
+unhandled_tests=0
+disabled_tests=0
+ok_tests=0
+ko_tests=0
+known_ko_tests=0
+
+# defaults to not verbose
+[ -z "$V" ] && V=0
+[ $V -eq 0 ] && quiet=1 || quiet=0
+
+##
+# get_tag_value(file) - get the 'check-<...>' tags & values
+get_tag_value()
+{
+	check_name=""
+	check_command="$default_cmd"
+	check_exit_value=0
+	check_timeout=0
+	check_known_to_fail=0
+	check_error_ignore=0
+	check_output_ignore=0
+	check_output_contains=0
+	check_output_excludes=0
+	check_output_pattern=0
+
+	lines=$(grep 'check-[a-z-]*' $1 | \
+		sed -e 's/^.*\(check-[a-z-]*:*\) *\(.*\)$/\1 \2/')
+
+	while read tag val; do
+		#echo "-> tag: '$tag'"
+		#echo "-> val: '$val'"
+		case $tag in
+		check-name:)		check_name="$val" ;;
+		check-command:)		check_command="$val" ;;
+		check-exit-value:)	check_exit_value="$val" ;;
+		check-timeout:)		[ -z "$val" ] && val=1
+					check_timeout="$val" ;;
+		check-known-to-fail)	check_known_to_fail=1 ;;
+		check-error-ignore)	check_error_ignore=1 ;;
+		check-output-ignore)	check_output_ignore=1 ;;
+		check-output-contains:)	check_output_contains=1 ;;
+		check-output-excludes:)	check_output_excludes=1 ;;
+		check-output-pattern-)	check_output_pattern=1 ;;
+		esac
+	done << EOT
+	$lines
+EOT
+}
+
+##
+# helper for has_(each|none)_patterns()
+has_patterns()
+{
+	ifile="$1"
+	patt="$2"
+	ofile="$3"
+	cmp="$4"
+	grep "$patt:" "$ifile" | \
+	sed -e "s/^.*$patt: *\(.*\)$/\1/" | \
+	while read val; do
+		grep -s -q "$val" "$ofile"
+		if [ "$?" $cmp 0 ]; then
+			return 1
+		fi
+	done
+
+	return $?
+}
+
+##
+# has_each_patterns(ifile tag ofile) - does ofile contains some
+#                        of the patterns given by ifile's tags?
+#
+# returns 0 if all present, 1 otherwise
+has_each_patterns()
+{
+	has_patterns "$1" "$2" "$3" -ne
+}
+
+##
+# has_none_patterns(ifile tag ofile) - does ofile contains some
+#                        of the patterns given by ifile's tags?
+#
+# returns 1 if any present, 0 otherwise
+has_none_patterns()
+{
+	has_patterns "$1" "$2" "$3" -eq
+}
+
+##
+# nbr_patterns(ifile tag ofile) - does ofile contains the
+#                        the patterns given by ifile's tags
+#                        the right number of time?
+nbr_patterns()
+{
+	ifile="$1"
+	patt="$2"
+	ofile="$3"
+	grep "$patt-[0-9][0-9]*-times:" "$ifile" | \
+	sed -e "s/^.*$patt-\([0-9][0-9]*\)-times: *\(.*\)/\1 \2/" | \
+	while read nbr pat; do
+		n=$(grep -s "$pat" "$ofile" | wc -l)
+		if [ "$n" -ne "$nbr" ]; then
+			return 1
+		fi
+	done
+
+	return $?
+}
+
+##
+# verbose(string) - prints string if we are in verbose mode
+verbose()
+{
+	[ "$V" -eq "1" ] && echo "        $1"
+	return 0
+}
+
+##
+# error(string[, die]) - prints an error and exits with value die if given
+error()
+{
+	[ "$quiet" -ne 1 ] && echo "error: $1"
+	[ -n "$2" ] && exit $2
+	return 0
+}
+
+do_usage()
+{
+echo "$prog_name - a tiny automatic testing script"
+echo "Usage: $prog_name [command] [command arguments]"
+echo
+echo "commands:"
+echo "    none                       runs the whole test suite"
+echo "    single file                runs the test in 'file'"
+echo "    format file [name [cmd]]   helps writing a new test case using cmd"
+echo
+echo "    help                       prints usage"
+}
+
+##
+# do_test(file) - tries to validate a test case
+#
+# it "parses" file, looking for check-* tags and tries to validate
+# the test against an expected result
+# returns:
+#	- 0 if the test passed,
+#	- 1 if it failed,
+#	- 2 if it is not a "test-suite" test.
+#	- 3 if the test is disabled.
+do_test()
+{
+	test_failed=0
+	file="$1"
+
+	get_tag_value $file
+
+	# can this test be handled by test-suite ?
+	# (it has to have a check-name key in it)
+	if [ "$check_name" = "" ]; then
+		echo "warning: test '$file' unhandled"
+		unhandled_tests=$(($unhandled_tests + 1))
+		return 2
+	fi
+	test_name="$check_name"
+
+	# does the test provide a specific command ?
+	if [ "$check_command" = "" ]; then
+		check_command="$defaut_command"
+	fi
+
+	# check for disabled commands
+	set -- $check_command
+	base_cmd=$1
+	for i in $disabled_cmds; do
+		if [ "$i" = "$base_cmd" ] ; then
+			disabled_tests=$(($disabled_tests + 1))
+			echo "     DISABLE $test_name ($file)"
+			return 3
+		fi
+	done
+
+	cmd=`eval echo $default_path/$check_command`
+
+	echo "     TEST    $test_name ($file)"
+
+	verbose "Using command       : $cmd"
+
+	# grab the expected exit value
+	expected_exit_value=$check_exit_value
+	verbose "Expecting exit value: $expected_exit_value"
+
+	# do we want a timeout?
+	if [ $check_timeout -ne 0 ]; then
+		cmd="timeout -k 1s $check_timeout $cmd"
+	fi
+
+	# grab the actual output & exit value
+	$cmd 1> $file.output.got 2> $file.error.got
+	actual_exit_value=$?
+
+	must_fail=$check_known_to_fail
+	quiet=0
+	[ $must_fail -eq 1 ] && [ $V -eq 0 ] && quiet=1
+	known_ko_tests=$(($known_ko_tests + $must_fail))
+
+	for stream in output error; do
+		eval ignore=\$check_${stream}_ignore
+		[ $ignore -eq 1 ] && continue
+
+		# grab the expected output
+		sed -n "/check-$stream-start/,/check-$stream-end/p" $file \
+		| grep -v check-$stream > "$file".$stream.expected
+
+		diff -u "$file".$stream.expected "$file".$stream.got > "$file".$stream.diff
+		if [ "$?" -ne "0" ]; then
+			error "actual $stream text does not match expected $stream text."
+			error  "see $file.$stream.* for further investigation."
+			[ $quiet -ne 1 ] && cat "$file".$stream.diff
+			test_failed=1
+		fi
+	done
+
+	if [ "$actual_exit_value" -ne "$expected_exit_value" ]; then
+		error "Actual exit value does not match the expected one."
+		error "expected $expected_exit_value, got $actual_exit_value."
+		test_failed=1
+	fi
+
+	# verify the 'check-output-contains/excludes' tags
+	if [ $check_output_contains -eq 1 ]; then
+		has_each_patterns "$file" 'check-output-contains' $file.output.got
+		if [ "$?" -ne "0" ]; then
+			error "Actual output doesn't contain some of the expected patterns."
+			test_failed=1
+		fi
+	fi
+	if [ $check_output_excludes -eq 1 ]; then
+		has_none_patterns "$file" 'check-output-excludes' $file.output.got
+		if [ "$?" -ne "0" ]; then
+			error "Actual output contains some patterns which are not expected."
+			test_failed=1
+		fi
+	fi
+	if [ $check_output_pattern -eq 1 ]; then
+		# verify the 'check-output-pattern-X-times' tags
+		nbr_patterns "$file" 'check-output-pattern' $file.output.got
+		if [ "$?" -ne "0" ]; then
+			error "Actual output doesn't contain the pattern the expected number."
+			test_failed=1
+		fi
+	fi
+
+	[ "$test_failed" -eq "$must_fail" ] || failed=1
+
+	if [ "$must_fail" -eq "1" ]; then
+		if [ "$test_failed" -eq "1" ]; then
+			echo "info: test '$file' is known to fail"
+		else
+			echo "error: test '$file' is known to fail but succeed!"
+			test_failed=1
+		fi
+	fi
+
+	if [ "$test_failed" -eq "1" ]; then
+		ko_tests=$(($ko_tests + 1))
+	else
+		ok_tests=$(($ok_tests + 1))
+		rm -f $file.{error,output}.{expected,got,diff}
+	fi
+	return $test_failed
+}
+
+do_test_suite()
+{
+	for i in $tests_list; do
+		do_test "$i"
+	done
+
+	# prints some numbers
+	tests_nr=$(($ok_tests + $ko_tests))
+	echo -n "Out of $tests_nr tests, $ok_tests passed, $ko_tests failed"
+	echo " ($known_ko_tests of them are known to fail)"
+	if [ "$unhandled_tests" -ne "0" ]; then
+		echo "$unhandled_tests tests could not be handled by $prog_name"
+	fi
+	if [ "$disabled_tests" -ne "0" ]; then
+		echo "$disabled_tests tests were disabled"
+	fi
+}
+
+##
+# do_format(file[, name[, cmd]]) - helps a test writer to format test-suite tags
+do_format()
+{
+	if [ -z "$2" ]; then
+		fname="$1"
+		fcmd=$default_cmd
+	elif [ -z "$3" ]; then
+		fname="$2"
+		fcmd=$default_cmd
+	else
+		fname="$2"
+		fcmd="$3"
+	fi
+	file="$1"
+	cmd=`eval echo $default_path/$fcmd`
+	$cmd 1> $file.output.got 2> $file.error.got
+	fexit_value=$?
+	cat <<_EOF
+/*
+ * check-name: $fname
+_EOF
+	if [ "$fcmd" != "$default_cmd" ]; then
+		echo " * check-command: $fcmd"
+	fi
+	if [ "$fexit_value" -ne "0" ]; then
+		echo " * check-exit-value: $fexit_value"
+	fi
+	for stream in output error; do
+		if [ -s "$file.$stream.got" ]; then
+			echo " *"
+			echo " * check-$stream-start"
+			cat "$file.$stream.got"
+			echo " * check-$stream-end"
+		fi
+	done
+	echo " */"
+	return 0
+}
+
+##
+# arg_file(filename) - checks if filename exists
+arg_file()
+{
+	[ -z "$1" ] && {
+		do_usage
+		exit 1
+	}
+	[ -e "$1" ] || {
+		error "Can't open file $1"
+		exit 1
+	}
+	return 0
+}
+
+case "$1" in
+	'')
+		do_test_suite
+		;;
+	single)
+		arg_file "$2"
+		do_test "$2"
+		case "$?" in
+			0) echo "$2 passed !";;
+			1) echo "$2 failed !";;
+			2) echo "$2 can't be handled by $prog_name";;
+		esac
+		;;
+	format)
+		arg_file "$2"
+		do_format "$2" "$3" "$4"
+		;;
+	help | *)
+		do_usage
+		exit 1
+		;;
+esac
+
+exit $failed
+

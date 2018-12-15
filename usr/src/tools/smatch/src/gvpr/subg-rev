@@ -1,0 +1,101 @@
+#!/usr/bin/gvpr -f
+// Compute the reverse partition of the chosen function
+//
+// Run with graph ... | return-paths | subg-rev -a functionname
+
+
+BEGIN {
+	// Find the immediate parent subgraph of this object
+	graph_t find_owner(obj_t o, graph_t g)
+	{
+		graph_t g1;
+		for (g1 = fstsubg(g); g1; g1 = nxtsubg(g1))
+			if(isIn(g1,o)) return g1;
+		return NULL;
+	}
+}
+
+BEG_G {
+	graph_t calls[]; // Crude hash table for tracking who calls what
+	graph_t sg = subg ($, "reachable");
+	graph_t target, g, g2;
+	edge_t e;
+	int i;
+
+	$tvtype = TV_rev;
+
+	// find the ep corresponding to ARG[0]
+	for (g = fstsubg($G); g; g = nxtsubg(g)) {
+		if(g.fun == ARGV[0]) {
+			node_t n;
+			n = node($,g.ep);
+			$tvroot = n;
+			n.style = "filled";
+			target = g;
+			break;
+		}
+	}
+	if(!target) {
+		printf(2, "Function %s not found\n", ARGV[0]);
+		exit(1);
+	}
+
+	// Add the incoming call edges to the allowed call list
+	i = 0;
+	for(e = fstin(n); e; e = nxtin(e)) {
+		if (e.op = "call") {
+			g2 = find_owner(e.tail, $G);
+			calls[sprintf("%s%d", g2.name, ++i)] = g;
+		}
+	}
+}
+
+
+E [op == "ret"] {
+
+	// This is a return edge. Allow the corresponding call
+	g = find_owner(head, $G);
+	i = 0;
+	while(calls[sprintf("%s%d", g.name, ++i)]) {
+	}
+	calls[sprintf("%s%d", g.name, i)] = find_owner(tail, $G);
+	g2 = find_owner(tail, $G);
+}
+
+
+N [split == 1] {
+
+	// Ignore returns back to the target function
+	for (e = fstin($); e; e = nxtin(e))
+		if (e.op == "ret" && isIn(target,e.tail))
+			delete($G,e);
+}
+
+N {
+	$tvroot = NULL;
+
+	for (e = fstin($); e; e = nxtin(e)) {
+		if (e.op == "call") {
+			int found = 0;
+			g = find_owner(e.tail, $G);
+			i = 0;
+			while(calls[sprintf("%s%d", g.name, ++i)]) {
+				if (isIn(calls[sprintf("%s%d", g.name, i)],e.head))
+					found = 1;
+			}
+			g2 = find_owner(e.head, $G);
+			if (!found) delete($G, e);
+		}
+	}
+
+	for (g = fstsubg($G); g; g = nxtsubg(g)) {
+		if(isIn(g,$) && g != sg) {
+			subnode (copy(sg, g), $);
+		}
+	}
+}
+
+END_G {
+	induce(sg);
+	write(sg);
+}

@@ -1,0 +1,8 @@
+/* These are "too hairy" for smatch. */
+dtrace_disx86
+elf32exec
+elfexec
+iscsi_ioctl
+lm_idle_chk
+segvn_fault_vnodepages
+tcp_input_data

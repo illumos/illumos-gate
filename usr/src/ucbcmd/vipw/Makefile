@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2019, Joyent, Inc.
 
 PROG= vipw
 
@@ -29,15 +30,18 @@ include ../Makefile.ucbcmd
 
 INC1 = $(SRC)/ucbhead
 
-LDLIBS =  -L$(ROOT)/usr/ucblib -R /usr/ucblib $(LDLIBS.cmd) -lucb
+LDLIBS =  -L$(ROOT)/usr/ucblib -R/usr/ucblib $(LDLIBS.cmd) -lucb
 
 CPPFLAGS = -I$(INC1) $(CPPFLAGS.master)
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-unused-variable
 
+# missing prototypes
+SMATCH=off
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG):	$(PROG).c
 	$(LINK.c) -o $@ $(PROG).c $(LDLIBS)
