@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Finds all unreferenced files in a source tree that do not match a list of
  * permitted pathnames.
  */
@@ -200,7 +204,7 @@ hg_manifest(const char *hgroot)
 	pnset_t	*pnsetp;
 	char	path[MAXPATHLEN];
 
-	pnsetp = calloc(sizeof (pnset_t), 1);
+	pnsetp = calloc(1, sizeof (pnset_t));
 	if (pnsetp == NULL ||
 	    asprintf(&hgcmd, "hg manifest -R %s", hgroot) == -1)
 		goto fail;
@@ -242,7 +246,7 @@ git_manifest(const char *gitroot)
 	pnset_t	*pnsetp;
 	char	path[MAXPATHLEN];
 
-	pnsetp = calloc(sizeof (pnset_t), 1);
+	pnsetp = calloc(1, sizeof (pnset_t));
 	if (pnsetp == NULL ||
 	    asprintf(&gitcmd, "git --git-dir=%s/.git ls-files", gitroot) == -1)
 		goto fail;
@@ -400,7 +404,7 @@ make_exset(const char *exceptfile)
 	pnset_t		*pnsetp;
 	unsigned int	i;
 
-	pnsetp = calloc(sizeof (pnset_t), 1);
+	pnsetp = calloc(1, sizeof (pnset_t));
 	if (pnsetp == NULL)
 		return (NULL);
 

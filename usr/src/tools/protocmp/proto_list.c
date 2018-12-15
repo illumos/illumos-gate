@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -193,7 +195,7 @@ parse_line(char **v, elem *e)
 	else {
 		e->symsrc = malloc(strlen(v[SYM]) + 1);
 		(void) strcpy(e->symsrc, v[SYM]);
-			if (e->file_type != SYM_LINK_T)
+		if (e->file_type != SYM_LINK_T)
 #if defined(__sparc)
 			if (strncmp(e->symsrc, "sun4/", 5) == 0)
 				e->arch = P_SUN4;

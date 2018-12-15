@@ -30,6 +30,9 @@ CPPFLAGS +=	-I. -include fts.h
 CPPFLAGS +=	-I$(NATIVE_ADJUNCT)/include
 LDFLAGS +=	-L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
 
+# 3rd party code
+SMATCH=off
+
 .KEEP_STATE:
 
 all:		$(PROG)

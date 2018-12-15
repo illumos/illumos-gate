@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * This file is a sewer.
  */
 
@@ -629,7 +633,7 @@ tdefdecl(char *cp, int h, tdesc_t **rtdp)
 				/* record it as unresolved */
 				parse_debug(3, NULL, "tdefdecl unres type %d",
 				    h2);
-				*rtdp = calloc(sizeof (**rtdp), 1);
+				*rtdp = calloc(1, sizeof (**rtdp));
 				(*rtdp)->t_type = TYPEDEF_UNRES;
 				(*rtdp)->t_id = h2;
 				break;
@@ -639,7 +643,7 @@ tdefdecl(char *cp, int h, tdesc_t **rtdp)
 			/* define a new type */
 			cp = tdefdecl(cp, h2, rtdp);
 			if ((*rtdp)->t_id && (*rtdp)->t_id != h2) {
-				ntdp = calloc(sizeof (*ntdp), 1);
+				ntdp = calloc(1, sizeof (*ntdp));
 				ntdp->t_type = TYPEDEF;
 				ntdp->t_tdesc = *rtdp;
 				*rtdp = ntdp;

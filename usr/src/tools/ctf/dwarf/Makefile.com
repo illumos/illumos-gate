@@ -3,6 +3,8 @@
 # Use is subject to license terms.
 #
 # Copyright 2011, Richard Lowe.
+#
+# Copyright (c) 2018, Joyent, Inc.
 
 include ../../Makefile.ctf
 
@@ -76,6 +78,9 @@ SRCDIR = ../common/
 CPPFLAGS +=	-I$(SRCDIR) -DELF_TARGET_ALL=1
 CERRWARN +=	-_gcc=-Wno-unused
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
+# libdwarf not clean
+SMATCH=off
 
 LDLIBS = -lelf -lc
 

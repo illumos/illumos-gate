@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2011 Jason King.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -132,7 +133,7 @@ fix_file(const char *filename, mode_t mode)
 		return (B_FALSE);
 	}
 
-	waitpid(pid, &stat, 0);
+	(void) waitpid(pid, &stat, 0);
 	if (!WIFEXITED(stat) || WEXITSTATUS(stat) != 0) {
 		warnx("Removing CTF information from %s failed", filename);
 		return (B_FALSE);
