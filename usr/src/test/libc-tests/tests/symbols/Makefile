@@ -50,6 +50,9 @@ EXTRAPROG += $(SYMTESTS)
 
 include ../Makefile.com
 
+# needs work
+SMOFF += testing_index_after_use
+
 LDLIBS += -lcustr
 LDLIBS64 += -lcustr
 

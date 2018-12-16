@@ -11,6 +11,7 @@
 
 #
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 include		$(SRC)/test/Makefile.com
@@ -26,6 +27,9 @@ CPPFLAGS +=	-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 LINTFLAGS +=	-erroff=E_BAD_FORMAT_STR2
 LINTFLAGS +=	-erroff=E_NAME_DECL_NOT_USED_DEF2
 LINTFLAGS +=	-erroff=E_FUNC_RET_ALWAYS_IGNOR2
+
+# needs work
+SMOFF += all_func_returns,leaks
 
 all:		$(PROG)
 

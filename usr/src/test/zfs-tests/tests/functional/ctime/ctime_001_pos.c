@@ -28,6 +28,9 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -322,7 +325,7 @@ main(int argc, char *argv[])
 		 * Sleep 2 seconds, then invoke command on given file
 		 */
 		(void) sleep(2);
-		timetest_table[i].func(tfile);
+		(void) timetest_table[i].func(tfile);
 
 		/*
 		 * Get time after operating.
