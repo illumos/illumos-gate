@@ -12,6 +12,7 @@
 #
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 UTSBASE		= ../..
 
@@ -51,6 +52,10 @@ CFLAGS += $(CCVERBOSE)
 # Driver depends on GLDv3 (mac)
 #
 LDFLAGS		+= -dy -N misc/mac
+
+# needs work
+$(OBJS_DIR)/sfxge_ev.o := SMOFF += index_overflow
+SMOFF += all_func_returns
 
 #
 # Default build targets.

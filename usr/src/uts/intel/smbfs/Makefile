@@ -24,11 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the smbfs (Server 
-#	message block file system) kernel module.
-#
-#	intel architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -69,6 +65,9 @@ LDFLAGS         += -dy -Ndrv/nsmb
 LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+SMOFF += all_func_returns,signed,deref_check
 
 # The mb_put/md_get functions are intentionally used with and without
 # return value checks, so filter those out like LGREP.2 does.

@@ -24,7 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the ac97 support module.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -53,6 +53,9 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LDFLAGS		+= -dy -Ndrv/audio
+
+# needs work
+$(OBJS_DIR)/ac97.o := SMOFF += index_overflow
 
 #
 #	Default build targets.

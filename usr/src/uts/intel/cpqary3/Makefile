@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2013 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -45,6 +45,8 @@ CPPFLAGS	+= -I$(UTSBASE)/common/io/cpqary3
 # 	Kernel Module Dependencies
 #
 LDFLAGS		+= -dy -Nmisc/scsi
+
+SMATCH=off
 
 #
 #	Default build targets.

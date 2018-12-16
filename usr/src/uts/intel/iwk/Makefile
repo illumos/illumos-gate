@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # This makefile drives the production of the iwk driver kernel module.
@@ -37,7 +38,7 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= iwk 
+MODULE		= iwk
 OBJECTS		= $(IWK_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IWK_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
@@ -61,10 +62,13 @@ LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 CPPFLAGS	+= -I. -D_KERNEL -DIWL=4965
 
-LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip 
+LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
 
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/iwk2.o := SMOFF += precedence
 
 #
 #	Default build targets.

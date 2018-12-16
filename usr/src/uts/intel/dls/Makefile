@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -66,6 +67,10 @@ LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/dls_link.o := SMOFF += all_func_returns
+
 
 #
 # Default build targets.

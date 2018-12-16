@@ -25,13 +25,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the xve
-#	network driver kernel module.
-#
-#	i86xpv architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -72,6 +66,9 @@ LINTFLAGS	+= -D_SOLARIS
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+# needs work
+SMATCH=off
 
 #
 #	Default build targets.

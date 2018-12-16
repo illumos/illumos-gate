@@ -25,10 +25,8 @@
 # Use is subject to license terms.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
-#	This makefile drives the production of the kernel rpcsec module.
-#
-#	intel implementation architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
+
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -70,6 +68,9 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/auth_des.o := SMOFF += deref_check
 
 #
 #	Default build targets.

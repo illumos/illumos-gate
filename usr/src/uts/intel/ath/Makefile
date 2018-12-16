@@ -22,6 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This file makes the atheros driver for an intel system
@@ -65,6 +66,9 @@ LDFLAGS		+= -dy -Nmisc/mac -Nmisc/net80211
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-empty-body
+
+# needs work
+$(OBJS_DIR)/ath_rate.o := SMOFF += index_overflow
 
 #
 #	Default build targets.

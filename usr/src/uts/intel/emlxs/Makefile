@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 # This makefile drives the production of the emlxs driver kernel module.
 #
@@ -94,6 +95,11 @@ LINTTAGS	+= -erroff=E_INCONS_VAL_TYPE_DECL2
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+SMOFF += indenting,deref_check,all_func_returns
+
+# seems definitely wrong
+$(OBJS_DIR)/emlxs_fcf.o := SMOFF += logical_instead_of_bitwise
 
 #
 #	Default build targets.

@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # uts/intel/devfs/Makefile
@@ -50,6 +51,9 @@ ROOTMODULE	= $(ROOT_FS_DIR)/$(MODULE)
 include $(UTSBASE)/intel/Makefile.intel
 
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+# needs work
+$(OBJS_DIR)/devfs_vnops.o := SMOFF += signed
 
 #
 #	Define targets

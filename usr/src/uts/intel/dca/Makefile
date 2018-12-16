@@ -25,6 +25,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the DCA kCF provider.
@@ -40,7 +41,7 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= dca	
+MODULE		= dca
 OBJECTS		= $(DCA_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DCA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
@@ -68,6 +69,9 @@ LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+# needs work
+$(OBJS_DIR)/dca_rsa.o := SMOFF += deref_check
 
 #
 #	Default build targets.

@@ -2,7 +2,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 #
 #	This makefile drives the production of the ACPI CA services
@@ -53,6 +53,8 @@ CFLAGS += $(CCVERBOSE) -DPWRDMN -DACPI_USE_LOCAL_CACHE -DACPI_DEBUG_OUTPUT
 # 3rd party code is not lint clean
 #
 CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
+
+SMOFF += all_func_returns
 
 LINTFLAGS += -errchk=%none
 LINTFLAGS += -errhdr=%none

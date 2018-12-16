@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -46,6 +46,9 @@ LINTTAGS	+= -erroff=E_FUNC_ARG_UNUSED
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 LINTTAGS	+= -erroff=E_FUNC_SET_NOT_USED
+
+# needs work
+$(OBJS_DIR)/udmf_usbgem.o := SMOFF += indenting
 
 #
 #	Define targets

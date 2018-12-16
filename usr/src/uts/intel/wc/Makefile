@@ -23,12 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#	This makefile drives the production of the wc driver
-#	kernel module.
-#
-#	intel implementation architecture independent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -62,6 +57,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 LDFLAGS		+= -dy -Nmisc/tem -Ndacf/consconfig_dacf
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+SMOFF += deref_check
 
 #
 #	Default build targets.

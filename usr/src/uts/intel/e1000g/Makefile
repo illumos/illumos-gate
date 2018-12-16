@@ -22,13 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/e1000g/Makefile
-#
-#	This makefile drives the production of the iprb
-#	network driver kernel module.
-#
-#	intel architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Paths to the base of the uts directory trees
@@ -70,6 +64,8 @@ CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
+
+SMOFF += all_func_returns,indenting,shift_to_zero
 
 LINTTAGS	+= -erroff=E_CONSTANT_CONDITION
 

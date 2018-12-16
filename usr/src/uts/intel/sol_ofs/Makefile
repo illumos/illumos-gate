@@ -21,7 +21,8 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
+
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -63,6 +64,9 @@ CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-unused-variable
+
+# needs work
+$(OBJS_DIR)/sol_cma.o := SMOFF += deref_check
 
 #
 #	Default build targets.

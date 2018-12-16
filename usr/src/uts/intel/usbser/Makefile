@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/usbser/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 
 #
@@ -64,6 +64,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+# needs work
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 

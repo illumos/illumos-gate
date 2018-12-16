@@ -22,11 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the AMD8111
-#	Fast Ethernet (amd8111s) driver module in intel systems
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -61,6 +57,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Driver depends on GLDv3
 #
 LDFLAGS		+= -dy -N misc/mac
+
+# seems wrong
+$(OBJS_DIR)/amd8111s_hw.o := SMOFF += precedence
 
 #
 #	Default build targets.

@@ -24,6 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	intel architecture dependent
@@ -98,6 +99,12 @@ LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
 # return value checks, so filter those out like LGREP.2 does.
 LGREP.nsmb =	egrep -v ' ignored: (mb_init|mb_put|md_get)'
 LTAIL	+=	2>&1 | $(LGREP.2) | $(LGREP.nsmb) || true
+
+# same for smatch
+SMOFF += all_func_returns
+
+# needs work
+SMOFF += signed,deref_check
 
 #
 #	Default build targets.

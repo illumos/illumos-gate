@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # This makefile drives the production of the EoIB Nexus driver
@@ -65,6 +66,9 @@ CFLAGS += $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/eib_ibt.o := SMOFF += deref_check
 
 #
 # Depends on misc/ibtl

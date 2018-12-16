@@ -24,8 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the audio support module.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -47,6 +46,9 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/audio/impl
 include $(UTSBASE)/intel/Makefile.intel
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/audio_grc3.o := SMOFF += index_overflow
 
 #
 #	Define targets

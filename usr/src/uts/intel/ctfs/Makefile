@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the contract file system
@@ -63,6 +64,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+# needs work
+$(OBJS_DIR)/ctfs_root.o := SMOFF += signed_integer_overflow_check
 
 #
 #	Default build targets.

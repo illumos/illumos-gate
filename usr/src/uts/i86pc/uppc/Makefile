@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 #	This makefile drives the production of the uppc mach
 #	kernel module.
@@ -62,6 +62,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CERRWARN	+= -_gcc=-Wno-unused-function
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
+
+# needs work
+$(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 
 #
 # Depends on ACPI CA interpreter

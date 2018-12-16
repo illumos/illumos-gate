@@ -23,6 +23,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2018, Joyent, Inc.
 #
 #	This makefile drives the production of the icmp IP driver
 #
@@ -76,6 +77,9 @@ LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+# needs work
+$(OBJS_DIR)/icmpddi.o := SMOFF += index_overflow
 
 #
 #	Default build targets.

@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the Chelsio N110
@@ -103,6 +104,11 @@ CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+SMOFF += indenting,all_func_returns,no_if_block
+
+# needs work
+$(OBJS_DIR)/sge.o := SMOFF += index_overflow
 
 #
 #

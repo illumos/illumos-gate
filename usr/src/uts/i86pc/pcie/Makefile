@@ -24,12 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#	This makefile drives the production of the kernel/misc/pcie module
-#	for PCI-E Error handling support in PCI-E nexus drivers.
-#
-#	i86pc implementation architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -68,6 +63,9 @@ CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function # safe
+
+# needs work
+SMOFF += all_func_returns,deref_check
 
 #
 #	Default build targets.

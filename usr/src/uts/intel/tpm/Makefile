@@ -21,9 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the TPM driver kernel
-#	module.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 UTSBASE	= $(SRC)/uts
 
@@ -64,6 +62,9 @@ CPPFLAGS	+= -I$(ROOT)/usr/include
 CPPFLAGS	+= -I$(ADJUNCT_PROTO)/usr/include
 
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+# needs work
+$(OBJS_DIR)/tpm.o := SMOFF += index_overflow
 
 #
 #	Default build targets.

@@ -23,13 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the kernel/misc/pcihp module
-#	for PCI hotplug support in PCI nexus drivers.
-#
-#	intel implementation architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -68,6 +62,9 @@ LDFLAGS		+= -dy -Nmisc/busra -Nmisc/hpcsvc
 #
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+# needs work
+SMOFF += indenting
 
 #
 #	Default build targets.

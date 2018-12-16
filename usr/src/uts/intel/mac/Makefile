@@ -22,10 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#	This makefile drives the production of the mac driver 
-#	kernel module.
-#
+# Copyright (c) 2018, Joyent, Inc.
+
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -67,6 +65,13 @@ CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-unused-variable
 
+# needs work
+SMOFF += all_func_returns
+$(OBJS_DIR)/mac.o := SMOFF += deref_check
+$(OBJS_DIR)/mac_util.o := SMOFF += signed
+
+# false positive
+$(OBJS_DIR)/mac_sched.o := SMOFF += assign_vs_compare
 #
 #	Default build targets.
 #

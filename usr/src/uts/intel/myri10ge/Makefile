@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -55,7 +56,8 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE)
 #
 LINTTAGS  += -DSOLARIS_S11 -erroff=E_STATIC_UNUSED
 
-#COPTIMIZE = -xO4
+# needs work
+SMATCH=off
 
 INC_PATH  += -I$(UTSBASE)/common/io/myri10ge -I$(UTSBASE)/common/io/myri10ge/firmware
 

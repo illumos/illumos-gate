@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #	This makefile drives the production of the gl_kmech_krb5 kernel module.
 #
@@ -72,6 +73,9 @@ CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+# needs work
+SMOFF += indenting
 
 #
 #	Default build targets.

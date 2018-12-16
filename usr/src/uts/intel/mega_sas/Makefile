@@ -21,6 +21,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # uts/intel/mega_sas/Makefile
@@ -62,6 +63,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 LDFLAGS		+= -dy -Nmisc/scsi
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/megaraid_sas.o := SMOFF += snprintf_overflow,all_func_returns
 
 #
 #	Default build targets.

@@ -23,10 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#	This makefile drives the production of the Neterion Xframe
-#	10G Ethernet (XGE) driver module in x86 systems
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Paths to the base of the uts directory trees
@@ -72,6 +69,9 @@ LINTFLAGS	+= -DSOLARIS11
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-type-limits
+
+# needs work
+SMOFF += all_func_returns
 
 #
 #

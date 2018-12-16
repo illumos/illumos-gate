@@ -22,11 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#
-#	This makefile drives the production of the gen_drv kernel
-#	driver to testing hotplugging operations
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -63,6 +59,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
 
 CERRWARN	+= -_gcc=-Wno-unused-variable
+
+# needs work
+$(OBJS_DIR)/gen_drv.o := SMOFF += indenting,deref_check
 
 #
 #	Default build targets.

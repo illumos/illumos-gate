@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the Broadcom BCM57xx
@@ -69,6 +70,9 @@ CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN       += -_gcc=-Wno-unused-variable
 CERRWARN       += -_gcc=-Wno-unused-function
+
+# 3rd party source
+SMOFF += all_func_returns
 
 #
 # Driver depends on MAC

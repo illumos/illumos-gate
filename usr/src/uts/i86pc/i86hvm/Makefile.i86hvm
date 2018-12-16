@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 ROOT_HVM_DIR		= $(ROOT_PLAT_DIR)/i86hvm
 ROOT_HVM_MOD_DIR	= $(ROOT_HVM_DIR)/kernel
@@ -58,3 +59,6 @@ LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
 #
 CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS
 ASFLAGS		+= -DXPV_HVM_DRIVER
+
+# needs work
+SMATCH=off

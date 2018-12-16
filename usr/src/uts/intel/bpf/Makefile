@@ -22,10 +22,12 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 # uts/intel/bpf/Makefile
 #
 #
-#	This makefile drives the production of the bpf driver 
+#	This makefile drives the production of the bpf driver
 #	kernel module.
 #
 #	intel architecture dependent
@@ -73,6 +75,9 @@ LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW -erroff=E_BAD_PTR_CAST_ALIGN
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
 
+# needs work
+$(OBJS_DIR)/bpf.o := SMOFF += all_func_returns
+
 #
 #	Default build targets.
 #
@@ -88,7 +93,7 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS) 
+modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
