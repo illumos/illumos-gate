@@ -10,20 +10,11 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	os-tests \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+SUBDIRS = cmd doc runfiles tests
 
-include Makefile.com
+include $(SRC)/test/Makefile.com

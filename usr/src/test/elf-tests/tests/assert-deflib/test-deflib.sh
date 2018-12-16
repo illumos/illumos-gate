@@ -24,13 +24,15 @@
 #
 unalias -a
 
+TESTDIR=$(dirname $0)
+
 sh_path=
 sh_lib="lib"
 sh_lib64="$sh_lib/64"
 sh_soname="libld.so.4"
-sh_cc="cc"
+sh_cc="gcc"
 sh_cflags="-m32"
-sh_file="link.c"
+sh_file="${TESTDIR}/link.c"
 sh_arg0=$(basename $0)
 
 function fatal
@@ -73,8 +75,7 @@ function run
 	fi
 }
 
-sh_path=$1
-[[ -z "$1" ]] && fatal "<proto root>"
+sh_path=${1:-/}
 validate
 
 run "-Wl,-zassert-deflib" 0 \

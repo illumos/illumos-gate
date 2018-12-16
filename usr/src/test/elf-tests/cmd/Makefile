@@ -11,19 +11,28 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
+include $(SRC)/test/Makefile.com
 
-SUBDIRS = \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	os-tests \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+ROOTOPTPKG = $(ROOT)/opt/elf-tests
+ROOTBIN = $(ROOTOPTPKG)/bin
 
-include Makefile.com
+PROGS = elftest
+
+CMDS = $(PROGS:%=$(ROOTBIN)/%)
+$(CMDS) := FILEMODE = 0555
+
+all lint clean clobber:
+
+install: $(CMDS)
+
+$(CMDS): $(ROOTBIN)
+
+$(ROOTBIN):
+	$(INS.dir)
+
+$(ROOTBIN)/%: %.ksh
+	$(INS.rename)

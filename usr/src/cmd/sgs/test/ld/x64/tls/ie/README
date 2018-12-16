@@ -1,9 +1,0 @@
-This tests the x64 link-editor's handling of Initial Executable TLS sequences.
-
-The original C source files are in orig/ but unused, since we need to avoid
-any changes to the compiler influencing our tests.
-
-    % ksh x64-ie-test.sh /path/to/proto/root
-    pass: addq-->leaq 1
-    ...
-    pass: bad insn sequence

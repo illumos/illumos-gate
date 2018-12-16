@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2012, Richard Lowe.
- */	
+ */
 
 	.section	.rodata.str1.1,"aMS",@progbits,1
 .LC0:
@@ -25,8 +25,9 @@ main:
 .LCFI0:
 	movq	%rsp, %rbp
 .LCFI1:
-	movq	foo@GOTTPOFF(%rip), %rsi
-	addq	%fs:0, %rsi
+	movq	foo@GOTTPOFF(%rip), %r12
+	addq	%fs:0, %r12
+        movq    %r12, %rsi
 	movl	$.LC0, %edi
 	movl	$0, %eax
 	call	printf
@@ -39,6 +40,7 @@ main:
 	.section	.rodata.str1.1
 .LC1:
 	.string	"foo"
+
 	.section	.tdata,"awT",@progbits
 	.align 8
 	.type	foo, @object

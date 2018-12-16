@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2012, Richard Lowe.
- */	
+ */
 
 	.section	.rodata.str1.1,"aMS",@progbits,1
 .LC0:
@@ -25,7 +25,7 @@ main:
 .LCFI0:
 	movq	%rsp, %rbp
 .LCFI1:
-	leaq	foo@GOTTPOFF(%rip), %rsi
+	movq	foo@GOTTPOFF(%rip), %rsi
 	addq	%fs:0, %rsi
 	movl	$.LC0, %edi
 	movl	$0, %eax

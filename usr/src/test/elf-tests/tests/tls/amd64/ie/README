@@ -1,0 +1,5 @@
+This tests the amd64 link-editor's handling of Initial Executable TLS sequences.
+
+The original C source files are in orig/ but unused, since we need to avoid
+any changes to the compiler influencing our tests.
+
