@@ -55,7 +55,7 @@ authorization name \fIname\fR. Successive calls to these functions return
 either successive \fBauth_attr\fR entries or \fINULL\fR.
 .sp
 .LP
-Th internal representation of an \fBauth_attr\fR entry is an \fBauthattr_t\fR
+The internal representation of an \fBauth_attr\fR entry is an \fBauthattr_t\fR
 structure defined in  <\fBauth_attr.h\fR> with the following members:
 .sp
 .in +2

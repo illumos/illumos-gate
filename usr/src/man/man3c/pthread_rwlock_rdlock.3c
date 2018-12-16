@@ -63,7 +63,6 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpthread_rwlock_rdlock()\fR function applies a read lock to the
 read-write lock referenced by \fIrwlock\fR.  The calling thread acquires the
@@ -93,7 +92,7 @@ The \fBpthread_rwlock_tryrdlock()\fR function applies a read lock like the
 \fBpthread_rwlock_rdlock()\fR function, with the exception that the function
 fails if the equivalent \fBpthread_rwlock_rdlock()\fR call would have blocked
 the calling thread.  In no case will the \fBpthread_rwlock_tryrdlock()\fR
-function ever bloc. It always either acquires the lock or fails and returns
+function ever block. It always either acquires the lock or fails and returns
 immediately.
 .sp
 .LP
@@ -105,7 +104,6 @@ If a signal is delivered to a thread waiting for a read-write lock for reading,
 upon return from the signal handler the thread resumes waiting for the
 read-write lock for reading as if it was not interrupted.
 .SH RETURN VALUES
-.sp
 .LP
 If successful, the \fBpthread_rwlock_rdlock()\fR function returns \fB0\fR.
 Otherwise, an error number is returned to indicate the error.
@@ -115,7 +113,6 @@ The \fBpthread_rwlock_tryrdlock()\fR function returns \fB0\fR if the lock for
 reading on the read-write lock object referenced by \fIrwlock\fR is acquired.
 Otherwise an error number  is returned to indicate the error.
 .SH ERRORS
-.sp
 .LP
 The \fBpthread_rwlock_rdlock()\fR and \fBpthread_rwlock_tryrdlock()\fR
 functions will fail if:
@@ -155,7 +152,6 @@ the lock or a writer with the appropriate priority was blocked on it.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See  \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -173,7 +169,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpthread_rwlock_init\fR(3C), \fBpthread_rwlock_wrlock\fR(3C),
 \fBpthread_rwlockattr_init\fR(3C), \fBpthread_rwlock_unlock\fR(3C),

@@ -13,7 +13,6 @@ file \- determine the type of a file by examining its contents
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBfile\fR performs a series of tests on each  \fIfilename\fR in an attempt to
 determine what it contains. If the contents of a file appear to be  \fBASCII\fR
@@ -24,7 +23,6 @@ text, \fBfile\fR examines the first 512 bytes and tries to guess its language.
 of \fImagic number\fR, that is, any file containing a numeric or string
 constant that indicates its type.
 .SH OPTIONS
-.sp
 .ne 2
 .na
 \fB\fB-c\fR\fR
@@ -93,7 +91,7 @@ doc:            roff,nroff, or eqn input text
 empty.file:     empty
 libz:           archive random library
 memos:          directory
-project:        symboliclink to /usr/project
+project:        symbolic link to /usr/project
 script:         executable shell script
 titles:         ascii text
 s5.stuff:       cpio archive
@@ -105,7 +103,6 @@ example%
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 The environment variables \fBLC_CTYPE\fR, \fBLANG\fR, and \fBLC_default\fR
 control the character classification throughout \fBfile\fR. On entry to
@@ -117,15 +114,12 @@ character classification rules of \fBLC_CTYPE\fR. When none of the values is
 valid, the shell character classification defaults to the   POSIX.1 "C"
 locale.
 .SH FILES
-.sp
 .LP
 \fB/etc/magic\fR
 .SH SEE ALSO
-.sp
 .LP
 \fBmagic\fR(4), \fBattributes\fR(5)
 .SH BUGS
-.sp
 .LP
 \fBfile\fR often makes mistakes.  In particular, it often suggests that command
 files are C programs.

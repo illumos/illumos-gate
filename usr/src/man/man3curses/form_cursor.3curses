@@ -17,13 +17,11 @@ form_cursor, pos_form_cursor \- position forms window cursor
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBpos_form_cursor()\fR moves the form window cursor to the location required
 by the form driver to resume form processing. This may be needed after the
 application calls a \fBcurses\fR library I/O routine.
 .SH RETURN VALUES
-.sp
 .LP
 \fBpos_form_cursor()\fR returns one of the following:
 .sp
@@ -32,7 +30,7 @@ application calls a \fBcurses\fR library I/O routine.
 \fBE_OK\fR
 .ad
 .RS 18n
-Thefunction returned successfully.
+The function returned successfully.
 .RE
 
 .sp
@@ -63,7 +61,6 @@ The form is not posted.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -79,11 +76,9 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcurses\fR(3CURSES), \fBforms\fR(3CURSES), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The header \fB<form.h>\fR automatically includes the headers  \fB<eti.h>\fR and
 \fB<curses.h>\fR\&.

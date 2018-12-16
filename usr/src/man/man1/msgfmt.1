@@ -16,7 +16,6 @@ msgfmt \- create a message object from a message file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmsgfmt\fR utility creates message object files from portable object
 files (\fIfilename\fR\fB\&.po\fR), without changing the portable object files.
@@ -35,7 +34,6 @@ script or programs.
 the \fBLC_CTYPE\fR locale category or according to the codeset specified in the
 \fB\&.po\fR file.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -135,7 +133,6 @@ check is performed.
 .RE
 
 .SH USAGE
-.sp
 .LP
 The format of portable object files (\fB\&.po\fR files) is defined as follows.
 Each \fB\&.po\fR file contains one or more lines, with each line containing
@@ -243,7 +240,7 @@ The \fBmsgstr\fR directive specifies the target string associated with the
 .LP
 The directive \fBmsgstr\fR[\fIn\fR] (where \fIn\fR = 0, 1, 2, ...) specifies
 the target string to be used with plural form handling functions
-\fBngettext()\fR, \fBdngettext()\fR, and \fBdcngetttext()\fR.
+\fBngettext()\fR, \fBdngettext()\fR, and \fBdcngettext()\fR.
 .sp
 .LP
 Message strings can contain the escape sequences \fB\\n\fR for newline,
@@ -353,7 +350,6 @@ codeset is determined by the current locale's codeset (the return value of
 \fBnl_langinfo(CODESET\fR)) by default, and can be changed by the call of
 \fBbind_textdomain_codeset()\fR.
 .SS "Message catalog file format"
-.sp
 .LP
 The \fBmsgfmt\fR utility can generate the message object both in Solaris
 message catalog file format and in GNU-compatible message catalog file format.
@@ -467,13 +463,11 @@ example% \fBmsgfmt -o hello.mo module1.po module2.po\fR
 .sp
 
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environmental variables
 that affect the execution of \fBmsgfmt\fR: \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR,
 and \fBNLSPATH\fR.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -489,12 +483,10 @@ CSI	Enabled
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBxgettext\fR(1), \fBgettext\fR(3C), \fBsetlocale\fR(3C), \fBattributes\fR(5),
 \fBenviron\fR(5)
 .SH NOTES
-.sp
 .LP
 Installing message catalogs under the C locale is pointless, since they are
 ignored for the sake of efficiency.
