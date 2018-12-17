@@ -49,6 +49,7 @@ $(__GNUC)LDLIBS +=	-lc
 $(__GNUC)LDFLAGS=	$(MAPFILE.NES:%=-Wl,-M%)
 
 $(ROOTONBLDMAN1ONBLDFILES) := FILEMODE=      644
+CSTD=	$(CSTD_GNU99)
 
 # Assume we don't have the install.bin available yet
 INS.file=	$(RM) $@; $(CP) $< $(@D); $(CHMOD) $(FILEMODE) $@

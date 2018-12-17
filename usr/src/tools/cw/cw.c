@@ -262,6 +262,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -311,7 +312,7 @@ typedef struct cw_ictx {
 	int		i_oldargc;
 	char		**i_oldargv;
 	pid_t		i_pid;
-	char		i_discard[MAXPATHLEN];
+	char		*i_tmpdir;
 	char		*i_stderr;
 } cw_ictx_t;
 
@@ -556,6 +557,65 @@ xlate(struct aelist *h, const char *xarg, const char **table)
 	}
 }
 
+/*
+ * The compiler wants the output file to end in appropriate extension.  If
+ * we're generating a name from whole cloth (path == NULL), we assume that
+ * extension to be .o, otherwise we match the extension of the caller.
+ */
+static char *
+discard_file_name(cw_ictx_t *ctx, const char *path)
+{
+	char *ret, *ext;
+	char tmpl[] = "cwXXXXXX";
+
+	if (path == NULL) {
+		ext = ".o";
+	} else {
+		ext = strrchr(path, '.');
+	}
+
+	/*
+	 * We need absolute control over where the temporary file goes, since
+	 * we rely on it for cleanup so tempnam(3C) and tmpnam(3C) are
+	 * inappropriate (they use TMPDIR, preferentially).
+	 *
+	 * mkstemp(3C) doesn't actually help us, since the temporary file
+	 * isn't used by us, only its name.
+	 */
+	if (mktemp(tmpl) == NULL)
+		nomem();
+
+	(void) asprintf(&ret, "%s/%s%s", ctx->i_tmpdir, tmpl,
+	    (ext != NULL) ? ext : "");
+
+	if (ret == NULL)
+		nomem();
+
+	return (ret);
+}
+
+static boolean_t
+is_source_file(const char *path)
+{
+	char *ext = strrchr(path, '.');
+
+	if ((ext == NULL) || ((ext + 1) == '\0'))
+		return (B_FALSE);
+
+	ext += 1;
+
+	if ((strcasecmp(ext, "c") == 0) ||
+	    (strcmp(ext, "cc") == 0) ||
+	    (strcmp(ext, "i") == 0) ||
+	    (strcasecmp(ext, "s") == 0) ||
+	    (strcmp(ext, "cpp") == 0)) {
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+
 static void
 do_gcc(cw_ictx_t *ctx)
 {
@@ -565,7 +625,7 @@ do_gcc(cw_ictx_t *ctx)
 	cw_op_t op = CW_O_LINK;
 	char *model = NULL;
 	char *nameflag;
-	int	mflag = 0;
+	int mflag = 0;
 
 	if (ctx->i_flags & CW_F_PROG) {
 		newae(ctx->i_ae, "--version");
@@ -621,10 +681,7 @@ do_gcc(cw_ictx_t *ctx)
 			    strcmp(arg + arglen - 3, ".il") == 0)
 				continue;
 
-			if (!in_output && arglen > 2 &&
-			    arg[arglen - 2] == '.' &&
-			    (arg[arglen - 1] == 'S' || arg[arglen - 1] == 's' ||
-			    arg[arglen - 1] == 'c' || arg[arglen - 1] == 'i'))
+			if (!in_output && is_source_file(arg))
 				c_files++;
 
 			/*
@@ -633,10 +690,11 @@ do_gcc(cw_ictx_t *ctx)
 			 * output is always discarded for the secondary
 			 * compiler.
 			 */
-			if ((ctx->i_flags & CW_F_SHADOW) && in_output)
-				newae(ctx->i_ae, ctx->i_discard);
-			else
+			if ((ctx->i_flags & CW_F_SHADOW) && in_output) {
+				newae(ctx->i_ae, discard_file_name(ctx, arg));
+			} else {
 				newae(ctx->i_ae, arg);
+			}
 			in_output = 0;
 			continue;
 		}
@@ -752,7 +810,7 @@ do_gcc(cw_ictx_t *ctx)
 				newae(ctx->i_ae, arg);
 			} else if (ctx->i_flags & CW_F_SHADOW) {
 				newae(ctx->i_ae, "-o");
-				newae(ctx->i_ae, ctx->i_discard);
+				newae(ctx->i_ae, discard_file_name(ctx, arg));
 			} else {
 				newae(ctx->i_ae, arg);
 			}
@@ -1190,8 +1248,16 @@ do_gcc(cw_ictx_t *ctx)
 
 	free(nameflag);
 
-	if (c_files > 1 && (ctx->i_flags & CW_F_SHADOW) &&
-	    op != CW_O_PREPROCESS) {
+	/*
+	 * When compiling multiple source files in a single invocation some
+	 * compilers output objects into the current directory with
+	 * predictable and conventional names.
+	 *
+	 * We prevent any attempt to compile multiple files at once so that
+	 * any such objects created by a shadow can't escape into a later
+	 * link-edit.
+	 */
+	if (c_files > 1 && op != CW_O_PREPROCESS) {
 		errx(2, "multiple source files are "
 		    "allowed only with -E or -P");
 	}
@@ -1259,9 +1325,12 @@ do_gcc(cw_ictx_t *ctx)
 		exit(2);
 	}
 
-	if ((op == CW_O_LINK || op == CW_O_PREPROCESS) &&
-	    (ctx->i_flags & CW_F_SHADOW))
-		exit(0);
+	if (ctx->i_flags & CW_F_SHADOW) {
+		if (op == CW_O_PREPROCESS)
+			exit(0);
+		else if (op == CW_O_LINK && c_files == 0)
+			exit(0);
+	}
 
 	if (model != NULL)
 		newae(ctx->i_ae, model);
@@ -1269,7 +1338,7 @@ do_gcc(cw_ictx_t *ctx)
 		newae(ctx->i_ae, "-lc");
 	if (!seen_o && (ctx->i_flags & CW_F_SHADOW)) {
 		newae(ctx->i_ae, "-o");
-		newae(ctx->i_ae, ctx->i_discard);
+		newae(ctx->i_ae, discard_file_name(ctx, NULL));
 	}
 }
 
@@ -1302,7 +1371,7 @@ do_smatch(cw_ictx_t *ctx)
 static void
 do_cc(cw_ictx_t *ctx)
 {
-	int in_output = 0, seen_o = 0;
+	int in_output = 0, seen_o = 0, c_files = 0;
 	cw_op_t op = CW_O_LINK;
 	char *nameflag;
 
@@ -1323,11 +1392,14 @@ do_cc(cw_ictx_t *ctx)
 		}
 
 		if (*arg != '-') {
+			if (!in_output && is_source_file(arg))
+				c_files++;
+
 			if (in_output == 0 || !(ctx->i_flags & CW_F_SHADOW)) {
 				newae(ctx->i_ae, arg);
 			} else {
 				in_output = 0;
-				newae(ctx->i_ae, ctx->i_discard);
+				newae(ctx->i_ae, discard_file_name(ctx, arg));
 			}
 			continue;
 		}
@@ -1351,7 +1423,7 @@ do_cc(cw_ictx_t *ctx)
 				newae(ctx->i_ae, arg);
 			} else if (ctx->i_flags & CW_F_SHADOW) {
 				newae(ctx->i_ae, "-o");
-				newae(ctx->i_ae, ctx->i_discard);
+				newae(ctx->i_ae, discard_file_name(ctx, arg));
 			} else {
 				newae(ctx->i_ae, arg);
 			}
@@ -1374,13 +1446,22 @@ do_cc(cw_ictx_t *ctx)
 
 	free(nameflag);
 
-	if ((op == CW_O_LINK || op == CW_O_PREPROCESS) &&
-	    (ctx->i_flags & CW_F_SHADOW))
-		exit(0);
+	/* See the comment on this same code in do_gcc() */
+	if (c_files > 1 && op != CW_O_PREPROCESS) {
+		errx(2, "multiple source files are "
+		    "allowed only with -E or -P");
+	}
+
+	if (ctx->i_flags & CW_F_SHADOW) {
+		if (op == CW_O_PREPROCESS)
+			exit(0);
+		else if (op == CW_O_LINK && c_files == 0)
+			exit(0);
+	}
 
 	if (!seen_o && (ctx->i_flags & CW_F_SHADOW)) {
 		newae(ctx->i_ae, "-o");
-		newae(ctx->i_ae, ctx->i_discard);
+		newae(ctx->i_ae, discard_file_name(ctx, NULL));
 	}
 }
 
@@ -1491,8 +1572,6 @@ reap(cw_ictx_t *ctx)
 		}
 	} while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
-	(void) unlink(ctx->i_discard);
-
 	if (stat(ctx->i_stderr, &s) < 0) {
 		warn("stat failed on child cleanup");
 		return (-1);
@@ -1522,21 +1601,7 @@ reap(cw_ictx_t *ctx)
 static int
 exec_ctx(cw_ictx_t *ctx, int block)
 {
-	char *file;
-
-	/*
-	 * To avoid offending cc's sensibilities, the name of its output
-	 * file must end in '.o'.
-	 */
-	if ((file = tempnam(NULL, ".cw")) == NULL) {
-		nomem();
-		return (-1);
-	}
-	(void) strlcpy(ctx->i_discard, file, MAXPATHLEN);
-	(void) strlcat(ctx->i_discard, ".o", MAXPATHLEN);
-	free(file);
-
-	if ((ctx->i_stderr = tempnam(NULL, ".cw")) == NULL) {
+	if ((ctx->i_stderr = tempnam(ctx->i_tmpdir, "cw")) == NULL) {
 		nomem();
 		return (-1);
 	}
@@ -1607,6 +1672,49 @@ parse_compiler(const char *spec, cw_compiler_t *compiler)
 		errx(1, "Excess tokens in compiler: %s", spec);
 }
 
+static void
+cleanup(cw_ictx_t *ctx)
+{
+	DIR *dirp;
+	struct dirent *dp;
+	char buf[MAXPATHLEN];
+
+	if ((dirp = opendir(ctx->i_tmpdir)) == NULL) {
+		if (errno != ENOENT) {
+			err(1, "couldn't open temp directory: %s",
+			    ctx->i_tmpdir);
+		} else {
+			return;
+		}
+	}
+
+	errno = 0;
+	while ((dp = readdir(dirp)) != NULL) {
+		(void) snprintf(buf, MAXPATHLEN, "%s/%s", ctx->i_tmpdir,
+		    dp->d_name);
+
+		if (strcmp(dp->d_name, ".") == 0 ||
+		    strcmp(dp->d_name, "..") == 0) {
+			continue;
+		}
+
+		if (unlink(buf) == -1)
+			err(1, "failed to unlink temp file: %s", dp->d_name);
+		errno = 0;
+	}
+
+	if (errno != 0) {
+		err(1, "failed to read temporary directory: %s",
+		    ctx->i_tmpdir);
+	}
+
+	(void) closedir(dirp);
+	if (rmdir(ctx->i_tmpdir) != 0) {
+		err(1, "failed to unlink temporary directory: %s",
+		    ctx->i_tmpdir);
+	}
+}
+
 int
 main(int argc, char **argv)
 {
@@ -1621,6 +1729,7 @@ main(int argc, char **argv)
 	boolean_t Cflg = B_FALSE;
 	boolean_t cflg = B_FALSE;
 	boolean_t nflg = B_FALSE;
+	char *tmpdir;
 
 	cw_ictx_t *main_ctx;
 
@@ -1708,6 +1817,16 @@ main(int argc, char **argv)
 		do_serial = 1;
 	}
 
+	tmpdir = getenv("TMPDIR");
+	if (tmpdir == NULL)
+		tmpdir = "/tmp";
+
+	if (asprintf(&main_ctx->i_tmpdir, "%s/cw.XXXXXX", tmpdir) == -1)
+		nomem();
+
+	if ((main_ctx->i_tmpdir = mkdtemp(main_ctx->i_tmpdir)) == NULL)
+		errx(1, "failed to create temporary directory");
+
 	ret |= exec_ctx(main_ctx, do_serial);
 
 	for (int i = 0; i < nshadows; i++) {
@@ -1717,7 +1836,7 @@ main(int argc, char **argv)
 		if ((shadow_ctx = newictx()) == NULL)
 			nomem();
 
-		memcpy(shadow_ctx, main_ctx, sizeof (cw_ictx_t));
+		(void) memcpy(shadow_ctx, main_ctx, sizeof (cw_ictx_t));
 
 		shadow_ctx->i_flags |= CW_F_SHADOW;
 		shadow_ctx->i_compiler = &shadows[i];
@@ -1739,5 +1858,6 @@ main(int argc, char **argv)
 		}
 	}
 
+	cleanup(main_ctx);
 	return (ret);
 }
