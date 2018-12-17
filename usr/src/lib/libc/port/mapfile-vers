@@ -77,6 +77,11 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.29 {
+    protected:
+	getrandom;
+} ILLUMOS_0.28;
+
 SYMBOL_VERSION ILLUMOS_0.28 {
     protected:
 	pthread_attr_getname_np;
@@ -3023,7 +3028,6 @@ $endif
 	_getfp;
 	_getgroupsbymember;
 	_getlogin_r;
-	getrandom;
 	_getsp;
 	__gettsp;
 	getvmusage;

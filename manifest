@@ -12580,6 +12580,7 @@ s usr/share/man/man2/getpmsg.2=getmsg.2
 s usr/share/man/man2/getppid.2=getpid.2
 f usr/share/man/man2/getppriv.2 0444 root bin
 s usr/share/man/man2/getprojid.2=settaskid.2
+f usr/share/man/man2/getrandom.2 0444 root bin
 s usr/share/man/man2/getrctl.2=setrctl.2
 f usr/share/man/man2/getrlimit.2 0444 root bin
 f usr/share/man/man2/getsid.2 0444 root bin

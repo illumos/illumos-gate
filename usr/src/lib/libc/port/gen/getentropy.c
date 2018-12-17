@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -23,7 +23,7 @@
 int
 getentropy(void *buf, size_t buflen)
 {
-	int ret;
+	ssize_t ret;
 
 	if (buflen > 256) {
 		errno = EIO;

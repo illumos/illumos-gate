@@ -14,6 +14,7 @@
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2013, OmniTI Computer Consulting, Inc.
 # Copyright 2017 Peter Tribble
+# Copyright 2018, Joyent, Inc.
 #
 
 file path=usr/share/man/man2/Intro.2
@@ -58,6 +59,7 @@ file path=usr/share/man/man2/getmsg.2
 file path=usr/share/man/man2/getpflags.2
 file path=usr/share/man/man2/getpid.2
 file path=usr/share/man/man2/getppriv.2
+file path=usr/share/man/man2/getrandom.2
 file path=usr/share/man/man2/getrlimit.2
 file path=usr/share/man/man2/getsid.2
 file path=usr/share/man/man2/getuid.2

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -68,12 +68,11 @@ extern int random_get_pseudo_bytes(uint8_t *, size_t);
 #endif /* _KERNEL */
 
 /*
- * Flags for the getrandom system call. Note, we may want to move these
- * definitions if we expose getrandom(2) into a public system call.
+ * Flags for the getrandom(2) system call.
  */
 #define	GRND_NONBLOCK	0x0001		/* O_NONBLOCK equiv */
 #define	GRND_RANDOM	0x0002		/* Use /dev/random, not /dev/urandom */
-extern int getrandom(void *, size_t, int);
+extern ssize_t getrandom(void *, size_t, unsigned int);
 
 #ifdef	__cplusplus
 }
