@@ -308,7 +308,7 @@ typedef struct cw_ictx {
 	int		i_oldargc;
 	char		**i_oldargv;
 	pid_t		i_pid;
-	char		*i_discard;
+	char		i_discard[MAXPATHLEN];
 	char		*i_stderr;
 } cw_ictx_t;
 
@@ -553,35 +553,6 @@ xlate(struct aelist *h, const char *xarg, const char **table)
 	}
 }
 
-/*
- * The compiler wants the output file to end in appropriate extension.  If
- * we're generating a name from whole cloth (path == NULL), we assume that
- * extension to be .o, otherwise we match the extension of the caller.
- */
-static char *
-discard_file_name(const char *path)
-{
-	char *ret, *ext, *file;
-
-	if (path == NULL) {
-		ext = ".o";
-	} else {
-		ext = strrchr(path, '.');
-	}
-
-	if ((ret = calloc(MAXPATHLEN, sizeof (char))) == NULL)
-		nomem();
-
-	if ((file = tempnam(NULL, ".cw")) == NULL)
-		nomem();
-
-	(void) strlcpy(ret, file, MAXPATHLEN);
-	if (ext != NULL)
-		(void) strlcat(ret, ext, MAXPATHLEN);
-	free(file);
-	return (ret);
-}
-
 static void
 do_gcc(cw_ictx_t *ctx)
 {
@@ -591,7 +562,7 @@ do_gcc(cw_ictx_t *ctx)
 	cw_op_t op = CW_O_LINK;
 	char *model = NULL;
 	char *nameflag;
-	int mflag = 0;
+	int	mflag = 0;
 
 	if (ctx->i_flags & CW_F_PROG) {
 		newae(ctx->i_ae, "--version");
@@ -659,12 +630,10 @@ do_gcc(cw_ictx_t *ctx)
 			 * output is always discarded for the secondary
 			 * compiler.
 			 */
-			if ((ctx->i_flags & CW_F_SHADOW) && in_output) {
-				ctx->i_discard = discard_file_name(arg);
+			if ((ctx->i_flags & CW_F_SHADOW) && in_output)
 				newae(ctx->i_ae, ctx->i_discard);
-			} else {
+			else
 				newae(ctx->i_ae, arg);
-			}
 			in_output = 0;
 			continue;
 		}
@@ -780,7 +749,6 @@ do_gcc(cw_ictx_t *ctx)
 				newae(ctx->i_ae, arg);
 			} else if (ctx->i_flags & CW_F_SHADOW) {
 				newae(ctx->i_ae, "-o");
-				ctx->i_discard = discard_file_name(arg);
 				newae(ctx->i_ae, ctx->i_discard);
 			} else {
 				newae(ctx->i_ae, arg);
@@ -1219,16 +1187,8 @@ do_gcc(cw_ictx_t *ctx)
 
 	free(nameflag);
 
-	/*
-	 * When compiling multiple source files in a single invocation some
-	 * compilers output objects into the current directory with
-	 * predictable and conventional names.
-	 *
-	 * We prevent any attempt to compile multiple files at once so that
-	 * any such objects created by a shadow can't escape into a later
-	 * link-edit.
-	 */
-	if (c_files > 1 && op != CW_O_PREPROCESS) {
+	if (c_files > 1 && (ctx->i_flags & CW_F_SHADOW) &&
+	    op != CW_O_PREPROCESS) {
 		errx(2, "multiple source files are "
 		    "allowed only with -E or -P");
 	}
@@ -1296,19 +1256,15 @@ do_gcc(cw_ictx_t *ctx)
 		exit(2);
 	}
 
-	if (ctx->i_flags & CW_F_SHADOW) {
-		if (op == CW_O_PREPROCESS)
-			exit(0);
-		else if (op == CW_O_LINK && c_files == 0)
-			exit(0);
-	}
+	if ((op == CW_O_LINK || op == CW_O_PREPROCESS) &&
+	    (ctx->i_flags & CW_F_SHADOW))
+		exit(0);
 
 	if (model != NULL)
 		newae(ctx->i_ae, model);
 	if (!nolibc)
 		newae(ctx->i_ae, "-lc");
 	if (!seen_o && (ctx->i_flags & CW_F_SHADOW)) {
-		ctx->i_discard = discard_file_name(NULL);
 		newae(ctx->i_ae, "-o");
 		newae(ctx->i_ae, ctx->i_discard);
 	}
@@ -1317,7 +1273,7 @@ do_gcc(cw_ictx_t *ctx)
 static void
 do_cc(cw_ictx_t *ctx)
 {
-	int in_output = 0, seen_o = 0, c_files = 0;
+	int in_output = 0, seen_o = 0;
 	cw_op_t op = CW_O_LINK;
 	char *nameflag;
 
@@ -1331,7 +1287,6 @@ do_cc(cw_ictx_t *ctx)
 
 	while (--ctx->i_oldargc > 0) {
 		char *arg = *++ctx->i_oldargv;
-		size_t arglen = strlen(arg);
 
 		if (strncmp(arg, "-_CC=", 5) == 0) {
 			newae(ctx->i_ae, strchr(arg, '=') + 1);
@@ -1339,17 +1294,10 @@ do_cc(cw_ictx_t *ctx)
 		}
 
 		if (*arg != '-') {
-			if (!in_output && arglen > 2 &&
-			    arg[arglen - 2] == '.' &&
-			    (arg[arglen - 1] == 'S' || arg[arglen - 1] == 's' ||
-			    arg[arglen - 1] == 'c' || arg[arglen - 1] == 'i'))
-				c_files++;
-
 			if (in_output == 0 || !(ctx->i_flags & CW_F_SHADOW)) {
 				newae(ctx->i_ae, arg);
 			} else {
 				in_output = 0;
-				ctx->i_discard = discard_file_name(arg);
 				newae(ctx->i_ae, ctx->i_discard);
 			}
 			continue;
@@ -1374,7 +1322,6 @@ do_cc(cw_ictx_t *ctx)
 				newae(ctx->i_ae, arg);
 			} else if (ctx->i_flags & CW_F_SHADOW) {
 				newae(ctx->i_ae, "-o");
-				ctx->i_discard = discard_file_name(arg);
 				newae(ctx->i_ae, ctx->i_discard);
 			} else {
 				newae(ctx->i_ae, arg);
@@ -1398,22 +1345,12 @@ do_cc(cw_ictx_t *ctx)
 
 	free(nameflag);
 
-	/* See the comment on this same code in do_gcc() */
-	if (c_files > 1 && op != CW_O_PREPROCESS) {
-		errx(2, "multiple source files are "
-		    "allowed only with -E or -P");
-	}
-
-	if (ctx->i_flags & CW_F_SHADOW) {
-		if (op == CW_O_PREPROCESS)
-			exit(0);
-		else if (op == CW_O_LINK && c_files == 0)
-			exit(0);
-	}
+	if ((op == CW_O_LINK || op == CW_O_PREPROCESS) &&
+	    (ctx->i_flags & CW_F_SHADOW))
+		exit(0);
 
 	if (!seen_o && (ctx->i_flags & CW_F_SHADOW)) {
 		newae(ctx->i_ae, "-o");
-		ctx->i_discard = discard_file_name(NULL);
 		newae(ctx->i_ae, ctx->i_discard);
 	}
 }
@@ -1523,7 +1460,6 @@ reap(cw_ictx_t *ctx)
 	} while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
 	(void) unlink(ctx->i_discard);
-	free(ctx->i_discard);
 
 	if (stat(ctx->i_stderr, &s) < 0) {
 		warn("stat failed on child cleanup");
@@ -1554,6 +1490,20 @@ reap(cw_ictx_t *ctx)
 static int
 exec_ctx(cw_ictx_t *ctx, int block)
 {
+	char *file;
+
+	/*
+	 * To avoid offending cc's sensibilities, the name of its output
+	 * file must end in '.o'.
+	 */
+	if ((file = tempnam(NULL, ".cw")) == NULL) {
+		nomem();
+		return (-1);
+	}
+	(void) strlcpy(ctx->i_discard, file, MAXPATHLEN);
+	(void) strlcat(ctx->i_discard, ".o", MAXPATHLEN);
+	free(file);
+
 	if ((ctx->i_stderr = tempnam(NULL, ".cw")) == NULL) {
 		nomem();
 		return (-1);
