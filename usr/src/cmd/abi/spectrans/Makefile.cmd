@@ -22,8 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -39,6 +38,9 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(U_BASE) -I..
 LDFLAGS	+=	-L$(U_DIR)
 LINTFLAGS +=	-xsuF -errtags=yes
+
+# not linted
+SMATCH=off
 
 LDLIBS	+=	-l$(U_LIB) -lgen
 LINTLIBS =	-L$(U_DIR) -l$(U_LIB)

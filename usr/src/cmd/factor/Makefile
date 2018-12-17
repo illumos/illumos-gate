@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= factor
 
@@ -29,6 +30,9 @@ include ../Makefile.cmd
 
 LDLIBS += -lm
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

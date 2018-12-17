@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		zonestat
 SRCS =		zonestat.c
@@ -32,6 +33,9 @@ LDLIBS 		+= -lscf -lzonestat -lumem
 LINTFLAGS	+= -u
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

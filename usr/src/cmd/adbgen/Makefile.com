@@ -25,6 +25,7 @@
 #
 # Copyright 2015 RackTop Systems.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROGS = adbgen1 adbgen3 adbgen4
 OBJS = adbsub.o
@@ -36,6 +37,10 @@ CLOBBERFILES = $(PROGS) $(OBJS) $(SCRIPTS)
 .KEEP_STATE:
 
 include ../../Makefile.cmd
+include ../../Makefile.targ
+
+# not linted
+SMATCH=off
 
 ROOTADBDIR32	= $(ROOT)/usr/lib/adb
 ROOTADBDIR64	= $(ROOT)/usr/lib/adb/$(MACH64)
@@ -77,5 +82,3 @@ $(ROOTADBDIR32):
 
 $(ROOTADBDIR64): $(ROOTADBDIR32)
 	$(INS.dir)
-
-include ../../Makefile.targ

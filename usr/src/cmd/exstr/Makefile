@@ -21,6 +21,7 @@
 #
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG= exstr
@@ -29,9 +30,12 @@ include ../Makefile.cmd
 
 CERRWARN += -_gcc=-Wno-extra
 
+# "missing type for func"
+SMATCH=off
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 

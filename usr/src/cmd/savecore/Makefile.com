@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= savecore
 SRCS= ../savecore.c ../../../uts/common/os/compress.c
@@ -33,6 +34,9 @@ CSTD = $(CSTD_GNU99)
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -DBZ_NO_STDIO -I$(SRC)/uts/common
+
+# not linted
+SMATCH=off
 
 #
 # savecore is compiled with bits from $(SRC)/common/bzip2 and some function

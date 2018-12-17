@@ -23,8 +23,7 @@
 # Copyright (c) 2013 RackTop Systems.
 # Copyright (c) 2013 Gary Mills
 #
-# cmd/oamuser/user/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 DEFAULTFILES= useradd.dfl
 
@@ -75,6 +74,9 @@ INSSKELFILE=	$(SKELFILE:%=$(ROOTSKEL)/%)
 
 CPPFLAGS=	-I$(HERE) -I$(LOCAL) $(CPPFLAGS.master)
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 $(INSSBINPROG)  := FILEMODE = 0555
 $(INSSYSADMPROG):= FILEMODE = 0500

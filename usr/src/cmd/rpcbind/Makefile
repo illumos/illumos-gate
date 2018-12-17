@@ -24,6 +24,7 @@
 #
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		rpcbind
 MANIFEST=	bind.xml
@@ -45,6 +46,9 @@ CPPFLAGS= -I. -DPORTMAP $(CPPFLAGS.master)
 CPPFLAGS += -D_REENTRANT
 $(RELEASE_BUILD)CPPFLAGS += -DNDEBUG
 LDLIBS += -lsocket -lnsl -lwrap -lscf -lumem
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

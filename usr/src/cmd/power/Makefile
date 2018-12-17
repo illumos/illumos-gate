@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/power/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 DAEMON_SRCS =	powerd.c sysstat.c
 DAEMON_OBJS =	$(DAEMON_SRCS:%.c=%.o)
@@ -75,13 +74,15 @@ ROOTLIBPOWERDAEMON= $(DAEMON:%=$(ROOTLIBPOWER)/%)
 $(ROOTLIBPOWER) := FILEMODE= 755
 $(ROOTLIBPOWERDAEMON) := FILEMODE= 555
 
-ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%) 
-$(ROOTETCFILES) := FILEMODE= 644 
+ROOTETCFILES= $(ETCFILES:%=$(ROOTETC)/%)
+$(ROOTETCFILES) := FILEMODE= 644
 
 #
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+
+SMOFF += signed
 
 .PARALLEL: $(OBJS)
 

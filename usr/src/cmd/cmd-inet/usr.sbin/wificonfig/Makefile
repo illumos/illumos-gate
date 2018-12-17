@@ -23,6 +23,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		wificonfig	
 OBJS=		wificonfig.o
@@ -36,6 +37,9 @@ $(ROOTSBIN)/wificonfig := FILEMODE = 04755
 ROOTUSRSBINLINKS = $(ROOTUSRSBIN)/$(PROG)
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-parentheses
+
+# needs work
+SMOFF += index_overflow,memcpy_overflow
 
 .KEEP_STATE:
 

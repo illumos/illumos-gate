@@ -21,6 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 # This target builds both a command (daemon) and various shared objects.  This
 # isn't a typical target, and the inclusion of both library and command
@@ -98,6 +99,9 @@ LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 # Define the dependencies required by devfsadm and all shared objects.
 LDLIBS +=		-ldevinfo

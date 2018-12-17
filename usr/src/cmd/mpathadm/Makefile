@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/mpathadm/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 include ../Makefile.cmd
 
@@ -37,9 +37,12 @@ LDLIBS += -lMPAPI -ldevid
 
 LINTFLAGS += -xerroff=E_BAD_FORMAT_STR2
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

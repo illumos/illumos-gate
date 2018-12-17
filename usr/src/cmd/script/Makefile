@@ -21,6 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= script
 
@@ -30,9 +31,11 @@ FILEMODE= 0555
 
 CERRWARN += -_gcc=-Wno-unused-variable
 
+SMOFF += all_func_returns
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 

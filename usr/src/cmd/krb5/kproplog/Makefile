@@ -2,6 +2,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG		=	kproplog
 
@@ -36,6 +37,9 @@ CPPFLAGS	+=	-I. -I$(SRC)/lib/krb5 \
 CERRWARN	+=	-_gcc=-Wno-unused-variable
 CERRWARN	+=	-_gcc=-Wno-unused-function
 CERRWARN	+=	-_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 all:		$(PROG)
 

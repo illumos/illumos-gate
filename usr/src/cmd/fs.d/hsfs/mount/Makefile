@@ -23,6 +23,7 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		hsfs
 LIBPROG=	mount
@@ -40,3 +41,6 @@ include		../../Makefile.mount
 include		../../Makefile.mount.targ
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
+
+# not linted
+SMATCH=off

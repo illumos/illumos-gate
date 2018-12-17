@@ -27,6 +27,9 @@ VPATH = ../common:$(SRC)/common/acpica/utilities:$(SRC)/common/acpica/tables
 
 CERRWARN += -_gcc=-Wno-unused-function
 
+# not linted
+SMATCH=off
+
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_DUMP_APP
 
 LDLIBS += -ldevinfo

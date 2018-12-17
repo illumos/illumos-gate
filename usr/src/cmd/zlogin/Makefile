@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG = zlogin
 
@@ -32,6 +33,9 @@ CFLAGS += $(CCVERBOSE)
 FILEMODE = 0555
 
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

@@ -21,8 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/last/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= last
 UTMPS= wtmpx
@@ -32,6 +31,9 @@ SYMSETC= $(UTMPS:%=symlinks_%)
 ETCTOVARADM= ../var/adm
 
 include ../Makefile.cmd
+
+# not linted
+SMATCH=off
 
 $(ROOTUTMPS):= FILEMODE= 644
 

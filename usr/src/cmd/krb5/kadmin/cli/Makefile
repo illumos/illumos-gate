@@ -2,6 +2,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= kadmin kadmin.local
 SHFILES= k5srvutil
@@ -36,6 +37,8 @@ CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
+
+SMATCH=off
 
 COPTFLAG += $(XESS) #-I$(KINCDIR) 
 

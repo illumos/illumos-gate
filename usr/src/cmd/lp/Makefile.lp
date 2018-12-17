@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # cmd/lp/Makefile.lp
@@ -96,6 +97,9 @@ CERRWARN +=	-_gcc=-Wno-clobbered
 CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-extra
 CERRWARN +=	-_gcc=-Wno-address
+
+# not linted
+SMATCH=off
 
 all:=		TARGET= all
 install:=	TARGET= install

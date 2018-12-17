@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= pr
 XPG4PROG= pr
@@ -32,6 +33,8 @@ SED = sed
 DCFILE = $(PROG).dc
 
 CERRWARN += -_gcc=-Wno-parentheses
+
+SMOFF += indenting
 
 $(XPG4):= CPPFLAGS += -DXPG4
 $(POFILE) := XGETFLAGS += -a -x pr.xcl

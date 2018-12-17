@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=		ar
@@ -42,6 +43,9 @@ CFLAGS +=	$(CCVERBOSE)
 CSTD=	$(CSTD_GNU99)
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+SMOFF += signed
+
 LDLIBS +=	-lelf $(CONVLIBDIR) $(CONV_LIB) -lsendfile
 LINTFLAGS=	-x
 LINTFLAGS64=	-x

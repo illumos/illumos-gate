@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =	rpc.smserverd
 OBJS =	smediad.o smediad_err.o myaudit.o smed_svc.o smed_xdr.o
@@ -47,6 +48,10 @@ CPPFLAGS += -D_REENTRANT
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-unused-variable
+
+# not linted
+SMATCH=off
+
 LINTFLAGS += -u
 
 .KEEP_STATE:

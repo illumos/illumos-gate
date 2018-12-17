@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY=	ldprof.a
@@ -46,6 +47,8 @@ CPPFLAGS=	-I. -I../common -I../../include \
 		-I$(SRCBASE)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master) -I$(ELFCAP)
 CFLAGS +=	$(C_PICFLAGS)
+
+SMOFF += indenting
 
 lint :=		ZRECORD =
 LDLIBS +=	$(ZRECORD) -lmapmalloc -lc $(DLLIB)

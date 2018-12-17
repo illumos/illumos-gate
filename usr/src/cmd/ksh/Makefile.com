@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 SHELL=/usr/bin/ksh93
 
@@ -61,6 +62,9 @@ CFLAGS64 += \
 # Workaround for CR#6628728 ("|memcntl()| prototype not available for C99/XPG6")
 pmain.o	:= CERRWARN += -_gcc=-Wno-implicit-function-declaration
 pmain.o	:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

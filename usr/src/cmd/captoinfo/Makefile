@@ -23,6 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= captoinfo
 
@@ -36,9 +37,12 @@ LDLIBS +=	-lcurses
 CPPFLAGS +=	-I../../lib/libcurses/screen
 CERRWARN +=	-_gcc=-Wno-parentheses
 
+# code is a mess right now
+SMATCH=off
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 $(PROG): $(OBJS) $(MAPFILE.INT)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

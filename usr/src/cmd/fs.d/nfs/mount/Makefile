@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2017, Joyent, Inc. All rights reserved.
+# Copyright 2018, Joyent, Inc. All rights reserved.
 #
 # cmd/fs.d/nfs/mount/Makefile
 
@@ -49,6 +49,9 @@ CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-address
 CERRWARN += -_gcc=-Wno-unused-function
+
+# unknown type for func
+SMATCH=off
 
 #
 # Message catalog

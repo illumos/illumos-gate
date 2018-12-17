@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 include		../Makefile.sp
 
@@ -66,6 +66,9 @@ in.lpd:=	LDLIBS +=	-lnsl -lsocket
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 all:	$(BINPROGS) $(SBINPROGS)
 

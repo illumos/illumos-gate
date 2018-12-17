@@ -20,14 +20,17 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1989, 2001 by Sun Microsystems, Inc.
 # All rights reserved.
+#
+# Copyright (c) 2018, Joyent, Inc.
+
 
 PROG= diskscan
 
 include ../Makefile.cmd
+
+SMOFF += leaks
 
 .KEEP_STATE:
 

@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/nfs/nfsstat/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		nfsstat
 
@@ -42,6 +42,10 @@ OBJS += $(STAT_COMMON_OBJS)
 
 CPPFLAGS += -I$(STATCOMMONDIR)
 CERRWARN += -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
+
 LDLIBS += -lkstat -lnsl
 
 $(PROG):	$(OBJS)

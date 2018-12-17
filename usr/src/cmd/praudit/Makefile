@@ -24,7 +24,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 XLATEDIR = $(SRC)/lib/libbsm/common
 
@@ -44,6 +44,8 @@ CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
+
+SMOFF += signed
 
 LDLIBS += -lbsm -lnsl -lpam -ltsol
 

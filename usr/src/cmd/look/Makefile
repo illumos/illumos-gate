@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= look
 DATADIR= dict
@@ -36,6 +37,9 @@ ROOTDATA=	$(DATA:%=$(ROOTDATADIR)/%)
 DIRS=		$(ROOTDATADIR)
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 FILEMODE=	755
 

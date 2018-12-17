@@ -22,11 +22,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG = luxadm
 
 COBJS = adm.o fchba.o lux_util.o fabric_conf.o
-OBJS_sparc= g_adm.o diag.o fcalupdate.o hotplug.o qlgcupdate.o setboot.o 
+OBJS_sparc= g_adm.o diag.o fcalupdate.o hotplug.o qlgcupdate.o setboot.o
 OBJS_i386 = x86_adm.o errormsgs.o
 OBJS = $(OBJS_$(MACH)) $(COBJS)
 
@@ -41,6 +42,9 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-address
+
+# not linted
+SMATCH=off
 
 sparc_LDLIBS = -la5k -lg_fc -ldevid -lkstat -ldevinfo
 i386_LDLIBS =

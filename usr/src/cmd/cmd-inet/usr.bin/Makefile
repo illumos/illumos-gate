@@ -24,6 +24,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=		finger rdate ruptime rwho whois
@@ -34,7 +35,7 @@ KCMDPROGS=	rcp rlogin rsh
 
 SUBDIRS=	chat dns-sd ftp nc nca netstat \
 		pppd pppdump pppstats rdist talk telnet tftp
-SUBDIR1=	talk 
+SUBDIR1=	talk
 MSGSUBDIRS=	nca talk
 
 # As programs get lint-clean, add them here.  Eventually.
@@ -74,6 +75,8 @@ CPPFLAGS +=	-DSYSV -DSTRNET -DBSD_COMP -I$(CMDINETCOMMONDIR)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-function
+
+ruptime :=     SMOFF += leaks
 
 # Eventually just plain CFLAGS should be += -v, but not until all in
 # PROGS are lint clean.
@@ -148,7 +151,7 @@ $(COMMONOBJS): $(COMMONSRCS)
 rlogin: rlogin.o $(COMMONOBJS)
 	$(LINK.c) $@.o $(COMMONOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
- 
+
 rcp: rcp.o $(COMMONOBJS)
 	$(LINK.c) $@.o $(COMMONOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
@@ -156,7 +159,7 @@ rcp: rcp.o $(COMMONOBJS)
 rsh: rsh.o $(COMMONOBJS)
 	$(LINK.c) $@.o $(COMMONOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
- 
+
 $(ROOTSUNWRCP):
 	$(RM) $@; $(SYMLINK) ../bin/rcp $@
 
@@ -177,7 +180,7 @@ clean_local:
 
 clobber: $(SUBDIRS) clobber_local
 clobber_local: clean_local
-	$(RM) $(CLOBBERFILES) 
+	$(RM) $(CLOBBERFILES)
 
 LINTLOCALS=	$(LINTCLEAN:%.c=lint-%)
 

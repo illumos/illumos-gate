@@ -11,6 +11,7 @@
 
 #
 # Copyright 2010 Chris Love.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 
@@ -29,6 +30,8 @@ CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 LINTFLAGS +=	-I. -erroff=E_CONSTANT_CONDITION
 
+SMOFF += leaks
+
 # install rules
 $(ROOTINC)/% : %
 	$(INS.file)
@@ -37,7 +40,7 @@ $(ROOTINC)/% : %
 
 .PARALLEL: $(OBJS)
 
-all:		$(PROG) 
+all:		$(PROG)
 
 $(PROG):	$(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/nfs/nfsref/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		nfsref
 
@@ -35,6 +35,9 @@ OBJS=	nfsref.o ref_subr.o
 SRCS=	nfsref.c
 
 CERRWARN += -_gcc=-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 LDLIBS += -lreparse -lnvpair -lnsl -lumem
 

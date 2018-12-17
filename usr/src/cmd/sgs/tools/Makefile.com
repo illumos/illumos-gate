@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -66,3 +67,6 @@ ROOTDIR=	$(ROOT)/opt/SUNWonld
 ROOTPROGS=	$(PROGS:%=$(ROOTDIR)/bin/%)
 
 FILEMODE=	0755
+
+# not linted
+SMATCH=off

@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 TESTPROG = gssdtest
 
@@ -37,7 +38,7 @@ GSSC_BASEOBJS = gssdtest.o gssd_release_name_and_type.o gssd_clnt_stubs.o \
 
 GD_OBJS	= gssd_svc.o
 GC_OBJS	= gssd_clnt.o
-G_OBJS	= gssd_xdr.o 
+G_OBJS	= gssd_xdr.o
 GSSDOBJS = $(GSSD_BASEOBJS) $(GD_OBJS) $(G_OBJS)
 GSSCOBJS = $(GSSC_BASEOBJS) $(GC_OBJS) $(G_OBJS)
 
@@ -68,12 +69,15 @@ ROOTLIB=	$(ROOT)/usr/lib/gss
 DIRS=	$(ROOTLIB)
 
 CPPFLAGS += -I$(SRC)/uts/common/gssapi/include
-COPTFLAG += $(XESS) #-I$(KINCDIR) 
+COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 LDLIBS += -lgss -lnsl
 

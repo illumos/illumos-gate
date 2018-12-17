@@ -23,6 +23,7 @@
 #
 # cmd/backup/Makefile.backup
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -43,6 +44,9 @@ CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-clobbered
+
+# not linted
+SMATCH=off
 
 UFSROOTETC=		$(ROOT)/etc
 UFSROOTUSR=		$(ROOT)/usr

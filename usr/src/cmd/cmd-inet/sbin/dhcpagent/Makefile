@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG    = dhcpagent
@@ -40,6 +41,9 @@ XGETFLAGS += -a -x dhcpagent.xcl
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 #
 # to compile a debug version, do a `make COPTFLAG="-g -XO0"'

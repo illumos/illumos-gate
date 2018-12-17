@@ -22,6 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/Makefile.master
 
@@ -39,7 +40,16 @@ include ../../../Makefile.module
 
 %.o := CPPFLAGS += $(PYCPPFLAGS)
 %.ln := CPPFLAGS += $(PYLNFLAGS)
+
+#
+# Why these? Well, the pyconfig.h header hard-codes _FILE_OFFSET_BITS
+# to 64, regardless of what we have set here.  GCC quietens this complaint via
+# use of -isystem, but neither lint nor smatch can do that.
+#
 LINTFLAGS += -erroff=E_MACRO_REDEFINED
+
+# not linted
+SMATCH=off
 
 dmod/$(MODULE) := LDLIBS += -lproc
 

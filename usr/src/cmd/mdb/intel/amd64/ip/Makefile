@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 MODULE = ip.so
 MDBTGT = kvm
@@ -34,3 +35,6 @@ include ../../Makefile.amd64
 include ../../../Makefile.module
 
 CPPFLAGS += -I$(SRC)/uts/common/inet
+
+# needs work
+SMOFF += shift_to_zero

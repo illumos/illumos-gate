@@ -11,6 +11,7 @@
 
 #
 # Copyright 2019 Toomas Soome <tsoome@me.com>
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 PROG=	etdump
@@ -18,6 +19,9 @@ OBJS=	etdump.o output_shell.o output_text.o
 SRCS=	$(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
+
+# comes from FreeBSD upstream
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 

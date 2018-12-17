@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include		../Makefile.sp
 
@@ -34,8 +35,6 @@ OBJECTS =	$(PROG).o
 ROOTPROG=	$(PROG:%=$(ROOTLIBLPBIN)/%)
 $(ROOTPROG)	:= FILEMODE=555
 
-CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
-
 .KEEP_STATE:
 
 all:		$(PROG)
@@ -46,13 +45,13 @@ $(ROOTLIBLPBIN):
 $(ROOTLIBLPBIN)/%:	%
 	$(INS.file)
 
-install:	all $(ROOTLIBLPBIN) $(ROOTPROG) 
+install:	all $(ROOTLIBLPBIN) $(ROOTPROG)
 
 $(PROGRAM):	$(OBJECTS)
 	$(CC) $(CFLAGS) -o $@ $(OBJECTS)
 
 clean:
-	$(RM) $(PROG) *.o 
+	$(RM) $(PROG) *.o
 
 cstyle:
 	cstyle $(SRCS)

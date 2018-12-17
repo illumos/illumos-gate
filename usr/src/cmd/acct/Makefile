@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		acctcms acctcom acctcon acctcon1 acctcon2 \
 		acctdisk acctdusg acctmerg accton acctprc acctprc1 \
@@ -91,6 +92,9 @@ CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-address
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

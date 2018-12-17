@@ -2,7 +2,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= klist
 
@@ -27,6 +27,9 @@ CPPFLAGS += -I$(SRC)/lib/gss_mechs/mech_krb5/include \
 LDFLAGS += $(KRUNPATH)
 LDLIBS += $(KMECHLIB)
 CERRWARN += -_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 $(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50 
 

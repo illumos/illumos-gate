@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libpicld_pluginutil.a
 VERS=		.1
@@ -53,6 +54,9 @@ POFILE=	picld_pluginutil.po
 CPPFLAGS +=	-I.. -I$(SRC)/lib/libpicl -I$(SRC)/lib/libpicltree
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+SMOFF += all_func_returns
+
 CPPFLAGS +=	-D_REENTRANT
 DYNFLAGS +=	$(ZNOLAZYLOAD)
 LDLIBS +=	-L$(SRC)/lib/libpicltree/$(MACH)

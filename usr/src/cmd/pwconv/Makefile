@@ -21,8 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/pwconv/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=           pwconv
 
@@ -32,9 +31,11 @@ TEXT_DOMAIN= SUNW_OST_ADMIN
 FILEMODE=       0555
 RELSBIN=        ../sbin
 
+SMOFF += indenting
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG) $(ROOTPROG)
 
@@ -44,5 +45,5 @@ $(ROOTPROG):
 clean:
 
 lint:   lint_PROG
- 
+
 include ../Makefile.targ

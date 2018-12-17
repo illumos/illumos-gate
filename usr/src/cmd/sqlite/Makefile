@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		sqlite
 
@@ -39,6 +40,9 @@ $(OBJS) :=	CFLAGS += $(CTF_FLAGS)
 $(OBJS) :=	CTFCONVERT_POST = $(CTFCONVERT_O)
 
 CERRWARN +=	-_gcc=-Wno-empty-body
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	-lsqlite-sys
 

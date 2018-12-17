@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/pools/poold/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		poold
 OBJS =		poold.o
@@ -86,6 +86,9 @@ LDFLAGS +=	-R$(JAVA_LIB_PATH)
 LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 $(BLD_JAVA_8)LINTFLAGS64 += -erroff=E_NAME_USED_NOT_DEF2
 LINTLIBS +=	-L$(LIBPOOL_PATH) -lpool
+
+# not linted
+SMATCH=off
 
 CPPFLAGS +=	$(INCS)
 ROOTCMDDIR =	$(ROOT)/usr/lib/pool

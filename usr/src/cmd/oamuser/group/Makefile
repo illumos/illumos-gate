@@ -23,8 +23,7 @@
 #
 # Copyright (c) 2013 RackTop Systems.
 #
-# cmd/oamuser/group/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 include ../../Makefile.cmd
 
@@ -53,6 +52,9 @@ INSSBINPROG=	$(SBINPROG:%=$(ROOTUSRSBIN)/%)
 
 CPPFLAGS=	-I$(HERE) -I$(LOCAL) $(CPPFLAGS.master)
 FILEMODE= 	0555
+
+# not linted
+SMATCH=off
 
 $(GROUPADD) :=	OBJS = $(ADD_OBJ)
 $(GROUPADD) :=	LDLIBS += $(LIBUSRGRP) -lcmdutils

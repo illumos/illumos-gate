@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 NETYPPROG =	rpc.yppasswdd
 DEFAULTFILES =	yppasswdd.dfl
@@ -59,6 +60,9 @@ RPCYPPASSWDDOBJ =	yppasswdd.o changepasswd.o
 CERRWARN +=		-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=		-_gcc=-Wno-parentheses
 CERRWARN +=		-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 #
 # Objects shared between all the major components

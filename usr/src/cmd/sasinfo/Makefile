@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 include ../Makefile.cmd
 
@@ -46,6 +46,8 @@ POFILES = $(LOCAL_OBJS:%.o=%.po)
 LDLIBS += -lSMHBAAPI
 
 CERRWARN += -_gcc=-Wno-unused-value
+
+SMOFF += indenting
 
 INCS += -I.
 INCS += -I$(SRC)/lib/smhba/common

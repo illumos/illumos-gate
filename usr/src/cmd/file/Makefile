@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= file
 XPG4PROG= file
@@ -42,6 +43,9 @@ C99LMODE= -Xc99=%all
 
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-type-limits
+
+# not linted
+SMATCH=off
 
 POFILE= file_all.po
 POFILES= $(SRCS:%.c=%.po)

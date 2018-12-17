@@ -23,7 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 # Copyright 2017 RackTop Systems.
 #
 
@@ -53,6 +53,8 @@ CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS) -DDEBUG
 CERRWARN += -_gcc=-Wmissing-braces
 CERRWARN += -_gcc=-Wsign-compare
 CERRWARN += -_gcc=-Wmissing-field-initializers
+
+SMOFF += 64bit_shift,all_func_returns
 
 # lint complains about unused _umem_* functions
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2

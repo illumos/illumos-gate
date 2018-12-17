@@ -23,10 +23,8 @@
 # Copyright 1990-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/lp/lib/oam/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
+
 include         ../../Makefile.lp
 
 LIBRARY =		liblpoam.a
@@ -70,6 +68,9 @@ include			../../../../lib/Makefile.lib
 LIBS = $(LIBRARY)
 
 CPPFLAGS =		-I$(LPINC) $(CPPFLAGS.master)
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

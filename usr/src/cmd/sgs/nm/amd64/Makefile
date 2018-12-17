@@ -22,6 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		nm
 
@@ -42,6 +43,8 @@ INCLIST=	-I../../include -I../../include/i386 \
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+SMOFF += precedence,indenting
 
 LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS64 +=	-x $(LDLIBS) -m64

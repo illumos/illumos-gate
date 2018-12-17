@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		dladm
 ROOTFS_PROG=	$(PROG)
@@ -44,6 +43,8 @@ LDLIBS +=	$(ZLAZYLOAD) -lrstp $(ZNOLAZYLOAD)
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+SMOFF += snprintf_overflow
 
 # For headers from librstp.
 LINTFLAGS +=	-erroff=E_TRAILING_COMMA_IN_ENUM

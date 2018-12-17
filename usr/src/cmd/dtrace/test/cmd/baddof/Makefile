@@ -23,6 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -39,6 +40,9 @@ SRCS = baddof
 CMDS = $(SRCS:%=$(ROOTBIN)/%)
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 $(CMDS) := FILEMODE = 0555
 

@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/vgrind/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # These are the objects associated with the overall vgrind command.
@@ -65,6 +65,9 @@ CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 #
 # Message catalog

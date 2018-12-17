@@ -23,7 +23,7 @@
 # Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fmt/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= fmt
 
@@ -36,6 +36,9 @@ include ../Makefile.cmd
 LDLIBS += -lcmdutils
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

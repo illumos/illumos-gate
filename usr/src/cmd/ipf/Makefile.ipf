@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#cmd/ipf/Makefile.ipf
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 
 LIBIPF=		../../lib/$(MACH)/libipf.a
@@ -41,3 +40,7 @@ CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-empty-body
+
+# not linted
+SMATCH=off
+
