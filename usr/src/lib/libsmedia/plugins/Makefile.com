@@ -22,8 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBS =		$(DYNLIB)
 
@@ -42,6 +41,9 @@ PLUGINS64  = $(LIBS:%=$(PLUGINDIR64)/%)
 CLEANFILES=	$(LINTOUT) $(LINTPLUGIN)
 
 SRCDIR =	../common
+
+# not linted
+SMATCH=off
 
 LINTFLAGS += -xu
 LINTFLAGS64 += -xu

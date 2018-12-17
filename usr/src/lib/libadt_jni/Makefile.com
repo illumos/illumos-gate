@@ -22,8 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libadt_jni.a
 VERS=		.1
@@ -39,6 +38,9 @@ SRCDIR =	../common
 
 CPPFLAGS +=	-I$(JAVA_ROOT)/include -I$(JAVA_ROOT)/include/solaris
 CPPFLAGS +=	-D_REENTRANT
+
+# not linted
+SMATCH=off
 
 DYNFLAGS +=
 LDLIBS +=	-lc -lbsm

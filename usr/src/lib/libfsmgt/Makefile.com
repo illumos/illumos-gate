@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libfsmgt.a
 VERS =		.1
@@ -53,6 +54,9 @@ CPPFLAGS +=	-D_REENTRANT -I$(SRC)/lib/libfsmgt/common \
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 CLOBBERFILES	+= $(SRCDIR)/nfs_sec.c
 CLOBBERFILES	+= $(SRCDIR)/replica.c

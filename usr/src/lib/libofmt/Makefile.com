@@ -11,6 +11,7 @@
 
 #
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY=	libofmt.a
@@ -28,6 +29,8 @@ SRCS=		$(SRCDIR)/ofmt.c
 
 $(LINTLIB)	:= SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lc
+
+SMOFF += kmalloc_wrong_size
 
 .KEEP_STATE:
 

@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
-#
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY = libipadm.a
@@ -45,6 +45,9 @@ CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CPPFLAGS +=	-I$(SRCDIR) -D_REENTRANT
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 SRCS	=	iscii91%UTF-8.c \
 		UTF-8%iscii91.c \
@@ -35,5 +36,8 @@ dummy: all
 include $(SRC)/lib/iconv_modules/Makefile.iconv
 
 CFLAGS += -I../include
+
+# needs work
+SMOFF += index_overflow
 
 all: $(PROGS)

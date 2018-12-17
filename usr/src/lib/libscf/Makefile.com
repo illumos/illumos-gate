@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libscf.a
 VERS =		.1
@@ -61,6 +62,9 @@ CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 #
 # For native builds, we compile and link against the native version

@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libvscan.a
 VERS= .1
@@ -40,6 +41,8 @@ ROOTLIBDIR = $(ROOT)/usr/lib/vscan
 LDLIBS += -lc -lscf -lsecdb -lm
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I$(SRCDIR)
+
+SMOFF += signed
 
 .KEEP_STATE:
 

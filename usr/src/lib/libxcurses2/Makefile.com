@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libcurses.a
 VERS=	.2
@@ -98,6 +99,9 @@ LDLIBS += -lc
 CPPFLAGS = -I../h -I../src/libc/xcurses $(CPPFLAGS.master)
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-unused-value
+
+# not linted
+SMATCH=off
 
 #
 # If and when somebody gets around to messaging this, CLOBBERFILE should not

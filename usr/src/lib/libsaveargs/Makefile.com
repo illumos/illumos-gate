@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # The build process for libsaveargs is sightly different from that used by other
@@ -93,6 +94,9 @@ CFLAGS += $(CFLAGS_$(CURTYPE)) $(CFLAGS_common)
 
 CFLAGS64_standalone = $(STAND_FLAGS_64)
 CFLAGS64 += $(CCVERBOSE) $(CFLAGS64_$(CURTYPE)) $(CFLAGS64_common)
+
+# not linted
+SMATCH=off
 
 DYNFLAGS +=     $(ZINTERPOSE)
 

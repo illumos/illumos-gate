@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/lib/Makefile.lib
 
@@ -51,6 +52,9 @@ CPPFLAGS +=	-D_REENTRANT \
 			-I$(SRC)/cmd/sgs/librtld_db/common \
 			-I$(SRC)/cmd/sgs/include \
 			-I$(SRC)/cmd/sgs/include/$(MACH)
+
+# not linted
+SMATCH=off
 
 ROOTLIBDIR =	$(ROOT)/usr/lib/brand/$(BRAND)
 ROOTLIBDIR64 =	$(ROOT)/usr/lib/brand/$(BRAND)/$(MACH64)

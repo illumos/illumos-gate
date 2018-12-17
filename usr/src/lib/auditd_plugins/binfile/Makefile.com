@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	audit_binfile.a
 VERS=		.1
@@ -39,6 +40,9 @@ CPPFLAGS	+= -D_REENTRANT -I$(LIBBSM)
 CPPFLAGS	+= -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 ROOTLIBDIR=	$(ROOT)/usr/lib/security
 

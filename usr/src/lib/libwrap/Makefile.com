@@ -22,6 +22,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY =	libwrap.a
@@ -48,7 +49,7 @@ LDLIBS +=	-lsocket -lnsl -lc
 CPPFLAGS +=	$(NETGROUP) $(TLI) $(ALWAYS_HOSTNAME) $(AUTH) \
 		$(STYLE) $(TABLES) $(DOT) $(BUGS) \
 		-DRFC931_TIMEOUT=$(RFC931_TIMEOUT) \
-		-I$(SRCDIR) 
+		-I$(SRCDIR)
 CFLAGS +=	$(CCVERBOSE)
 
 CERRWARN +=	-erroff=E_FUNC_EXPECTS_TO_RETURN_VALUE
@@ -59,6 +60,9 @@ CERRWARN +=	-_gcc=-Wno-return-type
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 
@@ -98,7 +102,7 @@ NETGROUP	= -DNETGROUP
 # module, which also gives hints on how to add your own extensions.
 # Uncomment the next definition to turn on the language extensions
 # (examples: allow, deny, banners, twist and spawn).
-# 
+#
 STYLE	= -DPROCESS_OPTIONS	# Enable language extensions.
 
 ###########################
@@ -126,7 +130,7 @@ STYLE	= -DPROCESS_OPTIONS	# Enable language extensions.
 # with connections from non-UNIX PCs.  On some systems, remote username
 # lookups can trigger a kernel bug, causing loss of service. The README
 # file describes how to find out if your UNIX kernel has that problem.
-# 
+#
 # Uncomment the following definition if the wrappers should always
 # attempt to get the remote user name. If this is not enabled you can
 # still do selective username lookups as documented in the hosts_access.5
@@ -155,7 +159,7 @@ TABLES	= -DHOSTS_DENY=\"/etc/hosts.deny\" -DHOSTS_ALLOW=\"/etc/hosts.allow\"
 # hostname.  With selective hostname lookups, the client hostname
 # lookup is postponed until the name is required by an access control
 # rule or by a %letter expansion.
-# 
+#
 # In order to perform selective hostname lookups, disable paranoid
 # mode (see previous section) and comment out the following definition.
 

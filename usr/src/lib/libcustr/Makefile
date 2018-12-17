@@ -27,6 +27,9 @@ clobber :=	TARGET= clobber
 install :=	TARGET= install
 lint :=		TARGET= lint
 
+# needs work
+SMOFF=all_func_returns
+
 .KEEP_STATE:
 
 all clean clobber install lint: $(SUBDIRS)

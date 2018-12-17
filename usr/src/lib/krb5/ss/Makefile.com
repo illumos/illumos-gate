@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libss.a
 VERS= .1
@@ -68,6 +69,8 @@ CPPFLAGS +=     -DHAVE_LIBSOCKET=1 -DHAVE_LIBNSL=1 -DHAS_STRDUP=1 \
 CFLAGS +=	$(CCVERBOSE) -I..
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-unused-variable
+
+SMOFF += all_func_returns
 
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) $(ZIGNORE)
 

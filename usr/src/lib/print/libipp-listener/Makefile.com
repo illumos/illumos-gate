@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =		libipp-listener.a
 VERS =			.0
@@ -54,6 +54,9 @@ CPPFLAGS +=	-I../../libipp-core/common
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 MAPFILES =	$(SRCDIR)/mapfile
 

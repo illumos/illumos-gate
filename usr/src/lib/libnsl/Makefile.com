@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2018 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY= libnsl.a
@@ -202,6 +203,9 @@ CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-clobbered
+
+# not linted
+SMATCH=off
 
 LIBMP =		-lmp
 lint :=		LIBMP =

@@ -22,6 +22,7 @@
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libsmb.a
 VERS= .1
@@ -87,6 +88,9 @@ CPPFLAGS +=	-Dsyslog=smb_syslog
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
 	$(OBJS_SHARED:%.o=$(SRC)/common/smbsrv/%.c)

@@ -23,6 +23,7 @@
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libefi.a
 VERS =		.1
@@ -41,6 +42,8 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 
 LINTFLAGS64 +=	-errchk=longptr64
+
+SMOFF += kmalloc_wrong_size
 
 .KEEP_STATE:
 

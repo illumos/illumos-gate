@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/pam_modules/krb5/Makefile.com
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	pam_krb5.a
 VERS=		.1
@@ -50,6 +49,9 @@ CPPFLAGS +=	-I../../../gss_mechs/mech_krb5/include \
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 # module needs to be unloadable because the key destructor might be
 # called after dlclose()

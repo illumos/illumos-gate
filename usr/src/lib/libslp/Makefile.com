@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libslp.a
 VERS =		.1
@@ -47,6 +48,9 @@ CPPFLAGS +=	-D_REENTRANT -I../clib -I$(JAVA_ROOT)/include \
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

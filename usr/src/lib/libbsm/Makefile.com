@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libbsm.a
 VERS = 		.1
@@ -87,6 +88,9 @@ LDLIBS +=	-lsocket -lnsl -lmd -lc -lsecdb -ltsol -linetutil -lscf
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 COMDIR=		../common
 AUDITD=		$(SRC)/cmd/auditd

@@ -23,6 +23,8 @@
 #
 # Copyright 2018 Jason King
 #
+# Copyright (c) 2018, Joyent, Inc.
+
 LIBRARY =	pkcs11_tpm.a
 VERS =		.1
 
@@ -95,6 +97,9 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-label
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 LINTSRC= $(OBJECTS:%.o=$(SRCDIR)/%.c)
 
 $(LINTLIB):=	SRCS	=	$(SRCDIR)/$(LINTSRC)
@@ -105,7 +110,7 @@ CLOBBERFILES += C.ln
 .KEEP_STATE:
 
 all: $(LIBS)
- 
+
 lint: $$(LINTSRC)
 	$(LINT.c) $(LINTCHECKFLAGS) $(LINTSRC) $(LDLIBS)
 

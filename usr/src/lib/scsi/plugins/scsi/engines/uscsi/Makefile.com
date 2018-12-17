@@ -23,9 +23,11 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2018, Joyent, Inc.
 
 MODULE =	uscsi
 SRCS =		uscsi.c
 
 include ../../Makefile.engine
+
+SMOFF += signed

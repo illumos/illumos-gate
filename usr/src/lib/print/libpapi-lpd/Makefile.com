@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =		psm-lpd.a
 VERS =			.1
@@ -50,6 +51,9 @@ CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 MAPFILES =	$(SRCDIR)/mapfile
 

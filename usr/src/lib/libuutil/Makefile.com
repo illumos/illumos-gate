@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libuutil.a
 VERS =		.1
@@ -72,6 +73,8 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -I../../common/inc
 LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 LINTFLAGS64 +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
+
+SMOFF += signed
 
 MY_NATIVE_CPPFLAGS = -DNATIVE_BUILD -I$(SRCDIR)
 MY_NATIVE_LDLIBS = -lc

@@ -22,9 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-# usr/src/lib/hal/libhal-storage/Makefile.com
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libhal-storage.a
 VERS =		.1.0.0
@@ -46,6 +44,8 @@ CFLAGS64 +=	-_gcc=-Wno-deprecated-declarations
 CPPFLAGS +=	-DGETTEXT_PACKAGE=\"$(HAL_GETTEXT_PACKAGE)\" -DENABLE_NLS
 CPPFLAGS +=	-DPACKAGE_LOCALE_DIR=\"/usr/lib/locale\"
 CPPFLAGS +=	-I$(ROOT)/usr/include/hal
+
+SMOFF += all_func_returns
 
 ROOTMAJLINK =	$(ROOTLIBDIR)/$(LIBRARY:.a=.so)$(VERS_MAJ)
 ROOTMAJLINK64 =	$(ROOTLIBDIR64)/$(LIBRARY:.a=.so)$(VERS_MAJ)

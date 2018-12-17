@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= sbd.a
 VERS= .1
@@ -50,6 +51,9 @@ LDLIBS +=	-lc -lkstat -lnvpair
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 CPPFLAGS +=	-I$(ROOT)/usr/platform/$(PLATFORM)/include -DSBD_DEBUG
 #

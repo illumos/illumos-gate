@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libcpc.a
 VERS	= .1
@@ -47,6 +48,9 @@ CFLAGS +=	$(CCVERBOSE)
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

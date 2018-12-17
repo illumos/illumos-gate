@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libdevinfo.a
 VERS=		.1
@@ -42,6 +43,9 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I..
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

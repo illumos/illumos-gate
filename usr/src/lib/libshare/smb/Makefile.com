@@ -24,6 +24,7 @@
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libshare_smb.a
 VERS =		.1
@@ -50,6 +51,10 @@ LDLIBS +=	-lshare -lscf -luuid -ldlpi -lnsl -lnvpair -lxml2 -lumem -lc
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
+
 CPPFLAGS +=	-D_REENTRANT -I$(ADJUNCT_PROTO)/usr/include/libxml2 \
   		-I$(SRCDIR)/../common
 $(ENABLE_SMB_PRINTING) CPPFLAGS += -DHAVE_CUPS

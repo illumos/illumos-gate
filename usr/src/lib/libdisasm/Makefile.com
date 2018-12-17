@@ -123,6 +123,9 @@ $(LINTLIB) := SRCS = $(COMDIR)/$(LINTSRC)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 # We want the thread-specific errno in the library, but we don't want it in
 # the standalone.  $(DTS_ERRNO) is designed to add -D_TS_ERRNO to $(CPPFLAGS),
 # in order to enable this feature.  Conveniently, -D_REENTRANT does the same

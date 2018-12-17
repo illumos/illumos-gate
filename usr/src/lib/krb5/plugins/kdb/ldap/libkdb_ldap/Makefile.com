@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libkdb_ldap.a
 VERS= .1
@@ -76,6 +77,10 @@ CPPFLAGS += 	-DHAVE_CONFIG_H \
 CFLAGS +=	$(CCVERBOSE) -I..
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
+
 DYNFLAGS +=	$(KRUNPATH) $(KERBRUNPATH) $(KMECHLIB)
 LDLIBS +=	-L $(ROOTLIBDIR) -lkadm5srv -lc -lnsl -lldap
 

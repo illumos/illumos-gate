@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	audit_syslog.a
 VERS=		.1
@@ -49,6 +50,9 @@ CPPFLAGS	+= -I$(LIBBSM)
 
 CERRWARN	+= -_gcc=-Wno-char-subscripts
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 ROOTLIBDIR=	$(ROOT)/usr/lib/security
 

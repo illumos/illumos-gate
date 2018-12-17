@@ -23,7 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libnisdb.a
 VERS=	.2
@@ -164,6 +164,9 @@ $(UVAR_PICS) := CERRWARN += -_gcc=-Wno-unused-variable
 # Correcting these might alter logic
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
 
 # Extra includes, from yp, for yptol files.
 CPPFLAGS += -I$(SRC)/cmd/ypcmd

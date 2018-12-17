@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libfdisk.a
 VERS= .1
@@ -53,6 +53,9 @@ LINTFLAGS +=    -erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=    -erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

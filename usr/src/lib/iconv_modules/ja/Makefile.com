@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/Makefile.master
 
@@ -33,6 +34,9 @@ LIB = $(MODULES:%.c=%.so)
 LIB64 = $(MODULES:%.c=$(MACH64)/%.so)
 
 LDLIBS=	-lc
+
+# needs work
+SMATCH=off
 
 INSTALL_MODULES = .modules_installed
 CLEANFILES += $(INSTALL_MODULES)

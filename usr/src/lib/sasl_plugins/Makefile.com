@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 COMMONOBJS=	plugin_common.o
 OBJECTS=	$(PLUG_OBJS) $(COMMONOBJS)
@@ -31,6 +32,9 @@ include $(SRC)/lib/Makefile.lib
 CPPFLAGS +=	-I$(SRC)/lib/libsasl/include
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 LIBS =		$(DYNLIB)
 SRCS=		$(PLUG_OBJS:%.o=../%.c) \

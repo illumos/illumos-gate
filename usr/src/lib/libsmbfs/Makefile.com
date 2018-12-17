@@ -26,6 +26,7 @@
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # lib/libsmbfs/Makefile.com
@@ -76,7 +77,7 @@ OBJ_LIB=\
 	ui-sun.o \
 	utf_str.o
 
-OBJ_CMN= smbfs_ntacl.o 
+OBJ_CMN= smbfs_ntacl.o
 
 OBJECTS= $(OBJ_LIB) $(OBJ_CMN)
 
@@ -97,10 +98,13 @@ CSTD=	$(CSTD_GNU99)
 LDLIBS += -lsocket -lnsl -lc -lmd -lpkcs11 -lkrb5 -lsec -lidmap
 
 # normal warnings...
-CFLAGS	+=	$(CCVERBOSE) 
+CFLAGS	+=	$(CCVERBOSE)
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 CPPFLAGS += -D__EXTENSIONS__ -D_REENTRANT -DMIA \
 	-I$(SRCDIR) -I.. -I../netsmb \

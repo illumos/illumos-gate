@@ -21,8 +21,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libsip.a
 VERS    = .1
@@ -42,6 +41,9 @@ LDLIBS +=	-lmd5 -lc
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-DOS='"solaris"' -D__OS_solaris -DNDEBUG
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

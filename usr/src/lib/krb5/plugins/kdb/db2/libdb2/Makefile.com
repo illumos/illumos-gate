@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libdb2.a
 VERS= .1
@@ -102,6 +103,10 @@ CPPFLAGS += 	-DHAVE_CONFIG_H \
 
 CFLAGS +=	$(CCVERBOSE) -I..
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
+
 LDLIBS +=	-lc
 
 # Identify that this library is an interposer (on dbm_ routines from libc.so.1).

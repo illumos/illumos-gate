@@ -21,8 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Makefile for KMF Plugins
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	kmf_pkcs11.a
 VERS=		.1
@@ -54,6 +53,9 @@ CPPFLAGS	+=	-D_REENTRANT $(KMFINC) -I$(INCDIR) \
 LINTFLAGS64	+=	-errchk=longptr64
 
 CERRWARN	+=	-_gcc=-Wno-unused-label
+
+# not linted
+SMATCH=off
 
 PICS=	$(OBJECTS:%=pics/%)
 

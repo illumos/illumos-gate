@@ -21,6 +21,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libkmfberder.a
 VERS= .1
@@ -50,6 +51,9 @@ CPPFLAGS64	+=	-I$(ADJUNCT_PROTO)/usr/include/libxml2 \
 LDLIBS		+=	-lc
 
 CERRWARN	+=	-_gcc=-Wno-unused-label
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

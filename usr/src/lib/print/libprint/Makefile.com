@@ -22,8 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =		libprint.a
 VERS =			.2
@@ -45,6 +44,9 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../head -D_REENTRANT
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	-lnsl -lsocket -lc -lldap
 

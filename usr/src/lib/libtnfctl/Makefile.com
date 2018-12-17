@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libtnfctl.a
 VERS=		.1
@@ -79,6 +80,9 @@ LINTFLAGS +=	-y
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 ASFLAGS +=	-P
 

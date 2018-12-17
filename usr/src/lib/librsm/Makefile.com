@@ -22,13 +22,14 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= librsm.a
 VERS= .2
 
 TEXT_DOMAIN=	SUNW_OST_OSLIB
 
-OBJECTS = rsmlib.o rsmgen.o rsmloopback.o 
+OBJECTS = rsmlib.o rsmgen.o rsmloopback.o
 
 # include library definitions, do not change order of include and DYNLIB
 include ../../Makefile.lib
@@ -41,7 +42,7 @@ LIBS = $(DYNLIB)
 DEBUG =
 $(NOT_RELEASE_BUILD)DEBUG = -DDEBUG
 
-# The COPTFLAG is used for optimization purposes. 
+# The COPTFLAG is used for optimization purposes.
 # It is disabled for debug builds
 $(NOT_RELEASE_BUILD)COPTFLAG =
 $(NOT_RELEASE_BUILD)COPTFLAG64 =
@@ -50,6 +51,9 @@ CPPFLAGS = -I../inc -I../../common/inc $(CPPFLAGS.master) -D_REENTRANT $(DEBUG)
 
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 LDLIBS += -lc
 

@@ -24,6 +24,7 @@
 #
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libfksmbsrv.a
 VERS =		.1
@@ -214,6 +215,9 @@ CPPFLAGS += -DDEBUG
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
 
 SRCS=   $(OBJS_LOCAL:%.o=$(SRCDIR)/%.c) \
 	$(OBJS_FS_SMBSRV:%.o=$(SRC)/uts/common/fs/smbsrv/%.c) \

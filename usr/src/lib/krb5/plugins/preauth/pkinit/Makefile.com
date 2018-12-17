@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= pkinit.a
 VERS= .1
@@ -67,6 +67,9 @@ CPPFLAGS += 	-I$(SRC)/lib/krb5 \
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 CFLAGS +=	$(CCVERBOSE) -I..
 DYNFLAGS +=	$(KRUNPATH) $(KMECHLIB) -znodelete
