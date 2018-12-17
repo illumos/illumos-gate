@@ -385,8 +385,8 @@ struct metaslab {
 	 * stay cached.
 	 */
 	uint64_t	ms_selected_txg;
+	uint64_t	ms_loaded_txg;	/* track when metaslab was loaded */
 
-	uint64_t	ms_alloc_txg;	/* last successful alloc (debug only) */
 	uint64_t	ms_max_size;	/* maximum allocatable size	*/
 
 	/*

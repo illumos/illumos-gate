@@ -156,6 +156,18 @@ int metaslab_load_pct = 50;
 int metaslab_unload_delay = TXG_SIZE * 2;
 
 /*
+ * Tunables used to reduce metaslab load/unload thrashing when selection
+ * algorithm is allocating across metaslabs very evenly. In addition to
+ * tracking when the slab was used for allocation (ms_selected_txg), we also
+ * track when it was loaded (ms_loaded_txg). If the slab would be unloaded,
+ * but the load txg is within the window of
+ *    metaslab_unload_delay + metaslab_load_window
+ * then we ramp up metaslab_unload_delay instead of unloading the metaslab.
+ */
+int metaslab_load_window = 10;
+int metaslab_unload_delay_max = 256;
+
+/*
  * Max number of metaslabs per group to preload.
  */
 int metaslab_preload_limit = SPA_DVAS_PER_BP;
@@ -1533,6 +1545,7 @@ metaslab_unload(metaslab_t *msp)
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
 	range_tree_vacate(msp->ms_allocatable, NULL, NULL);
 	msp->ms_loaded = B_FALSE;
+	msp->ms_loaded_txg = 0;
 	msp->ms_weight &= ~METASLAB_ACTIVE_MASK;
 	msp->ms_max_size = 0;
 }
@@ -2077,7 +2090,8 @@ metaslab_activate_allocator(metaslab_group_t *mg, metaslab_t *msp,
 }
 
 static int
-metaslab_activate(metaslab_t *msp, int allocator, uint64_t activation_weight)
+metaslab_activate(metaslab_t *msp, int allocator, uint64_t activation_weight,
+    uint64_t txg)
 {
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
 
@@ -2089,6 +2103,8 @@ metaslab_activate(metaslab_t *msp, int allocator, uint64_t activation_weight)
 				metaslab_group_sort(msp->ms_group, msp, 0);
 				return (error);
 			}
+			VERIFY0(msp->ms_loaded_txg);
+			msp->ms_loaded_txg = txg;
 		}
 		if ((msp->ms_weight & METASLAB_ACTIVE_MASK) != 0) {
 			/*
@@ -2201,8 +2217,11 @@ metaslab_preload(void *arg)
 
 	mutex_enter(&msp->ms_lock);
 	metaslab_load_wait(msp);
-	if (!msp->ms_loaded)
+	if (!msp->ms_loaded) {
 		(void) metaslab_load(msp);
+		VERIFY0(msp->ms_loaded_txg);
+		msp->ms_loaded_txg = spa_syncing_txg(spa);
+	}
 	msp->ms_selected_txg = spa_syncing_txg(spa);
 	mutex_exit(&msp->ms_lock);
 }
@@ -2727,22 +2746,35 @@ metaslab_sync_done(metaslab_t *msp, uint64_t txg)
 
 	/*
 	 * If the metaslab is loaded and we've not tried to load or allocate
-	 * from it in 'metaslab_unload_delay' txgs, then unload it.
+	 * from it in 'metaslab_unload_delay' txgs, then we normally unload it.
+	 * However, to prevent thrashing, if the metaslab was recently loaded,
+	 * then instead of unloading it, we increase the unload delay (only up
+	 * to the maximum).
 	 */
 	if (msp->ms_loaded &&
 	    msp->ms_initializing == 0 &&
 	    msp->ms_selected_txg + metaslab_unload_delay < txg) {
-		for (int t = 1; t < TXG_CONCURRENT_STATES; t++) {
-			VERIFY0(range_tree_space(
-			    msp->ms_allocating[(txg + t) & TXG_MASK]));
-		}
-		if (msp->ms_allocator != -1) {
-			metaslab_passivate(msp, msp->ms_weight &
-			    ~METASLAB_ACTIVE_MASK);
-		}
+		if (msp->ms_loaded_txg != 0 && msp->ms_loaded_txg +
+		    metaslab_unload_delay + metaslab_load_window >= txg) {
+			if (metaslab_unload_delay + metaslab_load_window <=
+			    metaslab_unload_delay_max) {
+				metaslab_unload_delay += metaslab_load_window;
+			}
+			DTRACE_PROBE1(zfs__metaslab__delay__unload,
+			    metaslab_t *, msp);
+		} else {
+			for (int t = 1; t < TXG_CONCURRENT_STATES; t++) {
+				VERIFY0(range_tree_space(
+				    msp->ms_allocating[(txg + t) & TXG_MASK]));
+			}
+			if (msp->ms_allocator != -1) {
+				metaslab_passivate(msp, msp->ms_weight &
+				    ~METASLAB_ACTIVE_MASK);
+			}
 
-		if (!metaslab_debug_unload)
-			metaslab_unload(msp);
+			if (!metaslab_debug_unload)
+				metaslab_unload(msp);
+		}
 	}
 
 	ASSERT0(range_tree_space(msp->ms_allocating[txg & TXG_MASK]));
@@ -2997,8 +3029,6 @@ metaslab_block_alloc(metaslab_t *msp, uint64_t size, uint64_t txg)
 
 		range_tree_add(msp->ms_allocating[txg & TXG_MASK], start, size);
 
-		/* Track the last successful allocation */
-		msp->ms_alloc_txg = txg;
 		metaslab_verify_space(msp, txg);
 	}
 
@@ -3041,10 +3071,10 @@ find_valid_metaslab(metaslab_group_t *mg, uint64_t activation_weight,
 		}
 
 		/*
-			 * If the selected metaslab is condensing or being
-			 * initialized, skip it.
+		 * If the selected metaslab is condensing or being
+		 * initialized, skip it.
 		 */
-			if (msp->ms_condensing || msp->ms_initializing > 0)
+		if (msp->ms_condensing || msp->ms_initializing > 0)
 			continue;
 
 		*was_active = msp->ms_allocator != -1;
@@ -3183,7 +3213,8 @@ metaslab_group_alloc_normal(metaslab_group_t *mg, zio_alloc_list_t *zal,
 			continue;
 		}
 
-		if (metaslab_activate(msp, allocator, activation_weight) != 0) {
+		if (metaslab_activate(msp, allocator, activation_weight,
+		    txg) != 0) {
 			mutex_exit(&msp->ms_lock);
 			continue;
 		}
@@ -3902,7 +3933,7 @@ metaslab_claim_concrete(vdev_t *vd, uint64_t offset, uint64_t size,
 	mutex_enter(&msp->ms_lock);
 
 	if ((txg != 0 && spa_writeable(spa)) || !msp->ms_loaded)
-		error = metaslab_activate(msp, 0, METASLAB_WEIGHT_CLAIM);
+		error = metaslab_activate(msp, 0, METASLAB_WEIGHT_CLAIM, txg);
 	/*
 	 * No need to fail in that case; someone else has activated the
 	 * metaslab, but that doesn't preclude us from using it.
