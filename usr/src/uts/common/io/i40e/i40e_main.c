@@ -2182,25 +2182,56 @@ i40e_config_def_vsi(i40e_t *i40e, i40e_hw_t *hw)
 	def_rxg->irg_vsi_seid = I40E_DEF_VSI_SEID(i40e);
 
 	/*
-	 * The controller places an implicit L2 filter for the primary
-	 * MAC pointing to the default VSI. We remove this filter to
-	 * prevent duplicate delivery of packets destined for the
-	 * primary MAC address as DLS will create the same filter on a
-	 * non-default VSI for the primary MAC client.
+	 * We have seen three different behaviors in regards to the
+	 * Default VSI and its implicit L2 MAC+VLAN filter.
+	 *
+	 * 1. It has an implicit filter for the factory MAC address
+	 *    and this filter counts against 'ifr_nmacfilt_used'.
+	 *
+	 * 2. It has an implicit filter for the factory MAC address
+	 *    and this filter DOES NOT count against 'ifr_nmacfilt_used'.
+	 *
+	 * 3. It DOES NOT have an implicit filter.
+	 *
+	 * All three of these cases are accounted for below. If we
+	 * fail to remove the L2 filter (ENOENT) then we assume there
+	 * wasn't one. Otherwise, if we successfully remove the
+	 * filter, we make sure to update the 'ifr_nmacfilt_used'
+	 * count accordingly.
+	 *
+	 * We remove this filter to prevent duplicate delivery of
+	 * packets destined for the primary MAC address as DLS will
+	 * create the same filter on a non-default VSI for the primary
+	 * MAC client.
+	 *
+	 * If you change the following code please test it across as
+	 * many X700 series controllers and firmware revisions as you
+	 * can.
 	 */
 	bzero(&filt, sizeof (filt));
 	bcopy(hw->mac.port_addr, filt.mac_addr, ETHERADDRL);
 	filt.flags = I40E_AQC_MACVLAN_DEL_PERFECT_MATCH;
 	filt.vlan_tag = 0;
 
-
 	ASSERT3U(i40e->i40e_resources.ifr_nmacfilt_used, <=, 1);
+	i40e_log(i40e, "Num L2 filters: %u",
+	    i40e->i40e_resources.ifr_nmacfilt_used);
 
 	err = i40e_aq_remove_macvlan(hw, I40E_DEF_VSI_SEID(i40e), &filt, 1,
 	    NULL);
-	if (err != I40E_SUCCESS) {
-		i40e_error(i40e, "Failed to remove primary MAC from default VSI"
-		    ":  %d (%d)", err, hw->aq.asq_last_status);
+	if (err == I40E_SUCCESS) {
+		i40e_log(i40e,
+		    "Removed L2 filter from Default VSI with SEID %u",
+		    I40E_DEF_VSI_SEID(i40e));
+	} else if (hw->aq.asq_last_status == ENOENT) {
+		i40e_log(i40e,
+		    "No L2 filter for Default VSI with SEID %u",
+		    I40E_DEF_VSI_SEID(i40e));
+	} else {
+		i40e_error(i40e, "Failed to remove L2 filter from"
+		    " Default VSI with SEID %u: %d (%d)",
+		    I40E_DEF_VSI_SEID(i40e), err, hw->aq.asq_last_status);
+
 		return (B_FALSE);
 	}
 
@@ -2228,7 +2259,7 @@ i40e_config_def_vsi(i40e_t *i40e, i40e_hw_t *hw)
 		i40e->i40e_resources.ifr_nmacfilt_used--;
 	} else {
 		if (i40e->i40e_resources.ifr_nmacfilt_used != 0) {
-			i40e_error(i40e, "Unexpected MAC filter count: %u"
+			i40e_error(i40e, "Unexpected L2 filter count: %u"
 			    " (expected 0)",
 			    i40e->i40e_resources.ifr_nmacfilt_used);
 			    return (B_FALSE);
