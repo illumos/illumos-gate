@@ -1,11 +1,12 @@
 '\" te
 .\" Copyright (c) 2003 Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 1989 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SYSTEM 4 "Jan 25, 2016"
+.TH SYSTEM 4 "Jan 29, 2019"
 .SH NAME
 system \- system configuration information file
 .SH DESCRIPTION
@@ -13,6 +14,23 @@ system \- system configuration information file
 The \fBsystem\fR file is used for customizing the operation of the operating
 system kernel. The recommended procedure is to preserve the original
 \fBsystem\fR file before modifying it.
+.sp
+.LP
+It is not recommended to edit the \fB/etc/system\fR file directly but rather
+to deliver configuration fragments into files under \fB/etc/system.d\fR;
+files in this directory are combined in alphabetical order and read by the
+kernel before \fB/etc/system\fR is processed. Directives in \fB/etc/system\fR
+therefore take precedence over any settings delivered in fragment files.
+.sp
+.LP
+The recommended naming schema for the fragment files is to use the name of
+the package which is delivering the file with '\fB/\fR' characters replaced
+by '\fB:\fR'; file names that start with a dot (\fB.\fR) will be ignored.
+.sp
+.LP
+If \fB/etc/system.d/\fR exists and contains any fragment files,
+then the directory must also be writable or it will not be possible to
+create or update the system boot archive.
 .sp
 .LP
 The \fBsystem\fR file contains commands which are read by the kernel during
@@ -286,9 +304,9 @@ escape sequences are supported within the quoted string:
 .sp
 .in +2
 .nf
-\en 	(newline)
-\et 	(tab)
-\eb 	(backspace)
+\en	(newline)
+\et	(tab)
+\eb	(backspace)
 .fi
 .in -2
 .sp
@@ -360,4 +378,4 @@ file that will work, you may specify \fB/dev/null\fR. This acts as an empty
 settings.
 .SH NOTES
 .LP
-The \fB/etc/system\fR file is read only once, at boot time.
+The \fBsystem\fR files are read only once, at boot time.

@@ -546,6 +546,7 @@ typedef int modid_t;
 extern kmutex_t mod_lock;
 
 extern char *systemfile;
+extern char *self_assembly;
 extern char **syscallnames;
 extern int moddebug;
 
