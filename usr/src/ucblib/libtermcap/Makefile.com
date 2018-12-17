@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libtermcap.a
 VERS=		.1
@@ -44,6 +45,9 @@ LDLIBS +=	-lc
 
 DEFS= -DCM_N -DCM_GT -DCM_B -DCM_D
 CPPFLAGS = $(DEFS) -I$(SRC)/ucbhead $(CPPFLAGS.master)
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

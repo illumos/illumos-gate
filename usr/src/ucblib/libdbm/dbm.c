@@ -31,6 +31,10 @@
  * under license from the Regents of the University of California.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 /*LINTLIBRARY*/
 
 #include	<sys/types.h>
@@ -524,12 +528,12 @@ delitem(char buf[PBLKSIZ], int n)
 		i2 = sp[n+1-1];
 	i3 = sp[sp[0]+1-1];
 	if (i2 > i1)
-	while (i1 > i3) {
-		i1--;
-		i2--;
-		buf[i2] = buf[i1];
-		buf[i1] = 0;
-	}
+		while (i1 > i3) {
+			i1--;
+			i2--;
+			buf[i2] = buf[i1];
+			buf[i1] = 0;
+		}
 	i2 -= i1;
 	for (i1 = n+1; i1 < sp[0]; i1++)
 		sp[i1+1-1] = sp[i1+1] + i2;

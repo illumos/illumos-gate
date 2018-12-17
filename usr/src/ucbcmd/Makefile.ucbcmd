@@ -23,6 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 #
 # ucbcmd/Makefile.ucbcmd
 #
@@ -57,6 +58,9 @@ ROOTPROG64=	$(PROG:%=$(ROOTBIN64)/%)
 ROOTPROG32=	$(PROG:%=$(ROOTBIN32)/%)
 
 ISAEXEC=	$(ROOT)/usr/lib/isaexec
+
+# don't lint any of ucbcmd
+SMATCH=off
 
 # storing LDLIBS in two macros allows reordering of options
 LDLIBS.cmd =    $(ENVLDLIBS1)  $(ENVLDLIBS2)  $(ENVLDLIBS3)
