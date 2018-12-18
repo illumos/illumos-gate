@@ -23,6 +23,10 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/cmn_err.h>
@@ -60,7 +64,7 @@ sctp_kstat_update(kstat_t *kp, int rw)
 	sctp_stack_t	*sctps;
 	mib2_sctp_t	sctp_mib;
 
-	if (kp == NULL|| kp->ks_data == NULL)
+	if (kp->ks_data == NULL)
 		return (EIO);
 
 	if (rw == KSTAT_WRITE)

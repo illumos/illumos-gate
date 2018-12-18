@@ -22,6 +22,7 @@
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -5072,7 +5073,7 @@ rawip_kstat_update(kstat_t *ksp, int rw)
 	netstack_t	*ns;
 	icmp_stack_t	*is;
 
-	if ((ksp == NULL) || (ksp->ks_data == NULL))
+	if (ksp->ks_data == NULL)
 		return (EIO);
 
 	if (rw == KSTAT_WRITE)
