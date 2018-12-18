@@ -137,10 +137,11 @@ will invoke each shadow compiler, with the outputs modified (as well as any
 translation for compiler style) as follows:
 .Bl -enum
 .It
-If
-.Nm cw
-is invoked to link-edit without compilation (the input files are all objects),
-the shadow compiler is not invoked.
+If neither of
+.Fl c ,
+.Fl S
+appears in the argument list (that is, linking is attempted or only the
+pre-processor is invoked), the shadow compilers will not be invoked.
 .It
 If the
 .Fl o Ar filename

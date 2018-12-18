@@ -23,14 +23,18 @@
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright (c) 2018, Joyent, Inc.
 #
+# - This file is sourced by "bldenv.sh" and "nightly.sh" and should not
+#   be executed directly.
+# - This script is only interpreted by ksh93 and explicitly allows the
+#   use of ksh93 language extensions.
 
-# Configuration variables for the runtime environment of the nightly
-# build script and other tools for construction and packaging of
-# releases.
-# This example is suitable for building an illumos workspace, which
-# will contain the resulting archives. It is based off the onnv
-# release. It sets NIGHTLY_OPTIONS to make nightly do:
+
+# -----------------------------------------------------------------------------
+# Parameters you are likely to want to change
+# -----------------------------------------------------------------------------
+
 #       DEBUG build only (-D, -F)
 #       do not bringover from the parent (-n)
 #       runs 'make check' (-C)
@@ -39,17 +43,82 @@
 #       creates packages for PIT/RE (-p)
 #       checks for changes in ELF runpaths (-r)
 #       build and use this workspace's tools in $SRC/tools (-t)
-#
-# - This file is sourced by "bldenv.sh" and "nightly.sh" and should not
-#   be executed directly.
-# - This script is only interpreted by ksh93 and explicitly allows the
-#   use of ksh93 language extensions.
-#
 export NIGHTLY_OPTIONS='-FnCDAmprt'
 
+# Some scripts optionally send mail messages to MAILTO.
+#export MAILTO=
+
 # CODEMGR_WS - where is your workspace at
-#export CODEMGR_WS="$HOME/ws/illumos-gate"
 export CODEMGR_WS="`git rev-parse --show-toplevel`"
+
+# Compilers may be specified using the following variables:
+# PRIMARY_CC	- primary C compiler
+# PRIMARY_CCC	- primary C++ compiler
+#
+# SHADOW_CCS    - list of shadow C compilers
+# SHADOW_CCCS	- list of shadow C++ compilers
+#
+# Each entry has the form <name>,<path to binary>,<style> where name is a
+# free-form name (possibly used in the makefiles to guard options), path is
+# the path to the executable.  style is the 'style' of command line taken by
+# the compiler, currently either gnu (or gcc) or sun (or cc), which is also
+# used by Makefiles to guard options.
+#
+# __SUNC and __GNUC must still be set to reflect the style of the primary
+# compiler (and to influence the default primary, otherwise)
+#
+# for example:
+# export PRIMARY_CC=gcc4,/opt/gcc/4.4.4/bin/gcc,gnu
+# export PRIMARY_CCC=gcc4,/opt/gcc/4.4.4/bin/g++,gnu
+# export SHADOW_CCS=studio12,/opt/SUNWspro/bin/cc,sun
+# export SHADOW_CCCS=studio12,/opt/SUNWspro/bin/CC,sun
+#
+# There can be several space-separated entries in SHADOW_* to run multiple
+# shadow compilers.
+#
+# To disable shadow compilation, unset SHADOW_* or set them to the empty string.
+#
+export SHADOW_CCS=gcc7,/usr/gcc/7/bin/gcc,gnu
+export SHADOW_CCCS=gcc7,/usr/gcc/7/bin/g++,gnu
+
+# Comment this out to disable support for SMB printing, i.e. if you
+# don't want to bother providing the CUPS headers this needs.
+export ENABLE_SMB_PRINTING=
+
+# If your distro uses certain versions of Perl, make sure either Makefile.master
+# contains your new defaults OR your .env file sets them.
+# These are how you would override for building on OmniOS r151028, for example.
+#export PERL_VERSION=5.28
+#export PERL_ARCH=i86pc-solaris-thread-multi-64int
+#export PERL_PKGVERS=
+
+# If your distro uses certain versions of Python, make sure either
+# Makefile.master contains your new defaults OR your .env file sets them.
+#export PYTHON_VERSION=2.7
+#export PYTHON_PKGVERS=-27
+#export PYTHON_SUFFIX=
+#export PYTHON3_VERSION=3.5
+#export PYTHON3_PKGVERS=-35
+#export PYTHON3_SUFFIX=m
+
+# To disable building with either Python2 or Python 3 (or both), uncomment
+# these lines:
+#export BUILDPY2='#'
+#export BUILDPY3='#'
+
+# Set if your distribution has different package versioning
+#export PKGVERS_BRANCH=2018.0.0.17900
+
+# Skip Java 8 builds on distributions that don't support it
+#export BLD_JAVA_8=
+
+# POST_NIGHTLY can be any command to be run at the end of nightly.  See
+# nightly(1) for interactions between environment variables and this command.
+#POST_NIGHTLY=
+
+# -----------------------------------------------------------------------------
+# You are less likely to need to modify parameters below.
+# -----------------------------------------------------------------------------
 
 # Maximum number of dmake jobs.  The recommended number is 2 + NCPUS,
 # where NCPUS is the number of logical CPUs on your build system.
@@ -98,16 +167,14 @@ ONBLD_BIN='/opt/onbld/bin'
 export PARENT_WS=''
 
 # CLONE_WS is the workspace nightly should do a bringover from.
+# The bringover, if any, is done as STAFFER.
 export CLONE_WS='ssh://anonhg@hg.illumos.org/illumos-gate'
 
-# The bringover, if any, is done as STAFFER.
 # Set STAFFER to your own login as gatekeeper or developer
 # The point is to use group "staff" and avoid referencing the parent
 # workspace as root.
-# Some scripts optionally send mail messages to MAILTO.
-#
 export STAFFER="$LOGNAME"
-export MAILTO="$STAFFER"
+export MAILTO="${MAILTO:-$STAFFER}"
 
 # If you wish the mail messages to be From: an arbitrary address, export
 # MAILFROM.
@@ -196,36 +263,6 @@ export BUILD_TOOLS='/opt'
 export SPRO_ROOT='/opt/SUNWspro'
 export SPRO_VROOT="$SPRO_ROOT"
 
-# Compilers may be specified using the following variables:
-# PRIMARY_CC	- primary C compiler
-# PRIMARY_CCC	- primary C++ compiler
-#
-# SHADOW_CCS    - list of shadow C compilers
-# SHADOW_CCCS	- list of shadow C++ compilers
-#
-# Each entry has the form <name>,<path to binary>,<style> where name is a
-# free-form name (possibly used in the makefiles to guard options), path is
-# the path to the executable.  style is the 'style' of command line taken by
-# the compiler, currently either gnu (or gcc) or sun (or cc), which is also
-# used by Makefiles to guard options.
-#
-# __SUNC and __GNUC must still be set to reflect the style of the primary
-# compiler (and to influence the default primary, otherwise)
-#
-# for example:
-# export PRIMARY_CC=gcc4,/opt/gcc/4.4.4/bin/gcc,gnu
-# export PRIMARY_CCC=gcc4,/opt/gcc/4.4.4/bin/g++,gnu
-# export SHADOW_CCS=studio12,/opt/SUNWspro/bin/cc,sun
-# export SHADOW_CCCS=studio12,/opt/SUNWspro/bin/CC,sun
-#
-# There can be several space-separated entries in SHADOW_* to run multiple
-# shadow compilers.
-#
-# To disable shadow compilation, unset SHADOW_* or set them to the empty string.
-#
-export SHADOW_CCS=gcc7,/usr/gcc/7/bin/gcc,gnu
-export SHADOW_CCCS=gcc7,/usr/gcc/7/bin/g++,gnu
-
 # This goes along with lint - it is a series of the form "A [y|n]" which
 # means "go to directory A and run 'make lint'" Then mail me (y) the
 # difference in the lint output. 'y' should only be used if the area you're
@@ -237,37 +274,8 @@ export SHADOW_CCCS=gcc7,/usr/gcc/7/bin/g++,gnu
 # if the 'N' option is not specified, is to run this test.
 #CHECK_PATHS='y'
 
-# POST_NIGHTLY can be any command to be run at the end of nightly.  See
-# nightly(1) for interactions between environment variables and this command.
-#POST_NIGHTLY=
-
-# Comment this out to disable support for SMB printing, i.e. if you
-# don't want to bother providing the CUPS headers this needs.
-export ENABLE_SMB_PRINTING=
-
-# If your distro uses certain versions of Perl, make sure either Makefile.master
-# contains your new defaults OR your .env file sets them.
-# These are how you would override for building on OmniOS r151028, for example.
-#export PERL_VERSION=5.28
-#export PERL_ARCH=i86pc-solaris-thread-multi-64int
-#export PERL_PKGVERS=-5161
-
 #
 # These checks ensure that if we accidentally run a program linked against the
 # proto area, that we then fail the build.
 #
 export LD_TOXIC_PATH="$ROOT/lib:$ROOT/usr/lib"
-
-# If your distro uses certain versions of Python, make sure either
-# Makefile.master contains your new defaults OR your .env file sets them.
-#export PYTHON_VERSION=2.7
-#export PYTHON_PKGVERS=-27
-#export PYTHON_SUFFIX=
-#export PYTHON3_VERSION=3.5
-#export PYTHON3_PKGVERS=-35
-#export PYTHON3_SUFFIX=m
-
-# To disable building with either Python2 or Python 3 (or both), uncomment
-# these lines:
-#export BUILDPY2='#'
-#export BUILDPY3='#'
