@@ -23,8 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include	<stdlib.h>
 #include	<stdio.h>
@@ -162,7 +163,7 @@ rd_new(struct ps_prochandle *php)
 	rd_agent_t	*rap;
 
 	LOG(ps_plog(MSG_ORIG(MSG_DB_RDNEW), php));
-	if ((rap = (rd_agent_t *)calloc(sizeof (rd_agent_t), 1)) == NULL)
+	if ((rap = (rd_agent_t *)calloc(1, sizeof (rd_agent_t))) == NULL)
 		return (0);
 
 	rap->rd_psp = php;

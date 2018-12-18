@@ -13,7 +13,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*
  * checknr: check an nroff/troff input file for matching macro calls.
@@ -190,7 +192,7 @@ char **argv;
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-	stk = (struct stkstr *)calloc(sizeof (struct stkstr), 100);
+	stk = (struct stkstr *)calloc(100, sizeof (struct stkstr));
 	maxstk = 100;
 	/* Figure out how many known commands there are */
 	while (knowncmds[ncmds])

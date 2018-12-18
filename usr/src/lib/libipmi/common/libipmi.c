@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <libipmi.h>
@@ -37,7 +39,7 @@ ipmi_open(int *errp, char **msg, uint_t xport_type, nvlist_t *params)
 	if (msg)
 		*msg = NULL;
 
-	if ((ihp = calloc(sizeof (ipmi_handle_t), 1)) == NULL) {
+	if ((ihp = calloc(1, sizeof (ipmi_handle_t))) == NULL) {
 		*errp = EIPMI_NOMEM;
 		if (msg)
 			*msg = "memory allocation failure";
