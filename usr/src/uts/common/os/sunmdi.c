@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014 Nexenta Systems Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -1478,11 +1479,10 @@ i_mdi_client_free(mdi_vhci_t *vh, mdi_client_t *ct)
 	mutex_destroy(&ct->ct_mutex);
 	kmem_free(ct, sizeof (*ct));
 
-	if (cdip != NULL) {
-		MDI_VHCI_CLIENT_UNLOCK(vh);
-		(void) i_mdi_devinfo_remove(vdip, cdip, flags);
-		MDI_VHCI_CLIENT_LOCK(vh);
-	}
+	MDI_VHCI_CLIENT_UNLOCK(vh);
+	(void) i_mdi_devinfo_remove(vdip, cdip, flags);
+	MDI_VHCI_CLIENT_LOCK(vh);
+
 	return (rv);
 }
 
