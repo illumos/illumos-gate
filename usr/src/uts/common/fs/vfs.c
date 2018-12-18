@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
@@ -1031,7 +1031,7 @@ out:
 static void
 lofi_remove(struct vfs *vfsp)
 {
-	struct lofi_ioctl *li = NULL;
+	struct lofi_ioctl *li;
 	ldi_ident_t ldi_id;
 	ldi_handle_t ldi_hdl;
 	int err;
@@ -1061,8 +1061,7 @@ lofi_remove(struct vfs *vfsp)
 
 out:
 	ldi_ident_release(ldi_id);
-	if (li != NULL)
-		kmem_free(li, sizeof (*li));
+	kmem_free(li, sizeof (*li));
 }
 
 /*
@@ -4232,7 +4231,7 @@ vfsinit(void)
 	for (vswp = &vfssw[1]; vswp < &vfssw[nfstype]; vswp++) {
 		RLOCK_VFSSW();
 		if (vswp->vsw_init != NULL)
-			(*vswp->vsw_init)(vswp - vfssw, vswp->vsw_name);
+			(void) (*vswp->vsw_init)(vswp - vfssw, vswp->vsw_name);
 		RUNLOCK_VFSSW();
 	}
 
