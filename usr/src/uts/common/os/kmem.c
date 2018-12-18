@@ -1425,10 +1425,12 @@ static void *
 kmem_log_enter(kmem_log_header_t *lhp, void *data, size_t size)
 {
 	void *logspace;
-	kmem_cpu_log_header_t *clhp = &lhp->lh_cpu[CPU->cpu_seqid];
+	kmem_cpu_log_header_t *clhp;
 
 	if (lhp == NULL || kmem_logging == 0 || panicstr)
 		return (NULL);
+
+	clhp = &lhp->lh_cpu[CPU->cpu_seqid];
 
 	mutex_enter(&clhp->clh_lock);
 	clhp->clh_hits++;
