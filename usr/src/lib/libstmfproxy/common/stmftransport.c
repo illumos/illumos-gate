@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -121,7 +125,7 @@ pt_socket_connect(int server_node, char *server)
 		sh = malloc(sizeof (*sh));
 		sh->sockfd = new_sfd;
 serv_out:
-		close(sfd);
+		(void) close(sfd);
 	} else {
 		struct	hostent *hp;
 
@@ -151,7 +155,7 @@ serv_out:
 
 		while (connect(sfd, (struct sockaddr *)&sin,
 		    sizeof (sin)) < 0) {
-			close(sfd);
+			(void) close(sfd);
 			if (errno == ECONNREFUSED) {
 				/* get a fresh socket and retry */
 				sfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -160,7 +164,7 @@ serv_out:
 					    "socket() call failed: %d", errno);
 					return (NULL);
 				}
-				sleep(2);
+				(void) sleep(2);
 			} else {
 				syslog(LOG_DAEMON|LOG_CRIT,
 				    "Cannot connect %s - %d", server, errno);
