@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 /* Command-line audio play utility */
 
 #include <stdio.h>
@@ -802,7 +806,8 @@ closeinput:;
 		(void) close(ifd);		/* close input file */
 		if (Errdetect) {
 			cnt = 0;
-			audio_set_play_error(Audio_fd, (unsigned int *)&cnt);
+			(void) audio_set_play_error(Audio_fd,
+			    (unsigned int *)&cnt);
 			if (cnt) {
 				Error(stderr,
 				    MGET("%s: output underflow in %s\n"),
