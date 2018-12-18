@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -274,7 +278,7 @@ proto_plugin_fini()
 	 */
 	for (p = rp_proto_list; p != NULL; p = p->plugin_next) {
 		if (p->plugin_ops->rpo_fini)
-			p->plugin_ops->rpo_fini();
+			(void) p->plugin_ops->rpo_fini();
 	}
 	while ((p = rp_proto_list) != NULL) {
 		rp_proto_list = p->plugin_next;
