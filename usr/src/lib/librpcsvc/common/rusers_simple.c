@@ -19,7 +19,6 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rusers_simple.c
@@ -27,6 +26,10 @@
  *
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <string.h>
@@ -85,13 +88,13 @@ rusers3(host, uap)
 					xdr_free(xdr_utmpidlearr, (char *)&up);
 					return (-1);
 				}
-				strncpy(rutp->ut_line,
+				(void) strncpy(rutp->ut_line,
 					up.uia_arr[i]->ui_utmp.ut_line,
 					sizeof (forsize.ut_line)+1);
-				strncpy(rutp->ut_user,
+				(void) strncpy(rutp->ut_user,
 					up.uia_arr[i]->ui_utmp.ut_name,
 					sizeof (forsize.ut_name)+1);
-				strncpy(rutp->ut_host,
+				(void) strncpy(rutp->ut_host,
 					up.uia_arr[i]->ui_utmp.ut_host,
 					sizeof (forsize.ut_host)+1);
 				rutp->ut_idle = up.uia_arr[i]->ui_idle;
@@ -117,7 +120,7 @@ rnusers(host)
 		if (rpc_call(host, RUSERSPROG, RUSERSVERS_IDLE, RUSERSPROC_NUM,
 			xdr_void, (char *) NULL,
 			xdr_u_int, (char *) &nusers, (char *) NULL) != 0)
-		return (-1);
+			return (-1);
 	}
 	return (nusers);
 }
