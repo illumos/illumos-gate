@@ -9080,7 +9080,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 				ptag = (void *)seg;
 				paddr = addr;
 			}
-			(*preclaim_callback)(ptag, paddr, len, *ppp, rw, 0);
+			(void) preclaim_callback(ptag, paddr, len, *ppp, rw, 0);
 		} else {
 			ASSERT((*ppp)[npages] == PCACHE_SHWLIST ||
 			    IS_SWAPFSVP((*ppp)[npages]->p_vnode));
