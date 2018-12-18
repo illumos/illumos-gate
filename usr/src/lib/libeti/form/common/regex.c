@@ -28,6 +28,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 /*LINTLIBRARY*/
 
 #include <sys/types.h>
@@ -134,8 +138,8 @@ __execute(char *addrc, char *addrl)
 	}
 	/* regular algorithm */
 	do {
-	__eptr_ = (intptr_t *)&__st[SSIZE];
-	__lptr_ = (intptr_t *)&__st[0];
+		__eptr_ = (intptr_t *)&__st[SSIZE];
+		__lptr_ = (intptr_t *)&__st[0];
 		if (i = __advance(p1, p2))  {
 			__loc1 = p1;
 			return (i);

@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -608,11 +612,11 @@ cmdParse(int argc, char *argv[], synTables_t synTable, void *callArgs,
 			    subcommand->exclusive &&
 			    strchr(subcommand->exclusive,
 			    cmdOptions[i].optval)) {
-					(void) printf("%s: '-%c': %s\n",
-					    commandName, cmdOptions[i].optval,
-					    gettext("is an exclusive option"));
+				(void) printf("%s: '-%c': %s\n",
+				    commandName, cmdOptions[i].optval,
+				    gettext("is an exclusive option"));
 				subUsage(DETAIL_USAGE, subcommand);
-					return (1);
+				return (1);
 			}
 		}
 	} else { /* no options were input */

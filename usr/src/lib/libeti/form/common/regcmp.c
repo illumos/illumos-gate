@@ -28,7 +28,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*LINTLIBRARY*/
 
@@ -209,7 +211,7 @@ libform_regcmp(char *cs1, char *cs2)
 
 		case '*':
 			if (*lastep == CBRA || *lastep == CKET)
-			goto cerror;
+				goto cerror;
 			*lastep |= STAR;
 			continue;
 
