@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2019, Joyent, Inc.
+ */
+
 #include <syslog.h>
 #include <dlfcn.h>
 #include <sys/types.h>
@@ -54,15 +58,15 @@ static char *pam_inames [PAM_MAX_ITEMS] = {
 /* PAM_SERVICE */	"service",
 /* PAM_USER */		"user",
 /* PAM_TTY */		"tty",
-/* PAM_RHOST */ 	"rhost",
+/* PAM_RHOST */		"rhost",
 /* PAM_CONV */		"conv",
 /* PAM_AUTHTOK */	"authtok",
 /* PAM_OLDAUTHTOK */	"oldauthtok",
-/* PAM_RUSER */ 	"ruser",
+/* PAM_RUSER */		"ruser",
 /* PAM_USER_PROMPT */	"user_prompt",
 /* PAM_REPOSITORY */	"repository",
 /* PAM_RESOURCE */	"resource",
-/* PAM_AUSER */ 	"auser",
+/* PAM_AUSER */		"auser",
 /* Undefined Items */
 };
 
@@ -76,14 +80,14 @@ static char *pam_inames [PAM_MAX_ITEMS] = {
 
 /* functions to dynamically load modules */
 static int	load_modules(pam_handle_t *, int, char *, pamtab_t *);
-static void 	*open_module(pam_handle_t *, char *);
+static void	*open_module(pam_handle_t *, char *);
 static int	load_function(void *, char *, int (**func)());
 
 /* functions to read and store the pam.conf configuration file */
 static int	open_pam_conf(struct pam_fh **, pam_handle_t *, char *);
 static void	close_pam_conf(struct pam_fh *);
 static int	read_pam_conf(pam_handle_t *, char *);
-static int 	get_pam_conf_entry(struct pam_fh *, pam_handle_t *,
+static int	get_pam_conf_entry(struct pam_fh *, pam_handle_t *,
     pamtab_t **);
 static char	*read_next_token(char **);
 static char	*nextline(struct pam_fh *, pam_handle_t *, int *);
@@ -797,8 +801,8 @@ pam_set_data(pam_handle_t *pamh, const char *module_data_name, void *data,
 
 	pam_trace(PAM_DEBUG_DATA,
 	    "pam_set_data(%p:%s:%d)=%p", (void *)pamh,
-	    module_data_name ? module_data_name : "NULL", pamh->pam_inmodule,
-	    data);
+	    (module_data_name != NULL) ? module_data_name : "NULL",
+	    (pamh != NULL) ? pamh->pam_inmodule : -1, data);
 	if (pamh == NULL || (pamh->pam_inmodule != WO_OK) ||
 	    module_data_name == NULL) {
 		return (PAM_SYSTEM_ERR);
