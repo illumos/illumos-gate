@@ -23,6 +23,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 RackTop Systems.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -115,7 +116,7 @@ vpanic(const char *fmt, va_list adx)
 
 	/* Call libc`assfail() so that mdb ::status works */
 	(void) vsnprintf(panicbuf, sizeof (panicbuf), fmt, adx);
-	assfail(panicbuf, "(panic)", 0);
+	(void) assfail(panicbuf, "(panic)", 0);
 
 	abort();	/* avoid "noreturn" warnings */
 }
