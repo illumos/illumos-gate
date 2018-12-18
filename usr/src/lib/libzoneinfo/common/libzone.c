@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -211,10 +213,6 @@ get_tz_countries(struct tz_country **country, struct tz_continent *cont)
 	int cmp, status;
 	size_t len, len_coord, len_ctnt;
 
-	if (cont->ctnt_name == NULL) {
-		errno = EINVAL;
-		return (-1);
-	}
 	len_ctnt = strlen(cont->ctnt_name);
 	ccbuf[0] = '\0';
 
