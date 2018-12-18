@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * mii - MII/PHY support for MAC drivers
  *
  * Utility module to provide a consistent interface to a MAC driver accross
@@ -1519,7 +1523,7 @@ debounce:
 		 * gigabit modes cannot use legacy parallel detection.
 		 */
 
-		if ((ph->phy_type == XCVR_1000T) &
+		if ((ph->phy_type == XCVR_1000T) &&
 		    (anexp & MII_AN_EXP_LPCANAN)) {
 
 			/* check for gige */
