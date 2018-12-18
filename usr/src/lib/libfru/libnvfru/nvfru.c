@@ -23,6 +23,8 @@
  * Copyright (c) 2014 Gary Mills
  *
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -402,7 +404,7 @@ rawfru_to_nvlist(uint8_t *buffer, size_t bufsize, char *cont_type,
 
 	err = convert_fru(hdl, nvlist);
 
-	fru_close_data_source();
+	(void) fru_close_data_source();
 
 	(void) pthread_mutex_unlock(&gLock);
 
