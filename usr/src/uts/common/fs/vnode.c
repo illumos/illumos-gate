@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  */
@@ -3368,7 +3368,7 @@ fop_open(
 		 * reflect the vnode switch.
 		 */
 		VOPSTATS_UPDATE(*vpp, open);
-		if (*vpp != vp && *vpp != NULL) {
+		if (*vpp != vp) {
 			vn_copypath(vp, *vpp);
 			if (((*vpp)->v_type == VREG) && (mode & FREAD))
 				atomic_inc_32(&(*vpp)->v_rdcnt);
