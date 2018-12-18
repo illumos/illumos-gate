@@ -2469,9 +2469,17 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 		needed_desc++;
 	}
 
+	/*
+	 * The second condition ensures that 'itrq_desc_tail' never
+	 * equals 'itrq_desc_head'. This enforces the rule found in
+	 * the second bullet point of section 8.4.3.1.5 of the XL710
+	 * PG, which declares the TAIL pointer in I40E_QTX_TAIL should
+	 * never overlap with the head. This means that we only ever
+	 * have 'itrq_tx_ring_size - 1' total available descriptors.
+	 */
 	mutex_enter(&itrq->itrq_tx_lock);
 	if (itrq->itrq_desc_free < i40e->i40e_tx_block_thresh ||
-	    itrq->itrq_desc_free < needed_desc) {
+	    (itrq->itrq_desc_free - 1) < needed_desc) {
 		txs->itxs_err_nodescs.value.ui64++;
 		mutex_exit(&itrq->itrq_tx_lock);
 		goto txfail;
