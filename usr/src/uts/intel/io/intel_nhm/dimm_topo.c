@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/nvpair.h>
@@ -156,25 +160,25 @@ inhm_dimm(nhm_dimm_t *nhm_dimm, uint32_t node, uint8_t channel, uint32_t dimm)
 	(void) nvlist_add_uint32(newdimm, "ranks", (uint32_t)nhm_dimm->nranks);
 	inhm_rank(newdimm, nhm_dimm, node, channel, dimm,
 	    nhm_dimm->dimm_size / nhm_dimm->nranks);
-	if (nhm_dimm->manufacturer && nhm_dimm->manufacturer[0]) {
+	if (nhm_dimm->manufacturer[0]) {
 		t = sizeof (nhm_dimm->manufacturer);
 		(void) strncpy(sbuf, nhm_dimm->manufacturer, t);
 		sbuf[t] = 0;
 		(void) nvlist_add_string(newdimm, "manufacturer", sbuf);
 	}
-	if (nhm_dimm->serial_number && nhm_dimm->serial_number[0]) {
+	if (nhm_dimm->serial_number[0]) {
 		t = sizeof (nhm_dimm->serial_number);
 		(void) strncpy(sbuf, nhm_dimm->serial_number, t);
 		sbuf[t] = 0;
 		(void) nvlist_add_string(newdimm, FM_FMRI_HC_SERIAL_ID, sbuf);
 	}
-	if (nhm_dimm->part_number && nhm_dimm->part_number[0]) {
+	if (nhm_dimm->part_number[0]) {
 		t = sizeof (nhm_dimm->part_number);
 		(void) strncpy(sbuf, nhm_dimm->part_number, t);
 		sbuf[t] = 0;
 		(void) nvlist_add_string(newdimm, FM_FMRI_HC_PART, sbuf);
 	}
-	if (nhm_dimm->revision && nhm_dimm->revision[0]) {
+	if (nhm_dimm->revision[0]) {
 		t = sizeof (nhm_dimm->revision);
 		(void) strncpy(sbuf, nhm_dimm->revision, t);
 		sbuf[t] = 0;
