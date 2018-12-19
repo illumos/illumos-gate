@@ -22,6 +22,7 @@
 # Copyright (c) 2008-2009, Intel Corporation.
 # All Rights Reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG = latencytop
 OBJS = latencytop.o display.o dwrapper.o klog.o stat.o table.o util.o
@@ -33,6 +34,8 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 
 CERRWARN += -_gcc=-Wno-uninitialized
+
+SMOFF += all_func_returns
 
 CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
 	-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
