@@ -458,7 +458,7 @@ choose_iodevs(struct snapshot *ss, struct iodev_snapshot *iodevs,
 			tmp = pos;
 			pos = pos->is_next;
 
-			if (df && df->if_skip_floppy &&
+			if (df->if_skip_floppy &&
 			    strncmp(tmp->is_name, "fd", 2) == 0)
 				continue;
 

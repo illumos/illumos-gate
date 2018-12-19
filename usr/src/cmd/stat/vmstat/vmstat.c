@@ -11,6 +11,10 @@
 /* from UCB 5.4 5/17/86 */
 /* from SunOS 4.1, SID 1.31 */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -224,9 +228,6 @@ show_disk(void *v1, void *v2, void *d)
 	hrtime_t oldtime = new->is_crtime;
 	double hr_etime;
 	double reads, writes;
-
-	if (new == NULL)
-		return;
 
 	if (old)
 		oldtime = old->is_stats.wlastupdate;
