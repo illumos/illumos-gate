@@ -22,6 +22,9 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -1302,7 +1305,6 @@ list_simple_for_all(boolean_t verbose)
 				    "failed to retrieve the providers' "
 				    "information from file kcf.conf - %s.",
 				    _PATH_KCF_CONF);
-				free(psoftlist_kernel);
 				rc = FAILURE;
 			} else {
 
