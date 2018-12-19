@@ -28,8 +28,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*
  * fmtmsg.c
@@ -723,7 +724,7 @@ main(int argc, char **argv)
 
 	}
 
-	if (!c_seen & !u_seen) class = MM_NULLMC;
+	if (!c_seen && !u_seen) class = MM_NULLMC;
 
 
 
