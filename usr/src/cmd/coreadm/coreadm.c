@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -547,7 +548,8 @@ read_legacy(void)
 			if (n == 1)
 				value[0] = '\0';
 			if (strcmp(name, "COREADM_GLOB_PATTERN") == 0) {
-				(void) strcpy(gpattern, value);
+				(void) strlcpy(gpattern, value,
+				    sizeof (gpattern));
 				continue;
 			}
 			if (strcmp(name, "COREADM_GLOB_CONTENT") == 0) {
@@ -555,7 +557,8 @@ read_legacy(void)
 				continue;
 			}
 			if (strcmp(name, "COREADM_INIT_PATTERN") == 0) {
-				(void) strcpy(ipattern, value);
+				(void) strlcpy(ipattern, value,
+				    sizeof (ipattern));
 				continue;
 			}
 			if (strcmp(name, "COREADM_INIT_CONTENT") == 0) {
