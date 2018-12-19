@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2017 Gary Mills
  * Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
  */
@@ -1636,8 +1636,7 @@ is_from_gz(const char *lifname)
 
 	if (if_info->ifi_cflags & IFIF_L3PROTECT)
 		ret = _B_TRUE;
-	if (if_info)
-		ipadm_free_if_info(if_info);
+	ipadm_free_if_info(if_info);
 	return (ret);
 }
 
