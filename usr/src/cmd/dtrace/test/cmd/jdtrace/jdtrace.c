@@ -55,7 +55,7 @@ main(int argc, char **argv)
 	p[i] = NULL;
 
 	if (sysinfo(SI_ARCHITECTURE_64, isaname, sizeof (isaname)) != -1)
-		asprintf(av, "/usr/java/bin/%s/java", isaname);
+		(void) asprintf(av, "/usr/java/bin/%s/java", isaname);
 
 	(void) execv(av[0], av);
 	err(1, "exec failed");
