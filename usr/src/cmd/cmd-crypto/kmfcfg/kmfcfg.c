@@ -21,6 +21,10 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <stdio.h>
 #include <strings.h>
 #include <ctype.h>
@@ -38,9 +42,9 @@
  * fix, and extend with new verbs.
  */
 typedef struct verbcmd_s {
-	char    	*verb;
+	char		*verb;
 	int		(*action)(int, char *[]);
-	char    	*synopsis;
+	char		*synopsis;
 } verbcmd;
 
 int	kc_list(int argc, char *argv[]);
@@ -140,11 +144,11 @@ static verbcmd cmds[] = {
 		"infile=inputdbfile\n" },
 	{ "export",	kc_export, "export [dbfile=dbfile] policy=policyname "
 		"outfile=newdbfile\n" },
-	{ "install", 	kc_install, "install keystore=keystorename "
+	{ "install",	kc_install, "install keystore=keystorename "
 		"modulepath=path [option=optionstring]\n"},
-	{ "uninstall", 	kc_uninstall, "uninstall keystore=keystorename\n"},
-	{ "-?",		kc_help, 	"help"},
-	{ "help",	kc_help, 	""}
+	{ "uninstall",	kc_uninstall, "uninstall keystore=keystorename\n"},
+	{ "-?",		kc_help,	"help"},
+	{ "help",	kc_help,	""}
 };
 
 static int num_cmds = sizeof (cmds) / sizeof (verbcmd);
@@ -189,7 +193,8 @@ main(int argc, char *argv[])
 	(void) textdomain(TEXT_DOMAIN);
 
 	prog = basename(argv[0]);
-	argv++; argc--;
+	argv++;
+	argc--;
 
 	if (argc == 0) {
 		usage();
