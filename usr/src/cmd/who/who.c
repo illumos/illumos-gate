@@ -30,6 +30,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  *	This program analyzes information found in /var/adm/utmpx
  *
  *	Additionally information is gathered from /etc/inittab
@@ -300,7 +304,7 @@ main(int argc, char **argv)
 	if (sopt == 1) {
 		terse = 1;
 		if (Topt == 1 || aopt == 1)
-		goerr++;
+			goerr++;
 	}
 #endif	/* XPG4 */
 
@@ -698,7 +702,7 @@ dump()
 	/*
 	 *	Get remote host from utmpx structure
 	 */
-	if (utmpp && utmpp->ut_host[0])
+	if (utmpp->ut_host[0])
 		(void) printf("\t(%.*s)", sizeof (utmpp->ut_host),
 		    utmpp->ut_host);
 
