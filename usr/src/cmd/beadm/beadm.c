@@ -27,6 +27,7 @@
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2017 Jason King
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -213,7 +214,6 @@ init_hdr_cols(enum be_fmt be_fmt, struct hdr_info *hdr)
 	col[3].col_name = _("Space");
 	col[4].col_name = _("Policy");
 	col[5].col_name = _("Created");
-	col[6].col_name = NULL;
 
 	switch (be_fmt) {
 	case BE_FMT_ALL:
