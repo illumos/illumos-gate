@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -993,7 +993,8 @@ core_pcbe_event_coverage(char *event)
 	} else {
 		if (find_generic_events(event, cmn_generic_events) != NULL) {
 			bitmap |= BITMASK_XBITS(num_gpc);
-		} if (find_generic_events(event, generic_events_pic0) != NULL) {
+		} else if (find_generic_events(event,
+		    generic_events_pic0) != NULL) {
 			bitmap |= 1ULL;
 		} else if (find_gpcevent_core_uarch(event,
 		    cmn_gpc_events_core_uarch) != NULL) {
