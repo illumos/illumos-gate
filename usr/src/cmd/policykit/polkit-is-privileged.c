@@ -21,6 +21,9 @@
  *
  **************************************************************************/
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
@@ -199,7 +202,7 @@ main (int argc, char *argv[])
 
 out:
 	if (ctx != NULL)
-		libpolkit_free_context (ctx);
+		(void) libpolkit_free_context (ctx);
 
 	return rc;
 }
