@@ -26,6 +26,10 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include	<stdio.h>
 #include	<string.h>
 #include	"msg.h"
@@ -156,7 +160,7 @@ ld_map_out(Ofl_desc *ofl)
 		 * like _init() and _fini() commonly have multiple occurrences).
 		 */
 		if ((sdp->sd_ref == REF_DYN_SEEN) ||
-		    (sdp->sd_aux && sdp->sd_aux->sa_symspec) ||
+		    (sdp->sd_aux->sa_symspec) ||
 		    (strcmp(MSG_ORIG(MSG_SYM_FINI_U), name) == 0) ||
 		    (strcmp(MSG_ORIG(MSG_SYM_INIT_U), name) == 0) ||
 		    (strcmp(MSG_ORIG(MSG_SYM_LIBVER_U), name) == 0))

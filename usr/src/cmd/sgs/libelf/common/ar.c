@@ -28,6 +28,10 @@
  *	  All Rights Reserved
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <ar.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -156,6 +160,7 @@ _elf_armem(Elf *elf, char *file, size_t fsz)
 		if ((l = (Memlist *)malloc(sizeof (Memlist) +
 		    (sizeof (Memident) * MEMIDENTNO))) == 0) {
 			_elf_seterr(EMEM_ARMEM, errno);
+			free(m);
 			return (0);
 		}
 		l->m_next = 0;
