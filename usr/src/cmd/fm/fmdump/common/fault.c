@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <fmdump.h>
@@ -183,7 +183,7 @@ flt_verb23_cmn(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp,
 
 	for (i = 0; i < rp->rec_nrefs; i++) {
 		fmdump_printf(fp, "  ");
-		efp->do_func(lp, &rp->rec_xrefs[i], fp);
+		(void) efp->do_func(lp, &rp->rec_xrefs[i], fp);
 	}
 
 	fmdump_printf(fp, "\n");
