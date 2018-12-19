@@ -87,7 +87,7 @@ static char *fma_classes[] = {
 const char *
 get_fma_tag(uint32_t index)
 {
-	if (index > (sizeof (fma_tags) / sizeof (struct fma_tags)))
+	if (index >= (sizeof (fma_tags) / sizeof (struct fma_tags)))
 		return (NULL);
 
 	return (fma_tags[index].t);
@@ -101,7 +101,7 @@ get_fma_tag(uint32_t index)
 const char *
 get_fma_class(uint32_t index)
 {
-	if (index > (sizeof (fma_tags) / sizeof (struct fma_tags)))
+	if (index >= (sizeof (fma_tags) / sizeof (struct fma_tags)))
 		return (NULL);
 
 	return (fma_tags[index].s);
