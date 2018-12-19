@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * PICL plug-in that creates device tree nodes for all platforms
  */
 
@@ -1770,7 +1774,7 @@ static int
 is_snapshot_stale(di_node_t root)
 {
 	snapshot_stale = 0;
-	di_walk_node(root, DI_WALK_CLDFIRST, NULL, check_stale_node);
+	(void) di_walk_node(root, DI_WALK_CLDFIRST, NULL, check_stale_node);
 	return (snapshot_stale);
 }
 
@@ -2546,8 +2550,8 @@ get_asr_export_list(char **exportlist, int *exportlistlen)
 		return (0);
 	}
 	(void) memcpy(*exportlist, opp->oprom_array, opp->oprom_size);
-	free(opp);
 	*exportlistlen = opp->oprom_size;
+	free(opp);
 	(void) close(d);
 	return (1);
 }
