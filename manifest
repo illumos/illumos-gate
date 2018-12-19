@@ -2820,8 +2820,6 @@ d usr/include/amd64/sys 0755 root bin
 f usr/include/amd64/sys/kdi_regs.h 0644 root bin
 f usr/include/amd64/sys/privmregs.h 0644 root bin
 f usr/include/amd64/sys/privregs.h 0644 root bin
-f usr/include/apptrace.h 0644 root bin
-f usr/include/apptrace_impl.h 0644 root bin
 f usr/include/ar.h 0644 root bin
 f usr/include/archives.h 0644 root bin
 d usr/include/arpa 0755 root bin
@@ -4892,23 +4890,6 @@ d usr/lib 0755 root bin
 f usr/lib/0@0.so.1 0755 root bin
 s usr/lib/32=.
 s usr/lib/64=amd64
-d usr/lib/abi 0755 root bin
-d usr/lib/abi/amd64 0755 root bin
-f usr/lib/abi/amd64/apptrace.so.1 0755 root bin
-d usr/lib/abi/appcert 0755 root bin
-f usr/lib/abi/appcert/AppcertUtil.pm 0555 root bin
-f usr/lib/abi/appcert/abi_index 0555 root bin
-f usr/lib/abi/appcert/etc.alt 0444 root bin
-f usr/lib/abi/appcert/etc.scoped 0444 root bin
-f usr/lib/abi/appcert/etc.tweaks 0444 root bin
-f usr/lib/abi/appcert/etc.warn 0444 root bin
-f usr/lib/abi/appcert/static_prof 0555 root bin
-f usr/lib/abi/appcert/symcheck 0555 root bin
-f usr/lib/abi/appcert/symprof 0555 root bin
-f usr/lib/abi/appcert/symreport 0555 root bin
-f usr/lib/abi/apptrace.so.1 0755 root bin
-f usr/lib/abi/spec2map 0755 root bin
-f usr/lib/abi/spec2trace 0755 root bin
 d usr/lib/acct 0755 root bin
 f usr/lib/acct/acctcms 0555 root bin
 f usr/lib/acct/acctcon 0555 root bin
@@ -5543,8 +5524,6 @@ f usr/lib/fm/amd64/libseslog.so.1 0755 root bin
 s usr/lib/fm/amd64/libseslog.so=libseslog.so.1
 f usr/lib/fm/amd64/libtopo.so.1 0755 root bin
 s usr/lib/fm/amd64/libtopo.so=libtopo.so.1
-f usr/lib/fm/buildcode 0555 root bin
-f usr/lib/fm/bustcode 0555 root bin
 d usr/lib/fm/dict 0755 root bin
 f usr/lib/fm/dict/AMD.dict 0444 root bin
 f usr/lib/fm/dict/DISK.dict 0444 root bin
@@ -5563,7 +5542,6 @@ f usr/lib/fm/dict/STORAGE.dict 0444 root bin
 f usr/lib/fm/dict/SUNOS.dict 0444 root bin
 f usr/lib/fm/dict/TEST.dict 0444 root bin
 f usr/lib/fm/dict/ZFS.dict 0444 root bin
-f usr/lib/fm/dictck 0555 root bin
 d usr/lib/fm/eft 0755 root bin
 f usr/lib/fm/eft/disk.eft 0444 root bin
 f usr/lib/fm/eft/neptune_xaui.eft 0444 root bin

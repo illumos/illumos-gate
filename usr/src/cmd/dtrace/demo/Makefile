@@ -21,6 +21,8 @@
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 
 include ../../Makefile.cmd
 
@@ -157,11 +159,11 @@ $(ROOTDEMODIR):
 $(ROOTDEMODIR)/%: %
 	$(INS.file)
 
-$(HTMLFILES):	$(DFILES) $(MKDEMO)	
-	./$(MKDEMO) $@
+$(HTMLFILES):	$(DFILES) $(MKDEMO)
+	$(PERL) ./$(MKDEMO) $@
 
-$(DFILES):	$(MKDEMO)	
-	./$(MKDEMO) $@
+$(DFILES):	$(MKDEMO)
+	$(PERL) ./$(MKDEMO) $@
 
 $(ROOTDEMOFILES): $(ROOTDEMODIR)
 

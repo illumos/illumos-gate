@@ -24,6 +24,8 @@
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 
 LIBBASENAME=	libc
 LIBRARY=	$(LIBBASENAME:%=%.a)
@@ -104,7 +106,7 @@ ROOTVARIANTLIBS= $(VARIANTS:%=$(ROOTVARIANTDIR)/$(LIBBASENAME)_%.so.1)
 ROOTVARIANTLIBS64= $(VARIANTS64:%=$(ROOTVARIANTDIR64)/$(LIBBASENAME)_%.so.1)
 
 # definitions for install_h target
-BASEHDRS=	getxby_door.h 
+BASEHDRS=	getxby_door.h
 CHECKHDRS=	$(BASEHDRS:%.h=port/gen/%.check)
 HDRS=		$(BASEHDRS)
 
@@ -133,7 +135,7 @@ all:	all_h lib32 $(BUILD64) .WAIT lib64 .WAIT etc THIRDPARTYLICENSE
 
 THIRDPARTYLICENSE: extract-copyright
 	$(RM) $@
-	./extract-copyright . > $@
+	$(PERL) ./extract-copyright . > $@
 
 etc:	$($(MACH)_ETC)
 

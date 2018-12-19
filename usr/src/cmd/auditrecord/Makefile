@@ -22,13 +22,15 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 
 include $(SRC)/cmd/Makefile.cmd
 
 ATTR =			audit_record_attr
 ROOTAUDITDIR =		$(ROOT)/usr/lib/audit
 
-SECURITYFILES = 	$(ATTR:%=$(ROOTAUDITDIR)/%)
+SECURITYFILES =		$(ATTR:%=$(ROOTAUDITDIR)/%)
 $(SECURITYFILES) :=	FILEMODE = $(LIBFILEMODE)
 
 PROG		= auditrecord
@@ -41,7 +43,7 @@ ADTXMLFILE	= $(LIBBSMDIR)/common/adt.xml
 
 .KEEP_STATE:
 
-all: $(PROG) $(ATTR) 
+all: $(PROG) $(ATTR)
 
 install: all $(ROOTUSRSBINPROG) install_data
 
@@ -59,7 +61,7 @@ clean:
 	$(RM) $(ATTR) $(STRIPTEXT) $(AGETTEXT)
 
 $(ATTR): $(STRIPTEXT) $(ATTRPROC) $(ADTXMLFILE) $(ATTR).txt
-	./$(STRIPTEXT) < $(ATTR).txt > $(ATTR)
+	$(PERL) ./$(STRIPTEXT) < $(ATTR).txt > $(ATTR)
 	$(PERL) -I $(LIBBSMDIR) ./$(ATTRPROC) $(ADTXMLFILE) >> $(ATTR)
 
 $(ROOTUSRSBINPROG): $(PROG)
