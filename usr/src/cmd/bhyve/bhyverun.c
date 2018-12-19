@@ -1024,7 +1024,7 @@ main(int argc, char *argv[])
 #ifdef	__FreeBSD__
 	optstr = "abehuwxACHIPSWYp:g:G:c:s:m:l:B:U:";
 #else
-	optstr = "abehuwxACHIPSWY:g:G:c:s:m:l:B:U:";
+	optstr = "abehuwxACHIPSWYg:G:c:s:m:l:B:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
