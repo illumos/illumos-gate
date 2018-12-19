@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -983,12 +983,14 @@ id_t
 smbios_info_boot(smbios_hdl_t *shp, smbios_boot_t *bp)
 {
 	const smb_struct_t *stp = smb_lookup_type(shp, SMB_TYPE_BOOT);
-	const smb_boot_t *b = (smb_boot_t *)(uintptr_t)stp->smbst_hdr;
+	const smb_boot_t *b;
 
 	if (stp == NULL)
 		return (-1); /* errno is set for us */
 
 	bzero(bp, sizeof (smbios_boot_t));
+
+	b = (smb_boot_t *)(uintptr_t)stp->smbst_hdr;
 
 	bp->smbt_status = b->smbbo_status[0];
 	bp->smbt_size = stp->smbst_hdr->smbh_len - sizeof (smb_boot_t);
