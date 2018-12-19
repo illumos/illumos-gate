@@ -24,6 +24,8 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <limits.h>
@@ -243,9 +245,9 @@ display_data(unsigned char *data, size_t length, fru_elemdef_t *def)
 		char *disp_str = (char *)alloca(length+1);
 		for (i = 0; i < length; i++)
 			disp_str[i] = data[i];
-			disp_str[i] = '\0';
-			(void) printf("%s", disp_str);
-			return;
+		disp_str[i] = '\0';
+		(void) printf("%s", disp_str);
+		return;
 	}
 
 	case FDTYPE_Enumeration:
@@ -592,7 +594,7 @@ updateiter_record(fru_nodehdl_t nodehdl, int cnt, char **ptr,
 			(void) fprintf(stderr,
 			gettext("fru_update_field():  %s\n"),
 			    fru_strerror(err));
-		return (1);
+			return (1);
 		}
 
 		iter_cnt = 1;

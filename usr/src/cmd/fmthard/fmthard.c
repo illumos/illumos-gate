@@ -34,6 +34,9 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+/*
  * Sun Microsystems version of fmthard:
  *
  * Supports the following arguments:
@@ -740,7 +743,7 @@ full size of disk.  The full disk capacity is %llu sectors.\n", i, fullsz);
 		    (vtoc->v_part[i].p_size % nblks)) {
 			(void) fprintf(stderr, "\
 fmthard: Partition %d not aligned on cylinder boundary \n", i);
-				exit(1);
+			exit(1);
 		}
 		if (vtoc->v_part[i].p_start > fullsz ||
 		    vtoc->v_part[i].p_start +

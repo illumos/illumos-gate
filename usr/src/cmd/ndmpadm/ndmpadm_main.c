@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -333,7 +334,7 @@ ndmp_set_config_process(char *propname)
 	if ((propvalue = strchr(propname, '=')) == NULL) {
 		(void) fprintf(stderr, gettext("Missing value in "
 		    "property=value argument for %s\n"), propname);
-			return;
+		return;
 	}
 	*propvalue = '\0';
 	propvalue++;
@@ -341,7 +342,7 @@ ndmp_set_config_process(char *propname)
 	if (*propname == '\0') {
 		(void) fprintf(stderr, gettext("Missing property in "
 		    "property=value argument for %s\n"), propname);
-			return;
+		return;
 	}
 	for (j = 0; j < NDMPADM_NPROP; j++) {
 		if (strcmp(propname, prop_table[j]) == 0)
@@ -513,7 +514,7 @@ ndmp_kill_sessions(int argc, char **argv, ndmp_command_t *cur_cmd)
 		} else {
 			(void) fprintf(stderr,
 			    gettext("Invalid argument %s\n"), argv[i]);
-				continue;
+			continue;
 		}
 		if (ret == -1)
 			(void) fprintf(stdout,

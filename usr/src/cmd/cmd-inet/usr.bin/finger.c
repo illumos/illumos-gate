@@ -38,6 +38,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * This is a finger program.  It prints out useful information about users
  * by digging it up from various system files.
  *
@@ -1359,7 +1363,7 @@ AlreadyPrinted(uid_t uid)
 
 	while (i++ < PPIndex) {
 		if (PlanPrinted[i] == uid)
-		return (1);
+			return (1);
 	}
 	if (i < PPMAX) {
 		PlanPrinted[i] = uid;

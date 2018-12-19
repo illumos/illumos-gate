@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *
- *  Copyright (c) 1994 by Sun Microsystems, Inc.
+ * Copyright (c) 1994 by Sun Microsystems, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -31,7 +31,6 @@
  *      P1003.2/D11.2
  *
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * Original ident string for reference
  * ident	"$Id: pathchk.c,v 1.29 1994/05/24 15:51:19 mark Exp $"
@@ -247,7 +246,7 @@ checkpathname(char *path, int pflag)
 		 * Find the end of the current component
 		 * and check for valid characters in the component
 		 */
-		 while (*p != '\0' && !M_FSDELIM(*p)) {
+		while (*p != '\0' && !M_FSDELIM(*p)) {
 			/*
 			 * for pflag: check for PFCS characters
 			 * otherwise assume all characters are valid
@@ -280,13 +279,13 @@ checkpathname(char *path, int pflag)
 			 * are required when not just
 			 * checking for portability.
 			 */
-			 struct stat sb;
-			 char fsdelim;
+			struct stat sb;
+			char fsdelim;
 
-			 fsdelim = *ecomp;
-			 *ecomp = '\0';
+			fsdelim = *ecomp;
+			*ecomp = '\0';
 
-			 if (stat(path, &sb) == -1) {
+			if (stat(path, &sb) == -1) {
 				/*
 				 * We error out if an
 				 * intermediate component
@@ -303,7 +302,7 @@ checkpathname(char *path, int pflag)
 				} else if (errno == ENOENT) {
 					checkStat = 0;
 				}
-			 } else if (S_ISDIR(sb.st_mode)) {
+			} else if (S_ISDIR(sb.st_mode)) {
 				/*
 				 * If the current prefix is a
 				 * directory, then we need to

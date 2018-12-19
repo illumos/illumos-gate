@@ -30,6 +30,10 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include	<signal.h>
 #include	<unistd.h>
 #include	<fcntl.h>
@@ -576,7 +580,7 @@ expand(wchar_t **a1, int c)
 							pbstr(lquote);
 
 						if (i <= 0)
-						break;
+							break;
 
 						pbstr(L",");
 					}

@@ -32,6 +32,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * chown [-fhR] uid[:gid] file ...
  * chown -R [-f] [-H|-L|-P] uid[:gid] file ...
  * chown -s [-fhR] ownersid[:groupsid] file ...
@@ -199,7 +203,7 @@ main(int argc, char *argv[])
 					if (errno == ERANGE) {
 						(void) fprintf(stderr, gettext(
 						"chown: group id too large\n"));
-							exit(2);
+						exit(2);
 					} else {
 						(void) fprintf(stderr, gettext(
 						"chown: invalid group id\n"));

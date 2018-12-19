@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/processor.h>
 #include <sys/ucode.h>
@@ -668,9 +672,9 @@ main(int argc, char *argv[])
 		uint32_t *revp = NULL;
 		int i;
 #if defined(_SYSCALL32_IMPL)
-	struct ucode_get_rev_struct32 inf32;
+		struct ucode_get_rev_struct32 inf32;
 #else
-	struct ucode_get_rev_struct info;
+		struct ucode_get_rev_struct info;
 #endif
 
 		cpuid_max = (processorid_t)sysconf(_SC_CPUID_MAX);
@@ -721,9 +725,9 @@ main(int argc, char *argv[])
 	if (action & UCODE_OPT_UPDATE) {
 		int tmprc;
 #if defined(_SYSCALL32_IMPL)
-	struct ucode_write_struct32 uw_struct32;
+		struct ucode_write_struct32 uw_struct32;
 #else
-	struct ucode_write_struct uw_struct;
+		struct ucode_write_struct uw_struct;
 #endif
 
 #if defined(_SYSCALL32_IMPL)

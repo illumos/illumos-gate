@@ -24,7 +24,9 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*
  * syseventd client interfaces
@@ -121,7 +123,7 @@ insert_client(void *client_data, int client_type, int retry_limit)
 				NULL);
 			(void) mutex_unlock(&scp->client_lock);
 			(void) mutex_unlock(&client_tbl_lock);
-				return (i);
+			return (i);
 		}
 	}
 

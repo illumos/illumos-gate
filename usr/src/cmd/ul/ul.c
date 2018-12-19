@@ -12,7 +12,9 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <locale.h>
@@ -460,7 +462,7 @@ iattr(void)
 			tszbf += n * MEMFCT;
 		}
 		tszbf -= n;
-		 *cp++ = cx;
+		*cp++ = cx;
 		while (--n > 0) {
 			*cp++ = cx;
 			i++;

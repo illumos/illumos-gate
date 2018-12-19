@@ -27,6 +27,7 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -274,9 +275,9 @@ main(int argc, char **argv)
 			    (void) fprintf(stderr,
 				gettext("Cannot determine who you are.\n"));
 			    exit(1);
-		    }
-		    (void) strlcpy(&ownname[0], &passptr->pw_name[0],
-			sizeof (ownname));
+			}
+			(void) strlcpy(&ownname[0], &passptr->pw_name[0],
+			    sizeof (ownname));
 		} else {
 			(void) strlcpy(&ownname[0], self.ut_user,
 			    sizeof (self.ut_user));
