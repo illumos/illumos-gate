@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include "ndievents.h"
 #include <sys/sunndi.h>
@@ -36,8 +38,8 @@
 
 
 int
-dip_to_pathname(struct dev_info *device, char *path, int buflen) {
-
+dip_to_pathname(struct dev_info *device, char *path, int buflen)
+{
 	char *bp;
 	char *addr;
 	char addr_str[32];
@@ -52,7 +54,7 @@ dip_to_pathname(struct dev_info *device, char *path, int buflen) {
 	if (device->devi_parent == NULL) {
 		if (mdb_readstr(nodename, sizeof (nodename),
 		    (uintptr_t)device->devi_node_name) == -1) {
-		    return (-1);
+			return (-1);
 		}
 
 		if (sizeof (nodename) > (buflen - strlen(path))) {
@@ -80,7 +82,7 @@ dip_to_pathname(struct dev_info *device, char *path, int buflen) {
 	}
 
 	if (device->devi_node_state < DS_INITIALIZED) {
-		strncpy(addr_str, '\0', sizeof ('\0'));
+		addr_str[0] = '\0';
 	} else {
 		addr = device->devi_addr;
 		if (mdb_readstr(addr_str, sizeof (addr_str),
@@ -119,7 +121,7 @@ ndi_callback_print(struct ndi_event_cookie *cookie, uint_t flags)
 
 	while (callback_list != NULL) {
 		if (mdb_vread(&cb, sizeof (struct ndi_event_callbacks),
-			    (uintptr_t)callback_list) == -1) {
+		    (uintptr_t)callback_list) == -1) {
 			mdb_warn("Could not read callback structure at"
 			    " %p", callback_list);
 			return (DCMD_ERR);
@@ -156,10 +158,10 @@ int
 ndi_event_print(struct ndi_event_hdl *hdl, uint_t flags)
 {
 
-	struct 	ndi_event_definition def;
-	struct 	ndi_event_cookie cookie;
-	struct 	ndi_event_cookie *cookie_list;
-	char 	ndi_event_name[256];
+	struct	ndi_event_definition def;
+	struct	ndi_event_cookie cookie;
+	struct	ndi_event_cookie *cookie_list;
+	char	ndi_event_name[256];
 
 	if (!hdl)
 		return (DCMD_ERR);
@@ -222,8 +224,7 @@ ndi_event_hdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_vread(&devi, sizeof (struct dev_info),
-		    (uintptr_t)handle.ndi_evthdl_dip)
-	    == -1) {
+	    (uintptr_t)handle.ndi_evthdl_dip) == -1) {
 		mdb_warn("failed to read devinfo node at %p",
 		    handle.ndi_evthdl_dip);
 		return (DCMD_ERR);
@@ -250,9 +251,9 @@ ndi_event_hdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			addr = (uintptr_t)handle.ndi_next_hdl;
 			if (mdb_vread(&handle, sizeof (struct ndi_event_hdl),
 			    (uintptr_t)addr) == -1) {
-			    mdb_warn("failed to read ndi_event_hdl at %p",
-			    addr);
-			    break;
+				mdb_warn("failed to read ndi_event_hdl at %p",
+				    addr);
+				break;
 			}
 
 		}

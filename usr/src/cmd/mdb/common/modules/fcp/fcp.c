@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * FCP mdb module
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 
@@ -328,8 +328,8 @@ targets_walk_i(mdb_walk_state_t *wsp)
 
 	tgt_hash_index = 0;
 
-	while ((port.port_tgt_hash_table[tgt_hash_index] == NULL) &&
-	    (tgt_hash_index < FCP_NUM_HASH)) {
+	while (tgt_hash_index < FCP_NUM_HASH &&
+	    port.port_tgt_hash_table[tgt_hash_index] == NULL) {
 		tgt_hash_index++;
 	}
 
@@ -369,10 +369,9 @@ targets_walk_s(mdb_walk_state_t *wsp)
 
 		tgt_hash_index++;
 
-		while ((port.port_tgt_hash_table[tgt_hash_index] == NULL) &&
-		    (tgt_hash_index < FCP_NUM_HASH)) {
+		while (tgt_hash_index < FCP_NUM_HASH &&
+		    port.port_tgt_hash_table[tgt_hash_index] == NULL)
 			tgt_hash_index++;
-		}
 
 		if (tgt_hash_index == FCP_NUM_HASH) {
 			/* You're done */

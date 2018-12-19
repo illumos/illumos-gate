@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  */
 /*
@@ -57,7 +57,7 @@
 /*
  * find_command_start --
  *
- * 	Given a buffer find the start of the last command.
+ *	Given a buffer find the start of the last command.
  */
 static char *
 tab_find_command_start(char *buf)
@@ -82,11 +82,11 @@ tab_find_command_start(char *buf)
 /*
  * get_dcmd --
  *
- * 	Given a buffer containing a command and its argument return
- * 	the name of the command and the offset in the buffer where
- * 	the command arguments start.
+ *	Given a buffer containing a command and its argument return
+ *	the name of the command and the offset in the buffer where
+ *	the command arguments start.
  *
- * 	Note: This will modify the buffer.
+ *	Note: This will modify the buffer.
  */
 char *
 tab_get_dcmd(char *buf, char **args, uint_t *flags)
@@ -118,11 +118,11 @@ tab_get_dcmd(char *buf, char **args, uint_t *flags)
 /*
  * count_args --
  *
- * 	Given a buffer containing dmcd arguments return the total number
- * 	of arguments.
+ *	Given a buffer containing dmcd arguments return the total number
+ *	of arguments.
  *
- * 	While parsing arguments we need to keep track of whether or not the last
- * 	arguments ends with a trailing space.
+ *	While parsing arguments we need to keep track of whether or not the last
+ *	arguments ends with a trailing space.
  */
 static int
 tab_count_args(const char *input, uint_t *flags)
@@ -158,10 +158,10 @@ tab_count_args(const char *input, uint_t *flags)
 /*
  * copy_args --
  *
- * 	Given a buffer containing dcmd arguments and an array of mdb_arg_t's
- * 	initialize the string value of each mdb_arg_t.
+ *	Given a buffer containing dcmd arguments and an array of mdb_arg_t's
+ *	initialize the string value of each mdb_arg_t.
  *
- * 	Note: This will modify the buffer.
+ *	Note: This will modify the buffer.
  */
 static int
 tab_copy_args(char *input, int argc, mdb_arg_t *argv)
@@ -204,12 +204,12 @@ tab_copy_args(char *input, int argc, mdb_arg_t *argv)
 /*
  * parse-buf --
  *
- * 	Parse the given buffer and return the specified dcmd, the number
- * 	of arguments, and array of mdb_arg_t containing the argument
- * 	values.
+ *	Parse the given buffer and return the specified dcmd, the number
+ *	of arguments, and array of mdb_arg_t containing the argument
+ *	values.
  *
- * 	Note: this will modify the specified buffer. Caller is responisble
- * 	for freeing argvp.
+ *	Note: this will modify the specified buffer. Caller is responisble
+ *	for freeing argvp.
  */
 static int
 tab_parse_buf(char *buf, char **dcmdp, int *argcp, mdb_arg_t **argvp,
@@ -253,9 +253,9 @@ tab_parse_buf(char *buf, char **dcmdp, int *argcp, mdb_arg_t **argvp,
 /*
  * tab_command --
  *
- * 	This function is executed anytime a tab is entered. It checks
- * 	the current buffer to determine if there is a valid dmcd,
- * 	if that dcmd has a tab completion handler it will invoke it.
+ *	This function is executed anytime a tab is entered. It checks
+ *	the current buffer to determine if there is a valid dmcd,
+ *	if that dcmd has a tab completion handler it will invoke it.
  *
  *	This function returns the string (if any) that should be added to the
  *	existing buffer to complete it.
@@ -403,8 +403,7 @@ mdb_tab_insert(mdb_tab_cookie_t *mcp, const char *name)
 	 * If we have a match set, then we want to verify that we actually match
 	 * it.
 	 */
-	if (mcp->mtc_base != NULL &&
-	    strncmp(name, mcp->mtc_base, strlen(mcp->mtc_base)) != 0)
+	if (strncmp(name, mcp->mtc_base, strlen(mcp->mtc_base)) != 0)
 		return;
 
 	v = mdb_nv_lookup(&mcp->mtc_nv, name);
@@ -443,13 +442,7 @@ mdb_tab_print(mdb_tab_cookie_t *mcp)
 const char *
 mdb_tab_match(mdb_tab_cookie_t *mcp)
 {
-	size_t blen;
-
-	if (mcp->mtc_base == NULL)
-		blen = 0;
-	else
-		blen = strlen(mcp->mtc_base);
-	return (mcp->mtc_match + blen);
+	return (mcp->mtc_match + strlen(mcp->mtc_base));
 }
 
 void

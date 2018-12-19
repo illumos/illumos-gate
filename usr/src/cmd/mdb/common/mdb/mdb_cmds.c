@@ -26,7 +26,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2018 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019 Joyent, Inc. All rights reserved.
  * Copyright (c) 2013 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
  * Copyright (c) 2015, 2017 by Delphix. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
@@ -1520,9 +1520,9 @@ map_name(const mdb_map_t *map, const char *name)
 		return ("[ stack ]");
 	if (map->map_flags & MDB_TGT_MAP_ANON)
 		return ("[ anon ]");
-	if (map->map_name != NULL)
-		return (map->map_name);
-	return ("[ unknown ]");
+	if (map->map_name[0] == '\0')
+		return ("[ unknown ]");
+	return (map->map_name);
 }
 
 /*ARGSUSED*/
@@ -2343,7 +2343,7 @@ cmd_head(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	const char *c;
 	mdb_pipe_t p;
 
-	if (!flags & DCMD_PIPE)
+	if (!(flags & DCMD_PIPE))
 		return (DCMD_USAGE);
 
 	if (argc == 1 || argc == 2) {

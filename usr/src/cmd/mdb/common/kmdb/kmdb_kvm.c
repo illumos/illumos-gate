@@ -2388,8 +2388,7 @@ kmt_destroy(mdb_tgt_t *t)
 	if (kmt->kmt_trapmap != NULL)
 		mdb_free(kmt->kmt_trapmap, BT_SIZEOFMAP(kmt->kmt_trapmax));
 
-	if (kmt != NULL)
-		mdb_free(kmt, sizeof (kmt_data_t));
+	mdb_free(kmt, sizeof (kmt_data_t));
 }
 
 static const mdb_tgt_ops_t kmt_ops = {

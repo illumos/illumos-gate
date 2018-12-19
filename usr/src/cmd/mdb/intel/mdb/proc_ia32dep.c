@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -250,8 +250,6 @@ fpcw2str(uint32_t cw, char *buf, size_t nbytes)
 	/*
 	 * Decode precision, rounding, and infinity options in control word.
 	 */
-	if (cw & FPSIG24)
-		p += mdb_snprintf(p, (size_t)(end - p), "|SIG24");
 	if (cw & FPSIG53)
 		p += mdb_snprintf(p, (size_t)(end - p), "|SIG53");
 	if (cw & FPSIG64)
