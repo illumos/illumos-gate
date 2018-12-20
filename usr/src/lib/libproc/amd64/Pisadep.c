@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <sys/stack.h>
@@ -158,6 +159,28 @@ Pissyscall_text(struct ps_prochandle *P, const void *buf, size_t buflen)
 
 #define	TR_ARG_MAX 6	/* Max args to print, same as SPARC */
 
+static boolean_t
+argcount_ctf(struct ps_prochandle *P, uint32_t pc, uint_t *countp)
+{
+	GElf_Sym sym;
+	ctf_file_t *ctfp;
+	ctf_funcinfo_t finfo;
+	prsyminfo_t si = { 0 };
+
+	if (Pxlookup_by_addr(P, pc, NULL, 0, &sym, &si) != 0)
+		return (B_FALSE);
+
+	if ((ctfp = Paddr_to_ctf(P, pc)) == NULL)
+		return (B_FALSE);
+
+	if (ctf_func_info(ctfp, si.prs_id, &finfo) == CTF_ERR)
+		return (B_FALSE);
+
+	*countp = finfo.ctc_argc;
+
+	return (B_TRUE);
+}
+
 /*
  * Given a return address, determine the likely number of arguments
  * that were pushed on the stack prior to its execution.  We do this by
@@ -247,7 +270,7 @@ Pstack_iter32(struct ps_prochandle *P, const prgregset_t regs,
 	uint_t argc;
 	ssize_t sz;
 	prgregset_t gregs;
-	uint32_t fp, pfp, pc;
+	uint32_t fp, pfp, pc, ctf_pc;
 	long args[32];
 	int rv;
 	int i;
@@ -272,7 +295,7 @@ Pstack_iter32(struct ps_prochandle *P, const prgregset_t regs,
 	(void) memcpy(gregs, regs, sizeof (gregs));
 
 	fp = regs[R_FP];
-	pc = regs[R_PC];
+	ctf_pc = pc = regs[R_PC];
 
 	while (fp != 0 || pc != 0) {
 		if (stack_loop(fp, &prevfp, &nfp, &pfpsize))
@@ -288,7 +311,12 @@ Pstack_iter32(struct ps_prochandle *P, const prgregset_t regs,
 			 */
 			if (frame.pc != -1L) {
 				sz -= 2* sizeof (uint32_t);
-				argc = argcount(P, (uint32_t)frame.pc, sz);
+				if (argcount_ctf(P, ctf_pc, &argc)) {
+					argc = MIN(argc, 32);
+				} else {
+					argc = argcount(P, (uint32_t)frame.pc,
+					    sz);
+				}
 			} else
 				argc = 3; /* sighandler(signo, sip, ucp) */
 		} else {
@@ -296,6 +324,7 @@ Pstack_iter32(struct ps_prochandle *P, const prgregset_t regs,
 			argc = 0;
 		}
 
+		ctf_pc = frame.pc;
 		gregs[R_FP] = fp;
 		gregs[R_PC] = pc;
 
@@ -465,7 +494,7 @@ read_args(struct ps_prochandle *P, uintptr_t fp, uintptr_t pc, prgreg_t *args,
 
 int
 Pstack_iter(struct ps_prochandle *P, const prgregset_t regs,
-	proc_stack_f *func, void *arg)
+    proc_stack_f *func, void *arg)
 {
 	struct {
 		uintptr_t fp;
