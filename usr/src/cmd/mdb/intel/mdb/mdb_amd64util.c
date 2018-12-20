@@ -39,6 +39,7 @@
 #include <mdb/mdb_kreg_impl.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_modapi.h>
+#include <mdb/mdb_isautil.h>
 #include <mdb/mdb_amd64util.h>
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_err.h>

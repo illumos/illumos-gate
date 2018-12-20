@@ -92,6 +92,17 @@ typedef uint32_t kreg_t;
 #define	KREG_SP		KREG_RSP
 #define	KREG_FP		KREG_RBP
 
+#define	KREG_EAX	KREG_RAX
+#define	KREG_EBX	KREG_RBX
+#define	KREG_ECX	KREG_RCX
+#define	KREG_EDX	KREG_RDX
+#define	KREG_ESI	KREG_RSI
+#define	KREG_EDI	KREG_RDI
+#define	KREG_EBP	KREG_RBP
+#define	KREG_ESP	KREG_RSP
+#define	KREG_EFLAGS	KREG_RFLAGS
+#define	KREG_EIP	KREG_RIP
+
 #else	/* __amd64 */
 
 #define	KREG_SAVFP	KDIREG_SAVFP

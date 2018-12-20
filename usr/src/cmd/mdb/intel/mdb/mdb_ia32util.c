@@ -23,16 +23,18 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
+#include <sys/types32.h>
 #include <sys/reg.h>
 #include <sys/privregs.h>
 #include <sys/stack.h>
 #include <sys/frame.h>
 
+#include <mdb/mdb_isautil.h>
 #include <mdb/mdb_ia32util.h>
 #include <mdb/mdb_target_impl.h>
 #include <mdb/mdb_kreg_impl.h>
@@ -41,10 +43,14 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb.h>
 
+#ifndef __amd64
 /*
  * We also define an array of register names and their corresponding
  * array indices.  This is used by the getareg and putareg entry points,
  * and also by our register variable discipline.
+ *
+ * When built into an amd64 mdb this won't be used as it's only a subset of
+ * mdb_amd64_kregs, hence the #ifdef.
  */
 const mdb_tgt_regdesc_t mdb_ia32_kregs[] = {
 	{ "savfp", KREG_SAVFP, MDB_TGT_R_EXPORT },
@@ -87,6 +93,7 @@ const mdb_tgt_regdesc_t mdb_ia32_kregs[] = {
 	{ "err", KREG_ERR, MDB_TGT_R_EXPORT | MDB_TGT_R_PRIV },
 	{ NULL, 0, 0 }
 };
+#endif
 
 void
 mdb_ia32_printregs(const mdb_tgt_gregset_t *gregs)
@@ -94,27 +101,27 @@ mdb_ia32_printregs(const mdb_tgt_gregset_t *gregs)
 	const kreg_t *kregs = &gregs->kregs[0];
 	kreg_t eflags = kregs[KREG_EFLAGS];
 
-	mdb_printf("%%cs = 0x%04x\t\t%%eax = 0x%0?p %A\n",
+	mdb_printf("%%cs = 0x%04x\t\t%%eax = 0x%08p %A\n",
 	    kregs[KREG_CS], kregs[KREG_EAX], kregs[KREG_EAX]);
 
-	mdb_printf("%%ds = 0x%04x\t\t%%ebx = 0x%0?p %A\n",
+	mdb_printf("%%ds = 0x%04x\t\t%%ebx = 0x%08p %A\n",
 	    kregs[KREG_DS], kregs[KREG_EBX], kregs[KREG_EBX]);
 
-	mdb_printf("%%ss = 0x%04x\t\t%%ecx = 0x%0?p %A\n",
+	mdb_printf("%%ss = 0x%04x\t\t%%ecx = 0x%08p %A\n",
 	    kregs[KREG_SS], kregs[KREG_ECX], kregs[KREG_ECX]);
 
-	mdb_printf("%%es = 0x%04x\t\t%%edx = 0x%0?p %A\n",
+	mdb_printf("%%es = 0x%04x\t\t%%edx = 0x%08p %A\n",
 	    kregs[KREG_ES], kregs[KREG_EDX], kregs[KREG_EDX]);
 
-	mdb_printf("%%fs = 0x%04x\t\t%%esi = 0x%0?p %A\n",
+	mdb_printf("%%fs = 0x%04x\t\t%%esi = 0x%08p %A\n",
 	    kregs[KREG_FS], kregs[KREG_ESI], kregs[KREG_ESI]);
 
-	mdb_printf("%%gs = 0x%04x\t\t%%edi = 0x%0?p %A\n\n",
+	mdb_printf("%%gs = 0x%04x\t\t%%edi = 0x%08p %A\n\n",
 	    kregs[KREG_GS], kregs[KREG_EDI], kregs[KREG_EDI]);
 
-	mdb_printf("%%eip = 0x%0?p %A\n", kregs[KREG_EIP], kregs[KREG_EIP]);
-	mdb_printf("%%ebp = 0x%0?p\n", kregs[KREG_EBP]);
-	mdb_printf("%%esp = 0x%0?p\n\n", kregs[KREG_ESP]);
+	mdb_printf("%%eip = 0x%08p %A\n", kregs[KREG_EIP], kregs[KREG_EIP]);
+	mdb_printf("%%ebp = 0x%08p\n", kregs[KREG_EBP]);
+	mdb_printf("%%esp = 0x%08p\n\n", kregs[KREG_ESP]);
 	mdb_printf("%%eflags = 0x%08x\n", eflags);
 
 	mdb_printf("  id=%u vip=%u vif=%u ac=%u vm=%u rf=%u nt=%u iopl=0x%x\n",
@@ -138,8 +145,8 @@ mdb_ia32_printregs(const mdb_tgt_gregset_t *gregs)
 	    (eflags & KREG_EFLAGS_PF_MASK) ? "PF" : "pf",
 	    (eflags & KREG_EFLAGS_CF_MASK) ? "CF" : "cf");
 
-#ifndef _KMDB
-	mdb_printf("  %%uesp = 0x%0?x\n", kregs[KREG_UESP]);
+#if !defined(__amd64) && !defined(_KMDB)
+	mdb_printf("  %%uesp = 0x%08x\n", kregs[KREG_UESP]);
 #endif
 	mdb_printf("%%trapno = 0x%x\n", kregs[KREG_TRAPNO]);
 	mdb_printf("   %%err = 0x%x\n", kregs[KREG_ERR]);
@@ -185,7 +192,7 @@ kvm_argcount(mdb_tgt_t *t, uintptr_t eip, ssize_t size)
 		n = 0;
 	}
 
-	return (MIN((ssize_t)n, size) / sizeof (long));
+	return (MIN((ssize_t)n, size) / sizeof (uint32_t));
 }
 
 int
@@ -198,9 +205,9 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	int err;
 
 	struct fr {
-		uintptr_t fr_savfp;
-		uintptr_t fr_savpc;
-		long fr_argv[32];
+		uintptr32_t fr_savfp;
+		uintptr32_t fr_savpc;
+		uint32_t fr_argv[32];
 	} fr;
 
 	uintptr_t fp = gsp->kregs[KREG_EBP];
@@ -227,8 +234,8 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 			goto badfp;
 		}
 		if ((size = mdb_tgt_vread(t, &fr, sizeof (fr), fp)) >=
-		    (ssize_t)(2 * sizeof (uintptr_t))) {
-			size -= (ssize_t)(2 * sizeof (uintptr_t));
+		    (ssize_t)(2 * sizeof (uintptr32_t))) {
+			size -= (ssize_t)(2 * sizeof (uintptr32_t));
 			argc = kvm_argcount(t, fr.fr_savpc, size);
 		} else {
 			err = EMDB_NOMAP;
@@ -262,7 +269,8 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 		advance_tortoise = !advance_tortoise;
 
-		if (got_pc && func(arg, pc, argc, fr.fr_argv, &gregs) != 0)
+		if (got_pc &&
+		    func(arg, pc, argc, (const long *)fr.fr_argv, &gregs) != 0)
 			break;
 
 		kregs[KREG_ESP] = kregs[KREG_EBP];
@@ -294,6 +302,12 @@ badfp:
 	return (set_errno(err));
 }
 
+#ifndef __amd64
+/*
+ * The functions mdb_ia32_step_out and mdb_ia32_next haven't yet been adapted
+ * to work when built for an amd64 mdb. They are unused by the amd64-only bhyve
+ * target, hence the #ifdef.
+ */
 /*
  * Determine the return address for the current frame.  Typically this is the
  * fr_savpc value from the current frame, but we also perform some special
@@ -404,13 +418,16 @@ mdb_ia32_next(mdb_tgt_t *t, uintptr_t *p, kreg_t pc, mdb_instr_t curinstr)
 
 	return (set_errno(EAGAIN));
 }
+#endif
 
 /*ARGSUSED*/
 int
-mdb_ia32_kvm_frame(void *arglim, uintptr_t pc, uint_t argc, const long *argv,
+mdb_ia32_kvm_frame(void *arglim, uintptr_t pc, uint_t argc, const long *largv,
     const mdb_tgt_gregset_t *gregs)
 {
-	argc = MIN(argc, (uint_t)arglim);
+	const uint32_t *argv = (const uint32_t *)largv;
+
+	argc = MIN(argc, (uintptr_t)arglim);
 	mdb_printf("%a(", pc);
 
 	if (argc != 0) {
@@ -424,11 +441,13 @@ mdb_ia32_kvm_frame(void *arglim, uintptr_t pc, uint_t argc, const long *argv,
 }
 
 int
-mdb_ia32_kvm_framev(void *arglim, uintptr_t pc, uint_t argc, const long *argv,
+mdb_ia32_kvm_framev(void *arglim, uintptr_t pc, uint_t argc, const long *largv,
     const mdb_tgt_gregset_t *gregs)
 {
-	argc = MIN(argc, (uint_t)arglim);
-	mdb_printf("%0?lr %a(", gregs->kregs[KREG_EBP], pc);
+	const uint32_t *argv = (const uint32_t *)largv;
+
+	argc = MIN(argc, (uintptr_t)arglim);
+	mdb_printf("%08lr %a(", gregs->kregs[KREG_EBP], pc);
 
 	if (argc != 0) {
 		mdb_printf("%lr", *argv++);

@@ -46,6 +46,7 @@
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_conf.h>
 #include <mdb/mdb_kreg_impl.h>
+#include <mdb/mdb_isautil.h>
 #include <mdb/mdb_amd64util.h>
 #include <mdb/kvm_isadep.h>
 #include <mdb/mdb_kvm.h>
