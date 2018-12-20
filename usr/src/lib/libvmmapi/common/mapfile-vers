@@ -40,6 +40,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_assign_pptdev;
 		vm_capability_name2type;
 		vm_capability_type2name;
+		vm_close;
 		vm_copy_setup;
 		vm_copy_teardown;
 		vm_copyin;
