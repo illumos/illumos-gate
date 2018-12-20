@@ -1167,12 +1167,44 @@ main(int argc, char *argv[])
 		ctfdump_fatal("failed to open file %s: %s\n", argv[0],
 		    ctf_errmsg(err));
 
-	if (parent != NULL) {
+	/*
+	 * Check to see if this file needs a parent. If it does not and we were
+	 * given one, that should be an error. If it does need one and the
+	 * parent is not specified, that is fine, we just won't know how to
+	 * find child types. If we are given a parent, check at least that the
+	 * labels match.
+	 */
+	if (ctf_parent_name(g_fp) == NULL) {
+		if (parent != NULL)
+			ctfdump_fatal("cannot use %s as a parent file, %s is "
+			    "not a child\n", parent, argv[0]);
+	} else if (parent != NULL) {
+		const char *explabel, *label;
 		ctf_file_t *pfp = ctf_open(parent, &err);
 
 		if (pfp == NULL)
 			ctfdump_fatal("failed to open parent file %s: %s\n",
 			    parent, ctf_errmsg(err));
+
+		/*
+		 * Before we import the parent into the child, check that the
+		 * labels match. While there is also the notion of the parent
+		 * name, it's less straightforward to match that. Require that
+		 * labels match.
+		 */
+		explabel = ctf_parent_label(g_fp);
+		label = ctf_label_topmost(pfp);
+		if (explabel == NULL || label == NULL ||
+		    strcmp(explabel, label) != 0) {
+			if (label == NULL)
+				label = "<missing>";
+			if (explabel == NULL)
+				explabel = "<missing>";
+			ctfdump_fatal("label mismatch between parent %s and "
+			    "child %s, parent has %s, child expects %s\n",
+			    parent, argv[0], label, explabel);
+		}
+
 		if (ctf_import(g_fp, pfp) != 0)
 			ctfdump_fatal("failed to import parent %s: %s\n",
 			    parent, ctf_errmsg(ctf_errno(g_fp)));
