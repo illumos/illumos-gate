@@ -10,20 +10,15 @@ bzero \- clear memory for a given number of bytes
 .SH SYNOPSIS
 .LP
 .nf
-#include <sys/types.h>
-#include <sys/ddi.h>
-
-
+#include <sys/sunddi.h>
 
 \fBvoid\fR \fBbzero\fR(\fBvoid *\fR\fIaddr\fR, \fBsize_t\fR \fIbytes\fR);
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIaddr\fR\fR
@@ -42,24 +37,20 @@ The number of bytes to clear starting at \fIaddr\fR.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBbzero()\fR function clears a contiguous portion of memory by filling it
 with zeros.
 .SH CONTEXT
-.sp
 .LP
 The \fBbzero()\fR function can be called from user, interrupt, or kernel
 context.
 .SH SEE ALSO
-.sp
 .LP
 \fBbcopy\fR(9F), \fBclrbuf\fR(9F), \fBkmem_zalloc\fR(9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
 .LP
 The address range specified must be within the kernel space. No range checking
 is done.  If an address outside of the kernel space is selected, the driver may

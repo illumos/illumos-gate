@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2015 Joyent, Inc.
+.\" Copyright 2018 Joyent, Inc.
 .\"
-.Dd Apr 10, 2015
+.Dd December 20, 2018
 .Dt VXLAN 7P
 .Os
 .Sh NAME
@@ -96,11 +96,18 @@ validate_vxlan(void *buf, int len, uint32_t *vidp)
 	vxlan_hdr_t *hdr;
 
 	if (len < sizeof (vxlan_hdr_t))
-		return (EINAVL);
+		return (EINVAL);
 
 	hdr = buf;
-	if ((ntohl(hdr->vxlan_flags) & VXLAN_MAGIC) == 0)
-		return (EINAVL);
+
+	/*
+	 * This verifies that the required flag is set; however, it does
+	 * not look at any of the other bist that are reserved in the
+	 * header. Software needs to evaluate how it should handle other
+	 * bits being set in the vxlan_flags member.
+	 */
+	if ((ntohl(hdr->vxlan_flags) & VXLAN_F_VDI) == 0)
+		return (EINVAL);
 
 	*vidp = ntohl(vxlan->vxlan_id) >> VXLAN_ID_SHIFT;
 
