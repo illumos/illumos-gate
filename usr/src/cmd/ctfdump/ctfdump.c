@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <string.h>
 #include <strings.h>
+#include <err.h>
 
 #define	MAX_NAMELEN (512)
 
@@ -123,17 +124,6 @@ ctfdump_printf(ctfdump_arg_t arg, const char *fmt, ...)
 }
 
 static void
-ctfdump_warn(const char *fmt, ...)
-{
-	va_list ap;
-
-	(void) fprintf(stderr, "%s: ", g_progname);
-	va_start(ap, fmt);
-	(void) vfprintf(stderr, fmt, ap);
-	va_end(ap);
-}
-
-static void
 ctfdump_fatal(const char *fmt, ...)
 {
 	va_list ap;
@@ -201,7 +191,7 @@ ctfdump_objects(void)
 {
 	ctfdump_title(CTFDUMP_OBJECTS, "Data Objects");
 	if (ctf_object_iter(g_fp, ctfdump_objects_cb, NULL) == CTF_ERR) {
-		ctfdump_warn("failed to dump objects: %s\n",
+		warnx("failed to dump objects: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
@@ -257,7 +247,7 @@ ctfdump_functions(void)
 	ctfdump_title(CTFDUMP_FUNCTIONS, "Functions");
 
 	if (ctf_function_iter(g_fp, ctfdump_functions_cb, NULL) == CTF_ERR) {
-		ctfdump_warn("failed to dump functions: %s\n",
+		warnx("failed to dump functions: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
@@ -310,7 +300,7 @@ ctfdump_labels(void)
 {
 	ctfdump_title(CTFDUMP_LABELS, "Label Table");
 	if (ctf_label_iter(g_fp, ctfdump_labels_cb, NULL) == CTF_ERR) {
-		ctfdump_warn("failed to dump labels: %s\n",
+		warnx("failed to dump labels: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
@@ -337,7 +327,7 @@ ctfdump_strings(void)
 
 	ctfdump_title(CTFDUMP_STRINGS, "String Table");
 	if (ctf_string_iter(g_fp, ctfdump_strings_cb, &stroff) == CTF_ERR) {
-		ctfdump_warn("failed to dump strings: %s\n",
+		warnx("failed to dump strings: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
@@ -680,7 +670,7 @@ ctfdump_types(void)
 	ctfdump_title(CTFDUMP_TYPES, "Types");
 
 	if (ctf_type_iter(g_fp, B_TRUE, ctfdump_types_cb, NULL) == CTF_ERR) {
-		ctfdump_warn("failed to dump types: %s\n",
+		warnx("failed to dump types: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
@@ -996,7 +986,7 @@ ctfdump_source(void)
 
 	if (ctf_type_iter(g_fp, B_FALSE, ctfsrc_collect_types_cb,
 	    idnames) == CTF_ERR) {
-		ctfdump_warn("failed to collect types: %s\n",
+		warnx("failed to collect types: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
@@ -1019,7 +1009,7 @@ ctfdump_source(void)
 
 	if (ctf_object_iter(g_fp, ctfsrc_collect_objects_cb,
 	    &count) == CTF_ERR) {
-		ctfdump_warn("failed to collect objects: %s\n",
+		warnx("failed to collect objects: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
@@ -1042,7 +1032,7 @@ ctfdump_source(void)
 
 	if (ctf_function_iter(g_fp, ctfsrc_collect_functions_cb,
 	    &count) == CTF_ERR) {
-		ctfdump_warn("failed to collect functions: %s\n",
+		warnx("failed to collect functions: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
 		g_exit = 1;
 	}
