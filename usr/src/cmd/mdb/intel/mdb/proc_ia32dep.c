@@ -99,7 +99,8 @@ pt_read_instr(mdb_tgt_t *t)
 	const lwpstatus_t *psp = &Pstatus(t->t_pshandle)->pr_lwp;
 	uint8_t ret = 0;
 
-	(void) mdb_tgt_vread(t, &ret, sizeof (ret), psp->pr_reg[EIP]);
+	(void) mdb_tgt_aread(t, MDB_TGT_AS_VIRT_I, &ret, sizeof (ret),
+	    psp->pr_reg[EIP]);
 
 	return (ret);
 }

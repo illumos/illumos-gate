@@ -143,6 +143,8 @@ rf_aread(mdb_tgt_t *t, mdb_tgt_as_t as, void *buf,
 {
 	switch ((uintptr_t)as) {
 	case (uintptr_t)MDB_TGT_AS_VIRT:
+	case (uintptr_t)MDB_TGT_AS_VIRT_I:
+	case (uintptr_t)MDB_TGT_AS_VIRT_S:
 	case (uintptr_t)MDB_TGT_AS_PHYS:
 		if (RF_CORE(t->t_data) != NULL)
 			return (rf_read(RF_CORE(t->t_data), buf, len, addr));
@@ -160,6 +162,8 @@ rf_awrite(mdb_tgt_t *t, mdb_tgt_as_t as, const void *buf,
 {
 	switch ((uintptr_t)as) {
 	case (uintptr_t)MDB_TGT_AS_VIRT:
+	case (uintptr_t)MDB_TGT_AS_VIRT_I:
+	case (uintptr_t)MDB_TGT_AS_VIRT_S:
 	case (uintptr_t)MDB_TGT_AS_PHYS:
 		if (RF_CORE(t->t_data) != NULL)
 			return (rf_write(RF_CORE(t->t_data), buf, len, addr));

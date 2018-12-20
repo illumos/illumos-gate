@@ -173,7 +173,8 @@ kvm_argcount(mdb_tgt_t *t, uintptr_t eip, ssize_t size)
 		M_ADD_IMM8  = 0x83	/* ADD imm8 to r/m32 */
 	};
 
-	if (mdb_tgt_vread(t, ins, sizeof (ins), eip) != sizeof (ins))
+	if (mdb_tgt_aread(t, MDB_TGT_AS_VIRT_I, ins, sizeof (ins), eip) !=
+	    sizeof (ins))
 		return (0);
 
 	if (ins[1] != M_MODRM_ESP)
@@ -233,8 +234,8 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 			err = EMDB_STKALIGN;
 			goto badfp;
 		}
-		if ((size = mdb_tgt_vread(t, &fr, sizeof (fr), fp)) >=
-		    (ssize_t)(2 * sizeof (uintptr32_t))) {
+		if ((size = mdb_tgt_aread(t, MDB_TGT_AS_VIRT_S, &fr,
+		    sizeof (fr), fp)) >= (ssize_t)(2 * sizeof (uintptr32_t))) {
 			size -= (ssize_t)(2 * sizeof (uintptr32_t));
 			argc = kvm_argcount(t, fr.fr_savpc, size);
 		} else {
@@ -252,8 +253,9 @@ mdb_ia32_kvm_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 			if (advance_tortoise != 0) {
 				struct fr tfr;
 
-				if (mdb_tgt_vread(t, &tfr, sizeof (tfr),
-				    tortoise_fp) != sizeof (tfr)) {
+				if (mdb_tgt_aread(t, MDB_TGT_AS_VIRT_S, &tfr,
+				    sizeof (tfr), tortoise_fp) !=
+				    sizeof (tfr)) {
 					err = EMDB_NOMAP;
 					goto badfp;
 				}
@@ -335,7 +337,8 @@ mdb_ia32_step_out(mdb_tgt_t *t, uintptr_t *p, kreg_t pc, kreg_t fp, kreg_t sp,
 			fp = sp;
 	}
 
-	if (mdb_tgt_vread(t, &fr, sizeof (fr), fp) == sizeof (fr)) {
+	if (mdb_tgt_aread(t, MDB_TGT_AS_VIRT_S, &fr, sizeof (fr), fp) ==
+	    sizeof (fr)) {
 		*p = fr.fr_savpc;
 		return (0);
 	}
@@ -386,7 +389,8 @@ mdb_ia32_next(mdb_tgt_t *t, uintptr_t *p, kreg_t pc, mdb_instr_t curinstr)
 	 * read the subsequent Mod/RM byte to perform additional decoding.
 	 */
 	if (curinstr == M_CALL_REG) {
-		if (mdb_tgt_vread(t, &m, sizeof (m), pc + 1) != sizeof (m))
+		if (mdb_tgt_aread(t, MDB_TGT_AS_VIRT_I, &m, sizeof (m), pc + 1)
+		    != sizeof (m))
 			return (-1); /* errno is set for us */
 
 		/*
