@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 
@@ -68,6 +69,9 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 # Should not have to do this, but the Kerberos includes are a mess.
 CPPFLAGS += -I $(ROOT)/usr/include/kerberosv5
+
+# needs work
+SMOFF += all_func_returns,deref_check
 
 CSTD =       $(CSTD_GNU99)
 C99LMODE =      -Xc99=%all
