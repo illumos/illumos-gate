@@ -100,7 +100,11 @@ spinup_ap(struct vmctx *ctx, int vcpu, int newcpu, uint64_t rip)
 
 	spinup_ap_realmode(ctx, newcpu, &rip);
 
+#ifdef __FreeBSD__
 	fbsdrun_addcpu(ctx, vcpu, newcpu, rip);
+#else
+	fbsdrun_addcpu(ctx, vcpu, newcpu, rip, false);
+#endif
 
 	return (newcpu);
 }
