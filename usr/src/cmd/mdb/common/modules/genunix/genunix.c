@@ -354,6 +354,47 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static void
+ps_help(void)
+{
+	mdb_printf("Display processes.\n\n"
+	    "Options:\n"
+	    "    -f\tDisplay command arguments\n"
+	    "    -l\tDisplay LWPs\n"
+	    "    -T\tDisplay tasks\n"
+	    "    -P\tDisplay projects\n"
+	    "    -z\tDisplay zones\n"
+	    "    -t\tDisplay threads\n\n");
+
+	mdb_printf("The resulting output is a table of the processes on the "
+	    "system.  The\n"
+	    "columns in the output consist of a combination of the "
+	    "following fields:\n\n");
+	mdb_printf("S\tProcess state.  Possible states are:\n"
+	    "\tS\tSleeping (SSLEEP)\n"
+	    "\tR\tRunnable (SRUN)\n"
+	    "\tZ\tZombie (SZOMB)\n"
+	    "\tI\tIdle (SIDL)\n"
+	    "\tO\tOn Cpu (SONPROC)\n"
+	    "\tT\tStopped (SSTOP)\n"
+	    "\tW\tWaiting (SWAIT)\n");
+
+	mdb_printf("PID\tProcess id.\n");
+	mdb_printf("PPID\tParent process id.\n");
+	mdb_printf("PGID\tProcess group id.\n");
+	mdb_printf("SID\tProcess id of the session leader.\n");
+	mdb_printf("TASK\tThe task id of the process.\n");
+	mdb_printf("PROJ\tThe project id of the process.\n");
+	mdb_printf("ZONE\tThe zone id of the process.\n");
+	mdb_printf("UID\tThe user id of the process.\n");
+	mdb_printf("FLAGS\tThe process flags (see ::pflags).\n");
+	mdb_printf("ADDR\tThe kernel address of the proc_t structure of the "
+	    "process\n");
+	mdb_printf("NAME\tThe name (p_user.u_comm field) of the process.  If "
+	    "the -f flag\n"
+	    "\tis specified, the arguments of the process are displayed.\n");
+}
+
 #define	PG_NEWEST	0x0001
 #define	PG_OLDEST	0x0002
 #define	PG_PIPE_OUT	0x0004
@@ -4036,7 +4077,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "panicinfo", NULL, "print panic information", panicinfo },
 	{ "pid2proc", "?", "convert PID to proc_t address", pid2proc },
 	{ "project", NULL, "display kernel project(s)", project },
-	{ "ps", "[-fltzTP]", "list processes (and associated thr,lwp)", ps },
+	{ "ps", "[-fltzTP]", "list processes (and associated thr,lwp)", ps,
+	    ps_help },
 	{ "pflags", NULL, "display various proc_t flags", pflags },
 	{ "pgrep", "[-x] [-n | -o] pattern",
 		"pattern match against all processes", pgrep },
