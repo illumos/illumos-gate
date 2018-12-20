@@ -13,45 +13,31 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-LIBRARY =	libvmm.a
-VERS =		.1
-
-OBJECTS =	libvmm.o list.o
-
 include ../Makefile.lib
-include ../Makefile.lib.64
 include ../Makefile.rootfs
 
-SRCDIR =	.
-COMDIR =	$(SRC)/common/list
-
-LIBS = $(DYNLIB)
-
-# The FreeBSD compat and contrib headers need to be first in the search
-# path, hence we can't just append them to CPPFLAGS. So we assign CPPFLAGS
-# directly and pull in CPPFLAGS.master at the appropriate place.
-CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
-		-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64 \
-		$(CPPFLAGS.master) -I$(SRC)/uts/i86pc
-
-LDLIBS +=	-lc -lvmmapi
+$(BUILD64)SUBDIRS += $(MACH64)
 
 HDRS =		libvmm.h
 HDRDIR =	.
 CHECKHDRS =	$(HDRS:%.h=%.check)
 
+all:=		TARGET= all
+install:=	TARGET= install
+clean:=		TARGET= clean
+clobber:=	TARGET= clobber
+lint:=		TARGET= lint
+
 .KEEP_STATE:
 
-all: $(LIBS)
+all install clean clobber lint: $(SUBDIRS)
 
-install_h: $(ROOTHDRS)
+install_h:	$(ROOTHDRS)
+check:		$(CHECKHDRS)
 
-check: $(CHECKHDRS)
+$(SUBDIRS): FRC
+	cd $@; pwd; $(MAKE) $(TARGET)
 
-pics/%.o: $(COMDIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-install: install_h all $(ROOTLIBS64)
+FRC:
 
 include ../Makefile.targ
