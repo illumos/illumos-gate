@@ -22,10 +22,14 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2018 Joyent, Inc.
+#
 
 SRCS =	kvm_amd64dep.c \
 	kvm_isadep.c \
 	mdb_amd64util.c \
+	mdb_ia32util.c \
+	mdb_bhyve.c \
 	proc_amd64dep.c
 
 %.o: %.c
@@ -42,12 +46,14 @@ SRCS =	kvm_amd64dep.c \
 %.ln: ../../mdb/%.c
 	$(LINT.c) -c $<
 
-include ../../../../Makefile.cmd
-include ../../../../Makefile.cmd.64
-include ../../Makefile.amd64
-include ../../../Makefile.mdb
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd.64
+include $(SRC)/cmd/mdb/intel/Makefile.amd64
+include $(SRC)/cmd/mdb/Makefile.mdb
+include $(SRC)/Makefile.psm
 
 CPPFLAGS += -I../../mdb
-LDLIBS += -lsaveargs
+
+LDLIBS += -lsaveargs -lvmm
 
 install: all $(ISAEXEC) $(ROOTPROG64) $(ROOTLINK64)

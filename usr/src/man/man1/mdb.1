@@ -11,7 +11,7 @@ mdb \- modular debugger
 .SH SYNOPSIS
 .LP
 .nf
-\fBmdb\fR [\fB-fkmuwyAFKMSUW\fR] [\(+-o \fIoption\fR] [\fB-p\fR \fIpid\fR] [\fB-s\fR \fIdistance\fR]
+\fBmdb\fR [\fB-fkmuwyAFKMSUW\fR] [\(+-o \fIoption\fR] [\fB-b\fR \fIVM\fR] [\fB-p\fR \fIpid\fR] [\fB-s\fR \fIdistance\fR]
      [\fB-I\fR \fIpath\fR] [\fB-L\fR \fIpath\fR] [\fB-P\fR \fIprompt\fR] [\fB-R\fR \fIroot\fR]
      [\fB-V\fR \fIdis-version\fR] [\fB-e\fR \fIexpr\fR] [object [core] | core | suffix]
 .fi
@@ -50,12 +50,13 @@ different contexts, including live and post-mortem.
 .LP
 The \fItarget\fR is the program being inspected by the debugger. \fBmdb\fR
 currently provides support for the following types of targets: user processes,
-user process core files, the live operating system (via \fB/dev/kmem\fR and
-\fB/dev/ksyms\fR), operating system crash dumps, user process images recorded
-inside an operating system crash dump, \fBELF\fR object files, and raw binary
-files. Each target exports a standard set of properties, including one or more
-address spaces, one or more symbol tables, a set of load objects, and a set of
-threads that can be examined using the debugger commands described below.
+user process core files, live bhyve VMs, the live operating system (via
+\fB/dev/kmem\fR and \fB/dev/ksyms\fR), operating system crash dumps, user
+process images recorded inside an operating system crash dump, \fBELF\fR object
+files, and raw binary files. Each target exports a standard set of properties,
+including one or more address spaces, one or more symbol tables, a set of load
+objects, and a set of threads that can be examined using the debugger commands
+described below.
 .sp
 .LP
 A debugger command, or \fIdcmd\fR (pronounced dee-command) in \fBmdb\fR
@@ -3692,6 +3693,15 @@ Disables automatic loading of \fBmdb\fR modules. By default, \fBmdb\fR attempts
 to load debugger modules corresponding to the active shared libraries in a user
 process or core file, or to the loaded kernel modules in the live operating
 system or an operating system crash dump.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-b\fR \fIVM\fR\fR
+.ad
+.RS 15n
+Attaches to and stops the specified bhyve VM.
 .RE
 
 .sp

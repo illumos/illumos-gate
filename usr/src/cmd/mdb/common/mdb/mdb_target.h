@@ -64,6 +64,9 @@ extern int mdb_kvm_tgt_create(mdb_tgt_t *, int, const char *[]);
 extern int mdb_proc_tgt_create(mdb_tgt_t *, int, const char *[]);
 extern int mdb_kproc_tgt_create(mdb_tgt_t *, int, const char *[]);
 extern int mdb_rawfile_tgt_create(mdb_tgt_t *, int, const char *[]);
+#ifdef __amd64
+extern int mdb_bhyve_tgt_create(mdb_tgt_t *, int, const char *[]);
+#endif
 #else
 extern int kmdb_kvm_create(mdb_tgt_t *, int, const char *[]);
 #endif
