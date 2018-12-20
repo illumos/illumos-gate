@@ -1018,7 +1018,7 @@ main(int argc, char *argv[])
 	int rtc_localtime;
 	bool gdb_stop;
 #ifndef __FreeBSD__
-	bool suspend;
+	bool suspend = false;
 #endif
 	struct vmctx *ctx;
 	uint64_t rip;
