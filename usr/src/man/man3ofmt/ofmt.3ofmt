@@ -11,8 +11,9 @@
 .\"
 .\" Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 .\" Copyright 2017 Nexenta Systems, Inc.
+.\" Copyright 2018 Joyent, Inc.
 .\"
-.Dd June 1, 2017
+.Dd December 20, 2018
 .Dt OFMT 3OFMT
 .Os
 .Sh NAME
@@ -158,8 +159,20 @@ as follows:
 is the application-specified callback function with the following prototype that
 provides a string representation of the value to be printed for the field:
 .Bd -literal -offset indent
-(*of_cb)(ofmt_arg_t *ofmt_arg, char *buf, uint_t bufsize)
+boolean_t (*of_cb)(ofmt_arg_t *ofmt_arg, char *buf, uint_t bufsize)
 .Ed
+.Pp
+The callback must not write beyond
+.Fa bufsize
+bytes of the string form into
+.Fa buf .
+If the function successfully translates the field into its string
+representation and places it into
+.Fa buf ,
+then the callback function should return
+.Dv B_TRUE .
+Otherwise, the callback function should return
+.Dv B_FALSE .
 .Pp
 The interpretation of the
 .Va of_id
