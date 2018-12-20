@@ -26,6 +26,9 @@
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved	*/
+/*
+ * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
+ */
 
 #ifndef	_SYS_DEBUGREG_H
 #define	_SYS_DEBUGREG_H
@@ -57,6 +60,7 @@ extern "C" {
 #define	DR_ICEALSO	0x2000	/* Flag bit reserved for in-circuit-emulator */
 #define	DR_SINGLESTEP	0x4000	/* Trap resulting from the single-step flag */
 #define	DR_TASKSWITCH	0x8000	/* Trap resulting from a task-switch */
+#define	DR_IN_RTM	0x10000	/* Trap inside an RTM region */
 
 /*
  * dr7 controls the rest of the debug registers.
@@ -73,6 +77,8 @@ extern "C" {
 #define	DR_CONTROL_RESERVED	0xFC00	/* Bits reserved by Intel */
 #define	DR_LOCAL_SLOWDOWN	0x100	/* Slow the pipeline for ldt addrs */
 #define	DR_GLOBAL_SLOWDOWN	0x200	/* Slow the pipeline for gdt addrs */
+#define	DR_RTM			0x800	/* Restricted Transactional Memory */
+#define	DR_GENERAL_DETECT	0x2000	/* General Detect Enable */
 
 #define	DR_LOCAL_ENABLE_SHIFT	0	/* Additional shift: local enable  */
 #define	DR_GLOBAL_ENABLE_SHIFT	1	/* Additional shift: global enable */
@@ -95,6 +101,7 @@ extern "C" {
 #define	DR_LEN_1		0x0	/* Settings for data length */
 #define	DR_LEN_2		0x4
 #define	DR_LEN_4		0xC
+#define	DR_LEN_8		0x8
 
 #ifdef	__cplusplus
 }

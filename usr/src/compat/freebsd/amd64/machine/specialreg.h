@@ -36,6 +36,7 @@
 #undef	CR4_PCE
 #undef	CR4_VMXE
 #undef	CR4_SMEP
+#undef	CR4_FSGSBASE
 #undef	CR4_PCIDE
 #endif /* _SYS_CONTROLREGS_H */
 
