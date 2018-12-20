@@ -281,6 +281,7 @@ SUBDIRS +=				\
 i386_SUBDIRS=		\
 	libfdisk	\
 	libsaveargs	\
+	libvmm		\
 	libvmmapi
 
 sparc_SUBDIRS=		\
@@ -512,6 +513,7 @@ HDRSUBDIRS=				\
 i386_HDRSUBDIRS=	\
 	libfdisk	\
 	libsaveargs	\
+	libvmm		\
 	libvmmapi
 
 sparc_HDRSUBDIRS=	\
@@ -617,7 +619,7 @@ libdiskmgt:	libdevid libdevinfo libadm libefi libkstat libsysevent
 $(INTEL_BLD)libdiskmgt: libfdisk
 libdladm:	libdevinfo libinetutil libscf librcm libexacct libkstat \
 		libpool varpd
-libdll: 	libast
+libdll:		libast
 libdlpi:	libinetutil libdladm
 libds:		libsysevent
 libdtrace:	libproc libgen libctf libmapmalloc
