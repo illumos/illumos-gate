@@ -113,6 +113,13 @@ int	vm_mmap_getnext(struct vmctx *ctx, vm_paddr_t *gpa, int *segid,
 void	*vm_create_devmem(struct vmctx *ctx, int segid, const char *name,
 	    size_t len);
 
+#ifndef __FreeBSD__
+/*
+ * Return the map offset for the device memory segment 'segid'.
+ */
+int	vm_get_devmem_offset(struct vmctx *ctx, int segid, off_t *mapoff);
+#endif
+
 /*
  * Map the memory segment identified by 'segid' into the guest address space
  * at [gpa,gpa+len) with protection 'prot'.

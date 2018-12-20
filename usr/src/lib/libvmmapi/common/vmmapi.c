@@ -573,6 +573,22 @@ vm_get_highmem_size(struct vmctx *ctx)
 	return (ctx->highmem);
 }
 
+#ifndef __FreeBSD__
+int
+vm_get_devmem_offset(struct vmctx *ctx, int segid, off_t *mapoff)
+{
+	struct vm_devmem_offset vdo;
+	int error;
+
+	vdo.segid = segid;
+	error = ioctl(ctx->fd, VM_DEVMEM_GETOFFSET, &vdo);
+	if (error == 0)
+		*mapoff = vdo.offset;
+
+	return (error);
+}
+#endif
+
 void *
 vm_create_devmem(struct vmctx *ctx, int segid, const char *name, size_t len)
 {
@@ -605,17 +621,8 @@ vm_create_devmem(struct vmctx *ctx, int segid, const char *name, size_t len)
 	if (fd < 0)
 		goto done;
 #else
-	{
-		struct vm_devmem_offset vdo;
-
-		vdo.segid = segid;
-		error = ioctl(ctx->fd, VM_DEVMEM_GETOFFSET, &vdo);
-		if (error == 0) {
-			mapoff = vdo.offset;
-		} else {
-			goto done;
-		}
-	}
+	if (vm_get_devmem_offset(ctx, segid, &mapoff) != 0)
+		goto done;
 #endif
 
 	/*

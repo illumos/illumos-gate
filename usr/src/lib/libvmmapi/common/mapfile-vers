@@ -54,6 +54,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 		vm_get_capability;
 		vm_get_desc;
 		vm_get_device_fd;
+		vm_get_devmem_offset;
 		vm_get_gpa_pmap;
 		vm_get_hpet_capabilities;
 		vm_get_highmem_size;
