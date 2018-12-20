@@ -801,14 +801,12 @@ smb_open_subr(smb_request_t *sr)
 			op->desired_access |= max_allowed;
 		}
 		/*
-		 * We created created this object (we own it) so
-		 * grant read/write attributes on this handle,
+		 * We created this object (we own it) so grant
+		 * read_control + read_attributes on this handle,
 		 * even if that was not requested.  This avoids
-		 * unexpected access failures later that would
-		 * happen if these were not granted.
+		 * unexpected access failures later.
 		 */
-		op->desired_access |= (READ_CONTROL |
-		    FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES);
+		op->desired_access |= (READ_CONTROL | FILE_READ_ATTRIBUTES);
 	}
 
 	status = NT_STATUS_SUCCESS;
