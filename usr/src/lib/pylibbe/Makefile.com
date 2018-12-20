@@ -33,8 +33,8 @@ include ../../Makefile.lib
 
 LIBLINKS =
 SRCDIR =	../common
-ROOTLIBDIR=	$(ROOT)/usr/lib/python$(PYTHON_VERSION)/vendor-packages
-ROOTLIBDIR64=	$(ROOT)/usr/lib/python$(PYTHON_VERSION)/vendor-packages/64
+ROOTLIBDIR=	$(ROOT)/usr/lib/python$(PYVER)/vendor-packages
+ROOTLIBDIR64=	$(ROOT)/usr/lib/python$(PYVER)/vendor-packages/64
 PYFILES=	$(PYSRCS)
 ROOTPYBEFILES=  $(PYFILES:%=$(ROOTLIBDIR)/%)
 
@@ -44,11 +44,11 @@ LIBS =		$(DYNLIB)
 LDLIBS +=	-lbe -lnvpair -lc
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64 -I../../libbe/common \
-	-I$(ADJUNCT_PROTO)/usr/include/python$(PYTHON_VERSION)$(PYTHON_SUFFIX)
+	-I$(ADJUNCT_PROTO)/usr/include/python$(PYVER)$(PYSUFFIX)
 
 .KEEP_STATE:
 
-all install := LDLIBS += -lpython$(PYTHON_VERSION)$(PYTHON_SUFFIX)
+all install := LDLIBS += -lpython$(PYVER)$(PYSUFFIX)
 
 all: $(PYOBJS) $(LIBS)
 
