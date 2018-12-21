@@ -262,7 +262,7 @@ kernel_decrypt(kernel_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	decrypt.cd_databuf = (char *)pData;
 	decrypt.cd_encrlen = ulEncryptedData;
 	decrypt.cd_encrbuf = (char *)pEncryptedData;
-	decrypt.cd_flags = 
+	decrypt.cd_flags =
 	    ((inplace && (pData != NULL)) || (pData == pEncryptedData)) &&
 	    (decrypt.cd_datalen == decrypt.cd_encrlen) ?
 	    CRYPTO_INPLACE_OPERATION : 0;

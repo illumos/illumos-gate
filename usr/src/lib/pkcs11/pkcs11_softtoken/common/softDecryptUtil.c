@@ -403,8 +403,8 @@ soft_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedPart,
 	case CKM_AES_CBC:
 	case CKM_AES_CBC_PAD:
 	case CKM_AES_CTR:
-        case CKM_AES_GCM:
-        case CKM_AES_CCM:
+	case CKM_AES_GCM:
+	case CKM_AES_CCM:
 	case CKM_BLOWFISH_CBC:
 	case CKM_RC4:
 

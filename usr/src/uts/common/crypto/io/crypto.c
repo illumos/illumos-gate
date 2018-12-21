@@ -252,7 +252,7 @@ static kcf_lock_withpad_t *crypto_locks;
  * as they are called after doing a get_session_ptr() which
  * sets the CRYPTO_SESSION_IS_BUSY flag.
  */
-#define	CRYPTO_DECREMENT_RCTL_SESSION(sp, val, rctl_chk) 	\
+#define	CRYPTO_DECREMENT_RCTL_SESSION(sp, val, rctl_chk)	\
 	if (((val) != 0) && ((sp) != NULL)) {			\
 		ASSERT(((sp)->sd_flags & CRYPTO_SESSION_IS_BUSY) != 0);	\
 		if (rctl_chk) {				\

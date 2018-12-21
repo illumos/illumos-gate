@@ -230,7 +230,6 @@ soft_aes_init_ctx(aes_ctx_t *aes_ctx, CK_MECHANISM_PTR mech_p,
 		break;
 	}
 	case CKM_AES_CCM: {
-		/* LINTED: pointer alignment */
 		CK_CCM_PARAMS *pp = (CK_CCM_PARAMS *)mech_p->pParameter;
 
 		/*
@@ -255,11 +254,11 @@ soft_aes_init_ctx(aes_ctx_t *aes_ctx, CK_MECHANISM_PTR mech_p,
 	}
 	case CKM_AES_GCM:
 		/*
-		* Similar to the ccm mode implementation, the gcm mode also
-		* predates PKCS#11 2.40, however in this instance
-		* CK_AES_GCM_PARAMS and CK_GCM_PARAMS are identical except
-		* for the member names, so we can just pass it along.
-		*/
+		 * Similar to the ccm mode implementation, the gcm mode also
+		 * predates PKCS#11 2.40, however in this instance
+		 * CK_AES_GCM_PARAMS and CK_GCM_PARAMS are identical except
+		 * for the member names, so we can just pass it along.
+		 */
 		rc = gcm_init_ctx((gcm_ctx_t *)aes_ctx, mech_p->pParameter,
 		    AES_BLOCK_LEN, aes_encrypt_block, aes_copy_block,
 		    aes_xor_block);
@@ -293,13 +292,11 @@ soft_aes_crypt_init_common(soft_session_t *session_p,
 	rv = soft_aes_init_key(aes_ctx, key_p);
 	if (rv != CKR_OK) {
 		goto done;
-		return (rv);
 	}
 
 	rv = soft_aes_init_ctx(aes_ctx, pMechanism, encrypt);
 	if (rv != CKR_OK) {
 		goto done;
-		return (rv);
 	}
 
 	(void) pthread_mutex_lock(&session_p->session_mutex);
@@ -772,7 +769,7 @@ soft_aes_decrypt_update(soft_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 
 		if (mech == CKM_AES_CBC_PAD && out_len <= AES_BLOCK_LEN) {
 			uint8_t *dest = (uint8_t *)aes_ctx->ac_remainder +
-				aes_ctx->ac_remainder_len;
+			    aes_ctx->ac_remainder_len;
 
 			bcopy(pEncryptedData, dest, ulEncryptedDataLen);
 			aes_ctx->ac_remainder_len += ulEncryptedDataLen;

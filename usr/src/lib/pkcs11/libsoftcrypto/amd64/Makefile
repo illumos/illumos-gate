@@ -30,7 +30,7 @@ VERS =		.1
 
 include		../Makefile.com
 
-AES_PSM_OBJS = 	aes_amd64.o aes_intel.o aeskey.o
+AES_PSM_OBJS =	aes_amd64.o aes_intel.o aeskey.o
 ARCFOUR_PSM_OBJS = arcfour-x86_64.o
 BIGNUM_PSM_OBJS = bignum_amd64.o bignum_amd64_asm.o
 MODES_PSM_OBJS = gcm_intel.o
