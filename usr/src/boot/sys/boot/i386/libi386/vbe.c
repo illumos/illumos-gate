@@ -43,9 +43,9 @@
 
 multiboot_tag_vbe_t vbestate;
 static struct vbeinfoblock *vbe =
-    (struct vbeinfoblock *) &vbestate.vbe_control_info;
+	(struct vbeinfoblock *)&vbestate.vbe_control_info;
 static struct modeinfoblock *vbe_mode =
-    (struct modeinfoblock *) &vbestate.vbe_mode_info;
+	(struct modeinfoblock *)&vbestate.vbe_mode_info;
 multiboot_color_t cmap[16];
 
 /* Actually assuming mode 3. */
@@ -199,17 +199,17 @@ static int
 vbe_mode_is_supported(struct modeinfoblock *mi)
 {
 	if ((mi->ModeAttributes & 0x01) == 0)
-		return 0;	/* mode not supported by hardware */
+		return (0);	/* mode not supported by hardware */
 	if ((mi->ModeAttributes & 0x08) == 0)
-		return 0;	/* linear fb not available */
+		return (0);	/* linear fb not available */
 	if ((mi->ModeAttributes & 0x10) == 0)
-		return 0;	/* text mode */
+		return (0);	/* text mode */
 	if (mi->NumberOfPlanes != 1)
-		return 0;	/* planar mode not supported */
+		return (0);	/* planar mode not supported */
 	if (mi->MemoryModel != 0x04 /* Packed pixel */ &&
 	    mi->MemoryModel != 0x06 /* Direct Color */)
-		return 0;	/* unsupported pixel format */
-	return 1;
+		return (0);	/* unsupported pixel format */
+	return (1);
 }
 
 static int
@@ -238,7 +238,7 @@ vbe_init(void)
 	gfx_fb.framebuffer_common.framebuffer_pitch = TEXT_COLS * 2;
 
 	/* Now check if we have vesa. */
-	memset(vbe, 0, sizeof(*vbe));
+	memset(vbe, 0, sizeof (*vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
 	if (biosvbe_info(vbe) != VBE_SUCCESS)
 		return;
@@ -254,7 +254,7 @@ vbe_init(void)
 int
 vbe_available(void)
 {
-	return vbestate.mb_type;
+	return (vbestate.mb_type);
 }
 
 int
@@ -289,7 +289,7 @@ vbe_set_palette(const struct paletteentry *entry, size_t slot)
 int
 vbe_get_mode(void)
 {
-	return vbestate.vbe_mode;
+	return (vbestate.vbe_mode);
 }
 
 int
@@ -393,7 +393,7 @@ vbe_set_mode(int modenum)
 static void *
 vbe_farptr(uint32_t farptr)
 {
-	return PTOV((((farptr & 0xffff0000) >> 12) + (farptr & 0xffff)));
+	return (PTOV((((farptr & 0xffff0000) >> 12) + (farptr & 0xffff))));
 }
 
 /*
@@ -408,7 +408,7 @@ vbe_find_mode_xydm(int x, int y, int depth, int m)
 	uint16_t mode;
 	int safety = 0, i;
 
-	memset(vbe, 0, sizeof(vbe));
+	memset(vbe, 0, sizeof (vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
 	if (biosvbe_info(vbe) != VBE_SUCCESS)
 		return (0);
@@ -430,7 +430,7 @@ vbe_find_mode_xydm(int x, int y, int depth, int m)
 			safety++;
 			farptr += 2;
 			if (safety == 100)
-				return 0;
+				return (0);
 			if (biosvbe_get_mode_info(mode, &mi) != VBE_SUCCESS) {
 				continue;
 			}
@@ -449,7 +449,7 @@ vbe_find_mode_xydm(int x, int y, int depth, int m)
 			if (mi.XResolution == x &&
 			    mi.YResolution == y &&
 			    mi.BitsPerPixel == i)
-				return mode;
+				return (mode);
 		}
 		if (depth != -1)
 			break;
@@ -535,7 +535,7 @@ vbe_print_vbe_info(struct vbeinfoblock *vbep)
 	if (vbep->OemSoftwareRev != 0) {
 		printf("OEM Version %d.%d, %s (%s, %s)\n",
 		    vbep->OemSoftwareRev >> 8, vbep->OemSoftwareRev & 0xF,
-			oemvendor, oemproductname, oemproductrev);
+		    oemvendor, oemproductname, oemproductrev);
 	}
 }
 
@@ -567,7 +567,7 @@ vbe_modelist(int depth)
 			printf(": no EDID information\n");
 	}
 
-	memset(vbe, 0, sizeof(vbe));
+	memset(vbe, 0, sizeof (vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
 	if (biosvbe_info(vbe) != VBE_SUCCESS)
 		goto done;
@@ -622,7 +622,7 @@ vbe_print_mode(void)
 	int mode, i, rc;
 	struct paletteentry pe;
 
-	memset(vbe, 0, sizeof(vbe));
+	memset(vbe, 0, sizeof (vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
 	if (biosvbe_info(vbe) != VBE_SUCCESS)
 		return;
@@ -651,11 +651,11 @@ vbe_print_mode(void)
 	    gfx_fb.framebuffer_common.framebuffer_width,
 	    gfx_fb.framebuffer_common.framebuffer_height,
 	    gfx_fb.framebuffer_common.framebuffer_bpp,
-            (gfx_fb.framebuffer_common.framebuffer_pitch << 3) /
+	    (gfx_fb.framebuffer_common.framebuffer_pitch << 3) /
 	    gfx_fb.framebuffer_common.framebuffer_bpp);
 	printf("\n    frame buffer: address=%jx, size=%jx",
-	    (uintmax_t) gfx_fb.framebuffer_common.framebuffer_addr,
-	    (uintmax_t) gfx_fb.framebuffer_common.framebuffer_height *
+	    (uintmax_t)gfx_fb.framebuffer_common.framebuffer_addr,
+	    (uintmax_t)gfx_fb.framebuffer_common.framebuffer_height *
 	    gfx_fb.framebuffer_common.framebuffer_pitch);
 
 	if (vbe_mode->MemoryModel == 0x6) {
@@ -784,6 +784,8 @@ command_vesa(int argc, char *argv[])
 		} else if (strchr(argv[2], 'x') != NULL) {
 			modenum = vbe_find_mode(argv[2]);
 		}
+	} else {
+		goto usage;
 	}
 
 	if (modenum == 0) {
