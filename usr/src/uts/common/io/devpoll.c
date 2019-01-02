@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -408,6 +408,17 @@ repoll:
 					pdp->pd_gen = gen;
 				}
 			}
+
+			/*
+			 * Skip entries marked with the sentinal value for
+			 * having already fired under oneshot conditions.
+			 */
+			if (pdp->pd_events == POLLONESHOT) {
+				releasef(fd);
+				BT_CLEAR(pcp->pc_bitmap, fd);
+				continue;
+			}
+
 			/*
 			 * XXX - pollrelock() logic needs to know which
 			 * which pollcache lock to grab. It'd be a
@@ -548,18 +559,19 @@ repoll:
 				/* Handle special polling modes. */
 				if (pdp->pd_events & POLLONESHOT) {
 					/*
-					 * If POLLONESHOT is set, perform the
-					 * implicit POLLREMOVE.
+					 * Entries operating under POLLONESHOT
+					 * will be marked with a sentinel value
+					 * to indicate that they have "fired"
+					 * when emitting an event.  This will
+					 * disable them from polling until a
+					 * later add/modify event rearms them.
 					 */
-					pdp->pd_fp = NULL;
-					pdp->pd_events = 0;
-
+					pdp->pd_events = POLLONESHOT;
 					if (pdp->pd_php != NULL) {
 						pollhead_delete(pdp->pd_php,
 						    pdp);
 						pdp->pd_php = NULL;
 					}
-
 					BT_CLEAR(pcp->pc_bitmap, fd);
 				} else if (pdp->pd_events & POLLET) {
 					/*
@@ -931,15 +943,16 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 
 				/*
 				 * We have decided that the cached information
-				 * was stale.  Clear pd_events to assure that
+				 * was stale.  Reset pd_events to assure that
 				 * we don't mistakenly operate on cached event
-				 * disposition.
+				 * disposition.  This configures the implicit
+				 * subscription to HUP and ERR events which
+				 * epoll features.
 				 */
-				pdp->pd_events = 0;
+				pdp->pd_events = POLLERR|POLLHUP;
 
 				epfdp = (dvpoll_epollfd_t *)pfdp;
 				pdp->pd_epolldata = epfdp->dpep_data;
-
 			}
 
 			ASSERT(pdp->pd_fd == fd);
@@ -1013,11 +1026,11 @@ dpwrite(dev_t dev, struct uio *uiop, cred_t *credp)
 			 * wake-ups.
 			 *
 			 * Drivers which never emit a pollhead will simply
-			 * disobey the exectation of edge-triggered behavior.
+			 * disobey the expectation of edge-triggered behavior.
 			 * This includes recursive epoll which, even on Linux,
 			 * yields its events in a level-triggered fashion only.
 			 */
-			if ((pdp->pd_events & POLLET) && error == 0 &&
+			if ((pfdp->events & POLLET) != 0 && error == 0 &&
 			    php == NULL) {
 				short levent = 0;
 
