@@ -25,8 +25,8 @@
 
 /*
  * rmf_slice.c :
- * 	This file contains the functions for parsing a slice file
- * 	for rmformat.
+ *	This file contains the functions for parsing a slice file
+ *	for rmformat.
  */
 
 #include <sys/types.h>
@@ -786,7 +786,7 @@ str2sector(char *str)
 
 int32_t
 valid_slice_file(smedia_handle_t handle, int32_t fd, char *file_name,
-	struct extvtoc *vt)
+    struct extvtoc *vt)
 {
 	struct stat status;
 	int32_t ret_val;
@@ -852,17 +852,17 @@ valid_slice_file(smedia_handle_t handle, int32_t fd, char *file_name,
  * in fdisk table.
  *	Following table describes how is it handled
  * SPARC:
- * 	SCSI/ATAPI, floppy, pcmcia : don't check for fdisk.
+ *	SCSI/ATAPI, floppy, pcmcia : don't check for fdisk.
  *				DKIOCGGEOM is sufficient.
  * x86 : floppy, pcmcia : Don't check for fdisk. DKIOCGGEOM is sufficient.
- * 	SCSI/ATAPI : Check for fdisk.
+ *	SCSI/ATAPI : Check for fdisk.
  *			if not present, assume that the solaris
  *				partition covers 100% of the medium
- * 				(minus one cylinder).
+ *				(minus one cylinder).
  *
- * 		if present :
+ *		if present :
  *				check for active solaris partition.
- * 				if not found, take the first solaris
+ *				if not found, take the first solaris
  *					partition.
  *			If there are no solaris partitions, its an error, stop.
  */
@@ -1114,7 +1114,7 @@ Solaris partition\n"));
 
 static int32_t
 get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
-	struct fdisk_info *fdisk)
+    struct fdisk_info *fdisk)
 {
 	struct mboot *boot_sec;
 	struct ipart *part;
@@ -1220,7 +1220,7 @@ get_fdisk(smedia_handle_t handle, int32_t fd, int32_t offset,
 
 /*
  * wrrite_defualt_label(int32_t fd)
- * 	fd = file descriptor for the device.
+ *	fd = file descriptor for the device.
  *
  * For sparc solaris
  *	Create a vtoc partition with
@@ -1351,7 +1351,7 @@ write_default_label(smedia_handle_t handle, int32_t fd)
 			return;
 	}
 
-	tmp_fd = open("/usr/lib/fs/ufs/mboot", O_RDONLY);
+	tmp_fd = open("/boot/pmbr", O_RDONLY);
 	if (tmp_fd <= 0) {
 		return;
 	}
@@ -1499,9 +1499,9 @@ write_default_label(smedia_handle_t handle, int32_t fd)
  * zip/jaz media. So, the meta data on the disk should be erased.
  *
  * If there is a valid fdisk table,
- * 	erase first 64K of each partition.
+ *	erase first 64K of each partition.
  * If there is a valid vtoc,
- * 	erase first 64k of each slice.
+ *	erase first 64k of each slice.
  * Then erase the 0th sector (the home for vtoc and fdisk) of the disk.
  * Note that teh vtoc on x86 resides in one of the fdisk partition.
  * So delay the erasing of the solaris partition until the vtoc is read.

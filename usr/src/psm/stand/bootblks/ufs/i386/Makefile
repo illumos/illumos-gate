@@ -25,51 +25,19 @@
 #
 # psm/stand/bootblks/ufs/i386/Makefile
 #
-.KEEP_STATE:
 
 BASEDIR = ../..
 
 include $(BASEDIR)/ufs/Makefile.ufs
 
+all	:=	TARGET= all
+install	:=	TARGET= install
+clean	:=	TARGET= clean
+clobber	:=	TARGET= clobber
+lint	:=	TARGET= lint
 
-CC		= $(GNUC_ROOT)/bin/gcc
-ASFLAGS		= -B$(GNUC_ROOT)/bin/ -fno-builtin -nostdinc
-CPPFLAGS	=
+.KEEP_STATE:
 
-LD		= $(GNU_ROOT)/bin/gld
-LDFLAGS		= -nostdlib -N -Ttext 600
+all install lint clean clobber: FRC
 
-OBJCOPY		= $(GNU_ROOT)/bin/gobjcopy
-
-INSTALL_DIR	= $(USR)/lib/fs/ufs
-INSTALL_TARGETS	= $(PROGS:%=$(INSTALL_DIR)/%)
-
-$(INSTALL_TARGETS) := FILEMODE = 0444
-
-PROGS		= mboot
-
-
-all: $(PROGS)
-
-$(PROGS): $$(@).exec
-	$(OBJCOPY) -O binary $@.exec $@
-
-%.exec: %.o
-	$(LD) $(LDFLAGS) -o $@ $(@:exec=o)
-
-
-install: all $(INSTALL_TARGETS)
-
-$(INSTALL_DIR)/%: $(INSTALL_DIR) %
-	$(INS.file)
-
-$(INSTALL_DIR):
-	$(INS.dir)
-
-lint:
-
-clean:
-	$(RM) *.exec *.o
-
-clobber: clean
-	$(RM) $(PROGS) $(INSTALLBOOT)
+FRC:

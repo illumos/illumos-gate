@@ -5770,7 +5770,6 @@ f usr/lib/fs/ufs/fstyp.so.1 0555 root bin
 h usr/lib/fs/ufs/fstyp=usr/sbin/fstyp
 f usr/lib/fs/ufs/labelit 0555 root bin
 f usr/lib/fs/ufs/lockfs 0555 root bin
-f usr/lib/fs/ufs/mboot 0444 root sys
 f usr/lib/fs/ufs/mkfs 0555 root bin
 s usr/lib/fs/ufs/mount=../../../../etc/fs/ufs/mount
 f usr/lib/fs/ufs/ncheck 0555 root bin
