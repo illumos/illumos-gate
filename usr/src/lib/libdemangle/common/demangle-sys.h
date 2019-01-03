@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Jason King
+ * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef _DEMANGLE_SYS_H
@@ -24,7 +25,8 @@ extern "C" {
 
 typedef enum sysdem_lang_e {
 	SYSDEM_LANG_AUTO,
-	SYSDEM_LANG_CPP
+	SYSDEM_LANG_CPP,
+	SYSDEM_LANG_RUST
 } sysdem_lang_t;
 
 typedef struct sysdem_alloc_s {

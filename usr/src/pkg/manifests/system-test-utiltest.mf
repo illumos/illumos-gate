@@ -15,6 +15,7 @@
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2017 Joyent, Inc.
 # Copyright 2017 Jason King.
+# Copyright 2018, Joyent, Inc.
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -1123,6 +1124,7 @@ file path=opt/util-tests/tests/date_test mode=0555
 file path=opt/util-tests/tests/demangle/afl-fast mode=0555
 file path=opt/util-tests/tests/demangle/gcc-libstdc++ mode=0555
 file path=opt/util-tests/tests/demangle/llvm-stdcxxabi mode=0555
+file path=opt/util-tests/tests/demangle/rust mode=0555
 file path=opt/util-tests/tests/dis/distest mode=0555
 file path=opt/util-tests/tests/dis/i386/32.adx.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.adx.s mode=0444

@@ -27,7 +27,7 @@
  */
 
 /*
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -66,8 +66,7 @@ mdb_dem_load(void)
 	dmp->dm_len = 0;
 	dmp->dm_buf = NULL;
 	dmp->dm_flags = MDB_DM_SCOPE;
-	/* stick with C++ for now to match old behavior */
-	dmp->dm_lang = SYSDEM_LANG_CPP;
+	dmp->dm_lang = SYSDEM_LANG_AUTO;
 
 	return (dmp);
 }

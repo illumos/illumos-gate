@@ -16,12 +16,12 @@
 
 LIBRARY = libdemangle-sys.a
 VERS    = .1
-OBJECTS = str.o util.o cxx_util.o cxx.o demangle.o
+OBJECTS = str.o strview.o util.o cxx_util.o cxx.o demangle.o rust.o
 
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc
+LDLIBS +=	-lc -lcustr
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

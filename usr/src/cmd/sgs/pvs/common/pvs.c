@@ -27,7 +27,7 @@
 /*
  * Analyze the versioning information within a file.
  *
- *   -C		demangle C++ symbol names.
+ *   -C		demangle symbol names.
  *
  *   -d		dump version definitions.
  *
