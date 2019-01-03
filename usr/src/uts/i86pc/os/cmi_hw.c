@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1237,7 +1237,7 @@ cmi_hdl_ent_lookup(uint_t chipid, uint_t coreid, uint_t strandid)
 	    ((strandid) & CMI_MAX_STRANDID(cmi_strand_nbits))));
 }
 
-extern void cpuid_get_ext_topo(uint_t, uint_t *, uint_t *);
+extern void cpuid_get_ext_topo(cpu_t *, uint_t *, uint_t *);
 
 cmi_hdl_t
 cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
@@ -1268,9 +1268,17 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 #else
 	vendor = cpuid_getvendor((cpu_t *)priv);
 #endif
-	if (vendor == X86_VENDOR_Intel && cmi_ext_topo_check == 0) {
-		cpuid_get_ext_topo(vendor, &cmi_core_nbits, &cmi_strand_nbits);
-		cmi_ext_topo_check = 1;
+
+	switch (vendor) {
+	case X86_VENDOR_Intel:
+	case X86_VENDOR_AMD:
+		if (cmi_ext_topo_check == 0) {
+			cpuid_get_ext_topo((cpu_t *)priv, &cmi_core_nbits,
+			    &cmi_strand_nbits);
+			cmi_ext_topo_check = 1;
+		}
+	default:
+		break;
 	}
 
 	if (chipid > CMI_MAX_CHIPID ||
