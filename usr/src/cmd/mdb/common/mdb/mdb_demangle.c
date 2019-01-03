@@ -26,6 +26,10 @@
  * Copyright 2018 Jason King
  */
 
+/*
+ * Copyright (c) 2019, Joyent, Inc.  All rights reserved.
+ */
+
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_demangle.h>
 #include <mdb/mdb_err.h>
@@ -62,8 +66,7 @@ mdb_dem_load(void)
 	dmp->dm_len = 0;
 	dmp->dm_buf = NULL;
 	dmp->dm_flags = MDB_DM_SCOPE;
-	/* stick with C++ for now to match old behavior */
-	dmp->dm_lang = SYSDEM_LANG_CPP;
+	dmp->dm_lang = SYSDEM_LANG_AUTO;
 
 	return (dmp);
 }
@@ -207,7 +210,20 @@ mdb_dem_process(mdb_demangler_t *dmp, const char *name)
 
 	res = sysdemangle(name + prefixlen, dmp->dm_lang, &mdb_dem_demops);
 	if (res == NULL) {
-		if (errno != EINVAL)
+		/*
+		 * EINVAL indicates the name is not a properly mangled name
+		 * (or perhaps is truncated so it cannot be correctly
+		 * demangled) while ENOTSUP means sysdemangle could not
+		 * determine which language was used to mangle the name when
+		 * SYSDEM_LANG_AUTO is used (the name might not be mangled,
+		 * the name could be truncated enough to prevent determination
+		 * of the name, etc).
+		 *
+		 * Both are allowed/expected failure modes, so in both cases
+		 * do not emit a warning -- let the caller display the
+		 * original name.
+		 */
+		if (errno != EINVAL && errno != ENOTSUP)
 			mdb_warn("Error while demangling");
 		return (-1);
 	}

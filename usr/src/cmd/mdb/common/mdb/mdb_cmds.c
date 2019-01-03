@@ -3207,8 +3207,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	 */
 	{ "?", "fmt-list", "format data from object file", cmd_print_object },
 	{ "$>", "[file]", "log session to a file", cmd_old_log },
-	{ "$g", "?", "get/set C++ demangling options", cmd_demflags },
-	{ "$G", NULL, "enable/disable C++ demangling support", cmd_demangle },
+	{ "$g", "?", "get/set demangling options", cmd_demflags },
+	{ "$G", NULL, "enable/disable demangling support", cmd_demangle },
 	{ "$i", NULL, "print signals that are ignored", cmd_notsup },
 	{ "$l", NULL, "print the representative thread's lwp id", cmd_notsup },
 	{ "$p", ":", "change debugger target context", cmd_context },

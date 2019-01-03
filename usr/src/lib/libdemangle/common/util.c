@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Jason King
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <sys/debug.h>
@@ -69,6 +70,20 @@ xrealloc(sysdem_ops_t *ops, void *p, size_t oldsz, size_t newsz)
 	}
 
 	return (temp);
+}
+
+char *
+xstrdup(sysdem_ops_t *ops, const char *src)
+{
+	size_t len = strlen(src);
+	char *str = zalloc(ops, len + 1);
+
+	if (str == NULL)
+		return (NULL);
+
+	/* zalloc(len+1) guarantees this will be NUL-terminated */
+	(void) memcpy(str, src, len);
+	return (str);
 }
 
 /*ARGSUSED*/

@@ -596,6 +596,7 @@ libcmdutils:	libavl
 libcpc:		libpctx
 libcrypt:	libgen
 libctf:		libdwarf
+libdemangle:	libcustr
 libdevid:	libdevinfo
 libdevinfo:	libsec libgen
 libdhcpagent:	libdhcputil libuuid libdlpi libcontract

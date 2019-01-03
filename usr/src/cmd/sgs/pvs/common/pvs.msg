@@ -22,6 +22,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2018, Joyent, Inc.
 #
 
 @ _START_
@@ -34,7 +35,7 @@
 # Argument usage messages.
 
 @ MSG_USAGE_BRIEF	"usage: %s [-Cdlnorsv] [-I index] [-N Name] file(s)\n"
-@ MSG_USAGE_DETAIL	"\t[-C]\t\tdemangle C++ symbol names\n\
+@ MSG_USAGE_DETAIL	"\t[-C]\t\tdemangle symbol names\n\
 			 \t[-d]\t\tprint version definition information\n\
 			 \t[-I index]\tqualify version with an index\n\
 			 \t[-l]\t\tprint reduced symbols\n\

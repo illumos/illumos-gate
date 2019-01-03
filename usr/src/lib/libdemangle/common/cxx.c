@@ -165,11 +165,10 @@ static const char *parse_vector_type(const char *, const char *, cpp_db_t *);
 size_t cpp_name_max_depth = 1024;	/* max depth of name stack */
 
 char *
-cpp_demangle(const char *src, sysdem_ops_t *ops)
+cpp_demangle(const char *src, size_t srclen, sysdem_ops_t *ops)
 {
 	char *result = NULL;
 	cpp_db_t db;
-	size_t srclen = strlen(src);
 
 	if (!db_init(&db, ops))
 		goto done;

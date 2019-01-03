@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Jason King.
+ * Copyright 2018, Joyent, Inc.
  */
 
 #include <dlfcn.h>
@@ -106,6 +107,6 @@ dis_demangle(const char *name)
 	 * from previous invocations is freed.
 	 */
 	free(demangled_name);
-	demangled_name = sysdemangle(name, SYSDEM_LANG_CPP, NULL);
+	demangled_name = sysdemangle(name, SYSDEM_LANG_AUTO, NULL);
 	return ((demangled_name != NULL) ? demangled_name : name);
 }

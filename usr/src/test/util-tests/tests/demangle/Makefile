@@ -11,6 +11,7 @@
 
 #
 # Copyright 2018 Jason King.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -19,7 +20,7 @@ include $(SRC)/test/Makefile.com
 
 ROOTBINDIR = $(ROOTOPTPKG)/bin
 
-PROG = gcc-libstdc++ llvm-stdcxxabi afl-fast
+PROG = gcc-libstdc++ llvm-stdcxxabi afl-fast rust
 
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/demangle
@@ -33,6 +34,7 @@ SRCS = $(OBJS:%.o=%.c)
 CSTD = $(CSTD_GNU99)
 
 LDLIBS += -ldemangle-sys
+rust := LDLIBS += -lumem
 
 all: $(PROG)
 
@@ -46,6 +48,10 @@ llvm-stdcxxabi: llvm-stdcxxabi.o
 
 afl-fast: afl-fast.o
 	$(LINK.c) -o $@ afl-fast.o $(LDLIBS)
+	$(POST_PROCESS)
+
+rust: rust.o
+	$(LINK.c) -o $@ rust.o $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(CMDS)

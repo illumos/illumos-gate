@@ -37,7 +37,7 @@
 			 [-N name] [-O osabi] [-T type] [-p | -w outfile] \
 			 file...\n"
 @ MSG_USAGE_DETAIL1	"\t[-c]\t\tdump section header information\n"
-@ MSG_USAGE_DETAIL2	"\t[-C]\t\tdemangle C++ symbol names\n"
+@ MSG_USAGE_DETAIL2	"\t[-C]\t\tdemangle symbol names\n"
 @ MSG_USAGE_DETAIL3	"\t[-d]\t\tdump the contents of the .dynamic section\n"
 @ MSG_USAGE_DETAIL4	"\t[-e]\t\tdump the elf header\n"
 @ MSG_USAGE_DETAIL5	"\t[-g]\t\tdump the contents of the .group sections\n"
