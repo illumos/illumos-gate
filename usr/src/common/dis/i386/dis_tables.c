@@ -21,7 +21,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2018 Joyent, Inc.
  */
 
 /*
@@ -30,7 +30,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include	"dis_tables.h"
 
@@ -44,8 +44,8 @@
  *
  * The behavior of this file can be controlled by one of the following flags:
  *
- * 	DIS_TEXT	Include text for disassembly
- * 	DIS_MEM		Include memory-size calculations
+ *	DIS_TEXT	Include text for disassembly
+ *	DIS_MEM		Include memory-size calculations
  *
  * Either or both of these can be defined.
  *
@@ -65,7 +65,7 @@ extern size_t strlcat(char *, const char *, size_t);
 #endif
 
 
-#define		TERM 	0	/* used to indicate that the 'indirect' */
+#define		TERM	0	/* used to indicate that the 'indirect' */
 				/* field terminates - no pointer.	*/
 
 /* Used to decode instructions. */
@@ -115,7 +115,7 @@ enum {
 	SEG,
 	MR,
 	RM,
-	RM_66r,		/* RM, but with a required 0x66 prefix */ 
+	RM_66r,		/* RM, but with a required 0x66 prefix */
 	IA,
 	MA,
 	SD,
@@ -134,7 +134,7 @@ enum {
 	NORM,		/* instructions w/o ModR/M byte, no memory access */
 	IMPLMEM,	/* instructions w/o ModR/M byte, implicit mem access */
 	O,		/* for call	*/
-	JTAB,		/* jump table 	*/
+	JTAB,		/* jump table	*/
 	IMUL,		/* for 186 iimul instr  */
 	CBW,		/* so data16 can be evaluated for cbw and variants */
 	MvI,		/* for 186 logicals */
@@ -169,7 +169,7 @@ enum {
 	MMO,		/* Prefixable MMX/SIMD-Int	mm/mem	-> mm */
 	MMOIMPL,	/* Prefixable MMX/SIMD-Int	mm	-> mm (mem) */
 	MMO3P,		/* Prefixable MMX/SIMD-Int	mm	-> r32,imm8 */
-	MMOM3,		/* Prefixable MMX/SIMD-Int	mm	-> r32 	*/
+	MMOM3,		/* Prefixable MMX/SIMD-Int	mm	-> r32	*/
 	MMOS,		/* Prefixable MMX/SIMD-Int	mm	-> mm/mem */
 	MMOMS,		/* Prefixable MMX/SIMD-Int	mm	-> mem */
 	MMOPM,		/* MMX/SIMD-Int			mm/mem	-> mm,imm8 */
@@ -187,33 +187,34 @@ enum {
 	XMMOXMM,	/* Prefixable SIMD		xmm/mem	-> mm	*/
 	XMMOM,		/* Prefixable SIMD		xmm	-> mem */
 	XMMOMS,		/* Prefixable SIMD		mem	-> xmm */
-	XMM,		/* SIMD 			xmm/mem	-> xmm */
+	XMM,		/* SIMD				xmm/mem	-> xmm */
 	XMM_66r,	/* SIMD 0x66 prefix required	xmm/mem	-> xmm */
-	XMM_66o,	/* SIMD 0x66 prefix optional 	xmm/mem	-> xmm */
+	XMM_66o,	/* SIMD 0x66 prefix optional	xmm/mem	-> xmm */
 	XMMXIMPL,	/* SIMD				xmm	-> xmm (mem) */
 	XMM3P,		/* SIMD				xmm	-> r32,imm8 */
 	XMM3PM_66r,	/* SIMD 0x66 prefix required	xmm	-> r32/mem,imm8 */
-	XMMP,		/* SIMD 			xmm/mem w/to xmm,imm8 */
+	XMMP,		/* SIMD				xmm/mem w/to xmm,imm8 */
 	XMMP_66o,	/* SIMD 0x66 prefix optional	xmm/mem w/to xmm,imm8 */
 	XMMP_66r,	/* SIMD 0x66 prefix required	xmm/mem w/to xmm,imm8 */
-	XMMPRM,		/* SIMD 			r32/mem -> xmm,imm8 */
+	XMMPRM,		/* SIMD				r32/mem -> xmm,imm8 */
 	XMMPRM_66r,	/* SIMD 0x66 prefix required	r32/mem -> xmm,imm8 */
 	XMMS,		/* SIMD				xmm	-> xmm/mem */
-	XMMM,		/* SIMD 			mem	-> xmm */
+	XMMM,		/* SIMD				mem	-> xmm */
 	XMMM_66r,	/* SIMD	0x66 prefix required	mem	-> xmm */
 	XMMMS,		/* SIMD				xmm	-> mem */
-	XMM3MX,		/* SIMD 			r32/mem -> xmm */
-	XMM3MXS,	/* SIMD 			xmm	-> r32/mem */
-	XMMSH,		/* SIMD 			xmm,imm8 */
-	XMMXM3,		/* SIMD 			xmm/mem -> r32 */
-	XMMX3,		/* SIMD 			xmm	-> r32 */
-	XMMXMM,		/* SIMD 			xmm/mem	-> mm */
-	XMMMX,		/* SIMD 			mm	-> xmm */
-	XMMXM,		/* SIMD 			xmm	-> mm */
-        XMMX2I,		/* SIMD				xmm -> xmm, imm, imm */
-        XMM2I,		/* SIMD				xmm, imm, imm */
+	XMM3MX,		/* SIMD				r32/mem -> xmm */
+	XMM3MXS,	/* SIMD				xmm	-> r32/mem */
+	XMMSH,		/* SIMD				xmm,imm8 */
+	XMMXM3,		/* SIMD				xmm/mem -> r32 */
+	XMMX3,		/* SIMD				xmm	-> r32 */
+	XMMXMM,		/* SIMD				xmm/mem	-> mm */
+	XMMMX,		/* SIMD				mm	-> xmm */
+	XMMXM,		/* SIMD				xmm	-> mm */
+	XMMX2I,		/* SIMD				xmm -> xmm, imm, imm */
+	XMM2I,		/* SIMD				xmm, imm, imm */
 	XMMFENCE,	/* SIMD lfence or mfence */
 	XMMSFNC,	/* SIMD sfence (none or mem) */
+	FSGS,		/* FSGSBASE if reg */
 	XGETBV_XSETBV,
 	VEX_NONE,	/* VEX  no operand */
 	VEX_MO,		/* VEX	mod_rm		               -> implicit reg */
@@ -221,21 +222,21 @@ enum {
 	VEX_VRMrX,	/* VEX  mod_rm, VEX.vvvv               -> mod_rm */
 	VEX_RRX,	/* VEX  VEX.vvvv, mod_reg              -> mod_rm */
 	VEX_RMRX,	/* VEX  VEX.vvvv, mod_rm, imm8[7:4]    -> mod_reg */
-	VEX_MX,         /* VEX  mod_rm                         -> mod_reg */
-	VEX_MXI,        /* VEX  mod_rm, imm8                   -> mod_reg */
-	VEX_XXI,        /* VEX  mod_rm, imm8                   -> VEX.vvvv */
-	VEX_MR,         /* VEX  mod_rm                         -> mod_reg */
-	VEX_RRI,        /* VEX  mod_reg, mod_rm                -> implicit(eflags/r32) */
-	VEX_RX,         /* VEX  mod_reg                        -> mod_rm */
-	VEX_KRR,        /* VEX  mod_rm                         -> mod_reg */
-	VEX_KMR,        /* VEX  mod_reg                        -> mod_rm */
-	VEX_KRM,        /* VEX  mod_rm                         -> mod_reg */
-	VEX_RR,         /* VEX  mod_rm                         -> mod_reg */
-	VEX_RRi,        /* VEX  mod_rm, imm8                   -> mod_reg */
-	VEX_RM,         /* VEX  mod_reg                        -> mod_rm */
+	VEX_MX,		/* VEX  mod_rm                         -> mod_reg */
+	VEX_MXI,	/* VEX  mod_rm, imm8                   -> mod_reg */
+	VEX_XXI,	/* VEX  mod_rm, imm8                   -> VEX.vvvv */
+	VEX_MR,		/* VEX  mod_rm                         -> mod_reg */
+	VEX_RRI,	/* VEX  mod_reg, mod_rm                -> implicit(eflags/r32) */
+	VEX_RX,		/* VEX  mod_reg                        -> mod_rm */
+	VEX_KRR,	/* VEX  mod_rm                         -> mod_reg */
+	VEX_KMR,	/* VEX  mod_reg                        -> mod_rm */
+	VEX_KRM,	/* VEX  mod_rm                         -> mod_reg */
+	VEX_RR,		/* VEX  mod_rm                         -> mod_reg */
+	VEX_RRi,	/* VEX  mod_rm, imm8                   -> mod_reg */
+	VEX_RM,		/* VEX  mod_reg                        -> mod_rm */
 	VEX_RIM,	/* VEX  mod_reg, imm8                  -> mod_rm */
-	VEX_RRM,        /* VEX  VEX.vvvv, mod_reg              -> mod_rm */
-	VEX_RMX,        /* VEX  VEX.vvvv, mod_rm               -> mod_reg */
+	VEX_RRM,	/* VEX  VEX.vvvv, mod_reg              -> mod_rm */
+	VEX_RMX,	/* VEX  VEX.vvvv, mod_rm               -> mod_reg */
 	VEX_SbVM,	/* VEX  SIB, VEX.vvvv                  -> mod_rm */
 	VMx,		/* vmcall/vmlaunch/vmresume/vmxoff */
 	VMxo,		/* VMx instruction with optional prefix */
@@ -243,8 +244,8 @@ enum {
 	BLS,		/* BLSR, BLSMSK, BLSI */
 	FMA,		/* FMA instructions, all VEX_RMrX */
 	ADX,		/* ADX instructions, support REX.w, mod_rm->mod_reg */
-	EVEX_RX,        /* EVEX  mod_reg                      -> mod_rm */
-	EVEX_MX,        /* EVEX  mod_rm                       -> mod_reg */
+	EVEX_RX,	/* EVEX  mod_reg                      -> mod_rm */
+	EVEX_MX,	/* EVEX  mod_rm                       -> mod_reg */
 	EVEX_RMrX	/* EVEX  EVEX.vvvv, mod_rm            -> mod_reg */
 };
 
@@ -565,7 +566,7 @@ const instable_t dis_opPause = TNS("pause", NORM);
  */
 const instable_t dis_op0F00[8] = {
 
-/*  [0]  */	TNS("sldt",M),		TNS("str",M),		TNSy("lldt",M), 	TNSy("ltr",M),
+/*  [0]  */	TNS("sldt",M),		TNS("str",M),		TNSy("lldt",M),		TNSy("ltr",M),
 /*  [4]  */	TNSZ("verr",M,2),	TNSZ("verw",M,2),	INVALID,		INVALID,
 };
 
@@ -576,7 +577,7 @@ const instable_t dis_op0F00[8] = {
 const instable_t dis_op0F01[8] = {
 
 /*  [0]  */	TNSZ("sgdt",VMx,6),	TNSZ("sidt",MONITOR_MWAIT,6),	TNSZ("lgdt",XGETBV_XSETBV,6),	TNSZ("lidt",SVM,6),
-/*  [4]  */	TNSZ("smsw",M,2),	INVALID, 		TNSZ("lmsw",M,2),	TNS("invlpg",SWAPGS_RDTSCP),
+/*  [4]  */	TNSZ("smsw",M,2),	INVALID,		TNSZ("lmsw",M,2),	TNS("invlpg",SWAPGS_RDTSCP),
 };
 
 /*
@@ -589,11 +590,19 @@ const instable_t dis_op0F18[8] = {
 };
 
 /*
- * 	Decode table for 0x0FAE opcodes -- SIMD state save/restore
+ *	Decode table for 0x0FAE opcodes -- SIMD state save/restore
  */
 const instable_t dis_op0FAE[8] = {
-/*  [0]  */	TNSZ("fxsave",M,512),	TNSZ("fxrstor",M,512),	TNS("ldmxcsr",M),	TNS("stmxcsr",M),
+/*  [0]  */	TNSZ("fxsave",FSGS,512),TNSZ("fxrstor",FSGS,512),TNS("ldmxcsr",FSGS),	TNS("stmxcsr",FSGS),
 /*  [4]  */	TNSZ("xsave",M,512),	TNS("lfence",XMMFENCE), TNS("mfence",XMMFENCE),	TNS("sfence",XMMSFNC),
+};
+
+/*
+ *	Decode table for 0xF30FAE opcodes -- FSGSBASE
+ */
+const instable_t dis_opF30FAE[8] = {
+/*  [0]  */	TNSx("rdfsbase",FSGS),	TNSx("rdgsbase",FSGS),	TNSx("wrfsbase",FSGS),	TNSx("wrgsbase",FSGS),
+/*  [4]  */	INVALID,		INVALID,		INVALID,		INVALID,
 };
 
 /*
@@ -607,7 +616,7 @@ const instable_t dis_op0FBA[8] = {
 };
 
 /*
- * 	Decode table for 0x0FC7 opcode (group 9)
+ *	Decode table for 0x0FC7 opcode (group 9)
  */
 
 const instable_t dis_op0FC7[8] = {
@@ -617,7 +626,7 @@ const instable_t dis_op0FC7[8] = {
 };
 
 /*
- * 	Decode table for 0x0FC7 opcode (group 9) mode 3
+ *	Decode table for 0x0FC7 opcode (group 9) mode 3
  */
 
 const instable_t dis_op0FC7m3[8] = {
@@ -627,7 +636,7 @@ const instable_t dis_op0FC7m3[8] = {
 };
 
 /*
- * 	Decode table for 0x0FC7 opcode with 0x66 prefix
+ *	Decode table for 0x0FC7 opcode with 0x66 prefix
  */
 
 const instable_t dis_op660FC7[8] = {
@@ -637,7 +646,7 @@ const instable_t dis_op660FC7[8] = {
 };
 
 /*
- * 	Decode table for 0x0FC7 opcode with 0xF3 prefix
+ *	Decode table for 0x0FC7 opcode with 0xF3 prefix
  */
 
 const instable_t dis_opF30FC7[8] = {
@@ -670,7 +679,7 @@ const instable_t dis_op0F7123[4][8] = {
 /*      .4 */	TNS("psrad",MMOSH),	INVALID,		TNS("pslld",MMOSH),	INVALID,
 }, {
 /*  [73].0 */	INVALID,		INVALID,		TNS("psrlq",MMOSH),	TNS("INVALID",MMOSH),
-/*      .4 */	INVALID,		INVALID, 		TNS("psllq",MMOSH),	TNS("INVALID",MMOSH),
+/*      .4 */	INVALID,		INVALID,		TNS("psllq",MMOSH),	TNS("INVALID",MMOSH),
 } };
 
 /*
@@ -1881,8 +1890,8 @@ const instable_t dis_opAVX660F3A[256] = {
 };
 
 /*
- * 	Decode table for 0x0F0D which uses the first byte of the mod_rm to
- * 	indicate a sub-code.
+ *	Decode table for 0x0F0D which uses the first byte of the mod_rm to
+ *	indicate a sub-code.
  */
 const instable_t dis_op0F0D[8] = {
 /*  [00]  */	INVALID,		TNS("prefetchw",PREF),	TNS("prefetchwt1",PREF),INVALID,
@@ -1956,7 +1965,7 @@ const instable_t dis_op0F[16][16] = {
 /*  [BC]  */	TS("bsf",MRw),		TS("bsr",MRw),		TS("movsb",MOVZ),	TNS("movswl",MOVZ),
 }, {
 /*  [C0]  */	TNS("xaddb",XADDB),	TS("xadd",RMw),		TNSZ("cmpps",XMMOPM,16),TNS("movnti",RM),
-/*  [C4]  */	TNSZ("pinsrw",MMOPRM,2),TNS("pextrw",MMO3P), 	TNSZ("shufps",XMMOPM,16),IND(dis_op0FC7),
+/*  [C4]  */	TNSZ("pinsrw",MMOPRM,2),TNS("pextrw",MMO3P),	TNSZ("shufps",XMMOPM,16),IND(dis_op0FC7),
 /*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 }, {
@@ -2039,7 +2048,7 @@ const instable_t dis_opAVX0F[16][16] = {
 /*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 }, {
 /*  [C0]  */	INVALID,		INVALID,		TNSZ("vcmpps",VEX_RMRX,16),INVALID,
-/*  [C4]  */	INVALID,		INVALID,	 	TNSZ("vshufps",VEX_RMRX,16),INVALID,
+/*  [C4]  */	INVALID,		INVALID,		TNSZ("vshufps",VEX_RMRX,16),INVALID,
 /*  [C8]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [CC]  */	INVALID,		INVALID,		INVALID,		INVALID,
 }, {
@@ -2365,7 +2374,7 @@ const instable_t dis_distable[16][16] = {
 /* [B,8] */	TS("mov",IR),		TS("mov",IR),		TS("mov",IR),		TS("mov",IR),
 /* [B,C] */	TS("mov",IR),		TS("mov",IR),		TS("mov",IR),		TS("mov",IR),
 }, {
-/* [C,0] */	IND(dis_opC0),		IND(dis_opC1), 		TNSyp("ret",RET),	TNSyp("ret",NORM),
+/* [C,0] */	IND(dis_opC0),		IND(dis_opC1),		TNSyp("ret",RET),	TNSyp("ret",NORM),
 /* [C,4] */	TNSx("les",MR),		TNSx("lds",MR),		TNS("movb",IMw),	TS("mov",IMw),
 /* [C,8] */	TNSyp("enter",ENTER),	TNSyp("leave",NORM),	TNS("lret",RET),	TNS("lret",NORM),
 /* [C,C] */	TNS("int",INT3),	TNS("int",INTx),	TNSx("into",NORM),	TNS("iret",NORM),
@@ -2484,7 +2493,7 @@ static int isize64[] = {1, 2, 4, 8};
  *
  * We further have to subdivide this based on the value of VEX_W and the value
  * of VEX_L. The array is constructed to be indexed as:
- * 	[opcode - 0x90][VEX_W][VEX_L].
+ *	[opcode - 0x90][VEX_W][VEX_L].
  */
 /* w = 0, 0x90 */
 typedef struct dis_gather_regs {
@@ -2917,7 +2926,7 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 	uint_t ss;		/* scale-factor from opcode */
 	uint_t index;		/* index register number */
 	uint_t base;		/* base register number */
-	int dispsize;   	/* size of displacement in bytes */
+	int dispsize;		/* size of displacement in bytes */
 #ifdef DIS_TEXT
 	char *opnd = x->d86_opnd[opindex].d86_opnd;
 #endif
@@ -3156,7 +3165,7 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 /*
  * Similar, but for 2 operands plus an immediate.
  * vbit indicates direction
- * 	0 for "opcode imm, r, r_m" or
+ *	0 for "opcode imm, r, r_m" or
  *	1 for "opcode imm, r_m, r"
  */
 #define	THREEOPERAND(x, mode, reg, r_m, rex_prefix, wbit, w2, immsize, vbit) { \
@@ -4016,8 +4025,8 @@ not_avx512:
 				/*
 				 * Calculate our offset in dis_op0F
 				 */
-				if ((uintptr_t)dp - (uintptr_t)dis_op0F
-				    > sizeof (dis_op0F))
+				if ((uintptr_t)dp - (uintptr_t)dis_op0F >
+				    sizeof (dis_op0F))
 					goto error;
 
 				off = ((uintptr_t)dp - (uintptr_t)dis_op0F) /
@@ -4030,6 +4039,19 @@ not_avx512:
 			}
 		}
 		break;
+	case FSGS:
+		if (rep_prefix == 0xf3) {
+			if ((uintptr_t)dp - (uintptr_t)dis_op0FAE >
+			    sizeof (dis_op0FAE))
+				goto error;
+
+			off = ((uintptr_t)dp - (uintptr_t)dis_op0FAE) /
+			    sizeof (instable_t);
+			dp = (instable_t *)&dis_opF30FAE[off];
+			rep_prefix = 0;
+		} else if (rep_prefix != 0x00) {
+			goto error;
+		}
 	}
 
 	/*
@@ -4419,6 +4441,24 @@ just_mem:
 		} else if (mode == 3 && r_m == 1) {
 #ifdef DIS_TEXT
 			(void) strncpy(x->d86_mnem, "rdtscp", OPLEN);
+#endif
+			NOMEM;
+			break;
+		} else if (mode == 3 && r_m == 2) {
+#ifdef DIS_TEXT
+			(void) strncpy(x->d86_mnem, "monitorx", OPLEN);
+#endif
+			NOMEM;
+			break;
+		} else if (mode == 3 && r_m == 3) {
+#ifdef DIS_TEXT
+			(void) strncpy(x->d86_mnem, "mwaitx", OPLEN);
+#endif
+			NOMEM;
+			break;
+		} else if (mode == 3 && r_m == 4) {
+#ifdef DIS_TEXT
+			(void) strncpy(x->d86_mnem, "clzero", OPLEN);
 #endif
 			NOMEM;
 			break;
@@ -5184,22 +5224,44 @@ xmmprm:
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
 
 		/* sfence doesn't take operands */
+		if (mode != REG_ONLY) {
+			if (opnd_size_prefix == 0x66) {
 #ifdef DIS_TEXT
-		if (mode == REG_ONLY) {
-			(void) strlcat(x->d86_mnem, "sfence", OPLEN);
-		} else {
-			(void) strlcat(x->d86_mnem, "clflush", OPLEN);
+				(void) strlcat(x->d86_mnem, "clflushopt",
+				    OPLEN);
+#endif
+			} else if (opnd_size_prefix == 0) {
+#ifdef DIS_TEXT
+				(void) strlcat(x->d86_mnem, "clflush", OPLEN);
+#endif
+			} else {
+				/* Unknown instruction */
+				goto error;
+			}
+
 			dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
 			dtrace_get_operand(x, mode, r_m, BYTE_OPND, 0);
 			NOMEM;
+#ifdef DIS_TEXT
+		} else {
+			(void) strlcat(x->d86_mnem, "sfence", OPLEN);
+#endif
 		}
-#else
-		if (mode != REG_ONLY) {
-			dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
-			dtrace_get_operand(x, mode, r_m, LONG_OPND, 0);
+		break;
+
+	case FSGS:
+		/*
+		 * The FSGSBASE instructions are taken only when the mode is set
+		 * to registers. They share opcodes with instructions like
+		 * fxrstor, stmxcsr, etc. We handle the repz prefix earlier.
+		 */
+		wbit = WBIT(opcode2);
+		dtrace_get_modrm(x, &mode, &reg, &r_m);
+		dtrace_rex_adjust(rex_prefix, mode, NULL, &r_m);
+		dtrace_get_operand(x, mode, r_m, wbit, 0);
+		if (mode == REG_ONLY) {
 			NOMEM;
 		}
-#endif
 		break;
 
 	/*
@@ -5224,8 +5286,8 @@ xmmprm:
 			/*
 			 * Only the following exact byte sequences are allowed:
 			 *
-			 * 	0f ae e8	lfence
-			 * 	0f ae f0	mfence
+			 *	0f ae e8	lfence
+			 *	0f ae f0	mfence
 			 */
 			if ((uint8_t)x->d86_bytes[x->d86_len - 1] != 0xe8 &&
 			    (uint8_t)x->d86_bytes[x->d86_len - 1] != 0xf0)
@@ -5235,7 +5297,15 @@ xmmprm:
 			if (reg == 5) {
 				(void) strncpy(x->d86_mnem, "xrstor", OPLEN);
 			} else if (reg == 6) {
-				(void) strncpy(x->d86_mnem, "xsaveopt", OPLEN);
+				if (opnd_size_prefix == 0x66) {
+					(void) strncpy(x->d86_mnem, "clwb",
+					    OPLEN);
+				} else if (opnd_size_prefix == 0x00) {
+					(void) strncpy(x->d86_mnem, "xsaveopt",
+					    OPLEN);
+				} else {
+					goto error;
+				}
 			} else {
 				goto error;
 			}

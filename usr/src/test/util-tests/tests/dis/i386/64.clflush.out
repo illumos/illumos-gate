@@ -1,0 +1,4 @@
+    libdis_test:     66 0f ae 30        clwb   (%rax)
+    libdis_test+0x4: 0f ae 3b           clflush (%rbx)
+    libdis_test+0x7: 66 0f ae 39        clflushopt (%rcx)
+    libdis_test+0xb: 0f 01 fc           clzero 

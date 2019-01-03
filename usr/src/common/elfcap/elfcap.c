@@ -391,6 +391,26 @@ static const elfcap_desc_t hw2_386[ELFCAP_NUM_HW2_386] = {
 	{						/* 0x00100000 */
 		AV_386_2_SHA, STRDESC("AV_386_2_SHA"),
 		STRDESC("SHA"), STRDESC("sha"),
+	},
+	{						/* 0x00200000 */
+		AV_386_2_FSGSBASE, STRDESC("AV_386_2_FSGSBASE"),
+		STRDESC("FSGSBASE"), STRDESC("fsgsbase")
+	},
+	{						/* 0x00400000 */
+		AV_386_2_CLFLUSHOPT, STRDESC("AV_386_2_CLFLUSHOPT"),
+		STRDESC("CLFLUSHOPT"), STRDESC("clflushopt")
+	},
+	{						/* 0x00800000 */
+		AV_386_2_CLWB, STRDESC("AV_386_2_CLWB"),
+		STRDESC("CLWB"), STRDESC("clwb")
+	},
+	{						/* 0x01000000 */
+		AV_386_2_MONITORX, STRDESC("AV_386_2_MONITORX"),
+		STRDESC("MONITORX"), STRDESC("monitorx")
+	},
+	{						/* 0x02000000 */
+		AV_386_2_CLZERO, STRDESC("AV_386_2_CLZERO"),
+		STRDESC("CLZERO"), STRDESC("clzero")
 	}
 };
 

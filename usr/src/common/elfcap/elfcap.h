@@ -50,8 +50,8 @@ typedef uint32_t elfcap_mask_t;
 
 typedef enum {
 	ELFCAP_STYLE_FULL =	1,	/* Full formal name (e.g. AV_386_SSE) */
-	ELFCAP_STYLE_UC = 	2,	/* Informal upper case (e.g. SSE) */
-	ELFCAP_STYLE_LC = 	3,	/* Informal lower case (e.g. sse) */
+	ELFCAP_STYLE_UC =	2,	/* Informal upper case (e.g. SSE) */
+	ELFCAP_STYLE_LC =	3,	/* Informal lower case (e.g. sse) */
 
 	ELFCAP_STYLE_F_ICMP =	0x0100	 /* Use case insensitive strcmp */
 } elfcap_style_t;
@@ -115,7 +115,7 @@ typedef enum {
 #define	ELFCAP_NUM_SF1			3
 #define	ELFCAP_NUM_HW1_SPARC		17
 #define	ELFCAP_NUM_HW1_386		32
-#define	ELFCAP_NUM_HW2_386		21
+#define	ELFCAP_NUM_HW2_386		26
 
 
 /*

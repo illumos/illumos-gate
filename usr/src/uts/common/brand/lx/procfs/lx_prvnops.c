@@ -4256,7 +4256,7 @@ lxpr_read_diskstats(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 *	2 - minor mumber
 		 *	3 - device name
 		 *	4 - reads completed successfully
-		 * 	5 - reads merged
+		 *	5 - reads merged
 		 *	6 - sectors read
 		 *	7 - time spent reading (ms)
 		 *	8 - writes completed
@@ -5349,7 +5349,7 @@ lxpr_read_sys_net_ipv4_tcp_max_syn_bl(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
  *	tcp_rexmit_interval_initial:	 1000
  *	tcp_rexmit_interval_min:	  400
  *	tcp_rexmit_interval_max:	60000
- * 	tcp_rexmit_interval_extra:	    0
+ *	tcp_rexmit_interval_extra:	    0
  * Not in tcp(7p) man page.
  *
  * From the tunables guide:
@@ -5833,7 +5833,7 @@ lx_cpuinfo_mapping_t lx_cpuinfo_mappings[] = {
 	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_3DNP,		"3dnowprefetch" },
 	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_OSVW,		"osvw" },
 	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_IBS,		"ibs" },
-	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_SSE5,		"xop" },
+	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_XOP,		"xop" },
 	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_SKINIT,	"skinit" },
 	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_WDT,		"wdt" },
 	{ LXCS_CPUIDX1_ECX, CPUID_AMD_ECX_LWP,		"lwp" },

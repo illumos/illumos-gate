@@ -14,7 +14,7 @@
  */
 
 /*
- * Test monitor/mawit related instructions
+ * Test FSGSBASE related instructions.
  */
 
 .text
@@ -22,8 +22,13 @@
 .globl libdis_test
 .type libdis_test, @function
 libdis_test:
-	monitor
-	mwait
-	mwaitx
-	monitorx
+	rdfsbase	%rax
+	rdgsbase	%rbx
+	wrfsbase	%rcx
+	wrgsbase	%rdx
+
+	rdfsbase	%eax
+	rdgsbase	%ebx
+	wrfsbase	%ecx
+	wrgsbase	%edx
 .size libdis_test, [.-libdis_test]

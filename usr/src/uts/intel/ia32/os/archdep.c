@@ -23,7 +23,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
@@ -1035,6 +1035,11 @@ bind_hwcap(void)
 	 * 32-bit processes can -always- use the lahf/sahf instructions
 	 */
 	auxv_hwcap32 |= AV_386_AHF;
+
+	/*
+	 * 32-bit processes can -never- use fsgsbase instructions.
+	 */
+	auxv_hwcap32_2 &= ~AV_386_2_FSGSBASE;
 #endif
 
 	if (auxv_hwcap32_include || auxv_hwcap32_exclude ||
