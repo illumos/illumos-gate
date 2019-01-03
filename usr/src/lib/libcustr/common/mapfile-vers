@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
 #
@@ -33,6 +33,8 @@ SYMBOL_VERSION ILLUMOSprivate {
     global:
 	custr_alloc;
 	custr_alloc_buf;
+	custr_alloc_fini;
+	custr_alloc_init;
 	custr_append;
 	custr_appendc;
 	custr_append_printf;
@@ -41,6 +43,8 @@ SYMBOL_VERSION ILLUMOSprivate {
 	custr_free;
 	custr_len;
 	custr_reset;
+	custr_xalloc;
+	custr_xalloc_buf;
     local:
 	*;
 };
