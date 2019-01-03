@@ -34,9 +34,852 @@
 /*
  * Copyright (c) 2019, Joyent, Inc.
  */
+
 /*
- * Various routines to handle identification
- * and classification of x86 processors.
+ * CPU Identification logic
+ *
+ * The purpose of this file and its companion, cpuid_subr.c, is to help deal
+ * with the identification of CPUs, their features, and their topologies. More
+ * specifically, this file helps drive the following:
+ *
+ * 1. Enumeration of features of the processor which are used by the kernel to
+ *    determine what features to enable or disable. These may be instruction set
+ *    enhancements or features that we use.
+ *
+ * 2. Enumeration of instruction set architecture (ISA) additions that userland
+ *    will be told about through the auxiliary vector.
+ *
+ * 3. Understanding the physical topology of the CPU such as the number of
+ *    caches, how many cores it has, whether or not it supports symmetric
+ *    multi-processing (SMT), etc.
+ *
+ * ------------------------
+ * CPUID History and Basics
+ * ------------------------
+ *
+ * The cpuid instruction was added by Intel roughly around the time that the
+ * original Pentium was introduced. The purpose of cpuid was to tell in a
+ * programmatic fashion information about the CPU that previously was guessed
+ * at. For example, an important part of cpuid is that we can know what
+ * extensions to the ISA exist. If you use an invalid opcode you would get a
+ * #UD, so this method allows a program (whether a user program or the kernel)
+ * to determine what exists without crashing or getting a SIGILL. Of course,
+ * this was also during the era of the clones and the AMD Am5x86. The vendor
+ * name shows up first in cpuid for a reason.
+ *
+ * cpuid information is broken down into ranges called a 'leaf'. Each leaf puts
+ * unique values into the registers %eax, %ebx, %ecx, and %edx and each leaf has
+ * its own meaning. The different leaves are broken down into different regions:
+ *
+ *	[ 0, 7fffffff ]			This region is called the 'basic'
+ *					region. This region is generally defined
+ *					by Intel, though some of the original
+ *					portions have different meanings based
+ *					on the manufacturer. These days, Intel
+ *					adds most new features to this region.
+ *					AMD adds non-Intel compatible
+ *					information in the third, extended
+ *					region. Intel uses this for everything
+ *					including ISA extensions, CPU
+ *					features, cache information, topology,
+ *					and more.
+ *
+ *					There is a hole carved out of this
+ *					region which is reserved for
+ *					hypervisors.
+ *
+ *	[ 40000000, 4fffffff ]		This region, which is found in the
+ *					middle of the previous region, is
+ *					explicitly promised to never be used by
+ *					CPUs. Instead, it is used by hypervisors
+ *					to communicate information about
+ *					themselves to the operating system. The
+ *					values and details are unique for each
+ *					hypervisor.
+ *
+ *	[ 80000000, ffffffff ]		This region is called the 'extended'
+ *					region. Some of the low leaves mirror
+ *					parts of the basic leaves. This region
+ *					has generally been used by AMD for
+ *					various extensions. For example, AMD-
+ *					specific information about caches,
+ *					features, and topology are found in this
+ *					region.
+ *
+ * To specify a range, you place the desired leaf into %eax, zero %ebx, %ecx,
+ * and %edx, and then issue the cpuid instruction. At the first leaf in each of
+ * the ranges, one of the primary things returned is the maximum valid leaf in
+ * that range. This allows for discovery of what range of CPUID is valid.
+ *
+ * The CPUs have potentially surprising behavior when using an invalid leaf or
+ * unimplemented leaf. If the requested leaf is within the valid basic or
+ * extended range, but is unimplemented, then %eax, %ebx, %ecx, and %edx will be
+ * set to zero. However, if you specify a leaf that is outside of a valid range,
+ * then instead it will be filled with the last valid _basic_ leaf. For example,
+ * if the maximum basic value is on leaf 0x3, then issuing a cpuid for leaf 4 or
+ * an invalid extended leaf will return the information for leaf 3.
+ *
+ * Some leaves are broken down into sub-leaves. This means that the value
+ * depends on both the leaf asked for in %eax and a secondary register. For
+ * example, Intel uses the value in %ecx on leaf 7 to indicate a sub-leaf to get
+ * additional information. Or when getting topology information in leaf 0xb, the
+ * initial value in %ecx changes which level of the topology that you are
+ * getting information about.
+ *
+ * cpuid values are always kept to 32 bits regardless of whether or not the
+ * program is in 64-bit mode. When executing in 64-bit mode, the upper
+ * 32 bits of the register are always set to zero so that way the values are the
+ * same regardless of execution mode.
+ *
+ * ----------------------
+ * Identifying Processors
+ * ----------------------
+ *
+ * We can identify a processor in two steps. The first step looks at cpuid leaf
+ * 0. Leaf 0 contains the processor's vendor information. This is done by
+ * putting a 12 character string in %ebx, %ecx, and %edx. On AMD, it is
+ * 'AuthenticAMD' and on Intel it is 'GenuineIntel'.
+ *
+ * From there, a processor is identified by a combination of three different
+ * values:
+ *
+ *  1. Family
+ *  2. Model
+ *  3. Stepping
+ *
+ * Each vendor uses the family and model to uniquely identify a processor. The
+ * way that family and model are changed depends on the vendor. For example,
+ * Intel has been using family 0x6 for almost all of their processor since the
+ * Pentium Pro/Pentium II era, often called the P6. The model is used to
+ * identify the exact processor. Different models are often used for the client
+ * (consumer) and server parts. Even though each processor often has major
+ * architectural differences, they still are considered the same family by
+ * Intel.
+ *
+ * On the other hand, each major AMD architecture generally has its own family.
+ * For example, the K8 is family 0x10, Bulldozer 0x15, and Zen 0x17. Within it
+ * the model number is used to help identify specific processors.
+ *
+ * The stepping is used to refer to a revision of a specific microprocessor. The
+ * term comes from equipment used to produce masks that are used to create
+ * integrated circuits.
+ *
+ * The information is present in leaf 1, %eax. In technical documentation you
+ * will see the terms extended model and extended family. The original family,
+ * model, and stepping fields were each 4 bits wide. If the values in either
+ * are 0xf, then one is to consult the extended model and extended family, which
+ * take previously reserved bits and allow for a larger number of models and add
+ * 0xf to them.
+ *
+ * When we process this information, we store the full family, model, and
+ * stepping in the struct cpuid_info members cpi_family, cpi_model, and
+ * cpi_step, respectively. Whenever you are performing comparisons with the
+ * family, model, and stepping, you should use these members and not the raw
+ * values from cpuid. If you must use the raw values from cpuid directly, you
+ * must make sure that you add the extended model and family to the base model
+ * and family.
+ *
+ * In general, we do not use information about the family, model, and stepping
+ * to determine whether or not a feature is present; that is generally driven by
+ * specific leaves. However, when something we care about on the processor is
+ * not considered 'architectural' meaning that it is specific to a set of
+ * processors and not promised in the architecture model to be consistent from
+ * generation to generation, then we will fall back on this information. The
+ * most common cases where this comes up is when we have to workaround errata in
+ * the processor, are dealing with processor-specific features such as CPU
+ * performance counters, or we want to provide additional information for things
+ * such as fault management.
+ *
+ * While processors also do have a brand string, which is the name that people
+ * are familiar with when buying the processor, they are not meant for
+ * programmatic consumption. That is what the family, model, and stepping are
+ * for.
+ *
+ * ------------
+ * CPUID Passes
+ * ------------
+ *
+ * As part of performing feature detection, we break this into several different
+ * passes. The passes are as follows:
+ *
+ *	Pass 0		This is a primordial pass done in locore.s to deal with
+ *			Cyrix CPUs that don't support cpuid. The reality is that
+ *			we likely don't run on them any more, but there is still
+ *			logic for handling them.
+ *
+ *	Pass 1		This is the primary pass and is responsible for doing a
+ *			large number of different things:
+ *
+ *			1. Determine which vendor manufactured the CPU and
+ *			determining the family, model, and stepping information.
+ *
+ *			2. Gathering a large number of feature flags to
+ *			determine which features the CPU support and which
+ *			indicate things that we need to do other work in the OS
+ *			to enable. Features detected this way are added to the
+ *			x86_featureset which can be queried to
+ *			determine what we should do. This includes processing
+ *			all of the basic and extended CPU features that we care
+ *			about.
+ *
+ *			3. Determining the CPU's topology. This includes
+ *			information about how many cores and threads are present
+ *			in the package. It also is responsible for figuring out
+ *			which logical CPUs are potentially part of the same core
+ *			and what other resources they might share. For more
+ *			information see the 'Topology' section.
+ *
+ *			4. Determining the set of CPU security-specific features
+ *			that we need to worry about and determine the
+ *			appropriate set of workarounds.
+ *
+ *			Pass 1 on the boot CPU occurs before KMDB is started.
+ *
+ *	Pass 2		The second pass is done after startup(). Here, we check
+ *			other miscellaneous features. Most of this is gathering
+ *			additional basic and extended features that we'll use in
+ *			later passes or for debugging support.
+ *
+ *	Pass 3		The third pass occurs after the kernel memory allocator
+ *			has been fully initialized. This gathers information
+ *			where we might need dynamic memory available for our
+ *			uses. This includes several varying width leaves that
+ *			have cache information and the processor's brand string.
+ *
+ *	Pass 4		The fourth and final normal pass is performed after the
+ *			kernel has brought most everything online. This is
+ *			invoked from post_startup(). In this pass, we go through
+ *			the set of features that we have enabled and turn that
+ *			into the hardware auxiliary vector features that
+ *			userland receives. This is used by userland, primarily
+ *			by the run-time link-editor (RTLD), though userland
+ *			software could also refer to it directly.
+ *
+ *	Microcode	After a microcode update, we do a selective rescan of
+ *			the cpuid leaves to determine what features have
+ *			changed. Microcode updates can provide more details
+ *			about security related features to deal with issues like
+ *			Spectre and L1TF. On occasion, vendors have violated
+ *			their contract and removed bits. However, we don't try
+ *			to detect that because that puts us in a situation that
+ *			we really can't deal with. As such, the only thing we
+ *			rescan are security related features today. See
+ *			cpuid_pass_ucode().
+ *
+ * All of the passes (except pass 0) are run on all CPUs. However, for the most
+ * part we only care about what the boot CPU says about this information and use
+ * the other CPUs as a rough guide to sanity check that we have the same feature
+ * set.
+ *
+ * We do not support running multiple logical CPUs with disjoint, let alone
+ * different, feature sets.
+ *
+ * ------------------
+ * Processor Topology
+ * ------------------
+ *
+ * One of the important things that we need to do is to understand the topology
+ * of the underlying processor. When we say topology in this case, we're trying
+ * to understand the relationship between the logical CPUs that the operating
+ * system sees and the underlying physical layout. Different logical CPUs may
+ * share different resources which can have important consequences for the
+ * performance of the system. For example, they may share caches, execution
+ * units, and more.
+ *
+ * The topology of the processor changes from generation to generation and
+ * vendor to vendor.  Along with that, different vendors use different
+ * terminology, and the operating system itself uses occasionally overlapping
+ * terminology. It's important to understand what this topology looks like so
+ * one can understand the different things that we try to calculate and
+ * determine.
+ *
+ * To get started, let's talk about a little bit of terminology that we've used
+ * so far, is used throughout this file, and is fairly generic across multiple
+ * vendors:
+ *
+ * CPU
+ *	A central processing unit (CPU) refers to a logical and/or virtual
+ *	entity that the operating system can execute instructions on. The
+ *	underlying resources for this CPU may be shared between multiple
+ *	entities; however, to the operating system it is a discrete unit.
+ *
+ * PROCESSOR and PACKAGE
+ *
+ *	Generally, when we use the term 'processor' on its own, we are referring
+ *	to the physical entity that one buys and plugs into a board. However,
+ *	because processor has been overloaded and one might see it used to mean
+ *	multiple different levels, we will instead use the term 'package' for
+ *	the rest of this file. The term package comes from the electrical
+ *	engineering side and refers to the physical entity that encloses the
+ *	electronics inside. Strictly speaking the package can contain more than
+ *	just the CPU, for example, on many processors it may also have what's
+ *	called an 'integrated graphical processing unit (GPU)'. Because the
+ *	package can encapsulate multiple units, it is the largest physical unit
+ *	that we refer to.
+ *
+ * SOCKET
+ *
+ *	A socket refers to unit on a system board (generally the motherboard)
+ *	that can receive a package. A single package, or processor, is plugged
+ *	into a single socket. A system may have multiple sockets. Often times,
+ *	the term socket is used interchangeably with package and refers to the
+ *	electrical component that has plugged in, and not the receptacle itself.
+ *
+ * CORE
+ *
+ *	A core refers to the physical instantiation of a CPU, generally, with a
+ *	full set of hardware resources available to it. A package may contain
+ *	multiple cores inside of it or it may just have a single one. A
+ *	processor with more than one core is often referred to as 'multi-core'.
+ *	In illumos, we will use the feature X86FSET_CMP to refer to a system
+ *	that has 'multi-core' processors.
+ *
+ *	A core may expose a single logical CPU to the operating system, or it
+ *	may expose multiple CPUs, which we call threads, defined below.
+ *
+ *	Some resources may still be shared by cores in the same package. For
+ *	example, many processors will share the level 3 cache between cores.
+ *	Some AMD generations share hardware resources between cores. For more
+ *	information on that see the section 'AMD Topology'.
+ *
+ * THREAD and STRAND
+ *
+ *	In this file, generally a thread refers to a hardware resources and not
+ *	the operating system's logical abstraction. A thread is always exposed
+ *	as an independent logical CPU to the operating system. A thread belongs
+ *	to a specific core. A core may have more than one thread. When that is
+ *	the case, the threads that are part of the same core are often referred
+ *	to as 'siblings'.
+ *
+ *	When multiple threads exist, this is generally referred to as
+ *	simultaneous multi-threading (SMT). When Intel introduced this in their
+ *	processors they called it hyper-threading (HT). When multiple threads
+ *	are active in a core, they split the resources of the core. For example,
+ *	two threads may share the same set of hardware execution units.
+ *
+ *	The operating system often uses the term 'strand' to refer to a thread.
+ *	This helps disambiguate it from the software concept.
+ *
+ * CHIP
+ *
+ *	Unfortunately, the term 'chip' is dramatically overloaded. At its most
+ *	base meaning, it is used to refer to a single integrated circuit, which
+ *	may or may not be the only thing in the package. In illumos, when you
+ *	see the term 'chip' it is almost always referring to the same thing as
+ *	the 'package'. However, many vendors may use chip to refer to one of
+ *	many integrated circuits that have been placed in the package. As an
+ *	example, see the subsequent definition.
+ *
+ *	To try and keep things consistent, we will only use chip when referring
+ *	to the entire integrated circuit package, with the exception of the
+ *	definition of multi-chip module (because it is in the name) and use the
+ *	term 'die' when we want the more general, potential sub-component
+ *	definition.
+ *
+ * DIE
+ *
+ *	A die refers to an integrated circuit. Inside of the package there may
+ *	be a single die or multiple dies. This is sometimes called a 'chip' in
+ *	vendor's parlance, but in this file, we use the term die to refer to a
+ *	subcomponent.
+ *
+ * MULTI-CHIP MODULE
+ *
+ *	A multi-chip module (MCM) refers to putting multiple distinct chips that
+ *	are connected together in the same package. When a multi-chip design is
+ *	used, generally each chip is manufactured independently and then joined
+ *	together in the package. For example, on AMD's Zen microarchitecture
+ *	(family 0x17), the package contains several dies (the second meaning of
+ *	chip from above) that are connected together.
+ *
+ * CACHE
+ *
+ *	A cache is a part of the processor that maintains copies of recently
+ *	accessed memory. Caches are split into levels and then into types.
+ *	Commonly there are one to three levels, called level one, two, and
+ *	three. The lower the level, the smaller it is, the closer it is to the
+ *	execution units of the CPU, and the faster it is to access. The layout
+ *	and design of the cache come in many different flavors, consult other
+ *	resources for a discussion of those.
+ *
+ *	Caches are generally split into two types, the instruction and data
+ *	cache. The caches contain what their names suggest, the instruction
+ *	cache has executable program text, while the data cache has all other
+ *	memory that the processor accesses. As of this writing, data is kept
+ *	coherent between all of the caches on x86, so if one modifies program
+ *	text before it is executed, that will be in the data cache, and the
+ *	instruction cache will be synchronized with that change when the
+ *	processor actually executes those instructions. This coherency also
+ *	covers the fact that data could show up in multiple caches.
+ *
+ *	Generally, the lowest level caches are specific to a core. However, the
+ *	last layer cache is shared between some number of cores. The number of
+ *	CPUs sharing this last level cache is important. This has implications
+ *	for the choices that the scheduler makes, as accessing memory that might
+ *	be in a remote cache after thread migration can be quite expensive.
+ *
+ *	Sometimes, the word cache is abbreviated with a '$', because in US
+ *	English the word cache is pronounced the same as cash. So L1D$ refers to
+ *	the L1 data cache, and L2$ would be the L2 cache. This will not be used
+ *	in the rest of this theory statement for clarity.
+ *
+ * MEMORY CONTROLLER
+ *
+ *	The memory controller is a component that provides access to DRAM. Each
+ *	memory controller can access a set number of DRAM channels. Each channel
+ *	can have a number of DIMMs (sticks of memory) associated with it. A
+ *	given package may have more than one memory controller. The association
+ *	of the memory controller to a group of cores is important as it is
+ *	cheaper to access memory on the controller that you are associated with.
+ *
+ * NUMA
+ *
+ *	NUMA or non-uniform memory access, describes a way that systems are
+ *	built. On x86, any processor core can address all of the memory in the
+ *	system. However, When using multiple sockets or possibly within a
+ *	multi-chip module, some of that memory is physically closer and some of
+ *	it is further. Memory that is further away is more expensive to access.
+ *	Consider the following image of multiple sockets with memory:
+ *
+ *	+--------+                                                +--------+
+ *	| DIMM A |         +----------+      +----------+         | DIMM D |
+ *	+--------+-+       |          |      |          |       +-+------+-+
+ *	  | DIMM B |=======| Socket 0 |======| Socket 1 |=======| DIMM E |
+ *	  +--------+-+     |          |      |          |     +-+------+-+
+ *	    | DIMM C |     +----------+      +----------+     | DIMM F |
+ *	    +--------+                                        +--------+
+ *
+ *	In this example, Socket 0 is closer to DIMMs A-C while Socket 1 is
+ *	closer to DIMMs D-F. This means that it is cheaper for socket 0 to
+ *	access DIMMs A-C and more expensive to access D-F as it has to go
+ *	through Socket 1 to get there. The inverse is true for Socket 1. DIMMs
+ *	D-F are cheaper than A-C. While the socket form is the most common, when
+ *	using multi-chip modules, this can also sometimes occur. For another
+ *	example of this that's more involved, see the AMD topology section.
+ *
+ *
+ * Intel Topology
+ * --------------
+ *
+ * Most Intel processors since Nehalem, (as of this writing the current gen
+ * is Skylake / Cannon Lake) follow a fairly similar pattern. The CPU portion of
+ * the package is a single monolithic die. MCMs currently aren't used. Most
+ * parts have three levels of caches, with the L3 cache being shared between
+ * all of the cores on the package. The L1/L2 cache is generally specific to
+ * an individual core. The following image shows at a simplified level what
+ * this looks like. The memory controller is commonly part of something called
+ * the 'Uncore', that used to be separate physical chips that were not a part of
+ * the package, but are now part of the same chip.
+ *
+ *  +-----------------------------------------------------------------------+
+ *  | Package                                                               |
+ *  |  +-------------------+  +-------------------+  +-------------------+  |
+ *  |  | Core              |  | Core              |  | Core              |  |
+ *  |  |  +--------+ +---+ |  |  +--------+ +---+ |  |  +--------+ +---+ |  |
+ *  |  |  | Thread | | L | |  |  | Thread | | L | |  |  | Thread | | L | |  |
+ *  |  |  +--------+ | 1 | |  |  +--------+ | 1 | |  |  +--------+ | 1 | |  |
+ *  |  |  +--------+ |   | |  |  +--------+ |   | |  |  +--------+ |   | |  |
+ *  |  |  | Thread | |   | |  |  | Thread | |   | |  |  | Thread | |   | |  |
+ *  |  |  +--------+ +---+ |  |  +--------+ +---+ |  |  +--------+ +---+ |  |
+ *  |  |  +--------------+ |  |  +--------------+ |  |  +--------------+ |  |
+ *  |  |  | L2 Cache     | |  |  | L2 Cache     | |  |  | L2 Cache     | |  |
+ *  |  |  +--------------+ |  |  +--------------+ |  |  +--------------+ |  |
+ *  |  +-------------------+  +-------------------+  +-------------------+  |
+ *  | +-------------------------------------------------------------------+ |
+ *  | |                         Shared L3 Cache                           | |
+ *  | +-------------------------------------------------------------------+ |
+ *  | +-------------------------------------------------------------------+ |
+ *  | |                        Memory Controller                          | |
+ *  | +-------------------------------------------------------------------+ |
+ *  +-----------------------------------------------------------------------+
+ *
+ * A side effect of this current architecture is that what we care about from a
+ * scheduling and topology perspective, is simplified. In general we care about
+ * understanding which logical CPUs are part of the same core and socket.
+ *
+ * To determine the relationship between threads and cores, Intel initially used
+ * the identifier in the advanced programmable interrupt controller (APIC). They
+ * also added cpuid leaf 4 to give additional information about the number of
+ * threads and CPUs in the processor. With the addition of x2apic (which
+ * increased the number of addressable logical CPUs from 8-bits to 32-bits), an
+ * additional cpuid topology leaf 0xB was added.
+ *
+ * AMD Topology
+ * ------------
+ *
+ * When discussing AMD topology, we want to break this into three distinct
+ * generations of topology. There's the basic topology that has been used in
+ * family 0xf+ (Opteron, Athlon64), there's the topology that was introduced
+ * with family 0x15 (Bulldozer), and there's the topology that was introduced
+ * with family 0x17 (Zen). AMD also has some additional terminology that's worth
+ * talking about.
+ *
+ * Until the introduction of family 0x17 (Zen), AMD did not implement something
+ * that they considered SMT. Whether or not the AMD processors have SMT
+ * influences many things including scheduling and reliability, availability,
+ * and serviceability (RAS) features.
+ *
+ * NODE
+ *
+ *	AMD uses the term node to refer to a die that contains a number of cores
+ *	and I/O resources. Depending on the processor family and model, more
+ *	than one node can be present in the package. When there is more than one
+ *	node this indicates a multi-chip module. Usually each node has its own
+ *	access to memory and I/O devices. This is important and generally
+ *	different from the corresponding Intel Nehalem-Skylake+ processors. As a
+ *	result, we track this relationship in the operating system.
+ *
+ *	In processors with an L3 cache, the L3 cache is generally shared across
+ *	the entire node, though the way this is carved up varies from generation
+ *	to generation.
+ *
+ * BULLDOZER
+ *
+ *	Starting with the Bulldozer family (0x15) and continuing until the
+ *	introduction of the Zen microarchitecture, AMD introduced the idea of a
+ *	compute unit. In a compute unit, two traditional cores share a number of
+ *	hardware resources. Critically, they share the FPU, L1 instruction
+ *	cache, and the L2 cache. Several compute units were then combined inside
+ *	of a single node.  Because the integer execution units, L1 data cache,
+ *	and some other resources were not shared between the cores, AMD never
+ *	considered this to be SMT.
+ *
+ * ZEN
+ *
+ *	The Zen family (0x17) uses a multi-chip module (MCM) design, the module
+ *	is called Zeppelin. These modules are similar to the idea of nodes used
+ *	previously. Each of these nodes has two DRAM channels which all of the
+ *	cores in the node can access uniformly. These nodes are linked together
+ *	in the package, creating a NUMA environment.
+ *
+ *	The Zeppelin die itself contains two different 'core complexes'. Each
+ *	core complex consists of four cores which each have two threads, for a
+ *	total of 8 logical CPUs per complex. Unlike other generations,
+ *	where all the logical CPUs in a given node share the L3 cache, here each
+ *	core complex has its own shared L3 cache.
+ *
+ *	A further thing that we need to consider is that in some configurations,
+ *	particularly with the Threadripper line of processors, not every die
+ *	actually has its memory controllers wired up to actual memory channels.
+ *	This means that some cores have memory attached to them and others
+ *	don't.
+ *
+ *	To put Zen in perspective, consider the following images:
+ *
+ *      +--------------------------------------------------------+
+ *      | Core Complex                                           |
+ *      | +-------------------+    +-------------------+  +---+  |
+ *      | | Core       +----+ |    | Core       +----+ |  |   |  |
+ *      | | +--------+ | L2 | |    | +--------+ | L2 | |  |   |  |
+ *      | | | Thread | +----+ |    | | Thread | +----+ |  |   |  |
+ *      | | +--------+-+ +--+ |    | +--------+-+ +--+ |  | L |  |
+ *      | |   | Thread | |L1| |    |   | Thread | |L1| |  | 3 |  |
+ *      | |   +--------+ +--+ |    |   +--------+ +--+ |  |   |  |
+ *      | +-------------------+    +-------------------+  | C |  |
+ *      | +-------------------+    +-------------------+  | a |  |
+ *      | | Core       +----+ |    | Core       +----+ |  | c |  |
+ *      | | +--------+ | L2 | |    | +--------+ | L2 | |  | h |  |
+ *      | | | Thread | +----+ |    | | Thread | +----+ |  | e |  |
+ *      | | +--------+-+ +--+ |    | +--------+-+ +--+ |  |   |  |
+ *      | |   | Thread | |L1| |    |   | Thread | |L1| |  |   |  |
+ *      | |   +--------+ +--+ |    |   +--------+ +--+ |  |   |  |
+ *      | +-------------------+    +-------------------+  +---+  |
+ *      |                                                        |
+ *	+--------------------------------------------------------+
+ *
+ *  This first image represents a single Zen core complex that consists of four
+ *  cores.
+ *
+ *
+ *	+--------------------------------------------------------+
+ *	| Zeppelin Die                                           |
+ *	|  +--------------------------------------------------+  |
+ *	|  |         I/O Units (PCIe, SATA, USB, etc.)        |  |
+ *	|  +--------------------------------------------------+  |
+ *      |                           HH                           |
+ *	|          +-----------+    HH    +-----------+          |
+ *	|          |           |    HH    |           |          |
+ *	|          |    Core   |==========|    Core   |          |
+ *	|          |  Complex  |==========|  Complex  |          |
+ *	|          |           |    HH    |           |          |
+ *	|          +-----------+    HH    +-----------+          |
+ *      |                           HH                           |
+ *	|  +--------------------------------------------------+  |
+ *	|  |                Memory Controller                 |  |
+ *	|  +--------------------------------------------------+  |
+ *      |                                                        |
+ *	+--------------------------------------------------------+
+ *
+ *  This image represents a single Zeppelin Die. Note how both cores are
+ *  connected to the same memory controller and I/O units. While each core
+ *  complex has its own L3 cache as seen in the first image, they both have
+ *  uniform access to memory.
+ *
+ *
+ *                      PP                     PP
+ *                      PP                     PP
+ *           +----------PP---------------------PP---------+
+ *           |          PP                     PP         |
+ *           |    +-----------+          +-----------+    |
+ *           |    |           |          |           |    |
+ *       MMMMMMMMM|  Zeppelin |==========|  Zeppelin |MMMMMMMMM
+ *       MMMMMMMMM|    Die    |==========|    Die    |MMMMMMMMM
+ *           |    |           |          |           |    |
+ *           |    +-----------+ooo    ...+-----------+    |
+ *           |          HH      ooo  ...       HH         |
+ *           |          HH        oo..         HH         |
+ *           |          HH        ..oo         HH         |
+ *           |          HH      ...  ooo       HH         |
+ *           |    +-----------+...    ooo+-----------+    |
+ *           |    |           |          |           |    |
+ *       MMMMMMMMM|  Zeppelin |==========|  Zeppelin |MMMMMMMMM
+ *       MMMMMMMMM|    Die    |==========|    Die    |MMMMMMMMM
+ *           |    |           |          |           |    |
+ *           |    +-----------+          +-----------+    |
+ *           |          PP                     PP         |
+ *           +----------PP---------------------PP---------+
+ *                      PP                     PP
+ *                      PP                     PP
+ *
+ *  This image represents a single Zen package. In this example, it has four
+ *  Zeppelin dies, though some configurations only have a single one. In this
+ *  example, each die is directly connected to the next. Also, each die is
+ *  represented as being connected to memory by the 'M' character and connected
+ *  to PCIe devices and other I/O, by the 'P' character. Because each Zeppelin
+ *  die is made up of two core complexes, we have multiple different NUMA
+ *  domains that we care about for these systems.
+ *
+ * CPUID LEAVES
+ *
+ * There are a few different CPUID leaves that we can use to try and understand
+ * the actual state of the world. As part of the introduction of family 0xf, AMD
+ * added CPUID leaf 0x80000008. This leaf tells us the number of logical
+ * processors that are in the system. Because families before Zen didn't have
+ * SMT, this was always the number of cores that were in the system. However, it
+ * should always be thought of as the number of logical threads to be consistent
+ * between generations. In addition we also get the size of the APIC ID that is
+ * used to represent the number of logical processors. This is important for
+ * deriving topology information.
+ *
+ * In the Bulldozer family, AMD added leaf 0x8000001E. The information varies a
+ * bit between Bulldozer and later families, but it is quite useful in
+ * determining the topology information. Because this information has changed
+ * across family generations, it's worth calling out what these mean
+ * explicitly. The registers have the following meanings:
+ *
+ *	%eax	The APIC ID. The entire register is defined to have a 32-bit
+ *		APIC ID, even though on systems without x2apic support, it will
+ *		be limited to 8 bits.
+ *
+ *	%ebx	On Bulldozer-era systems this contains information about the
+ *		number of cores that are in a compute unit (cores that share
+ *		resources). It also contains a per-package compute unit ID that
+ *		identifies which compute unit the logical CPU is a part of.
+ *
+ *		On Zen-era systems this instead contains the number of threads
+ *		per core and the ID of the core that the logical CPU is a part
+ *		of. Note, this ID is unique only to the package, it is not
+ *		globally unique across the entire system.
+ *
+ *	%ecx	This contains the number of nodes that exist in the package. It
+ *		also contains an ID that identifies which node the logical CPU
+ *		is a part of.
+ *
+ * Finally, we also use cpuid leaf 0x8000001D to determine information about the
+ * cache layout to determine which logical CPUs are sharing which caches.
+ *
+ * illumos Topology
+ * ----------------
+ *
+ * Based on the above we synthesize the information into several different
+ * variables that we store in the 'struct cpuid_info'. We'll go into the details
+ * of what each member is supposed to represent and their uniqueness. In
+ * general, there are two levels of uniqueness that we care about. We care about
+ * an ID that is globally unique. That means that it will be unique across all
+ * entities in the system. For example, the default logical CPU ID is globally
+ * unique. On the other hand, there is some information that we only care about
+ * being unique within the context of a single package / socket. Here are the
+ * variables that we keep track of and their meaning.
+ *
+ * Several of the values that are asking for an identifier, with the exception
+ * of cpi_apicid, are allowed to be synthetic.
+ *
+ *
+ * cpi_apicid
+ *
+ *	This is the value of the CPU's APIC id. This should be the full 32-bit
+ *	ID if the CPU is using the x2apic. Otherwise, it should be the 8-bit
+ *	APIC ID. This value is globally unique between all logical CPUs across
+ *	all packages. This is usually required by the APIC.
+ *
+ * cpi_chipid
+ *
+ *	This value indicates the ID of the package that the logical CPU is a
+ *	part of. This value is allowed to be synthetic. It is usually derived by
+ *	taking the CPU's APIC ID and determining how many bits are used to
+ *	represent CPU cores in the package. All logical CPUs that are part of
+ *	the same package must have the same value.
+ *
+ * cpi_coreid
+ *
+ *	This represents the ID of a CPU core. Two logical CPUs should only have
+ *	the same cpi_coreid value if they are part of the same core. These
+ *	values may be synthetic. On systems that support SMT, this value is
+ *	usually derived from the APIC ID, otherwise it is often synthetic and
+ *	just set to the value of the cpu_id in the cpu_t.
+ *
+ * cpi_pkgcoreid
+ *
+ *	This is similar to the cpi_coreid in that logical CPUs that are part of
+ *	the same core should have the same ID. The main difference is that these
+ *	values are only required to be unique to a given socket.
+ *
+ * cpi_clogid
+ *
+ *	This represents the logical ID of a logical CPU. This value should be
+ *	unique within a given socket for each logical CPU. This is allowed to be
+ *	synthetic, though it is usually based off of the CPU's apic ID. The
+ *	broader system expects that logical CPUs that have are part of the same
+ *	core have contiguous numbers. For example, if there were two threads per
+ *	core, then the core IDs divided by two should be the same and the first
+ *	modulus two should be zero and the second one. For example, IDs 4 and 5
+ *	indicate two logical CPUs that are part of the same core. But IDs 5 and
+ *	6 represent two logical CPUs that are part of different cores.
+ *
+ *	While it is common for the cpi_coreid and the cpi_clogid to be derived
+ *	from the same source, strictly speaking, they don't have to be and the
+ *	two values should be considered logically independent. One should not
+ *	try to compare a logical CPU's cpi_coreid and cpi_clogid to determine
+ *	some kind of relationship. While this is tempting, we've seen cases on
+ *	AMD family 0xf where the system's cpu id is not related to its APIC ID.
+ *
+ * cpi_ncpu_per_chip
+ *
+ *	This value indicates the total number of logical CPUs that exist in the
+ *	physical package. Critically, this is not the number of logical CPUs
+ *	that exist for just the single core.
+ *
+ *	This value should be the same for all logical CPUs in the same package.
+ *
+ * cpi_ncore_per_chip
+ *
+ *	This value indicates the total number of physical CPU cores that exist
+ *	in the package. The system compares this value with cpi_ncpu_per_chip to
+ *	determine if simultaneous multi-threading (SMT) is enabled. When
+ *	cpi_ncpu_per_chip equals cpi_ncore_per_chip, then there is no SMT and
+ *	the X86FSET_HTT feature is not set. If this value is greater than one,
+ *	than we consider the processor to have the feature X86FSET_CMP, to
+ *	indicate that there is support for more than one core.
+ *
+ *	This value should be the same for all logical CPUs in the same package.
+ *
+ * cpi_procnodes_per_pkg
+ *
+ *	This value indicates the number of 'nodes' that exist in the package.
+ *	When processors are actually a multi-chip module, this represents the
+ *	number of such modules that exist in the package. Currently, on Intel
+ *	based systems this member is always set to 1.
+ *
+ *	This value should be the same for all logical CPUs in the same package.
+ *
+ * cpi_procnodeid
+ *
+ *	This value indicates the ID of the node that the logical CPU is a part
+ *	of. All logical CPUs that are in the same node must have the same value
+ *	here. This value must be unique across all of the packages in the
+ *	system.  On Intel based systems, this is currently set to the value in
+ *	cpi_chipid because there is only one node.
+ *
+ * cpi_cores_per_compunit
+ *
+ *	This value indicates the number of cores that are part of a compute
+ *	unit. See the AMD topology section for this. This member only has real
+ *	meaning currently for AMD Bulldozer family processors. For all other
+ *	processors, this should currently be set to 1.
+ *
+ * cpi_compunitid
+ *
+ *	This indicates the compute unit that the logical CPU belongs to. For
+ *	processors without AMD Bulldozer-style compute units this should be set
+ *	to the value of cpi_coreid.
+ *
+ * cpi_ncpu_shr_last_cache
+ *
+ *	This indicates the number of logical CPUs that are sharing the same last
+ *	level cache. This value should be the same for all CPUs that are sharing
+ *	that cache. The last cache refers to the cache that is closest to memory
+ *	and furthest away from the CPU.
+ *
+ * cpi_last_lvl_cacheid
+ *
+ *	This indicates the ID of the last cache that the logical CPU uses. This
+ *	cache is often shared between multiple logical CPUs and is the cache
+ *	that is closest to memory and furthest away from the CPU. This value
+ *	should be the same for a group of logical CPUs only if they actually
+ *	share the same last level cache. IDs should not overlap between
+ *	packages.
+ *
+ * -----------
+ * Hypervisors
+ * -----------
+ *
+ * If trying to manage the differences between vendors wasn't bad enough, it can
+ * get worse thanks to our friend hardware virtualization. Hypervisors are given
+ * the ability to interpose on all cpuid instructions and change them to suit
+ * their purposes. In general, this is necessary as the hypervisor wants to be
+ * able to present a more uniform set of features or not necessarily give the
+ * guest operating system kernel knowledge of all features so it can be
+ * more easily migrated between systems.
+ *
+ * When it comes to trying to determine topology information, this can be a
+ * double edged sword. When a hypervisor doesn't actually implement a cpuid
+ * leaf, it'll often return all zeros. Because of that, you'll often see various
+ * checks scattered about fields being non-zero before we assume we can use
+ * them.
+ *
+ * When it comes to topology information, the hypervisor is often incentivized
+ * to lie to you about topology. This is because it doesn't always actually
+ * guarantee that topology at all. The topology path we take in the system
+ * depends on how the CPU advertises itself. If it advertises itself as an Intel
+ * or AMD CPU, then we basically do our normal path. However, when they don't
+ * use an actual vendor, then that usually turns into multiple one-core CPUs
+ * that we enumerate that are often on different sockets. The actual behavior
+ * depends greatly on what the hypervisor actually exposes to us.
+ *
+ * --------------------
+ * Exposing Information
+ * --------------------
+ *
+ * We expose CPUID information in three different forms in the system.
+ *
+ * The first is through the x86_featureset variable. This is used in conjunction
+ * with the is_x86_feature() function. This is queried by x86-specific functions
+ * to determine which features are or aren't present in the system and to make
+ * decisions based upon them. For example, users of this include everything from
+ * parts of the system dedicated to reliability, availability, and
+ * serviceability (RAS), to making decisions about how to handle security
+ * mitigations, to various x86-specific drivers. General purpose or
+ * architecture independent drivers should never be calling this function.
+ *
+ * The second means is through the auxiliary vector. The auxiliary vector is a
+ * series of tagged data that the kernel passes down to a user program when it
+ * begins executing. This information is used to indicate to programs what
+ * instruction set extensions are present. For example, information about the
+ * CPU supporting the machine check architecture (MCA) wouldn't be passed down
+ * since user programs cannot make use of it. However, things like the AVX
+ * instruction sets are. Programs use this information to make run-time
+ * decisions about what features they should use. As an example, the run-time
+ * link-editor (rtld) can relocate different functions depending on the hardware
+ * support available.
+ *
+ * The final form is through a series of accessor functions that all have the
+ * form cpuid_get*. This is used by a number of different subsystems in the
+ * kernel to determine more detailed information about what we're running on,
+ * topology information, etc. Some of these subsystems include processor groups
+ * (uts/common/os/pg.c.), CPU Module Interface (uts/i86pc/os/cmi.c), ACPI,
+ * microcode, and performance monitoring. These functions all ASSERT that the
+ * CPU they're being called on has reached a certain cpuid pass. If the passes
+ * are rearranged, then this needs to be adjusted.
  */
 
 #include <sys/types.h>
@@ -67,58 +910,6 @@
 #else
 #include <sys/ontrap.h>
 #endif
-
-/*
- * Pass 0 of cpuid feature analysis happens in locore. It contains special code
- * to recognize Cyrix processors that are not cpuid-compliant, and to deal with
- * them accordingly. For most modern processors, feature detection occurs here
- * in pass 1.
- *
- * Pass 1 of cpuid feature analysis happens just at the beginning of mlsetup()
- * for the boot CPU and does the basic analysis that the early kernel needs.
- * x86_featureset is set based on the return value of cpuid_pass1() of the boot
- * CPU.
- *
- * Pass 1 includes:
- *
- *	o Determining vendor/model/family/stepping and setting x86_type and
- *	  x86_vendor accordingly.
- *	o Processing the feature flags returned by the cpuid instruction while
- *	  applying any workarounds or tricks for the specific processor.
- *	o Mapping the feature flags into illumos feature bits (X86_*).
- *	o Processing extended feature flags if supported by the processor,
- *	  again while applying specific processor knowledge.
- *	o Determining the CMT characteristics of the system.
- *
- * Pass 1 is done on non-boot CPUs during their initialization and the results
- * are used only as a meager attempt at ensuring that all processors within the
- * system support the same features.
- *
- * Pass 2 of cpuid feature analysis happens just at the beginning
- * of startup().  It just copies in and corrects the remainder
- * of the cpuid data we depend on: standard cpuid functions that we didn't
- * need for pass1 feature analysis, and extended cpuid functions beyond the
- * simple feature processing done in pass1.
- *
- * Pass 3 of cpuid analysis is invoked after basic kernel services; in
- * particular kernel memory allocation has been made available. It creates a
- * readable brand string based on the data collected in the first two passes.
- *
- * Pass 4 of cpuid analysis is invoked after post_startup() when all
- * the support infrastructure for various hardware features has been
- * initialized. It determines which processor features will be reported
- * to userland via the aux vector.
- *
- * All passes are executed on all CPUs, but only the boot CPU determines what
- * features the kernel will use.
- *
- * Much of the worst junk in this file is for the support of processors
- * that didn't really implement the cpuid instruction properly.
- *
- * NOTE: The accessor functions (cpuid_get*) are aware of, and ASSERT upon,
- * the pass numbers.  Accordingly, changes to the pass code may require changes
- * to the accessor code.
- */
 
 uint_t x86_vendor = X86_VENDOR_IntelClone;
 uint_t x86_type = X86_TYPE_OTHER;
@@ -351,21 +1142,9 @@ struct xsave_info {
 #define	NMAX_CPI_EXTD	0x1f		/* eax = 0x80000000 .. 0x8000001e */
 
 /*
- * Some terminology needs to be explained:
- *  - Socket: Something that can be plugged into a motherboard.
- *  - Package: Same as socket
- *  - Chip: Same as socket. Note that AMD's documentation uses term "chip"
- *    differently: there, chip is the same as processor node (below)
- *  - Processor node: Some AMD processors have more than one
- *    "subprocessor" embedded in a package. These subprocessors (nodes)
- *    are fully-functional processors themselves with cores, caches,
- *    memory controllers, PCI configuration spaces. They are connected
- *    inside the package with Hypertransport links. On single-node
- *    processors, processor node is equivalent to chip/socket/package.
- *  - Compute Unit: Some AMD processors pair cores in "compute units" that
- *    share the FPU and the I$ and L2 caches.
+ * See the big theory statement for a more detailed explanation of what some of
+ * these members mean.
  */
-
 struct cpuid_info {
 	uint_t cpi_pass;		/* last pass completed */
 	/*
@@ -387,8 +1166,9 @@ struct cpuid_info {
 	uint_t cpi_ncache;		/* fn 2: number of elements */
 	uint_t cpi_ncpu_shr_last_cache;	/* fn 4: %eax: ncpus sharing cache */
 	id_t cpi_last_lvl_cacheid;	/* fn 4: %eax: derived cache id */
-	uint_t cpi_std_4_size;		/* fn 4: number of fn 4 elements */
-	struct cpuid_regs **cpi_std_4;	/* fn 4: %ecx == 0 .. fn4_size */
+	uint_t cpi_cache_leaf_size;	/* Number of cache elements */
+					/* Intel fn: 4, AMD fn: 8000001d */
+	struct cpuid_regs **cpi_cache_leaves;	/* Acual leaves from above */
 	struct cpuid_regs cpi_std[NMAX_CPI_STD];	/* 0 .. 7 */
 	/*
 	 * extended function information
@@ -540,6 +1320,14 @@ static struct cpuid_info cpuid_info0;
 #define	CPUID_LEAFD_2_YMM_SIZE		256
 
 /*
+ * Common extended leaf names to cut down on typos.
+ */
+#define	CPUID_LEAF_EXT_0		0x80000000
+#define	CPUID_LEAF_EXT_8		0x80000008
+#define	CPUID_LEAF_EXT_1d		0x8000001d
+#define	CPUID_LEAF_EXT_1e		0x8000001e
+
+/*
  * Functions we consune from cpuid_subr.c;  don't publish these in a header
  * file to try and keep people using the expected cpuid_* interfaces.
  */
@@ -607,7 +1395,7 @@ platform_cpuid_mangle(uint_t vendor, uint32_t eax, struct cpuid_regs *cp)
 			cp->cp_ecx &= ~CPUID_AMD_ECX_CR8D;
 			break;
 
-		case 0x80000008:
+		case CPUID_LEAF_EXT_8:
 			/*
 			 * Zero out the (ncores-per-chip - 1) field
 			 */
@@ -664,13 +1452,14 @@ cpuid_free_space(cpu_t *cpu)
 	ASSERT(cpi != &cpuid_info0);
 
 	/*
-	 * Free up any function 4 related dynamic storage
+	 * Free up any cache leaf related dynamic storage. The first entry was
+	 * cached from the standard cpuid storage, so we should not free it.
 	 */
-	for (i = 1; i < cpi->cpi_std_4_size; i++)
-		kmem_free(cpi->cpi_std_4[i], sizeof (struct cpuid_regs));
-	if (cpi->cpi_std_4_size > 0)
-		kmem_free(cpi->cpi_std_4,
-		    cpi->cpi_std_4_size * sizeof (struct cpuid_regs *));
+	for (i = 1; i < cpi->cpi_cache_leaf_size; i++)
+		kmem_free(cpi->cpi_cache_leaves[i], sizeof (struct cpuid_regs));
+	if (cpi->cpi_cache_leaf_size > 0)
+		kmem_free(cpi->cpi_cache_leaves,
+		    cpi->cpi_cache_leaf_size * sizeof (struct cpuid_regs *));
 
 	kmem_free(cpi, sizeof (*cpi));
 	cpu->cpu_m.mcpu_cpi = NULL;
@@ -804,6 +1593,198 @@ is_controldom(void)
 
 #endif	/* __xpv */
 
+/*
+ * Make sure that we have gathered all of the CPUID leaves that we might need to
+ * determine topology. We assume that the standard leaf 1 has already been done
+ * and that xmaxeax has already been calculated.
+ */
+static void
+cpuid_gather_amd_topology_leaves(cpu_t *cpu)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_8) {
+		struct cpuid_regs *cp;
+
+		cp = &cpi->cpi_extd[8];
+		cp->cp_eax = CPUID_LEAF_EXT_8;
+		(void) __cpuid_insn(cp);
+		platform_cpuid_mangle(cpi->cpi_vendor, CPUID_LEAF_EXT_8, cp);
+	}
+
+	if (is_x86_feature(x86_featureset, X86FSET_TOPOEXT) &&
+	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1e) {
+		struct cpuid_regs *cp;
+
+		cp = &cpi->cpi_extd[0x1e];
+		cp->cp_eax = CPUID_LEAF_EXT_1e;
+		(void) __cpuid_insn(cp);
+	}
+}
+
+/*
+ * Get the APIC ID for this processor. If Leaf B is present and valid, we prefer
+ * it to everything else. If not, and we're on an AMD system where 8000001e is
+ * valid, then we use that. Othewrise, we fall back to the default value for the
+ * APIC ID in leaf 1.
+ */
+static uint32_t
+cpuid_gather_apicid(struct cpuid_info *cpi)
+{
+	/*
+	 * Leaf B changes based on the arguments to it. Beacuse we don't cache
+	 * it, we need to gather it again.
+	 */
+	if (cpi->cpi_maxeax >= 0xB) {
+		struct cpuid_regs regs;
+		struct cpuid_regs *cp;
+
+		cp = &regs;
+		cp->cp_eax = 0xB;
+		cp->cp_edx = cp->cp_ebx = cp->cp_ecx = 0;
+		(void) __cpuid_insn(cp);
+
+		if (cp->cp_ebx != 0) {
+			return (cp->cp_edx);
+		}
+	}
+
+	if (cpi->cpi_vendor == X86_VENDOR_AMD &&
+	    is_x86_feature(x86_featureset, X86FSET_TOPOEXT) &&
+	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1e) {
+		return (cpi->cpi_extd[0x1e].cp_eax);
+	}
+
+	return (CPI_APIC_ID(cpi));
+}
+
+/*
+ * For AMD processors, attempt to calculate the number of chips and cores that
+ * exist. The way that we do this varies based on the generation, because the
+ * generations themselves have changed dramatically.
+ *
+ * If cpuid leaf 0x80000008 exists, that generally tells us the number of cores.
+ * However, with the advent of family 17h (Zen) it actually tells us the number
+ * of threads, so we need to look at leaf 0x8000001e if available to determine
+ * its value. Otherwise, for all prior families, the number of enabled cores is
+ * the same as threads.
+ *
+ * If we do not have leaf 0x80000008, then we assume that this processor does
+ * not have anything. AMD's older CPUID specification says there's no reason to
+ * fall back to leaf 1.
+ *
+ * In some virtualization cases we will not have leaf 8000001e or it will be
+ * zero. When that happens we assume the number of threads is one.
+ */
+static void
+cpuid_amd_ncores(struct cpuid_info *cpi, uint_t *ncpus, uint_t *ncores)
+{
+	uint_t nthreads, nthread_per_core;
+
+	nthreads = nthread_per_core = 1;
+
+	if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_8) {
+		nthreads = BITX(cpi->cpi_extd[8].cp_ecx, 7, 0) + 1;
+	} else if ((cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_HTT) != 0) {
+		nthreads = CPI_CPU_COUNT(cpi);
+	}
+
+	/*
+	 * For us to have threads, and know about it, we have to be at least at
+	 * family 17h and have the cpuid bit that says we have extended
+	 * topology.
+	 */
+	if (cpi->cpi_family >= 0x17 &&
+	    is_x86_feature(x86_featureset, X86FSET_TOPOEXT) &&
+	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1e) {
+		nthread_per_core = BITX(cpi->cpi_extd[0x1e].cp_ebx, 15, 8) + 1;
+	}
+
+	*ncpus = nthreads;
+	*ncores = nthreads / nthread_per_core;
+}
+
+static void
+cpuid_intel_ncores(struct cpuid_info *cpi, uint_t *ncpus, uint_t *ncores)
+{
+	if (cpi->cpi_maxeax >= 4) {
+		*ncores = BITX(cpi->cpi_std[4].cp_eax, 31, 26) + 1;
+		*ncpus = BITX(cpi->cpi_std[4].cp_eax, 25, 14) + 1;
+	} else if ((cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_HTT) != 0) {
+		*ncores = 1;
+		*ncpus = CPI_CPU_COUNT(cpi);
+	} else {
+		*ncpus = *ncores = 1;
+	}
+}
+
+static boolean_t
+cpuid_leafB_getids(cpu_t *cpu)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+	struct cpuid_regs regs;
+	struct cpuid_regs *cp;
+
+	if (cpi->cpi_maxeax < 0xB)
+		return (B_FALSE);
+
+	cp = &regs;
+	cp->cp_eax = 0xB;
+	cp->cp_edx = cp->cp_ebx = cp->cp_ecx = 0;
+
+	(void) __cpuid_insn(cp);
+
+	/*
+	 * Check CPUID.EAX=0BH, ECX=0H:EBX is non-zero, which
+	 * indicates that the extended topology enumeration leaf is
+	 * available.
+	 */
+	if (cp->cp_ebx != 0) {
+		uint32_t x2apic_id = 0;
+		uint_t coreid_shift = 0;
+		uint_t ncpu_per_core = 1;
+		uint_t chipid_shift = 0;
+		uint_t ncpu_per_chip = 1;
+		uint_t i;
+		uint_t level;
+
+		for (i = 0; i < CPI_FNB_ECX_MAX; i++) {
+			cp->cp_eax = 0xB;
+			cp->cp_ecx = i;
+
+			(void) __cpuid_insn(cp);
+			level = CPI_CPU_LEVEL_TYPE(cp);
+
+			if (level == 1) {
+				x2apic_id = cp->cp_edx;
+				coreid_shift = BITX(cp->cp_eax, 4, 0);
+				ncpu_per_core = BITX(cp->cp_ebx, 15, 0);
+			} else if (level == 2) {
+				x2apic_id = cp->cp_edx;
+				chipid_shift = BITX(cp->cp_eax, 4, 0);
+				ncpu_per_chip = BITX(cp->cp_ebx, 15, 0);
+			}
+		}
+
+		/*
+		 * cpi_apicid is taken care of in cpuid_gather_apicid.
+		 */
+		cpi->cpi_ncpu_per_chip = ncpu_per_chip;
+		cpi->cpi_ncore_per_chip = ncpu_per_chip /
+		    ncpu_per_core;
+		cpi->cpi_chipid = x2apic_id >> chipid_shift;
+		cpi->cpi_clogid = x2apic_id & ((1 << chipid_shift) - 1);
+		cpi->cpi_coreid = x2apic_id >> coreid_shift;
+		cpi->cpi_pkgcoreid = cpi->cpi_clogid >> coreid_shift;
+		cpi->cpi_procnodeid = cpi->cpi_chipid;
+		cpi->cpi_compunitid = cpi->cpi_coreid;
+
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
+
 static void
 cpuid_intel_getids(cpu_t *cpu, void *feature)
 {
@@ -811,6 +1792,20 @@ cpuid_intel_getids(cpu_t *cpu, void *feature)
 	uint_t chipid_shift = 0;
 	uint_t coreid_shift = 0;
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	/*
+	 * There are no compute units or processor nodes currently on Intel.
+	 * Always set these to one.
+	 */
+	cpi->cpi_procnodes_per_pkg = 1;
+	cpi->cpi_cores_per_compunit = 1;
+
+	/*
+	 * If cpuid Leaf B is present, use that to try and get this information.
+	 * It will be the most accurate for Intel CPUs.
+	 */
+	if (cpuid_leafB_getids(cpu))
+		return;
 
 	for (i = 1; i < cpi->cpi_ncpu_per_chip; i <<= 1)
 		chipid_shift++;
@@ -860,13 +1855,69 @@ cpuid_intel_getids(cpu_t *cpu, void *feature)
 		 */
 		cpi->cpi_coreid = cpi->cpi_chipid;
 		cpi->cpi_pkgcoreid = 0;
+	} else {
+		/*
+		 * Single-core single-thread processors.
+		 */
+		cpi->cpi_coreid = cpu->cpu_id;
+		cpi->cpi_pkgcoreid = 0;
 	}
 	cpi->cpi_procnodeid = cpi->cpi_chipid;
 	cpi->cpi_compunitid = cpi->cpi_coreid;
 }
 
+/*
+ * Historically, AMD has had CMP chips with only a single thread per core.
+ * However, starting in family 17h (Zen), this has changed and they now have
+ * multiple threads. Our internal core id needs to be a unique value.
+ *
+ * To determine the core id of an AMD system, if we're from a family before 17h,
+ * then we just use the cpu id, as that gives us a good value that will be
+ * unique for each core. If instead, we're on family 17h or later, then we need
+ * to do something more complicated. CPUID leaf 0x8000001e can tell us
+ * how many threads are in the system. Based on that, we'll shift the APIC ID.
+ * We can't use the normal core id in that leaf as it's only unique within the
+ * socket, which is perfect for cpi_pkgcoreid, but not us.
+ */
+static id_t
+cpuid_amd_get_coreid(cpu_t *cpu)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	if (cpi->cpi_family >= 0x17 &&
+	    is_x86_feature(x86_featureset, X86FSET_TOPOEXT) &&
+	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1e) {
+		uint_t nthreads = BITX(cpi->cpi_extd[0x1e].cp_ebx, 15, 8) + 1;
+		if (nthreads > 1) {
+			VERIFY3U(nthreads, ==, 2);
+			return (cpi->cpi_apicid >> 1);
+		}
+	}
+
+	return (cpu->cpu_id);
+}
+
+/*
+ * IDs on AMD is a more challenging task. This is notable because of the
+ * following two facts:
+ *
+ *  1. Before family 0x17 (Zen), there was no support for SMT and there was
+ *     also no way to get an actual unique core id from the system. As such, we
+ *     synthesize this case by using cpu->cpu_id.  This scheme does not,
+ *     however, guarantee that sibling cores of a chip will have sequential
+ *     coreids starting at a multiple of the number of cores per chip - that is
+ *     usually the case, but if the ACPI MADT table is presented in a different
+ *     order then we need to perform a few more gymnastics for the pkgcoreid.
+ *
+ *  2. In families 0x15 and 16x (Bulldozer and co.) the cores came in groups
+ *     called compute units. These compute units share the L1I cache, L2 cache,
+ *     and the FPU. To deal with this, a new topology leaf was added in
+ *     0x8000001e. However, parts of this leaf have different meanings
+ *     once we get to family 0x17.
+ */
+
 static void
-cpuid_amd_getids(cpu_t *cpu)
+cpuid_amd_getids(cpu_t *cpu, uchar_t *features)
 {
 	int i, first_half, coreidsz;
 	uint32_t nb_caps_reg;
@@ -875,41 +1926,31 @@ cpuid_amd_getids(cpu_t *cpu)
 	struct cpuid_regs *cp;
 
 	/*
-	 * AMD CMP chips currently have a single thread per core.
-	 *
-	 * Since no two cpus share a core we must assign a distinct coreid
-	 * per cpu, and we do this by using the cpu_id.  This scheme does not,
-	 * however, guarantee that sibling cores of a chip will have sequential
-	 * coreids starting at a multiple of the number of cores per chip -
-	 * that is usually the case, but if the ACPI MADT table is presented
-	 * in a different order then we need to perform a few more gymnastics
-	 * for the pkgcoreid.
-	 *
-	 * All processors in the system have the same number of enabled
-	 * cores. Cores within a processor are always numbered sequentially
-	 * from 0 regardless of how many or which are disabled, and there
-	 * is no way for operating system to discover the real core id when some
-	 * are disabled.
-	 *
-	 * In family 0x15, the cores come in pairs called compute units. They
-	 * share I$ and L2 caches and the FPU. Enumeration of this feature is
-	 * simplified by the new topology extensions CPUID leaf, indicated by
-	 * the X86 feature X86FSET_TOPOEXT.
+	 * Calculate the core id (this comes from hardware in family 0x17 if it
+	 * hasn't been stripped by virtualization). We always set the compute
+	 * unit id to the same value. Also, initialize the default number of
+	 * cores per compute unit and nodes per package. This will be
+	 * overwritten when we know information about a particular family.
 	 */
+	cpi->cpi_coreid = cpuid_amd_get_coreid(cpu);
+	cpi->cpi_compunitid = cpi->cpi_coreid;
+	cpi->cpi_cores_per_compunit = 1;
+	cpi->cpi_procnodes_per_pkg = 1;
 
-	cpi->cpi_coreid = cpu->cpu_id;
-	cpi->cpi_compunitid = cpu->cpu_id;
-
-	if (cpi->cpi_xmaxeax >= 0x80000008) {
-
+	/*
+	 * To construct the logical ID, we need to determine how many APIC IDs
+	 * are dedicated to the cores and threads. This is provided for us in
+	 * 0x80000008. However, if it's not present (say due to virtualization),
+	 * then we assume it's one. This should be present on all 64-bit AMD
+	 * processors.  It was added in family 0xf (Hammer).
+	 */
+	if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_8) {
 		coreidsz = BITX((cpi)->cpi_extd[8].cp_ecx, 15, 12);
 
 		/*
-		 * In AMD parlance chip is really a node while Solaris
-		 * sees chip as equivalent to socket/package.
+		 * In AMD parlance chip is really a node while illumos
+		 * uses chip as equivalent to socket/package.
 		 */
-		cpi->cpi_ncore_per_chip =
-		    BITX((cpi)->cpi_extd[8].cp_ecx, 7, 0) + 1;
 		if (coreidsz == 0) {
 			/* Use legacy method */
 			for (i = 1; i < cpi->cpi_ncore_per_chip; i <<= 1)
@@ -919,27 +1960,52 @@ cpuid_amd_getids(cpu_t *cpu)
 		}
 	} else {
 		/* Assume single-core part */
-		cpi->cpi_ncore_per_chip = 1;
 		coreidsz = 1;
 	}
+	cpi->cpi_clogid = cpi->cpi_apicid & ((1 << coreidsz) - 1);
 
-	cpi->cpi_clogid = cpi->cpi_pkgcoreid =
-	    cpi->cpi_apicid & ((1<<coreidsz) - 1);
-	cpi->cpi_ncpu_per_chip = cpi->cpi_ncore_per_chip;
+	/*
+	 * The package core ID varies depending on the family. For family 17h,
+	 * we can get this directly from leaf CPUID_LEAF_EXT_1e. Otherwise, we
+	 * can use the clogid as is. When family 17h is virtualized, the clogid
+	 * should be sufficient as if we don't have valid data in the leaf, then
+	 * we won't think we have SMT, in which case the cpi_clogid should be
+	 * sufficient.
+	 */
+	if (cpi->cpi_family >= 0x17 &&
+	    is_x86_feature(x86_featureset, X86FSET_TOPOEXT) &&
+	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1e &&
+	    cpi->cpi_extd[0x1e].cp_ebx != 0) {
+		cpi->cpi_pkgcoreid = BITX(cpi->cpi_extd[0x1e].cp_ebx, 7, 0);
+	} else {
+		cpi->cpi_pkgcoreid = cpi->cpi_clogid;
+	}
 
-	/* Get node ID, compute unit ID */
+	/*
+	 * Obtain the node ID and compute unit IDs. If we're on family 0x15
+	 * (bulldozer) or newer, then we can derive all of this from leaf
+	 * CPUID_LEAF_EXT_1e. Otherwise, the method varies by family.
+	 */
 	if (is_x86_feature(x86_featureset, X86FSET_TOPOEXT) &&
-	    cpi->cpi_xmaxeax >= 0x8000001e) {
+	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1e) {
 		cp = &cpi->cpi_extd[0x1e];
-		cp->cp_eax = 0x8000001e;
-		(void) __cpuid_insn(cp);
 
 		cpi->cpi_procnodes_per_pkg = BITX(cp->cp_ecx, 10, 8) + 1;
 		cpi->cpi_procnodeid = BITX(cp->cp_ecx, 7, 0);
-		cpi->cpi_cores_per_compunit = BITX(cp->cp_ebx, 15, 8) + 1;
-		cpi->cpi_compunitid = BITX(cp->cp_ebx, 7, 0)
-		    + (cpi->cpi_ncore_per_chip / cpi->cpi_cores_per_compunit)
-		    * (cpi->cpi_procnodeid / cpi->cpi_procnodes_per_pkg);
+
+		/*
+		 * For Bulldozer-era CPUs, recalculate the compute unit
+		 * information.
+		 */
+		if (cpi->cpi_family >= 0x15 && cpi->cpi_family < 0x17) {
+			cpi->cpi_cores_per_compunit =
+			    BITX(cp->cp_ebx, 15, 8) + 1;
+			cpi->cpi_compunitid = BITX(cp->cp_ebx, 7, 0) +
+			    (cpi->cpi_ncore_per_chip /
+			    cpi->cpi_cores_per_compunit) *
+			    (cpi->cpi_procnodeid /
+			    cpi->cpi_procnodes_per_pkg);
+		}
 	} else if (cpi->cpi_family == 0xf || cpi->cpi_family >= 0x11) {
 		cpi->cpi_procnodeid = (cpi->cpi_apicid >> coreidsz) & 7;
 	} else if (cpi->cpi_family == 0x10) {
@@ -1001,7 +2067,7 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
 
 	if (cpi->cpi_vendor == X86_VENDOR_AMD &&
-	    cpi->cpi_xmaxeax >= 0x80000008) {
+	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_8) {
 		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_IBPB)
 			add_x86_feature(featureset, X86FSET_IBPB);
 		if (cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_IBRS)
@@ -1104,6 +2170,117 @@ setup_xfem(void)
 	set_xcr(XFEATURE_ENABLED_MASK, flags);
 
 	xsave_bv_all = flags;
+}
+
+static void
+cpuid_pass1_topology(cpu_t *cpu, uchar_t *featureset)
+{
+	struct cpuid_info *cpi;
+
+	cpi = cpu->cpu_m.mcpu_cpi;
+
+	if (cpi->cpi_vendor == X86_VENDOR_AMD) {
+		cpuid_gather_amd_topology_leaves(cpu);
+	}
+
+	cpi->cpi_apicid = cpuid_gather_apicid(cpi);
+
+	/*
+	 * Before we can calculate the IDs that we should assign to this
+	 * processor, we need to understand how many cores and threads it has.
+	 */
+	switch (cpi->cpi_vendor) {
+	case X86_VENDOR_Intel:
+		cpuid_intel_ncores(cpi, &cpi->cpi_ncpu_per_chip,
+		    &cpi->cpi_ncore_per_chip);
+		break;
+	case X86_VENDOR_AMD:
+		cpuid_amd_ncores(cpi, &cpi->cpi_ncpu_per_chip,
+		    &cpi->cpi_ncore_per_chip);
+		break;
+	default:
+		/*
+		 * If we have some other x86 compatible chip, it's not clear how
+		 * they would behave. The most common case is virtualization
+		 * today, though there are also 64-bit VIA chips. Assume that
+		 * all we can get is the basic Leaf 1 HTT information.
+		 */
+		if ((cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_HTT) != 0) {
+			cpi->cpi_ncore_per_chip = 1;
+			cpi->cpi_ncpu_per_chip = CPI_CPU_COUNT(cpi);
+		}
+		break;
+	}
+
+	/*
+	 * Based on the calculated number of threads and cores, potentially
+	 * assign the HTT and CMT features.
+	 */
+	if (cpi->cpi_ncore_per_chip > 1) {
+		add_x86_feature(featureset, X86FSET_CMP);
+	}
+
+	if (cpi->cpi_ncpu_per_chip > 1 &&
+	    cpi->cpi_ncpu_per_chip != cpi->cpi_ncore_per_chip) {
+		add_x86_feature(featureset, X86FSET_HTT);
+	}
+
+	/*
+	 * Now that has been set up, we need to go through and calculate all of
+	 * the rest of the parameters that exist. If we think the CPU doesn't
+	 * have either SMT (HTT) or CMP, then we basically go through and fake
+	 * up information in some way. The most likely case for this is
+	 * virtualization where we have a lot of partial topology information.
+	 */
+	if (!is_x86_feature(featureset, X86FSET_HTT) &&
+	    !is_x86_feature(featureset, X86FSET_CMP)) {
+		/*
+		 * This is a single core, single-threaded processor.
+		 */
+		cpi->cpi_procnodes_per_pkg = 1;
+		cpi->cpi_cores_per_compunit = 1;
+		cpi->cpi_compunitid = 0;
+		cpi->cpi_chipid = -1;
+		cpi->cpi_clogid = 0;
+		cpi->cpi_coreid = cpu->cpu_id;
+		cpi->cpi_pkgcoreid = 0;
+		if (cpi->cpi_vendor == X86_VENDOR_AMD) {
+			cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 3, 0);
+		} else {
+			cpi->cpi_procnodeid = cpi->cpi_chipid;
+		}
+	} else {
+		switch (cpi->cpi_vendor) {
+		case X86_VENDOR_Intel:
+			cpuid_intel_getids(cpu, featureset);
+			break;
+		case X86_VENDOR_AMD:
+			cpuid_amd_getids(cpu, featureset);
+			break;
+		default:
+			/*
+			 * In this case, it's hard to say what we should do.
+			 * We're going to model them to the OS as single core
+			 * threads. We don't have a good identifier for them, so
+			 * we're just going to use the cpu id all on a single
+			 * chip.
+			 *
+			 * This case has historically been different from the
+			 * case above where we don't have HTT or CMP. While they
+			 * could be combined, we've opted to keep it separate to
+			 * minimize the risk of topology changes in weird cases.
+			 */
+			cpi->cpi_procnodes_per_pkg = 1;
+			cpi->cpi_cores_per_compunit = 1;
+			cpi->cpi_chipid = 0;
+			cpi->cpi_coreid = cpu->cpu_id;
+			cpi->cpi_clogid = cpu->cpu_id;
+			cpi->cpi_pkgcoreid = cpu->cpu_id;
+			cpi->cpi_procnodeid = cpi->cpi_chipid;
+			cpi->cpi_compunitid = cpi->cpi_coreid;
+			break;
+		}
+	}
 }
 
 void
@@ -1693,23 +2870,6 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 	if (is_x86_feature(featureset, X86FSET_PAE))
 		cpi->cpi_pabits = 36;
 
-	/*
-	 * Hyperthreading configuration is slightly tricky on Intel
-	 * and pure clones, and even trickier on AMD.
-	 *
-	 * (AMD chose to set the HTT bit on their CMP processors,
-	 * even though they're not actually hyperthreaded.  Thus it
-	 * takes a bit more work to figure out what's really going
-	 * on ... see the handling of the CMP_LGCY bit below)
-	 */
-	if (cp->cp_edx & CPUID_INTC_EDX_HTT) {
-		cpi->cpi_ncpu_per_chip = CPI_CPU_COUNT(cpi);
-		if (cpi->cpi_ncpu_per_chip > 1)
-			add_x86_feature(featureset, X86FSET_HTT);
-	} else {
-		cpi->cpi_ncpu_per_chip = 1;
-	}
-
 	if (cpi->cpi_maxeax >= 0xD && !xsave_force_disable) {
 		struct cpuid_regs r, *ecp;
 
@@ -1766,11 +2926,11 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 
 	if (xcpuid) {
 		cp = &cpi->cpi_extd[0];
-		cp->cp_eax = 0x80000000;
+		cp->cp_eax = CPUID_LEAF_EXT_0;
 		cpi->cpi_xmaxeax = __cpuid_insn(cp);
 	}
 
-	if (cpi->cpi_xmaxeax & 0x80000000) {
+	if (cpi->cpi_xmaxeax & CPUID_LEAF_EXT_0) {
 
 		if (cpi->cpi_xmaxeax > CPI_XMAXEAX_MAX)
 			cpi->cpi_xmaxeax = CPI_XMAXEAX_MAX;
@@ -1825,18 +2985,6 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			    (cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_FXSR) &&
 			    (cp->cp_ecx & CPUID_AMD_ECX_SSE4A)) {
 				add_x86_feature(featureset, X86FSET_SSE4A);
-			}
-
-			/*
-			 * If both the HTT and CMP_LGCY bits are set,
-			 * then we're not actually HyperThreaded.  Read
-			 * "AMD CPUID Specification" for more details.
-			 */
-			if (cpi->cpi_vendor == X86_VENDOR_AMD &&
-			    is_x86_feature(featureset, X86FSET_HTT) &&
-			    (cp->cp_ecx & CPUID_AMD_ECX_CMP_LGCY)) {
-				remove_x86_feature(featureset, X86FSET_HTT);
-				add_x86_feature(featureset, X86FSET_CMP);
 			}
 
 			/*
@@ -1904,12 +3052,13 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 			}
 			/*FALLTHROUGH*/
 		case X86_VENDOR_AMD:
-			if (cpi->cpi_xmaxeax < 0x80000008)
+			if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_8)
 				break;
 			cp = &cpi->cpi_extd[8];
-			cp->cp_eax = 0x80000008;
+			cp->cp_eax = CPUID_LEAF_EXT_8;
 			(void) __cpuid_insn(cp);
-			platform_cpuid_mangle(cpi->cpi_vendor, 0x80000008, cp);
+			platform_cpuid_mangle(cpi->cpi_vendor, CPUID_LEAF_EXT_8,
+			    cp);
 
 			/*
 			 * AMD uses ebx for some extended functions.
@@ -1945,41 +3094,6 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		}
 
 		/*
-		 * Derive the number of cores per chip
-		 */
-		switch (cpi->cpi_vendor) {
-		case X86_VENDOR_Intel:
-			if (cpi->cpi_maxeax < 4) {
-				cpi->cpi_ncore_per_chip = 1;
-				break;
-			} else {
-				cpi->cpi_ncore_per_chip =
-				    BITX((cpi)->cpi_std[4].cp_eax, 31, 26) + 1;
-			}
-			break;
-		case X86_VENDOR_AMD:
-			if (cpi->cpi_xmaxeax < 0x80000008) {
-				cpi->cpi_ncore_per_chip = 1;
-				break;
-			} else {
-				/*
-				 * On family 0xf cpuid fn 2 ECX[7:0] "NC" is
-				 * 1 less than the number of physical cores on
-				 * the chip.  In family 0x10 this value can
-				 * be affected by "downcoring" - it reflects
-				 * 1 less than the number of cores actually
-				 * enabled on this node.
-				 */
-				cpi->cpi_ncore_per_chip =
-				    BITX((cpi)->cpi_extd[8].cp_ecx, 7, 0) + 1;
-			}
-			break;
-		default:
-			cpi->cpi_ncore_per_chip = 1;
-			break;
-		}
-
-		/*
 		 * Get CPUID data about TSC Invariance in Deep C-State.
 		 */
 		switch (cpi->cpi_vendor) {
@@ -1995,57 +3109,9 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		default:
 			break;
 		}
-	} else {
-		cpi->cpi_ncore_per_chip = 1;
 	}
 
-	/*
-	 * If more than one core, then this processor is CMP.
-	 */
-	if (cpi->cpi_ncore_per_chip > 1) {
-		add_x86_feature(featureset, X86FSET_CMP);
-	}
-
-	/*
-	 * If the number of cores is the same as the number
-	 * of CPUs, then we cannot have HyperThreading.
-	 */
-	if (cpi->cpi_ncpu_per_chip == cpi->cpi_ncore_per_chip) {
-		remove_x86_feature(featureset, X86FSET_HTT);
-	}
-
-	cpi->cpi_apicid = CPI_APIC_ID(cpi);
-	cpi->cpi_procnodes_per_pkg = 1;
-	cpi->cpi_cores_per_compunit = 1;
-	if (is_x86_feature(featureset, X86FSET_HTT) == B_FALSE &&
-	    is_x86_feature(featureset, X86FSET_CMP) == B_FALSE) {
-		/*
-		 * Single-core single-threaded processors.
-		 */
-		cpi->cpi_chipid = -1;
-		cpi->cpi_clogid = 0;
-		cpi->cpi_coreid = cpu->cpu_id;
-		cpi->cpi_pkgcoreid = 0;
-		if (cpi->cpi_vendor == X86_VENDOR_AMD)
-			cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 3, 0);
-		else
-			cpi->cpi_procnodeid = cpi->cpi_chipid;
-	} else if (cpi->cpi_ncpu_per_chip > 1) {
-		if (cpi->cpi_vendor == X86_VENDOR_Intel)
-			cpuid_intel_getids(cpu, featureset);
-		else if (cpi->cpi_vendor == X86_VENDOR_AMD)
-			cpuid_amd_getids(cpu);
-		else {
-			/*
-			 * All other processors are currently
-			 * assumed to have single cores.
-			 */
-			cpi->cpi_coreid = cpi->cpi_chipid;
-			cpi->cpi_pkgcoreid = 0;
-			cpi->cpi_procnodeid = cpi->cpi_chipid;
-			cpi->cpi_compunitid = cpi->cpi_chipid;
-		}
-	}
+	cpuid_pass1_topology(cpu, featureset);
 
 	/*
 	 * Synthesize chip "revision" and socket type
@@ -2058,7 +3124,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 	    cpi->cpi_model, cpi->cpi_step);
 
 	if (cpi->cpi_vendor == X86_VENDOR_AMD) {
-		if (cpi->cpi_xmaxeax >= 0x80000008 &&
+		if (cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_8 &&
 		    cpi->cpi_extd[8].cp_ebx & CPUID_AMD_EBX_ERR_PTR_ZERO) {
 			/* Special handling for AMD FP not necessary. */
 			cpi->cpi_fp_amd_save = 0;
@@ -2229,61 +3295,6 @@ cpuid_pass2(cpu_t *cpu)
 		default:
 			break;
 		}
-	}
-
-	if (cpi->cpi_maxeax >= 0xB && cpi->cpi_vendor == X86_VENDOR_Intel) {
-		struct cpuid_regs regs;
-
-		cp = &regs;
-		cp->cp_eax = 0xB;
-		cp->cp_edx = cp->cp_ebx = cp->cp_ecx = 0;
-
-		(void) __cpuid_insn(cp);
-
-		/*
-		 * Check CPUID.EAX=0BH, ECX=0H:EBX is non-zero, which
-		 * indicates that the extended topology enumeration leaf is
-		 * available.
-		 */
-		if (cp->cp_ebx) {
-			uint32_t x2apic_id;
-			uint_t coreid_shift = 0;
-			uint_t ncpu_per_core = 1;
-			uint_t chipid_shift = 0;
-			uint_t ncpu_per_chip = 1;
-			uint_t i;
-			uint_t level;
-
-			for (i = 0; i < CPI_FNB_ECX_MAX; i++) {
-				cp->cp_eax = 0xB;
-				cp->cp_ecx = i;
-
-				(void) __cpuid_insn(cp);
-				level = CPI_CPU_LEVEL_TYPE(cp);
-
-				if (level == 1) {
-					x2apic_id = cp->cp_edx;
-					coreid_shift = BITX(cp->cp_eax, 4, 0);
-					ncpu_per_core = BITX(cp->cp_ebx, 15, 0);
-				} else if (level == 2) {
-					x2apic_id = cp->cp_edx;
-					chipid_shift = BITX(cp->cp_eax, 4, 0);
-					ncpu_per_chip = BITX(cp->cp_ebx, 15, 0);
-				}
-			}
-
-			cpi->cpi_apicid = x2apic_id;
-			cpi->cpi_ncpu_per_chip = ncpu_per_chip;
-			cpi->cpi_ncore_per_chip = ncpu_per_chip /
-			    ncpu_per_core;
-			cpi->cpi_chipid = x2apic_id >> chipid_shift;
-			cpi->cpi_clogid = x2apic_id & ((1 << chipid_shift) - 1);
-			cpi->cpi_coreid = x2apic_id >> coreid_shift;
-			cpi->cpi_pkgcoreid = cpi->cpi_clogid >> coreid_shift;
-		}
-
-		/* Make cp NULL so that we don't stumble on others */
-		cp = NULL;
 	}
 
 	/*
@@ -2498,10 +3509,10 @@ cpuid_pass2(cpu_t *cpu)
 	}
 
 
-	if ((cpi->cpi_xmaxeax & 0x80000000) == 0)
+	if ((cpi->cpi_xmaxeax & CPUID_LEAF_EXT_0) == 0)
 		goto pass2_done;
 
-	if ((nmax = cpi->cpi_xmaxeax - 0x80000000 + 1) > NMAX_CPI_EXTD)
+	if ((nmax = cpi->cpi_xmaxeax - CPUID_LEAF_EXT_0 + 1) > NMAX_CPI_EXTD)
 		nmax = NMAX_CPI_EXTD;
 	/*
 	 * Copy the extended properties, fixing them as we go.
@@ -2509,9 +3520,10 @@ cpuid_pass2(cpu_t *cpu)
 	 */
 	iptr = (void *)cpi->cpi_brandstr;
 	for (n = 2, cp = &cpi->cpi_extd[2]; n < nmax; cp++, n++) {
-		cp->cp_eax = 0x80000000 + n;
+		cp->cp_eax = CPUID_LEAF_EXT_0 + n;
 		(void) __cpuid_insn(cp);
-		platform_cpuid_mangle(cpi->cpi_vendor, 0x80000000 + n, cp);
+		platform_cpuid_mangle(cpi->cpi_vendor, CPUID_LEAF_EXT_0 + n,
+		    cp);
 		switch (n) {
 		case 2:
 		case 3:
@@ -2963,26 +3975,42 @@ cpuid_pass3(cpu_t *cpu)
 	ASSERT(cpi->cpi_pass == 2);
 
 	/*
-	 * Function 4: Deterministic cache parameters
+	 * Deterministic cache parameters
 	 *
-	 * Take this opportunity to detect the number of threads
-	 * sharing the last level cache, and construct a corresponding
-	 * cache id. The respective cpuid_info members are initialized
-	 * to the default case of "no last level cache sharing".
+	 * Intel uses leaf 0x4 for this, while AMD uses leaf 0x8000001d. The
+	 * values that are present are currently defined to be the same. This
+	 * means we can use the same logic to parse it as long as we use the
+	 * appropriate leaf to get the data. If you're updating this, make sure
+	 * you're careful about which vendor supports which aspect.
+	 *
+	 * Take this opportunity to detect the number of threads sharing the
+	 * last level cache, and construct a corresponding cache id. The
+	 * respective cpuid_info members are initialized to the default case of
+	 * "no last level cache sharing".
 	 */
 	cpi->cpi_ncpu_shr_last_cache = 1;
 	cpi->cpi_last_lvl_cacheid = cpu->cpu_id;
 
-	if (cpi->cpi_maxeax >= 4 && cpi->cpi_vendor == X86_VENDOR_Intel) {
+	if ((cpi->cpi_maxeax >= 4 && cpi->cpi_vendor == X86_VENDOR_Intel) ||
+	    (cpi->cpi_vendor == X86_VENDOR_AMD &&
+	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1d &&
+	    is_x86_feature(x86_featureset, X86FSET_TOPOEXT))) {
+		uint32_t leaf;
+
+		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+			leaf = 4;
+		} else {
+			leaf = CPUID_LEAF_EXT_1d;
+		}
 
 		/*
-		 * Find the # of elements (size) returned by fn 4, and along
+		 * Find the # of elements (size) returned by the leaf and along
 		 * the way detect last level cache sharing details.
 		 */
 		bzero(&regs, sizeof (regs));
 		cp = &regs;
 		for (i = 0, max = 0; i < CPI_FN4_ECX_MAX; i++) {
-			cp->cp_eax = 4;
+			cp->cp_eax = leaf;
 			cp->cp_ecx = i;
 
 			(void) __cpuid_insn(cp);
@@ -2996,29 +4024,33 @@ cpuid_pass3(cpu_t *cpu)
 				    CPI_NTHR_SHR_CACHE(cp) + 1;
 			}
 		}
-		cpi->cpi_std_4_size = size = i;
+		cpi->cpi_cache_leaf_size = size = i;
 
 		/*
-		 * Allocate the cpi_std_4 array. The first element
-		 * references the regs for fn 4, %ecx == 0, which
-		 * cpuid_pass2() stashed in cpi->cpi_std[4].
+		 * Allocate the cpi_cache_leaves array. The first element
+		 * references the regs for the corresponding leaf with %ecx set
+		 * to 0. This was gathered in cpuid_pass2().
 		 */
 		if (size > 0) {
-			cpi->cpi_std_4 =
+			cpi->cpi_cache_leaves =
 			    kmem_alloc(size * sizeof (cp), KM_SLEEP);
-			cpi->cpi_std_4[0] = &cpi->cpi_std[4];
+			if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+				cpi->cpi_cache_leaves[0] = &cpi->cpi_std[4];
+			} else {
+				cpi->cpi_cache_leaves[0] = &cpi->cpi_extd[0x1d];
+			}
 
 			/*
 			 * Allocate storage to hold the additional regs
-			 * for function 4, %ecx == 1 .. cpi_std_4_size.
+			 * for the leaf, %ecx == 1 .. cpi_cache_leaf_size.
 			 *
-			 * The regs for fn 4, %ecx == 0 has already
+			 * The regs for the leaf, %ecx == 0 has already
 			 * been allocated as indicated above.
 			 */
 			for (i = 1; i < size; i++) {
-				cp = cpi->cpi_std_4[i] =
+				cp = cpi->cpi_cache_leaves[i] =
 				    kmem_zalloc(sizeof (regs), KM_SLEEP);
-				cp->cp_eax = 4;
+				cp->cp_eax = leaf;
 				cp->cp_ecx = i;
 
 				(void) __cpuid_insn(cp);
@@ -3040,7 +4072,7 @@ cpuid_pass3(cpu_t *cpu)
 	/*
 	 * Now fixup the brand string
 	 */
-	if ((cpi->cpi_xmaxeax & 0x80000000) == 0) {
+	if ((cpi->cpi_xmaxeax & CPUID_LEAF_EXT_0) == 0) {
 		fabricate_brandstr(cpi);
 	} else {
 
@@ -3440,20 +4472,22 @@ cpuid_insn(cpu_t *cpu, struct cpuid_regs *cp)
 
 	/*
 	 * CPUID data is cached in two separate places: cpi_std for standard
-	 * CPUID functions, and cpi_extd for extended CPUID functions.
+	 * CPUID leaves , and cpi_extd for extended CPUID leaves.
 	 */
-	if (cp->cp_eax <= cpi->cpi_maxeax && cp->cp_eax < NMAX_CPI_STD)
+	if (cp->cp_eax <= cpi->cpi_maxeax && cp->cp_eax < NMAX_CPI_STD) {
 		xcp = &cpi->cpi_std[cp->cp_eax];
-	else if (cp->cp_eax >= 0x80000000 && cp->cp_eax <= cpi->cpi_xmaxeax &&
-	    cp->cp_eax < 0x80000000 + NMAX_CPI_EXTD)
-		xcp = &cpi->cpi_extd[cp->cp_eax - 0x80000000];
-	else
+	} else if (cp->cp_eax >= CPUID_LEAF_EXT_0 &&
+	    cp->cp_eax <= cpi->cpi_xmaxeax &&
+	    cp->cp_eax < CPUID_LEAF_EXT_0 + NMAX_CPI_EXTD) {
+		xcp = &cpi->cpi_extd[cp->cp_eax - CPUID_LEAF_EXT_0];
+	} else {
 		/*
 		 * The caller is asking for data from an input parameter which
 		 * the kernel has not cached.  In this case we go fetch from
 		 * the hardware and return the data directly to the user.
 		 */
 		return (__cpuid_insn(cp));
+	}
 
 	cp->cp_eax = xcp->cp_eax;
 	cp->cp_ebx = xcp->cp_ebx;
@@ -4353,17 +5387,18 @@ intel_cpuid_4_cache_info(struct cachetab *ct, struct cpuid_info *cpi)
 	uint32_t level, i;
 	int ret = 0;
 
-	for (i = 0; i < cpi->cpi_std_4_size; i++) {
-		level = CPI_CACHE_LVL(cpi->cpi_std_4[i]);
+	for (i = 0; i < cpi->cpi_cache_leaf_size; i++) {
+		level = CPI_CACHE_LVL(cpi->cpi_cache_leaves[i]);
 
 		if (level == 2 || level == 3) {
-			ct->ct_assoc = CPI_CACHE_WAYS(cpi->cpi_std_4[i]) + 1;
+			ct->ct_assoc =
+			    CPI_CACHE_WAYS(cpi->cpi_cache_leaves[i]) + 1;
 			ct->ct_line_size =
-			    CPI_CACHE_COH_LN_SZ(cpi->cpi_std_4[i]) + 1;
+			    CPI_CACHE_COH_LN_SZ(cpi->cpi_cache_leaves[i]) + 1;
 			ct->ct_size = ct->ct_assoc *
-			    (CPI_CACHE_PARTS(cpi->cpi_std_4[i]) + 1) *
+			    (CPI_CACHE_PARTS(cpi->cpi_cache_leaves[i]) + 1) *
 			    ct->ct_line_size *
-			    (cpi->cpi_std_4[i]->cp_ecx + 1);
+			    (cpi->cpi_cache_leaves[i]->cp_ecx + 1);
 
 			if (level == 2) {
 				ct->ct_label = l2_cache_str;
@@ -5372,69 +6407,21 @@ patch_memops(uint_t vendor)
 #endif  /* __amd64 && !__xpv */
 
 /*
- * This function finds the number of bits to represent the number of cores per
- * chip and the number of strands per core for the Intel platforms.
- * It re-uses the x2APIC cpuid code of the cpuid_pass2().
+ * We're being asked to tell the system how many bits are required to represent
+ * the various thread and strand IDs.
  */
 void
-cpuid_get_ext_topo(uint_t vendor, uint_t *core_nbits, uint_t *strand_nbits)
+cpuid_get_ext_topo(cpu_t *cpu, uint_t *core_nbits, uint_t *strand_nbits)
 {
-	struct cpuid_regs regs;
-	struct cpuid_regs *cp = &regs;
+	struct cpuid_info *cpi;
+	uint_t nthreads;
 
-	if (vendor != X86_VENDOR_Intel) {
-		return;
-	}
+	VERIFY(cpuid_checkpass(CPU, 1));
+	cpi = cpu->cpu_m.mcpu_cpi;
 
-	/* if the cpuid level is 0xB, extended topo is available. */
-	cp->cp_eax = 0;
-	if (__cpuid_insn(cp) >= 0xB) {
-
-		cp->cp_eax = 0xB;
-		cp->cp_edx = cp->cp_ebx = cp->cp_ecx = 0;
-		(void) __cpuid_insn(cp);
-
-		/*
-		 * Check CPUID.EAX=0BH, ECX=0H:EBX is non-zero, which
-		 * indicates that the extended topology enumeration leaf is
-		 * available.
-		 */
-		if (cp->cp_ebx) {
-			uint_t coreid_shift = 0;
-			uint_t chipid_shift = 0;
-			uint_t i;
-			uint_t level;
-
-			for (i = 0; i < CPI_FNB_ECX_MAX; i++) {
-				cp->cp_eax = 0xB;
-				cp->cp_ecx = i;
-
-				(void) __cpuid_insn(cp);
-				level = CPI_CPU_LEVEL_TYPE(cp);
-
-				if (level == 1) {
-					/*
-					 * Thread level processor topology
-					 * Number of bits shift right APIC ID
-					 * to get the coreid.
-					 */
-					coreid_shift = BITX(cp->cp_eax, 4, 0);
-				} else if (level == 2) {
-					/*
-					 * Core level processor topology
-					 * Number of bits shift right APIC ID
-					 * to get the chipid.
-					 */
-					chipid_shift = BITX(cp->cp_eax, 4, 0);
-				}
-			}
-
-			if (coreid_shift > 0 && chipid_shift > coreid_shift) {
-				*strand_nbits = coreid_shift;
-				*core_nbits = chipid_shift - coreid_shift;
-			}
-		}
-	}
+	nthreads = cpi->cpi_ncpu_per_chip / cpi->cpi_ncore_per_chip;
+	*core_nbits = ddi_fls(cpi->cpi_ncore_per_chip);
+	*strand_nbits = ddi_fls(nthreads);
 }
 
 void
@@ -5470,19 +6457,19 @@ cpuid_pass_ucode(cpu_t *cpu, uchar_t *fset)
 		    (cpi->cpi_family == 5 && cpi->cpi_model < 1))
 			return;
 
-		if (cpi->cpi_xmaxeax < 0x80000008) {
+		if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_8) {
 			bzero(&cp, sizeof (cp));
-			cp.cp_eax = 0x80000000;
+			cp.cp_eax = CPUID_LEAF_EXT_0;
 			cpi->cpi_xmaxeax = __cpuid_insn(&cp);
-			if (cpi->cpi_xmaxeax < 0x80000008) {
+			if (cpi->cpi_xmaxeax < CPUID_LEAF_EXT_8) {
 				return;
 			}
 		}
 
 		bzero(&cp, sizeof (cp));
-		cp.cp_eax = 0x80000008;
+		cp.cp_eax = CPUID_LEAF_EXT_8;
 		(void) __cpuid_insn(&cp);
-		platform_cpuid_mangle(cpi->cpi_vendor, 0x80000008, &cp);
+		platform_cpuid_mangle(cpi->cpi_vendor, CPUID_LEAF_EXT_8, &cp);
 		cpi->cpi_extd[8] = cp;
 	} else {
 		/*
