@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -1485,7 +1485,7 @@ xhci_port_count(xhci_t *xhcip)
 			fusb2 = first;
 		} else {
 			xhci_error(xhcip, "encountered port capabilities with "
-			    "unknown major USB version: %d\n", rvers);
+			    "unknown USB version: %x.%x\n", maj, min);
 		}
 	}
 
