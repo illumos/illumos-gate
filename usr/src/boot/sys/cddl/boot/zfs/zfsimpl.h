@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2002 McAfee, Inc.
  * All rights reserved.
  *
@@ -59,6 +59,9 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
+#ifndef _ZFSIMPL_H
+#define	_ZFSIMPL_H
+
 #define	MAXNAMELEN	256
 
 #define _NOTE(s)
@@ -76,7 +79,8 @@
 #define	P2ROUNDUP(x, align)		(-(-(x) & -(align)))
 #define	P2END(x, align)			(-(~(x) & -(align)))
 #define	P2PHASEUP(x, align, phase)	((phase) - (((phase) - (x)) & -(align)))
-#define	P2BOUNDARY(off, len, align)	(((off) ^ ((off) + (len) - 1)) > (align) - 1)
+#define	P2BOUNDARY(off, len, align)	\
+	(((off) ^ ((off) + (len) - 1)) > (align) - 1)
 
 /*
  * General-purpose 32-bit and 64-bit bitfield encodings.
@@ -675,7 +679,7 @@ typedef enum {
 #define	SPA_VERSION_SNAP_PROPS		SPA_VERSION_12
 #define	SPA_VERSION_USED_BREAKDOWN	SPA_VERSION_13
 #define	SPA_VERSION_PASSTHROUGH_X	SPA_VERSION_14
-#define SPA_VERSION_USERSPACE		SPA_VERSION_15
+#define	SPA_VERSION_USERSPACE		SPA_VERSION_15
 #define	SPA_VERSION_STMF_PROP		SPA_VERSION_16
 #define	SPA_VERSION_RAIDZ3		SPA_VERSION_17
 #define	SPA_VERSION_USERREFS		SPA_VERSION_18
@@ -739,10 +743,10 @@ typedef enum {
  * 'vdev_state' entry.  This is because a device can be in multiple states, such
  * as offline and degraded.
  */
-#define	ZPOOL_CONFIG_OFFLINE            "offline"
-#define	ZPOOL_CONFIG_FAULTED            "faulted"
-#define	ZPOOL_CONFIG_DEGRADED           "degraded"
-#define	ZPOOL_CONFIG_REMOVED            "removed"
+#define	ZPOOL_CONFIG_OFFLINE		"offline"
+#define	ZPOOL_CONFIG_FAULTED		"faulted"
+#define	ZPOOL_CONFIG_DEGRADED		"degraded"
+#define	ZPOOL_CONFIG_REMOVED		"removed"
 #define	ZPOOL_CONFIG_FRU		"fru"
 #define	ZPOOL_CONFIG_AUX_STATE		"aux_state"
 
@@ -1122,6 +1126,8 @@ typedef struct sa_hdr_phys {
 #define	SA_PARENT_OFFSET	40
 #define	SA_SYMLINK_OFFSET	160
 
+#define	ZIO_OBJSET_MAC_LEN	32
+
 /*
  * Intent log header - this on disk structure holds fields to manage
  * the log.  All fields are 64 bit to easily handle cross architectures.
@@ -1134,17 +1140,28 @@ typedef struct zil_header {
 	uint64_t zh_pad[5];
 } zil_header_t;
 
-#define	OBJSET_PHYS_SIZE 2048
+#define	OBJSET_PHYS_SIZE_V2 2048
+#define	OBJSET_PHYS_SIZE_V3 4096
+
+#define	OBJSET_PHYS_PAD0_SIZE	\
+	(OBJSET_PHYS_SIZE_V2 - sizeof (dnode_phys_t) * 3 -	\
+	    sizeof (zil_header_t) - sizeof (uint64_t) * 2 -	\
+	    2 * ZIO_OBJSET_MAC_LEN)
+#define	OBJSET_PHYS_PAD1_SIZE	\
+	(OBJSET_PHYS_SIZE_V3 - OBJSET_PHYS_SIZE_V2 - sizeof (dnode_phys_t))
 
 typedef struct objset_phys {
 	dnode_phys_t os_meta_dnode;
 	zil_header_t os_zil_header;
 	uint64_t os_type;
 	uint64_t os_flags;
-	char os_pad[OBJSET_PHYS_SIZE - sizeof (dnode_phys_t)*3 -
-	    sizeof (zil_header_t) - sizeof (uint64_t)*2];
+	uint8_t os_portable_mac[ZIO_OBJSET_MAC_LEN];
+	uint8_t os_local_mac[ZIO_OBJSET_MAC_LEN];
+	char os_pad0[OBJSET_PHYS_PAD0_SIZE];
 	dnode_phys_t os_userused_dnode;
 	dnode_phys_t os_groupused_dnode;
+	dnode_phys_t os_projectused_dnode;
+	char os_pad1[OBJSET_PHYS_PAD1_SIZE];
 } objset_phys_t;
 
 typedef struct dsl_dir_phys {
@@ -1467,7 +1484,7 @@ typedef struct ace {
 	uint16_t	a_type;		/* allow or deny */
 } ace_t;
 
-#define ACE_SLOT_CNT	6
+#define	ACE_SLOT_CNT	6
 
 typedef struct zfs_znode_acl {
 	uint64_t	z_acl_extern_obj;	  /* ext acl pieces */
@@ -1562,3 +1579,5 @@ typedef struct spa {
 } spa_t;
 
 static void decode_embedded_bp_compressed(const blkptr_t *, void *);
+
+#endif	/* _ZFSIMPL_H */
