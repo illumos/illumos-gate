@@ -24,6 +24,7 @@
  * Copyright 2013 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2016 Andrey Sokolov
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -553,7 +554,7 @@ lofi_destroy(struct lofi_state *lsp, cred_t *credp)
 	}
 
 	if (lsp->ls_vp != NULL) {
-		(void) VOP_PUTPAGE(lsp->ls_vp, 0, 0, B_INVAL, credp, NULL);
+		(void) VOP_PUTPAGE(lsp->ls_vp, 0, 0, B_FREE, credp, NULL);
 		(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag,
 		    1, 0, credp, NULL);
 		VN_RELE(lsp->ls_vp);
@@ -2934,7 +2935,7 @@ err:
 		lofi_destroy(lsp, credp);
 	} else {
 		if (vp != NULL) {
-			(void) VOP_PUTPAGE(vp, 0, 0, B_INVAL, credp, NULL);
+			(void) VOP_PUTPAGE(vp, 0, 0, B_FREE, credp, NULL);
 			(void) VOP_CLOSE(vp, flag, 1, 0, credp, NULL);
 			VN_RELE(vp);
 		}
