@@ -33,6 +33,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/queue.h>
+#include <endian.h>
 
 #include <sys/fs/hsfs_isospec.h>
 #include "cd9660_eltorito.h"
@@ -41,6 +42,16 @@
 
 #define	ISO_DEFAULT_BLOCK_SHIFT	11
 #define	ISO_DEFAULT_BLOCK_SIZE	(1 << ISO_DEFAULT_BLOCK_SHIFT)
+
+/* Little endian */
+void
+cd9660_721(uint16_t w, unsigned char *twochar)
+{
+#if BYTE_ORDER == BIG_ENDIAN
+	w = htole16(w);
+#endif
+	memcpy(twochar, &w, 2);
+}
 
 const char *
 system_id_string(uchar_t system_id)

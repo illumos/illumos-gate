@@ -26,6 +26,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "cd9660_eltorito.h"
 
@@ -51,8 +52,8 @@ output_entry(FILE *outfile, const char *filename __unused,
 		platform = system_id_string(platform_id);
 
 	fprintf(outfile,
-	    "et_platform=%s;et_system=%s;et_lba=%d;et_sectors=%d\n",
-	    platform, system_id_string(bcse->system_type[0]),
+	    "et_platform=%s;et_system=%s;et_lba=%" PRIu32 ";et_sectors=%"
+	    PRIu16 "\n", platform, system_id_string(bcse->system_type[0]),
 	    isonum_731(bcse->load_rba), isonum_721(bcse->sector_count));
 }
 
