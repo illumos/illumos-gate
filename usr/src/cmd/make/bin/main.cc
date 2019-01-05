@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -1794,8 +1795,6 @@ read_files_and_state(int argc, char **argv)
 	register Name		name;
 	Name			new_make_value;
 	Boolean			save_do_not_exec_rule;
-	Name			sdotMakefile;
-	Name			sdotmakefile_name;
 	static wchar_t		state_file_str;
 	static char		state_file_str_mb[MAXPATHLEN];
 	static struct _Name	state_filename;
@@ -1818,10 +1817,6 @@ read_files_and_state(int argc, char **argv)
 	Makefile = GETNAME(wcs_buffer, FIND_LENGTH);
 	MBSTOWCS(wcs_buffer, "makefile");
 	makefile_name = GETNAME(wcs_buffer, FIND_LENGTH);
-	MBSTOWCS(wcs_buffer, "s.makefile");
-	sdotmakefile_name = GETNAME(wcs_buffer, FIND_LENGTH);
-	MBSTOWCS(wcs_buffer, "s.Makefile");
-	sdotMakefile = GETNAME(wcs_buffer, FIND_LENGTH);
 
 /*
  *	initialize global dependency entry for .NOT_AUTO
@@ -1914,6 +1909,7 @@ read_files_and_state(int argc, char **argv)
 	case 2:
 		append_char('D', &makeflags_string);
 		append_char('D', &makeflags_string_posix);
+		/* FALLTHROUGH */
 	case 1:
 		append_char('D', &makeflags_string);
 		append_char('D', &makeflags_string_posix);
@@ -1922,6 +1918,7 @@ read_files_and_state(int argc, char **argv)
 	case 2:
 		append_char('d', &makeflags_string);
 		append_char('d', &makeflags_string_posix);
+		/* FALLTHROUGH */
 	case 1:
 		append_char('d', &makeflags_string);
 		append_char('d', &makeflags_string_posix);
@@ -1959,12 +1956,15 @@ read_files_and_state(int argc, char **argv)
 	case 4:
 		append_char('P', &makeflags_string);
 		append_char('P', &makeflags_string_posix);
+		/* FALLTHROUGH */
 	case 3:
 		append_char('P', &makeflags_string);
 		append_char('P', &makeflags_string_posix);
+		/* FALLTHROUGH */
 	case 2:
 		append_char('P', &makeflags_string);
 		append_char('P', &makeflags_string_posix);
+		/* FALLTHROUGH */
 	case 1:
 		append_char('P', &makeflags_string);
 		append_char('P', &makeflags_string_posix);

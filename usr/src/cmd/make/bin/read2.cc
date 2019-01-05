@@ -21,6 +21,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -509,7 +511,7 @@ find_target_groups(register Name_vector target_list, register int i, Boolean res
 		/* We need to keep this pointer so */
 		/* we can stuff it for last member */
 		clear_target_group = true;
-		/* fall into */
+		/* FALLTHROUGH */
 	      case 3:	/* Middle group member */
 		/* Add this target to the */
 		/* current chain */
@@ -774,6 +776,7 @@ enter_dependencies(register Name target, Chain target_group, register Name_vecto
 		built_last_make_run_seen = false;
 		command_changed = true;
 		target->ran_command = true;
+		/* FALLTHROUGH */
 	case reading_statefile:
 		/* Reading the statefile for the first time. Enter the rules */
 		/* as "Commands used" not "templates to use" */
@@ -785,6 +788,7 @@ enter_dependencies(register Name target, Chain target_group, register Name_vecto
 			}
 			line->body.line.command_used = command;
 		}
+		/* FALLTHROUGH */
 	case reading_cpp_file:
 		/* Reading report file from programs that reports */
 		/* dependencies. If this is the first time the target is */

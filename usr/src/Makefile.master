@@ -26,10 +26,10 @@
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
-# Copyright 2016 RackTop Systems.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019, Joyent, Inc.
+# Copyright 2019 RackTop Systems.
 #
 
 #
@@ -479,7 +479,15 @@ include $(SRC)/Makefile.smatch
 
 #
 # turn warnings into errors (C++)
-CCERRWARN=		-xwe
+CCERRWARN = -errtags=yes -errwarn=%all
+CCERRWARN += -erroff=E_EMPTY_TRANSLATION_UNIT
+CCERRWARN += -erroff=E_STATEMENT_NOT_REACHED
+
+CCERRWARN += -_gcc=-Wno-missing-braces
+CCERRWARN += -_gcc=-Wno-sign-compare
+CCERRWARN += -_gcc=-Wno-unknown-pragmas
+CCERRWARN += -_gcc=-Wno-unused-parameter
+CCERRWARN += -_gcc=-Wno-missing-field-initializers
 
 # C standard.  Keep Studio flags until we get rid of lint.
 CSTD_GNU89=	-xc99=%none

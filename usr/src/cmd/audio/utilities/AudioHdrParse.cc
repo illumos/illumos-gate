@@ -22,9 +22,9 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -235,6 +235,7 @@ static char		*lib_hz = NULL;
 			return (AUDIO_ERR_BADARG);
 		}
 		delete khz;
+		/* FALLTHROUGH */
 	case 1:
 		rate = irint(r);
 		break;

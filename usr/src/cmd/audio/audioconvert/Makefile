@@ -23,11 +23,13 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 RackTop Systems.
+#
 # Makefile for cmd/audio/audioconvert
 
 PROG= audioconvert
 
-include 	../../Makefile.cmd
+include	../../Makefile.cmd
 
 INCLUDES += -I../include -I.
 
@@ -40,6 +42,11 @@ OBJS= $(PROGSRCS:%.cc=%.o)
 LDLIBS += -laudio -lm -lc
 
 LDFLAGS += -L../utilities
+
+CCERRWARN += -_gcc=-Wno-switch
+CCERRWARN += -_gcc=-Wno-parentheses
+CCERRWARN += -_gcc=-Wno-ignored-qualifiers
+CCERRWARN += -_gcc=-Wno-return-type
 
 .PARALLEL:	$(OBJS)
 

@@ -23,6 +23,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
 
 #include <mksh/defs.h>
@@ -32,8 +34,8 @@ extern Property	append_prop(register Name target, register Property_id type);
 extern void	append_string(register wchar_t *from, register String to, register int length);
 extern void	enable_interrupt(register void (*handler) (int));
 extern char	*errmsg(int errnum);
-extern void	fatal_mksh(const char *message, ...);
-extern void	fatal_reader_mksh(const char *pattern, ...);
+extern void	fatal_mksh(const char *message, ...) __NORETURN;
+extern void	fatal_reader_mksh(const char *pattern, ...) __NORETURN;
 extern char	*get_current_path_mksh(void);
 extern Property	get_prop(register Property start, register Property_id type);
 extern char	*getmem(size_t size);

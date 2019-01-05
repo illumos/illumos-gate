@@ -22,8 +22,8 @@
  * Copyright 2006 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2016 RackTop Systems.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -2733,6 +2733,7 @@ sccs_get(register Name target, register Property *command)
 	case DONT_KNOW_SCCS:
 		/* We dont know by now there is no SCCS/s.* */
 		target->stat.has_sccs = NO_SCCS;
+		/* FALLTHROUGH */
 	case NO_SCCS:
 		/*
 		 * If there is no SCCS/s.* but the plain file exists,

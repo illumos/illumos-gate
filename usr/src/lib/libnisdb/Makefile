@@ -24,6 +24,8 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 RackTop Systems.
+#
 
 LIBRARY= libnisdb.a
 VERS=	.2
@@ -164,6 +166,17 @@ $(UVAR_PICS) := CERRWARN += -_gcc=-Wno-unused-variable
 # Correcting these might alter logic
 CERRWARN +=	$(CNOWARN_UNINIT)
 CERRWARN +=	-_gcc=-Wno-switch
+
+CCERRWARN +=	-_gcc=-Wno-parentheses
+CCERRWARN +=	-_gcc=-Wno-unused-variable
+CCERRWARN +=	-_gcc=-Wno-unused-value
+CCERRWARN +=	-_gcc=-Wno-unused-function
+CCERRWARN +=	-_gcc=-Wno-return-type
+CCERRWARN +=	-_gcc=-Wno-uninitialized
+
+CCERRWARN +=	-_gcc7=-Wno-nonnull-compare
+CCERRWARN +=	-_gcc8=-Wno-nonnull-compare
+CCERRWARN +=	-_gcc9=-Wno-nonnull-compare
 
 # not linted
 SMATCH=off

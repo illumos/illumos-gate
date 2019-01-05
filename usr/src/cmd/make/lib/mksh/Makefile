@@ -10,6 +10,7 @@
 #
 
 # Copyright 2015, Richard Lowe.
+# Copyright 2019 RackTop Systems.
 
 LIBRARY =	libmksh.a
 VERS =		.1
@@ -31,6 +32,11 @@ LIBS = $(LIBRARY)
 SRCDIR = ../
 MAPFILES=
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
+CCERRWARN += -_gcc=-Wno-unused-variable
+CCERRWARN += -_gcc=-Wno-unused-function
+CCERRWARN += -_gcc=-Wno-unused-value
+CCERRWARN += -_gcc=-Wno-uninitialized
 
 all: $(LIBS)
 

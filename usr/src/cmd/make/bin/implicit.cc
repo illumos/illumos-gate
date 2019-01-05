@@ -21,6 +21,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 RackTop Systems.
  */
 
 /*
@@ -322,6 +324,7 @@ posix_attempts:
 					}
 					continue;
 				}
+				/* FALLTHROUGH */
 			case build_running:
 				if(!name_found) {
 					store_name(source);
