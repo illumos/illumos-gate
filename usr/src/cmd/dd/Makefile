@@ -31,6 +31,7 @@ include ../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+LDLIBS += -lcmdutils
 
 .KEEP_STATE:
 
