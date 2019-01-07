@@ -1,478 +1,873 @@
-'\" te
+'\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" Copyright 1989 AT&T
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH TCP 7P "Feb 5, 2018"
-.SH NAME
-tcp, TCP \- Internet Transmission Control Protocol
-.SH SYNOPSIS
-.LP
-.nf
-\fB#include <sys/socket.h>\fR
-.fi
-
-.LP
-.nf
-\fB#include <netinet/in.h>\fR
-.fi
-
-.LP
-.nf
-\fBs = socket(AF_INET, SOCK_STREAM, 0);\fR
-.fi
-
-.LP
-.nf
-\fBs = socket(AF_INET6, SOCK_STREAM, 0);\fR
-.fi
-
-.LP
-.nf
-\fBt = t_open("/dev/tcp", O_RDWR);\fR
-.fi
-
-.LP
-.nf
-\fBt = t_open("/dev/tcp6", O_RDWR);\fR
-.fi
-
-.SH DESCRIPTION
-.LP
-\fBTCP\fR is the virtual circuit protocol of the Internet protocol family. It
-provides reliable, flow-controlled, in order, two-way transmission of data. It
-is a byte-stream protocol layered above the Internet Protocol (\fBIP\fR), or
-the Internet Protocol Version 6 (\fBIPv6\fR), the Internet protocol family's
+.\"
+.Dd "Jan 07, 2019"
+.Dt TCP 7P
+.Os
+.Sh NAME
+.Nm tcp ,
+.Nm TCP
+.Nd Internet Transmission Control Protocol
+.Sh SYNOPSIS
+.In sys/socket.h
+.In netinet/in.h
+.In netinet/tcp.h
+.Bd -literal
+s = socket(AF_INET, SOCK_STREAM, 0);
+s = socket(AF_INET6, SOCK_STREAM, 0);
+t = t_open("/dev/tcp", O_RDWR);
+t = t_open("/dev/tcp6", O_RDWR);
+.Ed
+.Sh DESCRIPTION
+TCP is the virtual circuit protocol of the Internet protocol family.
+It provides reliable, flow-controlled, in-order, two-way transmission of data.
+It is a byte-stream protocol layered above the Internet Protocol
+.Po Sy IP Pc ,
+or the Internet Protocol Version 6
+.Po Sy IPv6 Pc ,
+the Internet protocol family's
 internetwork datagram delivery protocol.
-.sp
-.LP
-Programs can access \fBTCP\fR using the socket interface as a \fBSOCK_STREAM\fR
-socket type, or using the Transport Level Interface (\fBTLI\fR) where it
-supports the connection-oriented (\fBT_COTS_ORD\fR) service type.
-.sp
-.LP
-\fBTCP\fR uses \fBIP\fR's host-level addressing and adds its own per-host
-collection of "port addresses." The endpoints of a \fBTCP\fR connection are
-identified by the combination of an \fBIP\fR or IPv6 address and a \fBTCP\fR
-port number. Although other protocols, such as the User Datagram Protocol
-(UDP), may use the same host and port address format, the port space of these
-protocols is distinct. See \fBinet\fR(7P) and \fBinet6\fR(7P) for details on
+.Pp
+Programs can access TCP using the socket interface as a
+.Dv SOCK_STREAM
+socket type, or using the Transport Level Interface
+.Po Sy TLI Pc
+where it supports the connection-oriented
+.Po Dv BT_COTS_ORD Pc
+service type.
+.Pp
+A checksum over all data helps TCP provide reliable communication.
+Using a window-based flow control mechanism that makes use of positive
+acknowledgements, sequence numbers, and a retransmission strategy, TCP can
+usually recover when datagrams are damaged, delayed, duplicated or delivered
+out of order by the underlying medium.
+.Pp
+TCP provides several socket options, defined in
+.In netinet/tcp.h
+and described throughout this document,
+which may be set using
+.Xr setsockopt 3SOCKET
+and read using
+.Xr getsockopt 3SOCKET .
+The
+.Fa level
+argument for these calls is the protocol number for TCP, available from
+.Xr getprotobyname 3SOCKET .
+IP level options may also be used with TCP.
+See
+.Xr ip 7P
+and
+.Xr ip6 7P .
+.Ss "Listening And Connecting"
+TCP uses IP's host-level addressing and adds its own per-host
+collection of
+.Dq port addresses .
+The endpoints of a TCP connection are
+identified by the combination of an IPv4 or IPv6 address and a TCP
+port number.
+Although other protocols, such as the User Datagram Protocol
+.Po Sy UDP Pc ,
+may use the same host and port address format, the port space of these
+protocols is distinct.
+See
+.Xr inet 7P
+and
+.Xr inet6 7P
+for details on
 the common aspects of addressing in the Internet protocol family.
-.sp
-.LP
-Sockets utilizing \fBTCP\fR are either "active" or "passive." Active sockets
-initiate connections to passive sockets. Both types of sockets must have their
-local \fBIP\fR or IPv6 address and \fBTCP\fR port number bound with the
-\fBbind\fR(3SOCKET) system call after the socket is created. By default,
-\fBTCP\fR sockets are active. A passive socket is created by calling the
-\fBlisten\fR(3SOCKET) system call after binding the socket with \fBbind()\fR.
-This establishes a queueing parameter for the passive socket. After this,
-connections to the passive socket can be received with the
-\fBaccept\fR(3SOCKET) system call. Active sockets use the
-\fBconnect\fR(3SOCKET) call after binding to initiate connections.
-.sp
-.LP
-By using the special value \fBINADDR_ANY\fR with \fBIP\fR, or the unspecified
-address (all zeroes) with IPv6, the local \fBIP\fR address can be left
-unspecified in the \fBbind()\fR call by either active or passive \fBTCP\fR
-sockets. This feature is usually used if the local address is either unknown or
-irrelevant. If left unspecified, the local \fBIP\fR or IPv6 address will be
-bound at connection time to the address of the network interface used to
-service the connection.
-.sp
-.LP
+.Pp
+Sockets utilizing TCP are either
+.Dq active
+or
+.Dq passive .
+Active sockets
+initiate connections to passive sockets.
+Passive sockets must have their local IPv4 or IPv6 address and TCP port number
+bound with the
+.Xr bind 3SOCKET
+system call after the socket is created.
+If an active socket has not been bound by the time
+.Xr connect 3SOCKET
+is called, then the operating system will choose a local address and port for
+the application.
+By default, TCP sockets are active.
+A passive socket is created by calling the
+.Xr listen 3SOCKET
+system call after binding, which establishes a queueing parameter for the
+passive socket.
+Connections to the passive socket can then be received using the
+.Xr accept 3SOCKET
+system call.
+Active sockets use the
+.Xr connect 3SOCKET
+call after binding to initiate connections.
+.Pp
+If incoming connection requests include an IP source route option, then the
+reverse source route will be used when responding.
+.Pp
+By using the special value
+.Dv INADDR_ANY
+with IPv4, or the unspecified
+address (all zeroes) with IPv6, the local IP address can be left
+unspecified in the
+.Fn bind
+call by either active or passive TCP
+sockets.
+This feature is usually used if the local address is either unknown or
+irrelevant.
+If left unspecified, the local IP address will be bound at connection time to
+the address of the network interface used to service the connection.
+For passive sockets, this is the destination address used by the connecting
+peer.
+For active sockets, this is usually an address on the same subnet as the
+destination or default gateway address, although the rules can be more complex.
+See
+.Sy "Source Address Selection"
+in
+.Xr inet6 7P
+for a detailed discussion of how this works in IPv6.
+.Pp
 Note that no two TCP sockets can be bound to the same port unless the bound IP
-addresses are different.  IPv4 \fBINADDR_ANY\fR and IPv6 unspecified addresses
-compare as equal to any IPv4 or IPv6 address. For example, if a socket is bound
-to \fBINADDR_ANY\fR or unspecified address and port X, no other socket can bind
-to port X, regardless of the binding address. This special consideration of
-\fBINADDR_ANY\fR and unspecified address can be changed using the socket option
-\fBSO_REUSEADDR\fR. If \fBSO_REUSEADDR\fR is set on a socket doing a bind, IPv4
-\fBINADDR_ANY\fR and IPv6 unspecified address do not compare as equal to any IP
-address. This means that as long as the two sockets are not both bound to
-\fBINADDR_ANY\fR/unspecified address or the same IP address, the two sockets
-can be bound to the same port.
-.sp
-.LP
-If an application does not want to allow another socket  using the
-\fBSO_REUSEADDR\fR option to bind to a port its socket is bound to, the
-application can set the socket level option \fBSO_EXCLBIND\fR on a socket. The
+addresses are different.
+IPv4
+.Dv INADDR_ANY
+and IPv6 unspecified addresses compare as equal to any IPv4 or IPv6 address.
+For example, if a socket is bound to
+.Dv INADDR_ANY
+or the unspecified address and port
+.Em N ,
+no other socket can bind to port
+.Em N ,
+regardless of the binding address.
+This special consideration of
+.Dv INADDR_ANY
+and the unspecified address can be changed using the socket option
+.Dv SO_REUSEADDR .
+If
+.Dv SO_REUSEADDR
+is set on a socket doing a bind, IPv4
+.Dv INADDR_ANY
+and the IPv6 unspecified address do not compare as equal to any IP address.
+This means that as long as the two sockets are not both bound to
+.Dv INADDR_ANY ,
+the unspecified address, or the same IP address, then the two sockets can be
+bound to the same port.
+.Pp
+If an application does not want to allow another socket using the
+.Dv SO_REUSEADDR
+option to bind to a port its socket is bound to, the
+application can set the socket-level
+.Po Dv SOL_SOCKET Pc
+option
+.Dv SO_EXCLBIND
+on a socket.
+The
 option values of 0 and 1 mean enabling and disabling the option respectively.
 Once this option is enabled on a socket, no other socket can be bound to the
 same port.
-.sp
-.LP
+.Ss "Sending And Receiving Data"
 Once a connection has been established, data can be exchanged using the
-\fBread\fR(2) and \fBwrite\fR(2) system calls.
-.sp
-.LP
-Under most circumstances, \fBTCP\fR sends data when it is presented. When
-outstanding data has not yet been acknowledged, \fBTCP\fR gathers small amounts
-of output to be sent in a single packet once an acknowledgement has been
-received. For a small number of clients, such as window systems that send a
-stream of mouse events which receive no replies, this packetization may cause
-significant delays. To circumvent this problem, \fBTCP\fR provides a
-socket-level boolean option, \fBTCP_NODELAY.\fR \fBTCP_NODELAY\fR is defined in
-\fB<netinet/tcp.h>\fR, and is set with \fBsetsockopt\fR(3SOCKET) and tested
-with \fBgetsockopt\fR(3SOCKET). The option level for the \fBsetsockopt()\fR
-call is the protocol number for \fBTCP,\fR available from
-\fBgetprotobyname\fR(3SOCKET).
-.sp
-.LP
-For some applications, it may be desirable for TCP not to send out data unless
-a full TCP segment can be sent. To enable this behavior, an application can use
-the \fBTCP_CORK\fR socket option. When \fBTCP_CORK\fR is set with a non-zero
-value, TCP sends out a full TCP segment only. When \fBTCP_CORK\fR is set to
-zero after it has been enabled, all buffered data is sent out (as permitted by
-the peer's receive window and the current congestion window). \fBTCP_CORK\fR is
-defined in <\fBnetinet/tcp.h\fR>,  and is set with \fBsetsockopt\fR(3SOCKET)
-and tested with \fBgetsockopt\fR(3SOCKET). The option level for the
-\fBsetsockopt()\fR call is the protocol  number  for TCP, available from
-\fBgetprotobyname\fR(3SOCKET).
-.sp
-.LP
-The \fBSO_RCVBUF\fR socket level option can be used to control the window
-that \fBTCP\fR advertises to the peer. \fBIP\fR level options may also be used
-with \fBTCP.\fR See \fBip\fR(7P) and \fBip6\fR(7P).
-.sp
-.LP
-\fBTCP\fR provides an urgent data mechanism, which may be invoked using the
-out-of-band provisions of \fBsend\fR(3SOCKET). The caller may mark one byte as
-"urgent" with the \fBMSG_OOB\fR flag to \fBsend\fR(3SOCKET). This sets an
-"urgent pointer" pointing to this byte in the \fBTCP\fR stream. The receiver on
-the other side of the stream is notified of the urgent data by a \fBSIGURG\fR
-signal. The \fBSIOCATMARK\fR \fBioctl\fR(2) request returns a value indicating
-whether the stream is at the urgent mark. Because the system never returns data
-across the urgent mark in a single \fBread\fR(2) call, it is possible to
+.Xr read 2
+and
+.Xr write 2
+system calls.
+If, after sending data, the local TCP receives no acknowledgements from its
+peer for a period of time (for example, if the remote machine crashes), the
+connection is closed and an error is returned.
+.Pp
+When a peer is sending data, it will only send up to the advertised
+.Dq receive window ,
+which is determined by how much more data the recipient can fit in its buffer.
+Applications can use the socket-level option
+.Dv SO_RCVBUF
+to increase or decrease the receive buffer size.
+Similarly, the socket-level option
+.Dv SO_SNDBUF
+can be used to allow TCP to buffer more unacknowledged and unsent data locally.
+.Pp
+Under most circumstances, TCP will send data when it is written by the
+application.
+When outstanding data has not yet been acknowledged, though, TCP will gather
+small amounts of output to be sent as a single packet once an acknowledgement
+has been received.
+Usually referred to as Nagle's Algorithm (RFC 896), this behavior helps prevent
+flooding the network with many small packets.
+.Pp
+However, for some highly interactive clients (such as remote shells or
+windowing systems that send a stream of keypresses or mouse events), this
+batching may cause significant delays.
+To disable this behavior, TCP provides a boolean socket option,
+.Dv TCP_NODELAY .
+.Pp
+Conversely, for other applications, it may be desirable for TCP not to send out
+any data until a full TCP segment can be sent.
+To enable this behavior, an application can use the TCP-level socket option
+.Dv TCP_CORK .
+When set to a non-zero value, TCP will only send out a full TCP segment.
+When
+.Dv TCP_CORK
+is set to zero after it has been enabled, all currently buffered data is sent
+out (as permitted by the peer's receive window and the current congestion
+window).
+.Pp
+TCP provides an urgent data mechanism, which may be invoked using the
+out-of-band provisions of
+.Xr send 3SOCKET .
+The caller may mark one byte as
+.Dq urgent
+with the
+.Dv MSG_OOB
+flag to
+.Xr send 3SOCKET .
+This sets an
+.Dq urgent pointer
+pointing to this byte in the TCP stream.
+The receiver on the other side of the stream is notified of the urgent data by a
+.Dv SIGURG
+signal.
+The
+.Dv SIOCATMARK
+.Xr ioctl 2
+request returns a value indicating whether the stream is at the urgent mark.
+Because the system never returns data across the urgent mark in a single
+.Xr read 2
+call, it is possible to
 advance to the urgent data in a simple loop which reads data, testing the
-socket with the \fBSIOCATMARK\fR \fBioctl()\fR request, until it reaches the
-mark.
-.sp
-.LP
-Incoming connection requests that include an \fBIP\fR source route option are
-noted, and the reverse source route is used in responding.
-.sp
-.LP
-A checksum over all data helps \fBTCP\fR implement reliability. Using a
-window-based flow control mechanism that makes use of positive
-acknowledgements, sequence numbers, and a retransmission strategy, \fBTCP\fR
-can usually recover when datagrams are damaged, delayed, duplicated or
-delivered out of order by the underlying communication medium.
-.sp
-.LP
-If the local \fBTCP\fR receives no acknowledgements from its peer for a period
-of time, (for example, if the remote machine crashes), the connection is closed
-and an error is returned.
-.sp
-.LP
-TCP follows the congestion control algorithm described in \fIRFC 2581\fR, and
-also supports the initial congestion window (cwnd) changes in \fIRFC 3390\fR.
+socket with the
+.Dv SIOCATMARK
+.Fn ioctl
+request, until it reaches the mark.
+.Ss "Congestion Control"
+TCP follows the congestion control algorithm described in RFC 2581, and
+also supports the initial congestion window (cwnd) changes in RFC 3390.
 The initial cwnd calculation can be overridden by the socket option
-TCP_INIT_CWND. An application can use this option to set the initial cwnd to a
-specified number of TCP segments. This applies to the cases when the connection
-first starts and restarts after an idle period.  The process must have the
-PRIV_SYS_NET_CONFIG privilege if it wants to specify a number greater than that
-calculated by \fIRFC 3390\fR.
-.sp
-.LP
-illumos supports \fBTCP\fR Extensions for High Performance (\fIRFC 7323\fR)
+.Dv TCP_INIT_CWND .
+An application can use this option to set the initial cwnd to a
+specified number of TCP segments.
+This applies to the cases when the connection
+first starts and restarts after an idle period.
+The process must have the
+.Dv PRIV_SYS_NET_CONFIG
+privilege if it wants to specify a number greater than that
+calculated by RFC 3390.
+.Ss "TCP Keep-Alive"
+Since TCP determines whether a remote peer is no longer reachable by timing out
+waiting for acknowledgements, a host that never sends any new data may never
+notice a peer that has gone away.
+While consumers can avoid this problem by sending their own periodic heartbeat
+messages (Transport Layer Security does this, for example),
+TCP describes an optional keep-alive mechanism in RFC 1122.
+Applications can enable it using the socket-level option
+.Dv SO_KEEPALIVE .
+When enabled, the first keep-alive probe is sent out after a TCP connection is
+idle for two hours.
+If the peer does not respond to the probe within eight minutes, the TCP
+connection is aborted.
+An application can alter the probe behavior using the following TCP-level
+socket options:
+.Bl -tag -offset indent -width 16m
+.It Dv TCP_KEEPALIVE_THRESHOLD
+Determines the interval for sending the first probe.
+The option value is specified as an unsigned integer in milliseconds.
+The system default is controlled by the TCP
+.Nm ndd
+parameter
+.Cm tcp_keepalive_interval .
+The minimum value is ten seconds.
+The maximum is ten days, while the default is two hours.
+.It Dv TCP_KEEPALIVE_ABORT_THRESHOLD
+If TCP does not receive a response to the probe, then this option determines
+how long to wait before aborting a TCP connection.
+The option value is an unsigned integer in milliseconds.
+The value zero indicates that TCP should never time
+out and abort the connection when probing.
+The system default is controlled by the TCP
+.Nm ndd
+parameter
+.Sy tcp_keepalive_abort_interval .
+The default is eight minutes.
+.It Dv TCP_KEEPIDLE
+This option, like
+.Dv TCP_KEEPALIVE_THRESHOLD ,
+determines the interval for sending the first probe, except that
+the option value is an unsigned integer in
+.Sy seconds .
+It is provided primarily for compatibility with other Unix flavors.
+.It Dv TCP_KEEPCNT
+This option specifies the number of keep-alive probes that should be sent
+without any response from the peer before aborting the connection.
+.It Dv TCP_KEEPINTVL
+This option specifies the interval in seconds between successive,
+unacknowledged keep-alive probes.
+.El
+.Ss "Additional Configuration"
+illumos supports TCP Extensions for High Performance (RFC 7323)
 which includes the window scale and timestamp options, and Protection Against
-Wrap Around Sequence Numbers (PAWS). Note that if timestamps are negotiated on
+Wrap Around Sequence Numbers
+.Po Sy PAWS Pc .
+Note that if timestamps are negotiated on
 a connection, received segments without timestamps on that connection are
 silently dropped per the suggestion in the RFC. illumos also supports Selective
-Acknowledgment (SACK) capabilities (RFC 2018) and Explicit Congestion
-Notification (ECN) mechanism (\fIRFC 3168\fR).
-.sp
-.LP
+Acknowledgment
+.Po Sy SACK Pc
+capabilities (RFC 2018) and Explicit Congestion
+Notification
+.Po Sy ECN Pc
+mechanism (RFC 3168).
+.Pp
 Turn on the window scale option in one of the following ways:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-An application can set \fBSO_SNDBUF\fR or \fBSO_RCVBUF\fR size in the
-\fBsetsockopt()\fR option to be larger than 64K. This must be done \fIbefore\fR
-the program calls \fBlisten()\fR or \fBconnect()\fR, because the window scale
-option is negotiated when the connection is established. Once the connection
+.Bl -bullet -offset indent -width 4m
+.It
+An application can set
+.Dv SO_SNDBUF
+or
+.Dv SO_RCVBUF
+size in the
+.Fn setsockopt
+option to be larger than 64K.
+This must be done
+.Em before
+the program calls
+.Fn listen
+or
+.Fn connect ,
+because the window scale
+option is negotiated when the connection is established.
+Once the connection
 has been made, it is too late to increase the send or receive window beyond the
-default \fBTCP\fR limit of 64K.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-For all applications, use \fBndd\fR(1M) to modify the configuration parameter
-\fBtcp_wscale_always\fR. If \fBtcp_wscale_always\fR is set to \fB1\fR, the
-window scale option will always be set when connecting to a remote system. If
-\fBtcp_wscale_always\fR is \fB0,\fR the window scale option will be set only if
-the user has requested a send or receive window larger than 64K. The default
-value of \fBtcp_wscale_always\fR is \fB1\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Regardless of the value of \fBtcp_wscale_always\fR, the window scale option
+default TCP limit of 64K.
+.It
+For all applications, use
+.Xr ndd 1M
+to modify the configuration parameter
+.Cm tcp_wscale_always .
+If
+.Cm tcp_wscale_always
+is set to
+.Sy 1 ,
+the
+window scale option will always be set when connecting to a remote system.
+If
+.Cm tcp_wscale_always
+is
+.Sy 0 ,
+the window scale option will be set only if
+the user has requested a send or receive window larger than 64K.
+The default value of
+.Cm tcp_wscale_always
+is
+.Sy 1 .
+.It
+Regardless of the value of
+.Cm tcp_wscale_always ,
+the window scale option
 will always be included in a connect acknowledgement if the connecting system
 has used the option.
-.RE
-.sp
-.LP
-Turn on \fBSACK\fR capabilities in the following way:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Use \fBndd\fR to modify the configuration parameter \fBtcp_sack_permitted\fR.
-If \fBtcp_sack_permitted\fR is set to \fB0\fR, \fBTCP\fR will not accept
-\fBSACK\fR or send out \fBSACK\fR information. If \fBtcp_sack_permitted\fR is
-set to \fB1\fR, \fBTCP\fR will not initiate a connection with \fBSACK\fR
-permitted option in the \fBSYN\fR segment, but will respond with \fBSACK\fR
-permitted option in the \fBSYN|ACK\fR segment if an incoming connection request
-has the \fBSACK \fR permitted option. This means that \fBTCP\fR will only
-accept \fBSACK\fR information if the other side of the connection also accepts
-\fBSACK\fR information. If \fBtcp_sack_permitted\fR is set to \fB2\fR, it will
-both initiate and accept connections with \fBSACK\fR information. The default
-for \fBtcp_sack_permitted\fR is \fB2\fR (active enabled).
-.RE
-.sp
-.LP
-Turn on \fBTCP ECN\fR mechanism in the following way:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Use \fBndd\fR to modify the configuration parameter \fBtcp_ecn_permitted\fR. If
-\fBtcp_ecn_permitted\fR is set to \fB0\fR, \fBTCP\fR will not negotiate with a
-peer that supports \fBECN\fR mechanism. If \fBtcp_ecn_permitted\fR is set to
-\fB1\fR when initiating a connection, TCP will not tell a peer that it supports
-ECN mechanism. However, it will tell a peer that it supports \fBECN\fR
+.El
+.Pp
+Turn on SACK capabilities in the following way:
+.Bl -bullet -offset indent -width 4m
+.It
+Use
+.Nm ndd
+to modify the configuration parameter
+.Cm tcp_sack_permitted .
+If
+.Cm tcp_sack_permitted
+is set to
+.Sy 0 ,
+TCP will not accept SACK or send out SACK information.
+If
+.Cm tcp_sack_permitted
+is
+set to
+.Sy 1 ,
+TCP will not initiate a connection with SACK permitted option in the
+.Sy SYN
+segment, but will respond with SACK permitted option in the
+.Sy SYN|ACK
+segment if an incoming connection request has the SACK permitted option.
+This means that TCP will only accept SACK information if the other side of the
+connection also accepts SACK information.
+If
+.Cm tcp_sack_permitted
+is set to
+.Sy 2 ,
+it will both initiate and accept connections with SACK information.
+The default for
+.Cm tcp_sack_permitted
+is
+.Sy 2
+.Pq active enabled .
+.El
+.Pp
+Turn on the TCP ECN mechanism in the following way:
+.Bl -bullet -offset indent -width 4m
+.It
+Use
+.Nm ndd
+to modify the configuration parameter
+.Cm tcp_ecn_permitted .
+If
+.Cm tcp_ecn_permitted
+is set to
+.Sy 0 ,
+then TCP will not negotiate with a peer that supports ECN mechanism.
+If
+.Cm tcp_ecn_permitted
+is set to
+.Sy 1
+when initiating a connection, TCP will not tell a peer that it supports
+.Sy ECN
+mechanism.
+However, it will tell a peer that it supports
+.Sy ECN
 mechanism when accepting a new incoming connection request if the peer
-indicates that it supports \fBECN\fR mechanism in the SYN segment. If
-tcp_ecn_permitted is set to 2, in addition to negotiating with a peer on ECN
-mechanism when accepting connections, TCP will indicate in the outgoing SYN
-segment that it supports \fBECN\fR mechanism when \fBTCP\fR makes active
-outgoing connections. The default for \fBtcp_ecn_permitted\fR is 1.
-.RE
-.sp
-.LP
+indicates that it supports
+.Sy ECN
+mechanism in the
+.Sy SYN
+segment.
+If
+.Cm tcp_ecn_permitted
+is set to 2, in addition to negotiating with a peer on
+.Sy ECN
+mechanism when accepting connections, TCP will indicate in the outgoing
+.Sy SYN
+segment that it supports
+.Sy ECN
+mechanism when TCP makes active outgoing connections.
+The default for
+.Cm tcp_ecn_permitted
+is 1.
+.El
+.Pp
 Turn on the timestamp option in the following way:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Use \fBndd\fR to modify the configuration parameter \fBtcp_tstamp_always\fR. If
-\fBtcp_tstamp_always\fR is \fB1\fR, the timestamp option will always be set
-when connecting to a remote machine. If \fBtcp_tstamp_always\fR is \fB0\fR, the
-timestamp option will not be set when connecting to a remote system. The
-default for \fBtcp_tstamp_always\fR is \fB0\fR.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Regardless of the value of \fBtcp_tstamp_always\fR, the timestamp option will
+.Bl -bullet -offset indent -width 4m
+.It
+Use
+.Nm ndd
+to modify the configuration parameter
+.Cm tcp_tstamp_always .
+If
+.Cm tcp_tstamp_always
+is
+.Sy 1 ,
+the timestamp option will always be set
+when connecting to a remote machine.
+If
+.Cm tcp_tstamp_always
+is
+.Sy 0 ,
+the timestamp option will not be set when connecting to a remote system.
+The
+default for
+.Cm tcp_tstamp_always
+is
+.Sy 0 .
+.It
+Regardless of the value of
+.Cm tcp_tstamp_always ,
+the timestamp option will
 always be included in a connect acknowledgement (and all succeeding packets) if
 the connecting system has used the timestamp option.
-.RE
-.sp
-.LP
+.El
+.Pp
 Use the following procedure to turn on the timestamp option only when the
 window scale option is in effect:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-Use \fBndd\fR to modify the configuration parameter \fBtcp_tstamp_if_wscale\fR.
-Setting \fBtcp_tstamp_if_wscale\fR to \fB1\fR will cause the timestamp option
+.Bl -bullet -offset indent -width 4m
+.It
+Use
+.Nm ndd
+to modify the configuration parameter
+.Cm tcp_tstamp_if_wscale .
+Setting
+.Cm tcp_tstamp_if_wscale
+to
+.Sy 1
+will cause the timestamp option
 to be set when connecting to a remote system, if the window scale option has
-been set. If \fBtcp_tstamp_if_wscale\fR is \fB0\fR, the timestamp option will
-not be set when connecting to a remote system. The default for
-\fBtcp_tstamp_if_wscale\fR is \fB1\fR.
-.RE
-.sp
-.LP
-Protection Against Wrap Around Sequence Numbers (PAWS) is always used when the
+been set.
+If
+.Cm tcp_tstamp_if_wscale
+is
+.Sy 0 ,
+the timestamp option will
+not be set when connecting to a remote system.
+The default for
+.Cm tcp_tstamp_if_wscale
+is
+.Sy 1 .
+.El
+.Pp
+Protection Against Wrap Around Sequence Numbers
+.Po Sy PAWS Pc
+is always used when the
 timestamp option is set.
-.sp
-.LP
-SunOS also supports multiple methods of generating initial sequence numbers.
-One of these methods is the improved technique suggested in \fBRFC\fR 1948. We
-\fBHIGHLY\fR recommend that you set sequence number generation parameters as
-close to boot time as possible. This prevents sequence number problems on
+.Pp
+The operating system also supports multiple methods of generating initial sequence numbers.
+One of these methods is the improved technique suggested in RFC 1948.
+We
+.Em HIGHLY
+recommend that you set sequence number generation parameters as
+close to boot time as possible.
+This prevents sequence number problems on
 connections that use the same connection-ID as ones that used a different
-sequence number generation. The \fBsvc:/network/initial:default\fR service
-configures the initial sequence number generation.  The service reads the value
-contained in the configuration file \fB/etc/default/inetinit\fR to determine
-which method to use.
-.sp
-.LP
-The \fB/etc/default/inetinit\fR file is an unstable interface, and may change
-in future releases.
-.sp
-.LP
-\fBTCP\fR may be configured to report some information on connections that
-terminate by means of an \fBRST\fR packet. By default, no logging is done. If
-the \fBndd\fR(1M) parameter \fItcp_trace\fR is set to 1, then trace data is
-collected for all new connections established after that time.
-.sp
-.LP
-The trace data consists of the \fBTCP\fR headers and \fBIP\fR source and
-destination addresses of the last few packets sent in each direction before RST
-occurred. Those packets are logged in a series of \fBstrlog\fR(9F) calls. This
-trace facility has a very low overhead, and so is superior to such utilities as
-\fBsnoop\fR(1M) for non-intrusive debugging for connections terminating by
-means of an \fBRST\fR.
-.sp
-.LP
-SunOS supports the keep-alive mechanism described in \fIRFC 1122\fR. It is
-enabled using the socket option SO_KEEPALIVE. When enabled, the first
-keep-alive probe is sent out after a TCP is idle for two hours If the peer does
-not respond to the probe within eight minutes, the TCP connection is aborted.
-You can alter the interval for sending out the first probe using the socket
-option TCP_KEEPALIVE_THRESHOLD. The option value is an unsigned integer in
-milliseconds. The system default is controlled by the TCP ndd parameter
-tcp_keepalive_interval. The minimum value is ten seconds. The maximum is ten
-days, while the default is two hours. If you receive no response to the probe,
-you can use the TCP_KEEPALIVE_ABORT_THRESHOLD socket option to change the time
-threshold for aborting a TCP connection. The option value is an unsigned
-integer in milliseconds. The value zero indicates that TCP should never time
-out and abort the connection when probing. The system default is controlled by
-the TCP ndd parameter tcp_keepalive_abort_interval. The default is eight
-minutes.
-.sp
-.LP
-socket options TCP_KEEPIDLE, TCP_KEEPCNT and TCP_KEEPINTVL are also supported
-for compatibility with other Unix Flavors. TCP_KEEPIDLE option specifies the
-interval in seconds for sending out the first keep-alive probe. TCP_KEEPCNT
-specifies the number of keep-alive probes to be sent before aborting the
-connection in the event of no response from peer. TCP_KEEPINTVL specifies the
-interval in seconds between successive keep-alive probes.
-.SH SEE ALSO
-.LP
-\fBsvcs\fR(1), \fBndd\fR(1M), \fBioctl\fR(2), \fBread\fR(2), \fBsvcadm\fR(1M),
-\fBwrite\fR(2), \fBaccept\fR(3SOCKET), \fBbind\fR(3SOCKET),
-\fBconnect\fR(3SOCKET), \fBgetprotobyname\fR(3SOCKET),
-\fBgetsockopt\fR(3SOCKET), \fBlisten\fR(3SOCKET), \fBsend\fR(3SOCKET),
-\fBsmf\fR(5), \fBinet\fR(7P), \fBinet6\fR(7P), \fBip\fR(7P), \fBip6\fR(7P)
-.sp
-.LP
-Ramakrishnan, K., Floyd, S., Black, D., RFC 3168, \fIThe Addition of Explicit
-Congestion Notification (ECN) to IP\fR, September 2001.
-.sp
-.LP
-Mathias, M. and Hahdavi, J. Pittsburgh Supercomputing Center; Ford, S. Lawrence
-Berkeley National Laboratory; Romanow, A. Sun Microsystems, Inc. \fIRFC 2018,
-TCP Selective Acknowledgement Options\fR, October 1996.
-.sp
-.LP
-Bellovin, S., \fIRFC 1948, Defending Against Sequence Number Attacks\fR, May
-1996.
-.sp
-.LP
-D. Borman, B. Braden, V. Jacobson and R. Scheffenegger, Ed., \fIRFC 7323, TCP
-Extensions for High Performance\fR, September 2014.
-.sp
-.LP
-Postel, Jon, \fIRFC 793, Transmission Control Protocol - DARPA Internet Program
-Protocol Specification\fR, Network Information Center, SRI International, Menlo
-Park, CA., September 1981.
-.SH DIAGNOSTICS
-.LP
+sequence number generation.
+The
+.Sy svc:/network/initial:default
+service configures the initial sequence number generation.
+The service reads the value contained in the configuration file
+.Pa /etc/default/inetinit
+to determine which method to use.
+.Pp
+The
+.Pa /etc/default/inetinit
+file is an unstable interface, and may change in future releases.
+.Sh EXAMPLES
+.Ss Example 1: Connecting to a server
+.Bd -literal
+$ gcc -std=c99 -Wall -lsocket -o client client.c
+$ cat client.c
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+int
+main(int argc, char *argv[])
+{
+	struct addrinfo hints, *gair, *p;
+	int fd, rv, rlen;
+	char buf[1024];
+	int y = 1;
+
+	if (argc != 3) {
+		fprintf(stderr, "%s <host> <port>\\n", argv[0]);
+		return (1);
+	}
+
+	memset(&hints, 0, sizeof (hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if ((rv = getaddrinfo(argv[1], argv[2], &hints, &gair)) != 0) {
+		fprintf(stderr, "getaddrinfo() failed: %s\\n",
+		    gai_strerror(rv));
+		return (1);
+	}
+
+	for (p = gair; p != NULL; p = p->ai_next) {
+		if ((fd = socket(
+		    p->ai_family,
+		    p->ai_socktype,
+		    p->ai_protocol)) == -1) {
+			perror("socket() failed");
+			continue;
+		}
+
+		if (connect(fd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(fd);
+			perror("connect() failed");
+			continue;
+		}
+
+		break;
+	}
+
+	if (p == NULL) {
+		fprintf(stderr, "failed to connect to server\\n");
+		return (1);
+	}
+
+	freeaddrinfo(gair);
+
+	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &y,
+	    sizeof (y)) == -1) {
+		perror("setsockopt(SO_KEEPALIVE) failed");
+		return (1);
+	}
+
+	while ((rlen = read(fd, buf, sizeof (buf))) > 0) {
+		fwrite(buf, rlen, 1, stdout);
+	}
+
+	if (rlen == -1) {
+		perror("read() failed");
+	}
+
+	fflush(stdout);
+
+	if (close(fd) == -1) {
+		perror("close() failed");
+	}
+
+	return (0);
+}
+$ ./client 127.0.0.1 8080
+hello
+$ ./client ::1 8080
+hello
+.Ed
+.Ss Example 2: Accepting client connections
+.Bd -literal
+$ gcc -std=c99 -Wall -lsocket -o server server.c
+$ cat server.c
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+void
+logmsg(struct sockaddr *s, int bytes)
+{
+	char dq[INET6_ADDRSTRLEN];
+
+	switch (s->sa_family) {
+	case AF_INET: {
+		struct sockaddr_in *s4 = (struct sockaddr_in *)s;
+		inet_ntop(AF_INET, &s4->sin_addr, dq, sizeof (dq));
+		fprintf(stdout, "sent %d bytes to %s:%d\\n",
+		    bytes, dq, ntohs(s4->sin_port));
+		break;
+	}
+	case AF_INET6: {
+		struct sockaddr_in6 *s6 = (struct sockaddr_in6 *)s;
+		inet_ntop(AF_INET6, &s6->sin6_addr, dq, sizeof (dq));
+		fprintf(stdout, "sent %d bytes to [%s]:%d\\n",
+		    bytes, dq, ntohs(s6->sin6_port));
+		break;
+	}
+	default:
+		fprintf(stdout, "sent %d bytes to unknown client\\n",
+		    bytes);
+		break;
+	}
+}
+
+int
+main(int argc, char *argv[])
+{
+	struct addrinfo hints, *gair, *p;
+	int sfd, cfd;
+	int slen, wlen, rv;
+
+	if (argc != 3) {
+		fprintf(stderr, "%s <port> <message>\\n", argv[0]);
+		return (1);
+	}
+
+	slen = strlen(argv[2]);
+
+	memset(&hints, 0, sizeof (hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+
+	if ((rv = getaddrinfo(NULL, argv[1], &hints, &gair)) != 0) {
+		fprintf(stderr, "getaddrinfo() failed: %s\\n",
+		    gai_strerror(rv));
+		return (1);
+	}
+
+	for (p = gair; p != NULL; p = p->ai_next) {
+		if ((sfd = socket(
+		    p->ai_family,
+		    p->ai_socktype,
+		    p->ai_protocol)) == -1) {
+			perror("socket() failed");
+			continue;
+		}
+
+		if (bind(sfd, p->ai_addr, p->ai_addrlen) == -1) {
+			close(sfd);
+			perror("bind() failed");
+			continue;
+		}
+
+		break;
+	}
+
+	if (p == NULL) {
+		fprintf(stderr, "server failed to bind()\\n");
+		return (1);
+	}
+
+	freeaddrinfo(gair);
+
+	if (listen(sfd, 1024) != 0) {
+		perror("listen() failed");
+		return (1);
+	}
+
+	fprintf(stdout, "waiting for clients...\\n");
+
+	for (int times = 0; times < 5; times++) {
+		struct sockaddr_storage stor;
+		socklen_t alen = sizeof (stor);
+		struct sockaddr *addr = (struct sockaddr *)&stor;
+
+		if ((cfd = accept(sfd, addr, &alen)) == -1) {
+			perror("accept() failed");
+			continue;
+		}
+
+		wlen = 0;
+
+		do {
+			wlen += write(cfd, argv[2] + wlen, slen - wlen);
+		} while (wlen < slen);
+
+		logmsg(addr, wlen);
+
+		if (close(cfd) == -1) {
+			perror("close(cfd) failed");
+		}
+	}
+
+	if (close(sfd) == -1) {
+		perror("close(sfd) failed");
+	}
+
+	fprintf(stdout, "finished.\\n");
+
+	return (0);
+}
+$ ./server 8080 $'hello\\n'
+waiting for clients...
+sent 6 bytes to [::ffff:127.0.0.1]:59059
+sent 6 bytes to [::ffff:127.0.0.1]:47448
+sent 6 bytes to [::ffff:127.0.0.1]:54949
+sent 6 bytes to [::ffff:127.0.0.1]:55186
+sent 6 bytes to [::1]:62256
+finished.
+.Ed
+.Sh DIAGNOSTICS
 A socket operation may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEISCONN\fR\fR
-.ad
-.RS 17n
-A \fBconnect()\fR operation was attempted on a socket on which a
-\fBconnect()\fR operation had already been performed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBETIMEDOUT\fR\fR
-.ad
-.RS 17n
+.Bl -tag -offset indent -width 16m
+.It Er EISCONN
+A
+.Fn connect
+operation was attempted on a socket on which a
+.Fn connect
+operation had already been performed.
+.It Er ETIMEDOUT
 A connection was dropped due to excessive retransmissions.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECONNRESET\fR\fR
-.ad
-.RS 17n
+.It Er ECONNRESET
 The remote peer forced the connection to be closed (usually because the remote
 machine has lost state information about the connection due to a crash).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBECONNREFUSED\fR\fR
-.ad
-.RS 17n
+.It Er ECONNREFUSED
 The remote peer actively refused connection establishment (usually because no
 process is listening to the port).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEADDRINUSE\fR\fR
-.ad
-.RS 17n
-A \fBbind()\fR operation was attempted on a socket with a network address/port
-pair that has already been bound to another socket.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEADDRNOTAVAIL\fR\fR
-.ad
-.RS 17n
-A \fBbind()\fR operation was attempted on a socket with a network address for
-which no network interface exists.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEACCES\fR\fR
-.ad
-.RS 17n
-A \fBbind()\fR operation was attempted with a "reserved" port number and the
-effective user \fBID\fR of the process was not the privileged user.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOBUFS\fR\fR
-.ad
-.RS 17n
+.It Er EADDRINUSE
+A
+.Fn bind
+operation was attempted on a socket with a network address/port pair that has
+already been bound to another socket.
+.It Er EADDRNOTAVAIL
+A
+.Fn bind
+operation was attempted on a socket with a network address for which no network
+interface exists.
+.It Er EACCES
+A
+.Fn bind
+operation was attempted with a
+.Dq reserved
+port number and the effective user ID of the process was not the privileged user.
+.It Er ENOBUFS
 The system ran out of memory for internal data structures.
-.RE
-
-.SH NOTES
-.LP
-The \fBtcp\fR service is managed by the service management facility,
-\fBsmf\fR(5), under the service identifier:
-.sp
-.in +2
-.nf
-svc:/network/initial:default
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.El
+.Sh SEE ALSO
+.Xr svcs 1 ,
+.Xr ndd 1M ,
+.Xr svcadm 1M ,
+.Xr ioctl 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr accept 3SOCKET ,
+.Xr bind 3SOCKET ,
+.Xr connect 3SOCKET ,
+.Xr getprotobyname 3SOCKET ,
+.Xr getsockopt 3SOCKET ,
+.Xr listen 3SOCKET ,
+.Xr send 3SOCKET ,
+.Xr smf 5 ,
+.Xr inet 7P ,
+.Xr inet6 7P ,
+.Xr ip 7P ,
+.Xr ip6 7P
+.Rs
+.%A "K. Ramakrishnan"
+.%A "S. Floyd"
+.%A "D. Black"
+.%T "The Addition of Explicit Congestion Notification (ECN) to IP"
+.%R "RFC 3168"
+.%D "September 2001"
+.Re
+.Rs
+.%A "M. Mathias"
+.%A "J. Mahdavi"
+.%A "S. Ford"
+.%A "A. Romanow"
+.%T "TCP Selective Acknowledgement Options"
+.%R "RFC 2018"
+.%D "October 1996"
+.Re
+.Rs
+.%A "S. Bellovin"
+.%T "Defending Against Sequence Number Attacks"
+.%R "RFC 1948"
+.%D "May 1996"
+.Re
+.Rs
+.%A "D. Borman"
+.%A "B. Braden"
+.%A "V. Jacobson"
+.%A "R. Scheffenegger, Ed."
+.%T "TCP Extensions for High Performance"
+.%R "RFC 7323"
+.%D "September 2014"
+.Re
+.Rs
+.%A "Jon Postel"
+.%T "Transmission Control Protocol - DARPA Internet Program Protocol Specification"
+.%R "RFC 793"
+.%C "Network Information Center, SRI International, Menlo Park, CA."
+.%D "September 1981"
+.Re
+.Sh NOTES
+The
+.Sy tcp
+service is managed by the service management facility,
+.Xr smf 5 ,
+under the service identifier
+.Sy svc:/network/initial:default .
+.Pp
 Administrative actions on this service, such as enabling, disabling, or
-requesting restart, can be performed using \fBsvcadm\fR(1M). The service's
-status can be queried using the \fBsvcs\fR(1) command.
+requesting restart, can be performed using
+.Xr svcadm 1M .
+The service's
+status can be queried using the
+.Xr svcs 1
+command.
