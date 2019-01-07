@@ -19,9 +19,6 @@
  *
  * CDDL HEADER END
  */
-#ifndef lint
-#ident	"%Z%%M%	%I%	%E% SMI"
-#endif
 
 /*
  * Copyright (c) 1988 by Sun Microsystems, Inc.
@@ -66,9 +63,7 @@ static void	printchar(int character, int delim);
 
 /*ARGSUSED*/
 int
-main(argc, argv)
-	int argc;
-	char **argv;
+main(int argc, char **argv)
 {
 	register int kbdfd;
 	register int keystation;
@@ -242,6 +237,9 @@ static char *funnies[] = {
 	"nop",
 	"oops",
 	"hole",
+	"",			/* not used */
+	"",			/* not used */
+	"",			/* not used */
 	"reset",
 	"error",
 	"idle",
@@ -258,6 +256,15 @@ static char *fa_class[] = {
 	"fa_cedilla",
 	"fa_acute",
 	"fa_grave",
+	"fa_macron",
+	"fa_breve",
+	"fa_dot",
+	"fa_slash",
+	"fa_ring",
+	"fa_apostrophe",
+	"fa_dacute",
+	"fa_ogonek",
+	"fa_caron"
 };
 
 #define	NFA_CLASS	(sizeof (fa_class) / sizeof (fa_class[0]))
@@ -311,15 +318,14 @@ static char	*padkeys[] = {
 #define	NPADKEYS	(sizeof (padkeys) / sizeof (padkeys[0]))
 
 static void
-printentry(kio)
-	register struct kiockeymap *kio;
+printentry(struct kiockeymap *kio)
 {
-	register int entry = (kio->kio_entry & 0x1F);
-	register int fkeyset;
-	register int i;
-	register int c;
+	int entry = (kio->kio_entry & 0x1F);
+	int fkeyset;
+	int i;
+	int c;
 
-	switch (kio->kio_entry >> 8) {
+	switch (KEYFLAGS(kio->kio_entry)) {
 
 	case 0x0:
 		if (kio->kio_entry == '"')
@@ -330,37 +336,37 @@ printentry(kio)
 			printchar((int)kio->kio_entry, '\'');
 		break;
 
-	case SHIFTKEYS >> 8:
+	case SHIFTKEYS:
 		if (entry < NSHIFTKEYS)
 			(void) printf("shiftkeys+%s", shiftkeys[entry]);
 		else
 			(void) printf("%#4x", kio->kio_entry);
 		break;
 
-	case BUCKYBITS >> 8:
+	case BUCKYBITS:
 		if (entry < NBUCKYBITS)
 			(void) printf("buckybits+%s", buckybits[entry]);
 		else
 			(void) printf("%#4x", kio->kio_entry);
 		break;
 
-	case FUNNY >> 8:
+	case FUNNY:
 		if (entry < NFUNNIES)
 			(void) printf("%s", funnies[entry]);
 		else
 			(void) printf("%#4x", kio->kio_entry);
 		break;
 
-	case FA_CLASS >> 8:
+	case FA_CLASS:
 		if (entry < NFA_CLASS)
 			(void) printf("%s", fa_class[entry]);
 		else
 			(void) printf("%#4x", kio->kio_entry);
 		break;
 
-	case STRING >> 8:
+	case STRING:
 		if (entry < NBUILTIN_STRINGS && strncmp(kio->kio_string,
-			builtin_strings[entry].string, KTAB_STRLEN) == 0)
+		    builtin_strings[entry].string, KTAB_STRLEN) == 0)
 			(void) printf("string+%s", builtin_strings[entry].name);
 		else {
 			(void) printf("\"");
@@ -372,16 +378,16 @@ printentry(kio)
 		}
 		break;
 
-	case FUNCKEYS >> 8:
+	case FUNCKEYS:
 		fkeyset = (int)(kio->kio_entry & 0xF0) >> 4;
 		if (fkeyset < NFKEYSETS)
 			(void) printf("%s(%d)", fkeysets[fkeyset],
-					(entry&0x0F) + 1);
+			    (entry & 0x0F) + 1);
 		else
 			(void) printf("%#4x", kio->kio_entry);
 		break;
 
-	case PADKEYS >> 8:
+	case PADKEYS:
 		if (entry < NPADKEYS)
 			(void) printf("%s", padkeys[entry]);
 		else
@@ -395,9 +401,7 @@ printentry(kio)
 }
 
 static void
-printchar(character, delim)
-	int character;
-	int delim;
+printchar(int character, int delim)
 {
 	switch (character) {
 
@@ -433,8 +437,10 @@ printchar(character, delim)
 		} else {
 			if (character < 040)
 				(void) printf("^%c", character + 0100);
-			else
+			else if (character <= 0xff)
 				(void) printf("'\\%.3o'", character);
+			else
+				(void) printf("%#4x", character);
 		}
 		break;
 	}

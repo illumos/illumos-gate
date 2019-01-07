@@ -21,8 +21,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Turkey F Type 6 (USB) key layout
 #
 key  49  base '\\' shift | caps '\\' ctrl ^\ altg nop

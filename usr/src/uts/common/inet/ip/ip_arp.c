@@ -59,8 +59,8 @@ typedef struct arp_m_s {
 } arp_m_t;
 
 static int arp_close(queue_t *, int, cred_t *);
-static void arp_rput(queue_t *, mblk_t *);
-static void arp_wput(queue_t *, mblk_t *);
+static int arp_rput(queue_t *, mblk_t *);
+static int arp_wput(queue_t *, mblk_t *);
 static arp_m_t	*arp_m_lookup(t_uscalar_t mac_type);
 static void arp_notify(ipaddr_t, mblk_t *, uint32_t, ip_recv_attr_t *,
 	ncec_t *);
@@ -101,11 +101,10 @@ struct module_info arp_mod_info = {
 	IP_MOD_ID, "arp", 1, INFPSZ, 65536, 1024
 };
 static struct qinit rinit_arp = {
-	(pfi_t)arp_rput, NULL, arp_open, arp_close, NULL, &arp_mod_info
+	arp_rput, NULL, arp_open, arp_close, NULL, &arp_mod_info
 };
 static struct qinit winit_arp = {
-	(pfi_t)arp_wput, NULL, arp_open, arp_close, NULL,
-	&arp_mod_info
+	arp_wput, NULL, arp_open, arp_close, NULL, &arp_mod_info
 };
 struct streamtab arpinfo = {
 	&rinit_arp, &winit_arp
@@ -118,52 +117,52 @@ struct streamtab arpinfo = {
  */
 #define	ARP_HOOK_IN(_hook, _event, _ilp, _hdr, _fm, _m, ipst)		\
 									\
-	if ((_hook).he_interested) {                       		\
-		hook_pkt_event_t info;                          	\
+	if ((_hook).he_interested) {					\
+		hook_pkt_event_t info;					\
 									\
 		info.hpe_protocol = ipst->ips_arp_net_data;		\
-		info.hpe_ifp = _ilp;                       		\
-		info.hpe_ofp = 0;                       		\
-		info.hpe_hdr = _hdr;                            	\
-		info.hpe_mp = &(_fm);                           	\
-		info.hpe_mb = _m;                               	\
+		info.hpe_ifp = _ilp;					\
+		info.hpe_ofp = 0;					\
+		info.hpe_hdr = _hdr;					\
+		info.hpe_mp = &(_fm);					\
+		info.hpe_mb = _m;					\
 		if (hook_run(ipst->ips_arp_net_data->netd_hooks,	\
 		    _event, (hook_data_t)&info) != 0) {			\
-			if (_fm != NULL) {                      	\
-				freemsg(_fm);                   	\
-				_fm = NULL;                     	\
-			}                                       	\
-			_hdr = NULL;                            	\
-			_m = NULL;                              	\
-		} else {                                        	\
-			_hdr = info.hpe_hdr;                    	\
-			_m = info.hpe_mb;                       	\
-		}                                               	\
+			if (_fm != NULL) {				\
+				freemsg(_fm);				\
+				_fm = NULL;				\
+			}						\
+			_hdr = NULL;					\
+			_m = NULL;					\
+		} else {						\
+			_hdr = info.hpe_hdr;				\
+			_m = info.hpe_mb;				\
+		}							\
 	}
 
 #define	ARP_HOOK_OUT(_hook, _event, _olp, _hdr, _fm, _m, ipst)		\
 									\
-	if ((_hook).he_interested) {                       		\
-		hook_pkt_event_t info;                          	\
+	if ((_hook).he_interested) {					\
+		hook_pkt_event_t info;					\
 									\
 		info.hpe_protocol = ipst->ips_arp_net_data;		\
-		info.hpe_ifp = 0;                       		\
-		info.hpe_ofp = _olp;                       		\
-		info.hpe_hdr = _hdr;                            	\
-		info.hpe_mp = &(_fm);                           	\
-		info.hpe_mb = _m;                               	\
+		info.hpe_ifp = 0;					\
+		info.hpe_ofp = _olp;					\
+		info.hpe_hdr = _hdr;					\
+		info.hpe_mp = &(_fm);					\
+		info.hpe_mb = _m;					\
 		if (hook_run(ipst->ips_arp_net_data->netd_hooks,	\
 		    _event, (hook_data_t)&info) != 0) {			\
-			if (_fm != NULL) {                      	\
-				freemsg(_fm);                   	\
-				_fm = NULL;                     	\
-			}                                       	\
-			_hdr = NULL;                            	\
-			_m = NULL;                              	\
-		} else {                                        	\
-			_hdr = info.hpe_hdr;                    	\
-			_m = info.hpe_mb;                       	\
-		}                                               	\
+			if (_fm != NULL) {				\
+				freemsg(_fm);				\
+				_fm = NULL;				\
+			}						\
+			_hdr = NULL;					\
+			_m = NULL;					\
+		} else {						\
+			_hdr = info.hpe_hdr;				\
+			_m = info.hpe_mb;				\
+		}							\
 	}
 
 static arp_m_t	arp_m_tbl[] = {
@@ -451,7 +450,7 @@ arp_ll_set_defaults(arl_t *arl, mblk_t *mp)
 	arl_defaults_common(arl, mp);
 }
 
-static void
+static int
 arp_wput(queue_t *q, mblk_t *mp)
 {
 	int err = EINVAL;
@@ -468,7 +467,7 @@ arp_wput(queue_t *q, mblk_t *mp)
 			    char *, "<some ioctl>", char *, "-",
 			    arl_t *, (arl_t *)q->q_ptr);
 			putnext(q, mp);
-			return;
+			break;
 		}
 		if ((mp1 = mp->b_cont) == 0)
 			err = EINVAL;
@@ -480,14 +479,15 @@ arp_wput(queue_t *q, mblk_t *mp)
 			miocack(q, mp, 0, 0);
 		else
 			miocnak(q, mp, 0, err);
-		return;
+		break;
 	default:
 		DTRACE_PROBE4(arl__dlpi, char *, "arp_wput default",
 		    char *, "default mblk", char *, "-",
 		    arl_t *, (arl_t *)q->q_ptr);
 		putnext(q, mp);
-		return;
+		break;
 	}
+	return (0);
 }
 
 /*
@@ -740,7 +740,7 @@ arp_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	freemsg(mp);
 }
 
-void
+int
 arp_rput(queue_t *q, mblk_t *mp)
 {
 	arl_t		*arl = q->q_ptr;
@@ -756,7 +756,7 @@ arp_rput(queue_t *q, mblk_t *mp)
 		if (DB_TYPE(mp) != M_PCPROTO) {
 			mutex_exit(&arl->arl_lock);
 			freemsg(mp);
-			return;
+			return (0);
 		}
 	} else {
 		arl_refhold_locked(arl);
@@ -806,12 +806,13 @@ arp_rput(queue_t *q, mblk_t *mp)
 	}
 	if (need_refrele)
 		arl_refrele(arl);
+	return (0);
 }
 
 static void
 arp_process_packet(ill_t *ill, mblk_t *mp)
 {
-	mblk_t 		*mp1;
+	mblk_t		*mp1;
 	arh_t		*arh;
 	in_addr_t	src_paddr, dst_paddr;
 	uint32_t	hlen, plen;
@@ -1384,7 +1385,7 @@ arp_ll_up(ill_t *ill)
 	mblk_t	*attach_mp = NULL;
 	mblk_t	*bind_mp = NULL;
 	mblk_t	*unbind_mp = NULL;
-	arl_t 	*arl;
+	arl_t	*arl;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 	arl = ill_to_arl(ill);
@@ -1506,7 +1507,7 @@ arp_notify(in_addr_t src, mblk_t *mp, uint32_t arcn_code,
 		hwm.hwm_hwaddr = (uchar_t *)(arh + 1);
 		hwm.hwm_flags = 0;
 		ncec_walk_common(ipst->ips_ndp4, NULL,
-		    (pfi_t)nce_update_hw_changed, &hwm, B_TRUE);
+		    nce_update_hw_changed, &hwm, B_TRUE);
 		freemsg(mp);
 		break;
 	}
@@ -1773,7 +1774,7 @@ arl_unbind(arl_t *arl)
 int
 arp_ll_down(ill_t *ill)
 {
-	arl_t 	*arl;
+	arl_t	*arl;
 	mblk_t *unbind_mp;
 	int err = 0;
 	boolean_t replumb = (ill->ill_replumbing == 1);

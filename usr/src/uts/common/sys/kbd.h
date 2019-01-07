@@ -26,8 +26,6 @@
 #ifndef _SYS_KBD_H
 #define	_SYS_KBD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS4.0 1.18 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -225,15 +223,15 @@ struct keyboards {
  * keyboard struct appropriately.
  */
 
+typedef unsigned int keymap_entry_t;
 #ifdef KEYMAP_SIZE_VARIABLE
 
-typedef unsigned short keymap_entry_t;
 
 #else
 #define	KEYMAP_SIZE	128
 
 struct keymap {
-	unsigned short	keymap[KEYMAP_SIZE];	/* maps keycodes to actions */
+	keymap_entry_t	keymap[KEYMAP_SIZE];	/* maps keycodes to actions */
 };
 
 #endif
@@ -262,7 +260,7 @@ struct exception_map {
 	/*
 	 * This is our translated version of the matching sequence.
 	 */
-	unsigned short exc_entry;
+	keymap_entry_t exc_entry;
 };
 
 /*
@@ -319,17 +317,23 @@ struct keyboard {
 struct compose_sequence_t {
 	unsigned char	first;	/* first ASCII char after COMPOSE key */
 	unsigned char	second; /* second ASCII char after COMPOSE key */
-	unsigned char	iso;	/* equivalent ISO code */
+	keymap_entry_t	utf8;	/* equivalent UTF-8 code */
 };
 
 /*
  * Define the floating accent sequence structure.
  */
 struct fltaccent_sequence_t {
-	unsigned short	fa_entry;	/* floating accent keymap entry */
+	keymap_entry_t	fa_entry;	/* floating accent keymap entry */
 	unsigned char	ascii;		/* ASCII char after FA-type key */
-	unsigned char	iso;		/* equivalent ISO code */
+	keymap_entry_t	utf8;		/* equivalent UTF-8 code */
 };
+
+/*
+ * The top byte is used to store the flags, leaving 24 bits for char.
+ */
+#define	KEYCHAR(c)	((c) & 0x00ffffff)
+#define	KEYFLAGS(c)	((c) & ~0x00ffffff)
 
 /*
  * The "special" entries' top 4 bits are defined below.	 Generally they are
@@ -338,7 +342,10 @@ struct fltaccent_sequence_t {
  * characters.	They are not special cased, but just normal cased.
  */
 
-#define	SHIFTKEYS	0x100	/* thru 0x10F.	This key helps to determine */
+#define	SPECIAL(h, l)	(((h) << 24) | (l))
+
+#define	SHIFTKEYS SPECIAL(0x1, 0)
+				/* thru 0x10F.	This key helps to determine */
 				/* the translation table used.	The bit */
 				/* position of its bit in "shiftmask" */
 				/* is added to the entry, eg */
@@ -347,7 +354,8 @@ struct fltaccent_sequence_t {
 				/* toggled.  Depending which tables you put */
 				/* it in, this works well for hold-down */
 				/* keys or press-on, press-off keys.  */
-#define	BUCKYBITS	0x200	/* thru 0x20F.	This key determines the state */
+#define	BUCKYBITS SPECIAL(0x2, 0)
+				/* thru 0x20F.	This key determines the state */
 				/* of one of the "bucky" bits above the */
 				/* returned ASCII character.  This is */
 				/* basically a way to pass mode-key-up/down */
@@ -366,33 +374,43 @@ struct fltaccent_sequence_t {
 				/* toggled.  Depending which tables you put */
 				/* it in, this works well for hold-down */
 				/* keys or press-on, press-off keys.  */
-#define	FUNNY		0x300	/* thru 0x30F.	This key does one of 16 funny */
+#define	FUNNY SPECIAL(0x3, 0)	/* thru 0x30F.	This key does one of 16 funny */
 				/* things based on the low 4 bits: */
-#define	NOP		0x300	/* This key does nothing. */
-#define	OOPS		0x301	/* This key exists but is undefined. */
-#define	HOLE		0x302	/* This key does not exist on the keyboard. */
+#define	NOP SPECIAL(0x3, 0x0)	/* This key does nothing. */
+#define	OOPS SPECIAL(0x3, 0x1) /* This key exists but is undefined. */
+#define	HOLE SPECIAL(0x3, 0x2) /* This key does not exist on the keyboard. */
 				/* Its position code should never be */
 				/* generated.  This indicates a software/ */
 				/* hardware mismatch, or bugs. */
-#define	RESET		0x306	/* Kbd was just reset */
-#define	ERROR		0x307	/* Kbd just detected an internal error */
-#define	IDLE		0x308	/* Kbd is idle (no keys down) */
-#define	COMPOSE		0x309	/* This key is the Compose key. */
-#define	NONL		0x30A	/* This key not affected by Num Lock */
+#define	RESET SPECIAL(0x3, 0x6) /* Kbd was just reset */
+#define	ERROR SPECIAL(0x3, 0x7) /* Kbd just detected an internal error */
+#define	IDLE SPECIAL(0x3, 0x8) /* Kbd is idle (no keys down) */
+#define	COMPOSE SPECIAL(0x3, 0x9) /* This key is the Compose key. */
+#define	NONL SPECIAL(0x3, 0xA) /* This key not affected by Num Lock */
 /* Combinations 0x30B to 0x30F are reserved for non-parameterized functions */
 
-#define	FA_CLASS	0x400	/* thru 0x40F.	These are for "floating */
+#define	FA_CLASS SPECIAL(0x4, 0)
+				/* thru 0x40F.	These are for "floating */
 				/* accent" characters.	The low-order 4 bits */
 				/* select one of those characters. */
 /* Definitions for the individual floating accents: */
-#define	FA_UMLAUT	0x400	/* umlaut accent */
-#define	FA_CFLEX	0x401	/* circumflex accent */
-#define	FA_TILDE	0x402	/* tilde accent */
-#define	FA_CEDILLA	0x403	/* cedilla accent */
-#define	FA_ACUTE	0x404	/* acute accent */
-#define	FA_GRAVE	0x405	/* grave accent */
+#define	FA_UMLAUT SPECIAL(0x4, 0x0)	/* umlaut accent */
+#define	FA_CFLEX SPECIAL(0x4, 0x1)	/* circumflex accent */
+#define	FA_TILDE SPECIAL(0x4, 0x2)	/* tilde accent */
+#define	FA_CEDILLA SPECIAL(0x4, 0x3)	/* cedilla accent */
+#define	FA_ACUTE SPECIAL(0x4, 0x4)	/* acute accent */
+#define	FA_GRAVE SPECIAL(0x4, 0x5)	/* grave accent */
+#define	FA_MACRON SPECIAL(0x4, 0x6)	/* macron accent */
+#define	FA_BREVE SPECIAL(0x4, 0x7)	/* breve accent */
+#define	FA_DOT SPECIAL(0x4, 0x8)	/* dot accent */
+#define	FA_SLASH SPECIAL(0x4, 0x9)	/* slash accent */
+#define	FA_RING SPECIAL(0x4, 0xa)	/* ring accent */
+#define	FA_APOSTROPHE SPECIAL(0x4, 0xb)	/* apostrophe accent */
+#define	FA_DACUTE SPECIAL(0x4, 0xc)	/* double acute accent */
+#define	FA_OGONEK SPECIAL(0x4, 0xd)	/* ogonek accent */
+#define	FA_CARON SPECIAL(0x4, 0xe)	/* caron accent */
 
-#define	STRING		0x500	/* thru 0x50F.	The low-order 4 bits index */
+#define	STRING SPECIAL(0x5, 0)	/* thru 0x50F.	The low-order 4 bits index */
 				/* a table select a string to be returned, */
 				/* char by char.  Each entry the table is */
 				/* null terminated. */
@@ -410,11 +428,11 @@ struct fltaccent_sequence_t {
  * the function key number within the group, and the next 4 bits indicate
  * the group.
  */
-#define	FUNCKEYS	0x600
-#define	LEFTFUNC	0x600	/* thru 0x60F.	The "left" group. */
-#define	RIGHTFUNC	0x610	/* thru 0x61F.	The "right" group. */
-#define	TOPFUNC		0x620	/* thru 0x62F.	The "top" group. */
-#define	BOTTOMFUNC	0x630	/* thru 0x63F.	The "bottom" group. */
+#define	FUNCKEYS	SPECIAL(0x6, 0)
+#define	LEFTFUNC SPECIAL(0x6, 0x0)	/* thru 0x60F.	The "left" group. */
+#define	RIGHTFUNC SPECIAL(0x6, 0x10)	/* thru 0x61F.	The "right" group. */
+#define	TOPFUNC SPECIAL(0x6, 0x20)	/* thru 0x62F.	The "top" group. */
+#define	BOTTOMFUNC SPECIAL(0x6, 0x30)	/* thru 0x63F.	The "bottom" group. */
 #define	LF(n)		(LEFTFUNC+(n)-1)
 #define	RF(n)		(RIGHTFUNC+(n)-1)
 #define	TF(n)		(TOPFUNC+(n)-1)
@@ -431,25 +449,25 @@ struct fltaccent_sequence_t {
  * where ESC is a single escape character and 0..9 indicate some number of
  * digits needed to encode the function key as a decimal number.
  */
-#define	PADKEYS		0x700
-#define	PADEQUAL	0x700		/* keypad = */
-#define	PADSLASH	0x701		/* keypad / */
-#define	PADSTAR		0x702		/* keypad * */
-#define	PADMINUS	0x703		/* keypad - */
-#define	PADSEP		0x704		/* keypad,  */
-#define	PAD7		0x705		/* keypad 7 */
-#define	PAD8		0x706		/* keypad 8 */
-#define	PAD9		0x707		/* keypad 9 */
-#define	PADPLUS		0x708		/* keypad + */
-#define	PAD4		0x709		/* keypad 4 */
-#define	PAD5		0x70A		/* keypad 5 */
-#define	PAD6		0x70B		/* keypad 6 */
-#define	PAD1		0x70C		/* keypad 1 */
-#define	PAD2		0x70D		/* keypad 2 */
-#define	PAD3		0x70E		/* keypad 3 */
-#define	PAD0		0x70F		/* keypad 0 */
-#define	PADDOT		0x710		/* keypad . */
-#define	PADENTER	0x711		/* keypad Enter */
+#define	PADKEYS		SPECIAL(0x7, 0)
+#define	PADEQUAL SPECIAL(0x7, 0x00)		/* keypad = */
+#define	PADSLASH SPECIAL(0x7, 0x01)		/* keypad / */
+#define	PADSTAR SPECIAL(0x7, 0x02)		/* keypad * */
+#define	PADMINUS SPECIAL(0x7, 0x03)		/* keypad - */
+#define	PADSEP SPECIAL(0x7, 0x04)		/* keypad,  */
+#define	PAD7 SPECIAL(0x7, 0x05)		/* keypad 7 */
+#define	PAD8 SPECIAL(0x7, 0x06)		/* keypad 8 */
+#define	PAD9 SPECIAL(0x7, 0x07)		/* keypad 9 */
+#define	PADPLUS SPECIAL(0x7, 0x08)		/* keypad + */
+#define	PAD4 SPECIAL(0x7, 0x09)		/* keypad 4 */
+#define	PAD5 SPECIAL(0x7, 0x0A)		/* keypad 5 */
+#define	PAD6 SPECIAL(0x7, 0x0B)		/* keypad 6 */
+#define	PAD1 SPECIAL(0x7, 0x0C)		/* keypad 1 */
+#define	PAD2 SPECIAL(0x7, 0x0D)		/* keypad 2 */
+#define	PAD3 SPECIAL(0x7, 0x0E)		/* keypad 3 */
+#define	PAD0 SPECIAL(0x7, 0x0F)		/* keypad 0 */
+#define	PADDOT SPECIAL(0x7, 0x10)		/* keypad . */
+#define	PADENTER SPECIAL(0x7, 0x11)		/* keypad Enter */
 
 #ifdef	__cplusplus
 }

@@ -723,6 +723,7 @@ usr/src/tools/btxld/btxld.c
 usr/src/tools/btxld/elfh.c
 usr/src/tools/btxld/elfh.h
 usr/src/tools/btxld/imgact_aout.h
+usr/src/tools/smatch/src/*
 usr/src/uts/common/fs/zfs/lua/*
 usr/src/uts/common/gssapi/gssapi.h
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c

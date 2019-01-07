@@ -247,7 +247,7 @@ extern void	udp_ddi_g_init(void);
 extern void	udp_ddi_g_destroy(void);
 extern void	udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr,
 		    socklen_t addrlen);
-extern void	udp_wput(queue_t *, mblk_t *);
+extern int	udp_wput(queue_t *, mblk_t *);
 
 extern void	*udp_kstat_init(netstackid_t stackid);
 extern void	udp_kstat_fini(netstackid_t stackid, kstat_t *ksp);

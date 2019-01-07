@@ -14,6 +14,7 @@
 #
 
 BINDIR=	/boot
+PNGLITE=$(SRC)/common/pnglite
 
 # Options used when building app-specific efi components
 # See conf/kern.mk for the correct set of these

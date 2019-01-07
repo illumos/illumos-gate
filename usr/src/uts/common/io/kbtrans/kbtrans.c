@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Generic keyboard support: translation
  *
@@ -63,11 +61,11 @@
 /*
  * Internal Function Prototypes
  */
-static boolean_t	kbtrans_do_compose(struct kbtrans_lower *, ushort_t,
-			    ushort_t, ushort_t *);
-static void		kbtrans_translate(struct kbtrans_lower *,
-				struct keyboard_callback *, kbtrans_key_t,
-				enum keystate);
+static boolean_t kbtrans_do_compose(struct kbtrans_lower *, keymap_entry_t,
+    keymap_entry_t, keymap_entry_t *);
+static void kbtrans_translate(struct kbtrans_lower *,
+    struct keyboard_callback *, kbtrans_key_t, enum keystate);
+
 /*
  * kbtrans_processkey:
  *
@@ -83,12 +81,10 @@ static void		kbtrans_translate(struct kbtrans_lower *,
  */
 void
 kbtrans_processkey(struct kbtrans_lower *lower,
-	struct keyboard_callback	*cb,
-	kbtrans_key_t 			key,
-	enum keystate 			state)
+    struct keyboard_callback *cb, kbtrans_key_t key, enum keystate state)
 {
 	DPRINTF(PRINT_L0, PRINT_MASK_ALL, (lower, "kbtrans_processkey: "
-		"newstate=%d key=%d", state, key));
+	    "newstate=%d key=%d", state, key));
 
 	/*
 	 * If there is a raw routine, then call it and return.
@@ -126,21 +122,19 @@ kbtrans_processkey(struct kbtrans_lower *lower,
  * for the character when it is done translating it.
  */
 static void
-kbtrans_translate(struct kbtrans_lower	*lower,
-	struct keyboard_callback	*cb,
-	kbtrans_key_t 			key,
-	enum keystate 			newstate)
+kbtrans_translate(struct kbtrans_lower *lower, struct keyboard_callback *cb,
+    kbtrans_key_t key, enum keystate newstate)
 {
 	unsigned		shiftmask;
-	register ushort_t	entry;
-	register ushort_t	entrytype;
-	ushort_t		result_iso;
-	unsigned short		*ke;
+	register keymap_entry_t	entry;
+	register unsigned	entrytype;
+	keymap_entry_t		result;
+	keymap_entry_t		*ke;
 	int			i;
 	boolean_t		good_compose;
 
 	DPRINTF(PRINT_L0, PRINT_MASK_ALL, (lower, "KEY TRANSLATE "
-		"newstate=0x%x key=0x%x\n", newstate, key));
+	    "newstate=0x%x key=0x%x\n", newstate, key));
 
 	if (lower->kbtrans_keyboard == NULL) {
 		/*
@@ -188,8 +182,7 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 		 * ask for the table we would have gotten had Num Lock not been
 		 * down, and translate using that table.
 		 */
-		ke = kbtrans_find_entry(lower, shiftmask & ~NUMLOCKMASK,
-			key);
+		ke = kbtrans_find_entry(lower, shiftmask & ~NUMLOCKMASK, key);
 
 		if (ke == NULL) {
 			/*
@@ -212,7 +205,7 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 	 * Categories include shift keys, function keys, and numeric keypad
 	 * keys.
 	 */
-	entrytype = (ushort_t)(entry & 0xFF00);
+	entrytype = KEYFLAGS(entry);
 
 	if (entrytype == SHIFTKEYS) {
 		/*
@@ -222,8 +215,7 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 		 */
 		if ((1 << (entry & 0x0F)) &
 		    lower->kbtrans_keyboard->k_toggleshifts) {
-			if ((1 << (entry & 0x0F)) &
-				lower->kbtrans_togglemask) {
+			if ((1 << (entry & 0x0F)) & lower->kbtrans_togglemask) {
 				newstate = KEY_RELEASED; /* toggling off */
 			} else {
 				newstate = KEY_PRESSED;	/* toggling on */
@@ -236,7 +228,6 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 		switch (lower->kbtrans_state) {
 		case COMPOSE1:
 			if (newstate == KEY_RELEASED)
-
 				return;
 
 			if (entry < ASCII_SET_SIZE) {
@@ -265,28 +256,22 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 			cb->kc_setled(lower->kbtrans_upper);
 
 			good_compose = kbtrans_do_compose(lower,
-				lower->kbtrans_compose_key, entry,
-				&result_iso);
+			    lower->kbtrans_compose_key, entry, &result);
 			if (good_compose) {
-				if (lower->kbtrans_compat)
-					result_iso += ISO_FIRST;
-				else
-					result_iso += EUC_FIRST;
 				cb->kc_keypressed(lower->kbtrans_upper,
-				    entrytype, key, result_iso);
+				    entrytype, key, result);
 			}
 			return;
 
 		case FLTACCENT:
 			if (newstate == KEY_RELEASED)
-
 				return;
 
 			/* next state is "normal" */
 			lower->kbtrans_state = NORMAL;
 			for (i = 0;
-			    (lower->kbtrans_fltaccent_table[i].fa_entry
-				!= lower->kbtrans_fltaccent_entry) ||
+			    (lower->kbtrans_fltaccent_table[i].fa_entry !=
+			    lower->kbtrans_fltaccent_entry) ||
 			    (lower->kbtrans_fltaccent_table[i].ascii != entry);
 			    i++) {
 				if (lower->kbtrans_fltaccent_table[i].fa_entry
@@ -297,10 +282,8 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 				}
 			}
 
-			cb->kc_keypressed(lower->kbtrans_upper, entrytype,
-					key, (lower->kbtrans_compat ?
-						ISO_FIRST : EUC_FIRST) +
-					lower->kbtrans_fltaccent_table[i].iso);
+			cb->kc_keypressed(lower->kbtrans_upper, entrytype, key,
+			    lower->kbtrans_fltaccent_table[i].utf8);
 
 			return;
 		}
@@ -321,7 +304,7 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 		if (lower->kbtrans_repeatkey != key) {
 			cb->kc_cancel_repeat(lower->kbtrans_upper);
 			cb->kc_setup_repeat(lower->kbtrans_upper, entrytype,
-				key);
+			    key);
 		}
 		/* key going up */
 	} else if (key == lower->kbtrans_repeatkey) {
@@ -342,7 +325,7 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 
 	case 0x0:		/* regular key */
 		cb->kc_keypressed(lower->kbtrans_upper, entrytype, key,
-			entry | lower->kbtrans_buckybits);
+		    SPECIAL(lower->kbtrans_buckybits, entry));
 		break;
 
 	case SHIFTKEYS: {
@@ -353,13 +336,13 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 			if (newstate == KEY_RELEASED) {
 				if (shiftbit == CAPSMASK) {
 					lower->kbtrans_led_state &=
-						~LED_CAPS_LOCK;
+					    ~LED_CAPS_LOCK;
 
 					cb->kc_setled(lower->kbtrans_upper);
 
 				} else if (shiftbit == NUMLOCKMASK) {
 					lower->kbtrans_led_state &=
-						    ~LED_NUM_LOCK;
+					    ~LED_NUM_LOCK;
 
 					cb->kc_setled(lower->kbtrans_upper);
 				}
@@ -367,12 +350,12 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 			} else {
 				if (shiftbit == CAPSMASK) {
 					lower->kbtrans_led_state |=
-						LED_CAPS_LOCK;
+					    LED_CAPS_LOCK;
 
 					cb->kc_setled(lower->kbtrans_upper);
 				} else if (shiftbit == NUMLOCKMASK) {
 					lower->kbtrans_led_state |=
-						LED_NUM_LOCK;
+					    LED_NUM_LOCK;
 
 					cb->kc_setled(lower->kbtrans_upper);
 				}
@@ -387,18 +370,18 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 
 		if (newstate == KEY_PRESSED) {
 			cb->kc_keypressed(lower->kbtrans_upper, entrytype, key,
-				entry);
+			    entry);
 		}
 
 		break;
 		}
 
 	case BUCKYBITS:
-		lower->kbtrans_buckybits ^= 1 << (7 + (entry & 0x0F));
+		lower->kbtrans_buckybits ^= 1 << (entry & 0x0F);
 
 		if (newstate == KEY_PRESSED) {
 			cb->kc_keypressed(lower->kbtrans_upper, entrytype, key,
-				entry);
+			    entry);
 		}
 
 		break;
@@ -414,18 +397,18 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 		case RESET:
 		case ERROR:
 			lower->kbtrans_shiftmask &=
-				lower->kbtrans_keyboard->k_idleshifts;
+			    lower->kbtrans_keyboard->k_idleshifts;
 
 			lower->kbtrans_shiftmask |=
-					lower->kbtrans_togglemask;
+			    lower->kbtrans_togglemask;
 
 			lower->kbtrans_buckybits &=
-				lower->kbtrans_keyboard->k_idlebuckys;
+			    lower->kbtrans_keyboard->k_idlebuckys;
 
 			cb->kc_cancel_repeat(lower->kbtrans_upper);
 
 			cb->kc_keypressed(lower->kbtrans_upper, entrytype, key,
-				entry);
+			    entry);
 
 			break;
 
@@ -480,16 +463,14 @@ kbtrans_translate(struct kbtrans_lower	*lower,
 /*
  * kbtrans_do_compose:
  *	Given a two key compose sequence, lookup the iso equivalent and put
- * 	the result in the result_iso_ptr.
+ *	the result in the result_ptr.
  */
 static boolean_t
-kbtrans_do_compose(struct kbtrans_lower *lower,
-		ushort_t	first_entry,
-		ushort_t	second_entry,
-		ushort_t	*result_iso_ptr)
+kbtrans_do_compose(struct kbtrans_lower *lower, keymap_entry_t first_entry,
+    keymap_entry_t second_entry, keymap_entry_t *result_ptr)
 {
 	struct compose_sequence_t *ptr;
-	ushort_t	tmp;
+	keymap_entry_t tmp;
 
 	/*
 	 * Validate the second keystroke.
@@ -510,11 +491,11 @@ kbtrans_do_compose(struct kbtrans_lower *lower,
 	}
 
 	ptr = lower->kbtrans_compose_table +
-		    lower->kbtrans_compose_map[first_entry];
+	    lower->kbtrans_compose_map[first_entry];
 
 	while (ptr->first == first_entry) {
 		if (ptr->second == second_entry) {
-			*result_iso_ptr = ptr->iso;
+			*result_ptr = ptr->utf8;
 
 			return (B_TRUE);
 		}
@@ -529,10 +510,9 @@ kbtrans_do_compose(struct kbtrans_lower *lower,
  * 	This routine finds the entry corresponding to the current shift
  * 	state and keycode.
  */
-unsigned short *
-kbtrans_find_entry(struct kbtrans_lower *lower,
-	register uint_t			mask,
-	kbtrans_key_t			key_station)
+keymap_entry_t *
+kbtrans_find_entry(struct kbtrans_lower *lower, uint_t mask,
+    kbtrans_key_t key_station)
 {
 	register struct keyboard *kp;
 	keymap_entry_t *km;

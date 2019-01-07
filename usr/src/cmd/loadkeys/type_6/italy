@@ -22,25 +22,23 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Italian Type 6 (USB) key layout
 #
 key  53  base '\\' shift | caps '\\' ctrl ^\ altg nop
 key  31  base 2 shift '"' caps 2 ctrl 2 altg nop
-key  32  base 3 shift £ caps 3 ctrl 3 altg nop
+key  32  base 3 shift 0x00A3 caps 3 ctrl 3 altg nop
 key  35  base 6 shift & caps 6 ctrl 6 altg nop
 key  36  base 7 shift / caps 7 ctrl 7 altg nop
 key  37  base 8 shift ( caps 8 ctrl 8 altg {
 key  38  base 9 shift ) caps 9 ctrl 9 altg }
 key  39  base 0 shift = caps 0 ctrl 0 altg nop
 key  45  base '\'' shift ? caps '\'' ctrl '\'' altg '`'
-key  46  base ì shift ^ caps Ì ctrl ^^ altg nop
-key  47  base è shift é caps È ctrl ^[ altg [
+key  46  base 0x00EC shift ^ caps 0x00CC ctrl ^^ altg nop
+key  47  base 0x00E8 shift 0x00E9 caps 0x00C8 ctrl ^[ altg [
 key  48  base + shift * caps + ctrl ^] altg ]
-key  51  base ò shift ç caps Ò ctrl ^@ altg @
-key  52  base à shift ° caps À ctrl à altg #
-key  50  base ù shift § caps Ù ctrl ù altg ~ numl nonl up nop
+key  51  base 0x00F2 shift 0x00E7 caps 0x00D2 ctrl ^@ altg @
+key  52  base 0x00E0 shift 0x00B0 caps 0x00C0 ctrl 0x00E0 altg #
+key  50  base 0x00F9 shift 0x00A7 caps 0x00D9 ctrl 0x00F9 altg ~ numl nonl up nop
 key  49  all hole
 key 100  base < shift > caps < ctrl < altg nop numl nonl up nop
 key  54  base , shift ; caps , ctrl , altg nop

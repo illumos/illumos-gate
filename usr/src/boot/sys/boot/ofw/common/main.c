@@ -147,7 +147,7 @@ main(int (*openfirm)(void *))
 			   ofw_setcurrdev, env_nounset);
 	env_setenv("loaddev", EV_VOLATILE, bootpath, env_noset,
 	    env_nounset);
-	setenv("LINES", "24", 1);		/* optional */
+	setenv("screen-#rows", "24", 1);		/* optional */
 
 	archsw.arch_getdev = ofw_getdev;
 	archsw.arch_copyin = ofw_copyin;

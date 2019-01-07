@@ -4,6 +4,7 @@
 #
 # cmd/cmd-inet/usr.bin/pppd/Makefile
 #
+# Copyright (c) 2019, Joyent, Inc.
 
 include		../../../Makefile.cmd
 include		Makefile.def
@@ -51,6 +52,9 @@ EXOBJS +=	mschap_test.o
 CLOBBERFILES +=	mschap_test
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# main() is too hairy for smatch
+SMATCH=off
 
 # This is used *only* for testing the portability of the libraries
 # required for MS-CHAPv1.  It is not needed in any normal system and

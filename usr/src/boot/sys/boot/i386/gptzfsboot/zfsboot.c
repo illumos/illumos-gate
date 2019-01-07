@@ -196,7 +196,7 @@ main(void)
 	env_nounset);
 
     /* Process configuration file */
-    setenv("LINES", "24", 1);
+    setenv("screen-#rows", "24", 1);
     auto_boot = 1;
 
     fd = open(PATH_CONFIG, O_RDONLY);

@@ -28,469 +28,535 @@
 
 #include <efi.h>
 #include <efilib.h>
+#include <sys/tem_impl.h>
+#include <sys/multiboot2.h>
+#include <machine/metadata.h>
+#include <gfx_fb.h>
 
 #include "bootstrap.h"
 
-static SIMPLE_TEXT_OUTPUT_INTERFACE	*conout;
-static SIMPLE_INPUT_INTERFACE		*conin;
+struct efi_fb		efifb;
+EFI_GRAPHICS_OUTPUT	*gop;
+EFI_UGA_DRAW_PROTOCOL	*uga;
 
-#ifdef TERM_EMU
+static EFI_GUID ccontrol_protocol_guid = EFI_CONSOLE_CONTROL_PROTOCOL_GUID;
+static EFI_CONSOLE_CONTROL_PROTOCOL	*console_control;
+static EFI_GUID simple_input_ex_guid = EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL_GUID;
+static EFI_CONSOLE_CONTROL_SCREEN_MODE	console_mode;
+static SIMPLE_TEXT_OUTPUT_INTERFACE	*conout;
+
+/* mode change callback and argument from tem */
+static vis_modechg_cb_t modechg_cb;
+static struct vis_modechg_arg *modechg_arg;
+static tem_vt_state_t tem;
+
+struct efi_console_data {
+	struct visual_ops			*ecd_visual_ops;
+	SIMPLE_INPUT_INTERFACE			*ecd_conin;
+	EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL	*ecd_coninex;
+};
+
+#define	KEYBUFSZ 10
+static unsigned keybuf[KEYBUFSZ];      /* keybuf for extended codes */
+
+static int key_pending;
+
+static const unsigned char solaris_color_to_efi_color[16] = {
+	EFI_WHITE,
+	EFI_BLACK,
+	EFI_BLUE,
+	EFI_GREEN,
+	EFI_CYAN,
+	EFI_RED,
+	EFI_MAGENTA,
+	EFI_BROWN,
+	EFI_LIGHTGRAY,
+	EFI_DARKGRAY,
+	EFI_LIGHTBLUE,
+	EFI_LIGHTGREEN,
+	EFI_LIGHTCYAN,
+	EFI_LIGHTRED,
+	EFI_LIGHTMAGENTA,
+	EFI_YELLOW
+};
+
 #define	DEFAULT_FGCOLOR	EFI_LIGHTGRAY
 #define	DEFAULT_BGCOLOR	EFI_BLACK
 
-#define	MAXARGS	8
-#define	KEYBUFSZ 10
-static unsigned keybuf[KEYBUFSZ];      /* keybuf for extended codes */
-static int key_pending;
+extern int efi_find_framebuffer(struct efi_fb *efifb);
 
-static int args[MAXARGS], argc;
-static int fg_c, bg_c;
-static UINTN curx, cury;
-static int esc;
-
-void get_pos(UINTN *x, UINTN *y);
-void curs_move(UINTN *_x, UINTN *_y, UINTN x, UINTN y);
-static void CL(int);
-void HO(void);
-void end_term(void);
-#endif
-
+static void efi_framebuffer_setup(void);
 static void efi_cons_probe(struct console *);
 static int efi_cons_init(struct console *, int);
-void efi_cons_putchar(struct console *, int);
-int efi_cons_getchar(struct console *);
-void efi_cons_efiputchar(int);
-int efi_cons_poll(struct console *);
+static void efi_cons_putchar(struct console *, int);
+static void efi_cons_efiputchar(int);
+static int efi_cons_getchar(struct console *);
+static int efi_cons_poll(struct console *);
+static int efi_cons_ioctl(struct console *cp, int cmd, void *data);
+
+static int efi_fb_devinit(struct vis_devinit *);
+static void efi_cons_cursor(struct vis_conscursor *);
+
+static int efi_text_devinit(struct vis_devinit *);
+static int efi_text_cons_clear(struct vis_consclear *);
+static void efi_text_cons_copy(struct vis_conscopy *);
+static void efi_text_cons_display(struct vis_consdisplay *);
 
 struct console efi_console = {
-	"text",
-	"EFI console",
-	C_WIDEOUT,
-	efi_cons_probe,
-	efi_cons_init,
-	efi_cons_putchar,
-	efi_cons_getchar,
-	efi_cons_poll,
-	0
+	.c_name = "text",
+	.c_desc = "EFI console",
+	.c_flags = C_WIDEOUT,
+	.c_probe = efi_cons_probe,
+	.c_init = efi_cons_init,
+	.c_out = efi_cons_putchar,
+	.c_in = efi_cons_getchar,
+	.c_ready = efi_cons_poll,
+	.c_ioctl = efi_cons_ioctl,
+	.c_private = NULL
 };
 
-#ifdef	TERM_EMU
+static struct vis_identifier fb_ident = { "efi_fb" };
+static struct vis_identifier text_ident = { "efi_text" };
 
-/* Get cursor position. */
-void
-get_pos(UINTN *x, UINTN *y)
+struct visual_ops fb_ops = {
+	.ident = &fb_ident,
+	.kdsetmode = NULL,
+	.devinit = efi_fb_devinit,
+	.cons_copy = NULL,
+	.cons_display = NULL,
+	.cons_cursor = efi_cons_cursor,
+	.cons_clear = NULL,
+	.cons_put_cmap = NULL
+};
+
+struct visual_ops text_ops = {
+	.ident = &text_ident,
+	.kdsetmode = NULL,
+	.devinit = efi_text_devinit,
+	.cons_copy = efi_text_cons_copy,
+	.cons_display = efi_text_cons_display,
+	.cons_cursor = efi_cons_cursor,
+	.cons_clear = efi_text_cons_clear,
+	.cons_put_cmap = NULL
+};
+
+/*
+ * platform specific functions for tem
+ */
+int
+plat_stdout_is_framebuffer(void)
 {
-	*x = conout->Mode->CursorColumn;
-	*y = conout->Mode->CursorRow;
+	return (console_mode == EfiConsoleControlScreenGraphics);
 }
 
-/* Move cursor to x rows and y cols (0-based). */
 void
-curs_move(UINTN *_x, UINTN *_y, UINTN x, UINTN y)
+plat_tem_hide_prom_cursor(void)
 {
-	conout->SetCursorPosition(conout, x, y);
-	if (_x != NULL)
-		*_x = conout->Mode->CursorColumn;
-	if (_y != NULL)
-		*_y = conout->Mode->CursorRow;
+	conout->EnableCursor(conout, FALSE);
 }
 
-/* Clear internal state of the terminal emulation code. */
-void
-end_term(void)
+static void
+plat_tem_display_prom_cursor(screen_pos_t row, screen_pos_t col)
 {
-	esc = 0;
-	argc = -1;
+
+	conout->SetCursorPosition(conout, col, row);
+	conout->EnableCursor(conout, TRUE);
 }
 
-#endif
+void
+plat_tem_get_prom_pos(uint32_t *row, uint32_t *col)
+{
+	if (console_mode == EfiConsoleControlScreenText) {
+		*col = (uint32_t)conout->Mode->CursorColumn;
+		*row = (uint32_t)conout->Mode->CursorRow;
+	} else {
+		*col = 0;
+		*row = 0;
+	}
+}
+
+/*
+ * plat_tem_get_prom_size() is supposed to return screen size
+ * in chars. Return real data for text mode and TEM defaults for graphical
+ * mode, so the tem can compute values based on default and font.
+ */
+void
+plat_tem_get_prom_size(size_t *height, size_t *width)
+{
+	UINTN cols, rows;
+	if (console_mode == EfiConsoleControlScreenText) {
+		(void) conout->QueryMode(conout, conout->Mode->Mode,
+		    &cols, &rows);
+		*height = (size_t)rows;
+		*width = (size_t)cols;
+	} else {
+		*height = TEM_DEFAULT_ROWS;
+		*width = TEM_DEFAULT_COLS;
+	}
+}
+
+/*
+ * Callback to notify about console mode change.
+ * mode is value from enum EFI_CONSOLE_CONTROL_SCREEN_MODE.
+ */
+void
+plat_cons_update_mode(int mode)
+{
+	UINTN cols, rows;
+	struct vis_devinit devinit;
+	struct efi_console_data *ecd = efi_console.c_private;
+
+	/* Make sure we have usable console. */
+	if (efi_find_framebuffer(&efifb)) {
+		console_mode = EfiConsoleControlScreenText;
+	} else {
+		efi_framebuffer_setup();
+		if (mode != -1 && console_mode != mode)
+			console_mode = mode;
+	}
+
+	if (console_control != NULL)
+		(void)console_control->SetMode(console_control, console_mode);
+
+	/* some firmware enables the cursor when switching modes */
+	conout->EnableCursor(conout, FALSE);
+	if (console_mode == EfiConsoleControlScreenText) {
+		(void)conout->QueryMode(conout, conout->Mode->Mode,
+		    &cols, &rows);
+		devinit.version = VIS_CONS_REV;
+		devinit.width = cols;
+		devinit.height = rows;
+		devinit.depth = 4;
+		devinit.linebytes = cols;
+		devinit.color_map = NULL;
+		devinit.mode = VIS_TEXT;
+		ecd->ecd_visual_ops = &text_ops;
+	} else {
+		devinit.version = VIS_CONS_REV;
+		devinit.width = gfx_fb.framebuffer_common.framebuffer_width;
+		devinit.height = gfx_fb.framebuffer_common.framebuffer_height;
+		devinit.depth = gfx_fb.framebuffer_common.framebuffer_bpp;
+		devinit.linebytes = gfx_fb.framebuffer_common.framebuffer_pitch;
+		devinit.color_map = gfx_fb_color_map;
+		devinit.mode = VIS_PIXEL;
+		ecd->ecd_visual_ops = &fb_ops;
+	}
+
+	modechg_cb(modechg_arg, &devinit);
+}
+
+static int
+efi_fb_devinit(struct vis_devinit *data)
+{
+	if (console_mode != EfiConsoleControlScreenGraphics)
+		return (1);
+
+	data->version = VIS_CONS_REV;
+	data->width = gfx_fb.framebuffer_common.framebuffer_width;
+	data->height = gfx_fb.framebuffer_common.framebuffer_height;
+	data->depth = gfx_fb.framebuffer_common.framebuffer_bpp;
+	data->linebytes = gfx_fb.framebuffer_common.framebuffer_pitch;
+	data->color_map = gfx_fb_color_map;
+	data->mode = VIS_PIXEL;
+
+	modechg_cb = data->modechg_cb;
+	modechg_arg = data->modechg_arg;
+
+	return (0);
+}
+
+static int
+efi_text_devinit(struct vis_devinit *data)
+{
+	UINTN cols, rows;
+
+	if (console_mode != EfiConsoleControlScreenText)
+		return (1);
+
+	(void)conout->QueryMode(conout, conout->Mode->Mode, &cols, &rows);
+	data->version = VIS_CONS_REV;
+	data->width = cols;
+	data->height = rows;
+	data->depth = 4;
+	data->linebytes = cols;
+	data->color_map = NULL;
+	data->mode = VIS_TEXT;
+
+	modechg_cb = data->modechg_cb;
+	modechg_arg = data->modechg_arg;
+
+	return (0);
+}
+
+static int
+efi_text_cons_clear(struct vis_consclear *ca)
+{
+	EFI_STATUS st;
+	UINTN attr = conout->Mode->Attribute & 0x0F;
+
+	attr = EFI_TEXT_ATTR(attr,
+	    solaris_color_to_efi_color[ca->bg_color & 0xF]);
+	st = conout->SetAttribute(conout, attr);
+	if (EFI_ERROR(st))
+		return (1);
+	st = conout->ClearScreen(conout);
+	if (EFI_ERROR(st))
+		return (1);
+	return (0);
+}
+
+static void
+efi_text_cons_copy(struct vis_conscopy *ma)
+{
+	UINTN col, row;
+
+	col = 0;
+	row = ma->e_row;
+	conout->SetCursorPosition(conout, col, row);
+
+	efi_cons_efiputchar('\n');
+}
+
+static void
+efi_text_cons_display(struct vis_consdisplay *da)
+{
+	EFI_STATUS st;
+	UINTN attr;
+	UINTN row, col;
+	tem_char_t *data;
+	int i;
+
+	(void)conout->QueryMode(conout, conout->Mode->Mode, &col, &row);
+
+	/* reduce clear line on bottom row by one to prevent autoscroll */
+	if (row - 1 == da->row && da->col == 0 && da->width == col)
+		da->width--;
+
+	data = (tem_char_t *)da->data;
+	attr = EFI_TEXT_ATTR(solaris_color_to_efi_color[da->fg_color & 0xf],
+	    solaris_color_to_efi_color[da->bg_color & 0xf]);
+	st = conout->SetAttribute(conout, attr);
+	if (EFI_ERROR(st))
+		return;
+	row = da->row;
+	col = da->col;
+	conout->SetCursorPosition(conout, col, row);
+	for (i = 0; i < da->width; i++)
+		efi_cons_efiputchar(data[i]);
+}
+
+static void efi_cons_cursor(struct vis_conscursor *cc)
+{
+	switch (cc->action) {
+	case VIS_HIDE_CURSOR:
+		if (plat_stdout_is_framebuffer())
+			gfx_fb_display_cursor(cc);
+		else
+			plat_tem_hide_prom_cursor();
+		break;
+	case VIS_DISPLAY_CURSOR:
+		if (plat_stdout_is_framebuffer())
+			gfx_fb_display_cursor(cc);
+		else
+			plat_tem_display_prom_cursor(cc->row, cc->col);
+		break;
+	case VIS_GET_CURSOR: {	/* only used at startup */
+		uint32_t row, col;
+
+		plat_tem_get_prom_pos(&row, &col);
+		cc->row = row;
+		cc->col = col;
+		}
+		break;
+	}
+}
+
+static int
+efi_cons_ioctl(struct console *cp, int cmd, void *data)
+{
+	struct efi_console_data *ecd = cp->c_private;
+	struct visual_ops *ops = ecd->ecd_visual_ops;
+
+	switch (cmd) {
+	case VIS_GETIDENTIFIER:
+		memmove(data, ops->ident, sizeof (struct vis_identifier));
+		break;
+	case VIS_DEVINIT:
+		return (ops->devinit(data));
+	case VIS_CONSCLEAR:
+		return (ops->cons_clear(data));
+	case VIS_CONSCOPY:
+		ops->cons_copy(data);
+		break;
+	case VIS_CONSDISPLAY:
+		ops->cons_display(data);
+		break;
+	case VIS_CONSCURSOR:
+		ops->cons_cursor(data);
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static void
+efi_framebuffer_setup(void)
+{
+	int bpp, pos;
+
+	bpp = fls(efifb.fb_mask_red | efifb.fb_mask_green |
+	    efifb.fb_mask_blue | efifb.fb_mask_reserved);
+
+	gfx_fb.framebuffer_common.mb_type = MULTIBOOT_TAG_TYPE_FRAMEBUFFER;
+	gfx_fb.framebuffer_common.mb_size = sizeof (gfx_fb);
+	gfx_fb.framebuffer_common.framebuffer_addr = efifb.fb_addr;
+	gfx_fb.framebuffer_common.framebuffer_width = efifb.fb_width;
+	gfx_fb.framebuffer_common.framebuffer_height = efifb.fb_height;
+	gfx_fb.framebuffer_common.framebuffer_bpp = bpp;
+	gfx_fb.framebuffer_common.framebuffer_pitch =
+	    efifb.fb_stride * (bpp >> 3);
+	gfx_fb.framebuffer_common.framebuffer_type =
+	    MULTIBOOT_FRAMEBUFFER_TYPE_RGB;
+	gfx_fb.framebuffer_common.mb_reserved = 0;
+
+	pos = ffs(efifb.fb_mask_red);
+	if (pos != 0)
+		pos--;
+	gfx_fb.u.fb2.framebuffer_red_mask_size = fls(efifb.fb_mask_red >> pos);
+	gfx_fb.u.fb2.framebuffer_red_field_position = pos;
+	pos = ffs(efifb.fb_mask_green);
+	if (pos != 0)
+		pos--;
+	gfx_fb.u.fb2.framebuffer_green_mask_size =
+	    fls(efifb.fb_mask_green >> pos);
+	gfx_fb.u.fb2.framebuffer_green_field_position = pos;
+	pos = ffs(efifb.fb_mask_blue);
+	if (pos != 0)
+		pos--;
+	gfx_fb.u.fb2.framebuffer_blue_mask_size =
+	    fls(efifb.fb_mask_blue >> pos);
+	gfx_fb.u.fb2.framebuffer_blue_field_position = pos;
+}
 
 static void
 efi_cons_probe(struct console *cp)
 {
+	struct efi_console_data *ecd;
+	EFI_STATUS status;
+	UINTN i, max_dim, best_mode, cols, rows;
+
+	ecd = calloc(1, sizeof (*ecd));
+	/*
+	 * As console probing is called very early, the only reason for
+	 * out of memory can be that we just do not have enough memory.
+	 */
+	if (ecd == NULL)
+		panic("efi_cons_probe: This system has not enough memory\n");
+	cp->c_private = ecd;
+
 	conout = ST->ConOut;
-	conin = ST->ConIn;
+	ecd->ecd_conin = ST->ConIn;
 	cp->c_flags |= C_PRESENTIN | C_PRESENTOUT;
+
+	status = BS->LocateProtocol(&ccontrol_protocol_guid, NULL,
+	    (VOID **)&console_control);
+	if (status == EFI_SUCCESS) {
+		BOOLEAN GopUgaExists, StdInLocked;
+		status = console_control->GetMode(console_control,
+		    &console_mode, &GopUgaExists, &StdInLocked);
+	} else {
+		console_mode = EfiConsoleControlScreenText;
+	}
+
+	max_dim = best_mode = 0;
+	for (i = 0; i <= conout->Mode->MaxMode ; i++) {
+		status = conout->QueryMode(conout, i, &cols, &rows);
+		if (EFI_ERROR(status))
+			continue;
+		if (cols * rows > max_dim) {
+			max_dim = cols * rows;
+			best_mode = i;
+		}
+	}
+	if (max_dim > 0)
+		conout->SetMode(conout, best_mode);
+	status = conout->QueryMode(conout, best_mode, &cols, &rows);
+	if (EFI_ERROR(status)) {
+		setenv("screen-#rows", "24", 1);
+		setenv("screen-#cols", "80", 1);
+	} else {
+		char env[8];
+		snprintf(env, sizeof (env), "%u", (unsigned)rows);
+		setenv("screen-#rows", env, 1);
+		snprintf(env, sizeof (env), "%u", (unsigned)cols);
+		setenv("screen-#cols", env, 1);
+	}
+
+	if (efi_find_framebuffer(&efifb)) {
+		console_mode = EfiConsoleControlScreenText;
+		ecd->ecd_visual_ops = &text_ops;
+	} else {
+		efi_framebuffer_setup();
+		console_mode = EfiConsoleControlScreenGraphics;
+		ecd->ecd_visual_ops = &fb_ops;
+	}
+
+	if (console_control != NULL)
+		(void)console_control->SetMode(console_control, console_mode);
+
+	/* some firmware enables the cursor when switching modes */
+	conout->EnableCursor(conout, FALSE);
 }
 
 static int
-efi_cons_init(struct console *cp __attribute((unused)),
-    int arg __attribute((unused)))
+efi_cons_init(struct console *cp, int arg __unused)
 {
+	struct efi_console_data *ecd;
+	void *coninex;
+	EFI_STATUS status;
+	int rc;
+
 	conout->SetAttribute(conout, EFI_TEXT_ATTR(DEFAULT_FGCOLOR,
 	    DEFAULT_BGCOLOR));
-#ifdef TERM_EMU
-	end_term();
-	get_pos(&curx, &cury);
-	curs_move(&curx, &cury, curx, cury);
-	fg_c = DEFAULT_FGCOLOR;
-	bg_c = DEFAULT_BGCOLOR;
 	memset(keybuf, 0, KEYBUFSZ);
-#endif
-	conout->EnableCursor(conout, TRUE);
-	return 0;
+
+	ecd = cp->c_private;
+	coninex = NULL;
+	/*
+	 * Try to set up for SimpleTextInputEx protocol. If not available,
+	 * we will use SimpleTextInput protocol.
+	 */
+	status = BS->OpenProtocol(ST->ConsoleInHandle, &simple_input_ex_guid,
+	    &coninex, IH, NULL, EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+	if (status == EFI_SUCCESS)
+		ecd->ecd_coninex = coninex;
+
+	gfx_framework_init(&fb_ops);
+	rc = tem_info_init(cp);
+
+	if (rc == 0 && tem == NULL) {
+		tem = tem_init();
+		if (tem != NULL)
+			tem_activate(tem, B_TRUE);
+	}
+
+	if (tem == NULL)
+		panic("Failed to set up console terminal");
+
+	return (0);
 }
 
 static void
-efi_cons_rawputchar(int c)
+efi_cons_putchar(struct console *cp __unused, int c)
 {
-	int i;
-	UINTN x, y;
-	conout->QueryMode(conout, conout->Mode->Mode, &x, &y);
-	static int ignorenl = 0;
+	uint8_t buf = c;
 
-	if (c == '\t')
-		/* XXX lame tab expansion */
-		for (i = 0; i < 8; i++)
-			efi_cons_rawputchar(' ');
-	else {
-#ifndef	TERM_EMU
-		if (c == '\n')
-			efi_cons_efiputchar('\r');
-		else
-			efi_cons_efiputchar(c);
-#else
-		switch (c) {
-		case '\r':
-			curx = 0;
-			break;
-		case '\n':
-			if (ignorenl)
-				ignorenl = 0;
-			else
-				cury++;
-			if ((efi_console.c_flags & C_MODERAW) == 0)
-				curx = 0;
-			if (cury >= y) {
-				efi_cons_efiputchar('\n');
-				cury--;
-			}
-			break;
-		case '\b':
-			if (curx > 0)
-				curx--;
-			break;
-		default:
-			if (curx > x) {
-				curx = 0;
-				cury++;
-				curs_move(&curx, &cury, curx, cury);
-			}
-			if ((efi_console.c_flags & C_MODERAW) == 0) {
-				if (cury > y-1) {
-					curx = 0;
-					efi_cons_efiputchar('\n');
-					cury--;
-					curs_move(&curx, &cury, curx, cury);
-				}
-			}
-			efi_cons_efiputchar(c);
-			curx++;
-			if ((efi_console.c_flags & C_MODERAW) == 0) {
-				if (curx == x) {
-					curx = 0;
-					ignorenl = 1;
-				}
-			} else if (curx == x) {
-				curx = 0;
-				if (cury == y)
-					efi_cons_efiputchar('\n');
-				else
-					cury++;
-			}
-		}
-		curs_move(&curx, &cury, curx, cury);
-#endif
-	}
-}
-
-/* Gracefully exit ESC-sequence processing in case of misunderstanding. */
-static void
-bail_out(int c)
-{
-	char buf[16], *ch;
-	int i;
-
-	if (esc) {
-		efi_cons_rawputchar('\033');
-		if (esc != '\033')
-			efi_cons_rawputchar(esc);
-		for (i = 0; i <= argc; ++i) {
-			sprintf(buf, "%d", args[i]);
-			ch = buf;
-			while (*ch)
-				efi_cons_rawputchar(*ch++);
-		}
-	}
-	efi_cons_rawputchar(c);
-	end_term();
-}
-
-/* Clear display from current position to end of screen. */
-static void
-CD(void) {
-	UINTN i, x, y;
-
-	get_pos(&curx, &cury);
-	if (curx == 0 && cury == 0) {
-		conout->ClearScreen(conout);
-		end_term();
-		return;
-	}
-
-	conout->QueryMode(conout, conout->Mode->Mode, &x, &y);
-	CL(0);  /* clear current line from cursor to end */
-	for (i = cury + 1; i < y-1; i++) {
-		curs_move(NULL, NULL, 0, i);
-		CL(0);
-	}
-	curs_move(NULL, NULL, curx, cury);
-	end_term();
-}
-
-/*
- * Absolute cursor move to args[0] rows and args[1] columns
- * (the coordinates are 1-based).
- */
-static void
-CM(void)
-{
-	if (args[0] > 0)
-		args[0]--;
-	if (args[1] > 0)
-		args[1]--;
-	curs_move(&curx, &cury, args[1], args[0]);
-	end_term();
-}
-
-/* Home cursor (left top corner), also called from mode command. */
-void
-HO(void)
-{
-	argc = 1;
-	args[0] = args[1] = 1;
-	CM();
-}
-
-/* Clear line from current position to end of line */
-static void
-CL(int direction)
-{
-	int i, len;
-	UINTN x, y;
-	CHAR16 *line;
-
-	conout->QueryMode(conout, conout->Mode->Mode, &x, &y);
-	switch (direction) {
-	case 0:         /* from cursor to end */
-		len = x - curx + 1;
-		break;
-	case 1:         /* from beginning to cursor */
-		len = curx;
-		break;
-	case 2:         /* entire line */
-	default:
-		len = x;
-		break;
-	}
-
-	if (cury == y - 1)
-		len--;
-
-	line = malloc(len * sizeof (CHAR16));
-	if (line == NULL) {
-		printf("out of memory\n");
-		return;
-	}
-	for (i = 0; i < len; i++)
-		line[i] = ' ';
-	line[len-1] = 0;
-
-	if (direction != 0)
-		curs_move(NULL, NULL, 0, cury);
-
-	conout->OutputString(conout, line);
-	/* restore cursor position */
-	curs_move(NULL, NULL, curx, cury);
-	free(line);
-	end_term();
-}
-
-static void
-get_arg(int c)
-{
-	if (argc < 0)
-		argc = 0;
-	args[argc] *= 10;
-	args[argc] += c - '0';
-}
-
-/* Emulate basic capabilities of sun-color terminal */
-static void
-efi_term_emu(int c)
-{
-	static int ansi_col[] = {
-		0, 4, 2, 6, 1, 5, 3, 7
-	};
-	int t, i;
-
-	switch (esc) {
-	case 0:
-		switch (c) {
-		case '\033':
-			esc = c;
-			break;
-		default:
-			efi_cons_rawputchar(c);
-			break;
-		}
-		break;
-	case '\033':
-		switch (c) {
-		case '[':
-			esc = c;
-			args[0] = 0;
-			argc = -1;
-			break;
-		default:
-			bail_out(c);
-			break;
-		}
-		break;
-	case '[':
-		switch (c) {
-		case ';':
-			if (argc < 0)
-				argc = 0;
-			else if (argc + 1 >= MAXARGS)
-				bail_out(c);
-			else
-				args[++argc] = 0;
-			break;
-		case 'A':		/* UP = \E[%dA */
-			if (argc == 0) {
-				UINTN x, y;
-				get_pos(&x, &y);
-				args[1] = x + 1;
-				args[0] = y - args[0] + 1;
-				CM();
-			} else
-				bail_out(c);
-			break;
-		case 'B':		/* DO = \E[%dB */
-			if (argc == 0) {
-				UINTN x, y;
-				get_pos(&x, &y);
-				args[1] = x + 1;
-				args[0] = y + args[0] + 1;
-				CM();
-			} else
-				bail_out(c);
-			break;
-		case 'C':		/* RI = \E[%dC */
-			if (argc == 0) {
-				UINTN x, y;
-				get_pos(&x, &y);
-				args[1] = args[0] + 1;
-				args[0] = y + 1;
-				CM();
-			} else
-				bail_out(c);
-			break;
-		case 'H':		/* ho = \E[H */
-			if (argc < 0)
-				HO();
-			else if (argc == 1)
-				CM();
-			else
-				bail_out(c);
-			break;
-		case 'J':               /* cd = \E[J */
-			if (argc < 0)
-				CD();
-			else
-				bail_out(c);
-			break;
-		case 'K':
-			if (argc < 0)
-				CL(0);
-			else if (argc == 0)
-				switch (args[0]) {
-				case 0:
-				case 1:
-				case 2:
-					CL(args[0]);
-				break;
-				default:
-					bail_out(c);
-				}
-			else
-				bail_out(c);
-			break;
-		case 'm':
-			if (argc < 0) {
-				fg_c = DEFAULT_FGCOLOR;
-				bg_c = DEFAULT_BGCOLOR;
-			}
-			for (i = 0; i <= argc; ++i) {
-				switch (args[i]) {
-				case 0:         /* back to normal */
-					fg_c = DEFAULT_FGCOLOR;
-					bg_c = DEFAULT_BGCOLOR;
-					break;
-				case 1:         /* bold */
-					fg_c |= 0x8;
-					break;
-				case 4:         /* underline */
-				case 5:         /* blink */
-					bg_c |= 0x8;
-					break;
-				case 7:         /* reverse */
-					t = fg_c;
-					fg_c = bg_c;
-					bg_c = t;
-					break;
-				case 30: case 31: case 32: case 33:
-				case 34: case 35: case 36: case 37:
-					fg_c = ansi_col[args[i] - 30];
-					break;
-				case 39:        /* normal */
-					fg_c = DEFAULT_FGCOLOR;
-					break;
-				case 40: case 41: case 42: case 43:
-				case 44: case 45: case 46: case 47:
-					bg_c = ansi_col[args[i] - 40];
-					break;
-				case 49:        /* normal */
-					bg_c = DEFAULT_BGCOLOR;
-					break;
-				}
-			}
-			conout->SetAttribute(conout, EFI_TEXT_ATTR(fg_c, bg_c));
-			end_term();
-			break;
-		default:
-			if (isdigit(c))
-				get_arg(c);
-			else
-				bail_out(c);
-			break;
-		}
-		break;
-	default:
-		bail_out(c);
-		break;
-	}
-}
-
-void
-efi_cons_putchar(struct console *cp __attribute((unused)), int c)
-{
-#ifdef TERM_EMU
-	efi_term_emu(c);
-#else
-	efi_cons_rawputchar(c);
-#endif
+	/* make sure we have some console output, support for panic() */
+	if (tem == NULL)
+		efi_cons_efiputchar(c);
+	else
+		tem_write(tem, &buf, sizeof (buf));
 }
 
 static int
@@ -560,7 +626,7 @@ keybuf_inschar(EFI_INPUT_KEY *key)
 }
 
 static bool
-efi_readkey(void)
+efi_readkey(SIMPLE_INPUT_INTERFACE *conin)
 {
 	EFI_STATUS status;
 	EFI_INPUT_KEY key;
@@ -573,37 +639,97 @@ efi_readkey(void)
 	return (false);
 }
 
-int
-efi_cons_getchar(struct console *cp __attribute((unused)))
+static bool
+efi_readkey_ex(EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *coninex)
 {
+	EFI_STATUS status;
+	EFI_INPUT_KEY *kp;
+	EFI_KEY_DATA  key_data;
+	uint32_t kss;
+
+	status = coninex->ReadKeyStrokeEx(coninex, &key_data);
+	if (status == EFI_SUCCESS) {
+		kss = key_data.KeyState.KeyShiftState;
+		kp = &key_data.Key;
+		if (kss & EFI_SHIFT_STATE_VALID) {
+
+			/*
+			 * quick mapping to control chars, replace with
+			 * map lookup later.
+			 */
+			if (kss & EFI_RIGHT_CONTROL_PRESSED ||
+			    kss & EFI_LEFT_CONTROL_PRESSED) {
+				if (kp->UnicodeChar >= 'a' &&
+				    kp->UnicodeChar <= 'z') {
+					kp->UnicodeChar -= 'a';
+					kp->UnicodeChar++;
+				}
+			}
+		}
+
+		keybuf_inschar(kp);
+		return (true);
+	}
+	return (false);
+}
+
+static int
+efi_cons_getchar(struct console *cp)
+{
+	struct efi_console_data *ecd;
 	int c;
 
 	if ((c = keybuf_getchar()) != 0)
 		return (c);
 
+	ecd = cp->c_private;
 	key_pending = 0;
 
-	if (efi_readkey())
-		return (keybuf_getchar());
+	if (ecd->ecd_coninex == NULL) {
+		if (efi_readkey(ecd->ecd_conin))
+			return (keybuf_getchar());
+	} else {
+		if (efi_readkey_ex(ecd->ecd_coninex))
+			return (keybuf_getchar());
+	}
 
 	return (-1);
 }
 
-int
-efi_cons_poll(struct console *cp __attribute((unused)))
+static int
+efi_cons_poll(struct console *cp)
 {
+	struct efi_console_data *ecd;
+	EFI_SIMPLE_TEXT_INPUT_EX_PROTOCOL *coninex;
+	SIMPLE_INPUT_INTERFACE *conin;
+	EFI_STATUS status;
+
 	if (keybuf_ischar() || key_pending)
 		return (1);
 
+	ecd = cp->c_private;
+	coninex = ecd->ecd_coninex;
+	conin = ecd->ecd_conin;
 	/*
 	 * Some EFI implementation (u-boot for example) do not support
 	 * WaitForKey().
 	 * CheckEvent() can clear the signaled state.
 	 */
-	if (conin->WaitForKey == NULL)
-		key_pending = efi_readkey();
-	else
-		key_pending = BS->CheckEvent(conin->WaitForKey) == EFI_SUCCESS;
+	if (coninex != NULL) {
+		if (coninex->WaitForKeyEx == NULL)
+			key_pending = efi_readkey_ex(coninex);
+		else {
+			status = BS->CheckEvent(coninex->WaitForKeyEx);
+			key_pending = status == EFI_SUCCESS;
+		}
+	} else {
+		if (conin->WaitForKey == NULL)
+			key_pending = efi_readkey(conin);
+		else {
+			status = BS->CheckEvent(conin->WaitForKey);
+			key_pending = status == EFI_SUCCESS;
+		}
+	}
 
 	return (key_pending);
 }
@@ -613,31 +739,13 @@ void
 efi_cons_efiputchar(int c)
 {
 	CHAR16 buf[2];
+	EFI_STATUS status;
 
-	/*
-	 * translate box chars to unicode
-	 */
-	switch (c) {
-	/* single frame */
-	case 0xb3: buf[0] = BOXDRAW_VERTICAL; break;
-	case 0xbf: buf[0] = BOXDRAW_DOWN_LEFT; break;
-	case 0xc0: buf[0] = BOXDRAW_UP_RIGHT; break;
-	case 0xc4: buf[0] = BOXDRAW_HORIZONTAL; break;
-	case 0xda: buf[0] = BOXDRAW_DOWN_RIGHT; break;
-	case 0xd9: buf[0] = BOXDRAW_UP_LEFT; break;
-
-	/* double frame */
-	case 0xba: buf[0] = BOXDRAW_DOUBLE_VERTICAL; break;
-	case 0xbb: buf[0] = BOXDRAW_DOUBLE_DOWN_LEFT; break;
-	case 0xbc: buf[0] = BOXDRAW_DOUBLE_UP_LEFT; break;
-	case 0xc8: buf[0] = BOXDRAW_DOUBLE_UP_RIGHT; break;
-	case 0xc9: buf[0] = BOXDRAW_DOUBLE_DOWN_RIGHT; break;
-	case 0xcd: buf[0] = BOXDRAW_DOUBLE_HORIZONTAL; break;
-
-	default:
-		buf[0] = c;
-	}
+	buf[0] = c;
         buf[1] = 0;     /* terminate string */
 
+	status = conout->TestString(conout, buf);
+	if (EFI_ERROR(status))
+		buf[0] = '?';
 	conout->OutputString(conout, buf);
 }

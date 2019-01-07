@@ -1,0 +1,9 @@
+copy_from_user 0
+__copy_from_user 0
+copy_user_generic 0
+loop_get_status 1
+loop_info64_to_old 1
+ib_copy_qp_attr_to_user 0
+tcp_get_info 1
+snd_rawmidi_info_select 1
+t3e3_if_config 3

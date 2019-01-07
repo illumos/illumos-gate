@@ -202,7 +202,7 @@
  *	call during process execution.
  *
  *   -	_ld_libc() can also be called by libc during process execution to
- * 	re-establish interfaces such as the locale.
+ *	re-establish interfaces such as the locale.
  */
 static void
 get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
@@ -475,14 +475,13 @@ rt_bind_clear(int flags)
 void
 rt_thr_init(Lm_list *lml)
 {
-	void	(*fptr)(void);
+	int	(*fptr)(void);
 
-	if ((fptr =
-	    (void (*)())lml->lm_lcs[CI_THRINIT].lc_un.lc_func) != NULL) {
+	if ((fptr = lml->lm_lcs[CI_THRINIT].lc_un.lc_func) != NULL) {
 		lml->lm_lcs[CI_THRINIT].lc_un.lc_func = NULL;
 
 		leave(lml, thr_flg_reenter);
-		(*fptr)();
+		(void) (*fptr)();
 		(void) enter(thr_flg_reenter);
 
 		/*

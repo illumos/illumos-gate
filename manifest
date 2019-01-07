@@ -2424,6 +2424,7 @@ h usr/bin/encrypt=usr/lib/isaexec
 f usr/bin/enhance 0555 root bin
 f usr/bin/env 0555 root bin
 f usr/bin/eqn 0555 root bin
+f usr/bin/etdump 0555 root bin
 f usr/bin/expand 0555 root bin
 f usr/bin/expr 0555 root bin
 f usr/bin/exstr 0555 root bin
@@ -11783,6 +11784,7 @@ s usr/share/man/man1/errstr.1=ckstr.1
 s usr/share/man/man1/errtime.1=cktime.1
 s usr/share/man/man1/erruid.1=ckuid.1
 s usr/share/man/man1/erryorn.1=ckyorn.1
+f usr/share/man/man1/etdump.1 0444 root bin
 f usr/share/man/man1/expand.1 0444 root bin
 f usr/share/man/man1/expr.1 0444 root bin
 f usr/share/man/man1/exstr.1 0444 root bin

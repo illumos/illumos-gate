@@ -1,0 +1,18 @@
+/*
+ * These functions don't return.  Unfortunately, sparse today doesn't correctly
+ * respect __NORETURN, so we have to explicitly list them here for now.
+ */
+__assert_fail
+__builtin_unreachable
+bop_panic
+efi_reset
+panic
+pc_reset
+prom_exit_to_mon
+prom_panic
+prom_reboot
+reset
+resume_from_zombie
+swtch_from_zombie
+thread_exit
+vpanic

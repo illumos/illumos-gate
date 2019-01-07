@@ -16,6 +16,7 @@
 
 include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
+include $(SRC)/boot/sys/boot/Makefile.inc
 
 CFLAGS=		-Os -fno-reorder-functions
 CPPFLAGS=	-D_STANDALONE -nostdinc -I../../../../include -I../../..
@@ -50,7 +51,6 @@ all: ${LOADER} loader.help
 install: all $(ROOTBOOTLOADER)
 
 PROG=		${LOADER}.sym
-INTERNALPROG=
 
 # architecture-specific loader code
 SRCS=		main.c conf.c vers.c chain.c
@@ -66,6 +66,7 @@ SRCS +=	boot.c commands.c console.c devopen.c interp.c
 SRCS +=	interp_backslash.c interp_parse.c ls.c misc.c
 SRCS +=	module.c panic.c linenoise.c multiboot2.c
 SRCS +=	zfs_cmd.c
+SRCS +=	font.c $(FONT).c list.c tem.c
 
 SRCS +=	load_elf32.c load_elf32_obj.c reloc_elf32.c
 SRCS +=	load_elf64.c load_elf64_obj.c reloc_elf64.c
@@ -89,6 +90,7 @@ CPPFLAGS +=	-I../../common
 CPPFLAGS +=	-I.
 
 CLEANFILES=	vers.c ${LOADER} ${LOADER}.sym ${LOADER}.bin loader.help
+CLEANFILES +=	$(FONT).c
 
 CFLAGS +=	-Wall
 LDFLAGS=	-static -Ttext 0x0
@@ -165,6 +167,15 @@ install: all $(ROOT_BOOT_DEFAULTS) $(ROOT_BOOT_FORTH) \
 
 %.o:	../../common/linenoise/%.c
 	$(COMPILE.c) -o $@ $<
+
+%.o: $(SRC)/common/list/%.c
+	$(COMPILE.c) -DNDEBUG $<
+
+%.o: $(SRC)/common/font/%.c
+	$(COMPILE.c) $<
+
+$(FONT).c: $(FONT_DIR)/$(FONT_SRC)
+	$(VTFONTCVT) -f compressed-source -o $@ $(FONT_DIR)/$(FONT_SRC)
 
 $(ROOT_BOOT)/%: ../../forth/%
 	$(INS.file)

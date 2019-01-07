@@ -22,14 +22,14 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2018 Toomas Soome <tsoome@me.com>
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Support routines for VGA drivers
  */
 
+#if defined(_KERNEL)
 #include <sys/debug.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -39,8 +39,6 @@
 #include <sys/systm.h>
 #include <sys/conf.h>
 
-#include <sys/vgareg.h>
-#include <sys/vgasubr.h>
 #include <sys/cmn_err.h>
 
 #include <sys/kmem.h>
@@ -50,6 +48,21 @@
 #include <sys/sunddi.h>
 
 #include <sys/modctl.h>
+
+#define	PUTB(reg, off, v)	ddi_put8(reg->handle, reg->addr + (off), v)
+#define	GETB(reg, off)		ddi_get8(reg->handle, reg->addr + (off))
+
+#elif defined(_STANDALONE)
+
+#include <stand.h>
+#include <machine/cpufunc.h>
+
+#define	PUTB(reg, off, v)	outb(reg + (off), v)
+#define	GETB(reg, off)		inb(reg + (off))
+#endif
+
+#include <sys/vgareg.h>
+#include <sys/vgasubr.h>
 
 #define	GET_HORIZ_END(c)	vga_get_crtc(c, VGA_CRTC_H_D_END)
 #define	GET_VERT_END(c)	(vga_get_crtc(c, VGA_CRTC_VDE) \
@@ -76,66 +89,63 @@ unsigned char VGA_ATR_TEXT[NUM_ATR_REG] = {
 	0x0c, 0x00, 0x0f, 0x08, 0x00 };
 
 void
-vga_get_hardware_settings(struct vgaregmap *reg, int *width, int *height)
+vga_get_hardware_settings(vgaregmap_t reg, int *width, int *height)
 {
 	*width = (GET_HORIZ_END(reg)+1)*8;
 	*height = GET_VERT_END(reg)+1;
 	if (GET_VERT_X2(reg)) *height *= 2;
 }
 
-#define	PUTB(reg, off, v) ddi_put8(reg->handle, reg->addr + (off), v)
-#define	GETB(reg, off) ddi_get8(reg->handle, reg->addr + (off))
-
 int
-vga_get_reg(struct vgaregmap *reg, int indexreg)
+vga_get_reg(vgaregmap_t reg, int indexreg)
 {
 	return (GETB(reg, indexreg));
 }
 
 void
-vga_set_reg(struct vgaregmap *reg, int indexreg, int v)
+vga_set_reg(vgaregmap_t reg, int indexreg, int v)
 {
 	PUTB(reg, indexreg, v);
 }
 
 int
-vga_get_crtc(struct vgaregmap *reg, int i)
+vga_get_crtc(vgaregmap_t reg, int i)
 {
 	return (vga_get_indexed(reg, VGA_CRTC_ADR, VGA_CRTC_DATA, i));
 }
 
 void
-vga_set_crtc(struct vgaregmap *reg, int i, int v)
+vga_set_crtc(vgaregmap_t reg, int i, int v)
 {
 	vga_set_indexed(reg, VGA_CRTC_ADR, VGA_CRTC_DATA, i, v);
 }
 
 int
-vga_get_seq(struct vgaregmap *reg, int i)
+vga_get_seq(vgaregmap_t reg, int i)
 {
 	return (vga_get_indexed(reg, VGA_SEQ_ADR, VGA_SEQ_DATA, i));
 }
 
 void
-vga_set_seq(struct vgaregmap *reg, int i, int v)
+vga_set_seq(vgaregmap_t reg, int i, int v)
 {
 	vga_set_indexed(reg, VGA_SEQ_ADR, VGA_SEQ_DATA, i, v);
 }
 
 int
-vga_get_grc(struct vgaregmap *reg, int i)
+vga_get_grc(vgaregmap_t reg, int i)
 {
 	return (vga_get_indexed(reg, VGA_GRC_ADR, VGA_GRC_DATA, i));
 }
 
 void
-vga_set_grc(struct vgaregmap *reg, int i, int v)
+vga_set_grc(vgaregmap_t reg, int i, int v)
 {
 	vga_set_indexed(reg, VGA_GRC_ADR, VGA_GRC_DATA, i, v);
 }
 
 int
-vga_get_atr(struct vgaregmap *reg, int i)
+vga_get_atr(vgaregmap_t reg, int i)
 {
 	int ret;
 
@@ -150,7 +160,7 @@ vga_get_atr(struct vgaregmap *reg, int i)
 }
 
 void
-vga_set_atr(struct vgaregmap *reg, int i, int v)
+vga_set_atr(vgaregmap_t reg, int i, int v)
 {
 	(void) GETB(reg, CGA_STAT);
 	PUTB(reg, VGA_ATR_AD, i);
@@ -162,7 +172,7 @@ vga_set_atr(struct vgaregmap *reg, int i, int v)
 
 void
 vga_set_indexed(
-	struct vgaregmap *reg,
+	vgaregmap_t reg,
 	int indexreg,
 	int datareg,
 	unsigned char index,
@@ -174,7 +184,7 @@ vga_set_indexed(
 
 int
 vga_get_indexed(
-	struct vgaregmap *reg,
+	vgaregmap_t reg,
 	int indexreg,
 	int datareg,
 	unsigned char index)
@@ -190,7 +200,7 @@ vga_get_indexed(
  */
 void
 vga_put_cmap(
-	struct vgaregmap *reg,
+	vgaregmap_t reg,
 	int index,
 	unsigned char r,
 	unsigned char g,
@@ -205,7 +215,7 @@ vga_put_cmap(
 
 void
 vga_get_cmap(
-	struct vgaregmap *reg,
+	vgaregmap_t reg,
 	int index,
 	unsigned char *r,
 	unsigned char *g,
@@ -220,8 +230,7 @@ vga_get_cmap(
 #ifdef	DEBUG
 
 void
-vga_dump_regs(struct vgaregmap *reg,
-	int maxseq, int maxcrtc, int maxatr, int maxgrc)
+vga_dump_regs(vgaregmap_t reg, int maxseq, int maxcrtc, int maxatr, int maxgrc)
 {
 	int i, j;
 

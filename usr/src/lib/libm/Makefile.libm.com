@@ -11,6 +11,7 @@
 
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 LIBMDIR		= $(SRC)/lib/libm
@@ -62,6 +63,10 @@ CFLAGS64	+= -_gcc=-D__C99FEATURES__
 # libm depends on integer overflow characteristics
 CFLAGS		+= -_gcc=-fno-strict-overflow
 CFLAGS64	+= -_gcc=-fno-strict-overflow
+
+# sparse currently has no _Complex support
+CFLAGS		+= -_smatch=off
+CFLAGS64	+= -_smatch=off
 
 $(DYNLIB) 	:= LDLIBS += -lc
 

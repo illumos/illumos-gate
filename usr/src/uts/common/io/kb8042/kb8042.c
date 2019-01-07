@@ -159,22 +159,46 @@ static int kb8042_close(queue_t *qp, int flag, cred_t *credp);
 static int kb8042_wsrv();
 
 struct module_info kb8042_sinfo = {
-	42,		/* Module ID */
-	module_name,
-	0, 32,		/* Minimum and maximum packet sizes */
-	256, 128	/* High and low water marks */
+	.mi_idnum = 42,			/* Module ID */
+	.mi_idname = module_name,	/* Module name */
+	.mi_minpsz = 0,			/* Minimum packet size */
+	.mi_maxpsz = 32,		/* Maximum packet size */
+	.mi_hiwat = 256,		/* High water mark */
+	.mi_lowat = 128			/* Low water mark */
 };
 
 static struct qinit kb8042_rinit = {
-	NULL, NULL, kb8042_open, kb8042_close, NULL, &kb8042_sinfo, NULL
+	.qi_putp = NULL,
+	.qi_srvp = NULL,
+	.qi_qopen = kb8042_open,
+	.qi_qclose = kb8042_close,
+	.qi_qadmin = NULL,
+	.qi_minfo = &kb8042_sinfo,
+	.qi_mstat = NULL,
+	.qi_rwp = NULL,
+	.qi_infop = NULL,
+	.qi_struiot = 0
 };
 
 static struct qinit kb8042_winit = {
-	putq, kb8042_wsrv, kb8042_open, kb8042_close, NULL, &kb8042_sinfo, NULL
+	.qi_putp = putq,
+	.qi_srvp = kb8042_wsrv,
+	.qi_qopen = kb8042_open,
+	.qi_qclose = kb8042_close,
+	.qi_qadmin = NULL,
+	.qi_minfo = &kb8042_sinfo,
+	.qi_mstat = NULL,
+	.qi_rwp = NULL,
+	.qi_infop = NULL,
+	.qi_struiot = 0
 };
 
-struct streamtab
-	kb8042_str_info = { &kb8042_rinit, &kb8042_winit, NULL, NULL };
+struct streamtab kb8042_str_info = {
+	.st_rdinit = &kb8042_rinit,
+	.st_wrinit = &kb8042_winit,
+	.st_muxrinit = NULL,
+	.st_muxwinit = NULL
+};
 
 struct kb8042	Kdws = {0};
 static dev_info_t *kb8042_dip = NULL;
@@ -185,36 +209,39 @@ static int kb8042_attach(dev_info_t *, ddi_attach_cmd_t);
 static int kb8042_detach(dev_info_t *, ddi_detach_cmd_t);
 
 static 	struct cb_ops cb_kb8042_ops = {
-	nulldev,		/* cb_open */
-	nulldev,		/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	&kb8042_str_info,	/* cb_stream */
-	D_MP
+	.cb_open = nulldev,
+	.cb_close = nulldev,
+	.cb_strategy = nodev,
+	.cb_print = nodev,
+	.cb_dump = nodev,
+	.cb_read = nodev,
+	.cb_write = nodev,
+	.cb_ioctl = nodev,
+	.cb_devmap = nodev,
+	.cb_mmap = nodev,
+	.cb_segmap = nodev,
+	.cb_chpoll = nochpoll,
+	.cb_prop_op = ddi_prop_op,
+	.cb_str = &kb8042_str_info,
+	.cb_flag = D_MP,
+	.cb_rev = CB_REV,
+	.cb_aread = nodev,
+	.cb_awrite = nodev
 };
 
 struct dev_ops kb8042_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* devo_refcnt */
-	kb8042_getinfo,		/* devo_getinfo */
-	nulldev,		/* devo_identify */
-	nulldev,		/* devo_probe */
-	kb8042_attach,		/* devo_attach */
-	kb8042_detach,		/* devo_detach */
-	nodev,			/* devo_reset */
-	&cb_kb8042_ops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	NULL,			/* devo_power */
-	ddi_quiesce_not_needed,	/* devo_quiesce */
+	.devo_rev = DEVO_REV,
+	.devo_refcnt = 0,
+	.devo_getinfo = kb8042_getinfo,
+	.devo_identify = nulldev,
+	.devo_probe = nulldev,
+	.devo_attach = kb8042_attach,
+	.devo_detach = kb8042_detach,
+	.devo_reset = nodev,
+	.devo_cb_ops = &cb_kb8042_ops,
+	.devo_bus_ops = NULL,
+	.devo_power = NULL,
+	.devo_quiesce = ddi_quiesce_not_needed
 };
 
 
@@ -227,15 +254,14 @@ struct dev_ops kb8042_ops = {
  * Module linkage information for the kernel.
  */
 static struct modldrv modldrv = {
-	&mod_driverops, /* Type of module.  This one is a driver */
-	"PS/2 keyboard driver",
-	&kb8042_ops,	/* driver ops */
+	.drv_modops = &mod_driverops,	/* Type of module. */
+	.drv_linkinfo = "PS/2 keyboard driver",
+	.drv_dev_ops = &kb8042_ops,	/* driver ops */
 };
 
 static struct modlinkage modlinkage = {
-	MODREV_1,
-	(void *) &modldrv,
-	NULL
+	.ml_rev = MODREV_1,
+	.ml_linkage = { &modldrv, NULL }
 };
 
 int

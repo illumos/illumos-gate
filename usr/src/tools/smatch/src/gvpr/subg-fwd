@@ -1,0 +1,79 @@
+#!/usr/bin/gvpr -f
+// Compute the forward partition of the chosen function
+//
+// Run with graph ... | return-paths | subg-fwd -a functionname
+//       or graph ... | subg-fwd
+
+
+BEGIN {
+	// Find the immediate parent subgraph of this object
+	graph_t find_owner(obj_t o, graph_t g)
+	{
+		graph_t g1;
+		for (g1 = fstsubg(g); g1; g1 = nxtsubg(g1))
+			if(isIn(g1,o)) return g1;
+		return NULL;
+	}
+}
+
+BEG_G {
+	graph_t sg = subg ($, sprintf("incoming-%s", ARGV[0]));
+	graph_t returns = graph("return-edges", ""); // Temporary graph to hold return edges
+	graph_t target, g, g2;
+	node_t n;
+	edge_t e;
+	int i;
+
+	$tvtype = TV_fwd;
+
+	// find the ep corresponding to ARG[0]
+	for (g = fstsubg($G); g; g = nxtsubg(g)) {
+		if(g.fun == ARGV[0]) {
+			n = node($,g.ep);
+			$tvroot = n;
+			n.style = "filled";
+			target = g;
+			break;
+		}
+	}
+	if(!target) {
+		printf(2, "Function %s not found\n", ARGV[0]);
+		exit(1);
+	}
+}
+
+// Preserve external functions
+E [op == "extern"] {
+	subnode (sg, head);
+}
+
+// Move unused return edges into a separate graph so they don't get followed
+N [op == "ret"] {
+	for (e = fstout($); e; e = nxtout(e))
+		if (e.op == "ret" && !isIn(sg, e.head)) {
+			clone(returns, e);
+			delete($G, e);
+		}
+}
+
+// Recover elided return edge for this target node
+N [op == "target" && indegree == 1] {
+	n = copy(returns, $);
+	e = fstin(n); // each target node can only have one return edge
+	e = edge(copy(sg, e.tail), $, "recovered"); // clone should work here, but doesn't
+	copyA(fstin(n), e);
+}
+
+// Copy relevant nodes
+N {
+	$tvroot = NULL;
+
+	g = find_owner($, $G);
+	if(g && g != sg)
+		subnode (copy(sg, g), $);
+}
+
+END_G {
+	induce(sg);
+	write(sg);
+}

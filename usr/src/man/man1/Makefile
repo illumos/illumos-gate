@@ -17,7 +17,7 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	1
+MANSECT=	1
 
 MANFILES=	acctcom.1			\
 		adb.1				\
@@ -123,6 +123,7 @@ MANFILES=	acctcom.1			\
 		enhance.1			\
 		env.1				\
 		eqn.1				\
+		etdump.1			\
 		exec.1				\
 		exit.1				\
 		expand.1			\

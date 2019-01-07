@@ -1,0 +1,1 @@
+CREATE TABLE fn_ptr_data_link (fn_ptr varchar(80), data varchar(80), CONSTRAINT unique_row UNIQUE (fn_ptr, data));

@@ -63,8 +63,6 @@
 
 #define _NOTE(s)
 
-typedef enum { B_FALSE, B_TRUE } boolean_t;
-
 /* CRC64 table */
 #define	ZFS_CRC64_POLY	0xC96C5795D7870F42ULL	/* ECMA-182, reflected form */
 
@@ -1243,10 +1241,10 @@ typedef struct mzap_phys {
  * 1<<FZAP_BLOCK_SHIFT byte blocks. The layout looks like one of:
  *
  * ptrtbl fits in first block:
- * 	[zap_phys_t zap_ptrtbl_shift < 6] [zap_leaf_t] ...
+ *	[zap_phys_t zap_ptrtbl_shift < 6] [zap_leaf_t] ...
  *
  * ptrtbl too big for first block:
- * 	[zap_phys_t zap_ptrtbl_shift >= 6] [zap_leaf_t] [ptrtbl] ...
+ *	[zap_phys_t zap_ptrtbl_shift >= 6] [zap_leaf_t] [ptrtbl] ...
  *
  */
 
@@ -1396,7 +1394,7 @@ typedef struct zap_leaf_phys {
 
 typedef union zap_leaf_chunk {
 	struct zap_leaf_entry {
-		uint8_t le_type; 		/* always ZAP_CHUNK_ENTRY */
+		uint8_t le_type;		/* always ZAP_CHUNK_ENTRY */
 		uint8_t le_value_intlen;	/* size of ints */
 		uint16_t le_next;		/* next entry in hash chain */
 		uint16_t le_name_chunk;		/* first chunk of the name */

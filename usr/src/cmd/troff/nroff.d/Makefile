@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2019, Joyent, Inc.
 
 include 	../../Makefile.cmd
 
@@ -44,6 +45,9 @@ CERRWARN +=	-_gcc=-Wno-extra
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
+
+# parse error: parsing (i (9223372034707292160-96) >= 65)
+SMATCH =	off
 
 LDLIBS +=	-lmapmalloc
 #

@@ -22,15 +22,13 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Swiss German Type 6 (USB) key layout
 #
-key  53  base § shift ° caps § ctrl § altg nop
+key  53  base 0x00A7 shift 0x00B0 caps 0x00A7 ctrl 0x00A7 altg nop
 key  30  base 1 shift + caps 1 ctrl 1 altg |
 key  31  base 2 shift '"' caps 2 ctrl ^@ altg @
 key  32  base 3 shift * caps 3 ctrl 3 altg #
-key  33  base 4 shift ç caps 4 ctrl ^^ altg ^
+key  33  base 4 shift 0x00E7 caps 4 ctrl ^^ altg ^
 key  34  base 5 shift % caps 5 ctrl 5 altg ~
 key  35  base 6 shift & caps 6 ctrl 6 altg nop
 key  36  base 7 shift / caps 7 ctrl 7 altg nop
@@ -40,11 +38,11 @@ key  39  base 0 shift = caps 0 ctrl 0 altg '`'
 key  45  base '\'' shift ? caps '\'' ctrl '\'' altg fa_acute
 key  46  base fa_cflex shift fa_grave caps fa_cflex ctrl ^^ altg fa_tilde
 key  28  base z shift Z caps Z ctrl ^Z altg nop
-key  47  base ü shift è caps Ü ctrl ^[ altg [
+key  47  base 0x00FC shift 0x00E8 caps 0x00DC ctrl ^[ altg [
 key  48  base fa_umlaut shift ! caps fa_umlaut ctrl ^] altg ]
-key  51  base ö shift é caps Ö ctrl ö altg nop
-key  52  base ä shift à caps Ä ctrl ä altg {
-key  50  base $ shift £ caps $ ctrl $ altg } numl nonl up nop
+key  51  base 0x00F6 shift 0x00E9 caps 0x00D6 ctrl 0x00F6 altg nop
+key  52  base 0x00E4 shift 0x00E0 caps 0x00C4 ctrl 0x00E4 altg {
+key  50  base $ shift 0x00A3 caps $ ctrl $ altg } numl nonl up nop
 key  49  all hole
 key 100  base < shift > caps < ctrl ^\ altg '\\' numl nonl up nop
 key  29  base y shift Y caps Y ctrl ^Y altg nop

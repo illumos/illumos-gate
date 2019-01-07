@@ -37,6 +37,7 @@
  * MIB information comes from IP.
  */
 
+static int	dummy_wput(queue_t *, mblk_t *);
 static int	dummy_modclose(queue_t *, int, cred_t *);
 static int	dummy_modopen(queue_t *q, dev_t *devp, int flag,
 		    int sflag, cred_t *credp);
@@ -52,12 +53,12 @@ struct module_info dummy_mod_info = {
 
 
 static struct qinit dummyrmodinit = {
-	(pfi_t)putnext, NULL, dummy_modopen, dummy_modclose, NULL,
+	dummy_wput, NULL, dummy_modopen, dummy_modclose, NULL,
 	&dummy_mod_info
 };
 
 static struct qinit dummywmodinit = {
-	(pfi_t)putnext, NULL, NULL, NULL, NULL, &dummy_mod_info
+	dummy_wput, NULL, NULL, NULL, NULL, &dummy_mod_info
 };
 
 struct streamtab dummymodinfo = {
@@ -65,6 +66,13 @@ struct streamtab dummymodinfo = {
 };
 
 /* ARGSUSED */
+static int
+dummy_wput(queue_t *q, mblk_t *m)
+{
+	putnext(q, m);
+	return (0);
+}
+
 static int
 dummy_modclose(queue_t *q, int flags __unused, cred_t *credp __unused)
 {

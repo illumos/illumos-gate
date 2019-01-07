@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Add these lines to your .vimrc file
+#
+# map <C-r> :! vim_smdb return_states <cword> <CR> :execute 'edit' system("cat ~/.smdb_tmp/cur") <CR>
+# map <C-c> :! vim_smdb <cword> <CR> :execute 'edit' system("cat ~/.smdb_tmp/cur") <CR>
+#
+# Now you can move your cursor over a function and hit CTRL-c to see how it's
+# called or CTRL-r to see what it returns.  Use the ":bd" command to get back to
+# your source.
+
+DIR="$HOME/.smdb_tmp"
+mkdir -p $DIR
+
+for i in $(seq 1 100) ; do
+	if [ ! -e $DIR/$i ] ; then
+		break
+	fi
+done
+
+if [ $i == 100 ] ; then
+	i=1
+fi
+
+next=$(($i + 1))
+
+rm -f $DIR/$next
+rm $DIR/.${i}.swp
+smdb $* > $DIR/$i
+
+echo "$DIR/$i" > $DIR/cur
+

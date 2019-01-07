@@ -1,0 +1,12 @@
+CREATE TABLE return_implies (
+	file varchar(128),
+	function varchar(64),
+	call_id integer,
+	static boolean,
+	type integer,
+	parameter integer,
+	key varchar(256),
+	value varchar(256),
+
+	CONSTRAINT implies_row UNIQUE (file, function, call_id, static, type, parameter, key, value)
+);

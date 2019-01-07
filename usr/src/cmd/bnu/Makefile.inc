@@ -22,6 +22,8 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 SRCS =		account.c anlwrk.c bnuconvert.c callers.c		\
 		chremdir.c cntrl.c conn.c cpmv.c ct.c			\
@@ -45,6 +47,9 @@ CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-extra
 CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
+
+# "parse error: parsing (arg (9223372034707292160-0,2-s32max) == 2)"
+SMATCH		= off
 
 TLILIB =	-lnsl -lsocket
 PAMLIB =        -lpam

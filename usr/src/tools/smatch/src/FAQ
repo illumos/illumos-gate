@@ -1,0 +1,74 @@
+	FAQ - Why sparse?
+
+Q.  Why not just use gcc?
+
+A.  Gcc is big, complex, and the gcc maintainers are not interested in
+    other uses of the gcc front-end.  In fact, gcc has explicitly
+    resisted splitting up the front and back ends and having some common
+    intermediate language because of religious license issues - you can
+    have multiple front ends and back ends, but they all have to be part
+    of gcc and licensed under the GPL. 
+
+    This all (in my opinion) makes gcc development harder than it should
+    be, and makes the end result very ungainly.  With "sparse", the
+    front-end is very explicitly separated into its own independent
+    project, and is totally independent from the users.  I don't want to
+    know what you do in the back-end, because I don't think I _should_
+    know or care. 
+
+
+Q.  Why not GPL?
+
+A.  See the previous question: I personally think that the front end
+    must be a totally separate project from the back end: any other
+    approach just leads to insanity.  However, at the same time clearly
+    we cannot write intermediate files etc crud (since then the back end
+    would have to re-parse the whole thing and would have to have its
+    own front end and just do a lot of things that do not make any sense
+    from a technical standpoint).
+
+    I like the GPL, but as rms says, "Linus is just an engineer". I
+    refuse to use a license if that license causes bad engineering
+    decisions.  I want the front-end to be considered a separate
+    project, yet the GPL considers the required linking to make the
+    combined thing a derived work. Which is against the whole point
+    of 'sparse'.
+
+    I'm not interested in code generation. I'm not interested in what
+    other people do with their back-ends.  I _am_ interested in making a
+    good front-end, and "good" means that people find it usable. And
+    they shouldn't be scared away by politics or licenses. If they want
+    to make their back-end be BSD/MIT licensed, that's great. And if
+    they want to have a proprietary back-end, that's ok by me too. It's
+    their loss, not mine.
+
+
+Q.  Does it really parse C?
+
+A.  Yeah, well...  It parses a fairly complete subset of "extended C" as
+    defined by gcc.  HOWEVER, since I don't believe in K&R syntax for
+    function declarations or in giving automatic integer types, it
+    doesn't do that.  If you don't give types to your variables, they
+    won't have any types, and you can't use them.
+
+    Similarly, it will be very unhappy about undeclared functions,
+    rather than just assuming they have type "int". 
+
+    Note that a large rationale for me doing this project is for type
+    following, which to some degree explains why the thing is type-anal
+    and refuses to touch the old-style pre-ANSI non-typed (or weakly
+    typed) constructs. Maybe somebody else who is working on projects
+    where pre-ANSI C makes sense might be more inclined to care about
+    ancient C.  It's open source, after all. Go wild.
+
+
+Q.  What other sparse resources are available?
+
+A.  Wiki: http://sparse.wiki.kernel.org/index.php/Main_Page
+
+    Mailing list: linux-sparse@vger.kernel.org
+    See http://vger.kernel.org/vger-lists.html#linux-sparse for subscription
+    instructions and links to archives
+
+    Git repo: git://git.kernel.org/pub/scm/devel/sparse/sparse.git
+    gitweb: http://git.kernel.org/?p=devel/sparse/sparse.git

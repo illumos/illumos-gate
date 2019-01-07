@@ -1,0 +1,73 @@
+#!/bin/bash
+
+function usage {
+    echo "Usage:  $0 [--sparse][--valgrind][--debug] path/to/file.c"
+    exit 1
+}
+
+SCRIPT_DIR=$(dirname $0)
+if [ -e $SCRIPT_DIR/../smatch ] ; then
+    CMD=$SCRIPT_DIR/../smatch
+elif which smatch | grep smatch > /dev/null ; then
+    CMD=smatch
+else
+    echo "Smatch binary not found."
+    exit 1
+fi
+
+while true ; do
+    if [[ "$1" == "--sparse" ]] ; then
+	CMD="sparse"
+	shift
+    elif [[ "$1" == "--test-parsing" ]] ; then
+	CMD="$SCRIPT_DIR/../test-parsing -no-lineno"
+	shift
+    elif echo "$1" | grep -q -- "--outfile=" ; then
+	outfile=$(echo "$1" | cut -d '=' -f 2)
+	if [ "outfile" != "" ] ; then
+	    POST="$POST > $outfile"
+	fi
+	shift
+    elif [[ "$1" == "--valgrind" ]] ; then
+	PRE="valgrind"
+	shift
+    elif [[ "$1" == "--endian" ]] ; then
+        ENDIAN="CF=-D__CHECK_ENDIAN__"
+	shift
+    elif [[ "$1" == "" ]] ; then
+	break
+    else
+	if [[ "$1" == "--help" ]] ; then
+		$CMD --help
+		exit 1
+	fi
+	if echo $1 | grep -q ^- ; then
+		POST="$1 $POST"
+	else
+		break
+	fi
+	shift
+    fi
+done
+if echo $CMD | grep -q smatch ; then
+    POST="--project=kernel --succeed $POST"
+fi
+
+cname=$1
+cname=$(echo ${cname/.o/.c})
+if [[ "$cname" == "" ]] ; then
+    usage
+fi
+if ! test -e $cname ; then
+    usage
+fi
+
+oname=$(echo ${cname/.c/.o})
+if ! echo $oname | grep -q .o$ && ! echo $oname | grep -q /$ ; then
+    usage
+fi
+if  echo $oname | grep -q .o$ ; then
+    rm -f $oname
+fi
+
+make C=2 $ENDIAN CHECK="$PRE $CMD $POST" $oname

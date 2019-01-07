@@ -1,0 +1,21 @@
+/*
+ * These macros are actively misleading to smatch so 
+ * it's best to ignore them.
+ */
+WARN_ON
+B43legacy_WARN_ON
+B43_WARN_ON
+/* ASSERT can be worthwhile or bogus. */
+HPI_DEBUG_ASSERT
+snd_BUG_ON
+WARN_ON_ONCE
+ubi_assert
+bfa_assert
+ZD_ASSERT
+ubifs_assert
+AR_DEBUG_ASSERT
+RT_ASSERT
+SKD_ASSERT
+SNIC_BUG_ON
+LASSERT
+AA_BUG

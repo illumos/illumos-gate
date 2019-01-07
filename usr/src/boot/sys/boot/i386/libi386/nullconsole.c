@@ -1,10 +1,10 @@
-/*-
+/*
  * nullconsole.c
  *
  * Author: Doug Ambrisko <ambrisko@whistle.com>
  * Copyright (c) 2000 Whistle Communications, Inc.
  * All rights reserved.
- * 
+ *
  * Subject to the following obligations and disclaimer of warranty, use and
  * redistribution of this software, in source or object code forms, with or
  * without modifications are expressly permitted by Whistle Communications;
@@ -15,7 +15,7 @@
  *    Communications, Inc. trademarks, including the mark "WHISTLE
  *    COMMUNICATIONS" on advertising, endorsements, or otherwise except as
  *    such appears in the above copyright notice or in the software.
- * 
+ *
  * THIS SOFTWARE IS BEING PROVIDED BY WHISTLE COMMUNICATIONS "AS IS", AND
  * TO THE MAXIMUM EXTENT PERMITTED BY LAW, WHISTLE COMMUNICATIONS MAKES NO
  * REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED, REGARDING THIS SOFTWARE,
@@ -55,6 +55,7 @@ struct console nullconsole = {
 	.c_out = nullc_putchar,
 	.c_in = nullc_getchar,
 	.c_ready = nullc_ischar,
+	.c_ioctl = NULL,
 	.c_private = NULL
 };
 
@@ -65,26 +66,24 @@ nullc_probe(struct console *cp)
 }
 
 static int
-nullc_init(struct console *cp __attribute((unused)),
-    int arg __attribute((unused)))
+nullc_init(struct console *cp __unused, int arg __unused)
 {
 	return(0);
 }
 
 static void
-nullc_putchar(struct console *cp __attribute((unused)),
-    int c __attribute((unused)))
+nullc_putchar(struct console *cp __unused, int c __unused)
 {
 }
 
 static int
-nullc_getchar(struct console *cp __attribute((unused)))
+nullc_getchar(struct console *cp __unused)
 {
 	return(-1);
 }
 
 static int
-nullc_ischar(struct console *cp __attribute((unused)))
+nullc_ischar(struct console *cp __unused)
 {
 	return(0);
 }

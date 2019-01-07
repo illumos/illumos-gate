@@ -27,11 +27,15 @@
 #ifndef	_SYS_VGAREG_H
 #define	_SYS_VGAREG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#define	VGA_REG_ADDR	0x3c0
+#define	VGA_REG_SIZE	0x20
+
+#define	VGA_MEM_ADDR	0xa0000
+#define	VGA_MEM_SIZE	0x20000
 
 /*
  * VGA frame buffer hardware definitions.

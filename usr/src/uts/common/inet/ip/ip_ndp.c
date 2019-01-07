@@ -107,7 +107,7 @@
  */
 
 static	void	nce_cleanup_list(ncec_t *ncec);
-static	void 	nce_set_ll(ncec_t *ncec, uchar_t *ll_addr);
+static	void	nce_set_ll(ncec_t *ncec, uchar_t *ll_addr);
 static	ncec_t	*ncec_lookup_illgrp(ill_t *, const in6_addr_t *,
     ncec_t *);
 static	nce_t	*nce_lookup_addr(ill_t *, const in6_addr_t *);
@@ -126,7 +126,7 @@ static	int	nce_add_common(ill_t *, uchar_t *, uint_t, const in6_addr_t *,
 static nce_t *nce_add_impl(ill_t *, ncec_t *, nce_t *, mblk_t *);
 static nce_t *nce_add(ill_t *, ncec_t *);
 static void nce_inactive(nce_t *);
-extern nce_t 	*nce_lookup(ill_t *, const in6_addr_t *);
+extern nce_t	*nce_lookup(ill_t *, const in6_addr_t *);
 static nce_t *nce_ill_lookup_then_add(ill_t *, ncec_t *);
 static int	nce_add_v6(ill_t *, uchar_t *, uint_t, const in6_addr_t *,
     uint16_t, uint16_t, nce_t **);
@@ -596,9 +596,9 @@ ncec_inactive(ncec_t *ncec)
  * that is going away.  Always called as a writer.
  */
 void
-ncec_delete_per_ill(ncec_t *ncec, uchar_t *arg)
+ncec_delete_per_ill(ncec_t *ncec, void *arg)
 {
-	if ((ncec != NULL) && ncec->ncec_ill == (ill_t *)arg) {
+	if ((ncec != NULL) && ncec->ncec_ill == arg) {
 		ncec_delete(ncec);
 	}
 }
@@ -934,13 +934,13 @@ nce_process(ncec_t *ncec, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 }
 
 /*
- * Pass arg1 to the pfi supplied, along with each ncec in existence.
+ * Pass arg1 to the cbf supplied, along with each ncec in existence.
  * ncec_walk() places a REFHOLD on the ncec and drops the lock when
  * walking the hash list.
  */
 void
-ncec_walk_common(ndp_g_t *ndp, ill_t *ill, pfi_t pfi, void *arg1,
-    boolean_t trace)
+ncec_walk_common(ndp_g_t *ndp, ill_t *ill, ncec_walk_cb_t cbf,
+    void *arg1, boolean_t trace)
 {
 	ncec_t	*ncec;
 	ncec_t	*ncec1;
@@ -958,11 +958,11 @@ ncec_walk_common(ndp_g_t *ndp, ill_t *ill, pfi_t pfi, void *arg1,
 			if (ill == NULL || ncec->ncec_ill == ill) {
 				if (trace) {
 					ncec_refhold(ncec);
-					(*pfi)(ncec, arg1);
+					(*cbf)(ncec, arg1);
 					ncec_refrele(ncec);
 				} else {
 					ncec_refhold_notr(ncec);
-					(*pfi)(ncec, arg1);
+					(*cbf)(ncec, arg1);
 					ncec_refrele_notr(ncec);
 				}
 			}
@@ -994,10 +994,10 @@ ncec_walk_common(ndp_g_t *ndp, ill_t *ill, pfi_t pfi, void *arg1,
  * Note that ill can be NULL hence can't derive the ipst from it.
  */
 void
-ncec_walk(ill_t *ill, pfi_t pfi, void *arg1, ip_stack_t *ipst)
+ncec_walk(ill_t *ill, ncec_walk_cb_t cbf, void *arg1, ip_stack_t *ipst)
 {
-	ncec_walk_common(ipst->ips_ndp4, ill, pfi, arg1, B_TRUE);
-	ncec_walk_common(ipst->ips_ndp6, ill, pfi, arg1, B_TRUE);
+	ncec_walk_common(ipst->ips_ndp4, ill, cbf, arg1, B_TRUE);
+	ncec_walk_common(ipst->ips_ndp6, ill, cbf, arg1, B_TRUE);
 }
 
 /*
@@ -2124,7 +2124,7 @@ ndp_xmit(ill_t *ill, uint32_t operation, uint8_t *hw_addr, uint_t hw_addr_len,
     const in6_addr_t *sender, const in6_addr_t *target, int flag)
 {
 	uint32_t	len;
-	icmp6_t 	*icmp6;
+	icmp6_t		*icmp6;
 	mblk_t		*mp;
 	ip6_t		*ip6h;
 	nd_opt_hdr_t	*opt;
@@ -3405,7 +3405,7 @@ ndp_verify_optlen(nd_opt_hdr_t *opt, int optlen)
  * order of ncec_last and/or maintain state)
  */
 static void
-ncec_cache_reclaim(ncec_t *ncec, char *arg)
+ncec_cache_reclaim(ncec_t *ncec, void *arg)
 {
 	ip_stack_t	*ipst = ncec->ncec_ipst;
 	uint_t		fraction = *(uint_t *)arg;
@@ -3436,7 +3436,7 @@ ip_nce_reclaim_stack(ip_stack_t *ipst)
 
 	IP_STAT(ipst, ip_nce_reclaim_calls);
 
-	ncec_walk(NULL, (pfi_t)ncec_cache_reclaim, (uchar_t *)&fraction, ipst);
+	ncec_walk(NULL, ncec_cache_reclaim, &fraction, ipst);
 
 	/*
 	 * Walk all CONNs that can have a reference on an ire, ncec or dce.
@@ -4363,7 +4363,7 @@ ip_nce_lookup_and_update(ipaddr_t *addr, ipif_t *ipif, ip_stack_t *ipst,
 		hwm.hwm_flags = flags;
 
 		ncec_walk_common(ipst->ips_ndp4, NULL,
-		    (pfi_t)nce_update_hw_changed, (uchar_t *)&hwm, B_TRUE);
+		    nce_update_hw_changed, &hwm, B_TRUE);
 	}
 }
 

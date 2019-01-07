@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2019, Joyent, Inc.
 
 PROG= rusage
 
@@ -31,10 +32,13 @@ INC1 = $(SRC)/ucbhead
 
 FILEMODE=	755
 
-LDLIBS +=  -L$(ROOT)/usr/ucblib -R /usr/ucblib -lucb
+LDLIBS +=  -L$(ROOT)/usr/ucblib -R/usr/ucblib -lucb
 
 CPPFLAGS = -I$(INC1) $(CPPFLAGS.master)
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
+
+# missing prototypes
+SMATCH=off
 
 .KEEP_STATE:
 

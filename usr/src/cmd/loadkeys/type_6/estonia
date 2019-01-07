@@ -30,13 +30,13 @@
 # However, all necessary ASCII characters are placed onto the right keys. 
 #
 #
-key  53  base ` shift fa_tilde caps ` ctrl ^^ altg '¬'
-key  30  base 1 shift ! caps 1 ctrl 1 altg ¹
+key  53  base fa_caron shift fa_tilde caps ` ctrl ^^ altg '~'
+key  30  base 1 shift ! caps 1 ctrl 1 altg 0x00B9
 key  31  base 2 shift '"' caps 2 ctrl ^@ altg @
-key  32  base 3 shift # caps 3 ctrl 3 altg £
-key  33  base 4 shift ¤ caps 4 ctrl 4 altg $
-key  34  base 5 shift % caps 5 ctrl 5 altg ½
-key  35  base 6 shift & caps 6 ctrl 6 altg '¬'
+key  32  base 3 shift # caps 3 ctrl 3 altg 0x00A2
+key  33  base 4 shift 0x00A4 caps 4 ctrl 4 altg $
+key  34  base 5 shift % caps 5 ctrl 5 altg 0x00BD
+key  35  base 6 shift & caps 6 ctrl 6 altg 0x00AC
 key  36  base 7 shift / caps 7 ctrl 7 altg {
 key  37  base 8 shift ( caps 8 ctrl ^[ altg [
 key  38  base 9 shift ) caps 9 ctrl ^] altg ]
@@ -44,17 +44,19 @@ key  39  base 0 shift = caps 0 ctrl 0 altg }
 key  45  base + shift ? caps + ctrl ^_ altg '\\'
 key  46  base fa_acute shift fa_grave caps fa_acute ctrl fa_acute altg `
 key  20  base q shift Q caps Q ctrl ^Q altg @
-key  47  base ü shift Ü caps Ü ctrl ü altg fa_umlaut
-key  48  base fa_umlaut shift ^ caps fa_umlaut ctrl fa_tilde altg ~
-key  51  base ö shift Ö caps Ö ctrl ö altg nop
-key  52  base ä shift Ä caps Ä ctrl ä altg ^
+key  47  base 0x00FC shift 0x00DC caps 0x00DC ctrl nop altg fa_umlaut
+key  48  base 0x00F5 shift 0x00D5 caps 0x00D5 ctrl nop altg ~
+key  51  base 0x00F6 shift 0x00D6 caps 0x00D6 ctrl nop altg nop
+key  52  base 0x00E4 shift 0x00C4 caps 0x00C4 ctrl nop altg ^
 key  50  base '\'' shift * caps '\'' ctrl '\'' altg '`' numl nonl up nop
 key  49  all hole
 key 100  base < shift > caps < ctrl ^| altg | numl nonl up nop
-key  29  base z shift Z caps Z ctrl ^Z altg «
-key  27  base x shift X caps X ctrl ^X altg »
-key   6  base c shift C caps C ctrl ^C altg ¢
-key  16  base m shift M caps M ctrl '\r' altg µ
+key  22  base s shift S caps S ctrl ^S altg 0x0161
+key  29  base z shift Z caps Z ctrl ^Z altg 0x017E
+key  27  base x shift X caps X ctrl ^X altg nop
+key   6  base c shift C caps C ctrl ^C altg 0x00A2
+key   8  base e shift E caps E ctrl ^E altg 0x20AC
+key  16  base m shift M caps M ctrl '\r' altg 0x00B5
 key  54  base , shift ; caps , ctrl , altg <
 key  55  base . shift : caps . ctrl . altg >
 key  56  base - shift _ caps - ctrl ^_ altg nop

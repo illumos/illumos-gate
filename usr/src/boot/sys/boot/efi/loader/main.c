@@ -31,6 +31,7 @@
 #include <sys/param.h>
 #include <sys/reboot.h>
 #include <sys/boot.h>
+#include <sys/consplat.h>
 #include <stand.h>
 #include <inttypes.h>
 #include <string.h>
@@ -44,6 +45,7 @@
 #include <uuid.h>
 
 #include <bootstrap.h>
+#include <gfx_fb.h>
 #include <smbios.h>
 
 #include <libzfs.h>
@@ -682,6 +684,7 @@ main(int argc, CHAR16 *argv[])
 		if (!interactive_interrupt("Failed to find bootable partition"))
 			return (EFI_NOT_FOUND);
 
+	autoload_font();		/* Set up the font list for console. */
 	efi_init_environment();
 	setenv("ISADIR", "amd64", 1);	/* we only build 64bit */
 	bi_isadir();			/* set ISADIR */
@@ -846,10 +849,14 @@ command_mode(int argc, char *argv[])
 	unsigned int mode;
 	int i;
 	char *cp;
-	char rowenv[8];
 	EFI_STATUS status;
 	SIMPLE_TEXT_OUTPUT_INTERFACE *conout;
-	extern void HO(void);
+	EFI_CONSOLE_CONTROL_SCREEN_MODE sm;
+
+	if (plat_stdout_is_framebuffer())
+		sm = EfiConsoleControlScreenGraphics;
+	else
+		sm = EfiConsoleControlScreenText;
 
 	conout = ST->ConOut;
 
@@ -869,11 +876,7 @@ command_mode(int argc, char *argv[])
 			printf("couldn't set mode %d\n", mode);
 			return (CMD_ERROR);
 		}
-		sprintf(rowenv, "%u", (unsigned)rows);
-		setenv("LINES", rowenv, 1);
-		sprintf(rowenv, "%u", (unsigned)cols);
-		setenv("COLUMNS", rowenv, 1);
-		HO();		/* set cursor */
+		plat_cons_update_mode(sm);
 		return (CMD_OK);
 	}
 

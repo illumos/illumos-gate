@@ -43,6 +43,7 @@ extern char *plat_stdoutpath(void);
 extern char *plat_diagpath(void);
 extern int plat_stdin_is_keyboard(void);
 extern int plat_stdout_is_framebuffer(void);
+extern void plat_tem_get_colors(uint8_t *, uint8_t *);
 extern void plat_tem_get_inverses(int *, int *);
 extern void plat_tem_get_prom_font_size(int *, int *);
 extern void plat_tem_get_prom_size(size_t *, size_t *);

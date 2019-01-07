@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -85,7 +85,6 @@ CPPFLAGS	+= -DLM_RXPKT_NON_CONTIGUOUS \
 		   -I$(SRCDIR)
 
 LDFLAGS		+= -dy -r -Ndrv/ip -Nmisc/mac
-#CERRWARN	+= -_gcc=-Wno-old-style-declaration
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
@@ -98,6 +97,9 @@ CERRWARN	+= -_cc=-erroff=E_ARGUEMENT_MISMATCH
 CERRWARN	+= -_cc=-erroff=E_INTEGER_OVERFLOW_DETECTED
 CERRWARN	+= -_cc=-erroff=E_CONST_PROMOTED_UNSIGNED_LL
 CERRWARN	+= -_cc=-erroff=E_ENUM_VAL_OVERFLOWS_INT_MAX
+
+# a whole mess
+SMATCH=off
 
 LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2

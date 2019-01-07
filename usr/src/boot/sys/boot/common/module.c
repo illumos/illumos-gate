@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -37,6 +37,8 @@
 #include <sys/module.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>
+#include <sys/tem_impl.h>
+#include <sys/font.h>
 
 #include "bootstrap.h"
 
@@ -103,7 +105,7 @@ command_load(int argc, char *argv[])
 {
     char	*typestr;
     int		dofile, dokld, ch, error;
-    
+
     dokld = dofile = 0;
     optind = 1;
     optreset = 1;
@@ -165,7 +167,7 @@ command_load(int argc, char *argv[])
 		"warning: KLD '%s' already loaded", argv[1]);
 	    return (CMD_WARN);
 	}
-	
+
 	return (error == 0 ? CMD_OK : CMD_CRIT);
     }
     /*
@@ -443,6 +445,7 @@ build_environment_module(void)
 		return;
 	}
 
+	tem_save_state();	/* Ask tem to save it's state in env. */
 	size = env_get_size();
 
 	fp = file_alloc();
@@ -471,6 +474,111 @@ build_environment_module(void)
 	}
 
 	laddr = bi_copyenv(loadaddr);
+
+	/* Looks OK so far; populate control structure */
+	fp->f_loader = -1;
+	fp->f_addr = loadaddr;
+	fp->f_size = laddr - loadaddr;
+
+	/* recognise space consumption */
+	loadaddr = laddr;
+
+	file_insert_tail(fp);
+}
+
+void
+build_font_module(void)
+{
+	bitmap_data_t *bd;
+	struct font *fd;
+	struct preloaded_file *fp;
+	size_t size;
+	uint32_t checksum;
+	int i;
+	char *name = "console-font";
+	vm_offset_t laddr;
+	struct font_info fi;
+	struct fontlist *fl;
+
+	if (STAILQ_EMPTY(&fonts))
+		return;
+
+	/* We can't load first */
+	if ((file_findfile(NULL, NULL)) == NULL) {
+		printf("Can not load font module: %s\n",
+		    "the kernel is not loaded");
+		return;
+	}
+
+	/* helper pointers */
+	bd = NULL;
+	STAILQ_FOREACH(fl, &fonts, font_next) {
+		if (fl->font_data->font != NULL) {
+			bd = fl->font_data;
+			break;
+		}
+	}
+	if (bd == NULL)
+		return;
+	fd = bd->font;
+
+	fi.fi_width = fd->vf_width;
+	checksum = fi.fi_width;
+	fi.fi_height = fd->vf_height;
+	checksum += fi.fi_height;
+	fi.fi_bitmap_size = bd->uncompressed_size;
+	checksum += fi.fi_bitmap_size;
+
+	size = roundup2(sizeof (struct font_info), 8);
+	for (i = 0; i < VFNT_MAPS; i++) {
+		fi.fi_map_count[i] = fd->vf_map_count[i];
+		checksum += fi.fi_map_count[i];
+		size += fd->vf_map_count[i] * sizeof (struct font_map);
+		size += roundup2(size, 8);
+	}
+	size += bd->uncompressed_size;
+
+	fi.fi_checksum = -checksum;
+
+	fp = file_alloc();
+	if (fp != NULL) {
+		fp->f_name = strdup(name);
+		fp->f_type = strdup(name);
+	}
+
+	if (fp == NULL || fp->f_name == NULL || fp->f_type == NULL) {
+		printf("Can not load font module: %s\n",
+		    "out of memory");
+		if (fp != NULL)
+			file_discard(fp);
+		return;
+	}
+
+	if (archsw.arch_loadaddr != NULL)
+		loadaddr = archsw.arch_loadaddr(LOAD_MEM, &size, loadaddr);
+
+	if (loadaddr == 0) {
+		printf("Can not load font module: %s\n",
+		    "out of memory");
+		file_discard(fp);
+		return;
+	}
+
+	laddr = loadaddr;
+	laddr += archsw.arch_copyin(&fi, laddr, sizeof (struct font_info));
+	laddr = roundup2(laddr, 8);
+
+	/* Copy maps. */
+	for (i = 0; i < VFNT_MAPS; i++) {
+		if (fd->vf_map_count[i] != 0) {
+			laddr += archsw.arch_copyin(fd->vf_map[i], laddr,
+			    fd->vf_map_count[i] * sizeof (struct font_map));
+			laddr = roundup2(laddr, 8);
+		}
+	}
+
+	/* Copy the bitmap. */
+	laddr += archsw.arch_copyin(fd->vf_bytes, laddr, fi.fi_bitmap_size);
 
 	/* Looks OK so far; populate control structure */
 	fp->f_loader = -1;
@@ -568,7 +676,7 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 
     /* Add to the list of loaded files */
     if (insert != 0)
-    	file_insert_tail(fp);
+	file_insert_tail(fp);
     close(fd);
     return(fp);
 }
@@ -630,7 +738,7 @@ mod_loadkld(const char *kldname, int argc, char *argv[])
 	    "can't find '%s'", kldname);
 	return (ENOENT);
     }
-    /* 
+    /*
      * Check if KLD already loaded
      */
     fp = file_findfile(filename, NULL);
@@ -640,7 +748,7 @@ mod_loadkld(const char *kldname, int argc, char *argv[])
 	free(filename);
 	return (0);
     }
-    for (last_file = preloaded_files; 
+    for (last_file = preloaded_files;
 	 last_file != NULL && last_file->f_next != NULL;
 	 last_file = last_file->f_next)
 	;
@@ -701,7 +809,7 @@ file_findmodule(struct preloaded_file *fp, char *modname,
     if (fp == NULL) {
 	for (fp = preloaded_files; fp; fp = fp->f_next) {
 	    mp = file_findmodule(fp, modname, verinfo);
-    	    if (mp)
+	    if (mp)
 		return (mp);
 	}
 	return (NULL);
@@ -715,7 +823,7 @@ file_findmodule(struct preloaded_file *fp, char *modname,
 	    mver = mp->m_version;
 	    if (mver == verinfo->md_ver_preferred)
 		return (mp);
-	    if (mver >= verinfo->md_ver_minimum && 
+	    if (mver >= verinfo->md_ver_minimum &&
 		mver <= verinfo->md_ver_maximum &&
 		mver > bestver) {
 		best = mp;
@@ -902,7 +1010,7 @@ mod_search_hints(struct moduledir *mdp, const char *modname,
 		found = 1;
 		break;
 	    }
-	    if (ival >= verinfo->md_ver_minimum && 
+	    if (ival >= verinfo->md_ver_minimum &&
 		ival <= verinfo->md_ver_maximum &&
 		ival > bestver) {
 		bestver = ival;
@@ -1024,7 +1132,7 @@ struct preloaded_file *
 file_alloc(void)
 {
     struct preloaded_file	*fp;
-    
+
     if ((fp = malloc(sizeof(struct preloaded_file))) != NULL) {
 	bzero(fp, sizeof(struct preloaded_file));
     }
@@ -1038,7 +1146,7 @@ static void
 file_insert_tail(struct preloaded_file *fp)
 {
     struct preloaded_file	*cm;
-    
+
     /* Append to list of loaded file */
     fp->f_next = NULL;
     if (preloaded_files == NULL) {

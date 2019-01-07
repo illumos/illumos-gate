@@ -25,9 +25,7 @@
  */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*	All Rights Reserved	*/
 
 /*
  *	ssignal, gsignal: software signals
@@ -54,8 +52,9 @@ ssignal(int sig, int (*action)(int)))(int)
 	if (sig >= MINSIG && sig <= MAXSIGNUM) {
 		savefn = sigs[sig-MINSIG];
 		sigs[sig-MINSIG] = action;
-	} else
-		savefn = (int(*)(int))SIG_DFL;
+	} else {
+		savefn = (int(*)(int))(uintptr_t)SIG_DFL;
+	}
 
 	return (savefn);
 }
@@ -66,12 +65,14 @@ gsignal(int sig)
 	int (*sigfn)(int);
 
 	if (sig < MINSIG || sig > MAXSIGNUM ||
-	    (sigfn = sigs[sig-MINSIG]) == (int(*)(int))SIG_DFL)
+	    (sigfn = sigs[sig-MINSIG]) == (int(*)(int))(uintptr_t)SIG_DFL) {
 		return (0);
-	else if (sigfn == (int(*)(int))SIG_IGN)
-		return (1);
-	else {
-		sigs[sig-MINSIG] = (int(*)(int))SIG_DFL;
-		return ((*sigfn)(sig));
+	} else {
+		if (sigfn == (int(*)(int))(uintptr_t)SIG_IGN) {
+			return (1);
+		} else {
+			sigs[sig-MINSIG] = (int(*)(int))(uintptr_t)SIG_DFL;
+			return ((*sigfn)(sig));
+		}
 	}
 }

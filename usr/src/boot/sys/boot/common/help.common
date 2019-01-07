@@ -80,8 +80,19 @@
 	will print the current device.
 
 ################################################################################
+# Tframebuffer DManage framebuffer setup
+
+	framebuffer on | off | get | list [depth] | set <display or mode number>
+
+	Switch framebuffer mode on or off, get current mode, list available
+	modes or set mode by using either display resolution or framebuffer
+	mode number. If the system does not provide display resolution via
+	EDID, the default resolution will be set to 800x600. If depth is not
+	specified, the best depth is used.
+
+################################################################################
 # Tload DLoad a kernel or module
-	
+
 	load [-t <type>] <filename> [arguments]
 
 	Loads the module contained in <filename> into memory.  If no other
@@ -172,45 +183,40 @@
 	Sets the default set of kernel boot filename(s). It may be overridden
 	by setting the bootfile variable to a semicolon-separated list of
 	filenames, each of which will be searched for in the module_path
-	directories. The default bootfile set is "kernel".
+	directories. The default bootfile set is "unix".
 
 ################################################################################
-# Tset Sboot_askname DPrompt for root device
+# Tset Sboot_ask DPrompt for configuration information
 
-	set boot_askname
+	set boot_ask
 
-	Instructs the kernel to prompt the user for the name of the root device
-	when the kernel is booted.
-
-################################################################################
-# Tset Sboot_cdrom DMount root file system from CD-ROM
-
-	set boot_cdrom
-
-	Instructs the kernel to try to mount the root file system from CD-ROM.
+	Instructs the kernel to prompt the user for the configuration
+	information when the kernel is booted.
 
 ################################################################################
-# Tset Sboot_ddb DDrop to the kernel debugger (DDB)
+# Tset Sboot_debug DDrop to the kernel debugger (kmdb)
 
-	set boot_ddb
+	set boot_debug
 
-	Instructs the kernel to start in the DDB debugger, rather than
-	proceeding to initialize when booted.
-
-################################################################################
-# Tset Sboot_dfltroot DUse default root file system
-
-	set boot_dfltroot
-
-	Instructs the kernel to mount the statically compiled-in root
-	file system.
+	Instructs the kernel to start in the kmdb debugger, rather than
+	proceeding to initialize when booted. Can only be used when boot_kmdb
+	is set.
 
 ################################################################################
-# Tset Sboot_gdb DSelect gdb-remote mode for the kernel debugger
+# Tset Sboot_kmdb DStart the kernel debugger (kmdb)
 
-	set boot_gdb
+	set boot_kmdb
 
-	Selects gdb-remote mode for the kernel debugger by default.
+	Instructs the kernel to start the kmdb debugger and then continue
+	with normal boot.
+
+################################################################################
+# Tset Sboot_reconfigure DInitaiate reconfiguration boot
+
+	set boot_reconfigure
+
+	The system will probe all attached hardware devices and configure
+	the logical namespace in /dev.
 
 ################################################################################
 # Tset Sboot_multicons DUse multiple consoles
@@ -222,50 +228,23 @@
 	by the conscontrol(8) utility.
 
 ################################################################################
-# Tset Sboot_mute DMute the console
-
-	set boot_mute
-
-	All console output is suppressed when console is muted.
-	In a running system, the state of console muting can be
-	manipulated by the conscontrol(8) utility.
-
-################################################################################
-# Tset Sboot_pause DPause after each line during device probing
-
-	set boot_pause
-
-	During the device probe, pause after each line is printed.
-
-################################################################################
-# Tset Sboot_serial DUse serial console
-
-	set boot_serial
-
-	Force the use of a serial console even when an internal console
-	is present.
-
-################################################################################
-# Tset Sboot_single DStart system in single-user mode
+# Tset Sboot_single DBoot into the single user mode
 
 	set boot_single
 
-	Prevents the kernel from initiating a multi-user startup; instead,
-	a single-user mode will be entered when the kernel has finished
-	device probes.
+	Boots only to init level 's'.
 
 ################################################################################
-# Tset Sboot_verbose DVerbose boot messages
+# Tset Sboot_verbose DBoot with verbose messages enabled
 
 	set boot_verbose
 
-	Setting this variable causes extra debugging information to be printed
-	by the kernel during the boot phase.
+	Without this setting, the messages are only logged in the system log.
 
 ################################################################################
 # Tset Sconsole DSet the current console
 
-	set console[=<value>]
+	set console[=<value>[,<value>]]
 
 	Sets the current console.  If <value> is omitted, a list of valid
 	consoles will be displayed.
@@ -276,15 +255,6 @@
 	set currdev=<device>
 
 	Selects the default device.  See lsdev for available devices.
-
-################################################################################
-# Tset Sinit_path DSet the list of init candidates
-
-	set init_path=<path>[:<path>...]
-
-	Sets the list of binaries which the kernel will try to run as initial
-	process.
-
 
 ################################################################################
 # Tset Smodule_path DSet the module search path
@@ -302,10 +272,16 @@
 	set prompt=<value>
 
 	The command prompt is displayed when the loader is waiting for input.
-	Variable substitution is performed on the prompt.  The default 
+	Variable substitution is performed on the prompt.  The default
 	prompt can be set with:
 
 		set prompt=\${interpret}
+
+################################################################################
+# Tset Sscreen-font DSet the framebuffer font
+
+	Without the value, will list the currently available list
+	of the fonts.
 
 ################################################################################
 # Tset Srootdev DSet the root filesystem
@@ -315,75 +291,6 @@
 	By default the value of $currdev is used to set the root filesystem
 	when the kernel is booted.  This can be overridden by setting
 	$rootdev explicitly.
-
-################################################################################
-# Tset Stunables DSet kernel tunable values
-
-	Various kernel tunable parameters can be overridden by specifying new 
-	values in the environment.
-
-	set kern.ipc.nmbclusters=<value>
-
-		Set the number of mbuf clusters to be allocated.  The value
-		cannot be set below the default determined when the kernel
-		was compiled.
-
-	set kern.ipc.nsfbufs=<value>		NSFBUFS
-
-		Set the number of sendfile buffers to be allocated.  This
-		overrides the value determined when the kernel was compiled.
-
-	set vm.kmem_size=<value>		VM_KMEM_SIZE
-
-		Sets the size of kernel memory (bytes).  This overrides
-		the value determined when the kernel was compiled.
-
-	set machdep.disable_mtrrs=1
-
-		Disable the use of i686 MTRRs (i386 only)
-
-	set net.inet.tcp.tcbhashsize=<value>	TCBHASHSIZE
-
-		Overrides the compile-time set value of TCBHASHSIZE or
-		the preset default of 512.  Must be a power of 2.
-
-	hw.syscons.sc_no_suspend_vtswitch=<value>
-
-		Disable VT switching on suspend.
-
-		value is 0 (default) or non-zero to enable.
-
-	set hw.physmem=<value>			MAXMEM (i386 only)
-
-		Limits the amount of physical memory space available to
-		the system to <value> bytes.  <value> may have a k, M or G
-		suffix to indicate kilobytes, megabytes and gigabytes
-		respectively.  Note that the current i386 architecture
-		limits this value to 4GB.
-
-		On systems where memory cannot be accurately probed,
-		this option provides a hint as to the actual size of
-		system memory (which will be tested before use).
-
-	set hw.{acpi,pci}.host_start_mem=<value>
-
-		Sets the lowest address that the pci code will assign
-		when it doesn't have other information about the address
-		to assign (like from a pci bridge).  This is only useful
-		in older systems without a pci bridge.  Also, it only
-		impacts devices that the BIOS doesn't assign to, typically
-		CardBus bridges.  The default <value> is 0x80000000, but
-		some systems need values like 0xf0000000, 0xfc000000 or
-		0xfe000000 may be suitable for older systems (the older
-		the system, the higher the number typically should be).
-
-	set hw.pci.enable_io_modes=<value>
-
-		Enable PCI resources which are left off by some BIOSes
-		or are not enabled correctly by the device driver.
-
-		value is 1 (default), but this may cause problems with
-		some peripherals.  Set to 0 to disable.
 
 ################################################################################
 # Tshow DShow the values of variables
@@ -405,12 +312,12 @@
 
 	read [-t <value>] [-p <prompt>] [<variable name>]
 
-	The read command reads a line of input from the terminal.  If the 
+	The read command reads a line of input from the terminal.  If the
 	-t argument is specified, it will return nothing if no input has been
-	received after <value> seconds.  (Any keypress will cancel the 
+	received after <value> seconds.  (Any keypress will cancel the
 	timeout).
 
-	If -p is specified, <prompt> is printed before reading input. No 
+	If -p is specified, <prompt> is printed before reading input. No
 	newline is emitted after the prompt.
 
 	If a variable name is supplied, the variable is set to the value read,
@@ -429,6 +336,6 @@
 	unset <variable name>
 
 	If allowed, the named variable's value is discarded and the variable
-	is removed.	
+	is removed.
 
 ################################################################################

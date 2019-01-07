@@ -1,10 +1,10 @@
-/*-
+/*
  * spinconsole.c
  *
  * Author: Maksym Sobolyev <sobomax@sippysoft.com>
  * Copyright (c) 2009 Sippy Software, Inc.
  * All rights reserved.
- * 
+ *
  * Subject to the following obligations and disclaimer of warranty, use and
  * redistribution of this software, in source or object code forms, with or
  * without modifications are expressly permitted by Whistle Communications;
@@ -15,7 +15,7 @@
  *    Communications, Inc. trademarks, including the mark "WHISTLE
  *    COMMUNICATIONS" on advertising, endorsements, or otherwise except as
  *    such appears in the above copyright notice or in the software.
- * 
+ *
  * THIS SOFTWARE IS BEING PROVIDED BY WHISTLE COMMUNICATIONS "AS IS", AND
  * TO THE MAXIMUM EXTENT PERMITTED BY LAW, WHISTLE COMMUNICATIONS MAKES NO
  * REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED, REGARDING THIS SOFTWARE,
@@ -40,13 +40,6 @@
 #include <stand.h>
 #include <bootstrap.h>
 
-extern void get_pos(int *x, int *y);
-extern void curs_move(int *_x, int *_y, int x, int y);
-#if defined(EFI)
-extern void efi_cons_efiputchar(int c);
-#else
-extern void vidc_biosputchar(int c);
-#endif
 
 static void	spinc_probe(struct console *cp);
 static int	spinc_init(struct console *cp, int arg);
@@ -63,6 +56,7 @@ struct console spinconsole = {
 	.c_out = spinc_putchar,
 	.c_in = spinc_getchar,
 	.c_ready = spinc_ischar,
+	.c_ioctl = NULL,
 	.c_private = NULL
 };
 
@@ -73,48 +67,42 @@ spinc_probe(struct console *cp)
 }
 
 static int
-spinc_init(struct console *cp __attribute((unused)),
-    int arg __attribute((unused)))
+spinc_init(struct console *cp __unused, int arg __unused)
 {
 	return(0);
 }
 
 static void
-spinc_putchar(struct console *cp __attribute((unused)),
-    int c __attribute((unused)))
+spinc_putchar(struct console *cp __unused, int c __unused)
 {
-#ifdef TERM_EMU
-	static int curx, cury;
-#endif
 	static unsigned tw_chars = 0x5C2D2F7C;    /* "\-/|" */
 	static time_t lasttime;
+	int i;
 	time_t now;
 
 	now = time(NULL);
 	if (now < (lasttime + 1))
 		return;
 	lasttime = now;
-#ifdef TERM_EMU
-	get_pos(&curx, &cury);
-	if (curx > 0)
-		curs_move(&curx, &cury, curx - 1, cury);
-#endif
-#if defined(EFI)
-	efi_cons_efiputchar((char)tw_chars);
-#else
-	vidc_biosputchar((char)tw_chars);
-#endif
+	for (i = 0; consoles[i] != NULL; i++)
+		if (strcmp(consoles[i]->c_name, "text") == 0)
+			break;
+	if (consoles[i] == NULL)
+		return;
+
+	consoles[i]->c_out(consoles[i], (char)tw_chars);
+	consoles[i]->c_out(consoles[i], '\b');
 	tw_chars = (tw_chars >> 8) | ((tw_chars & (unsigned long)0xFF) << 24);
 }
 
 static int
-spinc_getchar(struct console *cp __attribute((unused)))
+spinc_getchar(struct console *cp __unused)
 {
 	return(-1);
 }
 
 static int
-spinc_ischar(struct console *cp __attribute((unused)))
+spinc_ischar(struct console *cp __unused)
 {
 	return(0);
 }

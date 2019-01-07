@@ -27,42 +27,49 @@
 #ifndef	_SYS_VGASUBR_H
 #define	_SYS_VGASUBR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS4.1 1.11 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#ifdef _KERNEL
 
 struct vgaregmap {
 	uint8_t			*addr;
 	ddi_acc_handle_t	handle;
 	boolean_t		mapped;
 };
+typedef struct vgaregmap *vgaregmap_t;
 
-extern int vga_get_reg(struct vgaregmap *reg, int i);
-extern void vga_set_reg(struct vgaregmap *reg, int i, int v);
-extern int vga_get_crtc(struct vgaregmap *reg, int i);
-extern void vga_set_crtc(struct vgaregmap *reg, int i, int v);
-extern int vga_get_seq(struct vgaregmap *reg, int i);
-extern void vga_set_seq(struct vgaregmap *reg, int i, int v);
-extern int vga_get_grc(struct vgaregmap *reg, int i);
-extern void vga_set_grc(struct vgaregmap *reg, int i, int v);
-extern int vga_get_atr(struct vgaregmap *reg, int i);
-extern void vga_set_atr(struct vgaregmap *reg, int i, int v);
-extern void vga_put_cmap(struct vgaregmap *reg,
+#elif defined(_STANDALONE)
+
+typedef uint_t vgaregmap_t;
+
+#endif
+
+extern int vga_get_reg(vgaregmap_t reg, int i);
+extern void vga_set_reg(vgaregmap_t reg, int i, int v);
+extern int vga_get_crtc(vgaregmap_t reg, int i);
+extern void vga_set_crtc(vgaregmap_t reg, int i, int v);
+extern int vga_get_seq(vgaregmap_t reg, int i);
+extern void vga_set_seq(vgaregmap_t reg, int i, int v);
+extern int vga_get_grc(vgaregmap_t reg, int i);
+extern void vga_set_grc(vgaregmap_t reg, int i, int v);
+extern int vga_get_atr(vgaregmap_t reg, int i);
+extern void vga_set_atr(vgaregmap_t reg, int i, int v);
+extern void vga_put_cmap(vgaregmap_t reg,
 	int index, unsigned char r, unsigned char g, unsigned char b);
-extern void vga_get_cmap(struct vgaregmap *reg,
+extern void vga_get_cmap(vgaregmap_t reg,
 	int index, unsigned char *r, unsigned char *g, unsigned char *b);
-extern void vga_get_hardware_settings(struct vgaregmap *reg,
+extern void vga_get_hardware_settings(vgaregmap_t reg,
 	int *width, int *height);
-extern void vga_set_indexed(struct vgaregmap *reg, int indexreg,
+extern void vga_set_indexed(vgaregmap_t reg, int indexreg,
 	int datareg, unsigned char index, unsigned char val);
-extern int vga_get_indexed(struct vgaregmap *reg, int indexreg,
+extern int vga_get_indexed(vgaregmap_t reg, int indexreg,
 	int datareg, unsigned char index);
 
 #define	VGA_MISC_TEXT	0x67
 #define	NUM_CRTC_REG	25
-#define	NUM_SEQ_REG    	5
+#define	NUM_SEQ_REG	5
 #define	NUM_GRC_REG	9
 #define	NUM_ATR_REG	21
 
@@ -73,7 +80,7 @@ extern unsigned char VGA_GRC_TEXT[NUM_GRC_REG];
 extern unsigned char VGA_TEXT_PALETTES[64][3];
 
 #if	defined(DEBUG)
-extern void vga_dump_regs(struct vgaregmap *reg,
+extern void vga_dump_regs(vgaregmap_t reg,
 	int maxseq, int maxcrtc, int maxatr, int maxgrc);
 #endif
 

@@ -90,7 +90,7 @@ static void	ipmp_ill_bind_ipif(ill_t *, ipif_t *, enum ip_resolver_action);
 static ipif_t	*ipmp_ill_unbind_ipif(ill_t *, ipif_t *, boolean_t);
 static void	ipmp_phyint_get_kstats(phyint_t *, uint64_t *);
 static boolean_t ipmp_ipif_is_up_dataaddr(const ipif_t *);
-static void	ipmp_ncec_delete_nonlocal(ncec_t *, uchar_t *);
+static void	ipmp_ncec_delete_nonlocal(ncec_t *, void *);
 
 /*
  * Initialize IPMP state for IP stack `ipst'; called from ip_stack_init().
@@ -800,7 +800,7 @@ ipmp_illgrp_set_cast(ipmp_illgrp_t *illg, ill_t *castill)
 		 * last since ill_leave_multicast() may trigger IREs to be
 		 * built using ig_cast_ill.
 		 */
-		ncec_walk(ocastill, (pfi_t)ipmp_ncec_delete_nonlocal, ocastill,
+		ncec_walk(ocastill, ipmp_ncec_delete_nonlocal, ocastill,
 		    ocastill->ill_ipst);
 	}
 
@@ -1592,7 +1592,7 @@ ipmp_ill_deactivate(ill_t *ill)
 	 * any NCECs associated with the group and mark the group link down.
 	 */
 	if (--grp->gr_nactif == 0) {
-		ncec_walk(ipmp_ill, (pfi_t)ncec_delete_per_ill, ipmp_ill, ipst);
+		ncec_walk(ipmp_ill, ncec_delete_per_ill, ipmp_ill, ipst);
 		mp = grp->gr_linkdownmp;
 		grp->gr_linkdownmp = NULL;
 		ASSERT(mp != NULL);
@@ -2182,7 +2182,7 @@ ipmp_packet_is_probe(mblk_t *mp, ill_t *ill)
  * is not one of our local addresses.  Caller must be inside the IPSQ.
  */
 static void
-ipmp_ncec_delete_nonlocal(ncec_t *ncec, uchar_t *ill_arg)
+ipmp_ncec_delete_nonlocal(ncec_t *ncec, void *ill_arg)
 {
 	if (!NCE_MYADDR(ncec) && ncec->ncec_ill == (ill_t *)ill_arg)
 		ncec_delete(ncec);

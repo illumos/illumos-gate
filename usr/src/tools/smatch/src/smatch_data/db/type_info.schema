@@ -1,0 +1,9 @@
+CREATE TABLE type_info (
+	file varchar(80),
+	type integer,
+	key varchar(80),
+	value varchar(80),
+
+	CONSTRAINT type_info_constraint UNIQUE (type, key, value)
+);
+

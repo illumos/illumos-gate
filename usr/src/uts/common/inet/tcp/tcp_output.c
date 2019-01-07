@@ -80,7 +80,7 @@ static void	tcp_wput_proto(void *, mblk_t *, void *, ip_recv_attr_t *);
  */
 static int tcp_tx_pull_len = 16;
 
-void
+int
 tcp_wput(queue_t *q, mblk_t *mp)
 {
 	conn_t	*connp = Q_TO_CONN(q);
@@ -110,11 +110,11 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		CONN_INC_REF(connp);
 		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_output, connp,
 		    NULL, tcp_squeue_flag, SQTAG_TCP_OUTPUT);
-		return;
+		return (0);
 
 	case M_CMD:
 		tcp_wput_cmdblk(q, mp);
-		return;
+		return (0);
 
 	case M_PROTO:
 	case M_PCPROTO:
@@ -132,7 +132,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 				    "tcp_wput_proto, dropping one...");
 			}
 			freemsg(mp);
-			return;
+			return (0);
 		}
 		if (type == T_SVR4_OPTMGMT_REQ) {
 			/*
@@ -147,14 +147,14 @@ tcp_wput(queue_t *q, mblk_t *mp)
 			ASSERT(cr != NULL);
 			if (cr == NULL) {
 				tcp_err_ack(tcp, mp, TSYSERR, EINVAL);
-				return;
+				return (0);
 			}
 			if (snmpcom_req(q, mp, tcp_snmp_set, ip_snmp_get,
 			    cr)) {
 				/*
 				 * This was a SNMP request
 				 */
-				return;
+				return (0);
 			} else {
 				output_proc = tcp_wput_proto;
 			}
@@ -175,12 +175,12 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		switch (iocp->ioc_cmd) {
 		case TCP_IOC_ABORT_CONN:
 			tcp_ioctl_abort_conn(q, mp);
-			return;
+			return (0);
 		case TI_GETPEERNAME:
 		case TI_GETMYNAME:
 			mi_copyin(q, mp, NULL,
 			    SIZEOF_STRUCT(strbuf, iocp->ioc_flag));
-			return;
+			return (0);
 
 		default:
 			output_proc = tcp_wput_ioctl;
@@ -195,6 +195,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 	CONN_INC_REF(connp);
 	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, output_proc, connp,
 	    NULL, tcp_squeue_flag, SQTAG_TCP_WPUT_OTHER);
+	return (0);
 }
 
 /*
@@ -572,7 +573,7 @@ done:;
  * All further messages will also be handled by tcp_wput() because we cannot
  * be sure that the above short cut is safe later.
  */
-void
+int
 tcp_wput_sock(queue_t *wq, mblk_t *mp)
 {
 	conn_t			*connp = Q_TO_CONN(wq);
@@ -589,20 +590,22 @@ tcp_wput_sock(queue_t *wq, mblk_t *mp)
 	    MBLKL(mp) == sizeof (struct T_capability_req) &&
 	    car->PRIM_type == T_CAPABILITY_REQ) {
 		tcp_capability_req(tcp, mp);
-		return;
+		return (0);
 	}
 
 	tcp_wput(wq, mp);
+	return (0);
 }
 
 /* ARGSUSED */
-void
+int
 tcp_wput_fallback(queue_t *wq, mblk_t *mp)
 {
 #ifdef DEBUG
 	cmn_err(CE_CONT, "tcp_wput_fallback: Message during fallback \n");
 #endif
 	freemsg(mp);
+	return (0);
 }
 
 /*
@@ -718,7 +721,7 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 	STRUCT_HANDLE(strbuf, sb);
 	uint_t		addrlen;
 	conn_t		*connp = tcp->tcp_connp;
-	queue_t 	*q = connp->conn_wq;
+	queue_t		*q = connp->conn_wq;
 
 	/* Make sure it is one of ours. */
 	switch (iocp->ioc_cmd) {
@@ -819,7 +822,7 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 static void
 tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
-	conn_t 		*connp = (conn_t *)arg;
+	conn_t		*connp = (conn_t *)arg;
 	tcp_t		*tcp = connp->conn_tcp;
 	queue_t		*q = connp->conn_wq;
 	struct iocblk	*iocp;
@@ -1680,7 +1683,7 @@ finish:
 void
 tcp_shutdown_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
-	conn_t 	*connp = (conn_t *)arg;
+	conn_t	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
 
 	freemsg(mp);
@@ -2686,8 +2689,8 @@ tcp_xmit_listeners_reset(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst,
 	uint32_t	seg_seq;
 	uint32_t	seg_ack;
 	uint_t		flags;
-	ipha_t 		*ipha;
-	ip6_t 		*ip6h;
+	ipha_t		*ipha;
+	ip6_t		*ip6h;
 	boolean_t	policy_present;
 	netstack_t	*ns = ipst->ips_netstack;
 	tcp_stack_t	*tcps = ns->netstack_tcp;

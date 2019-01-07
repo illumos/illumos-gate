@@ -98,7 +98,7 @@ loader_main(struct loader_callbacks *cb, void *arg, int version, int ndisks)
 	printf("Memory: %ld k\n", memsize() / 1024);
 #endif
 
-	setenv("LINES", "24", 1);	/* optional */
+	setenv("screen-#rows", "24", 1);	/* optional */
 
 	/*
 	 * Set custom environment variables

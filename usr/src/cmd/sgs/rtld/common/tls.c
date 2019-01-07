@@ -120,12 +120,12 @@ tls_modaddrem(Rt_map *lmp, uint_t flag)
 	Lm_list		*lml = LIST(lmp);
 	TLS_modinfo	tmi;
 	Phdr		*tlsphdr;
-	void		(*fptr)(TLS_modinfo *);
+	int		(*fptr)(TLS_modinfo *);
 
 	if (flag & TM_FLG_MODADD) {
-		fptr = (void (*)())lml->lm_lcs[CI_TLS_MODADD].lc_un.lc_func;
+		fptr = lml->lm_lcs[CI_TLS_MODADD].lc_un.lc_func;
 	} else if (FLAGS1(lmp) & FL1_RT_TLSADD) {
-		fptr = (void (*)())lml->lm_lcs[CI_TLS_MODREM].lc_un.lc_func;
+		fptr = lml->lm_lcs[CI_TLS_MODREM].lc_un.lc_func;
 	} else {
 		return;
 	}
@@ -147,7 +147,7 @@ tls_modaddrem(Rt_map *lmp, uint_t flag)
 	tmi.tm_stattlsoffset = 0;
 
 	DBG_CALL(Dbg_tls_modactivity(LIST(lmp), &tmi, flag));
-	(*fptr)(&tmi);
+	(void) (*fptr)(&tmi);
 
 	/*
 	 * Tag that this link-map has registered its TLS, and, if this object
@@ -258,9 +258,9 @@ tls_statmod(Lm_list *lml, Rt_map *lmp)
 	uint_t		tlsmodndx, tlsmodcnt = lml->lm_tls;
 	TLS_modinfo	**tlsmodlist, *tlsbuflist;
 	Phdr		*tlsphdr;
-	void		(*fptr)(TLS_modinfo **, ulong_t);
+	int		(*fptr)(TLS_modinfo **, ulong_t);
 
-	fptr = (void (*)())lml->lm_lcs[CI_TLS_STATMOD].lc_un.lc_func;
+	fptr = lml->lm_lcs[CI_TLS_STATMOD].lc_un.lc_func;
 
 	/*
 	 * Allocate a buffer to report the TLS modules, the buffer consists of:
@@ -285,8 +285,8 @@ tls_statmod(Lm_list *lml, Rt_map *lmp)
 	 * If we don't have any TLS modules - report that and return.
 	 */
 	if (tlsmodcnt == 0) {
-		if (fptr)
-			(*fptr)(tlsmodlist, tls_static_resv);
+		if (fptr != NULL)
+			(void) (*fptr)(tlsmodlist, tls_static_resv);
 		DBG_CALL(Dbg_tls_static_block(&lml_main, 0, 0,
 		    tls_static_resv));
 		return (1);
@@ -330,7 +330,7 @@ tls_statmod(Lm_list *lml, Rt_map *lmp)
 
 	DBG_CALL(Dbg_tls_static_block(&lml_main, (void *)tlsmodlist,
 	    tls_static_size, tls_static_resv));
-	(*fptr)(tlsmodlist, (tls_static_size + tls_static_resv));
+	(void) (*fptr)(tlsmodlist, (tls_static_size + tls_static_resv));
 
 	/*
 	 * We're done with the list - clean it up.

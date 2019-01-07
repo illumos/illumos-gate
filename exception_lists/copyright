@@ -24,6 +24,7 @@
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011 by Delphix. All rights reserved.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 syntax: glob
@@ -425,6 +426,7 @@ usr/src/tools/btxld/btxld.c
 usr/src/tools/btxld/elfh.c
 usr/src/tools/btxld/elfh.h
 usr/src/tools/btxld/imgact_aout.h
+usr/src/tools/smatch/src/*
 usr/src/uts/intel/nsmb/ioc_check.ref
 usr/src/uts/intel/os/splashimage.xpm
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c

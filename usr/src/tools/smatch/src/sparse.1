@@ -1,0 +1,446 @@
+.\" Sparse manpage by Josh Triplett
+.TH sparse "1"
+.
+.SH NAME
+sparse \- Semantic Parser for C
+.
+.SH SYNOPSIS
+.B sparse
+[\fIWARNING OPTIONS\fR]... \fIfile.c\fR
+.
+.SH DESCRIPTION
+Sparse parses C source and looks for errors, producing warnings on standard
+error.
+.P
+Sparse accepts options controlling the set of warnings to generate.  To turn
+on warnings Sparse does not issue by default, use the corresponding warning
+option \fB\-Wsomething\fR.  Sparse issues some warnings by default; to turn
+off those warnings, pass the negation of the associated warning option,
+\fB\-Wno\-something\fR.
+.
+.SH WARNING OPTIONS
+.TP
+.B \-Wsparse\-all
+Turn on all sparse warnings, except for those explicitly disabled via
+\fB\-Wno\-something\fR.
+.TP
+.B \-Wsparse\-error
+Turn all sparse warnings into errors.
+.TP
+.B \-Waddress\-space
+Warn about code which mixes pointers to different address spaces.
+
+Sparse allows an extended attribute
+.BI __attribute__((address_space( num )))
+on pointers, which designates a pointer target in address space \fInum\fR (a
+constant integer).  With \fB\-Waddress\-space\fR, Sparse treats pointers with
+identical target types but different address spaces as distinct types.  To
+override this warning, such as for functions which convert pointers between
+address spaces, use a type that includes \fB__attribute__((force))\fR.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-address\-space\fR.
+.
+.TP
+.B \-Wbitwise
+Warn about unsupported operations or type mismatches with restricted integer
+types.
+
+Sparse supports an extended attribute, \fB__attribute__((bitwise))\fR, which
+creates a new restricted integer type from a base integer type, distinct from
+the base integer type and from any other restricted integer type not declared
+in the same declaration or \fBtypedef\fR.  For example, this allows programs
+to create \fBtypedef\fRs for integer types with specific endianness.  With
+\fB-Wbitwise\fR, Sparse will warn on any use of a restricted type in
+arithmetic operations other than bitwise operations, and on any conversion of
+one restricted type into another, except via a cast that includes
+\fB__attribute__((force))\fR.
+
+__bitwise ends up being a "stronger integer separation", one that
+doesn't allow you to mix with non-bitwise integers, so now it's much
+harder to lose the type by mistake.
+
+__bitwise is for *unique types* that cannot be mixed with other
+types, and that you'd never want to just use as a random integer (the
+integer 0 is special, though, and gets silently accepted iirc - it's
+kind of like "NULL" for pointers). So "gfp_t" or the "safe endianness"
+types would be __bitwise: you can only operate on them by doing
+specific operations that know about *that* particular type.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-bitwise\fR.
+.
+.TP
+.B \-Wcast\-to\-as
+Warn about casts which add an address space to a pointer type.
+
+A cast that includes \fB__attribute__((force))\fR will suppress this warning.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wcast\-truncate
+Warn about casts that truncate constant values.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-cast\-truncate\fR.
+.
+.TP
+.B \-Wconstant\-suffix
+Warn if an integer constant is larger than the maximum representable value
+of the type indicated by its type suffix (if any). For example, on a
+system where ints are 32-bit and longs 64-bit, the constant \fB0x100000000U\fR
+is larger than can be represented by an \fBunsigned int\fR but fits in an
+\fBunsigned long\fR. So its type is \fBunsigned long\fR but this is not
+indicated by its suffix. In this case, the warning could be suppressed by
+using the suffix \fBUL\fR: \fB0x100000000UL\fR.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wconstexpr-not-const
+Warn if a non-constant expression is encountered when really expecting a
+constant expression instead.
+Currently, this warns when initializing an object of static storage duration
+with an initializer which is not a constant expression.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wcontext
+Warn about potential errors in synchronization or other delimited contexts.
+
+Sparse supports several means of designating functions or statements that
+delimit contexts, such as synchronization.  Functions with the extended
+attribute
+.BI __attribute__((context( expression , in_context , out_context ))
+require the context \fIexpression\fR (for instance, a lock) to have the value
+\fIin_context\fR (a constant nonnegative integer) when called, and return with
+the value \fIout_context\fR (a constant nonnegative integer).  For APIs
+defined via macros, use the statement form
+.BI __context__( expression , in_value , out_value )
+in the body of the macro.
+
+With \fB-Wcontext\fR Sparse will warn when it sees a function change the
+context without indicating this with a \fBcontext\fR attribute, either by
+decreasing a context below zero (such as by releasing a lock without acquiring
+it), or returning with a changed context (such as by acquiring a lock without
+releasing it).  Sparse will also warn about blocks of code which may
+potentially execute with different contexts.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-context\fR.
+.
+.TP
+.B \-Wdecl
+Warn about any non-\fBstatic\fR variable or function definition that has no
+previous declaration.
+
+Private symbols (functions and variables) internal to a given source file
+should use \fBstatic\fR, to allow additional compiler optimizations, allow
+detection of unused symbols, and prevent other code from relying on these
+internal symbols.  Public symbols used by other source files will need
+declarations visible to those other source files, such as in a header file.
+All declarations should fall into one of these two categories.  Thus, with
+\fB-Wdecl\fR, Sparse warns about any symbol definition with neither
+\fBstatic\fR nor a declaration.  To fix this warning, declare private symbols
+\fBstatic\fR, and ensure that the files defining public symbols have the
+symbol declarations available first (such as by including the appropriate
+header file).
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-decl\fR.
+.
+.TP
+.B \-Wdeclaration-after-statement
+Warn about declarations that are not at the start of a block.
+
+These declarations are permitted in C99 but not in C89.
+
+Sparse issues these warnings by default only when the C dialect is
+C89 (i.e. -ansi or -std=c89).  To turn them off, use
+\fB\-Wno\-declaration\-after\-statement\fR.
+.
+.TP
+.B \-Wdefault\-bitfield\-sign
+Warn about any bitfield with no explicit signedness.
+
+Bitfields have no standard-specified default signedness. (C99 6.7.2) A
+bitfield without an explicit \fBsigned\fR or \fBunsigned\fR creates a
+portability problem for software that relies on the available range of values.
+To fix this, specify the bitfield type as \fBsigned\fR or \fBunsigned\fR
+explicitly.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wdesignated\-init
+Warn about positional initialization of structs marked as requiring designated
+initializers.
+
+Sparse allows an attribute
+.BI __attribute__((designated_init))
+which marks a struct as requiring designated initializers.  Sparse will warn
+about positional initialization of a struct variable or struct literal of a
+type that has this attribute.
+
+Requiring designated initializers for a particular struct type will insulate
+code using that struct type from changes to the layout of the type, avoiding
+the need to change initializers for that type unless they initialize a removed
+or incompatibly changed field.
+
+Common examples of this type of struct include collections of function pointers
+for the implementations of a class of related operations, for which the default
+NULL for an unmentioned field in a designated initializer will correctly
+indicate the absence of that operation.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-designated\-init\fR.
+.
+.TP
+.B \-Wdo\-while
+Warn about do-while loops that do not delimit the loop body with braces.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wenum\-mismatch
+Warn about the use of an expression of an incorrect \fBenum\fR type when
+initializing another \fBenum\fR type, assigning to another \fBenum\fR type, or
+passing an argument to a function which expects another \fBenum\fR type.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-enum\-mismatch\fR.
+.
+.TP
+.B \-Wempty\-character\-constant
+Warn about a constant such as ''.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-empty\-character\-constant\fR.
+.
+.TP
+.B \-Wexternal\-function\-has\-definition
+Warn about function definitions that are declared with external linkage.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-external\-function\-has\-definition\fR.
+.
+.TP
+.B \-Winit\-cstring
+Warn about initialization of a char array with a too long constant C string.
+
+If the size of the char array and the length of the string are the same,
+there is no space for the last nul char of the string in the array:
+
+.nf
+char s[3] = "abc";
+.fi
+
+If the array is used as a byte array, not as C string, this
+warning is just noise. However, if the array is passed to functions
+dealing with C string like printf(%s) and strcmp, it may cause a
+trouble.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wmemcpy\-max\-count
+Warn about call of \fBmemcpy()\fR, \fBmemset()\fR, \fBcopy_from_user()\fR, or
+\fBcopy_to_user()\fR with a large compile-time byte count.
+
+Sparse issues these warnings by default. To turn them off, use
+\fB\-Wno\-memcpy\-max\-count\fR.
+
+The limit can be changed with \fB\-fmemcpy\-max\-count=COUNT\fR,
+the default being \fB100000\fR.
+.
+.TP
+.B \-Wnon\-ansi\-function\-declaration
+Warn about non-ANSI function declarations.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-non\-ansi\-function\-declaration\fR.
+.
+.TP
+.B \-Wnon\-pointer\-null
+Warn about the use of 0 as a NULL pointer.
+
+0 has integer type.  NULL has pointer type.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-non\-pointer\-null\fR.
+.
+.TP
+.B \-Wold\-initializer
+Warn about the use of the pre-C99 GCC syntax for designated initializers.
+
+C99 provides a standard syntax for designated fields in \fBstruct\fR or
+\fBunion\fR initializers:
+
+.nf
+struct structname var = { .field = value };
+.fi
+
+GCC also has an old, non-standard syntax for designated initializers which
+predates C99:
+
+.nf
+struct structname var = { field: value };
+.fi
+
+Sparse will warn about the use of GCC's non-standard syntax for designated
+initializers.  To fix this warning, convert designated initializers to use the
+standard C99 syntax.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-old\-initializer\fR.
+.
+.TP
+.B \-Wone\-bit\-signed\-bitfield
+Warn about any one-bit \fBsigned\fR bitfields.
+
+A one-bit \fBsigned\fR bitfield can only have the values 0 and -1, or with
+some compilers only 0; this results in unexpected behavior for programs which
+expected the ability to store 0 and 1.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-one\-bit\-signed\-bitfield\fR.
+.
+.TP
+.B \-Wparen\-string
+Warn about the use of a parenthesized string to initialize an array.
+
+Standard C syntax does not permit a parenthesized string as an array
+initializer.  GCC allows this syntax as an extension.  With
+\fB\-Wparen\-string\fR, Sparse will warn about this syntax.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wpointer\-arith
+Warn about anything that depends on the \fBsizeof\fR a void or function type.
+
+C99 does not allow the \fBsizeof\fR operator to be applied to function types
+or to incomplete types such as void. GCC allows \fBsizeof\fR to be applied to
+these types as an extension and assigns these types a size of \fI1\fR. With
+\fB\-pointer\-arith\fR, Sparse will warn about pointer arithmetic on void
+or function pointers, as well as expressions which directly apply the
+\fBsizeof\fR operator to void or function types.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wptr\-subtraction\-blows
+Warn when subtracting two pointers to a type with a non-power-of-two size.
+
+Subtracting two pointers to a given type gives a difference in terms of the
+number of items of that type.  To generate this value, compilers will usually
+need to divide the difference by the size of the type, an potentially
+expensive operation for sizes other than powers of two.
+
+Code written using pointer subtraction can often use another approach instead,
+such as array indexing with an explicit array index variable, which may allow
+compilers to generate more efficient code.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wreturn\-void
+Warn if a function with return type void returns a void expression.
+
+C99 permits this, and in some cases this allows for more generic code in
+macros that use typeof or take a type as a macro argument.  However, some
+programs consider this poor style, and those programs can use
+\fB\-Wreturn\-void\fR to get warnings about it.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wshadow
+Warn when declaring a symbol which shadows a declaration with the same name in
+an outer scope.
+
+Such declarations can lead to error-prone code.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wsizeof-bool
+Warn when checking the sizeof a _Bool.
+
+C99 does not specify the sizeof a _Bool.  gcc uses 1.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wtransparent\-union
+Warn about any declaration using the GCC extension
+\fB__attribute__((transparent_union))\fR.
+
+Sparse issues these warnings by default.  To turn them off, use
+\fB\-Wno\-transparent\-union\fR.
+.
+.TP
+.B \-Wtypesign
+Warn when converting a pointer to an integer type into a pointer to an integer
+type with different signedness.
+
+Sparse does not issue these warnings by default.
+.
+.TP
+.B \-Wundef
+Warn about preprocessor conditionals that use the value of an undefined
+preprocessor symbol.
+
+Standard C (C99 6.10.1) permits using the value of an undefined preprocessor
+symbol in preprocessor conditionals, and specifies it has a value of 0.
+However, this behavior can lead to subtle errors.
+
+Sparse does not issue these warnings by default.
+.
+.SH MISC OPTIONS
+.TP
+.B \-gcc-base-dir \fIdir\fR
+Look for compiler-provided system headers in \fIdir\fR/include/ and \fIdir\fR/include-fixed/.
+.
+.TP
+.B \-multiarch-dir \fIdir\fR
+Look for system headers in the multiarch subdirectory \fIdir\fR.
+The \fIdir\fR name would normally take the form of the target's
+normalized GNU triplet. (e.g. i386-linux-gnu).
+.
+.SH DEBUG OPTIONS
+.TP
+.B \-fdump-linearize[=only]
+Dump the IR code of a function directly after its linearization,
+before any simplifications are made. If the argument \fB=only\fR is
+also given no further processing is done on the function.
+.
+.B \-fmem-report
+Report some statistics about memory allocation used by the tool.
+.
+.SH OTHER OPTIONS
+.TP
+.B \-fmemcpy-max-count=COUNT
+Set the limit for the warnings given by \fB-Wmemcpy-max-count\fR.
+A COUNT of 0, useless in itself, will effectively disable the warning.
+The default limit is 100000.
+.
+.TP
+.B \-ftabstop=WIDTH
+Set the distance between tab stops.  This helps sparse report correct
+column numbers in warnings or errors.  If the value is less than 1 or
+greater than 100, the option is ignored.  The default is 8.
+.
+.SH SEE ALSO
+.BR cgcc (1)
+.
+.SH HOMEPAGE
+http://www.kernel.org/pub/software/devel/sparse/
+.
+.SH MAILING LIST
+linux-sparse@vger.kernel.org
+.
+.SH MAINTAINER
+Christopher Li <sparse@chrisli.org>

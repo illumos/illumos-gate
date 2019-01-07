@@ -20,13 +20,10 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/ipcs/Makefile
-#
+# Copyright (c) 2019, Joyent, Inc.
 
 PROG=		ipcs
 XPG4PROG=	$(PROG)
@@ -36,6 +33,9 @@ include ../Makefile.cmd
 LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lproject
+
+# main() too hairy
+SMATCH =	off
 
 .KEEP_STATE:
 

@@ -187,7 +187,7 @@ void linenoiseClearScreen(void) {
 static int
 getColumns(void)
 {
-	char *columns = getenv("COLUMNS");
+	char *columns = getenv("screen-#cols");
 	if (columns == NULL)
 		return (80);
 	return (strtol(columns, NULL, 0));

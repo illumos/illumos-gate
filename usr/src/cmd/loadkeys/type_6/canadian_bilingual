@@ -28,42 +28,42 @@
 # "caps lock" acts as "shift lock" on this keyboard
 #
 key  53  base / shift | caps / ctrl ^\ altg '\\'
-key  30  base 1 shift ! caps 1 ctrl 1 altg ±
+key  30  base 1 shift ! caps 1 ctrl 1 altg 0x00B1
 key  31  base 2 shift @ caps 2 ctrl 2 altg nop
-key  32  base 3 shift # caps 3 ctrl 3 altg £
-key  33  base 4 shift $ caps 4 ctrl 4 altg ¢
-key  34  base 5 shift % caps 5 ctrl 5 altg ¤
-key  35  base 6 shift ? caps 6 ctrl 6 altg ¬
+key  32  base 3 shift # caps 3 ctrl 3 altg 0x00A3
+key  33  base 4 shift $ caps 4 ctrl 4 altg 0x00A2
+key  34  base 5 shift % caps 5 ctrl 5 altg 0x00A4
+key  35  base 6 shift ? caps 6 ctrl 6 altg 0x00AC
 key  36  base 7 shift & caps 7 ctrl 7 altg {
 key  37  base 8 shift * caps 8 ctrl 8 altg }
 key  38  base 9 shift ( caps 9 ctrl 9 altg [
 key  39  base 0 shift ) caps 0 ctrl 0 altg ]
-key  45  base - shift _ caps - ctrl ^_ altg ½
-key  46  base = shift + caps = ctrl = altg ¬
+key  45  base - shift _ caps - ctrl ^_ altg 0x00B0
+key  46  base = shift + caps = ctrl = altg 0x00AC
 key  20  base q shift Q caps Q ctrl ^Q altg nop
 key  26  base w shift W caps W ctrl ^W altg nop
 key  8   base e shift E caps E ctrl ^E altg nop
 key  28  base y shift Y caps Y ctrl ^Y altg nop
-key  18  base o shift O caps O ctrl ^O altg §
-key  19  base p shift P caps P ctrl ^P altg ¶
+key  18  base o shift O caps O ctrl ^O altg 0x00A7
+key  19  base p shift P caps P ctrl ^P altg 0x00B6
 key  47  base fa_cflex shift fa_umlaut caps fa_cflex ctrl fa_cflex altg fa_grave
-key  48  base ç shift Ç caps Ç ctrl ç altg ~
+key  48  base 0x00E7 shift 0x00C7 caps 0x00C7 ctrl 0x00E7 altg ~
 key   4  base a shift A caps A ctrl ^A altg nop
 key  22  base s shift S caps S ctrl ^S altg nop
 key  51  base ; shift : caps ; ctrl ; altg °
-key  52  base è shift È caps È ctrl ¨ altg {
-key  50  base à shift À caps À ctrl à altg } numl nonl up nop
-key  29  base z shift Z caps Z ctrl ^Z altg «
-key  27  base x shift X caps X ctrl ^X altg »
+key  52  base 0x00E8 shift 0x00C8 caps 0x00C8 ctrl 0x00A8 altg {
+key  50  base 0x00E0 shift 0x00C0 caps 0x00C0 ctrl 0x00E0 altg } numl nonl up nop
+key  29  base z shift Z caps Z ctrl ^Z altg 0x00AB
+key  27  base x shift X caps X ctrl ^X altg 0x00BB
 key   6  base c shift C caps C ctrl ^C altg nop
 key  25  base v shift V caps V ctrl ^V altg nop
 key   5  base b shift B caps B ctrl ^B altg nop
 key  17  base n shift N caps N ctrl ^N altg nop
-key  16  base m shift M caps M ctrl ^M altg µ
+key  16  base m shift M caps M ctrl ^M altg 0x00B5
 key  54  base , shift '\'' caps , ctrl , altg <
 key  55  base . shift '"' caps . ctrl . altg >
-key  56  base é shift É caps É ctrl é altg fa_acute
-key 100  base ù shift Ù caps Ù ctrl ù altg nop numl nonl up nop
+key  56  base 0x00E9 shift 0x00C9 caps 0x00C9 ctrl 0x00E9 altg fa_acute
+key 100  base 0x00F9 shift 0x00D9 caps 0x00D9 ctrl 0x00F9 altg nop numl nonl up nop
 #
 #
 # New function keys assigned old codes

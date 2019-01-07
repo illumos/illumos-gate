@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -28,7 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include "stand.h"
 #include <string.h>
@@ -36,8 +35,10 @@ __FBSDID("$FreeBSD$");
 static int	p_maxlines = -1;
 static int	p_freelines;
 
-static char *pager_prompt1 = " --more--  <space> page down <enter> line down <q> quit ";
-static char *pager_blank   = "                                                        ";
+static char *pager_prompt1 = \
+	" --more--  <space> page down <enter> line down <q> quit ";
+static char *pager_blank   = \
+	"                                                        ";
 
 /*
  * 'open' the pager
@@ -47,9 +48,9 @@ pager_open(void)
 {
     int		nlines;
     char	*cp, *lp;
-    
+
     nlines = 24;		/* sensible default */
-    if ((cp = getenv("LINES")) != NULL) {
+    if ((cp = getenv("screen-#rows")) != NULL) {
 	nlines = strtol(cp, &lp, 0);
     }
 
@@ -85,11 +86,11 @@ pager_output(const char *cp)
 
     if (cp == NULL)
 	return(0);
-    
+
     for (;;) {
 	if (*cp == 0)
 	    return(0);
-	
+
 	putchar(*cp);			/* always emit character */
 
 	if (*(cp++) == '\n') {		/* got a newline? */
@@ -134,7 +135,7 @@ pager_file(const char *fname)
     size_t	hmuch;
     int		fd;
     int		result;
-    
+
     if ((fd = open(fname, O_RDONLY)) == -1) {
 	printf("can't open '%s': %s\n", fname, strerror(errno));
 	return(-1);

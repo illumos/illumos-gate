@@ -482,7 +482,7 @@ main(void)
 	env_setenv("loaddev", EV_VOLATILE, ldev, env_noset, env_nounset);
 	printf("Booting from %s\n", ldev);
 
-	setenv("LINES", "24", 1);		/* optional */
+	setenv("screen-#rows", "24", 1);		/* optional */
 	setenv("prompt", "loader>", 1);
 
 	archsw.arch_loadaddr = uboot_loadaddr;
