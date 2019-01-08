@@ -26,6 +26,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "cd9660_eltorito.h"
 #include "etdump.h"
@@ -77,7 +78,8 @@ output_entry(FILE *outfile, const char *filename __unused,
 
 	fprintf(outfile, "%sSystem %s\n", indent,
 	    system_id_string(bcse->system_type[0]));
-	fprintf(outfile, "%sStart LBA %d (0x%x), sector count %d (0x%x)\n",
+	fprintf(outfile, "%sStart LBA %" PRIu32 " (0x%" PRIx32
+	    "), sector count %" PRIu16 " (0x%" PRIx16 ")\n",
 	    indent, isonum_731(bcse->load_rba), isonum_731(bcse->load_rba),
 	    isonum_721(bcse->sector_count), isonum_721(bcse->sector_count));
 	fprintf(outfile, "%sMedia type: %s\n", indent,

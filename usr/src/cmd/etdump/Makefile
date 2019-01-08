@@ -10,11 +10,11 @@
 #
 
 #
-# Copyright 2018 Toomas Soome <tsoome@me.com>
+# Copyright 2019 Toomas Soome <tsoome@me.com>
 #
 
 PROG=	etdump
-OBJS=	etdump.o output_shell.o output_text.o cd9660_conversion.o
+OBJS=	etdump.o output_shell.o output_text.o
 SRCS=	$(OBJS:%.o=%.c)
 
 include ../Makefile.cmd

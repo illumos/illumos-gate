@@ -33,14 +33,12 @@ OBJS=		$(LOCALOBJS) $(COMMONOBJS)
 include ../../../Makefile.cmd
 include ../../Makefile.cmd-inet
 
-XGETFLAGS += 	-a -x $(PROG).xcl
+XGETFLAGS +=	-a -x $(PROG).xcl
 LOCALSRCS=	$(LOCALOBJS:%.o=%.c)
 COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
 CPPFLAGS +=	-I$(CMDINETCOMMONDIR)
-CERRWARN +=	-_gcc=-Wno-unused-label
-CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=       -lofmt -linetutil -lipadm -lnvpair
 LINTFLAGS +=	-m
 
