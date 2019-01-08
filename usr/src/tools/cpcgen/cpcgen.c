@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -37,12 +37,14 @@
 #include <json_nvlist.h>
 
 #define	EXIT_USAGE	2
-
+#define	CPROC_MAX_STEPPINGS	16
 
 typedef struct cpc_proc {
 	struct cpc_proc *cproc_next;
 	uint_t		cproc_family;
 	uint_t		cproc_model;
+	uint_t		cproc_nsteps;
+	uint_t		cproc_steppings[CPROC_MAX_STEPPINGS];
 } cpc_proc_t;
 
 typedef enum cpc_file_type {
@@ -97,6 +99,8 @@ static cpc_whitelist_t cpcgen_whitelist[] = {
 	/* Skylake */
 	{ "SKL", "skl", CPC_FILE_CORE },
 	{ "SKX", "skx", CPC_FILE_CORE },
+	/* Cascade Lake */
+	{ "CLX", "clx", CPC_FILE_CORE },
 	/* Atom */
 	{ "BNL", "bnl", CPC_FILE_CORE },
 	{ "SLM", "slm", CPC_FILE_CORE },
@@ -112,7 +116,7 @@ typedef struct cpc_papi {
 
 /*
  * This table maps events with an Intel specific name to the corresponding PAPI
- * name. There may be multiple INtel events which map to the same PAPI event.
+ * name. There may be multiple Intel events which map to the same PAPI event.
  * This is usually because different processors have different names for an
  * event. We use the title as opposed to the event codes because those can
  * change somewhat arbitrarily between processor generations.
@@ -297,18 +301,26 @@ cpcgen_map_lookup(const char *path)
  * model.
  */
 static void
-cpcgen_parse_model(char *fsr, uint_t *family, uint_t *model)
+cpcgen_parse_model(char *fsr, uint_t *family, uint_t *model, uint_t *nstepp,
+    uint_t *steppings)
 {
 	const char *bstr = "GenuineIntel";
-	const char *brand, *fam, *mod;
+	const char *brand, *fam, *mod, *step;
 	char *last;
 	long l;
+	uint_t nstep = 0;
 
+	/*
+	 * Tokeninze the string. There may be an optional stepping portion,
+	 * which has a range of steppings enclosed by '[' and ']' characters.
+	 * While the other parts are required, the stepping may be missing.
+	 */
 	if ((brand = strtok_r(fsr, "-", &last)) == NULL ||
 	    (fam = strtok_r(NULL, "-", &last)) == NULL ||
 	    (mod = strtok_r(NULL, "-", &last)) == NULL) {
 		errx(EXIT_FAILURE, "failed to parse processor id \"%s\"", fsr);
 	}
+	step = strtok_r(NULL, "-", &last);
 
 	if (strcmp(bstr, brand) != 0) {
 		errx(EXIT_FAILURE, "brand string \"%s\" did not match \"%s\"",
@@ -327,6 +339,93 @@ cpcgen_parse_model(char *fsr, uint_t *family, uint_t *model)
 		errx(EXIT_FAILURE, "failed to parse model \"%s\"", mod);
 	}
 	*model = (uint_t)l;
+
+	if (step == NULL) {
+		*nstepp = 0;
+		return;
+	}
+
+	if (*step != '[' || ((last = strrchr(step, ']')) == NULL)) {
+		errx(EXIT_FAILURE, "failed to parse stepping \"%s\": missing "
+		    "stepping range brackets", step);
+	}
+	step++;
+	*last = '\0';
+	while (*step != '\0') {
+		if (!isxdigit(*step)) {
+			errx(EXIT_FAILURE, "failed to parse stepping: invalid "
+			    "stepping identifier '0x%x'", *step);
+		}
+
+		if (nstep >= CPROC_MAX_STEPPINGS) {
+			errx(EXIT_FAILURE, "failed to parse stepping: "
+			    "encountered too many steppings");
+		}
+
+		switch (*step) {
+		case '0':
+			steppings[nstep] = 0x0;
+			break;
+		case '1':
+			steppings[nstep] = 0x1;
+			break;
+		case '2':
+			steppings[nstep] = 0x2;
+			break;
+		case '3':
+			steppings[nstep] = 0x3;
+			break;
+		case '4':
+			steppings[nstep] = 0x4;
+			break;
+		case '5':
+			steppings[nstep] = 0x5;
+			break;
+		case '6':
+			steppings[nstep] = 0x6;
+			break;
+		case '7':
+			steppings[nstep] = 0x7;
+			break;
+		case '8':
+			steppings[nstep] = 0x8;
+			break;
+		case '9':
+			steppings[nstep] = 0x9;
+			break;
+		case 'a':
+		case 'A':
+			steppings[nstep] = 0xa;
+			break;
+		case 'b':
+		case 'B':
+			steppings[nstep] = 0xb;
+			break;
+		case 'c':
+		case 'C':
+			steppings[nstep] = 0xc;
+			break;
+		case 'd':
+		case 'D':
+			steppings[nstep] = 0xd;
+			break;
+		case 'e':
+		case 'E':
+			steppings[nstep] = 0xe;
+			break;
+		case 'f':
+		case 'F':
+			steppings[nstep] = 0xf;
+			break;
+		default:
+			errx(EXIT_FAILURE, "encountered non-hex stepping "
+			    "character: '%c'", *step);
+		}
+		nstep++;
+		step++;
+	}
+
+	*nstepp = nstep;
 }
 
 static nvlist_t *
@@ -436,7 +535,9 @@ cpcgen_read_mapfile(const char *datadir, const char *platform)
 	while (getline(&data, &datalen, map) != -1) {
 		char *fstr, *path, *tstr;
 		const char *name;
-		uint_t family, model;
+		uint_t family, model, nsteps;
+		uint_t steppings[CPROC_MAX_STEPPINGS];
+
 		cpc_type_t type;
 		cpc_map_t *map;
 		cpc_proc_t *proc;
@@ -458,7 +559,7 @@ cpcgen_read_mapfile(const char *datadir, const char *platform)
 			    "%u in %s", lineno, mappath);
 		}
 
-		cpcgen_parse_model(fstr, &family, &model);
+		cpcgen_parse_model(fstr, &family, &model, &nsteps, steppings);
 
 		if (strcmp(tstr, "core") == 0) {
 			type = CPC_FILE_CORE;
@@ -497,16 +598,22 @@ cpcgen_read_mapfile(const char *datadir, const char *platform)
 			map->cmap_data = parsed;
 			map->cmap_next = cpcgen_maps;
 			map->cmap_name = name;
+			map->cmap_procs = NULL;
 			cpcgen_maps = map;
 		}
 
-		if ((proc = malloc(sizeof (cpc_proc_t))) == NULL) {
+		if ((proc = calloc(1, sizeof (cpc_proc_t))) == NULL) {
 			err(EXIT_FAILURE, "failed to allocate memory for "
 			    "family and model tracking");
 		}
 
 		proc->cproc_family = family;
 		proc->cproc_model = model;
+		proc->cproc_nsteps = nsteps;
+		if (nsteps > 0) {
+			bcopy(steppings, proc->cproc_steppings,
+			    sizeof (steppings));
+		}
 		proc->cproc_next = map->cmap_procs;
 		map->cmap_procs = proc;
 	}
@@ -561,12 +668,29 @@ cpcgen_manual_file_before(FILE *f, cpc_map_t *map)
 	}
 
 	for (proc = map->cmap_procs; proc != NULL; proc = proc->cproc_next) {
-		if (fprintf(f, ".It\n.Sy Family 0x%x, Model 0x%x\n",
-		    proc->cproc_family, proc->cproc_model) == -1) {
-			warn("failed to write out model information for %s",
-			    map->cmap_name);
-			free(upper);
-			return (B_FALSE);
+		if (proc->cproc_nsteps > 0) {
+			uint_t step;
+
+			for (step = 0; step < proc->cproc_nsteps; step++) {
+				if (fprintf(f, ".It\n.Sy Family 0x%x, Model "
+				    "0x%x, Stepping 0x%x\n",
+				    proc->cproc_family, proc->cproc_model,
+				    proc->cproc_steppings[step]) == -1) {
+					warn("failed to write out model "
+					    "information for %s",
+					    map->cmap_name);
+					free(upper);
+					return (B_FALSE);
+				}
+			}
+		} else {
+			if (fprintf(f, ".It\n.Sy Family 0x%x, Model 0x%x\n",
+			    proc->cproc_family, proc->cproc_model) == -1) {
+				warn("failed to write out model information "
+				    "for %s", map->cmap_name);
+				free(upper);
+				return (B_FALSE);
+			}
 		}
 	}
 
@@ -794,6 +918,64 @@ cpcgen_cfile_event(FILE *f, nvlist_t *nvl, const char *path, uint_t ent)
 	return (B_TRUE);
 }
 
+static boolean_t
+cpcgen_generate_map(FILE *f, cpc_map_t *map, boolean_t start)
+{
+	cpc_proc_t *p;
+
+	if (fprintf(f, "\t%sif (", start ? "" : "} else ") == -1) {
+		return (B_FALSE);
+	}
+
+	for (p = map->cmap_procs; p != NULL; p = p->cproc_next) {
+		/*
+		 * Make sure the line is padded so the generated C code looks
+		 * like reasonable C style.
+		 */
+		if (p != map->cmap_procs) {
+			if (fputs("\t    ", f) == -1) {
+				return (B_FALSE);
+			}
+		}
+
+		if (p->cproc_nsteps > 0) {
+			uint_t i;
+
+			if (fprintf(f, "(model == 0x%x &&\n\t    (",
+			    p->cproc_model) == -1) {
+				return (B_FALSE);
+			}
+
+			for (i = 0; i < p->cproc_nsteps; i++) {
+				if (fprintf(f, "stepping == 0x%x%s",
+				    p->cproc_steppings[i],
+				    i + 1 != p->cproc_nsteps ?
+				    " ||\n\t    " : "") == -1) {
+					return (B_FALSE);
+				}
+			}
+
+			if (fputs("))", f) == -1) {
+				return (B_FALSE);
+			}
+		} else if (fprintf(f, "model == 0x%x", p->cproc_model) == -1) {
+			return (B_FALSE);
+		}
+
+		if (fprintf(f, "%s\n",
+		    p->cproc_next != NULL ? " ||" : ") {") == -1) {
+			return (B_FALSE);
+		}
+	}
+
+	if (fprintf(f, "\t\t\treturn (pcbe_core_events_%s);\n",
+	    map->cmap_name) == -1) {
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
 /*
  * Generate a header file that declares all of these arrays and provide a map
  * for models to the corresponding table to use.
@@ -838,7 +1020,8 @@ cpcgen_common_files(int dirfd)
 	    "extern \"C\" {\n"
 	    "#endif\n"
 	    "\n"
-	    "extern const struct events_table_t *core_cpcgen_table(uint_t);\n"
+	    "extern const struct events_table_t *core_cpcgen_table(uint_t, "
+	    "uint_t);\n"
 	    "\n") == -1) {
 		int e = errno;
 		(void) unlinkat(dirfd, tmpname, 0);
@@ -916,9 +1099,8 @@ cpcgen_common_files(int dirfd)
 	    "#include \"core_pcbe_cpcgen.h\"\n"
 	    "\n"
 	    "const struct events_table_t *\n"
-	    "core_cpcgen_table(uint_t model)\n"
-	    "{\n"
-	    "\tswitch (model) {\n") == -1) {
+	    "core_cpcgen_table(uint_t model, uint_t stepping)\n"
+	    "{\n") == -1) {
 		int e = errno;
 		(void) unlinkat(dirfd, tmpname, 0);
 		errno = e;
@@ -927,29 +1109,16 @@ cpcgen_common_files(int dirfd)
 	}
 
 	for (map = cpcgen_maps; map != NULL; map = map->cmap_next) {
-		cpc_proc_t *p;
-		for (p = map->cmap_procs; p != NULL; p = p->cproc_next) {
-			assert(p->cproc_family == 6);
-			if (fprintf(f, "\t\tcase 0x%x:\n", p->cproc_model) ==
-			    -1) {
-				int e = errno;
-				(void) unlinkat(dirfd, tmpname, 0);
-				errno = e;
-				errx(EXIT_FAILURE, "failed to write header to "
-				    "temporary file for %s", fname);
-			}
-		}
-		if (fprintf(f, "\t\t\treturn (pcbe_core_events_%s);\n",
-		    map->cmap_name) == -1) {
+		if (!cpcgen_generate_map(f, map, map == cpcgen_maps)) {
 			int e = errno;
 			(void) unlinkat(dirfd, tmpname, 0);
 			errno = e;
-			errx(EXIT_FAILURE, "failed to write entry to "
-			    "temporary file for %s", fname);
+			errx(EXIT_FAILURE, "failed to write to temporary "
+			    "file for %s", fname);
 		}
 	}
 
-	if (fprintf(f, "\t\tdefault:\n"
+	if (fprintf(f, "\t} else {\n"
 	    "\t\t\treturn (NULL);\n"
 	    "\t}\n"
 	    "}\n") == -1) {

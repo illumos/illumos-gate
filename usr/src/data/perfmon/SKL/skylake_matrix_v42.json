@@ -436,56 +436,56 @@
   {
     "MATRIX_REQUEST": "Null",
     "MATRIX_RESPONSE": "L3_MISS.SPL_HIT",
-    "MATRIX_VALUE": "0x007c00 ",
+    "MATRIX_VALUE": "0x007c40 ",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "tbd"
   },
   {
     "MATRIX_REQUEST": "Null",
     "MATRIX_RESPONSE": "L3_MISS.SNOOP_NONE",
-    "MATRIX_VALUE": "0x00bc00 ",
+    "MATRIX_VALUE": "0x00bc40 ",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "tbd"
   },
   {
     "MATRIX_REQUEST": "Null",
     "MATRIX_RESPONSE": "L3_MISS.SNOOP_NOT_NEEDED",
-    "MATRIX_VALUE": "0x013c00 ",
+    "MATRIX_VALUE": "0x013c40 ",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "tbd"
   },
   {
     "MATRIX_REQUEST": "Null",
     "MATRIX_RESPONSE": "L3_MISS.SNOOP_MISS",
-    "MATRIX_VALUE": "0x023c00 ",
+    "MATRIX_VALUE": "0x023c40 ",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "tbd"
   },
   {
     "MATRIX_REQUEST": "Null",
     "MATRIX_RESPONSE": "L3_MISS.SNOOP_HIT_NO_FWD",
-    "MATRIX_VALUE": "0x043c00 ",
+    "MATRIX_VALUE": "0x043c40 ",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "tbd"
   },
   {
     "MATRIX_REQUEST": "Null",
     "MATRIX_RESPONSE": "L3_MISS.SNOOP_HITM",
-    "MATRIX_VALUE": "0x103c00 ",
+    "MATRIX_VALUE": "0x103c40 ",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "tbd"
   },
   {
     "MATRIX_REQUEST": "Null",
     "MATRIX_RESPONSE": "L3_MISS.SNOOP_NON_DRAM",
-    "MATRIX_VALUE": "0x203c00 ",
+    "MATRIX_VALUE": "0x203c40 ",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "tbd"
   },
   {
     "MATRIX_REQUEST": "Null",
     "MATRIX_RESPONSE": "L3_MISS.ANY_SNOOP",
-    "MATRIX_VALUE": "0x3ffc00 ",
+    "MATRIX_VALUE": "0x3ffc40 ",
     "MATRIX_REGISTER": "0,1",
     "DESCRIPTION": "tbd"
   }

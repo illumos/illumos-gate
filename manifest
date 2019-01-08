@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2017 ASS-Einrichtungssysteme GmbH
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
@@ -14385,6 +14385,7 @@ f usr/share/man/man3cpc/bdw_de_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bdw_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bdx_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bnl_events.3cpc 0444 root bin
+f usr/share/man/man3cpc/clx_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/cpc.3cpc 0444 root bin
 f usr/share/man/man3cpc/cpc_access.3cpc 0444 root bin
 s usr/share/man/man3cpc/cpc_bind_cpu.3cpc=cpc_bind_curlwp.3cpc

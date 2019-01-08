@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 # This Makefile builds
 # the Intel Core Architecture Performance Counter BackEnd (PCBE).
@@ -38,6 +38,7 @@ CPCGEN_OBJS	= \
 	core_pcbe_bdw.o		\
 	core_pcbe_bdx.o		\
 	core_pcbe_bnl.o		\
+	core_pcbe_clx.o		\
 	core_pcbe_glm.o		\
 	core_pcbe_glp.o		\
 	core_pcbe_hsw.o		\

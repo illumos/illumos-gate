@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -625,7 +625,7 @@ core_pcbe_init(void)
 	uint64_t		j;
 	uint64_t		arch_events_vector_length;
 	size_t			arch_events_string_length;
-	uint_t			model;
+	uint_t			model, stepping;
 
 	if (cpuid_getvendor(CPU) != X86_VENDOR_Intel)
 		return (-1);
@@ -813,7 +813,8 @@ core_pcbe_init(void)
 
 		/* Non-architectural events list */
 		model = cpuid_getmodel(CPU);
-		events_table = core_cpcgen_table(model);
+		stepping = cpuid_getstep(CPU);
+		events_table = core_cpcgen_table(model, stepping);
 
 		for (i = 0; i < num_gpc; i++) {
 

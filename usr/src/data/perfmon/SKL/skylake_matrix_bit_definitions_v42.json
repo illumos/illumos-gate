@@ -1,0 +1,200 @@
+[
+  {
+    "BitName": "DEMAND_DATA_RD",
+    "BitIndex": "0",
+    "Type": "1",
+    "Description": "Counts demand data reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "DEMAND_RFO",
+    "BitIndex": "1",
+    "Type": "1",
+    "Description": "Counts all demand data writes (RFOs)",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "DEMAND_CODE_RD",
+    "BitIndex": "2",
+    "Type": "1",
+    "Description": "Counts all demand code reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "OTHER",
+    "BitIndex": "15",
+    "Type": "1",
+    "Description": "Counts any other requests",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ANY_RESPONSE",
+    "BitIndex": "16",
+    "Type": "2",
+    "Description": "have any response type.",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SUPPLIER_NONE",
+    "BitIndex": "17",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_HIT_M",
+    "BitIndex": "18",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_HIT_E",
+    "BitIndex": "19",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_HIT_S",
+    "BitIndex": "20",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_HIT",
+    "BitIndex": "18,19,20",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L4_HIT_LOCAL_L4",
+    "BitIndex": "22",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_MISS_LOCAL_DRAM",
+    "BitIndex": "26",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_MISS",
+    "BitIndex": "26,27,28,29",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SPL_HIT",
+    "BitIndex": "30",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_NONE",
+    "BitIndex": "31",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_NOT_NEEDED",
+    "BitIndex": "32",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_MISS",
+    "BitIndex": "33",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_HIT_NO_FWD",
+    "BitIndex": "34",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_HIT_WITH_FWD",
+    "BitIndex": "35",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "18,19,20,21",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_HITM",
+    "BitIndex": "36",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_NON_DRAM",
+    "BitIndex": "37",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ANY_SNOOP",
+    "BitIndex": "30,31,32,33,34,35,36,37",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  }
+]
