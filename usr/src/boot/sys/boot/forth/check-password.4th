@@ -1,6 +1,7 @@
 \ Copyright (c) 2006-2015 Devin Teske <dteske@FreeBSD.org>
+\ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 \ All rights reserved.
-\ 
+\
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
 \ are met:
@@ -9,7 +10,7 @@
 \ 2. Redistributions in binary form must reproduce the above copyright
 \    notice, this list of conditions and the following disclaimer in the
 \    documentation and/or other materials provided with the distribution.
-\ 
+\
 \ THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 \ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 \ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -21,8 +22,6 @@
 \ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
-\ 
-\ $FreeBSD$
 
 marker task-check-password.4th
 
@@ -49,7 +48,7 @@ variable readlen             \ input length
 \ this is to pass 0 as a stack parameter (ie. `0 sgetkey'). This function is
 \ called by the read function. You need not call it directly. NOTE: arrow keys
 \ show as 0 on the stack
-\ 
+\
 : sgetkey ( -- )
 
 	begin \ Loop forever
@@ -68,7 +67,7 @@ variable readlen             \ input length
 				dup 3 = if ( 4 ) ." |" else
 					1 spaces
 				then then then then drop
-				read-start @ 25 at-xy
+				read-start @ sr at-xy
 				exit
 			then then
 
@@ -94,7 +93,7 @@ variable readlen             \ input length
 
 : read ( c-addr/u -- ) \ Expects string prompt as stack input
 
-	0 25 at-xy           \ Move the cursor to the bottom-left
+	at-bl                \ Move the cursor to the bottom-left
 	dup 1+ read-start !  \ Store X offset after the prompt
 	0 readlen !          \ Initialize the read length
 	type                 \ Print the prompt
@@ -113,12 +112,12 @@ variable readlen             \ input length
 			10 emit  \ Echo new line
 			exit
 		else dup ctrl_u = if
-			3 spaces read-start @ 25 at-xy \ Erase the twiddle
+			3 spaces read-start @ sr at-xy \ Erase the twiddle
 			0 readlen ! \ Reset input to NULL
 		else dup bs_key = if
 			readlen @ 1 - dup readlen ! \ Decrement input length
 			dup 0< if drop 0 dup readlen ! then \ Don't go negative
-			0= if 3 spaces read-start @ 25 at-xy then \ Twiddle
+			0= if 3 spaces read-start @ sr at-xy then \ Twiddle
 		else dup \ Store the character
 			\ NB: sgetkey prevents overflow by way of blocking
 			\     at readmax except for Backspace or Enter

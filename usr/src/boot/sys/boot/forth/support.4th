@@ -201,7 +201,30 @@ create last_module_option sizeof module.next allot 0 last_module_option !
 : 2r> postpone r> postpone r> ; immediate
 : 2r@ postpone 2r> postpone 2dup postpone 2>r ; immediate
 
+\ Number to string
+: n2s ( n -- c-addr/u ) s>d <# #s #> ;
+\ String to number
+: s2n ( c-addr/u1 -- u2 | -1 ) ?number 0= if -1 then ;
+
+\ Test if an environment variable is set
 : getenv?  getenv -1 = if false else drop true then ;
+
+\ Fetch a number from an environment variable, or a default if not set or does
+\ not parse (s2n returns -1).
+: getenvn ( n1 c-addr/u -- n1 | n2 )
+	getenv dup -1 = if
+		\ environment variable not set
+		drop		( n1 -1 -- n1 )
+	else
+		s2n		( n1 c-addr/u1 -- n1 n2 )
+		dup -1 = if
+			\ parse failed
+			drop	( n1 n2 -- n1 )
+		else
+			nip	( n1 n2 -- n2 )
+		then
+	then
+;
 
 \ Returns TRUE if the framebuffer is active, FALSE otherwise
 : framebuffer? ( -- flag )

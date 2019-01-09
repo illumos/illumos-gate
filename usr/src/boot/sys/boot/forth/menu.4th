@@ -1,8 +1,9 @@
 \ Copyright (c) 2003 Scott Long <scottl@FreeBSD.org>
 \ Copyright (c) 2003 Aleksander Fafula <alex@fafula.com>
 \ Copyright (c) 2006-2015 Devin Teske <dteske@FreeBSD.org>
+\ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 \ All rights reserved.
-\ 
+\
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
 \ are met:
@@ -11,7 +12,7 @@
 \ 2. Redistributions in binary form must reproduce the above copyright
 \    notice, this list of conditions and the following disclaimer in the
 \    documentation and/or other materials provided with the distribution.
-\ 
+\
 \ THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
 \ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 \ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -23,8 +24,6 @@
 \ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
-\ 
-\ $FreeBSD$
 
 marker task-menu.4th
 
@@ -204,7 +203,7 @@ also menu-infrastructure definitions
 \ increments the cursor position to the next row for the creation of the next
 \ menu item. This function is called by the menu-create function. You need not
 \ call it directly.
-\ 
+\
 : printmenuitem ( menu_item_str -- ascii_keycode )
 
 	loader_color? if [char] ^ escc! then
@@ -256,7 +255,7 @@ also menu-infrastructure definitions
 \ display which kernel to boot when the [overloaded] `boot' word is interpreted.
 \ Used internally by menu-create, you need not (nor should you) call this
 \ directly.
-\ 
+\
 : parse-kernels ( N -- ) \ kernidx
 	kernidx ! ( n -- )	\ store provided `x' value
 	[char] 0 kernmenuidx !	\ initialize `y' value for menu_caption[x][y]
@@ -393,7 +392,7 @@ also menu-infrastructure definitions
 \ This function goes through the kernels that were discovered by the
 \ parse-kernels function [above], adding " (# of #)" text to the end of each
 \ caption.
-\ 
+\
 : tag-kernels ( -- )
 	kernidx @ ( -- x ) dup 0= if exit then
 	[char] 0 s"  (Y of Z)" ( x -- x y c-addr/u )
@@ -482,7 +481,7 @@ also menu-infrastructure definitions
 
 \ This function creates the list of menu items. This function is called by the
 \ menu-display function. You need not call it directly.
-\ 
+\
 : menu-create ( -- )
 
 	\ Print the frame caption at (x,y)
@@ -506,12 +505,12 @@ also menu-infrastructure definitions
 	if ( use default center alignement? )
 		menuX @ 19 + over 2 / - menuY @ 1-
 	then
-	at-xy type 
+	at-xy type
 
 	\ If $menu_init is set, evaluate it (allowing for whole menus to be
 	\ constructed dynamically -- as this function could conceivably set
 	\ the remaining environment variables to construct the menu entirely).
-	\ 
+	\
 	s" menu_init" getenv dup -1 <> if
 		evaluate
 	else
@@ -529,13 +528,13 @@ also menu-infrastructure definitions
 	\ and the key required to activate that menu item will be the decimal
 	\ ASCII of 48 plus the menu item (ie. 58 for the tenth item, aka. `:')
 	\ which is misleading and not desirable.
-	\ 
+	\
 	\ Thus, we do not allow more than 8 configurable items on the menu
 	\ (with "Reboot" as the optional ninth and highest numbered item).
 
-	\ 
+	\
 	\ Initialize the OsConsole option status.
-	\ 
+	\
 	0 menuosconsole !
 	s" menu_osconsole" getenv -1 <> if
 		c@ dup 48 > over 57 < and if ( '1' <= c1 <= '8' )
@@ -569,9 +568,9 @@ also menu-infrastructure definitions
 		drop
 	then
 
-	\ 
+	\
 	\ Initialize the ACPI option status.
-	\ 
+	\
 	0 menuacpi !
 	s" menu_acpi" getenv -1 <> if
 		c@ dup 48 > over 57 < and if ( '1' <= c1 <= '8' )
@@ -605,9 +604,9 @@ also menu-infrastructure definitions
 		drop
 	then
 
-	\ 
+	\
 	\ Initialize kernel captions after parsing $kernels
-	\ 
+	\
 	0 menukernel !
 	s" menu_kernel" getenv -1 <> if
 		c@ dup 48 > over 57 < and if ( '1' <= c1 <= '8' )
@@ -646,9 +645,9 @@ also menu-infrastructure definitions
 		drop
 	then
 
-	\ 
+	\
 	\ Initialize the menu_options visual separator.
-	\ 
+	\
 	0 menuoptions !
 	s" menu_options" getenv -1 <> if
 		c@ dup 48 > over 57 < and if ( '1' <= c1 <= '8' )
@@ -742,7 +741,7 @@ also menu-infrastructure definitions
 \ Takes a single integer on the stack and updates the timeout display. The
 \ integer must be between 0 and 9 (we will only update a single digit in the
 \ source message).
-\ 
+\
 : menu-timeout-update ( N -- )
 
 	\ Enforce minimum/maximum
@@ -763,7 +762,7 @@ also menu-infrastructure definitions
 		2drop ( n c-addr -- )
 	then
 
-	0 25 at-xy ( position cursor back at bottom-left )
+	at-bl
 ;
 
 \ This function blocks program flow (loops forever) until a key is pressed.
@@ -772,7 +771,7 @@ also menu-infrastructure definitions
 \ function. You need not call it directly.
 \ note, the esc sequences will be dropped, this needs to be changed if
 \ menu is built based on arrow keys.
-\ 
+\
 : getkey ( -- ascii_keycode )
 
 	begin \ loop forever
@@ -903,7 +902,7 @@ also menu-command-helpers definitions
 			ansi_caption[x]
 		else
 			menu_caption[x]
-		then	
+		then
 		getenv dup -1 <> if
 
 			2 pick ( n c-addr/u -- n c-addr/u n )
@@ -1033,13 +1032,13 @@ also menu-command-helpers definitions
 
 	\ At this point, we should have the following on the stack (in order,
 	\ from bottom to top):
-	\ 
+	\
 	\    n        - Ascii numeral representing the menu choice (inherited)
 	\    addr     - address of our internal cycle_stateN variable
 	\    k        - zero-based number we intend to store to the above
 	\    c-addr/u - string value we intend to store to menu_caption[x]
 	\               (or ansi_caption[x] with loader_color enabled)
-	\ 
+	\
 	\ Let's perform what we need to with the above.
 
 	\ Assign array value text to menu caption
@@ -1058,7 +1057,7 @@ only forth definitions also menu-infrastructure
 
 \ Erase and redraw the menu. Useful if you change a caption and want to
 \ update the menu to reflect the new value.
-\ 
+\
 : menu-redraw ( -- )
 	menu-erase
 	menu-create
@@ -1066,7 +1065,7 @@ only forth definitions also menu-infrastructure
 
 \ This function initializes the menu. Call this from your `loader.rc' file
 \ before calling any other menu-related functions.
-\ 
+\
 : menu-init ( -- )
 	menu_start
 	1- menuidx !    \ Initialize the starting index for the menu
@@ -1109,13 +1108,13 @@ only forth definitions also menu-infrastructure
 		42 13 menuX @ 3 - menuY @ 1- box \ Draw frame (w,h,x,y)
 	then
 
-	0 25 at-xy \ Move cursor to the bottom for output
+	at-bl
 ;
 
 also menu-namespace
 
 \ Main function. Call this from your `loader.rc' file.
-\ 
+\
 : menu-display ( -- )
 
 	0 menu_timeout_enabled ! \ start with automatic timeout disabled
@@ -1148,7 +1147,7 @@ also menu-namespace
 				dup 0< if
 					drop
 					menu-create
-					0 25 at-xy
+					at-bl
 					0 boot
 				then
 			then
@@ -1167,7 +1166,7 @@ also menu-namespace
 				then
 			then
 			menu_timeout_x ! ( store value on stack from above )
-        
+
 			\ read custom row position (if set)
 			s" loader_menu_timeout_y" getenv dup -1 = if
 				drop \ no custom row position
@@ -1186,7 +1185,7 @@ also menu-namespace
 
 	begin \ Loop forever
 
-		0 25 at-xy \ Move cursor to the bottom for output
+		at-bl
 		getkey     \ Block here, waiting for a key to be pressed
 
 		dup -1 = if
@@ -1212,13 +1211,13 @@ also menu-namespace
 			rot tuck = if
 
 				\ Adjust for missing ACPI menuitem on non-i386
-\ 				arch-i386? true <> menuacpi @ 0<> and if
-\ 					menuacpi @ over 2dup < -rot = or
-\ 					over 58 < and if
-\ 					( key >= menuacpi && key < 58: N -- N )
-\ 						1+
-\ 					then
-\ 				then
+\				arch-i386? true <> menuacpi @ 0<> and if
+\					menuacpi @ over 2dup < -rot = or
+\					over 58 < and if
+\					( key >= menuacpi && key < 58: N -- N )
+\						1+
+\					then
+\				then
 
 				\ Test for the environment variable
 				dup menu_command[x]
@@ -1253,9 +1252,9 @@ also menu-namespace
 				swap \ need iterator on top
 			then
 
-			\ 
+			\
 			\ Check for menu keycode shortcut(s)
-			\ 
+			\
 			dup menu_keycode[x]
 			getenv dup -1 = if
 				drop
@@ -1290,7 +1289,7 @@ also menu-namespace
 
 \ This function unsets all the possible environment variables associated with
 \ creating the interactive menu.
-\ 
+\
 : menu-unset ( -- )
 
 	49 \ Iterator start (loop range 49 to 56; ASCII '1' to '8')
@@ -1341,7 +1340,7 @@ only forth definitions also menu-infrastructure
 
 \ This function both unsets menu variables and visually erases the menu area
 \ in-preparation for another menu.
-\ 
+\
 : menu-clear ( -- )
 	menu-unset
 	menu-erase
