@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -369,7 +369,7 @@
 
 #include "i40e_sw.h"
 
-static char i40e_ident[] = "Intel 10/40Gb Ethernet v1.0.2";
+static char i40e_ident[] = "Intel 10/40Gb Ethernet v1.0.3";
 
 /*
  * The i40e_glock primarily protects the lists below and the i40e_device_t

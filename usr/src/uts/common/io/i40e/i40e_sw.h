@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -529,6 +529,8 @@ typedef struct i40e_txq_stat {
 	kstat_named_t	itxs_packets;		/* Packets out on queue */
 	kstat_named_t	itxs_descriptors;	/* Descriptors issued */
 	kstat_named_t	itxs_recycled;		/* Descriptors reclaimed */
+	kstat_named_t	itxs_force_copy;	/* non-TSO force copy */
+	kstat_named_t	itxs_tso_force_copy;	/* TSO force copy */
 	/*
 	 * Various failure conditions.
 	 */

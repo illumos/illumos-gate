@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include "i40e_sw.h"
@@ -1232,6 +1232,12 @@ i40e_stats_trqpair_init(i40e_trqpair_t *itrq)
 	kstat_named_init(&tsp->itxs_recycled, "tx_recycled",
 	    KSTAT_DATA_UINT64);
 	tsp->itxs_recycled.value.ui64 = 0;
+	kstat_named_init(&tsp->itxs_force_copy, "tx_force_copy",
+	    KSTAT_DATA_UINT64);
+	tsp->itxs_force_copy.value.ui64 = 0;
+	kstat_named_init(&tsp->itxs_tso_force_copy, "tx_tso_force_copy",
+	    KSTAT_DATA_UINT64);
+	tsp->itxs_tso_force_copy.value.ui64 = 0;
 
 	kstat_named_init(&tsp->itxs_hck_meoifail, "tx_hck_meoifail",
 	    KSTAT_DATA_UINT64);

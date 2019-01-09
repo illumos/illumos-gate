@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include "i40e_sw.h"
@@ -258,19 +258,29 @@
  * The driver is asked to process a single frame at a time. That message block
  * may be made up of multiple fragments linked together by the mblk_t`b_cont
  * member. The device has a hard limit of up to 8 buffers being allowed for use
- * for a single logical frame. For each fragment, we'll try and use an entry
- * from the TX descriptor ring and then we'll allocate a corresponding TX
- * control block.
+ * for a single non-LSO packet or LSO segment. The number of TX ring entires
+ * (and thus TX control blocks) used depends on the fragment sizes and DMA
+ * layout, as explained below.
  *
- * We alter our DMA strategy based on a threshold tied to the frame size.
+ * We alter our DMA strategy based on a threshold tied to the fragment size.
  * This threshold is configurable via the tx_dma_threshold property. If the
- * frame size is above the threshold, we do DMA binding of the fragments,
- * building a control block and data descriptor for each piece.  If it's below
- * or at the threshold then we just use a single control block and data
- * descriptor and simply bcopy all of the fragments into the pre-allocated DMA
- * buffer in the control block. For the LSO TX case we always do DMA binding of
- * the fragments, with one control block and one TX data descriptor allocated
- * per fragment.
+ * fragment is above the threshold, we DMA bind it -- consuming one TCB and
+ * potentially several data descriptors. The exact number of descriptors (equal
+ * to the number of DMA cookies) depends on page size, MTU size, b_rptr offset
+ * into page, b_wptr offset into page, and the physical layout of the dblk's
+ * memory (contiguous or not). Essentially, we are at the mercy of the DMA
+ * engine and the dblk's memory allocation. Knowing the exact number of
+ * descriptors up front is a task best not taken on by the driver itself.
+ * Instead, we attempt to DMA bind the fragment and verify the descriptor
+ * layout meets hardware constraints. If the proposed DMA bind does not satisfy
+ * the hardware constaints, then we discard it and instead copy the entire
+ * fragment into the pre-allocated TCB buffer (or buffers if the fragment is
+ * larger than the TCB buffer).
+ *
+ * If the fragment is below or at the threshold, we copy it to the pre-allocated
+ * buffer of a TCB. We compress consecutive copy fragments into a single TCB to
+ * conserve resources. We are guaranteed that the TCB buffer is made up of only
+ * 1 DMA cookie; and therefore consumes only one descriptor on the controller.
  *
  * Furthermore, if the frame requires HW offloads such as LSO, tunneling or
  * filtering, then the TX data descriptors must be preceeded by a single TX
@@ -1846,11 +1856,9 @@ mac_ether_offload_info(mblk_t *mp, mac_ether_offload_info_t *meoi)
  */
 static int
 i40e_tx_context(i40e_t *i40e, i40e_trqpair_t *itrq, mblk_t *mp,
-    i40e_tx_context_t *tctx)
+    mac_ether_offload_info_t *meo, i40e_tx_context_t *tctx)
 {
-	int ret;
 	uint32_t chkflags, start, mss, lsoflags;
-	mac_ether_offload_info_t meo;
 	i40e_txq_stat_t *txs = &itrq->itrq_txstat;
 
 	bzero(tctx, sizeof (i40e_tx_context_t));
@@ -1864,33 +1872,28 @@ i40e_tx_context(i40e_t *i40e, i40e_trqpair_t *itrq, mblk_t *mp,
 	if (chkflags == 0 && lsoflags == 0)
 		return (0);
 
-	if ((ret = mac_ether_offload_info(mp, &meo)) != 0) {
-		txs->itxs_hck_meoifail.value.ui64++;
-		return (ret);
-	}
-
 	/*
 	 * Have we been asked to checksum an IPv4 header. If so, verify that we
 	 * have sufficient information and then set the proper fields in the
 	 * command structure.
 	 */
 	if (chkflags & HCK_IPV4_HDRCKSUM) {
-		if ((meo.meoi_flags & MEOI_L2INFO_SET) == 0) {
+		if ((meo->meoi_flags & MEOI_L2INFO_SET) == 0) {
 			txs->itxs_hck_nol2info.value.ui64++;
 			return (-1);
 		}
-		if ((meo.meoi_flags & MEOI_L3INFO_SET) == 0) {
+		if ((meo->meoi_flags & MEOI_L3INFO_SET) == 0) {
 			txs->itxs_hck_nol3info.value.ui64++;
 			return (-1);
 		}
-		if (meo.meoi_l3proto != ETHERTYPE_IP) {
+		if (meo->meoi_l3proto != ETHERTYPE_IP) {
 			txs->itxs_hck_badl3.value.ui64++;
 			return (-1);
 		}
 		tctx->itc_data_cmdflags |= I40E_TX_DESC_CMD_IIPT_IPV4_CSUM;
-		tctx->itc_data_offsets |= (meo.meoi_l2hlen >> 1) <<
+		tctx->itc_data_offsets |= (meo->meoi_l2hlen >> 1) <<
 		    I40E_TX_DESC_LENGTH_MACLEN_SHIFT;
-		tctx->itc_data_offsets |= (meo.meoi_l3hlen >> 2) <<
+		tctx->itc_data_offsets |= (meo->meoi_l3hlen >> 2) <<
 		    I40E_TX_DESC_LENGTH_IPLEN_SHIFT;
 	}
 
@@ -1901,38 +1904,38 @@ i40e_tx_context(i40e_t *i40e, i40e_trqpair_t *itrq, mblk_t *mp,
 	 * offload.
 	 */
 	if (chkflags & HCK_PARTIALCKSUM) {
-		if ((meo.meoi_flags & MEOI_L4INFO_SET) == 0) {
+		if ((meo->meoi_flags & MEOI_L4INFO_SET) == 0) {
 			txs->itxs_hck_nol4info.value.ui64++;
 			return (-1);
 		}
 
 		if (!(chkflags & HCK_IPV4_HDRCKSUM)) {
-			if ((meo.meoi_flags & MEOI_L2INFO_SET) == 0) {
+			if ((meo->meoi_flags & MEOI_L2INFO_SET) == 0) {
 				txs->itxs_hck_nol2info.value.ui64++;
 				return (-1);
 			}
-			if ((meo.meoi_flags & MEOI_L3INFO_SET) == 0) {
+			if ((meo->meoi_flags & MEOI_L3INFO_SET) == 0) {
 				txs->itxs_hck_nol3info.value.ui64++;
 				return (-1);
 			}
 
-			if (meo.meoi_l3proto == ETHERTYPE_IP) {
+			if (meo->meoi_l3proto == ETHERTYPE_IP) {
 				tctx->itc_data_cmdflags |=
 				    I40E_TX_DESC_CMD_IIPT_IPV4;
-			} else if (meo.meoi_l3proto == ETHERTYPE_IPV6) {
+			} else if (meo->meoi_l3proto == ETHERTYPE_IPV6) {
 				tctx->itc_data_cmdflags |=
 				    I40E_TX_DESC_CMD_IIPT_IPV6;
 			} else {
 				txs->itxs_hck_badl3.value.ui64++;
 				return (-1);
 			}
-			tctx->itc_data_offsets |= (meo.meoi_l2hlen >> 1) <<
+			tctx->itc_data_offsets |= (meo->meoi_l2hlen >> 1) <<
 			    I40E_TX_DESC_LENGTH_MACLEN_SHIFT;
-			tctx->itc_data_offsets |= (meo.meoi_l3hlen >> 2) <<
+			tctx->itc_data_offsets |= (meo->meoi_l3hlen >> 2) <<
 			    I40E_TX_DESC_LENGTH_IPLEN_SHIFT;
 		}
 
-		switch (meo.meoi_l4proto) {
+		switch (meo->meoi_l4proto) {
 		case IPPROTO_TCP:
 			tctx->itc_data_cmdflags |=
 			    I40E_TX_DESC_CMD_L4T_EOFT_TCP;
@@ -1950,7 +1953,7 @@ i40e_tx_context(i40e_t *i40e, i40e_trqpair_t *itrq, mblk_t *mp,
 			return (-1);
 		}
 
-		tctx->itc_data_offsets |= (meo.meoi_l4hlen >> 2) <<
+		tctx->itc_data_offsets |= (meo->meoi_l4hlen >> 2) <<
 		    I40E_TX_DESC_LENGTH_L4_FC_LEN_SHIFT;
 	}
 
@@ -1968,7 +1971,7 @@ i40e_tx_context(i40e_t *i40e, i40e_trqpair_t *itrq, mblk_t *mp,
 		tctx->itc_ctx_cmdflags |= I40E_TX_CTX_DESC_TSO;
 		tctx->itc_ctx_mss = mss;
 		tctx->itc_ctx_tsolen = msgsize(mp) -
-		    (meo.meoi_l2hlen + meo.meoi_l3hlen + meo.meoi_l4hlen);
+		    (meo->meoi_l2hlen + meo->meoi_l3hlen + meo->meoi_l4hlen);
 	}
 
 	return (0);
@@ -2205,9 +2208,28 @@ i40e_tx_recycle_ring(i40e_trqpair_t *itrq)
 	DTRACE_PROBE2(i40e__recycle, i40e_trqpair_t *, itrq, uint32_t, count);
 }
 
+static void
+i40e_tx_copy_fragment(i40e_tx_control_block_t *tcb, const mblk_t *mp,
+    const size_t off, const size_t len)
+{
+	const void *soff = mp->b_rptr + off;
+	void *doff = tcb->tcb_dma.dmab_address + tcb->tcb_dma.dmab_len;
+
+	ASSERT3U(len, >, 0);
+	ASSERT3P(soff, >=, mp->b_rptr);
+	ASSERT3P(soff, <=, mp->b_wptr);
+	ASSERT3U(len, <=, MBLKL(mp));
+	ASSERT3U((uintptr_t)soff + len, <=, (uintptr_t)mp->b_wptr);
+	ASSERT3U(tcb->tcb_dma.dmab_size - tcb->tcb_dma.dmab_len, >=, len);
+	bcopy(soff, doff, len);
+	tcb->tcb_type = I40E_TX_COPY;
+	tcb->tcb_dma.dmab_len += len;
+	I40E_DMA_SYNC(&tcb->tcb_dma, DDI_DMA_SYNC_FORDEV);
+}
+
 static i40e_tx_control_block_t *
 i40e_tx_bind_fragment(i40e_trqpair_t *itrq, const mblk_t *mp,
-    boolean_t use_lso)
+    size_t off, boolean_t use_lso)
 {
 	ddi_dma_handle_t dma_handle;
 	ddi_dma_cookie_t dma_cookie;
@@ -2228,11 +2250,12 @@ i40e_tx_bind_fragment(i40e_trqpair_t *itrq, const mblk_t *mp,
 
 	dmaflags = DDI_DMA_WRITE | DDI_DMA_STREAMING;
 	if (ddi_dma_addr_bind_handle(dma_handle, NULL,
-	    (caddr_t)mp->b_rptr, MBLKL(mp), dmaflags, DDI_DMA_DONTWAIT, NULL,
-	    &dma_cookie, &ncookies) != DDI_DMA_MAPPED) {
+	    (caddr_t)(mp->b_rptr + off), MBLKL(mp) - off, dmaflags,
+	    DDI_DMA_DONTWAIT, NULL, &dma_cookie, &ncookies) != DDI_DMA_MAPPED) {
 		txs->itxs_bind_fails.value.ui64++;
 		goto bffail;
 	}
+
 	tcb->tcb_bind_ncookies = ncookies;
 	tcb->tcb_used_lso = use_lso;
 
@@ -2261,7 +2284,7 @@ bffail:
 
 static void
 i40e_tx_set_data_desc(i40e_trqpair_t *itrq, i40e_tx_context_t *tctx,
-    struct i40e_dma_bind_info *dbi, boolean_t last_desc)
+    caddr_t buff, size_t len, boolean_t last_desc)
 {
 	i40e_tx_desc_t *txdesc;
 	int cmd;
@@ -2290,21 +2313,479 @@ i40e_tx_set_data_desc(i40e_trqpair_t *itrq, i40e_tx_context_t *tctx,
 	 * Per the X710 manual, section 8.4.2.1.1, the buffer size
 	 * must be a value from 1 to 16K minus 1, inclusive.
 	 */
-	ASSERT3U(dbi->dbi_len, >=, 1);
-	ASSERT3U(dbi->dbi_len, <=, I40E_MAX_TX_BUFSZ - 1);
+	ASSERT3U(len, >=, 1);
+	ASSERT3U(len, <=, I40E_MAX_TX_BUFSZ - 1);
 
-	txdesc->buffer_addr = CPU_TO_LE64((uintptr_t)dbi->dbi_paddr);
+	txdesc->buffer_addr = CPU_TO_LE64((uintptr_t)buff);
 	txdesc->cmd_type_offset_bsz =
 	    LE_64(((uint64_t)I40E_TX_DESC_DTYPE_DATA |
 	    ((uint64_t)tctx->itc_data_offsets << I40E_TXD_QW1_OFFSET_SHIFT) |
 	    ((uint64_t)cmd << I40E_TXD_QW1_CMD_SHIFT) |
-	    ((uint64_t)dbi->dbi_len << I40E_TXD_QW1_TX_BUF_SZ_SHIFT)));
+	    ((uint64_t)len << I40E_TXD_QW1_TX_BUF_SZ_SHIFT)));
+}
+
+/*
+ * Place 'tcb' on the tail of the list represented by 'head'/'tail'.
+ */
+static inline void
+tcb_list_append(i40e_tx_control_block_t **head, i40e_tx_control_block_t **tail,
+    i40e_tx_control_block_t *tcb)
+{
+	if (*head == NULL) {
+		*head = tcb;
+		*tail = *head;
+	} else {
+		ASSERT3P(*tail, !=, NULL);
+		ASSERT3P((*tail)->tcb_next, ==, NULL);
+		(*tail)->tcb_next = tcb;
+		*tail = tcb;
+	}
+}
+
+/*
+ * This function takes a single packet, possibly consisting of
+ * multiple mblks, and creates a TCB chain to send to the controller.
+ * This TCB chain may span up to a maximum of 8 descriptors. A copy
+ * TCB consumes one descriptor; whereas a DMA TCB may consume 1 or
+ * more, depending on several factors. For each fragment (invidual
+ * mblk making up the packet), we determine if its size dictates a
+ * copy to the TCB buffer or a DMA bind of the dblk buffer. We keep a
+ * count of descriptors used; when that count reaches the max we force
+ * all remaining fragments into a single TCB buffer. We have a
+ * guarantee that the TCB buffer is always larger than the MTU -- so
+ * there is always enough room. Consecutive fragments below the DMA
+ * threshold are copied into a single TCB. In the event of an error
+ * this function returns NULL but leaves 'mp' alone.
+ */
+static i40e_tx_control_block_t *
+i40e_non_lso_chain(i40e_trqpair_t *itrq, mblk_t *mp, uint_t *ndesc)
+{
+	const mblk_t *nmp = mp;
+	uint_t needed_desc = 0;
+	boolean_t force_copy = B_FALSE;
+	i40e_tx_control_block_t *tcb = NULL, *tcbhead = NULL, *tcbtail = NULL;
+	i40e_t *i40e = itrq->itrq_i40e;
+	i40e_txq_stat_t *txs = &itrq->itrq_txstat;
+
+	/* TCB buffer is always larger than MTU. */
+	ASSERT3U(msgsize(mp), <, i40e->i40e_tx_buf_size);
+
+	while (nmp != NULL) {
+		const size_t nmp_len = MBLKL(nmp);
+
+		/* Ignore zero-length mblks. */
+		if (nmp_len == 0) {
+			nmp = nmp->b_cont;
+			continue;
+		}
+
+		if (nmp_len < i40e->i40e_tx_dma_min || force_copy) {
+			/* Compress consecutive copies into one TCB. */
+			if (tcb != NULL && tcb->tcb_type == I40E_TX_COPY) {
+				i40e_tx_copy_fragment(tcb, nmp, 0, nmp_len);
+				nmp = nmp->b_cont;
+				continue;
+			}
+
+			if ((tcb = i40e_tcb_alloc(itrq)) == NULL) {
+				txs->itxs_err_notcb.value.ui64++;
+				goto fail;
+			}
+
+			/*
+			 * TCB DMA buffer is guaranteed to be one
+			 * cookie by i40e_alloc_dma_buffer().
+			 */
+			i40e_tx_copy_fragment(tcb, nmp, 0, nmp_len);
+			needed_desc++;
+			tcb_list_append(&tcbhead, &tcbtail, tcb);
+		} else {
+			uint_t total_desc;
+
+			tcb = i40e_tx_bind_fragment(itrq, nmp, 0, B_FALSE);
+			if (tcb == NULL) {
+				i40e_error(i40e, "dma bind failed!");
+				goto fail;
+			}
+
+			/*
+			 * If the new total exceeds the max or we've
+			 * reached the limit and there's data left,
+			 * then give up binding and copy the rest into
+			 * the pre-allocated TCB buffer.
+			 */
+			total_desc = needed_desc + tcb->tcb_bind_ncookies;
+			if ((total_desc > I40E_TX_MAX_COOKIE) ||
+			    (total_desc == I40E_TX_MAX_COOKIE &&
+			    nmp->b_cont != NULL)) {
+				i40e_tcb_reset(tcb);
+				i40e_tcb_free(itrq, tcb);
+
+				if (tcbtail != NULL &&
+				    tcbtail->tcb_type == I40E_TX_COPY) {
+					tcb = tcbtail;
+				} else {
+					tcb = NULL;
+				}
+
+				force_copy = B_TRUE;
+				txs->itxs_force_copy.value.ui64++;
+				continue;
+			}
+
+			needed_desc += tcb->tcb_bind_ncookies;
+			tcb_list_append(&tcbhead, &tcbtail, tcb);
+		}
+
+		nmp = nmp->b_cont;
+	}
+
+	ASSERT3P(nmp, ==, NULL);
+	ASSERT3U(needed_desc, <=, I40E_TX_MAX_COOKIE);
+	ASSERT3P(tcbhead, !=, NULL);
+	*ndesc += needed_desc;
+	return (tcbhead);
+
+fail:
+	tcb = tcbhead;
+	while (tcb != NULL) {
+		i40e_tx_control_block_t *next = tcb->tcb_next;
+
+		ASSERT(tcb->tcb_type == I40E_TX_DMA ||
+		    tcb->tcb_type == I40E_TX_COPY);
+
+		tcb->tcb_mp = NULL;
+		i40e_tcb_reset(tcb);
+		i40e_tcb_free(itrq, tcb);
+		tcb = next;
+	}
+
+	return (NULL);
+}
+
+/*
+ * Section 8.4.1 of the 700-series programming guide states that a
+ * segment may span up to 8 data descriptors; including both header
+ * and payload data. However, empirical evidence shows that the
+ * controller freezes the Tx queue when presented with a segment of 8
+ * descriptors. Or, at least, when the first segment contains 8
+ * descriptors. One explanation is that the controller counts the
+ * context descriptor against the first segment, even though the
+ * programming guide makes no mention of such a constraint. In any
+ * case, we limit TSO segments to 7 descriptors to prevent Tx queue
+ * freezes. We still allow non-TSO segments to utilize all 8
+ * descriptors as they have not demonstrated the faulty behavior.
+ */
+uint_t i40e_lso_num_descs = 7;
+
+#define	I40E_TCB_LEFT(tcb)				\
+	((tcb)->tcb_dma.dmab_size - (tcb)->tcb_dma.dmab_len)
+
+/*
+ * This function is similar in spirit to i40e_non_lso_chain(), but
+ * much more complicated in reality. Like the previous function, it
+ * takes a packet (an LSO packet) as input and returns a chain of
+ * TCBs. The complication comes with the fact that we are no longer
+ * trying to fit the entire packet into 8 descriptors, but rather we
+ * must fit each MSS-size segment of the LSO packet into 8 descriptors.
+ * Except it's really 7 descriptors, see i40e_lso_num_descs.
+ *
+ * Your first inclination might be to verify that a given segment
+ * spans no more than 7 mblks; but it's actually much more subtle than
+ * that. First, let's describe what the hardware expects, and then we
+ * can expound on the software side of things.
+ *
+ * For an LSO packet the hardware expects the following:
+ *
+ *	o Each MSS-sized segment must span no more than 7 descriptors.
+ *
+ *	o The header size does not count towards the segment size.
+ *
+ *	o If header and payload share the first descriptor, then the
+ *	  controller will count the descriptor twice.
+ *
+ * The most important thing to keep in mind is that the hardware does
+ * not view the segments in terms of mblks, like we do. The hardware
+ * only sees descriptors. It will iterate each descriptor in turn,
+ * keeping a tally of bytes seen and descriptors visited. If the byte
+ * count hasn't reached MSS by the time the descriptor count reaches
+ * 7, then the controller freezes the queue and we are stuck.
+ * Furthermore, the hardware picks up its tally where it left off. So
+ * if it reached MSS in the middle of a descriptor, it will start
+ * tallying the next segment in the middle of that descriptor. The
+ * hardware's view is entirely removed from the mblk chain or even the
+ * descriptor layout. Consider these facts:
+ *
+ *	o The MSS will vary dpeneding on MTU and other factors.
+ *
+ *	o The dblk allocation will sit at various offsets within a
+ *	  memory page.
+ *
+ *	o The page size itself could vary in the future (i.e. not
+ *	  always 4K).
+ *
+ *	o Just because a dblk is virtually contiguous doesn't mean
+ *	  it's physically contiguous. The number of cookies
+ *	  (descriptors) required by a DMA bind of a single dblk is at
+ *	  the mercy of the page size and physical layout.
+ *
+ *	o The descriptors will most often NOT start/end on a MSS
+ *	  boundary. Thus the hardware will often start counting the
+ *	  MSS mid descriptor and finish mid descriptor.
+ *
+ * The upshot of all this is that the driver must learn to think like
+ * the controller; and verify that none of the constraints are broken.
+ * It does this by tallying up the segment just like the hardware
+ * would. This is handled by the two variables 'segsz' and 'segdesc'.
+ * After each attempt to bind a dblk, we check the constaints. If
+ * violated, we undo the DMA and force a copy until MSS is met. We
+ * have a guarantee that the TCB buffer is larger than MTU; thus
+ * ensuring we can always meet the MSS with a single copy buffer. We
+ * also copy consecutive non-DMA fragments into the same TCB buffer.
+ */
+static i40e_tx_control_block_t *
+i40e_lso_chain(i40e_trqpair_t *itrq, const mblk_t *mp,
+    const mac_ether_offload_info_t *meo, const i40e_tx_context_t *tctx,
+    uint_t *ndesc)
+{
+	size_t mp_len = MBLKL(mp);
+	/*
+	 * The cpoff (copy offset) variable tracks the offset inside
+	 * the current mp. There are cases where the entire mp is not
+	 * fully copied in one go: such as the header copy followed by
+	 * a non-DMA mblk, or a TCB buffer that only has enough space
+	 * to copy part of the current mp.
+	 */
+	size_t cpoff = 0;
+	/*
+	 * The segsz and segdesc variables track the controller's view
+	 * of the segment. The needed_desc variable tracks the total
+	 * number of data descriptors used by the driver.
+	 */
+	size_t segsz = 0;
+	uint_t segdesc = 0;
+	uint_t needed_desc = 0;
+	const size_t hdrlen =
+	    meo->meoi_l2hlen + meo->meoi_l3hlen + meo->meoi_l4hlen;
+	const size_t mss = tctx->itc_ctx_mss;
+	boolean_t force_copy = B_FALSE;
+	i40e_tx_control_block_t *tcb = NULL, *tcbhead = NULL, *tcbtail = NULL;
+	i40e_t *i40e = itrq->itrq_i40e;
+	i40e_txq_stat_t *txs = &itrq->itrq_txstat;
+
+	/*
+	 * We always copy the header in order to avoid more
+	 * complicated code dealing with various edge cases.
+	 */
+	ASSERT3U(MBLKL(mp), >=, hdrlen);
+	if ((tcb = i40e_tcb_alloc(itrq)) == NULL) {
+		txs->itxs_err_notcb.value.ui64++;
+		goto fail;
+	}
+	needed_desc++;
+
+	tcb_list_append(&tcbhead, &tcbtail, tcb);
+	i40e_tx_copy_fragment(tcb, mp, 0, hdrlen);
+	cpoff += hdrlen;
+
+	/*
+	 * A single descriptor containing both header and data is
+	 * counted twice by the controller.
+	 */
+	if ((mp_len > hdrlen && mp_len < i40e->i40e_tx_dma_min) ||
+	    (mp->b_cont != NULL &&
+	    MBLKL(mp->b_cont) < i40e->i40e_tx_dma_min)) {
+		segdesc = 2;
+	} else {
+		segdesc = 1;
+	}
+
+	/* If this fragment was pure header, then move to the next one. */
+	if (cpoff == mp_len) {
+		mp = mp->b_cont;
+		cpoff = 0;
+	}
+
+	while (mp != NULL) {
+		mp_len = MBLKL(mp);
+force_copy:
+		/* Ignore zero-length mblks. */
+		if (mp_len == 0) {
+			mp = mp->b_cont;
+			cpoff = 0;
+			continue;
+		}
+
+		/*
+		 * We copy into the preallocated TCB buffer when the
+		 * current fragment is less than the DMA threshold OR
+		 * when the DMA bind can't meet the controller's
+		 * segment descriptor limit.
+		 */
+		if (mp_len < i40e->i40e_tx_dma_min || force_copy) {
+			size_t tocopy;
+
+			/*
+			 * Our objective here is to compress
+			 * consecutive copies into one TCB (until it
+			 * is full). If there is no current TCB, or if
+			 * it is a DMA TCB, then allocate a new one.
+			 */
+			if (tcb == NULL ||
+			    (tcb != NULL && tcb->tcb_type != I40E_TX_COPY)) {
+				if ((tcb = i40e_tcb_alloc(itrq)) == NULL) {
+					txs->itxs_err_notcb.value.ui64++;
+					goto fail;
+				}
+
+				/*
+				 * The TCB DMA buffer is guaranteed to
+				 * be one cookie by i40e_alloc_dma_buffer().
+				 */
+				needed_desc++;
+				segdesc++;
+				ASSERT3U(segdesc, <=, i40e_lso_num_descs);
+				tcb_list_append(&tcbhead, &tcbtail, tcb);
+			}
+
+			tocopy = MIN(I40E_TCB_LEFT(tcb), mp_len - cpoff);
+			i40e_tx_copy_fragment(tcb, mp, cpoff, tocopy);
+			cpoff += tocopy;
+			segsz += tocopy;
+
+			/* We have consumed the current mp. */
+			if (cpoff == mp_len) {
+				mp = mp->b_cont;
+				cpoff = 0;
+			}
+
+			/* We have consumed the current TCB buffer. */
+			if (I40E_TCB_LEFT(tcb) == 0) {
+				tcb = NULL;
+			}
+
+			/*
+			 * We have met MSS with this copy; restart the
+			 * counters.
+			 */
+			if (segsz >= mss) {
+				segsz = segsz % mss;
+				segdesc = segsz == 0 ? 0 : 1;
+				force_copy = B_FALSE;
+			}
+
+			/*
+			 * We are at the controller's descriptor
+			 * limit; we must copy into the current TCB
+			 * until MSS is reached. The TCB buffer is
+			 * always bigger than the MTU so we know it is
+			 * big enough to meet the MSS.
+			 */
+			if (segdesc == i40e_lso_num_descs) {
+				force_copy = B_TRUE;
+			}
+		} else {
+			uint_t tsegdesc = segdesc;
+			size_t tsegsz = segsz;
+
+			ASSERT(force_copy == B_FALSE);
+			ASSERT3U(tsegdesc, <, i40e_lso_num_descs);
+
+			tcb = i40e_tx_bind_fragment(itrq, mp, cpoff, B_TRUE);
+			if (tcb == NULL) {
+				i40e_error(i40e, "dma bind failed!");
+				goto fail;
+			}
+
+			for (uint_t i = 0; i < tcb->tcb_bind_ncookies; i++) {
+				struct i40e_dma_bind_info dbi =
+				    tcb->tcb_bind_info[i];
+
+				tsegsz += dbi.dbi_len;
+				tsegdesc++;
+				ASSERT3U(tsegdesc, <=, i40e_lso_num_descs);
+
+				/*
+				 * We've met the MSS with this portion
+				 * of the DMA.
+				 */
+				if (tsegsz >= mss) {
+					tsegdesc = 1;
+					tsegsz = tsegsz % mss;
+				}
+
+				/*
+				 * We've reached max descriptors but
+				 * have not met the MSS. Undo the bind
+				 * and instead copy.
+				 */
+				if (tsegdesc == i40e_lso_num_descs) {
+					i40e_tcb_reset(tcb);
+					i40e_tcb_free(itrq, tcb);
+
+					if (tcbtail != NULL &&
+					    I40E_TCB_LEFT(tcb) > 0 &&
+					    tcbtail->tcb_type == I40E_TX_COPY) {
+						tcb = tcbtail;
+					} else {
+						tcb = NULL;
+					}
+
+					/*
+					 * Remember, we are still on
+					 * the same mp.
+					 */
+					force_copy = B_TRUE;
+					txs->itxs_tso_force_copy.value.ui64++;
+					goto force_copy;
+				}
+			}
+
+			ASSERT3U(tsegdesc, <=, i40e_lso_num_descs);
+			ASSERT3U(tsegsz, <, mss);
+
+			/*
+			 * We've made if through the loop without
+			 * breaking the segment descriptor contract
+			 * with the controller -- replace the segment
+			 * tracking values with the temporary ones.
+			 */
+			segdesc = tsegdesc;
+			segsz = tsegsz;
+			needed_desc += tcb->tcb_bind_ncookies;
+			cpoff = 0;
+			tcb_list_append(&tcbhead, &tcbtail, tcb);
+			mp = mp->b_cont;
+		}
+	}
+
+	ASSERT3P(mp, ==, NULL);
+	ASSERT3P(tcbhead, !=, NULL);
+	*ndesc += needed_desc;
+	return (tcbhead);
+
+fail:
+	tcb = tcbhead;
+	while (tcb != NULL) {
+		i40e_tx_control_block_t *next = tcb->tcb_next;
+
+		ASSERT(tcb->tcb_type == I40E_TX_DMA ||
+		    tcb->tcb_type == I40E_TX_COPY);
+
+		tcb->tcb_mp = NULL;
+		i40e_tcb_reset(tcb);
+		i40e_tcb_free(itrq, tcb);
+		tcb = next;
+	}
+
+	return (NULL);
 }
 
 /*
  * We've been asked to send a message block on the wire. We'll only have a
  * single chain. There will not be any b_next pointers; however, there may be
- * multiple b_cont blocks.
+ * multiple b_cont blocks. The number of b_cont blocks may exceed the
+ * controller's Tx descriptor limit.
  *
  * We may do one of three things with any given mblk_t chain:
  *
@@ -2319,17 +2800,14 @@ i40e_tx_set_data_desc(i40e_trqpair_t *itrq, i40e_tx_context_t *tctx,
 mblk_t *
 i40e_ring_tx(void *arg, mblk_t *mp)
 {
-	const mblk_t *nmp;
-	size_t mpsize;
-	i40e_tx_control_block_t *tcb_ctx = NULL, *tcb_data = NULL,
-	    **tcb_dma = NULL;
-	i40e_tx_desc_t *txdesc;
+	size_t msglen;
+	i40e_tx_control_block_t *tcb_ctx = NULL, *tcb = NULL, *tcbhead = NULL;
 	i40e_tx_context_desc_t *ctxdesc;
+	mac_ether_offload_info_t meo;
 	i40e_tx_context_t tctx;
-	int cmd, type;
-	uint_t i, needed_desc = 0, nbufs = 0;
-	boolean_t do_ctx_desc = B_FALSE, do_dma_bind = B_FALSE,
-	    use_lso = B_FALSE;
+	int type;
+	uint_t needed_desc = 0;
+	boolean_t do_ctx_desc = B_FALSE, use_lso = B_FALSE;
 
 	i40e_trqpair_t *itrq = arg;
 	i40e_t *i40e = itrq->itrq_i40e;
@@ -2347,12 +2825,18 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 		return (NULL);
 	}
 
+	if (mac_ether_offload_info(mp, &meo) != 0) {
+		freemsg(mp);
+		itrq->itrq_txstat.itxs_hck_meoifail.value.ui64++;
+		return (NULL);
+	}
+
 	/*
 	 * Figure out the relevant context about this frame that we might need
 	 * for enabling checksum, LSO, etc. This also fills in information that
 	 * we might set around the packet type, etc.
 	 */
-	if (i40e_tx_context(i40e, itrq, mp, &tctx) < 0) {
+	if (i40e_tx_context(i40e, itrq, mp, &meo, &tctx) < 0) {
 		freemsg(mp);
 		itrq->itrq_txstat.itxs_err_context.value.ui64++;
 		return (NULL);
@@ -2368,20 +2852,7 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 	 * recycling to cut back on stalls in the TX path.
 	 */
 
-	/*
-	 * Iterate through the mblks to calculate both the total size of the
-	 * frame and the number of fragments.  This is used to determine
-	 * whether we're doing DMA binding and, if so, how many TX control
-	 * blocks we'll need.
-	 */
-	mpsize = 0;
-	for (nmp = mp; nmp != NULL; nmp = nmp->b_cont) {
-		size_t blksz = MBLKL(nmp);
-		if (blksz > 0) {
-			mpsize += blksz;
-			nbufs++;
-		}
-	}
+	msglen = msgsize(mp);
 
 	if (do_ctx_desc) {
 		/*
@@ -2399,75 +2870,16 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 		needed_desc++;
 	}
 
-	/*
-	 * For the non-LSO TX case, we alter our DMA strategy based on a
-	 * threshold tied to the frame size.  This threshold is configurable
-	 * via the tx_dma_threshold property.
-	 *
-	 * If the frame size is above the threshold, we do DMA binding of the
-	 * fragments, building a control block and data descriptor for each
-	 * piece.
-	 *
-	 * If it's below or at the threshold then we just use a single control
-	 * block and data descriptor and simply bcopy all of the fragments into
-	 * the pre-allocated DMA buffer in the control block.
-	 *
-	 * For the LSO TX case we always do DMA binding.
-	 */
-	if (use_lso == B_TRUE || mpsize > i40e->i40e_tx_dma_min) {
-		do_dma_bind = B_TRUE;
-		tcb_dma =
-		    kmem_zalloc(nbufs * sizeof (i40e_tx_control_block_t *),
-		    KM_NOSLEEP);
-		if (tcb_dma == NULL) {
-			i40e_error(i40e, "failed to allocate tcb_dma list");
-			goto txfail;
-		}
-		/*
-		 * For each b_cont: bind the control block's DMA handle to the
-		 * b_rptr, and record the cookies so that we can later iterate
-		 * through them and build TX data descriptors.
-		 */
-		for (nmp = mp, i = 0; nmp != NULL; nmp = nmp->b_cont) {
-			if (MBLKL(nmp) == 0)
-				continue;
-			tcb_dma[i] = i40e_tx_bind_fragment(itrq, nmp, use_lso);
-			if (tcb_dma[i] == NULL) {
-				i40e_error(i40e, "dma bind failed!");
-				goto txfail;
-			}
-			if (i == 0)
-				tcb_dma[i]->tcb_mp = mp;
-			needed_desc += tcb_dma[i++]->tcb_bind_ncookies;
-		}
+	if (!use_lso) {
+		tcbhead = i40e_non_lso_chain(itrq, mp, &needed_desc);
 	} else {
-		/*
-		 * Just use a single control block and bcopy all of the
-		 * fragments into its pre-allocated DMA buffer.
-		 */
-		if ((tcb_data = i40e_tcb_alloc(itrq)) == NULL) {
-			txs->itxs_err_notcb.value.ui64++;
-			goto txfail;
-		}
-		tcb_data->tcb_type = I40E_TX_COPY;
-
-		ASSERT(tcb_data->tcb_dma.dmab_len == 0);
-		ASSERT(tcb_data->tcb_dma.dmab_size >= mpsize);
-
-		for (nmp = mp; nmp != NULL; nmp = nmp->b_cont) {
-			size_t clen = MBLKL(nmp);
-			void *coff = tcb_data->tcb_dma.dmab_address +
-			    tcb_data->tcb_dma.dmab_len;
-
-			bcopy(nmp->b_rptr, coff, clen);
-			tcb_data->tcb_dma.dmab_len += clen;
-		}
-		ASSERT(tcb_data->tcb_dma.dmab_len == mpsize);
-		I40E_DMA_SYNC(&tcb_data->tcb_dma, DDI_DMA_SYNC_FORDEV);
-
-		tcb_data->tcb_mp = mp;
-		needed_desc++;
+		tcbhead = i40e_lso_chain(itrq, mp, &meo, &tctx, &needed_desc);
 	}
+
+	if (tcbhead == NULL)
+		goto txfail;
+
+	tcbhead->tcb_mp = mp;
 
 	/*
 	 * The second condition ensures that 'itrq_desc_tail' never
@@ -2517,51 +2929,32 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 		}
 	}
 
-	if (do_dma_bind == B_TRUE) {
-		/*
-		 * Next build up a transmit data descriptor for each buffer.
-		 */
-		boolean_t last_desc = B_FALSE;
-		for (i = 0; i < nbufs; i++) {
-			itrq->itrq_tcb_work_list[itrq->itrq_desc_tail] =
-			    tcb_dma[i];
+	tcb = tcbhead;
+	while (tcb != NULL) {
 
-			for (uint_t c = 0; c < tcb_dma[i]->tcb_bind_ncookies;
-			    c++) {
-				if (i == (nbufs - 1) &&
-				    c == (tcb_dma[i]->tcb_bind_ncookies - 1)) {
-					last_desc = B_TRUE;
-				}
+		itrq->itrq_tcb_work_list[itrq->itrq_desc_tail] = tcb;
+		if (tcb->tcb_type == I40E_TX_COPY) {
+			boolean_t last_desc = (tcb->tcb_next == NULL);
+
+			i40e_tx_set_data_desc(itrq, &tctx,
+			    (caddr_t)tcb->tcb_dma.dmab_dma_address,
+			    tcb->tcb_dma.dmab_len, last_desc);
+		} else {
+			boolean_t last_desc = B_FALSE;
+			ASSERT3S(tcb->tcb_type, ==, I40E_TX_DMA);
+
+			for (uint_t c = 0; c < tcb->tcb_bind_ncookies; c++) {
+				last_desc = (c == tcb->tcb_bind_ncookies - 1) &&
+				    (tcb->tcb_next == NULL);
+
 				i40e_tx_set_data_desc(itrq, &tctx,
-				    &tcb_dma[i]->tcb_bind_info[c], last_desc);
+				    tcb->tcb_bind_info[c].dbi_paddr,
+				    tcb->tcb_bind_info[c].dbi_len,
+				    last_desc);
 			}
 		}
-		kmem_free(tcb_dma, nbufs * sizeof (i40e_tx_control_block_t *));
-		tcb_dma = NULL;
-	} else {
-		/*
-		 * Build up the single transmit data descriptor needed for the
-		 * non-DMA-bind case.
-		 */
-		itrq->itrq_desc_free--;
-		txdesc = &itrq->itrq_desc_ring[itrq->itrq_desc_tail];
-		itrq->itrq_tcb_work_list[itrq->itrq_desc_tail] = tcb_data;
-		itrq->itrq_desc_tail = i40e_next_desc(itrq->itrq_desc_tail, 1,
-		    itrq->itrq_tx_ring_size);
 
-		type = I40E_TX_DESC_DTYPE_DATA;
-		cmd = I40E_TX_DESC_CMD_EOP |
-		    I40E_TX_DESC_CMD_RS |
-		    I40E_TX_DESC_CMD_ICRC |
-		    tctx.itc_data_cmdflags;
-		txdesc->buffer_addr =
-		    CPU_TO_LE64((uintptr_t)tcb_data->tcb_dma.dmab_dma_address);
-		txdesc->cmd_type_offset_bsz = CPU_TO_LE64(((uint64_t)type |
-		    ((uint64_t)tctx.itc_data_offsets <<
-		    I40E_TXD_QW1_OFFSET_SHIFT) |
-		    ((uint64_t)cmd << I40E_TXD_QW1_CMD_SHIFT) |
-		    ((uint64_t)tcb_data->tcb_dma.dmab_len <<
-		    I40E_TXD_QW1_TX_BUF_SZ_SHIFT)));
+		tcb = tcb->tcb_next;
 	}
 
 	/*
@@ -2583,7 +2976,7 @@ i40e_ring_tx(void *arg, mblk_t *mp)
 		atomic_or_32(&i40e->i40e_state, I40E_ERROR);
 	}
 
-	txs->itxs_bytes.value.ui64 += mpsize;
+	txs->itxs_bytes.value.ui64 += msglen;
 	txs->itxs_packets.value.ui64++;
 	txs->itxs_descriptors.value.ui64 += needed_desc;
 
@@ -2603,20 +2996,18 @@ txfail:
 		i40e_tcb_reset(tcb_ctx);
 		i40e_tcb_free(itrq, tcb_ctx);
 	}
-	if (tcb_data != NULL) {
-		tcb_data->tcb_mp = NULL;
-		i40e_tcb_reset(tcb_data);
-		i40e_tcb_free(itrq, tcb_data);
-	}
-	if (tcb_dma != NULL) {
-		for (i = 0; i < nbufs; i++) {
-			if (tcb_dma[i] == NULL)
-				break;
-			tcb_dma[i]->tcb_mp = NULL;
-			i40e_tcb_reset(tcb_dma[i]);
-			i40e_tcb_free(itrq, tcb_dma[i]);
-		}
-		kmem_free(tcb_dma, nbufs * sizeof (i40e_tx_control_block_t *));
+
+	tcb = tcbhead;
+	while (tcb != NULL) {
+		i40e_tx_control_block_t *next = tcb->tcb_next;
+
+		ASSERT(tcb->tcb_type == I40E_TX_DMA ||
+		    tcb->tcb_type == I40E_TX_COPY);
+
+		tcb->tcb_mp = NULL;
+		i40e_tcb_reset(tcb);
+		i40e_tcb_free(itrq, tcb);
+		tcb = next;
 	}
 
 	mutex_enter(&itrq->itrq_tx_lock);
