@@ -22,6 +22,9 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,13 +106,13 @@ chown_file(const char *file, const char *group, const char *owner)
 
 	if (group) {
 		grp = stdfind(group, groupnames);
-		if (grp < 0)
+		if (grp == (gid_t)-1)
 			(void) fprintf(stderr, "unknown group(%s)\n", group);
 	}
 
 	if (owner) {
 		own = stdfind(owner, usernames);
-		if (own < 0) {
+		if (own == (uid_t)-1) {
 			(void) fprintf(stderr, "unknown owner(%s)\n", owner);
 			exit(1);
 		}

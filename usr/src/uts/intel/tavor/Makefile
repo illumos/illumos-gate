@@ -23,12 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the tavor InfiniBand module
-#
-#	intel architecture dependent
-#
-# uts/intel/tavor/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Paths to the base of the uts directory trees
@@ -85,6 +80,9 @@ CERRWARN	+= -_gcc=-Wno-unused-value
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-type-limits
+
+# needs work
+SMATCH=off
 
 #
 #	Default build targets.

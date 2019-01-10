@@ -23,6 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG	= aw
 
@@ -30,6 +31,9 @@ include ../Makefile.tools
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 LINTFLAGS += -ux -Xa -errchk=locfmtchk,parentheses
 

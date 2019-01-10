@@ -29,7 +29,7 @@
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -94,6 +94,18 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-label
+
+# needs work
+SMOFF += all_func_returns,indenting
+$(OBJS_DIR)/llex.o := SMOFF += index_overflow
+$(OBJS_DIR)/metaslab.o := SMOFF += no_if_block
+$(OBJS_DIR)/zfs_vnops.o := SMOFF += signed
+# needs work
+$(OBJS_DIR)/zvol.o := SMOFF += deref_check,signed
+
+# false positives
+$(OBJS_DIR)/zfs_ctldir.o := SMOFF += strcpy_overflow
+$(OBJS_DIR)/zfs_ioctl.o := SMOFF += strcpy_overflow
 
 #
 #	Default build targets.

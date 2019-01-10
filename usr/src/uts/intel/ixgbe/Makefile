@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2016 OmniTI Computer Consulting, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 # uts/intel/ixgbe/Makefile
 #
@@ -59,6 +60,9 @@ CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-unused-value
 CERRWARN	+= -_cc=-erroff=E_STATEMENT_NOT_REACHED
+
+# 3rd party code
+SMOFF += all_func_returns
 
 #
 #	Define targets

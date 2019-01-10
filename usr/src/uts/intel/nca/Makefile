@@ -24,13 +24,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the nca driver 
-#	kernel module.
-#
-#	Intel architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -70,6 +64,9 @@ LDFLAGS += -dy -Nfs/sockfs -Ndrv/ip
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+
+# needs work
+$(OBJS_DIR)/ncaddi.o := SMOFF += index_overflow
 
 #
 #	Default build targets.

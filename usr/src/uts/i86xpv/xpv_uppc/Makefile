@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 #	This makefile drives the production of the xpv_uppc mach
 #	kernel module.
@@ -63,6 +63,9 @@ DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 
 CERRWARN	+= -_gcc=-Wno-unused-function
+
+# needs work
+$(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 
 #
 #

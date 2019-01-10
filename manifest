@@ -18959,6 +18959,7 @@ f usr/share/man/man5/inotify.5 0444 root bin
 s usr/share/man/man5/intro.5=Intro.5
 f usr/share/man/man5/ipfilter.5 0444 root bin
 f usr/share/man/man5/isalist.5 0444 root bin
+f usr/share/man/man5/isoboot.5 0444 root bin
 f usr/share/man/man5/kerberos.5 0444 root bin
 f usr/share/man/man5/krb5_auth_rules.5 0444 root bin
 f usr/share/man/man5/krb5envvar.5 0444 root bin

@@ -24,6 +24,7 @@
 #
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the cifs server file system
@@ -73,6 +74,9 @@ INC_PATH	+= -I$(SRC)/common
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
+
+# needs work
+SMATCH=off
 
 #
 #	Default build targets.

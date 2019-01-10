@@ -24,11 +24,7 @@
 #
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
-# uts/intel/usb_ac/Makefile
-#
-#	This makefile drives the production of the usb_ac driver
-#	kernel module. Intel architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 
 #
@@ -67,6 +63,9 @@ CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/usb_ac.o := SMOFF += deref_check,indenting,testing_index_after_use
 
 #
 # depends on misc/usba

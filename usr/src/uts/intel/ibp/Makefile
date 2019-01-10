@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -61,6 +61,9 @@ LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-switch
+
+# needs work
+SMATCH=off
 
 #
 #	Default build targets.

@@ -24,8 +24,11 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
+#include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <strings.h>

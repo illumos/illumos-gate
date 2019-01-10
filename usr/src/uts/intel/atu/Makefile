@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # This makefile drives the production of the atu driver kernel module.
@@ -60,6 +61,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LDFLAGS		+= -dy -Nmisc/mac -Nmisc/net80211 -Nmisc/usba
 
 CERRWARN	+= -_gcc=-Wno-switch
+
+# needs work
+$(OBJS_DIR)/atu.o := SMOFF += all_func_returns
 
 #
 #	Default build targets.

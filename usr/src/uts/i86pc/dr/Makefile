@@ -25,10 +25,7 @@
 # Copyright (c) 2010, Intel Corporation.
 # All rights reserved.
 #
-#	This makefile drives the production of the dr driver module.
-#
-#	i86pc architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -71,6 +68,9 @@ CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-empty-body
+
+# needs work
+SMOFF += index_overflow
 
 #
 # module dependencies

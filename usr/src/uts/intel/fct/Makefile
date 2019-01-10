@@ -21,8 +21,7 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#	This makefile drives the production of the fct driver for 
-#	COMSTAR.
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -73,6 +72,9 @@ LINTTAGS	+= -erroff=E_IF_ELSE_ANNOTATION
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+SMOFF += strcpy_overflow
 
 #
 #	Default build targets.

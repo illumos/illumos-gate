@@ -12,6 +12,7 @@
 #
 # Copyright 2018 Toomas Soome <tsoome@me.com>
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include		../Makefile.tools
 
@@ -22,6 +23,9 @@ CPPFLAGS +=	-I$(SRC)/lib/libficl -I$(SRC)/common/ficl
 OBJS=		makesoftcore.o lz4.o
 SRCS=		makesoftcore.c lz4.c
 LDLIBS=		-lumem
+
+# not linted
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 

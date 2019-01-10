@@ -21,8 +21,7 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#	This makefile drives the production of the srpt pseudo-driver for 
-#	COMSTAR.
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -63,6 +62,9 @@ LDFLAGS		+= -dy -Ndrv/stmf -Nmisc/ibtl -Nmisc/ibcm
 C99LMODE=	-Xc99=%all
 
 CERRWARN	+= -_gcc=-Wno-unused-label
+
+# needs work
+$(OBJS_DIR)/srpt_stp.o := SMOFF += all_func_returns
 
 #
 #	Default build targets.

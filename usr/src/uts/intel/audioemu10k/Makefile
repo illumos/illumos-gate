@@ -24,8 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the audioemu10k driver.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -61,6 +60,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LDFLAGS		+= -dy -Ndrv/audio -Nmisc/ac97
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+SMOFF += all_func_returns
 
 $(OBJS_DIR)/%.o			:= CPPFLAGS += -I$(OBJS_DIR)
 $(OBJS_DIR)/%.ln		:= CPPFLAGS += -I$(OBJS_DIR)

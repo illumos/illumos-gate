@@ -37,6 +37,9 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-clobbered
 
+# needs work
+SMOFF += all_func_returns,testing_index_after_use
+
 CMDS=		$(PROG:%=$(TESTDIR)/%) $(SHPROG:%=$(TESTDIR)/%)
 $(CMDS):=	FILEMODE=0555
 TESTDATA=	$(DATA:%=$(DATADIR)/%)

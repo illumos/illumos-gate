@@ -22,10 +22,8 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
-#	This makefile drives the production of the Sun NIU
-#	10G/1G Ethernet leaf driver kernel module.
-#
+# Copyright (c) 2018, Joyent, Inc.
+
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -91,6 +89,9 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-type-limits
+
+# needs work
+SMATCH=off
 
 #
 #	Driver depends on mac & IP

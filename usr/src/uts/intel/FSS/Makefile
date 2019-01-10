@@ -22,8 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/FSS/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the FSS scheduling class
@@ -65,6 +64,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/fss.o := SMOFF += deref_check
 
 #
 #	Default build targets.

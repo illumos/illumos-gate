@@ -68,7 +68,7 @@ resetseg(uint_t seg)
 	if (rc == 0) {
 		done = 1;
 		ucp.uc_mcontext.gregs[seg] = selector;
-		setcontext(&ucp);
+		(void) setcontext(&ucp);
 	}
 	abort();
 }

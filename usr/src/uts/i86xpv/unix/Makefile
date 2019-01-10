@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 #	This makefile drives the production of unix (and unix.o).
 #
@@ -149,6 +149,9 @@ CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-clobbered
 CERRWARN	+= -_gcc=-Wno-unused-value
 CERRWARN	+= -_gcc=-Wno-empty-body
+
+# needs work
+SMATCH=off
 
 # Ensure that lint sees 'struct cpu' containing a fully declared
 # embedded 'struct machcpu'

@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 # This makefile drives the production of the VIA Rhine Ethernet
 # (vr) driver module in intel systems
@@ -58,6 +59,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+SMOFF += array_condition
 
 #
 # Driver depends on GLD

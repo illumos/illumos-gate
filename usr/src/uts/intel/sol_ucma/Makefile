@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -63,6 +63,9 @@ INCLUDE_PATH += -I$(UTSBASE)/common/sys/ib/clients/ofv/sol_ucma
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
+
+# needs work
+SMOFF += all_func_returns,logical_instead_of_bitwise
 
 #
 #	Default build targets.

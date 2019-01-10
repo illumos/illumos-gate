@@ -28,6 +28,10 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include "../file_common.h"
 
 /*
@@ -84,10 +88,12 @@ main(int argc, char *argv[])
 
 	if ((fd = open(filename, O_RDWR | O_CREAT | O_TRUNC, mode)) < 0) {
 		perror("open");
+		free(buf);
 		return (1);
 	}
 	if (write(fd, buf, filesize) < filesize) {
 		perror("write");
+		free(buf);
 		return (1);
 	}
 	fl.l_whence = SEEK_SET;
@@ -95,6 +101,7 @@ main(int argc, char *argv[])
 	fl.l_len = off_len;
 	if (fcntl(fd, F_FREESP, &fl) != 0) {
 		perror("fcntl");
+		free(buf);
 		return (1);
 	}
 

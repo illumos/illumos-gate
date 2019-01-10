@@ -28,6 +28,7 @@
 #define	_BOOTSTRAP_H_
 
 #include <sys/types.h>
+#include <stdbool.h>
 #include <sys/queue.h>
 #include <sys/linker_set.h>
 
@@ -240,6 +241,7 @@ int  file_addmodule(struct preloaded_file *fp, char *modname, int version,
 void build_environment_module(void);
 void build_font_module(void);
 vm_offset_t bi_copyenv(vm_offset_t);
+bool sha1(void *, size_t, uint8_t *);
 
 /* MI module loaders */
 #ifdef __elfN

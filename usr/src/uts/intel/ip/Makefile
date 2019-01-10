@@ -22,8 +22,9 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 #
-#	This makefile drives the production of the ip driver 
+#	This makefile drives the production of the ip driver
 #	kernel module.
 #
 #	intel implementation architecture dependent
@@ -68,6 +69,19 @@ CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-type-limits
 
+# false positives
+SMOFF += index_overflow
+
+# need work still
+$(OBJS_DIR)/igmp.o := SMOFF += shift_to_zero
+$(OBJS_DIR)/tnet.o := SMOFF += shift_to_zero
+SMOFF += signed,all_func_returns
+SMOFF += signed_integer_overflow_check
+
+# definitely wrong
+$(OBJS_DIR)/ip_input.o := SMOFF += or_vs_and
+$(OBJS_DIR)/ip6_input.o := SMOFF += or_vs_and
+
 #
 # To get the BPF header files included by ipnet.h
 #
@@ -78,7 +92,7 @@ INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 # swrand as it needs random numbers early on during boot before
 # kCF subsystem can load swrand.
 #
-LDFLAGS		+= -dy -Nmisc/md5 -Ncrypto/swrand -Nmisc/hook -Nmisc/neti 
+LDFLAGS		+= -dy -Nmisc/md5 -Ncrypto/swrand -Nmisc/hook -Nmisc/neti
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -22,6 +22,8 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -44,6 +46,9 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/ib/clients/iser
 include $(UTSBASE)/intel/Makefile.intel
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/iser_ib.o := SMOFF += deref_check
 
 #
 #	Define targets

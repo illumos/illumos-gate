@@ -12,6 +12,7 @@
 #
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=	vtfontcvt
 OBJS=	vtfontcvt.o
@@ -21,6 +22,9 @@ LZ4_OBJS=	lz4.o
 OBJS	+=	$(LZ4_OBJS)
 
 LDLIBS += -lumem
+
+# not linted
+SMATCH=off
 
 %.o:	$(LZ4COMMONDIR)/%.c
 	$(COMPILE.c) $<

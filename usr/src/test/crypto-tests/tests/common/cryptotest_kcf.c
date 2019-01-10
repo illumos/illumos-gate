@@ -76,8 +76,10 @@ cryptotest_init(cryptotest_t *arg, crypto_func_group_t fg)
 		return (NULL);
 
 	while ((fd = open(CRYPTO_DEVICE, O_RDWR)) < 0) {
-		if (errno != EINTR)
+		if (errno != EINTR) {
+			free(op);
 			return (NULL);
+		}
 	}
 
 	op->in = (char *)arg->in;

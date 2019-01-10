@@ -18,6 +18,8 @@
 #
 # CDDL HEADER END
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
@@ -75,6 +77,9 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+# needs work
+$(OBJS_DIR)/blowfish_impl.o := SMOFF += precedence
 
 #
 #	Default build targets.

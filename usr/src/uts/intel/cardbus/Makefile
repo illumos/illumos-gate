@@ -22,8 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/cardbus/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the cardbus kernel module.
@@ -56,7 +55,7 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-# 
+#
 # 	Include sun4u specific header files
 #
 INC_PATH        += -I$(UTSBASE)/sun4u -I$(UTSBASE)/sun4 -I$(UTSBASE)/i86pc
@@ -86,6 +85,8 @@ CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-function
 CERRWARN	+= -_gcc=-Wno-unused-variable
+
+SMOFF += indenting,no_if_block
 
 #
 #	Default build targets.

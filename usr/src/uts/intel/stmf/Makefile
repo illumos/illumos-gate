@@ -21,8 +21,7 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#	This makefile drives the production of the stmf driver for 
-#	COMSTAR.
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -57,6 +56,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
 CERRWARN	+= -erroff=E_STATEMENT_NOT_REACHED
+
+# needs work
+SMATCH=off
 
 C99LMODE=	-Xc99=%all
 

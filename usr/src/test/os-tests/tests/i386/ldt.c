@@ -28,7 +28,7 @@ char foo[4096];
 static void *
 donothing(void *nothing)
 {
-	sleep(5);
+	(void) sleep(5);
 	return (NULL);
 }
 
@@ -68,13 +68,13 @@ main(void)
 	}
 
 	for (int i = 0; i < 10; i++)
-		pthread_create(&tid, NULL, donothing, NULL);
+		(void) pthread_create(&tid, NULL, donothing, NULL);
 
 	if (forkall() == 0) {
-		sleep(2);
+		(void) sleep(2);
 		_exit(0);
 	}
 
-	sleep(6);
+	(void) sleep(6);
 	return (0);
 }

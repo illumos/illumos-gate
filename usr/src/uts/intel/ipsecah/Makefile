@@ -23,9 +23,10 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
-#	This makefile drives the production of the ipsecah driver 
+#	This makefile drives the production of the ipsecah driver
 #	kernel module.
 #
 #	intel implementation architecture dependent
@@ -75,6 +76,11 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/ipsecahddi.o := SMOFF += index_overflow
+$(OBJS_DIR)/ipsecah.o := SMOFF += deref_check
+$(OBJS_DIR)/sadb.o := SMOFF += signed_integer_overflow_check,deref_check,indenting,shift_to_zero
 
 #
 #	Default build targets.

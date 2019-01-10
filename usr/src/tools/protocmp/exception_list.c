@@ -24,6 +24,8 @@
  * Use is subject to license terms.
  *
  * Copyright 2015 PALO, Richard
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -76,6 +78,7 @@ parse_exception_line(char *line, elem_list *list)
 
 	while ((e->arch = assign_arch(arch)) == 0) {
 		if ((arch = strtok(NULL, FS)) == NULL) {
+			free(e);
 			return (0);
 		}
 	}

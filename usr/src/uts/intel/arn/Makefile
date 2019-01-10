@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 
 #
@@ -38,7 +39,7 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= arn
-OBJECTS		= $(ARN_OBJS:%=$(OBJS_DIR)/%) 
+OBJECTS		= $(ARN_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(ARN_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 
@@ -64,6 +65,9 @@ LINTTAGS        += -erroff=E_BAD_PTR_CAST_ALIGN
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-char-subscripts
+
+# various issues
+SMATCH=off
 
 #
 #	Default build targets.

@@ -12,6 +12,7 @@
 #
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 # This makefile drives the production of the iwn driver kernel module.
@@ -54,6 +55,9 @@ ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTFIRMWARE)
 
 LDFLAGS         += -dy -Nmisc/mac -Nmisc/net80211 -Ndrv/random -Ndrv/ip
+
+# needs work
+SMOFF += all_func_returns
 
 #
 #	Default build targets.

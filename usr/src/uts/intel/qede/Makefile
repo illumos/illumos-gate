@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2017 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 UTSBASE = ../..
@@ -47,6 +47,12 @@ CPPFLAGS	+= -I$(UTSBASE)/common/io/qede/579xx/hsi/mcp
 #
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function
+
+# 3rd party module
+SMOFF += all_func_returns,indenting,no_if_block,deref_check,testing_index_after_use
+
+# real bug in qede_multicast()
+$(OBJS_DIR)/qede_gld.o := SMOFF += assign_vs_compare
 
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)

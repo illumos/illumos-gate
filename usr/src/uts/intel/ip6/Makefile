@@ -23,13 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the ip6 driver 
-#	kernel module.
-#
-#	intel implementation architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -61,6 +55,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #	depends on ip
 #
 LDFLAGS		+= -dy -Ndrv/ip
+
+# needs work
+$(OBJS_DIR)/ip6ddi.o := SMOFF += index_overflow
 
 #
 #	Default build targets.

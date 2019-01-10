@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Routines used to read stabs data from a file, and to build a tdata structure
  * based on the interesting parts of that data.
  */
@@ -328,8 +332,7 @@ stabs_read(tdata_t *td, Elf *elf, const char *file)
 		 * the N_PSYM stabs.
 		 */
 		if (scope && stab->n_type != N_PSYM) {
-			if (iidescp)
-				iidesc_free(iidescp);
+			iidesc_free(iidescp);
 			goto parse_loop_end;
 		}
 

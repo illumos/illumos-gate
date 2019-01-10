@@ -24,10 +24,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the udp driver kernel module.
-#
-#	intel implementation architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -67,6 +64,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #	depends on ip and sockfs
 #
 LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs
+
+# needs work
+$(OBJS_DIR)/udpddi.o := SMOFF += index_overflow
 
 #
 #	Default build targets.

@@ -23,12 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the tcp6 driver kernel module.
-#
-#	intel implementation architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -50,6 +45,9 @@ CONF_SRCDIR	= $(UTSBASE)/common/inet/tcp
 # Need to remove ipddi.o since it has non-static defines for _init etc.
 IP_CHECK_OBJS	= $(IP_OBJS:ipddi.o=ip.o)
 EXTRA_CHECK_OBJS = $(IP_CHECK_OBJS:%=../ip/$(OBJS_DIR)/%)
+
+# needs work
+SMOFF += index_overflow
 
 #
 #	Include common rules.

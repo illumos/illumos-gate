@@ -22,8 +22,7 @@
 #
 # Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# This makefile drives the production of the fcoet driver for COMSTAR.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -38,6 +37,9 @@ MODULE		= fcoet
 OBJECTS		= $(FCOET_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(FCOET_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+
+# needs work
+SMOFF += all_func_returns,shift_to_zero
 
 #
 #	Include common rules.

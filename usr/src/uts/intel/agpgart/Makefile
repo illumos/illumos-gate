@@ -2,8 +2,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/agpgart/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the framework of agp protocol
@@ -38,6 +37,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/agpgart.o := SMOFF += deref_check
 
 #
 # For now, disable these lint checks; maintainers should endeavor

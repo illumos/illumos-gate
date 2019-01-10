@@ -12,6 +12,7 @@
 /*
  * Copyright 2012 Jilin Xpd <jilinxpd@gmail.com>
  * Copyright 2018 Nexenta Systems, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -139,20 +140,20 @@ main(int argc, char **argv)
 			break;
 		}
 
-	/* tag each block (to aid debug) */
-	p = file_addr;
-	q = file_addr + blksize - K;
-	memset(p, ' ', K);
-	snprintf(p, K, "\nblk=%d\n\n", i);
-	p += K;
+		/* tag each block (to aid debug) */
+		p = file_addr;
+		q = file_addr + blksize - K;
+		memset(p, ' ', K);
+		snprintf(p, K, "\nblk=%d\n\n", i);
+		p += K;
 
 		/* fill something into mapped addr */
-	while (p < q) {
-		memset(p, ' ', K);
-		snprintf(p, K, "\noff=0x%x\n\n",
-		    (i * blksize) + (p - file_addr));
-		p += K;
-	}
+		while (p < q) {
+			memset(p, ' ', K);
+			snprintf(p, K, "\noff=0x%x\n\n",
+			    (i * blksize) + (p - file_addr));
+			p += K;
+		}
 
 		/* sync mapped pages to file */
 		if (msync(file_addr, blksize, MS_SYNC) == -1) {

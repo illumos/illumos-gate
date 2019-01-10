@@ -3,6 +3,6 @@
 int
 main(int argc, char **argv)
 {
-	sleep(100000);
+	(void) sleep(100000);
 	return (0);
 }

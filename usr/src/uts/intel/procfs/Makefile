@@ -24,6 +24,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the procfs file system
@@ -76,6 +77,15 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+$(OBJS_DIR)/prsubr.o := SMOFF += all_func_returns
+$(OBJS_DIR)/prcontrol.o := SMOFF += all_func_returns
+$(OBJS_DIR)/prioctl.o := SMOFF += signed
+
+# false positives
+$(OBJS_DIR)/prvnops.o := SMOFF += strcpy_overflow
+
 #
 #	Default build targets.
 #

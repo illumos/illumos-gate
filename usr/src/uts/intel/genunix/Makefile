@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	This makefile drives the production of the generic
@@ -109,6 +110,24 @@ CERRWARN	+= -_gcc=-Wno-type-limits
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-clobbered
 CERRWARN	+= -_gcc=-Wno-empty-body
+
+# false positives
+SMOFF += index_overflow
+$(OBJS_DIR)/seg_vn.o := SMOFF += deref_check
+$(OBJS_DIR)/ddi_intr_irm.o := SMOFF += deref_check
+
+# need work still
+SMOFF += signed,indenting,all_func_returns
+$(OBJS_DIR)/clock_highres.o := SMOFF += signed_integer_overflow_check
+$(OBJS_DIR)/evchannels.o := SMOFF += allocating_enough_data
+$(OBJS_DIR)/klpd.o := SMOFF += cast_assign
+$(OBJS_DIR)/lookup.o := SMOFF += strcpy_overflow
+$(OBJS_DIR)/process.o := SMOFF += or_vs_and
+$(OBJS_DIR)/sunpci.o := SMOFF += deref_check
+$(OBJS_DIR)/timers.o := SMOFF += signed_integer_overflow_check
+
+# definitely wrong
+$(OBJS_DIR)/acl_common.o := SMOFF += or_vs_and
 
 #
 # Ensure that lint sees 'struct cpu' containing a fully declared

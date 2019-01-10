@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -58,6 +59,9 @@ INC_PATH += -I$(UTSBASE)/common/io/virtio
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+
+# needs work
+SMOFF += all_func_returns
 
 #
 #	Default build targets.

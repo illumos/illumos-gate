@@ -22,6 +22,8 @@
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
+
 
 #
 # uts/intel/sda/Makefile
@@ -75,6 +77,9 @@ CFLAGS += $(CCVERBOSE)
 MAPFILE		= $(UTSBASE)/common/io/sdcard/impl/mapfile
 LDFLAGS		+= -dy -Ndrv/blkdev -B reduce -M $(MAPFILE)
 CTFMRGFLAGS	+= -f
+
+# needs work
+SMOFF += all_func_returns
 
 #
 #	Default build targets.

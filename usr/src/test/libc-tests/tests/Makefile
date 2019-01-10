@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 SUBDIRS = \
@@ -56,6 +56,9 @@ SCRIPTS = \
 	psignal
 
 CPPFLAGS += -D_REENTRANT
+
+# needs work
+SMOFF += all_func_returns,snprintf_overflow
 
 PROGS32 = $(PROGS:%=%.32)
 PROGS64 = \

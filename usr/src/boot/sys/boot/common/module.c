@@ -39,8 +39,15 @@
 #include <sys/stdint.h>
 #include <sys/tem_impl.h>
 #include <sys/font.h>
+#include <sys/sha1.h>
 
 #include "bootstrap.h"
+
+#if defined(EFI)
+#define	PTOV(pa)	((void *)pa)
+#else
+#include "../i386/btx/lib/btxv86.h"
+#endif
 
 #define	MDIR_REMOVED	0x0001
 #define	MDIR_NOHINTS	0x0002
@@ -257,15 +264,19 @@ command_lsmod(int argc, char *argv[])
     struct kernel_module	*mp;
     struct file_metadata	*md;
     char			lbuf[80];
-    int				ch, verbose, ret = 0;
+    int				ch, verbose, hash, ret = 0;
 
     verbose = 0;
+    hash = 0;
     optind = 1;
     optreset = 1;
-    while ((ch = getopt(argc, argv, "v")) != -1) {
+    while ((ch = getopt(argc, argv, "vs")) != -1) {
 	switch(ch) {
 	case 'v':
 	    verbose = 1;
+	    break;
+	case 's':
+	    hash = 1;
 	    break;
 	case '?':
 	default:
@@ -287,7 +298,25 @@ command_lsmod(int argc, char *argv[])
 	    pager_output(fp->f_args);
 	    if (pager_output("\n"))
 		break;
+	    if (strcmp(fp->f_type, "hash") == 0) {
+		pager_output("    contents: ");
+		strncpy(lbuf, PTOV(fp->f_addr), fp->f_size);
+		if (pager_output(lbuf))
+			break;
+	    }
 	}
+
+	if (hash == 1) {
+		void *ptr = PTOV(fp->f_addr);
+
+		pager_output("  hash: ");
+		sha1(ptr, fp->f_size, (uint8_t *)lbuf);
+		for (int i = 0; i < SHA1_DIGEST_LENGTH; i++)
+			printf("%02x", (int)(lbuf[i] & 0xff));
+		if (pager_output("\n"))
+			break;
+	}
+
 	if (fp->f_modules) {
 	    pager_output("  modules: ");
 	    for (mp = fp->f_modules; mp; mp = mp->m_next) {
@@ -425,6 +454,22 @@ env_get_size(void)
 	return (size);
 }
 
+static void
+module_hash(struct preloaded_file *fp, void *addr, size_t size)
+{
+	uint8_t hash[SHA1_DIGEST_LENGTH];
+	char ascii[2 * SHA1_DIGEST_LENGTH + 1];
+	int i;
+
+	sha1(addr, size, hash);
+	for (i = 0; i < SHA1_DIGEST_LENGTH; i++) {
+		snprintf(ascii + 2 * i, sizeof (ascii) - 2 * i, "%02x",
+		    hash[i] & 0xff);
+	}
+	/* Out of memory here is not fatal issue. */
+	asprintf(&fp->f_args, "hash=%s", ascii);
+}
+
 /*
  * Create virtual module for environment variables.
  * This module should be created as late as possible before executing
@@ -474,8 +519,8 @@ build_environment_module(void)
 	}
 
 	laddr = bi_copyenv(loadaddr);
-
 	/* Looks OK so far; populate control structure */
+	module_hash(fp, PTOV(loadaddr), laddr - loadaddr);
 	fp->f_loader = -1;
 	fp->f_addr = loadaddr;
 	fp->f_size = laddr - loadaddr;
@@ -581,6 +626,7 @@ build_font_module(void)
 	laddr += archsw.arch_copyin(fd->vf_bytes, laddr, fi.fi_bitmap_size);
 
 	/* Looks OK so far; populate control structure */
+	module_hash(fp, PTOV(loadaddr), laddr - loadaddr);
 	fp->f_loader = -1;
 	fp->f_addr = loadaddr;
 	fp->f_size = laddr - loadaddr;

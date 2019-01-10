@@ -23,10 +23,7 @@
 #
 # uts/intel/mr_sas/Makefile
 #
-#	This makefile drives the production of the mr_sas driver kernel module.
-#
-#	intel implementation architecture dependent
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -62,6 +59,9 @@ LDFLAGS		+= -dy -Nmisc/scsi
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-switch
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+SMATCH=off
 
 #
 #	Default build targets.
