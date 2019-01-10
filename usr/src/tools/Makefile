@@ -77,6 +77,7 @@ sparc_SUBDIRS= \
 
 i386_SUBDIRS=		\
 	aw		\
+	cpcgen		\
 	elfextract	\
 	mbh_patch	\
 	btxld

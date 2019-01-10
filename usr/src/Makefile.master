@@ -220,6 +220,7 @@ LCDEF=		$(ONBLD_TOOLS)/bin/$(MACH)/localedef
 TIC=		$(ONBLD_TOOLS)/bin/$(MACH)/tic
 ZIC=		$(ONBLD_TOOLS)/bin/$(MACH)/zic
 OPENSSL=	/usr/bin/openssl
+CPCGEN=		$(ONBLD_TOOLS)/bin/$(MACH)/cpcgen
 
 FILEMODE=	644
 DIRMODE=	755
