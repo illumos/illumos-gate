@@ -32,7 +32,7 @@
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 /*
  * Various routines to handle identification
@@ -217,7 +217,9 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"ibrs_all",
 	"rsba",
 	"ssb_no",
-	"stibp_all"
+	"stibp_all",
+	"flush_cmd",
+	"l1d_vmentry_no"
 };
 
 boolean_t
@@ -1051,6 +1053,10 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 					add_x86_feature(featureset,
 					    X86FSET_RSBA);
 				}
+				if (reg & IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY) {
+					add_x86_feature(featureset,
+					    X86FSET_L1D_VM_NO);
+				}
 				if (reg & IA32_ARCH_CAP_SSB_NO) {
 					add_x86_feature(featureset,
 					    X86FSET_SSB_NO);
@@ -1062,6 +1068,9 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 
 		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_SSBD)
 			add_x86_feature(featureset, X86FSET_SSBD);
+
+		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_FLUSH_CMD)
+			add_x86_feature(featureset, X86FSET_FLUSH_CMD);
 	}
 }
 
@@ -4123,7 +4132,7 @@ static const char sl3_cache_str[] = "sectored-l3-cache";
 static const char sh_l2_tlb4k_str[] = "shared-l2-tlb-4k";
 
 static const struct cachetab {
-	uint8_t	ct_code;
+	uint8_t		ct_code;
 	uint8_t		ct_assoc;
 	uint16_t	ct_line_size;
 	size_t		ct_size;

@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
@@ -254,6 +254,7 @@ extern "C" {
 #define	CPUID_INTC_EDX_7_0_AVX5124FMAPS	0x00000008	/* AVX512 4FMAPS */
 #define	CPUID_INTC_EDX_7_0_SPEC_CTRL	0x04000000	/* Spec, IBPB, IBRS */
 #define	CPUID_INTC_EDX_7_0_STIBP	0x08000000	/* STIBP */
+#define	CPUID_INTC_EDX_7_0_FLUSH_CMD	0x10000000	/* IA32_FLUSH_CMD */
 #define	CPUID_INTC_EDX_7_0_ARCH_CAPS	0x20000000	/* IA32_ARCH_CAPS */
 #define	CPUID_INTC_EDX_7_0_SSBD		0x80000000	/* SSBD */
 
@@ -362,11 +363,12 @@ extern "C" {
 /*
  * Intel IA32_ARCH_CAPABILITIES MSR.
  */
-#define	MSR_IA32_ARCH_CAPABILITIES	0x10a
-#define	IA32_ARCH_CAP_RDCL_NO		0x0001
-#define	IA32_ARCH_CAP_IBRS_ALL		0x0002
-#define	IA32_ARCH_CAP_RSBA		0x0004
-#define	IA32_ARCH_CAP_SSB_NO		0x0010
+#define	MSR_IA32_ARCH_CAPABILITIES		0x10a
+#define	IA32_ARCH_CAP_RDCL_NO			0x0001
+#define	IA32_ARCH_CAP_IBRS_ALL			0x0002
+#define	IA32_ARCH_CAP_RSBA			0x0004
+#define	IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY	0x0008
+#define	IA32_ARCH_CAP_SSB_NO			0x0010
 
 /*
  * Intel Speculation related MSRs
@@ -378,6 +380,9 @@ extern "C" {
 
 #define	MSR_IA32_PRED_CMD	0x49
 #define	IA32_PRED_CMD_IBPB	0x01
+
+#define	MSR_IA32_FLUSH_CMD	0x10b
+#define	IA32_FLUSH_CMD_L1D	0x01
 
 #define	MCI_CTL_VALUE		0xffffffff
 
@@ -491,6 +496,8 @@ extern "C" {
 #define	X86FSET_RSBA		78
 #define	X86FSET_SSB_NO		79
 #define	X86FSET_STIBP_ALL	80
+#define	X86FSET_FLUSH_CMD	81
+#define	X86FSET_L1D_VM_NO	82
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -773,7 +780,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	81
+#define	NUM_X86_FEATURES	83
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
