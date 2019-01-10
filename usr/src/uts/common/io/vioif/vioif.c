@@ -11,9 +11,8 @@
 
 /*
  * Copyright 2013 Nexenta Inc.  All rights reserved.
- * Copyright 2015 Joyent, Inc.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /* Based on the NetBSD virtio driver by Minoura Makoto. */
@@ -61,7 +60,6 @@
 
 #include <sys/dlpi.h>
 #include <sys/taskq.h>
-#include <sys/cyclic.h>
 
 #include <sys/pattr.h>
 #include <sys/strsun.h>
@@ -217,6 +215,9 @@ static struct modlinkage modlinkage = {
 	},
 };
 
+/* Interval for the periodic TX reclaim */
+uint_t vioif_reclaim_ms = 200;
+
 ddi_device_acc_attr_t vioif_attr = {
 	DDI_DEVICE_ATTR_V0,
 	DDI_NEVERSWAP_ACC,	/* virtio is always native byte order */
@@ -279,7 +280,11 @@ struct vioif_softc {
 	struct virtqueue	*sc_tx_vq;
 	struct virtqueue	*sc_ctrl_vq;
 
-	unsigned int		sc_tx_stopped:1;
+	/* TX virtqueue management resources */
+	kmutex_t		sc_tx_lock;
+	boolean_t		sc_tx_corked;
+	boolean_t		sc_tx_drain;
+	timeout_id_t		sc_tx_reclaim_tid;
 
 	/* Feature bits. */
 	unsigned int		sc_rx_csum:1;
@@ -406,6 +411,8 @@ static char *vioif_priv_props[] = {
 	vioif_rxcopy_thresh,
 	NULL
 };
+
+static void vioif_reclaim_restart(struct vioif_softc *);
 
 /* Add up to ddi? */
 static ddi_dma_cookie_t *
@@ -708,26 +715,25 @@ exit_txalloc:
 }
 
 /* ARGSUSED */
-int
+static int
 vioif_multicst(void *arg, boolean_t add, const uint8_t *macaddr)
 {
 	return (DDI_SUCCESS);
 }
 
 /* ARGSUSED */
-int
+static int
 vioif_promisc(void *arg, boolean_t on)
 {
 	return (DDI_SUCCESS);
 }
 
 /* ARGSUSED */
-int
+static int
 vioif_unicst(void *arg, const uint8_t *macaddr)
 {
 	return (DDI_FAILURE);
 }
-
 
 static uint_t
 vioif_add_rx(struct vioif_softc *sc, int kmflag)
@@ -903,12 +909,13 @@ static uint_t
 vioif_reclaim_used_tx(struct vioif_softc *sc)
 {
 	struct vq_entry *ve;
-	struct vioif_tx_buf *buf;
 	uint32_t len;
-	mblk_t *mp;
 	uint_t num_reclaimed = 0;
 
 	while ((ve = virtio_pull_chain(sc->sc_tx_vq, &len))) {
+		struct vioif_tx_buf *buf;
+		mblk_t *mp;
+
 		/* We don't chain descriptors for tx, so don't expect any. */
 		ASSERT(ve->qe_next == NULL);
 
@@ -917,7 +924,7 @@ vioif_reclaim_used_tx(struct vioif_softc *sc)
 		buf->tb_mp = NULL;
 
 		if (mp != NULL) {
-			for (int i = 0; i < buf->tb_external_num; i++) {
+			for (uint_t i = 0; i < buf->tb_external_num; i++) {
 				(void) ddi_dma_unbind_handle(
 				    buf->tb_external_mapping[i].vbm_dmah);
 			}
@@ -931,12 +938,105 @@ vioif_reclaim_used_tx(struct vioif_softc *sc)
 		num_reclaimed++;
 	}
 
-	if (sc->sc_tx_stopped && num_reclaimed > 0) {
-		sc->sc_tx_stopped = 0;
-		mac_tx_update(sc->sc_mac_handle);
+	/* Return ring to transmitting state if descriptors were reclaimed. */
+	if (num_reclaimed > 0) {
+		boolean_t do_update = B_FALSE;
+
+		mutex_enter(&sc->sc_tx_lock);
+		if (sc->sc_tx_corked) {
+			/*
+			 * TX was corked on a lack of available descriptors.
+			 * That dire state has passed so the TX interrupt can
+			 * be disabled and MAC can be notified that
+			 * transmission is possible again.
+			 */
+			sc->sc_tx_corked = B_FALSE;
+			virtio_stop_vq_intr(sc->sc_tx_vq);
+			do_update = B_TRUE;
+		}
+		mutex_exit(&sc->sc_tx_lock);
+
+		/* Notify MAC outside the above lock */
+		if (do_update) {
+			mac_tx_update(sc->sc_mac_handle);
+		}
 	}
 
 	return (num_reclaimed);
+}
+
+static void
+vioif_reclaim_periodic(void *arg)
+{
+	struct vioif_softc *sc = arg;
+	uint_t num_reclaimed;
+
+	num_reclaimed = vioif_reclaim_used_tx(sc);
+
+	mutex_enter(&sc->sc_tx_lock);
+	sc->sc_tx_reclaim_tid = 0;
+	/*
+	 * If used descriptors were reclaimed or TX descriptors appear to be
+	 * outstanding, the ring is considered active and periodic reclamation
+	 * is necessary for now.
+	 */
+	if (num_reclaimed != 0 || vq_num_used(sc->sc_tx_vq) != 0) {
+		/* Do not reschedule if the ring is being drained. */
+		if (!sc->sc_tx_drain) {
+			vioif_reclaim_restart(sc);
+		}
+	}
+	mutex_exit(&sc->sc_tx_lock);
+}
+
+static void
+vioif_reclaim_restart(struct vioif_softc *sc)
+{
+	ASSERT(MUTEX_HELD(&sc->sc_tx_lock));
+	ASSERT(!sc->sc_tx_drain);
+
+	if (sc->sc_tx_reclaim_tid == 0) {
+		sc->sc_tx_reclaim_tid = timeout(vioif_reclaim_periodic, sc,
+		    MSEC_TO_TICK_ROUNDUP(vioif_reclaim_ms));
+	}
+}
+
+static void
+vioif_tx_drain(struct vioif_softc *sc)
+{
+	mutex_enter(&sc->sc_tx_lock);
+	sc->sc_tx_drain = B_TRUE;
+	/* Put a stop to the periodic reclaim if it is running */
+	if (sc->sc_tx_reclaim_tid != 0) {
+		timeout_id_t tid = sc->sc_tx_reclaim_tid;
+
+		/*
+		 * With sc_tx_drain set, there is no risk that a racing
+		 * vioif_reclaim_periodic() call will reschedule itself.
+		 *
+		 * Being part of the mc_stop hook also guarantees that
+		 * vioif_tx() will not be called to restart it.
+		 */
+		sc->sc_tx_reclaim_tid = 0;
+		mutex_exit(&sc->sc_tx_lock);
+		(void) untimeout(tid);
+		mutex_enter(&sc->sc_tx_lock);
+	}
+	virtio_stop_vq_intr(sc->sc_tx_vq);
+	mutex_exit(&sc->sc_tx_lock);
+
+	/*
+	 * Wait for all of the TX descriptors to be processed by the host so
+	 * they can be reclaimed.
+	 */
+	while (vq_num_used(sc->sc_tx_vq) != 0) {
+		(void) vioif_reclaim_used_tx(sc);
+		delay(5);
+	}
+
+	VERIFY(!sc->sc_tx_corked);
+	VERIFY3U(sc->sc_tx_reclaim_tid, ==, 0);
+	VERIFY3U(vq_num_used(sc->sc_tx_vq), ==, 0);
 }
 
 /* sc will be used to update stat counters. */
@@ -1180,28 +1280,60 @@ exit_tx_external:
 	return (B_TRUE);
 }
 
-mblk_t *
+static mblk_t *
 vioif_tx(void *arg, mblk_t *mp)
 {
 	struct vioif_softc *sc = arg;
-	mblk_t	*nmp;
+	mblk_t *nmp;
+
+	/*
+	 * Prior to attempting to send any more frames, do a reclaim to pick up
+	 * any descriptors which have been processed by the host.
+	 */
+	if (vq_num_used(sc->sc_tx_vq) != 0) {
+		(void) vioif_reclaim_used_tx(sc);
+	}
 
 	while (mp != NULL) {
 		nmp = mp->b_next;
 		mp->b_next = NULL;
 
 		if (!vioif_send(sc, mp)) {
-			sc->sc_tx_stopped = 1;
+			/*
+			 * If there are no descriptors available, try to
+			 * reclaim some, allowing a retry of the send if some
+			 * are found.
+			 */
 			mp->b_next = nmp;
-			break;
+			if (vioif_reclaim_used_tx(sc) != 0) {
+				continue;
+			}
+
+			/*
+			 * Otherwise, enable the TX ring interrupt so that as
+			 * soon as a descriptor becomes available, transmission
+			 * can begin again.  For safety, make sure the periodic
+			 * reclaim is running as well.
+			 */
+			mutex_enter(&sc->sc_tx_lock);
+			sc->sc_tx_corked = B_TRUE;
+			virtio_start_vq_intr(sc->sc_tx_vq);
+			vioif_reclaim_restart(sc);
+			mutex_exit(&sc->sc_tx_lock);
+			return (mp);
 		}
 		mp = nmp;
 	}
 
-	return (mp);
+	/* Ensure the periodic reclaim has been started. */
+	mutex_enter(&sc->sc_tx_lock);
+	vioif_reclaim_restart(sc);
+	mutex_exit(&sc->sc_tx_lock);
+
+	return (NULL);
 }
 
-int
+static int
 vioif_start(void *arg)
 {
 	struct vioif_softc *sc = arg;
@@ -1213,10 +1345,11 @@ vioif_start(void *arg)
 	virtio_start_vq_intr(sc->sc_rx_vq);
 
 	/*
-	 * Don't start interrupts on sc_tx_vq. We use VIRTIO_F_NOTIFY_ON_EMPTY,
-	 * so the device will send a transmit interrupt when the queue is empty
-	 * and we can reclaim it in one sweep.
+	 * Starting interrupts on the TX virtqueue is unnecessary at this time.
+	 * Descriptor reclamation is handling during transmit, via a periodic
+	 * timer, and when resources are tight, via the then-enabled interrupt.
 	 */
+	sc->sc_tx_drain = B_FALSE;
 
 	/*
 	 * Clear any data that arrived early on the receive queue and populate
@@ -1230,15 +1363,17 @@ vioif_start(void *arg)
 	return (DDI_SUCCESS);
 }
 
-void
+static void
 vioif_stop(void *arg)
 {
 	struct vioif_softc *sc = arg;
 
+	/* Ensure all TX descriptors have been processed and reclaimed */
+	vioif_tx_drain(sc);
+
 	virtio_stop_vq_intr(sc->sc_rx_vq);
 }
 
-/* ARGSUSED */
 static int
 vioif_stat(void *arg, uint_t stat, uint64_t *val)
 {
@@ -1521,8 +1656,7 @@ vioif_dev_features(struct vioif_softc *sc)
 	    VIRTIO_NET_F_HOST_ECN |
 	    VIRTIO_NET_F_MAC |
 	    VIRTIO_NET_F_STATUS |
-	    VIRTIO_F_RING_INDIRECT_DESC |
-	    VIRTIO_F_NOTIFY_ON_EMPTY);
+	    VIRTIO_F_RING_INDIRECT_DESC);
 
 	vioif_show_features(sc, "Host features: ", host_features);
 	vioif_show_features(sc, "Negotiated features: ",
@@ -1537,7 +1671,7 @@ vioif_dev_features(struct vioif_softc *sc)
 	return (DDI_SUCCESS);
 }
 
-static int
+static boolean_t
 vioif_has_feature(struct vioif_softc *sc, uint32_t feature)
 {
 	return (virtio_has_feature(&sc->sc_virtio, feature));
@@ -1587,7 +1721,7 @@ vioif_get_mac(struct vioif_softc *sc)
  * Virtqueue interrupt handlers
  */
 /* ARGSUSED */
-uint_t
+static uint_t
 vioif_rx_handler(caddr_t arg1, caddr_t arg2)
 {
 	struct virtio_softc *vsc = (void *) arg1;
@@ -1606,7 +1740,7 @@ vioif_rx_handler(caddr_t arg1, caddr_t arg2)
 }
 
 /* ARGSUSED */
-uint_t
+static uint_t
 vioif_tx_handler(caddr_t arg1, caddr_t arg2)
 {
 	struct virtio_softc *vsc = (void *)arg1;
@@ -1614,9 +1748,8 @@ vioif_tx_handler(caddr_t arg1, caddr_t arg2)
 	    struct vioif_softc, sc_virtio);
 
 	/*
-	 * The return value of this function is not needed but makes debugging
-	 * interrupts simpler because you can use it to detect if anything was
-	 * reclaimed in this handler.
+	 * The TX interrupt could race with other reclamation activity, so
+	 * interpreting the return value is unimportant.
 	 */
 	(void) vioif_reclaim_used_tx(sc);
 
@@ -1771,6 +1904,9 @@ vioif_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	if (!sc->sc_tx_vq)
 		goto exit_alloc2;
 	virtio_stop_vq_intr(sc->sc_tx_vq);
+
+	mutex_init(&sc->sc_tx_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(sc->sc_virtio.sc_intr_prio));
 
 	if (vioif_has_feature(sc, VIRTIO_NET_F_CTRL_VQ)) {
 		sc->sc_ctrl_vq = virtio_alloc_vq(&sc->sc_virtio, 2,
