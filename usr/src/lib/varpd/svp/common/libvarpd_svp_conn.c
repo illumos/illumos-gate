@@ -919,7 +919,6 @@ svp_conn_fallout(svp_conn_t *scp)
 		    "unkonwn state");
 	}
 	mutex_exit(&scp->sc_lock);
-	mutex_exit(&srp->sr_lock);
 }
 
 int
