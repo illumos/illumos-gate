@@ -15,7 +15,7 @@
 
 include $(SRC)/Makefile.master
 
-CC=     $(GCC_ROOT)/bin/gcc
+CC=     $(GNUC_ROOT)/bin/gcc
 
 COMDIR = ../../../../../common/crypto
 
