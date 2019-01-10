@@ -23,6 +23,7 @@
 \ SUCH DAMAGE.
 \
 \ Copyright 2015 Toomas Soome <tsoome@me.com>
+\ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 marker task-menu-commands.4th
 
@@ -608,21 +609,13 @@ also menu-namespace also menu-command-helpers
 	s" zfs_be_currpage" getenv dup -1 = if
 		drop s" 1"
 	else
-		0 s>d 2swap
-		>number		( ud caddr/u -- ud' caddr'/u' )
-		2drop
-		1 um/mod	( ud u1 -- u2 u3 )
-		swap drop	( ud2 u3 -- u3 )
+		s2n
 		1+		\ increment the page number
 		dup
 		s" zfs_be_pages" getenv
-		0 s>d 2swap
-		>number		( ud caddr/u -- ud' caddr'/u' )
-		2drop
-		1 um/mod	( ud u1 -- u2 u3 )
-		swap drop	( ud2 u3 -- u3 )
+		s2n
 		> if drop 1 then
-		s>d <# #s #>	\ convert back to a string
+		n2s
 	then
 
 	s" zfs_be_currpage" setenv

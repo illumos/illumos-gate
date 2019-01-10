@@ -1,4 +1,5 @@
 \ Copyright (c) 2012 Devin Teske <dteske@FreeBSD.org>
+\ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 \ All rights reserved.
 \
 \ Redistribution and use in source and binary forms, with or without
@@ -38,9 +39,9 @@ create menuset_y        1   allot
 
 	\ menuset_use_name is true or false
 	\ $type should be set to one of:
-	\ 	menu toggled ansi
+	\	menu toggled ansi
 	\ $var should be set to one of:
-	\ 	caption command keycode text ...
+	\	caption command keycode text ...
 	\ $affix is either prefix (menuset_use_name is true)
 	\               or infix (menuset_use_name is false)
 
@@ -77,9 +78,9 @@ create menuset_y        1   allot
 
 	\ menuset_use_name is true or false
 	\ $type should be set to one of:
-	\ 	menu toggled ansi
+	\	menu toggled ansi
 	\ $var should be set to one of:
-	\ 	caption command keycode text ...
+	\	caption command keycode text ...
 	\ $affix is either prefix (menuset_use_name is true)
 	\               or infix (menuset_use_name is false)
 
@@ -107,9 +108,9 @@ create menuset_y        1   allot
 
 	\ menuset_use_name is true or false
 	\ $type should be set to one of:
-	\ 	menu toggled ansi
+	\	menu toggled ansi
 	\ $var should be set to one of:
-	\ 	caption command keycode text ...
+	\	caption command keycode text ...
 	\ $x is "1" through "8"
 	\ $affix is either prefix (menuset_use_name is true)
 	\               or infix (menuset_use_name is false)
@@ -147,9 +148,9 @@ create menuset_y        1   allot
 
 	\ menuset_use_name is true or false
 	\ $type should be set to one of:
-	\ 	menu toggled ansi
+	\	menu toggled ansi
 	\ $var should be set to one of:
-	\ 	caption command keycode text ...
+	\	caption command keycode text ...
 	\ $x is "1" through "8"
 	\ $affix is either prefix (menuset_use_name is true)
 	\               or infix (menuset_use_name is false)
@@ -203,9 +204,9 @@ create menuset_y        1   allot
 
 	\ menuset_use_name is true or false
 	\ $type should be set to one of:
-	\ 	menu toggled ansi
+	\	menu toggled ansi
 	\ $var should be set to one of:
-	\ 	caption command keycode text ...
+	\	caption command keycode text ...
 	\ $x is "1" through "8"
 	\ $y is "0" through "9"
 	\ $affix is either prefix (menuset_use_name is true)
@@ -244,9 +245,9 @@ create menuset_y        1   allot
 
 	\ menuset_use_name is true or false
 	\ $type should be set to one of:
-	\ 	menu toggled ansi
+	\	menu toggled ansi
 	\ $var should be set to one of:
-	\ 	caption command keycode text ...
+	\	caption command keycode text ...
 	\ $x is "1" through "8"
 	\ $y is "0" through "9"
 	\ $affix is either prefix (menuset_use_name is true)
@@ -289,7 +290,7 @@ create menuset_y        1   allot
 	rot     ( n c-addr1 12 -- c-addr1 12 n )	\ move number on top
 
 	\ convert to string
-	s>d <# #s #> ( c-addr1 12 n -- c-addr1 12 c-addr2 u2 )
+	n2s	( c-addr1 12 n -- c-addr1 12 c-addr2 u2 )
 
 	\ Combine strings
 	begin ( using u2 in c-addr2/u2 pair as countdown to zero )
@@ -321,9 +322,9 @@ create menuset_y        1   allot
 
 : menuset-checksetnum ( N -- )
 
-	\ 
+	\
 	\ adjust input to be both positive and no-higher than 65535
-	\ 
+	\
 	abs dup 65535 > if drop 65535 then ( n -- n )
 
 	\
@@ -331,15 +332,15 @@ create menuset_y        1   allot
 	\ methodology (referencing the original numeric stack-input), or if-
 	\ instead $menuset_name{N} has been defined wherein we would then
 	\ use the value thereof as the prefix to every menu variable.
-	\ 
+	\
 
 	false menuset_use_name ! \ assume name is not set
 
-	menuset-setnum-namevar 
-	\ 
+	menuset-setnum-namevar
+	\
 	\ We now have a string that is the assembled variable name to check
 	\ for... $menuset_name{N}. Let's check for it.
-	\ 
+	\
 	2dup ( c-addr1 u1 -- c-addr1 u1 c-addr1 u1 ) \ save a copy
 	getenv dup -1 <> if ( c-addr1 u1 c-addr1 u1 -- c-addr1 u1 c-addr2 u2 )
 		\ The variable is set. Let's clean up the stack leaving only
@@ -357,60 +358,60 @@ create menuset_y        1   allot
 			\ truncate to original numeric stack-input
 	then
 
-	\ 
+	\
 	\ Now, depending on whether $menuset_name{N} has been set, we have
 	\ either the value thereof to be used as a prefix to all menu_*
 	\ variables or we have a string representing the numeric stack-input
 	\ to be used as a "set{N}" infix to the same menu_* variables.
-	\ 
+	\
 	\ For example, if the stack-input is 1 and menuset_name1 is NOT set
 	\ the following variables will be referenced:
-	\ 	ansiset1_caption[x]		-> ansi_caption[x]
-	\ 	ansiset1_caption[x][y]		-> ansi_caption[x][y]
-	\ 	menuset1_acpi			-> menu_acpi
-	\ 	menuset1_osconsole		-> menu_osconsole
-	\ 	menuset1_caption[x]		-> menu_caption[x]
-	\ 	menuset1_caption[x][y]		-> menu_caption[x][y]
-	\ 	menuset1_command[x]		-> menu_command[x]
-	\ 	menuset1_init			-> ``evaluated''
-	\ 	menuset1_init[x]		-> menu_init[x]
-	\ 	menuset1_kernel			-> menu_kernel
-	\ 	menuset1_keycode[x]		-> menu_keycode[x]
-	\ 	menuset1_options		-> menu_options
-	\ 	menuset1_optionstext		-> menu_optionstext
-	\ 	menuset1_reboot			-> menu_reboot
-	\ 	toggledset1_ansi[x]		-> toggled_ansi[x]
-	\ 	toggledset1_text[x]		-> toggled_text[x]
+	\	ansiset1_caption[x]		-> ansi_caption[x]
+	\	ansiset1_caption[x][y]		-> ansi_caption[x][y]
+	\	menuset1_acpi			-> menu_acpi
+	\	menuset1_osconsole		-> menu_osconsole
+	\	menuset1_caption[x]		-> menu_caption[x]
+	\	menuset1_caption[x][y]		-> menu_caption[x][y]
+	\	menuset1_command[x]		-> menu_command[x]
+	\	menuset1_init			-> ``evaluated''
+	\	menuset1_init[x]		-> menu_init[x]
+	\	menuset1_kernel			-> menu_kernel
+	\	menuset1_keycode[x]		-> menu_keycode[x]
+	\	menuset1_options		-> menu_options
+	\	menuset1_optionstext		-> menu_optionstext
+	\	menuset1_reboot			-> menu_reboot
+	\	toggledset1_ansi[x]		-> toggled_ansi[x]
+	\	toggledset1_text[x]		-> toggled_text[x]
 	\ otherwise, the following variables are referenced (where {name}
 	\ represents the value of $menuset_name1 (given 1 as stack-input):
-	\ 	{name}ansi_caption[x]		-> ansi_caption[x]
-	\ 	{name}ansi_caption[x][y]	-> ansi_caption[x][y]
-	\ 	{name}menu_acpi			-> menu_acpi
-	\ 	{name}menu_caption[x]		-> menu_caption[x]
-	\ 	{name}menu_caption[x][y]	-> menu_caption[x][y]
-	\ 	{name}menu_command[x]		-> menu_command[x]
-	\ 	{name}menu_init			-> ``evaluated''
-	\ 	{name}menu_init[x]		-> menu_init[x]
-	\ 	{name}menu_kernel		-> menu_kernel
-	\ 	{name}menu_keycode[x]		-> menu_keycode[x]
-	\ 	{name}menu_options		-> menu_options
-	\ 	{name}menu_optionstext		-> menu_optionstext
-	\ 	{name}menu_reboot		-> menu_reboot
-	\ 	{name}toggled_ansi[x]		-> toggled_ansi[x]
-	\ 	{name}toggled_text[x]		-> toggled_text[x]
-	\ 
+	\	{name}ansi_caption[x]		-> ansi_caption[x]
+	\	{name}ansi_caption[x][y]	-> ansi_caption[x][y]
+	\	{name}menu_acpi			-> menu_acpi
+	\	{name}menu_caption[x]		-> menu_caption[x]
+	\	{name}menu_caption[x][y]	-> menu_caption[x][y]
+	\	{name}menu_command[x]		-> menu_command[x]
+	\	{name}menu_init			-> ``evaluated''
+	\	{name}menu_init[x]		-> menu_init[x]
+	\	{name}menu_kernel		-> menu_kernel
+	\	{name}menu_keycode[x]		-> menu_keycode[x]
+	\	{name}menu_options		-> menu_options
+	\	{name}menu_optionstext		-> menu_optionstext
+	\	{name}menu_reboot		-> menu_reboot
+	\	{name}toggled_ansi[x]		-> toggled_ansi[x]
+	\	{name}toggled_text[x]		-> toggled_text[x]
+	\
 	\ Note that menuset{N}_init and {name}menu_init are the initializers
 	\ for the entire menu (for wholly dynamic menus) opposed to the per-
 	\ menuitem initializers (with [x] afterward). The whole-menu init
 	\ routine is evaluated and not passed down to $menu_init (which
 	\ would result in double evaluation). By doing this, the initializer
 	\ can initialize the menuset before we transfer it to active-duty.
-	\ 
+	\
 
-	\ 
+	\
 	\ Copy our affixation (prefix or infix depending on menuset_use_name)
 	\ to our buffer so that we can safely use the s-quote (s") buf again.
-	\ 
+	\
 	menuset_affixbuf 0 2swap ( c-addr2 u2 -- c-addr1 0 c-addr2 u2 )
 	begin ( using u2 in c-addr2/u2 pair as countdown to zero )
 		over ( c-addr1 u1 c-addr2 u2 -- c-addr1 u1 c-addr2 u2 c-addr2 )
@@ -433,7 +434,7 @@ create menuset_y        1   allot
 	\ Create a variable for referencing our affix data (prefix or infix
 	\ depending on menuset_use_name as described above). This variable will
 	\ be temporary and only used to simplify cmdbuf assembly.
-	\ 
+	\
 	s" affix" setenv ( c-addr1 u1 -- )
 ;
 
@@ -451,13 +452,13 @@ only forth definitions also menusets-infrastructure
 
 	menuset-checksetnum ( n -- )
 
-	\ 
+	\
 	\ From here out, we use temporary environment variables to make
 	\ dealing with variable-length strings easier.
-	\ 
+	\
 	\ menuset_use_name is true or false
 	\ $affix should be used appropriately w/respect to menuset_use_name
-	\ 
+	\
 
 	\ ... menu_init ...
 	s" set var=init" evaluate
