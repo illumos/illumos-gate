@@ -1,37 +1,61 @@
-'\" te
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2018, Joyent, Inc.
+.\" Copyright 2019, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROC 4 "August 22, 2018"
-.SH NAME
-proc \- /proc, the process file system
-.SH DESCRIPTION
-.LP
-\fB/proc\fR is a file system that provides access to the state of each process
-and light-weight process (lwp) in the system. The name of each entry in the
-\fB/proc\fR directory is a decimal number corresponding to a process-ID. These
-entries are themselves subdirectories. Access to process state is provided by
-additional files contained within each subdirectory; the hierarchy is described
-more completely below. In this document, ``\fB/proc\fR file'' refers to a
-non-directory file within the hierarchy rooted at \fB/proc\fR. The owner of
-each \fB/proc\fR file and subdirectory is determined by the user-ID of the
-process.
-.sp
-.LP
-\fB/proc\fR can be mounted on any mount point, in addition to the standard
-\fB/proc\fR mount point, and can be mounted several places at once. Such
-additional mounts are allowed in order to facilitate the confinement of
-processes to subtrees of the file system via \fBchroot\fR(1M) and yet allow
-such processes access to commands like \fBps\fR(1).
-.sp
-.LP
-Standard system calls are used to access \fB/proc\fR files: \fBopen\fR(2),
-\fBclose\fR(2), \fBread\fR(2), and \fBwrite\fR(2) (including \fBreadv\fR(2),
-\fBwritev\fR(2), \fBpread\fR(2), and \fBpwrite\fR(2)). Most files describe
-process state and can only be opened for reading. \fBctl\fR and \fBlwpctl\fR
+.Dd January 11, 2019
+.Dt PROC 4
+.Os
+.Sh NAME
+.Nm proc
+.Nd /proc, the process file system
+.Sh DESCRIPTION
+.Pa /proc
+is a file system that provides access to the state of each process
+and light-weight process (lwp) in the system.
+The name of each entry in the
+.Pa /proc
+directory is a decimal number corresponding to a process-ID.
+These entries are themselves subdirectories.
+Access to process state is provided by additional files contained within each
+subdirectory; the hierarchy is described more completely below.
+In this document,
+.Dq Pa /proc file
+refers to a non-directory file within the hierarchy rooted at
+.Pa /proc .
+The owner of each
+.Pa /proc
+file and subdirectory is determined by the user-ID of the process.
+.Pp
+.Pa /proc
+can be mounted on any mount point, in addition to the standard
+.Pa /proc
+mount point, and can be mounted several places at once.
+Such additional mounts are allowed in order to facilitate the confinement of
+processes to subtrees of the file system via
+.Xr chroot 2
+and yet allow such processes access to commands like
+.Xr ps 1 .
+.Pp
+Standard system calls are used to access
+.Pa /proc
+files:
+.Xr open 2 ,
+.Xr close 2 ,
+.Xr read 2 ,
+and
+.Xr write 2
+(including
+.Xr readv 2 ,
+.Xr writev 2 ,
+.Xr pread 2 ,
+and
+.Xr pwrite 2 ) .
+Most files describe process state and can only be opened for reading.
+.Pa ctl
+and
+.Pa lwpctl
 (control) files permit manipulation of process state and can only be opened for
 writing.
 .Pa as
@@ -426,7 +450,8 @@ Microstate accounting may not be disabled; however, it is still possible to
 toggle the flag.
 .It Sy PR_MSFORK
 Set by default in all processes to indicate that microstate accounting will be
-enabled for processes that this parent forks().
+enabled for processes that this parent
+.Xr fork 2 Ns s.
 However, this flag has been deprecated and no longer has any effect.
 It is possible to toggle this flag; however, it is not possible to disable
 microstate accounting.
@@ -1620,18 +1645,25 @@ contains the following entries:
 Write-only control file.
 The messages written to this file affect the specific
 lwp rather than the representative lwp, as is the case for the process's
-\fBctl\fR file.
-.SS lwpname
-A buffer of \fBTHREAD_NAME_MAX\fR bytes representing the LWP name; the buffer is
-zero-filled if the thread name is shorter than the buffer. If no thread name is
-set, the buffer contains the empty string. A read with a buffer shorter than
-\fBTHREAD_NAME_MAX\fR bytes is not guaranteed to be NUL-terminated.  Writing to
-this file will set the LWP name for the specific lwp.  This file may not be
-present in older operating system versions. \fBTHREAD_NAME_MAX\fR may increase
-in the future; clients should be prepared for this.
-.SS "lwpstatus"
-.LP
-lwp-specific state information. This file contains the \fBlwpstatus\fR
+.Pa ctl
+file.
+.Ss lwpname
+A buffer of
+.Dv THREAD_NAME_MAX
+bytes representing the LWP name; the buffer is
+zero-filled if the thread name is shorter than the buffer.
+If no thread name is set, the buffer contains the empty string.
+A read with a buffer shorter than
+.Dv THREAD_NAME_MAX
+bytes is not guaranteed to be NUL-terminated.
+Writing to this file will set the LWP name for the specific lwp.
+This file may not be present in older operating system versions.
+.Dv THREAD_NAME_MAX
+may increase in the future; clients should be prepared for this.
+.Ss lwpstatus
+lwp-specific state information.
+This file contains the
+.Vt lwpstatus
 structure for the specific lwp as described above for the representative lwp in
 the process's
 .Pa status
