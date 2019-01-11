@@ -907,19 +907,6 @@ extern "C" {
 #define	INTC_MODEL_DENVERTON		0x5f
 #define	INTC_MODEL_GEMINI_LAKE		0x7a
 
-
-/*
- * Definitions for Intel processor models. Note, these model values can overlap
- * in a given family. Processor models are added here on an as needed basis. The
- * Xeon extension here is to refer to what has been called the EP/EX lines or
- * E5/E7, generally multi-socket capable processors.
- */
-#define	INTC_MODEL_IVYBRIDGE_XEON	0x3E
-#define	INTC_MODEL_HASWELL_XEON		0x3F
-#define	INTC_MODEL_BROADWELL_XEON	0x4F
-#define	INTC_MODEL_BROADWELL_XEON_D	0x56
-#define	INTC_MODEL_SKYLAKE_XEON		0x55
-
 /*
  * xgetbv/xsetbv support
  * See section 13.3 in vol. 1 of the Intel devlopers manual.
