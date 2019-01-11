@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -102,6 +103,7 @@ static int command_boot(int argc, char *argv[]);
 static int command_unload(int argc, char *argv[]);
 static int command_load(int argc, char *argv[]);
 static int command_reboot(int argc, char *argv[]);
+static int command_sifting(int argc, char *argv[]);
 
 #define	BF_PARSE	100
 #define	BF_DICTSIZE	30000
@@ -749,6 +751,8 @@ bf_init(const char *rc, ficlOutputFunction out)
 	COMMAND_SET(cmdp, "unload", "unload all modules", command_unload);
 	STAILQ_INSERT_TAIL(&commands, cmdp, next);
 	COMMAND_SET(cmdp, "reboot", "reboot the system", command_reboot);
+	STAILQ_INSERT_TAIL(&commands, cmdp, next);
+	COMMAND_SET(cmdp, "sifting", "find words", command_sifting);
 	STAILQ_INSERT_TAIL(&commands, cmdp, next);
 
 	fsi = malloc(sizeof (ficlSystemInformation));
@@ -1976,5 +1980,16 @@ static int
 command_reboot(int argc, char *argv[])
 {
 	exit(0);
+	return (CMD_OK);
+}
+
+static int
+command_sifting(int argc, char *argv[])
+{
+	if (argc != 2) {
+		command_errmsg = "wrong number of arguments";
+		return (CMD_ERROR);
+	}
+	ficlPrimitiveSiftingImpl(bf_vm, argv[1]);
 	return (CMD_OK);
 }

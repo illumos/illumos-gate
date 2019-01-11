@@ -300,6 +300,14 @@
 	Displays the value of <variable>, or all variables if not specified.
 
 ################################################################################
+# Tsifting DSearch for words containing a substring
+
+	sifting <substring>
+
+	Displays words in the search order list containing the provided
+	<substring>.
+
+################################################################################
 # Tinclude DRead commands from a script file
 
 	include <filename> [<filename> ...]

@@ -711,15 +711,14 @@ ficlPrimitiveForget(ficlVm *vm)
 #define	nCOLWIDTH	8
 
 static void
-ficlPrimitiveWords(ficlVm *vm)
+ficlPrimitiveWordsBackend(ficlVm *vm, ficlDictionary *dictionary,
+    ficlHash *hash, char *ss)
 {
-	ficlDictionary *dictionary = ficlVmGetDictionary(vm);
-	ficlHash *hash = dictionary->wordlists[dictionary->wordlistCount - 1];
 	ficlWord *wp;
 	int nChars = 0;
 	int len;
 	unsigned i;
-	int nWords = 0;
+	int nWords = 0, dWords = 0;
 	char *cp;
 	char *pPad;
 	int columns;
@@ -747,6 +746,15 @@ ficlPrimitiveWords(ficlVm *vm)
 		for (wp = hash->table[i]; wp != NULL; wp = wp->link, nWords++) {
 			if (wp->length == 0) /* ignore :noname defs */
 				continue;
+
+			if (ss != NULL && strstr(wp->name, ss) == NULL)
+				continue;
+			if (ss != NULL && dWords == 0) {
+				sprintf(pPad, "        In vocabulary %s\n",
+				    hash->name ? hash->name : "<unknown>");
+				pager_output(pPad);
+			}
+			dWords++;
 
 			/* prevent line wrap due to long words */
 			if (nChars + wp->length >= columns) {
@@ -789,14 +797,35 @@ ficlPrimitiveWords(ficlVm *vm)
 		ficlVmTextOut(vm, pPad);
 	}
 
-	sprintf(pPad, "Dictionary: %d words, %ld cells used of %u total\n",
-	    nWords, (long)(dictionary->here - dictionary->base),
-	    dictionary->size);
-	pager_output(pPad);
+	if (ss == NULL) {
+		sprintf(pPad,
+		    "Dictionary: %d words, %ld cells used of %u total\n",
+		    nWords, (long)(dictionary->here - dictionary->base),
+		    dictionary->size);
+		pager_output(pPad);
+	}
 
 pager_done:
 	free(pPad);
 	pager_close();
+}
+
+static void
+ficlPrimitiveWords(ficlVm *vm)
+{
+	ficlDictionary *dictionary = ficlVmGetDictionary(vm);
+	ficlHash *hash = dictionary->wordlists[dictionary->wordlistCount - 1];
+	ficlPrimitiveWordsBackend(vm, dictionary, hash, NULL);
+}
+
+void
+ficlPrimitiveSiftingImpl(ficlVm *vm, char *ss)
+{
+	ficlDictionary *dict = ficlVmGetDictionary(vm);
+	int i;
+
+	for (i = 0; i < dict->wordlistCount; i++)
+		ficlPrimitiveWordsBackend(vm, dict, dict->wordlists[i], ss);
 }
 
 /*
