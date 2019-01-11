@@ -25,6 +25,7 @@
  *
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2016 RackTop Systems.
  */
 
@@ -170,7 +171,7 @@ typedef union {
 	char				buf[CONV_CAP_VAL_HW1_BUFSIZE];
 } Conv_cap_val_hw1_buf_t;
 
-#define	CONV_CAP_VAL_HW2_BUFSIZE	CONV_INV_BUFSIZE	/* for now */
+#define	CONV_CAP_VAL_HW2_BUFSIZE	350
 typedef union {
 	Conv_inv_buf_t			inv_buf;
 	char				buf[CONV_CAP_VAL_HW2_BUFSIZE];
