@@ -1335,6 +1335,11 @@ tem_copy_width(term_char_t *src, term_char_t *dst, int cols)
 	int width = cols - 1;
 
 	while (width >= 0) {
+		/* We can't compare images. */
+		if (TEM_CHAR_ATTR(src[width].tc_char) == TEM_ATTR_IMAGE ||
+		    TEM_CHAR_ATTR(dst[width].tc_char) == TEM_ATTR_IMAGE)
+			break;
+
 		/*
 		 * Find difference on line, compare char with its attributes
 		 * and colors.
@@ -1588,8 +1593,11 @@ tem_safe_pix_display(struct tem_vt_state *tem,
 	da.col = (col * da.width) + tems.ts_p_offset.x;
 
 	for (i = 0; i < count; i++) {
-		tem_safe_callback_bit2pix(tem, string[i]);
-		tems_safe_display(&da, credp, called_from);
+		/* Do not display image area */
+		if (!TEM_ATTR_ISSET(string[i].tc_char, TEM_ATTR_IMAGE)) {
+			tem_safe_callback_bit2pix(tem, string[i]);
+			tems_safe_display(&da, credp, called_from);
+		}
 		da.col += da.width;
 	}
 }
