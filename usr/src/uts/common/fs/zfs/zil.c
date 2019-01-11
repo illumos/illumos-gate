@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2014, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
  * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  */
@@ -3079,13 +3079,20 @@ zil_close(zilog_t *zilog)
 		txg = MAX(zilog->zl_dirty_max_txg, lwb->lwb_max_txg);
 	mutex_exit(&zilog->zl_lock);
 
-	/*
-	 * We need to use txg_wait_synced() to wait long enough for the
-	 * ZIL to be clean, and to wait for all pending lwbs to be
-	 * written out.
-	 */
-	if (txg != 0)
+	if (zilog_is_dirty(zilog)) {
+		/*
+		 * If we're dirty, always wait for the current transaction --
+		 * our lwb_max_txg may be in the past.
+		 */
+		txg_wait_synced(zilog->zl_dmu_pool, 0);
+	} else if (txg != 0) {
+		/*
+		 * We need to use txg_wait_synced() to wait long enough for the
+		 * ZIL to be clean, and to wait for all pending lwbs to be
+		 * written out.
+		 */
 		txg_wait_synced(zilog->zl_dmu_pool, txg);
+	}
 
 	if (zilog_is_dirty(zilog))
 		zfs_dbgmsg("zil (%p) is dirty, txg %llu", zilog, txg);
