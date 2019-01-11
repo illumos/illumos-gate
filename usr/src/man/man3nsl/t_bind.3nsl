@@ -45,29 +45,26 @@
 .\" Portions Copyright (c) 1998, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2017 Joyent, Inc.
 .\"
-.TH T_BIND 3NSL "Dec 27, 2013"
-.SH NAME
-t_bind \- bind an address to a transport endpoint
-.SH SYNOPSIS
-.LP
-.nf
-#include <xti.h>
-
-
-
-
-\fBint\fR \fBt_bind\fR(\fBint\fR \fIfd\fR, \fBconst struct t_bind *\fR\fIreq\fR, \fBstruct t_bind *\fR\fIret\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-This routine is part of the \fBXTI\fR interfaces that evolved from the
-\fBTLI\fR interfaces. \fBXTI\fR represents the future evolution of these
-interfaces. However, \fBTLI\fR interfaces are supported for compatibility. When
-using a \fBTLI\fR routine that has the same name as an \fBXTI\fR routine, the
-\fBtiuser.h\fR header file must be used.  Refer to the  \fBTLI\fR
-\fBCOMPATIBILITY\fR section for a description of differences between the two
+.Dd Sep 28, 2017
+.Dt T_BIND 3NSL
+.Os
+.Sh NAME
+.Nm t_bind
+.Nd bind an address to a tansport endpoint
+.Sh SYNOPSIS
+.Lb libnsl
+.In xti.h
+.Ft int
+.Fo t_bind
+.Fa "int fd"
+.Fa "const struct t_bind *req"
+.Fa "stuct t_bind *ret"
+.Fc
+.Sh DESCRIPTION
+This routine is part of the
+.Sy XTI
+interfaces that evolved from the
+.Sy TLI
 interfaces.
 .Sy XTI
 represents the future evolution of these
