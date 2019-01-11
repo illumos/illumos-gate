@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright (c) 2018, Joyent, Inc.
+-->
+
+<topology name='chassis' scheme='hc'>
+  <range name='chassis' min='0' max='0'>
+    <node instance='0'>
+      <fac-enum provider='fac_prov_ipmi' />
+      <!--
+        chassis locate LED
+      -->
+      <facility name='locate' type='indicator' provider='fac_prov_ipmi' >
+          <propgroup name='facility' version='1' name-stability='Private'
+             data-stability='Private' >
+                <propval name='type' type='uint32' value='1' />
+                <propmethod name='chassis_ident_mode' version='0'
+                    propname='mode' proptype='uint32' mutable='1' >
+                </propmethod>
+          </propgroup>
+      </facility>
+      <propgroup name='ipmi' version='1'
+          name-stability='Private' data-stability='Private' >
+         <propval name='entity-list' type='string_array' >
+           <propitem value='Intrusion' />
+           <propitem value='Pwr Consumption' />
+           <propitem value='Inlet Temp' />
+           <propitem value='Exhaust Temp' />
+         </propval>
+      </propgroup>
+    </node>
+  </range>
+</topology>

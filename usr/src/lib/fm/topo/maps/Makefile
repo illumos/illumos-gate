@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 sparc_SUBDIRS =	sun4u \
@@ -49,7 +50,12 @@ i386_SUBDIRS = i86pc \
 		SUNW,Sun-Fire-X4500 \
 		SUNW,Sun-Fire-X4540 \
 		SUNW,Sun-Fire-X4600-M2 \
-		Joyent,Joyent-Compute-Platform-1101
+		Joyent,Joyent-Compute-Platform-1101 \
+		Joyent,Joyent-Compute-Platform-330x \
+		Joyent,Joyent-Storage-Platform-7001 \
+		SMCI,SSG-2028R-ACR24L \
+		SMCI,SSG-6049P-E1CR36L \
+		SMCI,SSG-2029P-ACR24L
 
 SUBDIRS = $($(MACH)_SUBDIRS)
 

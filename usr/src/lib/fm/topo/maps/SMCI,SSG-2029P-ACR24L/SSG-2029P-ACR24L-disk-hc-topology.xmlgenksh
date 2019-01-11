@@ -1,0 +1,143 @@
+#!/bin/ksh
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2018, Joyent, Inc.
+#
+
+#
+# Generate the topology map for an expanderless system with 24 bays. HBAs are
+# in slots 2, 4, and 6. Additionally, there are two rear-facing SATA drive
+# bays, connected to the SATA headers on the motherboard.
+#
+
+function do_sas_node
+{
+  cat <<EOF
+    <node instance='${1}'>
+    <facility name='fail' type='indicator' provider='fac_prov_mptsas' >
+      <propgroup name='facility' version='1' name-stability='Private'
+        data-stability='Private' >
+        <propval name='type' type='uint32' value='0' />
+        <propmethod name='mptsas_led_mode' version='0' propname='mode'
+          proptype='uint32' mutable='1'>
+        </propmethod>
+      </propgroup>
+    </facility>
+    <facility name='ident' type='indicator' provider='fac_prov_mptsas' >
+      <propgroup name='facility' version='1' name-stability='Private'
+        data-stability='Private' >
+        <propval name='type' type='uint32' value='1' />
+        <propmethod name='mptsas_led_mode' version='0' propname='mode'
+          proptype='uint32' mutable='1'>
+        </propmethod>
+      </propgroup>
+    </facility>
+    <facility name='ok2rm' type='indicator' provider='fac_prov_mptsas' >
+      <propgroup name='facility' version='1' name-stability='Private'
+        data-stability='Private' >
+        <propval name='type' type='uint32' value='2' />
+        <propmethod name='mptsas_led_mode' version='0' propname='mode'
+          proptype='uint32' mutable='1'>
+        </propmethod>
+      </propgroup>
+    </facility>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='${2}' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='driver' type='string' value='mpt_sas' />
+        <propval name='devctl' type='string' value='${3}' />
+        <propval name='enclosure' type='uint32' value='${4}' />
+        <propval name='slot' type='uint32' value='${5}' />
+      </propgroup>
+    </node>
+EOF
+}
+
+function do_sata_node
+{
+	bay=$1
+	bay_inst=$2
+	#
+	# There are six SATA headers on the motherboard, which represent
+	# targets 0-5.  The two rear-facing SATA bays are connected to the two
+	# headers associated with targets 4 and 5.
+	#
+	(( target = bay + 4 ))
+	hpath="/pci@0,0/pci15d9,981@11,5"
+	tpath="/disk@${target},0"
+  cat <<EOF
+    <node instance='$bay_inst'>
+      <propgroup name='protocol' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='label' type='string' value='Rear Disk $bay' />
+      </propgroup>
+      <propgroup name='io' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='ap-path' type='string' value='/devices${hpath}:$target' />
+      </propgroup>
+      <propgroup name='binding' version='1' name-stability='Private'
+        data-stability='Private'>
+        <propval name='occupant-path' type='string'
+          value='$hpath$tpath' />
+      </propgroup>
+    </node>
+EOF
+}
+
+
+cat <<EOF
+<topology name='disk' scheme='hc'>
+  <range name='bay' min='0' max='25'>
+EOF
+
+enclosure=1
+bay=0
+slot=0
+devctl0='/devices/pci@7d,0/pci8086,2030@0/pci15d9,808@0:devctl'
+while (( slot <= 7 )); do
+  do_sas_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
+  (( bay = bay + 1 ))
+  (( slot = slot + 1 ))
+done
+
+slot=0
+devctl0='/devices/pci@cd,0/pci8086,2030@0/pci15d9,808@0:devctl'
+while (( slot <= 7 )); do
+  do_sas_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
+  (( bay = bay + 1 ))
+  (( slot = slot + 1 ))
+done
+
+slot=0
+devctl0='/devices/pci@56,0/pci8086,2030@0/pci15d9,808@0:devctl'
+while (( slot <= 7 )); do
+  do_sas_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
+  (( bay = bay + 1 ))
+  (( slot = slot + 1 ))
+done
+
+do_sata_node 0 24
+do_sata_node 1 25
+
+cat <<EOF
+    <dependents grouping='children'>
+      <range name='disk' min='0' max='0'>
+        <enum-method name='disk' version='1' />
+      </range>
+    </dependents>
+   </range>
+</topology>
+EOF

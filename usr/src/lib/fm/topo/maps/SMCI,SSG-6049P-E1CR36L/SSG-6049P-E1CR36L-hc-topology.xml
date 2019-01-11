@@ -1,0 +1,87 @@
+<?xml version="1.0"?>
+<!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
+<!--
+
+ This file and its contents are supplied under the terms of the
+ Common Development and Distribution License ("CDDL"), version 1.0.
+ You may only use this file in accordance with the terms of version
+ 1.0 of the CDDL.
+
+ A full copy of the text of the CDDL should have accompanied this
+ source.  A copy of the CDDL is also available via the Internet at
+ http://www.illumos.org/license/CDDL.
+
+ Copyright (c) 2018, Joyent, Inc.
+
+-->
+
+<topology name='i86pc' scheme='hc'>
+
+  <range name='motherboard' min='0' max='0'>
+    <enum-method name='smbios' version='1' />
+    <node instance='0' static='true'>
+        <fac-enum provider='fac_prov_ipmi' />
+        <propgroup name='protocol' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='label' type='string' value='MB' />
+        </propgroup>
+        <propgroup name='ipmi' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='entity-list' type='string_array' >
+                <propitem value='PCH Temp' />
+                <propitem value='Peripheral Temp' />
+                <propitem value='MB_10G Temp' />
+                <propitem value='12V' />
+                <propitem value='5VCC' />
+                <propitem value='3.3VCC' />
+                <propitem value='VDimmP1ABC' />
+                <propitem value='VDimmP1DEF' />
+                <propitem value='VDimmP2ABC' />
+                <propitem value='VDimmP2DEF' />
+                <propitem value='5SVB' />
+                <propitem value='3.3VSB' />
+                <propitem value='1.8V PCH' />
+                <propitem value='PVNN PCH' />
+                <propitem value='1.05V PCH' />
+            </propval>
+        </propgroup>
+    </node>
+
+    <dependents grouping='children'>
+      <range name='chip' min='0' max='1'>
+        <enum-method name='chip' version='1' />
+      </range>
+      <range name='hostbridge' min='0' max='254'>
+        <enum-method name='hostbridge' version='1' />
+      </range>
+      <range name='sp' min='0' max='0'>
+        <enum-method name='ipmi' version='1' />
+      </range>
+      <range name='slot' min='0' max='15'>
+        <enum-method name='smbios' version='1' />
+        <propmap name='SSG-6049P-E1CR36L-slot' />
+      </range>
+    </dependents>
+
+  </range>
+
+  <range name='chassis' min='0' max='0'>
+    <propmap name='SSG-6049P-E1CR36L-chassis' />
+
+    <dependents grouping='children'>
+
+       <range name='psu' min='0' max='1'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+       <range name='fan' min='0' max='7'>
+          <enum-method name='ipmi' version='1' />
+       </range>
+
+    </dependents>
+  </range>
+
+  <range name='ses-enclosure' min='0' max='1'>
+     <enum-method name='ses' version='1' />
+  </range>
+
+</topology>

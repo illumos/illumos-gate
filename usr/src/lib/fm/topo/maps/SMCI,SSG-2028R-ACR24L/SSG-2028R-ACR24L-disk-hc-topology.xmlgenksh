@@ -11,7 +11,12 @@
 #
 
 #
-# Copyright (c) 2013, Joyent, Inc. All rights reserved.
+# Copyright (c) 2017, Joyent, Inc.
+#
+
+#
+# Generate the topology map for an expanderless system with 3 bays. HBAs
+# are in slots 1, 3, and 5.
 #
 
 function do_node
@@ -36,7 +41,7 @@ EOF
 
 cat <<EOF
 <topology name='disk' scheme='hc'>
-  <range name='bay' min='0' max='15'>
+  <range name='bay' min='0' max='23'>
     <facility name='fail' type='indicator' provider='fac_prov_mptsas' >
       <propgroup name='facility' version='1' name-stability='Private'
         data-stability='Private' >
@@ -69,19 +74,25 @@ EOF
 enclosure=1
 bay=0
 slot=0
-devctl0='/devices/pci@0,0/pci8086,3c02@1/pci15d9,691@0:devctl'
-devctl1='/devices/pci@0,0/pci8086,e02@1/pci15d9,691@0:devctl'
+devctl0='/devices/pci@0,0/pci8086,6f04@2/pci15d9,808@0:devctl'
 while (( slot <= 7 )); do
-  do_node $bay "Front Disk $bay" "$devctl0|$devctl1" $enclosure $slot
+  do_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
   (( bay = bay + 1 ))
   (( slot = slot + 1 ))
 done
 
 slot=0
-devctl0='/devices/pci@0,0/pci8086,3c06@2,2/pci15d9,691@0:devctl'
-devctl1='/devices/pci@0,0/pci8086,e06@2,2/pci15d9,691@0:devctl'
+devctl0='/devices/pci@0,0/pci8086,6f08@3/pci15d9,808@0:devctl'
 while (( slot <= 7 )); do
-  do_node $bay "Front Disk $bay" "$devctl0|$devctl1" $enclosure $slot
+  do_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
+  (( bay = bay + 1 ))
+  (( slot = slot + 1 ))
+done
+
+slot=0
+devctl0='/devices/pci@78,0/pci8086,6f02@1/pci15d9,808@0:devctl'
+while (( slot <= 7 )); do
+  do_node $bay "Front Disk $bay" "$devctl0" $enclosure $slot
   (( bay = bay + 1 ))
   (( slot = slot + 1 ))
 done
