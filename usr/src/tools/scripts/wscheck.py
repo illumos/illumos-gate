@@ -1,4 +1,4 @@
-#!@PYTHON@
+#!@TOOLS_PYTHON@
 #
 # CDDL HEADER START
 #
@@ -22,6 +22,7 @@
 
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -29,7 +30,7 @@
 # (space tab, trailing space)
 #
 
-import sys, os
+import sys, os, io
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), "..", "lib",
                                 "python%d.%d" % sys.version_info[:2]))
@@ -42,13 +43,12 @@ from onbld.Checks.WsCheck import wscheck
 ret = 0
 for filename in sys.argv[1:]:
 	try:
-		fh = open(filename, 'r')
-	except IOError, e:
+		with io.open(filename, encoding='utf-8',
+		    errors='replace') as fh:
+			ret |= wscheck(fh, output=sys.stderr)
+	except IOError as e:
 		sys.stderr.write("failed to open '%s': %s\n" %
 				 (e.filename, e.strerror))
-                continue
-
-	ret |= wscheck(fh, output=sys.stderr)
-	fh.close()
+		continue
 
 sys.exit(ret)

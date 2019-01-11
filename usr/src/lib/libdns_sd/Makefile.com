@@ -29,10 +29,9 @@ OBJECTS =	dnssd_clientlib.o dnssd_clientstub.o dnssd_ipc.o
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB)
-$(LINTLIB):=    SRCS = $(SRCDIR)/$(LINTSRC)
-
-SRCDIR =	../common
+MAPFILEDIR=	../common
+SRCDIR=		$(SRC)/contrib/mDNSResponder/mDNSShared
+LIBS =		$(DYNLIB)
 
 LDLIBS +=	-lsocket -lnsl -lc
 
@@ -45,8 +44,10 @@ pics/dnssd_clientstub.o := CERRWARN +=	-_gcc=-Wno-unused-but-set-variable
 .PARALLEL =     $(OBJECTS)
 .KEEP_STATE:
 
-lint: lintcheck
-
 all: $(LIBS)
+
+pics/%.o:	$(SRCDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 include ../../Makefile.targ

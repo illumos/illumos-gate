@@ -1005,6 +1005,7 @@ xpv_getsocketstr(cmi_hdl_impl_t *hdl)
 	    xpv_model(hdl), xpv_stepping(hdl)));
 }
 
+/* ARGSUSED */
 static uint_t
 xpv_chipsig(cmi_hdl_impl_t *hdl)
 {

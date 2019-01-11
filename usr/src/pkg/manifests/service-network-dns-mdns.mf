@@ -44,17 +44,6 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/inet
 dir path=usr/share
-dir path=usr/share/lib
-dir path=usr/share/lib/java group=sys
-dir path=usr/share/lib/java/javadoc group=other
-dir path=usr/share/lib/java/javadoc/dnssd group=other
-dir path=usr/share/lib/java/javadoc/dnssd/api group=other
-dir path=usr/share/lib/java/javadoc/dnssd/api/com group=other
-dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple group=other
-dir path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd group=other
-$(JAVA_7_ONLY)dir path=usr/share/lib/java/javadoc/dnssd/api/resources \
-    group=other
-dir path=usr/share/lib/java/javadoc/dnssd/examples group=other
 dir path=usr/share/man
 dir path=usr/share/man/man1m
 dir path=usr/share/man/man3dns_sd
@@ -63,95 +52,10 @@ file path=lib/svc/manifest/network/dns/multicast.xml group=sys mode=0444
 file path=usr/bin/dns-sd mode=0555
 file path=usr/include/dns_sd.h
 file path=usr/lib/$(ARCH64)/libdns_sd.so.1
-file path=usr/lib/$(ARCH64)/libjdns_sd.so.1
-file path=usr/lib/$(ARCH64)/llib-ldns_sd.ln
 file path=usr/lib/$(ARCH64)/nss_mdns.so.1
 file path=usr/lib/inet/mdnsd mode=0555
 file path=usr/lib/libdns_sd.so.1
-file path=usr/lib/libjdns_sd.so.1
-file path=usr/lib/llib-ldns_sd
-file path=usr/lib/llib-ldns_sd.ln
 file path=usr/lib/nss_mdns.so.1
-file path=usr/share/lib/java/dnssd.jar group=sys
-file path=usr/share/lib/java/javadoc/dnssd/api/allclasses-frame.html \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/allclasses-noframe.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/BaseListener.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/BrowseListener.html \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSRecord.html \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSD.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDException.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDRecordRegistrar.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDRegistration.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DNSSDService.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/DomainListener.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/QueryListener.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/RegisterListener.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/RegisterRecordListener.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/ResolveListener.html \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/TXTRecord.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-frame.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-summary.html \
-    group=other
-file \
-    path=usr/share/lib/java/javadoc/dnssd/api/com/apple/dnssd/package-tree.html \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/constant-values.html \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/deprecated-list.html \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/help-doc.html group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/index-all.html group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/index.html group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/overview-tree.html group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/package-list group=other
-$(JAVA_7_ONLY)file \
-    path=usr/share/lib/java/javadoc/dnssd/api/resources/background.gif \
-    group=other
-$(JAVA_7_ONLY)file path=usr/share/lib/java/javadoc/dnssd/api/resources/tab.gif \
-    group=other
-$(JAVA_7_ONLY)file \
-    path=usr/share/lib/java/javadoc/dnssd/api/resources/titlebar.gif \
-    group=other
-$(JAVA_7_ONLY)file \
-    path=usr/share/lib/java/javadoc/dnssd/api/resources/titlebar_end.gif \
-    group=other
-$(JAVA_8_ONLY)file path=usr/share/lib/java/javadoc/dnssd/api/script.js \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/serialized-form.html \
-    group=other
-file path=usr/share/lib/java/javadoc/dnssd/api/stylesheet.css group=other
-file path=usr/share/lib/java/javadoc/dnssd/examples/BrowserApp.jar group=sys
-file path=usr/share/lib/java/javadoc/dnssd/examples/SimpleChat.jar group=sys
 file path=usr/share/man/man1m/dns-sd.1m
 file path=usr/share/man/man1m/mdnsd.1m
 file path=usr/share/man/man3dns_sd/DNSServiceBrowse.3dns_sd
@@ -174,14 +78,10 @@ legacy pkg=SUNWdsdu desc="Multicast DNS daemon and service discovery modules" \
     name="Multicast DNS and Service Discovery (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license usr/src/cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE \
-    license=usr/src/cmd/cmd-inet/usr.lib/mdnsd/THIRDPARTYLICENSE
-license usr/src/lib/libdns_sd/THIRDPARTYLICENSE \
-    license=usr/src/lib/libdns_sd/THIRDPARTYLICENSE
+license usr/src/contrib/mDNSResponder/LICENSE \
+    license=usr/src/contrib/mDNSResponder/LICENSE
 link path=usr/lib/$(ARCH64)/libdns_sd.so target=libdns_sd.so.1
-link path=usr/lib/$(ARCH64)/libjdns_sd.so target=libjdns_sd.so.1
 link path=usr/lib/libdns_sd.so target=libdns_sd.so.1
-link path=usr/lib/libjdns_sd.so target=libjdns_sd.so.1
 link path=usr/share/man/man3dns_sd/DNSServiceAddRecord.3dns_sd \
     target=DNSServiceCreateConnection.3dns_sd
 link path=usr/share/man/man3dns_sd/DNSServiceRegisterRecord.3dns_sd \

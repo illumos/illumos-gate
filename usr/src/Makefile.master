@@ -211,6 +211,8 @@ PYTHON3_VERSION=	3.5
 PYTHON3_PKGVERS=	-35
 PYTHON3_SUFFIX=		m
 PYTHON3=		/usr/bin/python$(PYTHON3_VERSION)
+$(BUILDPY3TOOLS)TOOLS_PYTHON=		$(PYTHON3)
+$(BUILDPY2TOOLS)TOOLS_PYTHON=		$(PYTHON)
 SORT=		/usr/bin/sort
 TR=		/usr/bin/tr
 TOUCH=		/usr/bin/touch
@@ -289,7 +291,10 @@ PYSHEBANG=	$(PYTHON)
 # (.py) file. As a part of this we also go through and change the #!
 # line in the python script to that of the actual python we are using.
 #
-INS.pyfile=	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" < $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
+INS.pyfile=	$(RM) $@; $(SED) \
+		-e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" \
+		-e "1s:^\#!@TOOLS_PYTHON@:\#!$(TOOLS_PYTHON):" \
+		< $< > $@; $(CHMOD) $(FILEMODE) $@; $(TOUCH) -r $< $@
 
 # MACH must be set in the shell environment per uname -p on the build host
 # More specific architecture variables should be set in lower makefiles.
@@ -1157,7 +1162,10 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(CHMOD) +x $@
 
 .py:
-	$(RM) $@; $(SED) -e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" < $< > $@; $(CHMOD) +x $@
+	$(RM) $@; $(SED) \
+		-e "1s:^\#!@PYTHON@:\#!$(PYSHEBANG):" \
+		-e "1s:^\#!@TOOLS_PYTHON@:\#!$(TOOLS_PYTHON):" \
+		< $< > $@; $(CHMOD) +x $@
 
 .py.pyc:
 	$(RM) $@

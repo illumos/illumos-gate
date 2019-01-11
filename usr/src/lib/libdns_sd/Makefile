@@ -25,21 +25,20 @@
 include ../Makefile.lib
 
 HDR =		dns_sd.h
-HDRDIR =	common
+HDRDIR =	$(SRC)/contrib/mDNSResponder/mDNSShared
 SUBDIRS	=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
 
-all := 		TARGET = all
+all :=		TARGET = all
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 install	:=	TARGET = install
-lint	:= 	TARGET = lint
 
 .KEEP_STATE:
 
-all install: install_h $(SUBDIRS) .WAIT java
+all install: install_h $(SUBDIRS)
 
-clean clobber: $(SUBDIRS) java
+clean clobber: $(SUBDIRS)
 
 ROOTHDRDIR=	$(ROOT)/usr/include
 ROOTHDRS=	$(HDR:%=$(ROOTHDRDIR)/%)
@@ -48,9 +47,7 @@ install_h:	$(ROOTHDRS)
 
 check:
 
-lint: $(SUBDIRS)
-
-$(SUBDIRS) java: FRC
+$(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

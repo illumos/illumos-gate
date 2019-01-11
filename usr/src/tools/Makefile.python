@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -31,12 +32,12 @@
 #
 #    PYSRCS   - List of python source files, these are also delivered as
 #               build product.
-#	      
+#
 #    PYOBJS   - List of compiled python (.pyc) files, with no directory prefix
-#	      
+#
 #    PYTOPDIR - Absolute (including $(ROOT)) path to which files will
 #               be installed, up until the version specific component.
-#	      
+#
 #    PYMODDIR - Relative path to which files will be installed, below
 #               the version specific component.
 #
@@ -63,32 +64,46 @@
 
 PYFILES = $(PYSRCS) $(PYOBJS)
 
-ROOTPYDIR = $(PYTOPDIR)/python$(PYTHON_VERSION)/$(PYMODDIR)
+ROOTPYDIR = $(PYTOPDIR)/python$(PYVER)/$(PYMODDIR)
 ROOTPYFILES	= $(PYFILES:%=$(ROOTPYDIR)/%)
 
 $(ROOTPYFILES) := FILEMODE = 0444
 
-PYVERSDIRS = python$(PYTHON_VERSION)
+PYVERSDIRS = python$(PYVER)
 
-PYVERSOBJS = $(PYOBJS:%=python$(PYTHON_VERSION)/%)
+PYVERSOBJS = $(PYOBJS:%=python$(PYVER)/%)
 
 CLOBBERFILES += $(PYVERSOBJS)
 CLOBBERDIRS += $(PYVERSDIRS)
 
 .KEEP_STATE:
 
-python$(PYTHON_VERSION)/%.pyc: %.py
-	@[ -d $(@D) ] || mkdir $(@D)
-	$(RM) $@
-	$(PYTHON) -mpy_compile $<
-	$(MV) $(*).pyc $@
-
-$(ROOTPYDIR)/%.pyc: python$(PYTHON_VERSION)/%.pyc
-	$(INS.pyfile)
-
-$(ROOTPYDIR)/%.py: %.py
+$(ROOTPYDIR)/%.py: ../%.py
 	$(INS.pyfile)
 
 pyclobber:
 	$(RM) $(CLOBBERFILES)
 	$(RM) -rf $(CLOBBERDIRS)
+
+# Python 2 module compilation
+
+python$(PYVER)/%.pyc: ../%.py
+	@[ -d $(@D) ] || mkdir $(@D)
+	$(RM) $@
+	$(PYTHON) -mpy_compile $<
+	$(MV) ../$(*).pyc $@
+
+$(ROOTPYDIR)/%.pyc: python$(PYVER)/%.pyc
+	$(INS.pyfile)
+
+# Python 3 module compilation
+
+python$(PYVER)/__pycache__/%.cpython$(PYPKGVERS).pyc: ../%.py
+	@[ -d $(@D) ] || mkdir -p $(@D)
+	$(RM) $@
+	$(PYTHON3) -mpy_compile $<
+	$(MV) ../__pycache__/$(*).cpython$(PYPKGVERS).pyc $@
+
+$(ROOTPYDIR)/__pycache__/%.pyc: python$(PYVER)/__pycache__/%.pyc
+	$(INS.pyfile)
+
