@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018, Joyent Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -5200,8 +5200,6 @@ zone_create(const char *zone_name, const char *zone_root,
 	zone_pdata[zoneid].zpers_zfsp =
 	    kmem_zalloc(sizeof (zone_zfs_io_t), KM_SLEEP);
 	zone_pdata[zoneid].zpers_zfsp->zpers_zfs_io_pri = 1;
-
-	zone->zone_ustate = cpu_uarray_zalloc(ZONE_USTATE_MAX, KM_SLEEP);
 
 	zone->zone_ustate = cpu_uarray_zalloc(ZONE_USTATE_MAX, KM_SLEEP);
 
