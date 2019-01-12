@@ -14,7 +14,7 @@
  */
 
 /*
- * Test monitor/mawit related instructions
+ * Test various cache related instructions.
  */
 
 .text
@@ -22,8 +22,8 @@
 .globl libdis_test
 .type libdis_test, @function
 libdis_test:
-	monitor
-	mwait
-	mwaitx
-	monitorx
+	clwb		(%eax)
+	clflush		(%ebx)
+	clflushopt	(%ecx)
+	clzero
 .size libdis_test, [.-libdis_test]

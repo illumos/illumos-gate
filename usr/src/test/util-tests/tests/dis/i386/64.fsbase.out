@@ -1,0 +1,8 @@
+    libdis_test:      f3 48 0f ae c0     rdfsbase %rax
+    libdis_test+0x5:  f3 48 0f ae cb     rdgsbase %rbx
+    libdis_test+0xa:  f3 48 0f ae d1     wrfsbase %rcx
+    libdis_test+0xf:  f3 48 0f ae da     wrgsbase %rdx
+    libdis_test+0x14: f3 0f ae c0        rdfsbase %eax
+    libdis_test+0x18: f3 0f ae cb        rdgsbase %ebx
+    libdis_test+0x1c: f3 0f ae d1        wrfsbase %ecx
+    libdis_test+0x20: f3 0f ae da        wrgsbase %edx

@@ -86,29 +86,35 @@ extern "C" {
 /*
  * Flags used in AT_SUN_HWCAP2 elements
  */
-#define	AV_386_2_F16C		0x00001	/* F16C half percision extensions */
-#define	AV_386_2_RDRAND		0x00002	/* RDRAND insn */
-#define	AV_386_2_BMI1		0x00004 /* BMI1 insns */
-#define	AV_386_2_BMI2		0x00008 /* BMI2 insns */
-#define	AV_386_2_FMA		0x00010	/* FMA insns */
-#define	AV_386_2_AVX2		0x00020	/* AVX2 insns */
-#define	AV_386_2_ADX		0x00040	/* ADX insns */
-#define	AV_386_2_RDSEED		0x00080	/* RDSEED insn */
-#define	AV_386_2_AVX512F	0x00100	/* AVX512 foundation insns */
-#define	AV_386_2_AVX512DQ	0x00200	/* AVX512DQ insns */
-#define	AV_386_2_AVX512IFMA	0x00400	/* AVX512IFMA insns */
-#define	AV_386_2_AVX512PF	0x00800	/* AVX512PF insns */
-#define	AV_386_2_AVX512ER	0x01000	/* AVX512ER insns */
-#define	AV_386_2_AVX512CD	0x02000	/* AVX512CD insns */
-#define	AV_386_2_AVX512BW	0x04000	/* AVX512BW insns */
-#define	AV_386_2_AVX512VL	0x08000	/* AVX512VL insns */
-#define	AV_386_2_AVX512VBMI	0x10000	/* AVX512VBMI insns */
-#define	AV_386_2_AVX512VPOPCDQ	0x20000	/* AVX512VPOPCNTDQ insns */
-#define	AV_386_2_AVX512_4NNIW	0x40000	/* AVX512 4NNIW insns */
-#define	AV_386_2_AVX512_4FMAPS	0x80000	/* AVX512 4FMAPS insns */
-#define	AV_386_2_SHA		0x100000 /* SHA insns */
+#define	AV_386_2_F16C		0x00000001 /* F16C half percision extensions */
+#define	AV_386_2_RDRAND		0x00000002 /* RDRAND insn */
+#define	AV_386_2_BMI1		0x00000004 /* BMI1 insns */
+#define	AV_386_2_BMI2		0x00000008 /* BMI2 insns */
+#define	AV_386_2_FMA		0x00000010 /* FMA insns */
+#define	AV_386_2_AVX2		0x00000020 /* AVX2 insns */
+#define	AV_386_2_ADX		0x00000040 /* ADX insns */
+#define	AV_386_2_RDSEED		0x00000080 /* RDSEED insn */
+#define	AV_386_2_AVX512F	0x00000100 /* AVX512 foundation insns */
+#define	AV_386_2_AVX512DQ	0x00000200 /* AVX512DQ insns */
+#define	AV_386_2_AVX512IFMA	0x00000400 /* AVX512IFMA insns */
+#define	AV_386_2_AVX512PF	0x00000800 /* AVX512PF insns */
+#define	AV_386_2_AVX512ER	0x00001000 /* AVX512ER insns */
+#define	AV_386_2_AVX512CD	0x00002000 /* AVX512CD insns */
+#define	AV_386_2_AVX512BW	0x00004000 /* AVX512BW insns */
+#define	AV_386_2_AVX512VL	0x00008000 /* AVX512VL insns */
+#define	AV_386_2_AVX512VBMI	0x00010000 /* AVX512VBMI insns */
+#define	AV_386_2_AVX512VPOPCDQ	0x00020000 /* AVX512VPOPCNTDQ insns */
+#define	AV_386_2_AVX512_4NNIW	0x00040000 /* AVX512 4NNIW insns */
+#define	AV_386_2_AVX512_4FMAPS	0x00080000 /* AVX512 4FMAPS insns */
+#define	AV_386_2_SHA		0x00100000 /* SHA insns */
+#define	AV_386_2_FSGSBASE	0x00200000 /* FSBASE/GSBASE */
+#define	AV_386_2_CLFLUSHOPT	0x00400000 /* CLFLUSHOPT instr */
+#define	AV_386_2_CLWB		0x00800000 /* CLWB insn */
+#define	AV_386_2_MONITORX	0x01000000 /* MONITORX insns */
+#define	AV_386_2_CLZERO		0x02000000 /* CLZERO */
 
 #define	FMT_AV_386_2							\
+	"\32clzero\31monitorx\030clwb\027clflushopt\026fsgsbase"	\
 	"\025sha\024avx512_4fmaps\023avx512_4nniw\022avx512vpopcntdq"	\
 	"\021avx512vbmi\020avx512vl\017avx512bw\016avx512cd"		\
 	"\015avx512er\014avx512pf\013avx512ifma\012avx512dq\011avx512f"	\

@@ -171,7 +171,7 @@ extern "C" {
 #define	CPUID_AMD_ECX_3DNP	0x00000100	/* AMD: 3DNowPrefectch */
 #define	CPUID_AMD_ECX_OSVW	0x00000200	/* AMD: OSVW */
 #define	CPUID_AMD_ECX_IBS	0x00000400	/* AMD: IBS */
-#define	CPUID_AMD_ECX_SSE5	0x00000800	/* AMD: Extended AVX */
+#define	CPUID_AMD_ECX_XOP	0x00000800	/* AMD: Extended Operation */
 #define	CPUID_AMD_ECX_SKINIT	0x00001000	/* AMD: SKINIT */
 #define	CPUID_AMD_ECX_WDT	0x00002000	/* AMD: WDT */
 				/* 0x00004000 - reserved */
@@ -183,10 +183,21 @@ extern "C" {
 				/* 0x00100000 - reserved */
 #define	CPUID_AMD_ECX_TBM	0x00200000	/* AMD: trailing bit manips. */
 #define	CPUID_AMD_ECX_TOPOEXT	0x00400000	/* AMD: Topology Extensions */
+#define	CPUID_AMD_ECX_PCEC	0x00800000	/* AMD: Core ext perf counter */
+#define	CUPID_AMD_ECX_PCENB	0x01000000	/* AMD: NB ext perf counter */
+				/* 0x02000000 - reserved */
+#define	CPUID_AMD_ECX_DBKP	0x40000000	/* AMD: Data breakpoint */
+#define	CPUID_AMD_ECX_PERFTSC	0x08000000	/* AMD: TSC Perf Counter */
+#define	CPUID_AMD_ECX_PERFL3	0x10000000	/* AMD: L3 Perf Counter */
+#define	CPUID_AMD_ECX_MONITORX	0x20000000	/* AMD: clzero */
+				/* 0x40000000 - reserved */
+				/* 0x80000000 - reserved */
 
 /*
  * AMD uses %ebx for some of their features (extended function 0x80000008).
  */
+#define	CPUID_AMD_EBX_CLZERO		0x000000001 /* AMD: CLZERO instr */
+#define	CPUID_AMD_EBX_IRCMSR		0x000000002 /* AMD: Ret. instrs MSR */
 #define	CPUID_AMD_EBX_ERR_PTR_ZERO	0x000000004 /* AMD: FP Err. Ptr. Zero */
 #define	CPUID_AMD_EBX_IBPB		0x000001000 /* AMD: IBPB */
 #define	CPUID_AMD_EBX_IBRS		0x000004000 /* AMD: IBRS */
@@ -214,20 +225,32 @@ extern "C" {
  * with the potential use of additional sub-leaves in the future, we now
  * specifically label the EBX features with their leaf and sub-leaf.
  */
+#define	CPUID_INTC_EBX_7_0_FSGSBASE	0x00000001	/* FSGSBASE */
+#define	CPUID_INTC_EBX_7_0_TSC_ADJ	0x00000002	/* TSC adjust MSR */
+#define	CPUID_INTC_EBX_7_0_SGX		0x00000004	/* SGX */
 #define	CPUID_INTC_EBX_7_0_BMI1		0x00000008	/* BMI1 instrs */
 #define	CPUID_INTC_EBX_7_0_HLE		0x00000010	/* HLE */
 #define	CPUID_INTC_EBX_7_0_AVX2		0x00000020	/* AVX2 supported */
+/* Bit 6 is reserved */
 #define	CPUID_INTC_EBX_7_0_SMEP		0x00000080	/* SMEP in CR4 */
 #define	CPUID_INTC_EBX_7_0_BMI2		0x00000100	/* BMI2 instrs */
+#define	CPUID_INTC_EBX_7_0_ENH_REP_MOV	0x00000200	/* Enhanced REP MOVSB */
 #define	CPUID_INTC_EBX_7_0_INVPCID	0x00000400	/* invpcid instr */
+#define	CPUID_INTC_EBX_7_0_RTM		0x00000800	/* RTM instrs */
+#define	CPUID_INTC_EBX_7_0_PQM		0x00001000	/* QoS Monitoring */
+#define	CPUID_INTC_EBX_7_0_DEP_CSDS	0x00002000	/* Deprecates CS/DS */
 #define	CPUID_INTC_EBX_7_0_MPX		0x00004000	/* Mem. Prot. Ext. */
+#define	CPUID_INTC_EBX_7_0_PQE		0x00080000	/* QoS Enforcement */
 #define	CPUID_INTC_EBX_7_0_AVX512F	0x00010000	/* AVX512 foundation */
 #define	CPUID_INTC_EBX_7_0_AVX512DQ	0x00020000	/* AVX512DQ */
 #define	CPUID_INTC_EBX_7_0_RDSEED	0x00040000	/* RDSEED instr */
 #define	CPUID_INTC_EBX_7_0_ADX		0x00080000	/* ADX instrs */
 #define	CPUID_INTC_EBX_7_0_SMAP		0x00100000	/* SMAP in CR 4 */
 #define	CPUID_INTC_EBX_7_0_AVX512IFMA	0x00200000	/* AVX512IFMA */
+/* Bit 22 is reserved */
+#define	CPUID_INTC_EBX_7_0_CLFLUSHOPT	0x00800000	/* CLFLUSOPT */
 #define	CPUID_INTC_EBX_7_0_CLWB		0x01000000	/* CLWB */
+#define	CPUID_INTC_EBX_7_0_PTRACE	0x02000000	/* Processor Trace */
 #define	CPUID_INTC_EBX_7_0_AVX512PF	0x04000000	/* AVX512PF */
 #define	CPUID_INTC_EBX_7_0_AVX512ER	0x08000000	/* AVX512ER */
 #define	CPUID_INTC_EBX_7_0_AVX512CD	0x10000000	/* AVX512CD */
@@ -241,17 +264,50 @@ extern "C" {
 	CPUID_INTC_EBX_7_0_AVX512ER | CPUID_INTC_EBX_7_0_AVX512CD | \
 	CPUID_INTC_EBX_7_0_AVX512BW | CPUID_INTC_EBX_7_0_AVX512VL)
 
+#define	CPUID_INTC_ECX_7_0_PREFETCHWT1	0x00000001	/* PREFETCHWT1 */
 #define	CPUID_INTC_ECX_7_0_AVX512VBMI	0x00000002	/* AVX512VBMI */
 #define	CPUID_INTC_ECX_7_0_UMIP		0x00000004	/* UMIP */
 #define	CPUID_INTC_ECX_7_0_PKU		0x00000008	/* umode prot. keys */
 #define	CPUID_INTC_ECX_7_0_OSPKE	0x00000010	/* OSPKE */
+#define	CPUID_INTC_ECX_7_0_WAITPKG	0x00000020	/* WAITPKG */
+#define	CPUID_INTC_ECX_7_0_AVX512VBMI2	0x00000040	/* AVX512 VBMI2 */
+/* bit 7 is reserved */
+#define	CPUID_INTC_ECX_7_0_GFNI		0x00000100	/* GFNI */
+#define	CPUID_INTC_ECX_7_0_VAES		0x00000200	/* VAES */
+#define	CPUID_INTC_ECX_7_0_VPCLMULQDQ	0x00000400	/* VPCLMULQDQ */
+#define	CPUID_INTC_ECX_7_0_AVX512VNNI	0x00000800	/* AVX512 VNNI */
+#define	CPUID_INTC_ECX_7_0_AVX512BITALG	0x00001000	/* AVX512 BITALG */
+/* bit 13 is reserved */
 #define	CPUID_INTC_ECX_7_0_AVX512VPOPCDQ 0x00004000	/* AVX512 VPOPCNTDQ */
+/* bits 15-16 are reserved */
+/* bits 17-21 are the value of MAWAU */
+#define	CPUID_INTC_ECX_7_0_RDPID	0x00400000	/* RPID, IA32_TSC_AUX */
+/* bits 23-24 are reserved */
+#define	CPUID_INTC_ECX_7_0_CLDEMOTE	0x02000000	/* Cache line demote */
+/* bit 26 is resrved */
+#define	CPUID_INTC_ECX_7_0_MOVDIRI	0x08000000	/* MOVDIRI insn */
+#define	CPUID_INTC_ECX_7_0_MOVDIR64B	0x10000000	/* MOVDIR64B insn */
+/* bit 29 is reserved */
+#define	CPUID_INTC_ECX_7_0_SGXLC	0x40000000	/* SGX Launch config */
+/* bit 31 is reserved */
 
+/*
+ * While CPUID_INTC_ECX_7_0_GFNI, CPUID_INTC_ECX_7_0_VAES, and
+ * CPUID_INTC_ECX_7_0_VPCLMULQDQ all have AVX512 components, they are still
+ * valid when AVX512 is not. However, the following flags all are only valid
+ * when AVX512 is present.
+ */
 #define	CPUID_INTC_ECX_7_0_ALL_AVX512 \
-(CPUID_INTC_ECX_7_0_AVX512VBMI | CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
+	(CPUID_INTC_ECX_7_0_AVX512VBMI | CPUID_INTC_ECX_7_0_AVX512VNNI | \
+	CPUID_INTC_ECX_7_0_AVX512BITALG | CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
 
+/* bits 0-1 are reserved */
 #define	CPUID_INTC_EDX_7_0_AVX5124NNIW	0x00000004	/* AVX512 4NNIW */
 #define	CPUID_INTC_EDX_7_0_AVX5124FMAPS	0x00000008	/* AVX512 4FMAPS */
+#define	CPUID_INTC_EDX_7_0_FSREPMOV	0x00000010	/* fast short rep mov */
+/* bits 5-17 are resreved */
+#define	CPUID_INTC_EDX_7_0_PCONFIG	0x00040000	/* PCONFIG */
+/* bits 19-26 are reserved */
 #define	CPUID_INTC_EDX_7_0_SPEC_CTRL	0x04000000	/* Spec, IBPB, IBRS */
 #define	CPUID_INTC_EDX_7_0_STIBP	0x08000000	/* STIBP */
 #define	CPUID_INTC_EDX_7_0_FLUSH_CMD	0x10000000	/* IA32_FLUSH_CMD */
@@ -498,6 +554,14 @@ extern "C" {
 #define	X86FSET_STIBP_ALL	80
 #define	X86FSET_FLUSH_CMD	81
 #define	X86FSET_L1D_VM_NO	82
+#define	X86FSET_FSGSBASE	83
+#define	X86FSET_CLFLUSHOPT	84
+#define	X86FSET_CLWB		85
+#define	X86FSET_MONITORX	86
+#define	X86FSET_CLZERO		87
+#define	X86FSET_XOP		88
+#define	X86FSET_FMA4		89
+#define	X86FSET_TBM		90
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -780,7 +844,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	83
+#define	NUM_X86_FEATURES	91
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
