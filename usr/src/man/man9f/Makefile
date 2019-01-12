@@ -1197,6 +1197,7 @@ MANLINKS=	AVL_NEXT.9f					\
 		scsi_hba_iportmap_iport_add.9f			\
 		scsi_hba_iportmap_iport_remove.9f		\
 		scsi_hba_pkt_free.9f				\
+		scsi_hba_tgtmap_destroy.9f 			\
 		scsi_hba_tgtmap_set_begin.9f 			\
 		scsi_hba_tgtmap_set_add.9f 			\
 		scsi_hba_tgtmap_set_end.9f 			\
@@ -2094,6 +2095,7 @@ scsi_hba_iport_find.9f			:= LINKSRC = scsi_hba_iport_exist.9f
 
 scsi_hba_pkt_free.9f			:= LINKSRC = scsi_hba_pkt_alloc.9f
 
+scsi_hba_tgtmap_destroy.9f 		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_begin.9f 		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_add.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
 scsi_hba_tgtmap_set_end.9f		:= LINKSRC = scsi_hba_tgtmap_create.9f
