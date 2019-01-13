@@ -180,6 +180,20 @@ biosvbe_ddc_caps(void)
 	return (v86.ebx & 0xffff);
 }
 
+/* Function 11h BL=01h - Flat Panel status */
+static int
+biosvbe_ddc_read_flat_panel_info(void *buf)
+{
+	v86.ctl = V86_FLAGS;
+	v86.addr = 0x10;
+	v86.eax = 0x4f11;	/* Flat Panel Interface extensions */
+	v86.ebx = 1;		/* Return Flat Panel Information */
+	v86.es = VTOPSEG(buf);
+	v86.edi = VTOPOFF(buf);
+	v86int();
+	return (v86.eax & 0xffff);
+}
+
 /* Function 15h BL=01h - Read EDID */
 static int
 biosvbe_ddc_read_edid(int blockno, void *buf)
@@ -495,6 +509,7 @@ vbe_get_edid(uint_t *pwidth, uint_t *pheight)
 	edid_info = bio_alloc(sizeof (*edid_info));
 	if (edid_info == NULL)
 		return (ret);
+	memset(edid_info, 0, sizeof (*edid_info));
 
 	if (VBE_ERROR(biosvbe_ddc_read_edid(0, edid_info)))
 		goto done;
@@ -511,9 +526,34 @@ vbe_get_edid(uint_t *pwidth, uint_t *pheight)
 	*pwidth = GET_EDID_INFO_WIDTH(edid_info, 0);
 	*pheight = GET_EDID_INFO_HEIGHT(edid_info, 0);
 
-	ret = true;
+	if (*pwidth > 0 && *pwidth <= EDID_MAX_PIXELS &&
+	    *pheight > 0 && *pheight <= EDID_MAX_LINES)
+		ret = true;
 done:
 	bio_free(edid_info, sizeof (*edid_info));
+	return (ret);
+}
+
+static bool
+vbe_get_flatpanel(uint_t *pwidth, uint_t *pheight)
+{
+	struct flatpanelinfo *fp_info;
+	bool ret = false;
+
+	fp_info = bio_alloc(sizeof (*fp_info));
+	if (fp_info == NULL)
+		return (ret);
+	memset(fp_info, 0, sizeof (*fp_info));
+
+	if (VBE_ERROR(biosvbe_ddc_read_flat_panel_info(fp_info)))
+		goto done;
+
+	*pwidth = fp_info->HorizontalSize;
+	*pheight = fp_info->VerticalSize;
+	ret = true;
+
+done:
+	bio_free(fp_info, sizeof (*fp_info));
 	return (ret);
 }
 
@@ -554,7 +594,8 @@ vbe_modelist(int depth)
 	uint16_t mode;
 	int nmodes = 0, safety = 0;
 	int ddc_caps;
-	uint_t edid_width, edid_height;
+	uint_t width, height;
+	bool edid = false;
 
 	if (!vbe_check())
 		return;
@@ -567,11 +608,15 @@ vbe_modelist(int depth)
 		if (ddc_caps & 2)
 			printf(" [DDC2]");
 
-		if (vbe_get_edid(&edid_width, &edid_height))
-			printf(": EDID %dx%d\n", edid_width, edid_height);
+		edid = vbe_get_edid(&width, &height);
+		if (edid)
+			printf(": EDID %dx%d\n", width, height);
 		else
 			printf(": no EDID information\n");
 	}
+	if (!edid)
+		if (vbe_get_flatpanel(&width, &height))
+			printf(": Panel %dx%d\n", width, height);
 
 	memset(vbe, 0, sizeof (vbe));
 	memcpy(vbe->VbeSignature, "VBE2", 4);
@@ -691,19 +736,29 @@ vbe_print_mode(void)
 	}
 }
 
+/*
+ * Try EDID preferred mode, if EDID or the suggested mode is not available,
+ * then try flat panel information.
+ * Fall back to VBE_DEFAULT_MODE.
+ */
 int
 vbe_default_mode(void)
 {
 	int modenum;
-	uint_t edid_width, edid_height;
+	uint_t width, height;
 
-	if (vbe_get_edid(&edid_width, &edid_height)) {
-		modenum = vbe_find_mode_xydm(edid_width, edid_height, -1, -1);
-		if (modenum == 0)
-			modenum = vbe_find_mode(VBE_DEFAULT_MODE);
-	} else {
-		modenum = vbe_find_mode(VBE_DEFAULT_MODE);
+	modenum = 0;
+	if (vbe_get_edid(&width, &height))
+		modenum = vbe_find_mode_xydm(width, height, -1, -1);
+
+	if (modenum == 0 &&
+	    vbe_get_flatpanel(&width, &height)) {
+		modenum = vbe_find_mode_xydm(width, height, -1, -1);
 	}
+
+	/* Still no mode? Fall back to default. */
+	if (modenum == 0)
+		modenum = vbe_find_mode(VBE_DEFAULT_MODE);
 	return (modenum);
 }
 
