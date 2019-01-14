@@ -26,12 +26,12 @@
 
 # Copyright 2010, Richard Lowe
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright (c) 2019, Joyent, Inc.
 
 #
 # Various database lookup classes/methods, i.e.:
-#     * monaco
-#     * bugs.opensolaris.org (b.o.o.)
 #     * redmine (illumos.org)
+#     * smartos
 #
 
 import re
@@ -82,11 +82,11 @@ class BugDB(object):
 
 	def __smartosbug(self, cr):
 		url = "http://smartos.org/bugview/json/%s" % cr
-		req = urllib2.Request(url)
+		req = Request(url)
 
 		try:
-			data = urllib2.urlopen(req)
-		except urllib2.HTTPError, e:
+			data = urlopen(req)
+		except HTTPError, e:
 			if e.code == 404 or e.code == 403 or e.code == 400:
 				raise NonExistentBug(cr)
 			else:
