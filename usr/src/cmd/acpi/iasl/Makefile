@@ -103,6 +103,9 @@ INTERMEDIATES = \
 
 CERRWARN += -_gcc=-Wno-unused-function
 
+# not linted
+SMATCH=off
+
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_ASL_COMPILER -I.
 
 LEX_C_FILES = aslcompilerlex.c dtparserlex.c prparserlex.c
