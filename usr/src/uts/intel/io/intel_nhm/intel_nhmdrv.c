@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/nvpair.h>
@@ -82,8 +86,8 @@ inhm_mc_snapshot_destroy()
 			continue;
 
 		kmem_free(inhm_mc_snapshot[i], inhm_mc_snapshotsz[i]);
-			inhm_mc_snapshot[i] = NULL;
-			inhm_mc_snapshotsz[i] = 0;
+		inhm_mc_snapshot[i] = NULL;
+		inhm_mc_snapshotsz[i] = 0;
 	}
 	inhm_mc_snapshotgen++;
 }

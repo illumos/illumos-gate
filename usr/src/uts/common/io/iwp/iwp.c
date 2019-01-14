@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -3832,21 +3836,21 @@ iwp_hw_set_before_auth(iwp_sc_t *sc)
 	IEEE80211_ADDR_COPY(sc->sc_config.bssid, in->in_bssid);
 	sc->sc_config.chan = LE_16(ieee80211_chan2ieee(ic, in->in_chan));
 
-		sc->sc_config.ofdm_ht_triple_stream_basic_rates = 0;
-		sc->sc_config.ofdm_ht_dual_stream_basic_rates = 0;
-		sc->sc_config.ofdm_ht_single_stream_basic_rates = 0;
+	sc->sc_config.ofdm_ht_triple_stream_basic_rates = 0;
+	sc->sc_config.ofdm_ht_dual_stream_basic_rates = 0;
+	sc->sc_config.ofdm_ht_single_stream_basic_rates = 0;
 
-		if (IEEE80211_MODE_11B == ic->ic_curmode) {
-			sc->sc_config.cck_basic_rates  = 0x03;
-			sc->sc_config.ofdm_basic_rates = 0;
-		} else if ((in->in_chan != IEEE80211_CHAN_ANYC) &&
-		    (IEEE80211_IS_CHAN_5GHZ(in->in_chan))) {
-			sc->sc_config.cck_basic_rates  = 0;
-			sc->sc_config.ofdm_basic_rates = 0x15;
-		} else { /* assume 802.11b/g */
-			sc->sc_config.cck_basic_rates  = 0x0f;
-			sc->sc_config.ofdm_basic_rates = 0xff;
-		}
+	if (IEEE80211_MODE_11B == ic->ic_curmode) {
+		sc->sc_config.cck_basic_rates  = 0x03;
+		sc->sc_config.ofdm_basic_rates = 0;
+	} else if ((in->in_chan != IEEE80211_CHAN_ANYC) &&
+	    (IEEE80211_IS_CHAN_5GHZ(in->in_chan))) {
+		sc->sc_config.cck_basic_rates  = 0;
+		sc->sc_config.ofdm_basic_rates = 0x15;
+	} else { /* assume 802.11b/g */
+		sc->sc_config.cck_basic_rates  = 0x0f;
+		sc->sc_config.ofdm_basic_rates = 0xff;
+	}
 
 	sc->sc_config.flags &= ~LE_32(RXON_FLG_SHORT_PREAMBLE_MSK |
 	    RXON_FLG_SHORT_SLOT_MSK);

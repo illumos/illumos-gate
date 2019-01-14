@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Kernel asynchronous I/O.
  * This is only for raw devices now (as of Nov. 1993).
  */
@@ -304,7 +308,7 @@ kaio(
 	offset_t	off;
 
 
-		rvp->r_vals = 0;
+	rvp->r_vals = 0;
 #if defined(_LITTLE_ENDIAN)
 	off = ((u_offset_t)uap[5] << 32) | (u_offset_t)uap[4];
 #else

@@ -26,6 +26,11 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -1355,7 +1360,7 @@ unmdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	unm_adapter  *adapter = (unm_adapter *)ddi_get_driver_private(dip);
 
 	if (adapter == NULL)
-	return (DDI_FAILURE);
+		return (DDI_FAILURE);
 
 	switch (cmd) {
 	case DDI_DETACH:

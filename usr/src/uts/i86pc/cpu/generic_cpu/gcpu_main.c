@@ -29,6 +29,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Generic x86 CPU Module
  *
  * This CPU module is used for generic x86 CPUs when Solaris has no other
@@ -269,11 +273,11 @@ gcpu_post_mpstartup(cmi_hdl_t hdl)
 	cms_post_mpstartup(hdl);
 
 #ifndef __xpv
-		/*
-		 * All cpu handles are initialized only once all cpus
-		 * are started, so we can begin polling post mp startup.
-		 */
-		gcpu_mca_poll_start(hdl);
+	/*
+	 * All cpu handles are initialized only once all cpus are started, so we
+	 * can begin polling post mp startup.
+	 */
+	gcpu_mca_poll_start(hdl);
 #endif
 }
 

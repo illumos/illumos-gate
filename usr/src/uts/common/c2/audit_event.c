@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -2340,9 +2341,9 @@ aus_ioctl(struct t_audit_data *tad)
 		au_uwrite(au_to_arg32(1, "fd", fd));
 		au_uwrite(au_to_arg32(2, "cmd", cmd));
 #ifndef _LP64
-			au_uwrite(au_to_arg32(3, "arg", (uint32_t)cmarg));
+		au_uwrite(au_to_arg32(3, "arg", (uint32_t)cmarg));
 #else
-			au_uwrite(au_to_arg64(3, "arg", (uint64_t)cmarg));
+		au_uwrite(au_to_arg64(3, "arg", (uint64_t)cmarg));
 #endif
 		return;
 	}
@@ -2363,9 +2364,9 @@ aus_ioctl(struct t_audit_data *tad)
 
 	au_uwrite(au_to_arg32(2, "cmd", cmd));
 #ifndef _LP64
-		au_uwrite(au_to_arg32(3, "arg", (uint32_t)cmarg));
+	au_uwrite(au_to_arg32(3, "arg", (uint32_t)cmarg));
 #else
-		au_uwrite(au_to_arg64(3, "arg", (uint64_t)cmarg));
+	au_uwrite(au_to_arg64(3, "arg", (uint64_t)cmarg));
 #endif
 }
 

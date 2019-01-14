@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -1859,10 +1863,10 @@ unm_nic_set_promisc_mode(struct unm_adapter_s *adapter)
 			break;
 	}
 
-if (!ret)
-	adapter->promisc = 1;
+	if (!ret)
+		adapter->promisc = 1;
 
-		return (ret);
+	return (ret);
 }
 
 int

@@ -24,6 +24,10 @@
 /* Copyright (c) 1990 Mentat Inc. */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Procedures for the kernel part of DVMRP,
  * a Distance-Vector Multicast Routing Protocol.
  * (See RFC-1075)
@@ -720,7 +724,7 @@ ip_mrouter_done(ip_stack_t *ipst)
 					mutex_exit(&mfc_rt->mfc_mutex);
 					(void) untimeout(
 					    mfc_rt->mfc_timeout_id);
-						mfc_rt->mfc_timeout_id = 0;
+					mfc_rt->mfc_timeout_id = 0;
 					mutex_enter(&mfc_rt->mfc_mutex);
 
 					/*

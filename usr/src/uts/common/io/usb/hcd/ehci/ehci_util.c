@@ -450,7 +450,7 @@ ehci_allocate_pools(ehci_state_t	*ehcip)
 			USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 			    "ehci_allocate_pools: More than 1 cookie");
 
-		goto failure;
+			goto failure;
 		}
 	} else {
 		USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,

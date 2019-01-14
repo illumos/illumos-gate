@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -2029,7 +2029,7 @@ port_fop_unmount(fsemarg_t *vf, int flag, cred_t *cr)
 	 * the hash list.
 	 */
 	for (pvfsp = *ppvfsp; pvfsp->pvfs != vfsp; pvfsp = pvfsp->pvfs_next)
-	;
+		;
 
 	/*
 	 * For some of the filesystems, allow unmounts to proceed only if
@@ -2079,7 +2079,7 @@ port_fop_unmount(fsemarg_t *vf, int flag, cred_t *cr)
 	mutex_enter(mtx);
 	for (; *ppvfsp && (*ppvfsp)->pvfs != vfsp;
 	    ppvfsp = &(*ppvfsp)->pvfs_next)
-	;
+		;
 
 	/*
 	 * remove and free it.

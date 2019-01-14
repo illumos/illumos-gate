@@ -28,6 +28,10 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/cpu_module_ms_impl.h>
 #include <sys/cpuvar.h>
@@ -224,7 +228,7 @@ cms_load_modctl(modctl_t *modp)
 		    "version %d, kernel requires API version %d",
 		    modp->mod_modname, CMS_API_VERSION_TOPRINT(apiver),
 		    CMS_API_VERSION_TOPRINT(CMS_API_VERSION));
-	return (NULL);
+		return (NULL);
 	}
 
 	if ((ops = cms_getops(modp)) == NULL)

@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*
  * Floppy Disk driver
@@ -1769,7 +1772,7 @@ get_geom:
 		if (rval != 0)
 			break;
 
-	if (fc.fdc_cmd == FDCMD_READ || fc.fdc_cmd == FDCMD_WRITE) {
+		if (fc.fdc_cmd == FDCMD_READ || fc.fdc_cmd == FDCMD_WRITE) {
 			auto struct iovec aiov;
 			auto struct uio auio;
 			struct uio *uio = &auio;

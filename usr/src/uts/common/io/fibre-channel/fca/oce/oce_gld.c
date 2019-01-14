@@ -22,6 +22,10 @@
 /* Copyright © 2003-2011 Emulex. All rights reserved.  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Source file containing the implementation of the driver entry points
  * and related helper functions
  */
@@ -210,7 +214,7 @@ oce_m_multicast(void *arg, boolean_t add, const uint8_t *mca)
 		ret = oce_set_multicast_table(dev, dev->if_id,
 		    &mca_hw_list[0], new_mcnt, B_FALSE);
 	}
-		if (ret != 0) {
+	if (ret != 0) {
 		oce_log(dev, CE_WARN, MOD_CONFIG,
 		    "mcast %s fails", add ? "ADD" : "DEL");
 		DEV_UNLOCK(dev);

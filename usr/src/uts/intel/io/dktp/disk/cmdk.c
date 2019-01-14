@@ -23,6 +23,10 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/scsi/scsi.h>
 #include <sys/dktp/cm.h>
 #include <sys/dktp/quetypes.h>
@@ -826,7 +830,7 @@ rwcmd_copyout(struct dadkio_rwcmd *rwcmdp, caddr_t outaddr, int flag)
 		case DDI_MODEL_NONE: {
 			if (ddi_copyout(rwcmdp, outaddr,
 			    sizeof (struct dadkio_rwcmd), flag))
-			return (EFAULT);
+				return (EFAULT);
 		}
 	}
 	return (0);

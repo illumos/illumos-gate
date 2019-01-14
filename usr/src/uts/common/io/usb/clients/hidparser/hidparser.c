@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <sys/usb/usba/usbai_version.h>
 #include <sys/usb/usba.h>
@@ -1642,11 +1645,11 @@ hidparser_ItemList(entity_item_t ** item_ptr, hidparser_tok_t *scan_ifp)
 			curr_ei->prev_coll = cache_ei;
 			cache_ei = curr_ei;
 
-				USB_DPRINTF_L3(PRINT_MASK_ALL,
-				    hparser_log_handle,
-				    "Start Collection:cache_ei = 0x%p,"
-				    " curr_ei = 0x%p",
-				    (void *)cache_ei, (void *)curr_ei);
+			USB_DPRINTF_L3(PRINT_MASK_ALL,
+			    hparser_log_handle,
+			    "Start Collection:cache_ei = 0x%p,"
+			    " curr_ei = 0x%p",
+			    (void *)cache_ei, (void *)curr_ei);
 
 			if (prev_ei == NULL) {
 				prev_ei = curr_ei;
