@@ -16,6 +16,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2015, Joyent, Inc.  All rights reserved.
 # Copyright 2018 Gary Mills
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -135,7 +136,8 @@ _MANFILES=	Intro.5			\
 
 sparc_MANFILES=
 
-i386_MANFILES=	brand.4th.5		\
+i386_MANFILES=	beastie.4th.5		\
+		brand.4th.5		\
 		check-password.4th.5	\
 		color.4th.5		\
 		delay.4th.5		\
