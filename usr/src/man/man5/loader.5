@@ -1,4 +1,5 @@
 .\" Copyright (c) 1999 Daniel C. Sobral
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -22,7 +23,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd July 24, 2018
+.Dd January 14, 2019
 .Dt LOADER 5
 .Os
 .Sh NAME
@@ -702,6 +703,81 @@ Writes a byte to a port.
 Returns the number of seconds since midnight.
 .It Ic tib> Pq -- Ar addr len
 Returns the remainder of the input buffer as a string on the stack.
+.El
+.Ss Loader Extra Framebuffer Words
+.Bl -tag -width XXXXXXXX
+.It Ic fb-bezier Pq Ar x1 y1 x2 y2 x3 y3 width --
+Draws a quadratic Bezier curve in the current foreground color using the
+three provided points and specified line with.
+.It Ic fb-drawrect Pq Ar x1 y1 x2 y2 fill --
+Draws a rectangle to the screen with the top left at
+.Em (x1,y1)
+and the bottom right at
+.Em (x2,y2)
+, using the current foreground color.
+If
+.Em fill
+is
+.Ic true
+then the rectangle will be filled in.
+.It Ic fb-line Pq Ar x1 y1 x2 y2 width --
+Draws a line from
+.Em (x1,y1)
+to
+.Em (x2,y2)
+in the current foreground color and with the specified width.
+.It Ic fb-putimage Pq Ar flags x1 y1 x2 y2 addr len -- flag
+Outputs an image to the screen.
+Returns
+.Ic true
+if the image was able to be written and
+.Ic false
+otherwise.
+Only truecolor PNG images are supported and the path to the file
+must be provided through the
+.Em addr
+and
+.Em len
+arguments on the stack.
+The image will be displayed in the rectangular screen region with the top left
+at
+.Em (x1,y1)
+and the bottom right at
+.Em (x2,y2)
+.
+.Pp
+Either
+.Em x2
+or
+.Em y2
+can be set to "0" which causes it to be calculated to maintain the aspect
+ratio of the image.
+If both are "0" then the native resolution of the image will be used.
+.Pp
+If
+.Em x1
+is "0", then the image will be placed as far over to the right of the
+screen as possible.
+Similarly, if
+.Em y1
+is "0", then the image will be placed as far down the screen as possible.
+.Pp
+Flags is a bitfield; the following bits are defined:
+.Bl -tag -width XXXXX -offset indent
+.It 1
+Draw a single pixel border around the image in the current foreground color.
+.It 2
+Do not scroll the image with the rest of the screen.
+.It 128
+Output diagnostic information (for debugging).
+.El
+.It Ic fb-setpixel Pq Ar x y --
+Colors the pixel at
+.Em (x,y)
+with the current foreground color.
+.It Ic term-drawrect Pq Ar x1 y1 x2 y2 --
+Draws a rectangle with rounded corners using terminal coordinates and the
+current foreground color.
 .El
 .Ss Loader Defined Environmental Queries
 .Bl -tag -width Ds

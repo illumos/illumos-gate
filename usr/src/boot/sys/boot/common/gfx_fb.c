@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -20,7 +21,7 @@
 #include <sys/cdefs.h>
 #include <sys/param.h>
 #include <stand.h>
-#if defined(EFI)
+#if	defined(EFI)
 #include <efi.h>
 #include <efilib.h>
 #else
@@ -51,7 +52,7 @@ static int gfx_fb_cons_clear(struct vis_consclear *);
 static void gfx_fb_cons_copy(struct vis_conscopy *);
 static void gfx_fb_cons_display(struct vis_consdisplay *);
 
-#if defined (EFI)
+#if	defined(EFI)
 static int gfx_gop_cons_clear(uint32_t data, uint32_t width, uint32_t height);
 static void gfx_gop_cons_copy(struct vis_conscopy *);
 static void gfx_gop_cons_display(struct vis_consdisplay *);
@@ -85,7 +86,7 @@ struct gfx_fb_ops {
 static uint8_t *
 gfx_get_fb_address(void)
 {
-#if defined(EFI)
+#if	defined(EFI)
 	return ((uint8_t *)(uintptr_t)
 	    gfx_fb.framebuffer_common.framebuffer_addr);
 #else
@@ -161,7 +162,7 @@ gfx_fb_color_map(uint8_t index)
 
 	if (gfx_fb.framebuffer_common.framebuffer_type !=
 	    MULTIBOOT_FRAMEBUFFER_TYPE_RGB) {
-		if (index < nitems (solaris_color_to_pc_color))
+		if (index < nitems(solaris_color_to_pc_color))
 			return (solaris_color_to_pc_color[index]);
 		else
 			return (index);
@@ -241,7 +242,7 @@ gfx_set_colors(struct env_var *ev, int flags, const void *value)
 		char *end;
 
 		errno = 0;
-		val = (int) strtol(value, &end, 0);
+		val = (int)strtol(value, &end, 0);
 		if (errno != 0 || *end != '\0') {
 			printf("Allowed values are either ansi color name or "
 			    "number from range [0-7].\n");
@@ -315,7 +316,7 @@ gfx_framework_init(struct visual_ops *fb_ops)
 {
 	int rc;
 	char *env, buf[2];
-#if defined (EFI)
+#if	defined(EFI)
 	extern EFI_GRAPHICS_OUTPUT *gop;
 
 	if (gop != NULL) {
@@ -351,7 +352,7 @@ gfx_framework_init(struct visual_ops *fb_ops)
 		env = "false";
 
 	env_setenv("tem.inverse", EV_VOLATILE, env, gfx_set_inverses,
-            env_nounset);
+	    env_nounset);
 
 	if (gfx_inverse_screen)
 		env = "true";
@@ -359,12 +360,12 @@ gfx_framework_init(struct visual_ops *fb_ops)
 		env = "false";
 
 	env_setenv("tem.inverse-screen", EV_VOLATILE, env, gfx_set_inverses,
-            env_nounset);
+	    env_nounset);
 
 	/* set up tem color controls */
 	env = getenv("tem.fg_color");
 	if (env != NULL) {
-		rc = (int) strtol(env, NULL, 0);
+		rc = (int)strtol(env, NULL, 0);
 		if (rc >= 0 && rc <= 7)
 			gfx_fg = rc;
 		unsetenv("tem.fg_color");
@@ -372,7 +373,7 @@ gfx_framework_init(struct visual_ops *fb_ops)
 
 	env = getenv("tem.bg_color");
 	if (env != NULL) {
-		rc = (int) strtol(env, NULL, 0);
+		rc = (int)strtol(env, NULL, 0);
 		if (rc >= 0 && rc <= 7)
 			gfx_bg = rc;
 		unsetenv("tem.bg_color");
@@ -390,7 +391,7 @@ gfx_framework_init(struct visual_ops *fb_ops)
  * visual io callbacks.
  */
 
-#if defined (EFI)
+#if	defined(EFI)
 static int
 gfx_gop_cons_clear(uint32_t data, uint32_t width, uint32_t height)
 {
@@ -464,7 +465,7 @@ gfx_fb_cons_clear(struct vis_consclear *ca)
 {
 	uint32_t data, width, height;
 	int ret;
-#if defined (EFI)
+#if	defined(EFI)
 	EFI_TPL tpl;
 #endif
 
@@ -472,17 +473,17 @@ gfx_fb_cons_clear(struct vis_consclear *ca)
 	width = gfx_fb.framebuffer_common.framebuffer_width;
 	height = gfx_fb.framebuffer_common.framebuffer_height;
 
-#if defined (EFI)
+#if	defined(EFI)
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
 	ret = gfx_fb_ops.gfx_cons_clear(data, width, height);
-#if defined (EFI)
+#if	defined(EFI)
 	BS->RestoreTPL(tpl);
 #endif
 	return (ret);
 }
 
-#if defined (EFI)
+#if	defined(EFI)
 static void
 gfx_gop_cons_copy(struct vis_conscopy *ma)
 {
@@ -519,12 +520,12 @@ gfx_bm_cons_copy(struct vis_conscopy *ma)
 	if (toffset <= soffset) {
 		for (uint32_t i = 0; i < height; i++) {
 			uint32_t increment = i * pitch;
-			(void)memmove(dst + increment, src + increment, width);
+			(void) memmove(dst + increment, src + increment, width);
 		}
 	} else {
 		for (int i = height - 1; i >= 0; i--) {
 			uint32_t increment = i * pitch;
-			(void)memmove(dst + increment, src + increment, width);
+			(void) memmove(dst + increment, src + increment, width);
 		}
 	}
 }
@@ -532,14 +533,14 @@ gfx_bm_cons_copy(struct vis_conscopy *ma)
 static void
 gfx_fb_cons_copy(struct vis_conscopy *ma)
 {
-#if defined (EFI)
+#if	defined(EFI)
 	EFI_TPL tpl;
 
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
 
 	gfx_fb_ops.gfx_cons_copy(ma);
-#if defined (EFI)
+#if	defined(EFI)
 	BS->RestoreTPL(tpl);
 #endif
 }
@@ -597,7 +598,7 @@ bitmap_cpy(uint8_t *dst, uint8_t *src, uint32_t len, int bpp)
 	}
 }
 
-#if defined (EFI)
+#if	defined(EFI)
 static void
 gfx_gop_cons_display(struct vis_consdisplay *da)
 {
@@ -649,7 +650,7 @@ gfx_bm_cons_display(struct vis_consdisplay *da)
 static void
 gfx_fb_cons_display(struct vis_consdisplay *da)
 {
-#if defined (EFI)
+#if	defined(EFI)
 	EFI_TPL tpl;
 #endif
 
@@ -662,11 +663,11 @@ gfx_fb_cons_display(struct vis_consdisplay *da)
 	    gfx_fb.framebuffer_common.framebuffer_height)
 		return;
 
-#if defined (EFI)
+#if	defined(EFI)
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
 	gfx_fb_ops.gfx_cons_display(da);
-#if defined (EFI)
+#if	defined(EFI)
 	BS->RestoreTPL(tpl);
 #endif
 }
@@ -679,7 +680,7 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 	uint16_t *fb16;
 	uint8_t *fb8, *fb;
 	uint32_t bpp, pitch;
-#if defined (EFI)
+#if	defined(EFI)
 	EFI_TPL tpl;
 #endif
 
@@ -694,7 +695,7 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 	 * frame buffer by (D xor FG) xor BG.
 	 */
 	offset = ca->col * bpp + ca->row * pitch;
-#if defined (EFI)
+#if	defined(EFI)
 	tpl = BS->RaiseTPL(TPL_NOTIFY);
 #endif
 	switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
@@ -756,7 +757,7 @@ gfx_fb_display_cursor(struct vis_conscursor *ca)
 		}
 		break;
 	}
-#if defined (EFI)
+#if	defined(EFI)
 	BS->RestoreTPL(tpl);
 #endif
 }
@@ -971,7 +972,7 @@ gfx_fb_bezier(uint32_t x0, uint32_t y0, uint32_t x1, uint32_t y1, uint32_t x2,
 				dx += xx;
 				err += dx;
 			}
-		} while (dy < dx ); /* gradient negates -> algorithm fails */
+		} while (dy < dx); /* gradient negates -> algorithm fails */
 	}
 	gfx_fb_line(x0, y0, x2, y2, width);
 }
@@ -1069,100 +1070,287 @@ gfx_term_drawrect(uint32_t ux1, uint32_t uy1, uint32_t ux2, uint32_t uy2)
 		gfx_fb_bezier(x1, y1 - i, x2 + i, y1 - i, x2 + i, y2, width-i);
 }
 
+#define	FL_PUTIMAGE_BORDER	0x1
+#define	FL_PUTIMAGE_NOSCROLL	0x2
+#define	FL_PUTIMAGE_DEBUG	0x80
+
 int
-gfx_fb_putimage(png_t *png)
+gfx_fb_putimage(png_t *png, uint32_t ux1, uint32_t uy1, uint32_t ux2,
+    uint32_t uy2, uint32_t flags)
 {
 	struct vis_consdisplay da;
-	uint32_t i, j, height, width, color;
-	int bpp;
+	uint32_t i, j, x, y, fheight, fwidth, color;
+	int fbpp;
 	uint8_t r, g, b, a, *p;
+	bool scale = false;
+	bool trace = false;
 
-	if (plat_stdout_is_framebuffer() == 0 ||
-	    png->color_type != PNG_TRUECOLOR_ALPHA) {
+	trace = (flags & FL_PUTIMAGE_DEBUG) != 0;
+
+	if (plat_stdout_is_framebuffer() == 0) {
+		if (trace)
+			printf("Framebuffer not active.\n");
 		return (1);
 	}
 
-	bpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
-	width = png->width;
-	height = png->height;
-	da.width = png->width;
-	da.height = png->height;
-	da.col = gfx_fb.framebuffer_common.framebuffer_width -
-	    tems.ts_p_offset.x;
-	da.col -= da.width;
-	da.row = gfx_fb.framebuffer_common.framebuffer_height -
-	    tems.ts_p_offset.y;
-	da.row -= da.height;
+	if (png->color_type != PNG_TRUECOLOR_ALPHA) {
+		if (trace)
+			printf("Not truecolor image.\n");
+		return (1);
+	}
+
+	if (ux1 > gfx_fb.framebuffer_common.framebuffer_width ||
+	    uy1 > gfx_fb.framebuffer_common.framebuffer_height) {
+		if (trace)
+			printf("Top left coordinate off screen.\n");
+		return (1);
+	}
+
+	if (png->width > UINT16_MAX || png->height > UINT16_MAX) {
+		if (trace)
+			printf("Image too large.\n");
+		return (1);
+	}
+
+	if (png->width < 1 || png->height < 1) {
+		if (trace)
+			printf("Image too small.\n");
+		return (1);
+	}
+
+	/*
+	 * If 0 was passed for either ux2 or uy2, then calculate the missing
+	 * part of the bottom right coordinate.
+	 */
+	scale = true;
+	if (ux2 == 0 && uy2 == 0) {
+		/* Both 0, use the native resolution of the image */
+		ux2 = ux1 + png->width;
+		uy2 = uy1 + png->height;
+		scale = false;
+	} else if (ux2 == 0) {
+		/* Set ux2 from uy2/uy1 to maintain aspect ratio */
+		ux2 = ux1 + (png->width * (uy2 - uy1)) / png->height;
+	} else if (uy2 == 0) {
+		/* Set uy2 from ux2/ux1 to maintain aspect ratio */
+		uy2 = uy1 + (png->height * (ux2 - ux1)) / png->width;
+	}
+
+	if (ux2 > gfx_fb.framebuffer_common.framebuffer_width ||
+	    uy2 > gfx_fb.framebuffer_common.framebuffer_height) {
+		if (trace)
+			printf("Bottom right coordinate off screen.\n");
+		return (1);
+	}
+
+	fwidth = ux2 - ux1;
+	fheight = uy2 - uy1;
+
+	/*
+	 * If the original image dimensions have been passed explicitly,
+	 * disable scaling.
+	 */
+	if (fwidth == png->width && fheight == png->height)
+		scale = false;
+
+	if (ux1 == 0) {
+		/*
+		 * No top left X co-ordinate (real coordinates start at 1),
+		 * place as far right as it will fit.
+		 */
+		ux2 = gfx_fb.framebuffer_common.framebuffer_width -
+		    tems.ts_p_offset.x;
+		ux1 = ux2 - fwidth;
+	}
+
+	if (uy1 == 0) {
+		/*
+		 * No top left Y co-ordinate (real coordinates start at 1),
+		 * place as far down as it will fit.
+		 */
+		uy2 = gfx_fb.framebuffer_common.framebuffer_height -
+		    tems.ts_p_offset.y;
+		uy1 = uy2 - fheight;
+	}
+
+	if (ux1 >= ux2 || uy1 >= uy2) {
+		if (trace)
+			printf("Image dimensions reversed.\n");
+		return (1);
+	}
+
+	if (fwidth < 2 || fheight < 2) {
+		if (trace)
+			printf("Target area too small\n");
+		return (1);
+	}
+
+	if (trace)
+		printf("Image %ux%u -> %ux%u @%ux%u\n",
+		    png->width, png->height, fwidth, fheight, ux1, uy1);
+
+	da.col = ux1;
+	da.row = uy1;
+	da.width = fwidth;
+	da.height = fheight;
 
 	/*
 	 * mark area used in tem
 	 */
-	tem_image_display(tems.ts_active, da.row / tems.ts_font.vf_height - 1,
-	    da.col / tems.ts_font.vf_width - 1,
-	    tems.ts_c_dimension.height - 1,
-	    tems.ts_c_dimension.width - 1);
+	if (!(flags & FL_PUTIMAGE_NOSCROLL)) {
+		tem_image_display(tems.ts_active,
+		    da.row / tems.ts_font.vf_height - 1,
+		    da.col / tems.ts_font.vf_width - 1,
+		    (da.row + da.height) / tems.ts_font.vf_height - 1,
+		    (da.col + da.width) / tems.ts_font.vf_width - 1);
+	}
 
-	da.data = malloc(width * height * bpp);
-	if (da.data == NULL)
+	if ((flags & FL_PUTIMAGE_BORDER))
+		gfx_fb_drawrect(ux1, uy1, ux2, uy2, 0);
+
+	fbpp = roundup2(gfx_fb.framebuffer_common.framebuffer_bpp, 8) >> 3;
+
+	da.data = malloc(fwidth * fheight * fbpp);
+	if (da.data == NULL) {
+		if (trace)
+			printf("Out of memory.\n");
 		return (1);
+	}
 
 	/*
 	 * Build image for our framebuffer.
 	 */
-	for (i = 0; i < height * width * png->bpp; i += png->bpp) {
-		r = png->image[i];
-		g = png->image[i+1];
-		b = png->image[i+2];
-		a = png->image[i+3];
 
-		j = i / png->bpp * bpp;
-		color = r >> (8 - gfx_fb.u.fb2.framebuffer_red_mask_size)
-		    << gfx_fb.u.fb2.framebuffer_red_field_position;
-		color |= g >> (8 - gfx_fb.u.fb2.framebuffer_green_mask_size)
-		    << gfx_fb.u.fb2.framebuffer_green_field_position;
-		color |= b >> (8 - gfx_fb.u.fb2.framebuffer_blue_mask_size)
-		    << gfx_fb.u.fb2.framebuffer_blue_field_position;
+	/* Helper to calculate the pixel index from the source png */
+#define	GETPIXEL(xx, yy) (((yy) * png->width + (xx)) * png->bpp)
 
-		switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
-		case 8: {
-			uint32_t best, dist, k;
-			int diff;
+	/*
+	 * For each of the x and y directions, calculate the number of pixels
+	 * in the source image that correspond to a single pixel in the target.
+	 * Use fixed-point arithmetic with 16-bits for each of the integer and
+	 * fractional parts.
+	 */
+	const uint32_t wcstep = ((png->width - 1) << 16) / (fwidth - 1);
+	const uint32_t hcstep = ((png->height - 1) << 16) / (fheight - 1);
 
-			color = 0;
-			best = 256 * 256 * 256;
-			for (k = 0; k < 16; k++) {
-				diff = r - cmap4_to_24.red[k];
-				dist = diff * diff;
-				diff = g - cmap4_to_24.green[k];
-				dist += diff * diff;
-				diff = b - cmap4_to_24.blue[k];
-				dist += diff * diff;
+	uint32_t hc = 0;
+	for (y = 0; y < fheight; y++) {
+		uint32_t hc2 = (hc >> 9) & 0x7f;
+		uint32_t hc1 = 0x80 - hc2;
 
-				if (dist < best) {
-					color = k;
-					best = dist;
-					if (dist == 0)
-						break;
-				}
+		uint32_t offset_y = hc >> 16;
+		uint32_t offset_y1 = offset_y + 1;
+
+		uint32_t wc = 0;
+		for (x = 0; x < fwidth; x++) {
+			uint32_t wc2 = (wc >> 9) & 0x7f;
+			uint32_t wc1 = 0x80 - wc2;
+
+			uint32_t offset_x = wc >> 16;
+			uint32_t offset_x1 = offset_x + 1;
+
+			/* Target pixel index */
+			j = (y * fwidth + x) * fbpp;
+
+			if (!scale) {
+				i = GETPIXEL(x, y);
+				r = png->image[i];
+				g = png->image[i + 1];
+				b = png->image[i + 2];
+				a = png->image[i + 3];
+			} else {
+				uint8_t pixel[4];
+
+				uint32_t p00 = GETPIXEL(offset_x, offset_y);
+				uint32_t p01 = GETPIXEL(offset_x, offset_y1);
+				uint32_t p10 = GETPIXEL(offset_x1, offset_y);
+				uint32_t p11 = GETPIXEL(offset_x1, offset_y1);
+
+				/*
+				 * Given a 2x2 array of pixels in the source
+				 * image, combine them to produce a single
+				 * value for the pixel in the target image.
+				 * Each column of pixels is combined using
+				 * a weighted average where the top and bottom
+				 * pixels contribute hc1 and hc2 respectively.
+				 * The calculation for bottom pixel pB and
+				 * top pixel pT is:
+				 *   (pT * hc1 + pB * hc2) / (hc1 + hc2)
+				 * Once the values are determined for the two
+				 * columns of pixels, then the columns are
+				 * averaged together in the same way but using
+				 * wc1 and wc2 for the weightings.
+				 *
+				 * Since hc1 and hc2 are chosen so that
+				 * hc1 + hc2 == 128 (and same for wc1 + wc2),
+				 * the >> 14 below is a quick way to divide by
+				 * (hc1 + hc2) * (wc1 + wc2)
+				 */
+				for (i = 0; i < 4; i++)
+					pixel[i] = (
+					    (png->image[p00 + i] * hc1 +
+					    png->image[p01 + i] * hc2) * wc1 +
+					    (png->image[p10 + i] * hc1 +
+					    png->image[p11 + i] * hc2) * wc2)
+					    >> 14;
+
+				r = pixel[0];
+				g = pixel[1];
+				b = pixel[2];
+				a = pixel[3];
 			}
-			da.data[j] = solaris_color_to_pc_color[color];
-			break;
+
+			color =
+			    r >> (8 - gfx_fb.u.fb2.framebuffer_red_mask_size)
+			    << gfx_fb.u.fb2.framebuffer_red_field_position |
+			    g >> (8 - gfx_fb.u.fb2.framebuffer_green_mask_size)
+			    << gfx_fb.u.fb2.framebuffer_green_field_position |
+			    b >> (8 - gfx_fb.u.fb2.framebuffer_blue_mask_size)
+			    << gfx_fb.u.fb2.framebuffer_blue_field_position;
+
+			switch (gfx_fb.framebuffer_common.framebuffer_bpp) {
+			case 8: {
+				uint32_t best, dist, k;
+				int diff;
+
+				color = 0;
+				best = 256 * 256 * 256;
+				for (k = 0; k < 16; k++) {
+					diff = r - cmap4_to_24.red[k];
+					dist = diff * diff;
+					diff = g - cmap4_to_24.green[k];
+					dist += diff * diff;
+					diff = b - cmap4_to_24.blue[k];
+					dist += diff * diff;
+
+					if (dist < best) {
+						color = k;
+						best = dist;
+						if (dist == 0)
+							break;
+					}
+				}
+				da.data[j] = solaris_color_to_pc_color[color];
+				break;
+			}
+			case 15:
+			case 16:
+				*(uint16_t *)(da.data+j) = color;
+				break;
+			case 24:
+				p = (uint8_t *)&color;
+				da.data[j] = p[0];
+				da.data[j+1] = p[1];
+				da.data[j+2] = p[2];
+				break;
+			case 32:
+				color |= a << 24;
+				*(uint32_t *)(da.data+j) = color;
+				break;
+			}
+			wc += wcstep;
 		}
-		case 15:
-		case 16:
-			*(uint16_t *)(da.data+j) = color;
-			break;
-		case 24:
-			p = (uint8_t *)&color;
-			da.data[j] = p[0];
-			da.data[j+1] = p[1];
-			da.data[j+2] = p[2];
-			break;
-		case 32:
-			color |= a << 24;
-			*(uint32_t *)(da.data+j) = color;
-			break;
-		}
+		hc += hcstep;
 	}
 
 	gfx_fb_cons_display(&da);
