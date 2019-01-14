@@ -112,7 +112,6 @@ vi, view, vedit \- screen-oriented (visual) display editor based on ex
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBvi\fR (visual) utility is a display-oriented text editor based on an
 underlying line editor \fBex\fR. It is possible to use the command mode of
@@ -137,11 +136,9 @@ The \fBvedit\fR invocation is intended for beginners. It is the same as
 \fBshowmode\fR and \fBnovice\fR flags are set, and \fBmagic\fR is turned off.
 These defaults make it easier to learn how to use \fBvi\fR.
 .SH OPTIONS
-.sp
 .LP
-The following options are supporrted:
+The following options are supported:
 .SS "Invocation Options"
-.sp
 .LP
 The following invocation options are interpreted by \fBvi\fR (previously
 documented options are discussed under NOTES):
@@ -289,13 +286,11 @@ search or positioning command).
 .RE
 
 .SS "/usr/xpg4/bin/vi and /usr/xpg6/bin/vi"
-.sp
 .LP
 If both the \fB-t\fR \fItag\fR and the \fB-c\fR \fIcommand\fR options are
-given, the \fB-t\fR \fItag\fR optionis processed first. That is, the file
+given, the \fB-t\fR \fItag\fR option is processed first. That is, the file
 containing \fItag\fR is selected by \fB-t\fR and then the command is executed.
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -308,11 +303,9 @@ A file to be edited.
 .RE
 
 .SH COMMAND SUMMARY
-.sp
 .LP
 The \fBvi\fR command modes are summarized in this section.
 .SS "vi Modes"
-.sp
 .ne 2
 .na
 \fBCommand\fR
@@ -352,7 +345,6 @@ return. An interrupt cancels termination.
 .RE
 
 .SS "Sample Commands"
-.sp
 .LP
 In the descriptions, \fICR\fR stands for carriage return and \fIESC\fR stands
 for the escape key.
@@ -500,7 +492,6 @@ any \fBex\fR or \fBed\fR command
 .RE
 
 .SS "Counts Before vi Commands"
-.sp
 .LP
 Numbers can be typed as a prefix to some commands. They are interpreted in one
 of these ways:
@@ -532,7 +523,6 @@ most of the rest
 .RE
 
 .SS "Interrupting, Canceling"
-.sp
 .ne 2
 .na
 \fB\fIESC\fR\fR
@@ -551,7 +541,6 @@ end insert or incomplete command
 .RE
 
 .SS "File Manipulation"
-.sp
 .ne 2
 .na
 \fBZZ\fR
@@ -728,7 +717,6 @@ In general, any \fBex\fR or \fBed\fR command (such as \fIsubstitute\fR or
 \fIglobal\fR) can be typed, preceded by a colon and followed by a carriage
 return.
 .SS "Positioning Within a File"
-.sp
 .ne 2
 .na
 \fBF\fR
@@ -892,7 +880,6 @@ find matching \fB( )\fR or \fB{ }\fR
 .RE
 
 .SS "Adjusting the Screen"
-.sp
 .ne 2
 .na
 \fB^L\fR
@@ -974,7 +961,6 @@ scroll window up one line
 .RE
 
 .SS "Marking and Returning"
-.sp
 .ne 2
 .na
 \fB\(ga\(ga\fR
@@ -1020,7 +1006,6 @@ move cursor to first non-white space in line marked by \fIx\fR
 .RE
 
 .SS "Line Positioning"
-.sp
 .ne 2
 .na
 \fBH\fR
@@ -1101,7 +1086,6 @@ previous line, same column
 .RE
 
 .SS "Character Positioning"
-.sp
 .ne 2
 .na
 \fB^\fR
@@ -1237,7 +1221,6 @@ find matching \fB( )\fR or \fB{ }\fR
 .RE
 
 .SS "Words, Sentences, Paragraphs"
-.sp
 .ne 2
 .na
 \fBw\fR
@@ -1328,7 +1311,6 @@ end of a blank-delimited word
 .RE
 
 .SS "Corrections During Insert"
-.sp
 .ne 2
 .na
 \fB^H\fR
@@ -1429,7 +1411,6 @@ quote non-printable character
 .RE
 
 .SS "Insert and Replace"
-.sp
 .ne 2
 .na
 \fBa\fR
@@ -1502,7 +1483,6 @@ replace characters
 .RE
 
 .SS "Operators"
-.sp
 .LP
 Operators are followed by a cursor motion and affect all text that would have
 been moved over. For example, since \fBw\fR moves over a word, \fBdw\fR deletes
@@ -1563,7 +1543,6 @@ filter through command
 .RE
 
 .SS "Miscellaneous Operations"
-.sp
 .ne 2
 .na
 \fBC\fR
@@ -1636,7 +1615,6 @@ yank lines (\fByy\fR)
 .RE
 
 .SS "Yank and Put"
-.sp
 .LP
 Put inserts the text most recently deleted or yanked; however, if a buffer is
 named (using the \fBASCII\fR lower-case letters \fBa\fR - \fBz\fR), the text in
@@ -1705,7 +1683,6 @@ delete into buffer \fIx\fR
 .RE
 
 .SS "Undo, Redo, Retrieve"
-.sp
 .ne 2
 .na
 \fBu\fR
@@ -1742,13 +1719,11 @@ retrieve \fId\fR'th last delete
 .RE
 
 .SH USAGE
-.sp
 .LP
 See \fBlargefile\fR(5) for the description of the behavior of \fBvi\fR and
 \fBview\fR when encountering files greater than or equal to 2 Gbyte ( 2^31
 bytes).
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBvi\fR: \fBLANG\fR, \fBLC_ALL\fR,
@@ -1785,7 +1760,6 @@ in a screenful and the vertical screen size in visual mode.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/var/tmp\fR\fR
@@ -1817,13 +1791,9 @@ subset of compiled terminal description database
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SS "/usr/bin/vi, /usr/bin/view, /usr/bin/vedit"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -1834,9 +1804,6 @@ CSI	Not enabled
 .TE
 
 .SS "/usr/xpg4/bin/vi, /usr/xpg4/bin/view, /usr/xpg4/bin/vedit"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -1849,9 +1816,6 @@ Interface Stability	Standard
 .TE
 
 .SS "/usr/xpg6/bin/vi, /usr/xpg6/bin/view, /usr/xpg6/bin/vedit"
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -1864,7 +1828,6 @@ Interface Stability	Standard
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBIntro\fR(1), \fBctags\fR(1), \fBed\fR(1), \fBedit\fR(1), \fBex\fR(1),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
@@ -1872,13 +1835,11 @@ Interface Stability	Standard
 .LP
 \fISolaris Advanced User\&'s Guide\fR
 .SH AUTHOR
-.sp
 .LP
 \fBvi\fR and \fBex\fR were developed by The University of California, Berkeley
 California, Computer Science Division, Department of Electrical Engineering and
 Computer Science.
 .SH NOTES
-.sp
 .LP
 Two options, although they continue to be supported, have been replaced in the
 documentation by options that follow the Command Syntax Standard (see

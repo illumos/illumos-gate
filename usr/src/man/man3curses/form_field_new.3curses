@@ -33,7 +33,6 @@ destroy forms fields
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBnew_field()\fR creates a new field with \fIr\fR rows and \fIc\fR columns,
 starting at \fIfrow\fR, \fIfcol\fR, in the subwindow of a form. \fInrow\fR is
@@ -53,7 +52,6 @@ changed without affecting the original field.
 .LP
 \fBfree_field()\fR frees the storage allocated for \fIfield\fR.
 .SH RETURN VALUES
-.sp
 .LP
 Routines that return pointers return \fINULL\fR on error. \fBfree_field()\fR
 returns one of the following:
@@ -63,7 +61,7 @@ returns one of the following:
 \fBE_OK\fR
 .ad
 .RS 18n
-Thefunction returned successfully.
+The function returned successfully.
 .RE
 
 .sp
@@ -94,7 +92,6 @@ An argument is incorrect.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -110,11 +107,9 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcurses\fR(3CURSES), \fBforms\fR(3CURSES), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The header \fB<form.h>\fR automatically includes the headers  \fB<eti.h>\fR and
 \fB<curses.h>\fR\&.

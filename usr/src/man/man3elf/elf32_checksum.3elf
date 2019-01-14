@@ -21,7 +21,6 @@ cc [ \fIflag\fR ... ] \fIfile\fR ... \fB-lelf\fR [ \fIlibrary\fR ... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBelf32_checksum()\fR function returns a simple checksum of selected
 sections of the image identified by \fIelf\fR. The value is typically used as
@@ -29,13 +28,12 @@ the \fB\&.dynamic\fR tag \fBDT_CHECKSUM\fR, recorded in dynamic executables and
 shared objects.
 .sp
 .LP
-Selected sections of the image are used to calcluate the checksum in order that
+Selected sections of the image are used to calculate the checksum in order that
 its value is not affected by utilities such as \fBstrip\fR(1).
 .sp
 .LP
 For the 64\(mibit class, replace 32 with 64 as appropriate.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -53,7 +51,6 @@ MT-Level	MT-Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBelf\fR(3ELF), \fBelf_version\fR(3ELF), \fBgelf\fR(3ELF), \fBlibelf\fR(3LIB),
 \fBattributes\fR(5)

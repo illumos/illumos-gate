@@ -13,13 +13,11 @@ mt \- magnetic tape control
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBmt\fR utility sends commands to a magnetic tape drive. If \fB-f\fR
 \fItapename\fR is not specified, the environment variable \fBTAPE\fR is used.
 If \fBTAPE\fR does not exist, \fBmt\fR uses the device \fB/dev/rmt/0n\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -32,7 +30,6 @@ Specifies the raw tape device.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -173,7 +170,7 @@ Prevents media removal.
 .ad
 .RS 10n
 Back spaces \fIcount\fR files. The tape is positioned on the first block of the
-file. This is equivalent to \fIcount+1\fR \fBbsf\fRs ollowed by one \fBfsf\fR.
+file. This is equivalent to \fIcount+1\fR \fBbsf\fRs followed by one \fBfsf\fR.
 .RE
 
 .sp
@@ -321,7 +318,6 @@ might also report that WORM media is loaded in that drive.
 .RE
 
 .SH EXIT STATUS
-.sp
 .ne 2
 .na
 \fB\fB0\fR\fR
@@ -350,7 +346,6 @@ An operation failed.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/rmt/*\fR\fR
@@ -360,12 +355,10 @@ magnetic tape interface
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBtar\fR(1), \fBtcopy\fR(1), \fBar.h\fR(3HEAD), \fBattributes\fR(5),
 \fBmtio\fR(7I), \fBst\fR(7D)
 .SH BUGS
-.sp
 .LP
 Not all devices support all options. Some options are hardware-dependent. Refer
 to the corresponding device manual page.

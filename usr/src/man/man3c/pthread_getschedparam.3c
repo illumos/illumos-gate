@@ -65,7 +65,6 @@ cc -mt [ \fIflag\fR... ] \fIfile\fR... -lpthread [ \fIlibrary\fR... ]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpthread_getschedparam()\fR and \fBpthread_setschedparam()\fR functions
 allow the scheduling policy and scheduling parameters of individual threads
@@ -147,15 +146,13 @@ parameters provided in \fIpolicy\fR and \fIparam\fR, respectively.
 If the \fBpthread_setschedparam()\fR function fails, no scheduling parameters
 will be changed  for the target thread.
 .SH RETURN VALUES
-.sp
 .LP
 If successful, the \fBpthread_getschedparam()\fR and
 \fBpthread_setschedparam()\fR functions return  \fB0\fR. Otherwise, an error
 number is returned to indicate the error.
 .SH ERRORS
-.sp
 .LP
-The \fBpthread_getschedparam()\fR and \fBpthread_gsetschedparam()\fR functions
+The \fBpthread_getschedparam()\fR and \fBpthread_setschedparam()\fR functions
 will fail if:
 .sp
 .ne 2
@@ -190,7 +187,6 @@ scheduling parameters or the scheduling policy of the specified thread.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -210,7 +206,6 @@ Standard	See \fBstandards\fR(5).
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpthread_attr_init\fR(3C), \fBsched_getparam\fR(3C),
 \fBsched_get_priority_max\fR(3C), \fBsched_get_priority_max\fR(3C),

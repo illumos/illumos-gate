@@ -189,7 +189,7 @@ main(int argc, char *argv[])
 		}
 		if (err != 0) {
 			/* Asynch connect failed */
-			fprintf(stderr, "asnchronous connect: %s\\n",
+			fprintf(stderr, "asynchronous connect: %s\\n",
 			    strerror(err));
 			(void) close(sock);
 			(void) close(eport);

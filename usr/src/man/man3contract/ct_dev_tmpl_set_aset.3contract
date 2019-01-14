@@ -49,7 +49,6 @@ int ct_dev_tmpl_set_aset(int fd, uint_t aset);
 .fi
 
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIaset\fR\fR
@@ -118,7 +117,6 @@ a pointer to a \fIuint_t\fR variable for receiving the current setting of the
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 These functions read and write device contract terms and operate on device
 contract template file descriptors obtained from the \fBcontract\fR(4)
@@ -152,12 +150,10 @@ set to 1 if the "noneg" term is set or to 0 otherwise.  The
 \fBct_dev_tmpl_clear_noneg()\fR term clears the nonnegotiable term from a
 template.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, these functions return 0. Otherwise, they return a
 non-zero error value.
 .SH ERRORS
-.sp
 .LP
 The \fBct_dev_tmpl_set_aset()\fR function will fail if:
 .sp
@@ -242,14 +238,13 @@ The \fBct_dev_tmpl_get_minor()\fR function will fail if:
 .sp
 .ne 2
 .na
-\fB\fBEOVEFLOW\fR\fR
+\fB\fBEOVERFLOW\fR\fR
 .ad
 .RS 12n
 The supplied buffer is too small.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -267,7 +262,6 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBlibcontract\fR(3LIB), \fBcontract\fR(4), \fBdevices\fR(4),
 \fBattributes\fR(5), \fBlfcompile\fR(5)

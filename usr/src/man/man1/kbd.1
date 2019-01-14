@@ -75,7 +75,7 @@ console port when Alternate Break sequence is in effect.
 .LP
 Although PPP is a binary protocol, it has the ability to avoid using characters
 that interfere with serial operation. The default alternate break sequence is
-CTRL-m \fB~\fR CTRL-b, or \fB0D 7E 02\fR in hexidecimal. In PPP, this can be
+CTRL-m \fB~\fR CTRL-b, or \fB0D 7E 02\fR in hexadecimal. In PPP, this can be
 avoided by setting either \fB0x00000004\fR or \fB0x00002000\fR in the ACCM.
 This forces an escape for the CTRL-b or CTRL-m characters, respectively.
 .sp

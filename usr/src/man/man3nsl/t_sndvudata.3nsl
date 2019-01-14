@@ -60,7 +60,6 @@ t_sndvudata \- send a data unit from one or more noncontiguous buffers
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 This function is used in connectionless mode to send a data unit to another
 transport user.  The argument  \fIfd\fR identifies the local transport endpoint
@@ -131,21 +130,18 @@ called before the destination user has activated its transport endpoint (see
 .sp
 .LP
 If it is not possible for the transport provider to immediately detect the
-conditions that cause the errors \fBTBADDADDR\fR and \fBTBADOPT\fR, these
+conditions that cause the errors \fBTBADADDR\fR and \fBTBADOPT\fR, these
 errors will alternatively be returned by  \fBt_rcvuderr\fR(3NSL). An
 application must therefore be prepared to receive these errors in both of these
 ways.
 .SH RETURN VALUES
-.sp
 .LP
 Upon successful completion, a value of  \fB0\fR is returned. Otherwise, a value
 of  -1 is returned and  \fBt_errno\fR is set to indicate an error.
 .SH VALID STATES
-.sp
 .LP
 \fBT_IDLE\fR.
 .SH ERRORS
-.sp
 .LP
 On failure,  \fBt_errno\fR is set to one of the following:
 .sp
@@ -259,12 +255,10 @@ A system error has occurred during execution of this function.
 .RE
 
 .SH TLI COMPATIBILITY
-.sp
 .LP
 In the \fBTLI\fR interface definition, no counterpart of this routine was
 defined.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5)  for descriptions of the following attributes:
 .sp
@@ -280,7 +274,6 @@ MT Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBfcntl\fR(2), \fBt_alloc\fR(3NSL), \fBt_open\fR(3NSL),
 \fBt_rcvudata\fR(3NSL), \fBt_rcvvudata\fR(3NSL) \fBt_rcvuderr\fR(3NSL),

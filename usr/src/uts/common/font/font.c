@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2017 Toomas Soome <tsoome@me.com>
+ * Copyright 2019 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -126,7 +126,7 @@ void
 font_bit_to_pix4(
     struct font *f,
     uint8_t *dest,
-    uint8_t c,
+    uint32_t c,
     uint8_t fg_color,
     uint8_t bg_color)
 {
@@ -137,6 +137,9 @@ font_bit_to_pix4(
 	uint8_t	data;
 	uint8_t	nibblett;
 	int	bytes_wide;
+
+	if (c >= ENCODED_CHARS)
+		c = '?';
 
 	cp = f->char_ptr[c];
 	bytes_wide = (f->width + 7) / 8;
@@ -179,7 +182,7 @@ void
 font_bit_to_pix8(
     struct font *f,
     uint8_t *dest,
-    uint8_t c,
+    uint32_t c,
     uint8_t fg_color,
     uint8_t bg_color)
 {
@@ -191,6 +194,9 @@ font_bit_to_pix8(
 	int	bytes_wide;
 	uint8_t	mask;
 	int	bitsleft, nbits;
+
+	if (c >= ENCODED_CHARS)
+		c = '?';
 
 	cp = f->char_ptr[c];
 	bytes_wide = (f->width + 7) / 8;
@@ -234,7 +240,7 @@ void
 font_bit_to_pix16(
     struct font *f,
     uint16_t *dest,
-    uint8_t c,
+    uint32_t c,
     uint16_t fg_color16,
     uint16_t bg_color16)
 {
@@ -245,6 +251,9 @@ font_bit_to_pix16(
 	uint16_t data, d;
 	int	bytes_wide;
 	int	bitsleft, nbits;
+
+	if (c >= ENCODED_CHARS)
+		c = '?';
 
 	cp = f->char_ptr[c];
 	bytes_wide = (f->width + 7) / 8;
@@ -288,7 +297,7 @@ void
 font_bit_to_pix24(
     struct font *f,
     uint8_t *dest,
-    uint8_t c,
+    uint32_t c,
     uint32_t fg_color32,
     uint32_t bg_color32)
 {
@@ -299,6 +308,9 @@ font_bit_to_pix24(
 	uint32_t data, d;
 	int	bytes_wide;
 	int	bitsleft, nbits;
+
+	if (c >= ENCODED_CHARS)
+		c = '?';
 
 	cp = f->char_ptr[c];
 	bytes_wide = (f->width + 7) / 8;
@@ -346,7 +358,7 @@ void
 font_bit_to_pix32(
     struct font *f,
     uint32_t *dest,
-    uint8_t c,
+    uint32_t c,
     uint32_t fg_color32,
     uint32_t bg_color32)
 {
@@ -357,6 +369,9 @@ font_bit_to_pix32(
 	uint32_t data;
 	int	bytes_wide;
 	int	bitsleft, nbits;
+
+	if (c >= ENCODED_CHARS)
+		c = '?';
 
 	cp = f->char_ptr[c];
 	bytes_wide = (f->width + 7) / 8;

@@ -22,6 +22,7 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Toomas Soome <tsoome@me.com>
  */
 
 #ifndef _SYS_FONT_H
@@ -42,7 +43,7 @@ extern "C" {
 struct font {
 	short	width;
 	short	height;
-	uchar_t	*char_ptr[ENCODED_CHARS];
+	uint8_t	*char_ptr[ENCODED_CHARS];
 	void	*image_data;
 };
 
@@ -71,11 +72,11 @@ extern bitmap_data_t font_data_7x14;
 extern bitmap_data_t font_data_6x10;
 
 void set_font(struct font *, short *, short *, short, short);
-void font_bit_to_pix4(struct font *, uint8_t *, uint8_t, uint8_t, uint8_t);
-void font_bit_to_pix8(struct font *, uint8_t *, uint8_t, uint8_t, uint8_t);
-void font_bit_to_pix16(struct font *, uint16_t *, uint8_t, uint16_t, uint16_t);
-void font_bit_to_pix24(struct font *, uint8_t *, uint8_t, uint32_t, uint32_t);
-void font_bit_to_pix32(struct font *, uint32_t *, uint8_t, uint32_t, uint32_t);
+void font_bit_to_pix4(struct font *, uint8_t *, uint32_t, uint8_t, uint8_t);
+void font_bit_to_pix8(struct font *, uint8_t *, uint32_t, uint8_t, uint8_t);
+void font_bit_to_pix16(struct font *, uint16_t *, uint32_t, uint16_t, uint16_t);
+void font_bit_to_pix24(struct font *, uint8_t *, uint32_t, uint32_t, uint32_t);
+void font_bit_to_pix32(struct font *, uint32_t *, uint32_t, uint32_t, uint32_t);
 
 #ifdef __cplusplus
 }

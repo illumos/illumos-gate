@@ -13,7 +13,6 @@ service_provider.conf \- service provider configuration file
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBservice_provider.conf\fR contains information about the device type that the
 service provider supports. This information includes the pathname of the
@@ -27,7 +26,7 @@ The \fBdatadm\fR program enumerates each device entry into a list of interface
 adapters, that is, interfaces to external network that are available to uDAPL
 consumers. This new list of interface adapters is appended to other service
 providers' information in the DAT static registry, \fBdat.conf\fR. You can do
-this is you invoke the \fBdatadm\fR program with the \fB-a\fR option and the
+this if you invoke the \fBdatadm\fR program with the \fB-a\fR option and the
 pathname of the \fBservice_provider.conf\fR file.
 .sp
 .LP
@@ -40,7 +39,7 @@ entry:
 .in +2
 .nf
 "\fIdriver_name\fR" "\fIAPI_version\fR" "\fIthreadsafe_library\fR | \e
-      \fInonthreadsafe_librar\fRy"\e
+      \fInonthreadsafe_library\fR"\e
 "\fIdefault_version\fR | \fInondefault_version\fR" \e
      "\fIservice_provider_library_pathname\fR"\e
 "\fIservice_provider_version\fR" "\fIservice_provider_instance_data\fR"\e
@@ -68,14 +67,14 @@ for example, \fBdriver_name=tavor\fR.
 .ad
 .sp .6
 .RS 4n
-Specifies the API version of the service provide library: For example,
+Specifies the API version of the service provider library: For example,
 \fB"u"major.minor\fR is \fBu1.2\fR.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fIthreadsafe_library\fR | \fInonthreadsafe_librar\fR\fR
+\fB\fIthreadsafe_library\fR | \fInonthreadsafe_library\fR\fR
 .ad
 .sp .6
 .RS 4n
@@ -89,7 +88,7 @@ Specifies a threadsafe or non-threadsafe library.
 .ad
 .sp .6
 .RS 4n
-Specifies a default or non-default version of library. A service provider can
+Specifies a default or non-default version of a library. A service provider can
 offer several versions of the library. If so, one version is designated as
 \fBdefault\fR with the rest as \fBnondefault\fR.
 .RE
@@ -166,7 +165,6 @@ pci15b3,5a44 u1.2 nonthreadsafe default \e
 .in -2
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -181,6 +179,5 @@ Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBdatadm\fR(1M), \fBdat.conf\fR(4), \fBattributes\fR(5)

@@ -164,7 +164,7 @@ descriptors from zero through
 in the descriptor sets are examined.
 .Pp
 If the
-.Fa readfs
+.Fa readfds
 argument is not a null pointer, it points to an object of
 type
 .Vt fd_set
@@ -173,7 +173,7 @@ for being ready to read, and on output indicates which file descriptors are
 ready to read.
 .Pp
 If the
-.Fa writefs
+.Fa writefds
 argument is not a null pointer, it points to an object of
 type
 .Vt fd_set
@@ -191,8 +191,8 @@ for error conditions pending, and on output indicates which file descriptors
 have error conditions pending.
 .Pp
 Upon successful completion, the objects pointed to by the
-.Fa readfs ,
-.Fa writefs ,
+.Fa readfds ,
+.Fa writefds ,
 and
 .Fa errorfds
 arguments are modified to indicate which file descriptors are ready for reading,
@@ -354,7 +354,7 @@ masks to be set to a non-zero value,
 completes successfully and returns 0.
 .Pp
 If the
-.Fa readfs ,
+.Fa readfds ,
 .Fa writefds ,
 and
 .Fa errorfds

@@ -40,7 +40,6 @@ field_status, set_max_field \- set and get forms field attributes
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBset_field_buffer()\fR sets buffer \fIbuf\fR of \fIfield\fR to \fIvalue\fR.
 Buffer 0 stores the displayed contents of the field. Buffers other than 0 are
@@ -57,7 +56,6 @@ field buffer 0 changes. \fBset_field_status()\fR sets the status flag of
 \fBset_max_field()\fR sets a maximum growth on a dynamic field, or if
 \fImax=\fR\fB0\fR turns off any maximum growth.
 .SH RETURN VALUES
-.sp
 .LP
 \fBfield_buffer()\fR returns \fINULL\fR on error.
 .sp
@@ -73,7 +71,7 @@ return one of the following:
 \fBE_OK\fR
 .ad
 .RS 18n
-Thefunction returned successfully.
+The function returned successfully.
 .RE
 
 .sp
@@ -95,7 +93,6 @@ An argument is incorrect.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -111,11 +108,9 @@ MT-Level	Unsafe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBcurses\fR(3CURSES), \fBforms\fR(3CURSES), \fBattributes\fR(5)
 .SH NOTES
-.sp
 .LP
 The header \fB<form.h>\fR automatically includes the headers  \fB<eti.h>\fR and
 \fB<curses.h>\fR\&.

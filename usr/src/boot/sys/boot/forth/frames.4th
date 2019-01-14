@@ -1,5 +1,6 @@
 \ Copyright (c) 2003 Scott Long <scottl@FreeBSD.org>
 \ Copyright (c) 2012-2015 Devin Teske <dteske@FreeBSD.org>
+\ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 \ All rights reserved.
 \
 \ Redistribution and use in source and binary forms, with or without
@@ -120,19 +121,15 @@ only forth definitions also frame-drawing
 ;
 
 : box	( w h x y -- )	\ Draw a box
-	\ Do we have frame buffer?
-	s" screen-height" getenv
-	dup -1 <> if
-		2drop
+	framebuffer? if
 		rot		( w x y h )
 		over + >R	( w x y -- R: y+h )
 		swap rot	( y x w -- R: y+h )
 		over + >R	( y x -- R: y+h x+w )
 		swap R> R> term-drawrect
 		exit
-	else
-		drop
 	then
+	\ Non-framebuffer version
 	2dup 1+ 4 pick 1- -rot
 	vline		\ Draw left vert line
 	2dup 1+ swap 5 pick + swap 4 pick 1- -rot

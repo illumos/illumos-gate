@@ -15,7 +15,6 @@ ypmap2src \- convert NIS maps to NIS source files
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 Use the \fBypmap2src\fR utility to convert standard NIS maps to approximations
 of the equivalent NIS source files. This utility functions like the reverse of
@@ -56,14 +55,12 @@ files.
 When \fBypmap2src\fR is run, it will take up-to-date comments from the map file
 and insert them into the NIS source file generated.
 .SS "Handling Custom Maps"
-.sp
 .LP
 \fBypmap2src\fR only knows about the standard NIS maps and standard source to
 map conversion. If an advanced user has changed these, that is, the user has
 modified the NIS makefile, the equivalent changes must also be made to the
 \fBypmap2src\fR script.
 .SH OPTIONS
-.sp
 .LP
 \fBypmap2src\fR supports the following options:
 .sp
@@ -112,7 +109,6 @@ be converted. By default, maps with the \fBLDAP_\fR prefix are converted.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 \fBypmap2src\fR supports the following operands:
 .sp
@@ -122,12 +118,11 @@ be converted. By default, maps with the \fBLDAP_\fR prefix are converted.
 .ad
 .RS 15n
 Lists the standard source files to convert. If this option is not given, then
-all the standard source files, plus any custom files pecified by the \fB-c\fR
+all the standard source files, plus any custom files specified by the \fB-c\fR
 option, are converted.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -143,7 +138,6 @@ Interface Stability	Obsolete
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBypmake\fR(1M), \fBypserv\fR(1M), \fBNISLDAPmapping\fR(4),
 \fBattributes\fR(5)
