@@ -25,7 +25,7 @@
  * Portions Copyright 2011 Martin Matuska
  * Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2014, 2016 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2014, 2019 Joyent, Inc. All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2013 Steven Hartland. All rights reserved.
@@ -5813,7 +5813,8 @@ out:
 static zfs_ioc_vec_t zfs_ioc_vec[ZFS_IOC_LAST - ZFS_IOC_FIRST];
 
 static void
-zfs_ioctl_register_legacy(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func,
+zfs_ioctl_register_legacy(const char *name, zfs_ioc_t ioc,
+    zfs_ioc_legacy_func_t *func,
     zfs_secpolicy_func_t *secpolicy, zfs_ioc_namecheck_t namecheck,
     boolean_t log_history, zfs_ioc_poolcheck_t pool_check)
 {
@@ -5824,6 +5825,7 @@ zfs_ioctl_register_legacy(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func,
 	ASSERT3P(vec->zvec_legacy_func, ==, NULL);
 	ASSERT3P(vec->zvec_func, ==, NULL);
 
+	vec->zvec_name = name;
 	vec->zvec_legacy_func = func;
 	vec->zvec_secpolicy = secpolicy;
 	vec->zvec_namecheck = namecheck;
@@ -5865,7 +5867,7 @@ zfs_ioctl_register_pool(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func,
     zfs_secpolicy_func_t *secpolicy, boolean_t log_history,
     zfs_ioc_poolcheck_t pool_check)
 {
-	zfs_ioctl_register_legacy(ioc, func, secpolicy,
+	zfs_ioctl_register_legacy(NULL, ioc, func, secpolicy,
 	    POOL_NAME, log_history, pool_check);
 }
 
@@ -5873,14 +5875,15 @@ static void
 zfs_ioctl_register_dataset_nolog(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func,
     zfs_secpolicy_func_t *secpolicy, zfs_ioc_poolcheck_t pool_check)
 {
-	zfs_ioctl_register_legacy(ioc, func, secpolicy,
+	zfs_ioctl_register_legacy(NULL, ioc, func, secpolicy,
 	    DATASET_NAME, B_FALSE, pool_check);
 }
 
 static void
-zfs_ioctl_register_pool_modify(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func)
+zfs_ioctl_register_pool_modify(const char *name, zfs_ioc_t ioc,
+    zfs_ioc_legacy_func_t *func)
 {
-	zfs_ioctl_register_legacy(ioc, func, zfs_secpolicy_config,
+	zfs_ioctl_register_legacy(name, ioc, func, zfs_secpolicy_config,
 	    POOL_NAME, B_TRUE, POOL_CHECK_SUSPENDED | POOL_CHECK_READONLY);
 }
 
@@ -5888,7 +5891,7 @@ static void
 zfs_ioctl_register_pool_meta(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func,
     zfs_secpolicy_func_t *secpolicy)
 {
-	zfs_ioctl_register_legacy(ioc, func, secpolicy,
+	zfs_ioctl_register_legacy(NULL, ioc, func, secpolicy,
 	    NO_NAME, B_FALSE, POOL_CHECK_NONE);
 }
 
@@ -5896,7 +5899,7 @@ static void
 zfs_ioctl_register_dataset_read_secpolicy(zfs_ioc_t ioc,
     zfs_ioc_legacy_func_t *func, zfs_secpolicy_func_t *secpolicy)
 {
-	zfs_ioctl_register_legacy(ioc, func, secpolicy,
+	zfs_ioctl_register_legacy(NULL, ioc, func, secpolicy,
 	    DATASET_NAME, B_FALSE, POOL_CHECK_SUSPENDED);
 }
 
@@ -5908,10 +5911,10 @@ zfs_ioctl_register_dataset_read(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func)
 }
 
 static void
-zfs_ioctl_register_dataset_modify(zfs_ioc_t ioc, zfs_ioc_legacy_func_t *func,
-    zfs_secpolicy_func_t *secpolicy)
+zfs_ioctl_register_dataset_modify(const char *name, zfs_ioc_t ioc,
+    zfs_ioc_legacy_func_t *func, zfs_secpolicy_func_t *secpolicy)
 {
-	zfs_ioctl_register_legacy(ioc, func, secpolicy,
+	zfs_ioctl_register_legacy(name, ioc, func, secpolicy,
 	    DATASET_NAME, B_TRUE, POOL_CHECK_SUSPENDED | POOL_CHECK_READONLY);
 }
 
@@ -6002,34 +6005,35 @@ zfs_ioctl_init(void)
 
 	/* IOCTLS that use the legacy function signature */
 
-	zfs_ioctl_register_legacy(ZFS_IOC_POOL_FREEZE, zfs_ioc_pool_freeze,
-	    zfs_secpolicy_config, NO_NAME, B_FALSE, POOL_CHECK_READONLY);
+	zfs_ioctl_register_legacy("pool_freeze", ZFS_IOC_POOL_FREEZE,
+	    zfs_ioc_pool_freeze, zfs_secpolicy_config, NO_NAME, B_FALSE,
+	    POOL_CHECK_READONLY);
 
 	zfs_ioctl_register_pool(ZFS_IOC_POOL_CREATE, zfs_ioc_pool_create,
 	    zfs_secpolicy_config, B_TRUE, POOL_CHECK_NONE);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_POOL_SCAN,
+	zfs_ioctl_register_pool_modify("pool_scan", ZFS_IOC_POOL_SCAN,
 	    zfs_ioc_pool_scan);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_POOL_UPGRADE,
+	zfs_ioctl_register_pool_modify("pool_upgrade", ZFS_IOC_POOL_UPGRADE,
 	    zfs_ioc_pool_upgrade);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_VDEV_ADD,
+	zfs_ioctl_register_pool_modify("vdev_add", ZFS_IOC_VDEV_ADD,
 	    zfs_ioc_vdev_add);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_VDEV_REMOVE,
+	zfs_ioctl_register_pool_modify("vdev_remove", ZFS_IOC_VDEV_REMOVE,
 	    zfs_ioc_vdev_remove);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_VDEV_SET_STATE,
+	zfs_ioctl_register_pool_modify("vdev_set_state", ZFS_IOC_VDEV_SET_STATE,
 	    zfs_ioc_vdev_set_state);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_VDEV_ATTACH,
+	zfs_ioctl_register_pool_modify("vdev_attach", ZFS_IOC_VDEV_ATTACH,
 	    zfs_ioc_vdev_attach);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_VDEV_DETACH,
+	zfs_ioctl_register_pool_modify("vdev_detach", ZFS_IOC_VDEV_DETACH,
 	    zfs_ioc_vdev_detach);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_VDEV_SETPATH,
+	zfs_ioctl_register_pool_modify("vdev_setpath", ZFS_IOC_VDEV_SETPATH,
 	    zfs_ioc_vdev_setpath);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_VDEV_SETFRU,
+	zfs_ioctl_register_pool_modify("vdev_setfru", ZFS_IOC_VDEV_SETFRU,
 	    zfs_ioc_vdev_setfru);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_POOL_SET_PROPS,
+	zfs_ioctl_register_pool_modify("pool_set_props", ZFS_IOC_POOL_SET_PROPS,
 	    zfs_ioc_pool_set_props);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_VDEV_SPLIT,
+	zfs_ioctl_register_pool_modify("vdev_split", ZFS_IOC_VDEV_SPLIT,
 	    zfs_ioc_vdev_split);
-	zfs_ioctl_register_pool_modify(ZFS_IOC_POOL_REGUID,
+	zfs_ioctl_register_pool_modify("pool_reguid", ZFS_IOC_POOL_REGUID,
 	    zfs_ioc_pool_reguid);
 
 	zfs_ioctl_register_pool_meta(ZFS_IOC_POOL_CONFIGS,
@@ -6107,20 +6111,20 @@ zfs_ioctl_init(void)
 	zfs_ioctl_register_dataset_read_secpolicy(ZFS_IOC_SEND,
 	    zfs_ioc_send, zfs_secpolicy_send);
 
-	zfs_ioctl_register_dataset_modify(ZFS_IOC_SET_PROP, zfs_ioc_set_prop,
-	    zfs_secpolicy_none);
-	zfs_ioctl_register_dataset_modify(ZFS_IOC_DESTROY, zfs_ioc_destroy,
-	    zfs_secpolicy_destroy);
-	zfs_ioctl_register_dataset_modify(ZFS_IOC_RENAME, zfs_ioc_rename,
-	    zfs_secpolicy_rename);
-	zfs_ioctl_register_dataset_modify(ZFS_IOC_RECV, zfs_ioc_recv,
+	zfs_ioctl_register_dataset_modify("set_prop", ZFS_IOC_SET_PROP,
+	    zfs_ioc_set_prop, zfs_secpolicy_none);
+	zfs_ioctl_register_dataset_modify("destroy", ZFS_IOC_DESTROY,
+	    zfs_ioc_destroy, zfs_secpolicy_destroy);
+	zfs_ioctl_register_dataset_modify("rename", ZFS_IOC_RENAME,
+	    zfs_ioc_rename, zfs_secpolicy_rename);
+	zfs_ioctl_register_dataset_modify("recv", ZFS_IOC_RECV, zfs_ioc_recv,
 	    zfs_secpolicy_recv);
-	zfs_ioctl_register_dataset_modify(ZFS_IOC_PROMOTE, zfs_ioc_promote,
-	    zfs_secpolicy_promote);
-	zfs_ioctl_register_dataset_modify(ZFS_IOC_INHERIT_PROP,
+	zfs_ioctl_register_dataset_modify("promote", ZFS_IOC_PROMOTE,
+	    zfs_ioc_promote, zfs_secpolicy_promote);
+	zfs_ioctl_register_dataset_modify("inherit_prop", ZFS_IOC_INHERIT_PROP,
 	    zfs_ioc_inherit_prop, zfs_secpolicy_inherit_prop);
-	zfs_ioctl_register_dataset_modify(ZFS_IOC_SET_FSACL, zfs_ioc_set_fsacl,
-	    zfs_secpolicy_set_fsacl);
+	zfs_ioctl_register_dataset_modify("set_fsacl", ZFS_IOC_SET_FSACL,
+	    zfs_ioc_set_fsacl, zfs_secpolicy_set_fsacl);
 
 	zfs_ioctl_register_dataset_nolog(ZFS_IOC_SHARE, zfs_ioc_share,
 	    zfs_secpolicy_share, POOL_CHECK_NONE);
@@ -6403,7 +6407,32 @@ zfsdev_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 
 		nvlist_free(outnvl);
 	} else {
+		spa_t *spa;
+		uint64_t orig_cookie = zc->zc_cookie;
+
 		error = vec->zvec_legacy_func(zc);
+
+		if (error == 0 && vec->zvec_allow_log &&
+		    vec->zvec_name != NULL &&
+		    spa_open(zc->zc_name, &spa, FTAG) == 0) {
+			nvlist_t *lognv = NULL;
+			char *msg;
+			uint_t len = strlen(vec->zvec_name) +
+			    strlen(zc->zc_name) + 128;
+
+			msg = kmem_alloc(len, KM_SLEEP);
+
+			lognv = fnvlist_alloc();
+			(void) snprintf(msg, len,
+			    "%s pool: %s cookie: %lu guid: %lx", vec->zvec_name,
+			    zc->zc_name, orig_cookie, zc->zc_guid);
+			fnvlist_add_string(lognv, ZPOOL_HIST_IOCTL, msg);
+
+			(void) spa_history_log_nvl(spa, lognv);
+			spa_close(spa, FTAG);
+			fnvlist_free(lognv);
+			kmem_free(msg, len);
+		}
 	}
 
 out:
