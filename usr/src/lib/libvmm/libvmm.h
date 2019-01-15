@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _LIBVMM_H
@@ -98,9 +98,9 @@ ssize_t vmm_vwrite(vmm_t *, int, int, const void *, size_t, uintptr_t);
 size_t vmm_ncpu(vmm_t *);
 size_t vmm_memsize(vmm_t *);
 
-void vmm_cont(vmm_t *);
+int vmm_cont(vmm_t *);
 int vmm_step(vmm_t *, int);
-void vmm_stop(vmm_t *);
+int vmm_stop(vmm_t *);
 
 int vmm_getreg(vmm_t *, int, int, uint64_t *);
 int vmm_setreg(vmm_t *, int, int, uint64_t);

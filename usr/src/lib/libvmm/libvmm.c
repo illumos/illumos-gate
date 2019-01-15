@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -30,6 +30,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <unistd.h>
 #include <assert.h>
 
 #include <machine/vmm.h>
@@ -103,6 +104,18 @@ vmm_open_vm(const char *name)
 	}
 
 	vmm_update_ncpu(vmm);
+
+	/*
+	 * If we open a VM that has just been created we may see a state
+	 * where it has no CPUs configured yet. We'll just wait for 10ms
+	 * and retry until we get a non-zero CPU count.
+	 */
+	if (vmm->vmm_ncpu == 0) {
+		do {
+			(void) usleep(10000);
+			vmm_update_ncpu(vmm);
+		} while (vmm->vmm_ncpu == 0);
+	}
 
 	return (vmm);
 }
@@ -304,10 +317,10 @@ vmm_memsize(vmm_t *vmm)
 	return (vmm->vmm_memsize);
 }
 
-void
+int
 vmm_cont(vmm_t *vmm)
 {
-	assert(vm_resume_cpu(vmm->vmm_ctx, -1) == 0);
+	return (vm_resume_cpu(vmm->vmm_ctx, -1));
 }
 
 int
@@ -336,12 +349,15 @@ vmm_step(vmm_t *vmm, int vcpu)
 	return (ret);
 }
 
-void
+int
 vmm_stop(vmm_t *vmm)
 {
-	assert(vm_suspend_cpu(vmm->vmm_ctx, -1) == 0);
+	int ret = vm_suspend_cpu(vmm->vmm_ctx, -1);
 
-	vmm_update_ncpu(vmm);
+	if (ret == 0)
+		vmm_update_ncpu(vmm);
+
+	return (ret);
 }
 
 /*
