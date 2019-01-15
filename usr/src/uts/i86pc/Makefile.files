@@ -224,6 +224,7 @@ ACPIDEV_OBJS += acpidev_drv.o \
 	acpidev_memory.o \
 	acpidev_pci.o \
 	acpidev_resource.o \
+	acpidev_usbport.o \
 	acpidev_util.o
 
 DRMACH_ACPI_OBJS += drmach_acpi.o dr_util.o drmach_err.o
@@ -254,7 +255,7 @@ INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/common/xen
 # since only C headers are included when #defined(__lint) is true.
 #
 
-ASSYM_DEPS      += 		\
+ASSYM_DEPS      +=		\
 	copy.o			\
 	desctbls_asm.o		\
 	ddi_i86_asm.o		\

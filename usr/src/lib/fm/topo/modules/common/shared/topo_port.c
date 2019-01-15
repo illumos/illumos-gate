@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/fm/protocol.h>
@@ -123,6 +123,19 @@ port_create_sff(topo_mod_t *mod, tnode_t *pnode, topo_instance_t inst,
 	tnode_t *tn;
 
 	tn = port_create_common(mod, pnode, inst, TOPO_PROP_PORT_TYPE_SFF);
+	if (tn == NULL)
+		return (-1);
+	*nodep = tn;
+	return (0);
+}
+
+int
+port_create_usb(topo_mod_t *mod, tnode_t *pnode, topo_instance_t inst,
+    tnode_t **nodep)
+{
+	tnode_t *tn;
+
+	tn = port_create_common(mod, pnode, inst, TOPO_PROP_PORT_TYPE_USB);
 	if (tn == NULL)
 		return (-1);
 	*nodep = tn;

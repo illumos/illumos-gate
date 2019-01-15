@@ -72,6 +72,9 @@ Copyright (c) 2018, Joyent, Inc.
         <enum-method name='smbios' version='1' />
         <propmap name='SSG-2028R-ACR24L-slot' />
       </range>
+      <range name='usb-mobo' min='0' max='256'>
+        <enum-method name='usb' version='1' />
+      </range>
     </dependents>
 
   </range>
@@ -90,6 +93,9 @@ Copyright (c) 2018, Joyent, Inc.
        <range name='bay' min='0' max='23'>
           <propmap name='SSG-2028R-ACR24L-disk' />
        </range>
+      <range name='usb-chassis' min='0' max='256'>
+        <enum-method name='usb' version='1' />
+      </range>
 
     </dependents>
 

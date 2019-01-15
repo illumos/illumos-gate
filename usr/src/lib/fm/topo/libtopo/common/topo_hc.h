@@ -93,6 +93,7 @@ extern "C" {
 #define	SUBCHASSIS	"subchassis"
 #define	SYSTEMBOARD	"systemboard"
 #define	TRANSCEIVER	"transceiver"
+#define	USB_DEVICE	"usb-device"
 #define	XAUI		"xaui"
 #define	XFP		"xfp"
 
@@ -171,6 +172,7 @@ extern "C" {
 #define	TOPO_PGROUP_PORT	"port"
 #define	TOPO_PROP_PORT_TYPE	"type"
 #define	TOPO_PROP_PORT_TYPE_SFF	"sff"
+#define	TOPO_PROP_PORT_TYPE_USB	"usb"
 
 #define	TOPO_PGROUP_TRANSCEIVER	"transceiver"
 #define	TOPO_PROP_TRANSCEIVER_TYPE	"type"
@@ -181,6 +183,29 @@ extern "C" {
 #define	TOPO_PORT_SFF_TRANSCEIVER_PN	"part-number"
 #define	TOPO_PORT_SFF_TRANSCEIVER_REV	"revision"
 #define	TOPO_PORT_SFF_TRANSCEIVER_SN	"serial-number"
+
+#define	TOPO_PGROUP_USB_PORT	"usb-port"
+#define	TOPO_PROP_USB_PORT_LPORTS	"logical-ports"
+#define	TOPO_PROP_USB_PORT_VERSIONS	"usb-versions"
+#define	TOPO_PROP_USB_PORT_TYPE		"port-type"
+#define	TOPO_PROP_USB_PORT_ATTRIBUTES	"port-attributes"
+#define	TOPO_PROP_USB_PORT_A_VISIBLE	"user-visible"
+#define	TOPO_PROP_USB_PORT_A_CONNECTED	"port-connected"
+#define	TOPO_PROP_USB_PORT_A_DISCONNECTED	"port-disconnected"
+#define	TOPO_PROP_USB_PORT_A_EXTERNAL	"external-port"
+#define	TOPO_PROP_USB_PORT_A_INTERNAL	"internal-port"
+#define	TOPO_PROP_USB_PORT_NATTRS	5
+
+#define	TOPO_PGROUP_USB_PROPS	"usb-properties"
+#define	TOPO_PGROUP_USB_PROPS_VID	"usb-vendor-id"
+#define	TOPO_PGROUP_USB_PROPS_PID	"usb-product-id"
+#define	TOPO_PGROUP_USB_PROPS_REV	"usb-revision-id"
+#define	TOPO_PGROUP_USB_PROPS_VNAME	"usb-vendor-name"
+#define	TOPO_PGROUP_USB_PROPS_PNAME	"usb-product-name"
+#define	TOPO_PGROUP_USB_PROPS_SN	"usb-serialno"
+#define	TOPO_PGROUP_USB_PROPS_VERSION	"usb-version"
+#define	TOPO_PGROUP_USB_PROPS_SPEED	"usb-speed"
+#define	TOPO_PGROUP_USB_PROPS_PORT	"usb-port"
 
 /*
  * These properties will exist on nodes enumerated by the ipmi module. They

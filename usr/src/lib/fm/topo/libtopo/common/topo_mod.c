@@ -96,6 +96,9 @@
 #include <sys/utsname.h>
 #include <sys/smbios.h>
 #include <sys/fm/protocol.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <topo_alloc.h>
 #include <topo_error.h>
@@ -917,4 +920,21 @@ topo_mod_clean_str(topo_mod_t *mod, const char *str)
 		return (NULL);
 
 	return (topo_cleanup_auth_str(mod->tm_hdl, str));
+}
+
+int
+topo_mod_file_search(topo_mod_t *mod, const char *file, int oflags)
+{
+	int ret;
+	char *path;
+	topo_hdl_t *thp = mod->tm_hdl;
+
+	path = topo_search_path(mod, thp->th_rootdir, file);
+	if (path == NULL) {
+		return (-1);
+	}
+
+	ret = open(path, oflags);
+	topo_mod_strfree(mod, path);
+	return (ret);
 }

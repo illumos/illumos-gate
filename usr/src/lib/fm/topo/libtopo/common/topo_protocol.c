@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <assert.h>
@@ -152,11 +153,11 @@ topo_node_fru_set(tnode_t *node, nvlist_t *fru, int flag, int *err)
 }
 
 int
-topo_node_label_set(tnode_t *node, char *label, int *err)
+topo_node_label_set(tnode_t *node, const char *label, int *err)
 {
 
 	/*
-	 * Inherit FRU property from our parent if * not specified
+	 * Inherit label property from our parent if * not specified
 	 */
 	if (label == NULL) {
 		if (topo_prop_inherit(node, TOPO_PGROUP_PROTOCOL,

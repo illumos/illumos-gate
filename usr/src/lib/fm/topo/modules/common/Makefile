@@ -33,6 +33,7 @@ SUBDIRS =		\
 	nic		\
 	ses		\
 	smbios		\
+	usb		\
 	xfp
 
 ses:	disk

@@ -572,6 +572,7 @@ file path=usr/lib/fm/topo/plugins/ipmi.so mode=0555
 file path=usr/lib/fm/topo/plugins/nic.so mode=0555
 file path=usr/lib/fm/topo/plugins/ses.so mode=0555
 file path=usr/lib/fm/topo/plugins/smbios.so mode=0555
+file path=usr/lib/fm/topo/plugins/usb.so mode=0555
 file path=usr/lib/fm/topo/plugins/xfp.so mode=0555
 #
 # Dictionaries, whether they are hardware-specific or not, are
@@ -767,6 +768,9 @@ $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-slot-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2028R-ACR24L-usb.usbtopo \
+    mode=0444
+$(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-chassis-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
@@ -779,6 +783,9 @@ $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-slot-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-2029P-ACR24L-usb.usbtopo \
+    mode=0444
+$(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-chassis-hc-topology.xml \
     mode=0444
 $(i386_ONLY)file \
@@ -786,6 +793,9 @@ $(i386_ONLY)file \
     mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-slot-hc-topology.xml \
+    mode=0444
+$(i386_ONLY)file \
+    path=usr/platform/i86pc/lib/fm/topo/maps/SSG-6049P-E1CR36L-usb.usbtopo \
     mode=0444
 $(i386_ONLY)file \
     path=usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4200-M2-disk-hc-topology.xml \
@@ -1021,15 +1031,22 @@ $(sparc_ONLY)link path=usr/platform/SUNW,T5140/lib/fm/fmd/plugins/etm.so \
     target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
 $(sparc_ONLY)link path=usr/platform/SUNW,USBRDT-5240/lib/fm/fmd/plugins/etm.so \
     target=../../../../../sun4v/lib/fm/fmd/plugins/etm.so
-#
-# symlinks for paticular topo maps
-#
 $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3101-hc-topology.xml \
     target=SSG-2028R-ACR24L-hc-topology.xml
+#
+# symlinks for paticular topo maps
+#
+
+$(i386_ONLY)link \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3101-usb.usbtopo \
+    target=SSG-2028R-ACR24L-usb.usbtopo
 $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-hc-topology.xml \
     target=SSG-2028R-ACR24L-hc-topology.xml
+$(i386_ONLY)link \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3102-usb.usbtopo \
+    target=SSG-2028R-ACR24L-usb.usbtopo
 $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-Compute-Platform-3302-hc-topology.xml \
     target=Joyent-Compute-Platform-3301-hc-topology.xml
@@ -1037,5 +1054,11 @@ $(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-M12G5-hc-topology.xml \
     target=SSG-2029P-ACR24L-hc-topology.xml
 $(i386_ONLY)link \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-M12G5-usb.usbtopo \
+    target=SSG-2029P-ACR24L-usb.usbtopo
+$(i386_ONLY)link \
     path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-S10G5-hc-topology.xml \
     target=SSG-6049P-E1CR36L-hc-topology.xml
+$(i386_ONLY)link \
+    path=usr/platform/i86pc/lib/fm/topo/maps/Joyent-S10G5-usb.usbtopo \
+    target=SSG-6049P-E1CR36L-usb.usbtopo

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -86,39 +86,39 @@
  *
  * There are four different kinds of endpoints:
  *
- * 	BULK		These transfers are large transfers of data to or from
- * 			a device. The most common use for bulk transfers is for
- * 			mass storage devices. Though they are often also used by
- * 			network devices and more. Bulk endpoints do not have an
- * 			explicit time component to them. They are always used
- * 			for one-shot transfers.
+ *	BULK		These transfers are large transfers of data to or from
+ *			a device. The most common use for bulk transfers is for
+ *			mass storage devices. Though they are often also used by
+ *			network devices and more. Bulk endpoints do not have an
+ *			explicit time component to them. They are always used
+ *			for one-shot transfers.
  *
- * 	CONTROL		These transfers are used to manipulate devices
- * 			themselves and are used for USB protocol level
- * 			operations (whether device-specific, class-specific, or
- * 			generic across all of USB). Unlike other transfers,
- * 			control transfers are always bi-directional and use
- * 			different kinds of transfers.
+ *	CONTROL		These transfers are used to manipulate devices
+ *			themselves and are used for USB protocol level
+ *			operations (whether device-specific, class-specific, or
+ *			generic across all of USB). Unlike other transfers,
+ *			control transfers are always bi-directional and use
+ *			different kinds of transfers.
  *
- * 	INTERRUPT	Interrupt transfers are used for small transfers that
- * 			happen infrequently, but need reasonable latency. A good
- * 			example of interrupt transfers is to receive input from
- * 			a USB keyboard. Interrupt-IN transfers are generally
- * 			polled. Meaning that a client (device driver) opens up
- * 			an interrupt-IN pipe to poll on it, and receives
- * 			periodic updates whenever there is information
- * 			available. However, Interrupt transfers can be used
- * 			as one-shot transfers both going IN and OUT.
+ *	INTERRUPT	Interrupt transfers are used for small transfers that
+ *			happen infrequently, but need reasonable latency. A good
+ *			example of interrupt transfers is to receive input from
+ *			a USB keyboard. Interrupt-IN transfers are generally
+ *			polled. Meaning that a client (device driver) opens up
+ *			an interrupt-IN pipe to poll on it, and receives
+ *			periodic updates whenever there is information
+ *			available. However, Interrupt transfers can be used
+ *			as one-shot transfers both going IN and OUT.
  *
- * 	ISOCHRONOUS	These transfers are things that happen once per
- * 			time-interval at a very regular rate. A good example of
- * 			these transfers are for audio and video. A device may
- * 			describe an interval as 10ms at which point it will read
- * 			or write the next batch of data every 10ms and transform
- * 			it for the user. There are no one-shot Isochronous-IN
- * 			transfers. There are one-shot Isochronous-OUT transfers,
- * 			but these are used by device drivers to always provide
- * 			the system with sufficient data.
+ *	ISOCHRONOUS	These transfers are things that happen once per
+ *			time-interval at a very regular rate. A good example of
+ *			these transfers are for audio and video. A device may
+ *			describe an interval as 10ms at which point it will read
+ *			or write the next batch of data every 10ms and transform
+ *			it for the user. There are no one-shot Isochronous-IN
+ *			transfers. There are one-shot Isochronous-OUT transfers,
+ *			but these are used by device drivers to always provide
+ *			the system with sufficient data.
  *
  * To find out information about the endpoints, USB devices have a series of
  * descriptors that cover different aspects of the device. For example, there
@@ -220,67 +220,67 @@
  * purpose of each of these files.
  *
  * xhci_command.c:	This file contains the logic to issue commands to the
- * 			controller as well as the actual functions that the
- * 			other parts of the driver use to cause those commands.
+ *			controller as well as the actual functions that the
+ *			other parts of the driver use to cause those commands.
  *
  * xhci_context.c:	This file manages various data structures used by the
- * 			controller to manage the controller's and device's
- * 			context data structures. See more in the xHCI Overview
- * 			and General Design for more information.
+ *			controller to manage the controller's and device's
+ *			context data structures. See more in the xHCI Overview
+ *			and General Design for more information.
  *
  * xhci_dma.c:		This manages the allocation of DMA memory and DMA
- * 			attributes for controller, whether memory is for a
- * 			transfer or something else. This file also deals with
- * 			all the logic of getting data in and out of DMA buffers.
+ *			attributes for controller, whether memory is for a
+ *			transfer or something else. This file also deals with
+ *			all the logic of getting data in and out of DMA buffers.
  *
  * xhci_endpoint.c:	This manages all of the logic of handling endpoints or
- * 			pipes. It deals with endpoint configuration, I/O
- * 			scheduling, timeouts, and callbacks to USBA.
+ *			pipes. It deals with endpoint configuration, I/O
+ *			scheduling, timeouts, and callbacks to USBA.
  *
  * xhci_event.c:	This manages callbacks from the hardware to the driver.
- * 			This covers command completion notifications and I/O
- * 			notifications.
+ *			This covers command completion notifications and I/O
+ *			notifications.
  *
  * xhci_hub.c:		This manages the virtual root-hub. It basically
- * 			implements and translates all of the USB level requests
- * 			into xhci specific implements. It also contains the
- * 			functions to register this hub with USBA.
+ *			implements and translates all of the USB level requests
+ *			into xhci specific implements. It also contains the
+ *			functions to register this hub with USBA.
  *
  * xhci_intr.c:		This manages the underlying interrupt allocation,
- * 			interrupt moderation, and interrupt routines.
+ *			interrupt moderation, and interrupt routines.
  *
  * xhci_quirks.c:	This manages information about buggy hardware that's
- * 			been collected and experienced primarily from other
- * 			systems.
+ *			been collected and experienced primarily from other
+ *			systems.
  *
  * xhci_ring.c:		This manages the abstraction of a ring in xhci, which is
- * 			the primary of communication between the driver and the
- * 			hardware, whether for the controller or a device.
+ *			the primary of communication between the driver and the
+ *			hardware, whether for the controller or a device.
  *
  * xhci_usba.c:		This implements all of the HCDI functions required by
- * 			USBA. This is the main entry point that drivers and the
- * 			kernel frameworks will reach to start any operation.
- * 			Many functions here will end up in the command and
- * 			endpoint code.
+ *			USBA. This is the main entry point that drivers and the
+ *			kernel frameworks will reach to start any operation.
+ *			Many functions here will end up in the command and
+ *			endpoint code.
  *
  * xhci.c:		This provides the main kernel DDI interfaces and
- * 			performs device initialization.
+ *			performs device initialization.
  *
  * xhci.h:		This is the primary header file which defines
- * 			illumos-specific data structures and constants to manage
- * 			the system.
+ *			illumos-specific data structures and constants to manage
+ *			the system.
  *
  * xhcireg.h:		This header file defines all of the register offsets,
- * 			masks, and related macros. It also contains all of the
- * 			constants that are used in various structures as defined
- * 			by the specification, such as command offsets, etc.
+ *			masks, and related macros. It also contains all of the
+ *			constants that are used in various structures as defined
+ *			by the specification, such as command offsets, etc.
  *
  * xhci_ioctl.h:	This contains a few private ioctls that are used by a
- * 			private debugging command. These are private.
+ *			private debugging command. These are private.
  *
  * cmd/xhci/xhci_portsc:	This is a private utility that can be useful for
- * 				debugging xhci state. It is the only consumer of
- * 				xhci_ioctl.h and the private ioctls.
+ *				debugging xhci state. It is the only consumer of
+ *				xhci_ioctl.h and the private ioctls.
  *
  * ----------------------------------
  * xHCI Overview and Structure Layout
@@ -1444,12 +1444,15 @@ xhci_find_ext_cap(xhci_t *xhcip, uint32_t id, uint32_t init, uint32_t *outp)
 static boolean_t
 xhci_port_count(xhci_t *xhcip)
 {
-	uint_t nusb2 = 0, nusb3 = 0;
+	uint_t nusb2 = 0, fusb2 = 0;
+	uint_t nusb30 = 0, fusb30 = 0;
+	uint_t nusb31 = 0, fusb31 = 0;
 	uint32_t off = UINT32_MAX;
 
 	while (xhci_find_ext_cap(xhcip, XHCI_ID_PROTOCOLS, off, &off) ==
 	    B_TRUE) {
 		uint32_t rvers, rport;
+		uint8_t maj, min, count, first;
 
 		/*
 		 * See xHCI 1.1 / 7.2 for the format of this. The first uint32_t
@@ -1466,23 +1469,48 @@ xhci_port_count(xhci_t *xhcip)
 			return (B_FALSE);
 		}
 
-		rvers = XHCI_XECP_PROT_MAJOR(rvers);
-		rport = XHCI_XECP_PROT_PCOUNT(rport);
+		maj = XHCI_XECP_PROT_MAJOR(rvers);
+		min = XHCI_XECP_PROT_MINOR(rvers);
+		count = XHCI_XECP_PROT_PCOUNT(rport);
+		first = XHCI_XECP_PROT_FPORT(rport);
 
-		if (rvers == 3) {
-			nusb3 += rport;
-		} else if (rvers <= 2) {
-			nusb2 += rport;
+		if (maj == 3 && min == 1) {
+			nusb31 = count;
+			fusb31 = first;
+		} else if (maj == 3 && min == 0) {
+			nusb30 = count;
+			fusb30 = first;
+		} else if (maj <= 2) {
+			nusb2 = count;
+			fusb2 = first;
 		} else {
 			xhci_error(xhcip, "encountered port capabilities with "
 			    "unknown major USB version: %d\n", rvers);
 		}
 	}
 
-	(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
-	    "usb2-capable-ports", nusb2);
-	(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
-	    "usb3-capable-ports", nusb3);
+	/*
+	 * These properties are used by FMA and the USB topo module.
+	 */
+	if (nusb2 > 0) {
+		(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
+		    "usb2.0-port-count", nusb2);
+		(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
+		    "usb2.0-first-port", fusb2);
+	}
+	if (nusb30 > 0) {
+		(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
+		    "usb3.0-port-count", nusb30);
+		(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
+		    "usb3.0-first-port", fusb30);
+	}
+
+	if (nusb31 > 0) {
+		(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
+		    "usb3.1-port-count", nusb30);
+		(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
+		    "usb3.1-first-port", fusb31);
+	}
 
 	return (B_TRUE);
 }
@@ -2183,7 +2211,7 @@ static struct dev_ops xhci_dev_ops = {
 	&xhci_cb_ops,			/* devo_cb_ops */
 	&usba_hubdi_busops,		/* devo_bus_ops */
 	usba_hubdi_root_hub_power,	/* devo_power */
-	ddi_quiesce_not_supported 	/* devo_quiesce */
+	ddi_quiesce_not_supported	/* devo_quiesce */
 };
 
 static struct modldrv xhci_modldrv = {

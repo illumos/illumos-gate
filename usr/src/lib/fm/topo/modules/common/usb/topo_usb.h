@@ -13,26 +13,28 @@
  * Copyright (c) 2018, Joyent, Inc.
  */
 
-#ifndef _TOPO_PORT_H
-#define	_TOPO_PORT_H
+#ifndef	_TOPO_USB_H
+#define	_TOPO_USB_H
+
+#include <libdevinfo.h>
 
 /*
- * Routines to manage and create ports.
+ * Common USB module header file.
  */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern int port_range_create(topo_mod_t *, tnode_t *, topo_instance_t,
-    topo_instance_t);
-extern int port_create_sff(topo_mod_t *, tnode_t *, topo_instance_t,
-    tnode_t **);
-extern int port_create_usb(topo_mod_t *, tnode_t *, topo_instance_t,
-    tnode_t **);
+#define	USB		"usb"
+#define	USB_VERSION	1
+
+#define	USB_PCI		"usb-pci"
+#define	USB_MOBO	"usb-mobo"
+#define	USB_CHASSIS	"usb-chassis"
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _TOPO_PORT_H */
+#endif	/* _TOPO_USB_H */

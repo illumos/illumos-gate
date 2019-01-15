@@ -149,11 +149,12 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 
 	/* pull the label property down from our parent 'bay' node */
 	if (topo_node_label(parent, &label, &err) != 0) {
-		topo_mod_dprintf(mod, "disk_set_props: "
-		    "label error %s\n", topo_strerror(err));
-		goto error;
-	}
-	if (topo_node_label_set(dtn, label, &err) != 0) {
+		if (err != ETOPO_PROP_NOENT) {
+			topo_mod_dprintf(mod, "disk_set_props: "
+			    "label error %s\n", topo_strerror(err));
+			goto error;
+		}
+	} else if (topo_node_label_set(dtn, label, &err) != 0) {
 		topo_mod_dprintf(mod, "disk_set_props: "
 		    "label_set error %s\n", topo_strerror(err));
 		goto error;
@@ -1006,7 +1007,25 @@ dev_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 	    INQUIRY_SERIAL_NO, &s) > 0) {
 		if ((dnode->ddn_serial = disk_trim_whitespace(mod, s)) == NULL)
 			goto error;
+	} else {
+		/*
+		 * Many USB disk devices don't emulate serial inquiry number
+		 * because their serial number can be longer than the standard
+		 * SCSI length. If we didn't get an inquiry serial number, fill
+		 * one in this way.
+		 */
+		di_node_t parent;
+
+		if ((parent = di_parent_node(node)) != DI_NODE_NIL &&
+		    di_prop_lookup_strings(DDI_DEV_T_ANY, parent,
+		    "usb-serialno", &s) > 0) {
+			if ((dnode->ddn_serial = disk_trim_whitespace(mod,
+			    s)) == NULL) {
+				goto error;
+			}
+		}
 	}
+
 	if (di_prop_lookup_int64(DDI_DEV_T_ANY, node,
 	    "device-nblocks", &nblocksp) > 0) {
 		nblocks = (uint64_t)*nblocksp;

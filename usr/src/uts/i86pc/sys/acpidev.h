@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_SYS_ACPIDEV_H
@@ -82,6 +82,7 @@ extern "C" {
 #define	ACPIDEV_TYPE_MEMORY		"acpimemory"
 #define	ACPIDEV_TYPE_PCI		"pci"
 #define	ACPIDEV_TYPE_PCIEX		"pciex"
+#define	ACPIDEV_TYPE_USBPORT		"acpiusbport"
 
 /* Device property names for ACPI objects. */
 #define	ACPIDEV_PROP_NAME_UNIT_ADDR	"unit-address"
@@ -116,6 +117,7 @@ typedef enum acpidev_class_id {
 	ACPIDEV_CLASS_ID_MEMORY = 6,
 	ACPIDEV_CLASS_ID_PCI = 7,
 	ACPIDEV_CLASS_ID_PCIEX = 8,
+	ACPIDEV_CLASS_ID_USB = 9,
 	ACPIDEV_CLASS_ID_MAX
 } acpidev_class_id_t;
 
@@ -244,6 +246,12 @@ struct acpidev_walk_info {
 	intptr_t			awi_scratchpad[4];
 };
 
+/*
+ * Scratchpad entries used by drivers. Note the CPU driver uses entries 0 and 1
+ * and do not currently have a #define.
+ */
+#define	AWI_SCRATCH_USBPORT	2
+
 /* Disable creating device nodes for ACPI objects. */
 #define	ACPIDEV_WI_DISABLE_CREATE	0x1
 /* Device node has already been created for an ACPI object. */
@@ -334,6 +342,7 @@ extern acpidev_class_t			acpidev_class_container;
 extern acpidev_class_t			acpidev_class_cpu;
 extern acpidev_class_t			acpidev_class_memory;
 extern acpidev_class_t			acpidev_class_pci;
+extern acpidev_class_t			acpidev_class_usbport;
 
 /*
  * Class driver lists.
@@ -343,6 +352,7 @@ extern acpidev_class_list_t		*acpidev_class_list_scope;
 extern acpidev_class_list_t		*acpidev_class_list_device;
 extern acpidev_class_list_t		*acpidev_class_list_cpu;
 extern acpidev_class_list_t		*acpidev_class_list_memory;
+extern acpidev_class_list_t		*acpidev_class_list_usbport;
 
 /*
  * Register a device class driver onto a driver list. All class drivers on the

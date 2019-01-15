@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2014 Martin Pieuchot. All rights reserved.
  * Copyright (c) 2010 Hans Petter Selasky. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -286,9 +286,10 @@ extern "C" {
 /*
  * xHCI Supported Protocol Capability. See xHCI 1.1 / 7.2.
  */
-#define	XHCI_XECP_PROT_MAJOR(x)		((x >> 24) & 0xff)
-#define	XHCI_XECP_PROT_MINOR(x)		((x >> 16) & 0xff)
-#define	XHCI_XECP_PROT_PCOUNT(x)	((x >> 8) & 0xff)
+#define	XHCI_XECP_PROT_MAJOR(x)		(((x) >> 24) & 0xff)
+#define	XHCI_XECP_PROT_MINOR(x)		(((x) >> 16) & 0xff)
+#define	XHCI_XECP_PROT_PCOUNT(x)	(((x) >> 8) & 0xff)
+#define	XHCI_XECP_PROT_FPORT(x)		((x) & 0xff)
 
 /*
  * xHCI Slot Context definitions - xHCI 1.1 / 6.2.2.
@@ -397,7 +398,7 @@ extern "C" {
 /*
  * TRB flags that are used between different different TRB types.
  */
-#define	XHCI_TRB_CYCLE		(1 << 0) 	/* Enqueue point of xfer ring */
+#define	XHCI_TRB_CYCLE		(1 << 0)	/* Enqueue point of xfer ring */
 #define	XHCI_TRB_ENT		(1 << 1)	/* Evaluate next TRB */
 #define	XHCI_TRB_LINKSEG	XHCI_TRB_ENT	/* Link to next segment */
 #define	XHCI_TRB_ISP		(1 << 2)	/* Interrupt on short packet */
@@ -460,7 +461,7 @@ extern "C" {
 #define	XHCI_CMD_RESET_DEV	(17 << 10)
 #define	XHCI_CMD_FEVENT		(18 << 10)
 #define	XHCI_CMD_NEG_BW		(19 << 10)
-#define	XHCI_CMD_SET_LT  	(20 << 10)
+#define	XHCI_CMD_SET_LT		(20 << 10)
 #define	XHCI_CMD_GET_BW		(21 << 10)
 #define	XHCI_CMD_FHEADER	(22 << 10)
 #define	XHCI_CMD_NOOP		(23 << 10)
@@ -498,25 +499,25 @@ extern "C" {
 #define	XHCI_CODE_RING_OVERRUN	15	/* Empty ring when receiving isoc */
 #define	XHCI_CODE_VF_RING_FULL	16	/* VF's event ring is full */
 #define	XHCI_CODE_PARAMETER	17	/* Context parameter is invalid */
-#define	XHCI_CODE_BW_OVERRUN	18 	/* TD exceeds the bandwidth */
+#define	XHCI_CODE_BW_OVERRUN	18	/* TD exceeds the bandwidth */
 #define	XHCI_CODE_CONTEXT_STATE	19	/* Transition from illegal ctx state */
 #define	XHCI_CODE_NO_PING_RESP	20	/* Unable to complete periodic xfer */
 #define	XHCI_CODE_EV_RING_FULL	21	/* Unable to post an evt to the ring */
 #define	XHCI_CODE_INCOMPAT_DEV	22	/* Device cannot be accessed */
 #define	XHCI_CODE_MISSED_SRV	23	/* Unable to service isoc EP in ESIT */
-#define	XHCI_CODE_CMD_RING_STOP	24 	/* Command Stop (CS) requested */
-#define	XHCI_CODE_CMD_ABORTED	25 	/* Command Abort (CA) operation */
-#define	XHCI_CODE_XFER_STOPPED	26 	/* xfer terminated by a stop endpoint */
-#define	XHCI_CODE_XFER_STOPINV	27 	/* TRB transfer length invalid */
-#define	XHCI_CODE_XFER_STOPSHORT	28 	/* Stopped before end of TD */
+#define	XHCI_CODE_CMD_RING_STOP	24	/* Command Stop (CS) requested */
+#define	XHCI_CODE_CMD_ABORTED	25	/* Command Abort (CA) operation */
+#define	XHCI_CODE_XFER_STOPPED	26	/* xfer terminated by a stop endpoint */
+#define	XHCI_CODE_XFER_STOPINV	27	/* TRB transfer length invalid */
+#define	XHCI_CODE_XFER_STOPSHORT	28	/* Stopped before end of TD */
 #define	XHCI_CODE_MELAT		29	/* Max Exit Latency too large */
 #define	XHCI_CODE_RESERVED	30
 #define	XHCI_CODE_ISOC_OVERRUN	31	/* IN data buffer < Max ESIT Payload */
-#define	XHCI_CODE_EVENT_LOST	32 	/* Internal overrun - impl. specific */
-#define	XHCI_CODE_UNDEFINED	33 	/* Fatal error - impl. specific */
-#define	XHCI_CODE_INVALID_SID	34 	/* Invalid stream ID received */
-#define	XHCI_CODE_SEC_BW	35 	/* Cannot alloc secondary BW Domain */
-#define	XHCI_CODE_SPLITERR	36 	/* USB2 split transaction */
+#define	XHCI_CODE_EVENT_LOST	32	/* Internal overrun - impl. specific */
+#define	XHCI_CODE_UNDEFINED	33	/* Fatal error - impl. specific */
+#define	XHCI_CODE_INVALID_SID	34	/* Invalid stream ID received */
+#define	XHCI_CODE_SEC_BW	35	/* Cannot alloc secondary BW Domain */
+#define	XHCI_CODE_SPLITERR	36	/* USB2 split transaction */
 
 #ifdef __cplusplus
 }

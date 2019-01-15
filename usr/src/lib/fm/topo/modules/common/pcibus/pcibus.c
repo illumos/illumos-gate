@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/fm/protocol.h>
@@ -45,6 +45,7 @@
 #include <did_props.h>
 #include <util.h>
 #include <topo_nic.h>
+#include <topo_usb.h>
 
 extern txprop_t Bus_common_props[];
 extern txprop_t Dev_common_props[];
@@ -537,6 +538,19 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 		}
 
 		(void) topo_mod_enumerate(mod, fn, NIC, NIC, 0, 0, din);
+	} else if (class == PCI_CLASS_SERIALBUS && subclass == PCI_SERIAL_USB) {
+		/*
+		 * If we encounter a USB controller, make sure to enumerate all
+		 * of its USB ports.
+		 */
+		if (topo_mod_load(mod, USB, USB_VERSION) == NULL) {
+			topo_mod_dprintf(mod, "pcibus enum could not load "
+			    "usb enum\n");
+			(void) topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM);
+			return;
+		}
+
+		(void) topo_mod_enumerate(mod, fn, USB, USB_PCI, 0, 0, din);
 	} else if (class == PCI_CLASS_MASS) {
 		di_node_t cn;
 		int niports = 0;

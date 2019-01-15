@@ -36,13 +36,18 @@ JOYENT_PLATFORMS = \
 	Joyent-Compute-Platform-3101-hc-topology.xml \
 	Joyent-Compute-Platform-3102-hc-topology.xml
 
+JOYENT_USBMAPS = \
+	Joyent-Compute-Platform-3101-usb.usbtopo \
+	Joyent-Compute-Platform-3102-usb.usbtopo
 ROOTJOYENTMAPS = $(JOYENT_PLATFORMS:%=$(arch_ROOTTOPOROOT)/%)
+ROOTJOYENTUSB = $(JOYENT_USBMAPS:%=$(arch_ROOTTOPOROOT)/%)
 
 TOPOFILE = \
 	SSG-2028R-ACR24L-hc-topology.xml \
 	SSG-2028R-ACR24L-chassis-hc-topology.xml \
 	SSG-2028R-ACR24L-disk-hc-topology.xml \
-	SSG-2028R-ACR24L-slot-hc-topology.xml
+	SSG-2028R-ACR24L-slot-hc-topology.xml \
+	SSG-2028R-ACR24L-usb.usbtopo
 
 SRCDIR = ../SMCI,SSG-2028R-ACR24L
 
@@ -52,7 +57,7 @@ CLOBBERFILES +=	$(ROOTJOYENTMAPS) SSG-2028R-ACR24L-disk-hc-topology.xml
 
 include ../Makefile.map
 
-install: $(ROOTJOYENTMAPS)
+install: $(ROOTJOYENTMAPS) $(ROOTJOYENTUSB)
 
 #
 # Note, the Joyent Compute Platform 310x is based on the SuperMicro
@@ -63,3 +68,6 @@ $(ROOTJOYENTMAPS): SSG-2028R-ACR24L-hc-topology.xml
 	$(RM) $@
 	$(SYMLINK) ./$? $@
 
+$(ROOTJOYENTUSB): SSG-2028R-ACR24L-usb.usbtopo
+	$(RM) $@
+	$(SYMLINK) ./$? $@

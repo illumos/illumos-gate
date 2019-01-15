@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -31,10 +32,13 @@
 #include <sys/acpica.h>
 #include <sys/acpidev.h>
 #include <sys/acpidev_impl.h>
+#include <sys/pci.h>
 
 static ACPI_STATUS acpidev_device_probe(acpidev_walk_info_t *infop);
 static acpidev_filter_result_t acpidev_device_filter(acpidev_walk_info_t *infop,
     char *devname, int maxlen);
+static acpidev_filter_result_t acpidev_device_filter_usb(acpidev_walk_info_t *,
+    ACPI_HANDLE, acpidev_filter_rule_t *, char *, int);
 static ACPI_STATUS acpidev_device_init(acpidev_walk_info_t *infop);
 
 static uint32_t acpidev_device_unitaddr = 0;
@@ -88,10 +92,20 @@ static acpidev_filter_rule_t acpidev_device_filters[] = {
 		NULL,
 		NULL,
 	},
+	{	/* Scan a device attempting to find a USB node */
+		acpidev_device_filter_usb,
+		0,
+		ACPIDEV_FILTER_SCAN,
+		&acpidev_class_list_usbport,
+		2,
+		INT_MAX,
+		NULL,
+		NULL
+	},
 	{	/* Scan other device objects not directly under ACPI root */
 		NULL,
 		0,
-		ACPIDEV_FILTER_SKIP,
+		ACPIDEV_FILTER_SCAN,
 		&acpidev_class_list_device,
 		2,
 		INT_MAX,
@@ -149,6 +163,57 @@ acpidev_device_probe(acpidev_walk_info_t *infop)
 	}
 
 	return (rc);
+}
+
+/*
+ * Attempt to determine which devices here correspond to an HCI for a USB
+ * controller.
+ */
+static acpidev_filter_result_t
+acpidev_device_filter_usb(acpidev_walk_info_t *infop, ACPI_HANDLE hdl,
+    acpidev_filter_rule_t *afrp, char *devname, int len)
+{
+	dev_info_t *dip;
+	char **compat;
+	uint_t ncompat, i;
+
+	if (infop->awi_op_type != ACPIDEV_OP_BOOT_REPROBE)
+		return (ACPIDEV_FILTER_SKIP);
+
+	/*
+	 * If we don't find a dip that matches this one, then let's not worry
+	 * about it. This means that it may not be a device we care about in any
+	 * way.
+	 */
+	if (ACPI_FAILURE(acpica_get_devinfo(hdl, &dip))) {
+		return (ACPIDEV_FILTER_SKIP);
+	}
+
+	/*
+	 * To determine if this is a PCI USB class controller, we grab its
+	 * compatible array and look for an instance of pciclass,0c03 or
+	 * pciexclass,0c03. The class code 0c03 is used to indicate a USB
+	 * controller.
+	 */
+	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "compatible", &compat, &ncompat) != DDI_SUCCESS) {
+		return (ACPIDEV_FILTER_SKIP);
+	}
+
+	for (i = 0; i < ncompat; i++) {
+		if (strcmp(compat[i], "pciclass,0c03") == 0 ||
+		    strcmp(compat[i], "pciexclass,0c03") == 0) {
+			ddi_prop_free(compat);
+			/*
+			 * We've found a PCI based USB controller. Switch to the
+			 * USB specific parser.
+			 */
+			return (ACPIDEV_FILTER_SCAN);
+		}
+	}
+
+	ddi_prop_free(compat);
+	return (ACPIDEV_FILTER_SKIP);
 }
 
 static acpidev_filter_result_t
