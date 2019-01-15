@@ -411,6 +411,9 @@ fmt_instr(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
 	char buf[BUFSIZ];
 	uintptr_t naddr;
 
+	if (as == MDB_TGT_AS_VIRT)
+		as = MDB_TGT_AS_VIRT_I;
+
 	while (cnt-- != 0) {
 		naddr = mdb_dis_ins2str(mdb.m_disasm, t, as,
 		    buf, sizeof (buf), addr);
@@ -430,6 +433,9 @@ fmt_dotinstr(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
 	char buf[BUFSIZ];
 	uintptr_t naddr;
 	uint32_t i;
+
+	if (as == MDB_TGT_AS_VIRT)
+		as = MDB_TGT_AS_VIRT_I;
 
 	for (mdb_iob_clrflags(mdb.m_out, oflags); cnt-- != 0; addr = naddr) {
 		if (mdb_tgt_aread(t, as, &i, sizeof (i), addr) != sizeof (i)) {

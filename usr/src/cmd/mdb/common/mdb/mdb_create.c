@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2018 Joyent, Inc.
+ */
 
 #include <mdb/mdb.h>
 #include <mdb/mdb_conf.h>
@@ -51,6 +53,11 @@ mdb_create_builtin_tgts(void)
 
 	if ((mp = mdb_module_load_builtin("mdb_raw")) != NULL)
 		mp->mod_tgt_ctor = mdb_rawfile_tgt_create;
+
+#ifdef __amd64
+	if ((mp = mdb_module_load_builtin("mdb_bhyve")) != NULL)
+		mp->mod_tgt_ctor = mdb_bhyve_tgt_create;
+#endif
 }
 
 void

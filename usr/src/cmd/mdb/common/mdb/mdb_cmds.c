@@ -2090,7 +2090,7 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (opt_f)
 		as = MDB_TGT_AS_FILE;
 	else
-		as = MDB_TGT_AS_VIRT;
+		as = MDB_TGT_AS_VIRT_I;
 
 	if (opt_w == FALSE) {
 		n++;
@@ -2635,8 +2635,9 @@ tgt_status(const mdb_tgt_status_t *tsp)
 		return (DCMD_OK);
 
 	if (tsp->st_pc != 0) {
-		if (mdb_dis_ins2str(mdb.m_disasm, mdb.m_target, MDB_TGT_AS_VIRT,
-		    buf, sizeof (buf), tsp->st_pc) != tsp->st_pc)
+		if (mdb_dis_ins2str(mdb.m_disasm, mdb.m_target,
+		    MDB_TGT_AS_VIRT_I, buf, sizeof (buf), tsp->st_pc) !=
+		    tsp->st_pc)
 			format = "target stopped at:\n%-#16a%8T%s\n";
 		else
 			format = "target stopped at %a:\n";

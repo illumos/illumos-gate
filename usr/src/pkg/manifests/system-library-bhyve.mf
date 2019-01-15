@@ -28,6 +28,7 @@ dir path=lib/$(ARCH64) group=bin
 dir path=usr group=sys
 dir path=usr/lib group=bin
 dir path=usr/lib/$(ARCH64) group=bin
+file path=lib/$(ARCH64)/libvmm.so.1
 file path=lib/$(ARCH64)/libvmmapi.so.1
 file path=usr/lib/$(ARCH64)/libppt.so.1
 file path=usr/lib/libppt.so.1

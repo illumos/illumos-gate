@@ -179,9 +179,31 @@ vm_open(const char *name)
 
 	return (vm);
 err:
+#ifdef __FreeBSD__
 	vm_destroy(vm);
+#else
+	/*
+	 * As libvmmapi is used by other programs to query and control bhyve
+	 * VMs, destroying a VM just because the open failed isn't useful. We
+	 * have to free what we have allocated, though.
+	 */
+	free(vm);
+#endif
 	return (NULL);
 }
+
+#ifndef __FreeBSD__
+void
+vm_close(struct vmctx *vm)
+{
+	assert(vm != NULL);
+	assert(vm->fd >= 0);
+
+	(void) close(vm->fd);
+
+	free(vm);
+}
+#endif
 
 void
 vm_destroy(struct vmctx *vm)
@@ -551,6 +573,22 @@ vm_get_highmem_size(struct vmctx *ctx)
 	return (ctx->highmem);
 }
 
+#ifndef __FreeBSD__
+int
+vm_get_devmem_offset(struct vmctx *ctx, int segid, off_t *mapoff)
+{
+	struct vm_devmem_offset vdo;
+	int error;
+
+	vdo.segid = segid;
+	error = ioctl(ctx->fd, VM_DEVMEM_GETOFFSET, &vdo);
+	if (error == 0)
+		*mapoff = vdo.offset;
+
+	return (error);
+}
+#endif
+
 void *
 vm_create_devmem(struct vmctx *ctx, int segid, const char *name, size_t len)
 {
@@ -583,17 +621,8 @@ vm_create_devmem(struct vmctx *ctx, int segid, const char *name, size_t len)
 	if (fd < 0)
 		goto done;
 #else
-	{
-		struct vm_devmem_offset vdo;
-
-		vdo.segid = segid;
-		error = ioctl(ctx->fd, VM_DEVMEM_GETOFFSET, &vdo);
-		if (error == 0) {
-			mapoff = vdo.offset;
-		} else {
-			goto done;
-		}
-	}
+	if (vm_get_devmem_offset(ctx, segid, &mapoff) != 0)
+		goto done;
 #endif
 
 	/*

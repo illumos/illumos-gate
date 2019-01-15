@@ -64,6 +64,9 @@ extern int mdb_kvm_tgt_create(mdb_tgt_t *, int, const char *[]);
 extern int mdb_proc_tgt_create(mdb_tgt_t *, int, const char *[]);
 extern int mdb_kproc_tgt_create(mdb_tgt_t *, int, const char *[]);
 extern int mdb_rawfile_tgt_create(mdb_tgt_t *, int, const char *[]);
+#ifdef __amd64
+extern int mdb_bhyve_tgt_create(mdb_tgt_t *, int, const char *[]);
+#endif
 #else
 extern int kmdb_kvm_create(mdb_tgt_t *, int, const char *[]);
 #endif
@@ -139,10 +142,12 @@ typedef void *		mdb_tgt_as_t;		/* Opaque address space id */
 typedef uint64_t	mdb_tgt_addr_t;		/* Generic unsigned address */
 typedef uint64_t	physaddr_t;		/* Physical memory address */
 
-#define	MDB_TGT_AS_VIRT	((mdb_tgt_as_t)-1L)	/* Virtual address space */
-#define	MDB_TGT_AS_PHYS	((mdb_tgt_as_t)-2L)	/* Physical address space */
-#define	MDB_TGT_AS_FILE	((mdb_tgt_as_t)-3L)	/* Object file address space */
-#define	MDB_TGT_AS_IO	((mdb_tgt_as_t)-4L)	/* I/o address space */
+#define	MDB_TGT_AS_VIRT	((mdb_tgt_as_t)-1L)	/* Virtual address space: */
+#define	MDB_TGT_AS_VIRT_I ((mdb_tgt_as_t)-2L)	/*   special case for code */
+#define	MDB_TGT_AS_VIRT_S ((mdb_tgt_as_t)-3L)	/*   special case for stack */
+#define	MDB_TGT_AS_PHYS	((mdb_tgt_as_t)-4L)	/* Physical address space */
+#define	MDB_TGT_AS_FILE	((mdb_tgt_as_t)-5L)	/* Object file address space */
+#define	MDB_TGT_AS_IO	((mdb_tgt_as_t)-6L)	/* I/o address space */
 
 extern ssize_t mdb_tgt_aread(mdb_tgt_t *, mdb_tgt_as_t,
 	void *, size_t, mdb_tgt_addr_t);

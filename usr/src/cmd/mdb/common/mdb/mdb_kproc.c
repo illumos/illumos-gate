@@ -553,7 +553,8 @@ kp_vtop(mdb_tgt_t *t, mdb_tgt_as_t as, uintptr_t va, physaddr_t *pap)
 	kp_data_t *kp = t->t_data;
 	physaddr_t pa;
 
-	if (as != MDB_TGT_AS_VIRT)
+	if (as != MDB_TGT_AS_VIRT && as != MDB_TGT_AS_VIRT_I &&
+	    as != MDB_TGT_AS_VIRT_S)
 		return (set_errno(EINVAL));
 
 	if ((pa = kvm_physaddr(kp->kp_cookie, kp->kp_as, va)) != -1ULL) {

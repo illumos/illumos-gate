@@ -75,7 +75,11 @@ static cpuset_t vcpus_active, vcpus_suspended, vcpus_waiting;
 static pthread_mutex_t gdb_lock;
 static pthread_cond_t idle_vcpus;
 static bool stop_pending, first_stop;
+#ifdef __FreeBSD__
 static int stepping_vcpu, stopped_vcpu;
+#else
+static int stepping_vcpu = -1, stopped_vcpu = -1;
+#endif
 
 /*
  * An I/O buffer contains 'capacity' bytes of room at 'data'.  For a

@@ -296,12 +296,12 @@ kaif_brkpt_arm(uintptr_t addr, mdb_instr_t *instrp)
 		return (set_errno(EMDB_TGTNOTSUP));
 	}
 
-	if (mdb_tgt_vread(mdb.m_target, instrp, sizeof (mdb_instr_t), addr) !=
-	    sizeof (mdb_instr_t))
+	if (mdb_tgt_aread(mdb.m_target, MDB_TGT_AS_VIRT_I, instrp,
+	    sizeof (mdb_instr_t), addr) != sizeof (mdb_instr_t))
 		return (-1); /* errno is set for us */
 
-	if (mdb_tgt_vwrite(mdb.m_target, &bkpt, sizeof (mdb_instr_t), addr) !=
-	    sizeof (mdb_instr_t))
+	if (mdb_tgt_awrite(mdb.m_target, MDB_TGT_AS_VIRT_I, &bkpt,
+	    sizeof (mdb_instr_t), addr) != sizeof (mdb_instr_t))
 		return (-1); /* errno is set for us */
 
 	return (0);
@@ -310,8 +310,8 @@ kaif_brkpt_arm(uintptr_t addr, mdb_instr_t *instrp)
 static int
 kaif_brkpt_disarm(uintptr_t addr, mdb_instr_t instrp)
 {
-	if (mdb_tgt_vwrite(mdb.m_target, &instrp, sizeof (mdb_instr_t), addr) !=
-	    sizeof (mdb_instr_t))
+	if (mdb_tgt_awrite(mdb.m_target, MDB_TGT_AS_VIRT_I, &instrp,
+	    sizeof (mdb_instr_t), addr) != sizeof (mdb_instr_t))
 		return (-1); /* errno is set for us */
 
 	return (0);
@@ -486,7 +486,7 @@ kaif_step(void)
 	}
 
 	if ((npc = mdb_dis_nextins(mdb.m_disasm, mdb.m_target,
-	    MDB_TGT_AS_VIRT, pc)) == pc) {
+	    MDB_TGT_AS_VIRT_I, pc)) == pc) {
 		warn("failed to decode instruction at %a for step\n", pc);
 		return (set_errno(EINVAL));
 	}
@@ -498,8 +498,8 @@ kaif_step(void)
 	 * versus their 64-bit counterparts.
 	 */
 	do {
-		if (mdb_tgt_vread(mdb.m_target, &instr, sizeof (mdb_instr_t),
-		    pc + pcoff) != sizeof (mdb_instr_t)) {
+		if (mdb_tgt_aread(mdb.m_target, MDB_TGT_AS_VIRT_I, &instr,
+		    sizeof (mdb_instr_t), pc + pcoff) != sizeof (mdb_instr_t)) {
 			warn("failed to read at %p for step",
 			    (void *)(pc + pcoff));
 			return (-1);
@@ -518,8 +518,8 @@ kaif_step(void)
 		return (set_errno(EMDB_TGTNOTSUP));
 
 	case M_ESC:
-		if (mdb_tgt_vread(mdb.m_target, &instr, sizeof (mdb_instr_t),
-		    pc + pcoff) != sizeof (mdb_instr_t)) {
+		if (mdb_tgt_aread(mdb.m_target, MDB_TGT_AS_VIRT_I, &instr,
+		    sizeof (mdb_instr_t), pc + pcoff) != sizeof (mdb_instr_t)) {
 			warn("failed to read at %p for step",
 			    (void *)(pc + pcoff));
 			return (-1);
@@ -568,8 +568,8 @@ kaif_step(void)
 		(void) kmdb_dpi_get_register("sp", &sp);
 		(void) kmdb_dpi_get_register(FLAGS_REG_NAME, &fl);
 
-		if (mdb_tgt_vread(mdb.m_target, &newfl, sizeof (kreg_t),
-		    sp) != sizeof (kreg_t)) {
+		if (mdb_tgt_aread(mdb.m_target, MDB_TGT_AS_VIRT_S, &newfl,
+		    sizeof (kreg_t), sp) != sizeof (kreg_t)) {
 			warn("failed to read " FLAGS_REG_NAME
 			    " at %p for popfl step\n", (void *)sp);
 			return (set_errno(EMDB_TGTNOTSUP)); /* XXX ? */
@@ -577,8 +577,8 @@ kaif_step(void)
 
 		fl = (fl & ~KREG_EFLAGS_IF_MASK) | KREG_EFLAGS_TF_MASK;
 
-		if (mdb_tgt_vwrite(mdb.m_target, &fl, sizeof (kreg_t),
-		    sp) != sizeof (kreg_t)) {
+		if (mdb_tgt_awrite(mdb.m_target, MDB_TGT_AS_VIRT_S, &fl,
+		    sizeof (kreg_t), sp) != sizeof (kreg_t)) {
 			warn("failed to update " FLAGS_REG_NAME
 			    " at %p for popfl step\n", (void *)sp);
 			return (set_errno(EMDB_TGTNOTSUP)); /* XXX ? */
@@ -617,8 +617,8 @@ kaif_step(void)
 		 */
 		(void) kmdb_dpi_get_register("sp", &sp);
 
-		if (mdb_tgt_vwrite(mdb.m_target, &oldfl, sizeof (kreg_t),
-		    sp) != sizeof (kreg_t)) {
+		if (mdb_tgt_awrite(mdb.m_target, MDB_TGT_AS_VIRT_S, &oldfl,
+		    sizeof (kreg_t), sp) != sizeof (kreg_t)) {
 			warn("failed to update pushed " FLAGS_REG_NAME
 			    " at %p after pushfl step\n", (void *)sp);
 			return (set_errno(EMDB_TGTNOTSUP)); /* XXX ? */

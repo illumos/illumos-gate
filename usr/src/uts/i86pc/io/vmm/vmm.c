@@ -2116,6 +2116,10 @@ restart:
 			break;
 		}
 
+		case VM_EXITCODE_MTRAP:
+			vm_suspend_cpu(vm, vcpuid);
+			retu = true;
+			break;
 #endif
 		default:
 			retu = true;	/* handled in userland */

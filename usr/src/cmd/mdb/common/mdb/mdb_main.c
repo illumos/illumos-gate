@@ -322,12 +322,13 @@ static void
 usage(int status)
 {
 	mdb_iob_printf(mdb.m_err, "Usage: %s [-fkmuwyAFKMSUW] [+/-o option] "
-	    "[-p pid] [-s dist] [-I path] [-L path]\n\t[-P prompt] "
+	    "[-b VM] [-p pid] [-s dist] [-I path] [-L path]\n\t[-P prompt] "
 	    "[-R root] [-V dis-version] [-e expr] "
 	    "[object [core] | core | suffix]\n\n",
 	    mdb.m_pname);
 
 	mdb_iob_puts(mdb.m_err,
+	    "\t-b attach to specified bhyve VM\n"
 	    "\t-e evaluate expr and return status\n"
 	    "\t-f force raw file debugging mode\n"
 	    "\t-k force kernel debugging mode\n"
@@ -405,6 +406,19 @@ identify_xvm_file(const char *file, int *longmode)
 }
 #endif /* __x86 */
 
+#ifndef __amd64
+/*
+ * There is no bhyve target in a 32bit x86 or any SPARC mdb. This dummy helps
+ * keep the code simpler.
+ */
+/*ARGSUSED*/
+static int
+mdb_bhyve_tgt_create(mdb_tgt_t *t, int argc, const char *argv[])
+{
+	return (set_errno(EINVAL));
+}
+#endif
+
 int
 main(int argc, char *argv[], char *envp[])
 {
@@ -424,6 +438,7 @@ main(int argc, char *argv[], char *envp[])
 	const char *Iflag = NULL, *Lflag = NULL, *Vflag = NULL, *pidarg = NULL;
 	const char *eflag = NULL;
 	int fflag = 0, Kflag = 0, Rflag = 0, Sflag = 0, Oflag = 0, Uflag = 0;
+	int bflag = 0;
 
 	int ttylike;
 	int longmode = 0;
@@ -513,8 +528,12 @@ main(int argc, char *argv[], char *envp[])
 
 	while (optind < argc) {
 		while ((c = getopt(argc, argv,
-		    "e:fkmo:p:s:uwyACD:FI:KL:MOP:R:SUV:W")) != (int)EOF) {
+		    "be:fkmo:p:s:uwyACD:FI:KL:MOP:R:SUV:W")) != (int)EOF) {
 			switch (c) {
+			case 'b':
+				bflag++;
+				tgt_ctor = mdb_bhyve_tgt_create;
+				break;
 			case 'e':
 				if (eflag != NULL) {
 					warn("-e already specified\n");
@@ -829,6 +848,15 @@ main(int argc, char *argv[], char *envp[])
 
 		if (fflag)
 			goto tcreate; /* skip re-exec and just create target */
+
+		/* bhyve: directly create target, or re-exec in case of 32bit */
+		if (bflag) {
+#ifndef __amd64
+			goto reexec;
+#else
+			goto tcreate;
+#endif
+		}
 
 		/*
 		 * If we just have an object file name, and that file doesn't

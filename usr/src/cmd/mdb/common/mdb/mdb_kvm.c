@@ -814,6 +814,8 @@ kt_vtop(mdb_tgt_t *t, mdb_tgt_as_t as, uintptr_t va, physaddr_t *pap)
 	case (uintptr_t)MDB_TGT_AS_IO:
 		return (set_errno(EINVAL));
 	case (uintptr_t)MDB_TGT_AS_VIRT:
+	case (uintptr_t)MDB_TGT_AS_VIRT_I:
+	case (uintptr_t)MDB_TGT_AS_VIRT_S:
 		asp = kt->k_as;
 		break;
 	default:

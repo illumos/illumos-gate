@@ -251,6 +251,9 @@ usage(int code)
 		"       -A: create ACPI tables\n"
 		"       -c: number of cpus and/or topology specification\n"
 		"       -C: include guest memory in core file\n"
+#ifndef __FreeBSD__
+	        "       -d: suspend cpu at boot\n"
+#endif
 		"       -e: exit on unhandled I/O access\n"
 		"       -g: gdb port\n"
 		"       -h: help\n"
@@ -500,8 +503,14 @@ fbsdrun_start_thread(void *param)
 	return (NULL);
 }
 
+#ifdef __FreeBSD__
 void
 fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip)
+#else
+void
+fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip,
+    bool suspend)
+#endif
 {
 	int error;
 
@@ -518,6 +527,11 @@ fbsdrun_addcpu(struct vmctx *ctx, int fromcpu, int newcpu, uint64_t rip)
 		err(EX_OSERR, "could not activate CPU %d", newcpu);
 
 	CPU_SET_ATOMIC(newcpu, &cpumask);
+
+#ifndef __FreeBSD__
+	if (suspend)
+		(void) vm_suspend_cpu(ctx, newcpu);
+#endif
 
 	/*
 	 * Set up the vmexit struct to allow execution to start
@@ -1057,6 +1071,9 @@ main(int argc, char *argv[])
 	int max_vcpus, mptgen, memflags;
 	int rtc_localtime;
 	bool gdb_stop;
+#ifndef __FreeBSD__
+	bool suspend = false;
+#endif
 	struct vmctx *ctx;
 	uint64_t rip;
 	size_t memsize;
@@ -1078,7 +1095,7 @@ main(int argc, char *argv[])
 #ifdef	__FreeBSD__
 	optstr = "abehuwxACHIPSWYp:g:G:c:s:m:l:B:U:";
 #else
-	optstr = "abehuwxACHIPSWYg:G:c:s:m:l:B:U:";
+	optstr = "abdehuwxACHIPSWYg:G:c:s:m:l:B:U:";
 #endif
 	while ((c = getopt(argc, argv, optstr)) != -1) {
 		switch (c) {
@@ -1097,7 +1114,11 @@ main(int argc, char *argv[])
 				    "configuration '%s'", optarg);
 			}
 			break;
-#ifdef	__FreeBSD__
+#ifndef	__FreeBSD__
+		case 'd':
+			suspend = true;
+			break;
+#else
 		case 'p':
 			if (pincpu_parse(optarg) != 0) {
 				errx(EX_USAGE, "invalid vcpu pinning "
@@ -1331,8 +1352,11 @@ main(int argc, char *argv[])
 	/*
 	 * Add CPU 0
 	 */
+#ifdef __FreeBSD__
 	fbsdrun_addcpu(ctx, BSP, BSP, rip);
-
+#else
+	fbsdrun_addcpu(ctx, BSP, BSP, rip, suspend);
+#endif
 	/*
 	 * Head off to the main event dispatch loop
 	 */
