@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		ldd
 
@@ -47,6 +48,8 @@ LDFLAGS +=	$(VERSREF) $(CC_USE_PROTO) $(MAPOPTS) $(LLDFLAGS)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lelf $(DLLIB)
 LINTFLAGS +=	-x
 LINTFLAGS64 +=	-x
+
+SMOFF += or_vs_and
 
 BLTDEFS=        msg.h
 BLTDATA=        msg.c

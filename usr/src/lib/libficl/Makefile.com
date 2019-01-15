@@ -12,6 +12,7 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=libficl-sys.a
 MAJOR = 4
@@ -39,6 +40,9 @@ CPPFLAGS +=	-I$(PNGLITE)
 pics/vm.o := CERRWARN += -_gcc=-Wno-clobbered
 
 LDLIBS +=	-luuid -lz -lc -lm -lumem
+
+# not linted
+SMATCH=off
 
 HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficltokens.h ../ficllocal.h \
 	$(FICLDIR)/ficlplatform/unix.h $(PNGLITE)/pnglite.h

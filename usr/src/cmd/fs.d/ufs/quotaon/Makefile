@@ -22,7 +22,7 @@
 # Use is subject to license terms.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 #
-# cmd/fs.d/ufs/quotaon/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		ufs
 LIBPROG=	quotaon
@@ -42,6 +42,9 @@ $(ROOTINIT_SCRIPT) :=	FILEMODE = 0744
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 lint:		lint_PROG
 

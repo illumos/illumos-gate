@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =		libipp-core.a
 VERS =			.0
@@ -45,6 +46,8 @@ CPPFLAGS +=	-I../../libpapi-common/common
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-switch
+
+SMOFF += all_func_returns
 
 MAPFILES =	$(SRCDIR)/mapfile
 

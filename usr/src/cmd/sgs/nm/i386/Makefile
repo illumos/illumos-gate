@@ -21,8 +21,7 @@
 #
 # Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# cmd/sgs/nm/i386/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		nm
 XPG4PROG=	nm
@@ -46,6 +45,8 @@ DEFLIST=	-DTARGET=I386 -DI386=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+SMOFF += precedence,indenting
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTFLAGS +=	-x $(LDLIBS)

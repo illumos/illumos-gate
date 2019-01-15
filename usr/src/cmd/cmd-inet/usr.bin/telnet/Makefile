@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 
 PROG=		telnet
 OBJS=		telnet.o commands.o main.o network.o ring.o \
@@ -52,6 +54,9 @@ CERRWARN +=	-_gcc=-Wno-unused-label
 LDLIBS +=	-lsocket -lnsl -ltermlib
 LDLIBS +=	-lmech_krb5 
 LDFLAGS +=	$(KRUNPATH) -L$(ROOT)$(KLIBDIR_DO) -L$(ROOT)$(KLIBDIR_GL)
+
+# "missing type for func"
+SMATCH=off
 
 .KEEP_STATE:
 

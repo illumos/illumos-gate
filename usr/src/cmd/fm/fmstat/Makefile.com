@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -46,6 +47,8 @@ CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_adm
 LDFLAGS += -R/usr/lib/fm
 LINTFLAGS += -mnu
+
+SMOFF += signed
 
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)

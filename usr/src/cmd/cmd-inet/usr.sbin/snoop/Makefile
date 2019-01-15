@@ -22,7 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2015 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG=	snoop
@@ -62,6 +62,9 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-function
+
+# we really should have smatch running on this code but...
+SMATCH=off
 
 .KEEP_STATE:
 

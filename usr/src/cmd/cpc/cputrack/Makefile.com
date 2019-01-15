@@ -22,8 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 include	../../../Makefile.cmd
 
@@ -35,6 +34,9 @@ LDLIBS +=	-lcpc -lpctx
 CFLAGS +=	$(CCVERBOSE) $(CTF_FLAGS)
 CFLAGS64 +=	$(CCVERBOSE) $(CTF_FLAGS)
 CPPFLAGS +=	-I$(SRC)/lib/libcpc/common
+
+# not linted
+SMATCH=off
 
 LINTFLAGS +=	-u
 LINTFLAGS64 +=	-u

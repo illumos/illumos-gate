@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY= libzpool.a
@@ -88,6 +88,9 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-empty-body
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-unused-label
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

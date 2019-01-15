@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 COMMONBASE = ../../common
 
@@ -48,6 +48,9 @@ POFILE = fcinfo_cmd.po
 POFILES = fcinfo.po fcinfo-list.po fcadm-list.po printAttrs.po fcoeadm.po
 
 CERRWARN += -_gcc=-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 

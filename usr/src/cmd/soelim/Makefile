@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include		../Makefile.cmd
 
@@ -32,6 +33,9 @@ OBJS =		soelim.o
 SRCS =		$(OBJS:%.o=%.c)
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 all :		$(PROG)
 

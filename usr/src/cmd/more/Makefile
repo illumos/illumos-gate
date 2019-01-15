@@ -23,6 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= more
 DATA= more.help
@@ -41,9 +42,12 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-clobbered
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
-all: $(PROG) $(DATA) 
+all: $(PROG) $(DATA)
 
 install: all $(ROOTPROG) $(ROOTLIBDATA)
 	$(RM) $(ROOTBIN)/page

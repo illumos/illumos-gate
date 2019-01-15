@@ -24,6 +24,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 MODULE = ip-transport
 CLASS = common
@@ -33,3 +34,6 @@ include ../../Makefile.plugin
 
 LDLIBS += -lsocket -lnsl
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off

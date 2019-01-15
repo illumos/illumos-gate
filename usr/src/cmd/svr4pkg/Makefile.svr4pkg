@@ -24,6 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -37,6 +38,9 @@ CPPFLAGS +=	-I$(SRC)/cmd/svr4pkg/hdrs \
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-address
+
+# multiple issues in this old code
+SMATCH=off
 
 LIBINST =       $(SRC)/cmd/svr4pkg/libinst/libinst.a
 

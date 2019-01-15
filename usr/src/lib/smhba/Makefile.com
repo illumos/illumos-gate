@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 
 LIBRARY =	libSMHBAAPI.a
@@ -48,6 +49,8 @@ CPPFLAGS +=	-DPOSIX_THREADS
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-function
+
+SMOFF += indenting,all_func_returns
 
 LDLIBS +=	-lc
 

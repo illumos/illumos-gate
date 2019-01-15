@@ -21,6 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=	strace strerr strclean
 
@@ -29,11 +30,13 @@ include ../../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-unused-variable
 
+SMOFF += all_func_returns
+
 FILEMODE= 0555
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 	-$(RM) $(ROOTBIN)/strace

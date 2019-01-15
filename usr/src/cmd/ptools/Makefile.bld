@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 # Copyright 2015 Joyent, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG:sh = basename `cd ..; pwd`
 
@@ -59,17 +60,23 @@ LDLIBS_pwdx		= -lproc
 LDLIBS += $(LDLIBS_$(PROG))
 
 CERRWARN_plgrp	+= -_gcc=-Wno-parentheses
+CERRWARN_plgrp	+= -_smatch=off
+
+CERRWARN_pmadvise += -_smatch=off
 
 CERRWARN_ppriv	+= -_gcc=-Wno-parentheses
 CERRWARN_ppriv	+= -_gcc=-Wno-uninitialized
 
 CERRWARN_ptree	+= -_gcc=-Wno-parentheses
+CERRWARN_ptree	+= -_smatch=off
 
 CERRWARN_pstack	+= -_gcc=-Wno-uninitialized
 CERRWARN_pstack	+= -_gcc=-Wno-clobbered
 
 CERRWARN_pargs	+= -_gcc=-Wno-clobbered
 CERRWARN_pargs	+= -_gcc=-Wno-type-limits
+
+CERRWARN_pwait	+= -_smatch=off
 
 CERRWARN += $(CERRWARN_$(PROG))
 

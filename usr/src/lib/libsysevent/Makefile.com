@@ -22,8 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libsysevent.a
 
@@ -43,6 +42,9 @@ LINTSRC =       $(LINTLIB:%.ln=%)
 CPPFLAGS +=	-D_REENTRANT -I..
 CFLAGS +=	$(CCVERBOSE)
 LDLIBS +=	-lnvpair -lc
+
+# not linted
+SMATCH=off
 
 $(LINTLIB) :=	SRCS = ../llib-lsysevent
 

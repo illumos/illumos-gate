@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		idmap
 CLIENTOBJS =	idmap.o idmap_engine.o namemaps.o
@@ -40,6 +41,9 @@ CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-address
+
+# not linted
+SMATCH=off
 
 POFILE = 	$(PROG)_all.po
 LDLIBS +=	-lidmap -ladutils -lsldap -lldap

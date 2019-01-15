@@ -23,6 +23,7 @@
 /*
  * Copyright 2013 STEC, Inc.  All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include	<sys/types.h>
@@ -4775,8 +4776,8 @@ skd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 	progress |= SKD_REGS_MAPPED;
 
-		skdev->iomap_iobase = skdev->iobase;
-		skdev->iomap_handle = skdev->iobase_handle;
+	skdev->iomap_iobase = skdev->iobase;
+	skdev->iomap_handle = skdev->iobase_handle;
 
 	Dcmn_err(CE_NOTE, "%s: PCI iobase=%ph, iomap=%ph, regnum=%d, "
 	    "regsize=%ld", skdev->name, (void *)skdev->iobase,

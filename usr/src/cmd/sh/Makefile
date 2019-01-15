@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		sh
 USR_PROG =	$(PROG)
@@ -45,6 +46,10 @@ CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-extra
 CERRWARN += -_gcc=-Wno-unused-variable
+
+# unknown type for func
+SMATCH=off
+
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
 LDLIBS += -lgen

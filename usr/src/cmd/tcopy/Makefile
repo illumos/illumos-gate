@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1990 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		tcopy
 
@@ -31,6 +32,9 @@ CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-extra
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE :
 

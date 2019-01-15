@@ -11,9 +11,8 @@
 
 #
 # Copyright 2017 Toomas Soome <tsoome@me.com>
+# Copyright (c) 2018, Joyent, Inc.
 #
-
-# cmd/cmd-inet/usr.bin/dns-sd/Makefile
 
 PROG=		dns-sd
 
@@ -28,6 +27,9 @@ CFLAGS += $(CSTD_GNU99)
 CPPFLAGS += -I$(SRCDIR)/mDNSShared
 CPPFLAGS += -DMDNS_VERSIONSTR_NODTS
 LDLIBS += -lsocket -ldns_sd
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

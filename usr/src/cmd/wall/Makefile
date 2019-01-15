@@ -21,7 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2012 Joyent, Inc. All Rights Reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG= wall
@@ -34,9 +34,11 @@ LDLIBS += -lzonecfg -lcontract
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 
+SMOFF += leaks
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 	-$(RM) $(ROOTETCPROG)

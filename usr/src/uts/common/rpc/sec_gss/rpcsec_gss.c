@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
  *
  * $Header:
@@ -277,9 +281,9 @@ rpc_gss_secget(CLIENT *clnt,
 	NOT_NULL(cr);
 	IS_ALIGNED(cr);
 #ifdef DEBUG
-if (HASH(cache_key, uid) < 0) {
-	prom_printf("cache_key %p, cr %p\n", cache_key, (void *)cr);
-}
+	if (HASH(cache_key, uid) < 0) {
+		prom_printf("cache_key %p, cr %p\n", cache_key, (void *)cr);
+	}
 #endif
 
 	/*

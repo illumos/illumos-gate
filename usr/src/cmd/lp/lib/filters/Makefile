@@ -23,6 +23,7 @@
 # Copyright 1990-2003 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY	=	liblpflt.a
 
@@ -51,6 +52,9 @@ CPPFLAGS =	-I../../include $(CPPFLAGS.master)
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 POFILE =	lp_lib_filters.po
 

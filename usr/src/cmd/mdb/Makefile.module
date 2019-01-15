@@ -23,7 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
-# Copyright 2015, Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 .KEEP_STATE:
@@ -128,6 +128,8 @@ LDFLAGS			+= $(ZTEXT)
 LDFLAGS64		+= $(ZTEXT)
 ASFLAGS			+= -P
 AS_CPPFLAGS		+= -D_ASM
+
+SMOFF += all_func_returns,index_overflow
 
 # Module type-specific compiler flags
 $(MODOBJS) :=			CFLAGS += $(C_BIGPICFLAGS) $(XREGSFLAG)

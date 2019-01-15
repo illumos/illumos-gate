@@ -22,6 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 include $(SRC)/Makefile.master
 
@@ -74,6 +75,9 @@ $(ICONV_DIR)/alias:=	FILEMODE=0444
 LDLIBS			= -lc
 
 LDFLAGS = $(DYNFLAGS) $(LDLIBS) $(CFLAG_OPT)
+
+# needs work
+SMATCH=off
 
 $(DYNOBJS)		:= CFLAGS += $(XREGSFLAG) $(C_PICFLAGS) -D_REENTRANT \
 					-I$(COMMON) -I$(COMMON)/tbls \

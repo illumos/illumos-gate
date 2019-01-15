@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-# cmd/rpcsvc/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 PROTOCOL_DIR= $(ROOT)/usr/include/rpcsvc
 
@@ -64,6 +63,10 @@ CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-extra
 CERRWARN += -_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
+
 LDLIBS += -lnsl
 rusers :=	CFLAGS += $(CCVERBOSE)
 $(BINPROG) :=	LDLIBS += -lrpcsvc

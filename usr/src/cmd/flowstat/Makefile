@@ -22,6 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=flowstat
 
@@ -37,6 +38,9 @@ LDLIBS += -ldladm -lofmt
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 ROOTCFGDIR=	$(ROOTETC)/dladm
 

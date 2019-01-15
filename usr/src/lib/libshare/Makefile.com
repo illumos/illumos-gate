@@ -20,6 +20,7 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 LIBRARY =	libshare.a
 VERS =		.1
@@ -47,6 +48,10 @@ CSTD +=	$(CSTD_GNU99)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
+
 CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) \
 		-I$(ADJUNCT_PROTO)/usr/include/libxml2
 

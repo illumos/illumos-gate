@@ -24,6 +24,7 @@
 #
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	libadutils.a
 VERS =		.1
@@ -46,6 +47,9 @@ CPPFLAGS +=	-I$(SRC)/lib/libldap5/include/ldap
 
 CERRWARN +=	-_gcc=-Wno-type-limits
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

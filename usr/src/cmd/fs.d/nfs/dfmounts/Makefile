@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		nfs
 LIBPROG=	dfmounts
@@ -42,6 +43,9 @@ LDLIBS +=	-lrpcsvc -lnsl
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-parentheses
+
+# unknown type for func
+SMATCH =	off
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)

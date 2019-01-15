@@ -22,7 +22,7 @@
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -6799,7 +6799,7 @@ hubd_delete_child(hubd_t *hubd, usb_port_t port, uint_t flag, boolean_t retry)
 			if (hubd->h_children_dips[port] == child_dip) {
 				usba_device_t *ud =
 				    hubd->h_usba_devices[port];
-					hubd->h_children_dips[port] = NULL;
+				hubd->h_children_dips[port] = NULL;
 				if (ud) {
 					mutex_exit(HUBD_MUTEX(hubd));
 

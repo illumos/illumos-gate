@@ -22,9 +22,9 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-#
 # Copyright (c) 2015 by Delphix. All rights reserved.
+#
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 LIBRARY= libzfs_jni.a
@@ -49,6 +49,8 @@ LDLIBS +=	-lc -lnvpair -ldiskmgt -lzfs
 CPPFLAGS +=	$(INCS)
 $(NOT_RELEASE_BUILD) CPPFLAGS += -DDEBUG
 CERRWARN +=	-_gcc=-Wno-switch
+
+SMOFF += all_func_returns
 
 SRCDIR =	../common
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

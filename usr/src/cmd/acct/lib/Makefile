@@ -19,14 +19,13 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright (c) 1989 by Sun Microsystems, Inc.
-#
+# Copyright (c) 2018, Joyent, Inc.
 #
 LIBS=	a.a
 
-OBJS=	pnpsplit.o  copyn.o devtolin.o expand.o lintodev.o \
-	namtouid.o tmless.o tmsecs.o uidtonam.o substr.o 
+OBJS=	pnpsplit.o devtolin.o expand.o lintodev.o \
+	namtouid.o tmless.o tmsecs.o uidtonam.o substr.o
 SRCS=	$(OBJS:%.o=%.c)
 
 include	../../Makefile.cmd
@@ -35,6 +34,9 @@ CPPFLAGS = -D_LTYPES -I.. $(CPPFLAGS.master)
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-extra
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

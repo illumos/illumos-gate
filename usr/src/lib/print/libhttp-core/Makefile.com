@@ -22,8 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =		libhttp-core.a
 VERS =			.1
@@ -46,6 +45,9 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 CPPFLAGS +=	-I../../libpapi-common/common
+
+# not linted
+SMATCH=off
 
 MAPFILES =	$(SRCDIR)/mapfile
 

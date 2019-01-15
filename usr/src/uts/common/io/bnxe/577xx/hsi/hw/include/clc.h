@@ -82,10 +82,6 @@ extern void elink_cb_notify_link_changed(struct elink_dev *cb);
 #define ELINK_EVENT_ID_SFP_UNQUALIFIED_MODULE 	1
 #define ELINK_EVENT_ID_SFP_POWER_FAULT 		2
 
-#ifdef ELINK_AUX_POWER
-#define elink_cb_event_log(cb, level, ...)
-#define elink_cb_get_friendly_name(cb) ''
-#endif /*ELINK_AUX_POWER */
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 #endif

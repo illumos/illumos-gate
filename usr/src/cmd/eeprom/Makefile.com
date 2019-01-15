@@ -21,6 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 #
 #	Create default so empty rules don't
@@ -40,6 +41,9 @@ OBJS		= error.o
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 LINT_OBJS = $(OBJS:%.o=%.ln)
 SOURCES = $(OBJS:%.o=%.c)

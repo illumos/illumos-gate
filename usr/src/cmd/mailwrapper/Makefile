@@ -12,10 +12,11 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Copyright 2014 Alexander Pyhalov
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 
-LIBPROG=	mailwrapper 
+LIBPROG=	mailwrapper
 
 PROG= 	       $(LIBPROG)
 
@@ -49,6 +50,8 @@ CPPFLAGS =	-I. $(CPPFLAGS.master)
 
 LINTFLAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 
+SMOFF += all_func_returns
+
 # conditional assignments
 #
 all:=		TARGET= all
@@ -65,7 +68,7 @@ $(ROOTINC)/% : %
 
 .PARALLEL: $(MWOBJS) $(OBJS)
 
-all:		$(PROG) 
+all:		$(PROG)
 
 mailwrapper:	$(MWOBJS)
 	$(LINK.c) -o $@ $(MWOBJS) $(LDLIBS)
@@ -75,7 +78,7 @@ install: all .WAIT $(ROOTLIBPROG) $(ROOTSYMLINKS) $(ROOTETCFILES)
 
 # ROOTSYMLINKS
 #
-$(ROOTBIN)/mailq: 
+$(ROOTBIN)/mailq:
 	$(RM) $@; $(SYMLINK) ../lib/mailwrapper $@
 
 $(ROOTLIB)/sendmail:
@@ -90,7 +93,7 @@ $(ROOTUSRSBIN)/sendmail:
 $(ROOTETCMAIL)/%:  %
 	$(INS.file)
 
-lint: 
+lint:
 	$(LINT.c) $(SRCS)
 
 clean:

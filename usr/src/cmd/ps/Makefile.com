@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/ps/Makefile.com
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=	ps
 
@@ -35,6 +34,9 @@ include ../../Makefile.cmd
 
 CFLAGS	+= $(CCVERBOSE)
 LDLIBS += -lproject
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

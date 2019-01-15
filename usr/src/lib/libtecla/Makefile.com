@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libtecla.a
 VERS=		.1
@@ -45,6 +46,9 @@ CPPFLAGS +=	-I$(SRCDIR) -DSTDC_HEADERS=1 -DHAVE_SYS_TYPES_H=1 \
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 CERRWARN +=	-_gcc=-Wno-type-limits
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

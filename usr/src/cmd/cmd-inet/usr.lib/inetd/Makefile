@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG	=	inetd
 MANIFEST=	inetd.xml inetd-upgrade.xml
@@ -41,6 +42,8 @@ $(RELEASE_BUILD)CPPFLAGS +=     -DNDEBUG
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-unused-label
+
+SMOFF += kmalloc_wrong_size
 
 LDLIBS    += -lsocket -lnsl -lrestart -lscf -lcontract -linetutil \
 		-lwrap -linetsvc -luutil -lumem -lbsm

@@ -25,7 +25,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG = isns
@@ -63,6 +63,9 @@ CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-ignored-qualifiers
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 CLOBBERFILES += $(DTRACE_HEADER)
 

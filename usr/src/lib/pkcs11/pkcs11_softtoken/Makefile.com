@@ -24,8 +24,7 @@
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2018, Joyent, Inc.
 #
-# lib/pkcs11/pkcs11_softtoken/Makefile.com
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = pkcs11_softtoken.a
 VERS= .1
@@ -135,6 +134,9 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-type-limits
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-empty-body
+
+# not linted
+SMATCH=off
 
 CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR) \
 	    -I$(DHDIR) -I$(DSADIR) -I$(ECCDIR) -I$(SRC)/common/crypto \

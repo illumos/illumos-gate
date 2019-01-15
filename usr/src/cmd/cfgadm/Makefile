@@ -23,11 +23,9 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/cfgadm/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
-PROG= cfgadm 
+PROG= cfgadm
 
 include ../Makefile.cmd
 
@@ -36,12 +34,14 @@ DCFILE= $(PROG).dc
 
 XGETFLAGS += -a -x cfgadm.xcl
 
-LDLIBS += -lcfgadm 
+LDLIBS += -lcfgadm
 LINTFLAGS += $(ENVLDFLAGS1) $(ENVLDFLAGS2) $(ENVLDFLAGS3) $(LDLIBS)
+
+SMOFF += snprintf_overflow
 
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTUSRSBINPROG)
 	-$(RM) $(ROOTETCPROG)

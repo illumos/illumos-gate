@@ -21,6 +21,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG =		wpad
 MANIFEST =	wpa.xml
@@ -36,6 +37,8 @@ LDLIBS    += 	-ldladm -ldlpi
 all install := LDLIBS += -lsunw_crypto
 
 LINTFLAGS += 	-u
+
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 

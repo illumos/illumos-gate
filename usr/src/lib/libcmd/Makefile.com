@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 
 SHELL=/usr/bin/ksh93
@@ -137,6 +138,9 @@ CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 pics/cut.o	:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
 pics/sync.o	:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED

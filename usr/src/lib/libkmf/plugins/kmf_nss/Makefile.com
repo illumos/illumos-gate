@@ -22,8 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Makefile for KMF Plugins
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	kmf_nss.a
 VERS=		.1
@@ -46,7 +45,7 @@ NSSLIBS64=	$(BERLIB64) -L$(ADJUNCT_PROTO)$(MPSDIR)/$(MACH64) \
 SRCDIR=		../common
 INCDIR=		../../include
 
-CFLAGS		+=	$(CCVERBOSE) 
+CFLAGS		+=	$(CCVERBOSE)
 CPPFLAGS	+=	-D_REENTRANT $(KMFINC) $(NSSINC)  \
 		-I$(INCDIR) -I$(ADJUNCT_PROTO)/usr/include/libxml2
 
@@ -58,6 +57,9 @@ LINTFLAGS64	+=	-erroff=E_STATIC_UNUSED
 CERRWARN	+=	-_gcc=-Wno-unused-label
 CERRWARN	+=	-_gcc=-Wno-unused-value
 CERRWARN	+=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 lint:=	NSSLIBS =	$(BERLIB)
 lint:=	NSSLIBS64 =	$(BERLIB64)

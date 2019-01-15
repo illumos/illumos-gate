@@ -23,6 +23,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE	  =	nfs
 TYPEPROG  =	mountd
@@ -43,6 +44,9 @@ CPPFLAGS +=	-D_REENTRANT -I../lib
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
 
 $(TYPEPROG):	$(OBJS)
 		$(COMPILE.d) -s $(DSRC) -o $(DOBJ) $(OBJS)

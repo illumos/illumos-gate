@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/lp/client/conv_fix/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 include 	../Makefile.sp
 
@@ -41,11 +40,14 @@ CPPFLAGS +=	-I$(NPRTINC)
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
 all:		$(PROG)
 
-install:	all $(ROOTLIBPRINTPROG) 
+install:	all $(ROOTLIBPRINTPROG)
 
 $(ROOTLIBPRINT)/%: %
 	$(INS.file)

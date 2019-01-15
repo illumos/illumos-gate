@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 CFLAGS += v
 
@@ -36,13 +37,16 @@ TXTS= READ_ME del.h.cb mkstr.c xstr.c
 POFILES= $(SRCS:%.c=%.po)
 
 include ../../Makefile.cmd
-$(XPG4) := CFLAGS += -DXPG4 
+$(XPG4) := CFLAGS += -DXPG4
 
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-unused-variable
+
+# way too old
+SMATCH=off
 
 POFILE= misc.po
 

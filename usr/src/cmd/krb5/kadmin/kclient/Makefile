@@ -22,6 +22,7 @@
 #
 # Makefile for Kerberos client-install utility.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		ksetpw \
 		kdyndns \
@@ -63,6 +64,9 @@ CPPFLAGS += -I$(SRC)/uts/common/gssapi/include \
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 ksetpw:=	LDFLAGS += $(KRUNPATH)
 kdyndns:=	LDFLAGS += -R/usr/lib/smbsrv

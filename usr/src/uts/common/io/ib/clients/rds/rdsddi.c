@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
@@ -839,7 +843,7 @@ rds_wrw(queue_t *q, struiod_t *dp)
 			/* Detect valid T_UNITDATA_REQ here */
 			if (((union T_primitives *)(uintptr_t)rptr)->type
 			    == T_UNITDATA_REQ)
-			break;
+				break;
 		}
 		/* FALLTHRU */
 	default:

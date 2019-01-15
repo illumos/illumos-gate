@@ -3,6 +3,10 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 /* radeon_state.c -- State support for Radeon -*- linux-c -*- */
 /*
  * Copyright 2000 VA Linux Systems, Inc., Fremont, California.
@@ -31,8 +35,6 @@
  *    Gareth Hughes <gareth@valinux.com>
  *    Kevin E. Martin <martin@valinux.com>
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "drmP.h"
 #include "drm.h"
@@ -2244,7 +2246,7 @@ static int radeon_cp_clear(DRM_IOCTL_ARGS)
 
 	if (DRM_COPY_FROM_USER(&depth_boxes, clear.depth_boxes,
 	    sarea_priv->nbox * sizeof (depth_boxes[0])))
-	return (EFAULT);
+		return (EFAULT);
 
 	radeon_cp_dispatch_clear(dev, &clear, depth_boxes);
 
@@ -2924,10 +2926,10 @@ radeon_emit_veclinear(drm_radeon_private_t *dev_priv,
 	int start = header.veclinear.addr_lo | (header.veclinear.addr_hi << 8);
 	RING_LOCALS;
 
-		if (!sz)
-			return (0);
-		if (sz * 4 > cmdbuf->bufsz)
-			return (EINVAL);
+	if (!sz)
+		return (0);
+	if (sz * 4 > cmdbuf->bufsz)
+		return (EINVAL);
 
 	BEGIN_RING(5 + sz);
 	OUT_RING_REG(RADEON_SE_TCL_STATE_FLUSH, 0);

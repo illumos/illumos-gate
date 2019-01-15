@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= db2.a
 VERS= .1
@@ -68,6 +69,9 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 DYNFLAGS +=	$(KRUNPATH) $(KERBRUNPATH) $(KMECHLIB)
 LDLIBS +=	-L $(ROOTLIBDIR) -ldb2 -lkdb -lkadm5srv -lc -lnsl

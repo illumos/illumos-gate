@@ -23,6 +23,7 @@
  * Copyright 2014 Gary Mills
  * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -307,7 +308,7 @@ again:
 					mp2 = mp2->b_cont;
 				}
 
-			freemsg(mp);
+				freemsg(mp);
 			}
 
 			thetime = (time_t)dummy;

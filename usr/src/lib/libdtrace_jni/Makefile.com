@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libdtrace_jni.a
 VERS = .1
@@ -50,6 +51,8 @@ CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS64)
 
 CERRWARN += -_gcc=-Wno-uninitialized
+
+SMOFF += all_func_returns
 
 LDLIBS += -lc -luutil -ldtrace -lproc
 

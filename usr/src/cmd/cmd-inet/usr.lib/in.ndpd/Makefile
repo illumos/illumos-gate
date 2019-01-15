@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		in.ndpd
 OBJS=		config.o main.o ndp.o tables.o trace.o
@@ -58,6 +59,9 @@ LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 CTFCONVERT_HOOK = && $(CTFCONVERT_O)
 CTFMERGE_HOOK = && $(CTFMERGE) -L VERSION -o $@ $(OBJS)

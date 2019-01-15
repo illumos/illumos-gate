@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 SRCS		=	tcvn%UCS-2.c \
             tcvn%UTF-8.c \
@@ -37,6 +38,9 @@ COMMON = ../common/
 
 LINK_TARGETS  = UCS-2BE%tcvn.so tcvn%UCS-2BE.so
 LINK_TARGETS += UCS-2BE%viscii.so viscii%UCS-2BE.so
+
+# needs work
+SMOFF += all_func_returns,deref_check
 
 dummy: all
 

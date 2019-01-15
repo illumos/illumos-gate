@@ -2,6 +2,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= ktutil
 
@@ -27,6 +28,9 @@ COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += $(KMECHLIB) $(ROOT)$(KERBLIBDIR)/libss.so

@@ -22,6 +22,10 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
@@ -4955,7 +4959,7 @@ nce_fuzz_interval(clock_t intv, boolean_t initial_time)
 			frac = 2;
 		/* Set intv randomly in the range [intv-frac .. intv+frac] */
 		if ((intv = intv - frac + rnd % (2 * frac + 1)) <= 0)
-		intv = 1;
+			intv = 1;
 	}
 	return (intv);
 }

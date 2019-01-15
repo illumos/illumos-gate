@@ -26,6 +26,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libpkg.a
 VERS=	.1
@@ -67,6 +68,10 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-clobbered
 CERRWARN +=	-_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
+
 CPPFLAGS +=	-I$(SRCDIR) -D_FILE_OFFSET_BITS=64
 
 .KEEP_STATE:

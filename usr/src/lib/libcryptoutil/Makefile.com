@@ -20,6 +20,7 @@
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libcryptoutil.a
 VERS=	.1
@@ -53,6 +54,9 @@ LINTFLAGS64 +=  -errchk=longptr64
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 all: $(LIBS)
 

@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		ikeadm ipsecalgs ipsecconf ipseckey ikecert
 SOCKETPROG=	ipsecalgs ipsecconf ipseckey 
@@ -58,6 +59,9 @@ CPPFLAGS +=     -DSYSV -DBSD_COMP -I$(CMDINETCOMMONDIR) -I.
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
 
 CFLAGS += $(XSTRCONST)
 LDLIBS += -lipsecutil -lnsl

@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/strsun.h>
@@ -1700,7 +1704,7 @@ vr_periodic(void *p)
 					vrp->reset = 1;
 					vr_log(vrp, CE_WARN,
 					    "TX stalled, resetting MAC");
-				vrp->stats.txstalls++;
+					vrp->stats.txstalls++;
 				} else {
 					/*
 					 * Increase until we find that we've
@@ -3390,9 +3394,9 @@ vr_mac_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 
 		default:
 			return;
-		}
+	}
 
-		mac_prop_info_set_default_uint8(prh, val);
+	mac_prop_info_set_default_uint8(prh, val);
 }
 
 /*

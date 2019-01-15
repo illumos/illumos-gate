@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= units
 UNITTAB=unittab
@@ -30,6 +31,9 @@ include ../Makefile.cmd
 
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 LIBUNITTAB= $(UNITTAB:%=$(ROOTSHLIB)/%)
 $(LIBUNITTAB) :=	FILEMODE =	$(LIBFILEMODE)

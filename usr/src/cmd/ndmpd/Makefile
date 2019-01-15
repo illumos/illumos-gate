@@ -1,5 +1,6 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -50,6 +51,9 @@ CPPFLAGS += $(LFLAGS64)
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DDEBUG
 CPPFLAGS += -I. -Iinclude
+
+# not linted
+SMATCH=off
 
 CSTD = $(CSTD_GNU99)
 

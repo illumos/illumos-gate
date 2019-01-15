@@ -25,7 +25,7 @@
 /*
  * Copyright 2011 Bayard G. Bell <buffer.g.overflow@gmail.com>.
  * All rights reserved. Use is subject to license terms.
- * Copyright (c) 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -3393,26 +3393,26 @@ sym_insert(struct module *mp, char *name, symid_t index)
 	symid_t *ip;
 
 #ifdef KOBJ_DEBUG
-		if (kobj_debug & D_SYMBOLS) {
-			static struct module *lastmp = NULL;
-			Sym *sp;
-			if (lastmp != mp) {
-				_kobj_printf(ops,
-				    "krtld: symbol entry: file=%s\n",
-				    mp->filename);
-				_kobj_printf(ops,
-				    "krtld:\tsymndx\tvalue\t\t"
-				    "symbol name\n");
-				lastmp = mp;
-			}
-			sp = (Sym *)(mp->symtbl +
-			    index * mp->symhdr->sh_entsize);
-			_kobj_printf(ops, "krtld:\t[%3d]", index);
-			_kobj_printf(ops, "\t0x%lx", sp->st_value);
-			_kobj_printf(ops, "\t%s\n", name);
+	if (kobj_debug & D_SYMBOLS) {
+		static struct module *lastmp = NULL;
+		Sym *sp;
+		if (lastmp != mp) {
+			_kobj_printf(ops,
+			    "krtld: symbol entry: file=%s\n",
+			    mp->filename);
+			_kobj_printf(ops,
+			    "krtld:\tsymndx\tvalue\t\t"
+			    "symbol name\n");
+			lastmp = mp;
 		}
-
+		sp = (Sym *)(mp->symtbl +
+		    index * mp->symhdr->sh_entsize);
+		_kobj_printf(ops, "krtld:\t[%3d]", index);
+		_kobj_printf(ops, "\t0x%lx", sp->st_value);
+		_kobj_printf(ops, "\t%s\n", name);
+	}
 #endif
+
 	for (ip = &mp->buckets[kobj_hash_name(name) % mp->hashsize]; *ip;
 	    ip = &mp->chains[*ip]) {
 		;

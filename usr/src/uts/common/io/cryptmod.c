@@ -2,6 +2,8 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright (c) 2018, Joyent, Inc.
+ *
  * STREAMS Crypto Module
  *
  * This module is used to facilitate Kerberos encryption
@@ -3003,7 +3005,7 @@ encrypt_block(queue_t *q, struct tmodinfo *tmi, mblk_t *mp, size_t plainlen)
 		if (cbp == NULL) {
 			cmn_err(CE_WARN,
 				"allocb (%d bytes) failed", sz);
-				return (NULL);
+			return (NULL);
 		}
 
 		cbp->b_cont = mp->b_cont;

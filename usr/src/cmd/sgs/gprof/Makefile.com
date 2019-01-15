@@ -22,8 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/gprof/Makefile.com
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		gprof
 
@@ -46,6 +45,10 @@ LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 LINTSRCS =	$(SRCS)
 LINTFLAGS +=	-x
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
+
 CLEANFILES +=	$(LINTOUTS)
 
 ROOTLIBBLURB=	$(BLURBS:%=$(ROOTSHLIBCCS)/%)

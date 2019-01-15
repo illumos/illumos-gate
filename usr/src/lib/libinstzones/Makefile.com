@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libinstzones.a
 VERS=		.1
@@ -56,6 +57,9 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-clobbered
 CERRWARN +=	-_gcc=-Wno-address
+
+# not linted
+SMATCH=off
 
 LIBS = $(DYNLIB) $(LINTLIB)
 

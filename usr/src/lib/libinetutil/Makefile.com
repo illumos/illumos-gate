@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libinetutil.a
 VERS = 	  .1
@@ -47,6 +48,8 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 
 CERRWARN +=	-_gcc=-Wno-parentheses
+
+SMOFF += index_overflow
 
 .KEEP_STATE:
 

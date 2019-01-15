@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= tnd
 OBJS= tnd.o
@@ -46,6 +47,8 @@ CPPFLAGS += -DDEBUG
 
 CERRWARN += -_gcc=-Wno-unused-value
 CERRWARN += -_gcc=-Wno-parentheses
+
+SMOFF += no_if_block
 
 .KEEP_STATE:
 

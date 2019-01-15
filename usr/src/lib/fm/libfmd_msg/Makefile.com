@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libfmd_msg.a
 VERS = .1
@@ -42,6 +43,9 @@ CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-uninitialized
+
+SMOFF += all_func_returns
+
 LDLIBS += -lnvpair -lc
 
 LINTFLAGS = -msux

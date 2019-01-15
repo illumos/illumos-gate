@@ -22,7 +22,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2017 RackTop Systems.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= ztest
 OBJS= $(PROG).o
@@ -56,6 +56,9 @@ LINTFLAGS += -erroff=E_STATIC_UNUSED
 LINTFLAGS64 += -erroff=E_STATIC_UNUSED
 
 CERRWARN += -_gcc=-Wno-switch
+
+# false positive
+SMOFF += signed
 
 .KEEP_STATE:
 

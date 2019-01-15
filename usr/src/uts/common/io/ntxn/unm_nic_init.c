@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -67,56 +71,56 @@ static unsigned int crb_addr_xform[MAX_CRB_XFORM];
 static void
 crb_addr_transform_setup(void)
 {
-		crb_addr_transform(XDMA);
-		crb_addr_transform(TIMR);
-		crb_addr_transform(SRE);
-		crb_addr_transform(SQN3);
-		crb_addr_transform(SQN2);
-		crb_addr_transform(SQN1);
-		crb_addr_transform(SQN0);
-		crb_addr_transform(SQS3);
-		crb_addr_transform(SQS2);
-		crb_addr_transform(SQS1);
-		crb_addr_transform(SQS0);
-		crb_addr_transform(RPMX7);
-		crb_addr_transform(RPMX6);
-		crb_addr_transform(RPMX5);
-		crb_addr_transform(RPMX4);
-		crb_addr_transform(RPMX3);
-		crb_addr_transform(RPMX2);
-		crb_addr_transform(RPMX1);
-		crb_addr_transform(RPMX0);
-		crb_addr_transform(ROMUSB);
-		crb_addr_transform(SN);
-		crb_addr_transform(QMN);
-		crb_addr_transform(QMS);
-		crb_addr_transform(PGNI);
-		crb_addr_transform(PGND);
-		crb_addr_transform(PGN3);
-		crb_addr_transform(PGN2);
-		crb_addr_transform(PGN1);
-		crb_addr_transform(PGN0);
-		crb_addr_transform(PGSI);
-		crb_addr_transform(PGSD);
-		crb_addr_transform(PGS3);
-		crb_addr_transform(PGS2);
-		crb_addr_transform(PGS1);
-		crb_addr_transform(PGS0);
-		crb_addr_transform(PS);
-		crb_addr_transform(PH);
-		crb_addr_transform(NIU);
-		crb_addr_transform(I2Q);
-		crb_addr_transform(EG);
-		crb_addr_transform(MN);
-		crb_addr_transform(MS);
-		crb_addr_transform(CAS2);
-		crb_addr_transform(CAS1);
-		crb_addr_transform(CAS0);
-		crb_addr_transform(CAM);
-		crb_addr_transform(C2C1);
-		crb_addr_transform(C2C0);
-		crb_addr_transform(SMB);
-		crb_addr_transform(OCM0);
+	crb_addr_transform(XDMA);
+	crb_addr_transform(TIMR);
+	crb_addr_transform(SRE);
+	crb_addr_transform(SQN3);
+	crb_addr_transform(SQN2);
+	crb_addr_transform(SQN1);
+	crb_addr_transform(SQN0);
+	crb_addr_transform(SQS3);
+	crb_addr_transform(SQS2);
+	crb_addr_transform(SQS1);
+	crb_addr_transform(SQS0);
+	crb_addr_transform(RPMX7);
+	crb_addr_transform(RPMX6);
+	crb_addr_transform(RPMX5);
+	crb_addr_transform(RPMX4);
+	crb_addr_transform(RPMX3);
+	crb_addr_transform(RPMX2);
+	crb_addr_transform(RPMX1);
+	crb_addr_transform(RPMX0);
+	crb_addr_transform(ROMUSB);
+	crb_addr_transform(SN);
+	crb_addr_transform(QMN);
+	crb_addr_transform(QMS);
+	crb_addr_transform(PGNI);
+	crb_addr_transform(PGND);
+	crb_addr_transform(PGN3);
+	crb_addr_transform(PGN2);
+	crb_addr_transform(PGN1);
+	crb_addr_transform(PGN0);
+	crb_addr_transform(PGSI);
+	crb_addr_transform(PGSD);
+	crb_addr_transform(PGS3);
+	crb_addr_transform(PGS2);
+	crb_addr_transform(PGS1);
+	crb_addr_transform(PGS0);
+	crb_addr_transform(PS);
+	crb_addr_transform(PH);
+	crb_addr_transform(NIU);
+	crb_addr_transform(I2Q);
+	crb_addr_transform(EG);
+	crb_addr_transform(MN);
+	crb_addr_transform(MS);
+	crb_addr_transform(CAS2);
+	crb_addr_transform(CAS1);
+	crb_addr_transform(CAS0);
+	crb_addr_transform(CAM);
+	crb_addr_transform(C2C1);
+	crb_addr_transform(C2C0);
+	crb_addr_transform(SMB);
+	crb_addr_transform(OCM0);
 
 	/*
 	 * Used only in P3 just define it for P2 also.

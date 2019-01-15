@@ -2,6 +2,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= kdb5_util
 
@@ -39,6 +40,9 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 LDFLAGS += $(KRUNPATH) $(KERBRUNPATH)
 LDLIBS += -L $(ROOT_KLIBDIR) -L $(KRB5LIB) -lkadm5srv -lkdb \

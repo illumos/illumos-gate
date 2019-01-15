@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY	=	libdhcpagent.a
 VERS =		.1
@@ -39,8 +40,11 @@ LDLIBS +=	-lc -lsocket -ldhcputil -luuid -ldlpi -lcontract
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-CFLAGS += 	$(CCVERBOSE) 
+CFLAGS += 	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-type-limits
+
+# needs work
+SMOFF += allocating_enough_data
 
 .KEEP_STATE:
 

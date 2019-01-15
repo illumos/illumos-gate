@@ -23,10 +23,7 @@
 # Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/cmd-inet/usr.lib/pppoe/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 include		../../../Makefile.cmd
 
@@ -35,6 +32,9 @@ CLIENT_OBJS=	pppoec.o common.o logging.o
 DAEMON_OBJS=	pppoed.o options.o logging.o common.o
 
 CPPFLAGS +=	-I$(SRC)/uts/common
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -1351,7 +1352,8 @@ ohci_polled_restore_state(ohci_polled_t	*ohci_polledp)
 
 		while (td) {
 
-		next_td = ohci_td_iommu_to_cpu(ohcip, Get_TD(td->hctd_next_td));
+			next_td = ohci_td_iommu_to_cpu(ohcip,
+			    Get_TD(td->hctd_next_td));
 
 			/*
 			 * Insert valid interrupt TD back into ED's

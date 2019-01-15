@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 # Makefile for name service cache daemon
 #
@@ -63,6 +64,9 @@ CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-type-limits
+
+# not linted
+SMATCH=off
 
 # nscd interposes on many symbols, and must export others for its own dlsym()
 # use, and dlsym() calls from libc.  Itemizing the interfaces within a mapfile

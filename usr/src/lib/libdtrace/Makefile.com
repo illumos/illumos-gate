@@ -22,6 +22,7 @@
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2011, 2016 by Delphix. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY = libdtrace.a
 VERS = .1
@@ -105,7 +106,7 @@ DLIBSRCS += \
 
 include ../../Makefile.lib
 
-SRCS = $(LIBSRCS:%.c=../common/%.c) $(LIBISASRCS:%.c=../$(MACH)/%.c) 
+SRCS = $(LIBSRCS:%.c=../common/%.c) $(LIBISASRCS:%.c=../$(MACH)/%.c)
 LIBS = $(DYNLIB) $(LINTLIB)
 
 SRCDIR = ../common
@@ -134,6 +135,9 @@ CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
 
 YYCFLAGS =
 LDLIBS += -lgen -lproc -lrtld_db -lnsl -lsocket -lctf -lelf -lc -lzonecfg

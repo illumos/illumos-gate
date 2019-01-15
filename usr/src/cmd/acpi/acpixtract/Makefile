@@ -26,6 +26,9 @@ VPATH = ../common:$(SRC)/common/acpica/utilities
 
 CERRWARN += -_gcc=-Wno-unused-function
 
+# not linted
+SMATCH=off
+
 CPPFLAGS += -I$(SRC)/uts/intel/sys/acpi -DACPI_XTRACT_APP
 
 .KEEP_STATE:

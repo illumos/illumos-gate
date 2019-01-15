@@ -3,6 +3,7 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2005-08 Adaptec, Inc.
  * Copyright (c) 2005-08 Adaptec Inc., Achim Leubner
  * Copyright (c) 2000 Michael Smith
@@ -7312,7 +7313,7 @@ aac_config_tgt(struct aac_softstate *softs, int tgt)
 		if (bp == NULL) {
 			if ((bp = scsi_alloc_consistent_buf(&ap, NULL,
 			    buf_len, B_READ, NULL_FUNC, NULL)) == NULL)
-			return (AACERR);
+				return (AACERR);
 		}
 		if ((pkt = scsi_init_pkt(&ap, NULL, bp, CDB_GROUP5,
 		    sizeof (struct scsi_arq_status), 0, PKT_CONSISTENT,

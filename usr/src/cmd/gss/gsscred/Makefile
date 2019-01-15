@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 SBINPROG = gsscred
 
@@ -46,9 +47,12 @@ ROOTBINPROG=		$(BINPROG:%=$(ROOTBIN)/%)
 
 COPTFLAG += $(XESS) $(INCDIRS) $(LIBPATH)
 
+# not linted
+SMATCH=off
+
 LDLIBS += -lgss
 
-$(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50 
+$(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50
 
 .KEEP_STATE:
 

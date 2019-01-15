@@ -20,7 +20,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015, Nexenta Systems, Inc.
-# 
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= installgrub
 
@@ -39,6 +39,9 @@ include ../Makefile.com
 
 CPPFLAGS += -I$(SRC)/uts/i86pc -I$(SRC)/uts/intel -I$(SRC)/uts/common
 CPPFLAGS += -I$(SRC)/common/util
+
+# not linted
+SMATCH=off
 
 LDLIBS += -lmd5
 

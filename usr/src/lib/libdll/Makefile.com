@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 SHELL=/usr/bin/ksh93
 
@@ -85,6 +86,9 @@ CFLAGS64 += \
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
+
+# needs work
+SMOFF += all_func_returns,strcpy_overflow
 
 .KEEP_STATE:
 

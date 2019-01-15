@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include "nge.h"
 static uint32_t	nge_watchdog_count	= 1 << 5;
 static uint32_t	nge_watchdog_check	= 1 << 3;
@@ -1010,25 +1014,25 @@ nge_chip_reset(nge_t *ngep)
 		mac = uaddr1.addr_bits.addr;
 		mac <<= 32;
 		mac |= nge_reg_get32(ngep, NGE_UNI_ADDR0);
-			ngep->chipinfo.hw_mac_addr = mac;
-			if (ngep->dev_spec_param.mac_addr_order) {
-				for (i = 0; i < ETHERADDRL; i++) {
-					ngep->chipinfo.vendor_addr.addr[i] =
-					    (uchar_t)mac;
-					ngep->cur_uni_addr.addr[i] =
-					    (uchar_t)mac;
-					mac >>= 8;
-				}
-			} else {
-				for (i = ETHERADDRL; i-- != 0; ) {
-					ngep->chipinfo.vendor_addr.addr[i] =
-					    (uchar_t)mac;
-					ngep->cur_uni_addr.addr[i] =
-					    (uchar_t)mac;
-					mac >>= 8;
-				}
+		ngep->chipinfo.hw_mac_addr = mac;
+		if (ngep->dev_spec_param.mac_addr_order) {
+			for (i = 0; i < ETHERADDRL; i++) {
+				ngep->chipinfo.vendor_addr.addr[i] =
+				    (uchar_t)mac;
+				ngep->cur_uni_addr.addr[i] =
+				    (uchar_t)mac;
+				mac >>= 8;
 			}
-			ngep->chipinfo.vendor_addr.set = 1;
+		} else {
+			for (i = ETHERADDRL; i-- != 0; ) {
+				ngep->chipinfo.vendor_addr.addr[i] =
+				    (uchar_t)mac;
+				ngep->cur_uni_addr.addr[i] =
+				    (uchar_t)mac;
+				mac >>= 8;
+			}
+		}
+		ngep->chipinfo.vendor_addr.set = 1;
 	}
 	pci_config_put8(ngep->cfg_handle, PCI_CONF_CACHE_LINESZ,
 	    ngep->chipinfo.clsize);

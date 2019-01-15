@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -510,7 +514,7 @@ usbwcm_input_intuos(usbwcm_state_t *usbwcmp, mblk_t *mp)
 		case 0x1:
 		/* Outbound tracking is unreliable on the Cintiq */
 			if (sc->sc_type->protocol == CINTIQ)
-			break;
+				break;
 
 		/* Tool motion */
 		/*FALLTHRU*/

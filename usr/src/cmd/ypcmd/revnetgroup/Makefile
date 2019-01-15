@@ -23,6 +23,7 @@
 # Copyright 1996, 2002 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG = revnetgroup
 
@@ -36,6 +37,9 @@ CERRWARN += -_gcc=-Wno-implicit-function-declaration
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
 all: $(PROG)
@@ -46,7 +50,7 @@ $(PROG): $(OBJS)
 
 install: all $(ROOTUSRSBINPROG)
 
-clean: 
+clean:
 	$(RM) $(OBJS)
 
 lint:

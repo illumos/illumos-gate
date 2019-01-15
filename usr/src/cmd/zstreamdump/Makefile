@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		zstreamdump
 OBJS=		zstreamdump.o
@@ -46,6 +47,9 @@ LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2 
 
 CERRWARN += -_gcc=-Wno-switch
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

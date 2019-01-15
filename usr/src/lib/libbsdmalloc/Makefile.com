@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libbsdmalloc.a
 VERS=		.1
@@ -52,6 +53,9 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT
 DYNFLAGS +=     $(ZINTERPOSE)
 LDLIBS +=       -lc
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

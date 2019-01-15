@@ -23,6 +23,7 @@
 # Copyright (c) 1989, 1996 by Sun Microsystems, Inc.
 # All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= bdiff 
 
@@ -32,6 +33,9 @@ FILEMODE=	755
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

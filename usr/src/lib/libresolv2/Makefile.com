@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libresolv.a
 VERS= .2
@@ -32,16 +32,16 @@ BSDOBJS=   	putenv.o	strcasecmp.o	strsep.o \
 		gettimeofday.o	setenv.o	strerror.o	utimes.o \
 		mktemp.o	setitimer.o	strpbrk.o	writev.o
 
-DSTOBJS=	dst_api.o	support.o	hmac_link.o 
+DSTOBJS=	dst_api.o	support.o	hmac_link.o
 
-# inet_addr, inet_pton, inet_ntop, and inet_ntoa removed due to overlap with 
+# inet_addr, inet_pton, inet_ntop, and inet_ntoa removed due to overlap with
 # libnsl
 INETOBJS= 	inet_net_pton.o	inet_neta.o	inet_lnaof.o \
 		inet_netof.o 	nsap_addr.o	inet_makeaddr.o	\
 		inet_network.o	inet_net_ntop.o	inet_cidr_ntop.o \
 		inet_cidr_pton.o 		inet_data.o
 
-# build only the IRS objects that the ISC libbind's make would 
+# build only the IRS objects that the ISC libbind's make would
 IRSTHROBJS=	gethostent_r.o	getnetent_r.o 	getnetgrent_r.o \
 		getprotoent_r.o	getservent_r.o
 IRSOBJS=	${IRSTHROBJS} \
@@ -108,9 +108,12 @@ LOCFLAGS +=	$(CRYPTFLAGS)
 LOCFLAGS +=	-D_SYS_STREAM_H -D_REENTRANT -DSVR4 -DSUNW_OPTIONS \
 		$(SOLCOMPAT) -I../include -I../../common/inc
 
-CPPFLAGS +=	$(LOCFLAGS) 
+CPPFLAGS +=	$(LOCFLAGS)
 
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
 
 DYNFLAGS +=	$(ZNODELETE)
 

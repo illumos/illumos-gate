@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/lp/client/lpset/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 include 	../Makefile.sp
 
@@ -39,13 +38,17 @@ FILEMODE=	04511
 
 CPPFLAGS +=	-I$(NPRTINC)
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
+
+# not linted
+SMATCH=off
+
 LDLIBS +=	$(LIBNPRT) -lsecdb
 
 .KEEP_STATE:
 
 all:		$(PROG)
 
-install:	all $(ROOTBIN) $(ROOTBINPROG) 
+install:	all $(ROOTBIN) $(ROOTBINPROG)
 
 $(ROOTBIN):
 	$(INS.dir)

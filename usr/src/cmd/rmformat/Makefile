@@ -23,6 +23,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= rmformat
 
@@ -35,6 +36,9 @@ SRCS= $(OBJS:.o=.c)
 LDLIBS +=	-lsmedia -lvolmgt -ladm -lefi
 
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 LINTFLAGS += -u
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
@@ -49,7 +53,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTPROG) 
+install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)

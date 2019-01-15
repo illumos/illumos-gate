@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= cdrw
 
@@ -42,6 +43,9 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CPPFLAGS +=	-D_REENTRANT -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 $(HAL_DBUS_CPPFLAGS)
 LINTFLAGS += 	-um
 
+# not linted
+SMATCH=off
+
 $(ROOTBIN)/cdrw := FILEMODE = 04755
 
 .KEEP_STATE:
@@ -52,7 +56,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS) $(NONLINTLDLIBS) $(CFLAGS)
 	$(POST_PROCESS)
 
-install: all $(ROOTPROG) 
+install: all $(ROOTPROG)
 
 clean:
 	$(RM) $(OBJS)

@@ -22,8 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= libsasl.a
 VERS= .1
@@ -51,6 +50,9 @@ PLUGDIR=	../plugin
 CFLAGS +=	$(CCVERBOSE) $(XSTRCONST)
 CFLAGS64 +=	$(XSTRCONST)
 CPPFLAGS +=	-I../include -I$(PLUGDIR)
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -1336,7 +1340,7 @@ mod_installexec(struct modlexec *modl, struct modlinkage *modlp)
 	if (eswp->exec_func != NULL) {
 		printf("exec type %x is already installed\n",
 		    *eswp->exec_magic);
-			return (EBUSY);		 /* it's already there! */
+		return (EBUSY);		 /* it's already there! */
 	}
 
 	rw_enter(eswp->exec_lock, RW_WRITER);

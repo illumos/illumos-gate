@@ -22,6 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY =	librestart.a
 VERS =		.1
@@ -41,6 +42,9 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 CFLAGS +=	$(CCVERBOSE) -Wp,$(CSTD_GNU99)
 
 CPPFLAGS +=
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

@@ -42,6 +42,9 @@ DYNFLAGS += $(ZINTERPOSE)
 
 CERRWARN += -_gcc=-Wno-unused-label
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
 all: $(LIBS)

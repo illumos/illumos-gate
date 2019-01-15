@@ -23,7 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fs.d/nfs/tests/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		nfs
 LIBPROG=	test_svc_tp_create
@@ -34,6 +34,9 @@ OBJS=		$(LIBPROG).o
 SRCS=		$(LIBPROG).c
 
 CFLAGS += $(CCVERBOSE)
+
+# not linted
+SMATCH=off
 
 LDLIBS +=	-lnsl -lsocket
 

@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * The InfiniBand  Nexus driver (IB nexus) is a bus nexus driver for IB bus.
  * It supports  Port nodes, Virtual Physical Point of Attachment nodes (VPPA)
  * for  HCAs registered with IBTL and IOC nodes for all the IOCs present in
@@ -2863,7 +2867,7 @@ ibnex_comm_svc_init(char *property, ibnex_node_type_t type)
 				IBTF_DPRINTF_L2("ibnex", "\tcomm_svc_init : "
 				    "Service name %s invalid : Not unique",
 				    servicep[count]);
-					continue;
+				continue;
 			}
 
 		valid[count] = 1;

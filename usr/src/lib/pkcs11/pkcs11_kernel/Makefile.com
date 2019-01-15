@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY= pkcs11_kernel.a
 VERS= .1
@@ -87,6 +88,9 @@ CFLAGS  +=      $(CCVERBOSE)
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-unused-label
+
+# not linted
+SMATCH=off
 
 ROOTLIBDIR=     $(ROOT)/usr/lib/security
 ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)

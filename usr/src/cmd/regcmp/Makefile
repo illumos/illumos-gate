@@ -22,12 +22,15 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= regcmp 
 
 include		../Makefile.cmd
 
 CERRWARN += -_gcc=-Wno-parentheses
+
+SMOFF += all_func_returns
 
 .KEEP_STATE:
 

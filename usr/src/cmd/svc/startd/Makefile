@@ -22,6 +22,7 @@
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Milan Jurik. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG = svc.startd
@@ -71,6 +72,9 @@ CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# these look like real bugs here, but ...
+SMOFF += impossible_mask,signed_integer_overflow_check
 
 $(OBJS) := CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_REENTRANT
 

@@ -23,6 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 SVCMETHOD=	svc-ripng
 MANIFEST=	ripng.xml
@@ -42,6 +43,9 @@ $(OBJS) :=	CFLAGS +=	$(CCVERBOSE)
 $(OBJS) :=	CPPFLAGS +=	$(_D_UNIX98_EXTN)
 
 LINTFLAGS +=	$(_D_UNIX98_EXTN)
+
+# not linted
+SMATCH=off
 
 # in.ripngd uses the ancillary data feature which is available only through
 # UNIX 98 standards version of Socket interface. This interface is supposed to

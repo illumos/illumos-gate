@@ -22,9 +22,10 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+#
 
-
-BINPROG=	mail 
+BINPROG=	mail
 
 PROG= 	       $(BINPROG)
 
@@ -76,6 +77,9 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-clobbered
 CERRWARN +=	-_gcc=-Wno-extra
 
+# missing type declarations for old-style functions
+SMATCH =	off
+
 LDLIBS +=	-lmail -lsocket
 
 # mail defines its own delete() - reduce symbols to locals to remove name clash.
@@ -104,7 +108,7 @@ $(ROOTINC)/% : %
 
 .PARALLEL: $(MAILOBJS) $(OBJS)
 
-all:		$(PROG) 
+all:		$(PROG)
 
 mail: 		$(MAILOBJS)
 	$(LINK.c) -o $@ $(MAILOBJS) $(LDLIBS)
@@ -117,7 +121,7 @@ install: all .WAIT $(ROOTBINPROG) $(ROOTSYMLINKS)
 $(ROOTBIN)/rmail:
 	$(RM) $@; $(SYMLINK) mail $@
 
-lint: 
+lint:
 	$(LINT.c) $(MAILSRC)
 
 clean:

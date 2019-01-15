@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		pvs
 
@@ -47,6 +48,9 @@ LDLIBS +=	$(LDDBGLIBDIR) $(LDDBG_LIB) $(ELFLIBDIR) -lelf \
 		    $(CONVLIBDIR) $(CONV_LIB)
 LINTFLAGS +=	-x
 LINTFLAGS64 +=	-x
+
+# not linted
+SMATCH=off
 
 BLTDEFS=	msg.h
 BLTDATA=	msg.c

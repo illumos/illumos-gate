@@ -23,8 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/expand/Makefile 
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		expand  unexpand
 SRCS=		$(PROG:=.c)
@@ -37,9 +36,11 @@ POFILE= expand.po
 
 CLOBBERFILES += expand_cmd.c
 
+SMOFF += signed
+
 .KEEP_STATE:
 
-all: $(PROG) 
+all: $(PROG)
 
 install: all $(ROOTPROG)
 

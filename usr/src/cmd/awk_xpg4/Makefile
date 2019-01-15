@@ -25,6 +25,7 @@
 #
 # cmd/awk_xpg4/Makefile
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 # NOTE: this is nawk in usr/src/cmd/awk_xpg4 to reside as /usr/xpg4/bin/awk
 
@@ -47,6 +48,9 @@ CERRWARN += -_gcc=-Wno-uninitialized
 YFLAGS += -d
 LDLIBS += -lm
 CLEANFILES= awk.c y.tab.h
+
+# not linted
+SMATCH=off
 
 # for messaging catalog
 

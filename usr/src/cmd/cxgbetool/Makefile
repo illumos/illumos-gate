@@ -12,11 +12,15 @@
 #
 # Copyright (c) 2018 by Chelsio Communications, Inc.
 #
+# Copyright (c) 2018, Joyent, Inc.
+
 PROG =  cxgbetool
 
 include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE) -I$(SRC)/uts/common/io/cxgbe/t4nex -I$(SRC)/uts/common/io/cxgbe/firmware
+
+SMOFF += all_func_returns
 
 all: $(PROG)
 

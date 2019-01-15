@@ -72,6 +72,9 @@ CERRWARN	+=	-_gcc=-Wno-switch
 CERRWARN	+=	-_gcc=-Wno-type-limits
 CERRWARN	+=	-_gcc=-Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
 all:    $(LIBS)

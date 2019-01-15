@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/modload/Makefile.com
+# Copyright (c) 2018, Joyent, Inc.
 #
 # makefile for loadable module utilities
 
@@ -60,6 +60,9 @@ LINT_PROG= $(PROG:%=lint_%.c)
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
 
 CERRWARN += -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 # install specifics
 

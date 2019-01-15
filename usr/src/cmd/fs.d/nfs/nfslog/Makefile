@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		nfs
 TYPEPROG=	nfslogd
@@ -42,6 +43,10 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-type-limits
+
+# not linted
+SMATCH=off
+
 CPPFLAGS += 	-D_FILE_OFFSET_BITS=64
 
 #

@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * routines common to isoch receive and isoch transmit
  */
 #include <sys/stat.h>
@@ -614,10 +618,11 @@ av1394_ic_dma_sync_frames(av1394_ic_t *icp, int idx, int cnt,
 
 	nsegs = (cnt / fps) + 1;
 
-		seg = idx / fps;
-		for (;;) {
-			(void) ddi_dma_sync(pool->ip_seg[seg].is_dma_hdl, 0,
-			    icp->ic_framesz, type);
+	seg = idx / fps;
+
+	for (;;) {
+		(void) ddi_dma_sync(pool->ip_seg[seg].is_dma_hdl, 0,
+		    icp->ic_framesz, type);
 
 		--nsegs;
 		if (nsegs == 0)

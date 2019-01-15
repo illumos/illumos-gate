@@ -23,7 +23,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1387,14 +1387,14 @@ apic_handle_pci_pci_bridge(dev_info_t *idip, int child_devno, int child_ipin,
 			 * found or the root is reached.
 			 */
 			ipin = (child_devno + child_ipin) % PCI_INTD;
-				if (bridge_bus == 0 && apic_pci_bus_total == 1)
-					bridge_bus = (int)apic_single_pci_busid;
-				pci_irq = ((bridge_devno & 0x1f) << 2) |
-				    (ipin & 0x3);
-				if ((*intrp = apic_find_io_intr_w_busid(pci_irq,
-				    bridge_bus)) != NULL) {
-					return (pci_irq);
-				}
+			if (bridge_bus == 0 && apic_pci_bus_total == 1)
+				bridge_bus = (int)apic_single_pci_busid;
+			pci_irq = ((bridge_devno & 0x1f) << 2) |
+			    (ipin & 0x3);
+			if ((*intrp = apic_find_io_intr_w_busid(pci_irq,
+			    bridge_bus)) != NULL) {
+				return (pci_irq);
+			}
 			dip = dipp;
 			child_devno = bridge_devno;
 			child_ipin = ipin;

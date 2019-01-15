@@ -2077,11 +2077,11 @@ strrput_nondata(queue_t *q, mblk_t *bp)
 					 * messages after it has done a
 					 * qprocsoff.
 					 */
-				if (_OTHERQ(q)->q_next == NULL)
-					freemsg(bp);
-				else
-					qreply(q, bp);
-				return (0);
+					if (_OTHERQ(q)->q_next == NULL)
+						freemsg(bp);
+					else
+						qreply(q, bp);
+					return (0);
 				}
 		}
 		freemsg(bp);

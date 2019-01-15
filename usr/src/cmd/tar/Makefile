@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 PROG= tar
@@ -38,6 +39,9 @@ LDLIBS += -lsec -lcmdutils -lnvpair -ltsol
 
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 CPPFLAGS += -DEUC
 

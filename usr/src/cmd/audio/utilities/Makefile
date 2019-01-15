@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Makefile for C++ Audio Library (libAudio.a) 
+# Copyright (c) 2018, Joyent, Inc.
 
 include ../../Makefile.cmd
 
@@ -36,6 +36,9 @@ CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-unused-variable
 CERRWARN += -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 LINTFLAGS += -m -v -u
 

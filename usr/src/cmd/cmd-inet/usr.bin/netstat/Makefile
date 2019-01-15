@@ -24,7 +24,7 @@
 #
 # Copyright (c) 1990 Mentat Inc.
 #
-# cmd/cmd-inet/usr.bin/netstat/Makefile
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=		netstat
 
@@ -50,9 +50,12 @@ CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-parentheses
 LDLIBS += -ldhcpagent -lsocket -lnsl -lkstat -ltsnet -ltsol
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
-all: $(PROG) $(NPROG) 
+all: $(PROG) $(NPROG)
 
 ROOTPROG=   $(PROG:%=$(ROOTBIN)/%)
 

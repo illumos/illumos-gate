@@ -24,7 +24,6 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
-#
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -67,6 +66,9 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-implicit-function-declaration
 CERRWARN +=	-_gcc=-Wno-unused-function
 CERRWARN +=	-_gcc=-Wno-unused-variable
+
+# not linted
+SMATCH=off
 
 all: $(EXES)
 

@@ -22,8 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/fdformat/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= fdformat
 
@@ -32,6 +31,9 @@ include ../Makefile.cmd
 LDLIBS +=	-lvolmgt
 LINTFLAGS +=    -um
 
+# not linted
+SMATCH=off
+
 .KEEP_STATE:
 
 #
@@ -39,7 +41,7 @@ LINTFLAGS +=    -um
 #
 $(ROOTPROG) := FILEMODE = 04555
 
-all: $(PROG) 
+all: $(PROG)
 
 fdformat: fdformat.c
 	$(LINK.c) -o $@ ./fdformat.c $(LDLIBS)

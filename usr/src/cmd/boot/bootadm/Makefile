@@ -25,7 +25,7 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= bootadm
 
@@ -51,6 +51,8 @@ LDLIBS += -lscf -lz -lbe -lzfs -lofmt $(LDLIBS_$(MACH))
 CFLAGS +=	$(XSTRCONST)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 CPPFLAGS +=	-I$(SRC)/uts/common -I$(SRC)/common -I$(SRC)/common/ficl
+
+SMOFF +=	all_func_returns
 
 CSTD=	$(CSTD_GNU99)
 

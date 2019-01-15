@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 
@@ -193,7 +193,7 @@ _fini(void)
 	}
 
 #ifndef NPROBE
-		(void) tnf_mod_unload(&modlinkage);
+	(void) tnf_mod_unload(&modlinkage);
 #endif /* ! NPROBE */
 
 	ddi_soft_state_fini(&dcam_state_p);

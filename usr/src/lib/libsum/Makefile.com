@@ -23,6 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 SHELL=/usr/bin/ksh93
 
@@ -75,6 +76,8 @@ CFLAGS64 += \
 	$(ASTCFLAGS64)
 
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+SMOFF += all_func_returns
 
 # This codepath is performance-critical
 sparc_COPTFLAG=-xO5 -_cc=-xprefetch=auto,explicit

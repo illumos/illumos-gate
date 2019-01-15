@@ -3,6 +3,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 ROUTEDPROG=	in.routed
 ROUTEDOBJS=	common.o if.o input.o main.o output.o parms.o radix.o \
@@ -39,6 +40,9 @@ CPPFLAGS +=	$(_D_XOPEN_EXTN)
 CFLAGS +=	$(CCVERBOSE)
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
+# not linted
+SMATCH=off
+
 LDLIBS +=	-lxnet -lmd -lsocket
 CLEAN_FILES +=	$(ROUTEDOBJS) $(RTQUERYOBJS)
 CLOBBERFILES +=	$(ROUTEDPROG) $(RTQUERYPROG)

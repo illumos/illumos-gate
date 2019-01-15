@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright (c) 2018, Joyent, Inc.
 #
 
 #
@@ -51,6 +52,9 @@ LDLIBS += -lmlrpc -lsmbfs -lnsl
 
 CPPFLAGS += -I$(SRC)/lib/libsmbfs \
 	-I$(SRC)/uts/common/smbclnt -I$(SRC)/uts/common
+
+# not linted
+SMATCH=off
 
 # Debugging
 ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG

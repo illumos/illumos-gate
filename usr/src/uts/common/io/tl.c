@@ -25,7 +25,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -2985,7 +2985,7 @@ tl_conn_req(queue_t *wq, mblk_t *mp)
 		 */
 		(void) (STRLOG(TL_ID, tep->te_minor, 2, SL_TRACE,
 		    "tl_conn_req: qlen overflow connection refused"));
-			err = ECONNREFUSED;
+		err = ECONNREFUSED;
 	}
 
 	/*

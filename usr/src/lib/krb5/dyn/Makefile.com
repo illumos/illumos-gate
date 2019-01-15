@@ -22,6 +22,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+
 
 LIBRARY= libdyn.a
 VERS= .1
@@ -62,6 +64,8 @@ CFLAGS +=	$(CCVERBOSE) -I..
 LDLIBS +=	-lc
 
 CERRWARN +=	-_gcc=-Wno-unused-variable
+
+SMOFF += no_if_block
 
 .KEEP_STATE:
 

@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=	sysdef
 OBJS=	$(PROG).o sdevinfo.o
@@ -31,6 +32,9 @@ include ../../Makefile.cmd
 
 LDLIBS	+= -ldevinfo -lelf
 CERRWARN += -_gcc=-Wno-parentheses
+
+# not linted
+SMATCH=off
 
 FILEMODE= 02555
 

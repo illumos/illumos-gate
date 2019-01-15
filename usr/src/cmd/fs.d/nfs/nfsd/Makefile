@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 FSTYPE=		nfs
 TYPEPROG=	nfsd
@@ -41,6 +41,9 @@ CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-variable
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-extra
+
+# not linted
+SMATCH=off
 
 $(TYPEPROG):	$(OBJS)
 		$(CC) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)

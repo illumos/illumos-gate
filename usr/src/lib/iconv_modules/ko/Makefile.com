@@ -22,6 +22,8 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
+
 
 include $(SRC)/lib/iconv_modules/Makefile.iconv
 
@@ -91,6 +93,9 @@ ALL_SOS   = $(E2I) $(I2E) $(E2J92) $(J922E) $(E2J) $(J2E) $(E2NB) $(NB2E) \
 
 LDFLAGS = $(DYNFLAGS) $(LDLIBS) $(CFLAG_OPT)
 CFLAGS += -I$(ICONV_COMMON) -I../inc
+
+# needs work
+SMATCH=off
 
 LINK_TARGETS = $(U2UH) $(C9332U) $(UH2U) $(E2U) $(I2U) $(O2U) $(N2U) \
 	$(E2I) $(E2J) $(E2J92) $(E2NB) $(I2E) $(J2E) $(J922E) $(NVBE) \

@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG= expr
 XPG4PROG= expr
@@ -38,6 +39,8 @@ include ../Makefile.cmd
 CFLAGS += $(CCVERBOSE)
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-extra
+# "missing type for func"
+SMATCH=off
 $(XPG4) := CFLAGS += -DXPG4
 $(XPG6) := CFLAGS += -DXPG6
 

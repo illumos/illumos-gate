@@ -21,8 +21,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# usr/src/cmd/cmd-inet/lib/nwamd/Makefile
-#
+# Copyright (c) 2018, Joyent, Inc.
 
 # Needed for ROOTFS_LIBDIR definition
 include		../../../../lib/Makefile.lib
@@ -59,6 +58,9 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-unused-label
+
+# not linted
+SMATCH=off
 
 #
 # Instrument with CTF data to ease debugging.

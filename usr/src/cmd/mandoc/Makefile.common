@@ -79,6 +79,9 @@ OBJS +=		compat_ohash.o
 # XXX gcc 4.4.4 false positive
 roff.o :=	CERRWARN += -_gcc=-Wno-uninitialized
 
+# not linted
+SMATCH=off
+
 CFLAGS +=	$(CC_VERBOSE)
 CSTD=		$(CSTD_GNU99)
 

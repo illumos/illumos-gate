@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 PROG=	whodo
 
@@ -34,6 +35,8 @@ include ../../Makefile.cmd.64
 
 CFLAGS64	+= $(CCVERBOSE)
 CERRWARN	+= -_gcc=-Wno-parentheses
+
+SMOFF += strcpy_overflow
 
 FILEMODE= 04555
 

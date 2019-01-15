@@ -23,6 +23,10 @@
  * Copyright 2010 QLogic Corporation. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <qlge.h>
 #include <sys/atomic.h>
 #include <sys/strsubr.h>
@@ -2400,7 +2404,7 @@ ql_set_rx_cksum(mblk_t *mp, struct ib_mac_iocb_rsp *net_rsp)
 	/* Not TCP or UDP packet? nothing more to do */
 	if (((net_rsp->flags2 & IB_MAC_IOCB_RSP_T) == 0) &&
 	    ((net_rsp->flags2 & IB_MAC_IOCB_RSP_U) == 0))
-	return;
+		return;
 
 	/* No CKO support for IPv6 */
 	if ((net_rsp->flags3 & IB_MAC_IOCB_RSP_V6) != 0)

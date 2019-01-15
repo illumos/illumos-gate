@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
@@ -11958,7 +11958,7 @@ mptsas_diag_register(mptsas_t *mpt, mptsas_fw_diag_register_t *diag_register,
 		mptsas_log(mpt, CE_WARN, "Check of DMA handle failed in "
 		    "mptsas_diag_register.");
 		ddi_fm_service_impact(mpt->m_dip, DDI_SERVICE_UNAFFECTED);
-			status = DDI_FAILURE;
+		status = DDI_FAILURE;
 	}
 
 	/*

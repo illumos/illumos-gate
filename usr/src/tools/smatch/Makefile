@@ -131,6 +131,8 @@ BUILT_HEADERS = src/version.h src/check_list_local.h
 
 .KEEP_STATE:
 
+.PARALLEL: $(OBJS)
+
 all: $(PROG)
 
 install: all .WAIT $(ROOTONBLDMACHPROG) $(ROOTONBLDDATAFILES)

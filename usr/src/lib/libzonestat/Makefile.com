@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libzonestat.a
 VERS=		.1
@@ -28,7 +29,7 @@ OBJECTS=	libzonestat.o
 
 include ../../Makefile.lib
 
-LIBS =		$(DYNLIB) $(LINTLIB) 
+LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lcmdutils -lumem -lc
 
 SRCDIR =	../common
@@ -36,6 +37,9 @@ CPPFLAGS +=	-I../common -mt -D_POSIX_PTHREAD_SEMANTICS
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

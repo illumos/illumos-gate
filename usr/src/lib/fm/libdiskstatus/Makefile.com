@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright (c) 2018, Joyent, Inc.
 
 LIBRARY=	libdiskstatus.a
 VERS=		.1
@@ -43,6 +43,9 @@ SRCDIR=		../common
 INCS +=		-I$(SRCDIR)
 LDLIBS +=	-lc -lnvpair
 CPPFLAGS +=	$(INCS)
+
+# not linted
+SMATCH=off
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
