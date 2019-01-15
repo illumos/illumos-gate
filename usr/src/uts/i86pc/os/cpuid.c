@@ -2508,13 +2508,14 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 
 #if !defined(__xpv)
 		/*
-		 * Do not use MONITOR/MWAIT to halt in the idle loop on any AMD
-		 * processors.  AMD does not intend MWAIT to be used in the cpu
-		 * idle loop on current and future processors.  10h and future
-		 * AMD processors use more power in MWAIT than HLT.
-		 * Pre-family-10h Opterons do not have the MWAIT instruction.
+		 * AMD has not historically used MWAIT in the CPU's idle loop.
+		 * Pre-family-10h Opterons do not have the MWAIT instruction. We
+		 * know for certain that in at least family 17h, per AMD, mwait
+		 * is preferred. Families in-between are less certain.
 		 */
-		idle_cpu_prefer_mwait = 0;
+		if (cpi->cpi_family < 0x17) {
+			idle_cpu_prefer_mwait = 0;
+		}
 #endif
 
 		break;
