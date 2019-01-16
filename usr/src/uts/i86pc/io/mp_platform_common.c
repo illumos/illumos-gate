@@ -22,7 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -1604,7 +1604,7 @@ apic_allocate_irq(int irq)
 {
 	int	freeirq, i;
 
-	if ((freeirq = apic_find_free_irq(irq, (APIC_RESV_IRQ - 1))) == -1)
+	if ((freeirq = apic_find_free_irq(irq, (APIC_RESV_IRQ - 1))) == -1) {
 		if ((freeirq = apic_find_free_irq(APIC_FIRST_FREE_IRQ,
 		    (irq - 1))) == -1) {
 			/*
@@ -1616,16 +1616,19 @@ apic_allocate_irq(int irq)
 				if ((apic_irq_table[i] == NULL) ||
 				    apic_irq_table[i]->airq_mps_intr_index ==
 				    FREE_INDEX) {
-				freeirq = i;
-				break;
+					freeirq = i;
+					break;
+				}
+			}
+
+			if (freeirq == -1) {
+				/* This shouldn't happen, but just in case */
+				cmn_err(CE_WARN, "%s: NO available IRQ", psm_name);
+				return (-1);
 			}
 		}
-		if (freeirq == -1) {
-			/* This shouldn't happen, but just in case */
-			cmn_err(CE_WARN, "%s: NO available IRQ", psm_name);
-			return (-1);
-		}
 	}
+
 	if (apic_irq_table[freeirq] == NULL) {
 		apic_irq_table[freeirq] =
 		    kmem_zalloc(sizeof (apic_irq_t), KM_NOSLEEP);

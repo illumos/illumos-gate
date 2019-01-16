@@ -22,7 +22,7 @@
 # uts/i86pc/apix/Makefile
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 #	This makefile drives the production of the apix "mach"
 #	kernel module.
@@ -63,8 +63,6 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 #
 LDFLAGS		+= -dy -N misc/acpica
 
-# needs work, real bug in apic_allocate_irq()
-$(OBJS_DIR)/mp_platform_common.o := SMOFF += indenting
 # needs work
 $(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 
