@@ -10,28 +10,22 @@
  */
 
 /*
- * Copyright 2014 Joyent, Inc.  All rights reserved.
+ * Copyright 2015 Joyent, Inc.
  */
 
-#include <sys/scsi/adapters/mpt_sas/mptsas_hash.h>
+#include <sys/refhash.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/list.h>
 #include <sys/ddi.h>
 
-#ifdef lint
-extern refhash_link_t *obj_to_link(refhash_t *, void *);
-extern void *link_to_obj(refhash_t *, refhash_link_t *);
-extern void *obj_to_tag(refhash_t *, void *);
-#else
 #define	obj_to_link(_h, _o)	\
 	((refhash_link_t *)(((char *)(_o)) + (_h)->rh_link_off))
 #define	link_to_obj(_h, _l)	\
 	((void *)(((char *)(_l)) - (_h)->rh_link_off))
 #define	obj_to_tag(_h, _o)	\
 	((void *)(((char *)(_o)) + (_h)->rh_tag_off))
-#endif
 
 refhash_t *
 refhash_create(uint_t bucket_count, refhash_hash_f hash,
@@ -208,7 +202,6 @@ refhash_next(refhash_t *hp, void *op)
 boolean_t
 refhash_obj_valid(refhash_t *hp, const void *op)
 {
-	/* LINTED - E_ARG_INCOMPATIBLE_WITH_ARG_L */
 	const refhash_link_t *lp = obj_to_link(hp, op);
 
 	return ((lp->rhl_flags & RHL_F_DEAD) != 0);

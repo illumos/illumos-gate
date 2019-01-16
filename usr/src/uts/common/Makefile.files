@@ -294,6 +294,7 @@ GENUNIX_OBJS +=	\
 		rctl.o		\
 		rctlsys.o	\
 		readlink.o	\
+		refhash.o	\
 		refstr.o	\
 		rename.o	\
 		resolvepath.o	\
@@ -1909,8 +1910,7 @@ ZYD_OBJS += zyd.o zyd_usb.o zyd_hw.o zyd_fw.o
 
 MXFE_OBJS += mxfe.o
 
-MPTSAS_OBJS += mptsas.o mptsas_hash.o mptsas_impl.o mptsas_init.o \
-		mptsas_raid.o mptsas_smhba.o
+MPTSAS_OBJS += mptsas.o mptsas_impl.o mptsas_init.o mptsas_raid.o mptsas_smhba.o
 
 SFE_OBJS += sfe.o sfe_util.o
 

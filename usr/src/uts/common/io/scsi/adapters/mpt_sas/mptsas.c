@@ -72,6 +72,7 @@
 #include <sys/file.h>
 #include <sys/policy.h>
 #include <sys/model.h>
+#include <sys/refhash.h>
 #include <sys/sysevent.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dr.h>
@@ -99,7 +100,6 @@
 #include <sys/scsi/adapters/mpt_sas/mptsas_var.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_smhba.h>
-#include <sys/scsi/adapters/mpt_sas/mptsas_hash.h>
 #include <sys/raidioctl.h>
 
 #include <sys/fs/dv_node.h>	/* devfs_clean */

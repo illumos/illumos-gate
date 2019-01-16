@@ -1583,6 +1583,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/pcmcia/pcs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/refhash/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/rpc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
