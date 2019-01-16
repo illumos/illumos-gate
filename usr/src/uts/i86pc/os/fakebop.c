@@ -50,6 +50,7 @@
 #include <sys/machsystm.h>
 #include <sys/archsystm.h>
 #include <sys/boot_console.h>
+#include <sys/framebuffer.h>
 #include <sys/cmn_err.h>
 #include <sys/systm.h>
 #include <sys/promif.h>
@@ -91,6 +92,9 @@ static uint_t kbm_debug = 0;
 	for (cp = (s); *cp; ++cp)		\
 		bcons_putchar(*cp);		\
 	}
+
+/* callback to boot_fb to set shadow frame buffer */
+extern void boot_fb_shadow_init(bootops_t *);
 
 bootops_t bootop;	/* simple bootops we'll pass on to kernel */
 struct bsys_mem bm;
@@ -2147,6 +2151,8 @@ _start(struct xboot_info *xbp)
 	 */
 	bop_idt_init();
 #endif
+	/* Set up the shadow fb for framebuffer console */
+	boot_fb_shadow_init(bops);
 
 	/*
 	 * Start building the boot properties from the command line

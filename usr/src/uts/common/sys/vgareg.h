@@ -37,6 +37,9 @@ extern "C" {
 #define	VGA_MEM_ADDR	0xa0000
 #define	VGA_MEM_SIZE	0x20000
 
+#define	VGA_TEXT_COLS	80
+#define	VGA_TEXT_ROWS	25
+
 /*
  * VGA frame buffer hardware definitions.
  */
@@ -86,6 +89,8 @@ extern "C" {
 #define	VGA_MISC_PGSL		0x20
 #define	VGA_MISC_HSP		0x40
 #define	VGA_MISC_VSP		0x80
+#define	VGA_MISC_IS1_VR		0x08	/* Vertical Retrace */
+#define	VGA_MISC_IS1_DD		0x01	/* Display Disabled */
 
 /*
  * CRT Controller registers
@@ -177,6 +182,11 @@ extern "C" {
 #define		VGA_SEQ_CLK_MODE_8DC		0x01
 #define	VGA_SEQ_EN_WT_PL	0x02
 #define		VGA_SEQ_EN_WT_PL_ALL		0x0f
+#define	VGA_SEQ_CMS		0x03		/* Char Map Select */
+#define		VGA_SEQ_CMS_SAH			0x20	/* Char. A (bit 2) */
+#define		VGA_SEQ_CMS_SBH			0x10	/* Char. B (bit 2) */
+#define		VGA_SEQ_CMS_SA			0x0C	/* Char. A (bit 0+1) */
+#define		VGA_SEQ_CMS_SB			0x03	/* Char. B (bit 0+1) */
 #define	VGA_SEQ_MEM_MODE	0x04
 #define		VGA_SEQ_MEM_MODE_EXT_MEM	0x02
 #define		VGA_SEQ_MEM_MODE_SEQ_MODE	0x04
@@ -202,13 +212,17 @@ extern "C" {
 /*
  * Attribute controller registers
  */
-#define	VGA_ATR_PLT_REG		0x00
-#define	VGA_ATR_NUM_PLT		0x10
-#define	VGA_ATR_MODE		0x10
-#define		VGA_ATR_MODE_GRAPH	0x01
-#define		VGA_ATR_MODE_9WIDE	0x04
-#define		VGA_ATR_MODE_BLINK	0x08
-#define		VGA_ATR_MODE_256CLR	0x40
+#define	VGA_ATR_PAS		0x20	/* Palette Address Source */
+#define	VGA_ATR_PLT_REG		0x00	/* Palette Register */
+#define	VGA_ATR_NUM_PLT		0x10	/* Palette Register count */
+#define	VGA_ATR_MODE		0x10	/* Attribute mode control */
+#define		VGA_ATR_MODE_GRAPH	0x01	/* Graphics enable */
+#define		VGA_ATR_MODE_MONO	0x02	/* Monochrome emulation */
+#define		VGA_ATR_MODE_9WIDE	0x04	/* Line Graphics enable */
+#define		VGA_ATR_MODE_BLINK	0x08	/* Blink enable */
+#define		VGA_ATR_MODE_PPM	0x20	/* Pixel panning mode */
+#define		VGA_ATR_MODE_256CLR	0x40	/* 8-bit color enable */
+#define		VGA_ATR_MODE_P54S	0x80	/* Palette bits 4-5 select */
 #define	VGA_ATR_BDR_CLR		0x11
 #define	VGA_ATR_DISP_PLN	0x12
 #define		VGA_ATR_DISP_PLN_ALL	0x0f

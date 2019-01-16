@@ -36,6 +36,7 @@
 #include <sys/multiboot2.h>
 #include <sys/multiboot2_impl.h>
 #include <sys/sysmacros.h>
+#include <sys/framebuffer.h>
 #include <sys/sha1.h>
 #include <util/string.h>
 #include <util/strtolctype.h>
@@ -144,6 +145,8 @@ multiboot_tag_mmap_t *mb2_mmap_tagp;
 int num_entries;			/* mmap entry count */
 boolean_t num_entries_set;		/* is mmap entry count set */
 uintptr_t load_addr;
+static boot_framebuffer_t framebuffer __aligned(16);
+static boot_framebuffer_t *fb;
 
 /* can not be automatic variables because of alignment */
 static efi_guid_t smbios3 = SMBIOS3_TABLE_GUID;
@@ -155,7 +158,7 @@ static efi_guid_t acpi1 = ACPI_10_TABLE_GUID;
 /*
  * This contains information passed to the kernel
  */
-struct xboot_info boot_info[2];	/* extra space to fix alignement for amd64 */
+struct xboot_info boot_info __aligned(16);
 struct xboot_info *bi;
 
 /*
@@ -171,6 +174,7 @@ int largepage_support = 0;
 int pae_support = 0;
 int pge_support = 0;
 int NX_support = 0;
+int PAT_support = 0;
 
 /*
  * Low 32 bits of kernel entry address passed back to assembler.
@@ -980,16 +984,16 @@ init_mem_alloc(void)
 static void
 dboot_multiboot1_xboot_consinfo(void)
 {
-	bi->bi_framebuffer = NULL;
+	fb->framebuffer = 0;
 }
 
 static void
 dboot_multiboot2_xboot_consinfo(void)
 {
-	multiboot_tag_framebuffer_t *fb;
-	fb = dboot_multiboot2_find_tag(mb2_info,
+	multiboot_tag_framebuffer_t *fbtag;
+	fbtag = dboot_multiboot2_find_tag(mb2_info,
 	    MULTIBOOT_TAG_TYPE_FRAMEBUFFER);
-	bi->bi_framebuffer = (native_ptr_t)(uintptr_t)fb;
+	fb->framebuffer = (uint64_t)(uintptr_t)fbtag;
 }
 
 static int
@@ -2029,24 +2033,29 @@ build_page_tables(void)
 	 * Map framebuffer memory as PT_NOCACHE as this is memory from a
 	 * device and therefore must not be cached.
 	 */
-	if (bi->bi_framebuffer != NULL) {
-		multiboot_tag_framebuffer_t *fb;
-		fb = (multiboot_tag_framebuffer_t *)(uintptr_t)
-		    bi->bi_framebuffer;
+	if (bi->bi_framebuffer != NULL && fb->framebuffer != 0) {
+		multiboot_tag_framebuffer_t *fb_tagp;
+		fb_tagp = (multiboot_tag_framebuffer_t *)(uintptr_t)
+		    fb->framebuffer;
 
-		start = fb->framebuffer_common.framebuffer_addr;
-		end = start + fb->framebuffer_common.framebuffer_height *
-		    fb->framebuffer_common.framebuffer_pitch;
+		start = fb_tagp->framebuffer_common.framebuffer_addr;
+		end = start + fb_tagp->framebuffer_common.framebuffer_height *
+		    fb_tagp->framebuffer_common.framebuffer_pitch;
 
 		if (map_debug)
 			dboot_printf("FB 1:1 map pa=%" PRIx64 "..%" PRIx64 "\n",
 			    start, end);
 		pte_bits |= PT_NOCACHE;
+		if (PAT_support != 0)
+			pte_bits |= PT_PAT_4K;
+
 		while (start < end) {
 			map_pa_at_va(start, start, 0);
 			start += MMU_PAGESIZE;
 		}
 		pte_bits &= ~PT_NOCACHE;
+		if (PAT_support != 0)
+			pte_bits &= ~PT_PAT_4K;
 	}
 #endif /* !__xpv */
 
@@ -2063,15 +2072,12 @@ See http://illumos.org/msg/SUNOS-8000-AK for details.\n"
 static void
 dboot_init_xboot_consinfo(void)
 {
-	uintptr_t addr;
-	/*
-	 * boot info must be 16 byte aligned for 64 bit kernel ABI
-	 */
-	addr = (uintptr_t)boot_info;
-	addr = (addr + 0xf) & ~0xf;
-	bi = (struct xboot_info *)addr;
+	bi = &boot_info;
 
 #if !defined(__xpv)
+	fb = &framebuffer;
+	bi->bi_framebuffer = (native_ptr_t)(uintptr_t)fb;
+
 	switch (multiboot_version) {
 	case 1:
 		dboot_multiboot1_xboot_consinfo();
@@ -2361,6 +2367,16 @@ startup_kernel(void)
 		}
 	}
 
+	/*
+	 * check for PAT support
+	 */
+	{
+		uint32_t eax = 1;
+		uint32_t edx = get_cpuid_edx(&eax);
+
+		if (edx & CPUID_INTC_EDX_PAT)
+			PAT_support = 1;
+	}
 #if !defined(_BOOT_TARGET_amd64)
 
 	/*
@@ -2402,6 +2418,8 @@ startup_kernel(void)
 			pge_support = 1;
 		if (edx & CPUID_INTC_EDX_PAE)
 			pae_support = 1;
+		if (edx & CPUID_INTC_EDX_PAT)
+			PAT_support = 1;
 
 		eax = 0x80000000;
 		edx = get_cpuid_edx(&eax);
@@ -2471,6 +2489,7 @@ startup_kernel(void)
 		top_level = 1;
 	}
 
+	DBG(PAT_support);
 	DBG(pge_support);
 	DBG(NX_support);
 	DBG(largepage_support);
@@ -2571,4 +2590,13 @@ startup_kernel(void)
 #endif
 
 	DBG_MSG("\n\n*** DBOOT DONE -- back to asm to jump to kernel\n\n");
+
+#ifndef __xpv
+	/* Update boot info with FB data */
+	fb->cursor.origin.x = fb_info.cursor.origin.x;
+	fb->cursor.origin.y = fb_info.cursor.origin.y;
+	fb->cursor.pos.x = fb_info.cursor.pos.x;
+	fb->cursor.pos.y = fb_info.cursor.pos.y;
+	fb->cursor.visible = fb_info.cursor.visible;
+#endif
 }
