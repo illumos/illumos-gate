@@ -941,12 +941,11 @@ got_fp:
 }
 
 /* ARGSUSED */
-int
+void
 dtrace_setreg(struct regs *rp, uint_t reg, ulong_t val)
 {
 	/* Not supported at this time */
 	DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
-	return (0);
 }
 
 /*ARGSUSED*/
