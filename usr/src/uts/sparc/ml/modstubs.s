@@ -204,7 +204,7 @@ fcnname/**/_info:							\
 	SET_SIZE(fcnname);						\
 	STUB_DATA(module, fcnname, install_fcn, retfcn, weak)
 
-#define SCALL_UNLOADABLE(module, fcnname, install_fcn, retfcn, weak)	\
+#define SCALL_NO_UNLOADABLE(module, fcnname, install_fcn, retfcn, weak)	\
 	ENTRY_NP(fcnname);						\
 	save	%sp, -SA(MINFRAME), %sp;	/* new window */	\
 	set	fcnname/**/_info, %l5;					\
