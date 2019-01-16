@@ -24,7 +24,7 @@
  */
 /*
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -2517,5 +2517,8 @@ so_krecv_unblock(sonode_t *so)
 
 	so->so_rcv_queued = 0;
 	(void) so_check_flow_control(so);
-	mutex_exit(&so->so_lock);
+	/*
+	 * so_check_flow_control() always drops so->so_lock, so we won't
+	 * need to drop it ourselves.
+	 */
 }
