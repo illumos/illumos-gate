@@ -136,7 +136,7 @@ Driver is incompatible with USBA framework.
 .Xr virtualkm 7D ,
 .Xr xhci 7D ,
 .Xr Intro 9F ,
-.Xr Intro 9S)
+.Xr Intro 9S
 .Pp
 .Rs
 .%T Writing Device Drivers

@@ -75,12 +75,12 @@ These functions are most often used in conjunction with Internet addresses and
 ports as returned by
 .Xr gethostent 3NSL
 and
-.Xr getservent 3NSL .
+.Xr getservent 3SOCKET .
 .Sh MT-LEVEL
 .Sy Safe
 .Sh SEE ALSO
 .Xr inet.h 3HEAD ,
 .Xr gethostent 3NSL ,
-.Xr getservent 3NSL ,
+.Xr getservent 3SOCKET ,
 .Xr attributes 5 ,
 .Xr byteorder 5

@@ -21,6 +21,7 @@
 
 #
 # Copyright 2016, Toomas Soome <tsoome@me.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -81,6 +82,7 @@ $(i386_ONLY)file path=boot/loader64.efi group=sys mode=0555
 $(i386_ONLY)file path=boot/pmbr group=sys mode=0444
 $(i386_ONLY)file path=boot/pxeboot group=sys mode=0444
 $(i386_ONLY)file path=usr/share/man/man4/loader.conf.4
+$(i386_ONLY)file path=usr/share/man/man5/beastie.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/brand.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/check-password.4th.5
 $(i386_ONLY)file path=usr/share/man/man5/color.4th.5

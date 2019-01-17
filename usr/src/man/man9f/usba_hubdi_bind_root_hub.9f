@@ -135,4 +135,4 @@ to indicate that they could not proceed.
 .Xr usba_hcdi 9E ,
 .Xr usba_hcdi_register 9F ,
 .Xr usba_hcdi_unregister 9F ,
-.Xr usb_dev_Descr 9S
+.Xr usb_dev_descr 9S

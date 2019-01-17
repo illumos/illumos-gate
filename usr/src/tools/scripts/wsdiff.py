@@ -71,10 +71,11 @@
 #        -i      Tell wsdiff which objects to compare via an input file list
 
 from __future__ import print_function
-import datetime, fnmatch, getopt, os, profile, subprocess
+import datetime, fnmatch, getopt, os, profile, io, subprocess
 import re, resource, select, shutil, signal, string, struct, sys, tempfile
 import time, threading
 from stat import *
+from subprocess import Popen, PIPE
 
 # Human readable diffs truncated by default if longer than this
 # Specifying -v on the command line will override
@@ -113,6 +114,11 @@ wsdiff_exceptions = [
 	"usr/perl5/5.8.4/lib/i86pc-solaris-64int/CORE/libperl.so.1",
 	"usr/perl5/5.6.1/lib/i86pc-solaris-64int/CORE/libperl.so.1"
 ]
+
+def getoutput(cmd):
+	p = Popen(cmd, shell=True, stdout=PIPE)
+	output, x = p.communicate()
+	return (p.returncode, output.decode(errors='replace'))
 
 #####
 # Logging routines
@@ -240,8 +246,7 @@ def diffFileData(tmpf1, tmpf2) :
 		tmpf2 = tmp_od2
 
 	try:
-		data = subprocess.check_output(
-		    diff_cmd + " " + tmpf1 + " " + tmpf2)
+		rc, data = getoutput(diff_cmd + " " + tmpf1 + " " + tmpf2)
 		# Remove the temp files as we no longer need them.
 		if binaries :
 			try:
@@ -272,13 +277,13 @@ def diffData(base, ptch, d1, d2) :
 	tmpFile2 = tmpDir2 + os.path.basename(ptch) + t.getName()
 
 	try:
-		fd1 = open(tmpFile1, "w")
+		fd1 = io.open(tmpFile1, mode='w', errors='ignore')
 	except:
 		error("failed to open: " + tmpFile1)
 		cleanup(1)
 
 	try:
-		fd2 = open(tmpFile2, "w")
+		fd2 = io.open(tmpFile2, mode='w', errors='ignore')
 	except:
 		error("failed to open: " + tmpFile2)
 		cleanup(1)
@@ -448,18 +453,16 @@ def getTheFileType(f) :
 #
 # Return non-zero if "f" is an ELF file
 #
-elfmagic = '\177ELF'
+elfmagic = b'\177ELF'
 def isELF(f) :
 	try:
-		fd = open(f)
-	except:
-		error("failed to open: " + f)
-		return 0
-	magic = fd.read(len(elfmagic))
-	fd.close()
+		with io.open(f, mode='rb') as fd:
+			magic = fd.read(len(elfmagic))
 
-	if magic == elfmagic :
-		return 1
+		if magic == elfmagic :
+			return 1
+	except:
+		pass
 	return 0
 
 #
@@ -468,17 +471,14 @@ def isELF(f) :
 #
 def isBinary(f) :
 	try:
-		fd = open(f)
-	except:
-		error("failed to open: " + f)
-		return 0
-	s = fd.read()
-	fd.close()
+		with io.open(f, mode='rb') as fd:
+			s = fd.read()
 
-	if s.find('\0') == -1 :
-		return 0
-	else :
-		return 1
+		if s.find(b'\0') == -1 :
+			return 0
+	except:
+		pass
+	return 1
 
 #####
 # Directory traversal and file finding
@@ -678,7 +678,7 @@ def get_elfheader(f) :
 
 	header = {}
 
-	hstring = subprocess.check_output(elfdump_cmd + " -c " + f)
+	rc, hstring = getoutput(elfdump_cmd + " -c " + f)
 
 	if len(hstring) == 0 :
 		error("Failed to dump ELF header for " + f)
@@ -707,7 +707,7 @@ def get_elfheader(f) :
 #
 def extract_elf_section(f, section) :
 
-	data = subprocess.check_output(dump_cmd + " -sn " + section + " " + f)
+	rc, data = getoutput(dump_cmd + " -sn " + section + " " + f)
 
 	if len(data) == 0 :
 		error(dump_cmd + "yielded no data on section " + section +
@@ -834,13 +834,13 @@ def compareElfs(base, ptch, quiet) :
 		base_header = get_elfheader(base)
 	except:
 		return
-	sections = base_header.keys()
+	sections = list(base_header.keys())
 
 	try:
 		ptch_header = get_elfheader(ptch)
 	except:
 		return
-	e2_only_sections = ptch_header.keys()
+	e2_only_sections = list(ptch_header.keys())
 
 	e1_only_sections = []
 
@@ -982,22 +982,20 @@ def compareArchives(base, ptch, fileType) :
 	# copy over the objects to the temp areas, and
 	# unpack them
 	baseCmd = "cp -fp " + base + " " + ArchTmpDir1
-	try:
-		output = subprocess.check_output(baseCmd)
-	except CalledProcessError:
+	rc, output = getoutput(baseCmd)
+	if rc != 0:
 		error(baseCmd + " failed: " + output)
 		clearTmpDirs(ArchTmpDir1, ArchTmpDir2)
 		return -1
 
 	ptchCmd = "cp -fp " + ptch + " " + ArchTmpDir2
-	try:
-		output = subprocess.check_output(ptchCmd)
-	except CalledProcessError:
+	rc, output = getoutput(ptchCmd)
+	if rc != 0:
 		error(ptchCmd + " failed: " + output)
 		clearTmpDirs(ArchTmpDir1, ArchTmpDir2)
 		return -1
 
-	bname = string.split(fileName, '/')[-1]
+	bname = fileName.split('/')[-1]
 	if fileType == "Java Archive" :
 		baseCmd = ("cd " + ArchTmpDir1 + "; " + "jar xf " + bname +
 			  "; rm -f " + bname + " META-INF/MANIFEST.MF")
@@ -1072,12 +1070,12 @@ def compareBasic(base, ptch, quiet, fileType) :
 		return 1
 
 	try:
-		baseFile = open(base)
+		baseFile = io.open(base, errors='replace')
 	except:
 		error("could not open " + base)
 		return -1
 	try:
-		ptchFile = open(ptch)
+		ptchFile = io.open(ptch, errors='replace')
 	except:
 		error("could not open " + ptch)
 		return -1
@@ -1095,10 +1093,9 @@ def compareBasic(base, ptch, quiet, fileType) :
 		toSnipEndStr = "-->\n"
 
 	if needToSnip :
-		toSnipBegin = string.find(baseData, toSnipBeginStr)
+		toSnipBegin = baseData.find(toSnipBeginStr)
 		if toSnipBegin != -1 :
-			toSnipEnd = (string.find(baseData[toSnipBegin:],
-						toSnipEndStr) +
+			toSnipEnd = (baseData[toSnipBegin:].find(toSnipEndStr) +
 						len(toSnipEndStr))
 			baseData = (baseData[:toSnipBegin] +
 				   baseData[toSnipBegin + toSnipEnd:])
@@ -1364,7 +1361,8 @@ def main() :
 	# Try to look for tools in $SRC/tools if the "-t" option
 	# was specified
 	#
-	arch = subprocess.check_output("uname -p")
+	rc, arch = getoutput("uname -p")
+	arch = arch.rstrip()
 	if localTools :
 		try:
 			src = os.environ['SRC']

@@ -27,7 +27,7 @@ the host machines native byte order and big or little-endian values.
 While the manual page details the macros defined by
 .In endian.h ,
 the functions are documented separately in
-.Xr endian 3C.
+.Xr endian 3C .
 More information on endianness and a general background on the topic can
 be found in
 .Xr byteorder 5 .

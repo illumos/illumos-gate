@@ -48,7 +48,7 @@ then it disables tracing for the signal
 The signal constants, representing valid values for
 .Fa which ,
 can be found in
-.Xr signal.h 3HEAD.
+.Xr signal.h 3HEAD .
 The signal
 .Dv SIGKILL
 may not be stopped.

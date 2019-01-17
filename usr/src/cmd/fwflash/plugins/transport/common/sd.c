@@ -232,7 +232,7 @@ sdfw_read_descriptor(struct devicelist *flashdev, libscsi_hdl_t *hdl,
 
 	if (nwritten != sizeof (descbuf)) {
 		logmsg(MSG_ERROR, gettext("%s: received a short read from the "
-		    "SCSI READ BUFFER command, expected %u bytes, read %u\n"),
+		    "SCSI READ BUFFER command, expected %u bytes, read %zu\n"),
 		    flashdev->drvname, sizeof (descbuf), nwritten);
 		return (FWFLASH_FAILURE);
 	}
@@ -258,7 +258,7 @@ sdfw_write(struct devicelist *flashdev, libscsi_hdl_t *handle,
 	libscsi_action_t *action = NULL;
 	spc3_write_buffer_cdb_t *wb_cdb;
 
-	logmsg(MSG_INFO, "%s: writing %u bytes of image %s at offset %u from "
+	logmsg(MSG_INFO, "%s: writing %u bytes of image %s at offset %zu from "
 	    "address %p\n", flashdev->drvname, len, verifier->imgfile, off,
 	    buf);
 	logmsg(MSG_INFO, "%s: writing to buffer id %u\n",
@@ -322,9 +322,9 @@ sdfw_write(struct devicelist *flashdev, libscsi_hdl_t *handle,
 		keystr = libscsi_sense_key_name(key);
 
 		logmsg(MSG_ERROR, gettext("%s: failed to write firmware: "
-		    "received sense key %llu (%s) additional sense code "
-		    "0x%llx/0x%llx (%s)\n"), flashdev->drvname, key,
-		    keystr != NULL ? keystr : "<unknown>",
+		    "received sense key %" PRIu64 " (%s) additional sense code "
+		    "0x%" PRIx64 "/0x%" PRIx64 " (%s)\n"), flashdev->drvname,
+		    key, keystr != NULL ? keystr : "<unknown>",
 		    asc, ascq, code != NULL ? code : "<unknown>");
 		goto err;
 	} else if (samstatus != SAM4_STATUS_GOOD) {
@@ -413,12 +413,12 @@ fw_writefw(struct devicelist *flashdev)
 	 * fits in the maximum transfer size.
 	 */
 	if (maxxfer < verifier->imgsize) {
-		logmsg(MSG_INFO, "%s: Maximum transfer is %u, required "
-		    "alignment is 2^%d\n", flashdev->drvname, maxxfer, align);
+		logmsg(MSG_INFO, "%s: Maximum transfer is %zu, required "
+		    "alignment is 2^%u\n", flashdev->drvname, maxxfer, align);
 		if (FW_SD_PARTIAL_WRITE_SIZE > maxxfer) {
 			logmsg(MSG_ERROR, gettext("%s: cannot write firmware "
 			    "image: HBA enforces a maximum transfer size of "
-			    "%u bytes, but the default partial transfer size "
+			    "%zu bytes, but the default partial transfer size "
 			    "is %u bytes\n"), flashdev->drvname, maxxfer,
 			    FW_SD_PARTIAL_WRITE_SIZE);
 			goto err;
@@ -432,7 +432,7 @@ fw_writefw(struct devicelist *flashdev)
 			goto err;
 		}
 
-		logmsg(MSG_INFO, "%s: final transfer block size is %u\n",
+		logmsg(MSG_INFO, "%s: final transfer block size is %zu\n",
 		    flashdev->drvname, maxxfer);
 	}
 

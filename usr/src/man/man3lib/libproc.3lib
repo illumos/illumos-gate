@@ -114,7 +114,7 @@ sections.
 Many of the operations in the library rely on debug information being
 present in a process and its associated libraries.
 The library leverages symbol table information, CTF data
-.Pq Xr CTF 4
+.Pq Xr ctf 4
 sections, and frame unwinding information based on the use of an ABI
 defined frame pointer, e\&.g\&.
 .Sy %ebp

@@ -228,10 +228,10 @@ will be called at this point.
 .Ss Binding the Root Hub
 Once this is set up, the hcdi driver must initialize its root hub by
 calling
-Xr usba_hcdi_bind_root_hub 9F .
+.Xr usba_hubdi_bind_root_hub 9F .
 To bind the root hub, the device driver is responsible for providing a
 device descriptor that represents the hardware.
- Depending on the hardware, this descriptor may be either static or dynamic.
+Depending on the hardware, this descriptor may be either static or dynamic.
 .Pp
 This device descriptor should be a packed descriptor that is the same
 that would be read off of the device.
@@ -276,7 +276,7 @@ As such, driver writers need to ensure that all initialization is done prior to
 loading the root hub.
 Once successfully loaded, driver writers should assume that they'll get other
 calls into the driver's operation vector before the call to
-.Xr usba_hubdi_bind_root_hub 9F.
+.Xr usba_hubdi_bind_root_hub 9F .
 .Pp
 If the call to
 .Xr usba_hubdi_bind_root_hub 9F

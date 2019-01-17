@@ -18916,6 +18916,7 @@ f usr/share/man/man5/audit_binfile.5 0444 root bin
 f usr/share/man/man5/audit_remote.5 0444 root bin
 f usr/share/man/man5/audit_syslog.5 0444 root bin
 s usr/share/man/man5/availability.5=attributes.5
+f usr/share/man/man5/beastie.4th.5 0444 root bin
 f usr/share/man/man5/brand.4th.5 0444 root bin
 f usr/share/man/man5/brands.5 0444 root bin
 f usr/share/man/man5/byteorder.5 0444 root bin
@@ -20502,6 +20503,7 @@ f usr/share/man/man9f/scsi_hba_pkt_comp.9f 0444 root bin
 s usr/share/man/man9f/scsi_hba_pkt_free.9f=scsi_hba_pkt_alloc.9f
 f usr/share/man/man9f/scsi_hba_probe.9f 0444 root bin
 f usr/share/man/man9f/scsi_hba_tgtmap_create.9f 0444 root bin
+s usr/share/man/man9f/scsi_hba_tgtmap_destroy.9f=scsi_hba_tgtmap_create.9f
 s usr/share/man/man9f/scsi_hba_tgtmap_set_add.9f=scsi_hba_tgtmap_create.9f
 s usr/share/man/man9f/scsi_hba_tgtmap_set_begin.9f=scsi_hba_tgtmap_create.9f
 s usr/share/man/man9f/scsi_hba_tgtmap_set_end.9f=scsi_hba_tgtmap_create.9f

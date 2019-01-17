@@ -64,8 +64,8 @@ struct qinit {
 .Xr queue 9S ,
 .Xr streamtab 9S
 .Pp
-.Xr Writing Device Drivers
+.%T Writing Device Drivers
 .Pp
-.Xr STREAMS Programming Guide
+.%T STREAMS Programming Guide
 .Sh NOTES
 This release includes no support for module statistics.

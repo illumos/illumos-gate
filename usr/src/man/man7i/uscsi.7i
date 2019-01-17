@@ -416,7 +416,7 @@ An error occurred during the execution of the command.
 .ad
 .RS 10n
 A process without root credentials tried to execute the \fBUSCSICMD\fR or
-\fRUSCSIMAXXFER\fR ioctl.
+\fBUSCSIMAXXFER\fR ioctl.
 .RE
 
 .sp

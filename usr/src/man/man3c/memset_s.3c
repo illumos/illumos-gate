@@ -96,7 +96,7 @@ Otherwise, a non-zero value is returned.
 .Sy Safe
 .Sh SEE ALSO
 .Xr memset 3C ,
-.Xr set_constraint_handler 3C
+.Xr set_constraint_handler_s 3C
 .Sh STANDARDS
 The
 .Fn memset_s
