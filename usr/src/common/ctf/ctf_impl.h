@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2012, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #ifndef	_CTF_IMPL_H
@@ -41,6 +41,8 @@
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
 #include <sys/varargs.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 
 #define	isspace(c) \
 	((c) == ' ' || (c) == '\t' || (c) == '\n' || \
@@ -56,6 +58,7 @@
 #include <stdio.h>
 #include <limits.h>
 #include <ctype.h>
+#include <stddef.h>
 
 #endif	/* _KERNEL */
 
@@ -76,6 +79,10 @@ typedef struct ctf_hash {
 	ushort_t h_nelems;	/* number of elements in hash table */
 	uint_t h_free;		/* index of next free hash element */
 } ctf_hash_t;
+
+struct ctf_idhash_iter {
+	int cii_id;	/* Current iteration id */
+};
 
 typedef struct ctf_strs {
 	const char *cts_strs;	/* base address of string table */
@@ -159,6 +166,20 @@ typedef struct ctf_dtdef {
 	} dtd_u;
 } ctf_dtdef_t;
 
+typedef struct ctf_dsdef {
+	ctf_list_t dsd_list;	/* list forward/back pointers */
+	ulong_t dsd_symidx;	/* symbol id */
+	ctf_id_t dsd_tid;	/* type for obj, 0 if function */
+	uint_t dsd_nargs;
+	ctf_id_t *dsd_argc;	/* function argv */
+} ctf_dsdef_t;
+
+typedef struct ctf_dldef {
+	ctf_list_t dld_list;	/* list forward/back pointers */
+	char *dld_name;		/* name of the label */
+	ctf_id_t dld_type;	/* type ID associated with the label */
+} ctf_dldef_t;
+
 typedef struct ctf_bundle {
 	ctf_file_t *ctb_file;	/* CTF container handle */
 	ctf_id_t ctb_type;	/* CTF type identifier */
@@ -211,6 +232,9 @@ struct ctf_file {
 	ulong_t ctf_dtnextid;	/* next dynamic type id to assign */
 	ulong_t ctf_dtoldid;	/* oldest id that has been committed */
 	void *ctf_specific;	/* data for ctf_get/setspecific */
+	ctf_list_t ctf_dsdefs;	/* list of dynamic obj/func definitions */
+	ctf_list_t ctf_dldefs;	/* list of dynamic labels */
+	uint_t ctf_hflags;	/* original flags on the header */
 };
 
 #define	LCTF_INDEX_TO_TYPEPTR(fp, i) \
@@ -225,61 +249,14 @@ struct ctf_file {
 #define	LCTF_RDWR	0x0004	/* CTF container is writable */
 #define	LCTF_DIRTY	0x0008	/* CTF container has been modified */
 
-#define	ECTF_BASE	1000	/* base value for libctf errnos */
-
-enum {
-	ECTF_FMT = ECTF_BASE,	/* file is not in CTF or ELF format */
-	ECTF_ELFVERS,		/* ELF version is more recent than libctf */
-	ECTF_CTFVERS,		/* CTF version is more recent than libctf */
-	ECTF_ENDIAN,		/* data is different endian-ness than lib */
-	ECTF_SYMTAB,		/* symbol table uses invalid entry size */
-	ECTF_SYMBAD,		/* symbol table data buffer invalid */
-	ECTF_STRBAD,		/* string table data buffer invalid */
-	ECTF_CORRUPT,		/* file data corruption detected */
-	ECTF_NOCTFDATA,		/* ELF file does not contain CTF data */
-	ECTF_NOCTFBUF,		/* buffer does not contain CTF data */
-	ECTF_NOSYMTAB,		/* symbol table data is not available */
-	ECTF_NOPARENT,		/* parent CTF container is not available */
-	ECTF_DMODEL,		/* data model mismatch */
-	ECTF_MMAP,		/* failed to mmap a data section */
-	ECTF_ZMISSING,		/* decompression library not installed */
-	ECTF_ZINIT,		/* failed to initialize decompression library */
-	ECTF_ZALLOC,		/* failed to allocate decompression buffer */
-	ECTF_DECOMPRESS,	/* failed to decompress CTF data */
-	ECTF_STRTAB,		/* string table for this string is missing */
-	ECTF_BADNAME,		/* string offset is corrupt w.r.t. strtab */
-	ECTF_BADID,		/* invalid type ID number */
-	ECTF_NOTSOU,		/* type is not a struct or union */
-	ECTF_NOTENUM,		/* type is not an enum */
-	ECTF_NOTSUE,		/* type is not a struct, union, or enum */
-	ECTF_NOTINTFP,		/* type is not an integer or float */
-	ECTF_NOTARRAY,		/* type is not an array */
-	ECTF_NOTREF,		/* type does not reference another type */
-	ECTF_NAMELEN,		/* buffer is too small to hold type name */
-	ECTF_NOTYPE,		/* no type found corresponding to name */
-	ECTF_SYNTAX,		/* syntax error in type name */
-	ECTF_NOTFUNC,		/* symtab entry does not refer to a function */
-	ECTF_NOFUNCDAT,		/* no func info available for function */
-	ECTF_NOTDATA,		/* symtab entry does not refer to a data obj */
-	ECTF_NOTYPEDAT,		/* no type info available for object */
-	ECTF_NOLABEL,		/* no label found corresponding to name */
-	ECTF_NOLABELDATA,	/* file does not contain any labels */
-	ECTF_NOTSUP,		/* feature not supported */
-	ECTF_NOENUMNAM,		/* enum element name not found */
-	ECTF_NOMEMBNAM,		/* member name not found */
-	ECTF_RDONLY,		/* CTF container is read-only */
-	ECTF_DTFULL,		/* CTF type is full (no more members allowed) */
-	ECTF_FULL,		/* CTF container is full */
-	ECTF_DUPMEMBER,		/* duplicate member name definition */
-	ECTF_CONFLICT,		/* conflicting type definition present */
-	ECTF_REFERENCED,	/* type has outstanding references */
-	ECTF_NOTDYN		/* type is not a dynamic type */
-};
+#define	CTF_ELF_SCN_NAME	".SUNW_ctf"
 
 extern ssize_t ctf_get_ctt_size(const ctf_file_t *, const ctf_type_t *,
     ssize_t *, ssize_t *);
 
 extern const ctf_type_t *ctf_lookup_by_id(ctf_file_t **, ctf_id_t);
+
+extern ctf_file_t *ctf_fdcreate_int(int, int *, ctf_sect_t *);
 
 extern int ctf_hash_create(ctf_hash_t *, ulong_t);
 extern int ctf_hash_insert(ctf_hash_t *, ctf_file_t *, ushort_t, uint_t);
@@ -294,11 +271,15 @@ extern void ctf_hash_destroy(ctf_hash_t *);
 
 extern void ctf_list_append(ctf_list_t *, void *);
 extern void ctf_list_prepend(ctf_list_t *, void *);
+extern void ctf_list_insert_before(ctf_list_t *, void *, void *);
 extern void ctf_list_delete(ctf_list_t *, void *);
 
 extern void ctf_dtd_insert(ctf_file_t *, ctf_dtdef_t *);
 extern void ctf_dtd_delete(ctf_file_t *, ctf_dtdef_t *);
 extern ctf_dtdef_t *ctf_dtd_lookup(ctf_file_t *, ctf_id_t);
+
+extern void ctf_dsd_delete(ctf_file_t *, ctf_dsdef_t *);
+extern void ctf_dld_delete(ctf_file_t *, ctf_dldef_t *);
 
 extern void ctf_decl_init(ctf_decl_t *, char *, size_t);
 extern void ctf_decl_fini(ctf_decl_t *);
@@ -326,6 +307,13 @@ extern const char *ctf_strerror(int);
 extern void ctf_dprintf(const char *, ...);
 
 extern void *ctf_zopen(int *);
+
+extern ctf_id_t ctf_add_encoded(ctf_file_t *, uint_t, const char *,
+    const ctf_encoding_t *, uint_t);
+extern ctf_id_t ctf_add_reftype(ctf_file_t *, uint_t, const char *, ctf_id_t,
+    uint_t);
+extern boolean_t ctf_sym_valid(uintptr_t, int, uint16_t, uint64_t,
+    uint32_t);
 
 extern const char _CTF_SECTION[];	/* name of CTF ELF section */
 extern const char _CTF_NULLSTR[];	/* empty string */

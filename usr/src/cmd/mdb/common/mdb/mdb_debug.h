@@ -27,8 +27,6 @@
 #ifndef	_MDB_DEBUG_H
 #define	_MDB_DEBUG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -66,8 +64,8 @@ extern void mdb_dmode(uint_t);
 
 extern const char *mdb_err2str(int);
 
-#ifdef DEBUG
 extern int mdb_dassert(const char *, const char *, int);
+#ifdef DEBUG
 #define	ASSERT(x)	((void)((x) || mdb_dassert(#x, __FILE__, __LINE__)))
 #else
 #define	ASSERT(x)

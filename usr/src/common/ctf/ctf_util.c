@@ -23,10 +23,12 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2015, Joyent, Inc.
+ */
 
 #include <ctf_impl.h>
+#include <sys/debug.h>
 
 /*
  * Simple doubly-linked list append routine.  This implementation assumes that
@@ -69,6 +71,24 @@ ctf_list_prepend(ctf_list_t *lp, void *new)
 		q->l_prev = p;
 	else
 		lp->l_prev = p;
+}
+
+void
+ctf_list_insert_before(ctf_list_t *head, void *item, void *nitem)
+{
+	ctf_list_t *lp = item;
+	ctf_list_t *new = nitem;
+	ctf_list_t *prev = lp->l_prev;
+
+	lp->l_prev = new;
+	new->l_next = lp;
+	new->l_prev = prev;
+	if (prev != NULL) {
+		prev->l_next = new;
+	} else {
+		ASSERT(head->l_next == lp);
+		head->l_next = new;
+	}
 }
 
 /*
@@ -149,4 +169,23 @@ ctf_set_errno(ctf_file_t *fp, int err)
 {
 	fp->ctf_errno = err;
 	return (CTF_ERR);
+}
+
+boolean_t
+ctf_sym_valid(uintptr_t strbase, int type, uint16_t shndx, uint64_t val,
+    uint32_t noff)
+{
+	const char *name;
+
+	if (type != STT_OBJECT && type != STT_FUNC)
+		return (B_FALSE);
+	if (shndx == SHN_UNDEF || noff == 0)
+		return (B_FALSE);
+	if (type == STT_OBJECT && shndx == SHN_ABS && val == 0)
+		return (B_FALSE);
+	name = (char *)(strbase + noff);
+	if (strcmp(name, "_START_") == 0 || strcmp(name, "_END_") == 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
 }

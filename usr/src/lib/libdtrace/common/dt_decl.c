@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
- * Copyright (c) 2013 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2015 Joyent, Inc. All rights reserved.
  */
 
 #include <strings.h>
@@ -652,7 +652,7 @@ dt_decl_member(dt_node_t *dnp)
 	}
 
 	if (ctf_add_member(dsp->ds_ctfp, dsp->ds_type,
-	    ident, dtt.dtt_type) == CTF_ERR) {
+	    ident, dtt.dtt_type, ULONG_MAX) == CTF_ERR) {
 		xyerror(D_UNKNOWN, "failed to define member '%s': %s\n",
 		    idname, ctf_errmsg(ctf_errno(dsp->ds_ctfp)));
 	}

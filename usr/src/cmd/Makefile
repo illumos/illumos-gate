@@ -106,6 +106,10 @@ COMMON_SUBDIRS=		\
 	crypt		\
 	csh		\
 	csplit		\
+	ctfconvert	\
+	ctfdiff		\
+	ctfdump		\
+	ctfmerge	\
 	ctrun		\
 	ctstat		\
 	ctwatch		\

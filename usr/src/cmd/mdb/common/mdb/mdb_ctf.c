@@ -24,7 +24,7 @@
  */
 /*
  * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_ctf.h>
@@ -37,6 +37,7 @@
 
 #include <libctf.h>
 #include <string.h>
+#include <limits.h>
 
 typedef struct tnarg {
 	mdb_tgt_t *tn_tgt;		/* target to use for lookup */
@@ -781,8 +782,9 @@ mdb_ctf_enum_iter(mdb_ctf_id_t id, mdb_ctf_enum_f *cb, void *data)
 /*
  * callback proxy for mdb_ctf_type_iter
  */
+/* ARGSUSED */
 static int
-type_iter_cb(ctf_id_t type, void *data)
+type_iter_cb(ctf_id_t type, boolean_t root, void *data)
 {
 	type_iter_t *tip = data;
 	mdb_ctf_id_t id;
@@ -812,7 +814,7 @@ mdb_ctf_type_iter(const char *object, mdb_ctf_type_f *cb, void *data)
 	ti.ti_arg = data;
 	ti.ti_fp = fp;
 
-	if ((ret = ctf_type_iter(fp, type_iter_cb, &ti)) == CTF_ERR)
+	if ((ret = ctf_type_iter(fp, B_FALSE, type_iter_cb, &ti)) == CTF_ERR)
 		return (set_errno(ctf_to_errno(ctf_errno(fp))));
 
 	return (ret);
@@ -1980,7 +1982,7 @@ mdb_ctf_add_member(const mdb_ctf_id_t *p, const char *name,
 		return (set_errno(ctf_to_errno(ctf_errno(mdb.m_synth))));
 	}
 
-	id = ctf_add_member(mdb.m_synth, mcip->mci_id, name, mtid);
+	id = ctf_add_member(mdb.m_synth, mcip->mci_id, name, mtid, ULONG_MAX);
 	if (id == CTF_ERR) {
 		mdb_dprintf(MDB_DBG_CTF, "failed to add member %s: %s\n",
 		    name, ctf_errmsg(ctf_errno(mdb.m_synth)));
@@ -2081,7 +2083,7 @@ mdb_ctf_add_pointer(const mdb_ctf_id_t *p, mdb_ctf_id_t *rid)
 	}
 
 
-	id = ctf_add_pointer(mdb.m_synth, CTF_ADD_ROOT, id);
+	id = ctf_add_pointer(mdb.m_synth, CTF_ADD_ROOT, NULL, id);
 	if (id == CTF_ERR) {
 		mdb_dprintf(MDB_DBG_CTF, "failed to add pointer: %s\n",
 		    ctf_errmsg(ctf_errno(mdb.m_synth)));
@@ -2129,6 +2131,7 @@ mdb_ctf_type_delete(const mdb_ctf_id_t *id)
 	return (0);
 }
 
+/* ARGSUSED */
 static int
 mdb_ctf_synthetics_file_cb(mdb_ctf_id_t id, void *arg)
 {
@@ -2166,7 +2169,7 @@ mdb_ctf_synthetics_from_file(const char *file)
 	ti.ti_fp = fp;
 	ti.ti_arg = syn;
 	ti.ti_cb = mdb_ctf_synthetics_file_cb;
-	if (ctf_type_iter(fp, type_iter_cb, &ti) == CTF_ERR) {
+	if (ctf_type_iter(fp, B_FALSE, type_iter_cb, &ti) == CTF_ERR) {
 		ret = set_errno(ctf_to_errno(ctf_errno(fp)));
 		mdb_warn("failed to add types");
 		goto cleanup;

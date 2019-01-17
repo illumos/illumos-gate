@@ -1,0 +1,446 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2018, Joyent, Inc.
+.\"
+.Dd Oct 2, 2018
+.Dt CTFDUMP 1
+.Os
+.Sh NAME
+.Nm ctfdump
+.Nd dump parts of ctf data from files
+.Sh SYNOPSIS
+.Nm ctfdump
+.Op Fl cdfhlsSt
+.Op Fl p Ar parent
+.Op Fl u Ar outfile
+.Ar file
+.Sh DESCRIPTION
+The
+.Nm
+utility dumps and decodes the
+.Sy CTF
+data contained inside of
+.Sy ELF
+objects and raw
+.Sy CTF
+files.
+.Lp
+.Nm
+can dump information about the
+.Sy CTF header ,
+the
+.Sy labels
+encoded in the
+.Sy CTF
+container,
+the types of
+.Sy data objects ,
+the internal
+.Sy string
+table,
+the types of the return function and the arguments for
+.Sy functions ,
+and of course, it displays information about the
+.Sy types
+defined in the
+.Sy CTF
+container.
+.Lp
+.Nm
+can also be used to dump out the raw
+.Sy CTF
+data and send it to another file.
+When writing out data, it always ensures that the
+.Sy CTF
+data is decompressed.
+In this form, the
+.Sy CTF
+data can be inspected using
+.Nm
+and other tools such as
+.Xr mdb 1 .
+.Lp
+.Nm
+in
+.Fl c
+mode will generate C-style output, which can be used for comparison.
+Note that this output is not directly compilable.
+.Lp
+When no options are specified,
+.Nm
+displays all information, except the C-style output.
+However, when the
+.Fl u
+option is used, then no information is displayed by default, unless
+requested through the appropriate option.
+.Sh OPTIONS
+The following options are supported:
+.Bl -hang -width Ds
+.It Fl c
+.Bd -filled -compact
+Generate C-style output.
+.Ed
+.It Fl d
+.Bd -filled -compact
+Dump the types of symbols that correspond to objects.
+.Ed
+.It Fl f
+.Bd -filled -compact
+Dump the types of the return values and arguments of the functions.
+.Ed
+.It Fl h
+.Bd -filled -compact
+Dump the
+.Sy CTF
+header
+.Ed
+.It Fl l
+.Bd -filled -compact
+Dump all
+.Sy CTF
+labels associated with the file.
+.Ed
+.It Fl p Ar parent
+.Bd -filled -compact
+Use the type information in
+.Em parent
+to supplement output.
+This is useful when a
+.Nm CTF
+container has been
+.Sy uniquified
+against
+.Em parent .
+This allows
+.Nm
+to use the names of types when used with
+.Fl t .
+.Ed
+.It Fl s
+.Bd -filled -compact
+Dump the internal
+.Sy CTF
+string table
+.Ed
+.It Fl S
+.Bd -filled -compact
+Displays statistics about the
+.Sy CTF
+container.
+.Ed
+.It Fl t
+.Bd -filled -compact
+Dump the type information contained in the
+.Sy CTF
+conatiner.
+.Ed
+.It Fl u Ar outfile
+.Bd -filled -compact
+Copies the uncompressed
+.Sy CTF
+data to the file specified by
+.Em outfile .
+This can be used to make it easier to inspect the raw
+.Sy CTF
+data.
+.Ed
+.El
+.Sh OUTPUT
+When the
+.Nm
+utility is executed with its default options, it prints out a textual
+representation of the
+.Sy CTF
+information.
+Note, the output format of
+.Nm
+is subject to change at any time and should not be relied upon as a
+stable format to be used for parsing.
+.Ss CTF Header
+This section describes the values in the
+.Sy CTF
+header.
+Each line in the section describes the value of one of the
+members of the header.
+For more information on the meaning and interpretation of these members,
+see
+.Xr ctf 4 .
+.Ss Label Table
+This section describes information about the labels present in the
+.Sy CTF
+information.
+Each entry in this section, if present, starts with a
+number and is followed by a string.
+An example entry in the label section might look like:
+.Bd -literal
+\&...
+   2270 joyent_20151001T070028Z
+\&...
+.Ed
+.Pp
+The number,
+.Em 2270 ,
+represents the last type that the label applies to.
+The string,
+.Em joyent_20151001T070028Z ,
+is the name of the label.
+In this case, if there were no other labels,
+it would indicate that the label applied to all types up to, and
+including, the type number 2270.
+For more information on how labels are used with
+.Sy CTF
+information, see the section
+.Em The Label Section
+in
+.Xr ctf 4 .
+.Ss Data Objects
+This section describes the type information relating to data objects
+from the symbol table.
+An entry for a data object consists of four columns.
+The first column is just a monotonic ID.
+The second number is the type id of the object.
+The third column is the name of the symbol and the fourth column is the
+corresponding index from the symbol table.
+.Pp
+Take for example, the following couple of entries:
+.Bd -literal
+\&...
+  [0] 13        hz (48)
+  [1] 78        _nd (49)
+  [2] 1656      __pfmt_label (56)
+  [3] 926       _aio_hash (68)
+  [4] 13        _lio_free (70)
+  [5] 1321      u8_number_of_bytes (73)
+\&...
+.Ed
+.Pp
+Let's take the first entry in the list above.
+The symbol is named
+.Sy hz .
+It is the first data object, as indicated by the number zero in
+brackets.
+It has a type id of 13 and in this case, it has a symbol table index of
+48.
+.Ss Functions
+This section describes the type information for functions.
+For each function present in the symbol table with type information, the
+function's entry into the function section, the function's name, the
+function's symbol table index, the function's return type, and the types
+of the function's arguments are printed.
+If a function is a variadic function, then the variadic argument is
+printed as the string
+.Sy '...' .
+.Pp
+Take for example, the following couple of entries:
+.Bd -literal
+\&...
+  [687] pfprint_stack (3110) returns: 11 args: (385, 115, 29, 1704, 223, 116, 2)
+  [688] pfprint_stddev (3111) returns: 11 args: (385, 115, 29, 1704, 223, 116, 2)
+  [689] pfprint_quantize (3112) returns: 11 args: (385, 115, 29, 1704, 223, 116, 2)
+  [690] pfprint_lquantize (3113) returns: 11 args: (385, 115, 29, 1704, 223, 116, 2)
+  [691] pfprint_llquantize (3114) returns: 11 args: (385, 115, 29, 1704, 223, 116, 2)
+\&...
+.Ed
+.Pp
+The first column is the function's entry number in the function type
+information section.
+It is enclosed in brackets.
+The next column is the function's name and it is followed in parenthesis
+by the its index in the
+symbol table.
+The following portions of this entry describe the return
+type and then all of the arguments, in positional order.
+.Ss Types
+The types section gives information about each type in the
+.Sy CTF
+container.
+Each entry begins with its type identifier.
+The type identifier may either be in square brackets or in angle
+brackets.
+If the type identifier is enclosed in angle brackets, then that
+represents that it is a root type or top-level type.
+If it is square brackets, then it is not.
+For more information on root types, see
+.Xr ctf 4 .
+.Pp
+Next, the type will have its name and kind.
+If it is an array, it will be followed with a subscript that describes
+the number of entries in the array.
+If it is a pointer, it will followed by the
+.Sy *
+symbol to indicate that it is a pointer.
+If the type has the
+.Sy const ,
+.Sy volatile ,
+.Sy typedef ,
+or
+.Sy restrict
+keyword applied to it, that will precede the name.
+All of these reference types, including pointer, will then be followed
+with an example of the type that they refer to.
+.Pp
+Types which are an integral or floating point value will be followed by
+information about their encoding and the number of bits represented in
+the type.
+.Pp
+Arrays will be followed by two different entries, the contents and
+index.
+The contents member contains the type id of the array's contents
+and the index member describes a type which can represent the array's
+index.
+.Pp
+Structures and unions will be preceded with the corresponding C keyword,
+.Sy struct
+or
+.Sy union .
+After that, the size in bytes of the structure will be indicated.
+ON each subsequent line, a single member will be listed.
+That line will contain the member's name, it's type identifier, and the
+offset into the structure that it can be found in, in bits.
+.Pp
+The following show examples of type information for all of these
+different types:
+.Bd -literal
+\&...
+  [5] char [12] contents: 1, index: 2
+  [6] short encoding=SIGNED offset=0 bits=16
+  <7> struct exit_status (4 bytes)
+        e_termination type=6 off=0
+        e_exit type=6 off=16
+
+  <8> typedef time_t refers to 2
+  <9> struct utmp (36 bytes)
+        ut_user type=3 off=0
+        ut_id type=4 off=64
+        ut_line type=5 off=96
+        ut_pid type=6 off=192
+        ut_type type=6 off=208
+        ut_exit type=7 off=224
+        ut_time type=8 off=256
+
+  <10> struct utmp * refers to 9
+  [11] const struct utmp refers to 9
+  [12] const struct utmp * refers to 11
+  <13> int encoding=SIGNED offset=0 bits=32
+  <14> typedef int32_t refers to 13
+\&...
+.Ed
+.Ss String Table
+This section describes all of the strings that are present in the
+.Sy CTF
+container.
+Each line represents an entry in the string table.
+First the byte offset into the string table is shown in brackets and
+then the
+string's value is displayed.
+Note the following examples:
+.Bd -literal
+  [0] \0
+  [1] joyent_20151001T070028Z
+  [25] char
+  [30] long
+  [35] short
+.Ed
+.Ss Statistics
+This section contains miscellaneous statistics about the
+.Sy CTF
+data present.
+Each line contains a single statistic.
+A brief explanation of the statistic is placed first, followed by an
+equals sign, and then finally the value.
+.Sh EXIT STATUS
+.Bl -inset
+.It Sy 0
+.Dl Execution completed successfully.
+.It Sy 1
+.Dl A fatal error occurred.
+.It Sy 2
+.Dl Invalid command line options were specified.
+.El
+.Sh EXAMPLES
+.Sy Example 1
+Displaying the Type Section of a Single File
+.Lp
+The following example dumps the type section of the file
+.Sy /usr/lib/libc.so.1 .
+.Bd -literal -offset 6n
+$ ctfdump -t /usr/lib/libc.so.1
+- Types ----------------------------------------------------
+
+  <1> int encoding=SIGNED offset=0 bits=32
+  <2> long encoding=SIGNED offset=0 bits=32
+  <3> typedef pid_t refers to 2
+  <4> unsigned int encoding=0x0 offset=0 bits=32
+  <5> typedef uid_t refers to 4
+  <6> typedef gid_t refers to 5
+  <7> typedef uintptr_t refers to 4
+\&...
+.Ed
+.Lp
+.Sy Example 2
+Dumping the CTF data to Another File
+.Lp
+The following example dumps the entire CTF data from the file
+.Sy /usr/lib/libc.so.1
+and places it into the file
+.Sy ctf.out .
+This then shows how you can use the
+.Xr mdb 1
+to inspect its contents.
+.Bd -literal -offset 6n
+$ ctfdump -u ctf.out /usr/lib/libc.so.1
+$ mdb ./ctf.out
+> ::typedef -r /usr/lib/libctf.so.1
+> 0::print ctf_header_t
+{
+    cth_preamble = {
+        ctp_magic = 0xcff1
+        ctp_version = 0x2
+        ctp_flags = 0
+    }
+    cth_parlabel = 0
+    cth_parname = 0
+    cth_lbloff = 0
+    cth_objtoff = 0x8
+    cth_funcoff = 0x5e0
+    cth_typeoff = 0x7178
+    cth_stroff = 0x12964
+    cth_strlen = 0x7c9c
+}
+.Ed
+.Lp
+.Sy Example 3
+Dumping C-style output
+.Bd -literal -offset 6n
+$ ctfdump -c ./genunix | more
+/* Types */
+
+typedef Elf64_Addr Addr;
+
+typedef unsigned char Bool;
+
+typedef struct CK_AES_CCM_PARAMS CK_AES_CCM_PARAMS;
+
+typedef struct CK_AES_GCM_PARAMS CK_AES_GCM_PARAMS;
+\&...
+.Ed
+.Sh INTERFACE STABILITY
+The command syntax is
+.Sy Committed .
+The output format is
+.Sy Uncommitted .
+.Sh SEE ALSO
+.Xr ctfdiff 1 ,
+.Xr dump 1 ,
+.Xr elfdump 1 ,
+.Xr mdb 1 ,
+.Xr ctf 4

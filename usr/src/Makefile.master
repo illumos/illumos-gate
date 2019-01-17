@@ -182,6 +182,7 @@ JAVADOC=	$(JAVA_ROOT)/bin/javadoc
 RMIC=		$(JAVA_ROOT)/bin/rmic
 JAR=		$(JAVA_ROOT)/bin/jar
 CTFCONVERT=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfconvert
+CTFDIFF=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfdiff
 CTFMERGE=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfmerge
 CTFSTABS=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstabs
 CTFSTRIP=	$(ONBLD_TOOLS)/bin/$(MACH)/ctfstrip
@@ -965,6 +966,15 @@ CTFCVTFLAGS=		-i -L VERSION
 # stripping.
 #
 CTFMRGFLAGS=
+
+#
+# Make the transition between old and new CTF Tools. The new ctf tools
+# do not support stabs (eg. Sun Studio). By setting BUILD_OLD_CTF_TOOLS
+# here or in the environment file, the old ones will be built.
+#
+BUILD_NEW_CTF_TOOLS=
+BUILD_OLD_CTF_TOOLS=$(POUND_SIGN)
+$(BUILD_OLD_CTF_TOOLS)BUILD_NEW_CTF_TOOLS= $(POUND_SIGN)
 
 CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 

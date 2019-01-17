@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysmacros.h>
 #include <sys/modctl.h>
 #include <sys/debug.h>
@@ -113,6 +111,15 @@ ctf_version(int version)
 		_libctf_version = MIN(CTF_VERSION, version);
 
 	return (_libctf_version);
+}
+
+/*ARGSUSED*/
+ctf_file_t *
+ctf_fdcreate_int(int fd, int *errp, ctf_sect_t *ctfp)
+{
+	if (errp != NULL)
+		*errp = ENOTSUP;
+	return (NULL);
 }
 
 /*ARGSUSED*/

@@ -146,6 +146,7 @@ main(int argc, char **argv)
 {
 	tdata_t *filetd, *mstrtd;
 	char *label = NULL;
+	char *altexec;
 	int verbose = 0;
 	int ignore_non_c = 0;
 	int c;
@@ -156,12 +157,21 @@ main(int argc, char **argv)
 
 	progname = basename(argv[0]);
 
+	ctf_altexec("CTFCONVERT_ALTEXEC", argc, argv);
+
 	if (getenv("CTFCONVERT_DEBUG_LEVEL"))
 		debug_level = atoi(getenv("CTFCONVERT_DEBUG_LEVEL"));
 	if (getenv("CTFCONVERT_DEBUG_PARSE"))
 		debug_parse = atoi(getenv("CTFCONVERT_DEBUG_PARSE"));
 
-	while ((c = getopt(argc, argv, ":l:L:o:ivs")) != EOF) {
+	if ((altexec = getenv("CTFCONVERT_ALTEXEC")) != NULL) {
+		(void) unsetenv("CTFCONVERT_ALTEXEC");
+		(void) execv(altexec, argv);
+		(void) fprintf(stderr, "ctfconvert altexec failed to "
+		    "run %s: %s\n", altexec, strerror(errno));
+	}
+
+	while ((c = getopt(argc, argv, ":l:L:o:givs")) != EOF) {
 		switch (c) {
 		case 'l':
 			label = optarg;

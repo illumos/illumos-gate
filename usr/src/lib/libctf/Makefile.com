@@ -23,42 +23,8 @@
 # Use is subject to license terms.
 #
 
-LIBRARY = libctf.a
-VERS = .1
-
-COMMON_OBJS = \
-	ctf_create.o \
-	ctf_decl.o \
-	ctf_error.o \
-	ctf_hash.o \
-	ctf_labels.o \
-	ctf_lookup.o \
-	ctf_open.o \
-	ctf_types.o \
-	ctf_util.o
-
-LIB_OBJS = \
-	ctf_lib.o \
-	ctf_subr.o
-
-OBJECTS = $(COMMON_OBJS) $(LIB_OBJS)
-
-include ../../Makefile.lib
+include ../Makefile.shared.com
 include ../../Makefile.rootfs
-
-SRCS = $(COMMON_OBJS:%.o=../../../common/ctf/%.c) $(LIB_OBJS:%.o=../common/%.c)
-LIBS = $(DYNLIB) $(LINTLIB)
-
-SRCDIR = ../common
-
-CPPFLAGS += -I../common -I../../../common/ctf -DCTF_OLD_VERSIONS
-CFLAGS += $(CCVERBOSE)
-
-CERRWARN += -_gcc=-Wno-uninitialized
-
-LDLIBS += -lc
-
-$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
@@ -67,7 +33,4 @@ all: $(LIBS)
 lint: lintcheck
 
 include ../../Makefile.targ
-
-objs/%.o pics/%.o: ../../../common/ctf/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
+include ../Makefile.shared.targ

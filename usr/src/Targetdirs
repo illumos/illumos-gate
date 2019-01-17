@@ -855,6 +855,8 @@ $(ROOT)/usr/lib/libdlpi.so.1:=		REALPATH=../../lib/libdlpi.so.1
 $(ROOT)/usr/lib/libdlpi.so:=		REALPATH=../../lib/libdlpi.so.1
 $(ROOT)/usr/lib/libdoor.so.1:=		REALPATH=../../lib/libdoor.so.1
 $(ROOT)/usr/lib/libdoor.so:=		REALPATH=../../lib/libdoor.so.1
+$(ROOT)/usr/lib/libdwarf.so.1:=		REALPATH=../../lib/libdwarf.so.1
+$(ROOT)/usr/lib/libdwarf.so:=		REALPATH=../../lib/libdwarf.so.1
 $(ROOT)/usr/lib/libefi.so.1:=		REALPATH=../../lib/libefi.so.1
 $(ROOT)/usr/lib/libefi.so:=		REALPATH=../../lib/libefi.so.1
 $(ROOT)/usr/lib/libelf.so.1:=		REALPATH=../../lib/libelf.so.1
@@ -1136,6 +1138,10 @@ $(ROOT)/usr/lib/$(MACH64)/libdoor.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libdoor.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdoor.so:= \
 	REALPATH=../../../lib/$(MACH64)/libdoor.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdwarf.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdwarf.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdwarf.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdwarf.so.1
 $(ROOT)/usr/lib/$(MACH64)/libefi.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libefi.so.1
 $(ROOT)/usr/lib/$(MACH64)/libefi.so:= \
@@ -1478,6 +1484,8 @@ SYM.USRLIB= \
 	/usr/lib/libdlpi.so.1 \
 	/usr/lib/libdoor.so \
 	/usr/lib/libdoor.so.1 \
+	/usr/lib/libdwarf.so \
+	/usr/lib/libdwarf.so.1 \
 	/usr/lib/libefi.so \
 	/usr/lib/libefi.so.1 \
 	/usr/lib/libelf.so \
@@ -1721,6 +1729,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libdlpi.so.1 \
 	/usr/lib/$(MACH64)/libdoor.so \
 	/usr/lib/$(MACH64)/libdoor.so.1 \
+	/usr/lib/$(MACH64)/libdwarf.so \
+	/usr/lib/$(MACH64)/libdwarf.so.1 \
 	/usr/lib/$(MACH64)/libefi.so \
 	/usr/lib/$(MACH64)/libefi.so.1 \
 	/usr/lib/$(MACH64)/libelf.so \

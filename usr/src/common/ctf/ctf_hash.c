@@ -25,9 +25,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <ctf_impl.h>
+#include <sys/debug.h>
 
 static const ushort_t _CTF_EMPTY[1] = { 0 };
 

@@ -19,49 +19,28 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
+include ../../Makefile.tools
+
+HDRS = libctf.h
+HDRDIR = common
+
+SUBDIRS = $(MACH)
+
+all := TARGET = all
+clean := TARGET = clean
+clobber := TARGET = clobber
+install := TARGET = install
+lint := TARGET = lint
+
 .KEEP_STATE:
-.SUFFIXES:
 
-PROG = ctfdump
-SRCS = dump.c utils.c symbol.c
+all clean clobber install lint: $(SUBDIRS)
 
-include ../../Makefile.ctf
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-LDFLAGS += -L$(NATIVE_ADJUNCT)/lib
-LDLIBS += -lelf -lz
-
-OBJS = $(SRCS:%.c=%.o)
-LINTFILES = $(SRCS:%.c=%.ln)
-
-CERRWARN += -_gcc=-Wno-uninitialized
-
-.NO_PARALLEL:
-.PARALLEL: $(OBJS) $(LINTFILES)
-
-all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
-	$(POST_PROCESS)
-
-%.o: ../%.c
-	$(COMPILE.c) $<
-
-$(ROOTONBLDMACHPROG): $(PROG)
-
-install: $(ROOTONBLDMACHPROG)
-
-clean:
-	$(RM) $(OBJS) $(LINTFILES)
-
-%.ln: ../%.c
-	$(LINT.c) -c $<
-
-lint: $(LINTFILES)
-	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)
-
-include ../../Makefile.ctf.targ
+FRC:

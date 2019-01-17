@@ -748,6 +748,8 @@ main(int argc, char **argv)
 
 	progname = basename(argv[0]);
 
+	ctf_altexec("CTFMERGE_ALTEXEC", argc, argv);
+
 	if (getenv("CTFMERGE_DEBUG_LEVEL"))
 		debug_level = atoi(getenv("CTFMERGE_DEBUG_LEVEL"));
 

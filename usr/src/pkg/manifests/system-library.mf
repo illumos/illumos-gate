@@ -200,6 +200,7 @@ file path=lib/$(ARCH64)/libdl.so.1
 file path=lib/$(ARCH64)/libdladm.so.1
 file path=lib/$(ARCH64)/libdlpi.so.1
 file path=lib/$(ARCH64)/libdoor.so.1
+file path=lib/$(ARCH64)/libdwarf.so.1
 file path=lib/$(ARCH64)/libefi.so.1
 file path=lib/$(ARCH64)/libelf.so.1
 file path=lib/$(ARCH64)/libfakekernel.so.1
@@ -279,6 +280,7 @@ file path=lib/libdl.so.1
 file path=lib/libdladm.so.1
 file path=lib/libdlpi.so.1
 file path=lib/libdoor.so.1
+file path=lib/libdwarf.so.1
 file path=lib/libefi.so.1
 file path=lib/libelf.so.1
 file path=lib/libelfsign.so.1
@@ -587,6 +589,8 @@ license usr/src/lib/libcmd/THIRDPARTYLICENSE \
     license=usr/src/lib/libcmd/THIRDPARTYLICENSE
 license usr/src/lib/libdll/THIRDPARTYLICENSE \
     license=usr/src/lib/libdll/THIRDPARTYLICENSE
+license usr/src/lib/libdwarf/THIRDPARTYLICENSE \
+    license=usr/src/lib/libdwarf/THIRDPARTYLICENSE
 license usr/src/lib/libinetutil/common/THIRDPARTYLICENSE \
     license=usr/src/lib/libinetutil/common/THIRDPARTYLICENSE
 license usr/src/lib/libkmf/THIRDPARTYLICENSE \
@@ -846,6 +850,8 @@ link path=usr/lib/$(ARCH64)/libdoor.so \
     target=../../../lib/$(ARCH64)/libdoor.so.1
 link path=usr/lib/$(ARCH64)/libdoor.so.1 \
     target=../../../lib/$(ARCH64)/libdoor.so.1
+link path=usr/lib/$(ARCH64)/libdwarf.so.1 \
+    target=../../../lib/$(ARCH64)/libdwarf.so.1
 link path=usr/lib/$(ARCH64)/libefi.so \
     target=../../../lib/$(ARCH64)/libefi.so.1
 link path=usr/lib/$(ARCH64)/libefi.so.1 \
@@ -1105,6 +1111,7 @@ link path=usr/lib/libdlpi.so target=../../lib/libdlpi.so.1
 link path=usr/lib/libdlpi.so.1 target=../../lib/libdlpi.so.1
 link path=usr/lib/libdoor.so target=../../lib/libdoor.so.1
 link path=usr/lib/libdoor.so.1 target=../../lib/libdoor.so.1
+link path=usr/lib/libdwarf.so.1 target=../../lib/libdwarf.so.1
 link path=usr/lib/libefi.so target=../../lib/libefi.so.1
 link path=usr/lib/libefi.so.1 target=../../lib/libefi.so.1
 link path=usr/lib/libelf.so target=../../lib/libelf.so.1

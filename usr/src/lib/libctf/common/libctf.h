@@ -23,6 +23,9 @@
  * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2015, Joyent, Inc.
+ */
 
 /*
  * This header file defines the interfaces available from the CTF debugger
@@ -32,15 +35,13 @@
  * the fullness of time after we gain more experience with the interfaces.
  *
  * In the meantime, be aware that any program linked with libctf in this
- * release of Solaris is almost guaranteed to break in the next release.
+ * release of illumos is almost guaranteed to break in the next release.
  *
  * In short, do not user this header file or libctf for any purpose.
  */
 
 #ifndef	_LIBCTF_H
 #define	_LIBCTF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ctf_api.h>
 
@@ -52,6 +53,44 @@ extern "C" {
  * This flag can be used to enable debug messages.
  */
 extern int _libctf_debug;
+
+typedef enum ctf_diff_flag {
+	CTF_DIFF_F_IGNORE_INTNAMES = 0x01
+} ctf_diff_flag_t;
+
+typedef struct ctf_diff ctf_diff_t;
+typedef void (*ctf_diff_type_f)(ctf_file_t *, ctf_id_t, boolean_t, ctf_file_t *,
+    ctf_id_t, void *);
+typedef void (*ctf_diff_func_f)(ctf_file_t *, ulong_t, boolean_t, ctf_file_t *,
+    ulong_t, void *);
+typedef void (*ctf_diff_obj_f)(ctf_file_t *, ulong_t, ctf_id_t, boolean_t,
+    ctf_file_t *, ulong_t, ctf_id_t, void *);
+
+extern int ctf_diff_init(ctf_file_t *, ctf_file_t *, ctf_diff_t **);
+extern uint_t ctf_diff_getflags(ctf_diff_t *);
+extern int ctf_diff_setflags(ctf_diff_t *, uint_t);
+extern int ctf_diff_types(ctf_diff_t *, ctf_diff_type_f, void *);
+extern int ctf_diff_functions(ctf_diff_t *, ctf_diff_func_f, void *);
+extern int ctf_diff_objects(ctf_diff_t *, ctf_diff_obj_f, void *);
+extern void ctf_diff_fini(ctf_diff_t *);
+
+#define	CTF_CONVERT_F_IGNNONC	0x01
+extern ctf_file_t *ctf_fdconvert(int, const char *, uint_t, uint_t, int *,
+    char *, size_t);
+
+typedef struct ctf_merge_handle ctf_merge_t;
+extern ctf_merge_t *ctf_merge_init(int, int *);
+extern int ctf_merge_add(ctf_merge_t *, ctf_file_t *);
+extern int ctf_merge_set_nthreads(ctf_merge_t *, const uint_t);
+extern int ctf_merge_label(ctf_merge_t *, const char *);
+extern int ctf_merge_uniquify(ctf_merge_t *, ctf_file_t *, const char *);
+extern int ctf_merge_merge(ctf_merge_t *, ctf_file_t **);
+extern int ctf_merge_dedup(ctf_merge_t *, ctf_file_t **);
+extern void ctf_merge_fini(ctf_merge_t *);
+
+#define	CTF_ELFWRITE_F_COMPRESS		0x1
+extern int ctf_elffdwrite(ctf_file_t *, int, int, int);
+extern int ctf_elfwrite(ctf_file_t *, const char *, const char *, int);
 
 #ifdef	__cplusplus
 }

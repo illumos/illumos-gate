@@ -442,6 +442,9 @@ void warning(char *, ...);
 void vadebug(int, char *, va_list);
 void debug(int, char *, ...);
 
+/* altexec.c */
+void ctf_altexec(const char *, int argc, char **);
+
 #ifdef __cplusplus
 }
 #endif

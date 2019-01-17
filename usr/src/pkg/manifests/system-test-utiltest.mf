@@ -36,6 +36,7 @@ dir path=opt/util-tests/tests/dis/sparc
 dir path=opt/util-tests/tests/files
 dir path=opt/util-tests/tests/libnvpair_json
 dir path=opt/util-tests/tests/libsff
+dir path=opt/util-tests/tests/mergeq
 file path=opt/util-tests/README mode=0444
 file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555
@@ -331,6 +332,8 @@ file path=opt/util-tests/tests/libsff/libsff_opts.out mode=0444
 file path=opt/util-tests/tests/libsff/libsff_strings mode=0555
 file path=opt/util-tests/tests/libsff/libsff_wave mode=0555
 file path=opt/util-tests/tests/libsff/libsff_wave.out mode=0444
+file path=opt/util-tests/tests/mergeq/mqt mode=0555
+file path=opt/util-tests/tests/mergeq/wqt mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
 file path=opt/util-tests/tests/set-linkprop mode=0555
 file path=opt/util-tests/tests/xargs_test mode=0555

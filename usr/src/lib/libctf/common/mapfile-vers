@@ -23,7 +23,7 @@
 #
 
 #
-# Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 
 #
@@ -53,9 +53,12 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_add_enumerator;
 	ctf_add_float;
 	ctf_add_forward;
+	ctf_add_funcptr;
 	ctf_add_function;
 	ctf_add_integer;
+	ctf_add_label;
 	ctf_add_member;
+	ctf_add_object;
 	ctf_add_pointer;
 	ctf_add_restrict;
 	ctf_add_struct;
@@ -64,19 +67,52 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_add_union;
 	ctf_add_volatile;
 	ctf_create;
+	ctf_dataptr;
 	ctf_delete_type;
+	ctf_diff_fini;
+	ctf_diff_functions;
+	ctf_diff_getflags;
+	ctf_diff_init;
+	ctf_diff_objects;
+	ctf_diff_setflags;
+	ctf_diff_types;
 	ctf_discard;
 	ctf_dup;
+	ctf_elffdwrite;
+	ctf_elfwrite;
 	ctf_enum_value;
+	ctf_fdconvert;
+	ctf_flags;
+	ctf_func_args_by_id;
+	ctf_func_info_by_id;
+	ctf_function_iter;
+	ctf_kind_name;
 	ctf_label_info;
 	ctf_label_iter;
 	ctf_label_topmost;
+	ctf_max_id;
 	ctf_member_info;
+	ctf_merge_add;
+	ctf_merge_dedup;
+	ctf_merge_fini;
+	ctf_merge_init;
+	ctf_merge_label;
+	ctf_merge_merge;
+	ctf_merge_set_nthreads;
+	ctf_merge_uniquify;
+	ctf_nr_syms;
+	ctf_object_iter;
 	ctf_parent_file;
+	ctf_parent_label;
 	ctf_parent_name;
 	ctf_set_array;
+	ctf_set_root;
+	ctf_set_size;
+	ctf_string_iter;
+	ctf_symbol_name;
 	ctf_type_align;
 	ctf_type_cmp;
+	ctf_type_cname;
 	ctf_type_compat;
 	ctf_type_pointer;
 	ctf_update;

@@ -95,6 +95,7 @@ COMMON_SUBDIRS = \
 	cmd/cpio \
 	cmd/crypt \
 	cmd/csplit \
+	cmd/ctfdump \
 	cmd/ctrun \
 	cmd/ctstat \
 	cmd/ctwatch \
