@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2019 Peter Tribble.
  */
 
 /*
@@ -443,7 +444,7 @@ int zsa_h_log_n[40];
 
 
 static int zsa_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr);
-static int zsa_close(queue_t *q, int flag);
+static int zsa_close(queue_t *q, int flag, cred_t *cr);
 static void zsa_wput(queue_t *q, mblk_t *mp);
 static void zsa_rsrv(queue_t *q);
 
@@ -963,7 +964,7 @@ zs_progress_check(void *arg)
 
 /*ARGSUSED*/
 static int
-zsa_close(queue_t *q, int flag)
+zsa_close(queue_t *q, int flag, cred_t *cr __unused)
 {
 	struct asyncline *za;
 	struct zscom *zs;

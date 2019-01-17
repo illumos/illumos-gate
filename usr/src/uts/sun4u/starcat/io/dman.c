@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2019 Peter Tribble.
  */
 
 
@@ -443,7 +444,7 @@ static int	man_deconfigure(void);
 static int	man_init_dests(man_t *, manstr_t *);
 static void	man_start_dest(man_dest_t *, manstr_t *, man_pg_t *);
 static void	man_set_optimized_dest(manstr_t *);
-static int	man_close(queue_t *);
+static int	man_close(queue_t *, int, cred_t *);
 static void	man_cancel_timers(man_adest_t *);
 static int	man_uwput(queue_t *, mblk_t *);
 static int	man_start(queue_t *, mblk_t *, eaddr_t *);
@@ -1426,7 +1427,7 @@ exit:
  *		- failure - errno value for failure
  */
 static int
-man_close(queue_t *rq)
+man_close(queue_t *rq, int flag __unused, cred_t *cr __unused)
 {
 	manstr_t		*close_msp;
 	manstr_t		*msp;

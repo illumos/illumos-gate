@@ -22,6 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
+ * Copyright (c) 2019 Peter Tribble.
  */
 
 
@@ -158,7 +159,7 @@ static int  zsh_probe(dev_info_t *dev);
 static int  zsh_attach(dev_info_t *dev, ddi_attach_cmd_t cmd);
 static int  zsh_detach(dev_info_t *dev, ddi_detach_cmd_t cmd);
 static int  zsh_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr);
-static int  zsh_close(queue_t *rq, int flag);
+static int  zsh_close(queue_t *rq, int flag, cred_t *cr);
 static void zsh_wput(queue_t *wq, mblk_t *mp);
 static int zsh_start(struct zscom *zs, struct syncline *zss);
 static void zsh_ioctl(queue_t *wq, mblk_t *mp);
@@ -633,7 +634,7 @@ int zsh_tx_enable_in_close = 0;
 
 /*ARGSUSED*/
 static int
-zsh_close(queue_t *rq, int flag)
+zsh_close(queue_t *rq, int flag, cred_t *cr __unused)
 {
 	struct ser_str *stp;
 	struct zscom *zs;
