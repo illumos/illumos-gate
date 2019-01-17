@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2014, 2018 by Delphix. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/conf.h>
@@ -367,8 +368,19 @@ sbd_zvol_rele_write_bufs(sbd_lu_t *sl, stmf_data_buf_t *dbuf)
 
 		abuf = abp[i];
 		size = arc_buf_size(abuf);
-		(void) dmu_assign_arcbuf_by_dnode(sl->sl_zvol_dn_hdl,
+		error = dmu_assign_arcbuf_by_dnode(sl->sl_zvol_dn_hdl,
 		    toffset, abuf, tx);
+		if (error != 0) {
+			/* return the arc bufs that were not assigned */
+			for (; i < dbuf->db_sglist_length; i++)
+				dmu_return_arcbuf(abp[i]);
+			dmu_tx_commit(tx);
+			rangelock_exit(lr);
+			kmem_free(zvio->zvio_abp,
+			    sizeof (arc_buf_t *) * dbuf->db_sglist_length);
+			zvio->zvio_abp = NULL;
+			return (error);
+		}
 		toffset += size;
 		resid -= size;
 	}
