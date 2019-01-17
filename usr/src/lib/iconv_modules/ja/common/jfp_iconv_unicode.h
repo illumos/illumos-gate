@@ -695,6 +695,9 @@ _icv_reset_unicode(void *cd)
 #elif	defined(_LITTLE_ENDIAN)
 	state->little_endian = B_TRUE;
 	state->bom_written = B_FALSE;
+#elif	defined(_BIG_ENDIAN)
+	state->little_endian = B_FALSE;
+	state->bom_written = B_FALSE;
 #endif
 
 	return;
