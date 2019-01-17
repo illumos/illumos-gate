@@ -156,7 +156,7 @@ SD_OBJS += sd.o sd_xbuf.o
 
 STRATEGY_OBJS += strategy.o
 UCODE_OBJS += ucode_drv.o
-VGATEXT_OBJS += vgatext.o vgasubr.o
+VGATEXT_OBJS += vgatext.o
 
 #
 #	Kernel linker

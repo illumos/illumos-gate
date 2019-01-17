@@ -47,11 +47,9 @@
 #include <sys/kd.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/gfx_private.h>
+#include "gfxp_fb.h"
 
 #define	MYNAME	"gfxp_vgatext"
-
-#define	TEXT_ROWS		25
-#define	TEXT_COLS		80
 
 #define	VGA_BRIGHT_WHITE	0x0f
 #define	VGA_BLACK		0x00
@@ -63,32 +61,6 @@
 #define	VGA_MEM_SIZE		0x20000
 
 #define	VGA_MMAP_FB_BASE	VGA_MEM_ADDR
-
-struct vgatext_softc {
-	struct vgaregmap 	regs;
-	struct vgaregmap 	fb;
-	off_t			fb_size;
-	int			fb_regno;
-	dev_info_t		*devi;
-	int			mode;	/* KD_TEXT or KD_GRAPHICS */
-	caddr_t			text_base;	/* hardware text base */
-	char			shadow[TEXT_ROWS*TEXT_COLS*2];
-	caddr_t			current_base;	/* hardware or shadow */
-	struct {
-		boolean_t visible;
-		int row;
-		int col;
-	}			cursor;
-	struct vis_polledio	polledio;
-	struct {
-		unsigned char red;
-		unsigned char green;
-		unsigned char blue;
-	}			colormap[VGA8_CMAP_ENTRIES];
-	unsigned char attrib_palette[VGA_ATR_NUM_PLT];
-	unsigned int flags;
-	kmutex_t lock;
-};
 
 typedef enum pc_colors {
 	pc_black	= 0,
@@ -146,6 +118,8 @@ static struct fbgattr vgatext_attr =  {
 	{ -1 }
 };
 
+static struct vis_identifier text_ident = { "SUNWtext" };
+
 #define	GFXP_FLAG_CONSOLE 0x00000001
 #define	GFXP_IS_CONSOLE(softc) ((softc)->flags & GFXP_FLAG_CONSOLE)
 
@@ -155,14 +129,14 @@ static struct fbgattr vgatext_attr =  {
  */
 
 
-int gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
-	gfxp_vgatext_softc_ptr_t ptr);
-static int vgatext_devinit(struct vgatext_softc *, struct vis_devinit *data);
-static void	vgatext_cons_copy(struct vgatext_softc *,
+int gfxp_vga_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
+    gfxp_fb_softc_ptr_t ptr);
+static int vgatext_devinit(struct gfxp_fb_softc *, struct vis_devinit *data);
+static void	vgatext_cons_copy(struct gfxp_fb_softc *,
 			struct vis_conscopy *);
-static void	vgatext_cons_display(struct vgatext_softc *,
+static void	vgatext_cons_display(struct gfxp_fb_softc *,
 			struct vis_consdisplay *);
-static void	vgatext_cons_cursor(struct vgatext_softc *,
+static void	vgatext_cons_cursor(struct gfxp_fb_softc *,
 			struct vis_conscursor *);
 static void	vgatext_polled_copy(struct vis_polledio_arg *,
 			struct vis_conscopy *);
@@ -170,26 +144,26 @@ static void	vgatext_polled_display(struct vis_polledio_arg *,
 			struct vis_consdisplay *);
 static void	vgatext_polled_cursor(struct vis_polledio_arg *,
 			struct vis_conscursor *);
-static void	vgatext_init(struct vgatext_softc *);
-static void	vgatext_set_text(struct vgatext_softc *);
+static void	vgatext_init(struct gfxp_fb_softc *);
+static void	vgatext_set_text(struct gfxp_fb_softc *);
 
-static void	vgatext_save_text(struct vgatext_softc *softc);
-static void	vgatext_restore_textmode(struct vgatext_softc *softc);
-static int	vgatext_suspend(struct vgatext_softc *softc);
-static void	vgatext_resume(struct vgatext_softc *softc);
+static void	vgatext_save_text(struct gfxp_fb_softc *softc);
+static void	vgatext_restore_textmode(struct gfxp_fb_softc *softc);
+static int	vgatext_suspend(struct gfxp_fb_softc *softc);
+static void	vgatext_resume(struct gfxp_fb_softc *softc);
 
 #if	defined(USE_BORDERS)
-static void	vgatext_init_graphics(struct vgatext_softc *);
+static void	vgatext_init_graphics(struct gfxp_fb_softc *);
 #endif
 
-static int vgatext_kdsetmode(struct vgatext_softc *softc, int mode);
-static void vgatext_setfont(struct vgatext_softc *softc);
-static void vgatext_get_cursor(struct vgatext_softc *softc,
+static int vgatext_kdsetmode(struct gfxp_fb_softc *softc, int mode);
+static void vgatext_setfont(struct gfxp_fb_softc *softc);
+static void vgatext_get_cursor(struct gfxp_fb_softc *softc,
 		screen_pos_t *row, screen_pos_t *col);
-static void vgatext_set_cursor(struct vgatext_softc *softc, int row, int col);
-static void vgatext_hide_cursor(struct vgatext_softc *softc);
-static void vgatext_save_colormap(struct vgatext_softc *softc);
-static void vgatext_restore_colormap(struct vgatext_softc *softc);
+static void vgatext_set_cursor(struct gfxp_fb_softc *softc, int row, int col);
+static void vgatext_hide_cursor(struct gfxp_fb_softc *softc);
+static void vgatext_save_colormap(struct gfxp_fb_softc *softc);
+static void vgatext_restore_colormap(struct gfxp_fb_softc *softc);
 static int vgatext_get_pci_reg_index(dev_info_t *const devi,
 		unsigned long himask, unsigned long hival, unsigned long addr,
 		off_t *offset);
@@ -198,18 +172,6 @@ static int vgatext_get_isa_reg_index(dev_info_t *const devi,
 
 static char	vgatext_silent;
 static char	happyface_boot;
-
-gfxp_vgatext_softc_ptr_t
-gfxp_vgatext_softc_alloc(void)
-{
-	return (kmem_zalloc(sizeof (struct vgatext_softc), KM_SLEEP));
-}
-
-void
-gfxp_vgatext_softc_free(gfxp_vgatext_softc_ptr_t ptr)
-{
-	kmem_free(ptr, sizeof (struct vgatext_softc));
-}
 
 /*
  * NOTE: this function is duplicated here and in consplat/vgatext while
@@ -241,7 +203,7 @@ is_pci_bridge(dev_info_t *dip)
 #define	STREQ(a, b)	(strcmp((a), (b)) == 0)
 
 static void
-gfxp_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
+gfxp_check_for_console(dev_info_t *devi, struct gfxp_fb_softc *softc,
     int pci_pcie_bus)
 {
 	ddi_acc_handle_t pci_conf;
@@ -319,10 +281,10 @@ gfxp_check_for_console(dev_info_t *devi, struct vgatext_softc *softc,
 }
 
 int
-gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
-    gfxp_vgatext_softc_ptr_t ptr)
+gfxp_vga_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
+    gfxp_fb_softc_ptr_t ptr)
 {
-	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
+	struct gfxp_fb_softc *softc = (struct gfxp_fb_softc *)ptr;
 	int	unit = ddi_get_instance(devi);
 	int	error;
 	char	*parent_type = NULL;
@@ -479,16 +441,16 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 fail:
 	if (parent_type != NULL)
 		ddi_prop_free(parent_type);
-	(void) gfxp_vgatext_detach(devi, DDI_DETACH, (void *)softc);
+	(void) gfxp_vga_detach(devi, DDI_DETACH, (void *)softc);
 	return (error);
 }
 
 /*ARGSUSED*/
 int
-gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
-    gfxp_vgatext_softc_ptr_t ptr)
+gfxp_vga_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
+    gfxp_fb_softc_ptr_t ptr)
 {
-	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
+	struct gfxp_fb_softc *softc = (struct gfxp_fb_softc *)ptr;
 
 	(void) ddi_prop_remove(DDI_DEV_T_ANY, devi, "primary-controller");
 
@@ -506,35 +468,14 @@ gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
 		return (DDI_SUCCESS);
 
 	default:
-		cmn_err(CE_WARN, "gfxp_vgatext_detach: unknown cmd 0x%x\n",
+		cmn_err(CE_WARN, "gfxp_vga_detach: unknown cmd 0x%x\n",
 		    cmd);
 		return (DDI_FAILURE);
 	}
 }
 
-/*ARGSUSED*/
-int
-gfxp_vgatext_open(dev_t *devp, int flag, int otyp, cred_t *cred,
-    gfxp_vgatext_softc_ptr_t ptr)
-{
-	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
-
-	if (softc == NULL || otyp == OTYP_BLK)
-		return (ENXIO);
-
-	return (0);
-}
-
-/*ARGSUSED*/
-int
-gfxp_vgatext_close(dev_t devp, int flag, int otyp, cred_t *cred,
-    gfxp_vgatext_softc_ptr_t ptr)
-{
-	return (0);
-}
-
 static int
-do_gfx_ioctl(int cmd, intptr_t data, int mode, struct vgatext_softc *softc)
+do_gfx_ioctl(int cmd, intptr_t data, int mode, struct gfxp_fb_softc *softc)
 {
 	static char kernel_only[] =
 	    "gfxp_vgatext_ioctl: %s is a kernel only ioctl";
@@ -548,6 +489,12 @@ do_gfx_ioctl(int cmd, intptr_t data, int mode, struct vgatext_softc *softc)
 	case KDGETMODE:
 		kd_mode = softc->mode;
 		if (ddi_copyout(&kd_mode, (void *)data, sizeof (int), mode))
+			return (EFAULT);
+		break;
+
+	case VIS_GETIDENTIFIER:
+		if (ddi_copyout(&text_ident, (void *)data,
+		    sizeof (struct vis_identifier), mode))
 			return (EFAULT);
 		break;
 
@@ -638,18 +585,18 @@ do_gfx_ioctl(int cmd, intptr_t data, int mode, struct vgatext_softc *softc)
 
 /*ARGSUSED*/
 int
-gfxp_vgatext_ioctl(
+gfxp_vga_ioctl(
     dev_t dev,
     int cmd,
     intptr_t data,
     int mode,
     cred_t *cred,
     int *rval,
-    gfxp_vgatext_softc_ptr_t ptr)
+    gfxp_fb_softc_ptr_t ptr)
 {
 	int err;
 
-	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
+	struct gfxp_fb_softc *softc = (struct gfxp_fb_softc *)ptr;
 
 	mutex_enter(&(softc->lock));
 	err = do_gfx_ioctl(cmd, data, mode, softc);
@@ -671,7 +618,7 @@ gfxp_vgatext_ioctl(
  * put it back during Resume
  */
 static void
-vgatext_save_text(struct vgatext_softc *softc)
+vgatext_save_text(struct gfxp_fb_softc *softc)
 {
 	unsigned	i;
 
@@ -680,7 +627,7 @@ vgatext_save_text(struct vgatext_softc *softc)
 }
 
 static void
-vgatext_restore_textmode(struct vgatext_softc *softc)
+vgatext_restore_textmode(struct gfxp_fb_softc *softc)
 {
 	unsigned	i;
 
@@ -696,7 +643,7 @@ vgatext_restore_textmode(struct vgatext_softc *softc)
 }
 
 static int
-vgatext_suspend(struct vgatext_softc *softc)
+vgatext_suspend(struct gfxp_fb_softc *softc)
 {
 	switch (softc->mode) {
 	case KD_TEXT:
@@ -714,7 +661,7 @@ vgatext_suspend(struct vgatext_softc *softc)
 }
 
 static void
-vgatext_resume(struct vgatext_softc *softc)
+vgatext_resume(struct gfxp_fb_softc *softc)
 {
 
 	switch (softc->mode) {
@@ -756,7 +703,7 @@ vgatext_progressbar_stop()
 }
 
 static void
-vgatext_kdsettext(struct vgatext_softc *softc)
+vgatext_kdsettext(struct gfxp_fb_softc *softc)
 {
 	int i;
 
@@ -773,7 +720,7 @@ vgatext_kdsettext(struct vgatext_softc *softc)
 }
 
 static void
-vgatext_kdsetgraphics(struct vgatext_softc *softc)
+vgatext_kdsetgraphics(struct gfxp_fb_softc *softc)
 {
 	vgatext_progressbar_stop();
 	vgatext_save_text(softc);
@@ -784,7 +731,7 @@ vgatext_kdsetgraphics(struct vgatext_softc *softc)
 }
 
 static int
-vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
+vgatext_kdsetmode(struct gfxp_fb_softc *softc, int mode)
 {
 	if ((mode == softc->mode) || (!GFXP_IS_CONSOLE(softc)))
 		return (0);
@@ -820,10 +767,10 @@ vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
 
 /*ARGSUSED*/
 int
-gfxp_vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
+gfxp_vga_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
     size_t *maplen, uint_t model, void *ptr)
 {
-	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
+	struct gfxp_fb_softc *softc = (struct gfxp_fb_softc *)ptr;
 	int err;
 	size_t length;
 
@@ -857,7 +804,7 @@ gfxp_vgatext_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off, size_t len,
 
 
 static int
-vgatext_devinit(struct vgatext_softc *softc, struct vis_devinit *data)
+vgatext_devinit(struct gfxp_fb_softc *softc, struct vis_devinit *data)
 {
 	/* initialize console instance */
 	data->version = VIS_CONS_REV;
@@ -877,7 +824,7 @@ vgatext_devinit(struct vgatext_softc *softc, struct vis_devinit *data)
  */
 
 static void
-vgatext_cons_display(struct vgatext_softc *softc, struct vis_consdisplay *da)
+vgatext_cons_display(struct gfxp_fb_softc *softc, struct vis_consdisplay *da)
 {
 	unsigned char	*string;
 	int	i;
@@ -920,7 +867,7 @@ vgatext_polled_display(
 	struct vis_polledio_arg *arg,
 	struct vis_consdisplay *da)
 {
-	vgatext_cons_display((struct vgatext_softc *)arg, da);
+	vgatext_cons_display((struct gfxp_fb_softc *)arg, da);
 }
 
 /*
@@ -928,7 +875,7 @@ vgatext_polled_display(
  */
 
 static void
-vgatext_cons_copy(struct vgatext_softc *softc, struct vis_conscopy *ma)
+vgatext_cons_copy(struct gfxp_fb_softc *softc, struct vis_conscopy *ma)
 {
 	unsigned short	*from;
 	unsigned short	*to;
@@ -1003,12 +950,12 @@ vgatext_polled_copy(
 	struct vis_polledio_arg *arg,
 	struct vis_conscopy *ca)
 {
-	vgatext_cons_copy((struct vgatext_softc *)arg, ca);
+	vgatext_cons_copy((struct gfxp_fb_softc *)arg, ca);
 }
 
 
 static void
-vgatext_cons_cursor(struct vgatext_softc *softc, struct vis_conscursor *ca)
+vgatext_cons_cursor(struct gfxp_fb_softc *softc, struct vis_conscursor *ca)
 {
 	if (vgatext_silent)
 		return;
@@ -1047,20 +994,20 @@ vgatext_polled_cursor(
 	struct vis_polledio_arg *arg,
 	struct vis_conscursor *ca)
 {
-	vgatext_cons_cursor((struct vgatext_softc *)arg, ca);
+	vgatext_cons_cursor((struct gfxp_fb_softc *)arg, ca);
 }
 
 
 
 /*ARGSUSED*/
 static void
-vgatext_hide_cursor(struct vgatext_softc *softc)
+vgatext_hide_cursor(struct gfxp_fb_softc *softc)
 {
 	/* Nothing at present */
 }
 
 static void
-vgatext_set_cursor(struct vgatext_softc *softc, int row, int col)
+vgatext_set_cursor(struct gfxp_fb_softc *softc, int row, int col)
 {
 	short	addr;
 
@@ -1076,7 +1023,7 @@ vgatext_set_cursor(struct vgatext_softc *softc, int row, int col)
 static int vga_row, vga_col;
 
 static void
-vgatext_get_cursor(struct vgatext_softc *softc,
+vgatext_get_cursor(struct gfxp_fb_softc *softc,
     screen_pos_t *row, screen_pos_t *col)
 {
 	short   addr;
@@ -1093,7 +1040,7 @@ vgatext_get_cursor(struct vgatext_softc *softc,
  * set to graphics, a preliminary implementation of happyface boot.
  */
 static void
-vgatext_set_text(struct vgatext_softc *softc)
+vgatext_set_text(struct gfxp_fb_softc *softc)
 {
 	int i;
 
@@ -1149,7 +1096,7 @@ vgatext_set_text(struct vgatext_softc *softc)
 }
 
 static void
-vgatext_init(struct vgatext_softc *softc)
+vgatext_init(struct gfxp_fb_softc *softc)
 {
 	unsigned char atr_mode;
 
@@ -1172,61 +1119,103 @@ vgatext_init(struct vgatext_softc *softc)
 
 #if	defined(USE_BORDERS)
 static void
-vgatext_init_graphics(struct vgatext_softc *softc)
+vgatext_init_graphics(struct gfxp_fb_softc *softc)
 {
 	vga_set_atr(&softc->regs, VGA_ATR_BDR_CLR,
 	    vga_get_atr(&softc->regs, VGA_BLACK));
 }
 #endif
 
+static char vga_fontslot = 0;
+
 static void
-vgatext_setfont(struct vgatext_softc *softc)
+vgatext_setfont(struct gfxp_fb_softc *softc)
 {
-	unsigned char *from;
-	unsigned char *to;
-	int	i;
-	int	j;
-	int	bpc;
+	static uchar_t fsreg[8] = {0x0, 0x30, 0x5, 0x35, 0xa, 0x3a, 0xf, 0x3f};
 
-/*
- * The newboot code to use font plane 2 breaks NVIDIA
- * (and some ATI) behavior.  Revert back to the S10
- * code.
- */
+	uchar_t *from;
+	uchar_t volatile *to;
+	int	i, j, s;
+	int	bpc, f_offset;
 
+	/* Sync-reset the sequencer registers */
+	vga_set_seq(&softc->regs, 0x00, 0x01);
 	/*
-	 * I'm embarassed to say that I don't know what these magic
-	 * sequences do, other than at the high level of "set the
-	 * memory window to allow font setup".  I stole them straight
-	 * from "kd"...
+	 *  enable write to plane2, since fonts
+	 * could only be loaded into plane2
 	 */
 	vga_set_seq(&softc->regs, 0x02, 0x04);
-	vga_set_seq(&softc->regs, 0x04, 0x06);
+	/*
+	 *  sequentially access data in the bit map being
+	 * selected by MapMask register (index 0x02)
+	 */
+	vga_set_seq(&softc->regs, 0x04, 0x07);
+	/* Sync-reset ended, and allow the sequencer to operate */
+	vga_set_seq(&softc->regs, 0x00, 0x03);
+
+	/*
+	 *  select plane 2 on Read Mode 0
+	 */
+	vga_set_grc(&softc->regs, 0x04, 0x02);
+	/*
+	 *  system addresses sequentially access data, follow
+	 * Memory Mode register bit 2 in the sequencer
+	 */
 	vga_set_grc(&softc->regs, 0x05, 0x00);
-	vga_set_grc(&softc->regs, 0x06, 0x04);
+	/*
+	 * set range of host memory addresses decoded by VGA
+	 * hardware -- A0000h-BFFFFh (128K region)
+	 */
+	vga_set_grc(&softc->regs, 0x06, 0x00);
 
 	/*
 	 * This assumes 8x16 characters, which yield the traditional 80x25
 	 * screen.  It really should support other character heights.
 	 */
 	bpc = 16;
+	s = vga_fontslot;
+	f_offset = s * 8 * 1024;
 	for (i = 0; i < 256; i++) {
 		from = font_data_8x16.encoding[i];
-		to = (unsigned char *)softc->fb.addr + i * 0x20;
+		to = (unsigned char *)softc->fb.addr + f_offset + i * 0x20;
 		for (j = 0; j < bpc; j++)
 			*to++ = *from++;
 	}
 
+	/* Sync-reset the sequencer registers */
+	vga_set_seq(&softc->regs, 0x00, 0x01);
+	/* enable write to plane 0 and 1 */
 	vga_set_seq(&softc->regs, 0x02, 0x03);
-	vga_set_seq(&softc->regs, 0x04, 0x02);
+	/*
+	 * enable character map selection
+	 * and odd/even addressing
+	 */
+	vga_set_seq(&softc->regs, 0x04, 0x03);
+	/*
+	 * select font map
+	 */
+	vga_set_seq(&softc->regs, 0x03, fsreg[s]);
+	/* Sync-reset ended, and allow the sequencer to operate */
+	vga_set_seq(&softc->regs, 0x00, 0x03);
+
+	/* restore graphic registers */
+
+	/* select plane 0 */
 	vga_set_grc(&softc->regs, 0x04, 0x00);
+	/* enable odd/even addressing mode */
 	vga_set_grc(&softc->regs, 0x05, 0x10);
+	/*
+	 * range of host memory addresses decoded by VGA
+	 * hardware -- B8000h-BFFFFh (32K region)
+	 */
 	vga_set_grc(&softc->regs, 0x06, 0x0e);
+	/* enable all color plane */
+	vga_set_atr(&softc->regs, 0x12, 0x0f);
 
 }
 
 static void
-vgatext_save_colormap(struct vgatext_softc *softc)
+vgatext_save_colormap(struct gfxp_fb_softc *softc)
 {
 	int i;
 
@@ -1242,7 +1231,7 @@ vgatext_save_colormap(struct vgatext_softc *softc)
 }
 
 static void
-vgatext_restore_colormap(struct vgatext_softc *softc)
+vgatext_restore_colormap(struct gfxp_fb_softc *softc)
 {
 	int i;
 
@@ -1374,7 +1363,7 @@ vgatext_get_isa_reg_index(
  */
 
 void
-vgatext_return_pointers(struct vgatext_softc *softc, struct vgaregmap *fbs,
+vgatext_return_pointers(struct gfxp_fb_softc *softc, struct vgaregmap *fbs,
     struct vgaregmap *regss)
 {
 

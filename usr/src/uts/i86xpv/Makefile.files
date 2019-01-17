@@ -193,7 +193,8 @@ BALLOON_OBJS += balloon_drv.o
 DOMCAPS_OBJS += domcaps.o
 EVTCHN_OBJS += evtchn_dev.o
 GFX_PRIVATE_OBJS += gfx_private.o gfxp_pci.o gfxp_segmap.o \
-		    gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o
+		    gfxp_devmap.o gfxp_vgatext.o gfxp_vm.o vgasubr.o \
+		    gfxp_fb.o
 IOAT_OBJS += ioat.o ioat_rs.o ioat_ioctl.o ioat_chan.o
 ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
 PCI_E_NEXUS_OBJS += npe.o npe_misc.o
