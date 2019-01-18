@@ -10,22 +10,11 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019 Joyent, Inc.
+# Copyright 2019, Joyent Inc.
 #
 
 .PARALLEL: $(SUBDIRS)
 
-SUBDIRS = \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	net-tests \
-	os-tests \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+SUBDIRS = cmd config runfiles tests
 
-include Makefile.com
+include $(SRC)/test/Makefile.com

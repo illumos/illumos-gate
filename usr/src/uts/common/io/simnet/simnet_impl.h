@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_SIMNET_IMPL_H
@@ -84,13 +85,23 @@ typedef struct simnet_dev {
 	uint_t			sd_mac_len;
 	uchar_t			sd_mac_addr[MAXMACADDRLEN];
 	simnet_stats_t		sd_stats;
+
+	/* Capabilities */
+	uint_t			sd_tx_cksum;
+	boolean_t		sd_lso;
 } simnet_dev_t;
+
+/* Simnet dladm private properties. */
+#define	SD_PROP_TX_ULP_CKSUM	"_tx_ulp_cksum"
+#define	SD_PROP_TX_IP_CKSUM	"_tx_ipv4_cksum"
+#define	SD_PROP_LSO		"_lso"
 
 /* Simnet device flags */
 #define	SDF_SHUTDOWN	0x00000001	/* Device shutdown, no new ops */
 #define	SDF_STARTED	0x00000002	/* Device started, allow ops */
 
 #define	SIMNET_MAX_MTU	9000		/* Max MTU supported by simnet driver */
+#define	SD_LSO_MAXLEN	65535		/* Max LSO supported by simnet driver */
 
 #ifdef	__cplusplus
 }

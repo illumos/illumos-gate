@@ -112,6 +112,37 @@ mac_free(mac_register_t *mregp)
 }
 
 /*
+ * Convert a MAC's offload features into the equivalent DB_CKSUMFLAGS
+ * value.
+ */
+static uint16_t
+mac_features_to_flags(mac_handle_t mh)
+{
+	uint16_t flags = 0;
+	uint32_t cap_sum = 0;
+	mac_capab_lso_t cap_lso;
+
+	if (mac_capab_get(mh, MAC_CAPAB_HCKSUM, &cap_sum)) {
+		if (cap_sum & HCKSUM_IPHDRCKSUM)
+			flags |= HCK_IPV4_HDRCKSUM;
+
+		if (cap_sum & HCKSUM_INET_PARTIAL)
+			flags |= HCK_PARTIALCKSUM;
+		else if (cap_sum & (HCKSUM_INET_FULL_V4 | HCKSUM_INET_FULL_V6))
+			flags |= HCK_FULLCKSUM;
+	}
+
+	/*
+	 * We don't need the information stored in 'cap_lso', but we
+	 * need to pass a non-NULL pointer to appease the driver.
+	 */
+	if (mac_capab_get(mh, MAC_CAPAB_LSO, &cap_lso))
+		flags |= HW_LSO;
+
+	return (flags);
+}
+
+/*
  * mac_register() is how drivers register new MACs with the GLDv3
  * framework.  The mregp argument is allocated by drivers using the
  * mac_alloc() function, and can be freed using mac_free() immediately upon
@@ -341,9 +372,13 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	    mip, 0, &p0, TS_RUN, minclsyspri);
 
 	/*
+	 * Cache the DB_CKSUMFLAGS that this MAC supports.
+	 */
+	mip->mi_tx_cksum_flags = mac_features_to_flags((mac_handle_t)mip);
+
+	/*
 	 * Initialize the capabilities
 	 */
-
 	bzero(&mip->mi_rx_rings_cap, sizeof (mac_capab_rings_t));
 	bzero(&mip->mi_tx_rings_cap, sizeof (mac_capab_rings_t));
 

@@ -23,7 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -2033,7 +2033,7 @@ done:
 
 				KIINCR(bki_forwards);
 				KLPINCR(blpsend, bkl_xmit);
-				MAC_RING_TX(blpsend->bl_mh, NULL, mpsend,
+				mpsend = mac_ring_tx(blpsend->bl_mh, NULL,
 				    mpsend);
 				freemsg(mpsend);
 				mpsend = next;
@@ -2189,7 +2189,7 @@ done:
 					    mpcopy);
 				}
 
-				MAC_RING_TX(blpsend->bl_mh, NULL, mpsend,
+				mpsend = mac_ring_tx(blpsend->bl_mh, NULL,
 				    mpsend);
 				freemsg(mpsend);
 				mpsend = next;
@@ -2571,7 +2571,7 @@ bridge_xmit_cb(mac_handle_t mh, mac_ring_handle_t rh, mblk_t *mpnext)
 	    (blp->bl_flags & BLF_SDUFAIL)))) {
 		KIINCR(bki_sent);
 		KLINCR(bkl_xmit);
-		MAC_RING_TX(blp->bl_mh, rh, mpnext, mp);
+		mp = mac_ring_tx(blp->bl_mh, rh, mpnext);
 		return (mp);
 	}
 
@@ -2629,7 +2629,7 @@ bridge_xmit_cb(mac_handle_t mh, mac_ring_handle_t rh, mblk_t *mpnext)
 			    B_FALSE, B_TRUE);
 		}
 		if (mp != NULL) {
-			MAC_RING_TX(blp->bl_mh, rh, mp, mp);
+			mp = mac_ring_tx(blp->bl_mh, rh, mp);
 			if (mp == NULL) {
 				KIINCR(bki_sent);
 				KLINCR(bkl_xmit);
@@ -2695,7 +2695,7 @@ bridge_trill_decaps(bridge_link_t *blp, mblk_t *mp, uint16_t ingress_nick)
 			/* Deliver a copy locally as well */
 			if ((mpcopy = copymsg(mp)) != NULL)
 				mac_rx_common(blp->bl_mh, NULL, mpcopy);
-			MAC_RING_TX(blp->bl_mh, NULL, mp, mp);
+			mp = mac_ring_tx(blp->bl_mh, NULL, mp);
 		}
 		if (mp == NULL) {
 			KIINCR(bki_sent);
@@ -2716,7 +2716,7 @@ bridge_trill_output(bridge_link_t *blp, mblk_t *mp)
 	bridge_inst_t *bip = blp->bl_inst;	/* used by macros */
 
 	mac_trill_snoop(blp->bl_mh, mp);
-	MAC_RING_TX(blp->bl_mh, NULL, mp, mp);
+	mp = mac_ring_tx(blp->bl_mh, NULL, mp);
 	if (mp == NULL) {
 		KIINCR(bki_sent);
 		KLINCR(bkl_xmit);

@@ -1348,7 +1348,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 		mutex_exit(&srs->srs_bw->mac_bw_lock);
 
 #define	MAC_TX_SRS_DROP_MESSAGE(srs, chain, cookie, s) {	\
-	mac_drop_pkt((chain), (s));				\
+	mac_drop_chain((chain), (s));				\
 	/* increment freed stats */				\
 	(srs)->srs_tx.st_stat.mts_sdrops++;			\
 	(cookie) = (mac_tx_cookie_t)(srs);			\
@@ -4355,7 +4355,7 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			 */
 			DB_CKSUMFLAGS(mp) |= HW_LOCAL_MAC;
 			CHECK_VID_AND_ADD_TAG(mp);
-			MAC_TX(mip, ring, mp, src_mcip);
+			mp = mac_provider_tx(mip, ring, mp, src_mcip);
 
 			/*
 			 * If the driver is out of descriptors and does a
@@ -4467,7 +4467,7 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			 * Unknown destination, send via the underlying
 			 * NIC.
 			 */
-			MAC_TX(mip, ring, mp, src_mcip);
+			mp = mac_provider_tx(mip, ring, mp, src_mcip);
 			if (mp != NULL) {
 				/*
 				 * Adjust for the last packet that

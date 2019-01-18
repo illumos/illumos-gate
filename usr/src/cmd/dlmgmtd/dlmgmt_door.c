@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1248,21 +1248,6 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 	}
 
 	if (oldzoneid != GLOBAL_ZONEID) {
-		if (newzoneid == GLOBAL_ZONEID && linkp->ll_onloan) {
-			/*
-			 * In this case we are attempting to assign a
-			 * loaned datalink from an NGZ to the GZ. We
-			 * can only reassign a loaned VNIC back to the
-			 * GZ when the zone is shutting down --
-			 * because otherwise the VNIC is in use by the
-			 * zone and will be busy. Leave the VNIC
-			 * loaned to the zone and return EBUSY to the
-			 * caller.
-			 */
-			err = EBUSY;
-			goto done;
-		}
-
 		if (zone_remove_datalink(oldzoneid, linkid) != 0) {
 			err = errno;
 			dlmgmt_log(LOG_WARNING, "unable to remove link %d from "
@@ -1272,6 +1257,7 @@ dlmgmt_setzoneid(void *argp, void *retp, size_t *sz, zoneid_t zoneid,
 
 		linkp->ll_onloan = B_FALSE;
 	}
+
 	if (newzoneid != GLOBAL_ZONEID) {
 		if (zone_add_datalink(newzoneid, linkid) != 0) {
 			err = errno;

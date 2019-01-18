@@ -10,22 +10,29 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
 #
+include $(SRC)/Makefile.master
 
-.PARALLEL: $(SUBDIRS)
+SRCS = default.run
+ROOTOPTPKG = $(ROOT)/opt/net-tests
+RUNFILES = $(ROOTOPTPKG)/runfiles
+CMDS = $(SRCS:%=$(RUNFILES)/%)
+$(CMDS) := FILEMODE = 0444
 
-SUBDIRS = \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	net-tests \
-	os-tests \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+include $(SRC)/test/Makefile.com
 
-include Makefile.com
+all: $(SRCS)
+
+install: $(CMDS)
+
+clobber: clean
+	$(RM) $(CMDS)
+
+$(CMDS): $(RUNFILES) $(SRCS)
+
+$(RUNFILES):
+	$(INS.dir)
+
+$(RUNFILES)/%: %
+	$(INS.file)

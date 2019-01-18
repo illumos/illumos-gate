@@ -10,22 +10,27 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
 #
+include $(SRC)/Makefile.master
 
-.PARALLEL: $(SUBDIRS)
+ROOTOPTPKG = $(ROOT)/opt/net-tests
+ROOTBIN = $(ROOTOPTPKG)/bin
+PROGS = nettest
+CMDS = $(PROGS:%=$(ROOTBIN)/%)
+$(CMDS) := FILEMODE = 0555
 
-SUBDIRS = \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	net-tests \
-	os-tests \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+include $(SRC)/test/Makefile.com
 
-include Makefile.com
+install: $(CMDS)
+
+clobber: clean
+	$(RM) $(CMDS)
+
+$(CMDS): $(ROOTBIN)
+
+$(ROOTBIN):
+	$(INS.dir)
+
+$(ROOTBIN)/%: %.ksh
+	$(INS.rename)

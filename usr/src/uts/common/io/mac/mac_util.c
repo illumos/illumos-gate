@@ -50,6 +50,7 @@
 #include <inet/ipsecah.h>
 #include <inet/tcp.h>
 #include <inet/udp_impl.h>
+#include <inet/sctp_ip.h>
 
 /*
  * The next two functions are used for dropping packets or chains of
@@ -157,6 +158,208 @@ mac_copymsgchain_cksum(mblk_t *mp)
 }
 
 /*
+ * Calculate the ULP checksum for IPv4. Return true if the calculation
+ * was successful, or false if an error occurred. If the later, place
+ * an error message into '*err'.
+ */
+static boolean_t
+mac_sw_cksum_ipv4(mblk_t *mp, uint32_t ip_hdr_offset, ipha_t *ipha,
+    const char **err)
+{
+	const uint8_t proto = ipha->ipha_protocol;
+	size_t len;
+	const uint32_t ip_hdr_sz = IPH_HDR_LENGTH(ipha);
+	/* ULP offset from start of L2. */
+	const uint32_t ulp_offset = ip_hdr_offset + ip_hdr_sz;
+	ipaddr_t src, dst;
+	uint32_t cksum;
+	uint16_t *up;
+
+	/*
+	 * We need a pointer to the ULP checksum. We're assuming the
+	 * ULP checksum pointer resides in the first mblk. Our native
+	 * TCP stack should always put the headers in the first mblk,
+	 * but currently we have no way to guarantee that other
+	 * clients don't spread headers (or even header fields) across
+	 * mblks.
+	 */
+	switch (proto) {
+	case IPPROTO_TCP:
+		ASSERT3U(MBLKL(mp), >=, (ulp_offset + sizeof (tcph_t)));
+		if (MBLKL(mp) < (ulp_offset + sizeof (tcph_t))) {
+			*err = "mblk doesn't contain TCP header";
+			goto bail;
+		}
+
+		up = IPH_TCPH_CHECKSUMP(ipha, ip_hdr_sz);
+		cksum = IP_TCP_CSUM_COMP;
+		break;
+
+	case IPPROTO_UDP:
+		ASSERT3U(MBLKL(mp), >=, (ulp_offset + sizeof (udpha_t)));
+		if (MBLKL(mp) < (ulp_offset + sizeof (udpha_t))) {
+			*err = "mblk doesn't contain UDP header";
+			goto bail;
+		}
+
+		up = IPH_UDPH_CHECKSUMP(ipha, ip_hdr_sz);
+		cksum = IP_UDP_CSUM_COMP;
+		break;
+
+	case IPPROTO_SCTP: {
+		sctp_hdr_t *sctph;
+
+		ASSERT3U(MBLKL(mp), >=, (ulp_offset + sizeof (sctp_hdr_t)));
+		if (MBLKL(mp) < (ulp_offset + sizeof (sctp_hdr_t))) {
+			*err = "mblk doesn't contain SCTP header";
+			goto bail;
+		}
+
+		sctph = (sctp_hdr_t *)(mp->b_rptr + ulp_offset);
+		sctph->sh_chksum = 0;
+		sctph->sh_chksum = sctp_cksum(mp, ulp_offset);
+		return (B_TRUE);
+	}
+
+	default:
+		*err = "unexpected protocol";
+		goto bail;
+
+	}
+
+	/* Pseudo-header checksum. */
+	src = ipha->ipha_src;
+	dst = ipha->ipha_dst;
+	len = ntohs(ipha->ipha_length) - ip_hdr_sz;
+
+	cksum += (dst >> 16) + (dst & 0xFFFF) + (src >> 16) + (src & 0xFFFF);
+	cksum += htons(len);
+
+	/*
+	 * We have already accounted for the pseudo checksum above.
+	 * Make sure the ULP checksum field is zero before computing
+	 * the rest.
+	 */
+	*up = 0;
+	cksum = IP_CSUM(mp, ulp_offset, cksum);
+	*up = (uint16_t)(cksum ? cksum : ~cksum);
+
+	return (B_TRUE);
+
+bail:
+	return (B_FALSE);
+}
+
+/*
+ * Calculate the ULP checksum for IPv6. Return true if the calculation
+ * was successful, or false if an error occurred. If the later, place
+ * an error message into '*err'.
+ */
+static boolean_t
+mac_sw_cksum_ipv6(mblk_t *mp, uint32_t ip_hdr_offset, const char **err)
+{
+	ip6_t* ip6h = (ip6_t *)(mp->b_rptr + ip_hdr_offset);
+	const uint8_t proto = ip6h->ip6_nxt;
+	const uint16_t *iphs = (uint16_t *)ip6h;
+	/* ULP offset from start of L2. */
+	uint32_t ulp_offset;
+	size_t len;
+	uint32_t cksum;
+	uint16_t *up;
+	uint16_t ip_hdr_sz;
+
+	if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &ip_hdr_sz, NULL)) {
+		*err = "malformed IPv6 header";
+		goto bail;
+	}
+
+	ulp_offset = ip_hdr_offset + ip_hdr_sz;
+
+	/*
+	 * We need a pointer to the ULP checksum. We're assuming the
+	 * ULP checksum pointer resides in the first mblk. Our native
+	 * TCP stack should always put the headers in the first mblk,
+	 * but currently we have no way to guarantee that other
+	 * clients don't spread headers (or even header fields) across
+	 * mblks.
+	 */
+	switch (proto) {
+	case IPPROTO_TCP:
+		ASSERT3U(MBLKL(mp), >=, (ulp_offset + sizeof (tcph_t)));
+		if (MBLKL(mp) < (ulp_offset + sizeof (tcph_t))) {
+			*err = "mblk doesn't contain TCP header";
+			goto bail;
+		}
+
+		up = IPH_TCPH_CHECKSUMP(ip6h, ip_hdr_sz);
+		cksum = IP_TCP_CSUM_COMP;
+		break;
+
+	case IPPROTO_UDP:
+		ASSERT3U(MBLKL(mp), >=, (ulp_offset + sizeof (udpha_t)));
+		if (MBLKL(mp) < (ulp_offset + sizeof (udpha_t))) {
+			*err = "mblk doesn't contain UDP header";
+			goto bail;
+		}
+
+		up = IPH_UDPH_CHECKSUMP(ip6h, ip_hdr_sz);
+		cksum = IP_UDP_CSUM_COMP;
+		break;
+
+	case IPPROTO_SCTP: {
+		sctp_hdr_t *sctph;
+
+		ASSERT3U(MBLKL(mp), >=, (ulp_offset + sizeof (sctp_hdr_t)));
+		if (MBLKL(mp) < (ulp_offset + sizeof (sctp_hdr_t))) {
+			*err = "mblk doesn't contain SCTP header";
+			goto bail;
+		}
+
+		sctph = (sctp_hdr_t *)(mp->b_rptr + ulp_offset);
+		/*
+		 * Zero out the checksum field to ensure proper
+		 * checksum calculation.
+		 */
+		sctph->sh_chksum = 0;
+		sctph->sh_chksum = sctp_cksum(mp, ulp_offset);
+		return (B_TRUE);
+	}
+
+	default:
+		*err = "unexpected protocol";
+		goto bail;
+	}
+
+	/*
+	 * The payload length includes the payload and the IPv6
+	 * extension headers; the idea is to subtract the extension
+	 * header length to get the real payload length.
+	 */
+	len = ntohs(ip6h->ip6_plen) - (ip_hdr_sz - IPV6_HDR_LEN);
+	cksum += len;
+
+	/*
+	 * We accumulate the pseudo header checksum in cksum; then we
+	 * call IP_CSUM to compute the checksum over the payload.
+	 */
+	cksum += iphs[4] + iphs[5] + iphs[6] + iphs[7] + iphs[8] + iphs[9] +
+	    iphs[10] + iphs[11] + iphs[12] + iphs[13] + iphs[14] + iphs[15] +
+	    iphs[16] + iphs[17] + iphs[18] + iphs[19];
+	cksum = IP_CSUM(mp, ulp_offset, cksum);
+
+	/* For UDP/IPv6 a zero UDP checksum is not allowed. Change to 0xffff */
+	if (proto == IPPROTO_UDP && cksum == 0)
+		cksum = ~cksum;
+
+	*up = (uint16_t)cksum;
+
+	return (B_TRUE);
+
+bail:
+	return (B_FALSE);
+}
+
+/*
  * Perform software checksum on a single message, if needed. The
  * emulation performed is determined by an intersection of the mblk's
  * flags and the emul flags requested. The emul flags are documented
@@ -167,12 +370,10 @@ mac_sw_cksum(mblk_t *mp, mac_emul_t emul)
 {
 	mblk_t *skipped_hdr = NULL;
 	uint32_t flags, start, stuff, end, value;
-	uint16_t len;
-	uint32_t offset;
+	uint32_t ip_hdr_offset;
 	uint16_t etype;
+	size_t ip_hdr_sz;
 	struct ether_header *ehp;
-	ipha_t *ipha;
-	uint8_t proto;
 	const char *err = "";
 
 	/*
@@ -202,21 +403,31 @@ mac_sw_cksum(mblk_t *mp, mac_emul_t emul)
 
 		evhp = (struct ether_vlan_header *)mp->b_rptr;
 		etype = ntohs(evhp->ether_type);
-		offset = sizeof (struct ether_vlan_header);
+		ip_hdr_offset = sizeof (struct ether_vlan_header);
 	} else {
 		etype = ntohs(ehp->ether_type);
-		offset = sizeof (struct ether_header);
+		ip_hdr_offset = sizeof (struct ether_header);
 	}
 
 	/*
-	 * If this packet isn't IPv4, then leave it alone. We still
-	 * need to add IPv6 support and we don't want to affect non-IP
-	 * traffic like ARP.
+	 * If this packet isn't IP, then leave it alone. We don't want
+	 * to affect non-IP traffic like ARP. Assume the IP header
+	 * doesn't include any options, for now. We will use the
+	 * correct size later after we know there are enough bytes to
+	 * at least fill out the basic header.
 	 */
-	if (etype != ETHERTYPE_IP)
+	switch (etype) {
+	case ETHERTYPE_IP:
+		ip_hdr_sz = sizeof (ipha_t);
+		break;
+	case ETHERTYPE_IPV6:
+		ip_hdr_sz = sizeof (ip6_t);
+		break;
+	default:
 		return (mp);
+	}
 
-	ASSERT3U(MBLKL(mp), >=, offset);
+	ASSERT3U(MBLKL(mp), >=, ip_hdr_offset);
 
 	/*
 	 * If the first mblk of this packet contains only the ethernet
@@ -224,8 +435,8 @@ mac_sw_cksum(mblk_t *mp, mac_emul_t emul)
 	 * contained in only a single mblk can then use the fastpaths
 	 * tuned to that possibility.
 	 */
-	if (MBLKL(mp) == offset) {
-		offset -= MBLKL(mp);
+	if (MBLKL(mp) == ip_hdr_offset) {
+		ip_hdr_offset -= MBLKL(mp);
 		/* This is guaranteed by mac_hw_emul(). */
 		ASSERT3P(mp->b_cont, !=, NULL);
 		skipped_hdr = mp;
@@ -238,8 +449,8 @@ mac_sw_cksum(mblk_t *mp, mac_emul_t emul)
 	 * this assumption but it's prudent to guard our future
 	 * clients that might not honor this contract.
 	 */
-	ASSERT3U(MBLKL(mp), >=, offset + sizeof (ipha_t));
-	if (MBLKL(mp) < (offset + sizeof (ipha_t))) {
+	ASSERT3U(MBLKL(mp), >=, ip_hdr_offset + ip_hdr_sz);
+	if (MBLKL(mp) < (ip_hdr_offset + ip_hdr_sz)) {
 		err = "mblk doesn't contain IP header";
 		goto bail;
 	}
@@ -268,86 +479,12 @@ mac_sw_cksum(mblk_t *mp, mac_emul_t emul)
 		mp = tmp;
 	}
 
-	ipha = (ipha_t *)(mp->b_rptr + offset);
+	if (etype == ETHERTYPE_IP) {
+		ipha_t *ipha = (ipha_t *)(mp->b_rptr + ip_hdr_offset);
 
-	/*
-	 * This code assumes a "simple" IP header (20 bytes, no
-	 * options). IPv4 options are mostly a historic artifact. The
-	 * one slight exception is Router Alert, but we don't expect
-	 * such a packet to land here.
-	 */
-	proto = ipha->ipha_protocol;
-	ASSERT(ipha->ipha_version_and_hdr_length == IP_SIMPLE_HDR_VERSION);
-	if (ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION) {
-		err = "not simple IP header";
-		goto bail;
-	}
-
-	switch (proto) {
-	case IPPROTO_TCP:
-		ASSERT3U(MBLKL(mp), >=,
-		    (offset + sizeof (ipha_t) + sizeof (tcph_t)));
-		if (MBLKL(mp) < (offset + sizeof (ipha_t) + sizeof (tcph_t))) {
-			err = "mblk doesn't contain TCP header";
-			goto bail;
-		}
-		break;
-
-	case IPPROTO_UDP:
-		ASSERT3U(MBLKL(mp), >=,
-		    (offset + sizeof (ipha_t) + sizeof (udpha_t)));
-		if (MBLKL(mp) < (offset + sizeof (ipha_t) + sizeof (udpha_t))) {
-			err = "mblk doesn't contain UDP header";
-			goto bail;
-		}
-		break;
-
-	default:
-		err = "unexpected protocol";
-		goto bail;
-	}
-
-	if (flags & (HCK_FULLCKSUM | HCK_IPV4_HDRCKSUM)) {
 		if ((flags & HCK_FULLCKSUM) && (emul & MAC_HWCKSUM_EMUL)) {
-			ipaddr_t src, dst;
-			uint32_t cksum;
-			uint16_t *up;
-
-			/* Get a pointer to the ULP checksum. */
-			switch (proto) {
-			case IPPROTO_TCP:
-				/* LINTED: improper alignment cast */
-				up = IPH_TCPH_CHECKSUMP(ipha,
-				    IP_SIMPLE_HDR_LENGTH);
-				break;
-
-			case IPPROTO_UDP:
-				/* LINTED: improper alignment cast */
-				up = IPH_UDPH_CHECKSUMP(ipha,
-				    IP_SIMPLE_HDR_LENGTH);
-				break;
-			}
-
-			/* Pseudo-header checksum. */
-			src = ipha->ipha_src;
-			dst = ipha->ipha_dst;
-			len = ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH;
-
-			cksum = (dst >> 16) + (dst & 0xFFFF) +
-			    (src >> 16) + (src & 0xFFFF);
-			cksum += htons(len);
-
-			/*
-			 * The checksum value stored in the packet
-			 * needs to be correct. Compute it here.
-			 */
-			*up = 0;
-			cksum += (((proto) == IPPROTO_UDP) ?
-			    IP_UDP_CSUM_COMP : IP_TCP_CSUM_COMP);
-			cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH +
-			    offset, cksum);
-			*(up) = (uint16_t)(cksum ? cksum : ~cksum);
-
+			if (!mac_sw_cksum_ipv4(mp, ip_hdr_offset, ipha, &err))
+				goto bail;
 		}
 
 		/* We always update the ULP checksum flags. */
@@ -358,47 +495,54 @@ mac_sw_cksum(mblk_t *mp, mac_emul_t emul)
 		}
 
 		/*
-		 * Out of paranoia, and for the sake of correctness,
-		 * we won't calulate the IP header checksum if it's
-		 * already populated. While unlikely, it's possible to
-		 * write code that might end up calling mac_sw_cksum()
-		 * twice on the same mblk (performing both LSO and
-		 * checksum emualtion in a single mblk chain loop --
-		 * the LSO emulation inserts a new chain into the
-		 * existing chain and then the loop iterates back over
-		 * the new segments and emulates the checksum a second
-		 * time). Normally this wouldn't be a problem, because
-		 * the HCK_*_OK flags are supposed to indicate that we
+		 * While unlikely, it's possible to write code that
+		 * might end up calling mac_sw_cksum() twice on the
+		 * same mblk (performing both LSO and checksum
+		 * emualtion in a single mblk chain loop -- the LSO
+		 * emulation inserts a new chain into the existing
+		 * chain and then the loop iterates back over the new
+		 * segments and emulates the checksum a second time).
+		 * Normally this wouldn't be a problem, because the
+		 * HCK_*_OK flags are supposed to indicate that we
 		 * don't need to do peform the work. But
 		 * HCK_IPV4_HDRCKSUM and HCK_IPV4_HDRCKSUM_OK have the
 		 * same value; so we cannot use these flags to
 		 * determine if the IP header checksum has already
-		 * been calculated or not. Luckily, if IP requests
-		 * HCK_IPV4_HDRCKSUM, then the IP header checksum will
-		 * be zero. So this test works just as well as
-		 * checking the flag. However, in the future, we
+		 * been calculated or not. For this reason, we zero
+		 * out the the checksum first. In the future, we
 		 * should fix the HCK_* flags.
 		 */
-		if ((flags & HCK_IPV4_HDRCKSUM) && (emul & MAC_HWCKSUM_EMULS) &&
-		    ipha->ipha_hdr_checksum == 0) {
+		if ((flags & HCK_IPV4_HDRCKSUM) && (emul & MAC_HWCKSUM_EMULS)) {
+			ipha->ipha_hdr_checksum = 0;
 			ipha->ipha_hdr_checksum = (uint16_t)ip_csum_hdr(ipha);
 			flags &= ~HCK_IPV4_HDRCKSUM;
 			flags |= HCK_IPV4_HDRCKSUM_OK;
 		}
+	} else if (etype == ETHERTYPE_IPV6) {
+		/* There is no IP header checksum for IPv6. */
+		if ((flags & HCK_FULLCKSUM) && (emul & MAC_HWCKSUM_EMUL)) {
+			if (!mac_sw_cksum_ipv6(mp, ip_hdr_offset, &err))
+				goto bail;
+			flags &= ~HCK_FULLCKSUM;
+			flags |= HCK_FULLCKSUM_OK;
+			value = 0;
+		}
 	}
 
+	/*
+	 * Partial checksum is the same for both IPv4 and IPv6.
+	 */
 	if ((flags & HCK_PARTIALCKSUM) && (emul & MAC_HWCKSUM_EMUL)) {
 		uint16_t *up, partial, cksum;
 		uchar_t *ipp; /* ptr to beginning of IP header */
 
-		ipp = mp->b_rptr + offset;
-		/* LINTED: cast may result in improper alignment */
+		ipp = mp->b_rptr + ip_hdr_offset;
 		up = (uint16_t *)((uchar_t *)ipp + stuff);
 		partial = *up;
 		*up = 0;
 
 		ASSERT3S(end, >, start);
-		cksum = ~IP_CSUM_PARTIAL(mp, offset + start, partial);
+		cksum = ~IP_CSUM_PARTIAL(mp, ip_hdr_offset + start, partial);
 		*up = cksum != 0 ? cksum : ~cksum;
 	}
 
@@ -1169,13 +1313,8 @@ fail:
  *    can't directly handle LSO packets or packets without fully
  *    calculated checksums.
  *
- * 2. A way for MAC providers (drivers) to offer LSO even when the
- *    underlying HW can't or won't supply LSO offload.
- *
- * At the time of this writing no provider is making use of this
- * function. However, the plan for the future is to always assume LSO
- * is available and then add SW LSO emulation to all providers that
- * don't support it in HW.
+ * 2. A way for MAC to offer hardware offloads when the underlying
+ *    hardware can't or won't.
  */
 void
 mac_hw_emul(mblk_t **mp_chain, mblk_t **otail, uint_t *ocount, mac_emul_t emul)

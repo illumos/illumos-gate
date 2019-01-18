@@ -1,0 +1,124 @@
+Running
+-------
+
+* Create three native zones and start them.
+
+* Edit config/ip_forwarding.config, entering the names of the zones
+  you created.
+
+* Run /opt/net-tests/bin/nettest.
+
+Overview
+--------
+
+The tests in this directory test the IP forwarding path under several
+different variations. All tests require three zones. The tests use
+these three zones, along with the simnet driver, to emulate a real IP
+forwarding scenario involving multiple hosts. All tests verify that
+TCP, UDP, ICMP, IPv4/IPv6, and fragmented IPv4/IPv6 traffic can cross
+the IP forwarding datapath. All tests send traffic across both "the
+wire" (simnet) and the special MAC-loopback path. Each test differs in
+its emulation of various hardware offload features (which would
+typically be presented by real NICs). There is no emulation of Rx
+checksum offload; all packets will be software checksummed by IP
+input. In the future we may want to add variations where Rx checksum
+offload is in play as that's a typical feature provided by NICs.
+
+The diagram below gives a visual representation of the situation we
+are testing and shows how the test components relate to each other.
+
++----------------------------+          +----------------------------+
+|client host (ipft_nic0)     |          |server host (ipft_nic1)     |
+|                            |          | +------------------------+ |
+|  +----------------------+  |          | |router zone             | |
+|  |ipft_client0          |  |          | |                        | |
+|  |192.168.77.2          |<-+----+     | |+----------------------+| |
+|  |fd00:0:1:4d::2        |  |    |     | ||ipft_client_r0        || |
+|  +----------------------+  |   Wire --+->|192.168.77.1          || |
++----------------------------+          | ||fd00:0:1:4d::1        || |
+                                        | |+----------------------+| |
+                                        | |            ^           | |
+                                        | |            |           | |
+                                        | |     IP     |           | |
+                                        | | forwarding |           | |
+                                        | |            |           | |
+                                        | |            v           | |
+                                        | |+----------------------+| |
+                                        | ||ipft_server_r0        || |
+                                        | ||VLAN 5                || |
+                                  +-----+->|192.168.88.1          || |
+                                  |     | ||fd00:0:1:58::1        || |
+                                  |     | |+----------------------+| |
+                                  |     | +------------------------+ |
+                     MAC-loopback |     |                            |
+                                  |     | +------------------------+ |
+                                  |     | |server zone             | |
+                                  |     | |                        | |
+                                  |     | |+----------------------+| |
+                                  |     | ||ipft_server0          || |
+                                  |     | ||VLAN 5                || |
+                                  +-----+->|192.168.88.2          || |
+                                        | ||fd00:0:1:58::2        || |
+                                        | |+----------------------+| |
+                                        | +------------------------+ |
+                                        +----------------------------+
+
+Requirements
+------------
+
+* These tests are currently SmartOS specific as they rely on simnet
+  extensions only found in illumos-joyent.
+
+* The client and server zones must provide `/usr/bin/socat`. It would
+  be nice to use netcat but our native version is missing features
+  like connection timeout.
+
+* The user must both create and start the three required zones.
+
+* All three zones should be native zones.
+
+* You must edit the ip_forwarding.config file; providing it with the
+  names of the zones you have created.
+
+Files
+-----
+
+ip_fowarding
+
+	The main test script; it provides the logic for all the tests
+	below. The different test variations are controlled by options
+	and it takes the three zones as arguments. This script is also
+	easily run by hand if you want to bypass the test-runner
+	framework. The rest of the test sripts are meant for
+	consumption by the test-runner framework and are wrappers
+	around this script.
+
+ip_fwd_no_cksum
+
+	Tests IP forwarding with no hardware offloads on any of the
+	interfaces.
+
+ip_fwd_partial_cksum
+
+	Tests IP forwarding with partial Tx checksum offload and IPv4
+	header checksum offload enabled on both interfaces.
+
+ip_fwd_full_cksum
+
+	Tests IP forwarding with full Tx checksum offload and IPv4
+	header checksum offload enabled on both interfaces.
+
+ip_fwd_partial_cksum_lso
+
+	Tests IP forwarding with partial Tx checksum offload, IPv4
+	header checksum offload, and TCP LSO on both interfaces.
+
+ip_fwd_full_cksum_lso
+
+	Tests IP forwarding with full Tx checksum offload, IPv4 header
+	checksum offload, and TCP LSO on both interfaces.
+
+config/ip_forwarding.config
+
+	This file must be modified to contain the names of the zones
+	the user crated for running these tests.

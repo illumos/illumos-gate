@@ -3582,7 +3582,9 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 	srs_tx = &srs->srs_tx;
 	if (srs_tx->st_mode == SRS_TX_DEFAULT &&
 	    (srs->srs_state & SRS_ENQUEUED) == 0 &&
-	    mip->mi_nactiveclients == 1 && mp_chain->b_next == NULL) {
+	    mip->mi_nactiveclients == 1 &&
+	    mp_chain->b_next == NULL &&
+	    (DB_CKSUMFLAGS(mp_chain) & HW_LSO) == 0) {
 		uint64_t	obytes;
 
 		/*
@@ -3623,8 +3625,9 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 		 * receiver -- mark the packet accordingly.
 		 */
 		DB_CKSUMFLAGS(mp_chain) |= HW_LOCAL_MAC;
+		mp_chain = mac_provider_tx(mip, srs_tx->st_arg2, mp_chain,
+		    mcip);
 
-		MAC_TX(mip, srs_tx->st_arg2, mp_chain, mcip);
 		if (mp_chain == NULL) {
 			cookie = 0;
 			SRS_TX_STAT_UPDATE(srs, opackets, 1);
@@ -3636,7 +3639,74 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 			mutex_exit(&srs->srs_lock);
 		}
 	} else {
-		cookie = srs_tx->st_func(srs, mp_chain, hint, flag, ret_mp);
+		mblk_t *mp = mp_chain;
+		mblk_t *new_head = NULL;
+		mblk_t *new_tail = NULL;
+
+		/*
+		 * There are occasions where the packets arriving here
+		 * may request hardware offloads that are not
+		 * available from the underlying MAC provider. This
+		 * currently only happens when a packet is sent across
+		 * the MAC-loopback path of one MAC and then forwarded
+		 * (via IP) to another MAC that lacks one or more of
+		 * the hardware offloads provided by the first one.
+		 * However, in the future, we may choose to pretend
+		 * all MAC providers support all offloads, performing
+		 * emulation on Tx as needed.
+		 *
+		 * We iterate each mblk in-turn, emulating hardware
+		 * offloads as required. From this process, we create
+		 * a new chain. The new chain may be the same as the
+		 * original chain (no hardware emulation needed), a
+		 * collection of new mblks (hardware emulation
+		 * needed), or a mix. At this point, the chain is safe
+		 * for consumption by the underlying MAC provider and
+		 * is passed down to the SRS.
+		 */
+		while (mp != NULL) {
+			mblk_t *next = mp->b_next;
+			mblk_t *tail = NULL;
+			const uint16_t needed =
+			    (DB_CKSUMFLAGS(mp) ^ mip->mi_tx_cksum_flags) &
+			    DB_CKSUMFLAGS(mp);
+
+			mp->b_next = NULL;
+
+			if (needed != 0) {
+				mac_emul_t emul = 0;
+
+				if (needed & HCK_IPV4_HDRCKSUM)
+					emul |= MAC_IPCKSUM_EMUL;
+				if (needed & (HCK_PARTIALCKSUM | HCK_FULLCKSUM))
+					emul |= MAC_HWCKSUM_EMUL;
+				if (needed & HW_LSO)
+					emul = MAC_LSO_EMUL;
+
+				mac_hw_emul(&mp, &tail, NULL, emul);
+
+				if (mp == NULL) {
+					mp = next;
+					continue;
+				}
+			}
+
+			if (new_head == NULL) {
+				new_head = mp;
+			} else {
+				new_tail->b_next = mp;
+			}
+
+			new_tail = (tail == NULL) ? mp : tail;
+			mp = next;
+		}
+
+		if (new_head == NULL) {
+			cookie = 0;
+			goto done;
+		}
+
+		cookie = srs_tx->st_func(srs, new_head, hint, flag, ret_mp);
 	}
 
 done:

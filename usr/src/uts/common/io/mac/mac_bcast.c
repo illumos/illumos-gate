@@ -240,7 +240,8 @@ mac_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain, boolean_t is_loopback)
 		MCIP_STAT_UPDATE(src_mcip, brdcstxmt, 1);
 		MCIP_STAT_UPDATE(src_mcip, brdcstxmtbytes, msgdsize(mp_chain));
 
-		MAC_TX(mip, mip->mi_default_tx_ring, mp_chain, src_mcip);
+		mp_chain = mac_provider_tx(mip, mip->mi_default_tx_ring,
+		    mp_chain, src_mcip);
 		if (mp_chain != NULL)
 			freemsgchain(mp_chain);
 	} else {
