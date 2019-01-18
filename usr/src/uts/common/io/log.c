@@ -73,9 +73,9 @@ static int
 log_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	if (ddi_create_minor_node(devi, "conslog", S_IFCHR,
-	    LOG_CONSMIN, DDI_PSEUDO, NULL) == DDI_FAILURE ||
+	    LOG_CONSMIN, DDI_PSEUDO, 0) == DDI_FAILURE ||
 	    ddi_create_minor_node(devi, "log", S_IFCHR,
-	    LOG_LOGMIN, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    LOG_LOGMIN, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
@@ -307,8 +307,8 @@ static struct qinit logwinit =
 static struct streamtab loginfo = { &logrinit, &logwinit, NULL, NULL };
 
 DDI_DEFINE_STREAM_OPS(log_ops, nulldev, nulldev, log_attach, nodev,
-	nodev, log_info, D_NEW | D_MP | D_MTPERMOD, &loginfo,
-	ddi_quiesce_not_needed);
+    nodev, log_info, D_NEW | D_MP | D_MTPERMOD, &loginfo,
+    ddi_quiesce_not_needed);
 
 static struct modldrv modldrv =
 	{ &mod_driverops, "streams log driver", &log_ops };
