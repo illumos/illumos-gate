@@ -76,7 +76,7 @@ static int myri10ge_lso_copy = 0;
 static mblk_t *myri10ge_send_wrapper(void *arg, mblk_t *mp);
 int myri10ge_tx_handles_initial = 128;
 
-static 	kmutex_t myri10ge_param_lock;
+static	kmutex_t myri10ge_param_lock;
 static void* myri10ge_db_lastfree;
 
 static int myri10ge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
@@ -103,7 +103,7 @@ unsigned char myri10ge_broadcastaddr[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 static ddi_dma_attr_t myri10ge_misc_dma_attr = {
 	DMA_ATTR_V0,			/* version number. */
-	(uint64_t)0, 			/* low address */
+	(uint64_t)0,			/* low address */
 	(uint64_t)0xffffffffffffffffULL, /* high address */
 	(uint64_t)0x7ffffff,		/* address counter max */
 	(uint64_t)4096,			/* alignment */
@@ -124,7 +124,7 @@ static ddi_dma_attr_t myri10ge_misc_dma_attr = {
 
 static ddi_dma_attr_t myri10ge_rx_jumbo_dma_attr = {
 	DMA_ATTR_V0,			/* version number. */
-	(uint64_t)0, 			/* low address */
+	(uint64_t)0,			/* low address */
 	(uint64_t)0xffffffffffffffffULL, /* high address */
 	(uint64_t)0x7ffffff,		/* address counter max */
 	(uint64_t)4096,			/* alignment */
@@ -139,7 +139,7 @@ static ddi_dma_attr_t myri10ge_rx_jumbo_dma_attr = {
 
 static ddi_dma_attr_t myri10ge_rx_std_dma_attr = {
 	DMA_ATTR_V0,			/* version number. */
-	(uint64_t)0, 			/* low address */
+	(uint64_t)0,			/* low address */
 	(uint64_t)0xffffffffffffffffULL, /* high address */
 	(uint64_t)0x7ffffff,		/* address counter max */
 #if defined sparc64 || defined __sparcv9
@@ -162,7 +162,7 @@ static ddi_dma_attr_t myri10ge_rx_std_dma_attr = {
 
 static ddi_dma_attr_t myri10ge_tx_dma_attr = {
 	DMA_ATTR_V0,			/* version number. */
-	(uint64_t)0, 			/* low address */
+	(uint64_t)0,			/* low address */
 	(uint64_t)0xffffffffffffffffULL, /* high address */
 	(uint64_t)0x7ffffff,		/* address counter max */
 	(uint64_t)1,			/* alignment */
@@ -393,8 +393,7 @@ myri10ge_pull_jpool(struct myri10ge_slice_state *ss)
 {
 	struct myri10ge_jpool_stuff *jpool = &ss->jpool;
 	struct myri10ge_jpool_entry *jtail, *j, *jfree;
-	volatile uintptr_t *putp;
-	uintptr_t put;
+	volatile void *putp;
 	int i;
 
 	/* find tail */
@@ -412,11 +411,10 @@ myri10ge_pull_jpool(struct myri10ge_slice_state *ss)
 	 */
 	for (i = 0; i < MYRI10GE_MAX_CPUS; i++) {
 		/* take per-CPU free list */
-		putp = (void *)&jpool->cpu[i & MYRI10GE_MAX_CPU_MASK].head;
-		if (*putp == NULL)
+		putp = &jpool->cpu[i & MYRI10GE_MAX_CPU_MASK].head;
+		jfree = atomic_swap_ptr(putp, NULL);
+		if (jfree == NULL)
 			continue;
-		put = atomic_swap_ulong(putp, 0);
-		jfree = (struct myri10ge_jpool_entry *)put;
 
 		/* append to pool */
 		if (jtail == NULL) {
@@ -1048,7 +1046,7 @@ myri10ge_reg_set(dev_info_t *dip, int *reg_set, int *span,
 #define	BUS_NUMBER(ip)		(ip[0] >> 16 & 0xff)
 #define	ADDRESS_SPACE(ip)	(ip[0] >> 24 & 0x03)
 #define	PCI_ADDR_HIGH(ip)	(ip[1])
-#define	PCI_ADDR_LOW(ip) 	(ip[2])
+#define	PCI_ADDR_LOW(ip)	(ip[2])
 #define	PCI_SPAN_HIGH(ip)	(ip[3])
 #define	PCI_SPAN_LOW(ip)	(ip[4])
 
@@ -1291,8 +1289,8 @@ myri10ge_dummy_rdma(struct myri10ge_priv *mgp, int enable)
 	buf[0] = mgp->cmd_dma.high;		/* confirm addr MSW */
 	buf[1] = mgp->cmd_dma.low;		/* confirm addr LSW */
 	buf[2] = htonl(0xffffffff);		/* confirm data */
-	buf[3] = htonl(mgp->cmd_dma.high); 	/* dummy addr MSW */
-	buf[4] = htonl(mgp->cmd_dma.low); 	/* dummy addr LSW */
+	buf[3] = htonl(mgp->cmd_dma.high);	/* dummy addr MSW */
+	buf[4] = htonl(mgp->cmd_dma.low);	/* dummy addr LSW */
 	buf[5] = htonl(enable);			/* enable? */
 
 
@@ -1353,7 +1351,7 @@ myri10ge_load_firmware(struct myri10ge_priv *mgp)
 	 * do not. Therefore the handoff copy must skip the first 8 bytes
 	 */
 	buf[3] = htonl(MYRI10GE_FW_OFFSET + 8); /* where the code starts */
-	buf[4] = htonl(size - 8); 	/* length of code */
+	buf[4] = htonl(size - 8);	/* length of code */
 	buf[5] = htonl(8);		/* where to copy to */
 	buf[6] = htonl(0);		/* where to jump to */
 
@@ -2913,7 +2911,7 @@ myri10ge_pullup(struct myri10ge_slice_state *ss, mblk_t *mp)
 		return (DDI_FAILURE);
 	}
 	MYRI10GE_ATOMIC_SLICE_STAT_INC(xmit_pullup);
-	mac_hcksum_set(mp, start, stuff, NULL, NULL, tx_offload_flags);
+	mac_hcksum_set(mp, start, stuff, 0, 0, tx_offload_flags);
 	if (tx_offload_flags & HW_LSO)
 		DB_LSOMSS(mp) = (uint16_t)mss;
 	lso_info_set(mp, mss, tx_offload_flags);
@@ -4244,9 +4242,9 @@ myri10ge_enable_nvidia_ecrc(struct myri10ge_priv *mgp)
 	ddi_acc_handle_t handle;
 	unsigned long bus_number, dev_number, func_number;
 	unsigned long cfg_pa, paddr, base, pgoffset;
-	char 		*cvaddr, *ptr;
+	char		*cvaddr, *ptr;
 	uint32_t	*ptr32;
-	int 		retval = DDI_FAILURE;
+	int		retval = DDI_FAILURE;
 	int dontcare;
 	uint16_t read_vid, read_did, vendor_id, device_id;
 
@@ -4270,8 +4268,8 @@ myri10ge_enable_nvidia_ecrc(struct myri10ge_priv *mgp)
 	pci_config_teardown(&handle);
 
 	if (myri10ge_verbose) {
-		unsigned long 	bus_number, dev_number, func_number;
-		int 		reg_set, span;
+		unsigned long	bus_number, dev_number, func_number;
+		int		reg_set, span;
 		(void) myri10ge_reg_set(parent_dip, &reg_set, &span,
 		    &bus_number, &dev_number, &func_number);
 		if (myri10ge_verbose)
@@ -4793,7 +4791,7 @@ static int
 myri10ge_find_cap(ddi_acc_handle_t handle, uint8_t *capptr, uint8_t capid)
 {
 	uint16_t	status;
-	uint8_t 	ptr;
+	uint8_t		ptr;
 
 	/* check to see if we have capabilities */
 	status = pci_config_get16(handle, PCI_CONF_STAT);
@@ -6023,7 +6021,7 @@ static int
 myri10ge_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	struct myri10ge_priv	*mgp, *tmp;
-	int 			status, i, jbufs_alloced;
+	int			status, i, jbufs_alloced;
 
 	if (cmd == DDI_SUSPEND) {
 		status = myri10ge_suspend(dip);
