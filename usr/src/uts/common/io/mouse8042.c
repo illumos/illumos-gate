@@ -20,7 +20,7 @@
  */
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -319,11 +319,11 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * transparent.
 	 *
 	 * So we change minor node numbering scheme to be:
-	 * 	external node minor num == instance * 2
+	 *	external node minor num == instance * 2
 	 *	internal node minor num == instance * 2 + 1
 	 */
 	rc = ddi_create_minor_node(dip, "mouse", S_IFCHR, instance * 2,
-	    DDI_NT_MOUSE, NULL);
+	    DDI_NT_MOUSE, 0);
 	if (rc != DDI_SUCCESS) {
 		goto fail_1;
 	}
@@ -922,7 +922,7 @@ mouse8042_reset_fsm(mouse8042_reset_state_e reset_state, uint8_t mdata)
 			return (MSE_RESET_AA);
 		break;
 
-	case MSE_RESET_AA: 	/* 0xAA received; now we expect 0x00 */
+	case MSE_RESET_AA:	/* 0xAA received; now we expect 0x00 */
 		if (mdata == MSE_00)
 			return (MSE_RESET_IDLE);
 		break;
