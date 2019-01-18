@@ -26,7 +26,7 @@
 
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 #include <sys/errno.h>
 #include <sys/types.h>
@@ -81,7 +81,7 @@ static int vgatext_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int vgatext_devmap(dev_t, devmap_cookie_t, offset_t, size_t,
 			    size_t *, uint_t);
 
-static 	struct cb_ops cb_vgatext_ops = {
+static struct cb_ops cb_vgatext_ops = {
 	vgatext_open,		/* cb_open */
 	vgatext_close,		/* cb_close */
 	nodev,			/* cb_strategy */
@@ -235,7 +235,7 @@ vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	(void) snprintf(name, sizeof (name), "text-%d", unit);
 	error = ddi_create_minor_node(devi, name, S_IFCHR,
-	    INST2NODE1(unit), DDI_NT_DISPLAY, NULL);
+	    INST2NODE1(unit), DDI_NT_DISPLAY, 0);
 	if (error == DDI_SUCCESS)
 		return (DDI_SUCCESS);
 
