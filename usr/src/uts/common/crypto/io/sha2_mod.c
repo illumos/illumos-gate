@@ -220,7 +220,7 @@ static crypto_provider_info_t sha2_prov_info = {
 	sha2_mech_info_tab
 };
 
-static crypto_kcf_provider_handle_t sha2_prov_handle = NULL;
+static crypto_kcf_provider_handle_t sha2_prov_handle = 0;
 
 int
 _init()
