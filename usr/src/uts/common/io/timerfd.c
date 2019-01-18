@@ -122,7 +122,7 @@ timerfd_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	if (ddi_soft_state_zalloc(timerfd_softstate, minor) != DDI_SUCCESS) {
 		vmem_free(timerfd_minor, (void *)(uintptr_t)minor, 1);
 		mutex_exit(&timerfd_lock);
-		return (NULL);
+		return (ENXIO);
 	}
 
 	state = ddi_get_soft_state(timerfd_softstate, minor);
@@ -331,7 +331,7 @@ timerfd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 			return (ENODEV);
 		}
 
-		if (st.tfd_settime_ovalue != NULL) {
+		if (st.tfd_settime_ovalue != 0) {
 			err = it->it_backend->clk_timer_gettime(it, &oval);
 
 			if (err != 0) {
@@ -373,7 +373,7 @@ timerfd_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		    TIMER_ABSTIME : TIMER_RELTIME, &when);
 		timerfd_itimer_unlock(state, it);
 
-		if (err != 0 || st.tfd_settime_ovalue == NULL)
+		if (err != 0 || st.tfd_settime_ovalue == 0)
 			return (err);
 
 		if ((err = timerfd_copyout(&oval, st.tfd_settime_ovalue)) != 0)
@@ -455,7 +455,7 @@ timerfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "timerfd", S_IFCHR,
-	    TIMERFDMNRN_TIMERFD, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    TIMERFDMNRN_TIMERFD, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		cmn_err(CE_NOTE, "/dev/timerfd couldn't create minor node");
 		ddi_soft_state_fini(&timerfd_softstate);
 		mutex_exit(&timerfd_lock);
