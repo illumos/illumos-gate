@@ -828,7 +828,7 @@ rsm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ASSERT(rnum == RSM_DRIVER_MINOR);
 
 	if (ddi_create_minor_node(devi, DRIVER_NAME, S_IFCHR,
-	    rnum, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    rnum, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		DBG_PRINTF((category, RSM_ERR,
 		    "rsm: rsm_attach - unable to allocate "
 		    "minor #\n"));
@@ -2854,7 +2854,7 @@ rsm_publish(rsmseg_t *seg, rsm_ioctlmsg_t *msg, intptr_t dataptr, int mode)
 	rsm_access_entry_t	*rsmpi_acl;
 	rsm_memory_local_t	mem;
 	struct buf		*xbuf;
-	dev_t 			sdev = 0;
+	dev_t			sdev = 0;
 	adapter_t		*adapter;
 	rsm_memseg_id_t		segment_id = 0;
 	int			loopback_flag = 0;
@@ -2887,7 +2887,7 @@ rsm_publish(rsmseg_t *seg, rsm_ioctlmsg_t *msg, intptr_t dataptr, int mode)
 	/*
 	 * The application provided msg->key is used for resolving a
 	 * segment id according to the following:
-	 *    key = 0   		Kernel Agent selects the segment id
+	 *    key = 0			Kernel Agent selects the segment id
 	 *    key <= RSM_DLPI_ID_END	Reserved for system usage except
 	 *				RSMLIB range
 	 *    key < RSM_USER_APP_ID_BASE segment id = key
@@ -3442,7 +3442,7 @@ static void
 rsm_send_importer_disconnects(rsm_memseg_id_t ex_segid,
     rsm_node_id_t ex_nodeid)
 {
-	rsmipc_request_t 	request;
+	rsmipc_request_t	request;
 	importing_token_t	*prev_token, *token, *tmp_token, *tokp;
 	importing_token_t	*force_disconnect_list = NULL;
 	int			index;
@@ -3694,7 +3694,7 @@ rsm_intr_reply(rsmipc_msghdr_t *msg)
 	 * copy data into reply slot area
 	 * signal waiter
 	 */
-	rsmipc_slot_t 	*slot;
+	rsmipc_slot_t	*slot;
 	rsmipc_cookie_t	*cookie;
 	void *data = (void *) msg;
 	size_t size = sizeof (rsmipc_reply_t);
@@ -5745,7 +5745,7 @@ static void
 rsm_send_suspend()
 {
 	int			i, e;
-	rsmipc_request_t 	request;
+	rsmipc_request_t	request;
 	list_element_t		*tokp;
 	list_element_t		*head = NULL;
 	importing_token_t	*token;
@@ -5834,7 +5834,7 @@ rsm_send_suspend()
 static void
 rsm_send_resume()
 {
-	rsmipc_request_t 	request;
+	rsmipc_request_t	request;
 	list_element_t		*elem, *head;
 
 	/*
@@ -6450,7 +6450,7 @@ rsm_connect(rsmseg_t *seg, rsm_ioctlmsg_t *msg, cred_t *cred,
 		atomic_inc_16(bar_va + seg->s_hdr.rsmrc_num);
 		/* return user off into barrier page where status will be */
 		msg->off = (int)seg->s_hdr.rsmrc_num;
-		msg->gnum = bar_va[msg->off]; 	/* gnum race */
+		msg->gnum = bar_va[msg->off];	/* gnum race */
 	} else {
 		msg->off = 0;
 		msg->gnum = 0;	/* gnum race */
@@ -6765,7 +6765,7 @@ rsm_chpoll(dev_t dev, short events, int anyyet, short *reventsp,
 {
 	minor_t		rnum;
 	rsmresource_t	*res;
-	rsmseg_t 	*seg;
+	rsmseg_t	*seg;
 	DBG_DEFINE(category, RSM_KERNEL_AGENT | RSM_FUNC_ALL | RSM_DDI);
 
 	DBG_PRINTF((category, RSM_DEBUG_VERBOSE, "rsm_chpoll enter\n"));
