@@ -177,19 +177,19 @@ int ecpp_debug = ECPP_DEBUG;
 int noecp = 0;	/* flag not to use ECP mode */
 
 /* driver entry point fn definitions */
-static int 	ecpp_open(queue_t *, dev_t *, int, int, cred_t *);
+static int	ecpp_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	ecpp_close(queue_t *, int, cred_t *);
-static uint_t 	ecpp_isr(caddr_t);
+static uint_t	ecpp_isr(caddr_t);
 static uint_t	ecpp_softintr(caddr_t);
 
 /* configuration entry point fn definitions */
-static int 	ecpp_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static int	ecpp_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int	ecpp_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	ecpp_detach(dev_info_t *, ddi_detach_cmd_t);
 static struct ecpp_hw_bind *ecpp_determine_sio_type(struct ecppunit *);
 
 /* isr support routines */
-static uint_t 	ecpp_nErr_ihdlr(struct ecppunit *);
+static uint_t	ecpp_nErr_ihdlr(struct ecppunit *);
 static uint_t	ecpp_pio_ihdlr(struct ecppunit *);
 static uint_t	ecpp_dma_ihdlr(struct ecppunit *);
 static uint_t	ecpp_M1553_intr(struct ecppunit *);
@@ -213,8 +213,8 @@ static void	ecpp_putioc_stateful_copyin(queue_t *, mblk_t *, size_t);
 static void	ecpp_srvioc_devid(queue_t *, mblk_t *,
 				struct ecpp_device_id *, int *);
 static void	ecpp_srvioc_prnif(queue_t *, mblk_t *);
-static void 	ecpp_ack_ioctl(queue_t *, mblk_t *);
-static void 	ecpp_nack_ioctl(queue_t *, mblk_t *, int);
+static void	ecpp_ack_ioctl(queue_t *, mblk_t *);
+static void	ecpp_nack_ioctl(queue_t *, mblk_t *, int);
 
 /* kstat routines */
 static void	ecpp_kstat_init(struct ecppunit *);
@@ -275,10 +275,10 @@ static uint8_t	m1553_read_config_reg(struct ecppunit *, uint8_t);
 static void	m1553_write_config_reg(struct ecppunit *, uint8_t, uint8_t);
 
 /* M1553 Southbridge DMAC 8237 support routines */
-static int 	dma8237_dma_start(struct ecppunit *);
+static int	dma8237_dma_start(struct ecppunit *);
 static int	dma8237_dma_stop(struct ecppunit *, size_t *);
 static size_t	dma8237_getcnt(struct ecppunit *);
-static void 	dma8237_write_addr(struct ecppunit *, uint32_t);
+static void	dma8237_write_addr(struct ecppunit *, uint32_t);
 static void	dma8237_write_count(struct ecppunit *, uint32_t);
 static uint32_t	dma8237_read_count(struct ecppunit *);
 static void	dma8237_write(struct ecppunit *, int, uint8_t);
@@ -301,7 +301,7 @@ static size_t	x86_getcnt(struct ecppunit *);
 /* IEEE 1284 phase transitions */
 static void	ecpp_1284_init_interface(struct ecppunit *);
 static int	ecpp_1284_termination(struct ecppunit *);
-static uchar_t 	ecpp_idle_phase(struct ecppunit *);
+static uchar_t	ecpp_idle_phase(struct ecppunit *);
 static int	ecp_forward2reverse(struct ecppunit *);
 static int	ecp_reverse2forward(struct ecppunit *);
 static int	read_nibble_backchan(struct ecppunit *);
@@ -315,8 +315,8 @@ static void	ecpp_ecp_read_timeout(void *);
 static void	ecpp_ecp_read_completion(struct ecppunit *);
 
 /* IEEE 1284 mode transitions */
-static void 	ecpp_default_negotiation(struct ecppunit *);
-static int 	ecpp_mode_negotiation(struct ecppunit *, uchar_t);
+static void	ecpp_default_negotiation(struct ecppunit *);
+static int	ecpp_mode_negotiation(struct ecppunit *, uchar_t);
 static int	ecpp_1284_negotiation(struct ecppunit *, uint8_t, uint8_t *);
 static int	ecp_negotiation(struct ecppunit *);
 static int	nibble_negotiation(struct ecppunit *);
@@ -691,7 +691,7 @@ ecpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	(void) sprintf(name, "ecpp%d", instance);
 
 	if (ddi_create_minor_node(dip, name, S_IFCHR, instance,
-	    DDI_NT_PRINTER, NULL) == DDI_FAILURE) {
+	    DDI_NT_PRINTER, 0) == DDI_FAILURE) {
 		ecpp_error(dip, "ecpp_attach: create_minor_node failed\n");
 		goto fail_minor;
 	}
@@ -2353,7 +2353,7 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 			break;
 		}
 
-		if (new_ifcap & PRN_BIDI) { 	/* go bidirectional */
+		if (new_ifcap & PRN_BIDI) {	/* go bidirectional */
 			ecpp_default_negotiation(pp);
 		} else {			/* go unidirectional */
 			(void) ecpp_mode_negotiation(pp, ECPP_CENTRONICS);
@@ -2393,7 +2393,7 @@ ecpp_srvioc(queue_t *q, mblk_t *mp)
 static void
 ecpp_srvioc_devid(queue_t *q, mblk_t *mp, struct ecpp_device_id *id, int *rlen)
 {
-	struct ecppunit 	*pp;
+	struct ecppunit		*pp;
 	struct copyresp		*csp;
 	struct ecpp_copystate	*stp;
 	int			error;
@@ -3535,7 +3535,7 @@ ecpp_softintr(caddr_t arg)
 
 /*
  * Transfer clean-up:
- * 	shut down the DMAC
+ *	shut down the DMAC
  *	stop the transfer timer
  *	enable write queue
  */
@@ -4112,7 +4112,7 @@ ecpp_determine_sio_type(struct ecppunit *pp)
 /*
  *
  * IEEE 1284 support routines:
- * 	negotiation and termination;
+ *	negotiation and termination;
  *	phase transitions;
  *	device ID;
  *
@@ -4281,7 +4281,7 @@ ecpp_1284_negotiation(struct ecppunit *pp, uint8_t xreq, uint8_t *rdsr)
 
 	/*
 	 * Event 2: peripheral asserts nAck, deasserts nFault,
-	 * 			asserts Select, asserts PError
+	 *			asserts Select, asserts PError
 	 */
 	if (wait_dsr(pp, ECPP_nERR | ECPP_SLCT | ECPP_PE | ECPP_nACK,
 	    ECPP_nERR | ECPP_SLCT | ECPP_PE, 35000) < 0) {
@@ -6203,7 +6203,7 @@ dma8237_read_count(struct ecppunit *pp)
 		break;
 
 	default:
-		return (NULL);
+		return (0);
 	}
 
 	p = (uint16_t *)&pp->uh.m1553.isa_space->isa_reg[c_wcnt];
