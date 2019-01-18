@@ -101,7 +101,7 @@ static uint32_t previous_bytes[HASHSIZE/BYTES_IN_WORD];	/* prev random bytes */
 static physmem_entsrc_t entsrc;		/* Physical mem as an entropy source */
 static timeout_id_t rnd_timeout_id;
 static int snum_waiters;
-static crypto_kcf_provider_handle_t swrand_prov_handle = NULL;
+static crypto_kcf_provider_handle_t swrand_prov_handle = 0;
 swrand_stats_t swrand_stats;
 
 static int physmem_ent_init(physmem_entsrc_t *);
