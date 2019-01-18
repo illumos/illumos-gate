@@ -2369,7 +2369,7 @@ qlt_download_fw(qlt_state_t *qlt)
  */
 static fct_status_t
 qlt_load_risc_ram(qlt_state_t *qlt, uint32_t *host_addr,
-				uint32_t word_count, uint32_t risc_addr)
+    uint32_t word_count, uint32_t risc_addr)
 {
 	uint32_t words_sent = 0;
 	uint32_t words_being_sent;
@@ -3059,7 +3059,7 @@ qlt_handle_resp_queue_update(qlt_state_t *qlt)
 
 fct_status_t
 qlt_portid_to_handle(qlt_state_t *qlt, uint32_t id, uint16_t cmd_handle,
-				uint16_t *ret_handle)
+    uint16_t *ret_handle)
 {
 	fct_status_t ret;
 	mbox_cmd_t *mcp;
@@ -3126,7 +3126,7 @@ qlt_portid_to_handle(qlt_state_t *qlt, uint32_t id, uint16_t cmd_handle,
 /* ARGSUSED */
 fct_status_t
 qlt_fill_plogi_req(fct_local_port_t *port, fct_remote_port_t *rp,
-				fct_cmd_t *login)
+    fct_cmd_t *login)
 {
 	uint8_t *p;
 
@@ -3153,7 +3153,7 @@ qlt_fill_plogi_req(fct_local_port_t *port, fct_remote_port_t *rp,
 /* ARGSUSED */
 fct_status_t
 qlt_fill_plogi_resp(fct_local_port_t *port, fct_remote_port_t *rp,
-				fct_cmd_t *login)
+    fct_cmd_t *login)
 {
 	return (FCT_SUCCESS);
 }
@@ -6043,7 +6043,7 @@ qlt_dump_el_trace_buffer(qlt_state_t *qlt)
 	mutex_enter(&qlt->el_trace_desc->mutex);
 
 	rval = qlt_validate_trace_desc(qlt);
-	if (rval != NULL) {
+	if (rval != 0) {
 		cmn_err(CE_CONT, "qlt(%d) Dump EL trace - invalid desc\n",
 		    qlt->instance);
 	} else if ((dump_start = qlt_find_trace_start(qlt)) != NULL) {
@@ -6073,7 +6073,7 @@ qlt_dump_el_trace_buffer(qlt_state_t *qlt)
 				    dump_current) {
 					break;
 				}
-			} else if (*dump_current == NULL) {
+			} else if (*dump_current == '\0') {
 				break;
 			}
 		}
@@ -6120,8 +6120,8 @@ qlt_validate_trace_desc(qlt_state_t *qlt)
 static char *
 qlt_find_trace_start(qlt_state_t *qlt)
 {
-	char	*trace_start = 0;
-	char	*trace_next  = 0;
+	char	*trace_start = NULL;
+	char	*trace_next  = NULL;
 
 	trace_next = qlt->el_trace_desc->trace_buffer +
 	    qlt->el_trace_desc->next;
@@ -6138,7 +6138,7 @@ qlt_find_trace_start(qlt_state_t *qlt)
 	    (qlt->el_trace_desc->trace_buffer +
 	    qlt->el_trace_desc->trace_buffer_size)) {
 		trace_start = qlt->el_trace_desc->trace_buffer;
-	} else if (*trace_next != NULL) {
+	} else if (*trace_next != '\0') {
 		trace_start = trace_next + (strlen(trace_next) + 1);
 	} else {
 		trace_start = qlt->el_trace_desc->trace_buffer;
@@ -6201,7 +6201,7 @@ qlt_convert_string_to_ull(char *prop, int radix,
 static boolean_t
 qlt_wwn_overload_prop(qlt_state_t *qlt)
 {
-	char		*prop_val = 0;
+	char		*prop_val = NULL;
 	int		rval;
 	int		radix;
 	u_longlong_t	wwnn = 0, wwpn = 0;
