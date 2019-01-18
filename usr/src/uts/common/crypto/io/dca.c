@@ -664,8 +664,8 @@ dca_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	dca = ddi_get_soft_state(dca_state, instance);
 	ASSERT(dca != NULL);
 	dca->dca_dip = dip;
-	WORKLIST(dca, MCR1)->dwl_prov = NULL;
-	WORKLIST(dca, MCR2)->dwl_prov = NULL;
+	WORKLIST(dca, MCR1)->dwl_prov = 0;
+	WORKLIST(dca, MCR2)->dwl_prov = 0;
 	/* figure pagesize */
 	dca->dca_pagesize = ddi_ptob(dip, 1);
 
@@ -856,11 +856,11 @@ dca_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 failed:
 	/* unregister from the crypto framework */
-	if (WORKLIST(dca, MCR1)->dwl_prov != NULL) {
+	if (WORKLIST(dca, MCR1)->dwl_prov != 0) {
 		(void) crypto_unregister_provider(
 		    WORKLIST(dca, MCR1)->dwl_prov);
 	}
-	if (WORKLIST(dca, MCR2)->dwl_prov != NULL) {
+	if (WORKLIST(dca, MCR2)->dwl_prov != 0) {
 		(void) crypto_unregister_provider(
 		    WORKLIST(dca, MCR2)->dwl_prov);
 	}
@@ -925,7 +925,7 @@ dca_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * Unregister from kCF.
 	 * This needs to be done at the beginning of detach.
 	 */
-	if (WORKLIST(dca, MCR1)->dwl_prov != NULL) {
+	if (WORKLIST(dca, MCR1)->dwl_prov != 0) {
 		if (crypto_unregister_provider(
 		    WORKLIST(dca, MCR1)->dwl_prov) != CRYPTO_SUCCESS) {
 			dca_error(dca, "unable to unregister MCR1 from kcf");
@@ -933,7 +933,7 @@ dca_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 	}
 
-	if (WORKLIST(dca, MCR2)->dwl_prov != NULL) {
+	if (WORKLIST(dca, MCR2)->dwl_prov != 0) {
 		if (crypto_unregister_provider(
 		    WORKLIST(dca, MCR2)->dwl_prov) != CRYPTO_SUCCESS) {
 			dca_error(dca, "unable to unregister MCR2 from kcf");
@@ -1243,7 +1243,7 @@ dca_uninit(dca_t *dca)
 		mutex_destroy(&wlp->dwl_freereqslock);
 		mutex_destroy(&wlp->dwl_freelock);
 		cv_destroy(&wlp->dwl_cv);
-		wlp->dwl_prov = NULL;
+		wlp->dwl_prov = 0;
 	}
 }
 
@@ -1927,7 +1927,7 @@ dca_bindchains(dca_request_t *reqp, size_t incnt, size_t outcnt)
 		reqp->dr_in_next = reqp->dr_chain_in_head.dc_next_paddr;
 		reqp->dr_in_len = reqp->dr_chain_in_head.dc_buffer_length;
 	} else {
-		reqp->dr_in_paddr = NULL;
+		reqp->dr_in_paddr = 0;
 		reqp->dr_in_next = 0;
 		reqp->dr_in_len = 0;
 	}
@@ -1960,7 +1960,7 @@ dca_bindchains(dca_request_t *reqp, size_t incnt, size_t outcnt)
 		reqp->dr_out_next = reqp->dr_chain_out_head.dc_next_paddr;
 		reqp->dr_out_len = reqp->dr_chain_out_head.dc_buffer_length;
 	} else {
-		reqp->dr_out_paddr = NULL;
+		reqp->dr_out_paddr = 0;
 		reqp->dr_out_next = 0;
 		reqp->dr_out_len = 0;
 	}
@@ -1978,7 +1978,7 @@ dca_unbindchains(dca_request_t *reqp)
 	int rv1 = DDI_SUCCESS;
 
 	/* Clear the input chain */
-	if (reqp->dr_chain_in_head.dc_buffer_paddr != NULL) {
+	if (reqp->dr_chain_in_head.dc_buffer_paddr != 0) {
 		(void) ddi_dma_unbind_handle(reqp->dr_chain_in_dmah);
 		reqp->dr_chain_in_head.dc_buffer_paddr = 0;
 	}
@@ -1988,7 +1988,7 @@ dca_unbindchains(dca_request_t *reqp)
 	}
 
 	/* Clear the output chain */
-	if (reqp->dr_chain_out_head.dc_buffer_paddr != NULL) {
+	if (reqp->dr_chain_out_head.dc_buffer_paddr != 0) {
 		(void) ddi_dma_unbind_handle(reqp->dr_chain_out_dmah);
 		reqp->dr_chain_out_head.dc_buffer_paddr = 0;
 	}
@@ -2011,7 +2011,7 @@ dca_bindchains_one(dca_request_t *reqp, size_t cnt, int dr_offset,
 	caddr_t			chain_kaddr_pre;
 	caddr_t			chain_kaddr;
 	uint32_t		chain_paddr;
-	int 			i;
+	int			i;
 
 	/* Advance past the context structure to the starting address */
 	chain_paddr = reqp->dr_ctx_paddr + dr_offset;
