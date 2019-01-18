@@ -241,7 +241,7 @@ static unsigned int	ipd_max_delay = IPD_MAX_DELAY;	/* max delay in us */
 static kmutex_t		ipd_nsl_lock;		/* lock for the nestack list */
 static list_t		ipd_nsl;		/* list of netstacks */
 static kmutex_t		ipd_nactive_lock;	/* lock for nactive */
-static unsigned int	ipd_nactive; 		/* number of active netstacks */
+static unsigned int	ipd_nactive;		/* number of active netstacks */
 static int		ipd_nactive_fudge = 4;	/* amount to fudge by in list */
 
 /*
@@ -880,7 +880,7 @@ ipd_ioctl_list(intptr_t arg, cred_t *cr)
 	nzones = MIN(cur, rzones);
 	if (nzones > 0) {
 		if (ddi_copyout(configs, STRUCT_FGETP(h, ipil_info),
-		    nzones * sizeof (ipd_ioc_info_t), NULL) != 0)
+		    nzones * sizeof (ipd_ioc_info_t), 0) != 0)
 			rval = EFAULT;
 	}
 
