@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 					/* from S5R4 1.22 */
@@ -78,7 +78,7 @@ struct cb_ops	sy_cb_ops = {
 	syioctl,		/* ioctl */
 	nodev,			/* devmap */
 	nodev,			/* mmap */
-	nodev, 			/* segmap */
+	nodev,			/* segmap */
 	sypoll,			/* poll */
 	ddi_prop_op,		/* cb_prop_op */
 	0,			/* streamtab  */
@@ -150,7 +150,7 @@ static int
 sy_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	if (ddi_create_minor_node(devi, "tty", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (-1);
 	}
@@ -301,7 +301,7 @@ sywrite(dev_t dev, struct uio *uiop, struct cred *cr)
 /* ARGSUSED */
 int
 syioctl(dev_t dev, int cmd, intptr_t arg, int mode, struct cred *cr,
-	int *rvalp)
+    int *rvalp)
 {
 	sess_t	*sp;
 	int	error;
@@ -337,7 +337,7 @@ syioctl(dev_t dev, int cmd, intptr_t arg, int mode, struct cred *cr,
 /* ARGSUSED */
 int
 sypoll(dev_t dev, short events, int anyyet, short *reventsp,
-	struct pollhead **phpp)
+    struct pollhead **phpp)
 {
 	sess_t  *sp;
 	int	error;
