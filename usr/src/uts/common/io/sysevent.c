@@ -703,7 +703,7 @@ sysevent_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "sysevent", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
@@ -727,23 +727,24 @@ sysevent_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 }
 
 static struct cb_ops sysevent_cb_ops = {
-	sysevent_open,		/* open */
-	sysevent_close,		/* close */
-	nodev,			/* strategy */
-	nodev,			/* print */
-	nodev,			/* dump */
-	nodev,			/* read */
-	nodev,			/* write */
-	sysevent_ioctl,		/* ioctl */
-	nodev,			/* devmap */
-	nodev,			/* mmap */
-	nodev,			/* segmap */
-	nochpoll,		/* poll */
-	ddi_prop_op,		/* prop_op */
-	0,			/* streamtab  */
-	D_NEW|D_MP,		/* flag */
-	NULL,			/* aread */
-	NULL			/* awrite */
+	.cb_open = sysevent_open,
+	.cb_close = sysevent_close,
+	.cb_strategy = nodev,
+	.cb_print = nodev,
+	.cb_dump = nodev,
+	.cb_read = nodev,
+	.cb_write = nodev,
+	.cb_ioctl = sysevent_ioctl,
+	.cb_devmap = nodev,
+	.cb_mmap = nodev,
+	.cb_segmap = nodev,
+	.cb_chpoll = nochpoll,
+	.cb_prop_op = ddi_prop_op,
+	.cb_str = NULL,
+	.cb_flag = D_NEW | D_MP,
+	.cb_rev = CB_REV,
+	.cb_aread = NULL,
+	.cb_awrite = NULL
 };
 
 static struct dev_ops sysevent_ops = {
@@ -756,7 +757,7 @@ static struct dev_ops sysevent_ops = {
 	sysevent_detach,	/* detach */
 	nodev,			/* reset */
 	&sysevent_cb_ops,	/* driver operations */
-	(struct bus_ops *)0,	/* no bus operations */
+	NULL,			/* no bus operations */
 	nulldev,		/* power */
 	ddi_quiesce_not_needed,		/* quiesce */
 };
