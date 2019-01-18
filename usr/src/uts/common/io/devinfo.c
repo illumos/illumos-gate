@@ -461,9 +461,9 @@ di_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    di_max_opens * sizeof (struct di_state *), KM_SLEEP);
 
 		if (ddi_create_minor_node(dip, "devinfo", S_IFCHR,
-		    DI_FULL_PARENT, DDI_PSEUDO, NULL) == DDI_FAILURE ||
+		    DI_FULL_PARENT, DDI_PSEUDO, 0) == DDI_FAILURE ||
 		    ddi_create_minor_node(dip, "devinfo,ro", S_IFCHR,
-		    DI_READONLY_PARENT, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    DI_READONLY_PARENT, DDI_PSEUDO, 0) == DDI_FAILURE) {
 			kmem_free(di_states,
 			    di_max_opens * sizeof (struct di_state *));
 			ddi_remove_minor_node(dip, NULL);
@@ -1298,7 +1298,7 @@ di_key_cmp(mod_hash_key_t key1, mod_hash_key_t key2)
 static void
 di_copy_aliases(struct di_state *st, alias_pair_t *apair, di_off_t *offp)
 {
-	di_off_t 		off;
+	di_off_t		off;
 	struct di_all		*all = DI_ALL_PTR(st);
 	struct di_alias		*di_alias;
 	di_off_t		curroff;
@@ -1817,7 +1817,7 @@ di_copynode(struct dev_info *node, struct di_stack *dsp, struct di_state *st)
 	me->top_phci = 0;		/* Filled up by build_phci_list. */
 	me->next_phci = 0;		/* Filled up by build_phci_list. */
 	me->multipath_component = MULTIPATH_COMPONENT_NONE; /* set default. */
-	me->user_private_data = NULL;
+	me->user_private_data = 0;
 
 	/*
 	 * Get parent's offset in snapshot from the stack
@@ -2517,7 +2517,7 @@ out:
  */
 static di_off_t
 di_getmdata(struct ddi_minor_data *mnode, di_off_t *off_p, di_off_t node,
-	struct di_state *st)
+    struct di_state *st)
 {
 	di_off_t	off;
 	struct di_minor	*me;
@@ -2536,7 +2536,7 @@ di_getmdata(struct ddi_minor_data *mnode, di_off_t *off_p, di_off_t node,
 		me->self = off;
 		me->type = mnode->type;
 		me->node = node;
-		me->user_private_data = NULL;
+		me->user_private_data = 0;
 
 		off += sizeof (struct di_minor);
 
