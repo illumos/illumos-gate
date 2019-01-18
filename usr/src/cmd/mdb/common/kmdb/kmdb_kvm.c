@@ -22,7 +22,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  *
- * Copyright 2018 Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <kmdb/kmdb_kvm.h>
@@ -49,6 +49,7 @@
 #include <sys/kobj.h>
 #include <sys/kobj_impl.h>
 #include <sys/bitmap.h>
+#include <sys/uuid.h>
 #include <vm/as.h>
 
 static const char KMT_RTLD_NAME[] = "krtld";
@@ -554,7 +555,7 @@ static int
 kmt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	struct utsname uts;
-	char uuid[37];
+	char uuid[UUID_PRINTABLE_STRING_LENGTH];
 	kreg_t tt;
 
 	if (mdb_tgt_readsym(mdb.m_target, MDB_TGT_AS_VIRT, &uts, sizeof (uts),
@@ -570,16 +571,14 @@ kmt_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("operating system: %s %s (%s)\n",
 	    uts.release, uts.version, uts.machine);
 
-	if (mdb_tgt_readsym(mdb.m_target, MDB_TGT_AS_VIRT, uuid, sizeof (uuid),
-	    "genunix", "dump_osimage_uuid") != sizeof (uuid)) {
-		warn("failed to read 'dump_osimage_uuid' string from kernel\n");
-		(void) strcpy(uuid, "(error)");
-	} else if (*uuid == '\0') {
-		(void) strcpy(uuid, "(not set)");
-	} else if (uuid[36] != '\0') {
-		(void) strcpy(uuid, "(invalid)");
+	mdb_print_gitstatus();
+
+	if (mdb_readsym(uuid, sizeof (uuid),
+	    "dump_osimage_uuid") == sizeof (uuid) &&
+	    uuid[sizeof (uuid) - 1] == '\0') {
+		mdb_printf("image uuid: %s\n", uuid[0] != '\0' ?
+		    uuid : "(not set)");
 	}
-	mdb_printf("image uuid: %s\n", uuid);
 
 	mdb_printf("DTrace state: %s\n", (kmdb_kdi_dtrace_get_state() ==
 	    KDI_DTSTATE_DTRACE_ACTIVE ? "active (debugger breakpoints cannot "

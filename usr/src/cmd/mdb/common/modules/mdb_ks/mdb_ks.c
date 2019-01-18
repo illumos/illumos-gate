@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -59,6 +59,12 @@
 #include <vm/page.h>
 
 #define	MDB_PATH_NELEM	256			/* Maximum path components */
+
+/*
+ * Due to mdb_param.h shenanigans, there's no simple way to include string.h
+ * here...
+ */
+extern char *strtok(char *restrict, const char *restrict);
 
 typedef struct mdb_path {
 	size_t mdp_nelem;			/* Number of components */
@@ -1012,9 +1018,9 @@ find_mbind(const char *name, uintptr_t *hashtab)
 int
 mdb_name_to_major(const char *name, major_t *major)
 {
-	uintptr_t	mbind;
-	uintptr_t	mb_hashtab[MOD_BIND_HASHSIZE];
-	struct bind 	mbind_local;
+	uintptr_t mbind;
+	uintptr_t mb_hashtab[MOD_BIND_HASHSIZE];
+	struct bind mbind_local;
 
 
 	if (mdb_readsym(mb_hashtab, sizeof (mb_hashtab), "mb_hashtab") == -1) {
@@ -1809,4 +1815,72 @@ mdb_get_lbolt(void)
 	}
 
 	return ((ts/nsec) - lbi.lbi_debug_time);
+}
+
+#define	startswith(a, b) (strncmp((a), (b), strlen(b)) == 0)
+
+/*
+ * Dig out the branch and revision of the illumos-joyent repo, if we were
+ * provided with it.  This is a rather fragile JSON parser, in that it requires
+ * JSON formatted exactly as per the boot_archive.gitstatus file that
+ * "gitstatus_start" is built from.
+ */
+void
+mdb_print_gitstatus(void)
+{
+	boolean_t in_joyent = B_FALSE;
+	GElf_Sym sym;
+
+	if (mdb_lookup_by_name("gitstatus_start", &sym) != 0)
+		return;
+
+	char *str = mdb_zalloc(4096, UM_SLEEP | UM_GC);
+
+	if (mdb_readstr(str, 4096, sym.st_value) < 1)
+		return;
+
+	/*
+	 * Each line is of the form
+	 *
+	 *	"repo": "smartos-live",
+	 */
+	for (char *line = strtok(str, "\n"); line != NULL;
+	    line = strtok(NULL, "\n")) {
+		/* skip whitespace and first " */
+		line += strspn(line, " \t\"");
+
+		if (startswith(line, "repo")) {
+			line += sizeof ("repo") - 1;
+			line += strspn(line, " \t\":");
+
+			if (startswith(line, "illumos-joyent"))
+				in_joyent = B_TRUE;
+			else if (in_joyent)
+				return;
+			continue;
+		}
+
+		if (!in_joyent)
+			continue;
+
+		if (startswith(line, "branch")) {
+			char *trail = strrchr(line, '"');
+			if (trail != NULL)
+				*trail = '\0';
+			line += sizeof ("branch") - 1;
+			line += strspn(line, " \t\":");
+			mdb_printf("git branch: %s\n", line);
+			continue;
+		}
+
+		if (startswith(line, "rev")) {
+			char *trail = strrchr(line, '"');
+			if (trail != NULL)
+				*trail = '\0';
+			line += sizeof ("rev") - 1;
+			line += strspn(line, " \t\":");
+			mdb_printf("git rev: %s\n", line);
+			continue;
+		}
+	}
 }
