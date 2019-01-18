@@ -1092,18 +1092,18 @@ ip_routeto_impl(struct sockaddr *address, struct sockaddr *nexthop,
 	 */
 	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 		ire_refrele(ire);
-		return (NULL);
+		return ((uintptr_t)NULL);
 	}
 
 	nexthop_ire = ire_nexthop(ire);
 	if (nexthop_ire == NULL) {
 		ire_refrele(ire);
-		return (0);
+		return ((uintptr_t)NULL);
 	}
 	if (nexthop_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 		ire_refrele(nexthop_ire);
 		ire_refrele(ire);
-		return (0);
+		return ((uintptr_t)NULL);
 	}
 
 	ASSERT(nexthop_ire->ire_ill != NULL);

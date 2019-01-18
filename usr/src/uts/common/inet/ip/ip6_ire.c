@@ -126,7 +126,7 @@ ire_init_v6(ire_t *ire, const in6_addr_t *v6addr, const in6_addr_t *v6mask,
 
 	error = ire_init_common(ire, type, ill, zoneid, flags, IPV6_VERSION,
 	    gc, ipst);
-	if (error != NULL)
+	if (error != 0)
 		return (error);
 
 	/* Determine which function pointers to use */

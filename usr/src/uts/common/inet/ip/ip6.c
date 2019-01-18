@@ -2116,7 +2116,7 @@ ip_set_destination_v6(in6_addr_t *src_addrp, const in6_addr_t *dst_addr,
 	}
 	if (!(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
 		/* Get an nce to cache. */
-		nce = ire_to_nce(ire, NULL, firsthop);
+		nce = ire_to_nce(ire, 0, firsthop);
 		if (nce == NULL) {
 			/* Allocation failure? */
 			ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
