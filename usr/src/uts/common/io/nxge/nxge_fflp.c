@@ -858,7 +858,7 @@ nxge_status_t
 nxge_classify_exit_sw(p_nxge_t nxgep)
 {
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, "==> nxge_classify_exit_sw"));
-	nxgep->classifier.state = NULL;
+	nxgep->classifier.state = 0;
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, "<== nxge_classify_exit_sw"));
 	return (NXGE_OK);
 }
@@ -2175,7 +2175,7 @@ nxge_fflp_handle_sys_errors(p_nxge_t nxgep)
 			    portn));
 		}
 		statsp->errlog.vlan = (uint32_t)vlan_err.value;
-		NXGE_FM_REPORT_ERROR(nxgep, NULL, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, 0, 0,
 		    NXGE_FM_EREPORT_FFLP_VLAN_PAR_ERR);
 		npi_fflp_vlan_error_clear(handle);
 	}
@@ -2206,7 +2206,7 @@ nxge_fflp_handle_sys_errors(p_nxge_t nxgep)
 		}
 
 		statsp->errlog.tcam = (uint32_t)tcam_err.value;
-		NXGE_FM_REPORT_ERROR(nxgep, NULL, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, 0, 0,
 		    NXGE_FM_EREPORT_FFLP_TCAM_ERR);
 		npi_fflp_tcam_error_clear(handle);
 	}
@@ -2228,7 +2228,7 @@ nxge_fflp_handle_sys_errors(p_nxge_t nxgep)
 				statsp->hash_pio_err[rdc_grp]++;
 				statsp->errlog.hash_pio[rdc_grp] =
 				    (uint32_t)fcram_err.value;
-				NXGE_FM_REPORT_ERROR(nxgep, NULL, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, 0, 0,
 				    NXGE_FM_EREPORT_FFLP_HASHT_DATA_ERR);
 				npi_fflp_fcram_error_clear(handle, rdc_grp);
 			}
@@ -2255,7 +2255,7 @@ nxge_fflp_handle_sys_errors(p_nxge_t nxgep)
 		    fcram2_err.bits.ldw.h1,
 		    fcram2_err.bits.ldw.subarea,
 		    fcram2_err.bits.ldw.syndrome));
-		NXGE_FM_REPORT_ERROR(nxgep, NULL, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, 0, 0,
 		    NXGE_FM_EREPORT_FFLP_HASHT_LOOKUP_ERR);
 	}
 	statsp->errlog.hash_lookup1 = (uint32_t)fcram1_err.value;

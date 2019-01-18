@@ -3652,7 +3652,7 @@ nxge_dma_mem_free(p_nxge_dma_common_t dma_p)
 	}
 #endif
 	dma_p->kaddrp = NULL;
-	dma_p->alength = NULL;
+	dma_p->alength = 0;
 }
 
 static void

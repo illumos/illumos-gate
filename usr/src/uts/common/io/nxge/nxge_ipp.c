@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <nxge_impl.h>
 #include <nxge_ipp.h>
 
@@ -365,7 +363,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 		if ((rs = npi_ipp_get_state_mach(handle, portn,
 		    &errlogp->state_mach)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_IPP_SOP_MISS);
 		if (statsp->sop_miss < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -380,7 +378,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 		if ((rs = npi_ipp_get_state_mach(handle, portn,
 		    &errlogp->state_mach)) != NPI_SUCCESS)
 			return (NXGE_ERROR | rs);
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_IPP_EOP_MISS);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_ipp_err_evnts: fatal error: eop_miss\n"));
@@ -398,7 +396,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 			if ((rs = npi_ipp_get_ecc_syndrome(handle, portn,
 			    &errlogp->ecc_syndrome)) != NPI_SUCCESS)
 				return (NXGE_ERROR | rs);
-			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+			NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 			    NXGE_FM_EREPORT_IPP_DFIFO_UE);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_ipp_err_evnts: fatal error: dfifo_ue\n"));
@@ -407,7 +405,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	}
 	if (istatus.bits.w0.pre_fifo_perr) {
 		statsp->pfifo_perr++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_IPP_PFIFO_PERR);
 		if (statsp->pfifo_perr < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -417,7 +415,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	}
 	if (istatus.bits.w0.pre_fifo_overrun) {
 		statsp->pfifo_over++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_IPP_PFIFO_OVER);
 		if (statsp->pfifo_over < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -427,7 +425,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 	}
 	if (istatus.bits.w0.pre_fifo_underrun) {
 		statsp->pfifo_und++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_IPP_PFIFO_UND);
 		if (statsp->pfifo_und < IPP_MAX_ERR_SHOW)
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -474,7 +472,7 @@ nxge_ipp_handle_sys_errors(p_nxge_t nxgep)
 		 * not report the error if it is port2.
 		 */
 		if (portn != 2) {
-			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+			NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 			    NXGE_FM_EREPORT_IPP_ECC_ERR_MAX);
 			if (statsp->ecc_err_cnt < (IPP_MAX_ERR_SHOW *
 			    IPP_ECC_CNT_MASK)) {

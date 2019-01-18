@@ -1230,7 +1230,7 @@ nxge_rxdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 	if (set->owned.map == 0) {
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		    "nxge_rxdma_regs_dump_channels: no channels"));
-		return (NULL);
+		return (0);
 	}
 
 	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
@@ -2482,7 +2482,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 				" 0x%llx", channel, rcr_entry));
 			}
 #endif
-			NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, NULL,
+			NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, 0,
 			    NXGE_FM_EREPORT_RDMC_DCF_ERR);
 		} else if (pkt_too_long_err) {
 			rdc_stats->pkt_too_long_err++;
@@ -4493,7 +4493,7 @@ nxge_rxdma_handle_sys_errors(p_nxge_t nxgep)
 
 	if (stat.bits.ldw.id_mismatch) {
 		statsp->id_mismatch++;
-		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, nxgep->mac.portnum, 0,
 		    NXGE_FM_EREPORT_RDMC_ID_MISMATCH);
 		/* Global fatal error encountered */
 	}
@@ -4561,14 +4561,14 @@ nxge_rxdma_handle_port_errors(p_nxge_t nxgep, uint32_t ipp_status,
 
 	if (ipp_status & (0x1 << portn)) {
 		statsp->ipp_eop_err++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_RDMC_IPP_EOP_ERR);
 		rxport_fatal = B_TRUE;
 	}
 
 	if (zcp_status & (0x1 << portn)) {
 		statsp->zcp_eop_err++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_RDMC_ZCP_EOP_ERR);
 		rxport_fatal = B_TRUE;
 	}
@@ -4949,9 +4949,10 @@ nxge_rxdma_databuf_free(p_rx_rbr_ring_t rbr_p)
 		    "==> nxge_rxdma_databuf_free: free chunk %d "
 		    "kaddrp $%p chunk size %d",
 		    index, kaddr, chunk_size));
-		if (kaddr == NULL) continue;
+		if (kaddr == 0)
+			continue;
 		nxge_free_buf(rbr_p->rbr_alloc_type, kaddr, chunk_size);
-		ring_info->buffer[index].kaddr = NULL;
+		ring_info->buffer[index].kaddr = 0;
 	}
 
 	NXGE_DEBUG_MSG((NULL, DMA_CTL, "<== nxge_rxdma_databuf_free"));
@@ -4966,7 +4967,7 @@ nxge_free_buf(buf_alloc_type_t alloc_type, uint64_t kaddr, uint32_t buf_size)
 {
 	NXGE_DEBUG_MSG((NULL, DMA_CTL, "==> nxge_free_buf"));
 
-	if (kaddr == NULL || !buf_size) {
+	if (kaddr == 0 || !buf_size) {
 		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
 		    "==> nxge_free_buf: invalid kaddr $%p size to free %d",
 		    kaddr, buf_size));

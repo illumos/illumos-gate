@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <npi_zcp.h>
 
 static int zcp_mem_read(npi_handle_t, uint16_t, uint8_t,
@@ -310,7 +308,7 @@ npi_zcp_tt_static_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		return (NPI_FAILURE | NPI_ZCP_FLOW_ID_INVALID);
 	}
 
-	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_TT_STATIC, NULL,
+	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_TT_STATIC, 0,
 	    (zcp_ram_unit_t *)&val) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    " npi_zcp_tt_static_entry"
@@ -385,8 +383,7 @@ npi_zcp_tt_static_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		}
 
 		if (zcp_mem_write(handle, flow_id, ZCP_RAM_SEL_TT_STATIC,
-		    byte_en, NULL,
-		    (zcp_ram_unit_t *)&val) != 0) {
+		    byte_en, 0, (zcp_ram_unit_t *)&val) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_zcp_tt_static_entry"
 			    " HW Error: ZCP_RAM_ACC <0x%x>",
@@ -434,7 +431,7 @@ npi_zcp_tt_dynamic_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		return (NPI_FAILURE | NPI_ZCP_FLOW_ID_INVALID);
 	}
 
-	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_TT_DYNAMIC, NULL,
+	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_TT_DYNAMIC, 0,
 	    (zcp_ram_unit_t *)&val) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    " npi_zcp_tt_dynamic_entry"
@@ -501,8 +498,7 @@ npi_zcp_tt_dynamic_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		}
 
 		if (zcp_mem_write(handle, flow_id, ZCP_RAM_SEL_TT_DYNAMIC,
-		    byte_en, NULL,
-		    (zcp_ram_unit_t *)&val) != 0) {
+		    byte_en, 0, (zcp_ram_unit_t *)&val) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_zcp_tt_dynamic_entry"
 			    " HW Error: ZCP_RAM_ACC <0x%x>",
@@ -557,7 +553,7 @@ npi_zcp_tt_bam_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 		return (NPI_FAILURE | NPI_ZCP_BAM_WORD_EN_INVALID);
 	}
 
-	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_BAM0 + bankn, NULL,
+	if (zcp_mem_read(handle, flow_id, ZCP_RAM_SEL_BAM0 + bankn, 0,
 	    (zcp_ram_unit_t *)&val) != 0) {
 		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 		    " npi_zcp_tt_bam_entry"
@@ -568,8 +564,7 @@ npi_zcp_tt_bam_entry(npi_handle_t handle, io_op_t op, uint16_t flow_id,
 
 	if (op == OP_SET) {
 		if (zcp_mem_write(handle, flow_id, ZCP_RAM_SEL_BAM0 + bankn,
-		    word_en, NULL,
-		    (zcp_ram_unit_t *)&val) != 0) {
+		    word_en, 0, (zcp_ram_unit_t *)&val) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_zcp_tt_bam_entry"
 			    " HW Error: ZCP_RAM_ACC <0x%x>",
@@ -605,7 +600,7 @@ npi_zcp_tt_cfifo_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 	}
 
 	if (op == OP_SET) {
-		if (zcp_mem_write(handle, NULL, ZCP_RAM_SEL_CFIFO0 + portn,
+		if (zcp_mem_write(handle, 0, ZCP_RAM_SEL_CFIFO0 + portn,
 		    0x1ffff, entryn, data) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_zcp_tt_cfifo_entry"
@@ -614,7 +609,7 @@ npi_zcp_tt_cfifo_entry(npi_handle_t handle, io_op_t op, uint8_t portn,
 			return (NPI_FAILURE | NPI_ZCP_MEM_WRITE_FAILED);
 		}
 	} else {
-		if (zcp_mem_read(handle, NULL, ZCP_RAM_SEL_CFIFO0 + portn,
+		if (zcp_mem_read(handle, 0, ZCP_RAM_SEL_CFIFO0 + portn,
 		    entryn, data) != 0) {
 			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
 			    " npi_zcp_tt_cfifo_entry"
