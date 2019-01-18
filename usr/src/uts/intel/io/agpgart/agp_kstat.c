@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/kstat.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -102,7 +100,7 @@ agp_init_kstats(agpgart_softstate_t *sc)
 	    KSTAT_TYPE_NAMED, sizeof (agpkstat_name)/sizeof (char *) - 1,
 	    KSTAT_FLAG_PERSISTENT);
 	if (ksp == NULL)
-		return (NULL);
+		return (1);
 
 	ksp->ks_private = sc;
 	ksp->ks_update = agp_kstat_update;
