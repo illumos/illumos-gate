@@ -1183,7 +1183,7 @@ free_cmdQ_buffers(pesge *sge, struct cmdQ *Q, unsigned int credits_pend)
 				ce->ce_dh = NULL;	/* may not be needed */
 			}
 			skb = ce->ce_mp;
-			if (skb && ((ce->ce_flg & CH_ARP) == NULL)) {
+			if (skb && ((ce->ce_flg & CH_ARP) == 0)) {
 				freemsg(skb);
 			}
 			ce->ce_mp = NULL;
@@ -1196,7 +1196,7 @@ free_cmdQ_buffers(pesge *sge, struct cmdQ *Q, unsigned int credits_pend)
 				ce->ce_dh = NULL;	/* may not be needed */
 			}
 			skb = ce->ce_mp;
-			if (skb && ((ce->ce_flg & CH_ARP) == NULL)) {
+			if (skb && ((ce->ce_flg & CH_ARP) == 0)) {
 				freemsg(skb);
 			}
 			ce->ce_mp = NULL;
@@ -1222,7 +1222,7 @@ free_cmdQ_buffers(pesge *sge, struct cmdQ *Q, unsigned int credits_pend)
 		}
 
 		skb = ce->ce_mp;
-		if (skb && ((ce->ce_flg & CH_ARP) == NULL)) {
+		if (skb && ((ce->ce_flg & CH_ARP) == 0)) {
 			freemsg(skb);
 		}
 		ce->ce_mp = NULL;
