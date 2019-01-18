@@ -625,7 +625,7 @@ bofi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 		(void) snprintf(buf, sizeof (buf), "%s,ctl", name);
 		if (ddi_create_minor_node(dip, buf, S_IFCHR, 0,
-		    DDI_PSEUDO, NULL) == DDI_FAILURE)
+		    DDI_PSEUDO, 0) == DDI_FAILURE)
 			return (DDI_FAILURE);
 
 		if (ddi_get_soft_iblock_cookie(dip, DDI_SOFTINT_MED,
@@ -4478,7 +4478,7 @@ bofi_post_event(dev_info_t *dip, dev_info_t *rdip,
 			for (lp = hp->link; lp != NULL; lp = lp->link) {
 				ep = lp->errentp;
 				ep->errstate.errmsg_count++;
-				if ((ep->errstate.msg_time == NULL ||
+				if ((ep->errstate.msg_time == 0 ||
 				    ep->errstate.severity > arg->f_impact) &&
 				    (ep->state & BOFI_DEV_ACTIVE)) {
 					ep->errstate.msg_time = bofi_gettime();
@@ -4535,7 +4535,7 @@ bofi_fm_ereport_callback(sysevent_t *ev, void *cookie)
 			ep->errstate.errmsg_count++;
 			if (!(ep->state & BOFI_DEV_ACTIVE))
 				continue;
-			if (ep->errstate.msg_time != NULL)
+			if (ep->errstate.msg_time != 0)
 				continue;
 			if (service_ereport) {
 				ptr = class + strlen(service_class);
