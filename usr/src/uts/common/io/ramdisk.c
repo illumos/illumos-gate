@@ -824,7 +824,7 @@ rd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			rsp->rd_dip = dip;
 
 			if (ddi_create_minor_node(dip, RD_CTL_NODE,
-			    S_IFCHR, 0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+			    S_IFCHR, 0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 				goto attach_failed;
 			}
 		} else {
