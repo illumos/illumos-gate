@@ -91,7 +91,7 @@ static struct cb_ops sysm_cb_ops = {
 	sysmioctl,		/* ioctl */
 	nodev,			/* devmap */
 	nodev,			/* mmap */
-	nodev, 			/* segmap */
+	nodev,			/* segmap */
 	sysmpoll,		/* poll */
 	ddi_prop_op,		/* cb_prop_op */
 	NULL,			/* streamtab  */
@@ -198,9 +198,9 @@ sysm_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		ASSERT(sysm_dip == NULL);
 
 		if (ddi_create_minor_node(devi, "sysmsg", S_IFCHR,
-		    SYS_SYSMIN, DDI_PSEUDO, NULL) == DDI_FAILURE ||
+		    SYS_SYSMIN, DDI_PSEUDO, 0) == DDI_FAILURE ||
 		    ddi_create_minor_node(devi, "msglog", S_IFCHR,
-		    SYS_MSGMIN, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    SYS_MSGMIN, DDI_PSEUDO, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(devi, NULL);
 			return (DDI_FAILURE);
 		}
@@ -591,7 +591,7 @@ sysmioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred, int *rvalp)
 		}
 	}
 
-	if (infop[0] != NULL) {
+	if (infop[0] != '\0') {
 		if ((rval = lookupname(infop, UIO_SYSSPACE, FOLLOW,
 		    NULLVPP, &vp)) == 0) {
 			if (vp->v_type != VCHR) {
@@ -613,7 +613,7 @@ sysmioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred, int *rvalp)
 		for (i = 0; i < MAXDEVS; i++) {
 			rw_enter(&sysmcache[i].dca_lock, RW_READER);
 			if (sysmcache[i].dca_flags & SYSM_ENABLED) {
-				if (infop[0] != NULL)
+				if (infop[0] != '\0')
 					(void) strcat(infop, " ");
 				(void) strcat(infop, sysmcache[i].dca_name);
 			}
@@ -691,7 +691,7 @@ err_exit:
 /* ARGSUSED */
 static int
 sysmpoll(dev_t dev, short events, int anyyet, short *reventsp,
-	struct pollhead **phpp)
+    struct pollhead **phpp)
 {
 	return (VOP_POLL(dcvp, events, anyyet, reventsp, phpp, NULL));
 }
