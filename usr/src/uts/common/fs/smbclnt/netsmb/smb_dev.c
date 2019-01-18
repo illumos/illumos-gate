@@ -309,7 +309,7 @@ nsmb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	if (ddi_create_minor_node(dip, "nsmb", S_IFCHR, 0, DDI_PSEUDO,
-	    NULL) == DDI_FAILURE) {
+	    0) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "nsmb_attach: create minor");
 		return (DDI_FAILURE);
 	}
