@@ -2394,7 +2394,7 @@ hxge_dma_mem_free(p_hxge_dma_common_t dma_p)
 	}
 
 	dma_p->kaddrp = NULL;
-	dma_p->alength = NULL;
+	dma_p->alength = 0;
 }
 
 /*
@@ -3255,7 +3255,7 @@ static int
 hxge_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, void *pr_val)
 {
-	hxge_t 		*hxgep = barg;
+	hxge_t		*hxgep = barg;
 	p_hxge_stats_t	statsp = hxgep->statsp;
 	int		err = 0;
 	link_flowctrl_t fl;
@@ -4462,9 +4462,9 @@ hxge_link_update(p_hxge_t hxgep, link_state_t state)
 static void
 hxge_msix_init(p_hxge_t hxgep)
 {
-	uint32_t 		data0;
-	uint32_t 		data1;
-	uint32_t 		data2;
+	uint32_t		data0;
+	uint32_t		data1;
+	uint32_t		data2;
 	int			i;
 	uint32_t		msix_entry0;
 	uint32_t		msix_entry1;

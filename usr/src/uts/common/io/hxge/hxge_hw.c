@@ -330,7 +330,7 @@ hxge_peu_handle_sys_errors(p_hxge_t hxgep)
 		    "==> hxge_peu_handle_sys_errors: hcr_parerr"));
 	}
 
-	HXGE_FM_REPORT_ERROR(hxgep, NULL, HXGE_FM_EREPORT_PEU_ERR);
+	HXGE_FM_REPORT_ERROR(hxgep, 0, HXGE_FM_EREPORT_PEU_ERR);
 	return (HXGE_OK);
 }
 
@@ -396,11 +396,11 @@ hxge_syserr_intr(caddr_t arg1, caddr_t arg2)
 		(void) hxge_peu_handle_sys_errors(hxgep);
 
 		if (estat.bits.peu_err1)
-			HXGE_FM_REPORT_ERROR(hxgep, NULL,
+			HXGE_FM_REPORT_ERROR(hxgep, 0,
 			    HXGE_FM_EREPORT_PEU_ERR);
 
 		if (estat.bits.vnm_pio_err1)
-			HXGE_FM_REPORT_ERROR(hxgep, NULL,
+			HXGE_FM_REPORT_ERROR(hxgep, 0,
 			    HXGE_FM_EREPORT_PEU_VNM_PIO_ERR);
 	} else if (estat.value != 0) {
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,

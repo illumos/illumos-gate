@@ -183,7 +183,7 @@ hxge_enable_rxdma_channel(p_hxge_t hxgep, uint16_t channel,
     int n_init_kick)
 {
 	hpi_handle_t		handle;
-	rdc_desc_cfg_t 		rdc_desc;
+	rdc_desc_cfg_t		rdc_desc;
 	rdc_rcr_cfg_b_t		*cfgb_p;
 	hpi_status_t		rs = HPI_SUCCESS;
 
@@ -1900,7 +1900,7 @@ hxge_receive_packet(p_hxge_t hxgep, p_rx_rcr_ring_t rcr_p,
 		rdc_stats->ierrors++;
 		/* Update error stats */
 		rdc_stats->errlog.compl_err_type = error_type;
-		HXGE_FM_REPORT_ERROR(hxgep, NULL, HXGE_FM_EREPORT_RDMC_RCR_ERR);
+		HXGE_FM_REPORT_ERROR(hxgep, 0, HXGE_FM_EREPORT_RDMC_RCR_ERR);
 
 		if (error_type & RCR_CTRL_FIFO_DED) {
 			rdc_stats->ctrl_fifo_ecc_err++;
@@ -2561,13 +2561,13 @@ hxge_map_rxdma_channel_cfg_ring(p_hxge_t hxgep, uint16_t dma_channel,
     p_hxge_dma_common_t *dma_mbox_cntl_p, p_rx_rbr_ring_t *rbr_p,
     p_rx_rcr_ring_t *rcr_p, p_rx_mbox_t *rx_mbox_p)
 {
-	p_rx_rbr_ring_t 	rbrp;
-	p_rx_rcr_ring_t 	rcrp;
-	p_rx_mbox_t 		mboxp;
-	p_hxge_dma_common_t 	cntl_dmap;
-	p_hxge_dma_common_t 	dmap;
-	p_rx_msg_t 		*rx_msg_ring;
-	p_rx_msg_t 		rx_msg_p;
+	p_rx_rbr_ring_t		rbrp;
+	p_rx_rcr_ring_t		rcrp;
+	p_rx_mbox_t		mboxp;
+	p_hxge_dma_common_t	cntl_dmap;
+	p_hxge_dma_common_t	dmap;
+	p_rx_msg_t		*rx_msg_ring;
+	p_rx_msg_t		rx_msg_p;
 	rdc_rbr_cfg_a_t		*rcfga_p;
 	rdc_rbr_cfg_b_t		*rcfgb_p;
 	rdc_rcr_cfg_a_t		*cfga_p;
@@ -2580,7 +2580,7 @@ hxge_map_rxdma_channel_cfg_ring(p_hxge_t hxgep, uint16_t dma_channel,
 	uint32_t		bkaddr;
 	hxge_status_t		status = HXGE_OK;
 	int			i;
-	uint32_t 		hxge_port_rcr_size;
+	uint32_t		hxge_port_rcr_size;
 
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL,
 	    "==> hxge_map_rxdma_channel_cfg_ring"));
@@ -3535,7 +3535,7 @@ hxge_rxdma_handle_sys_errors(p_hxge_t hxgep)
 	if (stat.bits.rx_ctrl_fifo_ded) {
 		/* Global fatal error encountered */
 		statsp->ctrl_fifo_ded++;
-		HXGE_FM_REPORT_ERROR(hxgep, NULL,
+		HXGE_FM_REPORT_ERROR(hxgep, 0,
 		    HXGE_FM_EREPORT_RDMC_CTRL_FIFO_DED);
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 		    "==> hxge_rxdma_handle_sys_errors: "
@@ -3553,7 +3553,7 @@ hxge_rxdma_handle_sys_errors(p_hxge_t hxgep)
 	if (stat.bits.rx_data_fifo_ded) {
 		/* Global fatal error encountered */
 		statsp->data_fifo_ded++;
-		HXGE_FM_REPORT_ERROR(hxgep, NULL,
+		HXGE_FM_REPORT_ERROR(hxgep, 0,
 		    HXGE_FM_EREPORT_RDMC_DATA_FIFO_DED);
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 		    "==> hxge_rxdma_handle_sys_errors: "
@@ -3576,7 +3576,7 @@ static hxge_status_t
 hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 {
 	hpi_handle_t		handle;
-	hpi_status_t 		rs = HPI_SUCCESS;
+	hpi_status_t		rs = HPI_SUCCESS;
 	p_rx_rbr_ring_t		rbrp;
 	p_rx_rcr_ring_t		rcrp;
 	p_rx_mbox_t		mboxp;
