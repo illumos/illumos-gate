@@ -115,19 +115,19 @@ extern "C" {
 #define	PCIE_PUT(sz, bus_p, off, val) \
 	pci_config_put ## sz(bus_p->bus_cfg_hdl, off, val)
 #define	PCIE_CAP_GET(sz, bus_p, off) \
-	PCI_CAP_GET ## sz(bus_p->bus_cfg_hdl, NULL, bus_p->bus_pcie_off, off)
+	PCI_CAP_GET ## sz(bus_p->bus_cfg_hdl, 0, bus_p->bus_pcie_off, off)
 #define	PCIE_CAP_PUT(sz, bus_p, off, val) \
-	PCI_CAP_PUT ## sz(bus_p->bus_cfg_hdl, NULL, bus_p->bus_pcie_off, off, \
+	PCI_CAP_PUT ## sz(bus_p->bus_cfg_hdl, 0, bus_p->bus_pcie_off, off, \
 	    val)
 #define	PCIE_AER_GET(sz, bus_p, off) \
-	PCI_XCAP_GET ## sz(bus_p->bus_cfg_hdl, NULL, bus_p->bus_aer_off, off)
+	PCI_XCAP_GET ## sz(bus_p->bus_cfg_hdl, 0, bus_p->bus_aer_off, off)
 #define	PCIE_AER_PUT(sz, bus_p, off, val) \
-	PCI_XCAP_PUT ## sz(bus_p->bus_cfg_hdl, NULL, bus_p->bus_aer_off, off, \
+	PCI_XCAP_PUT ## sz(bus_p->bus_cfg_hdl, 0, bus_p->bus_aer_off, off, \
 	    val)
 #define	PCIX_CAP_GET(sz, bus_p, off) \
-	PCI_CAP_GET ## sz(bus_p->bus_cfg_hdl, NULL, bus_p->bus_pcix_off, off)
+	PCI_CAP_GET ## sz(bus_p->bus_cfg_hdl, 0, bus_p->bus_pcix_off, off)
 #define	PCIX_CAP_PUT(sz, bus_p, off, val) \
-	PCI_CAP_PUT ## sz(bus_p->bus_cfg_hdl, NULL, bus_p->bus_pcix_off, off, \
+	PCI_CAP_PUT ## sz(bus_p->bus_cfg_hdl, 0, bus_p->bus_pcix_off, off, \
 	    val)
 
 /* Translate PF error return values to DDI_FM values */
