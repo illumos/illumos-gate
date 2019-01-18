@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2018 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/tests/functional/slog/slog.kshlib
@@ -47,7 +48,7 @@ log_assert "log device can survive when one of the pool device get corrupted."
 
 for type in "mirror" "raidz" "raidz2"; do
 	for spare in "" "spare"; do
-		log_must $ZPOOL create $TESTPOOL $type $VDEV $spare $SDEV \
+		log_must zpool create $TESTPOOL $type $VDEV $spare $SDEV \
 			log $LDEV
 
                 # Create a file to be corrupted
