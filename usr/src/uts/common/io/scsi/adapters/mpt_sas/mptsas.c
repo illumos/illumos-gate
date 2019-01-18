@@ -4196,7 +4196,7 @@ mptsas_cache_frames_destructor(void *buf, void *cdrarg)
 		(void) ddi_dma_unbind_handle(p->m_dma_hdl);
 		(void) ddi_dma_mem_free(&p->m_acc_hdl);
 		ddi_dma_free_handle(&p->m_dma_hdl);
-		p->m_phys_addr = NULL;
+		p->m_phys_addr = 0;
 		p->m_frames_addr = NULL;
 		p->m_dma_hdl = NULL;
 		p->m_acc_hdl = NULL;
@@ -6147,7 +6147,8 @@ mptsas_free_devhdl(mptsas_t *mpt, uint16_t devhdl)
 	req.DevHandle = LE_16(devhdl);
 
 	ret = mptsas_do_passthru(mpt, (uint8_t *)&req, (uint8_t *)&rep, NULL,
-	    sizeof (req), sizeof (rep), NULL, 0, NULL, 0, 60, FKIOCTL);
+	    sizeof (req), sizeof (rep), 0, MPTSAS_PASS_THRU_DIRECTION_NONE,
+	    NULL, 0, 60, FKIOCTL);
 	if (ret != 0) {
 		cmn_err(CE_WARN, "mptsas_free_devhdl: passthru SAS IO Unit "
 		    "Control error %d", ret);
@@ -6184,7 +6185,7 @@ mptsas_update_sata_bridge(mptsas_t *mpt, dev_info_t *parent,
 	uint32_t		page_address;
 	uint16_t		bay_num, enclosure, io_flags;
 	uint32_t		dev_info;
-	char 			uabuf[SCSI_WWN_BUFLEN];
+	char			uabuf[SCSI_WWN_BUFLEN];
 	dev_info_t		*dip;
 	mdi_pathinfo_t		*pip;
 
@@ -10676,7 +10677,7 @@ mptsas_start_passthru(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	 */
 	(void) ddi_dma_sync(dma_hdl, 0, 0, DDI_DMA_SYNC_FORDEV);
 	request_desc |= (SMID << 16) + desc_type;
-	cmd->cmd_rfm = NULL;
+	cmd->cmd_rfm = 0;
 	MPTSAS_START_CMD(mpt, request_desc);
 	if ((mptsas_check_dma_handle(dma_hdl) != DDI_SUCCESS) ||
 	    (mptsas_check_acc_handle(acc_hdl) != DDI_SUCCESS)) {
@@ -11543,7 +11544,7 @@ mptsas_start_diag(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	    DDI_DMA_SYNC_FORDEV);
 	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
-	cmd->cmd_rfm = NULL;
+	cmd->cmd_rfm = 0;
 	MPTSAS_START_CMD(mpt, request_desc);
 	if ((mptsas_check_dma_handle(mpt->m_dma_req_frame_hdl) !=
 	    DDI_SUCCESS) ||
@@ -13857,7 +13858,7 @@ mptsas_get_target_device_info(mptsas_t *mpt, uint32_t page_address,
 
 	if ((dev_info & (MPI2_SAS_DEVICE_INFO_SSP_TARGET |
 	    MPI2_SAS_DEVICE_INFO_SATA_DEVICE |
-	    MPI2_SAS_DEVICE_INFO_ATAPI_DEVICE)) == NULL) {
+	    MPI2_SAS_DEVICE_INFO_ATAPI_DEVICE)) == 0) {
 		rval = DEV_INFO_WRONG_DEVICE_TYPE;
 		return (rval);
 	}
@@ -16848,7 +16849,7 @@ mptsas_send_sep(mptsas_t *mpt, mptsas_enclosure_t *mep, uint16_t idx,
 	Mpi2SepRequest_t	req;
 	Mpi2SepReply_t		rep;
 	int			ret;
-	uint16_t 		enctype;
+	uint16_t		enctype;
 	uint16_t		slot;
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
@@ -16878,7 +16879,8 @@ mptsas_send_sep(mptsas_t *mpt, mptsas_enclosure_t *mep, uint16_t idx,
 		req.SlotStatus = LE_32(*status);
 	}
 	ret = mptsas_do_passthru(mpt, (uint8_t *)&req, (uint8_t *)&rep, NULL,
-	    sizeof (req), sizeof (rep), NULL, 0, NULL, 0, 60, FKIOCTL);
+	    sizeof (req), sizeof (rep), 0, MPTSAS_PASS_THRU_DIRECTION_NONE,
+	    NULL, 0, 60, FKIOCTL);
 	if (ret != 0) {
 		mptsas_log(mpt, CE_NOTE, "mptsas_send_sep: passthru SEP "
 		    "Processor Request message error %d", ret);

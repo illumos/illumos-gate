@@ -281,7 +281,7 @@ mptsas_start_config_page_access(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	    DDI_DMA_SYNC_FORDEV);
 	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
-	cmd->cmd_rfm = NULL;
+	cmd->cmd_rfm = 0;
 	MPTSAS_START_CMD(mpt, request_desc);
 	if ((mptsas_check_dma_handle(mpt->m_dma_req_frame_hdl) !=
 	    DDI_SUCCESS) ||
@@ -1399,7 +1399,7 @@ mptsas_update_flash(mptsas_t *mpt, caddr_t ptrbuffer, uint32_t size,
 	    DDI_DMA_SYNC_FORDEV);
 	request_desc = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_DEFAULT_TYPE;
-	cmd->cmd_rfm = NULL;
+	cmd->cmd_rfm = 0;
 	MPTSAS_START_CMD(mpt, request_desc);
 
 	rvalue = 0;
@@ -2864,7 +2864,7 @@ mptsas_enclosurepage_0_cb(mptsas_t *mpt, caddr_t page_memp,
     ddi_acc_handle_t accessp, uint16_t iocstatus, uint32_t iocloginfo,
     va_list ap)
 {
-	uint32_t 			page_address;
+	uint32_t			page_address;
 	pMpi2SasEnclosurePage0_t	encpage, encout;
 
 	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
