@@ -4060,7 +4060,7 @@ nv_rem_intrs(nv_ctl_t *nvc)
  */
 static void
 nv_vcmn_err(int ce, nv_ctl_t *nvc, nv_port_t *nvp, const char *fmt, va_list ap,
-	boolean_t log_to_sata_ring)
+    boolean_t log_to_sata_ring)
 {
 	char port[NV_STR_LEN];
 	char inst[NV_STR_LEN];
@@ -7141,7 +7141,7 @@ nv_sgp_cleanup(nv_ctl_t *nvc)
 		cb->sgpio_cr0 = SGP_CR0_ENABLE_MASK;
 		(void) nv_sgp_write_data(nvc);
 
-		cb->sgpio_sr = NULL;
+		cb->sgpio_sr = 0;
 
 		/* zero out the CBP to cmn mapping */
 		for (i = 0; i < NV_MAX_CBPS; i++) {
