@@ -88,7 +88,7 @@ static char *sgen_devtypes[] = {
 #define	SGEN_VENDID_MAX 8
 #define	SGEN_PRODID_MAX 16
 
-#define	FILL_SCSI1_LUN(devp, pkt) 					\
+#define	FILL_SCSI1_LUN(devp, pkt)					\
 	if ((devp)->sd_inq->inq_ansi == 0x1) {				\
 		int _lun;						\
 		_lun = ddi_prop_get_int(DDI_DEV_T_ANY, (devp)->sd_dev,	\
@@ -254,7 +254,7 @@ _info(struct modinfo *modinfop)
 
 /*
  * sgen_typename()
- * 	return a device type's name by looking it up in the sgen_devtypes table.
+ *	return a device type's name by looking it up in the sgen_devtypes table.
  */
 static char *
 sgen_typename(uchar_t typeno)
@@ -266,8 +266,8 @@ sgen_typename(uchar_t typeno)
 
 /*
  * sgen_typenum()
- * 	return a device type's number by looking it up in the sgen_devtypes
- * 	table.
+ *	return a device type's number by looking it up in the sgen_devtypes
+ *	table.
  */
 static int
 sgen_typenum(const char *typename, uchar_t *typenum)
@@ -284,8 +284,8 @@ sgen_typenum(const char *typename, uchar_t *typenum)
 
 /*
  * sgen_setup_binddb()
- * 	initialize a data structure which stores all of the information about
- * 	which devices and device types the driver should bind to.
+ *	initialize a data structure which stores all of the information about
+ *	which devices and device types the driver should bind to.
  */
 static void
 sgen_setup_binddb(dev_info_t *dip)
@@ -390,7 +390,7 @@ sgen_setup_binddb(dev_info_t *dip)
 
 /*
  * sgen_cleanup_binddb()
- * 	deallocate data structures for binding database.
+ *	deallocate data structures for binding database.
  */
 static void
 sgen_cleanup_binddb()
@@ -424,7 +424,7 @@ sgen_cleanup_binddb()
 
 /*
  * sgen_bind_byinq()
- * 	lookup a device in the binding database by its inquiry data.
+ *	lookup a device in the binding database by its inquiry data.
  */
 static int
 sgen_bind_byinq(dev_info_t *dip)
@@ -471,8 +471,8 @@ sgen_bind_byinq(dev_info_t *dip)
 
 /*
  * sgen_bind_bytype()
- * 	lookup a device type in the binding database; if found, return a
- * 	format string corresponding to the string in the .conf file.
+ *	lookup a device type in the binding database; if found, return a
+ *	format string corresponding to the string in the .conf file.
  */
 static int
 sgen_bind_bytype(dev_info_t *dip)
@@ -493,13 +493,13 @@ sgen_bind_bytype(dev_info_t *dip)
 
 /*
  * sgen_get_binding()
- * 	Check to see if the device in question matches the criteria for
- * 	sgen to bind.
+ *	Check to see if the device in question matches the criteria for
+ *	sgen to bind.
  *
- * 	Either the .conf file must specify a device_type entry which
- * 	matches the SCSI device type of this device, or the inquiry
- * 	string provided by the device must match an inquiry string specified
- * 	in the .conf file.  Inquiry data is matched first.
+ *	Either the .conf file must specify a device_type entry which
+ *	matches the SCSI device type of this device, or the inquiry
+ *	string provided by the device must match an inquiry string specified
+ *	in the .conf file.  Inquiry data is matched first.
  */
 static int
 sgen_get_binding(dev_info_t *dip)
@@ -531,7 +531,7 @@ done:
 
 /*
  * sgen_attach()
- * 	attach(9e) entrypoint.
+ *	attach(9e) entrypoint.
  */
 static int
 sgen_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
@@ -632,7 +632,7 @@ sgen_do_attach(dev_info_t *dip)
 	 * For simplicity, the minor number == the instance number
 	 */
 	if (ddi_create_minor_node(dip, sgen_typename(devtype), S_IFCHR,
-	    instance, DDI_NT_SGEN, NULL) == DDI_FAILURE) {
+	    instance, DDI_NT_SGEN, 0) == DDI_FAILURE) {
 		scsi_unprobe(scsidevp);
 		ddi_prop_remove_all(dip);
 		sgen_log(sg_state, SGEN_DIAG1,
@@ -735,8 +735,8 @@ sgen_do_attach(dev_info_t *dip)
 
 /*
  * sgen_setup_sense()
- * 	Allocate a request sense packet so that if sgen needs to fetch sense
- * 	data for the user, it will have a pkt ready to send.
+ *	Allocate a request sense packet so that if sgen needs to fetch sense
+ *	data for the user, it will have a pkt ready to send.
  */
 static int
 sgen_setup_sense(sgen_state_t *sg_state)
@@ -778,7 +778,7 @@ sgen_setup_sense(sgen_state_t *sg_state)
 
 /*
  * sgen_create_errstats()
- * 	create named kstats for tracking occurrence of errors.
+ *	create named kstats for tracking occurrence of errors.
  */
 static void
 sgen_create_errstats(sgen_state_t *sg_state, int instance)
@@ -824,7 +824,7 @@ sgen_create_errstats(sgen_state_t *sg_state, int instance)
 
 /*
  * sgen_detach()
- * 	detach(9E) entrypoint
+ *	detach(9E) entrypoint
  */
 static int
 sgen_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
@@ -859,7 +859,7 @@ sgen_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 /*
  * sgen_do_detach()
- * 	detach the driver, tearing down resources.
+ *	detach the driver, tearing down resources.
  */
 static int
 sgen_do_detach(dev_info_t *dip)
@@ -923,11 +923,11 @@ sgen_do_detach(dev_info_t *dip)
 
 /*
  * sgen_do_suspend()
- * 	suspend the driver.  This sets the "suspend" bit for this target if it
- * 	is currently open; once resumed, the suspend bit will cause
- * 	subsequent I/Os to fail.  We want user programs to close and
- * 	reopen the device to acknowledge that they need to reexamine its
- * 	state and do the right thing.
+ *	suspend the driver.  This sets the "suspend" bit for this target if it
+ *	is currently open; once resumed, the suspend bit will cause
+ *	subsequent I/Os to fail.  We want user programs to close and
+ *	reopen the device to acknowledge that they need to reexamine its
+ *	state and do the right thing.
  */
 static int
 sgen_do_suspend(dev_info_t *dip)
@@ -992,9 +992,9 @@ sgen_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 
 /*
  * sgen_probe()
- * 	probe(9e) entrypoint.  sgen *never* returns DDI_PROBE_PARTIAL, in
- * 	order to avoid leaving around extra devinfos.  If sgen's binding
- * 	rules indicate that it should bind, it returns DDI_PROBE_SUCCESS.
+ *	probe(9e) entrypoint.  sgen *never* returns DDI_PROBE_PARTIAL, in
+ *	order to avoid leaving around extra devinfos.  If sgen's binding
+ *	rules indicate that it should bind, it returns DDI_PROBE_SUCCESS.
  */
 static int
 sgen_probe(dev_info_t *dip)
@@ -1046,8 +1046,8 @@ sgen_probe(dev_info_t *dip)
 
 /*
  * sgen_open()
- * 	open(9e) entrypoint.  sgen enforces a strict exclusive open policy per
- * 	target.
+ *	open(9e) entrypoint.  sgen enforces a strict exclusive open policy per
+ *	target.
  */
 /*ARGSUSED1*/
 static int
@@ -1098,7 +1098,7 @@ sgen_open(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 
 /*
  * sgen_close()
- * 	close(9e) entrypoint.
+ *	close(9e) entrypoint.
  */
 /*ARGSUSED1*/
 static int
@@ -1128,7 +1128,7 @@ sgen_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 /*
  * sgen_ioctl()
- * 	sgen supports the USCSI(7I) ioctl interface.
+ *	sgen supports the USCSI(7I) ioctl interface.
  */
 /*ARGSUSED4*/
 static int
@@ -1195,7 +1195,7 @@ sgen_ioctl(dev_t dev,
 
 /*
  * sgen_uscsi_cmd()
- * 	Setup, configuration and teardown for a uscsi(7I) command
+ *	Setup, configuration and teardown for a uscsi(7I) command
  */
 /*ARGSUSED*/
 static int
@@ -1298,8 +1298,8 @@ sgen_uscsi_cmd(dev_t dev, struct uscsi_cmd *ucmd, int flag)
 
 /*
  * sgen_hold_cmdbuf()
- * 	Acquire a lock on the command buffer for the given target.  Returns
- * 	non-zero if interrupted.
+ *	Acquire a lock on the command buffer for the given target.  Returns
+ *	non-zero if interrupted.
  */
 static int
 sgen_hold_cmdbuf(sgen_state_t *sg_state)
@@ -1319,7 +1319,7 @@ sgen_hold_cmdbuf(sgen_state_t *sg_state)
 
 /*
  * sgen_rele_cmdbuf()
- * 	release the command buffer for a particular target.
+ *	release the command buffer for a particular target.
  */
 static void
 sgen_rele_cmdbuf(sgen_state_t *sg_state)
@@ -1332,8 +1332,8 @@ sgen_rele_cmdbuf(sgen_state_t *sg_state)
 
 /*
  * sgen_start()
- * 	Transport a uscsi command; this is invoked by physio() or directly
- * 	by sgen_uscsi_cmd().
+ *	Transport a uscsi command; this is invoked by physio() or directly
+ *	by sgen_uscsi_cmd().
  */
 static int
 sgen_start(struct buf *bp)
@@ -1402,8 +1402,8 @@ sgen_start(struct buf *bp)
 
 /*
  * sgen_scsi_transport()
- * 	a simple scsi_transport() wrapper which can be configured to inject
- * 	sporadic errors for testing.
+ *	a simple scsi_transport() wrapper which can be configured to inject
+ *	sporadic errors for testing.
  */
 static int
 sgen_scsi_transport(struct scsi_pkt *pkt)
@@ -1436,7 +1436,7 @@ sgen_scsi_transport(struct scsi_pkt *pkt)
 
 /*
  * sgen_make_uscsi_cmd()
- * 	Initialize a SCSI packet usable for USCSI.
+ *	Initialize a SCSI packet usable for USCSI.
  */
 static int
 sgen_make_uscsi_cmd(sgen_state_t *sg_state, struct buf *bp)
@@ -1523,8 +1523,8 @@ sgen_make_uscsi_cmd(sgen_state_t *sg_state, struct buf *bp)
 
 /*
  * sgen_restart()
- * 	sgen_restart() is called after a timeout, when a command has been
- * 	postponed due to a TRAN_BUSY response from the HBA.
+ *	sgen_restart() is called after a timeout, when a command has been
+ *	postponed due to a TRAN_BUSY response from the HBA.
  */
 static void
 sgen_restart(void *arg)
@@ -1560,11 +1560,11 @@ sgen_restart(void *arg)
 
 /*
  * sgen_callback()
- * 	Command completion processing
+ *	Command completion processing
  *
- * 	sgen's completion processing is very pessimistic-- it does not retry
- * 	failed commands; instead, it allows the user application to make
- * 	decisions about what has gone wrong.
+ *	sgen's completion processing is very pessimistic-- it does not retry
+ *	failed commands; instead, it allows the user application to make
+ *	decisions about what has gone wrong.
  */
 static void
 sgen_callback(struct scsi_pkt *pkt)
@@ -1694,13 +1694,13 @@ sgen_initiate_sense(sgen_state_t *sg_state, int path_instance)
 
 /*
  * sgen_handle_incomplete()
- * 	sgen is pessimistic, but also careful-- it doesn't try to retry
- * 	incomplete commands, but it also doesn't go resetting devices;
- * 	it is hard to tell if the device will be tolerant of that sort
- * 	of prodding.
+ *	sgen is pessimistic, but also careful-- it doesn't try to retry
+ *	incomplete commands, but it also doesn't go resetting devices;
+ *	it is hard to tell if the device will be tolerant of that sort
+ *	of prodding.
  *
- * 	This routine has been left as a guide for the future--- the
- * 	current administration's hands-off policy may need modification.
+ *	This routine has been left as a guide for the future--- the
+ *	current administration's hands-off policy may need modification.
  */
 /*ARGSUSED*/
 static int
@@ -1712,12 +1712,12 @@ sgen_handle_incomplete(sgen_state_t *sg_state, struct scsi_pkt *pkt)
 
 /*
  * sgen_handle_autosense()
- * 	Deal with SENSE data acquired automatically via the auto-request-sense
- * 	facility.
+ *	Deal with SENSE data acquired automatically via the auto-request-sense
+ *	facility.
  *
- * 	Sgen takes a pessimistic view of things-- it doesn't retry commands,
- * 	and unless the device recovered from the problem, this routine returns
- * 	COMMAND_DONE_ERROR.
+ *	Sgen takes a pessimistic view of things-- it doesn't retry commands,
+ *	and unless the device recovered from the problem, this routine returns
+ *	COMMAND_DONE_ERROR.
  */
 static int
 sgen_handle_autosense(sgen_state_t *sg_state, struct scsi_pkt *pkt)
@@ -1806,7 +1806,7 @@ sgen_handle_autosense(sgen_state_t *sg_state, struct scsi_pkt *pkt)
 
 /*
  * sgen_handle_sense()
- * 	Examine sense data that was manually fetched from the target.
+ *	Examine sense data that was manually fetched from the target.
  */
 static int
 sgen_handle_sense(sgen_state_t *sg_state)
@@ -1889,7 +1889,7 @@ sgen_handle_sense(sgen_state_t *sg_state)
 
 /*
  * sgen_check_error()
- * 	examine the command packet for abnormal completion.
+ *	examine the command packet for abnormal completion.
  *
  *	sgen_check_error should only be called at the completion of the
  *	command packet.
@@ -1938,7 +1938,7 @@ sgen_check_error(sgen_state_t *sg_state, struct buf *bp)
 
 /*
  * sgen_tur()
- * 	test if a target is ready to operate by sending it a TUR command.
+ *	test if a target is ready to operate by sending it a TUR command.
  */
 static int
 sgen_tur(dev_t dev)
@@ -1960,8 +1960,8 @@ sgen_tur(dev_t dev)
 
 /*
  * sgen_diag_ok()
- * 	given an sg_state and a desired diagnostic level, return true if
- * 	it is acceptable to output a message.
+ *	given an sg_state and a desired diagnostic level, return true if
+ *	it is acceptable to output a message.
  */
 /*ARGSUSED*/
 static int
@@ -2043,8 +2043,8 @@ sgen_log(sgen_state_t *sg_state, int level, const char *fmt, ...)
 
 /*
  * sgen_dump_cdb()
- * 	dump out the contents of a cdb.  Take care that 'label' is not too
- * 	large, or 'buf' could overflow.
+ *	dump out the contents of a cdb.  Take care that 'label' is not too
+ *	large, or 'buf' could overflow.
  */
 static void
 sgen_dump_cdb(sgen_state_t *sg_state, const char *label,
