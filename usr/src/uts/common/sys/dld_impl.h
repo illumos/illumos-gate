@@ -328,7 +328,7 @@ typedef struct dld_ap {
 								\
 	mutex_enter(&(dsp)->ds_lock);				\
 	if ((dsp)->ds_dlstate != DL_IDLE ||			\
-	    !mac_tx_is_flow_blocked((dsp)->ds_mch, NULL)) {	\
+	    !mac_tx_is_flow_blocked((dsp)->ds_mch, 0)) {	\
 		if ((dsp)->ds_tx_flow_mp == NULL)		\
 			(dsp)->ds_tx_flow_mp = getq(q);		\
 		ASSERT((dsp)->ds_tx_flow_mp != NULL);		\
