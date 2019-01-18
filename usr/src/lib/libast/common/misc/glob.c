@@ -564,6 +564,12 @@ skip:
 		gp->gl_error = GLOB_NOSPACE;
 }
 
+static void
+_closedir(void *ptr)
+{
+	(void) closedir(ptr);
+}
+
 int
 glob(const char* pattern, int flags, int (*errfn)(const char*, int), register glob_t* gp)
 {
@@ -627,7 +633,7 @@ glob(const char* pattern, int flags, int (*errfn)(const char*, int), register gl
 		{
 			gp->gl_opendir = (GL_opendir_f)opendir;
 			gp->gl_readdir = (GL_readdir_f)readdir;
-			gp->gl_closedir = (GL_closedir_f)closedir;
+			gp->gl_closedir = _closedir;
 			if (!gp->gl_stat)
 				gp->gl_stat = (GL_stat_f)pathstat;
 		}

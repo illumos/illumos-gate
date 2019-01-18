@@ -143,11 +143,25 @@ extern char *strrchr(const char *, int);
 extern char *strstr(const char *, const char *);
 #endif /* __cplusplus >= 199711L */
 
+#if __cplusplus >= 199711L
+}
+#endif /* end of namespace std */
+
+/*
+ * ISO C11 Annex K functions are not allowed to be in the standard
+ * namespace; however, it is implementation-defined as to whether or
+ * not they are in the global namespace and we opt to make them
+ * available to software.
+ */
 #if __EXT1_VISIBLE
 
 #ifndef	_RSIZE_T_DEFINED
 #define	_RSIZE_T_DEFINED
+#if __cplusplus >= 199711L
+typedef std::size_t rsize_t;
+#else
 typedef size_t rsize_t;
+#endif
 #endif
 
 #ifndef	_ERRNO_T_DEFINED
@@ -158,10 +172,6 @@ typedef int errno_t;
 /* ISO/IEC 9899:2011 K.3.7.4.1.1 */
 extern errno_t memset_s(void *, rsize_t, int, rsize_t);
 #endif	/* __EXT1_VISIBLE */
-
-#if __cplusplus >= 199711L
-}
-#endif /* end of namespace std */
 
 #ifdef	__cplusplus
 }

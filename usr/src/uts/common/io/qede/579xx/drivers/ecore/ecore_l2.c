@@ -1886,7 +1886,7 @@ static void __ecore_get_vport_port_stats(struct ecore_hwfn *p_hwfn,
 
 	ecore_memcpy_from(p_hwfn, p_ptt, &port_stats,
 			  p_hwfn->mcp_info->port_addr +
-			  OFFSETOF(struct public_port, stats),
+			  offsetof(struct public_port, stats),
 			  sizeof(port_stats));
 
 	p_common->rx_64_byte_packets += port_stats.eth.r64;

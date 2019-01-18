@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -4599,21 +4599,20 @@ ldterm_do_ioctl(queue_t *q, mblk_t *mp)
 		}
 
 		locale_name_sz = 0;
-		if (csdp->locale_name) {
-			for (i = 0; i < MAXNAMELEN; i++)
-				if (csdp->locale_name[i] == '\0')
-					break;
-			/*
-			 * We cannot have any string that is not NULL byte
-			 * terminated.
-			 */
-			if (i >= MAXNAMELEN) {
-				miocnak(q, mp, 0, ERANGE);
-				return;
-			}
 
-			locale_name_sz = i + 1;
+		for (i = 0; i < MAXNAMELEN; i++)
+			if (csdp->locale_name[i] == '\0')
+				break;
+		/*
+		 * We cannot have any string that is not NULL byte
+		 * terminated.
+		 */
+		if (i >= MAXNAMELEN) {
+			miocnak(q, mp, 0, ERANGE);
+			return;
 		}
+
+		locale_name_sz = i + 1;
 
 		/*
 		 * As the final check, if there was invalid codeset_type

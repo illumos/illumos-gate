@@ -2955,6 +2955,7 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 {
 	struct lofi_state *lsp;
 	struct lofi_ioctl *klip;
+	char namebuf[MAXNAMELEN];
 	int err;
 
 	err = copy_in_lofi_ioctl(ulip, &klip, ioctl_flag);
@@ -2980,6 +2981,7 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 	}
 
 	klip->li_id = LOFI_MINOR2ID(getminor(lsp->ls_dev));
+	(void) snprintf(namebuf, sizeof (namebuf), "%u", klip->li_id);
 
 	/*
 	 * If it's still held open, we'll do one of three things:
@@ -3024,6 +3026,10 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 		lofi_destroy(lsp, credp);
 	}
 
+	/* Remove name from devlink cache */
+	mutex_enter(&lofi_devlink_cache.ln_lock);
+	(void) nvlist_remove_all(lofi_devlink_cache.ln_data, namebuf);
+	mutex_exit(&lofi_devlink_cache.ln_lock);
 done:
 	mutex_exit(&lofi_lock);
 	if (err == 0)

@@ -23,6 +23,8 @@
  * Copyright (c) 2012 Gary Mills
  *
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 /*
  * Copyright (c) 2009, Pyun YongHyeon <yongari@FreeBSD.org>
@@ -1352,9 +1354,7 @@ fail3:
 fail2:
 	pci_config_teardown(&atgep->atge_conf_handle);
 fail1:
-	if (atgep)
-		kmem_free(atgep, sizeof (atge_t));
-
+	kmem_free(atgep, sizeof (atge_t));
 	return (DDI_FAILURE);
 }
 

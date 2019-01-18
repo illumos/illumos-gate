@@ -622,7 +622,7 @@ qede_transceiver_info(void *arg, uint_t id, mac_transceiver_info_t *infop)
          * us one bit.
          */
         transceiver_state = ecore_rd(hwfn, ptt, hwfn->mcp_info->port_addr +
-            OFFSETOF(struct public_port, transceiver_data));
+            offsetof(struct public_port, transceiver_data));
         transceiver_state = GET_FIELD(transceiver_state, ETH_TRANSCEIVER_STATE);
         ecore_ptt_release(hwfn, ptt);
 

@@ -531,7 +531,7 @@ struct phy_defs {
 #define PROTECTION_OVERRIDE_DEPTH_ELEMENTS 20
 #define PROTECTION_OVERRIDE_DEPTH_DWORDS   	(PROTECTION_OVERRIDE_DEPTH_ELEMENTS 	* PROTECTION_OVERRIDE_ELEMENT_DWORDS)
 
-#define MCP_SPAD_TRACE_OFFSIZE_ADDR		(MCP_REG_SCRATCH + 	OFFSETOF(struct static_init, sections[SPAD_SECTION_TRACE]))
+#define MCP_SPAD_TRACE_OFFSIZE_ADDR		(MCP_REG_SCRATCH + 	offsetof(struct static_init, sections[SPAD_SECTION_TRACE]))
 
 #define EMPTY_FW_VERSION_STR		"???_???_???_???"
 #define EMPTY_FW_IMAGE_STR		"???????????????"
@@ -2113,12 +2113,12 @@ static u32 ecore_dump_mfw_ver_param(struct ecore_hwfn *p_hwfn,
 		public_data_addr = ecore_rd(p_hwfn, p_ptt, MISC_REG_SHARED_MEM_ADDR) | MCP_REG_SCRATCH;
 
 		/* Find MCP public global section offset */
-		global_section_offsize_addr = public_data_addr + OFFSETOF(struct mcp_public_data, sections) + sizeof(offsize_t) * PUBLIC_GLOBAL;
+		global_section_offsize_addr = public_data_addr + offsetof(struct mcp_public_data, sections) + sizeof(offsize_t) * PUBLIC_GLOBAL;
 		global_section_offsize = ecore_rd(p_hwfn, p_ptt, global_section_offsize_addr);
 		global_section_addr = MCP_REG_SCRATCH + (global_section_offsize & OFFSIZE_OFFSET_MASK) * 4;
 
 		/* Read MFW version from MCP public global section */
-		mfw_ver = ecore_rd(p_hwfn, p_ptt, global_section_addr + OFFSETOF(struct public_global, mfw_ver));
+		mfw_ver = ecore_rd(p_hwfn, p_ptt, global_section_addr + offsetof(struct public_global, mfw_ver));
 
 		/* Dump MFW version param */
 		if (OSAL_SNPRINTF(mfw_ver_str, sizeof(mfw_ver_str), "%d_%d_%d_%d", (u8)(mfw_ver >> 24), (u8)(mfw_ver >> 16), (u8)(mfw_ver >> 8), (u8)mfw_ver) < 0)
@@ -4472,13 +4472,13 @@ static enum dbg_status ecore_mcp_trace_get_data_info(struct ecore_hwfn *p_hwfn,
 	*trace_data_grc_addr = MCP_REG_SCRATCH + SECTION_OFFSET(spad_trace_offsize);
 
 	/* Read signature from MCP trace section */
-	signature = ecore_rd(p_hwfn, p_ptt, *trace_data_grc_addr + OFFSETOF(struct mcp_trace, signature));
+	signature = ecore_rd(p_hwfn, p_ptt, *trace_data_grc_addr + offsetof(struct mcp_trace, signature));
 
 	if (signature != MFW_TRACE_SIGNATURE)
 		return DBG_STATUS_INVALID_TRACE_SIGNATURE;
 
 	/* Read trace size from MCP trace section */
-	*trace_data_size = ecore_rd(p_hwfn, p_ptt, *trace_data_grc_addr + OFFSETOF(struct mcp_trace, size));
+	*trace_data_size = ecore_rd(p_hwfn, p_ptt, *trace_data_grc_addr + offsetof(struct mcp_trace, size));
 
 	return DBG_STATUS_OK;
 }

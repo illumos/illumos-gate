@@ -182,7 +182,7 @@ extern void aio_req_remove_portq(aio_t *, aio_req_t *);
 extern void aio_enq(aio_req_t **, aio_req_t *, int);
 extern void aio_deq(aio_req_t **, aio_req_t *);
 /* Clustering: PXFS module uses this interface */
-extern void aio_done(struct buf *);
+extern int aio_done(struct buf *);
 
 #endif /* _KERNEL */
 

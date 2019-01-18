@@ -534,20 +534,6 @@ u32 LOG2(u32);
 #define	DIV_ROUND_UP(n, d)		(((n) + (d) - 1) / (d))
 #define	ROUNDUP(x, y)			((((x) + ((y) - 1)) / (y)) * (y))
 
-
-/*
- * @VB: Don't want to include sys/sysmacros.h just
- * for the offsetof macro
- */
-#ifndef	OFFSETOF
-#define	OFFSETOF(type, member)		((size_t) (&(((type *)0)->member)))
-/*#define offsetof(type, member)          ((size_t) (&(((type *)0)->member)))*/
-#endif
-
-#ifndef offsetof
-#define offsetof(type, member)          ((size_t) (&(((type *)0)->member)))
-#endif
-
 void qede_print(char *format, ...);
 void qede_print_err(char *format, ...);
 

@@ -65,6 +65,16 @@ extern int at_quick_exit(void (*)(void));
 extern _NORETURN_KYWD void quick_exit(int);
 #endif /* !_STRICT_SYMBOLS || _STDC_C11 || __cplusplus >= 201103L */
 
+#if __cplusplus >= 199711L
+}
+#endif
+
+/*
+ * ISO C11 Annex K functions are not allowed to be in the standard
+ * namespace; however, it is implementation-defined as to whether or
+ * not they are in the global namespace and we opt to make them
+ * available to software.
+ */
 #if __EXT1_VISIBLE
 
 #ifndef	_ERRNO_T_DEFINED
@@ -84,10 +94,6 @@ extern _NORETURN_KYWD void abort_handler_s(const char *_RESTRICT_KYWD,
 extern void ignore_handler_s(const char *_RESTRICT_KYWD, void *_RESTRICT_KYWD,
     errno_t);
 #endif	/* __EXT1_VISIBLE */
-
-#if __cplusplus >= 199711L
-}
-#endif
 
 #ifdef __cplusplus
 }

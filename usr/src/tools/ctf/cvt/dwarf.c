@@ -863,11 +863,19 @@ die_enum_create(dwarf_t *dw, Dwarf_Die die, Dwarf_Off off, tdesc_t *tdp)
 			el = xcalloc(sizeof (elist_t));
 			el->el_name = die_name(dw, mem);
 
-			if (die_signed(dw, mem, DW_AT_const_value, &sval, 0)) {
-				el->el_number = sval;
-			} else if (die_unsigned(dw, mem, DW_AT_const_value,
+			/*
+			 * We have to be careful here: newer GCCs generate DWARF
+			 * where an unsigned value will happily pass
+			 * die_signed().  Since negative values will fail
+			 * die_unsigned(), we try that first to make sure we get
+			 * the right value.
+			 */
+			if (die_unsigned(dw, mem, DW_AT_const_value,
 			    &uval, 0)) {
 				el->el_number = uval;
+			} else if (die_signed(dw, mem, DW_AT_const_value,
+			    &sval, 0)) {
+				el->el_number = sval;
 			} else {
 				terminate("die %llu: enum %llu: member without "
 				    "value\n", off, die_off(dw, mem));
@@ -1643,8 +1651,34 @@ die_variable_create(dwarf_t *dw, Dwarf_Die die, Dwarf_Off off, tdesc_t *tdp)
 
 	debug(3, "die %llu: creating object definition\n", off);
 
-	if (die_isdecl(dw, die) || (name = die_name(dw, die)) == NULL)
-		return; /* skip prototypes and nameless objects */
+	/* Skip "Non-Defining Declarations" */
+	if (die_isdecl(dw, die))
+		return;
+
+	/*
+	 * If we find a DIE of "Declarations Completing Non-Defining
+	 * Declarations", we will use the referenced type's DIE.  This isn't
+	 * quite correct, e.g. DW_AT_decl_line will be the forward declaration
+	 * not this site.  It's sufficient for what we need, however: in
+	 * particular, we should find DW_AT_external as needed there.
+	 */
+	if (die_attr(dw, die, DW_AT_specification, 0) != NULL) {
+		Dwarf_Die sdie;
+		Dwarf_Off soff;
+
+		soff = die_attr_ref(dw, die, DW_AT_specification);
+
+		if (dwarf_offdie(dw->dw_dw, soff,
+		    &sdie, &dw->dw_err) != DW_DLV_OK) {
+			terminate("dwarf_offdie(%llu) failed: %s\n",
+			    soff, dwarf_errmsg(dw->dw_err));
+		}
+
+		die = sdie;
+	}
+
+	if ((name = die_name(dw, die)) == NULL)
+		return;
 
 	ii = xcalloc(sizeof (iidesc_t));
 	ii->ii_type = die_isglobal(dw, die) ? II_GVAR : II_SVAR;

@@ -27,8 +27,6 @@
 #ifndef _SYS_FDBUFFER_H
 #define	_SYS_FDBUFFER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -153,7 +151,7 @@ extern void fdb_free(fdbuffer_t *fdbuf);
 extern void fdb_add_hole(fdbuffer_t *fdbuf, u_offset_t off, size_t len);
 extern buf_t *fdb_iosetup(fdbuffer_t *fdbuf, u_offset_t off, size_t len,
     struct vnode *vn, int flags);
-extern void fdb_iodone(buf_t *bufp);
+extern int fdb_iodone(buf_t *bufp);
 extern void fdb_ioerrdone(fdbuffer_t *fdbuf, int error);
 extern void fdb_init(void);
 
