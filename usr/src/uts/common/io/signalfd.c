@@ -715,7 +715,7 @@ signalfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "signalfd", S_IFCHR,
-	    SIGNALFDMNRN_SIGNALFD, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    SIGNALFDMNRN_SIGNALFD, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		cmn_err(CE_NOTE, "/dev/signalfd couldn't create minor node");
 		ddi_soft_state_fini(&signalfd_softstate);
 		id_space_destroy(signalfd_minor);
