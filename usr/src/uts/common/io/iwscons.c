@@ -607,7 +607,7 @@ iwscnattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	ASSERT(iwscn_dip == NULL);
 
 	if (ddi_create_minor_node(devi, "iwscn", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		return (DDI_FAILURE);
 	}
 
@@ -655,7 +655,7 @@ struct cb_ops	iwscn_cb_ops = {
 	iwscnioctl,		/* ioctl */
 	nodev,			/* devmap */
 	nodev,			/* mmap */
-	nodev, 			/* segmap */
+	nodev,			/* segmap */
 	iwscnpoll,		/* poll */
 	ddi_prop_op,		/* cb_prop_op */
 	NULL,			/* streamtab  */
