@@ -3662,7 +3662,7 @@ aac_free_comm_space(struct aac_softstate *softs)
 	softs->comm_space_acc_handle = NULL;
 	ddi_dma_free_handle(&softs->comm_space_dma_handle);
 	softs->comm_space_dma_handle = NULL;
-	softs->comm_space_phyaddr = NULL;
+	softs->comm_space_phyaddr = 0;
 }
 
 /*
