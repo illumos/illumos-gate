@@ -1084,7 +1084,7 @@ iscsit_tgt_avl_compare(const void *void_tgt1, const void *void_tgt2)
 {
 	const iscsit_tgt_t	*tgt1 = void_tgt1;
 	const iscsit_tgt_t	*tgt2 = void_tgt2;
-	int 			result;
+	int			result;
 
 	/*
 	 * Sort by ISID first then TSIH
@@ -1132,7 +1132,7 @@ iscsit_portal_t *
 iscsit_tgt_lookup_portal(iscsit_tgt_t *tgt, struct sockaddr_storage *sa,
     iscsit_tpgt_t **output_tpgt)
 {
-	iscsit_tpgt_t 	*tpgt;
+	iscsit_tpgt_t	*tpgt;
 	iscsit_portal_t	*portal;
 
 	/* Caller holds tgt->target_mutex */
@@ -1189,7 +1189,7 @@ iscsit_tgt_unbind_sess(iscsit_tgt_t *tgt, iscsit_sess_t *sess)
 	}
 }
 
-#define	LOCK_FOR_SESS_LOOKUP(lookup_tgt) { 			\
+#define	LOCK_FOR_SESS_LOOKUP(lookup_tgt) {			\
 	if ((lookup_tgt) == NULL) {				\
 		ISCSIT_GLOBAL_LOCK(RW_READER);			\
 	} else {						\
@@ -1197,11 +1197,11 @@ iscsit_tgt_unbind_sess(iscsit_tgt_t *tgt, iscsit_sess_t *sess)
 	}							\
 }
 
-#define	UNLOCK_FOR_SESS_LOOKUP(lookup_tgt) { 			\
+#define	UNLOCK_FOR_SESS_LOOKUP(lookup_tgt) {			\
 	if ((lookup_tgt) == NULL) {				\
 		ISCSIT_GLOBAL_UNLOCK();				\
-	} else {					 	\
-		mutex_exit(&(lookup_tgt)->target_mutex); 	\
+	} else {						\
+		mutex_exit(&(lookup_tgt)->target_mutex);	\
 	}							\
 }
 
@@ -1224,7 +1224,7 @@ iscsit_tgt_lookup_sess(iscsit_tgt_t *tgt, char *initiator_name,
 	}
 
 	LOCK_FOR_SESS_LOOKUP(tgt);
-	if (avl_numnodes(sess_avl) == NULL) {
+	if (avl_numnodes(sess_avl) == 0) {
 		UNLOCK_FOR_SESS_LOOKUP(tgt);
 		return (NULL);
 	}
@@ -1419,7 +1419,7 @@ iscsit_tpgt_avl_compare(const void *void_tpgt1, const void *void_tpgt2)
 static idm_status_t
 iscsit_tgt_online(iscsit_tgt_t *tgt)
 {
-	iscsit_tpgt_t 		*tpgt, *tpgt_fail;
+	iscsit_tpgt_t		*tpgt, *tpgt_fail;
 	idm_status_t		rc;
 
 	mutex_enter(&tgt->target_mutex);
@@ -1468,7 +1468,7 @@ iscsit_tgt_offline_cb(void *tgt_void)
 static void
 iscsit_tgt_offline(iscsit_tgt_t *tgt)
 {
-	iscsit_tpgt_t 		*tpgt;
+	iscsit_tpgt_t		*tpgt;
 	iscsit_sess_t		*ist;
 
 	mutex_enter(&tgt->target_mutex);
@@ -1741,7 +1741,7 @@ iscsit_tpg_avl_compare(const void *void_tpg1, const void *void_tpg2)
 {
 	const iscsit_tpg_t	*tpg1 = void_tpg1;
 	const iscsit_tpg_t	*tpg2 = void_tpg2;
-	int 			result;
+	int			result;
 
 	/*
 	 * Sort by ISID first then TSIH
@@ -2077,7 +2077,7 @@ iscsit_ini_avl_compare(const void *void_ini1, const void *void_ini2)
 {
 	const iscsit_ini_t	*ini1 = void_ini1;
 	const iscsit_ini_t	*ini2 = void_ini2;
-	int 			result;
+	int			result;
 
 	/*
 	 * Sort by ISID first then TSIH
