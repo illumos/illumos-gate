@@ -2089,7 +2089,7 @@ dup_failed:
 	if (freezer != curthread)
 		mutex_exit(QLOCK(q));
 
-	STR_FTEVENT_MSG(bp, q, FTEV_GETQ, NULL);
+	STR_FTEVENT_MSG(bp, q, FTEV_GETQ, 0);
 
 	return (bp);
 }
@@ -2286,7 +2286,7 @@ rmvq_noenab(queue_t *q, mblk_t *mp)
 	if (freezer != curthread)
 		mutex_exit(QLOCK(q));
 
-	STR_FTEVENT_MSG(mp, q, FTEV_RMVQ, NULL);
+	STR_FTEVENT_MSG(mp, q, FTEV_RMVQ, 0);
 }
 
 /*
@@ -2334,7 +2334,7 @@ flushq_common(queue_t *q, int flag, int pcproto_flag)
 		nmp = mp->b_next;
 		mp->b_next = mp->b_prev = NULL;
 
-		STR_FTEVENT_MBLK(mp, q, FTEV_FLUSHQ, NULL);
+		STR_FTEVENT_MBLK(mp, q, FTEV_FLUSHQ, 0);
 
 		if (pcproto_flag && (mp->b_datap->db_type == M_PCPROTO))
 			(void) putq(q, mp);
@@ -2773,7 +2773,7 @@ putq(queue_t *q, mblk_t *bp)
 		}
 	}
 
-	STR_FTEVENT_MSG(bp, q, FTEV_PUTQ, NULL);
+	STR_FTEVENT_MSG(bp, q, FTEV_PUTQ, 0);
 
 	if ((mcls > QNORM) ||
 	    (canenable(q) && (q->q_flag & QWANTR || bp->b_band)))
@@ -2955,7 +2955,7 @@ putbq(queue_t *q, mblk_t *bp)
 		}
 	}
 
-	STR_FTEVENT_MSG(bp, q, FTEV_PUTBQ, NULL);
+	STR_FTEVENT_MSG(bp, q, FTEV_PUTBQ, 0);
 
 	if ((mcls > QNORM) || (canenable(q) && (q->q_flag & QWANTR)))
 		qenable_locked(q);
@@ -3095,7 +3095,7 @@ badord:
 		}
 	}
 
-	STR_FTEVENT_MSG(mp, q, FTEV_INSQ, NULL);
+	STR_FTEVENT_MSG(mp, q, FTEV_INSQ, 0);
 
 	if (canenable(q) && (q->q_flag & QWANTR))
 		qenable_locked(q);

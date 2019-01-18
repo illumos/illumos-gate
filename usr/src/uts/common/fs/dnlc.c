@@ -954,7 +954,7 @@ dnlc_reduce_cache(void *reduce_percent)
 	if (dnlc_reduce_idle && (dnlc_nentries >= ncsize || reduce_percent)) {
 		dnlc_reduce_idle = 0;
 		if ((taskq_dispatch(system_taskq, do_dnlc_reduce_cache,
-		    reduce_percent, TQ_NOSLEEP)) == NULL)
+		    reduce_percent, TQ_NOSLEEP)) == (uintptr_t)NULL)
 			dnlc_reduce_idle = 1;
 	}
 }

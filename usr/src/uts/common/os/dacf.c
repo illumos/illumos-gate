@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * DACF: device autoconfiguration support
  *
@@ -141,7 +139,7 @@ static dacf_ds_t dacf_devspecs[] = {
 	{ "minor-nodetype", 	DACF_DS_MIN_NT 		},
 	{ "driver-minorname", 	DACF_DS_DRV_MNAME	},
 	{ "device-path",	DACF_DS_DEV_PATH	},
-	{ NULL,			NULL			},
+	{ NULL,			DACF_DS_ERROR		},
 };
 
 mod_hash_t *posta_mntype, *posta_mname, *posta_devname;	/* post-attach */

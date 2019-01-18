@@ -49,7 +49,7 @@ pci_fm_err_t pci_err_tbl[] = {
 	PCI_MA,		PCI_STAT_R_MAST_AB,	PCI_TARG_MA,	DDI_FM_UNKNOWN,
 	PCI_REC_TA,	PCI_STAT_R_TARG_AB,	PCI_TARG_REC_TA, DDI_FM_UNKNOWN,
 	PCI_SIG_TA,	PCI_STAT_S_TARG_AB,	NULL,		DDI_FM_UNKNOWN,
-	NULL, NULL, NULL, NULL,
+	NULL, 0, NULL, DDI_FM_OK,
 };
 
 pci_fm_err_t pci_bdg_err_tbl[] = {
@@ -61,14 +61,14 @@ pci_fm_err_t pci_bdg_err_tbl[] = {
 #endif
 	PCI_REC_TA,	PCI_STAT_R_TARG_AB,	PCI_TARG_REC_TA, DDI_FM_UNKNOWN,
 	PCI_SIG_TA,	PCI_STAT_S_TARG_AB,	NULL,		DDI_FM_UNKNOWN,
-	NULL, NULL, NULL, NULL,
+	NULL, 0, NULL, DDI_FM_OK,
 };
 
 static pci_fm_err_t pcix_err_tbl[] = {
 	PCIX_SPL_DIS,		PCI_PCIX_SPL_DSCD,	NULL,	DDI_FM_UNKNOWN,
 	PCIX_UNEX_SPL,		PCI_PCIX_UNEX_SPL,	NULL,	DDI_FM_UNKNOWN,
 	PCIX_RX_SPL_MSG,	PCI_PCIX_RX_SPL_MSG,	NULL,   DDI_FM_UNKNOWN,
-	NULL, NULL, NULL, NULL,
+	NULL, 0, NULL, DDI_FM_OK,
 };
 
 static pci_fm_err_t pcix_sec_err_tbl[] = {
@@ -76,7 +76,7 @@ static pci_fm_err_t pcix_sec_err_tbl[] = {
 	PCIX_UNEX_SPL,		PCI_PCIX_BSS_UNEX_SPL,	NULL,	DDI_FM_UNKNOWN,
 	PCIX_BSS_SPL_OR,	PCI_PCIX_BSS_SPL_OR,	NULL,	DDI_FM_OK,
 	PCIX_BSS_SPL_DLY,	PCI_PCIX_BSS_SPL_DLY,	NULL,	DDI_FM_OK,
-	NULL, NULL, NULL, NULL,
+	NULL, 0, NULL, DDI_FM_OK,
 };
 
 static int
@@ -1113,7 +1113,7 @@ pci_ereport_post(dev_info_t *dip, ddi_fm_error_t *derr, uint16_t *xx_status)
 
 	ASSERT(fmhdl);
 
-	if (de.fme_ena == NULL)
+	if (de.fme_ena == 0)
 		de.fme_ena = fm_ena_generate(0, FM_ENA_FMT1);
 
 	erpt_p = (pci_erpt_t *)fmhdl->fh_bus_specific;

@@ -246,7 +246,7 @@ again:
 						swap_phys_free(pvp, poff,
 						    PAGESIZE);
 						ap->an_pvp = NULL;
-						ap->an_poff = NULL;
+						ap->an_poff = 0;
 						hat_setmod(pp);
 					}
 
@@ -423,7 +423,7 @@ swap_getconpage(
 
 				swap_phys_free(pvp, poff, PAGESIZE);
 				ap->an_pvp = NULL;
-				ap->an_poff = NULL;
+				ap->an_poff = 0;
 				hat_setmod(pp);
 				mutex_exit(ahm);
 			}

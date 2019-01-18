@@ -357,7 +357,7 @@ static pci_cap_entry_t pci_cap_table[] = {
 	 * {PCI_CAP_ID_AGP_8X, 0, NULL},
 	 * {PCI_CAP_ID_SECURE_DEV, 0, NULL},
 	 */
-	{PCI_CAP_NEXT_PTR_NULL, 0, NULL}
+	{PCI_CAP_NEXT_PTR_NULL, 0, 0}
 };
 
 

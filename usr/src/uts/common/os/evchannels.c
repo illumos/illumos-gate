@@ -563,7 +563,7 @@ evch_evq_destroy(evch_eventq_t *eqp)
 
 	ASSERT(evch_dl_getnum(&eqp->eq_subscr) == 0);
 	/* Kill delivery thread */
-	if (eqp->eq_thrid != NULL) {
+	if (eqp->eq_thrid != 0) {
 		mutex_enter(&eqp->eq_queuemx);
 		eqp->eq_tabortflag = 1;
 		eqp->eq_holdmode = 0;

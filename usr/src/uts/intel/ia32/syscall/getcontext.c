@@ -74,7 +74,7 @@ savecontext(ucontext_t *ucp, const k_sigset_t *mask)
 	 * been disabled for this LWP. If stack bounds checking is disabled
 	 * or the copyin() fails, we fall back to the legacy behavior.
 	 */
-	if (lwp->lwp_ustack == NULL ||
+	if (lwp->lwp_ustack == (uintptr_t)NULL ||
 	    copyin((void *)lwp->lwp_ustack, &ucp->uc_stack,
 	    sizeof (ucp->uc_stack)) != 0 ||
 	    ucp->uc_stack.ss_size == 0) {
@@ -266,7 +266,7 @@ savecontext32(ucontext32_t *ucp, const k_sigset_t *mask)
 	ucp->uc_flags = UC_ALL;
 	ucp->uc_link = (caddr32_t)lwp->lwp_oldcontext;
 
-	if (lwp->lwp_ustack == NULL ||
+	if (lwp->lwp_ustack == (uintptr_t)NULL ||
 	    copyin((void *)lwp->lwp_ustack, &ucp->uc_stack,
 	    sizeof (ucp->uc_stack)) != 0 ||
 	    ucp->uc_stack.ss_size == 0) {

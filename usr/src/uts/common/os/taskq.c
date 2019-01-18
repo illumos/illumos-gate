@@ -1167,7 +1167,7 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		if ((tqe = taskq_ent_alloc(tq, flags)) == NULL) {
 			tq->tq_nomem++;
 			mutex_exit(&tq->tq_lock);
-			return (NULL);
+			return ((taskqid_t)tqe);
 		}
 		/* Make sure we start without any flags */
 		tqe->tqent_un.tqent_flags = 0;

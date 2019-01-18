@@ -781,9 +781,9 @@ acevals_init(acevals_t *vals, uid_t key)
 static void
 ace_list_init(ace_list_t *al, int dfacl_flag)
 {
-	acevals_init(&al->user_obj, NULL);
-	acevals_init(&al->group_obj, NULL);
-	acevals_init(&al->other_obj, NULL);
+	acevals_init(&al->user_obj, 0);
+	acevals_init(&al->group_obj, 0);
+	acevals_init(&al->other_obj, 0);
 	al->numusers = 0;
 	al->numgroups = 0;
 	al->acl_mask = 0;

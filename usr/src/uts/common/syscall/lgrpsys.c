@@ -182,7 +182,7 @@ meminfo(int addr_count, struct meminfo *mip)
 				out_array[i] = lgrp->lgrp_id;
 				val_array[i] = VALID_ADDR | VALID_REQ;
 			} else {
-				out_array[i] = NULL;
+				out_array[i] = 0;
 				val_array[i] = 0;
 			}
 		}
@@ -1857,7 +1857,7 @@ lgrp_snapshot_copy32(caddr32_t buf, size32_t bufsize)
 	snap_size = snap_hdr_size + info_size + cpuids_size + bitmasks_size +
 	    lats_size;
 
-	if (buf == NULL || bufsize <= 0) {
+	if (buf == 0 || bufsize <= 0) {
 		return (snap_size);
 	}
 
