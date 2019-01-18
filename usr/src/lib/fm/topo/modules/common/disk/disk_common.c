@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -154,7 +154,8 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 			    "label error %s\n", topo_strerror(err));
 			goto error;
 		}
-	} else if (topo_node_label_set(dtn, label, &err) != 0) {
+	} else if (topo_prop_set_string(dtn, TOPO_PGROUP_PROTOCOL,
+	    TOPO_PROP_LABEL, TOPO_PROP_MUTABLE, label, &err) != 0) {
 		topo_mod_dprintf(mod, "disk_set_props: "
 		    "label_set error %s\n", topo_strerror(err));
 		goto error;
