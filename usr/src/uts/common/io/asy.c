@@ -1077,13 +1077,13 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		(void) snprintf(name, ASY_MINOR_LEN, "%d", instance);
 	}
 	status = ddi_create_minor_node(devi, name, S_IFCHR, instance,
-	    asy->asy_com_port != 0 ? DDI_NT_SERIAL_MB : DDI_NT_SERIAL, NULL);
+	    asy->asy_com_port != 0 ? DDI_NT_SERIAL_MB : DDI_NT_SERIAL, 0);
 	if (status == DDI_SUCCESS) {
 		(void) strcat(name, ",cu");
 		status = ddi_create_minor_node(devi, name, S_IFCHR,
 		    OUTLINE | instance,
 		    asy->asy_com_port != 0 ? DDI_NT_SERIAL_MB_DO :
-		    DDI_NT_SERIAL_DO, NULL);
+		    DDI_NT_SERIAL_DO, 0);
 	}
 
 	if (status != DDI_SUCCESS) {
