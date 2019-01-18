@@ -58,8 +58,7 @@ static int emul64_cdb_debug	= 0;
 /*
  * cb_ops function prototypes
  */
-static int emul64_ioctl(dev_t, int cmd, intptr_t arg, int mode,
-			cred_t *credp, int *rvalp);
+static int emul64_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
 /*
  * dev_ops functions prototypes
@@ -87,7 +86,7 @@ static struct scsi_pkt *emul64_scsi_init_pkt(struct scsi_address *ap,
     struct scsi_pkt *pkt, struct buf *bp, int cmdlen, int statuslen,
     int tgtlen, int flags, int (*callback)(), caddr_t arg);
 static void emul64_scsi_destroy_pkt(struct scsi_address *ap,
-					struct scsi_pkt *pkt);
+    struct scsi_pkt *pkt);
 static void emul64_scsi_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt);
 static void emul64_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt);
 static int emul64_scsi_reset_notify(struct scsi_address *ap, int flag,
@@ -99,29 +98,23 @@ static int emul64_scsi_reset_notify(struct scsi_address *ap, int flag,
 static void emul64_i_initcap(struct emul64 *emul64);
 
 static void emul64_i_log(struct emul64 *emul64, int level, char *fmt, ...);
-static int emul64_get_tgtrange(struct emul64 *,
-				intptr_t,
-				emul64_tgt_t **,
-				emul64_tgt_range_t *);
-static int emul64_write_off(struct emul64 *,
-			    emul64_tgt_t *,
-			    emul64_tgt_range_t *);
-static int emul64_write_on(struct emul64 *,
-				emul64_tgt_t *,
-				emul64_tgt_range_t *);
+static int emul64_get_tgtrange(struct emul64 *, intptr_t, emul64_tgt_t **,
+    emul64_tgt_range_t *);
+static int emul64_write_off(struct emul64 *, emul64_tgt_t *,
+    emul64_tgt_range_t *);
+static int emul64_write_on(struct emul64 *, emul64_tgt_t *,
+    emul64_tgt_range_t *);
 static emul64_nowrite_t *emul64_nowrite_alloc(emul64_range_t *);
 static void emul64_nowrite_free(emul64_nowrite_t *);
 static emul64_nowrite_t *emul64_find_nowrite(emul64_tgt_t *,
-					diskaddr_t start_block,
-					size_t blkcnt,
-					emul64_rng_overlap_t *overlapp,
-					emul64_nowrite_t ***prevp);
+    diskaddr_t start_block, size_t blkcnt, emul64_rng_overlap_t *overlapp,
+    emul64_nowrite_t ***prevp);
 
 extern emul64_tgt_t *find_tgt(struct emul64 *, ushort_t, ushort_t);
 
 #ifdef EMUL64DEBUG
 static void emul64_debug_dump_cdb(struct scsi_address *ap,
-		struct scsi_pkt *pkt);
+    struct scsi_pkt *pkt);
 #endif
 
 
@@ -391,7 +384,7 @@ emul64_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	tran->tran_destroy_pkt		= emul64_scsi_destroy_pkt;
 	tran->tran_dmafree		= emul64_scsi_dmafree;
 	tran->tran_sync_pkt		= emul64_scsi_sync_pkt;
-	tran->tran_reset_notify 	= emul64_scsi_reset_notify;
+	tran->tran_reset_notify		= emul64_scsi_reset_notify;
 
 	tmp_dma_attr.dma_attr_minxfer = 0x1;
 	tmp_dma_attr.dma_attr_burstsizes = 0x7f;
@@ -516,7 +509,7 @@ emul64_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 /*ARGSUSED*/
 static int
 emul64_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
-	scsi_hba_tran_t *tran, struct scsi_device *sd)
+    scsi_hba_tran_t *tran, struct scsi_device *sd)
 {
 	struct emul64	*emul64;
 	emul64_tgt_t	*tgt;
@@ -807,8 +800,8 @@ emul64_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 /* ARGSUSED */
 static struct scsi_pkt *
 emul64_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
-	struct buf *bp, int cmdlen, int statuslen, int tgtlen,
-	int flags, int (*callback)(), caddr_t arg)
+    struct buf *bp, int cmdlen, int statuslen, int tgtlen,
+    int flags, int (*callback)(), caddr_t arg)
 {
 	struct emul64		*emul64	= ADDR2EMUL64(ap);
 	struct emul64_cmd	*sp;
@@ -938,7 +931,7 @@ emul64_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
  */
 static int
 emul64_scsi_reset_notify(struct scsi_address *ap, int flag,
-void (*callback)(caddr_t), caddr_t arg)
+    void (*callback)(caddr_t), caddr_t arg)
 {
 	struct emul64				*emul64 = ADDR2EMUL64(ap);
 	struct emul64_reset_notify_entry	*p, *beforep;
@@ -1151,7 +1144,7 @@ emul64_error_inject_req(struct emul64 *emul64, intptr_t arg)
 	struct emul64_error_inj_data error_inj_req;
 
 	/* Check args */
-	if (arg == NULL) {
+	if (arg == (intptr_t)NULL) {
 		return (EINVAL);
 	}
 
@@ -1368,10 +1361,8 @@ emul64_scsi_reset(struct scsi_address *ap, int level)
 }
 
 static int
-emul64_get_tgtrange(struct emul64 *emul64,
-		    intptr_t arg,
-		    emul64_tgt_t **tgtp,
-		    emul64_tgt_range_t *tgtr)
+emul64_get_tgtrange(struct emul64 *emul64, intptr_t arg, emul64_tgt_t **tgtp,
+    emul64_tgt_range_t *tgtr)
 {
 	if (ddi_copyin((void *)arg, tgtr, sizeof (*tgtr), 0) != 0) {
 		cmn_err(CE_WARN, "emul64: ioctl - copy in failed\n");
@@ -1390,12 +1381,8 @@ emul64_get_tgtrange(struct emul64 *emul64,
 }
 
 static int
-emul64_ioctl(dev_t dev,
-	int cmd,
-	intptr_t arg,
-	int mode,
-	cred_t *credp,
-	int *rvalp)
+emul64_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
 {
 	struct emul64		*emul64;
 	int			instance;
@@ -1444,9 +1431,8 @@ emul64_ioctl(dev_t dev,
 
 /* ARGSUSED */
 static int
-emul64_write_off(struct emul64 *emul64,
-	emul64_tgt_t *tgt,
-	emul64_tgt_range_t *tgtr)
+emul64_write_off(struct emul64 *emul64, emul64_tgt_t *tgt,
+    emul64_tgt_range_t *tgtr)
 {
 	size_t			blkcnt = tgtr->emul64_blkrange.emul64_blkcnt;
 	emul64_nowrite_t	*cur;
@@ -1487,9 +1473,8 @@ emul64_write_off(struct emul64 *emul64,
 
 /* ARGSUSED */
 static int
-emul64_write_on(struct emul64 *emul64,
-		emul64_tgt_t *tgt,
-		emul64_tgt_range_t *tgtr)
+emul64_write_on(struct emul64 *emul64, emul64_tgt_t *tgt,
+    emul64_tgt_range_t *tgtr)
 {
 	size_t			blkcnt = tgtr->emul64_blkrange.emul64_blkcnt;
 	emul64_nowrite_t	*cur;
@@ -1534,11 +1519,8 @@ emul64_write_on(struct emul64 *emul64,
 }
 
 static emul64_nowrite_t *
-emul64_find_nowrite(emul64_tgt_t *tgt,
-		    diskaddr_t sb,
-		    size_t blkcnt,
-		    emul64_rng_overlap_t *overlap,
-		    emul64_nowrite_t ***prevp)
+emul64_find_nowrite(emul64_tgt_t *tgt, diskaddr_t sb, size_t blkcnt,
+    emul64_rng_overlap_t *overlap, emul64_nowrite_t ***prevp)
 {
 	emul64_nowrite_t	*cur;
 	emul64_nowrite_t	**prev;
@@ -1625,7 +1607,7 @@ emul64_debug_dump_cdb(struct scsi_address *ap, struct scsi_pkt *pkt)
 	struct emul64	*emul64	= ADDR2EMUL64(ap);
 	struct emul64_cmd	*sp	= PKT2CMD(pkt);
 	uint8_t		*cdb	= pkt->pkt_cdbp;
-	char		buf [256];
+	char		buf[256];
 	char		*p;
 	int		i;
 
@@ -1644,7 +1626,7 @@ emul64_debug_dump_cdb(struct scsi_address *ap, struct scsi_pkt *pkt)
 	}
 	*p++ = ']';
 	*p++ = '\n';
-	*p = 0;
+	*p = '\0';
 
 	cmn_err(CE_CONT, buf);
 }
