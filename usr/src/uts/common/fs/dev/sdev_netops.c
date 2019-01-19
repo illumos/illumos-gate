@@ -251,7 +251,7 @@ devnet_filldir(struct sdev_node *ddv)
 	datalink_id_t	linkid;
 
 	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
-	if (rw_tryupgrade(&ddv->sdev_contents) == NULL) {
+	if (rw_tryupgrade(&ddv->sdev_contents) == 0) {
 		rw_exit(&ddv->sdev_contents);
 		rw_enter(&ddv->sdev_contents, RW_WRITER);
 	}

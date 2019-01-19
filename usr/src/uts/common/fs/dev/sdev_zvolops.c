@@ -183,7 +183,7 @@ devzvol_objset_check(char *dsname, dmu_objset_type_t *type)
 	boolean_t	ispool, is_snapshot;
 	zfs_cmd_t	*zc;
 	int rc;
-	nvlist_t 	*nvl;
+	nvlist_t	*nvl;
 	size_t nvsz;
 
 	ispool = (strchr(dsname, '/') == NULL);
@@ -462,7 +462,7 @@ devzvol_create_pool_dirs(struct vnode *dvp)
 		kmem_free((void *)(uintptr_t)devzvol_zclist,
 		    devzvol_zclist_size);
 		devzvol_gen = 0;
-		devzvol_zclist = NULL;
+		devzvol_zclist = 0;
 		devzvol_zclist_size = 0;
 		goto out;
 	}
