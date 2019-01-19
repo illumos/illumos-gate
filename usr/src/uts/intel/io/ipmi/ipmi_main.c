@@ -89,7 +89,7 @@ get_smbios_ipmi_info(void)
 	 * it is not installed. In this case we see 0x0 as the base address.
 	 * If we see this address, assume the device is not really present.
 	 */
-	if (ipmi.smbip_addr == NULL) {
+	if (ipmi.smbip_addr == 0) {
 		cmn_err(CE_WARN, "!SMBIOS: Invalid base address");
 		return (DDI_FAILURE);
 	}
