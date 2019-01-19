@@ -399,8 +399,8 @@ rds_ep_init(rds_ep_t *ep, ib_guid_t hca_guid)
 	mutex_enter(&ep->ep_lock);
 	ep->ep_state = RDS_EP_STATE_UNCONNECTED;
 	ep->ep_hca_guid = hca_guid;
-	ep->ep_lbufid = NULL;
-	ep->ep_rbufid = NULL;
+	ep->ep_lbufid = 0;
+	ep->ep_rbufid = 0;
 	ep->ep_segfbp = NULL;
 	ep->ep_seglbp = NULL;
 
@@ -411,7 +411,7 @@ rds_ep_init(rds_ep_t *ep, ib_guid_t hca_guid)
 	ep->ep_ackwr.wr_opcode = IBT_WRC_RDMAW;
 	ep->ep_ackwr.wr_nds = 1;
 	ep->ep_ackwr.wr_sgl = &ep->ep_ackds;
-	ep->ep_ackwr.wr.rc.rcwr.rdma.rdma_raddr = NULL;
+	ep->ep_ackwr.wr.rc.rcwr.rdma.rdma_raddr = 0;
 	ep->ep_ackwr.wr.rc.rcwr.rdma.rdma_rkey = 0;
 	mutex_exit(&ep->ep_lock);
 
@@ -532,7 +532,7 @@ rds_session_reinit(rds_session_t *sp, ib_gid_t lgid)
 	rds_unmark_all_ports(sp, RDS_REMOTE);
 
 	/* This should not happen but just a safe guard */
-	if (sp->session_dataep.ep_ack_addr == NULL) {
+	if (sp->session_dataep.ep_ack_addr == 0) {
 		RDS_DPRINTF2("rds_session_reinit",
 		    "ERROR: Unexpected: SP(0x%p) - state: %d",
 		    sp, sp->session_state);
@@ -1761,7 +1761,7 @@ rds_resend_messages(void *arg)
 
 	ASSERT(spool->pool_nfree == spool->pool_nbuffers);
 
-	if (ep->ep_lbufid == NULL) {
+	if (ep->ep_lbufid == 0) {
 		RDS_DPRINTF2("rds_resend_messages",
 		    "SP(%p) Remote session is cleaned up ", sp);
 		/*
