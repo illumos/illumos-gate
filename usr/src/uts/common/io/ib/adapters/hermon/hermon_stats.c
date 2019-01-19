@@ -245,7 +245,7 @@ hermon_kstat_picN_create(hermon_state_t *state, int num_pic, int num_evt,
 	drv_instance = ddi_get_instance(state->hs_dip);
 	(void) sprintf(pic_name, "pic%d", num_pic);
 	picN_ksp = kstat_create(drv_name, drv_instance, pic_name, "bus",
-	    KSTAT_TYPE_NAMED, num_evt, NULL);
+	    KSTAT_TYPE_NAMED, num_evt, 0);
 	if (picN_ksp == NULL) {
 		return (NULL);
 	}
