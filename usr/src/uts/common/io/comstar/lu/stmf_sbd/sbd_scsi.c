@@ -3392,8 +3392,8 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			return;
 		/*
 		 * } else if (cdb1 == SSVC_ACTION_READ_LONG_G4) {
-		 * 	sbd_handle_read(task, initial_dbuf);
-		 * 	return;
+		 *	sbd_handle_read(task, initial_dbuf);
+		 *	return;
 		 */
 		}
 	}
@@ -3402,7 +3402,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	 * if (cdb0 == SCMD_SVC_ACTION_OUT_G4) {
 	 *	if (cdb1 == SSVC_ACTION_WRITE_LONG_G4) {
 	 *		 sbd_handle_write(task, initial_dbuf);
-	 * 		return;
+	 *		return;
 	 *	}
 	 * }
 	 */
@@ -3703,7 +3703,7 @@ sbd_flush_data_cache(sbd_lu_t *sl, int fsync_done)
 over_fsync:
 	if (((sl->sl_data_vtype == VCHR) || (sl->sl_data_vtype == VBLK)) &&
 	    ((sl->sl_flags & SL_NO_DATA_DKIOFLUSH) == 0)) {
-		ret = VOP_IOCTL(sl->sl_data_vp, DKIOCFLUSHWRITECACHE, NULL,
+		ret = VOP_IOCTL(sl->sl_data_vp, DKIOCFLUSHWRITECACHE, 0,
 		    FKIOCTL, kcred, &r, NULL);
 		if ((ret == ENOTTY) || (ret == ENOTSUP)) {
 			mutex_enter(&sl->sl_lock);

@@ -888,7 +888,7 @@ sbd_load_section_hdr(sbd_lu_t *sl, sm_section_hdr_t *sms)
 {
 	sm_section_hdr_t	h;
 	uint64_t		st;
-	sbd_status_t 		ret;
+	sbd_status_t		ret;
 
 	for (st = sl->sl_meta_offset + sizeof (sbd_meta_start_t);
 	    st < sl->sl_meta_size_used; st += h.sms_size) {
@@ -3502,7 +3502,7 @@ sbd_update_zfs_prop(sbd_lu_t *sl)
 		num = (*dp) & 0xF;
 		*ah_meta++ = (num < 10) ? (num + '0') : (num + ('a' - 10));
 	}
-	*ah_meta = NULL;
+	*ah_meta = '\0';
 	file = sbd_get_zvol_name(sl);
 	if (sbd_zvolset(file, (char *)ptr)) {
 		ret = SBD_META_CORRUPTED;
