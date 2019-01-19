@@ -283,7 +283,7 @@ iser_handle_cm_conn_est(ibt_cm_event_t *evp)
 		 * Kick the state machine.  At CS_S3_XPT_UP the state machine
 		 * will notify the client (target) about the new connection.
 		 */
-		idm_conn_event(ic, CE_CONNECT_ACCEPT, NULL);
+		idm_conn_event(ic, CE_CONNECT_ACCEPT, (uintptr_t)NULL);
 		iser_conn->ic_stage = ISER_CONN_STAGE_IC_CONNECTED;
 		mutex_exit(&iser_conn->ic_lock);
 
