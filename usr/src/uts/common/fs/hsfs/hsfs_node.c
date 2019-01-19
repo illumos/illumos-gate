@@ -1008,8 +1008,7 @@ hs_parsedir(
 		if (IS_SUSP_IMPLEMENTED(fsp)) {
 			error = parse_sua((uchar_t *)dnp, dnlen,
 			    &name_change_flag, dirp, last_offset,
-			    hdp, fsp,
-			    (uchar_t *)NULL, NULL);
+			    hdp, fsp, NULL, 0);
 			if (error) {
 				if (hdp->sym_link) {
 					kmem_free(hdp->sym_link,
