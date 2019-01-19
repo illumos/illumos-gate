@@ -1117,8 +1117,8 @@ ehci_polled_save_state(ehci_polled_t	*ehci_polledp)
 	 */
 	qh = ehci_polledp->ehci_polled_qh;
 	for (i = 0; i < 5; i++) {
-		Set_QH(qh->qh_buf[i], NULL);
-		Set_QH(qh->qh_buf_high[i], NULL);
+		Set_QH(qh->qh_buf[i], 0);
+		Set_QH(qh->qh_buf_high[i], 0);
 	}
 	Set_QH(qh->qh_next_qtd, ehci_qtd_cpu_to_iommu(ehcip,
 	    ehci_polledp->ehci_polled_active_intr_qtd_list));
@@ -1296,7 +1296,7 @@ ehci_polled_stop_processing(ehci_polled_t	*ehci_polledp)
 	    Get_QH(qh->qh_ctrl) & ~(EHCI_QH_CTRL_ED_INACTIVATE));
 	Set_QH(qh->qh_status,
 	    Get_QH(qh->qh_status) & ~(EHCI_QH_STS_XACT_STATUS));
-	Set_QH(qh->qh_curr_qtd, NULL);
+	Set_QH(qh->qh_curr_qtd, 0);
 	Set_QH(qh->qh_alt_next_qtd, EHCI_QH_ALT_NEXT_QTD_PTR_VALID);
 
 	/*
@@ -1430,7 +1430,7 @@ ehci_polled_process_active_intr_qtd_list(ehci_polled_t	*ehci_polledp)
 				tw->tw_qtd_free_list = qtd;
 			} else {
 				tw->tw_qtd_free_list = qtd;
-				Set_QTD(qtd->qtd_tw_next_qtd, NULL);
+				Set_QTD(qtd->qtd_tw_next_qtd, 0);
 				Set_QTD(qtd->qtd_state, EHCI_QTD_DUMMY);
 			}
 			break;
@@ -1601,7 +1601,7 @@ ehci_polled_insert_bulk_qtd(
 
 	tw->tw_qtd_free_list = ehci_qtd_iommu_to_cpu(ehcip,
 	    Get_QTD(new_dummy_qtd->qtd_tw_next_qtd));
-	Set_QTD(new_dummy_qtd->qtd_tw_next_qtd, NULL);
+	Set_QTD(new_dummy_qtd->qtd_tw_next_qtd, 0);
 
 	/* Get the current and next dummy QTDs */
 	curr_dummy_qtd = ehci_qtd_iommu_to_cpu(ehcip,
@@ -1765,7 +1765,7 @@ ehci_polled_insert_qtd_on_tw(
 	 * Set the next pointer to NULL because
 	 * this is the last QTD on list.
 	 */
-	Set_QTD(qtd->qtd_tw_next_qtd, NULL);
+	Set_QTD(qtd->qtd_tw_next_qtd, 0);
 
 	if (tw->tw_qtd_head == NULL) {
 		ASSERT(tw->tw_qtd_tail == NULL);
@@ -1821,7 +1821,7 @@ ehci_polled_create_done_qtd_list(
 			ehci_polled_remove_qtd_from_active_intr_qtd_list(
 			    ehci_polledp, curr_qtd);
 
-			Set_QTD(curr_qtd->qtd_active_qtd_next, NULL);
+			Set_QTD(curr_qtd->qtd_active_qtd_next, 0);
 
 			if (done_qtd_list) {
 				Set_QTD(last_done_qtd->qtd_active_qtd_next,
@@ -1874,8 +1874,8 @@ ehci_polled_insert_qtd_into_active_intr_qtd_list(
 		    ehci_qtd_cpu_to_iommu(ehcip, qtd));
 	} else {
 		ehci_polledp->ehci_polled_active_intr_qtd_list = qtd;
-		Set_QTD(qtd->qtd_active_qtd_next, NULL);
-		Set_QTD(qtd->qtd_active_qtd_prev, NULL);
+		Set_QTD(qtd->qtd_active_qtd_next, 0);
+		Set_QTD(qtd->qtd_active_qtd_prev, 0);
 	}
 }
 
@@ -2260,6 +2260,6 @@ ehci_polled_remove_async_qh(
 	}
 
 	/* qh_prev to indicate it is no longer in the circular list */
-	Set_QH(qh->qh_prev, NULL);
+	Set_QH(qh->qh_prev, 0);
 
 }

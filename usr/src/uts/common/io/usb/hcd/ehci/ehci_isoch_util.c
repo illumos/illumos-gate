@@ -697,7 +697,7 @@ ehci_deallocate_itd(
 
 		Set_ITD(itd->itd_itw_next_itd, old_itd->itd_itw_next_itd);
 
-		if (itd->itd_itw_next_itd == NULL) {
+		if (itd->itd_itw_next_itd == 0) {
 			itw->itw_itd_tail = itd;
 		}
 	} else {
@@ -843,7 +843,7 @@ void ehci_insert_itd_on_itw(
 	 * Set the next pointer to NULL because
 	 * this is the last ITD on list.
 	 */
-	Set_ITD(itd->itd_itw_next_itd, NULL);
+	Set_ITD(itd->itd_itw_next_itd, 0);
 
 	if (itw->itw_itd_head == NULL) {
 		ASSERT(itw->itw_itd_tail == NULL);
@@ -911,7 +911,7 @@ ehci_remove_itd_from_active_list(
 	if (curr_itd == itd) {
 		ehcip->ehci_active_itd_list =
 		    ehci_itd_iommu_to_cpu(ehcip, itd->itd_next_active_itd);
-		itd->itd_next_active_itd = NULL;
+		itd->itd_next_active_itd = 0;
 
 		return;
 	}
@@ -930,7 +930,7 @@ ehci_remove_itd_from_active_list(
 	if ((curr_itd) && (next_itd == itd)) {
 		Set_ITD(curr_itd->itd_next_active_itd,
 		    Get_ITD(itd->itd_next_active_itd));
-		Set_ITD(itd->itd_next_active_itd, NULL);
+		Set_ITD(itd->itd_next_active_itd, 0);
 	} else {
 		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 		    "ehci_remove_itd_from_active_list: "
@@ -1380,10 +1380,8 @@ ehci_itd_cpu_to_iommu(
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
-	if (addr == NULL) {
-
-		return (NULL);
-	}
+	if (addr == NULL)
+		return (0);
 
 	td = (uint32_t)ehcip->ehci_itd_pool_cookie.dmac_address +
 	    (uint32_t)((uintptr_t)addr -
@@ -1417,10 +1415,8 @@ ehci_itd_iommu_to_cpu(
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
-	if (addr == NULL) {
-
+	if (addr == 0)
 		return (NULL);
-	}
 
 	itd = (ehci_itd_t *)((uintptr_t)
 	    (addr - ehcip->ehci_itd_pool_cookie.dmac_address) +

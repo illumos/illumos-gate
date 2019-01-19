@@ -371,7 +371,7 @@ ehci_alloc_qh(
 
 			ehci_unpack_endpoint(ehcip, ph, qh);
 
-			Set_QH(qh->qh_curr_qtd, NULL);
+			Set_QH(qh->qh_curr_qtd, 0);
 			Set_QH(qh->qh_alt_next_qtd,
 			    EHCI_QH_ALT_NEXT_QTD_PTR_VALID);
 
@@ -1202,7 +1202,7 @@ ehci_remove_async_qh(
 	}
 
 	/* qh_prev to indicate it is no longer in the circular list */
-	Set_QH(qh->qh_prev, NULL);
+	Set_QH(qh->qh_prev, 0);
 
 	if (reclaim) {
 		ehci_insert_qh_on_reclaim_list(ehcip, pp);
@@ -1253,7 +1253,7 @@ ehci_remove_intr_qh(
 	}
 
 	/* qh_prev to indicate it is no longer in the circular list */
-	Set_QH(qh->qh_prev, NULL);
+	Set_QH(qh->qh_prev, 0);
 
 	if (reclaim) {
 		ehci_insert_qh_on_reclaim_list(ehcip, pp);
@@ -1392,10 +1392,8 @@ ehci_qh_iommu_to_cpu(
 {
 	ehci_qh_t	*qh;
 
-	if (addr == NULL) {
-
+	if (addr == 0)
 		return (NULL);
-	}
 
 	qh = (ehci_qh_t *)((uintptr_t)
 	    (addr - ehcip->ehci_qh_pool_cookie.dmac_address) +
@@ -2269,7 +2267,7 @@ ehci_insert_qtd(
 	ASSERT(new_dummy_qtd != NULL);
 	tw->tw_qtd_free_list = ehci_qtd_iommu_to_cpu(ehcip,
 	    Get_QTD(new_dummy_qtd->qtd_tw_next_qtd));
-	Set_QTD(new_dummy_qtd->qtd_tw_next_qtd, NULL);
+	Set_QTD(new_dummy_qtd->qtd_tw_next_qtd, 0);
 
 	/* Get the current and next dummy QTDs */
 	curr_dummy_qtd = ehci_qtd_iommu_to_cpu(ehcip,
@@ -2532,7 +2530,7 @@ ehci_insert_qtd_on_tw(
 	 * Set the next pointer to NULL because
 	 * this is the last QTD on list.
 	 */
-	Set_QTD(qtd->qtd_tw_next_qtd, NULL);
+	Set_QTD(qtd->qtd_tw_next_qtd, 0);
 
 	if (tw->tw_qtd_head == NULL) {
 		ASSERT(tw->tw_qtd_tail == NULL);
@@ -2590,8 +2588,8 @@ ehci_insert_qtd_into_active_qtd_list(
 		    ehci_qtd_cpu_to_iommu(ehcip, qtd));
 	} else {
 		ehcip->ehci_active_qtd_list = qtd;
-		Set_QTD(qtd->qtd_active_qtd_next, NULL);
-		Set_QTD(qtd->qtd_active_qtd_prev, NULL);
+		Set_QTD(qtd->qtd_active_qtd_next, 0);
+		Set_QTD(qtd->qtd_active_qtd_prev, 0);
 	}
 }
 
@@ -2750,7 +2748,7 @@ ehci_deallocate_qtd(
 
 			Set_QTD(qtd->qtd_tw_next_qtd, old_qtd->qtd_tw_next_qtd);
 
-			if (qtd->qtd_tw_next_qtd == NULL) {
+			if (qtd->qtd_tw_next_qtd == 0) {
 				tw->tw_qtd_tail = qtd;
 			}
 		} else {
@@ -2820,10 +2818,8 @@ ehci_qtd_iommu_to_cpu(
 {
 	ehci_qtd_t	*qtd;
 
-	if (addr == NULL) {
-
+	if (addr == 0)
 		return (NULL);
-	}
 
 	qtd = (ehci_qtd_t *)((uintptr_t)
 	    (addr - ehcip->ehci_qtd_pool_cookie.dmac_address) +

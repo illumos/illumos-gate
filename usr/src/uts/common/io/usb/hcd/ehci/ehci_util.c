@@ -1076,7 +1076,8 @@ ehci_init_hardware(ehci_state_t	*ehcip)
 			 * always keep a dummy QH on the list.
 			 */
 			ehci_qh_t *dummy_async_qh =
-			    ehci_alloc_qh(ehcip, NULL, NULL);
+			    ehci_alloc_qh(ehcip, NULL,
+			    EHCI_INTERRUPT_MODE_FLAG);
 
 			Set_QH(dummy_async_qh->qh_link_ptr,
 			    ((ehci_qh_cpu_to_iommu(ehcip, dummy_async_qh) &
@@ -4654,8 +4655,8 @@ ehci_do_byte_stats(
 	uint8_t		attr,
 	uint8_t		addr)
 {
-	uint8_t 	type = attr & USB_EP_ATTR_MASK;
-	uint8_t 	dir = addr & USB_EP_DIR_MASK;
+	uint8_t		type = attr & USB_EP_ATTR_MASK;
+	uint8_t		dir = addr & USB_EP_DIR_MASK;
 
 	if (dir == USB_EP_DIR_IN) {
 		EHCI_TOTAL_STATS_DATA(ehcip)->reads++;

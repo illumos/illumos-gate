@@ -396,7 +396,7 @@ ehci_create_done_qtd_list(
 			/* Remove this QTD from active QTD list */
 			ehci_remove_qtd_from_active_qtd_list(ehcip, curr_qtd);
 
-			Set_QTD(curr_qtd->qtd_active_qtd_next, NULL);
+			Set_QTD(curr_qtd->qtd_active_qtd_next, 0);
 
 			if (done_qtd_list) {
 				Set_QTD(last_done_qtd->qtd_active_qtd_next,
