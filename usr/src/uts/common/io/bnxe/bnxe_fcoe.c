@@ -1351,7 +1351,7 @@ boolean_t BnxeFcoePrvPoll(dev_info_t * pDev)
     if (pRxQ->inPollMode == B_FALSE)
     {
         BnxeLogWarn(pUM, "Polling on FCoE ring %d when NOT in poll mode!", idx);
-        return NULL;
+        return B_FALSE;
     }
 
     pRxQ->pollCnt++;
