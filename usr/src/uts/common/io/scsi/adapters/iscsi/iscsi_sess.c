@@ -1094,7 +1094,7 @@ iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event,
 
 	/* Audit event */
 	idm_sm_audit_event(&isp->sess_state_audit,
-	    SAS_ISCSI_SESS, isp->sess_state, event, NULL);
+	    SAS_ISCSI_SESS, isp->sess_state, event, 0);
 
 	isp->sess_prev_state = isp->sess_state;
 	isp->sess_state_lbolt = ddi_get_lbolt();
@@ -2463,8 +2463,8 @@ iscsi_sess_update_busy_luns(iscsi_sess_t *isp, boolean_t clear)
  * must call iscsi_sess_enum_query at a later time to unblock next enum
  */
 iscsi_enum_result_t
-iscsi_sess_enum_request(iscsi_sess_t *isp, boolean_t wait,
-    uint32_t event_count) {
+iscsi_sess_enum_request(iscsi_sess_t *isp, boolean_t wait, uint32_t event_count)
+{
 	iscsi_task_t		*itp;
 
 	itp = kmem_zalloc(sizeof (iscsi_task_t), KM_SLEEP);
@@ -2509,7 +2509,8 @@ iscsi_sess_enum_request(iscsi_sess_t *isp, boolean_t wait,
  * The last caller is responsible for kicking off the DONE status
  */
 iscsi_enum_result_t
-iscsi_sess_enum_query(iscsi_sess_t *isp) {
+iscsi_sess_enum_query(iscsi_sess_t *isp)
+{
 	iscsi_enum_result_t	ret = ISCSI_SESS_ENUM_IOFAIL;
 
 	mutex_enter(&isp->sess_enum_lock);
@@ -2528,13 +2529,15 @@ iscsi_sess_enum_query(iscsi_sess_t *isp) {
 }
 
 static void
-iscsi_sess_enum_warn(iscsi_sess_t *isp, iscsi_enum_result_t r) {
+iscsi_sess_enum_warn(iscsi_sess_t *isp, iscsi_enum_result_t r)
+{
 	cmn_err(CE_WARN, "iscsi session (%u) enumeration fails - %s",
 	    isp->sess_oid, iscsi_sess_enum_warn_msgs[r]);
 }
 
 void
-iscsi_sess_enter_state_zone(iscsi_sess_t *isp) {
+iscsi_sess_enter_state_zone(iscsi_sess_t *isp)
+{
 	mutex_enter(&isp->sess_state_wmutex);
 	while (isp->sess_state_hasw == B_TRUE) {
 		cv_wait(&isp->sess_state_wcv, &isp->sess_state_wmutex);
@@ -2546,7 +2549,8 @@ iscsi_sess_enter_state_zone(iscsi_sess_t *isp) {
 }
 
 void
-iscsi_sess_exit_state_zone(iscsi_sess_t *isp) {
+iscsi_sess_exit_state_zone(iscsi_sess_t *isp)
+{
 	rw_exit(&isp->sess_state_rwlock);
 
 	mutex_enter(&isp->sess_state_wmutex);

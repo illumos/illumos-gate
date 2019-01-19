@@ -46,11 +46,11 @@ boolean_t iscsi_io_logging = B_FALSE;
 #define	ISCSI_CHECK_SCSI_READ(ICHK_CMD, ICHK_HDR, ICHK_LEN, ICHK_TYPE)	\
 	if (idm_pattern_checking)  {					\
 		struct scsi_pkt *pkt = (ICHK_CMD)->cmd_un.scsi.pkt;	\
-		if (((ICHK_HDR)->response == 0) && 			\
+		if (((ICHK_HDR)->response == 0) &&			\
 		    ((ICHK_HDR)->cmd_status == 0) &&			\
 		    ((pkt->pkt_cdbp[0] == SCMD_READ_G1) ||		\
-		    (pkt->pkt_cdbp[0] == SCMD_READ_G4) || 		\
-		    (pkt->pkt_cdbp[0] == SCMD_READ) || 			\
+		    (pkt->pkt_cdbp[0] == SCMD_READ_G4) ||		\
+		    (pkt->pkt_cdbp[0] == SCMD_READ) ||			\
 		    (pkt->pkt_cdbp[0] == SCMD_READ_G5))) {		\
 			idm_buf_t *idb = (ICHK_CMD)->cmd_un.scsi.ibp_ibuf; \
 			IDM_BUFPAT_CHECK(idb, ICHK_LEN, ICHK_TYPE); \
@@ -296,7 +296,7 @@ iscsi_rx_scsi_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 void
 iscsi_task_cleanup(int opcode, iscsi_cmd_t *icmdp)
 {
-	struct buf 	*bp;
+	struct buf	*bp;
 	idm_buf_t	*ibp, *obp;
 	idm_task_t	*itp;
 
@@ -606,7 +606,7 @@ iscsi_cmd_rsp_cmd_status(iscsi_cmd_t *icmdp, iscsi_scsi_rsp_hdr_t *issrhp,
 idm_status_t
 iscsi_rx_process_login_pdu(idm_conn_t *ic, idm_pdu_t *pdu)
 {
-	iscsi_conn_t 		*icp;
+	iscsi_conn_t		*icp;
 
 	icp = ic->ic_handle;
 
@@ -1061,7 +1061,7 @@ iscsi_rx_process_reject_rsp(idm_conn_t *ic, idm_pdu_t *pdu)
 	uint32_t		dlength		= 0;
 	iscsi_hdr_t		*old_ihp	= NULL;
 	iscsi_conn_t		*icp		= ic->ic_handle;
-	uint8_t			*data 		= pdu->isp_data;
+	uint8_t			*data		= pdu->isp_data;
 	idm_status_t		status		= IDM_STATUS_SUCCESS;
 	int			i		= 0;
 
@@ -1183,7 +1183,7 @@ iscsi_rx_process_rejected_tsk_mgt(idm_conn_t *ic, iscsi_hdr_t *old_ihp)
 {
 	iscsi_sess_t		*isp	= NULL;
 	iscsi_cmd_t		*icmdp	= NULL;
-	iscsi_conn_t		*icp 	= ic->ic_handle;
+	iscsi_conn_t		*icp	= ic->ic_handle;
 
 	isp = icp->conn_sess;
 	ASSERT(old_ihp != NULL);
@@ -3169,7 +3169,8 @@ iscsi_process_rsp_status(iscsi_sess_t *isp, iscsi_conn_t *icp,
 }
 
 static void
-iscsi_drop_conn_cleanup(iscsi_conn_t *icp) {
+iscsi_drop_conn_cleanup(iscsi_conn_t *icp)
+{
 	mutex_enter(&icp->conn_state_mutex);
 	idm_ini_conn_disconnect(icp->conn_ic);
 	mutex_exit(&icp->conn_state_mutex);
@@ -3191,7 +3192,7 @@ iscsi_rx_error_pdu(idm_conn_t *ic, idm_pdu_t *pdu, idm_status_t status)
 void
 iscsi_rx_misc_pdu(idm_conn_t *ic, idm_pdu_t *pdu)
 {
-	iscsi_conn_t 		*icp;
+	iscsi_conn_t		*icp;
 	iscsi_hdr_t		*ihp	= (iscsi_hdr_t *)pdu->isp_hdr;
 	iscsi_sess_t		*isp;
 	idm_status_t		status;
@@ -3394,7 +3395,7 @@ iscsi_wd_thread(iscsi_thread_t *thread, void *arg)
 
 	ASSERT(isp != NULL);
 
-	while (rc != NULL) {
+	while (rc != 0) {
 
 		iscsi_timeout_checks(isp);
 		iscsi_nop_checks(isp);
