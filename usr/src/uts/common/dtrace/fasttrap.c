@@ -121,7 +121,7 @@
  * creation lock.
  *
  * Briefly:
- * 	bucket lock before provider lock
+ *	bucket lock before provider lock
  *	DTrace before provider lock
  *	creation lock before DTrace
  *	never hold the provider lock and creation lock simultaneously
@@ -2134,7 +2134,7 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "fasttrap", S_IFCHR, 0,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
