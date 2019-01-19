@@ -973,7 +973,7 @@ daplka_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Create the filesystem device node.
 	 */
 	if (ddi_create_minor_node(dip, DAPLKA_MINOR_NAME, S_IFCHR,
-	    0, DDI_PSEUDO, NULL) != DDI_SUCCESS) {
+	    0, DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		DERR("attach: bad create_minor_node\n");
 		retval = DDI_FAILURE;
 		goto error;
@@ -5386,7 +5386,7 @@ daplka_mr_destroy(daplka_resource_t *gen_rp)
 		mr_rp->mr_hdl = NULL;
 		D3("mr_destroy: mr deregistered\n");
 	}
-	mr_rp->mr_attr.mr_vaddr = NULL;
+	mr_rp->mr_attr.mr_vaddr = 0;
 
 	/*
 	 * release reference on PD
@@ -9885,7 +9885,7 @@ daplka_dbglog(char *str)
 	if (length > remlen) {
 		if (remlen)
 			bcopy(str, daplka_dbgbuf + daplka_dbgnext, remlen);
-		daplka_dbgbuf[sizeof (daplka_dbgbuf) - 1] = (char)NULL;
+		daplka_dbgbuf[sizeof (daplka_dbgbuf) - 1] = '\0';
 		str += remlen;
 		length -= remlen;
 		daplka_dbgnext = 0;
