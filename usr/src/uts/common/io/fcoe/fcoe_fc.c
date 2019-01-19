@@ -208,7 +208,7 @@ fcoe_tx_frame(fcoe_frame_t *frm)
 tx_frame:
 	ret_cookie = mac_tx(mac->fm_cli_handle, FRM2MBLK(frm), 0,
 	    MAC_TX_NO_ENQUEUE, &ret_mblk);
-	if (ret_cookie != NULL) {
+	if (ret_cookie != (mac_tx_cookie_t)NULL) {
 		mutex_enter(&mac->fm_mutex);
 		(void) cv_reltimedwait(&mac->fm_tx_cv, &mac->fm_mutex,
 		    drv_usectohz(100000), TR_CLOCK_TICK);
