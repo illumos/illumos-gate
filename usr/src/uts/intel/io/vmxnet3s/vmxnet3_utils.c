@@ -156,7 +156,7 @@ error_dma_handle:
 	ddi_dma_free_handle(&dma->dmaHandle);
 error:
 	dma->buf = NULL;
-	dma->bufPA = NULL;
+	dma->bufPA = 0;
 	dma->bufLen = 0;
 	return (err);
 }
@@ -196,7 +196,7 @@ vmxnet3_free_dma_mem(vmxnet3_dmabuf_t *dma)
 	ddi_dma_free_handle(&dma->dmaHandle);
 
 	dma->buf = NULL;
-	dma->bufPA = NULL;
+	dma->bufPA = 0;
 	dma->bufLen = 0;
 }
 
