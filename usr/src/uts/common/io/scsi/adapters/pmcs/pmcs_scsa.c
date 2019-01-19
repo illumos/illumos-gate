@@ -1640,7 +1640,7 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			pwrk->ptr = (void *) pmcs_SAS_done;
 			if ((rval = pmcs_SAS_run(sp, pwrk)) != 0) {
 				if (rval != PMCS_WQ_RUN_FAIL_RES_CMP) {
-					sp->cmd_tag = NULL;
+					sp->cmd_tag = 0;
 				}
 				pmcs_dec_phy_ref_count(phyp);
 				pmcs_pwork(pwp, pwrk);
@@ -1655,7 +1655,7 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			ASSERT(xp->dtype == SATA);
 			pwrk->ptr = (void *) pmcs_SATA_done;
 			if ((rval = pmcs_SATA_run(sp, pwrk)) != 0) {
-				sp->cmd_tag = NULL;
+				sp->cmd_tag = 0;
 				pmcs_dec_phy_ref_count(phyp);
 				pmcs_pwork(pwp, pwrk);
 				SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
@@ -1906,7 +1906,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 				CMD2PKT(sp)->pkt_state |= STATE_GOT_BUS |
 				    STATE_GOT_TARGET | STATE_SENT_CMD |
 				    STATE_GOT_STATUS;
-				sp->cmd_tag = NULL;
+				sp->cmd_tag = 0;
 				mutex_enter(&pwp->cq_lock);
 				STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 				PMCS_CQ_RUN_LOCKED(pwp);
