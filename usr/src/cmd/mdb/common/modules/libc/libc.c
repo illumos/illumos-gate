@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -1106,9 +1106,14 @@ tid2ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (error);
 }
 
+/*
+ * This is used by both d_tsd and d_errno, and contains the sum of all
+ * members used by both commands.
+ */
 typedef struct mdb_libc_ulwp {
 	void *ul_ftsd[TSD_NFAST];
 	tsd_t *ul_stsd;
+	int *ul_errnop;
 } mdb_libc_ulwp_t;
 
 /*
@@ -1161,7 +1166,45 @@ d_tsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static int
+d_errno(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	mdb_libc_ulwp_t u;
+	uintptr_t ulwp_addr;
+	int error, errval;
+
+	if (argc != 0 || (flags & DCMD_ADDRSPEC) == 0)
+		return (DCMD_USAGE);
+
+	error = tid2ulwp_impl(addr, &ulwp_addr);
+	if (error != DCMD_OK)
+		return (error);
+
+	/*
+	 * For historical compatibility, thread 1's errno value is stored in
+	 * a libc global variable 'errno', while each additional thread's
+	 * errno value is stored in ulwp_t->ul_errno.  In addition,
+	 * ulwp_t->ul_errnop is set to the address of the thread's errno value,
+	 * (i.e. for tid 1, curthead->ul_errnop = &errno, for tid > 1,
+	 * curthread->ul_errnop = &curthread->ul_errno).
+	 *
+	 * Since errno itself uses *curthread->ul_errnop (see ___errno()) to
+	 * return the thread's current errno value, we do the same.
+	 */
+	if (mdb_ctf_vread(&u, "ulwp_t", "mdb_libc_ulwp_t", ulwp_addr, 0) == -1)
+		return (DCMD_ERR);
+
+	if (mdb_vread(&errval, sizeof (errval), (uintptr_t)u.ul_errnop) == -1) {
+		mdb_warn("cannot read error value at 0x%p", u.ul_errnop);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%d\n", errval);
+	return (DCMD_OK);
+}
+
 static const mdb_dcmd_t dcmds[] = {
+	{ "errno", "?", "print errno of a given TID", d_errno, NULL },
 	{ "jmp_buf", ":", "print jmp_buf contents", d_jmp_buf, NULL },
 	{ "sigjmp_buf", ":", "print sigjmp_buf contents", d_sigjmp_buf, NULL },
 	{ "siginfo", ":", "print siginfo_t structure", d_siginfo, NULL },
