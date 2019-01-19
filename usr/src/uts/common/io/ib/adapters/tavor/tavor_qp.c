@@ -888,7 +888,7 @@ tavor_special_qp_alloc(tavor_state_t *state, tavor_qp_info_t *qpinfo,
 	qp->qp_wqinfo.qa_bind_align  = max(sq_wqe_size, rq_wqe_size);
 	qp->qp_wqinfo.qa_location = wq_location;
 	status = tavor_queue_alloc(state, &qp->qp_wqinfo, sleepflag);
-	if (status != NULL) {
+	if (status != 0) {
 		/* Set "status" and "errormsg" and goto failure */
 		TAVOR_TNF_FAIL(IBT_INSUFF_RESOURCE, "failed work queue");
 		goto spec_qpalloc_fail5;
