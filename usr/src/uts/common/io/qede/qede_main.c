@@ -1108,22 +1108,9 @@ qede_alloc_intrs(qede_t *qede)
 		/* Allocate an array big enough for maximum supported */
 		intr_ctx->intr_hdl_array = kmem_zalloc(
 		    intr_ctx->intr_hdl_array_size, KM_SLEEP);
-		if (intr_ctx->intr_hdl_array == NULL) {
-			cmn_err(CE_WARN, 
-			    "qede:%s: Failed to allocate"
-			    " intr_ctx->intr_hdl_array\n",
-				__func__);
-			return (status);
-		}
+
 		intr_ctx->intr_vect_info = kmem_zalloc(
 		    intr_ctx->intr_vect_info_array_size, KM_SLEEP);
-		if (intr_ctx->intr_vect_info_array_size == NULL) {
-			cmn_err(CE_WARN, 
-			    "qede:%s: Failed to allocate"
-			    " intr_ctx->vect_info_array_size\n",
-				__func__);
-			goto err_exit;
-		}
 
 		/* 
 		 * Use strict allocation. It will fail if we do not get

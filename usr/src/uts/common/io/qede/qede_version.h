@@ -39,7 +39,7 @@
 
 #define MAJVERSION 8 
 #define MINVERSION 1
-#define REVVERSION 24
+#define REVVERSION 25
 
 #endif  /* !_QEDE_VERSION_H */
 
