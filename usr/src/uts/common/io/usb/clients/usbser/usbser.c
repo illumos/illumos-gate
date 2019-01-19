@@ -281,7 +281,7 @@ usbser_soft_state_size()
 /*ARGSUSED*/
 int
 usbser_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-		void **result, void *statep)
+    void **result, void *statep)
 {
 	int		instance;
 	int		ret = DDI_FAILURE;
@@ -383,7 +383,7 @@ usbser_first_device(void)
 
 int
 usbser_attach(dev_info_t *dip, ddi_attach_cmd_t cmd,
-		void *statep, ds_ops_t *ds_ops)
+    void *statep, ds_ops_t *ds_ops)
 {
 	int		instance;
 	usbser_state_t	*usp;
@@ -471,7 +471,7 @@ usbser_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, void *statep)
 /*ARGSUSED*/
 int
 usbser_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr,
-		void *statep)
+    void *statep)
 {
 	usbser_state_t	*usp;
 	usbser_port_t	*pp;
@@ -901,7 +901,7 @@ usbser_create_port_minor_nodes(usbser_state_t *usp, int port_num)
 	minor = USBSER_MAKEMINOR(instance, port_num, 0);
 
 	if (ddi_create_minor_node(usp->us_dip, name,
-	    S_IFCHR, minor, DDI_NT_SERIAL, NULL) != DDI_SUCCESS) {
+	    S_IFCHR, minor, DDI_NT_SERIAL, 0) != DDI_SUCCESS) {
 
 		return (USB_FAILURE);
 	}
@@ -913,7 +913,7 @@ usbser_create_port_minor_nodes(usbser_state_t *usp, int port_num)
 	minor = USBSER_MAKEMINOR(instance, port_num, OUTLINE);
 
 	if (ddi_create_minor_node(usp->us_dip, name,
-	    S_IFCHR, minor, DDI_NT_SERIAL_DO, NULL) != DDI_SUCCESS) {
+	    S_IFCHR, minor, DDI_NT_SERIAL_DO, 0) != DDI_SUCCESS) {
 
 		return (USB_FAILURE);
 	}
@@ -1362,7 +1362,7 @@ usbser_restore_ports_state(usbser_state_t *usp)
  */
 static int
 usbser_open_setup(queue_t *rq, usbser_port_t *pp, int minor, int flag,
-		cred_t *cr)
+    cred_t *cr)
 {
 	int	rval = USBSER_CONTINUE;
 
