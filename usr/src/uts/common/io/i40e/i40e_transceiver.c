@@ -513,10 +513,10 @@ i40e_prev_desc(int base, int count, int size)
 static void
 i40e_free_dma_buffer(i40e_dma_buffer_t *dmap)
 {
-	if (dmap->dmab_dma_address != NULL) {
+	if (dmap->dmab_dma_address != 0) {
 		VERIFY(dmap->dmab_dma_handle != NULL);
 		(void) ddi_dma_unbind_handle(dmap->dmab_dma_handle);
-		dmap->dmab_dma_address = NULL;
+		dmap->dmab_dma_address = 0;
 		dmap->dmab_size = 0;
 	}
 
@@ -536,7 +536,7 @@ i40e_free_dma_buffer(i40e_dma_buffer_t *dmap)
 	 * therefore should always be NULLed out due to the above code. This
 	 * is here to catch us acting sloppy.
 	 */
-	ASSERT(dmap->dmab_dma_address == NULL);
+	ASSERT(dmap->dmab_dma_address == 0);
 	ASSERT(dmap->dmab_address == NULL);
 	ASSERT(dmap->dmab_size == 0);
 	dmap->dmab_len = 0;
