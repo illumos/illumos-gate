@@ -61,7 +61,7 @@ static dtrace_provider_id_t profile_id;
  * On SPARC, the picture is further complicated because the compiler
  * optimizes away tail-calls -- so the following frames are optimized away:
  *
- * 	profile_fire
+ *	profile_fire
  *	cyclic_expire
  *
  * This gives three frames.  However, on DEBUG kernels, the cyclic_expire
@@ -200,14 +200,14 @@ profile_provide(void *arg, const dtrace_probedesc_t *desc)
 	} types[] = {
 		{ PROF_PREFIX_PROFILE, PROF_PROFILE },
 		{ PROF_PREFIX_TICK, PROF_TICK },
-		{ NULL, NULL }
+		{ NULL, 0 }
 	};
 
 	const struct {
 		char *name;
 		hrtime_t mult;
 	} suffixes[] = {
-		{ "ns", 	NANOSEC / NANOSEC },
+		{ "ns",		NANOSEC / NANOSEC },
 		{ "nsec",	NANOSEC / NANOSEC },
 		{ "us",		NANOSEC / MICROSEC },
 		{ "usec",	NANOSEC / MICROSEC },
@@ -466,7 +466,7 @@ profile_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "profile", S_IFCHR, 0,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE ||
+	    DDI_PSEUDO, 0) == DDI_FAILURE ||
 	    dtrace_register("profile", &profile_attr,
 	    DTRACE_PRIV_KERNEL | DTRACE_PRIV_USER, NULL,
 	    &profile_pops, NULL, &profile_id) != 0) {
