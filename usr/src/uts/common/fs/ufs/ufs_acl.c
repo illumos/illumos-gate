@@ -86,7 +86,7 @@ long	si_cachemiss = 0;
  * cr - Ptr to credentials
  *
  * Returns:	0 - Success
- * 		N - From errno.h
+ *		N - From errno.h
  */
 static int
 ufs_si_store(struct inode *ip, si_t *sp, int puship, cred_t *cr)
@@ -306,7 +306,7 @@ switchshadows:
 	 *
 	 *		If an ACL mask exists, the effective group rights are
 	 *		set to the mask.  Otherwise, the effective group rights
-	 * 		are set to the object group bits.
+	 *		are set to the object group bits.
 	 */
 	if (sp->aowner) {				/* Owner */
 		ip->i_mode &= ~0700;			/* clear Owner */
@@ -404,25 +404,20 @@ errout:
  * cr - Ptr to credentials
  *
  * Returns:	0 - Success
- * 		N - From errno.h
+ *		N - From errno.h
  */
-int
-ufs_si_load(struct inode *ip, cred_t *cr)
 /*
  *	ip	parent inode in
  *	cr	credentials in
  */
+int
+ufs_si_load(struct inode *ip, cred_t *cr)
 {
 	struct vfs	*vfsp;
 	struct inode	*sip;
 	ufs_fsd_t	*fsdp;
 	si_t		*sp;
-	vsecattr_t	vsecattr = {
-				(uint_t)0,
-				(int)0,
-				(void *)NULL,
-				(int)0,
-				(void *)NULL};
+	vsecattr_t	vsecattr = { 0, 0, NULL, 0, NULL};
 	aclent_t	*aclp;
 	ufs_acl_t	*ufsaclp;
 	caddr_t		acldata = NULL;
@@ -506,20 +501,20 @@ ufs_si_load(struct inode *ip, cred_t *cr)
 	 */
 	bzero((caddr_t)&vsecattr, sizeof (vsecattr_t));
 	for (fsdp = (ufs_fsd_t *)acldata;
-			fsdp < (ufs_fsd_t *)(acldata + acldatalen);
-			fsdp = (ufs_fsd_t *)((caddr_t)fsdp +
-				FSD_RECSZ(fsdp, fsdp->fsd_size))) {
+	    fsdp < (ufs_fsd_t *)(acldata + acldatalen);
+	    fsdp = (ufs_fsd_t *)((caddr_t)fsdp +
+	    FSD_RECSZ(fsdp, fsdp->fsd_size))) {
 		if (fsdp->fsd_size <= 0)
 			break;
 		switch (fsdp->fsd_type) {
 		case FSD_ACL:
 			numacls = vsecattr.vsa_aclcnt =
-				(int)((fsdp->fsd_size - 2 * sizeof (int)) /
-							sizeof (ufs_acl_t));
+			    (int)((fsdp->fsd_size -
+			    2 * sizeof (int)) / sizeof (ufs_acl_t));
 			aclp = vsecattr.vsa_aclentp =
-			kmem_zalloc(numacls * sizeof (aclent_t), KM_SLEEP);
+			    kmem_zalloc(numacls * sizeof (aclent_t), KM_SLEEP);
 			for (ufsaclp = (ufs_acl_t *)fsdp->fsd_data;
-							numacls; ufsaclp++) {
+			    numacls; ufsaclp++) {
 				aclp->a_type = ufsaclp->acl_tag;
 				aclp->a_id = ufsaclp->acl_who;
 				aclp->a_perm = ufsaclp->acl_perm;
@@ -529,12 +524,12 @@ ufs_si_load(struct inode *ip, cred_t *cr)
 			break;
 		case FSD_DFACL:
 			numacls = vsecattr.vsa_dfaclcnt =
-				(int)((fsdp->fsd_size - 2 * sizeof (int)) /
-							sizeof (ufs_acl_t));
+			    (int)((fsdp->fsd_size -
+			    2 * sizeof (int)) / sizeof (ufs_acl_t));
 			aclp = vsecattr.vsa_dfaclentp =
-			kmem_zalloc(numacls * sizeof (aclent_t), KM_SLEEP);
+			    kmem_zalloc(numacls * sizeof (aclent_t), KM_SLEEP);
 			for (ufsaclp = (ufs_acl_t *)fsdp->fsd_data;
-							numacls; ufsaclp++) {
+			    numacls; ufsaclp++) {
 				aclp->a_type = ufsaclp->acl_tag;
 				aclp->a_id = ufsaclp->acl_who;
 				aclp->a_perm = ufsaclp->acl_perm;
@@ -547,17 +542,17 @@ ufs_si_load(struct inode *ip, cred_t *cr)
 	/* Sort the lists */
 	if (vsecattr.vsa_aclentp) {
 		ksort((caddr_t)vsecattr.vsa_aclentp, vsecattr.vsa_aclcnt,
-				sizeof (aclent_t), cmp2acls);
+		    sizeof (aclent_t), cmp2acls);
 		if ((err = acl_validate(vsecattr.vsa_aclentp,
-				vsecattr.vsa_aclcnt, ACL_CHECK)) != 0) {
+		    vsecattr.vsa_aclcnt, ACL_CHECK)) != 0) {
 			goto alldone;
 		}
 	}
 	if (vsecattr.vsa_dfaclentp) {
 		ksort((caddr_t)vsecattr.vsa_dfaclentp, vsecattr.vsa_dfaclcnt,
-				sizeof (aclent_t), cmp2acls);
+		    sizeof (aclent_t), cmp2acls);
 		if ((err = acl_validate(vsecattr.vsa_dfaclentp,
-				vsecattr.vsa_dfaclcnt, DEF_ACL_CHECK)) != 0) {
+		    vsecattr.vsa_dfaclcnt, DEF_ACL_CHECK)) != 0) {
 			goto alldone;
 		}
 	}
@@ -613,10 +608,10 @@ alldone:
 
 	if (vsecattr.vsa_aclentp)
 		kmem_free(vsecattr.vsa_aclentp,
-			vsecattr.vsa_aclcnt * sizeof (aclent_t));
+		    vsecattr.vsa_aclcnt * sizeof (aclent_t));
 	if (vsecattr.vsa_dfaclentp)
 		kmem_free(vsecattr.vsa_dfaclentp,
-			vsecattr.vsa_dfaclcnt * sizeof (aclent_t));
+		    vsecattr.vsa_dfaclcnt * sizeof (aclent_t));
 	return (err);
 }
 
@@ -627,13 +622,13 @@ alldone:
  * We follow the procedure defined in Sec. 3.3.5, ACL Access
  * Check Algorithm, of the POSIX 1003.6 Draft Standard.
  */
-int
-ufs_acl_access(struct inode *ip, int mode, cred_t *cr)
 /*
- *	ip 	parent inode
- *	mode 	mode of access read, write, execute/examine
+ *	ip	parent inode
+ *	mode	mode of access read, write, execute/examine
  *	cr	credentials
  */
+int
+ufs_acl_access(struct inode *ip, int mode, cred_t *cr)
 {
 	ufs_ic_acl_t *acl;
 	int ismask, mask = 0;
@@ -649,7 +644,7 @@ ufs_acl_access(struct inode *ip, int mode, cred_t *cr)
 	sp = ip->i_ufs_acl;
 
 	ismask = sp->aclass.acl_ismask ?
-	    sp->aclass.acl_ismask : NULL;
+	    sp->aclass.acl_ismask : 0;
 
 	if (ismask)
 		mask = sp->aclass.acl_maskbits;
@@ -662,7 +657,7 @@ ufs_acl_access(struct inode *ip, int mode, cred_t *cr)
 	owner = sp->aowner->acl_ic_who;
 	if (uid == owner) {
 		return (MODE_CHECK(owner, mode, (sp->aowner->acl_ic_perm << 6),
-							    cr, ip));
+		    cr, ip));
 	}
 
 	/*
@@ -692,8 +687,7 @@ ufs_acl_access(struct inode *ip, int mode, cred_t *cr)
 	 * (4) Accumulate the permissions in matching ACL_GROUP entries
 	 */
 	if (sp->agroups)
-		for (acl = sp->agroups; acl != NULL; acl = acl->acl_ic_next)
-		{
+		for (acl = sp->agroups; acl != NULL; acl = acl->acl_ic_next) {
 			if (groupmember(acl->acl_ic_who, cr)) {
 				ngroup++;
 				gperm |= acl->acl_ic_perm;
@@ -753,7 +747,7 @@ ufs_acl_get(struct inode *ip, vsecattr_t *vsap, int flag, cred_t *cr)
 		/* Group */
 		aclentp->a_type = GROUP_OBJ;
 		aclentp->a_perm = ((ushort_t)(ip->i_mode & 0070)) >> 3;
-		aclentp->a_id = ip->i_gid; 	/* Really undefined */
+		aclentp->a_id = ip->i_gid;	/* Really undefined */
 		aclentp++;
 
 		/* Other */
@@ -997,7 +991,7 @@ formacl(ufs_ic_acl_t **aclpp, aclent_t *aclentp)
  * spp - Ptr to ptr to si struct for the results
  *
  * Returns:	0 - Success
- * 		N - From errno.h
+ *		N - From errno.h
  */
 static int
 vsecattr2aclentry(vsecattr_t *vsap, si_t **spp)
@@ -1641,9 +1635,9 @@ alldone:
 int
 ufs_si_free(si_t *sp, struct vfs *vfsp, cred_t *cr)
 {
-	struct inode 	*sip;
-	int 		shadow;
-	int 		err = 0;
+	struct inode	*sip;
+	int		shadow;
+	int		err = 0;
 	int		refcnt;
 	int		signature;
 
@@ -2013,7 +2007,7 @@ aclcmp(ufs_ic_acl_t *aclin1p, ufs_ic_acl_t *aclin2p)
  *
  * Returns:
  *		0 - Not identical
- * 		1 - Identical
+ *		1 - Identical
  */
 static int
 si_cmp(si_t *sp1, si_t *sp2)
