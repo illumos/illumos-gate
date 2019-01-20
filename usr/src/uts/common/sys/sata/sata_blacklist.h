@@ -54,7 +54,7 @@ sata_pmult_bl_t sata_pmult_blacklist[] = {
 	{0x37261095, 0x0, 0x6, 0x5}, /* Silicon Image 3726, 5 ports. */
 	{0x47261095, 0x0, 0x7, 0x5}, /* Silicon Image 4726, 5 ports. */
 	{0x47231095, 0x0, 0x4, 0x2}, /* Silicon Image 4723, 2 ports. */
-	NULL
+	0
 };
 
 
