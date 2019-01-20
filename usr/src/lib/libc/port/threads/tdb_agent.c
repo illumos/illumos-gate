@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains most of the functionality
  * required to support the threads portion of libc_db.
@@ -368,7 +366,7 @@ tdb_sync_obj_deregister(void *addr)
 	 * (Once the hash table is allocated, it is never deallocated.)
 	 */
 	if (tdbp->tdb_sync_addr_hash == NULL ||
-	    tdbp->tdb_sync_addr_hash[hash = tdb_addr_hash(addr)] == NULL)
+	    tdbp->tdb_sync_addr_hash[hash = tdb_addr_hash(addr)] == 0)
 		return;
 
 	lmutex_lock(&udp->tdb_hash_lock);

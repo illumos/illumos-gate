@@ -67,7 +67,7 @@ libc_mkstemps(char *as, int slen, int flags)
 	int	len;
 	char	*tstr, *str, *mkret;
 
-	if (as == NULL || *as == NULL)
+	if (as == NULL || *as == '\0')
 		return (-1);
 
 	len = (int)strlen(as);

@@ -88,12 +88,12 @@ extern const Lc_interface rtld_funcs[];
  */
 #pragma weak _uberdata = __uberdata
 uberdata_t __uberdata = {
-	{ DEFAULTMUTEX, NULL, 0 },	/* link_lock */
-	{ RECURSIVEMUTEX, NULL, 0 },	/* ld_lock */
-	{ RECURSIVEMUTEX, NULL, 0 },	/* fork_lock */
-	{ RECURSIVEMUTEX, NULL, 0 },	/* atfork_lock */
-	{ RECURSIVEMUTEX, NULL, 0 },	/* callout_lock */
-	{ DEFAULTMUTEX, NULL, 0 },	/* tdb_hash_lock */
+	{ DEFAULTMUTEX, 0, 0 },	/* link_lock */
+	{ RECURSIVEMUTEX, 0, 0 },	/* ld_lock */
+	{ RECURSIVEMUTEX, 0, 0 },	/* fork_lock */
+	{ RECURSIVEMUTEX, 0, 0 },	/* atfork_lock */
+	{ RECURSIVEMUTEX, 0, 0 },	/* callout_lock */
+	{ DEFAULTMUTEX, 0, 0 },	/* tdb_hash_lock */
 	{ 0, },				/* tdb_hash_lock_stats */
 	{ { 0 }, },			/* siguaction[NSIG] */
 	{{ DEFAULTMUTEX, NULL, 0 },		/* bucket[NBUCKETS] */

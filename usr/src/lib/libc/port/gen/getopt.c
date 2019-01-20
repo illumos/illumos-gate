@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * See getopt(3C) and SUS/XPG getopt() for function definition and
  * requirements.
@@ -199,7 +197,7 @@ getopt(int argc, char *const *argv, const char *optstring)
 		if (optind >= argc || argv[optind][0] != '-' ||
 		    argv[optind] == NULL || argv[optind][1] == '\0')
 			return (EOF);
-		else if (strcmp(argv[optind], "--") == NULL) {
+		else if (strcmp(argv[optind], "--") == 0) {
 			optind++;
 			return (EOF);
 		}

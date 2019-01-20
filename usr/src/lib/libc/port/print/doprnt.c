@@ -1904,7 +1904,7 @@ wide_S:
 						 * wbuff, allocate larger buffer
 						 */
 						if ((nwc =
-						    mbstowcs(NULL, bp, NULL)) ==
+						    mbstowcs(NULL, bp, 0)) ==
 						    (size_t)-1) {
 							sec_display =
 							    strlen(bp);
