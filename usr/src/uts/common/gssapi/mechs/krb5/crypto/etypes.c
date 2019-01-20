@@ -6,14 +6,14 @@
 
 /*
  * Copyright (C) 1998 by the FundsXpress, INC.
- * 
+ *
  * All rights reserved.
- * 
+ *
  * Export of this software from the United States of America may require
  * a specific license from the United States Government.  It is the
  * responsibility of any person or organization contemplating export to
  * obtain such a license before exporting.
- * 
+ *
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -24,7 +24,7 @@
  * permission.  FundsXpress makes no representations about the suitability of
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
@@ -37,7 +37,7 @@
 #define	krb5int_des_string_to_key	NULL
 #define	krb5_dk_string_to_key	NULL
 #define	krb5int_arcfour_string_to_key	NULL
-#endif 	/* _KERNEL */
+#endif	/* _KERNEL */
 
 #include <k5-int.h>
 #include <enc_provider.h>
@@ -102,7 +102,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
       "des-cbc-raw", "DES cbc mode raw",
       &krb5int_enc_des, NULL,
       krb5_raw_encrypt_length, krb5_raw_encrypt, krb5_raw_decrypt,
-      NULL,
+      0,
 #ifndef _KERNEL
       krb5int_des_string_to_key,
 #else
@@ -117,7 +117,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
       "des3-cbc-raw", "Triple DES cbc mode raw",
       &krb5int_enc_des3, NULL,
       krb5_raw_encrypt_length, krb5_raw_encrypt, krb5_raw_decrypt,
-      NULL,
+      0,
 #ifndef _KERNEL
       krb5int_dk_string_to_key,
 #else
@@ -192,7 +192,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
       "des-hmac-sha1", "DES with HMAC/sha1",
       &krb5int_enc_des, &krb5int_hash_sha1,
       krb5_dk_encrypt_length, krb5_dk_encrypt, krb5_dk_decrypt,
-      NULL,
+      0,
 #ifndef _KERNEL
       krb5int_dk_string_to_key,
 #else
@@ -221,7 +221,7 @@ krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
       "rc4-hmac", "ArcFour with HMAC/md5", &krb5int_enc_arcfour,
       &krb5int_hash_md5,
       krb5_arcfour_encrypt_length, krb5_arcfour_encrypt,
-      krb5_arcfour_decrypt, 
+      krb5_arcfour_decrypt,
 	CKSUMTYPE_HMAC_MD5_ARCFOUR,
 #ifndef _KERNEL
 	krb5int_arcfour_string_to_key,
@@ -395,7 +395,7 @@ setup_kef_keytypes()
 crypto_mech_type_t
 get_cipher_mech_type(krb5_context context, krb5_keyblock *key)
 {
-	int i;	
+	int i;
 	struct krb5_keytypes *kt;
 
 	if (key == NULL)
@@ -411,14 +411,14 @@ get_cipher_mech_type(krb5_context context, krb5_keyblock *key)
 			return (kt->kef_cipher_mt);
 		}
 	}
-	return (CRYPTO_MECH_INVALID);	
+	return (CRYPTO_MECH_INVALID);
 }
 
 /*ARGSUSED*/
 crypto_mech_type_t
 get_hash_mech_type(krb5_context context, krb5_keyblock *key)
 {
-	int i;	
+	int i;
 	struct krb5_keytypes *kt;
 
 	if (key == NULL)
@@ -434,7 +434,7 @@ get_hash_mech_type(krb5_context context, krb5_keyblock *key)
 			return (kt->kef_hash_mt);
 		}
 	}
-	return (CRYPTO_MECH_INVALID);	
+	return (CRYPTO_MECH_INVALID);
 }
 
 #endif /* _KERNEL */
