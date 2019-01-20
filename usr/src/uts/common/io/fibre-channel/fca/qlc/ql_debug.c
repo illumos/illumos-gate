@@ -55,7 +55,7 @@ char *ql_find_trace_start(ql_adapter_state_t *ha);
 uint32_t	el_message_number = 0;
 uint32_t	ql_enable_ellock = 0;
 
-extern int 	getpcstack(pc_t *, int);
+extern int	getpcstack(pc_t *, int);
 extern char	*kobj_getsymname(uintptr_t, ulong_t *);
 
 /*
@@ -512,7 +512,7 @@ ql_dump_el_trace_buffer(ql_adapter_state_t *ha)
 	TRACE_BUFFER_LOCK(ha);
 
 	rval = ql_validate_trace_desc(ha);
-	if (rval != NULL) {
+	if (rval != 0) {
 		cmn_err(CE_CONT, "%s(%d) Dump EL trace - invalid desc\n",
 		    QL_NAME, ha->instance);
 	} else if ((dump_start = ql_find_trace_start(ha)) != NULL) {
@@ -542,7 +542,7 @@ ql_dump_el_trace_buffer(ql_adapter_state_t *ha)
 				    dump_current) {
 					break;
 				}
-			} else if (*dump_current == NULL) {
+			} else if (*dump_current == '\0') {
 				break;
 			}
 		}
@@ -606,7 +606,7 @@ ql_find_trace_start(ql_adapter_state_t *ha)
 	    (ha->el_trace_desc->trace_buffer +
 	    ha->el_trace_desc->trace_buffer_size)) {
 		trace_start = ha->el_trace_desc->trace_buffer;
-	} else if (*trace_next != NULL) {
+	} else if (*trace_next != '\0') {
 		trace_start = trace_next + (strlen(trace_next) + 1);
 	} else {
 		trace_start = ha->el_trace_desc->trace_buffer;

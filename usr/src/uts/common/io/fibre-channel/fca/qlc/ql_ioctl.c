@@ -1047,7 +1047,7 @@ ql_nv_util_dump(ql_adapter_state_t *ha, void *bp, int mode)
 	QL_PRINT_9(CE_CONT, "(%d): started\n", ha->instance);
 
 	if (ha->nvram_cache == NULL ||
-	    ha->nvram_cache->size == NULL ||
+	    ha->nvram_cache->size == 0 ||
 	    ha->nvram_cache->cache == NULL) {
 		EL(ha, "failed, kmem_zalloc\n");
 		return (ENOMEM);
@@ -1526,11 +1526,11 @@ ql_vpd_lookup(ql_adapter_state_t *ha, uint8_t *opcode, uint8_t *bp,
 
 		/* copy the data back */
 		(void) strncpy((int8_t *)bp, (int8_t *)(vpd+3), (int64_t)len);
-		bp[len] = NULL;
+		bp[len] = 0;
 	} else {
 		/* error -- couldn't find tag */
-		bp[0] = NULL;
-		if (opcode[1] != NULL) {
+		bp[0] = 0;
+		if (opcode[1] != 0) {
 			EL(ha, "unable to find tag '%s'\n", opcode);
 		} else {
 			EL(ha, "unable to find tag '%xh'\n", opcode[0]);
@@ -2443,7 +2443,7 @@ ql_adm_updfwmodule(ql_adapter_state_t *ha, ql_adm_op_t *dop, int mode)
 	for (link = ql_hba.first; link != NULL; link = link->next) {
 		ha2 = link->base_address;
 
-		if ((fw_class == ha2->fw_class) && (ha2->fw_class == NULL)) {
+		if ((fw_class == ha2->fw_class) && (ha2->fw_class == 0)) {
 			if ((rval = (int32_t)ql_fwmodule_resolve(ha2)) !=
 			    QL_SUCCESS) {
 				EL(ha2, "unable to load f/w module: '%x' "
