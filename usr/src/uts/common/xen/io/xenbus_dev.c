@@ -92,7 +92,7 @@
 /* Some handy macros */
 #define	XENBUSDRV_MASK_READ_IDX(idx)	((idx) & (PAGESIZE - 1))
 #define	XENBUSDRV_MINOR2INST(minor)	((int)(minor))
-#define	XENBUSDRV_NCLONES 		256
+#define	XENBUSDRV_NCLONES		256
 #define	XENBUSDRV_INST2SOFTS(instance)	\
 	((xenbus_dev_t *)ddi_get_soft_state(xenbusdrv_statep, (instance)))
 
@@ -147,7 +147,7 @@ static int xenbusdrv_queue_reply(xenbus_dev_t *, const struct xsd_sockmsg *,
 
 /* Solaris driver framework */
 
-static 	struct cb_ops xenbusdrv_cb_ops = {
+static struct cb_ops xenbusdrv_cb_ops = {
 	xenbusdrv_open,			/* cb_open */
 	xenbusdrv_close,		/* cb_close */
 	nodev,				/* cb_strategy */
@@ -286,7 +286,7 @@ xenbusdrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    NULL);
 
 	error = ddi_create_minor_node(dip, "xenbus", S_IFCHR, unit,
-	    DDI_PSEUDO, NULL);
+	    DDI_PSEUDO, 0);
 	if (error != DDI_SUCCESS)
 		goto fail;
 
