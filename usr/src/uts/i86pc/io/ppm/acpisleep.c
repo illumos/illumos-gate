@@ -87,7 +87,7 @@ acpi_enter_sleepstate(s3a_t *s3ap)
 
 	PT(PT_SWV);
 	/* Set waking vector */
-	if (AcpiSetFirmwareWakingVector(wakephys, NULL) != AE_OK) {
+	if (AcpiSetFirmwareWakingVector(wakephys, 0) != AE_OK) {
 		PT(PT_SWV_FAIL);
 		PMD(PMD_SX, ("Can't SetFirmwareWakingVector(%lx)\n",
 		    (long)wakephys))
