@@ -769,7 +769,7 @@ pset_list(psetid_t *psetlist, uint_t *numpsets)
 			psets[0] = psetid;
 		}
 	} else {
-		real_npsets = cpupart_list(0, NULL, CP_ALL);
+		real_npsets = cpupart_list(NULL, 0, CP_ALL);
 		if (real_npsets) {
 			psets = kmem_alloc(real_npsets * sizeof (psetid_t),
 			    KM_SLEEP);
