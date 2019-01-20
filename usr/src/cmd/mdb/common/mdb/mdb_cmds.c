@@ -2173,6 +2173,46 @@ cmd_dis(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static void
+dis_help(void)
+{
+	static const char dis_desc[] =
+"Disassembles instructions starting at the final argument or the current\n"
+"value of dot. If the address is the start of a function, the entire\n"
+"function is disassembled, or else a window of instructions before and after\n"
+"the disassembled address are displayed.\n"
+"\n";
+
+	static const char dis_opts[] =
+"  -a         Print instruction addresses as numeric values instead of \n"
+"             symbolic values.\n"
+"  -b         Print instruction addresses as both numeric and symbolic "
+"values.\n"
+"  -f         Read instructions from the target's object file instead of the \n"
+"             target's virtual address space.\n"
+"  -n instr   Display 'instr' instructions before and after the given "
+"address.\n"
+"  -w         Force window behavior, even at the start of a function.\n"
+"\n";
+
+	static const char dis_examples[] =
+"  ::dis\n"
+"  clock::dis\n"
+"  ::dis gethrtime\n"
+"  set_freemem+0x16::dis -n 4\n"
+"\n";
+
+	mdb_printf("%s", dis_desc);
+	(void) mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	(void) mdb_inc_indent(2);
+	mdb_printf("%s", dis_opts);
+	(void) mdb_dec_indent(2);
+	mdb_printf("%<b>EXAMPLES%</b>\n");
+	(void) mdb_inc_indent(2);
+	(void) mdb_printf("%s", dis_examples);
+}
+
 /*ARGSUSED*/
 static int
 walk_step(uintptr_t addr, const void *data, void *private)
@@ -3113,7 +3153,8 @@ const mdb_dcmd_t mdb_dcmd_builtins[] = {
 	{ "dcmds", "[[-n] pattern]",
 	    "list available debugger commands", cmd_dcmds, cmd_dcmds_help },
 	{ "delete", "?[id|all]", "delete traced software events", cmd_delete },
-	{ "dis", "?[-abfw] [-n cnt] [addr]", "disassemble near addr", cmd_dis },
+	{ "dis", "?[-abfw] [-n cnt] [addr]", "disassemble near addr", cmd_dis,
+	    dis_help },
 	{ "disasms", NULL, "list available disassemblers", cmd_disasms },
 	{ "dismode", "[mode]", "get/set disassembly mode", cmd_dismode },
 	{ "dmods", "[-l] [mod]", "list loaded debugger modules", cmd_dmods },
