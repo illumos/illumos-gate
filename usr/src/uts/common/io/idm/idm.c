@@ -293,7 +293,7 @@ idm_ini_conn_connect(idm_conn_t *ic)
 	idm_conn_hold(ic);
 
 	/* Kick state machine */
-	idm_conn_event(ic, CE_CONNECT_REQ, NULL);
+	idm_conn_event(ic, CE_CONNECT_REQ, (uintptr_t)NULL);
 
 	/* Wait for login flag */
 	mutex_enter(&ic->ic_state_mutex);
@@ -332,7 +332,7 @@ idm_ini_conn_connect(idm_conn_t *ic)
 void
 idm_ini_conn_disconnect(idm_conn_t *ic)
 {
-	idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
+	idm_conn_event(ic, CE_TRANSPORT_FAIL, (uintptr_t)NULL);
 }
 
 /*
@@ -351,7 +351,8 @@ idm_ini_conn_disconnect_sync(idm_conn_t *ic)
 	mutex_enter(&ic->ic_state_mutex);
 	if ((ic->ic_state != CS_S9_INIT_ERROR) &&
 	    (ic->ic_state != CS_S11_COMPLETE)) {
-		idm_conn_event_locked(ic, CE_TRANSPORT_FAIL, NULL, CT_NONE);
+		idm_conn_event_locked(ic, CE_TRANSPORT_FAIL, (uintptr_t)NULL,
+		    CT_NONE);
 		while ((ic->ic_state != CS_S9_INIT_ERROR) &&
 		    (ic->ic_state != CS_S11_COMPLETE))
 			cv_wait(&ic->ic_state_cv, &ic->ic_state_mutex);
@@ -995,7 +996,7 @@ idm_buf_alloc(idm_conn_t *ic, void *bufptr, uint64_t buflen)
 	buf->idb_buflen		= buflen;
 	buf->idb_exp_offset	= 0;
 	buf->idb_bufoffset	= 0;
-	buf->idb_xfer_len 	= 0;
+	buf->idb_xfer_len	= 0;
 	buf->idb_magic		= IDM_BUF_MAGIC;
 	buf->idb_in_transport	= B_FALSE;
 	buf->idb_bufbcopy	= B_FALSE;
@@ -1280,7 +1281,7 @@ idm_task_alloc(idm_conn_t *ic)
 
 	idt->idt_state		= TASK_IDLE;
 	idt->idt_ic		= ic;
-	idt->idt_private 	= NULL;
+	idt->idt_private	= NULL;
 	idt->idt_exp_datasn	= 0;
 	idt->idt_exp_rttsn	= 0;
 	idt->idt_flags		= 0;
@@ -2209,7 +2210,8 @@ idm_refcnt_rele_and_destroy(idm_refcnt_t *refcnt, idm_refcnt_cb_t *cb_func)
 		refcnt->ir_cb = cb_func;
 		refcnt->ir_waiting = REF_WAIT_ASYNC;
 		if (taskq_dispatch(idm.idm_global_taskq,
-		    &idm_refcnt_unref_task, refcnt, TQ_SLEEP) == TASKQID_INVALID) {
+		    &idm_refcnt_unref_task, refcnt, TQ_SLEEP) ==
+		    TASKQID_INVALID) {
 			cmn_err(CE_WARN,
 			    "idm_refcnt_rele: Couldn't dispatch task");
 		}
