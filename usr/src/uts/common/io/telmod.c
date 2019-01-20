@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module implements the "fast path" processing for the telnet protocol.
  * Since it only knows a very small number of the telnet protocol options,
@@ -663,7 +661,7 @@ telmodwput(
 	switch (mp->b_datap->db_type) {
 	case M_DATA:
 		if (!canputnext(q) || (tmip->flags & TEL_STOPPED) ||
-			(q->q_first)) {
+		    (q->q_first)) {
 			noenable(q);
 			(void) putq(q, mp);
 			break;
@@ -679,7 +677,7 @@ telmodwput(
 
 	case M_CTL:
 		if (((mp->b_wptr - mp->b_rptr) == 1) &&
-			(*(mp->b_rptr) == M_CTL_MAGIC_NUMBER)) {
+		    (*(mp->b_rptr) == M_CTL_MAGIC_NUMBER)) {
 			savemp = mp->b_cont;
 			freeb(mp);
 			mp = savemp;
@@ -785,8 +783,8 @@ telmodwput(
 			} else {
 #ifdef DEBUG
 				cmn_err(CE_NOTE,
-				"telmodwput: unexpected ioctl type 0x%x",
-					ioc->ioc_cmd);
+				    "telmodwput: unexpected ioctl type 0x%x",
+				    ioc->ioc_cmd);
 #endif
 				miocnak(q, mp, 0, EINVAL);
 			}
@@ -886,7 +884,7 @@ telmodwsrv(queue_t *q)
 
 		case M_CTL:
 			if (((mp->b_wptr - mp->b_rptr) == 1) &&
-				(*(mp->b_rptr) == M_CTL_MAGIC_NUMBER)) {
+			    (*(mp->b_rptr) == M_CTL_MAGIC_NUMBER)) {
 				savemp = mp->b_cont;
 				freeb(mp);
 				mp = savemp;
@@ -965,7 +963,7 @@ rcv_parse(queue_t *q, mblk_t *mp)
 		 */
 		if (!(tmip->flags & TEL_BINARY_IN) &&
 		    (tmip->flags & TEL_CRRCV)) {
-			if ((*mp->b_rptr == '\n') || (*mp->b_rptr == NULL)) {
+			if ((*mp->b_rptr == '\n') || (*mp->b_rptr == '\0')) {
 				if (mp->b_wptr == (mp->b_rptr + 1)) {
 					tmip->flags &= ~TEL_CRRCV;
 					if (prevmp) {
@@ -1046,7 +1044,7 @@ rcv_parse(queue_t *q, mblk_t *mp)
 				 */
 
 				if ((newmp = allocb(sizeof (char),
-					BPRI_MED)) == NULL) {
+				    BPRI_MED)) == NULL) {
 					/*
 					 * Save the dup'ed mp containing
 					 * the protocol information which
@@ -1072,7 +1070,7 @@ rcv_parse(queue_t *q, mblk_t *mp)
 				 * Set TEL_CRRCV flag if last character is CR
 				 */
 				if ((tmp == (mp->b_wptr - 1)) &&
-					(tmp[0] == '\r')) {
+				    (tmp[0] == '\r')) {
 					tmip->flags |= TEL_CRRCV;
 					break;
 				}
@@ -1082,7 +1080,7 @@ rcv_parse(queue_t *q, mblk_t *mp)
 				 * LF/NULL and realign the message block.
 				 */
 				if ((tmp[0] == '\r') && ((tmp[1] == '\n') ||
-				    (tmp[1] == NULL))) {
+				    (tmp[1] == '\0'))) {
 					/*
 					 * If CR is in the middle of a block,
 					 * we need to get rid of LF and join
@@ -1152,9 +1150,9 @@ snd_parse(queue_t *q, mblk_t *mp)
 	tmp1 = newmp->b_rptr;
 	while (mp) {
 		if (!(tmip->flags & TEL_BINARY_OUT) &&
-			(tmip->flags & TEL_CRSND)) {
+		    (tmip->flags & TEL_CRSND)) {
 			if (*(mp->b_rptr) != '\n')
-				*tmp1++ = NULL;
+				*tmp1++ = '\0';
 			tmip->flags &= ~TEL_CRSND;
 		}
 		tmp = mp->b_rptr;
@@ -1162,7 +1160,7 @@ snd_parse(queue_t *q, mblk_t *mp)
 			if (!(tmip->flags & TEL_BINARY_OUT)) {
 				*tmp1++ = *tmp;
 				if ((tmp == (mp->b_wptr - 1)) &&
-					(tmp[0] == '\r')) {
+				    (tmp[0] == '\r')) {
 						tmip->flags |= TEL_CRSND;
 						break;
 				}
@@ -1173,7 +1171,7 @@ snd_parse(queue_t *q, mblk_t *mp)
 					break;
 				}
 				if ((tmp[0] == '\r') && (tmp[1] != '\n')) {
-					*tmp1++ = NULL;
+					*tmp1++ = '\0';
 				}
 			} else
 				*tmp1++ = *tmp;
