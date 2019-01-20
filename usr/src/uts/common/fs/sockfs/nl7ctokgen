@@ -20,9 +20,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -60,7 +57,7 @@ NAME=${NAME%.txt}
 TOKEN="$TOKEN
 token_t $NAME[] = {
 $ELE
-	{NULL}
+	{0}
 };
 
 #define	${NAME}_cnt (sizeof ($NAME) / sizeof (*$NAME))

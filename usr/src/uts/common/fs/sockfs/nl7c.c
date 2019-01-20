@@ -51,6 +51,8 @@
 #include <sys/systm.h>
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/led.h>
@@ -267,26 +269,6 @@ nl7c_mi_report_addr(mblk_t *mp)
 }
 
 /*
- * ASCII to unsigned.
- *
- * Note, it's assumed that *p is a valid zero byte terminated string.
- */
-
-static unsigned
-atou(const char *p)
-{
-	int c;
-	int v = 0;
-
-	/* Shift and add digit by digit */
-	while ((c = *p++) != NULL && isdigit(c)) {
-		v *= 10;
-		v += c - '0';
-	}
-	return (v);
-}
-
-/*
  * Inet ASCII to binary.
  *
  * Note, it's assumed that *s is a valid zero byte terminated string, and
@@ -417,7 +399,7 @@ ncaportconf_read(void)
 					parse = EOL;
 				}
 			} else if (c == '=') {
-				if (*tok != NULL) {
+				if (*tok != '\0') {
 					/* Only know one token, skip */
 					parse = EOL;
 					break;
@@ -435,7 +417,7 @@ ncaportconf_read(void)
 		case ADDR:
 			if (c == '/') {
 				/* addr/port separator, end of addr */
-				*stringp = NULL;
+				*stringp = 0;
 				if (inet_atob(string, addrp)) {
 					/* Bad addr, skip */
 					parse = EOL;
@@ -469,9 +451,16 @@ ncaportconf_read(void)
 				}
 				break;
 			} else if (c == '#' || isspace(c)) {
+				unsigned long result = 0;
+
 				/* End of port number, convert */
-				*stringp = NULL;
-				addrp->port = ntohs(atou(string));
+				*stringp = '\0';
+				if (ddi_strtoul(string, NULL, 10, &result)
+				    != 0) {
+					parse = EOL;
+					break;
+				}
+				addrp->port = ntohs(result);
 
 				/* End of parse, add entry */
 				nl7c_addr_add(addrp);
@@ -582,7 +571,7 @@ ncakmodconf_read(void)
 				 * Found EOL, if tok found done,
 				 * else start on next-line.
 				 */
-				if (*tok == NULL) {
+				if (*tok == '\0') {
 					nl7c_enabled = B_TRUE;
 					goto done;
 				}
@@ -721,11 +710,11 @@ ncalogdconf_read(void)
 				 * Found tok separator, if tok found get
 				 * tok text, else skip rest of line.
 				 */
-				if (tokstatusp != NULL && *tokstatusp == NULL)
+				if (tokstatusp != NULL && *tokstatusp == '\0')
 					tok = tokstatus;
-				else if (toksizep != NULL && *toksizep == NULL)
+				else if (toksizep != NULL && *toksizep == '\0')
 					tok = toksize;
-				else if (tokfilep != NULL && *tokfilep == NULL)
+				else if (tokfilep != NULL && *tokfilep == '\0')
 					tok = tokfile;
 				if (tok != NULL)
 					parse = TEXT;
@@ -746,7 +735,7 @@ ncalogdconf_read(void)
 				 * (if any) and start on next line.
 				 */
 				if (tok == tokstatus) {
-					if (*++tokstatusp == NULL)
+					if (*++tokstatusp == '\0')
 						nl7c_logd_enabled = B_TRUE;
 				} else if (tok == toksize) {
 					file_size = sz;
@@ -761,7 +750,7 @@ ncalogdconf_read(void)
 				}
 				parse = START;
 			} else if (tok == tokstatus) {
-				if (! isalpha(c) || *++tokstatusp == NULL ||
+				if (! isalpha(c) || *++tokstatusp == '\0' ||
 				    c != *tokstatusp) {
 					/* Not enabled, skip line */
 					parse = EOL;
@@ -921,7 +910,7 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 	clock_t	timout;
 	rval_t	rval;
 	uchar_t pri;
-	int 	pflag;
+	int	pflag;
 	int	error;
 	boolean_t more;
 	boolean_t ret = B_FALSE;

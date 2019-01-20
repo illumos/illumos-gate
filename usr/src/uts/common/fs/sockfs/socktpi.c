@@ -88,12 +88,12 @@
 /*
  * Possible failures when memory can't be allocated. The documented behavior:
  *
- * 		5.5:			4.X:		XNET:
+ *		5.5:			4.X:		XNET:
  * accept:	ENOMEM/ENOSR/EINTR	- (EINTR)	ENOMEM/ENOBUFS/ENOSR/
  *							EINTR
  *	(4.X does not document EINTR but returns it)
  * bind:	ENOSR			-		ENOBUFS/ENOSR
- * connect: 	EINTR			EINTR		ENOBUFS/ENOSR/EINTR
+ * connect:	EINTR			EINTR		ENOBUFS/ENOSR/EINTR
  * getpeername:	ENOMEM/ENOSR		ENOBUFS (-)	ENOBUFS/ENOSR
  * getsockname:	ENOMEM/ENOSR		ENOBUFS (-)	ENOBUFS/ENOSR
  *	(4.X getpeername and getsockname do not fail in practice)
@@ -182,8 +182,8 @@ static struct sonode *sotpi_create(struct sockparams *, int, int, int, int,
 
 static boolean_t	sotpi_info_create(struct sonode *, int);
 static void		sotpi_info_init(struct sonode *);
-static void 		sotpi_info_fini(struct sonode *);
-static void 		sotpi_info_destroy(struct sonode *);
+static void		sotpi_info_fini(struct sonode *);
+static void		sotpi_info_destroy(struct sonode *);
 
 /*
  * Do direct function call to the transport layer below; this would
@@ -202,7 +202,7 @@ extern	void sigunintr(k_sigset_t *);
 static int	sotpi_unbind(struct sonode *, int);
 
 /* TPI sockfs sonode operations */
-int 		sotpi_init(struct sonode *, struct sonode *, struct cred *,
+int		sotpi_init(struct sonode *, struct sonode *, struct cred *,
 		    int);
 static int	sotpi_accept(struct sonode *, int, struct cred *,
 		    struct sonode **);
@@ -230,16 +230,16 @@ extern int	sotpi_getsockopt(struct sonode *, int, int, void *,
 		    socklen_t *, int, struct cred *);
 extern int	sotpi_setsockopt(struct sonode *, int, int, const void *,
 		    socklen_t, struct cred *);
-static int 	sotpi_ioctl(struct sonode *, int, intptr_t, int, struct cred *,
+static int	sotpi_ioctl(struct sonode *, int, intptr_t, int, struct cred *,
 		    int32_t *);
-static int 	socktpi_plumbioctl(struct vnode *, int, intptr_t, int,
+static int	socktpi_plumbioctl(struct vnode *, int, intptr_t, int,
 		    struct cred *, int32_t *);
-static int 	sotpi_poll(struct sonode *, short, int, short *,
+static int	sotpi_poll(struct sonode *, short, int, short *,
 		    struct pollhead **);
-static int 	sotpi_close(struct sonode *, int, struct cred *);
+static int	sotpi_close(struct sonode *, int, struct cred *);
 
 static int	i_sotpi_info_constructor(sotpi_info_t *);
-static void 	i_sotpi_info_destructor(sotpi_info_t *);
+static void	i_sotpi_info_destructor(sotpi_info_t *);
 
 sonodeops_t sotpi_sonodeops = {
 	sotpi_init,		/* sop_init		*/
@@ -279,7 +279,7 @@ sotpi_create(struct sockparams *sp, int family, int type, int protocol,
     int version, int sflags, int *errorp, cred_t *cr)
 {
 	struct sonode	*so;
-	kmem_cache_t 	*cp;
+	kmem_cache_t	*cp;
 	int		sfamily = family;
 
 	ASSERT(sp->sp_sdev_info.sd_vnode != NULL);
@@ -6109,7 +6109,7 @@ sotpi_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 #ifdef DEBUG
 			zcmn_err(getzoneid(), CE_WARN,
 			    "Unsupported STREAMS ioctl 0x%x on socket. "
-			    "Pid = %d\n", cmd, 	curproc->p_pid);
+			    "Pid = %d\n", cmd, curproc->p_pid);
 #endif /* DEBUG */
 			return (EOPNOTSUPP);
 		}
@@ -6201,7 +6201,7 @@ socktpi_plumbioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		STRUCT_DECL(str_list, ustrlist);
 		STRUCT_INIT(ustrlist, mode);
 
-		if (arg == NULL) {
+		if (arg == 0) {
 			error = strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp);
 			if (error == 0)
 				(*rvalp)++;	/* Add one for sockmod */
@@ -6799,7 +6799,7 @@ sotpi_info_init(struct sonode *so)
 	sotpi_info_t *sti = SOTOTPI(so);
 	time_t now;
 
-	sti->sti_dev 	= so->so_sockparams->sp_sdev_info.sd_vnode->v_rdev;
+	sti->sti_dev	= so->so_sockparams->sp_sdev_info.sd_vnode->v_rdev;
 	vp->v_rdev	= sti->sti_dev;
 
 	sti->sti_orig_sp = NULL;
