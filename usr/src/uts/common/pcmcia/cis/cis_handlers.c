@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the tuple handlers that are called by the CIS
  *	parser.
@@ -1877,7 +1875,7 @@ cistpl_linktarget_handler(cistpl_callout_t *co, cistpl_t *tp, uint32_t flags,
 				cs->length = tl;
 				(void) strncpy(cs->tpltg_tag, (char *)cp,
 								cs->length);
-				cs->tpltg_tag[cs->length] = NULL;
+				cs->tpltg_tag[cs->length] = '\0';
 
 			} /* HANDTPL_PARSE_LTUPLE */
 
@@ -2147,7 +2145,7 @@ cis_getstr(cistpl_t *tp)
 	while ((*cpp != 0) && (*cpp != 0xff))
 	    cpp++;
 
-	*cpp = NULL;
+	*cpp = '\0';
 
 	return ((char *)cp);
 }
@@ -2164,7 +2162,7 @@ static void
 cis_return_name(cistpl_callout_t *co, cistpl_get_tuple_name_t *gtn)
 {
 	(void) strncpy(gtn->name, co->text, CIS_MAX_TUPLE_NAME_LEN);
-	gtn->name[CIS_MAX_TUPLE_NAME_LEN - 1] = NULL;
+	gtn->name[CIS_MAX_TUPLE_NAME_LEN - 1] = '\0';
 }
 
 /*

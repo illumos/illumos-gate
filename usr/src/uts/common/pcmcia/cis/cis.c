@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is a collection of routines that make up the Card Information
  *	Structure (CIS) interpreter.  The algorigthms used are based
@@ -638,7 +636,7 @@ cis_process_longlink(cistpl_callout_t *cistpl_callout, cistpl_t *tp,
 		cis_info->flags &= ~CW_LONGLINK_FOUND;
 		if (cis_tuple_handler(cistpl_callout, tp,
 						HANDTPL_PARSE_LTUPLE,
-						cisparse, NULL) &
+						cisparse, 0) &
 							HANDTPL_ERROR)
 		    return (HANDTPL_ERROR);
 		switch (tp->type) {
@@ -890,13 +888,13 @@ cis_convert_devspeed(convert_speed_t *cs)
 	} else if (cs->Attributes & CONVERT_DEVSPEED_TO_NS) {
 	    exponent = (cs->devspeed & (CISTPL_DEVSPEED_MAX_TBL - 1));
 	    if ((mantissa = (((cs->devspeed)>>3) &
-				(CISTPL_DEVSPEED_MAX_MAN - 1))) == NULL) {
-		if ((cs->nS = cd->table[exponent]) == NULL)
+				(CISTPL_DEVSPEED_MAX_MAN - 1))) == 0) {
+		if ((cs->nS = cd->table[exponent]) == 0)
 		    return (CS_BAD_SPEED);
 		return (CS_SUCCESS);
 	    } else {
 		if ((cs->nS = ((cd->mantissa[mantissa] *
-					cd->exponent[exponent]) / 10)) == NULL)
+					cd->exponent[exponent]) / 10)) == 0)
 		    return (CS_BAD_SPEED);
 		return (CS_SUCCESS);
 	    }
@@ -1126,7 +1124,7 @@ cis_list_create(cistpl_callout_t *cistpl_callout, cs_socket_t *sp)
 					FIND_LTUPLE_FWDF |
 					CIS_GET_LTUPLE_IGNORE)) != NULL) {
 			gtp->flags |= CISTPLF_IGNORE_TUPLE;
-			gtp = cis_get_ltuple(gtp, NULL, GET_NEXT_LTUPLEF |
+			gtp = cis_get_ltuple(gtp, 0, GET_NEXT_LTUPLEF |
 							CIS_GET_LTUPLE_IGNORE);
 		    } /* while */
 		} /* if (cis_get_ltuple(cis[fn])) */
@@ -1284,7 +1282,7 @@ cis_create_cis_chain(cs_socket_t *sp, cistpl_callout_t *cistpl_callout,
 			/*
 			 * Point to the last tuple in the list.
 			 */
-		    cis_info->cis = cis_get_ltuple(cis_info->cis, NULL,
+		    cis_info->cis = cis_get_ltuple(cis_info->cis, 0,
 							GET_LAST_LTUPLEF);
 		    break;
 		case CW_LONGLINK_C_FOUND:
@@ -1297,7 +1295,7 @@ cis_create_cis_chain(cs_socket_t *sp, cistpl_callout_t *cistpl_callout,
 			/*
 			 * Point to the last tuple in the list.
 			 */
-		    cis_info->cis = cis_get_ltuple(cis_info->cis, NULL,
+		    cis_info->cis = cis_get_ltuple(cis_info->cis, 0,
 							GET_LAST_LTUPLEF);
 		    break;
 		case CW_LONGLINK_MFC_FOUND:

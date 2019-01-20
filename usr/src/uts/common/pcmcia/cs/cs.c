@@ -1921,9 +1921,9 @@ cs_add_client_to_socket(unsigned sn, client_handle_t *ch,
 	 * Save the DDI information.
 	 */
 	client->dip = cr->dip;
-	cr->driver_name[MODMAXNAMELEN - 1] = NULL;
-	client->driver_name = (char *)kmem_zalloc(strlen(cr->driver_name) + 1,
-								KM_SLEEP);
+	cr->driver_name[MODMAXNAMELEN - 1] = '\0';
+	client->driver_name = kmem_zalloc(strlen(cr->driver_name) + 1,
+	    KM_SLEEP);
 	(void) strcpy(client->driver_name, cr->driver_name);
 	client->instance = ddi_get_instance(cr->dip);
 
@@ -3613,7 +3613,7 @@ cs_card_for_client(client_t *client)
 	 */
 	if (ddi_getprop(DDI_DEV_T_ANY, client->dip,    (DDI_PROP_CANSLEEP |
 							DDI_PROP_NOTPROM),
-							PCM_DEV_ACTIVE, NULL)) {
+							PCM_DEV_ACTIVE, 0)) {
 #ifdef	CS_DEBUG
 	    if (cs_debug > 1) {
 		cmn_err(CE_CONT, "cs_card_for_client: client handle 0x%x "
@@ -4889,7 +4889,7 @@ cs_modify_window(window_handle_t wh, modify_win_t *mw)
 
 	mw->Attributes &= ~WIN_DATA_WIDTH_VALID;
 
-	if ((error = cs_modify_mem_window(wh, mw, NULL, NULL)) != CS_SUCCESS) {
+	if ((error = cs_modify_mem_window(wh, mw, NULL, 0)) != CS_SUCCESS) {
 	    EVENT_THREAD_MUTEX_EXIT(client_lock_acquired, sp);
 	    mutex_exit(&cs_globals.window_lock);
 	    return (error);
@@ -5670,7 +5670,7 @@ cs_request_io(client_handle_t client_handle, io_req_t *ior)
 						ior->Attributes1)) !=
 								CS_SUCCESS) {
 		(void) cs_setup_io_win(socket_num, client->io_alloc.Window1,
-					NULL, NULL, NULL,
+					NULL, NULL, 0,
 					(
 						IO_DEALLOCATE_WINDOW |
 						IO_DISABLE_WINDOW));
@@ -5701,7 +5701,7 @@ cs_request_io(client_handle_t client_handle, io_req_t *ior)
 								CS_SUCCESS) {
 		    (void) cs_setup_io_win(socket_num,
 						client->io_alloc.Window2,
-						NULL, NULL, NULL,
+						NULL, NULL, 0,
 						(
 							IO_DEALLOCATE_WINDOW |
 							IO_DISABLE_WINDOW));
@@ -5722,13 +5722,13 @@ cs_request_io(client_handle_t client_handle, io_req_t *ior)
 								CS_SUCCESS) {
 		    (void) cs_setup_io_win(socket_num,
 						client->io_alloc.Window1,
-						NULL, NULL, NULL,
+						NULL, NULL, 0,
 						(
 							IO_DEALLOCATE_WINDOW |
 							IO_DISABLE_WINDOW));
 		    (void) cs_setup_io_win(socket_num,
 						client->io_alloc.Window2,
-						NULL, NULL, NULL,
+						NULL, NULL, 0,
 						(
 							IO_DEALLOCATE_WINDOW |
 							IO_DISABLE_WINDOW));
@@ -5907,13 +5907,13 @@ cs_release_io(client_handle_t client_handle, io_req_t *ior)
 	} else {
 #endif	/* USE_IOMMAP_WINDOW */
 	    (void) cs_setup_io_win(socket_num, client->io_alloc.Window1,
-						NULL, NULL, NULL,
+						NULL, NULL, 0,
 						(
 							IO_DEALLOCATE_WINDOW |
 							IO_DISABLE_WINDOW));
 	    if (client->io_alloc.Window2 != PCMCIA_MAX_WINDOWS)
 		(void) cs_setup_io_win(socket_num, client->io_alloc.Window2,
-						NULL, NULL, NULL,
+						NULL, NULL, 0,
 						(
 							IO_DEALLOCATE_WINDOW |
 							IO_DISABLE_WINDOW));
@@ -7366,7 +7366,7 @@ cs_get_physical_adapter_info(client_handle_t ch,
 	cs_socket_t *sp;
 	int client_lock_acquired;
 
-	if (ch == NULL)
+	if (ch == 0)
 	    gpai->PhySocket = CS_GET_SOCKET_NUMBER(gpai->LogSocket);
 	else
 	    gpai->PhySocket = GET_CLIENT_SOCKET(ch);
@@ -7375,14 +7375,14 @@ cs_get_physical_adapter_info(client_handle_t ch,
 	 * Determine if the passed socket number is valid or not.
 	 */
 	if ((sp = cs_get_sp(CS_GET_SOCKET_NUMBER(gpai->PhySocket))) == NULL)
-	    return ((ch == NULL) ? CS_BAD_SOCKET : CS_BAD_HANDLE);
+	    return ((ch == 0) ? CS_BAD_SOCKET : CS_BAD_HANDLE);
 
 	EVENT_THREAD_MUTEX_ENTER(client_lock_acquired, sp);
 
 	/*
 	 * If we were passed a client handle, determine if it's valid or not.
 	 */
-	if (ch != NULL) {
+	if (ch != 0) {
 	    if (cs_find_client(ch, NULL) == NULL) {
 		EVENT_THREAD_MUTEX_EXIT(client_lock_acquired, sp);
 		return (CS_BAD_HANDLE);
@@ -7435,7 +7435,7 @@ cs_map_log_socket(client_handle_t ch, map_log_socket_t *mls)
 	cs_socket_t *sp;
 	int client_lock_acquired;
 
-	if (ch == NULL)
+	if (ch == 0)
 	    mls->PhySocket = CS_GET_SOCKET_NUMBER(mls->LogSocket);
 	else
 	    mls->PhySocket = GET_CLIENT_SOCKET(ch);
@@ -7444,14 +7444,14 @@ cs_map_log_socket(client_handle_t ch, map_log_socket_t *mls)
 	 * Determine if the passed socket number is valid or not.
 	 */
 	if ((sp = cs_get_sp(CS_GET_SOCKET_NUMBER(mls->PhySocket))) == NULL)
-	    return ((ch == NULL) ? CS_BAD_SOCKET : CS_BAD_HANDLE);
+	    return ((ch == 0) ? CS_BAD_SOCKET : CS_BAD_HANDLE);
 
 	EVENT_THREAD_MUTEX_ENTER(client_lock_acquired, sp);
 
 	/*
 	 * If we were passed a client handle, determine if it's valid or not.
 	 */
-	if (ch != NULL) {
+	if (ch != 0) {
 	    if (cs_find_client(ch, NULL) == NULL) {
 		EVENT_THREAD_MUTEX_EXIT(client_lock_acquired, sp);
 		return (CS_BAD_HANDLE);
@@ -7567,7 +7567,7 @@ cs_event2text(event2text_t *e2t, int event_source)
 		} /* if (cs_ss_event_text) */
 	    } /* for (event) */
 	    if (e2t->text[0])
-		e2t->text[strlen(e2t->text)-1] = NULL;
+		e2t->text[strlen(e2t->text)-1] = '\0';
 	} /* if (!event_source) */
 
 	return (CS_SUCCESS);
