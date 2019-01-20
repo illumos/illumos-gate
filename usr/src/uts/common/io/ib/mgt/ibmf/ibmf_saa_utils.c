@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
@@ -485,7 +483,7 @@ static void ibmf_saa_multipath_record_parse_buffer(uchar_t *buffer,
 	uint16_t		num_gids;
 
 	sa_multipath_record_t	*multipath_record =
-		(sa_multipath_record_t *)record;
+	    (sa_multipath_record_t *)record;
 
 	ibmf_utils_unpack_data("l2c2s14c", buffer,
 	    IBMF_SAA_MULTIPATH_RECORD_SIZE, multipath_record,
@@ -871,7 +869,7 @@ static void ibmf_saa_multipath_record_to_buf(void *record, uchar_t *buffer)
 	char			gid_str[20];
 	uint16_t		num_gids;
 	sa_multipath_record_t	*multipath_record =
-		(sa_multipath_record_t *)record;
+	    (sa_multipath_record_t *)record;
 
 	num_gids = multipath_record->SGIDCount + multipath_record->DGIDCount;
 
@@ -974,7 +972,7 @@ ibmf_saa_utils_pack_payload(uchar_t *structs_payload, size_t
 
 	if (structs_payload_length == 0) {
 
-		*buf_payload_lengthp = NULL;
+		*buf_payload_lengthp = 0;
 		*buf_payloadp = NULL;
 
 		return (IBMF_SUCCESS);
