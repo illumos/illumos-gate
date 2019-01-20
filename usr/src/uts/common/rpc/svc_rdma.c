@@ -529,7 +529,7 @@ svc_rdma_krecv(SVCXPRT *clone_xprt, mblk_t *mp, struct rpc_msg *msg)
 
 		cllong->u.c_daddr3 = cllong->rb_longbuf.addr;
 
-		if (cllong->u.c_daddr == NULL) {
+		if (cllong->u.c_daddr == 0) {
 			DTRACE_PROBE(krpc__e__svcrdma__krecv__nomem);
 			rdma_buf_free(conn, &cllong->rb_longbuf);
 			clist_free(cllong);

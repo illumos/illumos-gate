@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -79,7 +79,7 @@ static void loopb_u2t(const char *, struct netbuf *);
  * mask which allows various types of debugging messages to be printed
  * out.
  *
- *	rpclog & 1 	will cause actual failures to be printed.
+ *	rpclog & 1	will cause actual failures to be printed.
  *	rpclog & 2	will cause informational messages to be
  *			printed on the client side of rpc.
  *	rpclog & 4	will cause informational messages to be
@@ -372,7 +372,7 @@ loopb_u2t(const char *ua, struct netbuf *addr)
 
 	univp = ua;
 	transp = addr->buf;
-	while (*univp != NULL) {
+	while (*univp != '\0') {
 		if (*univp == '\\' && *(univp+1) == '\\') {
 			*transp = '\\';
 			univp += 2;
@@ -597,7 +597,7 @@ rpcbind_getaddr(struct knetconfig *config, rpcprog_t prog, rpcvers_t vers,
 		clnt_destroy(client);
 
 		if (status == RPC_SUCCESS) {
-			if (ua == NULL || *ua == NULL) {
+			if (ua == NULL || *ua == '\0') {
 				status = RPC_PROGNOTREGISTERED;
 				continue;
 			}
@@ -738,10 +738,7 @@ rpc_tpierr2name(uint_t err)
 #define	IN6ADDRSZ	16
 #define	INT16SZ	2
 const char *
-kinet_ntop6(src, dst, size)
-	uchar_t *src;
-	char *dst;
-	size_t size;
+kinet_ntop6(uchar_t *src, char *dst, size_t size)
 {
 	/*
 	 * Note that int32_t and int16_t need only be "at least" large enough
