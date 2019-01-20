@@ -318,7 +318,7 @@ static int compare_data(crypto_data_t *, uchar_t *);
 static int core_rsa_encrypt(crypto_key_t *, uchar_t *, int, uchar_t *, int);
 static int core_rsa_decrypt(crypto_key_t *, uchar_t *, int, uchar_t *);
 
-static crypto_kcf_provider_handle_t rsa_prov_handle = NULL;
+static crypto_kcf_provider_handle_t rsa_prov_handle = 0;
 
 int
 _init(void)
@@ -341,11 +341,11 @@ int
 _fini(void)
 {
 	/* Unregister from KCF if module is registered */
-	if (rsa_prov_handle != NULL) {
+	if (rsa_prov_handle != 0) {
 		if (crypto_unregister_provider(rsa_prov_handle))
 			return (EBUSY);
 
-		rsa_prov_handle = NULL;
+		rsa_prov_handle = 0;
 	}
 
 	return (mod_remove(&modlinkage));
