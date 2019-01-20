@@ -154,7 +154,7 @@ static crypto_provider_info_t md4_prov_info = {
 	md4_mech_info_tab
 };
 
-static crypto_kcf_provider_handle_t md4_prov_handle = NULL;
+static crypto_kcf_provider_handle_t md4_prov_handle = 0;
 
 int
 _init(void)
@@ -177,11 +177,11 @@ int
 _fini(void)
 {
 	/* Unregister from KCF if module is registered */
-	if (md4_prov_handle != NULL) {
+	if (md4_prov_handle != 0) {
 		if (crypto_unregister_provider(md4_prov_handle))
 			return (EBUSY);
 
-		md4_prov_handle = NULL;
+		md4_prov_handle = 0;
 	}
 
 	return (mod_remove(&modlinkage));
