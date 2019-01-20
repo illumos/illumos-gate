@@ -23,7 +23,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #include <sys/types.h>
@@ -61,8 +61,8 @@
 static int prinit();
 
 static mntopts_t proc_mntopts = {
-	NULL,
-	0
+	.mo_count = 0,
+	.mo_list = NULL
 };
 
 static vfsdef_t vfw = {
@@ -189,7 +189,7 @@ prinit(int fstype, char *name)
 /* ARGSUSED */
 static int
 prmount(struct vfs *vfsp, struct vnode *mvp,
-	struct mounta *uap, struct cred *cr)
+    struct mounta *uap, struct cred *cr)
 {
 	prnode_t *pnp;
 	zone_t *zone = curproc->p_zone;
