@@ -134,7 +134,7 @@ cpr_stat_cleanup()
 
 	for (cep = cp->cs_event_head; cep; cep = cep->ce_next) {
 		if ((cep->ce_ntests & CE_START_MASK) &&
-		    strcmp(cep->ce_name, "POST CPR DELAY") != NULL) {
+		    strcmp(cep->ce_name, "POST CPR DELAY") != 0) {
 			cpr_stat_event_end(cep->ce_name, 0);
 			cep->ce_ntests &= ~CE_START_MASK;
 		}
@@ -184,10 +184,10 @@ cpr_stat_event_print()
 			tabs = "\t\t";
 		else
 			tabs = "\t";
-		if (strcmp(cep->ce_name, "Suspend Total") == NULL ||
-		    strcmp(cep->ce_name, "Resume Total") == NULL ||
-		    strcmp(cep->ce_name, "POST CPR DELAY") == NULL ||
-		    strcmp(cep->ce_name, "WHOLE CYCLE") == NULL)
+		if (strcmp(cep->ce_name, "Suspend Total") == 0 ||
+		    strcmp(cep->ce_name, "Resume Total") == 0 ||
+		    strcmp(cep->ce_name, "POST CPR DELAY") == 0 ||
+		    strcmp(cep->ce_name, "WHOLE CYCLE") == 0)
 			fmt = "%s%s%d\t\t%3d.%1d\t\t%3d.%1d\n";
 		else
 			fmt = "%s%s%d\t\t  %3d.%1d\t\t  %3d.%1d\n";
@@ -231,12 +231,12 @@ cpr_find_event(char *name, int new)
 	int i;
 
 	for (cep = cp->cs_event_head; cep; cep = cep->ce_next) {
-		if (strcmp(name, cep->ce_name) == NULL)
+		if (strcmp(name, cep->ce_name) == 0)
 			return (cep);
 	}
 
 	/* if not begin not end either */
-	if (new == NULL)
+	if (new == 0)
 		return (NULL);
 
 	for (i = 0; i < CPR_E_MAX_EVENTNUM; i++) {
