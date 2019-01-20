@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -927,7 +927,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 						return (1);
 					}
 					ASSERT(tp->tim_mymaxlen >= 0);
-					if (tp->tim_mymaxlen != NULL) {
+					if (tp->tim_mymaxlen != 0) {
 						kmem_free(tp->tim_myname,
 						    tp->tim_mymaxlen);
 					}
@@ -2928,7 +2928,7 @@ tim_answer_ti_sync(queue_t *q, mblk_t *mp, struct tim_tim *tp,
  */
 static void
 tim_send_ioctl_tpi_msg(queue_t *q, mblk_t *mp, struct tim_tim *tp,
-	struct iocblk *iocb)
+    struct iocblk *iocb)
 {
 	mblk_t *tmp;
 	int ioc_cmd = iocb->ioc_cmd;
