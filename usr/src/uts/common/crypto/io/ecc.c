@@ -222,7 +222,7 @@ static crypto_provider_info_t ecc_prov_info = {
 	ecc_mech_info_tab
 };
 
-static crypto_kcf_provider_handle_t ecc_prov_handle = NULL;
+static crypto_kcf_provider_handle_t ecc_prov_handle = 0;
 
 static int ecc_sign_common(ecc_ctx_t *, crypto_data_t *, crypto_data_t *,
     crypto_req_handle_t);
@@ -256,11 +256,11 @@ int
 _fini(void)
 {
 	/* Unregister from KCF if module is registered */
-	if (ecc_prov_handle != NULL) {
+	if (ecc_prov_handle != 0) {
 		if (crypto_unregister_provider(ecc_prov_handle))
 			return (EBUSY);
 
-		ecc_prov_handle = NULL;
+		ecc_prov_handle = 0;
 	}
 
 	return (mod_remove(&modlinkage));
