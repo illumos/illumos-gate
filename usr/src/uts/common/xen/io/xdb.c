@@ -372,7 +372,7 @@ xdb_get_buf(xdb_t *vdp, blkif_request_t *req, xdb_request_t *xreq)
 				unmapop.host_addr =
 				    (uint64_t)(uintptr_t)XDB_IOPAGE_VA(
 				    vdp->xs_iopage_va, xreq->xr_idx, i);
-				unmapop.dev_bus_addr = NULL;
+				unmapop.dev_bus_addr = 0;
 				unmapop.handle = mapops[i].handle;
 				(void) HYPERVISOR_grant_table_op(
 				    GNTTABOP_unmap_grant_ref, &unmapop, 1);
@@ -676,7 +676,7 @@ xdb_biodone(buf_t *bp)
 		unlogva(vdp, unmapops[i].host_addr);
 		mutex_exit(&vdp->xs_iomutex);
 #endif
-		unmapops[i].dev_bus_addr = NULL;
+		unmapops[i].dev_bus_addr = 0;
 		unmapops[i].handle = xreq->xr_page_hdls[i];
 	}
 	err = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
@@ -697,7 +697,7 @@ xdb_biodone(buf_t *bp)
 		 * For now, just cast to void.
 		 */
 		(void) ldi_ioctl(vdp->xs_ldi_hdl,
-		    DKIOCFLUSHWRITECACHE, NULL, FKIOCTL, kcred, NULL);
+		    DKIOCFLUSHWRITECACHE, 0, FKIOCTL, kcred, NULL);
 	}
 
 	mutex_enter(&vdp->xs_iomutex);
@@ -1692,7 +1692,7 @@ xdb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Check if the frontend device is supposed to be read only */
 	if (xenbus_read_str(xsname, "mode", &str) != 0)
 		return (DDI_FAILURE);
-	if ((strcmp(str, "r") == NULL) || (strcmp(str, "ro") == NULL))
+	if ((strcmp(str, "r") == 0) || (strcmp(str, "ro") == 0))
 		vdp->xs_type |= XDB_DEV_RO;
 	strfree(str);
 

@@ -589,7 +589,7 @@ errout2:
 	/* unmap ring page */
 	unmapop.host_addr = (uint64_t)(uintptr_t)ringva;
 	unmapop.handle = ring->xr_grant_hdl;
-	unmapop.dev_bus_addr = NULL;
+	unmapop.dev_bus_addr = 0;
 	(void) HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &unmapop, 1);
 	hat_release_mapping(kas.a_hat, ringva);
 errout1:
@@ -612,7 +612,7 @@ xvdi_unmap_ring(xendev_ring_t *ring)
 	impl_acc_hdl_free(ring->xr_acc_hdl);
 	unmapop.host_addr = (uint64_t)(uintptr_t)ring->xr_vaddr;
 	unmapop.handle = ring->xr_grant_hdl;
-	unmapop.dev_bus_addr = NULL;
+	unmapop.dev_bus_addr = 0;
 	(void) HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &unmapop, 1);
 	hat_release_mapping(kas.a_hat, ring->xr_vaddr);
 	vmem_xfree(heap_arena, ring->xr_vaddr, PAGESIZE);
