@@ -70,32 +70,32 @@ static drm_inst_state_t *drm_sup_devt_to_state(dev_t);
 static void drm_supp_free_drv_entry(dev_info_t *);
 
 static struct devmap_callback_ctl drm_devmap_callbacks = {
-		DEVMAP_OPS_REV, 		/* devmap_rev */
-		drm_devmap_map,				/* devmap_map */
-		NULL,			/* devmap_access */
+		DEVMAP_OPS_REV,			/* devmap_rev */
+		drm_devmap_map,			/* devmap_map */
+		NULL,				/* devmap_access */
 		drm_devmap_dup,			/* devmap_dup */
-		drm_devmap_unmap 		/* devmap_unmap */
+		drm_devmap_unmap		/* devmap_unmap */
 };
 
 /*
  * Common device operations structure for all DRM drivers
  */
 struct cb_ops drm_cb_ops = {
-	drm_sun_open,			/* cb_open */
-	drm_sun_close,			/* cb_close */
+	drm_sun_open,				/* cb_open */
+	drm_sun_close,				/* cb_close */
 	nodev,					/* cb_strategy */
 	nodev,					/* cb_print */
 	nodev,					/* cb_dump */
 	nodev,					/* cb_read */
 	nodev,					/* cb_write */
-	drm_sun_ioctl,		/* cb_ioctl */
-	drm_sun_devmap,		/* cb_devmap */
+	drm_sun_ioctl,				/* cb_ioctl */
+	drm_sun_devmap,				/* cb_devmap */
 	nodev,					/* cb_mmap */
-	NULL,			/* cb_segmap */
+	NULL,					/* cb_segmap */
 	nochpoll,				/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
+	ddi_prop_op,				/* cb_prop_op */
 	0,					/* cb_stream */
-	D_NEW | D_MTSAFE |D_DEVMAP	/* cb_flag */
+	D_NEW | D_MTSAFE |D_DEVMAP		/* cb_flag */
 };
 
 int
@@ -171,7 +171,7 @@ drm_supp_register(dev_info_t *dip, drm_device_t *dp)
 	/* create a minor node for common graphics ops */
 	(void) sprintf(buf, "%s%d", GFX_NAME, instance);
 	error = ddi_create_minor_node(dip, buf, S_IFCHR,
-	    INST2NODE0(instance), DDI_NT_DISPLAY, NULL);
+	    INST2NODE0(instance), DDI_NT_DISPLAY, 0);
 	if (error != DDI_SUCCESS) {
 		DRM_ERROR("drm_supp_regiter: "
 		    "failed to create minor node for gfx");
@@ -766,7 +766,7 @@ drm_devmap_map(devmap_cookie_t dhc, dev_t dev, uint_t flags,
 {
 	devmap_handle_t			*dhp;
 	drm_inst_state_t		*statep;
-	struct ddi_umem_cookie 	*cp;
+	struct ddi_umem_cookie		*cp;
 
 	statep = drm_sup_devt_to_state(dev);
 	ASSERT(statep != NULL);
@@ -995,7 +995,7 @@ drm_supp_device_capability(void *handle, int capid)
 	/* has capabilities list ? */
 	if ((pci_config_get16(mstate->mis_cfg_hdl, PCI_CONF_STAT) &
 	    PCI_CONF_CAP_MASK) == 0)
-		return (NULL);
+		return (0);
 
 	caps_ptr = pci_config_get8(mstate->mis_cfg_hdl, PCI_CONF_CAP_PTR);
 	while (caps_ptr != PCI_CAP_NEXT_PTR_NULL) {
