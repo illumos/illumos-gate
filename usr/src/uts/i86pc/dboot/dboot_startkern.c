@@ -1665,7 +1665,7 @@ process_efi32(EFI_SYSTEM_TABLE32 *efi)
 			bi->bi_smbios = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
-		if (bi->bi_smbios == NULL &&
+		if (bi->bi_smbios == 0 &&
 		    dboot_same_guids(&config[i].VendorGuid, &smbios)) {
 			bi->bi_smbios = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
@@ -1674,7 +1674,7 @@ process_efi32(EFI_SYSTEM_TABLE32 *efi)
 			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
-		if (bi->bi_acpi_rsdp == NULL &&
+		if (bi->bi_acpi_rsdp == 0 &&
 		    dboot_same_guids(&config[i].VendorGuid, &acpi1)) {
 			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
@@ -1698,7 +1698,7 @@ process_efi64(EFI_SYSTEM_TABLE64 *efi)
 			bi->bi_smbios = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
-		if (bi->bi_smbios == NULL &&
+		if (bi->bi_smbios == 0 &&
 		    dboot_same_guids(&config[i].VendorGuid, &smbios)) {
 			bi->bi_smbios = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
@@ -1708,7 +1708,7 @@ process_efi64(EFI_SYSTEM_TABLE64 *efi)
 			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;
 		}
-		if (bi->bi_acpi_rsdp == NULL &&
+		if (bi->bi_acpi_rsdp == 0 &&
 		    dboot_same_guids(&config[i].VendorGuid, &acpi1)) {
 			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
 			    config[i].VendorTable;

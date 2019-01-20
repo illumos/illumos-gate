@@ -91,19 +91,19 @@ kmutex_t av_lock;
  * must not be used there.
  */
 ddi_softint_hdl_impl_t softlevel_hdl[DDI_IPL_10] = {
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 1 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 2 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 3 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 4 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 5 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 6 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 7 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 8 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 9 */
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL}, /* level 10 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 1 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 2 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 3 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 4 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 5 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 6 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 7 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 8 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 9 */
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL}, /* level 10 */
 };
 ddi_softint_hdl_impl_t softlevel1_hdl =
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL};
 
 /*
  * clear/check softint pending flag corresponding for
@@ -541,7 +541,7 @@ static uint64_t dummy_tick;
 /* remove an interrupt vector from the chain */
 static void
 remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
-	int vect)
+    int vect)
 {
 	struct autovec *p, *target;
 	int	lo_pri, hi_pri;
