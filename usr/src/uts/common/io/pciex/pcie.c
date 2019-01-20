@@ -932,7 +932,7 @@ void
 pcie_rc_fini_bus(dev_info_t *dip)
 {
 	pcie_bus_t *bus_p = PCIE_DIP2DOWNBUS(dip);
-	ndi_set_bus_private(dip, B_FALSE, NULL, NULL);
+	ndi_set_bus_private(dip, B_FALSE, 0, NULL);
 	kmem_free(PCIE_BUS2DOM(bus_p), sizeof (pcie_domain_t));
 	kmem_free(bus_p, sizeof (pcie_bus_t));
 }
@@ -1270,7 +1270,7 @@ pcie_fini_bus(dev_info_t *dip, uint8_t flags)
 			    "hotplug-capable");
 		}
 
-		ndi_set_bus_private(dip, B_TRUE, NULL, NULL);
+		ndi_set_bus_private(dip, B_TRUE, 0, NULL);
 		kmem_free(bus_p, sizeof (pcie_bus_t));
 	}
 }
@@ -1798,7 +1798,7 @@ pcie_init_root_port_mps(dev_info_t *dip)
 	(void) pcie_get_fabric_mps(ddi_get_parent(dip),
 	    ddi_get_child(dip), &max_supported);
 
-	rp_cap = PCI_CAP_GET16(bus_p->bus_cfg_hdl, NULL,
+	rp_cap = PCI_CAP_GET16(bus_p->bus_cfg_hdl, 0,
 	    bus_p->bus_pcie_off, PCIE_DEVCAP) &
 	    PCIE_DEVCAP_MAX_PAYLOAD_MASK;
 
@@ -1991,7 +1991,7 @@ pcie_get_max_supported(dev_info_t *dip, void *arg)
 		goto fail3;
 	}
 
-	max_supported = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+	max_supported = PCI_CAP_GET16(config_handle, 0, cap_ptr,
 	    PCIE_DEVCAP) & PCIE_DEVCAP_MAX_PAYLOAD_MASK;
 
 	PCIE_DBG("PCIE MPS: %s: MPS Capabilities %x\n", ddi_driver_name(dip),
@@ -2039,7 +2039,7 @@ pcie_root_port(dev_info_t *dip)
 			continue;
 		}
 
-		port_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
+		port_type = PCI_CAP_GET16(config_handle, 0, cap_ptr,
 		    PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 
 		pci_config_teardown(&config_handle);
@@ -2349,7 +2349,7 @@ pcie_ari_get_next_function(dev_info_t *dip, int *func)
 		return (DDI_FAILURE);
 	}
 
-	val = PCI_CAP_GET32(handle, NULL, cap_ptr, PCIE_ARI_CAP);
+	val = PCI_CAP_GET32(handle, 0, cap_ptr, PCIE_ARI_CAP);
 
 	next_function = (val >> PCIE_ARI_CAP_NEXT_FUNC_SHIFT) &
 	    PCIE_ARI_CAP_NEXT_FUNC_MASK;

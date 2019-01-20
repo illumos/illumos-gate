@@ -154,7 +154,7 @@ extern void pcie_fini_dom(dev_info_t *);
 /* Following macros are only valid for leaf devices */
 #define	PCIE_DOMAIN_ID_GET(bus_p) \
 	((uint_t)(PCIE_IS_ASSIGNED(bus_p)			\
-	    ? PCIE_BUS2DOM(bus_p)->domain.id.domain_id : NULL))
+	    ? PCIE_BUS2DOM(bus_p)->domain.id.domain_id : 0))
 #define	PCIE_DOMAIN_ID_SET(bus_p, new_id) \
 	if (!PCIE_IS_BDG(bus_p)) \
 		PCIE_BUS2DOM(bus_p)->domain.id.domain_id = (uint_t)(new_id)
