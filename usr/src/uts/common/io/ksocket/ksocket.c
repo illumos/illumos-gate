@@ -841,7 +841,7 @@ ksocket_spoll(ksocket_t ks, int timo, short events, short *revents,
 	if (pdp->pd_php != NULL) {
 		pollhead_delete(pdp->pd_php, pdp);
 		pdp->pd_php = NULL;
-		pdp->pd_fd = NULL;
+		pdp->pd_fd = 0;
 	}
 
 	/*
