@@ -53,8 +53,6 @@
  * IN THE SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef XPV_HVM_DRIVER
 #include <sys/xpv_support.h>
 #include <sys/hypervisor.h>
@@ -70,9 +68,9 @@
 
 int
 xenbus_watch_path(struct xenbus_device *dev, const char *path,
-			struct xenbus_watch *watch,
-			void (*callback)(struct xenbus_watch *,
-			const char **, unsigned int))
+    struct xenbus_watch *watch,
+    void (*callback)(struct xenbus_watch *,
+    const char **, unsigned int))
 {
 	int err;
 
@@ -93,9 +91,9 @@ xenbus_watch_path(struct xenbus_device *dev, const char *path,
 
 int
 xenbus_watch_path2(struct xenbus_device *dev, const char *path,
-			const char *path2, struct xenbus_watch *watch,
-			void (*callback)(struct xenbus_watch *,
-			const char **, unsigned int))
+    const char *path2, struct xenbus_watch *watch,
+    void (*callback)(struct xenbus_watch *,
+    const char **, unsigned int))
 {
 	int err;
 	char *state;
@@ -124,7 +122,7 @@ xenbus_watch_path2(struct xenbus_device *dev, const char *path,
  */
 int
 xenbus_switch_state(struct xenbus_device *dev, xenbus_transaction_t xbt,
-			XenbusState state)
+    XenbusState state)
 {
 	int current_state;
 	int err;
@@ -169,7 +167,7 @@ error_path(struct xenbus_device *dev)
 
 static void
 common_dev_error(struct xenbus_device *dev, int err, const char *fmt,
-		va_list ap)
+    va_list ap)
 {
 	int ret;
 	unsigned int len;
@@ -193,7 +191,7 @@ common_dev_error(struct xenbus_device *dev, int err, const char *fmt,
 		goto fail;
 	}
 
-	if (xenbus_write(NULL, path_buffer, "error", printf_buffer) != 0) {
+	if (xenbus_write(0, path_buffer, "error", printf_buffer) != 0) {
 		printf("xenbus: failed to write error node for %s (%s)\n",
 		    dev->nodename, printf_buffer);
 		goto fail;
@@ -235,7 +233,7 @@ void
 xenbus_dev_ok(struct xenbus_device *dev)
 {
 	if (dev->has_error) {
-		if (xenbus_rm(NULL, dev->nodename, "error") != 0)
+		if (xenbus_rm(0, dev->nodename, "error") != 0)
 			printf("xenbus: failed to clear error node for %s\n",
 			    dev->nodename);
 		else
