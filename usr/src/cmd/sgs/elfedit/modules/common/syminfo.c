@@ -109,7 +109,7 @@ typedef enum {
  */
 typedef struct {
 	elfedit_obj_state_t	*obj_state;
-	syminfo_opt_t		optmask;   	/* Mask of options used */
+	syminfo_opt_t		optmask;	/* Mask of options used */
 	int			argc;		/* # of plain arguments */
 	const char		**argv;		/* Plain arguments */
 	struct {				/* Syminfo */
@@ -796,7 +796,7 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_NEEDED) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_NEEDED), 0,
 		    SYMINFO_OPT_F_NEEDED, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SYMNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SYMNDX) */
@@ -820,13 +820,13 @@ elfedit_init(elfedit_module_version_t version)
 	static const char *name_si_flags[] = {
 	    MSG_ORIG(MSG_CMD_SI_FLAGS), NULL };
 	static elfedit_cmd_optarg_t opt_si_flags[] = {
-		{ ELFEDIT_STDOA_OPT_AND, NULL, ELFEDIT_CMDOA_F_INHERIT,
+		{ ELFEDIT_STDOA_OPT_AND, 0, ELFEDIT_CMDOA_F_INHERIT,
 		    SYMINFO_OPT_F_AND, SYMINFO_OPT_F_OR },
-		{ ELFEDIT_STDOA_OPT_CMP, NULL,
+		{ ELFEDIT_STDOA_OPT_CMP, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, SYMINFO_OPT_F_CMP, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
-		{ ELFEDIT_STDOA_OPT_OR, NULL, ELFEDIT_CMDOA_F_INHERIT,
+		{ ELFEDIT_STDOA_OPT_OR, 0, ELFEDIT_CMDOA_F_INHERIT,
 		    SYMINFO_OPT_F_OR, SYMINFO_OPT_F_AND },
 		{ MSG_ORIG(MSG_STR_MINUS_SYMNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SYMNDX) */

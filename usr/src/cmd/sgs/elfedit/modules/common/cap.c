@@ -131,7 +131,7 @@ typedef struct {
 	struct {			/* String table */
 		elfedit_section_t *sec;
 	} str;
-	cap_opt_t	optmask;   	/* Mask of options used */
+	cap_opt_t	optmask;	/* Mask of options used */
 	int		argc;		/* # of plain arguments */
 	const char	**argv;		/* Plain arguments */
 } ARGSTATE;
@@ -1237,18 +1237,18 @@ elfedit_init(elfedit_module_version_t version)
 {
 	/* For commands that only accept -capid, -and, -cmp, -o, and -or */
 	static elfedit_cmd_optarg_t opt_ostyle_capid_bitop[] = {
-		{ ELFEDIT_STDOA_OPT_AND, NULL,
+		{ ELFEDIT_STDOA_OPT_AND, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, CAP_OPT_F_AND, CAP_OPT_F_OR },
 		{ MSG_ORIG(MSG_STR_MINUS_CAPID),
 		    /* MSG_INTL(MSG_OPTDESC_CAPID) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_CAPID), ELFEDIT_CMDOA_F_VALUE,
 		    CAP_OPT_F_CAPID, CAP_OPT_F_CAPNDX },
-		{ MSG_ORIG(MSG_STR_IDNAME), NULL, 0 },
-		{ ELFEDIT_STDOA_OPT_CMP, NULL,
+		{ MSG_ORIG(MSG_STR_IDNAME), 0, 0 },
+		{ ELFEDIT_STDOA_OPT_CMP, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, CAP_OPT_F_CMP, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
-		{ ELFEDIT_STDOA_OPT_OR, NULL,
+		{ ELFEDIT_STDOA_OPT_OR, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, CAP_OPT_F_OR, CAP_OPT_F_AND },
 		{ NULL }
 	};
@@ -1259,7 +1259,7 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_CAPID) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_CAPID), ELFEDIT_CMDOA_F_VALUE,
 		    CAP_OPT_F_CAPID, CAP_OPT_F_CAPNDX },
-		{ MSG_ORIG(MSG_STR_IDNAME), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_IDNAME), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_CAPNDX),
 		    /* MSG_INTL(MSG_OPTDESC_CAPNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_CAPNDX), 0,
@@ -1290,12 +1290,12 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_CAPID) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_CAPID), ELFEDIT_CMDOA_F_VALUE,
 		    CAP_OPT_F_CAPID, CAP_OPT_F_CAPNDX },
-		{ MSG_ORIG(MSG_STR_IDNAME), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_IDNAME), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_CAPNDX),
 		    /* MSG_INTL(MSG_OPTDESC_CAPNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_CAPNDX), 0,
 		    CAP_OPT_F_CAPNDX, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ NULL }
 	};
@@ -1319,12 +1319,12 @@ elfedit_init(elfedit_module_version_t version)
 		    /* MSG_INTL(MSG_OPTDESC_CAPID) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_CAPID), ELFEDIT_CMDOA_F_VALUE,
 		    CAP_OPT_F_CAPID, CAP_OPT_F_CAPNDX },
-		{ MSG_ORIG(MSG_STR_IDNAME), NULL, 0 },
+		{ MSG_ORIG(MSG_STR_IDNAME), 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_CAPNDX),
 		    /* MSG_INTL(MSG_OPTDESC_CAPNDX) */
 		    ELFEDIT_I18NHDL(MSG_OPTDESC_CAPNDX), 0,
 		    CAP_OPT_F_CAPNDX, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_S),
 		    /* MSG_INTL(MSG_OPTDESC_S) */

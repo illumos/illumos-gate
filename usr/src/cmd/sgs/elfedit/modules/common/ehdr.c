@@ -140,7 +140,7 @@ typedef enum {
  */
 typedef struct {
 	elfedit_obj_state_t	*obj_state;
-	ehdr_opt_t		optmask;   	/* Mask of options used */
+	ehdr_opt_t		optmask;	/* Mask of options used */
 	int			argc;		/* # of plain arguments */
 	const char		**argv;		/* Plain arguments */
 } ARGSTATE;
@@ -1763,7 +1763,7 @@ elfedit_init(elfedit_module_version_t version)
 {
 	/* Many of the commands only accept -o */
 	static elfedit_cmd_optarg_t opt_std[] = {
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ NULL }
 	};
@@ -1861,13 +1861,13 @@ elfedit_init(elfedit_module_version_t version)
 	static const char *name_e_flags[] = {
 		MSG_ORIG(MSG_CMD_E_FLAGS), NULL };
 	static elfedit_cmd_optarg_t opt_e_flags[] = {
-		{ ELFEDIT_STDOA_OPT_AND, NULL,
+		{ ELFEDIT_STDOA_OPT_AND, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, EHDR_OPT_F_AND, EHDR_OPT_F_OR },
-		{ ELFEDIT_STDOA_OPT_CMP, NULL,
+		{ ELFEDIT_STDOA_OPT_CMP, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, EHDR_OPT_F_CMP, 0 },
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
-		{ ELFEDIT_STDOA_OPT_OR, NULL,
+		{ ELFEDIT_STDOA_OPT_OR, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, EHDR_OPT_F_OR, EHDR_OPT_F_AND },
 		{ NULL }
 	};
@@ -1938,7 +1938,7 @@ elfedit_init(elfedit_module_version_t version)
 	static const char *name_e_shstrndx[] = {
 		MSG_ORIG(MSG_CMD_E_SHSTRNDX), NULL };
 	static elfedit_cmd_optarg_t opt_e_shstrndx[] = {
-		{ ELFEDIT_STDOA_OPT_O, NULL,
+		{ ELFEDIT_STDOA_OPT_O, 0,
 		    ELFEDIT_CMDOA_F_INHERIT, 0, 0 },
 		{ MSG_ORIG(MSG_STR_MINUS_SHNDX),
 		    /* MSG_INTL(MSG_OPTDESC_SHNDX) */
