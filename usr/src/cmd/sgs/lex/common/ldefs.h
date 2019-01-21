@@ -29,8 +29,6 @@
 #ifndef	_LDEFS_H
 #define	_LDEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -129,7 +127,7 @@
  * example, a lex character class "[_0-9a-zA-Z]"
  * would be translated to the intermidiate
  * form:
- *   	RCCL
+ *	RCCL
  *	 |
  *	 |
  *	 v
@@ -250,8 +248,8 @@ void phead2(void);
 void ptail(void);
 void statistics(void);
 void error_tail(void) __NORETURN;
-void error();
-void warning();
+void error(char *, ...);
+void warning(char *, ...);
 void lgate(void);
 void scopy(CHR *s, CHR *t);
 void cclinter(int sw);
