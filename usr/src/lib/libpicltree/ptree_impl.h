@@ -27,8 +27,6 @@
 #ifndef	_PTREE_IMPL_H
 #define	_PTREE_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -52,7 +50,7 @@ typedef uint64_t picl_hdl_t;
 /*
  * Is the object PICLized?
  */
-#define	IS_PICLIZED(x)		((x)->picl_hdl != NULL)
+#define	IS_PICLIZED(x)		((x)->picl_hdl != 0)
 
 /*
  * A handle is a 64-bit quantity with the daemon's pid value in top 32 bits
@@ -126,7 +124,7 @@ typedef	struct picl_prop	picl_prop_t;
  */
 struct picl_node {
 	rwlock_t	rwlock;		/* protects properties */
-	picl_obj_t  	*firstprop;
+	picl_obj_t	*firstprop;
 	char		*classname;
 	picl_obj_t	*parent;	/* protected by ptree lock */
 	picl_obj_t	*child;		/* protected by ptree lock */
@@ -217,7 +215,7 @@ typedef struct picld_plugin_reg_list {
 typedef struct picld_plinfo {
 	char			*libname;
 	char			*pathname;
-	void 			*dlh;
+	void			*dlh;
 	struct picld_plinfo	*next;
 } picld_plugin_desc_t;
 

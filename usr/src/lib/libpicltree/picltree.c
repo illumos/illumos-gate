@@ -591,7 +591,7 @@ picl_hdl_error(picl_hdl_t hdl)
 	(void) pthread_mutex_lock(&piclhdl_lock);
 	err = PICL_STALEHANDLE;
 	if ((pid != picld_pid) || (hash_val >= picl_hdl_hi) ||
-	    (hash_val == NULL))
+	    (hash_val == 0))
 		err = PICL_INVALIDHANDLE;
 	(void) pthread_mutex_unlock(&piclhdl_lock);
 	return (err);
@@ -610,7 +610,7 @@ ptree_hdl_error(picl_hdl_t hdl)
 	(void) pthread_mutex_lock(&ptreehdl_lock);
 	err = PICL_STALEHANDLE;
 	if ((pid != picld_pid) || (hash_val >= ptree_hdl_hi) ||
-	    (hash_val == NULL))
+	    (hash_val == 0))
 		err = PICL_INVALIDHANDLE;
 	(void) pthread_mutex_unlock(&ptreehdl_lock);
 	return (err);
@@ -623,7 +623,7 @@ ptree_hdl_error(picl_hdl_t hdl)
 int
 cvt_picl2ptree(picl_hdl_t hdl, picl_hdl_t *ptree_hdl)
 {
-	picl_hdl_t 	tmph;
+	picl_hdl_t	tmph;
 	int		err;
 
 	(void) rw_rdlock(&picltbl_rwlock);		/* lock picl */
@@ -1430,7 +1430,7 @@ ptree_add_prop(picl_nodehdl_t nodeh, picl_prophdl_t proph)
 	int		err;
 	picl_obj_t	*nodep;
 	picl_obj_t	*propp;
-	picl_obj_t  	*tbl_obj;
+	picl_obj_t	*tbl_obj;
 	picl_obj_t	*refobj;
 
 	(void) rw_rdlock(&ptree_rwlock);		/* RDLock ptree */
@@ -1788,8 +1788,8 @@ ptree_get_next_by_col(picl_prophdl_t proph, picl_prophdl_t *nextcolh)
 int
 ptree_create_node(const char *name, const char *clname, picl_nodehdl_t *nodeh)
 {
-	picl_obj_t 		*pobj;
-	ptree_propinfo_t 	propinfo;
+	picl_obj_t		*pobj;
+	ptree_propinfo_t	propinfo;
 	picl_prophdl_t		phdl;
 	picl_prophdl_t		cphdl;
 	int			err;
@@ -2097,7 +2097,7 @@ ptree_get_propinfo(picl_prophdl_t proph, ptree_propinfo_t *pinfo)
 {
 	int		err;
 	picl_obj_t	*nodep;
-	picl_obj_t  	*propp;
+	picl_obj_t	*propp;
 
 	(void) rw_rdlock(&ptree_rwlock);		/* lock ptree */
 	nodep = propp = NULL;
@@ -2126,7 +2126,7 @@ xptree_get_propinfo_by_name(picl_nodehdl_t nodeh, const char *pname,
 {
 	int		err;
 	picl_obj_t	*nodep;
-	picl_obj_t  	*propp;
+	picl_obj_t	*propp;
 
 	(void) rw_rdlock(&ptree_rwlock);		/* lock ptree */
 	nodep = propp = NULL;
@@ -2747,7 +2747,7 @@ check_propval(picl_nodehdl_t nodeh, char *pname, char *pval)
 {
 	int			err;
 	picl_prophdl_t		proph;
-	ptree_propinfo_t 	pinfo;
+	ptree_propinfo_t	pinfo;
 	void			*vbuf;
 
 	err = ptree_get_prop_by_name(nodeh, pname, &proph);
@@ -2902,7 +2902,7 @@ ptree_get_node_by_path(const char *piclprl, picl_nodehdl_t *handle)
 	char		*ptr;
 	char		*defprop;
 	char		*tokindex;
-	int 		err;
+	int		err;
 	int		len;
 	int		npflg;	/* namepath flag */
 
@@ -3297,7 +3297,7 @@ init_plugin_reg_list(void)
 static int
 picltree_set_root(picl_nodehdl_t rooth)
 {
-	picl_obj_t 	*pobj;
+	picl_obj_t	*pobj;
 	int		err;
 
 	(void) rw_rdlock(&ptree_rwlock);		/* lock ptree */
