@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Simplified front end to client rpc.
  */
@@ -115,7 +113,7 @@ rpc_call(const char *host, const rpcprog_t prognum, const rpcvers_t versnum,
 		return (rpc_createerr.cf_stat);
 	}
 
-	if ((nettype == NULL) || (nettype[0] == NULL))
+	if ((nettype == NULL) || (nettype[0] == '\0'))
 		nettype = "netpath";
 	if (!(rcp->valid &&
 	    rcp->pid == getpid() &&

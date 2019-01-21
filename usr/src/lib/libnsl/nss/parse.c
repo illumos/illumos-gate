@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -135,7 +133,7 @@ _unescape(char *s, char *esc)
 		else
 			tmp[j++] = s[i];
 	}
-	tmp[j] = NULL;
+	tmp[j] = '\0';
 	return (tmp);
 }
 
