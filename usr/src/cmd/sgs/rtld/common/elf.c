@@ -315,12 +315,12 @@ elf_verify(caddr_t addr, size_t size, Fdesc *fdp, const char *name,
  *
  *  -	elf_needed() is called to establish any ld.so.1 dependencies.  These
  *	dependencies should all be lazy loaded, so this routine is typically a
- * 	no-op.  However, we call elf_needed() for completeness, in case any
+ *	no-op.  However, we call elf_needed() for completeness, in case any
  *	NEEDED initialization is required.
  *
  *  -	For intel, ld.so.1's JMPSLOT relocations need relative updates. These
  *	are by default skipped thus delaying all relative relocation processing
- * 	on every invocation of ld.so.1.
+ *	on every invocation of ld.so.1.
  */
 int
 elf_rtld_load()
@@ -344,7 +344,7 @@ elf_rtld_load()
 	 *
 	 *  -	ld.so.1 does not exercise *any* PLT's before it has made a call
 	 *	to elf_lazy_load().  This is because all dynamic dependencies
-	 * 	are recorded as lazy dependencies.
+	 *	are recorded as lazy dependencies.
 	 */
 	(void) elf_reloc_relative_count((ulong_t)JMPREL(lmp),
 	    (ulong_t)(PLTRELSZ(lmp) / RELENT(lmp)), (ulong_t)RELENT(lmp),
@@ -422,7 +422,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	/*
 	 * Establish a link-map control list for this request.
 	 */
-	if ((lmco = create_cntl(lml, 0)) == NULL) {
+	if ((lmco = create_cntl(lml, 0)) == 0) {
 		remove_alist(&palp, 1);
 		return (NULL);
 	}
@@ -838,7 +838,7 @@ _elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
 		    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED));
 
 		if (tracing || DBG_ENABLED) {
-			Bnd_desc 	*bdp;
+			Bnd_desc	*bdp;
 			Aliste		idx;
 
 			FLAGS1(ilmp) |= FL1_RT_USED;
@@ -924,8 +924,8 @@ _elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
 			/*
 			 * Establish a link-map control list for this request.
 			 */
-			if ((lmco = create_cntl(lml, 0)) == NULL)
-				return (NULL);
+			if ((lmco = create_cntl(lml, 0)) == 0)
+				return (0);
 
 			/*
 			 * Determine the capability filtees.  If none can be
@@ -1016,7 +1016,7 @@ _elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
 				 *  -	ld.so.1 is available to relocate
 				 *	against.
 				 *  -	There's no need to add an dependencies
-				 * 	to this handle.
+				 *	to this handle.
 				 */
 				rdflags = (GPD_DLSYM | GPD_RELOC);
 
@@ -1070,8 +1070,8 @@ _elf_lookup_filtee(Slookup *slp, Sresult *srp, uint_t *binfo, uint_t ndx,
 				 * Establish a link-map control list for this
 				 * request.
 				 */
-				if ((lmco = create_cntl(lml, 0)) == NULL)
-					return (NULL);
+				if ((lmco = create_cntl(lml, 0)) == 0)
+					return (0);
 
 				/*
 				 * Locate and load the filtee.
@@ -1874,13 +1874,13 @@ elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
 				JMPREL(lmp) = (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_INIT:
-				if (dyn->d_un.d_ptr != NULL)
+				if (dyn->d_un.d_ptr != 0)
 					INIT(lmp) =
 					    (void (*)())(dyn->d_un.d_ptr +
 					    base);
 				break;
 			case DT_FINI:
-				if (dyn->d_un.d_ptr != NULL)
+				if (dyn->d_un.d_ptr != 0)
 					FINI(lmp) =
 					    (void (*)())(dyn->d_un.d_ptr +
 					    base);
@@ -2510,7 +2510,7 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	 * symbol lookup hash table.
 	 */
 	str = STRTAB(lmp);
-	if (SUNWSYMSZ(lmp) == NULL) {
+	if (SUNWSYMSZ(lmp) == 0) {
 		sym = SYMTAB(lmp);
 		/*
 		 * If we don't have a .hash table there are no symbols
@@ -2720,7 +2720,7 @@ elf_lazy_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 	 * as each object supplies its own lazy dependencies.
 	 */
 	if (aplist_append(&alist, lmp, AL_CNT_LAZYFIND) == NULL)
-		return (NULL);
+		return (0);
 
 	for (APLIST_TRAVERSE(alist, idx1, lmp1)) {
 		uint_t	dynndx;
@@ -2777,8 +2777,8 @@ elf_lazy_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 			 * A successful lazy load can mean one of two things:
 			 *
 			 *  -	new objects have been loaded, in which case the
-			 * 	objects will have been analyzed, relocated, and
-			 * 	finally moved to the callers control list.
+			 *	objects will have been analyzed, relocated, and
+			 *	finally moved to the callers control list.
 			 *  -	the objects are already loaded, and this lazy
 			 *	load has simply associated the referenced object
 			 *	with it's lazy dependencies.
@@ -2860,7 +2860,7 @@ elf_lazy_find_sym(Slookup *slp, Sresult *srp, uint_t *binfo, int *in_nfavl)
 			if (slp->sl_flags & LKUP_NODESCENT)
 				continue;
 
-			if (aplist_test(&alist, nlmp, AL_CNT_LAZYFIND) == NULL)
+			if (aplist_test(&alist, nlmp, AL_CNT_LAZYFIND) == 0)
 				return (0);
 		}
 	}

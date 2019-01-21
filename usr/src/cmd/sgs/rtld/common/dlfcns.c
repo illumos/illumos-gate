@@ -745,7 +745,7 @@ dlmopen_core(Lm_list *lml, Lm_list *olml, const char *path, int mode,
 	 * provides flexibility should we be able to support dlopening more
 	 * than one object in the future.
 	 */
-	if (LM_FIX_NAME(clmp)(path, clmp, &palp, AL_CNT_NEEDED, orig) == NULL)
+	if (LM_FIX_NAME(clmp)(path, clmp, &palp, AL_CNT_NEEDED, orig) == 0)
 		return (NULL);
 
 	if ((palp->al_arritems > 1) && ((mode & RTLD_FIRST) == 0)) {
@@ -758,7 +758,7 @@ dlmopen_core(Lm_list *lml, Lm_list *olml, const char *path, int mode,
 	 * Establish a link-map control list for this request, and load the
 	 * associated object.
 	 */
-	if ((nlmco = create_cntl(lml, 1)) == NULL) {
+	if ((nlmco = create_cntl(lml, 1)) == 0) {
 		remove_alist(&palp, 1);
 		return (NULL);
 	}
@@ -866,7 +866,7 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 *
 	 *  LM_ID_BASE:		Operate on the PRIMARY (executables) link map
 	 *  LM_ID_LDSO:		Operation on ld.so.1's link map
-	 *  LM_ID_NEWLM: 	Create a new link-map.
+	 *  LM_ID_NEWLM:	Create a new link-map.
 	 */
 	if (lml == (Lm_list *)LM_ID_NEWLM) {
 		if ((lml = calloc(sizeof (Lm_list), 1)) == NULL)
@@ -2268,7 +2268,7 @@ dlinfo(void *handle, int request, void *p)
  *		incrementing a pointer. Hence, alist additions that occur
  *		in mid-traverse will not cause confusion.
  *
- * 	There is one limitation: We cannot continue operation if an object
+ *	There is one limitation: We cannot continue operation if an object
  *	is removed from the process from within a callback. We detect when
  *	this happens and return immediately with a -1 return value.
  *

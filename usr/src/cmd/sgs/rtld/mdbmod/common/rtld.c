@@ -502,7 +502,7 @@ rtmap_format(uintptr_t addr, const void *data, void *private)
 	if (wdp && (wdp->w_flags & RTLD_FLG_VERBOSE)) {
 		mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 		(void) mdb_call_dcmd(
-		    MSG_ORIG(MSG_RTMAP_STR), addr, DCMD_ADDRSPEC, NULL, NULL);
+		    MSG_ORIG(MSG_RTMAP_STR), addr, DCMD_ADDRSPEC, 0, NULL);
 		return (0);
 	}
 
@@ -679,7 +679,7 @@ dcmd_Setenv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 walk_rtmap_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn(MSG_ORIG(MSG_ERR_NAS), MSG_ORIG(MSG_RTMAP_STR));
 		return (WALK_ERR);
 	}
@@ -692,7 +692,7 @@ walk_rtmap_step(mdb_walk_state_t *wsp)
 	int	status;
 	Rt_map	lmp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 	if (mdb_vread(&lmp, sizeof (Rt_map), wsp->walk_addr) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ),
