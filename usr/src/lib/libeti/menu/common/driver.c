@@ -20,15 +20,13 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
  * Copyright (c) 1997, by Sun Mircrosystems, Inc.
  * All rights reserved.
  */
-
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
 
 /*LINTLIBRARY*/
 
@@ -153,8 +151,8 @@ menu_driver(MENU *m, int c)
 			break;
 		}
 		case REQ_NEXT_MATCH: {
-			if (IthPattern(m, 0) != NULL) {
-				ret = _match(m, NULL, &current);
+			if (IthPattern(m, 0) != '\0') {
+				ret = _match(m, '\0', &current);
 			} else {
 				if (Index(current)+1 >= Nitems(m)) {
 					current = IthItem(m, 0);
@@ -177,7 +175,7 @@ menu_driver(MENU *m, int c)
 			break;
 		}
 		case REQ_PREV_MATCH: {
-			if (IthPattern(m, 0) != NULL) {
+			if (IthPattern(m, 0) != '\0') {
 				ret = _match(m, '\b', &current);
 			} else {
 				/* This differs from PREV_ITEM in that */
