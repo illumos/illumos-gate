@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <assert.h>
 #include <errno.h>
@@ -727,8 +725,8 @@ _sip_get_header_functions(sip_header_function_t *sip_header_function_table,
 			return (NULL);
 		}
 		header_name = sip_header->sip_hdr_current;
-		if (sip_find_separator(sip_header, SIP_HCOLON, (char)NULL,
-		    (char)NULL, B_FALSE) != 0) {
+		if (sip_find_separator(sip_header, SIP_HCOLON, 0,
+		    0, B_FALSE) != 0) {
 			return (NULL);
 		}
 		len = sip_header->sip_hdr_current - header_name;

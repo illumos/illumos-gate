@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <assert.h>
 #include <errno.h>
@@ -117,11 +115,11 @@ sip_find_separator(_sip_header_t *sip_header, char separator_1st,
 			continue;
 		}
 		if (isspace(*sip_header->sip_hdr_current) ||
-		    (separator_1st != (char)NULL &&
+		    (separator_1st != 0 &&
 		    (*sip_header->sip_hdr_current == separator_1st)) ||
-		    (separator_2nd != (char)NULL &&
+		    (separator_2nd != 0 &&
 		    (*sip_header->sip_hdr_current == separator_2nd)) ||
-		    (separator_3rd != (char)NULL &&
+		    (separator_3rd != 0 &&
 		    (*sip_header->sip_hdr_current == separator_3rd))) {
 			return (0);
 		}
@@ -320,7 +318,7 @@ sip_parse_params(_sip_header_t *sip_header, sip_param_t **parsed_list)
 		if (quoted_name && sip_find_token(sip_header, SIP_QUOTE) != 0) {
 			return (EPROTO);
 		} else if (sip_find_separator(sip_header, SIP_SEMI, SIP_COMMA,
-		    (char)NULL, B_FALSE) != 0) {
+		    0, B_FALSE) != 0) {
 			return (EPROTO);
 		}
 		param->param_value.sip_str_len = sip_header->sip_hdr_current -
@@ -535,7 +533,7 @@ sip_parse_hdr_parser1(_sip_header_t *hdr, sip_parsed_header_t **phdr, char sep)
 		    B_FALSE) == 0) {
 			char	c = *hdr->sip_hdr_current;
 
-			if (isspace(c) && sep == (char)NULL) {
+			if (isspace(c) && sep == 0) {
 				value->str_val_ptr = value->sip_value_start;
 				value->str_val_len = hdr->sip_hdr_current -
 				    value->sip_value_start;
@@ -571,7 +569,7 @@ sip_parse_hdr_parser1(_sip_header_t *hdr, sip_parsed_header_t **phdr, char sep)
 			/*
 			 * two strings, use sip_2strs_t
 			 */
-			if ((sep != (char)NULL) && (c == sep)) {
+			if ((sep != 0) && (c == sep)) {
 				value->strs1_val_ptr = value->sip_value_start;
 				value->strs1_val_len = hdr->sip_hdr_current -
 				    value->sip_value_start;
@@ -579,7 +577,7 @@ sip_parse_hdr_parser1(_sip_header_t *hdr, sip_parsed_header_t **phdr, char sep)
 				value->strs2_val_ptr =
 				    (++hdr->sip_hdr_current);
 				if (sip_find_separator(hdr, SIP_SEMI, SIP_COMMA,
-				    (char)NULL, B_FALSE) == 0) {
+				    0, B_FALSE) == 0) {
 					char t = *(hdr->sip_hdr_current);
 					value->strs2_val_len =
 					    hdr->sip_hdr_current -
@@ -598,7 +596,7 @@ sip_parse_hdr_parser1(_sip_header_t *hdr, sip_parsed_header_t **phdr, char sep)
 					    hdr->sip_hdr_current;
 					goto end;
 				}
-			} else if (sep != (char)NULL) {
+			} else if (sep != 0) {
 				value->sip_value_state = SIP_VALUE_BAD;
 				goto get_next_val;
 			}
@@ -827,7 +825,7 @@ sip_parse_hdr_parser3(_sip_header_t *hdr, sip_parsed_header_t **phdr, int type,
 				cur = value->sip_value_start;
 				hdr->sip_hdr_current = cur;
 				if (sip_find_separator(hdr, SIP_COMMA,
-				    (char)NULL, (char)NULL, B_FALSE) != 0) {
+				    0, 0, B_FALSE) != 0) {
 					value->strs2_val_ptr = cur;
 					value->strs2_val_len =
 					    hdr->sip_hdr_current -
@@ -885,7 +883,7 @@ sip_parse_hdr_parser3(_sip_header_t *hdr, sip_parsed_header_t **phdr, int type,
 				sip_parse_uri_str(&value->str_val, value);
 		}
 
-		r = sip_find_separator(hdr, SIP_COMMA, SIP_SEMI, (char)NULL,
+		r = sip_find_separator(hdr, SIP_COMMA, SIP_SEMI, 0,
 		    B_FALSE);
 		if (r != 0) {
 			value->sip_value_end = hdr->sip_hdr_current;
@@ -1043,7 +1041,7 @@ sip_parse_hdr_parser5(_sip_header_t *hdr, sip_parsed_header_t **phdr,
 		tmp_param = new_param;
 		tmp_param->param_name.sip_str_ptr = tmp_cur;
 
-		if (sip_find_separator(hdr, SIP_EQUAL, SIP_COMMA, (char)NULL,
+		if (sip_find_separator(hdr, SIP_EQUAL, SIP_COMMA, 0,
 		    B_FALSE) != 0) {
 			tmp_param->param_name.sip_str_len =
 			    hdr->sip_hdr_current - tmp_cur;
