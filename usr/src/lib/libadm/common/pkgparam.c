@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
@@ -52,7 +52,7 @@
 #define	ESCAPE	'\\'
 
 static char sepset[] =	":=\n";
-static char qset[] = 	"'\"";
+static char qset[] =	"'\"";
 static char *pkg_inst_root = NULL;
 
 char *pkgdir = NULL;
@@ -368,8 +368,8 @@ pkgparam(char *pkg, char *param)
 	}
 
 	if (pt = fpkgparam(fp, param)) {
-		if (strcmp(param, "ARCH") == NULL ||
-		    strcmp(param, "CATEGORY") == NULL) {
+		if (strcmp(param, "ARCH") == 0 ||
+		    strcmp(param, "CATEGORY") == 0) {
 			/* remove all whitespace from value */
 			value = copy = pt;
 			while (*value) {
@@ -411,7 +411,7 @@ set_PKGpaths(char *path)
 char *
 get_PKGLOC(void)
 {
-	if (Adm_pkgloc[0] == NULL)
+	if (Adm_pkgloc[0] == '\0')
 		return (PKGLOC);
 	else
 		return (Adm_pkgloc);
@@ -420,7 +420,7 @@ get_PKGLOC(void)
 char *
 get_PKGADM(void)
 {
-	if (Adm_pkgadm[0] == NULL)
+	if (Adm_pkgadm[0] == '\0')
 		return (PKGADM);
 	else
 		return (Adm_pkgadm);
