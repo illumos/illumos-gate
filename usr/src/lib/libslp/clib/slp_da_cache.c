@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module contains a cache used to optimized scope and DA
  * discovery. Entries live for a short duration only (about 10 seconds),
@@ -226,7 +224,7 @@ static SLPError start_cache_thr() {
 	(void) cond_init(&cache_called_cond, 0, NULL);
 
 	if ((terr = thr_create(
-		0, NULL, (void *(*)(void *)) cache_thr,
+		0, 0, (void *(*)(void *)) cache_thr,
 		NULL, 0, NULL)) != 0) {
 		slp_err(LOG_CRIT, 0, "start_cache_thr",
 			"could not start thread: %s", strerror(terr));

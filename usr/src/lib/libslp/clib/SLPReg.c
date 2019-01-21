@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains all functions pertaining to registrations:
  *	SLPReg
@@ -565,7 +563,7 @@ static SLPError start_reg_thr() {
 
 	/* start the reg thread */
 	if ((terr = thr_create(
-		0, NULL, (void *(*)(void *)) reg_thread,
+		0, 0, (void *(*)(void *)) reg_thread,
 		NULL, 0, NULL)) != 0) {
 		slp_err(LOG_CRIT, 0, "start_reg_thr",
 			"could not start thread: %s",

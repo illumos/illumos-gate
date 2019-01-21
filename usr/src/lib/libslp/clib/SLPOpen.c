@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <thread.h>
@@ -50,8 +48,8 @@ SLPError SLPOpen(const char *pcLang, SLPBoolean isAsync, SLPHandle *phSLP) {
 
 	/* initialize outcall synchronization */
 	hp->pending_outcall = SLP_FALSE;
-	(void) mutex_init(&(hp->outcall_lock), NULL, NULL);
-	(void) cond_init(&(hp->outcall_cv), NULL, NULL);
+	(void) mutex_init(&(hp->outcall_lock), USYNC_THREAD, NULL);
+	(void) cond_init(&(hp->outcall_cv), USYNC_THREAD, NULL);
 	hp->close_on_end = SLP_FALSE;
 	hp->consumer_tid = 0;
 
