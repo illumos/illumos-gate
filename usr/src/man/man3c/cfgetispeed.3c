@@ -42,69 +42,68 @@
 .\"
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2019, Joyent, Inc.
 .\"
-.TH CFGETISPEED 3C "Jul 24, 2002"
-.SH NAME
-cfgetispeed, cfgetospeed \- get input and output baud rate
-.SH SYNOPSIS
-.LP
-.nf
-#include <termios.h>
-
-\fBspeed_t\fR \fBcfgetispeed\fR(\fBconst struct termios *\fR\fItermios_p\fR);
-.fi
-
-.LP
-.nf
-\fBspeed_t\fR \fBcfgetospeed\fR(\fBconst struct termios *\fR\fItermios_p\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBcfgetispeed()\fR function extracts the input baud rate from the
-\fBtermios\fR structure to which the \fItermios_p\fR argument points.
-.sp
-.LP
-The \fBcfgetospeed()\fR function extracts the output baud rate from the
-\fBtermios\fR structure to which the \fItermios_p\fR argument points.
-.sp
-.LP
-These functions returns exactly the value in the \fBtermios\fR data structure,
-without interpretation.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBcfgetispeed()\fR returns a value of type
-\fBspeed_t\fR representing the input baud rate.
-.sp
-.LP
-Upon successful completion, \fBcfgetospeed()\fR returns a value of type
-\fBspeed_t\fR representing the output baud rate.
-.SH ERRORS
-.sp
-.LP
+.Dd January 20, 2019
+.Dt CFGETISPEED 3C
+.Os
+.Sh NAME
+.Nm cfgetispeed ,
+.Nm cfgetospeed
+.Nd get input and output baud rate
+.Sh SYNOPSIS
+.In termios.h
+.Ft speed_t
+.Fo cfgetispeed
+.Fa "const struct termios *termios_p"
+.Fc
+.Ft speed_t
+.Fo cfgetospeed
+.Fa "const struct termios *termios_p"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn cfgetispeed
+function extracts the input baud rate from the
+.Vt termios
+structure to which the
+.Fa termios_p
+argument points.
+.Pp
+The
+.Fn cfgetospeed
+function extracts the output baud rate from the
+.Vt termios
+structure to which the
+.Fa termios_p
+argument points.
+.Pp
+These functions return exactly the value in the
+.Vt termios
+data structure, without interpretation.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn cfgetispeed
+returns a value of type
+.Vt speed_t
+representing the input baud rate.
+.Pp
+Upon successful completion,
+.Fn cfgetospeed
+returns a value of type
+.Vt speed_t
+representing the output baud rate.
+.Sh ERRORS
 No errors are defined.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe, and Async-Signal-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBcfgetospeed\fR(3C), \fBtcgetattr\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5), \fBtermio\fR(7I)
+.Sh INTERFACE STABILITY
+Standard
+.Sh MT-LEVEL
+MT-Safe
+.Pp
+Async-Signal-Safe
+.Sh SEE ALSO
+.Xr cfsetispeed 3C ,
+.Xr tcgetattr 3C ,
+.Xr attributes 5 ,
+.Xr standards 5 ,
+.Xr termio 7I

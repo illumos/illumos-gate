@@ -42,85 +42,88 @@
 .\"
 .\" Portions Copyright (c) 1992, X/Open Company Limited.  All Rights Reserved.
 .\" Copyright (c) 2002, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2019, Joyent, Inc.
 .\"
-.TH CFSETISPEED 3C "Jul 24, 2002"
-.SH NAME
-cfsetispeed, cfsetospeed \- set input and output baud rate
-.SH SYNOPSIS
-.LP
-.nf
-#include <termios.h>
-
-\fBint\fR \fBcfsetispeed\fR(\fBstruct termios *\fR\fItermios_p\fR, \fBspeed_t\fR \fIspeed\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBcfsetospeed\fR(\fBstruct termios *\fR\fItermios_p\fR, \fBspeed_t\fR \fIspeed\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBcfsetispeed()\fR function sets the input baud rate stored in the
-structure pointed to by \fItermios_p\fR to \fIspeed.\fR
-.sp
-.LP
-The \fBcfsetospeed()\fR function sets the output baud rate stored in the
-structure pointed to by \fItermios_p\fR to \fIspeed.\fR
-.sp
-.LP
+.Dd January 20, 2019
+.Dt CFSETISPEED 3C
+.Os
+.Sh NAME
+.Nm cfsetispeed ,
+.Nm cfsetospeed
+.Nd set input and output baud rate
+.Sh SYNOPSIS
+.In termios.h
+.Ft int
+.Fo cfsetispeed
+.Fa "struct termios *termios_p"
+.Fa "speed_t speed"
+.Fc
+.Ft int
+.Fo cfsetospeed
+.Fa "struct termios *termios_p"
+.Fa "speed_t speed"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn cfsetispeed
+function sets the input baud rate stored in the
+structure pointed to by
+.Fa termios_p
+to
+.Fa speed .
+.Pp
+The
+.Fn cfsetospeed
+function sets the output baud rate stored in the
+structure pointed to by
+.Fa termios_p
+to
+.Fa speed .
+.Pp
 There is no effect on the baud rates set in the hardware until a subsequent
-successful call to \fBtcsetattr\fR(3C) on the same \fBtermios\fR structure.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBcfsetispeed()\fR and \fBcfsetospeed()\fR return
-\fB0\fR. Otherwise \fB\(mi1\fR is returned, and \fBerrno\fR may be set to
-indicate the error.
-.SH ERRORS
-.sp
-.LP
-The \fBcfsetispeed()\fR and \fBcfsetospeed()\fR functions may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The \fIspeed\fR value is not a valid baud rate.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value of \fIspeed\fR is outside the range of possible speed values as
-specified in \fB<termios.h>\fR\&.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe, and Async-Signal-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBcfgetispeed\fR(3C), \fBtcsetattr\fR(3C), \fBattributes\fR(5),
-\fBstandards\fR(5), \fBtermio\fR(7I)
+successful call to
+.Xr tcsetattr 3C
+on the same
+.Vt termios
+structure.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn cfsetispeed
+and
+.Fn cfsetospeed
+return
+.Sy 0 .
+Otherwise
+.Sy \(mi1
+is returned, and
+.Va errno
+may be set to indicate the error.
+.Sh ERRORS
+The
+.Fn cfsetispeed
+and
+.Fn cfsetospeed
+functions may fail if:
+.Bl -tag -width EINVAL
+.It Er EINVAL
+The
+.Fa speed
+value is not a valid baud rate.
+.It Er EINVAL
+The value of
+.Fa speed
+is outside the range of possible speed values as specified in
+.In termios.h .
+.El
+.Sh INTERFACE STABILITY
+Standard
+.Sh MT-LEVEL
+MT-Safe
+.Pp
+Async-Signal-Safe
+.Sh SEE ALSO
+.Xr cfgetispeed 3C ,
+.Xr tcsetattr 3C ,
+.Xr attributes 5 ,
+.Xr standards 5 ,
+.Xr termio 7I
