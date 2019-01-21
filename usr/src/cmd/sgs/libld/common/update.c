@@ -207,7 +207,7 @@ update_osym(Ofl_desc *ofl)
 	Word		*symshndx = NULL;	/* .symtab_shndx table */
 	Word		*dynshndx = NULL;	/* .dynsym_shndx table */
 	Word		*ldynshndx = NULL;	/* .SUNW_ldynsym_shndx table */
-	Word		ldynsym_cnt = NULL;	/* number of items in */
+	Word		ldynsym_cnt = 0;	/* number of items in */
 						/*	.SUNW_ldynsym */
 	Str_tbl		*shstrtab;
 	Str_tbl		*strtab;
@@ -307,7 +307,7 @@ update_osym(Ofl_desc *ofl)
 	if (!(flags & FLG_OF_NOVERSEC) &&
 	    (flags & (FLG_OF_VERNEED | FLG_OF_VERDEF))) {
 		versym = (Versym *)ofl->ofl_osversym->os_outdata->d_buf;
-		versym[0] = NULL;
+		versym[0] = 0;
 	} else
 		versym = NULL;
 
@@ -1607,7 +1607,7 @@ update_osym(Ofl_desc *ofl)
 
 		DBG_CALL(Dbg_syms_old(ofl, sdp));
 
-		spec = NULL;
+		spec = 0;
 		/*
 		 * assign new symbol value.
 		 */

@@ -1695,7 +1695,7 @@ make_cap(Ofl_desc *ofl, Word shtype, const char *shname, int ident)
 	}
 
 	if (size == 0)
-		return (NULL);
+		return (0);
 
 	if (new_section(ofl, shtype, shname, size, &isec,
 	    &shdr, &data) == S_ERROR)
@@ -2380,7 +2380,7 @@ make_dynstr(Ofl_desc *ofl)
 			    (ELF_ST_BIND(sdp->sd_sym->st_info) != STB_LOCAL))
 				continue;
 
-			if (sdp->sd_sym->st_name == NULL)
+			if (sdp->sd_sym->st_name == 0)
 				continue;
 
 			if (st_insert(ofl->ofl_dynstrtab, sdp->sd_name) == -1)
