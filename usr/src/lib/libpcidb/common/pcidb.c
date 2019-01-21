@@ -90,7 +90,7 @@ struct pcidb_device {
 
 struct pcidb_vendor {
 	uint16_t		pv_id;
-	char 			pv_name[PCI_NAME_MAX];
+	char			pv_name[PCI_NAME_MAX];
 	struct pcidb_device	*pv_dstart;
 	struct pcidb_device	*pv_dend;
 	struct pcidb_vendor	*pv_prev;
@@ -278,7 +278,7 @@ newstate:
 		case PDB_VENDOR:
 			v = parse_vendor(buf, hdl);
 			if (v == NULL)
-				return (NULL);
+				return (0);
 			state = PDB_DEVICE;
 			continue;
 		case PDB_DEVICE:
@@ -295,7 +295,7 @@ newstate:
 			assert(v != NULL);
 			d = parse_device(buf, v);
 			if (d == NULL)
-				return (NULL);
+				return (0);
 			continue;
 		case PDB_SUBDEV:
 			if (buf[0] != '\t') {
