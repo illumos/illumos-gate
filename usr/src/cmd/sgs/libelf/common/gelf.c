@@ -269,7 +269,7 @@ gelf_update_phdr(Elf *elf, int ndx, GElf_Phdr *src)
 		return (0);
 
 	if (elf_getphdrnum(elf, &phnum) == -1)
-		return (NULL);
+		return (0);
 
 	if (phnum < ndx) {
 		_elf_seterr(EREQ_RAND, 0);
