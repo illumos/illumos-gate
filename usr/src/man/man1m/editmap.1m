@@ -23,7 +23,8 @@
 .\" BE LIABLE FOR ANY DIRECT, INDIRECT,    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT    NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF    USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON    ANY THEORY OF LIABILITY, WHETHER
 .\" IN CONTRACT, STRICT LIABILITY, OR TORT    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF    THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.TH EDITMAP 1M "Sep 14, 2001"
+.\" Copyright (c) 2019 Peter Tribble.
+.TH EDITMAP 1M "Jan 21, 2019"
 .SH NAME
 editmap \- query and edit single records in database maps for sendmail
 .SH SYNOPSIS
@@ -34,7 +35,6 @@ editmap \- query and edit single records in database maps for sendmail
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBeditmap\fR command queries or edits one record in a database maps used
 by the keyed map lookups in \fBsendmail\fR(1M). Arguments are passed on the
@@ -46,17 +46,16 @@ database formats, selected using the \fImaptype\fR parameter. See
 \fBOPERANDS\fR.
 .sp
 .LP
- If the \fBTrustedUser\fR option is set in the \fBsendmail\fR configuration
+If the \fBTrustedUser\fR option is set in the \fBsendmail\fR configuration
 file and \fBeditmap\fR is invoked as root, the generated files are owned by the
 specified \fBTrustedUser\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-C\fR \fIfile\fR\fR
+\fB-C\fR \fIfile\fR
 .ad
 .RS 11n
 Use the specified \fBsendmail\fR configuration file (\fIfile\fR) to look up the
@@ -66,28 +65,28 @@ Use the specified \fBsendmail\fR configuration file (\fIfile\fR) to look up the
 .sp
 .ne 2
 .na
-\fB\fB-f\fR\fR
+\fB-f\fR
 .ad
 .RS 11n
 Disable the folding of all upper case letters in the key to lower case.
-Normally, all upper case letters in the key are folded to upper case. This is
-intended to mesh with the \fB-f\fR flag in the \fBK\fR line  in
+Normally, all upper case letters in the key are folded to lower case. This is
+intended to mesh with the \fB-f\fR flag in the \fBK\fR line in
 \fBsendmail.cf\fR. The value is never case folded.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-N\fR\fR
+\fB-N\fR
 .ad
 .RS 11n
- Include the null byte that terminates strings in the map (for alias maps).
+Include the null byte that terminates strings in the map (for alias maps).
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-q\fR\fR
+\fB-q\fR
 .ad
 .RS 11n
 Query the map for the specified key. If found, print value to standard output
@@ -98,31 +97,31 @@ and exit with \fBEX_UNAVAILABLE\fR.
 .sp
 .ne 2
 .na
-\fB\fB-u\fR\fR
+\fB-u\fR
 .ad
 .RS 11n
-Update the record for key with value or inserts a new record if one doesn't
-exist. Exits with \fB0\fR on success or \fBEX_IOERR\fR on failure.
+Update the record for the specified key with the specified value or inserts a
+new record if one doesn't exist. Exits with \fB0\fR on success or
+\fBEX_IOERR\fR on failure.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-x\fR\fR
+\fB-x\fR
 .ad
 .RS 11n
- Delete the specific key from the map. Exit with \fB0\fR on success or
+Delete the specified key from the map. Exits with \fB0\fR on success or
 \fBEX_IOERR\fR on failure.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
 .ne 2
 .na
-\fB\fIkey\fR\fR
+\fIkey\fR
 .ad
 .RS 12n
 The left hand side of a record.
@@ -142,7 +141,7 @@ Each record is of the form:
 .sp
 .ne 2
 .na
-\fB\fImapname\fR \fR
+\fImapname\fR
 .ad
 .RS 12n
 File name of the database map being created.
@@ -151,7 +150,7 @@ File name of the database map being created.
 .sp
 .ne 2
 .na
-\fB\fImaptype\fR \fR
+\fImaptype\fR
 .ad
 .RS 12n
 Specifies the database format. The following \fImaptype\fR parameters are
@@ -159,7 +158,7 @@ available:
 .sp
 .ne 2
 .na
-\fB\fBdbm\fR \fR
+\fBdbm\fR
 .ad
 .RS 10n
 Specifies \fBDBM\fR format maps.
@@ -168,7 +167,7 @@ Specifies \fBDBM\fR format maps.
 .sp
 .ne 2
 .na
-\fB\fBbtree\fR \fR
+\fBbtree\fR
 .ad
 .RS 10n
 Specifies B-Tree format maps.
@@ -177,7 +176,7 @@ Specifies B-Tree format maps.
 .sp
 .ne 2
 .na
-\fB\fBhash\fR \fR
+\fBhash\fR
 .ad
 .RS 10n
 Specifies hash format maps.
@@ -188,7 +187,7 @@ Specifies hash format maps.
 .sp
 .ne 2
 .na
-\fB\fIvalue\fR\fR
+\fIvalue\fR
 .ad
 .RS 12n
 The right hand side of a record.
@@ -206,6 +205,5 @@ Each record is of the form:
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBmakemap\fR(1M), \fBsendmail\fR(1M), \fBattributes\fR(5)
