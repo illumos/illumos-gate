@@ -43,8 +43,8 @@ typedef struct {
 	Seg_Table	*b_e_seg_table;
 	section_info_table *sec_table;
 	int64_t		*off_table;	/* maintains section's offset; set to */
-					/* 	retain old offset, else 0 */
-	int64_t		*nobits_table; 	/* maintains NOBITS sections */
+					/*	retain old offset, else 0 */
+	int64_t		*nobits_table;	/* maintains NOBITS sections */
 	char		*new_sec_string;
 } file_state_t;
 
@@ -115,7 +115,7 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 			artmpfile.tmp_name = tempnam(TMPDIR, "mcs2");
 			if ((fdartmp = open(artmpfile.tmp_name,
 			    O_WRONLY | O_APPEND | O_CREAT,
-			    (mode_t)0666)) == NULL) {
+			    (mode_t)0666)) == 0) {
 				error_message(OPEN_TEMP_ERROR,
 				    SYSTEM_ERROR, strerror(errno),
 				    prog, artmpfile);
@@ -313,17 +313,17 @@ static int
 traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
     file_state_t *state)
 {
-	Elf_Scn *	scn;
-	Elf_Scn *	temp_scn;
-	Elf_Data *	data;
-	GElf_Shdr *	shdr;
-	char 		*temp_name;
-	section_info_table *	sinfo;
-	GElf_Xword 	x;
-	int 		ret = 0, SYM = 0;	/* used by strip command */
-	int 		phnum = ehdr->e_phnum;
-	unsigned 	int i, scn_index;
-	size_t 		shstrndx, shnum;
+	Elf_Scn		*scn;
+	Elf_Scn		*temp_scn;
+	Elf_Data	*data;
+	GElf_Shdr	*shdr;
+	char		*temp_name;
+	section_info_table *sinfo;
+	GElf_Xword	x;
+	int		ret = 0, SYM = 0;	/* used by strip command */
+	int		phnum = ehdr->e_phnum;
+	unsigned	int i, scn_index;
+	size_t		shstrndx, shnum;
 
 	state->Sect_exists = 0;
 
@@ -716,7 +716,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 		return (FAILURE);
 	}
 
-	if (gelf_newehdr(dst_elf, gelf_getclass(src_elf)) == NULL) {
+	if (gelf_newehdr(dst_elf, gelf_getclass(src_elf)) == 0) {
 		error_message(LIBELF_ERROR, LIBelf_ERROR, elf_errmsg(-1), prog);
 		return (FAILURE);
 	}
@@ -743,7 +743,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 	if (src_ehdr->e_phnum != 0) {
 		(void) elf_flagelf(dst_elf, ELF_C_SET, ELF_F_LAYOUT);
 
-		if (gelf_newphdr(dst_elf, src_ehdr->e_phnum) == NULL) {
+		if (gelf_newphdr(dst_elf, src_ehdr->e_phnum) == 0) {
 			error_message(LIBELF_ERROR, LIBelf_ERROR,
 			    elf_errmsg(-1), prog);
 			return (FAILURE);
@@ -1041,7 +1041,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 		dst_shdr.sh_type = SHT_PROGBITS;
 		dst_shdr.sh_flags = 0;
 		dst_shdr.sh_addr = 0;
-		if (src_ehdr->e_phnum != NULL)
+		if (src_ehdr->e_phnum != 0)
 			dst_shdr.sh_offset = new_offset;
 		else
 			dst_shdr.sh_offset = 0;
