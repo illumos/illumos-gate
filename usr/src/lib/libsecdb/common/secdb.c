@@ -257,7 +257,7 @@ _kva_dup(kva_t *old_kva)
 	int	size;
 	kv_t	*old_data;
 	kv_t	*new_data;
-	kva_t 	*nkva = NULL;
+	kva_t	*nkva = NULL;
 
 	if (old_kva == NULL) {
 		return (NULL);
@@ -339,7 +339,7 @@ _argv_to_csl(char **strings)
 			(void) strcat(newstr, strings[i]);
 			(void) strcat(newstr, ",");
 		}
-		newstr[len-1] = NULL;
+		newstr[len-1] = '\0';
 		return (newstr);
 	} else
 		return (NULL);
