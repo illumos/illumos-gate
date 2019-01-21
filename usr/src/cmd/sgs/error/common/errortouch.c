@@ -24,7 +24,6 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -583,7 +582,7 @@ writetouched(int overwrite)
 	botch = 0;
 	oktorm = 1;
 	while ((nread = fread(edbuf, 1, sizeof (edbuf),
-	    o_touchedfile)) != NULL) {
+	    o_touchedfile)) != 0) {
 		if (nread != fwrite(edbuf, 1, nread, n_touchedfile)) {
 			/*
 			 *	Catastrophe in temporary area: file system full?
@@ -643,7 +642,7 @@ mustoverwrite(FILE *preciousfile, FILE *tmpfile)
 {
 	int	nread;
 
-	while ((nread = fread(edbuf, 1, sizeof (edbuf), tmpfile)) != NULL) {
+	while ((nread = fread(edbuf, 1, sizeof (edbuf), tmpfile)) != 0) {
 		if (mustwrite(edbuf, nread, preciousfile) == 0)
 			return (0);
 	}
