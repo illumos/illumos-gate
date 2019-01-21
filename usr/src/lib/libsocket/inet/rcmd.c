@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -799,8 +799,8 @@ _checkhost(char *rhost, char *lhost, int len)
 			nodomain = 1;
 			return (0);
 		}
-		ldomain[MAXHOSTNAMELEN] = NULL;
-		if ((domainp = index(ldomain, '.')) == (char *)NULL) {
+		ldomain[MAXHOSTNAMELEN] = '\0';
+		if ((domainp = index(ldomain, '.')) == NULL) {
 			nodomain = 1;
 			return (0);
 		}
