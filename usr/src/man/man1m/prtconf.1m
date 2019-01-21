@@ -1,10 +1,11 @@
 '\" te
 .\"  Copyright 1989 AT&T Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved
 .\"  Copyright 2012, Joyent, Inc. All Rights Reserved
+.\"  Copyright 2019, Peter tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\" See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
 .\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PRTCONF 1M "Mar 24, 2016"
+.TH PRTCONF 1M "Jan 21, 2019"
 .SH NAME
 prtconf \- print system configuration
 .SH SYNOPSIS
@@ -30,7 +31,7 @@ The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-a\fR\fR
+\fB-a\fR
 .ad
 .RS 6n
 Display all the ancestors device nodes, up to the root node of the device tree,
@@ -40,7 +41,7 @@ for the device specified on the command line.
 .sp
 .ne 2
 .na
-\fB\fB-b\fR\fR
+\fB-b\fR
 .ad
 .RS 6n
 Display the firmware device tree root properties for the purpose of platform
@@ -51,7 +52,7 @@ identification. These properties are "name", "compatible", "banner-name" and
 .sp
 .ne 2
 .na
-\fB\fB-c\fR\fR
+\fB-c\fR
 .ad
 .RS 6n
 Display the device subtree rooted at the device node specified on the command
@@ -62,7 +63,7 @@ command line.
 .sp
 .ne 2
 .na
-\fB\fB-d\fR\fR
+\fB-d\fR
 .ad
 .RS 6n
 Display vendor ID and device ID for PCI and PCI Express devices, in addition to
@@ -73,7 +74,7 @@ also be shown.
 .sp
 .ne 2
 .na
-\fB\fB-D\fR\fR
+\fB-D\fR
 .ad
 .RS 6n
 For each system peripheral in the device tree, displays the name of the device
@@ -83,10 +84,10 @@ driver used to manage the peripheral.
 .sp
 .ne 2
 .na
-\fB\fB-F\fR\fR
+\fB-F\fR
 .ad
 .RS 6n
-A SPARC-only option. Returns the device path name of the console frame buffer,
+Returns the device path name of the console frame buffer,
 if one exists. If there is no frame buffer, \fBprtconf\fR returns a non-zero
 exit code. This flag must be used by itself. It returns only the name of the
 console, frame buffer device or a non-zero exit code. For example, if the
@@ -98,7 +99,7 @@ console frame buffer on a SUNW,Ultra-30 is \fBffb\fR, the command returns:
 .sp
 .ne 2
 .na
-\fB\fB-m\fR\fR
+\fB-m\fR
 .ad
 .RS 6n
 Displays the amount of system memory in megabytes.
@@ -108,7 +109,7 @@ This flag must be used by itself.
 
 .ne 2
 .na
-\fB\fB-p\fR\fR
+\fB-p\fR
 .ad
 .RS 6n
 Displays information derived from the device tree provided by the firmware
@@ -121,7 +122,7 @@ later.
 .sp
 .ne 2
 .na
-\fB\fB-P\fR\fR
+\fB-P\fR
 .ad
 .RS 6n
 Includes information about pseudo devices. By default, information regarding
@@ -131,7 +132,7 @@ pseudo devices is omitted.
 .sp
 .ne 2
 .na
-\fB\fB-v\fR\fR
+\fB-v\fR
 .ad
 .RS 6n
 Specifies verbose mode.
@@ -140,7 +141,7 @@ Specifies verbose mode.
 .sp
 .ne 2
 .na
-\fB\fB-V\fR\fR
+\fB-V\fR
 .ad
 .RS 6n
 Displays platform-dependent \fBPROM\fR (on SPARC platforms) or booting system
@@ -152,17 +153,12 @@ platform-dependent.
 .sp
 .ne 2
 .na
-\fB\fB-x\fR\fR
+\fB-x\fR
 .ad
 .RS 6n
-Reports if the firmware on this system is 64-bit ready. Some existing platforms
-may need a firmware upgrade in order to run the 64-bit kernel. If the operation
-is not applicable to this platform or the firmware is already 64-bit ready, it
-exits silently with a return code of zero. If the operation is applicable to
-this platform and the firmware is not 64-bit ready, it displays a descriptive
-message on the standard output and exits with a non-zero return code. The
-hardware platform documentation contains more information about the platforms
-that may need a firmware upgrade in order to run the 64-bit kernel.
+A legacy flag that reported if the firmware on this system is 64-bit ready.
+As illumos only runs on 64-bit platforms, this flag is kept for compatibility
+only, and zero is always returned.
 .sp
 This flag overrides all other flags and must be used by itself.
 .RE
@@ -173,7 +169,7 @@ The following operands are supported:
 .sp
 .ne 2
 .na
-\fB\fIdev_path\fR\fR
+\fIdev_path\fR
 .ad
 .RS 12n
 The path to a target device minor node, device nexus node, or device link for
@@ -186,7 +182,7 @@ The following exit values are returned:
 .sp
 .ne 2
 .na
-\fB\fB0\fR\fR
+\fB0\fR
 .ad
 .RS 12n
 No error occurred.
@@ -195,12 +191,11 @@ No error occurred.
 .sp
 .ne 2
 .na
-\fB\fBnon-zero\fR\fR
+\fBnon-zero\fR
 .ad
 .RS 12n
-With the \fB-F\fR option (SPARC only), a non-zero return value means that the
-output device is not a frame buffer. With the \fB-x\fR option, a non-zero
-return value means that the firmware is not 64-bit ready. In all other cases, a
+With the \fB-F\fR option, a non-zero return value means that the
+output device is not a frame buffer. In all other cases, a
 non-zero return value means that an error occurred.
 .RE
 
@@ -220,12 +215,7 @@ Interface Stability	Unstable
 
 .SH SEE ALSO
 .LP
-\fBfuser\fR(1M), \fBmodinfo\fR(1M), \fBsysdef\fR(1M), \fBattributes\fR(5)
-.sp
-.LP
-\fISun Hardware Platform Guide\fR
-.SS "SPARC Only"
-.LP
+\fBfuser\fR(1M), \fBmodinfo\fR(1M), \fBsysdef\fR(1M), \fBattributes\fR(5),
 \fBopenprom\fR(7D)
 .SH NOTES
 .LP

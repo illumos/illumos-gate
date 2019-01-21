@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2019 Peter Tribble.
  */
 
 #ifndef	_PRT_CONF_H
@@ -42,7 +43,6 @@ extern void indent_to_level(int);
 extern void prtconf_devinfo();
 extern int do_fbname();
 extern int do_promversion();
-extern int do_prom_version64(void);
 extern int do_prominfo();
 void indent_to_level(int);
 extern int do_productinfo();

@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019 Peter Tribble.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -43,12 +44,8 @@ static char	new_path[MAXPATHLEN];
 
 #define	INDENT_LENGTH	4
 
-#ifdef	__x86
-static const char *usage = "%s [ -V | -x | -abcdvpPD ] [ <device_path > ]\n";
-#else
 static const char *usage =
-	"%s [ -F | -V | -x | -abcdvpPD ][ <device_path > ]\n";
-#endif	/* __x86 */
+	"%s [ -F | -m | -V | -x | -abcdvpPD ] [ <device_path > ]\n";
 
 static void
 setpname(const char *name)
@@ -167,7 +164,7 @@ cleanup_path(const char *input_path, char *path)
  */
 
 #ifdef	DEBUG
-static const char *optstring = "abcdDvVxmpPFf:M:dLuC";
+static const char *optstring = "abcdDvVxmpPFf:M:LuC";
 #else
 static const char *optstring = "abcdDvVxmpPFf:uC";
 #endif	/* DEBUG */
@@ -252,7 +249,7 @@ main(int argc, char *argv[])
 		return (do_promversion());
 
 	if (opts.o_prom_ready64)
-		return (do_prom_version64());
+		return (0);
 
 	if (opts.o_productinfo)
 		return (do_productinfo());
