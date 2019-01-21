@@ -186,7 +186,7 @@ OM_uint32 *		time_rec;
 	} else
 		mechs = desired_mechs;
 
-	if (mechs->count == NULL)
+	if (mechs->count == 0)
 		return (GSS_S_BAD_MECH);
 
 	/* allocate the output credential structure */
