@@ -416,7 +416,7 @@ la_i86_pltenter(Elf32_Sym *symp, uint_t symndx, uintptr_t *refcooke,
 		(void) close(fd);
 	}
 
-	if (bhp->bh_bkts[bktno].bb_head == NULL) {
+	if (bhp->bh_bkts[bktno].bb_head == 0) {
 		binding_entry *	bep;
 		unsigned int	be_off;
 		unsigned int	sym_off;
