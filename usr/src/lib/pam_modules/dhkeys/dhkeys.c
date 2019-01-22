@@ -257,8 +257,9 @@ establish_key(pam_handle_t *pamh, int flags, int debug, char *netname)
 	if (passwd) {
 		(void) strlcpy(short_pass, passwd, sizeof (short_pass));
 		short_passp = short_pass;
-	} else
+	} else {
 		short_passp = NULL;
+	}
 
 	if (mechs = __nis_get_mechanisms(FALSE)) {
 
@@ -408,7 +409,7 @@ remove_key(pam_handle_t *pamh, int flags, int debug)
 	pthread_t tid;
 
 	(void) pam_get_item(pamh, PAM_USER, (void **)&uname);
-	if (uname == NULL || *uname == NULL) {
+	if (uname == NULL || *uname == '\0') {
 		if (debug)
 			syslog(LOG_DEBUG,
 			    "pam_dhkeys: user NULL or empty in remove_key()");
@@ -442,8 +443,9 @@ remove_key(pam_handle_t *pamh, int flags, int debug)
 		pwu_rep->type = auth_rep->type;
 		pwu_rep->scope = auth_rep->scope;
 		pwu_rep->scope_len = auth_rep->scope_len;
-	} else
+	} else {
 		pwu_rep = PWU_DEFAULT_REP;
+	}
 
 	/* Retrieve user's uid/gid from the password repository */
 	attr_pw[0].type = ATTR_UID; attr_pw[0].next = &attr_pw[1];
