@@ -182,7 +182,7 @@ struct option_defs optdefs[] = {
 	{ SHOPT_FSO,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_QUOTAS,		OPT_TYPE_BOOLEAN },
 	{ SHOPT_ENCRYPT,	OPT_TYPE_STRING },
-	{ NULL, NULL }
+	{ NULL, 0 }
 };
 
 /*
