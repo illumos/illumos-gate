@@ -213,7 +213,7 @@ krb5_kt_add_ad_entries(krb5_context ctx, char **sprincs_str, char *domain,
 		goto cleanup;
 
 	code = krb5_get_permitted_enctypes(ctx, &enctypes);
-	if (code != 0 || *enctypes == NULL)
+	if (code != 0 || *enctypes == 0)
 		goto cleanup;
 
 	for (tprinc = sprincs_str; *tprinc; tprinc++) {
@@ -441,7 +441,7 @@ krb5_kt_ad_validate(krb5_context ctx, char *sprinc_str, uint_t flags,
 		goto cleanup;
 
 	code = krb5_get_permitted_enctypes(ctx, &enctypes);
-	if (code != 0 || *enctypes == NULL)
+	if (code != 0 || *enctypes == 0)
 		goto cleanup;
 
 	if ((code = krb5_kt_start_seq_get(ctx, kt, &cursor)) != 0)

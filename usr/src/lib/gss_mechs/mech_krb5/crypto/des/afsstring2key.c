@@ -382,7 +382,7 @@ char *afs_crypt(const char *pw, const char *salt,
 	for(i=0; i<66; i++)
 		block[i] = 0;
 	/* Solaris Kerberos */
-	for(i=0; ((c= *pw) != NULL) && i<64; pw++){
+	for(i=0; ((c= *pw) != 0) && i<64; pw++){
 		for(j=0; j<7; j++, i++)
 			block[i] = (c>>(6-j)) & 01;
 		i++;

@@ -19,18 +19,18 @@ krb5_cc_copy_creds_except(krb5_context context, krb5_ccache incc, krb5_ccache ou
 
    flags = 0;				/* turns off OPENCLOSE mode */
    /* Solaris Kerberos */
-   if ((code = krb5_cc_set_flags(context, incc, flags)) != NULL)
+   if ((code = krb5_cc_set_flags(context, incc, flags)) != 0)
       return(code);
    /* Solaris Kerberos */
-   if ((code = krb5_cc_set_flags(context, outcc, flags)) != NULL)
+   if ((code = krb5_cc_set_flags(context, outcc, flags)) != 0)
       return(code);
 
    /* Solaris Kerberos */
-   if ((code = krb5_cc_start_seq_get(context, incc, &cur)) != NULL)
+   if ((code = krb5_cc_start_seq_get(context, incc, &cur)) != 0)
       goto cleanup;
 
    /* Solaris Kerberos */
-   while ((code = krb5_cc_next_cred(context, incc, &cur, &creds)) == NULL) {
+   while ((code = krb5_cc_next_cred(context, incc, &cur, &creds)) == 0) {
       if (krb5_principal_compare(context, princ, creds.server))
 	 continue;
 
@@ -165,11 +165,11 @@ krb5_verify_init_creds(krb5_context context,
       if ((ret = krb5_cc_resolve(context, "MEMORY:rd_req", &ccache)))
 	 goto cleanup;
       /* Solaris Kerberos */
-      if ((ret = krb5_cc_initialize(context, ccache, creds->client)) != NULL)
+      if ((ret = krb5_cc_initialize(context, ccache, creds->client)) != 0)
 	 goto cleanup;
 
       /* Solaris Kerberos */
-      if ((ret = krb5_cc_store_cred(context, ccache, creds)) != NULL)
+      if ((ret = krb5_cc_store_cred(context, ccache, creds)) != 0)
 	 goto cleanup;
 
       /* set up for get_creds */
@@ -212,10 +212,10 @@ krb5_verify_init_creds(krb5_context context,
 	   retcc = NULL;
 
 	   /* Solaris Kerberos */
-	   if (((ret = krb5_cc_resolve(context, "MEMORY:rd_req2", &retcc)) != NULL) ||
-	       ((ret = krb5_cc_initialize(context, retcc, creds->client)) != NULL) ||
+	   if (((ret = krb5_cc_resolve(context, "MEMORY:rd_req2", &retcc)) != 0) ||
+	       ((ret = krb5_cc_initialize(context, retcc, creds->client)) != 0) ||
 	       ((ret = krb5_cc_copy_creds_except(context, ccache, retcc,
-						creds->server)) != NULL)) {
+						creds->server)) != 0)) {
 	       /* Solaris Kerberos */
 	       if (retcc)
 		   (void) krb5_cc_destroy(context, retcc);

@@ -124,7 +124,7 @@ krb5_gss_cred_id_rec *cred;
 
 	cred->ccache = NULL;
 
-	if (password == NULL || password->length == NULL ||
+	if (password == NULL || password->length == 0 ||
 	    password->value == NULL)
 		pw = strdup("");
 	else if (*((char *)password->value + (password->length - 1)) == '\0')
