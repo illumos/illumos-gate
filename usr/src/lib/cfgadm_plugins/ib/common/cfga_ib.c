@@ -620,7 +620,7 @@ ib_setup_for_devctl_cmd(char *ap_id, boolean_t use_static_ap_id,
 	char	*apid = (use_static_ap_id == B_TRUE) ? IB_STATIC_APID : ap_id;
 
 	/* Get a handle to the ap */
-	if ((*devctl_hdl = devctl_ap_acquire(apid, NULL)) == NULL) {
+	if ((*devctl_hdl = devctl_ap_acquire(apid, 0)) == NULL) {
 		DPRINTF("ib_setup_for_devctl_cmd: devctl_ap_acquire "
 		    "errno: %d\n", errno);
 		ib_cleanup_after_devctl_cmd(*devctl_hdl, *user_nvlistp);
@@ -628,7 +628,7 @@ ib_setup_for_devctl_cmd(char *ap_id, boolean_t use_static_ap_id,
 	}
 
 	/* Set up to pass dynamic ap_id down to driver */
-	if (nvlist_alloc(user_nvlistp, NV_UNIQUE_NAME_TYPE, NULL) != 0) {
+	if (nvlist_alloc(user_nvlistp, NV_UNIQUE_NAME_TYPE, 0) != 0) {
 		DPRINTF("ib_setup_for_devctl: nvlist_alloc errno: %d\n", errno);
 		*user_nvlistp = NULL;	/* Prevent possible incorrect free in */
 					/* ib_cleanup_after_devctl_cmd */

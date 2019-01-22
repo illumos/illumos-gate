@@ -608,7 +608,7 @@ cfga_change_state(
 	 * Checking device type. A port multiplier is not configurable - it is
 	 * already configured as soon as it is connected.
 	 */
-	if ((rv = do_control_ioctl(ap_id, SATA_CFGA_GET_AP_TYPE, NULL,
+	if ((rv = do_control_ioctl(ap_id, SATA_CFGA_GET_AP_TYPE, 0,
 	    (void **)&str_type, &size)) != CFGA_SATA_OK) {
 		/* no such deivce */
 		goto bailout;
@@ -985,7 +985,7 @@ cfga_private_func(
 			goto bailout;
 		}
 
-		rv = do_control_ioctl(ap_id, SATA_CFGA_RESET_PORT, NULL,
+		rv = do_control_ioctl(ap_id, SATA_CFGA_RESET_PORT, 0,
 		    (void **)&str_p, &size);
 
 	} else if (strcmp(func, SATA_RESET_DEVICE) == 0) {
@@ -1019,7 +1019,7 @@ cfga_private_func(
 			goto bailout;
 		}
 
-		rv = do_control_ioctl(ap_id, SATA_CFGA_RESET_DEVICE, NULL,
+		rv = do_control_ioctl(ap_id, SATA_CFGA_RESET_DEVICE, 0,
 		    (void **)&str_p, &size);
 
 	} else if (strcmp(func, SATA_RESET_ALL) == 0) {
@@ -1041,7 +1041,7 @@ cfga_private_func(
 			rv = CFGA_SATA_NACK;
 			goto bailout;
 		}
-		rv = do_control_ioctl(ap_id, SATA_CFGA_RESET_ALL, NULL,
+		rv = do_control_ioctl(ap_id, SATA_CFGA_RESET_ALL, 0,
 		    (void **)&str_p, &size);
 
 	} else if (strcmp(func, SATA_PORT_DEACTIVATE) == 0) {
@@ -1063,7 +1063,7 @@ cfga_private_func(
 			goto bailout;
 		}
 
-		rv = do_control_ioctl(ap_id, SATA_CFGA_PORT_DEACTIVATE, NULL,
+		rv = do_control_ioctl(ap_id, SATA_CFGA_PORT_DEACTIVATE, 0,
 		    (void **)&str_p, &size);
 
 	} else if (strcmp(func, SATA_PORT_ACTIVATE) == 0) {
@@ -1086,7 +1086,7 @@ cfga_private_func(
 		}
 
 		rv = do_control_ioctl(ap_id, SATA_CFGA_PORT_ACTIVATE,
-		    NULL, (void **)&str_p, &size);
+		    0, (void **)&str_p, &size);
 		goto bailout;
 
 	} else if (strcmp(func, SATA_PORT_SELF_TEST) == 0) {
@@ -1094,7 +1094,7 @@ cfga_private_func(
 		    strlen(SATA_CONFIRM_DEVICE_SUSPEND) +
 		    strlen("Self Test Port") + strlen(ap_id);
 
-		if ((msg = (char *)calloc(len +3, 1)) != NULL) {
+		if ((msg = calloc(len +3, 1)) != NULL) {
 			(void) snprintf(msg, len +3, "Self Test"
 			    " %s%s\n%s",
 			    SATA_CONFIRM_PORT, ap_id,
@@ -1109,7 +1109,7 @@ cfga_private_func(
 		}
 
 		rv = do_control_ioctl(ap_id, SATA_CFGA_PORT_SELF_TEST,
-		    NULL, (void **)&str_p, &size);
+		    0, (void **)&str_p, &size);
 	} else {
 		/* Unrecognized operation request */
 		rv = CFGA_SATA_HWOPNOTSUPP;
@@ -1561,7 +1561,7 @@ cfga_list_ext(
 	(*ap_id_list)->ap_class[0] = '\0';	/* Filled by libcfgadm */
 	(*ap_id_list)->ap_busy = devctl_ap_state.ap_in_transition;
 	(*ap_id_list)->ap_status_time = devctl_ap_state.ap_last_change;
-	(*ap_id_list)->ap_info[0] = NULL;
+	(*ap_id_list)->ap_info[0] = '\0';
 
 	if ((*ap_id_list)->ap_r_state == CFGA_STAT_CONNECTED) {
 		char *str_p;
@@ -1572,7 +1572,7 @@ cfga_list_ext(
 		 * Model (MOD:)
 		 */
 		if ((rv = do_control_ioctl(ap_id, SATA_CFGA_GET_MODEL_INFO,
-		    NULL, (void **)&str_p, &size)) != CFGA_SATA_OK) {
+		    0, (void **)&str_p, &size)) != CFGA_SATA_OK) {
 			(void) printf(
 			    "SATA_CFGA_GET_MODULE_INFO ioctl failed\n");
 			goto bailout;
@@ -1599,7 +1599,7 @@ cfga_list_ext(
 		 */
 		if ((rv = do_control_ioctl(ap_id,
 		    SATA_CFGA_GET_REVFIRMWARE_INFO,
-		    NULL, (void **)&str_p, &size)) != CFGA_SATA_OK) {
+		    0, (void **)&str_p, &size)) != CFGA_SATA_OK) {
 			(void) printf(
 			    "SATA_CFGA_GET_REVFIRMWARE_INFO ioctl failed\n");
 			goto bailout;
@@ -1626,7 +1626,7 @@ cfga_list_ext(
 		 */
 		if ((rv = do_control_ioctl(ap_id,
 		    SATA_CFGA_GET_SERIALNUMBER_INFO,
-		    NULL, (void **)&str_p, &size)) != CFGA_SATA_OK) {
+		    0, (void **)&str_p, &size)) != CFGA_SATA_OK) {
 			(void) printf(
 			    "SATA_CFGA_GET_SERIALNUMBER_INFO ioctl failed\n");
 			goto bailout;
@@ -1650,7 +1650,7 @@ cfga_list_ext(
 
 		/* Fill in ap_type which is collected from HBA driver */
 		/* call do_control_ioctl TBD */
-		if ((rv = do_control_ioctl(ap_id, SATA_CFGA_GET_AP_TYPE, NULL,
+		if ((rv = do_control_ioctl(ap_id, SATA_CFGA_GET_AP_TYPE, 0,
 		    (void **)&str_p, &size)) != CFGA_SATA_OK) {
 			(void) printf(
 			    "SATA_CFGA_GET_AP_TYPE ioctl failed\n");
@@ -1923,7 +1923,7 @@ setup_for_devctl_cmd(
 	}
 
 	/* Set up nvlist to pass the port number down to the driver */
-	if (nvlist_alloc(user_nvlistp, NV_UNIQUE_NAME_TYPE, NULL) != 0) {
+	if (nvlist_alloc(user_nvlistp, NV_UNIQUE_NAME_TYPE, 0) != 0) {
 		*user_nvlistp = NULL;
 		rv = CFGA_SATA_NVLIST;
 		(void) printf("nvlist_alloc failed\n");
@@ -2105,7 +2105,7 @@ sata_get_devicepath(const char *ap_id)
 	size_t		size;
 	cfga_sata_ret_t	rv;
 
-	rv = do_control_ioctl(ap_id, SATA_CFGA_GET_DEVICE_PATH, NULL,
+	rv = do_control_ioctl(ap_id, SATA_CFGA_GET_DEVICE_PATH, 0,
 	    (void **)&devpath, &size);
 
 	if (rv == CFGA_SATA_OK) {

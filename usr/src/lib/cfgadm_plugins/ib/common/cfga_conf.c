@@ -117,7 +117,7 @@ ib_get_var_type(char *str)
 
 	cfgvar = &ibcfg_varlist[0];
 	while (cfgvar->type != IB_NONE) {
-		if (strcasecmp(cfgvar->name, str) == NULL)
+		if (strcasecmp(cfgvar->name, str) == 0)
 			break;
 		else
 			cfgvar++;

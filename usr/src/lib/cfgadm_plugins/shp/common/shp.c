@@ -954,7 +954,7 @@ cfga_private_func(const char *function, const char *ap_id,
 				if ((strncmp(str, func_strs[MODE], len) == 0) &&
 				    (*(str+(len)) == '=')) {
 					for (str = (str+(++len)), i = 0;
-					    *str != NULL; i++, str++) {
+					    *str != '\0'; i++, str++) {
 						buf[i] = *str;
 					}
 				}

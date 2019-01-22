@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "cfga_usb.h"
 
 
@@ -117,15 +115,15 @@ static int
 get_string(u_longlong_t *llptr, char *tchar)
 {
 	register char *cp;
-	register char *start = (char *)0;
+	register char *start = NULL;
 	register int len = 0;
 
 	len = strlen(tchar);
 	start = tchar;
 	/* copy string */
-	cp = (char *)calloc(len + 1, sizeof (char));
-	if (cp == (char *)NULL) {
-		*llptr = NULL;
+	cp = calloc(len + 1, sizeof (char));
+	if (cp == NULL) {
+		*llptr = 0;
 
 		return (0);
 	}
@@ -256,7 +254,7 @@ usb_get_var_type(char *str)
 
 	cfgvar = &usbcfg_varlist[0];
 	while (cfgvar->field != USB_NONE) {
-		if (strcasecmp(cfgvar->name, str) == NULL) {
+		if (strcasecmp(cfgvar->name, str) == 0) {
 			break;
 		} else {
 			cfgvar++;

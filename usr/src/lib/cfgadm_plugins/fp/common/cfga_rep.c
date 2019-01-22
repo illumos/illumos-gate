@@ -82,10 +82,10 @@ search_line(char *buf, int buflen, char *srch_str, int slen,
 	*bytes_left = buflen;
 	*write_offset = 0;
 
-	if (buf == NULL || *buf == NULL || buflen <= 0)
+	if (buf == NULL || *buf == '\0' || buflen <= 0)
 		return (-2);	/* Arbitrary -ve val. srch_str not found */
 
-	if (srch_str == NULL || *srch_str == NULL || slen <= 0)
+	if (srch_str == NULL || *srch_str == '\0' || slen <= 0)
 		return (0);	/* This says srch_str was found */
 
 	sol = cur_pos = buf;
