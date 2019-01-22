@@ -217,7 +217,7 @@ sysevent_evc_unbind(evchan_t *scp)
 	 * Unsubscribe, if we are in the process which did the bind.
 	 */
 	if (EV_PID(scp) == getpid()) {
-		uargs.sid.name = NULL;
+		uargs.sid.name = (uintptr_t)NULL;
 		uargs.sid.len = 0;
 		/*
 		 * The unsubscribe ioctl will block until all door upcalls have
@@ -705,7 +705,7 @@ sysevent_evc_unsubscribe(evchan_t *scp, const char *sid)
 	if (strcmp(sid, EVCH_ALLSUB) == 0) {
 		all_subscribers++;
 		/* Indicates all subscriber id's for this channel */
-		uargs.sid.name = NULL;
+		uargs.sid.name = (uintptr_t)NULL;
 		uargs.sid.len = 0;
 	} else {
 		uargs.sid.name = (uintptr_t)sid;
