@@ -142,9 +142,9 @@ reperr(char *fmt, ...)
 
 int
 cverify(int fix, char *ftype, char *path, struct cinfo *cinfo,
-	int allow_checksum)
+    int allow_checksum)
 {
-	struct stat	status; 	/* file status buffer */
+	struct stat	status;		/* file status buffer */
 	struct utimbuf	times;
 	unsigned long	mycksum;
 	int		setval, retcode;
@@ -179,11 +179,11 @@ cverify(int fix, char *ftype, char *path, struct cinfo *cinfo,
 		} else if (fix < 0) {
 			/* modtimes must be the same */
 			if (strftime(tbuf1, sizeof (tbuf1), DATEFMT,
-				localtime(&cinfo->modtime)) == 0) {
+			    localtime(&cinfo->modtime)) == 0) {
 				reperr(pkg_gt(ERR_MEM));
 			}
 			if (strftime(tbuf2, sizeof (tbuf2), DATEFMT,
-				localtime(&status.st_mtime)) == 0) {
+			    localtime(&status.st_mtime)) == 0) {
 				reperr(pkg_gt(ERR_MEM));
 			}
 			reperr(pkg_gt(ERR_MTIME), tbuf1, tbuf2);
@@ -295,7 +295,7 @@ compute_checksum(int *r_cksumerr, char *a_path)
 	 */
 	errno = 0;
 	while ((nread = read(fd, (void*)buf,
-		    (sbuf.st_size < CHUNK) ? sbuf.st_size : CHUNK)) > 0) {
+	    (sbuf.st_size < CHUNK) ? sbuf.st_size : CHUNK)) > 0) {
 		uchar_t *s;
 		uint32_t *p = buf;
 
@@ -328,8 +328,8 @@ compute_checksum(int *r_cksumerr, char *a_path)
 	return (lsavhi+lsavlo);
 }
 
-static 	struct stat	status; 	/* file status buffer */
-static  struct statvfs	vfsstatus;	/* filesystem status buffer */
+static	struct stat	status;		/* file status buffer */
+static	struct statvfs	vfsstatus;	/* filesystem status buffer */
 
 /*
  * Remove the thing that's currently in place so we can put down the package
@@ -384,7 +384,7 @@ clear_target(char *path, char *ftype, int is_a_dir)
 int
 averify(int fix, char *ftype, char *path, struct ainfo *ainfo)
 {
-	struct group	*grp; 	/* group entry buffer */
+	struct group	*grp;	/* group entry buffer */
 	struct passwd	*pwd;
 	int		n;
 	int		setval;
@@ -397,9 +397,9 @@ averify(int fix, char *ftype, char *path, struct ainfo *ainfo)
 	char		buf[PATH_MAX];
 	ino_t		my_ino;
 	dev_t		my_dev;
-	char 		cwd[MAXPATHLEN];
-	char 		*cd;
-	char 		*c;
+	char		cwd[MAXPATHLEN];
+	char		*cd;
+	char		*c;
 
 	setval = (*ftype == '?');
 	retcode = 0;
@@ -435,7 +435,7 @@ averify(int fix, char *ftype, char *path, struct ainfo *ainfo)
 			if (strcmp(cd, c) == 0)
 				(void) strcpy(cd, "/");
 			else
-				*c = NULL;
+				*c = '\0';
 
 			if (chdir(cd) != 0) {
 				reperr(pkg_gt(ERR_CHDIR), cd);
@@ -493,7 +493,7 @@ averify(int fix, char *ftype, char *path, struct ainfo *ainfo)
 	/* If we are to process symlinks the old way then we follow the link */
 	if (nonABI_symlinks()) {
 		if ((*ftype == 's') ? lstat(path, &status) :
-			stat(path, &status)) {
+		    stat(path, &status)) {
 			reperr(pkg_gt(ERR_EXIST));
 			retcode = VE_EXIST;
 			myftype = '?';
@@ -511,37 +511,37 @@ averify(int fix, char *ftype, char *path, struct ainfo *ainfo)
 	if (!statError) {
 		/* determining actual type of existing object */
 		switch (status.st_mode & S_IFMT) {
-		    case S_IFLNK:
+		case S_IFLNK:
 			myftype = 's';
 			break;
 
-		    case S_IFIFO:
+		case S_IFIFO:
 			myftype = 'p';
 			break;
 
-		    case S_IFCHR:
+		case S_IFCHR:
 			myftype = 'c';
 			break;
 
-		    case S_IFDIR:
+		case S_IFDIR:
 			myftype = 'd';
 			targ_is_dir = 1;
 			break;
 
-		    case S_IFBLK:
+		case S_IFBLK:
 			myftype = 'b';
 			break;
 
-		    case S_IFREG:
-		    case 0:
+		case S_IFREG:
+		case 0:
 			myftype = 'f';
 			break;
 
-		    case S_IFDOOR:
+		case S_IFDOOR:
 			myftype = 'D';
 			break;
 
-		    default:
+		default:
 			reperr(pkg_gt(ERR_UNKNOWN));
 			return (VE_FTYPE);
 		}
@@ -695,7 +695,7 @@ averify(int fix, char *ftype, char *path, struct ainfo *ainfo)
 					return (VE_FAIL);
 				}
 			} else if (*ftype == 'p') {
-				if (mknod(path, ainfo->mode | S_IFIFO, NULL) ||
+				if (mknod(path, ainfo->mode | S_IFIFO, 0) ||
 				    (stat(path, &status) < 0)) {
 					reperr(pkg_gt(ERR_PIPEFAIL));
 					return (VE_FAIL);
@@ -736,7 +736,7 @@ averify(int fix, char *ftype, char *path, struct ainfo *ainfo)
 				retcode = VE_FAIL;
 		} else {
 			reperr(pkg_gt(ERR_PERM), ainfo->mode,
-				status.st_mode & 07777);
+			    status.st_mode & 07777);
 			if (!retcode)
 				retcode = VE_ATTR;
 		}

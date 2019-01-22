@@ -36,7 +36,7 @@
 #include "pkgdev.h"
 #include "pkglib.h"
 
-extern char	*devattr(char *device, char *attribute); 	/* libadm.a */
+extern char	*devattr(char *device, char *attribute);	/* libadm.a */
 
 int
 devtype(char *alias, struct pkgdev *devp)
@@ -59,7 +59,7 @@ devtype(char *alias, struct pkgdev *devp)
 
 	/* see if alias represents a mountable device (e.g., a floppy) */
 	if ((devp->mount = devattr(alias, "mountpt")) != NULL &&
-	    devp->mount[0] != NULL) {
+	    devp->mount[0] != '\0') {
 		devp->bdevice = devattr(alias, "bdevice");
 		if (!devp->bdevice || !devp->bdevice[0]) {
 			if (devp->bdevice) {

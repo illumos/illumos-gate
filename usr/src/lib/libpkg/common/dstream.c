@@ -91,7 +91,7 @@ struct dstoc {
 #define	ds_nparts	ds_toc->nparts
 #define	ds_maxsiz	ds_toc->maxsiz
 
-int	ds_totread; 	/* total number of parts read */
+int	ds_totread;	/* total number of parts read */
 int	ds_fd = -1;
 int	ds_curpartcnt = -1;
 
@@ -100,16 +100,16 @@ int	ds_ginit(char *device);
 int	ds_close(int pkgendflg);
 
 static FILE	*ds_pp;
-static int	ds_realfd = -1; 	/* file descriptor for real device */
-static int	ds_read; 	/* number of parts read for current package */
-static int	ds_volno; 	/* volume number of current volume */
-static int	ds_volcnt; 	/* total number of volumes */
-static char	ds_volnos[128]; 	/* parts/volume info */
+static int	ds_realfd = -1;	/* file descriptor for real device */
+static int	ds_read;	/* number of parts read for current package */
+static int	ds_volno;	/* volume number of current volume */
+static int	ds_volcnt;	/* total number of volumes */
+static char	ds_volnos[128];	/* parts/volume info */
 static char	*ds_device;
 static int	ds_volpart;	/* number of parts read in current volume, */
 						/* including skipped parts */
 static int	ds_bufsize;
-static int	ds_skippart; 	/* number of parts skipped in current volume */
+static int	ds_skippart;	/* number of parts skipped in current volume */
 
 static int	ds_getnextvol(char *device);
 static int	ds_skip(char *device, int nskip);
@@ -299,7 +299,7 @@ ds_init(char *device, char **pkg, char *norewind)
 	char	line[LSIZE+1];
 	int	i, n, count = 0, header_size = BLK_SIZE;
 
-	if (!ds_header) { 	/* If the header hasn't been read yet */
+	if (!ds_header) {	/* If the header hasn't been read yet */
 		if (ds_fd >= 0)
 			(void) ds_close(0);
 
@@ -608,7 +608,7 @@ ds_getnextvol(char *device)
 	(void) sprintf(prompt,
 	    pkg_gt("Insert %%v %d of %d into %%p"),
 	    ds_volno, ds_volcnt);
-	if (n = getvol(device, NULL, NULL, prompt))
+	if (n = getvol(device, NULL, 0, prompt))
 		return (n);
 	if ((ds_fd = open(device, O_RDONLY)) < 0)
 		return (-1);
