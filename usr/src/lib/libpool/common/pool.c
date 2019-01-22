@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -355,7 +353,7 @@ pool_base_info(const pool_elem_t *pe, char_buf_t *cb, int deep)
 	}
 
 	if (append_char_buf(cb, "\n%s%s", cb->cb_tab_buf,
-		pool_elem_class_string(pe)) == PO_FAIL) {
+	    pool_elem_class_string(pe)) == PO_FAIL) {
 		return (NULL);
 	}
 
@@ -923,7 +921,7 @@ pool_put_property(pool_conf_t *conf, pool_elem_t *pe, const char *name,
 
 	if (TO_CONF(pe) != conf) {
 		pool_seterror(POE_BADPARAM);
-		return (NULL);
+		return (PO_FAIL);
 	}
 
 	/* Don't allow (re)setting of the "temporary" property */
@@ -1103,7 +1101,7 @@ pool_rm_property(pool_conf_t *conf, pool_elem_t *pe, const char *name)
 
 	if (TO_CONF(pe) != conf) {
 		pool_seterror(POE_BADPARAM);
-		return (NULL);
+		return (PO_FAIL);
 	}
 
 	/* Don't allow removal of the "temporary" property */
@@ -1673,7 +1671,7 @@ pool_conf_update(const pool_conf_t *conf, int *changed)
 int
 pool_walk_properties(pool_conf_t *conf, pool_elem_t *elem, void *arg,
     int (*prop_callback)(pool_conf_t *, pool_elem_t *, const char *,
-	pool_value_t *, void *))
+    pool_value_t *, void *))
 {
 	return (pool_walk_any_properties(conf, elem, arg, prop_callback, 0));
 }
@@ -1699,7 +1697,7 @@ free_value_list(int npvals, pool_value_t **pvals)
 int
 pool_walk_any_properties(pool_conf_t *conf, pool_elem_t *elem, void *arg,
     int (*prop_callback)(pool_conf_t *, pool_elem_t *, const char *,
-	pool_value_t *, void *), int any)
+    pool_value_t *, void *), int any)
 {
 	pool_value_t **pvals;
 	int i;
@@ -1768,7 +1766,7 @@ pool_walk_any_properties(pool_conf_t *conf, pool_elem_t *elem, void *arg,
 			if (any == 1 || prop_is_hidden(&props[i]) == PO_FALSE) {
 				if (props[i].pp_op.ppo_get_value) {
 					if (pool_value_set_name(pvals[j],
-					props[i].pp_pname) == PO_FAIL) {
+					    props[i].pp_pname) == PO_FAIL) {
 						free_value_list(npvals, pvals);
 						return (PO_FAIL);
 					}
@@ -2359,7 +2357,7 @@ setup_transfer(pool_conf_t *conf, pool_resource_t *src, pool_resource_t *tgt,
 #endif	/* DEBUG */
 		if (*src_size - size < src_min ||
 		    (resource_is_default(tgt) == PO_FALSE &&
-			*tgt_size + size > tgt_max)) {
+		    *tgt_size + size > tgt_max)) {
 			pool_seterror(POE_INVALID_CONF);
 			return (XFER_FAIL);
 		}
