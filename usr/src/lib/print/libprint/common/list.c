@@ -59,14 +59,15 @@ list_append(void **list, void *item)
 		if (list != NULL)
 			list[0] = item;
 	} else {
-		int	count;
+		int count;
 
-		for (count = 0; list[count] != NULL; count++);
+		for (count = 0; list[count] != NULL; count++)
+			;
 
 		if ((count + 1) % _list_increment == 0) { /* increase size */
-			void	**new_list = NULL;
+			void **new_list = NULL;
 			int new_size = (((count + 1) / _list_increment) + 1) *
-				_list_increment;
+			    _list_increment;
 
 			new_list = (void **)calloc(new_size, sizeof (void *));
 			if (new_list == NULL)
@@ -123,27 +124,24 @@ list_locate(void **list, int (*compair)(void *, void *), void *element)
 void **
 list_concatenate(void **list1, void **list2)
 {
-	void	**list = NULL;
-	int	size1 = 0,
-		size2 = 0,
-		new_size = 0;
+	void **list = NULL;
+	int size1 = 0, size2 = 0, new_size = 0;
 #ifdef DEBUG
 	syslog(LOG_DEBUG, "list_concatenate(0x%x, 0x%x)", list1, list2);
 #endif
 	if ((list1 == NULL) || (list2 == NULL))
 		return ((list1 != NULL) ? list1 : list2);
 
-	for (size1 = 0; list1[size1] != NULL; size1++);
-	for (size2 = 0; list2[size2] != NULL; size2++);
+	for (size1 = 0; list1[size1] != NULL; size1++)
+		;
+	for (size2 = 0; list2[size2] != NULL; size2++)
+		;
 
 	/* list1 + list2 padded to a multiple of _list_increment */
 	new_size = ((size1 + size2)/_list_increment + 2) * _list_increment;
 
-	if ((list = (void **)calloc((new_size), sizeof (void *)))
-				!= NULL) {
+	if ((list = (void **)calloc((new_size), sizeof (void *))) != NULL) {
 		int count = 0;
-
-		(void) memset(list, NULL, (new_size * sizeof (void *)));
 
 		for (size1 = 0; list1[size1] != NULL; size1++)
 			list[count++] = list1[size1];
@@ -168,8 +166,7 @@ list_concatenate(void **list1, void **list2)
 int
 list_iterate(void **list, int (*vfunc)(void *, va_list), ...)
 {
-	int	current = 0,
-		rc = 0;
+	int current = 0, rc = 0;
 
 #ifdef DEBUG
 	syslog(LOG_DEBUG, "list_iterate(0x%x, 0x%x)", list, vfunc);

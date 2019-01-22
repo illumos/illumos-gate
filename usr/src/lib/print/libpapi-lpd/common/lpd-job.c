@@ -98,8 +98,9 @@ add_lpd_control_line(char **metadata, char code, char *value)
 			strlcpy(tmp, *metadata, size);
 			free(*metadata);
 			*metadata = (char *)tmp;
-		} else
+		} else {
 			return (PAPI_TEMPORARY_ERROR);
+		}
 	}
 
 	snprintf(line, sizeof (line), "%c%s\n", code, value);
@@ -151,7 +152,7 @@ add_int_control_line(char **metadata, char code, int value, int flag)
 
 static papi_status_t
 lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
-		char **metadata, papi_attribute_t ***used)
+    char **metadata, papi_attribute_t ***used)
 {
 	papi_status_t status = PAPI_OK;
 	char *s;
@@ -347,7 +348,7 @@ unused_attributes(papi_attribute_t **list, papi_attribute_t **used)
  */
 static papi_status_t
 lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
-		char **metadata, papi_attribute_t ***used)
+    char **metadata, papi_attribute_t ***used)
 {
 	papi_attribute_t *tmp[2];
 	char *s;
@@ -384,7 +385,7 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 
 	/* Pages */
 	s = NULL;
-	memset(tmp, NULL, sizeof (tmp));
+	memset(tmp, 0, sizeof (tmp));
 	tmp[0] = papiAttributeListFind(attributes, "page-ranges");
 	if (tmp[0] != NULL) {
 		char buf[BUFSIZ];
@@ -438,7 +439,7 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 
 papi_status_t
 lpd_add_hpux_attributes(service_t *svc, papi_attribute_t **attributes,
-		char **metadata, papi_attribute_t ***used)
+    char **metadata, papi_attribute_t ***used)
 {
 	char *s = NULL;
 
@@ -453,7 +454,7 @@ lpd_add_hpux_attributes(service_t *svc, papi_attribute_t **attributes,
 
 papi_status_t
 lpd_job_add_attributes(service_t *svc, papi_attribute_t **attributes,
-		char **metadata, papi_attribute_t ***used)
+    char **metadata, papi_attribute_t ***used)
 {
 	if ((svc == NULL) || (metadata == NULL))
 		return (PAPI_BAD_REQUEST);
@@ -480,7 +481,7 @@ lpd_job_add_attributes(service_t *svc, papi_attribute_t **attributes,
 
 papi_status_t
 lpd_job_add_files(service_t *svc, papi_attribute_t **attributes,
-		char **files, char **metadata, papi_attribute_t ***used)
+    char **files, char **metadata, papi_attribute_t ***used)
 {
 	char *format = "text/plain";
 	char rfc_fmt = 'l';
@@ -563,7 +564,7 @@ lpd_job_add_files(service_t *svc, papi_attribute_t **attributes,
 
 papi_status_t
 lpd_submit_job(service_t *svc, char *metadata, papi_attribute_t ***attributes,
-		int *ofd)
+    int *ofd)
 {
 	papi_status_t status = PAPI_INTERNAL_ERROR;
 	int fd;
@@ -603,8 +604,9 @@ lpd_submit_job(service_t *svc, char *metadata, papi_attribute_t ***attributes,
 			status = PAPI_TIMEOUT;
 			break;
 		}
-	} else
+	} else {
 		status = PAPI_OK;
+	}
 
 	if (ofd != NULL)
 		*ofd = fd;

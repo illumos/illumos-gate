@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -93,7 +91,7 @@ bsd_addr_to_string(const ns_bsd_addr_t *addr)
 	if (addr->extension != NULL) {
 		(void) strlcat(buf, ",", sizeof (buf));
 		if (strlcat(buf, addr->extension, sizeof (buf))
-						>= sizeof (buf)) {
+		    >= sizeof (buf)) {
 			syslog(LOG_ERR, "bsd_addr_to_string: buffer overflow");
 			return (NULL);
 		}
@@ -163,7 +161,7 @@ internal_list_to_string(const ns_printer_t **list)
 		(void) strlcat(buf, ",", sizeof (buf));
 		if (strlcat(buf, (*list)->name, sizeof (buf)) >= sizeof (buf)) {
 			syslog(LOG_ERR,
-				"internal_list_to_string:buffer overflow");
+			    "internal_list_to_string:buffer overflow");
 			return (NULL);
 		}
 	}
@@ -181,7 +179,7 @@ value_to_string(const char *key, void *value)
 		if (strcmp(key, NS_KEY_BSDADDR) == 0) {
 			string = bsd_addr_to_string(value);
 		} else if ((strcmp(key, NS_KEY_ALL) == 0) ||
-			    (strcmp(key, NS_KEY_GROUP) == 0)) {
+		    (strcmp(key, NS_KEY_GROUP) == 0)) {
 			string = list_to_string(value);
 		} else if (strcmp(key, NS_KEY_LIST) == 0) {
 			string = internal_list_to_string(value);
@@ -199,11 +197,11 @@ string_to_value(const char *key, char *string)
 {
 	void *value = NULL;
 
-	if ((key != NULL) && (string != NULL) && (string[0] != NULL)) {
+	if ((key != NULL) && (string != NULL) && (string[0] != '\0')) {
 		if (strcmp(key, NS_KEY_BSDADDR) == 0) {
 			value = (void *)string_to_bsd_addr(string);
 		} else if ((strcmp(key, NS_KEY_ALL) == 0) ||
-			    (strcmp(key, NS_KEY_GROUP) == 0)) {
+		    (strcmp(key, NS_KEY_GROUP) == 0)) {
 			value = (void *)strsplit(string, ",");
 		} else {
 			value = (void *)string;
@@ -232,9 +230,9 @@ split_name(char *name, const char *delimiter, char **p1, char **p2, char **p3)
 
 	for (tmp = (char *)strtok_r(name, delimiter, &junk); tmp != NULL;
 	    tmp = (char *)strtok_r(NULL, delimiter, &junk))
-		if ((p1 != NULL) && (*p1 == NULL))
+		if ((p1 != NULL) && (*p1 == NULL)) {
 			*p1 = tmp;
-		else if ((p2 != NULL) && (*p2 == NULL)) {
+		} else if ((p2 != NULL) && (*p2 == NULL)) {
 			*p2 = tmp;
 			if (p3 == NULL)
 				break;
@@ -275,18 +273,18 @@ posix_name(const char *name)
 		memset(buf, 0, sizeof (buf));
 		if ((server != NULL) && (queue != NULL))
 			snprintf(buf, sizeof (buf), "%s,%s%s%s", server,
-				queue, (extension != NULL ? "," : ""),
-				(extension != NULL ? extension : ""));
+			    queue, (extension != NULL ? "," : ""),
+			    (extension != NULL ? extension : ""));
 
 		/* build the structure here */
-		if (buf[0] != NULL) {
+		if (buf[0] != '\0') {
 			ns_kvp_t **list, *kvp;
 
 			kvp = ns_kvp_create(NS_KEY_BSDADDR, buf);
 			list = (ns_kvp_t **)list_append(NULL, kvp);
 			if (list != NULL)
 				printer = ns_printer_create(strdup(name), NULL,
-							"posix", list);
+				    "posix", list);
 		}
 	}
 
@@ -331,33 +329,28 @@ ns_bsd_addr_cmp(ns_bsd_addr_t *a1, ns_bsd_addr_t *a2)
  *              real printer names and alias names while doing the compare.
  *
  * INPUTS:      ns_bsd_addr_t *a1 - a bsd addr
- *              ns_bsd_addr_t *21 - another bsd addr
+ *              ns_bsd_addr_t *a2 - another bsd addr
  */
 
 static int
 ns_bsd_addr_cmp_local(ns_bsd_addr_t *a1, ns_bsd_addr_t *a2)
-
 {
 	int rc;
 
-	if ((a1 == NULL) || (a2 == NULL))
-	{
+	if ((a1 == NULL) || (a2 == NULL)) {
 		return (1);
 	}
 
-	if ((rc = strcmp(a1->server, a2->server)) != 0)
-	{
+	if ((rc = strcmp(a1->server, a2->server)) != 0) {
 		return (rc);
 	}
 
-	if ((a1->printer == NULL) || (a2->printer == NULL))
-	{
+	if ((a1->printer == NULL) || (a2->printer == NULL)) {
 		return (a1->printer != a2->printer);
 	}
 
 	rc = strcmp(a1->printer, a2->printer);
-	if (rc == 0)
-	{
+	if (rc == 0) {
 		/*
 		 * The printer's real names are the same, but now check if
 		 * their local names (alias) are the same.
@@ -425,14 +418,13 @@ ns_bsd_addr_get_name(char *name)
  */
 ns_bsd_addr_t **
 ns_bsd_addr_get_list(int unique)
-
 {
 	ns_printer_t **printers;
 	ns_bsd_addr_t **list = NULL;
 	char **aliases = NULL;
 
 	for (printers = ns_printer_get_list(NULL);
-			printers != NULL && *printers != NULL; printers++) {
+	    printers != NULL && *printers != NULL; printers++) {
 		ns_bsd_addr_t *addr;
 
 		if (strcmp(NS_NAME_ALL, (*printers)->name) == 0)
@@ -447,49 +439,39 @@ ns_bsd_addr_get_list(int unique)
 		if (unique == UNIQUE)
 			list =
 			    (ns_bsd_addr_t **)list_append_unique((void **)list,
-				(void *)addr, (COMP_T)ns_bsd_addr_cmp);
-		else
-		if (unique == LOCAL_UNIQUE)
+			    (void *)addr, (COMP_T)ns_bsd_addr_cmp);
+		else if (unique == LOCAL_UNIQUE)
 			list =
 			    (ns_bsd_addr_t **)list_append_unique((void **)list,
-				(void *)addr, (COMP_T)ns_bsd_addr_cmp_local);
+			    (void *)addr, (COMP_T)ns_bsd_addr_cmp_local);
 		else
 			list = (ns_bsd_addr_t **)list_append((void **)list,
-					(void *)addr);
+			    (void *)addr);
 
 		for (aliases = (*printers)->aliases;
-			(aliases != NULL) && (*aliases != NULL); aliases++)
-		{
+		    (aliases != NULL) && (*aliases != NULL); aliases++) {
 			/*
 			 * Include any alias names that belong to the printer
 			 */
 
 			if ((addr =
-			    ns_get_value(NS_KEY_BSDADDR, *printers)) != NULL)
-			{
-				if (addr->printer == NULL)
-				{
+			    ns_get_value(NS_KEY_BSDADDR, *printers)) != NULL) {
+				if (addr->printer == NULL) {
 					addr->printer = strdup(*aliases);
 				}
 				addr->pname = strdup(*aliases);
 			}
 
-			if (unique == UNIQUE)
-			{
+			if (unique == UNIQUE) {
 				list = (ns_bsd_addr_t **)
-					list_append_unique((void **)list,
-					(void *)addr, (COMP_T)ns_bsd_addr_cmp);
-			}
-			else
-			if (unique == LOCAL_UNIQUE)
-			{
+				    list_append_unique((void **)list,
+				    (void *)addr, (COMP_T)ns_bsd_addr_cmp);
+			} else if (unique == LOCAL_UNIQUE) {
 				list = (ns_bsd_addr_t **)
-					list_append_unique((void **)list,
-						(void *)addr,
-						(COMP_T)ns_bsd_addr_cmp_local);
-			}
-			else
-			{
+				    list_append_unique((void **)list,
+				    (void *)addr,
+				    (COMP_T)ns_bsd_addr_cmp_local);
+			} else {
 				list = (ns_bsd_addr_t **)
 				    list_append((void **)list, (void *)addr);
 			}
@@ -526,14 +508,14 @@ ns_bsd_addr_get_all(int unique)
 		def = NS_NAME_DEFAULT;
 
 	list = (ns_bsd_addr_t **)list_append((void **)list,
-			(void *)ns_bsd_addr_get_name(def));
+	    (void *)ns_bsd_addr_get_name(def));
 
 	endprinterentry();
 	if ((printer = ns_printer_get_name(NS_NAME_ALL, NULL)) == NULL)
 		return (ns_bsd_addr_get_list(unique));
 
 	for (printers = (char **)ns_get_value(NS_KEY_ALL, printer);
-			printers != NULL && *printers != NULL; printers++) {
+	    printers != NULL && *printers != NULL; printers++) {
 		ns_bsd_addr_t *addr;
 
 		addr = ns_bsd_addr_get_name(*printers);
@@ -542,10 +524,10 @@ ns_bsd_addr_get_all(int unique)
 		if (unique == UNIQUE)
 			list =
 			    (ns_bsd_addr_t **)list_append_unique((void **)list,
-				(void *)addr, (COMP_T)ns_bsd_addr_cmp);
+			    (void *)addr, (COMP_T)ns_bsd_addr_cmp);
 		else
 			list = (ns_bsd_addr_t **)list_append((void **)list,
-					(void *)addr);
+			    (void *)addr);
 	}
 
 	return (list);

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -62,7 +60,7 @@
  */
 ns_printer_t *
 ns_printer_create(char *name, char **aliases, char *source,
-			ns_kvp_t **attributes)
+    ns_kvp_t **attributes)
 {
 	ns_printer_t *printer;
 
@@ -104,7 +102,7 @@ ns_printer_match_name(ns_printer_t *printer, const char *name)
 
 	if ((strcmp(printer->name, name) == 0) ||
 	    (list_locate((void **)printer->aliases,
-			(COMP_T)ns_strcmp, (void *)name) != NULL))
+	    (COMP_T)ns_strcmp, (void *)name) != NULL))
 		return (0);
 
 	return (-1);
@@ -147,9 +145,9 @@ ns_printer_name_list(const ns_printer_t *printer)
 	}
 
 	list_iterate((void **)printer->aliases,
-		(VFUNC_T)_ns_append_printer_name, buf, sizeof (buf));
+	    (VFUNC_T)_ns_append_printer_name, buf, sizeof (buf));
 
-	buf[strlen(buf) - 1] = (char)NULL;
+	buf[strlen(buf) - 1] = '\0';
 
 	return (strdup(buf));
 }

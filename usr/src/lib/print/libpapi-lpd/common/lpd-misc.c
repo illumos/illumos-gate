@@ -83,7 +83,7 @@ recvfd(int sockfd)
 #if defined(sun) && defined(unix) && defined(I_RECVFD)
 	struct strrecvfd recv_fd;
 
-	memset(&recv_fd, NULL, sizeof (recv_fd));
+	memset(&recv_fd, 0, sizeof (recv_fd));
 	if (ioctl(sockfd, I_RECVFD, &recv_fd) == 0)
 		fd = recv_fd.fd;
 #else
@@ -136,7 +136,8 @@ lpd_open(service_t *svc, char type, char **args, int timeout)
 #define	SUID_LPD_PORT "/usr/lib/print/lpd-port"
 #endif
 
-	av[0] = SUID_LPD_PORT; ac = 1;
+	av[0] = SUID_LPD_PORT;
+	ac = 1;
 
 	/* server */
 	av[ac++] = "-H";
@@ -189,7 +190,8 @@ lpd_open(service_t *svc, char type, char **args, int timeout)
 	default: {	/* parent */
 		int err, status = 0;
 
-		while ((waitpid(pid, &status, 0) < 0) && (errno == EINTR));
+		while ((waitpid(pid, &status, 0) < 0) && (errno == EINTR))
+			;
 		errno = WEXITSTATUS(status);
 
 		if (errno == 0)

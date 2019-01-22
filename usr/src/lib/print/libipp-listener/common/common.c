@@ -25,8 +25,6 @@
  *
  */
 
-/* $Id: common.c 155 2006-04-26 02:34:54Z ktou $ */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,10 +81,10 @@ get_printer_id(papi_attribute_t **attributes, char **printer, int *id)
 	result = papiAttributeListGetString(attributes, NULL, "job-uri", &job);
 	if (result != PAPI_OK) {
 		result = papiAttributeListGetString(attributes, NULL,
-						"printer-uri", printer);
+		    "printer-uri", printer);
 		if (result == PAPI_OK)
 			papiAttributeListGetInteger(attributes, NULL,
-						"job-id", id);
+			    "job-id", id);
 	} else {
 		*printer = job;
 		if ((job = strrchr(*printer, '/')) != NULL) {
@@ -105,10 +103,10 @@ get_string_list(papi_attribute_t **attributes, char *name, char ***values)
 	char *value = NULL;
 
 	for (result = papiAttributeListGetString(attributes, &iterator,
-					name, &value);
+	    name, &value);
 	    result == PAPI_OK;
 	    result = papiAttributeListGetString(attributes, &iterator,
-					NULL, &value))
+	    NULL, &value))
 		list_append(values, value);
 }
 
@@ -117,17 +115,17 @@ add_default_attributes(papi_attribute_t ***attributes)
 {
 
 	(void) papiAttributeListAddString(attributes, PAPI_ATTR_APPEND,
-			"ipp-versions-supported", "1.0");
+	    "ipp-versions-supported", "1.0");
 	(void) papiAttributeListAddString(attributes, PAPI_ATTR_APPEND,
-			"ipp-versions-supported", "1.1");
+	    "ipp-versions-supported", "1.1");
 	(void) papiAttributeListAddBoolean(attributes, PAPI_ATTR_EXCL,
-			"multiple-document-jobs-supported", 0);
+	    "multiple-document-jobs-supported", 0);
 	/*
 	 * Should be able to ask the web server if it supports SSL or TLS, but
 	 * for now, we pick only "none"
 	 */
 	(void) papiAttributeListAddString(attributes, PAPI_ATTR_EXCL,
-			"uri-security-supported", "none");
+	    "uri-security-supported", "none");
 
 	/*
 	 * For now, we only "none".  As we support more authentication methods,
@@ -137,21 +135,21 @@ add_default_attributes(papi_attribute_t ***attributes)
 	 * See RFC2911 page 127 for more information.
 	 */
 	(void) papiAttributeListAddString(attributes, PAPI_ATTR_EXCL,
-			"uri-authentication-supported", "requesting-user-name");
+	    "uri-authentication-supported", "requesting-user-name");
 	(void) papiAttributeListAddString(attributes, PAPI_ATTR_EXCL,
-			"uri-security-supported", "none");
+	    "uri-security-supported", "none");
 	/* printer-uri-supported is added in the service based attributes */
 
 	(void) papiAttributeListAddInteger(attributes, PAPI_ATTR_EXCL,
-			"multiple-operation-time-out", 60);
+	    "multiple-operation-time-out", 60);
 
 	/* I18N related */
 	(void) papiAttributeListAddString(attributes, PAPI_ATTR_EXCL,
-			"charset-configured", "utf-8");
+	    "charset-configured", "utf-8");
 	(void) papiAttributeListAddString(attributes, PAPI_ATTR_EXCL,
-			"charset-supported", "utf-8");
+	    "charset-supported", "utf-8");
 	(void) papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
-			"natural-language-configured", "en-us");
+	    "natural-language-configured", "en-us");
 }
 
 static void
@@ -159,7 +157,7 @@ massage_printer_attributes_group(papi_attribute_t **group, char *printer_uri)
 {
 	if (papiAttributeListFind(group, "printer-uri-supported") != NULL)
 		papiAttributeListAddString(&group, PAPI_ATTR_REPLACE,
-				"printer-uri-supported", printer_uri);
+		    "printer-uri-supported", printer_uri);
 }
 
 static void
@@ -167,7 +165,7 @@ massage_job_attributes_group(papi_attribute_t **group, char *printer_uri)
 {
 	if (papiAttributeListFind(group, "job-printer-uri") != NULL)
 		papiAttributeListAddString(&group, PAPI_ATTR_REPLACE,
-				"job-printer-uri", printer_uri);
+		    "job-printer-uri", printer_uri);
 
 	if (papiAttributeListFind(group, "job-printer-uri") != NULL) {
 		char buf[BUFSIZ];
@@ -176,7 +174,7 @@ massage_job_attributes_group(papi_attribute_t **group, char *printer_uri)
 		papiAttributeListGetInteger(group, NULL, "job-id", &id);
 		snprintf(buf, sizeof (buf), "%s/%d", printer_uri, id);
 		papiAttributeListAddString(&group, PAPI_ATTR_REPLACE,
-				"job-uri", buf);
+		    "job-uri", buf);
 	}
 }
 
@@ -205,18 +203,16 @@ massage_response(papi_attribute_t **request, papi_attribute_t **response)
 		snprintf(buf, sizeof (buf), "http://%s:%d%s", host, port, path);
 
 	for (status = papiAttributeListGetCollection(response, &iter,
-				"printer-attributes-group", &group);
-	     status == PAPI_OK;
-	     status = papiAttributeListGetCollection(NULL, &iter,
-				NULL, &group))
+	    "printer-attributes-group", &group);
+	    status == PAPI_OK;
+	    status = papiAttributeListGetCollection(NULL, &iter, NULL, &group))
 		massage_printer_attributes_group(group, buf);
 
 	iter = NULL;
 	for (status = papiAttributeListGetCollection(response, &iter,
-				"job-attributes-group", &group);
-	     status == PAPI_OK;
-	     status = papiAttributeListGetCollection(NULL, &iter,
-				NULL, &group))
+	    "job-attributes-group", &group);
+	    status == PAPI_OK;
+	    status = papiAttributeListGetCollection(NULL, &iter, NULL, &group))
 		massage_job_attributes_group(group, buf);
 }
 
@@ -230,7 +226,7 @@ add_supported_locales(papi_attribute_t ***attributes)
 	FILE *fp;
 
 	papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
-			"generated-natural-language-supported", "en-us");
+	    "generated-natural-language-supported", "en-us");
 
 	if ((fp = fopen("/usr/lib/locale/lcttab", "r")) != NULL) {
 		char buf[1024];
@@ -243,26 +239,29 @@ add_supported_locales(papi_attribute_t ***attributes)
 			if (name == NULL)
 				continue;
 
-			for (i = 0; ((passed == 1) && (name[i] != NULL)); i++)
+			for (i = 0; ((passed == 1) && (name[i] != '\0')); i++) {
 				if (isalpha(name[i]) != 0)
 					name[i] = tolower(name[i]);
 				else if ((name[i] == '_') || (name[i] == '-'))
 					name[i] = '-';
 				else
 					passed = 0;
+			}
 
 			if ((passed == 1) &&
 			    ((file = strtok(NULL, " \t\n")) != NULL)) {
 					char path[1024];
 
 				snprintf(path, sizeof (path),
-					"/usr/lib/locale/%s", file);
+				    "/usr/lib/locale/%s", file);
 
-				if (access(path, F_OK) == 0)
-					papiAttributeListAddString(attributes,
-						PAPI_ATTR_APPEND,
-					"generated-natural-language-supported",
-					name);
+				if (access(path, F_OK) != 0)
+					continue;
+
+				papiAttributeListAddString(attributes,
+				    PAPI_ATTR_APPEND,
+				    "generated-natural-language-supported",
+				    name);
 			}
 		}
 		(void) fclose(fp);
@@ -271,7 +270,7 @@ add_supported_locales(papi_attribute_t ***attributes)
 
 void
 papi_to_ipp_printer_group(papi_attribute_t ***response,
-		papi_attribute_t **request, int flags, papi_printer_t p)
+    papi_attribute_t **request, int flags, papi_printer_t p)
 {
 	papi_attribute_t **ipp_group = NULL;
 
@@ -284,19 +283,19 @@ papi_to_ipp_printer_group(papi_attribute_t ***response,
 	ipp_operations_supported(&ipp_group, request);
 
 	(void) papiAttributeListAddCollection(response, flags,
-			"printer-attributes-group", ipp_group);
+	    "printer-attributes-group", ipp_group);
 	papiAttributeListFree(ipp_group);
 }
 
 void
 papi_to_ipp_job_group(papi_attribute_t ***response,
-			papi_attribute_t **request, int flags, papi_job_t j)
+    papi_attribute_t **request, int flags, papi_job_t j)
 {
 	papi_attribute_t **ipp_group = NULL;
 
 	copy_attributes(&ipp_group, papiJobGetAttributeList(j));
 
 	(void) papiAttributeListAddCollection(response, flags,
-			"job-attributes-group", ipp_group);
+	    "job-attributes-group", ipp_group);
 	papiAttributeListFree(ipp_group);
 }
