@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	Change the label of a file
  */
@@ -204,7 +202,7 @@ zonecopy(m_label_t *src_win_sl, char *remote_dir, char *filename,
 
 	if (datasize > bufsize) {
 		if ((callp = (labeld_data_t *)malloc(datasize)) == NULL) {
-			return (NULL);
+			return (0);
 		}
 		bufsize = datasize;
 	}
