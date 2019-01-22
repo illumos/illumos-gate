@@ -180,7 +180,7 @@ Pfindexec(struct ps_prochandle *P, const char *aout,
 	 * Fourth try: read the string pointed to by argv[0] out of the
 	 * stack in the process's address space.
 	 */
-	if (P->psinfo.pr_argv != NULL &&
+	if (P->psinfo.pr_argv != (uintptr_t)NULL &&
 	    Pread(P, &addr, sizeof (addr), P->psinfo.pr_argv) != -1 &&
 	    Pread_string(P, path, sizeof (path), (off_t)addr) > 0) {
 
