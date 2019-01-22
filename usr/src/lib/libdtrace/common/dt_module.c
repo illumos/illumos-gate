@@ -906,11 +906,11 @@ dt_module_unload(dtrace_hdl_t *dtp, dt_module_t *dmp)
 	dmp->dm_asrsv = 0;
 	dmp->dm_aslen = 0;
 
-	dmp->dm_text_va = NULL;
+	dmp->dm_text_va = 0;
 	dmp->dm_text_size = 0;
-	dmp->dm_data_va = NULL;
+	dmp->dm_data_va = 0;
 	dmp->dm_data_size = 0;
-	dmp->dm_bss_va = NULL;
+	dmp->dm_bss_va = 0;
 	dmp->dm_bss_size = 0;
 
 	if (dmp->dm_extern != NULL) {

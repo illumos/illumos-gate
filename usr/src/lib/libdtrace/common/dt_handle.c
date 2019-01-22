@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -247,7 +245,7 @@ dt_handle_liberr(dtrace_hdl_t *dtp, const dtrace_probedata_t *data,
 	err.dteda_action = -1;
 	err.dteda_offset = -1;
 	err.dteda_fault = DTRACEFLT_LIBRARY;
-	err.dteda_addr = NULL;
+	err.dteda_addr = 0;
 
 	len = strlen(faultstr) +
 	    strlen(errpd->dtpd_provider) + strlen(errpd->dtpd_mod) +
