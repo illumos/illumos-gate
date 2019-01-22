@@ -124,7 +124,7 @@ frt_initialize(int num, char **args)
 	}
 
 	g_raw->cont = open_raw_data(g_raw);
-	if (g_raw->cont == NULL) {
+	if (g_raw->cont == 0) {
 		return (FRU_FAILURE);
 	}
 
