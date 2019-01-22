@@ -289,7 +289,7 @@ SUNW_C_KeyToObject(CK_SESSION_HANDLE hSession, CK_MECHANISM_TYPE mech,
 	/* template for creating generic secret key object */
 	CK_ATTRIBUTE template[NUM_SECRETKEY_ATTRS];
 
-	if ((hSession == NULL) || (obj == NULL) ||
+	if ((hSession == CK_INVALID_HANDLE) || (obj == NULL) ||
 	    (rawkey == NULL) || (rawkey_len == 0)) {
 		return (CKR_ARGUMENTS_BAD);
 	}
@@ -386,7 +386,7 @@ pkcs11_PasswdToPBKD2Object(CK_SESSION_HANDLE hSession, char *passphrase,
 	CK_ULONG i, j, num_asym_mechs, num_fixed_secs, num_mapping;
 	CK_ATTRIBUTE template[NUM_SECRETKEY_ATTRS];
 
-	if (hSession == NULL || obj == NULL ||
+	if (hSession == CK_INVALID_HANDLE || obj == NULL ||
 	    passphrase == NULL || passphrase_len == 0 ||
 	    iterations == 0UL) {
 		return (CKR_ARGUMENTS_BAD);
@@ -510,9 +510,9 @@ pkcs11_ObjectToKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE obj,
 	CK_RV rv;
 	CK_ATTRIBUTE template;
 
-	if (hSession == NULL)
+	if (hSession == CK_INVALID_HANDLE)
 		return (CKR_SESSION_HANDLE_INVALID);
-	if (obj == NULL)
+	if (obj == 0)
 		return (CKR_OBJECT_HANDLE_INVALID);
 	if (rawkey == NULL || rawkey_len == NULL)
 		return (CKR_ARGUMENTS_BAD);

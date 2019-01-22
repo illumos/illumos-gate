@@ -1243,7 +1243,7 @@ clone_by_wrap(meta_object_t *object, slot_object_t *new_clone,
     slot_session_t *dst_slot_session)
 {
 	slot_session_t *src_slot_session = NULL;
-	CK_OBJECT_HANDLE wrappingKey = NULL, unwrappingKey = NULL;
+	CK_OBJECT_HANDLE wrappingKey = 0, unwrappingKey = 0;
 	CK_MECHANISM wrappingMech;
 	CK_BYTE *wrappedKey = NULL;
 	CK_ULONG wrappedKeyLen = 0;

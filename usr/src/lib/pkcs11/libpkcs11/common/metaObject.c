@@ -55,15 +55,15 @@ static int num_stop_rv = sizeof (stop_rv) / sizeof (CK_RV);
  * it doesn't need to be used by the code at this point.
  *
  * static CK_RV try_again_rv[] = {
- * 	CKR_DEVICE_ERROR,
- * 	CKR_DEVICE_MEMORY,
- * 	CKR_DEVICE_REMOVED,
- * 	CKR_FUNCTION_FAILED,
- * 	CKR_GENERAL_ERROR,
- * 	CKR_HOST_MEMORY,
- * 	CKR_TEMPLATE_INCONSISTENT,
- * 	CKR_ATTRIBUTE_READ_ONLY,
- * 	CKR_ATTRIBUTE_VALUE_INVALID
+ *	CKR_DEVICE_ERROR,
+ *	CKR_DEVICE_MEMORY,
+ *	CKR_DEVICE_REMOVED,
+ *	CKR_FUNCTION_FAILED,
+ *	CKR_GENERAL_ERROR,
+ *	CKR_HOST_MEMORY,
+ *	CKR_TEMPLATE_INCONSISTENT,
+ *	CKR_ATTRIBUTE_READ_ONLY,
+ *	CKR_ATTRIBUTE_VALUE_INVALID
  * };
  * static int num_try_again_rv = sizeof (try_again_rv) / sizeof (CK_RV);
  */
@@ -180,7 +180,7 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 	 */
 
 	if (meta_freeobject_check(session, object, NULL, pTemplate, ulCount,
-	    NULL)) {
+	    0)) {
 		/*
 		 * Make sure we are logged into the keystore if this is a
 		 * private freetoken object.
