@@ -124,7 +124,7 @@ get_disk(dm_descriptor_t disk, int *error)
 				    dm_get_associated_descriptors(disk,
 				    DM_MEDIA, error);
 				if (*error != 0 || media == NULL ||
-				    *media == NULL) {
+				    *media == 0) {
 					handle_error(
 					    "could not get media from disk %s",
 					    dp->name);
@@ -177,7 +177,7 @@ get_disk_aliases(dm_descriptor_t disk, char *name, int *error)
 		int j;
 
 		/* Count aliases */
-		for (j = 0; aliases[j] != NULL; j++)
+		for (j = 0; aliases[j] != 0; j++)
 			;
 
 		names = (char **)calloc(j + 1, sizeof (char *));
@@ -187,7 +187,7 @@ get_disk_aliases(dm_descriptor_t disk, char *name, int *error)
 		} else {
 
 			/* For each alias... */
-			for (j = 0; *error == 0 && aliases[j] != NULL; j++) {
+			for (j = 0; *error == 0 && aliases[j] != 0; j++) {
 
 				dm_descriptor_t alias = aliases[j];
 				char *aname = dm_get_name(alias, error);
@@ -271,7 +271,7 @@ get_disk_slices(dm_descriptor_t media, const char *name, uint32_t blocksize,
 
 		/* For each slice... */
 		for (j = 0; *error == 0 &&
-		    slices != NULL && slices[j] != NULL; j++) {
+		    slices != NULL && slices[j] != 0; j++) {
 
 			/* Get slice */
 			dmgt_slice_t *slice =
@@ -690,7 +690,7 @@ dmgt_avail_disk_iter(dmgt_disk_iter_f func, void *data)
 		int i;
 
 		/* For each disk... */
-		for (i = 0; disks != NULL && disks[i] != NULL; i++) {
+		for (i = 0; disks != NULL && disks[i] != 0; i++) {
 			dm_descriptor_t disk = (dm_descriptor_t)disks[i];
 			int online;
 
