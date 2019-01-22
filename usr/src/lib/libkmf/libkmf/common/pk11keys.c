@@ -26,7 +26,7 @@ typedef struct
 } ALG_INFO;
 
 static const ALG_INFO alg_info_map[] = {
-	{ KMF_ALGID_RSA, CKK_RSA, CKM_RSA_PKCS, CKM_RSA_PKCS, NULL},
+	{ KMF_ALGID_RSA, CKK_RSA, CKM_RSA_PKCS, CKM_RSA_PKCS, 0},
 	{ KMF_ALGID_DSA, CKK_DSA, CKM_DSA, CKM_DSA, CKM_SHA_1 },
 	{ KMF_ALGID_ECDSA, CKK_EC, CKM_ECDSA, CKM_ECDSA, CKM_SHA_1 },
 	{ KMF_ALGID_SHA1WithDSA, CKK_DSA, CKM_DSA, CKM_DSA, CKM_SHA_1 },
@@ -554,7 +554,7 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 	CK_MECHANISM_TYPE mechtype;
 	CK_KEY_TYPE keytype;
 	CK_OBJECT_HANDLE ckKeyHandle = 0;
-	CK_SESSION_HANDLE ckSession = NULL;
+	CK_SESSION_HANDLE ckSession = 0;
 	CK_ULONG out_len = 0, in_len = 0, total_encrypted = 0;
 	uint8_t *in_data, *out_data;
 	int i, blocks, block_size;
