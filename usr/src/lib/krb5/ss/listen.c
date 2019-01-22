@@ -7,7 +7,7 @@
  * Listener loop for subsystem library libss.a.
  *
  *	util/ss/listen.c
- * 
+ *
  * Copyright 1987, 1988 by MIT Student Information Processing Board
  *
  * For copyright information, see copyright.h.
@@ -107,7 +107,7 @@ CPL_MATCH_FN(cmdmatch) {
 		free (l);
 		return (ret);
 	}
-		
+
 	/* Don't bother if the arg count is not 1 or 0 */
 	if (argc < 2) {
 		len = argc ? strlen(argv[0]) : 0;
@@ -153,16 +153,16 @@ int ss_listen (sci_idx)
     RETSIGTYPE (*sig_int)(), (*old_sig_cont)();
     int mask;
 #endif
-    
+
     current_info = info = ss_info(sci_idx);
     info->abort = 0;
 
     /* Solaris Kerberos */
     gl = new_GetLine(MAX_LINE_LEN, MAX_HIST_LEN);
     if (gl == NULL) {
-        ss_error(sci_idx, 0, dgettext(TEXT_DOMAIN,
+	ss_error(sci_idx, 0, dgettext(TEXT_DOMAIN,
             "new_GetLine() failed.\n"));
-    	current_info = old_info;
+	current_info = old_info;
 	return (SS_ET_TECLA_ERR);
     }
 
@@ -175,8 +175,8 @@ int ss_listen (sci_idx)
     /* Alloc space for them */
     commands.cmd = malloc(sizeof (char *) * commands.count);
     if (commands.cmd == NULL) {
-    	current_info = old_info;
-    	gl = del_GetLine(gl);
+	current_info = old_info;
+	gl = del_GetLine(gl);
 	return (ENOMEM);
     }
 
@@ -187,8 +187,8 @@ int ss_listen (sci_idx)
 	ss_error(sci_idx, 0, dgettext(TEXT_DOMAIN,
             "failed to register completion function.\n"));
 	free(commands.cmd);
-    	current_info = old_info;
-    	gl = del_GetLine(gl);
+	current_info = old_info;
+	gl = del_GetLine(gl);
 	return (SS_ET_TECLA_ERR);
     }
 
@@ -226,7 +226,7 @@ int ss_listen (sci_idx)
      * Let libtecla deal with SIGINT when it's doing its own processing
      * otherwise the input line won't be cleared on SIGINT.
      */
-    if (gl_trap_signal(gl, SIGINT, GLS_DONT_FORWARD, GLS_ABORT, NULL)) {
+    if (gl_trap_signal(gl, SIGINT, GLS_DONT_FORWARD, GLS_ABORT, 0)) {
         ss_error(sci_idx, 0, dgettext(TEXT_DOMAIN,
             "Failed to trap SIGINT.\n"));
 	code = SS_ET_TECLA_ERR;
@@ -320,7 +320,6 @@ void ss_abort_subsystem(sci_idx, code)
 {
     ss_info(sci_idx)->abort = 1;
     ss_info(sci_idx)->exit_status = code;
-    
 }
 
 void ss_quit(argc, argv, sci_idx, infop)
