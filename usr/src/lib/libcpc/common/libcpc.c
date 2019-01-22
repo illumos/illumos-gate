@@ -203,7 +203,7 @@ cpc_set_create(cpc_t *cpc)
 	set->cs_fd	= -1;
 	set->cs_pctx	= NULL;
 	set->cs_id	= -1;
-	set->cs_thr	= NULL;
+	set->cs_thr	= 0;
 
 	sigblocked = cpc_lock(cpc);
 	set->cs_next = cpc->cpc_sets;
@@ -617,7 +617,7 @@ cpc_unbind(cpc_t *cpc, cpc_set_t *set)
 		break;
 	}
 
-	set->cs_thr = NULL;
+	set->cs_thr = 0;
 	set->cs_id = -1;
 	set->cs_state = CS_UNBOUND;
 	if (ret != 0)
@@ -781,7 +781,7 @@ cpc_get_list(int which, int arg)
 void
 cpc_walk_requests(cpc_t *cpc, cpc_set_t *set, void *arg,
     void (*action)(void *arg, int index, const char *event, uint64_t preset,
-	uint_t flags, int nattrs, const cpc_attr_t *attrs))
+    uint_t flags, int nattrs, const cpc_attr_t *attrs))
 {
 	cpc_request_t	*rp;
 	cpc_attr_t	*attrs = NULL;
@@ -871,7 +871,7 @@ err:
 /*ARGSUSED*/
 void
 cpc_walk_events_all(cpc_t *cpc, void *arg,
-		    void (*action)(void *arg, const char *event))
+    void (*action)(void *arg, const char *event))
 {
 	cpc_walk_events_impl(cpc, arg, action, 0);
 }
@@ -880,7 +880,7 @@ cpc_walk_events_all(cpc_t *cpc, void *arg,
 /*ARGSUSED*/
 void
 cpc_walk_generic_events_all(cpc_t *cpc, void *arg,
-			    void (*action)(void *arg, const char *event))
+    void (*action)(void *arg, const char *event))
 {
 	cpc_walk_events_impl(cpc, arg, action, 1);
 }
