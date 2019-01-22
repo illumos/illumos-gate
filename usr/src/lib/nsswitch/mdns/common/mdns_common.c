@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mdns_common.h"
 
 static int _nss_mdns_queryrecord(const char *rrname, int rrclass, int rrtype,
@@ -91,7 +89,7 @@ _nss_mdns_queryrecord(const char *rrname, int rrclass, int rrtype,
 	err = DNSServiceQueryRecord(&ref, flags, opinterface,
 	    rrname, rrtype, rrclass, callback, data);
 	if (err != kDNSServiceErr_NoError || ref == NULL ||
-	    (sockfd = DNSServiceRefSockFD(ref)) == NULL) {
+	    (sockfd = DNSServiceRefSockFD(ref)) == 0) {
 		DNSServiceRefDeallocate(ref);
 		data->status = NSS_UNAVAIL;
 		return (NSS_UNAVAIL);

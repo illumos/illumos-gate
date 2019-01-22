@@ -27,8 +27,6 @@
  * convenient method of aliasing and specifying an interest list.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #pragma weak _nss_user__printers_constr = _nss_user_printers_constr
 
 #include <nss_dbdefs.h>
@@ -47,17 +45,18 @@ _nss_user_printers_convert(char *entry, nss_XbyY_args_t *args)
 	int			length = 0;
 
 	if ((value = strpbrk(entry, "\t ")) != NULL) {
-		*value = NULL; value++;
+		*value = '\0';
+		value++;
 
-		while ((*value != NULL) && (isspace(*value) != 0))
+		while ((*value != '\0') && (isspace(*value) != 0))
 			value++;
 
 		if ((key = strpbrk(value, "\n\t ")) != NULL)
-			*key = NULL;
+			*key = '\0';
 	}
 
-	args->buf.buffer[0] = NULL;
-	if ((value == NULL) || (*value == NULL)) {	/* bad value */
+	args->buf.buffer[0] = '\0';
+	if ((value == NULL) || (*value == '\0')) {	/* bad value */
 		args->erange = 1;
 		return (res);
 	}
@@ -71,7 +70,7 @@ _nss_user_printers_convert(char *entry, nss_XbyY_args_t *args)
 			namelist, key);
 
 	/* append the value  ':' must be escaped for posix style names */
-	while ((length < args->buf.buflen) && (*value != NULL)) {
+	while ((length < args->buf.buflen) && (*value != '\0')) {
 		if (*value == ':')
 			args->buf.buffer[length++] = '\\';
 		args->buf.buffer[length++] = *value++;
@@ -82,7 +81,7 @@ _nss_user_printers_convert(char *entry, nss_XbyY_args_t *args)
 		return (res);
 	}
 
-	args->buf.buffer[length] = NULL;	/* terminate, just in case */
+	args->buf.buffer[length] = '\0';	/* terminate, just in case */
 	args->returnval = args->buf.result;
 	res = NSS_SUCCESS;
 

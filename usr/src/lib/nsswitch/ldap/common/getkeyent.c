@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <pwd.h>
 #include <ctype.h>
 #include "ldap_common.h"
@@ -87,7 +85,7 @@ _nss_ldap_key2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		goto result_key2str;
 	}
 	while (*pkey_array) {
-		if (strncasecmp(*pkey_array, keytype, keytypelen) == NULL)
+		if (strncasecmp(*pkey_array, keytype, keytypelen) == 0)
 			break;
 		pkey_array++;
 	}
@@ -112,7 +110,7 @@ _nss_ldap_key2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 		goto result_key2str;
 	}
 	while (*skey_array) {
-		if (strncasecmp(*skey_array, keytype, keytypelen) == NULL)
+		if (strncasecmp(*skey_array, keytype, keytypelen) == 0)
 			break;
 		skey_array++;
 	}
