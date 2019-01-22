@@ -867,7 +867,7 @@ raidcfg_list_next(int handle)
 
 int
 raidcfg_set_attr(int handle, uint32_t set_cmd, void *value,
-	char **plugin_err_str)
+    char **plugin_err_str)
 {
 	raid_obj_id_t obj_id;
 	raid_obj_type_id_t type;
@@ -924,8 +924,8 @@ raidcfg_update_fw(int handle, char *file, char **plugin_err_str)
 
 int
 raidcfg_create_array(int num_of_comps, int *disk_handles,
-	uint32_t raid_level, uint64_t size, uint32_t stripe_size,
-	char **plugin_err_str)
+    uint32_t raid_level, uint64_t size, uint32_t stripe_size,
+    char **plugin_err_str)
 {
 	raid_obj_id_t *disk_obj_ids, obj_id;
 	array_attr_t *array_attr;
@@ -1031,7 +1031,7 @@ raidcfg_delete_array(int array_handle, char **plugin_err_str)
 
 int
 raidcfg_set_hsp(raidcfg_hsp_relation_t *hsp_relations,
-	char **plugin_err_str)
+    char **plugin_err_str)
 {
 	raid_obj_id_t disk_obj_id, array_obj_id;
 	raid_obj_id_t *hsp_relation_objs;
@@ -1108,7 +1108,7 @@ raidcfg_set_hsp(raidcfg_hsp_relation_t *hsp_relations,
 
 int
 raidcfg_unset_hsp(raidcfg_hsp_relation_t *hsp_relations,
-	char **plugin_err_str)
+    char **plugin_err_str)
 {
 	raid_obj_id_t disk_obj_id, array_obj_id;
 	raid_obj_id_t *hsp_relation_objs;
@@ -1189,7 +1189,7 @@ raidcfg_unset_hsp(raidcfg_hsp_relation_t *hsp_relations,
 void
 raidcfg_init(void)
 {
-	(void) mutex_init(&raidcfg_mp, NULL, NULL);
+	(void) mutex_init(&raidcfg_mp, USYNC_THREAD, NULL);
 	raid_plugin_init();
 	(void) raid_handle_init();
 	(void) obj_rescan(&raid_tab_sys);
@@ -1222,7 +1222,7 @@ intcompare(const void *p1, const void *p2)
 
 static uint64_t
 raid_space_noalign(raid_obj_tab_t *raid_tab, uint32_t raid_level, int num,
-	raid_obj_id_t *disk_objs, arraypart_attr_t *arraypart_attrs)
+    raid_obj_id_t *disk_objs, arraypart_attr_t *arraypart_attrs)
 {
 	disk_attr_t *disk_attr;
 	diskseg_attr_t *diskseg_attr;
@@ -1658,7 +1658,7 @@ raid_obj_get_lib(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 raid_obj_set_lib(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_lib_t *raid_lib)
+    raid_lib_t *raid_lib)
 {
 	raid_obj_handle_t handle;
 	controller_attr_t *attr;
@@ -1810,7 +1810,7 @@ obj_rescan(raid_obj_tab_t *raid_tab)
 
 static raid_obj_id_t
 obj_get_comp(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_type_id_t obj_type)
+    raid_obj_type_id_t obj_type)
 {
 	raid_obj_id_t id;
 	raid_obj_type_id_t type;
@@ -1939,7 +1939,7 @@ obj_locate_controller(raid_obj_tab_t *raid_tab, uint32_t controller_id)
 
 static raid_obj_id_t
 obj_locate_array(raid_obj_tab_t *raid_tab, uint32_t controller_id,
-	uint32_t array_id)
+    uint32_t array_id)
 {
 	raid_obj_id_t obj_id;
 
@@ -1954,7 +1954,7 @@ obj_locate_array(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 
 static raid_obj_id_t
 obj_locate_array_recur(raid_obj_tab_t *raid_tab,
-	raid_obj_id_t container_obj_id, uint32_t array_id)
+    raid_obj_id_t container_obj_id, uint32_t array_id)
 {
 	raid_obj_id_t obj_id, ret;
 	array_attr_t *attr;
@@ -1982,7 +1982,7 @@ obj_locate_array_recur(raid_obj_tab_t *raid_tab,
 
 static raid_obj_id_t
 obj_locate_hsp(raid_obj_tab_t *raid_tab, uint32_t controller_id,
-	uint32_t disk_id, uint32_t array_id)
+    uint32_t disk_id, uint32_t array_id)
 {
 	raid_obj_id_t obj_id;
 	hsp_attr_t *hsp_attr;
@@ -2010,7 +2010,7 @@ obj_locate_hsp(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 
 static raid_obj_id_t
 obj_locate_disk(raid_obj_tab_t *raid_tab, uint32_t controller_id,
-	uint32_t disk_id)
+    uint32_t disk_id)
 {
 	raid_obj_id_t obj_id;
 	disk_attr_t *attr;
@@ -2037,7 +2037,7 @@ obj_locate_disk(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 
 static raid_obj_id_t
 obj_locate_arraypart(raid_obj_tab_t *raid_tab, uint32_t controller_id,
-	uint32_t array_id, uint32_t disk_id)
+    uint32_t array_id, uint32_t disk_id)
 {
 	raid_obj_id_t obj_id;
 
@@ -2066,7 +2066,7 @@ obj_locate_arraypart(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 
 static raid_obj_id_t
 obj_locate_diskseg(raid_obj_tab_t *raid_tab, uint32_t controller_id,
-	uint32_t disk_id, uint32_t seq_no)
+    uint32_t disk_id, uint32_t seq_no)
 {
 	raid_obj_id_t obj_id;
 	diskseg_attr_t *attr;
@@ -2093,7 +2093,7 @@ obj_locate_diskseg(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 
 static raid_obj_id_t
 obj_locate_task(raid_obj_tab_t *raid_tab, uint32_t controller_id,
-	uint32_t task_id)
+    uint32_t task_id)
 {
 	raid_obj_id_t obj_id, obj_id2, task_obj_id;
 	task_attr_t *attr;
@@ -2174,7 +2174,7 @@ obj_locate_task(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 
 static raid_obj_id_t
 obj_locate_prop(raid_obj_tab_t *raid_tab, uint32_t controller_id,
-	uint32_t disk_id, uint32_t prop_id)
+    uint32_t disk_id, uint32_t prop_id)
 {
 	raid_obj_id_t obj_id;
 	property_attr_t *prop_attr;
@@ -2219,7 +2219,7 @@ obj_get_controller(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
  */
 static int
 obj_sys_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_type_id_t comp_type)
+    raid_obj_type_id_t comp_type)
 {
 	DIR *dir;
 	struct dirent *dp;
@@ -2255,7 +2255,7 @@ obj_sys_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 static int
 obj_sys_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	int num, raid_obj_id_t *comp_list, raid_obj_type_id_t comp_type)
+    int num, raid_obj_id_t *comp_list, raid_obj_type_id_t comp_type)
 {
 	DIR *dir;
 	struct dirent *dp;
@@ -2311,7 +2311,7 @@ obj_sys_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 static int
 obj_controller_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_type_id_t comp_type)
+    raid_obj_type_id_t comp_type)
 {
 	raid_lib_t *raid_lib;
 	int ret = SUCCESS, fd;
@@ -2337,7 +2337,7 @@ obj_controller_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 static int
 obj_controller_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	int comp_num, raid_obj_id_t *comp_list, raid_obj_type_id_t comp_type)
+    int comp_num, raid_obj_id_t *comp_list, raid_obj_type_id_t comp_type)
 {
 	raid_lib_t *raid_lib;
 	controller_attr_t *ctl_attrp;
@@ -2449,7 +2449,7 @@ obj_controller_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 obj_controller_act(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	uint32_t sub_cmd, void *prop_list, char **plugin_err_str)
+    uint32_t sub_cmd, void *prop_list, char **plugin_err_str)
 {
 	controller_attr_t *attr;
 	raid_lib_t *raid_lib;
@@ -2564,7 +2564,7 @@ obj_controller_act(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 static int
 obj_array_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_type_id_t comp_type)
+    raid_obj_type_id_t comp_type)
 {
 	array_attr_t *attr;
 	controller_attr_t *ctl_attrp;
@@ -2606,7 +2606,7 @@ obj_array_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 static int
 obj_array_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	int comp_num, raid_obj_id_t *comp_list, raid_obj_type_id_t comp_type)
+    int comp_num, raid_obj_id_t *comp_list, raid_obj_type_id_t comp_type)
 {
 	array_attr_t *attr;
 	controller_attr_t *ctl_attrp;
@@ -2743,7 +2743,7 @@ obj_array_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 obj_array_set_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	uint32_t sub_cmd, uint32_t *value, char **plugin_err_str)
+    uint32_t sub_cmd, uint32_t *value, char **plugin_err_str)
 {
 	array_attr_t *attr;
 	controller_attr_t *ctl_attrp;
@@ -2800,7 +2800,7 @@ obj_array_set_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 static int
 obj_disk_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_type_id_t comp_type)
+    raid_obj_type_id_t comp_type)
 {
 	disk_attr_t *attr;
 	controller_attr_t *ctl_attrp;
@@ -2846,7 +2846,7 @@ obj_disk_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 static int
 obj_disk_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	int comp_num, raid_obj_id_t *comp_list, raid_obj_type_id_t comp_type)
+    int comp_num, raid_obj_id_t *comp_list, raid_obj_type_id_t comp_type)
 {
 	disk_attr_t *attr;
 	controller_attr_t *ctl_attrp;
@@ -3226,7 +3226,7 @@ obj_prop_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
-	int num_of_comp, raid_obj_id_t *disk_list, char **plugin_err_str)
+    int num_of_comp, raid_obj_id_t *disk_list, char **plugin_err_str)
 {
 	controller_attr_t *controller_attr;
 	array_attr_t *array_attr, array_attr2;
@@ -3536,7 +3536,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 
 static int
 obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
-	char **plugin_err_str)
+    char **plugin_err_str)
 {
 	raid_obj_id_t controller_obj_id;
 	controller_attr_t *controller_attr;
@@ -3578,7 +3578,7 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 
 static int
 obj_hsp_bind(raid_obj_tab_t *raid_tab, raid_obj_id_t *obj_ids,
-	char **plugin_err_str)
+    char **plugin_err_str)
 {
 	raid_obj_id_t obj_id, controller_obj_id = OBJ_NONE;
 	raid_obj_id_t array_obj_id, disk_obj_id;
@@ -3747,7 +3747,7 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, raid_obj_id_t *obj_ids,
 
 static int
 obj_hsp_unbind(raid_obj_tab_t *raid_tab, raid_obj_id_t *obj_ids,
-	char **plugin_err_str)
+    char **plugin_err_str)
 {
 	raid_obj_id_t obj_id, controller_obj_id = OBJ_NONE;
 	raid_obj_id_t array_obj_id, disk_obj_id;
@@ -3998,7 +3998,7 @@ raid_obj_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t raid_obj_id)
 
 static int
 raid_obj_add_org(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_id_t container_id)
+    raid_obj_id_t container_id)
 {
 	raid_obj_id_t tmp, tmp1;
 
@@ -4040,7 +4040,7 @@ raid_obj_get_type(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 raid_obj_set_type(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_type_id_t type)
+    raid_obj_type_id_t type)
 {
 	raid_obj_t *obj;
 
@@ -4069,7 +4069,7 @@ raid_obj_get_status(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 raid_obj_set_status(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_status_t status)
+    raid_obj_status_t status)
 {
 	raid_obj_t *obj;
 
@@ -4084,7 +4084,7 @@ raid_obj_set_status(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 static int
 raid_obj_clear_status(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_status_t status)
+    raid_obj_status_t status)
 {
 	raid_obj_t *obj;
 
@@ -4111,7 +4111,7 @@ raid_obj_get_container(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 raid_obj_set_container(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_id_t container_id)
+    raid_obj_id_t container_id)
 {
 	raid_obj_t *obj;
 
@@ -4137,7 +4137,7 @@ raid_obj_get_comp(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 raid_obj_set_comp(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_id_t comp)
+    raid_obj_id_t comp)
 {
 	raid_obj_t *obj;
 
@@ -4163,7 +4163,7 @@ raid_obj_get_sibling(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 raid_obj_set_sibling(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_id_t sibling)
+    raid_obj_id_t sibling)
 {
 	raid_obj_t *obj;
 
@@ -4190,7 +4190,7 @@ raid_obj_get_data_ptr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 raid_obj_set_data_ptr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	void *data)
+    void *data)
 {
 	raid_obj_t *obj;
 
@@ -4217,7 +4217,7 @@ raid_obj_get_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 static int
 raid_obj_set_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
-	raid_obj_handle_t handle)
+    raid_obj_handle_t handle)
 {
 	raid_obj_t *obj;
 
