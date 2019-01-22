@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Includes
  */
@@ -58,7 +56,7 @@
 /*
  * Defines
  */
-#define	TNF_FILE_MODE 	(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+#define	TNF_FILE_MODE	(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
 /*
  * Declarations
@@ -76,7 +74,7 @@ static TNFW_B_CONTROL __tnfw_b_control_local = {
 	NULL,
 	_tnf_trace_initialize,
 	_tnf_fork_thread_setup,
-	NULL
+	0
 };
 
 TNFW_B_CONTROL *_tnfw_b_control = &__tnfw_b_control_local;
@@ -140,7 +138,7 @@ _tnf_trace_initialize(void)
 {
 	int		fd;
 	int		created_file = 0;
-	static mutex_t 	init_mutex = DEFAULTMUTEX;
+	static mutex_t	init_mutex = DEFAULTMUTEX;
 
 	/*
 	 * if this is a MT program and the primordial thread hasn't been
