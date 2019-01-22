@@ -26,6 +26,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2019 Peter Tribble.
  */
 
 
@@ -200,7 +201,7 @@ int baudtable[] = {
 };
 
 static int asyopen(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr);
-static int asyclose(queue_t *q, int flag);
+static int asyclose(queue_t *q, int flag, cred_t *cr);
 static void asywput(queue_t *q, mblk_t *mp);
 static void asyrsrv(queue_t *q);
 
@@ -1107,7 +1108,7 @@ async_progress_check(void *arg)
  * Close routine.
  */
 static int
-asyclose(queue_t *q, int flag)
+asyclose(queue_t *q, int flag, cred_t *cr __unused)
 {
 	struct asyncline *async;
 	struct asycom	 *asy;

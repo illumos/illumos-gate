@@ -140,7 +140,7 @@ drm_supp_register(dev_info_t *dip, drm_device_t *dp)
 	agp_master_softc_t	*agpm;
 	drm_inst_state_t	*mstate;
 	drm_inst_list_t		*entry;
-	gfxp_vgatext_softc_ptr_t gfxp;
+	gfxp_fb_softc_ptr_t	gfxp;
 	struct dev_ops	*devop;
 
 	ASSERT(dip != NULL);
@@ -161,8 +161,8 @@ drm_supp_register(dev_info_t *dip, drm_device_t *dp)
 	}
 
 	/* Generic graphics initialization */
-	gfxp = gfxp_vgatext_softc_alloc();
-	error = gfxp_vgatext_attach(dip, DDI_ATTACH, gfxp);
+	gfxp = gfxp_fb_softc_alloc();
+	error = gfxp_fb_attach(dip, DDI_ATTACH, gfxp);
 	if (error != DDI_SUCCESS) {
 		DRM_ERROR("drm_supp_regiter: failed to init gfx");
 		goto exit1;
@@ -224,9 +224,9 @@ exit4:
 exit3:
 	pci_config_teardown(&pci_cfg_handle);
 exit2:
-	(void) gfxp_vgatext_detach(dip, DDI_DETACH, gfxp);
+	(void) gfxp_fb_detach(dip, DDI_DETACH, gfxp);
 exit1:
-	gfxp_vgatext_softc_free(gfxp);
+	gfxp_fb_softc_free(gfxp);
 	drm_supp_free_drv_entry(dip);
 	ddi_remove_minor_node(dip, NULL);
 
@@ -254,9 +254,9 @@ drm_supp_unregister(void *handle)
 
 	/* graphics misc module detach */
 	if (mstate->mis_gfxp) {
-		(void) gfxp_vgatext_detach(mstate->mis_dip, DDI_DETACH,
+		(void) gfxp_fb_detach(mstate->mis_dip, DDI_DETACH,
 		    mstate->mis_gfxp);
-		gfxp_vgatext_softc_free(mstate->mis_gfxp);
+		gfxp_fb_softc_free(mstate->mis_gfxp);
 	}
 
 	mstate->mis_devp = NULL;
@@ -448,7 +448,7 @@ drm_sun_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	ASSERT(minor <= MAX_CLONE_MINOR);
 	switch (minor) {
 	case GFX_MINOR:
-		retval = gfxp_vgatext_ioctl(dev, cmd, arg,
+		retval = gfxp_fb_ioctl(dev, cmd, arg,
 		    mode, credp, rvalp, mstate->mis_gfxp);
 		return (retval);
 
@@ -544,7 +544,7 @@ drm_sun_devmap(dev_t dev, devmap_cookie_t dhp, offset_t offset,
 	minor = DEV2MINOR(dev);
 	switch (minor) {
 	case GFX_MINOR:
-		ret = gfxp_vgatext_devmap(dev, dhp, offset, len, maplen, model,
+		ret = gfxp_fb_devmap(dev, dhp, offset, len, maplen, model,
 		    mstate->mis_gfxp);
 		return (ret);
 

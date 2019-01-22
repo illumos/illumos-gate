@@ -1,9 +1,22 @@
 .\" Copyright 1989 AT&T
 .\" Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2019, Joyent, Inc.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .Dd January 11, 2019
 .Dt PROC 4
 .Os
@@ -451,7 +464,7 @@ toggle the flag.
 .It Sy PR_MSFORK
 Set by default in all processes to indicate that microstate accounting will be
 enabled for processes that this parent
-.Xr fork 2 Ns s.
+.Xr fork 2 Ns s .
 However, this flag has been deprecated and no longer has any effect.
 It is possible to toggle this flag; however, it is not possible to disable
 microstate accounting.
@@ -1069,7 +1082,7 @@ typedef struct lwpsinfo {
     processorid_t pr_onpro;  /* processor which last ran this lwp */
     processorid_t pr_bindpro;/* processor to which lwp is bound */
     psetid_t pr_bindpset;    /* processor set to which lwp is bound */
-    lgrp_id_t pr_lgrp	      /* home lgroup */
+    lgrp_id_t pr_lgrp;       /* home lgroup */
 } lwpsinfo_t;
 .Ed
 .Pp

@@ -192,7 +192,7 @@ drm_install_irq_handle(drm_device_t *dev)
 	dev_info_t *dip = dev->dip;
 
 	if (dip == NULL) {
-		DRM_ERROR("drm_install_irq_handle: cannot get vgatext's dip");
+		DRM_ERROR("drm_install_irq_handle: cannot get gfxp_fb's dip");
 		return (DDI_FAILURE);
 	}
 

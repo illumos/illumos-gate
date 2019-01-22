@@ -43,8 +43,10 @@ MODULE		= vgatext
 OBJECTS		= $(VGATEXT_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(VGATEXT_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+GFX_DIR		= $(UTSBASE)/i86pc/io/gfx_private
+INC_PATH	+= -I$(GFX_DIR)
 
-LDFLAGS +=	-dy
+LDFLAGS +=	-dy -Nmisc/gfx_private
 
 #
 #	Include common rules.
@@ -57,17 +59,6 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY) # $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-
-CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-unused-variable
 
 #
 #	Default build targets.

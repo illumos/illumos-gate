@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	   All Rights Reserved	*/
 /*
  * Copyright (c) 2018, Joyent, Inc.
  */
@@ -974,8 +974,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 	if (hasauxv) {
 		int auxf = AF_SUN_HWCAPVERIFY;
+#if defined(__amd64)
 		size_t fpsize;
 		int fptype;
+#endif /* defined(__amd64) */
 
 		/*
 		 * Note: AT_SUN_PLATFORM, AT_SUN_EXECNAME and AT_RANDOM were

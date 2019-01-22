@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2019 Peter Tribble.
 #
 
 #
@@ -323,7 +324,12 @@ ROOTLIBDIR=     $(ROOT)/usr/4lib
 
 CPPFLAGS= -Dsparc \
 	-I. -Iinc -I../inc/include -I../inc/include/sys $(CPPFLAGS.master)
-ASFLAGS=  -P -D__STDC__ -DLOCORE -D_SYS_SYS_S -D_ASM $(CPPFLAGS)
+#
+# contents of CPPFLAGS copied to ASFLAGS so it's immune to CPPFLAGS
+# being changed later
+#
+ASFLAGS=  -P -D__STDC__ -DLOCORE -D_SYS_SYS_S -D_ASM -Dsparc \
+	-I. -Iinc -I../inc/include -I../inc/include/sys $(CPPFLAGS.master)
 LDLIBS= -t -R/usr/ucblib -L$(ROOT)/usr/ucblib $(LDLIBS.lib) \
 	-lucb -lc -lnsl -lsocket
 
@@ -342,7 +348,6 @@ $(DYNLIBS5) :=	SONAME = $(DYNLIBS5)
 
 pics/%.o:= ASFLAGS += $(AS_PICFLAGS) -DPIC
 pics/%.o:= CPPFLAGS += $(C_PICFLAGS) -DPIC
-s5pics/%.o:= ASFLAGS += $(AS_PICFLAGS) -DPIC
 DYNFLAGS += $(ZINTERPOSE)
 
 BUILD.s=  $(AS) $(ASFLAGS) $< -o $@
@@ -382,6 +387,10 @@ CLOBBERFILES= ../libc/compat/sys5/mkepoch
 
 # conditional assignments
 s5pics/%.o:= CPPFLAGS = -Dsparc -DS5EMUL $(C_PICFLAGS) -DPIC -I. -Iinc \
+	-I../inc/5include -I../inc/include -I../inc/include/sys \
+	$(CPPFLAGS.master)
+s5pics/%.o:= ASFLAGS = -P -D__STDC__ -DLOCORE -D_SYS_SYS_S -D_ASM \
+	-Dsparc -DS5EMUL $(AS_PICFLAGS) -DPIC -I. -Iinc \
 	-I../inc/5include -I../inc/include -I../inc/include/sys \
 	$(CPPFLAGS.master)
 

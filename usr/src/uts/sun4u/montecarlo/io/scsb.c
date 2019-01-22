@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2019 Peter Tribble.
  */
 
 /*
@@ -110,7 +111,7 @@ static	char	*scsb_build_version = SCSB_BUILD_VERSION;
  * cb_ops section of scsb driver.
  */
 static	int	sm_open(queue_t *, dev_t *, int, int, cred_t *);
-static	int	sm_close(queue_t *, int, int, cred_t *);
+static	int	sm_close(queue_t *, int, cred_t *);
 
 static	int	sm_rput(queue_t *, mblk_t *);	/* from i2c below */
 static	int	sm_wput(queue_t *, mblk_t *);	/* from above */
@@ -1202,7 +1203,7 @@ sm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 /*ARGSUSED*/
 static int
-sm_close(queue_t *q, int flag, int otyp, cred_t *credp)
+sm_close(queue_t *q, int flag, cred_t *credp)
 {
 	scsb_state_t	*scsb;
 	int		clone;

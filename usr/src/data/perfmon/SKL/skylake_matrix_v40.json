@@ -1,0 +1,492 @@
+[
+  {
+    "MATRIX_REQUEST": "DEMAND_DATA_RD",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0001 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts demand data reads"
+  },
+  {
+    "MATRIX_REQUEST": "DEMAND_RFO",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts all demand data writes (RFOs)"
+  },
+  {
+    "MATRIX_REQUEST": "DEMAND_CODE_RD",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x0004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts all demand code reads"
+  },
+  {
+    "MATRIX_REQUEST": "OTHER",
+    "MATRIX_RESPONSE": "Null",
+    "MATRIX_VALUE": "0x8000 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "Counts any other requests"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "ANY_RESPONSE",
+    "MATRIX_VALUE": "0x000001 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "have any response type."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "SUPPLIER_NONE.SPL_HIT",
+    "MATRIX_VALUE": "0x004002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "SUPPLIER_NONE.SNOOP_NONE",
+    "MATRIX_VALUE": "0x008002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "SUPPLIER_NONE.SNOOP_NOT_NEEDED",
+    "MATRIX_VALUE": "0x010002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "SUPPLIER_NONE.SNOOP_MISS",
+    "MATRIX_VALUE": "0x020002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "SUPPLIER_NONE.SNOOP_HIT_NO_FWD",
+    "MATRIX_VALUE": "0x040002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "SUPPLIER_NONE.SNOOP_HITM",
+    "MATRIX_VALUE": "0x100002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "SUPPLIER_NONE.SNOOP_NON_DRAM",
+    "MATRIX_VALUE": "0x200002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "SUPPLIER_NONE.ANY_SNOOP",
+    "MATRIX_VALUE": "0x3fc002 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_M.SPL_HIT",
+    "MATRIX_VALUE": "0x004004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_M.SNOOP_NONE",
+    "MATRIX_VALUE": "0x008004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_M.SNOOP_NOT_NEEDED",
+    "MATRIX_VALUE": "0x010004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_M.SNOOP_MISS",
+    "MATRIX_VALUE": "0x020004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_M.SNOOP_HIT_NO_FWD",
+    "MATRIX_VALUE": "0x040004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_M.SNOOP_HITM",
+    "MATRIX_VALUE": "0x100004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_M.SNOOP_NON_DRAM",
+    "MATRIX_VALUE": "0x200004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_M.ANY_SNOOP",
+    "MATRIX_VALUE": "0x3fc004 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_E.SPL_HIT",
+    "MATRIX_VALUE": "0x004008 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_E.SNOOP_NONE",
+    "MATRIX_VALUE": "0x008008 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_E.SNOOP_NOT_NEEDED",
+    "MATRIX_VALUE": "0x010008 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_E.SNOOP_MISS",
+    "MATRIX_VALUE": "0x020008 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_E.SNOOP_HIT_NO_FWD",
+    "MATRIX_VALUE": "0x040008 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_E.SNOOP_HITM",
+    "MATRIX_VALUE": "0x100008 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_E.SNOOP_NON_DRAM",
+    "MATRIX_VALUE": "0x200008 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_E.ANY_SNOOP",
+    "MATRIX_VALUE": "0x3fc008 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_S.SPL_HIT",
+    "MATRIX_VALUE": "0x004010 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_S.SNOOP_NONE",
+    "MATRIX_VALUE": "0x008010 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_S.SNOOP_NOT_NEEDED",
+    "MATRIX_VALUE": "0x010010 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_S.SNOOP_MISS",
+    "MATRIX_VALUE": "0x020010 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_S.SNOOP_HIT_NO_FWD",
+    "MATRIX_VALUE": "0x040010 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_S.SNOOP_HITM",
+    "MATRIX_VALUE": "0x100010 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_S.SNOOP_NON_DRAM",
+    "MATRIX_VALUE": "0x200010 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT_S.ANY_SNOOP",
+    "MATRIX_VALUE": "0x3fc010 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.SPL_HIT",
+    "MATRIX_VALUE": "0x00401c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.SNOOP_NONE",
+    "MATRIX_VALUE": "0x00801c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.SNOOP_NOT_NEEDED",
+    "MATRIX_VALUE": "0x01001c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "hit in the L3 and sibling core snoops are not needed as either the core-valid bit is not set or the shared line is present in multiple cores."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.SNOOP_MISS",
+    "MATRIX_VALUE": "0x02001c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "hit in the L3 and the snoops sent to sibling cores return clean response."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.SNOOP_HIT_NO_FWD",
+    "MATRIX_VALUE": "0x04001c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded."
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.SNOOP_HITM",
+    "MATRIX_VALUE": "0x10001c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.SNOOP_NON_DRAM",
+    "MATRIX_VALUE": "0x20001c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_HIT.ANY_SNOOP",
+    "MATRIX_VALUE": "0x3fc01c ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.SPL_HIT",
+    "MATRIX_VALUE": "0x004040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.SNOOP_NONE",
+    "MATRIX_VALUE": "0x008040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.SNOOP_NOT_NEEDED",
+    "MATRIX_VALUE": "0x010040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.SNOOP_MISS",
+    "MATRIX_VALUE": "0x020040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.SNOOP_HIT_NO_FWD",
+    "MATRIX_VALUE": "0x040040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.SNOOP_HIT_WITH_FWD",
+    "MATRIX_VALUE": "0x080040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.SNOOP_HITM",
+    "MATRIX_VALUE": "0x100040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.SNOOP_NON_DRAM",
+    "MATRIX_VALUE": "0x200040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L4_HIT_LOCAL_L4.ANY_SNOOP",
+    "MATRIX_VALUE": "0x3fc040 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS_LOCAL_DRAM.SPL_HIT",
+    "MATRIX_VALUE": "0x004400 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS_LOCAL_DRAM.SNOOP_NONE",
+    "MATRIX_VALUE": "0x008400 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS_LOCAL_DRAM.SNOOP_NOT_NEEDED",
+    "MATRIX_VALUE": "0x010400 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS_LOCAL_DRAM.SNOOP_MISS",
+    "MATRIX_VALUE": "0x020400 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS_LOCAL_DRAM.SNOOP_HIT_NO_FWD",
+    "MATRIX_VALUE": "0x040400 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS_LOCAL_DRAM.SNOOP_HITM",
+    "MATRIX_VALUE": "0x100400 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS_LOCAL_DRAM.SNOOP_NON_DRAM",
+    "MATRIX_VALUE": "0x200400 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS_LOCAL_DRAM.ANY_SNOOP",
+    "MATRIX_VALUE": "0x3fc400 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS.SPL_HIT",
+    "MATRIX_VALUE": "0x007c00 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS.SNOOP_NONE",
+    "MATRIX_VALUE": "0x00bc00 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS.SNOOP_NOT_NEEDED",
+    "MATRIX_VALUE": "0x013c00 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS.SNOOP_MISS",
+    "MATRIX_VALUE": "0x023c00 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS.SNOOP_HIT_NO_FWD",
+    "MATRIX_VALUE": "0x043c00 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS.SNOOP_HITM",
+    "MATRIX_VALUE": "0x103c00 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS.SNOOP_NON_DRAM",
+    "MATRIX_VALUE": "0x203c00 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  },
+  {
+    "MATRIX_REQUEST": "Null",
+    "MATRIX_RESPONSE": "L3_MISS.ANY_SNOOP",
+    "MATRIX_VALUE": "0x3ffc00 ",
+    "MATRIX_REGISTER": "0,1",
+    "DESCRIPTION": "tbd"
+  }
+]

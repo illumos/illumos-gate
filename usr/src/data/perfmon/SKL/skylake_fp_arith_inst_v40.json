@@ -1,0 +1,38 @@
+[
+  {
+    "BitName": "SCALAR_DOUBLE",
+    "BitIndex": "0",
+    "FlopsMultiplier": "1",
+    "Description": "Number of SSE/AVX computational scalar double precision floating-point instructions retired. Each count represents 1 computation. Applies to SSE* and AVX* scalar double precision floating-point instructions: ADD SUB MUL DIV MIN MAX SQRT FM(N)ADD/SUB.  FM(N)ADD/SUB instructions count twice as they perform multiple calculations per element."
+  },
+  {
+    "BitName": "SCALAR_SINGLE",
+    "BitIndex": "1",
+    "FlopsMultiplier": "1",
+    "Description": "Number of SSE/AVX computational scalar single precision floating-point instructions retired. Each count represents 1 computation. Applies to SSE* and AVX* scalar single precision floating-point instructions: ADD SUB MUL DIV MIN MAX RCP RSQRT SQRT FM(N)ADD/SUB.  FM(N)ADD/SUB instructions count twice as they perform multiple calculations per element."
+  },
+  {
+    "BitName": "128BIT_PACKED_DOUBLE",
+    "BitIndex": "2",
+    "FlopsMultiplier": "2",
+    "Description": "Number of SSE/AVX computational 128-bit packed double precision floating-point instructions retired. Each count represents 2 computations. Applies to SSE* and AVX* packed double precision floating-point instructions: ADD SUB MUL DIV MIN MAX SQRT DPP FM(N)ADD/SUB.  DPP and FM(N)ADD/SUB instructions count twice as they perform multiple calculations per element."
+  },
+  {
+    "BitName": "128BIT_PACKED_SINGLE",
+    "BitIndex": "3",
+    "FlopsMultiplier": "4",
+    "Description": "Number of SSE/AVX computational 128-bit packed single precision floating-point instructions retired. Each count represents 4 computations. Applies to SSE* and AVX* packed single precision floating-point instructions: ADD SUB MUL DIV MIN MAX RCP RSQRT SQRT DPP FM(N)ADD/SUB.  DPP and FM(N)ADD/SUB instructions count twice as they perform multiple calculations per element."
+  },
+  {
+    "BitName": "256BIT_PACKED_DOUBLE",
+    "BitIndex": "4",
+    "FlopsMultiplier": "4",
+    "Description": "Number of SSE/AVX computational 256-bit packed double precision floating-point instructions retired. Each count represents 4 computations. Applies to SSE* and AVX* packed double precision floating-point instructions: ADD SUB MUL DIV MIN MAX SQRT DPP FM(N)ADD/SUB.  DPP and FM(N)ADD/SUB instructions count twice as they perform multiple calculations per element."
+  },
+  {
+    "BitName": "256BIT_PACKED_SINGLE",
+    "BitIndex": "5",
+    "FlopsMultiplier": "8",
+    "Description": "Number of SSE/AVX computational 256-bit packed single precision floating-point instructions retired. Each count represents 8 computations. Applies to SSE* and AVX* packed single precision floating-point instructions: ADD SUB MUL DIV MIN MAX RCP RSQRT SQRT DPP FM(N)ADD/SUB.  DPP and FM(N)ADD/SUB instructions count twice as they perform multiple calculations per element."
+  }
+]
