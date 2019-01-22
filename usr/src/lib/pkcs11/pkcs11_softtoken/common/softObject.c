@@ -239,7 +239,7 @@ C_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 	/* Obtain the session handle which object belongs to. */
 	creating_session = object_p->session_handle;
 
-	if (creating_session == NULL) {
+	if (creating_session == 0) {
 		/*
 		 * This is a token object to be deleted.
 		 * For token object, there is no creating session concept,
