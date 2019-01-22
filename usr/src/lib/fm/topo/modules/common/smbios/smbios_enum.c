@@ -153,7 +153,7 @@ smbios_make_slot(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 		return (NULL);
 	}
 	if (topo_node_fru(smed->sme_pnode, &fmri, NULL, &err) != 0 ||
-	    topo_node_fru_set(slotnode, fmri, NULL, &err) != 0) {
+	    topo_node_fru_set(slotnode, fmri, 0, &err) != 0) {
 		topo_mod_dprintf(mod, "failed to set FRU on %s=%d: %s", SLOT,
 		    smed->sme_slot_inst, topo_strerror(err));
 		nvlist_free(fmri);
@@ -262,7 +262,7 @@ smbios_make_dimm(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 	topo_pgroup_hcset(dimmnode, auth);
 	nvlist_free(auth);
 
-	if (topo_node_fru_set(dimmnode, fmri, NULL, &err) != 0) {
+	if (topo_node_fru_set(dimmnode, fmri, 0, &err) != 0) {
 		topo_mod_dprintf(mod, "failed to set FRU on %s: %s",
 		    DIMM, topo_strerror(err));
 		nvlist_free(fmri);
@@ -487,7 +487,7 @@ smbios_enum_motherboard(smbios_hdl_t *shp, smb_enum_data_t *smed)
 	topo_pgroup_hcset(mbnode, auth);
 	nvlist_free(auth);
 
-	if (topo_node_fru_set(mbnode, fmri, NULL, &err) != 0) {
+	if (topo_node_fru_set(mbnode, fmri, 0, &err) != 0) {
 		topo_mod_dprintf(mod, "failed to set FRU on %s: %s",
 		    MOTHERBOARD, topo_strerror(err));
 		nvlist_free(fmri);
