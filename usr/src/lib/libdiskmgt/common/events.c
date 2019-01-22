@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stropts.h>
@@ -151,7 +149,7 @@ dm_init_event_queue(void (*cb)(nvlist_t *, int), int *errp)
 		    /* installing a cb; we didn't have one before */
 		    thread_t watch_thread;
 
-		    *errp = thr_create(NULL, NULL,
+		    *errp = thr_create(NULL, 0,
 			(void *(*)(void *))cb_watch_events, NULL, THR_DAEMON,
 			&watch_thread);
 		}
@@ -171,7 +169,7 @@ dm_init_event_queue(void (*cb)(nvlist_t *, int), int *errp)
 
 		callback = cb;
 
-		*errp = thr_create(NULL, NULL,
+		*errp = thr_create(NULL, 0,
 		    (void *(*)(void *))cb_watch_events, NULL, THR_DAEMON,
 		    &watch_thread);
 	    }
@@ -445,7 +443,7 @@ walk_devtree()
 
 	switch (walker_state) {
 	case WALK_NONE:
-	    if (thr_create(NULL, NULL, (void *(*)(void *))walker, NULL,
+	    if (thr_create(NULL, 0, (void *(*)(void *))walker, NULL,
 		THR_DAEMON, &walk_thread) == 0) {
 		walker_state = WALK_WAITING;
 	    }

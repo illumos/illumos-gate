@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Creates and maintains a cache of mount points.
  */
@@ -91,7 +89,7 @@ inuse_mnt(char *slice, nvlist_t *attrs, int *errp)
 
 	    if (*errp == 0) {
 		/* start a thread to monitor the mnttab */
-		*errp = thr_create(NULL, NULL, (void *(*)(void *))watch_mnttab,
+		*errp = thr_create(NULL, 0, (void *(*)(void *))watch_mnttab,
 		    NULL, THR_NEW_LWP | THR_DAEMON, &mnttab_thread);
 	    }
 

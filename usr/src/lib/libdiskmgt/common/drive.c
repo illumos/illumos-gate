@@ -973,7 +973,7 @@ get_disk_kstats(kstat_ctl_t *kc, char *diskname, char *classname,
 		while (*ename && *ename != ',') {
 		    *dname++ = *ename++;
 		}
-		*dname = NULL;
+		*dname = '\0';
 
 		if (libdiskmgt_str_eq(diskname, kstat_name)) {
 		    (void) kstat_read(kc, ksp, NULL);
