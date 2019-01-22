@@ -119,8 +119,7 @@ audit_allocate_record(status)
 	else
 		event = s_audit;
 
-	if (au_preselect(event, &mask.ai_mask, AU_PRS_BOTH, AU_PRS_REREAD)
-		== NULL)
+	if (au_preselect(event, &mask.ai_mask, AU_PRS_BOTH, AU_PRS_REREAD) == 0)
 		return (0);
 
 	(void) au_write(ad, au_to_me());	/* add subject token */

@@ -680,7 +680,7 @@ getdmapfield(char *ptr)
 	ptr = trim_white(ptr);
 	if (ptr == NULL)
 		return (NULL);
-	if (*ptr == NULL)
+	if (*ptr == '\0')
 		return (NULL);
 
 	return (ptr);
@@ -700,7 +700,7 @@ getdmapdfield(char *ptr)
 	tptr = dmapdskip(ptr);
 	if (ptr == NULL)
 		return (NULL);
-	if (*ptr == NULL)
+	if (*ptr == '\0')
 		return (NULL);
 
 	return (ptr);
