@@ -29,6 +29,7 @@
 # Copyright 2017 RackTop Systems.
 # Copyright 2019, Joyent, Inc.
 # Copyright 2018 Jason King
+# Copyright 2019 Peter Tribble
 #
 
 #
@@ -1017,4 +1018,5 @@ lib/llib-lcustr.ln
 # smatch is delivered and used only with the source tree
 #
 opt/onbld/bin/i386/smatch	i386
-opt/onbld/share/smatch		i386
+opt/onbld/bin/sparc/smatch	sparc
+opt/onbld/share/smatch
