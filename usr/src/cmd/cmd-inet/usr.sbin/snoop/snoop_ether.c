@@ -98,7 +98,7 @@ interface_t INTERFACES[] = {
 	{ DL_6TO4, 0, 9, 1, IPPROTO_ENCAP, IPPROTO_IPV6,
 	    ipv4_header_len, interpret_iptun, B_FALSE },
 
-	{ (uint_t)-1, 0, 0, 0, 0, NULL, NULL, B_FALSE }
+	{ (uint_t)-1, 0, 0, 0, 0, 0, NULL, B_FALSE }
 };
 
 /* externals */

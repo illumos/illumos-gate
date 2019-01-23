@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 1988, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -662,7 +660,7 @@ mklist(buf, name)
 	*argv = 0;
 	argvp = argv+1;
 	n = 0;
-	for (cp = cp2 = buf; (c = *cp) != NULL;  cp++) {
+	for (cp = cp2 = buf; (c = *cp) != '\0';  cp++) {
 		if (c == '|' || c == ':') {
 			*cp++ = '\0';
 			/*
@@ -1673,7 +1671,7 @@ env_opt_add(ep)
 	else
 		*opt_replyp++ = ENV_USERVAR;
 	for (;;) {
-		while ((c = *ep++) != NULL) {
+		while ((c = *ep++) != '\0') {
 			switch (c&0xff) {
 			case IAC:
 				*opt_replyp++ = IAC;

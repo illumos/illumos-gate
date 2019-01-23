@@ -3096,7 +3096,7 @@ int ifindex)
 	/* truncate any logical suffix */
 
 	if ((cp = strchr(lr->lifr_name, '@')) != NULL) {
-		*cp = NULL;
+		*cp = '\0';
 	}
 
 	/* print interface name */
@@ -4265,8 +4265,8 @@ int *upper)
 		*upper = (int)strtol(cp, &end2, 10);
 		SKIPWS(end);
 		SKIPWS(end2);
-		if ((range_st == end) || (*end != NULL) ||
-		    (cp == end) || (*end2 != NULL)) {
+		if ((range_st == end) || (*end != '\0') ||
+		    (cp == end) || (*end2 != '\0')) {
 			IPQOSCDBG0(L0, "Failed reading a-b\n");
 			return (IPQOS_CONF_ERR);
 		}
@@ -4275,7 +4275,7 @@ int *upper)
 
 		*lower = *upper = (int)strtol(range_st, &end, 10);
 		SKIPWS(end);
-		if ((range_st == end) || (*end != NULL)) {
+		if ((range_st == end) || (*end != '\0')) {
 			IPQOSCDBG0(L0, "Failed reading a\n");
 			return (IPQOS_CONF_ERR);
 		}
@@ -4405,7 +4405,7 @@ str_val_nd_t *enum_nvs)
 		} else {
 			value = (int)strtol(svalue, &end, 10);
 			SKIPWS(end);
-			if ((svalue == end) || (*end != NULL)) {
+			if ((svalue == end) || (*end != '\0')) {
 				IPQOSCDBG0(L0, "Invalid value\n");
 				goto array_err;
 			}
@@ -4971,7 +4971,7 @@ read_enum_nvs(char *line, char *module_name)
 			goto fail;
 		}
 		bcopy(start, name, len);
-		name[len] = NULL;
+		name[len] = '\0';
 		IPQOSCDBG1(L0, "Stored name: %s\n", name);
 
 		/* read assignment */
@@ -5190,7 +5190,7 @@ char *module)
 	token = strtok(info_str, ",");
 	*size = (uint32_t)strtol(token, &end, 10);
 	SKIPWS(end);
-	if ((end == token) || (*end != NULL)) {
+	if ((end == token) || (*end != '\0')) {
 		IPQOSCDBG0(L0, "Invalid size\n");
 		goto fail;
 	}
@@ -9326,7 +9326,7 @@ char *dstpath)
 	/* not pwd or root */
 
 	} else {
-		*pathend = NULL;
+		*pathend = '\0';
 		tmppath = malloc(strlen(dstpath) + strlen("/ipqosconf.tmp") +
 		    1);
 		if (tmppath == NULL) {

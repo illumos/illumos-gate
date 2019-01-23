@@ -271,7 +271,7 @@ main(int argc, char *argv[])
 	/*
 	 * Start delayed processing thread.
 	 */
-	(void) thr_create(NULL, NULL, (void *(*)(void *))do_delay_write, NULL,
+	(void) thr_create(NULL, 0, (void *(*)(void *))do_delay_write, NULL,
 	    THR_NEW_LWP, NULL);
 
 	/*
@@ -279,7 +279,7 @@ main(int argc, char *argv[])
 	 */
 	for (rdev = rarpdev_head; rdev != NULL; rdev = rdev->next) {
 		if (rdev->dh_rarp != NULL) {
-			(void) thr_create(NULL, NULL,
+			(void) thr_create(NULL, 0,
 			    (void *(*)(void *))do_rarp, (void *)rdev,
 			    THR_NEW_LWP, NULL);
 		}

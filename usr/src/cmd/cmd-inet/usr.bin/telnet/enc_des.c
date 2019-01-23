@@ -3,8 +3,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * usr/src/cmd/cmd-inet/usr.bin/telnet/enc_des.c
  */
@@ -126,7 +124,7 @@ ecb_encrypt(struct stinfo *stp, Block in, Block out)
 	/* this is a kerberos enctype, not a telopt enctype */
 	dout.enctype = ENCTYPE_UNKNOWN;
 
-	code = krb5_c_encrypt(telnet_context, &stp->str_key, NULL, NULL,
+	code = krb5_c_encrypt(telnet_context, &stp->str_key, 0, NULL,
 		&din, &dout);
 	if (code)
 		(void) fprintf(stderr, gettext(

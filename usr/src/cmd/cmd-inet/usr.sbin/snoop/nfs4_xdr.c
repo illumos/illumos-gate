@@ -1991,7 +1991,7 @@ xdr_entry4(register XDR *xdrs, entry4 *objp)
 
 			objp->nextentry = (entry4 *)mem_alloc(sizeof (entry4));
 			if (objp->nextentry == NULL)
-				return (NULL);
+				return (FALSE);
 			bzero(objp->nextentry, sizeof (entry4));
 			objp = objp->nextentry;
 

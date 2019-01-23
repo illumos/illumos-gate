@@ -603,7 +603,7 @@ CPL_MATCH_FN(cmd_cpl_fn)
 		return (add_stuff(cpl, line, ncp_scope_cmds, word_end));
 	}
 	/* should never get here */
-	return (NULL);
+	return (0);
 }
 
 const char *

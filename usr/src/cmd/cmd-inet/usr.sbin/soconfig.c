@@ -268,27 +268,27 @@ split_line(char *line, char *argvec[], int maxargvec)
 	/* Truncate at the beginning of a comment */
 	cp = strchr(line, '#');
 	if (cp != NULL)
-		*cp = NULL;
+		*cp = '\0';
 
 	/* CONSTCOND */
 	while (1) {
 		/* Skip any whitespace */
-		while (isspace(*line) && *line != NULL)
+		while (isspace(*line))
 			line++;
 
 		if (i >= maxargvec)
 			return (i);
 
 		argvec[i] = line;
-		if (*line == NULL)
+		if (*line == '\0')
 			return (i);
 		i++;
 		/* Skip until next whitespace */
-		while (!isspace(*line) && *line != NULL)
+		while (!isspace(*line) && *line != '\0')
 			line++;
-		if (*line != NULL) {
+		if (*line != '\0') {
 			/* Break off argument */
-			*line++ = NULL;
+			*line++ = '\0';
 		}
 	}
 	/* NOTREACHED */

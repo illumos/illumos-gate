@@ -164,7 +164,7 @@ reservedport(int proto, int port)
 	switch (proto) {
 	case IPPROTO_TCP: pt = pt_tcp; break;
 	case IPPROTO_UDP: pt = pt_udp; break;
-	default: return (NULL);
+	default: return (0);
 	}
 	for (p = pt; p->pt_num; p++) {
 		if (port == p->pt_num)

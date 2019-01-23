@@ -3517,7 +3517,7 @@ dhcp_walk_interfaces(int af, boolean_t printed_one)
 		if (ioctl(sock_fd, SIOCGLIFCONF, &lifc) == -1) {
 			(void) close(sock_fd);
 			free(lifc.lifc_buf);
-			return (NULL);
+			return (B_FALSE);
 		}
 
 		n_ifs = lifc.lifc_len / sizeof (struct lifreq);

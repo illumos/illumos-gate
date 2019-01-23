@@ -541,8 +541,8 @@ static struct toktable {
 	{"nat_rport",		TOK_NATRPORT,		NEXTNUM},
 	{"encap",		TOK_ENCAP,		NEXTNUMSTR},
 
-	{"outbound",		TOK_FLAG_OUTBOUND,	NULL},
-	{"inbound",		TOK_FLAG_INBOUND,	NULL},
+	{"outbound",		TOK_FLAG_OUTBOUND,	0},
+	{"inbound",		TOK_FLAG_INBOUND,	0},
 
 	{"reserved_bits",	TOK_RESERVED,		NEXTNUM},
 	{"replay_value",	TOK_REPLAY_VALUE,	NEXTNUM},

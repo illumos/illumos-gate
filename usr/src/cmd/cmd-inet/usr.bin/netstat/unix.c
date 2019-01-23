@@ -235,7 +235,7 @@ nextstr(char *pas)
 {
 	char *next;
 
-	for (next = &pas[strlen(pas) + 1]; *next == NULL; ) {
+	for (next = &pas[strlen(pas) + 1]; *next == '\0'; ) {
 		next++;
 	}
 

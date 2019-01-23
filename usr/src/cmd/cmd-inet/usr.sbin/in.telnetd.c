@@ -922,7 +922,7 @@ auth_is(uchar_t *data, int cnt)
 		return;
 	}
 
-	while (aptr->AuthName != NULL &&
+	while (aptr->AuthName != 0 &&
 	    (aptr->AuthName != data[0] || aptr->AuthHow != data[1]))
 		aptr++;
 
@@ -1117,7 +1117,7 @@ encrypt_is(uchar_t *data, int cnt)
 		break;
 	default:
 		iv_status = CFB64_IV_BAD;
-		encr_data.decrypt.type = NULL;
+		encr_data.decrypt.type = 0;
 		if (enc_debug)
 			(void) fprintf(stderr,
 				    "\t(encrypt_is) Can't find type (%d) "

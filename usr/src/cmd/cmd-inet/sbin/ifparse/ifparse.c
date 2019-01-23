@@ -435,7 +435,7 @@ ifparse(int argc, char *argv[], struct afswtch *afp)
 		return (0);
 
 	if (strcmp(*argv, "auto-dhcp") == 0 || strcmp(*argv, "dhcp") == 0) {
-		if ((parsemode & PARSEFIXED) != NULL) {
+		if ((parsemode & PARSEFIXED) != 0) {
 			while (argc) {
 				(void) fputs(*argv++, stdout);
 				if (--argc != 0)
