@@ -24,7 +24,7 @@
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  */
 
@@ -371,8 +371,14 @@ typedef int zio_pipe_stage_t(zio_t *zio);
  * the reexecute flags are protected by io_lock, modifiable by children,
  * and always propagated -- even when ZIO_FLAG_DONT_PROPAGATE is set.
  */
-#define	ZIO_REEXECUTE_NOW	0x01
-#define	ZIO_REEXECUTE_SUSPEND	0x02
+#define	ZIO_REEXECUTE_NOW		0x01
+#define	ZIO_REEXECUTE_SUSPEND		0x02
+#define	ZIO_REEXECUTE_NO_SUSPEND	0x04
+
+#define	ZIO_SHOULD_REEXECUTE(x)		\
+	((x)->io_reexecute & ZIO_REEXECUTE_NOW || \
+	((x)->io_reexecute & ZIO_REEXECUTE_SUSPEND && \
+	(((x)->io_reexecute & ZIO_REEXECUTE_NO_SUSPEND) == 0)))
 
 typedef struct zio_alloc_list {
 	list_t  zal_list;

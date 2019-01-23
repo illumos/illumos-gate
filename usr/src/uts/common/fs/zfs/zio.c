@@ -24,6 +24,7 @@
  * Copyright (c) 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright (c) 2019 Joyent, Inc.
  */
 
 #include <sys/sysmacros.h>
@@ -3774,6 +3775,24 @@ zio_done(zio_t *zio)
 		}
 	}
 
+	/*
+	 * When we have an error on a slog vdev, we must ensure that the
+	 * zio is not suspended. Suspending the zio will cause dataset deletion
+	 * or an attempt to remove the slog to hang. In both cases, the code
+	 * might be trying to clean up the zil blocks on the slog, but because
+	 * the slog is dead, the suspended zio causes this to hang indefinitely.
+	 * The system properly switches over to using zils on regular storage
+	 * when the slog dies.
+	 *
+	 * This is a reasonable point in the stack to detect that the vdev is
+	 * a slog. The 'no_suspend' flag will propagate up to the logical zio
+	 * via zio_notify_parent.
+	 */
+	if (zio->io_error && vd != NULL && vd->vdev_islog &&
+	    !vdev_accessible(vd, zio)) {
+		zio->io_reexecute |= ZIO_REEXECUTE_NO_SUSPEND;
+	}
+
 	if (zio->io_error && zio == lio) {
 		/*
 		 * Determine whether zio should be reexecuted.  This will
@@ -3818,7 +3837,7 @@ zio_done(zio_t *zio)
 	 */
 	zio_inherit_child_errors(zio, ZIO_CHILD_LOGICAL);
 
-	if ((zio->io_error || zio->io_reexecute) &&
+	if ((zio->io_error || ZIO_SHOULD_REEXECUTE(zio)) &&
 	    IO_IS_ALLOCATING(zio) && zio->io_gang_leader == zio &&
 	    !(zio->io_flags & (ZIO_FLAG_IO_REWRITE | ZIO_FLAG_NOPWRITE)))
 		zio_dva_unallocate(zio, zio->io_gang_tree, bp);
@@ -3832,7 +3851,7 @@ zio_done(zio_t *zio)
 	    (zio->io_reexecute & ZIO_REEXECUTE_SUSPEND))
 		zio->io_reexecute = 0;
 
-	if (zio->io_reexecute) {
+	if (ZIO_SHOULD_REEXECUTE(zio)) {
 		/*
 		 * This is a logical I/O that wants to reexecute.
 		 *
@@ -3903,7 +3922,7 @@ zio_done(zio_t *zio)
 	}
 
 	ASSERT(zio->io_child_count == 0);
-	ASSERT(zio->io_reexecute == 0);
+	ASSERT(!ZIO_SHOULD_REEXECUTE(zio));
 	ASSERT(zio->io_error == 0 || (zio->io_flags & ZIO_FLAG_CANFAIL));
 
 	/*
