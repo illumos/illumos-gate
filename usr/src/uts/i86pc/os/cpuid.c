@@ -1984,6 +1984,7 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 		 */
 		switch (cpi->cpi_vendor) {
 		case X86_VENDOR_Intel:
+		case X86_VENDOR_AMD:
 			if (cpi->cpi_maxeax >= 7) {
 				cp = &cpi->cpi_extd[7];
 				cp->cp_eax = 0x80000007;
@@ -3882,9 +3883,9 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	 */
 	if (cpi->cpi_vendor != X86_VENDOR_AMD ||
 	    cpi->cpi_family == 4 || cpi->cpi_family == 5 ||
-	    cpi->cpi_family == 6)
-
+	    cpi->cpi_family == 6) {
 		return (0);
+	}
 
 	eax = cpi->cpi_std[1].cp_eax;
 
@@ -4045,10 +4046,21 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 131:
 		return (cpi->cpi_family < 0x10);
 	case 6336786:
+
 		/*
 		 * Test for AdvPowerMgmtInfo.TscPStateInvariant
-		 * if this is a K8 family or newer processor
+		 * if this is a K8 family or newer processor. We're testing for
+		 * this 'erratum' to determine whether or not we have a constant
+		 * TSC.
+		 *
+		 * Our current fix for this is to disable the C1-Clock ramping.
+		 * However, this doesn't work on newer processor families nor
+		 * does it work when virtualized as those devices don't exist.
 		 */
+		if (cpi->cpi_family >= 0x12 || get_hwenv() != HW_NATIVE) {
+			return (0);
+		}
+
 		if (CPI_FAMILY(cpi) == 0xf) {
 			struct cpuid_regs regs;
 			regs.cp_eax = 0x80000007;
@@ -4057,6 +4069,12 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 		}
 		return (0);
 	case 6323525:
+		/*
+		 * This erratum (K8 #147) is not present on family 10 and newer.
+		 */
+		if (cpi->cpi_family >= 0x10) {
+			return (0);
+		}
 		return (((((eax >> 12) & 0xff00) + (eax & 0xf00)) |
 		    (((eax >> 4) & 0xf) | ((eax >> 12) & 0xf0))) < 0xf40);
 

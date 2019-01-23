@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -1121,6 +1121,9 @@ workaround_errata(struct cpu *cpu)
 	/*
 	 * This isn't really an erratum, but for convenience the
 	 * detection/workaround code lives here and in cpuid_opteron_erratum.
+	 * Note, the technique only is valid on families before 12h and
+	 * certainly doesn't work when we're virtualized. This is checked for in
+	 * the erratum workaround.
 	 */
 	if (cpuid_opteron_erratum(cpu, 6336786) > 0) {
 #if defined(OPTERON_WORKAROUND_6336786)
@@ -1171,7 +1174,9 @@ workaround_errata(struct cpu *cpu)
 
 	/*LINTED*/
 	/*
-	 * Mutex primitives don't work as expected.
+	 * Mutex primitives don't work as expected. This is erratum #147 from
+	 * 'Revision Guide for AMD Athlon 64 and AMD Opteron Processors'
+	 * document 25759.
 	 */
 	if (cpuid_opteron_erratum(cpu, 6323525) > 0) {
 #if defined(OPTERON_WORKAROUND_6323525)
