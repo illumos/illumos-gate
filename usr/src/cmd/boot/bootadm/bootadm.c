@@ -1034,13 +1034,13 @@ list_setting(menu_t *mp, char *which, char *setting)
 	assert(which);
 	assert(setting);
 
-	if (*which != NULL) {
+	if (*which != '\0') {
 		/*
 		 * If "which" is not a number, assume it's a setting we want
 		 * to look for and so set up the routine to look for "which"
 		 * in the default entry.
 		 */
-		while (*p != NULL)
+		while (*p != '\0')
 			if (!(isdigit((int)*p++))) {
 				setting = which;
 				which = mp->curdefault->arg;
@@ -1061,10 +1061,10 @@ list_setting(menu_t *mp, char *which, char *setting)
 		return (BAM_ERROR);
 	}
 
-	found = (*setting == NULL);
+	found = (*setting == '\0');
 
 	for (lp = ent->start; lp != NULL; lp = lp->next) {
-		if ((*setting == NULL) && (lp->flags != BAM_COMMENT))
+		if ((*setting == '\0') && (lp->flags != BAM_COMMENT))
 			bam_print("%s\n", lp->line);
 		else if (lp->cmd != NULL && strcmp(setting, lp->cmd) == 0) {
 			bam_print("%s\n", lp->arg);

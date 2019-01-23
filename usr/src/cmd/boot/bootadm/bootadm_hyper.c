@@ -35,8 +35,8 @@
 
 #include "bootadm.h"
 
-#define	HYPER_KERNEL_DIR 		"/platform/i86xpv/kernel"
-#define	METAL_KERNEL_DIR 		"/platform/i86pc/kernel"
+#define	HYPER_KERNEL_DIR		"/platform/i86xpv/kernel"
+#define	METAL_KERNEL_DIR		"/platform/i86pc/kernel"
 
 #define	BOOTRC_FILE			"/boot/solaris/bootenv.rc"
 #define	ZFS_BOOTSTR			"$ZFS-BOOTFS"
@@ -72,7 +72,7 @@ append_str(char *orig, char *str, char *delim)
 	if ((str == NULL) || (delim == NULL))
 		return (NULL);
 
-	if ((orig == NULL) || (*orig == NULL)) {
+	if ((orig == NULL) || (*orig == '\0')) {
 		/*
 		 * Return a pointer to a copy of the path so a caller can
 		 * always rely upon being able to free() a returned pointer.
@@ -147,26 +147,26 @@ get_token(char **token, char *str, char *delim)
 
 	*token = NULL;
 
-	if ((str == NULL) || (*str == NULL))
+	if ((str == NULL) || (*str == '\0'))
 		return (NULL);
 
 	do {
 		if ((*str == '\'') || (*str == '"')) {
 			char quote = *str++;
 
-			while ((*str != NULL) && (*str != quote))
+			while ((*str != '\0') && (*str != quote))
 				str++;
 
 			/* no matching quote found in string */
-			if (*str++ == NULL)
+			if (*str++ == '\0')
 				return (NULL);
 		}
 
 		/* look for a character from the delimiter string */
-		for (dp = delim; ((*dp != NULL) && (*dp != *str)); dp++)
+		for (dp = delim; ((*dp != '\0') && (*dp != *str)); dp++)
 			;
 
-		if (*dp != NULL) {
+		if (*dp != '\0') {
 			len = str - start + 1;
 
 			/* found a delimiter, so create a token string */
@@ -183,7 +183,7 @@ get_token(char **token, char *str, char *delim)
 
 			return (str);
 		}
-	} while (*str++ != NULL);
+	} while (*str++ != '\0');
 
 	/* if we hit the end of the string, the token is the whole string  */
 	*token = s_strdup(start);
@@ -338,7 +338,7 @@ cvt_metal_option(char *optstr)
 
 	namlen = value - optstr;
 
-	if (*++value == NULL)
+	if (*++value == '\0')
 		return (1);
 
 	if (strncmp(optstr, "console", namlen) == 0) {
@@ -395,7 +395,7 @@ cvt_hyper_option(char *optstr)
 
 	namlen = value - optstr;
 
-	if (*++value == NULL)
+	if (*++value == '\0')
 		return (1);
 
 	/*
@@ -681,7 +681,7 @@ parse_bootenvrc(char *osroot)
 		int port = 0;
 
 		/* we're only interested in parsing "setprop" directives. */
-		if (strncmp(line, "setprop", 7) != NULL)
+		if (strncmp(line, "setprop", 7) != 0)
 			continue;
 
 		/* eat initial "setprop" */
@@ -913,7 +913,7 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 		}
 	}
 
-	if ((extra_args != NULL) && (*extra_args != NULL)) {
+	if ((extra_args != NULL) && (*extra_args != '\0')) {
 		newstr = append_str(kern_bargs, extra_args, " ");
 		free(kern_bargs);
 		kern_bargs = newstr;
@@ -925,7 +925,7 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	kernel = alloca(len);
 
 	if (kern_bargs != NULL) {
-		if (*kern_bargs != NULL)
+		if (*kern_bargs != '\0')
 			(void) snprintf(kernel, len, "%s%s %s", osroot,
 			    XEN_MENU, kern_bargs);
 
@@ -1003,7 +1003,7 @@ abort:
 	if (ret != BAM_NOCHANGE)
 		bam_error(_("error converting GRUB menu entry on %s for use "
 		    "with the hypervisor.\nAborting.\n"),
-		    ((*osroot == NULL) ? "/" : osroot));
+		    ((*osroot == '\0') ? "/" : osroot));
 
 	return (ret);
 }
