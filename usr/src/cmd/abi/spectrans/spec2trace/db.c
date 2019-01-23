@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * db.c -- the tiny database for trace.  Only stores
  *	global things: see symtab for per-function data.
@@ -74,7 +72,7 @@ db_set_current_library(char const *p)
 	errlog(BEGIN, "db_set_current_library() {");
 	(void) strncpy(Database.Current_Library, p,
 	    sizeof (Database.Current_Library));
-	Database.Current_Library[sizeof (Database.Current_Library) - 1] = NULL;
+	Database.Current_Library[sizeof (Database.Current_Library) - 1] = '\0';
 	errlog(END, "}");
 }
 
@@ -187,7 +185,7 @@ db_get_output_file(void)
 	char	*p, *q;
 
 	errlog(BEGIN, "db_get_output_file() {");
-	if (*Database.Output_File != NULL) {
+	if (*Database.Output_File != '\0') {
 		/* It was set with the -o option */
 		errlog(VERBOSE, "output file from -o = '%s'\n",
 			Database.Output_File);

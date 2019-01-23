@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * trace.c -- a  simple translator from spec source to c source for
@@ -628,8 +626,8 @@ to_basetype(char *str)
 	int	levels = 0;
 
 	assert(strlen(str) < MAXLINE, "string exceeded MAXLINE");
-	buffer[0] = NULL;
-	for (; *p != NULL; p++) {
+	buffer[0] = '\0';
+	for (; *p != '\0'; p++) {
 		switch (*p) {
 		case ' ': /* Convert spaces to single ' '. */
 			if (*(q-1) != ' ')
@@ -652,12 +650,12 @@ to_basetype(char *str)
 			*q++ = *p;
 			break;
 		}
-		*q = NULL;
+		*q = '\0';
 	}
 	assert(q < &buffer[MAXLINE], "q fell off end of buffer");
 	q--;
 	while (*q == ' ') {
-		*q-- = NULL;
+		*q-- = '\0';
 	}
 	assert(strlen(buffer) < MAXLINE, "buffer length exceeded MAXLINE");
 	(void) strcpy(str, buffer);
@@ -675,12 +673,12 @@ to_actual(void)
 	static char buffer[MAXLINE+1];
 	int	n;
 
-	*buffer = NULL;
+	*buffer = '\0';
 	if ((p = symtab_get_first_arg()) != NULL) {
 		n = MAXLINE - snprintf(buffer, MAXLINE, "%s", name_of(p));
 		for (p = symtab_get_next_arg(); p != NULL;
 						p = symtab_get_next_arg()) {
-			if (*name_of(p) != NULL)
+			if (*name_of(p) != '\0')
 				n -= snprintf(strend(buffer), n,
 					", %s", name_of(p));
 		}
@@ -698,7 +696,7 @@ strpqcpy(char *target, char *p, char *q)
 	char	saved;
 
 	saved = *q;
-	*q = NULL;
+	*q = '\0';
 	(void) strcpy(target, p);
 	*q = saved;
 	return (target);

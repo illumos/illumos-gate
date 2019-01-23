@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <string.h>
 #include "parser.h"
@@ -169,7 +167,7 @@ generate_a_binding(char *name, char *value)
 	char	*q;
 
 	errlog(BEGIN, "generate_a_binding() {");
-	if (*value == NULL) {
+	if (*value == '\0') {
 		errlog(FATAL, "programmer error: asked to generate an "
 			"empty binding");
 	}
@@ -191,7 +189,7 @@ generate_a_binding(char *name, char *value)
 
 	/* Walk across line, emitting tokens and transformed tokens */
 
-	for (; *p != NULL; p = q) {
+	for (; *p != '\0'; p = q) {
 		p = skipb(p);
 		q = nextsep(p);
 
@@ -254,7 +252,7 @@ strpqcmp(char *v1, char *p, char *q)
 
 	errlog(BEGIN, "strpqcmp() {");
 	saved = *q;
-	*q = NULL;
+	*q = '\0';
 	rc = (strcmp(v1, p));
 	*q = saved;
 	errlog(END, "}");
@@ -271,7 +269,7 @@ strpqprint(char *p, char *q, FILE *fp)
 
 	errlog(BEGIN, "strpqprint() {");
 	saved = *q;
-	*q = NULL;
+	*q = '\0';
 	(void) fputs(p, fp);
 	*q = saved;
 	errlog(END, "}");

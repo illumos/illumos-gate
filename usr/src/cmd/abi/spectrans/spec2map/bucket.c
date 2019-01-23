@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <malloc.h>
 #include <stdlib.h>
@@ -724,7 +722,7 @@ checksum(const char *p)
 {
 	int sum;
 
-	for (sum = 0; *p != NULL; ++p) {
+	for (sum = 0; *p != '\0'; ++p) {
 		if (sum & 01)
 			sum = (sum >> 1) + 0x8000;
 		else

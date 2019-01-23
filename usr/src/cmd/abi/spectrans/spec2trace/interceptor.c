@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * interceptor.c -- a functional decomposition of generate.c,
  *	the code generator for apptrace
@@ -168,7 +166,7 @@ generate_i_declarations(char *errname, int voidfunc, char *ret_str)
 {
 
 	errlog(BEGIN, "generate_i_declarations() {");
-	if (*errname != NULL) {
+	if (*errname != '\0') {
 		/* Create locals for errno-type variable, */
 		(void) fprintf(Bodyfp,
 		    "    int saved_errvar = %s;\n", errname);
@@ -230,7 +228,7 @@ generate_i_call(
 
 	errlog(BEGIN, "generate_i_call() {");
 	/* Zero the error variable. */
-	if (*error_name != NULL) {
+	if (*error_name != '\0') {
 		(void) fprintf(Bodyfp,  "    %s = 0;\n", error_name);
 	}
 
@@ -246,7 +244,7 @@ generate_i_call(
 	}
 
 	/* Then set the local copy of the error variable. */
-	if (*error_name != NULL) {
+	if (*error_name != '\0') {
 		(void) fprintf(Bodyfp,
 		    "    functions_errvar = %s;\n", error_name);
 	}
@@ -387,7 +385,7 @@ generate_i_closedown(char *error_name, int void_func)
 	(void) fprintf(Bodyfp,
 	    "    abiunlock(&omask);\n");
 
-	if (*error_name != NULL) {
+	if (*error_name != '\0') {
 		/* Restore error variables. */
 		(void) fprintf(Bodyfp,
 		    "    %s = (functions_errvar == 0)? "
