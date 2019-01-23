@@ -28,7 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "stdio.h"
@@ -96,7 +95,7 @@ fdgets(char *buf, int len, int fd)
 	char    tmp;
 	int	count = 0;
 
-	memset(buf, NULL, len);
+	memset(buf, 0, len);
 	while ((count < len) && (Read(fd, &tmp, 1) > 0))
 		if ((buf[count++] = tmp) == '\n') break;
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -254,7 +252,7 @@ ParsePageList(char *list)
 			char *s1 = page, *s2;
 
 			if (s2 = strchr(page, '-')) {
-				*s2++ = NULL;
+				*s2++ = '\0';
 				start = atoi(s1);
 				end = atoi(s2);
 				if (end < start) {

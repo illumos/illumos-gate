@@ -111,7 +111,7 @@ void clean_string(char *ptr)
 	wchar_t wc;
 	size_t len;
 
-	for (cp = ptr; *cp != NULL; ) {
+	for (cp = ptr; *cp != '\0'; ) {
 		if ((len = mbtowc(&wc, cp, MB_CUR_MAX)) == -1) {
 			cp++;
 			continue;
@@ -735,7 +735,7 @@ exec(int type, ...)
 		} else if (strcmp(clean_title, "") != 0) {
 			char *ct_p;
 
-			for (ct_p = clean_title; *ct_p != NULL; ct_p++) {
+			for (ct_p = clean_title; *ct_p != '\0'; ct_p++) {
 				if (*ct_p == '"')
 					*ct_p = ' ';
 			}

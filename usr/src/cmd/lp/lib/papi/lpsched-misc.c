@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <stdio.h>
@@ -41,7 +39,7 @@ papiAttributeListAddLPString(papi_attribute_t ***list, int flags, char *name,
 	papi_status_t result = PAPI_BAD_ARGUMENT;
 
 	if ((list != NULL) && (name != NULL) && (value != NULL) &&
-	    (value[0] != NULL))
+	    (value[0] != '\0'))
 		result = papiAttributeListAddString(list, flags, name, value);
 	return (result);
 }
@@ -119,7 +117,7 @@ printer_name_from_uri_id(char *uri, int32_t id)
 			result = "";
 	}
 
-	if ((result[0] == NULL) && (id != -1)) {
+	if ((result[0] == '\0') && (id != -1)) {
 		char path[32];
 
 		snprintf(path, sizeof (path), "%d-0", id);

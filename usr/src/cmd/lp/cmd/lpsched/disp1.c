@@ -1161,7 +1161,7 @@ s_pass_peer_connection(char *m, MESG *md)
 	(void) getmessage(m, S_PASS_PEER_CONNECTION);
 	syslog(LOG_DEBUG, "s_pass_peer_connection()");
 
-	memset(&recv_fd, NULL, sizeof (recv_fd));
+	memset(&recv_fd, 0, sizeof (recv_fd));
 	if (ioctl(md->readfd, I_RECVFD, &recv_fd) == 0) {
 		int fd = recv_fd.fd;
 

@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *
  * postprint - PostScript translator for ASCII files.
@@ -107,6 +105,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "comments.h"			/* PostScript file structuring comments */
 #include "gen.h"			/* general purpose definitions */

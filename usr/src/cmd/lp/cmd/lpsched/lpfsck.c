@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "stdarg.h"
 #include "stdlib.h"
 #include "fcntl.h"
@@ -323,7 +321,7 @@ va_makepath (va_list *pap, char **ret)
 	char 			buf[MAXPATHLEN];
 	int			buflen;
 
-	memset(buf, NULL, sizeof (buf));
+	memset(buf, 0, sizeof (buf));
 	while ((component = va_arg((*pap), char *)) != NULL) {
 		if (strlcat(buf, component, sizeof (buf)) >= sizeof (buf) ||
 			strlcat(buf, "/", sizeof (buf)) >= sizeof (buf)) {
