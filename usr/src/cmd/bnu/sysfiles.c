@@ -480,7 +480,7 @@ char *buf;
 
 	ASSERT(len >= BUFSIZ, "BUFFER TOO SMALL", "getsysline", 0);
 	for(;;) {
-		while (getaline(fsystems, buf) != NULL)
+		while (getaline(fsystems, buf) != 0)
 		    if ((*buf != '#') && (*buf != ' ') &&
 			(*buf != '\t') && (*buf != '\n')) {
 			(void) _uu_resetlocale(LC_ALL, prev);

@@ -28,8 +28,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "uucp.h"
 
 #include "pk.h"
@@ -72,7 +70,7 @@ gturnon()
 	if (Debug > 4)
 		pkdebug = 1;
 	Pk = pkopen(Ifn, Ofn);
-	if ((int) Pk == NULL)
+	if (Pk == NULL)
 		return(FAIL);
 	return(0);
 }

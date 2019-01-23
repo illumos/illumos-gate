@@ -25,8 +25,6 @@
 /*	Copyright 2004 Sun Microsystems, Inc.  All rights reserved. */
 /*	Use is subject to license terms. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * uudecode [-o outfile | -p] [input]
  *
@@ -356,7 +354,7 @@ decode(FILE *in, FILE *out, int base64)
 		while ((fgets(inbuf, sizeof (inbuf), in)) != NULL) {
 			/* process an input line */
 			iptr = inbuf;
-			while ((curchr = *(iptr++)) != NULL) {
+			while ((curchr = *(iptr++)) != '\0') {
 				/* decode chars */
 				if (curchr == '=') /* if end */
 					endseen++;
