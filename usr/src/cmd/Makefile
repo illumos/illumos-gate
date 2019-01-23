@@ -28,6 +28,7 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2018 Gary Mills
+# Copyright 2019 Peter Tribble
 #
 
 include ../Makefile.master
@@ -62,7 +63,6 @@ COMMON_SUBDIRS=		\
 	adbgen		\
 	acct		\
 	acctadm		\
-	ahciem		\
 	arch		\
 	asa		\
 	ast		\
@@ -109,7 +109,6 @@ COMMON_SUBDIRS=		\
 	ctrun		\
 	ctstat		\
 	ctwatch		\
-	cxgbetool	\
 	datadm		\
 	date		\
 	dc		\
@@ -478,7 +477,9 @@ i386_SUBDIRS=		\
 	acpi		\
 	acpihpd		\
 	addbadsec	\
+	ahciem		\
 	biosdev		\
+	cxgbetool	\
 	diskscan	\
 	nvmeadm		\
 	rtc		\
