@@ -812,13 +812,12 @@ mk_revoke(int optflag, char *file)
 					continue;
 				}
 				(void) close(fp);
-				if (strcmp(info.pr_fname, "vold") == NULL) {
+				if (strcmp(info.pr_fname, "vold") == 0) {
 					dprintf("%d matched vold name\n",
 					    fuserpid);
 					continue;
 				}
-				if (strcmp(info.pr_fname, "deallocate")
-				    == NULL) {
+				if (strcmp(info.pr_fname, "deallocate") == 0) {
 					dprintf("%d matched deallocate name\n",
 					    fuserpid);
 					continue;
@@ -1147,7 +1146,7 @@ out:
 
 int
 _allocate_dev(int optflag, uid_t uid, devalloc_t *da, char *zonename,
-	int *lock_fd)
+    int *lock_fd)
 {
 	int			i;
 	int			bytes = 0;
@@ -1156,8 +1155,8 @@ _allocate_dev(int optflag, uid_t uid, devalloc_t *da, char *zonename,
 	int			dealloc_optflag = 0;
 	char			*fname = NULL;
 	char			file_name[MAXPATHLEN];
-	devmap_t 		*dm;
-	struct stat 		stat_buf;
+	devmap_t		*dm;
+	struct stat		stat_buf;
 	struct state_file	sf;
 	struct zone_path	zpath;
 
