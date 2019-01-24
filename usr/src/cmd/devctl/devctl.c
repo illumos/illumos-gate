@@ -32,17 +32,17 @@
  * usage: devctl [-v] command [device/bus pathname]
  *
  * Commands:
- * 	list		- list all controllers exporting the devctl interface
+ *	list		- list all controllers exporting the devctl interface
  *	online		- online a device
  *	offline		- offline a device
- *	remove  	- remove a device from the device tree
- * 	quiesce		- quiesce the bus
+ *	remove		- remove a device from the device tree
+ *	quiesce		- quiesce the bus
  *	unquiesce	- resume bus activity
  *	configure	- configure a bus's child devices
  *	unconfigure	- unconfigure a bus's child devices
  *	bus-reset	- reset a bus
  *	dev-reset	- reset a device
- * 	bus-getstate	- return the current state of the bus
+ *	bus-getstate	- return the current state of the bus
  *	dev-getstate	- return the current state of the device
  *	bus-devcreate	- create a new device, bus specific
  *	dev-raisepower		- power up a device via pm_raise_power() (pm)
@@ -181,7 +181,7 @@ int
 main(int argc, char *argv[])
 {
 	int	c;
-	int 	rv;
+	int	rv;
 	int	pathlen;
 	struct cmds *dcmd;
 	devctl_hdl_t dcp;
@@ -548,7 +548,7 @@ run_list_ctlrs(void)
 		    progname);
 		exit(-1);
 	}
-	(void) di_walk_minor(dinode, DDI_NT_NEXUS, NULL, 0, &nexif);
+	(void) di_walk_minor(dinode, DDI_NT_NEXUS, 0, NULL, &nexif);
 	di_fini(dinode);
 	exit(0);
 }
