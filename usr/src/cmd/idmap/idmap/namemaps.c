@@ -1013,7 +1013,7 @@ idmap_get_namemap(idmap_nm_handle_t *p, int *is_source_ad, char **winname,
 	if (*winname != NULL) {
 		*is_source_ad = IDMAP_YES;
 
-		if (p->is_ad == NULL) {
+		if (p->is_ad == FALSE) {
 			rc = IDMAP_ERR_ARG;
 			namemap_log(
 			    gettext("AD namemaps are not active."));
@@ -1034,7 +1034,7 @@ idmap_get_namemap(idmap_nm_handle_t *p, int *is_source_ad, char **winname,
 
 		*is_source_ad = IDMAP_NO;
 
-		if (p->is_nldap == NULL) {
+		if (p->is_nldap == FALSE) {
 			rc = IDMAP_ERR_ARG;
 			namemap_log(
 			    gettext("Native ldap namemaps aren't active."));
