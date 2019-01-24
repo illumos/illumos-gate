@@ -4,15 +4,13 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-     
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -77,7 +75,7 @@ main(int argc, char **argv)
 		exit(2);
 	}
 	wstring = strdup(argv[1]);
-	if (tab != NULL) {
+	if (tab != 0) {
 		if ((ptr = strchr(wstring, tab)) != NULL) {
 			*++ptr = '\0';
 		}
