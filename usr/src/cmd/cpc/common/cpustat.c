@@ -94,7 +94,7 @@ static int	ncpus;
 static int	max_chip_id;
 static int	*chip_designees;    /* cpuid of CPU which counts for phs chip */
 static int	smt = 0;	    /* If set, cpustat needs to be SMT-aware. */
-static pcinfo_t	fxinfo = { 0, "FX", NULL }; /* FX scheduler class info */
+static pcinfo_t	fxinfo = { 0, "FX", 0 }; /* FX scheduler class info */
 
 static uint_t timestamp_fmt = NODATE;
 
@@ -463,7 +463,7 @@ gtick(void *arg)
 			goto bad;
 		(void) mutex_lock(&state->soak_lock);
 		state->soak_state = SOAK_PAUSE;
-		if (thr_create(NULL, 0, soaker, state, NULL, &tid) != 0)
+		if (thr_create(NULL, 0, soaker, state, 0, &tid) != 0)
 			goto bad;
 
 		while (state->soak_state == SOAK_PAUSE)
