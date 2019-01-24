@@ -144,7 +144,7 @@ again:
 		else
 			base = 8;
 	}
-	while ((c = *cp) != NULL) {
+	while ((c = *cp) != '\0') {
 		if (isdigit(c)) {
 			if ((c - '0') >= base)
 				break;
@@ -463,7 +463,8 @@ addentry(void *entry, int mod)
  * Display usage message to STDERR.
  */
 static void
-usage(char *msg) {
+usage(char *msg)
+{
 
 	if (msg)
 		(void) fprintf(stderr, "%s\n", msg);
@@ -508,7 +509,8 @@ usage(char *msg) {
  *		AF_INET6	: IPv6
  */
 static int
-check_ipaddr(char *addr, char **newaddr) {
+check_ipaddr(char *addr, char **newaddr)
+{
 	ipaddr_t	addr_ipv4 = 0;
 	in6_addr_t	addr_ipv6;
 
@@ -519,7 +521,7 @@ check_ipaddr(char *addr, char **newaddr) {
 
 		/* Convert IPv4-mapped IPv6 address to IPv4 */
 		if (IN6_IS_ADDR_V4MAPPED(&addr_ipv6) ||
-					IN6_IS_ADDR_V4COMPAT(&addr_ipv6)) {
+		    IN6_IS_ADDR_V4COMPAT(&addr_ipv6)) {
 			IN6_V4MAPPED_TO_IPADDR(&addr_ipv6, addr_ipv4);
 			if ((*newaddr = calloc(1, INET_ADDRSTRLEN)) == NULL) {
 				(void) fprintf(stderr,
@@ -2167,7 +2169,7 @@ dump_aliases(ns_ldap_result_t *res)
 {
 
 	char	**value = NULL;
-	int 		attr_count = 0;
+	int		attr_count = 0;
 
 	value = __ns_ldap_getAttr(res->entry, "mail");
 	if (value && value[0])
@@ -3819,8 +3821,8 @@ static void
 dump_project(ns_ldap_result_t *res)
 {
 	char    **value = NULL;
-	char 	*endptr = NULL;
-	int 	projid;
+	char	*endptr = NULL;
+	int	projid;
 
 	if (res == NULL || res->entry == NULL)
 		return;
@@ -4721,7 +4723,8 @@ static int get_basedn(char *service, char **basedn) {
 	}
 }
 static char *
-h_errno2str(int h_errno) {
+h_errno2str(int h_errno)
+{
 	switch (h_errno) {
 	case HOST_NOT_FOUND:
 		return ("HOST_NOT_FOUND");
