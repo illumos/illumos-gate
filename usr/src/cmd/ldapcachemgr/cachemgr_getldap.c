@@ -108,14 +108,14 @@ typedef enum {
 	INFO_SERVER_UNKNOWN	= 0,
 	INFO_SERVER_CONNECTING	= 1,
 	INFO_SERVER_UP		= 2,
-	INFO_SERVER_ERROR 	= 3,
+	INFO_SERVER_ERROR	= 3,
 	INFO_SERVER_REMOVED	= 4
 } info_server_t;
 
 typedef enum {
 	INFO_STATUS_UNKNOWN	= 0,
-	INFO_STATUS_ERROR 	= 1,
-	INFO_STATUS_NEW   	= 2,
+	INFO_STATUS_ERROR	= 1,
+	INFO_STATUS_NEW		= 2,
 	INFO_STATUS_OLD		= 3
 } info_status_t;
 
@@ -140,12 +140,12 @@ typedef struct server_info_ext {
 	info_rw_t		type;
 	info_server_t		server_status;
 	info_server_t		prev_server_status;
-	info_status_t 		info_status;
+	info_status_t		info_status;
 	ns_server_status_t	change;
 } server_info_ext_t;
 
 typedef struct server_info {
-	struct server_info 	*next;
+	struct server_info	*next;
 	mutex_t			mutex[2];	/* 0: current copy lock */
 						/* 1: update copy lock */
 	server_info_ext_t	sinfo[2]; /* 0: current, 1:  update copy */
@@ -180,7 +180,8 @@ static void create_buf_and_notify(char *input, ns_server_status_t st);
  *         0 FAIL
  */
 static int
-load_config() {
+load_config(void)
+{
 	ns_ldap_error_t *error;
 	int		rc = 1;
 
@@ -189,7 +190,7 @@ load_config() {
 	(void) rw_wrlock(&ldap_lock);
 	if ((error = __ns_ldap_LoadConfiguration()) != NULL) {
 		logit("Error: Unable to read '%s': %s\n",
-			NSCONFIGFILE, error->message);
+		    NSCONFIGFILE, error->message);
 		__ns_ldap_freeError(&error);
 		rc = 0; /* FAIL */
 	} else
@@ -248,8 +249,7 @@ getldap_free_hash(cache_hash_t *p)
  * This function expects a lock in place when called.
  */
 static cache_hash_t *
-getldap_scan_hash(cache_type_t type, char *from,
-		cache_hash_t *idx)
+getldap_scan_hash(cache_type_t type, char *from, cache_hash_t *idx)
 {
 	while (idx) {
 		if (idx->type == type &&
@@ -297,15 +297,15 @@ getldap_get_cacheData_stat(int max, int current, char **output)
 
 static int
 getldap_cache_op(cache_op_t op, cache_type_t type,
-			char *from, char **to)
+    char *from, char **to)
 {
 #define	CACHE_HASH_MAX		257
 #define	CACHE_HASH_MAX_ENTRY	256
 	static cache_hash_t	*hashTbl[CACHE_HASH_MAX];
 	cache_hash_t		*next, *idx, *newp;
 	unsigned long		hash;
-	static rwlock_t 	cache_lock = DEFAULTRWLOCK;
-	int 			i;
+	static rwlock_t		cache_lock = DEFAULTRWLOCK;
+	int			i;
 	static int		entry_num = 0;
 
 	if (current_admin.debug_level >= DBG_ALL) {
@@ -559,7 +559,7 @@ getldap_get_rootDSE(void *arg)
 	serverInfo->sinfo[1].rootDSE_data	= NULL;
 	if (serverInfo->sinfo[1].errormsg)
 		free(serverInfo->sinfo[1].errormsg);
-	serverInfo->sinfo[1].errormsg 		= NULL;
+	serverInfo->sinfo[1].errormsg		= NULL;
 	(void) mutex_unlock(&serverInfo->mutex[1]);
 
 	(void) mutex_lock(&serverInfo->mutex[1]);
@@ -702,8 +702,8 @@ getldap_init_serverInfo(server_info_t **head)
 			break;
 		}
 
-		info->sinfo[0].type 		= INFO_RW_UNKNOWN;
-		info->sinfo[1].type 		= INFO_RW_UNKNOWN;
+		info->sinfo[0].type		= INFO_RW_UNKNOWN;
+		info->sinfo[1].type		= INFO_RW_UNKNOWN;
 		info->sinfo[0].info_status	= INFO_STATUS_UNKNOWN;
 		info->sinfo[1].info_status	= INFO_STATUS_UNKNOWN;
 		info->sinfo[0].server_status	= INFO_SERVER_UNKNOWN;
@@ -721,9 +721,9 @@ getldap_init_serverInfo(server_info_t **head)
 		info->sinfo[1].hostname		= NULL;
 		info->sinfo[0].rootDSE_data	= NULL;
 		info->sinfo[1].rootDSE_data	= NULL;
-		info->sinfo[0].errormsg 	= NULL;
-		info->sinfo[1].errormsg 	= NULL;
-		info->next 		= NULL;
+		info->sinfo[0].errormsg		= NULL;
+		info->sinfo[1].errormsg		= NULL;
+		info->next			= NULL;
 	}
 	__s_api_free2dArray(servers);
 	if (exitrc != NS_LDAP_SUCCESS) {
@@ -777,9 +777,9 @@ static int
 getldap_set_serverInfo(server_info_t *head, int reset_bindtime, info_op_t op)
 {
 	server_info_t	*info;
-	int 		atleast1 = 0;
+	int		atleast1 = 0;
 	thread_t	*tid;
-	int 		num_threads = 0, i, j;
+	int		num_threads = 0, i, j;
 	void		*status;
 	void		**paramVal = NULL;
 	ns_ldap_error_t	*error = NULL;
@@ -888,14 +888,14 @@ getldap_set_serverInfo(server_info_t *head, int reset_bindtime, info_op_t op)
  */
 static int
 getldap_get_serverInfo(server_info_t *head, char *input,
-		char **output, int *svr_removed)
+    char **output, int *svr_removed)
 {
-	server_info_t	*info 	= NULL;
+	server_info_t	*info	= NULL;
 	server_info_t	*server	= NULL;
-	char 		*addr	= NULL;
-	char 		*req	= NULL;
-	char 		req_new[] = NS_CACHE_NEW;
-	char 		addr_type[] = NS_CACHE_ADDR_IP;
+	char		*addr	= NULL;
+	char		*req	= NULL;
+	char		req_new[] = NS_CACHE_NEW;
+	char		addr_type[] = NS_CACHE_ADDR_IP;
 	int		matched = FALSE, len = 0, rc = 0;
 	char		*ret_addr = NULL, *ret_addrFQDN = NULL;
 	char		*new_addr = NULL;
@@ -1105,7 +1105,7 @@ getldap_format_refresh_time(char **output, time_t *prev, time_t *next)
 #define	TIME_HEADER2	"  Next refresh time:     "
 	int		hdr1_len = strlen(gettext(TIME_HEADER1));
 	int		hdr2_len = strlen(gettext(TIME_HEADER2));
-	struct	tm 	tm;
+	struct tm	tm;
 	char		nbuf[256];
 	char		pbuf[256];
 	int		len;
@@ -1159,12 +1159,12 @@ getldap_format_refresh_time(char **output, time_t *prev, time_t *next)
  */
 static int
 getldap_get_server_stat(server_info_t *head, char **output,
-		time_t *prev, time_t *next)
+    time_t *prev, time_t *next)
 {
 #define	S_HEADER	"Server information: "
 #define	S_FORMAT	"  server: %s, status: %s%s"
 #define	S_ERROR		"    error message: %s%s"
-	server_info_t	*info 	= NULL;
+	server_info_t	*info = NULL;
 	int	header_len = strlen(gettext(S_HEADER));
 	int	format_len = strlen(gettext(S_FORMAT));
 	int	error_len = strlen(gettext(S_ERROR));
@@ -1289,7 +1289,7 @@ getldap_get_refresh_stat(char **output)
 	int		hdr0_len = strlen(gettext(R_HEADER0));
 	int		hdr1_len = strlen(gettext(R_HEADER1));
 	int		cache_ttl = -1, len = 0;
-	time_t 		expire = 0;
+	time_t		expire = 0;
 	void		**paramVal = NULL;
 	ns_ldap_error_t	*errorp = NULL;
 	char		*output1 = NULL;
@@ -1443,7 +1443,7 @@ getldap_get_cacheTTL()
  */
 static int
 getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
-		int *no_gd_server)
+    int *no_gd_server)
 {
 #define	REFRESHTTL_REGULAR	600
 #define	REFRESHTTL_MAX		43200
@@ -1611,8 +1611,8 @@ static int
 getldap_serverInfo_op(info_op_t op, char *input, char **output)
 {
 
-	static rwlock_t 	info_lock = DEFAULTRWLOCK;
-	static rwlock_t 	info_lock_old = DEFAULTRWLOCK;
+	static rwlock_t		info_lock = DEFAULTRWLOCK;
+	static rwlock_t		info_lock_old = DEFAULTRWLOCK;
 	static mutex_t		info_mutex;
 	static cond_t		info_cond;
 	static int		creating = FALSE;
@@ -1620,11 +1620,11 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 	static int		sec_to_refresh = 0;
 	static int		in_no_server_mode = FALSE;
 
-	static server_info_t 	*serverInfo = NULL;
-	static server_info_t 	*serverInfo_old = NULL;
-	server_info_t 		*serverInfo_1;
-	int 			is_creating;
-	int 			err, no_server_good = FALSE;
+	static server_info_t	*serverInfo = NULL;
+	static server_info_t	*serverInfo_old = NULL;
+	server_info_t		*serverInfo_1;
+	int			is_creating;
+	int			err, no_server_good = FALSE;
 	int			server_removed = FALSE;
 	int			fall_thru = FALSE;
 	static struct timespec	timeout;
@@ -1819,7 +1819,7 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 		if (current_admin.debug_level >= DBG_SERVER_LIST_REFRESH) {
 			logit("operation is INFO_OP_REFRESH_WAIT...\n");
 		}
-		(void) cond_init(&info_cond, NULL, NULL);
+		(void) cond_init(&info_cond, USYNC_THREAD, NULL);
 		(void) mutex_lock(&info_mutex);
 		err = 0;
 		while (err != ETIME) {
@@ -2022,7 +2022,7 @@ getldap_serverInfo_refresh()
 void
 getldap_getserver(LineBuf *config_info, ldap_call_t *in)
 {
-	char 		req[] = "0";
+	char		req[] = "0";
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_getserver()...\n");
@@ -2171,7 +2171,7 @@ getldap_get_cacheStat(LineBuf *stat_info)
 		return;
 	}
 	/* get cache data statisitcs */
-	(void) getldap_cache_op(CACHE_OP_GETSTAT, NULL, NULL, &coutstr);
+	(void) getldap_cache_op(CACHE_OP_GETSTAT, 0, NULL, &coutstr);
 	if (coutstr == NULL) {
 		free(foutstr);
 		free(soutstr);
@@ -2583,7 +2583,7 @@ getldap_refresh()
 						first_time = 0;
 						(void) rw_unlock(&ldap_lock);
 						(void) cond_init(&cond,
-						    NULL, NULL);
+						    USYNC_THREAD, NULL);
 						(void) mutex_lock(&sighuplock);
 						timeout.tv_sec =
 						    CACHESLEEPTIME;
@@ -2641,7 +2641,7 @@ getldap_refresh()
 				logit("getldap_refresh: (2)about to sleep "
 				"for %d seconds\n", sleeptime);
 			}
-			(void) cond_init(&cond, NULL, NULL);
+			(void) cond_init(&cond, USYNC_THREAD, NULL);
 			(void) mutex_lock(&sighuplock);
 			timeout.tv_sec = sleeptime;
 			timeout.tv_nsec = 0;
