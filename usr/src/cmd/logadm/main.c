@@ -831,7 +831,7 @@ rotateto(struct fn *fnp, struct opts *opts, int n, struct fn *recentlog,
 	fn_free(dirname);
 
 	/* do the rename */
-	if (n == 0 && opts_count(opts, "c") != NULL) {
+	if (n == 0 && opts_count(opts, "c") != 0) {
 		docopytruncate(opts, fn_s(fnp), fn_s(newfile));
 	} else if (n == 0 && opts_count(opts, "M")) {
 		struct fn *rawcmd = fn_new(opts_optarg(opts, "M"));
@@ -1112,7 +1112,7 @@ docopytruncate(struct opts *opts, const char *file, const char *file_copy)
 	ssize_t len;
 
 	/* print info if necessary */
-	if (opts_count(opts, "vn") != NULL) {
+	if (opts_count(opts, "vn") != 0) {
 		(void) out("# log rotation via atomic copy and truncation"
 		    " (-c flag):\n");
 		(void) out("# copy %s to %s\n", file, file_copy);
