@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "utils.h"
 #include <locale.h>
 #include <poll.h>
@@ -394,7 +392,7 @@ addtolist(char *dev)
 			    buf[0] == SPACE || buf[0] == TAB)
 				continue;
 			len = strlen(buf);
-			buf[len - 1] = NULL; /* Clear carriage return */
+			buf[len - 1] = '\0'; /* Clear carriage return */
 			if (pathcmp(dev, buf) == 0) {
 				/* they match so use name passed in. */
 				(void) fprintf(nfp, "%s\n", dev);
@@ -457,7 +455,7 @@ removefromlist(char *dev)
 		    value[0] == SPACE || value[0] == TAB)
 			continue;
 		len = strlen(value);
-		value[len - 1] = NULL; /* Clear carriage return */
+		value[len - 1] = '\0'; /* Clear carriage return */
 		if (pathcmp(dev, value) == 0) {
 			/* they match so don't write it */
 			continue;
