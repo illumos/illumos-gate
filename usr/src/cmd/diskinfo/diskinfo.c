@@ -264,7 +264,7 @@ enumerate_disks(di_opts_t *opts)
 		    topo_strerror(err));
 	}
 
-	for (i = 0; media != NULL && media[i] != NULL; i++) {
+	for (i = 0; media != NULL && media[i] != 0; i++) {
 		if ((disk = dm_get_associated_descriptors(media[i],
 		    DM_DRIVE, &err)) == NULL) {
 			continue;
