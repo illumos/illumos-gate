@@ -88,7 +88,7 @@ typedef	ulong_t		u_off_t;
 #define	XATTRHDR	".hdr"
 
 #define	NAMELEN		32
-#define	TYPELEN 	16
+#define	TYPELEN		16
 #define	PERMLEN		4
 
 #define	FILE_COPIED	1
@@ -352,17 +352,17 @@ typedef struct sl_remap
 {
 	dev_t			dev;		/* device */
 	int			inode_count;	/* # inodes seen on dev */
-	struct sl_remap 	*next;		/* next in the chain */
+	struct sl_remap		*next;		/* next in the chain */
 } sl_remap_t;
 
 /* forward declarations */
 
-static sl_info_t 	*sl_info_alloc(void);
-static sl_info_t 	*sl_insert(dev_t, ino_t, int);
+static sl_info_t	*sl_info_alloc(void);
+static sl_info_t	*sl_insert(dev_t, ino_t, int);
 static ulong_t		sl_numlinks(dev_t, ino_t, int);
 static void		sl_preview_synonyms(void);
 static void		sl_remember_tgt(const struct stat *, int, int);
-static sl_info_t 	*sl_search(dev_t, ino_t, int);
+static sl_info_t	*sl_search(dev_t, ino_t, int);
 static sl_info_t	*sl_devhash_lookup(dev_t);
 static void		sl_devhash_insert(dev_t, sl_info_t *);
 
@@ -652,7 +652,7 @@ typedef enum {
 static struct xattr_hdr	*xattrhead;
 static struct xattr_buf	*xattrp;
 static struct xattr_buf	*xattr_linkp;
-static int 		xattrbadhead;	/* is extended attribute header bad? */
+static int		xattrbadhead;	/* is extended attribute header bad? */
 
 static int	append_secattr(char **, int *, acl_t *);
 
@@ -1295,7 +1295,7 @@ ckopts(long mask)
 	if (mask & OCH) {
 		t_p = Hdr_p;
 
-		while (*t_p != NULL) {
+		while (*t_p != '\0') {
 			if (isupper(*t_p)) {
 				*t_p = 'a' + (*t_p - 'A');
 			}
@@ -1892,7 +1892,7 @@ creat_spec(int dirfd)
 
 		curdir = strrchr(nam_p, '.');
 
-		if (curdir != NULL && curdir[1] == NULL) {
+		if (curdir != NULL && curdir[1] == '\0') {
 			lastslash = strrchr(nam_p, '/');
 
 			if (lastslash != NULL) {
@@ -2607,10 +2607,10 @@ errout:
  * Strip off the sparse file information that is prepended to
  * the compressed sparse file. The information is in the following
  * format:
- * 	<prepended info size><SP><orig file size><SP><holes info>
+ *	<prepended info size><SP><orig file size><SP><holes info>
  * where prepended info size is long right justified in 10 bytes.
  * Holesdata consists of the series of offset pairs:
- * 	<data offset><SP><hole offset><SP><data offset><SP><hole offset>...
+ *	<data offset><SP><hole offset><SP><data offset><SP><hole offset>...
  * prepended info size and original file size have been read in gethdr().
  * We read the rest of holes information here in this function.
  */
@@ -4070,13 +4070,13 @@ retry_open_attr(int pdirfd, int cwd, char *fullname, char *pattr, char *name,
  * it will be set to 0.
  *
  * Possible return values:
- * 	ATTR_OK		Successfully opened and, if needed, changed into the
+ *	ATTR_OK		Successfully opened and, if needed, changed into the
  *			attribute directory containing attrname.
  *	ATTR_SKIP	The command line specifications don't enable the
  *			processing of the attribute type.
- * 	ATTR_CHDIR_ERR	An error occurred while trying to change into an
+ *	ATTR_CHDIR_ERR	An error occurred while trying to change into an
  *			attribute directory.
- * 	ATTR_OPEN_ERR	An error occurred while trying to open an
+ *	ATTR_OPEN_ERR	An error occurred while trying to open an
  *			attribute directory.
  *	ATTR_XATTR_ERR	The underlying file system doesn't support extended
  *			attributes.
@@ -4673,7 +4673,7 @@ gethdr(void)
 			return (0);
 		else {
 			preptr = &prebuf[0];
-			if (*preptr != NULL) {
+			if (*preptr != '\0') {
 				k = strlen(&prebuf[0]);
 				if (k < PRESIZ) {
 					(void) strcpy(&fullnam[0], &prebuf[0]);
@@ -8026,10 +8026,9 @@ is_floppy(int fd)
  * existing secinfo.
  */
 static int
-append_secattr(
-	char		**secinfo,	/* existing security info */
-	int		*secinfo_len,	/* length of existing security info */
-	acl_t		*aclp) 	/* new attribute data pointer */
+append_secattr(char	**secinfo,	/* existing security info */
+    int			*secinfo_len,	/* length of existing security info */
+    acl_t		*aclp)	/* new attribute data pointer */
 {
 	char	*new_secinfo;
 	char	*attrtext;
@@ -8265,7 +8264,7 @@ xattrs_out(int (*func)())
 #if defined(_PC_SATTR_ENABLED)
 	if (SysAtflag) {
 		int		filefd;
-		nvlist_t 	*slist = NULL;
+		nvlist_t	*slist = NULL;
 
 		/*
 		 * Determine if there are non-transient system
@@ -8552,7 +8551,7 @@ prepare_xattr_hdr(
 {
 	char			*bufhead;	/* ptr to full buffer */
 	char			*aptr;
-	struct xattr_hdr 	*hptr;		/* ptr to header in bufhead */
+	struct xattr_hdr	*hptr;		/* ptr to header in bufhead */
 	struct xattr_buf	*tptr;		/* ptr to pathing pieces */
 	int			totalen;	/* total buffer length */
 	int			len;		/* length returned to user */
@@ -9313,7 +9312,7 @@ preview_attrs(char *s, char *attrparent)
 #if defined(_PC_SATTR_ENABLED)
 	if (SysAtflag) {
 		int		filefd;
-		nvlist_t 	*slist = NULL;
+		nvlist_t	*slist = NULL;
 
 		/* Determine if there are non-transient system attributes. */
 		errno = 0;
