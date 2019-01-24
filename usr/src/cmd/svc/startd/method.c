@@ -948,7 +948,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		MUTEX_UNLOCK(&inst->ri_lock);
 
 		do {
-			r = waitpid(pid, &ret_status, NULL);
+			r = waitpid(pid, &ret_status, 0);
 		} while (r == -1 && errno == EINTR);
 		if (r == -1)
 			err = errno;

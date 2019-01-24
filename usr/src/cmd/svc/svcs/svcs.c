@@ -554,7 +554,7 @@ get_restarter_time_prop(scf_instance_t *inst, const char *pname,
 	int r;
 
 	r = inst_get_single_val(inst, SCF_PG_RESTARTER, pname, SCF_TYPE_TIME,
-	    tvp, NULL, ok_if_empty ? EMPTY_OK : 0, 0, 1);
+	    tvp, 0, ok_if_empty ? EMPTY_OK : 0, 0, 1);
 
 	return (r == 0 ? 0 : -1);
 }
@@ -1651,7 +1651,7 @@ sprint_stime(char **buf, scf_walkinfo_t *wip)
 		    SCF_PROPERTY_STATE_TIMESTAMP, &tv, 0);
 	} else {
 		r = pg_get_single_val(wip->pg, SCF_PROPERTY_STATE_TIMESTAMP,
-		    SCF_TYPE_TIME, &tv, NULL, 0);
+		    SCF_TYPE_TIME, &tv, 0, 0);
 	}
 
 	if (r != 0) {
@@ -1703,7 +1703,7 @@ sortkey_stime(char *buf, int reverse, scf_walkinfo_t *wip)
 		    SCF_PROPERTY_STATE_TIMESTAMP, &tv, 0);
 	else
 		r = pg_get_single_val(wip->pg, SCF_PROPERTY_STATE_TIMESTAMP,
-		    SCF_TYPE_TIME, &tv, NULL, 0);
+		    SCF_TYPE_TIME, &tv, 0, 0);
 
 	if (r == 0) {
 		int64_t sec;
@@ -2517,7 +2517,7 @@ print_detailed(void *unused, scf_walkinfo_t *wip)
 			    gettext("next_state"), buf);
 
 		if (pg_get_single_val(rpg, SCF_PROPERTY_STATE_TIMESTAMP,
-		    SCF_TYPE_TIME, &tv, NULL, 0) == 0) {
+		    SCF_TYPE_TIME, &tv, 0, 0) == 0) {
 			stime = tv.tv_sec;
 			tmp = localtime(&stime);
 			for (tbsz = 50; ; tbsz *= 2) {

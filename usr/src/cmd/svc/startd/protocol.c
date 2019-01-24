@@ -89,7 +89,7 @@ graph_protocol_init()
 
 	(void) pthread_mutex_init(&graph_queue->gpeq_lock, &mutex_attrs);
 	graph_queue->gpeq_event_list = startd_list_create(
-	    graph_protocol_event_queue_pool, graph_queue, NULL);
+	    graph_protocol_event_queue_pool, graph_queue, 0);
 }
 
 /*
@@ -204,7 +204,7 @@ restarter_protocol_init()
 
 	(void) pthread_mutex_init(&restarter_queue->rpeq_lock, &mutex_attrs);
 	restarter_queue->rpeq_event_list = startd_list_create(
-	    restarter_protocol_event_queue_pool, restarter_queue, NULL);
+	    restarter_protocol_event_queue_pool, restarter_queue, 0);
 
 	log_framework(LOG_DEBUG, "Initialized restarter protocol\n");
 }
@@ -382,11 +382,11 @@ restarter_protocol_init_delegate(char *fmri)
 		/*
 		 * The following errors can be returned in this
 		 * case :
-		 * 	EINVAL : inappropriate flags or dump flag
-		 * 		and the dump failed.
-		 * 	EEXIST : svc.startd already has a channel
-		 * 		named as the master channel name
-		 * 	ENOMEM : too many subscribers to the channel
+		 *	EINVAL : inappropriate flags or dump flag
+		 *		and the dump failed.
+		 *	EEXIST : svc.startd already has a channel
+		 *		named as the master channel name
+		 *	ENOMEM : too many subscribers to the channel
 		 */
 		uu_warn("Failed to subscribe to restarter %s, channel %s with "
 		    "subscriber id %s : \n", fmri, master_channel_name, sid);

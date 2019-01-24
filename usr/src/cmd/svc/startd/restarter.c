@@ -1738,7 +1738,7 @@ rep_retry:
 		info->sf_id = rip->ri_id;
 		info->sf_method_type = METHOD_REFRESH;
 		info->sf_event_type = RERR_REFRESH;
-		info->sf_reason = NULL;
+		info->sf_reason = 0;
 
 		assert(rip->ri_method_thread == 0);
 		rip->ri_method_thread =
