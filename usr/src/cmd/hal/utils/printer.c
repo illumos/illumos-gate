@@ -5,8 +5,6 @@
  * Licensed under the Academic Free License version 2.1
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef HAVE_CONFIG_H
 #include <config.h>
 #endif
@@ -31,7 +29,7 @@ strip_ws(char *s)
 		char *p;
 
 		/* skip the leading whitespace */
-		for (; ((*s != NULL) && (isspace(*s) != 0)); s++);
+		for (; ((*s != '\0') && (isspace(*s) != 0)); s++);
 
 		/* drop the trailing whitespace */
 		for (p = s + strlen(s) - 1; ((p > s) && (isspace(*p) != 0));

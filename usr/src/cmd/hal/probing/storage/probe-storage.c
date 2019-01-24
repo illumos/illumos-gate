@@ -137,7 +137,7 @@ get_cdrom_properties (int fd, LibHalChangeSet *cs)
 	char **wspeeds;
 	char *wspeeds_mem;
 	int i;
-			
+
 	libhal_changeset_set_property_bool (cs, "storage.cdrom.cdr", FALSE);
 	libhal_changeset_set_property_bool (cs, "storage.cdrom.cdrw", FALSE);
 	libhal_changeset_set_property_bool (cs, "storage.cdrom.dvd", FALSE);
@@ -156,9 +156,9 @@ get_cdrom_properties (int fd, LibHalChangeSet *cs)
 
 	walk_profiles(fd, get_cdrom_properties_walker, cs);
 
-	/* XXX */		
+	/* XXX */
 	libhal_changeset_set_property_bool (cs, "storage.cdrom.support_media_changed", TRUE);
-			
+
 	get_read_write_speeds(fd, &read_speed, &write_speed, &write_speeds, &n_wspeeds, &write_speeds_mem);
 
 	libhal_changeset_set_property_int (cs, "storage.cdrom.read_speed", read_speed);
@@ -166,7 +166,7 @@ get_cdrom_properties (int fd, LibHalChangeSet *cs)
 
 	if (n_wspeeds <= 0) {
 		wspeeds_mem = NULL;
- 		libhal_changeset_set_property_strlist (cs, "storage.cdrom.write_speeds", (const char **)&wspeeds_mem);
+		libhal_changeset_set_property_strlist (cs, "storage.cdrom.write_speeds", (const char **)&wspeeds_mem);
 		return;
 	}
 	if ((wspeeds = (char **)calloc(n_wspeeds + 1, sizeof (char *))) == NULL) {
@@ -268,7 +268,7 @@ check_floppy(int fd, dbus_bool_t *wprot)
 	int	chg;
 
 	if ((ioctl(fd, FDGETCHANGE, &chg) == 0) && !(chg & FDGC_CURRENT)) {
-		*wprot = ((chg & FDGC_CURWPROT) != NULL);
+		*wprot = ((chg & FDGC_CURWPROT) != 0);
 		return (TRUE);
 	} else {
 		return (FALSE);
@@ -321,7 +321,7 @@ drop_privileges ()
 	priv_freeset(lPrivSet);
 }
 
-int 
+int
 main (int argc, char *argv[])
 {
 	int ret = 1;
@@ -382,7 +382,7 @@ main (int argc, char *argv[])
 		goto out;
 	}
 
-	HAL_DEBUG (("Doing probe-storage for %s (drive_type %s) (udi=%s) (--only-check-for-media==%d)", 
+	HAL_DEBUG (("Doing probe-storage for %s (drive_type %s) (udi=%s) (--only-check-for-media==%d)",
 	     device_file, drive_type, udi, only_check_for_media));
 
 	if ((rfd = open (raw_device_file, O_RDONLY | O_NONBLOCK)) < 0) {
