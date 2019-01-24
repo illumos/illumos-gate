@@ -593,6 +593,6 @@ run_command(char *command, int argc, char *argv[], sa_handle_t handle)
 	 * need to check priviledges and restrict what can be done
 	 * based on least priviledge and sub-command.
 	 */
-	ret = cmdvec->cmdfunc(handle, NULL, argc, argv);
+	ret = cmdvec->cmdfunc(handle, 0, argc, argv);
 	return (ret);
 }
