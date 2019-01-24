@@ -75,7 +75,7 @@ optionTbl_t longOptions[] = {
 subCommandProps_t subcommands[] = {
 	{"start", it_enable, NULL, NULL, NULL, OPERAND_NONE, NULL},
 	{"stop", it_disable, NULL, NULL, NULL, OPERAND_NONE, NULL},
-	{NULL, 0, NULL, NULL, 0, NULL, 0, NULL}
+	{NULL, 0, NULL, NULL, 0, 0, 0, NULL}
 };
 
 /* globals */
