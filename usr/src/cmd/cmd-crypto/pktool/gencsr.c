@@ -226,7 +226,7 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 		SET_VALUE(kmf_set_csr_subject_altname(&csr, altname, altcrit,
 		    alttype), "kmf_set_csr_subject_altname");
 	}
-	if (kubits != NULL) {
+	if (kubits != 0) {
 		SET_VALUE(kmf_set_csr_ku(&csr, kucrit, kubits),
 		    "kmf_set_csr_ku");
 	}
@@ -312,7 +312,7 @@ gencsr_nss(KMF_HANDLE_T kmfhandle,
 		SET_VALUE(kmf_set_csr_subject_altname(&csr, altname, altcrit,
 		    alttype), "kmf_set_csr_subject_altname");
 	}
-	if (kubits != NULL) {
+	if (kubits != 0) {
 		SET_VALUE(kmf_set_csr_ku(&csr, kucrit, kubits),
 		    "kmf_set_csr_ku");
 	}

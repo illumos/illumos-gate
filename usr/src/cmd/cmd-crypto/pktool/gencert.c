@@ -109,7 +109,7 @@ gencert_pkcs11(KMF_HANDLE_T kmfhandle,
 	SET_VALUE(kmf_set_cert_serial(&signedCert, serial),
 	    "serial number");
 
-	SET_VALUE(kmf_set_cert_validity(&signedCert, NULL, ltime),
+	SET_VALUE(kmf_set_cert_validity(&signedCert, 0, ltime),
 	    "validity time");
 
 	SET_VALUE(kmf_set_cert_sig_alg(&signedCert, sigAlg),
@@ -315,7 +315,7 @@ gencert_file(KMF_HANDLE_T kmfhandle,
 	SET_VALUE(kmf_set_cert_serial(&signedCert, serial),
 	    "serial number");
 
-	SET_VALUE(kmf_set_cert_validity(&signedCert, NULL, ltime),
+	SET_VALUE(kmf_set_cert_validity(&signedCert, 0, ltime),
 	    "validity time");
 
 	SET_VALUE(kmf_set_cert_sig_alg(&signedCert, sigAlg),
@@ -467,7 +467,7 @@ gencert_nss(KMF_HANDLE_T kmfhandle,
 	SET_VALUE(kmf_set_cert_serial(&signedCert, serial),
 	    "serial number");
 
-	SET_VALUE(kmf_set_cert_validity(&signedCert, NULL, ltime),
+	SET_VALUE(kmf_set_cert_validity(&signedCert, 0, ltime),
 	    "validity time");
 
 	SET_VALUE(kmf_set_cert_sig_alg(&signedCert, sigAlg),

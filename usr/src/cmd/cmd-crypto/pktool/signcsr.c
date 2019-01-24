@@ -127,7 +127,7 @@ build_cert_from_csr(KMF_CSR_DATA *csrdata,
 
 	SET_VALUE(kmf_set_cert_serial(signedCert, serial), "serial number");
 
-	SET_VALUE(kmf_set_cert_validity(signedCert, NULL, ltime),
+	SET_VALUE(kmf_set_cert_validity(signedCert, 0, ltime),
 	    "validity time");
 
 	if (issuer) {
