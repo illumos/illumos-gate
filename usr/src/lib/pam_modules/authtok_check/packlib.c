@@ -4,6 +4,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * This program is copyright Alec Muffett 1993. The author disclaims all
  * responsibility or liability with respect to it's usage or its effect
  * upon hardware or computer systems, and maintains copyright as set out
@@ -223,8 +227,8 @@ PutPW(PWDICT *pwp, char *string)
 			ostr = nstr;
 		}
 
-	(void) memset(pwp->data, '\0', sizeof (pwp->data));
-	pwp->count = 0;
+		(void) memset(pwp->data, '\0', sizeof (pwp->data));
+		pwp->count = 0;
 	}
 	return (0);
 }

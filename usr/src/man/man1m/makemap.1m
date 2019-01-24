@@ -23,7 +23,8 @@
 .\" BE LIABLE FOR ANY DIRECT, INDIRECT,    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT    NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF    USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON    ANY THEORY OF LIABILITY, WHETHER
 .\" IN CONTRACT, STRICT LIABILITY, OR TORT    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF    THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 .\"  Copyright (c) 2009, Sun Microsystems, Inc.  All Rights Reserved.
-.TH MAKEMAP 1M "Apr 22, 2008"
+.\" Copyright (c) 2019 Peter Tribble.
+.TH MAKEMAP 1M "Jan 21, 2019"
 .SH NAME
 makemap \- create database maps for sendmail
 .SH SYNOPSIS
@@ -31,11 +32,10 @@ makemap \- create database maps for sendmail
 .nf
 \fBmakemap\fR [\fB-N\fR] [\fB-d\fR] [\fB-f\fR] [\fB-o\fR] [\fB-r\fR] [\fB-s\fR] [\fB-v\fR] [\fB-C\fR \fIfile\fR]
      [\fB-c\fR \fIcachesize\fR] [\fB-D\fR \fIcommentchar\fR] [\fB-e\fR] [\fB-l\fR] [\fB-t\fR \fIdelim\fR]
-     [\fB-u\fR] \fImantype\fR \fImapname\fR
+     [\fB-u\fR] \fImaptype\fR \fImapname\fR
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBmakemap\fR creates the database maps used by the keyed map lookups in
 \fBsendmail\fR(1M). \fBmakemap\fR reads from the standard input and outputs to
@@ -44,21 +44,21 @@ the specified \fImapname\fR.
 .LP
 In all cases, \fBmakemap\fR reads lines from the standard input consisting of
 two words separated by whitespace. The first is the database key, the second is
-the value. The value may contain \fB%\fR\fIn\fR strings to indicated parameter
+the value. The value may contain \fB%\fR\fIn\fR strings to indicate parameter
 substitution. Literal percents should be doubled (\fB%%\fR). Blank lines and
 lines beginning with \fB#\fR are ignored.
 .sp
 .LP
-\fBmakemap\fR handles three different database formats. Database format is
-selected using the \fImaptype\fR parameter. See \fBOPERANDS\fR.
+Depending on how it is compiled, \fBmakemap\fR handles up to three different
+database formats, selected using the \fImaptype\fR parameter. See
+\fBOPERANDS\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-c\fR \fIcachesize\fR\fR
+\fB-c\fR \fIcachesize\fR
 .ad
 .RS 18n
 Use the specified hash and B-Tree cache size (\fIcachesize\fR).
@@ -67,27 +67,27 @@ Use the specified hash and B-Tree cache size (\fIcachesize\fR).
 .sp
 .ne 2
 .na
-\fB\fB-C\fR \fIfile\fR\fR
+\fB-C\fR \fIfile\fR
 .ad
 .RS 18n
-Use the specified sendmail configuration file (\fIfile\fR) for looking up the
-TrustedUser option.
+Use the specified \fBsendmail\fR configuration file (\fIfile\fR) for looking up
+the \fBTrustedUser\fR option.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-d\fR\fR
+\fB-d\fR
 .ad
 .RS 18n
 Allow duplicate keys in the map. This is only allowed on B-Tree format maps. If
-two identical keys are read, both be inserted into the map.
+two identical keys are read, both are inserted into the map.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-D\fR \fIcommentchar\fR\fR
+\fB-D\fR \fIcommentchar\fR
 .ad
 .RS 18n
 Use the specified character to indicate a comment (which is ignored) instead of
@@ -97,7 +97,7 @@ the default of '\fB#\fR'.
 .sp
 .ne 2
 .na
-\fB\fB-e\fR\fR
+\fB-e\fR
 .ad
 .RS 18n
 Allow empty value (right hand side).
@@ -106,7 +106,7 @@ Allow empty value (right hand side).
 .sp
 .ne 2
 .na
-\fB\fB-f\fR\fR
+\fB-f\fR
 .ad
 .RS 18n
 Normally, all upper case letters in the key are folded to lower case. This flag
@@ -117,7 +117,7 @@ disables that behavior. This is intended to mesh with the \fB-f\fR flag in the
 .sp
 .ne 2
 .na
-\fB\fB-l\fR\fR
+\fB-l\fR
 .ad
 .RS 18n
 List supported map types.
@@ -126,17 +126,17 @@ List supported map types.
 .sp
 .ne 2
 .na
-\fB\fB-N\fR\fR
+\fB-N\fR
 .ad
 .RS 18n
 Include the null byte that terminates strings in the map. This must match the
-\fB-N\fR flag in the \fBK\fR line in \fBsendmail.cf\fR
+\fB-N\fR flag in the \fBK\fR line in \fBsendmail.cf\fR.
 .RE
 
 .sp
 .ne 2
 .na
-\fB\fB-o\fR\fR
+\fB-o\fR
 .ad
 .RS 18n
 Append to an old file. This allows you to augment an existing file.
@@ -145,7 +145,7 @@ Append to an old file. This allows you to augment an existing file.
 .sp
 .ne 2
 .na
-\fB\fB-r\fR\fR
+\fB-r\fR
 .ad
 .RS 18n
 Allow replacement of existing keys. Normally \fBmakemap\fR complains if you
@@ -155,7 +155,7 @@ repeat a key, and does not do the insert.
 .sp
 .ne 2
 .na
-\fB\fB-s\fR\fR
+\fB-s\fR
 .ad
 .RS 18n
 Ignore safety checks on maps being created. This includes checking for hard or
@@ -165,7 +165,7 @@ symbolic links in world writable directories.
 .sp
 .ne 2
 .na
-\fB\fB-t\fR \fIdelim\fR\fR
+\fB-t\fR \fIdelim\fR
 .ad
 .RS 18n
 Use the specified delimiter (\fIdelim\fR) instead of whitespace.
@@ -174,7 +174,7 @@ Use the specified delimiter (\fIdelim\fR) instead of whitespace.
 .sp
 .ne 2
 .na
-\fB\fB-u\fR\fR
+\fB-u\fR
 .ad
 .RS 18n
 Dump (unmap) the content of the database to standard output. Note that, if the
@@ -185,20 +185,19 @@ content is dumped instead of whitespace.
 .sp
 .ne 2
 .na
-\fB\fB-v\fR\fR
+\fB-v\fR
 .ad
 .RS 18n
-Verbosely print what it is doing.
+Verbosely print keys and values being added.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
 .ne 2
 .na
-\fB\fImapname\fR\fR
+\fImapname\fR
 .ad
 .RS 11n
 File name of the database map being created.
@@ -207,7 +206,7 @@ File name of the database map being created.
 .sp
 .ne 2
 .na
-\fB\fImaptype\fR\fR
+\fImaptype\fR
 .ad
 .RS 11n
 Specifies the database format. The following \fImaptype\fR parameters are
@@ -215,7 +214,7 @@ available:
 .sp
 .ne 2
 .na
-\fB\fBdbm\fR\fR
+\fBdbm\fR
 .ad
 .RS 9n
 Specifies \fBDBM\fR format maps.
@@ -224,7 +223,7 @@ Specifies \fBDBM\fR format maps.
 .sp
 .ne 2
 .na
-\fB\fBbtree\fR\fR
+\fBbtree\fR
 .ad
 .RS 9n
 Specifies B-Tree format maps.
@@ -233,7 +232,7 @@ Specifies B-Tree format maps.
 .sp
 .ne 2
 .na
-\fB\fBhash\fR\fR
+\fBhash\fR
 .ad
 .RS 9n
 Specifies hash format maps.
@@ -242,6 +241,5 @@ Specifies hash format maps.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBeditmap\fR(1M), \fBsendmail\fR(1M), \fBattributes\fR(5)

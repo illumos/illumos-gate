@@ -15,7 +15,9 @@
  * All rights reserved.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /* LINTLIBRARY */
 
@@ -95,8 +97,8 @@ m_dsb(int qx, int n, short *a, short *b)
 	}
 	borrow += *bptr;
 	*bptr = (short)(borrow & 077777);
-		if (borrow >= 0) s3b2shit = borrow >> fifteen; /* 3b2 */
-		else s3b2shit = 0xfffe0000 | (borrow >> fifteen);
+	if (borrow >= 0) s3b2shit = borrow >> fifteen; /* 3b2 */
+	else s3b2shit = 0xfffe0000 | (borrow >> fifteen);
 	if (s3b2shit == 0) {
 #ifdef DEBUGDSB
 	(void) printf("mdsb 0\n");

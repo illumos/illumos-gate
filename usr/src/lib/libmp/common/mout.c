@@ -15,7 +15,9 @@
  * All rights reserved.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /* LINTLIBRARY */
 
@@ -40,35 +42,37 @@ m_in(MINT *a, short b, FILE *f)
 	x.len = 0;
 	y.len = 1;
 	y.val = &qy;
-	while ((c = getc(f)) != EOF)
-	switch (c) {
+	while ((c = getc(f)) != EOF) {
+		switch (c) {
 
-	case '\\':
-		(void) getc(f);
-		continue;
-	case '\t':
-	case '\n':
-		a->len *= sign;
-		_mp_xfree(&x);
-		return (0);
-	case ' ':
-		continue;
-	case '-':
-		sign = -sign;
-		continue;
-	default:
-		if (c >= '0' && c <= '9') {
-			qy = c - '0';
-			mp_mult(&x, &ten, a);
-			mp_madd(a, &y, a);
-			_mp_move(a, &x);
+		case '\\':
+			(void) getc(f);
 			continue;
-		} else {
-			(void) ungetc(c, stdin);
+		case '\t':
+		case '\n':
 			a->len *= sign;
+			_mp_xfree(&x);
 			return (0);
+		case ' ':
+			continue;
+		case '-':
+			sign = -sign;
+			continue;
+		default:
+			if (c >= '0' && c <= '9') {
+				qy = c - '0';
+				mp_mult(&x, &ten, a);
+				mp_madd(a, &y, a);
+				_mp_move(a, &x);
+				continue;
+			} else {
+				(void) ungetc(c, stdin);
+				a->len *= sign;
+				return (0);
+			}
 		}
 	}
+
 	return (EOF);
 }
 

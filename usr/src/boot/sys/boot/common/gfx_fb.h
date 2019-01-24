@@ -105,11 +105,11 @@ void gfx_fb_line(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 void gfx_fb_bezier(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t,
 	uint32_t);
 void plat_cons_update_mode(int);
-int gfx_fb_putimage(png_t *);
+int gfx_fb_putimage(png_t *, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 
 bool gfx_parse_mode_str(char *, int *, int *, int *);
-#ifdef  __cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif  /* _GFX_FB_H */
+#endif /* _GFX_FB_H */

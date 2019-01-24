@@ -34,9 +34,9 @@
 	1+ \ increase y for next time we're called
 ;
 
-: logo ( x y -- ) \ color Illumos logo
+: logo ( x y -- ) \ color illumos logo
 
-	s" /boot/illumos.png" fb-putimage if 2drop exit then
+	0 0 0 0 0 s" /boot/illumos.png" fb-putimage if 2drop exit then
 
 	s"     @[33m,                             " logo+
 	s"    @[33m,./% @[31m&                         " logo+

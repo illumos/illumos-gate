@@ -22,7 +22,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <mcamd_api.h>
 #include <mcamd_err.h>
@@ -568,8 +570,7 @@ mc_offset_to_pa(struct mcamd_hdl *hdl, mcamd_node_t *mc, mcamd_node_t *dimm,
 		if (cs == NULL) {
 			mcamd_dprintf(hdl, MCAMD_DBG_ERR, "mcamd_offset_to_pa: "
 			    "failed to find cs for bad cs#%d\n", mcp.badcs);
-				return (mcamd_set_errno(hdl,
-				    EMCAMD_TREEINVALID));
+			return (mcamd_set_errno(hdl, EMCAMD_TREEINVALID));
 		}
 
 		/* found bad cs - reread properties from it instead of spare */

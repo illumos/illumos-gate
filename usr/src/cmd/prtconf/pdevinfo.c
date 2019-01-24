@@ -25,6 +25,9 @@
 /*
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
+/*
+ * Copyright (c) 2019 Peter Tribble.
+ */
 
 /*
  * For machines that support the openprom, fetch and print the list
@@ -1738,42 +1741,6 @@ do_promversion(void)
 }
 
 int
-do_prom_version64(void)
-{
-#ifdef	sparc
-	Oppbuf	oppbuf;
-	struct openpromio *opp = &(oppbuf.opp);
-	/*LINTED*/
-	struct openprom_opr64 *opr = (struct openprom_opr64 *)opp->oprom_array;
-
-	static const char msg[] =
-	    "NOTICE: The firmware on this system does not support the "
-	    "64-bit OS.\n"
-	    "\tPlease upgrade to at least the following version:\n"
-	    "\t\t%s\n\n";
-
-	if (promopen(O_RDONLY))  {
-		(void) fprintf(stderr, "Cannot open openprom device\n");
-		return (-1);
-	}
-
-	opp->oprom_size = MAXVALSIZE;
-	if (ioctl(prom_fd, OPROMREADY64, opp) < 0)
-		exit(_error("OPROMREADY64"));
-
-	if (opr->return_code == 0)
-		return (0);
-
-	(void) printf(msg, opr->message);
-
-	promclose();
-	return (opr->return_code);
-#else
-	return (0);
-#endif
-}
-
-int
 do_productinfo(void)
 {
 	di_node_t root, next_node;
@@ -1819,7 +1786,7 @@ do_productinfo(void)
 
 di_node_t
 find_node_by_name(di_prom_handle_t promh, di_node_t parent,
-		char *node_name)
+    char *node_name)
 {
 	di_node_t next_node;
 	uchar_t *prop_valp;
@@ -1838,7 +1805,7 @@ find_node_by_name(di_prom_handle_t promh, di_node_t parent,
 
 int
 get_propval_by_name(di_prom_handle_t promh, di_node_t node, const char *name,
-			uchar_t **valp)
+    uchar_t **valp)
 {
 	int len;
 	uchar_t *bufp;
@@ -1855,7 +1822,7 @@ get_propval_by_name(di_prom_handle_t promh, di_node_t node, const char *name,
 
 static void
 dump_prodinfo(di_prom_handle_t promh, di_node_t node, const char **propstr,
-		char *node_name, int num)
+    char *node_name, int num)
 {
 	int out, len, index1, index, endswap = 0;
 	uchar_t *prop_valp;

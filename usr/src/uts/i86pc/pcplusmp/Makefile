@@ -24,7 +24,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -67,8 +67,6 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 #
 LDFLAGS		+= -dy -N misc/acpica
 
-# needs work
-$(OBJS_DIR)/mp_platform_common.o := SMOFF += indenting
 # needs work
 $(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 

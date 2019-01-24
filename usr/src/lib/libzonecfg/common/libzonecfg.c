@@ -22,7 +22,7 @@
 /*
  * Copyright 2014 Gary Mills
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -3274,8 +3274,8 @@ zonecfg_devwalk_cb(const char *path, const struct stat *st, int f,
 	if (strlen(path) <= g_devwalk_skip_prefix)
 		return (0);
 
-	g_devwalk_cb(path + g_devwalk_skip_prefix, st->st_uid, st->st_gid,
-	    st->st_mode & S_IAMB, acl_txt != NULL ? acl_txt : "",
+	(void) g_devwalk_cb(path + g_devwalk_skip_prefix, st->st_uid,
+	    st->st_gid, st->st_mode & S_IAMB, acl_txt != NULL ? acl_txt : "",
 	    g_devwalk_data);
 	free(acl_txt);
 	return (0);

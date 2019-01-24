@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2000 Daniel Capo Sobral
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD$
  */
 
 /*
@@ -71,35 +70,37 @@
  */
 
 #ifdef _STANDALONE
+/* ( flags x1 y1 x2 y2 -- flag ) */
 void
 ficl_fb_putimage(ficlVm *pVM)
 {
 	char *namep, *name;
 	ficlUnsigned names;
 	ficlInteger ret = FICL_FALSE;
+	uint32_t x1, y1, x2, y2, f;
 	png_t png;
 
-	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 2, 1);
+	FICL_STACK_CHECK(ficlVmGetDataStack(pVM), 7, 1);
 
 	names = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
 	namep = (char *)ficlStackPopPointer(ficlVmGetDataStack(pVM));
+	y2 = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
+	x2 = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
+	y1 = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
+	x1 = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
+	f = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
 
-	name = ficlMalloc(names+1);
+	name = ficlMalloc(names + 1);
 	if (!name)
 		ficlVmThrowError(pVM, "Error: out of memory");
-	strncpy(name, namep, names);
+	(void) strncpy(name, namep, names);
 	name[names] = '\0';
 
-	if (png_open(&png, name) != PNG_NO_ERROR) {
-		ret = FICL_FALSE;
-		ficlFree(name);
-		ficlStackPushInteger(ficlVmGetDataStack(pVM), ret);
-		return;
+	if (png_open(&png, name) == PNG_NO_ERROR) {
+		if (gfx_fb_putimage(&png, x1, y1, x2, y2, f) == 0)
+			ret = FICL_TRUE;	/* success */
+		png_close(&png);
 	}
-
-	if (gfx_fb_putimage(&png) == 0)
-		ret = FICL_TRUE;	/* success */
-	png_close(&png);
 	ficlFree(name);
 	ficlStackPushInteger(ficlVmGetDataStack(pVM), ret);
 }
