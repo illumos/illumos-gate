@@ -553,7 +553,7 @@ parseargs(int ac, char *av[])
 	/* process the arguments */
 
 	for (i = mac = 0;
-	    (av[i] != (char *)NULL) && (av[i][0] != (char)NULL);
+	    (av[i] != NULL) && (av[i][0] != '\0');
 	    i++) {
 		if (!fflag && av[i][0] == '-') {
 			/*
