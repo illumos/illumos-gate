@@ -19,7 +19,6 @@
  *
  * CDDL HEADER END
  */
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1994, by Sun Microsystems, Inc.
@@ -46,7 +45,7 @@ putservent(const struct servent *sp, FILE *fp)
 	}
 
 	if (fprintf(fp, "%-20s %d/%s",
-		    sp->s_name, ntohs(sp->s_port), sp->s_proto) == EOF)
+	    sp->s_name, ntohs(sp->s_port), sp->s_proto) == EOF)
 		rc = 1;
 	for (p = sp->s_aliases; *p != 0; p++) {
 		if (fprintf(fp, " %s", *p) == EOF)
@@ -83,10 +82,10 @@ dogetserv(const char **list)
 
 			/* Copy string to avoiding modifying the argument */
 			(void) strncpy(key, *list, sizeof (key));
-			key[sizeof (key) - 1] = NULL;
+			key[sizeof (key) - 1] = '\0';
 			/* Split at a '/' to extract protocol number */
 			if ((cp = strchr(key, '/')) != NULL) {
-				*cp = NULL;
+				*cp = '\0';
 				protocol = cp + 1;
 			}
 			port = htons(atoi(key));
