@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -923,14 +921,9 @@ map_d_e_l(
  *
  */
 static size_t
-eval_cond_tbl(
-	icv_state_t		*ist,
-	itm_place_t		cond_place,
-	const unsigned char	**inbuf,
-	size_t			*inbytesleft,
-	size_t			outbytesleft,
-	itm_direc_t		*direc
-)
+eval_cond_tbl(icv_state_t *ist, itm_place_t cond_place,
+    const unsigned char **inbuf, size_t *inbytesleft, size_t outbytesleft,
+    itm_direc_t *direc)
 {
 	itm_tbl_hdr_t		*cond_hdr;
 	itm_cond_t		*cond;
@@ -997,7 +990,7 @@ eval_cond_tbl(
 			retval = 0;
 			eth = ADDR(cond->operand.place);
 			eh = (itm_escapeseq_hdr_t *)(eth + 1);
-			if (NULL == ist->default_action.itm_ptr) {
+			if (0 == ist->default_action.itm_ptr) {
 				ist->default_action = direc->action;
 				TRACE_MESSAGE('E',
 				    ("escape seq (default action=%6p, "
