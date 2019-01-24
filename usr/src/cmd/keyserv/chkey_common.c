@@ -81,7 +81,8 @@ static int get_ldap_bindPassword(char **);
  * will be used.
  */
 static int
-get_ldap_bindDN(char **ret_bindDN) {
+get_ldap_bindDN(char **ret_bindDN)
+{
 
 	char	bindDN[BUFSIZ];
 	char	prompt[BUFSIZ];
@@ -94,7 +95,7 @@ get_ldap_bindDN(char **ret_bindDN) {
 	"\nThe LDAP bind DN and password are required for this update.\n"
 	"If you are not sure what values to enter, please contact your\n"
 	"LDAP administrator.\n\nPlease enter LDAP bind DN [%s]: ",
-	LDAP_BINDDN_DEFAULT);
+	    LDAP_BINDDN_DEFAULT);
 
 	printf(prompt);
 
@@ -142,9 +143,10 @@ get_ldap_bindDN(char **ret_bindDN) {
  * Prompt the user for a ldap bind password.
  */
 static int
-get_ldap_bindPassword(char **ret_bindPass) {
+get_ldap_bindPassword(char **ret_bindPass)
+{
 
-	char 	bindPassword[BUFSIZ];
+	char	bindPassword[BUFSIZ];
 	char	prompt[BUFSIZ];
 	char	*bindPass = NULL;
 
@@ -153,7 +155,7 @@ get_ldap_bindPassword(char **ret_bindPass) {
 	*ret_bindPass = NULL;
 
 	(void) snprintf(prompt, BUFSIZ,
-		"Please enter LDAP bind password: ");
+	    "Please enter LDAP bind password: ");
 
 	bindPass = getpassphrase(prompt);
 
@@ -171,7 +173,7 @@ get_ldap_bindPassword(char **ret_bindPass) {
 	 * from previous entered.
 	 */
 	(void) snprintf(prompt, BUFSIZ,
-		"Re-enter LDAP bind password to confirm: ");
+	    "Re-enter LDAP bind password to confirm: ");
 
 	bindPass = getpassphrase(prompt);
 
@@ -187,13 +189,13 @@ get_ldap_bindPassword(char **ret_bindPass) {
 	} else {
 		(void) memset(bindPass, 0, strlen(bindPass));
 		if ((*ret_bindPass = (char *)malloc(strlen(bindPassword)+1))
-			== NULL) {
+		    == NULL) {
 			(void) memset(bindPassword, 0, BUFSIZ);
 			return (PROMPTGET_MEMORY_FAIL);
 		}
 
 		(void) strlcpy(*ret_bindPass, bindPassword,
-			strlen(bindPassword)+1);
+		    strlen(bindPassword)+1);
 
 		/* Clean up and erase the credential info */
 		(void) memset(bindPassword, 0, BUFSIZ);
@@ -239,8 +241,7 @@ is_switch_policy(struct __nsw_switchconfig *conf, char *target)
 
 char *
 first_and_only_switch_policy(char *policy,
-		    struct __nsw_switchconfig *default_conf,
-		    char *head_msg)
+    struct __nsw_switchconfig *default_conf, char *head_msg)
 {
 	struct __nsw_switchconfig *conf;
 	enum __nsw_parse_err perr;
@@ -291,8 +292,7 @@ first_and_only_switch_policy(char *policy,
 
 int
 check_switch_policy(char *policy, char *target_service,
-		    struct __nsw_switchconfig *default_conf,
-		    char *head_msg, char *tail_msg)
+    struct __nsw_switchconfig *default_conf, char *head_msg, char *tail_msg)
 {
 	struct __nsw_switchconfig *conf;
 	enum __nsw_parse_err perr;
@@ -464,12 +464,8 @@ static char *keyAttrs[] = {
  */
 
 static int
-ldap_attr_mod(ns_ldap_entry_t *entry,
-	    char *mechname,
-	    char *public,
-	    ns_ldap_attr_t **pkeyattrs,
-	    char *crypt,
-	    ns_ldap_attr_t **ckeyattrs)
+ldap_attr_mod(ns_ldap_entry_t *entry, char *mechname, char *public,
+    ns_ldap_attr_t **pkeyattrs, char *crypt, ns_ldap_attr_t **ckeyattrs)
 {
 	char		**alist[2];
 	char		*keys[2];
@@ -568,13 +564,8 @@ ldap_attr_mod(ns_ldap_entry_t *entry,
  * user.
  */
 static void
-update_ldap_attr(const char *dn,
-		ns_ldap_attr_t **attrs,
-		const char *passwd,
-		int add,
-		int update4host,
-		const char *bindDN,
-		const char *bindPasswd)
+update_ldap_attr(const char *dn, ns_ldap_attr_t **attrs, const char *passwd,
+    int add, int update4host, const char *bindDN, const char *bindPasswd)
 {
 	int		ldaprc;
 	int		authstried = 0;
@@ -681,11 +672,11 @@ update_ldap_attr(const char *dn,
 		if (add == TRUE)
 			ldaprc = __ns_ldap_addAttr("publickey", dn,
 			    (const ns_ldap_attr_t * const *)attrs,
-			    credp, NULL, &errorp);
+			    credp, 0, &errorp);
 		else
 			ldaprc = __ns_ldap_repAttr("publickey", dn,
 			    (const ns_ldap_attr_t * const *)attrs,
-			    credp, NULL, &errorp);
+			    credp, 0, &errorp);
 		if (ldaprc == NS_LDAP_SUCCESS) {
 			/* clean up ns_cred_t structure in memory */
 			if (credp != NULL)
@@ -725,11 +716,8 @@ out:
  * they are not used or an error comes up.
  */
 int
-ldap_update(char *mechname,
-	    char *netname,
-	    char *public,
-	    char *crypt,
-	    char *passwd)
+ldap_update(char *mechname, char *netname, char *public, char *crypt,
+    char *passwd)
 {
 	char		*netnamecpy;
 	char		*id;
