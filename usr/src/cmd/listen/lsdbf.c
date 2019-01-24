@@ -29,8 +29,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * data base routines for the network listener process
  */
@@ -532,7 +530,7 @@ int mflag;
 		DEBUG((9,"scan_line failed svc_code strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 	*svc_code_p = bp;
 	nexttok = ++p;
 
@@ -540,7 +538,7 @@ int mflag;
 		DEBUG((9,"scan_line failed flags strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 
 	while (*nexttok)  {
 		switch (*nexttok)  {
@@ -564,7 +562,7 @@ int mflag;
 		DEBUG((9,"scan_line failed id strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 	*id_p = nexttok;
 	nexttok = ++p;
 
@@ -572,7 +570,7 @@ int mflag;
 		DEBUG((9,"scan_line failed res1 strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 	*res1_p = nexttok;
 	nexttok = ++p;
 
@@ -580,7 +578,7 @@ int mflag;
 		DEBUG((9,"scan_line failed res2 strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 	*res2_p = nexttok;
 	nexttok = ++p;
 
@@ -588,7 +586,7 @@ int mflag;
 		DEBUG((9,"scan_line failed res3 strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 	*res3_p = nexttok;
 	nexttok = ++p;
 
@@ -596,7 +594,7 @@ int mflag;
 		DEBUG((9,"scan_line failed private strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 	*private_p = nexttok;
 	nexttok = ++p;
 
@@ -604,7 +602,7 @@ int mflag;
 		DEBUG((9,"scan_line failed rpc strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 
 	*prognum = -1;
 	*vernum = -1;
@@ -658,7 +656,7 @@ int mflag;
 		DEBUG((9,"scan_line failed sflags strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 
 	*sflags = 0;
 	while (*nexttok)  {
@@ -698,7 +696,7 @@ int mflag;
 		DEBUG((9,"scan_line failed module strchr"));
 		return(0);
 	}
-	*p = NULL;
+	*p = '\0';
 	*module_p = nexttok;
 	nexttok = ++p;
 
@@ -914,7 +912,7 @@ register char *mp;
 	extern int errno;
 
 	DEBUG((9,"in pushmod:"));
-	if (!mp || *mp == NULL) {
+	if (!mp || *mp == '\0') {
 		DEBUG((9,"NULL list: exiting pushmod"));
 		return(0);
 	}
