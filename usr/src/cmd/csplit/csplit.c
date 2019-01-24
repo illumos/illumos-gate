@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
@@ -114,7 +114,7 @@ main(int argc, char **argv)
 
 				break;
 			case 'n':		/* POSIX.2 */
-				for (ptr = optarg; *ptr != NULL; ptr++)
+				for (ptr = optarg; *ptr != '\0'; ptr++)
 					if (!isdigit((int)*ptr))
 						fatal("-n num\n", NULL);
 				fiwidth = atoi(optarg);
@@ -225,7 +225,7 @@ asc_to_ll(char *str, long long *plc)
 		}
 		break;
 	}
-	for (; *str != NULL; str++)
+	for (; *str != '\0'; str++)
 		if (*str >= '0' && *str <= '9')
 			*plc = *plc * 10 + *str - '0';
 		else
@@ -362,7 +362,7 @@ getfile()
 
 	if (create) {
 		if (fptr == 0)
-			for (fptr = file; *fptr != NULL; fptr++)
+			for (fptr = file; *fptr != '\0'; fptr++)
 				continue;
 		(void) sprintf(fptr, "%.*d", fiwidth, ctr++);
 
@@ -458,7 +458,7 @@ num_arg(char *arg, int md)
 
 	ptr = rep;
 	for (++arg; *arg != '}'; arg += len) {
-		if (*arg == NULL)
+		if (*arg == '\0')
 			fatal("%s: missing '}'\n", targ);
 		if ((len = mblen(arg, MB_LEN_MAX)) <= 0)
 			len = 1;
@@ -467,7 +467,7 @@ num_arg(char *arg, int md)
 		(void) memcpy(ptr, arg, len);
 		ptr += len;
 	}
-	*ptr = NULL;
+	*ptr = '\0';
 	if ((asc_to_ll(rep, &repeat) == ERR) || repeat < 0L)
 		fatal("Illegal repeat count: %s\n", targ);
 	if (md == LINMODE) {
@@ -506,7 +506,7 @@ re_arg(char *string)
 		if (*ptr == '\\')
 			++ptr;
 
-		if (*ptr == NULL)
+		if (*ptr == '\0')
 			fatal("%s: missing delimiter\n", targ);
 
 		if ((len = mblen(ptr, MB_LEN_MAX)) <= 0)
@@ -520,7 +520,7 @@ re_arg(char *string)
 	 * to be '/' or '%'.
 	 */
 
-	*ptr = NULL;
+	*ptr = '\0';
 	if (asc_to_ll(++ptr, &offset) == ERR)
 		fatal("%s: illegal offset\n", string);
 
