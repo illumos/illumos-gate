@@ -211,7 +211,7 @@ do_gssdtest(char *buf)
 			printf(gettext("Loop Count is %d \n"), i);
 			/*
 			 * if (i > 53)
-			 * 	printf ("Loop counter is greater than 55\n");
+			 *	printf ("Loop counter is greater than 55\n");
 			 */
 			_gss_acquire_cred(argc, argv);
 			_gss_init_sec_context(argc, argv);
@@ -1930,7 +1930,7 @@ char **argv;
 	else
 		mechType = gss_str2oid((char *)GSS_KRB5_MECH_OID);
 
-	if (mechType == NULL || mechType->length == NULL) {
+	if (mechType == NULL || mechType->length == 0) {
 		FREE(nameType->elements, nameType->length);
 		FREE(nameType, sizeof (gss_OID_desc));
 		printf(gettext("improperly formated mech OID\n"));

@@ -162,7 +162,7 @@ kgss_acquire_cred_wrapped(minor_status,
 		if (minor_status != NULL)
 			*minor_status = DEFAULT_MINOR_STAT;
 		if (output_cred_handle != NULL)
-			*output_cred_handle = NULL;
+			*output_cred_handle = 0;
 		if (actual_mechs != NULL)
 			*actual_mechs = NULL;
 		if (time_rec != NULL)
@@ -294,7 +294,7 @@ kgss_add_cred_wrapped(minor_status,
 {
 	CLIENT *clnt;
 
-	OM_uint32 	minor_status_temp;
+	OM_uint32	minor_status_temp;
 	gss_buffer_desc	external_name;
 	gss_OID		name_type;
 	int		i;
@@ -509,14 +509,14 @@ OM_uint32 gssd_cred_verifier;
 		if (minor_status != NULL)
 			*minor_status = DEFAULT_MINOR_STAT;
 		if (cred_handle != NULL)
-			*cred_handle = NULL;
+			*cred_handle = 0;
 
 		return (GSS_S_FAILURE);
 	}
 
 	/* if the release succeeded, null out the cred_handle */
 	if (res.status == GSS_S_COMPLETE && cred_handle != NULL)
-		*cred_handle = NULL;
+		*cred_handle = 0;
 
 	/* copy the rpc results into the return arguments */
 	if (minor_status != NULL)
@@ -1180,7 +1180,7 @@ kgss_delete_sec_context_wrapped(minor_status,
 		if (minor_status != NULL)
 			*minor_status = DEFAULT_MINOR_STAT;
 		if (context_handle != NULL)
-			*context_handle = NULL;
+			*context_handle = 0;
 		if (output_token != NULL)
 			output_token->length = 0;
 
@@ -1193,7 +1193,7 @@ kgss_delete_sec_context_wrapped(minor_status,
 		*minor_status = res.minor_status;
 
 	if (res.context_handle.GSS_CTX_ID_T_len == 0)
-		*context_handle = NULL;
+		*context_handle = 0;
 	else
 		/*LINTED*/
 		*context_handle = *((gssd_ctx_id_t *)
@@ -2320,7 +2320,7 @@ kgss_export_sec_context_wrapped(minor_status,
 		if (minor_status != NULL)
 			*minor_status = DEFAULT_MINOR_STAT;
 		if (context_handle != NULL)
-			*context_handle = NULL;
+			*context_handle = 0;
 		if (output_token != NULL)
 			output_token->length = 0;
 
@@ -2333,7 +2333,7 @@ kgss_export_sec_context_wrapped(minor_status,
 		*minor_status = res.minor_status;
 
 	if (res.context_handle.GSS_CTX_ID_T_len == 0)
-		*context_handle = NULL;
+		*context_handle = 0;
 	else
 		*context_handle =
 		    *((gssd_ctx_id_t *)res.context_handle.GSS_CTX_ID_T_val);
