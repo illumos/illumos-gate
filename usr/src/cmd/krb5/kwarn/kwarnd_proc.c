@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  RPC server procedures for the usermode daemon kwarnd.
  */
@@ -883,7 +881,7 @@ kwarnd_check_warning_list(void)
 		    app_krb5_user_uid(), cred_warning_list);
 
 	while (1) {
-		(void) poll(NULL, NULL, 60000);
+		(void) poll(NULL, 0, 60000);
 
 		for (cw = cred_warning_list;
 			cw != NULL;
