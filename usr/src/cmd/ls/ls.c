@@ -31,7 +31,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
@@ -187,7 +187,7 @@ struct	lbuf	{
 	} ln;
 	char	ltype;		/* filetype */
 	ino_t	lnum;		/* inode number of file */
-	mode_t	lflags; 	/* 0777 bits used as r,w,x permissions */
+	mode_t	lflags;		/* 0777 bits used as r,w,x permissions */
 	nlink_t	lnl;		/* number of links to file */
 	uid_t	luid;
 	gid_t	lgid;
@@ -198,7 +198,7 @@ struct	lbuf	{
 	timestruc_t	lct;
 	timestruc_t	lmt;
 	char	*flinkto;	/* symbolic link contents */
-	char 	acl;		/* indicate there are additional acl entries */
+	char	acl;		/* indicate there are additional acl entries */
 	int	cycle;		/* cycle detected flag */
 	struct ditem *ancinfo;	/* maintains ancestor info */
 	acl_t *aclp;		/* ACL if present */
@@ -315,7 +315,7 @@ static int		statreq;
 static uint64_t		block_size = 1;
 static char		*dotp = ".";
 
-static u_longlong_t 	tblocks; /* number of blocks of files in a directory */
+static u_longlong_t	tblocks; /* number of blocks of files in a directory */
 static time_t		year, now;
 
 static int		num_cols = 80;
@@ -2537,7 +2537,7 @@ set_sysattrtm_display(char *name, struct lbuf *rep)
 	size_t		len;
 
 	if (nvpair_value_uint64_array(pair, &value, &nelem) == 0) {
-		if (*value != NULL) {
+		if (value != NULL) {
 			len = strlen(name);
 			i = 0;
 			while (rep->extm[i].stm != 0 && i < sacnt)
