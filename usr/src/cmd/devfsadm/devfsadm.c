@@ -378,7 +378,7 @@ main(int argc, char *argv[])
 			detachfromtty();
 			(void) cond_init(&cv, USYNC_THREAD, 0);
 			(void) mutex_init(&count_lock, USYNC_THREAD, 0);
-			if (thr_create(NULL, NULL,
+			if (thr_create(NULL, 0,
 			    (void *(*)(void *))instance_flush_thread,
 			    NULL, THR_DETACHED, NULL) != 0) {
 				err_print(CANT_CREATE_THREAD, "daemon",
@@ -390,7 +390,7 @@ main(int argc, char *argv[])
 			/* start the minor_fini_thread */
 			(void) mutex_init(&minor_fini_mutex, USYNC_THREAD, 0);
 			(void) cond_init(&minor_fini_cv, USYNC_THREAD, 0);
-			if (thr_create(NULL, NULL,
+			if (thr_create(NULL, 0,
 			    (void *(*)(void *))minor_fini_thread,
 			    NULL, THR_DETACHED, NULL)) {
 				err_print(CANT_CREATE_THREAD, "minor_fini",
@@ -705,7 +705,7 @@ parse_args(int argc, char *argv[])
 		}
 
 		if (bind == TRUE) {
-			if ((mc.major == -1) || (mc.drvname[0] == NULL)) {
+			if ((mc.major == -1) || (mc.drvname[0] == '\0')) {
 				err_print(MAJOR_AND_B_FLAG);
 				devfsadm_exit(1);
 				/*NOTREACHED*/
@@ -6354,7 +6354,7 @@ create_selector_list(char *selector)
 	selector_list_t *selector_list;
 
 	/* parse_devfs_spec splits the next field into keyword & value */
-	while ((*selector != NULL) && (error == FALSE)) {
+	while ((*selector != '\0') && (error == FALSE)) {
 		if (parse_selector(&selector, &key, &val) == DEVFSADM_FAILURE) {
 			error = TRUE;
 			break;
@@ -7557,7 +7557,7 @@ getnexttoken(char *next, char **nextp, char **tokenpp, char *tchar)
 			;
 		if (*cp1 == '=' || *cp1 == ':' || *cp1 == '&' || *cp1 == '|' ||
 		    *cp1 == ';' || *cp1 == '\n' || *cp1 == '\0') {
-			*cp = NULL;	/* terminate token */
+			*cp = '\0';	/* terminate token */
 			cp = cp1;
 		}
 	}
