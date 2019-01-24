@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rcv.h"
 #include <locale.h>
 
@@ -293,7 +291,7 @@ void
 commands(void)
 {
 	int eofloop;
-	register int n;
+	int n;
 	char linebuf[LINESIZE];
 	char line[LINESIZE];
 	struct stat minfo;
@@ -454,8 +452,8 @@ execute(char linebuf[], int contxt)
 	char word[LINESIZE];
 	char *arglist[MAXARGC];
 	const struct cmd *com;
-	register char *cp, *cp2;
-	register int c, e;
+	char *cp, *cp2;
+	int c, e;
 	int muvec[2];
 
 	/*
@@ -586,13 +584,13 @@ execute(char linebuf[], int contxt)
 			break;
 		if (c  == 0)
 			if (msgCount == 0)
-				*msgvec = NULL;
+				*msgvec = 0;
 			else {
 				*msgvec = first(com->c_msgflag,
 					com->c_msgmask);
-				msgvec[1] = NULL;
+				msgvec[1] = 0;
 			}
-		if (*msgvec == NULL) {
+		if (*msgvec == 0) {
 			fprintf(stderr, gettext("No applicable messages\n"));
 			break;
 		}
@@ -756,7 +754,7 @@ setmsize(int sz)
 static const struct cmd *
 lex(char word[])
 {
-	register const struct cmd *cp;
+	const struct cmd *cp;
 
 	for (cp = &cmdtab[0]; cp->c_name != NOSTR; cp++)
 		if (isprefix(word, cp->c_name))
@@ -770,7 +768,7 @@ lex(char word[])
 static int
 isprefix(char *as1, char *as2)
 {
-	register char *s1, *s2;
+	char *s1, *s2;
 
 	s1 = as1;
 	s2 = as2;
@@ -795,7 +793,7 @@ static int	inithdr;		/* am printing startup headers */
 void
 stop(int s)
 {
-	register NODE *head;
+	NODE *head;
 
 	noreset = 0;
 	if (!inithdr)
@@ -867,8 +865,8 @@ announce(void)
 int
 newfileinfo(int start)
 {
-	register struct message *mp;
-	register int u, n, mdot, d, s;
+	struct message *mp;
+	int u, n, mdot, d, s;
 	char fname[BUFSIZ], zname[BUFSIZ], *ename;
 
 	if (Hflag)
@@ -945,7 +943,7 @@ pversion(char *s)
 void
 load(char *name)
 {
-	register FILE *in, *oldin;
+	FILE *in, *oldin;
 
 	if ((in = fopen(name, "r")) == NULL)
 		return;

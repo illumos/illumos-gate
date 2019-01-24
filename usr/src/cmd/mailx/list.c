@@ -36,7 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "rcv.h"
 #include <locale.h>
@@ -73,8 +72,8 @@ static void	unmark(int mesg);
 int
 getmessage(char *buf, int *vector, int flags)
 {
-	register int *ip;
-	register struct message *mp;
+	int *ip;
+	struct message *mp;
 	int firstmsg = -1;
 	char delims[] = "\t- ";
 	char *result  = NULL;
@@ -104,7 +103,7 @@ getmessage(char *buf, int *vector, int flags)
 		if (mp->m_flag & MMARK)
 			*ip++ = mp - &message[0] + 1;
 	}
-	*ip = NULL;
+	*ip = 0;
 	return (ip - vector);
 }
 
@@ -146,8 +145,8 @@ isinteger(char *buf)
 int
 getmsglist(char *buf, int *vector, int flags)
 {
-	register int *ip;
-	register struct message *mp;
+	int *ip;
+	struct message *mp;
 
 	if (markall(buf, flags) < 0)
 		return (-1);
@@ -155,7 +154,7 @@ getmsglist(char *buf, int *vector, int flags)
 	for (mp = &message[0]; mp < &message[msgCount]; mp++)
 		if (mp->m_flag & MMARK)
 			*ip++ = mp - &message[0] + 1;
-	*ip = NULL;
+	*ip = 0;
 	return (ip - vector);
 }
 
@@ -200,9 +199,9 @@ static	int	lastcolmod;
 static int
 markall(char buf[], int f)
 {
-	register char **np;
-	register int i;
-	register struct message *mp;
+	char **np;
+	int i;
+	struct message *mp;
 	char *namelist[NMLSIZE], *bufp;
 	int tok, beg, mc, star, other, colmod, colresult;
 
@@ -366,7 +365,7 @@ namelist[0]);
 
 	if (colmod != 0) {
 		for (i = 1; i <= msgCount; i++) {
-			register struct coltab *colp;
+			struct coltab *colp;
 
 			mp = &message[i - 1];
 			for (colp = &coltab[0]; colp->co_char; colp++)
@@ -380,7 +379,7 @@ namelist[0]);
 			if (mp->m_flag & MMARK)
 				break;
 		if (mp >= &message[msgCount]) {
-			register struct coltab *colp;
+			struct coltab *colp;
 
 			printf(gettext("No messages satisfy"));
 			for (colp = &coltab[0]; colp->co_char; colp++)
@@ -400,7 +399,7 @@ namelist[0]);
 static int
 evalcol(int col)
 {
-	register struct coltab *colp;
+	struct coltab *colp;
 
 	if (col == 0)
 		return (lastcolmod);
@@ -416,7 +415,7 @@ evalcol(int col)
 static int
 check(int mesg, int f)
 {
-	register struct message *mp;
+	struct message *mp;
 
 	if (mesg < 1 || mesg > msgCount) {
 		printf(gettext("%d: Invalid message number\n"), mesg);
@@ -438,9 +437,9 @@ check(int mesg, int f)
 int
 getrawlist(char line[], char **argv, int argc)
 {
-	register char **ap, *cp, *cp2;
+	char **ap, *cp, *cp2;
 	char linebuf[LINESIZE], quotec;
-	register char **last;
+	char **last;
 
 	ap = argv;
 	cp = line;
@@ -515,9 +514,9 @@ static struct lex {
 static int
 scan(char **sp)
 {
-	register char *cp, *cp2;
-	register char c;
-	register struct lex *lp;
+	char *cp, *cp2;
+	char c;
+	struct lex *lp;
 	int quotec;
 
 	if (regretp >= 0) {
@@ -649,8 +648,8 @@ scaninit(void)
 int
 first(int f, int m)
 {
-	register int mesg;
-	register struct message *mp;
+	int mesg;
+	struct message *mp;
 
 	mesg = dot - &message[0] + 1;
 	f &= MDELETED;
@@ -666,7 +665,7 @@ first(int f, int m)
 			return (mesg);
 		mesg--;
 	}
-	return (NULL);
+	return (0);
 }
 
 /*
@@ -692,8 +691,8 @@ static char lastscan[128];
 static int
 matchsubj(char *str, int mesg)
 {
-	register struct message *mp;
-	register char *cp, *cp2, *backup;
+	struct message *mp;
+	char *cp, *cp2, *backup;
 
 	str++;
 	if (strlen(str) == 0)
@@ -729,7 +728,7 @@ matchsubj(char *str, int mesg)
 static void
 mark(int mesg)
 {
-	register int i;
+	int i;
 
 	i = mesg;
 	if (i < 1 || i > msgCount)
@@ -744,7 +743,7 @@ mark(int mesg)
 static void
 unmark(int mesg)
 {
-	register int i;
+	int i;
 
 	i = mesg;
 	if (i < 1 || i > msgCount)
@@ -758,8 +757,8 @@ unmark(int mesg)
 static int
 metamess(int meta, int f)
 {
-	register int c, m;
-	register struct message *mp;
+	int c, m;
+	struct message *mp;
 
 	c = meta;
 	switch (c) {

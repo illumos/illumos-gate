@@ -59,7 +59,7 @@ static int	forward(char ms[], FILE *obuf, int f);
 static FILE	*mesedit(FILE *ibuf, FILE *obuf, int c, struct header *hp);
 static FILE	*mespipe(FILE *ibuf, FILE *obuf, char cmd[]);
 static void	resetsigs(int resethup);
-static int	stripnulls(register char *linebuf, register int nread);
+static int	stripnulls(char *linebuf, int nread);
 static void	xhalt(void);
 static char	**Xaddone(char **hf, char news[]);
 static int	tabputs(const char *line, FILE *obuf);
@@ -95,7 +95,7 @@ collect(struct header *hp)
 	FILE *ibuf, *fbuf, *obuf;
 	int escape, eof;
 	long lc, cc;
-	register int c, t;
+	int c, t;
 	int hdrs;
 	char linebuf[LINESIZE+1], *cp;
 	char *iprompt;
@@ -240,7 +240,7 @@ collect(struct header *hp)
 			hdrs = 0;
 			continue;
 		}
-		if ((nread = getaline(linebuf,LINESIZE,stdin,&hasnulls)) == NULL) {
+		if ((nread = getaline(linebuf,LINESIZE,stdin,&hasnulls)) == 0) {
 			if (intty && value("ignoreeof") != NOSTR) {
 				if (++eof > 35)
 					break;
@@ -769,7 +769,7 @@ resetsigs(int resethup)
 static int
 exwrite(char name[], FILE *ibuf)
 {
-	register FILE *of;
+	FILE *of;
 	struct stat junk;
 	void (*sigint)(int), (*sigpipe)(int);
 	int pi = (*name == '!');
@@ -794,7 +794,7 @@ exwrite(char name[], FILE *ibuf)
 void
 lcwrite(char *fn, FILE *fi, FILE *fo, int addnl)
 {
-	register int c;
+	int c;
 	long lc, cc;
 
 	printf("\"%s\" ", fn);
@@ -836,13 +836,13 @@ mesedit(FILE *ibuf, FILE *obuf, int c, struct header *hp)
 {
 	pid_t pid;
 	FILE *fbuf;
-	register int t;
+	int t;
 	void (*sigint)(int);
 #ifdef SIGCONT
 	void (*sigcont)(int);
 #endif
 	struct stat sbuf;
-	register char *edit;
+	char *edit;
 	char hdr[LINESIZE];
 	char *oto, *osubject, *occ, *obcc, **oothers;
 	int fd = -1;
@@ -995,7 +995,7 @@ out:
 static FILE *
 mespipe(FILE *ibuf, FILE *obuf, char cmd[])
 {
-	register FILE *ni, *no;
+	FILE *ni, *no;
 	pid_t pid;
 	int s;
 	void (*sigint)(int);
@@ -1081,25 +1081,25 @@ static char *indentprefix;	/* used instead of tab by tabputs */
 static int
 forward(char ms[], FILE *obuf, int f)
 {
-	register int *msgvec, *ip;
+	int *msgvec, *ip;
 
 	msgvec = (int *) salloc((msgCount+1) * sizeof *msgvec);
 	if (msgvec == NOINTPTR)
 		return(0);
 	if (getmsglist(ms, msgvec, 0) < 0)
 		return(0);
-	if (*msgvec == NULL) {
+	if (*msgvec == 0) {
 		*msgvec = first(0, MMNORM);
-		if (*msgvec == NULL) {
+		if (*msgvec == 0) {
 			printf(gettext("No appropriate messages\n"));
 			return(0);
 		}
-		msgvec[1] = NULL;
+		msgvec[1] = 0;
 	}
 	if (tolower(f) == 'm')
 		indentprefix = value("indentprefix");
 	printf(gettext("Interpolating:"));
-	for (ip = msgvec; *ip != NULL; ip++) {
+	for (ip = msgvec; *ip != 0; ip++) {
 		touch(*ip);
 		printf(" %d", *ip);
 		if (msend(&message[*ip-1], obuf, islower(f) ? M_IGNORE : 0,
@@ -1156,8 +1156,8 @@ collcont(int s)
 static void 
 collrub(int s)
 {
-	register FILE *dbuf;
-	register char *deadletter;
+	FILE *dbuf;
+	char *deadletter;
 
 # ifdef OLD_BSD_SIGS
 	if (s == SIGHUP)
@@ -1225,7 +1225,7 @@ intack(int s)
 int
 getaline(char *line, int size, FILE *f, int *hasnulls)
 {
-	register int i, ch;
+	int i, ch;
 	for (i = 0; (i < size) && ((ch=getc(f)) != EOF); ) {
 		if ( ch == '\0' )
 			*hasnulls = 1;
@@ -1270,7 +1270,7 @@ addto(char hf[], char news[])
 char *
 addone(char hf[], char news[])
 {
-	register char *cp, *cp2, *linebuf;
+	char *cp, *cp2, *linebuf;
 
 	if (hf == NOSTR)
 		hf = savestr("");
@@ -1291,7 +1291,7 @@ addone(char hf[], char news[])
 static int 
 nptrs(char **hf)
 {
-	register int i;
+	int i;
 
 	if (!hf)
 		return(0);
@@ -1306,7 +1306,7 @@ nptrs(char **hf)
 static char **
 Xaddone(char **hf, char news[])
 {
-	register char *linebuf;
+	char *linebuf;
 	char **ohf = hf;
 	int nhf = nptrs(hf);
 
@@ -1328,7 +1328,7 @@ Xaddone(char **hf, char news[])
 static void
 cpout(char *str, FILE *ofd)
 {
-	register char *cp = str;
+	char *cp = str;
 
 	while (*cp) {
 		if (*cp == '\\') {
@@ -1370,9 +1370,9 @@ xhalt(void)
  * Strip the nulls from a buffer of length n
  */
 static int 
-stripnulls(register char *linebuf, register int nread)
+stripnulls(char *linebuf, int nread)
 {
-	register int i, j;
+	int i, j;
 
 	for (i = 0; i < nread; i++)
 		if (linebuf[i] == '\0')

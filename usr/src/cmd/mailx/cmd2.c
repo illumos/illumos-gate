@@ -75,7 +75,7 @@ next(int *msgvec)
 	register struct message *mp;
 	int list[2];
 
-	if (*msgvec != NULL) {
+	if (*msgvec != 0) {
 		if (*msgvec < 0) {
 			printf((gettext("Negative message given\n")));
 			return (1);
@@ -113,7 +113,7 @@ hitit:
 	 * Print dot.
 	 */
 	list[0] = dot - &message[0] + 1;
-	list[1] = NULL;
+	list[1] = 0;
 	return (type(list));
 }
 
@@ -154,11 +154,11 @@ save1(char str[], int mark)
 		return (1);
 	if (!f) {
 		*msgvec = first(0, MMNORM);
-		if (*msgvec == NULL) {
+		if (*msgvec == 0) {
 			printf(gettext("No messages to %s.\n"), cmd);
 			return (1);
 		}
-		msgvec[1] = NULL;
+		msgvec[1] = 0;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
 		return (1);
@@ -229,11 +229,11 @@ put1(char str[], int doign)
 		return (1);
 	if (!f) {
 		*msgvec = first(0, MMNORM);
-		if (*msgvec == NULL) {
+		if (*msgvec == 0) {
 			printf(gettext("No messages to put.\n"));
 			return (1);
 		}
-		msgvec[1] = NULL;
+		msgvec[1] = 0;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
 		return (1);
@@ -374,11 +374,11 @@ swrite(char str[])
 		return (1);
 	if (!f) {
 		*msgvec = first(0, MMNORM);
-		if (*msgvec == NULL) {
+		if (*msgvec == 0) {
 			printf(gettext("No messages to write.\n"));
 			return (1);
 		}
-		msgvec[1] = NULL;
+		msgvec[1] = 0;
 	}
 	if (f && getmsglist(str, msgvec, 0) < 0)
 		return (1);
@@ -530,7 +530,7 @@ deltype(int msgvec[])
 		list[0]++;
 		if (list[0] > lastdot) {
 			touch(list[0]);
-			list[1] = NULL;
+			list[1] = 0;
 			return (type(list));
 		}
 		printf(gettext("At EOF\n"));
@@ -552,8 +552,8 @@ delm(int *msgvec)
 	int *ip, mesg;
 	int last;
 
-	last = NULL;
-	for (ip = msgvec; *ip != NULL; ip++) {
+	last = 0;
+	for (ip = msgvec; *ip != 0; ip++) {
 		mesg = *ip;
 		touch(mesg);
 		mp = &message[mesg-1];
@@ -561,10 +561,10 @@ delm(int *msgvec)
 		mp->m_flag &= ~(MPRESERVE|MSAVED|MBOX);
 		last = mesg;
 	}
-	if (last != NULL) {
+	if (last != 0) {
 		dot = &message[last-1];
 		last = first(0, MDELETED);
-		if (last != NULL) {
+		if (last != 0) {
 			dot = &message[last-1];
 			return (0);
 		} else {
