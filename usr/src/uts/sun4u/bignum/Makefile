@@ -61,7 +61,7 @@ LDFLAGS += -dy -Nmisc/kcf
 # lint pass one enforcement
 #
 CFLAGS		+= $(CCVERBOSE) -I$(CRYPTODIR) -I$(COM1_DIR)
-CFLAGS		+= -DUMUL64 -DUSE_FLOATING_POINT
+CFLAGS		+= -DUMUL64
 LINTFLAGS	+= -I$(CRYPTODIR) -I$(COM1_DIR)
 CERRWARN	+= -_gcc=-Wno-unused-function
 
