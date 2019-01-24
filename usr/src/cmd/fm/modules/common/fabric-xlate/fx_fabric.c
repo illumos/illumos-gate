@@ -50,7 +50,7 @@ fab_erpt_tbl_t fab_pci_erpt_tbl[] = {
 	PCI_MA,			PCI_STAT_R_MAST_AB,	NULL,
 	PCI_REC_TA,		PCI_STAT_R_TARG_AB,	NULL,
 	PCI_SIG_TA,		PCI_STAT_S_TARG_AB,	NULL,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 
 /* Translate Fabric ereports to ereport.io.pci.sec-* */
@@ -63,14 +63,14 @@ static fab_erpt_tbl_t fab_pci_bdg_erpt_tbl[] = {
 #endif
 	PCI_REC_TA,		PCI_STAT_R_TARG_AB,	NULL,
 	PCI_SIG_TA,		PCI_STAT_S_TARG_AB,	NULL,
-	NULL, NULL, NULL, NULL,
+	NULL, 0, NULL,
 };
 
 
 /* Translate Fabric ereports to ereport.io.pci.dto */
 static fab_erpt_tbl_t fab_pci_bdg_ctl_erpt_tbl[] = {
 	PCI_DTO,	PCI_BCNF_BCNTRL_DTO_STAT,	NULL,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 
 /* Translate Fabric ereports to ereport.io.pciex.* */
@@ -81,7 +81,7 @@ static fab_erpt_tbl_t fab_pcie_ce_erpt_tbl[] = {
 	PCIEX_BDP,	PCIE_AER_CE_BAD_DLLP,		NULL,
 	PCIEX_BTP,	PCIE_AER_CE_BAD_TLP,		NULL,
 	PCIEX_ANFE,	PCIE_AER_CE_AD_NFE,		NULL,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 
 /*
@@ -104,7 +104,7 @@ static fab_erpt_tbl_t fab_pcie_ue_erpt_tbl[] = {
 	PCIEX_UR,	PCIE_AER_UCE_UR,		PCI_TARG_MA,
 #endif
 	PCIEX_POIS,	PCIE_AER_UCE_PTLP,		PCI_TARG_MDPE,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 
 /* Translate Fabric ereports to ereport.io.pciex.* */
@@ -124,7 +124,7 @@ static fab_erpt_tbl_t fab_pcie_sue_erpt_tbl[] = {
 	PCIEX_S_PERR,	PCIE_AER_SUCE_PERR_ASSERT,	PCI_TARG_MDPE,
 	PCIEX_S_SERR,	PCIE_AER_SUCE_SERR_ASSERT,	NULL,
 	PCIEX_INTERR,	PCIE_AER_SUCE_INTERNAL_ERR,	NULL,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 
 /* Translate Fabric ereports to ereport.io.pcix.* */
@@ -132,7 +132,7 @@ static fab_erpt_tbl_t fab_pcix_erpt_tbl[] = {
 	PCIX_SPL_DIS,		PCI_PCIX_SPL_DSCD,	NULL,
 	PCIX_UNEX_SPL,		PCI_PCIX_UNEX_SPL,	NULL,
 	PCIX_RX_SPL_MSG,	PCI_PCIX_RX_SPL_MSG,	NULL,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 static fab_erpt_tbl_t *fab_pcix_bdg_erpt_tbl = fab_pcix_erpt_tbl;
 
@@ -142,7 +142,7 @@ static fab_erpt_tbl_t fab_pcix_bdg_sec_erpt_tbl[] = {
 	PCIX_UNEX_SPL,		PCI_PCIX_BSS_UNEX_SPL,	NULL,
 	PCIX_BSS_SPL_OR,	PCI_PCIX_BSS_SPL_OR,	NULL,
 	PCIX_BSS_SPL_DLY,	PCI_PCIX_BSS_SPL_DLY,	NULL,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 
 /* Translate Fabric ereports to ereport.io.pciex.* */
@@ -153,7 +153,7 @@ static fab_erpt_tbl_t fab_pcie_nadv_erpt_tbl[] = {
 	PCIEX_FAT,		PCIE_DEVSTS_FE_DETECTED,	NULL,
 	PCIEX_NONFAT,		PCIE_DEVSTS_NFE_DETECTED,	NULL,
 	PCIEX_CORR,		PCIE_DEVSTS_CE_DETECTED,	NULL,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 
 /* Translate Fabric ereports to ereport.io.pciex.* */
@@ -163,7 +163,7 @@ static fab_erpt_tbl_t fab_pcie_rc_erpt_tbl[] = {
 	PCIEX_RC_CE_MSG,	PCIE_AER_RE_STS_CE_RCVD,	NULL,
 	PCIEX_RC_MCE_MSG,	PCIE_AER_RE_STS_MUL_CE_RCVD,	NULL,
 	PCIEX_RC_MUE_MSG,	PCIE_AER_RE_STS_MUL_FE_NFE_RCVD, NULL,
-	NULL, NULL, NULL
+	NULL, 0, NULL
 };
 
 /*
@@ -175,7 +175,7 @@ static fab_erpt_tbl_t fab_pcie_fake_rc_erpt_tbl[] = {
 	PCIEX_RC_FE_MSG,	PCIE_DEVSTS_FE_DETECTED,	NULL,
 	PCIEX_RC_NFE_MSG,	PCIE_DEVSTS_NFE_DETECTED,	NULL,
 	PCIEX_RC_CE_MSG,	PCIE_DEVSTS_CE_DETECTED,	NULL,
-	NULL, NULL, NULL,
+	NULL, 0, NULL,
 };
 
 /* ARGSUSED */

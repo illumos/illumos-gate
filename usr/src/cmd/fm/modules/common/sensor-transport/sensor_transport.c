@@ -388,7 +388,7 @@ parse_spoof_param(fmd_hdl_t *hdl, char *param, sensor_transport_t *stp)
 	char *sensor, *last_sensor, *field, *last_field;
 	nvlist_t *spoof;
 
-	if (nvlist_alloc(&stp->st_spoofs, NV_UNIQUE_NAME, 0) != NULL) {
+	if (nvlist_alloc(&stp->st_spoofs, NV_UNIQUE_NAME, 0) != 0) {
 		return (-1);
 	}
 

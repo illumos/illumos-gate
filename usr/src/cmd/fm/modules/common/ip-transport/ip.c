@@ -852,7 +852,8 @@ ip_start_connections()
  * connecting to the server.
  */
 static void
-ip_timeout(fmd_hdl_t *hdl, id_t id, void *arg) {
+ip_timeout(fmd_hdl_t *hdl, id_t id, void *arg)
+{
 	int install_timer;
 	ip_cinfo_t *cinfo;
 	ip_xprt_t *ipx;
@@ -861,33 +862,33 @@ ip_timeout(fmd_hdl_t *hdl, id_t id, void *arg) {
 		fmd_hdl_error(hdl, "ip_timeout failed because hg arg is NULL");
 	} else if (ip_argis_cinfo(arg)) {
 		ip_debug(IP_DEBUG_FINER,
-			"Enter ip_timeout (a) install new timer");
+		    "Enter ip_timeout (a) install new timer");
 		cinfo = arg;
 		if ((ip_xprt_setup(hdl, arg) != 0) && !ip_quit)
 			cinfo->ipc_timer = fmd_timer_install(
-				hdl, cinfo, NULL, ip_sleep);
+			    hdl, cinfo, NULL, ip_sleep);
 		else
-			cinfo->ipc_timer = NULL;
+			cinfo->ipc_timer = 0;
 	} else {
 		ipx = arg;
 		if (ipx->ipx_flags & FMD_XPRT_SUSPENDED) {
-			ipx->ipx_spnd_timer = NULL;
+			ipx->ipx_spnd_timer = 0;
 			ip_debug(IP_DEBUG_FINE, "timer %d waking ipx %p",
-				(int)id, arg);
+			    (int)id, arg);
 			ipx->ipx_flags &= ~FMD_XPRT_SUSPENDED;
 			fmd_xprt_resume(hdl, ipx->ipx_xprt);
 		} else {
 			ip_debug(IP_DEBUG_FINE, "timer %d closing ipx %p",
-				(int)id, arg);
+			    (int)id, arg);
 			cinfo = ipx->ipx_cinfo;
 			install_timer = (ipx->ipx_flags & FMD_XPRT_ACCEPT) !=
-				FMD_XPRT_ACCEPT;
+			    FMD_XPRT_ACCEPT;
 			ip_xprt_destroy(ipx);
 			if (install_timer && !ip_quit)
 				cinfo->ipc_timer = fmd_timer_install(
-					hdl, cinfo, NULL, ip_sleep);
+				    hdl, cinfo, NULL, ip_sleep);
 			else
-				cinfo->ipc_timer = NULL;
+				cinfo->ipc_timer = 0;
 		}
 	}
 }

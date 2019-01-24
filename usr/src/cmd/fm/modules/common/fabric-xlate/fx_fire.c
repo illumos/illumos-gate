@@ -66,7 +66,7 @@ static fab_fire_tbl_t fab_fire_pec_ue_tbl[] = {
 	FAB_FIRE_UE(TE,	 TRAINING, PCI_STAT_S_SYSERR,	0),
 	FAB_FIRE_UE(CA,	 CA,	   PCI_STAT_S_TARG_AB,
 	    PCI_STAT_S_TARG_AB),
-	NULL, NULL, NULL,
+	NULL, 0, 0,
 };
 
 #define	FAB_FIRE_CE(fb, bit) \
@@ -77,7 +77,7 @@ static fab_fire_tbl_t fab_fire_pec_ce_tbl[] = {
 	FAB_FIRE_CE(BDP,	BAD_DLLP),
 	FAB_FIRE_CE(BTP,	BAD_TLP),
 	FAB_FIRE_CE(RE,		RECEIVER_ERR),
-	NULL, NULL, NULL,
+	NULL, 0, 0,
 };
 
 /*
@@ -97,7 +97,7 @@ static fab_fire_tbl_t fab_fire_pec_oe_tbl[] = {
 	FAB_FIRE_OE(ERO, DLP),
 	FAB_FIRE_OE(EMP, DLP),
 	FAB_FIRE_OE(EPE, DLP),
-	NULL, NULL, NULL,
+	NULL, 0, 0,
 };
 
 #define	FAB_FIRE_DMC(fb) \
@@ -115,7 +115,7 @@ static fab_fire_tbl_t fab_fire_dmc_tbl[] = {
 	FAB_N2_DMU("sun4v_inv_pg_sz"),
 	FAB_N2_DMU("sun4v_key_err"),
 	FAB_N2_DMU("sun4v_va_oor"),
-	NULL, NULL, NULL
+	NULL, 0, 0
 };
 
 /* ARGSUSED */
