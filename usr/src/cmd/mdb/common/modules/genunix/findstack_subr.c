@@ -117,7 +117,7 @@ crawl(uintptr_t frame, uintptr_t kbase, uintptr_t ktop, uintptr_t ubase,
 		 */
 		if (kill_fp) {
 			fs_dprintf(("<7> fpp = %p\n", fpp));
-			*fpp = NULL;
+			*fpp = 0;
 		}
 
 		fs_dprintf(("<8> levels = %d\n", levels));

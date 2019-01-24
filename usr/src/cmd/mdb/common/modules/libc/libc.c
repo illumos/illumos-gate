@@ -324,7 +324,7 @@ uc_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	ucontext_t uc;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&uc, sizeof (uc), addr) != sizeof (uc)) {
@@ -346,7 +346,7 @@ oldc_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("walker only supports global walk\n");
 		return (WALK_ERR);
 	}
@@ -378,7 +378,7 @@ oldc_walk_step(mdb_walk_state_t *wsp)
 		uintptr_t addr = lsp->pr_oldcontext;
 		ucontext_t uc;
 
-		if (addr == NULL)
+		if (addr == 0)
 			return (WALK_NEXT);
 
 		if (mdb_vread(&uc, sizeof (uc), addr) != sizeof (uc)) {
@@ -718,17 +718,17 @@ uberdata_addr(void)
 
 	if (mdb_lookup_by_obj("libc.so.1", "_tdb_bootstrap", &sym) != 0) {
 		mdb_warn("cannot find libc.so.1`_tdb_bootstrap");
-		return (NULL);
+		return (0);
 	}
 	if (mdb_vread(&addr, sizeof (addr), sym.st_value) == sizeof (addr) &&
-	    addr != NULL &&
+	    addr != 0 &&
 	    mdb_vread(&uaddr, sizeof (uaddr), addr) == sizeof (uaddr) &&
-	    uaddr != NULL) {
+	    uaddr != 0) {
 		return (uaddr);
 	}
 	if (mdb_lookup_by_obj("libc.so.1", "_uberdata", &sym) != 0) {
 		mdb_warn("cannot find libc.so.1`_uberdata");
-		return (NULL);
+		return (0);
 	}
 	return ((uintptr_t)sym.st_value);
 }
@@ -745,7 +745,7 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (argc != 0)
 		return (DCMD_USAGE);
-	if (!(flags & DCMD_ADDRSPEC) && (addr = uberdata_addr()) == NULL)
+	if (!(flags & DCMD_ADDRSPEC) && (addr = uberdata_addr()) == 0)
 		return (DCMD_ERR);
 
 	if (mdb_vread(&uberdata, sizeof (uberdata), addr) !=
@@ -922,14 +922,14 @@ ulwp_walk_init(mdb_walk_state_t *wsp)
 		    "platform's offset for uberdata.all_lwps");
 	}
 
-	if (addr == NULL &&
-	    ((uber_addr = uberdata_addr()) == NULL ||
+	if (addr == 0 &&
+	    ((uber_addr = uberdata_addr()) == 0 ||
 	    mdb_vread(&addr, sizeof (addr), uber_addr + offset)
 	    != sizeof (addr))) {
 		mdb_warn("cannot find 'uberdata.all_lwps'");
 		return (WALK_ERR);
 	}
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 	wsp->walk_addr = addr;
 	wsp->walk_data = (void *)addr;
@@ -942,7 +942,7 @@ ulwp_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	ulwp_t ulwp;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 	if (mdb_vread(&ulwp, sizeof (ulwp), addr) != sizeof (ulwp) &&
 	    (bzero(&ulwp, sizeof (ulwp)),
@@ -956,7 +956,7 @@ ulwp_walk_step(mdb_walk_state_t *wsp)
 	 */
 	if ((wsp->walk_addr = (uintptr_t)ulwp.ul_forw)
 	    == (uintptr_t)wsp->walk_data)
-		wsp->walk_addr = NULL;
+		wsp->walk_addr = 0;
 	return (wsp->walk_callback(addr, &ulwp, wsp->walk_cbdata));
 }
 
@@ -1107,13 +1107,13 @@ d_tsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	mdb_libc_ulwp_t u;
 	uintptr_t ulwp_addr;
-	uintptr_t key = NULL;
+	uintptr_t key = 0;
 	void *element = NULL;
 
 	if (mdb_getopts(argc, argv, 'k', MDB_OPT_UINTPTR, &key, NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (!(flags & DCMD_ADDRSPEC) || key == NULL)
+	if (!(flags & DCMD_ADDRSPEC) || key == 0)
 		return (DCMD_USAGE);
 
 	if (tid2ulwp_impl(addr, &ulwp_addr) != DCMD_OK)

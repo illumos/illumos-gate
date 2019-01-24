@@ -138,10 +138,10 @@ devinfo_parents_walk_init(mdb_walk_state_t *wsp)
 
 	if (mdb_readvar(&devinfo_root, "top_devinfo") == -1) {
 		mdb_warn("failed to read 'top_devinfo'");
-		return (NULL);
+		return (0);
 	}
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		wsp->walk_addr = devinfo_root;
 	addr = wsp->walk_addr;
 
@@ -233,10 +233,10 @@ devinfo_children_walk_init(mdb_walk_state_t *wsp)
 
 	if (mdb_readvar(&devinfo_root, "top_devinfo") == -1) {
 		mdb_warn("failed to read 'top_devinfo'");
-		return (NULL);
+		return (0);
 	}
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		wsp->walk_addr = devinfo_root;
 
 	dic = mdb_alloc(sizeof (devinfo_children_walk_data_t), UM_SLEEP);
@@ -266,7 +266,7 @@ devinfo_children_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	int status = WALK_NEXT;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&dic->dic_dev, sizeof (dic->dic_dev), addr) == -1) {
@@ -447,7 +447,7 @@ devnames_walk_init(mdb_walk_state_t *wsp)
 	int devcnt;
 	uintptr_t devnamesp;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("devnames walker only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -508,7 +508,7 @@ devinfo_siblings_walk_init(mdb_walk_state_t *wsp)
 	struct dev_info di;
 	uintptr_t addr = wsp->walk_addr;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("a dev_info struct address must be provided\n");
 		return (WALK_ERR);
 	}
@@ -539,7 +539,7 @@ devinfo_siblings_walk_step(mdb_walk_state_t *wsp)
 	struct dev_info di;
 	uintptr_t addr = wsp->walk_addr;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&di, sizeof (di), addr) == -1) {
@@ -557,7 +557,7 @@ devi_next_walk_step(mdb_walk_state_t *wsp)
 	struct dev_info di;
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&di, sizeof (di), wsp->walk_addr) == -1)
@@ -654,27 +654,27 @@ devinfo_print_props_value(int elem_size, int nelem,
  * Guesses how to interpret the value of the property
  *
  * Params:
- * 	type      - Should be the type value of the property
- * 	prop_val  - Pointer to the property value data buffer
- * 	prop_len  - Length of the property value data buffer
+ *	type      - Should be the type value of the property
+ *	prop_val  - Pointer to the property value data buffer
+ *	prop_len  - Length of the property value data buffer
  *
  * Return values:
- * 	nelem     - The number of elements stored in the property value
- * 			data buffer pointed to by prop_val.
- * 	elem_size - The size (in bytes) of the elements stored in the property
- * 			value data buffer pointed to by prop_val.
- * 			Upon return if elem_size == 0 and nelem != 0 then
- * 			the property value data buffer contains strings
- * 	len_err   - There was an error with the length of the data buffer.
- * 			Its size is not a multiple of the array value type.
- * 			It will be interpreted as an array of bytes.
+ *	nelem     - The number of elements stored in the property value
+ *			data buffer pointed to by prop_val.
+ *	elem_size - The size (in bytes) of the elements stored in the property
+ *			value data buffer pointed to by prop_val.
+ *			Upon return if elem_size == 0 and nelem != 0 then
+ *			the property value data buffer contains strings
+ *	len_err   - There was an error with the length of the data buffer.
+ *			Its size is not a multiple of the array value type.
+ *			It will be interpreted as an array of bytes.
  */
 static void
 devinfo_print_props_guess(int type, unsigned char *prop_val, int prop_len,
     int *elem_size, int *nelem, int *len_err)
 {
 	*len_err = 0;
-	if (prop_len == NULL) {
+	if (prop_len == 0) {
 		*elem_size = 0;
 		*nelem = 0;
 		return;
@@ -1061,7 +1061,7 @@ prtconf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (mdb_readvar(&devinfo_root, "top_devinfo") == -1) {
 		mdb_warn("failed to read 'top_devinfo'");
-		return (NULL);
+		return (0);
 	}
 
 	if ((flags & DCMD_ADDRSPEC) == 0) {
@@ -1564,7 +1564,7 @@ soft_state_walk_init(mdb_walk_state_t *wsp)
 	soft_state_walk_t *sst;
 
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	sst = mdb_zalloc(sizeof (soft_state_walk_t), UM_SLEEP|UM_GC);
@@ -1707,7 +1707,7 @@ devbindings(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 binding_hash_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	wsp->walk_data = mdb_alloc(sizeof (void *) * MOD_BIND_HASHSIZE,
@@ -1735,7 +1735,7 @@ binding_hash_walk_step(mdb_walk_state_t *wsp)
 	 * Walk the singly-linked list of struct bind
 	 */
 	bind_p = ((uintptr_t *)wsp->walk_data)[(ulong_t)wsp->walk_arg];
-	while (bind_p != NULL) {
+	while (bind_p != 0) {
 
 		if (mdb_vread(&bind, sizeof (bind), bind_p) == -1) {
 			mdb_warn("failed to read bind struct at %p",
@@ -1764,16 +1764,16 @@ int
 binding_hash_entry(uintptr_t addr, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
-	struct bind 	bind;
+	struct bind	bind;
 	/* Arbitrary lengths based on output format below */
 	char name[MAXPATHLEN] = "???";
 	char bind_name[MAXPATHLEN] = "<null>";
 
-	if ((flags & DCMD_ADDRSPEC) == NULL)
+	if ((flags & DCMD_ADDRSPEC) == 0)
 		return (DCMD_USAGE);
 
 	/* Allow null addresses to be passed (as from a walker) */
-	if (addr == NULL)
+	if (addr == 0)
 		return (DCMD_OK);
 
 	if (mdb_vread(&bind, sizeof (bind), addr) == -1) {
@@ -1855,7 +1855,7 @@ devinfo_audit_log_walk_step(mdb_walk_state_t *wsp)
 	int status = WALK_NEXT;
 
 	/* read in current entry and invoke callback */
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&dil->dil_buf, sizeof (devinfo_audit_t), addr) == -1) {
@@ -1868,7 +1868,7 @@ devinfo_audit_log_walk_step(mdb_walk_state_t *wsp)
 	if (--dil->dil_index < 0)
 		dil->dil_index += dil->dil_max;
 	if (dil->dil_index == dil->dil_start) {
-		wsp->walk_addr = NULL;
+		wsp->walk_addr = 0;
 		return (WALK_DONE);
 	}
 
@@ -1991,7 +1991,7 @@ devinfo_audit_node_walk_step(mdb_walk_state_t *wsp)
 	devinfo_audit_node_walk_data_t *dih = wsp->walk_data;
 	devinfo_audit_t *da = &dih->dih_buf;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 	(void) wsp->walk_callback(wsp->walk_addr, NULL, wsp->walk_cbdata);
 
@@ -2117,7 +2117,7 @@ devinfo_fmc_walk_init(mdb_walk_state_t *wsp)
 {
 	struct i_ddi_fmc fec;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	if (mdb_vread(&fec, sizeof (fec), wsp->walk_addr) == -1) {
@@ -2159,7 +2159,7 @@ minornode_walk_init(mdb_walk_state_t *wsp)
 	struct dev_info di;
 	uintptr_t addr = wsp->walk_addr;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("a dev_info struct address must be provided\n");
 		return (WALK_ERR);
 	}
@@ -2179,7 +2179,7 @@ minornode_walk_step(mdb_walk_state_t *wsp)
 	struct ddi_minor_data md;
 	uintptr_t addr = wsp->walk_addr;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&md, sizeof (md), addr) == -1) {

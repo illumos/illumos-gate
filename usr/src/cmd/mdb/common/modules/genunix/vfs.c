@@ -53,7 +53,7 @@
 int
 vfs_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "rootvfs") == -1) {
 		mdb_warn("failed to read 'rootvfs'");
 		return (WALK_ERR);
@@ -373,7 +373,7 @@ next_realvp(uintptr_t invp, struct vnode *outvn, uintptr_t *outvp)
 		*outvp = (uintptr_t)stream.sd_vnode;
 	}
 
-	if (*outvp == invp || *outvp == NULL)
+	if (*outvp == invp || *outvp == 0)
 		return (REALVP_DONE);
 
 	return (REALVP_CONTINUE);
@@ -499,7 +499,7 @@ pfiles_dig_pathname(uintptr_t vp, char *path)
 				vp = (uintptr_t)
 				    sockparams.sp_sdev_info.sd_vnode;
 			} else {
-				vp = NULL;
+				vp = 0;
 			}
 		}
 	}
@@ -514,8 +514,8 @@ pfiles_dig_pathname(uintptr_t vp, char *path)
 	/*
 	 * A common problem is that device pathnames are prefixed with
 	 * /dev/../devices/.  We just clean those up slightly:
-	 * 	/dev/../devices/<mumble> --> /devices/<mumble>
-	 * 	/dev/pts/../../devices/<mumble> --> /devices/<mumble>
+	 *	/dev/../devices/<mumble> --> /devices/<mumble>
+	 *	/dev/pts/../../devices/<mumble> --> /devices/<mumble>
 	 */
 	if (strncmp("/dev/../devices/", path, strlen("/dev/../devices/")) == 0)
 		strcpy(path, path + 7);
@@ -599,7 +599,7 @@ sctp_getsockaddr(sctp_t *sctp, struct sockaddr *addr)
 		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
 			sctp_ipif_t	ipif;
 			in6_addr_t	laddr;
-			list_node_t 	*pnode;
+			list_node_t	*pnode;
 			list_node_t	node;
 
 			if (mdb_vread(&ipif, sizeof (sctp_ipif_t),
@@ -935,7 +935,7 @@ pfile_callback(uintptr_t addr, const struct file *f, struct pfiles_cbdata *cb)
 
 	cb->fd++;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		return (WALK_NEXT);
 	}
 
@@ -958,7 +958,7 @@ pfile_callback(uintptr_t addr, const struct file *f, struct pfiles_cbdata *cb)
 		uintptr_t next_realvpp;
 
 		err = next_realvp(realvpp, &layer_vn, &next_realvpp);
-		if (next_realvpp != NULL)
+		if (next_realvpp != 0)
 			realvpp = next_realvpp;
 
 	} while (err == REALVP_CONTINUE);
@@ -1118,7 +1118,7 @@ file_t_callback(uintptr_t addr, const struct file *f, struct pfiles_cbdata *cb)
 
 	cb->fd++;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		return (WALK_NEXT);
 	}
 

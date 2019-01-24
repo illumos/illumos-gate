@@ -387,7 +387,7 @@ sctp_istr_msgs(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
 {
 	mblk_t			istrmp;
 	mblk_t			dmp;
-	sctp_data_hdr_t 	dp;
+	sctp_data_hdr_t		dp;
 	uintptr_t		daddr;
 	uintptr_t		chaddr;
 	boolean_t		bbit;
@@ -419,10 +419,10 @@ sctp_istr_msgs(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
 
 
 			daddr = (uintptr_t)dmp.b_cont;
-		} while (daddr != NULL);
+		} while (daddr != 0);
 
 		addr = (uintptr_t)istrmp.b_next;
-	} while (addr != NULL);
+	} while (addr != 0);
 
 	return (DCMD_OK);
 }
@@ -475,10 +475,10 @@ sctp_reass_list(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
 			    dp.sdh_tsn, bbit, ebit);
 
 			daddr = (uintptr_t)dmp.b_cont;
-		} while (daddr != NULL);
+		} while (daddr != 0);
 
 		addr = (uintptr_t)srpmp.b_next;
-	} while (addr != NULL);
+	} while (addr != 0);
 
 	return (DCMD_OK);
 }
@@ -517,7 +517,7 @@ sctp_uo_reass_list(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *av)
 		    dp.sdh_tsn, dp.sdh_flags, ubit, bbit, ebit);
 
 		addr = (uintptr_t)dmp.b_next;
-	} while (addr != NULL);
+	} while (addr != 0);
 
 	return (DCMD_OK);
 }
@@ -1048,21 +1048,21 @@ bind_size(sctp_stack_t *sctps)
 	return (SCTP_BIND_FANOUT_SIZE);
 }
 
-static intptr_t
+static uintptr_t
 find_next_hash_item(fanout_walk_data_t *fw)
 {
 	sctp_tf_t tf;
 	sctp_t sctp;
 
 	/* first try to continue down the hash chain */
-	if (fw->sctp != NULL) {
+	if (fw->sctp != 0) {
 		/* try to get next in hash chain */
 		if (mdb_vread(&sctp, sizeof (sctp), fw->sctp) == -1) {
 			mdb_warn("failed to read sctp at %p", fw->sctp);
-			return (NULL);
+			return (0);
 		}
 		fw->sctp = fw->getnext(&sctp);
-		if (fw->sctp != NULL)
+		if (fw->sctp != 0)
 			return (fw->sctp);
 		else
 			/* end of chain; go to next bucket */
@@ -1076,7 +1076,7 @@ find_next_hash_item(fanout_walk_data_t *fw)
 		    (uintptr_t)(fw->fanout + fw->index)) == -1) {
 			mdb_warn("failed to read tf at %p",
 			    fw->fanout + fw->index);
-			return (NULL);
+			return (0);
 		}
 		if (tf.tf_sctp != NULL) {
 			/* start of a new chain */
@@ -1084,7 +1084,7 @@ find_next_hash_item(fanout_walk_data_t *fw)
 			return (fw->sctp);
 		}
 	}
-	return (NULL);
+	return (0);
 }
 
 static int
@@ -1105,11 +1105,11 @@ fanout_stack_walk_init(mdb_walk_state_t *wsp)
 	lw = mdb_alloc(sizeof (*lw), UM_SLEEP);
 	lw->index = 0;
 	lw->size = fi->getsize(sctps);
-	lw->sctp = NULL;
+	lw->sctp = 0;
 	lw->fanout = (sctp_tf_t *)kaddr;
 	lw->getnext = fi->getnext;
 
-	if ((wsp->walk_addr = find_next_hash_item(lw)) == NULL) {
+	if ((wsp->walk_addr = find_next_hash_item(lw)) == 0) {
 		return (WALK_DONE);
 	}
 	wsp->walk_data = lw;
@@ -1133,7 +1133,7 @@ fanout_stack_walk_step(mdb_walk_state_t *wsp)
 	if (status != WALK_NEXT)
 		return (status);
 
-	if ((wsp->walk_addr = find_next_hash_item(fw)) == NULL)
+	if ((wsp->walk_addr = find_next_hash_item(fw)) == 0)
 		return (WALK_DONE);
 
 	return (WALK_NEXT);
@@ -1203,14 +1203,14 @@ sctp_walk_faddr_init(mdb_walk_state_t *wsp)
 {
 	sctp_t sctp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	if (mdb_vread(&sctp, sizeof (sctp), wsp->walk_addr) == -1) {
 		mdb_warn("failed to read sctp at %p", wsp->walk_addr);
 		return (WALK_ERR);
 	}
-	if ((wsp->walk_addr = (uintptr_t)sctp.sctp_faddrs) != NULL)
+	if ((wsp->walk_addr = (uintptr_t)sctp.sctp_faddrs) != 0)
 		return (WALK_NEXT);
 	else
 		return (WALK_DONE);
@@ -1230,7 +1230,7 @@ sctp_walk_faddr_step(mdb_walk_state_t *wsp)
 	status = wsp->walk_callback(faddr_ptr, &sctp_faddr, wsp->walk_cbdata);
 	if (status != WALK_NEXT)
 		return (status);
-	if ((faddr_ptr = (uintptr_t)sctp_faddr.sf_next) == NULL) {
+	if ((faddr_ptr = (uintptr_t)sctp_faddr.sf_next) == 0) {
 		return (WALK_DONE);
 	} else {
 		wsp->walk_addr = faddr_ptr;
@@ -1256,7 +1256,7 @@ sctp_walk_saddr_init(mdb_walk_state_t *wsp)
 	int i;
 	saddr_walk_t *swalker;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	swalker = mdb_alloc(sizeof (saddr_walk_t), UM_SLEEP);
@@ -1402,7 +1402,7 @@ sctp_stack_ill_walk_init(mdb_walk_state_t *wsp)
 	}
 	if (mdb_vread(&iw.ills, sizeof (iw.ills), kaddr) == -1) {
 		mdb_warn("failed to read 'sctps_g_ills'");
-		return (NULL);
+		return (0);
 	}
 
 	/* Find the first ill. */
@@ -1474,7 +1474,7 @@ sctp_stack_ipif_walk_init(mdb_walk_state_t *wsp)
 	}
 	if (mdb_vread(&iw.ipifs, sizeof (iw.ipifs), kaddr) == -1) {
 		mdb_warn("failed to read 'sctps_g_ipifs'");
-		return (NULL);
+		return (0);
 	}
 
 	/* Find the first ipif. */
@@ -1509,7 +1509,7 @@ sctps_sc_walk_init(mdb_walk_state_t *wsp)
 {
 	sctp_stack_t sctps;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	if (mdb_vread(&sctps, sizeof (sctps), wsp->walk_addr) == -1) {

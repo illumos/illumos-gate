@@ -72,7 +72,7 @@ static const bitname_t squeue_states[] = {
 	{ "SQS_WORKER",		"... by a worker thread" },
 	{ "SQS_ENTER",		"... by an squeue_enter() thread" },
 	{ "SQS_FAST",		"... in fast-path mode" },
-	{ "SQS_USER", 		"A non interrupt user" },
+	{ "SQS_USER",		"A non interrupt user" },
 	{ "SQS_BOUND",		"worker thread bound to CPU" },
 	{ "SQS_PROFILE",	"profiling enabled" },
 	{ "SQS_REENTER",	"re-entered thred" },
@@ -88,7 +88,7 @@ typedef struct illif_walk_data {
 typedef struct ncec_walk_data_s {
 	struct ndp_g_s	ncec_ip_ndp;
 	int		ncec_hash_tbl_index;
-	ncec_t 		ncec;
+	ncec_t		ncec;
 } ncec_walk_data_t;
 
 typedef struct ncec_cbdata_s {
@@ -128,7 +128,7 @@ typedef struct ipcl_hash_walk_data_s {
 } ipcl_hash_walk_data_t;
 
 typedef struct ill_walk_data_s {
-	ill_t 		ill;
+	ill_t		ill;
 } ill_walk_data_t;
 
 typedef struct ill_cbdata_s {
@@ -139,13 +139,13 @@ typedef struct ill_cbdata_s {
 } ill_cbdata_t;
 
 typedef struct ipif_walk_data_s {
-	ipif_t 		ipif;
+	ipif_t		ipif;
 } ipif_walk_data_t;
 
 typedef struct ipif_cbdata_s {
 	ill_t		ill;
 	int		ipif_ipversion;
-	boolean_t 	verbose;
+	boolean_t	verbose;
 } ipif_cbdata_t;
 
 typedef struct hash_walk_arg_s {
@@ -179,7 +179,7 @@ static hash_walk_arg_t proto_v6_hash_arg = {
 };
 
 typedef struct ip_list_walk_data_s {
-	off_t 	nextoff;
+	off_t	nextoff;
 } ip_list_walk_data_t;
 
 typedef struct ip_list_walk_arg_s {
@@ -419,7 +419,7 @@ tcps_sc_walk_init(mdb_walk_state_t *wsp)
 {
 	tcp_stack_t tcps;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	if (mdb_vread(&tcps, sizeof (tcps), wsp->walk_addr) == -1) {
@@ -477,7 +477,7 @@ th_hash_walk_init(mdb_walk_state_t *wsp)
 	GElf_Sym sym;
 	list_node_t *next;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_lookup_by_obj("ip", "ip_thread_list", &sym) == 0) {
 			wsp->walk_addr = sym.st_value;
 		} else {
@@ -517,7 +517,7 @@ illif_stack_walk_init(mdb_walk_state_t *wsp)
 {
 	illif_walk_data_t *iw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("illif_stack supports only local walks\n");
 		return (WALK_ERR);
 	}
@@ -863,7 +863,7 @@ ire_next_walk_step(mdb_walk_state_t *wsp)
 	int status;
 
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&ire, sizeof (ire), wsp->walk_addr) == -1) {
@@ -1687,7 +1687,7 @@ ip_rnext(const queue_t *q)
 	    (uintptr_t)q->q_ptr) == sizeof (ill))
 		return ((uintptr_t)ill.ill_rq);
 
-	return (NULL);
+	return (0);
 }
 
 uintptr_t
@@ -1700,7 +1700,7 @@ ip_wnext(const queue_t *q)
 	    (uintptr_t)q->q_ptr) == sizeof (ill))
 		return ((uintptr_t)ill.ill_wq);
 
-	return (NULL);
+	return (0);
 }
 
 /*
@@ -1872,7 +1872,7 @@ th_trace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_ERR);
 		}
 	}
-	if (mdb_pwalk("th_hash", th_hash_summary, &thw, NULL) == -1) {
+	if (mdb_pwalk("th_hash", th_hash_summary, &thw, 0) == -1) {
 		mdb_warn("can't walk th_hash entries");
 		return (DCMD_ERR);
 	}
@@ -2243,7 +2243,7 @@ ncec_get_next_hash_tbl(uintptr_t start, int *index, struct ndp_g_s ndp)
 	uintptr_t addr = start;
 	int i = *index;
 
-	while (addr == NULL) {
+	while (addr == 0) {
 
 		if (++i >= NCE_TABLE_SIZE)
 			break;
@@ -2288,21 +2288,21 @@ static uintptr_t
 ipcl_hash_get_next_connf_tbl(ipcl_hash_walk_data_t *iw)
 {
 	struct connf_s connf;
-	uintptr_t addr = NULL, next;
+	uintptr_t addr = 0, next;
 	int index = iw->connf_tbl_index;
 
 	do {
 		next = iw->hash_tbl + index * sizeof (struct connf_s);
 		if (++index >= iw->hash_tbl_size) {
-			addr = NULL;
+			addr = 0;
 			break;
 		}
 		if (mdb_vread(&connf, sizeof (struct connf_s), next) == -1)  {
 			mdb_warn("failed to read conn_t at %p", next);
-			return (NULL);
+			return (0);
 		}
 		addr = (uintptr_t)connf.connf_head;
-	} while (addr == NULL);
+	} while (addr == 0);
 	iw->connf_tbl_index = index;
 	return (addr);
 }
@@ -2343,7 +2343,7 @@ ipcl_hash_walk_init(mdb_walk_state_t *wsp)
 	wsp->walk_addr = ipcl_hash_get_next_connf_tbl(iw);
 	wsp->walk_data = iw;
 
-	if (wsp->walk_addr != NULL)
+	if (wsp->walk_addr != 0)
 		return (WALK_NEXT);
 	else
 		return (WALK_DONE);
@@ -2357,7 +2357,7 @@ ipcl_hash_walk_step(mdb_walk_state_t *wsp)
 	conn_t *conn = iw->conn;
 	int ret = WALK_DONE;
 
-	while (addr != NULL) {
+	while (addr != 0) {
 		if (mdb_vread(conn, sizeof (conn_t), addr) == -1) {
 			mdb_warn("failed to read conn_t at %p", addr);
 			return (WALK_ERR);
@@ -2370,7 +2370,7 @@ ipcl_hash_walk_step(mdb_walk_state_t *wsp)
 	if (ret == WALK_NEXT) {
 		wsp->walk_addr = ipcl_hash_get_next_connf_tbl(iw);
 
-		if (wsp->walk_addr != NULL)
+		if (wsp->walk_addr != 0)
 			return (WALK_NEXT);
 		else
 			return (WALK_DONE);
@@ -2396,7 +2396,7 @@ ncec_stack_walk_init(mdb_walk_state_t *wsp)
 {
 	ncec_walk_data_t *nw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("ncec_stack requires ndp_g_s address\n");
 		return (WALK_ERR);
 	}
@@ -2415,7 +2415,7 @@ ncec_stack_walk_init(mdb_walk_state_t *wsp)
 	 * ncec_get_next_hash_tbl() starts at ++i , so initialize index to -1
 	 */
 	nw->ncec_hash_tbl_index = -1;
-	wsp->walk_addr = ncec_get_next_hash_tbl(NULL,
+	wsp->walk_addr = ncec_get_next_hash_tbl(0,
 	    &nw->ncec_hash_tbl_index, nw->ncec_ip_ndp);
 	wsp->walk_data = nw;
 
@@ -2428,7 +2428,7 @@ ncec_stack_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	ncec_walk_data_t *nw = wsp->walk_data;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&nw->ncec, sizeof (ncec_t), addr) == -1) {
@@ -2543,7 +2543,7 @@ ill_format(uintptr_t addr, const void *illptr, void *ill_cb_arg)
 		{ "S",		PHYI_STANDBY,		PHYI_STANDBY	},
 		{ "i",		PHYI_INACTIVE,		PHYI_INACTIVE	},
 		{ "O",		PHYI_OFFLINE,		PHYI_OFFLINE	},
-		{ "T", 		ILLF_NOTRAILERS,	ILLF_NOTRAILERS },
+		{ "T",		ILLF_NOTRAILERS,	ILLF_NOTRAILERS },
 		{ "A",		ILLF_NOARP,		ILLF_NOARP	},
 		{ "M",		ILLF_MULTICAST,		ILLF_MULTICAST	},
 		{ "F",		ILLF_ROUTER,		ILLF_ROUTER	},
@@ -2713,7 +2713,7 @@ ip_list_walk_init(mdb_walk_state_t *wsp)
 	ip_list_walk_data_t *iw;
 	uintptr_t addr = (uintptr_t)(wsp->walk_addr + arg->off);
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("only local walks supported\n");
 		return (WALK_ERR);
 	}
@@ -2735,7 +2735,7 @@ ip_list_walk_step(mdb_walk_state_t *wsp)
 	ip_list_walk_data_t *iw = wsp->walk_data;
 	uintptr_t addr = wsp->walk_addr;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 	wsp->walk_addr = addr + iw->nextoff;
 	if (mdb_vread(&wsp->walk_addr, sizeof (uintptr_t),
@@ -3183,14 +3183,14 @@ ilb_rules_walk_init(mdb_walk_state_t *wsp)
 {
 	ilb_stack_t ilbs;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	if (mdb_vread(&ilbs, sizeof (ilbs), wsp->walk_addr) == -1) {
 		mdb_warn("failed to read ilb_stack_t at %p", wsp->walk_addr);
 		return (WALK_ERR);
 	}
-	if ((wsp->walk_addr = (uintptr_t)ilbs.ilbs_rule_head) != NULL)
+	if ((wsp->walk_addr = (uintptr_t)ilbs.ilbs_rule_head) != 0)
 		return (WALK_NEXT);
 	else
 		return (WALK_DONE);
@@ -3209,7 +3209,7 @@ ilb_rules_walk_step(mdb_walk_state_t *wsp)
 	status = wsp->walk_callback(wsp->walk_addr, &rule, wsp->walk_cbdata);
 	if (status != WALK_NEXT)
 		return (status);
-	if ((wsp->walk_addr = (uintptr_t)rule.ir_next) == NULL)
+	if ((wsp->walk_addr = (uintptr_t)rule.ir_next) == 0)
 		return (WALK_DONE);
 	else
 		return (WALK_NEXT);
@@ -3220,14 +3220,14 @@ ilb_servers_walk_init(mdb_walk_state_t *wsp)
 {
 	ilb_rule_t rule;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	if (mdb_vread(&rule, sizeof (rule), wsp->walk_addr) == -1) {
 		mdb_warn("failed to read ilb_rule_t at %p", wsp->walk_addr);
 		return (WALK_ERR);
 	}
-	if ((wsp->walk_addr = (uintptr_t)rule.ir_servers) != NULL)
+	if ((wsp->walk_addr = (uintptr_t)rule.ir_servers) != 0)
 		return (WALK_NEXT);
 	else
 		return (WALK_DONE);
@@ -3246,7 +3246,7 @@ ilb_servers_walk_step(mdb_walk_state_t *wsp)
 	status = wsp->walk_callback(wsp->walk_addr, &server, wsp->walk_cbdata);
 	if (status != WALK_NEXT)
 		return (status);
-	if ((wsp->walk_addr = (uintptr_t)server.iser_next) == NULL)
+	if ((wsp->walk_addr = (uintptr_t)server.iser_next) == 0)
 		return (WALK_DONE);
 	else
 		return (WALK_NEXT);
@@ -3271,7 +3271,7 @@ ilb_nat_src_walk_init(mdb_walk_state_t *wsp)
 	ilb_walk_t *ns_walk;
 	ilb_nat_src_entry_t *entry = NULL;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	ns_walk = mdb_alloc(sizeof (ilb_walk_t), UM_SLEEP);
@@ -3410,7 +3410,7 @@ ilb_conn_walk_init(mdb_walk_state_t *wsp)
 	ilb_walk_t *conn_walk;
 	ilb_conn_hash_t head;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	conn_walk = mdb_alloc(sizeof (ilb_walk_t), UM_SLEEP);
@@ -3512,7 +3512,7 @@ ilb_sticky_walk_init(mdb_walk_state_t *wsp)
 	ilb_walk_t *sticky_walk;
 	ilb_sticky_t *st = NULL;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	sticky_walk = mdb_alloc(sizeof (ilb_walk_t), UM_SLEEP);

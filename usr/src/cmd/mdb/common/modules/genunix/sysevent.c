@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "sysevent.h"
 
 int
@@ -181,7 +179,7 @@ sysevent_class_list(uintptr_t addr, uint_t flags, int argc,
 int
 sysevent_subclass_list_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("sysevent_subclass_list does not support global "
 		    "walks");
 		return (WALK_ERR);
@@ -196,7 +194,7 @@ sysevent_subclass_list_walk_step(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (subclass_lst_t),
@@ -230,7 +228,7 @@ sysevent_class_list_walk_init(mdb_walk_state_t *wsp)
 {
 	class_walk_data_t *cl_walker;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("sysevent_class_list does not support global walks");
 		return (WALK_ERR);
 	}
@@ -259,7 +257,7 @@ sysevent_class_list_walk_step(mdb_walk_state_t *wsp)
 	cl_walker = (class_walk_data_t *)wsp->walk_data;
 
 	/* Skip over empty class table entries */
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		if (mdb_vread(&clist, sizeof (class_lst_t),
 		    wsp->walk_addr) == -1) {
 			mdb_warn("failed to read class list at %p",
@@ -380,7 +378,7 @@ sysevent_channel_walk_init(mdb_walk_state_t *wsp)
 {
 	channel_walk_data_t *ch_walker;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("sysevent_channel supports only global walks");
 		return (WALK_ERR);
 	}
@@ -408,7 +406,7 @@ sysevent_channel_walk_step(mdb_walk_state_t *wsp)
 	ch_walker = (channel_walk_data_t *)wsp->walk_data;
 
 	/* Skip over empty hash table entries */
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		if (mdb_vread(&scd, sizeof (sysevent_channel_descriptor_t),
 		    wsp->walk_addr) == -1) {
 			mdb_warn("failed to read channel at %p",
@@ -444,7 +442,7 @@ sysevent_channel_walk_fini(mdb_walk_state_t *wsp)
 int
 sysevent_pend_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_readvar(&wsp->walk_addr, "log_eventq_head") == -1) {
 			mdb_warn("failed to read 'log_eventq_head'");
 			return (WALK_ERR);
@@ -461,7 +459,7 @@ sysevent_walk_step(mdb_walk_state_t *wsp)
 	int status;
 	uintptr_t ev_arg_addr;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (log_eventq_t),
@@ -480,7 +478,7 @@ sysevent_walk_step(mdb_walk_state_t *wsp)
 int
 sysevent_sent_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_readvar(&wsp->walk_addr, "log_eventq_sent") == -1) {
 			mdb_warn("failed to read 'log_eventq_sent'");
 			return (WALK_ERR);

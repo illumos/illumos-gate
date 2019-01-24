@@ -383,7 +383,7 @@ cmd_wr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 			dpth.dpth_path++;
 
-			if (pathp == NULL)
+			if (pathp == 0)
 				break;
 
 			if (mdb_readstr(path, sizeof (path), pathp) < 0) {
@@ -427,7 +427,7 @@ iob_stack_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	mdb_iob_t iob;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&iob, sizeof (iob), addr) == -1) {
@@ -442,7 +442,7 @@ iob_stack_walk_step(mdb_walk_state_t *wsp)
 static int
 frame_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		wsp->walk_addr = (uintptr_t)get_mdb()->m_flist.ml_prev;
 
 	return (WALK_NEXT);
@@ -454,7 +454,7 @@ frame_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	mdb_frame_t f;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&f, sizeof (f), addr) == -1) {
@@ -469,7 +469,7 @@ frame_walk_step(mdb_walk_state_t *wsp)
 static int
 target_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		wsp->walk_addr = (uintptr_t)get_mdb()->m_target;
 
 	return (WALK_NEXT);
@@ -481,7 +481,7 @@ target_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	mdb_tgt_t t;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&t, sizeof (t), addr) == -1) {
@@ -499,7 +499,7 @@ sespec_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	mdb_sespec_t s;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&s, sizeof (s), addr) == -1) {
@@ -517,7 +517,7 @@ vespec_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	mdb_vespec_t v;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&v, sizeof (v), addr) == -1) {
@@ -535,7 +535,7 @@ se_matched_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	mdb_sespec_t s;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&s, sizeof (s), addr) == -1) {
@@ -597,7 +597,7 @@ _mdb_init(void)
 		    "implementation (mdb_t mismatch)\n");
 	}
 
-	if (mdb_readvar(&addr, "_mdb_abort_str") != -1 && addr != NULL &&
+	if (mdb_readvar(&addr, "_mdb_abort_str") != -1 && addr != 0 &&
 	    mdb_readstr(buf, sizeof (buf), addr) > 0)
 		mdb_printf("mdb: debugger failed with error: %s\n", buf);
 

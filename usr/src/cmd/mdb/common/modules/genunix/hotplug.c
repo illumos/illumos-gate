@@ -130,7 +130,7 @@ hotplug(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		if (mdb_readvar(&devinfo_root, "top_devinfo") == -1) {
 			mdb_warn("failed to read 'top_devinfo'");
-			return (NULL);
+			return (0);
 		}
 
 		data.di_base = devinfo_root;

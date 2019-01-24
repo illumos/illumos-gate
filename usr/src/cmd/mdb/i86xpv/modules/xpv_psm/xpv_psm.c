@@ -281,7 +281,7 @@ print_bus(int irq)
 
 	dip_addr = (uintptr_t)avhp.av_dip;
 
-	if (dip_addr == NULL)
+	if (dip_addr == 0)
 		goto fail;
 
 	/*

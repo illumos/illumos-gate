@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/tsol/tndb.h>
 #include <sys/modhash_impl.h>
@@ -128,7 +126,7 @@ tnrh_walk_step(mdb_walk_state_t *wsp)
 	tsol_tnrhc_t tnrhc;
 	int status;
 
-	while (wsp->walk_addr == NULL) {
+	while (wsp->walk_addr == 0) {
 		if (*twp->hptr == NULL || twp->idx >= TNRHC_SIZE) {
 			twp->hptr++;
 			if (twp->hptr == twp->tnrhc_table +

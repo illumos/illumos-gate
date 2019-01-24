@@ -165,7 +165,7 @@ taskq(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_warn("unable to walk taskq_cache");
 			return (DCMD_ERR);
 		}
-		tqi.tqi_size += 10; 	/* slop */
+		tqi.tqi_size += 10;	/* slop */
 		tqi.tqi_array = mdb_zalloc(
 		    sizeof (*tqi.tqi_array) * tqi.tqi_size, UM_SLEEP|UM_GC);
 
@@ -320,7 +320,7 @@ taskq_ent_walk_init(mdb_walk_state_t *wsp)
 	taskq_t	tq_head;
 
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("start address required\n");
 		return (WALK_ERR);
 	}
@@ -402,7 +402,7 @@ taskq_thread_walk_init(mdb_walk_state_t *wsp)
 	tti = wsp->walk_data = mdb_zalloc(sizeof (*tti), UM_SLEEP);
 	tti->tti_addr = wsp->walk_addr;
 
-	if (wsp->walk_addr != NULL &&
+	if (wsp->walk_addr != 0 &&
 	    mdb_vread(&tq, sizeof (tq), wsp->walk_addr) != -1 &&
 	    !(tq.tq_flags & TASKQ_DYNAMIC)) {
 
@@ -449,7 +449,7 @@ taskq_thread_walk_step(mdb_walk_state_t *wsp)
 		addr = tti->tti_tlist[tti->tti_idx];
 		tti->tti_idx++;
 
-		if (addr == NULL)
+		if (addr == 0)
 			return (WALK_NEXT);
 
 		if (mdb_vread(&tti->tti_thread, sizeof (kthread_t),

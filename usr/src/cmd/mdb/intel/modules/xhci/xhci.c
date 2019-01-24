@@ -585,7 +585,7 @@ xhci_mdb_walk_xhci_endpoint_step(mdb_walk_state_t *wsp)
 		return (WALK_DONE);
 
 	addr = (uintptr_t)xm->xmwe_device.xd_endpoints[xm->xmwe_ep];
-	if (addr != NULL) {
+	if (addr != 0) {
 		xhci_endpoint_t xe;
 
 		if (mdb_vread(&xe, sizeof (xe), addr) != sizeof (xe)) {

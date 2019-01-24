@@ -219,9 +219,9 @@ typedef struct tg_node {
 	uintptr_t	tgn_base;	/* address base of object */
 	uintptr_t	tgn_limit;	/* address limit of object */
 	tg_edge_t	*tgn_incoming;	/* incoming edges */
-	tg_edge_t 	*tgn_outgoing;	/* outgoing edges */
-	tg_type_t 	*tgn_typelist;	/* conjectured typelist */
-	tg_type_t 	*tgn_fraglist;	/* type fragment list */
+	tg_edge_t	*tgn_outgoing;	/* outgoing edges */
+	tg_type_t	*tgn_typelist;	/* conjectured typelist */
+	tg_type_t	*tgn_fraglist;	/* type fragment list */
 	char		tgn_marked;	/* marked */
 	char		tgn_postmarked;	/* marked in postpass */
 	int		tgn_smaller;	/* size of next-smaller cache */
@@ -252,7 +252,7 @@ typedef struct tg_typeoffs {
 typedef struct tg_buildstate {
 	uintptr_t		tgbs_addr;	/* address of region */
 	uintptr_t		*tgbs_buf;	/* in-core copy of region */
-	size_t 			tgbs_ndx;	/* current pointer index */
+	size_t			tgbs_ndx;	/* current pointer index */
 	size_t			tgbs_nptrs;	/* number of pointers */
 	tg_node_t		*tgbs_src;	/* corresponding node */
 	struct tg_buildstate	*tgbs_next;	/* next stacked or free */
@@ -273,7 +273,7 @@ typedef struct tg_todo {
 } tg_todo_t;
 
 typedef struct tg_nodedata {
-	tg_node_t 		*tgd_next;	/* next node to fill in */
+	tg_node_t		*tgd_next;	/* next node to fill in */
 	size_t			tgd_size;	/* size of this node */
 } tg_nodedata_t;
 
@@ -316,7 +316,7 @@ struct {
  * new entry in tg_typetab[] is likely warranted.)
  */
 struct {
-	char 		*tgt_type_name;		/* filled in statically */
+	char		*tgt_type_name;		/* filled in statically */
 	char		*tgt_actual_name;	/* filled in statically */
 	mdb_ctf_id_t	tgt_type;		/* determined dynamically */
 	mdb_ctf_id_t	tgt_actual_type;	/* determined dynamically */
@@ -904,7 +904,7 @@ typegraph_couldbe(uintptr_t addr, mdb_ctf_id_t type)
 
 	rsize = mdb_ctf_type_size(rtype);
 
-	if (val == NULL || rsize == 0)
+	if (val == 0 || rsize == 0)
 		return (1);
 
 	/*
@@ -1209,7 +1209,7 @@ typegraph_build_anchored(uintptr_t addr, size_t size, mdb_ctf_id_t type)
 	ssize_t rval;
 	int mask = sizeof (uintptr_t) - 1;
 
-	if (addr == NULL || size < sizeof (uintptr_t))
+	if (addr == 0 || size < sizeof (uintptr_t))
 		return;
 
 	/*
@@ -2932,7 +2932,7 @@ findlocks_findmutex(const char *name, mdb_ctf_id_t type, ulong_t offs,
 
 	if (mdb_ctf_type_cmp(type, mutex) == 0) {
 		mdb_ctf_id_t ttype;
-		uintptr_t owner = NULL;
+		uintptr_t owner = 0;
 		tg_node_t *node;
 
 		if (mdb_pwalk("mutex_owner",
@@ -2943,7 +2943,7 @@ findlocks_findmutex(const char *name, mdb_ctf_id_t type, ulong_t offs,
 		/*
 		 * Check to see if the owner is a thread.
 		 */
-		if (owner == NULL || (node = typegraph_search(owner)) == NULL)
+		if (owner == 0 || (node = typegraph_search(owner)) == NULL)
 			return (0);
 
 		if (!mdb_ctf_type_valid(node->tgn_type))
@@ -2957,7 +2957,7 @@ findlocks_findmutex(const char *name, mdb_ctf_id_t type, ulong_t offs,
 		if (mdb_ctf_type_cmp(ttype, thread) != 0)
 			return (0);
 
-		if (fl->fl_thread != NULL && owner != fl->fl_thread)
+		if (fl->fl_thread != 0 && owner != fl->fl_thread)
 			return (0);
 
 		if (fl->fl_ndx >= fl->fl_nlocks) {
@@ -3139,7 +3139,7 @@ findlocks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("findlocks: nota bene: %slocks may be held",
 	    fl.fl_nlocks ? "other " : "");
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_printf("\n");
 	} else {
 		mdb_printf(" by %p\n", addr);
@@ -3179,7 +3179,7 @@ findlocks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  * looking for nodes that satisfy the following criteria:
  *
  *  (a)	The node is an array.  That is, the node was either determined to
- * 	be of type CTF_K_ARRAY, or the node was inferred to be an array in
+ *	be of type CTF_K_ARRAY, or the node was inferred to be an array in
  *	pass2 of type identification (described above).
  *
  *  (b)	Each element of the array is a structure that is smaller than the

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/kmem.h>
 #include <sys/proc.h>
 #include <sys/time.h>
@@ -306,7 +304,7 @@ mdivhci(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 mdi_pi_client_link_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("Address is required");
 		return (WALK_ERR);
 	}
@@ -319,14 +317,14 @@ mdi_pi_client_link_walk_init(mdb_walk_state_t *wsp)
 int
 mdi_pi_client_link_walk_step(mdb_walk_state_t *wsp)
 {
-	int 		status = 0;
+	int		status = 0;
 	static int	counts = 0;
 
 	if (firstaddr == wsp->walk_addr && counts != 0) {
 		counts = 0;
 		return (WALK_DONE);
 	}
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		counts = 0;
 		return (WALK_DONE);
 	}
@@ -376,7 +374,7 @@ mdiclient_paths(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 mdi_pi_phci_link_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("Address is required");
 		return (WALK_ERR);
 	}
@@ -395,7 +393,7 @@ mdi_pi_phci_link_walk_step(mdb_walk_state_t *wsp)
 		counts = 0;
 		return (WALK_DONE);
 	}
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		counts = 0;
 		return (WALK_DONE);
 	}
@@ -443,7 +441,7 @@ mdiphci_paths(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 mdi_phci_ph_next_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("Address is required");
 		return (WALK_ERR);
 	}
@@ -462,7 +460,7 @@ mdi_phci_ph_next_walk_step(mdb_walk_state_t *wsp)
 		counts = 0;
 		return (WALK_DONE);
 	}
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		counts = 0;
 		return (WALK_DONE);
 	}

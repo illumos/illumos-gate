@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysinfo.h>
 #include <sys/nvpair.h>
 #include <sys/nvpair_impl.h>
@@ -47,7 +45,7 @@ nvpair_walk_init(mdb_walk_state_t *wsp)
 	nvpriv_t nvpriv;
 	i_nvp_t *tmp;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("nvpair does not support global walks\n");
 		return (WALK_ERR);
 	}
@@ -74,7 +72,7 @@ nvpair_walk_step(mdb_walk_state_t *wsp)
 	nvpair_t *nvpair;
 	i_nvp_t i_nvp, *tmp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&i_nvp, sizeof (i_nvp), wsp->walk_addr) == -1) {
@@ -123,8 +121,8 @@ print_nvlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 /*
  * ::nvpair [-rq]
  *
- * 	-r	Recursively print any nvlist elements
- * 	-q	Quiet mode; print members only as "name=value"
+ *	-r	Recursively print any nvlist elements
+ *	-q	Quiet mode; print members only as "name=value"
  *
  * Prints out a single nvpair.  By default, all information is printed.  When
  * given the '-q' option, the type of elements is hidden, and elements are
@@ -159,7 +157,7 @@ nvpair_info_t nvpair_info[] =  {
 	{ DATA_TYPE_UINT16_ARRAY,	2, "uint16_array" },
 	{ DATA_TYPE_INT32_ARRAY,	4, "int32_array" },
 	{ DATA_TYPE_UINT32_ARRAY,	4, "uint32_array" },
-	{ DATA_TYPE_INT64_ARRAY, 	8, "int64_array" },
+	{ DATA_TYPE_INT64_ARRAY,	8, "int64_array" },
 	{ DATA_TYPE_UINT64_ARRAY,	8, "uint64_array" },
 	{ DATA_TYPE_STRING_ARRAY,	0, "string_array" },
 	{ DATA_TYPE_NVLIST_ARRAY,	0, "nvpair list_array" }

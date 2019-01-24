@@ -259,7 +259,7 @@ qlclinks_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ql_head_t		ql_hba;
 	ql_adapter_state_t	*qlstate;
-	uintptr_t		hbaptr = NULL;
+	uintptr_t		hbaptr = 0;
 
 	if ((flags & DCMD_ADDRSPEC) || argc != 0) {
 		return (DCMD_USAGE);
@@ -288,7 +288,7 @@ qlclinks_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("%<u>%-?s\t%-45s%</u>\n\n", "baseaddr", "instance");
 
 	hbaptr = (uintptr_t)ql_hba.first;
-	while (hbaptr != NULL) {
+	while (hbaptr != 0) {
 
 		if (mdb_vread(qlstate, sizeof (ql_adapter_state_t),
 		    hbaptr) == -1) {
@@ -309,7 +309,7 @@ qlclinks_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    (qlstate->vp_next != NULL)) {
 
 			ql_adapter_state_t	*vqlstate;
-			uintptr_t		vhbaptr = NULL;
+			uintptr_t		vhbaptr = 0;
 
 			vhbaptr = (uintptr_t)qlstate->vp_next;
 
@@ -325,7 +325,7 @@ qlclinks_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 			mdb_printf("%<u>vp baseaddr\t\tvp index%</u>\n");
 
-			while (vhbaptr != NULL) {
+			while (vhbaptr != 0) {
 
 				if (mdb_vread(vqlstate,
 				    sizeof (ql_adapter_state_t), vhbaptr) ==
@@ -415,7 +415,7 @@ qlcver_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("unable to read firmware table\n");
 	} else {
 		ql_adapter_state_t	*qlstate;
-		uintptr_t		hbaptr = NULL;
+		uintptr_t		hbaptr = 0;
 
 		if (mdb_readvar(&ql_hba, "ql_hba") == -1) {
 			mdb_warn("failed to read ql_hba structure");
@@ -447,13 +447,13 @@ qlcver_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 			if (&ql_hba == NULL) {
 				mdb_warn("failed to read ql_hba structure");
-				hbaptr = NULL;
+				hbaptr = 0;
 			} else {
 				hbaptr = (uintptr_t)ql_hba.first;
 			}
 
 			found = 0;
-			while (hbaptr != NULL) {
+			while (hbaptr != 0) {
 
 				if (mdb_vread(qlstate,
 				    sizeof (ql_adapter_state_t), hbaptr) ==
@@ -525,7 +525,7 @@ qlc_el_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint32_t		instance;
 	uint32_t		qlsize = sizeof (ql_adapter_state_t);
 	ql_adapter_state_t	*qlstate;
-	uintptr_t		hbaptr = NULL;
+	uintptr_t		hbaptr = 0;
 	ql_head_t		ql_hba;
 
 	if ((mdbs = mdb_get_state()) == MDB_STATE_DEAD) {
@@ -590,7 +590,7 @@ qlc_el_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		hbaptr = (uintptr_t)ql_hba.first;
 
-		while (hbaptr != NULL) {
+		while (hbaptr != 0) {
 
 			if (mdb_vread(qlstate, qlsize, hbaptr) == -1) {
 				mdb_free(qlstate, qlsize);
@@ -611,7 +611,7 @@ qlc_el_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 			/* find the correct instance to change */
 			hbaptr = (uintptr_t)ql_hba.first;
-			while (hbaptr != NULL) {
+			while (hbaptr != 0) {
 
 				if (mdb_vread(qlstate, qlsize, hbaptr) == -1) {
 					mdb_free(qlstate, qlsize);
@@ -627,7 +627,7 @@ qlc_el_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				hbaptr = (uintptr_t)qlstate->hba.next;
 			}
 
-			if (hbaptr == NULL) {
+			if (hbaptr == 0) {
 				mdb_printf("instance %d is not loaded",
 				    instance);
 				continue;
@@ -1154,7 +1154,7 @@ qlstates_walk_init(mdb_walk_state_t *wsp)
 {
 	ql_head_t	ql_hba;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if ((mdb_readvar(&ql_hba, "ql_hba") == -1) ||
 		    (&ql_hba == NULL)) {
 			mdb_warn("failed to read ql_hba structure");
@@ -1189,7 +1189,7 @@ qlstates_walk_step(mdb_walk_state_t *wsp)
 {
 	ql_adapter_state_t	*qlstate;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		return (WALK_DONE);
 	}
 
@@ -1259,7 +1259,7 @@ qlstates_walk_fini(mdb_walk_state_t *wsp)
 static int
 qlsrb_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("failed to read ql_srb addr at %p",
 		    wsp->walk_addr);
 		return (WALK_ERR);
@@ -1289,7 +1289,7 @@ qlsrb_walk_step(mdb_walk_state_t *wsp)
 {
 	ql_srb_t	*qlsrb;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (ql_srb_t),
@@ -1351,7 +1351,7 @@ qlsrb_walk_fini(mdb_walk_state_t *wsp)
 static int
 qllunq_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("failed to read ql_lun addr at %p",
 		    wsp->walk_addr);
 		return (WALK_ERR);
@@ -1383,7 +1383,7 @@ qllunq_walk_step(mdb_walk_state_t *wsp)
 	ql_link_t	ql_link;
 	ql_link_t	*qllink;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (ql_lun_t),
@@ -1472,7 +1472,7 @@ qltgtq_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint32_t		index;
 	ql_head_t		*dev;
 
-	if ((!(flags & DCMD_ADDRSPEC)) || addr == NULL) {
+	if ((!(flags & DCMD_ADDRSPEC)) || addr == 0) {
 		mdb_warn("ql_hba structure addr is required");
 		return (DCMD_USAGE);
 	}
@@ -1733,10 +1733,10 @@ qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	ql_adapter_state_t	*ha;
 	ql_head_t		ql_hba;
-	uintptr_t		hbaptr = NULL;
+	uintptr_t		hbaptr = 0;
 	int			verbose = 0;
 
-	if ((!(flags & DCMD_ADDRSPEC)) || addr == NULL) {
+	if ((!(flags & DCMD_ADDRSPEC)) || addr == 0) {
 		mdb_warn("ql_adapter_state structure addr is required");
 		return (DCMD_USAGE);
 	}
@@ -1765,7 +1765,7 @@ qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("failed to read ql_hba structure -- is qlc loaded?");
 	} else if (verbose) {
 		hbaptr = (uintptr_t)ql_hba.first;
-		while (hbaptr != NULL) {
+		while (hbaptr != 0) {
 
 			if (mdb_vread(ha, sizeof (ql_adapter_state_t),
 			    hbaptr) == -1) {
@@ -3188,7 +3188,7 @@ qlc_gettrace_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char			*dump_current  = 0;
 	el_trace_desc_t		*trace_desc;
 
-	if ((!(flags & DCMD_ADDRSPEC)) || addr == NULL) {
+	if ((!(flags & DCMD_ADDRSPEC)) || addr == 0) {
 		mdb_warn("ql_adapter_state structure addr is required");
 		return (DCMD_USAGE);
 	}
@@ -3270,7 +3270,7 @@ qlc_gettrace_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if ((trace_next + EL_BUFFER_RESERVE) >= trace_end) {
 		dump_start = trace_start;
-	} else if (*trace_next != NULL) {
+	} else if (*trace_next != '\0') {
 		dump_start = trace_next + (strlen(trace_next) + 1);
 	} else {
 		dump_start = trace_start;
@@ -3300,7 +3300,7 @@ qlc_gettrace_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				mdb_printf("Done %x", dump_current);
 				break;
 			}
-		} else if (*dump_current == NULL) {
+		} else if (*dump_current == '\0') {
 			mdb_printf("Done %x(null)", dump_current);
 			break;
 		}

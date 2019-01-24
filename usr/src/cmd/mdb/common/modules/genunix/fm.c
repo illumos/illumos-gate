@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/sysmacros.h>
@@ -47,7 +45,7 @@ ereportq_pend_walk_init(mdb_walk_state_t *wsp)
 	errorq_t eq;
 	uintptr_t addr;
 
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&addr, "ereport_errorq") == -1) {
 		mdb_warn("failed to read ereport_errorq");
 		return (WALK_ERR);
@@ -76,7 +74,7 @@ ereportq_pend_walk_step(mdb_walk_state_t *wsp)
 	errorq_nvelem_t eqnp;
 	errorq_elem_t elem;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&elem, sizeof (elem), addr) != sizeof (elem) ||
@@ -99,7 +97,7 @@ ereportq_dump_walk_init(mdb_walk_state_t *wsp)
 	errorq_t eq;
 	uintptr_t addr;
 
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&addr, "ereport_errorq") == -1) {
 		mdb_warn("failed to read ereport_errorq");
 		return (WALK_ERR);
@@ -128,7 +126,7 @@ ereportq_dump_walk_step(mdb_walk_state_t *wsp)
 	errorq_nvelem_t eqnp;
 	errorq_elem_t elem;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&elem, sizeof (elem), addr) != sizeof (elem) ||

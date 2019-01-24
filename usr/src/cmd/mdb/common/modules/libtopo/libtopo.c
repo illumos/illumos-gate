@@ -573,7 +573,7 @@ ttree_walk_init(mdb_walk_state_t *wsp)
 {
 	topo_hdl_t th;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("NULL topo_hdl_t passed in");
 		return (WALK_ERR);
 	}
@@ -596,7 +596,7 @@ ttree_walk_step(mdb_walk_state_t *wsp)
 	int rv;
 	ttree_t *tree;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (ttree_t), wsp->walk_addr)
@@ -628,7 +628,7 @@ tmod_walk_init(mdb_walk_state_t *wsp)
 {
 	topo_hdl_t th;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("NULL topo_hdl_t passed in");
 		return (WALK_ERR);
 	}
@@ -667,7 +667,7 @@ tmod_walk_step(mdb_walk_state_t *wsp)
 	int rv;
 	topo_mod_t *tm;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (topo_mod_t), wsp->walk_addr)
@@ -693,7 +693,7 @@ tmod_walk_step(mdb_walk_state_t *wsp)
 			return (DCMD_ERR);
 		}
 	else
-		wsp->walk_addr = NULL;
+		wsp->walk_addr = 0;
 
 	return (rv);
 }
@@ -710,7 +710,7 @@ tpg_walk_init(mdb_walk_state_t *wsp)
 {
 	tnode_t node;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("NULL tnode_t passed in");
 		return (WALK_ERR);
 	}
@@ -733,7 +733,7 @@ tpg_walk_step(mdb_walk_state_t *wsp)
 	int rv;
 	topo_pgroup_t *tpgp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (topo_pgroup_t), wsp->walk_addr)
@@ -766,7 +766,7 @@ tpl_walk_init(mdb_walk_state_t *wsp)
 {
 	topo_pgroup_t pg;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("NULL topo_pgroup_t passed in");
 		return (WALK_ERR);
 	}
@@ -789,7 +789,7 @@ tpl_walk_step(mdb_walk_state_t *wsp)
 	int rv;
 	topo_proplist_t *plp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (topo_proplist_t), wsp->walk_addr)
@@ -823,7 +823,7 @@ tnh_walk_init(mdb_walk_state_t *wsp)
 	tnode_t node;
 	tnwalk_state_t *state;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("NULL tnode_t passed in");
 		return (WALK_ERR);
 	}
@@ -896,7 +896,7 @@ tlist_walk_init(mdb_walk_state_t *wsp)
 {
 	topo_list_t tl;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("NULL topo_list_t passed in\n");
 		return (WALK_ERR);
 	}
@@ -918,7 +918,7 @@ tlist_walk_step(mdb_walk_state_t *wsp)
 	int rv;
 	topo_list_t *tl;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (topo_list_t), wsp->walk_addr) ==

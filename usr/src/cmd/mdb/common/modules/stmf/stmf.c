@@ -42,7 +42,7 @@
 static int
 stmf_ilport_walk_i(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		struct stmf_state state;
 
 		if (mdb_readsym(&state, sizeof (struct stmf_state),
@@ -62,7 +62,7 @@ stmf_ilport_walk_s(mdb_walk_state_t *wsp)
 {
 	int status = WALK_NEXT;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (struct stmf_i_local_port),
@@ -167,12 +167,12 @@ stmf_ilports(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 struct stmf_i_local_port *
 next_stmf_port(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (stmf_ilport_walk_i(wsp) == WALK_ERR) {
 			stmf_ilport_walk_f(wsp);
 			return (NULL);
 		}
-		if (wsp->walk_addr == NULL)
+		if (wsp->walk_addr == 0)
 			stmf_ilport_walk_f(wsp);
 		return ((struct stmf_i_local_port *)wsp->walk_addr);
 	}
@@ -181,7 +181,7 @@ next_stmf_port(mdb_walk_state_t *wsp)
 		stmf_ilport_walk_f(wsp);
 		return (NULL);
 	}
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		stmf_ilport_walk_f(wsp);
 	return ((struct stmf_i_local_port *)wsp->walk_addr);
 }
@@ -209,7 +209,7 @@ stmf_iss(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 	}
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("address of stmf_i_local_port should be specified\n");
 		return (DCMD_ERR);
 	}
@@ -561,7 +561,7 @@ fct_irp_walk_i(mdb_walk_state_t *wsp)
 	struct fct_local_port port;
 	struct fct_i_local_port iport;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("Can not perform global walk");
 		return (WALK_ERR);
 	}
@@ -595,7 +595,7 @@ fct_irp_walk_s(mdb_walk_state_t *wsp)
 	int status = WALK_NEXT;
 	fct_i_remote_port_t *rp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (rp_index++ >= port_max_logins)
@@ -621,7 +621,7 @@ fct_irp_walk_s(mdb_walk_state_t *wsp)
 static void
 fct_irp_walk_f(mdb_walk_state_t *wsp)
 {
-	wsp->walk_addr = NULL;
+	wsp->walk_addr = 0;
 }
 
 /*
@@ -688,7 +688,7 @@ fct_irps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-static uintptr_t cur_iport_for_irp_loop = NULL;
+static uintptr_t cur_iport_for_irp_loop = 0;
 
 static fct_i_remote_port_t *
 next_rport(struct fct_i_local_port *iport)
@@ -698,7 +698,7 @@ next_rport(struct fct_i_local_port *iport)
 	int ret;
 	fct_i_remote_port_t *irp;
 
-	if (ws.walk_addr == NULL || cur_iport_for_irp_loop !=
+	if (ws.walk_addr == 0 || cur_iport_for_irp_loop !=
 	    (uintptr_t)iport) {
 		*((fct_i_remote_port_t **)ws.walk_cbdata) = NULL;
 		cur_iport_for_irp_loop = (uintptr_t)iport;
@@ -707,7 +707,7 @@ next_rport(struct fct_i_local_port *iport)
 			fct_irp_walk_f(&ws);
 			return (NULL);
 		}
-		if (ws.walk_addr == NULL) {
+		if (ws.walk_addr == 0) {
 			fct_irp_walk_f(&ws);
 			return (NULL);
 		}
@@ -805,7 +805,7 @@ find_irp_by_wwn(struct stmf_i_local_port *siport, uint8_t wwn[8])
 			break;
 		}
 	}
-	cur_iport_for_irp_loop = NULL;
+	cur_iport_for_irp_loop = 0;
 	return (ret);
 }
 
@@ -1142,7 +1142,7 @@ stmf_scsi_task_walk_init(mdb_walk_state_t *wsp)
 	 * Input should be a stmf_worker, so read it to get the
 	 * worker_task_head to get the start of the task list
 	 */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("<worker addr>::walk stmf_scsi_task\n");
 		return (WALK_ERR);
 	}
@@ -1165,7 +1165,7 @@ stmf_scsi_task_walk_step(mdb_walk_state_t *wsp)
 	stmf_i_scsi_task_t	itask;
 	int			status;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		return (WALK_DONE);
 	}
 
@@ -1329,7 +1329,7 @@ stmf_worker_walk_step(mdb_walk_state_t *wsp)
 	stmf_worker_walk_data_t	*walk_data = wsp->walk_data;
 	int			status;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		return (WALK_DONE);
 	}
 

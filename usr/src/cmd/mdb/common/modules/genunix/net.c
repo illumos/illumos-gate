@@ -210,7 +210,7 @@ net_udp_ipv6(const udp_t *udp)
 int
 sonode_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		GElf_Sym sym;
 		struct socklist *slp;
 
@@ -239,7 +239,7 @@ sonode_walk_step(mdb_walk_state_t *wsp)
 	int status;
 	struct sotpi_sonode *stp;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (struct sotpi_sonode),
@@ -273,7 +273,7 @@ mi_walk_init(mdb_walk_state_t *wsp)
 {
 	struct mi_walk_data *wdp;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("mi doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -281,7 +281,7 @@ mi_walk_init(mdb_walk_state_t *wsp)
 	wdp = mdb_alloc(sizeof (struct mi_walk_data), UM_SLEEP);
 
 	/* So that we do not immediately return WALK_DONE below */
-	wdp->mi_wd_miofirst = NULL;
+	wdp->mi_wd_miofirst = 0;
 
 	wsp->walk_data = wdp;
 	return (WALK_NEXT);
@@ -306,7 +306,7 @@ mi_walk_step(mdb_walk_state_t *wsp)
 	}
 
 	/* Only true in the first iteration */
-	if (wdp->mi_wd_miofirst == NULL) {
+	if (wdp->mi_wd_miofirst == 0) {
 		wdp->mi_wd_miofirst = wsp->walk_addr;
 		status = WALK_NEXT;
 	} else {

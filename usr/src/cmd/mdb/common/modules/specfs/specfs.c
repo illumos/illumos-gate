@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -84,7 +82,7 @@ snode_walk_step(mdb_walk_state_t *wsp)
 	struct snode *sp;
 	struct snode snode;
 
-	while (addr == NULL) {
+	while (addr == 0) {
 		if (--sw->sw_stablesz == 0)
 			return (WALK_DONE);
 

@@ -100,7 +100,7 @@ find_dip(uintptr_t dip_addr, const void *local_dip, void *cb_arg)
 	usba_device2devinfo_cbdata_t	*cb_data =
 	    (usba_device2devinfo_cbdata_t *)cb_arg;
 
-	if ((cur_usb_dev = mdb_usba_get_usba_device(dip_addr)) == NULL) {
+	if ((cur_usb_dev = mdb_usba_get_usba_device(dip_addr)) == 0) {
 		/*
 		 * If there's no corresponding usba_device_t, this dip isn't
 		 * a usb node.  Might be an sd node.  Ignore it.
@@ -184,7 +184,7 @@ int
 usba_list_walk_init(mdb_walk_state_t *wsp)
 {
 	/* Must have a start addr.  */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("not a global walk.  Starting address required\n");
 
 		return (WALK_ERR);
@@ -217,7 +217,7 @@ usba_list_walk_step(mdb_walk_state_t *wsp)
 	wsp->walk_addr = (uintptr_t)list_entry.next;
 
 	/* Check if we're at the last element */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 
 		return (WALK_DONE);
 	}
@@ -239,7 +239,7 @@ usba_list_walk_step(mdb_walk_state_t *wsp)
 int
 usb_pipe_handle_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("not a global walk; usba_device_t required\n");
 
 		return (WALK_ERR);
@@ -405,7 +405,7 @@ usba_device_walk_init(mdb_walk_state_t *wsp)
 {
 	usba_list_entry_t	list_entry;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn(
 		    "global walk only.  Must be invoked without an address\n");
 
@@ -505,7 +505,7 @@ usba_device(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char		pathname[MAXNAMELEN];
 	char		dname[MODMAXNAMELEN + 1] = "<unatt>"; /* Driver name */
 	char		drv_statep[MODMAXNAMELEN+ 10];
-	uint_t		usb_flag  = NULL;
+	uint_t		usb_flag  = 0;
 	boolean_t	no_driver_attached = FALSE;
 	uintptr_t	dip_addr;
 	struct dev_info	devinfo;
@@ -577,7 +577,7 @@ usba_device(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (usb_flag & USB_DUMP_VERBOSE) {
 		int		i;
-		uintptr_t	statep = NULL;
+		uintptr_t	statep = 0;
 		char		*string_descr;
 		char		**config_cloud, **conf_str_descr;
 		usb_dev_descr_t	usb_dev_descr;
@@ -786,7 +786,7 @@ usba_debug_buf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 	local_debug_buf[debug_buf_size - 1] = '\0';
 
-	if (strlen(local_debug_buf) == NULL) {
+	if (strlen(local_debug_buf) == 0) {
 
 		return (DCMD_OK);
 	}

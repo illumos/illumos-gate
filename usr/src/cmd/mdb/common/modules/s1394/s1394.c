@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mdb_modapi.h>
 #include <sys/dditypes.h>
 #include <sys/sysinfo.h>
@@ -66,7 +64,7 @@ speedmap_walk_init(mdb_walk_state_t *wsp)
 	s1394_state_t	*statep;
 	s1394_state_t	state;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_readvar(&statep, "s1394_statep") == -1) {
 			mdb_warn("failed to find the s1394_statep pointer");
 			return (WALK_ERR);
@@ -88,7 +86,7 @@ speedmap_walk_step(mdb_walk_state_t *wsp)
 	s1394_hal_t	hal;
 	uintptr_t	addr = wsp->walk_addr;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&hal, sizeof (s1394_hal_t), addr) == -1) {

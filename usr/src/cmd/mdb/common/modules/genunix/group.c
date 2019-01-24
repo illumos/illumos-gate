@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Display group information and walk all elements of a group
  */
@@ -160,7 +158,7 @@ group_walk_step(mdb_walk_state_t *wsp)
 	/*
 	 * Print non-NULL elements
 	 */
-	status = wsp->walk_addr == NULL ?
+	status = wsp->walk_addr == 0 ?
 	    WALK_NEXT :
 	    wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
 		wsp->walk_cbdata);

@@ -108,7 +108,7 @@ umem_update_variables(void)
 static int
 umem_ptc_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_layered_walk("ulwp", wsp) == -1) {
 			mdb_warn("couldn't walk 'ulwp'");
 			return (WALK_ERR);
@@ -137,7 +137,7 @@ umem_ptc_walk_step(mdb_walk_state_t *wsp)
 			return (WALK_ERR);
 		}
 
-		if (this == NULL)
+		if (this == 0)
 			break;
 
 		rval = wsp->walk_callback(this, &this, wsp->walk_cbdata);
@@ -303,7 +303,7 @@ umem_log_status(const char *name, umem_log_header_t *val)
 	uintptr_t pos = (uintptr_t)val;
 	size_t size;
 
-	if (pos == NULL)
+	if (pos == 0)
 		return;
 
 	if (mdb_vread(&my_lh, sizeof (umem_log_header_t), pos) == -1) {
@@ -516,7 +516,7 @@ umem_cpu_walk_fini(mdb_walk_state_t *wsp)
 int
 umem_cpu_cache_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("umem_cpu_cache doesn't support global walks");
 		return (WALK_ERR);
 	}
@@ -554,7 +554,7 @@ umem_slab_walk_init(mdb_walk_state_t *wsp)
 	uintptr_t caddr = wsp->walk_addr;
 	umem_cache_t c;
 
-	if (caddr == NULL) {
+	if (caddr == 0) {
 		mdb_warn("umem_slab doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -577,7 +577,7 @@ umem_slab_walk_partial_init(mdb_walk_state_t *wsp)
 	uintptr_t caddr = wsp->walk_addr;
 	umem_cache_t c;
 
-	if (caddr == NULL) {
+	if (caddr == 0) {
 		mdb_warn("umem_slab_partial doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -705,7 +705,7 @@ umem_hash_walk_init(mdb_walk_state_t *wsp)
 	size_t nelems;
 	size_t hsize;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("umem_hash doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -745,15 +745,15 @@ int
 umem_hash_walk_step(mdb_walk_state_t *wsp)
 {
 	umem_hash_walk_t *umhw = wsp->walk_data;
-	uintptr_t addr = NULL;
+	uintptr_t addr = 0;
 
-	if ((addr = (uintptr_t)umhw->umhw_cur.bc_next) == NULL) {
+	if ((addr = (uintptr_t)umhw->umhw_cur.bc_next) == 0) {
 		while (umhw->umhw_pos < umhw->umhw_nelems) {
-			if ((addr = umhw->umhw_table[umhw->umhw_pos++]) != NULL)
+			if ((addr = umhw->umhw_table[umhw->umhw_pos++]) != 0)
 				break;
 		}
 	}
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&umhw->umhw_cur, sizeof (umem_bufctl_t), addr) == -1) {
@@ -1126,7 +1126,7 @@ umem_walk_init_common(mdb_walk_state_t *wsp, int type)
 
 	type &= ~UM_HASH;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("umem walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -1593,7 +1593,7 @@ umem_walk_init(mdb_walk_state_t *wsp)
 	if (wsp->walk_arg != NULL)
 		wsp->walk_addr = (uintptr_t)wsp->walk_arg;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		UMEM_WALK_ALL("umem", wsp);
 	return (umem_walk_init_common(wsp, UM_ALLOCATED));
 }
@@ -1601,7 +1601,7 @@ umem_walk_init(mdb_walk_state_t *wsp)
 int
 bufctl_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		UMEM_WALK_ALL("bufctl", wsp);
 	return (umem_walk_init_common(wsp, UM_ALLOCATED | UM_BUFCTL));
 }
@@ -1609,7 +1609,7 @@ bufctl_walk_init(mdb_walk_state_t *wsp)
 int
 freemem_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		UMEM_WALK_ALL("freemem", wsp);
 	return (umem_walk_init_common(wsp, UM_FREE));
 }
@@ -1617,7 +1617,7 @@ freemem_walk_init(mdb_walk_state_t *wsp)
 int
 freectl_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		UMEM_WALK_ALL("freectl", wsp);
 	return (umem_walk_init_common(wsp, UM_FREE | UM_BUFCTL));
 }
@@ -1636,7 +1636,7 @@ bufctl_history_walk_init(mdb_walk_state_t *wsp)
 	umem_bufctl_audit_t bc;
 	umem_bufctl_audit_t bcn;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("bufctl_history walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -1681,7 +1681,7 @@ bufctl_history_walk_step(mdb_walk_state_t *wsp)
 	umem_bufctl_audit_t *b;
 	UMEM_LOCAL_BUFCTL_AUDIT(&b);
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(b, UMEM_BUFCTL_AUDIT_SIZE, addr) == -1) {
@@ -1735,12 +1735,12 @@ umem_log_walk_init(mdb_walk_state_t *wsp)
 	 * By default (global walk), walk the umem_transaction_log.  Otherwise
 	 * read the log whose umem_log_header_t is stored at walk_addr.
 	 */
-	if (lp == NULL && umem_readvar(&lp, "umem_transaction_log") == -1) {
+	if (lp == 0 && umem_readvar(&lp, "umem_transaction_log") == -1) {
 		mdb_warn("failed to read 'umem_transaction_log'");
 		return (WALK_ERR);
 	}
 
-	if (lp == NULL) {
+	if (lp == 0) {
 		mdb_warn("log is disabled\n");
 		return (WALK_ERR);
 	}
@@ -1884,7 +1884,7 @@ allocdby_walk_init_common(mdb_walk_state_t *wsp, const char *walk)
 {
 	allocdby_walk_t *abw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("allocdby walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -2065,7 +2065,7 @@ whatis_walk_umem(uintptr_t addr, void *ignored, whatis_info_t *wi)
 	size_t size = wi->wi_cache->cache_bufsize;
 
 	while (mdb_whatis_match(w, addr, size, &cur))
-		whatis_print_umem(wi, cur, addr, NULL);
+		whatis_print_umem(wi, cur, addr, 0);
 
 	return (WHATIS_WALKRET(w));
 }
@@ -2385,7 +2385,7 @@ umem_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	if (lhp == NULL) {
+	if (lhp == 0) {
 		mdb_warn("no umem transaction log\n");
 		return (DCMD_ERR);
 	}
@@ -2495,8 +2495,8 @@ bufctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t verbose = FALSE;
 	uint_t history = FALSE;
 	uint_t in_history = FALSE;
-	uintptr_t caller = NULL, thread = NULL;
-	uintptr_t laddr, haddr, baddr = NULL;
+	uintptr_t caller = 0, thread = 0;
+	uintptr_t laddr, haddr, baddr = 0;
 	hrtime_t earliest = 0, latest = 0;
 	int i, depth;
 	char c[MDB_SYM_NAMLEN];
@@ -2577,7 +2577,7 @@ bufctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	depth = MIN(bcp->bc_depth, umem_stack_depth);
 
-	if (caller != NULL) {
+	if (caller != 0) {
 		laddr = caller;
 		haddr = caller + sizeof (caller);
 
@@ -2600,7 +2600,7 @@ bufctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			return (DCMD_OK);
 	}
 
-	if (thread != NULL && (uintptr_t)bcp->bc_thread != thread)
+	if (thread != 0 && (uintptr_t)bcp->bc_thread != thread)
 		return (DCMD_OK);
 
 	if (earliest != 0 && bcp->bc_timestamp < earliest)
@@ -2958,7 +2958,7 @@ vmem_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	while (vaddr != NULL) {
+	while (vaddr != 0) {
 		vp = mdb_zalloc(sizeof (vmem_node_t), UM_SLEEP);
 		vp->vn_addr = vaddr;
 		vp->vn_next = head;
@@ -2977,7 +2977,7 @@ vmem_walk_init(mdb_walk_state_t *wsp)
 
 	for (vp = head; vp != NULL; vp = vp->vn_next) {
 
-		if ((paddr = (uintptr_t)vp->vn_vmem.vm_source) == NULL) {
+		if ((paddr = (uintptr_t)vp->vn_vmem.vm_source) == 0) {
 			vp->vn_sibling = root;
 			root = vp;
 			continue;
@@ -3126,7 +3126,7 @@ vmem_seg_walk_common_init(mdb_walk_state_t *wsp, uint8_t type, char *name)
 {
 	vmem_seg_walk_t *vsw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("vmem_%s does not support global walks\n", name);
 		return (WALK_ERR);
 	}
@@ -3242,7 +3242,7 @@ vmem(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	for (paddr = (uintptr_t)v.vm_source; paddr != NULL; ident += 2) {
+	for (paddr = (uintptr_t)v.vm_source; paddr != 0; ident += 2) {
 		if (mdb_vread(&parent, sizeof (parent), paddr) == -1) {
 			mdb_warn("couldn't trace %p's ancestry", addr);
 			ident = 0;
@@ -3310,7 +3310,7 @@ vmem_seg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int depth;
 	uintptr_t laddr, haddr;
 
-	uintptr_t caller = NULL, thread = NULL;
+	uintptr_t caller = 0, thread = 0;
 	uintptr_t minsize = 0, maxsize = 0;
 
 	hrtime_t earliest = 0, latest = 0;
@@ -3392,11 +3392,10 @@ vmem_seg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    (depth == 0 || depth > VMEM_STACK_DEPTH);
 
 	if (no_debug) {
-		if (caller != NULL || thread != NULL || earliest != 0 ||
-		    latest != 0)
+		if (caller != 0 || thread != 0 || earliest != 0 || latest != 0)
 			return (DCMD_OK);		/* not enough info */
 	} else {
-		if (caller != NULL) {
+		if (caller != 0) {
 			laddr = caller;
 			haddr = caller + sizeof (caller);
 
@@ -3420,7 +3419,7 @@ vmem_seg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				return (DCMD_OK);
 		}
 
-		if (thread != NULL && (uintptr_t)vs.vs_thread != thread)
+		if (thread != 0 && (uintptr_t)vs.vs_thread != thread)
 			return (DCMD_OK);
 
 		if (earliest != 0 && vs.vs_timestamp < earliest)

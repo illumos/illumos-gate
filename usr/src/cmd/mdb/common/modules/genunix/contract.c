@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 #include <sys/types.h>
 #include <sys/contract_impl.h>
@@ -33,7 +31,7 @@
 int
 ct_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		wsp->walk_addr = wsp->walk_addr +
 		    OFFSETOF(ct_type_t, ct_type_avl);
 	} else {
@@ -54,7 +52,7 @@ ct_walk_init(mdb_walk_state_t *wsp)
 int
 ct_event_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("ct_event walker requires ct_equeue address\n");
 		return (WALK_ERR);
 	}
@@ -71,7 +69,7 @@ ct_event_walk_init(mdb_walk_state_t *wsp)
 int
 ct_listener_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("ct_listener walker requires ct_equeue address\n");
 		return (WALK_ERR);
 	}

@@ -42,7 +42,7 @@
 static int
 fcip_walk_i(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "fcip_port_head") == -1) {
 		mdb_warn("failed to read 'fcip_port_head'");
 		return (WALK_ERR);
@@ -57,7 +57,7 @@ fcip_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (fcip_port_info_t),

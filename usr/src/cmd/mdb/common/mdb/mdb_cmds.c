@@ -2789,7 +2789,7 @@ cmd_run(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_warn("failed to create new target");
 		return (DCMD_ERR);
 	}
-	return (cmd_cont(NULL, 0, 0, NULL));
+	return (cmd_cont(0, 0, 0, NULL));
 }
 #endif
 
@@ -2809,7 +2809,7 @@ ve_delete(mdb_tgt_t *t, mdb_tgt_spec_desc_t *sp, int vid, void *data)
 	if (vid < 0)
 		return (0); /* skip over target implementation events */
 
-	if (sp->spec_base != NULL) {
+	if (sp->spec_base != 0) {
 		(void) mdb_tgt_vespec_info(t, vid, &spec, NULL, 0);
 		if (sp->spec_base - spec.spec_base < spec.spec_size)
 			status = mdb_tgt_vespec_delete(t, vid);
@@ -2836,7 +2836,7 @@ ve_delete_spec(mdb_tgt_spec_desc_t *sp)
 	    (mdb_tgt_vespec_f *)ve_delete, sp);
 
 	if (sp->spec_size == 0) {
-		if (sp->spec_id != 0 || sp->spec_base != NULL)
+		if (sp->spec_id != 0 || sp->spec_base != 0)
 			mdb_warn("no traced events matched description\n");
 	}
 

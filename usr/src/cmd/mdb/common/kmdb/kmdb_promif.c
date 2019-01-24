@@ -72,7 +72,7 @@ kmdb_prom_getchar(int wait)
 	getchar = (uintptr_t)pio->cons_polledio_getchar;
 	arg = (uintptr_t)pio->cons_polledio_argument;
 
-	if (!wait && ischar != NULL && !kmdb_dpi_call(ischar, 1, &arg))
+	if (!wait && ischar != 0 && !kmdb_dpi_call(ischar, 1, &arg))
 		return (-1);
 
 	return ((int)kmdb_dpi_call(getchar, 1, &arg));

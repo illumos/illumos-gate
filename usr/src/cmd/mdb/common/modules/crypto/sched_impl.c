@@ -251,7 +251,7 @@ areq_walk_init_common(mdb_walk_state_t *wsp, boolean_t use_first)
 		return (WALK_ERR);
 	}
 	if ((wsp->walk_addr = (use_first ? (uintptr_t)gswq_copy.gs_first :
-	    (uintptr_t)gswq_copy.gs_last)) == NULL) {
+	    (uintptr_t)gswq_copy.gs_last)) == 0) {
 		mdb_printf("Global swq is empty\n");
 		return (WALK_DONE);
 	}
@@ -282,7 +282,7 @@ an_id_walk_init(mdb_walk_state_t *wsp, idwalk_type_t type)
 {
 	kcf_areq_node_t *adn;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("must give kcf_areq_node address\n");
 		return (WALK_ERR);
 	}
@@ -334,7 +334,7 @@ an_id_walk_step(mdb_walk_state_t *wsp, idwalk_type_t type)
 	int status;
 	kcf_areq_node_t *ptr;
 
-	if (wsp->walk_addr == NULL)	/* then we're done */
+	if (wsp->walk_addr == 0)	/* then we're done */
 		return (WALK_DONE);
 
 	ptr = wsp->walk_data;
@@ -351,19 +351,19 @@ an_id_walk_step(mdb_walk_state_t *wsp, idwalk_type_t type)
 	switch (type) {
 		case IDNEXT:
 			if ((wsp->walk_addr =
-			    (uintptr_t)ptr->an_idnext) == NULL)
+			    (uintptr_t)ptr->an_idnext) == 0)
 				return (WALK_DONE);
 			break;
 
 		case IDPREV:
 			if ((wsp->walk_addr =
-			    (uintptr_t)ptr->an_idprev) == NULL)
+			    (uintptr_t)ptr->an_idprev) == 0)
 				return (WALK_DONE);
 			break;
 
 		case CTXCHAIN:
 			if ((wsp->walk_addr =
-			    (uintptr_t)ptr->an_ctxchain_next) == NULL)
+			    (uintptr_t)ptr->an_ctxchain_next) == 0)
 				return (WALK_DONE);
 			break;
 
@@ -425,7 +425,7 @@ an_walk_step_common(mdb_walk_state_t *wsp, boolean_t use_next)
 	    wsp->walk_cbdata);
 
 	if ((wsp->walk_addr = (use_next ? (uintptr_t)ptr->an_next :
-	    (uintptr_t)ptr->an_prev)) == NULL)
+	    (uintptr_t)ptr->an_prev)) == 0)
 		return (WALK_DONE);
 
 	return (status);
@@ -556,7 +556,7 @@ crypto_pr_reqid(uintptr_t addr, reqid_data_t *data, reqid_cb_data_t *cbdata)
 	int i;
 	int needhdr = TRUE;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_printf("kcf_reqid_table[%d] = NULL\n", data->rd_cur_index);
 		return (WALK_NEXT);
 	}
@@ -585,7 +585,7 @@ crypto_pr_reqid(uintptr_t addr, reqid_data_t *data, reqid_cb_data_t *cbdata)
 		mdb_printf("DEBUG: node_addr = %p\n", node_addr);
 #endif
 
-		if (node_addr == NULL)
+		if (node_addr == 0)
 			break;  /* skip */
 
 		if (mdb_vread(&node, sizeof (kcf_areq_node_t), node_addr)

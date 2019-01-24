@@ -235,7 +235,7 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 		break;
 	}
 	case MAC_FLOW_ATTR: {
-		struct 	in_addr	in4;
+		struct	in_addr	in4;
 		uintptr_t	desc_addr;
 		flow_desc_t	fdesc;
 
@@ -283,7 +283,7 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 	case MAC_FLOW_MISC: {
 		char		flow_flags[2 * FLOW_MAX_FLAGS];
 		char		flow_type[2 * FLOW_MAX_TYPE];
-		GElf_Sym 	sym;
+		GElf_Sym	sym;
 		char		func_name[MDB_SYM_NAMLEN] = "";
 		uintptr_t	func, match_addr;
 
@@ -325,8 +325,8 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 		break;
 	}
 	case MAC_FLOW_STATS: {
-		uint64_t  		totibytes = 0;
-		uint64_t  		totobytes = 0;
+		uint64_t		totibytes = 0;
+		uint64_t		totobytes = 0;
 		mac_soft_ring_set_t	*mac_srs;
 		mac_rx_stats_t		mac_rx_stat;
 		mac_tx_stats_t		mac_tx_stat;
@@ -472,7 +472,7 @@ mac_common_walk_step(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
@@ -1043,7 +1043,7 @@ mac_group_walk_init(mdb_walk_state_t *wsp)
 {
 	int ret;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("non-global walks are not supported\n");
 		return (WALK_ERR);
 	}
@@ -1069,7 +1069,7 @@ mac_group_walk_step(mdb_walk_state_t *wsp)
 	 * walkers are a bit unsporting, they don't actually read in the data
 	 * for us.
 	 */
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&mi, sizeof (mac_impl_t), wsp->walk_addr) == -1) {
@@ -1081,7 +1081,7 @@ mac_group_walk_step(mdb_walk_state_t *wsp)
 	 * First go for rx groups, then tx groups.
 	 */
 	mgp = (uintptr_t)mi.mi_rx_groups;
-	while (mgp != NULL) {
+	while (mgp != 0) {
 		if (mdb_vread(&mg, sizeof (mac_group_t), mgp) == -1) {
 			mdb_warn("failed to read mac_group_t at %p", mgp);
 			return (WALK_ERR);
@@ -1094,7 +1094,7 @@ mac_group_walk_step(mdb_walk_state_t *wsp)
 	}
 
 	mgp = (uintptr_t)mi.mi_tx_groups;
-	while (mgp != NULL) {
+	while (mgp != 0) {
 		if (mdb_vread(&mg, sizeof (mac_group_t), mgp) == -1) {
 			mdb_warn("failed to read mac_group_t at %p", mgp);
 			return (WALK_ERR);
@@ -1115,7 +1115,7 @@ mac_group_count_clients(mac_group_t *mgp)
 	int clients = 0;
 	uintptr_t mcp = (uintptr_t)mgp->mrg_clients;
 
-	while (mcp != NULL) {
+	while (mcp != 0) {
 		mac_grp_client_t c;
 
 		if (mdb_vread(&c, sizeof (c), mcp) == -1) {

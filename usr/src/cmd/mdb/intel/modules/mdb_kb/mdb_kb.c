@@ -919,7 +919,7 @@ xkb_walk_syms(xkb_t *xkb, uintptr_t modhead, char **buf,
 		    modctl + offsetof(struct modctl, mod_mp), &modulep))
 			return (0);
 
-		if (modulep == NULL)
+		if (modulep == 0)
 			goto next;
 
 		if (!xkb_read_module(xkb, modulep, &module, &sym_addr,

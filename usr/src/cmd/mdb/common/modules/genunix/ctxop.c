@@ -24,8 +24,6 @@
  * All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mdb_modapi.h>
 #include <sys/thread.h>
 #include "ctxop.h"
@@ -35,7 +33,7 @@ ctxop_walk_init(mdb_walk_state_t *wsp)
 {
 	kthread_t thread, *tp = &thread;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("must specify thread for ctxop walk\n");
 		return (WALK_ERR);
 	}
@@ -55,7 +53,7 @@ ctxop_walk_step(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data,

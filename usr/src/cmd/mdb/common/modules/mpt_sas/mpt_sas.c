@@ -119,7 +119,7 @@ mdi_info_cb(uintptr_t addr, const void *data, void *cbdata)
 		return (-1);
 	}
 
-	*dev_path = NULL;
+	*dev_path = '\0';
 	if (construct_path((uintptr_t)c.ct_dip, dev_path) != DCMD_OK)
 		strcpy(dev_path, "unknown");
 
@@ -227,7 +227,7 @@ klist_head(list_t *lp, uintptr_t klp)
 {
 	if ((uintptr_t)lp->list_head.list_next ==
 	    klp + offsetof(struct list, list_head))
-		return (NULL);
+		return (0);
 
 	return ((uintptr_t)(((char *)lp->list_head.list_next) -
 	    lp->list_offset));
@@ -241,7 +241,7 @@ klist_next(list_t *lp, uintptr_t klp, void *op)
 	    lp->list_offset);
 
 	if ((uintptr_t)np->list_next == klp + offsetof(struct list, list_head))
-		return (NULL);
+		return (0);
 
 	return (((uintptr_t)(np->list_next)) - lp->list_offset);
 }
@@ -284,7 +284,7 @@ krefhash_next(uintptr_t khp, void *op, uintptr_t *addr)
 	lp = (refhash_link_t *)(((char *)(op)) + mh.rh_link_off);
 	ml = *lp;
 	while ((klp = klist_next(&mh.rh_objs,
-	    khp + offsetof(refhash_t, rh_objs), &ml)) != NULL) {
+	    khp + offsetof(refhash_t, rh_objs), &ml)) != 0) {
 		mdb_vread(&ml, sizeof (ml), klp);
 		if (!(ml.rhl_flags & RHL_F_DEAD))
 			break;
@@ -474,7 +474,7 @@ display_slotinfo(struct mptsas *mp, struct mptsas_slots *s)
 		return (DCMD_ERR);
 	}
 
-	if (state != MDB_STATE_STOPPED && panicstr == NULL) {
+	if (state != MDB_STATE_STOPPED && panicstr == 0) {
 		mdb_warn("mptsas: slot info not available for live dump\n");
 		return (DCMD_ERR);
 	}

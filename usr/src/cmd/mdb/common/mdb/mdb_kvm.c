@@ -140,7 +140,7 @@ kt_load_modules(kt_data_t *kt, mdb_tgt_t *t)
 	addr = head = (uintptr_t)sym.st_value;
 
 	do {
-		if (addr == NULL)
+		if (addr == 0)
 			break; /* Avoid spurious NULL pointers in list */
 
 		if (mdb_tgt_vread(t, &ctl, sizeof (ctl), addr) == -1) {
@@ -1190,7 +1190,7 @@ kt_load_ctfdata(mdb_tgt_t *t, kt_module_t *km)
 	if (km->km_ctfp != NULL)
 		return (km->km_ctfp);
 
-	if (km->km_ctf_va == NULL) {
+	if (km->km_ctf_va == 0) {
 		(void) set_errno(EMDB_NOCTF);
 		return (NULL);
 	}

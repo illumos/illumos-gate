@@ -303,7 +303,7 @@ umastat_vmem(uintptr_t addr, const vmem_t *v, void *ignored)
 	vmem_t parent;
 	int ident = 0;
 
-	for (paddr = (uintptr_t)v->vm_source; paddr != NULL; ident += 4) {
+	for (paddr = (uintptr_t)v->vm_source; paddr != 0; ident += 4) {
 		if (mdb_vread(&parent, sizeof (parent), paddr) == -1) {
 			mdb_warn("couldn't trace %p's ancestry", addr);
 			ident = 0;

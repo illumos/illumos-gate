@@ -97,8 +97,8 @@ domain_walk_init(mdb_walk_state_t *wsp)
 {
 	domain_walk_t *dwp;
 
-	if (wsp->walk_addr == NULL)
-		if ((wsp->walk_addr = get_dom0_addr()) == NULL)
+	if (wsp->walk_addr == 0)
+		if ((wsp->walk_addr = get_dom0_addr()) == 0)
 			return (WALK_ERR);
 
 	dwp = mdb_alloc(sizeof (domain_walk_t), UM_SLEEP);
@@ -114,7 +114,7 @@ domain_walk_step(mdb_walk_state_t *wsp)
 	mdb_xpv_domain_t dom;
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	status = wsp->walk_callback(wsp->walk_addr, (void *)wsp->walk_addr,
@@ -148,8 +148,8 @@ vcpu_walk_init(mdb_walk_state_t *wsp)
 	vcpu_walk_t *vwp;
 	uintptr_t off;
 
-	if (wsp->walk_addr == NULL)
-		if ((wsp->walk_addr = get_dom0_addr()) == NULL)
+	if (wsp->walk_addr == 0)
+		if ((wsp->walk_addr = get_dom0_addr()) == 0)
 			return (WALK_ERR);
 
 	if (mdb_ctf_offsetof(domain_type, "vcpu", &off)) {
@@ -174,7 +174,7 @@ vcpu_walk_step(mdb_walk_state_t *wsp)
 
 	if (vwp->vw_count++ >= MAX_VIRT_CPUS)
 		return (WALK_DONE);
-	if ((wsp->walk_addr == NULL) ||
+	if ((wsp->walk_addr == 0) ||
 	    (mdb_vread(&vcpu_ptr, sizeof (uintptr_t), wsp->walk_addr) == -1) ||
 	    (vcpu_ptr == 0))
 		return (WALK_DONE);

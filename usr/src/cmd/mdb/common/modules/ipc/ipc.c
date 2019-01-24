@@ -355,7 +355,7 @@ ds_walk_init(mdb_walk_state_t *wsp)
 {
 	ipc_ops_vec_t	*iv = wsp->walk_arg;
 
-	if (wsp->walk_arg != NULL && wsp->walk_addr != NULL)
+	if (wsp->walk_arg != NULL && wsp->walk_addr != 0)
 		mdb_printf("ignoring provided address\n");
 
 	if (wsp->walk_arg)

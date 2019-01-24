@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * A generic memory leak detector.  The target interface, defined in
  * <leaky_impl.h>, is implemented by the genunix and libumem dmods to fill
@@ -250,7 +248,7 @@ leaky_grep(uintptr_t addr, size_t size)
 	size_t base_size;
 	const uintptr_t mask = sizeof (uintptr_t) - 1;
 
-	if (addr == NULL || size == 0)
+	if (addr == 0 || size == 0)
 		return;
 
 	state_idx = 0;
@@ -666,7 +664,7 @@ leaky_filter(const leak_pc_t *stack, int depth, uintptr_t filter)
 	GElf_Sym sym;
 	char c;
 
-	if (filter == NULL)
+	if (filter == 0)
 		return (1);
 
 	for (i = 0; i < depth; i++) {
@@ -712,7 +710,7 @@ leaky_dump(uintptr_t filter, uint_t dump_verbose)
 	}
 
 	if (!seen) {
-		if (filter != NULL)
+		if (filter != 0)
 			mdb_printf(
 			    "findleaks: no memory leaks matching %a found\n",
 			    filter);
@@ -780,7 +778,7 @@ findleaks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	leak_ndx_t i;
 	leak_mtab_t *lmp;
 	ssize_t total;
-	uintptr_t filter = NULL;
+	uintptr_t filter = 0;
 	uint_t dump = 0;
 	uint_t force = 0;
 	uint_t verbose = 0;
@@ -901,7 +899,7 @@ leaky_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		lkb = NULL;
 		goto found;
 	}
