@@ -112,8 +112,7 @@ struct  dkl_partition *part;
  *		-- read the alternate sector partition tables
  */
 int
-read_altsctr(part)
-struct 	dkl_partition *part;
+read_altsctr(struct dkl_partition *part)
 {
 	if (ap->ap_tblp == NULL) {
 /*	    allocate buffer for the alts partition table (sector size)	*/
@@ -126,7 +125,7 @@ struct 	dkl_partition *part;
 	    }
 
 /*	    allocate buffer for the alts partition map (sector size)	*/
-/*	    buffers include the disk image bit map 			*/
+/*	    buffers include the disk image bit map			*/
 /*	    and the incore transformed char map				*/
 
 	    if ((ap->ap_memmapp = (uchar_t *)malloc(part->p_size)) == NULL) {
@@ -271,7 +270,7 @@ init_altsctr()
 	ap->ap_tblp->alts_map_base =
 		altsmap_alloc(ap->ap_tbl_secsiz / NBPSCTR,
 			ap->part.p_size, ap->ap_map_sectot, ALTS_MAP_UP);
-	if (ap->ap_tblp->alts_map_base == NULL) {
+	if (ap->ap_tblp->alts_map_base == 0) {
 	    perror("Unable to allocate alternate map on disk: ");
 	    return (57);
 	}
@@ -282,10 +281,10 @@ init_altsctr()
 
 
 /*
- * 	read the alternate partition tables from disk
+ *	read the alternate partition tables from disk
  */
 static int
-get_altsctr()
+get_altsctr(void)
 {
 	int	mystatus = FAILURE;
 	int	status = 0;
@@ -496,7 +495,7 @@ gen_alts_ent() {
 		altsmap_alloc((blkaddr_t)ap->ap_tblp->alts_map_base +
 			ap->ap_map_sectot, (blkaddr_t)ap->part.p_size,
 			ap->ap_ent_secsiz / NBPSCTR, ALTS_MAP_UP);
-	if (ap->ap_tblp->alts_ent_base == NULL) {
+	if (ap->ap_tblp->alts_ent_base == 0) {
 	    perror("Unable to allocate alternate entry table on disk: ");
 	    return (65);
 	}
@@ -527,7 +526,7 @@ assign_altsctr()
 	    alts_ind =
 		altsmap_alloc(ap->part.p_size-1, ap->ap_tblp->alts_map_base +
 			ap->ap_map_sectot - 1, cluster, ALTS_MAP_DOWN);
-	    if (alts_ind == NULL) {
+	    if (alts_ind == 0) {
 		(void) fprintf(stderr,
 	"Unable to allocate alternates for bad starting sector %u.\n",
 			(ap->ap_entp)[i].bad_start);
@@ -547,9 +546,9 @@ assign_altsctr()
  *	transform the disk image alts bit map to incore char map
  */
 static void
-expand_map()
+expand_map(void)
 {
-	int 	i;
+	int	i;
 
 	for (i = 0; i < ap->part.p_size; i++) {
 	    (ap->ap_memmapp)[i] = altsmap_getbit(i);
@@ -560,10 +559,9 @@ expand_map()
  *	transform the incore alts char map to the disk image bit map
  */
 static void
-compress_map()
+compress_map(void)
 {
-
-	int 	i;
+	int	i;
 	int	bytesz;
 	char	mask = 0;
 	int	maplen = 0;
@@ -631,13 +629,13 @@ int	dir;
 		return (first_ind);
 
 	}
-	return (NULL);
+	return (0);
 }
 
 
 
 /*
- * 	bubble sort the entry table into ascending order
+ *	bubble sort the entry table into ascending order
  */
 static void
 ent_sort(buf, cnt)
