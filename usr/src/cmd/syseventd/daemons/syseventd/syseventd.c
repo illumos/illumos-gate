@@ -83,7 +83,7 @@ static int door_upcall_retval;		/* Kernel event posting return value */
 static int fini_pending = 0;		/* fini pending flag */
 static int deliver_buf = 0;		/* Current event buffer from kernel */
 static int dispatch_buf = 0;		/* Current event buffer dispatched */
-static sysevent_t **eventbuf; 		/* Global array of event buffers */
+static sysevent_t **eventbuf;		/* Global array of event buffers */
 static struct ev_completion *event_compq;	/* Event completion queue */
 static mutex_t ev_comp_lock;		/* Event completion queue lock */
 static mutex_t err_mutex;		/* error logging lock */
@@ -453,19 +453,19 @@ main(int argc, char **argv)
 		syseventd_exit(2);
 	}
 
-	if (thr_create(NULL, NULL, (void *(*)(void *))dispatch_message,
+	if (thr_create(NULL, 0, (void *(*)(void *))dispatch_message,
 	    (void *)0, 0, NULL) < 0) {
 		syseventd_err_print(INIT_THR_CREATE_ERR, strerror(errno));
 		syseventd_exit(2);
 	}
-	if (thr_create(NULL, NULL,
+	if (thr_create(NULL, 0,
 	    (void *(*)(void *))event_completion_thr, NULL,
 	    THR_BOUND, NULL) != 0) {
 		syseventd_err_print(INIT_THR_CREATE_ERR, strerror(errno));
 		syseventd_exit(2);
 	}
 	/* Create signal catching thread */
-	if (thr_create(NULL, NULL, (void *(*)(void *))sigwait_thr,
+	if (thr_create(NULL, 0, (void *(*)(void *))sigwait_thr,
 	    NULL, 0, NULL) < 0) {
 		syseventd_err_print(INIT_THR_CREATE_ERR, strerror(errno));
 		syseventd_exit(2);

@@ -333,7 +333,7 @@ slm_init()
 	(void) mutex_init(&evq_lock, USYNC_THREAD, NULL);
 	(void) cond_init(&evq_cv, USYNC_THREAD, NULL);
 
-	if (thr_create(NULL, NULL, (void *(*)(void *))devfsadmd_deliver_thr,
+	if (thr_create(NULL, 0, (void *(*)(void *))devfsadmd_deliver_thr,
 	    NULL, THR_BOUND, &deliver_thr_id) != 0) {
 		(void) mutex_destroy(&evq_lock);
 		(void) cond_destroy(&evq_cv);

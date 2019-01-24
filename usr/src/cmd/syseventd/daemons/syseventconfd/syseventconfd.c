@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * syseventconfd - The sysevent conf daemon
  *
@@ -183,8 +181,8 @@ main(int argc, char **argv)
 	(void) thr_sigsetmask(SIG_BLOCK, &set, NULL);
 
 	/* Create signal catching thread */
-	if (thr_create(NULL, NULL, (void *(*)(void *))sigwait_thr,
-		(void *)NULL, 0, NULL) < 0) {
+	if (thr_create(NULL, 0, (void *(*)(void *))sigwait_thr,
+		NULL, 0, NULL) < 0) {
 		syserrmsg(INIT_THR_CREATE_ERR, strerror(errno));
 		exit(2);
 	}
@@ -287,7 +285,7 @@ exec_cmd(struct cmd *cmd)
 	arg_t		*args;
 	pid_t		pid;
 	char		*lp;
-	char 		*p;
+	char		*p;
 	int		i;
 	sigset_t	set, prior_set;
 
