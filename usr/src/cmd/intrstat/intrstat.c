@@ -520,7 +520,7 @@ main(int argc, char **argv)
 	if (optind != argc) {
 		g_sleeptime = strtol(argv[optind], &end, 10);
 
-		if (*end != NULL || g_sleeptime == 0)
+		if (*end != '\0' || g_sleeptime == 0)
 			fatal("invalid interval '%s'\n", argv[1]);
 
 		if (g_sleeptime <= 0)
