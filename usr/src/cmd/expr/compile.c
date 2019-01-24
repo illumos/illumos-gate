@@ -32,16 +32,14 @@
  *	table not present.
  *
  *	Goal is to work with vi and sed/ed.
- * 	Returns expbuf in dhl format (encoding of first two bytes).
- * 	Note also that this is profoundly single threaded.  You
+ *	Returns expbuf in dhl format (encoding of first two bytes).
+ *	Note also that this is profoundly single threaded.  You
  *	cannot call compile twice with two separate search strings
  *	because the second call will wipe out the earlier stored string.
  *	This must be fixed, plus a general cleanup should be performed
  *	if this is to be integrated into libc.
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <widec.h>
@@ -58,11 +56,11 @@
  * psuedo compile/step/advance global variables
  */
 extern int nbra;
-extern char *locs; 		/* for stopping execess recursion */
-extern char *loc1;  		/* 1st character which matched RE */
-extern char *loc2; 		/* char after lst char in matched RE */
-extern char *braslist[]; 	/* start of nbra subexp  */
-extern char *braelist[]; 	/* end of nbra subexp    */
+extern char *locs;		/* for stopping execess recursion */
+extern char *loc1;		/* 1st character which matched RE */
+extern char *loc2;		/* char after lst char in matched RE */
+extern char *braslist[];	/* start of nbra subexp  */
+extern char *braelist[];	/* end of nbra subexp    */
 extern int regerrno;
 extern int reglength;
 
@@ -73,7 +71,7 @@ static int dhl_step(const char *str, const char *ep);
 static int dhl_advance(const char *str, const char *ep);
 static int map_errnos(int);		/* Convert regcomp error */
 static int dhl_doit(const char *, const regex_t *, const int flags);
-static char * dhl_compile(const char *instr, char *ep, char *endbuf);
+static char *dhl_compile(const char *instr, char *ep, char *endbuf);
 
 /*
  * # of sub re's: NOTE: For now limit on bra list defined here
@@ -89,7 +87,7 @@ static regmatch_t rm[SEPSIZE];		/* ptr to list of RE matches */
  * regex structures, one for advance and one for step.
  */
 static struct regex_comp {
-	char 	r_head[2];		/* Header for DL encoding for vi */
+	char	r_head[2];		/* Header for DL encoding for vi */
 	regex_t r_stp;			/* For use by step */
 	regex_t r_adv;			/* For use by advance */
 } reg_comp;
@@ -139,17 +137,16 @@ advance(const char *instr, const char *expbuf)
  * I say "apparently" as the code to compile()/step() is poorly written.
  */
 static char *
-dhl_compile(instr, expbuf, endbuf)
-const char *instr;		/* the regular expression		*/
-char *expbuf;			/* where the compiled RE gets placed	*/
-char *endbuf;			/* ending addr of expbuf		*/
+dhl_compile(const char *instr,	/* the regular expression		*/
+    char *expbuf,		/* where the compiled RE gets placed	*/
+    char *endbuf)		/* ending addr of expbuf		*/
 {
 	int rv;
 	int alloc = 0;
 	char adv_instr[4096];	/* PLENTY big temp buffer */
 	char *instrp;		/* PLENTY big temp buffer */
 
-	if (*instr == (char) NULL) {
+	if (*instr == '\0') {
 		regerrno = 41;
 		return (NULL);
 	}
@@ -198,7 +195,7 @@ char *endbuf;			/* ending addr of expbuf		*/
 	 */
 
 	if (instr[0] == '^')
-		instrp = (char *) instr; /* String already has leading ^ */
+		instrp = (char *)instr; /* String already has leading ^ */
 	else {
 		adv_instr[0] = '^';
 		strncpy(&adv_instr[1], instr, 2048);
@@ -213,14 +210,14 @@ char *endbuf;			/* ending addr of expbuf		*/
 	/*
 	 * update global variables
 	 */
-	nbra = (int) reg_comp.r_adv.re_nsub > 0 ?
-	    (int) reg_comp.r_adv.re_nsub : 0;
+	nbra = (int)reg_comp.r_adv.re_nsub > 0 ?
+	    (int)reg_comp.r_adv.re_nsub : 0;
 	regerrno = 0;
 
 	/*
 	 * Set the header flags for use by vi
 	 */
-	if (instr[0] == '^') 		/* if beginning of string,	*/
+	if (instr[0] == '^')		/* if beginning of string,	*/
 		reg_comp.r_head[0] = 1;	/* set special flag		*/
 	else
 		reg_comp.r_head[0] = 0;	/* clear special flag		*/
@@ -232,7 +229,7 @@ char *endbuf;			/* ending addr of expbuf		*/
 	/*
 	 * Copy our reg_comp structure to expbuf
 	 */
-	(void) memcpy(expbuf, (char *) &reg_comp, regexc_size);
+	(void) memcpy(expbuf, (char *)&reg_comp, regexc_size);
 
 out:
 	/*
@@ -259,9 +256,8 @@ out:
  * dhl_step: step through a string until a RE match is found, or end of str
  */
 static int
-dhl_step(str, ep)
-const char *str;		/* characters to be checked for a match	*/
-const char *ep;			/* compiled RE from dhl_compile()	*/
+dhl_step(const char *str,	/* characters to be checked for a match	*/
+    const char *ep)		/* compiled RE from dhl_compile()	*/
 {
 	/*
 	 * Check if we're passed a null ep
@@ -273,7 +269,7 @@ const char *ep;			/* compiled RE from dhl_compile()	*/
 	/*
 	 * Call common routine with r_stp (step) structure
 	 */
-	return (dhl_doit(str, &(((struct regex_comp *) ep)->r_stp),
+	return (dhl_doit(str, &(((struct regex_comp *)ep)->r_stp),
 	    ((locs != NULL) ? REG_NOTBOL : 0)));
 }
 
@@ -281,9 +277,8 @@ const char *ep;			/* compiled RE from dhl_compile()	*/
  * dhl_advance: implement advance
  */
 static int
-dhl_advance(str, ep)
-const char *str;		/* characters to be checked for a match	*/
-const char *ep;			/* compiled RE from dhl_compile()	*/
+dhl_advance(const char *str,	/* characters to be checked for a match	*/
+    const char *ep)		/* compiled RE from dhl_compile()	*/
 {
 	int rv;
 	/*
@@ -296,7 +291,7 @@ const char *ep;			/* compiled RE from dhl_compile()	*/
 	/*
 	 * Call common routine with r_adv (advance) structure
 	 */
-	rv = dhl_doit(str, &(((struct regex_comp *) ep)->r_adv), 0);
+	rv = dhl_doit(str, &(((struct regex_comp *)ep)->r_adv), 0);
 	loc1 = NULL;		/* Clear it per the compile man page */
 	return (rv);
 }
@@ -305,10 +300,9 @@ const char *ep;			/* compiled RE from dhl_compile()	*/
  * dhl_doit - common code for step and advance
  */
 static int
-dhl_doit(str, rep, flags)
-const char *str;		/* characters to be checked for a match	*/
-const regex_t *rep;
-const int flags;		/* flags to be passed to regexec directly */
+dhl_doit(const char *str,	/* characters to be checked for a match	*/
+    const regex_t *rep,
+    const int flags)		/* flags to be passed to regexec directly */
 {
 	int rv;
 	int i;
@@ -344,7 +338,7 @@ const int flags;		/* flags to be passed to regexec directly */
 		braslist[i] = (char *)str + prm->rm_so;
 		braelist[i] = (char *)str + prm->rm_eo;
 		if (i >= SEPSIZE) {
-			regerrno = 50; 	/* regex overflow */
+			regerrno = 50;	/* regex overflow */
 			return (0);
 		}
 	}
@@ -362,19 +356,19 @@ const int flags;		/* flags to be passed to regexec directly */
  *	regerrno to compile/step error mapping:
  *	This is really a big compromise.  Some errors don't map at all
  *	like regcomp error 15 is generated by both compile() error types
- *  	44 & 46.  So which one should we map to?
+ *	44 & 46.  So which one should we map to?
  *	Note REG_ESUB Can't happen- 9 is no longer max num of subexpressions
  *	To do your errors right use xregerr() to get the regcomp error
  *	string and print that.
  *
- * |	regcomp/regexec		     | 	Compile/step/advance		    |
+ * |    regcomp/regexec              |  Compile/step/advance                |
  * +---------------------------------+--------------------------------------+
  * 0 REG_OK	  Pattern matched	1  - Pattern matched
  * 1 REG_NOMATCH  No match		0  - Pattern didn't match
  * 2 REG_ECOLLATE Bad collation elmnt.	67 - Returned by compile on mbtowc err
  * 3 REG_EESCAPE  trailing \ in patrn	45 - } expected after \.
  * 4 REG_ENEWLINE \n before end pattrn	36 - Illegal or missing delimiter.
- * 5 REG_ENSUB	  Over 9 \( \) pairs 	43 - Too many \(
+ * 5 REG_ENSUB    Over 9 \( \) pairs	43 - Too many \(
  * 6 REG_ESUBREG  Bad number in \[0-9]  25 - ``\digit'' out of range.
  * 7 REG_EBRACK   [ ] inbalance		49 - [ ] imbalance.
  * 8 REG_EPAREN   ( ) inbalance         42 - \(~\) imbalance.
@@ -481,13 +475,13 @@ map_errnos(int Errno)
  */
 
 void
-regex_comp_free(void * a)
+regex_comp_free(void *a)
 {
 	/*
 	 * Free any data being held for previous search strings
 	 */
 
-	if (((struct regex_comp *) a) == NULL) {
+	if (a == NULL) {
 		return;
 	}
 
