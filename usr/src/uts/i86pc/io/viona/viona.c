@@ -34,7 +34,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -286,7 +286,7 @@
 
 #define	VRING_USED_F_NO_NOTIFY		1
 
-#define	BCM_NIC_DRIVER		"bnxe"
+#define	BNXE_NIC_DRIVER		"bnxe"
 
 /*
  * Feature bits. See section 5.1.3 of the VIRTIO 1.0 spec.
@@ -474,6 +474,7 @@ struct viona_link {
 	uint32_t		l_features;
 	uint32_t		l_features_hw;
 	uint32_t		l_cap_csum;
+	boolean_t		l_force_tx_copy;
 
 	uintptr_t		l_notify_ioport;
 	void			*l_notify_cookie;
@@ -552,7 +553,12 @@ static net_instance_t		*viona_neti;
  * copy tx mbufs from virtio ring to avoid necessitating a wait for packet
  * transmission to free resources.
  */
-static boolean_t		viona_force_copy_tx_mblks = B_FALSE;
+static kmutex_t			viona_force_copy_lock;
+static enum viona_force_copy {
+	VFC_UNINITALIZED	= 0,
+	VFC_COPY_UNEEDED	= 1,
+	VFC_COPY_REQUIRED	= 2,
+}				viona_force_copy_state = VFC_UNINITALIZED;
 
 static int viona_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
     void **result);
@@ -681,20 +687,41 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-static void
-set_viona_tx_mode()
+/*
+ * Check if full TX packet copying is needed.  This should not be called from
+ * viona attach()/detach() context.
+ */
+static boolean_t
+viona_tx_copy_needed()
 {
-	major_t bcm_nic_major;
+	boolean_t result;
 
-	if ((bcm_nic_major = ddi_name_to_major(BCM_NIC_DRIVER))
-	    != DDI_MAJOR_T_NONE) {
-		if (ddi_hold_installed_driver(bcm_nic_major) != NULL) {
-			viona_force_copy_tx_mblks = B_TRUE;
-			ddi_rele_driver(bcm_nic_major);
-			return;
+	mutex_enter(&viona_force_copy_lock);
+	if (viona_force_copy_state == VFC_UNINITALIZED) {
+		major_t bnxe_major;
+
+		/*
+		 * The original code for viona featured an explicit check for
+		 * the bnxe driver which, when found present, necessitated that
+		 * all transmissions be copied into their own mblks instead of
+		 * passing guest memory to the underlying device.
+		 *
+		 * The motivations for this are unclear, but until it can be
+		 * proven unnecessary, the check lives on.
+		 */
+		viona_force_copy_state = VFC_COPY_UNEEDED;
+		if ((bnxe_major = ddi_name_to_major(BNXE_NIC_DRIVER))
+		    != DDI_MAJOR_T_NONE) {
+			if (ddi_hold_installed_driver(bnxe_major) != NULL) {
+				viona_force_copy_state = VFC_COPY_REQUIRED;
+				ddi_rele_driver(bnxe_major);
+			}
 		}
 	}
-	viona_force_copy_tx_mblks = B_FALSE;
+	result = (viona_force_copy_state == VFC_COPY_REQUIRED);
+	mutex_exit(&viona_force_copy_lock);
+
+	return (result);
 }
 
 /* ARGSUSED */
@@ -736,13 +763,14 @@ viona_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	viona_minors = id_space_create("viona_minors",
 	    VIONA_CTL_MINOR + 1, UINT16_MAX);
 
+	mutex_init(&viona_force_copy_lock, NULL, MUTEX_DRIVER, NULL);
+
 	/* Create mblk for padding when VLAN tags are stripped */
 	mp = allocb_wait(VLAN_TAGSZ, BPRI_HI, STR_NOSIG, NULL);
 	bzero(mp->b_rptr, VLAN_TAGSZ);
 	mp->b_wptr += VLAN_TAGSZ;
 	viona_vlan_pad_mp = mp;
 
-	set_viona_tx_mode();
 	viona_dip = dip;
 	ddi_report_dev(viona_dip);
 
@@ -1056,6 +1084,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	link = kmem_zalloc(sizeof (viona_link_t), KM_SLEEP);
 	link->l_linkid = kvc.c_linkid;
 	link->l_vm_hold = hold;
+	link->l_force_tx_copy = viona_tx_copy_needed();
 
 	err = mac_open_by_linkid(link->l_linkid, &link->l_mh);
 	if (err != 0) {
@@ -1319,7 +1348,7 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	ring->vr_cur_aidx = 0;
 
 	/* Allocate desb handles for TX ring if packet copying not disabled */
-	if (kri.ri_index == VIONA_VQ_TX && !viona_force_copy_tx_mblks) {
+	if (kri.ri_index == VIONA_VQ_TX && !link->l_force_tx_copy) {
 		viona_desb_t *dp;
 
 		dp = kmem_zalloc(sizeof (viona_desb_t) * cnt, KM_SLEEP);
