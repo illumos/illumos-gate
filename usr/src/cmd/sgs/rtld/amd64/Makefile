@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 BASEPLAT =	amd64
@@ -30,7 +31,7 @@ BASEPLAT =	amd64
 
 P_COMOBJS=	debugdata.o \
 		analyze.o	elf.o		external.o	globals.o \
-		malloc.o 	paths.o		setup.o		util.o \
+		malloc.o	paths.o		setup.o		util.o \
 		dlfcns.o	config_elf.o	locale.o	tsort.o \
 		remove.o	move.o		tls.o		cap.o
 
@@ -42,11 +43,11 @@ P_MACHOBJS=	amd64_elf.o	_setup.o	dlamd64getunwind.o
 
 CP_MACHOBJS=
 
-S_MACHOBJS=	
+S_MACHOBJS=
 
 P_ASOBJS=	boot.o		boot_elf.o	caller.o
 
-S_ASOBJS=	
+S_ASOBJS=
 
 CRTSRCS=	../../../../lib/crt/amd64
 CRTI=		pics/crti.o
@@ -68,7 +69,6 @@ ADBGENFLAGS +=	-mlp64
 ADBGENCFLAGS +=	-erroff=%all
 ADBSUB=		$(ADBSUB64)
 CPPFLAGS +=	-D_ELF64
-LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 SONAME=		/lib/amd64/ld.so.1
 
 SGSMSGTARG +=	$(SGSMSGINTEL) $(SGSMSGINTEL64) $(SGSMSG64)
@@ -85,8 +85,6 @@ CONVLIBDIR =	$(CONVLIBDIR64)
 all:		$(RTLD)
 
 install:	all $(ROOTDYNLIB64)
-
-lint:		$(LINTOUT64)
 
 adbmacros:	adb .WAIT $(ADBSCRIPTS)
 

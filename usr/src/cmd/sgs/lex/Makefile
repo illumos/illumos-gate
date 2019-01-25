@@ -19,13 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1993,1997 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# cmd/sgs/lex/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../../../Makefile.master
@@ -39,12 +36,10 @@ install :=	TARGET= install
 install_lib :=	TARGET= install_lib
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 
 .KEEP_STATE:
 
-all clean clobber install install_lib lint:	$(SUBDIRS)
-
+all clean clobber install install_lib:	$(SUBDIRS)
 
 $(MACH) $(MACH64): FRC
 		@cd $@; pwd; $(MAKE) $(TARGET)

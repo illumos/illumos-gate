@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../Makefile.com
@@ -48,8 +49,6 @@ test:		$(TESTS)
 DEMOCFLAGS=
 
 install:	all $(ROOTONLDBINPROG64)
-
-lint:		$(LINTOUT)
 # DEMO DELETE END
 
 include		../Makefile.targ

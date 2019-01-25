@@ -22,14 +22,16 @@
 # Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		nm
 XPG4PROG=	nm
 
 ARFORMAT=	PORTAR
 
-include 	../../../Makefile.cmd
-include 	../../Makefile.com
+include		../../../Makefile.cmd
+include		../../Makefile.com
 
 COMOBJS=	nm.o
 
@@ -49,9 +51,6 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 SMOFF += precedence,indenting
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
-LINTFLAGS +=	-x $(LDLIBS)
-LINTSRCS=	$(SRCS)
-CLEANFILES +=	$(LINTOUTS)
 objs.xpg4/%.o := CPPFLAGS += -DXPG4
 
 $(DEMOBJS):=	DEFLIST = -DELF_OBJ
@@ -84,8 +83,6 @@ install:	all $(VAR_SGSBINPROG) $(ROOTXPG4PROG) $(VAR_SGSCCSLINK)
 
 clean:
 		$(RM) $(OBJS) $(XPG4OBJS) $(CLEANFILES)
-
-lint:		 $(LINTOUT32) $(SGSLINTOUT)
 
 include		../../../Makefile.targ
 include		../../Makefile.targ

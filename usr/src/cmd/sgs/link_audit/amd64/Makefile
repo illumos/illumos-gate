@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../Makefile.com
@@ -31,12 +31,8 @@ include		../Makefile.com
 CONVLIBDIR =	$(CONVLIBDIR64)
 ELFLIBDIR =	$(ELFLIBDIR64)
 
-lint :=		CONV_LIB =	$(CONV_LIB64)
-
 $(ONLIBS) \
 $(CCSLIBS) :=	CFLAGS64 +=	$(C_PICFLAGS64) $(NO_ASM_WARN)
-
-LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 
 .KEEP_STATE:
 

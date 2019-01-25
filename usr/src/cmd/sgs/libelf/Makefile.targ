@@ -21,6 +21,7 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 objs/%.o \
@@ -46,16 +47,7 @@ pics/%.o:	../common/%.c
 all:		$(BLTSRCS) .WAIT $(LIBS) $(LIBLINKS)
 
 install:	all .WAIT $(ROOTFS_LIBS) $(ROOTFS_LINKS) \
-		$(ROOTFS_LINTLIB) \
-		.WAIT $(ROOTDEMODIRS) .WAIT $(ROOTDEMOFILES) \
-		$(ROOTFS_LIBDIR)/$(LINTLIBSRC)
-
-$(ROOTFS_LIBDIR)/$(LINTLIBSRC): ../common/$(LINTLIBSRC)
-		$(VAR_POUND_1)  $(INS.file) ../common/$(LINTLIBSRC)
-
-lint:		$(LINTLIB) $(LINTOUT32) $(LINTOUT64) $(SGSLINTOUT)
-
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64)
+		.WAIT $(ROOTDEMODIRS) .WAIT $(ROOTDEMOFILES)
 
 delete:
 		$(RM) $(DYNLIB)

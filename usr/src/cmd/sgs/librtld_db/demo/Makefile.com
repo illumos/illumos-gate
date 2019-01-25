@@ -19,11 +19,13 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		rdb
 
 # DEMO DELETE START
-include 	../../../../Makefile.cmd
+include		../../../../Makefile.cmd
 # DEMO DELETE END
 
 MACH:sh=	uname -p
@@ -56,16 +58,6 @@ LDLIBS +=	-lrtld_db -lelf -ll -ly
 CLEANFILES +=	$(BLTSRC) $(BLTHDR) simp libsub.so.1
 
 # DEMO DELETE START
-# The following lint error suppression definitions are to remove lex errors
-# we have no control over.
-LINTERRS =	-erroff=E_NAME_DEF_NOT_USED2 \
-		-erroff=E_FUNC_RET_ALWAYS_IGNOR2 \
-		-erroff=E_FUNC_RET_MAYBE_IGNORED2 \
-		-erroff=E_BLOCK_DECL_UNUSED \
-		-erroff=E_EQUALITY_NOT_ASSIGNMENT
-LINTFLAGS +=	$(LDLIBS) -L../../$(MACH) $(LINTERRS)
-LINTFLAGS64 +=	$(LDLIBS) -L../../$(MACH) $(LINTERRS)
-CLEANFILES +=	$(LINTOUT)
 
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-label
@@ -73,7 +65,7 @@ CERRWARN +=	-_gcc=-Wno-unused-variable
 # DEMO DELETE END
 
 test-sparc=	test-sparc-regs
-test-i386=	
+test-i386=
 TESTS=		test-maps test-breaks test-steps test-plt_skip \
 		    test-object-padding $(test-$(MACH))
 

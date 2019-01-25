@@ -21,6 +21,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 include		../../../Makefile.master
 
@@ -67,13 +69,12 @@ install:=	TARGET=	install
 package:=	TARGET=	package
 clean:=		TARGET=	clean
 clobber:=	TARGET=	clobber
-lint:=		TARGET=	lint
 
 .PARALLEL: $(ROOTDEMOFILES)
 
 .KEEP_STATE:
 
-all clean clobber lint : \
+all clean clobber: \
 	$(SUBDIRS)
 
 package install : \

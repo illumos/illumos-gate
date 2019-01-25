@@ -24,11 +24,13 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		dump
 
-include 	$(SRC)/cmd/Makefile.cmd
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJS=	dump.o		fcns.o
 
@@ -47,7 +49,3 @@ CERRWARN +=	-_gcc=-Wno-uninitialized
 SMOFF += indenting
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
-LINTFLAGS +=	-x
-LINTSRCS =	$(SRCS)
-
-CLEANFILES +=	$(LINTOUTS)

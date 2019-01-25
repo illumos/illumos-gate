@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 DUPOBJS=	stab64.o
@@ -30,7 +31,6 @@ include ../Makefile.com
 
 all:		$(DYNLIB)
 install:	all $(ROOTDYNLIB)
-lint:		$(LINTOUT64)
 
 
 include ../Makefile.targ

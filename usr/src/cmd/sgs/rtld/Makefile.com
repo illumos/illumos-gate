@@ -21,8 +21,9 @@
 
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
-#
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 RTLD=		ld.so.1
 
@@ -142,12 +143,6 @@ SRCS=		$(AVLOBJ:%.o=$(VAR_AVLDIR)/%.c) \
 		$(G_MACHOBJS:%.o=$(SRCBASE)/uts/$(PLAT)/krtld/%.c) \
 		$(CP_MACHOBJS:%.o=../$(MACH)/%.c) \
 		$(ASOBJS:%.o=%.s)
-LINTSRCS=	$(SRCS) ../common/lintsup.c
 
-LINTFLAGS +=	-u -Dsun -D_REENTRANT -erroff=E_EMPTY_TRANSLATION_UNIT \
-		-erroff=E_NAME_DECL_NOT_USED_DEF2
-LINTFLAGS64 +=	-u -D_REENTRANT -erroff=E_CAST_INT_TO_SMALL_INT \
-		-erroff=E_NAME_DECL_NOT_USED_DEF2
-
-CLEANFILES +=	$(LINTOUTS)  $(CRTS)  $(BLTFILES)
+CLEANFILES +=	$(CRTS) $(BLTFILES)
 CLOBBERFILES +=	$(RTLD)

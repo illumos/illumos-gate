@@ -24,6 +24,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 # include global definitions
@@ -268,7 +269,6 @@ COMMON_SUBDIRS = \
 	cmd/sed \
 	cmd/setpgrp \
 	cmd/smbios \
-	cmd/sgs \
 	cmd/smbsrv \
 	cmd/smserverd \
 	cmd/sort \

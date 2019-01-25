@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 # Object lists are organized into primary (most frequently used code) and
@@ -69,7 +70,6 @@ include		$(SRC)/cmd/sgs/rtld/Makefile.com
 CPPFLAGS +=	-I../../../../uts/sparc/krtld -DA_OUT
 CFLAGS +=	-xregs=no%appl
 ASFLAGS +=	$(AS_PICFLAGS)
-LINTFLAGS +=	-DA_OUT
 ADBGENCFLAGS +=	-erroff=%all
 ADBGENFLAGS +=	-milp32
 ADBSUB=		$(ADBSUB32)
@@ -82,8 +82,6 @@ SGSMSGTARG +=	$(SGSMSGSPARC) $(SGSMSGSPARC32) $(SGSMSG32)
 all:		$(RTLD)
 
 install:	all $(ROOTDYNLIB)
-
-lint:		$(LINTOUT32)
 
 adbmacros:	adb .WAIT $(ADBSCRIPTS)
 

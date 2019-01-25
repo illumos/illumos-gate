@@ -22,12 +22,13 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG =		ld
 
-include 	$(SRC)/cmd/Makefile.cmd
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJS =	ld.o
 BLTOBJ =	msg.o
@@ -44,11 +45,6 @@ LDLIBS +=	$(LDLIBDIR) $(LD_LIB) $(ELFLIBDIR) -lelf \
 
 CERRWARN +=	-_gcc=-Wno-switch
 CERRWARN +=	-_gcc=-Wno-parentheses
-
-LINTFLAGS +=	-x
-LINTFLAGS64 +=	-x $(VAR_LINTFLAGS64)
-
-CLEANFILES +=	$(LINTOUTS)
 
 native :=	LDFLAGS = -R$(SGSLIBDIR) $(ZNOVERSION)
 native :=	LDLIBS = -L$(SGSLIBDIR) $(LD_LIB) -lelf $(CONVLIBDIR) \
@@ -67,7 +63,6 @@ SGSMSGALL=	$(SGSMSGCOM)
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n ld_msg
 
 SRCS=		$(MACHOBJS:%.o=%.c)  $(COMOBJS:%.o=../common/%.c)  $(BLTDATA)
-LINTSRCS=	$(SRCS) ../common/lintsup.c
 
 CLEANFILES +=	$(BLTFILES)
 

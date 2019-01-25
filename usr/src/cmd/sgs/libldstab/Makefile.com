@@ -23,6 +23,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 LIBRARY=	libldstab.a
 VERS=		.1
@@ -43,17 +45,8 @@ CPPFLAGS +=	-I$(ELFCAP)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
 DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO)
 
-LINTFLAGS +=	-erroff=E_NAME_DECL_NOT_USED_DEF2 \
-		-erroff=E_NAME_DEF_NOT_USED2 \
-		-erroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS64 +=	-erroff=E_NAME_DECL_NOT_USED_DEF2 \
-		-erroff=E_NAME_DEF_NOT_USED2 \
-		-erroff=E_NAME_USED_NOT_DEF2
-
 SRCS=		$(COMOBJS:%.o=../common/%.c)
-LINTSRCS=	$(SRCS)
 
-CLEANFILES +=	$(LINTOUTS)
 CLOBBERFILES +=	$(DYNLIB)
 
 ROOTDYNLIB=	$(DYNLIB:%=$(ROOTLIBDIR)/%)

@@ -22,7 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/messages/Makefile.targ
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 all:		$(POFILE)
 
@@ -36,7 +37,7 @@ $(MSGDOMAIN)/$(POFILE): \
 		$(RM) $(MSGDOMAIN)/$(POFILE)
 		cp $(POFILE) $(MSGDOMAIN)
 
-delete lint:
+delete:
 
 clean:
 		$(RM) $(CLEANFILES)

@@ -28,7 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2017 RackTop Systems.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -690,9 +690,7 @@ $(ROOT)/usr/ccs/lib/values-Xt.o:=	REALPATH=../../lib/values-Xt.o
 $(ROOT)/usr/ccs/lib/values-xpg4.o:=	REALPATH=../../lib/values-xpg4.o
 $(ROOT)/usr/ccs/lib/values-xpg6.o:=	REALPATH=../../lib/values-xpg6.o
 $(ROOT)/usr/ccs/lib/libl.so:=		REALPATH=../../lib/libl.so.1
-$(ROOT)/usr/ccs/lib/llib-ll.ln:=	REALPATH=../../lib/llib-ll.ln
 $(ROOT)/usr/ccs/lib/liby.so:=		REALPATH=../../lib/liby.so.1
-$(ROOT)/usr/ccs/lib/llib-ly.ln:=	REALPATH=../../lib/llib-ly.ln
 $(ROOT)/usr/lib/lwp/libthread.so.1:=	REALPATH=../libthread.so.1
 $(ROOT)/usr/lib/lwp/libthread_db.so.1:=	REALPATH=../libthread_db.so.1
 
@@ -741,12 +739,8 @@ $(ROOT)/usr/ccs/lib/$(MACH64)/values-xpg6.o:= \
 	REALPATH=../../../lib/$(MACH64)/values-xpg6.o
 $(ROOT)/usr/ccs/lib/$(MACH64)/libl.so:= \
 	REALPATH=../../../lib/$(MACH64)/libl.so.1
-$(ROOT)/usr/ccs/lib/$(MACH64)/llib-ll.ln:= \
-	REALPATH=../../../lib/$(MACH64)/llib-ll.ln
 $(ROOT)/usr/ccs/lib/$(MACH64)/liby.so:= \
 	REALPATH=../../../lib/$(MACH64)/liby.so.1
-$(ROOT)/usr/ccs/lib/$(MACH64)/llib-ly.ln:= \
-	REALPATH=../../../lib/$(MACH64)/llib-ly.ln
 $(ROOT)/usr/lib/lwp/$(MACH64)/libthread.so.1:= \
 	REALPATH=../../$(MACH64)/libthread.so.1
 $(ROOT)/usr/lib/lwp/$(MACH64)/libthread_db.so.1:= \
@@ -782,9 +776,7 @@ SYM.USRCCSLIB= \
 	/usr/ccs/lib/values-xpg4.o \
 	/usr/ccs/lib/values-xpg6.o \
 	/usr/ccs/lib/libl.so \
-	/usr/ccs/lib/llib-ll.ln \
 	/usr/ccs/lib/liby.so \
-	/usr/ccs/lib/llib-ly.ln \
 	/usr/lib/lwp/libthread.so.1 \
 	/usr/lib/lwp/libthread_db.so.1
 
@@ -811,9 +803,7 @@ SYM.USRCCSLIB64= \
 	/usr/ccs/lib/$(MACH64)/values-xpg4.o \
 	/usr/ccs/lib/$(MACH64)/values-xpg6.o \
 	/usr/ccs/lib/$(MACH64)/libl.so \
-	/usr/ccs/lib/$(MACH64)/llib-ll.ln \
 	/usr/ccs/lib/$(MACH64)/liby.so \
-	/usr/ccs/lib/$(MACH64)/llib-ly.ln \
 	/usr/lib/lwp/$(MACH64)/libthread.so.1 \
 	/usr/lib/lwp/$(MACH64)/libthread_db.so.1
 
@@ -989,14 +979,10 @@ $(ROOT)/usr/lib/llib-ldhcpagent.ln:=	REALPATH=../../lib/llib-ldhcpagent.ln
 $(ROOT)/usr/lib/llib-ldhcpagent:=	REALPATH=../../lib/llib-ldhcpagent
 $(ROOT)/usr/lib/llib-ldhcputil.ln:=	REALPATH=../../lib/llib-ldhcputil.ln
 $(ROOT)/usr/lib/llib-ldhcputil:=	REALPATH=../../lib/llib-ldhcputil
-$(ROOT)/usr/lib/llib-ldl.ln:=		REALPATH=../../lib/llib-ldl.ln
-$(ROOT)/usr/lib/llib-ldl:=		REALPATH=../../lib/llib-ldl
 $(ROOT)/usr/lib/llib-ldoor.ln:=		REALPATH=../../lib/llib-ldoor.ln
 $(ROOT)/usr/lib/llib-ldoor:=		REALPATH=../../lib/llib-ldoor
 $(ROOT)/usr/lib/llib-lefi.ln:=		REALPATH=../../lib/llib-lefi.ln
 $(ROOT)/usr/lib/llib-lefi:=		REALPATH=../../lib/llib-lefi
-$(ROOT)/usr/lib/llib-lelf.ln:=		REALPATH=../../lib/llib-lelf.ln
-$(ROOT)/usr/lib/llib-lelf:=		REALPATH=../../lib/llib-lelf
 $(ROOT)/usr/lib/llib-lfdisk.ln:=	REALPATH=../../lib/llib-lfdisk.ln
 $(ROOT)/usr/lib/llib-lfdisk:=		REALPATH=../../lib/llib-lfdisk
 $(ROOT)/usr/lib/llib-lgen.ln:=		REALPATH=../../lib/llib-lgen.ln
@@ -1027,8 +1013,6 @@ $(ROOT)/usr/lib/llib-lrpcsvc.ln:=	REALPATH=../../lib/llib-lrpcsvc.ln
 $(ROOT)/usr/lib/llib-lrpcsvc:=		REALPATH=../../lib/llib-lrpcsvc
 $(ROOT)/usr/lib/llib-lrt.ln:=		REALPATH=../../lib/llib-lrt.ln
 $(ROOT)/usr/lib/llib-lrt:=		REALPATH=../../lib/llib-lrt
-$(ROOT)/usr/lib/llib-lrtld_db.ln:=	REALPATH=../../lib/llib-lrtld_db.ln
-$(ROOT)/usr/lib/llib-lrtld_db:=		REALPATH=../../lib/llib-lrtld_db
 $(ROOT)/usr/lib/llib-lscf.ln:=		REALPATH=../../lib/llib-lscf.ln
 $(ROOT)/usr/lib/llib-lscf:=		REALPATH=../../lib/llib-lscf
 $(ROOT)/usr/lib/llib-lsec.ln:=		REALPATH=../../lib/llib-lsec.ln
@@ -1361,14 +1345,10 @@ $(ROOT)/usr/lib/$(MACH64)/llib-ldevinfo.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ldevinfo.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-ldhcputil.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ldhcputil.ln
-$(ROOT)/usr/lib/$(MACH64)/llib-ldl.ln:= \
-	REALPATH=../../../lib/$(MACH64)/llib-ldl.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-ldoor.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ldoor.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lefi.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lefi.ln
-$(ROOT)/usr/lib/$(MACH64)/llib-lelf.ln:= \
-	REALPATH=../../../lib/$(MACH64)/llib-lelf.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lgen.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lgen.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-linetutil.ln:= \
@@ -1397,8 +1377,6 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lrpcsvc.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lrpcsvc.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lrt.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lrt.ln
-$(ROOT)/usr/lib/$(MACH64)/llib-lrtld_db.ln:= \
-	REALPATH=../../../lib/$(MACH64)/llib-lrtld_db.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lscf.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lscf.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lsec.ln:= \
@@ -1622,14 +1600,10 @@ SYM.USRLIB= \
 	/usr/lib/llib-ldhcpagent.ln \
 	/usr/lib/llib-ldhcputil \
 	/usr/lib/llib-ldhcputil.ln \
-	/usr/lib/llib-ldl \
-	/usr/lib/llib-ldl.ln \
 	/usr/lib/llib-ldoor \
 	/usr/lib/llib-ldoor.ln \
 	/usr/lib/llib-lefi \
 	/usr/lib/llib-lefi.ln \
-	/usr/lib/llib-lelf \
-	/usr/lib/llib-lelf.ln \
 	/usr/lib/llib-lgen \
 	/usr/lib/llib-lgen.ln \
 	/usr/lib/llib-linetutil \
@@ -1658,8 +1632,6 @@ SYM.USRLIB= \
 	/usr/lib/llib-lrpcsvc.ln \
 	/usr/lib/llib-lrt \
 	/usr/lib/llib-lrt.ln \
-	/usr/lib/llib-lrtld_db \
-	/usr/lib/llib-lrtld_db.ln \
 	/usr/lib/llib-lscf \
 	/usr/lib/llib-lscf.ln \
 	/usr/lib/llib-lsec \
@@ -1856,10 +1828,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-ldevid.ln \
 	/usr/lib/$(MACH64)/llib-ldevinfo.ln \
 	/usr/lib/$(MACH64)/llib-ldhcputil.ln \
-	/usr/lib/$(MACH64)/llib-ldl.ln \
 	/usr/lib/$(MACH64)/llib-ldoor.ln \
 	/usr/lib/$(MACH64)/llib-lefi.ln \
-	/usr/lib/$(MACH64)/llib-lelf.ln \
 	/usr/lib/$(MACH64)/llib-lgen.ln \
 	/usr/lib/$(MACH64)/llib-linetutil.ln \
 	/usr/lib/$(MACH64)/llib-lintl.ln \
@@ -1874,7 +1844,6 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lresolv.ln \
 	/usr/lib/$(MACH64)/llib-lrpcsvc.ln \
 	/usr/lib/$(MACH64)/llib-lrt.ln \
-	/usr/lib/$(MACH64)/llib-lrtld_db.ln \
 	/usr/lib/$(MACH64)/llib-lscf.ln \
 	/usr/lib/$(MACH64)/llib-lsec.ln \
 	/usr/lib/$(MACH64)/llib-lsecdb.ln \

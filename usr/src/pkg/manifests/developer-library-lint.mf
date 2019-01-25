@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 OmniTI Computer Consulting, Inc.  All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/developer/library/lint@$(PKGVERS)
@@ -56,12 +57,10 @@ file path=lib/$(ARCH64)/llib-lcurses.ln
 file path=lib/$(ARCH64)/llib-ldevice.ln
 file path=lib/$(ARCH64)/llib-ldevid.ln
 file path=lib/$(ARCH64)/llib-ldevinfo.ln
-file path=lib/$(ARCH64)/llib-ldl.ln
 file path=lib/$(ARCH64)/llib-ldladm.ln
 file path=lib/$(ARCH64)/llib-ldlpi.ln
 file path=lib/$(ARCH64)/llib-ldoor.ln
 file path=lib/$(ARCH64)/llib-lefi.ln
-file path=lib/$(ARCH64)/llib-lelf.ln
 $(i386_ONLY)file path=lib/$(ARCH64)/llib-lfdisk.ln
 file path=lib/$(ARCH64)/llib-lgen.ln
 file path=lib/$(ARCH64)/llib-lintl.ln
@@ -80,7 +79,6 @@ file path=lib/$(ARCH64)/llib-lrcm.ln
 file path=lib/$(ARCH64)/llib-lresolv.ln
 file path=lib/$(ARCH64)/llib-lrpcsvc.ln
 file path=lib/$(ARCH64)/llib-lrt.ln
-file path=lib/$(ARCH64)/llib-lrtld_db.ln
 file path=lib/$(ARCH64)/llib-lscf.ln
 file path=lib/$(ARCH64)/llib-lsec.ln
 file path=lib/$(ARCH64)/llib-lsecdb.ln
@@ -121,8 +119,6 @@ file path=lib/llib-ldevid
 file path=lib/llib-ldevid.ln
 file path=lib/llib-ldevinfo
 file path=lib/llib-ldevinfo.ln
-file path=lib/llib-ldl
-file path=lib/llib-ldl.ln
 file path=lib/llib-ldladm
 file path=lib/llib-ldladm.ln
 file path=lib/llib-ldlpi
@@ -131,8 +127,6 @@ file path=lib/llib-ldoor
 file path=lib/llib-ldoor.ln
 file path=lib/llib-lefi
 file path=lib/llib-lefi.ln
-file path=lib/llib-lelf
-file path=lib/llib-lelf.ln
 $(i386_ONLY)file path=lib/llib-lfdisk
 $(i386_ONLY)file path=lib/llib-lfdisk.ln
 file path=lib/llib-lgen
@@ -171,8 +165,6 @@ file path=lib/llib-lrpcsvc
 file path=lib/llib-lrpcsvc.ln
 file path=lib/llib-lrt
 file path=lib/llib-lrt.ln
-file path=lib/llib-lrtld_db
-file path=lib/llib-lrtld_db.ln
 file path=lib/llib-lscf
 file path=lib/llib-lscf.ln
 file path=lib/llib-lsec
@@ -346,8 +338,6 @@ link path=usr/ccs/lib/$(ARCH64)/llib-lform.ln \
     target=../../../lib/$(ARCH64)/llib-lform.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-lgen.ln \
     target=../../../../lib/$(ARCH64)/llib-lgen.ln
-link path=usr/ccs/lib/$(ARCH64)/llib-ll.ln \
-    target=../../../lib/$(ARCH64)/llib-ll.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-lmenu.ln \
     target=../../../lib/$(ARCH64)/llib-lmenu.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-lpanel.ln \
@@ -356,8 +346,6 @@ link path=usr/ccs/lib/$(ARCH64)/llib-ltermcap.ln \
     target=../../../../lib/$(ARCH64)/llib-ltermcap.ln
 link path=usr/ccs/lib/$(ARCH64)/llib-ltermlib.ln \
     target=../../../../lib/$(ARCH64)/llib-lcurses.ln
-link path=usr/ccs/lib/$(ARCH64)/llib-ly.ln \
-    target=../../../lib/$(ARCH64)/llib-ly.ln
 link path=usr/ccs/lib/llib-lcurses target=../../../lib/llib-lcurses
 link path=usr/ccs/lib/llib-lcurses.ln target=../../../lib/llib-lcurses.ln
 link path=usr/ccs/lib/llib-lform target=../../lib/llib-lform
@@ -394,14 +382,10 @@ link path=usr/lib/$(ARCH64)/llib-ldevid.ln \
     target=../../../lib/$(ARCH64)/llib-ldevid.ln
 link path=usr/lib/$(ARCH64)/llib-ldevinfo.ln \
     target=../../../lib/$(ARCH64)/llib-ldevinfo.ln
-link path=usr/lib/$(ARCH64)/llib-ldl.ln \
-    target=../../../lib/$(ARCH64)/llib-ldl.ln
 link path=usr/lib/$(ARCH64)/llib-ldoor.ln \
     target=../../../lib/$(ARCH64)/llib-ldoor.ln
 link path=usr/lib/$(ARCH64)/llib-lefi.ln \
     target=../../../lib/$(ARCH64)/llib-lefi.ln
-link path=usr/lib/$(ARCH64)/llib-lelf.ln \
-    target=../../../lib/$(ARCH64)/llib-lelf.ln
 $(i386_ONLY)link path=usr/lib/$(ARCH64)/llib-lfdisk.ln \
     target=../../../lib/$(ARCH64)/llib-lfdisk.ln
 link path=usr/lib/$(ARCH64)/llib-lgen.ln \
@@ -428,8 +412,6 @@ link path=usr/lib/$(ARCH64)/llib-lrpcsvc.ln \
     target=../../../lib/$(ARCH64)/llib-lrpcsvc.ln
 link path=usr/lib/$(ARCH64)/llib-lrt.ln \
     target=../../../lib/$(ARCH64)/llib-lrt.ln
-link path=usr/lib/$(ARCH64)/llib-lrtld_db.ln \
-    target=../../../lib/$(ARCH64)/llib-lrtld_db.ln
 link path=usr/lib/$(ARCH64)/llib-lscf.ln \
     target=../../../lib/$(ARCH64)/llib-lscf.ln
 link path=usr/lib/$(ARCH64)/llib-lsec.ln \
@@ -482,14 +464,10 @@ link path=usr/lib/llib-ldevid target=../../lib/llib-ldevid
 link path=usr/lib/llib-ldevid.ln target=../../lib/llib-ldevid.ln
 link path=usr/lib/llib-ldevinfo target=../../lib/llib-ldevinfo
 link path=usr/lib/llib-ldevinfo.ln target=../../lib/llib-ldevinfo.ln
-link path=usr/lib/llib-ldl target=../../lib/llib-ldl
-link path=usr/lib/llib-ldl.ln target=../../lib/llib-ldl.ln
 link path=usr/lib/llib-ldoor target=../../lib/llib-ldoor
 link path=usr/lib/llib-ldoor.ln target=../../lib/llib-ldoor.ln
 link path=usr/lib/llib-lefi target=../../lib/llib-lefi
 link path=usr/lib/llib-lefi.ln target=../../lib/llib-lefi.ln
-link path=usr/lib/llib-lelf target=../../lib/llib-lelf
-link path=usr/lib/llib-lelf.ln target=../../lib/llib-lelf.ln
 $(i386_ONLY)link path=usr/lib/llib-lfdisk target=../../lib/llib-lfdisk
 $(i386_ONLY)link path=usr/lib/llib-lfdisk.ln target=../../lib/llib-lfdisk.ln
 link path=usr/lib/llib-lgen target=../../lib/llib-lgen
@@ -516,8 +494,6 @@ link path=usr/lib/llib-lrpcsvc target=../../lib/llib-lrpcsvc
 link path=usr/lib/llib-lrpcsvc.ln target=../../lib/llib-lrpcsvc.ln
 link path=usr/lib/llib-lrt target=../../lib/llib-lrt
 link path=usr/lib/llib-lrt.ln target=../../lib/llib-lrt.ln
-link path=usr/lib/llib-lrtld_db target=../../lib/llib-lrtld_db
-link path=usr/lib/llib-lrtld_db.ln target=../../lib/llib-lrtld_db.ln
 link path=usr/lib/llib-lscf target=../../lib/llib-lscf
 link path=usr/lib/llib-lscf.ln target=../../lib/llib-lscf.ln
 link path=usr/lib/llib-lsec target=../../lib/llib-lsec

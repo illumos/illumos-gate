@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../Makefile.com
@@ -34,7 +34,5 @@ all:		$(DYNLIB) $(LIBLINKS)
 
 install \
 package:	all $(ROOTDYNLIB)
-
-lint:		$(LINTOUT32) $(SGSLINTOUT)
 
 include		../Makefile.targ

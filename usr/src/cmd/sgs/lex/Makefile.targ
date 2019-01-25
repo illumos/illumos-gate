@@ -23,6 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 $(PROG): objs .WAIT $(POBJS)
@@ -79,19 +80,8 @@ objs/%.o pics/%.o:	../common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ../common/%
-	$(INS.file)
-
 $(DYNLINKLIBDIR)/%: %$(VERS)
 	$(INS.liblink)
 
 clean:
 	$(RM) $(POBJS) $(OBJS) $(PICS) $(CLEANFILES)
-
-$(LINTLIB): $$(SRCS) 
-	$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1 
-
-lintcheck: $$(SRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)
-

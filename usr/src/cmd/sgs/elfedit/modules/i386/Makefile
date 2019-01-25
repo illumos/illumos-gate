@@ -23,13 +23,10 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../Makefile.com
-
-lint :=		CONV_LIB =	$(CONV_LIB32)
-lint :=		LDDBG_LIB =	$(LDDBG_LIB32)
 
 CFLAGS +=	$(C_PICFLAGS)
 

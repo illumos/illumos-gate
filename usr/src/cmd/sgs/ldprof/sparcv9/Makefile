@@ -23,7 +23,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include ../Makefile.com
@@ -32,14 +32,12 @@ ROOTLIBDIR64=	$(ROOT)/usr/lib/link_audit/$(MACH64)
 ROOTDYNLIB64=	$(DYNLIB:%=$(ROOTLIBDIR64)/%)
 
 CFLAGS64 +=	$(C_PICFLAGS64) -D_ELF64
-LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 
 .KEEP_STATE:
 
 all:		$(BLTDEFS) .WAIT $(DYNLIB)
 install package:	all $(ROOTDYNLIB64)
 	@echo doing make install $(ROOTDYNLIB64)
-lint:		$(LINTOUT64)
 
 include ../Makefile.targ
 include ../../Makefile.sub.64

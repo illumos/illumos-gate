@@ -19,6 +19,7 @@
 # CDDL HEADER END
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
@@ -60,8 +61,7 @@ SRCS=		$(COMOBJS:%.o=../common/%.c)  $(NATOBJS:%.o=../common/%.c)
 
 CPPFLAGS +=	$(VAR_TOOLS_CPPFLAGS)
 LDFLAGS +=	$(CC_USE_PROTO)
-CLEANFILES +=	$(LINTOUT) $(SGSMSG_OBJS)
-LINTFLAGS=	-ax
+CLEANFILES +=	$(SGSMSG_OBJS)
 
 ROOTDIR=	$(ROOT)/opt/SUNWonld
 ROOTPROGS=	$(PROGS:%=$(ROOTDIR)/bin/%)

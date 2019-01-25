@@ -19,13 +19,10 @@
 # CDDL HEADER END
 #
 
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Standard subdirs makefile for the sgs area.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -49,7 +46,6 @@ clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 delete :=	TARGET= delete
 install :=	TARGET= install
-lint :=		TARGET= lint
 catalog :=	TARGET= catalog
 package :=	TARGET= package
 chkmsg :=	TARGET= chkmsg
@@ -57,7 +53,7 @@ chkmsg :=	TARGET= chkmsg
 .KEEP_STATE:
 .KEEP_STATE_FILE: .make.state.$(MACH)
 
-all clean clobber delete install lint catalog package chkmsg: \
+all clean clobber delete install catalog package chkmsg: \
 		$(SUBDIRS)
 
 $(SUBDIRS):	FRC

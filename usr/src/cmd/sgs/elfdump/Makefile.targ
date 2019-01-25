@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 %.o:		../common/%.c
@@ -78,10 +79,6 @@ delete:
 
 package \
 install:        all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
-
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64)
-
-lint:		$(LINTOUT32) $(LINTOUT64) $(SGSLINTOUT)
 
 include		$(SRC)/cmd/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ

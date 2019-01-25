@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 BASEPLAT =	i386
@@ -75,8 +76,6 @@ SGSMSGTARG +=	$(SGSMSGINTEL) $(SGSMSGINTEL32) $(SGSMSG32)
 all:		$(RTLD)
 
 install:	all $(ROOTDYNLIB)
-
-lint:		$(LINTOUT32)
 
 adbmacros:	adb .WAIT $(ADBSCRIPTS)
 

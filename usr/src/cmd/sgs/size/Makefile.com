@@ -23,11 +23,13 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		size
 
-include 	$(SRC)/cmd/Makefile.cmd
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJS=	main.o process.o fcns.o
 
@@ -44,6 +46,4 @@ LDFLAGS +=	$(LLDFLAGS)
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
 
-LINTSRCS =	$(SRCS)
-
-CLEANFILES +=	$(OBJS) $(LINTOUTS)
+CLEANFILES +=	$(OBJS)

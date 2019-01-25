@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2018 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY =	libconv.a
@@ -110,25 +111,10 @@ AS_CPPFLAGS=	-P -D_ASM $(CPPFLAGS)
 
 BLTDATA=	$(BLTOBJS:%.o=%.c) $(BLTOBJS:%.o=%.h) report_bufsize.h
 
-SRCS=		../common/llib-lconv
-LINTSRCS=	$(COMOBJS:%.o=../common/%.c) \
-		    $(COMOBJS_NOMSG:%.o=../common/%.c) \
-		    $(ELFCOM_OBJS:%.o=$(ELFCAP)/%.c) ../common/lintsup.c
-LINTSRCS32 =	$(COMOBJS32:%32.o=../common/%.c)
-LINTSRCS64 =	$(COMOBJS64:%64.o=../common/%.c)
-
-# Since libconv uses dlopen(3C) to load libdemangle-sys.so (much like it did
-# for the old Sun Studio libdemangle.so) in order to avoid messy bootstrapping
-# problems, but it also needs the definitions from demangle-sys.h for
-# SYSDEM_LANG_AUTO, lint will complain about sysdemangle() being defined but not
-# used unless it is explicitly included during the lint pass
-$(LINTOUT32)	:= LDLIBS += -ldemangle-sys
-$(LINTOUT64)	:= LDLIBS += -ldemangle-sys
+MSGSRCS=	$(COMOBJS:%.o=../common/%.c) \
+		$(COMOBJS_NOMSG:%.o=../common/%.c) \
+		$(ELFCOM_OBJS:%.o=$(ELFCAP)/%.c)
 
 SGSMSGTARG=	$(BLTOBJS:%_msg.o=../common/%.msg)
 
-LINTFLAGS +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
-LINTFLAGS64 +=	-u -erroff=E_NAME_DECL_NOT_USED_DEF2
-
-CLEANFILES +=	$(BLTDATA) $(LINTOUTS) bld_vernote vernote.s
-CLOBBERFILES +=	$(LINTLIBS)
+CLEANFILES +=	$(BLTDATA) bld_vernote vernote.s

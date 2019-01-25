@@ -22,14 +22,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/sgs/lex/i386/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 INCLIST_i386=	-I.
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 include		../Makefile.com
 
 .KEEP_STATE:
@@ -40,7 +38,7 @@ all_lib:	$(LIBS)
 
 install:	all $(ROOTPROG) $(ROOTFORMS) $(ROOTCCSBINLINK)
 
-install_lib:	all_lib $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB) $(ROOTLINT)
+install_lib:	all_lib $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB)
 
 include		../Makefile.targ
 include		../../../Makefile.targ

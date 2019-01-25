@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 all:		$(PROG)
@@ -44,8 +45,6 @@ clean:
 
 delete:
 		$(RM) $(PROG)
-
-lint:		$(LINTOUT32) $(SGSLINTOUT)
 
 include		$(SRC)/cmd/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ

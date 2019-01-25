@@ -23,6 +23,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		moe
 
@@ -40,9 +42,6 @@ MAPOPT=		$(MAPFILE:%=-M%)
 LDFLAGS +=	-Wl,$(VERSREF) $(CC_USE_PROTO) $(MAPOPT)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB)
 
-LINTFLAGS +=	-x
-LINTFLAGS64 +=	-x
-
 BLTDEFS=	msg.h
 BLTDATA=	msg.c
 BLTMESG=	$(SGSMSGDIR)/moe
@@ -55,6 +54,5 @@ SGSMSGALL=	$(SGSMSGCOM)
 SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n moe_msg
 
 SRCS=		$(COMOBJ:%.o=../common/%.c) $(BLTDATA)
-LINTSRCS=	$(SRCS) ../common/lintsup.c
 
-CLEANFILES +=	$(LINTOUTS) $(BLTFILES)
+CLEANFILES +=	$(BLTFILES)

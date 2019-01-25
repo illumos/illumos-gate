@@ -22,13 +22,14 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		ranlib
 
 SRCS=		$(PROG:%=%.sh)
 
-include 	../../Makefile.cmd
+include		../../Makefile.cmd
 
 .KEEP_STATE:
 
@@ -37,7 +38,5 @@ all:		$(PROG)
 install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
-
-lint:
 
 include		../../Makefile.targ

@@ -20,12 +20,14 @@
 #
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms. 
+# Use is subject to license terms.
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG=		unifdef
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 
 OBJS=		unifdef.o
 
@@ -35,9 +37,6 @@ DEFLIST=	-DELF_OBJ -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 CSTD=	$(CSTD_GNU99)
-LINTFLAGS +=	$(LDLIBS)
-
-CLEANFILES +=	$(LINTOUT)
 
 CERRWARN +=	-_gcc=-Wno-char-subscripts
 CERRWARN +=	-_gcc=-Wno-parentheses
@@ -57,11 +56,5 @@ install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)
-
-lint:		$(LINTOUT)
-
-$(LINTOUT):	$(SRCS)
-		perl ../../tools/lint_hdr.pl $(PROG)	 > $(LINTOUT)
-		$(LINT.c) $(SRCS)			2>&1 | tee -a $(LINTOUT)
 
 include		../../../Makefile.targ

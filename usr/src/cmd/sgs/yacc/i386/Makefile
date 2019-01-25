@@ -22,13 +22,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
-# cmd/sgs/yacc/i386/Makefile
 
 DEFLIST=	-DELF
 
-include 	../../../Makefile.cmd
+include		../../../Makefile.cmd
 include		../Makefile.com
 
 .KEEP_STATE:
@@ -41,7 +40,7 @@ install:	all $(ROOTPROG) $(ROOTYACCPAR) $(ROOTCCSBINLINK)
 		$(RM) $(ROOTCCSBIN)/yaccpar
 		$(SYMLINK) ../../share/lib/ccs/yaccpar $(ROOTCCSBIN)/yaccpar
 
-install_lib:	all_lib $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB) $(ROOTLINT)
+install_lib:	all_lib $(ROOTLIBS) $(ROOTLINKS) $(DYNLINKLIB)
 
 include		../Makefile.targ
 include		../../../Makefile.targ

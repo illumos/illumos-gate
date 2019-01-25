@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 include		$(SRC)/lib/Makefile.filter.com
 include		../Makefile.com
@@ -37,8 +39,7 @@ ROOT4LIBDIR =	$(ROOT)/usr/4lib
 ROOT4LINKS =	$(ROOT4LIBDIR)/$(4DYNLIB)
 $(ROOT4LINKS):=	LIBLINKPATH = ../../lib/
 
-install:	all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT) \
-		$(ROOT4LINKS)
+install:	all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS) $(ROOT4LINKS)
 
 $(ROOT4LINKS):	$(ROOTFS_DYNLIB)
 		$(INS.liblink)

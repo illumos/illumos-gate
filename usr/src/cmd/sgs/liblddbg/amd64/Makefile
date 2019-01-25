@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../Makefile.com
@@ -31,8 +32,6 @@ ROOTFS_DYNLIB64 = \
 		$(DYNLIB:%=$(ROOTFS_LIBDIR64)/%)
 
 CONVLIBDIR =	$(CONVLIBDIR64)
-
-LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 
 .KEEP_STATE:
 

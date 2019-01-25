@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 objs/%.o \
@@ -44,13 +45,7 @@ pics/%.o:	../common/%.c
 
 all:		$(BLTSRCS) .WAIT $(LIBS) $(LIBLINKS)
 
-install:	all .WAIT $(ROOTFS_LIBS64) $(ROOTFS_LINKS64) \
-		$(ROOTFS_LINTLIB64)
-
-lint:		$(LINTLIB) $(LINTOUT32) $(LINTOUT64) $(SGSLINTOUT)
-
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64)
-
+install:	all .WAIT $(ROOTFS_LIBS64) $(ROOTFS_LINKS64)
 
 delete:
 		$(RM) $(DYNLIB)

@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 
@@ -113,7 +113,6 @@ catalog:	$(SGSMSGDIR)/elfedit_cap \
 		$(SGSMSGDIR)/elfedit_str \
 		$(SGSMSGDIR)/elfedit_sym \
 		$(SGSMSGDIR)/elfedit_syminfo
-		
 
 chkmsg:		$(SRCS)
 		sh $(CHKMSG) -m ../common/cap.msg ../common/cap.c
@@ -125,33 +124,5 @@ chkmsg:		$(SRCS)
 		sh $(CHKMSG) -m ../common/sym.msg ../common/sym.c
 		sh $(CHKMSG) -m ../common/syminfo.msg ../common/syminfo.c
 
-
-LINT_HDR=	perl $(SGSTOOLS)/lint_hdr.pl
-
-lint:
-		$(LINT_HDR) "elfedit modules"		 > $(LINTOUT)
-		$(LINT_HDR) -s "cap.so"			>> $(LINTOUT)
-		$(LINT.c) ../common/cap.c 		2>&1 | tee -a $(LINTOUT)
-
-		$(LINT_HDR) -s "dyn.so"			>> $(LINTOUT)
-		$(LINT.c) ../common/dyn.c 		2>&1 | tee -a $(LINTOUT)
-
-		$(LINT_HDR) -s "ehdr.so"		>> $(LINTOUT)
-		$(LINT.c) ../common/ehdr.c 		2>&1 | tee -a $(LINTOUT)
-
-		$(LINT_HDR) -s "phdr.so"		>> $(LINTOUT)
-		$(LINT.c) ../common/phdr.c 		2>&1 | tee -a $(LINTOUT)
-
-		$(LINT_HDR) -s "shdr.so"		>> $(LINTOUT)
-		$(LINT.c) ../common/shdr.c 		2>&1 | tee -a $(LINTOUT)
-
-		$(LINT_HDR) -s "str.so"			>> $(LINTOUT)
-		$(LINT.c) ../common/str.c 		2>&1 | tee -a $(LINTOUT)
-
-		$(LINT_HDR) -s "sym.so"			>> $(LINTOUT)
-		$(LINT.c) ../common/sym.c 		2>&1 | tee -a $(LINTOUT)
-
-		$(LINT_HDR) -s "syminfo.so"		>> $(LINTOUT)
-		$(LINT.c) ../common/syminfo.c 		2>&1 | tee -a $(LINTOUT)
 
 include		$(SRC)/lib/Makefile.targ
