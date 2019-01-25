@@ -28,7 +28,9 @@
  *      All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*LINTLIBRARY*/
 
@@ -337,9 +339,14 @@ field_info(FIELD *f, int *rows, int *cols, int *frow, int *fcol,
 int
 set_max_field(FIELD *f, int max)
 {
-	BOOLEAN	onerow = OneRow(f);
+	BOOLEAN	onerow;
 
-	if (!f || max && ((onerow && f->dcols > max) ||
+	if (f == NULL)
+		return (E_BAD_ARGUMENT);
+
+	onerow = OneRow(f);
+
+	if (max && ((onerow && f->dcols > max) ||
 	    (!onerow && f->drows > max)))
 		return (E_BAD_ARGUMENT);
 

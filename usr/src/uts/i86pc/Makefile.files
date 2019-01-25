@@ -142,6 +142,7 @@ BOOT_DRIVER_OBJS =		\
 	boot_keyboard.o		\
 	boot_keyboard_table.o	\
 	boot_vga.o		\
+	boot_fb.o		\
 	boot_mmu.o		\
 	dboot_multiboot2.o	\
 	$(FONT_OBJS)

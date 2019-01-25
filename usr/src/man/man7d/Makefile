@@ -15,6 +15,7 @@
 # Copyright (c) 2017, Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2019 Peter Tribble
 #
 
 include		$(SRC)/Makefile.master
@@ -102,7 +103,6 @@ _MANFILES=	aac.7d		\
 		ptm.7d		\
 		pts.7d		\
 		pty.7d		\
-		qede.7d		\
 		qlc.7d		\
 		ramdisk.7d	\
 		random.7d	\
@@ -223,6 +223,7 @@ i386_MANFILES=	ahci.7d		\
 		nv_sata.7d	\
 		nvme.7d		\
 		pcn.7d		\
+		qede.7d		\
 		radeon.7d	\
 		ral.7d		\
 		rtw.7d		\

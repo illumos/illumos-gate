@@ -28,15 +28,18 @@
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/archsystm.h>
+#include <sys/framebuffer.h>
 #include <sys/boot_console.h>
 #include <sys/panic.h>
 #include <sys/ctype.h>
+#include <sys/ascii.h>
+#include <sys/vgareg.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
 #endif /* __xpv */
 
+#include "boot_console_impl.h"
 #include "boot_serial.h"
-#include "boot_vga.h"
 
 #if defined(_BOOT)
 #include <dboot/dboot_asm.h>
@@ -57,6 +60,7 @@ extern int bcons_getchar_xen(void);
 extern int bcons_ischar_xen(void);
 #endif /* __xpv */
 
+fb_info_t fb_info;
 static int cons_color = CONS_COLOR;
 static int console = CONS_SCREEN_TEXT;
 static int diag = CONS_INVALID;
@@ -92,22 +96,6 @@ console_hypervisor_dev_type(int *tnum)
 	return (console_hypervisor_device);
 }
 #endif /* __xpv */
-
-/* Clear the screen and initialize VIDEO, XPOS and YPOS. */
-void
-clear_screen(void)
-{
-	/*
-	 * XXX should set vga mode so we don't depend on the
-	 * state left by the boot loader.  Note that we have to
-	 * enable the cursor before clearing the screen since
-	 * the cursor position is dependant upon the cursor
-	 * skew, which is initialized by vga_cursor_display()
-	 */
-	vga_cursor_display();
-	vga_clear(cons_color);
-	vga_setpos(0, 0);
-}
 
 /* Put the character C on the screen. */
 static void
@@ -202,15 +190,6 @@ serial_init(void)
 
 	/* adjust setting based on tty properties */
 	serial_adjust_prop();
-
-#if defined(_BOOT)
-	/*
-	 * Do a full reset to match console behavior.
-	 * 0x1B + c - reset everything
-	 */
-	serial_putchar(0x1B);
-	serial_putchar('c');
-#endif
 }
 
 /* Advance str pointer past white space */
@@ -608,6 +587,167 @@ bcons_init_env(struct xboot_info *xbi)
 	boot_env.be_size = modules[i].bm_size;
 }
 
+int
+boot_fb(struct xboot_info *xbi, int console)
+{
+	if (xbi_fb_init(xbi) == B_FALSE)
+		return (console);
+
+	/* FB address is not set, fall back to serial terminal. */
+	if (fb_info.paddr == 0) {
+		return (CONS_TTY);
+	}
+
+	fb_info.terminal.x = 80;
+	fb_info.terminal.y = 34;
+	boot_fb_init(CONS_FRAMEBUFFER);
+
+	if (console == CONS_SCREEN_TEXT)
+		return (CONS_FRAMEBUFFER);
+	return (console);
+}
+
+/*
+ * TODO.
+ * quick and dirty local atoi. Perhaps should build with strtol, but
+ * dboot & early boot mix does overcomplicate things much.
+ * Stolen from libc anyhow.
+ */
+static int
+atoi(const char *p)
+{
+	int n, c, neg = 0;
+	unsigned char *up = (unsigned char *)p;
+
+	if (!isdigit(c = *up)) {
+		while (isspace(c))
+			c = *++up;
+		switch (c) {
+		case '-':
+			neg++;
+			/* FALLTHROUGH */
+		case '+':
+			c = *++up;
+		}
+		if (!isdigit(c))
+			return (0);
+	}
+	for (n = '0' - c; isdigit(c = *++up); ) {
+		n *= 10; /* two steps to avoid unnecessary overflow */
+		n += '0' - c; /* accum neg to avoid surprises at MAX */
+	}
+	return (neg ? n : -n);
+}
+
+static int
+set_vga_color(void)
+{
+	int color;
+	uint8_t tmp;
+/* BEGIN CSTYLED */
+/*                              Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
+	uint8_t dim_xlate[] = {  1,  5,  3,  7,  2,  6,  4,  8 };
+	uint8_t brt_xlate[] = {  9, 13, 11, 15, 10, 14, 12,  0 };
+	uint8_t solaris_color_to_pc_color[16] = {
+		15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
+	};
+/* END CSTYLED */
+
+	/*
+	 * Now we have two principal cases, black on white and white on black.
+	 * And we have possible inverse to switch them, and we want to
+	 * follow the tem logic to set VGA TEXT color. FB will take care
+	 * of itself in boot_fb.c
+	 */
+	if (fb_info.inverse == B_TRUE ||
+	    fb_info.inverse_screen == B_TRUE) {
+		tmp = dim_xlate[fb_info.fg_color];
+		color = solaris_color_to_pc_color[tmp] << 4;
+		tmp = brt_xlate[fb_info.bg_color];
+		color |= solaris_color_to_pc_color[tmp];
+		return (color);
+	}
+
+	/* use bright white for background */
+	if (fb_info.bg_color == 7)
+		tmp = brt_xlate[fb_info.bg_color];
+	else
+		tmp = dim_xlate[fb_info.bg_color];
+
+	color = solaris_color_to_pc_color[tmp] << 4;
+	tmp = dim_xlate[fb_info.fg_color];
+	color |= solaris_color_to_pc_color[tmp];
+	return (color);
+}
+
+static void
+bcons_init_fb(void)
+{
+	const char *propval;
+	int intval;
+
+	/* initialize with explicit default values */
+	fb_info.fg_color = CONS_COLOR;
+	fb_info.bg_color = 0;
+	fb_info.inverse = B_FALSE;
+	fb_info.inverse_screen = B_FALSE;
+
+	/* color values are 0 - 7 */
+	propval = find_boot_prop("tem.fg_color");
+	if (propval != NULL) {
+		intval = atoi(propval);
+		if (intval >= 0 && intval <= 7)
+			fb_info.fg_color = intval;
+	}
+
+	/* color values are 0 - 7 */
+	propval = find_boot_prop("tem.bg_color");
+	if (propval != NULL && ISDIGIT(*propval)) {
+		intval = atoi(propval);
+		if (intval >= 0 && intval <= 7)
+			fb_info.bg_color = intval;
+	}
+
+	/* get inverses. allow 0, 1, true, false */
+	propval = find_boot_prop("tem.inverse");
+	if (propval != NULL) {
+		if (*propval == '1' || MATCHES(propval, "true"))
+			fb_info.inverse = B_TRUE;
+	}
+
+	propval = find_boot_prop("tem.inverse-screen");
+	if (propval != NULL) {
+		if (*propval == '1' || MATCHES(propval, "true"))
+			fb_info.inverse_screen = B_TRUE;
+	}
+
+#if defined(_BOOT) && defined(_NEWFONT)
+	/*
+	 * Load cursor position from bootloader only in dboot,
+	 * dboot will pass cursor position to kernel via xboot info.
+	 */
+	/*
+	 * To keep consistent console, we reset boot screen till new fonts
+	 * are available.
+	 */
+	propval = find_boot_prop("tem.cursor.row");
+	if (propval != NULL) {
+		intval = atoi(propval);
+		if (intval >= 0 && intval <= 0xFFFF)
+			fb_info.cursor.pos.y = intval;
+	}
+
+	propval = find_boot_prop("tem.cursor.col");
+	if (propval != NULL) {
+		intval = atoi(propval);
+		if (intval >= 0 && intval <= 0xFFFF)
+			fb_info.cursor.pos.x = intval;
+	}
+#endif
+
+	cons_color = set_vga_color();
+}
+
 /*
  * Go through the console_devices array trying to match the string
  * we were given.  The string on the command line must end with
@@ -664,6 +804,9 @@ bcons_init(struct xboot_info *xbi)
 	boot_line = (char *)(uintptr_t)xbi->bi_cmdline;
 	bcons_init_env(xbi);
 	console = CONS_INVALID;
+
+	/* set up initial fb_info */
+	bcons_init_fb();
 
 #if defined(__xpv)
 	bcons_init_xen(boot_line);
@@ -745,6 +888,8 @@ bcons_init(struct xboot_info *xbi)
 	}
 #endif /* __xpv */
 
+	/* make sure the FB is set up if present */
+	console = boot_fb(xbi, console);
 	switch (console) {
 	case CONS_TTY:
 		serial_init();
@@ -765,10 +910,9 @@ bcons_init(struct xboot_info *xbi)
 		kb_init();
 		break;
 	case CONS_SCREEN_TEXT:
+		boot_vga_init(cons_color);
+		/* Fall through */
 	default:
-#if defined(_BOOT)
-		clear_screen();	/* clears the grub or xen screen */
-#endif /* _BOOT */
 		kb_init();
 		break;
 	}
@@ -964,6 +1108,9 @@ _doputchar(int device, int c)
 	case CONS_SCREEN_TEXT:
 		screen_putchar(c);
 		return;
+	case CONS_FRAMEBUFFER:
+		boot_fb_putchar(c);
+		return;
 	case CONS_SCREEN_GRAPHICS:
 #if !defined(_BOOT)
 	case CONS_USBSER:
@@ -996,12 +1143,13 @@ bcons_putchar(int c)
 		return;
 	} else  if (c == '\n' || c == '\r') {
 		bhcharpos = 0;
-		_doputchar(console, '\r');
-		_doputchar(console, c);
-		if (diag != console) {
+		if (console != CONS_FRAMEBUFFER)
+			_doputchar(console, '\r');
+		if (diag != console && diag != CONS_FRAMEBUFFER)
 			_doputchar(diag, '\r');
+		_doputchar(console, c);
+		if (diag != console)
 			_doputchar(diag, c);
-		}
 		return;
 	} else if (c == '\b') {
 		if (bhcharpos)
