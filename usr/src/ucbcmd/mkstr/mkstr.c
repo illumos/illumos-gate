@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * mkstr - create a string error message file by massaging C source
  *
@@ -237,7 +235,7 @@ copystr(void)
 	}
 out:
 	*cp = 0;
-	(void) printf("%d", hashit(buf, 1, NULL));
+	(void) printf("%d", hashit(buf, 1, 0));
 }
 
 static int
@@ -254,7 +252,7 @@ inithash(void)
 	int mesgpt = 0;
 
 	rewind(mesgread);
-	while (fgetNUL(buf, sizeof (buf), mesgread) != NULL) {
+	while (fgetNUL(buf, sizeof (buf), mesgread) != 0) {
 		(void) hashit(buf, 0, mesgpt);
 		mesgpt += strlen(buf) + 2;
 	}
@@ -315,5 +313,5 @@ fgetNUL(char *obuf, int rmdr, FILE *file)
 		*buf++ = c;
 	*buf++ = 0;
 	(void) getc(file);
-	return ((feof(file) || ferror(file)) ? NULL : 1);
+	return ((feof(file) || ferror(file)) ? 0 : 1);
 }
