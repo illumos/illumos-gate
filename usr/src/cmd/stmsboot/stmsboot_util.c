@@ -51,8 +51,8 @@
 #define	VHCI_CTL_NODE	"/devices/scsi_vhci:devctl"
 
 /* nvlist property names, these are ALL string types */
-#define	NVL_DEVID 	"nvl-devid"
-#define	NVL_PATH 	"nvl-path"
+#define	NVL_DEVID	"nvl-devid"
+#define	NVL_PATH	"nvl-path"
 #define	NVL_PHYSPATH	"nvl-physpath"
 #define	NVL_MPXPATH	"nvl-mpxiopath"
 #define	NVL_MPXEN	"nvl-mpxioenabled"
@@ -409,12 +409,18 @@ parse_args(int argc, char *argv[])
 				    "driver name: %s\n"), strerror(errno));
 				exit(errno);
 			}
-			bcopy(optarg, drvlimit, strlen(optarg));
+			if (strlcpy(drvlimit, optarg, MAXMODCONFNAME) >=
+			    MAXMODCONFNAME) {
+				logmsg(MSG_ERROR,
+				    gettext("invalid parent driver (%s) "
+				    "specified"), optarg);
+				usage();
+			}
 			/* update this if adding support for a new driver */
-			if ((strncmp(drvlimit, "fp", 2) == NULL) &&
-			    (strncmp(drvlimit, "mpt", 3) == NULL) &&
-			    (strncmp(drvlimit, "mpt_sas", 7) == NULL) &&
-			    (strncmp(drvlimit, "pmcs", 4) == NULL)) {
+			if (strcmp(drvlimit, "fp") != 0 &&
+			    strcmp(drvlimit, "mpt") != 0 &&
+			    strcmp(drvlimit, "mpt_sas") != 0 &&
+			    strcmp(drvlimit, "pmcs") != 0) {
 				logmsg(MSG_ERROR,
 				    gettext("invalid parent driver (%s) "
 				    "specified"), drvlimit);
