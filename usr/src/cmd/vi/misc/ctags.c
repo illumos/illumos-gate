@@ -28,7 +28,7 @@
  *		e.g. classz ::afunc
  *
  *   Enhance operator functions support:
- *  	-  Control flow involving operator tokens scanning are
+ *	-  Control flow involving operator tokens scanning are
  *	   consistent with that of other function tokens - original
  *	   hacking method for 2.0 is removed.  This will accurately
  *	   identify tags for declarations of the form 'operator+()'
@@ -69,7 +69,7 @@ char copyright[] = "@(#) Copyright (c) 1980 Regents of the University of "
 #define	endtoken(arg)	(_etk[arg])	/* T if char ends tokens	*/
 #define	isgood(arg)	(_gd[arg])	/* T if char can be after ')'	*/
 
-#define	optoken(arg)	(_opr[arg])	/* T if char can be 		*/
+#define	optoken(arg)	(_opr[arg])	/* T if char can be		*/
 					/* an overloaded operator token	*/
 
 #define	max(I1, I2)	(I1 > I2 ? I1 : I2)
@@ -104,7 +104,7 @@ typedef enum {none, begin, begin_rec, begin_tag, middle, end } TYST;
 
 static TYST tydef = none;
 
-static char	searchar = '/';		/* use /.../ searches 		*/
+static char	searchar = '/';		/* use /.../ searches		*/
 
 static int	lineno;			/* line number of current line */
 static char
@@ -141,7 +141,7 @@ static FILE
 	*inf,			/* ioptr for current input file		*/
 	*outf;			/* ioptr for tags file			*/
 
-static long	lineftell;	/* ftell after getc( inf ) == '\n' 	*/
+static long	lineftell;	/* ftell after getc( inf ) == '\n'	*/
 
 static NODE	*head;		/* the head of the sorted binary tree	*/
 
@@ -354,9 +354,9 @@ char	*file;
 	/* .l implies lisp or lex source code */
 	if (cp && cp[1] == 'l' && cp[2] == '\0') {
 #ifdef __STDC__
-		if (strchr(";([", first_char()) != NULL) 	/* lisp */
+		if (strchr(";([", first_char()) != NULL)	/* lisp */
 #else
-		if (index(";([", first_char()) != NULL) 	/* lisp */
+		if (index(";([", first_char()) != NULL)		/* lisp */
 #endif
 		{
 			L_funcs(inf);
@@ -545,7 +545,7 @@ C_entries()
 			continue;
 		    case '/':
 			*++sp = c = getc(inf);
-			/* Handles the C++ comment token "//" 		*/
+			/* Handles the C++ comment token "//"		*/
 			if (c == '*')
 				incomm = TRUE;
 			else if (c == '/') {
@@ -1451,7 +1451,7 @@ char **av;			/* ptr to original argument space	*/
 	}
 
 	/* for each argument, see if we need to change things:		*/
-	for (; (av[i] != (char *)NULL) && (av[i][0] != (char)NULL); i++) {
+	for (; (av[i] != NULL) && (av[i][0] != '\0'); i++) {
 
 		if (strcmp(av[i], "--") == 0) {
 			fflag = 1;	/* just handle filenames now	*/
@@ -1466,7 +1466,7 @@ char **av;			/* ptr to original argument space	*/
 		 *
 		 * so, if we've found a "-" string which needs separating:
 		 */
-		if (fflag == 0 && 	/* not handling filename args	*/
+		if (fflag == 0 &&	/* not handling filename args	*/
 		    av[i][0] == '-' &&	/* and this is a flag		*/
 		    sz > 2) {		/* and there's more than 1 flag	*/
 			/* then for each flag after the "-" sign:	*/
