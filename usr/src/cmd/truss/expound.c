@@ -27,7 +27,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #define	_SYSCALL32
 
@@ -202,7 +202,7 @@ show_timeofday(private_t *pri)
 	struct timeval tod;
 	long offset;
 
-	if (pri->sys_nargs < 1 || (offset = pri->sys_args[0]) == NULL)
+	if (pri->sys_nargs < 1 || (offset = pri->sys_args[0]) == 0)
 		return;
 
 	if (data_model == PR_MODEL_NATIVE) {
@@ -330,7 +330,7 @@ show_times(private_t *pri)
 	long offset;
 	struct tms tms;
 
-	if (pri->sys_nargs < 1 || (offset = pri->sys_args[0]) == NULL)
+	if (pri->sys_nargs < 1 || (offset = pri->sys_args[0]) == 0)
 		return;
 
 	if (data_model == PR_MODEL_NATIVE) {
@@ -380,7 +380,7 @@ show_uname(private_t *pri, long offset)
 		char	machine[9];
 	} ubuf;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &ubuf, sizeof (ubuf), offset) == sizeof (ubuf)) {
 		(void) printf(
 		    "%s\tsys=%-9.9snod=%-9.9srel=%-9.9sver=%-9.9smch=%.9s\n",
@@ -399,7 +399,7 @@ show_ustat(private_t *pri, long offset)
 {
 	struct ustat ubuf;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &ubuf, sizeof (ubuf), offset) == sizeof (ubuf)) {
 		(void) printf(
 		    "%s\ttfree=%-6ld tinode=%-5lu fname=%-6.6s fpack=%-.6s\n",
@@ -417,7 +417,7 @@ show_ustat32(private_t *pri, long offset)
 {
 	struct ustat32 ubuf;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &ubuf, sizeof (ubuf), offset) == sizeof (ubuf)) {
 		(void) printf(
 		    "%s\ttfree=%-6d tinode=%-5u fname=%-6.6s fpack=%-.6s\n",
@@ -531,8 +531,8 @@ show_cladm(private_t *pri, int code, int function, long offset)
 }
 
 #define	ALL_LOCK_TYPES						\
-	(USYNC_PROCESS | LOCK_ERRORCHECK | LOCK_RECURSIVE | 	\
-	LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT | LOCK_ROBUST | 	\
+	(USYNC_PROCESS | LOCK_ERRORCHECK | LOCK_RECURSIVE |	\
+	LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT | LOCK_ROBUST |	\
 	USYNC_PROCESS_ROBUST)
 
 /* return cv and mutex types */
@@ -899,7 +899,7 @@ print_strbuf32(private_t *pri, struct strbuf32 *sp, const char *name, int dump)
 	 * Should we show the buffer contents?
 	 * Keyed to the '-r fds' and '-w fds' options?
 	 */
-	if (sp->buf == NULL || sp->len <= 0)
+	if (sp->buf == 0 || sp->len <= 0)
 		(void) fputc('\n', stdout);
 	else {
 		int nb = (sp->len > 8)? 8 : sp->len;
@@ -1515,7 +1515,7 @@ show_statvfs(private_t *pri)
 	struct statvfs statvfs;
 	char *cp;
 
-	if (pri->sys_nargs > 1 && (offset = pri->sys_args[1]) != NULL &&
+	if (pri->sys_nargs > 1 && (offset = pri->sys_args[1]) != 0 &&
 	    Pread(Proc, &statvfs, sizeof (statvfs), offset)
 	    == sizeof (statvfs)) {
 		(void) printf(
@@ -1561,7 +1561,7 @@ show_statvfs32(private_t *pri)
 	struct statvfs32 statvfs;
 	char *cp;
 
-	if (pri->sys_nargs > 1 && (offset = pri->sys_args[1]) != NULL &&
+	if (pri->sys_nargs > 1 && (offset = pri->sys_args[1]) != 0 &&
 	    Pread(Proc, &statvfs, sizeof (statvfs), offset)
 	    == sizeof (statvfs)) {
 		(void) printf(
@@ -1607,7 +1607,7 @@ show_statvfs64(private_t *pri)
 	struct statvfs64_32 statvfs;
 	char *cp;
 
-	if (pri->sys_nargs > 1 && (offset = pri->sys_args[1]) != NULL &&
+	if (pri->sys_nargs > 1 && (offset = pri->sys_args[1]) != 0 &&
 	    Pread(Proc, &statvfs, sizeof (statvfs), offset)
 	    == sizeof (statvfs)) {
 		(void) printf(
@@ -1651,7 +1651,7 @@ show_statfs(private_t *pri)
 	long offset;
 	struct statfs statfs;
 
-	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != NULL &&
+	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != 0 &&
 	    Pread(Proc, &statfs, sizeof (statfs), offset) == sizeof (statfs)) {
 		(void) printf(
 		"%s\tfty=%d bsz=%ld fsz=%ld blk=%ld bfr=%ld fil=%lu ffr=%lu\n",
@@ -1677,7 +1677,7 @@ show_statfs32(private_t *pri)
 	long offset;
 	struct statfs32 statfs;
 
-	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != NULL &&
+	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != 0 &&
 	    Pread(Proc, &statfs, sizeof (statfs), offset) == sizeof (statfs)) {
 		(void) printf(
 		    "%s\tfty=%d bsz=%d fsz=%d blk=%d bfr=%d fil=%u ffr=%u\n",
@@ -1862,7 +1862,7 @@ show_fcntl(private_t *pri)
 		return;
 	}
 
-	if (pri->sys_nargs < 3 || (offset = pri->sys_args[2]) == NULL)
+	if (pri->sys_nargs < 3 || (offset = pri->sys_args[2]) == 0)
 		return;
 
 	switch (pri->sys_args[1]) {
@@ -1971,22 +1971,22 @@ show_gp_msg(private_t *pri, int what)
 		Eserialize();
 
 #ifdef _LP64
-	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != NULL) {
+	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != 0) {
 		if (data_model == PR_MODEL_LP64)
 			show_strbuf(pri, offset, "ctl", dump);
 		else
 			show_strbuf32(pri, offset, "ctl", dump);
 	}
-	if (pri->sys_nargs >= 3 && (offset = pri->sys_args[2]) != NULL) {
+	if (pri->sys_nargs >= 3 && (offset = pri->sys_args[2]) != 0) {
 		if (data_model == PR_MODEL_LP64)
 			show_strbuf(pri, offset, "dat", dump);
 		else
 			show_strbuf32(pri, offset, "dat", dump);
 	}
 #else	/* _LP64 */
-	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != NULL)
+	if (pri->sys_nargs >= 2 && (offset = pri->sys_args[1]) != 0)
 		show_strbuf(pri, offset, "ctl", dump);
-	if (pri->sys_nargs >= 3 && (offset = pri->sys_args[2]) != NULL)
+	if (pri->sys_nargs >= 3 && (offset = pri->sys_args[2]) != 0)
 		show_strbuf(pri, offset, "dat", dump);
 #endif	/* _LP64 */
 
@@ -2118,12 +2118,12 @@ show_pollsys(private_t *pri)
 	nfds = pri->sys_args[1];
 
 	/* enter region of lengthy output */
-	if (offset != NULL && nfds > 32) {
+	if (offset != 0 && nfds > 32) {
 		Eserialize();
 		serial = 1;
 	}
 
-	if (offset != NULL && nfds > 0)
+	if (offset != 0 && nfds > 0)
 		show_all_pollfds(pri, offset, nfds);
 
 	if (pri->sys_nargs > 2)
@@ -2190,7 +2190,7 @@ show_msgctl64(private_t *pri, long offset)
 {
 	struct msqid_ds64 msgq;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &msgq, sizeof (msgq), offset) == sizeof (msgq)) {
 		show_perm64(pri, &msgq.msgx_perm);
 
@@ -2213,7 +2213,7 @@ show_msgctl(private_t *pri, long offset)
 {
 	struct msqid_ds msgq;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &msgq, sizeof (msgq), offset) == sizeof (msgq)) {
 		show_perm(pri, &msgq.msg_perm);
 
@@ -2238,7 +2238,7 @@ show_msgctl32(private_t *pri, long offset)
 {
 	struct msqid_ds32 msgq;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &msgq, sizeof (msgq), offset) == sizeof (msgq)) {
 		show_perm32(pri, &msgq.msg_perm);
 
@@ -2263,7 +2263,7 @@ show_msgbuf(private_t *pri, long offset, long msgsz)
 {
 	struct msgbuf msgb;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &msgb, sizeof (msgb.mtype), offset) ==
 	    sizeof (msgb.mtype)) {
 		/* enter region of lengthy output */
@@ -2288,7 +2288,7 @@ show_msgbuf32(private_t *pri, long offset, long msgsz)
 {
 	struct ipcmsgbuf32 msgb;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &msgb, sizeof (msgb.mtype), offset) ==
 	    sizeof (msgb.mtype)) {
 		/* enter region of lengthy output */
@@ -2413,7 +2413,7 @@ show_semctl64(private_t *pri, long offset)
 {
 	struct semid_ds64 semds;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &semds, sizeof (semds), offset) == sizeof (semds)) {
 		show_perm64(pri, &semds.semx_perm);
 
@@ -2429,7 +2429,7 @@ show_semctl(private_t *pri, long offset)
 {
 	struct semid_ds semds;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &semds, sizeof (semds), offset) == sizeof (semds)) {
 		show_perm(pri, &semds.sem_perm);
 
@@ -2448,7 +2448,7 @@ show_semctl32(private_t *pri, long offset)
 {
 	struct semid_ds32 semds;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &semds, sizeof (semds), offset) == sizeof (semds)) {
 		show_perm32(pri, &semds.sem_perm);
 
@@ -2552,7 +2552,7 @@ show_shmctl64(private_t *pri, long offset)
 {
 	struct shmid_ds64 shmds;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &shmds, sizeof (shmds), offset) == sizeof (shmds)) {
 		show_perm64(pri, &shmds.shmx_perm);
 
@@ -2576,7 +2576,7 @@ show_shmctl(private_t *pri, long offset)
 {
 	struct shmid_ds shmds;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &shmds, sizeof (shmds), offset) == sizeof (shmds)) {
 		show_perm(pri, &shmds.shm_perm);
 
@@ -2601,7 +2601,7 @@ show_shmctl32(private_t *pri, long offset)
 {
 	struct shmid_ds32 shmds;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &shmds, sizeof (shmds), offset) == sizeof (shmds)) {
 		show_perm32(pri, &shmds.shm_perm);
 
@@ -2672,7 +2672,7 @@ show_groups(private_t *pri, long offset, long count)
 	if (count > 100)
 		count = 100;
 
-	if (count > 0 && offset != NULL &&
+	if (count > 0 && offset != 0 &&
 	    Pread(Proc, &groups[0], count*sizeof (int), offset) ==
 	    count*sizeof (int)) {
 		int n;
@@ -2714,7 +2714,7 @@ show_sigset(private_t *pri, long offset, const char *name)
 {
 	sigset_t sigset;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &sigset, sizeof (sigset), offset) == sizeof (sigset)) {
 		(void) printf("%s\t%s =%s\n",
 		    pri->pname, name, sigset_string(pri, &sigset));
@@ -2727,7 +2727,7 @@ show_sigaltstack32(private_t *pri, long offset, const char *name)
 {
 	struct sigaltstack32 altstack;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &altstack, sizeof (altstack), offset) ==
 	    sizeof (altstack)) {
 		(void) printf("%s\t%s: sp=0x%.8X size=%u flags=0x%.4X\n",
@@ -2751,7 +2751,7 @@ show_sigaltstack(private_t *pri, long offset, const char *name)
 		return;
 	}
 #endif
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &altstack, sizeof (altstack), offset) ==
 	    sizeof (altstack)) {
 		(void) printf("%s\t%s: sp=0x%.8lX size=%lu flags=0x%.4X\n",
@@ -2769,11 +2769,11 @@ show_sigaction32(private_t *pri, long offset, const char *name, long odisp)
 {
 	struct sigaction32 sigaction;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &sigaction, sizeof (sigaction), offset) ==
 	    sizeof (sigaction)) {
 		/* This is stupid, we shouldn't have to do this */
-		if (odisp != NULL)
+		if (odisp != 0)
 			sigaction.sa_handler = (caddr32_t)odisp;
 		(void) printf(
 		    "%s    %s: hand = 0x%.8X mask =%s flags = 0x%.4X\n",
@@ -2797,11 +2797,11 @@ show_sigaction(private_t *pri, long offset, const char *name, long odisp)
 		return;
 	}
 #endif
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &sigaction, sizeof (sigaction), offset) ==
 	    sizeof (sigaction)) {
 		/* This is stupid, we shouldn't have to do this */
-		if (odisp != NULL)
+		if (odisp != 0)
 			sigaction.sa_handler = (void (*)())odisp;
 		(void) printf(
 		    "%s    %s: hand = 0x%.8lX mask =%s flags = 0x%.4X\n",
@@ -3133,7 +3133,7 @@ show_siginfo32(private_t *pri, long offset)
 {
 	struct siginfo32 siginfo;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &siginfo, sizeof (siginfo), offset) == sizeof (siginfo))
 		print_siginfo32(pri, &siginfo);
 }
@@ -3150,7 +3150,7 @@ show_siginfo(private_t *pri, long offset)
 		return;
 	}
 #endif
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &siginfo, sizeof (siginfo), offset) == sizeof (siginfo))
 		print_siginfo(pri, &siginfo);
 }
@@ -3198,7 +3198,7 @@ show_iovec32(private_t *pri, long offset, int niov, int showbuf, long count)
 	if (niov > 16)		/* is this the real limit? */
 		niov = 16;
 
-	if (offset != NULL && niov > 0 &&
+	if (offset != 0 && niov > 0 &&
 	    Pread(Proc, &iovec[0], niov*sizeof (iovec32_t), offset)
 	    == niov*sizeof (iovec32_t)) {
 		/* enter region of lengthy output */
@@ -3244,7 +3244,7 @@ show_iovec(private_t *pri, long offset, long niov, int showbuf, long count)
 	if (niov > 16)		/* is this the real limit? */
 		niov = 16;
 
-	if (offset != NULL && niov > 0 &&
+	if (offset != 0 && niov > 0 &&
 	    Pread(Proc, &iovec[0], niov*sizeof (iovec_t), offset)
 	    == niov*sizeof (iovec_t)) {
 		/* enter region of lengthy output */
@@ -3393,7 +3393,7 @@ show_rlimit32(private_t *pri, long offset)
 {
 	struct rlimit32 rlimit;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &rlimit, sizeof (rlimit), offset) == sizeof (rlimit)) {
 		(void) printf("%s\t", pri->pname);
 		switch (rlimit.rlim_cur) {
@@ -3432,7 +3432,7 @@ show_rlimit64(private_t *pri, long offset)
 {
 	struct rlimit64 rlimit;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &rlimit, sizeof (rlimit), offset) == sizeof (rlimit)) {
 		(void) printf("%s\t", pri->pname);
 		switch (rlimit.rlim_cur) {
@@ -3473,7 +3473,7 @@ show_nuname(private_t *pri, long offset)
 {
 	struct utsname ubuf;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &ubuf, sizeof (ubuf), offset) == sizeof (ubuf)) {
 		(void) printf(
 		    "%s\tsys=%s nod=%s rel=%s ver=%s mch=%s\n",
@@ -3546,7 +3546,7 @@ show_sockaddr(private_t *pri,
 		len -= sizeof (soun->sun_family);
 		if (len >= 0) {
 			/* Null terminate */
-			soun->sun_path[len] = NULL;
+			soun->sun_path[len] = 0;
 			(void) printf("%s\tAF_UNIX  %s = %s\n", pri->pname,
 			    str, soun->sun_path);
 		}
@@ -3593,7 +3593,7 @@ show_msghdr32(private_t *pri, long offset)
 	struct msghdr32 {
 		caddr32_t	msg_name;
 		uint32_t	msg_namelen;
-		caddr32_t 	msg_iov;
+		caddr32_t	msg_iov;
 		int32_t		msg_iovlen;
 	} msg;
 	const lwpstatus_t *Lsp = pri->lwpstat;
@@ -3606,7 +3606,7 @@ show_msghdr32(private_t *pri, long offset)
 	if (Pread(Proc, &msg, sizeof (msg), offset) != sizeof (msg))
 		return;
 
-	if (msg.msg_name != NULL && msg.msg_namelen != 0)
+	if (msg.msg_name != 0 && msg.msg_namelen != 0)
 		show_sockaddr(pri, "msg_name",
 		    (long)msg.msg_name, 0, (long)msg.msg_namelen);
 	/*
@@ -4191,7 +4191,7 @@ show_ntp_gettime(private_t *pri)
 	struct ntptimeval ntv;
 	long offset;
 
-	if (pri->sys_nargs < 1 || (offset = pri->sys_args[0]) == NULL)
+	if (pri->sys_nargs < 1 || (offset = pri->sys_args[0]) == 0)
 		return;
 
 	if (data_model == PR_MODEL_NATIVE) {
@@ -4295,7 +4295,7 @@ show_ntp_adjtime(private_t *pri)
 	struct timex timex;
 	long offset;
 
-	if (pri->sys_nargs < 1 || (offset = pri->sys_args[0]) == NULL)
+	if (pri->sys_nargs < 1 || (offset = pri->sys_args[0]) == 0)
 		return;
 
 	if (Pread(Proc, &timex, sizeof (timex), offset) != sizeof (timex))
@@ -4708,12 +4708,12 @@ show_rctls(private_t *pri)
 		 */
 		(void) printf("%s\tOld rctlblk: 0x%lx\n", pri->pname,
 		    pri->sys_args[2]);
-		if (pri->sys_args[2] != NULL) {
+		if (pri->sys_args[2] != 0) {
 			show_rctlblk(pri, pri->sys_args[2]);
 		}
 		(void) printf("%s\tNew rctlblk: 0x%lx\n", pri->pname,
 		    pri->sys_args[3]);
-		if (pri->sys_args[3] != NULL) {
+		if (pri->sys_args[3] != 0) {
 			show_rctlblk(pri, pri->sys_args[3]);
 		}
 		break;
@@ -5331,7 +5331,7 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_sigaction:
 		if (pri->sys_nargs > 1)
 			show_sigaction(pri, (long)pri->sys_args[1],
-			    "new", NULL);
+			    "new", 0);
 		if (!err && pri->sys_nargs > 2)
 			show_sigaction(pri, (long)pri->sys_args[2],
 			    "old", r0);

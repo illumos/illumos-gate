@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #define	_SYSCALL32
 
@@ -65,7 +65,7 @@ show_stat32(private_t *pri, long offset)
 	struct stat32 statb;
 	timestruc_t ts;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &statb, sizeof (statb), offset) == sizeof (statb)) {
 		(void) printf(
 		    "%s    d=0x%.8X i=%-5u m=0%.6o l=%-2u u=%-5u g=%-5u",
@@ -110,7 +110,7 @@ show_stat64_32(private_t *pri, long offset)
 	struct stat64_32 statb;
 	timestruc_t ts;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &statb, sizeof (statb), offset) == sizeof (statb)) {
 		(void) printf(
 		    "%s    d=0x%.8X i=%-5llu m=0%.6o l=%-2u u=%-5u g=%-5u",
@@ -154,7 +154,7 @@ show_stat64(private_t *pri, long offset)
 {
 	struct stat64 statb;
 
-	if (offset != NULL &&
+	if (offset != 0 &&
 	    Pread(Proc, &statb, sizeof (statb), offset) == sizeof (statb)) {
 		(void) printf(
 		    "%s    d=0x%.16lX i=%-5lu m=0%.6o l=%-2u u=%-5u g=%-5u",
