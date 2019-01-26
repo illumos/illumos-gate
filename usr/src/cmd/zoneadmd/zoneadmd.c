@@ -351,7 +351,7 @@ filter_bootargs(zlog_t *zlogp, const char *inargs, char *outargs,
 	 * We preserve compatibility with the Solaris system boot behavior,
 	 * which allows:
 	 *
-	 * 	# reboot kernel/unix -s -m verbose
+	 *	# reboot kernel/unix -s -m verbose
 	 *
 	 * In this example, kernel/unix tells the booter what file to
 	 * boot.  We don't want reboot in a zone to be gratuitously different,
@@ -523,7 +523,7 @@ notify_zonestatd(zoneid_t zoneid)
 	params.desc_ptr = NULL;
 	params.desc_num = 0;
 	params.rbuf = NULL;
-	params.rsize = NULL;
+	params.rsize = 0;
 	(void) door_call(fd, &params);
 	(void) close(fd);
 }
@@ -1668,20 +1668,20 @@ setup_door(zlog_t *zlogp)
  * vnodes we could be dealing with.  Our strategy is as follows:
  *
  * - If the file we opened is a regular file (common case):
- * 	There is no fattach(3c)ed door, so we have a chance of becoming
- * 	the managing zoneadmd. We attempt to lock the file: if it is
- * 	already locked, that means someone else raced us here, so we
- * 	lose and give up.  zoneadm(1m) will try to contact the zoneadmd
- * 	that beat us to it.
+ *	There is no fattach(3c)ed door, so we have a chance of becoming
+ *	the managing zoneadmd. We attempt to lock the file: if it is
+ *	already locked, that means someone else raced us here, so we
+ *	lose and give up.  zoneadm(1m) will try to contact the zoneadmd
+ *	that beat us to it.
  *
  * - If the file we opened is a namefs file:
- * 	This means there is already an established door fattach(3c)'ed
- * 	to the rendezvous path.  We've lost the race, so we give up.
- * 	Note that in this case we also try to grab the file lock, and
- * 	will succeed in acquiring it since the vnode locked by the
- * 	"winning" zoneadmd was a regular one, and the one we locked was
- * 	the fattach(3c)'ed door node.  At any rate, no harm is done, and
- * 	we just return to zoneadm(1m) which knows to retry.
+ *	This means there is already an established door fattach(3c)'ed
+ *	to the rendezvous path.  We've lost the race, so we give up.
+ *	Note that in this case we also try to grab the file lock, and
+ *	will succeed in acquiring it since the vnode locked by the
+ *	"winning" zoneadmd was a regular one, and the one we locked was
+ *	the fattach(3c)'ed door node.  At any rate, no harm is done, and
+ *	we just return to zoneadm(1m) which knows to retry.
  */
 static int
 make_daemon_exclusive(zlog_t *zlogp)
