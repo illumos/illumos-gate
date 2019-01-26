@@ -23,7 +23,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 
@@ -60,7 +60,7 @@ int
 main(int argc, char *argv[])
 {
 	int cmd, fcn;
-	uintptr_t mdep = NULL;
+	uintptr_t mdep = (uintptr_t)NULL;
 	sigset_t set;
 	adt_session_data_t *ah;  /* audit session handle */
 	adt_event_data_t *event = NULL; /* event to be generated */
@@ -152,7 +152,7 @@ main(int argc, char *argv[])
 	case AD_FASTREBOOT:
 #ifdef __i386
 		fcn_id = ADT_UADMIN_FCN_AD_FASTREBOOT;
-		mdep = NULL;	/* Ignore all arguments */
+		mdep = (uintptr_t)NULL;	/* Ignore all arguments */
 #else /* __i386 */
 		fcn = AD_BOOT;
 		fcn_id = ADT_UADMIN_FCN_AD_BOOT;
@@ -160,7 +160,7 @@ main(int argc, char *argv[])
 		break;
 	case AD_FASTREBOOT_DRYRUN:
 		fcn_id = ADT_UADMIN_FCN_AD_FASTREBOOT_DRYRUN;
-		mdep = NULL;	/* Ignore all arguments */
+		mdep = (uintptr_t)NULL;	/* Ignore all arguments */
 		break;
 	default:
 		fcn_id = 0;
@@ -435,7 +435,7 @@ wait_for_auqueue()
 	au_stat_t	au_stat;
 	int		retries = 10;
 
-	while (retries-- && auditon(A_GETSTAT, (caddr_t)&au_stat, NULL) == 0) {
+	while (retries-- && auditon(A_GETSTAT, (caddr_t)&au_stat, 0) == 0) {
 		if (au_stat.as_enqueue == au_stat.as_written) {
 			break;
 		}
