@@ -45,7 +45,7 @@ typedef struct {
 static rwlock_t		cfg_paramDB_rwlock = DEFAULTRWLOCK;
 static nscd_db_t	*cfg_paramDB = NULL;
 
-static	nscd_cfg_global_data_t 	*nscd_cfg_global_current;
+static	nscd_cfg_global_data_t	*nscd_cfg_global_current;
 static	nscd_cfg_nsw_db_data_t	*nscd_cfg_nsw_db_data_current;
 static	nscd_cfg_nsw_db_data_t	*nscd_cfg_nsw_alldb_current;
 static	rwlock_t		*nscd_cfg_global_rwlock;
@@ -90,7 +90,7 @@ _nscd_cfg_get_list(
 	char			*me = "_nscd_cfg_get_list";
 	int			i, num, size;
 	nscd_cfg_id_t		*l;
-	nscd_cfg_list_t 	*ret;
+	nscd_cfg_list_t		*ret;
 	nscd_cfg_param_desc_t	*pl;
 	nscd_cfg_stat_desc_t	*sl;
 	void			*p;
@@ -1270,7 +1270,7 @@ _nscd_cfg_init(
 	nscd_cfg_global_rwlock = calloc(1, sizeof (rwlock_t));
 	if (nscd_cfg_global_rwlock == NULL)
 		return (NSCD_NO_MEMORY);
-	(void) rwlock_init(nscd_cfg_global_rwlock, NULL, NULL);
+	(void) rwlock_init(nscd_cfg_global_rwlock, USYNC_THREAD, NULL);
 
 	*nscd_cfg_global_current = nscd_cfg_global_default;
 
@@ -1291,7 +1291,7 @@ _nscd_cfg_init(
 		    nscd_cfg_nsw_db_data_default;
 
 		(void) rwlock_init(&nscd_cfg_nsw_db_data_rwlock[i],
-		    NULL, NULL);
+		    0, NULL);
 	}
 
 	/* add db specific defaults */
@@ -1382,7 +1382,7 @@ _nscd_cfg_init(
 	if (nscd_cfg_nsw_alldb_rwlock == NULL)
 		return (NSCD_NO_MEMORY);
 
-	(void) rwlock_init(nscd_cfg_nsw_alldb_rwlock, NULL, NULL);
+	(void) rwlock_init(nscd_cfg_nsw_alldb_rwlock, 0, NULL);
 
 	rc = _nscd_cfg_set_vlen_data_int(
 	    &nscd_cfg_nsw_db_data_default,
@@ -1833,7 +1833,7 @@ _nscd_cfg_copy_group_data_out(
 		if (_nscd_cfg_flag_is_set(desc->pflag,
 		    NSCD_CFG_PFLAG_VLEN_DATA)) {
 			src = _nscd_cfg_locate_vlen_data(src, &dlen);
-			if (dlen == NULL)
+			if (dlen == 0)
 				continue;
 		}
 
@@ -1903,7 +1903,7 @@ _nscd_cfg_copy_group_data_merge(
 		return (NSCD_INVALID_ARGUMENT);
 	}
 
-	if (param_index != NULL && pdata == NULL) {
+	if (param_index != 0 && pdata == NULL) {
 		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
 		(me, "param_index != NULL but pdata == %p\n", pdata);
 		return (NSCD_INVALID_ARGUMENT);
@@ -2106,13 +2106,13 @@ _nscd_cfg_get(
 /*
  * three type of data:
  * 1 - single param
- * 	desc is that of the param
+ *	desc is that of the param
  * 2 - single param to be sent in a group
  *	a single bit is set in the bitmap,
- * 	desc is that of the group
+ *	desc is that of the group
  * 3 - group data
  *	one of more bits are set in the bitmap,
- * 	desc is that of the group
+ *	desc is that of the group
  */
 static nscd_rc_t
 _nscd_cfg_notify_s(
@@ -2371,8 +2371,8 @@ _nscd_cfg_str_to_data(
 	case NSCD_CFG_DATA_INTEGER:
 
 		errno = 0;
-		*(int *)data = (int)strtol(str, (char **)NULL, 10);
-		if (errno != NULL) {
+		*(int *)data = (int)strtol(str, NULL, 10);
+		if (errno != 0) {
 
 			(void) snprintf(msg, sizeof (msg),
 			gettext("unable to convert data (%s) for %s"),
@@ -2392,8 +2392,8 @@ _nscd_cfg_str_to_data(
 	case NSCD_CFG_DATA_BITMAP:
 
 		errno = 0;
-		bitmap = (nscd_cfg_bitmap_t)strtol(str, (char **)NULL, 10);
-		if (errno != NULL) {
+		bitmap = (nscd_cfg_bitmap_t)strtol(str, NULL, 10);
+		if (errno != 0) {
 
 			(void) snprintf(msg, sizeof (msg),
 			gettext("unable to convert data (%s) for %s"),

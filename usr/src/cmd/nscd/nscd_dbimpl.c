@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -92,7 +90,7 @@ calc_hash(
 	unsigned int	hval = 0;
 	char		ch;
 
-	while (*str != NULL) {
+	while (*str != '\0') {
 		unsigned int	g;
 
 		ch = (char)*str++;
@@ -189,7 +187,7 @@ _nscd_get_db_entry(
 nscd_rc_t
 _nscd_add_db_entry(
 	nscd_db_t		*db,
-	const char 		*str,
+	const char		*str,
 	nscd_db_entry_t		*entry,
 	nscd_db_option_t	option)
 {
@@ -241,7 +239,7 @@ _nscd_add_db_entry(
 
 		if (idx_p->next_p == NULL) {
 			if (option == NSCD_ADD_DB_ENTRY_LAST ||
-				option == NSCD_ADD_DB_ENTRY_IF_NONE) {
+			    option == NSCD_ADD_DB_ENTRY_IF_NONE) {
 				prev_p = idx_p;
 				goto add_entry;
 			}
@@ -373,7 +371,7 @@ _nscd_delete_db_entry(
 nscd_db_entry_t *
 _nscd_alloc_db_entry(
 	int			type,
-	const char 		*name,
+	const char		*name,
 	int			dataSize,
 	int			num_data,
 	int			num_array)
@@ -435,7 +433,7 @@ _nscd_delete_db_entry_cookie(
 
 	/* more snaity check */
 	if (db != c->db || c->hash == NULL ||
-		c->idx < 0 || c->idx >= db->array_size)
+	    c->idx < 0 || c->idx >= db->array_size)
 		return;
 
 	/* retrieve the hash entry from the cookie */
@@ -503,7 +501,7 @@ _nscd_alloc_db(
 	else if (size == NSCD_DB_SIZE_TINY)
 		sz = 3;
 	db->hash_tbl_p = (nscd_hash_t  **)calloc(sz + 1,
-			sizeof (nscd_hash_t *));
+	    sizeof (nscd_hash_t *));
 	if (db->hash_tbl_p == NULL) {
 		free(db);
 		return (NULL);
@@ -578,7 +576,7 @@ _nscd_walk_db(
 		 * could change c->idx to -1.
 		 */
 		if (db != c->db ||
-			c->idx < -1 || c->idx >= db->array_size)
+		    c->idx < -1 || c->idx >= db->array_size)
 			return (NULL);
 
 		/* is there a next entry ? */

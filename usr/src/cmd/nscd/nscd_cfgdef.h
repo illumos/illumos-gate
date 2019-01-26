@@ -809,7 +809,7 @@ static nscd_cfg_nsw_db_data_t nscd_cfg_nsw_db_data_default = {
 	{
 
 	NSCD_CFG_GROUP_INFO_FRONTEND,
-	50, 			/* worker_thread_per_nsw_db */
+	50,			/* worker_thread_per_nsw_db */
 
 	},
 
@@ -1001,10 +1001,10 @@ nscd_cfg_nsw_spc_default_t	_nscd_cfg_nsw_link_default[] = {
 
 #define	NSCD_CFG_SGROUP_DESC_NULL \
 	{ \
-		{-1, NULL}, -1, NSCD_CFG_SFLAG_GROUP, NULL, \
+		{-1, NULL}, -1, NSCD_CFG_SFLAG_GROUP, 0, \
 		0, 0, 0, \
 		0, 0, 0, \
-		NULL \
+		0 \
 	}
 
 /*
