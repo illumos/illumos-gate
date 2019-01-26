@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Overview of poolcfg(1)
  *
@@ -439,7 +437,7 @@ transfer_qty: PCC_TRANSFER PCV_VAL_UINT PCK_FROM PCE_PSET src PCK_TO tgt
 		cmd->cmd_tgt2 = $5;
 		cmd->cmd_qty = $2;
 	};
-			
+
 discover_command: PCC_DISC
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -912,7 +910,7 @@ parser_resource_create(cmd_t *cmd, const char *type)
 	    == NULL)
 		die(gettext(ERR_CREATE_ELEMENT), type, cmd->cmd_tgt1,
 		    get_errstr());
-	
+
 	process_min_max(resource);
 
 	prop_list_walk(cmd, pool_resource_to_elem(conf, resource));
@@ -1433,7 +1431,7 @@ transfer_list_walk(cmd_t *cmd, pool_resource_t *tgt)
 	    assoc = assoc->assoc_next) {
 		pool_component_t *comp;
 		pool_resource_t *src;
-		pool_component_t *xfer[2] = {NULL};	
+		pool_component_t *xfer[2] = {NULL};
 
 		if ((comp = get_cpu(assoc->assoc_name)) == NULL)
 			die(gettext(ERR_LOCATE_ELEMENT), gettext(CPU),
@@ -1494,12 +1492,12 @@ get_cpu(const char *name)
 		return (NULL);
 	}
 
-	for (c = name; *c != NULL; c++) {
+	for (c = name; *c != '\0'; c++) {
 		if (!isdigit(*c)){
 			pool_value_free(vals[0]);
 			pool_value_free(vals[1]);
 			die(gettext(ERR_LOCATE_ELEMENT), gettext(CPU),
-		    	    cmd->cmd_tgt1, gettext("CPU id should only contain "
+			    cmd->cmd_tgt1, gettext("CPU id should only contain "
 			    "digits"));
 		}
 	}

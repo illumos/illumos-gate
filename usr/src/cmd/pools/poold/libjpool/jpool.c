@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <errno.h>
 #include <jni.h>
 #include <pool.h>
@@ -165,7 +163,8 @@ copyArray(JNIEnv *jenv, void **nativeArray)
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1version(JNIEnv *jenv,
-    jclass jcls, jlong jver) {
+    jclass jcls, jlong jver)
+{
 	return ((jlong)pool_version((uint_t)jver));
 }
 
@@ -175,7 +174,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1version(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POX_1NATIVE(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POX_NATIVE);
 }
 
@@ -185,7 +185,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POX_1NATIVE(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POX_1TEXT(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POX_TEXT);
 }
 
@@ -195,7 +196,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POX_1TEXT(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1INVAL(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POC_INVAL);
 }
 
@@ -205,7 +207,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1INVAL(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1UINT(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POC_UINT);
 }
 
@@ -215,7 +218,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1UINT(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1INT(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POC_INT);
 }
 
@@ -225,7 +229,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1INT(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1DOUBLE(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POC_DOUBLE);
 }
 
@@ -235,7 +240,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1DOUBLE(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1BOOL(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POC_BOOL);
 }
 
@@ -245,7 +251,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1BOOL(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1STRING(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POC_STRING);
 }
 
@@ -255,7 +262,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POC_1STRING(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POV_1NONE(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POV_NONE);
 }
 
@@ -265,7 +273,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POV_1NONE(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POV_1LOOSE(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POV_LOOSE);
 }
 
@@ -275,7 +284,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POV_1LOOSE(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POV_1STRICT(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POV_STRICT);
 }
 
@@ -285,7 +295,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POV_1STRICT(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POV_1RUNTIME(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POV_RUNTIME);
 }
 
@@ -295,7 +306,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POV_1RUNTIME(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POF_1INVALID(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POF_INVALID);
 }
 
@@ -305,7 +317,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POF_1INVALID(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POF_1VALID(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POF_VALID);
 }
 
@@ -315,7 +328,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POF_1VALID(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_get_1POF_1DESTROY(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)POF_DESTROY);
 }
 
@@ -325,7 +339,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_get_1POF_1DESTROY(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1error(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)pool_error());
 }
 
@@ -335,7 +350,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1error(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1strerror(JNIEnv *jenv,
-    jclass jcls, jint jperr) {
+    jclass jcls, jint jperr)
+{
 	jstring jresult = NULL;
 	char *result;
 
@@ -352,7 +368,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1strerror(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1strerror_1sys(JNIEnv *
-    jenv, jclass jcls) {
+    jenv, jclass jcls)
+{
 	jstring jresult = NULL;
 	char *result;
 
@@ -369,7 +386,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1strerror_1sys(JNIEnv *
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolsException_getErrno(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jint)errno);
 }
 
@@ -379,7 +397,8 @@ Java_com_sun_solaris_service_pools_PoolsException_getErrno(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1type_1list(
-    JNIEnv *jenv, jclass jcls, jlong jreslist, jlong jnumres) {
+    JNIEnv *jenv, jclass jcls, jlong jreslist, jlong jnumres)
+{
 	char **reslist = (char **)(uintptr_t)jreslist;
 	uint_t *numres = (uint_t *)(uintptr_t)jnumres;
 
@@ -392,7 +411,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1type_1list(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1status(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	int status;
 	int err;
 
@@ -409,7 +429,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1status(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1set_1status(JNIEnv *jenv,
-    jclass jcls, jint jstate) {
+    jclass jcls, jint jstate)
+{
 	return ((jint)pool_set_status((int)jstate));
 }
 
@@ -419,7 +440,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1set_1status(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1alloc(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jlong)(uintptr_t)pool_conf_alloc());
 }
 
@@ -429,7 +451,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1alloc(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT void JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1free(JNIEnv *jenv,
-    jclass jcls, jlong jconf) {
+    jclass jcls, jlong jconf)
+{
 	pool_conf_free((pool_conf_t *)(uintptr_t)jconf);
 }
 
@@ -439,7 +462,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1free(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1status(JNIEnv *jenv,
-    jclass jcls, jlong jconf) {
+    jclass jcls, jlong jconf)
+{
 	return ((jint)pool_conf_status((pool_conf_t *)(uintptr_t)jconf));
 }
 
@@ -449,7 +473,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1status(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1close(JNIEnv *jenv,
-    jclass jcls, jlong jconf) {
+    jclass jcls, jlong jconf)
+{
 	return ((jint)pool_conf_close((pool_conf_t *)(uintptr_t)jconf));
 }
 
@@ -459,7 +484,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1close(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1remove(JNIEnv *jenv,
-    jclass jcls, jlong jconf) {
+    jclass jcls, jlong jconf)
+{
 	return ((jint)pool_conf_remove((pool_conf_t *)(uintptr_t)jconf));
 }
 
@@ -469,7 +495,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1remove(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1open(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jstring jlocation, jint jflags) {
+    jclass jcls, jlong jconf, jstring jlocation, jint jflags)
+{
 	const char *location;
 	int result;
 
@@ -489,7 +516,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1open(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1rollback(
-    JNIEnv *jenv, jclass jcls, jlong jconf) {
+    JNIEnv *jenv, jclass jcls, jlong jconf)
+{
 	return ((jint)pool_conf_rollback((pool_conf_t *)(uintptr_t)jconf));
 }
 
@@ -499,7 +527,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1rollback(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1commit(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jint jactive) {
+    jclass jcls, jlong jconf, jint jactive)
+{
 	return ((jint)pool_conf_commit(
 	    (pool_conf_t *)(uintptr_t)jconf, (int)jactive));
 }
@@ -510,7 +539,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1commit(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1export(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jstring jlocation, jint jformat) {
+    jclass jcls, jlong jconf, jstring jlocation, jint jformat)
+{
 	const char *location;
 	int result;
 
@@ -530,9 +560,10 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1export(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1validate(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jint jlevel) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jint jlevel)
+{
 	return ((jint)pool_conf_validate((pool_conf_t *)(uintptr_t)jconf,
-		    (pool_valid_level_t)jlevel));
+	    (pool_valid_level_t)jlevel));
 }
 
 /*
@@ -541,7 +572,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1validate(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1update(JNIEnv *jenv,
-    jclass jcls, jlong jconf) {
+    jclass jcls, jlong jconf)
+{
 	int changed;
 	int result;
 
@@ -560,7 +592,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1update(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1pool(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jstring jname) {
+    jclass jcls, jlong jconf, jstring jname)
+{
 	const char *name;
 	pool_t *result;
 
@@ -579,7 +612,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1pool(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jobject JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1pools(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jobject jprops) {
+    jclass jcls, jlong jconf, jobject jprops)
+{
 	pool_value_t **props;
 	pool_t **result;
 	jclass Lclazz;
@@ -644,7 +678,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1pools(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1resource(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jstring jtype, jstring jname) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jstring jtype, jstring jname)
+{
 	const char *type;
 	const char *name;
 	pool_resource_t *result;
@@ -668,7 +703,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1resource(
 /*ARGSUSED*/
 JNIEXPORT jobject JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1resources(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jobject jprops) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jobject jprops)
+{
 	pool_value_t **props;
 	pool_resource_t **result;
 	jclass Lclazz;
@@ -732,7 +768,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1resources(
 /*ARGSUSED*/
 JNIEXPORT jobject JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1components(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jobject jprops) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jobject jprops)
+{
 	pool_value_t **props;
 	pool_component_t **result;
 	jclass Lclazz;
@@ -796,7 +833,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1components(
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1location(
-    JNIEnv *jenv, jclass jcls, jlong jconf) {
+    JNIEnv *jenv, jclass jcls, jlong jconf)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -813,7 +851,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1location(
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1info(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jint jflags) {
+    jclass jcls, jlong jconf, jint jflags)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -831,7 +870,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1info(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1create(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jstring jtype, jstring jname) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jstring jtype, jstring jname)
+{
 	const char *type;
 	const char *name;
 	pool_resource_t *result;
@@ -856,9 +896,10 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1create(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1destroy(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jresource) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jresource)
+{
 	return ((jint)pool_resource_destroy((pool_conf_t *)(uintptr_t)jconf,
-		    (pool_resource_t *)(uintptr_t)jresource));
+	    (pool_resource_t *)(uintptr_t)jresource));
 }
 
 /*
@@ -868,7 +909,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1destroy(
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1transfer(
     JNIEnv *jenv, jclass jcls, jlong jconf, jlong jsource, jlong jtarget,
-    jlong jsize) {
+    jlong jsize)
+{
 	return (pool_resource_transfer((pool_conf_t *)(uintptr_t)jconf,
 	    (pool_resource_t *)(uintptr_t)jsource,
 	    (pool_resource_t *)(uintptr_t)jtarget,
@@ -882,7 +924,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1transfer(
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1xtransfer(
     JNIEnv *jenv, jclass jcls, jlong jconf, jlong jsource, jlong jtarget,
-    jobject jcomponents) {
+    jobject jcomponents)
+{
 	pool_component_t **components;
 	int result;
 	jclass Lclazz;
@@ -910,7 +953,7 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1xtransfer(
 			    sizeof (pool_component_t *))) == NULL) {
 				throwException(jenv, "java/lang/Exception",
 				    "Could not allocate component array");
-				return (NULL);
+				return (0);
 			}
 			/*
 			 * Copy in the array
@@ -950,7 +993,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1xtransfer(
 JNIEXPORT jobject JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1resource_\
 1components(JNIEnv *jenv, jclass jcls, jlong jconf, jlong jresource,
-    jobject jprops) {
+    jobject jprops)
+{
 	pool_value_t **props;
 	pool_component_t **result;
 	jclass Lclazz;
@@ -1014,7 +1058,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1resource_\
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1info(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jresource, jint jflags) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jresource, jint jflags)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -1033,7 +1078,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1info(
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1create(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jstring jname) {
+    jclass jcls, jlong jconf, jstring jname)
+{
 	const char *name;
 	pool_t *result;
 
@@ -1052,7 +1098,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1create(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1destroy(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jlong jpool) {
+    jclass jcls, jlong jconf, jlong jpool)
+{
 	return ((jint)pool_destroy((pool_conf_t *)(uintptr_t)jconf,
 	    (pool_t *)(uintptr_t)jpool));
 }
@@ -1063,7 +1110,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1destroy(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1associate(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jlong jpool, jlong jresource) {
+    jclass jcls, jlong jconf, jlong jpool, jlong jresource)
+{
 	return ((jint)pool_associate((pool_conf_t *)(uintptr_t)jconf,
 	    (pool_t *)(uintptr_t)jpool,
 	    (pool_resource_t *)(uintptr_t)jresource));
@@ -1075,7 +1123,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1associate(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1dissociate(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jlong jpool, jlong jresource) {
+    jclass jcls, jlong jconf, jlong jpool, jlong jresource)
+{
 	return ((jint)pool_dissociate((pool_conf_t *)(uintptr_t)jconf,
 	    (pool_t *)(uintptr_t)jpool,
 	    (pool_resource_t *)(uintptr_t)jresource));
@@ -1087,7 +1136,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1dissociate(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1info(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jlong jpool, jint jflags) {
+    jclass jcls, jlong jconf, jlong jpool, jint jflags)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -1106,7 +1156,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1info(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jobject JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1pool_1resources(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jpool, jobject jprops) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jpool, jobject jprops)
+{
 	pool_value_t **props;
 	pool_resource_t **result;
 	jclass Lclazz;
@@ -1170,7 +1221,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1query_1pool_1resources(
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1owning_1resource(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jcomponent) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jcomponent)
+{
 	return ((jlong)(uintptr_t)pool_get_owning_resource(
 	    (pool_conf_t *)(uintptr_t)jconf,
 	    (pool_component_t *)(uintptr_t)jcomponent));
@@ -1182,7 +1234,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1owning_1resource(
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1component_1info(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jcomponent, jint jflags) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jcomponent, jint jflags)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -1202,7 +1255,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1component_1info(
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1property(
     JNIEnv *jenv, jclass jcls, jlong jconf, jlong jelem, jstring jname,
-    jlong jproperty) {
+    jlong jproperty)
+{
 	const char *name;
 	int result;
 
@@ -1224,7 +1278,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1property(
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1put_1property(
     JNIEnv *jenv, jclass jcls, jlong jconf, jlong jelem, jstring jname,
-    jlong jvalue) {
+    jlong jvalue)
+{
 	const char *name;
 	int result;
 
@@ -1244,7 +1299,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1put_1property(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1rm_1property(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jlong jelem, jstring jname) {
+    jclass jcls, jlong jconf, jlong jelem, jstring jname)
+{
 	const char *name;
 	int result;
 
@@ -1264,13 +1320,14 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1rm_1property(JNIEnv *jenv,
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1walk_1properties(
     JNIEnv *jenv, jclass jcls, jlong jconf, jlong jelem, jlong jarg,
-    jlong jcallback) {
+    jlong jcallback)
+{
 	int result;
 
 	result = (int)pool_walk_properties((pool_conf_t *)(uintptr_t)jconf,
 	    (pool_elem_t *)(uintptr_t)jelem, (void *)(uintptr_t)jarg,
 	    (int (*)(pool_conf_t *, pool_elem_t *, char const *,
-		pool_value_t *, void *))(uintptr_t)jcallback);
+	    pool_value_t *, void *))(uintptr_t)jcallback);
 
 	return ((jint)result);
 }
@@ -1281,7 +1338,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1walk_1properties(
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1to_1elem(
-    JNIEnv *jenv, jclass jcls, jlong jconf) {
+    JNIEnv *jenv, jclass jcls, jlong jconf)
+{
 	return ((jlong)(uintptr_t)pool_conf_to_elem(
 	    (pool_conf_t *)(uintptr_t)jconf));
 }
@@ -1292,7 +1350,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1conf_1to_1elem(
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1to_1elem(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jlong jpool) {
+    jclass jcls, jlong jconf, jlong jpool)
+{
 	return ((jlong)(uintptr_t)pool_to_elem((pool_conf_t *)(uintptr_t)jconf,
 	    (pool_t *)(uintptr_t)jpool));
 }
@@ -1303,7 +1362,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1to_1elem(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1to_1elem(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jresource) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jresource)
+{
 	return ((jlong)(uintptr_t)pool_resource_to_elem(
 	    (pool_conf_t *)(uintptr_t)jconf,
 	    (pool_resource_t *)(uintptr_t)jresource));
@@ -1315,7 +1375,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1resource_1to_1elem(
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1component_1to_1elem(
-    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jcomponent) {
+    JNIEnv *jenv, jclass jcls, jlong jconf, jlong jcomponent)
+{
 	return ((jlong)(uintptr_t)pool_component_to_elem(
 	    (pool_conf_t *)(uintptr_t)jconf,
 	    (pool_component_t *)(uintptr_t)jcomponent));
@@ -1327,7 +1388,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1component_1to_1elem(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1get_1type(
-    JNIEnv *jenv, jclass jcls, jlong jvalue) {
+    JNIEnv *jenv, jclass jcls, jlong jvalue)
+{
 	return ((jint)pool_value_get_type((pool_value_t *)(uintptr_t)jvalue));
 }
 
@@ -1337,7 +1399,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1get_1type(
 /*ARGSUSED*/
 JNIEXPORT void JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1uint64(
-    JNIEnv *jenv, jclass jcls, jlong jvalue, jlong jui64) {
+    JNIEnv *jenv, jclass jcls, jlong jvalue, jlong jui64)
+{
 	pool_value_set_uint64(
 	    (pool_value_t *)(uintptr_t)jvalue, (uint64_t)jui64);
 }
@@ -1348,7 +1411,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1uint64(
 /*ARGSUSED*/
 JNIEXPORT void JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1int64(
-    JNIEnv *jenv, jclass jcls, jlong jvalue, jlong ji64) {
+    JNIEnv *jenv, jclass jcls, jlong jvalue, jlong ji64)
+{
 	pool_value_set_int64((pool_value_t *)(uintptr_t)jvalue, (int64_t)ji64);
 }
 
@@ -1358,7 +1422,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1int64(
 /*ARGSUSED*/
 JNIEXPORT void JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1double(
-    JNIEnv *jenv, jclass jcls, jlong jvalue, jdouble jd) {
+    JNIEnv *jenv, jclass jcls, jlong jvalue, jdouble jd)
+{
 	pool_value_set_double((pool_value_t *)(uintptr_t)jvalue, (double)jd);
 }
 
@@ -1368,7 +1433,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1double(
 /*ARGSUSED*/
 JNIEXPORT void JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1bool(
-    JNIEnv *jenv, jclass jcls, jlong jvalue, jshort jb) {
+    JNIEnv *jenv, jclass jcls, jlong jvalue, jshort jb)
+{
 	pool_value_set_bool((pool_value_t *)(uintptr_t)jvalue, (uchar_t)jb);
 }
 
@@ -1378,7 +1444,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1bool(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1string(
-    JNIEnv * jenv, jclass jcls, jlong jvalue, jstring jstr) {
+    JNIEnv * jenv, jclass jcls, jlong jvalue, jstring jstr)
+{
 	const char *str;
 	int result;
 
@@ -1396,7 +1463,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1string(
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1get_1name(
-    JNIEnv *jenv, jclass jcls, jlong jvalue) {
+    JNIEnv *jenv, jclass jcls, jlong jvalue)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -1413,7 +1481,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1get_1name(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1name(
-    JNIEnv *jenv, jclass jcls, jlong jvalue, jstring jname) {
+    JNIEnv *jenv, jclass jcls, jlong jvalue, jstring jname)
+{
 	const char *name;
 	int result;
 
@@ -1431,7 +1500,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1set_1name(
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1alloc(JNIEnv *jenv,
-    jclass jcls) {
+    jclass jcls)
+{
 	return ((jlong)(uintptr_t)pool_value_alloc());
 }
 
@@ -1441,7 +1511,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1alloc(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT void JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1free(JNIEnv *jenv,
-    jclass jcls, jlong jvalue) {
+    jclass jcls, jlong jvalue)
+{
 	pool_value_free((pool_value_t *)(uintptr_t)jvalue);
 }
 
@@ -1451,7 +1522,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1value_1free(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1static_1location(
-    JNIEnv *jenv, jclass jcls) {
+    JNIEnv *jenv, jclass jcls)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -1468,7 +1540,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1static_1location(
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1dynamic_1location(JNIEnv *
-    jenv, jclass jcls) {
+    jenv, jclass jcls)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -1485,7 +1558,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1dynamic_1location(JNIEnv *
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1set_1binding(JNIEnv *jenv,
-    jclass jcls, jstring jpool, jint jidtype, jint jpid) {
+    jclass jcls, jstring jpool, jint jidtype, jint jpid)
+{
 	const char *pool;
 	int result;
 
@@ -1503,7 +1577,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1set_1binding(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1binding(JNIEnv *jenv,
-    jclass jcls, jint jpid) {
+    jclass jcls, jint jpid)
+{
 	jstring jresult = NULL;
 	const char *result;
 
@@ -1521,7 +1596,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1binding(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1resource_1binding(
-    JNIEnv *jenv, jclass jcls, jstring jtype, jint jpid) {
+    JNIEnv *jenv, jclass jcls, jstring jtype, jint jpid)
+{
 	jstring jresult = NULL;
 	const char *type;
 	const char *result;
@@ -1543,7 +1619,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1get_1resource_1binding(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1walk_1pools(JNIEnv *jenv,
-    jclass jcls, jlong jconf, jlong jarg, jlong jcallback) {
+    jclass jcls, jlong jconf, jlong jarg, jlong jcallback)
+{
 	int result;
 
 	result = pool_walk_pools((pool_conf_t *)(uintptr_t)jconf,
@@ -1559,7 +1636,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1walk_1pools(JNIEnv *jenv,
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1walk_1resources(
     JNIEnv *jenv, jclass jcls, jlong jconf, jlong jpool, jlong jarg,
-    jlong jcallback) {
+    jlong jcallback)
+{
 	int result;
 
 	result = pool_walk_resources((pool_conf_t *)(uintptr_t)jconf,
@@ -1576,7 +1654,8 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1walk_1resources(
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_PoolInternal_pool_1walk_1components(
     JNIEnv *jenv, jclass jcls, jlong jconf, jlong jresource, jlong jarg,
-    jlong jcallback) {
+    jlong jcallback)
+{
 	int result;
 
 	result = pool_walk_components((pool_conf_t *)(uintptr_t)jconf,
@@ -1589,7 +1668,7 @@ Java_com_sun_solaris_service_pools_PoolInternal_pool_1walk_1components(
 /*ARGSUSED*/
 JNIEXPORT jint JNICALL
 Java_com_sun_solaris_service_pools_Element_walkProps(JNIEnv *env,
-	jobject obj, jlong conf, jlong elem, jobject handler, jobject userobj)
+    jobject obj, jlong conf, jlong elem, jobject handler, jobject userobj)
 {
 	struct pool_callback pc;
 
@@ -1604,7 +1683,7 @@ Java_com_sun_solaris_service_pools_Element_walkProps(JNIEnv *env,
 /*ARGSUSED*/
 static int
 pool_property_walker(pool_conf_t *conf, pool_elem_t *pe, const char *name,
-	pool_value_t *pv, void *user)
+    pool_value_t *pv, void *user)
 {
 	jclass clazz, vclazz;
 	jmethodID mgetwalk, mvcon;
@@ -1667,13 +1746,13 @@ pool_property_walker(pool_conf_t *conf, pool_elem_t *pe, const char *name,
 	    "service/pools/Value;Ljava/lang/Object;)I")) == NULL)
 		return (PO_FAIL);
 	return ((*pc->pc_env)->CallIntMethod(pc->pc_env,
-		pc->pc_handler, mgetwalk, pc->pc_elem, valueObj, pc->pc_user));
+	    pc->pc_handler, mgetwalk, pc->pc_elem, valueObj, pc->pc_user));
 }
 
 /*ARGSUSED*/
 JNIEXPORT jlong JNICALL
 Java_com_sun_solaris_service_pools_Value_getLongValue(JNIEnv *jenv,
-	jclass class, jlong pointer)
+    jclass class, jlong pointer)
 {
 	int64_t arg2;
 	int result;
@@ -1700,7 +1779,7 @@ Java_com_sun_solaris_service_pools_Value_getLongValue(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jstring JNICALL
 Java_com_sun_solaris_service_pools_Value_getStringValue(JNIEnv *jenv,
-	jclass class, jlong pointer)
+    jclass class, jlong pointer)
 {
 	const char *arg2;
 	int result;
@@ -1715,7 +1794,7 @@ Java_com_sun_solaris_service_pools_Value_getStringValue(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jboolean JNICALL
 Java_com_sun_solaris_service_pools_Value_getBoolValue(JNIEnv *jenv,
-	jclass class, jlong pointer)
+    jclass class, jlong pointer)
 {
 	uchar_t arg2;
 	int result;
@@ -1734,7 +1813,7 @@ Java_com_sun_solaris_service_pools_Value_getBoolValue(JNIEnv *jenv,
 /*ARGSUSED*/
 JNIEXPORT jdouble JNICALL
 Java_com_sun_solaris_service_pools_Value_getDoubleValue(JNIEnv *jenv,
-	jclass class, jlong pointer)
+    jclass class, jlong pointer)
 {
 	double arg2;
 	int result;
