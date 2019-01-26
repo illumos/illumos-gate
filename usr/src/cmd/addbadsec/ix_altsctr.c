@@ -274,7 +274,7 @@ init_altsctr(void)
 	ap->ap_tblp->alts_map_base =
 		altsmap_alloc(ap->ap_tbl_secsiz / NBPSCTR,
 			ap->part.p_size, ap->ap_map_sectot, ALTS_MAP_UP);
-	if (ap->ap_tblp->alts_map_base == NULL) {
+	if (ap->ap_tblp->alts_map_base == 0) {
 	    perror("Unable to allocate alternate map on disk: ");
 	    exit(57);
 	}
@@ -482,7 +482,7 @@ gen_alts_ent(void)
 		altsmap_alloc(ap->ap_tblp->alts_map_base + ap->ap_map_sectot,
 			ap->part.p_size,
 			ap->ap_ent_secsiz / NBPSCTR, ALTS_MAP_UP);
-	if (ap->ap_tblp->alts_ent_base == NULL) {
+	if (ap->ap_tblp->alts_ent_base == 0) {
 	    perror("Unable to allocate alternate entry table on disk: ");
 	    exit(65);
 	}
@@ -512,7 +512,7 @@ assign_altsctr(void)
 	    alts_ind =
 		altsmap_alloc(ap->part.p_size-1, ap->ap_tblp->alts_map_base +
 			ap->ap_map_sectot - 1, cluster, ALTS_MAP_DOWN);
-	    if (alts_ind == NULL) {
+	    if (alts_ind == 0) {
 	    	(void) fprintf(stderr,
 		    "Unable to allocate alternates for bad starting"
 		    " sector %u.\n", (ap->ap_entp)[i].bad_start);
