@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <dtrace.h>
 #include <limits.h>
@@ -907,7 +905,7 @@ main(int argc, char **argv)
 
 	if (opt_H) {
 		dprog_add(g_hold_init);
-		if (g_opt_s == NULL)
+		if (g_opt_s == 0)
 			dprog_add(g_hold_times);
 		else
 			dprog_add(g_hold_histogram);
@@ -915,7 +913,7 @@ main(int argc, char **argv)
 
 	if (opt_C) {
 		dprog_add(g_ctnd_init);
-		if (g_opt_s == NULL)
+		if (g_opt_s == 0)
 			dprog_add(g_ctnd_times);
 		else
 			dprog_add(g_ctnd_histogram);
