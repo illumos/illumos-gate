@@ -111,8 +111,8 @@ audit_init(door_data_t *door_dp)
 	door_dp->audit_event = 0;
 	door_dp->audit_sorf = -2;
 	door_dp->audit_user = NULL;
-	door_dp->audit_text[0] = NULL;
-	door_dp->audit_text1[0] = NULL;
+	door_dp->audit_text[0] = '\0';
+	door_dp->audit_text1[0] = '\0';
 	door_dp->audit_na = 0;
 	door_dp->audit_asid = (au_asid_t)(-1);
 	door_dp->audit_path = NULL;
