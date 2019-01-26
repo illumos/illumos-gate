@@ -290,7 +290,7 @@ main(int argc, char **argv)
 			 * init() was invoked from a console that was not
 			 * the default console, nor was it an auxiliary.
 			 */
-			if (cttyname[0] == NULL)
+			if (cttyname[0] == '\0')
 				termhandler(0);
 				/* Never returns */
 
