@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -115,7 +113,7 @@ uberdata_addr(struct ps_prochandle *Pr, char dmodel)
 	GElf_Sym sym;
 
 	if (Plookup_by_name(Pr, "libc.so", "_tdb_bootstrap", &sym) < 0)
-		return (NULL);
+		return ((uintptr_t)NULL);
 #ifdef _LP64
 	if (dmodel != PR_MODEL_NATIVE) {
 		caddr32_t uaddr;
@@ -143,7 +141,7 @@ uberdata_addr(struct ps_prochandle *Pr, char dmodel)
 			return (uaddr);
 	}
 	if (Plookup_by_name(Pr, "libc.so", "_uberdata", &sym) < 0)
-		return (0);
+		return ((uintptr_t)NULL);
 	return (sym.st_value);
 }
 
@@ -214,7 +212,7 @@ look(char *arg)
 	if (action == NULL) {
 		(void) fprintf(stderr,
 		"%s: cannot malloc() space for %d sigaction structures\n",
-			command, maxsig);
+		    command, maxsig);
 		goto look_error;
 	}
 	if (read(fd, (char *)action, maxsig * sizeof (struct sigaction)) !=
@@ -239,7 +237,7 @@ look(char *arg)
 		if (psinfo.pr_dmodel != PR_MODEL_NATIVE) {
 			caddr32_t addr;
 			aharraddr = uberaddr +
-				offsetof(uberdata32_t, siguaction);
+			    offsetof(uberdata32_t, siguaction);
 			aharrlen = sizeof (siguaction32_t) * NSIG;
 			(void) Pread(Pr, &addr, sizeof (addr),
 			    uberaddr + offsetof(uberdata32_t, sigacthandler));
@@ -248,7 +246,7 @@ look(char *arg)
 #endif
 		{
 			aharraddr = uberaddr +
-				offsetof(uberdata_t, siguaction);
+			    offsetof(uberdata_t, siguaction);
 			aharrlen = sizeof (siguaction_t) * NSIG;
 			(void) Pread(Pr, &intfnaddr, sizeof (intfnaddr),
 			    uberaddr + offsetof(uberdata_t, sigacthandler));
@@ -323,7 +321,7 @@ look(char *arg)
 					(void) printf("\t%-8s", hname);
 				else
 					(void) printf("\t0x%-8lx",
-						(ulong_t)haddr);
+					    (ulong_t)haddr);
 
 				s = sigflags(sig, sp->sa_flags);
 				(void) printf("%s", (*s != '\0')? s : "\t0");
@@ -334,7 +332,7 @@ look(char *arg)
 			}
 		} else if (sig == SIGCLD) {
 			s = sigflags(sig,
-				sp->sa_flags & (SA_NOCLDWAIT|SA_NOCLDSTOP));
+			    sp->sa_flags & (SA_NOCLDWAIT | SA_NOCLDSTOP));
 			if (*s != '\0')
 				(void) printf("\t\t%s", s);
 		}
@@ -371,10 +369,10 @@ sigflags(int sig, int flags)
 	static char code_buf[100];
 	char *str = code_buf;
 	int flagmask =
-		(SA_ONSTACK|SA_RESETHAND|SA_RESTART|SA_SIGINFO|SA_NODEFER);
+	    (SA_ONSTACK | SA_RESETHAND | SA_RESTART | SA_SIGINFO | SA_NODEFER);
 
 	if (sig == SIGCLD)
-		flagmask |= (SA_NOCLDSTOP|SA_NOCLDWAIT);
+		flagmask |= (SA_NOCLDSTOP | SA_NOCLDWAIT);
 
 	*str = '\0';
 	if (flags & ~flagmask)
@@ -414,19 +412,19 @@ deinterpose(int sig, void *aharr, psinfo_t *psinfo, struct sigaction *sp)
 #ifdef _LP64
 	if (psinfo->pr_dmodel != PR_MODEL_NATIVE) {
 		struct sigaction32 *sa32 = (struct sigaction32 *)
-			((uintptr_t)aharr + sig * sizeof (siguaction32_t) +
-			offsetof(siguaction32_t, sig_uaction));
+		    ((uintptr_t)aharr + sig * sizeof (siguaction32_t) +
+		    offsetof(siguaction32_t, sig_uaction));
 
 		sp->sa_flags = sa32->sa_flags;
 		sp->sa_handler = (void (*)())(uintptr_t)sa32->sa_handler;
 		(void) memcpy(&sp->sa_mask, &sa32->sa_mask,
-			sizeof (sp->sa_mask));
+		    sizeof (sp->sa_mask));
 	} else
 #endif
 	{
 		struct sigaction *sa = (struct sigaction *)
-			((uintptr_t)aharr + sig * sizeof (siguaction_t) +
-			offsetof(siguaction_t, sig_uaction));
+		    ((uintptr_t)aharr + sig * sizeof (siguaction_t) +
+		    offsetof(siguaction_t, sig_uaction));
 
 		sp->sa_flags = sa->sa_flags;
 		sp->sa_handler = sa->sa_handler;
