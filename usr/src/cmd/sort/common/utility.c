@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "utility.h"
 
 #include "initialize.h"
@@ -556,7 +554,7 @@ wxwrite(int fd, wchar_t *ptr)
 	size_t req_bufsize;
 
 	if (ptr == NULL)
-		return (cxwrite(NULL, 0, 1));
+		return (cxwrite(fd, NULL, 0));
 
 	if (convert_buffer == NULL)
 		convert_buffer = safe_realloc(NULL, convert_bufsize);
