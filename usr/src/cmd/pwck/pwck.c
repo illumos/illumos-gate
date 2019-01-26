@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #include <sys/types.h>
@@ -125,7 +125,7 @@ main(int argc, char **argv)
 
 		/* Check number of fields */
 
-		for (i = 0; buf[i] != NULL; i++)
+		for (i = 0; buf[i] != '\0'; i++)
 			if (buf[i] == ':') {
 				delim[colons] = i;
 				++colons;
@@ -136,7 +136,7 @@ main(int argc, char **argv)
 			continue;
 		}
 		delim[6] = i - 1;
-		delim[7] = NULL;
+		delim[7] = '\0';
 
 		/*
 		 * Check the first char is alpha; the rest alphanumeric;
@@ -191,7 +191,7 @@ main(int argc, char **argv)
 			logbuf[j] = buf[i];
 		logbuf[j] = '\0';
 
-		if (logbuf[0] == NULL)
+		if (logbuf[0] == '\0')
 			error(ERROR6a);
 		else if ((stat(logbuf, &obuf)) == -1)
 			error(ERROR6);
@@ -211,7 +211,7 @@ main(int argc, char **argv)
 				error(ERROR7);
 
 			for (j = 0; j < 512; j++)
-				logbuf[j] = NULL;
+				logbuf[j] = '\0';
 		}
 	}
 	(void) fclose(fptr);
