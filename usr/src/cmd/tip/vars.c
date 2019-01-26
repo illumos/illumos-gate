@@ -9,8 +9,6 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "tip.h"
 
 /*
@@ -85,5 +83,5 @@ value_t vtable[] = {
 	    "par",	(char *)&PA },
 	{ "hardwareflow", BOOL,			(READ|WRITE)<<PUBLIC,
 	    "hf",	(char *)FALSE },
-	{ NOSTR, NULL, NULL, NOSTR, NOSTR }
+	{ NOSTR, 0, 0, NOSTR, NOSTR }
 };
