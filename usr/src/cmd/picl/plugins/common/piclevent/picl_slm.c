@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -255,7 +253,7 @@ piclslm_add_ec_dr_req_args(nvlist_t *nvl, sysevent_t *ev)
 	}
 
 	if (nvlist_lookup_string(nvlist, DR_AP_ID, &ap_id) != 0 ||
-		ap_id == NULL) {
+	    ap_id == NULL) {
 		nvlist_free(nvlist);
 		return (EINVAL);
 	}
@@ -269,15 +267,14 @@ piclslm_add_ec_dr_req_args(nvlist_t *nvl, sysevent_t *ev)
 	if (nvlist_lookup_string(nvlist, DR_REQ_TYPE, &dr_req) != 0)
 		dr_req = "";
 
-	if (nvlist_add_string(nvl, PICLEVENTARG_DR_REQ_TYPE,
-		dr_req)) {
+	if (nvlist_add_string(nvl, PICLEVENTARG_DR_REQ_TYPE, dr_req)) {
 		nvlist_free(nvlist);
 		return (EAGAIN);
 	}
 
 	if (piclslm_debug)
 		syslog(LOG_DEBUG, "piclevent: dr_req_type = %s on %s\n",
-			(dr_req ? dr_req : "Investigate"), ap_id);
+		    (dr_req ? dr_req : "Investigate"), ap_id);
 
 	nvlist_free(nvlist);
 	return (0);
@@ -344,7 +341,7 @@ piclslm_deliver_event(sysevent_t *ev, int flag)
 		return (EAGAIN);
 	}
 
-	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, NULL)) {
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, 0)) {
 		free(ename);
 		sysevent_free(dupev);
 		return (EAGAIN);
@@ -371,7 +368,7 @@ piclslm_deliver_event(sysevent_t *ev, int flag)
 	if (nvlist_add_string(nvl, PICLEVENTARG_EVENT_NAME, ename) ||
 	    nvlist_add_string(nvl, PICLEVENTARG_DATA_TYPE,
 	    PICLEVENTARG_PICLEVENT_DATA) ||
-	    nvlist_pack(nvl, &pack_buf, &nvl_size, NV_ENCODE_NATIVE, NULL)) {
+	    nvlist_pack(nvl, &pack_buf, &nvl_size, NV_ENCODE_NATIVE, 0)) {
 		free(ename);
 		nvlist_free(nvl);
 		sysevent_free(dupev);
@@ -402,7 +399,7 @@ slm_init(void)
 	(void) mutex_init(&nvq_lock, USYNC_THREAD, NULL);
 	(void) cond_init(&nvq_cv, USYNC_THREAD, NULL);
 
-	if (thr_create(NULL, NULL, piclslm_deliver_thr,
+	if (thr_create(NULL, 0, piclslm_deliver_thr,
 	    NULL, THR_BOUND, &piclslm_deliver_thr_id) != 0) {
 		(void) mutex_destroy(&nvq_lock);
 		(void) cond_destroy(&nvq_cv);
