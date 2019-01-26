@@ -291,7 +291,7 @@ lookup_ks_name(char *ks_name, int want_devid)
 		goto fail;
 
 	part = strchr(ks_name, ',');		/* start of ",<partition>" */
-	p = strchr(ks_name, ':'); 		/* start of ":<partition>" */
+	p = strchr(ks_name, ':');		/* start of ":<partition>" */
 	if (part != NULL && p != NULL)
 		goto fail;			/* can't have both */
 	if (p != NULL)
@@ -508,7 +508,7 @@ again:
 	if (*cp == ',') {
 		cp++;
 		while (*cp != ':') {
-			if (*cp == NULL)
+			if (*cp == '\0')
 				return (NULL);
 			cp++;
 		}
@@ -520,7 +520,7 @@ again:
 	 */
 	while (*cp) {
 		if (isspace(*cp) || *cp == ',') {
-			*cp = NULL;
+			*cp = '\0';
 			return (path);
 		}
 		cp++;

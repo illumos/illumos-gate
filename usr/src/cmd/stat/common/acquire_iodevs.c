@@ -355,7 +355,7 @@ iodev_match(struct iodev_snapshot *dev, struct iodev_filter *df)
 		return (1);		/* pass */
 
 	/* no filtered names, pass if not floppy and skipped */
-	if (df->if_nr_names == NULL)
+	if (df->if_nr_names == 0)
 		return (!(df->if_skip_floppy && is_floppy));
 
 	isn = dev->is_name;
@@ -451,7 +451,7 @@ choose_iodevs(struct snapshot *ss, struct iodev_snapshot *iodevs,
 	 * don't want to fill the  remaining slots - it is just confusing
 	 * if we don that, it makes it look like the filter code is broken.
 	 */
-	if ((df->if_nr_names == NULL) || (nr_iodevs != nr_iodevs_orig)) {
+	if ((df->if_nr_names == 0) || (nr_iodevs != nr_iodevs_orig)) {
 		/* now insert any iodevs into the remaining slots */
 		pos = iodevs;
 		while (pos && nr_iodevs) {
@@ -627,7 +627,7 @@ get_ids(struct iodev_snapshot *iodev, const char *pretty)
 
 static void
 get_pretty_name(enum snapshot_types types, struct iodev_snapshot *iodev,
-	kstat_ctl_t *kc)
+    kstat_ctl_t *kc)
 {
 	disk_list_t	*dl;
 	char		*pretty = NULL;
@@ -683,8 +683,7 @@ get_iodev_type(kstat_t *ksp)
 
 /* get the lun/target/initiator from the name, return 1 on success */
 static int
-get_lti(char *s,
-	char *lname, int *l, char *tname, int *t, char *iname, int *i)
+get_lti(char *s, char *lname, int *l, char *tname, int *t, char *iname, int *i)
 {
 	int  num = 0;
 
