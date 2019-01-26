@@ -268,6 +268,6 @@ void
 pt_sugg_as_root(void)
 {
 	pt_sugg_add("Suggestion: run as root to get suggestions"
-	    " for reducing system power consumption",  40, NULL, NULL,
+	    " for reducing system power consumption",  40, 0, NULL,
 	    NULL);
 }

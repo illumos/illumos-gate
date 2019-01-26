@@ -49,15 +49,15 @@ static event_info_t *event;
 static int
 pt_events_walk(const dtrace_aggdata_t *data, void *arg)
 {
-	dtrace_aggdesc_t 	*aggdesc = data->dtada_desc;
-	dtrace_recdesc_t 	*rec1, *rec2, *rec3;
-	dtrace_syminfo_t 	dts;
-	GElf_Sym 		sym;
+	dtrace_aggdesc_t	*aggdesc = data->dtada_desc;
+	dtrace_recdesc_t	*rec1, *rec2, *rec3;
+	dtrace_syminfo_t	dts;
+	GElf_Sym		sym;
 	uint64_t		offender_addr;
-	uint64_t 		n = 0;
-	int32_t 		*instance, *offender_cpu;
-	int 			i;
-	char 			*offense_name;
+	uint64_t		n = 0;
+	int32_t			*instance, *offender_cpu;
+	int			i;
+	char			*offense_name;
 
 	if (g_top_events >= EVENT_NUM_MAX)
 		return (0);
@@ -107,7 +107,7 @@ pt_events_walk(const dtrace_aggdata_t *data, void *arg)
 		 * We have the address of the kernel callout.
 		 * Try to resolve it into a meaningful symbol
 		 */
-		if (offender_addr != NULL && dtrace_lookup_by_addr(dtp,
+		if (offender_addr != 0 && dtrace_lookup_by_addr(dtp,
 		    offender_addr, &sym, &dts) == 0) {
 			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "%s`%s", dts.dts_object,
@@ -151,7 +151,7 @@ pt_events_walk(const dtrace_aggdata_t *data, void *arg)
 		/*
 		 * Try to resolve the address of the cross call function.
 		 */
-		if (offender_addr != NULL && dtrace_lookup_by_addr(dtp,
+		if (offender_addr != 0 && dtrace_lookup_by_addr(dtp,
 		    offender_addr, &sym, &dts) == 0) {
 			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "<xcalls> %s`%s",
@@ -190,7 +190,7 @@ pt_events_walk(const dtrace_aggdata_t *data, void *arg)
 		/*
 		 * Try to resolve the address of the cross call function.
 		 */
-		if (offender_addr != NULL && dtrace_lookup_by_addr(dtp,
+		if (offender_addr != 0 && dtrace_lookup_by_addr(dtp,
 		    offender_addr, &sym, &dts) == 0) {
 			(void) snprintf((char *)(event->offense_name),
 			    EVENT_NAME_MAX, "<xcalls> %s`%s (CPU %d)",
@@ -226,10 +226,10 @@ pt_events_walk(const dtrace_aggdata_t *data, void *arg)
 int
 pt_events_stat_prepare(void)
 {
-	dtrace_prog_t 		*prog;
-	dtrace_proginfo_t 	info;
-	dtrace_optval_t 	statustime;
-	int 			err;
+	dtrace_prog_t		*prog;
+	dtrace_proginfo_t	info;
+	dtrace_optval_t		statustime;
+	int			err;
 	char			*prog_ptr;
 
 	event = g_event_info;
