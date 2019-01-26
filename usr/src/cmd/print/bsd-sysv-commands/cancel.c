@@ -200,7 +200,7 @@ main(int ac, char *av[])
 				/* Remove first job from printer */
 
 				status = papiPrinterListJobs(svc, printer,
-				    NULL, NULL, 0, &jobs);
+				    NULL, 0, 0, &jobs);
 
 				if (status != PAPI_OK) {
 					fprintf(stderr, gettext(

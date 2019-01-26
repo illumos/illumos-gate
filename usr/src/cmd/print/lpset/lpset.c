@@ -273,18 +273,18 @@ main(int ac, char *av[])
 
 			key = *(changes++);
 
-			for (p = key; ((p != NULL) && (*p != NULL)); p++)
+			for (p = key; ((p != NULL) && (*p != '\0')); p++)
 				if (*p == '=') {
-					*p = NULL;
+					*p = '\0';
 					value = ++p;
 					break;
 				} else if (*p == '\\')
 					p++;
 
-			if ((value != NULL) && (*value == NULL))
+			if ((value != NULL) && (*value == '\0'))
 				value = NULL;
 
-			if ((key != NULL) && (key[0] != NULL)) {
+			if ((key != NULL) && (key[0] != '\0')) {
 				if ((value == NULL) &&
 				    (ns_get_value(key, printer_obj) == NULL) &&
 				    (has_equals == 0)) {
