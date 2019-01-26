@@ -316,7 +316,7 @@ orig_path_ptr(char *path)
 		 */
 		else if (strncmp(path, install_root, install_root_len) == 0) {
 			retv = path + install_root_len;
-			if (*retv == NULL)
+			if (*retv == '\0')
 				retv = "/";
 
 			/*

@@ -600,7 +600,7 @@ doinclude(void)
 	translate(file, temp);
 	canonize(temp);
 
-	if (*temp == NULL)
+	if (*temp == '\0')
 		return;
 	else if (*temp != '/')
 		(void) snprintf(file, sizeof (file), "%s/%s", dname[nfp], temp);

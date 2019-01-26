@@ -223,7 +223,7 @@ get_server_host(uint32_t n)
 	if (n < fs_tab_used) {
 		(void) strcpy(hostname, fs_tab[n]->remote_name);
 		if ((host_end = strchr(hostname, ':')) == NULL) {
-			if ((strcmp(fs_tab[n]->fstype, MNTTYPE_AUTOFS)) == NULL)
+			if ((strcmp(fs_tab[n]->fstype, MNTTYPE_AUTOFS)) == 0)
 				return ("automounter");
 			else
 				return (fs_tab[n]->fstype);
@@ -1121,7 +1121,7 @@ fsys(char *path)
 		 * do the string compare. -- JST
 		 */
 		if ((fs_namelen == 1 && *(fs_tab[i]->name) == '/') ||
-		    ((term_char == '/' || term_char == NULL) &&
+		    ((term_char == '/' || term_char == '\0') &&
 		    strncmp(fs_tab[i]->name, path2use, fs_namelen) == 0)) {
 			return (i);
 		}

@@ -326,7 +326,7 @@ selpkg(char *p)
 			}
 		} else {
 			for (i = 0; i < pkgcnt; ++i) {
-				if (selected[i] == NULL) {
+				if (selected[i] == '\0') {
 					root = get_inst_root();
 					if (root)
 						(void) snprintf(buf,

@@ -427,7 +427,7 @@ main(int argc, char *argv[])
 
 	/* add command line variables */
 	while (*cmdparam && (value = strchr(*cmdparam, '=')) != NULL) {
-		*value = NULL;	/* terminate the parameter */
+		*value = '\0';	/* terminate the parameter */
 		value++;	/* value is now the value (not '=') */
 		putparam(*cmdparam++, value);  /* store it in environ */
 	}

@@ -227,7 +227,7 @@ seed_pkgobjmap(struct cfextra *ext_entry, char *path, char *local)
 
 	if (ext_ptr == NULL || *ext_ptr == NULL) {
 		progerr(gettext(ERR_MEMORY));
-		return (NULL);
+		return (0);
 	}
 
 	ext = *ext_ptr;

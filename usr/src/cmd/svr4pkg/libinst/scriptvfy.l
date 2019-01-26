@@ -626,7 +626,7 @@ scripteval(char *script_name, char *script_path, int mask, int silent)
 	int error = 0;
 	line_no = 1;
 
-	if ((script_path == NULL) || (*script_path == NULL) ||
+	if ((script_path == NULL) || (*script_path == '\0') ||
 	    (script_name == NULL)) {
 		logerr(gettext(ERR_ARGS));
 		return (0);
