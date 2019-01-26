@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rcm_impl.h"
 #include "rcm_module.h"
 
@@ -235,7 +233,7 @@ module_load(char *modname)
 
 		if (module->dlhandle == NULL) {
 			rcm_log_message(RCM_NOTICE,
-				gettext("cannot open module %s\n"), modname);
+			    gettext("cannot open module %s\n"), modname);
 			goto fail;
 		}
 
@@ -243,9 +241,9 @@ module_load(char *modname)
 		 * dlsym rcm_mod_init/fini/info() entry points
 		 */
 		module->init = (struct rcm_mod_ops *(*)())dlsym(
-					module->dlhandle, "rcm_mod_init");
+		    module->dlhandle, "rcm_mod_init");
 		module->fini = (int (*)())dlsym(
-					module->dlhandle, "rcm_mod_fini");
+		    module->dlhandle, "rcm_mod_fini");
 		module->info = (const char *(*)())dlsym(module->dlhandle,
 		    "rcm_mod_info");
 		if (module->init == NULL || module->fini == NULL ||
@@ -266,7 +264,7 @@ module_load(char *modname)
 	if ((module->modops = module_init(module)) == NULL) {
 		if (module->dlhandle)
 			rcm_log_message(RCM_ERROR,
-				gettext("cannot init module %s\n"), modname);
+			    gettext("cannot init module %s\n"), modname);
 		goto fail;
 	}
 
@@ -1566,7 +1564,7 @@ rcmd_db_init()
 			module_t *module;
 
 			if (strcmp(entp->d_name, ".") == 0 ||
-				strcmp(entp->d_name, "..") == 0)
+			    strcmp(entp->d_name, "..") == 0)
 				continue;
 
 			if (rcm_script == 0) {
@@ -1750,7 +1748,7 @@ rcmd_db_clean()
 	rcm_log_message(RCM_DEBUG,
 	    "rcm_db_clean(): launch thread to clean database\n");
 
-	if (thr_create(NULL, NULL, (void *(*)(void *))db_clean,
+	if (thr_create(NULL, 0, (void *(*)(void *))db_clean,
 	    NULL, THR_DETACHED, NULL) != 0) {
 		rcm_log_message(RCM_WARNING,
 		    gettext("failed to create cleanup thread %s\n"),
