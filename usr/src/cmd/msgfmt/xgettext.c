@@ -24,7 +24,6 @@
  * All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<ctype.h>
 #include	<stdio.h>
@@ -58,13 +57,13 @@ struct strlist_st {
 
 /*
  * istextdomain	: Boolean telling if this node contains textdomain call.
- * isduplicate 	: Boolean telling if this node duplicate of any other msgid.
+ * isduplicate	: Boolean telling if this node duplicate of any other msgid.
  * msgid	: contains msgid or textdomain if istextdomain is true.
  * msgstr	: contains msgstr.
  * comment	: comment extracted in case of -c option.
  * fname	: tells which file contains msgid.
  * linenum	: line number in the file.
- * next   	: Next node.
+ * next		: Next node.
  */
 struct element_st {
 	char			istextdomain;
@@ -409,30 +408,28 @@ static void
 print_help(void)
 {
 	(void) fprintf(stderr, "\n");
+	(void) fprintf(stderr, "-a\t\t\tfind ALL strings\n");
 	(void) fprintf(stderr,
-		"-a\t\t\tfind ALL strings\n");
+	    "-c <comment-tag>\tget comments containing <flag>\n");
 	(void) fprintf(stderr,
-		"-c <comment-tag>\tget comments containing <flag>\n");
+	    "-d <default-domain>\tuse <default-domain> for default domain\n");
+	(void) fprintf(stderr, "-h\t\t\tHelp\n");
 	(void) fprintf(stderr,
-	"-d <default-domain>\tuse <default-domain> for default domain\n");
+	    "-j\t\t\tupdate existing file with the current result\n");
 	(void) fprintf(stderr,
-		"-h\t\t\tHelp\n");
+	    "-M <suffix>\t\tfill in msgstr with msgid<suffix>\n");
 	(void) fprintf(stderr,
-		"-j\t\t\tupdate existing file with the current result\n");
+	    "-m <prefix>\t\tfill in msgstr with <prefix>msgid\n");
 	(void) fprintf(stderr,
-		"-M <suffix>\t\tfill in msgstr with msgid<suffix>\n");
+	    "-n\t\t\tline# file name and line number info in output\n");
 	(void) fprintf(stderr,
-		"-m <prefix>\t\tfill in msgstr with <prefix>msgid\n");
+	    "-p <pathname>\t\tuse <pathname> for output file directory\n");
 	(void) fprintf(stderr,
-		"-n\t\t\tline# file name and line number info in output\n");
+	    "-s\t\t\tgenerate sorted output files\n");
+	(void) fprintf(stderr, "-x <exclude-file>\texclude strings in file "
+	    "<exclude-file> from output\n");
 	(void) fprintf(stderr,
-		"-p <pathname>\t\tuse <pathname> for output file directory\n");
-	(void) fprintf(stderr,
-		"-s\t\t\tgenerate sorted output files\n");
-	(void) fprintf(stderr,
-"-x <exclude-file>\texclude strings in file <exclude-file> from output\n");
-	(void) fprintf(stderr,
-		"-\t\t\tread stdin, use as a filter (input only)\n");
+	    "-\t\t\tread stdin, use as a filter (input only)\n");
 } /* print_help */
 
 /*
@@ -521,7 +518,7 @@ handle_cplus_comment_line(void)
 	if (in_quote == TRUE) {
 		lstrcat(qstring_buf, yytext);
 	} else if ((in_comment == FALSE) &&
-		    (in_skippable_string == FALSE)) {
+	    (in_skippable_string == FALSE)) {
 
 		/*
 		 * If already in c comments, don't do anything.
@@ -546,7 +543,7 @@ handle_open_comment(void)
 	if (in_quote == TRUE) {
 		lstrcat(qstring_buf, yytext);
 	} else if ((in_comment == FALSE) &&
-		    (in_skippable_string == FALSE)) {
+	    (in_skippable_string == FALSE)) {
 
 		in_comment = TRUE;
 		is_last_comment_line = FALSE;
@@ -604,7 +601,7 @@ handle_gettext(void)
 		 * gettext will be put into default domain .po file
 		 * curr_domain does not change for gettext.
 		 */
-		curr_domain[0] = NULL;
+		curr_domain[0] = '\0';
 	}
 } /* handle_gettext */
 
@@ -636,7 +633,7 @@ handle_dgettext(void)
 		 * dgettext will be put into domain file specified.
 		 * curr_domain will follow.
 		 */
-		curr_domain[0] = NULL;
+		curr_domain[0] = '\0';
 	}
 } /* handle_dgettext */
 
@@ -669,7 +666,7 @@ handle_dcgettext(void)
 		 * dcgettext will be put into domain file specified.
 		 * curr_domain will follow.
 		 */
-		curr_domain[0] = NULL;
+		curr_domain[0] = '\0';
 	}
 } /* handle_dcgettext */
 
@@ -687,7 +684,7 @@ handle_textdomain(void)
 	} else if (in_comment == FALSE) {
 		in_textdomain = TRUE;
 		linenum_saved = curr_linenum;
-		curr_domain[0] = NULL;
+		curr_domain[0] = '\0';
 	}
 } /* handle_textdomain */
 
@@ -774,7 +771,7 @@ handle_esc_newline(void)
 		}
 	}
 
-	curr_line[0] = NULL;
+	curr_line[0] = '\0';
 } /* handle_esc_newline */
 
 /*
@@ -789,9 +786,9 @@ handle_quote(void)
 	if (in_comment == TRUE) {
 		/*EMPTY*/
 	} else if ((in_gettext == TRUE) ||
-			(in_dgettext == TRUE) ||
-			(in_dcgettext == TRUE) ||
-			(in_textdomain == TRUE)) {
+	    (in_dgettext == TRUE) ||
+	    (in_dcgettext == TRUE) ||
+	    (in_textdomain == TRUE)) {
 		if (in_str == TRUE) {
 			if (in_quote == FALSE) {
 				in_quote = TRUE;
@@ -821,7 +818,7 @@ handle_quote(void)
 		}
 	} else {
 		in_skippable_string = (in_skippable_string == TRUE) ?
-					FALSE : TRUE;
+		    FALSE : TRUE;
 	}
 } /* handle_quote */
 
@@ -847,7 +844,7 @@ copy_strlist_to_str(char *str, struct strlist_st *strlist)
 {
 	struct strlist_st	*p;
 
-	str[0] = NULL;
+	str[0] = '\0';
 
 	if (strlist != NULL) {
 		p = strlist;
@@ -883,7 +880,7 @@ handle_comma(void)
 				 */
 				if (is_first_comma_found == FALSE) {
 					copy_strlist_to_str(curr_domain,
-								strhead);
+					    strhead);
 					free_strlist(strhead);
 					strhead = strtail = NULL;
 					is_first_comma_found = TRUE;
@@ -936,7 +933,7 @@ handle_newline(void)
 		}
 	}
 
-	curr_line[0] = NULL;
+	curr_line[0] = '\0';
 	/*
 	 * C++ comment always ends with new line.
 	 */
@@ -966,9 +963,9 @@ static void
 initialize_globals(void)
 {
 	default_domain = strdup(DEFAULT_DOMAIN);
-	curr_domain[0] = NULL;
-	curr_file[0] = NULL;
-	qstring_buf[0] = NULL;
+	curr_domain[0] = '\0';
+	curr_file[0] = '\0';
+	qstring_buf[0] = '\0';
 } /* initialize_globals() */
 
 /*
@@ -1041,7 +1038,7 @@ trim_line(char *line)
 	for (i = 0; i <= (last-first); i++) {
 		line[i] = line[p++];
 	}
-	line [i] = NULL;
+	line [i] = '\0';
 } /* trim_line */
 
 /*
@@ -1058,7 +1055,7 @@ read_exclude_file(void)
 
 	if ((fp = fopen(exclude_file, "r")) == NULL) {
 		(void) fprintf(stderr, "ERROR, can't open exclude file: %s\n",
-				exclude_file);
+		    exclude_file);
 		exit(2);
 	}
 
@@ -1144,7 +1141,7 @@ get_next_ch(struct strlist_st *p, int *m, char *c)
 			break;
 		} else if (p->str == NULL)  {
 			p = p->next;
-		} else if (p->str[*m] == NULL) {
+		} else if (p->str[*m] == '\0') {
 			p = p->next;
 			*m = 0;
 		} else {
@@ -1380,7 +1377,7 @@ add_qstring_to_str(void)
 		strtail = strtail->next;
 	}
 
-	qstring_buf[0] = NULL;
+	qstring_buf[0] = '\0';
 } /* add_qstring_to_str */
 
 /*
@@ -1403,16 +1400,16 @@ find_domain_node(char *dname)
 	}
 
 	if ((dname == NULL) ||
-	    (dname[0] == NULL) ||
+	    (dname[0] == '\0') ||
 	    (strcmp(dname, default_domain) == 0)) {
 		if (def_dom == NULL) {
 			def_dom = new_domain();
 		}
 		if (strcmp(dname, default_domain) == 0) {
-			(void) fprintf(stderr,
-		"%s \"%s\" is used in dgettext of file:%s line:%d.\n",
-				"Warning: default domain name",
-				default_domain, curr_file, curr_linenum);
+			(void) fprintf(stderr, "%s \"%s\" is used in dgettext "
+			    "of file:%s line:%d.\n",
+			    "Warning: default domain name",
+			    default_domain, curr_file, curr_linenum);
 		}
 		return (def_dom);
 	} else {
@@ -1493,15 +1490,15 @@ isextracted(struct strlist_st *strlist)
 	p = strlist;
 	while (p != NULL) {
 		first = strdup(p->str);
-		while ((first != NULL) && (first[0] != NULL)) {
+		while ((first != NULL) && (first[0] != '\0')) {
 			pc = first;
 
 			/*CONSTCOND*/
 			while (1) {
-				if (*pc == NULL) {
+				if (*pc == '\0') {
 					break;
 				} else if ((*pc == ' ') || (*pc == '\t')) {
-					*pc++ = NULL;
+					*pc++ = '\0';
 					break;
 				}
 				pc++;
@@ -1645,7 +1642,7 @@ add_str_to_element_list(int istextdomain, char *domain_list)
 		 */
 		if (tmp_dom != NULL) {
 			if (isduplicate(tmp_dom->gettext_head,
-					tmp_elem->msgid) == TRUE) {
+			    tmp_elem->msgid) == TRUE) {
 				tmp_elem->isduplicate = TRUE;
 			}
 		}
@@ -1694,7 +1691,7 @@ write_all_files(void)
  */
 static void
 add_node_to_polist(struct element_st **pohead,
-	struct element_st **potail, struct element_st *elem)
+    struct element_st **potail, struct element_st *elem)
 {
 	if (elem == NULL) {
 		return;
@@ -1752,7 +1749,7 @@ read_po(char *fname)
 				state = IN_COMMENT;
 				tmp_elem = new_element();
 				tmp_elem->comment = comment_tail =
-							new_strlist();
+				    new_strlist();
 				/*
 				 * remove new line and skip "# "
 				 * in the beginning of the existing
@@ -1905,7 +1902,7 @@ write_one_file(struct domain_st *head)
 	 * The domain name is either "messages" or specified by option -d.
 	 * The default domain name is contained in default_domain variable.
 	 */
-	dname[0] = NULL;
+	dname[0] = '\0';
 	if ((head != NULL) &&
 	    (head->dname != NULL)) {
 		(void) strcpy(dname, head->dname);
@@ -1939,11 +1936,11 @@ write_one_file(struct domain_st *head)
 		}
 		existing_po_list = read_po(fname);
 		head->gettext_head = append_list(existing_po_list,
-					head->gettext_head);
+		    head->gettext_head);
 #ifdef DEBUG
 		if (head->dname != NULL) {
 			printf("===after merge (-j option): <%s>===\n",
-			head->dname);
+			    head->dname);
 		} else {
 			printf("===after merge (-j option): <NULL>===\n");
 		}
@@ -1954,7 +1951,7 @@ write_one_file(struct domain_st *head)
 
 	if ((fp = fopen(fname, "w")) == NULL) {
 		(void) fprintf(stderr,
-			"ERROR, can't open output file: %s\n", fname);
+		    "ERROR, can't open output file: %s\n", fname);
 		exit(2);
 	}
 
@@ -1996,7 +1993,7 @@ write_one_file(struct domain_st *head)
 		 *    because there are read from exising file.
 		 */
 		if (((cflg == TRUE) || (jflg == TRUE)) &&
-			(p->istextdomain != TRUE)) {
+		    (p->istextdomain != TRUE)) {
 			output_comment(fp, p->comment);
 		}
 
@@ -2011,9 +2008,9 @@ write_one_file(struct domain_st *head)
 		 * should not printed in such case.
 		 */
 		if ((nflg == TRUE) && (p->istextdomain == FALSE) &&
-			(p->linenum > 0)) {
+		    (p->linenum > 0)) {
 			(void) fprintf(fp, "# File:%s, line:%d\n",
-					p->fname, p->linenum);
+			    p->fname, p->linenum);
 		}
 
 		/*
@@ -2048,7 +2045,7 @@ output_textdomain(FILE *fp, struct element_st *p)
 	 * Write textdomain() line as a comment.
 	 */
 	(void) fprintf(fp, "# File:%s, line:%d, textdomain(\"%s\");\n",
-		p->fname, p->linenum,  p->msgid->str);
+	    p->fname, p->linenum,  p->msgid->str);
 } /* output_textdomain */
 
 /*
@@ -2113,20 +2110,18 @@ output_msgid(FILE *fp, struct strlist_st *p, int duplicate)
 			 */
 			if ((Mflg == TRUE) && (p->next == NULL)) {
 				/* -M and -m and single line case */
-				(void) fprintf(fp,
-					"msgstr \"%s%s%s\"\n",
-					prefix, p->str, suffix);
+				(void) fprintf(fp, "msgstr \"%s%s%s\"\n",
+				    prefix, p->str, suffix);
 			} else {
 				/* -M and -m and multi line case */
-				(void) fprintf(fp,
-					"msgstr \"%s%s\"\n",
-					prefix, p->str);
+				(void) fprintf(fp, "msgstr \"%s%s\"\n",
+				    prefix, p->str);
 			}
 		} else {
 			if ((Mflg == TRUE) && (p->next == NULL)) {
 				/* -M only with single line case */
 				(void) fprintf(fp, "msgstr \"%s%s\"\n",
-						p->str, suffix);
+				    p->str, suffix);
 			} else {
 				/* -M only with multi line case */
 				(void) fprintf(fp, "msgstr \"%s\"\n", p->str);
@@ -2144,7 +2139,7 @@ output_msgid(FILE *fp, struct strlist_st *p, int duplicate)
 		 * If multi line msgid, add suffix after the last line.
 		 */
 		if ((Mflg == TRUE) && (p->next != NULL) &&
-					(suffix[0] != NULL)) {
+		    (suffix[0] != '\0')) {
 			(void) fprintf(fp, "       \"%s\"\n", suffix);
 		}
 	} else {
