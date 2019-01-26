@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,7 +87,7 @@ main(int argc, char **argv)
 		(void) strncpy(path, argv[1], MAXPATHLEN);
 
 		for (i = 0; i < CMD_TABLE_SIZE; i++) {
-			if (strcmp(argv[2], cmd_table[i].string) == NULL) {
+			if (strcmp(argv[2], cmd_table[i].string) == 0) {
 				command = cmd_table[i].val;
 				devctl_command = cmd_table[i].devctl_val;
 			}
@@ -115,7 +113,7 @@ main(int argc, char **argv)
 		(void) strncpy(errctl.name, argv[1], MAXNAMELEN);
 		errctl.instance = atoi(argv[2]);
 		for (i = 0; i < CMD_TABLE_SIZE; i++) {
-			if (strcmp(argv[3], cmd_table[i].string) == NULL) {
+			if (strcmp(argv[3], cmd_table[i].string) == 0) {
 				command = cmd_table[i].val;
 				devctl_command = cmd_table[i].devctl_val;
 			}
