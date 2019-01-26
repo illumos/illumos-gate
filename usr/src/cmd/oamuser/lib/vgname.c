@@ -25,10 +25,8 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -54,7 +52,7 @@ valid_gname(char *group, struct group **gptr, int *warning)
 	if (!group || !*group)
 		return (INVALID);
 
-	for (c = *ptr; c != NULL; ptr++, c = *ptr) {
+	for (c = *ptr; c != '\0'; ptr++, c = *ptr) {
 		len++;
 		if (!isprint(c) || (c == ':') || (c == '\n'))
 			return (INVALID);

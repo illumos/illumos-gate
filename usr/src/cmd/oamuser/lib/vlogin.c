@@ -27,7 +27,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*LINTLIBRARY*/
 
@@ -62,7 +62,7 @@ valid_login(char *login, struct passwd **pptr, int *warning)
 	c = *ptr;
 	if (!isalpha(c))
 		bad1char++;
-	for (; c != NULL; ptr++, c = *ptr) {
+	for (; c != '\0'; ptr++, c = *ptr) {
 		len++;
 		if (!isprint(c) || (c == ':') || (c == '\n'))
 			return (INVALID);

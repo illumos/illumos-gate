@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include	<sys/types.h>
@@ -53,7 +51,7 @@ valid_projname(char *project, struct project *pptr, void *buf, size_t blen,
 	if (!project || !*project)
 		return (INVALID);
 
-	for (c = *ptr; c != NULL; ptr++, c = *ptr) {
+	for (c = *ptr; c != '\0'; ptr++, c = *ptr) {
 		len++;
 		if (!isprint(c) || (c == ':') || (c == '\n'))
 			return (INVALID);
