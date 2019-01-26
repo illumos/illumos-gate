@@ -39,11 +39,15 @@ nvme_ioctl(int fd, int ioc, size_t *bufsize, void **buf, uint64_t arg,
 		*res = ~0ULL;
 
 	if (bufsize != NULL && *bufsize != 0) {
+		void *ptr;
+
 		assert(buf != NULL);
 
-		if ((nioc.n_buf = (uintptr_t)calloc(*bufsize, 1)) == NULL)
+		ptr = calloc(1, *bufsize);
+		if (ptr == NULL)
 			err(-1, "nvme_ioctl()");
 
+		nioc.n_buf = (uintptr_t)ptr;
 		nioc.n_len = *bufsize;
 	}
 
