@@ -23,8 +23,6 @@
  * Copyright (c) 1994, by Sun Microsytems, Inc.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Includes
  */
@@ -185,7 +183,7 @@ spec_match(spec_t * spec_p,
 		return ((strcmp(spec_p->str, str) == 0));
 
 	case SPEC_REGEXP:
-		return ((step(str, spec_p->regexp_p) != NULL));
+		return ((step(str, spec_p->regexp_p) != 0));
 	}
 
 	return (B_FALSE);
@@ -317,7 +315,7 @@ spec_valtrav(spec_t * spec_p,
 	}
 	for (s = s0 = valstr; ; s++) {
 		switch (*s) {
-		case NULL:
+		case '\0':
 			if (intoken) {
 				if (spec_match(spec_p, s0))
 					(*fun) (spec_p, s0, calldatap);

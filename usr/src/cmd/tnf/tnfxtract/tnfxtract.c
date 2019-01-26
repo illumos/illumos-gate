@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -128,7 +126,7 @@ dumpfile_init()
 			"kvm_read error in %s\n"), dumpfile);
 		exit(1);
 	}
-	if (dump_bufaddr == NULL || tnf_bufsize == 0) {
+	if (dump_bufaddr == (uintptr_t)NULL || tnf_bufsize == 0) {
 		(void) fprintf(stderr, gettext(
 			"No trace data available in the kernel.\n"));
 		exit(1);
