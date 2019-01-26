@@ -10,10 +10,10 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 	- Redistributions of source code must retain the above copyright
+ *	- Redistributions of source code must retain the above copyright
  *	  notice, this list of conditions and the following disclaimer.
  *
- * 	- Redistributions in binary form must reproduce the above copyright
+ *	- Redistributions in binary form must reproduce the above copyright
  *	  notice, this list of conditions and the following disclaimer in
  *	  the documentation and/or other materials provided with the
  *	  distribution.
@@ -859,7 +859,7 @@ ndmpd_api_find_env(void *cookie, char *name)
 
 	envp = session->ns_data.dd_env;
 	for (i = 0; envp && i < session->ns_data.dd_env_len; envp++, i++)
-		if (strcmp(name, envp->name) == NULL)
+		if (strcmp(name, envp->name) == 0)
 			return (envp);
 
 	return (NULL);
@@ -1021,7 +1021,7 @@ ndmpd_api_get_name(void *cookie, ulong_t name_index)
  * Parameters:
  *   cookie (input) - session pointer.
  *   block  (input) -
- * 		TRUE 	block until a request has been processed or
+ *		TRUE	block until a request has been processed or
  *			until a file handler has been called.
  *		FALSE	don't block.
  *
