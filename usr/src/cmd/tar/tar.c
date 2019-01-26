@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
@@ -405,7 +405,7 @@ struct linkbuf {
 	dev_t	devnum;
 	int	count;
 	char	pathname[MAXNAM+1];	/* added 1 for last NULL */
-	char 	attrname[MAXNAM+1];
+	char	attrname[MAXNAM+1];
 	struct	linkbuf *nextp;
 } *ihead;
 
@@ -566,7 +566,7 @@ static	int	uflag;
 static	int	errflag;
 static	int	oflag;
 static	int	bflag, Aflag;
-static 	int	Pflag;			/* POSIX conformant archive */
+static	int	Pflag;			/* POSIX conformant archive */
 static	int	Eflag;			/* Allow files greater than 8GB */
 static	int	atflag;			/* traverse extended attributes */
 static	int	saflag;			/* traverse extended sys attributes */
@@ -629,7 +629,7 @@ static	int	extno;		/* number of extent:  starts at 1 */
 static	int	extotal;	/* total extents in this file */
 static	off_t	extsize;	/* size of current extent during extraction */
 static	ushort_t	Oumask = 0;	/* old umask value */
-static 	boolean_t is_posix;	/* true if archive is POSIX-conformant */
+static	boolean_t is_posix;	/* true if archive is POSIX-conformant */
 static	const	char	*magic_type = "ustar";
 static	size_t	xrec_size = 8 * PATH_MAX;	/* extended rec initial size */
 static	char	*xrec_ptr;
@@ -710,7 +710,7 @@ int waitaround = 0;		/* wait for rendezvous with the debugger */
 #define	BSUF		4	/* number of valid 'bzip2' sufixes */
 #define	XSUF		1	/* number of valid 'xz' suffixes */
 
-static	char		*compress_opt; 	/* compression type */
+static	char		*compress_opt;	/* compression type */
 
 static	char		*gsuffix[] = {".gz", "-gz", ".z", "-z", "_z", ".Z",
 			".tgz", ".taz"};
@@ -1989,7 +1989,7 @@ putfile(char *longname, char *shortname, char *parent, attr_data_t *attrinfo,
 	 *	-- the length of the fullname equals NAMSIZ, and the shortname
 	 *	   is less than NAMSIZ, (splitting in this case preserves
 	 *	   compatibility with 5.6 and 5.5.1 tar), or
-	 * 	-- the length of the fullname equals NAMSIZ, the file is a
+	 *	-- the length of the fullname equals NAMSIZ, the file is a
 	 *	   directory and we are not in POSIX-conformant mode (where
 	 *	   trailing slashes are removed from directories).
 	 */
@@ -2694,13 +2694,13 @@ splitfile(char *longname, int ifd, char *name, char *prefix, int filetype)
  *	            regular file when extracted
  *
  *	Returns 1 when file size > 0 and typeflag is not recognized
- * 	Otherwise returns 0
+ *	Otherwise returns 0
  */
 static int
 convtoreg(off_t size)
 {
 	if ((size > 0) && (dblock.dbuf.typeflag != '0') &&
-	    (dblock.dbuf.typeflag != NULL) && (dblock.dbuf.typeflag != '1') &&
+	    (dblock.dbuf.typeflag != '\0') && (dblock.dbuf.typeflag != '1') &&
 	    (dblock.dbuf.typeflag != '2') && (dblock.dbuf.typeflag != '3') &&
 	    (dblock.dbuf.typeflag != '4') && (dblock.dbuf.typeflag != '5') &&
 	    (dblock.dbuf.typeflag != '6') && (dblock.dbuf.typeflag != 'A') &&
@@ -2825,13 +2825,13 @@ verify_attr_support(char *filename, int attrflg, arc_action_t actflag,
  * it will be set to 0.
  *
  * Possible return values:
- * 	ATTR_OK		Successfully opened and, if needed, changed into the
+ *	ATTR_OK		Successfully opened and, if needed, changed into the
  *			attribute directory containing attrname.
  *	ATTR_SKIP	The command line specifications don't enable the
  *			processing of the attribute type.
- * 	ATTR_CHDIR_ERR	An error occurred while trying to change into an
+ *	ATTR_CHDIR_ERR	An error occurred while trying to change into an
  *			attribute directory.
- * 	ATTR_OPEN_ERR	An error occurred while trying to open an
+ *	ATTR_OPEN_ERR	An error occurred while trying to open an
  *			attribute directory.
  *	ATTR_XATTR_ERR	The underlying file system doesn't support extended
  *			attributes.
@@ -3213,7 +3213,7 @@ doxtract(char *argv[])
 					(void) unlink(namep);
 			}
 			linkp = templink;
-			if (*linkp !=  NULL) {
+			if (*linkp != '\0') {
 				if (Aflag && *linkp == '/')
 					linkp++;
 				if (link(linkp, namep) < 0) {
@@ -3254,7 +3254,7 @@ doxtract(char *argv[])
 					(void) unlink(namep);
 			}
 			linkp = templink;
-			if (*linkp != NULL) {
+			if (*linkp != '\0') {
 				if (Aflag && *linkp == '/')
 					linkp++;
 				if (link(linkp, namep) < 0) {
@@ -3303,7 +3303,7 @@ doxtract(char *argv[])
 					(void) unlink(namep);
 			}
 			linkp = templink;
-			if (*linkp != NULL) {
+			if (*linkp != '\0') {
 				if (Aflag && *linkp == '/')
 					linkp++;
 				if (link(linkp, namep) < 0) {
@@ -3443,10 +3443,10 @@ doxtract(char *argv[])
 			}
 		}
 		if (dblock.dbuf.typeflag == '0' ||
-		    dblock.dbuf.typeflag == NULL || convflag) {
+		    dblock.dbuf.typeflag == '\0' || convflag) {
 			delete_target(dirfd, comp, namep);
 			linkp = templink;
-			if (*linkp != NULL) {
+			if (*linkp != '\0') {
 				if (Aflag && *linkp == '/')
 					linkp++;
 				if (link(linkp, comp) < 0) {
@@ -3652,7 +3652,7 @@ filedone:
 
 		if (pflag && newfile == TRUE && !dir &&
 		    (dblock.dbuf.typeflag == '0' ||
-		    dblock.dbuf.typeflag == NULL ||
+		    dblock.dbuf.typeflag == '\0' ||
 		    convflag || dblock.dbuf.typeflag == '1')) {
 			if (fstat(ofile, &xtractbuf) == -1)
 				(void) fprintf(stderr, gettext(
@@ -3983,7 +3983,7 @@ xblocks(int issysattr, off_t bytes, int ofile)
 }
 
 /*
- * 	xsfile	extract split file
+ *	xsfile	extract split file
  *
  *	xsfile(ofd);	ofd = output file descriptor
  *
@@ -5526,7 +5526,7 @@ add_file_to_table(file_list_t *table[], char *str)
 
 	(void) strcpy(name, str);
 	while (name[strlen(name) - 1] == '/') {
-		name[strlen(name) - 1] = NULL;
+		name[strlen(name) - 1] = '\0';
 	}
 
 	h = hash(name);
@@ -5564,7 +5564,7 @@ is_in_table(file_list_t *table[], char *str)
 
 	(void) strcpy(name, str);
 	while (name[strlen(name) - 1] == '/') {
-		name[strlen(name) - 1] = NULL;
+		name[strlen(name) - 1] = '\0';
 	}
 
 	/*
@@ -5583,7 +5583,7 @@ is_in_table(file_list_t *table[], char *str)
 	 * check for any parent directories in the file list
 	 */
 	while ((ptr = strrchr(name, '/'))) {
-		*ptr = NULL;
+		*ptr = '\0';
 		h = hash(name);
 		exp = table[h];
 		while (exp != NULL) {
@@ -6661,7 +6661,7 @@ delete_target(int fd, char *comp, char *namep)
 					(void) unlinkat(fd, comp, 0);
 				} else if ((n = readlink(namep, buf,
 				    PATH_MAX)) != -1) {
-					buf[n] = (char)NULL;
+					buf[n] = '\0';
 					(void) unlinkat(fd, buf,
 					    AT_REMOVEDIR);
 					if (errno == ENOTDIR)
@@ -6835,7 +6835,7 @@ write_ancillary(union hblock *dblockp, char *secinfo, int len, char hdrtype)
  * Read the data record for extended headers and then the regular header.
  * The data are read into the buffer and then null-terminated.  Entries
  * for typeflag 'X' extended headers are of the format:
- * 	"%d %s=%s\n"
+ *	"%d %s=%s\n"
  *
  * When an extended header record is found, the extended header must
  * be processed and its values used to override the values in the
@@ -7592,7 +7592,7 @@ prepare_xattr(
 {
 	char			*bufhead;	/* ptr to full buffer */
 	char			*aptr;
-	struct xattr_hdr 	*hptr;		/* ptr to header in bufhead */
+	struct xattr_hdr	*hptr;		/* ptr to header in bufhead */
 	struct xattr_buf	*tptr;		/* ptr to pathing pieces */
 	int			totalen;	/* total buffer length */
 	int			len;		/* length returned to user */
@@ -8617,8 +8617,8 @@ chop_endslashes(char *path)
  *
  *	attribute type        attribute		process procedure
  *	----------------      ----------------  --------------------------
- *   	DIR_TYPE       = 'D'   directory flag	append if a directory
- *    	LBL_TYPE       = 'L'   SL[IL] or SL	append ascii label
+ *	DIR_TYPE       = 'D'   directory flag	append if a directory
+ *	LBL_TYPE       = 'L'   SL[IL] or SL	append ascii label
  *
  *
  */
@@ -8771,7 +8771,7 @@ append_ext_attr(char *shortname, char **secinfo, int *len)
  *	attribute type        attribute		process procedure
  *	----------------      ----------------  -------------------------
  *    #	LBL_TYPE       = 'L'   SL               construct binary label
- *    #	APRIV_TYPE     = 'P'   allowed priv    	construct privileges
+ *    #	APRIV_TYPE     = 'P'   allowed priv     construct privileges
  *    #	FPRIV_TYPE     = 'p'   forced priv	construct privileges
  *    #	COMP_TYPE      = 'C'   path component	construct real path
  *    #	DIR_TYPE       = 'D'   directory flag	note it is a directory
@@ -9264,7 +9264,7 @@ compress_back()
 void
 check_compression(void)
 {
-	char 	magic[16];
+	char	magic[16];
 	FILE	*fp;
 
 	if ((fp = fopen(usefile, "r")) != NULL) {
@@ -9339,7 +9339,7 @@ add_suffix()
 void
 decompress_file(void)
 {
-	pid_t 	pid;
+	pid_t	pid;
 	char	*added_suffix;
 
 
@@ -9430,7 +9430,7 @@ uncompress_file(void)
 char *
 check_suffix(char **suf, int size)
 {
-	int 	i;
+	int	i;
 	int	slen;
 	int	nlen = strlen(usefile);
 
