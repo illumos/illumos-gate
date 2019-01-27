@@ -9,6 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 # Adapted from acpica/generate/unix/iasl/Makefile, which lacked a copyright
 # notice.
@@ -142,7 +143,7 @@ $(LEX_C_FILES):
 %parse.c %.y.h: %.y
 	_suffix=`echo $@ | awk -F. '{print $$NF}'` && \
 	_d=`mktemp -d $(PARSER).XXXXXX` && \
-	(cd $$_d && $(BISON) -y -v -d -p$(PARSER) ../$(LY_BASE).y) && \
+	(cd $$_d && $(BISON) -o y.tab.c -v -d -p$(PARSER) ../$(LY_BASE).y) && \
 	mv $$_d/y.tab.$$_suffix $@; \
 	_ret=$$?; \
 	rm -rf $$_d; \
