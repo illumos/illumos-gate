@@ -39,7 +39,7 @@
 extern "C" {
 #endif
 
-#define	WARM_RESET_VECTOR	0x467	/* the ROM/BIOS vector for 	*/
+#define	WARM_RESET_VECTOR	0x467	/* the ROM/BIOS vector for	*/
 					/* starting up secondary cpu's	*/
 /* timer modes for clkinitf */
 #define	TIMER_ONESHOT		0x1
@@ -51,7 +51,7 @@ extern "C" {
 extern void (*psminitf)();	/* psm init entry point			*/
 extern void (*picinitf)();	/* pic init entry point			*/
 extern int (*clkinitf)(int, int *);	/* clock init entry point	*/
-extern int (*ap_mlsetup)(); 	/* completes init of starting cpu	*/
+extern int (*ap_mlsetup)();	/* completes init of starting cpu	*/
 extern void (*send_dirintf)();	/* send interprocessor intr		*/
 extern hrtime_t (*gethrtimef)(); /* get high resolution timer value	*/
 extern hrtime_t (*gethrtimeunscaledf)(); /* get high res timer unscaled value */
@@ -59,7 +59,7 @@ extern void (*psm_shutdownf)(int, int);	/* machine dependent shutdown	*/
 extern void (*psm_preshutdownf)(int, int); /* machine dependent pre-shutdown */
 extern void (*psm_notifyf)(int); /* PSMI module notification		*/
 extern void (*psm_set_idle_cpuf)(processorid_t); /* cpu changed to idle */
-extern void (*psm_unset_idle_cpuf)(processorid_t); /* cpu out of idle 	*/
+extern void (*psm_unset_idle_cpuf)(processorid_t); /* cpu out of idle	*/
 extern int (*psm_disable_intr)(processorid_t); /* disable intr to cpu	*/
 extern void (*psm_enable_intr)(processorid_t); /* enable intr to cpu	*/
 extern int (*psm_get_clockirq)(int); /* get clock vector		*/
@@ -76,12 +76,13 @@ extern uint32_t (*psm_get_localapicid)(uint32_t);	/* get local-apic id */
 extern uchar_t (*psm_xlate_vector_by_irq)(uchar_t); /* get vector for an irq */
 extern int (*psm_get_pir_ipivect)(void); /* get PIR (for VMM) ipi vect	*/
 extern void (*psm_send_pir_ipi)(processorid_t);	/* send PIR ipi		*/
+extern void (*psm_cmci_setup)(processorid_t, boolean_t); /* Control CPU CMCI */
 
 extern int (*slvltovect)(int);	/* ipl interrupt priority level		*/
 extern int (*setlvl)(int, int *); /* set intr pri represented by vect	*/
 extern void (*setlvlx)(int, int); /* set intr pri to specified level	*/
 extern void (*setspl)(int);	/* mask intr below or equal given ipl	*/
-extern int (*addspl)(int, int, int, int); /* add intr mask of vector 	*/
+extern int (*addspl)(int, int, int, int); /* add intr mask of vector	*/
 extern int (*delspl)(int, int, int, int); /* delete intr mask of vector */
 extern int (*get_pending_spl)(void);	/* get highest pending ipl */
 extern int (*addintr)(void *, int, avfunc, char *, int, caddr_t, caddr_t,

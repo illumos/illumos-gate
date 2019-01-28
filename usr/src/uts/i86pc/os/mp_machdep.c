@@ -117,10 +117,10 @@ void (*psm_notifyf)(int)	= (void (*)(int))return_instr;
 void (*psm_set_idle_cpuf)(int)	= (void (*)(int))return_instr;
 void (*psm_unset_idle_cpuf)(int) = (void (*)(int))return_instr;
 void (*psminitf)()		= mach_init;
-void (*picinitf)() 		= return_instr;
-int (*clkinitf)(int, int *) 	= (int (*)(int, int *))return_instr;
-int (*ap_mlsetup)() 		= (int (*)(void))return_instr;
-void (*send_dirintf)() 		= return_instr;
+void (*picinitf)()		= return_instr;
+int (*clkinitf)(int, int *)	= (int (*)(int, int *))return_instr;
+int (*ap_mlsetup)()		= (int (*)(void))return_instr;
+void (*send_dirintf)()		= return_instr;
 void (*setspl)(int)		= (void (*)(int))return_instr;
 int (*addspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
 int (*delspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
@@ -151,6 +151,7 @@ uint32_t (*psm_get_localapicid)(uint32_t) = NULL;
 uchar_t (*psm_xlate_vector_by_irq)(uchar_t) = NULL;
 int (*psm_get_pir_ipivect)(void) = NULL;
 void (*psm_send_pir_ipi)(processorid_t) = NULL;
+void (*psm_cmci_setup)(processorid_t, boolean_t) = NULL;
 
 int (*psm_clkinit)(int) = NULL;
 void (*psm_timer_reprogram)(hrtime_t) = NULL;
@@ -1158,6 +1159,7 @@ mach_smpinit(void)
 	psm_get_ipivect = pops->psm_get_ipivect;
 	psm_get_pir_ipivect = pops->psm_get_pir_ipivect;
 	psm_send_pir_ipi = pops->psm_send_pir_ipi;
+	psm_cmci_setup = pops->psm_cmci_setup;
 
 
 	(void) add_avintr((void *)NULL, XC_HI_PIL, xc_serv, "xc_intr",
@@ -1311,9 +1313,9 @@ static int x86_cpu_freq[] = { 60, 75, 80, 90, 120, 160, 166, 175, 180, 233 };
  * is most likely printed on the part.
  *
  * Some examples:
- * 	AMD Athlon 1000 mhz measured as 998 mhz
- * 	Intel Pentium III Xeon 733 mhz measured as 731 mhz
- * 	Intel Pentium IV 1500 mhz measured as 1495mhz
+ *	AMD Athlon 1000 mhz measured as 998 mhz
+ *	Intel Pentium III Xeon 733 mhz measured as 731 mhz
+ *	Intel Pentium IV 1500 mhz measured as 1495mhz
  *
  * If in the future this function is no longer sufficient to correct
  * for the error in the measurement, then the algorithm used to perform

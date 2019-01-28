@@ -122,11 +122,7 @@ int apic_enable_cpcovf_intr = 1;
 
 /* vector at which CMCI interrupts come in */
 int apic_cmci_vect;
-extern int cmi_enable_cmci;
 extern void cmi_cmci_trap(void);
-
-kmutex_t cmci_cpu_setup_lock;	/* protects cmci_cpu_setup_registered */
-int cmci_cpu_setup_registered;
 
 lock_t apic_mode_switch_lock;
 
@@ -382,30 +378,20 @@ apic_cmci_disable(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3)
 	return (0);
 }
 
-/*ARGSUSED*/
-int
-cmci_cpu_setup(cpu_setup_t what, int cpuid, void *arg)
+void
+apic_cmci_setup(processorid_t cpuid, boolean_t enable)
 {
 	cpuset_t	cpu_set;
 
 	CPUSET_ONLY(cpu_set, cpuid);
 
-	switch (what) {
-		case CPU_ON:
-			xc_call(NULL, NULL, NULL, CPUSET2BV(cpu_set),
-			    (xc_func_t)apic_cmci_enable);
-			break;
-
-		case CPU_OFF:
-			xc_call(NULL, NULL, NULL, CPUSET2BV(cpu_set),
-			    (xc_func_t)apic_cmci_disable);
-			break;
-
-		default:
-			break;
+	if (enable) {
+		xc_call(NULL, NULL, NULL, CPUSET2BV(cpu_set),
+		    (xc_func_t)apic_cmci_enable);
+	} else {
+		xc_call(NULL, NULL, NULL, CPUSET2BV(cpu_set),
+		    (xc_func_t)apic_cmci_disable);
 	}
-
-	return (0);
 }
 
 static void

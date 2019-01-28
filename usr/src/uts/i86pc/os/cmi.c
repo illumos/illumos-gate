@@ -70,13 +70,6 @@ int cmi_force_generic = 0;
  */
 int cmi_panic_on_uncorrectable_error = 1;
 
-#ifndef __xpv
-/*
- * Set to indicate whether we are able to enable cmci interrupt.
- */
-int cmi_enable_cmci = 0;
-#endif
-
 /*
  * Subdirectory (relative to the module search path) in which we will
  * look for cpu modules.

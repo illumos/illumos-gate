@@ -84,7 +84,7 @@ extern uchar_t	apic_io_vectbase[MAX_IO_APIC];
 extern uchar_t	apic_io_vectend[MAX_IO_APIC];
 extern uchar_t	apic_io_ver[MAX_IO_APIC];
 extern int	apic_io_max;
-extern int 	apic_nvidia_io_max;
+extern int	apic_nvidia_io_max;
 extern int apic_setspl_delay;		/* apic_setspl - delay enable	*/
 extern int apic_clkvect;
 
@@ -190,7 +190,7 @@ extern void	apic_send_pir_ipi(processorid_t);
 
 extern int apic_error_intr();
 extern void apic_cpcovf_mask_clear(void);
-extern int cmci_cpu_setup(cpu_setup_t what, int cpuid, void *arg);
+extern void apic_cmci_setup(processorid_t, boolean_t);
 extern void apic_intrmap_init(int apic_mode);
 extern processorid_t apic_find_cpu(int flag);
 extern processorid_t apic_get_next_bind_cpu(void);
