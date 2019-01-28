@@ -439,7 +439,7 @@ static int utf8_to_hkscs(int unidx, unsigned long hkscscode, char *buf, size_t b
 
 	*buf = hkscs_str[0] = c1;
 	*(buf+1) = hkscs_str[1] = c2;
-	hkscs_str[2] = NULL;
+	hkscs_str[2] = '\0';
 	}
 
 #ifdef DEBUG

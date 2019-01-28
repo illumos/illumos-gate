@@ -104,7 +104,7 @@ struct _cv_state {
 };
 
 extern	TWNiconv * aTWNiconv();
-extern	void 	adeTWNiconv(TWNiconv *);
+extern	void	adeTWNiconv(TWNiconv *);
 extern	size_t	aisotoeuc(TWNiconv *, char **, size_t *, char **, size_t *);
 extern	void	areset(TWNiconv *);
 
@@ -306,7 +306,7 @@ _icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 			break;
 		case C6:		/* plane #1: 2nd Chinese character */
 			st->keepc[1] = (char) (**inbuf | MSB);
-			st->keepc[2] = st->keepc[3] = NULL;
+			st->keepc[2] = st->keepc[3] = '\0';
 			n = iso_to_cns(1, st->keepc, *outbuf, *outbytesleft);
 			if (n > 0) {
 				(*outbuf) += n;
