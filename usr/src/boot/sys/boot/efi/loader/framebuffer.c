@@ -496,17 +496,12 @@ efifb_get_edid(UINT32 *pwidth, UINT32 *pheight)
 {
 	extern EFI_GRAPHICS_OUTPUT *gop;
 	struct vesa_edid_info *edid_info;
-	struct edid_detailed_timings *timings;
 	int rv = 1;
 
 	edid_info = efifb_gop_get_edid(gop);
 	if (edid_info != NULL) {
-		timings = edid_info->detailed_timings;
-		*pwidth = timings[0].horizontal_active_lo |
-		    (((int)(timings[0].horizontal_hi & 0xf0)) << 4);
-
-		*pheight = timings[0].vertical_active_lo |
-		    (((int)(timings[0].vertical_hi & 0xf0)) << 4);
+		*pwidth = GET_EDID_INFO_WIDTH(edid_info, 0);
+		*pheight = GET_EDID_INFO_HEIGHT(edid_info, 0);
 		rv = 0;
 	}
 	free(edid_info);

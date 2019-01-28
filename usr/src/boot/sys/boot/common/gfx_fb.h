@@ -93,6 +93,16 @@ struct vesa_edid_info {
 	uint8_t checksum;
 } __packed;
 
+#define	GET_EDID_INFO_WIDTH(edid_info, timings_num) \
+    ((edid_info)->detailed_timings[(timings_num)].horizontal_active_lo | \
+    (((uint_t)(edid_info)->detailed_timings[(timings_num)].horizontal_hi & \
+    0xf0) << 4))
+
+#define	GET_EDID_INFO_HEIGHT(edid_info, timings_num) \
+    ((edid_info)->detailed_timings[(timings_num)].vertical_active_lo | \
+    (((uint_t)(edid_info)->detailed_timings[(timings_num)].vertical_hi & \
+    0xf0) << 4))
+
 extern multiboot_tag_framebuffer_t gfx_fb;
 
 void gfx_framework_init(struct visual_ops *);

@@ -9,6 +9,7 @@
 \ http://www.illumos.org/license/CDDL.
 
 \ Copyright 2017 Toomas Soome <tsoome@me.com>
+\ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 \ This module is implementing the beadm user command to support listing
 \ and switching Boot Environments (BE) from command line and
@@ -377,7 +378,7 @@ builtin: beadm
 		5 /mod swap dup page_remainder !		\ save remainder
 		if 1+ then
 		dup page_count !				\ save count
-		s>d <# #s #> s" zfs_be_pages" setenv
+		n2s s" zfs_be_pages" setenv
 		TRUE
 	then
 ;
@@ -389,13 +390,8 @@ builtin: beadm
 	then
 
 	0 to device
-	s" zfs_be_currpage" getenv dup -1 = if
-		drop s" 1"
-	then
-	0 s>d 2swap
-	>number ( ud caddr/u -- ud' caddr'/u' )
-	2drop
-	1 um/mod nip 5 *
+	1 s" zfs_be_currpage" getenvn
+	5 *
 	page_count @ 5 *
 	page_remainder @ if
 		5 page_remainder @ - -

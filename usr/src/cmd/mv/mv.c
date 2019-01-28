@@ -32,6 +32,10 @@
 /*	  All Rights Reserved  	*/
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * University Copyright- Copyright (c) 1982, 1986, 1988
  * The Regents of the University of California
  * All Rights Reserved
@@ -1939,25 +1943,24 @@ copy_sysattr(char *source, char *target)
 			 * the defaults set when its created and thus  no need
 			 * to copy the defaults.
 			 */
-			if (dp->d_name != NULL) {
-				res = sysattr_list(cmd, srcattrfd, dp->d_name);
-				if (res == NULL)
-					goto next;
+			res = sysattr_list(cmd, srcattrfd, dp->d_name);
+			if (res == NULL)
+				goto next;
 
 			/*
 			 * Copy non default extended system attributes of named
 			 * attribute file.
 			 */
-				if (fsetattr(targattrfd,
-				    XATTR_VIEW_READWRITE, res) != 0) {
-					++error;
-					(void) fprintf(stderr, gettext("%s: "
-					    "Failed to copy extended system "
-					    "attributes from attribute file "
-					    "%s of %s to %s\n"), cmd,
-					    dp->d_name, source, target);
-				}
+			if (fsetattr(targattrfd,
+			    XATTR_VIEW_READWRITE, res) != 0) {
+				++error;
+				(void) fprintf(stderr, gettext("%s: "
+				    "Failed to copy extended system "
+				    "attributes from attribute file "
+				    "%s of %s to %s\n"), cmd,
+				    dp->d_name, source, target);
 			}
+
 next:
 			if (srcattrfd != -1)
 				(void) close(srcattrfd);

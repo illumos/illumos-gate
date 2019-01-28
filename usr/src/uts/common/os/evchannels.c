@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * This file contains the source of the general purpose event channel extension
  * to the sysevent framework. This implementation is made up mainly of four
  * layers of functionality: the event queues (evch_evq_*()), the handling of
@@ -1976,7 +1980,7 @@ int
 sysevent_evc_control(evchan_t *scp, int cmd, ...)
 {
 	va_list		ap;
-	evch_chan_t	*chp = ((evch_bind_t *)scp)->bd_channel;
+	evch_chan_t	*chp;
 	uint32_t	*chlenp;
 	uint32_t	chlen;
 	uint32_t	ochlen;
@@ -1985,6 +1989,8 @@ sysevent_evc_control(evchan_t *scp, int cmd, ...)
 	if (scp == NULL) {
 		return (EINVAL);
 	}
+
+	chp = ((evch_bind_t *)scp)->bd_channel;
 
 	va_start(ap, cmd);
 	mutex_enter(&chp->ch_mutex);

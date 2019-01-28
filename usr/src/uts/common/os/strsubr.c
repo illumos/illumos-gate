@@ -362,7 +362,8 @@ static void esballoc_mblk_free(mblk_t *);
  *	for passthru read and write queues
  */
 
-static void pass_wput(queue_t *, mblk_t *);
+static int pass_rput(queue_t *, mblk_t *);
+static int pass_wput(queue_t *, mblk_t *);
 static queue_t *link_addpassthru(stdata_t *);
 static void link_rempassthru(queue_t *);
 
@@ -376,7 +377,7 @@ struct  module_info passthru_info = {
 };
 
 struct  qinit passthru_rinit = {
-	(int (*)())putnext,
+	pass_rput,
 	NULL,
 	NULL,
 	NULL,
@@ -386,7 +387,7 @@ struct  qinit passthru_rinit = {
 };
 
 struct  qinit passthru_winit = {
-	(int (*)()) pass_wput,
+	pass_wput,
 	NULL,
 	NULL,
 	NULL,
@@ -7815,12 +7816,19 @@ strsetuio(stdata_t *stp)
 	stp->sd_struiordq = wrq ? _RD(wrq) : 0;
 }
 
+static int
+pass_rput(queue_t *q, mblk_t *mp)
+{
+	putnext(q, mp);
+	return (0);
+}
+
 /*
  * pass_wput, unblocks the passthru queues, so that
  * messages can arrive at muxs lower read queue, before
  * I_LINK/I_UNLINK is acked/nacked.
  */
-static void
+static int
 pass_wput(queue_t *q, mblk_t *mp)
 {
 	syncq_t *sq;
@@ -7829,6 +7837,7 @@ pass_wput(queue_t *q, mblk_t *mp)
 	if (sq->sq_flags & SQ_BLOCKED)
 		unblocksq(sq, SQ_BLOCKED, 0);
 	putnext(q, mp);
+	return (0);
 }
 
 /*
