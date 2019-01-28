@@ -60,7 +60,7 @@ chinese_to_big5( _iconv_st *st, unsigned char **outbuf, size_t *outbytesleft, in
 {
 
 	table_t key, *ptr;
-	if ( st->SSfunc == NULL && st->SOcharset == 'A') {	/* GB2312 */
+	if ( st->SSfunc == NONE && st->SOcharset == 'A') {	/* GB2312 */
 	    return gb_to_big5(st, outbuf, outbytesleft);
 	}
 

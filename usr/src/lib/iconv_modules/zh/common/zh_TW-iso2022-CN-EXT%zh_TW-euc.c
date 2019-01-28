@@ -54,7 +54,7 @@ static int
 chinese_to_euc( _iconv_st *st, unsigned char **outbuf, size_t *outbytesleft, int plane_no )
 {
 
-	if ( st->SSfunc == NULL && st->SOcharset == 'A') {	/* GB2312 */
+	if ( st->SSfunc == NONE && st->SOcharset == 'A') {	/* GB2312 */
 	    return gb_to_euc(st, outbuf, outbytesleft);
 	}
 

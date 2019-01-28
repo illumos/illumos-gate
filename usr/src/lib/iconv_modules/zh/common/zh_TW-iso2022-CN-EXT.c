@@ -64,9 +64,9 @@ _icv_open()
 	st->ESCstate = OFF;
 	st->firstbyte = True;
 	st->numsav = 0;
-	st->SOcharset = NULL;		/* no default charset */
-	st->SS2charset = NULL;		/* no default charset */
-	st->SS3charset = NULL;		/* no default charset */
+	st->SOcharset = 0;		/* no default charset */
+	st->SS2charset = 0;		/* no default charset */
+	st->SS3charset = 0;		/* no default charset */
 	st->nonidcount = 0;
 	st->_errno = 0;
 
@@ -123,9 +123,9 @@ iso2022_icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 	    st->ESCstate = OFF;
 	    st->firstbyte = True;
 	    st->numsav = 0;
-	    st->SOcharset = NULL;
-	    st->SS2charset = NULL;
-	    st->SS3charset = NULL;
+	    st->SOcharset = 0;
+	    st->SS2charset = 0;
+	    st->SS3charset = 0;
 	    st->nonidcount = 0;
 	    st->_errno = 0;
 	    return ((size_t) 0);
@@ -182,7 +182,7 @@ iso2022_icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 	    } else if ( st->ESCstate != OFF ) { /* Continue processing the
 						  escape sequence */
 		ret = process_esc_seq( **inbuf, st );
-		if ( ret == DONE ) { 	/* ESC seq interpreted correctly.
+		if ( ret == DONE ) {	/* ESC seq interpreted correctly.
 					     Switch off the escape machine */
 		    st->ESCstate = OFF;
 		} else if ( ret == INVALID ){
@@ -207,13 +207,13 @@ iso2022_icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 			st->_errno = errno = EILSEQ;
 			st->nonidcount += 1; /* For this character */
 		    }
-		    st->numsav = 0; 	 /* Discard the saved characters of
+		    st->numsav = 0;	 /* Discard the saved characters of
 					    invalid sequence */
 		    st->ESCstate = OFF;
 		} /* more char. needed for escape sequence */
 	    } else if (st->Sfunc  == SI) {
 		/* Switch state to SO only if SOdesignation is set. */
-		if ( **inbuf == SO && st->SOcharset != NULL ){
+		if ( **inbuf == SO && st->SOcharset != 0 ){
 		    st->Sfunc = SO;
 		} else { /* Is ASCII */
 		    n = ascii_to_euc(**inbuf, st, outbuf, outbytesleft );
@@ -268,7 +268,7 @@ process_esc_seq( char c, _iconv_st *st )
 	case E0:
 	    switch (c){
 	    case SS2LOW:
-		if ( st->SS2charset == NULL ){
+		if ( st->SS2charset == 0 ){
 		    /* We do not expect SS2 shift function before
 		       SS2 designation is set */
 		    st->savbuf[0] = ESC;
@@ -281,7 +281,7 @@ process_esc_seq( char c, _iconv_st *st )
 		st->nonidcount -= 1;
 		return(DONE);
 	    case SS3LOW:
-		if ( st->SS3charset == NULL ){
+		if ( st->SS3charset == 0 ){
 		    /* We do not expect SS3 shift function before
 		       SS3 designation is set */
 		    st->savbuf[0] = ESC;
@@ -384,7 +384,7 @@ iscns( _iconv_st *st )
 {
 	int plane_no = -1;
 
-	if ( st->SSfunc == NULL && st->SOcharset == 'G' )
+	if ( st->SSfunc == NONE && st->SOcharset == 'G' )
 	    plane_no = 1;
 	else if ( st->SSfunc == SS2 && st->SS2charset == 'H' )
 	    plane_no = 2;

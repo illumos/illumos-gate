@@ -153,7 +153,7 @@ _icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 			} else {	/* 2-byte Chinese character - plane #1 */
 				if (**inbuf & MSB) {	/* plane #1 */
 					st->keepc[1] = (**inbuf);
-					st->keepc[2] = st->keepc[3] = NULL;
+					st->keepc[2] = st->keepc[3] = '\0';
 					n = cns_to_big5(1, st->keepc, *outbuf,
 							*outbytesleft);
 					if (n > 0) {

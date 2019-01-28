@@ -234,7 +234,7 @@ static int big5_2nd_byte(char inbuf)
 static int get_plane_no_by_big5(const char c1, const char c2,
 			int *unidx, unsigned long *cnscode)
 {
-	int 		ret;
+	int		ret;
 	unsigned long	big5code;
 
 	big5code = (unsigned long) ((c1 & ONEBYTE) << 8) + (c2 & ONEBYTE);
@@ -300,7 +300,7 @@ static int big5_to_cns(int plane_no, int unidx, unsigned long cnscode,
 		if ( buflen < 2 ) goto err;
 		*buf = cns_str[0] = c1;
 		*(buf+1) = cns_str[1] = c2;
-		cns_str[2] = cns_str[3] = cns_str[4] = NULL;
+		cns_str[2] = cns_str[3] = cns_str[4] = '\0';
 		ret_size = 2;
 		break;
 	case 2:
@@ -323,7 +323,7 @@ static int big5_to_cns(int plane_no, int unidx, unsigned long cnscode,
 		*(unsigned char*)(buf+1) = cns_str[1] = PMASK + plane_no;
 		*(unsigned char*) (buf+2) = cns_str[2] = c1;
 		*(unsigned char*) (buf+3) = cns_str[3] = c2;
-		cns_str[4] = NULL;
+		cns_str[4] = '\0';
 		ret_size = 4;
 		break;
 	}

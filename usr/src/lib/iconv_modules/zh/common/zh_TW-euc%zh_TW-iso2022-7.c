@@ -207,7 +207,7 @@ _icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 				if (**inbuf & MSB) {	/* plane #1 */
 					st->cstate = C4;
 					st->keepc[1] = (**inbuf);
-					st->keepc[2] = st->keepc[3] = NULL;
+					st->keepc[2] = st->keepc[3] = '\0';
 					plane_no = 1;
 					continue;       /* should not advance *inbuf */
 				} else {	/* input char doesn't belong
@@ -403,10 +403,10 @@ size_t
 _cv_enconv(struct _cv_state *st, char **cvinbuf, size_t *cvinbytesleft,
 				char **cvoutbuf, size_t *cvoutbytesleft)
 {
-	register char 	*inbuf;
-	register char	*outbuf;
-	register size_t insize;
-	register size_t outsize;
+	char	*inbuf;
+	char	*outbuf;
+	size_t insize;
+	size_t outsize;
 
 	unsigned char	uc;
 	int		i;

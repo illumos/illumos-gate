@@ -242,7 +242,7 @@ _icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 			break;
 		case C6:		/* plane #1: 2nd Chinese character */
 			st->keepc[1] = (char) (**inbuf | MSB);
-			st->keepc[2] = st->keepc[3] = NULL;
+			st->keepc[2] = st->keepc[3] = '\0';
 			n = iso_to_big5(1, st->keepc, *outbuf, *outbytesleft);
 			if (n > 0) {
 				(*outbuf) += n;
