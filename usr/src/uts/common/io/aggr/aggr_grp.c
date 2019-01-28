@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Joyent, Inc.
+ * Copyright (c) 2017, Joyent, Inc.
  */
 
 /*
@@ -122,7 +122,6 @@ static void aggr_rem_pseudo_rx_group(aggr_port_t *, aggr_pseudo_rx_group_t *);
 static int aggr_pseudo_disable_intr(mac_intr_handle_t);
 static int aggr_pseudo_enable_intr(mac_intr_handle_t);
 static int aggr_pseudo_start_ring(mac_ring_driver_t, uint64_t);
-static void aggr_pseudo_stop_ring(mac_ring_driver_t);
 static int aggr_addmac(void *, const uint8_t *);
 static int aggr_remmac(void *, const uint8_t *);
 static mblk_t *aggr_rx_poll(void *, int);
@@ -1006,23 +1005,22 @@ aggr_pseudo_enable_intr(mac_intr_handle_t ih)
 	return (mac_hwring_enable_intr(rr_ring->arr_hw_rh));
 }
 
+/*
+ * Here we need to start the pseudo-ring. As MAC already ensures that the
+ * underlying device is set up, all we need to do is save the ring generation.
+ *
+ * Note, we don't end up wanting to use the underlying mac_hwring_start/stop
+ * functions here as those don't actually stop and start the ring, they just
+ * quiesce the ring. Regardless of whether the aggr is logically up or not, we
+ * want to make sure that we can receive traffic for LACP.
+ */
 static int
 aggr_pseudo_start_ring(mac_ring_driver_t arg, uint64_t mr_gen)
 {
 	aggr_pseudo_rx_ring_t *rr_ring = (aggr_pseudo_rx_ring_t *)arg;
-	int err;
 
-	err = mac_hwring_start(rr_ring->arr_hw_rh);
-	if (err == 0)
-		rr_ring->arr_gen = mr_gen;
-	return (err);
-}
-
-static void
-aggr_pseudo_stop_ring(mac_ring_driver_t arg)
-{
-	aggr_pseudo_rx_ring_t *rr_ring = (aggr_pseudo_rx_ring_t *)arg;
-	mac_hwring_stop(rr_ring->arr_hw_rh);
+	rr_ring->arr_gen = mr_gen;
+	return (0);
 }
 
 /*
@@ -2269,7 +2267,7 @@ aggr_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
 
 		infop->mri_driver = (mac_ring_driver_t)rx_ring;
 		infop->mri_start = aggr_pseudo_start_ring;
-		infop->mri_stop = aggr_pseudo_stop_ring;
+		infop->mri_stop = NULL;
 
 		infop->mri_intr = aggr_mac_intr;
 		infop->mri_poll = aggr_rx_poll;
@@ -2697,7 +2695,7 @@ static int
 aggr_set_port_sdu(aggr_grp_t *grp, aggr_port_t *port, uint32_t sdu,
     uint32_t *old_mtu)
 {
-	boolean_t 		removed = B_FALSE;
+	boolean_t		removed = B_FALSE;
 	mac_perim_handle_t	mph;
 	mac_diag_t		diag;
 	int			err, rv, retry = 0;
@@ -2786,12 +2784,12 @@ static int
 aggr_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val)
 {
-	int 		err = ENOTSUP;
-	aggr_grp_t 	*grp = m_driver;
+	int		err = ENOTSUP;
+	aggr_grp_t	*grp = m_driver;
 
 	switch (pr_num) {
 	case MAC_PROP_MTU: {
-		uint32_t 	mtu;
+		uint32_t	mtu;
 
 		if (pr_valsize < sizeof (mtu)) {
 			err = EINVAL;
@@ -2924,8 +2922,8 @@ aggr_grp_possible_mtu_range(aggr_grp_t *grp, mac_propval_uint32_range_t **prval,
 	mac_propval_range_t		**vals;
 	aggr_port_t			*port;
 	mac_perim_handle_t		mph;
-	uint_t 				i, numr;
-	int 				err = 0;
+	uint_t				i, numr;
+	int				err = 0;
 	size_t				sz_propval, sz_range32;
 	size_t				size;
 
