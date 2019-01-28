@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -231,9 +231,9 @@ get_token()
 
 		    case '=':
 			ch = trans_string(ptr);
-			if (ch != NULL && ch != ',')
+			if (ch != '\0' && ch != ',')
 			    warning("Missing comma");
-			if (ch == NULL)
+			if (ch == '\0')
 				warning("NULL string value");
 			curr_token.tk_name = buffer;
 			curr_token.tk_valstring = ptr;
@@ -301,7 +301,7 @@ get_token()
  *	Returns the next character in the input stream.  Comments and leading
  *	white space are stripped.  The global state variable 'firstcolumn' is
  *	set TRUE if the character returned is from the first column of the
- * 	inputline.  The global variable curr_line is incremented for each new.
+ *	inputline.  The global variable curr_line is incremented for each new.
  *	line. The global variable curr_file_pos is set to the file offset
  *	of the beginning of each line.
  *
@@ -493,7 +493,7 @@ trans_string(char *ptr)
 	*ptr = '\0';
 
 	if (count == 0)
-		return (NULL);
+		return (0);
 	return (ch);
 }
 
