@@ -22,6 +22,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -146,7 +149,6 @@ retain_nvram_page(void)
 	char name[32];
 	static char create_prop[] =
 	    "0 to my-self dev / 0 0 \" boot-retained-page\" property";
-	static char ue10000[] = "SUNW,Ultra-Enterprise-10000";
 	static char ue[] = "SUNW,Ultra-Enterprise";
 	extern int verbosemode;
 
@@ -157,8 +159,7 @@ retain_nvram_page(void)
 		len = prom_getproplen(prom_rootnode(), "name");
 		if ((len != -1) && (len <= sizeof (name))) {
 			(void) prom_getprop(prom_rootnode(), "name", name);
-			if ((strcmp(name, ue) == 0) ||
-			    (strcmp(name, ue10000) == 0))
+			if (strcmp(name, ue) == 0)
 				return;
 		}
 	}

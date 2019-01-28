@@ -22,11 +22,12 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef	_SYS_MACHTHREAD_H
 #define	_SYS_MACHTHREAD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/asi.h>
 #include <sys/sun4asi.h>
@@ -51,31 +52,7 @@ extern "C" {
 	sll	out, 16, out;		\
 	srl	out, 16, out;
 
-#ifdef	_STARFIRE
-/*
- * CPU_INDEX(r, scr)
- * Returns cpu id in r.
- * On Starfire, this is read from the Port Controller's Port ID
- * register in local space.
- *
- * Need to load the 64 bit address of the PC's PortID reg
- * using only one register. Kludge the 41 bits address constant to
- * be 32bits by shifting it 12 bits to the right first.
- */
-#define	LOCAL_PC_PORTID_ADDR_SRL12 0x1FFF4000
-#define	PC_PORT_ID 0xD0
-
-#define	CPU_INDEX(r, scr)			\
-	rdpr	%pstate, scr;			\
-	andn	scr, PSTATE_IE | PSTATE_AM, r;	\
-	wrpr	r, 0, %pstate;			\
-	set	LOCAL_PC_PORTID_ADDR_SRL12, r;  \
-	sllx    r, 12, r;                       \
-	or	r, PC_PORT_ID, r;		\
-	lduwa	[r]ASI_IO, r;			\
-	wrpr	scr, 0, %pstate
-
-#elif	defined(_OPL)
+#ifdef _OPL
 /*
  * For OPL platform, we get CPU_INDEX from ASI_EIDR.
  */
@@ -84,7 +61,7 @@ extern "C" {
 	and	r, 0xfff, r
 
 
-#else /* _STARFIRE */
+#else /* _OPL */
 
 /*
  * UPA supports up to 32 devices while Safari supports up to
@@ -112,7 +89,7 @@ extern "C" {
 	srlx	r, 17, r;		\
 	and	r, CPU_MASK, r
 
-#endif	/* _STARFIRE */
+#endif	/* _OPL */
 
 /*
  * Given a cpu id extract the appropriate word

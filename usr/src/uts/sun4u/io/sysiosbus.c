@@ -27,6 +27,10 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  */
 
+/*
+ * Copyright 2019 Peter Tribble.
+ */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
@@ -50,9 +54,6 @@
 #include <sys/machsystm.h>
 #include <sys/intreg.h>
 #include <sys/ddi_subrdefs.h>
-#ifdef _STARFIRE
-#include <sys/starfire.h>
-#endif /* _STARFIRE */
 #include <sys/sdt.h>
 
 /* Useful debugging Stuff */
@@ -286,20 +287,6 @@ static uint_t sbus_intr_reset(void *);
 static int
 sbus_update_intr_state(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp, uint_t new_intr_state);
-
-#ifdef	_STARFIRE
-void
-pc_ittrans_init(int, caddr_t *);
-
-void
-pc_ittrans_uninit(caddr_t);
-
-int
-pc_translate_tgtid(caddr_t, int, volatile uint64_t *);
-
-void
-pc_ittrans_cleanup(caddr_t, volatile uint64_t *);
-#endif	/* _STARFIRE */
 
 /*
  * Configuration data structures
@@ -693,11 +680,6 @@ sbus_do_detach(dev_info_t *devi)
 	}
 	mutex_exit(&sbus_attachcnt_mutex);
 
-#ifdef _STARFIRE
-	/* free starfire specific soft intr mapping structure */
-	pc_ittrans_uninit(softsp->ittrans_cookie);
-#endif /* _STARFIRE */
-
 	/* free the soft state structure */
 	ddi_soft_state_free(sbusp, instance);
 
@@ -739,11 +721,6 @@ sbus_init(struct sbus_soft_state *softsp, caddr_t address)
 	DPRINTF(SBUS_REGISTERS_DEBUG, ("SYSIO Control reg: 0x%p\n"
 	    "SBUS Control reg: 0x%p", (void *)softsp->sysio_ctrl_reg,
 	    (void *)softsp->sbus_ctrl_reg));
-
-#ifdef _STARFIRE
-	/* Setup interrupt target translation for starfire */
-	pc_ittrans_init(softsp->upa_id, &softsp->ittrans_cookie);
-#endif /* _STARFIRE */
 
 	softsp->intr_mapping_ign =
 	    UPAID_TO_IGN(softsp->upa_id) << IMR_IGN_SHIFT;
@@ -815,27 +792,6 @@ sbus_resume_init(struct sbus_soft_state *softsp, int resume)
 	 * (RAZ) Get rid of this later!!!
 	 */
 
-#ifdef _STARFIRE
-	/*
-	 * For Starfire, we need to program a
-	 * constant odd value.
-	 * Zero out the MID field before ORing
-	 * We leave the LSB of the MID field intact since
-	 * we cannot have a zero(even) MID value
-	 */
-	uint64_t tmpconst = 0x1DULL;
-	*softsp->sysio_ctrl_reg &= 0xFF0FFFFFFFFFFFFFULL;
-	*softsp->sysio_ctrl_reg |= tmpconst << 51;
-
-	/*
-	 * Program in the interrupt group number
-	 * Here we have to convert the starfire
-	 * 7 bit upaid into a 5bit value.
-	 */
-	*softsp->sysio_ctrl_reg |=
-	    (uint64_t)STARFIRE_UPAID2HWIGN(softsp->upa_id)
-	    << SYSIO_IGN;
-#else
 	/* for the rest of sun4u's */
 	*softsp->sysio_ctrl_reg |=
 	    (uint64_t)softsp->upa_id << 51;
@@ -843,7 +799,6 @@ sbus_resume_init(struct sbus_soft_state *softsp, int resume)
 	/* Program in the interrupt group number */
 	*softsp->sysio_ctrl_reg |=
 	    (uint64_t)softsp->upa_id << SYSIO_IGN;
-#endif /* _STARFIRE */
 
 	/*
 	 * Set appropriate fields of sbus control register.
@@ -1821,16 +1776,10 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		    (softsp->intr_hndlr_cnt[slot] == 0)) {
 
 			cpu_id = intr_dist_cpuid();
-#ifdef	_STARFIRE
-			tmp_mondo_vec = pc_translate_tgtid(
-			    softsp->ittrans_cookie, cpu_id,
-			    mondo_vec_reg) << IMR_TID_SHIFT;
-#else
 			tmp_mondo_vec =
 			    cpu_id << IMR_TID_SHIFT;
 			DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: initial "
 			    "mapping reg 0x%lx\n", tmp_mondo_vec));
-#endif	/* _STARFIRE */
 		} else {
 			/*
 			 * There is already a different
@@ -2004,10 +1953,6 @@ sbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 	if ((softsp->intr_hndlr_cnt[slot] == 0) || (slot >= EXT_SBUS_SLOTS)) {
 		ASSERT(sbus_arg->handler_list == NULL);
-#ifdef	_STARFIRE
-		/* Do cleanup for interrupt target translation */
-		pc_ittrans_cleanup(softsp->ittrans_cookie, mondo_vec_reg);
-#endif	/* _STARFIRE */
 	}
 
 
@@ -2245,20 +2190,10 @@ sbus_intrdist(void *arg)
 		last_mondo_vec_reg = (uint64_t *)mondo_vec_reg;
 
 		cpu_id = intr_dist_cpuid();
-#ifdef _STARFIRE
-		/*
-		 * For Starfire it is a pain to check the current target for
-		 * the mondo since we have to read the PC asics ITTR slot
-		 * assigned to this mondo. It will be much easier to assume
-		 * the current target is always different and do the target
-		 * reprogram all the time.
-		 */
-#else
 		if (((*mondo_vec_reg & IMR_TID) >> IMR_TID_SHIFT) == cpu_id) {
 			/* It is the same, don't reprogram */
 			return;
 		}
-#endif	/* _STARFIRE */
 
 		/* So it's OK to reprogram the CPU target */
 
@@ -2315,14 +2250,7 @@ sbus_intrdist(void *arg)
 		}
 
 		/* re-target the mondo and turn it on */
-#ifdef _STARFIRE
-		mondo_vec = (pc_translate_tgtid(softsp->ittrans_cookie,
-		    cpu_id, mondo_vec_reg) <<
-		    INTERRUPT_CPU_FIELD) |
-		    INTERRUPT_VALID;
-#else
 		mondo_vec = (cpu_id << INTERRUPT_CPU_FIELD) | INTERRUPT_VALID;
-#endif	/* _STARFIRE */
 
 		/* write it back to the hardware. */
 		*mondo_vec_reg = mondo_vec;

@@ -22,11 +22,12 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef	_SYS_PROM_PLAT_H
 #define	_SYS_PROM_PLAT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 #include <sys/cpuvar.h>
@@ -260,16 +261,6 @@ extern	int		prom_starcat_iosram_read(uint32_t key, uint32_t offset,
 			    uint32_t len, caddr_t buf);
 extern	int		prom_starcat_iosram_write(uint32_t key, uint32_t offset,
 			    uint32_t len, caddr_t buf);
-
-/*
- * Starfire-specific routines
- */
-extern	int		prom_starfire_add_brd(uint_t cpuid);
-extern	int		prom_starfire_rm_brd(uint_t brdnum);
-extern	void		prom_starfire_add_cpu(uint_t cpuid);
-extern	void		prom_starfire_rm_cpu(uint_t cpuid);
-extern	int		prom_starfire_move_cpu0(uint_t cpuid);
-extern	void		prom_starfire_init_console(uint_t cpuid);
 
 /*
  * OPL-specific routines

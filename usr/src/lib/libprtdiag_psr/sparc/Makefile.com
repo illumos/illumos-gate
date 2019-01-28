@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 
 LIBRARY= libprtdiag_psr.a
@@ -33,7 +34,7 @@ VERS= .1
 #
 PSR_MACH= sun4u
 #
-# PLATFORM_OBJECTS is defined in ./desktop ./wgs ./sunfire ./starfire Makefiles
+# PLATFORM_OBJECTS is defined in ./desktop ./wgs ./sunfire Makefiles
 #
 OBJECTS= $(PLATFORM_OBJECTS)
 

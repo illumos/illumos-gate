@@ -23,11 +23,12 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef _SYS_SYSIOSBUS_H
 #define	_SYS_SYSIOSBUS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef _ASM
 #include <sys/avintr.h>
@@ -319,9 +320,6 @@ struct sbus_soft_state {
 	pfn_t sbus_io_hi_pfn;
 	struct iophyslist *sbus_io_ranges;
 	int intr_mapping_ign;		/* placeholder for the IGN */
-#ifdef	_STARFIRE
-	caddr_t ittrans_cookie;		/* starfire intr target translation */
-#endif	/* _STARFIRE */
 #ifdef	DEBUG
 	kmutex_t iomemlock;		/* Memory usage lock (debug only) */
 	struct io_mem_list *iomem;	/* Memory usage list (debug only) */

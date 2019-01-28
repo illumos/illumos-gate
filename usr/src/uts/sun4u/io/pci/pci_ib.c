@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 /*
  * PCI Interrupt Block (RISCx) implementation
@@ -40,10 +43,6 @@
 #include <sys/clock.h>
 #include <sys/cpuvar.h>
 #include <sys/pci/pci_obj.h>
-
-#ifdef _STARFIRE
-#include <sys/starfire.h>
-#endif /* _STARFIRE */
 
 /*LINTLIBRARY*/
 static uint_t ib_intr_reset(void *arg);
@@ -156,10 +155,6 @@ ib_intr_enable(pci_t *pci_p, ib_ino_t ino)
 	 */
 	mutex_enter(&ib_p->ib_intr_lock);
 	cpu_id = intr_dist_cpuid();
-#ifdef _STARFIRE
-	cpu_id = pc_translate_tgtid(IB2CB(ib_p)->cb_ittrans_cookie, cpu_id,
-	    IB_GET_MAPREG_INO(ino));
-#endif /* _STARFIRE */
 	DEBUG2(DBG_IB, pci_p->pci_dip,
 	    "ib_intr_enable: ino=%x cpu_id=%x\n", ino, cpu_id);
 
@@ -202,10 +197,6 @@ ib_intr_disable(ib_t *ib_p, ib_ino_t ino, int wait)
 	}
 wait_done:
 	IB_INO_INTR_PEND(ib_clear_intr_reg_addr(ib_p, ino));
-#ifdef _STARFIRE
-	pc_ittrans_cleanup(IB2CB(ib_p)->cb_ittrans_cookie,
-	    (volatile uint64_t *)(uintptr_t)ino);
-#endif /* _STARFIRE */
 }
 
 /* can only used for psycho internal interrupts thermal, power, ue, ce, pbm */
@@ -231,15 +222,8 @@ ib_intr_dist_nintr(ib_t *ib_p, ib_ino_t ino, volatile uint64_t *imr_p)
 
 	cpu_id = intr_dist_cpuid();
 
-#ifdef _STARFIRE
-	if (ino) {
-		cpu_id = pc_translate_tgtid(IB2CB(ib_p)->cb_ittrans_cookie,
-		    cpu_id, IB_GET_MAPREG_INO(ino));
-	}
-#else /* _STARFIRE */
 	if (ib_map_reg_get_cpu(*imr_p) == cpu_id)
 		return;
-#endif /* _STARFIRE */
 
 	*imr_p = ib_get_map_reg(IB_IMR2MONDO(imr), cpu_id);
 	imr = *imr_p;	/* flush previous write */
@@ -286,20 +270,8 @@ ib_intr_dist(ib_t *ib_p, ib_ino_info_t *ino_p)
 	imr_p = ib_intr_map_reg_addr(ib_p, ino);
 	state_reg = IB_INO_INTR_STATE_REG(ib_p, ino);
 
-#ifdef _STARFIRE
-	/*
-	 * For Starfire it is a pain to check the current target for
-	 * the mondo since we have to read the PC asics ITTR slot
-	 * assigned to this mondo. It will be much easier to assume
-	 * the current target is always different and do the target
-	 * reprogram all the time.
-	 */
-	cpu_id = pc_translate_tgtid(IB2CB(ib_p)->cb_ittrans_cookie, cpu_id,
-	    IB_GET_MAPREG_INO(ino));
-#else
 	if (ib_map_reg_get_cpu(*imr_p) == cpu_id) /* same cpu, no reprog */
 		return;
-#endif /* _STARFIRE */
 
 	/* disable interrupt, this could disrupt devices sharing our slot */
 	IB_INO_INTR_OFF(imr_p);

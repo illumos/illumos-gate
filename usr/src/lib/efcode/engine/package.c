@@ -22,8 +22,9 @@
  * Copyright 2006 Sun Microsystems, Inc.   All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -165,28 +166,11 @@ deactivate_device(fcode_env_t *env, device_t *d)
 	do_definitions(env);
 }
 
-/*
- * Starfire hack to set '/' device_type to 'upa'
- */
-#include <sys/systeminfo.h>
-static void
-starfire_hack(fcode_env_t *env)
-{
-	char platform[100];
-
-	sysinfo(SI_PLATFORM, platform, sizeof (platform));
-	if (strcmp(platform, "SUNW,Ultra-Enterprise-10000") == 0 &&
-	    find_property(env->root_node, "device_type") == NULL) {
-		create_string_prop(env, "device_type", "upa");
-	}
-}
-
 void
 root_node(fcode_env_t *env)
 {
 	do_also(env);
 	activate_device(env, env->root_node);
-	starfire_hack(env);
 }
 
 void

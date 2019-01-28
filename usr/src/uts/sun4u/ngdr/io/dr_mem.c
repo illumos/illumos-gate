@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2019 Peter Tribble.
+ */
+
+/*
  * DR memory support routines.
  */
 
@@ -628,7 +632,6 @@ dr_detach_mem(dr_handle_t *hp, dr_common_unit_t *cp)
 	}
 }
 
-#ifndef _STARFIRE
 /*
  * XXX workaround for certain lab configurations (see also starcat drmach.c)
  * Temporary code to get around observed incorrect results from
@@ -698,7 +701,6 @@ again:
 }
 
 #define	kphysm_del_span_query dr_del_span_query
-#endif /* _STARFIRE */
 
 /*
  * NOTE: This routine is only partially smart about multiple

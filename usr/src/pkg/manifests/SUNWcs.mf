@@ -25,6 +25,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2017 Toomas Soome <tsoome@me.com>
+# Copyright 2019 Peter Tribble.
 #
 
 <include SUNWcs.man1.inc>
@@ -452,9 +453,6 @@ $(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-15000.xml \
 $(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-880.xml \
     group=sys mode=0444
 $(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire.xml group=sys \
-    mode=0444
-$(sparc_ONLY)file \
-    path=etc/svc/profile/platform_SUNW,Ultra-Enterprise-10000.xml group=sys \
     mode=0444
 $(sparc_ONLY)file \
     path=etc/svc/profile/platform_SUNW,UltraSPARC-IIi-Netract.xml group=sys \

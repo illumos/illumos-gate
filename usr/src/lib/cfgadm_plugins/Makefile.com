@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 # lib/cfgadm_plugins/Makefile.com
 
@@ -37,7 +38,6 @@ LINKED_PLATFORMS	= SUNW,Ultra-2
 LINKED_PLATFORMS	+= SUNW,Ultra-4
 LINKED_PLATFORMS	+= SUNW,Ultra-250
 LINKED_PLATFORMS	+= SUNW,Ultra-Enterprise
-LINKED_PLATFORMS	+= SUNW,Ultra-Enterprise-10000
 LINKED_PLATFORMS	+= SUNW,UltraSPARC-IIi-Netract
 LINKED_PLATFORMS	+= SUNW,UltraSPARC-IIe-NetraCT-40
 LINKED_PLATFORMS	+= SUNW,UltraSPARC-IIe-NetraCT-60

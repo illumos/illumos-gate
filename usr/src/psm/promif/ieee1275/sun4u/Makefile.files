@@ -21,6 +21,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 # psm/promif/ieee1275/sun4u/Makefile.files
 #
@@ -53,7 +54,6 @@ CORE_OBJS +=				\
 	prom_set_traptable.o		\
 	prom_sparc.o			\
 	prom_starcat.o			\
-	prom_starfire.o			\
 	prom_sunfire.o			\
 	prom_tlb.o			\
 	prom_vercheck.o			\

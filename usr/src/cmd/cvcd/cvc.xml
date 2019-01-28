@@ -3,6 +3,7 @@
 <!--
  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
+ Copyright 2019 Peter Tribble.
 
  CDDL HEADER START
 
@@ -22,8 +23,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -49,7 +48,7 @@
 		<service_fmri value='svc:/network/loopback' />
 	</dependency>
 
-	<!-- sckmd is required on OPL and Starcat but not Starfire -->
+	<!-- sckmd is required on OPL and Starcat -->
 	<dependency
 	    name='sckmd'
 	    grouping='optional_all'

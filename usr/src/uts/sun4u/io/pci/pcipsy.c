@@ -22,8 +22,9 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 /*
  * Psycho+ specifics implementation:
@@ -54,10 +55,6 @@
 #include <sys/fm/io/sun4upci.h>
 #include <sys/pci/pci_obj.h>
 #include <sys/pci/pcipsy.h>
-
-#ifdef _STARFIRE
-#include <sys/starfire.h>
-#endif /* _STARFIRE */
 
 static uint32_t pci_identity_init(pci_t *pci_p);
 static int pci_intr_setup(pci_t *pci_p);
@@ -706,9 +703,6 @@ pci_cb_teardown(pci_t *pci_p)
 		cb_disable_nintr(cb_p, CBNINTR_THERMAL, IB_INTR_WAIT);
 		VERIFY(rem_ivintr(mondo, pci_pil[CBNINTR_THERMAL]) == 0);
 	}
-#ifdef _STARFIRE
-	pc_ittrans_uninit(cb_p->cb_ittrans_cookie);
-#endif /* _STARFIRE */
 }
 
 int
@@ -961,27 +955,6 @@ pbm_configure(pbm_t *pbm_p)
 	 */
 	l &= ~PSYCHO_PCI_CTRL_WAKEUP_EN;
 
-#ifdef _STARFIRE
-	/*
-	 * Hack to determine whether we do Starfire special handling
-	 * For starfire, we simply program a constant odd-value
-	 * (0x1D) in the MID field.
-	 *
-	 * Zero out the MID field before ORing. We leave the LSB of
-	 * the MID field intact since we cannot have a zero (even)
-	 * MID value.
-	 */
-	l &= 0xFF0FFFFFFFFFFFFFULL;
-	l |= 0x1DULL << 51;
-
-	/*
-	 * Program in the Interrupt Group Number.  Here we have to
-	 * convert the starfire 7bit upaid into a 5bit value.
-	 */
-	l |= (uint64_t)STARFIRE_UPAID2HWIGN(pbm_p->pbm_pci_p->pci_id)
-		<< COMMON_CB_CONTROL_STATUS_IGN_SHIFT;
-#endif /* _STARFIRE */
-
 	/*
 	 * Now finally write the control register with the appropriate value.
 	 */
@@ -1159,11 +1132,6 @@ pci_cb_setup(pci_t *pci_p)
 	csr |= COMMON_CB_CONTROL_STATUS_APCKEN;
 	csr &= ~COMMON_CB_CONTROL_STATUS_IAP;
 	stdphysio(csr_pa, csr);
-
-#ifdef _STARFIRE
-	/* Setup Starfire interrupt target translation */
-	pc_ittrans_init(pci_p->pci_id, &cb_p->cb_ittrans_cookie);
-#endif /* _STARFIRE */
 
 }
 

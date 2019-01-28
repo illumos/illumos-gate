@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 # psm/stand/bootblks/ufs/sparc/sun4u/Makefile
 #
@@ -40,7 +41,6 @@ PLATLINKS	= SUNW,Ultra-2
 PLATLINKS	+= SUNW,Ultra-250
 PLATLINKS	+= SUNW,Ultra-4
 PLATLINKS	+= SUNW,Ultra-Enterprise
-PLATLINKS	+= SUNW,Ultra-Enterprise-10000
 PLATLINKS	+= SUNW,Sun-Blade-100
 PLATLINKS	+= SUNW,Sun-Blade-1000
 PLATLINKS	+= SUNW,Sun-Blade-1500

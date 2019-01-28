@@ -20,12 +20,11 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1997 by Sun Microsystems, Inc.
 # All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
-# Makefile definitions for Starfire's Network Console related items.
+# Makefile definitions for Starcat's Network Console related items.
 #
 # cmd/cvcd/sparc/Makefile
 #

@@ -25,6 +25,9 @@
 /*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #include <sys/sysmacros.h>
 #include <sys/stack.h>
@@ -115,7 +118,6 @@ intr_init(cpu_t *cp)
 	extern uint_t softlevel1();
 
 	init_ivintr();
-	REGISTER_BBUS_INTR();
 
 	/*
 	 * Register these software interrupts for ddi timer.

@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef	_SYS_PCI_IB_H
 #define	_SYS_PCI_IB_H
@@ -177,17 +180,6 @@ struct ib_ino_info {
 	((imr) & (COMMON_INTR_MAP_REG_IGN | COMMON_INTR_MAP_REG_INO))
 
 #define	IB_IS_OBIO_INO(ino) (ino & 0x20)
-
-#ifdef _STARFIRE
-/*
- * returns a uniq ino per interrupt mapping register
- * For on board devices, inos are not shared. But for plugin devices,
- * return the 1st ino of the 4 that are sharing the same mapping register.
- */
-#define	IB_GET_MAPREG_INO(ino)	\
-	((volatile uint64_t *)(uintptr_t)((ino & 0x20) ? \
-	    ino : ((ino >> 2) << 2)))
-#endif /* _STARFIRE */
 
 #define	IB_IGN_TO_MONDO(ign, ino)	(((ign) << PCI_INO_BITS) | (ino))
 #define	IB_INO_TO_MONDO(ib_p, ino)	IB_IGN_TO_MONDO((ib_p)->ib_ign, ino)

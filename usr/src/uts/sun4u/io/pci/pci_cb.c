@@ -23,8 +23,9 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 /*
  * PCI Control Block object
@@ -37,10 +38,6 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/pci/pci_obj.h>
 #include <sys/machsystm.h>
-
-#ifdef _STARFIRE
-#include <sys/starfire.h>
-#endif /* _STARFIRE */
 
 /*LINTLIBRARY*/
 
@@ -100,11 +97,6 @@ cb_enable_nintr(pci_t *pci_p, enum cb_nintr_index idx)
 
 	mutex_enter(&cb_p->cb_intr_lock);
 	cpu_id = intr_dist_cpuid();
-
-#ifdef _STARFIRE
-	cpu_id = pc_translate_tgtid(cb_p->cb_ittrans_cookie, cpu_id,
-		IB_GET_MAPREG_INO(ino));
-#endif /* _STARFIRE */
 
 	reg = ib_get_map_reg(mondo, cpu_id);
 	stdphysio(pa, reg);
@@ -167,10 +159,6 @@ cb_disable_nintr(cb_t *cb_p, enum cb_nintr_index idx, int wait)
 	cb_set_nintr_reg(cb_p, ino, COMMON_CLEAR_INTR_REG_PENDING);
 	cb_p->cb_inos[idx] = 0;
 	mutex_exit(&cb_p->cb_intr_lock);
-#ifdef _STARFIRE
-	pc_ittrans_cleanup(cb_p->cb_ittrans_cookie,
-	    (volatile uint64_t *)(uintptr_t)ino);
-#endif /* _STARFIRE */
 }
 
 void
@@ -206,13 +194,8 @@ cb_intr_dist(void *arg)
 
 		mondo = CB_INO_TO_MONDO(cb_p, ino);
 		cpu_id = intr_dist_cpuid();
-#ifdef _STARFIRE
-		cpu_id = pc_translate_tgtid(cb_p->cb_ittrans_cookie, cpu_id,
-			IB_GET_MAPREG_INO(ino));
-#else
 		if (ib_map_reg_get_cpu(imr) == cpu_id)
 			continue;	/* same cpu target, no re-program */
-#endif
 		cb_disable_nintr_reg(cb_p, ino, IB_INTR_WAIT);
 		stdphysio(mr_pa, ib_get_map_reg(mondo, cpu_id));
 		(void) lddphysio(mr_pa);	/* flush previous write */

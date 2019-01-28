@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
 
 #
@@ -45,11 +46,6 @@ dir path=platform/SUNW,Sun-Fire-15000/kernel group=sys
 dir path=platform/SUNW,Sun-Fire-15000/kernel/drv group=sys
 dir path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64) group=sys
 dir path=platform/SUNW,Sun-Fire-15000/lib
-dir path=platform/SUNW,Ultra-Enterprise-10000 group=sys
-dir path=platform/SUNW,Ultra-Enterprise-10000/kernel group=sys
-dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv group=sys
-dir path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64) group=sys
-dir path=platform/SUNW,Ultra-Enterprise-10000/lib
 dir path=usr/share/man
 dir path=usr/share/man/man1m
 dir path=usr/share/man/man7d
@@ -62,14 +58,6 @@ file path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/cvcredir group=sys
 file path=platform/SUNW,Sun-Fire-15000/kernel/drv/cvc.conf group=sys
 file path=platform/SUNW,Sun-Fire-15000/kernel/drv/cvcredir.conf group=sys
 file path=platform/SUNW,Sun-Fire-15000/lib/cvcd group=sys mode=0755
-file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64)/cvc \
-    group=sys
-file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/$(ARCH64)/cvcredir \
-    group=sys
-file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/cvc.conf group=sys
-file path=platform/SUNW,Ultra-Enterprise-10000/kernel/drv/cvcredir.conf \
-    group=sys
-file path=platform/SUNW,Ultra-Enterprise-10000/lib/cvcd group=sys mode=0700
 file path=usr/share/man/man1m/cvcd.1m
 file path=usr/share/man/man7d/cvc.7d
 file path=usr/share/man/man7d/cvcredir.7d

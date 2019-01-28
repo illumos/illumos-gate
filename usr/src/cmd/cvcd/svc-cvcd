@@ -22,8 +22,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 Peter Tribble.
 #
 # Start script for cvcd
 #
@@ -45,17 +44,13 @@ getproparg() {
 }
 
 platform=`/sbin/uname -i`
-starfire="SUNW,Ultra-Enterprise-10000"
 starcat="SUNW,Sun-Fire-15000" 
 
-args=""
 if [ $platform = "$starcat" ]; then
+	args=""
 	args="$args `getproparg -a cvc/ah_auth`"
 	args="$args `getproparg -e cvc/esp_encr`"
 	args="$args `getproparg -u cvc/esp_auth`"
-fi
-
-if [ $platform = "$starfire" -o $platform = "$starcat" ]; then
 	/platform/$platform/lib/cvcd $args	# Fail if can't execute
 	exit					# Use cvcd's exit status
 else
