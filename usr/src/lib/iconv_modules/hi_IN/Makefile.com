@@ -35,7 +35,7 @@ dummy: all
 
 include $(SRC)/lib/iconv_modules/Makefile.iconv
 
-CFLAGS += -I../include
+CPPFLAGS += -I../include
 
 # needs work
 SMOFF += index_overflow
