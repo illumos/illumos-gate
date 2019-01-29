@@ -1883,6 +1883,7 @@ mdb_ctf_synthetics_create_base(int kind)
 	return (0);
 
 discard:
+	err = set_errno(ctf_to_errno(ctf_errno(cp)));
 	(void) ctf_discard(cp);
 	return (err);
 }

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2015, Joyent, Inc. 
+# Copyright (c) 2015, Joyent, Inc.
 #
 
 include ../Makefile.com

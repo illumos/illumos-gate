@@ -30,8 +30,8 @@
  * then treat it as a circular buffer.
  *
  * Items will be issued to a processing function two at a time, until there is
- * only one item remaining in the queue, at which point we will be doing doing
- * any merging work.
+ * only one item remaining in the queue, at which point we will be doing any
+ * merging work.
  *
  * A given queue has three different entries that we care about tracking:
  *
@@ -415,7 +415,7 @@ mergeq_push(mergeq_t *mqp, size_t slot, void *item)
 		mqp->mq_ncommit %= mqp->mq_cap;
 		mqp->mq_gncommit++;
 	}
-	cond_broadcast(&mqp->mq_cond);
+	(void) cond_broadcast(&mqp->mq_cond);
 }
 
 static void *
@@ -514,7 +514,7 @@ mergeq_thr_merge(void *arg)
 			if (mqp->mq_iserror == B_FALSE) {
 				mqp->mq_iserror = B_TRUE;
 				mqp->mq_error = ret;
-				cond_broadcast(&mqp->mq_cond);
+				(void) cond_broadcast(&mqp->mq_cond);
 			}
 			mqp->mq_nactthrs--;
 			VERIFY0(mutex_unlock(&mqp->mq_lock));

@@ -55,19 +55,20 @@ and
 .Lp
 Two
 .Sy labels
-are considered the same, if they have the same name.
+are the same if they have the same name.
 Two
 .Sy objects
-are considered the same if they have the same name and the type of the
+are the same if they have the same name and the type of the
 object is the same.
 Two
 .Sy functions
-are considered the same if they have the same, the same return type, the
-same number of arguments, and the types of their arguments are the same.
+are considered the same if they have the same name, the same return
+type, the same number of arguments, and the types of their arguments are
+the same.
 .Lp
 Two
 .Sy types
-are considered the same if they have the same, they represent the same
+are considered the same if they have the same name, they represent the same
 kind of thing, and the contents of the type are the same.
 This varies for each specific kind, for example, two structs are the
 same if they have the same members whose types, offsets, and names are
@@ -118,7 +119,7 @@ When diffing
 only consider the function
 .Em function .
 This option requires that the option
-.Fl -f
+.Fl f
 be specified and can be repeated multiple times.
 .Ed
 .It Fl I
@@ -208,7 +209,7 @@ Types specified here do not impact the diffing of
 or
 .Sy functions .
 Even with
-.Fl -T
+.Fl T
 specified, other types will be diffed as necessary for the evaluation of
 the named types; however, the results of those intermediate differences
 will not impact the results of

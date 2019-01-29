@@ -167,11 +167,11 @@ typedef struct ctf_dtdef {
 } ctf_dtdef_t;
 
 typedef struct ctf_dsdef {
-	ctf_list_t dts_list;	/* list forward/back pointers */
-	ulong_t dts_symidx;	/* symbol id */
-	ctf_id_t dts_tid;	/* type for obj, 0 if function */
-	uint_t dts_nargs;
-	ctf_id_t *dts_argc;	/* function argv */
+	ctf_list_t dsd_list;	/* list forward/back pointers */
+	ulong_t dsd_symidx;	/* symbol id */
+	ctf_id_t dsd_tid;	/* type for obj, 0 if function */
+	uint_t dsd_nargs;
+	ctf_id_t *dsd_argc;	/* function argv */
 } ctf_dsdef_t;
 
 typedef struct ctf_dldef {

@@ -1029,3 +1029,19 @@ lib/llib-lcustr.ln
 opt/onbld/bin/i386/smatch	i386
 opt/onbld/bin/sparc/smatch	sparc
 opt/onbld/share/smatch
+
+#
+# libdwarf is private for the moment
+#
+lib/amd64/libdwarf.so			i386
+lib/sparcv9/libdwarf.so			sparc
+lib/libdwarf.so
+usr/lib/amd64/libdwarf.so		i386
+usr/lib/sparcv9/libdwarf.so		sparc
+usr/lib/libdwarf.so
+
+#
+# We're not quite ready to ship ctfconvert and ctfmerge
+#
+usr/bin/ctfconvert
+usr/bin/ctfmerge

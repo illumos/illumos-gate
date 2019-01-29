@@ -161,7 +161,6 @@ z_strerror(int err)
 static int
 ctf_zdata_init(ctf_zdata_t *czd, ctf_file_t *fp)
 {
-	int err;
 	ctf_header_t *cthp;
 
 	bzero(czd, sizeof (ctf_zdata_t));
@@ -178,8 +177,8 @@ ctf_zdata_init(ctf_zdata_t *czd, ctf_file_t *fp)
 	czd->czd_next = (void *)((uintptr_t)czd->czd_buf +
 	    sizeof (ctf_header_t));
 
-	if ((err = zlib.z_initcomp(&czd->czd_zstr, Z_BEST_COMPRESSION,
-	    ZLIB_VERSION, sizeof (z_stream))) != Z_OK)
+	if (zlib.z_initcomp(&czd->czd_zstr, Z_BEST_COMPRESSION,
+	    ZLIB_VERSION, sizeof (z_stream)) != Z_OK)
 		return (ctf_set_errno(fp, ECTF_ZLIB));
 
 	return (0);
@@ -217,7 +216,7 @@ ctf_zdata_compress_buffer(ctf_zdata_t *czd, const void *buf, size_t bufsize)
 
 	czd->czd_zstr.next_out = czd->czd_next;
 	czd->czd_zstr.avail_out = czd->czd_allocsz -
-	    (czd->czd_next - czd->czd_buf);
+	    ((uintptr_t)czd->czd_next - (uintptr_t)czd->czd_buf);
 	czd->czd_zstr.next_in = (Bytef *)buf;
 	czd->czd_zstr.avail_in = bufsize;
 
@@ -292,8 +291,8 @@ ctf_zdata_cleanup(ctf_zdata_t *czd)
  * size of the allocation. These may be different due to the nature of
  * compression.
  *
- * In addition, we flush the compression inbetween our two phases such that we
- * maintain a different dictionary bbetween the CTF data and the string section.
+ * In addition, we flush the compression between our two phases such that we
+ * maintain a different dictionary between the CTF data and the string section.
  */
 int
 ctf_compress(ctf_file_t *fp, void **buf, size_t *allocsz, size_t *elfsize)
@@ -329,7 +328,7 @@ ctf_compress(ctf_file_t *fp, void **buf, size_t *allocsz, size_t *elfsize)
 
 	*buf = czd.czd_buf;
 	*allocsz = czd.czd_allocsz;
-	*elfsize = (uintptr_t)(czd.czd_next - czd.czd_buf);
+	*elfsize = (uintptr_t)czd.czd_next - (uintptr_t)czd.czd_buf;
 
 	return (0);
 }

@@ -14,7 +14,7 @@
  */
 
 /*
- * The following ia a basic overview of how we diff types in containers (the
+ * The following is a basic overview of how we diff types in containers (the
  * generally interesting part of diff, and what's used by merge). We maintain
  * two mapping tables, a table of forward mappings (src->dest), and a reverse
  * mapping (dest->src). Both are initialized to contain no mapping, and can also
@@ -28,7 +28,7 @@
  * following structure:
  *
  * struct foo {
- * 	struct foo *foo_next;
+ *	struct foo *foo_next;
  * };
  *
  * If it turns out that we were wrong, we discard our guesses.
@@ -425,7 +425,7 @@ ctf_diff_struct(ctf_diff_t *cds, ctf_file_t *ifp, ctf_id_t iid, ctf_file_t *ofp,
 /*
  * Two unions are the same if they have the same set of members. This is similar
  * to, but slightly different from a struct. The offsets of members don't
- * matter. However, their is no guarantee of ordering so we have to fall back to
+ * matter. However, there is no guarantee of ordering so we have to fall back to
  * doing an O(N^2) scan.
  */
 typedef struct ctf_diff_union_member {
@@ -715,20 +715,18 @@ ctf_diff_pass1(ctf_diff_t *cds, boolean_t self)
 	int i, j, diff;
 	int istart, iend, jstart, jend;
 
+	istart = 1;
+	iend = cds->cds_ifp->ctf_typemax;
 	if (cds->cds_ifp->ctf_flags & LCTF_CHILD) {
-		istart = 0x8001;
-		iend = cds->cds_ifp->ctf_typemax + 0x8000;
-	} else {
-		istart = 1;
-		iend = cds->cds_ifp->ctf_typemax;
+		istart += CTF_CHILD_START;
+		iend += CTF_CHILD_START;
 	}
 
+	jstart = 1;
+	jend = cds->cds_ofp->ctf_typemax;
 	if (cds->cds_ofp->ctf_flags & LCTF_CHILD) {
-		jstart = 0x8001;
-		jend = cds->cds_ofp->ctf_typemax + 0x8000;
-	} else {
-		jstart = 1;
-		jend = cds->cds_ofp->ctf_typemax;
+		jstart += CTF_CHILD_START;
+		jend += CTF_CHILD_START;
 	}
 
 	for (i = istart; i <= iend; i++) {
@@ -803,8 +801,8 @@ ctf_diff_pass2(ctf_diff_t *cds)
 	start = 0x1;
 	end = cds->cds_ofp->ctf_typemax;
 	if (cds->cds_ofp->ctf_flags & LCTF_CHILD) {
-		start += 0x8000;
-		end += 0x8000;
+		start += CTF_CHILD_START;
+		end += CTF_CHILD_START;
 	}
 
 	for (i = start; i <= end; i++) {
@@ -834,9 +832,9 @@ ctf_diff_init(ctf_file_t *ifp, ctf_file_t *ofp, ctf_diff_t **cdsp)
 	fsize = sizeof (ctf_id_t) * ifp->ctf_typemax;
 	rsize = sizeof (ctf_id_t) * ofp->ctf_typemax;
 	if (ifp->ctf_flags & LCTF_CHILD)
-		fsize += 0x8000 * sizeof (ctf_id_t);
+		fsize += CTF_CHILD_START * sizeof (ctf_id_t);
 	if (ofp->ctf_flags & LCTF_CHILD)
-		rsize += 0x8000 * sizeof (ctf_id_t);
+		rsize += CTF_CHILD_START * sizeof (ctf_id_t);
 
 	cds->cds_forward = ctf_alloc(fsize);
 	if (cds->cds_forward == NULL) {
@@ -914,9 +912,9 @@ ctf_diff_fini(ctf_diff_t *cds)
 	fsize = sizeof (ctf_id_t) * cds->cds_ifp->ctf_typemax;
 	rsize = sizeof (ctf_id_t) * cds->cds_ofp->ctf_typemax;
 	if (cds->cds_ifp->ctf_flags & LCTF_CHILD)
-		fsize += 0x8000 * sizeof (ctf_id_t);
+		fsize += CTF_CHILD_START * sizeof (ctf_id_t);
 	if (cds->cds_ofp->ctf_flags & LCTF_CHILD)
-		rsize += 0x8000 * sizeof (ctf_id_t);
+		rsize += CTF_CHILD_START * sizeof (ctf_id_t);
 
 	if (cds->cds_ifuncs != NULL)
 		ctf_free(cds->cds_ifuncs,
@@ -969,8 +967,8 @@ ctf_diff_symid(ctf_diff_t *cds, ctf_id_t iid, ctf_id_t oid)
 
 	/*
 	 * If we have parent containers on the scene here, we need to go through
-	 * and do a full diff check because while a diff for types will not
-	 * actually go through and check types in the parent container.
+	 * and do a full diff check because a diff for types will not actually
+	 * go through and check types in the parent container.
 	 */
 	if (iid == 0 || oid == 0)
 		return (iid == oid ? B_FALSE: B_TRUE);

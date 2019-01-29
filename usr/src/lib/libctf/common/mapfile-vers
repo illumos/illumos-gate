@@ -58,8 +58,8 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_add_integer;
 	ctf_add_label;
 	ctf_add_member;
-	ctf_add_pointer;
 	ctf_add_object;
+	ctf_add_pointer;
 	ctf_add_restrict;
 	ctf_add_struct;
 	ctf_add_type;
@@ -69,10 +69,10 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_create;
 	ctf_dataptr;
 	ctf_delete_type;
-	ctf_diff_init;
 	ctf_diff_fini;
 	ctf_diff_functions;
 	ctf_diff_getflags;
+	ctf_diff_init;
 	ctf_diff_objects;
 	ctf_diff_setflags;
 	ctf_diff_types;

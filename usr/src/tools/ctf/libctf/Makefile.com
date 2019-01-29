@@ -16,14 +16,6 @@
 include $(SRC)/lib/libctf/Makefile.shared.com
 include ../../Makefile.ctf
 
-#
-# For some reason LDFLAGS doesn't seem to be taking effect at the
-# moment. Therefore add what we need to LDLIBS for now.
-#
-LDLIBS += \
-	-L$(ROOTONBLDLIBMACH) \
-	'-R$$ORIGIN/../../lib/$(MACH)' \
-
 CSTD = $(CSTD_GNU99)
 C99LMODE = -Xc99=%all
 
@@ -33,7 +25,8 @@ CPPFLAGS +=	-I$(SRC)/lib/libctf/common/ \
 		-include ../../common/ctf_headers.h \
 		-DCTF_OLD_VERSIONS \
 		-DCTF_TOOLS_BUILD
-LDLIBS += -lc -lelf -ldwarf -lavl
+LDLIBS += -lc -lelf -L$(ROOTONBLDLIBMACH) -ldwarf -lavl
+DYNFLAGS += '-R$$ORIGIN/../../lib/$(MACH)'
 
 .KEEP_STATE:
 

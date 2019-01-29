@@ -279,8 +279,7 @@ main(int argc, char *argv[])
 			errno = 0;
 			argj = strtol(optarg, &eptr, 10);
 			if (errno != 0 || argj == LONG_MAX ||
-			    argj == LONG_MIN || argj <= 0 ||
-			    argj > UINT_MAX || *eptr != '\0') {
+			    argj > 1024 || *eptr != '\0') {
 				ctfconvert_fatal("invalid argument for -j: "
 				    "%s\n", optarg);
 			}

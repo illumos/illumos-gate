@@ -27,7 +27,7 @@
  */
 
 /*
- * Routines for writing ctf data to elf files, originally from the ctf tools.
+ * Routines for writing ctf data to elf files.
  */
 
 #include <libctf_impl.h>
@@ -413,9 +413,9 @@ ctf_elfwrite(ctf_file_t *fp, const char *input, const char *output, int flags)
 
 	ret = ctf_elffdwrite(fp, ifd, ofd, flags);
 
-	if (close(ifd) != 0 && ret != 0)
+	if (close(ifd) != 0 && ret == 0)
 		ret = ctf_set_errno(fp, errno);
-	if (close(ofd) != 0 && ret != 0)
+	if (close(ofd) != 0 && ret == 0)
 		ret = ctf_set_errno(fp, errno);
 
 	return (ret);

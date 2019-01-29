@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-PROG = ctfconvert-altexec
+PROG = ctfconvert
 SRCS = ctfconvert.c
 
 include ../../Makefile.ctf

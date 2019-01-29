@@ -25,7 +25,6 @@
 # Copyright 2008, 2010, Richard Lowe
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
-# Copyright 2018 (c) Joyent, Inc.  All rights reserved.
 # Copyright (c) 2017 by Delphix. All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
@@ -1730,9 +1729,9 @@ if [[ "$t_FLAG" = "y" ]]; then
 		GENOFFSETS=${TOOLS_PROTO}/opt/onbld/bin/genoffsets
 		export GENOFFSETS
 
-		CTFCONVERT=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert-altexec
+		CTFCONVERT=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfconvert
 		export CTFCONVERT
-		CTFMERGE=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge-altexec
+		CTFMERGE=${TOOLS_PROTO}/opt/onbld/bin/${MACH}/ctfmerge
 		export CTFMERGE
 
 		PATH="${TOOLS_PROTO}/opt/onbld/bin/${MACH}:${PATH}"

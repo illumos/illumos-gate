@@ -13,7 +13,7 @@
 # Copyright (c) 2015, Joyent, Inc.
 #
 
-PROG= ctfmerge 
+PROG= ctfmerge
 
 include ../Makefile.cmd
 

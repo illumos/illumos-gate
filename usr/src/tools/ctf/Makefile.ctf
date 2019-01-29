@@ -29,12 +29,12 @@ include ../../../Makefile.tools
 #
 # A `make install' from the tools directory needs to work, even if the rest of
 # the tree hasn't been built.  As such, we need to tell the ctf builds how
-# to find the ctf specific headers located outside the tools subtree. We also 
+# to find the ctf specific headers located outside the tools subtree. We also
 # want to tell them how to get to the common tools source files.
-# 
+#
 # For additonal details on the ordering of includes via -I, see the comments
 # in $(SRC)/tools/ctf/common/ctf_headers.h.
-# 
+#
 
 HDRDIRS= \
 	-_gcc=-nostdinc \

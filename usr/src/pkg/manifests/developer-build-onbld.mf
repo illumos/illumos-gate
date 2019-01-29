@@ -78,6 +78,7 @@ file path=opt/onbld/bin/$(ARCH)/codereview mode=0555
 $(i386_ONLY)file path=opt/onbld/bin/$(ARCH)/cpcgen mode=0555
 file path=opt/onbld/bin/$(ARCH)/cscope-fast mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfconvert mode=0555
+file path=opt/onbld/bin/$(ARCH)/ctfdiff mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfdump mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfmerge mode=0555
 file path=opt/onbld/bin/$(ARCH)/ctfstabs mode=0555
@@ -146,6 +147,7 @@ file path=opt/onbld/etc/exception_lists/interface_cmp
 file path=opt/onbld/etc/its.conf
 file path=opt/onbld/etc/its.reg
 file path=opt/onbld/lib/$(ARCH)/64/libmakestate.so.1
+file path=opt/onbld/lib/$(ARCH)/libctf.so.1 mode=0555
 file path=opt/onbld/lib/$(ARCH)/libdwarf.so.1
 file path=opt/onbld/lib/$(ARCH)/libmakestate.so.1
 file path=opt/onbld/lib/perl/onbld_elfmod.pm
@@ -396,10 +398,11 @@ legacy pkg=SUNWonbld desc="tools used to build the OS-Net consolidation" \
     name="OS-Net Build Tools" version=11.11,REV=2009.10.22
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
-license usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE \
-    license=usr/src/tools/ctf/dwarf/THIRDPARTYLICENSE
+license usr/src/lib/libdwarf/THIRDPARTYLICENSE \
+    license=usr/src/lib/libdwarf/THIRDPARTYLICENSE
 link path=opt/onbld/bin/$(ARCH)/dmake target=make
 link path=opt/onbld/bin/git-nits target=git-pbchk
+link path=opt/onbld/lib/$(ARCH)/libctf.so target=libctf.so.1
 $(python2tools_ONLY)link path=opt/onbld/lib/python \
     target=python$(PYTHON_VERSION)
 link path=opt/onbld/man/man1onbld/git-nits.1onbld target=git-pbchk.1onbld

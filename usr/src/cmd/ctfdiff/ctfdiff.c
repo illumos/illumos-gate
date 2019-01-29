@@ -100,7 +100,7 @@ ctfdiff_func_cb(ctf_file_t *ifp, ulong_t iidx, boolean_t similar,
 	if (ctf_symbol_name(ifp, iidx, namebuf, sizeof (namebuf)) == NULL) {
 		if (g_nextfunc != 0)
 			return;
-		(void) printf("ctf container %s function %ld is different\n",
+		(void) printf("ctf container %s function %lu is different\n",
 		    ctfdiff_fp_to_name(ifp), iidx);
 	} else {
 		if (g_nextfunc != 0) {
@@ -112,7 +112,7 @@ ctfdiff_func_cb(ctf_file_t *ifp, ulong_t iidx, boolean_t similar,
 			if (i == g_nextfunc)
 				return;
 		}
-		(void) printf("ctf container %s function %s (%ld) is "
+		(void) printf("ctf container %s function %s (%lu) is "
 		    "different\n", ctfdiff_fp_to_name(ifp), namebuf, iidx);
 	}
 
@@ -132,7 +132,7 @@ ctfdiff_obj_cb(ctf_file_t *ifp, ulong_t iidx, ctf_id_t iid, boolean_t similar,
 	if (ctf_symbol_name(ifp, iidx, namebuf, sizeof (namebuf)) == NULL) {
 		if (g_nextobj != 0)
 			return;
-		(void) printf("ctf container %s object %ld is different\n",
+		(void) printf("ctf container %s object %lu is different\n",
 		    ctfdiff_fp_to_name(ifp), iidx);
 	} else {
 		if (g_nextobj != 0) {
@@ -144,7 +144,7 @@ ctfdiff_obj_cb(ctf_file_t *ifp, ulong_t iidx, ctf_id_t iid, boolean_t similar,
 			if (i == g_nextobj)
 				return;
 		}
-		(void) printf("ctf container %s object %s (%ld) is different\n",
+		(void) printf("ctf container %s object %s (%lu) is different\n",
 		    ctfdiff_fp_to_name(ifp), namebuf, iidx);
 	}
 

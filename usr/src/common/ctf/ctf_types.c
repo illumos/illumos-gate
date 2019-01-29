@@ -1257,7 +1257,7 @@ ctf_string_iter(ctf_file_t *fp, ctf_string_f *func, void *arg)
 }
 
 /*
- * fp isn't strictly necesasry at the moment. However, if we ever rev the file
+ * fp isn't strictly necessary at the moment. However, if we ever rev the file
  * format, the valid values for kind will change.
  */
 const char *

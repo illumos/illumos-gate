@@ -14,9 +14,7 @@
  */
 
 /*
- * Dump information about CTF containers. This was inspired by the original
- * ctfdump written in tools/ctf, but this has been reimplemented in terms of
- * libctf.
+ * Dump information about CTF containers.
  */
 
 #include <stdio.h>
@@ -179,8 +177,8 @@ ctfdump_objects_cb(const char *name, ctf_id_t id, ulong_t symidx, void *arg)
 
 	int len;
 
-	len = snprintf(NULL, 0, "  [%u] %u", g_stats.cs_ndata, id);
-	ctfdump_printf(CTFDUMP_OBJECTS, "  [%u] %u %*s%s (%u)\n",
+	len = snprintf(NULL, 0, "  [%lu] %ld", g_stats.cs_ndata, id);
+	ctfdump_printf(CTFDUMP_OBJECTS, "  [%lu] %ld %*s%s (%lu)\n",
 	    g_stats.cs_ndata, id, MAX(15 - len, 0), "", name, symidx);
 	g_stats.cs_ndata++;
 	return (0);
@@ -224,10 +222,10 @@ ctfdump_functions_cb(const char *name, ulong_t symidx, ctf_funcinfo_t *ctc,
 	}
 
 	ctfdump_printf(CTFDUMP_FUNCTIONS,
-	    "  [%lu] %s (%lu) returns: %u args: (", g_stats.cs_nfuncs, name,
+	    "  [%lu] %s (%lu) returns: %ld args: (", g_stats.cs_nfuncs, name,
 	    symidx, ctc->ctc_return);
 	for (i = 0; i < ctc->ctc_argc; i++)
-		ctfdump_printf(CTFDUMP_FUNCTIONS, "%lu%s", g_fargc[i],
+		ctfdump_printf(CTFDUMP_FUNCTIONS, "%ld%s", g_fargc[i],
 		    i + 1 == ctc->ctc_argc ? "" : ", ");
 	if (ctc->ctc_flags & CTF_FUNC_VARARG)
 		ctfdump_printf(CTFDUMP_FUNCTIONS, "%s...",
@@ -291,7 +289,7 @@ static int
 ctfdump_labels_cb(const char *name, const ctf_lblinfo_t *li, void *arg)
 {
 	_NOTE(ARGUNUSED(arg));
-	ctfdump_printf(CTFDUMP_LABELS, "  %5lu %s\n", li->ctb_typeidx, name);
+	ctfdump_printf(CTFDUMP_LABELS, "  %5ld %s\n", li->ctb_typeidx, name);
 	return (0);
 }
 
@@ -485,7 +483,7 @@ static int
 ctfdump_member_cb(const char *member, ctf_id_t type, ulong_t off, void *arg)
 {
 	int *count = arg;
-	ctfdump_printf(CTFDUMP_TYPES, "\t%s type=%lu off=%lu\n", member, type,
+	ctfdump_printf(CTFDUMP_TYPES, "\t%s type=%ld off=%lu\n", member, type,
 	    off);
 	*count = *count + 1;
 	return (0);
@@ -519,7 +517,7 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 
 	if (ctf_type_name(g_fp, id, name, sizeof (name)) == NULL) {
 		if (ctf_errno(g_fp) != ECTF_NOPARENT)
-			ctfdump_fatal("type %lu missing name: %s\n", id,
+			ctfdump_fatal("type %ld missing name: %s\n", id,
 			    ctf_errmsg(ctf_errno(g_fp)));
 		(void) snprintf(name, sizeof (name), "(unknown %s)",
 		    ctf_kind_name(g_fp, kind));
@@ -527,9 +525,9 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 
 	g_stats.cs_ntypes[kind]++;
 	if (root == B_TRUE)
-		ctfdump_printf(CTFDUMP_TYPES, "  <%lu> ", id);
+		ctfdump_printf(CTFDUMP_TYPES, "  <%ld> ", id);
 	else
-		ctfdump_printf(CTFDUMP_TYPES, "  [%lu] ", id);
+		ctfdump_printf(CTFDUMP_TYPES, "  [%ld] ", id);
 
 	switch (kind) {
 	case CTF_K_UNKNOWN:
@@ -558,14 +556,14 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 		if ((ref = ctf_type_reference(g_fp, id)) == CTF_ERR)
 			ctfdump_fatal("failed to get reference type for %s: "
 			    "%s\n", name, ctf_errmsg(ctf_errno(g_fp)));
-		ctfdump_printf(CTFDUMP_TYPES, "%s refers to %lu", name,
+		ctfdump_printf(CTFDUMP_TYPES, "%s refers to %ld", name,
 		    ref);
 		break;
 	case CTF_K_ARRAY:
 		if (ctf_array_info(g_fp, id, &ar) == CTF_ERR)
 			ctfdump_fatal("failed to get array information for "
 			    "%s: %s\n", name, ctf_errmsg(ctf_errno(g_fp)));
-		ctfdump_printf(CTFDUMP_TYPES, "%s contents: %lu, index: %lu",
+		ctfdump_printf(CTFDUMP_TYPES, "%s contents: %ld, index: %ld",
 		    name, ar.ctr_contents, ar.ctr_index);
 		break;
 	case CTF_K_FUNCTION:
@@ -581,9 +579,9 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 				    ctf_errmsg(ctf_errno(g_fp)));
 		}
 		ctfdump_printf(CTFDUMP_TYPES,
-		    "%s returns: %lu args: (", name, ctc.ctc_return);
+		    "%s returns: %ld args: (", name, ctc.ctc_return);
 		for (i = 0; i < ctc.ctc_argc; i++) {
-			ctfdump_printf(CTFDUMP_TYPES, "%lu%s", g_fargc[i],
+			ctfdump_printf(CTFDUMP_TYPES, "%ld%s", g_fargc[i],
 			    i + 1 == ctc.ctc_argc ? "" : ", ");
 		}
 		if (ctc.ctc_flags & CTF_FUNC_VARARG)
@@ -597,7 +595,7 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 		if (size == CTF_ERR)
 			ctfdump_fatal("failed to get size of %s: %s\n", name,
 			    ctf_errmsg(ctf_errno(g_fp)));
-		ctfdump_printf(CTFDUMP_TYPES, "%s (%d bytes)\n", name, size);
+		ctfdump_printf(CTFDUMP_TYPES, "%s (%zd bytes)\n", name, size);
 		count = 0;
 		if (ctf_member_iter(g_fp, id, ctfdump_member_cb, &count) != 0)
 			ctfdump_fatal("failed to iterate members of %s: %s\n",
@@ -630,28 +628,28 @@ ctfdump_types_cb(ctf_id_t id, boolean_t root, void *arg)
 		if ((ref = ctf_type_reference(g_fp, id)) == CTF_ERR)
 			ctfdump_fatal("failed to get reference type for %s: "
 			    "%s\n", name, ctf_errmsg(ctf_errno(g_fp)));
-		ctfdump_printf(CTFDUMP_TYPES, "typedef %s refers to %lu", name,
+		ctfdump_printf(CTFDUMP_TYPES, "typedef %s refers to %ld", name,
 		    ref);
 		break;
 	case CTF_K_VOLATILE:
 		if ((ref = ctf_type_reference(g_fp, id)) == CTF_ERR)
 			ctfdump_fatal("failed to get reference type for %s: "
 			    "%s\n", name, ctf_errmsg(ctf_errno(g_fp)));
-		ctfdump_printf(CTFDUMP_TYPES, "%s refers to %lu", name,
+		ctfdump_printf(CTFDUMP_TYPES, "%s refers to %ld", name,
 		    ref);
 		break;
 	case CTF_K_CONST:
 		if ((ref = ctf_type_reference(g_fp, id)) == CTF_ERR)
 			ctfdump_fatal("failed to get reference type for %s: "
 			    "%s\n", name, ctf_errmsg(ctf_errno(g_fp)));
-		ctfdump_printf(CTFDUMP_TYPES, "%s refers to %lu", name,
+		ctfdump_printf(CTFDUMP_TYPES, "%s refers to %ld", name,
 		    ref);
 		break;
 	case CTF_K_RESTRICT:
 		if ((ref = ctf_type_reference(g_fp, id)) == CTF_ERR)
 			ctfdump_fatal("failed to get reference type for %s: "
 			    "%s\n", name, ctf_errmsg(ctf_errno(g_fp)));
-		ctfdump_printf(CTFDUMP_TYPES, "%s refers to %lu", name,
+		ctfdump_printf(CTFDUMP_TYPES, "%s refers to %ld", name,
 		    ref);
 		break;
 	default:
@@ -708,7 +706,7 @@ ctfsrc_member_cb(const char *member, ctf_id_t type, ulong_t off, void *arg)
 
 	if (ctf_type_cname(g_fp, type, name, sizeof (name), member) == NULL) {
 		if (ctf_errno(g_fp) != ECTF_NOPARENT) {
-			ctfdump_fatal("type %lu missing name: %s\n", type,
+			ctfdump_fatal("type %ld missing name: %s\n", type,
 			    ctf_errmsg(ctf_errno(g_fp)));
 		}
 
@@ -840,7 +838,7 @@ ctfsrc_type(ctf_id_t id, const char *name)
 				    refname, ctf_errmsg(ctf_errno(g_fp)));
 			}
 
-			(void) printf("typedef %s{ /* 0x%x bytes */\n",
+			(void) printf("typedef %s{ /* 0x%zx bytes */\n",
 			    refname, size);
 
 			if (ctf_member_iter(g_fp, ref,

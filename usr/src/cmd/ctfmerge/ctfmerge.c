@@ -107,7 +107,7 @@ ctfmerge_expect_ctf(const char *name, Elf *elf)
 		size_t len;
 
 		if (gelf_getsym(data, i, &sym) == NULL)
-			ctfmerge_fatal("failed to read symbol table entry %d "
+			ctfmerge_fatal("failed to read symbol table entry %lu "
 			    "for %s: %s\n", i, name, elf_errmsg(elf_errno()));
 
 		if (GELF_ST_TYPE(sym.st_info) != STT_FILE)
@@ -300,11 +300,10 @@ ctfmerge_usage(const char *fmt, ...)
 		va_end(ap);
 	}
 
-	(void) fprintf(stderr, "Usage: %s [-gt] [-d uniqfile] [-l label] "
+	(void) fprintf(stderr, "Usage: %s [-t] [-d uniqfile] [-l label] "
 	    "[-L labelenv] [-j nthrs] -o outfile file ...\n"
 	    "\n"
 	    "\t-d  uniquify merged output against uniqfile\n"
-	    "\t-g  do not remove source debug information (STABS, DWARF)\n"
 	    "\t-j  use nthrs threads to perform the merge\n"
 	    "\t-l  set output container's label to specified value\n"
 	    "\t-L  set output container's label to value from environment\n"
@@ -370,8 +369,7 @@ main(int argc, char *argv[])
 			errno = 0;
 			argj = strtol(optarg, &eptr, 10);
 			if (errno != 0 || argj == LONG_MAX ||
-			    argj == LONG_MIN || argj <= 0 ||
-			    argj > UINT_MAX || *eptr != '\0') {
+			    argj > 1024 || *eptr != '\0') {
 				ctfmerge_fatal("invalid argument for -j: %s\n",
 				    optarg);
 			}
@@ -428,7 +426,7 @@ main(int argc, char *argv[])
 		    ctf_errmsg(err));
 
 	if ((err = ctf_merge_set_nthreads(cmh, nthreads)) != 0)
-		ctfmerge_fatal("failed to set parallelism to %d: %s\n",
+		ctfmerge_fatal("failed to set parallelism to %u: %s\n",
 		    nthreads, ctf_errmsg(err));
 
 	for (i = 0; i < argc; i++) {

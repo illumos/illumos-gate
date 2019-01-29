@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-PROG = ctfmerge-altexec
+PROG = ctfmerge
 SRCS = ctfmerge.c
 
 include ../../Makefile.ctf

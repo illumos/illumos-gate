@@ -28,7 +28,7 @@ include ../../Makefile.tools
 HDRS = libctf.h
 HDRDIR = common
 
-SUBDIRS = $(MACH) 
+SUBDIRS = $(MACH)
 
 all := TARGET = all
 clean := TARGET = clean

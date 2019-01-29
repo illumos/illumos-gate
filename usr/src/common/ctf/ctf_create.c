@@ -399,17 +399,17 @@ ctf_update(ctf_file_t *fp)
 				continue;
 		}
 
-		while (dsd != NULL && i > dsd->dts_symidx)
+		while (dsd != NULL && i > dsd->dsd_symidx)
 			dsd = ctf_list_next(dsd);
 		if (type == STT_OBJECT) {
 			objsize += sizeof (uint16_t);
 		} else {
 			/* Every function has a uint16_t info no matter what */
-			if (dsd == NULL || i < dsd->dts_symidx) {
+			if (dsd == NULL || i < dsd->dsd_symidx) {
 				funcsize += sizeof (uint16_t);
 			} else {
 				funcsize += sizeof (uint16_t) *
-				    (dsd->dts_nargs + 2);
+				    (dsd->dsd_nargs + 2);
 			}
 		}
 	}
@@ -439,8 +439,8 @@ ctf_update(ctf_file_t *fp)
 	hdr.cth_stroff = hdr.cth_typeoff + size;
 	hdr.cth_strlen = fp->ctf_dtstrlen + plen;
 	size = sizeof (ctf_header_t) + hdr.cth_stroff + hdr.cth_strlen;
-	ctf_dprintf("lbloff: %d\nobjtoff: %d\nfuncoff: %d\n"
-	    "typeoff: %d\nstroff: %d\nstrlen: %d\n",
+	ctf_dprintf("lbloff: %u\nobjtoff: %u\nfuncoff: %u\n"
+	    "typeoff: %u\nstroff: %u\nstrlen: %u\n",
 	    hdr.cth_lbloff, hdr.cth_objtoff, hdr.cth_funcoff,
 	    hdr.cth_typeoff, hdr.cth_stroff, hdr.cth_strlen);
 
@@ -599,19 +599,19 @@ ctf_update(ctf_file_t *fp)
 				continue;
 		}
 
-		while (dsd != NULL && i > dsd->dts_symidx) {
+		while (dsd != NULL && i > dsd->dsd_symidx) {
 			dsd = ctf_list_next(dsd);
 		}
 		if (type == STT_OBJECT) {
-			if (dsd == NULL || i < dsd->dts_symidx) {
+			if (dsd == NULL || i < dsd->dsd_symidx) {
 				*obj = 0;
 			} else {
-				*obj = dsd->dts_tid;
+				*obj = dsd->dsd_tid;
 			}
 			obj++;
 			VERIFY((uintptr_t)obj <= (uintptr_t)func);
 		} else {
-			if (dsd == NULL || i < dsd->dts_symidx) {
+			if (dsd == NULL || i < dsd->dsd_symidx) {
 				ushort_t data = CTF_TYPE_INFO(CTF_K_UNKNOWN,
 				    0, 0);
 				*func = data;
@@ -619,15 +619,15 @@ ctf_update(ctf_file_t *fp)
 			} else {
 				int j;
 				ushort_t data = CTF_TYPE_INFO(CTF_K_FUNCTION, 0,
-				    dsd->dts_nargs);
+				    dsd->dsd_nargs);
 
 				*func = data;
 				func++;
-				*func = dsd->dts_tid;
+				*func = dsd->dsd_tid;
 				func++;
-				for (j = 0; j < dsd->dts_nargs; j++)
-					func[j] = dsd->dts_argc[j];
-				func += dsd->dts_nargs;
+				for (j = 0; j < dsd->dsd_nargs; j++)
+					func[j] = dsd->dsd_argc[j];
+				func += dsd->dsd_nargs;
 			}
 		}
 	}
@@ -818,7 +818,7 @@ ctf_dsd_lookup(ctf_file_t *fp, ulong_t idx)
 
 	for (dsd = ctf_list_next(&fp->ctf_dsdefs); dsd != NULL;
 	    dsd = ctf_list_next(dsd)) {
-		if (dsd->dts_symidx == idx)
+		if (dsd->dsd_symidx == idx)
 			return (dsd);
 	}
 
@@ -835,7 +835,7 @@ ctf_dsd_insert(ctf_file_t *fp, ctf_dsdef_t *dsd)
 
 	for (i = ctf_list_next(&fp->ctf_dsdefs); i != NULL;
 	    i = ctf_list_next(i)) {
-		if (i->dts_symidx > dsd->dts_symidx)
+		if (i->dsd_symidx > dsd->dsd_symidx)
 			break;
 	}
 
@@ -851,9 +851,9 @@ ctf_dsd_insert(ctf_file_t *fp, ctf_dsdef_t *dsd)
 void
 ctf_dsd_delete(ctf_file_t *fp, ctf_dsdef_t *dsd)
 {
-	if (dsd->dts_nargs > 0)
-		ctf_free(dsd->dts_argc,
-		    sizeof (ctf_id_t) * dsd->dts_nargs);
+	if (dsd->dsd_nargs > 0)
+		ctf_free(dsd->dsd_argc,
+		    sizeof (ctf_id_t) * dsd->dsd_nargs);
 	ctf_list_delete(&fp->ctf_dsdefs, dsd);
 	ctf_free(dsd, sizeof (ctf_dsdef_t));
 }
@@ -1061,14 +1061,15 @@ ctf_add_array(ctf_file_t *fp, uint_t flag, const ctf_arinfo_t *arp)
 	fpd = fp;
 	if (ctf_lookup_by_id(&fpd, arp->ctr_contents) == NULL &&
 	    ctf_dtd_lookup(fp, arp->ctr_contents) == NULL) {
-		ctf_dprintf("bad contents for array: %d\n", arp->ctr_contents);
+		ctf_dprintf("bad contents for array: %ld\n",
+		    arp->ctr_contents);
 		return (ctf_set_errno(fp, ECTF_BADID));
 	}
 
 	fpd = fp;
 	if (ctf_lookup_by_id(&fpd, arp->ctr_index) == NULL &&
 	    ctf_dtd_lookup(fp, arp->ctr_index) == NULL) {
-		ctf_dprintf("bad index for array: %d\n", arp->ctr_index);
+		ctf_dprintf("bad index for array: %ld\n", arp->ctr_index);
 		return (ctf_set_errno(fp, ECTF_BADID));
 	}
 
@@ -1391,7 +1392,7 @@ ctf_add_enumerator(ctf_file_t *fp, ctf_id_t enid, const char *name, int value)
 	for (dmd = ctf_list_next(&dtd->dtd_u.dtu_members);
 	    dmd != NULL; dmd = ctf_list_next(dmd)) {
 		if (strcmp(dmd->dmd_name, name) == 0) {
-			ctf_dprintf("encountered dupliacte member %s\n", name);
+			ctf_dprintf("encountered duplicate member %s\n", name);
 			return (ctf_set_errno(fp, ECTF_DUPMEMBER));
 		}
 	}
@@ -1449,7 +1450,7 @@ ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type,
 
 	/*
 	 * Structures may have members which are anonymous. If they have two of
-	 * these, then the duplicte member detection would find it due to the
+	 * these, then the duplicate member detection would find it due to the
 	 * string of "", so we skip it.
 	 */
 	if (name != NULL && *name != '\0') {
@@ -2014,21 +2015,21 @@ ctf_add_function(ctf_file_t *fp, ulong_t idx, const ctf_funcinfo_t *fip,
 	dsd = ctf_alloc(sizeof (ctf_dsdef_t));
 	if (dsd == NULL)
 		return (ctf_set_errno(fp, ENOMEM));
-	dsd->dts_nargs = fip->ctc_argc;
+	dsd->dsd_nargs = fip->ctc_argc;
 	if (fip->ctc_flags & CTF_FUNC_VARARG)
-		dsd->dts_nargs++;
-	if (dsd->dts_nargs != 0) {
-		dsd->dts_argc = ctf_alloc(sizeof (ctf_id_t) * dsd->dts_nargs);
-		if (dsd->dts_argc == NULL) {
+		dsd->dsd_nargs++;
+	if (dsd->dsd_nargs != 0) {
+		dsd->dsd_argc = ctf_alloc(sizeof (ctf_id_t) * dsd->dsd_nargs);
+		if (dsd->dsd_argc == NULL) {
 			ctf_free(dsd, sizeof (ctf_dsdef_t));
 			return (ctf_set_errno(fp, ENOMEM));
 		}
-		bcopy(argc, dsd->dts_argc, sizeof (ctf_id_t) * fip->ctc_argc);
+		bcopy(argc, dsd->dsd_argc, sizeof (ctf_id_t) * fip->ctc_argc);
 		if (fip->ctc_flags & CTF_FUNC_VARARG)
-			dsd->dts_argc[fip->ctc_argc] = 0;
+			dsd->dsd_argc[fip->ctc_argc] = 0;
 	}
-	dsd->dts_symidx = idx;
-	dsd->dts_tid = fip->ctc_return;
+	dsd->dsd_symidx = idx;
+	dsd->dsd_tid = fip->ctc_return;
 
 	ctf_dsd_insert(fp, dsd);
 	fp->ctf_flags |= LCTF_DIRTY;
@@ -2075,9 +2076,9 @@ ctf_add_object(ctf_file_t *fp, ulong_t idx, ctf_id_t type)
 	dsd = ctf_alloc(sizeof (ctf_dsdef_t));
 	if (dsd == NULL)
 		return (ctf_set_errno(fp, ENOMEM));
-	dsd->dts_symidx = idx;
-	dsd->dts_tid = type;
-	dsd->dts_argc = NULL;
+	dsd->dsd_symidx = idx;
+	dsd->dsd_tid = type;
+	dsd->dsd_argc = NULL;
 
 	ctf_dsd_insert(fp, dsd);
 	fp->ctf_flags |= LCTF_DIRTY;
@@ -2137,7 +2138,7 @@ ctf_add_label(ctf_file_t *fp, const char *name, ctf_id_t type, uint_t position)
  * Update the size of a structure or union. Note that we don't allow this to
  * shrink the size of a struct or union, only to increase it. This is useful for
  * cases when you have a structure whose actual size is larger than the sum of
- * its members due to padding for natuaral alignment.
+ * its members due to padding for natural alignment.
  */
 int
 ctf_set_size(ctf_file_t *fp, ctf_id_t id, const ulong_t newsz)

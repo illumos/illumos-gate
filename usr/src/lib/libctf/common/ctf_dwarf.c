@@ -51,7 +51,7 @@
  * anything in the system.
  *
  * Once we do a conversion, we store a mapping in an AVL tree that goes from the
- * DWARF's die offset, which is relative to the given compilation unit), to a
+ * DWARF's die offset, which is relative to the given compilation unit, to a
  * ctf_id_t.
  *
  * Unfortunately, some compilers actually will emit duplicate entries for a
@@ -71,17 +71,17 @@
  * compilation units, we break the work into two halves. The first half
  * processes each compilation unit (potentially in parallel) and then the second
  * half optionally merges all of the dies in the first half. First, we'll cover
- * what's involved in converting a single ctf_die_t's dwarf to CTF. This covers
+ * what's involved in converting a single ctf_cu_t's dwarf to CTF. This covers
  * the work done in ctf_dwarf_convert_one().
  *
- * An individual ctf_die_t, which represents a compilation unit, is converted to
+ * An individual ctf_cu_t, which represents a compilation unit, is converted to
  * CTF in a series of multiple passes.
  *
- * Pass 1: During the first pass we walk all of the dies and if we find a
- * function, variable, struct, union, enum or typedef, we recursively transform
- * all of its types. We don't recurse or process everything, because we don't
- * want to add some of the types that compilers may add which are effectively
- * unused.
+ * Pass 1: During the first pass we walk all of the top-level dies and if we
+ * find a function, variable, struct, union, enum or typedef, we recursively
+ * transform all of its types. We don't recurse or process everything, because
+ * we don't want to add some of the types that compilers may add which are
+ * effectively unused.
  *
  * During pass 1, if we encounter any structures or unions we mark them for
  * fixing up later. This is necessary because we may not be able to determine
@@ -129,11 +129,11 @@
  * The following steps reflect the general process of doing a conversion.
  *
  * 1) Walk the dwarf section and determine the number of compilation units
- * 2) Create a ctf_die_t for each compilation unit
- * 3) Add all ctf_die_t's to a workq
+ * 2) Create a ctf_cu_t for each compilation unit
+ * 3) Add all ctf_cu_t's to a workq
  * 4) Have the workq process each die with ctf_dwarf_convert_one. This itself
  *    is comprised of several steps, which were already enumerated.
- * 5) If we have multiple dies, we do a ctf merge of all the dies. The mechanics
+ * 5) If we have multiple cu's, we do a ctf merge of all the dies. The mechanics
  *    of the merge are discussed in lib/libctf/common/ctf_merge.c.
  * 6) Free everything up and return a ctf_file_t to the user. If we only had a
  *    single compilation unit, then we give that to the user. Otherwise, we
@@ -144,13 +144,13 @@
  *
  * The process has been designed to be amenable to threading. Each compilation
  * unit has its own type stream, therefore the logical place to divide and
- * conquer is at the compilation unit. Each ctf_die_t has been built to be able
+ * conquer is at the compilation unit. Each ctf_cu_t has been built to be able
  * to be processed independently of the others. It has its own libdwarf handle,
  * as a given libdwarf handle may only be used by a single thread at a time.
- * This allows the various ctf_die_t's to be processed in parallel by different
+ * This allows the various ctf_cu_t's to be processed in parallel by different
  * threads.
  *
- * All of the ctf_die_t's are loaded into a workq which allows for a number of
+ * All of the ctf_cu_t's are loaded into a workq which allows for a number of
  * threads to be specified and used as a thread pool to process all of the
  * queued work. We set the number of threads to use in the workq equal to the
  * number of threads that the user has specified.
@@ -174,7 +174,7 @@
  * example, a function's return type will be stored in the local DW_AT_type
  * attribute while the arguments will be in child DIEs. There are also various
  * times when we don't have any DW_AT_type. In that case, the lack of a type
- * implies, at least for C, that it's C type is void. Because DWARF doesn't emit
+ * implies, at least for C, that its C type is void. Because DWARF doesn't emit
  * one, we have a synthetic void type that we create and manipulate instead and
  * pass it off to consumers on an as-needed basis. If nothing has a void type,
  * it will not be emitted.
@@ -246,43 +246,43 @@ typedef struct ctf_dwbitf {
 } ctf_dwbitf_t;
 
 /*
- * The ctf_die_t represents a single top-level DWARF die unit. While generally,
- * the typical object file hs only a single die, if we're asked to convert
+ * The ctf_cu_t represents a single top-level DWARF die unit. While generally,
+ * the typical object file has only a single die, if we're asked to convert
  * something that's been linked from multiple sources, multiple dies will exist.
  */
 typedef struct ctf_die {
-	Elf		*cd_elf;	/* shared libelf handle */
-	char		*cd_name;	/* basename of the DIE */
-	ctf_merge_t	*cd_cmh;	/* merge handle */
-	ctf_list_t	cd_vars;	/* List of variables */
-	ctf_list_t	cd_funcs;	/* List of functions */
-	ctf_list_t	cd_bitfields;	/* Bit field members */
-	Dwarf_Debug	cd_dwarf;	/* shared libdwarf handle */
-	Dwarf_Die	cd_cu;		/* libdwarf compilation unit */
-	Dwarf_Off	cd_cuoff;	/* cu's offset */
-	Dwarf_Off	cd_maxoff;	/* maximum offset */
-	ctf_file_t	*cd_ctfp;	/* output CTF file */
-	avl_tree_t	cd_map;		/* map die offsets to CTF types */
-	char		*cd_errbuf;	/* error message buffer */
-	size_t		cd_errlen;	/* error message buffer length */
-	size_t		cd_ptrsz;	/* object's pointer size */
-	boolean_t	cd_bigend;	/* is it big endian */
-	boolean_t	cd_doweaks;	/* should we convert weak symbols? */
-	uint_t		cd_mach;	/* machine type */
-	ctf_id_t	cd_voidtid;	/* void pointer */
-	ctf_id_t	cd_longtid;	/* id for a 'long' */
-} ctf_die_t;
+	Elf		*cu_elf;	/* shared libelf handle */
+	char		*cu_name;	/* basename of the DIE */
+	ctf_merge_t	*cu_cmh;	/* merge handle */
+	ctf_list_t	cu_vars;	/* List of variables */
+	ctf_list_t	cu_funcs;	/* List of functions */
+	ctf_list_t	cu_bitfields;	/* Bit field members */
+	Dwarf_Debug	cu_dwarf;	/* libdwarf handle */
+	Dwarf_Die	cu_cu;		/* libdwarf compilation unit */
+	Dwarf_Off	cu_cuoff;	/* cu's offset */
+	Dwarf_Off	cu_maxoff;	/* maximum offset */
+	ctf_file_t	*cu_ctfp;	/* output CTF file */
+	avl_tree_t	cu_map;		/* map die offsets to CTF types */
+	char		*cu_errbuf;	/* error message buffer */
+	size_t		cu_errlen;	/* error message buffer length */
+	size_t		cu_ptrsz;	/* object's pointer size */
+	boolean_t	cu_bigend;	/* is it big endian */
+	boolean_t	cu_doweaks;	/* should we convert weak symbols? */
+	uint_t		cu_mach;	/* machine type */
+	ctf_id_t	cu_voidtid;	/* void pointer */
+	ctf_id_t	cu_longtid;	/* id for a 'long' */
+} ctf_cu_t;
 
-static int ctf_dwarf_offset(ctf_die_t *, Dwarf_Die, Dwarf_Off *);
-static int ctf_dwarf_convert_die(ctf_die_t *, Dwarf_Die);
-static int ctf_dwarf_convert_type(ctf_die_t *, Dwarf_Die, ctf_id_t *, int);
+static int ctf_dwarf_offset(ctf_cu_t *, Dwarf_Die, Dwarf_Off *);
+static int ctf_dwarf_convert_die(ctf_cu_t *, Dwarf_Die);
+static int ctf_dwarf_convert_type(ctf_cu_t *, Dwarf_Die, ctf_id_t *, int);
 
-static int ctf_dwarf_function_count(ctf_die_t *, Dwarf_Die, ctf_funcinfo_t *,
+static int ctf_dwarf_function_count(ctf_cu_t *, Dwarf_Die, ctf_funcinfo_t *,
     boolean_t);
-static int ctf_dwarf_convert_fargs(ctf_die_t *, Dwarf_Die, ctf_funcinfo_t *,
+static int ctf_dwarf_convert_fargs(ctf_cu_t *, Dwarf_Die, ctf_funcinfo_t *,
     ctf_id_t *);
 
-typedef int (ctf_dwarf_symtab_f)(ctf_die_t *, const GElf_Sym *, ulong_t,
+typedef int (ctf_dwarf_symtab_f)(ctf_cu_t *, const GElf_Sym *, ulong_t,
     const char *, const char *, void *);
 
 /*
@@ -292,26 +292,26 @@ typedef int (ctf_dwarf_symtab_f)(ctf_die_t *, const GElf_Sym *, ulong_t,
  * into a CTF backend error and fill in the error buffer.
  */
 static int
-ctf_dwarf_error(ctf_die_t *cdp, ctf_file_t *cfp, int err, const char *fmt, ...)
+ctf_dwarf_error(ctf_cu_t *cup, ctf_file_t *cfp, int err, const char *fmt, ...)
 {
 	va_list ap;
 	int ret;
 	size_t off = 0;
-	ssize_t rem = cdp->cd_errlen;
+	ssize_t rem = cup->cu_errlen;
 	if (cfp != NULL)
 		err = ctf_errno(cfp);
 
 	if (err == ENOMEM)
 		return (err);
 
-	ret = snprintf(cdp->cd_errbuf, rem, "die %s: ", cdp->cd_name);
+	ret = snprintf(cup->cu_errbuf, rem, "die %s: ", cup->cu_name);
 	if (ret < 0)
 		goto err;
 	off += ret;
 	rem = MAX(rem - ret, 0);
 
 	va_start(ap, fmt);
-	ret = vsnprintf(cdp->cd_errbuf + off, rem, fmt, ap);
+	ret = vsnprintf(cup->cu_errbuf + off, rem, fmt, ap);
 	va_end(ap);
 	if (ret < 0)
 		goto err;
@@ -319,38 +319,38 @@ ctf_dwarf_error(ctf_die_t *cdp, ctf_file_t *cfp, int err, const char *fmt, ...)
 	off += ret;
 	rem = MAX(rem - ret, 0);
 	if (fmt[strlen(fmt) - 1] != '\n') {
-		(void) snprintf(cdp->cd_errbuf + off, rem,
+		(void) snprintf(cup->cu_errbuf + off, rem,
 		    ": %s\n", ctf_errmsg(err));
 	}
 	va_end(ap);
 	return (ECTF_CONVBKERR);
 
 err:
-	cdp->cd_errbuf[0] = '\0';
+	cup->cu_errbuf[0] = '\0';
 	return (ECTF_CONVBKERR);
 }
 
 /*
- * DWARF often ops to put no explicit type to describe a void type. eg. if we
+ * DWARF often opts to put no explicit type to describe a void type. eg. if we
  * have a reference type whose DW_AT_type member doesn't exist, then we should
  * instead assume it points to void. Because this isn't represented, we
  * instead cause it to come into existence.
  */
 static ctf_id_t
-ctf_dwarf_void(ctf_die_t *cdp)
+ctf_dwarf_void(ctf_cu_t *cup)
 {
-	if (cdp->cd_voidtid == CTF_ERR) {
+	if (cup->cu_voidtid == CTF_ERR) {
 		ctf_encoding_t enc = { CTF_INT_SIGNED, 0, 0 };
-		cdp->cd_voidtid = ctf_add_integer(cdp->cd_ctfp, CTF_ADD_ROOT,
+		cup->cu_voidtid = ctf_add_integer(cup->cu_ctfp, CTF_ADD_ROOT,
 		    "void", &enc);
-		if (cdp->cd_voidtid == CTF_ERR) {
-			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+		if (cup->cu_voidtid == CTF_ERR) {
+			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 			    "failed to create void type: %s\n",
-			    ctf_errmsg(ctf_errno(cdp->cd_ctfp)));
+			    ctf_errmsg(ctf_errno(cup->cu_ctfp)));
 		}
 	}
 
-	return (cdp->cd_voidtid);
+	return (cup->cu_voidtid);
 }
 
 /*
@@ -359,26 +359,26 @@ ctf_dwarf_void(ctf_die_t *cdp)
  * have a single instance of long across everything.
  */
 static ctf_id_t
-ctf_dwarf_long(ctf_die_t *cdp)
+ctf_dwarf_long(ctf_cu_t *cup)
 {
-	if (cdp->cd_longtid == CTF_ERR) {
+	if (cup->cu_longtid == CTF_ERR) {
 		ctf_encoding_t enc;
 
 		enc.cte_format = CTF_INT_SIGNED;
 		enc.cte_offset = 0;
 		/* All illumos systems are LP */
-		enc.cte_bits = cdp->cd_ptrsz * 8;
-		cdp->cd_longtid = ctf_add_integer(cdp->cd_ctfp, CTF_ADD_NONROOT,
+		enc.cte_bits = cup->cu_ptrsz * 8;
+		cup->cu_longtid = ctf_add_integer(cup->cu_ctfp, CTF_ADD_NONROOT,
 		    "long", &enc);
-		if (cdp->cd_longtid == CTF_ERR) {
-			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+		if (cup->cu_longtid == CTF_ERR) {
+			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 			    "failed to create long type: %s\n",
-			    ctf_errmsg(ctf_errno(cdp->cd_ctfp)));
+			    ctf_errmsg(ctf_errno(cup->cu_ctfp)));
 		}
 
 	}
 
-	return (cdp->cd_longtid);
+	return (cup->cu_longtid);
 }
 
 static int
@@ -395,7 +395,7 @@ ctf_dwmap_comp(const void *a, const void *b)
 }
 
 static int
-ctf_dwmap_add(ctf_die_t *cdp, ctf_id_t id, Dwarf_Die die, boolean_t fix)
+ctf_dwmap_add(ctf_cu_t *cup, ctf_id_t id, Dwarf_Die die, boolean_t fix)
 {
 	int ret;
 	avl_index_t index;
@@ -404,7 +404,7 @@ ctf_dwmap_add(ctf_die_t *cdp, ctf_id_t id, Dwarf_Die die, boolean_t fix)
 
 	VERIFY(id > 0 && id < CTF_MAX_TYPE);
 
-	if ((ret = ctf_dwarf_offset(cdp, die, &off)) != 0)
+	if ((ret = ctf_dwarf_offset(cup, die, &off)) != 0)
 		return (ret);
 
 	if ((dwmap = ctf_alloc(sizeof (ctf_dwmap_t))) == NULL)
@@ -415,14 +415,14 @@ ctf_dwmap_add(ctf_die_t *cdp, ctf_id_t id, Dwarf_Die die, boolean_t fix)
 	dwmap->cdm_id = id;
 	dwmap->cdm_fix = fix;
 
-	ctf_dprintf("dwmap: %p %x->%d\n", dwmap, (uint32_t)off, id);
-	VERIFY(avl_find(&cdp->cd_map, dwmap, &index) == NULL);
-	avl_insert(&cdp->cd_map, dwmap, index);
+	ctf_dprintf("dwmap: %p %" DW_PR_DUx "->%d\n", dwmap, off, id);
+	VERIFY(avl_find(&cup->cu_map, dwmap, &index) == NULL);
+	avl_insert(&cup->cu_map, dwmap, index);
 	return (0);
 }
 
 static int
-ctf_dwarf_attribute(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
+ctf_dwarf_attribute(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
     Dwarf_Attribute *attrp)
 {
 	int ret;
@@ -434,49 +434,49 @@ ctf_dwarf_attribute(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
 		*attrp = NULL;
 		return (ENOENT);
 	}
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to get attribute for type: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
 
 static int
-ctf_dwarf_ref(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name, Dwarf_Off *refp)
+ctf_dwarf_ref(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name, Dwarf_Off *refp)
 {
 	int ret;
 	Dwarf_Attribute attr;
 	Dwarf_Error derr;
 
-	if ((ret = ctf_dwarf_attribute(cdp, die, name, &attr)) != 0)
+	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
 	if (dwarf_formref(attr, refp, &derr) == DW_DLV_OK) {
-		dwarf_dealloc(cdp->cd_dwarf, attr, DW_DLA_ATTR);
+		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
 		return (0);
 	}
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to get unsigned attribute for type: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
 
 static int
-ctf_dwarf_refdie(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
+ctf_dwarf_refdie(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
     Dwarf_Die *diep)
 {
 	int ret;
 	Dwarf_Off off;
 	Dwarf_Error derr;
 
-	if ((ret = ctf_dwarf_ref(cdp, die, name, &off)) != 0)
+	if ((ret = ctf_dwarf_ref(cup, die, name, &off)) != 0)
 		return (ret);
 
-	off += cdp->cd_cuoff;
-	if ((ret = dwarf_offdie(cdp->cd_dwarf, off, diep, &derr)) !=
+	off += cup->cu_cuoff;
+	if ((ret = dwarf_offdie(cup->cu_dwarf, off, diep, &derr)) !=
 	    DW_DLV_OK) {
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
-		    "failed to get die from offset %llu: %s\n",
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
+		    "failed to get die from offset %" DW_PR_DUu ": %s\n",
 		    off, dwarf_errmsg(derr));
 		return (ECTF_CONVBKERR);
 	}
@@ -485,66 +485,66 @@ ctf_dwarf_refdie(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
 }
 
 static int
-ctf_dwarf_signed(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
+ctf_dwarf_signed(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
     Dwarf_Signed *valp)
 {
 	int ret;
 	Dwarf_Attribute attr;
 	Dwarf_Error derr;
 
-	if ((ret = ctf_dwarf_attribute(cdp, die, name, &attr)) != 0)
+	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
 	if (dwarf_formsdata(attr, valp, &derr) == DW_DLV_OK) {
-		dwarf_dealloc(cdp->cd_dwarf, attr, DW_DLA_ATTR);
+		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
 		return (0);
 	}
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to get unsigned attribute for type: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
 
 static int
-ctf_dwarf_unsigned(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
+ctf_dwarf_unsigned(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
     Dwarf_Unsigned *valp)
 {
 	int ret;
 	Dwarf_Attribute attr;
 	Dwarf_Error derr;
 
-	if ((ret = ctf_dwarf_attribute(cdp, die, name, &attr)) != 0)
+	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
 	if (dwarf_formudata(attr, valp, &derr) == DW_DLV_OK) {
-		dwarf_dealloc(cdp->cd_dwarf, attr, DW_DLA_ATTR);
+		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
 		return (0);
 	}
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to get unsigned attribute for type: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
 
 static int
-ctf_dwarf_boolean(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
+ctf_dwarf_boolean(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name,
     Dwarf_Bool *val)
 {
 	int ret;
 	Dwarf_Attribute attr;
 	Dwarf_Error derr;
 
-	if ((ret = ctf_dwarf_attribute(cdp, die, name, &attr)) != 0)
+	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
 	if (dwarf_formflag(attr, val, &derr) == DW_DLV_OK) {
-		dwarf_dealloc(cdp->cd_dwarf, attr, DW_DLA_ATTR);
+		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
 		return (0);
 	}
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to get boolean attribute for type: %s\n",
 	    dwarf_errmsg(derr));
 
@@ -552,7 +552,7 @@ ctf_dwarf_boolean(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name,
 }
 
 static int
-ctf_dwarf_string(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name, char **strp)
+ctf_dwarf_string(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half name, char **strp)
 {
 	int ret;
 	char *s;
@@ -560,7 +560,7 @@ ctf_dwarf_string(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name, char **strp)
 	Dwarf_Error derr;
 
 	*strp = NULL;
-	if ((ret = ctf_dwarf_attribute(cdp, die, name, &attr)) != 0)
+	if ((ret = ctf_dwarf_attribute(cup, die, name, &attr)) != 0)
 		return (ret);
 
 	if (dwarf_formstring(attr, &s, &derr) == DW_DLV_OK) {
@@ -568,18 +568,18 @@ ctf_dwarf_string(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half name, char **strp)
 			ret = ENOMEM;
 		else
 			ret = 0;
-		dwarf_dealloc(cdp->cd_dwarf, attr, DW_DLA_ATTR);
+		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
 		return (ret);
 	}
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to get string attribute for type: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
 
 static int
-ctf_dwarf_member_location(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Unsigned *valp)
+ctf_dwarf_member_location(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Unsigned *valp)
 {
 	int ret;
 	Dwarf_Error derr;
@@ -587,44 +587,44 @@ ctf_dwarf_member_location(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Unsigned *valp)
 	Dwarf_Locdesc *loc;
 	Dwarf_Signed locnum;
 
-	if ((ret = ctf_dwarf_attribute(cdp, die, DW_AT_data_member_location,
+	if ((ret = ctf_dwarf_attribute(cup, die, DW_AT_data_member_location,
 	    &attr)) != 0)
 		return (ret);
 
 	if (dwarf_loclist(attr, &loc, &locnum, &derr) != DW_DLV_OK) {
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to obtain location list for member offset: %s",
 		    dwarf_errmsg(derr));
-		dwarf_dealloc(cdp->cd_dwarf, attr, DW_DLA_ATTR);
+		dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
 		return (ECTF_CONVBKERR);
 	}
-	dwarf_dealloc(cdp->cd_dwarf, attr, DW_DLA_ATTR);
+	dwarf_dealloc(cup->cu_dwarf, attr, DW_DLA_ATTR);
 
 	if (locnum != 1 || loc->ld_s->lr_atom != DW_OP_plus_uconst) {
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to parse location structure for member");
-		dwarf_dealloc(cdp->cd_dwarf, loc->ld_s, DW_DLA_LOC_BLOCK);
-		dwarf_dealloc(cdp->cd_dwarf, loc, DW_DLA_LOCDESC);
+		dwarf_dealloc(cup->cu_dwarf, loc->ld_s, DW_DLA_LOC_BLOCK);
+		dwarf_dealloc(cup->cu_dwarf, loc, DW_DLA_LOCDESC);
 		return (ECTF_CONVBKERR);
 	}
 
 	*valp = loc->ld_s->lr_number;
 
-	dwarf_dealloc(cdp->cd_dwarf, loc->ld_s, DW_DLA_LOC_BLOCK);
-	dwarf_dealloc(cdp->cd_dwarf, loc, DW_DLA_LOCDESC);
+	dwarf_dealloc(cup->cu_dwarf, loc->ld_s, DW_DLA_LOC_BLOCK);
+	dwarf_dealloc(cup->cu_dwarf, loc, DW_DLA_LOCDESC);
 	return (0);
 }
 
 
 static int
-ctf_dwarf_offset(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Off *offsetp)
+ctf_dwarf_offset(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Off *offsetp)
 {
 	Dwarf_Error derr;
 
 	if (dwarf_dieoffset(die, offsetp, &derr) == DW_DLV_OK)
 		return (0);
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to get die offset: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
@@ -642,38 +642,38 @@ ctf_die_offset(Dwarf_Die die)
 }
 
 static int
-ctf_dwarf_tag(ctf_die_t *cdp, Dwarf_Die die, Dwarf_Half *tagp)
+ctf_dwarf_tag(ctf_cu_t *cup, Dwarf_Die die, Dwarf_Half *tagp)
 {
 	Dwarf_Error derr;
 
 	if (dwarf_tag(die, tagp, &derr) == DW_DLV_OK)
 		return (0);
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to get tag type: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
 
 static int
-ctf_dwarf_sib(ctf_die_t *cdp, Dwarf_Die base, Dwarf_Die *sibp)
+ctf_dwarf_sib(ctf_cu_t *cup, Dwarf_Die base, Dwarf_Die *sibp)
 {
 	Dwarf_Error derr;
 	int ret;
 
 	*sibp = NULL;
-	ret = dwarf_siblingof(cdp->cd_dwarf, base, sibp, &derr);
+	ret = dwarf_siblingof(cup->cu_dwarf, base, sibp, &derr);
 	if (ret == DW_DLV_OK || ret == DW_DLV_NO_ENTRY)
 		return (0);
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to sibling from die: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
 }
 
 static int
-ctf_dwarf_child(ctf_die_t *cdp, Dwarf_Die base, Dwarf_Die *childp)
+ctf_dwarf_child(ctf_cu_t *cup, Dwarf_Die base, Dwarf_Die *childp)
 {
 	Dwarf_Error derr;
 	int ret;
@@ -683,7 +683,7 @@ ctf_dwarf_child(ctf_die_t *cdp, Dwarf_Die base, Dwarf_Die *childp)
 	if (ret == DW_DLV_OK || ret == DW_DLV_NO_ENTRY)
 		return (0);
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to child from die: %s\n",
 	    dwarf_errmsg(derr));
 	return (ECTF_CONVBKERR);
@@ -696,20 +696,20 @@ ctf_dwarf_child(ctf_die_t *cdp, Dwarf_Die base, Dwarf_Die *childp)
  * fall back to DW_AT_external. Lack of DW_AT_external implies that it is not.
  */
 static int
-ctf_dwarf_isglobal(ctf_die_t *cdp, Dwarf_Die die, boolean_t *igp)
+ctf_dwarf_isglobal(ctf_cu_t *cup, Dwarf_Die die, boolean_t *igp)
 {
 	int ret;
 	Dwarf_Signed vis;
 	Dwarf_Bool ext;
 
-	if ((ret = ctf_dwarf_signed(cdp, die, DW_AT_visibility, &vis)) == 0) {
+	if ((ret = ctf_dwarf_signed(cup, die, DW_AT_visibility, &vis)) == 0) {
 		*igp = vis == DW_VIS_exported;
 		return (0);
 	} else if (ret != ENOENT) {
 		return (ret);
 	}
 
-	if ((ret = ctf_dwarf_boolean(cdp, die, DW_AT_external, &ext)) != 0) {
+	if ((ret = ctf_dwarf_boolean(cup, die, DW_AT_external, &ext)) != 0) {
 		if (ret == ENOENT) {
 			*igp = B_FALSE;
 			return (0);
@@ -721,7 +721,7 @@ ctf_dwarf_isglobal(ctf_die_t *cdp, Dwarf_Die die, boolean_t *igp)
 }
 
 static int
-ctf_dwarf_die_elfenc(Elf *elf, ctf_die_t *cdp, char *errbuf, size_t errlen)
+ctf_dwarf_die_elfenc(Elf *elf, ctf_cu_t *cup, char *errbuf, size_t errlen)
 {
 	GElf_Ehdr ehdr;
 
@@ -732,14 +732,14 @@ ctf_dwarf_die_elfenc(Elf *elf, ctf_die_t *cdp, char *errbuf, size_t errlen)
 		return (ECTF_CONVBKERR);
 	}
 
-	cdp->cd_mach = ehdr.e_machine;
+	cup->cu_mach = ehdr.e_machine;
 
 	if (ehdr.e_ident[EI_CLASS] == ELFCLASS32) {
-		cdp->cd_ptrsz = 4;
-		VERIFY(ctf_setmodel(cdp->cd_ctfp, CTF_MODEL_ILP32) == 0);
+		cup->cu_ptrsz = 4;
+		VERIFY(ctf_setmodel(cup->cu_ctfp, CTF_MODEL_ILP32) == 0);
 	} else if (ehdr.e_ident[EI_CLASS] == ELFCLASS64) {
-		cdp->cd_ptrsz = 8;
-		VERIFY(ctf_setmodel(cdp->cd_ctfp, CTF_MODEL_LP64) == 0);
+		cup->cu_ptrsz = 8;
+		VERIFY(ctf_setmodel(cup->cu_ctfp, CTF_MODEL_LP64) == 0);
 	} else {
 		(void) snprintf(errbuf, errlen,
 		    "unknown ELF class %d", ehdr.e_ident[EI_CLASS]);
@@ -747,12 +747,12 @@ ctf_dwarf_die_elfenc(Elf *elf, ctf_die_t *cdp, char *errbuf, size_t errlen)
 	}
 
 	if (ehdr.e_ident[EI_DATA] == ELFDATA2LSB) {
-		cdp->cd_bigend = B_FALSE;
+		cup->cu_bigend = B_FALSE;
 	} else if (ehdr.e_ident[EI_DATA] == ELFDATA2MSB) {
-		cdp->cd_bigend = B_TRUE;
+		cup->cu_bigend = B_TRUE;
 	} else {
 		(void) snprintf(errbuf, errlen,
-		    "unknown ELF data encoding: %d", ehdr.e_ident[EI_DATA]);
+		    "unknown ELF data encoding: %hhu", ehdr.e_ident[EI_DATA]);
 		return (ECTF_CONVBKERR);
 	}
 
@@ -804,20 +804,20 @@ static const ctf_dwarf_fpmap_t ctf_dwarf_fpmaps[] = {
 };
 
 static int
-ctf_dwarf_float_base(ctf_die_t *cdp, Dwarf_Signed type, ctf_encoding_t *enc)
+ctf_dwarf_float_base(ctf_cu_t *cup, Dwarf_Signed type, ctf_encoding_t *enc)
 {
 	const ctf_dwarf_fpmap_t *map = &ctf_dwarf_fpmaps[0];
 	const ctf_dwarf_fpent_t *ent;
 	uint_t col = 0, mult = 1;
 
 	for (map = &ctf_dwarf_fpmaps[0]; map->cdf_mach != EM_NONE; map++) {
-		if (map->cdf_mach == cdp->cd_mach)
+		if (map->cdf_mach == cup->cu_mach)
 			break;
 	}
 
 	if (map->cdf_mach == EM_NONE) {
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
-		    "Unsupported machine type: %d\n", cdp->cd_mach);
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
+		    "Unsupported machine type: %d\n", cup->cu_mach);
 		return (ENOTSUP);
 	}
 
@@ -837,20 +837,20 @@ ctf_dwarf_float_base(ctf_die_t *cdp, Dwarf_Signed type, ctf_encoding_t *enc)
 		}
 	}
 
-	(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 	    "failed to find valid fp mapping for encoding %d, size %d bits\n",
 	    type, enc->cte_bits);
 	return (EINVAL);
 }
 
 static int
-ctf_dwarf_dwarf_base(ctf_die_t *cdp, Dwarf_Die die, int *kindp,
+ctf_dwarf_dwarf_base(ctf_cu_t *cup, Dwarf_Die die, int *kindp,
     ctf_encoding_t *enc)
 {
 	int ret;
 	Dwarf_Signed type;
 
-	if ((ret = ctf_dwarf_signed(cdp, die, DW_AT_encoding, &type)) != 0)
+	if ((ret = ctf_dwarf_signed(cup, die, DW_AT_encoding, &type)) != 0)
 		return (ret);
 
 	switch (type) {
@@ -881,11 +881,11 @@ ctf_dwarf_dwarf_base(ctf_die_t *cdp, Dwarf_Die die, int *kindp,
 	case DW_ATE_SUN_imaginary_float:
 	case DW_ATE_SUN_interval_float:
 		*kindp = CTF_K_FLOAT;
-		if ((ret = ctf_dwarf_float_base(cdp, type, enc)) != 0)
+		if ((ret = ctf_dwarf_float_base(cup, type, enc)) != 0)
 			return (ret);
 		break;
 	default:
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "encountered unkown DWARF encoding: %d", type);
 		return (ECTF_CONVBKERR);
 	}
@@ -903,7 +903,7 @@ ctf_dwarf_parse_base(const char *name, int *kindp, ctf_encoding_t *enc,
     char **newnamep)
 {
 	char buf[256];
-	char *base, *c;
+	char *base, *c, *last;
 	int nlong = 0, nshort = 0, nchar = 0, nint = 0;
 	int sign = 1;
 
@@ -911,7 +911,8 @@ ctf_dwarf_parse_base(const char *name, int *kindp, ctf_encoding_t *enc,
 		return (EINVAL);
 
 	(void) strlcpy(buf, name, sizeof (buf));
-	for (c = strtok(buf, " "); c != NULL; c = strtok(NULL, " ")) {
+	for (c = strtok_r(buf, " ", &last); c != NULL;
+	    c = strtok_r(NULL, " ", &last)) {
 		if (strcmp(c, "signed") == 0) {
 			sign = 1;
 		} else if (strcmp(c, "unsigned") == 0) {
@@ -972,7 +973,7 @@ ctf_dwarf_parse_base(const char *name, int *kindp, ctf_encoding_t *enc,
 }
 
 static int
-ctf_dwarf_create_base(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot,
+ctf_dwarf_create_base(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot,
     Dwarf_Off off)
 {
 	int ret;
@@ -982,9 +983,9 @@ ctf_dwarf_create_base(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot,
 	ctf_encoding_t enc;
 	ctf_id_t id;
 
-	if ((ret = ctf_dwarf_string(cdp, die, DW_AT_name, &name)) != 0)
+	if ((ret = ctf_dwarf_string(cup, die, DW_AT_name, &name)) != 0)
 		return (ret);
-	if ((ret = ctf_dwarf_unsigned(cdp, die, DW_AT_byte_size, &sz)) != 0) {
+	if ((ret = ctf_dwarf_unsigned(cup, die, DW_AT_byte_size, &sz)) != 0) {
 		goto out;
 	}
 	ctf_dprintf("Creating base type %s from off %llu, size: %d\n", name,
@@ -999,16 +1000,16 @@ ctf_dwarf_create_base(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot,
 		if (ret != EINVAL)
 			return (ret);
 		ctf_dprintf("falling back to dwarf for base type %s\n", name);
-		if ((ret = ctf_dwarf_dwarf_base(cdp, die, &kind, &enc)) != 0)
+		if ((ret = ctf_dwarf_dwarf_base(cup, die, &kind, &enc)) != 0)
 			return (ret);
 	}
 
-	id = ctf_add_encoded(cdp->cd_ctfp, isroot, name, &enc, kind);
+	id = ctf_add_encoded(cup->cu_ctfp, isroot, name, &enc, kind);
 	if (id == CTF_ERR) {
-		ret = ctf_errno(cdp->cd_ctfp);
+		ret = ctf_errno(cup->cu_ctfp);
 	} else {
 		*idp = id;
-		ret = ctf_dwmap_add(cdp, id, die, B_FALSE);
+		ret = ctf_dwmap_add(cup, id, die, B_FALSE);
 	}
 out:
 	ctf_free(name, strlen(name) + 1);
@@ -1023,7 +1024,7 @@ out:
  * have a DW_AT_data_member_location. We won't have both. Thus we check first
  * for DW_AT_data_bit_offset, and if it exists, we're set.
  *
- * Next, if we have a bitfield and we don't ahve a DW_AT_data_bit_offset, then
+ * Next, if we have a bitfield and we don't have a DW_AT_data_bit_offset, then
  * we have to grab the data location and use the following dance:
  *
  * 2) Gather the set of DW_AT_byte_size, DW_AT_bit_offset, and DW_AT_bit_size.
@@ -1034,15 +1035,16 @@ out:
  * little endian to obtain the proper offset.
  */
 static int
-ctf_dwarf_member_offset(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t mid,
+ctf_dwarf_member_offset(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t mid,
     ulong_t *offp)
 {
 	int ret;
 	Dwarf_Unsigned loc, bitsz, bytesz;
 	Dwarf_Signed bitoff;
-	size_t off, tsz;
+	size_t off;
+	ssize_t tsz;
 
-	if ((ret = ctf_dwarf_unsigned(cdp, die, DW_AT_data_bit_offset,
+	if ((ret = ctf_dwarf_unsigned(cup, die, DW_AT_data_bit_offset,
 	    &loc)) == 0) {
 		*offp = loc;
 		return (0);
@@ -1050,11 +1052,11 @@ ctf_dwarf_member_offset(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t mid,
 		return (ret);
 	}
 
-	if ((ret = ctf_dwarf_member_location(cdp, die, &loc)) != 0)
+	if ((ret = ctf_dwarf_member_location(cup, die, &loc)) != 0)
 		return (ret);
 	off = loc * 8;
 
-	if ((ret = ctf_dwarf_signed(cdp, die, DW_AT_bit_offset,
+	if ((ret = ctf_dwarf_signed(cup, die, DW_AT_bit_offset,
 	    &bitoff)) != 0) {
 		if (ret != ENOENT)
 			return (ret);
@@ -1063,16 +1065,16 @@ ctf_dwarf_member_offset(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t mid,
 	}
 
 	/* At this point we have to have DW_AT_bit_size */
-	if ((ret = ctf_dwarf_unsigned(cdp, die, DW_AT_bit_size, &bitsz)) != 0)
+	if ((ret = ctf_dwarf_unsigned(cup, die, DW_AT_bit_size, &bitsz)) != 0)
 		return (ret);
 
-	if ((ret = ctf_dwarf_unsigned(cdp, die, DW_AT_byte_size,
+	if ((ret = ctf_dwarf_unsigned(cup, die, DW_AT_byte_size,
 	    &bytesz)) != 0) {
 		if (ret != ENOENT)
 			return (ret);
-		if ((tsz = ctf_type_size(cdp->cd_ctfp, mid)) == CTF_ERR) {
-			int e = ctf_errno(cdp->cd_ctfp);
-			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+		if ((tsz = ctf_type_size(cup->cu_ctfp, mid)) == CTF_ERR) {
+			int e = ctf_errno(cup->cu_ctfp);
+			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 			    "failed to get type size: %s", ctf_errmsg(e));
 			return (ECTF_CONVBKERR);
 		}
@@ -1080,7 +1082,7 @@ ctf_dwarf_member_offset(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t mid,
 		tsz = bytesz;
 	}
 	tsz *= 8;
-	if (cdp->cd_bigend == B_TRUE) {
+	if (cup->cu_bigend == B_TRUE) {
 		*offp = off + bitoff;
 	} else {
 		*offp = off + tsz - bitoff - bitsz;
@@ -1099,11 +1101,11 @@ ctf_dwarf_member_offset(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t mid,
  * bit size member and it does not equal the byte size member, then we need to
  * create a bitfield type based on this.
  *
- * Note: When we support DWARFv4, there may be a chance that we ned to also
+ * Note: When we support DWARFv4, there may be a chance that we need to also
  * search for the DW_AT_byte_size if we don't have a DW_AT_bit_size member.
  */
 static int
-ctf_dwarf_member_bitfield(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp)
+ctf_dwarf_member_bitfield(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp)
 {
 	int ret;
 	Dwarf_Unsigned bitsz;
@@ -1113,7 +1115,7 @@ ctf_dwarf_member_bitfield(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp)
 	ctf_id_t base = *idp;
 	int kind;
 
-	if ((ret = ctf_dwarf_unsigned(cdp, die, DW_AT_bit_size, &bitsz)) != 0) {
+	if ((ret = ctf_dwarf_unsigned(cup, die, DW_AT_bit_size, &bitsz)) != 0) {
 		if (ret == ENOENT)
 			return (0);
 		return (ret);
@@ -1128,12 +1130,12 @@ ctf_dwarf_member_bitfield(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp)
 	 * something of type integer or enumeration.
 	 */
 	VERIFY(bitsz < UINT32_MAX);
-	dtd = ctf_dtd_lookup(cdp->cd_ctfp, base);
+	dtd = ctf_dtd_lookup(cup->cu_ctfp, base);
 	VERIFY(dtd != NULL);
 	kind = CTF_INFO_KIND(dtd->dtd_data.ctt_info);
 	while (kind == CTF_K_TYPEDEF || kind == CTF_K_CONST ||
 	    kind == CTF_K_VOLATILE) {
-		dtd = ctf_dtd_lookup(cdp->cd_ctfp, dtd->dtd_data.ctt_type);
+		dtd = ctf_dtd_lookup(cup->cu_ctfp, dtd->dtd_data.ctt_type);
 		VERIFY(dtd != NULL);
 		kind = CTF_INFO_KIND(dtd->dtd_data.ctt_info);
 	}
@@ -1146,7 +1148,7 @@ ctf_dwarf_member_bitfield(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp)
 	 * enums sizing as an ABI concern more or less. To that effect, today on
 	 * all illumos platforms the size of an enum is generally that of an
 	 * int as our supported data models and ABIs all agree on that. So what
-	 * we'll do is fake up a CTF enconding here to use. In this case, we'll
+	 * we'll do is fake up a CTF encoding here to use. In this case, we'll
 	 * treat it as an unsigned value of whatever size the underlying enum
 	 * currently has (which is in the ctt_size member of its dynamic type
 	 * data).
@@ -1158,7 +1160,7 @@ ctf_dwarf_member_bitfield(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp)
 		e.cte_bits = dtd->dtd_data.ctt_size * NBBY;
 	}
 
-	for (cdb = ctf_list_next(&cdp->cd_bitfields); cdb != NULL;
+	for (cdb = ctf_list_next(&cup->cu_bitfields); cdb != NULL;
 	    cdb = ctf_list_next(cdb)) {
 		if (cdb->cdb_base == base && cdb->cdb_nbits == bitsz)
 			break;
@@ -1189,18 +1191,18 @@ ctf_dwarf_member_bitfield(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp)
 
 		cdb->cdb_base = base;
 		cdb->cdb_nbits = bitsz;
-		cdb->cdb_id = ctf_add_integer(cdp->cd_ctfp, CTF_ADD_NONROOT,
+		cdb->cdb_id = ctf_add_integer(cup->cu_ctfp, CTF_ADD_NONROOT,
 		    name, &e);
 		if (cdb->cdb_id == CTF_ERR) {
-			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 			    "failed to get add bitfield type %s: %s", name,
-			    ctf_errmsg(ctf_errno(cdp->cd_ctfp)));
+			    ctf_errmsg(ctf_errno(cup->cu_ctfp)));
 			ctf_free(name, namesz + 1);
 			ctf_free(cdb, sizeof (ctf_dwbitf_t));
 			return (ECTF_CONVBKERR);
 		}
 		ctf_free(name, namesz + 1);
-		ctf_list_append(&cdp->cd_bitfields, cdb);
+		ctf_list_append(&cup->cu_bitfields, cdb);
 	}
 
 	*idp = cdb->cdb_id;
@@ -1209,21 +1211,21 @@ ctf_dwarf_member_bitfield(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp)
 }
 
 static int
-ctf_dwarf_fixup_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t base, boolean_t add)
+ctf_dwarf_fixup_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t base, boolean_t add)
 {
 	int ret, kind;
 	Dwarf_Die child, memb;
 	Dwarf_Unsigned size;
 	ulong_t nsz;
 
-	kind = ctf_type_kind(cdp->cd_ctfp, base);
+	kind = ctf_type_kind(cup->cu_ctfp, base);
 	VERIFY(kind != CTF_ERR);
 	VERIFY(kind == CTF_K_STRUCT || kind == CTF_K_UNION);
 
 	/*
 	 * Members are in children. However, gcc also allows empty ones.
 	 */
-	if ((ret = ctf_dwarf_child(cdp, die, &child)) != 0)
+	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0)
 		return (ret);
 	if (child == NULL)
 		return (0);
@@ -1236,16 +1238,16 @@ ctf_dwarf_fixup_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t base, boolean_t add)
 		char *mname;
 		ulong_t memboff = 0;
 
-		if ((ret = ctf_dwarf_tag(cdp, memb, &tag)) != 0)
+		if ((ret = ctf_dwarf_tag(cup, memb, &tag)) != 0)
 			return (ret);
 
 		if (tag != DW_TAG_member)
 			continue;
 
-		if ((ret = ctf_dwarf_refdie(cdp, memb, DW_AT_type, &tdie)) != 0)
+		if ((ret = ctf_dwarf_refdie(cup, memb, DW_AT_type, &tdie)) != 0)
 			return (ret);
 
-		if ((ret = ctf_dwarf_convert_type(cdp, tdie, &mid,
+		if ((ret = ctf_dwarf_convert_type(cup, tdie, &mid,
 		    CTF_ADD_NONROOT)) != 0)
 			return (ret);
 		ctf_dprintf("Got back type id: %d\n", mid);
@@ -1254,13 +1256,13 @@ ctf_dwarf_fixup_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t base, boolean_t add)
 		 * If we're not adding a member, just go ahead and return.
 		 */
 		if (add == B_FALSE) {
-			if ((ret = ctf_dwarf_member_bitfield(cdp, memb,
+			if ((ret = ctf_dwarf_member_bitfield(cup, memb,
 			    &mid)) != 0)
 				return (ret);
 			goto next;
 		}
 
-		if ((ret = ctf_dwarf_string(cdp, memb, DW_AT_name,
+		if ((ret = ctf_dwarf_string(cup, memb, DW_AT_name,
 		    &mname)) != 0 && ret != ENOENT)
 			return (ret);
 		if (ret == ENOENT)
@@ -1268,21 +1270,21 @@ ctf_dwarf_fixup_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t base, boolean_t add)
 
 		if (kind == CTF_K_UNION) {
 			memboff = 0;
-		} else if ((ret = ctf_dwarf_member_offset(cdp, memb, mid,
+		} else if ((ret = ctf_dwarf_member_offset(cup, memb, mid,
 		    &memboff)) != 0) {
 			if (mname != NULL)
 				ctf_free(mname, strlen(mname) + 1);
 			return (ret);
 		}
 
-		if ((ret = ctf_dwarf_member_bitfield(cdp, memb, &mid)) != 0)
+		if ((ret = ctf_dwarf_member_bitfield(cup, memb, &mid)) != 0)
 			return (ret);
 
-		ret = ctf_add_member(cdp->cd_ctfp, base, mname, mid, memboff);
+		ret = ctf_add_member(cup->cu_ctfp, base, mname, mid, memboff);
 		if (ret == CTF_ERR) {
-			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 			    "failed to add member %s: %s",
-			    mname, ctf_errmsg(ctf_errno(cdp->cd_ctfp)));
+			    mname, ctf_errmsg(ctf_errno(cup->cu_ctfp)));
 			if (mname != NULL)
 				ctf_free(mname, strlen(mname) + 1);
 			return (ECTF_CONVBKERR);
@@ -1292,7 +1294,7 @@ ctf_dwarf_fixup_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t base, boolean_t add)
 			ctf_free(mname, strlen(mname) + 1);
 
 next:
-		if ((ret = ctf_dwarf_sib(cdp, memb, &sib)) != 0)
+		if ((ret = ctf_dwarf_sib(cup, memb, &sib)) != 0)
 			return (ret);
 		memb = sib;
 	}
@@ -1305,12 +1307,12 @@ next:
 		return (0);
 
 	/* Finally set the size of the structure to the actual byte size */
-	if ((ret = ctf_dwarf_unsigned(cdp, die, DW_AT_byte_size, &size)) != 0)
+	if ((ret = ctf_dwarf_unsigned(cup, die, DW_AT_byte_size, &size)) != 0)
 		return (ret);
 	nsz = size;
-	if ((ctf_set_size(cdp->cd_ctfp, base, nsz)) == CTF_ERR) {
-		int e = ctf_errno(cdp->cd_ctfp);
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	if ((ctf_set_size(cup->cu_ctfp, base, nsz)) == CTF_ERR) {
+		int e = ctf_errno(cup->cu_ctfp);
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "failed to set type size for %d to 0x%x: %s", base,
 		    (uint32_t)size, ctf_errmsg(e));
 		return (ECTF_CONVBKERR);
@@ -1320,7 +1322,7 @@ next:
 }
 
 static int
-ctf_dwarf_create_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
+ctf_dwarf_create_sou(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
     int kind, int isroot)
 {
 	int ret;
@@ -1333,7 +1335,7 @@ ctf_dwarf_create_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 	 * Deal with the terribly annoying case of anonymous structs and unions.
 	 * If they don't have a name, set the name to the empty string.
 	 */
-	if ((ret = ctf_dwarf_string(cdp, die, DW_AT_name, &name)) != 0 &&
+	if ((ret = ctf_dwarf_string(cup, die, DW_AT_name, &name)) != 0 &&
 	    ret != ENOENT)
 		return (ret);
 	if (ret == ENOENT)
@@ -1345,7 +1347,7 @@ ctf_dwarf_create_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 	 * go ahead and create a forward. During a dedup or merge, the forward
 	 * will be replaced with the real thing.
 	 */
-	if ((ret = ctf_dwarf_boolean(cdp, die, DW_AT_declaration,
+	if ((ret = ctf_dwarf_boolean(cup, die, DW_AT_declaration,
 	    &decl)) != 0) {
 		if (ret != ENOENT)
 			return (ret);
@@ -1353,17 +1355,17 @@ ctf_dwarf_create_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 	}
 
 	if (decl != 0) {
-		base = ctf_add_forward(cdp->cd_ctfp, isroot, name, kind);
+		base = ctf_add_forward(cup->cu_ctfp, isroot, name, kind);
 	} else if (kind == CTF_K_STRUCT) {
-		base = ctf_add_struct(cdp->cd_ctfp, isroot, name);
+		base = ctf_add_struct(cup->cu_ctfp, isroot, name);
 	} else {
-		base = ctf_add_union(cdp->cd_ctfp, isroot, name);
+		base = ctf_add_union(cup->cu_ctfp, isroot, name);
 	}
 	ctf_dprintf("added sou %s (%d) (%d)\n", name, kind, base);
 	if (name != NULL)
 		ctf_free(name, strlen(name) + 1);
 	if (base == CTF_ERR)
-		return (ctf_errno(cdp->cd_ctfp));
+		return (ctf_errno(cup->cu_ctfp));
 	*idp = base;
 
 	/*
@@ -1371,14 +1373,14 @@ ctf_dwarf_create_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 	 * do anything else.
 	 */
 	if (decl == B_TRUE)
-		return (ctf_dwmap_add(cdp, base, die, B_FALSE));
-	if ((ret = ctf_dwmap_add(cdp, base, die, B_TRUE)) != 0)
+		return (ctf_dwmap_add(cup, base, die, B_FALSE));
+	if ((ret = ctf_dwmap_add(cup, base, die, B_TRUE)) != 0)
 		return (ret);
 
 	/*
 	 * Members are in children. However, gcc also allows empty ones.
 	 */
-	if ((ret = ctf_dwarf_child(cdp, die, &child)) != 0)
+	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0)
 		return (ret);
 	if (child == NULL)
 		return (0);
@@ -1387,7 +1389,7 @@ ctf_dwarf_create_sou(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 }
 
 static int
-ctf_dwarf_create_array_range(ctf_die_t *cdp, Dwarf_Die range, ctf_id_t *idp,
+ctf_dwarf_create_array_range(ctf_cu_t *cup, Dwarf_Die range, ctf_id_t *idp,
     ctf_id_t base, int isroot)
 {
 	int ret;
@@ -1398,11 +1400,11 @@ ctf_dwarf_create_array_range(ctf_die_t *cdp, Dwarf_Die range, ctf_id_t *idp,
 
 	ctf_dprintf("creating array range\n");
 
-	if ((ret = ctf_dwarf_sib(cdp, range, &sib)) != 0)
+	if ((ret = ctf_dwarf_sib(cup, range, &sib)) != 0)
 		return (ret);
 	if (sib != NULL) {
 		ctf_id_t id;
-		if ((ret = ctf_dwarf_create_array_range(cdp, sib, &id,
+		if ((ret = ctf_dwarf_create_array_range(cup, sib, &id,
 		    base, CTF_ADD_NONROOT)) != 0)
 			return (ret);
 		ar.ctr_contents = id;
@@ -1410,8 +1412,8 @@ ctf_dwarf_create_array_range(ctf_die_t *cdp, Dwarf_Die range, ctf_id_t *idp,
 		ar.ctr_contents = base;
 	}
 
-	if ((ar.ctr_index = ctf_dwarf_long(cdp)) == CTF_ERR)
-		return (ctf_errno(cdp->cd_ctfp));
+	if ((ar.ctr_index = ctf_dwarf_long(cup)) == CTF_ERR)
+		return (ctf_errno(cup->cu_ctfp));
 
 	/*
 	 * Array bounds can be signed or unsigned, but there are several kinds
@@ -1424,12 +1426,12 @@ ctf_dwarf_create_array_range(ctf_die_t *cdp, Dwarf_Die range, ctf_id_t *idp,
 	 * try signed first, falling back to unsigned if we got a negative
 	 * value.
 	 */
-	if ((ret = ctf_dwarf_unsigned(cdp, range, DW_AT_upper_bound,
+	if ((ret = ctf_dwarf_unsigned(cup, range, DW_AT_upper_bound,
 	    &val)) == 0) {
 		ar.ctr_nelems = val + 1;
 	} else if (ret != ENOENT) {
 		return (ret);
-	} else if ((ret = ctf_dwarf_signed(cdp, range, DW_AT_upper_bound,
+	} else if ((ret = ctf_dwarf_signed(cup, range, DW_AT_upper_bound,
 	    &sval)) == 0) {
 		ar.ctr_nelems = sval + 1;
 	} else if (ret != ENOENT) {
@@ -1438,8 +1440,8 @@ ctf_dwarf_create_array_range(ctf_die_t *cdp, Dwarf_Die range, ctf_id_t *idp,
 		ar.ctr_nelems = 0;
 	}
 
-	if ((*idp = ctf_add_array(cdp->cd_ctfp, isroot, &ar)) == CTF_ERR)
-		return (ctf_errno(cdp->cd_ctfp));
+	if ((*idp = ctf_add_array(cup->cu_ctfp, isroot, &ar)) == CTF_ERR)
+		return (ctf_errno(cup->cu_ctfp));
 
 	return (0);
 }
@@ -1450,25 +1452,25 @@ ctf_dwarf_create_array_range(ctf_die_t *cdp, Dwarf_Die range, ctf_id_t *idp,
  * complicated form, we should have a child that has the DW_TAG_subrange type.
  */
 static int
-ctf_dwarf_create_array(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
+ctf_dwarf_create_array(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 {
 	int ret;
 	Dwarf_Die tdie, rdie;
 	ctf_id_t tid;
 	Dwarf_Half rtag;
 
-	if ((ret = ctf_dwarf_refdie(cdp, die, DW_AT_type, &tdie)) != 0)
+	if ((ret = ctf_dwarf_refdie(cup, die, DW_AT_type, &tdie)) != 0)
 		return (ret);
-	if ((ret = ctf_dwarf_convert_type(cdp, tdie, &tid,
+	if ((ret = ctf_dwarf_convert_type(cup, tdie, &tid,
 	    CTF_ADD_NONROOT)) != 0)
 		return (ret);
 
-	if ((ret = ctf_dwarf_child(cdp, die, &rdie)) != 0)
+	if ((ret = ctf_dwarf_child(cup, die, &rdie)) != 0)
 		return (ret);
-	if ((ret = ctf_dwarf_tag(cdp, rdie, &rtag)) != 0)
+	if ((ret = ctf_dwarf_tag(cup, rdie, &rtag)) != 0)
 		return (ret);
 	if (rtag != DW_TAG_subrange_type) {
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "encountered array without DW_TAG_subrange_type child\n");
 		return (ECTF_CONVBKERR);
 	}
@@ -1479,15 +1481,15 @@ ctf_dwarf_create_array(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 	 * subranges. If it's the latter, then for each subrange we introduce a
 	 * type. We can always use the base type.
 	 */
-	if ((ret = ctf_dwarf_create_array_range(cdp, rdie, idp, tid,
+	if ((ret = ctf_dwarf_create_array_range(cup, rdie, idp, tid,
 	    isroot)) != 0)
 		return (ret);
 	ctf_dprintf("Got back id %d\n", *idp);
-	return (ctf_dwmap_add(cdp, *idp, die, B_FALSE));
+	return (ctf_dwmap_add(cup, *idp, die, B_FALSE));
 }
 
 static int
-ctf_dwarf_create_reference(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
+ctf_dwarf_create_reference(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
     int kind, int isroot)
 {
 	int ret;
@@ -1496,7 +1498,7 @@ ctf_dwarf_create_reference(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 	char *name;
 	size_t namelen;
 
-	if ((ret = ctf_dwarf_string(cdp, die, DW_AT_name, &name)) != 0 &&
+	if ((ret = ctf_dwarf_string(cup, die, DW_AT_name, &name)) != 0 &&
 	    ret != ENOENT)
 		return (ret);
 	if (ret == ENOENT) {
@@ -1508,57 +1510,57 @@ ctf_dwarf_create_reference(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 
 	ctf_dprintf("reference kind %d %s\n", kind, name != NULL ? name : "<>");
 
-	if ((ret = ctf_dwarf_refdie(cdp, die, DW_AT_type, &tdie)) != 0) {
+	if ((ret = ctf_dwarf_refdie(cup, die, DW_AT_type, &tdie)) != 0) {
 		if (ret != ENOENT) {
 			ctf_free(name, namelen);
 			return (ret);
 		}
-		if ((id = ctf_dwarf_void(cdp)) == CTF_ERR) {
+		if ((id = ctf_dwarf_void(cup)) == CTF_ERR) {
 			ctf_free(name, namelen);
-			return (ctf_errno(cdp->cd_ctfp));
+			return (ctf_errno(cup->cu_ctfp));
 		}
 	} else {
-		if ((ret = ctf_dwarf_convert_type(cdp, tdie, &id,
+		if ((ret = ctf_dwarf_convert_type(cup, tdie, &id,
 		    CTF_ADD_NONROOT)) != 0) {
 			ctf_free(name, namelen);
 			return (ret);
 		}
 	}
 
-	if ((*idp = ctf_add_reftype(cdp->cd_ctfp, isroot, name, id, kind)) ==
+	if ((*idp = ctf_add_reftype(cup->cu_ctfp, isroot, name, id, kind)) ==
 	    CTF_ERR) {
 		ctf_free(name, namelen);
-		return (ctf_errno(cdp->cd_ctfp));
+		return (ctf_errno(cup->cu_ctfp));
 	}
 
 	ctf_free(name, namelen);
-	return (ctf_dwmap_add(cdp, *idp, die, B_FALSE));
+	return (ctf_dwmap_add(cup, *idp, die, B_FALSE));
 }
 
 static int
-ctf_dwarf_create_enum(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
+ctf_dwarf_create_enum(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 {
 	int ret;
 	ctf_id_t id;
 	Dwarf_Die child;
 	char *name;
 
-	if ((ret = ctf_dwarf_string(cdp, die, DW_AT_name, &name)) != 0 &&
+	if ((ret = ctf_dwarf_string(cup, die, DW_AT_name, &name)) != 0 &&
 	    ret != ENOENT)
 		return (ret);
 	if (ret == ENOENT)
 		name = NULL;
-	id = ctf_add_enum(cdp->cd_ctfp, isroot, name);
+	id = ctf_add_enum(cup->cu_ctfp, isroot, name);
 	ctf_dprintf("added enum %s (%d)\n", name, id);
 	if (name != NULL)
 		ctf_free(name, strlen(name) + 1);
 	if (id == CTF_ERR)
-		return (ctf_errno(cdp->cd_ctfp));
+		return (ctf_errno(cup->cu_ctfp));
 	*idp = id;
-	if ((ret = ctf_dwmap_add(cdp, id, die, B_FALSE)) != 0)
+	if ((ret = ctf_dwmap_add(cup, id, die, B_FALSE)) != 0)
 		return (ret);
 
-	if ((ret = ctf_dwarf_child(cdp, die, &child)) != 0) {
+	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0) {
 		if (ret == ENOENT)
 			ret = 0;
 		return (ret);
@@ -1571,14 +1573,14 @@ ctf_dwarf_create_enum(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 		Dwarf_Die arg = child;
 		int eval;
 
-		if ((ret = ctf_dwarf_sib(cdp, arg, &child)) != 0)
+		if ((ret = ctf_dwarf_sib(cup, arg, &child)) != 0)
 			return (ret);
 
-		if ((ret = ctf_dwarf_tag(cdp, arg, &tag)) != 0)
+		if ((ret = ctf_dwarf_tag(cup, arg, &tag)) != 0)
 			return (ret);
 
 		if (tag != DW_TAG_enumerator) {
-			if ((ret = ctf_dwarf_convert_type(cdp, arg, NULL,
+			if ((ret = ctf_dwarf_convert_type(cup, arg, NULL,
 			    CTF_ADD_NONROOT)) != 0)
 				return (ret);
 			continue;
@@ -1587,7 +1589,7 @@ ctf_dwarf_create_enum(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 		/*
 		 * DWARF v4 section 5.7 tells us we'll always have names.
 		 */
-		if ((ret = ctf_dwarf_string(cdp, arg, DW_AT_name, &name)) != 0)
+		if ((ret = ctf_dwarf_string(cup, arg, DW_AT_name, &name)) != 0)
 			return (ret);
 
 		/*
@@ -1596,10 +1598,10 @@ ctf_dwarf_create_enum(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 		 * Since negative values will fail ctf_dwarf_unsigned(), we try
 		 * that first to make sure we get the right value.
 		 */
-		if ((ret = ctf_dwarf_unsigned(cdp, arg, DW_AT_const_value,
+		if ((ret = ctf_dwarf_unsigned(cup, arg, DW_AT_const_value,
 		    &uval)) == 0) {
 			eval = (int)uval;
-		} else if ((ret = ctf_dwarf_signed(cdp, arg, DW_AT_const_value,
+		} else if ((ret = ctf_dwarf_signed(cup, arg, DW_AT_const_value,
 		    &sval)) == 0) {
 			eval = sval;
 		}
@@ -1608,18 +1610,18 @@ ctf_dwarf_create_enum(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 			if (ret != ENOENT)
 				return (ret);
 
-			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 			    "encountered enumeration without constant value\n");
 			return (ECTF_CONVBKERR);
 		}
 
-		ret = ctf_add_enumerator(cdp->cd_ctfp, id, name, eval);
+		ret = ctf_add_enumerator(cup->cu_ctfp, id, name, eval);
 		if (ret == CTF_ERR) {
-			(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+			(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 			    "failed to add enumarator %s (%d) to %d\n",
 			    name, eval, id);
 			ctf_free(name, strlen(name) + 1);
-			return (ctf_errno(cdp->cd_ctfp));
+			return (ctf_errno(cup->cu_ctfp));
 		}
 		ctf_free(name, strlen(name) + 1);
 	}
@@ -1632,7 +1634,7 @@ ctf_dwarf_create_enum(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
  * encounter one that's just a declaration. In which case, we error on it.
  */
 static int
-ctf_dwarf_create_fptr(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
+ctf_dwarf_create_fptr(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 {
 	int ret;
 	Dwarf_Bool b;
@@ -1642,7 +1644,7 @@ ctf_dwarf_create_fptr(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 
 	bzero(&fi, sizeof (ctf_funcinfo_t));
 
-	if ((ret = ctf_dwarf_boolean(cdp, die, DW_AT_declaration, &b)) != 0) {
+	if ((ret = ctf_dwarf_boolean(cup, die, DW_AT_declaration, &b)) != 0) {
 		if (ret != ENOENT)
 			return (ret);
 	} else {
@@ -1653,18 +1655,18 @@ ctf_dwarf_create_fptr(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 	/*
 	 * Return type is in DW_AT_type, if none, it returns void.
 	 */
-	if ((ret = ctf_dwarf_refdie(cdp, die, DW_AT_type, &retdie)) != 0) {
+	if ((ret = ctf_dwarf_refdie(cup, die, DW_AT_type, &retdie)) != 0) {
 		if (ret != ENOENT)
 			return (ret);
-		if ((fi.ctc_return = ctf_dwarf_void(cdp)) == CTF_ERR)
-			return (ctf_errno(cdp->cd_ctfp));
+		if ((fi.ctc_return = ctf_dwarf_void(cup)) == CTF_ERR)
+			return (ctf_errno(cup->cu_ctfp));
 	} else {
-		if ((ret = ctf_dwarf_convert_type(cdp, retdie, &fi.ctc_return,
+		if ((ret = ctf_dwarf_convert_type(cup, retdie, &fi.ctc_return,
 		    CTF_ADD_NONROOT)) != 0)
 			return (ret);
 	}
 
-	if ((ret = ctf_dwarf_function_count(cdp, die, &fi, B_TRUE)) != 0) {
+	if ((ret = ctf_dwarf_function_count(cup, die, &fi, B_TRUE)) != 0) {
 		return (ret);
 	}
 
@@ -1673,24 +1675,24 @@ ctf_dwarf_create_fptr(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp, int isroot)
 		if (argv == NULL)
 			return (ENOMEM);
 
-		if ((ret = ctf_dwarf_convert_fargs(cdp, die, &fi, argv)) != 0) {
+		if ((ret = ctf_dwarf_convert_fargs(cup, die, &fi, argv)) != 0) {
 			ctf_free(argv, sizeof (ctf_id_t) * fi.ctc_argc);
 			return (ret);
 		}
 	}
 
-	if ((*idp = ctf_add_funcptr(cdp->cd_ctfp, isroot, &fi, argv)) ==
+	if ((*idp = ctf_add_funcptr(cup->cu_ctfp, isroot, &fi, argv)) ==
 	    CTF_ERR) {
 		ctf_free(argv, sizeof (ctf_id_t) * fi.ctc_argc);
-		return (ctf_errno(cdp->cd_ctfp));
+		return (ctf_errno(cup->cu_ctfp));
 	}
 
 	ctf_free(argv, sizeof (ctf_id_t) * fi.ctc_argc);
-	return (ctf_dwmap_add(cdp, *idp, die, B_FALSE));
+	return (ctf_dwmap_add(cup, *idp, die, B_FALSE));
 }
 
 static int
-ctf_dwarf_convert_type(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
+ctf_dwarf_convert_type(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
     int isroot)
 {
 	int ret;
@@ -1702,13 +1704,13 @@ ctf_dwarf_convert_type(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 	if (idp == NULL)
 		idp = &id;
 
-	if ((ret = ctf_dwarf_offset(cdp, die, &offset)) != 0)
+	if ((ret = ctf_dwarf_offset(cup, die, &offset)) != 0)
 		return (ret);
 
-	if (offset > cdp->cd_maxoff) {
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	if (offset > cup->cu_maxoff) {
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "die offset %llu beyond maximum for header %llu\n",
-		    offset, cdp->cd_maxoff);
+		    offset, cup->cu_maxoff);
 		return (ECTF_CONVBKERR);
 	}
 
@@ -1716,65 +1718,65 @@ ctf_dwarf_convert_type(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 	 * If we've already added an entry for this offset, then we're done.
 	 */
 	lookup.cdm_off = offset;
-	if ((map = avl_find(&cdp->cd_map, &lookup, NULL)) != NULL) {
+	if ((map = avl_find(&cup->cu_map, &lookup, NULL)) != NULL) {
 		*idp = map->cdm_id;
 		return (0);
 	}
 
-	if ((ret = ctf_dwarf_tag(cdp, die, &tag)) != 0)
+	if ((ret = ctf_dwarf_tag(cup, die, &tag)) != 0)
 		return (ret);
 
 	ret = ENOTSUP;
 	switch (tag) {
 	case DW_TAG_base_type:
 		ctf_dprintf("base\n");
-		ret = ctf_dwarf_create_base(cdp, die, idp, isroot, offset);
+		ret = ctf_dwarf_create_base(cup, die, idp, isroot, offset);
 		break;
 	case DW_TAG_array_type:
 		ctf_dprintf("array\n");
-		ret = ctf_dwarf_create_array(cdp, die, idp, isroot);
+		ret = ctf_dwarf_create_array(cup, die, idp, isroot);
 		break;
 	case DW_TAG_enumeration_type:
 		ctf_dprintf("enum\n");
-		ret = ctf_dwarf_create_enum(cdp, die, idp, isroot);
+		ret = ctf_dwarf_create_enum(cup, die, idp, isroot);
 		break;
 	case DW_TAG_pointer_type:
 		ctf_dprintf("pointer\n");
-		ret = ctf_dwarf_create_reference(cdp, die, idp, CTF_K_POINTER,
+		ret = ctf_dwarf_create_reference(cup, die, idp, CTF_K_POINTER,
 		    isroot);
 		break;
 	case DW_TAG_structure_type:
 		ctf_dprintf("struct\n");
-		ret = ctf_dwarf_create_sou(cdp, die, idp, CTF_K_STRUCT,
+		ret = ctf_dwarf_create_sou(cup, die, idp, CTF_K_STRUCT,
 		    isroot);
 		break;
 	case DW_TAG_subroutine_type:
 		ctf_dprintf("fptr\n");
-		ret = ctf_dwarf_create_fptr(cdp, die, idp, isroot);
+		ret = ctf_dwarf_create_fptr(cup, die, idp, isroot);
 		break;
 	case DW_TAG_typedef:
 		ctf_dprintf("typedef\n");
-		ret = ctf_dwarf_create_reference(cdp, die, idp, CTF_K_TYPEDEF,
+		ret = ctf_dwarf_create_reference(cup, die, idp, CTF_K_TYPEDEF,
 		    isroot);
 		break;
 	case DW_TAG_union_type:
 		ctf_dprintf("union\n");
-		ret = ctf_dwarf_create_sou(cdp, die, idp, CTF_K_UNION,
+		ret = ctf_dwarf_create_sou(cup, die, idp, CTF_K_UNION,
 		    isroot);
 		break;
 	case DW_TAG_const_type:
 		ctf_dprintf("const\n");
-		ret = ctf_dwarf_create_reference(cdp, die, idp, CTF_K_CONST,
+		ret = ctf_dwarf_create_reference(cup, die, idp, CTF_K_CONST,
 		    isroot);
 		break;
 	case DW_TAG_volatile_type:
 		ctf_dprintf("volatile\n");
-		ret = ctf_dwarf_create_reference(cdp, die, idp, CTF_K_VOLATILE,
+		ret = ctf_dwarf_create_reference(cup, die, idp, CTF_K_VOLATILE,
 		    isroot);
 		break;
 	case DW_TAG_restrict_type:
 		ctf_dprintf("restrict\n");
-		ret = ctf_dwarf_create_reference(cdp, die, idp, CTF_K_RESTRICT,
+		ret = ctf_dwarf_create_reference(cup, die, idp, CTF_K_RESTRICT,
 		    isroot);
 		break;
 	default:
@@ -1789,35 +1791,35 @@ ctf_dwarf_convert_type(ctf_die_t *cdp, Dwarf_Die die, ctf_id_t *idp,
 }
 
 static int
-ctf_dwarf_walk_lexical(ctf_die_t *cdp, Dwarf_Die die)
+ctf_dwarf_walk_lexical(ctf_cu_t *cup, Dwarf_Die die)
 {
 	int ret;
 	Dwarf_Die child;
 
-	if ((ret = ctf_dwarf_child(cdp, die, &child)) != 0)
+	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0)
 		return (ret);
 
 	if (child == NULL)
 		return (0);
 
-	return (ctf_dwarf_convert_die(cdp, die));
+	return (ctf_dwarf_convert_die(cup, die));
 }
 
 static int
-ctf_dwarf_function_count(ctf_die_t *cdp, Dwarf_Die die, ctf_funcinfo_t *fip,
+ctf_dwarf_function_count(ctf_cu_t *cup, Dwarf_Die die, ctf_funcinfo_t *fip,
     boolean_t fptr)
 {
 	int ret;
 	Dwarf_Die child, sib, arg;
 
-	if ((ret = ctf_dwarf_child(cdp, die, &child)) != 0)
+	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0)
 		return (ret);
 
 	arg = child;
 	while (arg != NULL) {
 		Dwarf_Half tag;
 
-		if ((ret = ctf_dwarf_tag(cdp, arg, &tag)) != 0)
+		if ((ret = ctf_dwarf_tag(cup, arg, &tag)) != 0)
 			return (ret);
 
 		/*
@@ -1835,7 +1837,7 @@ ctf_dwarf_function_count(ctf_die_t *cdp, Dwarf_Die die, ctf_funcinfo_t *fip,
 		 */
 		if (tag == DW_TAG_formal_parameter && fptr == B_FALSE) {
 			char *name;
-			if ((ret = ctf_dwarf_string(cdp, die, DW_AT_name,
+			if ((ret = ctf_dwarf_string(cup, die, DW_AT_name,
 			    &name)) != 0)
 				return (ret);
 			if (strcmp(name, DWARF_VARARGS_NAME) == 0)
@@ -1849,7 +1851,7 @@ ctf_dwarf_function_count(ctf_die_t *cdp, Dwarf_Die die, ctf_funcinfo_t *fip,
 		    fip->ctc_argc > 0) {
 			fip->ctc_flags |= CTF_FUNC_VARARG;
 		}
-		if ((ret = ctf_dwarf_sib(cdp, arg, &sib)) != 0)
+		if ((ret = ctf_dwarf_sib(cup, arg, &sib)) != 0)
 			return (ret);
 		arg = sib;
 	}
@@ -1858,30 +1860,30 @@ ctf_dwarf_function_count(ctf_die_t *cdp, Dwarf_Die die, ctf_funcinfo_t *fip,
 }
 
 static int
-ctf_dwarf_convert_fargs(ctf_die_t *cdp, Dwarf_Die die, ctf_funcinfo_t *fip,
+ctf_dwarf_convert_fargs(ctf_cu_t *cup, Dwarf_Die die, ctf_funcinfo_t *fip,
     ctf_id_t *argv)
 {
 	int ret;
 	int i = 0;
 	Dwarf_Die child, sib, arg;
 
-	if ((ret = ctf_dwarf_child(cdp, die, &child)) != 0)
+	if ((ret = ctf_dwarf_child(cup, die, &child)) != 0)
 		return (ret);
 
 	arg = child;
 	while (arg != NULL) {
 		Dwarf_Half tag;
 
-		if ((ret = ctf_dwarf_tag(cdp, arg, &tag)) != 0)
+		if ((ret = ctf_dwarf_tag(cup, arg, &tag)) != 0)
 			return (ret);
 		if (tag == DW_TAG_formal_parameter) {
 			Dwarf_Die tdie;
 
-			if ((ret = ctf_dwarf_refdie(cdp, arg, DW_AT_type,
+			if ((ret = ctf_dwarf_refdie(cup, arg, DW_AT_type,
 			    &tdie)) != 0)
 				return (ret);
 
-			if ((ret = ctf_dwarf_convert_type(cdp, tdie, &argv[i],
+			if ((ret = ctf_dwarf_convert_type(cup, tdie, &argv[i],
 			    CTF_ADD_ROOT)) != 0)
 				return (ret);
 			i++;
@@ -1889,13 +1891,13 @@ ctf_dwarf_convert_fargs(ctf_die_t *cdp, Dwarf_Die die, ctf_funcinfo_t *fip,
 			/*
 			 * Once we hit argc entries, we're done. This ensures we
 			 * don't accidentally hit a varargs which should be the
-			 * least entry.
+			 * last entry.
 			 */
 			if (i == fip->ctc_argc)
 				break;
 		}
 
-		if ((ret = ctf_dwarf_sib(cdp, arg, &sib)) != 0)
+		if ((ret = ctf_dwarf_sib(cup, arg, &sib)) != 0)
 			return (ret);
 		arg = sib;
 	}
@@ -1904,7 +1906,7 @@ ctf_dwarf_convert_fargs(ctf_die_t *cdp, Dwarf_Die die, ctf_funcinfo_t *fip,
 }
 
 static int
-ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
+ctf_dwarf_convert_function(ctf_cu_t *cup, Dwarf_Die die)
 {
 	int ret;
 	char *name;
@@ -1917,7 +1919,7 @@ ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
 	 * we can't get a name, then instead of returning ENOENT, we silently
 	 * swallow the error.
 	 */
-	if ((ret = ctf_dwarf_string(cdp, die, DW_AT_name, &name)) != 0) {
+	if ((ret = ctf_dwarf_string(cup, die, DW_AT_name, &name)) != 0) {
 		if (ret == ENOENT)
 			return (0);
 		return (ret);
@@ -1931,8 +1933,8 @@ ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
 	bzero(cdf, sizeof (ctf_dwfunc_t));
 	cdf->cdf_name = name;
 
-	if ((ret = ctf_dwarf_refdie(cdp, die, DW_AT_type, &tdie)) == 0) {
-		if ((ret = ctf_dwarf_convert_type(cdp, tdie,
+	if ((ret = ctf_dwarf_refdie(cup, die, DW_AT_type, &tdie)) == 0) {
+		if ((ret = ctf_dwarf_convert_type(cup, tdie,
 		    &(cdf->cdf_fip.ctc_return), CTF_ADD_ROOT)) != 0) {
 			ctf_free(name, strlen(name) + 1);
 			ctf_free(cdf, sizeof (ctf_dwfunc_t));
@@ -1943,11 +1945,11 @@ ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
 		ctf_free(cdf, sizeof (ctf_dwfunc_t));
 		return (ret);
 	} else {
-		if ((cdf->cdf_fip.ctc_return = ctf_dwarf_void(cdp)) ==
+		if ((cdf->cdf_fip.ctc_return = ctf_dwarf_void(cup)) ==
 		    CTF_ERR) {
 			ctf_free(name, strlen(name) + 1);
 			ctf_free(cdf, sizeof (ctf_dwfunc_t));
-			return (ctf_errno(cdp->cd_ctfp));
+			return (ctf_errno(cup->cu_ctfp));
 		}
 	}
 
@@ -1961,7 +1963,7 @@ ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
 	 * Note, we already got the return type by going in and grabbing it out
 	 * of the DW_AT_type.
 	 */
-	if ((ret = ctf_dwarf_function_count(cdp, die, &cdf->cdf_fip,
+	if ((ret = ctf_dwarf_function_count(cup, die, &cdf->cdf_fip,
 	    B_FALSE)) != 0) {
 		ctf_free(name, strlen(name) + 1);
 		ctf_free(cdf, sizeof (ctf_dwfunc_t));
@@ -1977,7 +1979,7 @@ ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
 			ctf_free(cdf, sizeof (ctf_dwfunc_t));
 			return (ENOMEM);
 		}
-		if ((ret = ctf_dwarf_convert_fargs(cdp, die,
+		if ((ret = ctf_dwarf_convert_fargs(cup, die,
 		    &cdf->cdf_fip, cdf->cdf_argv)) != 0) {
 			ctf_free(cdf->cdf_argv, sizeof (ctf_id_t) * argc);
 			ctf_free(name, strlen(name) + 1);
@@ -1988,7 +1990,7 @@ ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
 		cdf->cdf_argv = NULL;
 	}
 
-	if ((ret = ctf_dwarf_isglobal(cdp, die, &cdf->cdf_global)) != 0) {
+	if ((ret = ctf_dwarf_isglobal(cup, die, &cdf->cdf_global)) != 0) {
 		ctf_free(cdf->cdf_argv, sizeof (ctf_id_t) *
 		    cdf->cdf_fip.ctc_argc);
 		ctf_free(name, strlen(name) + 1);
@@ -1996,7 +1998,7 @@ ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
 		return (ret);
 	}
 
-	ctf_list_append(&cdp->cd_funcs, cdf);
+	ctf_list_append(&cup->cu_funcs, cdf);
 	return (ret);
 }
 
@@ -2004,7 +2006,7 @@ ctf_dwarf_convert_function(ctf_die_t *cdp, Dwarf_Die die)
  * Convert variables, but only if they're not prototypes and have names.
  */
 static int
-ctf_dwarf_convert_variable(ctf_die_t *cdp, Dwarf_Die die)
+ctf_dwarf_convert_variable(ctf_cu_t *cup, Dwarf_Die die)
 {
 	int ret;
 	char *name;
@@ -2014,7 +2016,7 @@ ctf_dwarf_convert_variable(ctf_die_t *cdp, Dwarf_Die die)
 	ctf_dwvar_t *cdv;
 
 	/* Skip "Non-Defining Declarations" */
-	if ((ret = ctf_dwarf_boolean(cdp, die, DW_AT_declaration, &b)) == 0) {
+	if ((ret = ctf_dwarf_boolean(cup, die, DW_AT_declaration, &b)) == 0) {
 		if (b != 0)
 			return (0);
 	} else if (ret != ENOENT) {
@@ -2028,10 +2030,10 @@ ctf_dwarf_convert_variable(ctf_die_t *cdp, Dwarf_Die die)
 	 * not this site.  It's sufficient for what we need, however: in
 	 * particular, we should find DW_AT_external as needed there.
 	 */
-	if ((ret = ctf_dwarf_refdie(cdp, die, DW_AT_specification,
+	if ((ret = ctf_dwarf_refdie(cup, die, DW_AT_specification,
 	    &tdie)) == 0) {
 		Dwarf_Off offset;
-		if ((ret = ctf_dwarf_offset(cdp, tdie, &offset)) != 0)
+		if ((ret = ctf_dwarf_offset(cup, tdie, &offset)) != 0)
 			return (ret);
 		ctf_dprintf("die 0x%llx DW_AT_specification -> die 0x%llx\n",
 		    ctf_die_offset(die), ctf_die_offset(tdie));
@@ -2040,18 +2042,18 @@ ctf_dwarf_convert_variable(ctf_die_t *cdp, Dwarf_Die die)
 		return (ret);
 	}
 
-	if ((ret = ctf_dwarf_string(cdp, die, DW_AT_name, &name)) != 0 &&
+	if ((ret = ctf_dwarf_string(cup, die, DW_AT_name, &name)) != 0 &&
 	    ret != ENOENT)
 		return (ret);
 	if (ret == ENOENT)
 		return (0);
 
-	if ((ret = ctf_dwarf_refdie(cdp, die, DW_AT_type, &tdie)) != 0) {
+	if ((ret = ctf_dwarf_refdie(cup, die, DW_AT_type, &tdie)) != 0) {
 		ctf_free(name, strlen(name) + 1);
 		return (ret);
 	}
 
-	if ((ret = ctf_dwarf_convert_type(cdp, tdie, &id,
+	if ((ret = ctf_dwarf_convert_type(cup, tdie, &id,
 	    CTF_ADD_ROOT)) != 0)
 		return (ret);
 
@@ -2063,13 +2065,13 @@ ctf_dwarf_convert_variable(ctf_die_t *cdp, Dwarf_Die die)
 	cdv->cdv_name = name;
 	cdv->cdv_type = id;
 
-	if ((ret = ctf_dwarf_isglobal(cdp, die, &cdv->cdv_global)) != 0) {
+	if ((ret = ctf_dwarf_isglobal(cup, die, &cdv->cdv_global)) != 0) {
 		ctf_free(cdv, sizeof (ctf_dwvar_t));
 		ctf_free(name, strlen(name) + 1);
 		return (ret);
 	}
 
-	ctf_list_append(&cdp->cd_vars, cdv);
+	ctf_list_append(&cup->cu_vars, cdv);
 	return (0);
 }
 
@@ -2077,45 +2079,45 @@ ctf_dwarf_convert_variable(ctf_die_t *cdp, Dwarf_Die die)
  * Walk through our set of top-level types and process them.
  */
 static int
-ctf_dwarf_walk_toplevel(ctf_die_t *cdp, Dwarf_Die die)
+ctf_dwarf_walk_toplevel(ctf_cu_t *cup, Dwarf_Die die)
 {
 	int ret;
 	Dwarf_Off offset;
 	Dwarf_Half tag;
 
-	if ((ret = ctf_dwarf_offset(cdp, die, &offset)) != 0)
+	if ((ret = ctf_dwarf_offset(cup, die, &offset)) != 0)
 		return (ret);
 
-	if (offset > cdp->cd_maxoff) {
-		(void) snprintf(cdp->cd_errbuf, cdp->cd_errlen,
+	if (offset > cup->cu_maxoff) {
+		(void) snprintf(cup->cu_errbuf, cup->cu_errlen,
 		    "die offset %llu beyond maximum for header %llu\n",
-		    offset, cdp->cd_maxoff);
+		    offset, cup->cu_maxoff);
 		return (ECTF_CONVBKERR);
 	}
 
-	if ((ret = ctf_dwarf_tag(cdp, die, &tag)) != 0)
+	if ((ret = ctf_dwarf_tag(cup, die, &tag)) != 0)
 		return (ret);
 
 	ret = 0;
 	switch (tag) {
 	case DW_TAG_subprogram:
 		ctf_dprintf("top level func\n");
-		ret = ctf_dwarf_convert_function(cdp, die);
+		ret = ctf_dwarf_convert_function(cup, die);
 		break;
 	case DW_TAG_variable:
 		ctf_dprintf("top level var\n");
-		ret = ctf_dwarf_convert_variable(cdp, die);
+		ret = ctf_dwarf_convert_variable(cup, die);
 		break;
 	case DW_TAG_lexical_block:
 		ctf_dprintf("top level block\n");
-		ret = ctf_dwarf_walk_lexical(cdp, die);
+		ret = ctf_dwarf_walk_lexical(cup, die);
 		break;
 	case DW_TAG_enumeration_type:
 	case DW_TAG_structure_type:
 	case DW_TAG_typedef:
 	case DW_TAG_union_type:
 		ctf_dprintf("top level type\n");
-		ret = ctf_dwarf_convert_type(cdp, die, NULL, B_TRUE);
+		ret = ctf_dwarf_convert_type(cup, die, NULL, B_TRUE);
 		break;
 	default:
 		break;
@@ -2130,16 +2132,16 @@ ctf_dwarf_walk_toplevel(ctf_die_t *cdp, Dwarf_Die die)
  * convert any siblings that are associaed with this die.
  */
 static int
-ctf_dwarf_convert_die(ctf_die_t *cdp, Dwarf_Die die)
+ctf_dwarf_convert_die(ctf_cu_t *cup, Dwarf_Die die)
 {
 	while (die != NULL) {
 		int ret;
 		Dwarf_Die sib;
 
-		if ((ret = ctf_dwarf_walk_toplevel(cdp, die)) != 0)
+		if ((ret = ctf_dwarf_walk_toplevel(cup, die)) != 0)
 			return (ret);
 
-		if ((ret = ctf_dwarf_sib(cdp, die, &sib)) != 0)
+		if ((ret = ctf_dwarf_sib(cup, die, &sib)) != 0)
 			return (ret);
 		die = sib;
 	}
@@ -2147,16 +2149,16 @@ ctf_dwarf_convert_die(ctf_die_t *cdp, Dwarf_Die die)
 }
 
 static int
-ctf_dwarf_fixup_die(ctf_die_t *cdp, boolean_t addpass)
+ctf_dwarf_fixup_die(ctf_cu_t *cup, boolean_t addpass)
 {
 	ctf_dwmap_t *map;
 
-	for (map = avl_first(&cdp->cd_map); map != NULL;
-	    map = AVL_NEXT(&cdp->cd_map, map)) {
+	for (map = avl_first(&cup->cu_map); map != NULL;
+	    map = AVL_NEXT(&cup->cu_map, map)) {
 		int ret;
 		if (map->cdm_fix == B_FALSE)
 			continue;
-		if ((ret = ctf_dwarf_fixup_sou(cdp, map->cdm_die, map->cdm_id,
+		if ((ret = ctf_dwarf_fixup_sou(cup, map->cdm_die, map->cdm_id,
 		    addpass)) != 0)
 			return (ret);
 	}
@@ -2165,7 +2167,7 @@ ctf_dwarf_fixup_die(ctf_die_t *cdp, boolean_t addpass)
 }
 
 static ctf_dwfunc_t *
-ctf_dwarf_match_func(ctf_die_t *cdp, const char *file, const char *name,
+ctf_dwarf_match_func(ctf_cu_t *cup, const char *file, const char *name,
     int bind)
 {
 	ctf_dwfunc_t *cdf;
@@ -2174,10 +2176,10 @@ ctf_dwarf_match_func(ctf_die_t *cdp, const char *file, const char *name,
 		return (NULL);
 
 	/* Nothing we can do if we can't find a name to compare it to. */
-	if (bind == STB_LOCAL && (file == NULL || cdp->cd_name == NULL))
+	if (bind == STB_LOCAL && (file == NULL || cup->cu_name == NULL))
 		return (NULL);
 
-	for (cdf = ctf_list_next(&cdp->cd_funcs); cdf != NULL;
+	for (cdf = ctf_list_next(&cup->cu_funcs); cdf != NULL;
 	    cdf = ctf_list_next(cdf)) {
 		if (bind == STB_GLOBAL && cdf->cdf_global == B_FALSE)
 			continue;
@@ -2185,7 +2187,7 @@ ctf_dwarf_match_func(ctf_die_t *cdp, const char *file, const char *name,
 			continue;
 		if (strcmp(name, cdf->cdf_name) != 0)
 			continue;
-		if (bind == STB_LOCAL && strcmp(file, cdp->cd_name) != 0)
+		if (bind == STB_LOCAL && strcmp(file, cup->cu_name) != 0)
 			continue;
 		return (cdf);
 	}
@@ -2193,17 +2195,17 @@ ctf_dwarf_match_func(ctf_die_t *cdp, const char *file, const char *name,
 	return (NULL);
 }
 static ctf_dwvar_t *
-ctf_dwarf_match_var(ctf_die_t *cdp, const char *file, const char *name,
+ctf_dwarf_match_var(ctf_cu_t *cup, const char *file, const char *name,
     int bind)
 {
 	ctf_dwvar_t *cdv;
 
 	/* Nothing we can do if we can't find a name to compare it to. */
-	if (bind == STB_LOCAL && (file == NULL || cdp->cd_name == NULL))
+	if (bind == STB_LOCAL && (file == NULL || cup->cu_name == NULL))
 		return (NULL);
 	ctf_dprintf("Still considering %s\n", name);
 
-	for (cdv = ctf_list_next(&cdp->cd_vars); cdv != NULL;
+	for (cdv = ctf_list_next(&cup->cu_vars); cdv != NULL;
 	    cdv = ctf_list_next(cdv)) {
 		if (bind == STB_GLOBAL && cdv->cdv_global == B_FALSE)
 			continue;
@@ -2211,7 +2213,7 @@ ctf_dwarf_match_var(ctf_die_t *cdp, const char *file, const char *name,
 			continue;
 		if (strcmp(name, cdv->cdv_name) != 0)
 			continue;
-		if (bind == STB_LOCAL && strcmp(file, cdp->cd_name) != 0)
+		if (bind == STB_LOCAL && strcmp(file, cup->cu_name) != 0)
 			continue;
 		return (cdv);
 	}
@@ -2220,11 +2222,11 @@ ctf_dwarf_match_var(ctf_die_t *cdp, const char *file, const char *name,
 }
 
 static int
-ctf_dwarf_symtab_iter(ctf_die_t *cdp, ctf_dwarf_symtab_f *func, void *arg)
+ctf_dwarf_symtab_iter(ctf_cu_t *cup, ctf_dwarf_symtab_f *func, void *arg)
 {
 	int ret;
 	ulong_t i;
-	ctf_file_t *fp = cdp->cd_ctfp;
+	ctf_file_t *fp = cup->cu_ctfp;
 	const char *file = NULL;
 	uintptr_t symbase = (uintptr_t)fp->ctf_symtab.cts_data;
 	uintptr_t strbase = (uintptr_t)fp->ctf_strtab.cts_data;
@@ -2271,7 +2273,7 @@ ctf_dwarf_symtab_iter(ctf_die_t *cdp, ctf_dwarf_symtab_f *func, void *arg)
 			gsymp = symp;
 		}
 
-		ret = func(cdp, gsymp, i, file, name, arg);
+		ret = func(cup, gsymp, i, file, name, arg);
 		if (ret != 0)
 			return (ret);
 	}
@@ -2280,7 +2282,7 @@ ctf_dwarf_symtab_iter(ctf_die_t *cdp, ctf_dwarf_symtab_f *func, void *arg)
 }
 
 static int
-ctf_dwarf_conv_funcvars_cb(ctf_die_t *cdp, const GElf_Sym *symp, ulong_t idx,
+ctf_dwarf_conv_funcvars_cb(ctf_cu_t *cup, const GElf_Sym *symp, ulong_t idx,
     const char *file, const char *name, void *arg)
 {
 	int ret, bind, type;
@@ -2295,44 +2297,42 @@ ctf_dwarf_conv_funcvars_cb(ctf_die_t *cdp, const GElf_Sym *symp, ulong_t idx,
 		return (0);
 
 	if (type == STT_OBJECT) {
-		ctf_dwvar_t *cdv = ctf_dwarf_match_var(cdp, file, name,
+		ctf_dwvar_t *cdv = ctf_dwarf_match_var(cup, file, name,
 		    bind);
 		ctf_dprintf("match for %s (%d): %p\n", name, idx, cdv);
 		if (cdv == NULL)
 			return (0);
-		ret = ctf_add_object(cdp->cd_ctfp, idx, cdv->cdv_type);
+		ret = ctf_add_object(cup->cu_ctfp, idx, cdv->cdv_type);
 		ctf_dprintf("added object %s\n", name);
 	} else {
-		ctf_dwfunc_t *cdf = ctf_dwarf_match_func(cdp, file, name,
+		ctf_dwfunc_t *cdf = ctf_dwarf_match_func(cup, file, name,
 		    bind);
 		if (cdf == NULL)
 			return (0);
-		ret = ctf_add_function(cdp->cd_ctfp, idx, &cdf->cdf_fip,
+		ret = ctf_add_function(cup->cu_ctfp, idx, &cdf->cdf_fip,
 		    cdf->cdf_argv);
 	}
 
 	if (ret == CTF_ERR) {
-		return (ctf_errno(cdp->cd_ctfp));
+		return (ctf_errno(cup->cu_ctfp));
 	}
 
 	return (0);
 }
 
 static int
-ctf_dwarf_conv_funcvars(ctf_die_t *cdp)
+ctf_dwarf_conv_funcvars(ctf_cu_t *cup)
 {
-	return (ctf_dwarf_symtab_iter(cdp, ctf_dwarf_conv_funcvars_cb, NULL));
+	return (ctf_dwarf_symtab_iter(cup, ctf_dwarf_conv_funcvars_cb, NULL));
 }
 
 /*
- * Note, this comment comes from the original version of the CTF tools.
+ * If we have a weak symbol, attempt to find the strong symbol it will resolve
+ * to.  Note: the code where this actually happens is in sym_process() in
+ * cmd/sgs/libld/common/syms.c
  *
- * If we have a weak symbol, attempt to find the strong symbol it will
- * resolve to.  Note: the code where this actually happens is in
- * sym_process() in cmd/sgs/libld/common/syms.c
- *
- * Finding the matching symbol is unfortunately not trivial.  For a
- * symbol to be a candidate, it must:
+ * Finding the matching symbol is unfortunately not trivial.  For a symbol to be
+ * a candidate, it must:
  *
  * - have the same type (function, object)
  * - have the same value (address)
@@ -2340,26 +2340,29 @@ ctf_dwarf_conv_funcvars(ctf_die_t *cdp)
  * - not be another weak symbol
  * - belong to the same section (checked via section index)
  *
- * If such a candidate is global, then we assume we've found it.  The
- * linker generates the symbol table such that the curfile might be
- * incorrect; this is OK for global symbols, since find_iidesc() doesn't
- * need to check for the source file for the symbol.
+ * To perform this check, we first iterate over the symbol table. For each weak
+ * symbol that we encounter, we then do a second walk over the symbol table,
+ * calling ctf_dwarf_conv_check_weak(). If a symbol matches the above, then it's
+ * either a local or global symbol. If we find a global symbol then we go with
+ * it and stop searching for additional matches.
  *
- * We might have found a strong local symbol, where the curfile is
- * accurate and matches that of the weak symbol.  We assume this is a
- * reasonable match.
+ * If instead, we find a local symbol, things are more complicated. The first
+ * thing we do is to try and see if we have file information about both symbols
+ * (STT_FILE). If they both have file information and it matches, then we treat
+ * that as a good match and stop searching for additional matches.
  *
- * If we've got a local symbol with a non-matching curfile, there are
- * two possibilities.  Either this is a completely different symbol, or
- * it's a once-global symbol that was scoped to local via a mapfile.  In
- * the latter case, curfile is likely inaccurate since the linker does
- * not preserve the needed curfile in the order of the symbol table (see
- * the comments about locally scoped symbols in libld's update_osym()).
- * As we can't tell this case from the former one, we use this symbol
- * iff no other matching symbol is found.
+ * Otherwise, this means we have a non-matching file and a local symbol. We
+ * treat this as a candidate and if we find a better match (one of the two cases
+ * above), use that instead. There are two different ways this can happen.
+ * Either this is a completely different symbol, or it's a once-global symbol
+ * that was scoped to local via a mapfile.  In the former case, curfile is
+ * likely inaccurate since the linker does not preserve the needed curfile in
+ * the order of the symbol table (see the comments about locally scoped symbols
+ * in libld's update_osym()).  As we can't tell this case from the former one,
+ * we use this symbol iff no other matching symbol is found.
  *
- * What we really need here is a SUNW section containing weak<->strong
- * mappings that we can consume.
+ * What we really need here is a SUNW section containing weak<->strong mappings
+ * that we can consume.
  */
 typedef struct ctf_dwarf_weak_arg {
 	const GElf_Sym *cweak_symp;
@@ -2369,7 +2372,7 @@ typedef struct ctf_dwarf_weak_arg {
 } ctf_dwarf_weak_arg_t;
 
 static int
-ctf_dwarf_conv_check_weak(ctf_die_t *cdp, const GElf_Sym *symp,
+ctf_dwarf_conv_check_weak(ctf_cu_t *cup, const GElf_Sym *symp,
     ulong_t idx, const char *file, const char *name, void *arg)
 {
 	ctf_dwarf_weak_arg_t *cweak = arg;
@@ -2416,39 +2419,39 @@ ctf_dwarf_conv_check_weak(ctf_die_t *cdp, const GElf_Sym *symp,
 }
 
 static int
-ctf_dwarf_duplicate_sym(ctf_die_t *cdp, ulong_t idx, ulong_t matchidx)
+ctf_dwarf_duplicate_sym(ctf_cu_t *cup, ulong_t idx, ulong_t matchidx)
 {
-	ctf_id_t id = ctf_lookup_by_symbol(cdp->cd_ctfp, matchidx);
+	ctf_id_t id = ctf_lookup_by_symbol(cup->cu_ctfp, matchidx);
 
 	/*
 	 * If we matched something that for some reason didn't have type data,
 	 * we don't consider that a fatal error and silently swallow it.
 	 */
 	if (id == CTF_ERR) {
-		if (ctf_errno(cdp->cd_ctfp) == ECTF_NOTYPEDAT)
+		if (ctf_errno(cup->cu_ctfp) == ECTF_NOTYPEDAT)
 			return (0);
 		else
-			return (ctf_errno(cdp->cd_ctfp));
+			return (ctf_errno(cup->cu_ctfp));
 	}
 
-	if (ctf_add_object(cdp->cd_ctfp, idx, id) == CTF_ERR)
-		return (ctf_errno(cdp->cd_ctfp));
+	if (ctf_add_object(cup->cu_ctfp, idx, id) == CTF_ERR)
+		return (ctf_errno(cup->cu_ctfp));
 
 	return (0);
 }
 
 static int
-ctf_dwarf_duplicate_func(ctf_die_t *cdp, ulong_t idx, ulong_t matchidx)
+ctf_dwarf_duplicate_func(ctf_cu_t *cup, ulong_t idx, ulong_t matchidx)
 {
 	int ret;
 	ctf_funcinfo_t fip;
 	ctf_id_t *args = NULL;
 
-	if (ctf_func_info(cdp->cd_ctfp, matchidx, &fip) == CTF_ERR) {
-		if (ctf_errno(cdp->cd_ctfp) == ECTF_NOFUNCDAT)
+	if (ctf_func_info(cup->cu_ctfp, matchidx, &fip) == CTF_ERR) {
+		if (ctf_errno(cup->cu_ctfp) == ECTF_NOFUNCDAT)
 			return (0);
 		else
-			return (ctf_errno(cdp->cd_ctfp));
+			return (ctf_errno(cup->cu_ctfp));
 	}
 
 	if (fip.ctc_argc != 0) {
@@ -2456,24 +2459,24 @@ ctf_dwarf_duplicate_func(ctf_die_t *cdp, ulong_t idx, ulong_t matchidx)
 		if (args == NULL)
 			return (ENOMEM);
 
-		if (ctf_func_args(cdp->cd_ctfp, matchidx, fip.ctc_argc, args) ==
+		if (ctf_func_args(cup->cu_ctfp, matchidx, fip.ctc_argc, args) ==
 		    CTF_ERR) {
 			ctf_free(args, sizeof (ctf_id_t) * fip.ctc_argc);
-			return (ctf_errno(cdp->cd_ctfp));
+			return (ctf_errno(cup->cu_ctfp));
 		}
 	}
 
-	ret = ctf_add_function(cdp->cd_ctfp, idx, &fip, args);
+	ret = ctf_add_function(cup->cu_ctfp, idx, &fip, args);
 	if (args != NULL)
 		ctf_free(args, sizeof (ctf_id_t) * fip.ctc_argc);
 	if (ret == CTF_ERR)
-		return (ctf_errno(cdp->cd_ctfp));
+		return (ctf_errno(cup->cu_ctfp));
 
 	return (0);
 }
 
 static int
-ctf_dwarf_conv_weaks_cb(ctf_die_t *cdp, const GElf_Sym *symp,
+ctf_dwarf_conv_weaks_cb(ctf_cu_t *cup, const GElf_Sym *symp,
     ulong_t idx, const char *file, const char *name, void *arg)
 {
 	int ret, type;
@@ -2500,7 +2503,7 @@ ctf_dwarf_conv_weaks_cb(ctf_die_t *cdp, const GElf_Sym *symp,
 
 	ctf_dprintf("Trying to find weak equiv for %s\n", name);
 
-	ret = ctf_dwarf_symtab_iter(cdp, ctf_dwarf_conv_check_weak, &cweak);
+	ret = ctf_dwarf_symtab_iter(cup, ctf_dwarf_conv_check_weak, &cweak);
 	VERIFY(ret == 0 || ret == 1);
 
 	/*
@@ -2516,18 +2519,18 @@ ctf_dwarf_conv_weaks_cb(ctf_die_t *cdp, const GElf_Sym *symp,
 	 * Now, finally go and add the type based on the match.
 	 */
 	if (type == STT_OBJECT) {
-		ret = ctf_dwarf_duplicate_sym(cdp, idx, cweak.cweak_idx);
+		ret = ctf_dwarf_duplicate_sym(cup, idx, cweak.cweak_idx);
 	} else {
-		ret = ctf_dwarf_duplicate_func(cdp, idx, cweak.cweak_idx);
+		ret = ctf_dwarf_duplicate_func(cup, idx, cweak.cweak_idx);
 	}
 
 	return (ret);
 }
 
 static int
-ctf_dwarf_conv_weaks(ctf_die_t *cdp)
+ctf_dwarf_conv_weaks(ctf_cu_t *cup)
 {
-	return (ctf_dwarf_symtab_iter(cdp, ctf_dwarf_conv_weaks_cb, NULL));
+	return (ctf_dwarf_symtab_iter(cup, ctf_dwarf_conv_weaks_cb, NULL));
 }
 
 /* ARGSUSED */
@@ -2536,82 +2539,82 @@ ctf_dwarf_convert_one(void *arg, void *unused)
 {
 	int ret;
 	ctf_file_t *dedup;
-	ctf_die_t *cdp = arg;
+	ctf_cu_t *cup = arg;
 
-	ctf_dprintf("converting die: %s\n", cdp->cd_name);
-	ctf_dprintf("max offset: %x\n", cdp->cd_maxoff);
-	VERIFY(cdp != NULL);
+	ctf_dprintf("converting die: %s\n", cup->cu_name);
+	ctf_dprintf("max offset: %x\n", cup->cu_maxoff);
+	VERIFY(cup != NULL);
 
-	ret = ctf_dwarf_convert_die(cdp, cdp->cd_cu);
-	ctf_dprintf("ctf_dwarf_convert_die (%s) returned %d\n", cdp->cd_name,
+	ret = ctf_dwarf_convert_die(cup, cup->cu_cu);
+	ctf_dprintf("ctf_dwarf_convert_die (%s) returned %d\n", cup->cu_name,
 	    ret);
 	if (ret != 0) {
 		return (ret);
 	}
-	if (ctf_update(cdp->cd_ctfp) != 0) {
-		return (ctf_dwarf_error(cdp, cdp->cd_ctfp, 0,
+	if (ctf_update(cup->cu_ctfp) != 0) {
+		return (ctf_dwarf_error(cup, cup->cu_ctfp, 0,
 		    "failed to update output ctf container"));
 	}
 
-	ret = ctf_dwarf_fixup_die(cdp, B_FALSE);
-	ctf_dprintf("ctf_dwarf_fixup_die (%s) returned %d\n", cdp->cd_name,
+	ret = ctf_dwarf_fixup_die(cup, B_FALSE);
+	ctf_dprintf("ctf_dwarf_fixup_die (%s) returned %d\n", cup->cu_name,
 	    ret);
 	if (ret != 0) {
 		return (ret);
 	}
-	if (ctf_update(cdp->cd_ctfp) != 0) {
-		return (ctf_dwarf_error(cdp, cdp->cd_ctfp, 0,
+	if (ctf_update(cup->cu_ctfp) != 0) {
+		return (ctf_dwarf_error(cup, cup->cu_ctfp, 0,
 		    "failed to update output ctf container"));
 	}
 
-	ret = ctf_dwarf_fixup_die(cdp, B_TRUE);
-	ctf_dprintf("ctf_dwarf_fixup_die (%s) returned %d\n", cdp->cd_name,
+	ret = ctf_dwarf_fixup_die(cup, B_TRUE);
+	ctf_dprintf("ctf_dwarf_fixup_die (%s) returned %d\n", cup->cu_name,
 	    ret);
 	if (ret != 0) {
 		return (ret);
 	}
-	if (ctf_update(cdp->cd_ctfp) != 0) {
-		return (ctf_dwarf_error(cdp, cdp->cd_ctfp, 0,
+	if (ctf_update(cup->cu_ctfp) != 0) {
+		return (ctf_dwarf_error(cup, cup->cu_ctfp, 0,
 		    "failed to update output ctf container"));
 	}
 
 
-	if ((ret = ctf_dwarf_conv_funcvars(cdp)) != 0) {
-		return (ctf_dwarf_error(cdp, NULL, ret,
+	if ((ret = ctf_dwarf_conv_funcvars(cup)) != 0) {
+		return (ctf_dwarf_error(cup, NULL, ret,
 		    "failed to convert strong functions and variables"));
 	}
 
-	if (ctf_update(cdp->cd_ctfp) != 0) {
-		return (ctf_dwarf_error(cdp, cdp->cd_ctfp, 0,
+	if (ctf_update(cup->cu_ctfp) != 0) {
+		return (ctf_dwarf_error(cup, cup->cu_ctfp, 0,
 		    "failed to update output ctf container"));
 	}
 
-	if (cdp->cd_doweaks == B_TRUE) {
-		if ((ret = ctf_dwarf_conv_weaks(cdp)) != 0) {
-			return (ctf_dwarf_error(cdp, NULL, ret,
+	if (cup->cu_doweaks == B_TRUE) {
+		if ((ret = ctf_dwarf_conv_weaks(cup)) != 0) {
+			return (ctf_dwarf_error(cup, NULL, ret,
 			    "failed to convert weak functions and variables"));
 		}
 
-		if (ctf_update(cdp->cd_ctfp) != 0) {
-			return (ctf_dwarf_error(cdp, cdp->cd_ctfp, 0,
+		if (ctf_update(cup->cu_ctfp) != 0) {
+			return (ctf_dwarf_error(cup, cup->cu_ctfp, 0,
 			    "failed to update output ctf container"));
 		}
 	}
 
-	ctf_phase_dump(cdp->cd_ctfp, "pre-dedup");
+	ctf_phase_dump(cup->cu_ctfp, "pre-dedup");
 	ctf_dprintf("adding inputs for dedup\n");
-	if ((ret = ctf_merge_add(cdp->cd_cmh, cdp->cd_ctfp)) != 0) {
-		return (ctf_dwarf_error(cdp, NULL, ret,
+	if ((ret = ctf_merge_add(cup->cu_cmh, cup->cu_ctfp)) != 0) {
+		return (ctf_dwarf_error(cup, NULL, ret,
 		    "failed to add inputs for merge"));
 	}
 
 	ctf_dprintf("starting merge\n");
-	if ((ret = ctf_merge_dedup(cdp->cd_cmh, &dedup)) != 0) {
-		return (ctf_dwarf_error(cdp, NULL, ret,
+	if ((ret = ctf_merge_dedup(cup->cu_cmh, &dedup)) != 0) {
+		return (ctf_dwarf_error(cup, NULL, ret,
 		    "failed to deduplicate die"));
 	}
-	ctf_close(cdp->cd_ctfp);
-	cdp->cd_ctfp = dedup;
+	ctf_close(cup->cu_ctfp);
+	cup->cu_ctfp = dedup;
 
 	return (0);
 }
@@ -2622,7 +2625,7 @@ ctf_dwarf_convert_one(void *arg, void *unused)
  * to NULL, which ctf_close happily ignores.
  */
 static void
-ctf_dwarf_free_die(ctf_die_t *cdp)
+ctf_dwarf_free_die(ctf_cu_t *cup)
 {
 	ctf_dwfunc_t *cdf, *ndf;
 	ctf_dwvar_t *cdv, *ndv;
@@ -2631,19 +2634,19 @@ ctf_dwarf_free_die(ctf_die_t *cdp)
 	void *cookie;
 	Dwarf_Error derr;
 
-	ctf_dprintf("Beginning to free die: %p\n", cdp);
-	cdp->cd_elf = NULL;
-	ctf_dprintf("Trying to free name: %p\n", cdp->cd_name);
-	if (cdp->cd_name != NULL)
-		ctf_free(cdp->cd_name, strlen(cdp->cd_name) + 1);
-	ctf_dprintf("Trying to free merge handle: %p\n", cdp->cd_cmh);
-	if (cdp->cd_cmh != NULL) {
-		ctf_merge_fini(cdp->cd_cmh);
-		cdp->cd_cmh = NULL;
+	ctf_dprintf("Beginning to free die: %p\n", cup);
+	cup->cu_elf = NULL;
+	ctf_dprintf("Trying to free name: %p\n", cup->cu_name);
+	if (cup->cu_name != NULL)
+		ctf_free(cup->cu_name, strlen(cup->cu_name) + 1);
+	ctf_dprintf("Trying to free merge handle: %p\n", cup->cu_cmh);
+	if (cup->cu_cmh != NULL) {
+		ctf_merge_fini(cup->cu_cmh);
+		cup->cu_cmh = NULL;
 	}
 
 	ctf_dprintf("Trying to free functions\n");
-	for (cdf = ctf_list_next(&cdp->cd_funcs); cdf != NULL; cdf = ndf) {
+	for (cdf = ctf_list_next(&cup->cu_funcs); cdf != NULL; cdf = ndf) {
 		ndf = ctf_list_next(cdf);
 		ctf_free(cdf->cdf_name, strlen(cdf->cdf_name) + 1);
 		if (cdf->cdf_fip.ctc_argc != 0) {
@@ -2654,34 +2657,33 @@ ctf_dwarf_free_die(ctf_die_t *cdp)
 	}
 
 	ctf_dprintf("Trying to free variables\n");
-	for (cdv = ctf_list_next(&cdp->cd_vars); cdv != NULL; cdv = ndv) {
+	for (cdv = ctf_list_next(&cup->cu_vars); cdv != NULL; cdv = ndv) {
 		ndv = ctf_list_next(cdv);
 		ctf_free(cdv->cdv_name, strlen(cdv->cdv_name) + 1);
 		ctf_free(cdv, sizeof (ctf_dwvar_t));
 	}
 
 	ctf_dprintf("Trying to free bitfields\n");
-	for (cdb = ctf_list_next(&cdp->cd_bitfields); cdb != NULL; cdb = ndb) {
+	for (cdb = ctf_list_next(&cup->cu_bitfields); cdb != NULL; cdb = ndb) {
 		ndb = ctf_list_next(cdb);
 		ctf_free(cdb, sizeof (ctf_dwbitf_t));
 	}
 
-	/* How do we clean up die usage? */
-	ctf_dprintf("Trying to clean up dwarf_t: %p\n", cdp->cd_dwarf);
-	(void) dwarf_finish(cdp->cd_dwarf, &derr);
-	cdp->cd_dwarf = NULL;
-	ctf_close(cdp->cd_ctfp);
+	ctf_dprintf("Trying to clean up dwarf_t: %p\n", cup->cu_dwarf);
+	(void) dwarf_finish(cup->cu_dwarf, &derr);
+	cup->cu_dwarf = NULL;
+	ctf_close(cup->cu_ctfp);
 
 	cookie = NULL;
-	while ((map = avl_destroy_nodes(&cdp->cd_map, &cookie)) != NULL) {
+	while ((map = avl_destroy_nodes(&cup->cu_map, &cookie)) != NULL) {
 		ctf_free(map, sizeof (ctf_dwmap_t));
 	}
-	avl_destroy(&cdp->cd_map);
-	cdp->cd_errbuf = NULL;
+	avl_destroy(&cup->cu_map);
+	cup->cu_errbuf = NULL;
 }
 
 static void
-ctf_dwarf_free_dies(ctf_die_t *cdies, int ndies)
+ctf_dwarf_free_dies(ctf_cu_t *cdies, int ndies)
 {
 	int i;
 
@@ -2690,7 +2692,7 @@ ctf_dwarf_free_dies(ctf_die_t *cdies, int ndies)
 		ctf_dwarf_free_die(&cdies[i]);
 	}
 
-	ctf_free(cdies, sizeof (ctf_die_t) * ndies);
+	ctf_free(cdies, sizeof (ctf_cu_t) * ndies);
 }
 
 static int
@@ -2728,14 +2730,8 @@ ctf_dwarf_count_dies(Dwarf_Debug dw, Dwarf_Error *derr, int *ndies,
 	return (0);
 }
 
-/*
- * Iterate over all of the dies and create a ctf_die_t for each of them. This is
- * used to determine if we have zero, one, or multiple dies to convert. If we
- * have zero, that's an error. If there's only one die, that's the simple case.
- * No merge needed and only a single Dwarf_Debug as well.
- */
 static int
-ctf_dwarf_init_die(int fd, Elf *elf, ctf_die_t *cdp, int ndie, char *errbuf,
+ctf_dwarf_init_die(int fd, Elf *elf, ctf_cu_t *cup, int ndie, char *errbuf,
     size_t errlen)
 {
 	int ret;
@@ -2744,7 +2740,7 @@ ctf_dwarf_init_die(int fd, Elf *elf, ctf_die_t *cdp, int ndie, char *errbuf,
 	Dwarf_Unsigned offset = 0;
 	Dwarf_Error derr;
 
-	while ((ret = dwarf_next_cu_header(cdp->cd_dwarf, &hdrlen, NULL,
+	while ((ret = dwarf_next_cu_header(cup->cu_dwarf, &hdrlen, NULL,
 	    &abboff, &addrsz, &nexthdr, &derr)) != DW_DLV_NO_ENTRY) {
 		char *name;
 		Dwarf_Die cu, child;
@@ -2761,69 +2757,69 @@ ctf_dwarf_init_die(int fd, Elf *elf, ctf_die_t *cdp, int ndie, char *errbuf,
 		 * Compilers are apparently inconsistent. Some emit no DWARF for
 		 * empty files and others emit empty compilation unit.
 		 */
-		cdp->cd_voidtid = CTF_ERR;
-		cdp->cd_longtid = CTF_ERR;
-		cdp->cd_elf = elf;
-		cdp->cd_maxoff = nexthdr - 1;
-		cdp->cd_ctfp = ctf_fdcreate(fd, &ret);
-		if (cdp->cd_ctfp == NULL) {
-			ctf_free(cdp, sizeof (ctf_die_t));
+		cup->cu_voidtid = CTF_ERR;
+		cup->cu_longtid = CTF_ERR;
+		cup->cu_elf = elf;
+		cup->cu_maxoff = nexthdr - 1;
+		cup->cu_ctfp = ctf_fdcreate(fd, &ret);
+		if (cup->cu_ctfp == NULL) {
+			ctf_free(cup, sizeof (ctf_cu_t));
 			return (ret);
 		}
-		avl_create(&cdp->cd_map, ctf_dwmap_comp, sizeof (ctf_dwmap_t),
+		avl_create(&cup->cu_map, ctf_dwmap_comp, sizeof (ctf_dwmap_t),
 		    offsetof(ctf_dwmap_t, cdm_avl));
-		cdp->cd_errbuf = errbuf;
-		cdp->cd_errlen = errlen;
-		bzero(&cdp->cd_vars, sizeof (ctf_list_t));
-		bzero(&cdp->cd_funcs, sizeof (ctf_list_t));
-		bzero(&cdp->cd_bitfields, sizeof (ctf_list_t));
+		cup->cu_errbuf = errbuf;
+		cup->cu_errlen = errlen;
+		bzero(&cup->cu_vars, sizeof (ctf_list_t));
+		bzero(&cup->cu_funcs, sizeof (ctf_list_t));
+		bzero(&cup->cu_bitfields, sizeof (ctf_list_t));
 
-		if ((ret = ctf_dwarf_die_elfenc(elf, cdp, errbuf,
+		if ((ret = ctf_dwarf_die_elfenc(elf, cup, errbuf,
 		    errlen)) != 0) {
-			avl_destroy(&cdp->cd_map);
-			ctf_free(cdp, sizeof (ctf_die_t));
+			avl_destroy(&cup->cu_map);
+			ctf_free(cup, sizeof (ctf_cu_t));
 			return (ret);
 		}
 
-		if ((ret = ctf_dwarf_sib(cdp, NULL, &cu)) != 0) {
-			avl_destroy(&cdp->cd_map);
-			ctf_free(cdp, sizeof (ctf_die_t));
+		if ((ret = ctf_dwarf_sib(cup, NULL, &cu)) != 0) {
+			avl_destroy(&cup->cu_map);
+			ctf_free(cup, sizeof (ctf_cu_t));
 			return (ret);
 		}
 		if (cu == NULL) {
 			(void) snprintf(errbuf, errlen,
 			    "file does not contain DWARF data\n");
-			avl_destroy(&cdp->cd_map);
-			ctf_free(cdp, sizeof (ctf_die_t));
+			avl_destroy(&cup->cu_map);
+			ctf_free(cup, sizeof (ctf_cu_t));
 			return (ECTF_CONVBKERR);
 		}
 
-		if ((ret = ctf_dwarf_child(cdp, cu, &child)) != 0) {
-			avl_destroy(&cdp->cd_map);
-			ctf_free(cdp, sizeof (ctf_die_t));
+		if ((ret = ctf_dwarf_child(cup, cu, &child)) != 0) {
+			avl_destroy(&cup->cu_map);
+			ctf_free(cup, sizeof (ctf_cu_t));
 			return (ret);
 		}
 		if (child == NULL) {
 			(void) snprintf(errbuf, errlen,
 			    "file does not contain DWARF data\n");
-			avl_destroy(&cdp->cd_map);
-			ctf_free(cdp, sizeof (ctf_die_t));
+			avl_destroy(&cup->cu_map);
+			ctf_free(cup, sizeof (ctf_cu_t));
 			return (ECTF_CONVBKERR);
 		}
 
-		cdp->cd_cuoff = offset;
-		cdp->cd_cu = child;
+		cup->cu_cuoff = offset;
+		cup->cu_cu = child;
 
-		if ((cdp->cd_cmh = ctf_merge_init(fd, &ret)) == NULL) {
-			avl_destroy(&cdp->cd_map);
-			ctf_free(cdp, sizeof (ctf_die_t));
+		if ((cup->cu_cmh = ctf_merge_init(fd, &ret)) == NULL) {
+			avl_destroy(&cup->cu_map);
+			ctf_free(cup, sizeof (ctf_cu_t));
 			return (ret);
 		}
 
-		if (ctf_dwarf_string(cdp, cu, DW_AT_name, &name) == 0) {
+		if (ctf_dwarf_string(cup, cu, DW_AT_name, &name) == 0) {
 			size_t len = strlen(name) + 1;
 			char *b = basename(name);
-			cdp->cd_name = strdup(b);
+			cup->cu_name = strdup(b);
 			ctf_free(name, len);
 		}
 		break;
@@ -2840,7 +2836,7 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 	int err, ret, ndies, i;
 	Dwarf_Debug dw;
 	Dwarf_Error derr;
-	ctf_die_t *cdies = NULL, *cdp;
+	ctf_cu_t *cdies = NULL, *cup;
 	workq_t *wqp = NULL;
 
 	if (errp == NULL)
@@ -2851,10 +2847,10 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 	ret = dwarf_elf_init(elf, DW_DLC_READ, NULL, NULL, &dw, &derr);
 	if (ret != DW_DLV_OK) {
 		/*
-		 * The old CTF tools used to check if we expected DWARF data
-		 * here. In this case, if we actually have some amount of DWARF,
-		 * but no section, for now, just go ahead and create an empty
-		 * CTF file.
+		 * We may want to expect DWARF data here and fail conversion if
+		 * it's missing. In this case, if we actually have some amount
+		 * of DWARF, but no section, for now, just go ahead and create
+		 * an empty CTF file.
 		 */
 		if (ret == DW_DLV_NO_ENTRY ||
 		    dwarf_errno(derr) == DW_DLE_DEBUG_INFO_NULL) {
@@ -2869,6 +2865,13 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 		return (CTF_CONV_ERROR);
 	}
 
+	/*
+	 * Iterate over all of the compilation units and create a ctf_cu_t for
+	 * each of them.  This is used to determine if we have zero, one, or
+	 * multiple dies to convert. If we have zero, that's an error. If
+	 * there's only one die, that's the simple case.  No merge needed and
+	 * only a single Dwarf_Debug as well.
+	 */
 	ndies = 0;
 	ret = ctf_dwarf_count_dies(dw, &derr, &ndies, errmsg, errlen);
 	if (ret != 0) {
@@ -2877,18 +2880,18 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 	}
 
 	(void) dwarf_finish(dw, &derr);
-	cdies = ctf_alloc(sizeof (ctf_die_t) * ndies);
+	cdies = ctf_alloc(sizeof (ctf_cu_t) * ndies);
 	if (cdies == NULL) {
 		*errp = ENOMEM;
 		return (CTF_CONV_ERROR);
 	}
 
 	for (i = 0; i < ndies; i++) {
-		cdp = &cdies[i];
+		cup = &cdies[i];
 		ret = dwarf_elf_init(elf, DW_DLC_READ, NULL, NULL,
-		    &cdp->cd_dwarf, &derr);
+		    &cup->cu_dwarf, &derr);
 		if (ret != 0) {
-			ctf_free(cdies, sizeof (ctf_die_t) * ndies);
+			ctf_free(cdies, sizeof (ctf_cu_t) * ndies);
 			(void) snprintf(errmsg, errlen,
 			    "failed to initialize DWARF: %s\n",
 			    dwarf_errmsg(derr));
@@ -2901,15 +2904,15 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 			*errp = ret;
 			goto out;
 		}
-		cdp->cd_doweaks = ndies > 1 ? B_FALSE : B_TRUE;
+		cup->cu_doweaks = ndies > 1 ? B_FALSE : B_TRUE;
 	}
 
 	ctf_dprintf("found %d DWARF die(s)\n", ndies);
 
 	/*
-	 * If we only have one die, there's no reason to use multiple threads,
-	 * even if the user requested them. After all, they just gave us an
-	 * upper bound.
+	 * If we only have one compilation unit, there's no reason to use
+	 * multiple threads, even if the user requested them. After all, they
+	 * just gave us an upper bound.
 	 */
 	if (ndies == 1)
 		nthrs = 1;
@@ -2920,10 +2923,10 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 	}
 
 	for (i = 0; i < ndies; i++) {
-		cdp = &cdies[i];
-		ctf_dprintf("adding die %s: %p, %x %x\n", cdp->cd_name,
-		    cdp->cd_cu, cdp->cd_cuoff, cdp->cd_maxoff);
-		if (workq_add(wqp, cdp) == -1) {
+		cup = &cdies[i];
+		ctf_dprintf("adding die %s: %p, %x %x\n", cup->cu_name,
+		    cup->cu_cu, cup->cu_cuoff, cup->cu_maxoff);
+		if (workq_add(wqp, cup) == -1) {
 			*errp = errno;
 			goto out;
 		}
@@ -2958,8 +2961,8 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 
 		ctf_dprintf("adding dies\n");
 		for (i = 0; i < ndies; i++) {
-			cdp = &cdies[i];
-			if ((ret = ctf_merge_add(cmp, cdp->cd_ctfp)) != 0) {
+			cup = &cdies[i];
+			if ((ret = ctf_merge_add(cmp, cup->cu_ctfp)) != 0) {
 				ctf_merge_fini(cmp);
 				*errp = ret;
 				goto out;
@@ -2980,8 +2983,8 @@ ctf_dwarf_convert(int fd, Elf *elf, uint_t nthrs, int *errp, ctf_file_t **fpp,
 		ctf_dprintf("successfully converted!\n");
 	} else {
 		*errp = 0;
-		*fpp = cdies->cd_ctfp;
-		cdies->cd_ctfp = NULL;
+		*fpp = cdies->cu_ctfp;
+		cdies->cu_ctfp = NULL;
 		ctf_dprintf("successfully converted!\n");
 	}
 

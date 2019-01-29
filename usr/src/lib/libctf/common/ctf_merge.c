@@ -26,9 +26,7 @@
  * In terms of exported APIs, we don't really export a simple merge two
  * containers, as the general way this is used, in something like ctfmerge(1),
  * is to add all the containers and then let us figure out the best way to merge
- * it. In the future we'll want to grow some control over the number of threads
- * that we use to do this, if we end up wanting a muli-threaded merge. If we do,
- * we should take care to do the merge in the same way every time.
+ * it.
  */
 
 #include <libctf_impl.h>
@@ -486,7 +484,7 @@ ctf_merge_add_sou(ctf_merge_types_t *cmp, ctf_id_t id, boolean_t forward)
 		return (suid);
 
 	/*
-	 * If this is a forward reference then it's mapping should already
+	 * If this is a forward reference then its mapping should already
 	 * exist.
 	 */
 	if (forward == B_FALSE) {
@@ -548,7 +546,7 @@ ctf_merge_add_type(ctf_merge_types_t *cmp, ctf_id_t id)
 		break;
 	case CTF_K_UNKNOWN:
 		/*
-		 * We don't add uknown types, and we later assert that nothing
+		 * We don't add unknown types, and we later assert that nothing
 		 * should reference them.
 		 */
 		return (0);
@@ -857,6 +855,39 @@ cleanup:
 	return (0);
 }
 
+/*
+ * After performing a pass, we need to go through the object and function type
+ * maps and potentially fix them up based on the new maps that we haev.
+ */
+static void
+ctf_merge_fixup_nontypes(ctf_merge_types_t *cmp, ctf_merge_input_t *cmi)
+{
+	ctf_merge_objmap_t *cmo;
+	ctf_merge_funcmap_t *cmf;
+
+	for (cmo = list_head(&cmi->cmi_omap); cmo != NULL;
+	    cmo = list_next(&cmi->cmi_omap, cmo)) {
+		if (cmo->cmo_tid == 0)
+			continue;
+		VERIFY(cmp->cm_tmap[cmo->cmo_tid].cmt_map != 0);
+		cmo->cmo_tid = cmp->cm_tmap[cmo->cmo_tid].cmt_map;
+	}
+
+	for (cmf = list_head(&cmi->cmi_fmap); cmf != NULL;
+	    cmf = list_next(&cmi->cmi_fmap, cmf)) {
+		int i;
+
+		VERIFY(cmp->cm_tmap[cmf->cmf_rtid].cmt_map != 0);
+		cmf->cmf_rtid = cmp->cm_tmap[cmf->cmf_rtid].cmt_map;
+		for (i = 0; i < cmf->cmf_argc; i++) {
+			VERIFY(cmp->cm_tmap[cmf->cmf_args[i]].cmt_map !=
+			    0);
+			cmf->cmf_args[i] =
+			    cmp->cm_tmap[cmf->cmf_args[i]].cmt_map;
+		}
+	}
+}
+
 static int
 ctf_uniquify_types(ctf_merge_t *cmh, ctf_file_t *src, ctf_file_t **outp)
 {
@@ -917,30 +948,7 @@ ctf_uniquify_types(ctf_merge_t *cmh, ctf_file_t *src, ctf_file_t **outp)
 
 	for (cmi = list_head(&cmh->cmh_inputs); cmi != NULL;
 	    cmi = list_next(&cmh->cmh_inputs, cmi)) {
-		ctf_merge_objmap_t *cmo;
-		ctf_merge_funcmap_t *cmf;
-
-		for (cmo = list_head(&cmi->cmi_omap); cmo != NULL;
-		    cmo = list_next(&cmi->cmi_omap, cmo)) {
-			if (cmo->cmo_tid == 0)
-				continue;
-			VERIFY(cm.cm_tmap[cmo->cmo_tid].cmt_map != 0);
-			cmo->cmo_tid = cm.cm_tmap[cmo->cmo_tid].cmt_map;
-		}
-
-		for (cmf = list_head(&cmi->cmi_fmap); cmf != NULL;
-		    cmf = list_next(&cmi->cmi_fmap, cmf)) {
-			int i;
-
-			VERIFY(cm.cm_tmap[cmf->cmf_rtid].cmt_map != 0);
-			cmf->cmf_rtid = cm.cm_tmap[cmf->cmf_rtid].cmt_map;
-			for (i = 0; i < cmf->cmf_argc; i++) {
-				VERIFY(cm.cm_tmap[cmf->cmf_args[i]].cmt_map !=
-				    0);
-				cmf->cmf_args[i] =
-				    cm.cm_tmap[cmf->cmf_args[i]].cmt_map;
-			}
-		}
+		ctf_merge_fixup_nontypes(&cm, cmi);
 	}
 
 	ctf_merge_types_fini(&cm);
@@ -1052,7 +1060,7 @@ ctf_merge_label(ctf_merge_t *cmh, const char *label)
 }
 
 static int
-ctf_merge_add_funcs(const char *name, ulong_t idx, ctf_funcinfo_t *fip,
+ctf_merge_add_funcs_cb(const char *name, ulong_t idx, ctf_funcinfo_t *fip,
     void *arg)
 {
 	ctf_merge_input_t *cmi = arg;
@@ -1081,7 +1089,7 @@ ctf_merge_add_funcs(const char *name, ulong_t idx, ctf_funcinfo_t *fip,
 }
 
 static int
-ctf_merge_add_objs(const char *name, ctf_id_t id, ulong_t idx, void *arg)
+ctf_merge_add_objs_cb(const char *name, ctf_id_t id, ulong_t idx, void *arg)
 {
 	ctf_merge_input_t *cmi = arg;
 	ctf_merge_objmap_t *cmo;
@@ -1124,13 +1132,13 @@ ctf_merge_add(ctf_merge_t *cmh, ctf_file_t *input)
 	    offsetof(ctf_merge_objmap_t, cmo_node));
 
 	if (cmh->cmh_msyms == B_TRUE) {
-		if ((ret = ctf_function_iter(input, ctf_merge_add_funcs,
+		if ((ret = ctf_function_iter(input, ctf_merge_add_funcs_cb,
 		    cmi)) != 0) {
 			ctf_merge_fini_input(cmi);
 			return (ret);
 		}
 
-		if ((ret = ctf_object_iter(input, ctf_merge_add_objs,
+		if ((ret = ctf_object_iter(input, ctf_merge_add_objs_cb,
 		    cmi)) != 0) {
 			ctf_merge_fini_input(cmi);
 			return (ret);
@@ -1326,11 +1334,6 @@ ctf_merge_merge(ctf_merge_t *cmh, ctf_file_t **outp)
 		return (errno);
 	}
 
-	/*
-	 * We should consider doing a divide and conquer and parallel merge
-	 * here. If we did, we'd want to use some number of threads to perform
-	 * this operation.
-	 */
 	VERIFY(cmh->cmh_ninputs % 2 == 0);
 	for (cmi = list_head(&cmh->cmh_inputs); cmi != NULL;
 	    cmi = list_next(&cmh->cmh_inputs, cmi)) {
@@ -1374,7 +1377,7 @@ ctf_merge_merge(ctf_merge_t *cmh, ctf_file_t **outp)
 
 	ltype = out->ctf_typemax;
 	if ((out->ctf_flags & LCTF_CHILD) && ltype != 0)
-		ltype += 0x8000;
+		ltype += CTF_CHILD_START;
 	ctf_dprintf("trying to add the label\n");
 	if (cmh->cmh_label != NULL &&
 	    ctf_add_label(out, cmh->cmh_label, ltype, 0) != 0) {
@@ -1458,8 +1461,6 @@ ctf_merge_dedup(ctf_merge_t *cmp, ctf_file_t **outp)
 	ctf_diff_t *cdp = NULL;
 	ctf_merge_input_t *cmi, *cmc;
 	ctf_file_t *ifp, *ofp;
-	ctf_merge_objmap_t *cmo;
-	ctf_merge_funcmap_t *cmf;
 	ctf_merge_types_t cm;
 
 	if (cmp == NULL || outp == NULL)
@@ -1506,30 +1507,10 @@ ctf_merge_dedup(ctf_merge_t *cmp, ctf_file_t **outp)
 	ctf_dprintf("Successfully deduped types\n");
 	ctf_phase_dump(cm.cm_out, "dedup-pre-syms");
 
-
 	/*
 	 * Now we need to fix up the object and function maps.
 	 */
-	for (cmo = list_head(&cmi->cmi_omap); cmo != NULL;
-	    cmo = list_next(&cmi->cmi_omap, cmo)) {
-		if (cmo->cmo_tid == 0)
-			continue;
-		ctf_dprintf("mapped %s %d->%d\n", cmo->cmo_name,
-		    cmo->cmo_tid, cm.cm_tmap[cmo->cmo_tid].cmt_map);
-		cmo->cmo_tid = cm.cm_tmap[cmo->cmo_tid].cmt_map;
-	}
-
-	for (cmf = list_head(&cmi->cmi_fmap); cmf != NULL;
-	    cmf = list_next(&cmi->cmi_fmap, cmf)) {
-		int i;
-
-		VERIFY(cm.cm_tmap[cmf->cmf_rtid].cmt_map != 0);
-		cmf->cmf_rtid = cm.cm_tmap[cmf->cmf_rtid].cmt_map;
-		for (i = 0; i < cmf->cmf_argc; i++) {
-			VERIFY(cm.cm_tmap[cmf->cmf_args[i]].cmt_map != 0);
-			cmf->cmf_args[i] = cm.cm_tmap[cmf->cmf_args[i]].cmt_map;
-		}
-	}
+	ctf_merge_fixup_nontypes(&cm, cmi);
 
 	if (cmp->cmh_msyms == B_TRUE) {
 		ret = ctf_merge_symbols(cmp, cm.cm_out);
