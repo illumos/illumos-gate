@@ -116,7 +116,7 @@ typedef struct psm_cpu_request {
 	} req;
 } psm_cpu_request_t;
 
-struct 	psm_ops {
+struct	psm_ops {
 	int	(*psm_probe)(void);
 
 	void	(*psm_softinit)(void);
@@ -173,10 +173,10 @@ struct 	psm_ops {
 #endif
 #if defined(PSMI_1_3) || defined(PSMI_1_4) || defined(PSMI_1_5) || \
     defined(PSMI_1_6) || defined(PSMI_1_7)
-	void 	(*psm_timer_reprogram)(hrtime_t time);
+	void	(*psm_timer_reprogram)(hrtime_t time);
 	void	(*psm_timer_enable)(void);
-	void 	(*psm_timer_disable)(void);
-	void 	(*psm_post_cyclic_setup)(void *arg);
+	void	(*psm_timer_disable)(void);
+	void	(*psm_post_cyclic_setup)(void *arg);
 #endif
 #if defined(PSMI_1_4) || defined(PSMI_1_5) || defined(PSMI_1_6) || \
     defined(PSMI_1_7)
@@ -202,7 +202,7 @@ struct 	psm_ops {
 struct psm_info {
 	ushort_t p_version;
 	ushort_t p_owner;
-	struct 	psm_ops	*p_ops;
+	struct	psm_ops	*p_ops;
 	char	*p_mach_idstring;	/* machine identification string */
 	char	*p_mach_desc;		/* machine descriptions		 */
 };
@@ -268,7 +268,7 @@ struct psm_info {
 #define	PSM_INVALID_CPU		-1
 
 
-struct 	psm_ops_ver01 {
+struct	psm_ops_ver01 {
 	int	(*psm_probe)(void);
 
 	void	(*psm_softinit)(void);

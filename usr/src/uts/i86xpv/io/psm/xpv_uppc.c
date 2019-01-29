@@ -650,7 +650,7 @@ xen_uppc_acpi_translate_pci_irq(dev_info_t *dip, int busid, int devid,
 	if (status == ACPI_PSM_SUCCESS) {
 		acpi_new_irq_cache_ent(busid, devid, ipin, *pci_irqp,
 		    intr_flagp, &acpipsmlnk);
-		psm_set_elcr(*pci_irqp, 1); 	/* set IRQ to PCI mode */
+		psm_set_elcr(*pci_irqp, 1);	/* set IRQ to PCI mode */
 
 		XEN_UPPC_VERBOSE_IRQ((CE_CONT, "!xVM_uppc: [ACPI] "
 		    "new irq %d for device %s, instance #%d\n",
@@ -738,7 +738,7 @@ xen_uppc_translate_irq(dev_info_t *dip, int irqno)
 		/* FALLTHRU to common case - returning irqno */
 	} else {
 		/* non-PCI; assumes ISA-style edge-triggered */
-		psm_set_elcr(irqno, 0); 	/* set IRQ to ISA mode */
+		psm_set_elcr(irqno, 0);		/* set IRQ to ISA mode */
 
 		XEN_UPPC_VERBOSE_IRQ((CE_CONT, "!xVM_uppc: non-pci,"
 		    "irqno %d device %s instance %d\n", irqno,

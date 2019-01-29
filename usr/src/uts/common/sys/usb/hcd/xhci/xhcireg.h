@@ -509,7 +509,7 @@ extern "C" {
 #define	XHCI_CODE_CMD_ABORTED	25	/* Command Abort (CA) operation */
 #define	XHCI_CODE_XFER_STOPPED	26	/* xfer terminated by a stop endpoint */
 #define	XHCI_CODE_XFER_STOPINV	27	/* TRB transfer length invalid */
-#define	XHCI_CODE_XFER_STOPSHORT	28 	/* Stopped before end of TD */
+#define	XHCI_CODE_XFER_STOPSHORT	28	/* Stopped before end of TD */
 #define	XHCI_CODE_MELAT		29	/* Max Exit Latency too large */
 #define	XHCI_CODE_RESERVED	30
 #define	XHCI_CODE_ISOC_OVERRUN	31	/* IN data buffer < Max ESIT Payload */

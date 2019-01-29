@@ -84,7 +84,7 @@ extern uchar_t	apic_io_vectbase[MAX_IO_APIC];
 extern uchar_t	apic_io_vectend[MAX_IO_APIC];
 extern uchar_t	apic_io_ver[MAX_IO_APIC];
 extern int	apic_io_max;
-extern int 	apic_nvidia_io_max;
+extern int	apic_nvidia_io_max;
 extern int apic_setspl_delay;		/* apic_setspl - delay enable	*/
 extern int apic_clkvect;
 

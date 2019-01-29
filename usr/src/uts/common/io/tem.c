@@ -914,31 +914,36 @@ tems_get_initial_color(tem_color_t *pcolor)
 
 	pcolor->fg_color = DEFAULT_ANSI_FOREGROUND;
 	pcolor->bg_color = DEFAULT_ANSI_BACKGROUND;
+#ifndef _HAVE_TEM_FIRMWARE
+	/*
+	 * _HAVE_TEM_FIRMWARE is defined on SPARC, at this time, the
+	 * plat_tem_get_colors() is implemented only on x86.
+	 */
+	plat_tem_get_colors(&pcolor->fg_color, &pcolor->bg_color);
+#endif
 
-	if (plat_stdout_is_framebuffer()) {
-		tems_get_inverses(&inverse, &inverse_screen);
-		if (inverse)
-			flags |= TEM_ATTR_REVERSE;
-		if (inverse_screen)
-			flags |= TEM_ATTR_SCREEN_REVERSE;
+	tems_get_inverses(&inverse, &inverse_screen);
+	if (inverse)
+		flags |= TEM_ATTR_REVERSE;
+	if (inverse_screen)
+		flags |= TEM_ATTR_SCREEN_REVERSE;
 
-		if (flags != 0) {
-			/*
-			 * If either reverse flag is set, the screen is in
-			 * white-on-black mode.  We set the bold flag to
-			 * improve readability.
-			 */
-			flags |= TEM_ATTR_BOLD;
-		} else {
-			/*
-			 * Otherwise, the screen is in black-on-white mode.
-			 * The SPARC PROM console, which starts in this mode,
-			 * uses the bright white background colour so we
-			 * match it here.
-			 */
-			if (pcolor->bg_color == ANSI_COLOR_WHITE)
-				flags |= TEM_ATTR_BRIGHT_BG;
-		}
+	if (flags != 0) {
+		/*
+		 * If either reverse flag is set, the screen is in
+		 * white-on-black mode.  We set the bold flag to
+		 * improve readability.
+		 */
+		flags |= TEM_ATTR_BOLD;
+	} else {
+		/*
+		 * Otherwise, the screen is in black-on-white mode.
+		 * The SPARC PROM console, which starts in this mode,
+		 * uses the bright white background colour so we
+		 * match it here.
+		 */
+		if (pcolor->bg_color == ANSI_COLOR_WHITE)
+			flags |= TEM_ATTR_BRIGHT_BG;
 	}
 
 	pcolor->a_flags = flags;

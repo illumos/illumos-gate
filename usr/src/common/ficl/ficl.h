@@ -1711,6 +1711,7 @@ FICL_PLATFORM_EXTERN ficlWord *ficlSystemLookupLocal(ficlSystem *system,
 FICL_PLATFORM_EXTERN int ficlVmParseNumber(ficlVm *vm, ficlString s);
 FICL_PLATFORM_EXTERN void ficlPrimitiveTick(ficlVm *vm);
 FICL_PLATFORM_EXTERN void ficlPrimitiveParseStepParen(ficlVm *vm);
+FICL_PLATFORM_EXTERN void ficlPrimitiveSiftingImpl(ficlVm *vm, char *ss);
 #if FICL_WANT_LOCALS
 FICL_PLATFORM_EXTERN void ficlLocalParen(ficlVm *vm, int isDouble, int isFloat);
 #endif /* FICL_WANT_LOCALS */

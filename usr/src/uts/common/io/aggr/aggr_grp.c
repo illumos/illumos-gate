@@ -3049,7 +3049,7 @@ static int
 aggr_set_port_sdu(aggr_grp_t *grp, aggr_port_t *port, uint32_t sdu,
     uint32_t *old_mtu)
 {
-	boolean_t 		removed = B_FALSE;
+	boolean_t		removed = B_FALSE;
 	mac_perim_handle_t	mph;
 	mac_diag_t		diag;
 	int			err, rv, retry = 0;
@@ -3138,12 +3138,12 @@ static int
 aggr_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
     uint_t pr_valsize, const void *pr_val)
 {
-	int 		err = ENOTSUP;
-	aggr_grp_t 	*grp = m_driver;
+	int		err = ENOTSUP;
+	aggr_grp_t	*grp = m_driver;
 
 	switch (pr_num) {
 	case MAC_PROP_MTU: {
-		uint32_t 	mtu;
+		uint32_t	mtu;
 
 		if (pr_valsize < sizeof (mtu)) {
 			err = EINVAL;
@@ -3276,8 +3276,8 @@ aggr_grp_possible_mtu_range(aggr_grp_t *grp, mac_propval_uint32_range_t **prval,
 	mac_propval_range_t		**vals;
 	aggr_port_t			*port;
 	mac_perim_handle_t		mph;
-	uint_t 				i, numr;
-	int 				err = 0;
+	uint_t				i, numr;
+	int				err = 0;
 	size_t				sz_propval, sz_range32;
 	size_t				size;
 

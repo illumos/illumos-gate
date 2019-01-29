@@ -1,5 +1,6 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * Simple commandline interpreter, toplevel and misc.
@@ -110,7 +110,7 @@ interact(const char *rc)
      * Before interacting, we might want to autoboot.
      */
     autoboot_maybe();
-    
+
     /*
      * Not autobooting, go manual
      */
@@ -119,7 +119,6 @@ interact(const char *rc)
 	setenv("prompt", "${interpret}", 1);
     if (getenv("interpret") == NULL)
         setenv("interpret", "ok", 1);
-    
 
     while ((input = linenoise(prompt())) != NULL) {
 	bf_vm->sourceId.i = 0;
@@ -147,7 +146,7 @@ command_include(int argc, char *argv[])
     int		res;
     char	**argvbuf;
 
-    /* 
+    /*
      * Since argv is static, we need to save it here.
      */
     argvbuf = (char**) calloc((u_int)argc, sizeof(char*));
@@ -165,12 +164,25 @@ command_include(int argc, char *argv[])
     return(res);
 }
 
+COMMAND_SET(sifting, "sifting", "find words", command_sifting);
+
+static int
+command_sifting(int argc, char *argv[])
+{
+	if (argc != 2) {
+		command_errmsg = "wrong number of arguments";
+		return (CMD_ERROR);
+	}
+	ficlPrimitiveSiftingImpl(bf_vm, argv[1]);
+	return (CMD_OK);
+}
+
 /*
  * Header prepended to each line. The text immediately follows the header.
  * We try to make this short in order to save memory -- the loader has
  * limited memory available, and some of the forth files are very long.
  */
-struct includeline 
+struct includeline
 {
     struct includeline  *next;
     int                 line;
