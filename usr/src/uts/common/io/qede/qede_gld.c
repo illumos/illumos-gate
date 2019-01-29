@@ -1165,7 +1165,7 @@ qede_multicast(qede_t *qede, boolean_t flag, const uint8_t *ptr_mcaddr)
                 qede->params.multi_promisc_fl = B_FALSE;
         } else {
                 if ((qede->params.multi_promisc_fl == B_FALSE) && 
-		    (qede->params.promisc_fl = B_FALSE)) {
+		    (qede->params.promisc_fl == B_FALSE)) {
                         ret = qede_set_filter_rx_mode(qede, 
 			    QEDE_FILTER_RX_MODE_MULTI_PROMISC);
                 }
