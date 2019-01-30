@@ -25,8 +25,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <pwd.h>
@@ -38,8 +36,6 @@
 char	*lint_libs[] = {
 	IG_FILE1,
 	IG_FILE2,
-	IG_FILE3,
-	IG_FILE4,
 	0
 };
 
@@ -80,12 +76,12 @@ getignored(char *auxname)
 		(void) strcpy(filename, auxname);
 #ifdef FULLDEBUG
 	printf("Opening file \"%s\" to read names to ignore.\n",
-		filename);
+	    filename);
 #endif
 	if ((fyle = fopen(filename, "r")) == NULL) {
 #ifdef FULLDEBUG
 		fprintf(stderr, "%s: Can't open file \"%s\"\n",
-			processname, filename);
+		    processname, filename);
 #endif
 		return;
 	}
@@ -99,7 +95,7 @@ getignored(char *auxname)
 	if (freopen(filename, "r", fyle) == NULL) {
 #ifdef FULLDEBUG
 		fprintf(stderr, "%s: Failure to open \"%s\" for second read.\n",
-			processname, filename);
+		    processname, filename);
 #endif
 		nignored = 0;
 		return;
