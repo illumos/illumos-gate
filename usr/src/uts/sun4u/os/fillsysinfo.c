@@ -117,7 +117,7 @@ uint64_t	system_clock_freq;
 caddr_t		v_auxio_addr = NULL;
 caddr_t		v_eeprom_addr = NULL;
 caddr_t		v_timecheck_addr = NULL;
-caddr_t 	v_rtc_addr_reg = NULL;
+caddr_t		v_rtc_addr_reg = NULL;
 volatile unsigned char	*v_rtc_data_reg = NULL;
 volatile uint8_t	*v_pmc_addr_reg = NULL;
 volatile uint8_t	*v_pmc_data_reg = NULL;
@@ -130,7 +130,7 @@ uint_t		niommu_tsbs = 0;
  */
 #define	CHOSEN_EEPROM	"eeprom"
 #define	WATCHDOG_ENABLE "watchdog-enable"
-static pnode_t 		chosen_eeprom;
+static pnode_t		chosen_eeprom;
 
 /*
  * Appropriate tod module will be dynamically selected while booting
@@ -1028,6 +1028,7 @@ check_cpus_set(void)
 			boot_ncpus = boot_max_ncpus = ncpunode;
 		} else {
 			max_ncpus = ncpunode;
+			boot_ncpus = ncpunode;
 		}
 	} else {
 		cmn_err(CE_NOTE, "MP not supported on mismatched modules,"
@@ -1042,6 +1043,7 @@ check_cpus_set(void)
 		}
 
 		max_ncpus = 1;
+		boot_ncpus = 1;
 	}
 }
 
