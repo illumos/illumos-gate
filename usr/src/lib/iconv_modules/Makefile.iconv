@@ -43,8 +43,8 @@ CLEANFILES	= *.o *.so.* *.so $(CREATE_LINKS)
 
 PROTOCLEANFILES = $(ICONV_LIBS) $(ICONV_LIBS_64)
 
-CFLAGS		+= -I../../inc -I. -I../../common $(C_PICFLAGS) $(GSHARED)
-CFLAGS		+= -I$(ADJUNCT_PROTO)/usr/include
+CPPFLAGS	+= -I../../inc -I. -I../../common
+CFLAGS		+= $(C_PICFLAGS) $(GSHARED)
 
 DYNFLAGS=	$(GSHARED) $(ZTEXT) $(ZDEFS) $(BDIRECT) \
 		$(MAPFILES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
@@ -80,15 +80,15 @@ $(ICONV_DIR)/%: ../%
 	$(POST_PROCESS_SO)
 
 %.o: ../%.c
-	$(CC) $(CFLAGS) -c -o $@ $(@:%.o=../%.c)
+	$(COMPILE.c) $(CFLAGS) -o $@ $<
 	$(POST_PROCESS_O)
 
 %.o: ../common/%.c
-	$(CC) $(CFLAGS) -c -o $@ $(@:%.o=../common/%.c)
+	$(COMPILE.c) $(CFLAGS) -o $@ $<
 	$(POST_PROCESS_O)
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $(@:%.o=%.c)
+	$(COMPILE.c) $(CFLAGS) -o $@ $<
 	$(POST_PROCESS_O)
 
 lint: FRC

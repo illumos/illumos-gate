@@ -87,71 +87,71 @@ SRCS		=	UTF-8%zh_CN.iso2022-7.c \
 dummy: all
 
 gb2312%UCS-2LE.o: $(COMMON)zh_CN.euc%UTF-8.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 GBK%UCS-2LE.o: $(COMMON)zh_CN.gbk%UTF-8.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 GBK%UCS-2BE.o: $(COMMON)zh_CN.gbk%UTF-8.c
-	$(CC) $(CFLAGS) -DUCS_2BE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2BE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 GBK%UCS-4LE.o: $(COMMON)zh_CN.gbk%UTF-8.c
-	$(CC) $(CFLAGS) -DUCS_4LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_4LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 GBK%UCS-4BE.o: $(COMMON)zh_CN.gbk%UTF-8.c
-	$(CC) $(CFLAGS) -DUCS_4BE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_4BE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 UCS-2LE%gb2312.o: $(COMMON)UTF-8%zh_CN.euc.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 UCS-2LE%GBK.o: $(COMMON)UTF-8%zh_CN.gbk.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 UCS-2BE%GBK.o: $(COMMON)UTF-8%zh_CN.gbk.c
-	$(CC) $(CFLAGS) -DUCS_2BE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2BE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 UCS-4LE%GBK.o: $(COMMON)UTF-8%zh_CN.gbk.c
-	$(CC) $(CFLAGS) -DUCS_4LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_4LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 UCS-4BE%GBK.o: $(COMMON)UTF-8%zh_CN.gbk.c
-	$(CC) $(CFLAGS) -DUCS_4BE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_4BE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 cns11643%UCS-2LE.o: $(COMMON)zh_TW-euc%UTF-8.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 BIG5%UCS-2LE.o: $(COMMON)zh_TW-big5%UTF-8.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 Big5-HKSCS%UCS-2LE.o: $(COMMON)zh_HK.hkscs%UTF-8.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 UCS-2LE%cns11643.o: $(COMMON)UTF-8%zh_TW-euc.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 UCS-2LE%BIG5.o: $(COMMON)UTF-8%zh_TW-big5.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 UCS-2LE%Big5-HKSCS.o: $(COMMON)UTF-8%zh_HK.hkscs.c
-	$(CC) $(CFLAGS) -DUCS_2LE -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DUCS_2LE -c -o $@ $^
 	$(POST_PROCESS_O)
 
 common_utf8.o: $(ICONV_COMMON)/common_utf8.c
-	$(CC) $(CFLAGS) -c -o $@ $(ICONV_COMMON)/common_utf8.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $(ICONV_COMMON)/common_utf8.c
 	$(POST_PROCESS_O)
 
 UCS-2LE%cns11643.so: UCS-2LE%cns11643.o common_utf8.o
@@ -179,7 +179,7 @@ UTF-8%zh_HK.hkscs.so: UTF-8%zh_HK.hkscs.o common_utf8.o
 	$(POST_PROCESS_SO)
 
 zh_TW-iso2022-CN-EXT.o: $(COMMON)/zh_TW-iso2022-CN-EXT.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $^
 	$(POST_PROCESS_O)
 
 zh_TW-iso2022-CN-EXT%zh_TW-big5.so: zh_TW-iso2022-CN-EXT%zh_TW-big5.o zh_TW-iso2022-CN-EXT.o
@@ -191,11 +191,11 @@ zh_TW-iso2022-CN-EXT%zh_TW-euc.so: zh_TW-iso2022-CN-EXT%zh_TW-euc.o zh_TW-iso202
 	$(POST_PROCESS_SO)
 
 utf8%ibm.o: $(ICONV_COMMON)/utf8%ibm.c
-	$(CC) $(CFLAGS) -c -o $@ $(ICONV_COMMON)/utf8%ibm.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $(ICONV_COMMON)/utf8%ibm.c
 	$(POST_PROCESS_O)
 
 tab_lookup.o: $(ICONV_COMMON)/tab_lookup.c
-	$(CC) $(CFLAGS) -c -o $@ $(ICONV_COMMON)/tab_lookup.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $(ICONV_COMMON)/tab_lookup.c
 	$(POST_PROCESS_O)
 
 zh_TW-cp937%UTF-8.so: zh_TW-cp937%UTF-8.o utf8%ibm.o tab_lookup.o

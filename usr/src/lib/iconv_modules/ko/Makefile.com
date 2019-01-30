@@ -92,7 +92,7 @@ ALL_SOS   = $(E2I) $(I2E) $(E2J92) $(J922E) $(E2J) $(J2E) $(E2NB) $(NB2E) \
 	$(C9332U) $(U2C933)
 
 LDFLAGS = $(DYNFLAGS) $(LDLIBS) $(CFLAG_OPT)
-CFLAGS += -I$(ICONV_COMMON) -I../inc
+CPPFLAGS += -I$(ICONV_COMMON) -I../inc
 
 # needs work
 SMATCH=off
@@ -207,51 +207,51 @@ $(C9332U): Cp933_to_UTF8.o ibm%utf8.o tab_lookup.o $(ICONV_COMMON)tab_lookup.h
 # objs
 #
 common_utf8.o: $(ICONV_COMMON)common_utf8.c $(COMMON)common_def.h
-	$(CC) -c $(CFLAGS) $(ICONV_COMMON)common_utf8.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) $(ICONV_COMMON)common_utf8.c -o $@
 	$(POST_PROCESS_O)
 
 ucs_LE_to_unihan.o : $(COMMON)ucs_to_unihan.c
-	$(CC) -c $(CFLAGS) -DUCS_2LE $(COMMON)ucs_to_unihan.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) -DUCS_2LE $(COMMON)ucs_to_unihan.c -o $@
 	$(POST_PROCESS_O)
 
 ucs_BE_to_unihan.o : $(COMMON)ucs_to_unihan.c
-	$(CC) -c $(CFLAGS) -DUCS_2BE $(COMMON)ucs_to_unihan.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) -DUCS_2BE $(COMMON)ucs_to_unihan.c -o $@
 	$(POST_PROCESS_O)
 
 unihan_to_UCS-2BE_main.o : $(COMMON)unihan_to_UCS_main.c
-	$(CC) -c $(CFLAGS) -DUCS_2BE $(COMMON)unihan_to_UCS_main.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) -DUCS_2BE $(COMMON)unihan_to_UCS_main.c -o $@
 	$(POST_PROCESS_O)
 
 unihan_to_UCS-2LE_main.o : $(COMMON)unihan_to_UCS_main.c
-	$(CC) -c $(CFLAGS) -DUCS_2LE $(COMMON)unihan_to_UCS_main.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) -DUCS_2LE $(COMMON)unihan_to_UCS_main.c -o $@
 	$(POST_PROCESS_O)
 
 ibm%utf8.o : $(ICONV_COMMON)ibm%utf8.c  $(COMMON)common_def.h
-	$(CC) -c $(CFLAGS) $(ICONV_COMMON)ibm%utf8.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) $(ICONV_COMMON)ibm%utf8.c -o $@
 	$(POST_PROCESS_O)
 
 utf8%ibm.o: $(ICONV_COMMON)utf8%ibm.c $(COMMON)common_def.h
-	$(CC) -c $(CFLAGS) $(ICONV_COMMON)utf8%ibm.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) $(ICONV_COMMON)utf8%ibm.c -o $@
 	$(POST_PROCESS_O)
 
 cnv_utf8ibm.o: $(ICONV_COMMON)cnv_utf8ibm.c $(ICONV_COMMON)tab_lookup.h
-	$(CC) -c $(CFLAGS) $(ICONV_COMMON)cnv_utf8ibm.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) $(ICONV_COMMON)cnv_utf8ibm.c -o $@
 	$(POST_PROCESS_O)
 
 cnv_ibmutf8.o: $(ICONV_COMMON)cnv_ibmutf8.c $(ICONV_COMMON)tab_lookup.h
-	$(CC) -c $(CFLAGS) $(ICONV_COMMON)cnv_ibmutf8.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) $(ICONV_COMMON)cnv_ibmutf8.c -o $@
 	$(POST_PROCESS_O)
 
 tab_lookup.o: $(ICONV_COMMON)tab_lookup.c $(ICONV_COMMON)tab_lookup.h
-	$(CC) -c $(CFLAGS) $(ICONV_COMMON)tab_lookup.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) $(ICONV_COMMON)tab_lookup.c -o $@
 	$(POST_PROCESS_O)
 
 Cp933_to_UTF8.o: $(COMMON)Cp933_to_UTF8.c $(ICONV_COMMON)tab_lookup.h  $(COMMON)cp933_ucs2.h
-	$(CC) -c $(CFLAGS) $(COMMON)Cp933_to_UTF8.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) $(COMMON)Cp933_to_UTF8.c -o $@
 	$(POST_PROCESS_O)
 
 UTF8_to_Cp933.o: $(COMMON)UTF8_to_Cp933.c $(ICONV_COMMON)tab_lookup.h $(COMMON)ucs2_cp933.h
-	$(CC) -c $(CFLAGS) $(COMMON)UTF8_to_Cp933.c -o $@
+	$(CC) $(CPPFLAGS) -c $(CFLAGS) $(COMMON)UTF8_to_Cp933.c -o $@
 	$(POST_PROCESS_O)
 
 #
