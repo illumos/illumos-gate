@@ -26,7 +26,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc.  All rights reserved.
  */
 
 #include <mdb/mdb_types.h>
@@ -112,6 +112,7 @@ yyexpand(int val)
 %left	MDB_TOK_LSHIFT MDB_TOK_RSHIFT
 %left	'-' '+'
 %left	'*' '%' '#'
+%left	MDB_TOK_MODULUS
 
 %right	MDB_COR_VALUE
 %right	MDB_OBJ_VALUE
@@ -308,6 +309,16 @@ expression:	expression '+' expression { $$ = $1 + $3; }
 
 			$$ = (intmax_t)$1 / (intmax_t)$3;
 		}
+
+	|	expression MDB_TOK_MODULUS expression {
+
+			if ($3 == 0UL)
+				yyerror("attempted to divide by zero");
+
+			$$ = $1 % $3;
+		}
+
+
 
 	|	expression '&' expression { $$ = $1 & $3; }
 	|	expression '|' expression { $$ = $1 | $3; }
