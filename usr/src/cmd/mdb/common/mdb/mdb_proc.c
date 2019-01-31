@@ -1990,8 +1990,7 @@ pt_env_set(pt_data_t *pt, const char *nameval)
 	(void) mdb_nv_insert(&pt->p_env, name, NULL, (uintptr_t)val,
 	    MDB_NV_EXTNAME);
 
-	if (equals)
-		*equals = '=';
+	*equals = '=';
 }
 
 /*

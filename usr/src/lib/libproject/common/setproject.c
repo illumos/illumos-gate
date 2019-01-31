@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 
@@ -501,7 +501,7 @@ bind_to_pool(const char *pool_name, pid_t pid, int force)
 	 * 'system.bind-default' = 'true'.
 	 */
 	if ((pvals[0] = pool_value_alloc()) == NULL) {
-		pool_conf_close(conf);
+		(void) pool_conf_close(conf);
 		pool_conf_free(conf);
 		return (-1);
 	}
@@ -510,7 +510,7 @@ bind_to_pool(const char *pool_name, pid_t pid, int force)
 	    pool_value_get_bool(pvals[0], &bval) != PO_SUCCESS ||
 	    bval == PO_FALSE) {
 		pool_value_free(pvals[0]);
-		pool_conf_close(conf);
+		(void) pool_conf_close(conf);
 		pool_conf_free(conf);
 		errno = pool_name == NULL ? EACCES : ESRCH;
 		return (-1);
@@ -522,7 +522,7 @@ bind_to_pool(const char *pool_name, pid_t pid, int force)
 		 * No default pools exist.
 		 */
 		pool_value_free(pvals[0]);
-		pool_conf_close(conf);
+		(void) pool_conf_close(conf);
 		pool_conf_free(conf);
 		errno = pool_name == NULL ? EACCES : ESRCH;
 		return (-1);

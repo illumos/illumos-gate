@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  * Copyright (c) 2013, 2015 by Delphix. All rights reserved.
  */
 
@@ -2116,7 +2116,7 @@ whatis_walk_seg(uintptr_t addr, const vmem_seg_t *vs, whatis_info_t *wi)
 		    (vs->vs_type == VMEM_ALLOC) ? "allocated" : "freed",
 		    wi->wi_vmem->vm_name);
 
-		if (!mdb_whatis_flags(w) & WHATIS_QUIET)
+		if (!(mdb_whatis_flags(w) & WHATIS_QUIET))
 			whatis_call_printer(vmem_seg, addr);
 		else
 			mdb_printf("\n");

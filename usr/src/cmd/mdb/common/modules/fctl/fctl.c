@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <sys/mdb_modapi.h>
 #include <sys/mutex.h>
@@ -244,7 +247,7 @@ ulp_walk_f(mdb_walk_state_t *wsp)
 static int
 ulps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	fc_ulp_list_t 		ulplist;
+	fc_ulp_list_t		ulplist;
 	fc_ulp_modinfo_t	ulp;
 	char			ulp_name[30];
 
@@ -354,7 +357,7 @@ ulpmod_walk_f(mdb_walk_state_t *wsp)
 static int
 ulpmods(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	fc_ulp_module_t 	modlist;
+	fc_ulp_module_t		modlist;
 	fc_ulp_modinfo_t	modinfo;
 	fc_ulp_ports_t		ulp_port;
 
@@ -1109,7 +1112,7 @@ fc_trace_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 	}
 
-	if (logq.il_flags & FC_TRACE_LOGQ_V2 != 0) {
+	if ((logq.il_flags & FC_TRACE_LOGQ_V2) != 0) {
 		rval = fc_dump_logmsg((fc_trace_dmsg_t *)logq.il_msgh, pktstart,
 		    pktend, &printed);
 	} else {

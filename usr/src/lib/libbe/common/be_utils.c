@@ -25,6 +25,7 @@
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 
@@ -270,7 +271,7 @@ be_get_boot_args(char **fbarg, int entry)
 			    "-B zfs-bootfs=%s,bootpath=\"%s\"\n", kernel,
 			    kernel_options, node->be_root_ds, tmp);
 
-		if (fbarg == NULL)
+		if (*fbarg == NULL)
 			ret = BE_ERR_NOMEM;
 		else
 			ret = 0;
@@ -3908,9 +3909,9 @@ be_create_menu(
 	if (mkdirp(menu_path,
 	    S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == -1 &&
 	    errno != EEXIST) {
-		free(menu_path);
 		be_print_err(gettext("be_create_menu: Failed to create the %s "
 		    "directory: %s\n"), menu_path, strerror(errno));
+		free(menu_path);
 		return (errno_to_be_err(errno));
 	}
 	free(menu_path);
