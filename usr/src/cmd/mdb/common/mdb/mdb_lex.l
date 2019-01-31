@@ -28,6 +28,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -130,6 +131,9 @@ RGX_COMMENT	"//".*\n
 
 <S_INITIAL>"!="	|
 <S_EXPR>"!="	return (MDB_TOK_NOTEQUAL); /* Inequality operator */
+
+<S_INITIAL>"%%"	|
+<S_EXPR>"%%"	return (MDB_TOK_MODULUS); /* Modulus operator */
 
 <S_INITIAL>"!"	|
 <S_FMTLIST>"!"	|
