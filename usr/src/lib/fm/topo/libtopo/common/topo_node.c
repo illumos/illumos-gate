@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
  */
 
 /*
@@ -129,12 +130,15 @@ static void
 topo_node_destroy(tnode_t *node)
 {
 	int i;
-	tnode_t *pnode = node->tn_parent;
+	tnode_t *pnode;
 	topo_nodehash_t *nhp;
-	topo_mod_t *hmod, *mod = node->tn_enum;
+	topo_mod_t *hmod, *mod;
 
 	if (node == NULL)
 		return;
+
+	pnode = node->tn_parent;
+	mod = node->tn_enum;
 
 	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC, "destroying node %s=%d\n",
 	    topo_node_name(node), topo_node_instance(node));

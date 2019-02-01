@@ -23,6 +23,9 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
+ */
 
 #include <signal.h>
 #include <dirent.h>
@@ -122,7 +125,7 @@ static void
 topo_mod_stop(topo_mod_t *mod)
 {
 	if (mod->tm_flags & TOPO_MOD_INIT) {
-		mod->tm_mops->mop_fini(mod);
+		(void) mod->tm_mops->mop_fini(mod);
 		if (mod->tm_flags & TOPO_MOD_REG)
 			topo_mod_unregister(mod);
 	}
@@ -179,10 +182,12 @@ topo_mod_lookup(topo_hdl_t *thp, const char *name, int bump)
 static void
 topo_mod_destroy(topo_mod_t *mod)
 {
-	topo_hdl_t *thp = mod->tm_hdl;
+	topo_hdl_t *thp;
 
 	if (mod == NULL)
 		return;
+
+	thp = mod->tm_hdl;
 
 	assert(mod->tm_refs == 0);
 	assert(!MUTEX_HELD(&mod->tm_lock));

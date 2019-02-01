@@ -23,6 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
+ */
 
 #include <stdio.h>
 #include <strings.h>
@@ -35,8 +38,14 @@
 #include <topo_prop.h>
 #include <topo_tree.h>
 
-#define	INT32BUFSZ	sizeof (UINT32_MAX) + 1
-/* 2 bytes for "0x" + 16 bytes for the hex value + 1 for sign + null */
+/*
+ * In the XML representation of the topo snapshot, 32-bit integer values are
+ * represented as base-10 values.
+ *
+ * 10 bytes for base-10 value + 1 for sign + nul
+ */
+#define	INT32BUFSZ	12
+/* 2 bytes for "0x" + 16 bytes for the hex value + 1 for sign + nul */
 #define	INT64BUFSZ	20
 #define	XML_VERSION	"1.0"
 
@@ -115,7 +124,8 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 			if (topo_prop_get_int32(node, pgname, pv->tp_name, &val,
 			    &err) == 0) {
 				(void) snprintf(vbuf, INT64BUFSZ, "%d", val);
-				(void) snprintf(tbuf, 10, "%s", Int32);
+				(void) snprintf(tbuf, sizeof (tbuf), "%s",
+				    Int32);
 				pval = vbuf;
 			} else
 				return;
@@ -126,7 +136,8 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 			if (topo_prop_get_uint32(node, pgname, pv->tp_name,
 			    &val, &err) == 0) {
 				(void) snprintf(vbuf, INT64BUFSZ, "0x%x", val);
-				(void) snprintf(tbuf, 10, "%s", UInt32);
+				(void) snprintf(tbuf, sizeof (tbuf), "%s",
+				    UInt32);
 				pval = vbuf;
 			} else
 				return;
@@ -138,7 +149,8 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 			    &err) == 0) {
 				(void) snprintf(vbuf, INT64BUFSZ, "0x%llx",
 				    (longlong_t)val);
-				(void) snprintf(tbuf, 10, "%s", Int64);
+				(void) snprintf(tbuf, sizeof (tbuf), "%s",
+				    Int64);
 				pval = vbuf;
 			} else
 				return;
@@ -150,7 +162,8 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 			    &val, &err) == 0) {
 				(void) snprintf(vbuf, INT64BUFSZ, "0x%llx",
 				    (u_longlong_t)val);
-				(void) snprintf(tbuf, 10, "%s", UInt64);
+				(void) snprintf(tbuf, sizeof (tbuf), "%s",
+				    UInt64);
 				pval = vbuf;
 			} else
 				return;
@@ -160,7 +173,7 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 			if (topo_prop_get_string(node, pgname, pv->tp_name,
 			    &pval, &err) != 0)
 				return;
-			(void) snprintf(tbuf, 10, "%s", "string");
+			(void) snprintf(tbuf, sizeof (tbuf), "%s", "string");
 			break;
 		}
 		case TOPO_TYPE_FMRI: {
@@ -178,7 +191,7 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 				}
 			} else
 				return;
-			(void) snprintf(tbuf, 10, "%s", FMRI);
+			(void) snprintf(tbuf, sizeof (tbuf), "%s", FMRI);
 			break;
 		}
 		case TOPO_TYPE_UINT32_ARRAY: {
@@ -204,7 +217,8 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
 				}
 				topo_hdl_free(thp, val,
 				    nelem * sizeof (uint32_t));
-				(void) snprintf(tbuf, 10, "%s", UInt32_Arr);
+				(void) snprintf(tbuf, sizeof (tbuf), "%s",
+				    UInt32_Arr);
 				pval = aval;
 			}
 			break;

@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 LIBRARY = libtopo.a
@@ -82,9 +82,6 @@ CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
-
-# not linted
-SMATCH=off
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -m64
