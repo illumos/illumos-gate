@@ -23,11 +23,13 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		gprof
 
-include 	$(SRC)/cmd/Makefile.cmd
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJS=	gprof.o arcs.o dfn.o lookup.o calls.o \
 		printgprof.o printlist.o readelf.o
@@ -42,14 +44,10 @@ CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
 CFLAGS +=	$(CCVERBOSE)
 CSTD=	$(CSTD_GNU99)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf
-LINTSRCS =	$(SRCS)
-LINTFLAGS +=	-x
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
 # not linted
 SMATCH=off
-
-CLEANFILES +=	$(LINTOUTS)
 
 ROOTLIBBLURB=	$(BLURBS:%=$(ROOTSHLIBCCS)/%)
 

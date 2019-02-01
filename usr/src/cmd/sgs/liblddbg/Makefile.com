@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY =	liblddbg.a
@@ -56,9 +57,6 @@ include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
 
-LINTFLAGS +=	-u -D_REENTRANT
-LINTFLAGS64 +=	-u -D_REENTRANT
-
 CERRWARN +=	-_gcc=-Wno-unused-value
 CERRWARN +=	-_gcc=-Wno-uninitialized
 CERRWARN +=	-_gcc=-Wno-parentheses
@@ -83,15 +81,10 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n liblddbg_msg
 
 CHKSRCS =	$(COMOBJS32:%32.o=../common/%.c)
 
-SRCS =		../common/llib-llddbg
 LIBSRCS =	$(COMOBJS:%.o=../common/%.c) \
 		$(TOOLOBJ:%.o=$(SGSTOOLS)/common/%.c) $(BLTDATA)
 
-LINTSRCS =	$(LIBSRCS) ../common/lintsup.c
-LINTSRCS32 =	$(COMOBJS32:%32.o=../common/%.c)
-LINTSRCS64 =	$(COMOBJS64:%64.o=../common/%.c)
-
-CLEANFILES +=	$(LINTOUTS) $(BLTFILES)
-CLOBBERFILES +=	$(DYNLIB) $(LINTLIBS) $(LIBLINKS)
+CLEANFILES +=	$(BLTFILES)
+CLOBBERFILES +=	$(DYNLIB) $(LIBLINKS)
 
 ROOTFS_DYNLIB =	$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)

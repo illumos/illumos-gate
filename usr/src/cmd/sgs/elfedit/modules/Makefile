@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
@@ -37,11 +36,10 @@ install:=	TARGET=	install
 package:=	TARGET=	package
 clean:=		TARGET=	clean
 clobber:=	TARGET=	clobber
-lint:=		TARGET=	lint
 
 .KEEP_STATE:
 
-package all chkmsg catalog clean clobber lint install: \
+package all chkmsg catalog clean clobber install: \
 	$(SUBDIRS)
 
 $(SUBDIRS):	FRC

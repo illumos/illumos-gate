@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1996, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 objs/%.o \
 objs.xpg4/%.o:	../common/%.c
@@ -38,10 +39,6 @@ delete:
 		$(RM) $(PROG)
 
 catalog:	$(BLTMESG)
-
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64)
-
-lint:		$(LINTOUT32) $(SGSLINTOUT)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) -o $@ $(LLDFLAGS) $(OBJS) $(LDLIBS)

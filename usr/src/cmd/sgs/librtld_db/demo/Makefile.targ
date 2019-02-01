@@ -19,6 +19,8 @@
 # CDDL HEADER END
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 $(OBJDIR)/%.o:	%.c
 		$(COMPILE.c) $< -o $@
@@ -93,9 +95,6 @@ clobber: clean FRC
 FRC:
 
 # DEMO DELETE START
-
-$(LINTOUT):	$(SRCS)
-		$(LINT.c) $(SRCS) > lint.out 2>&1
 
 include		$(SRC)/cmd/sgs/Makefile.targ
 # DEMO DELETE END

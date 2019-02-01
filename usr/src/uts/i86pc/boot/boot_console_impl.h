@@ -13,11 +13,11 @@
  * Copyright 2016 Toomas Soome <tsome@me.com>
  */
 
-#include <sys/types.h>
-#include <sys/bootinfo.h>
-
 #ifndef _BOOT_CONSOLE_IMPL_H
 #define	_BOOT_CONSOLE_IMPL_H
+
+#include <sys/types.h>
+#include <sys/bootinfo.h>
 
 /*
  * Boot console implementation details.
@@ -27,15 +27,19 @@
 extern "C" {
 #endif
 
-extern boolean_t xbi_fb_init(struct xboot_info *);
-extern void boot_fb_init(int);
-extern void boot_fb_putchar(uint8_t);
-extern void boot_vga_init(int);
+/* Console device callbacks. */
+typedef struct bcons_dev {
+	void (*bd_putchar)(int);
+	void (*bd_eraseline)(void);
+	void (*bd_cursor)(boolean_t);
+	void (*bd_setpos)(int, int);
+	void (*bd_shift)(int);
+} bcons_dev_t;
 
-extern void vga_setpos(int, int);
-extern void vga_getpos(int *, int *);
-extern void vga_scroll(int);
-extern void vga_drawc(int, int);
+extern boolean_t xbi_fb_init(struct xboot_info *, bcons_dev_t *);
+extern void boot_fb_init(int);
+extern void boot_vga_init(bcons_dev_t *);
+extern void boot_get_color(uint32_t *, uint32_t *);
 
 #ifdef __cplusplus
 }

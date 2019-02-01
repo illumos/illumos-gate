@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 pics/%.o:	../common/%.c
@@ -36,9 +37,6 @@ pics/%64.o:	../common/%.c
 		$(COMPILE.c) -D_ELF64 $(PICFLAGS) -o $@ $<
 		$(POST_PROCESS_O)
 
-$(ROOTFS_LIBDIR)/$(LINTLIBSRC): ../common/$(LINTLIBSRC)
-		$(INS.file) ../common/$(LINTLIBSRC)
-
 delete:
 		-$(RM) $(DYNLIB)
 
@@ -49,8 +47,8 @@ include		$(SRC)/cmd/sgs/Makefile.targ
 
 catalog:
 
-chkmsg:		$(LINTSRCS)
-		sh $(CHKMSG) $(CHKMSGFLAGS) $(LINTSRCS)
+chkmsg:		$(MSGSRCS)
+		sh $(CHKMSG) $(CHKMSGFLAGS) $(MSGSRCS)
 
 $(BLTDEFS) + \
 $(BLTDATA):	$(SGSMSGTARG)

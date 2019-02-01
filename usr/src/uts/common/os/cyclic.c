@@ -2385,7 +2385,7 @@ cyclic_unconfigure(cpu_t *c)
 }
 
 static int
-cyclic_cpu_setup(cpu_setup_t what, int id)
+cyclic_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 {
 	/*
 	 * We are guaranteed that there is still/already an entry in the
@@ -3217,7 +3217,7 @@ cyclic_mp_init()
 		}
 	} while ((c = c->cpu_next) != cpu_list);
 
-	register_cpu_setup_func((cpu_setup_func_t *)cyclic_cpu_setup, NULL);
+	register_cpu_setup_func(cyclic_cpu_setup, NULL);
 	mutex_exit(&cpu_lock);
 }
 

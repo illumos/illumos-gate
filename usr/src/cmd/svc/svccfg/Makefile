@@ -47,7 +47,7 @@ MYOBJS =	$(SRCS:%.c=%.o) \
 		notify_params.o
 OBJS =		$(MYOBJS)
 
-POFILES = 	$(SRCS:%.c=%.po) \
+POFILES =	$(SRCS:%.c=%.po) \
 		svccfg_grammar.po \
 		svccfg_lex.po \
 		../common/manifest_find.po \
@@ -96,8 +96,6 @@ $(NOT_NATIVE)SVCCFG_EXTRA_LIBS += -ltecla
 LIBSCF		= $(SRC)/lib/libscf
 LIBTECLA	= $(SRC)/lib/libtecla		# just for the header
 LIBUUTIL	= $(SRC)/lib/libuutil
-
-debug := COPTFLAG = -g
 
 lint := LINTFLAGS = -mux
 lint := SVCCFG_EXTRA_LIBS = -lscf -ll -luutil -lumem -lmd5 -lnvpair

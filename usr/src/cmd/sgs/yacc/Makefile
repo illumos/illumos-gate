@@ -19,14 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1995,1997 by Sun Microsystems, Inc.
 # All Rights Reserved.
 #
-# cmd/sgs/yacc/Makefile
-#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 include		../../../Makefile.master
 
@@ -41,7 +37,6 @@ install :=	TARGET= install
 install_lib :=	TARGET= install_lib
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 
 # for messaging catalog
 #
@@ -50,11 +45,11 @@ POFILE= yacc.po
 
 .KEEP_STATE:
 
-all clean clobber install install_lib lint:	$(SUBDIRS)
+all clean clobber install install_lib:	$(SUBDIRS)
 
 catalog:	$(POFILE)
 
-$(POFILE):	
+$(POFILE):
 	$(RM) $@
 	$(XGETTEXT) $(XGETFLAGS) $(CSRC)
 	sed "/^domain/d" < messages.po > $@

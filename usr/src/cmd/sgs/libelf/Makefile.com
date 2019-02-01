@@ -22,6 +22,7 @@
 # Copyright 2015 Gary Mills
 # Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY=	libelf.a
@@ -66,9 +67,6 @@ MAPFILES =	../common/mapfile-vers
 DYNFLAGS +=	$(VERSREF)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) -lc
 
-LINTFLAGS +=	-u -erroff=E_BAD_PTR_CAST_ALIGN
-LINTFLAGS64 +=	-u -erroff=E_CAST_INT_TO_SMALL_INT
-
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
@@ -96,20 +94,16 @@ SGSMSGFLAGS2=	$(SGSMSGFLAGS) -h $(BLTDEFS) -d $(BLTDATA) -n libelf_msg
 BLTSRCS=	$(BLTOBJS:%.o=%.c)
 LIBSRCS=	$(COMOBJS:%.o=../common/%.c)  $(MISCOBJS:%.o=../misc/%.c) \
 		$(MACHOBJS:%.o=%.c)  $(BLTSRCS)
-SRCS=		../common/llib-lelf
-LINTSRCS=	$(LIBSRCS) ../common/lintsup.c
 
 ROOTFS_DYNLIB=		$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)
-ROOTFS_LINTLIB=		$(LINTLIB:%=$(ROOTFS_LIBDIR)/%)
 
 ROOTFS_DYNLIB64=	$(DYNLIB:%=$(ROOTFS_LIBDIR64)/%)
-ROOTFS_LINTLIB64=	$(LINTLIB:%=$(ROOTFS_LIBDIR64)/%)
 
 $(ROOTFS_DYNLIB) :=	FILEMODE= 755
 $(ROOTFS_DYNLIB64) :=	FILEMODE= 755
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+LIBS =		$(DYNLIB)
 
-CLEANFILES +=	$(LINTOUTS) $(BLTSRCS) $(BLTFILES)
+CLEANFILES +=	$(BLTSRCS) $(BLTFILES)
 
 .PARALLEL:	$(LIBS)

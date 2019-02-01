@@ -19,13 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1995-1999 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-# cmd/sgs/nm/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../../../Makefile.master
@@ -38,7 +35,6 @@ all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-lint :=		TARGET= lint
 package :=	TARGET= package
 
 # for messaging catalog
@@ -47,7 +43,7 @@ POFILE= nm.po
 
 .KEEP_STATE:
 
-all clean clobber install lint package:	$(SUBDIRS)
+all clean clobber install package:	$(SUBDIRS)
 
 catalog:	$(POFILE)
 

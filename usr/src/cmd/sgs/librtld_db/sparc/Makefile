@@ -23,7 +23,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PLTOBJS =	plt32_resolution.o
@@ -33,11 +33,8 @@ include		../Makefile.com
 
 .KEEP_STATE:
 
-all:		$(DYNLIB) $(LINTLIB)
+all:		$(DYNLIB)
 
-install:	all $(ROOTFS_DYNLIB) $(ROOTFS_LINKS) \
-		$(ROOTFS_LIBDIR)/$(LINTLIB) $(ROOTFS_LIBDIR)/$(LINTLIBSRC)
-
-lint:		$(LINTLIB) $(LINTOUT32) $(SGSLINTOUT)
+install:	all $(ROOTFS_DYNLIB) $(ROOTFS_LINKS)
 
 include		../Makefile.targ

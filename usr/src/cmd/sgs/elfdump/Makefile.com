@@ -22,6 +22,7 @@
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG=		elfdump
@@ -31,8 +32,8 @@ include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJ =	main.o			corenote.o \
 		dwarf.o			struct_layout.o \
-		struct_layout_i386.o 	struct_layout_amd64.o \
-		struct_layout_sparc.o 	struct_layout_sparcv9.o
+		struct_layout_i386.o	struct_layout_amd64.o \
+		struct_layout_sparc.o	struct_layout_sparcv9.o
 
 COMOBJ32 =	elfdump32.o fake_shdr32.o
 
@@ -56,9 +57,6 @@ LDFLAGS +=	$(VERSREF) $(CC_USE_PROTO) $(MAPOPT) $(LLDFLAGS)
 LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(CONVLIBDIR) $(CONV_LIB)
 
-LINTFLAGS +=	-x
-LINTFLAGS64 +=	-x
-
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
 # not linted
@@ -78,6 +76,5 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n elfdump_msg
 SRCS =		$(COMOBJ:%.o=../common/%.c) \
 		$(COMOBJ32:%32.o=../common/%.c) \
 		$(TOOLOBJ:%.o=../../tools/common/%.c) $(BLTDATA)
-LINTSRCS =	$(SRCS) ../common/lintsup.c
 
-CLEANFILES +=	$(LINTOUTS) $(BLTFILES) gen_struct_layout
+CLEANFILES +=	$(BLTFILES) gen_struct_layout

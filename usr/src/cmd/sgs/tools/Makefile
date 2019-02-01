@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Makefile to support tools used for linker development.  GEXECS are those
 # tools that the installed for distribution in the SUNWonld package.
 #
@@ -33,8 +31,10 @@
 #
 #  o	proto: creates a proto directory structure suitable for sgs make
 #	installs (basically a subset of Targetdirs).
+
 #
-# cmd/sgs/tools/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 include		$(SRC)/Makefile.master
 
@@ -57,7 +57,6 @@ all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 
 
 .KEEP_STATE:
@@ -70,8 +69,6 @@ clean clobber:	$(SUBDIRS)
 		$(RM) $(RMFLAGS) $(EXECS)
 
 delete:
-
-lint:		$(SUBDIRS)
 
 %:		%.ksh
 		$(RM) $@

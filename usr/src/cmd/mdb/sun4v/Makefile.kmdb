@@ -95,7 +95,7 @@ MAPFILE_SOURCES = \
 %.fth: $(SRC)/cmd/mdb/sparc/kmdb/%.fdbg
 	grep '^#' <$< >$(<F).c
 	grep -v '^#' <$< >$(<F).tmp
-	$(CC) $(CTFSTABSCFLAGS) $(CPPFLAGS) -g -c -o $(<F).o $(<F).c
+	$(CC) $(CTFSTABSCFLAGS) $(CPPFLAGS) $(CCGDEBUG) -c -o $(<F).o $(<F).c
 	$(CTFCONVERT) $(CTFCVTFLAGS) $(<F).o
 	$(CTFSTABS) -t forth -i $(<F).tmp -o $@ $(<F).o
 	$(RM) $(<F).c $(<F).tmp $(<F).o

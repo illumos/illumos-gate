@@ -23,6 +23,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 LIBRARY=	libldmake.a
 VERS=		.1
@@ -41,19 +43,11 @@ DYNFLAGS +=	$(CC_USE_PROTO)
 CFLAGS +=	$(C_PICFLAGS)
 CFLAGS64 +=	$(C_PICFLAGS64)
 
-LINTFLAGS +=	-erroff=E_NAME_DECL_NOT_USED_DEF2 \
-		-erroff=E_NAME_DEF_NOT_USED2 \
-		-erroff=E_NAME_USED_NOT_DEF2
-LINTFLAGS64 +=	-erroff=E_NAME_DECL_NOT_USED_DEF2 \
-		-erroff=E_NAME_DEF_NOT_USED2 \
-		-erroff=E_NAME_USED_NOT_DEF2
-LINTSRCS =	$(SRCS)
-
 SRCS=		$(OBJECTS:%.o=../common/%.c)
 LDLIBS +=	-lc
 
 CLEANFILES +=
-CLOBBERFILES +=	$(DYNLIB) $(LINTLIB) $(LINTOUTS)
+CLOBBERFILES +=	$(DYNLIB)
 
 ROOTDYNLIB=	$(DYNLIB:%=$(ROOTLIBDIR)/%)
 ROOTDYNLIB64=	$(DYNLIB:%=$(ROOTLIBDIR64)/%)

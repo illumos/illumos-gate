@@ -19,14 +19,9 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1990 by Sun Microsystems, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
-# lib/rtld.4.x/Makefile
-#
-# only installs an already-built a.out ld.so file
 
 #include library definitions
 include ../../../lib/Makefile.lib
@@ -48,5 +43,3 @@ install: $(ROOTFILE)
 clean:
 
 clobber: clean
-
-lint:

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 COMOBJS64 =	rd_elf64.o
@@ -31,23 +32,19 @@ include		../Makefile.com
 
 SGSMSGTARG +=	$(SGSMSGSPARCV9)
 
-LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 CPPFLAGS +=	-D_SYSCALL32
 CONVLIBDIR =	$(CONVLIBDIR64)
 
 .KEEP_STATE:
 
-all:		$(DYNLIB) $(LINTLIB)
+all:		$(DYNLIB)
 
-install:	all $(ROOTFS_DYNLIB64) $(ROOTFS_LINKS64) \
-		$(ROOTFS_LIBDIR64)/$(LINTLIB)
+install:	all $(ROOTFS_DYNLIB64) $(ROOTFS_LINKS64)
 
 pics/plt32_resolution.o: ../sparc/plt32_resolution.c
 		$(COMPILE.c) -D_ELF32 $(PICFLAGS) -o $@ \
 		    ../sparc/plt32_resolution.c
 		$(POST_PROCESS_O)
-
-lint:		$(LINTLIB) $(LINTOUT32) $(LINTOUT64) $(SGSLINTOUT)
 
 include		../Makefile.targ
 include		../../Makefile.sub.64

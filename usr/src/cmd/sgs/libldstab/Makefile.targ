@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 pics/%.o:	../common/%.c
@@ -32,8 +33,6 @@ pics/%.o:	../common/%.c
 pics/%64.o:	../common/%.c
 		$(COMPILE.c) -o $@ -D_ELF64 $<
 		$(POST_PROCESS_O)
-
-lint:		$(LINTOUT32) $(SGSLINTOUT)
 
 delete:
 		-$(RM) $(DYNLIB)

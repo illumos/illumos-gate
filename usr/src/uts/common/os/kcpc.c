@@ -2420,10 +2420,12 @@ kcpc_set_create(kcpc_request_t *reqs, int nreqs, int set_flags, int kmem_flags)
  * to be preserved, so it is set to NULL.
  */
 static void
-kcpc_cpustop_func(boolean_t preserve_context)
+kcpc_cpustop_func(uintptr_t arg1, uintptr_t arg2 __unused)
 {
+	boolean_t preserve_context;
 	kpreempt_disable();
 
+	preserve_context = (boolean_t)arg1;
 	/*
 	 * Someone already stopped this context before us, so there is nothing
 	 * to do.
@@ -2453,17 +2455,17 @@ kcpc_cpustop_func(boolean_t preserve_context)
 void
 kcpc_cpu_stop(cpu_t *cp, boolean_t preserve_context)
 {
-	cpu_call(cp, (cpu_call_func_t)kcpc_cpustop_func,
-	    preserve_context, 0);
+	cpu_call(cp, kcpc_cpustop_func, preserve_context, 0);
 }
 
 /*
  * Program the context on the current CPU
  */
 static void
-kcpc_remoteprogram_func(kcpc_ctx_t *ctx, uintptr_t arg)
+kcpc_remoteprogram_func(uintptr_t arg1, uintptr_t arg2)
 {
-	boolean_t for_thread = (boolean_t)arg;
+	kcpc_ctx_t *ctx = (kcpc_ctx_t *)arg1;
+	boolean_t for_thread = (boolean_t)arg2;
 
 	ASSERT(ctx != NULL);
 
@@ -2478,7 +2480,7 @@ kcpc_remoteprogram_func(kcpc_ctx_t *ctx, uintptr_t arg)
 void
 kcpc_cpu_program(cpu_t *cp, kcpc_ctx_t *ctx)
 {
-	cpu_call(cp, (cpu_call_func_t)kcpc_remoteprogram_func, (uintptr_t)ctx,
+	cpu_call(cp, kcpc_remoteprogram_func, (uintptr_t)ctx,
 	    (uintptr_t)B_FALSE);
 }
 

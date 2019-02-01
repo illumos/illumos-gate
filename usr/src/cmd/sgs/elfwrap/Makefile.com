@@ -23,6 +23,8 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 PROG=		elfwrap
 
@@ -54,9 +56,6 @@ LLDFLAGS64 =
 LDFLAGS +=	$(VERSREF) $(CC_USE_PROTO) $(MAPOPTS) $(LLDFLAGS)
 LDLIBS +=	$(ELFLIBDIR) -lelf $(CONVLIBDIR) $(CONV_LIB)
 
-LINTFLAGS +=	-x
-LINTFLAGS64 +=	-x
-
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
 BLTDEFS =	msg.h
@@ -73,6 +72,5 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n elfwrap_msg
 SRCS =		$(COMOBJ:%.o=../common/%.c) ../common/machine.c \
 		$(COMOBJ32:%32.o=../common/%.c) \
 		$(TOOLOBJ:%.o=../../tools/common/%.c) $(BLTDATA)
-LINTSRCS =	$(SRCS) ../common/lintsup.c
 
-CLEANFILES +=	$(LINTOUTS) $(BLTFILES)
+CLEANFILES +=	$(BLTFILES)

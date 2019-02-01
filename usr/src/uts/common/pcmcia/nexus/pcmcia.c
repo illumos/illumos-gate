@@ -384,7 +384,7 @@ pcmcia_attach(dev_info_t *dip, anp_t *adapter)
 	mutex_enter(&pcmcia_enum_lock);
 	mutex_enter(&pcmcia_global_lock);
 	if (pcmcia_num_adapters == 0) {
-		pcmcia_cis_parser = (f_tt *)CISParser;
+		pcmcia_cis_parser = (f_tt *)(uintptr_t)CISParser;
 		cis_parser = (void *(*)(int, ...)) CISParser;
 		pcmcia_cs_event = (f_tt *)cs_event;
 		cs_socket_services = SocketServices;
@@ -1744,7 +1744,7 @@ pcmcia_set_em_handler(int (*handler)(), caddr_t events, int elen,
 		if (mif == NULL)
 			return (ENOSPC);
 
-		mif->mif_function = (void (*)())handler;
+		mif->mif_function = (void (*)())(uintptr_t)handler;
 		bcopy(events, mif->mif_events, elen);
 		mif->mif_id = id;
 		mutex_enter(&pcmcia_global_lock);
@@ -3815,7 +3815,7 @@ SSSetIRQHandler(set_irq_handler_t *handler)
 
 	retval = ddi_add_intr(dip, 0, handler->iblk_cookie,
 	    handler->idev_cookie,
-	    (uint32_t(*)(caddr_t)) handler->handler,
+	    (uint32_t(*)(caddr_t))(uintptr_t) handler->handler,
 	    handler->arg1);
 
 	if (retval == DDI_SUCCESS) {
@@ -4530,18 +4530,18 @@ is_subtractv(dev_info_t *dip)
 
 /*
  * pcmcia_pci_alloc()
- * 	allocate mem or I/O resource from the ancestor of the cardbus bridge.
- * 	First start from the parent node. If the parent is a subtractive
- * 	decode bridge and it does not have the requested resource, go up the
- * 	device tree to find the resource.
+ *	allocate mem or I/O resource from the ancestor of the cardbus bridge.
+ *	First start from the parent node. If the parent is a subtractive
+ *	decode bridge and it does not have the requested resource, go up the
+ *	device tree to find the resource.
  *
- * 	dip		the parent node of the cardbus bridge
+ *	dip		the parent node of the cardbus bridge
  *
- * 	res_dip		returns a pointer to the node from which the
- * 			resource is obtained. *res_dip could point to
- * 			the parent or a higher level ancestor. *res_dip
- * 			should be saved by the caller and later passed
- * 			to pcmcia_ra_free();
+ *	res_dip		returns a pointer to the node from which the
+ *			resource is obtained. *res_dip could point to
+ *			the parent or a higher level ancestor. *res_dip
+ *			should be saved by the caller and later passed
+ *			to pcmcia_ra_free();
  */
 int
 pcmcia_pci_alloc(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
@@ -5292,7 +5292,7 @@ pcmcia_intr_enable_isr(dev_info_t *dip, dev_info_t *rdip,
 
 	handler.socket = sockp->ls_socket;
 	handler.irq = irq;
-	handler.handler = (f_tt *)hdlp->ih_cb_func;
+	handler.handler = (f_tt *)(uintptr_t)hdlp->ih_cb_func;
 	handler.arg1 = hdlp->ih_cb_arg1;
 	handler.arg2 = hdlp->ih_cb_arg2;
 	handler.handler_id = (uint32_t)(uintptr_t)rdip;

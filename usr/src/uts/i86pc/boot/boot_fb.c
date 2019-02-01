@@ -31,6 +31,7 @@
 #include <sys/bootinfo.h>
 #include <sys/boot_console.h>
 #include <sys/bootconf.h>
+#include "boot_console_impl.h"
 
 #define	P2ROUNDUP(x, align)	(-(-(x) & -(align)))
 #define	MIN(a, b)		((a) < (b) ? (a) : (b))
@@ -61,8 +62,6 @@ struct vis_conscopy {
 
 static struct font	boot_fb_font; /* set by set_font() */
 static uint8_t		glyph[MAX_GLYPH];
-static uint32_t		last_line_size;
-static fb_info_pixel_coord_t last_line;
 
 /* color translation */
 typedef struct {
@@ -87,11 +86,17 @@ static text_cmap_t cmap4_to_24 = {
 /* END CSTYLED */
 };
 
+static void boot_fb_putchar(int);
+static void boot_fb_eraseline(void);
+static void boot_fb_setpos(int, int);
+static void boot_fb_shiftline(int);
+static void boot_fb_eraseline_impl(uint16_t, uint16_t);
+
 /*
  * extract data from MB2 framebuffer tag and set up initial frame buffer.
  */
 boolean_t
-xbi_fb_init(struct xboot_info *xbi)
+xbi_fb_init(struct xboot_info *xbi, bcons_dev_t *bcons_dev)
 {
 	multiboot_tag_framebuffer_t *tag;
 	boot_framebuffer_t *xbi_fb;
@@ -121,6 +126,12 @@ xbi_fb_init(struct xboot_info *xbi)
 	fb_info.screen.x = tag->framebuffer_common.framebuffer_width;
 	fb_info.screen.y = tag->framebuffer_common.framebuffer_height;
 	fb_info.fb_size = fb_info.screen.y * fb_info.pitch;
+
+	bcons_dev->bd_putchar = boot_fb_putchar;
+	bcons_dev->bd_eraseline = boot_fb_eraseline;
+	bcons_dev->bd_cursor = boot_fb_cursor;
+	bcons_dev->bd_setpos = boot_fb_setpos;
+	bcons_dev->bd_shift = boot_fb_shiftline;
 
 	if (fb_info.paddr == 0)
 		fb_info.fb_type = FB_TYPE_UNKNOWN;
@@ -187,16 +198,14 @@ boot_fb_fill(uint8_t *dst, uint32_t data, uint32_t len)
 	case 16:
 		dst16 = (uint16_t *)dst;
 		len /= 2;
-		for (i = 0; i < len; i++) {
+		for (i = 0; i < len; i++)
 			dst16[i] = (uint16_t)data;
-		}
 		break;
 	case 32:
 		dst32 = (uint32_t *)dst;
 		len /= 4;
-		for (i = 0; i < len; i++) {
+		for (i = 0; i < len; i++)
 			dst32[i] = data;
-		}
 		break;
 	}
 }
@@ -207,27 +216,54 @@ boot_fb_cpy(uint8_t *dst, uint8_t *src, uint32_t len)
 {
 	uint16_t *dst16, *src16;
 	uint32_t *dst32, *src32;
-	uint32_t i;
 
 	switch (fb_info.depth) {
 	case 24:
 	case 8:
-		for (i = 0; i < len; i++)
-			dst[i] = src[i];
+	default:
+		if (dst <= src) {
+			do {
+				*dst++ = *src++;
+			} while (--len != 0);
+		} else {
+			dst += len;
+			src += len;
+			do {
+				*--dst = *--src;
+			} while (--len != 0);
+		}
 		break;
 	case 15:
 	case 16:
 		dst16 = (uint16_t *)dst;
 		src16 = (uint16_t *)src;
-		for (i = 0; i < len >> 1; i++) {
-			dst16[i] = src16[i];
+		len /= 2;
+		if (dst16 <= src16) {
+			do {
+				*dst16++ = *src16++;
+			} while (--len != 0);
+		} else {
+			dst16 += len;
+			src16 += len;
+			do {
+				*--dst16 = *--src16;
+			} while (--len != 0);
 		}
 		break;
 	case 32:
 		dst32 = (uint32_t *)dst;
 		src32 = (uint32_t *)src;
-		for (i = 0; i < len >> 2; i++) {
-			dst32[i] = src32[i];
+		len /= 4;
+		if (dst32 <= src32) {
+			do {
+				*dst32++ = *src32++;
+			} while (--len != 0);
+		} else {
+			dst32 += len;
+			src32 += len;
+			do {
+				*--dst32 = *--src32;
+			} while (--len != 0);
 		}
 		break;
 	}
@@ -256,7 +292,7 @@ boot_fb_shadow_init(bootops_t *bops)
 /*
  * Translate ansi color based on inverses and brightness.
  */
-static void
+void
 boot_get_color(uint32_t *fg, uint32_t *bg)
 {
 	/* ansi to solaris colors, see also boot_console.c */
@@ -363,35 +399,30 @@ boot_fb_init(int console)
 
 #if defined(_BOOT)
 	/* clear the screen if cursor is set to 0,0 */
-	fb_info.cursor.pos.x = fb_info.cursor.pos.y = 0;
-	if (console == CONS_FRAMEBUFFER &&
-	    fb_info.cursor.pos.x == 0 && fb_info.cursor.pos.y == 0) {
-		uint32_t fg, bg;
-		int i;
+	if (fb_info.cursor.pos.x == 0 && fb_info.cursor.pos.y == 0) {
+		uint32_t fg, bg, toffset;
+		uint16_t y;
 
 		boot_get_color(&fg, &bg);
 		bg = boot_color_map(bg);
 
-		for (i = 0; i < fb_info.screen.y; i++) {
-			uint8_t *dest = fb_info.fb + i * fb_info.pitch;
+		toffset = 0;
+		for (y = 0; y < fb_info.screen.y; y++) {
+			uint8_t *dest = fb_info.fb + toffset;
+
 			boot_fb_fill(dest, bg, fb_info.pitch);
+			toffset += fb_info.pitch;
 		}
 	}
 #endif
-	/* set up pre-calculated last line */
-	last_line_size = fb_info.terminal.x * boot_fb_font.width *
-	    fb_info.bpp;
-	last_line.x = window.x;
-	last_line.y = window.y + (fb_info.terminal.y - 1) * boot_fb_font.height;
-
 }
 
 /* copy rectangle to framebuffer. */
 static void
 boot_fb_blit(struct vis_consdisplay *rect)
 {
-	uint32_t size;	/* write size per scanline */
-	uint8_t *fbp, *sfbp;	/* fb + calculated offset */
+	uint32_t offset, size;		/* write size per scanline */
+	uint8_t *fbp, *sfbp = NULL;	/* fb + calculated offset */
 	int i;
 
 	/* make sure we will not write past FB */
@@ -402,14 +433,10 @@ boot_fb_blit(struct vis_consdisplay *rect)
 		return;
 
 	size = rect->width * fb_info.bpp;
-	fbp = fb_info.fb + rect->col * fb_info.bpp +
-	    rect->row * fb_info.pitch;
-	if (fb_info.shadow_fb != NULL) {
-		sfbp = fb_info.shadow_fb + rect->col * fb_info.bpp +
-		    rect->row * fb_info.pitch;
-	} else {
-		sfbp = NULL;
-	}
+	offset = rect->col * fb_info.bpp + rect->row * fb_info.pitch;
+	fbp = fb_info.fb + offset;
+	if (fb_info.shadow_fb != NULL)
+		sfbp = fb_info.shadow_fb + offset;
 
 	/* write all scanlines in rectangle */
 	for (i = 0; i < rect->height; i++) {
@@ -450,6 +477,105 @@ bit_to_pix(uchar_t c)
 	}
 }
 
+static void
+boot_fb_eraseline_impl(uint16_t x, uint16_t y)
+{
+	uint32_t toffset, size;
+	uint32_t fg, bg;
+	uint8_t *dst, *sdst;
+	int i;
+
+	boot_get_color(&fg, &bg);
+	bg = boot_color_map(bg);
+
+	size = fb_info.terminal.x * boot_fb_font.width * fb_info.bpp;
+
+	toffset = x * fb_info.bpp + y * fb_info.pitch;
+	dst = fb_info.fb + toffset;
+	if (fb_info.shadow_fb != NULL)
+		sdst = fb_info.shadow_fb + toffset;
+
+	for (i = 0; i < boot_fb_font.height; i++) {
+		uint8_t *dest = dst + i * fb_info.pitch;
+		if (fb_info.fb + fb_info.fb_size >= dest + size)
+			boot_fb_fill(dest, bg, size);
+		if (fb_info.shadow_fb != NULL) {
+			dest = sdst + i * fb_info.pitch;
+			if (fb_info.shadow_fb + fb_info.fb_size >=
+			    dest + size) {
+				boot_fb_fill(dest, bg, size);
+			}
+		}
+	}
+}
+
+static void
+boot_fb_eraseline(void)
+{
+	boot_fb_eraseline_impl(fb_info.cursor.origin.x,
+	    fb_info.cursor.origin.y);
+}
+
+/*
+ * Copy rectangle from console to console.
+ * If shadow buffer is available, use shadow as source.
+ */
+static void
+boot_fb_conscopy(struct vis_conscopy *c_copy)
+{
+	uint32_t soffset, toffset;
+	uint32_t width, height, increment;
+	uint8_t *src, *dst, *sdst = NULL;
+	int i;
+
+	soffset = c_copy->s_col * fb_info.bpp + c_copy->s_row * fb_info.pitch;
+	toffset = c_copy->t_col * fb_info.bpp + c_copy->t_row * fb_info.pitch;
+
+	src = fb_info.fb + soffset;
+	dst = fb_info.fb + toffset;
+
+	if (fb_info.shadow_fb != NULL) {
+		src = fb_info.shadow_fb + soffset;
+		sdst = fb_info.shadow_fb + toffset;
+	}
+
+	width = (c_copy->e_col - c_copy->s_col + 1) * fb_info.bpp;
+	height = c_copy->e_row - c_copy->s_row + 1;
+
+	for (i = 0; i < height; i++) {
+		increment = i * fb_info.pitch;
+
+		/* Make sure we fit into FB size. */
+		if (soffset + increment + width >= fb_info.fb_size ||
+		    toffset + increment + width >= fb_info.fb_size)
+			break;
+
+		boot_fb_cpy(dst + increment, src + increment, width);
+
+		if (sdst != NULL)
+			boot_fb_cpy(sdst + increment, src + increment, width);
+	}
+}
+
+/* Shift the line content by chars. */
+static void
+boot_fb_shiftline(int chars)
+{
+	struct vis_conscopy c_copy;
+
+	c_copy.s_col = fb_info.cursor.origin.x;
+	c_copy.s_row = fb_info.cursor.origin.y;
+
+	c_copy.e_col = (fb_info.terminal.x - chars) * boot_fb_font.width;
+	c_copy.e_col += fb_info.terminal_origin.x;
+	c_copy.e_row = c_copy.s_row + boot_fb_font.height;
+
+	c_copy.t_col = fb_info.cursor.origin.x + chars * boot_fb_font.width;
+	c_copy.t_row = fb_info.cursor.origin.y;
+
+	boot_fb_conscopy(&c_copy);
+}
+
 /*
  * move the terminal window lines [1..y] to [0..y-1] and clear last line.
  */
@@ -457,14 +583,6 @@ static void
 boot_fb_scroll(void)
 {
 	struct vis_conscopy c_copy;
-	uint32_t soffset, toffset;
-	uint32_t width, height;
-	uint32_t fg, bg;
-	uint8_t *src, *dst, *sdst;
-	int i;
-
-	boot_get_color(&fg, &bg);
-	bg = boot_color_map(bg);
 
 	/* support for scrolling. set up the console copy data and last line */
 	c_copy.s_row = fb_info.terminal_origin.y + boot_fb_font.height;
@@ -474,44 +592,12 @@ boot_fb_scroll(void)
 	c_copy.t_row = fb_info.terminal_origin.y;
 	c_copy.t_col = fb_info.terminal_origin.x;
 
-	soffset = c_copy.s_col * fb_info.bpp + c_copy.s_row * fb_info.pitch;
-	toffset = c_copy.t_col * fb_info.bpp + c_copy.t_row * fb_info.pitch;
-	if (fb_info.shadow_fb != NULL) {
-		src = fb_info.shadow_fb + soffset;
-		sdst = fb_info.shadow_fb + toffset;
-	} else {
-		src = fb_info.fb + soffset;
-		sdst = NULL;
-	}
-	dst = fb_info.fb + toffset;
-
-	width = (c_copy.e_col - c_copy.s_col + 1) * fb_info.bpp;
-	height = c_copy.e_row - c_copy.s_row + 1;
-	for (i = 0; i < height; i++) {
-		uint32_t increment = i * fb_info.pitch;
-		boot_fb_cpy(dst + increment, src + increment, width);
-		if (sdst != NULL)
-			boot_fb_cpy(sdst + increment, src + increment, width);
-	}
+	boot_fb_conscopy(&c_copy);
 
 	/* now clean up the last line */
-	toffset = last_line.x * fb_info.bpp + last_line.y * fb_info.pitch;
-	dst = fb_info.fb + toffset;
-	if (fb_info.shadow_fb != NULL)
-		sdst = fb_info.shadow_fb + toffset;
-
-	for (i = 0; i < boot_fb_font.height; i++) {
-		uint8_t *dest = dst + i * fb_info.pitch;
-		if (fb_info.fb + fb_info.fb_size >= dest + last_line_size)
-			boot_fb_fill(dest, bg, last_line_size);
-		if (sdst != NULL) {
-			dest = sdst + i * fb_info.pitch;
-			if (fb_info.shadow_fb + fb_info.fb_size >=
-			    dest + last_line_size) {
-				boot_fb_fill(dest, bg, last_line_size);
-			}
-		}
-	}
+	boot_fb_eraseline_impl(fb_info.terminal_origin.x,
+	    fb_info.terminal_origin.y +
+	    (fb_info.terminal.y - 1) * boot_fb_font.height);
 }
 
 /*
@@ -626,64 +712,40 @@ boot_fb_cursor(boolean_t visible)
 }
 
 static void
-set_cursor_row(void)
+boot_fb_setpos(int row, int col)
 {
-	fb_info.cursor.pos.y++;
-	fb_info.cursor.pos.x = 0;
-	fb_info.cursor.origin.x = fb_info.terminal_origin.x;
+	if (row < 0)
+		row = 0;
+	if (row >= fb_info.terminal.y)
+		row = fb_info.terminal.y - 1;
+	if (col < 0)
+		col = 0;
+	if (col >= fb_info.terminal.x)
+		col = fb_info.terminal.x - 1;
 
-	if (fb_info.cursor.pos.y < fb_info.terminal.y &&
-	    fb_info.cursor.origin.y + boot_fb_font.height < fb_info.screen.y) {
-		fb_info.cursor.origin.y += boot_fb_font.height;
-	} else {
-		fb_info.cursor.pos.y = fb_info.terminal.y - 1;
-		/* fix the cursor origin y */
-		fb_info.cursor.origin.y = fb_info.terminal_origin.y +
-		    boot_fb_font.height * fb_info.cursor.pos.y;
-		boot_fb_scroll();
-	}
+	fb_info.cursor.pos.x = col;
+	fb_info.cursor.pos.y = row;
+	fb_info.cursor.origin.x = fb_info.terminal_origin.x;
+	fb_info.cursor.origin.x += col * boot_fb_font.width;
+	fb_info.cursor.origin.y = fb_info.terminal_origin.y;
+	fb_info.cursor.origin.y += row * boot_fb_font.height;
 }
 
 static void
-set_cursor_col(void)
-{
-	fb_info.cursor.pos.x++;
-	if (fb_info.cursor.pos.x < fb_info.terminal.x &&
-	    fb_info.cursor.origin.x + boot_fb_font.width < fb_info.screen.x) {
-		fb_info.cursor.origin.x += boot_fb_font.width;
-	} else {
-		fb_info.cursor.pos.x = 0;
-		fb_info.cursor.origin.x = fb_info.terminal_origin.x;
-		set_cursor_row();
-	}
-}
-
-void
-boot_fb_putchar(uint8_t c)
+boot_fb_putchar(int c)
 {
 	struct vis_consdisplay display;
-	boolean_t bs = B_FALSE;
+	int rows, cols;
 
-	/* early tem startup will switch cursor off, if so, keep it off  */
-	boot_fb_cursor(B_FALSE);	/* cursor off */
-	switch (c) {
-	case '\n':
-		set_cursor_row();
-		boot_fb_cursor(B_TRUE);
+	rows = fb_info.cursor.pos.y;
+	cols = fb_info.cursor.pos.x;
+
+	if (c == '\n') {
+		if (rows < fb_info.terminal.y - 1)
+			boot_fb_setpos(rows + 1, cols);
+		else
+			boot_fb_scroll();
 		return;
-	case '\r':
-		fb_info.cursor.pos.x = 0;
-		fb_info.cursor.origin.x = fb_info.terminal_origin.x;
-		boot_fb_cursor(B_TRUE);
-		return;
-	case '\b':
-		if (fb_info.cursor.pos.x > 0) {
-			fb_info.cursor.pos.x--;
-			fb_info.cursor.origin.x -= boot_fb_font.width;
-		}
-		c = ' ';
-		bs = B_TRUE;
-		break;
 	}
 
 	bit_to_pix(c);
@@ -694,7 +756,12 @@ boot_fb_putchar(uint8_t c)
 	display.data = glyph;
 
 	boot_fb_blit(&display);
-	if (bs == B_FALSE)
-		set_cursor_col();
-	boot_fb_cursor(B_TRUE);
+	if (cols < fb_info.terminal.x - 1)
+		boot_fb_setpos(rows, cols + 1);
+	else if (rows < fb_info.terminal.y - 1)
+		boot_fb_setpos(rows + 1, 0);
+	else {
+		boot_fb_setpos(rows, 0);
+		boot_fb_scroll();
+	}
 }

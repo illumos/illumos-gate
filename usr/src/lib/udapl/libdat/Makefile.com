@@ -23,8 +23,8 @@
 # Use is subject to license terms.
 #
 
-LIBRARY=       	libdat.a 
-VERS=          	.1 
+LIBRARY=	libdat.a
+VERS=		.1
 
 OBJECTS =	\
 	dat_dictionary.o \
@@ -36,16 +36,16 @@ OBJECTS =	\
 	dat_api.o \
 	udat.o	\
 	udat_api.o \
-	udat_sr_parser.o 
+	udat_sr_parser.o
 
 include ../../../Makefile.lib
 
-LIBS = 	$(DYNLIB) $(LINTLIB)
+LIBS =	$(DYNLIB) $(LINTLIB)
 LDLIBS += -lc
 
 SRCDIR =	../common
 
-CPPFLAGS +=     -I../include 
+CPPFLAGS +=     -I../include
 CFLAGS +=	$(CCVERBOSE)
 LINTFLAGS +=	-DDEBUG
 LINTFLAGS64 +=	-DDEBUG
@@ -54,8 +54,6 @@ $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 CERRWARN +=	-_gcc=-Wno-type-limits
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
-debug := COPTFLAG = -g
-debug := COPTFLAG64 = -g
 
 .KEEP_STATE:
 

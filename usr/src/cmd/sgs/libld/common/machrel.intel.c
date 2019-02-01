@@ -415,11 +415,22 @@ static uchar_t tlsinstr_gd_le[] = {
 	0x90
 };
 
-static uchar_t tlsinstr_gd_ie_movgs[] = {
+static uchar_t tlsinstr_ld_le_movgs[] = {
 	/*
-	 *	movl %gs:0x0,%eax
+	 * 0x00 movl %gs:0x0,%eax
 	 */
-	0x65, 0xa1, 0x00, 0x00, 0x00, 00
+	0x65, 0xa1, 0x00, 0x00, 0x00, 0x00,
+};
+
+/*
+ * 0x00 nopl 0(%eax,%eax) -- the intel recommended 5-byte nop
+ * See Intel® 64 and IA-32 Architectures Software Developer’s Manual
+ *    Volume 2B: Instruction Set Reference, M-U
+ *    Table 4-12, Recommended Multi-Byte Sequence of NOP Instruction
+ */
+static uchar_t tlsinstr_nop5[] = {
+
+	0x0f, 0x1f, 0x44, 0x00, 0x00
 };
 
 #define	TLS_GD_IE_MOV	0x8b	/* movl opcode */
@@ -528,7 +539,8 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	case R_386_TLS_GD_PLT:
 	case R_386_PLT32:
 		/*
-		 * Fixup done via the TLS_GD relocation
+		 * Fixup done via the TLS_GD/TLS_LDM relocation processing
+		 * and ld_reloc_plt() handling __tls_get_addr().
 		 */
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_386_NONE, arsp, ld_reloc_sym_name));
@@ -542,17 +554,10 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 * Transition:
 		 *	call __tls_get_addr()
 		 * to:
-		 *	nop
-		 *	nop
-		 *	nop
-		 *	nop
-		 *	nop
+		 *	nopl 0x0(%eax,%eax)
 		 */
-		*(offset - 1) = TLS_NOP;
-		*(offset) = TLS_NOP;
-		*(offset + 1) = TLS_NOP;
-		*(offset + 2) = TLS_NOP;
-		*(offset + 3) = TLS_NOP;
+		(void) memcpy(offset - 1, tlsinstr_nop5,
+		    sizeof (tlsinstr_nop5));
 		return (FIX_DONE);
 
 	case R_386_TLS_LDM:
@@ -569,8 +574,17 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		 *
 		 *  0x00 movl %gs:0, %eax
 		 */
-		(void) memcpy(offset - 2, tlsinstr_gd_ie_movgs,
-		    sizeof (tlsinstr_gd_ie_movgs));
+		(void) memcpy(offset - 2, tlsinstr_ld_le_movgs,
+		    sizeof (tlsinstr_ld_le_movgs));
+
+		/*
+		 *  We implicitly treat this as if a R_386_TLS_LDM_PLT for the
+		 *  __tls_get_addr call followed it as the GNU compiler
+		 *  doesn't generate one.  This is safe, because if one _does_
+		 *  exist we'll just write the nop again.
+		 */
+		(void) memcpy(offset + 4, tlsinstr_nop5,
+		    sizeof (tlsinstr_nop5));
 		return (FIX_DONE);
 
 	case R_386_TLS_LDO_32:
@@ -736,7 +750,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	 */
 	REL_CACHE_TRAVERSE(&ofl->ofl_actrels, idx, rcbp, arsp) {
 		uchar_t		*addr;
-		Xword 		value;
+		Xword		value;
 		Sym_desc	*sdp;
 		const char	*ifl_name;
 		Xword		refaddr;

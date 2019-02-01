@@ -4,7 +4,7 @@
 # The contents of this file are subject to the terms of the
 # Common Development and Distribution License (the "License").
 # You may not use this file except in compliance with the License.
-# 
+#
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
@@ -18,13 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/sgs/size/i386/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../Makefile.com
@@ -35,7 +32,5 @@ DEFLIST=	-DI386 -DELF
 
 package \
 install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
-
-lint:		$(LINTOUT32) $(SGSLINTOUT)
 
 include		../Makefile.targ

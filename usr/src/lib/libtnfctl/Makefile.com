@@ -66,13 +66,11 @@ HDRS=		tnfctl.h
 ROOTHDRDIR=	$(ROOT)/usr/include/tnf
 ROOTHDRS=	$(HDRS:%=$(ROOTHDRDIR)/%)
 CHECKHDRS=	$(HDRS:%.h=%.check)
-$(ROOTHDRS) := 	FILEMODE = 0644
+$(ROOTHDRS) :=	FILEMODE = 0644
 CHECKHDRS =	$(HDRS:%.h=%.check)
 
 LDLIBS +=	-lc -lelf
 
-# Uncomment the following line for a debug build
-# COPTFLAG =	-g -DDEBUG $(CCVERBOSE)
 CPPFLAGS +=	-I$(SRC)/lib/libtnfprobe -D_REENTRANT -I$(SRC)/cmd/sgs/include
 
 LINTFLAGS +=	-y

@@ -54,6 +54,7 @@
  * Specify breakpoint default action
  */
 
+#include <stdbool.h>
 #include "ficl.h"
 
 extern void exit(int);
@@ -103,7 +104,7 @@ ficlVmSetBreak(ficlVm *vm, ficlBreakpoint *pBP)
  * d e b u g P r o m p t
  */
 static void
-ficlDebugPrompt(ficlVm *vm, int debug)
+ficlDebugPrompt(bool debug)
 {
 	if (debug)
 		setenv("prompt", "dbg> ", 1);
@@ -385,7 +386,7 @@ ficlPrimitiveStepBreak(ficlVm *vm)
 	ficlString command;
 	ficlWord *word;
 	ficlWord *pOnStep;
-	int debug = 1;
+	bool debug = true;
 
 	if (!vm->restart) {
 		FICL_VM_ASSERT(vm, vm->callback.system->breakpoint.address);
@@ -419,11 +420,11 @@ ficlPrimitiveStepBreak(ficlVm *vm)
 		else {
 			sprintf(vm->pad, "next: %s\n", word->name);
 			if (strcmp(word->name, "interpret") == 0)
-				debug = 0;
+				debug = false;
 		}
 
 		ficlVmTextOut(vm, vm->pad);
-		ficlDebugPrompt(vm, debug);
+		ficlDebugPrompt(debug);
 	} else {
 		vm->restart = 0;
 	}
@@ -457,7 +458,7 @@ ficlPrimitiveStepBreak(ficlVm *vm)
 		}
 
 		case 'q':
-			ficlDebugPrompt(vm, 0);
+			ficlDebugPrompt(false);
 			ficlVmThrow(vm, FICL_VM_STATUS_ABORT);
 			break;
 		case 'x': {
@@ -482,7 +483,7 @@ ficlPrimitiveStepBreak(ficlVm *vm)
 				ficlVmTextOut(vm, "\n");
 			}
 			if (returnValue == FICL_VM_STATUS_ERROR_EXIT)
-				ficlDebugPrompt(vm, 0);
+				ficlDebugPrompt(false);
 
 			ficlVmThrow(vm, returnValue);
 			break;
@@ -497,12 +498,12 @@ ficlPrimitiveStepBreak(ficlVm *vm)
 			    "q -- Quit (stop debugging and abort)\n"
 			    "x -- eXecute the rest of the line "
 			    "as Ficl words\n");
-			ficlDebugPrompt(vm, 1);
+			ficlDebugPrompt(true);
 			ficlVmThrow(vm, FICL_VM_STATUS_RESTART);
 		break;
 	}
 
-	ficlDebugPrompt(vm, 0);
+	ficlDebugPrompt(false);
 }
 
 /*

@@ -21,7 +21,9 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 %.o:		../common/%.c
 		$(COMPILE.c) $<
@@ -42,8 +44,6 @@ delete:
 install \
 package:	all $(ROOTPROG)
 
-lint:		$(LINTOUT32) $(SGSLINTOUT)
-
 $(PROG):	$(OBJS)  $(MAPFILE)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
@@ -52,7 +52,7 @@ include		$(SRC)/cmd/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
- 
+
 catalog:	$(BLTMESG)
 
 chkmsg:		$(SRCS)

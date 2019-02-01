@@ -1237,8 +1237,6 @@ file path=opt/util-tests/tests/dis/i386/tst.fence.s mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.msr.out mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.msr.s mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.mwait.out mode=0444
-file path=opt/util-tests/tests/dis/i386/tst.mwait.out mode=0444
-file path=opt/util-tests/tests/dis/i386/tst.mwait.s mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.mwait.s mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.random.out mode=0444
 file path=opt/util-tests/tests/dis/i386/tst.random.s mode=0444

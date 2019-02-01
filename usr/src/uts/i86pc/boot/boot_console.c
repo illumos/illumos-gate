@@ -61,7 +61,7 @@ extern int bcons_ischar_xen(void);
 #endif /* __xpv */
 
 fb_info_t fb_info;
-static int cons_color = CONS_COLOR;
+static bcons_dev_t bcons_dev;				/* Device callbacks */
 static int console = CONS_SCREEN_TEXT;
 static int diag = CONS_INVALID;
 static int tty_num = 0;
@@ -71,6 +71,30 @@ static struct boot_env {
 	char	*be_env;	/* ends with double ascii nul */
 	size_t	be_size;	/* size of the environment, including nul */
 } boot_env;
+
+/*
+ * Simple console terminal emulator for early boot.
+ * We need this to support kmdb, all other console output is supposed
+ * to be simple text output.
+ */
+typedef enum btem_state_type {
+	A_STATE_START,
+	A_STATE_ESC,
+	A_STATE_CSI,
+	A_STATE_CSI_QMARK,
+	A_STATE_CSI_EQUAL
+} btem_state_type_t;
+
+#define	BTEM_MAXPARAMS	5
+typedef struct btem_state {
+	btem_state_type_t btem_state;
+	boolean_t btem_gotparam;
+	int btem_curparam;
+	int btem_paramval;
+	int btem_params[BTEM_MAXPARAMS];
+} btem_state_t;
+
+static btem_state_t boot_tem;
 
 static int serial_ischar(void);
 static int serial_getchar(void);
@@ -96,51 +120,6 @@ console_hypervisor_dev_type(int *tnum)
 	return (console_hypervisor_device);
 }
 #endif /* __xpv */
-
-/* Put the character C on the screen. */
-static void
-screen_putchar(int c)
-{
-	int row, col;
-
-	vga_getpos(&row, &col);
-	switch (c) {
-	case '\t':
-		col += 8 - (col % 8);
-		if (col == VGA_TEXT_COLS)
-			col = 79;
-		vga_setpos(row, col);
-		break;
-
-	case '\r':
-		vga_setpos(row, 0);
-		break;
-
-	case '\b':
-		if (col > 0)
-			vga_setpos(row, col - 1);
-		break;
-
-	case '\n':
-		if (row < VGA_TEXT_ROWS - 1)
-			vga_setpos(row + 1, col);
-		else
-			vga_scroll(cons_color);
-		break;
-
-	default:
-		vga_drawc(c, cons_color);
-		if (col < VGA_TEXT_COLS -1)
-			vga_setpos(row, col + 1);
-		else if (row < VGA_TEXT_ROWS - 1)
-			vga_setpos(row + 1, 0);
-		else {
-			vga_setpos(row, 0);
-			vga_scroll(cons_color);
-		}
-		break;
-	}
-}
 
 static int port;
 
@@ -590,16 +569,15 @@ bcons_init_env(struct xboot_info *xbi)
 int
 boot_fb(struct xboot_info *xbi, int console)
 {
-	if (xbi_fb_init(xbi) == B_FALSE)
+	if (xbi_fb_init(xbi, &bcons_dev) == B_FALSE)
 		return (console);
 
 	/* FB address is not set, fall back to serial terminal. */
-	if (fb_info.paddr == 0) {
+	if (fb_info.paddr == 0)
 		return (CONS_TTY);
-	}
 
-	fb_info.terminal.x = 80;
-	fb_info.terminal.y = 34;
+	fb_info.terminal.x = VGA_TEXT_COLS;
+	fb_info.terminal.y = VGA_TEXT_ROWS;
 	boot_fb_init(CONS_FRAMEBUFFER);
 
 	if (console == CONS_SCREEN_TEXT)
@@ -637,47 +615,6 @@ atoi(const char *p)
 		n += '0' - c; /* accum neg to avoid surprises at MAX */
 	}
 	return (neg ? n : -n);
-}
-
-static int
-set_vga_color(void)
-{
-	int color;
-	uint8_t tmp;
-/* BEGIN CSTYLED */
-/*                              Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
-	uint8_t dim_xlate[] = {  1,  5,  3,  7,  2,  6,  4,  8 };
-	uint8_t brt_xlate[] = {  9, 13, 11, 15, 10, 14, 12,  0 };
-	uint8_t solaris_color_to_pc_color[16] = {
-		15, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
-	};
-/* END CSTYLED */
-
-	/*
-	 * Now we have two principal cases, black on white and white on black.
-	 * And we have possible inverse to switch them, and we want to
-	 * follow the tem logic to set VGA TEXT color. FB will take care
-	 * of itself in boot_fb.c
-	 */
-	if (fb_info.inverse == B_TRUE ||
-	    fb_info.inverse_screen == B_TRUE) {
-		tmp = dim_xlate[fb_info.fg_color];
-		color = solaris_color_to_pc_color[tmp] << 4;
-		tmp = brt_xlate[fb_info.bg_color];
-		color |= solaris_color_to_pc_color[tmp];
-		return (color);
-	}
-
-	/* use bright white for background */
-	if (fb_info.bg_color == 7)
-		tmp = brt_xlate[fb_info.bg_color];
-	else
-		tmp = dim_xlate[fb_info.bg_color];
-
-	color = solaris_color_to_pc_color[tmp] << 4;
-	tmp = dim_xlate[fb_info.fg_color];
-	color |= solaris_color_to_pc_color[tmp];
-	return (color);
 }
 
 static void
@@ -744,8 +681,6 @@ bcons_init_fb(void)
 			fb_info.cursor.pos.x = intval;
 	}
 #endif
-
-	cons_color = set_vga_color();
 }
 
 /*
@@ -910,7 +845,7 @@ bcons_init(struct xboot_info *xbi)
 		kb_init();
 		break;
 	case CONS_SCREEN_TEXT:
-		boot_vga_init(cons_color);
+		boot_vga_init(&bcons_dev);
 		/* Fall through */
 	default:
 		kb_init();
@@ -1099,6 +1034,182 @@ serial_ischar(void)
 }
 
 static void
+btem_control(btem_state_t *btem, int c)
+{
+	int y, rows, cols;
+
+	rows = fb_info.cursor.pos.y;
+	cols = fb_info.cursor.pos.x;
+
+	btem->btem_state = A_STATE_START;
+	switch (c) {
+	case A_BS:
+		bcons_dev.bd_setpos(rows, cols - 1);
+		break;
+
+	case A_HT:
+		cols += 8 - (cols % 8);
+		if (cols >= fb_info.terminal.x)
+			cols = fb_info.terminal.x - 1;
+		bcons_dev.bd_setpos(rows, cols);
+		break;
+
+	case A_CR:
+		bcons_dev.bd_setpos(rows, 0);
+		break;
+
+	case A_FF:
+		for (y = 0; y < fb_info.terminal.y; y++) {
+			bcons_dev.bd_setpos(y, 0);
+			bcons_dev.bd_eraseline();
+		}
+		bcons_dev.bd_setpos(0, 0);
+		break;
+
+	case A_ESC:
+		btem->btem_state = A_STATE_ESC;
+		break;
+
+	default:
+		bcons_dev.bd_putchar(c);
+		break;
+	}
+}
+
+/*
+ * if parameters [0..count - 1] are not set, set them to the value
+ * of newparam.
+ */
+static void
+btem_setparam(btem_state_t *btem, int count, int newparam)
+{
+	int i;
+
+	for (i = 0; i < count; i++) {
+		if (btem->btem_params[i] == -1)
+			btem->btem_params[i] = newparam;
+	}
+}
+
+static void
+btem_chkparam(btem_state_t *btem, int c)
+{
+	int rows, cols;
+
+	rows = fb_info.cursor.pos.y;
+	cols = fb_info.cursor.pos.x;
+	switch (c) {
+	case '@':			/* insert char */
+		btem_setparam(btem, 1, 1);
+		bcons_dev.bd_shift(btem->btem_params[0]);
+		break;
+
+	case 'A':			/* cursor up */
+		btem_setparam(btem, 1, 1);
+		bcons_dev.bd_setpos(rows - btem->btem_params[0], cols);
+		break;
+
+	case 'B':			/* cursor down */
+		btem_setparam(btem, 1, 1);
+		bcons_dev.bd_setpos(rows + btem->btem_params[0], cols);
+		break;
+
+	case 'C':			/* cursor right */
+		btem_setparam(btem, 1, 1);
+		bcons_dev.bd_setpos(rows, cols + btem->btem_params[0]);
+		break;
+
+	case 'D':			/* cursor left */
+		btem_setparam(btem, 1, 1);
+		bcons_dev.bd_setpos(rows, cols - btem->btem_params[0]);
+		break;
+
+	case 'K':
+		bcons_dev.bd_eraseline();
+		break;
+	default:
+		/* bcons_dev.bd_putchar(c); */
+		break;
+	}
+	btem->btem_state = A_STATE_START;
+}
+
+static void
+btem_getparams(btem_state_t *btem, int c)
+{
+	if (isdigit(c)) {
+		btem->btem_paramval = btem->btem_paramval * 10 + c - '0';
+		btem->btem_gotparam = B_TRUE;
+		return;
+	}
+
+	if (btem->btem_curparam < BTEM_MAXPARAMS) {
+		if (btem->btem_gotparam == B_TRUE) {
+			btem->btem_params[btem->btem_curparam] =
+			    btem->btem_paramval;
+		}
+		btem->btem_curparam++;
+	}
+
+	if (c == ';') {
+		/* Restart parameter search */
+		btem->btem_gotparam = B_FALSE;
+		btem->btem_paramval = 0;
+	} else {
+		btem_chkparam(btem, c);
+	}
+}
+
+/* Simple boot terminal parser. */
+static void
+btem_parse(btem_state_t *btem, int c)
+{
+	int i;
+
+	/* Normal state? */
+	if (btem->btem_state == A_STATE_START) {
+		if (c == A_CSI || c < ' ')
+			btem_control(btem, c);
+		else
+			bcons_dev.bd_putchar(c);
+		return;
+	}
+
+	/* In <ESC> sequence */
+	if (btem->btem_state != A_STATE_ESC) {
+		btem_getparams(btem, c);
+		return;
+	}
+
+	/* Previous char was <ESC> */
+	switch (c) {
+	case '[':
+		btem->btem_curparam = 0;
+		btem->btem_paramval = 0;
+		btem->btem_gotparam = B_FALSE;
+		/* clear the parameters */
+		for (i = 0; i < BTEM_MAXPARAMS; i++)
+			btem->btem_params[i] = -1;
+		btem->btem_state = A_STATE_CSI;
+		return;
+
+	case 'Q':	/* <ESC>Q */
+	case 'C':	/* <ESC>C */
+		btem->btem_state = A_STATE_START;
+		return;
+
+	default:
+		btem->btem_state = A_STATE_START;
+		break;
+	}
+
+	if (c < ' ')
+		btem_control(btem, c);
+	else
+		bcons_dev.bd_putchar(c);
+}
+
+static void
 _doputchar(int device, int c)
 {
 	switch (device) {
@@ -1106,10 +1217,10 @@ _doputchar(int device, int c)
 		serial_putchar(c);
 		return;
 	case CONS_SCREEN_TEXT:
-		screen_putchar(c);
-		return;
 	case CONS_FRAMEBUFFER:
-		boot_fb_putchar(c);
+		bcons_dev.bd_cursor(B_FALSE);
+		btem_parse(&boot_tem, c);
+		bcons_dev.bd_cursor(B_TRUE);
 		return;
 	case CONS_SCREEN_GRAPHICS:
 #if !defined(_BOOT)
@@ -1124,8 +1235,6 @@ _doputchar(int device, int c)
 void
 bcons_putchar(int c)
 {
-	static int bhcharpos = 0;
-
 #if defined(__xpv)
 	if (!DOMAIN_IS_INITDOMAIN(xen_info) ||
 	    console == CONS_HYPERVISOR) {
@@ -1134,33 +1243,11 @@ bcons_putchar(int c)
 	}
 #endif /* __xpv */
 
-	if (c == '\t') {
-		do {
-			_doputchar(console, ' ');
-			if (diag != console)
-				_doputchar(diag, ' ');
-		} while (++bhcharpos % 8);
-		return;
-	} else  if (c == '\n' || c == '\r') {
-		bhcharpos = 0;
-		if (console != CONS_FRAMEBUFFER)
-			_doputchar(console, '\r');
-		if (diag != console && diag != CONS_FRAMEBUFFER)
+	if (c == '\n') {
+		_doputchar(console, '\r');
+		if (diag != console)
 			_doputchar(diag, '\r');
-		_doputchar(console, c);
-		if (diag != console)
-			_doputchar(diag, c);
-		return;
-	} else if (c == '\b') {
-		if (bhcharpos)
-			bhcharpos--;
-		_doputchar(console, c);
-		if (diag != console)
-			_doputchar(diag, c);
-		return;
 	}
-
-	bhcharpos++;
 	_doputchar(console, c);
 	if (diag != console)
 		_doputchar(diag, c);

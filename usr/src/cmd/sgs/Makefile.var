@@ -21,16 +21,17 @@
 
 #
 # Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 # The link-editor related source files and Makefile files have at times been
 # unified across all presently maintained release gates.  However, some of the
 # compiler pre-processor flags and link-editor flags are different among the
-# releases.  This file is used to specify such flags. 
-# 
+# releases.  This file is used to specify such flags.
+#
 # This file is included by ./Makefile.com, but may also be included directly in
 # the case where the utility is relying on the contents of ../../Makefile.com.
-# 
+#
 # This file should be the only file which is different among the presently
 # maintained release workspaces, when the sources are unified.
 #
@@ -40,7 +41,7 @@
 # Some source files need to use #ifdef to distinguish between the patch release,
 # and for the packages targeting to the pre-libc/libthread unified environment.
 # These values are available for CPPFLAGS:
-#	
+#
 #	SGS_PRE_UNIFIED_PROCESS
 #
 #		is set if the target release is for pre-libc/libthread unified
@@ -49,7 +50,6 @@
 #
 # Common Macro definitions
 #
-VAR_LINTFLAGS64=	-m64
 
 VAR_PLAT_sparc=		sparc
 VAR_PLAT_i386=		intel/ia32

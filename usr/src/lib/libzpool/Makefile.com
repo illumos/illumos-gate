@@ -66,8 +66,8 @@ $(LIBS): ../common/zfs.h
 CSTD=	$(CSTD_GNU99)
 C99LMODE=	-Xc99=%all
 
-CFLAGS +=	-g $(CCVERBOSE) $(CNOGLOBAL)
-CFLAGS64 +=	-g $(CCVERBOSE)	$(CNOGLOBAL)
+CFLAGS +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
+CFLAGS64 +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
 LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lsysevent -lmd \
 		-lfakekernel
 CPPFLAGS.first =	-I$(SRC)/lib/libfakekernel/common

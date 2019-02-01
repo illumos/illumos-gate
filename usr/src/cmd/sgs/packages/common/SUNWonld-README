@@ -71,7 +71,7 @@ SUNWonld - link-editors development package.
 	http://sunsoftpatch.eng
 
     If it has been obsoleted, the patch will be in:
-    
+
         /net/on${RELEASE}-patch/on${RELEASE}/patches/${MACH}/obsolete
 
 
@@ -146,7 +146,7 @@ plus:
     4158744 patch 103627-02 causes core when RPATH has blank entry and
 	    dlopen/dlclose is used
 are incorporated in the following patches:
-	Solaris/SunOS 5.5.1_sparc	patch 103627-13	
+	Solaris/SunOS 5.5.1_sparc	patch 103627-13
 	Solaris/SunOS 5.5.1_x86		patch 103628-12
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
@@ -459,7 +459,7 @@ All the above changes are incorporated in the following patches:
 4497270 The -zredlocsym option should not eliminate partially initialized local
 	symbols
 4496963 dumping an object with crle(1) that uses $ORIGIN can loose its
-	dependencies 
+	dependencies
 4499413 Sun linker orders of magnitude slower than gnu linker
 4461760 lazy loading libXm and libXt can fail.
 4469031 The partial initialized (local) symbols for intel platform is not
@@ -649,7 +649,7 @@ Bugid   Risk Synopsis
 4765536 crle: symbolic links can confuse alternative object configuration info
 4766815 ld -r of object the TLS data fails
 4770484 elfdump can not handle stripped archive file
-4770494 The ld command gives improper error message handling broken archive 
+4770494 The ld command gives improper error message handling broken archive
 4775738 overwriting output relocation table when 'ld -zignore' is used
 4778247 elfdump -e of core files fails
 4779976 elfdump dies on bad relocation entries
@@ -722,7 +722,7 @@ All the above changes are incorporated in the following patches:
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.9_sparc		patch T112963-09
-	Solaris/SunOS 5.9_x86  		patch T113986-05
+	Solaris/SunOS 5.9_x86		patch T113986-05
 	Solaris/SunOS 5.8_sparc		patch T109147-25
 	Solaris/SunOS 5.8_x86		patch T109148-25
 --------------------------------------------------------------------------------
@@ -806,7 +806,7 @@ Bugid   Risk Synopsis
 4955802 /usr/ccs/bin/ld dumps core in process_reld()
 4964415 elfdump issues wrong relocation error message
 4966465 LD_NOAUXFLTR fails when object is both a standard and auxiliary filter
-4973865 the link-editor does not scale properly when linking objects with 
+4973865 the link-editor does not scale properly when linking objects with
 	lots of syms
 4975598 SHT_SUNW_ANNOTATE section relocation not resolved
 4974828 nss_files nss_compat r_mt tests randomly segfaulting
@@ -935,7 +935,7 @@ All the above changes are incorporated in the following patches:
 6195521 64-bit moe(1) missed the train
 6198358 AMD64: bad eh_frame_hdr data when C and C++ mixed in a.out
 6204123 ld.so.1: symbol lookup fails even after lazy loading fallback
-6207495 UNIX98/UNIX03 vsx namespace violation DYNL.hdr/misc/dlfcn/T.dlfcn 
+6207495 UNIX98/UNIX03 vsx namespace violation DYNL.hdr/misc/dlfcn/T.dlfcn
 	14 Failed
 6217285 ctfmerge crashed during full onnv build
 --------------------------------------------------------------------------------
@@ -1350,7 +1350,7 @@ Bugid   Risk Synopsis
 	PSARC/2007/026 ELF symbol sort sections
 6518480 ld -melf_i386 doesn't complain (D)
 6519951 bfu is just another word for exit today (RPATH -> RUNPATH conversion
-	bites us) (D) 
+	bites us) (D)
 6521504 ld: hardware capabilities processing from relocatables objects needs
 	hardening.
 6518322 Some ELF utilities need updating for .SUNW_ldynsym section (D)
@@ -1661,3 +1661,4 @@ Bugid   Risk Synopsis
 7323	ld(1) -zignore can erroneously discard init and fini arrays as unreferenced
 7594	ld -zaslr should accept Solaris-compatible values
 8616	ld has trouble parsing -z options specified with -Wl
+10267	ld and GCC disagree about i386 local dynamic TLS

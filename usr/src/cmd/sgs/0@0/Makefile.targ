@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 pics/%.o:	../common/%.c
@@ -41,7 +40,3 @@ include		$(SRC)/lib/Makefile.targ
 
 delete:
 		$(RM) $(DYNLIB)
-
-lint:
-		perl ../../tools/lint_hdr.pl 0@0.so.1	> $(LINTOUT)
-		$(LINT.c) $(SRCS)			2>&1 | tee -a $(LINTOUT)

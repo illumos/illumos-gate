@@ -22,6 +22,7 @@
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 RackTop Systems.
 # Copyright 2017 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/cmd/Makefile.cmd
@@ -92,7 +93,7 @@ POFILES=	$(POSUBDIRS:%=%/%.po)
 MSGSUBDIRS=	ld		ldd		libld		liblddbg \
 		libldstab	librtld		rtld		libelf \
 		ldprof		libcrle		pvs		elfdump	\
-		elfedit		crle		moe 		lari \
+		elfedit		crle		moe		lari \
 		librtld_db	elfwrap		ar
 
 MSGDIR=		messages
@@ -146,7 +147,7 @@ install_lib:	FRC
 		@ cd lex; pwd; $(MAKE) $@
 		@ cd yacc; pwd; $(MAKE) $@
 
-lint:		$(SUBDIRS)
+lint:
 
 delete \
 clean clobber:	native-clobber .WAIT $(SUBDIRS) $(MSGDIR)
@@ -181,7 +182,7 @@ FRC:
 # and tweak the file globs slightly.
 #
 XRPRUNE=	rtld.4.x packages abi
-XRADD=		*.msg mapfile* llib-[a-z]*
+XRADD=		*.msg mapfile*
 XRDEL=		Makefile* kobj_*
 
 #

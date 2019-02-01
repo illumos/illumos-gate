@@ -20,23 +20,22 @@
 #
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/Makefile.master
-
-LINTLOG=	../lint.$(MACH).log
 
 PKGARCHIVE=	.
 DATAFILES=	copyright prototype_com prototype_$(MACH) postinstall \
 		preremove depend checkinstall
 README=		SUNWonld-README
 FILES=		$(DATAFILES) pkginfo
-PACKAGE= 	SUNWonld
+PACKAGE=	SUNWonld
 ROOTONLD=	$(ROOT)/opt/SUNWonld
 ROOTREADME=	$(README:%=$(ROOTONLD)/%)
 
-CLEANFILES=	$(FILES) awk_pkginfo ../bld_awk_pkginfo $(LINTLOG)
-CLOBBERFILES=	$(PACKAGE) $(LINTLOG).bak
+CLEANFILES=	$(FILES) awk_pkginfo ../bld_awk_pkginfo
+CLOBBERFILES=	$(PACKAGE)
 
 ../%:		../common/%.ksh
 		$(RM) $@

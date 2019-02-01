@@ -47,13 +47,7 @@ CSTD= $(CSTD_GNU99)
 
 LDLIBS += -lsmbfs
 
-CPPFLAGS += -I$(SRC)/uts/common -I$(SRC)/lib/libsmbfs 
-
-# uncomment these for dbx debugging
-#COPTFLAG = -g
-#CTF_FLAGS =
-#CTFCONVERT_O=
-#CTFMERGE_LIB=
+CPPFLAGS += -I$(SRC)/uts/common -I$(SRC)/lib/libsmbfs
 
 .KEEP_STATE:
 
@@ -67,5 +61,5 @@ install:	$(ROOTLIBFSTYPEPROG)
 
 lint:	lint_SRCS
 
-clean:     
+clean:
 	$(RM) $(OBJS) $(POFILE)

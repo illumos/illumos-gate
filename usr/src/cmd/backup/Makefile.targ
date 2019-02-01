@@ -19,18 +19,15 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/backup/Makefile.targ
-#
 
 # support for debugging
 debug:=		DUMPLIB= libdump_g.a
-debug:=		CFLAGS= -g $(XESS) -DDEBUG -DFDEBUG -DTDEBUG ${SBFLAGS}
+debug:=		CFLAGS= $(CCGDEBUG) $(XESS) -DDEBUG -DFDEBUG -DTDEBUG ${SBFLAGS}
 CFLAGS +=	$(XSTRCONST)
 DEBUGDIR=	.debug
 DEBUGOBJS=	$(OBJECTS:%=$(DEBUGDIR)/%)

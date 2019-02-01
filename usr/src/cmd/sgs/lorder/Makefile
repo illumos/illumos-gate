@@ -22,16 +22,14 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/sgs/lorder/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 PROG=		lorder
 
 SRCS=		$(PROG:%=%.sh)
 
-include 	$(SRC)/cmd/Makefile.cmd
+include		$(SRC)/cmd/Makefile.cmd
 include		$(SRC)/cmd/sgs/Makefile.com
 
 .KEEP_STATE:
@@ -41,7 +39,5 @@ all:		$(PROG)
 install:	all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
 
 clean:
-
-lint:
 
 include		../../Makefile.targ

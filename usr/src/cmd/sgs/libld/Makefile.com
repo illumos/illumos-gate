@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 LIBRARY =	libld.a
 VERS =		.4
@@ -50,8 +51,7 @@ TOOLOBJS =	alist.o		assfail.o	findprime.o	string_table.o \
 		strhash.o
 AVLOBJ =	avl.o
 
-# Relocation engine objects. These are kept separate from the L_XXX_MACHOBJS
-# lists below in order to facilitate linting them.
+# Relocation engine objects.
 G_MACHOBJS32 =	doreloc_sparc_32.o doreloc_x86_32.o
 G_MACHOBJS64 =	doreloc_sparc_64.o doreloc_x86_64.o
 
@@ -64,7 +64,6 @@ E_X86_TOOLOBJS =	leb128.o
 L_X86_MACHOBJS32 =	machrel.intel32.o
 L_X86_MACHOBJS64 =	machrel.amd64.o
 
-
 # All target specific objects rolled together
 E_TOOLOBJS =	$(E_SPARC_TOOLOBJS) \
 	$(E_X86_TOOLOBJS)
@@ -72,7 +71,6 @@ L_MACHOBJS32 =	$(L_SPARC_MACHOBJS32) \
 	$(L_X86_MACHOBJS32)
 L_MACHOBJS64 =	$(L_SPARC_MACHOBJS64) \
 	$(L_X86_MACHOBJS64)
-
 
 
 BLTOBJ =	msg.o
@@ -83,8 +81,8 @@ OBJECTS =	$(BLTOBJ) $(G_MACHOBJS32) $(G_MACHOBJS64) \
 		$(COMOBJS) $(COMOBJS32) $(COMOBJS64) \
 		$(TOOLOBJS) $(E_TOOLOBJS) $(AVLOBJ) $(ELFCAPOBJ)
 
-include 	$(SRC)/lib/Makefile.lib
-include 	$(SRC)/cmd/sgs/Makefile.com
+include		$(SRC)/lib/Makefile.lib
+include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
 
@@ -109,9 +107,6 @@ CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRCBASE)/lib/libc/inc \
 		    $(VAR_LIBLD_CPPFLAGS)
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(ELFLIBDIR) -lelf $(DLLIB) -lc
-
-LINTFLAGS +=	-u -D_REENTRANT
-LINTFLAGS64 +=	-u -D_REENTRANT
 
 DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO) '-R$$ORIGIN'
 
@@ -144,33 +139,13 @@ CHKSRCS =	$(SRCBASE)/uts/common/krtld/reloc.h \
 		$(KRTLD_AMD64)/doreloc.c \
 		$(KRTLD_SPARC)/doreloc.c
 
-SRCS =		../common/llib-lld
 LIBSRCS =	$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
 		$(E_TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
 		$(COMOBJS:%.o=../common/%.c) \
 		$(AVLOBJS:%.o=$(VAR_AVLDIR)/%.c) \
 		$(BLTDATA)
 
-LINTSRCS =	$(LIBSRCS) ../common/lintsup.c
-LINTSRCS32 =	$(COMOBJS32:%32.o=../common/%.c) \
-		$(L_MACHOBJS32:%32.o=../common/%.c)
-LINTSRCS64 =	$(COMOBJS64:%64.o=../common/%.c) \
-		$(L_MACHOBJS64:%64.o=../common/%.c)
-
-# Add the shared relocation engine source files to the lint
-# sources and add the necessary command line options to lint them
-# correctly. Make can't derive the files since the source and object
-# names are not directly related
-$(LINTOUT32) :=	CPPFLAGS += -DDO_RELOC_LIBLD
-$(LINTOUT64) :=	CPPFLAGS += -DDO_RELOC_LIBLD -D_ELF64
-$(LINTLIB32) :=	CPPFLAGS += -DDO_RELOC_LIBLD
-$(LINTLIB64) :=	CPPFLAGS += -DDO_RELOC_LIBLD -D_ELF64
-LINTSRCS32 +=	$(KRTLD_I386)/doreloc.c	\
-		$(KRTLD_SPARC)/doreloc.c
-LINTSRCS64 +=	$(KRTLD_AMD64)/doreloc.c \
-		$(KRTLD_SPARC)/doreloc.c
-
-CLEANFILES +=	$(LINTOUTS) $(BLTFILES)
-CLOBBERFILES +=	$(DYNLIB) $(LINTLIBS) $(LIBLINKS)
+CLEANFILES +=	$(BLTFILES)
+CLOBBERFILES +=	$(DYNLIB) $(LIBLINKS)
 
 ROOTFS_DYNLIB =	$(DYNLIB:%=$(ROOTFS_LIBDIR)/%)

@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 pics/%.o:	../common/%.c
@@ -92,11 +93,6 @@ $(LIBLINKS):
 
 delete:
 		$(RM) $(DYNLIB)
-
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64) $(LINTLIB32) $(LINTLIB64)
-
-lint:		$(LINTLIB32) $(LINTOUT32) $(LINTLIB64) $(LINTOUT64) \
-		    .WAIT $(SGSLINTOUT)
 
 # Special target for native builds (ie. when we need to build a version of ld
 # to build a version of ld :-).

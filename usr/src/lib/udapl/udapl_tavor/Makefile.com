@@ -24,8 +24,8 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 
-LIBRARY=       	udapl_tavor.a
-VERS=          	.1
+LIBRARY=	udapl_tavor.a
+VERS=		.1
 
 LOCOBJS =	\
 	dapl_cno_create.o \
@@ -157,8 +157,6 @@ CERRWARN +=	-_gcc=-Wno-switch
 SMATCH=off
 
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDAPL_DBG
-debug := COPTFLAG = -g
-debug := COPTFLAG64 = -g
 
 .KEEP_STATE:
 

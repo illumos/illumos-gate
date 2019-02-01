@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 # Object lists are organized into primary (most frequently used code) and
@@ -73,7 +74,6 @@ ADBGENFLAGS +=	-mlp64
 ADBGENCFLAGS +=	-erroff=%all
 ADBSUB=		$(ADBSUB64)
 CPPFLAGS +=	-D_ELF64
-LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 SONAME=		/lib/sparcv9/ld.so.1
 
 SGSMSGTARG +=	$(SGSMSGSPARC) $(SGSMSGSPARC64) $(SGSMSG64)
@@ -91,8 +91,6 @@ CONVLIBDIR =	$(CONVLIBDIR64)
 all:		$(RTLD)
 
 install:	all $(ROOTDYNLIB64)
-
-lint:		$(LINTOUT64)
 
 adbmacros:	adb .WAIT $(ADBSCRIPTS)
 

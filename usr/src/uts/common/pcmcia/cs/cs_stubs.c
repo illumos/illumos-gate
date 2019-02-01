@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This is the PCMCIA Card Services kernel stubs module. It provides
  *	the various PCMCIA kernel framework entry points.
@@ -77,10 +75,10 @@ int cs_stubs_debug = 0;
 
 static csfunction_t *cardservices = NULL;
 static int do_cs_call = 0;
-static int cs_no_carservices(void);
+static int cs_no_carservices(int32_t, ...);
 
 #define	CardServices	(do_cs_call ? (*cardservices) :		\
-			((csfunction_t *)cs_no_carservices))
+			(cs_no_carservices))
 
 #ifdef	USE_CS_STUBS_MODULE
 
@@ -154,7 +152,7 @@ csx_register_cardservices(cs_register_cardservices_t *rcs)
 
 	    case CS_ENTRY_DEREGISTER:
 		do_cs_call = 0;
-		cardservices = (csfunction_t *)cs_no_carservices;
+		cardservices = cs_no_carservices;
 #ifdef	CS_STUBS_DEBUG
 	if (cs_stubs_debug > 2)
 	    cmn_err(CE_CONT,
@@ -1216,7 +1214,7 @@ csx_SetHandleOffset(acc_handle_t handle, uint32_t offset)
 }
 
 static int
-cs_no_carservices()
+cs_no_carservices(int32_t arg __unused, ...)
 {
 #ifdef	CS_STUBS_DEBUG
 	if (cs_stubs_debug > 3)

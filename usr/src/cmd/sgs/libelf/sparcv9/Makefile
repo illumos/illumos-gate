@@ -23,14 +23,13 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		../Makefile.com
 
 CONVLIBDIR=	$(CONVLIBDIR64)
 
-LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 MISCOBJS=	$(MISCOBJS64)
 
 .KEEP_STATE:

@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2016 RackTop Systems.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 pics/%.o:	../common/%.c
@@ -58,8 +59,8 @@ include		$(SRC)/cmd/sgs/Makefile.targ
 
 catalog:	$(BLTMESG)
 
-chkmsg:		$(LINTSRCS)
-		sh $(CHKMSG) $(CHKMSGFLAGS) $(LINTSRCS)
+chkmsg:		$(MSGSRCS)
+		sh $(CHKMSG) $(CHKMSGFLAGS) $(MSGSRCS)
 
 $(BLTDEFS) + \
 $(BLTDATA) + \

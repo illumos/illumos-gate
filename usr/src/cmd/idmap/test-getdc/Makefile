@@ -27,11 +27,11 @@ PROG =		test-getdc
 OBJS =		getdc_main.o
 
 SRCS =	$(OBJS:%.o=%.c)
-POFILES = 	$(OBJS:.o=.po)
+POFILES =	$(OBJS:.o=.po)
 
 include ../../Makefile.cmd
 
-POFILE = 	$(PROG)_all.po
+POFILE =	$(PROG)_all.po
 
 LDLIBS +=	-ladutils -lnsl -lumem
 LDFLAGS +=	-R'$$ORIGIN/../lib'
@@ -51,7 +51,7 @@ lint_SRCS :=	CPPFLAGS += $(INCS)
 all: $(PROG)
 
 $(PROG): $(OBJS) FRC
-	$(LINK.c) -g -o $@ $(OBJS) $(LDLIBS)
+	$(LINK.c) $(CCGDEBUG) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 $(POFILE): $(POFILES)

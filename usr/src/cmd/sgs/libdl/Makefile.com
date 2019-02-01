@@ -20,11 +20,10 @@
 #
 #
 # Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBRARY =	libdl.a
 VERS =		.1
 
 include		$(SRC)/lib/Makefile.rootfs
-
-LIBS +=		$(LINTLIB)

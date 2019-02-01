@@ -22,12 +22,10 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/sgs/size/sparcv9/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-include 	../Makefile.com
+include		../Makefile.com
 
 DEFLIST=	-DSPARC -DELF
 
@@ -42,8 +40,6 @@ VAR_SGSCCSLINK=	$(VAR_SGSCCSLINK64)
 
 package \
 install:	all $(ROOTPROG64) $(ROOTCCSBINLINK64)
-
-lint:		$(LINTOUT64) $(SGSLINTOUT)
 
 include		../Makefile.targ
 include		../../Makefile.sub.64

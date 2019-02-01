@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/developer/object-file@$(PKGVERS)
@@ -71,8 +72,6 @@ file path=usr/bin/symorder mode=0555
 file path=usr/bin/tsort mode=0555
 file path=usr/bin/unifdef mode=0555
 file path=usr/bin/yacc mode=0555
-file path=usr/lib/$(ARCH64)/llib-ll.ln
-file path=usr/lib/$(ARCH64)/llib-ly.ln
 file path=usr/lib/elfedit/$(ARCH64)/cap.so
 file path=usr/lib/elfedit/$(ARCH64)/dyn.so
 file path=usr/lib/elfedit/$(ARCH64)/ehdr.so
@@ -89,10 +88,6 @@ file path=usr/lib/elfedit/shdr.so
 file path=usr/lib/elfedit/str.so
 file path=usr/lib/elfedit/sym.so
 file path=usr/lib/elfedit/syminfo.so
-file path=usr/lib/llib-ll
-file path=usr/lib/llib-ll.ln
-file path=usr/lib/llib-ly
-file path=usr/lib/llib-ly.ln
 file path=usr/share/lib/ccs/gprof.callg.blurb mode=0444
 file path=usr/share/lib/ccs/gprof.flat.blurb mode=0444
 file path=usr/share/lib/ccs/nceucform
@@ -155,8 +150,6 @@ link path=usr/ccs/bin/tsort target=../../bin/tsort
 link path=usr/ccs/bin/unifdef target=../../bin/unifdef
 link path=usr/ccs/bin/yacc target=../../bin/yacc
 link path=usr/ccs/bin/yaccpar target=../../share/lib/ccs/yaccpar
-link path=usr/ccs/lib/llib-ll.ln target=../../lib/llib-ll.ln
-link path=usr/ccs/lib/llib-ly.ln target=../../lib/llib-ly.ln
 link path=usr/lib/elfedit/32 target=.
 link path=usr/lib/elfedit/64 target=$(ARCH64)
 depend fmri=developer/macro/cpp type=require

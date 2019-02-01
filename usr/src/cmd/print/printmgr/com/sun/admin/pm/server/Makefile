@@ -35,7 +35,7 @@ JNIHDR_FILES =	com_sun_admin_pm_server_DoPrinterNS.h
 
 OBJECTS =	DoPrinterNS.o NS.o
 
-CLASSFILES = 	Printer.class \
+CLASSFILES =	Printer.class \
 		Host.class \
 		SysCommand.class \
 		NameService.class \
@@ -111,7 +111,7 @@ $(JNIHDR_FILES): $(JNICLASSFILES)
 # Build standalone programs for testing
 #
 NS: NS.c
-	$(CC) NS.c -g $(ILDOFF) -o NS -DMAIN=1 $(ENVLDLIBS1) $(ENVLIBS2) \
+	$(CC) NS.c $(CCGDEBUG) $(ILDOFF) -o NS -DMAIN=1 $(ENVLDLIBS1) $(ENVLIBS2) \
 	    -lprint -lnsl -lsocket
 
 lint: $(JNIHDR_FILES) lintcheck

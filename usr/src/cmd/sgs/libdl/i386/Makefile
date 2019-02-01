@@ -22,12 +22,14 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 include		$(SRC)/lib/Makefile.filter.com
 include		../Makefile.com
 
 DYNFLAGS +=	-F /usr/lib/ld.so.1
 
-install:	all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install:	all $(ROOTLIBDIR) .WAIT $(ROOTLIBS) $(ROOTLINKS)
 
 include		$(SRC)/lib/Makefile.filter.targ

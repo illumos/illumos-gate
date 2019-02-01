@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 include		$(SRC)/cmd/sgs/librtld/Makefile.com
@@ -32,7 +33,5 @@ CPPFLAGS +=	-I../../../../uts/sparc/krtld
 all:		$(DYNLIB) $(LIBLINKS)
 
 install:	all $(ROOTFS_DYNLIB)
-
-lint:		$(LINTLIB) $(LINTOUT32) $(SGSLINTOUT)
 
 include		$(SRC)/cmd/sgs/librtld/Makefile.targ

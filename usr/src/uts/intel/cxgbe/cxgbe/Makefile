@@ -43,7 +43,7 @@ ALL_TARGET = $(BINARY)
 LINT_TARGET = $(MODULE).lint
 INSTALL_TARGET = $(BINARY) $(ROOTMODULE)
 
-CFLAGS += -g -I$(UTSBASE)/common/io/cxgbe -I$(UTSBASE)/common/io/cxgbe/common \
+CFLAGS += -I$(UTSBASE)/common/io/cxgbe -I$(UTSBASE)/common/io/cxgbe/common \
 	-I$(UTSBASE)/common/io/cxgbe/t4nex -I$(UTSBASE)/common/io/cxgbe/shared
 
 #

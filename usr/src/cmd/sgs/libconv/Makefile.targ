@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 pics/%.o:	../common/%.c
 		$(COMPILE.c) -o $@ $<
@@ -81,13 +83,8 @@ $(LIBRARY):	pics $$(PICS)
 		$(AR) $(ARFLAGS) $@ $(PICS)
 		$(POST_PROCESS_A)
 
-chkmsg:		$(LINTSRCS)
-		sh $(CHKMSG) $(CHKMSGFLAGS) $(LINTSRCS)
-
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64) $(LINTLIB32) $(LINTLIB64)
-
-lint:		$(LINTLIB32) $(LINTOUT32) $(LINTLIB64) $(LINTOUT64) \
-		    .WAIT $(SGSLINTOUT)
+chkmsg:		$(MSGSRCS)
+		sh $(CHKMSG) $(CHKMSGFLAGS) $(MSGSRCS)
 
 catalog:
 

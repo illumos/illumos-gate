@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 %.o:		../common/%.c
@@ -72,10 +72,6 @@ delete:
 
 install \
 package:	all $(ROOTPROG)
-
-.PARALLEL:	$(LINTOUT32) $(LINTOUT64)
-
-lint:		$(LINTOUT32) $(LINTOUT64) $(SGSLINTOUT)
 
 include		$(SRC)/cmd/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ

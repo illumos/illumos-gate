@@ -20,10 +20,10 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1994-2001 by Sun Microsystems, Inc.
 # All rights reserved.
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 .KEEP_STATE:
@@ -41,7 +41,5 @@ delete:
 		$(RM) $(PROG)
 
 install:	all
-
-lint:
 
 include		../../../Makefile.targ
