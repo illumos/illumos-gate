@@ -598,7 +598,7 @@ is_source_file(const char *path)
 {
 	char *ext = strrchr(path, '.');
 
-	if ((ext == NULL) || ((ext + 1) == '\0'))
+	if ((ext == NULL) || (*(ext + 1) == '\0'))
 		return (B_FALSE);
 
 	ext += 1;
