@@ -64,7 +64,6 @@ static int	bitmap_cons_clear(struct gfxp_fb_softc *,
     struct vis_consclear *);
 static void	bitmap_cons_cursor(struct gfxp_fb_softc *,
     struct vis_conscursor *);
-static uint32_t bitmap_color_map(uint8_t);
 static void	bitmap_polled_copy(struct vis_polledio_arg *,
     struct vis_conscopy *);
 static void	bitmap_polled_display(struct vis_polledio_arg *,
@@ -262,33 +261,6 @@ bitmap_setup_fb(struct gfxp_fb_softc *softc)
 	return (DDI_SUCCESS);
 }
 
-static uint32_t
-bitmap_color_map(uint8_t index)
-{
-	uint8_t c, mask;
-	uint32_t color = 0;
-
-	c = cmap4_to_24.red[index];
-	mask = (1 << fb_info.rgb.red.size) - 1;
-	c >>= 8 - fb_info.rgb.red.size;
-	c &= mask;
-	color |= c << fb_info.rgb.red.pos;
-
-	c = cmap4_to_24.green[index];
-	mask = (1 << fb_info.rgb.green.size) - 1;
-	c >>= 8 - fb_info.rgb.green.size;
-	c &= mask;
-	color |= c << fb_info.rgb.green.pos;
-
-	c = cmap4_to_24.blue[index];
-	mask = (1 << fb_info.rgb.blue.size) - 1;
-	c >>= 8 - fb_info.rgb.blue.size;
-	c &= mask;
-	color |= c << fb_info.rgb.blue.pos;
-
-	return (color);
-}
-
 static int
 bitmap_devinit(struct gfxp_fb_softc *softc, struct vis_devinit *data)
 {
@@ -307,7 +279,7 @@ bitmap_devinit(struct gfxp_fb_softc *softc, struct vis_devinit *data)
 	data->width = console->fb.screen.x;
 	data->height = console->fb.screen.y;
 	data->linebytes = console->fb.pitch;
-	data->color_map = bitmap_color_map;
+	data->color_map = boot_color_map;
 	data->depth = console->fb.depth;
 	data->mode = VIS_PIXEL;
 	data->polledio = &softc->polledio;
@@ -467,7 +439,7 @@ bitmap_cons_clear(struct gfxp_fb_softc *softc, struct vis_consclear *ca)
 
 	console = softc->console;
 	pitch = console->fb.pitch;
-	data = bitmap_color_map(ca->bg_color);
+	data = boot_color_map(ca->bg_color);
 	switch (console->fb.depth) {
 	case 8:
 		for (i = 0; i < console->fb.screen.y; i++) {

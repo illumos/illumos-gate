@@ -36,6 +36,7 @@
 
 #define	P2ROUNDUP(x, align)	(-(-(x) & -(align)))
 #define	MIN(a, b)		((a) < (b) ? (a) : (b))
+#define	nitems(x)		(sizeof ((x)) / sizeof ((x)[0]))
 
 /*
  * Simplified visual_io data structures from visual_io.h
@@ -354,50 +355,45 @@ boot_get_color(uint32_t *fg, uint32_t *bg)
 	/* ansi to solaris colors, see also boot_console.c */
 	if (fb_info.inverse == B_TRUE ||
 	    fb_info.inverse_screen == B_TRUE) {
-		*bg = dim_xlate[fb_info.fg_color];
-		*fg = brt_xlate[fb_info.bg_color];
-	} else {
-		if (fb_info.bg_color == 7)
-			*bg = brt_xlate[fb_info.bg_color];
+		if (fb_info.fg_color < 16)
+			*bg = dim_xlate[fb_info.fg_color];
 		else
-			*bg = dim_xlate[fb_info.bg_color];
-		*fg = dim_xlate[fb_info.fg_color];
+			*bg = fb_info.fg_color;
+
+		if (fb_info.bg_color < 16)
+			*fg = brt_xlate[fb_info.bg_color];
+		else
+			*fg = fb_info.bg_color;
+	} else {
+		if (fb_info.bg_color < 16) {
+			if (fb_info.bg_color == 7)
+				*bg = brt_xlate[fb_info.bg_color];
+			else
+				*bg = dim_xlate[fb_info.bg_color];
+		} else {
+			*bg = fb_info.bg_color;
+		}
+		if (fb_info.fg_color < 16)
+			*fg = dim_xlate[fb_info.fg_color];
+		else
+			*fg = fb_info.fg_color;
 	}
 }
 
 /*
  * Map indexed color to RGB value.
  */
-static uint32_t
+uint32_t
 boot_color_map(uint8_t index)
 {
-	uint8_t c;
-	int pos, size;
-	uint32_t color;
+	if (fb_info.fb_type != FB_TYPE_RGB) {
+		if (index < nitems(solaris_color_to_pc_color))
+			return (solaris_color_to_pc_color[index]);
+		else
+			return (index);
+	}
 
-	/* 8bit depth is for indexed colors */
-	if (fb_info.depth == 8)
-		return (index);
-
-	if (index >= sizeof (cmap4_to_24.red))
-		index = 0;
-
-	c = cmap4_to_24.red[index];
-	pos = fb_info.rgb.red.pos;
-	size = fb_info.rgb.red.size;
-	color = ((c >> 8 - size) & ((1 << size) - 1)) << pos;
-
-	c = cmap4_to_24.green[index];
-	pos = fb_info.rgb.green.pos;
-	size = fb_info.rgb.green.size;
-	color |= ((c >> 8 - size) & ((1 << size) - 1)) << pos;
-
-	c = cmap4_to_24.blue[index];
-	pos = fb_info.rgb.blue.pos;
-	size = fb_info.rgb.blue.size;
-	color |= ((c >> 8 - size) & ((1 << size) - 1)) << pos;
-
-	return (color);
+	return (rgb_color_map(&fb_info.rgb, index));
 }
 
 /* set up out simple console. */

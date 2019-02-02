@@ -1183,7 +1183,6 @@ tem_setparam(struct tem_vt_state *tem, int count, int newparam)
 	}
 }
 
-
 /*
  * select graphics mode based on the param vals stored in a_params
  */
@@ -1265,6 +1264,32 @@ tem_selgraph(struct tem_vt_state *tem)
 			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
 			break;
 
+		case 38:
+			/* We should have at least 3 parameters */
+			if (curparam < 3)
+				break;
+
+			/*
+			 * 256 and truecolor needs depth at least 24, but
+			 * we still need to process the sequence.
+			 */
+			count++;
+			curparam--;
+			param = tem->tvs_params[count];
+			switch (param) {
+			case 5:	/* 256 colors */
+				count++;
+				curparam--;
+				if (tems.ts_pdepth < 24)
+					break;
+				tem->tvs_fg_color = tem->tvs_params[count];
+				tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
+				break;
+			default:
+				break;
+			}
+			break;
+
 		case 39:
 			/*
 			 * Reset the foreground colour and brightness.
@@ -1286,6 +1311,32 @@ tem_selgraph(struct tem_vt_state *tem)
 		case 47: /* white	(bright white)	background */
 			tem->tvs_bg_color = param - 40;
 			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
+			break;
+
+		case 48:
+			/* We should have at least 3 parameters */
+			if (curparam < 3)
+				break;
+
+			/*
+			 * 256 and truecolor needs depth at least 24, but
+			 * we still need to process the sequence.
+			 */
+			count++;
+			curparam--;
+			param = tem->tvs_params[count];
+			switch (param) {
+			case 5:	/* 256 colors */
+				count++;
+				curparam--;
+				if (tems.ts_pdepth < 24)
+					break;
+				tem->tvs_bg_color = tem->tvs_params[count];
+				tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
+				break;
+			default:
+				break;
+			}
 			break;
 
 		case 49:
@@ -2233,6 +2284,9 @@ tem_pix_bit2pix(struct tem_vt_state *tem, term_char_t c)
 	void (*fp)(struct tem_vt_state *, tem_char_t,
 	    unsigned char, unsigned char);
 
+	fg = DEFAULT_ANSI_FOREGROUND;
+	bg = DEFAULT_ANSI_BACKGROUND;
+
 	tem_get_color(&fg, &bg, c);
 	switch (tems.ts_pdepth) {
 	case 4:
@@ -2334,6 +2388,8 @@ tem_cls(struct tem_vt_state *tem)
 	    TEM_ATTR_SCREEN_REVERSE);
 	c.tc_char = TEM_ATTR(attr);
 
+	fg_color = DEFAULT_ANSI_FOREGROUND;
+	bg_color = DEFAULT_ANSI_BACKGROUND;
 	tem_get_color(&fg_color, &bg_color, c);
 	cl.bg_color = bg_color;
 	(void)tems_cls(&cl);
@@ -2587,6 +2643,8 @@ tem_pix_cursor(struct tem_vt_state *tem, short action)
 	    TEM_ATTR_REVERSE);
 	c.tc_char = TEM_ATTR(attr);
 
+	fg = DEFAULT_ANSI_FOREGROUND;
+	bg = DEFAULT_ANSI_BACKGROUND;
 	tem_get_color(&fg, &bg, c);
 
 	switch (tems.ts_pdepth) {
@@ -2733,15 +2791,24 @@ tem_get_attr(struct tem_vt_state *tem, text_color_t *fg,
 static void
 tem_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
 {
-	if (TEM_CHAR_ATTR(c.tc_char) & (TEM_ATTR_BRIGHT_FG | TEM_ATTR_BOLD))
-		*fg = brt_xlate[c.tc_fg_color];
-	else
-		*fg = dim_xlate[c.tc_fg_color];
+	if (c.tc_fg_color < 16) {
+		if (TEM_CHAR_ATTR(c.tc_char) &
+		    (TEM_ATTR_BRIGHT_FG | TEM_ATTR_BOLD))
+			*fg = brt_xlate[c.tc_fg_color];
+		else
+			*fg = dim_xlate[c.tc_fg_color];
+	} else {
+		*fg = c.tc_fg_color;
+	}
 
-	if (TEM_CHAR_ATTR(c.tc_char) & TEM_ATTR_BRIGHT_BG)
-		*bg = brt_xlate[c.tc_bg_color];
-	else
-		*bg = dim_xlate[c.tc_bg_color];
+	if (c.tc_bg_color < 16) {
+		if (TEM_CHAR_ATTR(c.tc_char) & TEM_ATTR_BRIGHT_BG)
+			*bg = brt_xlate[c.tc_bg_color];
+		else
+			*bg = dim_xlate[c.tc_bg_color];
+	} else {
+		*bg = c.tc_bg_color;
+	}
 }
 
 void

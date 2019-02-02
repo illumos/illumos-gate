@@ -87,6 +87,69 @@ const text_cmap_t cmap4_to_24 = {
 };
 /* END CSTYLED */
 
+static uint32_t
+rgb_to_color(const rgb_t *rgb, uint8_t r, uint8_t g, uint8_t b)
+{
+	uint32_t color;
+	int pos, size;
+
+	pos = rgb->red.pos;
+	size = rgb->red.size;
+	color = ((r >> (8 - size)) & ((1 << size) - 1)) << pos;
+
+	pos = rgb->green.pos;
+	size = rgb->green.size;
+	color |= ((g >> (8 - size)) & ((1 << size) - 1)) << pos;
+
+	pos = rgb->blue.pos;
+	size = rgb->blue.size;
+	color |= ((b >> (8 - size)) & ((1 << size) - 1)) << pos;
+
+	return (color);
+}
+
+uint32_t
+rgb_color_map(const rgb_t *rgb, uint8_t index)
+{
+	uint32_t color, code, gray, level;
+
+	if (index < 16) {
+		color = rgb_to_color(rgb, cmap4_to_24.red[index],
+		    cmap4_to_24.green[index], cmap4_to_24.blue[index]);
+		return (color);
+	}
+
+	/* 6x6x6 color cube */
+	if (index > 15 && index < 232) {
+		uint32_t red, green, blue;
+
+		for (red = 0; red < 6; red++) {
+			for (green = 0; green < 6; green++) {
+				for (blue = 0; blue < 6; blue++) {
+					code = 16 + (red * 36) +
+					    (green * 6) + blue;
+					if (code != index)
+						continue;
+					red = red ? (red * 40 + 55) : 0;
+					green = green ? (green * 40 + 55) : 0;
+					blue = blue ? (blue * 40 + 55) : 0;
+					color = rgb_to_color(rgb, red, green,
+					    blue);
+					return (color);
+				}
+			}
+		}
+	}
+
+	/* colors 232-255 are a grayscale ramp */
+	for (gray = 0; gray < 24; gray++) {
+		level = (gray * 10) + 8;
+		code = 232 + gray;
+		if (code == index)
+			break;
+	}
+	return (rgb_to_color(rgb, level, level, level));
+}
 /*
  * Fonts are statically linked with this module. At some point an
  * RFE might be desireable to allow dynamic font loading.  The

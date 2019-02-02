@@ -32,6 +32,7 @@
 #include <sys/visual_io.h>
 #include <sys/multiboot2.h>
 #include <sys/font.h>
+#include <sys/rgb.h>
 #include <sys/endian.h>
 #include <gfx_fb.h>
 #include <pnglite.h>
@@ -156,9 +157,7 @@ gfx_parse_mode_str(char *str, int *x, int *y, int *depth)
 uint32_t
 gfx_fb_color_map(uint8_t index)
 {
-	uint8_t c;
-	int pos, size;
-	uint32_t color;
+	rgb_t rgb;
 
 	if (gfx_fb.framebuffer_common.framebuffer_type !=
 	    MULTIBOOT_FRAMEBUFFER_TYPE_RGB) {
@@ -168,22 +167,16 @@ gfx_fb_color_map(uint8_t index)
 			return (index);
 	}
 
-	c = cmap4_to_24.red[index];
-	pos = gfx_fb.u.fb2.framebuffer_red_field_position;
-	size = gfx_fb.u.fb2.framebuffer_red_mask_size;
-	color = ((c >> (8 - size)) & ((1 << size) - 1)) << pos;
+	rgb.red.pos = gfx_fb.u.fb2.framebuffer_red_field_position;
+	rgb.red.size = gfx_fb.u.fb2.framebuffer_red_mask_size;
 
-	c = cmap4_to_24.green[index];
-	pos = gfx_fb.u.fb2.framebuffer_green_field_position;
-	size = gfx_fb.u.fb2.framebuffer_green_mask_size;
-	color |= ((c >> (8 - size)) & ((1 << size) - 1)) << pos;
+	rgb.green.pos = gfx_fb.u.fb2.framebuffer_green_field_position;
+	rgb.green.size = gfx_fb.u.fb2.framebuffer_green_mask_size;
 
-	c = cmap4_to_24.blue[index];
-	pos = gfx_fb.u.fb2.framebuffer_blue_field_position;
-	size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
-	color |= ((c >> (8 - size)) & ((1 << size) - 1)) << pos;
+	rgb.blue.pos = gfx_fb.u.fb2.framebuffer_blue_field_position;
+	rgb.blue.size = gfx_fb.u.fb2.framebuffer_blue_mask_size;
 
-	return (color);
+	return (rgb_color_map(&rgb, index));
 }
 
 static bool
@@ -228,12 +221,17 @@ color_name_to_ansi(const char *name, int *val)
 static int
 gfx_set_colors(struct env_var *ev, int flags, const void *value)
 {
-	int val = 0;
+	int val = 0, limit;
 	char buf[2];
 	const void *evalue;
 
 	if (value == NULL)
 		return (CMD_OK);
+
+	if (gfx_fb.framebuffer_common.framebuffer_bpp < 24)
+		limit = 7;
+	else
+		limit = 255;
 
 	if (color_name_to_ansi(value, &val)) {
 		snprintf(buf, sizeof (buf), "%d", val);
@@ -245,16 +243,18 @@ gfx_set_colors(struct env_var *ev, int flags, const void *value)
 		val = (int)strtol(value, &end, 0);
 		if (errno != 0 || *end != '\0') {
 			printf("Allowed values are either ansi color name or "
-			    "number from range [0-7].\n");
+			    "number from range [0-7]%s.\n",
+			    limit == 7 ? "" : " or [16-255]");
 			return (CMD_OK);
 		}
 		evalue = value;
 	}
 
 	/* invalid value? */
-	if (val < 0 || val > 7) {
+	if ((val < 0 || val > limit) || (val > 7 && val < 16)) {
 		printf("Allowed values are either ansi color name or "
-		    "number from range [0-7].\n");
+		    "number from range [0-7]%s.\n",
+		    limit == 7 ? "" : " or [16-255]");
 		return (CMD_OK);
 	}
 
@@ -314,7 +314,7 @@ gfx_set_inverses(struct env_var *ev, int flags, const void *value)
 void
 gfx_framework_init(struct visual_ops *fb_ops)
 {
-	int rc;
+	int rc, limit;
 	char *env, buf[2];
 #if	defined(EFI)
 	extern EFI_GRAPHICS_OUTPUT *gop;
@@ -325,6 +325,11 @@ gfx_framework_init(struct visual_ops *fb_ops)
 		gfx_fb_ops.gfx_cons_display = gfx_gop_cons_display;
 	}
 #endif
+
+	if (gfx_fb.framebuffer_common.framebuffer_bpp < 24)
+		limit = 7;
+	else
+		limit = 255;
 
 	/* Add visual io callbacks */
 	fb_ops->cons_clear = gfx_fb_cons_clear;
@@ -366,7 +371,7 @@ gfx_framework_init(struct visual_ops *fb_ops)
 	env = getenv("tem.fg_color");
 	if (env != NULL) {
 		rc = (int)strtol(env, NULL, 0);
-		if (rc >= 0 && rc <= 7)
+		if ((rc >= 0 && rc <= limit) && (rc <= 7 || rc >= 16))
 			gfx_fg = rc;
 		unsetenv("tem.fg_color");
 	}
@@ -374,7 +379,7 @@ gfx_framework_init(struct visual_ops *fb_ops)
 	env = getenv("tem.bg_color");
 	if (env != NULL) {
 		rc = (int)strtol(env, NULL, 0);
-		if (rc >= 0 && rc <= 7)
+		if ((rc >= 0 && rc <= limit) && (rc <= 7 || rc >= 16))
 			gfx_bg = rc;
 		unsetenv("tem.bg_color");
 	}

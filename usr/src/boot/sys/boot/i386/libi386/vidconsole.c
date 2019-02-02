@@ -640,7 +640,6 @@ vidc_init(struct console *cp, int arg)
 		return (0);
 
 	vidc_started = 1;
-	gfx_framework_init(&fb_ops);
 
 	/*
 	 * Check Miscellaneous Output Register (Read at 3CCh, Write at 3C2h)
@@ -676,6 +675,7 @@ vidc_init(struct console *cp, int arg)
 		}
 	}
 
+	gfx_framework_init(&fb_ops);
 	rc = tem_info_init(cp);
 
 	if (rc != 0) {

@@ -596,6 +596,32 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
 			break;
 
+		case 38:
+			/* We should have at least 3 parameters */
+			if (curparam < 3)
+				break;
+
+			/*
+			 * 256 and truecolor needs depth at least 24, but
+			 * we still need to process the sequence.
+			 */
+			count++;
+			curparam--;
+			param = tem->tvs_params[count];
+			switch (param) {
+			case 5: /* 256 colors */
+				count++;
+				curparam--;
+				if (tems.ts_pdepth < 24)
+					break;
+				tem->tvs_fg_color = tem->tvs_params[count];
+				tem->tvs_flags &= ~TEM_ATTR_BRIGHT_FG;
+				break;
+			default:
+				break;
+			}
+			break;
+
 		case 39:
 			/*
 			 * Reset the foreground colour and brightness.
@@ -617,6 +643,32 @@ tem_safe_selgraph(struct tem_vt_state *tem)
 		case 47: /* white	(bright white)	background */
 			tem->tvs_bg_color = param - 40;
 			tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
+			break;
+
+		case 48:
+			/* We should have at least 3 parameters */
+			if (curparam < 3)
+				break;
+
+			/*
+			 * 256 and truecolor needs depth at least 24, but
+			 * we still need to process the sequence.
+			 */
+			count++;
+			curparam--;
+			param = tem->tvs_params[count];
+			switch (param) {
+			case 5: /* 256 colors */
+				count++;
+				curparam--;
+				if (tems.ts_pdepth < 24)
+					break;
+				tem->tvs_bg_color = tem->tvs_params[count];
+				tem->tvs_flags &= ~TEM_ATTR_BRIGHT_BG;
+				break;
+			default:
+				break;
+			}
 			break;
 
 		case 49:
@@ -2299,15 +2351,23 @@ tem_safe_get_attr(struct tem_vt_state *tem, text_color_t *fg,
 static void
 tem_safe_get_color(text_color_t *fg, text_color_t *bg, term_char_t c)
 {
-	if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_FG | TEM_ATTR_BOLD))
-		*fg = brt_xlate[c.tc_fg_color];
-	else
-		*fg = dim_xlate[c.tc_fg_color];
+	*fg = c.tc_fg_color;
+	*bg = c.tc_bg_color;
 
-	if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_BG))
-		*bg = brt_xlate[c.tc_bg_color];
-	else
-		*bg = dim_xlate[c.tc_bg_color];
+	if (c.tc_fg_color < 16) {
+		if (TEM_ATTR_ISSET(c.tc_char,
+		    TEM_ATTR_BRIGHT_FG | TEM_ATTR_BOLD))
+			*fg = brt_xlate[c.tc_fg_color];
+		else
+			*fg = dim_xlate[c.tc_fg_color];
+	}
+
+	if (c.tc_bg_color < 16) {
+		if (TEM_ATTR_ISSET(c.tc_char, TEM_ATTR_BRIGHT_BG))
+			*bg = brt_xlate[c.tc_bg_color];
+		else
+			*bg = dim_xlate[c.tc_bg_color];
+	}
 }
 
 /*
