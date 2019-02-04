@@ -27,12 +27,12 @@
 
 
 #
-# uts/intel/io/sata/Makefile
+# uts/sparc/io/sata/Makefile
 #
 #	This makefile drives the production of the sata "misc"
 #	kernel module.
 #
-#	intel architecture dependent
+#	sparc architecture dependent
 #
 
 #
@@ -51,7 +51,7 @@ ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 #
 #	Include common rules.
 #
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/sparc/Makefile.sparc
 
 #
 #	Define targets
@@ -120,4 +120,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/intel/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ
