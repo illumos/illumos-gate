@@ -324,3 +324,10 @@ ASSYM_DEPS      +=		\
 CPR_IMPL_OBJS	= cpr_impl.o	cpr_wakecode.o
 
 $(KDI_ASSYM_DEPS:%=$(OBJS_DIR)/%):	$(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h
+
+#
+# Intel Integrated Memory Controller
+# (Sandy Bridge - Cascade Lake)
+#
+IMC_OBJS =	imc.o imc_decode.o imc_dump.o
+IMCSTUB_OBJS =	imcstub.o

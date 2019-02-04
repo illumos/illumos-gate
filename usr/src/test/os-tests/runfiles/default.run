@@ -78,3 +78,6 @@ tests = ['acquire-compare', 'acquire-spray']
 user = root
 arch = i86pc
 tests = ['ldt', 'badseg']
+
+[/opt/os-tests/tests/imc_test]
+arch = i86pc

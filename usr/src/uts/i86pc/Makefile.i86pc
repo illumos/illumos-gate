@@ -260,6 +260,7 @@ DRV_KMODS	+= fipe
 DRV_KMODS	+= vmm
 DRV_KMODS	+= viona
 DRV_KMODS	+= ppt
+DRV_KMODS	+= imc imcstub
 
 DRV_KMODS	+= cpudrv
 

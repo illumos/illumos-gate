@@ -14,7 +14,7 @@
 # Copyright 2019 Joyent, Inc.
 #
 
-SUBDIRS_i386 = i386
+SUBDIRS_i386 = i386 imc
 
 SUBDIRS =       \
 		ddi_ufm \

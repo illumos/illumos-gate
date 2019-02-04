@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _MC_INTEL_H
@@ -35,6 +36,7 @@ extern "C" {
 
 #define	MCINTEL_NVLIST_VERSTR	"mcintel-nvlist-version"
 #define	MCINTEL_NVLIST_VERS0	0
+#define	MCINTEL_NVLIST_VERS1	1
 
 #define	MCINTEL_NVLIST_VERS	MCINTEL_NVLIST_VERS0
 
@@ -59,6 +61,62 @@ extern "C" {
 #define	MCINTEL_NVLIST_SERIALNO	"dimm-serial-number"
 #define	MCINTEL_NVLIST_PARTNO	"dimm-part-number"
 #define	MCINTEL_NVLIST_REV	"dimm-part-rev"
+
+/*
+ * Version 1 payload. Whereas the version 0 payload uses a flat name space, we
+ * instead opt to use a hierarchical name space. This means that we can know how
+ * many devices there are at any level, as each level has this. Effectively,
+ * this means that we have an nvlist structure, for a socket that looks like:
+ *
+ * socket
+ *	string	version
+ *	uint8_t num-memory-controllers
+ *	nvlist array memory-controller[]
+ *		uint8_t num-channels
+ *		boolean ecc
+ *		string page policy
+ *		string lockstep || independent
+ *		nvlist array channel[]
+ *			uint8_t dpc
+ *			nvlist array dimm[]
+ *				boolean_t present;
+ *				uint32_t ncolumns
+ *				uint32_t nrows
+ *				uint64_t density (in bytes)
+ *				uint32_t width
+ *				uint32_t ranks
+ *				uint32_t banks
+ *				boolean_t array ranks_disabled
+ *				boolean_t hdrl-enabled
+ *				boolean_t hdrl-parity
+ *				uint32_t 3dnumranks
+ */
+
+#define	MCINTEL_NVLIST_V1_NMC		"num-memory-controllers"
+#define	MCINTEL_NVLIST_V1_MCS		"memory-controllers"
+#define	MCINTEL_NVLIST_V1_MC_NCHAN	"num-memory-channels"
+#define	MCINTEL_NVLIST_V1_MC_CHANNELS	"memory-controller-channels"
+#define	MCINTEL_NVLIST_V1_MC_ECC	"memory-controller-ecc"
+#define	MCINTEL_NVLIST_V1_MC_POLICY	"memory-controller-page-policy"
+#define	MCINTEL_NVLIST_V1_MC_POLICY_OPEN	"open-page"
+#define	MCINTEL_NVLIST_V1_MC_POLICY_CLOSED	"closed-page"
+#define	MCINTEL_NVLIST_V1_MC_CHAN_MODE	"memory-controller-channel-mode"
+#define	MCINTEL_NVLIST_V1_MC_CHAN_MODE_LOCK	"lockstep"
+#define	MCINTEL_NVLIST_V1_MC_CHAN_MODE_INDEP	"independent"
+#define	MCINTEL_NVLIST_V1_CHAN_NDPC	"memory-channel-dimms-per-channel"
+#define	MCINTEL_NVLIST_V1_CHAN_DIMMS	"memory-channel-dimms"
+#define	MCINTEL_NVLIST_V1_DIMM_PRESENT	"dimm-present"
+#define	MCINTEL_NVLIST_V1_DIMM_SIZE	"dimm-size"
+#define	MCINTEL_NVLIST_V1_DIMM_NCOLS	"dimm-num-columns"
+#define	MCINTEL_NVLIST_V1_DIMM_NROWS	"dimm-num-rows"
+#define	MCINTEL_NVLIST_V1_DIMM_DENSITY	"dimm-density"
+#define	MCINTEL_NVLIST_V1_DIMM_WIDTH	"dimm-width"
+#define	MCINTEL_NVLIST_V1_DIMM_RANKS	"dimm-ranks"
+#define	MCINTEL_NVLIST_V1_DIMM_BANKS	"dimm-banks"
+#define	MCINTEL_NVLIST_V1_DIMM_RDIS	"dimm-ranks-disabled"
+#define	MCINTEL_NVLIST_V1_DIMM_HDRL	"dimm-hdrl-enabled"
+#define	MCINTEL_NVLIST_V1_DIMM_HDRLP	"dimm-hdrl-parity-enabled"
+#define	MCINTEL_NVLIST_V1_DIMM_3DRANK	"dimm-3dranks"
 
 #define	FM_EREPORT_PAYLOAD_NAME_FERR_GLOBAL		"ferr_global"
 #define	FM_EREPORT_PAYLOAD_NAME_NERR_GLOBAL		"nerr_global"

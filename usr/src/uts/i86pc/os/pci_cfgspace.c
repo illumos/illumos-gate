@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -289,7 +290,14 @@ pci_check_bios(void)
 
 	pci_bios_mech = (ax & 0x3);
 	pci_bios_vers = regs.ebx.word.bx;
-	pci_bios_maxbus = (regs.ecx.word.cx & 0xff);
+
+	/*
+	 * Several BIOS implementations have known problems where they don't end
+	 * up correctly telling us to scan all PCI buses in the system. In
+	 * particular, many on-die CPU PCI devices are on a last bus that is
+	 * sometimes not enumerated. As such, do not trust the BIOS.
+	 */
+	pci_bios_maxbus = pci_max_nbus;
 
 	switch (pci_bios_mech) {
 	default:	/* ?!? */

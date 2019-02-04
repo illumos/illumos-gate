@@ -1810,6 +1810,8 @@ f platform/i86pc/kernel/drv/amd64/cpudrv 0755 root sys
 f platform/i86pc/kernel/drv/amd64/dr 0755 root sys
 f platform/i86pc/kernel/drv/amd64/fipe 0755 root sys
 f platform/i86pc/kernel/drv/amd64/ioat 0755 root sys
+f platform/i86pc/kernel/drv/amd64/imc 0755 root sys
+f platform/i86pc/kernel/drv/amd64/imcstub 0755 root sys
 f platform/i86pc/kernel/drv/amd64/isa 0755 root sys
 f platform/i86pc/kernel/drv/amd64/npe 0755 root sys
 f platform/i86pc/kernel/drv/amd64/pci 0755 root sys
@@ -1823,6 +1825,7 @@ f platform/i86pc/kernel/drv/cpc.conf 0644 root sys
 f platform/i86pc/kernel/drv/dr.conf 0644 root sys
 f platform/i86pc/kernel/drv/fipe.conf 0644 root sys
 f platform/i86pc/kernel/drv/ioat.conf 0644 root sys
+f platform/i86pc/kernel/drv/imc.conf 0644 root sys
 f platform/i86pc/kernel/drv/pci-ide.conf 0644 root sys
 f platform/i86pc/kernel/drv/pit_beep.conf 0644 root sys
 f platform/i86pc/kernel/drv/ppm.conf 0644 root sys
@@ -5588,6 +5591,7 @@ f usr/lib/fm/fmd/fmd 0555 root bin
 f usr/lib/fm/fmd/fminject 0555 root bin
 f usr/lib/fm/fmd/fmsim 0555 root bin
 f usr/lib/fm/fmd/fmtopo 0555 root bin
+f usr/lib/fm/fmd/mcdecode 0555 root bin
 f usr/lib/fm/fmd/ipmitopo 0555 root bin
 d usr/lib/fm/fmd/plugins 0755 root bin
 f usr/lib/fm/fmd/plugins/cpumem-retire.conf 0644 root bin
@@ -19113,6 +19117,8 @@ f usr/share/man/man7d/hxge.7d 0444 root bin
 f usr/share/man/man7d/i40e.7d 0444 root bin
 f usr/share/man/man7d/ieee1394.7d 0444 root bin
 f usr/share/man/man7d/igb.7d 0444 root bin
+f usr/share/man/man7d/imc.7d 0444 root bin
+f usr/share/man/man7d/imcstub.7d 0444 root bin
 f usr/share/man/man7d/ipmi.7d 0444 root bin
 f usr/share/man/man7d/ipnet.7d 0444 root bin
 f usr/share/man/man7d/iprb.7d 0444 root bin
