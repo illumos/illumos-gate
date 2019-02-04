@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 /*
  * The Sun Studio and GCC (patched for opensolaris/illumos) compilers
@@ -217,7 +220,7 @@ instr_size(dis_handle_t *dhp, uint8_t *ins, unsigned int i, size_t size)
 static boolean_t
 has_saved_fp(dis_handle_t *dhp, uint8_t *ins, int size)
 {
-	int 		i, j;
+	int		i, j;
 	uint32_t	n;
 	boolean_t	found_push = B_FALSE;
 	ssize_t		sz = 0;
@@ -231,7 +234,7 @@ has_saved_fp(dis_handle_t *dhp, uint8_t *ins, int size)
 				continue;
 
 			n = INSTR1(ins, i);
-			for (j = 0; j <= NUM_FP_PUSHES; j++)
+			for (j = 0; j < NUM_FP_PUSHES; j++)
 				if (save_fp_pushes[j] == n) {
 					found_push = B_TRUE;
 					break;
@@ -240,7 +243,7 @@ has_saved_fp(dis_handle_t *dhp, uint8_t *ins, int size)
 			if (sz != 3)
 				continue;
 			n = INSTR3(ins, i);
-			for (j = 0; j <= NUM_FP_MOVS; j++)
+			for (j = 0; j < NUM_FP_MOVS; j++)
 				if (save_fp_movs[j] == n)
 					return (B_TRUE);
 		}
