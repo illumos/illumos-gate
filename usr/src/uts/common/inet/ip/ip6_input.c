@@ -23,7 +23,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1891,6 +1891,16 @@ ip_input_cksum_v6(iaflags_t iraflags, mblk_t *mp, ip6_t *ip6h,
 		return (B_TRUE);
 	}
 
+	hck_flags = DB_CKSUMFLAGS(mp);
+
+	if (hck_flags & HW_LOCAL_MAC) {
+		/*
+		 * The packet is from a same-machine sender in which
+		 * case we assume data integrity.
+		 */
+		return (B_TRUE);
+	}
+
 	/*
 	 * Revert to software checksum calculation if the interface
 	 * isn't capable of checksum offload.
@@ -1907,9 +1917,6 @@ ip_input_cksum_v6(iaflags_t iraflags, mblk_t *mp, ip6_t *ip6h,
 	 * We apply this for all ULP protocols. Does the HW know to
 	 * not set the flags for SCTP and other protocols.
 	 */
-
-	hck_flags = DB_CKSUMFLAGS(mp);
-
 	if (hck_flags & HCK_FULLCKSUM_OK) {
 		/*
 		 * Hardware has already verified the checksum.
