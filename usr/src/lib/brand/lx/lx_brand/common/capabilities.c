@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -220,7 +220,7 @@ lx_cap_update_priv(priv_set_t *priv, const uint32_t cap[])
 	boolean_t updated = B_FALSE;
 	for (i = 0; i <= LX_CAP_MAX_CHECK; i++) {
 		cap_set = LX_CAP_CAPISSET(i, cap);
-		if (lx_cap_mapping[i] == NULL || i > LX_CAP_MAX_VALID) {
+		if (i > LX_CAP_MAX_VALID || lx_cap_mapping[i] == NULL) {
 			/* don't allow setting unsupported caps */
 			if (cap_set) {
 				/*

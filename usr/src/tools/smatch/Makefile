@@ -28,7 +28,11 @@ include ../Makefile.tools
 i386_CC = $(GNUC_ROOT)/bin/gcc
 sparc_CC = $(GNUC_ROOT)/bin/gcc
 
-CFLAGS = -O -D__sun -Wall -Wno-unknown-pragmas -std=gnu99 -nodefaultlibs
+#
+# Note that we always build smatch 64-bit, assuring that we get the same binary
+# regardless of the image of the build machine.
+#
+CFLAGS = -O -m64 -D__sun -Wall -Wno-unknown-pragmas -std=gnu99 -nodefaultlibs
 
 SMATCHDATADIR = $(ROOTONBLDSHARE)/smatch
 
@@ -38,7 +42,15 @@ CFLAGS += -DMULTIARCH_TRIPLET=NULL
 
 LDLIBS += -lsqlite3 -lcrypto -lm -lgcc -lc
 LDFLAGS = $(MAPFILE.NES:%=-Wl,-M%)
+
+#
+# To allow linking to $(NATIVE_ADJUNCT) libraries on both multiarch (where
+# 64-bit libraries will be found in $(NATIVE_ADJUNCT)/lib/$(MACH64)) and 64-bit
+# images (where 64-bit libraries will be found in $(NATIVE_ADJUNCT)/lib/), we
+# set our library and run paths to both locations.
+#
 LDFLAGS += -L$(NATIVE_ADJUNCT)/lib -R$(NATIVE_ADJUNCT)/lib
+LDFLAGS += -L$(NATIVE_ADJUNCT)/lib/$(MACH64) -R$(NATIVE_ADJUNCT)/lib/$(MACH64)
 
 CPPFLAGS += -nostdinc
 CPPFLAGS += -Isrc/

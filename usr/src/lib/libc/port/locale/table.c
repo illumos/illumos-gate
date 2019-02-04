@@ -1,6 +1,7 @@
 /*
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2017 Nexenta Systems, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -39,7 +40,7 @@
 #include "mblocal.h"
 #include "_ctype.h"
 
-#define	_DEFRUNETYPE { \
+#define	_DEFRUNETYPE \
 	/* 00 */ \
 	_CTYPE_C, \
 	_CTYPE_C, \
@@ -183,10 +184,9 @@
 	_CTYPE_P|_CTYPE_R|_CTYPE_G, \
 	_CTYPE_P|_CTYPE_R|_CTYPE_G, \
 	_CTYPE_P|_CTYPE_R|_CTYPE_G, \
-	_CTYPE_C, \
-}
+	_CTYPE_C
 
-#define	_DEFMAPLOWER { \
+#define	_DEFMAPLOWER \
 	0x00,	0x01,	0x02,	0x03,	0x04,	0x05,	0x06,	0x07, \
 	0x08,	0x09,	0x0a,	0x0b,	0x0c,	0x0d,	0x0e,	0x0f, \
 	0x10,	0x11,	0x12,	0x13,	0x14,	0x15,	0x16,	0x17, \
@@ -218,10 +218,9 @@
 	0xe0,	0xe1,	0xe2,	0xe3,	0xe4,	0xe5,	0xe6,	0xe7, \
 	0xe8,	0xe9,	0xea,	0xeb,	0xec,	0xed,	0xee,	0xef, \
 	0xf0,	0xf1,	0xf2,	0xf3,	0xf4,	0xf5,	0xf6,	0xf7, \
-	0xf8,	0xf9,	0xfa,	0xfb,	0xfc,	0xfd,	0xfe,	0xff, \
-}
+	0xf8,	0xf9,	0xfa,	0xfb,	0xfc,	0xfd,	0xfe,	0xff
 
-#define	_DEFMAPUPPER { \
+#define	_DEFMAPUPPER \
 	0x00,	0x01,	0x02,	0x03,	0x04,	0x05,	0x06,	0x07, \
 	0x08,	0x09,	0x0a,	0x0b,	0x0c,	0x0d,	0x0e,	0x0f, \
 	0x10,	0x11,	0x12,	0x13,	0x14,	0x15,	0x16,	0x17, \
@@ -253,27 +252,32 @@
 	0xe0,	0xe1,	0xe2,	0xe3,	0xe4,	0xe5,	0xe6,	0xe7, \
 	0xe8,	0xe9,	0xea,	0xeb,	0xec,	0xed,	0xee,	0xef, \
 	0xf0,	0xf1,	0xf2,	0xf3,	0xf4,	0xf5,	0xf6,	0xf7, \
-	0xf8,	0xf9,	0xfa,	0xfb,	0xfc,	0xfd,	0xfe,	0xff, \
-}
+	0xf8,	0xf9,	0xfa,	0xfb,	0xfc,	0xfd,	0xfe,	0xff,
 
 _RuneLocale _DefaultRuneLocale = {
 	_RUNE_MAGIC_1,
 	"NONE",
-	_DEFRUNETYPE,
-	_DEFMAPLOWER,
-	_DEFMAPUPPER,
+	{ _DEFRUNETYPE },
+	{ _DEFMAPLOWER },
+	{ _DEFMAPUPPER },
 };
 
 /*
  * __ctype_mask, __trans_lower, and __trans_upper come from former _ctype.c and
  * have to stay pointers for binary compatibility, so we provide separate
- * storage for them, initialized to "C" locale contents by default.
+ * storage for them, initialized to "C" locale contents by default.  Note that
+ * legacy code may dereference __ctype_mask[-1] when checking against EOF,
+ * relying on that value to be 0.  To allow this, ___ctype_mask is expanded by
+ * one value and prepended with a leading 0, with __ctype_mask being set to
+ * point to ___ctype_mask[1].  (__trans_lower and __trans_upper do not suffer
+ * from this as EOF access was prevented in legacy code by a check against
+ * isascii(), which always returned 0 for EOF.)
  */
-static unsigned int ___ctype_mask[_CACHED_RUNES] = _DEFRUNETYPE;
-unsigned int *__ctype_mask = ___ctype_mask;
+static unsigned int ___ctype_mask[_CACHED_RUNES + 1] = { 0, _DEFRUNETYPE };
+unsigned int *__ctype_mask = &___ctype_mask[1];
 
-static int ___trans_lower[_CACHED_RUNES] = _DEFMAPLOWER;
+static int ___trans_lower[_CACHED_RUNES] = { _DEFMAPLOWER };
 int *__trans_lower = ___trans_lower;
 
-static int ___trans_upper[_CACHED_RUNES] = _DEFMAPUPPER;
+static int ___trans_upper[_CACHED_RUNES] = { _DEFMAPUPPER };
 int *__trans_upper = ___trans_upper;

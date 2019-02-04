@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 
 include ../../../Makefile.tools
 
@@ -43,7 +43,7 @@ HDRDIRS= \
 	-I/usr/include \
 	-I$(SRC)/uts/common \
 	-I$(SRC)/common/ctf \
-	-I$(NATIVE_ADJUNCT)/include
+	-I$(ADJUNCT_PROTO)/usr/include
 
 CPPFLAGS += $(HDRDIRS)
 CFLAGS += $(CCVERBOSE)

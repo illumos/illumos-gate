@@ -22,6 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
 
 include ../../Makefile.ctf
 
@@ -74,7 +75,7 @@ DWARFLDFLAGS	= \
 	-ldwarf
 DWARFCPPFLAGS	= -I$(SRC)/lib/libdwarf/common
 
-LDFLAGS		+= -L$(NATIVE_ADJUNCT)/lib
+LDFLAGS		+= -L$(ADJUNCT_PROTO)/lib
 LDLIBS		+= -lz -lelf
 CPPFLAGS	+= -D_REENTRANT
 CFLAGS		+= $(CTF_FLAGS)

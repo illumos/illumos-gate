@@ -381,6 +381,17 @@ CCNOREORDER=	\
 	-_gcc7=-fno-reorder-functions \
 	-_gcc8=-fno-reorder-functions
 
+#
+# gcc has a rather aggressive optimization on by default that infers loop
+# bounds based on undefined behavior (!!).  This can lead to some VERY
+# surprising optimizations -- ones that may be technically correct in the
+# strictest sense but also result in incorrect program behavior.  We turn
+# this optimization off, with extreme prejudice.
+#
+CCNOAGGRESSIVELOOPS= \
+	-_gcc7=-fno-aggressive-loop-optimizations \
+	-_gcc8=-fno-aggressive-loop-optimizations
+
 # One optimization the compiler might perform is to turn this:
 #	#pragma weak foo
 #	extern int foo;
@@ -618,10 +629,12 @@ $(SRCDBGBLD)CCSOURCEDEBUGFLAGS	= $(CCGDEBUG) -xs
 CFLAGS=         $(COPTFLAG) $($(MACH)_CFLAGS) $(SPACEFLAG) $(CCMODE) \
 		$(ILDOFF) $(CERRWARN) $(CSTD) $(CCUNBOUND) $(IROPTFLAG) \
 		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CCNOREORDER) \
+		$(CCNOAGGRESSIVELOOPS) \
 		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS)
 CFLAGS64=       $(COPTFLAG64) $($(MACH64)_CFLAGS) $(SPACEFLAG64) $(CCMODE64) \
 		$(ILDOFF) $(CERRWARN) $(CSTD) $(CCUNBOUND) $(IROPTFLAG64) \
 		$(CGLOBALSTATIC) $(CCNOAUTOINLINE) $(CCNOREORDER) \
+		$(CCNOAGGRESSIVELOOPS) \
 		$(CSOURCEDEBUGFLAGS) $(CUSERFLAGS64)
 #
 # Flags that are used to build parts of the code that are subsequently
