@@ -290,7 +290,7 @@ topo_usb_parse_port_type(topo_mod_t *mod, topo_usb_parse_t *parse,
 
 	errno = 0;
 	val = strtoul(line, &eptr, 0);
-	if (errno != 0 || *eptr != '\0' || val > UINT_MAX) {
+	if (errno != 0 || *eptr != '\0' || val >= UINT_MAX) {
 		topo_mod_dprintf(mod, "encountered bad value for port-type "
 		    "line: %s", line);
 		return (B_FALSE);

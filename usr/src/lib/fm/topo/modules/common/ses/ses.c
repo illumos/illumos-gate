@@ -478,8 +478,8 @@ ses_contract_thread(void *arg)
 	fds.fd = efd;
 	fds.events = POLLIN;
 	fds.revents = 0;
-	sigaddset(&sigset, sesthread.thr_sig);
-	pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
+	(void) sigaddset(&sigset, sesthread.thr_sig);
+	(void) pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
 	for (;;) {
 		/* check if we've been asked to exit */
 		(void) pthread_mutex_lock(&sesthread.mt);

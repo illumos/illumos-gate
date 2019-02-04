@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * FMA event subscription interfaces - subscribe to FMA protocol
  * from outside the fault manager.
  */
@@ -205,10 +209,9 @@ fmev_shdlctl_thrcreate(fmev_shdl_t hdl, door_xcreate_server_func_t *func,
  * does not keep either retrying (EAGAIN) or bleat to cmn_err.
  */
 
-uint64_t fmev_proxy_cb_inval;
 uint64_t fmev_proxy_cb_enomem;
 
-int
+static int
 fmev_proxy_cb(sysevent_t *sep, void *arg)
 {
 	struct fmev_subinfo *sip = arg;
@@ -216,11 +219,6 @@ fmev_proxy_cb(sysevent_t *sep, void *arg)
 	nvlist_t *nvl;
 	char *class;
 	fmev_t ev;
-
-	if (sip == NULL || sip->si_cb == NULL) {
-		fmev_proxy_cb_inval++;
-		return (0);
-	}
 
 	if ((ev = fmev_sysev2fmev(IHDL2HDL(ihdl), sep, &class, &nvl)) == NULL) {
 		fmev_proxy_cb_enomem++;

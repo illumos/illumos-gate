@@ -1,423 +1,530 @@
-'\" te
 .\"  Copyright (c) 2009 Sun Microsystems, Inc. All rights reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH AUDIO 7I "May 6, 2009"
-.SH NAME
-audio \- generic audio device interface
-.SH SYNOPSIS
-.LP
-.nf
-\fB#include\fR \fB<sys/audio.h>\fR
-.fi
-
-.SH OVERVIEW
-.sp
-.LP
-An audio device is used to play and/or record a stream of audio data. Since a
+.\" Copyright 2018, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 8, 2018
+.Dt AUDIO 7I
+.Os
+.Sh NAME
+.Nm audio
+.Nd generic audio device interface
+.Sh SYNOPSIS
+.In sys/audio.h
+.Sh OVERVIEW
+An audio device is used to play and/or record a stream of audio data.
+Since a
 specific audio device may not support all functionality described below, refer
 to the device-specific manual pages for a complete description of each hardware
-device. An application can use the \fBAUDIO_GETDEV\fR \fBioctl\fR(2) to
-determine the current audio hardware associated with \fB/dev/audio\fR.
-.sp
-.LP
+device.
+An application can use the
+.Dv AUDIO_GETDEV
+.Xr ioctl 2
+to determine the current audio hardware associated with
+.Pa /dev/audio .
+.Pp
 The audio framework provides a software mixing engine (audio mixer) for all
 audio devices, allowing more than one process to play or record audio at the
 same time.
-.SS "Backward Compatibility"
-.sp
-.LP
-It is no longer possible to disable the mixing function. Applications must not
+.Ss "Backward Compatibility"
+It is no longer possible to disable the mixing function.
+Applications must not
 assume that they have exclusive access to the audio device.
-.SS "Multi-Stream Codecs"
-.sp
-.LP
-The audio mixer supports multi-stream Codecs. These devices have DSP engines
-that provide sample rate conversion, hardware mixing, and other features. The
-use of such hardware features is opaque to applications.
-.SH AUDIO FORMATS
-.sp
-.LP
+.Ss "Multi-Stream Codecs"
+The audio mixer supports multi-stream Codecs.
+These devices have DSP engines
+that provide sample rate conversion, hardware mixing, and other features.
+The use of such hardware features is opaque to applications.
+.Sh AUDIO FORMATS
 Digital audio data represents a quantized approximation of an analog audio
-signal waveform. In the simplest case, these quantized numbers represent the
-amplitude of the input waveform at particular sampling intervals. To achieve
-the best approximation of an input signal, the highest possible sampling
-frequency and precision should be used. However, increased accuracy comes at a
-cost of increased data storage requirements. For instance, one minute of
-monaural audio recorded in \(*m-Law format (pronounced \fBmew-law\fR) at 8 KHz
-requires nearly 0.5 megabytes of storage, while the standard Compact Disc audio
-format (stereo 16-bit linear \fBPCM\fR data sampled at 44.1 KHz) requires
-approximately 10 megabytes per minute.
-.sp
-.LP
-Audio data may be represented in several different formats. An audio device's
-current audio data format can be determined by using the \fBAUDIO_GETINFO\fR
-\fBioctl\fR(2) described below.
-.sp
-.LP
+signal waveform.
+In the simplest case, these quantized numbers represent the
+amplitude of the input waveform at particular sampling intervals.
+To achieve the best approximation of an input signal, the highest possible sampling
+frequency and precision should be used.
+However, increased accuracy comes at a cost of increased data storage requirements.
+For instance, one minute of
+monaural audio recorded in \(*m-Law format (pronounced
+.Em mew-law )
+at 8 KHz requires nearly 0.5 megabytes of storage, while the standard Compact Disc
+audio format (stereo 16-bit linear
+.Sy PCM
+data sampled at 44.1 KHz) requires approximately 10 megabytes per minute.
+.Pp
+Audio data may be represented in several different formats.
+An audio device's
+current audio data format can be determined by using the
+.Dv AUDIO_GETINFO
+.Xr ioctl 2
+described below.
+.Pp
 An audio data format is characterized in the audio driver by four parameters:
-Sample Rate, Encoding, Precision, and Channels. Refer to the device-specific
-manual pages for a list of the audio formats that each device supports. In
-addition to the formats that the audio device supports directly, other formats
-provide higher data compression. Applications may convert audio data to and
+Sample Rate, Encoding, Precision, and Channels.
+Refer to the device-specific
+manual pages for a list of the audio formats that each device supports.
+In addition to the formats that the audio device supports directly, other formats
+provide higher data compression.
+Applications may convert audio data to and
 from these formats when playing or recording.
-.SS "Sample Rate"
-.sp
-.LP
+.Ss "Sample Rate"
 Sample rate is a number that represents the sampling frequency (in samples per
 second) of the audio data.
-.sp
-.LP
+.Pp
 The audio mixer always configures the hardware for the highest possible sample
-rate for both play and record. This ensures that none of the audio streams
-require compute-intensive low pass filtering. The result is that high sample
-rate audio streams are not degraded by filter ing.
-.sp
-.LP
+rate for both play and record.
+This ensures that none of the audio streams
+require compute-intensive low pass filtering.
+The result is that high sample rate audio streams are not degraded by filtering.
+.Pp
 Sample rate conversion can be a compute-intensive operation, depending on the
-number of channels and a device's sample rate. For example, an 8KHz signal can
-be easily converted to 48KHz, requiring a low cost up sampling by 6. However,
-converting from 44.1KHz to 48KHz is compute  intensive because it must be up
-sampled by 160 and then down sampled by 147. This is only done using integer
-multipliers.
-.sp
-.LP
+number of channels and a device's sample rate.
+For example, an 8KHz signal can
+be easily converted to 48KHz, requiring a low cost up sampling by 6.
+However,
+converting from 44.1KHz to 48KHz is compute intensive because it must be up
+sampled by 160 and then down sampled by 147.
+This is only done using integer multipliers.
+.Pp
 Applications can greatly reduce the impact of sample rate conversion by
-carefully picking the sample rate. Applications should always use the highest
-sample rate the device supports. An application can also do its own sample rate
-conversion (to take advantage of floating  point and accelerated instruction or
+carefully picking the sample rate.
+Applications should always use the highest
+sample rate the device supports.
+An application can also do its own sample rate
+conversion (to take advantage of floating point and accelerated instruction or
 use small integers for up and down sampling.
-.sp
-.LP
+.Pp
 All modern audio devices run at 48 kHz or a multiple thereof, hence just using
 48 kHz may be a reasonable compromise if the application is not prepared to
 select higher sample rates.
-.SS "Encodings"
-.sp
-.LP
-An encoding parameter specifies the audio data representation. \(*m-Law
-encoding corresponds to \fICCITT G.711\fR, and is the standard for voice data
-used by telephone companies in the United States, Canada, and Japan. A-Law
-encoding is also part of \fICCITT G.711\fR and is the standard encoding for
-telephony elsewhere in the world. A-Law and \(*m-Law audio data are sampled at
+.Ss "Encodings"
+An encoding parameter specifies the audio data representation.
+\(*m-Law
+encoding corresponds to
+.Em CCITT G.711 ,
+and is the standard for voice data
+used by telephone companies in the United States, Canada, and Japan.
+A-Law encoding is also part of
+.Em CCITT G.711
+and is the standard encoding for telephony elsewhere in the world.
+A-Law and \(*m-Law audio data are sampled at
 a rate of 8000 samples per second with 12-bit precision, with the data
-compressed to 8-bit samples. The resulting audio data quality is equivalent to
+compressed to 8-bit samples.
+The resulting audio data quality is equivalent to
 that of standard analog telephone service.
-.sp
-.LP
+.Pp
 Linear Pulse Code Modulation (PCM) is an uncompressed, signed audio format in
-which sample values are directly proportional to audio signal voltages. Each
-sample is a 2's complement number that represents a positive or negative
+which sample values are directly proportional to audio signal voltages.
+Each sample is a 2's complement number that represents a positive or negative
 amplitude.
-.SS "Precision"
-.sp
-.LP
-Precision indicates the number of bits used to store each audio sample. For
-instance, u-Law and A-Law data are stored with 8-bit precision. \fBPCM\fR data
-may be stored at various precisions, though 16-bit is the most common.
-.SS "Channels"
-.sp
-.LP
-Multiple channels of audio may be interleaved at sample boundaries. A sample
-frame consists of a single sample from each active channel. For example, a
-sample frame of stereo 16-bit \fBPCM\fR data consists of two 16-bit samples,
+.Ss "Precision"
+Precision indicates the number of bits used to store each audio sample.
+For instance, \(*m-Law and A-Law data are stored with 8-bit precision.
+.Sy PCM
+data may be stored at various precisions, though 16-bit is the most common.
+.Ss "Channels"
+Multiple channels of audio may be interleaved at sample boundaries.
+A sample frame consists of a single sample from each active channel.
+For example, a sample frame of stereo 16-bit
+.Sy PCM
+data consists of two 16-bit samples,
 corresponding to the left and right channel data.
-.sp
-.LP
+.Pp
 The audio mixer sets the hardware to the maximum number of channels supported.
 If a mono signal is played or recorded, it is mixed on the first two (usually
-the left and right) channels only. Silence is mixed on the remaining channels
-.SS "Supported Formats"
-.sp
-.LP
+the left and right) channels only.
+Silence is mixed on the remaining channels
+.Ss "Supported Formats"
 The audio mixer supports the following audio formats:
-.sp
-.in +2
-.nf
-Encoding           Precision   Channels
-Signed Linear PCM  32-bit      Mono or Stereo
-Signed Linear PCM  16-bit      Mono or Stereo
-Signed Linear PCM   8-bit      Mono or Stereo
-u-Law               8-bit      Mono or Stereo
-A-Law               8-bit      Mono or Stereo
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Bl -column "Signed Linear PCM" "Precision" "Mono or Stereo" -offset 2n
+.It Encoding Ta Precision Ta Channels
+.It "Signed Linear PCM" Ta "32-bit" Ta "Mono or Stereo"
+.It "Signed Linear PCM" Ta "16-bit" Ta "Mono or Stereo"
+.It "Signed Linear PCM" Ta "8-bit" Ta "Mono or Stereo"
+.It "\(*m-Law" Ta "8-bit" Ta "Mono or Stereo"
+.It "A-Law" Ta "8-bit" Ta "Mono or Stereo"
+.El
+.Pp
 The audio mixer converts all audio streams to 24-bit Linear PCM before mixing.
-After mixing, conversion is made to the best possible Codec format. The
+After mixing, conversion is made to the best possible Codec format.
+The
 conversion process is not compute intensive and audio applications can choose
 the encoding format that best meets their needs.
-.sp
-.LP
+.Pp
 Note that the mixer discards the low order 8 bits of 32-bit Signed Linear PCM
-in order to perform mixing. (This is done to allow for possible overflows to
-fit into 32-bits when mixing multiple streams together.) Hence, the maximum
-effective precision is 24-bits.
-.SH DESCRIPTION
-.sp
-.LP
-The device \fB/dev/audio\fR is a device driver that dispatches audio requests
-to the appropriate underlying audio hardware. The audio driver is implemented
-as a \fBSTREAMS\fR driver. In order to record audio input, applications
-\fBopen\fR(2) the \fB/dev/audio\fR device and read data from it using the
-\fBread\fR(2) system call. Similarly, sound data is queued to the audio output
-port by using the \fBwrite\fR(2) system call. Device configuration is performed
-using the \fBioctl\fR(2) interface.
-.sp
-.LP
+in order to perform mixing.
+(This is done to allow for possible overflows to
+fit into 32-bits when mixing multiple streams together.)
+Hence, the maximum effective precision is 24-bits.
+.Sh DESCRIPTION
+The device
+.Pa /dev/audio
+is a device driver that dispatches audio requests
+to the appropriate underlying audio hardware.
+The audio driver is implemented as a
+.Sy STREAMS
+driver.
+In order to record audio input, applications
+.Xr open 2
+the
+.Pa /dev/audio
+device and read data from it using the
+.Xr read 2
+system call.
+Similarly, sound data is queued to the audio output port by using the
+.Xr write 2
+system call.
+Device configuration is performed using the
+.Xr ioctl 2
+interface.
+.Pp
 Because some systems may contain more than one audio device, application
-writers are encouraged to query the \fBAUDIODEV\fR environment variable. If
-this variable is present in the environment, its value should identify the path
-name of the default audio device.
-.SS "Opening the Audio Device"
-.sp
-.LP
-The audio device is not treated as an exclusive resource. Each process may open
-the audio device once.
-.sp
-.LP
-Each \fBopen()\fR completes as long as there are channels available to be
-allocated. If no channels are available to be allocated:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-if either the \fBO_NDELAY\fR or \fBO_NONBLOCK\fR flags are set in the
-\fBopen()\fR \fIoflag\fR argument, then -1 is immediately returned, with
-\fIerrno\fR set to \fBEBUSY.\fR
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-if neither the \fBO_NDELAY\fR nor the \fBO_NONBLOCK\fR flag are set, then
-\fBopen()\fR hangs until the device is available or a signal is delivered to
-the process, in which case a -1 is returned with \fIerrno\fR set to
-\fBEINTR.\fR
-.RE
-.sp
-.LP
-Upon the initial open() of the audio channel, the audio mixer sets the data
-format of the audio channel to the default state of 8-bit, 8Khz, mono u-Law
-data. If the audio device does not support this configuration, it informs the
-audio mixer of the initial configuration. Audio applications should explicitly
-set the encoding characteristics to match the audio data requirements, and not
-depend on the default configuration.
-.SS "Recording Audio Data"
-.sp
-.LP
-The \fBread()\fR system call copies data from the system's buffers to the
-application. Ordinarily, \fBread()\fR blocks until the user buffer is filled.
-The \fBI_NREAD\fR \fBioctl\fR (see \fBstreamio\fR(7I)) may be used to determine
-the amount of data that may be read without blocking. The device may
-alternatively be set to a non-blocking mode, in which case \fBread()\fR
-completes immediately, but may return fewer bytes than requested. Refer to the
-\fBread\fR(2) manual page for a complete description of this behavior.
-.sp
-.LP
+writers are encouraged to query the
+.Ev AUDIODEV
+environment variable.
+If this variable is present in the environment, its value should identify the
+path name of the default audio device.
+.Ss "Opening the Audio Device"
+The audio device is not treated as an exclusive resource.
+Each process may open the audio device once.
+.Pp
+Each
+.Xr open 2
+completes as long as there are channels available to be allocated.
+If no channels are available to be allocated:
+.Bl -bullet -offset indent
+.It
+if either the
+.Dv O_NDELAY
+or
+.Dv O_NONBLOCK
+flags are set in the
+.Xr open 2
+.Fa oflag
+argument, then -1 is immediately returned, with
+.Va errno
+set to
+.Er EBUSY .
+.It
+if neither the
+.Dv O_NDELAY
+nor the
+.Dv O_NONBLOCK
+flag are set, then
+.Xr open 2
+hangs until the device is available or a signal is delivered to
+the process, in which case a -1 is returned with
+.Va errno
+set to
+.Er EINTR .
+.El
+.Pp
+Upon the initial
+.Xr open 2
+of the audio channel, the audio mixer sets the data
+format of the audio channel to the default state of 8-bit, 8Khz, mono \(*m-Law
+data.
+.Pp
+If the audio device does not support this configuration, it informs the
+audio mixer of the initial configuration.
+Audio applications should explicitly set the encoding characteristics to match the
+audio data requirements, and not depend on the default configuration.
+.Ss "Recording Audio Data"
+The
+.Xr read 2
+system call copies data from the system's buffers to the application.
+Ordinarily,
+.Xr read 2
+blocks until the user buffer is filled.
+The
+.Dv I_NREAD
+.Sy ioctl
+(see
+.Xr streamio 7I )
+may be used to determine the amount of data that may be read without blocking.
+The device may alternatively be set to a non-blocking mode, in which case
+.Xr read 2
+completes immediately, but may return fewer bytes than requested.
+Refer to the
+.Xr read 2
+manual page for a complete description of this behavior.
+.Pp
 When the audio device is opened with read access, the device driver immediately
-starts buffering audio input data. Since this consumes system resources,
+starts buffering audio input data.
+Since this consumes system resources,
 processes that do not record audio data should open the device write-only
-(\fBO_WRONLY\fR).
-.sp
-.LP
-The transfer of input data to \fBSTREAMS\fR buffers may be paused (or resumed)
-by using the \fBAUDIO_SETINFO\fR \fBioctl\fR to set (or clear) the
-\fIrecord.pause\fR flag in the audio information structure (see below). All
-unread input data in the \fBSTREAMS\fR queue may be discarded by using the
-\fBI_FLUSH\fR \fBSTREAMS\fR \fBioctl\fR. See \fBstreamio\fR(7I). When changing
-record parameters, the input stream should be paused and flushed before the
-change, and resumed afterward. Otherwise, subsequent reads may return samples
-in the old format followed by samples in the new format. This is particularly
-important when new parameters result in a changed sample size.
-.sp
-.LP
-Input data can accumulate in \fBSTREAMS\fR buffers very quickly. At a minimum,
-it will accumulate at 8000 bytes per second for 8-bit, 8 KHz, mono, u-Law data.
+.Pq Dv O_WRONLY .
+.Pp
+The transfer of input data to
+.Sy STREAMS
+buffers may be paused (or resumed) by using the
+.Dv AUDIO_SETINFO
+.Sy ioctl
+to set (or clear) the
+.Fa record.pause
+flag in the audio information structure (see below).
+All unread input data in the
+.Sy STREAMS
+queue may be discarded by using the
+.Dv I_FLUSH
+.Sy STREAMS
+ioctl.
+See
+.Xr streamio 7I .
+When changing record parameters, the input stream should be paused and flushed
+before the change, and resumed afterward.
+Otherwise, subsequent reads may return samples
+in the old format followed by samples in the new format.
+This is particularly important when new parameters result in a changed sample size.
+.Pp
+Input data can accumulate in
+.Sy STREAMS
+buffers very quickly.
+At a minimum,
+it will accumulate at 8000 bytes per second for 8-bit, 8 KHz, mono, \(*m-Law data.
 If the device is configured for 16-bit linear or higher sample rates, it will
-accumulate even faster. If the application that consumes the data cannot keep
-up with this data rate, the \fBSTREAMS\fR queue may become full. When this
-occurs, the \fIrecord.error\fR flag is set in the audio information structure
-and input sampling ceases until there is room in the input queue for additional
-data. In such cases, the input data stream contains a discontinuity. For this
-reason, audio recording applications should open the audio device when they are
-prepared to begin reading data, rather than at the start of extensive
+accumulate even faster.
+If the application that consumes the data cannot keep
+up with this data rate, the
+.Sy STREAMS
+queue may become full.
+When this occurs, the
+.Fa record.error
+flag is set in the audio information structure and input sampling ceases until
+there is room in the input queue for additional data.
+In such cases, the input data stream contains a discontinuity.
+For this reason, audio recording applications should open the audio device when
+they are prepared to begin reading data, rather than at the start of extensive
 initialization.
-.SS "Playing Audio Data"
-.sp
-.LP
-The \fBwrite()\fR system call copies data from an application's buffer to the
-\fBSTREAMS\fR output queue. Ordinarily, \fBwrite()\fR blocks until the entire
-user buffer is transferred. The device may alternatively be set to a
-non-blocking mode, in which case \fBwrite()\fR completes immediately, but may
-have transferred fewer bytes than requested. See \fBwrite\fR(2).
-.sp
-.LP
-Although \fBwrite()\fR returns when the data is successfully queued, the actual
-completion of audio output may take considerably longer. The \fBAUDIO_DRAIN\fR
-\fBioctl\fR may be issued to allow an application to block until all of the
-queued output data has been played. Alternatively, a process may request
+.Ss "Playing Audio Data"
+The
+.Xr write 2
+system call copies data from an application's buffer to the
+.Sy STREAMS
+output queue.
+Ordinarily,
+.Xr write 2
+blocks until the entire user buffer is transferred.
+The device may alternatively be set to a non-blocking mode, in which case
+.Xr write 2
+completes immediately, but may have transferred fewer bytes than requested.
+See
+.Xr write 2 .
+.Pp
+Although
+.Xr write 2
+returns when the data is successfully queued, the actual
+completion of audio output may take considerably longer.
+The
+.Dv AUDIO_DRAIN
+ioctl may be issued to allow an application to block until all of the
+queued output data has been played.
+Alternatively, a process may request
 asynchronous notification of output completion by writing a zero-length buffer
-(end-of-file record) to the output stream. When such a buffer has been
-processed, the \fIplay.eof\fR flag in the audio information structure is
-incremented.
-.sp
-.LP
-The final \fBclose\fR(2) of the file descriptor hangs until all of the audio
-output has drained. If a signal interrupts the \fBclose()\fR, or if the process
-exits without closing the device, any remaining data queued for audio output is
-flushed and the device is closed immediately.
-.sp
-.LP
+(end-of-file record) to the output stream.
+When such a buffer has been
+processed, the
+.Fa play.eof
+flag in the audio information structure is incremented.
+.Pp
+The final
+.Xr close 2
+of the file descriptor hangs until all of the audio
+output has drained.
+If a signal interrupts the
+.Xr close 2 ,
+or if the process exits without closing the device, any remaining data queued
+for audio output is flushed and the device is closed immediately.
+.Pp
 The consumption of output data may be paused (or resumed) by using the
-\fBAUDIO_SETINFO\fR \fBioctl\fR to set (or clear) the \fIplay.pause\fR flag in
-the audio information structure. Queued output data may be discarded by using
-the \fBI_FLUSH\fR \fBSTREAMS\fR \fBioctl\fR. (See \fBstreamio\fR(7I)).
-.sp
-.LP
-Output data is played from the \fBSTREAMS\fR buffers at a default rate of at
+.Dv AUDIO_SETINFO
+ioctl to set (or clear) the
+.Fa play.pause
+flag in the audio information structure.
+Queued output data may be discarded by using
+the
+.Dv I_FLUSH
+.Sy STREAMS
+ioctl.
+(See
+.Xr streamio 7I ) .
+.Pp
+Output data is played from the
+.Sy STREAMS
+buffers at a default rate of at
 least 8000 bytes per second for \(*m-Law, A-Law or 8-bit PCM data (faster for
-16-bit linear data or higher sampling rates). If the output queue becomes
-empty, the \fIplay.error\fR flag is set in the audio information structure and
-output is stopped until additional data is written. If an application attempts
+16-bit linear data or higher sampling rates).
+If the output queue becomes
+empty, the
+.Fa play.error
+flag is set in the audio information structure and
+output is stopped until additional data is written.
+If an application attempts
 to write a number of bytes that is not a multiple of the current sample frame
-size, an error is generated and the bad data is thrown away. Additional writes
-are allowed.
-.SS "Asynchronous I/O"
-.sp
-.LP
-The \fBI_SETSIG\fR \fBSTREAMS\fR \fBioctl\fR enables asynchronous notification,
-through the \fBSIGPOLL\fR signal, of input and output ready condition changes.
-The \fBO_NONBLOCK\fR flag may be set using the \fBF_SETFL\fR \fBfcntl\fR(2) to
-enable non-blocking \fBread()\fR and \fBwrite()\fR requests. This is normally
+size, an error is generated and the bad data is thrown away.
+Additional writes are allowed.
+.Ss "Asynchronous I/O"
+The
+.Dv I_SETSIG
+.Sy STREAMS
+ioctl
+enables asynchronous notification, through the
+.Dv SIGPOLL
+signal, of input and output ready condition changes.
+The
+.Dv O_NONBLOCK
+flag may be set using the
+.Dv F_SETFL
+.Xr fcntl 2
+to
+enable non-blocking
+.Xr read 2
+and
+.Xr write 2
+requests.
+This is normally
 sufficient for applications to maintain an audio stream in the background.
-.SS "Audio Control Pseudo-Device"
-.sp
-.LP
+.Ss "Audio Control Pseudo-Device"
 It is sometimes convenient to have an application, such as a volume control
 panel, modify certain characteristics of the audio device while it is being
 used by an unrelated process.
-.sp
-.LP
-The \fB/dev/audioctl\fR pseudo-device is provided for this purpose. Any number
-of processes may open \fB/dev/audioctl\fR simultaneously. However, \fBread()\fR
-and \fBwrite()\fR system calls are ignored by \fB/dev/audioctl\fR. The
-\fBAUDIO_GETINFO\fR and \fBAUDIO_SETINFO\fR \fBioctl\fR commands may be issued
-to \fB/dev/audioctl\fR to determine the status or alter the behavior of
-\fB/dev/audio\fR. Note: In general, the audio control device name is
-constructed by appending the letters \fB"ctl"\fR to the path name of the audio
-device.
-.SS "Audio Status Change Notification"
-.sp
-.LP
+.Pp
+The
+.Pa /dev/audioctl
+pseudo-device is provided for this purpose.
+Any number of processes may open
+.Pa /dev/audioctl
+simultaneously.
+However,
+.Xr read 2
+and
+.Xr write 2
+system calls are ignored by
+.Pa /dev/audioctl .
+The
+.Dv AUDIO_GETINFO
+and
+.Dv AUDIO_SETINFO
+ioctl commands may be issued to
+.Pa /dev/audioctl
+to determine the status or alter the behavior of
+.Pa /dev/audio .
+Note: In general, the audio control device name is
+constructed by appending the letters
+.Qq Sy ctl
+to the path name of the audio device.
+.Ss "Audio Status Change Notification"
 Applications that open the audio control pseudo-device may request asynchronous
 notification of changes in the state of the audio device by setting the
-\fBS_MSG\fR flag in an \fBI_SETSIG\fR \fBSTREAMS\fR \fBioctl\fR. Such processes
-receive a \fBSIGPOLL\fR signal when any of the following events occur:
-.RS +4
-.TP
-.ie t \(bu
-.el o
-An \fBAUDIO_SETINFO\fR \fBioctl\fR has altered the device state.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.Dv S_MSG
+flag in an
+.Dv I_SETSIG
+.Sy STREAMS
+ioctl.
+Such processes receive a
+.Dv SIGPOLL
+signal when any of the following events occur:
+.Bl -bullet -offset indent
+.It
+An
+.Dv AUDIO_SETINFO
+ioctl has altered the device state.
+.It
 An input overflow or output underflow has occurred.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
 An end-of-file record (zero-length buffer) has been processed on output.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
-An \fBopen()\fR or \fBclose()\fR of \fB/dev/audio\fR has altered the device
-state.
-.RE
-.RS +4
-.TP
-.ie t \(bu
-.el o
+.It
+An
+.Xr open 2
+or
+.Xr close 2
+of
+.Pa /dev/audio
+has altered the device state.
+.It
 An external event (such as speakerbox's volume control) has altered the device
 state.
-.RE
-.SH IOCTLS
-.SS "Audio Information Structure"
-.sp
-.LP
+.El
+.Sh IOCTLS
+.Ss "Audio Information Structure"
 The state of the audio device may be polled or modified using the
-\fBAUDIO_GETINFO\fR and \fBAUDIO_SETINFO\fR \fBioctl\fR commands. These
-commands operate on the \fBaudio_info\fR structure as defined, in
-\fB<sys/audio.h>\fR, as follows:
-.sp
-.in +2
-.nf
+.Dv AUDIO_GETINFO
+and
+.Dv AUDIO_SETINFO
+ioctl commands.
+These commands operate on the
+.Vt audio_info
+structure as defined, in
+.In sys/audio.h ,
+as follows:
+.Bd -literal -offset 2n
 /*
-* This structure contains state information for audio device
-* IO streams
-*/
+ * This structure contains state information for audio device
+ * IO streams
+ */
 
 struct audio_prinfo {
-  /*
-  * The following values describe the
-  * audio data encoding
-  */
- uint_t sample_rate; /* samples per second */
- uint_t channels;  /* number of interleaved channels */
- uint_t precision; /* number of bits per sample */
- uint_t encoding;  /* data encoding method */
+     /*
+      * The following values describe the
+      * audio data encoding
+      */
+      uint_t sample_rate; /* samples per second */
+      uint_t channels;    /* number of interleaved channels */
+      uint_t precision;   /* number of bits per sample */
+      uint_t encoding;    /* data encoding method */
 
+      /*
+       * The following values control audio device
+       * configuration
+       */
+      uint_t gain; /* volume level */
+      uint_t port; /* selected I/O port */
+      uint_t buffer_size; /* I/O buffer size */
 
-  /*
-  * The following values control audio device
-  * configuration
-  */
- uint_t gain; /* volume level */
- uint_t port; /* selected I/O port */
- uint_t buffer_size; /* I/O buffer size */
+     /*
+      * The following values describe the current device
+      * state
+      */
+     uint_t samples; /* number of samples converted */
+     uint_t eof;     /* End Of File counter (play only) */
+     uchar_t pause;  /* non-zero if paused, zero to resume */
+     uchar_t error;  /* non-zero if overflow/underflow */
+     uchar_t waiting; /* non-zero if a process wants access */
+     uchar_t balance; /* stereo channel balance */
 
-  /*
-  * The following values describe the current device
-  * state
-  */
- uint_t samples; /* number of samples converted */
- uint_t eof;  /* End Of File counter (play only) */
- uchar_t pause;  /* non-zero if paused, zero to resume */
- uchar_t error; /* non-zero if overflow/underflow */
- uchar_t waiting; /* non-zero if a process wants access */
- uchar_t balance; /* stereo channel balance */
-   /*
-   * The following values are read-only device state
-   * information
-   */
- uchar_t open;/* non-zero if open access granted */
- uchar_t active; /* non-zero if I/O active */
- uint_t avail_ports; /* available I/O ports */
- uint_t mod_ports; /* modifiable I/O ports */
+     /*
+      * The following values are read-only device state
+      * information
+      */
+      uchar_t open;   /* non-zero if open access granted */
+      uchar_t active; /* non-zero if I/O active */
+      uint_t avail_ports; /* available I/O ports */
+      uint_t mod_ports; /* modifiable I/O ports */
 };
 typedef struct audio_prinfo audio_prinfo_t;
 
-  /*
-  * This structure is used in AUDIO_GETINFO and AUDIO_SETINFO ioctl
-  * commands
-  */
+/*
+ * This structure is used in AUDIO_GETINFO and AUDIO_SETINFO ioctl
+ * commands
+ */
 struct audio_info {
- audio_prinfo_t record;/* input status info */
- audio_prinfo_t play;/* output status info */
- uint_t monitor_gain; /* input to output mix */
- uchar_toutput_muted; /* non-zero if output muted */
- uint_t hw_features; /* supported H/W features */
- uint_t sw_features;/* supported S/W features */
- uint_t sw_features_enabled;
+    audio_prinfo_t record;/* input status info */
+    audio_prinfo_t play; /* output status info */
+    uint_t monitor_gain; /* input to output mix */
+    uchar_toutput_muted; /* non-zero if output muted */
+    uint_t hw_features;  /* supported H/W features */
+    uint_t sw_features;  /* supported S/W features */
+    uint_t sw_features_enabled;
                 /* supported S/W features enabled */
 };
 typedef struct audio_info audio_info_t;
@@ -426,392 +533,467 @@ typedef struct audio_info audio_info_t;
 #define AUDIO_ENCODING_ULAW (1) /* u-Law encoding */
 #define AUDIO_ENCODING_ALAW (2) /* A-Law encoding */
 #define AUDIO_ENCODING_LINEAR (3) /* Signed Linear PCM encoding */
+
 /*
-* These ranges apply to record, play, and
-* monitor gain values
+ * These ranges apply to record, play, and
+ * monitor gain values
  */
 #define AUDIO_MIN_GAIN (0)/* minimum gain value */
 #define AUDIO_MAX_GAIN (255) /* maximum gain value */
 
 /*
-* These values apply to the balance field to adjust channel
-* gain values
+ * These values apply to the balance field to adjust channel
+ * gain values
  */
-#define AUDIO_LEFT_BALANCE(0) /* left channel only */
-#define AUDIO_MID_BALANCE (32) /* equal left/right balance */
+#define AUDIO_LEFT_BALANCE   (0) /* left channel only */
+#define AUDIO_MID_BALANCE   (32) /* equal left/right balance */
 #define AUDIO_RIGHT_BALANCE (64) /* right channel only */
 
 /*
-* Define some convenient audio port names
-* (for port, avail_ports and mod_ports)
+ * Define some convenient audio port names
+ * (for port, avail_ports and mod_ports)
  */
 
 /* output ports (several might be enabled at once) */
-#define AUDIO_SPEAKER (0x01)/* built-in speaker */
-#define AUDIO_HEADPHONE (0x02)/* headphone jack */
-#define AUDIO_LINE_OUT (0x04)/* line out */
-#define AUDIO_SPDIF_OUT (0x08)/* SPDIF port */
-#define AUDIO_AUX1_OUT (0x10)/* aux1 out */
-#define AUDIO_AUX2_OUT (0x20)/* aux2 out */
+#define AUDIO_SPEAKER   (0x01) /* built-in speaker */
+#define AUDIO_HEADPHONE (0x02) /* headphone jack */
+#define AUDIO_LINE_OUT  (0x04) /* line out */
+#define AUDIO_SPDIF_OUT (0x08) /* SPDIF port */
+#define AUDIO_AUX1_OUT  (0x10) /* aux1 out */
+#define AUDIO_AUX2_OUT  (0x20) /* aux2 out */
 
-/* input ports (usually only one may be
-* enabled at a time)
+/*
+ * input ports (usually only one may be enabled at a time)
  */
 #define AUDIO_MICROPHONE (0x01) /* microphone */
-#define AUDIO_LINE_IN (0x02) /* line in */
-#define AUDIO_CD(0x04) /* on-board CD inputs */
+#define AUDIO_LINE_IN  (0x02) /* line in */
+#define AUDIO_CD       (0x04) /* on-board CD inputs */
 #define AUDIO_SPDIF_IN (0x08) /* SPDIF port */
-#define AUDIO_AUX1_IN (0x10) /* aux1 in */
-#define AUDIO_AUX2_IN (0x20) /* aux2 in */
-#define AUDIO_CODEC_LOOPB_IN (0x40) /* Codec inter.loopback */
+#define AUDIO_AUX1_IN  (0x10) /* aux1 in */
+#define AUDIO_AUX2_IN  (0x20) /* aux2 in */
+#define AUDIO_CODEC_LOOPB_IN (0x40) /* Codec inter. loopback */
 
 /* These defines are for hardware features */
 #define AUDIO_HWFEATURE_DUPLEX (0x00000001u)
-/*simult. play & cap. supported */
+/* simult. play & cap. supported */
 
 #define AUDIO_HWFEATURE_MSCODEC (0x00000002u)
 /* multi-stream Codec */
 
 /* These defines are for software features *
 #define AUDIO_SWFEATURE_MIXER (0x00000001u)
- /* audio mixer audio pers. mod. */
+/* audio mixer audio pers. mod. */
 
 /*
-* Parameter for the AUDIO_GETDEV ioctl
-* to determine current audio devices
-*/#define MAX_AUDIO_DEV_LEN(16)
+ * Parameter for the AUDIO_GETDEV ioctl
+ * to determine current audio devices
+ */
+#define MAX_AUDIO_DEV_LEN (16)
 struct audio_device {
- char name[MAX_AUDIO_DEV_LEN];
- char version[MAX_AUDIO_DEV_LEN];
- char config[MAX_AUDIO_DEV_LEN];
+    char name[MAX_AUDIO_DEV_LEN];
+    char version[MAX_AUDIO_DEV_LEN];
+    char config[MAX_AUDIO_DEV_LEN];
 };
 typedef struct audio_device audio_device_t;
-.fi
-.in -2
-
-.sp
-.LP
-The \fIplay.gain\fR and \fIrecord.gain\fR fields specify the output and input
-volume levels. A value of \fBAUDIO_MAX_GAIN\fR indicates maximum volume. Audio
-output may also be temporarily muted by setting a non-zero value in the
-\fIoutput_muted\fR field. Clearing this field restores audio output  to the
-normal state.
-.sp
-.LP
-The \fImonitor_gain\fR field is present for compatibility, and is no longer
-supported. See \fBdsp\fR(7I) for more detail.
-.sp
-.LP
-Likewise, the \fIplay.port\fR, \fIplay.ports\fR, \fIplay.mod_ports\fR,
-\fIrecord.port\fR, \fIrecord.ports\fR, and \fIrecord.mod_ports\fR are no longer
-supported. See \fBdsp\fR(7I) for more detail.
-.sp
-.LP
-The \fIplay.balance\fR and \fIrecord.balance\fR fields are fixed to
-\fBAUDIO_MID_BALANCE\fR. Changes to volume levels for different channels can be
-made using the interfaces in \fBdsp\fR(7I).
-.sp
-.LP
-The \fIplay.pause\fR and \fIrecord.pause\fR flags may be used to pause and
-resume the transfer of data between the audio device and the STREAMS buffers.
-The \fIplay.error\fR and \fIrecord.error\fR flags indicate that data underflow
-or overflow has occurred. The \fIplay.active\fR and \fIrecord.active\fR flags
-indicate  that data transfer is currently active in the corresponding
+.Ed
+.Pp
+The
+.Fa play.gain
+and
+.Fa record.gain
+fields specify the output and input volume levels.
+A value of
+.Dv AUDIO_MAX_GAIN
+indicates maximum volume.
+Audio output may also be temporarily muted by setting a non-zero value in the
+.Fa output_muted
+field.
+Clearing this field restores audio output to the normal state.
+.Pp
+The
+.Va monitor_gain
+field is present for compatibility, and is no longer supported.
+See
+.Xr dsp 7I
+for more detail.
+.Pp
+Likewise, the
+.Fa play.port ,
+.Fa play.ports ,
+.Fa play.mod_ports ,
+.Fa record.port ,
+.Fa record.ports ,
+and
+.Fa record.mod_ports
+are no longer supported.
+See
+.Xr dsp 7I
+for more detail.
+.Pp
+The
+.Fa play.balance
+and
+.Fa record.balance
+fields are fixed to
+.Dv AUDIO_MID_BALANCE .
+Changes to volume levels for different channels can be
+made using the interfaces in
+.Xr dsp 7I .
+.Pp
+The
+.Fa play.pause
+and
+.Fa record.pause
+flags may be used to pause and
+resume the transfer of data between the audio device and the
+.Sy STREAMS
+buffers.
+The
+.Fa play.error
+and
+.Fa record.error
+flags indicate that data underflow or overflow has occurred.
+The
+.Fa play.active
+and
+.Fa record.active
+flags indicate that data transfer is currently active in the corresponding
 direction.
-.sp
-.LP
-The \fIplay.open\fR and \fIrecord.open\fR flags indicate that the device is
-currently open with the corresponding access permission. The \fIplay.waiting\fR
-and \fIrecord.waiting\fR flags provide an indication that a process may be
-waiting to access the device. These flags are set automatically when a process
-blocks on \fBopen()\fR, though they may also be set using the
-\fBAUDIO_SETINFO\fR ioctl command. They are cleared only when a process
-relinquishes access by closing the device.
-.sp
-.LP
-The \fIplay.samples\fR and \fIrecord.samples\fR fields are zeroed at
-\fBopen()\fR and are incremented each time a data sample is copied to or from
-the associated STREAMS queue. Some audio drivers may be limited to counting
-buffers of samples, instead of single samples for their samples accounting. For
-this reason, applications should not assume that the samples fields contain a
-perfectly accurate count. The \fIplay.eof\fR field increments whenever a
-zero-length output buffer is synchronously processed. Applications may use this
-field to detect  the completion of particular segments of audio output.
-.sp
-.LP
-The \fIrecord.buffer_size\fR field controls the amount of input data that is
-buffered in the device driver during record operations. Applications that have
+.Pp
+The
+.Fa play.open
+and
+.Fa record.open
+flags indicate that the device is
+currently open with the corresponding access permission.
+The
+.Fa play.waiting
+and
+.Fa record.waiting
+flags provide an indication that a process may be waiting to access the device.
+These flags are set automatically when a process blocks on
+.Xr open 2 ,
+though they may also be set using the
+.Dv AUDIO_SETINFO
+ioctl command.
+They are cleared only when a process relinquishes access by closing the device.
+.Pp
+The
+.Fa play.samples
+and
+.Fa record.samples
+fields are zeroed at
+.Xr open 2
+and are incremented each time a data sample is copied to or from
+the associated
+.Sy STREAMS
+queue.
+Some audio drivers may be limited to counting
+buffers of samples, instead of single samples for their samples accounting.
+For this reason, applications should not assume that the samples fields contain a
+perfectly accurate count.
+The
+.Fa play.eof
+field increments whenever a zero-length output buffer is synchronously processed.
+Applications may use this
+field to detect the completion of particular segments of audio output.
+.Pp
+The
+.Fa record.buffer_size
+field controls the amount of input data that is
+buffered in the device driver during record operations.
+Applications that have
 particular requirements for low latency should set the value appropriately.
 Note however that smaller input buffer sizes may result in higher system
-overhead. The value of this field is specified in bytes and drivers will
-constrain it to be a multiple of the current sample frame size. Some drivers
-may place other requirements on the value of this field. Refer to the audio
-device-specific manual page for more details. If an application changes the
-format of the audio device and does not modify the \fIrecord.buffer_size\fR
+overhead.
+The value of this field is specified in bytes and drivers will
+constrain it to be a multiple of the current sample frame size.
+Some drivers may place other requirements on the value of this field.
+Refer to the audio device-specific manual page for more details.
+If an application changes the
+format of the audio device and does not modify the
+.Fa record.buffer_size
 field, the device driver may use a default value to compensate for the new data
-rate. Therefore, if an application is going to modify this field, it should
-modify it during or after the format change itself, not before. When changing
-the \fIrecord.buffer_size\fR parameters, the input stream should be paused and
-flushed before the change, and resumed afterward. Otherwise,  subsequent reads
+rate.
+Therefore, if an application is going to modify this field, it should
+modify it during or after the format change itself, not before.
+When changing
+the
+.Fa record.buffer_size
+parameters, the input stream should be paused and
+flushed before the change, and resumed afterward.
+Otherwise, subsequent reads
 may return samples in the old format followed by samples in the new format.
 This is particularly important when new parameters result in a changed sample
-size. If you change the \fIrecord.buffer_size\fR for the first packet, this
-protocol must be followed or the first buffer will be the default buffer size
-for the device, followed by packets of the requested change size.
-.sp
-.LP
-The \fIrecord.buffer_size\fR field may be modified only on the \fB/dev/audio\fR
+size.
+If you change the
+.Fa record.buffer_size
+for the first packet, this protocol must be followed or the first buffer will
+be the default buffer size for the device, followed by packets of the requested
+change size.
+.Pp
+The
+.Fa record.buffer_size
+field may be modified only on the
+.Pa /dev/audio
 device by processes that have it opened for reading.
-.sp
-.LP
-The \fIplay.buffer_size\fR field is currently not supported.
-.sp
-.LP
-The audio data format is indicated by the \fIsample_rate, channels,
-precision\fR and encoding fields. The values of these fields correspond to the
-descriptions in the \fBAUDIO FORMATS\fR section of this man page. Refer to the
+.Pp
+The
+.Fa play.buffer_size
+field is currently not supported.
+.Pp
+The audio data format is indicated by the
+.Fa sample_rate ,
+.Fa channels ,
+.Fa precision ,
+and
+.Fa encoding
+fields.
+The values of these fields correspond to the
+descriptions in the
+.Sx "AUDIO FORMATS"
+section of this man page.
+Refer to the
 audio device-specific manual pages for a list of supported data format
 combinations.
-.sp
-.LP
-The data format fields can be modified only on the \fB/dev/audio\fR device.
-.sp
-.LP
-If the parameter changes requested by an \fBAUDIO_SETINFO\fR ioctl cannot all
-be accommodated, \fBioctl()\fR returns with \fBerrno\fR set to \fBEINVAL\fR and
-no changes are made to the device state.
-.SS "Streamio IOCTLS"
-.sp
-.LP
-All of the \fBstreamio\fR(7I) \fBioctl\fR commands may be issued for the
-\fB/dev/audio\fR device. Because the \fB/dev/audioctl\fR device has its own
-\fBSTREAMS\fR queues, most of these commands neither modify nor report the
-state of \fB/dev/audio\fR if issued for the \fB/dev/audioctl\fR device. The
-\fBI_SETSIG\fR \fBioctl\fR may be issued for \fB/dev/audioctl\fR to enable the
-notification of audio status changes, as described above.
-.SS "Audio IOCTLS"
-.sp
-.LP
-The audio device additionally supports the following \fBioctl\fR commands:
-.sp
-.ne 2
-.na
-\fB\fBAUDIO_DRAIN\fR\fR
-.ad
-.RS 17n
-The argument is ignored. This command suspends the calling process until the
+.Pp
+The data format fields can be modified only on the
+.Pa /dev/audio
+device.
+.Pp
+If the parameter changes requested by an
+.Dv AUDIO_SETINFO
+ioctl cannot all be accommodated,
+.Xr ioctl 2
+returns with
+.Va errno
+set to
+.Er EINVAL
+and no changes are made to the device state.
+.Ss "Streamio IOCTLS"
+All of the
+.Xr streamio 7I
+.Xr ioctl 2
+commands may be issued for the
+.Pa /dev/audio
+device.
+Because the
+.Pa /dev/audioctl
+device has its own
+.Sy STREAMS
+queues, most of these commands neither modify nor report the
+state of
+.Pa /dev/audio
+if issued for the
+.Pa /dev/audioctl
+device.
+The
+.Dv I_SETSIG
+ioctl may be issued for
+.Pa /dev/audioctl
+to enable the notification of audio status changes, as described above.
+.Ss "Audio IOCTLS"
+The audio device additionally supports the following
+.Xr ioctl 2
+commands:
+.Bl -tag -width "AUDIO_GETINFO"
+.It Dv AUDIO_DRAIN
+The argument is ignored.
+This command suspends the calling process until the
 output STREAMS queue is empty and all queued samples have been played, or until
-a signal is delivered to the calling process. It may not be issued for the
-\fB/dev/audioctldevice\fR.  An implicit \fBAUDIO_DRAIN\fR is performed on the
-final \fBclose()\fR of \fB/dev/audio\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBAUDIO_GETDEV\fR\fR
-.ad
-.RS 17n
-The argument is a pointer to an \fBaudio_device_t\fR structure. This command
-may be issued for either \fB/dev/audio\fR or \fB/dev/audioctl\fR. The returned
+a signal is delivered to the calling process.
+It may not be issued for the
+.Pa /dev/audioctl
+device.
+An implicit
+.Dv AUDIO_DRAIN
+is performed on the final
+.Xr close 2
+of
+.Pa /dev/audio .
+.It Dv AUDIO_GETDEV
+The argument is a pointer to an
+.Vt audio_device_t
+structure.
+This command may be issued for either
+.Pa /dev/audio
+or
+.Pa /dev/audioctl .
+The returned
 value in the name field will be a string that will identify the current
-\fB/dev/audio\fR hardware device, the value in version will be a string
-indicating the current version of the hardware, and \fBconfig\fR will be a
-device-specific string identifying the properties of the audio stream
-associated with that file descriptor. Refer to the audio device-specific manual
+.Pa /dev/audio
+hardware device, the value in version will be a string
+indicating the current version of the hardware, and
+.Fa config
+will be a device-specific string identifying the properties of the audio stream
+associated with that file descriptor.
+Refer to the audio device-specific manual
 pages to determine the actual strings returned by the device driver.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBAUDIO_GETINFO\fR\fR
-.ad
-.RS 17n
-The argument is a pointer to an \fBaudio_info_t\fR structure. This command may
-be issued for either \fB/dev/audio\fR or \fB/dev/audioctl\fR. The current state
-of the \fB/dev/audio\fR device is returned in the structure.
-.sp
+.It Dv AUDIO_GETINFO
+The argument is a pointer to an
+.Vt audio_info_t
+structure.
+This command may be issued for either
+.Pa /dev/audio
+or
+.Pa /dev/audioctl .
+The current state of the
+.Pa /dev/audio
+device is returned in the structure.
 Values return pertain to a logical view of the device as seen by and private to
 the process, and do not necessarily reflect the actual hardware device itself.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBAUDIO_SETINFO\fR\fR
-.ad
-.RS 17n
-The argument is a pointer to an \fBaudio_info_t\fR structure. This command may
-be issued for either the \fB/dev/audio\fR or the \fB/dev/audioctl\fR device
-with some restrictions. This command configures the audio device according to
+.It Dv AUDIO_SETINFO
+The argument is a pointer to an
+.Vt audio_info_t
+structure.
+This command may be issued for either the
+.Pa /dev/audio
+or the
+.Pa /dev/audioctl
+device with some restrictions.
+This command configures the audio device according to
 the supplied structure and overwrites the existing structure with the new state
-of the device. Note: The \fIplay.samples\fR, \fIrecord.samples\fR,
-\fIplay.error\fR, \fIrecord.error\fR, and \fIplay.eof\fR fields are modified to
-reflect the state of the device when the \fBAUDIO_SETINFO\fR is issued. This
-allows programs to automatically modify  these fields while retrieving the
+of the device.
+Note: The
+.Fa play.samples ,
+.Fa record.samples ,
+.Fa play.error ,
+.Fa record.error ,
+and
+.Fa play.eof
+fields are modified to reflect the state of the device when the
+.Dv AUDIO_SETINFO
+is issued.
+This allows programs to automatically modify these fields while retrieving the
 previous value.
-.sp
-As with \fBAUDIO_SETINFO\fR, the settings managed by this ioctl deal with a
+.Pp
+As with
+.Dv AUDIO_SETINFO ,
+the settings managed by this ioctl deal with a
 logical view of the device which is private to the process, and don't
 necessarily have any impact on the hardware device itself.
-.RE
-
-.sp
-.LP
+.El
+.Pp
 Certain fields in the audio information structure, such as the pause flags, are
-treated as read-only when \fB/dev/audio\fR is not open with the corresponding
-access permission. Other fields, such as the gain levels and encoding
-information, may have a restricted set of acceptable values. Applications that
+treated as read-only when
+.Pa /dev/audio
+is not open with the corresponding access permission.
+Other fields, such as the gain levels and encoding
+information, may have a restricted set of acceptable values.
+Applications that
 attempt to modify such fields should check the returned values to be sure that
-the corresponding change took effect. The \fIsample_rate\fR, \fIchannels\fR,
-\fIprecision\fR, and \fIencoding\fR fields treated as read-only for
-\fB/dev/audioctl\fR, so that applications  can be guaranteed that the existing
+the corresponding change took effect.
+The
+.Fa sample_rate ,
+.Fa channels ,
+.Fa precision ,
+and
+.Fa encoding
+fields treated as read-only for
+.Pa /dev/audioctl ,
+so that applications can be guaranteed that the existing
 audio format will stay in place until they relinquish the audio device.
-\fBAUDIO_SETINFO\fR will return \fBEINVAL\fR when the desired configuration is
-not possible, or \fBEBUSY\fR when another process has control of the audio
-device.
-.sp
-.LP
+.Dv AUDIO_SETINFO
+will return
+.Er EINVAL
+when the desired configuration is not possible, or
+.Er EBUSY
+when another process has control of the audio device.
+.Pp
 All of the logical device state is reset when the corresponding I/O stream of
-\fB/dev/audio\fR is closed.
-.sp
-.LP
-The \fBaudio_info_t\fR structure may be initialized through the use of the
-\fBAUDIO_INITINFO\fR macro. This macro sets all fields in the structure to
-values that are ignored by the \fBAUDIO_SETINFO\fR command. For instance, the
-following code switches the output port from the built-in speaker to the
-headphone jack without modifying any other audio parameters:
-.sp
-.in +2
-.nf
+.Pa /dev/audio
+is closed.
+.Pp
+The
+.Vt audio_info_t
+structure may be initialized through the use of the
+.Dv AUDIO_INITINFO
+macro.
+This macro sets all fields in the structure to
+values that are ignored by the
+.Dv AUDIO_SETINFO
+command.
+For instance, the following code switches the output port from the built-in
+speaker to the headphone jack without modifying any other audio parameters:
+.Bd -literal -offset 2n
 audio_info_t info;
 AUDIO_INITINFO();
 info.play.port = AUDIO_HEADPHONE;
 err = ioctl(audio_fd, AUDIO_SETINFO, );
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 This technique eliminates problems associated with using a sequence of
-\fBAUDIO_GETINFO\fR followed by \fBAUDIO_SETINFO\fR.
-.SH ERRORS
-.sp
-.LP
-An \fBopen()\fR will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEBUSY\fR\fR
-.ad
-.RS 9n
-The requested play or record access is busy and either the \fBO_NDELAY\fR or
-\fBO_NONBLOCK\fR flag was set in the \fBopen()\fR request.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINTR\fR\fR
-.ad
-.RS 9n
-The requested play or record access is busy and a signal interrupted the
-\fBopen()\fR request.
-.RE
-
-.sp
-.LP
-An \fBioctl()\fR will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The parameter changes requested in the \fBAUDIO_SETINFO()\fR ioctl are invalid
-or are not supported by the device.
-.RE
-
-.SH FILES
-.sp
-.LP
+.Dv AUDIO_GETINFO
+followed by
+.Dv AUDIO_SETINFO .
+.Sh FILES
 The physical audio device names are system dependent and are rarely used by
-programmers. Programmers should use the following generic device names:
-.sp
-.ne 2
-.na
-\fB\fB/dev/audio\fR\fR
-.ad
-.RS 28n
+programmers.
+Programmers should use the following generic device names:
+.Bl -tag -width "/usr/share/audio/samples"
+.It Pa /dev/audio
 Symbolic link to the system's primary audio device
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/audioctl\fR\fR
-.ad
-.RS 28n
-Symbolic link to the control device for \fB/dev/audio\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/sound/0\fR\fR
-.ad
-.RS 28n
+.It Pa /dev/audioctl
+Symbolic link to the control device for
+.Pa /dev/audio
+.It Pa /dev/sound/0
 First audio device in the system
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/sound/0ctl\fR\fR
-.ad
-.RS 28n
-Audio control device for \fB/dev/sound/0\fR
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/audio/samples\fR\fR
-.ad
-.RS 28n
+.It Pa /dev/sound/0ctl
+Audio control device for
+.Pa /dev/sound/0
+.It Pa /usr/share/audio/samples
 Audio files
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for a description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC, x86
-_
-Stability Level	Obsolete Uncommitted
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBclose\fR(2), \fBfcntl\fR(2), \fBioctl\fR(2), \fBopen\fR(2), \fBpoll\fR(2),
-\fBread\fR(2), \fBwrite\fR(2), \fBattributes\fR(5), \fBdsp\fR(7I),
-\fBstreamio\fR(7I)
-.SH BUGS
-.sp
-.LP
-Due to a feature of the STREAMS implementation, programs that are terminated or
+.El
+.Sh ERRORS
+An
+.Xr open 2
+call will fail if:
+.Bl -tag -width "EINTR"
+.It Er EBUSY
+The requested play or record access is busy and either the
+.Dv O_NDELAY
+or
+.Dv O_NONBLOCK
+flag was set in the
+.Xr open 2
+request.
+.It Er EINTR
+The requested play or record access is busy and a signal interrupted the
+.Xr open 2
+request.
+.El
+.Pp
+An
+.Xr ioctl 2
+call will fail if:
+.Bl -tag -width "EINVAL"
+.It Er EINVAL
+The parameter changes requested in the
+.Dv AUDIO_SETINFO
+ioctl are invalid or are not supported by the device.
+.El
+.Sh ARCHITECTURE
+SPARC
+X86
+.Sh INTERFACE STABILITY
+Obsolete Uncommitted
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr fcntl 2 ,
+.Xr ioctl 2 ,
+.Xr open 2 ,
+.Xr poll 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr attributes 5 ,
+.Xr dsp 7I ,
+.Xr streamio 7I
+.Sh BUGS
+Due to a feature of the
+.Sy STREAMS
+implementation, programs that are terminated or
 exit without closing the audio device may hang for a short period while audio
-output drains. In general, programs that produce audio output should catch the
-\fBSIGINT\fR signal and flush the output stream before exiting.
+output drains.
+In general, programs that produce audio output should catch the
+.Dv SIGINT
+signal and flush the output stream before exiting.

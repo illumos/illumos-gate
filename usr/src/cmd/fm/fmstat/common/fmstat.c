@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <fm/fmd_adm.h>
 
 #include <strings.h>
@@ -373,7 +377,7 @@ modstat_compute(struct modstats *mp, fmd_adm_stats_t *ams)
 }
 
 /*ARGSUSED*/
-static int
+static void
 stat_one_xprt(id_t id, void *ignored)
 {
 	fmd_adm_stats_t ams;
@@ -381,7 +385,7 @@ stat_one_xprt(id_t id, void *ignored)
 
 	if (fmd_adm_xprt_stats(g_adm, id, &ams) != 0) {
 		warn("failed to retrieve statistics for transport %d", (int)id);
-		return (0); /* continue on to the next transport */
+		return;
 	}
 
 	for (mp = g_mods; mp != NULL; mp = mp->m_next) {
@@ -392,7 +396,7 @@ stat_one_xprt(id_t id, void *ignored)
 	if (mp == NULL && (mp = modstat_create(NULL, id)) == NULL) {
 		warn("failed to allocate memory for transport %d", (int)id);
 		(void) fmd_adm_stats_free(g_adm, &ams);
-		return (0);
+		return;
 	}
 
 	modstat_compute(mp, &ams);
@@ -412,7 +416,6 @@ stat_one_xprt(id_t id, void *ignored)
 	    mp->m_new->module.fmds_value.str);
 
 	(void) fmd_adm_stats_free(g_adm, &ams);
-	return (0);
 }
 
 static void
@@ -426,7 +429,7 @@ stat_xprt(void)
 		die("failed to retrieve list of transports");
 }
 
-static int
+static void
 stat_one_xprt_auth(id_t id, void *arg)
 {
 	const char *module = arg;
@@ -435,7 +438,7 @@ stat_one_xprt_auth(id_t id, void *arg)
 
 	if (fmd_adm_xprt_stats(g_adm, id, &ams) != 0) {
 		warn("failed to retrieve statistics for transport %d", (int)id);
-		return (0); /* continue on to the next transport */
+		return;
 	}
 
 	for (mp = g_mods; mp != NULL; mp = mp->m_next) {
@@ -446,7 +449,7 @@ stat_one_xprt_auth(id_t id, void *arg)
 	if (mp == NULL && (mp = modstat_create(NULL, id)) == NULL) {
 		warn("failed to allocate memory for transport %d", (int)id);
 		(void) fmd_adm_stats_free(g_adm, &ams);
-		return (0);
+		return;
 	}
 
 	modstat_compute(mp, &ams);
@@ -461,7 +464,6 @@ stat_one_xprt_auth(id_t id, void *arg)
 	}
 
 	(void) fmd_adm_stats_free(g_adm, &ams);
-	return (0);
 }
 
 static void

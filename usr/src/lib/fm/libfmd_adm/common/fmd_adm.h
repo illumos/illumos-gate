@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #ifndef	_FMD_ADM_H
 #define	_FMD_ADM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/fmd_api.h>
 
@@ -129,7 +131,7 @@ extern int fmd_adm_serd_iter(fmd_adm_t *, const char *,
     fmd_adm_serd_f *, void *);
 extern int fmd_adm_serd_reset(fmd_adm_t *, const char *, const char *);
 
-typedef int fmd_adm_xprt_f(id_t, void *);
+typedef void fmd_adm_xprt_f(id_t, void *);
 
 extern int fmd_adm_xprt_iter(fmd_adm_t *, fmd_adm_xprt_f *, void *);
 extern int fmd_adm_xprt_stats(fmd_adm_t *, id_t, fmd_adm_stats_t *);

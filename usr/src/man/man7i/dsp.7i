@@ -1,483 +1,488 @@
-'\" te
 .\"  Copyright (c) 2009 Sun Microsystems, Inc. All rights reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DSP 7I "May 11, 2009"
-.SH NAME
-dsp \- generic audio device interface
-.SH SYNOPSIS
-.LP
-.nf
-\fB#include\fR \fB<sys/soundcard.h>\fR
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-To record audio input, applications \fBopen()\fR the appropriate device and
-read data from it using the \fBread()\fR system call. Similarly, sound data is
-queued to the audio output port by using the \fBwrite\fR(2) system call. Device
-configuration is performed using the \fBioctl\fR(2) interface.
-.sp
-.LP
+.\" Copyright 2018, Joyent, Inc.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.Dd July 9, 2018
+.Dt DSP 7I
+.Os
+.Sh NAME
+.Nm dsp
+.Nd generic audio device interface
+.Sh SYNOPSIS
+.In sys/soundcard.h
+.Sh DESCRIPTION
+To record audio input, applications
+.Xr open 2
+the appropriate device and
+read data from it using the
+.Xr read 2
+system call.
+Similarly, sound data is queued to the audio output port by using the
+.Xr write 2
+system call.
+Device configuration is performed using the
+.Xr ioctl 2
+interface.
+.Pp
 Because some systems can contain more than one audio device, application
-writers are encouraged to open the \fB/dev/mixer\fR device and determine the
-physical devices present on the system using the \fBSNDCTL_SYSINFO\fR and
-\fBSNDCTL_AUDIOINFO\fR ioctls. See \fBmixer\fR(7I). The user should be provided
-a the ability to select a different audio device, or alternatively, an
-environment variable such as \fBAUDIODSP\fR can be used. In the absence of any
-specific configuration from the user, the generic device file, \fB/dev/dsp\fR,
-can be used.  This normally points to a reasonably appropriate default audio
+writers are encouraged to open the
+.Pa /dev/mixer
+device and determine the
+physical devices present on the system using the
+.Dv SNDCTL_SYSINFO
+and
+.Dv SNDCTL_AUDIOINFO
+ioctls.
+See
+.Xr mixer 7I .
+The user should be provided
+wth the ability to select a different audio device, or alternatively, an
+environment variable such as
+.Ev AUDIODSP
+can be used.
+In the absence of any
+specific configuration from the user, the generic device file,
+.Pa /dev/dsp ,
+can be used.
+This normally points to a reasonably appropriate default audio
 device for the system.
-.SS "Opening the Audio Device"
-.sp
-.LP
+.Ss "Opening the Audio Device"
 The audio device is not treated as an exclusive resource.
-.sp
-.LP
-Each \fBopen()\fR completes as long as there are channels available to be
-allocated. If no channels are available to be allocated, the call returns
-\fB-1\fR with the \fBerrno\fR set to \fBEBUSY\fR.
-.sp
-.LP
+.Pp
+Each
+.Xr open 2
+completes as long as there are channels available to be allocated.
+If no channels are available to be allocated, the call returns
+.Sy -1
+with the
+.Va errno
+set to
+.Er EBUSY .
+.Pp
 Audio applications should explicitly set the encoding characteristics to match
 the audio data requirements after opening the device, and not depend on any
 default configuration.
-.SS "Recording Audio Data"
-.sp
-.LP
-The \fBread()\fR system call copies data from the system's buffers to the
-application. Ordinarily, \fBread()\fR blocks until the user buffer is filled.
-The \fBpoll\fR(2) system call can be used to determine the presence of data
-that can be read without blocking. The device can alternatively be set to a
-non-blocking mode, in which case \fBread()\fR completes immediately, but can
-return fewer bytes than requested. Refer to the \fBread\fR(2) manual page for a
-complete description of this behavior.
-.sp
-.LP
+.Ss "Recording Audio Data"
+The
+.Xr read 2
+system call copies data from the system's buffers to the application.
+Ordinarily,
+.Xr read 2
+blocks until the user buffer is filled.
+The
+.Xr poll 2
+system call can be used to determine the presence of data
+that can be read without blocking.
+The device can alternatively be set to a
+non-blocking mode, in which case
+.Xr read 2
+completes immediately, but can return fewer bytes than requested.
+Refer to the
+.Xr read 2
+manual page for a complete description of this behavior.
+.Pp
 When the audio device is opened with read access, the device driver allocates
-resources for recording. Since this consumes system resources, processes that
-do not record audio data should open the device write-only (\fBO_WRONLY\fR).
-.sp
-.LP
-The recording process can be stopped by using the \fBSNDCTL_DSP_HALT_INPUT\fR
+resources for recording.
+Since this consumes system resources, processes that
+do not record audio data should open the device write-only
+.Pq Dv O_WRONLY .
+.Pp
+The recording process can be stopped by using the
+.Dv SNDCTL_DSP_HALT_INPUT
 ioctl, which also discards all pending record data in underlying device FIFOs.
-.sp
-.LP
+.Pp
 Before changing record parameters, the input should be stopped using the
-\fBSNDCTL_DSP_HALT_INPUT\fR ioctl, which also flushes the any underlying device
-input FIFOs. (This is not necessary if the process never started recording by
-calling \fBread\fR(2). Otherwise, subsequent reads can return samples in the
-old format followed by samples in the new format. This is particularly
+.Dv SNDCTL_DSP_HALT_INPUT
+ioctl, which also flushes the any underlying device input FIFOs.
+(This is not necessary if the process never started recording by calling
+.Xr read 2 .
+Otherwise, subsequent reads can return samples in the
+old format followed by samples in the new format.
+This is particularly
 important when new parameters result in a changed sample size.
-.sp
-.LP
-Input data can accumulate in device buffers very quickly. At a minimum, it
-accumulates at 8000 bytes per second for 8-bit, 8 KHz, mono, \fBu-Law\fR data.
+.Pp
+Input data can accumulate in device buffers very quickly.
+At a minimum, it accumulates at 8000 bytes per second for 8-bit, 8 KHz, mono,
+.Sy \(*m-Law
+data.
 If the device is configured for more channels, higher sample resolution, or
-higher sample rates, it accumulates even faster. If the application that
-consumes the data cannot keep up with this data rate, the underlying FIFOs can
-become full. When this occurs, any new incoming data is lost until the
-application makes room available by consuming data. Additionally, a record
-overrun is noted, which can be retrieved using the \fBSNDCTL_DSP_GETERROR\fR
+higher sample rates, it accumulates even faster.
+If the application that consumes the data cannot keep up with this data rate,
+the underlying FIFOs can become full.
+When this occurs, any new incoming data is lost until the
+application makes room available by consuming data.
+Additionally, a record overrun is noted, which can be retrieved using the
+.Dv SNDCTL_DSP_GETERROR
 ioctl.
-.sp
-.LP
+.Pp
 Record volume for a stream can be adjusted by issuing the
-\fBSNDCTL_DSP_SETRECVOL\fR ioctl. The volume can also be retrieved using the
-\fBSNDCTL_DSP_GETRECVOL\fR.
-.SS "Playing Audio Data"
-.sp
-.LP
-The \fBwrite()\fR system call copies data from an application's buffer to the
-device output FIFO. Ordinarily, \fBwrite()\fR blocks until the entire user
-buffer is transferred. The device can alternatively be set to a non-blocking
-mode, in which case \fBwrite()\fRcompletes immediately, but might have
-transferred fewer bytes than requested. See \fBwrite\fR(2).
-.sp
-.LP
-Although \fBwrite()\fR returns when the data is successfully queued, the actual
-completion of audio output might take considerably longer. The
-\fBSNDCTL_DSP_SYNC\fR ioctl can be issued to allow an application to block
+.Dv SNDCTL_DSP_SETRECVOL
+ioctl.
+The volume can also be retrieved using the
+.Dv SNDCTL_DSP_GETRECVOL .
+.Ss "Playing Audio Data"
+The
+.Xr write 1
+system call copies data from an application's buffer to the device output FIFO.
+Ordinarily,
+.Xr write 2
+blocks until the entire user
+buffer is transferred.
+The device can alternatively be set to a non-blocking
+mode, in which case
+.Xr write 2
+completes immediately, but might have
+transferred fewer bytes than requested.
+See
+.Xr write 2 .
+.Pp
+Although
+.Xr write 2
+returns when the data is successfully queued, the actual
+completion of audio output might take considerably longer.
+The
+.Dv SNDCTL_DSP_SYNC
+ioctl can be issued to allow an application to block
 until all of the queued output data has been played.
-.sp
-.LP
-The final \fBclose\fR(2) of the file descriptor waits until all of the audio
-output has drained. If a signal interrupts the \fBclose()\fR, or if the process
+.Pp
+The final
+.Xr close 2
+of the file descriptor waits until all of the audio output has drained.
+If a signal interrupts the
+.Xr close 2 ,
+or if the process
 exits without closing the device, any remaining data queued for audio output is
 flushed and the device is closed immediately.
-.sp
-.LP
+.Pp
 The output of playback data can be halted entirely, by calling the
-\fBSNDCTL_DSP_HALT_OUTPUT\fR ioctl. This also discards any data that is queued
-for playback in device FIFOs.
-.sp
-.LP
-Before changing playback parameters, the output should be drained using the
-\fBSNDCTL_DSP_SYNC\fR ioctl, and then stopped using the
-\fBSNDCTL_DSP_HALT_OUTPUT\fR ioctl, which also flushes the any underlying
-device output FIFOs. This is not necessary if the process never started
-playback, such as by calling \fBwrite\fR(2). This is particularly important
-when new parameters result in a changed sample size.
-.sp
-.LP
-Output data is played from the playback buffers at a default rate of at least
-8000 bytes per second for u-Law, A-Law or 8-bit PCM data (faster for 16-bit
-linear data or higher sampling rates). If the output FIFO becomes empty, the
-framework plays silence, resulting in audible stall or click in the output,
-until more data is supplied by the application. The condition is also noted as
-a play underrun, which can be determined using the \fBSNDCTL_DSP_GETERROR\fR
+.Dv SNDCTL_DSP_HALT_OUTPUT
 ioctl.
-.sp
-.LP
+This also discards any data that is queued for playback in device FIFOs.
+.Pp
+Before changing playback parameters, the output should be drained using the
+.Dv SNDCTL_DSP_SYNC
+ioctl, and then stopped using the
+.Dv SNDCTL_DSP_HALT_OUTPUT
+ioctl, which also flushes the any underlying device output FIFOs.
+This is not necessary if the process never started playback, such as by calling
+.Xr write 2 .
+This is particularly important
+when new parameters result in a changed sample size.
+.Pp
+Output data is played from the playback buffers at a default rate of at least
+8000 bytes per second for \(*m-Law, A-Law or 8-bit PCM data (faster for 16-bit
+linear data or higher sampling rates).
+If the output FIFO becomes empty, the
+framework plays silence, resulting in audible stall or click in the output,
+until more data is supplied by the application.
+The condition is also noted as
+a play underrun, which can be determined using the
+.Dv SNDCTL_DSP_GETERROR
+ioctl.
+.Pp
 Playback volume for a stream can be adjusted by issuing the
-\fBSNDCTL_DSP_SETPLAYVOL\fR ioctl. The volume can also be retrieved using the
-\fBSNDCTL_DSP_GETPLAYVOL\fR.
-.SS "Asynchronous I/O"
-.sp
-.LP
-The \fBO_NONBLOCK\fR flag can be set using the \fBF_SETFL\fR \fBfcntl\fR(2) to
-enable non-blocking \fBread()\fR and \fBwrite()\fR requests. This is normally
+.Dv SNDCTL_DSP_SETPLAYVOL
+ioctl.
+The volume can also be retrieved using the
+.Dv SNDCTL_DSP_GETPLAYVOL .
+.Ss "Asynchronous I/O"
+The
+.Dv O_NONBLOCK
+flag can be set using the
+.Dv F_SETFL
+.Xr fcntl 2
+to enable non-blocking
+.Xr read 2
+and
+.Xr write 2
+requests.
+This is normally
 sufficient for applications to maintain an audio stream in the background.
-.sp
-.LP
+.Pp
 It is also possible to determine the amount of data that can be transferred for
-playback or recording without blocking using the \fBSNDCTL_DSP_GETOSPACE\fR or
-\fBSNDCTL_DSP_GETISPACE\fR ioctls, respectively.
-.SS "Mixer Pseudo-Device"
-.sp
-.LP
-The \fB/dev/mixer\fR provides access to global hardware settings such as master
-volume settings, etc. It is also the interface used for determining the
+playback or recording without blocking using the
+.Dv SNDCTL_DSP_GETOSPACE
+or
+.Dv SNDCTL_DSP_GETISPACE
+ioctls, respectively.
+.Ss "Mixer Pseudo-Device"
+The
+.Pa /dev/mixer
+provides access to global hardware settings such as master volume settings, etc.
+It is also the interface used for determining the
 hardware configuration on the system.
-.sp
-.LP
-Applications should \fBopen\fR(2) \fB/dev/mixer\fR, and use the
-\fBSNDCTL_SYSINFO\fR and \fBSNDCTL_AUDIOINFO\fR ioctls to determine the device
-node names of audio devices on the system. See \fBmixer\fR(7I) for additional
-details.
-.SH IOCTLS
-.SS "Information IOCTLs"
-.sp
-.LP
+.Pp
+Applications should
+.Xr open 2
+.Pa /dev/mixer ,
+and use the
+.Dv SNDCTL_SYSINFO
+and
+.Dv SNDCTL_AUDIOINFO
+ioctls to determine the device node names of audio devices on the system.
+See
+.Xr mixer 7I
+for additional details.
+.Sh IOCTLS
+.Ss "Information IOCTLs"
 The following ioctls are supported on the audio device, as well as the mixer
-device. See \fBmixer\fR(7I) for details.
-.sp
-.in +2
-.nf
-OSS_GETVERSION
-SNDCTL_SYSINFO
-SNDCTL_AUDIOINFO
-SNDCTL_MIXERINFO
-SNDCTL_CARDINFO
-.fi
-.in -2
-
-.SS "Audio IOCTLs"
-.sp
-.LP
-The \fBdsp\fR device supports the following ioctl commands:
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_SYNC\fR\fR
-.ad
-.RS 27n
-The argument is ignored. This command suspends the calling process until the
+device.
+See
+.Xr mixer 7I
+for details.
+.Bd -literal -offset 2n
+.Dv OSS_GETVERSION
+.Dv SNDCTL_SYSINFO
+.Dv SNDCTL_AUDIOINFO
+.Dv SNDCTL_MIXERINFO
+.Dv SNDCTL_CARDINFO
+.Ed
+.Ss "Audio IOCTLs"
+The
+.Nm
+device supports the following ioctl commands:
+.Pp
+.\" A compact list is used so that items with multiple tags don't have
+.\" vertical whitespace.  However that means explicit .Pp statements must
+.\" be added.
+.Bl -tag -width "SNDCTL_DSP_CURRENT_IPTR" -compact
+.It Dv SNDCTL_DSP_SYNC
+The argument is ignored.
+This command suspends the calling process until the
 output FIFOs are empty and all queued samples have been played, or until a
-signal is delivered to the calling process. An implicit \fBSNDCTL_DSP_SYNC\fR
-is performed on the final \fBclose()\fR of the \fBdsp\fR device.
-.sp
+signal is delivered to the calling process.
+An implicit
+.Dv SNDCTL_DSP_SYNC
+is performed on the final
+.Xr close 2
+of the
+.Nm
+device.
+.Pp
 This ioctl should not be used unnecessarily, as if it is used in the middle of
-playback it causes a small click or pause, as the FIFOs are drained. The
-correct use of this ioctl is just before changing sample formats.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_HALT\fR\fR
-.ad
-.br
-.na
-\fB\fBSNDCTL_DSP_HALT_INPUT\fR\fR
-.ad
-.br
-.na
-\fB\fBSNDCTL_DSP_HALT_OUTPUT\fR\fR
-.ad
-.RS 27n
-The argument is ignored. All input or output (or both) associated with the file
+playback it causes a small click or pause, as the FIFOs are drained.
+The correct use of this ioctl is just before changing sample formats.
+.Pp
+.It Dv SNDCTL_DSP_HALT
+.It Dv SNDCTL_DSP_HALT_INPUT
+.It Dv SNDCTL_DSP_HALT_OUTPUT
+The argument is ignored.
+All input or output (or both) associated with the file
 is halted, and any pending data is discarded.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_SPEED\fR\fR
-.ad
-.RS 27n
+.Pp
+.It Dv SNDCTL_DSP_SPEED
 The argument is a pointer to an integer, indicating the sample rate (in Hz) to
-be used. The rate applies to both input and output for the file descriptor. On
-return the actual rate, which can differ from that requested, is stored in the
-integer pointed to by the argument. To query the configured speed without
-changing it the value 0 can be used by the application
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_GETFMTS\fR\fR
-.ad
-.RS 27n
+be used.
+The rate applies to both input and output for the file descriptor.
+On return the actual rate, which can differ from that requested, is stored in
+the integer pointed to by the argument.
+To query the configured speed without
+changing it the value 0 can be used by the application.
+.Pp
+.It Dv SNDCTL_DSP_GETFMTS
 The argument is a pointer to an integer, which receives a bit mask of encodings
-supported by the device. Possible values are
-.sp
-.in +2
-.nf
-AFMT_MU_LAW      8-bit unsigned u-Law
-AFMT_A_LAW       8-bit unsigned a-Law
-AFMT_U8          8-bit unsigned linear PCM
-AFMT_S16_LE      16-bit signed
-                  little-endian linear PCM
-AFMT_S16_BE      16-bit signed
-                  big-endian linear PCM
-AFMT_S16_NE      16-bit signed native-endian
-                  linear PCM
-AFMT_U16_LE      16-bit unsigned
-                  little-endian linear PCM
-AFMT_U16_BE      16-bit unsigned big-endian
-                  linear PCM
-AFMT_U16_NE      16-bit unsigned big-endian
-                  linear PCM
-AFMT_S24_LE      24-bit signed little-endian
-                  linear PCM, 32-bit aligned
-AFMT_S24_BE      24-bit signed big-endian
-                  linear PCM, 32-bit aligned
-AFMT_S24_NE      24-bit signed native-endian
-                  linear PCM, 32-bit aligned
-AFMT_S32_LE      32-bit signed little-endian
-                  linear PCM
-AFMT_S32_BE      32-bit signed big-endian
-                   linear PCM
-AFMT_S32_NE      32-bit signed native-endian
-                   linear PCM
-AFMT_S24_PACKED  24-bit signed little-endian
-                   packed linear PCM
-.fi
-.in -2
-.sp
-
-Not all devices support all of these encodings. This implementation uses
-\fBAFMT_S24_LE\fR or \fBAFMT_S24_BE\fR, whichever is native, internally.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_SETFMT\fR\fR
-.ad
-.RS 27n
+supported by the device.
+Possible values are:
+.Pp
+.Bl -tag -width "AFMT_S24_PACKED" -compact -offset 2n
+.It Dv AFMT_MU_LAW
+8-bit unsigned \(*m-Law
+.It Dv AFMT_A_LAW
+8-bit unsigned a-Law
+.It Dv AFMT_U8
+8-bit unsigned linear PCM
+.It Dv AFMT_S16_LE
+16-bit signed little-endian linear PCM
+.It Dv AFMT_S16_BE
+16-bit signed big-endian linear PCM
+.It Dv AFMT_S16_NE
+16-bit signed native-endian linear PCM
+.It Dv AFMT_U16_LE
+16-bit unsigned little-endian linear PCM
+.It Dv AFMT_U16_BE
+16-bit unsigned big-endian linear PCM
+.It Dv AFMT_U16_NE
+16-bit unsigned native-endian linear PCM
+.It Dv AFMT_S24_LE
+24-bit signed little-endian linear PCM, 32-bit aligned
+.It Dv AFMT_S24_BE
+24-bit signed big-endian linear PCM, 32-bit aligned
+.It Dv AFMT_S24_NE
+24-bit signed native-endian linear PCM, 32-bit aligned
+.It Dv AFMT_S32_LE
+32-bit signed little-endian linear PCM
+.It Dv AFMT_S32_BE
+32-bit signed big-endian linear PCM
+.It Dv AFMT_S32_NE
+32-bit signed native-endian linear PCM
+.It Dv AFMT_S24_PACKED
+24-bit signed little-endian packed linear PCM
+.El
+.Pp
+Not all devices support all of these encodings.
+This implementation uses
+.Dv AFMT_S24_LE
+or
+.Dv AFMT_S24_BE ,
+whichever is native, internally.
+.Pp
+.It Dv SNDCTL_DSP_SETFMT
 The argument is a pointer to an integer, which indicates the encoding to be
-used. The same values as for \fBSNDCTL_DSP_GETFMT\fR can be used, but the
-caller can only specify a single option. The encoding is used for both input
+used.
+The same values as for
+.Dv SNDCTL_DSP_GETFMT
+can be used, but the caller can only specify a single option.
+The encoding is used for both input
 and output performed on the file descriptor.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_CHANNELS\fR\fR
-.ad
-.RS 27n
+.Pp
+.It Dv SNDCTL_DSP_CHANNELS
 The argument is a pointer to an integer, indicating the number of channels to
-be used (1 for mono, 2 for stereo, etc.) The value applies to both input and
-output for the file descriptor. On return the actual channel configuration
-(which can differ from that requested) is stored in the integer pointed to by
-the argument. To query the configured channels without changing it the value 0
+be used (1 for mono, 2 for stereo, etc.)
+The value applies to both input and output for the file descriptor.
+On return the actual channel configuration (which can differ from that
+requested) is stored in the integer pointed to by the argument.
+To query the configured channels without changing it the value 0
 can be used by the application.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDDCTL_DSP_GETCAPS\fR\fR
-.ad
-.RS 27n
+.Pp
+.It Dv SNDDCTL_DSP_GETCAPS
 The argument is a pointer to an integer bit mask, which indicates the
-capabilities of the device. The bits returned can include
-.sp
-.in +2
-.nf
-PCM_CAP_OUTPUT  Device supports playback
-PCM_CAP_INPUT   Device supports recording
-PCM_CAP_DUPLEX  Device supports simultaneous
-                    playback and recording
-.fi
-.in -2
-.sp
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_GETPLAYVOL\fR\fR
-.ad
-.br
-.na
-\fB\fBSNDCTL_DSP_GETRECVOL\fR\fR
-.ad
-.RS 27n
+capabilities of the device.
+The bits returned can include:
+.Pp
+.Bl -tag -width "PCM_CAP_DUPLEX" -compact -offset 2n
+.It Dv PCM_CAP_OUTPUT
+Device supports playback
+.It Dv PCM_CAP_INPUT
+Device supports recording
+.It Dv PCM_CAP_DUPLEX
+Device supports simultaneous playback and recording
+.El
+.Pp
+.It Dv SNDCTL_DSP_GETPLAYVOL
+.It Dv SNDCTL_DSP_GETRECVOL
 The argument is a pointer to an integer to receive the volume level for either
-playback or record. The value is encoded as a stereo value with the values for
-two channels in the least significant two bytes. The value for each channel
-thus has a range of 0-100.  In this implementation, only the low order byte is
+playback or record.
+The value is encoded as a stereo value with the values for
+two channels in the least significant two bytes.
+The value for each channel thus has a range of 0-100.
+In this implementation, only the low order byte is
 used, as the value is treated as a monophonic value, but a stereo value (with
 both channel levels being identical) is returned for compatibility.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_SETPLAYVOL\fR\fR
-.ad
-.br
-.na
-\fB\fBSNDCTL_DSP_SETRECVOL\fR\fR
-.ad
-.RS 27n
+.Pp
+.It Dv SNDCTL_DSP_SETPLAYVOL
+.It Dv SNDCTL_DSP_SETRECVOL
 The argument is a pointer to an integer indicating volume level for either
-playback or record. The value is encoded as a stereo value with the values for
-two channels in the least significant two bytes. The value for each channel has
-a range of 0-100. Note that in this implementation, only the low order byte is
-used, as the value is treated as a monophonic value. Portable applications
-should assign the same value to both bytes
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_GETISPACE\fR\fR
-.ad
-.br
-.na
-\fB\fBSNDCTL_DSP_GETOSPACE\fR\fR
-.ad
-.RS 27n
-The argument is a pointer to a \fBstruct audio_buf_info\fR, which has the
-following structure:
-.sp
-.in +2
-.nf
+playback or record.
+The value is encoded as a stereo value with the values for
+two channels in the least significant two bytes.
+The value for each channel has a range of 0-100.
+Note that in this implementation, only the low order byte is
+used, as the value is treated as a monophonic value.
+Portable applications should assign the same value to both bytes.
+.Pp
+.It Dv SNDCTL_DSP_GETISPACE
+.It Dv SNDCTL_DSP_GETOSPACE
+The argument is a pointer to a
+.Vt struct audio_buf_info ,
+which has the following structure:
+.Bd -literal -offset 2n
 typedef struct audio_buf_info {
-   int fragments;* /# of available fragments */
+   int fragments; /* # of available fragments */
    int fragstotal;
         /* Total # of fragments allocated */
    int fragsize;
         /* Size of a fragment in bytes */
    int bytes;
        /* Available space in bytes */
-   /* Note! 'bytes' could be more than
-      fragments*fragsize */
+   /*
+    * Note! 'bytes' could be more than
+    * fragments*fragsize
+    */
 } audio_buf_info;
-.fi
-.in -2
-.sp
-
-The fields fragments, \fBfragstotal\fR, and \fBfragsize\fR are intended for use
-with compatible applications (and in the future with \fBmmap\fR(2)) only, and
-need not be used by typical applications. On successful return the bytes member
-contains the number of bytes that can be transferred  without blocking.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_CURRENT_IPTR\fR\fR
-.ad
-.br
-.na
-\fB\fBSNDCTL_DSP_CURRENT_OPTR\fR\fR
-.ad
-.RS 27n
-The argument is a pointer to an \fBoss_count_t\fR, which has the following
-definition:
-.sp
-.in +2
-.nf
+.Ed
+.Pp
+The fields
+.Fa fragments ,
+.Fa fragstotal ,
+and
+.Fa fragsize
+are intended for use with compatible applications (and in the future with
+.Xr mmap 2 )
+only, and need not be used by typical applications.
+On successful return the bytes member
+contains the number of bytes that can be transferred without blocking.
+.Pp
+.It Dv SNDCTL_DSP_CURRENT_IPTR
+.It Dv SNDCTL_DSP_CURRENT_OPTR
+The argument is a pointer to an
+.Vt oss_count_t ,
+which has the following definition:
+.Bd -literal -offset 2n
 typedef struct {
     long long samples;
        /* Total # of samples */
     int fifo_samples;
        /* Samples in device FIFO */
-    int filler[32];/* For future use */
+    int filler[32]; /* For future use */
 } oss_count_t;
-.fi
-.in -2
-.sp
-
-The \fBsamples\fR field contains the total number of samples transferred by the
-device so far. The \fBfifo_samples\fR is the depth of any hardware FIFO. This
-structure can be useful for accurate stream positioning and latency
+.Ed
+.Pp
+The
+.Fa samples
+field contains the total number of samples transferred by the
+device so far.
+The
+.Fa fifo_samples
+is the depth of any hardware FIFO.
+This structure can be useful for accurate stream positioning and latency
 calculations.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_GETIPTR\fR\fR
-.ad
-.br
-.na
-\fB\fBSNDCTL_DSP_GETOPTR\fR\fR
-.ad
-.RS 27n
-The argument is a pointer to a \fBstruct count_info\fR, which has the following
-definition:
-.sp
-.in +2
-.nf
+.Pp
+.It Dv SNDCTL_DSP_GETIPTR
+.It Dv SNDCTL_DSP_GETOPTR
+The argument is a pointer to a
+.Vt struct count_info ,
+which has the following definition:
+.Bd -literal -offset 2n
 typedef struct count_info {
     unsigned int bytes;
       /* Total # of bytes processed */
     int blocks;
-      /* # of fragment transitions since
-      last time */
-    int ptr;/* Current DMA pointer value */
+      /*
+       * # of fragment transitions since
+       * last time
+       */
+    int ptr; /* Current DMA pointer value */
 } count_info;
-.fi
-.in -2
-.sp
-
+.Ed
+.Pp
 These ioctls are primarily supplied for compatibility, and should not be used
 by most applications.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_GETODELAY\fR\fR
-.ad
-.RS 27n
-The argument is a pointer to an integer. On return, the integer contains the
+.Pp
+.It Dv SNDCTL_DSP_GETODELAY
+The argument is a pointer to an integer.
+On return, the integer contains the
 number of bytes still to be played before the next byte written are played.
-This can be used for accurate determination of device latency. The result can
-differ from actual value by up the depth of the internal device FIFO, which is
-typically 64 bytes.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBSNDCTL_DSP_GETERROR\fR\fR
-.ad
-.RS 27n
-The argument is a pointer to a \fBstruct audio_errinfo\fR, defined as follows:
-.sp
-.in +2
-.nf
+This can be used for accurate determination of device latency.
+The result can differ from actual value by up the depth of the internal device
+FIFO, which is typically 64 bytes.
+.Pp
+.It Dv SNDCTL_DSP_GETERROR
+The argument is a pointer to a
+.Vt struct audio_errinfo ,
+defined as follows:
+.Bd -literal -offset 2n
 typedef struct audio_errinfo {
      int play_underruns;
      int rec_overruns;
@@ -491,162 +496,107 @@ typedef struct audio_errinfo {
      int rec_errorparm;
      int filler[16];
 } audio_errinfo;
-.fi
-.in -2
-.sp
-
-For this implementation, only the \fBplay_underruns\fR and \fBrec_overruns\fR
-values are significant. No other fields are used in this implementation.
-.sp
+.Ed
+.Pp
+For this implementation, only the
+.Fa play_underruns
+and
+.Fa rec_overruns
+values are significant.
+No other fields are used in this implementation.
+.Pp
 These fields are reset to zero each time their value is retrieved using this
 ioctl.
-.RE
-
-.SS "Compatibility IOCTLS"
-.sp
-.LP
+.El
+.Ss "Compatibility IOCTLS"
 These ioctls are supplied exclusively for compatibility with existing
-applications. Their use is not recommended, and they are not documented here.
+applications.
+Their use is not recommended, and they are not documented here.
 Many of these are implemented as simple no-ops.
-.sp
-.in +2
-.nf
-SNDCTL_DSP_POST
-SNDCTL_DSP_STEREO
-SNDCTL_DSP_SETDUPLEX
-SNDCTL_DSP_LOW_WATER
-SNDCTL_DSP_PROFILE
-SNDCTL_DSP_GETBLKSIZE
-SNDCTL_DSP_SUBDIVIDE
-SNDCTL_DSP_SETFRAGMENT
-SNDCTL_DSP_COOKEDMODE
-SNDCTL_DSP_READCTL
-SNDCTL_DSP_WRITECTL
-SNDCTL_DSP_SILENCE
-SNDCTL_DSP_SKIP
-SNDCTL_DSP_POST
-SNDCTL_DSP_GET_RECSRC
-SNDCTL_DSP_SET_RECSRC
-SNDCTL_DSP_SET_RECSRC_NAMES
-SNDCTL_DSP_GET_PLAYTGT
-SNDCTL_DSP_SET_PLAYTGT
-SNDCTL_DSP_SET_PLAYTGT_NAMES
-SNDCTL_DSP_GETTRIGGER
-SNDCTL_DSP_SETTRIGGER
-SNDCTL_AUDIOINFO_EX
-SNDCTL_ENGINEINFO
-.fi
-.in -2
-.sp
-
-.SH ERRORS
-.sp
-.LP
-An \fBopen()\fR fails if:
-.sp
-.ne 2
-.na
-\fB\fBEBUSY\fR\fR
-.ad
-.RS 10n
-The requested play or record access isbusy and either the \fBO_NDELAY\fR or
-\fBO_NONBLOCK\fR flag was set in the \fBopen()\fR request.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINTR\fR\fR
-.ad
-.RS 10n
+.Pp
+.Bl -tag -width "Dv" -offset 2n -compact
+.It Dv SNDCTL_DSP_POST
+.It Dv SNDCTL_DSP_STEREO
+.It Dv SNDCTL_DSP_SETDUPLEX
+.It Dv SNDCTL_DSP_LOW_WATER
+.It Dv SNDCTL_DSP_PROFILE
+.It Dv SNDCTL_DSP_GETBLKSIZE
+.It Dv SNDCTL_DSP_SUBDIVIDE
+.It Dv SNDCTL_DSP_SETFRAGMENT
+.It Dv SNDCTL_DSP_COOKEDMODE
+.It Dv SNDCTL_DSP_READCTL
+.It Dv SNDCTL_DSP_WRITECTL
+.It Dv SNDCTL_DSP_SILENCE
+.It Dv SNDCTL_DSP_SKIP
+.It Dv SNDCTL_DSP_POST
+.It Dv SNDCTL_DSP_GET_RECSRC
+.It Dv SNDCTL_DSP_SET_RECSRC
+.It Dv SNDCTL_DSP_SET_RECSRC_NAMES
+.It Dv SNDCTL_DSP_GET_PLAYTGT
+.It Dv SNDCTL_DSP_SET_PLAYTGT
+.It Dv SNDCTL_DSP_SET_PLAYTGT_NAMES
+.It Dv SNDCTL_DSP_GETTRIGGER
+.It Dv SNDCTL_DSP_SETTRIGGER
+.It Dv SNDCTL_AUDIOINFO_EX
+.It Dv SNDCTL_ENGINEINFO
+.El
+.Sh FILES
+The physical audio device names are system dependent and are rarely used by
+programmers.
+Programmers should use the generic device names listed below.
+.Bl -tag -width "/usr/share/audio/samples"
+.It Pa /dev/dsp
+Symbolic link to the system's primary audio device
+.It Pa /dev/mixer
+Symbolic link to the pseudo mixer device for the system
+.It Pa /dev/sndstat
+Symbolic link to the pseudo mixer device for the system
+.It Pa /usr/share/audio/samples
+Audio files
+.El
+.Sh ERRORS
+An
+.Xr open 2
+call fails if:
+.Bl -tag -width "EINVAL"
+.It Er EBUSY
+The requested play or record access is busy and either the
+.Dv O_NDELAY
+or
+.Dv O_NONBLOCK
+flag was set in the
+.Xr open 2
+request.
+.It Er EINTR
 The requested play or record access is busy and a signal interrupted the
-\fBopen()\fR request.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.Xr open 2
+request.
+.It Er EINVAL
 The device cannot support the requested play or record access.
-.RE
-
-.sp
-.LP
-An \fBioctl()\fR fails if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.El
+.Pp
+An
+.Xr ioctl 2
+call fails if:
+.Bl -tag -width "EINVAL"
+.It Er EINVAL
 The parameter changes requested in the ioctl are invalid or are not supported
 by the device.
-.RE
-
-.SH FILES
-.sp
-.LP
-The physical audio device names are system dependent and are rarely used by
-programmers. Programmers should use the generic device names listed below.
-.sp
-.ne 2
-.na
-\fB\fB/dev/dsp\fR\fR
-.ad
-.RS 28n
-Symbolic link to the system's primary audio device
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/mixer\fR\fR
-.ad
-.RS 28n
-Symbolic link to the pseudo mixer device for the system
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/dev/sndstat\fR\fR
-.ad
-.RS 28n
-Symbolic link to the pseudo mixer device for the system
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/usr/share/audio/samples\fR\fR
-.ad
-.RS 28n
-Audio files
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(5) for a description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Architecture	SPARC, x86
-_
-Stability Level	Uncommitted
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBclose\fR(2), \fBfcntl\fR(2), \fBioctl\fR(2), \fBmmap\fR(2), \fBopen\fR(2),
-\fBpoll\fR(2), \fBread\fR(2), \fBwrite\fR(2), \fBattributes\fR(5),
-\fBaudio\fR(7D), \fBmixer\fR(7I)
+.El
+.Sh ARCHITECTURE
+SPARC
+X86
+.Sh INTERFACE STABILITY
+Uncommitted
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr fcntl 2 ,
+.Xr ioctl 2 ,
+.Xr mmap 2 ,
+.Xr open 2 ,
+.Xr poll 2 ,
+.Xr read 2 ,
+.Xr write 2 ,
+.Xr attributes 5 ,
+.Xr audio 7D ,
+.Xr mixer 7I
