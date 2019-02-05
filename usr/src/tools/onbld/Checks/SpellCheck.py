@@ -21,7 +21,7 @@
 
 #
 # Copyright 2016 Joyent, Inc.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 import re, sys
@@ -282,6 +282,7 @@ def spellcheck(fh, filename=None, output=sys.stderr, **opts):
 
 	fh.seek(0)
 	for line in fh:
+		line = line.decode(errors='replace')
 		for entry in misspellingREs:
 			ret |= check(spellMsg, output, filename, line,
 			    lineno, entry)
