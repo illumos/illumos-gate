@@ -29,7 +29,7 @@
 #include <errno.h>
 #include <sys/types.h>
 
-#include "tab_lookup.h"   	/* table lookup data types */
+#include "tab_lookup.h"	/* table lookup data types */
 
 #define MSB     0x80    /* most significant bit */
 #define ONEBYTE 0xff    /* right most byte */
@@ -261,13 +261,8 @@ unsigned long   *ibm_code;
  * Return: > 0 - converted with enough space in output buffer
  *         = 0 - no space in outbuf
  */
-int utf8_to_ibm(unidx, ibm_code, buf, buflen, st)
-int             unidx;
-unsigned long   ibm_code;
-char            *buf;
-size_t          buflen;
-_icv_state 	*st;
-
+int utf8_to_ibm(int unidx, unsigned long ibm_code, char *buf, size_t buflen,
+    _icv_state *st)
 {
         unsigned long   val;            /* IBM value */
         char            c1, c2, ibm_str[3];
@@ -316,7 +311,7 @@ _icv_state 	*st;
 
         *buf = ibm_str[0] = c1;
         *(buf+1) = ibm_str[1] = c2;
-        ibm_str[2] = NULL;
+        ibm_str[2] = '\0';
 
 #ifdef DEBUG
     fprintf(stderr, "\t->%x %x<-\n", *buf, *(buf+1));

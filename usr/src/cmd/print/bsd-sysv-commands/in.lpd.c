@@ -130,7 +130,7 @@ static papi_attribute_t **
 parse_cf(papi_service_t svc, char *cf, char **files)
 {
 	papi_attribute_t **list = NULL;
-	char	previous = NULL;
+	char	previous = '\0';
 	char	*entry;
 	int	copies_set = 0;
 	int	copies = 0;
@@ -509,7 +509,7 @@ berkeley_receive_files(papi_service_t svc, FILE *ifp, FILE *ofp, char *printer)
 		case 0x02: {	/* Receive control file */
 			if (((cf = strchr(buf, ' ')) != NULL) &&
 			    (strlen(cf) > 4)) {
-				while ((*cf != NULL) && (isdigit(*cf) == 0))
+				while ((*cf != '\0') && (isdigit(*cf) == 0))
 					cf++;
 				rid = atoi(cf);
 			}

@@ -492,8 +492,7 @@ boot_fb_eraseline_impl(uint16_t x, uint16_t y)
 
 	toffset = x * fb_info.bpp + y * fb_info.pitch;
 	dst = fb_info.fb + toffset;
-	if (fb_info.shadow_fb != NULL)
-		sdst = fb_info.shadow_fb + toffset;
+	sdst = fb_info.shadow_fb + toffset;
 
 	for (i = 0; i < boot_fb_font.height; i++) {
 		uint8_t *dest = dst + i * fb_info.pitch;

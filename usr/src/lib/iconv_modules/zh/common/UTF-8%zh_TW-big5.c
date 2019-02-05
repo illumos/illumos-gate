@@ -458,7 +458,7 @@ static int utf8_to_big5(int unidx, unsigned long big5code, char *buf, size_t buf
 
 	*buf = big5_str[0] = c1;
 	*(buf+1) = big5_str[1] = c2;
-	big5_str[2] = NULL;
+	big5_str[2] = '\0';
 	}
 
 #ifdef DEBUG

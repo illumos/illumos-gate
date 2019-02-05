@@ -397,7 +397,7 @@ _icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 static int get_plane_no_by_utf(uint_t unicode,
 			int *unidx, unsigned long *cnscode)
 {
-	int 		ret;
+	int		ret;
 
         /* test whether it belongs to private Unicode plane 15 */
         if (unicode >= Low_UDA_In_Unicode && unicode <= High_UDA_In_Unicode)
@@ -486,7 +486,7 @@ static int utf8_to_cns(int plane_no, int unidx, unsigned long cnscode,
 		if ( buflen < 2) goto err;
 		*buf = cns_str[0] = c1;
 		*(buf+1) = cns_str[1] = c2;
-		cns_str[2] = cns_str[3] = cns_str[4] = NULL;
+		cns_str[2] = cns_str[3] = cns_str[4] = '\0';
 		ret_size = 2;
 		break;
 	case 2:
@@ -509,7 +509,7 @@ static int utf8_to_cns(int plane_no, int unidx, unsigned long cnscode,
 		*(buf+1) = cns_str[1] = PMASK + plane_no;
 		*(buf+2) = cns_str[2] = c1;
 		*(buf+3) = cns_str[3] = c2;
-		cns_str[4] = NULL;
+		cns_str[4] = '\0';
 		ret_size = 4;
 		break;
 	}

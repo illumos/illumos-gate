@@ -238,6 +238,8 @@ again:
 			s = script->s;
 			state = ST_STRING;
 			goto again;
+		default:
+			errx(1, "BUG: Unknown script type: %d\n", script->type);
 		}
 		/*NOTREACHED*/
 

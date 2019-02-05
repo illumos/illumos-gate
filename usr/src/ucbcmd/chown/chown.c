@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * chown [-fR] uid[.gid] file ...
@@ -51,6 +49,7 @@
 #include <dirent.h>
 #include <grp.h>
 #include <errno.h>
+#include <unistd.h>
 
 struct	passwd *pwd;
 struct	passwd *getpwnam();

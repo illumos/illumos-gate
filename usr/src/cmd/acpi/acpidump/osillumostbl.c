@@ -444,7 +444,7 @@ OslLoadRsdp(void)
 
 try_bios:
 	/* Try to get RSDP from BIOS memory */
-	if (Gbl_RsdpBase != NULL) {
+	if (Gbl_RsdpBase != 0) {
 		physaddr = Gbl_RsdpBase;
 		mapsize = sizeof (ACPI_TABLE_RSDP);
 	} else {
@@ -658,7 +658,7 @@ OslListBiosTables(void)
 		}
 
 		/* Skip NULL entries in RSDT/XSDT */
-		if (TableAddress == NULL) {
+		if (TableAddress == 0) {
 			continue;
 		}
 
@@ -807,7 +807,7 @@ OslGetBiosTable(char *Signature, UINT32 Instance, ACPI_TABLE_HEADER **Table,
 
 			/* Skip NULL entries in RSDT/XSDT */
 
-			if (TableAddress == NULL) {
+			if (TableAddress == 0) {
 				continue;
 			}
 
@@ -887,7 +887,7 @@ OslMapTable(ACPI_SIZE Address, char *Signature, ACPI_TABLE_HEADER **Table)
 	ACPI_TABLE_HEADER	*MappedTable;
 	UINT32			Length;
 
-	if (Address == NULL) {
+	if (Address == 0) {
 		return (AE_BAD_ADDRESS);
 	}
 

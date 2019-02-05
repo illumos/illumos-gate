@@ -194,7 +194,7 @@ _icv_iconv(_iconv_st *st, char **inbuf, size_t *inbytesleft,
 					int uconv_num_internal = 0;
 
 					st->keepc[1] = (**inbuf);
-					st->keepc[2] = st->keepc[3] = NULL;
+					st->keepc[2] = st->keepc[3] = '\0';
 					n = cns_to_utf8(1, st, *outbuf,
 							*outbytesleft, &uconv_num_internal);
 					if (n > 0) {

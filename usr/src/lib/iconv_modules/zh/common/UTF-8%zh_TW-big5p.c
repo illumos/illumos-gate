@@ -361,7 +361,7 @@ static int utf8_to_big5p(int unidx, unsigned long big5pcode, char *buf, size_t b
 
 	*buf = big5p_str[0] = c1;
 	*(buf+1) = big5p_str[1] = c2;
-	big5p_str[2] = NULL;
+	big5p_str[2] = '\0';
 	}
 
 #ifdef DEBUG
