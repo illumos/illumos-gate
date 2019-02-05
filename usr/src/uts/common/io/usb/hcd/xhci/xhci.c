@@ -1474,7 +1474,17 @@ xhci_port_count(xhci_t *xhcip)
 		count = XHCI_XECP_PROT_PCOUNT(rport);
 		first = XHCI_XECP_PROT_FPORT(rport);
 
-		if (maj == 3 && min == 1) {
+		/*
+		 * In the wild, we've seen some systems that are using a minor
+		 * version of 0x10 and some that are using 0x01 in this field.
+		 * While the xhci spec says that we should expect it to be a
+		 * minor of 0x01 based on the xHCI 1.1 specification Table 155:
+		 * xHCI Supported Protocols. However, the USB 3.1 specification
+		 * defines the version to be 0x10 when encoded as a BCD style.
+		 * As such, handle both and hope we never get to revision 16 of
+		 * USB 3.
+		 */
+		if (maj == 3 && (min == 0x10 || min == 0x01)) {
 			nusb31 = count;
 			fusb31 = first;
 		} else if (maj == 3 && min == 0) {
@@ -1507,7 +1517,7 @@ xhci_port_count(xhci_t *xhcip)
 
 	if (nusb31 > 0) {
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
-		    "usb3.1-port-count", nusb30);
+		    "usb3.1-port-count", nusb31);
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, xhcip->xhci_dip,
 		    "usb3.1-first-port", fusb31);
 	}
