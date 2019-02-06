@@ -323,6 +323,13 @@ function default_mirror_setup
 	log_pass
 }
 
+function default_mirror_2way_setup
+{
+	default_mirror_setup_noexit $1 $2
+
+	log_pass
+}
+
 #
 # Given a pair of disks, set up a storage pool and dataset for the mirror
 # @parameters: $1 the primary side of the mirror
