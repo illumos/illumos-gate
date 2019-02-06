@@ -213,7 +213,7 @@ ptms_walk_init(mdb_walk_state_t *wsp)
 {
 	size_t nslots;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("ptms supports only global walks");
 		return (WALK_ERR);
 	}
@@ -253,7 +253,7 @@ ptms_walk_step(mdb_walk_state_t *wsp)
 		return (WALK_DONE);
 	}
 
-	if (ptr == NULL) {
+	if (ptr == 0) {
 		wsp->walk_addr += sizeof (uintptr_t);
 		return (WALK_NEXT);
 	}

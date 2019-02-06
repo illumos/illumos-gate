@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sysevent.h>
 #include <sys/sysevent_impl.h>
 #include <libsysevent.h>
@@ -128,7 +126,7 @@ static const mdb_dcmd_t dcmds[] = {
 int
 sysevent_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("sysevent does not support global walks");
 		return (WALK_ERR);
 	}
@@ -142,7 +140,7 @@ sysevent_walk_step(mdb_walk_state_t *wsp)
 	int status;
 	sysevent_queue_t se_q;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&se_q, sizeof (se_q), wsp->walk_addr) == -1) {

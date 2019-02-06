@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 
 #include <sys/types.h>
@@ -50,7 +48,7 @@ ufslogmap_walk_init(mdb_walk_state_t *wsp)
 {
 	ufslogmap_walk_data_t *uw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("must specify an address\n");
 		return (WALK_ERR);
 	}

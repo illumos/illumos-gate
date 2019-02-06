@@ -37,7 +37,7 @@
 int
 tsd_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "tsd_list") == -1) {
 		mdb_warn("failed to read 'tsd_list'");
 		return (WALK_ERR);
@@ -52,7 +52,7 @@ tsd_walk_step(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data,
@@ -83,14 +83,14 @@ ttotsd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	kthread_t thread, *t = &thread;
 	struct tsd_thread tsdata, *ts = &tsdata;
-	uintptr_t key = NULL;
+	uintptr_t key = 0;
 	uintptr_t eladdr;
 	void *element = NULL;
 
 	if (mdb_getopts(argc, argv, 'k', MDB_OPT_UINTPTR, &key, NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (!(flags & DCMD_ADDRSPEC) || key == NULL)
+	if (!(flags & DCMD_ADDRSPEC) || key == 0)
 		return (DCMD_USAGE);
 
 	if (mdb_vread(t, sizeof (*t), addr) == -1) {

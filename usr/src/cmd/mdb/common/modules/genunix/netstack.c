@@ -56,7 +56,7 @@ netstack_walk_step(mdb_walk_state_t *wsp)
 	int status;
 	netstack_t nss;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&nss, sizeof (netstack_t), wsp->walk_addr) == -1) {

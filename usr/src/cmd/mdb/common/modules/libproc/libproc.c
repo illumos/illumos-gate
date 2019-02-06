@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libproc.h>
 #include <Pcontrol.h>
 #include <stddef.h>
@@ -36,8 +34,8 @@ typedef struct ps_prochandle ps_prochandle_t;
 /*
  * addr::pr_symtab [-a | n]
  *
- * 	-a	Sort symbols by address
- * 	-n	Sort symbols by name
+ *	-a	Sort symbols by address
+ *	-n	Sort symbols by name
  *
  * Given a sym_tbl_t, dump its contents in tabular form.  When given '-a' or
  * '-n', we use the sorted tables 'sym_byaddr' or 'sym_byname', respectively.
@@ -234,7 +232,7 @@ pr_file_info_walk_init(mdb_walk_state_t *wsp)
 	ps_prochandle_t psp;
 	file_info_walk_t *fiw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("pr_file_info doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -300,7 +298,7 @@ pr_map_info_walk_init(mdb_walk_state_t *wsp)
 	ps_prochandle_t psp;
 	map_info_walk_t *miw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("pr_map_info doesn't support global walks\n");
 		return (WALK_ERR);
 	}

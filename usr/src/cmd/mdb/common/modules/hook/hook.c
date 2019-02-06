@@ -215,7 +215,7 @@ hookevent_stack_walk_init(mdb_walk_state_t *wsp)
 {
 	hook_family_int_t hf;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("global walk not supported\n");
 		return (WALK_ERR);
 	}
@@ -241,7 +241,7 @@ hookevent_stack_walk_step(mdb_walk_state_t *wsp)
 		return (DCMD_ERR);
 	}
 	wsp->walk_addr = (uintptr_t)SLIST_NEXT(&hr, hei_entry);
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
 	    wsp->walk_cbdata));

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines extracted from usr/src/uts/common/io/usb/usba/usba.c.
  */
@@ -48,7 +46,7 @@ mdb_usba_is_root_hub(struct dev_info *dip)
 {
 	uintptr_t	p = (uintptr_t)dip->devi_hw_prop_ptr;
 
-	while (p != NULL) {
+	while (p != 0) {
 		ddi_prop_t prop;
 		char prop_name[128];
 
@@ -98,7 +96,7 @@ mdb_usba_get_usba_device(uintptr_t dip_addr)
 	if (mdb_vread(&devinfo, sizeof (struct dev_info), dip_addr) == -1) {
 		mdb_warn("failed to read dev_info at %p", dip_addr);
 
-		return (NULL);
+		return (0);
 	}
 
 	/*
@@ -114,7 +112,7 @@ mdb_usba_get_usba_device(uintptr_t dip_addr)
 
 		if (!hcdi_addr) {
 
-			return (NULL);
+			return (0);
 		}
 
 		/* Read hcdi struct into local address space. */
@@ -122,7 +120,7 @@ mdb_usba_get_usba_device(uintptr_t dip_addr)
 		    hcdi_addr) == -1) {
 			mdb_warn("failed to read hcdi struct");
 
-			return (NULL);
+			return (0);
 		}
 
 		return ((uintptr_t)hcdi_struct.hcdi_usba_device);
@@ -134,7 +132,7 @@ mdb_usba_get_usba_device(uintptr_t dip_addr)
 		    dip_addr) == -1) {
 			mdb_warn("failed to read dev_info at %p", dip_addr);
 
-			return (NULL);
+			return (0);
 		}
 
 		/* casts needed to keep lint happy */

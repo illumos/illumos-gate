@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -166,7 +166,7 @@ topo_debug_set(topo_hdl_t *thp, const char *dbmode, const char *dout)
 	for (dbp = (topo_debug_mode_t *)_topo_dbout_modes;
 	    dbp->tdm_name != NULL; ++dbp) {
 		if (strcmp(dout, dbp->tdm_name) == 0)
-		thp->th_dbout = dbp->tdm_mode;
+			thp->th_dbout = dbp->tdm_mode;
 	}
 	topo_hdl_unlock(thp);
 }

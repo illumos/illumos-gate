@@ -145,7 +145,7 @@ for term in $termlist; do
 		echo "\t{ \"$attr\", $type, (void *)$data },"
 	done
 
-	echo "\t{ NULL, NULL, NULL }"
+	echo "\t{ NULL, 0, NULL }"
 	echo "};\n"
 
 	$verbose && echo "done" >& 2

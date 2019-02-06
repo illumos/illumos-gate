@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Multidata dcmds and walkers, part of the genunix mdb module,
  * and operate on core Multidata structures.
@@ -503,7 +501,7 @@ mmdq_walk_init(mdb_walk_state_t *wsp, char *name, uintptr_t qh,
 	ql_t ql;
 
 	/* Caller must have supplied an address */
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	qwp = mdb_alloc(sizeof (*qwp), UM_SLEEP);
@@ -590,7 +588,7 @@ pdesc_slab_walk_init(mdb_walk_state_t *wsp)
 {
 	uintptr_t q_head;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	/*
@@ -649,7 +647,7 @@ pdesc_walk_init(mdb_walk_state_t *wsp)
 {
 	uintptr_t q_head;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	/*
@@ -817,7 +815,7 @@ pattr_walk_init(mdb_walk_state_t *wsp)
 {
 	uintptr_t q_head;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	/*

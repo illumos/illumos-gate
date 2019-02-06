@@ -51,7 +51,7 @@ typedef struct str_types {
 
 typedef struct ftblk_data {
 	ftblk_t ft_data;	/* Copy of ftblk */
-	int 	ft_ix;		/* Index in event list */
+	int	ft_ix;		/* Index in event list */
 	boolean_t ft_in_evlist;	/* Iterating through evlist */
 } ftblkdata_t;
 
@@ -64,7 +64,7 @@ typedef void sdprint_func(stdata_t *, stdata_t *);
  * Queue flags
  */
 static const strflags_t qf[] = {
-	{ SF(QENAB), 		"Queue is already enabled to run"	},
+	{ SF(QENAB),		"Queue is already enabled to run"	},
 	{ SF(QWANTR),		"Someone wants to read Q"		},
 	{ SF(QWANTW),		"Someone wants to write Q"		},
 	{ SF(QFULL),		"Q is considered full"			},
@@ -83,7 +83,7 @@ static const strflags_t qf[] = {
 	{ SF(QINSERVICE),	"service routine executing"		},
 	{ SF(QWCLOSE),		"will not be enabled"			},
 	{ SF(QEND),		"last queue in stream"			},
-	{ SF(QWANTWSYNC),	"Streamhead wants to write Q" 		},
+	{ SF(QWANTWSYNC),	"Streamhead wants to write Q"		},
 	{ SF(QSYNCSTR),		"Q supports Synchronous STREAMS"	},
 	{ SF(QISDRV),		"the Queue is attached to a driver"	},
 	{ SF(0x00400000),	"unused (was QHOT)"			},
@@ -158,7 +158,7 @@ static const struct str_flags stdf[] = {
 	{ SF(STRATMARK),	"at mark (due to MSGMARKNEXT)"		},
 	{ SF(STZCNOTIFY),	"wait for zerocopy mblk to be acked"	},
 	{ SF(STRPLUMB),		"stream plumbing changes in progress"	},
-	{ SF(STREOF),  		"End-of-file indication"		},
+	{ SF(STREOF),		"End-of-file indication"		},
 	{ SF(STREOPENFAIL),	"re-open has failed"			},
 	{ SF(STRMATE),		"this stream is a mate"			},
 	{ SF(STRHASLINKS),	"there are I_LINKs under this stream"	},
@@ -166,11 +166,11 @@ static const struct str_flags stdf[] = {
 };
 
 static const struct str_flags mbf[] = {
-	{ SF(MSGMARK), 		"last byte of message is marked"	},
+	{ SF(MSGMARK),		"last byte of message is marked"	},
 	{ SF(MSGNOLOOP),	"don't loop message to write side"	},
 	{ SF(MSGDELIM),		"message is delimited"			},
 	{ SF(0x08),		"unused"				},
-	{ SF(MSGMARKNEXT), 	"Private: b_next's first byte marked"	},
+	{ SF(MSGMARKNEXT),	"Private: b_next's first byte marked"	},
 	{ SF(MSGNOTMARKNEXT),	"Private: ... not marked"		},
 	{ 0, NULL,		NULL					}
 };
@@ -209,7 +209,7 @@ static const strtypes_t mbt[] = {
 	{ "M_PCEVENT",	M_PCEVENT,	"Obsoleted: do not use"		},
 	{ "M_UNHANGUP",	M_UNHANGUP,	"line reconnect"		},
 	{ "M_CMD",	M_CMD,		"out-of-band ioctl command"	},
-	{ NULL,		0,		NULL 				}
+	{ NULL,		0,		NULL				}
 };
 
 /* Allocation flow trace events, starting from 0 */
@@ -243,7 +243,7 @@ static const char *ftev_proc[] = {
 /* 109 */	"putbq",
 /* 10A */	"flushq",
 /* 10B */	"0x10b",
-/* 10C */ 	"0x10c",
+/* 10C */	"0x10c",
 /* 10D */	"putnext",
 /* 10E */	"rwnext",
 };
@@ -388,7 +388,7 @@ queue(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * If any of the filtering flags is specified, don't print anything
 	 * except the matching pointer.
 	 */
-	if (flag != NULL || not_flag != NULL || mod != NULL || syncq != NULL)
+	if (flag != NULL || not_flag != NULL || mod != NULL || syncq != 0)
 		quiet = TRUE;
 
 	if (DCMD_HDRSPEC(flags) && !quiet) {
@@ -414,7 +414,7 @@ queue(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	for (maddr = (uintptr_t)q.q_first; maddr != NULL; nblks++) {
+	for (maddr = (uintptr_t)q.q_first; maddr != 0; nblks++) {
 		if (mdb_vread(&mblk, sizeof (mblk), maddr) == -1) {
 			mdb_warn("couldn't read mblk %p for queue %p",
 			    maddr, addr);
@@ -889,7 +889,7 @@ syncq2q(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 queue_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "qhead") == -1) {
 		mdb_warn("failed to read 'qhead'");
 		return (WALK_ERR);
@@ -904,7 +904,7 @@ queue_link_step(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (queue_t), wsp->walk_addr) == -1) {
@@ -924,7 +924,7 @@ queue_next_step(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (queue_t), wsp->walk_addr) == -1) {
@@ -950,7 +950,7 @@ str_walk_init(mdb_walk_state_t *wsp)
 {
 	stdata_t s;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("walk must begin at address of stdata_t\n");
 		return (WALK_ERR);
 	}
@@ -972,7 +972,7 @@ strr_walk_step(mdb_walk_state_t *wsp)
 	queue_t *rq = wsp->walk_data, *wq = rq + 1;
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (queue_t) * 2,
@@ -999,7 +999,7 @@ strw_walk_step(mdb_walk_state_t *wsp)
 	queue_t *rq = wsp->walk_data, *wq = rq + 1;
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (queue_t) * 2,
@@ -1106,7 +1106,7 @@ b_cont_step(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (mblk_t), wsp->walk_addr) == -1) {
@@ -1126,7 +1126,7 @@ b_next_step(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (mblk_t), wsp->walk_addr) == -1) {
@@ -1438,7 +1438,7 @@ strftblk_step(mdb_walk_state_t *wsp)
 	ftblk_t *ftbp;
 	int status = WALK_NEXT;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	ftd = (ftblkdata_t *)wsp->walk_data;

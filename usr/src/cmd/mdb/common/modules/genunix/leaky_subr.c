@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_param.h>
 #include <mdb/mdb_modapi.h>
 
@@ -393,7 +391,7 @@ leaky_subr_estimate(size_t *estp)
 		return (DCMD_ERR);
 	}
 
-	if (state != MDB_STATE_STOPPED && panicstr == NULL) {
+	if (state != MDB_STATE_STOPPED && panicstr == 0) {
 		mdb_warn("findleaks: cannot be run on a live dump.\n");
 		return (DCMD_ERR);
 	}
@@ -464,7 +462,7 @@ leaky_subr_run(void)
 	 * If kmdb is loaded, we need to walk it's module list, since kmdb
 	 * modctl structures can reference kmem allocations.
 	 */
-	if ((mdb_readvar(&dmods, "kdi_dmods") != -1) && (dmods != NULL))
+	if ((mdb_readvar(&dmods, "kdi_dmods") != -1) && (dmods != 0))
 		(void) mdb_pwalk("modctl", (mdb_walk_cb_t)leaky_modctl,
 		    NULL, dmods);
 

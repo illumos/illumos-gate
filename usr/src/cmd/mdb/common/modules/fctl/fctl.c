@@ -74,7 +74,7 @@ struct fc_local_port port;
 static int
 port_walk_i(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "fctl_fca_portlist") == -1) {
 		mdb_warn("failed to read 'fctl_fca_portlist'");
 		return (WALK_ERR);
@@ -93,7 +93,7 @@ port_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (fc_fca_port_t), wsp->walk_addr)
@@ -201,7 +201,7 @@ ports(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 ulp_walk_i(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "fctl_ulp_list") == -1) {
 		mdb_warn("failed to read 'fctl_ulp_list'");
 		return (WALK_ERR);
@@ -218,7 +218,7 @@ ulp_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (fc_ulp_list_t), wsp->walk_addr)
@@ -311,7 +311,7 @@ ulps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 ulpmod_walk_i(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "fctl_ulp_modules") == -1) {
 		mdb_warn("failed to read 'fctl_ulp_modules'");
 		return (WALK_ERR);
@@ -328,7 +328,7 @@ ulpmod_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (fc_ulp_module_t), wsp->walk_addr)
@@ -580,7 +580,7 @@ pd_by_pwwn_walk_i(mdb_walk_state_t *wsp)
 {
 	fc_local_port_t port;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("pd_by_pwwn walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -632,7 +632,7 @@ pd_by_pwwn_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if ((wsp->walk_addr == NULL) &&
+	if ((wsp->walk_addr == 0) &&
 	    (pd_hash_index >= (PWWN_HASH_TABLE_SIZE - 1))) {
 		return (WALK_DONE);
 	}
@@ -649,7 +649,7 @@ pd_by_pwwn_walk_s(mdb_walk_state_t *wsp)
 	wsp->walk_addr =
 	    (uintptr_t)(((fc_remote_port_t *)wsp->walk_data)->pd_wwn_hnext);
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		/*
 		 * Try the next hash list, if there is one.
 		 */
@@ -694,7 +694,7 @@ pd_by_did_walk_i(mdb_walk_state_t *wsp)
 {
 	fc_local_port_t port;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("pd_by_did walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -745,7 +745,7 @@ pd_by_did_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if ((wsp->walk_addr == NULL) &&
+	if ((wsp->walk_addr == 0) &&
 	    (pd_hash_index >= (D_ID_HASH_TABLE_SIZE - 1))) {
 		return (WALK_DONE);
 	}
@@ -762,7 +762,7 @@ pd_by_did_walk_s(mdb_walk_state_t *wsp)
 	wsp->walk_addr =
 	    (uintptr_t)(((fc_remote_port_t *)wsp->walk_data)->pd_did_hnext);
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		/*
 		 * Try the next hash list, if there is one.
 		 */
@@ -1175,7 +1175,7 @@ fcp_trace_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 job_request_walk_i(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("The address of a fc_local_port"
 		    " structure must be given\n");
 		return (WALK_ERR);
@@ -1204,7 +1204,7 @@ job_request_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (struct job_request),
@@ -1245,7 +1245,7 @@ job_request_walk_f(mdb_walk_state_t *wsp)
 static int
 orphan_walk_i(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("The address of a fc_local_port"
 		    " structure must be given\n");
 		return (WALK_ERR);
@@ -1274,7 +1274,7 @@ orphan_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (struct fc_orphan),

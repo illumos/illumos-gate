@@ -210,10 +210,11 @@ tem_safe_check_first_time(
 		return;
 
 	first_time = 0;
-	if (tems.ts_display_mode == VIS_TEXT) {
+	if (tems.ts_display_mode == VIS_TEXT)
 		tem_safe_text_cursor(tem, VIS_GET_CURSOR, credp, called_from);
-		tem_safe_align_cursor(tem);
-	}
+	else
+		tem_safe_pix_cursor(tem, VIS_GET_CURSOR, credp, called_from);
+	tem_safe_align_cursor(tem);
 }
 
 /*
@@ -2052,6 +2053,13 @@ tem_safe_pix_cursor(struct tem_vt_state *tem, short action,
 	ca.action = action;
 
 	tems_safe_cursor(&ca, credp, called_from);
+
+	if (action == VIS_GET_CURSOR) {
+		tem->tvs_c_cursor.row = (ca.row - tems.ts_p_offset.y) /
+		    tems.ts_font.height;
+		tem->tvs_c_cursor.col = (ca.col - tems.ts_p_offset.x) /
+		    tems.ts_font.width;
+	}
 }
 
 static void

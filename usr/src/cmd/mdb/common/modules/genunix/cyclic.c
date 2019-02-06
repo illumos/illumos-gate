@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "cyclic.h"
 
 #define	CYCLIC_TRACE
@@ -88,7 +86,7 @@ cycomni_walk_init(mdb_walk_state_t *wsp)
 {
 	cyc_id_t id;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("must provide a cyclic id\n");
 		return (WALK_ERR);
 	}
@@ -115,7 +113,7 @@ cycomni_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	cyc_omni_cpu_t omni;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&omni, sizeof (omni), addr) == -1) {
@@ -471,7 +469,7 @@ cyctrace_walk_init(mdb_walk_state_t *wsp)
 
 	cpu = mdb_zalloc(sizeof (cyc_cpu_t), UM_SLEEP);
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		/*
 		 * If an address isn't provided, we'll use the passive buffer.
 		 */
@@ -595,7 +593,7 @@ int
 cyctrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	if (!(flags & DCMD_ADDRSPEC) || argc != 0)
-		addr = NULL;
+		addr = 0;
 
 	if (mdb_pwalk("cyctrace", (mdb_walk_cb_t)cyctrace_walk,
 	    (void *)addr, addr) == -1) {

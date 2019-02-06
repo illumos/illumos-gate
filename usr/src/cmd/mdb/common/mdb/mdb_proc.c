@@ -3170,7 +3170,7 @@ pt_object_iter(mdb_tgt_t *t, mdb_tgt_map_f *func, void *private)
 		(void) strncpy(mp->map_name, s, MDB_TGT_MAPSZ);
 		mp->map_name[MDB_TGT_MAPSZ - 1] = '\0';
 		mp->map_flags = MDB_TGT_MAP_R | MDB_TGT_MAP_X;
-		mp->map_base = NULL;
+		mp->map_base = 0;
 		mp->map_size = 0;
 
 		if (func(private, mp, s) != 0)
@@ -3983,7 +3983,7 @@ pt_brkpt_ctor(mdb_tgt_t *t, mdb_sespec_t *sep, void *args)
 
 	ptb = mdb_alloc(sizeof (pt_brkpt_t), UM_SLEEP);
 	ptb->ptb_addr = pta->pta_addr;
-	ptb->ptb_instr = NULL;
+	ptb->ptb_instr = 0;
 	sep->se_data = ptb;
 
 	return (0);
@@ -4001,7 +4001,7 @@ static char *
 pt_brkpt_info(mdb_tgt_t *t, mdb_sespec_t *sep, mdb_vespec_t *vep,
     mdb_tgt_spec_desc_t *sp, char *buf, size_t nbytes)
 {
-	uintptr_t addr = NULL;
+	uintptr_t addr = 0;
 
 	if (vep != NULL) {
 		pt_bparg_t *pta = vep->ve_args;
@@ -4385,7 +4385,7 @@ pt_add_sbrkpt(mdb_tgt_t *t, const char *sym,
 
 	pta = mdb_alloc(sizeof (pt_bparg_t), UM_SLEEP);
 	pta->pta_symbol = strdup(sym);
-	pta->pta_addr = NULL;
+	pta->pta_addr = 0;
 
 	return (mdb_tgt_vespec_insert(t, &proc_brkpt_ops, spec_flags,
 	    func, data, pta, pt_bparg_dtor));
@@ -5098,7 +5098,7 @@ pt_xd_auxv(mdb_tgt_t *t, void *buf, size_t nbytes)
 
 	if (P != NULL && (auxv = Pgetauxvec(P)) != NULL &&
 	    auxv->a_type != AT_NULL) {
-		for (auxp = auxv, auxn = 1; auxp->a_type != NULL; auxp++)
+		for (auxp = auxv, auxn = 1; auxp->a_type != 0; auxp++)
 			auxn++;
 	}
 

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
 #include <sys/types.h>
@@ -50,7 +48,7 @@ inode_walk_init(mdb_walk_state_t *wsp)
 	union ihead ih;
 	inode_walk_data_t *iw;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("inode_cache only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -342,7 +340,7 @@ acl_walk_init(mdb_walk_state_t *wsp)
 	si_t *si;
 	ufs_ic_acl_t **aclpp;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("acl walk needs an inode address\n");
 		return (WALK_ERR);
 	}
@@ -382,7 +380,7 @@ acl_walk_step(mdb_walk_state_t *wsp)
 	ufs_ic_acl_t **aclpp;
 	ufs_ic_acl_t acl;
 
-	while (addr == NULL) {
+	while (addr == 0) {
 		wsp->walk_arg = (void *)(uintptr_t)++i;
 
 		if (acl_map[i].am_offset == -1)

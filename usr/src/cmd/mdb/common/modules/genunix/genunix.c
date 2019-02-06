@@ -414,12 +414,12 @@ pgrep_cb(uintptr_t addr, const void *ignored, void *data)
 		    p.p_user.u_start.tv_nsec;
 
 		if (pgp->pg_flags & PG_NEWEST) {
-			if (pgp->pg_xaddr == NULL || start > pgp->pg_xstart) {
+			if (pgp->pg_xaddr == 0 || start > pgp->pg_xstart) {
 				pgp->pg_xaddr = addr;
 				pgp->pg_xstart = start;
 			}
 		} else {
-			if (pgp->pg_xaddr == NULL || start < pgp->pg_xstart) {
+			if (pgp->pg_xaddr == 0 || start < pgp->pg_xstart) {
 				pgp->pg_xaddr = addr;
 				pgp->pg_xstart = start;
 			}
@@ -579,7 +579,7 @@ project(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 callout_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("callout doesn't support global walk");
 		return (WALK_ERR);
 	}
@@ -596,7 +596,7 @@ callout_walk_step(mdb_walk_state_t *wsp)
 {
 	int retval;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		return (WALK_DONE);
 	}
 	if (mdb_vread(wsp->walk_data, sizeof (callout_t),
@@ -631,7 +631,7 @@ callout_walk_fini(mdb_walk_state_t *wsp)
 int
 callout_list_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("callout list doesn't support global walk");
 		return (WALK_ERR);
 	}
@@ -644,7 +644,7 @@ callout_list_walk_step(mdb_walk_state_t *wsp)
 {
 	int retval;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		return (WALK_DONE);
 	}
 	if (mdb_vread(wsp->walk_data, sizeof (callout_list_t),
@@ -686,7 +686,7 @@ callout_table_walk_init(mdb_walk_state_t *wsp)
 
 	cot_walk_data = mdb_alloc(sizeof (cot_data_t), UM_SLEEP);
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_readvar(&cot_walk_data->ct0, "callout_table") == -1) {
 			mdb_warn("failed to read 'callout_table'");
 			return (WALK_ERR);
@@ -1202,7 +1202,7 @@ callout_t_cb(uintptr_t addr, const void *data, void *priv)
 	}
 
 	if (!(coargs->flags & COF_EMPTY) && (
-	    (ct->ct_heap == NULL) || (ct->ct_cyclic == NULL))) {
+	    (ct->ct_heap == NULL) || (ct->ct_cyclic == 0))) {
 		return (WALK_NEXT);
 	}
 
@@ -1542,9 +1542,9 @@ callout(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (!(flags & DCMD_ADDRSPEC)) {
 		/* don't pass "dot" if no addr. */
-		addr = NULL;
+		addr = 0;
 	}
-	if (addr != NULL) {
+	if (addr != 0) {
 		/*
 		 * a callout table was specified. Ignore -r|n option
 		 * to avoid null output.
@@ -1978,7 +1978,7 @@ lminfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%<u>%-?s %2s %4s %6s %-16s %-?s %s%</u>\n",
 		    "ADDR", "TP", "FLAG", "PID", "COMM", "VNODE", "PATH");
 
-	return (mdb_pwalk("lock_graph", lminfo_cb, NULL, NULL));
+	return (mdb_pwalk("lock_graph", lminfo_cb, NULL, 0));
 }
 
 /*ARGSUSED*/
@@ -1987,7 +1987,7 @@ whereopen_fwalk(uintptr_t addr, struct file *f, uintptr_t *target)
 {
 	if ((uintptr_t)f->f_vnode == *target) {
 		mdb_printf("file %p\n", addr);
-		*target = NULL;
+		*target = 0;
 	}
 
 	return (WALK_NEXT);
@@ -2004,7 +2004,7 @@ whereopen_pwalk(uintptr_t addr, void *ignored, uintptr_t *target)
 		return (WALK_ERR);
 	}
 
-	if (t == NULL)
+	if (t == 0)
 		mdb_printf("%p\n", addr);
 
 	return (WALK_NEXT);
@@ -2016,7 +2016,7 @@ whereopen(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	uintptr_t target = addr;
 
-	if (!(flags & DCMD_ADDRSPEC) || addr == NULL)
+	if (!(flags & DCMD_ADDRSPEC) || addr == 0)
 		return (DCMD_USAGE);
 
 	if (mdb_walk("proc", (mdb_walk_cb_t)whereopen_pwalk, &target) == -1) {
@@ -2185,7 +2185,7 @@ kmastat_vmem(uintptr_t addr, const vmem_t *v, const void *ignored)
 	vmem_t parent;
 	int ident = 0;
 
-	for (paddr = (uintptr_t)v->vm_source; paddr != NULL; ident += 4) {
+	for (paddr = (uintptr_t)v->vm_source; paddr != 0; ident += 4) {
 		if (mdb_vread(&parent, sizeof (parent), paddr) == -1) {
 			mdb_warn("couldn't trace %p's ancestry", addr);
 			ident = 0;
@@ -2453,7 +2453,7 @@ file_walk_init(mdb_walk_state_t *wsp)
 	file_walk_data_t *fw;
 	mdb_file_proc_t p;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("file walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -2502,7 +2502,7 @@ again:
 	if (fw->fw_ndx == fw->fw_nofiles)
 		return (WALK_DONE);
 
-	if ((fp = (uintptr_t)fw->fw_flist[fw->fw_ndx++].uf_file) == NULL)
+	if ((fp = (uintptr_t)fw->fw_flist[fw->fw_ndx++].uf_file) == 0)
 		goto again;
 
 	(void) mdb_vread(&file, sizeof (file), (uintptr_t)fp);
@@ -2519,7 +2519,7 @@ allfile_walk_step(mdb_walk_state_t *wsp)
 	if (fw->fw_ndx == fw->fw_nofiles)
 		return (WALK_DONE);
 
-	if ((fp = (uintptr_t)fw->fw_flist[fw->fw_ndx++].uf_file) != NULL)
+	if ((fp = (uintptr_t)fw->fw_flist[fw->fw_ndx++].uf_file) != 0)
 		(void) mdb_vread(&file, sizeof (file), (uintptr_t)fp);
 	else
 		bzero(&file, sizeof (file));
@@ -2539,7 +2539,7 @@ file_walk_fini(mdb_walk_state_t *wsp)
 int
 port_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("port walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -2590,7 +2590,7 @@ portev_walk_init(mdb_walk_state_t *wsp)
 	struct list	*list;
 	uintptr_t	vp;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("portev walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -2673,7 +2673,7 @@ proc_walk_init(mdb_walk_state_t *wsp)
 	GElf_Sym sym;
 	proc_walk_data_t *pw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_lookup_by_name("p0", &sym) == -1) {
 			mdb_warn("failed to read 'practive'");
 			return (WALK_ERR);
@@ -2734,7 +2734,7 @@ proc_walk_step(mdb_walk_state_t *wsp)
 	if (status != WALK_NEXT)
 		return (status);
 
-	if ((wsp->walk_addr = cld) != NULL) {
+	if ((wsp->walk_addr = cld) != 0) {
 		if (mdb_ctf_vread(&pr, "proc_t", "mdb_walk_proc_t",
 		    cld, 0) == -1) {
 			mdb_warn("proc %p has invalid p_child %p; skipping\n",
@@ -2760,14 +2760,14 @@ sib:
 	if (pw->pw_depth == 0)
 		return (WALK_DONE);
 
-	if (sib != NULL && mdb_ctf_vread(&pr, "proc_t", "mdb_walk_proc_t",
+	if (sib != 0 && mdb_ctf_vread(&pr, "proc_t", "mdb_walk_proc_t",
 	    sib, 0) == -1) {
 		mdb_warn("proc %p has invalid p_sibling %p; skipping\n",
 		    addr, sib);
-		sib = NULL;
+		sib = 0;
 	}
 
-	if ((wsp->walk_addr = sib) == NULL) {
+	if ((wsp->walk_addr = sib) == 0) {
 		if (pw->pw_depth > 0) {
 			wsp->walk_addr = pw->pw_stack[pw->pw_depth - 1];
 			return (WALK_NEXT);
@@ -2829,7 +2829,7 @@ task_walk_step(mdb_walk_state_t *wsp)
 int
 project_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_readvar(&wsp->walk_addr, "proj0p") == -1) {
 			mdb_warn("failed to read 'proj0p'");
 			return (WALK_ERR);
@@ -2912,7 +2912,7 @@ cpu_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (panicstr != NULL) {
+	if (panicstr != 0) {
 		if (mdb_lookup_by_name("panic_cpu", &sym) == -1) {
 			mdb_warn("failed to find 'panic_cpu'");
 			return (WALK_ERR);
@@ -2947,7 +2947,7 @@ cpu_walk_init(mdb_walk_state_t *wsp)
 			return (WALK_ERR);
 		}
 
-		if (panicstr != NULL && panic_cpu.cpu_id == cpu.cpu_id) {
+		if (panicstr != 0 && panic_cpu.cpu_id == cpu.cpu_id) {
 			cw->cw_array[i++] = addr;
 		} else {
 			cw->cw_array[i++] = current;
@@ -2967,7 +2967,7 @@ cpu_walk_step(mdb_walk_state_t *wsp)
 	cpu_t cpu;
 	uintptr_t addr = cw->cw_array[cw->cw_ndx++];
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&cpu, sizeof (cpu), addr) == -1) {
@@ -3016,7 +3016,7 @@ cpuinfo_walk_ithread(uintptr_t addr, const kthread_t *thr, cpuinfo_data_t *cid)
 		return (WALK_NEXT);
 	}
 
-	if (cid->cid_ithr[id][pil] != NULL) {
+	if (cid->cid_ithr[id][pil] != 0) {
 		mdb_warn("CPU %d has multiple threads at pil %d (at least "
 		    "%p and %p)\n", id, pil, addr, cid->cid_ithr[id][pil]);
 		return (WALK_NEXT);
@@ -3177,7 +3177,7 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 		for (i = NINTR - 1; i >= 0; i--) {
 			uintptr_t iaddr = cid->cid_ithr[cpu->cpu_id][i];
 
-			if (iaddr == NULL)
+			if (iaddr == 0)
 				continue;
 
 			if (!found_one) {
@@ -3207,7 +3207,7 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 			pinned = (uintptr_t)t.t_intr;
 		}
 
-		if (found_one && pinned != NULL) {
+		if (found_one && pinned != 0) {
 			cid->cid_print_head = TRUE;
 			(void) strcpy(p.p_user.u_comm, "?");
 
@@ -3256,7 +3256,7 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 		for (i = npri - 1; i >= 0; i--) {
 			uintptr_t taddr = (uintptr_t)dq[i].dq_first;
 
-			while (taddr != NULL) {
+			while (taddr != 0) {
 				if (mdb_vread(&t, sizeof (t), taddr) == -1) {
 					mdb_warn("failed to read kthread_t "
 					    "at %p", taddr);
@@ -3426,7 +3426,7 @@ ptree_walk(uintptr_t addr, const void *ignored, void *data)
 
 	mdb_ctf_vread(&proc, "proc_t", "mdb_ptree_proc_t", addr, 0);
 
-	for (paddr = (uintptr_t)proc.p_parent; paddr != NULL; ident += 5) {
+	for (paddr = (uintptr_t)proc.p_parent; paddr != 0; ident += 5) {
 		mdb_ctf_vread(&parent, "proc_t", "mdb_ptree_proc_t", paddr, 0);
 		paddr = (uintptr_t)parent.p_parent;
 	}
@@ -3460,7 +3460,7 @@ int
 ptree(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	if (!(flags & DCMD_ADDRSPEC))
-		addr = NULL;
+		addr = 0;
 	else
 		ptree_ancestors(addr, addr);
 
@@ -3676,7 +3676,7 @@ did2thread(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 static int
 errorq_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "errorq_list") == -1) {
 		mdb_warn("failed to read errorq_list");
 		return (WALK_ERR);
@@ -3691,7 +3691,7 @@ errorq_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t addr = wsp->walk_addr;
 	errorq_t eq;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&eq, sizeof (eq), addr) == -1) {
@@ -3723,7 +3723,7 @@ eqd_push_list(eqd_walk_data_t *eqdp, uintptr_t addr)
 {
 	errorq_elem_t eqe;
 
-	while (addr != NULL) {
+	while (addr != 0) {
 		if (mdb_vread(&eqe, sizeof (eqe), addr) != sizeof (eqe)) {
 			mdb_warn("failed to read errorq element at %p", addr);
 			break;

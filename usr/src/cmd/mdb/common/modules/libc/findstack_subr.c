@@ -105,7 +105,7 @@ sobj_text_to_ops(const char *name, uintptr_t *sobj_ops_out)
 void
 sobj_ops_to_text(uintptr_t addr, char *out, size_t sz)
 {
-	(void) snprintf(out, sz, "%s", addr == NULL ? "<none>" : (char *)addr);
+	(void) snprintf(out, sz, "%s", addr == 0 ? "<none>" : (char *)addr);
 }
 
 static int
@@ -259,7 +259,7 @@ stacks_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
 	}
 
 	fsip->fsi_tstate = ulwp.ul_sleepq != NULL;
-	fsip->fsi_sobj_ops = (uintptr_t)(ulwp.ul_sleepq == NULL ? NULL :
+	fsip->fsi_sobj_ops = (uintptr_t)(ulwp.ul_sleepq == NULL ? 0 :
 	    (ulwp.ul_qtype == MX ? STACKS_SOBJ_MX : STACKS_SOBJ_CV));
 
 	if (mdb_getareg(addr, STACKS_REGS_FP, &reg) != 0) {
@@ -278,14 +278,14 @@ stacks_findstack(uintptr_t addr, findstack_info_t *fsip, uint_t print_warnings)
 	fsip->fsi_pc = (uintptr_t)reg;
 #endif
 
-	while (fp != NULL) {
+	while (fp != 0) {
 		if (mdb_vread(&frame, sizeof (frame), fp) == -1) {
 			mdb_warn("couldn't read frame for thread 0x%p at %p",
 			    addr, fp);
 			return (-1);
 		}
 
-		if (frame.rw_rtn == NULL)
+		if (frame.rw_rtn == 0)
 			break;
 
 		if (fsip->fsi_depth < fsip->fsi_max_depth) {

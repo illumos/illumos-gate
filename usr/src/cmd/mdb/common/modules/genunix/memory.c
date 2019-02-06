@@ -83,7 +83,7 @@ page_walk_init(mdb_walk_state_t *wsp)
 	size_t	hashsz;
 	vnode_t	vn;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 
 		/*
 		 * Walk all pages
@@ -157,7 +157,7 @@ page_walk_step(mdb_walk_state_t *wsp)
 		 * back around to the first one (we finished), or we
 		 * can't read the page we're looking at, we are done.
 		 */
-		if (pp == NULL || pp == pwd->pw_first)
+		if (pp == 0 || pp == pwd->pw_first)
 			return (WALK_DONE);
 		if (mdb_vread(&page, sizeof (page_t), pp) == -1) {
 			mdb_warn("unable to read page_t at %#lx", pp);
@@ -170,7 +170,7 @@ page_walk_step(mdb_walk_state_t *wsp)
 		 * first page), set it.
 		 */
 		wsp->walk_addr = (uintptr_t)page.p_vpnext;
-		if (pwd->pw_first == NULL)
+		if (pwd->pw_first == 0)
 			pwd->pw_first = pp;
 
 	} else if (pwd->pw_hashleft > 0) {
@@ -181,7 +181,7 @@ page_walk_step(mdb_walk_state_t *wsp)
 		 * If pp (the walk address) is NULL, we scan through
 		 * the page hash table until we find a page.
 		 */
-		if (pp == NULL) {
+		if (pp == 0) {
 
 			/*
 			 * Iterate through the page hash table until we
@@ -196,12 +196,12 @@ page_walk_step(mdb_walk_state_t *wsp)
 				}
 				pwd->pw_hashleft--;
 				pwd->pw_hashloc++;
-			} while (pwd->pw_hashleft && (pp == NULL));
+			} while (pwd->pw_hashleft && (pp == 0));
 
 			/*
 			 * We've reached the end; exit.
 			 */
-			if (pp == NULL)
+			if (pp == 0)
 				return (WALK_DONE);
 		}
 
@@ -811,7 +811,7 @@ swap_walk_step(mdb_walk_state_t *wsp)
 
 	sip = wsp->walk_addr;
 
-	if (sip == NULL)
+	if (sip == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&si, sizeof (struct swapinfo), sip) == -1) {
@@ -866,7 +866,7 @@ memlist_walk_step(mdb_walk_state_t *wsp)
 
 	mlp = wsp->walk_addr;
 
-	if (mlp == NULL)
+	if (mlp == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&ml, sizeof (struct memlist), mlp) == -1) {
@@ -907,7 +907,7 @@ memlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			if (!(list & 1))
 				continue;
 			if ((mdb_readvar(&ptr, lists[i]) == -1) ||
-			    (ptr == NULL)) {
+			    (ptr == 0)) {
 				mdb_warn("%s not found or invalid", lists[i]);
 				return (DCMD_ERR);
 			}
@@ -938,7 +938,7 @@ memlist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 seg_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("seg walk must begin at struct as *\n");
 		return (WALK_ERR);
 	}
@@ -1136,7 +1136,7 @@ anon_walk_init_common(mdb_walk_state_t *wsp, ulong_t minslot, ulong_t maxslot)
 {
 	anon_walk_data_t *aw;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("anon walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -1222,7 +1222,7 @@ anon_walk_step(mdb_walk_state_t *wsp)
 
 			levtwoptr = (uintptr_t)aw->aw_levone[aw->aw_levone_ndx];
 
-			if (levtwoptr == NULL) {
+			if (levtwoptr == 0) {
 				if (!aw->aw_all) {
 					aw->aw_levtwo_ndx = 0;
 					aw->aw_levone_ndx++;
@@ -1257,12 +1257,12 @@ anon_walk_step(mdb_walk_state_t *wsp)
 		}
 	}
 
-	if (anonptr != NULL) {
+	if (anonptr != 0) {
 		mdb_vread(&anon, sizeof (anon), anonptr);
 		return (wsp->walk_callback(anonptr, &anon, wsp->walk_cbdata));
 	}
 	if (aw->aw_all) {
-		return (wsp->walk_callback(NULL, NULL, wsp->walk_cbdata));
+		return (wsp->walk_callback(0, NULL, wsp->walk_cbdata));
 	}
 	return (WALK_NEXT);
 }
@@ -1295,7 +1295,7 @@ segvn_anon_walk_init(mdb_walk_state_t *wsp)
 	struct anon_map		amp;
 	struct seg		seg;
 
-	if (svd_addr == NULL) {
+	if (svd_addr == 0) {
 		mdb_warn("segvn_anon walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -1404,7 +1404,7 @@ segvn_pages_walk_init(mdb_walk_state_t *wsp)
 	segvn_walk_data_t	*svw;
 	struct segvn_data	*svd;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("segvn walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -1513,7 +1513,7 @@ segvn_pages_walk_step(mdb_walk_state_t *wsp)
 		u_offset_t off;
 
 		if (svw->svw_sparse_idx >= svw->svw_sparse_count) {
-			pp = NULL;
+			pp = 0;
 			if (!svw->svw_all) {
 				return (WALK_DONE);
 			}
@@ -1522,14 +1522,14 @@ segvn_pages_walk_step(mdb_walk_state_t *wsp)
 			    &svw->svw_sparse[svw->svw_sparse_idx];
 			off = svs->svs_offset - svd->offset;
 			if (svw->svw_all && svw->svw_walkoff != off) {
-				pp = NULL;
+				pp = 0;
 			} else {
 				pp = svs->svs_page;
 				svw->svw_sparse_idx++;
 			}
 		}
 
-	} else if (svd->amp == NULL || wsp->walk_addr == NULL) {
+	} else if (svd->amp == NULL || wsp->walk_addr == 0) {
 		/*
 		 * If there's no anon, or the anon slot is NULL, look up
 		 * <vp, offset>.
@@ -1538,7 +1538,7 @@ segvn_pages_walk_step(mdb_walk_state_t *wsp)
 			pp = mdb_page_lookup((uintptr_t)svd->vp,
 			    svd->offset + svw->svw_walkoff);
 		} else {
-			pp = NULL;
+			pp = 0;
 		}
 
 	} else {
@@ -1562,12 +1562,12 @@ segvn_pages_walk_step(mdb_walk_state_t *wsp)
 				mdb_warn("walk segvn_pages: useless struct "
 				    "anon at %p\n", wsp->walk_addr);
 			}
-			pp = NULL;	/* nothing at this offset */
+			pp = 0;	/* nothing at this offset */
 		}
 	}
 
 	svw->svw_walkoff += PAGESIZE;	/* Update for the next call */
-	if (pp != NULL) {
+	if (pp != 0) {
 		if (mdb_vread(&page, sizeof (page_t), pp) == -1) {
 			mdb_warn("unable to read page_t at %#lx", pp);
 			return (WALK_ERR);
@@ -1575,7 +1575,7 @@ segvn_pages_walk_step(mdb_walk_state_t *wsp)
 		return (wsp->walk_callback(pp, &page, wsp->walk_cbdata));
 	}
 	if (svw->svw_all) {
-		return (wsp->walk_callback(NULL, NULL, wsp->walk_cbdata));
+		return (wsp->walk_callback(0, NULL, wsp->walk_cbdata));
 	}
 	return (WALK_NEXT);
 }
@@ -1670,7 +1670,7 @@ vnode2smap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 
 		saddr = (uintptr_t)smp.sm_hash;
-	} while (saddr != NULL);
+	} while (saddr != 0);
 
 	mdb_printf("no smap for vnode %p, offs %p\n", addr, offset);
 	return (DCMD_OK);

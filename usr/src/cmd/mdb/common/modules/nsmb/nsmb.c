@@ -85,7 +85,7 @@ smb_co_walk_init(mdb_walk_state_t *wsp, int level)
 	smb_co_walk_data_t *smbw;
 	size_t psz;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_ERR);
 
 	smbw = mdb_alloc(sizeof (*smbw), UM_SLEEP | UM_GC);
@@ -140,7 +140,7 @@ smb_vc_walk_init(mdb_walk_state_t *wsp)
 {
 	GElf_Sym sym;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("::walk smb_vc only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -183,7 +183,7 @@ smb_co_walk_step(mdb_walk_state_t *wsp)
 	smb_co_walk_data_t *smbw = wsp->walk_data;
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&smbw->u, smbw->size, wsp->walk_addr)
@@ -390,7 +390,7 @@ rqlist_walk_step(mdb_walk_state_t *wsp)
 	smb_rq_t rq;
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&rq, sizeof (rq), wsp->walk_addr) == -1) {
@@ -466,7 +466,7 @@ pwtree_walk_init(mdb_walk_state_t *wsp)
 {
 	GElf_Sym sym;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("pwtree walk only supports global walks\n");
 		return (WALK_ERR);
 	}

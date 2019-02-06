@@ -76,7 +76,7 @@ srpt_ioc_walk_init(mdb_walk_state_t *wsp)
 static int
 srpt_list_walk_step(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		return (WALK_DONE);
 	}
 	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
@@ -96,7 +96,7 @@ srpt_tgt_walk_init(mdb_walk_state_t *wsp)
 	 * Input should be a srpt_ioc_t, read it to get the
 	 * srpt_target_port_t
 	 */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("<srpt_ioc_t addr>::walk srpt_target\n");
 		return (WALK_ERR);
 	}
@@ -114,7 +114,7 @@ srpt_tgt_walk_init(mdb_walk_state_t *wsp)
 static int
 srpt_tgt_walk_step(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		return (WALK_DONE);
 	}
 
@@ -143,7 +143,7 @@ srpt_channel_walk_init(mdb_walk_state_t *wsp)
 	 * Input should be a srpt_target_port_t, read it to get the
 	 * list of channels
 	 */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("<srpt_target_port_t addr>::walk srpt_channel\n");
 		return (WALK_ERR);
 	}
@@ -168,7 +168,7 @@ srpt_scsi_session_walk_init(mdb_walk_state_t *wsp)
 	 * Input should be a srpt_target_port_t, read it to get the
 	 * srpt_session_t
 	 */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("<srpt_target_port_t addr>::walk srpt_scsi_session\n");
 		return (WALK_ERR);
 	}
@@ -189,7 +189,7 @@ srpt_scsi_session_walk_init(mdb_walk_state_t *wsp)
 static int
 srpt_task_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("<srpt_session_t addr>::walk srpt_tasks\n");
 		return (WALK_ERR);
 	}
@@ -211,7 +211,7 @@ srpt_print_ioc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char		mask[9];
 	int		i;
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("address of srpt_ioc should be specified\n");
 		return (DCMD_ERR);
 	}

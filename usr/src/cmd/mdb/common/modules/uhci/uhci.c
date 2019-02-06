@@ -231,7 +231,7 @@ uhci_td(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("\n  UHCI td struct at (vaddr) %08x:\n", addr);
 
-	if (!(td.link_ptr & HC_END_OF_LIST) && td.link_ptr != NULL) {
+	if (!(td.link_ptr & HC_END_OF_LIST) && td.link_ptr != 0) {
 		mdb_printf("        link_ptr (paddr)    : %-8x        "
 		    "(vaddr)      : %p\n",
 		    td.link_ptr,
@@ -258,7 +258,7 @@ uhci_td(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    "startingframe: %0x\n", td.isoc_pkt_index, td.starting_frame);
 
 
-	if (td.link_ptr == NULL)  {
+	if (td.link_ptr == 0)  {
 		mdb_printf("        --> Link pointer = NULL\n");
 		return (DCMD_ERR);
 	} else {
@@ -343,7 +343,7 @@ uhci_qh(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("\n  UHCI qh struct at (vaddr) %08x:\n", addr);
 
-	if (!(qh.link_ptr & HC_END_OF_LIST) && qh.link_ptr != NULL) {
+	if (!(qh.link_ptr & HC_END_OF_LIST) && qh.link_ptr != 0) {
 		mdb_printf("        link_ptr (paddr)    : %08x        "
 		    "(vaddr)      : %p\n",
 		    qh.link_ptr,
@@ -355,7 +355,7 @@ uhci_qh(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    qh.link_ptr);
 	}
 
-	if (!(qh.element_ptr & HC_END_OF_LIST) && qh.element_ptr != NULL) {
+	if (!(qh.element_ptr & HC_END_OF_LIST) && qh.element_ptr != 0) {
 		mdb_printf("        element_ptr (paddr) : %08x        "
 		    "(vaddr)      : %p\n",
 		    qh.element_ptr,
@@ -375,7 +375,7 @@ uhci_qh(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("        bulk_xfer_isoc_info : %?p\n", qh.bulk_xfer_info);
 
 
-	if (qh.link_ptr == NULL)  {
+	if (qh.link_ptr == 0)  {
 		mdb_printf("        --> Link pointer = NULL\n");
 		return (DCMD_ERR);
 	} else {
@@ -398,7 +398,7 @@ uhci_qh(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 
-	if (qh.element_ptr == NULL)  {
+	if (qh.element_ptr == 0)  {
 		mdb_printf("        element_ptr = NULL\n");
 		return (DCMD_ERR);
 	} else {
@@ -449,7 +449,7 @@ uhci_qh(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 uhci_td_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL)  {
+	if (wsp->walk_addr == 0)  {
 		return (DCMD_USAGE);
 	}
 
@@ -495,7 +495,7 @@ uhci_td_walk_step(mdb_walk_state_t *wsp)
 	wsp->walk_addr = ((uhci_td_t *)wsp->walk_data)->link_ptr;
 
 	/* Check if we're at the last element */
-	if (wsp->walk_addr == NULL || wsp->walk_addr & HC_END_OF_LIST)
+	if (wsp->walk_addr == 0 || wsp->walk_addr & HC_END_OF_LIST)
 		return (WALK_DONE);
 
 	/* Make sure next element is a TD.  If a QH, stop.  */
@@ -507,7 +507,7 @@ uhci_td_walk_step(mdb_walk_state_t *wsp)
 	/* Strip terminate etc. bits.  */
 	wsp->walk_addr &= QH_LINK_PTR_MASK; /* there is no TD_LINK_PTR_MASK */
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	/*
@@ -528,7 +528,7 @@ uhci_td_walk_step(mdb_walk_state_t *wsp)
 int
 uhci_qh_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (DCMD_USAGE);
 
 	wsp->walk_data = mdb_alloc(sizeof (queue_head_t), UM_SLEEP | UM_GC);
@@ -560,7 +560,7 @@ uhci_qh_walk_step(mdb_walk_state_t *wsp)
 	uhci_state_t	*uhcip = (uhci_state_t *)wsp->walk_arg;
 
 
-	if (wsp->walk_addr == NULL)	/* Should never occur */
+	if (wsp->walk_addr == 0)	/* Should never occur */
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (queue_head_t), wsp->walk_addr)
@@ -577,7 +577,7 @@ uhci_qh_walk_step(mdb_walk_state_t *wsp)
 
 
 	/* Check if we're at the last element */
-	if (wsp->walk_addr == NULL || wsp->walk_addr & HC_END_OF_LIST)  {
+	if (wsp->walk_addr == 0 || wsp->walk_addr & HC_END_OF_LIST)  {
 		return (WALK_DONE);
 	}
 
@@ -590,7 +590,7 @@ uhci_qh_walk_step(mdb_walk_state_t *wsp)
 	/* Strip terminate etc. bits.  */
 	wsp->walk_addr &= QH_LINK_PTR_MASK;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	/*

@@ -20,7 +20,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2015, 2016 by Delphix. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
-# Copyright 2018 Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -125,7 +125,7 @@ def git_parent_branch(branch):
 
     if not p:
         sys.stderr.write("Failed finding git parent branch\n")
-        sys.exit(err)
+        sys.exit(1)
 
     for line in p:
         # Git 1.7 will leave a ' ' trailing any non-tracking branch
@@ -141,8 +141,8 @@ def git_comments(parent):
     p = git('log --pretty=tformat:%%B:SEP: %s..' % parent)
 
     if not p:
-        sys.stderr.write("Failed getting git comments\n")
-        sys.exit(err)
+        sys.stderr.write("No outgoing changesets found - missing -p option?\n");
+        sys.exit(1)
 
     return [x.strip() for x in p if x != ':SEP:\n']
 
@@ -157,7 +157,7 @@ def git_file_list(parent, paths=None):
 
     if not p:
         sys.stderr.write("Failed building file-list from git\n")
-        sys.exit(err)
+        sys.exit(1)
 
     ret = set()
     for fname in p:

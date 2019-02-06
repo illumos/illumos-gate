@@ -555,7 +555,7 @@ $(i386_ONLY)file path=kernel/misc/$(ARCH64)/pcie group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/pcihp group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/pcmcia group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/rpcsec group=sys mode=0755
-$(i386_ONLY)file path=kernel/misc/$(ARCH64)/sata group=sys mode=0755
+file path=kernel/misc/$(ARCH64)/sata group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/scsi group=sys mode=0755
 file path=kernel/misc/$(ARCH64)/strplumb group=sys mode=0755
 $(sparc_ONLY)file path=kernel/misc/$(ARCH64)/swapgeneric group=sys mode=0755

@@ -90,7 +90,7 @@ ttrace_walk_init(mdb_walk_state_t *wsp)
 
 	ttcp = mdb_zalloc(ttc_size, UM_SLEEP);
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("ttrace only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -113,7 +113,7 @@ ttrace_walk_init(mdb_walk_state_t *wsp)
 	for (i = 0; i < NCPU; i++) {
 		trap_trace_ctl_t *ttc = &ttcp[i];
 
-		if (ttc->ttc_first == NULL)
+		if (ttc->ttc_first == 0)
 			continue;
 
 		/*
@@ -144,7 +144,7 @@ ttrace_walk_step(mdb_walk_state_t *wsp)
 	for (i = 0; i < NCPU; i++) {
 		ttc = &ttcp[i];
 
-		if (ttc->ttc_current == NULL)
+		if (ttc->ttc_current == 0)
 			continue;
 
 		if (ttc->ttc_current < ttc->ttc_first)
@@ -174,7 +174,7 @@ ttrace_walk_step(mdb_walk_state_t *wsp)
 	rval = wsp->walk_callback(ttc->ttc_current, &rec, wsp->walk_cbdata);
 
 	if (ttc->ttc_current == ttc->ttc_next)
-		ttc->ttc_current = NULL;
+		ttc->ttc_current = 0;
 	else
 		ttc->ttc_current -= sizeof (trap_trace_rec_t);
 
@@ -614,7 +614,7 @@ mutex_owner_step(mdb_walk_state_t *wsp)
 	if (!MUTEX_TYPE_ADAPTIVE(&mtx))
 		return (WALK_DONE);
 
-	if ((owner = (uintptr_t)MUTEX_OWNER(&mtx)) == NULL)
+	if ((owner = (uintptr_t)MUTEX_OWNER(&mtx)) == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(&thr, sizeof (thr), owner) != -1)

@@ -114,7 +114,7 @@ avl_walk_init_range(mdb_walk_state_t *wsp, uintptr_t begin, uintptr_t end,
 	 * "node" always points at the avl_node_t field inside the struct
 	 */
 	aw->aw_buff = mdb_zalloc(tree->avl_size, UM_SLEEP);
-	aw->aw_end = (end == NULL ? NULL : end + tree->avl_offset);
+	aw->aw_end = (end == 0 ? 0 : end + tree->avl_offset);
 	aw->aw_elem_name = element_name;
 	aw->aw_elem_check = element_check;
 	aw->aw_elem_check_arg = arg;
@@ -123,10 +123,10 @@ avl_walk_init_range(mdb_walk_state_t *wsp, uintptr_t begin, uintptr_t end,
 	 * get the first avl_node_t address, use same algorithm
 	 * as avl_start() -- leftmost child in tree from root
 	 */
-	if (begin == NULL) {
+	if (begin == 0) {
 		addr = (uintptr_t)tree->avl_root;
-		if (addr == NULL) {
-			wsp->walk_addr = NULL;
+		if (addr == 0) {
+			wsp->walk_addr = 0;
 			return (WALK_NEXT);
 		}
 		addr = avl_leftmostchild(addr, aw->aw_buff, tree->avl_offset,
@@ -150,14 +150,14 @@ error:
 int
 avl_walk_init(mdb_walk_state_t *wsp)
 {
-	return (avl_walk_init_range(wsp, NULL, NULL, NULL, NULL, NULL, NULL));
+	return (avl_walk_init_range(wsp, 0, 0, NULL, NULL, NULL, NULL));
 }
 
 int
 avl_walk_init_named(mdb_walk_state_t *wsp,
     const char *avl_name, const char *element_name)
 {
-	return (avl_walk_init_range(wsp, NULL, NULL, avl_name, element_name,
+	return (avl_walk_init_range(wsp, 0, 0, avl_name, element_name,
 	    NULL, NULL));
 }
 
@@ -166,7 +166,7 @@ avl_walk_init_checked(mdb_walk_state_t *wsp,
     const char *avl_name, const char *element_name,
     int (*element_check)(void *, uintptr_t, void *), void *arg)
 {
-	return (avl_walk_init_range(wsp, NULL, NULL, avl_name, element_name,
+	return (avl_walk_init_range(wsp, 0, 0, avl_name, element_name,
 	    element_check, arg));
 }
 
@@ -189,12 +189,12 @@ avl_walk_step(mdb_walk_state_t *wsp)
 	 * don't walk past the end of the tree!
 	 */
 	addr = wsp->walk_addr;
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_DONE);
 
 	aw = (struct aw_info *)wsp->walk_data;
 
-	if (aw->aw_end != NULL && wsp->walk_addr == aw->aw_end)
+	if (aw->aw_end != 0 && wsp->walk_addr == aw->aw_end)
 		return (WALK_DONE);
 
 	size = aw->aw_tree.avl_size;
@@ -235,7 +235,7 @@ avl_walk_step(mdb_walk_state_t *wsp)
 	 * thru as many left children as possible
 	 */
 	addr = (uintptr_t)node->avl_child[1];
-	if (addr != NULL) {
+	if (addr != 0) {
 		addr = avl_leftmostchild(addr, aw->aw_buff, offset, size,
 		    aw->aw_elem_name);
 		if (addr == (uintptr_t)-1L)
@@ -249,7 +249,7 @@ avl_walk_step(mdb_walk_state_t *wsp)
 		for (;;) {
 			was_child = AVL_XCHILD(node);
 			addr = (uintptr_t)AVL_XPARENT(node);
-			if (addr == NULL)
+			if (addr == 0)
 				break;
 			addr -= offset;
 			if (was_child == 0) /* stop on return from left child */

@@ -53,7 +53,7 @@ sata_dmsg_walk_i(mdb_walk_state_t *wsp)
 	uintptr_t rbuf_addr;
 	sata_trace_rbuf_t rbuf;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_readvar(&rbuf_addr, "sata_debug_rbuf") == -1) {
 			mdb_warn("failed to read 'sata_debug_rbuf'");
 			return (WALK_ERR);
@@ -87,7 +87,7 @@ sata_dmsg_walk_s(mdb_walk_state_t *wsp)
 {
 	int status;
 
-	if (wsp->walk_addr == NULL)
+	if (wsp->walk_addr == 0)
 		return (WALK_DONE);
 
 	if (mdb_vread(wsp->walk_data, sizeof (sata_trace_dmsg_t),
@@ -107,7 +107,7 @@ sata_dmsg_walk_s(mdb_walk_state_t *wsp)
 	 * If we've looped then we're done.
 	 */
 	if (wsp->walk_addr == (uintptr_t)wsp->walk_arg)
-		wsp->walk_addr = NULL;
+		wsp->walk_addr = 0;
 
 	return (status);
 }
@@ -224,7 +224,7 @@ sata_rbuf_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * If ring buffer address not provided try to obtain
 	 * it using sata_debug_rbuf global.
 	 */
-	if ((addr == NULL) || !(flags & DCMD_ADDRSPEC)) {
+	if ((addr == 0) || !(flags & DCMD_ADDRSPEC)) {
 		if (mdb_readvar(&addr, "sata_debug_rbuf") == -1) {
 			mdb_warn("Failed to read 'sata_debug_rbuf'.");
 			return (DCMD_ERR);

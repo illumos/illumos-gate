@@ -783,7 +783,7 @@ cmd_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 
 		a = tmp;
-	} while (a != addr && a != NULL);
+	} while (a != addr && a != 0);
 
 	return (DCMD_OK);
 }
@@ -1143,7 +1143,7 @@ print_ptr(const char *type, const char *name, mdb_ctf_id_t id,
 
 	mdb_printf("%a", value);
 
-	if (value == NULL || strcmp(type, "caddr_t") == 0)
+	if (value == 0 || strcmp(type, "caddr_t") == 0)
 		return (0);
 
 	if (mdb_ctf_type_kind(base) == CTF_K_POINTER &&
@@ -2413,7 +2413,7 @@ cmd_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if ((flags & DCMD_ADDRSPEC) && !opt_i)
 		pa.pa_addr = opt_p ? mdb_get_dot() : addr;
 	else
-		pa.pa_addr = NULL;
+		pa.pa_addr = 0;
 
 	if (opt_i) {
 		const char *vargv[2];

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mdb_modapi.h>
 #include <sys/kcpc.h>
 #include <sys/cpc_impl.h>
@@ -156,7 +154,7 @@ cpc_ctx_walk_init(mdb_walk_state_t *wsp)
 {
 	struct cpc_ctx_aux *cca;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("only global cpc_ctx walk supported\n");
 		return (WALK_ERR);
 	}
@@ -171,7 +169,7 @@ cpc_ctx_walk_init(mdb_walk_state_t *wsp)
 	}
 
 	wsp->walk_data = cca;
-	wsp->walk_addr = NULL;
+	wsp->walk_addr = 0;
 	return (WALK_NEXT);
 }
 
@@ -182,7 +180,7 @@ cpc_ctx_walk_step(mdb_walk_state_t *wsp)
 	kcpc_ctx_t ctx;
 	struct cpc_ctx_aux *cca = wsp->walk_data;
 
-	while (wsp->walk_addr == NULL) {
+	while (wsp->walk_addr == 0) {
 		if (cca->cca_bucket == KCPC_HASH_BUCKETS)
 			return (WALK_DONE);
 		wsp->walk_addr = cca->cca_hash[cca->cca_bucket++];

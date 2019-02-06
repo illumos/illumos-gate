@@ -52,7 +52,7 @@
 int
 id2probe(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	uintptr_t probe = NULL;
+	uintptr_t probe = 0;
 	uintptr_t probes;
 
 	if (!(flags & DCMD_ADDRSPEC))
@@ -114,7 +114,7 @@ dtracemdb_eprobe(dtrace_state_t *state, dtrace_eprobedesc_t *epd)
 		return (-1);
 	}
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("epid %d doesn't match an ecb\n", epid);
 		return (-1);
 	}
@@ -135,7 +135,7 @@ dtracemdb_eprobe(dtrace_state_t *state, dtrace_eprobedesc_t *epd)
 	 * This is a little painful:  in order to find the number of actions,
 	 * we need to first walk through them.
 	 */
-	for (ap = (uintptr_t)ecb.dte_action, nactions = 0; ap != NULL; ) {
+	for (ap = (uintptr_t)ecb.dte_action, nactions = 0; ap != 0; ) {
 		if (mdb_vread(&act, sizeof (act), ap) == -1) {
 			mdb_warn("failed to read action %p on ecb %p",
 			    ap, addr);
@@ -154,7 +154,7 @@ dtracemdb_eprobe(dtrace_state_t *state, dtrace_eprobedesc_t *epd)
 	epd->dtepd_uarg = ecb.dte_uarg;
 	epd->dtepd_size = ecb.dte_size;
 
-	for (ap = (uintptr_t)ecb.dte_action, nactions = 0; ap != NULL; ) {
+	for (ap = (uintptr_t)ecb.dte_action, nactions = 0; ap != 0; ) {
 		if (mdb_vread(&act, sizeof (act), ap) == -1) {
 			mdb_warn("failed to read action %p on ecb %p",
 			    ap, addr);
@@ -204,11 +204,11 @@ dtracemdb_probe(dtrace_state_t *state, dtrace_probedesc_t *pd)
 			return (-1);
 		}
 
-		if (paddr != NULL)
+		if (paddr != 0)
 			break;
 	}
 
-	if (paddr == NULL) {
+	if (paddr == 0) {
 		errno = ESRCH;
 		return (-1);
 	}
@@ -274,7 +274,7 @@ dtracemdb_aggdesc(dtrace_state_t *state, dtrace_aggdesc_t *agd)
 		return (-1);
 	}
 
-	if (addr == NULL) {
+	if (addr == 0) {
 		mdb_warn("aggid %d doesn't match an aggregation\n", aggid);
 		return (-1);
 	}
@@ -810,7 +810,7 @@ dtracemdb_stat(void *varg, processorid_t cpu)
 		return (-1);
 	}
 
-	if (caddr == NULL)
+	if (caddr == 0)
 		return (-1);
 
 	if (mdb_vread(&c, sizeof (c), caddr) == -1) {
@@ -1177,7 +1177,7 @@ dtrace_errhash_init(mdb_walk_state_t *wsp)
 	uintptr_t *hash, addr;
 	int i;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("dtrace_errhash walk only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -1277,7 +1277,7 @@ dtrace_helptrace_init(mdb_walk_state_t *wsp)
 	uint32_t next;
 	uintptr_t buffer;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("dtrace_helptrace only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -1287,7 +1287,7 @@ dtrace_helptrace_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (buffer == NULL) {
+	if (buffer == 0) {
 		mdb_warn("helper tracing is not enabled\n");
 		return (WALK_ERR);
 	}
@@ -1521,7 +1521,7 @@ dtrace_state_init(mdb_walk_state_t *wsp)
 	minor_t max = 0;
 	dtrace_state_walk_t *dw;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("dtrace_state only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -1745,7 +1745,7 @@ dtrace_aggkey_init(mdb_walk_state_t *wsp)
 	dtrace_aggkey_data_t *data;
 	size_t hsize;
 
-	if ((addr = wsp->walk_addr) == NULL) {
+	if ((addr = wsp->walk_addr) == 0) {
 		mdb_warn("dtrace_aggkey walk needs aggregation buffer\n");
 		return (WALK_ERR);
 	}
@@ -1789,7 +1789,7 @@ dtrace_aggkey_step(mdb_walk_state_t *wsp)
 	dtrace_aggkey_t key;
 	uintptr_t addr;
 
-	while ((addr = data->dtakd_next) == NULL) {
+	while ((addr = data->dtakd_next) == 0) {
 		if (data->dtakd_ndx == data->dtakd_hashsize)
 			return (WALK_DONE);
 
@@ -1834,7 +1834,7 @@ dtrace_dynvar_init(mdb_walk_state_t *wsp)
 	size_t hsize;
 	GElf_Sym sym;
 
-	if ((addr = wsp->walk_addr) == NULL) {
+	if ((addr = wsp->walk_addr) == 0) {
 		mdb_warn("dtrace_dynvar walk needs dtrace_dstate_t\n");
 		return (WALK_ERR);
 	}
@@ -2377,7 +2377,7 @@ dtrace_ecb_init(mdb_walk_state_t *wsp)
 	dtrace_state_t state;
 	dtrace_ecb_walk_t *ecbwp;
 
-	if ((addr = wsp->walk_addr) == NULL) {
+	if ((addr = wsp->walk_addr) == 0) {
 		mdb_warn("dtrace_ecb walk needs dtrace_state_t\n");
 		return (WALK_ERR);
 	}
@@ -2416,7 +2416,7 @@ dtrace_ecb_step(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (ecbp == NULL)
+	if (ecbp == 0)
 		return (WALK_NEXT);
 
 	return (wsp->walk_callback(ecbp, NULL, wsp->walk_cbdata));
@@ -2579,7 +2579,7 @@ pid2state_init(mdb_walk_state_t *wsp)
 	struct dev_info info;
 	pid_t pid = (pid_t)wsp->walk_addr;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("pid2state walk requires PID\n");
 		return (WALK_ERR);
 	}
@@ -2669,7 +2669,7 @@ dtrace_probes_walk(uintptr_t addr, void *ignored, uintptr_t *target)
 	dtrace_probe_t probe;
 	dtrace_probedesc_t pd;
 
-	if (addr == NULL)
+	if (addr == 0)
 		return (WALK_ERR);
 
 	if (mdb_vread(&ecb, sizeof (dtrace_ecb_t), addr) == -1) {
@@ -2738,7 +2738,7 @@ dtrace_probes(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				continue;
 			}
 
-			if (paddr == NULL)
+			if (paddr == 0)
 				continue;
 
 			pd.dtpd_id = i + 1;

@@ -1453,7 +1453,7 @@ mdb_tgt_vespec_info(mdb_tgt_t *t, int vid, mdb_tgt_spec_desc_t *sp,
 	sp->spec_limit = vep->ve_limit;
 	sp->spec_state = sep->se_state;
 	sp->spec_errno = sep->se_errno;
-	sp->spec_base = NULL;
+	sp->spec_base = 0;
 	sp->spec_size = 0;
 	sp->spec_data = vep->ve_data;
 

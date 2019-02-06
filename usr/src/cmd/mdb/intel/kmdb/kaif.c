@@ -268,7 +268,7 @@ kaif_toxic_text(uintptr_t addr)
 	static GElf_Sym toxic_syms[2] = { 0, };
 	size_t i;
 
-	if (toxic_syms[0].st_name == NULL) {
+	if (toxic_syms[0].st_name == 0) {
 		if (mdb_tgt_lookup_by_name(mdb.m_target, MDB_TGT_OBJ_EXEC,
 		    "tr_iret_user", &toxic_syms[0], NULL) != 0)
 			warn("couldn't find tr_iret_user\n");
@@ -693,7 +693,7 @@ kaif_dump_crumbs(uintptr_t addr, int cpuid)
 {
 	int i;
 
-	if (addr != NULL) {
+	if (addr != 0) {
 		/* dump_crumb will protect us against bogus addresses */
 		dump_crumb((kdi_crumb_t *)addr);
 

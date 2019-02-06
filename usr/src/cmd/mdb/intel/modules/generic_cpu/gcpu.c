@@ -160,7 +160,7 @@ cmih_walk_init(mdb_walk_state_t *wsp)
 	void *pg;
 	cmi_hdl_ent_t *ent;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("cmihdl is a global walker\n");
 		return (WALK_ERR);
 	}
@@ -214,7 +214,7 @@ cmih_walk_init(mdb_walk_state_t *wsp)
 	}
 
 	/* Look up the hdl of the first strand <0,0,0> */
-	wsp->walk_addr = NULL;
+	wsp->walk_addr = 0;
 	if ((ent = cmih_ent_lookup(awsp)) != NULL)
 		wsp->walk_addr = (uintptr_t)ent->cmae_hdlp;
 
@@ -225,14 +225,14 @@ static int
 cmih_walk_step(mdb_walk_state_t *wsp)
 {
 	struct cmih_walk_state *awsp = wsp->walk_data;
-	uintptr_t addr = NULL;
+	uintptr_t addr = 0;
 	cmi_hdl_impl_t hdl;
 	cmi_hdl_ent_t *ent;
 	int rv;
 
 	if ((ent = cmih_ent_lookup(awsp)) != NULL)
 		addr = (uintptr_t)ent->cmae_hdlp;
-	if (wsp->walk_addr == NULL || addr == NULL)
+	if (wsp->walk_addr == 0 || addr == 0)
 		return (cmih_ent_next(awsp) ? WALK_NEXT : WALK_DONE);
 
 	if (mdb_vread(&hdl, sizeof (hdl), addr) != sizeof (hdl)) {
@@ -493,13 +493,13 @@ cmihdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 		mdb_free(buf, len);
 
-		cb.mod_hdladdr = NULL;
+		cb.mod_hdladdr = 0;
 		if (mdb_walk("cmihdl", cmihdl_cb, &cb) == -1) {
 			mdb_warn("cmi_hdl walk failed\n");
 			return (DCMD_ERR);
 		}
 
-		if (cb.mod_hdladdr == NULL) {
+		if (cb.mod_hdladdr == 0) {
 			if (cb.mod_cpuid != -1) {
 				mdb_warn("No handle found for cpuid %d\n",
 				    cb.mod_cpuid);
@@ -602,7 +602,7 @@ gcpu_mptwalk_init(mdb_walk_state_t *wsp)
 	uint_t nent, i;
 	hrtime_t latest;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("the address of a poll trace array must be "
 		    "specified\n");
 		return (WALK_ERR);

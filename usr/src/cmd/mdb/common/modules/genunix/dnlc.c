@@ -31,7 +31,7 @@ dnlc_walk_init(mdb_walk_state_t *wsp)
 {
 	dnlc_walk_t *dwp;
 
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("dnlc walk doesn't support global walks\n");
 		return (WALK_ERR);
 	}
@@ -66,7 +66,7 @@ dnlc_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t result, addr = wsp->walk_addr;
 
 next:
-	while (addr == dwp->dw_head || addr == NULL) {
+	while (addr == dwp->dw_head || addr == 0) {
 		if (dwp->dw_index >= dwp->dw_hashsz) {
 			return (WALK_DONE);
 		}
@@ -87,7 +87,7 @@ next:
 		 * This entry may have become bogus since acquiring the address
 		 * from its neighbor.  Continue on if that is the case.
 		 */
-		addr = NULL;
+		addr = 0;
 		goto next;
 	}
 	wsp->walk_addr = addr;

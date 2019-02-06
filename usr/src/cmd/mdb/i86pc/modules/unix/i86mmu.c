@@ -112,7 +112,7 @@ memseg_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 int
 memseg_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr != NULL) {
+	if (wsp->walk_addr != 0) {
 		mdb_warn("memseg only supports global walks\n");
 		return (WALK_ERR);
 	}
@@ -200,10 +200,10 @@ init_mmu(void)
 	    mdb_readsym(&xen_virt_start, sizeof (xen_virt_start),
 	    "xen_virt_start") == -1 ||
 	    mdb_readsym(&mfn_count, sizeof (mfn_count), "mfn_count") == -1) {
-		mfn_list_addr = NULL;
+		mfn_list_addr = 0;
 	}
 
-	is_xpv = mfn_list_addr != NULL;
+	is_xpv = mfn_list_addr != 0;
 
 #ifndef _KMDB
 	/*
@@ -247,7 +247,7 @@ mdb_mfn_to_pfn(mfn_t mfn)
 	mfn_t tmp;
 	pfn_t *pfn_list;
 
-	if (mfn_list_addr == NULL)
+	if (mfn_list_addr == 0)
 		return (-(pfn_t)1);
 
 	pfn_list = (pfn_t *)xen_virt_start;
@@ -271,7 +271,7 @@ mdb_pfn_to_mfn(pfn_t pfn)
 
 	init_mmu();
 
-	if (mfn_list_addr == NULL || pfn >= mfn_count)
+	if (mfn_list_addr == 0 || pfn >= mfn_count)
 		return (-(mfn_t)1);
 
 	if (mdb_vread(&mfn, sizeof (mfn),

@@ -85,12 +85,12 @@ list_walk_init_range(mdb_walk_state_t *wsp, uintptr_t begin, uintptr_t end,
 	lwd->lw_offset = list.list_offset;
 	lwd->lw_obj = mdb_alloc(list.list_size, UM_SLEEP);
 	lwd->lw_head = (uintptr_t)&((list_t *)wsp->walk_addr)->list_head;
-	lwd->lw_end = (end == NULL ? NULL : end + lwd->lw_offset);
+	lwd->lw_end = (end == 0 ? 0 : end + lwd->lw_offset);
 	lwd->lw_elem_name = element_name;
 	lwd->lw_elem_check = element_check;
 	lwd->lw_elem_check_arg = arg;
 
-	wsp->walk_addr = (begin == NULL
+	wsp->walk_addr = (begin == 0
 	    ? (uintptr_t)list.list_head.list_next
 	    : begin + lwd->lw_offset);
 	wsp->walk_data = lwd;
@@ -101,14 +101,14 @@ list_walk_init_range(mdb_walk_state_t *wsp, uintptr_t begin, uintptr_t end,
 int
 list_walk_init(mdb_walk_state_t *wsp)
 {
-	return (list_walk_init_range(wsp, NULL, NULL, NULL, NULL, NULL, NULL));
+	return (list_walk_init_range(wsp, 0, 0, NULL, NULL, NULL, NULL));
 }
 
 int
 list_walk_init_named(mdb_walk_state_t *wsp,
     const char *list_name, const char *element_name)
 {
-	return (list_walk_init_range(wsp, NULL, NULL, list_name, element_name,
+	return (list_walk_init_range(wsp, 0, 0, list_name, element_name,
 	    NULL, NULL));
 }
 
@@ -117,7 +117,7 @@ list_walk_init_checked(mdb_walk_state_t *wsp,
     const char *list_name, const char *element_name,
     int (*element_check)(void *, uintptr_t, void *), void *arg)
 {
-	return (list_walk_init_range(wsp, NULL, NULL, list_name, element_name,
+	return (list_walk_init_range(wsp, 0, 0, list_name, element_name,
 	    element_check, arg));
 }
 
@@ -132,7 +132,7 @@ list_walk_step(mdb_walk_state_t *wsp)
 	if (wsp->walk_addr == lwd->lw_head)
 		return (WALK_DONE);
 
-	if (lwd->lw_end != NULL && wsp->walk_addr == lwd->lw_end)
+	if (lwd->lw_end != 0 && wsp->walk_addr == lwd->lw_end)
 		return (WALK_DONE);
 
 	if (mdb_vread(lwd->lw_obj, lwd->lw_size, addr) == -1) {

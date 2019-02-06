@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/vfs.h>
 #include <sys/fs/lofs_node.h>
@@ -54,7 +52,7 @@ lnode_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		uintptr_t rootvfsp, vfsp;
 		uint_t htsize;
 
@@ -159,7 +157,7 @@ lnode_walk_step(mdb_walk_state_t *wsp)
 	 * If the next lnode_t address we want is NULL, advance to the next
 	 * hash bucket.  When we reach lw_tabsz, we're done.
 	 */
-	while (wsp->walk_addr == NULL) {
+	while (wsp->walk_addr == 0) {
 		if (++lwp->lw_tabi < lwp->lw_tabsz)
 			wsp->walk_addr =
 			    (uintptr_t)lwp->lw_table[lwp->lw_tabi].lh_chain;

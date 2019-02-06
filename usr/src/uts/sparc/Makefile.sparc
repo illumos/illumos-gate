@@ -388,6 +388,7 @@ MISC_KMODS	+= hidparser kbtrans usba usba10 usbs49_fw
 MISC_KMODS	+= s1394
 MISC_KMODS	+= hpcsvc pcihp
 MISC_KMODS	+= rsmops
+MISC_KMODS	+= sata
 MISC_KMODS	+= kcf
 MISC_KMODS	+= ksocket
 MISC_KMODS	+= ibcm

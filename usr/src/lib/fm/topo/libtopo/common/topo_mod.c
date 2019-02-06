@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -474,7 +474,6 @@ topo_mod_memfmri(topo_mod_t *mod, int version, uint64_t pa, uint64_t offset,
 		return (set_fmri_err(mod, EMOD_FMRI_NVL));
 
 	err = nvlist_add_string(args, FM_FMRI_MEM_UNUM, unum);
-		nvlist_free(args);
 	if (flags & TOPO_MEMFMRI_PA)
 		err |= nvlist_add_uint64(args, FM_FMRI_MEM_PHYSADDR, pa);
 	if (flags & TOPO_MEMFMRI_OFFSET)

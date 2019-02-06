@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/salib.h>
 
 #define	EOF	(-1)
@@ -56,7 +54,7 @@ getopt(int argc, char *const *argv, const char *opts)
 		if (optind >= argc || argv[optind][0] != '-' ||
 		    argv[optind] == NULL || argv[optind][1] == '\0')
 			return (EOF);
-		else if (strcmp(argv[optind], "--") == NULL) {
+		else if (strcmp(argv[optind], "--") == 0) {
 			optind++;
 			return (EOF);
 		}

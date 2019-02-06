@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/mdb_modapi.h>
 #include <sys/scsi/scsi.h>
 #include <sys/dkio.h>
@@ -72,7 +70,7 @@ typedef struct i_ddi_soft_state sd_state_str_t, *sd_state_str_ptr;
 /* structure to store soft state statistics */
 typedef struct sd_str {
 	void		*sd_state;
-	uintptr_t 	current_root;
+	uintptr_t	current_root;
 	int		current_list_count;
 	int		valid_root_count;
 	int		silent;
@@ -95,7 +93,7 @@ typedef struct sd_str {
 static int
 buf_avforw_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("buffer address required with the command\n");
 		return (WALK_ERR);
 	}
@@ -127,7 +125,7 @@ buf_avforw_walk_step(mdb_walk_state_t *wsp)
 	 * if walk_addr is null then it effectively means an end of all
 	 * buf structures, hence end the iterations.
 	 */
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		return (WALK_DONE);
 	}
 
@@ -308,7 +306,7 @@ init_softstate_members(mdb_walk_state_t *wsp)
 static int
 sd_state_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == 0 &&
 	    mdb_readvar(&wsp->walk_addr, "sd_state") == -1) {
 		mdb_warn("failed to read 'sd_state'");
 		return (WALK_ERR);
@@ -458,7 +456,7 @@ process_semo_sleepq(uintptr_t	walk_addr, int silent)
 		rootBuf = (uintptr_t)currentBuf.av_forw;
 	}
 
-	if (rootBuf == NULL) {
+	if (rootBuf == 0) {
 		mdb_printf("------------------------------\n");
 		mdb_printf("Processed %d SEMOCLOSE SLEEP Q entries\n",
 							semo_sleepq_count);
@@ -516,7 +514,7 @@ process_sdlun_waitq(uintptr_t walk_addr, int silent)
 		++sdLunQ_count;
 	}
 
-	if (rootBuf == NULL) {
+	if (rootBuf == 0) {
 		mdb_printf("------------------------------\n");
 		mdb_printf("Processed %d UN WAIT Q entries\n", sdLunQ_count);
 		mdb_printf("------------------------------\n");
@@ -543,7 +541,7 @@ process_xbuf(uintptr_t xbuf_attr, int silent)
 	void			*xba_root;
 	int			xbuf_q_count = 0;
 
-	if (xbuf_attr == NULL) {
+	if (xbuf_attr == 0) {
 		mdb_printf("---------------------------\n");
 		mdb_printf("No XBUF ATTR entry\n");
 		mdb_printf("---------------------------\n");
@@ -630,7 +628,7 @@ print_footer(const void *walk_data)
  *		invokes the walker.
  *		It is called during each walk step. It displays the contents
  *		of the current soft state object (addr) passed to it by the
- * 		step function. It also prints the header and footer during the
+ *		step function. It also prints the header and footer during the
  *		first and the last step of the walker.
  *		The contents of the soft state also includes various queues
  *		it includes like Xbuf, semo_close, sdlun_waitq.

@@ -281,7 +281,7 @@ zone_walk_init(mdb_walk_state_t *wsp)
 {
 	GElf_Sym sym;
 
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		if (mdb_lookup_by_name("zone_active", &sym) == -1) {
 			mdb_warn("failed to find 'zone_active'");
 			return (WALK_ERR);
@@ -305,7 +305,7 @@ zone_walk_step(mdb_walk_state_t *wsp)
 int
 zsd_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL) {
+	if (wsp->walk_addr == 0) {
 		mdb_warn("global walk not supported\n");
 		return (WALK_ERR);
 	}
