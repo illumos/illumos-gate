@@ -25,7 +25,7 @@
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2017 Datto Inc.
  */
 
@@ -677,6 +677,9 @@ extern void spa_spare_add(vdev_t *vd);
 extern void spa_spare_remove(vdev_t *vd);
 extern boolean_t spa_spare_exists(uint64_t guid, uint64_t *pool, int *refcnt);
 extern void spa_spare_activate(vdev_t *vd);
+
+/* spare polling */
+extern void spa_spare_poll(spa_t *spa);
 
 /* L2ARC state (which is global across all pools) */
 extern void spa_l2cache_add(vdev_t *vd);

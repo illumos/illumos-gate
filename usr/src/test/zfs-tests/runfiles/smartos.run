@@ -49,7 +49,7 @@ tests = ['zpool_remove_001_neg', 'zpool_remove_002_pos',
     'zpool_remove_003_pos']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_replace]
-tests = ['zpool_replace_001_neg']
+tests = ['zpool_replace_001_neg', 'zpool_replace_002_neg']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_scrub]
 tests = ['zpool_scrub_001_neg', 'zpool_scrub_004_pos', 'zpool_scrub_005_pos']

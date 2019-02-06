@@ -21,19 +21,31 @@
 #
 
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-
-#
 # Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
 
-verify_runnable "global"
-verify_disk_count "$DISKS" 3
+#
+# DESCRIPTION:
+#
+# zpool replace returns an error when spare device is faulted.
+#
+# STRATEGY:
+# 1. Add hot spare to pool
+# 2. Fault the hot spare device
+# 3. Attempt to replace a device in a pool with the faulted spare
+# 4. Verify the 'zpool replace' command fails
+#
 
+SPARE=${DISKS##* }
 DISK=${DISKS%% *}
 
-default_mirror_setup $DISKS
+verify_runnable "global"
+log_must zpool add $TESTPOOL spare $SPARE
+log_assert "zpool replace returns an error when the hot spare is faulted"
+
+log_must zinject -d $SPARE -A fault $TESTPOOL
+log_mustnot zpool replace $TESTPOOL $DISK $SPARE
+
+log_pass "zpool replace returns an error when the hot spare is faulted"

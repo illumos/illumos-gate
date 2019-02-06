@@ -10496,6 +10496,7 @@ f usr/sbin/amd64/ippool 0555 root bin
 f usr/sbin/amd64/lockstat 0555 root bin
 f usr/sbin/amd64/plockstat 0555 root bin
 f usr/sbin/amd64/zdb 0555 root bin
+f usr/sbin/amd64/zinject 0555 root bin
 f usr/sbin/arp 0555 root bin
 f usr/sbin/audit 0555 root bin
 f usr/sbin/auditconfig 0555 root bin
@@ -10771,6 +10772,7 @@ h usr/sbin/zdb=usr/lib/isaexec
 f usr/sbin/zdump 0555 root bin
 s usr/sbin/zfs=../../sbin/zfs
 f usr/sbin/zic 0555 root bin
+h usr/sbin/zinject=usr/lib/isaexec
 f usr/sbin/zlogin 0555 root bin
 f usr/sbin/zoneadm 0555 root bin
 f usr/sbin/zonecfg 0555 root bin

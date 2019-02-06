@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -121,13 +122,21 @@ find_vdev(libzfs_handle_t *zhdl, nvlist_t *nv, const char *search_fru,
 	}
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_L2CACHE,
-	    &child, &children) != 0)
-		return (NULL);
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if ((ret = find_vdev(zhdl, child[c], search_fru,
+			    search_guid)) != NULL)
+				return (ret);
+		}
+	}
 
-	for (c = 0; c < children; c++) {
-		if ((ret = find_vdev(zhdl, child[c], search_fru,
-		    search_guid)) != NULL)
-			return (ret);
+	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_SPARES,
+	    &child, &children) == 0) {
+		for (c = 0; c < children; c++) {
+			if ((ret = find_vdev(zhdl, child[c], search_fru,
+			    search_guid)) != NULL)
+				return (ret);
+		}
 	}
 
 	return (NULL);

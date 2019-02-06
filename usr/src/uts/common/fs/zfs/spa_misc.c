@@ -26,6 +26,7 @@
  * Copyright 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright (c) 2017 Datto Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -1008,6 +1009,41 @@ spa_aux_activate(vdev_t *vd, avl_tree_t *avl)
  * separate spare lock exists for the status query path, which does not need to
  * be completely consistent with respect to other vdev configuration changes.
  */
+
+/*
+ * Poll the spare vdevs to make sure they are not faulty.
+ *
+ * The probe operation will raise an ENXIO error and create an FM ereport if the
+ * probe fails.
+ */
+void
+spa_spare_poll(spa_t *spa)
+{
+	boolean_t async_request = B_FALSE;
+	spa_config_enter(spa, SCL_STATE, FTAG, RW_READER);
+	for (int i = 0; i < spa->spa_spares.sav_count; i++) {
+		spa_aux_t search, *found;
+		vdev_t *vd = spa->spa_spares.sav_vdevs[i];
+
+		search.aux_guid = vd->vdev_guid;
+
+		mutex_enter(&spa_spare_lock);
+		found = avl_find(&spa_spare_avl, &search, NULL);
+		/* This spare is in use by a pool. */
+		if (found != NULL && found->aux_pool != NULL) {
+			mutex_exit(&spa_spare_lock);
+			continue;
+		}
+		mutex_exit(&spa_spare_lock);
+
+		vd->vdev_probe_wanted = B_TRUE;
+		async_request = B_TRUE;
+	}
+	if (async_request)
+		spa_async_request(spa, SPA_ASYNC_PROBE);
+
+	spa_config_exit(spa, SCL_STATE, FTAG);
+}
 
 static int
 spa_spare_compare(const void *a, const void *b)
