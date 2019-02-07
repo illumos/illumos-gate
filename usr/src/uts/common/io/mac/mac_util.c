@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1239,9 +1239,19 @@ mac_hw_emul(mblk_t **mp_chain, mblk_t **otail, uint_t *ocount, mac_emul_t emul)
 			 */
 			mac_sw_lso(mp, emul, &tmphead, &tmptail,
 			    &tmpcount);
+			if (tmphead == NULL) {
+				/* mac_sw_lso() freed the mp. */
+				mp = next;
+				continue;
+			}
 			count += tmpcount;
 		} else if ((flags & HCK_NEEDED) && (emul & MAC_HWCKSUM_EMULS)) {
 			tmp = mac_sw_cksum(mp, emul);
+			if (tmp == NULL) {
+				/* mac_sw_cksum() freed the mp. */
+				mp = next;
+				continue;
+			}
 			tmphead = tmp;
 			tmptail = tmp;
 			count++;
