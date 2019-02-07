@@ -46,6 +46,7 @@ CHKHDRS=  \
 	ddi_subrdefs.h	\
 	debug_info.h	\
 	fastboot.h	\
+	hma.h		\
 	ht.h		\
 	mach_mmu.h	\
 	machclock.h	\

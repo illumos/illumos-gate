@@ -1681,6 +1681,7 @@ $(i386_ONLY)file path=usr/platform/i86pc/include/sys/cram.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/ddi_subrdefs.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/debug_info.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/fastboot.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/hma.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/ht.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/mach_mmu.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/machclock.h

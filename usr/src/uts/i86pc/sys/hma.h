@@ -38,6 +38,7 @@ extern "C" {
  */
 typedef struct hma_reg hma_reg_t;
 extern hma_reg_t *hma_register(const char *);
+extern hma_reg_t *hma_register_exclusive(const char *);
 extern void hma_unregister(hma_reg_t *);
 
 /*
