@@ -48,15 +48,15 @@ print " *"
 print " * Copyright 1990, 1995 by Mortice Kern Systems Inc.  All rights reserved."
 print " *"
 print " */"
-print
+print ""
 print "#if M_RCSID"
 print "#ifndef lint"
 printf "static char rcsID[] = \"$Header%s\";\n", "$"
 print "#endif"
 print "#endif"
-print
+print ""
 print "#include <private.h>"
-print
+print ""
 print "/*"
 print " * This table is used to map a KEY_ constant to an"
 print " * index for cur_term->_str[] for use by keyname()."
