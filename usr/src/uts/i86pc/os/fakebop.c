@@ -26,7 +26,7 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  *
- * Copyright 2018 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -1288,6 +1288,10 @@ save_boot_info(struct xboot_info *xbi)
  * using a structured layout.
  *
  * We will not overwrite already set properties.
+ *
+ * Note that the menu items in particular can contain characters not
+ * well-handled as bootparams, such as spaces, brackets, and the like, so that's
+ * another reason.
  */
 static struct bop_blacklist {
 	const char *bl_name;
@@ -1295,7 +1299,6 @@ static struct bop_blacklist {
 } bop_prop_blacklist[] = {
 	{ "ISADIR", sizeof ("ISADIR") },
 	{ "acpi", sizeof ("acpi") },
-	{ "autoboot_delay", sizeof ("autoboot_delay") },
 	{ "autoboot_delay", sizeof ("autoboot_delay") },
 	{ "beansi_", sizeof ("beansi_") },
 	{ "beastie", sizeof ("beastie") },
@@ -1308,8 +1311,16 @@ static struct bop_blacklist {
 	{ "kernel", sizeof ("kernel") },
 	{ "loaddev", sizeof ("loaddev") },
 	{ "loader_", sizeof ("loader_") },
+	{ "mainansi_", sizeof ("mainansi_") },
+	{ "mainmenu_", sizeof ("mainmenu_") },
+	{ "maintoggled_", sizeof ("maintoggled_") },
+	{ "menu_timeout_command", sizeof ("menu_timeout_command") },
+	{ "menuset_", sizeof ("menuset_") },
 	{ "module_path", sizeof ("module_path") },
 	{ "nfs.", sizeof ("nfs.") },
+	{ "optionsansi_", sizeof ("optionsansi_") },
+	{ "optionsmenu_", sizeof ("optionsmenu_") },
+	{ "optionstoggled_", sizeof ("optionstoggled_") },
 	{ "pcibios", sizeof ("pcibios") },
 	{ "prompt", sizeof ("prompt") },
 	{ "smbios", sizeof ("smbios") },
