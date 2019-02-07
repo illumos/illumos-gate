@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -257,7 +257,7 @@ logfile_write_event(logfile_t *lfp, const char *stream, const char *event)
 }
 
 static void
-close_log(logfile_t *lfp, const char *why)
+close_log(logfile_t *lfp, const char *why, boolean_t ign_err)
 {
 	int err;
 
@@ -278,7 +278,8 @@ close_log(logfile_t *lfp, const char *why)
 	logfile_write_event(lfp, "logfile", why);
 
 	err = close(lfp->lf_fd);
-	assert(err == 0);
+	if (!ign_err)
+		assert(err == 0);
 
 	lfp->lf_size = 0;
 	lfp->lf_fd = -1;
@@ -340,7 +341,7 @@ logstream_sighandler(int sig)
 
 		switch (sig) {
 		case SIGHUP:
-			close_log(&logfiles[i], "close-rotate");
+			close_log(&logfiles[i], "close-rotate", B_FALSE);
 			open_log(&logfiles[i], "open-rotate");
 			break;
 		case SIGUSR1:
@@ -500,7 +501,7 @@ rotate_log(logfile_t *lfp)
 		    "'%s' to '%s'", lfp->lf_path, path);
 	}
 
-	close_log(lfp, "close-rotate");
+	close_log(lfp, "close-rotate", B_FALSE);
 	open_log(lfp, "open-rotate");
 
 	if (logging_rot_keep == 0) {
@@ -917,7 +918,7 @@ logstream_open(const char *logname, const char *stream, logstream_flags_t flags)
 }
 
 void
-logstream_close(int ls)
+logstream_close(int ls, boolean_t abrupt)
 {
 	logstream_t *lsp;
 	logfile_t *lfp;
@@ -948,7 +949,7 @@ logstream_close(int ls)
 
 	/* No more streams using this log file so return to initial state */
 
-	close_log(lfp, "close");
+	close_log(lfp, "close", abrupt);
 
 	(void) memset(lfp, 0, sizeof (*lfp));
 	lfp->lf_fd = -1;

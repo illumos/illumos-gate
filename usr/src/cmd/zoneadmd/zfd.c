@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1107,8 +1107,8 @@ death:
 	eventstream[0] = -1;
 	(void) close(eventstream[1]);
 	eventstream[1] = -1;
-	logstream_close(logout);
-	logstream_close(logerr);
+	logstream_close(logout, B_FALSE);
+	logstream_close(logerr, B_FALSE);
 }
 
 /*

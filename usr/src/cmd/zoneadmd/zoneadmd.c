@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -1727,7 +1727,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	 * it is time for us to shut down zoneadmd.
 	 */
 	if (zargp == DOOR_UNREF_DATA) {
-		logstream_close(platloghdl);
+		logstream_close(platloghdl, B_TRUE);
 
 		/*
 		 * See comment at end of main() for info on the last rites.

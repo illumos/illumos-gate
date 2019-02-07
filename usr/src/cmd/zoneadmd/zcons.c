@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -1055,5 +1055,5 @@ death:
 	destroy_console_sock(serverfd);
 	(void) destroy_console_devs(zlogp);
 
-	logstream_close(conslog);
+	logstream_close(conslog, B_FALSE);
 }

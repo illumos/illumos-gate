@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_ZONEADMD_H
@@ -177,7 +177,7 @@ extern void destroy_log_thread(zlog_t *);
 extern void logstream_init(zlog_t *);
 extern int logstream_open(const char *, const char *, logstream_flags_t);
 extern void logstream_write(int, char *, int);
-extern void logstream_close(int);
+extern void logstream_close(int, boolean_t);
 
 /*
  * Contract handling.
