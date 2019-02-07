@@ -32,6 +32,7 @@ struct hma_reg {
 
 static kmutex_t hma_lock;
 static list_t hma_registrations;
+static boolean_t hma_exclusive = B_FALSE;
 
 static boolean_t hma_vmx_ready = B_FALSE;
 static const char *hma_vmx_error = NULL;
@@ -100,18 +101,14 @@ hma_init(void)
 	}
 }
 
-hma_reg_t *
-hma_register(const char *name)
+static hma_reg_t *
+hma_register_backend(const char *name)
 {
 	struct hma_reg *reg;
 	boolean_t is_ready;
 
-	VERIFY(name != NULL);
+	ASSERT(MUTEX_HELD(&hma_lock));
 
-	reg = kmem_zalloc(sizeof (*reg), KM_SLEEP);
-	reg->hr_name = name;
-
-	mutex_enter(&hma_lock);
 	switch (cpuid_getvendor(CPU)) {
 	case X86_VENDOR_Intel:
 		is_ready = hma_vmx_ready;
@@ -124,12 +121,48 @@ hma_register(const char *name)
 		break;
 	}
 
-	if (!is_ready) {
-		kmem_free(reg, sizeof (*reg));
-		reg = NULL;
-	} else {
-		list_insert_tail(&hma_registrations, reg);
+	if (!is_ready)
+		return (NULL);
+
+	reg = kmem_zalloc(sizeof (*reg), KM_SLEEP);
+	reg->hr_name = name;
+	list_insert_tail(&hma_registrations, reg);
+
+	return (reg);
+}
+
+hma_reg_t *
+hma_register(const char *name)
+{
+	struct hma_reg *reg = NULL;
+
+	VERIFY(name != NULL);
+
+	mutex_enter(&hma_lock);
+
+	if (!hma_exclusive)
+		reg = hma_register_backend(name);
+
+	mutex_exit(&hma_lock);
+
+	return (reg);
+}
+
+hma_reg_t *
+hma_register_exclusive(const char *name)
+{
+	struct hma_reg *reg = NULL;
+
+	VERIFY(name != NULL);
+
+	mutex_enter(&hma_lock);
+
+	if (list_is_empty(&hma_registrations)) {
+		reg = hma_register_backend(name);
+		if (reg != NULL)
+			hma_exclusive = B_TRUE;
 	}
+
 	mutex_exit(&hma_lock);
 
 	return (reg);
@@ -143,6 +176,8 @@ hma_unregister(hma_reg_t *reg)
 
 	mutex_enter(&hma_lock);
 	list_remove(&hma_registrations, reg);
+	if (hma_exclusive && list_is_empty(&hma_registrations))
+		hma_exclusive = B_FALSE;
 	mutex_exit(&hma_lock);
 	kmem_free(reg, sizeof (*reg));
 }

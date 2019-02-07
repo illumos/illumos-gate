@@ -46,6 +46,7 @@ HDRS=  \
 	ddi_subrdefs.h	\
 	debug_info.h	\
 	fastboot.h	\
+	hma.h		\
 	mach_mmu.h	\
 	machclock.h	\
 	machcpuvar.h	\
