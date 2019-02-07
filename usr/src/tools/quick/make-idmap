@@ -186,7 +186,6 @@ do_tags() {
 do_tar() {
 	git_rev=`git rev-parse --short=8 HEAD`
 	files="
-kernel/misc/idmap
 kernel/misc/amd64/idmap
 lib/svc/manifest/system/idmap.xml
 usr/lib/idmapd

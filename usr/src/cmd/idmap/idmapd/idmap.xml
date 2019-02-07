@@ -118,6 +118,10 @@
 			type='count'
 			value='3600' />
 		<propval
+			name='site_name'
+			type='astring'
+			value='' />
+		<propval
 			name='use_ads'
 			type='boolean'
 			value='true' />

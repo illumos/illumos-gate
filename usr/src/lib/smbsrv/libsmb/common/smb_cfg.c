@@ -66,10 +66,11 @@ struct str_val {
 #define	MACHINE_UUID			"machine_uuid"
 #define	IDMAP_DOMAIN			"domain_name"
 #define	IDMAP_PREF_DC			"preferred_dc"
+#define	IDMAP_SITE_NAME			"site_name"
 #define	IDMAP_PG_NAME			"config"
 
-#define	SMB_SECMODE_WORKGRP_STR 	"workgroup"
-#define	SMB_SECMODE_DOMAIN_STR  	"domain"
+#define	SMB_SECMODE_WORKGRP_STR		"workgroup"
+#define	SMB_SECMODE_DOMAIN_STR		"domain"
 
 #define	SMB_ENC_LEN	1024
 #define	SMB_DEC_LEN	256
@@ -156,6 +157,8 @@ static char *smb_base64_encode(char *str_to_encode);
 static char *smb_base64_decode(char *encoded_str);
 static int smb_config_get_idmap_preferred_dc(char *, int);
 static int smb_config_set_idmap_preferred_dc(char *);
+static int smb_config_get_idmap_site_name(char *, int);
+static int smb_config_set_idmap_site_name(char *);
 
 char *
 smb_config_getname(smb_cfg_id_t id)
@@ -377,6 +380,8 @@ smb_config_getstr(smb_cfg_id_t id, char *cbuf, int bufsz)
 	cfg = smb_config_getent(id);
 	assert(cfg->sc_type == SCF_TYPE_ASTRING);
 
+	if (id == SMB_CI_ADS_SITE)
+		return (smb_config_get_idmap_site_name(cbuf, bufsz));
 	if (id == SMB_CI_DOMAIN_SRV)
 		return (smb_config_get_idmap_preferred_dc(cbuf, bufsz));
 
@@ -583,6 +588,8 @@ smb_config_setstr(smb_cfg_id_t id, char *value)
 	cfg = smb_config_getent(id);
 	assert(cfg->sc_type == SCF_TYPE_ASTRING);
 
+	if (id == SMB_CI_ADS_SITE)
+		return (smb_config_set_idmap_site_name(value));
 	if (id == SMB_CI_DOMAIN_SRV)
 		return (smb_config_set_idmap_preferred_dc(value));
 
@@ -875,6 +882,30 @@ smb_config_set_idmap_preferred_dc(char *value)
 {
 	return (smb_config_setenv_generic(IDMAP_FMRI_PREFIX, IDMAP_PG_NAME,
 	    IDMAP_PREF_DC, value));
+}
+
+static int
+smb_config_get_idmap_site_name(char *cbuf, int bufsz)
+{
+	char *s;
+	int len, rc = -1;
+
+	s = smb_config_getenv_generic(IDMAP_SITE_NAME,
+	    IDMAP_FMRI_PREFIX, IDMAP_PG_NAME);
+	if (s != NULL) {
+		len = strlcpy(cbuf, s, bufsz);
+		if (len < bufsz)
+			rc = 0;
+		free(s);
+	}
+	return (rc);
+}
+
+static int
+smb_config_set_idmap_site_name(char *value)
+{
+	return (smb_config_setenv_generic(IDMAP_FMRI_PREFIX, IDMAP_PG_NAME,
+	    IDMAP_SITE_NAME, value));
 }
 
 /*
