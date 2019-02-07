@@ -86,12 +86,10 @@ ctxop_walk_step(mdb_walk_state_t *wsp)
 	uintptr_t next;
 	int status;
 
-	if (wsp->walk_addr == 0)
-		return (WALK_DONE);
-
-	if (mdb_vread(wsp->walk_data,
-	    sizeof (ctxop_t), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read ctxop at %p", wsp->walk_addr);
+	if (mdb_vread(&next, sizeof (next),
+	    wsp->walk_addr + priv->cws_next_offset) == -1) {
+		mdb_warn("failed to read ctxop`next at %p",
+		    wsp->walk_addr + priv->cws_next_offset);
 		return (WALK_DONE);
 	}
 
