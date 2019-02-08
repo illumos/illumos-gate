@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 UTSBASE = ../..
@@ -53,6 +53,13 @@ SMOFF += all_func_returns,indenting,no_if_block,deref_check,testing_index_after_
 
 # real bug in qede_multicast()
 $(OBJS_DIR)/qede_gld.o := SMOFF += assign_vs_compare
+
+#
+# Unfortunately the default use of -fstack-protector-strong breaks the
+# qede module. For the time being limit its use of stack-protector to
+# the basic form (-fstack-protector).
+#
+STACKPROTECT=basic
 
 ALL_TARGET	= $(BINARY) $(CONFMOD)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
