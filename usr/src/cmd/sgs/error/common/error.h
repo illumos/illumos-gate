@@ -27,8 +27,6 @@
 #ifndef _ERROR_H
 #define	_ERROR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -170,10 +168,8 @@ extern struct lang_desc lang_table[];
  *	be touched, or if the function reference is to a
  *	function the user doesn't want recorded.
  */
-#define	IG_FILE1	"llib-lc"
-#define	IG_FILE2	"llib-port"
-#define	IG_FILE3	"/usr/lib/llib-lc"
-#define	IG_FILE4	"/usr/lib/llib-port"
+#define	IG_FILE1	"llib-port"
+#define	IG_FILE2	"/usr/lib/llib-port"
 
 #define	ERRORNAME	"/.errorrc"
 int	nignored;

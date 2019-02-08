@@ -25,6 +25,7 @@
 # Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 LIBCDIR=	$(SRC)/lib/libc
@@ -1165,39 +1166,6 @@ CLEANFILES +=			\
 
 CLOBBERFILES +=	$(LIB_PIC)
 
-# list of C source for lint
-SRCS=							\
-	$(ATOMICOBJS:%.o=$(SRC)/common/atomic/%.c)	\
-	$(XATTROBJS:%.o=$(SRC)/common/xattr/%.c)	\
-	$(COMOBJS:%.o=$(SRC)/common/util/%.c)		\
-	$(DTRACEOBJS:%.o=$(SRC)/common/dtrace/%.c)	\
-	$(PORTFP:%.o=$(LIBCDIR)/port/fp/%.c)		\
-	$(PORTGEN:%.o=$(LIBCDIR)/port/gen/%.c)		\
-	$(PORTI18N:%.o=$(LIBCDIR)/port/i18n/%.c)	\
-	$(PORTINET:%.o=$(LIBCDIR)/port/inet/%.c)	\
-	$(PORTLOCALE:%.o=$(LIBCDIR)/port/locale/%.c)	\
-	$(PORTPRINT:%.o=$(LIBCDIR)/port/print/%.c)	\
-	$(PORTREGEX:%.o=$(LIBCDIR)/port/regex/%.c)	\
-	$(PORTSTDIO:%.o=$(LIBCDIR)/port/stdio/%.c)	\
-	$(PORTSYS:%.o=$(LIBCDIR)/port/sys/%.c)		\
-	$(AIOOBJS:%.o=$(LIBCDIR)/port/aio/%.c)		\
-	$(RTOBJS:%.o=$(LIBCDIR)/port/rt/%.c)		\
-	$(SECFLAGSOBJS:%.o=$(SRC)/common/secflags/%.c)	\
-	$(TPOOLOBJS:%.o=$(LIBCDIR)/port/tpool/%.c)	\
-	$(THREADSOBJS:%.o=$(LIBCDIR)/port/threads/%.c)	\
-	$(THREADSMACHOBJS:%.o=$(LIBCDIR)/$(MACH)/threads/%.c) \
-	$(UNICODEOBJS:%.o=$(SRC)/common/unicode/%.c)	\
-	$(UNWINDMACHOBJS:%.o=$(LIBCDIR)/port/unwind/%.c) \
-	$(FPOBJS:%.o=$(LIBCDIR)/$(MACH)/fp/%.c)		\
-	$(LIBCBASE)/gen/ecvt.c				\
-	$(LIBCBASE)/gen/makectxt.c			\
-	$(LIBCBASE)/gen/siginfolst.c			\
-	$(LIBCBASE)/gen/siglongjmp.c			\
-	$(LIBCBASE)/gen/strcmp.c			\
-	$(LIBCBASE)/gen/sync_instruction_memory.c	\
-	$(LIBCBASE)/sys/ptrace.c			\
-	$(LIBCBASE)/sys/uadmin.c
-
 # conditional assignments
 $(DYNLIB) := CRTI = crti.o
 $(DYNLIB) := CRTN = crtn.o
@@ -1290,18 +1258,6 @@ pics/gettimeofday.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS)
 .KEEP_STATE:
 
 all: $(LIBS) $(LIB_PIC)
-
-lint	:=	CPPFLAGS += -I$(LIBCDIR)/$(MACH)/fp
-lint	:=	CPPFLAGS += -D_MSE_INT_H -D_LCONV_C99
-lint	:=	LINTFLAGS += -mn -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-
-lint:
-	@echo $(LINT.c) ...
-	@$(LINT.c) $(SRCS) $(LDLIBS)
-
-$(LINTLIB):= SRCS=$(LIBCDIR)/port/llib-lc
-$(LINTLIB):= CPPFLAGS += -D_MSE_INT_H
-$(LINTLIB):= LINTFLAGS=-nvx
 
 # object files that depend on inline template
 $(TIL:%=pics/%): $(LIBCBASE)/threads/i386.il

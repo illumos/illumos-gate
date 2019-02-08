@@ -19,6 +19,9 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2019 Peter Tribble.
+ */
+/*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
@@ -54,28 +57,17 @@ extern "C" {
  * The maximum possible number of UPA devices in a system.
  * MAX_UPA maybe defined in a platform's makefile.
  */
-#ifdef	_STARFIRE
-/*
- * We have a 7 bit id space for UPA devices in Xfire
- */
-#define	MAX_UPA			128
-#else
 #ifndef MAX_UPA
 #define	MAX_UPA			32
 #endif
-#endif	/* _STARFIRE */
 
 /*
  * Maximum cpuid value that we support.  NCPU can be defined in a platform's
  * makefile.
  */
-#if	(defined(_STARFIRE) && !defined(lint))
-#define	NCPU	64
-#else
 #ifndef NCPU
 #define	NCPU	32
 #endif
-#endif	/* _STARFIRE && !lint */
 
 #if	(NCPU <= 1)
 #define	NCPU_LOG2	0
@@ -323,11 +315,7 @@ extern "C" {
 #define	PFN_TO_BUSTYPE(pfn)	(((pfn) >> 19) & 0x1FF)
 #define	IO_BUSTYPE(pfn)	((PFN_TO_BUSTYPE(pfn) & 0x100) >> 8)
 
-#ifdef	_STARFIRE
-#define	PFN_TO_UPAID(pfn)	BUSTYPE_TO_UPAID(PFN_TO_BUSTYPE(pfn))
-#else
 #define	PFN_TO_UPAID(pfn)	(((pfn) >> 20) & 0x1F)
-#endif	/* _STARFIRE */
 
 /*
  * Defines used for the ptl1_panic parameter, which is passed to the

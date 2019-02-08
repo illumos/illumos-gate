@@ -23,8 +23,9 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 /*
  * CPU support routines for DR
@@ -514,9 +515,6 @@ sbd_pre_attach_cpu(sbd_handle_t *hp, sbd_devlist_t *devlist, int devnum)
 			 */
 			PR_CPU("%s: unmapping sigblk for cpu %d\n",
 				f, cpuid);
-
-			/* platform specific release of sigblk */
-			CPU_SGN_MAPOUT(cpuid);
 		}
 
 	}

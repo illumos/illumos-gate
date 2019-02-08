@@ -23,11 +23,12 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef _SYS_SPITREGS_H
 #define	_SYS_SPITREGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -37,24 +38,11 @@ extern "C" {
  * This file is cpu dependent.
  */
 
-#ifdef _STARFIRE
-/*
- * Starfire's cpu upaids are not the same
- * as cpuids.
- * XXX - our obp took the liberty of
- * converting cpu upaids into cpuids when
- * presenting it as upa-portid property.
- */
-#define	CPUID_TO_UPAID(upaid)	(((upaid & 0x3C) << 1) |	\
-				((upaid & 0x40) >> 4) |		\
-				(upaid &0x3))
-#else
 /*
  * The mid is the same as the cpu id.
  * We might want to change this later
  */
 #define	CPUID_TO_UPAID(cpuid)	(cpuid)
-#endif	/* _STARFIRE */
 
 /*
  * LSU Control Register

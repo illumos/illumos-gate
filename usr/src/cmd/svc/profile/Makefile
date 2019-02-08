@@ -22,6 +22,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 
 include ../../Makefile.cmd
@@ -44,7 +45,6 @@ PROFILESRCS = \
 	platform_SUNW,Sun-Fire-15000.xml \
 	platform_SUNW,Sun-Fire-880.xml \
 	platform_SUNW,Sun-Fire.xml \
-	platform_SUNW,Ultra-Enterprise-10000.xml \
 	platform_SUNW,UltraSPARC-IIi-Netract.xml \
 	platform_none.xml \
 	platform_sun4v.xml

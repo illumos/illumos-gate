@@ -23,6 +23,10 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019 Peter Tribble.
+ */
+
 #include <sys/machsystm.h>
 #include <sys/cpu_module.h>
 #include <sys/dtrace.h>
@@ -68,11 +72,6 @@ init_cpu_info(struct cpu *cp)
 
 	(void) strcpy(pi->pi_processor_type, "sparcv9");
 	(void) strcpy(pi->pi_fputypes, "sparcv9");
-
-	/*
-	 * StarFire requires the signature block stuff setup here
-	 */
-	CPU_SGN_MAPIN(cpuid);
 
 	/*
 	 * cpu0 is always initialized at boot time, but it can be initialized

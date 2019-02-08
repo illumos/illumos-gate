@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Peter Tribble.
+ */
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -95,7 +99,6 @@ static uint_t	pagemask	= 0x1fff;
 
 static char *sun4u_bootables[] = {
 	"platform/sun4u/kernel/sparcv9/unix",
-	"platform/SUNW,Ultra-Enterprise-10000/kernel/sparcv9/unix",
 	"platform/SUNW,Sun-Fire-15000/kernel/sparcv9/unix",
 	"platform/sun4u/cprboot",
 	"platform/sun4u/bootlst"

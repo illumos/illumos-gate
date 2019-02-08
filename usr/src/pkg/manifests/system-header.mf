@@ -27,6 +27,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Peter Tribble.
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -154,7 +155,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-2 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-250 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-4 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise-10000 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIi-Netract group=sys
@@ -1722,7 +1722,6 @@ $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cpc_ultra.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cpr_impl.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cpu_impl.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cpu_sgnblk_defs.h
-$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/cvc.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/daktari.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/ddi_subrdefs.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/dvma.h
@@ -1774,7 +1773,6 @@ $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/scsb_led.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/simmstat.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/spitregs.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sram.h
-$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/starfire.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sun4asi.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sysctrl.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sysioerr.h
@@ -2012,8 +2010,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-2/include \
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-250/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-4/include \
-    target=../sun4u/include
-$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise-10000/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/include \
     target=../sun4u/include

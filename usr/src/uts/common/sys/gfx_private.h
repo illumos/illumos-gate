@@ -50,6 +50,11 @@ typedef char *gfxp_fb_softc_ptr_t;
 #define	GFXP_MEMORY_UNCACHED		1
 #define	GFXP_MEMORY_WRITECOMBINED	2
 
+enum gfxp_type {
+	GFXP_BITMAP,
+	GFXP_VGATEXT
+};
+
 typedef uint64_t gfx_maddr_t;
 typedef char *gfxp_acc_handle_t;
 

@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
 #	This makefile contains the common definitions for the sun4u unix
 #	and all sun4u implementation architecture dependent modules.
@@ -158,7 +159,6 @@ include $(UTSBASE)/Makefile.uts
 
 # These come after Makefile.uts.
 IMPLEMENTATIONS		 = tazmo 
-IMPLEMENTATIONS		+= starfire 
 IMPLEMENTATIONS		+= javelin 
 IMPLEMENTATIONS		+= darwin 
 IMPLEMENTATIONS		+= quasar 
@@ -459,7 +459,7 @@ CPU_KMODS	+= cheetah cheetahplus jalapeno serrano spitfire hummingbird
 #
 #	sun4u 'TOD' Modules (/platform/.../kernel/tod):
 #
-TOD_KMODS	+= todds1287 todds1337 todmostek todstarfire 
+TOD_KMODS	+= todds1287 todds1337 todmostek 
 TOD_KMODS	+= todm5819 todblade todbq4802 todsg todopl
 TOD_KMODS	+= todm5819p_rmc todstarcat 
 

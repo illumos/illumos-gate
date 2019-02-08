@@ -458,6 +458,7 @@ tem_info_init(char *pathname, cred_t *credp)
 
 	/* other sanity checks */
 	if (!((temargs.depth == 4) || (temargs.depth == 8) ||
+	    (temargs.depth == 15) || (temargs.depth == 16) ||
 	    (temargs.depth == 24) || (temargs.depth == 32))) {
 		cmn_err(CE_WARN, "terminal emulator: unsupported depth");
 		ret = tems_failed(credp, B_TRUE);
@@ -533,6 +534,7 @@ tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 	tems.ts_pdepth = tp->depth;
 	tems.ts_linebytes = tp->linebytes;
 	tems.ts_display_mode = tp->mode;
+	tems.ts_color_map = tp->color_map;
 
 	switch (tp->mode) {
 	case VIS_TEXT:
@@ -679,14 +681,28 @@ tems_modechange_callback(struct vis_modechg_arg *arg,
 }
 
 /*
+ * This function is used to clear entire screen via the underlying framebuffer
+ * driver.
+ */
+int
+tems_cls_layered(struct vis_consclear *pda,
+    cred_t *credp)
+{
+	int rval;
+
+	(void) ldi_ioctl(tems.ts_hdl, VIS_CONSCLEAR,
+	    (intptr_t)pda, FKIOCTL, credp, &rval);
+	return (rval);
+}
+
+/*
  * This function is used to display a rectangular blit of data
  * of a given size and location via the underlying framebuffer driver.
  * The blit can be as small as a pixel or as large as the screen.
  */
 void
-tems_display_layered(
-	struct vis_consdisplay *pda,
-	cred_t *credp)
+tems_display_layered(struct vis_consdisplay *pda,
+    cred_t *credp)
 {
 	int rval;
 
@@ -701,9 +717,8 @@ tems_display_layered(
  * such as from vi when deleting characters and words.
  */
 void
-tems_copy_layered(
-	struct vis_conscopy *pma,
-	cred_t *credp)
+tems_copy_layered(struct vis_conscopy *pma,
+    cred_t *credp)
 {
 	int rval;
 
@@ -716,9 +731,8 @@ tems_copy_layered(
  * pixel inverting, text block cursor via the underlying framebuffer.
  */
 void
-tems_cursor_layered(
-	struct vis_conscursor *pca,
-	cred_t *credp)
+tems_cursor_layered(struct vis_conscursor *pca,
+    cred_t *credp)
 {
 	int rval;
 

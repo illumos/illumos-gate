@@ -23,11 +23,12 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef	_SYS_PCI_CB_H
 #define	_SYS_PCI_CB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -78,10 +79,6 @@ struct cb {
 	uint64_t cb_obsta_pa;		/* 1st-attached-side sta reg base PA */
 
 	uint64_t *cb_imr_save;
-
-#ifdef _STARFIRE
-	caddr_t cb_ittrans_cookie;	/* intr tgt translation */
-#endif
 };
 
 #define	CB_INO_TO_MONDO(cb_p, ino)	((cb_p)->cb_ign << PCI_INO_BITS | (ino))

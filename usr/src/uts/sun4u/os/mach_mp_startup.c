@@ -22,6 +22,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #include <sys/machsystm.h>
 #include <sys/cpu_module.h>
@@ -64,10 +67,6 @@ init_cpu_info(struct cpu *cp)
 	(void) strcpy(pi->pi_processor_type, "sparcv9");
 	(void) strcpy(pi->pi_fputypes, "sparcv9");
 
-	/*
-	 * StarFire requires the signature block stuff setup here
-	 */
-	CPU_SGN_MAPIN(cpuid);
 	if (cpuid == cpu0.cpu_id) {
 		/*
 		 * cpu0 starts out running.  Other cpus are

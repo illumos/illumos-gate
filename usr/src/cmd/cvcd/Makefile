@@ -19,16 +19,15 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
-# Makefile definitions for Starfire Network Console related items.
+# Makefile definitions for Starcat Network Console related items.
 #
 # cmd/cvcd/Makefile
 #
-# These utilities are specific to the Ultra-Enterprise-10000 platform at this
+# These utilities are specific to the Sun-Fire-15000 platform at this
 # time.
 #
 

@@ -162,7 +162,6 @@ sparc_MANFILES=	audiocs.7d	\
 		fas.7d		\
 		gpio_87317.7d	\
 		grbeep.7d	\
-		idn.7d		\
 		mc-opl.7d	\
 		n2rng.7d	\
 		ncp.7d		\

@@ -48,7 +48,6 @@ file path=lib/$(ARCH64)/llib-ladm.ln
 file path=lib/$(ARCH64)/llib-laio.ln
 file path=lib/$(ARCH64)/llib-lavl.ln
 file path=lib/$(ARCH64)/llib-lbsm.ln
-file path=lib/$(ARCH64)/llib-lc.ln
 file path=lib/$(ARCH64)/llib-lc_db.ln
 file path=lib/$(ARCH64)/llib-lcontract.ln
 file path=lib/$(ARCH64)/llib-lcryptoutil.ln
@@ -101,8 +100,6 @@ file path=lib/llib-lavl
 file path=lib/llib-lavl.ln
 file path=lib/llib-lbsm
 file path=lib/llib-lbsm.ln
-file path=lib/llib-lc
-file path=lib/llib-lc.ln
 file path=lib/llib-lc_db
 file path=lib/llib-lc_db.ln
 file path=lib/llib-lcontract
@@ -368,8 +365,6 @@ link path=usr/lib/$(ARCH64)/llib-lavl.ln \
     target=../../../lib/$(ARCH64)/llib-lavl.ln
 link path=usr/lib/$(ARCH64)/llib-lbsm.ln \
     target=../../../lib/$(ARCH64)/llib-lbsm.ln
-link path=usr/lib/$(ARCH64)/llib-lc.ln \
-    target=../../../lib/$(ARCH64)/llib-lc.ln
 link path=usr/lib/$(ARCH64)/llib-lcontract.ln \
     target=../../../lib/$(ARCH64)/llib-lcontract.ln
 link path=usr/lib/$(ARCH64)/llib-lctf.ln \
@@ -450,8 +445,6 @@ link path=usr/lib/llib-lavl target=../../lib/llib-lavl
 link path=usr/lib/llib-lavl.ln target=../../lib/llib-lavl.ln
 link path=usr/lib/llib-lbsm target=../../lib/llib-lbsm
 link path=usr/lib/llib-lbsm.ln target=../../lib/llib-lbsm.ln
-link path=usr/lib/llib-lc target=../../lib/llib-lc
-link path=usr/lib/llib-lc.ln target=../../lib/llib-lc.ln
 link path=usr/lib/llib-lcontract target=../../lib/llib-lcontract
 link path=usr/lib/llib-lcontract.ln target=../../lib/llib-lcontract.ln
 link path=usr/lib/llib-lctf target=../../lib/llib-lctf

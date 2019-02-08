@@ -22,6 +22,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 #	This Makefile defines all file modules for the directory uts/sun4u
 #	and it's children. These are the source files which are sun4u
@@ -160,7 +161,6 @@ SHA1_OBJS	+= sha1_asm.o
 TODMOSTEK_OBJS	+= todmostek.o
 TODDS1287_OBJS	+= todds1287.o
 TODDS1337_OBJS	+= todds1337.o
-TODSTARFIRE_OBJS += todstarfire.o
 TODSTARCAT_OBJS	+= todstarcat.o
 TODBLADE_OBJS	+= todblade.o
 TODM5819_OBJS	+= todm5819.o

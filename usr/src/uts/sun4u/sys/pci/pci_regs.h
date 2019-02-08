@@ -22,11 +22,12 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef _SYS_PCI_REGS_H
 #define	_SYS_PCI_REGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -65,8 +66,6 @@ extern "C" {
 /*
  * (psycho and schizo) control register bit definitions:
  */
-#define	COMMON_CB_CONTROL_STATUS_IGN		0x0007c00000000000ull
-#define	COMMON_CB_CONTROL_STATUS_IGN_SHIFT	46
 #define	COMMON_CB_CONTROL_STATUS_APCKEN		0x0000000000000008ull
 #define	COMMON_CB_CONTROL_STATUS_APERR		0x0000000000000004ull
 #define	COMMON_CB_CONTROL_STATUS_IAP		0x0000000000000002ull

@@ -26,6 +26,9 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef	_SBD_IOCTL_H
 #define	_SBD_IOCTL_H
@@ -507,34 +510,6 @@ typedef struct {
 	/* SMS reported unrecoverable error: Board is Unusable */
 #define	ESTC_NWSWITCH		1037
 	/* Cannot unconfigure I/O board: network switch failed */
-
-/* Starfire error codes */
-
-#define	ESTF_NONE		2000	/* No error */
-#define	ESTF_GETPROP		2001	/* Cannot read property value */
-#define	ESTF_GETPROPLEN		2002	/* Cannot determine property length */
-#define	ESTF_BNUM		2003	/* Invalid board number */
-#define	ESTF_CONFIGBUSY		2004
-	/* Cannot proceed; Board is configured or busy */
-#define	ESTF_NOCPUID		2005	/* No CPU specified for connect */
-#define	ESTF_PROBE		2006	/* Firmware probe failed */
-#define	ESTF_DEPROBE		2007	/* Firmware deprobe failed */
-#define	ESTF_MOVESIGB		2008	/* Firmware move-cpu0 failed */
-#define	ESTF_JUGGLE		2009	/* Cannot move SIGB assignment */
-#define	ESTF_HASSIGB		2010
-	/* Cannot disconnect CPU; SIGB is currently assigned */
-#define	ESTF_SUPPORT		2011	/* Operation not supported */
-#define	ESTF_DRVFAIL		2012	/* Device driver failure */
-#define	ESTF_SETCPUVAL		2013
-	/* Must specify a CPU on the given board */
-#define	ESTF_NODEV		2014	/* No such device */
-#define	ESTF_INTERBOARD		2015
-	/* Memory configured with inter-board interleaving */
-#define	ESTF_UNKPTCMD		2016	/* Unrecognized platform command */
-#define	ESTF_NOTID		2017	/* drmach parameter is not a valid ID */
-#define	ESTF_INAPPROP		2018
-	/* drmach parameter is inappropriate for operation */
-#define	ESTF_INTERNAL		2019	/* Unexpected internal condition */
 
 /* Daktari error codes */
 

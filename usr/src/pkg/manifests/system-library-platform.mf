@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
 
 set name=pkg.fmri value=pkg:/system/library/platform@$(PKGVERS)
@@ -116,8 +117,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-250/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-4 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-4/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise-10000 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise-10000/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Ultra-Enterprise/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib
@@ -174,8 +173,6 @@ $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Ultra-2/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Ultra-250/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Ultra-4/lib/libprtdiag_psr.so.1
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Ultra-Enterprise-10000/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Ultra-Enterprise/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file \
@@ -515,12 +512,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-4/sbin target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-5_10 target=SUNW,Ultra-2
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-60 target=SUNW,Ultra-2
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-80 target=SUNW,Ultra-2
-$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise-10000/lib/cfgadm \
-    target=../../sun4u/lib/cfgadm
-$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise-10000/lib/fs \
-    target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise-10000/sbin \
-    target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Ultra-Enterprise/lib/fs \

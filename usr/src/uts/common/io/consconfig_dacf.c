@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2019 Peter Tribble.
+ */
+
+/*
  * This module performs two functions.  First, it kicks off the driver loading
  * of the console devices during boot in dynamic_console_config().
  * The loading of the drivers for the console devices triggers the
@@ -1533,29 +1537,6 @@ dynamic_console_config(void)
 	consconfig_load_drivers(consconfig_sp);
 	consconfig_sp->cons_input_type = cons_get_input_type(consconfig_sp);
 
-	/*
-	 * This is legacy special case code for the "cool" virtual console
-	 * for the Starfire project.  Starfire has a dummy "ssp-serial"
-	 * node in the OBP device tree and cvc is a pseudo driver.
-	 */
-	if (consconfig_sp->cons_stdout_path != NULL && stdindev == NODEV &&
-	    strstr(consconfig_sp->cons_stdout_path, "ssp-serial")) {
-		/*
-		 * Setup the virtual console driver for Starfire
-		 * Note that console I/O will still go through prom for now
-		 * (notice we don't open the driver here). The cvc driver
-		 * will be activated when /dev/console is opened by init.
-		 * During that time, a cvcd daemon will be started that
-		 * will open the cvcredirection driver to facilitate
-		 * the redirection of console I/O from cvc to cvcd.
-		 */
-		rconsvp = i_consconfig_createvp(CVC_PATH);
-		if (rconsvp == NULL)
-			goto done;
-		rconsdev = rconsvp->v_rdev;
-		goto done;
-	}
-
 	rwsconsvp = consconfig_sp->cons_wc_vp;
 	rwsconsdev = consconfig_sp->cons_wc_vp->v_rdev;
 
@@ -1574,7 +1555,6 @@ dynamic_console_config(void)
 	    mousedev,  kbddev, fbdev, rconsdev);
 
 	flush_deferred_console_buf();
-done:
 	consconfig_sp->cons_initialized = B_TRUE;
 }
 

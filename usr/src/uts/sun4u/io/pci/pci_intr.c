@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 /*
  * PCI nexus interrupt handling:
@@ -40,10 +43,6 @@
 #include <sys/pci/pci_obj.h>
 #include <sys/sdt.h>
 #include <sys/clock.h>
-
-#ifdef _STARFIRE
-#include <sys/starfire.h>
-#endif /* _STARFIRE */
 
 /*
  * interrupt jabber:
@@ -579,10 +578,6 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 	weight = pci_class_to_intr_weight(rdip);
 	intr_dist_cpuid_add_device_weight(cpu_id, rdip, weight);
 
-#ifdef _STARFIRE
-	cpu_id = pc_translate_tgtid(cb_p->cb_ittrans_cookie, cpu_id,
-	    IB_GET_MAPREG_INO(ino));
-#endif /* _STARFIRE */
 	if (!ipil_list) {
 		*ino_p->ino_map_reg = ib_get_map_reg(mondo, cpu_id);
 		*ino_p->ino_map_reg;

@@ -1,31 +1,20 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2019 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PCIPSY 7D "May 26, 2005"
+.TH PCIPSY 7D "Jan 28, 2019"
 .SH NAME
 pcipsy \- PCI bus to Safari bus nexus driver
 .SH DESCRIPTION
-.sp
 .LP
-The \fBpcipsy\fR nexus driver is used for certain IO assemblies for sun4u and
-high-end Enterprise E10000 servers..
+The \fBpcipsy\fR nexus driver is used for certain IO assemblies for sun4u
+servers.
 .SH FILES
-.sp
 .ne 2
 .na
-\fB/platform/SUNW,Ultra-Enterprise-10000/kernel/drv/sparcv9/pcipsy\fR
-.ad
-.sp .6
-.RS 4n
-32-bit ELF kernel module.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/platform/sun4u/kernel/drv/sparcv9/pcipsy\fR\fR
+\fB/platform/sun4u/kernel/drv/sparcv9/pcipsy\fR
 .ad
 .sp .6
 .RS 4n
@@ -33,6 +22,5 @@ high-end Enterprise E10000 servers..
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpcisch\fR(7D)

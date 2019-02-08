@@ -20,15 +20,14 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 2001 by Sun Microsystems, Inc.
 # All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
 
 #
 # This Makefile defines the shared dr module that is used by
-# directories uts/sun4u/starfire and uts/sun4u/starcat.
+# directory uts/sun4u/starcat.
 #
 
 #

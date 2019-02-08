@@ -348,7 +348,6 @@ COMMON_SUBDIRS = \
 	lib/libbrand \
 	lib/libbsdmalloc \
 	lib/libbsm \
-	lib/libc \
 	lib/libc_db \
 	lib/libcfgadm \
 	lib/libcmdutils \

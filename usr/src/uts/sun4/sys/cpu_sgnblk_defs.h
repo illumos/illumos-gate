@@ -23,11 +23,12 @@
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef	_CPU_SGNBLK_DEFS_H
 #define	_CPU_SGNBLK_DEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -123,38 +124,6 @@ typedef union {
 }
 
 extern void (*cpu_sgn_func)(ushort_t, uchar_t, uchar_t, int);
-
-
-
-#ifdef _STARFIRE
-
-extern void register_bbus_intr();
-extern void cpu_sgn_mapin(int);
-extern void cpu_sgn_mapout(int);
-extern int cpu_sgn_exists(int);
-extern ushort_t get_cpu_sgn(int);
-extern uchar_t get_cpu_sgn_state(int);
-
-#define	REGISTER_BBUS_INTR()	register_bbus_intr()
-#define	CPU_SGN_MAPIN(cpuid)	cpu_sgn_mapin(cpuid)
-#define	CPU_SGN_MAPOUT(cpuid)	cpu_sgn_mapout(cpuid)
-#define	CPU_SGN_EXISTS(cpuid)	cpu_sgn_exists(cpuid)
-#define	SGN_CPU_IS_OS(cpuid)	(get_cpu_sgn(cpuid) == OS_SIG)
-#define	SGN_CPU_IS_OBP(cpuid)	(get_cpu_sgn(cpuid) == OBP_SIG)
-#define	SGN_CPU_STATE_IS_DETACHED(cpuid)	\
-				(get_cpu_sgn_state(cpuid) == SIGST_DETACHED)
-
-#else
-
-#define	REGISTER_BBUS_INTR()
-#define	CPU_SGN_MAPIN(cpuid)
-#define	CPU_SGN_MAPOUT(cpuid)
-#define	CPU_SGN_EXISTS(cpuid)	(0)
-#define	SGN_CPU_IS_OS(cpuid)	(0)
-#define	SGN_CPU_IS_OBP(cpuid)	(0)
-#define	SGN_CPU_STATE_IS_DETACHED(cpuid)	(0)
-
-#endif	/* _STARFIRE */
 
 #endif	/* _KERNEL */
 

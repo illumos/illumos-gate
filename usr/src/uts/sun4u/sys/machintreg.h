@@ -23,11 +23,12 @@
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #ifndef _SYS_MACHINTREG_H
 #define	_SYS_MACHINTREG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -150,16 +151,6 @@ extern "C" {
 #define	INR_EN_SHIFT	31
 #define	INR_PID_SHIFT	26
 #define	INR_PID_MASK	(IRSR_PID_MASK << (INR_PID_SHIFT))
-#ifdef	_STARFIRE
-/*
- * Starfire interrupt group number is 7 bits
- * Starfire's IGN (inter group #) is not the same as upaid
- */
-#define	IGN_SIZE	7		/* Interrupt Group Number bit size */
-#define	UPAID_TO_IGN(upaid) ((((upaid & 0x3C) >> 1) | (upaid & 0x1)) |	\
-				(((upaid & 0x2) << 4) |			\
-				((upaid & 0x40) ^ 0x40)))
-#else
 /*
  * IGN_SIZE can be defined in a platform's makefile. If it is not defined,
  * use a default of 5.
@@ -168,7 +159,6 @@ extern "C" {
 #define	IGN_SIZE	5		/* Interrupt Group Number bit size */
 #endif
 #define	UPAID_TO_IGN(upaid) (upaid)
-#endif	/* _STARFIRE */
 
 #define	IR_CPU_CLEAR	0x4		/* clear pending register for cpu */
 #define	IR_MASK_OFFSET	0x4

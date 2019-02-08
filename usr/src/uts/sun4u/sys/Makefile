@@ -20,6 +20,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 # Copyright 2018 Joyent, Inc.
 #
@@ -91,7 +92,6 @@ HDRS=	\
 	pte.h			\
 	sbd_ioctl.h		\
 	spitregs.h		\
-	starfire.h		\
 	sysioerr.h		\
 	sysiosbus.h		\
 	todmostek.h		\

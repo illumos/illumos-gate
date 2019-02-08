@@ -23,8 +23,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 Peter Tribble.
 #
 # Start script for dcs
 #
@@ -47,7 +46,6 @@ getproparg() {
 
 DCS=/usr/lib/dcs
 platform=`/sbin/uname -i`
-e10k="SUNW,Ultra-Enterprise-10000"
 sf15k="SUNW,Sun-Fire-15000"
 opl="SUNW,SPARC-Enterprise"
 
@@ -60,8 +58,7 @@ elif [ $platform = "$opl" ]; then
 	args="-l"
 fi
 
-if [ $platform = "$e10k" -o $platform = "$sf15k" -o \
-     $platform = "$opl" ]; then
+if [ $platform = "$sf15k" -o $platform = "$opl" ]; then
 	$DCS $args			# Fail if can't execute
 	exit				# Use dcs's exit status
 else

@@ -23,8 +23,9 @@
  * Copyright 1990-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -52,16 +53,6 @@ int oven_test = 0;
  * To indicate if the prom has the property of "thermal-interrupt".
  */
 static int thermal_interrupt_enabled = 0;
-
-#ifdef	_STARFIRE
-#include <sys/starfire.h>
-
-int
-pc_translate_tgtid(caddr_t, int, volatile uint64_t *);
-
-void
-pc_ittrans_cleanup(caddr_t, volatile uint64_t *);
-#endif	/* _STARFIRE */
 
 /*
  * adb debug_sysio_errs to 1 if you don't want your system to panic on
@@ -235,29 +226,17 @@ sysio_init_err(struct sbus_soft_state *softsp)
 	 */
 	mondo_vec_reg = (uint64_t *)(softsp->intr_mapping_reg + UE_ECC_MAPREG);
 	cpu_id = acpu_id;
-#ifdef	_STARFIRE
-	cpu_id = pc_translate_tgtid(softsp->ittrans_cookie, cpu_id,
-				mondo_vec_reg);
-#endif	/* _STARFIRE */
 	tmp_mondo_vec = (cpu_id << INTERRUPT_CPU_FIELD) | INTERRUPT_VALID;
 	*mondo_vec_reg = tmp_mondo_vec;
 
 	mondo_vec_reg = (uint64_t *)(softsp->intr_mapping_reg + CE_ECC_MAPREG);
 	cpu_id = acpu_id;
-#ifdef	_STARFIRE
-	cpu_id = pc_translate_tgtid(softsp->ittrans_cookie, cpu_id,
-				mondo_vec_reg);
-#endif	/* _STARFIRE */
 	tmp_mondo_vec = (cpu_id << INTERRUPT_CPU_FIELD) | INTERRUPT_VALID;
 	*mondo_vec_reg = tmp_mondo_vec;
 
 	mondo_vec_reg =
 	    (uint64_t *)(softsp->intr_mapping_reg + SBUS_ERR_MAPREG);
 	cpu_id = acpu_id;
-#ifdef	_STARFIRE
-	cpu_id = pc_translate_tgtid(softsp->ittrans_cookie, cpu_id,
-				mondo_vec_reg);
-#endif	/* _STARFIRE */
 
 	tmp_mondo_vec = (cpu_id << INTERRUPT_CPU_FIELD) | INTERRUPT_VALID;
 	*mondo_vec_reg = tmp_mondo_vec;
@@ -312,11 +291,6 @@ sysio_dis_err(struct sbus_soft_state *softsp)
 
 	*mondo_vec_reg = 0;
 
-#ifdef	_STARFIRE
-	/* do cleanup for starfire interrupt target translation */
-	pc_ittrans_cleanup(softsp->ittrans_cookie, mondo_vec_reg);
-#endif	/* _STARFIRE */
-
 	*clear_vec_reg = 0;
 
 	mondo_vec_reg = (softsp->intr_mapping_reg + CE_ECC_MAPREG);
@@ -324,22 +298,12 @@ sysio_dis_err(struct sbus_soft_state *softsp)
 
 	*mondo_vec_reg = 0;
 
-#ifdef	_STARFIRE
-	/* Do cleanup for starfire interrupt target translation */
-	pc_ittrans_cleanup(softsp->ittrans_cookie, mondo_vec_reg);
-#endif	/* _STARFIRE */
-
 	*clear_vec_reg = 0;
 
 	mondo_vec_reg = (softsp->intr_mapping_reg + SBUS_ERR_MAPREG);
 	clear_vec_reg = (softsp->clr_intr_reg + SBUS_ERR_CLEAR);
 
 	*mondo_vec_reg = 0;
-
-#ifdef	_STARFIRE
-	/* Do cleanup for starfire interrupt target translation */
-	pc_ittrans_cleanup(softsp->ittrans_cookie, mondo_vec_reg);
-#endif	/* _STARFIRE */
 
 	*clear_vec_reg = 0;
 
