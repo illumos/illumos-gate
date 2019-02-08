@@ -135,7 +135,36 @@ CFLAGS			+= $(SPACEFLAG)
 CFLAGS			+= $(CCUNBOUND)
 CFLAGS			+= $(CFLAGS_uts)
 CFLAGS			+= -xstrconst
-CFLAGS			+= -_gcc=-fstack-protector
+
+#
+# Options to control which version of stack-protector we enable. This
+# gives us a bit of flexibility and is unfortunately necessary as some
+# modules do not function correctly with our defaults (qede).
+#
+#  o STACKPROTECT_		Sets the appropriate version for the compiler
+#  o STACKPROTECT_strong	Sets us to use strong on all of the
+#				compilers it supports. This is the same
+#				as the default.
+#
+#  o STACKPROTECT_none		Disables the stack protector.
+#
+#  o STACKPROTECT_all		Enables it for everything.
+#
+#  o STACKPROTECT_basic		Enables the basic stack protector.
+#
+# -fstack-protector-strong is not available in our gcc4 which is why we
+# have per-compiler versions below.
+#
+STACKPROTECT_		= -_gcc4=-fstack-protector
+STACKPROTECT_		+= -_gcc7=-fstack-protector-strong
+STACKPROTECT_		+= -_gcc8=-fstack-protector-strong
+
+STACKPROTECT_strong	= $(STACKPROTECT_)
+STACKPROTECT_none	= -_gcc=-fstack-protector-none
+STACKPROTECT_all	= -_gcc=-fstack-protector-all
+STACKPROTECT_basic	= -_gcc=-fstack-protector
+
+CFLAGS			+= $(STACKPROTECT_$(STACKPROTECT))
 
 ASFLAGS_XARCH_32	= $(i386_ASFLAGS)
 ASFLAGS_XARCH_64	= $(amd64_ASFLAGS)
