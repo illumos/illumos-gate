@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 LIBRARY= libpcp.a
 VERS= .1
@@ -42,8 +44,6 @@ LINKED_LIBPCP_DIR	= \
 	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/libpcp.so)
 LINKED_LIBPCP1_DIR	= \
 	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/libpcp.so.1)
-LINKED_LLIBLPCP_DIR 	= \
-	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/llib-lpcp.ln)
 
 LIBS = $(DYNLIB) $(LINTLIB)
 CFLAGS +=	$(CCVERBOSE)
@@ -52,7 +52,6 @@ LDLIBS +=	-lc -lumem -ldevinfo
 PLATLIBS =	$(USR_PLAT_DIR)/$(PLATFORM)/lib
 INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libpcp.so.1 $@
 INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/libpcp.so $@
-INS.slink8=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/llib-lpcp.ln $@
 
 .KEEP_STATE:
 

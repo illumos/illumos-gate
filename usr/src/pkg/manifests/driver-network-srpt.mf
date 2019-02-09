@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/driver/network/srpt@$(PKGVERS)
@@ -60,10 +61,7 @@ file path=lib/svc/manifest/system/ibsrp/target.xml group=sys mode=0444 \
 file path=lib/svc/method/svc-srpt mode=0555 variant.opensolaris.zone=global
 file path=usr/include/libsrpt.h
 file path=usr/lib/$(ARCH64)/libsrpt.so.1
-file path=usr/lib/$(ARCH64)/llib-lsrpt.ln
 file path=usr/lib/libsrpt.so.1
-file path=usr/lib/llib-lsrpt
-file path=usr/lib/llib-lsrpt.ln
 file path=usr/lib/mdb/kvm/$(ARCH64)/srpt.so group=sys mode=0555
 file path=usr/sbin/srptadm mode=0555
 file path=usr/share/man/man7d/srpt.7d

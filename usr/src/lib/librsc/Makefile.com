@@ -22,6 +22,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 LIBRARY= librsc.a
 VERS= .1
@@ -40,8 +42,6 @@ LINKED_LIBRSC_DIR	= \
 	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/librsc.so)
 LINKED_LIBRSC1_DIR	= \
 	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/librsc.so.1)
-LINKED_LLIBLRSC_DIR 	= \
-	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/llib-lrsc.ln)
 
 # There should be a mapfile here
 MAPFILES =
@@ -53,7 +53,6 @@ LDLIBS +=	-lc
 PLATLIBS =	$(USR_PLAT_DIR)/$(PLATFORM)/lib/
 INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/librsc.so.1 $@
 INS.slink7=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/librsc.so $@
-INS.slink8=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/llib-lrsc.ln $@
 
 .KEEP_STATE:
 
@@ -71,8 +70,7 @@ $(PLATLIBS)/librsc.so:
 
 install:	all $(USR_PSM_LIBS) $(PLATLIBS)/librsc.so \
 		$(LINKED_DIRS) $(LINKED_LIB_DIRS) \
-		$(LINKED_LIBRSC_DIR) $(LINKED_LIBRSC1_DIR) \
-		$(LINKED_LLIBLRSC_DIR)
+		$(LINKED_LIBRSC_DIR) $(LINKED_LIBRSC1_DIR)
 
 $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(INS.file)
@@ -88,8 +86,5 @@ $(LINKED_LIBRSC_DIR): $(USR_PLAT_DIR)
 
 $(LINKED_LIBRSC1_DIR): $(USR_PLAT_DIR)
 	-$(INS.slink6)
-
-$(LINKED_LLIBLRSC_DIR): $(USR_PLAT_DIR)
-	-$(INS.slink8)
 
 include $(SRC)/lib/Makefile.targ

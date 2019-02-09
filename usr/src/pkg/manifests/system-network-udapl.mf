@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -49,10 +50,7 @@ dir path=usr/share/man/man4
 file path=etc/dat/dat.conf group=sys original_name=SUNWudapl:etc/dat/dat.conf \
     preserve=true
 file path=usr/lib/$(ARCH64)/libdat.so.1
-file path=usr/lib/$(ARCH64)/llib-ldat.ln
 file path=usr/lib/libdat.so.1
-file path=usr/lib/llib-ldat
-file path=usr/lib/llib-ldat.ln
 file path=usr/sbin/datadm mode=0555
 file path=usr/share/man/man1m/datadm.1m
 file path=usr/share/man/man3dat/dat_cno_create.3dat

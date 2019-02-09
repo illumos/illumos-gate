@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/service/network/load-balancer/ilb@$(PKGVERS)
@@ -45,12 +46,9 @@ dir path=usr/sbin
 file path=lib/svc/manifest/network/loadbalancer/ilbd.xml group=sys mode=0444
 file path=usr/include/libilb.h
 file path=usr/lib/$(ARCH64)/libilb.so.1
-file path=usr/lib/$(ARCH64)/llib-lilb.ln
 file path=usr/lib/inet/ilb/ilb_probe mode=0555
 file path=usr/lib/inet/ilbd mode=0555
 file path=usr/lib/libilb.so.1
-file path=usr/lib/llib-lilb
-file path=usr/lib/llib-lilb.ln
 file path=usr/sbin/ilbadm mode=0555
 legacy pkg=SUNWilb \
     desc="Integrated IP layer 3/4 load balancer for Solaris (usr)" \

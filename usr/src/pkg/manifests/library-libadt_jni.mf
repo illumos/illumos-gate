@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/library/libadt_jni@$(PKGVERS)
@@ -35,10 +36,8 @@ dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 dir path=usr/lib/audit
 file path=usr/lib/$(ARCH64)/libadt_jni.so.1
-file path=usr/lib/$(ARCH64)/llib-ladt_jni.ln
 file path=usr/lib/audit/Audit.jar
 file path=usr/lib/libadt_jni.so.1
-file path=usr/lib/llib-ladt_jni.ln
 legacy pkg=SUNWaudit \
     desc="Java Solaris Auditing interface / AuditService Implementation" \
     name="AuditService Implementation"

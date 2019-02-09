@@ -21,6 +21,7 @@
 
 #
 # Copyright 2018 Jason King
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/library/demangle@$(PKGVERS)
@@ -32,10 +33,7 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 file path=usr/lib/$(ARCH64)/libdemangle-sys.so.1
-file path=usr/lib/$(ARCH64)/llib-ldemangle-sys.ln
 file path=usr/lib/libdemangle-sys.so.1
-file path=usr/lib/llib-ldemangle-sys
-file path=usr/lib/llib-ldemangle-sys.ln
 license lic_CDDL license=lic_CDDL
 license usr/src/lib/libdemangle/THIRDPARTYLICENSE \
     license=usr/src/lib/libdemangle/THIRDPARTYLICENSE

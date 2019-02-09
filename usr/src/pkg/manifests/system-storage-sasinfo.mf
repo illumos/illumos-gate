@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -52,11 +53,8 @@ file path=etc/smhba.conf group=sys original_name=SUNWsmhba:etc/smhba.conf \
 file path=usr/include/smhbaapi.h
 file path=usr/lib/$(ARCH64)/libSMHBAAPI.so.1
 file path=usr/lib/$(ARCH64)/libsun_sas.so.1
-file path=usr/lib/$(ARCH64)/llib-lSMHBAAPI.ln
 file path=usr/lib/libSMHBAAPI.so.1
 file path=usr/lib/libsun_sas.so.1
-file path=usr/lib/llib-lSMHBAAPI
-file path=usr/lib/llib-lSMHBAAPI.ln
 file path=usr/sbin/sasinfo mode=0555
 file path=usr/share/man/man1m/sasinfo.1m
 file path=usr/share/man/man3lib/libSMHBAAPI.3lib

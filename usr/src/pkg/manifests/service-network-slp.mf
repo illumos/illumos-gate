@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/service/network/slp@$(PKGVERS)
@@ -57,11 +58,8 @@ file path=lib/svc/manifest/network/slp.xml group=sys mode=0444
 file path=lib/svc/method/slp mode=0555
 file path=usr/include/slp.h
 file path=usr/lib/$(ARCH64)/libslp.so.1
-file path=usr/lib/$(ARCH64)/llib-lslp.ln
 file path=usr/lib/inet/slpd mode=0555
 file path=usr/lib/libslp.so.1
-file path=usr/lib/llib-lslp
-file path=usr/lib/llib-lslp.ln
 file path=usr/share/lib/slp/slp.jar group=sys
 file path=usr/share/lib/slp/slpd.jar group=sys mode=0600
 file path=usr/share/man/man1m/slpd.1m

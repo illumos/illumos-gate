@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/zones/internal@$(PKGVERS)
@@ -37,15 +38,6 @@ file path=usr/include/libbrand.h
 file path=usr/include/libuutil.h
 file path=usr/include/libzonecfg.h
 file path=usr/include/zonestat_impl.h
-file path=usr/lib/$(ARCH64)/llib-lbrand.ln
-file path=usr/lib/$(ARCH64)/llib-lzonecfg.ln
-file path=usr/lib/$(ARCH64)/llib-lzonestat.ln
-file path=usr/lib/llib-lbrand
-file path=usr/lib/llib-lbrand.ln
-file path=usr/lib/llib-lzonecfg
-file path=usr/lib/llib-lzonecfg.ln
-file path=usr/lib/llib-lzonestat
-file path=usr/lib/llib-lzonestat.ln
 legacy pkg=SUNWzoneint desc="Solaris Zones internal files" \
     name="Solaris Zones Internal Files" version=11.11,REV=2009.10.13
 license cr_Sun license=cr_Sun

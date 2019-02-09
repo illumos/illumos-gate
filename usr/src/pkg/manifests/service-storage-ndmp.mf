@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -54,10 +55,7 @@ file path=lib/svc/manifest/system/ndmp.xml group=sys mode=0444
 file path=lib/svc/method/svc-ndmp mode=0555
 file path=usr/include/libndmp.h
 file path=usr/lib/$(ARCH64)/libndmp.so.1
-file path=usr/lib/$(ARCH64)/llib-lndmp.ln
 file path=usr/lib/libndmp.so.1
-file path=usr/lib/llib-lndmp
-file path=usr/lib/llib-lndmp.ln
 file path=usr/lib/ndmp/ndmpd mode=0555
 file path=usr/sbin/ndmpadm mode=0555
 file path=usr/sbin/ndmpstat mode=0555

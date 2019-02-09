@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/service/picl@$(PKGVERS)
@@ -155,16 +156,9 @@ dir path=usr/share/man/man3picltree
 file path=lib/svc/manifest/system/picl.xml group=sys mode=0444 \
     variant.opensolaris.zone=global
 file path=usr/lib/$(ARCH64)/libpicl.so.1
-file path=usr/lib/$(ARCH64)/llib-lpicl.ln
 file path=usr/lib/libpicl.so.1
 file path=usr/lib/libpicld_pluginutil.so.1
 file path=usr/lib/libpicltree.so.1
-file path=usr/lib/llib-lpicl
-file path=usr/lib/llib-lpicl.ln
-file path=usr/lib/llib-lpicld_pluginutil
-file path=usr/lib/llib-lpicld_pluginutil.ln
-file path=usr/lib/llib-lpicltree
-file path=usr/lib/llib-lpicltree.ln
 file path=usr/lib/picl/picld mode=0555
 file path=usr/lib/picl/plugins/libpicldevtree.so.1 group=sys
 file path=usr/lib/picl/plugins/libpiclevent.so.1 group=sys

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/library/libfcoe@$(PKGVERS)
@@ -38,10 +39,7 @@ dir path=usr/share/man/man3fcoe
 dir path=usr/share/man/man3lib
 file path=usr/include/libfcoe.h
 file path=usr/lib/$(ARCH64)/libfcoe.so.1
-file path=usr/lib/$(ARCH64)/llib-lfcoe.ln
 file path=usr/lib/libfcoe.so.1
-file path=usr/lib/llib-lfcoe
-file path=usr/lib/llib-lfcoe.ln
 file path=usr/share/man/man3fcoe/FCOE_CreatePort.3fcoe
 file path=usr/share/man/man3fcoe/FCOE_DeletePort.3fcoe
 file path=usr/share/man/man3fcoe/FCOE_GetPortList.3fcoe
