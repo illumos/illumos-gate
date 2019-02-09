@@ -1,0 +1,43 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Joyent, Inc.
+#
+
+#
+# This Makefile should be included in individual kernel modules to opt
+# into a -z defs world. Note, this should be included after a MAPFILES
+# entry is defined. See uts/common/README.mapfiles for more information.
+#
+
+#
+# Mapfile base
+#
+MAPBASE = $(UTSBASE)/common/mapfiles
+DTRACE_MAPFILE = $(OBJS_DIR)/dtrace.mapfile
+
+#
+# Always append -z defs to the LD FLAGS and append all mapfiles.
+#
+LDFLAGS += -z defs $(MAPFILES:%=-M $(MAPBASE)/%.mapfile) -M $(DTRACE_MAPFILE)
+
+#
+# Definitions and rules to assemble the DTrace probe mapfile. There's no
+# good way to automatically do this, hence we have a slightly gross
+# series of automated tools. This does mean that we have a bit more work
+# to do, but also means that probes can be added arbitrarily without
+# having to manually edit mapfiles.
+#
+DTRACE_AWK_FILE = $(MAPBASE)/dtrace.mapfile.awk
+
+$(OBJS_DIR)/dtrace.mapfile: $(OBJECTS) $(DTRACE_AWK_FILE)
+	$(NM) -u $(OBJECTS) | $(AWK) -f $(DTRACE_AWK_FILE) > $@

@@ -50,7 +50,7 @@ $(OBJECTS): $(INLINES)
 #	Partially link .o files to generate the kmod. The fake dependency
 #	on modstubs simplifies things...
 #
-$(BINARY):		$(OBJECTS)
+$(BINARY):		$(OBJECTS) $(DTRACE_MAPFILE)
 	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)

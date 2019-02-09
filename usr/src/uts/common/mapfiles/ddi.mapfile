@@ -1,0 +1,191 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Joyent, Inc.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object scoping must comply with the rules detailed in
+#
+#	usr/src/uts/common/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+#
+# This file contains core functions provided by the DDI and also items
+# required as part of the platform's runime ABI (think compiler
+# functions).
+#
+
+$mapfile_version 2
+
+SYMBOL_SCOPE {
+    global:
+	__divdi3			{ FLAGS = EXTERN };
+	__stack_chk_fail		{ FLAGS = EXTERN };
+	__stack_chk_guard		{ FLAGS = EXTERN };
+	allocb				{ FLAGS = EXTERN };
+	assfail				{ FLAGS = EXTERN };
+	assfail3			{ FLAGS = EXTERN };
+	atomic_dec_32_nv		{ FLAGS = EXTERN };
+	bcmp				{ FLAGS = EXTERN };
+	bcopy				{ FLAGS = EXTERN };
+	bzero				{ FLAGS = EXTERN };
+	cmn_err				{ FLAGS = EXTERN };
+	cv_broadcast			{ FLAGS = EXTERN };
+	cv_destroy			{ FLAGS = EXTERN };
+	cv_init				{ FLAGS = EXTERN };
+	cv_reltimedwait			{ FLAGS = EXTERN };
+	ddi_cb_register			{ FLAGS = EXTERN };
+	ddi_cb_unregister		{ FLAGS = EXTERN };
+	ddi_dev_regsize			{ FLAGS = EXTERN };
+	ddi_dma_addr_bind_handle	{ FLAGS = EXTERN };
+	ddi_dma_alloc_handle		{ FLAGS = EXTERN };
+	ddi_dma_free_handle		{ FLAGS = EXTERN };
+	ddi_dma_mem_alloc		{ FLAGS = EXTERN };
+	ddi_dma_mem_free		{ FLAGS = EXTERN };
+	ddi_dma_nextcookie		{ FLAGS = EXTERN };
+	ddi_dma_sync			{ FLAGS = EXTERN };
+	ddi_dma_unbind_handle		{ FLAGS = EXTERN };
+	ddi_fls				{ FLAGS = EXTERN };
+	ddi_fm_acc_err_clear		{ FLAGS = EXTERN };
+	ddi_fm_acc_err_get		{ FLAGS = EXTERN };
+	ddi_fm_dma_err_get		{ FLAGS = EXTERN };
+	ddi_fm_ereport_post		{ FLAGS = EXTERN };
+	ddi_fm_fini			{ FLAGS = EXTERN };
+	ddi_fm_handler_register		{ FLAGS = EXTERN };
+	ddi_fm_handler_unregister	{ FLAGS = EXTERN };
+	ddi_fm_init			{ FLAGS = EXTERN };
+	ddi_fm_service_impact		{ FLAGS = EXTERN };
+	ddi_get_driver_private		{ FLAGS = EXTERN };
+	ddi_get_instance		{ FLAGS = EXTERN };
+	ddi_get_lbolt			{ FLAGS = EXTERN };
+	ddi_get_lbolt64			{ FLAGS = EXTERN };
+	ddi_get_name			{ FLAGS = EXTERN };
+	ddi_get_parent			{ FLAGS = EXTERN };
+	ddi_get16			{ FLAGS = EXTERN };
+	ddi_get32			{ FLAGS = EXTERN };
+	ddi_get64			{ FLAGS = EXTERN };
+	ddi_intr_add_handler		{ FLAGS = EXTERN };
+	ddi_intr_alloc			{ FLAGS = EXTERN };
+	ddi_intr_block_disable		{ FLAGS = EXTERN };
+	ddi_intr_block_enable		{ FLAGS = EXTERN };
+	ddi_intr_disable		{ FLAGS = EXTERN };
+	ddi_intr_enable			{ FLAGS = EXTERN };
+	ddi_intr_free			{ FLAGS = EXTERN };
+	ddi_intr_get_cap		{ FLAGS = EXTERN };
+	ddi_intr_get_navail		{ FLAGS = EXTERN };
+	ddi_intr_get_nintrs		{ FLAGS = EXTERN };
+	ddi_intr_get_pri		{ FLAGS = EXTERN };
+	ddi_intr_get_supported_types	{ FLAGS = EXTERN };
+	ddi_intr_remove_handler		{ FLAGS = EXTERN };
+	ddi_periodic_add		{ FLAGS = EXTERN };
+	ddi_periodic_delete		{ FLAGS = EXTERN };
+	ddi_power			{ FLAGS = EXTERN };
+	ddi_prop_free			{ FLAGS = EXTERN };
+	ddi_prop_get_int		{ FLAGS = EXTERN };
+	ddi_prop_lookup_int_array	{ FLAGS = EXTERN };
+	ddi_prop_op			{ FLAGS = EXTERN };
+	ddi_prop_remove_all		{ FLAGS = EXTERN };
+	ddi_prop_update_int_array	{ FLAGS = EXTERN };
+	ddi_prop_update_string		{ FLAGS = EXTERN };
+	ddi_ptob			{ FLAGS = EXTERN };
+	ddi_put16			{ FLAGS = EXTERN };
+	ddi_put32			{ FLAGS = EXTERN };
+	ddi_quiesce_not_supported	{ FLAGS = EXTERN };
+	ddi_regs_map_free		{ FLAGS = EXTERN };
+	ddi_regs_map_setup		{ FLAGS = EXTERN };
+	ddi_set_driver_private		{ FLAGS = EXTERN };
+	ddi_strtol			{ FLAGS = EXTERN };
+	ddi_taskq_create		{ FLAGS = EXTERN };
+	ddi_taskq_destroy		{ FLAGS = EXTERN };
+	ddi_taskq_dispatch		{ FLAGS = EXTERN };
+	delay				{ FLAGS = EXTERN };
+	desballoc			{ FLAGS = EXTERN };
+	dev_err				{ FLAGS = EXTERN };
+	drv_usectohz			{ FLAGS = EXTERN };
+	drv_usecwait			{ FLAGS = EXTERN };
+	fm_ena_generate			{ FLAGS = EXTERN };
+	freeb				{ FLAGS = EXTERN };
+	freemsg				{ FLAGS = EXTERN };
+	freemsgchain			{ FLAGS = EXTERN };
+	gethrtime			{ FLAGS = EXTERN };
+	kmem_alloc			{ FLAGS = EXTERN };
+	kmem_free			{ FLAGS = EXTERN };
+	kmem_zalloc			{ FLAGS = EXTERN };
+	kstat_create			{ FLAGS = EXTERN };
+	kstat_delete			{ FLAGS = EXTERN };
+	kstat_install			{ FLAGS = EXTERN };
+	kstat_named_init		{ FLAGS = EXTERN };
+	list_create			{ FLAGS = EXTERN };
+	list_destroy			{ FLAGS = EXTERN };
+	list_head			{ FLAGS = EXTERN };
+	list_insert_tail		{ FLAGS = EXTERN };
+	list_next			{ FLAGS = EXTERN };
+	list_remove			{ FLAGS = EXTERN };
+	memcpy				{ FLAGS = EXTERN };
+	memset				{ FLAGS = EXTERN };
+	miocack				{ FLAGS = EXTERN };
+	miocnak				{ FLAGS = EXTERN };
+	mod_driverops			{ FLAGS = EXTERN };
+	mod_info			{ FLAGS = EXTERN };
+	mod_install			{ FLAGS = EXTERN };
+	mod_remove			{ FLAGS = EXTERN };
+	msgpullup			{ FLAGS = EXTERN };
+	msgsize				{ FLAGS = EXTERN };
+	mutex_destroy			{ FLAGS = EXTERN };
+	mutex_enter			{ FLAGS = EXTERN };
+	mutex_exit			{ FLAGS = EXTERN };
+	mutex_init			{ FLAGS = EXTERN };
+	mutex_owned			{ FLAGS = EXTERN };
+	mutex_tryenter			{ FLAGS = EXTERN };
+	nochpoll			{ FLAGS = EXTERN };
+	nodev				{ FLAGS = EXTERN };
+	nulldev				{ FLAGS = EXTERN };
+	panic				{ FLAGS = EXTERN };
+	pci_config_get16		{ FLAGS = EXTERN };
+	pci_config_get32		{ FLAGS = EXTERN };
+	pci_config_get64		{ FLAGS = EXTERN };
+	pci_config_get8			{ FLAGS = EXTERN };
+	pci_config_put16		{ FLAGS = EXTERN };
+	pci_config_put32		{ FLAGS = EXTERN };
+	pci_config_put64		{ FLAGS = EXTERN };
+	pci_config_put8			{ FLAGS = EXTERN };
+	pci_config_setup		{ FLAGS = EXTERN };
+	pci_config_teardown		{ FLAGS = EXTERN };
+	pci_ereport_post		{ FLAGS = EXTERN };
+	pci_ereport_setup		{ FLAGS = EXTERN };
+	pci_ereport_teardown		{ FLAGS = EXTERN };
+	pci_lcap_locate			{ FLAGS = EXTERN };
+	qreply				{ FLAGS = EXTERN };
+	rw_destroy			{ FLAGS = EXTERN };
+	rw_enter			{ FLAGS = EXTERN };
+	rw_exit				{ FLAGS = EXTERN };
+	rw_init				{ FLAGS = EXTERN };
+	snprintf			{ FLAGS = EXTERN };
+	sprintf				{ FLAGS = EXTERN };
+	strcat				{ FLAGS = EXTERN };
+	strcmp				{ FLAGS = EXTERN };
+	strcpy				{ FLAGS = EXTERN };
+	strlen				{ FLAGS = EXTERN };
+	timeout				{ FLAGS = EXTERN };
+	untimeout			{ FLAGS = EXTERN };
+	vsnprintf			{ FLAGS = EXTERN };
+	vsprintf			{ FLAGS = EXTERN };
+};

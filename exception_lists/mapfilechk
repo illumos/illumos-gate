@@ -33,7 +33,7 @@
 #
 # This file provides an exception mechanism for specifying files
 # that match this pattern that should be skipped.
-# 
+#
 
 syntax: glob
 exception_lists/mapfilechk
@@ -49,3 +49,5 @@ usr/src/cmd/perl/*
 usr/src/cmd/mklocale/*
 usr/src/tools/onbld/Checks/Mapfile*
 usr/src/tools/scripts/*
+usr/src/uts/common/mapfiles/dtrace.mapfile.awk
+usr/src/uts/Makefile.mapfile

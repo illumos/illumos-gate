@@ -1,0 +1,68 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2016 Joyent, Inc.
+#
+
+Kernel Module Build Time Symbol Verification
+--------------------------------------------
+
+Historically, kernel modules have all been built as relocatable objects.
+They are not dynamic objects and dependency information is always noted
+in individual makefiles. Along with this, there has never been any
+verification of the symbols that are being used. This means that it's
+possible for a kernel module author to refer to a symbol that doesn't
+exist and not find out until they try to install the module.
+
+To help find these problems at build time, we provide an opt-in system
+for modules to use, leveraging the link-editor's '-z defs' option.  This
+option ensures that there are no unknown definitons at link-edit time.
+To supply these definitions we supply a series of mapfiles in this
+directory.
+
+These mapfiles are not the traditional versioning mapfiles like those in
+usr/src/lib/README.mapfiles! Please review the following differences
+closely:
+
+* These mapfiles do not declare any versions!
+* These mapfiles do not use the 'SYMBOL_VERSION' directive, instead they
+  use the 'SYMBOL_SCOPE' directive.
+* These mapfiles do not hide symbols! Library mapfiles always have
+  something to catch all local symbols. That should *never* be used
+  here. These mapfiles should not affect visibility.
+* All symbols in these mapfiles should be marked 'EXTERN' to indicate
+  that they are not provided by the kernel module but by another.
+* These mapfiles do not declare what is or isn't a public interface,
+  though they are often grouped around interfaces, to make it easier for
+  a driver author to get this right.
+
+Mapfiles are organized based on kernel module. For example the GLDv3
+device driver interface is provided by the 'mac' module and thus is
+found in the file 'mac.mapfile'. The DDI is currently in the 'ddi'
+mapfile. Functions that are found in genunix and unix that aren't in
+the DDI should not be put in that mapfile.
+
+Note, the existing files may not be complete. These are intended to only
+have the public interfaces provided by modules and thus should not
+include every symbol in them. As the need arises, add new symbols or
+modules as appropriate.
+
+To opt a module into this, first declare a series of MAPFILES that they
+should check against in the module. This should be a series of one or
+more files, for example:
+
+MAPFILES += ddi mac
+
+Next, you should add an include of Makefile.mapfile right before you
+include Makefile.targ. You can do this with the following line:
+
+include $(UTSBASE)/Makefile.mapfile

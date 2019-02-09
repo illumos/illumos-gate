@@ -48,6 +48,8 @@ SMOFF += all_func_returns
 
 LDFLAGS		+= -dy -N misc/mac
 
+MAPFILES	+= ddi mac random
+
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)
@@ -66,4 +68,5 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
+include $(UTSBASE)/Makefile.mapfile
 include $(UTSBASE)/intel/Makefile.targ
