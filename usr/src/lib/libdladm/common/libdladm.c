@@ -22,6 +22,10 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
@@ -121,6 +125,7 @@ dladm_open(dladm_handle_t *handle)
 
 	(*handle)->dld_fd = dld_fd;
 	(*handle)->door_fd = -1;
+	(*handle)->dld_kcp = NULL;
 
 	return (DLADM_STATUS_OK);
 }
@@ -132,6 +137,8 @@ dladm_close(dladm_handle_t handle)
 		(void) close(handle->dld_fd);
 		if (handle->door_fd != -1)
 			(void) close(handle->door_fd);
+		if (handle->dld_kcp != NULL)
+			(void) kstat_close(handle->dld_kcp);
 		free(handle);
 	}
 }
@@ -140,6 +147,14 @@ int
 dladm_dld_fd(dladm_handle_t handle)
 {
 	return (handle->dld_fd);
+}
+
+kstat_ctl_t *
+dladm_dld_kcp(dladm_handle_t handle)
+{
+	if (handle->dld_kcp == NULL)
+		handle->dld_kcp = kstat_open();
+	return (handle->dld_kcp);
 }
 
 /*

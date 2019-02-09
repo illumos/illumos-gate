@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef _LIBDLSTAT_H
 #define	_LIBDLSTAT_H
 
@@ -279,10 +283,12 @@ extern dladm_stat_chain_t	*dladm_link_stat_diffchain(dladm_stat_chain_t *,
 extern dladm_stat_chain_t	*dladm_link_stat_query_all(dladm_handle_t,
 				    datalink_id_t, dladm_stat_type_t);
 
-extern flow_stat_t		*dladm_flow_stat_query(const char *);
+extern flow_stat_t		*dladm_flow_stat_query(dladm_handle_t,
+				    const char *);
 extern flow_stat_t		*dladm_flow_stat_diff(flow_stat_t *,
 				    flow_stat_t *);
-extern name_value_stat_entry_t	*dladm_flow_stat_query_all(const char *);
+extern name_value_stat_entry_t	*dladm_flow_stat_query_all(dladm_handle_t,
+				    const char *);
 
 #ifdef	__cplusplus
 }
