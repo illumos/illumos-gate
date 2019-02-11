@@ -124,7 +124,7 @@ biosvbe_get_mode(int *mode)
 	v86.addr = 0x10;
 	v86.eax = 0x4f03;
 	v86int();
-	*mode = v86.ebx & 0xffff;
+	*mode = v86.ebx & 0x3fff;	/* Bits 0-13 */
 	return (v86.eax & 0xffff);
 }
 
