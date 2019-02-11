@@ -338,7 +338,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	/*
 	 * Allocate and initialize the Elf_Data structure.
 	 */
-	if ((elfdata = libld_calloc(sizeof (Elf_Data), 1)) == NULL)
+	if ((elfdata = libld_calloc(1, sizeof (Elf_Data))) == NULL)
 		return (S_ERROR);
 	elfdata->d_type = ELF_T_BYTE;
 	elfdata->d_align = ld_targ.t_m.m_word_align;
@@ -347,7 +347,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	/*
 	 * Allocate and initialize the Shdr structure.
 	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == NULL)
+	if ((shdr = libld_calloc(1, sizeof (Shdr))) == NULL)
 		return (S_ERROR);
 	shdr->sh_type = ld_targ.t_m.m_sht_unwind;
 	shdr->sh_flags = SHF_ALLOC;

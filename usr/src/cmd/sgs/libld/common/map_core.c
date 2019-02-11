@@ -841,7 +841,7 @@ cexp_ident_add(Mapfile *mf, const char *name)
 			return (1);
 	}
 
-	if ((node = libld_calloc(sizeof (*node), 1)) == NULL)
+	if ((node = libld_calloc(1, sizeof (*node))) == NULL)
 		return (0);
 	node->ceid_name = name;
 	avl_add(lms.lms_cexp_id, node);
@@ -893,7 +893,7 @@ cexp_ident_init(void)
 	if (lms.lms_cexp_id != NULL)
 		return (TRUE);
 
-	lms.lms_cexp_id = libld_calloc(sizeof (*lms.lms_cexp_id), 1);
+	lms.lms_cexp_id = libld_calloc(1, sizeof (*lms.lms_cexp_id));
 	if (lms.lms_cexp_id == NULL)
 		return (FALSE);
 	avl_create(lms.lms_cexp_id, cexp_ident_cmp, sizeof (cexp_id_node_t),
@@ -1790,7 +1790,7 @@ gettoken_ident(Mapfile *mf, int flags, ld_map_tkval_t *tkv)
 	 *	mf_next pointer.
 	 */
 	tok = (*mf->mf_next & 0x80) ?
-	    TK_OP_ILLCHR : mf->mf_tokdisp[*mf->mf_next];
+	    TK_OP_ILLCHR : mf->mf_tokdisp[(unsigned)*mf->mf_next];
 	switch (tok) {
 	case TK_OP_BADCHR:
 		null_patch_eol(mf->mf_next, &np);
@@ -2208,7 +2208,7 @@ mapfile_version(Mapfile *mf)
 	while (cont) {
 		/* Map the character to a dispatch action */
 		tok = (*mf->mf_next & 0x80) ?
-		    TK_OP_ILLCHR : gettok_dispatch_v2[*mf->mf_next];
+		    TK_OP_ILLCHR : gettok_dispatch_v2[(unsigned)*mf->mf_next];
 
 		switch (tok) {
 		case TK_OP_WS:	/* White space */

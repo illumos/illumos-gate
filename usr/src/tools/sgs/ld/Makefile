@@ -26,8 +26,8 @@ include		../Makefile.com
 include		../../Makefile.tools
 include		$(SGSHOME)/ld/Makefile.com
 
-LDLIBS =	-L../libconv -L$(ROOTONBLDLIBMACH) -lld -lelf -lconv
-NATIVE_LIBS +=	libc.so
+LDLIBS =	-lumem -L../libconv -L$(ROOTONBLDLIBMACH) -lld -lelf -lconv
+NATIVE_LIBS +=	libc.so libumem.so
 CPPFLAGS =	$(NATIVE_CPPFLAGS)
 CFLAGS =	$(NATIVE_CFLAGS)
 MAPFILES =	$(SRCDIR)/common/mapfile-intf

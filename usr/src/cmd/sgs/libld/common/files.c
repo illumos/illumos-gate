@@ -188,7 +188,7 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 * section elf_getdata() will still create a data buffer (the buffer
 	 * will be null and the size will reflect the actual memory size).
 	 */
-	if ((isp = libld_calloc(sizeof (Is_desc), 1)) == NULL)
+	if ((isp = libld_calloc(1, sizeof (Is_desc))) == NULL)
 		return (S_ERROR);
 	isp->is_shdr = shdr;
 	isp->is_file = ifl;
@@ -630,7 +630,7 @@ get_cap_group(Objcapset *ocapset, Word cnum, Ofl_desc *ofl, Is_desc *isp)
 	/*
 	 * If a capabilities group is not found, create a new one.
 	 */
-	if (((cgp = libld_calloc(sizeof (Cap_group), 1)) == NULL) ||
+	if (((cgp = libld_calloc(1, sizeof (Cap_group))) == NULL) ||
 	    (aplist_append(&(ofl->ofl_capgroups), cgp,
 	    AL_CNT_CAP_DESCS) == NULL))
 		return (NULL);
@@ -721,7 +721,7 @@ ld_cap_add_family(Ofl_desc *ofl, Sym_desc *lsdp, Sym_desc *csdp, Cap_group *cgp,
 	 * Make sure the capability families have an initialized AVL tree.
 	 */
 	if ((avlt = ofl->ofl_capfamilies) == NULL) {
-		if ((avlt = libld_calloc(sizeof (avl_tree_t), 1)) == NULL)
+		if ((avlt = libld_calloc(1, sizeof (avl_tree_t))) == NULL)
 			return (S_ERROR);
 		avl_create(avlt, &ld_sym_avl_comp, sizeof (Cap_avlnode),
 		    SGSOFFSETOF(Cap_avlnode, cn_symavlnode.sav_node));
@@ -743,7 +743,7 @@ ld_cap_add_family(Ofl_desc *ofl, Sym_desc *lsdp, Sym_desc *csdp, Cap_group *cgp,
 	qcav.cn_symavlnode.sav_name = lsdp->sd_name;
 
 	if ((cav = avl_find(avlt, &qcav, &where)) == NULL) {
-		if ((cav = libld_calloc(sizeof (Cap_avlnode), 1)) == NULL)
+		if ((cav = libld_calloc(1, sizeof (Cap_avlnode))) == NULL)
 			return (S_ERROR);
 		cav->cn_symavlnode.sav_hash = qcav.cn_symavlnode.sav_hash;
 		cav->cn_symavlnode.sav_name = qcav.cn_symavlnode.sav_name;
@@ -1033,7 +1033,7 @@ process_cap(Ofl_desc *ofl, Ifl_desc *ifl, Is_desc *cisp)
 	 * is used, although it will be sparsely populated, as the list provides
 	 * a convenient mechanism for traversal later.
 	 */
-	if (((cdp = libld_calloc(sizeof (Cap_desc), 1)) == NULL) ||
+	if (((cdp = libld_calloc(1, sizeof (Cap_desc))) == NULL) ||
 	    (aplist_append(&(cdp->ca_groups), NULL, cnum) == NULL))
 		return (S_ERROR);
 
