@@ -88,17 +88,17 @@ tem_safe_callbacks_t tem_safe_pix_callbacks = {
 };
 
 
-static void	tem_safe_control(struct tem_vt_state *, uchar_t,
+static void	tem_safe_control(struct tem_vt_state *, tem_char_t,
 			cred_t *, enum called_from);
 static void	tem_safe_setparam(struct tem_vt_state *, int, int);
 static void	tem_safe_selgraph(struct tem_vt_state *);
-static void	tem_safe_chkparam(struct tem_vt_state *, uchar_t,
+static void	tem_safe_chkparam(struct tem_vt_state *, tem_char_t,
 			cred_t *, enum called_from);
-static void	tem_safe_getparams(struct tem_vt_state *, uchar_t,
+static void	tem_safe_getparams(struct tem_vt_state *, tem_char_t,
 			cred_t *, enum called_from);
-static void	tem_safe_outch(struct tem_vt_state *, uchar_t,
+static void	tem_safe_outch(struct tem_vt_state *, tem_char_t,
 			cred_t *, enum called_from);
-static void	tem_safe_parse(struct tem_vt_state *, uchar_t,
+static void	tem_safe_parse(struct tem_vt_state *, tem_char_t,
 			cred_t *, enum called_from);
 
 static void	tem_safe_new_line(struct tem_vt_state *,
@@ -141,21 +141,21 @@ static void	tem_safe_pix_clear_prom_output(struct tem_vt_state *tem,
 static void	tem_safe_virtual_cls(struct tem_vt_state *, int, screen_pos_t,
 		    screen_pos_t);
 static void	tem_safe_virtual_display(struct tem_vt_state *,
-		    unsigned char *, int, screen_pos_t, screen_pos_t,
+		    tem_char_t *, int, screen_pos_t, screen_pos_t,
 		    text_color_t, text_color_t);
 static void	tem_safe_virtual_copy(struct tem_vt_state *, screen_pos_t,
 		    screen_pos_t, screen_pos_t, screen_pos_t,
 		    screen_pos_t, screen_pos_t);
 static void	tem_safe_align_cursor(struct tem_vt_state *tem);
-static void	bit_to_pix4(struct tem_vt_state *tem, uchar_t c,
+static void	bit_to_pix4(struct tem_vt_state *tem, tem_char_t c,
 		    text_color_t fg_color, text_color_t bg_color);
-static void	bit_to_pix8(struct tem_vt_state *tem, uchar_t c,
+static void	bit_to_pix8(struct tem_vt_state *tem, tem_char_t c,
 		    text_color_t fg_color, text_color_t bg_color);
-static void	bit_to_pix16(struct tem_vt_state *tem, uchar_t c,
+static void	bit_to_pix16(struct tem_vt_state *tem, tem_char_t c,
 		    text_color_t fg_color, text_color_t bg_color);
-static void	bit_to_pix24(struct tem_vt_state *tem, uchar_t c,
+static void	bit_to_pix24(struct tem_vt_state *tem, tem_char_t c,
 		    text_color_t fg_color, text_color_t bg_color);
-static void	bit_to_pix32(struct tem_vt_state *tem, uchar_t c,
+static void	bit_to_pix32(struct tem_vt_state *tem, tem_char_t c,
 		    text_color_t fg_color, text_color_t bg_color);
 
 /* BEGIN CSTYLED */
@@ -349,9 +349,6 @@ tem_safe_input_byte(struct tem_vt_state *tem, uchar_t c, cred_t *credp,
 				v = (v << 6) | (b & 0x3f);
 			}
 
-			/* Use '?' as replacement if needed. */
-			if (v > 0xff)
-				v = '?';
 			tem_safe_parse(tem, v, credp, called_from);
 			tem->tvs_utf8_partial = 0;
 		}
@@ -451,7 +448,7 @@ tems_safe_cursor(struct vis_conscursor *pca, cred_t *credp,
  */
 
 static void
-tem_safe_control(struct tem_vt_state *tem, uchar_t ch, cred_t *credp,
+tem_safe_control(struct tem_vt_state *tem, tem_char_t ch, cred_t *credp,
     enum called_from called_from)
 {
 	tem->tvs_state = A_STATE_START;
@@ -668,7 +665,7 @@ tem_safe_selgraph(struct tem_vt_state *tem)
  *                It assumes that the next lower level will do so.
  */
 static void
-tem_safe_chkparam(struct tem_vt_state *tem, uchar_t ch, cred_t *credp,
+tem_safe_chkparam(struct tem_vt_state *tem, tem_char_t ch, cred_t *credp,
     enum called_from called_from)
 {
 	int	i;
@@ -931,7 +928,7 @@ tem_safe_chkparam(struct tem_vt_state *tem, uchar_t ch, cred_t *credp,
  * Gather the parameters of an ANSI escape sequence
  */
 static void
-tem_safe_getparams(struct tem_vt_state *tem, uchar_t ch,
+tem_safe_getparams(struct tem_vt_state *tem, tem_char_t ch,
     cred_t *credp, enum called_from called_from)
 {
 	ASSERT((called_from == CALLED_FROM_STANDALONE) ||
@@ -971,7 +968,7 @@ tem_safe_getparams(struct tem_vt_state *tem, uchar_t ch,
  */
 
 static void
-tem_safe_outch(struct tem_vt_state *tem, uchar_t ch,
+tem_safe_outch(struct tem_vt_state *tem, tem_char_t ch,
     cred_t *credp, enum called_from called_from)
 {
 
@@ -1111,7 +1108,7 @@ tem_safe_align_cursor(struct tem_vt_state *tem)
  */
 
 static void
-tem_safe_parse(struct tem_vt_state *tem, uchar_t ch,
+tem_safe_parse(struct tem_vt_state *tem, tem_char_t ch,
     cred_t *credp, enum called_from called_from)
 {
 	int	i;
@@ -1402,25 +1399,35 @@ tem_safe_clear_chars(struct tem_vt_state *tem, int count, screen_pos_t row,
 
 /*ARGSUSED*/
 void
-tem_safe_text_display(struct tem_vt_state *tem, uchar_t *string,
+tem_safe_text_display(struct tem_vt_state *tem, tem_char_t *string,
     int count, screen_pos_t row, screen_pos_t col,
     text_color_t fg_color, text_color_t bg_color,
     cred_t *credp, enum called_from called_from)
 {
 	struct vis_consdisplay da;
+	int i;
+	uint8_t c;
 
 	ASSERT((MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&tem->tvs_lock)) ||
 	    called_from == CALLED_FROM_STANDALONE);
 
-	da.data = string;
-	da.width = (screen_size_t)count;
+	da.data = &c;
+	da.width = 1;
 	da.row = row;
 	da.col = col;
 
 	da.fg_color = fg_color;
 	da.bg_color = bg_color;
 
-	tems_safe_display(&da, credp, called_from);
+	for (i = 0; i < count; i++) {
+		/* VGATEXT can only display single byte chars. */
+		if (string[i] > 0xff)
+			c = '?';
+		else
+			c = (uint8_t)string[i];
+		tems_safe_display(&da, credp, called_from);
+		da.col++;
+	}
 }
 
 /*
@@ -1490,7 +1497,7 @@ tem_safe_text_cls(struct tem_vt_state *tem,
 	ASSERT((MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&tem->tvs_lock)) ||
 	    called_from == CALLED_FROM_STANDALONE);
 
-	da.data = tems.ts_blank_line;
+	da.data = (unsigned char *)tems.ts_blank_line;
 	da.width = (screen_size_t)count;
 	da.row = row;
 	da.col = col;
@@ -1502,7 +1509,7 @@ tem_safe_text_cls(struct tem_vt_state *tem,
 
 void
 tem_safe_pix_display(struct tem_vt_state *tem,
-    uchar_t *string, int count,
+    tem_char_t *string, int count,
     screen_pos_t row, screen_pos_t col,
     text_color_t fg_color, text_color_t bg_color,
     cred_t *credp, enum called_from called_from)
@@ -1592,10 +1599,10 @@ tem_safe_pix_copy(struct tem_vt_state *tem,
 }
 
 void
-tem_safe_pix_bit2pix(struct tem_vt_state *tem, unsigned char c,
+tem_safe_pix_bit2pix(struct tem_vt_state *tem, tem_char_t c,
     unsigned char fg, unsigned char bg)
 {
-	void (*fp)(struct tem_vt_state *, unsigned char,
+	void (*fp)(struct tem_vt_state *, tem_char_t,
 	    unsigned char, unsigned char);
 
 	switch (tems.ts_pdepth) {
@@ -2106,7 +2113,7 @@ tem_safe_pix_cursor(struct tem_vt_state *tem, short action,
 }
 
 static void
-bit_to_pix4(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color,
+bit_to_pix4(struct tem_vt_state *tem, tem_char_t c, text_color_t fg_color,
     text_color_t bg_color)
 {
 	uint8_t *dest = (uint8_t *)tem->tvs_pix_data;
@@ -2114,7 +2121,7 @@ bit_to_pix4(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color,
 }
 
 static void
-bit_to_pix8(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color,
+bit_to_pix8(struct tem_vt_state *tem, tem_char_t c, text_color_t fg_color,
     text_color_t bg_color)
 {
 	uint8_t *dest = (uint8_t *)tem->tvs_pix_data;
@@ -2122,7 +2129,7 @@ bit_to_pix8(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color,
 }
 
 static void
-bit_to_pix16(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color4,
+bit_to_pix16(struct tem_vt_state *tem, tem_char_t c, text_color_t fg_color4,
     text_color_t bg_color4)
 {
 	uint16_t fg_color16, bg_color16;
@@ -2138,7 +2145,7 @@ bit_to_pix16(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color4,
 }
 
 static void
-bit_to_pix24(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color4,
+bit_to_pix24(struct tem_vt_state *tem, tem_char_t c, text_color_t fg_color4,
     text_color_t bg_color4)
 {
 	uint32_t fg_color32, bg_color32;
@@ -2159,7 +2166,7 @@ bit_to_pix24(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color4,
 }
 
 static void
-bit_to_pix32(struct tem_vt_state *tem, uchar_t c, text_color_t fg_color4,
+bit_to_pix32(struct tem_vt_state *tem, tem_char_t c, text_color_t fg_color4,
     text_color_t bg_color4)
 {
 	uint32_t fg_color32, bg_color32, *dest;
@@ -2272,12 +2279,12 @@ tem_safe_pix_cls_range(struct tem_vt_state *tem,
  * virtual screen operations
  */
 static void
-tem_safe_virtual_display(struct tem_vt_state *tem, unsigned char *string,
+tem_safe_virtual_display(struct tem_vt_state *tem, tem_char_t *string,
     int count, screen_pos_t row, screen_pos_t col,
     text_color_t fg_color, text_color_t bg_color)
 {
 	int i, width;
-	unsigned char *addr;
+	tem_char_t *addr;
 	text_color_t *pfgcolor;
 	text_color_t *pbgcolor;
 
@@ -2298,17 +2305,66 @@ tem_safe_virtual_display(struct tem_vt_state *tem, unsigned char *string,
 }
 
 static void
-i_virtual_copy(unsigned char *base,
+i_virtual_copy_tem_chars(tem_char_t *base,
     screen_pos_t s_col, screen_pos_t s_row,
     screen_pos_t e_col, screen_pos_t e_row,
     screen_pos_t t_col, screen_pos_t t_row)
 {
-	unsigned char   *from;
-	unsigned char   *to;
+	tem_char_t	*from;
+	tem_char_t	*to;
 	int		cnt;
 	screen_size_t chars_per_row;
-	unsigned char   *to_row_start;
-	unsigned char   *from_row_start;
+	tem_char_t	*to_row_start;
+	tem_char_t	*from_row_start;
+	screen_size_t   rows_to_move;
+	int		cols = tems.ts_c_dimension.width;
+
+	chars_per_row = e_col - s_col + 1;
+	rows_to_move = e_row - s_row + 1;
+
+	to_row_start = base + ((t_row * cols) + t_col);
+	from_row_start = base + ((s_row * cols) + s_col);
+
+	if (to_row_start < from_row_start) {
+		while (rows_to_move-- > 0) {
+			to = to_row_start;
+			from = from_row_start;
+			to_row_start += cols;
+			from_row_start += cols;
+			for (cnt = chars_per_row; cnt-- > 0; )
+				*to++ = *from++;
+		}
+	} else {
+		/*
+		 * Offset to the end of the region and copy backwards.
+		 */
+		cnt = rows_to_move * cols + chars_per_row;
+		to_row_start += cnt;
+		from_row_start += cnt;
+
+		while (rows_to_move-- > 0) {
+			to_row_start -= cols;
+			from_row_start -= cols;
+			to = to_row_start;
+			from = from_row_start;
+			for (cnt = chars_per_row; cnt-- > 0; )
+				*--to = *--from;
+		}
+	}
+}
+
+static void
+i_virtual_copy_colors(text_color_t *base,
+    screen_pos_t s_col, screen_pos_t s_row,
+    screen_pos_t e_col, screen_pos_t e_row,
+    screen_pos_t t_col, screen_pos_t t_row)
+{
+	text_color_t	*from;
+	text_color_t	*to;
+	int		cnt;
+	screen_size_t chars_per_row;
+	text_color_t	*to_row_start;
+	text_color_t	*from_row_start;
 	screen_size_t   rows_to_move;
 	int		cols = tems.ts_c_dimension.width;
 
@@ -2375,15 +2431,13 @@ tem_safe_virtual_copy(struct tem_vt_state *tem,
 	    t_col + chars_per_row > cols)
 		return;
 
-	i_virtual_copy(tem->tvs_screen_buf, s_col, s_row,
+	i_virtual_copy_tem_chars(tem->tvs_screen_buf, s_col, s_row,
 	    e_col, e_row, t_col, t_row);
 
-	/* text_color_t is the same size as char */
-	i_virtual_copy((unsigned char *)tem->tvs_fg_buf,
+	i_virtual_copy_colors(tem->tvs_fg_buf,
 	    s_col, s_row, e_col, e_row, t_col, t_row);
-	i_virtual_copy((unsigned char *)tem->tvs_bg_buf,
+	i_virtual_copy_colors(tem->tvs_bg_buf,
 	    s_col, s_row, e_col, e_row, t_col, t_row);
-
 }
 
 static void
@@ -2434,7 +2488,7 @@ tem_safe_unblank_screen(struct tem_vt_state *tem, cred_t *credp,
 	size_t	tc_size = sizeof (text_color_t);
 	int	row, col, count, col_start;
 	int	width;
-	unsigned char *buf;
+	tem_char_t *buf;
 
 	ASSERT((MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&tem->tvs_lock)) ||
 	    called_from == CALLED_FROM_STANDALONE);

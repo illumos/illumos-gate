@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -60,7 +62,7 @@ ilb_open(ilb_handle_t *hp)
 	if (hp == NULL)
 		return (ILB_STATUS_EINVAL);
 
-	hi = calloc(sizeof (*hi), 1);
+	hi = calloc(1, sizeof (*hi));
 	if (hi == NULL)
 		return (ILB_STATUS_ENOMEM);
 

@@ -51,6 +51,7 @@
 #include <uuid/uuid.h>
 #endif
 #include <string.h>
+#include <gfx_fb.h>
 #include "ficl.h"
 
 /*
@@ -69,7 +70,6 @@
  *		.#	    ( value -- )
  */
 
-#ifdef _STANDALONE
 /* ( flags x1 y1 x2 y2 -- flag ) */
 void
 ficl_fb_putimage(ficlVm *pVM)
@@ -177,7 +177,6 @@ ficl_term_drawrect(ficlVm *pVM)
 	x1 = ficlStackPopUnsigned(ficlVmGetDataStack(pVM));
 	gfx_term_drawrect(x1, y1, x2, y2);
 }
-#endif /* _STANDALONE */
 
 void
 ficlSetenv(ficlVm *pVM)
@@ -1024,7 +1023,6 @@ ficlSystemCompilePlatform(ficlSystem *pSys)
 	    FICL_WORD_DEFAULT);
 	ficlDictionarySetPrimitive(dp, "uuid-to-string", ficlUuidToString,
 	    FICL_WORD_DEFAULT);
-#ifdef _STANDALONE
 	ficlDictionarySetPrimitive(dp, "fb-setpixel", ficl_fb_setpixel,
 	    FICL_WORD_DEFAULT);
 	ficlDictionarySetPrimitive(dp, "fb-line", ficl_fb_line,
@@ -1037,6 +1035,7 @@ ficlSystemCompilePlatform(ficlSystem *pSys)
 	    FICL_WORD_DEFAULT);
 	ficlDictionarySetPrimitive(dp, "term-drawrect", ficl_term_drawrect,
 	    FICL_WORD_DEFAULT);
+#ifdef _STANDALONE
 	/* Register words from linker set. */
 	SET_FOREACH(fnpp, Xficl_compile_set)
 		(*fnpp)(pSys);

@@ -224,15 +224,15 @@ tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
 		    kmem_alloc(ptem->tvs_pix_data_size, KM_SLEEP);
 	}
 
-	ptem->tvs_outbuf_size = tems.ts_c_dimension.width;
-	ptem->tvs_outbuf =
-	    (unsigned char *)kmem_alloc(ptem->tvs_outbuf_size, KM_SLEEP);
+	ptem->tvs_outbuf_size = tems.ts_c_dimension.width *
+	    sizeof (*ptem->tvs_outbuf);
+	ptem->tvs_outbuf = kmem_alloc(ptem->tvs_outbuf_size, KM_SLEEP);
 
 	width = tems.ts_c_dimension.width;
 	height = tems.ts_c_dimension.height;
-	ptem->tvs_screen_buf_size = width * height;
-	ptem->tvs_screen_buf =
-	    (unsigned char *)kmem_alloc(width * height, KM_SLEEP);
+	ptem->tvs_screen_buf_size = width * height *
+	    sizeof (*ptem->tvs_screen_buf);
+	ptem->tvs_screen_buf = kmem_alloc(ptem->tvs_screen_buf_size, KM_SLEEP);
 
 	total = width * height * tc_size;
 	ptem->tvs_fg_buf = (text_color_t *)kmem_alloc(total, KM_SLEEP);
@@ -254,7 +254,7 @@ tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
 
 		}
 
-	ptem->tvs_initialized  = 1;
+	ptem->tvs_initialized = 1;
 }
 
 int
@@ -527,7 +527,8 @@ static void
 tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 {
 	int i;
-	int old_blank_buf_size = tems.ts_c_dimension.width;
+	int old_blank_buf_size = tems.ts_c_dimension.width *
+	    sizeof (*tems.ts_blank_line);
 
 	ASSERT(MUTEX_HELD(&tems.ts_lock));
 
@@ -595,8 +596,9 @@ tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 	if (tems.ts_blank_line)
 		kmem_free(tems.ts_blank_line, old_blank_buf_size);
 
-	tems.ts_blank_line = (unsigned char *)
-	    kmem_alloc(tems.ts_c_dimension.width, KM_SLEEP);
+	tems.ts_blank_line =
+	    kmem_alloc(tems.ts_c_dimension.width * sizeof (*tems.ts_blank_line),
+	    KM_SLEEP);
 	for (i = 0; i < tems.ts_c_dimension.width; i++)
 		tems.ts_blank_line[i] = ' ';
 }

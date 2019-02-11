@@ -23,6 +23,10 @@
  * Copyright 2017, Joyent, Inc.
  */
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #ifndef _LIBDLADM_IMPL_H
 #define	_LIBDLADM_IMPL_H
 
@@ -49,6 +53,7 @@ extern "C" {
 struct dladm_handle {
 	int dld_fd;	/* file descriptor to DLD_CONTROL_DEV */
 	int door_fd;	/* file descriptor to DLMGMT_DOOR */
+	kstat_ctl_t *dld_kcp;	/* for kstat consumers */
 };
 
 /* DLMGMT_DOOR can only be accessed by libdladm and dlmgmtd */

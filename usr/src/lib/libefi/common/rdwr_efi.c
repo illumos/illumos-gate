@@ -24,6 +24,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Toomas Soome <tsoome@me.com>
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -188,7 +189,7 @@ efi_alloc_and_init(int fd, uint32_t nparts, struct dk_gpt **vtoc)
 	length = sizeof (struct dk_gpt) +
 	    sizeof (struct dk_part) * (nparts - 1);
 
-	if ((*vtoc = calloc(length, 1)) == NULL)
+	if ((*vtoc = calloc(1, length)) == NULL)
 		return (-1);
 
 	vptr = *vtoc;
@@ -229,7 +230,7 @@ efi_alloc_and_read(int fd, struct dk_gpt **vtoc)
 	if (read_disk_info(fd, &capacity, &lbsize) != 0)
 		return (VT_ERROR);
 
-	if ((mbr = calloc(lbsize, 1)) == NULL)
+	if ((mbr = calloc(1, lbsize)) == NULL)
 		return (VT_ERROR);
 
 	if ((ioctl(fd, DKIOCGMBOOT, (caddr_t)mbr)) == -1) {
@@ -256,7 +257,7 @@ efi_alloc_and_read(int fd, struct dk_gpt **vtoc)
 	nparts = EFI_MIN_ARRAY_SIZE / sizeof (efi_gpe_t);
 	length = (int) sizeof (struct dk_gpt) +
 	    (int) sizeof (struct dk_part) * (nparts - 1);
-	if ((*vtoc = calloc(length, 1)) == NULL)
+	if ((*vtoc = calloc(1, length)) == NULL)
 		return (VT_ERROR);
 
 	(*vtoc)->efi_nparts = nparts;
@@ -423,7 +424,7 @@ efi_read(int fd, struct dk_gpt *vtoc)
 		}
 	}
 
-	if ((dk_ioc.dki_data = calloc(label_len, 1)) == NULL)
+	if ((dk_ioc.dki_data = calloc(1, label_len)) == NULL)
 		return (VT_ERROR);
 
 	dk_ioc.dki_length = disk_info.dki_lbsize;
@@ -1020,7 +1021,7 @@ efi_write(int fd, struct dk_gpt *vtoc)
 	 * for backup GPT header.
 	 */
 	lba_backup_gpt_hdr = vtoc->efi_last_u_lba + 1 + nblocks;
-	if ((dk_ioc.dki_data = calloc(dk_ioc.dki_length, 1)) == NULL)
+	if ((dk_ioc.dki_data = calloc(1, dk_ioc.dki_length)) == NULL)
 		return (VT_ERROR);
 
 	efi = dk_ioc.dki_data;

@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 #
 
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 #
 # Wrap a command-line check tool in a pythonic API
@@ -46,7 +46,7 @@ def processcheck(command, args, inpt, output):
 	# don't deadlock with the child if both pipes fill.
 	#
 	try:
-		tmpfile = tempfile.TemporaryFile(prefix=command, mode="w+b")
+		tmpfile = tempfile.TemporaryFile(prefix=command, mode="w+")
 	except EnvironmentError as e:
 		output.write("Could not create temporary file: %s\n" % e)
 		return (3, None)

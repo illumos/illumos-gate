@@ -23,6 +23,10 @@
  * Copyright 2017, Joyent, Inc.
  */
 
+/*
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association
+ */
+
 #ifndef _LIBDLADM_H
 #define	_LIBDLADM_H
 
@@ -30,6 +34,7 @@
 #include <sys/dld.h>
 #include <sys/dlpi.h>
 #include <libnvpair.h>
+#include <kstat.h>
 
 /*
  * This file includes structures, macros and common routines shared by all
@@ -215,6 +220,12 @@ extern void		dladm_close(dladm_handle_t);
  * dlmgmtd are given access to the door file descriptor.
  */
 extern int	dladm_dld_fd(dladm_handle_t);
+/*
+ * Retrieve kstat_ctl_t* from handle.The libkstat handle is opened
+ * when the first caller needs it.This allows the library to share
+ * the kstat handle.
+ */
+extern kstat_ctl_t	*dladm_dld_kcp(dladm_handle_t);
 
 typedef struct dladm_arg_info {
 	const char	*ai_name;
