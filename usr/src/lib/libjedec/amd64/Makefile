@@ -10,14 +10,10 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
-# Copyright 2019 Joyent, Inc.
+# Copyright (c) 2018 Joyent, Inc.
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown ctf smbios libjedec
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-include $(SRC)/test/Makefile.com
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)

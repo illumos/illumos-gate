@@ -20,7 +20,7 @@
 #
 #
 # Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2018, Joyent, Inc.
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
@@ -107,6 +107,8 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_info_processor;
 	smbios_info_extprocessor;
 	smbios_info_slot;
+	smbios_info_slot_peers;
+	smbios_info_slot_peers_free;
 	smbios_info_smbios;
 	smbios_info_smbios_version;
 	smbios_info_strtab;
@@ -125,9 +127,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	smbios_memarray_ecc_desc;
 	smbios_memarray_loc_desc;
 	smbios_memarray_use_desc;
+	smbios_memdevice_op_capab_desc;
+	smbios_memdevice_op_capab_name;
 	smbios_memdevice_flag_desc;
 	smbios_memdevice_flag_name;
 	smbios_memdevice_form_desc;
+	smbios_memdevice_memtech_desc;
 	smbios_memdevice_type_desc;
 	smbios_memdevice_rank_desc;
 	smbios_open;
