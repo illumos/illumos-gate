@@ -1986,7 +1986,7 @@ ctf_add_function(ctf_file_t *fp, ulong_t idx, const ctf_funcinfo_t *fip,
 	if (ctf_dsd_lookup(fp, idx) != NULL)
 		return (ctf_set_errno(fp, ECTF_CONFLICT));
 
-	if (symbase == NULL)
+	if (symbase == (uintptr_t)NULL)
 		return (ctf_set_errno(fp, ECTF_STRTAB));
 
 	if (idx > fp->ctf_nsyms)
@@ -2053,7 +2053,7 @@ ctf_add_object(ctf_file_t *fp, ulong_t idx, ctf_id_t type)
 	if (ctf_dsd_lookup(fp, idx) != NULL)
 		return (ctf_set_errno(fp, ECTF_CONFLICT));
 
-	if (symbase == NULL)
+	if (symbase == (uintptr_t)NULL)
 		return (ctf_set_errno(fp, ECTF_STRTAB));
 
 	if (idx > fp->ctf_nsyms)
