@@ -441,7 +441,6 @@
 
 @ MSG_SYS_OPEN		"file %s: open failed: %s"
 @ MSG_SYS_UNLINK	"file %s: unlink failed: %s"
-@ MSG_SYS_MMAPANON	"mmap anon failed: %s"
 @ MSG_SYS_MALLOC	"malloc failed: %s"
 
 
