@@ -101,7 +101,7 @@ ctf_convert_ftypes(Elf *elf, ctf_convert_source_t *types)
 	}
 }
 
-static ctf_file_t *
+ctf_file_t *
 ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t nthrs, uint_t flags,
     int *errp, char *errbuf, size_t errlen)
 {

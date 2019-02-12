@@ -78,6 +78,7 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_diff_types;
 	ctf_discard;
 	ctf_dup;
+	ctf_elfconvert;
 	ctf_elffdwrite;
 	ctf_elfwrite;
 	ctf_enum_value;
