@@ -43,7 +43,7 @@ HDRDIRS= \
 	-I/usr/include \
 	-I$(SRC)/uts/common \
 	-I$(SRC)/common/ctf \
-	-I$(ADJUNCT_PROTO)/usr/include
+	-I$(NATIVE_ADJUNCT)/include
 
 CPPFLAGS += $(HDRDIRS)
 CFLAGS += $(CCVERBOSE)

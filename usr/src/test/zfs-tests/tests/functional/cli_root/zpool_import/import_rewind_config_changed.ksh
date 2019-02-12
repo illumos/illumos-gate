@@ -48,7 +48,7 @@ function custom_cleanup
 {
 	set_vdev_validate_skip 0
 	cleanup
-	log_must mdb_ctf_set_int vdev_min_ms_count 0t16
+	log_must mdb_ctf_set_int zfs_vdev_min_ms_count 0t16
 	log_must mdb_ctf_set_int spa_allocators 0t4
 }
 
@@ -206,7 +206,7 @@ increase_device_sizes $(( FILE_SIZE * 4 ))
 
 # Increase the number of metaslabs for small pools temporarily to
 # reduce the chance of reusing a metaslab that holds old MOS metadata.
-log_must mdb_ctf_set_int vdev_min_ms_count 0t150
+log_must mdb_ctf_set_int zfs_vdev_min_ms_count 0t150
 
 # Decrease the number of allocators for pools created during this test,
 # to increase the odds that metadata survives from old txgs.

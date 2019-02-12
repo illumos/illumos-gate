@@ -29,6 +29,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * Utility functions
  */
 #include <unistd.h>
@@ -319,7 +323,7 @@ str2chr_wrap_cb(int c)
  */
 static int
 str2chr(Lm_list *lml, int ndx, int argc, char **argv, char *arg, int c,
-    const char *opt, size_t optsz, int cbfunc(int))
+    const char *opt, size_t optsz, int (*cbfunc)(int))
 {
 	if (optsz == 0) {
 		/*

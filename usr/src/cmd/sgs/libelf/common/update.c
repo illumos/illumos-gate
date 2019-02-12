@@ -29,6 +29,10 @@
  *	  All Rights Reserved
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <memory.h>
 #include <malloc.h>
 #include <limits.h>
@@ -742,9 +746,6 @@ _elfxx_update(Elf * elf, Elf_Cmd cmd)
 	size_t		sz;
 	unsigned	u;
 	Ehdr		*eh = elf->ed_ehdr;
-
-	if (elf == 0)
-		return (-1);
 
 	ELFWLOCK(elf)
 	switch (cmd) {

@@ -17,8 +17,8 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs bunyan \
-	 mergeq workq grep_xpg4 awk smbios libjedec
-SUBDIRS += demangle
+SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
+SUBDIRS += demangle mergeq workq
+SUBDIRS += bunyan awk smbios libjedec
 
 include $(SRC)/test/Makefile.com

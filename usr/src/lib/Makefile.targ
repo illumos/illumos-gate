@@ -100,7 +100,7 @@ $(DYNLIBCCC): pics .WAIT $$(PICS) $$(ALTPICS) $$(EXTPICS)
 	$(POST_PROCESS_SO)
 
 $(LINTLIB): $$(SRCS) 
-	$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1 
+	$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1
 
 lintcheck: $$(SRCS)
 	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS)

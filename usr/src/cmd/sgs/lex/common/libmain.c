@@ -27,7 +27,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include "stdio.h"
 
@@ -40,7 +42,7 @@ extern int  yylex();
 int
 main(int argc, char **argv)
 {
-	yylex();
+	(void) yylex();
 	exit(0);
 
 	/*NOTREACHED*/

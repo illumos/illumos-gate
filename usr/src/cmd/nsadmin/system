@@ -1,4 +1,3 @@
-*ident	"%Z%%M%	%I%	%E% SMI" /* SVR4 1.5 */
 *
 * CDDL HEADER START
 *
@@ -23,6 +22,18 @@
 *
 * SYSTEM SPECIFICATION FILE
 *
+
+* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NOTE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+*
+* It is not recommended to edit this file directly but rather
+* to deliver configuration fragments into files under /etc/system.d;
+* files in /etc/system.d are combined in alphabetical order and read by
+* the kernel before this file (/etc/system) is processed.
+*
+* Refer to the system(4) manual page for more information and
+* recommendations on naming fragment files.
+*
+* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NOTE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 * moddir:
 *
@@ -72,7 +83,7 @@
 *
 *	Cause these modules to be loaded at boot time, (just before mounting
 *	the root filesystem) rather than at first reference. Note that
-* 	forceload expects a filename which includes the directory. Also
+*	forceload expects a filename which includes the directory. Also
 *	note that loading a module does not necessarily imply that it will
 *	be installed.
 *

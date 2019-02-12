@@ -23,7 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Gary Mills
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
-# Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 # Copyright 2019 Peter Tribble.
 #
@@ -90,6 +90,7 @@ dir path=etc/svc/profile/site group=sys
 dir path=etc/svc/volatile group=sys
 dir path=etc/sysevent group=sys
 dir path=etc/sysevent/config group=sys
+dir path=etc/system.d group=sys
 dir path=etc/tm group=sys
 dir path=etc/user_attr.d group=sys
 dir path=export group=sys

@@ -1472,7 +1472,7 @@ metaslab_ops_t *zfs_metaslab_ops = &metaslab_df_ops;
 /*
  * Wait for any in-progress metaslab loads to complete.
  */
-void
+static void
 metaslab_load_wait(metaslab_t *msp)
 {
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
@@ -1483,20 +1483,17 @@ metaslab_load_wait(metaslab_t *msp)
 	}
 }
 
-int
-metaslab_load(metaslab_t *msp)
+static int
+metaslab_load_impl(metaslab_t *msp)
 {
 	int error = 0;
-	boolean_t success = B_FALSE;
 
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
-	ASSERT(!msp->ms_loaded);
-	ASSERT(!msp->ms_loading);
+	ASSERT(msp->ms_loading);
 
-	msp->ms_loading = B_TRUE;
 	/*
 	 * Nobody else can manipulate a loading metaslab, so it's now safe
-	 * to drop the lock.  This way we don't have to hold the lock while
+	 * to drop the lock. This way we don't have to hold the lock while
 	 * reading the spacemap from disk.
 	 */
 	mutex_exit(&msp->ms_lock);
@@ -1513,29 +1510,50 @@ metaslab_load(metaslab_t *msp)
 		    msp->ms_start, msp->ms_size);
 	}
 
-	success = (error == 0);
-
 	mutex_enter(&msp->ms_lock);
-	msp->ms_loading = B_FALSE;
 
-	if (success) {
-		ASSERT3P(msp->ms_group, !=, NULL);
-		msp->ms_loaded = B_TRUE;
+	if (error != 0)
+		return (error);
 
-		/*
-		 * If the metaslab already has a spacemap, then we need to
-		 * remove all segments from the defer tree; otherwise, the
-		 * metaslab is completely empty and we can skip this.
-		 */
-		if (msp->ms_sm != NULL) {
-			for (int t = 0; t < TXG_DEFER_SIZE; t++) {
-				range_tree_walk(msp->ms_defer[t],
-				    range_tree_remove, msp->ms_allocatable);
-			}
+	ASSERT3P(msp->ms_group, !=, NULL);
+	msp->ms_loaded = B_TRUE;
+
+	/*
+	 * If the metaslab already has a spacemap, then we need to
+	 * remove all segments from the defer tree; otherwise, the
+	 * metaslab is completely empty and we can skip this.
+	 */
+	if (msp->ms_sm != NULL) {
+		for (int t = 0; t < TXG_DEFER_SIZE; t++) {
+			range_tree_walk(msp->ms_defer[t],
+			    range_tree_remove, msp->ms_allocatable);
 		}
-		msp->ms_max_size = metaslab_block_maxsize(msp);
 	}
+	msp->ms_max_size = metaslab_block_maxsize(msp);
+
+	return (0);
+}
+
+int
+metaslab_load(metaslab_t *msp, uint64_t txg)
+{
+	ASSERT(MUTEX_HELD(&msp->ms_lock));
+
+	/*
+	 * There may be another thread loading the same metaslab, if that's
+	 * the case just wait until the other thread is done and return.
+	 */
+	metaslab_load_wait(msp);
+	if (msp->ms_loaded)
+		return (0);
+	VERIFY(!msp->ms_loading);
+
+	msp->ms_loading = B_TRUE;
+	int error = metaslab_load_impl(msp);
+	msp->ms_loading = B_FALSE;
+	msp->ms_loaded_txg = txg;
 	cv_broadcast(&msp->ms_load_cv);
+
 	return (error);
 }
 
@@ -1617,7 +1635,7 @@ metaslab_init(metaslab_group_t *mg, uint64_t id, uint64_t object, uint64_t txg,
 	 */
 	if (metaslab_debug_load && ms->ms_sm != NULL) {
 		mutex_enter(&ms->ms_lock);
-		VERIFY0(metaslab_load(ms));
+		VERIFY0(metaslab_load(ms, txg));
 		mutex_exit(&ms->ms_lock);
 	}
 
@@ -2096,15 +2114,10 @@ metaslab_activate(metaslab_t *msp, int allocator, uint64_t activation_weight,
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
 
 	if ((msp->ms_weight & METASLAB_ACTIVE_MASK) == 0) {
-		int error = 0;
-		metaslab_load_wait(msp);
-		if (!msp->ms_loaded) {
-			if ((error = metaslab_load(msp)) != 0) {
-				metaslab_group_sort(msp->ms_group, msp, 0);
-				return (error);
-			}
-			VERIFY0(msp->ms_loaded_txg);
-			msp->ms_loaded_txg = txg;
+		int error = metaslab_load(msp, txg);
+		if (error != 0) {
+			metaslab_group_sort(msp->ms_group, msp, 0);
+			return (error);
 		}
 		if ((msp->ms_weight & METASLAB_ACTIVE_MASK) != 0) {
 			/*
@@ -2216,12 +2229,7 @@ metaslab_preload(void *arg)
 	ASSERT(!MUTEX_HELD(&msp->ms_group->mg_lock));
 
 	mutex_enter(&msp->ms_lock);
-	metaslab_load_wait(msp);
-	if (!msp->ms_loaded) {
-		(void) metaslab_load(msp);
-		VERIFY0(msp->ms_loaded_txg);
-		msp->ms_loaded_txg = spa_syncing_txg(spa);
-	}
+	(void) metaslab_load(msp, spa_syncing_txg(spa));
 	msp->ms_selected_txg = spa_syncing_txg(spa);
 	mutex_exit(&msp->ms_lock);
 }

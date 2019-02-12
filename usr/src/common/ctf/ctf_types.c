@@ -1083,8 +1083,6 @@ ctf_object_iter(ctf_file_t *fp, ctf_object_f *func, void *arg)
 			continue;
 		id = *(ushort_t *)((uintptr_t)fp->ctf_buf +
 		    fp->ctf_sxlate[i]);
-		if (id == 0)
-			continue;
 
 		/*
 		 * Validate whether or not we're looking at a data object as

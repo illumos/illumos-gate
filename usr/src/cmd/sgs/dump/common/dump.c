@@ -833,12 +833,6 @@ dump_reloc_table(Elf *elf_file, GElf_Ehdr *p_ehdr,
 	}
 	sym_size = sym_data->d_size;
 
-	if (p_scns == NULL) {
-		(void) fprintf(stderr,
-		"%s: %s: no section table data\n", prog_name, filename);
-		return;
-	}
-
 	if (p_scns->p_shdr.sh_type == SHT_RELA) {
 		if (!n_flag && r_flag)
 			(void) printf("\n%s:\n", p_scns->scn_name);

@@ -44,6 +44,7 @@ dir path=opt/util-tests/tests/awk/examples/out
 dir path=opt/util-tests/tests/awk/gnu
 dir path=opt/util-tests/tests/awk/syn
 dir path=opt/util-tests/tests/awk/tests
+dir path=opt/util-tests/tests/mergeq
 file path=opt/util-tests/README mode=0444
 file path=opt/util-tests/bin/print_json mode=0555
 file path=opt/util-tests/bin/utiltest mode=0555

@@ -2897,11 +2897,10 @@ main(int argc, char *argv[])
 
 child_out:
 	assert(pid == 0);
-	if (shstate != NULL) {
-		shstate->status = -1;
-		(void) sema_post(&shstate->sem);
-		(void) munmap((char *)shstate, shstatelen);
-	}
+
+	shstate->status = -1;
+	(void) sema_post(&shstate->sem);
+	(void) munmap((char *)shstate, shstatelen);
 
 	/*
 	 * This might trigger an unref notification, but if so,
