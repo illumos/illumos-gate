@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -982,7 +982,7 @@ ctfdump_source(void)
 		    strerror(errno));
 	}
 
-	if (ctf_type_iter(g_fp, B_FALSE, ctfsrc_collect_types_cb,
+	if (ctf_type_iter(g_fp, B_TRUE, ctfsrc_collect_types_cb,
 	    idnames) == CTF_ERR) {
 		warnx("failed to collect types: %s",
 		    ctf_errmsg(ctf_errno(g_fp)));
