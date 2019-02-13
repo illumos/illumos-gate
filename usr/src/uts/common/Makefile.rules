@@ -210,16 +210,14 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/exec/java/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/$(VGATEXT_FONT).c:	$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf \
-	$(VGATEXT_FONT_DIR)/bdf_to_c.awk
-	$(AWK) -f $(VGATEXT_FONT_DIR)/bdf_to_c.awk	\
-		$(VGATEXT_FONT_DIR)/$(VGATEXT_FONT_SRC).bdf > $@
+$(OBJS_DIR)/$(FONT).c:	$(FONT_DIR)/$(FONT_SRC).bdf
+	$(VTFONTCVT) -f source -o $@ $(FONT_DIR)/$(FONT_SRC).bdf
 
-$(OBJS_DIR)/$(VGATEXT_FONT).o:	$(OBJS_DIR)/$(VGATEXT_FONT).c
+$(OBJS_DIR)/$(FONT).o:		$(OBJS_DIR)/$(FONT).c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/font/%.c
+$(OBJS_DIR)/%.o:		$(SRC)/common/font/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -2014,7 +2012,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/dlpistub/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/font/%.c
+$(LINTS_DIR)/%.ln:		$(SRC)/common/font/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/1394/%.c

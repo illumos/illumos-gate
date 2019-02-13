@@ -35,6 +35,7 @@
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/tem_impl.h>
+#include <sys/rgb.h>
 #include <sys/font.h>
 #include <sys/sysmacros.h>
 
@@ -50,26 +51,6 @@
 /*                            Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
 const uint8_t dim_xlate[] = {  1,  5,  3,  7,  2,  6,  4,  8 };
 const uint8_t brt_xlate[] = {  9, 13, 11, 15, 10, 14, 12,  0 };
-
-/* The pc color here is actually referring to standard 16 color VGA map. */
-typedef enum pc_colors {
-	pc_black	= 0,
-	pc_blue		= 1,
-	pc_green	= 2,
-	pc_cyan		= 3,
-	pc_red		= 4,
-	pc_magenta	= 5,
-	pc_brown	= 6,
-	pc_white	= 7,
-	pc_grey		= 8,
-	pc_brt_blue	= 9,
-	pc_brt_green	= 10,
-	pc_brt_cyan	= 11,
-	pc_brt_red	= 12,
-	pc_brt_magenta	= 13,
-	pc_yellow	= 14,
-	pc_brt_white	= 15
-} pc_colors_t;
 
 const uint8_t solaris_color_to_pc_color[16] = {
 	pc_brt_white,		/*  0 - brt_white	*/

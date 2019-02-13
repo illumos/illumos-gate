@@ -108,8 +108,8 @@ CLEANFILES	+=		\
 	$(DBOOT_BIN)
 
 CLEANFILES	+=		\
-	$(DBOOT_OBJS_DIR)/$(VGATEXT_FONT).c \
-	$(OBJS_DIR)/$(VGATEXT_FONT).c
+	$(DBOOT_OBJS_DIR)/$(FONT).c \
+	$(OBJS_DIR)/$(FONT).c
 
 CLEANFILES	+=		\
 	$(OBJS_DIR)/fb_swtch_src.o \

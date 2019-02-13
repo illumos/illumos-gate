@@ -121,7 +121,7 @@ static struct modlmisc	modlmisc = {
 };
 
 static struct modlinkage modlinkage = {
-	MODREV_1, (void *)&modlmisc, NULL
+	MODREV_1, { (void *)&modlmisc, NULL }
 };
 
 int
@@ -209,12 +209,10 @@ static void
 tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
     boolean_t init_color, boolean_t clear_screen)
 {
-	int i, j;
-	int width, height;
-	int total;
+	unsigned i, j, width, height;
+	text_attr_t attr;
 	text_color_t fg;
 	text_color_t bg;
-	size_t	tc_size = sizeof (text_color_t);
 
 	ASSERT(MUTEX_HELD(&tems.ts_lock) && MUTEX_HELD(&ptem->tvs_lock));
 
@@ -230,14 +228,13 @@ tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
 
 	width = tems.ts_c_dimension.width;
 	height = tems.ts_c_dimension.height;
-	ptem->tvs_screen_buf_size = width * height *
+	ptem->tvs_screen_history_size = height;
+
+	ptem->tvs_screen_buf_size = width * ptem->tvs_screen_history_size *
 	    sizeof (*ptem->tvs_screen_buf);
 	ptem->tvs_screen_buf = kmem_alloc(ptem->tvs_screen_buf_size, KM_SLEEP);
-
-	total = width * height * tc_size;
-	ptem->tvs_fg_buf = (text_color_t *)kmem_alloc(total, KM_SLEEP);
-	ptem->tvs_bg_buf = (text_color_t *)kmem_alloc(total, KM_SLEEP);
-	ptem->tvs_color_buf_size = total;
+	ptem->tvs_screen_rows = kmem_alloc(ptem->tvs_screen_history_size *
+	    sizeof (term_char_t *), KM_SLEEP);
 
 	tem_safe_reset_display(ptem, credp, CALLED_FROM_NORMAL,
 	    clear_screen, init_color);
@@ -245,23 +242,28 @@ tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
 	ptem->tvs_utf8_left = 0;
 	ptem->tvs_utf8_partial = 0;
 
-	tem_safe_get_color(ptem, &fg, &bg, TEM_ATTR_SCREEN_REVERSE);
-	for (i = 0; i < height; i++)
+	/* Get default attributes and fill up the screen buffer. */
+	tem_safe_get_attr(ptem, &fg, &bg, &attr, TEM_ATTR_SCREEN_REVERSE);
+	for (i = 0; i < ptem->tvs_screen_history_size; i++) {
+		ptem->tvs_screen_rows[i] = &ptem->tvs_screen_buf[i * width];
+
 		for (j = 0; j < width; j++) {
-			ptem->tvs_screen_buf[i * width + j] = ' ';
-			ptem->tvs_fg_buf[(i * width +j) * tc_size] = fg;
-			ptem->tvs_bg_buf[(i * width +j) * tc_size] = bg;
+			ptem->tvs_screen_rows[i][j].tc_fg_color = fg;
+			ptem->tvs_screen_rows[i][j].tc_bg_color = bg;
+			ptem->tvs_screen_rows[i][j].tc_char =
+			    TEM_ATTR(attr) | ' ';
 
 		}
+	}
 
-	ptem->tvs_initialized = 1;
+	ptem->tvs_initialized = B_TRUE;
 }
 
-int
+boolean_t
 tem_initialized(tem_vt_state_t tem_arg)
 {
 	struct tem_vt_state *ptem = (struct tem_vt_state *)tem_arg;
-	int ret;
+	boolean_t ret;
 
 	mutex_enter(&ptem->tvs_lock);
 	ret = ptem->tvs_initialized;
@@ -288,7 +290,7 @@ tem_init(cred_t *credp)
 	 * A tem is regarded as initialized only after tem_internal_init(),
 	 * will be set at the end of tem_internal_init().
 	 */
-	ptem->tvs_initialized = 0;
+	ptem->tvs_initialized = B_FALSE;
 
 
 	if (!tems.ts_initialized) {
@@ -335,10 +337,10 @@ tem_free_buf(struct tem_vt_state *tem)
 		kmem_free(tem->tvs_pix_data, tem->tvs_pix_data_size);
 	if (tem->tvs_screen_buf != NULL)
 		kmem_free(tem->tvs_screen_buf, tem->tvs_screen_buf_size);
-	if (tem->tvs_fg_buf != NULL)
-		kmem_free(tem->tvs_fg_buf, tem->tvs_color_buf_size);
-	if (tem->tvs_bg_buf != NULL)
-		kmem_free(tem->tvs_bg_buf, tem->tvs_color_buf_size);
+	if (tem->tvs_screen_rows != NULL) {
+		kmem_free(tem->tvs_screen_rows, tem->tvs_screen_history_size *
+		    sizeof (term_char_t *));
+	}
 }
 
 void
@@ -526,6 +528,7 @@ tems_check_videomode(struct vis_devinit *tp)
 static void
 tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 {
+	bitmap_data_t *font_data;
 	int i;
 	int old_blank_buf_size = tems.ts_c_dimension.width *
 	    sizeof (*tems.ts_blank_line);
@@ -571,19 +574,28 @@ tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 		 * default builtin font. set_font() will adjust the rows
 		 * and columns to fit on the screen.
 		 */
-		set_font(&tems.ts_font,
-		    &tems.ts_c_dimension.height,
+		font_data = set_font(&tems.ts_c_dimension.height,
 		    &tems.ts_c_dimension.width,
 		    tems.ts_p_dimension.height,
 		    tems.ts_p_dimension.width);
 
+		for (i = 0; i < VFNT_MAPS; i++) {
+			tems.ts_font.vf_map[i] =
+			    font_data->font->vf_map[i];
+			tems.ts_font.vf_map_count[i] =
+			    font_data->font->vf_map_count[i];
+		}
+		tems.ts_font.vf_bytes = font_data->font->vf_bytes;
+		tems.ts_font.vf_width = font_data->font->vf_width;
+		tems.ts_font.vf_height = font_data->font->vf_height;
+
 		tems.ts_p_offset.y = (tems.ts_p_dimension.height -
-		    (tems.ts_c_dimension.height * tems.ts_font.height)) / 2;
+		    (tems.ts_c_dimension.height * tems.ts_font.vf_height)) / 2;
 		tems.ts_p_offset.x = (tems.ts_p_dimension.width -
-		    (tems.ts_c_dimension.width * tems.ts_font.width)) / 2;
+		    (tems.ts_c_dimension.width * tems.ts_font.vf_width)) / 2;
 
 		tems.ts_pix_data_size =
-		    tems.ts_font.width * tems.ts_font.height;
+		    tems.ts_font.vf_width * tems.ts_font.vf_height;
 
 		tems.ts_pix_data_size *= 4;
 
@@ -596,11 +608,8 @@ tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 	if (tems.ts_blank_line)
 		kmem_free(tems.ts_blank_line, old_blank_buf_size);
 
-	tems.ts_blank_line =
-	    kmem_alloc(tems.ts_c_dimension.width * sizeof (*tems.ts_blank_line),
-	    KM_SLEEP);
-	for (i = 0; i < tems.ts_c_dimension.width; i++)
-		tems.ts_blank_line[i] = ' ';
+	tems.ts_blank_line = kmem_alloc(tems.ts_c_dimension.width *
+	    sizeof (*tems.ts_blank_line), KM_SLEEP);
 }
 
 /*
@@ -765,9 +774,9 @@ tems_reset_colormap(cred_t *credp, enum called_from called_from)
 	case 8:
 		cm.index = 0;
 		cm.count = 16;
-		cm.red   = cmap4_to_24.red;   /* 8-bits (1/3 of TrueColor 24) */
-		cm.blue  = cmap4_to_24.blue;  /* 8-bits (1/3 of TrueColor 24) */
-		cm.green = cmap4_to_24.green; /* 8-bits (1/3 of TrueColor 24) */
+		cm.red   = (uint8_t *)cmap4_to_24.red;
+		cm.blue  = (uint8_t *)cmap4_to_24.blue;
+		cm.green = (uint8_t *)cmap4_to_24.green;
 		(void) ldi_ioctl(tems.ts_hdl, VIS_PUTCMAP, (intptr_t)&cm,
 		    FKIOCTL, credp, &rval);
 		break;
@@ -808,7 +817,7 @@ tem_prom_scroll_up(struct tem_vt_state *tem, int nrows, cred_t *credp,
 	int	ncols, width;
 
 	/* copy */
-	ma.s_row = nrows * tems.ts_font.height;
+	ma.s_row = nrows * tems.ts_font.vf_height;
 	ma.e_row = tems.ts_p_dimension.height - 1;
 	ma.t_row = 0;
 
@@ -819,7 +828,7 @@ tem_prom_scroll_up(struct tem_vt_state *tem, int nrows, cred_t *credp,
 	tems_safe_copy(&ma, credp, called_from);
 
 	/* clear */
-	width = tems.ts_font.width;
+	width = tems.ts_font.vf_width;
 	ncols = (tems.ts_p_dimension.width + (width - 1))/ width;
 
 	tem_safe_pix_cls_range(tem, 0, nrows, tems.ts_p_offset.y,
@@ -851,8 +860,8 @@ tem_adjust_row(struct tem_vt_state *tem, int prom_row, cred_t *credp,
 
 	tem_y = (prom_row + 1) * prom_charheight + prom_window_top -
 	    tems.ts_p_offset.y;
-	tem_row = (tem_y + tems.ts_font.height - 1) /
-	    tems.ts_font.height - 1;
+	tem_row = (tem_y + tems.ts_font.vf_height - 1) /
+	    tems.ts_font.vf_height - 1;
 
 	if (tem_row < 0) {
 		tem_row = 0;

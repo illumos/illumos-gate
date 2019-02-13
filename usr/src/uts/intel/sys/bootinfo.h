@@ -62,7 +62,8 @@ typedef enum boot_module_type {
 	BMT_ROOTFS,
 	BMT_FILE,
 	BMT_HASH,
-	BMT_ENV
+	BMT_ENV,
+	BMT_FONT
 } boot_module_type_t;
 
 struct boot_memlist {

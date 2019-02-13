@@ -25,9 +25,9 @@
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 
 #include <stdlib.h>
@@ -633,10 +633,7 @@ int	signo;
  * that are not needed any more.
  */
 static void
-pcsync_close(p0, p1, pid, fd)
-int	*p0;
-int	*p1;
-int	pid;
+pcsync_close(int *p0, int *p1, int pid, int fd)
 {
 	char	ch;
 

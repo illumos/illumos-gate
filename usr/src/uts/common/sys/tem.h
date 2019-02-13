@@ -42,7 +42,7 @@ typedef void (*tem_modechg_cb_t) (tem_modechg_cb_arg_t arg);
 
 typedef	struct __tem_vt_state *tem_vt_state_t;
 
-int	tem_initialized(tem_vt_state_t);
+boolean_t tem_initialized(tem_vt_state_t);
 
 tem_vt_state_t tem_init(cred_t *);
 
