@@ -1,18 +1,13 @@
 The bhyve kernel module and its associated userland consumers have been updated
 to the latest upstream FreeBSD sources as of:
 
-commit f81459bd8363602ed5e436f10288320419e80ccf
-Author: andrew <andrew@FreeBSD.org>
-Date:   Thu Sep 27 11:16:19 2018 +0000
 
-    Handle a guest executing a vm instruction by trapping and raising an
-    undefined instruction exception. Previously we would exit the guest,
-    however an unprivileged user could execute these.
+commit 6b1bb0edb4792cc3d4e6b71c4a80e99438081d5d
+Author: imp <imp@FreeBSD.org>
+Date:   Tue Feb 12 19:05:09 2019 +0000
 
-    Found with:     syzkaller
-    Reviewed by:    araujo, tychon (previous version)
-    Approved by:    re (kib)
-    MFC after:      1 week
-    Differential Revision:  https://reviews.freebsd.org/D17192
+    Revert r343077 until the license issues surrounding it can be resolved.
 
-Which corresponds to SVN revision: 338957
+    Approved by:    core@
+
+Which corresponds to SVN revision: 344057

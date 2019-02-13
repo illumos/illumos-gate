@@ -104,7 +104,7 @@ __FBSDID("$FreeBSD$");
 	 PROCBASED_NMI_WINDOW_EXITING)
 
 #ifdef __FreeBSD__
-#define	PROCBASED_CTLS_ONE_SETTING 					\
+#define	PROCBASED_CTLS_ONE_SETTING					\
 	(PROCBASED_SECONDARY_CONTROLS	|				\
 	 PROCBASED_MWAIT_EXITING	|				\
 	 PROCBASED_MONITOR_EXITING	|				\
@@ -471,7 +471,7 @@ vmx_allow_x2apic_msrs(struct vmx *vmx)
 
 	for (i = 0; i < 8; i++)
 		error += guest_msr_ro(vmx, MSR_APIC_TMR0 + i);
-	
+
 	for (i = 0; i < 8; i++)
 		error += guest_msr_ro(vmx, MSR_APIC_IRR0 + i);
 
@@ -631,6 +631,7 @@ vmx_disable(void *arg __unused)
 static int
 vmx_cleanup(void)
 {
+
 	if (pirvec >= 0)
 		lapic_ipi_free(pirvec);
 
@@ -902,7 +903,8 @@ vmx_init(int ipinum)
 	}
 
 #ifdef __FreeBSD__
-	guest_l1d_flush = (cpu_ia32_arch_caps & IA32_ARCH_CAP_RDCL_NO) == 0;
+	guest_l1d_flush = (cpu_ia32_arch_caps &
+	    IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY) == 0;
 	TUNABLE_INT_FETCH("hw.vmm.l1d_flush", &guest_l1d_flush);
 
 	/*
@@ -1231,7 +1233,7 @@ vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
 {
 #ifdef __FreeBSD__
 	int handled, func;
-	
+
 	func = vmxctx->guest_rax;
 #else
 	int handled;
@@ -3229,6 +3231,10 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 	struct vm_exit *vmexit;
 	struct vlapic *vlapic;
 	uint32_t exit_reason;
+#ifdef __FreeBSD__
+	struct region_descriptor gdtr, idtr;
+	uint16_t ldt_sel;
+#endif
 
 	vmx = arg;
 	vm = vmx->vm;
@@ -3358,17 +3364,56 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		 * re-VMLAUNCH as opposed to VMRESUME.
 		 */
 		launched = (vmx->vmcs_state[vcpu] & VS_LAUNCHED) != 0;
+		/*
+		 * Restoration of the GDT limit is taken care of by
+		 * vmx_savectx().  Since the maximum practical index for the
+		 * IDT is 255, restoring its limits from the post-VMX-exit
+		 * default of 0xffff is not a concern.
+		 *
+		 * Only 64-bit hypervisor callers are allowed, which forgoes
+		 * the need to restore any LDT descriptor.  Toss an error to
+		 * anyone attempting to break that rule.
+		 */
+		if (curproc->p_model != DATAMODEL_LP64) {
+			ht_release();
+			enable_intr();
+			bzero(vmexit, sizeof (*vmexit));
+			vmexit->rip = rip;
+			vmexit->exitcode = VM_EXITCODE_VMX;
+			vmexit->u.vmx.status = VM_FAIL_INVALID;
+			handled = UNHANDLED;
+			break;
+		}
+#else
+		/*
+		 * VM exits restore the base address but not the
+		 * limits of GDTR and IDTR.  The VMCS only stores the
+		 * base address, so VM exits set the limits to 0xffff.
+		 * Save and restore the full GDTR and IDTR to restore
+		 * the limits.
+		 *
+		 * The VMCS does not save the LDTR at all, and VM
+		 * exits clear LDTR as if a NULL selector were loaded.
+		 * The userspace hypervisor probably doesn't use a
+		 * LDT, but save and restore it to be safe.
+		 */
+		sgdt(&gdtr);
+		sidt(&idtr);
+		ldt_sel = sldt();
 #endif
+
 		vmx_run_trace(vmx, vcpu);
 		vmx_dr_enter_guest(vmxctx);
 		rc = vmx_enter_guest(vmxctx, vmx, launched);
 		vmx_dr_leave_guest(vmxctx);
+
 #ifndef	__FreeBSD__
 		vmx->vmcs_state[vcpu] |= VS_LAUNCHED;
-#endif
-
-#ifndef __FreeBSD__
 		ht_release();
+#else
+		bare_lgdt(&gdtr);
+		lidt(&idtr);
+		lldt(ldt_sel);
 #endif
 
 		/* Collect some information for VM exit processing */
@@ -3522,7 +3567,7 @@ vmx_get_intr_shadow(struct vmx *vmx, int vcpu, int running, uint64_t *retval)
 	uint64_t gi;
 	int error;
 
-	error = vmcs_getreg(&vmx->vmcs[vcpu], running, 
+	error = vmcs_getreg(&vmx->vmcs[vcpu], running,
 	    VMCS_IDENT(VMCS_GUEST_INTERRUPTIBILITY), &gi);
 	*retval = (gi & HWINTR_BLOCKING) ? 1 : 0;
 	return (error);
@@ -3566,8 +3611,8 @@ vmx_shadow_reg(int reg)
 	switch (reg) {
 	case VM_REG_GUEST_CR0:
 		shreg = VMCS_CR0_SHADOW;
-                break;
-        case VM_REG_GUEST_CR4:
+		break;
+	case VM_REG_GUEST_CR4:
 		shreg = VMCS_CR4_SHADOW;
 		break;
 	default:
@@ -3638,7 +3683,7 @@ vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 		if (shadow > 0) {
 			/*
 			 * Store the unmodified value in the shadow
-			 */			
+			 */
 			error = vmcs_setreg(&vmx->vmcs[vcpu], running,
 				    VMCS_IDENT(shadow), val);
 		}
@@ -3821,7 +3866,7 @@ vmx_setcap(void *arg, int vcpu, int type, int val)
 		}
 	}
 
-        return (retval);
+	return (retval);
 }
 
 struct vlapic_vtx {
@@ -4174,7 +4219,7 @@ vmx_vlapic_init(void *arg, int vcpuid)
 	struct vmx *vmx;
 	struct vlapic *vlapic;
 	struct vlapic_vtx *vlapic_vtx;
-	
+
 	vmx = arg;
 
 	vlapic = malloc(sizeof(struct vlapic_vtx), M_VLAPIC, M_WAITOK | M_ZERO);

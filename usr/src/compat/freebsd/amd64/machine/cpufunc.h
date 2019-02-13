@@ -288,5 +288,24 @@ load_dr7(uint64_t dr7)
 	__asm __volatile("movq %0,%%dr7" : : "r" (dr7));
 }
 
+#ifdef _KERNEL
+/*
+ * Including the native sys/segments.h in userspace seriously conflicts with
+ * the FreeBSD compat/contrib headers.
+ */
+#include <sys/segments.h>
+
+static __inline void
+lldt(u_short sel)
+{
+	wr_ldtr(sel);
+}
+
+static __inline u_short
+sldt()
+{
+	return (rd_ldtr());
+}
+#endif /* _KERNEL */
 
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_CPUFUNC_H_ */

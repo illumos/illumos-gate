@@ -2640,7 +2640,11 @@ pci_xhci_parse_opts(struct pci_xhci_softc *sc, char *opts)
 	struct pci_xhci_dev_emu	*dev;
 	struct usb_devemu	*ue;
 	void	*devsc;
+#ifdef __FreeBSD__
 	char	*uopt, *xopts, *config;
+#else
+	char	*uopt = NULL, *xopts, *config;
+#endif
 	int	usb3_port, usb2_port, i;
 
 	usb3_port = sc->usb3_port_start - 1;
@@ -2717,6 +2721,10 @@ pci_xhci_parse_opts(struct pci_xhci_softc *sc, char *opts)
 
 		sc->ndevices++;
 	}
+#ifdef __FreeBSD__
+	if (uopt != NULL)
+		free(uopt);
+#endif
 
 portsfinal:
 	sc->portregs = calloc(XHCI_MAX_DEVS, sizeof(struct pci_xhci_portregs));
@@ -2746,6 +2754,7 @@ done:
 			free(devices);
 		}
 	}
+	free(uopt);
 	return (sc->ndevices);
 }
 

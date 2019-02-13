@@ -47,6 +47,9 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/iodev.h>
 
+#ifndef WITHOUT_CAPSICUM
+#include <capsicum_helpers.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

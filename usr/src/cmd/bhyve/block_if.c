@@ -51,6 +51,9 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include <assert.h>
+#ifndef WITHOUT_CAPSICUM
+#include <capsicum_helpers.h>
+#endif
 #include <err.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -459,8 +462,10 @@ blockif_open(const char *optstr, const char *ident)
 	char tname[MAXCOMLEN + 1];
 #ifdef	__FreeBSD__
 	char name[MAXPATHLEN];
-#endif
 	char *nopt, *xopts, *cp;
+#else
+	char *nopt, *xopts, *cp = NULL;
+#endif
 	struct blockif_ctxt *bc;
 	struct stat sbuf;
 #ifdef	__FreeBSD__
@@ -538,7 +543,7 @@ blockif_open(const char *optstr, const char *ident)
 	if (ro)
 		cap_rights_clear(&rights, CAP_FSYNC, CAP_WRITE);
 
-	if (cap_rights_limit(fd, &rights) == -1 && errno != ENOSYS)
+	if (caph_rights_limit(fd, &rights) == -1)
 		errx(EX_OSERR, "Unable to apply rights for sandbox");
 #endif
 
@@ -628,7 +633,7 @@ blockif_open(const char *optstr, const char *ident)
 #endif
 
 #ifndef WITHOUT_CAPSICUM
-	if (cap_ioctls_limit(fd, cmds, nitems(cmds)) == -1 && errno != ENOSYS)
+	if (caph_ioctls_limit(fd, cmds, nitems(cmds)) == -1)
 		errx(EX_OSERR, "Unable to apply rights for sandbox");
 #endif
 
@@ -700,6 +705,13 @@ blockif_open(const char *optstr, const char *ident)
 err:
 	if (fd >= 0)
 		close(fd);
+#ifdef __FreeBSD__
+	free(cp);
+	free(xopts);
+	free(nopt);
+#else
+	free(nopt);
+#endif
 	return (NULL);
 }
 

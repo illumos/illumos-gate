@@ -1965,6 +1965,7 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 	struct vm *vm;
 	uint64_t vmcb_pa;
 	int handled;
+	uint16_t ldt_sel;
 
 	svm_sc = arg;
 	vm = svm_sc->vm;
@@ -2049,6 +2050,15 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			break;
 		}
 
+		/*
+		 * #VMEXIT resumes the host with the guest LDTR, so
+		 * save the current LDT selector so it can be restored
+		 * after an exit.  The userspace hypervisor probably
+		 * doesn't use a LDT, but save and restore it to be
+		 * safe.
+		 */
+		ldt_sel = sldt();
+
 		svm_inj_interrupts(svm_sc, vcpu, vlapic);
 
 		/* Activate the nested pmap on 'curcpu' */
@@ -2082,6 +2092,9 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		 * to be restored explicitly.
 		 */
 		restore_host_tss();
+
+		/* Restore host LDTR. */
+		lldt(ldt_sel);
 
 		/* #VMEXIT disables interrupts so re-enable them here. */ 
 		enable_gintr();
