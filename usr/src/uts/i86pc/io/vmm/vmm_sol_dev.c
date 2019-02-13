@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2015 Pluribus Networks Inc.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -69,6 +69,7 @@ static sdev_plugin_hdl_t vmmdev_sdev_hdl;
 
 static kmutex_t		vmm_mtx;
 static list_t		vmm_list;
+static list_t		vmm_destroy_list;
 static id_space_t	*vmm_minors;
 static void		*vmm_statep;
 
@@ -1504,6 +1505,7 @@ vmm_do_vm_destroy_locked(vmm_softc_t *sc, boolean_t clean_zsd)
 	minor = sc->vmm_minor;
 	zone_rele(sc->vmm_zone);
 	if (sc->vmm_is_open) {
+		list_insert_tail(&vmm_destroy_list, sc);
 		sc->vmm_flags |= VMM_DESTROY;
 	} else {
 		vm_destroy(sc->vmm_vm);
@@ -1610,6 +1612,7 @@ vmm_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	sc->vmm_is_open = B_FALSE;
 
 	if (sc->vmm_flags & VMM_DESTROY) {
+		list_remove(&vmm_destroy_list, sc);
 		vm_destroy(sc->vmm_vm);
 		ddi_soft_state_free(vmm_statep, minor);
 		id_free(vmm_minors, minor);
@@ -1920,7 +1923,7 @@ vmm_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	mutex_enter(&vmm_mtx);
-	if (!list_is_empty(&vmm_list)) {
+	if (!list_is_empty(&vmm_list) || !list_is_empty(&vmm_destroy_list)) {
 		mutex_exit(&vmm_mtx);
 		mutex_exit(&vmmdev_mtx);
 		return (DDI_FAILURE);
@@ -2002,6 +2005,8 @@ _init(void)
 	mutex_init(&vmmdev_mtx, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vmm_mtx, NULL, MUTEX_DRIVER, NULL);
 	list_create(&vmm_list, sizeof (vmm_softc_t),
+	    offsetof(vmm_softc_t, vmm_node));
+	list_create(&vmm_destroy_list, sizeof (vmm_softc_t),
 	    offsetof(vmm_softc_t, vmm_node));
 	vmm_minors = id_space_create("vmm_minors", VMM_CTL_MINOR + 1, MAXMIN32);
 
