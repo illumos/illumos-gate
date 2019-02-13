@@ -1,0 +1,35 @@
+#
+# CDDL HEADER START
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri value=pkg:/system/bhyve/tests@$(PKGVERS)
+set name=pkg.description value="BSD hypervisor tests"
+set name=pkg.summary value="BSD hypervisor tests"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Virtualization
+set name=variant.arch value=i386
+dir path=opt/bhyvetest
+dir path=opt/bhyvetest/bin
+dir path=opt/bhyvetest/tst
+dir path=opt/bhyvetest/tst/mevent
+file path=opt/bhyvetest/bin/bhyvetest mode=0555
+file path=opt/bhyvetest/tst/mevent/lists.delete.exe mode=0555
+file path=opt/bhyvetest/tst/mevent/read.disable.exe mode=0555
+file path=opt/bhyvetest/tst/mevent/read.pause.exe mode=0555
+file path=opt/bhyvetest/tst/mevent/read.requeue.exe mode=0555
+license lic_CDDL license=lic_CDDL

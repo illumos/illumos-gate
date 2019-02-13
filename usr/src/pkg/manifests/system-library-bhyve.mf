@@ -1,0 +1,33 @@
+#
+# CDDL HEADER START
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
+
+set name=pkg.fmri value=pkg:/system/library/bhyve@$(PKGVERS)
+set name=pkg.description value="BSD hypervisor (libraries)"
+set name=pkg.summary value="BSD hypervisor (libraries)"
+set name=variant.arch value=i386
+dir path=lib group=bin
+dir path=lib/$(ARCH64) group=bin
+dir path=usr group=sys
+dir path=usr/lib group=bin
+dir path=usr/lib/$(ARCH64) group=bin
+file path=lib/$(ARCH64)/libvmm.so.1
+file path=lib/$(ARCH64)/libvmmapi.so.1
+file path=usr/lib/$(ARCH64)/libppt.so.1
+file path=usr/lib/libppt.so.1
+license lic_CDDL license=lic_CDDL

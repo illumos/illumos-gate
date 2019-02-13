@@ -15,6 +15,7 @@
 
 #
 # Copyright 2018 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -30,31 +31,27 @@ set name=info.classification \
     value=org.opensolaris.category.2008:System/Virtualization
 set name=variant.arch value=i386
 dir path=kernel group=sys
-dir path=lib group=bin
-dir path=lib/$(ARCH64) group=bin
 dir path=usr group=sys
 dir path=usr/kernel/drv group=sys
 dir path=usr/kernel/drv/$(ARCH64) group=sys
-dir path=usr/lib group=bin
+dir path=usr/sbin
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man1m
-dir path=usr/sbin
 driver name=ppt
 driver name=viona
 driver name=vmm
-file path=lib/$(ARCH64)/libvmmapi.so.1
-link path=lib/$(ARCH64)/libvmmapi.so target=./libvmmapi.so.1
 file path=usr/kernel/drv/$(ARCH64)/ppt
 file path=usr/kernel/drv/$(ARCH64)/viona
 file path=usr/kernel/drv/$(ARCH64)/vmm
 file path=usr/kernel/drv/ppt.conf
 file path=usr/kernel/drv/viona.conf
 file path=usr/kernel/drv/vmm.conf
-file path=usr/lib/libppt.so.1
-file path=usr/lib/$(ARCH64)/libppt.so.1
 file path=usr/sbin/bhyve mode=0555
 file path=usr/sbin/bhyvectl mode=0555
 file path=usr/sbin/pptadm mode=0555
 file path=usr/share/man/man1m/pptadm.1m
 license lic_CDDL license=lic_CDDL
+depend fmri=developer/acpi type=require
+depend fmri=system/bhyve/firmware type=require
+depend fmri=system/library/bhyve type=require
