@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 PROMSRCS += \
@@ -66,6 +66,7 @@ KMDBLIBS = $(STANDLIBS) ../mdb_ks/kmod/mdb_ks
 MAPFILE_SOURCES = \
 	$(MAPFILE_SOURCES_COMMON) \
 	../../kmdb/kmdb_dpi_isadep.h \
+	../../mdb/mdb_x86util.h \
 	$(MAPFILE_SOURCES_$(MACH))
 
 %.o: ../../../../../uts/intel/promif/%.c

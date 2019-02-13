@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -64,6 +64,7 @@
 #include <mdb/mdb_isautil.h>
 #include <mdb/mdb_amd64util.h>
 #include <mdb/mdb_ia32util.h>
+#include <mdb/mdb_x86util.h>
 #include <mdb/mdb.h>
 
 #include <sys/controlregs.h>
@@ -76,11 +77,6 @@
 #include <libvmm.h>
 
 #define	MDB_DEF_PROMPT	"[%<_cpuid>]> "
-
-#define	MMU_PAGESHIFT	12
-#define	MMU_PAGESIZE	(1 << MMU_PAGESHIFT)
-#define	MMU_PAGEOFFSET	(MMU_PAGESIZE - 1)
-#define	MMU_PAGEMASK	(~MMU_PAGEOFFSET)
 
 typedef struct bhyve_data {
 	vmm_t *bd_vmm;
@@ -480,75 +476,6 @@ bhyve_status_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-static void
-bhyve_print_desc(const char *name, const vmm_desc_t *desc, int width)
-{
-	const char *type;
-	const mdb_bitmask_t *bits;
-
-	static const mdb_bitmask_t mem_desc_flag_bits[] = {
-		{ "P",		0x80,	0x80 },
-		{ "16b",	0x6000, 0x0 },
-		{ "32b",	0x6000, 0x4000 },
-		{ "64b",	0x6000,	0x2000 },
-		{ "G",		0x8000,	0x8000 },
-		{ "A",		0x1,	0x1 },
-		{ NULL,		0,	0 },
-	};
-
-	static const char *mem_desc_types[] = {
-		"data, up, read-only",
-		"data, up, read-write",
-		"data, down, read-only",
-		"data, down, read-write",
-		"code, non-conforming, execute-only",
-		"code, non-conforming, execute-read",
-		"code, conforming, execute-only",
-		"code, conforming, execute-read"
-	};
-
-	static const mdb_bitmask_t sys_desc_flag_bits[] = {
-		{ "P",		0x80,	0x80 },
-		{ "16b",	0x6000, 0x0 },
-		{ "32b",	0x6000, 0x4000 },
-		{ "64b",	0x6000,	0x2000 },
-		{ "G",		0x8000,	0x8000 },
-		{ NULL,		0,	0 },
-	};
-
-	static const char *sys_desc_types[] = {
-		"reserved",
-		"16b TSS, available",
-		"LDT",
-		"16b TSS, busy",
-		"16b call gate",
-		"task gate",
-		"16b interrupt gate",
-		"16b trap gate",
-		"reserved",
-		"32b/64b TSS, available",
-		"reserved",
-		"32b/64b TSS, busy",
-		"32b/64b call gate",
-		"reserved",
-		"32b/64b interrupt gate"
-		"32b/64b trap gate",
-	};
-
-	if (desc->vd_acc & 0x10) {
-		type = mem_desc_types[(desc->vd_acc >> 1) & 7];
-		bits = mem_desc_flag_bits;
-	} else {
-		type = sys_desc_types[desc->vd_acc & 0xf];
-		bits = sys_desc_flag_bits;
-	}
-
-	mdb_printf("%%%s = 0x%0*p/0x%0*x 0x%05x "
-	    "<%susable, %s, dpl %d, flags: %b>\n",
-	    name, width, desc->vd_base, width / 2, desc->vd_lim, desc->vd_acc,
-	    (desc->vd_acc >> 16) & 1 ? "un" : "", type,
-	    (desc->vd_acc >> 5) & 3, desc->vd_acc, bits);
-}
 
 static int
 bhyve_sysregs_dcmd(uintptr_t addr, uint_t flags, int argc,
@@ -557,19 +484,12 @@ bhyve_sysregs_dcmd(uintptr_t addr, uint_t flags, int argc,
 	bhyve_data_t *bd = mdb.m_target->t_data;
 	uint64_t cpu = bd->bd_curcpu;
 	int ret = DCMD_ERR;
-	vmm_desc_t gdtr, ldtr, idtr, tr, cs, ds, es, fs, gs, ss;
-	uint64_t *regvals;
+	struct sysregs sregs;
 	int i;
-	int width = sizeof (uint64_t) * 2;
-
-	if (vmm_vcpu_mode(bd->bd_vmm, cpu) != VMM_MODE_LONG)
-		width /= 2;
 
 	/*
-	 * This array must use the order of definitions set in libvmm.h
-	 * to make GETREG() work.
+	 * This array must use the order of the elements of struct sysregs.
 	 */
-#define	GETREG(r)	(regvals[r - VMM_REG_OFFSET])
 	static const int regnums[] = {
 		VMM_REG_CR0,
 		VMM_REG_CR2,
@@ -588,64 +508,6 @@ bhyve_sysregs_dcmd(uintptr_t addr, uint_t flags, int argc,
 		VMM_REG_PDPTE3,
 		VMM_REG_INTR_SHADOW
 	};
-
-	static const mdb_bitmask_t efer_flag_bits[] = {
-		{ "SCE",	AMD_EFER_SCE,	AMD_EFER_SCE },
-		{ "LME",	AMD_EFER_LME,	AMD_EFER_LME },
-		{ "LMA",	AMD_EFER_LMA,	AMD_EFER_LMA },
-		{ "NXE",	AMD_EFER_NXE,	AMD_EFER_NXE },
-		{ "SVME",	AMD_EFER_SVME,	AMD_EFER_SVME },
-		{ "LMSLE",	AMD_EFER_LMSLE,	AMD_EFER_LMSLE },
-		{ "FFXSR",	AMD_EFER_FFXSR,	AMD_EFER_FFXSR },
-		{ "TCE",	AMD_EFER_TCE,	AMD_EFER_TCE },
-		{ NULL,		0,		0 }
-	};
-
-	static const mdb_bitmask_t cr0_flag_bits[] = {
-		{ "PE",		CR0_PE,		CR0_PE },
-		{ "MP",		CR0_MP,		CR0_MP },
-		{ "EM",		CR0_EM,		CR0_EM },
-		{ "TS",		CR0_TS,		CR0_TS },
-		{ "ET",		CR0_ET,		CR0_ET },
-		{ "NE",		CR0_NE,		CR0_NE },
-		{ "WP",		CR0_WP,		CR0_WP },
-		{ "AM",		CR0_AM,		CR0_AM },
-		{ "NW",		CR0_NW,		CR0_NW },
-		{ "CD",		CR0_CD,		CR0_CD },
-		{ "PG",		CR0_PG,		CR0_PG },
-		{ NULL,		0,		0 }
-	};
-
-	static const mdb_bitmask_t cr3_flag_bits[] = {
-		{ "PCD",	CR3_PCD,	CR3_PCD },
-		{ "PWT",	CR3_PWT,	CR3_PWT },
-		{ NULL,		0,		0, }
-	};
-
-	static const mdb_bitmask_t cr4_flag_bits[] = {
-		{ "VME",	CR4_VME,	CR4_VME },
-		{ "PVI",	CR4_PVI,	CR4_PVI },
-		{ "TSD",	CR4_TSD,	CR4_TSD },
-		{ "DE",		CR4_DE,		CR4_DE },
-		{ "PSE",	CR4_PSE,	CR4_PSE },
-		{ "PAE",	CR4_PAE,	CR4_PAE },
-		{ "MCE",	CR4_MCE,	CR4_MCE },
-		{ "PGE",	CR4_PGE,	CR4_PGE },
-		{ "PCE",	CR4_PCE,	CR4_PCE },
-		{ "OSFXSR",	CR4_OSFXSR,	CR4_OSFXSR },
-		{ "OSXMMEXCPT",	CR4_OSXMMEXCPT,	CR4_OSXMMEXCPT },
-		{ "UMIP",	CR4_UMIP,	CR4_UMIP },
-		{ "VMXE",	CR4_VMXE,	CR4_VMXE },
-		{ "SMXE",	CR4_SMXE,	CR4_SMXE },
-		{ "FSGSBASE",	CR4_FSGSBASE,	CR4_FSGSBASE },
-		{ "PCIDE",	CR4_PCIDE,	CR4_PCIDE },
-		{ "OSXSAVE",	CR4_OSXSAVE,	CR4_OSXSAVE },
-		{ "SMEP",	CR4_SMEP,	CR4_SMEP },
-		{ "SMAP",	CR4_SMAP,	CR4_SMAP },
-		{ "PKE",	CR4_PKE,	CR4_PKE },
-		{ NULL,		0,		0 }
-	};
-
 
 	if (flags & DCMD_ADDRSPEC) {
 		if (argc != 0)
@@ -667,66 +529,40 @@ bhyve_sysregs_dcmd(uintptr_t addr, uint_t flags, int argc,
 		return (DCMD_ERR);
 	}
 
-	regvals = mdb_zalloc(ARRAY_SIZE(regnums) * sizeof (uint64_t), UM_SLEEP);
-
 	if (vmm_get_regset(bd->bd_vmm, cpu, ARRAY_SIZE(regnums), regnums,
-	    regvals) != 0)
+	    (uint64_t *)&sregs) != 0)
 		goto fail;
 
-	if (vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_GDTR, &gdtr) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_IDTR, &idtr) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_LDTR, &ldtr) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_TR, &tr) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_CS, &cs) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_DS, &ds) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_ES, &es) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_FS, &fs) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_GS, &gs) != 0 ||
-	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_SS, &ss) != 0)
+	if (vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_GDTR,
+	    (vmm_desc_t *)&sregs.sr_gdtr) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_IDTR,
+	    (vmm_desc_t *)&sregs.sr_idtr) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_LDTR,
+	    (vmm_desc_t *)&sregs.sr_ldtr) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_TR,
+	    (vmm_desc_t *)&sregs.sr_tr) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_CS,
+	    (vmm_desc_t *)&sregs.sr_cs) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_DS,
+	    (vmm_desc_t *)&sregs.sr_ds) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_ES,
+	    (vmm_desc_t *)&sregs.sr_es) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_FS,
+	    (vmm_desc_t *)&sregs.sr_fs) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_GS,
+	    (vmm_desc_t *)&sregs.sr_gs) != 0 ||
+	    vmm_get_desc(bd->bd_vmm, cpu, VMM_DESC_SS,
+	    (vmm_desc_t *)&sregs.sr_ss) != 0)
 		goto fail;
 
-	mdb_printf("%%efer = 0x%0lx <%b>\n",
-	    GETREG(VMM_REG_EFER), GETREG(VMM_REG_EFER), efer_flag_bits);
-	mdb_printf("%%cr0 = 0x%0lx <%b>\n",
-	    GETREG(VMM_REG_CR0), GETREG(VMM_REG_CR0), cr0_flag_bits);
-	mdb_printf("%%cr2 = 0x%0*p %A\n", width,
-	    GETREG(VMM_REG_CR2), GETREG(VMM_REG_CR2));
-	mdb_printf("%%cr3 = 0x%0lx <pfn:0x%lx ",
-	    GETREG(VMM_REG_CR3), GETREG(VMM_REG_CR3) >> MMU_PAGESHIFT);
-	if (GETREG(VMM_REG_CR4) & CR4_PCIDE)
-		mdb_printf("pcid:%lu>\n", GETREG(VMM_REG_CR3) & MMU_PAGEOFFSET);
-	else
-		mdb_printf("flags:%b>\n", GETREG(VMM_REG_CR3), cr3_flag_bits);
-	mdb_printf("%%cr4 = 0x%0lx <%b>\n\n",
-	    GETREG(VMM_REG_CR4), GETREG(VMM_REG_CR4), cr4_flag_bits);
+	mdb_x86_print_sysregs(&sregs, vmm_vcpu_mode(bd->bd_vmm, cpu) ==
+	    VMM_MODE_LONG);
 
-	mdb_printf("%%pdpte0 = 0x%0?p\t%%pdpte2 = 0x%0?p\n",
-	    GETREG(VMM_REG_PDPTE0), GETREG(VMM_REG_PDPTE2));
-	mdb_printf("%%pdpte1 = 0x%0?p\t%%pdpte3 = 0x%0?p\n\n",
-	    GETREG(VMM_REG_PDPTE1), GETREG(VMM_REG_PDPTE3));
-
-	mdb_printf("%%gdtr = 0x%0*x/0x%hx\n",
-	    width, gdtr.vd_base, gdtr.vd_lim);
-	mdb_printf("%%idtr = 0x%0*x/0x%hx\n",
-	    width, idtr.vd_base, idtr.vd_lim);
-	bhyve_print_desc("ldtr", &ldtr, width);
-	bhyve_print_desc("tr  ", &tr, width);
-	bhyve_print_desc("cs  ", &cs, width);
-	bhyve_print_desc("ss  ", &ss, width);
-	bhyve_print_desc("ds  ", &ds, width);
-	bhyve_print_desc("es  ", &es, width);
-	bhyve_print_desc("fs  ", &fs, width);
-	bhyve_print_desc("gs  ", &gs, width);
-
-	mdb_printf("%%intr_shadow = 0x%lx\n\n",
-	    GETREG(VMM_REG_INTR_SHADOW));
-#undef GETREG
 	ret = DCMD_OK;
 
 fail:
 	if (ret != DCMD_OK)
 		mdb_warn("failed to get system registers for CPU %d\n", cpu);
-	mdb_free(regvals, ARRAY_SIZE(regnums) * sizeof (uint64_t));
 	return (ret);
 }
 
@@ -892,13 +728,13 @@ static int
 bhyve_seg2reg(const char *seg)
 {
 	if (strcasecmp(seg, "cs") == 0)
-		return(VMM_DESC_CS);
+		return (VMM_DESC_CS);
 	else if (strcasecmp(seg, "ds") == 0)
-		return(VMM_DESC_DS);
+		return (VMM_DESC_DS);
 	else if (strcasecmp(seg, "es") == 0)
-		return(VMM_DESC_ES);
+		return (VMM_DESC_ES);
 	else if (strcasecmp(seg, "fs") == 0)
-		return(VMM_DESC_FS);
+		return (VMM_DESC_FS);
 	else if (strcasecmp(seg, "gs") == 0)
 		return (VMM_DESC_GS);
 	else if (strcasecmp(seg, "ss") == 0)
@@ -1058,7 +894,7 @@ bhyve_setflags(mdb_tgt_t *tgt, int flags)
 		boolean_t writable = (flags & MDB_TGT_F_RDWR) != 0;
 
 		vmm_unmap(bd->bd_vmm);
-		if (vmm_map(bd->bd_vmm, writable)!= 0) {
+		if (vmm_map(bd->bd_vmm, writable) != 0) {
 			mdb_warn("failed to map guest memory");
 			return (set_errno(EMDB_TGT));
 		}

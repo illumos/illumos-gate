@@ -20,11 +20,12 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_x86util.h>
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
 #include <sys/traptrace.h>
@@ -963,73 +964,24 @@ x86_featureset_dcmd(uintptr_t addr, uint_t flags, int argc,
 static int
 sysregs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	ulong_t cr0, cr2, cr3, cr4;
+	struct sysregs sregs = { 0 };
 	desctbr_t gdtr;
+	boolean_t longmode = B_FALSE;
 
-	static const mdb_bitmask_t cr0_flag_bits[] = {
-		{ "PE",		CR0_PE,		CR0_PE },
-		{ "MP",		CR0_MP,		CR0_MP },
-		{ "EM",		CR0_EM,		CR0_EM },
-		{ "TS",		CR0_TS,		CR0_TS },
-		{ "ET",		CR0_ET,		CR0_ET },
-		{ "NE",		CR0_NE,		CR0_NE },
-		{ "WP",		CR0_WP,		CR0_WP },
-		{ "AM",		CR0_AM,		CR0_AM },
-		{ "NW",		CR0_NW,		CR0_NW },
-		{ "CD",		CR0_CD,		CR0_CD },
-		{ "PG",		CR0_PG,		CR0_PG },
-		{ NULL,		0,		0 }
-	};
+#ifdef __amd64
+	longmode = B_TRUE;
+#endif
 
-	static const mdb_bitmask_t cr3_flag_bits[] = {
-		{ "PCD",	CR3_PCD,	CR3_PCD },
-		{ "PWT",	CR3_PWT,	CR3_PWT },
-		{ NULL,		0,		0, }
-	};
-
-	static const mdb_bitmask_t cr4_flag_bits[] = {
-		{ "VME",	CR4_VME,	CR4_VME },
-		{ "PVI",	CR4_PVI,	CR4_PVI },
-		{ "TSD",	CR4_TSD,	CR4_TSD },
-		{ "DE",		CR4_DE,		CR4_DE },
-		{ "PSE",	CR4_PSE,	CR4_PSE },
-		{ "PAE",	CR4_PAE,	CR4_PAE },
-		{ "MCE",	CR4_MCE,	CR4_MCE },
-		{ "PGE",	CR4_PGE,	CR4_PGE },
-		{ "PCE",	CR4_PCE,	CR4_PCE },
-		{ "OSFXSR",	CR4_OSFXSR,	CR4_OSFXSR },
-		{ "OSXMMEXCPT",	CR4_OSXMMEXCPT,	CR4_OSXMMEXCPT },
-		{ "VMXE",	CR4_VMXE,	CR4_VMXE },
-		{ "SMXE",	CR4_SMXE,	CR4_SMXE },
-		{ "PCIDE",	CR4_PCIDE,	CR4_PCIDE },
-		{ "OSXSAVE",	CR4_OSXSAVE,	CR4_OSXSAVE },
-		{ "SMEP",	CR4_SMEP,	CR4_SMEP },
-		{ "SMAP",	CR4_SMAP,	CR4_SMAP },
-		{ NULL,		0,		0 }
-	};
-
-	cr0 = kmdb_unix_getcr0();
-	cr2 = kmdb_unix_getcr2();
-	cr3 = kmdb_unix_getcr3();
-	cr4 = kmdb_unix_getcr4();
+	sregs.sr_cr0 = kmdb_unix_getcr0();
+	sregs.sr_cr2 = kmdb_unix_getcr2();
+	sregs.sr_cr3 = kmdb_unix_getcr3();
+	sregs.sr_cr4 = kmdb_unix_getcr4();
 
 	kmdb_unix_getgdtr(&gdtr);
+	sregs.sr_gdtr.d_base = gdtr.dtr_base;
+	sregs.sr_gdtr.d_lim = gdtr.dtr_limit;
 
-	mdb_printf("%%cr0 = 0x%lx <%b>\n", cr0, cr0, cr0_flag_bits);
-	mdb_printf("%%cr2 = 0x%lx <%a>\n", cr2, cr2);
-
-	if ((cr4 & CR4_PCIDE)) {
-		mdb_printf("%%cr3 = 0x%lx <pfn:0x%lx pcid:%lu>\n", cr3,
-		    cr3 >> MMU_PAGESHIFT, cr3 & MMU_PAGEOFFSET);
-	} else {
-		mdb_printf("%%cr3 = 0x%lx <pfn:0x%lx flags:%b>\n", cr3,
-		    cr3 >> MMU_PAGESHIFT, cr3, cr3_flag_bits);
-	}
-
-	mdb_printf("%%cr4 = 0x%lx <%b>\n", cr4, cr4, cr4_flag_bits);
-
-	mdb_printf("%%gdtr.base = 0x%lx, %%gdtr.limit = 0x%hx\n",
-	    gdtr.dtr_base, gdtr.dtr_limit);
+	mdb_x86_print_sysregs(&sregs, longmode);
 
 	return (DCMD_OK);
 }

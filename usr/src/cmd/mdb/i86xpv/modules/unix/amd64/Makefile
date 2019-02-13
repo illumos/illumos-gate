@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 
 MODULE = unix.so
 MDBTGT = kvm
@@ -40,6 +40,7 @@ MODSRCS_DIR = ../../../../i86pc/modules/unix/
 
 CPPFLAGS += -DMP -D_MACHDEP -D__xpv
 CPPFLAGS += -I../../../../common
+CPPFLAGS += -I../../../../intel
 CPPFLAGS += -I$(SRC)/uts/common
 CPPFLAGS += -I$(SRC)/uts/i86xpv
 CPPFLAGS += -I$(SRC)/uts/i86pc
