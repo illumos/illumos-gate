@@ -221,7 +221,7 @@ static cmdfunc_t do_add_bridge, do_remove_bridge, do_show_bridge;
 static cmdfunc_t do_create_iptun, do_modify_iptun, do_delete_iptun;
 static cmdfunc_t do_show_iptun, do_up_iptun, do_down_iptun;
 
-static void 	do_up_vnic_common(int, char **, const char *, boolean_t);
+static void	do_up_vnic_common(int, char **, const char *, boolean_t);
 
 static int show_part(dladm_handle_t, datalink_id_t, void *);
 
@@ -317,9 +317,9 @@ static cmd_t	cmds[] = {
 	    "    show-secobj      [-pP] [-o <field>,...] [<secobj>,...]\n" },
 	{ "init-linkprop",	do_init_linkprop,	NULL		},
 	{ "init-secobj",	do_init_secobj,		NULL		},
-	{ "create-vlan", 	do_create_vlan,
+	{ "create-vlan",	do_create_vlan,
 	    "    create-vlan      [-ft] -l <link> -v <vid> [link]"	},
-	{ "delete-vlan", 	do_delete_vlan,
+	{ "delete-vlan",	do_delete_vlan,
 	    "    delete-vlan      [-t] <link>"				},
 	{ "show-vlan",		do_show_vlan,
 	    "    show-vlan        [-pP] [-o <field>,..] [<link>]\n"	},
@@ -619,7 +619,7 @@ static const ofmt_field_t ether_fields[] = {
 { "REM_FAULT",	17,
 	offsetof(ether_fields_buf_t, eth_rem_fault), print_default_cb},
 {NULL,		0,
-	0, 	NULL}}
+	0,	NULL}}
 ;
 
 typedef struct print_ether_state {
@@ -651,8 +651,8 @@ static const ofmt_field_t link_s_fields[] = {
 { "IERRORS",	10,		LINK_S_IERRORS,	print_link_stats_cb},
 { "OPACKETS",	12,		LINK_S_OPKTS,	print_link_stats_cb},
 { "OBYTES",	12,		LINK_S_OBYTES,	print_link_stats_cb},
-{ "OERRORS",	8,		LINK_S_OERRORS,	print_link_stats_cb}}
-;
+{ "OERRORS",	8,		LINK_S_OERRORS,	print_link_stats_cb},
+{ NULL,		0,		0,		NULL}};
 
 typedef struct link_args_s {
 	char		*link_s_link;
@@ -712,7 +712,7 @@ typedef struct laggr_fields_buf_s {
 
 typedef struct laggr_args_s {
 	int			laggr_lport; /* -1 indicates the aggr itself */
-	const char 		*laggr_link;
+	const char		*laggr_link;
 	dladm_aggr_grp_attr_t	*laggr_ginfop;
 	dladm_status_t		*laggr_status;
 	pktsum_t		*laggr_pktsumtot; /* -s only */
@@ -1534,7 +1534,7 @@ show_usage_time(dladm_usage_t *usage, void *arg)
 {
 	show_usage_state_t	*state = (show_usage_state_t *)arg;
 	char			buf[DLADM_STRSIZE];
-	usage_l_fields_buf_t 	ubuf;
+	usage_l_fields_buf_t	ubuf;
 	time_t			time;
 	double			bw;
 	dladm_status_t		status;
@@ -1723,7 +1723,7 @@ do_show_usage(int argc, char *argv[], const char *use)
 		die("show-usage requires a file");
 
 	if (optind == (argc-1)) {
-		uint32_t 	flags;
+		uint32_t	flags;
 
 		resource = argv[optind];
 		if (!state.us_showall &&
@@ -2988,7 +2988,7 @@ print_aggr_info(show_grp_state_t *state, const char *link,
 static boolean_t
 print_xaggr_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
-	const laggr_args_t 	*l = ofarg->ofmt_cbarg;
+	const laggr_args_t	*l = ofarg->ofmt_cbarg;
 	boolean_t		is_port = (l->laggr_lport >= 0);
 	char			tmpbuf[DLADM_STRSIZE];
 	const char		*objname;
@@ -3174,7 +3174,7 @@ static boolean_t
 print_aggr_stats_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
 	const laggr_args_t	*l = ofarg->ofmt_cbarg;
-	int 			portnum;
+	int			portnum;
 	boolean_t		is_port = (l->laggr_lport >= 0);
 	dladm_aggr_port_attr_t	*portp;
 	dladm_status_t		*stat, status;
@@ -3826,7 +3826,7 @@ print_phys_one_hwgrp_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	case PHYS_H_RINGS:
 		ringstr[0] = '\0';
 		for (i = 0; i < attr->hg_n_rings; i++) {
-			uint_t 	index = attr->hg_rings[i];
+			uint_t	index = attr->hg_rings[i];
 
 			if (start == -1) {
 				start = index;
@@ -4878,7 +4878,7 @@ do_up_vnic_common(int argc, char *argv[], const char *use, boolean_t vlan)
 {
 	datalink_id_t	linkid = DATALINK_ALL_LINKID;
 	dladm_status_t	status;
-	char 		*type;
+	char		*type;
 
 	type = vlan ? "vlan" : "vnic";
 
@@ -6551,7 +6551,7 @@ static boolean_t
 print_linkprop_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
 	linkprop_args_t		*arg = ofarg->ofmt_cbarg;
-	char 			*propname = arg->ls_propname;
+	char			*propname = arg->ls_propname;
 	show_linkprop_state_t	*statep = arg->ls_state;
 	char			*ptr = statep->ls_line;
 	char			*lim = ptr + MAX_PROP_LINE;
@@ -7609,9 +7609,9 @@ do_init_linkprop(int argc, char **argv, const char *use)
 static void
 do_show_ether(int argc, char **argv, const char *use)
 {
-	int 			option;
+	int			option;
 	datalink_id_t		linkid;
-	print_ether_state_t 	state;
+	print_ether_state_t	state;
 	char			*fields_str = NULL;
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
