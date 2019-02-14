@@ -13,7 +13,8 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2018 Joyent, Inc.
-#
+# Copyright 2019, Carlos Neira <cneirabustos@gmail.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 include		$(SRC)/Makefile.master
 
@@ -220,6 +221,7 @@ MANLINKS=					\
 		Pread_string.3proc		\
 		proc_arg_xgrab.3proc		\
 		proc_arg_xpsinfo.3proc		\
+		proc_dmodelname.3proc		\
 		proc_finistdio.3proc		\
 		proc_flushstdio.3proc		\
 		proc_free_priv.3proc		\
@@ -395,6 +397,7 @@ proc_str2content.3proc		:= LINKSRC = proc_content2str.3proc
 proc_flushstdio.3proc		:= LINKSRC = proc_initstdio.3proc
 proc_finistdio.3proc		:= LINKSRC = proc_initstdio.3proc
 
+proc_dmodelname.3proc		:= LINKSRC = proc_fltname.3proc
 proc_signame.3proc		:= LINKSRC = proc_fltname.3proc
 proc_sysname.3proc		:= LINKSRC = proc_fltname.3proc
 

@@ -11,6 +11,8 @@
 
 #
 # Copyright 2018 Joyent, Inc.
+# Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 file path=usr/share/man/man3proc/proc_service.3proc
@@ -229,6 +231,7 @@ link path=usr/share/man/man3proc/pr_stat64.3proc target=pr_stat.3proc
 link path=usr/share/man/man3proc/Pread_string.3proc target=Pread.3proc
 link path=usr/share/man/man3proc/proc_arg_xgrab.3proc target=proc_arg_grab.3proc
 link path=usr/share/man/man3proc/proc_arg_xpsinfo.3proc target=proc_arg_psinfo.3proc
+link path=usr/share/man/man3proc/proc_dmodelname.3proc target=proc_fltname.3proc
 link path=usr/share/man/man3proc/proc_finistdio.3proc target=proc_initstdio.3proc
 link path=usr/share/man/man3proc/proc_flushstdio.3proc target=proc_initstdio.3proc
 link path=usr/share/man/man3proc/proc_free_priv.3proc target=proc_get_priv.3proc

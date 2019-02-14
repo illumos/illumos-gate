@@ -23,6 +23,8 @@
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright 2018 Joyent, Inc.
 # Copyright (c) 2013 by Delphix. All rights reserved.
+# Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -204,6 +206,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	proc_arg_xgrab;
 	proc_arg_xpsinfo;
 	proc_content2str;
+	proc_dmodelname;
 	proc_finistdio;
 	proc_fltname;
 	proc_fltset2str;
