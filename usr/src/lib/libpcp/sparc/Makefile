@@ -21,7 +21,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libpcp/sparc/Makefile
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 
 UTSBASE= ../../../uts
 
@@ -72,10 +73,6 @@ $(LINKED_LIBPCP_DIR): $(USR_PLAT_DIR)
 $(LINKED_LIBPCP1_DIR): $(USR_PLAT_DIR)
 	-$(INS.slink6)
 
-$(LINKED_LLIBLPCP_DIR): $(USR_PLAT_DIR)
-	-$(INS.slink8)
-
 install: all $(USR_PSM_LIBS) $(PLATLIBS)/libpcp.so \
 	$(LINKED_DIRS) $(LINKED_LIB_DIRS) \
-	$(LINKED_LIBPCP_DIR) $(LINKED_LIBPCP1_DIR) \
-	$(LINKED_LLIBLPCP_DIR)
+	$(LINKED_LIBPCP_DIR) $(LINKED_LIBPCP1_DIR)

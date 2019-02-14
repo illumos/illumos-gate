@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/library/storage/libmpapi@$(PKGVERS)
@@ -42,10 +43,7 @@ dir path=usr/share/man/man3mpapi
 dir path=usr/share/man/man4
 file path=etc/mpapi.conf original_name=SUNWmpapi:etc/mpapi.conf preserve=true
 file path=lib/$(ARCH64)/libMPAPI.so.1 variant.opensolaris.zone=global
-file path=lib/$(ARCH64)/llib-lMPAPI.ln variant.opensolaris.zone=global
 file path=lib/libMPAPI.so.1 variant.opensolaris.zone=global
-file path=lib/llib-lMPAPI variant.opensolaris.zone=global
-file path=lib/llib-lMPAPI.ln variant.opensolaris.zone=global
 file path=usr/include/mpapi-sun.h
 file path=usr/include/mpapi.h
 file path=usr/share/man/man3lib/libMPAPI.3lib

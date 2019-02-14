@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/network/iscsi/target@$(PKGVERS)
@@ -60,10 +61,7 @@ file path=lib/svc/method/iscsi-target mode=0555 \
 file path=usr/include/libiscsit.h
 file path=usr/include/sys/iscsit/iscsit_common.h
 file path=usr/lib/$(ARCH64)/libiscsit.so.1
-file path=usr/lib/$(ARCH64)/llib-liscsit.ln
 file path=usr/lib/libiscsit.so.1
-file path=usr/lib/llib-liscsit
-file path=usr/lib/llib-liscsit.ln
 file path=usr/sbin/itadm mode=0555
 file path=usr/share/man/man1m/itadm.1m
 file path=usr/share/man/man3iscsit/it_config_load.3iscsit

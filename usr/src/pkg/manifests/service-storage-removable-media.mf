@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/service/storage/removable-media@$(PKGVERS)
@@ -43,10 +44,7 @@ dir path=usr/lib/smedia/$(ARCH64)
 dir path=usr/share/man/man1m
 file path=lib/svc/manifest/network/rpc/smserver.xml group=sys mode=0444
 file path=usr/lib/$(ARCH64)/libsmedia.so.1
-file path=usr/lib/$(ARCH64)/llib-lsmedia.ln
 file path=usr/lib/libsmedia.so.1
-file path=usr/lib/llib-lsmedia
-file path=usr/lib/llib-lsmedia.ln
 file path=usr/lib/smedia/$(ARCH64)/sm_blkdev.so.1 mode=0555
 file path=usr/lib/smedia/$(ARCH64)/sm_fd.so.1 mode=0555
 file path=usr/lib/smedia/$(ARCH64)/sm_scsi.so.1 mode=0555

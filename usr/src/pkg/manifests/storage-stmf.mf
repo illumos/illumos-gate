@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/storage/stmf@$(PKGVERS)
@@ -92,11 +93,8 @@ file path=usr/include/sys/stmf_defines.h
 file path=usr/include/sys/stmf_ioctl.h
 file path=usr/lib/$(ARCH64)/libstmf.so.1
 file path=usr/lib/$(ARCH64)/libstmfproxy.so.1
-file path=usr/lib/$(ARCH64)/llib-lstmf.ln
 file path=usr/lib/libstmf.so.1
 file path=usr/lib/libstmfproxy.so.1
-file path=usr/lib/llib-lstmf
-file path=usr/lib/llib-lstmf.ln
 file path=usr/lib/mdb/kvm/$(ARCH64)/stmf.so group=sys mode=0555
 file path=usr/lib/mdb/kvm/$(ARCH64)/stmf_sbd.so group=sys mode=0555
 file path=usr/sbin/sbdadm mode=0555

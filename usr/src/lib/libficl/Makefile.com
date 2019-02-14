@@ -33,6 +33,8 @@ CSTD=	$(CSTD_GNU99)
 PNGLITE=	$(SRC)/common/pnglite
 CPPFLAGS +=	-I.. -I$(FICLDIR) -I$(FICLDIR)/emu -D_LARGEFILE64_SOURCE=1
 CPPFLAGS +=	-I$(PNGLITE)
+CFLAGS += $(C_BIGPICFLAGS)
+CFLAGS64 += $(C_BIGPICFLAGS64)
 
 # As variable "count" is marked volatile, gcc 4.4.4 will complain about
 # function argument. So we switch this warning off

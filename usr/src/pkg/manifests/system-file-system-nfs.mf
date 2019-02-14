@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/file-system/nfs@$(PKGVERS)
@@ -84,8 +85,6 @@ file path=usr/lib/fs/nfs/nfsfind group=sys mode=0555
 file path=usr/lib/fs/nfs/showmount mode=0555
 file path=usr/lib/fs/nfs/umount mode=0555
 file path=usr/lib/nfs/libmapid.so.1
-file path=usr/lib/nfs/llib-lmapid
-file path=usr/lib/nfs/llib-lmapid.ln
 file path=usr/lib/nfs/lockd mode=0555
 file path=usr/lib/nfs/nfs4cbd mode=0555
 file path=usr/lib/nfs/nfsmapid mode=0555

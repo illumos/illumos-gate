@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include "statcommon.h"
 
 #include <sys/types.h>
@@ -118,8 +122,7 @@ char	**argv;
 
 
 static void
-display_stats(s, cnt)
-au_stat_t *s;
+display_stats(au_stat_t *s, int cnt)
 {
 	int	offset[12];   /* used to line the header up correctly */
 	char	buf[512];

@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/management/wbem/data-management@$(PKGVERS)
@@ -32,8 +33,6 @@ set name=variant.arch value=$(ARCH)
 dir path=usr group=sys
 dir path=usr/lib
 file path=usr/lib/libfsmgt.so.1
-file path=usr/lib/llib-lfsmgt
-file path=usr/lib/llib-lfsmgt.ln
 legacy pkg=SUNWdmgtr desc="software for WBEM/CIM data device management" \
     name="Solaris Data Management WBEM/CIM API (root)"
 legacy pkg=SUNWdmgtu desc="software for WBEM/CIM data device management" \

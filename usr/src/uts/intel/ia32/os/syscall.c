@@ -862,10 +862,16 @@ deferred_singlestep_trap(caddr_t pc)
  * flag error if lwp won't see signal immediately
  */
 int64_t
-nosys()
+nosys(void)
 {
 	tsignal(curthread, SIGSYS);
 	return (set_errno(ENOSYS));
+}
+
+int
+nosys32(void)
+{
+	return (nosys());
 }
 
 /*

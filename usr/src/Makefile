@@ -26,7 +26,7 @@
 # Copyright 2015 OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2018 Joyent, Inc.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -200,9 +200,6 @@ bldtools:
 #
 rootdirs: $(ROOTDIRS)
 	$(INS) -d -m 775 $(ROOT)/var/mail/:saved
-
-lint: FRC
-	$(MAKE) -f Makefile.lint
 
 _msgdirs:       $(MSGDIRS)
 

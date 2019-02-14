@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/service/hal@$(PKGVERS)
@@ -116,8 +117,6 @@ file path=lib/svc/method/svc-network-discovery mode=0555 \
     variant.opensolaris.zone=global
 file path=usr/lib/$(ARCH64)/libhal-storage.so.1.0.0
 file path=usr/lib/$(ARCH64)/libhal.so.1.0.0
-file path=usr/lib/$(ARCH64)/llib-lhal-storage.ln
-file path=usr/lib/$(ARCH64)/llib-lhal.ln
 file path=usr/lib/$(ARCH64)/pkgconfig/hal-storage.pc
 file path=usr/lib/$(ARCH64)/pkgconfig/hal.pc
 file path=usr/lib/hal/hal-functions mode=0555
@@ -156,10 +155,6 @@ file path=usr/lib/hal/sunos/hal-system-power-shutdown-sunos mode=0555
 file path=usr/lib/hal/sunos/hal-system-power-suspend-sunos mode=0555
 file path=usr/lib/libhal-storage.so.1.0.0
 file path=usr/lib/libhal.so.1.0.0
-file path=usr/lib/llib-lhal
-file path=usr/lib/llib-lhal-storage
-file path=usr/lib/llib-lhal-storage.ln
-file path=usr/lib/llib-lhal.ln
 file path=usr/lib/pkgconfig/hal-storage.pc
 file path=usr/lib/pkgconfig/hal.pc
 file path=usr/sbin/hal-device mode=0555

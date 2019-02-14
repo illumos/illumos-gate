@@ -1329,6 +1329,26 @@ tem_safe_scroll(struct tem_vt_state *tem, int start, int end, int count,
 	}
 }
 
+static int
+tem_copy_width(term_char_t *src, term_char_t *dst, int cols)
+{
+	int width = cols - 1;
+
+	while (width >= 0) {
+		/*
+		 * Find difference on line, compare char with its attributes
+		 * and colors.
+		 */
+		if (src[width].tc_char != dst[width].tc_char ||
+		    src[width].tc_fg_color != dst[width].tc_fg_color ||
+		    src[width].tc_bg_color != dst[width].tc_bg_color) {
+			break;
+		}
+		width--;
+	}
+	return (width + 1);
+}
+
 static void
 tem_safe_copy_area(struct tem_vt_state *tem,
     screen_pos_t s_col, screen_pos_t s_row,
@@ -1336,6 +1356,8 @@ tem_safe_copy_area(struct tem_vt_state *tem,
     screen_pos_t t_col, screen_pos_t t_row,
     cred_t *credp, enum called_from called_from)
 {
+	size_t soffset, toffset;
+	term_char_t *src, *dst;
 	int rows;
 	int cols;
 
@@ -1362,16 +1384,52 @@ tem_safe_copy_area(struct tem_vt_state *tem,
 	    t_col + cols > tems.ts_c_dimension.width)
 		return;
 
-	tem_safe_virtual_copy(tem,
-	    s_col, s_row,
-	    e_col, e_row,
-	    t_col, t_row);
+	soffset = s_col + s_row * tems.ts_c_dimension.width;
+	toffset = t_col + t_row * tems.ts_c_dimension.width;
+	src = tem->tvs_screen_buf + soffset;
+	dst = tem->tvs_screen_buf + toffset;
 
-	if (!tem->tvs_isactive)
-		return;
+	/*
+	 * Copy line by line. We determine the length by comparing the
+	 * screen content from cached text in tvs_screen_buf.
+	 */
+	if (toffset <= soffset) {
+		for (int i = 0; i < rows; i++) {
+			int increment = i * tems.ts_c_dimension.width;
+			int width;
 
-	tem_safe_callback_copy(tem, s_col, s_row,
-	    e_col, e_row, t_col, t_row, credp, called_from);
+			width = tem_copy_width(src + increment,
+			    dst + increment, cols);
+
+			tem_safe_virtual_copy(tem, s_col, s_row + i,
+			    e_col  - cols + width, s_row + i,
+			    t_col, t_row + i);
+
+			if (tem->tvs_isactive) {
+				tem_safe_callback_copy(tem, s_col, s_row + i,
+				    e_col - cols + width, s_row + i,
+				    t_col, t_row + i, credp, called_from);
+			}
+		}
+	} else {
+		for (int i = rows - 1; i >= 0; i--) {
+			int increment = i * tems.ts_c_dimension.width;
+			int width;
+
+			width = tem_copy_width(src + increment,
+			    dst + increment, cols);
+
+			tem_safe_virtual_copy(tem, s_col, s_row + i,
+			    e_col  - cols + width, s_row + i,
+			    t_col, t_row + i);
+
+			if (tem->tvs_isactive) {
+				tem_safe_callback_copy(tem, s_col, s_row + i,
+				    e_col - cols + width, s_row + i,
+				    t_col, t_row + i, credp, called_from);
+			}
+		}
+	}
 }
 
 static void

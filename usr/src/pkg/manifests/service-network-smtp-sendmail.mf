@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri \
@@ -177,8 +178,6 @@ file path=usr/include/libmilter/mfdef.h
 file path=usr/lib/help/auths/locale/C/MailHeader.html
 file path=usr/lib/help/auths/locale/C/MailQueue.html
 file path=usr/lib/libmilter.so.1
-file path=usr/lib/llib-lmilter
-file path=usr/lib/llib-lmilter.ln
 file path=usr/lib/mail.local mode=0555
 file path=usr/lib/smrsh mode=0555
 file path=usr/lib/smtp/sendmail/mailq mode=4555

@@ -952,9 +952,7 @@ rpcmod_hold(queue_t *q)
 }
 
 void
-rpcmod_release(queue_t *q, mblk_t *bp,
-    /* LINTED E_FUNC_ARG_UNUSED */
-    bool_t enable __unused)
+rpcmod_release(queue_t *q, mblk_t *bp, bool_t enable __unused)
 {
 	struct rpcm *rmp;
 
@@ -2616,7 +2614,7 @@ ioc_eperm:
 			 */
 			break;
 		}
-		/* fallthru */;
+		/* FALLTHROUGH */
 	default:
 		if (mp->b_datap->db_type >= QPCTL) {
 			if (mp->b_datap->db_type == M_FLUSH) {

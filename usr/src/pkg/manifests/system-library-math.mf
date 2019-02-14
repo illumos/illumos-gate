@@ -11,6 +11,7 @@
 
 #
 # Copyright (c) 2012, Igor Kozhukhov <ikozhukhov@gmail.com>.  All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 <include system-library-math.man3m.inc>
@@ -43,7 +44,6 @@ dir path=usr/share/man/man3mvec
 file path=lib/$(ARCH64)/libm.so.1
 file path=lib/$(ARCH64)/libm.so.2
 file path=lib/$(ARCH64)/libmvec.so.1
-file path=lib/$(ARCH64)/llib-lm.ln
 $(sparc_ONLY)file path=lib/cpu/sparcv8plus+vis/libmvec_isa.so.1
 $(sparc_ONLY)file path=lib/cpu/sparcv9+vis/$(ARCH64)/libmvec_isa.so.1
 $(sparc_ONLY)file path=lib/cpu/sparcv9+vis2/$(ARCH64)/libmvec_isa.so.1
@@ -52,8 +52,6 @@ file path=lib/libm.so.1
 file path=lib/libm.so.2
 file path=lib/libmvec.so.1
 $(i386_ONLY)file path=lib/libmvec/libmvec_hwcap1.so.1
-file path=lib/llib-lm
-file path=lib/llib-lm.ln
 file path=usr/include/complex.h
 file path=usr/include/fenv.h
 file path=usr/include/floatingpoint.h
@@ -81,12 +79,8 @@ link path=usr/lib/$(ARCH64)/libmvec.so \
     target=../../../lib/$(ARCH64)/libmvec.so.1
 link path=usr/lib/$(ARCH64)/libmvec.so.1 \
     target=../../../lib/$(ARCH64)/libmvec.so.1
-link path=usr/lib/$(ARCH64)/llib-lm.ln \
-    target=../../../lib/$(ARCH64)/llib-lm.ln
 link path=usr/lib/libm.so target=../../lib/libm.so.2
 link path=usr/lib/libm.so.1 target=../../lib/libm.so.1
 link path=usr/lib/libm.so.2 target=../../lib/libm.so.2
 link path=usr/lib/libmvec.so target=../../lib/libmvec.so.1
 link path=usr/lib/libmvec.so.1 target=../../lib/libmvec.so.1
-link path=usr/lib/llib-lm target=../../lib/llib-lm
-link path=usr/lib/llib-lm.ln target=../../lib/llib-lm.ln

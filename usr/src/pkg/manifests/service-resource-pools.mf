@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/service/resource-pools@$(PKGVERS)
@@ -65,10 +66,7 @@ file path=usr/include/pool.h
 file path=usr/kernel/drv/$(ARCH64)/pool group=sys
 file path=usr/kernel/drv/pool.conf group=sys
 file path=usr/lib/$(ARCH64)/libpool.so.1
-file path=usr/lib/$(ARCH64)/llib-lpool.ln
 file path=usr/lib/libpool.so.1
-file path=usr/lib/llib-lpool
-file path=usr/lib/llib-lpool.ln
 file path=usr/lib/rcm/modules/SUNW_pool_rcm.so mode=0555
 file path=usr/sbin/pooladm mode=0555
 file path=usr/sbin/poolbind mode=0555

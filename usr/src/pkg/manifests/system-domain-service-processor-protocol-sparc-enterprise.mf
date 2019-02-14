@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -68,7 +69,6 @@ file path=platform/SUNW,SPARC-Enterprise/kernel/drv/oplkmdrv.conf group=sys
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/dscp.ppp.options group=sys \
     mode=0555
 file path=usr/platform/SUNW,SPARC-Enterprise/lib/libdscp.so.1
-file path=usr/platform/SUNW,SPARC-Enterprise/lib/llib-ldscp.ln group=sys
 file path=usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp mode=0755
 file path=usr/share/man/man1m/prtdscp.1m
 file path=usr/share/man/man7d/dm2s.7d

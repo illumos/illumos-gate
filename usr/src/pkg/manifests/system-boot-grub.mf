@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -70,8 +71,6 @@ $(i386_ONLY)file path=boot/grub/vstafs_stage1_5 group=sys
 $(i386_ONLY)file path=boot/grub/xfs_stage1_5 group=sys
 $(i386_ONLY)file path=boot/grub/zfs_stage1_5 group=sys
 file path=lib/libgrubmgmt.so.1
-file path=lib/llib-lgrubmgmt
-file path=lib/llib-lgrubmgmt.ln
 file path=usr/share/man/man5/grub.5
 $(i386_ONLY)legacy pkg=SUNWgrub desc="Multiboot Boot Loader" \
     name="GNU GRUB - GNU GRand Unified Bootloader"

@@ -22,6 +22,7 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/diagnostic/cpu-counters@$(PKGVERS)
@@ -60,14 +61,8 @@ $(i386_ONLY)file path=usr/kernel/pcbe/$(ARCH64)/pcbe.GenuineIntel.6.15 \
     group=sys mode=0755
 file path=usr/lib/$(ARCH64)/libcpc.so.1
 file path=usr/lib/$(ARCH64)/libpctx.so.1
-file path=usr/lib/$(ARCH64)/llib-lcpc.ln
-file path=usr/lib/$(ARCH64)/llib-lpctx.ln
 file path=usr/lib/libcpc.so.1
 file path=usr/lib/libpctx.so.1
-file path=usr/lib/llib-lcpc
-file path=usr/lib/llib-lcpc.ln
-file path=usr/lib/llib-lpctx
-file path=usr/lib/llib-lpctx.ln
 file path=usr/sbin/cpustat mode=0555
 file path=usr/share/man/man1/cputrack.1
 file path=usr/share/man/man1m/cpustat.1m

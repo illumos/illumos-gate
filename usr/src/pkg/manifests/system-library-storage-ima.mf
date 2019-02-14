@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/library/storage/ima@$(PKGVERS)
@@ -35,13 +36,7 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 file path=usr/lib/$(ARCH64)/libsun_ima.so.1
-file path=usr/lib/$(ARCH64)/llib-lima.ln
-file path=usr/lib/$(ARCH64)/llib-lsun_ima.ln
 file path=usr/lib/libsun_ima.so.1
-file path=usr/lib/llib-lima
-file path=usr/lib/llib-lima.ln
-file path=usr/lib/llib-lsun_ima
-file path=usr/lib/llib-lsun_ima.ln
 legacy pkg=SUNWima \
     desc="SNIA iSCSI Managment API plugin library for iSCSI adapters" \
     name="Solaris IMA Software Initiator Plugin"

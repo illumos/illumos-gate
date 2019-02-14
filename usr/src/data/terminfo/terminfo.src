@@ -5296,7 +5296,7 @@ sun-type4|Sun Workstation console with type 4 keyboard,
 #	cbt=\E[Z
 #	dim=\E[2m
 #	blink=\E[5m
-# It supports bold, but not underline -TD (2009-09-19)
+# It supports bold -TD (2009-09-19)
 sun-color|Sun Microsystems Workstation console with color support (IA systems),
 	colors#8, ncv#3, pairs#64,
 	cub=\E[%p1%dD, cud=\E[%p1%dB, cuf=\E[%p1%dC,
@@ -5304,7 +5304,7 @@ sun-color|Sun Microsystems Workstation console with color support (IA systems),
 	setaf=\E[3%p1%dm,
 	setb=\E[4%?%p1%{1}%=%t4%e%p1%{3}%=%t6%e%p1%{4}%=%t1%e%p1%{6}%=%t3%e%p1%d%;m,
 	setf=\E[3%?%p1%{1}%=%t4%e%p1%{3}%=%t6%e%p1%{4}%=%t1%e%p1%{6}%=%t3%e%p1%d%;m,
-	smso=\E[1m, use=sun,
+	smso=\E[1m, smul=\E[4m,rmul=\E[24m,use=sun,
 
 #### Iris consoles
 #

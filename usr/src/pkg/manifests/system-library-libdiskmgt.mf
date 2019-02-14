@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/library/libdiskmgt@$(PKGVERS)
@@ -33,10 +34,7 @@ dir path=usr group=sys
 dir path=usr/lib
 dir path=usr/lib/$(ARCH64)
 file path=usr/lib/$(ARCH64)/libdiskmgt.so.1
-file path=usr/lib/$(ARCH64)/llib-ldiskmgt.ln
 file path=usr/lib/libdiskmgt.so.1
-file path=usr/lib/llib-ldiskmgt
-file path=usr/lib/llib-ldiskmgt.ln
 legacy pkg=SUNWsmapi desc="Software libraries for storage management" \
     name="Storage Management APIs"
 license cr_Sun license=cr_Sun
