@@ -15054,7 +15054,7 @@ ip_get_zoneid_v4(ipaddr_t addr, mblk_t *mp, ip_recv_attr_t *ira,
 
 	if (lookup_zoneid != ALL_ZONES)
 		ire_flags |= MATCH_IRE_ZONEONLY;
-	ire = ire_ftable_lookup_v4(addr, NULL, NULL, IRE_LOCAL | IRE_LOOPBACK,
+	ire = ire_ftable_lookup_v4(addr, 0, 0, IRE_LOCAL | IRE_LOOPBACK,
 	    NULL, lookup_zoneid, NULL, ire_flags, 0, ipst, NULL);
 	if (ire != NULL) {
 		zoneid = IP_REAL_ZONEID(ire->ire_zoneid, ipst);

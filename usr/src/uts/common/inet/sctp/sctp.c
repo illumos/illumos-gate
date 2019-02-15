@@ -1788,7 +1788,7 @@ sctp_find_next_tq(sctp_t *sctp)
 	for (try = 0; try < sctps->sctps_recvq_tq_list_cur_sz; try++) {
 		tq = sctps->sctps_recvq_tq_list[next_tq];
 		if (taskq_dispatch(tq, sctp_process_recvq, sctp,
-		    TQ_NOSLEEP) != NULL) {
+		    TQ_NOSLEEP) != (uintptr_t)NULL) {
 			sctp->sctp_recvq_tq = tq;
 			return (B_TRUE);
 		}
@@ -1803,7 +1803,8 @@ sctp_find_next_tq(sctp_t *sctp)
 	 */
 	sctp_inc_taskq(sctps);
 	tq = sctps->sctps_recvq_tq_list[sctps->sctps_recvq_tq_list_cur_sz - 1];
-	if (taskq_dispatch(tq, sctp_process_recvq, sctp, TQ_NOSLEEP) != NULL) {
+	if (taskq_dispatch(tq, sctp_process_recvq, sctp, TQ_NOSLEEP) !=
+	    (uintptr_t)NULL) {
 		sctp->sctp_recvq_tq = tq;
 		return (B_TRUE);
 	}

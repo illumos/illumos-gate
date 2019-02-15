@@ -1390,7 +1390,7 @@ ixa_check_drain_insert(conn_t *connp, ip_xmit_attr_t *ixa)
 
 	if (idd->idd_tx_fctl_df(idd->idd_tx_fctl_dh, cookie) == 0) {
 		DTRACE_PROBE1(ill__tx__not__blocked, uintptr_t, cookie);
-	} else if (idl_txl->txl_cookie != NULL &&
+	} else if (idl_txl->txl_cookie != (uintptr_t)NULL &&
 	    idl_txl->txl_cookie != ixa->ixa_cookie) {
 		DTRACE_PROBE2(ill__tx__cookie__collision, uintptr_t, cookie,
 		    uintptr_t, idl_txl->txl_cookie);

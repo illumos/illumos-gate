@@ -543,7 +543,7 @@ ire_init_v4(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *gateway,
 
 	error = ire_init_common(ire, type, ill, zoneid, flags, IPV4_VERSION,
 	    gc, ipst);
-	if (error != NULL)
+	if (error != 0)
 		return (error);
 
 	/* Determine which function pointers to use */
