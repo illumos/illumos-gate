@@ -1729,7 +1729,7 @@ ipstate_t *is;
 		} else if (flags == TH_SYN) {
 			is->is_s0[source] = ntohl(tcp->th_seq) + 1;
 			if ((TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2)))
-				(void) fr_tcpoptions(fin, tcp, tdata);
+				(void) fr_tcpoptions(fin, tcp, fdata);
 
 			if ((fin->fin_out != 0) && (is->is_pass & FR_NEWISN))
 				fr_checknewisn(fin, is);
@@ -1840,6 +1840,7 @@ int flags;
 	 * the receiver also does window scaling)
 	 */
 	if (!(tcpflags & TH_SYN) && (fdata->td_winflags & TCP_WSCALE_FIRST)) {
+		fdata->td_winflags &= ~TCP_WSCALE_FIRST;
 		fdata->td_maxwin = win;
 	}
 
@@ -1902,7 +1903,7 @@ int flags;
 #endif
 /* XXX what about big packets */
 #define MAXACKWINDOW 66000
-	    (-ackskew <= (MAXACKWINDOW << fdata->td_winscale)) &&
+	    (-ackskew <= (MAXACKWINDOW)) &&
 	    ( ackskew <= (MAXACKWINDOW << fdata->td_winscale))) {
 		inseq = 1;
 	/*
