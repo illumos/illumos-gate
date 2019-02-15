@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2013 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_VMPARAM_H_
@@ -20,14 +20,26 @@
 extern caddr_t kpm_vbase;
 extern size_t kpm_size;
 
-#define	PHYS_TO_DMAP(x)	({ 			\
-	ASSERT((uintptr_t)(x) < kpm_size);	\
-	(uintptr_t)(x) | (uintptr_t)kpm_vbase; })
+static inline uintptr_t
+phys_to_dmap(uintptr_t pa)
+{
+	ASSERT3U(pa, <, kpm_size);
+	return ((uintptr_t)kpm_vbase + pa);
+}
 
-#define	DMAP_TO_PHYS(x)	({				\
-	ASSERT((uintptr_t)(x) >= (uintptr_t)kpm_vbase);		\
-	ASSERT((uintptr_t)(x) < ((uintptr_t)kpm_vbase + kpm_size));	\
-	(uintptr_t)(x) & ~(uintptr_t)kpm_vbase; })	\
+static inline uintptr_t
+dmap_to_phys(uintptr_t kva)
+{
+	const uintptr_t base = (uintptr_t)kpm_vbase;
+
+	ASSERT3U(kva, >=, base);
+	ASSERT3U(kva, <, base + kpm_size);
+
+	return (kva - base);
+}
+
+#define	PHYS_TO_DMAP(x)	phys_to_dmap(x)
+#define	DMAP_TO_PHYS(x)	dmap_to_phys(x)
 
 
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_VMPARAM_H_ */
