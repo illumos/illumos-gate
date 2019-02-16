@@ -45,8 +45,15 @@
  * 10 bytes for base-10 value + 1 for sign + nul
  */
 #define	INT32BUFSZ	12
-/* 2 bytes for "0x" + 16 bytes for the hex value + 1 for sign + nul */
-#define	INT64BUFSZ	20
+/*
+ * Buffer that is large enough to hold the string representation of any signed
+ * or unsigned 64-bit integer.
+ *
+ * 2 bytes for "0x" + 16 bytes for the base-16 value + nul
+ * or
+ * 19 bytes for base-10 value + 1 for sign + nul
+ */
+#define	INT64BUFSZ	21
 #define	XML_VERSION	"1.0"
 
 static int txml_print_range(topo_hdl_t *, FILE *, tnode_t *, int);
@@ -115,129 +122,240 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, tnode_t *node, const char *pgname,
     topo_propval_t *pv)
 {
 	int err;
-	char *fmri = NULL;
-	char vbuf[INT64BUFSZ], tbuf[32], *pval = NULL, *aval = NULL;
+	uint_t nelem;
+	char vbuf[INT64BUFSZ];
 
 	switch (pv->tp_type) {
 		case TOPO_TYPE_INT32: {
 			int32_t val;
+
 			if (topo_prop_get_int32(node, pgname, pv->tp_name, &val,
-			    &err) == 0) {
-				(void) snprintf(vbuf, INT64BUFSZ, "%d", val);
-				(void) snprintf(tbuf, sizeof (tbuf), "%s",
-				    Int32);
-				pval = vbuf;
-			} else
+			    &err) != 0)
 				return;
+
+			(void) snprintf(vbuf, INT64BUFSZ, "%d", val);
+			begin_end_element(fp, Propval, Name, pv->tp_name, Type,
+			    Int32, Value, vbuf, NULL);
 			break;
 		}
 		case TOPO_TYPE_UINT32: {
 			uint32_t val;
+
 			if (topo_prop_get_uint32(node, pgname, pv->tp_name,
-			    &val, &err) == 0) {
-				(void) snprintf(vbuf, INT64BUFSZ, "0x%x", val);
-				(void) snprintf(tbuf, sizeof (tbuf), "%s",
-				    UInt32);
-				pval = vbuf;
-			} else
+			    &val, &err) != 0)
 				return;
+
+			(void) snprintf(vbuf, INT64BUFSZ, "0x%x", val);
+			begin_end_element(fp, Propval, Name, pv->tp_name, Type,
+			    UInt32, Value, vbuf, NULL);
 			break;
 		}
 		case TOPO_TYPE_INT64: {
 			int64_t val;
+
 			if (topo_prop_get_int64(node, pgname, pv->tp_name, &val,
-			    &err) == 0) {
-				(void) snprintf(vbuf, INT64BUFSZ, "0x%llx",
-				    (longlong_t)val);
-				(void) snprintf(tbuf, sizeof (tbuf), "%s",
-				    Int64);
-				pval = vbuf;
-			} else
+			    &err) != 0)
 				return;
+
+			(void) snprintf(vbuf, INT64BUFSZ, "%" PRId64, val);
+			begin_end_element(fp, Propval, Name, pv->tp_name, Type,
+			    Int64, Value, vbuf, NULL);
 			break;
 		}
 		case TOPO_TYPE_UINT64: {
 			uint64_t val;
+
 			if (topo_prop_get_uint64(node, pgname, pv->tp_name,
-			    &val, &err) == 0) {
-				(void) snprintf(vbuf, INT64BUFSZ, "0x%llx",
-				    (u_longlong_t)val);
-				(void) snprintf(tbuf, sizeof (tbuf), "%s",
-				    UInt64);
-				pval = vbuf;
-			} else
+			    &val, &err) != 0)
 				return;
+
+			(void) snprintf(vbuf, INT64BUFSZ, "0x%" PRIx64, val);
+			begin_end_element(fp, Propval, Name, pv->tp_name, Type,
+			    UInt64, Value, vbuf, NULL);
+			break;
+		}
+		case TOPO_TYPE_DOUBLE: {
+			double val;
+			char *dblstr = NULL;
+
+			if (topo_prop_get_double(node, pgname, pv->tp_name,
+			    &val, &err) != 0)
+				return;
+
+			/*
+			 * The %a format specifier allows floating point values
+			 * to be serialized without losing precision.
+			 */
+			if (asprintf(&dblstr, "%a", val) < 0)
+				return;
+			begin_end_element(fp, Propval, Name, pv->tp_name, Type,
+			    Double, Value, dblstr, NULL);
+			free(dblstr);
 			break;
 		}
 		case TOPO_TYPE_STRING: {
+			char *strbuf = NULL;
+
 			if (topo_prop_get_string(node, pgname, pv->tp_name,
-			    &pval, &err) != 0)
+			    &strbuf, &err) != 0)
 				return;
-			(void) snprintf(tbuf, sizeof (tbuf), "%s", "string");
+
+			begin_end_element(fp, Propval, Name, pv->tp_name, Type,
+			    String, Value, strbuf, NULL);
+			topo_hdl_strfree(thp, strbuf);
 			break;
 		}
 		case TOPO_TYPE_FMRI: {
-			nvlist_t *val;
+			nvlist_t *val = NULL;
+			char *fmristr = NULL;
 
 			if (topo_prop_get_fmri(node, pgname, pv->tp_name, &val,
-			    &err) == 0) {
-				if (topo_fmri_nvl2str(thp, val, &fmri, &err)
-				    == 0) {
-					nvlist_free(val);
-					pval = fmri;
-				} else {
-					nvlist_free(val);
-					return;
-				}
-			} else
+			    &err) != 0 ||
+			    topo_fmri_nvl2str(thp, val, &fmristr, &err) != 0) {
+				nvlist_free(val);
 				return;
-			(void) snprintf(tbuf, sizeof (tbuf), "%s", FMRI);
+			}
+			nvlist_free(val);
+			begin_end_element(fp, Propval, Name, pv->tp_name, Type,
+			    FMRI, Value, fmristr, NULL);
+			topo_hdl_strfree(thp, fmristr);
+			break;
+		}
+		case TOPO_TYPE_INT32_ARRAY: {
+			int32_t *val;
+
+			if (topo_prop_get_int32_array(node, pgname,
+			    pv->tp_name, &val, &nelem, &err) != 0)
+				return;
+
+			begin_element(fp, Propval, Name, pv->tp_name, Type,
+			    Int32_Arr, NULL);
+
+			for (uint_t i = 0; i < nelem; i++) {
+				(void) snprintf(vbuf, INT64BUFSZ, "%d", val[i]);
+				begin_end_element(fp, Propitem, Value, vbuf,
+				    NULL);
+			}
+
+			topo_hdl_free(thp, val, nelem * sizeof (int32_t));
+			end_element(fp, Propval);
 			break;
 		}
 		case TOPO_TYPE_UINT32_ARRAY: {
 			uint32_t *val;
-			uint_t nelem, i;
+
 			if (topo_prop_get_uint32_array(node, pgname,
 			    pv->tp_name, &val, &nelem, &err) != 0)
 				return;
 
-			if (nelem > 0) {
-				if ((aval = calloc((nelem * 9 - 1),
-				    sizeof (uchar_t))) == NULL) {
+			begin_element(fp, Propval, Name, pv->tp_name, Type,
+			    UInt32_Arr, NULL);
 
-					topo_hdl_free(thp, val,
-					    nelem * sizeof (uint32_t));
-					return;
-				}
-
-				(void) sprintf(aval, "0x%x", val[0]);
-				for (i = 1; i < nelem; i++) {
-					(void) sprintf(vbuf, " 0x%x", val[i]);
-					(void) strcat(aval, vbuf);
-				}
-				topo_hdl_free(thp, val,
-				    nelem * sizeof (uint32_t));
-				(void) snprintf(tbuf, sizeof (tbuf), "%s",
-				    UInt32_Arr);
-				pval = aval;
+			for (uint_t i = 0; i < nelem; i++) {
+				(void) snprintf(vbuf, INT64BUFSZ, "0x%x",
+				    val[i]);
+				begin_end_element(fp, Propitem, Value, vbuf,
+				    NULL);
 			}
+
+			topo_hdl_free(thp, val, nelem * sizeof (uint32_t));
+			end_element(fp, Propval);
+			break;
+		}
+		case TOPO_TYPE_INT64_ARRAY: {
+			int64_t *val;
+
+			if (topo_prop_get_int64_array(node, pgname,
+			    pv->tp_name, &val, &nelem, &err) != 0)
+				return;
+
+			begin_element(fp, Propval, Name, pv->tp_name, Type,
+			    Int64_Arr, NULL);
+
+			for (uint_t i = 0; i < nelem; i++) {
+				(void) snprintf(vbuf, INT64BUFSZ, "%" PRId64,
+				    val[i]);
+				begin_end_element(fp, Propitem, Value, vbuf,
+				    NULL);
+			}
+
+			topo_hdl_free(thp, val, nelem * sizeof (int64_t));
+			end_element(fp, Propval);
+			break;
+		}
+		case TOPO_TYPE_UINT64_ARRAY: {
+			uint64_t *val;
+
+			if (topo_prop_get_uint64_array(node, pgname,
+			    pv->tp_name, &val, &nelem, &err) != 0)
+				return;
+
+			begin_element(fp, Propval, Name, pv->tp_name, Type,
+			    UInt64_Arr, NULL);
+
+			for (uint_t i = 0; i < nelem; i++) {
+				(void) snprintf(vbuf, INT64BUFSZ, "0x%" PRIx64,
+				    val[i]);
+				begin_end_element(fp, Propitem, Value, vbuf,
+				    NULL);
+			}
+
+			topo_hdl_free(thp, val, nelem * sizeof (uint64_t));
+			end_element(fp, Propval);
+			break;
+		}
+		case TOPO_TYPE_STRING_ARRAY: {
+			char **val;
+
+			if (topo_prop_get_string_array(node, pgname,
+			    pv->tp_name, &val, &nelem, &err) != 0)
+				return;
+
+			begin_element(fp, Propval, Name, pv->tp_name, Type,
+			    String_Arr, NULL);
+
+			for (uint_t i = 0; i < nelem; i++) {
+				begin_end_element(fp, Propitem, Value, val[i],
+				    NULL);
+			}
+			for (uint_t i = 0; i < nelem; i++) {
+				topo_hdl_strfree(thp, val[i]);
+			}
+			topo_hdl_free(thp, val, nelem * sizeof (char *));
+
+			end_element(fp, Propval);
+			break;
+		}
+		case TOPO_TYPE_FMRI_ARRAY: {
+			nvlist_t **val;
+			char *fmristr = NULL;
+			int ret;
+
+			if (topo_prop_get_fmri_array(node, pgname,
+			    pv->tp_name, &val, &nelem, &err) != 0)
+				return;
+
+			begin_element(fp, Propval, Name, pv->tp_name, Type,
+			    FMRI_Arr, NULL);
+
+			for (uint_t i = 0; i < nelem; i++) {
+				if ((ret = topo_fmri_nvl2str(thp, val[i],
+				    &fmristr, &err)) != 0)
+					break;
+				begin_end_element(fp, Propitem, Value, fmristr,
+				    NULL);
+				topo_hdl_strfree(thp, fmristr);
+			}
+			for (uint_t i = 0; i < nelem; i++) {
+				nvlist_free(val[i]);
+			}
+			topo_hdl_free(thp, val, nelem * sizeof (nvlist_t *));
+			end_element(fp, Propval);
 			break;
 		}
 		default:
 			return;
 	}
-
-	begin_end_element(fp, Propval, Name, pv->tp_name, Type, tbuf,
-	    Value, pval, NULL);
-
-	if (pval != NULL && pv->tp_type == TOPO_TYPE_STRING)
-		topo_hdl_strfree(thp, pval);
-
-	if (fmri != NULL)
-		topo_hdl_strfree(thp, fmri);
-
-	if (aval != NULL)
-		free(aval);
 }
 
 static void
@@ -277,7 +395,19 @@ txml_print_node(topo_hdl_t *thp, FILE *fp, tnode_t *node)
 	topo_pgroup_t *pg;
 
 	(void) snprintf(inst, INT32BUFSZ, "%d", node->tn_instance);
-	begin_element(fp, Node, Instance, inst, Static, True, NULL);
+	/*
+	 * The "static" attribute for the "node" element controls whether the
+	 * node gets enumerated, if it doesn't already exist.  Setting it to
+	 * true causes the node to not be created.  The primary use-case for
+	 * setting it to true is when want to use XML to override a property
+	 * value on a topo node that was already created by an enumerator
+	 * module.  In this case we're trying to serialize the whole topology
+	 * in a fashion such that we could reconstitute it from the generated
+	 * XML. In which case, we relly need it to create all the nodes becuase
+	 * no enumerator modules will be running.  Hence, we set static to
+	 * false.
+	 */
+	begin_element(fp, Node, Instance, inst, Static, False, NULL);
 	for (pg = topo_list_next(&node->tn_pgroups); pg != NULL;
 	    pg = topo_list_next(pg)) {
 		txml_print_pgroup(thp, fp, node, pg);

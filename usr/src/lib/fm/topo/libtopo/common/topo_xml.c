@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <libxml/parser.h>
@@ -118,8 +118,10 @@ xmlattr_to_int(topo_mod_t *mp,
 	    propname);
 	if ((str = xmlGetProp(n, (xmlChar *)propname)) == NULL)
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR));
-	*value = strtoull((char *)str, (char **)&estr, 10);
-	if (estr == str) {
+
+	errno = 0;
+	*value = strtoull((char *)str, (char **)&estr, 0);
+	if (errno != 0 || *estr != '\0') {
 		/* no conversion was done */
 		xmlFree(str);
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_BADNUM));
@@ -139,8 +141,10 @@ xmlattr_to_double(topo_mod_t *mp,
 	    "xmlattr_to_double(propname=%s)\n", propname);
 	if ((str = xmlGetProp(n, (xmlChar *)propname)) == NULL)
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_NOATTR));
-	*value = strtod((char *)str, (char **)&estr);
-	if (estr == str || *estr != '\0') {
+
+	errno = 0;
+	*value = strtold((char *)str, (char **)&estr);
+	if (errno != 0 || *estr != '\0') {
 		/* full or partial conversion failure */
 		xmlFree(str);
 		return (topo_mod_seterrno(mp, ETOPO_PRSR_BADNUM));
@@ -224,7 +228,7 @@ xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
 	double dbl;
 	uint_t i = 0, nelems = 0;
 	nvlist_t *fmri;
-	xmlChar *str;
+	xmlChar *str, *estr;
 	char **strarrbuf;
 	void *arrbuf;
 	nvlist_t **nvlarrbuf;
@@ -301,13 +305,9 @@ xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(cn, (xmlChar *)Value))
-				    == NULL)
+				if (xmlattr_to_int(mp, cn, Value, &ui) < 0)
 					return (-1);
-
-				((int32_t *)arrbuf)[i++]
-				    = atoi((const char *)str);
-				xmlFree(str);
+				((int32_t *)arrbuf)[i++] = (int32_t)ui;
 			}
 		}
 
@@ -323,13 +323,9 @@ xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(cn, (xmlChar *)Value))
-				    == NULL)
+				if (xmlattr_to_int(mp, cn, Value, &ui) < 0)
 					return (-1);
-
-				((uint32_t *)arrbuf)[i++]
-				    = atoi((const char *)str);
-				xmlFree(str);
+				((uint32_t *)arrbuf)[i++] = (uint32_t)ui;
 			}
 		}
 
@@ -345,13 +341,9 @@ xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(cn, (xmlChar *)Value))
-				    == NULL)
+				if (xmlattr_to_int(mp, cn, Value, &ui) < 0)
 					return (-1);
-
-				((int64_t *)arrbuf)[i++]
-				    = atol((const char *)str);
-				xmlFree(str);
+				((int64_t *)arrbuf)[i++] = (int64_t)ui;
 			}
 		}
 
@@ -367,13 +359,9 @@ xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
 			if ((xmlStrcmp(cn->name, (xmlChar *)Propitem) == 0) ||
 			    (xmlStrcmp(cn->name, (xmlChar *)Argitem) == 0)) {
 
-				if ((str = xmlGetProp(cn, (xmlChar *)Value))
-				    == NULL)
+				if (xmlattr_to_int(mp, cn, Value, &ui) < 0)
 					return (-1);
-
-				((uint64_t *)arrbuf)[i++]
-				    = atol((const char *)str);
-				xmlFree(str);
+				((uint64_t *)arrbuf)[i++] = ui;
 			}
 		}
 

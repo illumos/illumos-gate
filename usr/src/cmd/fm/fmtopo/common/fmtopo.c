@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
  */
 
 
@@ -42,7 +42,6 @@
 #define	FMTOPO_EXIT_USAGE	2
 
 #define	STDERR	"stderr"
-#define	DOTS	"..."
 #define	ALL	"all"
 
 static const char *g_pname;
@@ -389,12 +388,7 @@ uint32_def:
 		case DATA_TYPE_STRING: {
 			char *val;
 			(void) nvpair_value_string(pv_nvp, &val);
-			if (!opt_V && strlen(val) > 48) {
-				(void) snprintf(buf, 48, "%s...", val);
-				(void) printf(" %s", buf);
-			} else {
-				(void) printf(" %s", val);
-			}
+			(void) printf(" %s", val);
 			break;
 		}
 		case DATA_TYPE_NVLIST: {
@@ -402,19 +396,13 @@ uint32_def:
 			char *fmri;
 			(void) nvpair_value_nvlist(pv_nvp, &val);
 			if (topo_fmri_nvl2str(thp, val, &fmri, &err) != 0) {
-				if (opt_V)
-					nvlist_print(stdout, nvl);
+				(void) fprintf(stderr, "failed to convert "
+				    "FMRI to string: (%s)\n",
+				    topo_strerror(err));
+				nvlist_print(stdout, nvl);
 				break;
 			}
-
-			if (!opt_V && strlen(fmri) > 48) {
-				(void) snprintf(buf, 48, "%s", fmri);
-				(void) snprintf(&buf[45], 4, "%s", DOTS);
-				(void) printf(" %s", buf);
-			} else {
-				(void) printf(" %s", fmri);
-			}
-
+			(void) printf(" %s", fmri);
 			topo_hdl_strfree(thp, fmri);
 			break;
 		}
@@ -468,6 +456,29 @@ uint32_def:
 			(void) printf("]");
 			break;
 		}
+		case DATA_TYPE_NVLIST_ARRAY: {
+			nvlist_t **val;
+			char *fmri;
+			int ret;
+
+			(void) nvpair_value_nvlist_array(pv_nvp, &val, &nelem);
+			(void) printf(" [ ");
+			for (i = 0; i < nelem; i++) {
+				ret = topo_fmri_nvl2str(thp, val[i], &fmri,
+				    &err);
+				if (ret != 0) {
+					(void) fprintf(stderr, "failed to "
+					    "convert FMRI to string (%s)\n",
+					    topo_strerror(err));
+					nvlist_print(stdout, val[i]);
+					break;
+				}
+				(void) printf("\"%s\" ", fmri);
+				topo_hdl_strfree(thp, fmri);
+			}
+			(void) printf("]");
+			break;
+		}
 		default:
 			(void) fprintf(stderr, " unknown data type (%d)",
 			    nvpair_type(pv_nvp));
@@ -498,11 +509,6 @@ print_pgroup(topo_hdl_t *thp, tnode_t *node, const char *pgn, char *dstab,
 	if (dstab == NULL || nstab == NULL || version == -1) {
 		(void) printf("  group: %-30s version: - stability: -/-\n",
 		    pgn);
-	} else if (!opt_V && strlen(pgn) > 30) {
-		(void) snprintf(buf, 26, "%s", pgn);
-		(void) snprintf(&buf[27], 4, "%s", DOTS);
-		(void) printf("  group: %-30s version: %-3d stability: %s/%s\n",
-		    buf, version, nstab, dstab);
 	} else {
 		(void) printf("  group: %-30s version: %-3d stability: %s/%s\n",
 		    pgn, version, nstab, dstab);
