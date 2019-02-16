@@ -819,6 +819,23 @@
  *	share the same last level cache. IDs should not overlap between
  *	packages.
  *
+ * cpi_ncore_bits
+ *
+ * 	This indicates the number of bits that are required to represent all of
+ * 	the cores in the system. As cores are derived based on their APIC IDs,
+ * 	we aren't guaranteed a run of APIC IDs starting from zero. It's OK for
+ * 	this value to be larger than the actual number of IDs that are present
+ * 	in the system. This is used to size tables by the CMI framework. It is
+ * 	only filled in for Intel and AMD CPUs.
+ *
+ * cpi_nthread_bits
+ *
+ * 	This indicates the number of bits required to represent all of the IDs
+ * 	that cover the logical CPUs that exist on a given core. It's OK for this
+ * 	value to be larger than the actual number of IDs that are present in the
+ * 	system.  This is used to size tables by the CMI framework. It is
+ * 	only filled in for Intel and AMD CPUs.
+ *
  * -----------
  * Hypervisors
  * -----------
@@ -1184,6 +1201,13 @@ struct cpuid_info {
 	int cpi_pkgcoreid;		/* core number within single package */
 	uint_t cpi_ncore_per_chip;	/* AMD: fn 0x80000008: %ecx[7-0] */
 					/* Intel: fn 4: %eax[31-26] */
+
+	/*
+	 * These values represent the number of bits that are required to store
+	 * information about the number of cores and threads.
+	 */
+	uint_t cpi_ncore_bits;
+	uint_t cpi_nthread_bits;
 	/*
 	 * supported feature information
 	 */
@@ -1704,17 +1728,30 @@ cpuid_amd_ncores(struct cpuid_info *cpi, uint_t *ncpus, uint_t *ncores)
 	*ncores = nthreads / nthread_per_core;
 }
 
+/*
+ * Seed the initial values for the cores and threads for an Intel based
+ * processor. These values will be overwritten if we detect that the processor
+ * supports CPUID leaf 0xb.
+ */
 static void
 cpuid_intel_ncores(struct cpuid_info *cpi, uint_t *ncpus, uint_t *ncores)
 {
+	/*
+	 * Only seed the number of physical cores from the first level leaf 4
+	 * information. The number of threads there indicate how many share the
+	 * L1 cache, which may or may not have anything to do with the number of
+	 * logical CPUs per core.
+	 */
 	if (cpi->cpi_maxeax >= 4) {
 		*ncores = BITX(cpi->cpi_std[4].cp_eax, 31, 26) + 1;
-		*ncpus = BITX(cpi->cpi_std[4].cp_eax, 25, 14) + 1;
-	} else if ((cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_HTT) != 0) {
+	} else {
 		*ncores = 1;
+	}
+
+	if ((cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_HTT) != 0) {
 		*ncpus = CPI_CPU_COUNT(cpi);
 	} else {
-		*ncpus = *ncores = 1;
+		*ncpus = *ncores;
 	}
 }
 
@@ -1779,6 +1816,11 @@ cpuid_leafB_getids(cpu_t *cpu)
 		cpi->cpi_procnodeid = cpi->cpi_chipid;
 		cpi->cpi_compunitid = cpi->cpi_coreid;
 
+		if (coreid_shift > 0 && chipid_shift > coreid_shift) {
+			cpi->cpi_nthread_bits = coreid_shift;
+			cpi->cpi_ncore_bits = chipid_shift - coreid_shift;
+		}
+
 		return (B_TRUE);
 	} else {
 		return (B_FALSE);
@@ -1806,6 +1848,17 @@ cpuid_intel_getids(cpu_t *cpu, void *feature)
 	 */
 	if (cpuid_leafB_getids(cpu))
 		return;
+
+	/*
+	 * In this case, we have the leaf 1 and leaf 4 values for ncpu_per_chip
+	 * and ncore_per_chip. These represent the largest power of two values
+	 * that we need to cover all of the IDs in the system. Therefore, we use
+	 * those values to seed the number of bits needed to cover information
+	 * in the case when leaf B is not available. These values will probably
+	 * be larger than required, but that's OK.
+	 */
+	cpi->cpi_nthread_bits = ddi_fls(cpi->cpi_ncpu_per_chip);
+	cpi->cpi_ncore_bits = ddi_fls(cpi->cpi_ncore_per_chip);
 
 	for (i = 1; i < cpi->cpi_ncpu_per_chip; i <<= 1)
 		chipid_shift++;
@@ -2059,6 +2112,10 @@ cpuid_amd_getids(cpu_t *cpu, uchar_t *features)
 
 	cpi->cpi_chipid =
 	    cpi->cpi_procnodeid / cpi->cpi_procnodes_per_pkg;
+
+	cpi->cpi_ncore_bits = coreidsz;
+	cpi->cpi_nthread_bits = ddi_fls(cpi->cpi_ncpu_per_chip /
+	    cpi->cpi_ncore_per_chip);
 }
 
 static void
@@ -6466,20 +6523,27 @@ patch_memops(uint_t vendor)
 
 /*
  * We're being asked to tell the system how many bits are required to represent
- * the various thread and strand IDs.
+ * the various thread and strand IDs. While it's tempting to derive this based
+ * on the values in cpi_ncore_per_chip and cpi_ncpu_per_chip, that isn't quite
+ * correct. Instead, this needs to be based on the number of bits that the APIC
+ * allows for these different configurations. We only update these to a larger
+ * value if we find one.
  */
 void
 cpuid_get_ext_topo(cpu_t *cpu, uint_t *core_nbits, uint_t *strand_nbits)
 {
 	struct cpuid_info *cpi;
-	uint_t nthreads;
 
 	VERIFY(cpuid_checkpass(CPU, 1));
 	cpi = cpu->cpu_m.mcpu_cpi;
 
-	nthreads = cpi->cpi_ncpu_per_chip / cpi->cpi_ncore_per_chip;
-	*core_nbits = ddi_fls(cpi->cpi_ncore_per_chip);
-	*strand_nbits = ddi_fls(nthreads);
+	if (cpi->cpi_ncore_bits > *core_nbits) {
+		*core_nbits = cpi->cpi_ncore_bits;
+	}
+
+	if (cpi->cpi_nthread_bits > *strand_nbits) {
+		*strand_nbits = cpi->cpi_nthread_bits;
+	}
 }
 
 void
