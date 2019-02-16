@@ -111,6 +111,7 @@ dir path=opt/zfs-tests/tests/functional/history
 dir path=opt/zfs-tests/tests/functional/holes
 dir path=opt/zfs-tests/tests/functional/inheritance
 dir path=opt/zfs-tests/tests/functional/inuse
+dir path=opt/zfs-tests/tests/functional/large_dnode
 dir path=opt/zfs-tests/tests/functional/large_files
 dir path=opt/zfs-tests/tests/functional/largest_pool
 dir path=opt/zfs-tests/tests/functional/libzfs
@@ -2202,6 +2203,26 @@ file path=opt/zfs-tests/tests/functional/inuse/inuse_007_pos mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse_008_pos mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/inuse_009_pos mode=0555
 file path=opt/zfs-tests/tests/functional/inuse/setup mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_001_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_002_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_003_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_004_neg \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_005_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_006_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_007_neg \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_008_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/large_dnode_009_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/large_dnode/setup mode=0555
 file path=opt/zfs-tests/tests/functional/large_files/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/large_files/large_files_001_pos \
     mode=0555

@@ -58,7 +58,7 @@ log_onexit cleanup
 set -A perms	create snapshot mount send allow quota reservation \
 		recordsize mountpoint checksum compression canmount atime \
 		devices exec volsize setuid readonly snapdir userprop \
-		aclmode aclinherit rollback clone rename promote \
+		aclmode aclinherit rollback clone rename promote dnodesize \
 		zoned xattr receive destroy sharenfs share
 
 log_must zpool set delegation=off $TESTPOOL
