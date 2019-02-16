@@ -76,6 +76,7 @@ SRCDIR =	../common
 CLEANFILES += $(SRCDIR)/topo_error.c $(SRCDIR)/topo_tables.c
 
 CPPFLAGS += -I../common -I$(ADJUNCT_PROTO)/usr/include/libxml2 -I.
+CSTD = $(CSTD_GNU99)
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS += -D_POSIX_PTHREAD_SEMANTICS
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
