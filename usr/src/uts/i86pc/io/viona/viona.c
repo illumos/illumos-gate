@@ -2661,6 +2661,8 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 	if (ftype == ETHERTYPE_IP) {
 		if ((link->l_cap_csum & HCKSUM_INET_FULL_V4) != 0 &&
 		    (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP)) {
+			uint16_t *csump = (uint16_t *)(mp->b_rptr + csum_stuff);
+			*csump = 0;
 			flags |= HCK_FULLCKSUM;
 			mac_hcksum_set(mp, 0, 0, 0, 0, flags);
 			return (B_TRUE);
@@ -2673,6 +2675,8 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 	} else if (ftype == ETHERTYPE_IPV6) {
 		if ((link->l_cap_csum & HCKSUM_INET_FULL_V6) != 0 &&
 		    (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP)) {
+			uint16_t *csump = (uint16_t *)(mp->b_rptr + csum_stuff);
+			*csump = 0;
 			flags |= HCK_FULLCKSUM;
 			mac_hcksum_set(mp, 0, 0, 0, 0, flags);
 			return (B_TRUE);
