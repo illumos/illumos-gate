@@ -14,8 +14,7 @@
 #
 
 include $(SRC)/Makefile.master
-
-CC=     $(GNUC_ROOT)/bin/gcc
+include $(SRC)/boot/sys/boot/Makefile.inc
 
 install:
 
@@ -39,17 +38,13 @@ SRCS +=	delay.c \
 
 OBJS=	$(SRCS:%.c=%.o)
 
-PNGLITE=$(SRC)/common/pnglite
-
-CPPFLAGS= -D_STANDALONE -DEFI
-CFLAGS  = -Os
-
-CPPFLAGS += -nostdinc -I. -I../../../../../include -I../../../..
+CPPFLAGS += -DEFI
+CPPFLAGS += -I. -I../../../../../include -I../../../..
 CPPFLAGS += -I$(SRC)/common/ficl -I../../../libficl
 CPPFLAGS += -I../../include
 CPPFLAGS += -I../../include/$(MACHINE)
 CPPFLAGS += -I../../../../../lib/libstand
-CPPFLAGS += -I../../../zfs
+CPPFLAGS += -I$(ZFSSRC)
 CPPFLAGS += -I../../../../cddl/boot/zfs
 CPPFLAGS += -I../../../../../lib/libz
 CPPFLAGS += -I$(PNGLITE)

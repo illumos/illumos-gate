@@ -14,18 +14,17 @@
 #
 
 include $(SRC)/Makefile.master
+include $(SRC)/boot/sys/boot/Makefile.inc
 
 ROOT_BOOT = $(ROOT)/boot
 
-CC=	$(GNUC_ROOT)/bin/gcc
-LD=	$(GNU_ROOT)/bin/gld
-DD=	/usr/bin/dd
-CFLAGS= -Os -I../../..
+DD=		/usr/bin/dd
+CFLAGS += -I../../..
 CCASFLAGS= -Wa,--divide
 
 include ../Makefile.inc
 
-BTXDIR=../btx
+BTXDIR= ../btx
 
 PROG=	${LDR}
 INTERNALPROG=
@@ -47,7 +46,7 @@ FILEMODE=0444
 #CFLAGS+=-DALWAYS_SERIAL
 #.endif
 
-CFLAGS +=-I../common
+CFLAGS += -I../common
 
 LOADERBIN= ../loader/loader.bin
 

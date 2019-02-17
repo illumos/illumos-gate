@@ -14,7 +14,6 @@
 #
 
 MACHINE=	$(MACH)
-ASFLAGS=	-m32
 
 all:		libcrypto.a
 

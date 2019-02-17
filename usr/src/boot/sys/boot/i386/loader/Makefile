@@ -18,25 +18,17 @@ include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
 include $(SRC)/boot/sys/boot/Makefile.inc
 
-CFLAGS=		-Os -fno-reorder-functions
-CPPFLAGS=	-D_STANDALONE -nostdinc -I../../../../include -I../../..
+CPPFLAGS +=	-I../../../../include -I../../..
 CPPFLAGS +=	-I$(SRC)/uts/intel/sys/acpi
 CPPFLAGS +=	-I../../../../lib/libz
 LOADER=		loader
 NEWVERSWHAT=	"ZFS enabled bootstrap loader" x86
 
 # Set by loader Makefile
-CPPFLAGS +=	-I../../zfs
+CPPFLAGS +=	-I$(ZFSSRC)
 CPPFLAGS +=	-I../libi386
-LIBZFSBOOT=	../../zfs/$(MACH)/libzfsboot.a
 LIBI386=        ../libi386/libi386.a
 
-# loader.help build needs better awk
-AWK=		/usr/xpg4/bin/awk
-LD=		$(GNU_ROOT)/bin/gld
-CC=		$(GNUC_ROOT)/bin/gcc
-OBJCOPY=	$(GNU_ROOT)/bin/gobjcopy
-GSTRIP=		$(GNU_ROOT)/bin/gstrip
 ROOT_BOOT=	$(ROOT)/boot
 ROOT_BOOT_DEFAULTS=	$(ROOT)/boot/defaults
 ROOT_BOOT_FORTH=	$(ROOT)/boot/forth
@@ -92,7 +84,6 @@ CPPFLAGS +=	-I.
 CLEANFILES=	vers.c ${LOADER} ${LOADER}.sym ${LOADER}.bin loader.help
 CLEANFILES +=	$(FONT).c
 
-CFLAGS +=	-Wall
 LDFLAGS=	-static -Ttext 0x0
 
 # i386 standalone support library
@@ -136,8 +127,8 @@ FORTH +=	menu.rc
 
 # XXX crt0.o needs to be first for pxeboot(8) to work
 
-DPADD=	${LIBFICL} ${LIBZFSBOOT} ${LIBI386} ${LIBCRYPTO} ${LIBSTAND}
-LDADD=	${LIBFICL} ${LIBZFSBOOT} ${LIBI386} ${LIBCRYPTO} ${LIBSTAND}
+DPADD=	${LIBFICL} ${LIBI386} ${LIBCRYPTO} ${LIBSTAND}
+LDADD=	${LIBFICL} ${LIBI386} ${LIBCRYPTO} ${LIBSTAND}
 
 CLEANFILES +=	machine x86
 

@@ -28,6 +28,7 @@ all clean clobber: $(SUBDIRS)
 
 install: all
 
+.PARALLEL:
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 

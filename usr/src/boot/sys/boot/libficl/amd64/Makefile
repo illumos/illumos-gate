@@ -22,7 +22,7 @@ all install: lib
 
 include ../Makefile.com
 
-CFLAGS += -m64 -mno-red-zone
+CFLAGS += -m64 $(CFLAGS64)
 
 $(OBJECTS): machine x86
 

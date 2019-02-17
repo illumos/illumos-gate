@@ -15,14 +15,13 @@
 #
 
 MACHINE=	$(MACH64)
-ASFLAGS=	-m64
 
 all:		libefi.a
 
 SRCS=	time.c
 include ../Makefile.com
 
-CFLAGS +=	-m64
+CFLAGS +=	-m64 $(CFLAGS64)
 
 CLEANFILES +=	machine x86
 

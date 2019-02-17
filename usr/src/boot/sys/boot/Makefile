@@ -18,7 +18,7 @@
 include $(SRC)/Makefile.master
 
 INSTDIRS = i386 efi
-SUBDIRS = libstand libficl libcrypto zfs $(INSTDIRS)
+SUBDIRS = libstand libficl libcrypto $(INSTDIRS)
 
 all	:=	TARGET = all
 clean	:=	TARGET = clean
@@ -36,6 +36,8 @@ all clean clobber: $(SUBDIRS)
 # rules should be added to the Makefiles in those directories.
 #
 install: all .WAIT $(INSTDIRS)
+
+.PARALLEL: libstand libficl libcrypto
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)

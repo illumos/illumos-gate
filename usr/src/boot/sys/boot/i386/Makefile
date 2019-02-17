@@ -39,5 +39,6 @@ cdboot gptzfsboot loader pxeldr isoboot: btx
 
 FRC:
 
+.PARALLEL:
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
