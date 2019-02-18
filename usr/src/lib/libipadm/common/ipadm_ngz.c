@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <errno.h>
@@ -347,6 +348,7 @@ i_ipadm_zone_get_network(zoneid_t zoneid, datalink_id_t linkid, int type,
     void *buf, size_t *bufsize)
 {
 	zone_net_data_t *zndata;
+	ipadm_status_t ret = IPADM_SUCCESS;
 
 	zndata = calloc(1, sizeof (*zndata) + *bufsize);
 	if (zndata == NULL)
@@ -357,11 +359,14 @@ i_ipadm_zone_get_network(zoneid_t zoneid, datalink_id_t linkid, int type,
 
 	if (zone_getattr(zoneid, ZONE_ATTR_NETWORK, zndata,
 	    sizeof (*zndata) + *bufsize) < 0) {
-		return (ipadm_errno2status(errno));
+		ret = ipadm_errno2status(errno);
+		goto out;
 	}
 	*bufsize = zndata->zn_len;
 	bcopy(zndata->zn_val, buf, *bufsize);
-	return (IPADM_SUCCESS);
+out:
+	free(zndata);
+	return (ret);
 }
 
 /*
@@ -447,7 +452,7 @@ fail:
  */
 ipadm_status_t
 ipadm_init_net_from_gz(ipadm_handle_t iph, char *ifname,
-	void (*persist_if)(char *, boolean_t, boolean_t))
+    void (*persist_if)(char *, boolean_t, boolean_t))
 {
 	ngz_walk_data_t nwd;
 	uint64_t flags;
