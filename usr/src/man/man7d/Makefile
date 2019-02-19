@@ -126,6 +126,7 @@ _MANFILES=	aac.7d		\
 		tty.7d		\
 		ttymux.7d	\
 		tzmon.7d	\
+		ufm.7d		\
 		ugen.7d		\
 		uhci.7d		\
 		usb_ac.7d	\

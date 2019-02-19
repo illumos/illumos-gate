@@ -1,0 +1,111 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd Apr 30, 2019
+.Dt DDI_UFM_SLOT 9F
+.Os
+.Sh NAME
+.Nm ddi_ufm_slot ,
+.Nm ddi_ufm_slot_set_version ,
+.Nm ddi_ufm_slot_set_attrs ,
+.Nm ddi_ufm_slot_set_misc
+.Nd UFM slot property routines
+.Sh SYNOPSIS
+#include <sys/ddi_ufm.h>
+.sp
+.Ft void
+.Fo ddi_ufm_slot_set_version
+.Fa "ddi_ufm_slot_t *usp"
+.Fa "const char *version"
+.Fc
+.Ft void
+.Fo ddi_ufm_slot_set_attrs
+.Fa "ddi_ufm_slot_t *usp"
+.Fa "ddi_ufm_attr_t attrs"
+.Fc
+.Ft void
+.Fo ddi_ufm_slot_set_misc
+.Fa "ddi_ufm_slot_t *usp"
+.Fa "nvlist_t *nvl"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is evolving still in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa usp
+A pointer to a UFM slot structure that was passed to the driver in its
+.Xr ddi_ufm_op_fill_slot 9E
+entry point.
+.It Fa version
+A device-specific ASCII string that indicates the current version of the
+firmware image in the slot.
+.It Fa attrs
+The bitwise-inclusive-OR of one of several attributes of a firmware
+slot.
+See the discussion of the
+.Fn ddi_ufm_op_fill_slot
+function in
+.Xr ddi_ufm 9E .
+.It Fa nvl
+An nvlist_t with ancillary, device-specific data.
+.El
+.Sh DESCRIPTION
+The
+.Fn ddi_ufm_slot_set_version ,
+.Fn ddi_ufm_slot_set_attrs ,
+and
+.Fn ddi_ufm_slot_set_misc
+functions are used by device drivers to set information about a firmware
+slot on the slot structure
+.Fa usp
+as a part of implementing their
+.Xr ddi_ufm_op_fill_slot 9E
+entry point.
+For more information on slots and the use of these functions, see the
+description of the
+.Fn ddi_ufm_op_fill_slot
+function in
+.Xr ddi_ufm 9E .
+.Pp
+The
+.Fn ddi_ufm_slot_set_version
+function sets the version property of a firmware slot.
+The version should be a human-readable ASCII string that describes the current
+firmware revision in a way that makes sense to an administrator and someone
+who is referencing the documentation of a vendor.
+.Pp
+The
+.Fn ddi_ufm_slot_set_attrs
+function describes attributes of a UFM slot as defined by the
+ddi_ufm_attr_t enum.
+.Pp
+The
+.Fn ddi_ufm_slot_set_misc
+function is used by the driver to set ancillary key-value data that may
+be useful to a consumer.
+For example, a driver may use this method to encode specific information that
+the firmware provides about how or when it was produced or installed on the
+device.
+The driver should create an nvlist for this purpose with
+.Xr nvlist_alloc 9F .
+Once the driver passes the nvlist to the
+.Fn ddi_ufm_slot_set_misc
+function, then the driver must not manipulate or free the nvlist at all.
+It is the property of the UFM subsystem.
+.Sh CONTEXT
+These functions should only be called in the context of the
+.Xr ddi_ufm_op_fill_slot 9E
+entry point.
+.Sh SEE ALSO

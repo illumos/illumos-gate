@@ -304,6 +304,26 @@ disk_set_props(topo_mod_t *mod, tnode_t *parent,
 	}
 	err = 0;
 
+	/*
+	 * Create UFM node to capture the drive firmware version
+	 */
+	if (dnode->ddn_firm != NULL) {
+		topo_ufm_slot_info_t slotinfo = { 0 };
+
+		slotinfo.usi_version = dnode->ddn_firm;
+		slotinfo.usi_active = B_TRUE;
+		if (strcmp(topo_node_name(parent), USB_DEVICE) == 0)
+			slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_NONE;
+		else
+			slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_WO;
+		if (topo_node_range_create(mod, dtn, UFM, 0, 0) != 0 ||
+		    topo_mod_create_ufm(mod, dtn, "drive firmware",
+		    &slotinfo) == NULL) {
+			topo_mod_dprintf(mod, "failed to create %s node", UFM);
+			goto out;
+		}
+	}
+
 out:
 	if (drive_descr != 0)
 		dm_free_descriptor(drive_descr);

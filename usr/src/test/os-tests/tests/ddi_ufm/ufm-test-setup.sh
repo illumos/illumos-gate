@@ -1,3 +1,5 @@
+#!/usr/bin/bash
+
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -10,23 +12,23 @@
 #
 
 #
-# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2019 Joyent, Inc.
 #
 
-SUBDIRS_i386 = i386
+grep ufmtest /etc/name_to_major &>/dev/null
+if [[ $? -eq 0 ]]; then
+	printf "ufmtest driver is already installed\n"
+	exit 0
+fi
 
-SUBDIRS =       \
-		ddi_ufm \
-		file-locking \
-		pf_key \
-		poll \
-		sdevfs \
-		secflags \
-		sigqueue \
-		sockfs \
-		spoof-ras \
-		stress \
-		$(SUBDIRS_$(MACH))
+printf "Installing ufmtest driver ... \n"
+/usr/sbin/add_drv -v -f ufmtest
 
-include $(SRC)/test/Makefile.com
+if [[ $? -ne 0 ]]; then
+	printf "%s\n%s\n" "Failed to install the ufmtest driver." \
+	    "Verify that the IPS package system/io/tests is installed." 1>&2
+	exit 1
+else
+	exit 0
+fi
+

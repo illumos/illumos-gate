@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 [DEFAULT]
@@ -62,6 +62,10 @@ tests = ['conn', 'dgram', 'drop_priv', 'nosignal', 'sockpair']
 [/opt/os-tests/tests/pf_key]
 user = root
 tests = ['acquire-compare', 'acquire-spray']
+
+[/opt/os-tests/tests/ddi_ufm]
+user = root
+tests = ['ufm-test-setup', 'ufm-test', 'ufm-test-cleanup']
 
 [/opt/os-tests/tests/i386]
 user = root

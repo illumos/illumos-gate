@@ -26,6 +26,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2017 James S Blachly, MD <james.blachly@gmail.com>
 # Copyright 2019 RackTop Systems
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -286,6 +287,7 @@ $(sparc_ONLY)driver name=uata \
 $(i386_ONLY)driver name=ucode perms="* 0644 root sys"
 driver name=udp perms="udp 0666 root sys"
 driver name=udp6 perms="udp6 0666 root sys"
+driver name=ufm perms="ufm 0666 root sys"
 $(i386_ONLY)driver name=vgatext \
     alias=pciclass,000100 \
     alias=pciclass,030000 \
@@ -406,6 +408,7 @@ $(sparc_ONLY)file path=kernel/drv/$(ARCH64)/uata group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/ucode group=sys
 file path=kernel/drv/$(ARCH64)/udp group=sys
 file path=kernel/drv/$(ARCH64)/udp6 group=sys
+file path=kernel/drv/$(ARCH64)/ufm group=sys
 $(i386_ONLY)file path=kernel/drv/$(ARCH64)/vgatext group=sys
 file path=kernel/drv/$(ARCH64)/vnic group=sys
 file path=kernel/drv/$(ARCH64)/wc group=sys
@@ -490,6 +493,7 @@ $(sparc_ONLY)file path=kernel/drv/uata.conf group=sys \
 $(i386_ONLY)file path=kernel/drv/ucode.conf group=sys
 file path=kernel/drv/udp.conf group=sys
 file path=kernel/drv/udp6.conf group=sys
+file path=kernel/drv/ufm.conf group=sys
 file path=kernel/drv/vnic.conf group=sys
 file path=kernel/drv/wc.conf group=sys
 $(sparc_ONLY)file path=kernel/exec/$(ARCH64)/aoutexec group=sys mode=0755

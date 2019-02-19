@@ -152,6 +152,7 @@ GENUNIX_OBJS +=	\
 		ddi_intr_irm.o	\
 		ddi_nodeid.o	\
 		ddi_periodic.o	\
+		ddi_ufm.o	\
 		devcfg.o	\
 		devcache.o	\
 		device.o	\

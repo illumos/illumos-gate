@@ -520,18 +520,6 @@ smbios_enum_motherboard(smbios_hdl_t *shp, smb_enum_data_t *smed)
 	if (rc == 0 && asset != NULL)
 		rc += topo_prop_set_string(mbnode, TOPO_PGROUP_MOTHERBOARD,
 		    TOPO_PROP_MB_ASSET, TOPO_PROP_IMMUTABLE, asset, &err);
-	if (rc == 0 && bios_vendor != NULL)
-		rc += topo_prop_set_string(mbnode, TOPO_PGROUP_MOTHERBOARD,
-		    TOPO_PROP_MB_FIRMWARE_VENDOR, TOPO_PROP_IMMUTABLE,
-		    bios_vendor, &err);
-	if (rc == 0 && bios_rev != NULL)
-		rc += topo_prop_set_string(mbnode, TOPO_PGROUP_MOTHERBOARD,
-		    TOPO_PROP_MB_FIRMWARE_REV, TOPO_PROP_IMMUTABLE,
-		    bios_rev, &err);
-	if (rc == 0 && bios_reldate != NULL)
-		rc += topo_prop_set_string(mbnode, TOPO_PGROUP_MOTHERBOARD,
-		    TOPO_PROP_MB_FIRMWARE_RELDATE, TOPO_PROP_IMMUTABLE,
-		    bios_reldate, &err);
 
 	if (rc != 0) {
 		topo_mod_dprintf(mod, "error setting properties on %s node",
@@ -539,6 +527,45 @@ smbios_enum_motherboard(smbios_hdl_t *shp, smb_enum_data_t *smed)
 		(void) topo_mod_seterrno(mod, err);
 		goto err;
 	}
+	/*
+	 * If we were able to gleen the BIOS version from SMBIOS, then set
+	 * up a UFM node to capture that information.
+	 */
+	if (bios_rev != NULL) {
+		topo_ufm_slot_info_t slotinfo = { 0 };
+		nvlist_t *extra;
+
+		slotinfo.usi_version = bios_rev;
+		slotinfo.usi_active = B_TRUE;
+		slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_NONE;
+
+		if (bios_vendor != NULL || bios_reldate != NULL) {
+			if (nvlist_alloc(&extra, NV_UNIQUE_NAME, 0) != 0) {
+				goto err;
+			}
+			if (bios_vendor != NULL && nvlist_add_string(extra,
+			    TOPO_PROP_MB_FIRMWARE_VENDOR, bios_vendor) != 0) {
+				nvlist_free(extra);
+				goto err;
+			}
+			if (bios_reldate != NULL && nvlist_add_string(extra,
+			    TOPO_PROP_MB_FIRMWARE_RELDATE, bios_reldate) !=
+			    0) {
+				nvlist_free(extra);
+				goto err;
+			}
+			slotinfo.usi_extra = extra;
+		}
+		if (topo_node_range_create(mod, mbnode, UFM, 0, 0) != 0) {
+			topo_mod_dprintf(mod, "failed to create %s range",
+			    UFM);
+			nvlist_free(extra);
+			goto err;
+		}
+		(void) topo_mod_create_ufm(mod, mbnode, "BIOS", &slotinfo);
+		nvlist_free(extra);
+	}
+
 err:
 	topo_mod_strfree(mod, manuf);
 	topo_mod_strfree(mod, prod);

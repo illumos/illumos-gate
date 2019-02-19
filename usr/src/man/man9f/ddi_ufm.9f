@@ -1,0 +1,162 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright (c) 2019, Joyent, Inc.
+.\"
+.Dd Apr 30, 2019
+.Dt DDI_UFM 9F
+.Os
+.Sh NAME
+.Nm ddi_ufm ,
+.Nm ddi_ufm_init ,
+.Nm ddi_ufm_update ,
+.Nm ddi_ufm_fini
+.Nd DDI upgradable firmware module interfaces
+.Sh SYNOPSIS
+.In sys/ddi_ufm.h
+.Ft int
+.Fo ddi_ufm_init
+.Fa "dev_info_t *dip"
+.Fa "int version"
+.Fa "ddi_ufm_ops_t *ops"
+.Fa "ddi_ufm_handle_t **ufmpp"
+.Fa "void *drv_arg"
+.Fc
+.Ft void
+.Fo ddi_ufm_update
+.Fa "ddi_ufm_handle_t *ufmp"
+.Fc
+.Ft void
+.Fo ddi_ufm_fini
+.Fa "ddi_ufm_handle_t *ufmp"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is evolving still in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa dip
+Pointer to the devices
+.Vt dev_info
+structure for the specific instance.
+.It Fa version
+A value which indicates the current revision of the interface that the
+device supports.
+Should generally be set to
+.Dv DDI_UFM_CURRENT_VERSION .
+.It Fa ops
+A pointer to a UFM operations structure.
+See
+.Xr ddi_ufm 9E
+for more information.
+.It Fa ufmp
+A pinter to the opaque handle returned from
+.Fn ddi_ufm_init .
+.It Fa ufmpp
+A pointer to store the opaque handle from
+.Fn ddi_ufm_init .
+.It Fa drv_arg
+A driver specific argument that will be passed to various operations.
+.El
+.Sh DESCRIPTION
+These functions provide support for initializing and performing various
+upgradeable firmware module (UFM) operations.
+For more information, please see
+.Xr ddi_ufm 9E .
+.Pp
+The
+.Fn ddi_ufm_init
+function is used to initialize support for the UFM subsystem for a given
+device.
+The
+.Fa dip
+argument should be the
+.Vt dev_info
+structure of the specific device.
+The
+.Fa version
+argument represents the current revision of the UFM interface that the
+driver supports.
+Drivers inside of illumos should always use
+.Dv DDI_UFM_CURRENT_VERSION .
+Device drivers which need to bind to a specific revision, should instead
+pass the latest version:
+.Dv DDI_UFM_VERSION_ONE .
+The operations structure,
+.Fa ops ,
+should be filled according to the rules in
+.Xr ddi_ufm 9E .
+These will be the entry points that device drivers call.
+The value of
+.Fa drv_arg
+will be passed to all of the driver's entry points.
+When the function returns,
+.Fa ufmpp
+will be filled in with a handle that the driver should reference when
+needing to perform subsequent UFM operations.
+No UFM entry points will be called until after the driver calls the
+.Fn ddi_ufm_update
+function.
+.Pp
+When the device driver is detaching or needs to unregister from the UFM
+subsystem, then the device driver should call the
+.Fn ddi_ufm_fini
+function with the handle that they obtained during the call to
+initialize.
+Note, this function will block and ensure that any outstanding UFM operations
+are terminated.
+The driver must not hold any locks that are required in its callbacks across
+the call to
+.Fn ddi_ufm_fini .
+.Pp
+The
+.Fn ddi_ufm_update
+function should be used in two different circumstances.
+It should be used at the end of a driver's
+.Xr attach 9E
+endpoint to indicate that it is ready to receive UFM requests.
+It should also be called whenever the driver believes that the UFM might have
+changed.
+This may happen after a device reset or firmware change.
+Unlike the other functions, this can be called from any context with any locks
+held, excepting high-level interrupt context which normal device drivers
+will not have interrupts for.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn ddi_ufm_init
+function returns zero, indicating that it has successfully registered
+with the UFM subsystem.
+.Fa ufmpp
+will be filled in with a pointer to the UFM handle.
+.Pp
+The
+.Fn ddi_ufm_init
+and
+.Fn ddi_ufm_fini
+functions are generally called from a device's
+.Xr attach 9E
+and
+.Xr fini 9E
+routines, though they may be called from
+.Sy user
+or
+.Sy kernel
+context.
+.Pp
+The
+.Fn ddi_ufm_update
+function may be called from any context except a high-level interrupt
+handler above lock level.
+.Sh SEE ALSO
+.Xr attach 9E ,
+.Xr ddi_ufm 9E ,
+.Xr fini 9E
