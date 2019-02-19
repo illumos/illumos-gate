@@ -1,0 +1,420 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd Apr 30, 2019
+.Dt DDI_UFM 9E
+.Os
+.Sh NAME
+.Nm ddi_ufm ,
+.Nm ddi_ufm_op_nimages ,
+.Nm ddi_ufm_op_fill_image ,
+.Nm ddi_ufm_op_nslots ,
+.Nm ddi_ufm_op_fill_slot
+.Nd DDI upgradable firmware module entry points
+.Sh SYNOPSIS
+.Vt typedef struct ddi_ufm_handle ddi_ufm_handle_t
+.Vt typedef struct ddi_ufm_ops ddi_ufm_ops_t
+.In sys/ddi_ufm.h
+.Ft int
+.Fo ddi_ufm_op_getcaps
+.Fa "ddi_ufm_handle_t *uhp"
+.Fa "void *drv_arg"
+.Fa "ddi_ufm_cap_t *caps"
+.Fc
+.Ft int
+.Fo ddi_ufm_op_nimages
+.Fa "ddi_ufm_handle_t *uhp"
+.Fa "void *drv_arg"
+.Fa "uint_t *nimgp"
+.Fc
+.Ft int
+.Fo ddi_ufm_op_fill_image
+.Fa "ddi_ufm_handle_t *uhp"
+.Fa "void *drv_arg"
+.Fa "uint_t imgid"
+.Fa "ddi_ufm_image_t *uip"
+.Fc
+.Ft int
+.Fo ddi_ufm_op_fill_slot
+.Fa "ddi_ufm_handle_t *uhp"
+.Fa "void *drv_arg"
+.Fa "uint_t imgid"
+.Fa "uint_t slotid"
+.Fa "ddi_ufm_slot_t *usp"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving - This interface is evolving still in illumos. API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa uhp
+A handle corresponding to the device's UFM handle.
+This is the same value as returned in .Xr ddi_ufm_init 9F .
+.It Fa drv_arg
+This is a private value that the driver passed in when calling
+.Xr ddi_ufm_init 9F .
+.It Fa nimgp
+A pointer that the driver should set with a number of images.
+.It Fa nslotp
+A pointer that the driver should set with a number of slots.
+.It Fa imgid
+An integer indicating which image information is being requested for.
+.It Fa uip
+An opaque pointer that represents a UFM image.
+.It Fa slotid
+An integer indicating which slot information is being requested for.
+.It Fa usp
+An opaque pointer that represents a UFM slot.
+.El
+.Sh DESCRIPTION
+Upgradable firmware modules (UFM) are a potential component of many
+devices.
+These interfaces aim to provide a simple series of callbacks
+for a device driver to implement such that it is easy to report
+information and in the future, manipulate firmware modules.
+.Ss UFM Background
+UFMs may come in different flavors and styles ranging from a
+firmware blob, to an EEPROM image, to microcode, and more.
+Take for example a hard drive.
+While it is a field replaceable unit (FRU), it also contains some amount
+of firmware that manages the drive which can be updated independently of
+replacing the drive.
+.Pp
+The motherboard often has a UFM in the form of the BIOS or UEFI.
+The Lights out management controller on a system has a UFM, which is usually
+the entire system image.
+CPUs also have a UFM in the form of microcode.
+.Pp
+An important property of a UFM is that it is a property of the device
+itself.
+For example, many WiFi device drivers are required to send a binary blob of
+firmware to the device after every reset.
+Because these images are not properties of the device and must be upgraded by
+either changing the device driver or related system files, we do not consider
+these UFMs.
+.Pp
+There are also devices that have firmware which is a property of the
+device, but may not be upgradable from the running OS.
+This may be because the vendor doesn't have tooling to upgrade the image or
+because the firmware image itself cannot be upgraded in the field at all.
+For example, a YubiKey has a firmware image that's burned into it in the
+factory, but there is no way to change the firmware on it short of
+replacing the device in its entirety.
+However, because these images are a permanent part of the device, we also
+consider them a UFM.
+.Ss Images and Slots
+A device that supports UFMs is made up of one or more distinct firmware
+images.
+Each image has its own unique purpose.
+For example, a motherboard may have both a BIOS and a CPLD image, each of which
+has independent firmware revisions.
+.Pp
+A given image may have a number of slots.
+A slot represents a particular version of the image.
+Only one slot can be active at a given time.
+Devices support slots such that a firmware image can be downloaded
+to the device without impacting the current device if it fails half-way
+through.
+The slot that's currently in use is referred to as the
+.Em active
+slot.
+.Pp
+The various entry points are designed such that all a driver has to do
+is provide information about the image and its slots to the kernel, it
+does not have to wrangle with how that is marshalled to users and the
+appearance of those structures.
+.Ss Registering with the UFM Subsystem
+During a device driver's
+.Xr attach 9E
+entry point, a device driver should register with the UFM subsystem by
+filling out a UFM operations vector and then calling
+.Xr ddi_ufm_init 9F .
+The driver may pass in a value, usually a pointer to its soft state
+pointer, which it will then receive when its subsequent entry points are
+called.
+.Pp
+Once the driver has finished initializing, it must call
+.Xr ddi_ufm_update 9F
+to indicate that the driver is in a state where it's ready to receive
+calls to the entry points.
+.Pp
+The various UFM entry points may be called from an arbitrary kernel
+context.
+However, they will only ever be called from a single thread at
+a given time.
+.Ss UFM operations vector
+The UFM operations vector is a structure that has the following members:
+.Bd -literal -offset indent
+typedef struct ddi_ufm_ops {
+	int (*ddi_ufm_op_nimages)(ddi_ufm_handle_t *uhp, void *arg,
+	    uint_t *nimgp);
+	int (*ddi_ufm_op_fill_image)(ddi_ufm_handle_t *uhp, void *arg,
+            uint_t imgid, ddi_ufm_image_t *img);
+	int (*ddi_ufm_op_fill_slot)(ddi_ufm_handle_t *uhp, void *arg,
+            int imgid, ddi_ufm_image_t *img, uint_t slotid,
+	    ddi_ufm_slot_t *slotp);
+	int (*ddi_ufm_op_getcaps)(ddi_ufm_handle_t *uhp, void *arg,
+	    ddi_ufm_cap_t *caps);
+} ddi_ufm_ops_t;
+.Ed
+.Pp
+The
+.Fn ddi_ufm_op_nimages
+entry point is optional.
+If a device only has a single image, then there is no reason to implement the
+.Fn ddi_ufm_op_nimages entry point.
+The system will assume that there is only a single image.
+.Pp
+Slots and images are numbered starting at zero.
+If a driver indicates support for multiple images or slots then the images
+or slots will be numbered sequentially going from 0 to the number of images or
+slots minus one.
+These values will be passed to the various entry points to indicate which image
+and slot the system is interested in.
+It is up to the driver to maintain a consistent view of the images and slots
+for a given UFM.
+.Pp
+The members of this structure should be filled in the following ways:
+.Bl -tag -width Fn
+.It Fn ddi_ufm_op_nimages
+The
+.Fn ddi_ufm_op_nimages
+entry point is an optional entry point that answers the question of how
+many different, distinct firmware images are present on the device.
+Once the driver determines how many are present, it should set the value in
+.Fa nimgp to the determined value.
+.Pp
+It is legal for a device to pass in zero for this value, which indicates
+that there are none present.
+.Pp
+Upon successful completion, the driver should return
+.Sy 0 .
+Otherwise, the driver should return the appropriate error number.
+For a full list of error numbers, see
+.Xr Intro 2 .
+Common values are:
+.Bl -tag -width Er -offset width
+.It Er EIO
+An error occurred while communicating with the device to determine the
+number of firmware images.
+.El
+.It Fn ddi_ufm_op_fill_image
+The
+.Fn ddi_ufm_op_fill_image
+entry point is used to fill in information about a given image.
+The value in
+.Fa imgid
+is used to indicate which image the system is asking to fill
+information about.
+If the driver does not recognize the image ID in
+.Fa imgid
+then it should return an error.
+.Pp
+The
+.Ft ddi_ufm_image_t
+structure passed in
+.Fa uip
+is opaque.
+To fill in information about the image, the driver should call the functions
+described in
+.Xr ddi_ufm_image 9F .
+.Pp
+The driver should call the
+.Xr ddi_ufm_image_set_desc 9F
+function to set a description of the image which indicates its purpose.
+This should be a human-readable string.
+The driver may also set any ancillary data that it deems may be useful with the
+.Xr ddi_ufm_image_set_misc 9F function.
+This function takes an nvlist, allowing the driver to set arbitrary keys and values.
+.Pp
+Once the driver has finished setting all of the information about the
+image then the driver should return
+.Sy 0 .
+Otherwise, the driver should return the appropriate error number.
+For a full list of error numbers, see
+.Xr Intro 2 .
+Common values are:
+.Bl -tag -width Er -offset width
+.It Er EINVAL
+The image indicated by
+.Fa imgid
+is unknown.
+.It Er EIO
+An error occurred talking to the device while trying to fill out
+firmware image information.
+.It Er ENOMEM
+The driver was unable to allocate memory while filling out image
+information.
+.El
+.It Fn ddi_ufm_op_fill_slot
+The
+.Fn ddi_ufm_op_fill_slot
+function is used to fill in information about a specific slot for a
+specific image.
+The value in
+.Fa imgid
+indicates the image the system wants slot information for and the value
+in
+.Fa slotid
+indicates which slot of that image the system is interested in.
+If the device driver does not recognize the value in either or
+.Fa imgid
+or
+.Fa slotid ,
+then it should return an error.
+.Pp
+The
+.Ft ddi_ufm_slot_t
+structure passed in
+.Fa usp
+is opaque.
+To fill in information about the image the driver should call the functions
+described in
+.Xr ddi_ufm_slot 9F .
+.Pp
+The driver should call the
+.Xr ddi_ufm_slot_set_version 9F
+function to indicate the version of the UFM.
+The version is a device-specific character string.
+It should contain the current version of the UFM as a human can understand it
+and it should try to match the format used by device vendor.
+.Pp
+The
+.Xr ddi_ufm_slot_set_attrs 9F
+function should be used to set the attributes of the UFM slot.
+These attributes include the following enumeration values:
+.Bl -tag -width Dv
+.It Dv DDI_UFM_ATTR_READABLE
+This attribute indicates that the firmware image in the specified slot
+may be read, even if the device driver does not currently support such
+functionality.
+.It Dv DDI_UFM_ATTR_WRITEABLE
+This attributes indicates that the firmware image in the specified slot
+may be updated, even if the driver does not currently support such
+functionality.
+.It Dv DDI_UFM_ATTR_ACTIVE
+This attributes indicates that the firmware image in the specified slot
+is the active
+.Pq i.e. currently running
+firmware.
+Only one slot should be marked active.
+.It Dv DDI_UFM_ATTR_EMPTY
+This attributes indicates that the specified slot does not currently contain
+any firmware image.
+.El
+.Pp
+Finally, if there are any device-specific key-value pairs that form
+useful, ancillary data, then the driver should assemble an nvlist and
+pass it to the
+.Xr ddi_ufm_set_misc 9F
+function.
+.Pp
+Once the driver has finished setting all of the information about the
+slot then the driver should return
+.Sy 0 .
+Otherwise, the driver should return the appropriate error number.
+For a full list of error numbers, see
+.Xr Intro 2 .
+Common values are:
+.Bl -tag -width Er -offset width
+.It Er EINVAL
+The image or slot indicated by
+.Fa imgid
+and
+.Fa slotid
+is unknown.
+.It Er EIO
+An error occurred talking to the device while trying to fill out
+firmware slot information.
+.It Er ENOMEM
+The driver was unable to allocate memory while filling out slot
+information.
+.El
+.It Fn ddi_ufm_op_getcaps
+The
+.Fn ddi_ufm_op_getcaps
+function is used to indicate which DDI UFM capabilities are supported by this
+driver instance.
+Currently there is only a single capability
+.Pq DDI_UFM_CAP_REPORT
+which indicates that the driver is capable of reporting UFM information for this
+instance.
+Future UFM versions may add additional capabilities such as the ability to
+obtain a raw dump of the firmware image or to upgrade the firmware.
+.Pp
+The driver should indicate the supported capabilities by setting the value in
+the
+.Ft caps
+parameter.
+Once the driver has populated
+.Ft caps
+with an appropriate value, then the driver should return
+.Sy 0 .
+Otherwise, the driver should return the appropriate error number.
+For a full list of error numbers, see
+.Xr Intro 2 .
+Common values are:
+.Bl -tag -width Er -offset width
+.It Er EIO
+An error occurred talking to the device while trying to discover firmware
+capabilties.
+.It Er ENOMEM
+The driver was unable to allocate memory.
+.El
+.El
+.Ss Caching and Updates
+The system will fetch firmware and slot information on an as-needed
+basis.
+Once it obtains some information, it may end up caching this information on
+behalf of the driver.
+Whenever the driver believes that something could have changed -- it need know
+that it has -- then the driver must call
+.Xr ddi_ufm_update 9F .
+.Ss Locking
+All UFM operations on a single UFM handle will always be run serially.
+However, the device driver may still need to apply adequate locking to
+its structure members as other may be accessing the same data structure
+or trying to communicate with the device.
+.Ss Unregistering from the UFM subsystem
+When a device driver is detached, it should unregister from the UFM
+subsystem.
+To do so, the driver should call
+.Xr ddi_ufm_fini 9F .
+By the time this function returns, the driver is guaranteed that no UFM
+entry points will be called.
+However, if there are outstanding UFM related activity, the function will
+block until it is terminated.
+.Ss ioctl Interface
+Userland consumers can access UFM information via a set of ioctls that are
+implemented by the
+.Xr ufd 7D
+driver.
+.Sh CONTEXT
+The various UFM entry points that a device driver must implement will
+always be called from
+.Sy kernel
+context.
+.Sh SEE ALSO
+.Xr Intro 2 ,
+.Xr ufd 7D ,
+.Xr attach 9E ,
+.Xr ddi_ufm_fini 9F ,
+.Xr ddi_ufm_image 9F ,
+.Xr ddi_ufm_image_set_desc 9F ,
+.Xr ddi_ufm_image_set_misc 9F ,
+.Xr ddi_ufm_image_set_nslots 9F ,
+.Xr ddi_ufm_init 9F ,
+.Xr ddi_ufm_slot 9F ,
+.Xr ddi_ufm_slot_set_attrs 9F ,
+.Xr ddi_ufm_slot_set_misc 9F ,
+.Xr ddi_ufm_slot_set_version 9F ,
+.Xr ddi_ufm_update 9F

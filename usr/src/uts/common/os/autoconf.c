@@ -22,6 +22,9 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 /*
  * This file contains ddi functions needed during boot and DR.
@@ -49,6 +52,7 @@
 #include <sys/bootconf.h>
 #include <sys/fm/util.h>
 #include <sys/ddifm_impl.h>
+#include <sys/ddi_ufm_impl.h>
 
 extern dev_info_t *top_devinfo;
 extern dev_info_t *scsi_vhci_dip;
@@ -91,6 +95,7 @@ setup_ddi(void)
 	fm_init();
 	ndi_fm_init();
 	irm_init();
+	ufm_init();
 
 	(void) i_ddi_load_drvconf(DDI_MAJOR_T_NONE);
 

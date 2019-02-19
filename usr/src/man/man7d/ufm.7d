@@ -1,0 +1,206 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd Jun 5, 2019
+.Dt UFM 7D
+.Os
+.Sh NAME
+.Nm ufm
+.Nd Upgradeable Firmware Module driver
+.Sh SYNOPSIS
+.Pa /dev/ufm
+.Lp
+.In sys/ddi_ufm.h
+.Sh DESCRIPTION
+The
+.Nm
+device is a character special file that provides acccess to
+Upgradeable Firmware Image information, as described in
+.Xr ddi_ufm 9E
+via a private ioctl interface.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /kernel/drv/amd64/ufm
+64-bit AMD64 ELF kernel driver
+.It Pa /kernel/drv/sparcv9/ufm
+64-bit SPARC ELF kernel driver
+.El
+.Sh IOCTLS
+The
+.Nm
+driver implements a versioned ioctl interface for accessing UFM facilities.
+The ioctl interfaces are defined in sys/ddi_ufm.h.
+The following ioctl cmds are supported by DDI_UFM_VERSION_ONE:
+.Bl -tag -width Dv
+.It Dv UFM_IOC_GETCAPS
+The
+.Dv UFM_IOC_GETCAPS
+ioctl is used to retrieve the set of DDI UFM capabilities supported by this
+device instance.
+Currently there is only a single capability
+.Dv DDI_UFM_CAP_REPORT ,
+which indicates
+that the driver is capable of reporting UFM information.
+.Pp
+The ddi_ufm_cap_t type defines a bitfield enumerating the full set of DDI UFM
+capabilities.
+.Bd -literal
+typedef enum {
+	DDI_UFM_CAP_REPORT	= 1 << 0,
+} ddi_ufm_cap_t;
+.Ed
+.Pp
+The ufm_ioc_getcaps_t type defines the input/output data for the
+.Dv UFM_IOC_GETCAPS
+ioctl.
+Callers should specify the ufmg_version and ufmg_devpath fields.
+On success the ufmg_caps field will be filled in with a value indicating the
+supported UFM capabilities of the device specified in ufmg_devpath.
+.Bd -literal
+typedef struct ufm_ioc_getcaps {
+	uint_t 		ufmg_version;	/* DDI_UFM_VERSION */
+	uint_t		ufmg_caps;	/* UFM Caps */
+	char 		ufmg_devpath[MAXPATHLEN];
+} ufm_ioc_getcaps_t;
+.Ed
+.It UFM_IOC_REPORTSZ
+The
+.Dv UFM_IOC_REPORTSZ ioctl is used to retrieve the amount of space
+(in bytes) required to hold the UFM data for this device instance.
+This should be used to allocate a sufficiently sized buffer for the
+.Dv UFM_IOC_REPORT
+ioctl.
+.Pp
+The ufm_ioc_bufsz_t struct defines the input/output data for the
+.Dv UFM_IOC_REPORTSZ ioctl.
+Callers should specify the ufbz_version and ufbz_devpath fields.
+On success the ufmg_size field will be filled in with the required buffer size.
+.Bd -literal
+typedef struct ufm_ioc_bufsz {
+	uint_t 		ufbz_version;	/* DDI_UFM_VERSION */
+	size_t		ufbz_size;	/* sz of buf to be returned by ioctl */
+	char		ufbz_devpath[MAXPATHLEN];
+} ufm_ioc_bufsz_t;
+.Ed
+.It UFM_IOC_REPORT
+The
+.Dv UFM_IOC_REPORT ioctl returns UFM image and slot data in the form of a
+packed nvlist.
+The ufm_ioc_report_t struct defines the input/output data for the
+.Dv UFM_IOC_REPORT
+ioctl.
+Callers should specify the ufmr_version, ufmr_bufsz and ufmr_devpath fields.
+On success, the ufmr_buf field will point to a packed nvlist containing the UFM
+data for the specified device instance.
+This data can be unpacked and decoded into an nvlist using
+.Xr nvlist_unpack 3NVPAIR .
+.Bd -literal
+typedef struct ufm_ioc_report {
+	uint_t		ufmr_version;	/* DDI_UFM_VERSION */
+	size_t		ufmr_bufsz;	/* size of caller-supplied buffer */
+	caddr_t		ufmr_buf;	/* buf to hold packed output nvl */
+	char		ufmr_devpath[MAXPATHLEN];
+} ufm_ioc_report_t;
+.Pp
+Due to the asynchronous nature of the system, it's possible for a device to
+undergo a configuration change in between a
+.Dv UFM_IOC_REPORTSZ ioctl and a subsequent
+.Dv UFM_IOC_REPORT ioctl that would alter the size of the buffer
+required to hold the UFM data.
+.Pp
+If the size of buffer supplied in the
+.Dv UFM_IOC_REPORT ioctl is greater than is required to hold the UFM data, then
+the ioctl will succeed and the ufmr_bufsz field will be updated to reflect the
+actual size of the returned UFM data.
+If the size of buffer supplied in the
+.Dv UFM_IOC_REPORT ioctl is less than what is required to hold the UFM data,
+the ioctl will fail with errno set to
+.Er EOVERFLOW .
+.Ed
+.El
+.Sh EXAMPLES
+This example demonstrates how to use the UFM_IOC_GETCAPS ioctl to determine
+the UFM capabilities of a given device instance.
+.Bd -literal
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/ddi_ufm.h>
+#include <sys/types.h>
+
+static const char devname[] = "/pci@ce,0/pci8086,2030@0/pci15d9,808@0";
+
+int
+main(int argc, char **argv)
+{
+        int fd;
+        ufm_ioc_getcaps_t ioc = { 0 };
+
+        if ((fd = open(DDI_UFM_DEV, O_RDWR)) < 0) {
+                (void) fprintf(stderr, "failed to open %s (%s)\n", DDI_UFM_DEV,
+                    strerror(errno));
+                return (1);
+        }
+
+        ioc.ufmg_version = DDI_UFM_CURRENT_VERSION;
+        (void) strcpy(ioc.ufmg_devpath, devname);
+
+        if (ioctl(fd, UFM_IOC_GETCAPS, &ioc) < 0) {
+                (void) fprintf(stderr, "getcaps ioctl failed (%s)\n",
+                    strerror(errno));
+                (void) close(fd);
+                return (1);
+        }
+        if ((ioc.ufmg_caps & DDI_UFM_CAP_REPORT) == 0) {
+                (void) printf("Driver does not support DDI_UFM_CAP_REPORT\n");
+        } else {
+                (void) printf("Driver supports DDI_UFM_CAP_REPORT\n");
+        }
+        (void) close(fd);
+        return (0);
+}
+.Ed
+.Sh ERRORS
+On failure to open or perform ioctls to the
+.Nm
+driver, 
+.Va errno
+will be set to indicate the type of error.
+A subset of the more common errors are detailed below.
+For a full list of error numbers, see
+.Xr Intro 2
+.Bl -tag -width Er
+.It Er ENOTSUP
+Either the requested ioctl is not supported by the target device, the device
+does not exist or the device does not support the UFM interfaces.
+.It Er EFAULT
+The ufm driver encountered a failure while copying data either from or to the
+address space of the calling process.
+.It Er EAGAIN
+The device driver is not currently ready to accept calls to it's DDI UFM entry
+points.
+This may be because the driver is not fully initialized or because the driver
+is in the process of detaching.
+.It Er EIO
+A failure occurred while executing a DDI UFM entry point.
+.El
+.Sh INTERFACE STABILITY
+.Sy Evolving
+.Sh SEE ALSO
+.Xr ddi_ufm 9E ,
+.Xr ddi_ufm_image 9E ,
+.Xr ddi_ufm_slot 9E ,
+.Xr ddi_ufm 9F

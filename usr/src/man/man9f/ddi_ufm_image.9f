@@ -1,0 +1,101 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd Apr 30, 2019
+.Dt DDI_UFM_IMAGE 9F
+.Os
+.Sh NAME
+.Nm ddi_ufm_image_set_desc ,
+.Nm ddi_ufm_image_set_misc
+.Nd UFM image property routines
+.Sh SYNOPSIS
+.In sys/ddi_ufm.h
+.Ft void
+.Fo ddi_ufm_image_set_desc
+.Fa "ddi_ufm_image_t *uip"
+.Fa "const char *description"
+.Fc
+.Ft void
+.Fo ddi_ufm_image_set_misc
+.Fa "ddi_ufm_image_t *uip"
+.Fa "nvlist_t *nvl"
+.Fc
+.Ft void
+.Fo ddi_ufm_image_set_nslots
+.Fa "ddi_ufm_image_t *uip"
+.Fa "uint_t nslots"
+.Fc
+.Sh INTERFACE LEVEL
+.Sy Evolving -
+This interface is evolving still in illumos.
+API and ABI stability is not guaranteed.
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa uip
+A pointer to a UFM image that was passed to the driver in its
+.Xr ddi_ufm_op_fill_image 9E
+entry point.
+.It Fa description
+A human-readable description of the firmware image.
+.It Fa nvl
+An nvlist_t with ancillary, device-specific data.
+.It Fa nslots
+The number of firmware slots supported by this firmare image.
+.El
+.Sh DESCRIPTION
+The
+.Fn ddi_ufm_image_set_desc ,
+.Fn ddi_ufm_image_set_misc
+and
+.Fn ddi_ufm_image_set_nslots
+functions are used by device drivers to set information about a firmware
+image on the image structure
+.Fa uip
+as a part of implementing their
+.Xr ddi_ufm_op_fill_image 9E
+entry point.
+For more information on images and the use of these functions, see the
+description of the
+.Fn ddi_ufm_op_fill_image
+function in
+.Xr ddi_ufm 9E .
+.Pp
+The
+.Fn ddi_ufm_image_set_desc
+function sets the description of the firmware image.
+This description is intended for administrators and should convey the intended
+use of the image.
+.Pp
+The
+.Fn ddi_ufm_image_set_misc
+function is used by drivers to set ancillary key-value data that may be
+useful to a consumer.
+The driver should create an nvlist for this purpose with
+.Xr nvlist_alloc 9F
+Once the driver passes the nvlist to the
+.Fn ddi_ufm_image_set_misc
+function, then the driver must not manipulate or free the nvlist at all.
+It is the property of the UFM subsystem.
+.Pp
+The
+.Fn ddi_ufm_image_set_nslots
+function should be called to indicate the number of firmware slots supported
+by this firmware image.
+.Sh CONTEXT
+These functions should only be called in the context of the
+.Xr ddi_ufm_op_fill_image 9E
+entry point.
+.Sh SEE ALSO
+.Xr ddi_ufm 9E ,
+.Xr ddi_ufm_op_fill_image 9E ,
+.Xr nvlist_alloc 9F

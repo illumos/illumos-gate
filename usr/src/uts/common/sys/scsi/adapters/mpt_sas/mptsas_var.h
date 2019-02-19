@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
 
@@ -62,6 +62,7 @@
 #include <sys/isa_defs.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
+#include <sys/ddi_ufm.h>
 #include <sys/scsi/adapters/mpt_sas/mptsas_ioctl.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_tool.h>
 #include <sys/scsi/adapters/mpt_sas/mpi/mpi2_cnfg.h>
@@ -913,6 +914,9 @@ typedef struct mptsas {
 	int			m_diag_action_in_progress;
 	uint16_t		m_dev_handle;
 	uint16_t		m_smp_devhdl;
+
+	/* DDI UFM Handle */
+	ddi_ufm_handle_t	*m_ufmh;
 
 	/*
 	 * Event recording

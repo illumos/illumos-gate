@@ -70,6 +70,7 @@ extern "C" {
 #include <sys/list.h>
 #include <sys/debug.h>
 #include <sys/sdt.h>
+#include <sys/ddi_ufm.h>
 #include "i40e_type.h"
 #include "i40e_osdep.h"
 #include "i40e_prototype.h"
@@ -342,6 +343,7 @@ typedef enum i40e_attach_state {
 	I40E_ATTACH_ENABLE_INTR	= 0x1000,	/* DDI interrupts enabled */
 	I40E_ATTACH_FM_INIT	= 0x2000,	/* FMA initialized */
 	I40E_ATTACH_LINK_TIMER	= 0x4000,	/* link check timer */
+	I40E_ATTACH_UFM_INIT	= 0x8000,	/* DDI UFM initialized */
 } i40e_attach_state_t;
 
 
@@ -932,6 +934,9 @@ typedef struct i40e {
 	 */
 	uint32_t	i40e_led_status;
 	boolean_t	i40e_led_saved;
+
+	/* DDI UFM handle */
+	ddi_ufm_handle_t	*i40e_ufmh;
 } i40e_t;
 
 /*

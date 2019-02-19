@@ -11,13 +11,25 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 SUBDIRS_i386 = i386
 
-SUBDIRS = poll secflags sigqueue spoof-ras sdevfs sockfs stress timer tmpfs \
-	file-locking pf_key $(SUBDIRS_$(MACH))
+SUBDIRS =       \
+		ddi_ufm \
+		file-locking \
+		pf_key \
+		poll \
+		sdevfs \
+		secflags \
+		sigqueue \
+		sockfs \
+		spoof-ras \
+		stress \
+		timer \
+		tmpfs \
+		$(SUBDIRS_$(MACH))
 
 PROGS = \
 	OS-6097

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -515,6 +515,7 @@ ipmi_enum_sp(topo_mod_t *mod, tnode_t *pnode)
 	nvlist_t *auth, *fmri;
 	tnode_t *sp_node;
 	topo_pgroup_info_t pgi;
+	topo_ufm_slot_info_t slotinfo = { 0 };
 	int err, ch, i, ret = -1;
 
 	if ((ihp = topo_mod_ipmi_hold(mod)) == NULL)
@@ -575,6 +576,19 @@ ipmi_enum_sp(topo_mod_t *mod, tnode_t *pnode)
 		goto out;
 	}
 	nvlist_free(fmri);
+
+	/*
+	 * Create UFM node to capture the SP LOM version
+	 */
+	slotinfo.usi_version = sp_rev;
+	slotinfo.usi_active = B_TRUE;
+	slotinfo.usi_mode = TOPO_UFM_SLOT_MODE_NONE;
+	if (topo_node_range_create(mod, sp_node, UFM, 0, 0) != 0 ||
+	    topo_mod_create_ufm(mod, sp_node,
+	    "Baseboard Management Controller firmware", &slotinfo) == NULL) {
+		topo_mod_dprintf(mod, "failed to create %s node", UFM);
+		goto out;
+	}
 
 	/*
 	 * Iterate through the channels to find the LAN channel.

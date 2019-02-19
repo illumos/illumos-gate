@@ -12,7 +12,7 @@
 #
 # Copyright 2017, Richard Lowe
 # Copyright 2014 Garrett D'Amore <garrett@damore>
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 # Copyright 2016 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
@@ -242,6 +242,9 @@ MANFILES=	ASSERT.9f				\
 		ddi_strtol.9f				\
 		ddi_strtoll.9f				\
 		ddi_strtoul.9f				\
+		ddi_ufm.9f				\
+		ddi_ufm_image.9f			\
+		ddi_ufm_slot.9f				\
 		ddi_umem_alloc.9f			\
 		ddi_umem_iosetup.9f			\
 		ddi_umem_lock.9f			\
@@ -915,6 +918,14 @@ MANLINKS=	AVL_NEXT.9f					\
 		ddi_taskq_suspend.9f				\
 		ddi_taskq_wait.9f				\
 		ddi_trigger_softintr.9f				\
+		ddi_ufm_fini.9f					\
+		ddi_ufm_image_set_desc.9f			\
+		ddi_ufm_image_set_misc.9f			\
+		ddi_ufm_init.9f					\
+		ddi_ufm_slot_set_attrs.9f			\
+		ddi_ufm_slot_set_misc.9f			\
+		ddi_ufm_slot_set_version.9f			\
+		ddi_ufm_update.9f				\
 		ddi_umem_free.9f				\
 		ddi_umem_unlock.9f				\
 		ddi_unmap_regs.9f				\
@@ -1754,6 +1765,15 @@ devmap_umem_setup.9f			:= LINKSRC = devmap_devmem_setup.9f
 ddi_devmap_segmap.9f			:= LINKSRC = devmap_setup.9f
 
 devmap_load.9f				:= LINKSRC = devmap_unload.9f
+
+ddi_ufm_fini.9f				:= LINKSRC = ddi_ufm.9f
+ddi_ufm_image_set_desc.9f		:= LINKSRC = ddi_ufm_image.9f
+ddi_ufm_image_set_misc.9f		:= LINKSRC = ddi_ufm_image.9f
+ddi_ufm_init.9f				:= LINKSRC = ddi_ufm.9f
+ddi_ufm_slot_set_attrs.9f		:= LINKSRC = ddi_ufm_slot.9f
+ddi_ufm_slot_set_misc.9f		:= LINKSRC = ddi_ufm_slot.9f
+ddi_ufm_slot_set_version.9f		:= LINKSRC = ddi_ufm_slot.9f
+ddi_ufm_update.9f			:= LINKSRC = ddi_ufm.9f
 
 dlerrorack.9f				:= LINKSRC = dlbindack.9f
 dlokack.9f				:= LINKSRC = dlbindack.9f

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -970,4 +970,226 @@ topo_mod_hc_occupied(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	*out = nvl;
 
 	return (0);
+}
+
+/*
+ * Convenience routine for creating a UFM slot node.  This routine assumes
+ * that the caller has already created the containing range via a call to
+ * topo_node_range_create().
+ */
+tnode_t *
+topo_mod_create_ufm_slot(topo_mod_t *mod, tnode_t *ufmnode,
+    topo_ufm_slot_info_t *slotinfo)
+{
+	nvlist_t *auth = NULL, *fmri = NULL;
+	tnode_t *slotnode;
+	topo_pgroup_info_t pgi;
+	int err, rc;
+
+	if (slotinfo == NULL || slotinfo->usi_version == NULL ||
+	    slotinfo->usi_mode == 0) {
+		topo_mod_dprintf(mod, "invalid slot info");
+		topo_mod_seterrno(mod, ETOPO_MOD_INVAL);
+		return (NULL);
+	}
+	if ((auth = topo_mod_auth(mod, ufmnode)) == NULL) {
+		topo_mod_dprintf(mod, "topo_mod_auth() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		return (NULL);
+	}
+
+	if ((fmri = topo_mod_hcfmri(mod, ufmnode, FM_HC_SCHEME_VERSION,
+	    SLOT, slotinfo->usi_slotid, NULL, auth, NULL, NULL, NULL)) ==
+	    NULL) {
+		nvlist_free(auth);
+		topo_mod_dprintf(mod, "topo_mod_hcfmri() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		return (NULL);
+	}
+
+	if ((slotnode = topo_node_bind(mod, ufmnode, SLOT,
+	    slotinfo->usi_slotid, fmri)) == NULL) {
+		nvlist_free(auth);
+		nvlist_free(fmri);
+		topo_mod_dprintf(mod, "topo_node_bind() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		return (NULL);
+	}
+
+	/* Create authority and system pgroups */
+	topo_pgroup_hcset(slotnode, auth);
+	nvlist_free(auth);
+	nvlist_free(fmri);
+
+	/* Just inherit the parent's FRU */
+	if (topo_node_fru_set(slotnode, NULL, NULL, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set FRU on %s: %s", UFM,
+		    topo_strerror(err));
+		(void) topo_mod_seterrno(mod, err);
+		goto slotfail;
+	}
+
+	pgi.tpi_name = TOPO_PGROUP_SLOT;
+	pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
+	pgi.tpi_datastab = TOPO_STABILITY_PRIVATE;
+	pgi.tpi_version = TOPO_VERSION;
+	rc = topo_pgroup_create(slotnode, &pgi, &err);
+
+	if (rc == 0)
+		rc += topo_prop_set_uint32(slotnode, TOPO_PGROUP_SLOT,
+		    TOPO_PROP_SLOT_TYPE, TOPO_PROP_IMMUTABLE,
+		    TOPO_SLOT_TYPE_UFM, &err);
+
+	pgi.tpi_name = TOPO_PGROUP_UFM_SLOT;
+
+	if (rc == 0)
+		rc += topo_pgroup_create(slotnode, &pgi, &err);
+
+	if (rc == 0) {
+		rc += topo_prop_set_uint32(slotnode, TOPO_PGROUP_UFM_SLOT,
+		    TOPO_PROP_UFM_SLOT_MODE, TOPO_PROP_IMMUTABLE,
+		    slotinfo->usi_mode, &err);
+	}
+
+	if (rc == 0) {
+		rc += topo_prop_set_uint32(slotnode, TOPO_PGROUP_UFM_SLOT,
+		    TOPO_PROP_UFM_SLOT_ACTIVE, TOPO_PROP_IMMUTABLE,
+		    (uint32_t)slotinfo->usi_active, &err);
+	}
+
+	if (rc == 0) {
+		rc += topo_prop_set_string(slotnode, TOPO_PGROUP_UFM_SLOT,
+		    TOPO_PROP_UFM_SLOT_VERSION, TOPO_PROP_IMMUTABLE,
+		    slotinfo->usi_version, &err);
+	}
+
+	if (rc == 0 && slotinfo->usi_extra != NULL) {
+		nvpair_t *elem = NULL;
+		char *pname, *pval;
+
+		while ((elem = nvlist_next_nvpair(slotinfo->usi_extra,
+		    elem)) != NULL) {
+			if (nvpair_type(elem) != DATA_TYPE_STRING)
+				continue;
+
+			pname = nvpair_name(elem);
+			if ((rc -= nvpair_value_string(elem, &pval)) != 0)
+				break;
+
+			rc += topo_prop_set_string(slotnode,
+			    TOPO_PGROUP_UFM_SLOT, pname, TOPO_PROP_IMMUTABLE,
+			    pval, &err);
+
+			if (rc != 0)
+				break;
+		}
+	}
+
+	if (rc != 0) {
+		topo_mod_dprintf(mod, "error setting properties on %s node",
+		    SLOT);
+		(void) topo_mod_seterrno(mod, err);
+		goto slotfail;
+	}
+	return (slotnode);
+
+slotfail:
+	topo_node_unbind(slotnode);
+	return (NULL);
+}
+
+/*
+ * This is a convenience routine to allow enumerator modules to easily create
+ * the necessary UFM node layout for the most common case, which will be a
+ * single UFM with a single slot.  This routine assumes that the caller has
+ * already created the containing range via a call to topo_node_range_create().
+ *
+ * For more complex scenarios (like multiple slots per UFM), callers can set
+ * the slotinfo param to NULL.  In this case the ufm node will get created, but
+ * it will skip creating the slot node - allowing the module to manually call
+ * topo_mod_create_ufm_slot() to create custom UFM slots.
+ */
+tnode_t *
+topo_mod_create_ufm(topo_mod_t *mod, tnode_t *parent, const char *descr,
+    topo_ufm_slot_info_t *slotinfo)
+{
+	nvlist_t *auth = NULL, *fmri = NULL;
+	tnode_t *ufmnode, *slotnode;
+	topo_pgroup_info_t pgi;
+	int err, rc;
+
+	if ((auth = topo_mod_auth(mod, parent)) == NULL) {
+		topo_mod_dprintf(mod, "topo_mod_auth() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		return (NULL);
+	}
+
+	if ((fmri = topo_mod_hcfmri(mod, parent, FM_HC_SCHEME_VERSION,
+	    UFM, 0, NULL, auth, NULL, NULL, NULL)) ==
+	    NULL) {
+		nvlist_free(auth);
+		topo_mod_dprintf(mod, "topo_mod_hcfmri() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		return (NULL);
+	}
+
+	if ((ufmnode = topo_node_bind(mod, parent, UFM, 0, fmri)) == NULL) {
+		nvlist_free(auth);
+		nvlist_free(fmri);
+		topo_mod_dprintf(mod, "topo_node_bind() failed: %s",
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		return (NULL);
+	}
+
+	/* Create authority and system pgroups */
+	topo_pgroup_hcset(ufmnode, auth);
+	nvlist_free(auth);
+	nvlist_free(fmri);
+
+	/* Just inherit the parent's FRU */
+	if (topo_node_fru_set(ufmnode, NULL, NULL, &err) != 0) {
+		topo_mod_dprintf(mod, "failed to set FRU on %s: %s", UFM,
+		    topo_strerror(err));
+		(void) topo_mod_seterrno(mod, err);
+		goto ufmfail;
+	}
+
+	pgi.tpi_name = TOPO_PGROUP_UFM;
+	pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
+	pgi.tpi_datastab = TOPO_STABILITY_PRIVATE;
+	pgi.tpi_version = TOPO_VERSION;
+	rc = topo_pgroup_create(ufmnode, &pgi, &err);
+
+	if (rc == 0)
+		rc += topo_prop_set_string(ufmnode, TOPO_PGROUP_UFM,
+		    TOPO_PROP_UFM_DESCR, TOPO_PROP_IMMUTABLE, descr, &err);
+
+	if (rc != 0) {
+		topo_mod_dprintf(mod, "error setting properties on %s node",
+		    UFM);
+		(void) topo_mod_seterrno(mod, err);
+		goto ufmfail;
+	}
+
+	if (slotinfo != NULL) {
+		if (topo_node_range_create(mod, ufmnode, SLOT, 0, 0) < 0) {
+			topo_mod_dprintf(mod, "error creating %s range", SLOT);
+			goto ufmfail;
+		}
+		slotnode = topo_mod_create_ufm_slot(mod, ufmnode, slotinfo);
+
+		if (slotnode == NULL)
+			goto ufmfail;
+	}
+	return (ufmnode);
+
+ufmfail:
+	topo_node_unbind(ufmnode);
+	return (NULL);
 }

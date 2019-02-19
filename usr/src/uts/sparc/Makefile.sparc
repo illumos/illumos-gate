@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
-# Copyright (c) 2015, Joyent, Inc. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2016 Gary Mills
 # Copyright 2016 Nexenta Systems, Inc.
 #
@@ -244,6 +244,8 @@ DRV_KMODS	+= inotify
 DRV_KMODS	+= eventfd
 DRV_KMODS	+= signalfd
 DRV_KMODS	+= timerfd
+DRV_KMODS	+= ufm
+DRV_KMODS	+= ufmtest
 
 #
 #       Hardware Drivers in common space

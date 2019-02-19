@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2014 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2014, Tegile Systems Inc. All rights reserved.
  */
@@ -131,7 +131,17 @@ static int mptsas_quiesce(dev_info_t *devi);
 #endif	/* __sparc */
 
 /*
- * Resource initilaization for hardware
+ * ddi_ufm_ops
+ */
+static int mptsas_ufm_fill_image(ddi_ufm_handle_t *ufmh, void *arg,
+    uint_t imgno, ddi_ufm_image_t *img);
+static int mptsas_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg,
+    uint_t imgno, uint_t slotno, ddi_ufm_slot_t *slot);
+static int mptsas_ufm_getcaps(ddi_ufm_handle_t *ufmh, void *arg,
+    ddi_ufm_cap_t *caps);
+
+/*
+ * Resource initialization for hardware
  */
 static void mptsas_setup_cmd_reg(mptsas_t *mpt);
 static void mptsas_disable_bus_master(mptsas_t *mpt);
@@ -559,6 +569,12 @@ static struct dev_ops mptsas_ops = {
 #endif	/* __sparc */
 };
 
+static ddi_ufm_ops_t mptsas_ufm_ops = {
+	NULL,
+	mptsas_ufm_fill_image,
+	mptsas_ufm_fill_slot,
+	mptsas_ufm_getcaps
+};
 
 #define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.24"
 
@@ -1237,6 +1253,15 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	mptsas_fm_init(mpt);
 
+	/*
+	 * Initialize us with the UFM subsystem
+	 */
+	if (ddi_ufm_init(dip, DDI_UFM_CURRENT_VERSION, &mptsas_ufm_ops,
+	    &mpt->m_ufmh, mpt) != 0) {
+		mptsas_log(mpt, CE_WARN, "failed to initialize UFM subsystem");
+		goto fail;
+	}
+
 	if (mptsas_alloc_handshake_msg(mpt,
 	    sizeof (Mpi2SCSITaskManagementRequest_t)) == DDI_FAILURE) {
 		mptsas_log(mpt, CE_WARN, "cannot initialize handshake msg.");
@@ -1536,6 +1561,9 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * After this point, we are not going to fail the attach.
 	 */
+
+	/* Let the UFM susbsystem know we're ready to receive callbacks */
+	ddi_ufm_update(mpt->m_ufmh);
 
 	/* Print message of HBA present */
 	ddi_report_dev(dip);
@@ -1876,6 +1904,9 @@ mptsas_do_detach(dev_info_t *dip)
 	if (!mpt) {
 		return (DDI_FAILURE);
 	}
+
+	ddi_ufm_fini(mpt->m_ufmh);
+
 	/*
 	 * Still have pathinfo child, should not detach mpt driver
 	 */
@@ -16968,4 +16999,48 @@ mptsas_dma_addr_destroy(ddi_dma_handle_t *dma_hdp, ddi_acc_handle_t *acc_hdp)
 	(void) ddi_dma_mem_free(acc_hdp);
 	ddi_dma_free_handle(dma_hdp);
 	*dma_hdp = NULL;
+}
+
+/*
+ * DDI UFM Callbacks
+ */
+static int
+mptsas_ufm_fill_image(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    ddi_ufm_image_t *img)
+{
+	if (imgno != 0)
+		return (EINVAL);
+
+	ddi_ufm_image_set_desc(img, "IOC Firmware");
+	ddi_ufm_image_set_nslots(img, 1);
+
+	return (0);
+}
+
+static int
+mptsas_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    uint_t slotno, ddi_ufm_slot_t *slot)
+{
+	mptsas_t *mpt = (mptsas_t *)arg;
+	char *buf;
+
+	if (imgno != 0 || slotno != 0 ||
+	    ddi_prop_lookup_string(DDI_DEV_T_ANY, mpt->m_dip,
+	    DDI_PROP_DONTPASS, "firmware-version", &buf) != DDI_PROP_SUCCESS)
+		return (EINVAL);
+
+	ddi_ufm_slot_set_attrs(slot, DDI_UFM_ATTR_ACTIVE);
+	ddi_ufm_slot_set_version(slot, buf);
+
+	ddi_prop_free(buf);
+
+	return (0);
+}
+
+static int
+mptsas_ufm_getcaps(ddi_ufm_handle_t *ufmh, void *arg, ddi_ufm_cap_t *caps)
+{
+	*caps = DDI_UFM_CAP_REPORT;
+
+	return (0);
 }

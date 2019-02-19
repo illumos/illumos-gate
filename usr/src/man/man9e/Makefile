@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 include		$(SRC)/Makefile.master
@@ -28,6 +28,7 @@ MANFILES=	Intro.9e		\
 		close.9e		\
 		csx_event_handler.9e	\
 		detach.9e		\
+		ddi_ufm.9e		\
 		devmap.9e		\
 		devmap_access.9e	\
 		devmap_contextmgt.9e	\
@@ -96,7 +97,11 @@ MANFILES=	Intro.9e		\
 		usba_hcdi.9e		\
 		write.9e
 
-MANLINKS=	_info.9e		\
+MANLINKS=	ddi_ufm_op_fill_image.9e	\
+		ddi_ufm_op_fill_slot.9e	\
+		ddi_ufm_op_nimages.9e	\
+		ddi_ufm_op_nslots.9e	\
+		_info.9e		\
 		_init.9e		\
 		gldv3.9e		\
 		GLDv3.9e		\
@@ -130,6 +135,10 @@ MANLINKS=	_info.9e		\
 		usba_hcdi_pipe_close.9e		\
 		usba_hcdi_pipe_stop_isoc_polling.9e
 
+ddi_ufm_op_nimages.9e		:= LINKSRC = ddi_ufm.9e
+ddi_ufm_op_nslots.9e		:= LINKSRC = ddi_ufm.9e
+ddi_ufm_op_fill_image.9e	:= LINKSRC = ddi_ufm.9e
+ddi_ufm_op_fill_slot.9e		:= LINKSRC = ddi_ufm.9e
 intro.9e			:= LINKSRC = Intro.9e
 
 _info.9e			:= LINKSRC = _fini.9e

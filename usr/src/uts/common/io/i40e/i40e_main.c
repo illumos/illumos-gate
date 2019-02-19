@@ -1420,6 +1420,9 @@ i40e_unconfigure(dev_info_t *devinfo, i40e_t *i40e)
 	if (i40e->i40e_attach_progress & I40E_ATTACH_FM_INIT)
 		i40e_fm_fini(i40e);
 
+	if (i40e->i40e_attach_progress & I40E_ATTACH_UFM_INIT)
+		ddi_ufm_fini(i40e->i40e_ufmh);
+
 	kmem_free(i40e->i40e_aqbuf, I40E_ADMINQ_BUFSZ);
 	kmem_free(i40e, sizeof (i40e_t));
 
@@ -2033,7 +2036,7 @@ i40e_set_shared_vsi_props(i40e_t *i40e,
 	info->mapping_flags = LE_16(I40E_AQ_VSI_QUE_MAP_CONTIG);
 	info->queue_mapping[0] =
 	    LE_16((vsi_qp_base << I40E_AQ_VSI_QUEUE_SHIFT) &
-		I40E_AQ_VSI_QUEUE_MASK);
+	    I40E_AQ_VSI_QUEUE_MASK);
 
 	/*
 	 * tc_queues determines the size of the traffic class, where
@@ -2057,9 +2060,9 @@ i40e_set_shared_vsi_props(i40e_t *i40e,
 	 */
 	info->tc_mapping[0] =
 	    LE_16(((0 << I40E_AQ_VSI_TC_QUE_OFFSET_SHIFT) &
-		    I40E_AQ_VSI_TC_QUE_OFFSET_MASK) |
-		((tc_queues << I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT) &
-		    I40E_AQ_VSI_TC_QUE_NUMBER_MASK));
+	    I40E_AQ_VSI_TC_QUE_OFFSET_MASK) |
+	    ((tc_queues << I40E_AQ_VSI_TC_QUE_NUMBER_SHIFT) &
+	    I40E_AQ_VSI_TC_QUE_NUMBER_MASK));
 
 	/*
 	 * I40E_AQ_VSI_PVLAN_MODE_ALL ("VLAN driver insertion mode")
@@ -3208,6 +3211,85 @@ i40e_drain_rx(i40e_t *i40e)
 	return (B_TRUE);
 }
 
+/*
+ * DDI UFM Callbacks
+ */
+static int
+i40e_ufm_fill_image(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    ddi_ufm_image_t *img)
+{
+	if (imgno != 0)
+		return (EINVAL);
+
+	ddi_ufm_image_set_desc(img, "Firmware");
+	ddi_ufm_image_set_nslots(img, 1);
+
+	return (0);
+}
+
+static int
+i40e_ufm_fill_slot(ddi_ufm_handle_t *ufmh, void *arg, uint_t imgno,
+    uint_t slotno, ddi_ufm_slot_t *slot)
+{
+	i40e_t *i40e = (i40e_t *)arg;
+	char *fw_ver = NULL, *fw_bld = NULL, *api_ver = NULL;
+	nvlist_t *misc = NULL;
+	uint_t flags = DDI_PROP_DONTPASS;
+	int err;
+
+	if (imgno != 0 || slotno != 0 ||
+	    ddi_prop_lookup_string(DDI_DEV_T_ANY, i40e->i40e_dip, flags,
+	    "firmware-version", &fw_ver) != DDI_PROP_SUCCESS ||
+	    ddi_prop_lookup_string(DDI_DEV_T_ANY, i40e->i40e_dip, flags,
+	    "firmware-build", &fw_bld) != DDI_PROP_SUCCESS ||
+	    ddi_prop_lookup_string(DDI_DEV_T_ANY, i40e->i40e_dip, flags,
+	    "api-version", &api_ver) != DDI_PROP_SUCCESS) {
+		err = EINVAL;
+		goto err;
+	}
+
+	ddi_ufm_slot_set_attrs(slot, DDI_UFM_ATTR_ACTIVE);
+	ddi_ufm_slot_set_version(slot, fw_ver);
+
+	(void) nvlist_alloc(&misc, NV_UNIQUE_NAME, KM_SLEEP);
+	if ((err = nvlist_add_string(misc, "firmware-build", fw_bld)) != 0 ||
+	    (err = nvlist_add_string(misc, "api-version", api_ver)) != 0) {
+		goto err;
+	}
+	ddi_ufm_slot_set_misc(slot, misc);
+
+	ddi_prop_free(fw_ver);
+	ddi_prop_free(fw_bld);
+	ddi_prop_free(api_ver);
+
+	return (0);
+err:
+	nvlist_free(misc);
+	if (fw_ver != NULL)
+		ddi_prop_free(fw_ver);
+	if (fw_bld != NULL)
+		ddi_prop_free(fw_bld);
+	if (api_ver != NULL)
+		ddi_prop_free(api_ver);
+
+	return (err);
+}
+
+static int
+i40e_ufm_getcaps(ddi_ufm_handle_t *ufmh, void *arg, ddi_ufm_cap_t *caps)
+{
+	*caps = DDI_UFM_CAP_REPORT;
+
+	return (0);
+}
+
+static ddi_ufm_ops_t i40e_ufm_ops = {
+	NULL,
+	i40e_ufm_fill_image,
+	i40e_ufm_fill_slot,
+	i40e_ufm_getcaps
+};
+
 static int
 i40e_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
@@ -3322,6 +3404,14 @@ i40e_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		goto attach_fail;
 	}
 	i40e->i40e_attach_progress |= I40E_ATTACH_ENABLE_INTR;
+
+	if (ddi_ufm_init(i40e->i40e_dip, DDI_UFM_CURRENT_VERSION, &i40e_ufm_ops,
+	    &i40e->i40e_ufmh, i40e) != 0) {
+		i40e_error(i40e, "failed to initialize UFM subsystem");
+		goto attach_fail;
+	}
+	ddi_ufm_update(i40e->i40e_ufmh);
+	i40e->i40e_attach_progress |= I40E_ATTACH_UFM_INIT;
 
 	atomic_or_32(&i40e->i40e_state, I40E_INITIALIZED);
 

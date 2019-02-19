@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
@@ -164,6 +164,8 @@ CHKHDRS=			\
 	ddi_implfuncs.h		\
 	ddi_obsolete.h		\
 	ddi_periodic.h		\
+	ddi_ufm.h		\
+	ddi_ufm_impl.h		\
 	ddidevmap.h		\
 	ddidmareq.h		\
 	ddimapreq.h		\

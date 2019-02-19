@@ -717,6 +717,7 @@ f kernel/drv/amd64/tzmon 0755 root sys
 f kernel/drv/amd64/ucode 0755 root sys
 f kernel/drv/amd64/udp 0755 root sys
 f kernel/drv/amd64/udp6 0755 root sys
+f kernel/drv/amd64/ufm 0755 root sys
 f kernel/drv/amd64/ugen 0755 root sys
 f kernel/drv/amd64/uhci 0755 root sys
 f kernel/drv/amd64/usb_ac 0755 root sys
@@ -866,6 +867,7 @@ f kernel/drv/tzmon.conf 0644 root sys
 f kernel/drv/ucode.conf 0644 root sys
 f kernel/drv/udp.conf 0644 root sys
 f kernel/drv/udp6.conf 0644 root sys
+f kernel/drv/ufm.conf 0644 root sys
 f kernel/drv/uhci.conf 0644 root sys
 f kernel/drv/usbftdi.conf 0644 root sys
 f kernel/drv/usbser_edge.conf 0644 root sys
@@ -3859,6 +3861,8 @@ f usr/include/sys/ddi_intr_impl.h 0644 root bin
 f usr/include/sys/ddi_isa.h 0644 root bin
 f usr/include/sys/ddi_obsolete.h 0644 root bin
 f usr/include/sys/ddi_periodic.h 0644 root bin
+f usr/include/sys/ddi_ufm.h 0644 root bin
+f usr/include/sys/ddi_ufm_impl.h 0644 root bin
 f usr/include/sys/ddidevmap.h 0644 root bin
 f usr/include/sys/ddidmareq.h 0644 root bin
 f usr/include/sys/ddifm.h 0644 root bin
@@ -19177,6 +19181,7 @@ s usr/share/man/man7d/ticotsord.7d=ticlts.7d
 f usr/share/man/man7d/tty.7d 0444 root bin
 f usr/share/man/man7d/ttymux.7d 0444 root bin
 f usr/share/man/man7d/tzmon.7d 0444 root bin
+f usr/share/man/man7d/ufm.7d 0444 root bin
 f usr/share/man/man7d/ugen.7d 0444 root bin
 f usr/share/man/man7d/uhci.7d 0444 root bin
 s usr/share/man/man7d/urandom.7d=random.7d
@@ -19327,6 +19332,11 @@ f usr/share/man/man9e/awrite.9e 0444 root bin
 f usr/share/man/man9e/chpoll.9e 0444 root bin
 f usr/share/man/man9e/close.9e 0444 root bin
 f usr/share/man/man9e/csx_event_handler.9e 0444 root bin
+f usr/share/man/man9e/ddi_ufm.9e 0444 root bin
+s usr/share/man/man9e/ddi_ufm_op_fill_image.9e=ddi_ufm.9e
+s usr/share/man/man9e/ddi_ufm_op_fill_slot.9e=ddi_ufm.9e
+s usr/share/man/man9e/ddi_ufm_op_nimages.9e=ddi_ufm.9e
+s usr/share/man/man9e/ddi_ufm_op_nslots.9e=ddi_ufm.9e
 f usr/share/man/man9e/detach.9e 0444 root bin
 f usr/share/man/man9e/devmap.9e 0444 root bin
 f usr/share/man/man9e/devmap_access.9e 0444 root bin
@@ -20013,6 +20023,17 @@ s usr/share/man/man9f/ddi_taskq_resume.9f=taskq.9f
 s usr/share/man/man9f/ddi_taskq_suspend.9f=taskq.9f
 s usr/share/man/man9f/ddi_taskq_wait.9f=taskq.9f
 s usr/share/man/man9f/ddi_trigger_softintr.9f=ddi_add_softintr.9f
+f usr/share/man/man9f/ddi_ufm.9f 0444 root bin
+s usr/share/man/man9f/ddi_ufm_fini.9f=ddi_ufm.9f
+s usr/share/man/man9f/ddi_ufm_init.9f=ddi_ufm.9f
+s usr/share/man/man9f/ddi_ufm_update.9f=ddi_ufm.9f
+f usr/share/man/man9f/ddi_ufm_image.9f 0444 root bin
+s usr/share/man/man9f/ddi_ufm_image_set_desc.9f=ddi_ufm_image.9f
+s usr/share/man/man9f/ddi_ufm_image_set_misc.9f=ddi_ufm_image.9f
+f usr/share/man/man9f/ddi_ufm_slot.9f 0444 root bin
+s usr/share/man/man9f/ddi_ufm_slot_set_attrs.9f=ddi_ufm_slot.9f
+s usr/share/man/man9f/ddi_ufm_slot_set_misc.9f=ddi_ufm_slot.9f
+s usr/share/man/man9f/ddi_ufm_slot_set_version.9f=ddi_ufm_slot.9f
 f usr/share/man/man9f/ddi_umem_alloc.9f 0444 root bin
 s usr/share/man/man9f/ddi_umem_free.9f=ddi_umem_alloc.9f
 f usr/share/man/man9f/ddi_umem_iosetup.9f 0444 root bin
