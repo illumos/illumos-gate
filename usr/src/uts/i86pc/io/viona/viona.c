@@ -2532,9 +2532,18 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 	ipha_t *ipha = NULL;
 	uint8_t ipproto = IPPROTO_NONE; /* NONE is not exactly right, but ok */
 	uint16_t flags = 0;
+	const uint_t csum_start = hdr->vrh_csum_start;
+	const uint_t csum_stuff = hdr->vrh_csum_offset + csum_start;
 
-	if (MBLKL(mp) < sizeof (*eth)) {
-		/* Buffers shorter than an ethernet header are hopeless */
+	/*
+	 * Validate that the checksum offsets provided by the guest are within
+	 * the bounds of the packet.  Additionally, ensure that the checksum
+	 * contents field is within the headers mblk copied by viona_tx().
+	 */
+	if (csum_start >= len || csum_start < eth_len || csum_stuff >= len ||
+	    (csum_stuff + sizeof (uint16_t)) > MBLKL(mp)) {
+		VIONA_PROBE2(fail_hcksum, viona_link_t *, link, mblk_t *, mp);
+		VIONA_RING_STAT_INCR(ring, fail_hcksum);
 		return (B_FALSE);
 	}
 
@@ -2634,17 +2643,13 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 	 */
 	if ((link->l_cap_csum & HCKSUM_INET_PARTIAL) != 0 &&
 	    (ipproto == IPPROTO_TCP || ipproto == IPPROTO_UDP)) {
-		uint_t start, stuff, end;
-
 		/*
 		 * MAC expects these offsets to be relative to the
 		 * start of the L3 header rather than the L2 frame.
 		 */
-		start = hdr->vrh_csum_start - eth_len;
-		stuff = start + hdr->vrh_csum_offset;
-		end = len - eth_len;
 		flags |= HCK_PARTIALCKSUM;
-		mac_hcksum_set(mp, start, stuff, end, 0, flags);
+		mac_hcksum_set(mp, csum_start - eth_len, csum_stuff - eth_len,
+		    len - eth_len, 0, flags);
 		return (B_TRUE);
 	}
 
