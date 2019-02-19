@@ -2488,7 +2488,7 @@ start:	txinfo->nsegs = 0;
 		}
 		freemsg(*fp);
 		*fp = m;
-		mac_hcksum_set(m, NULL, NULL, NULL, NULL, txinfo->flags);
+		mac_hcksum_set(m, 0, 0, 0, 0, txinfo->flags);
 	}
 
 	if (txinfo->len <= IMM_LEN && !sgl_only)
@@ -2519,8 +2519,7 @@ start:	txinfo->nsegs = 0;
 				free_txinfo_resources(txq, txinfo);
 				freemsg(*fp);
 				*fp = m;
-				mac_hcksum_set(m, NULL, NULL, NULL, NULL,
-				    txinfo->flags);
+				mac_hcksum_set(m, 0, 0, 0, 0, txinfo->flags);
 				goto start;
 			}
 

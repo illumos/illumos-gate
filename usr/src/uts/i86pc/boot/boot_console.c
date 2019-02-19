@@ -629,19 +629,19 @@ bcons_init_fb(void)
 	fb_info.inverse = B_FALSE;
 	fb_info.inverse_screen = B_FALSE;
 
-	/* color values are 0 - 7 */
+	/* color values are 0 - 255 */
 	propval = find_boot_prop("tem.fg_color");
 	if (propval != NULL) {
 		intval = atoi(propval);
-		if (intval >= 0 && intval <= 7)
+		if (intval >= 0 && intval <= 255)
 			fb_info.fg_color = intval;
 	}
 
-	/* color values are 0 - 7 */
+	/* color values are 0 - 255 */
 	propval = find_boot_prop("tem.bg_color");
 	if (propval != NULL && ISDIGIT(*propval)) {
 		intval = atoi(propval);
-		if (intval >= 0 && intval <= 7)
+		if (intval >= 0 && intval <= 255)
 			fb_info.bg_color = intval;
 	}
 

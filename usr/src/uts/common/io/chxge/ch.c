@@ -321,7 +321,7 @@ _fini(void)
 	for (i = 0; i < SZ_INUSE; i++)
 		t += buffers_in_use[i];
 
-	if (t != NULL)
+	if (t != 0)
 		return (DDI_FAILURE);
 
 	status = mod_remove(&modlinkage);
@@ -1915,7 +1915,7 @@ ch_get_prop(ch_t *chp)
 	dev_info_t *pdip;
 	uint32_t vendor_id, device_id, revision_id;
 	uint32_t *prop_val = NULL;
-	uint32_t prop_len = NULL;
+	uint32_t prop_len = 0;
 
 	val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
 	    "enable_dvma", -1);
@@ -1994,7 +1994,7 @@ ch_get_prop(ch_t *chp)
 
 		/* if 133 Mhz not enabled, then do nothing - we're not PCIx */
 		v = pci_config_get32(chp->ch_hpci, 0x64);
-		if ((v & 0x20000) == NULL) {
+		if ((v & 0x20000) == 0) {
 			chp->ch_config.burstsize_set = 0;
 			chp->ch_config.transaction_cnt_set = 0;
 			goto fail_exit;
@@ -2257,7 +2257,7 @@ fail_exit:
 		val = ddi_getprop(DDI_DEV_T_ANY, chp->ch_dip, DDI_PROP_DONTPASS,
 		    "enable-checksum-offload", -1);
 	if (val != -1) {
-		if (val == NULL)
+		if (val == 0)
 			chp->ch_config.cksum_enabled = 0;
 	}
 

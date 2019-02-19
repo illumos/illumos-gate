@@ -252,7 +252,6 @@ tem_internal_init(struct tem_vt_state *ptem, cred_t *credp,
 			ptem->tvs_screen_rows[i][j].tc_bg_color = bg;
 			ptem->tvs_screen_rows[i][j].tc_char =
 			    TEM_ATTR(attr) | ' ';
-
 		}
 	}
 
@@ -910,6 +909,19 @@ tem_pix_align(struct tem_vt_state *tem, cred_t *credp,
 		tem->tvs_s_cursor.row = tem->tvs_c_cursor.row =
 		    (screen_pos_t)row;
 		tem->tvs_s_cursor.col = tem->tvs_c_cursor.col = 0;
+
+		/*
+		 * When tem is starting up, part of the screen is filled
+		 * with information from boot loader and early boot.
+		 * For tem, the screen content above current cursor
+		 * should be treated as image.
+		 */
+		for (; row > 0; row--) {
+			for (col = 0; col < tems.ts_c_dimension.width; col++) {
+				tem->tvs_screen_rows[row][col].tc_char =
+				    TEM_ATTR(TEM_ATTR_IMAGE);
+			}
+		}
 	} else {
 		tem_safe_reset_display(tem, credp, called_from, B_TRUE, B_TRUE);
 	}

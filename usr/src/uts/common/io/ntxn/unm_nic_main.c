@@ -330,7 +330,7 @@ unm_free_hw_resources(unm_adapter *adapter)
 	if (adapter->ahw.cmdDescHead != NULL) {
 		unm_pci_free_consistent(&adapter->ahw.cmd_desc_dma_handle,
 		    &adapter->ahw.cmd_desc_acc_handle);
-		adapter->ahw.cmdDesc_physAddr = NULL;
+		adapter->ahw.cmdDesc_physAddr = 0;
 		adapter->ahw.cmdDescHead = NULL;
 	}
 
@@ -344,7 +344,7 @@ unm_free_hw_resources(unm_adapter *adapter)
 				    &rcv_desc->rx_desc_dma_handle,
 				    &rcv_desc->rx_desc_acc_handle);
 				rcv_desc->desc_head = NULL;
-				rcv_desc->phys_addr = NULL;
+				rcv_desc->phys_addr = 0;
 			}
 		}
 
@@ -352,7 +352,7 @@ unm_free_hw_resources(unm_adapter *adapter)
 			unm_pci_free_consistent(
 			    &recv_ctx->status_desc_dma_handle,
 			    &recv_ctx->status_desc_acc_handle);
-			recv_ctx->rcvStatusDesc_physAddr = NULL;
+			recv_ctx->rcvStatusDesc_physAddr = 0;
 			recv_ctx->rcvStatusDescHead = NULL;
 		}
 	}

@@ -240,6 +240,10 @@ dirmatch(struct open_file *f, const char *path, struct iso_directory_record *dp,
 		icase = 1;
 	} else
 		icase = 0;
+
+	if (strlen(path) != len)
+		return (0);
+
 	for (i = len; --i >= 0; path++, cp++) {
 		if (!*path || *path == '/')
 			break;
@@ -251,6 +255,7 @@ dirmatch(struct open_file *f, const char *path, struct iso_directory_record *dp,
 	}
 	if (*path && *path != '/')
 		return (0);
+
 	/*
 	 * Allow stripping of trailing dots and the version number.
 	 * Note that this will find the first instead of the last version
@@ -345,8 +350,9 @@ cd9660_open(const char *path, struct open_file *f)
 			    first ? 0 : lenskip)) {
 				first = 0;
 				break;
-			} else
+			} else {
 				first = 0;
+			}
 
 			dp = (struct iso_directory_record *)
 			    ((char *)dp + isonum_711(dp->length));

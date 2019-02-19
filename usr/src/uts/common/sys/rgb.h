@@ -71,6 +71,8 @@ extern const uint8_t dim_xlate[];
 extern const uint8_t brt_xlate[];
 extern const uint8_t solaris_color_to_pc_color[16];
 
+extern uint32_t rgb_color_map(const rgb_t *, uint8_t);
+
 #ifdef __cplusplus
 }
 #endif

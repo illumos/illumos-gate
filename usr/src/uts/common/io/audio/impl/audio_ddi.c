@@ -71,7 +71,7 @@ audio_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* look up our properties! */
 
-	if (audio_dev_register(adev) != NULL) {
+	if (audio_dev_register(adev) != DDI_SUCCESS) {
 		audio_dev_free(adev);
 		return (DDI_FAILURE);
 	}

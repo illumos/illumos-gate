@@ -209,16 +209,16 @@ cn_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	if (ddi_create_minor_node(devi, "syscon", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		return (DDI_FAILURE);
 	}
 	if (ddi_create_minor_node(devi, "systty", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}
 	if (ddi_create_minor_node(devi, "console", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}

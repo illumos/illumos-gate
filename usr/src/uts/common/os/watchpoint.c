@@ -1160,7 +1160,7 @@ watch_copyoutstr(
 	return (error);
 }
 
-typedef int (*fuword_func)(const void *, void *);
+typedef void (*fuword_func)(const void *, void *);
 
 /*
  * Generic form of watch_fuword8(), watch_fuword16(), etc.

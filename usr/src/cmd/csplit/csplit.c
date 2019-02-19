@@ -27,6 +27,10 @@
 /*	  All Rights Reserved  	*/
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * csplit - Context or line file splitter
  * Compile: cc -O -s -o csplit csplit.c
  */
@@ -391,7 +395,7 @@ getfile()
 		}
 
 		if ((opfil = fopen(file, "w")) == NULL) {
-			(void) strcpy(tfile, file);
+			(void) strlcpy(tfile, file, sizeof (tfile));
 			(void) sprintf(fptr, "%.*d", fiwidth, (ctr-2));
 			fatal("Cannot create %s\n", tfile);
 		}

@@ -121,7 +121,7 @@ static void *wqt_grow_args[] = {
 };
 
 static wq_test_t wq_tests[] = {
-	{ "empty", wqt_add, 0, 0, NULL, wqt_empty_args },
+	{ "empty", wqt_add, 0, 0, 0, wqt_empty_args },
 	{ "single", wqt_add, 0, 0, 42, wqt_single_args },
 	{ "double", wqt_add, 0, 0, 69, wqt_double_args },
 	{ "wrap", wqt_add, 0, 0, 64, wqt_wrap_args },

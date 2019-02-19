@@ -274,7 +274,7 @@ consms_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "mouse", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (-1);
 	}
@@ -973,7 +973,7 @@ consms_new_firm_event(ushort_t id, int value)
 		fep = (Firm_event *)tmp->b_wptr;
 		fep->id = id;
 		fep->pair_type = FE_PAIR_NONE;
-		fep->pair = NULL;
+		fep->pair = '\0';
 		fep->value = value;
 		tmp->b_wptr += sizeof (Firm_event);
 	}

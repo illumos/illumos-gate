@@ -302,7 +302,7 @@ pe_start(ch_t *sa, mblk_t *mp, uint32_t flg)
 		struct cpl_tx_pkt *cpl;
 
 		/* PR2928 & PR3309 */
-		if (sa->ch_ip == NULL) {
+		if (sa->ch_ip == 0) {
 			ushort_t ethertype = ntohs(*(short *)&mp->b_rptr[12]);
 			if (ethertype == ETHERTYPE_ARP) {
 				if (is_T2(sa)) {
@@ -467,7 +467,7 @@ pe_start(ch_t *sa, mblk_t *mp, uint32_t flg)
 			lseg = ch_bind_dma_handle(sa, len,
 			    (void *)mp->b_rptr, &hmp[nseg],
 			    mseg - nseg);
-			if (lseg == NULL) {
+			if (lseg == 0) {
 				sa->sge->intr_cnt.tx_no_dma1++;
 
 				/*
@@ -543,7 +543,7 @@ pe_start(ch_t *sa, mblk_t *mp, uint32_t flg)
 #else	/* defined(__sparc) */
 		nseg = ch_bind_dma_handle(sa, len,
 		    (void *)mp->b_rptr, &hmp[0], 16);
-		if (nseg == NULL) {
+		if (nseg == 0) {
 			sa->sge->intr_cnt.tx_no_dma2++;
 
 			/*
@@ -919,10 +919,10 @@ pe_attach(ch_t *chp)
 	if (t1_init_sw_modules(chp, bi) < 0)
 		return (1);
 
-	if (pe_small_rbuf_pool_init(chp) == NULL)
+	if (pe_small_rbuf_pool_init(chp) == 0)
 		return (1);
 
-	if (pe_big_rbuf_pool_init(chp) == NULL)
+	if (pe_big_rbuf_pool_init(chp) == 0)
 		return (1);
 
 	/*

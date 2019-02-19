@@ -83,6 +83,7 @@ typedef struct fb_info {
 
 extern fb_info_t fb_info;
 void boot_fb_cursor(boolean_t);
+extern uint32_t boot_color_map(uint8_t);
 
 #ifdef __cplusplus
 }
