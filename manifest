@@ -80,6 +80,7 @@ s dev/ip6=../devices/pseudo/ip6@0:ip6
 s dev/ip=../devices/pseudo/ip@0:ip
 s dev/ipauth=../devices/pseudo/ipf@0:ipauth
 s dev/ipf=../devices/pseudo/ipf@0:ipf
+s dev/ipfev=../devices/pseudo/ipf@0:ipfev
 s dev/ipl=../devices/pseudo/ipf@0:ipf
 s dev/iplookup=../devices/pseudo/ipf@0:iplookup
 s dev/ipmpstub=../devices/pseudo/dlpistub@0:ipmpstub

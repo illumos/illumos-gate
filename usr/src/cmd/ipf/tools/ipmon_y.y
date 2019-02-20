@@ -1,11 +1,14 @@
 /*
  * Copyright (C) 1993-2005  by Darren Reed.
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2019 Joyent, Inc.
  */ 
 
 %{
 #include "ipf.h"
 #include <syslog.h>
+#include <uuid/uuid.h>
 #undef	OPT_NAT
 #undef	OPT_VERBOSE
 #include "ipmon_l.h"
@@ -42,11 +45,13 @@ static	ipmon_action_t	*alist = NULL;
 	struct in_addr	addr;
 	struct opt	*opt;
 	union	i6addr	ip6;
+	uuid_t	uuid;
 }
 
 %token	<num>	YY_NUMBER YY_HEX
 %token	<str>	YY_STR
 %token	<ip6>	YY_IPV6
+%token	<uuid>	YY_UUID
 %token	YY_COMMENT 
 %token	YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
 %token	YY_RANGE_OUT YY_RANGE_IN

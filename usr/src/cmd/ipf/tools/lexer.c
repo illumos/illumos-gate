@@ -5,6 +5,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <ctype.h>
@@ -14,6 +15,7 @@
 #endif
 #include <sys/ioctl.h>
 #include <syslog.h>
+#include <uuid/uuid.h>
 #ifdef	TEST_LEXER
 # define	NO_YACC
 union	{
@@ -21,6 +23,7 @@ union	{
 	char		*str;
 	struct in_addr	ipa;
 	i6addr_t	ip6;
+	uuid_t		uuid;
 } yylval;
 #endif
 #include "lexer.h"
@@ -454,6 +457,40 @@ nextchar:
 		c = oc;
 	}
 #endif
+
+	/*
+	 * UUID: e.g., "2426e38c-9f63-c0b8-cfd5-9aaeaf992d42" or its uppercase
+	 * variant.
+	 */
+	if (isbuilding == 0 && (ishex(c) || c == '-')) {
+		char uuidbuf[UUID_PRINTABLE_STRING_LENGTH], *s, oc;
+		int start;
+
+		start = yypos;
+		s = uuidbuf;
+		oc = c;
+
+		/*
+		 * Don't worry about exact position of hexdigits and hyphens
+		 * because uuid_parse() will provide the sanity check.
+		 */
+		do {
+			*s++ = c;
+			c = yygetc(1);
+		} while ((ishex(c) || c == '-') &&
+		    (s - uuidbuf < sizeof (uuidbuf)));
+		yyunputc(c);
+		*s = '\0';
+
+		if (uuid_parse(uuidbuf, yylval.uuid) == 0) {
+			rval = YY_UUID;
+			yyexpectaddr = 0;
+			goto done;
+		}
+		yypos = start;
+		c = oc;
+	}
+
 
 	if (c == ':') {
 		if (isbuilding == 1) {

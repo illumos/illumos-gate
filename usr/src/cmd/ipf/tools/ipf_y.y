@@ -6,6 +6,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include "ipf.h"
@@ -16,6 +17,7 @@
 # define _NET_BPF_H_
 # include <pcap.h>
 #endif
+#include <uuid/uuid.h>
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
 #include "netinet/ipl.h"
@@ -98,6 +100,7 @@ static  int             set_ipv6_addr = 0;
 		union	i6addr	m;
 	} ipp;
 	union	i6addr	ip6;
+	uuid_t	uuid;
 };
 
 %type	<port>	portnum
@@ -117,6 +120,7 @@ static  int             set_ipv6_addr = 0;
 %token		YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
 %token		YY_RANGE_OUT YY_RANGE_IN
 %token	<ip6>	YY_IPV6
+%token	<uuid>	YY_UUID
 
 %token	IPFY_PASS IPFY_BLOCK IPFY_COUNT IPFY_CALL
 %token	IPFY_RETICMP IPFY_RETRST IPFY_RETICMPASDST
@@ -127,6 +131,7 @@ static  int             set_ipv6_addr = 0;
 %token	IPFY_HEAD IPFY_GROUP
 %token	IPFY_AUTH IPFY_PREAUTH
 %token	IPFY_LOG IPFY_BODY IPFY_FIRST IPFY_LEVEL IPFY_ORBLOCK
+%token	IPFY_UUID IPFY_CFWLOG
 %token	IPFY_LOGTAG IPFY_MATCHTAG IPFY_SETTAG IPFY_SKIP
 %token	IPFY_FROM IPFY_ALL IPFY_ANY IPFY_BPFV4 IPFY_BPFV6 IPFY_POOL IPFY_HASH
 %token	IPFY_PPS
@@ -518,6 +523,8 @@ taginlist:
 taginspec:
 	logtag
 	|nattag
+	|uuidtag
+	|cfwtag
 	;
 
 nattag:	IPFY_NAT '=' YY_STR		{ DOALL(strncpy(fr->fr_nattag.ipt_tag,\
@@ -528,6 +535,12 @@ nattag:	IPFY_NAT '=' YY_STR		{ DOALL(strncpy(fr->fr_nattag.ipt_tag,\
 	;
 
 logtag:	IPFY_LOG '=' YY_NUMBER		{ DOALL(fr->fr_logtag = $3;) }
+	;
+
+cfwtag:	IPFY_CFWLOG			{ DOALL(fr->fr_flags |= FR_CFWLOG;) }
+	;
+
+uuidtag: IPFY_UUID '=' YY_UUID		{ DOALL(uuid_copy(fr->fr_uuid, $3);) }
 	;
 
 settagout:
@@ -542,6 +555,8 @@ tagoutlist:
 tagoutspec:
 	logtag
 	| nattag
+	| uuidtag
+	| cfwtag
 	;
 
 matchtagin:
@@ -1566,6 +1581,7 @@ static	struct	wordtab ipfwords[96] = {
 	{ "bpf-v6",			IPFY_BPFV6 },
 #endif
 	{ "call",			IPFY_CALL },
+	{ "cfwlog",			IPFY_CFWLOG },
 	{ "code",			IPFY_ICMPCODE },
 	{ "count",			IPFY_COUNT },
 	{ "dup-to",			IPFY_DUPTO },
@@ -1641,6 +1657,7 @@ static	struct	wordtab ipfwords[96] = {
 	{ "to",				IPFY_TO },
 	{ "ttl",			IPFY_TTL },
 	{ "udp",			IPFY_UDP },
+	{ "uuid",			IPFY_UUID },
 	{ "v6hdrs",			IPF6_V6HDRS },
 	{ "with",			IPFY_WITH },
 	{ NULL,				0 }

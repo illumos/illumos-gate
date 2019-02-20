@@ -22,9 +22,21 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2018 Joyent, Inc. All rights reserved
+# Copyright 2019 Joyent, Inc.
 #
 
+cfw_evdrops
+cfw_evreports
+cfw_ring
+cfw_ringcv
+cfw_ringend
+cfw_ringfull
+cfw_ringlock
+cfw_ringmask
+cfw_ringsize
+cfw_ringstart
+cfw_timeout_tries
+cfw_timeout_wait
 fr_availfuncs
 fr_features
 fr_objbytes
@@ -68,6 +80,7 @@ icmptoicmp6unreach
 idletime_tab
 ip6exthdr
 ipf_cb_ops
+ipf_cfwlog_enabled
 ipf_dev_info
 ipf_devfiles
 ipf_eth_bcast_addr

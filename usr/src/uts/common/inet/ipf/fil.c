@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #if defined(KERNEL) || defined(_KERNEL)
@@ -2587,6 +2587,9 @@ ipf_stack_t *ifs;
 		(void) fr_dolog(fin, &pass);
 	}
 #endif
+
+	if (IFS_CFWLOG(ifs, fr) && FR_ISBLOCK(pass))
+		ipf_block_cfwlog(fr, fin, ifs);
 
 	/*
 	 * The FI_STATE flag is cleared here so that calling fr_checkstate

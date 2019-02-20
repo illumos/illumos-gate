@@ -8,7 +8,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -380,6 +380,7 @@ u_int flags;
 	if (fin->fin_nattag != NULL)
 		bcopy(fin->fin_nattag, (void *)&ipfl.fl_nattag,
 		      sizeof(ipfl.fl_nattag));
+	bcopy(fin->fin_fr->fr_uuid, ipfl.fl_uuid, sizeof (ipfl.fl_uuid));
 	ipfl.fl_flags = flags;
 	ipfl.fl_dir = fin->fin_out;
 	ipfl.fl_lflags = fin->fin_flx;

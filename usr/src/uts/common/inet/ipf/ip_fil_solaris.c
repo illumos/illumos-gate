@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #if !defined(lint)
@@ -907,6 +907,9 @@ int *rp;
 		return ENXIO;
 	unit = isp->ipfs_minor;
 
+	if (unit == IPL_LOGEV)
+		return (ipf_cfwlog_ioctl(dev, cmd, data, mode, cp, rp));
+
 	zid = crgetzoneid(cp);
 	if (cmd == SIOCIPFZONESET) {
 		if (zid == GLOBAL_ZONEID)
@@ -1247,11 +1250,35 @@ cred_t *cred;
 	if (IPL_LOGMAX < min)
 		return ENXIO;
 
+	/* Special-case ipfev: global-zone-open only. */
+	if (min == IPL_LOGEV) {
+		if (crgetzoneid(cred) != GLOBAL_ZONEID)
+			return (ENXIO);
+		/*
+		 * Else enable the CFW logging of events.
+		 * NOTE: For now, we only allow one open at a time.
+		 * Use atomic_cas to confirm/deny. And also for now,
+		 * assume sizeof (boolean_t) == sizeof (uint_t).
+		 *
+		 * Per the *_{refrele,REFRELE}() in other parts of inet,
+		 * ensure all loads/stores complete before calling cas.
+		 * membar_exit() does this.
+		 */
+		membar_exit();
+		if (atomic_cas_uint(&ipf_cfwlog_enabled, 0, 1) != 0)
+			return (EBUSY);
+	}
+
 	minor = (minor_t)(uintptr_t)vmem_alloc(ipf_minor, 1,
 	    VM_BESTFIT | VM_SLEEP);
 
 	if (ddi_soft_state_zalloc(ipf_state, minor) != 0) {
 		vmem_free(ipf_minor, (void *)(uintptr_t)minor, 1);
+		if (min == IPL_LOGEV) {
+			/* See above... */
+			membar_exit();
+			VERIFY(atomic_cas_uint(&ipf_cfwlog_enabled, 1, 0) == 1);
+		}
 		return ENXIO;
 	}
 
@@ -1273,6 +1300,7 @@ int flags, otype;
 cred_t *cred;
 {
 	minor_t	min = getminor(dev);
+	ipf_devstate_t *isp;
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplclose(%x,%x,%x,%x)\n", dev, flags, otype, cred);
@@ -1280,6 +1308,15 @@ cred_t *cred;
 
 	if (IPL_LOGMAX < min)
 		return ENXIO;
+
+	isp = ddi_get_soft_state(ipf_state, min);
+	if (isp != NULL && isp->ipfs_minor == IPL_LOGEV) {
+		/*
+		 * Disable CFW logging.  See iplopen() for details.
+		 */
+		membar_exit();
+		VERIFY(atomic_cas_uint(&ipf_cfwlog_enabled, 1, 0) == 1);
+	}
 
 	ddi_soft_state_free(ipf_state, min);
 	vmem_free(ipf_minor, (void *)(uintptr_t)min, 1);
@@ -1310,6 +1347,9 @@ cred_t *cp;
 	if (isp == NULL)
 		return ENXIO;
 	unit = isp->ipfs_minor;
+
+	if (unit == IPL_LOGEV)
+		return (ipf_cfwlog_read(dev, uio, cp));
 
         /*
 	 * ipf_find_stack returns with a read lock on ifs_ipf_global
@@ -1361,6 +1401,9 @@ cred_t *cp;
 	if (isp == NULL)
 		return ENXIO;
 	unit = isp->ipfs_minor;
+
+	if (unit == IPL_LOGEV)
+		return (EIO);	/* ipfev doesn't support write yet. */
 
         /*
 	 * ipf_find_stack returns with a read lock on ifs_ipf_global

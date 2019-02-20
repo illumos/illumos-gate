@@ -6,6 +6,7 @@
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,6 +40,7 @@
 #include <sys/time.h>
 #include <syslog.h>
 #include <net/if.h>
+#include <uuid/uuid.h>
 #if __FreeBSD_version >= 300000
 # include <net/if_var.h>
 #endif
@@ -89,6 +91,7 @@ static	void	setnatproto __P((int));
 		int	v;
 	} ipp;
 	union	i6addr	ip6;
+	uuid_t	uuid;
 };
 
 %token  <num>   YY_NUMBER YY_HEX
@@ -97,6 +100,7 @@ static	void	setnatproto __P((int));
 %token	  YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
 %token	  YY_RANGE_OUT YY_RANGE_IN
 %token  <ip6>   YY_IPV6
+%token  <uuid>	YY_UUID
 
 %token	IPNY_MAPBLOCK IPNY_RDR IPNY_PORT IPNY_PORTS IPNY_AUTO IPNY_RANGE
 %token	IPNY_MAP IPNY_BIMAP IPNY_FROM IPNY_TO IPNY_MASK IPNY_PORTMAP IPNY_ANY

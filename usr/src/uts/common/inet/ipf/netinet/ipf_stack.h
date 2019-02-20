@@ -6,7 +6,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	__IPF_STACK_H__
@@ -46,6 +46,7 @@ struct ipf_stack {
 	struct ipf_stack	*ifs_gz_cont_ifs;
 	netid_t			ifs_netid;
 	zoneid_t		ifs_zone;
+	zoneid_t		ifs_zone_did;
 	boolean_t		ifs_gz_controlled;
 
 	/* ipf module */
@@ -316,6 +317,7 @@ struct ipf_stack {
 	char			*ifs_addmask_key;
 	char			*ifs_rn_zeros;
 	char			*ifs_rn_ones;
+
 #ifdef KERNEL
 	/* kstats for inbound and outbound */
 	kstat_t			*ifs_kstatp[2];

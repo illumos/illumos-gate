@@ -8,7 +8,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	__IP_FIL_H__
@@ -16,6 +16,7 @@
 
 #include "netinet/ip_compat.h"
 #include <sys/zone.h>
+#include <sys/uuid.h>
 
 #ifdef	SOLARIS
 #undef	SOLARIS
@@ -115,6 +116,8 @@
 #define	SIOCDELFR	SIOCRMAFR
 #define	SIOCINSFR	SIOCINAFR
 # define	SIOCIPFZONESET	_IOWR('r', 97, struct ipfzoneobj)
+# define	SIOCIPFCFWCFG	_IOR('r', 98, struct ipfcfwcfg)
+# define	SIOCIPFCFWNEWSZ	_IOWR('r', 99, struct ipfcfwcfg)
 
 /*
  * What type of table is getting flushed?
@@ -599,6 +602,7 @@ typedef	struct	frentry {
 	u_32_t	fr_flags;	/* per-rule flags && options (see below) */
 	u_32_t	fr_logtag;	/* user defined log tag # */
 	u_32_t	fr_collect;	/* collection number */
+	uuid_t	fr_uuid;	/* user defined uuid */
 	u_int	fr_arg;		/* misc. numeric arg for rule */ 
 	u_int	fr_loglevel;	/* syslog log facility + priority */
 	u_int	fr_age[2];	/* non-TCP timeouts */
@@ -727,6 +731,7 @@ typedef	struct	frentry {
 #define	FR_NEWISN	0x400000	/* new ISN for outgoing TCP */
 #define	FR_NOICMPERR	0x800000	/* do not match ICMP errors in state */
 #define	FR_STATESYNC	0x1000000	/* synchronize state to slave */
+#define	FR_CFWLOG	0x2000000	/* Global CFW logging enabled */
 #define	FR_NOMATCH	0x8000000	/* no match occured */
 		/*	0x10000000 	FF_LOGPASS */
 		/*	0x20000000 	FF_LOGBLOCK */
@@ -882,6 +887,7 @@ typedef	struct	ipflog	{
 	u_32_t	fl_lflags;
 	u_32_t	fl_logtag;
 	ipftag_t	fl_nattag;
+	uuid_t	fl_uuid;
 	u_short	fl_plen;	/* extra data after hlen */
 	u_short	fl_loglevel;	/* syslog log level */
 	char	fl_group[FR_GROUPLEN];
@@ -930,6 +936,7 @@ typedef	struct	ipflog	{
 #define	IPSYNC_NAME	"/dev/ipsync"
 #define	IPSCAN_NAME	"/dev/ipscan"
 #define	IPLOOKUP_NAME	"/dev/iplookup"
+#define	IPFEV_NAME	"/dev/ipfev"
 
 #define	IPL_LOGIPF	0	/* Minor device #'s for accessing logs */
 #define	IPL_LOGNAT	1
@@ -938,8 +945,9 @@ typedef	struct	ipflog	{
 #define	IPL_LOGSYNC	4
 #define	IPL_LOGSCAN	5
 #define	IPL_LOGLOOKUP	6
-#define	IPL_LOGCOUNT	7
-#define	IPL_LOGMAX	7
+#define	IPL_LOGEV	7
+#define	IPL_LOGCOUNT	8
+#define	IPL_LOGMAX	8
 #define	IPL_LOGSIZE	(IPL_LOGMAX + 1)
 #define	IPL_LOGALL	-1
 #define	IPL_LOGNONE	-2
@@ -1179,6 +1187,21 @@ typedef	struct	ipfzoneobj	{
 	u_32_t		ipfz_gz;			/* GZ stack boolean */
 	char		ipfz_zonename[ZONENAME_MAX];	/* zone to act on */
 } ipfzoneobj_t;
+
+/* ioctl to grab CFW logging parameters */
+typedef struct ipfcfwcfg {
+	/* CFG => Max event size, NEWSZ => ignored in, like CFG out. */
+	uint32_t ipfcfwc_maxevsize;
+	/*
+	 * CFG => Current ring size,
+	 * NEWSZ => New ring size, must be 2^N for 3 <= N <= 31.
+	 */
+	uint32_t ipfcfwc_evringsize;
+	/* CFG => Number of event reports, NEWSZ => ignored in, like CFG out. */
+	uint64_t ipfcfwc_evreports;
+	/* CFG => Number of event drops, NEWSZ => ignored in, like CFG out. */
+	uint64_t ipfcfwc_evdrops;
+} ipfcfwcfg_t;
 
 #if defined(_KERNEL)
 /* Set ipfs_zoneid to this if no zone has been set: */
@@ -1558,6 +1581,23 @@ extern	int	ipflog __P((fr_info_t *, u_int));
 extern	int	ipllog __P((int, fr_info_t *, void **, size_t *, int *, int,
 			    ipf_stack_t *));
 extern	void	fr_logunload __P((ipf_stack_t *));
+
+/* SmartOS single-FD global-zone state accumulator (see cfw.c) */
+extern boolean_t ipf_cfwlog_enabled;
+struct ipstate;	/* Ugggh. */
+extern void ipf_log_cfwlog __P((struct ipstate *, uint_t, ipf_stack_t *));
+extern void ipf_block_cfwlog __P((frentry_t *, fr_info_t *, ipf_stack_t *));
+#define	IFS_CFWLOG(ifs, fr) ((ifs)->ifs_gz_controlled && ipf_cfwlog_enabled &&\
+	fr != NULL && ((fr)->fr_flags & FR_CFWLOG))
+struct cfwev_s;	/* See ipf_cfw.h */
+extern boolean_t ipf_cfwev_consume __P((struct cfwev_s *, boolean_t));
+/* See cfw.c's ipf_cfwev_consume_many() for details. */
+typedef uint_t (*cfwmanycb_t) __P((struct cfwev_s *, uint_t, void *));
+extern int ipf_cfwlog_read __P((dev_t, struct uio *, struct cred *));
+extern int ipf_cfwlog_ioctl __P((dev_t, int, intptr_t, int, cred_t *, int *));
+#define	IPF_CFW_RING_ALLOCATE 0
+#define	IPF_CFW_RING_DESTROY 1
+extern int ipf_cfw_ring_resize(uint32_t);
 
 extern	frentry_t	*fr_acctpkt __P((fr_info_t *, u_32_t *));
 extern	int		fr_copytolog __P((int, char *, int));

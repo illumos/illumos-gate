@@ -8,10 +8,13 @@
  *
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
+
+#include <sys/uuid.h>
 
 #if defined(__STDC__) || defined(__GNUC__) || defined(_AIX51)
 # define	SIOCDELST	_IOW('r', 61, struct ipfobj)
@@ -66,6 +69,7 @@ typedef struct ipstate {
 					/* in both directions */
 	u_32_t	is_optmsk[2];		/*    "      "    mask */
 					/* in both directions */
+	uuid_t	is_uuid;
 	u_short	is_sec;			/* security options set */
 	u_short	is_secmsk;		/*    "        "    mask */
 	u_short	is_auth;		/* authentication options set */

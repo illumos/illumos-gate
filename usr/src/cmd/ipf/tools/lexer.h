@@ -1,4 +1,6 @@
-
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 typedef	struct	wordtab	{
 	char	*w_word;
 	int	w_value;
@@ -16,6 +18,7 @@ typedef	struct	wordtab	{
 #define	YY_IPV6		1008
 #define	YY_STR		1009
 #define	YY_IPADDR	1010
+#define	YY_UUID		1011
 #endif
 
 #define	YYBUFSIZ	8192

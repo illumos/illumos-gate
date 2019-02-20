@@ -5,7 +5,7 @@
  *
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  *
- * Copyright (c) 2014, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #if defined(KERNEL) || defined(_KERNEL)
@@ -108,6 +108,7 @@ struct file;
 #  include <sys/systm.h>
 # endif
 #endif
+#include <sys/uuid.h>
 /* END OF INCLUDES */
 
 
@@ -1445,6 +1446,7 @@ u_int flags;
 			is->is_sti.tqe_flags |= TQE_RULEBASED;
 		}
 		is->is_tag = fr->fr_logtag;
+		memcpy(is->is_uuid, fr->fr_uuid, sizeof (uuid_t));
 
 		is->is_ifp[(out << 1) + 1] = fr->fr_ifas[1];
 		is->is_ifp[(1 - out) << 1] = fr->fr_ifas[2];
@@ -1523,6 +1525,9 @@ u_int flags;
 #endif
 	if (ifs->ifs_ipstate_logging)
 		ipstate_log(is, ISL_NEW, ifs);
+
+	if (IFS_CFWLOG(ifs, is->is_rule))
+		ipf_log_cfwlog(is, ISL_NEW, ifs);
 
 	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
@@ -2314,6 +2319,8 @@ u_32_t cmask;
 		is->is_flags &= ~(SI_W_SPORT|SI_W_DPORT);
 		if ((flags & SI_CLONED) && ifs->ifs_ipstate_logging)
 			ipstate_log(is, ISL_CLONE, ifs);
+		if ((flags & SI_CLONED) && IFS_CFWLOG(ifs, is->is_rule))
+			ipf_log_cfwlog(is, ISL_CLONE, ifs);
 	}
 
 	ret = -1;
@@ -3397,6 +3404,15 @@ ipf_stack_t *ifs;
  
 	if (ifs->ifs_ipstate_logging != 0 && why != 0)
 		ipstate_log(is, why, ifs);
+	/*
+	 * For now, ipf_log_cfwlog() copes with all "why" values. Strictly
+	 * speaking, though, they all map to one event (CFWEV_END), which for
+	 * now is not supported, hence no code calling ipf_log_cfwlog() like
+	 * below:
+	 *
+	 * if (why != 0 && IFS_CFWLOG(ifs, is->is_rule))
+	 *	ipf_log_cfwlog(is, why, ifs);
+	 */
 
 	if (is->is_rule != NULL) {
 		is->is_rule->fr_statecnt--;
@@ -3930,7 +3946,6 @@ int flags;
 
 	return rval;
 }
-
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipstate_log                                                 */
