@@ -432,6 +432,10 @@ tests = ['inuse_001_pos', 'inuse_003_pos', 'inuse_004_pos',
     'inuse_009_pos']
 post =
 
+[/opt/zfs-tests/tests/functional/large_dnode]
+tests = ['large_dnode_001_pos', 'large_dnode_003_pos',
+    'large_dnode_004_neg', 'large_dnode_005_pos', 'large_dnode_007_neg']
+
 [/opt/zfs-tests/tests/functional/large_files]
 tests = ['large_files_001_pos']
 

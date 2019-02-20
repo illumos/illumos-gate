@@ -59,6 +59,7 @@ set -A perms	create		true		false	\
 		allow		true		true	\
 		quota		true		false	\
 		reservation	true		true	\
+		dnodesize	true		false	\
 		recordsize	true		false	\
 		mountpoint	true		false	\
 		checksum	true		true	\
