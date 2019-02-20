@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * PnP BIOS enumerator.
@@ -249,44 +248,47 @@ biospnp_call(int func, const char *fmt, ...)
 {
     va_list	ap;
     const char	*p;
-    u_int8_t	*argp;
-    u_int32_t	args[4];
-    u_int32_t	i;
+    uint8_t	*argp;
+    uint16_t	int16;
+    uint32_t	args[4];
+    uint32_t	i;
 
     /* function number first */
-    argp = (u_int8_t *)args;
-    *(u_int16_t *)argp = func;
-    argp += sizeof(u_int16_t);
+    argp = (uint8_t *)args;
+    int16 = func;
+    bcopy(&int16, argp, sizeof (int16));
+    argp += sizeof(uint16_t);
 
     /* take args according to format */
     va_start(ap, fmt);
     for (p = fmt; *p != 0; p++) {
 	switch(*p) {
-
 	case 'w':
-	    i = va_arg(ap, u_int);
-	    *(u_int16_t *)argp = i;
-	    argp += sizeof(u_int16_t);
+	    i = va_arg(ap, uint32_t);
+	    int16 = i;
+	    bcopy(&int16, argp, sizeof (int16));
+	    argp += sizeof (uint16_t);
 	    break;
 	    
 	case 'l':
-	    i = va_arg(ap, u_int32_t);
-	    *(u_int32_t *)argp = i;
-	    argp += sizeof(u_int32_t);
+	    i = va_arg(ap, uint32_t);
+	    bcopy(&i, argp, sizeof (i));
+	    argp += sizeof (uint32_t);
 	    break;
 	}
     }
     va_end(ap);
 
     /* BIOS segment last */
-    *(u_int16_t *)argp = pnp_Icheck->pnp_rmds;
-    argp += sizeof(u_int16_t);
+    int16 = pnp_Icheck->pnp_rmds;
+    bcopy(&int16, argp, sizeof (int16));
+    argp += sizeof(uint16_t);
 
     /* prepare for call */
     v86.ctl = V86_ADDR | V86_CALLF; 
-    v86.addr = ((u_int32_t)pnp_Icheck->pnp_rmcs << 16) + pnp_Icheck->pnp_rmip;
+    v86.addr = ((uint32_t)pnp_Icheck->pnp_rmcs << 16) + pnp_Icheck->pnp_rmip;
     
     /* call with packed stack and return */
     v86bios(args[0], args[1], args[2], args[3]);
-    return(v86.eax & 0xffff);
+    return (v86.eax & 0xffff);
 }

@@ -233,10 +233,10 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
     ssym = esym = 0;
     md = file_findmetadata(kfp, MODINFOMD_SSYM);
     if (md != NULL)
-	ssym = *((vm_offset_t *)&(md->md_data));
+	bcopy(&md->md_data, &ssym, sizeof (vm_offset_t));
     md = file_findmetadata(kfp, MODINFOMD_ESYM);
     if (md != NULL)
-	esym = *((vm_offset_t *)&(md->md_data));
+	bcopy(&md->md_data, &esym, sizeof (vm_offset_t));
     if (ssym == 0 || esym == 0)
 	ssym = esym = 0;		/* sanity */
 
