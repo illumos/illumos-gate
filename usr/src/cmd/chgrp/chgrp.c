@@ -38,8 +38,6 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * chgrp [-fhR] gid file ...
  * chgrp -R [-f] [-H|-L|-P] gid file ...
@@ -82,41 +80,18 @@ static int isnumber(char *);
 static int Perror(char *);
 static void chgrpr(char *, gid_t);
 
-#ifdef XPG4
-/*
- * Check to see if we are to follow symlinks specified on the command line.
- * This assumes we've already checked to make sure neither -h or -P was
- * specified, so we are just looking to see if -R -L, or -R -H was specified,
- * or, since -R has the same behavior as -R -L, if -R was specified by itself.
- * Therefore, all we really need to check for is if -R was specified.
- */
-#define	FOLLOW_CL_LINKS	(rflag)
-#else
 /*
  * Check to see if we are to follow symlinks specified on the command line.
  * This assumes we've already checked to make sure neither -h or -P was
  * specified, so we are just looking to see if -R -L, or -R -H was specified.
- * Note: -R by itself will change the group of a directory referenced by a
- * symlink however it will not follow the symlink to any other part of the
- * file hierarchy.
  */
 #define	FOLLOW_CL_LINKS	(rflag && (Hflag || Lflag))
-#endif
 
-#ifdef XPG4
-/*
- * Follow symlinks when traversing directories.  Since -R behaves the
- * same as -R -L, we always want to follow symlinks to other parts
- * of the file hierarchy unless -H was specified.
- */
-#define	FOLLOW_D_LINKS	(!Hflag)
-#else
 /*
  * Follow symlinks when traversing directories.  Only follow symlinks
  * to other parts of the file hierarchy if -L was specified.
  */
 #define	FOLLOW_D_LINKS	(Lflag)
-#endif
 
 #define	CHOWN(f, u, g)	if (chown(f, u, g) < 0) { \
 				status += Perror(f); \
@@ -185,6 +160,13 @@ main(int argc, char *argv[])
 			default:
 				usage();
 		}
+	/*
+	 * Set Pflag by default for recursive operations
+	 * if no other options were specified.
+	 */
+	if (rflag && !(Lflag || Hflag || Pflag || hflag)) {
+		Pflag = 1;
+	}
 
 	/*
 	 * Check for sufficient arguments

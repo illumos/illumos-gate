@@ -10,13 +10,41 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
+# Copyright 2019 Alexander Pyhalov
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown
-
+include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+TESTDIR = $(ROOTOPTPKG)/tests/files
+
+PROGS = cout0 \
+	cout1 \
+	cout2 \
+	cout3 \
+	cout4 \
+	cout5 \
+	cout6 \
+	cout7 \
+	cout8 \
+	cout9 \
+	cout10 \
+	cout11
+
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0444
+
+all lint clean clobber:
+
+install: $(CMDS)
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %
+	$(INS.file)

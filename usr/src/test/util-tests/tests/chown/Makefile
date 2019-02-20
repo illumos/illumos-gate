@@ -10,13 +10,36 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
+# Copyright 2019 Alexander Pyhalov
 #
 
-SUBDIRS = date dis dladm iconv libnvpair_json libsff printf xargs grep_xpg4
-SUBDIRS += demangle mergeq workq chown
+.PARALLEL: $(SUBDIRS)
+
+include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/test/Makefile.com
+
+ROOTOPTPKG = $(ROOT)/opt/util-tests
+TESTDIR = $(ROOTOPTPKG)/tests
+
+PROGS = chown_test
+
+CMDS = $(PROGS:%=$(TESTDIR)/%)
+$(CMDS) := FILEMODE = 0555
+
+all lint clean clobber:
+
+install: $(CMDS)
+
+$(CMDS): $(TESTDIR)
+
+$(TESTDIR):
+	$(INS.dir)
+
+$(TESTDIR)/%: %.ksh
+	$(INS.rename)
+
+SUBDIRS = files
 
 include $(SRC)/test/Makefile.com

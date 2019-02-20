@@ -19,49 +19,37 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG= chgrp
-XPG4PROG= chgrp
-XD= exobjs.xpg4
 EXOBJS= chgrp.o
-XPG4EXOBJS= exobjs.xpg4/chgrp.o
 
 include ../Makefile.cmd
 
-$(XPG4) :=	CFLAGS += -DXPG4
+ROOTXPG4LINK=$(ROOTXPG4BIN)/$(PROG)
+
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 LDLIBS += -lcmdutils -lsec
 
 .KEEP_STATE:
 
-all: $(PROG) $(XPG4)
+all: $(PROG)
 
 $(PROG):	$(EXOBJS)
 	$(LINK.c) -o $@ $(EXOBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-$(XPG4): $(XD) $(XPG4EXOBJS)
-	$(LINK.c) -o $@ $(XPG4EXOBJS) $(LDLIBS)
-	$(POST_PROCESS)
+$(ROOTXPG4LINK):        $(ROOTPROG)
+	-$(RM) $@
+	-$(SYMLINK) ../../bin/chgrp $@
 
-install: all $(ROOTPROG) $(ROOTXPG4PROG)
+install: all $(ROOTPROG) $(ROOTXPG4LINK)
 
 clean:
-	-@rm -rf $(EXOBJS) $(XD)
+	-@rm -rf $(EXOBJS)
 
 lint:	lint_PROG
-
-$(XPG4EXOBJS):	$(XD)
-
-$(XD)/%.o:	%.c
-	$(COMPILE.c) -o $@ $<
-
-$(XD):
-	-@mkdir -p $@
 
 include ../Makefile.targ
