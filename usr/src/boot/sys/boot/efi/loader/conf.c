@@ -24,6 +24,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright (c) 2019, Joyent, Inc.
+ */
+
 #include <sys/cdefs.h>
 
 #include <stand.h>
@@ -36,7 +40,9 @@ struct devsw *devsw[] = {
 	&efipart_fddev,
 	&efipart_cddev,
 	&efipart_hddev,
+#ifndef LOADER_DISABLE_SNP
 	&efinet_dev,
+#endif
 	&zfs_dev,
 	NULL
 };
@@ -57,7 +63,9 @@ struct fs_ops *file_system[] = {
 };
 
 struct netif_driver *netif_drivers[] = {
+#ifndef LOADER_DISABLE_SNP
 	&efinetif,
+#endif
 	NULL
 };
 

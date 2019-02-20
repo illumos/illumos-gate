@@ -12,6 +12,8 @@
 #
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
@@ -86,6 +88,13 @@ CPPFLAGS +=	-I../../../../cddl/boot/zfs
 CPPFLAGS +=	-I$(SRC)/uts/intel/sys/acpi
 CPPFLAGS +=	-I$(PNGLITE)
 CPPFLAGS +=	-DNO_PCI -DEFI
+
+#
+# Using SNP from loader causes issues when chain-loading iPXE, as described in
+# TRITON-1191.  While the exact problem is not known, we have no use for SNP, so
+# we'll just disable it.
+#
+CPPFLAGS +=	-DLOADER_DISABLE_SNP
 
 # Export serial numbers, UUID, and asset tag from loader.
 smbios.o := CPPFLAGS += -DSMBIOS_SERIAL_NUMBERS
