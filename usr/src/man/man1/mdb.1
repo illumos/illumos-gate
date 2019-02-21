@@ -1,11 +1,11 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright (c) 2017, Joyent, Inc. All Rights Reserved.
+.\" Copyright (c) 2019, Joyent, Inc. All Rights Reserved.
 .\" Copyright (c) 2014, 2017 by Delphix. All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH MDB 1 "Dec 9, 2017"
+.TH MDB 1 "Feb 21, 2019"
 .SH NAME
 mdb \- modular debugger
 .SH SYNOPSIS
@@ -1346,7 +1346,7 @@ N	newline
 O	octal unsigned int (4 bytes)
 P	symbol (4 or 8 bytes)
 Q	octal signed int (4 bytes)
-R	binary int (8 bytes)
+R	binary unsigned long long (8 bytes)
 S	T{
 string using C string notation (variable size)
 T}
@@ -1369,6 +1369,7 @@ f	float (4 bytes)
 g	octal signed long long (8 bytes)
 h	swap bytes (2 bytes)
 i	disassembled instruction (variable size)
+j	jazzed-up binary unsigned long long (8 bytes)
 n	newline
 o	octal unsigned short (2 bytes)
 p	symbol (4 or 8 bytes)

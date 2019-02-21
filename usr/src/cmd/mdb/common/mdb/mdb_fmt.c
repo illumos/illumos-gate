@@ -21,7 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -82,8 +82,9 @@ typedef mdb_tgt_addr_t mdb_fmt_func_f(mdb_tgt_t *,
 #define	FMT_PRINTF	0x2	/* f_ptr is a const char * format string */
 #define	FMT_MATCH	0x4	/* Match command (not supported here) */
 #define	FMT_WRITE	0x8	/* Command writes to address space */
+#define	FMT_NOAUTOWRAP	0x10	/* Autowrap should not be autoenabled */
 
-#define	FMT_TYPE(x)	((x) & 0x7) /* Excludes modifying flags (FMT_WRITE) */
+#define	FMT_TYPE(x)	((x) & 0x7) /* Excludes modifying flags */
 
 typedef struct mdb_fmt_desc {
 	int f_type;		/* Type of format (see above) */
@@ -120,6 +121,7 @@ static const char help_match64[] = "long long";
 static const char help_match16[] = "short";
 static const char help_uintptr[] = "hexadecimal uintptr_t";
 static const char help_ctf[] = "whose size is inferred by CTF info";
+static const char help_jazzed[] = "jazzed-up binary unsigned long long";
 
 /*ARGSUSED*/
 static mdb_tgt_addr_t
@@ -455,10 +457,12 @@ static mdb_tgt_addr_t
 fmt_binary(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
 {
 	uint64_t x;
+	const char *fmts[] = { "%-64s", "%-65s" };
+	const uint64_t mask = 0x8000000000000000ull;
 
 	while (cnt-- != 0) {
 		if (mdb_tgt_aread(t, as, &x, sizeof (x), addr) == sizeof (x)) {
-			mdb_iob_printf(mdb.m_out, "%-64s",
+			mdb_iob_printf(mdb.m_out, fmts[(x & mask) != 0],
 			    numtostr(x, 2, NTOS_UNSIGNED));
 			mdb_nv_set_value(mdb.m_rvalue, x);
 			addr += sizeof (x);
@@ -467,6 +471,83 @@ fmt_binary(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
 			break;
 		}
 	}
+	return (addr);
+}
+
+static mdb_tgt_addr_t
+fmt_jazzed(mdb_tgt_t *t, mdb_tgt_as_t as, mdb_tgt_addr_t addr, size_t cnt)
+{
+	uint64_t x;
+	char buf[256];
+
+	while (cnt-- != 0) {
+		boolean_t header = B_TRUE;
+
+		if (mdb_tgt_aread(t, as, &x, sizeof (x), addr) != sizeof (x)) {
+			warn("failed to read data from target");
+			break;
+		}
+
+		mdb_nv_set_value(mdb.m_rvalue, x);
+		addr += sizeof (x);
+
+		mdb_iob_printf(mdb.m_out, "%s\n",
+		    numtostr(x, 2, NTOS_UNSIGNED));
+
+		while (x != 0) {
+			int b = 63, forearm;
+			int i = 0, highbit;
+
+			/*
+			 * Find the high bit...
+			 */
+			while (!(x & (1ULL << b)))
+				b--;
+
+			highbit = b;
+
+			/*
+			 * ...and iterate over the remaining bits, putting
+			 * the upper arm in our buffer for any set bit (and
+			 * a space otherwise).
+			 */
+			while (x & ((1ULL << b) - 1)) {
+				buf[i++] = x & (1ULL << b) ? '|' : ' ';
+				b--;
+			}
+
+			/*
+			 * If this is the header line, print the upper arm
+			 * for the lowest set bit and continue...
+			 */
+			if (header) {
+				header = B_FALSE;
+				buf[i] = '\0';
+				mdb_iob_printf(mdb.m_out, "%s|\n", buf);
+				continue;
+			}
+
+			/*
+			 * ...otherwise, put the elbow and forearm into our
+			 * buffer, and print it.
+			 */
+			buf[i++] = '+';
+
+			for (forearm = b; forearm > -2; forearm--)
+				buf[i++] = '-';
+
+			buf[i] = '\0';
+			mdb_iob_printf(mdb.m_out, "%s bit %d %smask 0x%0*llx\n",
+			    buf, b, b < 10 && highbit >= 10 ? " " : "",
+			    (highbit / 4) + 1, 1ULL << b);
+
+			/*
+			 * Finally, clear the lowest set bit and continue.
+			 */
+			x &= ~(1ULL << b);
+		}
+	}
+
 	return (addr);
 }
 
@@ -560,13 +641,13 @@ static const mdb_fmt_desc_t fmttab[] = {
 	{ FMT_PRINTF, "%-8x", NULL, 1 },			/* 66 = B */
 	{ FMT_FUNC, FUNCP(fmt_escchr), help_escchr, 1 },	/* 67 = C */
 	{ FMT_PRINTF, "%-16d", NULL, 4 },			/* 68 = D */
-	{ FMT_PRINTF, "%-16llu", NULL, 8 },			/* 69 = E */
+	{ FMT_PRINTF, "%-21llu", NULL, 8 },			/* 69 = E */
 #ifdef _KMDB
 	{ FMT_NONE, NULL, NULL, 0 },				/* 70 = F */
 #else
 	{ FMT_PRINTF, "%g", NULL, sizeof (double), B_TRUE },	/* 70 = F */
 #endif
-	{ FMT_PRINTF, "%-16llo", NULL, 8 },			/* 71 = G */
+	{ FMT_PRINTF, "%-23llo", NULL, 8 },			/* 71 = G */
 	{ FMT_FUNC, FUNCP(fmt_swapint), help_swapint, 4 },	/* 72 = H */
 	{ FMT_FUNC, FUNCP(fmt_dotinstr), help_dotinstr, 0 },	/* 73 = I */
 	{ FMT_FUNC, FUNCP(fmt_hex64), help_hex64, 8 },		/* 74 = J */
@@ -579,7 +660,7 @@ static const mdb_fmt_desc_t fmttab[] = {
 	{ FMT_MATCH, NULL, help_match64, 8 },			/* 77 = M */
 	{ FMT_FUNC, FUNCP(fmt_nl), help_nl, SZ_NONE },		/* 78 = N */
 	{ FMT_PRINTF, "%-#16o", NULL, 4 },			/* 79 = O */
-	{ FMT_PRINTF, "%-16a", NULL, sizeof (uintptr_t) },	/* 80 = P */
+	{ FMT_PRINTF, "%-19a", NULL, sizeof (uintptr_t) },	/* 80 = P */
 	{ FMT_PRINTF, "%-#16q", NULL, 4 },			/* 81 = Q */
 	{ FMT_FUNC, FUNCP(fmt_binary), help_binary, 8 },	/* 82 = R */
 	{ FMT_FUNC, FUNCP(fmt_escstr), help_escstr, 0 },	/* 83 = S */
@@ -600,23 +681,24 @@ static const mdb_fmt_desc_t fmttab[] = {
 	{ FMT_PRINTF, "%-#8o", NULL, 1 },			/* 98 = b */
 	{ FMT_PRINTF, "%c", NULL, 1 },				/* 99 = c */
 	{ FMT_PRINTF, "%-8hd", NULL, 2 },			/* 100 = d */
-	{ FMT_PRINTF, "%-16lld", NULL, 8 },			/* 101 = e */
+	{ FMT_PRINTF, "%-21lld", NULL, 8 },			/* 101 = e */
 #ifdef _KMDB
 	{ FMT_NONE, NULL, NULL, 0 },				/* 102 = f */
 #else
 	{ FMT_FUNC, FUNCP(fmt_float), help_f, sizeof (float),
 	    B_TRUE },						/* 102 = f */
 #endif
-	{ FMT_PRINTF, "%-16llq", NULL, 8 },			/* 103 = g */
+	{ FMT_PRINTF, "%-24llq", NULL, 8 },			/* 103 = g */
 	{ FMT_FUNC, FUNCP(fmt_swapshort), help_swapshort, 2 },	/* 104 = h */
 	{ FMT_FUNC, FUNCP(fmt_instr), help_instr, 0 },		/* 105 = i */
-	{ FMT_NONE, NULL, NULL, 0 },				/* 106 = j */
+	{ FMT_FUNC|FMT_NOAUTOWRAP,
+	    FUNCP(fmt_jazzed), help_jazzed, 8 },		/* 106 = j */
 	{ FMT_NONE, NULL, NULL, 0 },				/* 107 = k */
 	{ FMT_MATCH, NULL, help_match16, 2 },			/* 108 = l */
 	{ FMT_NONE, NULL, NULL, 0 },				/* 109 = m */
 	{ FMT_FUNC, FUNCP(fmt_nl), help_nl, SZ_NONE },		/* 110 = n */
 	{ FMT_PRINTF, "%-#8ho", NULL, 2 },			/* 111 = o */
-	{ FMT_PRINTF, "%-16a", NULL, sizeof (uintptr_t) },	/* 112 = p */
+	{ FMT_PRINTF, "%-19a", NULL, sizeof (uintptr_t) },	/* 112 = p */
 	{ FMT_PRINTF, "%-#8hq", NULL, 2 },			/* 113 = q */
 	{ FMT_FUNC, FUNCP(fmt_ws), help_ws, SZ_NONE },		/* 114 = r */
 	{ FMT_FUNC, FUNCP(fmt_rawstr), help_rawstr, 0 },	/* 115 = s */
@@ -637,6 +719,7 @@ mdb_fmt_print(mdb_tgt_t *t, mdb_tgt_as_t as,
 	mdb_fmt_func_f *funcp;
 	uintmax_t rvalue;
 	void *buf;
+	uint_t oflags = mdb.m_flags;
 
 	union {
 		uint64_t i8;
@@ -649,6 +732,14 @@ mdb_fmt_print(mdb_tgt_t *t, mdb_tgt_as_t as,
 	if (fmt < 0 || fmt > (sizeof (fmttab) / sizeof (fmttab[0]))) {
 		warn("invalid format character -- '%c'\n", fmt);
 		return (addr);
+	}
+
+	if (!(fp->f_type & FMT_NOAUTOWRAP)) {
+		/*
+		 * Unless a format has explicitly opted out, we force autowrap
+		 * for the duration of mdb_fmt_print().
+		 */
+		mdb.m_flags |= MDB_FL_AUTOWRAP;
 	}
 
 	switch (FMT_TYPE(fp->f_type)) {
@@ -724,6 +815,8 @@ mdb_fmt_print(mdb_tgt_t *t, mdb_tgt_as_t as,
 	default:
 		warn("invalid format character -- '%c'\n", fmt);
 	}
+
+	mdb.m_flags = oflags;
 
 	return (addr);
 }

@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -162,11 +162,14 @@ typedef struct {
 /*
  * Define macro for determining if we should automatically wrap to the next
  * line of output, based on the amount of consumed buffer space and the
- * specified size of the next thing to be inserted (n).
+ * specified size of the next thing to be inserted (n) -- being careful to
+ * not force a spurious wrap if we're autoindented and already at the margin.
  */
 #define	IOB_WRAPNOW(iob, n)	\
 	(IOB_AUTOWRAP(iob) && (iob)->iob_nbytes != 0 && \
-	((n) + (iob)->iob_nbytes > (iob)->iob_cols))
+	((n) + (iob)->iob_nbytes > (iob)->iob_cols) &&  \
+	!(((iob)->iob_flags & MDB_IOB_INDENT) && \
+	(iob)->iob_nbytes == (iob)->iob_margin))
 
 /*
  * Define prompt string and string to erase prompt string for iob_pager
@@ -1910,7 +1913,7 @@ mdb_iob_fill(mdb_iob_t *iob, int c, size_t nfill)
 void
 mdb_iob_ws(mdb_iob_t *iob, size_t n)
 {
-	if (iob->iob_nbytes + n < iob->iob_cols)
+	if (!IOB_AUTOWRAP(iob) || iob->iob_nbytes + n < iob->iob_cols)
 		mdb_iob_fill(iob, ' ', n);
 	else
 		mdb_iob_nl(iob);
