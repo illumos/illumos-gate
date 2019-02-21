@@ -30,6 +30,7 @@
 
 #include <sys/types.h>
 #include <sys/promif.h>
+#include <sys/salib.h>
 
 #include <kmdb/kmdb_promif_impl.h>
 #include <kmdb/kmdb_kdi.h>
@@ -109,4 +110,22 @@ kmdb_prom_stdout_is_framebuffer(kmdb_auxv_t *kav)
 
 	/* Anything else is classified as local console. */
 	return (1);
+}
+
+void
+kmdb_prom_get_tem_size(kmdb_auxv_t *kav, ushort_t *rows, ushort_t *cols)
+{
+	char *val;
+	unsigned long u;
+
+	val = kmdb_prom_get_ddi_prop(kav, "screen-#rows");
+	if (val != NULL) {
+		u = strtoul(val, NULL, 10);
+		*rows = (ushort_t)u;
+	}
+	val = kmdb_prom_get_ddi_prop(kav, "screen-#cols");
+	if (val != NULL) {
+		u = strtoul(val, NULL, 10);
+		*cols = (ushort_t)u;
+	}
 }

@@ -1357,7 +1357,7 @@ swapsize(caddr_t v)
 	if ((kpd = segkp_find(segkp, v)) != NULL)
 		return (SEGKP_MAPLEN(kpd->kp_len, kpd->kp_flags));
 	else
-		return (NULL);
+		return (0);
 }
 
 /*

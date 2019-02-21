@@ -123,8 +123,8 @@ static boolean_t ntxn_m_getcapab(void *arg, mac_capab_t cap, void *cap_data);
  */
 int
 unm_pci_alloc_consistent(unm_adapter *adapter,
-		int size, caddr_t *address, ddi_dma_cookie_t *cookie,
-		ddi_dma_handle_t *dma_handle, ddi_acc_handle_t *handlep)
+    int size, caddr_t *address, ddi_dma_cookie_t *cookie,
+    ddi_dma_handle_t *dma_handle, ddi_acc_handle_t *handlep)
 {
 	int			err;
 	uint32_t		ncookies;
@@ -1148,9 +1148,9 @@ unm_nic_check_temp(struct unm_adapter_s *adapter)
 }
 
 static void
-unm_watchdog(unsigned long v)
+unm_watchdog(void *v)
 {
-	unm_adapter *adapter = (unm_adapter *)v;
+	unm_adapter *adapter = v;
 
 	if ((adapter->portnum == 0) && unm_nic_check_temp(adapter)) {
 		/*
@@ -1165,8 +1165,8 @@ unm_watchdog(unsigned long v)
 	/*
 	 * This function schedules a call for itself.
 	 */
-	adapter->watchdog_timer = timeout((void (*)(void *))&unm_watchdog,
-	    (void *)adapter, 2 * drv_usectohz(1000000));
+	adapter->watchdog_timer = timeout(&unm_watchdog,
+	    adapter, 2 * drv_usectohz(1000000));
 
 }
 
@@ -1566,8 +1566,8 @@ unm_post_rx_buffers_nodb(struct unm_adapter_s *adapter,
 	unm_rcv_desc_ctx_t	*rcv_desc = &recv_ctx->rcv_desc[ringid];
 	struct unm_rx_buffer	*rx_buffer;
 	rcvDesc_t		*pdesc;
-	int 			count, producer = rcv_desc->producer;
-	int 			last_producer = producer;
+	int			count, producer = rcv_desc->producer;
+	int			last_producer = producer;
 
 	for (count = 0; count < rcv_desc->rx_desc_handled; count++) {
 		rx_buffer = unm_reserve_rx_buffer(rcv_desc);
@@ -1606,7 +1606,7 @@ unm_post_rx_buffers_nodb(struct unm_adapter_s *adapter,
 
 int
 unm_nic_fill_statistics_128M(struct unm_adapter_s *adapter,
-			    struct unm_statistics *unm_stats)
+    struct unm_statistics *unm_stats)
 {
 	void *addr;
 	if (adapter->ahw.board_type == UNM_NIC_XGBE) {
@@ -2108,7 +2108,7 @@ unm_kstat_update(kstat_t *ksp, int flag)
 
 static kstat_t *
 unm_setup_named_kstat(unm_adapter *adapter, int instance, char *name,
-	const unm_ksindex_t *ksip, size_t size, int (*update)(kstat_t *, int))
+    const unm_ksindex_t *ksip, size_t size, int (*update)(kstat_t *, int))
 {
 	kstat_t *ksp;
 	kstat_named_t *knp;

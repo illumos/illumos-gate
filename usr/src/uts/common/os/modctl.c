@@ -2301,17 +2301,17 @@ modctl_hp(int subcmd, const char *path, char *cn_name, uintptr_t arg,
 	switch (subcmd) {
 	case MODHPOPS_CHANGE_STATE:
 		error = ddihp_modctl(DDI_HPOP_CN_CHANGE_STATE, devpath,
-		    cn_name_str, arg, NULL);
+		    cn_name_str, arg, 0);
 		break;
 	case MODHPOPS_CREATE_PORT:
 		/* Create an empty PORT */
 		error = ddihp_modctl(DDI_HPOP_CN_CREATE_PORT, devpath,
-		    cn_name_str, NULL, NULL);
+		    cn_name_str, 0, 0);
 		break;
 	case MODHPOPS_REMOVE_PORT:
 		/* Remove an empty PORT */
 		error = ddihp_modctl(DDI_HPOP_CN_REMOVE_PORT, devpath,
-		    cn_name_str, NULL, NULL);
+		    cn_name_str, 0, 0);
 		break;
 	case MODHPOPS_BUS_GET:
 		error = ddihp_modctl(DDI_HPOP_CN_GET_PROPERTY, devpath,

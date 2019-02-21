@@ -81,11 +81,11 @@ static void consms_mux_ack(consms_msg_t *, mblk_t *);
 static void consms_mux_disp_data(mblk_t *);
 
 
-static int	consmsopen();
-static int	consmsclose();
-static void	consmsuwput();
-static void	consmslrput();
-static void	consmslwserv();
+static int	consmsopen(queue_t *, dev_t *, int, int, cred_t	*);
+static int	consmsclose(queue_t *, int, cred_t *);
+static int	consmsuwput(queue_t *, mblk_t *);
+static int	consmslrput(queue_t *, mblk_t *);
+static int	consmslwserv(queue_t *);
 
 static struct module_info consmsm_info = {
 	0,
@@ -107,7 +107,7 @@ static struct qinit consmsurinit = {
 };
 
 static struct qinit consmsuwinit = {
-	(int (*)())consmsuwput,
+	consmsuwput,
 	(int (*)())NULL,
 	consmsopen,
 	consmsclose,
@@ -117,7 +117,7 @@ static struct qinit consmsuwinit = {
 };
 
 static struct qinit consmslrinit = {
-	(int (*)())consmslrput,
+	consmslrput,
 	(int (*)())NULL,
 	(int (*)())NULL,
 	(int (*)())NULL,
@@ -128,7 +128,7 @@ static struct qinit consmslrinit = {
 
 static struct qinit consmslwinit = {
 	putq,
-	(int (*)())consmslwserv,
+	consmslwserv,
 	(int (*)())NULL,
 	(int (*)())NULL,
 	(int (*)())NULL,
@@ -177,7 +177,7 @@ static struct {
 };
 
 
-static 	struct cb_ops cb_consms_ops = {
+static struct cb_ops cb_consms_ops = {
 	nulldev,		/* cb_open */
 	nulldev,		/* cb_close */
 	nodev,			/* cb_strategy */
@@ -324,9 +324,9 @@ consms_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 /*ARGSUSED*/
 static int
 consms_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
-	register int error;
+	int error;
 
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
@@ -350,11 +350,7 @@ consms_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 
 /*ARGSUSED*/
 static int
-consmsopen(q, devp, flag, sflag, crp)
-	queue_t *q;
-	dev_t	*devp;
-	int	flag, sflag;
-	cred_t	*crp;
+consmsopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 {
 	upperqueue = q;
 	qprocson(q);
@@ -363,10 +359,7 @@ consmsopen(q, devp, flag, sflag, crp)
 
 /*ARGSUSED*/
 static int
-consmsclose(q, flag, crp)
-	queue_t *q;
-	int	flag;
-	cred_t	*crp;
+consmsclose(queue_t *q, int flag, cred_t *crp)
 {
 	qprocsoff(q);
 	upperqueue = NULL;
@@ -376,10 +369,8 @@ consmsclose(q, flag, crp)
 /*
  * Put procedure for upper write queue.
  */
-static void
-consmsuwput(q, mp)
-	register queue_t *q;
-	register mblk_t *mp;
+static int
+consmsuwput(queue_t *q, mblk_t *mp)
 {
 	struct iocblk		*iocbp = (struct iocblk *)mp->b_rptr;
 	consms_msg_t		*msg;
@@ -445,14 +436,13 @@ consmsuwput(q, mp)
 		*mp->b_rptr = (char)error;
 		qreply(q, mp);
 	}
+	return (0);
 }
 
 static void
-consmsioctl(q, mp)
-	register queue_t *q;
-	register mblk_t *mp;
+consmsioctl(queue_t *q, mblk_t *mp)
 {
-	register struct iocblk *iocp;
+	struct iocblk *iocp;
 	int		error;
 	mblk_t		*datap;
 
@@ -520,23 +510,21 @@ consmsioctl(q, mp)
  * Service procedure for lower write queue.
  * Puts things on the queue below us, if it lets us.
  */
-static void
-consmslwserv(q)
-	register queue_t *q;
+static int
+consmslwserv(queue_t *q)
 {
-	register mblk_t *mp;
+	mblk_t *mp;
 
 	while (canput(q->q_next) && (mp = getq(q)) != NULL)
 		putnext(q, mp);
+	return (0);
 }
 
 /*
  * Put procedure for lower read queue.
  */
-static void
-consmslrput(q, mp)
-	register queue_t *q;
-	register mblk_t *mp;
+static int
+consmslrput(queue_t *q, mblk_t *mp)
 {
 	struct iocblk		*iocbp = (struct iocblk *)mp->b_rptr;
 	struct copyreq		*copyreq = (struct copyreq *)mp->b_rptr;
@@ -613,6 +601,7 @@ consmslrput(q, mp)
 		freemsg(mp);	/* anything useful here? */
 		break;
 	}
+	return (0);
 }
 
 /* ARGSUSED */
@@ -1306,7 +1295,7 @@ consms_mux_max_wheel_report(mblk_t *mp)
 static void
 consms_mux_cache_states(mblk_t *mp)
 {
-	struct iocblk 		*iocp;
+	struct iocblk		*iocp;
 	Ms_parms		*parms;
 	Ms_screen_resolution	*sr;
 	wheel_state		*ws;

@@ -293,7 +293,7 @@ typedef struct dld_ioc_macprop_s {
 	datalink_id_t	pr_linkid;
 	mac_prop_id_t	pr_num;
 	uint_t		pr_perm_flags;
-	char    	pr_name[MAXLINKPROPNAME];
+	char		pr_name[MAXLINKPROPNAME];
 	uint_t		pr_valsize;		/* sizeof pr_val */
 	char		pr_val[1];
 } dld_ioc_macprop_t;
@@ -453,8 +453,8 @@ int	dld_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 int	dld_devt_to_instance(dev_t);
 int	dld_open(queue_t *, dev_t *, int, int, cred_t *);
 int	dld_close(queue_t *, int, cred_t *);
-void	dld_wput(queue_t *, mblk_t *);
-void	dld_wsrv(queue_t *);
+int	dld_wput(queue_t *, mblk_t *);
+int	dld_wsrv(queue_t *);
 int	dld_str_open(queue_t *, dev_t *, void *);
 int	dld_str_close(queue_t *);
 void	*dld_str_private(queue_t *);

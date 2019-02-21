@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018, Joyent Inc.
  * Copyright (c) 2015, 2016 by Delphix. All rights reserved.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -141,6 +142,8 @@
 
 /* Number of times to retry unmounting if it fails */
 #define	UMOUNT_RETRIES	30
+
+#define	ALT_MOUNT(mount_cmd)	((mount_cmd) != Z_MNT_BOOT)
 
 /* a reasonable estimate for the number of lwps per process */
 #define	LWPS_PER_PROCESS	10
@@ -1381,13 +1384,13 @@ free_fs_data(struct zone_fstab *fsarray, uint_t nelem)
  * scratch zone. The Environment creation process is split up into two
  * functions(build_mounted_pre_var() and build_mounted_post_var()). It
  * is done this way because:
- * 	We need to have both /etc and /var in the root of the scratchzone.
- * 	We loopback mount zone's own /etc and /var into the root of the
- * 	scratch zone. Unlike /etc, /var can be a seperate filesystem. So we
- * 	need to delay the mount of /var till the zone's root gets populated.
+ *	We need to have both /etc and /var in the root of the scratchzone.
+ *	We loopback mount zone's own /etc and /var into the root of the
+ *	scratch zone. Unlike /etc, /var can be a seperate filesystem. So we
+ *	need to delay the mount of /var till the zone's root gets populated.
  *	So mounting of localdirs[](/etc and /var) have been moved to the
- * 	build_mounted_post_var() which gets called only after the zone
- * 	specific filesystems are mounted.
+ *	build_mounted_post_var() which gets called only after the zone
+ *	specific filesystems are mounted.
  *
  * Note that the scratch zone we set up for updating the zone (Z_MNT_UPDATE)
  * does not loopback mount the zone's own /etc and /var into the root of the
@@ -2728,7 +2731,7 @@ add_net_for_linkid(zlog_t *zlogp, zoneid_t zoneid, zone_addr_list_t *start)
 		goto done;
 
 	/* over-write last ',' with '\0' */
-	zaddr[strnlen(zaddr, zlen) + 1] = '\0';
+	zaddr[strnlen(zaddr, zlen) - 1] = '\0';
 
 	/*
 	 * First make sure L3 protection is not already set on the link.

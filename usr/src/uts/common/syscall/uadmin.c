@@ -282,7 +282,7 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		 * vfs_syncall() can acquire the vfs locks they need.
 		 */
 		sema_p(&fsflush_sema);
-		(void) callb_execute_class(CB_CL_UADMIN_PRE_VFS, NULL);
+		(void) callb_execute_class(CB_CL_UADMIN_PRE_VFS, 0);
 
 		vfs_unmountall();
 		(void) VFS_MOUNTROOT(rootvfs, ROOT_UNMOUNT);
@@ -444,7 +444,7 @@ uadmin(int cmd, int fcn, uintptr_t mdep)
 	 * Certain subcommands intepret a non-NULL mdep value as a pointer to
 	 * a boot string.  We pull that in as bootargs, if applicable.
 	 */
-	if (mdep != NULL &&
+	if (mdep != (uintptr_t)NULL &&
 	    (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_DUMP ||
 	    cmd == A_FREEZE || cmd == A_CONFIG)) {
 		bootargs = kmem_zalloc(BOOTARGS_MAX, KM_SLEEP);

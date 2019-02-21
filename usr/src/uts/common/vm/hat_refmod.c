@@ -230,7 +230,7 @@ hat_freestat(struct as *as, int id)
 	mutex_enter(&hat_statlock);
 
 	for (prev_ahrm = NULL; hrm; hrm = hrm->hrm_anext) {
-		if ((id == hrm->hrm_id) || (id == NULL)) {
+		if ((id == hrm->hrm_id) || (id == 0)) {
 
 			hrm_hashout(hrm);
 			hrm->hrm_hnext = hrm_blist;

@@ -1104,8 +1104,12 @@ do_alloc:
 			mutex_exit(&vmp->vm_lock);
 			if (vmp->vm_cflags & VMC_XALLOC) {
 				size_t oasize = asize;
-				vaddr = ((vmem_ximport_t *)
-				    vmp->vm_source_alloc)(vmp->vm_source,
+				vmem_ximport_t *vmem_ximport;
+
+				vmem_ximport = (vmem_ximport_t *)
+				    (uintptr_t)vmp->vm_source_alloc;
+
+				vaddr = vmem_ximport(vmp->vm_source,
 				    &asize, align, vmflag & VM_KMFLAGS);
 				ASSERT(asize >= oasize);
 				ASSERT(P2PHASE(asize,
@@ -1576,12 +1580,14 @@ vmem_xcreate(const char *name, void *base, size_t size, size_t quantum,
     vmem_ximport_t *afunc, vmem_free_t *ffunc, vmem_t *source,
     size_t qcache_max, int vmflag)
 {
+	vmem_alloc_t *af;
+
+	af = (vmem_alloc_t *)(uintptr_t)afunc;
 	ASSERT(!(vmflag & (VMC_POPULATOR | VMC_XALLOC)));
 	vmflag &= ~(VMC_POPULATOR | VMC_XALLOC);
 
 	return (vmem_create_common(name, base, size, quantum,
-	    (vmem_alloc_t *)afunc, ffunc, source, qcache_max,
-	    vmflag | VMC_XALLOC));
+	    af, ffunc, source, qcache_max, vmflag | VMC_XALLOC));
 }
 
 vmem_t *

@@ -1204,7 +1204,7 @@ sys_set_var(int fcn, struct sysparam *sysp, void *p)
 	} else
 		return;
 
-	if (symaddr != NULL) {
+	if (symaddr != (uintptr_t)NULL) {
 		switch (size) {
 		case 1:
 			set_int8_var(symaddr, sysp);

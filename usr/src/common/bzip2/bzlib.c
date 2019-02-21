@@ -673,12 +673,13 @@ int BZ_API(BZ2_bzDecompressInit)
  */
 int BZ_API(BZ2_bzDecompressReset) ( bz_stream* strm )
 {
-   DState* s = strm->state;
+   DState* s;
 
    if (!bz_config_ok()) return BZ_CONFIG_ERROR;
 
    if (strm == NULL) return BZ_PARAM_ERROR;
 
+   s = strm->state;
    s->strm                  = strm;
 
    s->state                 = BZ_X_MAGIC_1;

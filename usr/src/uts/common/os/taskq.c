@@ -700,7 +700,7 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
 	taskq_random = (taskq_random * 2416 + 374441) % 1771875;\
 	if ((flag & TQ_NOSLEEP) &&				\
 	    taskq_random < 1771875 / taskq_dmtbf) {		\
-		return (NULL);					\
+		return ((taskqid_t)NULL);			\
 	}
 
 #define	TASKQ_S_RANDOM_DISPATCH_FAILURE(tq, flag)		\
@@ -710,7 +710,7 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
 	    (tq->tq_nalloc > tq->tq_minalloc)) &&		\
 	    (taskq_random < (1771875 / taskq_smtbf))) {		\
 		mutex_exit(&tq->tq_lock);			\
-		return (NULL);					\
+		return ((taskqid_t)NULL);			\
 	}
 #else
 #define	TASKQ_S_RANDOM_DISPATCH_FAILURE(tq, flag)
@@ -1167,7 +1167,7 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		if ((tqe = taskq_ent_alloc(tq, flags)) == NULL) {
 			tq->tq_nomem++;
 			mutex_exit(&tq->tq_lock);
-			return (NULL);
+			return ((taskqid_t)tqe);
 		}
 		/* Make sure we start without any flags */
 		tqe->tqent_un.tqent_flags = 0;

@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights resrved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <cryptoutil.h>
@@ -161,7 +162,7 @@ convert_mechlist(CK_MECHANISM_TYPE **pmech_list, CK_ULONG *mech_count,
 	}
 
 	*pmech_list = malloc(n * sizeof (CK_MECHANISM_TYPE));
-	if (pmech_list == NULL) {
+	if (*pmech_list == NULL) {
 		cryptodebug("out of memory");
 		return (FAILURE);
 	}

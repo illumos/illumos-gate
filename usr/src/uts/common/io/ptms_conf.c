@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains global data and code shared between master and slave parts
  * of the pseudo-terminal driver.
@@ -608,8 +606,8 @@ ptms_constructor(void *maddr, void *arg, int kmflags)
 	pt->pts_rdq = NULL;
 	pt->ptm_rdq = NULL;
 	pt->pt_nullmsg = NULL;
-	pt->pt_pid = NULL;
-	pt->pt_minor = NULL;
+	pt->pt_pid = 0;
+	pt->pt_minor = 0;
 	pt->pt_refcnt = 0;
 	pt->pt_state = 0;
 	pt->pt_zoneid = GLOBAL_ZONEID;

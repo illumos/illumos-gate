@@ -2087,7 +2087,7 @@ secpolicy_rpcmod_open(const cred_t *cr)
 	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_NFS, B_FALSE))
 		return (secpolicy_nfs(cr));
 	else
-		return (secpolicy_net_config(cr, NULL));
+		return (secpolicy_net_config(cr, B_FALSE));
 }
 
 int

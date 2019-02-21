@@ -118,7 +118,7 @@ pci_get_msi_ctrl(dev_info_t *dip, int type, ushort_t *msi_ctrl,
 
 	if ((PCI_CAP_LOCATE(*h, PCI_CAP_ID_MSI, caps_ptr) == DDI_SUCCESS) &&
 	    (type == DDI_INTR_TYPE_MSI)) {
-		if ((*msi_ctrl = PCI_CAP_GET16(*h, NULL, *caps_ptr,
+		if ((*msi_ctrl = PCI_CAP_GET16(*h, 0, *caps_ptr,
 		    PCI_MSI_CTRL)) == PCI_CAP_EINVAL16)
 			goto done;
 
@@ -130,7 +130,7 @@ pci_get_msi_ctrl(dev_info_t *dip, int type, ushort_t *msi_ctrl,
 
 	if ((PCI_CAP_LOCATE(*h, PCI_CAP_ID_MSI_X, caps_ptr) == DDI_SUCCESS) &&
 	    (type == DDI_INTR_TYPE_MSIX)) {
-		if ((*msi_ctrl = PCI_CAP_GET16(*h, NULL, *caps_ptr,
+		if ((*msi_ctrl = PCI_CAP_GET16(*h, 0, *caps_ptr,
 		    PCI_MSIX_CTRL)) == PCI_CAP_EINVAL16)
 			goto done;
 
@@ -214,37 +214,35 @@ pci_msi_configure(dev_info_t *rdip, int type, int count, int inum,
 	if (type == DDI_INTR_TYPE_MSI) {
 		/* Set the bits to inform how many MSIs are enabled */
 		msi_ctrl |= ((highbit(count) -1) << PCI_MSI_MME_SHIFT);
-		PCI_CAP_PUT16(h, NULL, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
+		PCI_CAP_PUT16(h, 0, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
 
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: msi_ctrl = %x\n",
-		    PCI_CAP_GET16(h, NULL, caps_ptr, PCI_MSI_CTRL)));
+		    PCI_CAP_GET16(h, 0, caps_ptr, PCI_MSI_CTRL)));
 
 		/* Set the "data" and "addr" bits */
-		PCI_CAP_PUT32(h, NULL, caps_ptr, PCI_MSI_ADDR_OFFSET, addr);
+		PCI_CAP_PUT32(h, 0, caps_ptr, PCI_MSI_ADDR_OFFSET, addr);
 
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: msi_addr = %x\n",
-		    PCI_CAP_GET32(h, NULL, caps_ptr, PCI_MSI_ADDR_OFFSET)));
+		    PCI_CAP_GET32(h, 0, caps_ptr, PCI_MSI_ADDR_OFFSET)));
 
 		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
-			PCI_CAP_PUT32(h, NULL, caps_ptr, PCI_MSI_ADDR_OFFSET
+			PCI_CAP_PUT32(h, 0, caps_ptr, PCI_MSI_ADDR_OFFSET
 			    + 4, addr >> 32);
 
 			DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: upper "
-			    "32bit msi_addr = %x\n", PCI_CAP_GET32(h, NULL,
+			    "32bit msi_addr = %x\n", PCI_CAP_GET32(h, 0,
 			    caps_ptr, PCI_MSI_ADDR_OFFSET + 4)));
 
-			PCI_CAP_PUT16(h, NULL, caps_ptr, PCI_MSI_64BIT_DATA,
-			    data);
+			PCI_CAP_PUT16(h, 0, caps_ptr, PCI_MSI_64BIT_DATA, data);
 
 			DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: msi_data "
-			    "= %x\n", PCI_CAP_GET16(h, NULL, caps_ptr,
+			    "= %x\n", PCI_CAP_GET16(h, 0, caps_ptr,
 			    PCI_MSI_64BIT_DATA)));
 		} else {
-			PCI_CAP_PUT16(h, NULL, caps_ptr, PCI_MSI_32BIT_DATA,
-			    data);
+			PCI_CAP_PUT16(h, 0, caps_ptr, PCI_MSI_32BIT_DATA, data);
 
 			DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: msi_data "
-			    "= %x\n", PCI_CAP_GET16(h, NULL, caps_ptr,
+			    "= %x\n", PCI_CAP_GET16(h, 0, caps_ptr,
 			    PCI_MSI_32BIT_DATA)));
 		}
 	} else if (type == DDI_INTR_TYPE_MSIX) {
@@ -307,22 +305,20 @@ pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 
 	if (type == DDI_INTR_TYPE_MSI) {
 		msi_ctrl &= (~PCI_MSI_MME_MASK);
-		PCI_CAP_PUT16(h, NULL, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
+		PCI_CAP_PUT16(h, 0, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
 
-		PCI_CAP_PUT32(h, NULL, caps_ptr, PCI_MSI_ADDR_OFFSET, 0);
+		PCI_CAP_PUT32(h, 0, caps_ptr, PCI_MSI_ADDR_OFFSET, 0);
 
 		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
-			PCI_CAP_PUT16(h, NULL, caps_ptr, PCI_MSI_64BIT_DATA,
-			    0);
-			PCI_CAP_PUT32(h, NULL, caps_ptr, PCI_MSI_ADDR_OFFSET
+			PCI_CAP_PUT16(h, 0, caps_ptr, PCI_MSI_64BIT_DATA, 0);
+			PCI_CAP_PUT32(h, 0, caps_ptr, PCI_MSI_ADDR_OFFSET
 			    + 4, 0);
 		} else {
-			PCI_CAP_PUT16(h, NULL, caps_ptr, PCI_MSI_32BIT_DATA,
-			    0);
+			PCI_CAP_PUT16(h, 0, caps_ptr, PCI_MSI_32BIT_DATA, 0);
 		}
 
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_unconfigure: msi_ctrl "
-		    "= %x\n", PCI_CAP_GET16(h, NULL, caps_ptr, PCI_MSI_CTRL)));
+		    "= %x\n", PCI_CAP_GET16(h, 0, caps_ptr, PCI_MSI_CTRL)));
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		uintptr_t	off;
@@ -411,14 +407,14 @@ pci_msi_enable_mode(dev_info_t *rdip, int type)
 			goto finished;
 
 		msi_ctrl |= PCI_MSI_ENABLE_BIT;
-		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
+		PCI_CAP_PUT16(cfg_hdle, 0, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		if (msi_ctrl & PCI_MSIX_ENABLE_BIT)
 			goto finished;
 
 		msi_ctrl |= PCI_MSIX_ENABLE_BIT;
-		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSIX_CTRL,
+		PCI_CAP_PUT16(cfg_hdle, 0, caps_ptr, PCI_MSIX_CTRL,
 		    msi_ctrl);
 	}
 
@@ -459,14 +455,13 @@ pci_msi_disable_mode(dev_info_t *rdip, int type)
 		if (!(msi_ctrl & PCI_MSI_ENABLE_BIT))
 			goto finished;
 		msi_ctrl &= ~PCI_MSI_ENABLE_BIT;
-		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
+		PCI_CAP_PUT16(cfg_hdle, 0, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		if (!(msi_ctrl & PCI_MSIX_ENABLE_BIT))
 			goto finished;
 
 		msi_ctrl &= ~PCI_MSIX_ENABLE_BIT;
-		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSIX_CTRL,
-		    msi_ctrl);
+		PCI_CAP_PUT16(cfg_hdle, 0, caps_ptr, PCI_MSIX_CTRL, msi_ctrl);
 	}
 
 finished:
@@ -507,13 +502,13 @@ pci_msi_set_mask(dev_info_t *rdip, int type, int inum)
 		offset = (msi_ctrl &  PCI_MSI_64BIT_MASK) ?
 		    PCI_MSI_64BIT_MASKBITS : PCI_MSI_32BIT_MASK;
 
-		if ((mask_bits = PCI_CAP_GET32(cfg_hdle, NULL, caps_ptr,
+		if ((mask_bits = PCI_CAP_GET32(cfg_hdle, 0, caps_ptr,
 		    offset)) == PCI_CAP_EINVAL32)
 			goto done;
 
 		mask_bits |= (1 << inum);
 
-		PCI_CAP_PUT32(cfg_hdle, NULL, caps_ptr, offset, mask_bits);
+		PCI_CAP_PUT32(cfg_hdle, 0, caps_ptr, offset, mask_bits);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		uintptr_t		off;
@@ -570,13 +565,13 @@ pci_msi_clr_mask(dev_info_t *rdip, int type, int inum)
 
 		offset = (msi_ctrl &  PCI_MSI_64BIT_MASK) ?
 		    PCI_MSI_64BIT_MASKBITS : PCI_MSI_32BIT_MASK;
-		if ((mask_bits = PCI_CAP_GET32(cfg_hdle, NULL, caps_ptr,
+		if ((mask_bits = PCI_CAP_GET32(cfg_hdle, 0, caps_ptr,
 		    offset)) == PCI_CAP_EINVAL32)
 			goto done;
 
 		mask_bits &= ~(1 << inum);
 
-		PCI_CAP_PUT32(cfg_hdle, NULL, caps_ptr, offset, mask_bits);
+		PCI_CAP_PUT32(cfg_hdle, 0, caps_ptr, offset, mask_bits);
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		uintptr_t		off;
@@ -637,7 +632,7 @@ pci_msi_get_pending(dev_info_t *rdip, int type, int inum, int *pendingp)
 		offset = (msi_ctrl &  PCI_MSI_64BIT_MASK) ?
 		    PCI_MSI_64BIT_PENDING : PCI_MSI_32BIT_PENDING;
 
-		if ((pending_bits = PCI_CAP_GET32(cfg_hdle, NULL, caps_ptr,
+		if ((pending_bits = PCI_CAP_GET32(cfg_hdle, 0, caps_ptr,
 		    offset)) == PCI_CAP_EINVAL32)
 			goto done;
 
@@ -727,7 +722,7 @@ pci_msi_set_nintrs(dev_info_t *rdip, int type, int navail)
 	if (type == DDI_INTR_TYPE_MSI) {
 		msi_ctrl |= ((highbit(navail) -1) << PCI_MSI_MME_SHIFT);
 
-		PCI_CAP_PUT16(cfg_hdle, NULL, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
+		PCI_CAP_PUT16(cfg_hdle, 0, caps_ptr, PCI_MSI_CTRL, msi_ctrl);
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_set_nintrs: unsupported\n"));
 	}
@@ -809,7 +804,7 @@ pci_msix_init(dev_info_t *rdip)
 	msix_p->msix_dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
 	/* Map the entire MSI-X vector table */
-	msix_p->msix_tbl_offset = PCI_CAP_GET32(cfg_hdle, NULL, caps_ptr,
+	msix_p->msix_tbl_offset = PCI_CAP_GET32(cfg_hdle, 0, caps_ptr,
 	    PCI_MSIX_TBL_OFFSET);
 
 	if ((breg = pci_msix_bir_index[msix_p->msix_tbl_offset &
@@ -870,7 +865,7 @@ pci_msix_init(dev_info_t *rdip)
 	/*
 	 * Map in the MSI-X Pending Bit Array
 	 */
-	msix_p->msix_pba_offset = PCI_CAP_GET32(cfg_hdle, NULL, caps_ptr,
+	msix_p->msix_pba_offset = PCI_CAP_GET32(cfg_hdle, 0, caps_ptr,
 	    PCI_MSIX_PBA_OFFSET);
 
 	if ((breg = pci_msix_bir_index[msix_p->msix_pba_offset &

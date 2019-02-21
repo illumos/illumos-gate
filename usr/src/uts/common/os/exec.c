@@ -389,7 +389,7 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	 */
 	up->u_acflag &= ~AFORK;
 	bcopy(exec_file, up->u_comm, MAXCOMLEN+1);
-	curthread->t_predcache = NULL;
+	curthread->t_predcache = 0;
 
 	/*
 	 * Clear contract template state
@@ -1729,7 +1729,7 @@ stk_copyin(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 			if (args->scrubenv && strncmp(tmp, "LD_", 3) == 0) {
 				/* Undo the copied string */
 				args->stk_strp = tmp;
-				*(args->stk_offp++) = NULL;
+				*(args->stk_offp++) = 0;
 			}
 			envp += ptrsize;
 		}

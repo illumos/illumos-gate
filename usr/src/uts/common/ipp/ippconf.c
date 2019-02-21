@@ -3231,7 +3231,7 @@ hash(
 	 * Make a hash value by XORing all the ascii codes in the text string.
 	 */
 
-	for (ptr = (char *)name; *ptr != NULL; ptr++) {
+	for (ptr = (char *)name; *ptr != '\0'; ptr++) {
 		val ^= *ptr;
 	}
 

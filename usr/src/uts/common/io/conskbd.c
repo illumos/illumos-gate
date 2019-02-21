@@ -93,9 +93,9 @@ static int conskbd_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 /*
  * STREAMS queue processing procedures
  */
-static void	conskbduwsrv(queue_t *);
-static void	conskbdlwserv(queue_t *);
-static void	conskbdlrput(queue_t *, mblk_t *);
+static int	conskbduwsrv(queue_t *);
+static int	conskbdlwserv(queue_t *);
+static int	conskbdlrput(queue_t *, mblk_t *);
 static int	conskbdclose(queue_t *, int, cred_t *);
 static int	conskbdopen(queue_t *, dev_t *, int, int, cred_t *);
 
@@ -126,8 +126,8 @@ static struct qinit conskbdurinit = {
 
 /* upper write queue processing procedures structuresi */
 static struct qinit conskbduwinit = {
-	(int (*)())putq,		/* qi_putp */
-	(int (*)())conskbduwsrv,	/* qi_srvp */
+	putq,		/* qi_putp */
+	conskbduwsrv,	/* qi_srvp */
 	conskbdopen,			/* qi_qopen */
 	conskbdclose,			/* qi_qclose */
 	(int (*)())NULL,		/* qi_qadmin */
@@ -137,7 +137,7 @@ static struct qinit conskbduwinit = {
 
 /* lower read queue processing procedures structures */
 static struct qinit conskbdlrinit = {
-	(int (*)())conskbdlrput,	/* qi_putp */
+	conskbdlrput,	/* qi_putp */
 	(int (*)())NULL,		/* qi_srvp */
 	(int (*)())NULL,		/* qi_qopen */
 	(int (*)())NULL,		/* qi_qclose */
@@ -149,7 +149,7 @@ static struct qinit conskbdlrinit = {
 /* lower write processing procedures structures */
 static struct qinit conskbdlwinit = {
 	putq,				/* qi_putp */
-	(int (*)())conskbdlwserv,	/* qi_srvp */
+	conskbdlwserv,	/* qi_srvp */
 	(int (*)())NULL,		/* qi_qopen */
 	(int (*)())NULL,		/* qi_qclose */
 	(int (*)())NULL,		/* qi_qadmin */
@@ -167,7 +167,7 @@ static struct streamtab conskbd_str_info = {
 
 
 /* Entry points structure */
-static 	struct cb_ops cb_conskbd_ops = {
+static struct cb_ops cb_conskbd_ops = {
 	nulldev,		/* cb_open */
 	nulldev,		/* cb_close */
 	nodev,			/* cb_strategy */
@@ -316,7 +316,7 @@ static void conskbd_streams_setled(struct kbtrans_hardware *, int);
 static boolean_t conskbd_override_kbtrans(queue_t *, mblk_t *);
 static boolean_t
 conskbd_polled_keycheck(struct kbtrans_hardware *,
-		kbtrans_key_t *, enum keystate *);
+    kbtrans_key_t *, enum keystate *);
 
 /*
  * Callbacks needed by kbtrans
@@ -426,7 +426,7 @@ _info(struct modinfo *modinfop)
  * conskbd_attach()
  *
  * Description:
- * 	This routine creates two device nodes. One is the "kbd" node, which
+ *	This routine creates two device nodes. One is the "kbd" node, which
  * is used by user application programs(such as Xserver).The other is the
  * "conskbd" node, which is an internal node. consconfig_dacf module will
  * open this internal node, and link the conskbd under the wc (workstaion
@@ -507,7 +507,7 @@ conskbd_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 /* ARGSUSED */
 static int
 conskbd_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
 	register int error;
 
@@ -658,12 +658,12 @@ conskbdclose(queue_t *q, int flag, cred_t *crp)
  * qi_putq() routine, which is a standard putq() routine, puts all
  * messages into a queue, and lets the following service procedure
  * deal with all messages.
- * 	This routine is invoked when ioctl commands are send down
+ *	This routine is invoked when ioctl commands are send down
  * by a consumer of the keyboard device, eg, when the keyboard
  * consumer tries to determine the keyboard layout type, or sets
  * the led states.
  */
-static void
+static int
 conskbduwsrv(queue_t *q)
 {
 	mblk_t	*mp;
@@ -817,6 +817,7 @@ conskbduwsrv(queue_t *q)
 		}
 	}	/* end of while */
 
+	return (0);
 }	/* conskbduwsrv() */
 
 static void
@@ -1104,7 +1105,7 @@ conskbd_legacy_kbd_ioctl(queue_t *q, mblk_t *mp)
  * Service procedure for lower write queue.
  * Puts things on the queue below us, if it lets us.
  */
-static void
+static int
 conskbdlwserv(queue_t *q)
 {
 	register mblk_t *mp;
@@ -1112,6 +1113,7 @@ conskbdlwserv(queue_t *q)
 	while (canput(q->q_next) && (mp = getq(q)) != NULL)
 		putnext(q, mp);
 
+	return (0);
 }	/* conskbdlwserv() */
 
 /*
@@ -1119,11 +1121,11 @@ conskbdlwserv(queue_t *q)
  * Pass everything up to minor device 0 if "directio" set, otherwise to minor
  * device 1.
  */
-static void
+static int
 conskbdlrput(queue_t *q, mblk_t *mp)
 {
 	conskbd_lower_queue_t	*lqs;
-	struct iocblk 	*iocp;
+	struct iocblk	*iocp;
 	Firm_event	*fe;
 
 	DPRINTF(PRINT_L1, PRINT_MASK_ALL, ("conskbdlrput\n"));
@@ -1224,6 +1226,7 @@ conskbdlrput(queue_t *q, mblk_t *mp)
 		break;
 	}
 
+	return (0);
 }	/* conskbdlrput() */
 
 
@@ -1340,15 +1343,15 @@ conskbd_handle_downstream_msg(queue_t *q, mblk_t *mp)
 		 *	is not available in normal mode once returning
 		 *	from kmdb;
 		 * 3) for KIOCCMD
-		 * 	3.1) for KBD_CMD_NOBELL
-		 * 		there's no beep in USB and PS2 keyboard,
-		 * 		this ioctl actually disables the beep on
-		 * 		system mainboard. Note that all the cloned
-		 * 		messages sent down to lower queues do the
-		 * 		same job for system mainboard. Therefore,
-		 * 		even if we fail to send this ioctl to most
-		 * 		of lower queues, the beep still would be
-		 * 		disabled. So, no trouble exists here.
+		 *	3.1) for KBD_CMD_NOBELL
+		 *		there's no beep in USB and PS2 keyboard,
+		 *		this ioctl actually disables the beep on
+		 *		system mainboard. Note that all the cloned
+		 *		messages sent down to lower queues do the
+		 *		same job for system mainboard. Therefore,
+		 *		even if we fail to send this ioctl to most
+		 *		of lower queues, the beep still would be
+		 *		disabled. So, no trouble exists here.
 		 *	3.2) for others
 		 *		nothing;
 		 *
@@ -1623,7 +1626,7 @@ err_exit:
 static void
 conskbd_kioctrans_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 {
-	struct iocblk 	*iocp;
+	struct iocblk	*iocp;
 	mblk_t		*req;
 	queue_t		*lowerque;
 	int		err = ENOMEM;
@@ -2107,11 +2110,11 @@ conskbd_legacy_upstream_msg(conskbd_lower_queue_t *lqs, mblk_t *mp)
  * Kbtrans will invoke it in two cases:
  *
  * 1) application initiated request
- * 	A KIOCSLED ioctl is sent by an application. The ioctl will be
- * 	be prcoessed by queue service procedure conskbduwsrv(), which
- * 	in turn calls kbtrans to process the ioctl. Then kbtrans invokes
- * 	conskbd_streams_setled() to set LED, after that,  kbtrans will
- * 	return an ACK message to upper module.
+ *	A KIOCSLED ioctl is sent by an application. The ioctl will be
+ *	be prcoessed by queue service procedure conskbduwsrv(), which
+ *	in turn calls kbtrans to process the ioctl. Then kbtrans invokes
+ *	conskbd_streams_setled() to set LED, after that,  kbtrans will
+ *	return an ACK message to upper module.
  *
  * 2) Kbtrans initiated the request
  *	When conskbd works in TR_ASCII translation mode, if anyone of
@@ -2180,10 +2183,10 @@ conskbd_polledio_setled(struct kbtrans_hardware *hw, int led_state)
 
 static boolean_t
 conskbd_polled_keycheck(struct kbtrans_hardware *hw,
-		kbtrans_key_t *keycode, enum keystate *state)
+    kbtrans_key_t *keycode, enum keystate *state)
 {
 	conskbd_state_t  *conskbdp = (conskbd_state_t *)hw;
-	struct cons_polledio 		*cb;
+	struct cons_polledio	*cb;
 	conskbd_lower_queue_t	*lqs;
 	boolean_t	ret = B_FALSE;
 

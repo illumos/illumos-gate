@@ -23,8 +23,6 @@
  * Copyright (C) 2003-2005 Chelsio Communications.  All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* my3126.c */
-
 #include "cphy.h"
 #include "elmer0.h"
 #include "suni1x10gexp_regs.h"
@@ -66,9 +64,10 @@ static int my3126_interrupt_clear(struct cphy *cphy)
 	return (0);
 }
 
-#define OFFSET(REG_ADDR)    (REG_ADDR << 2)
+#define	OFFSET(REG_ADDR)    (REG_ADDR << 2)
 
-static int my3126_interrupt_handler(struct cphy *cphy)
+static int
+my3126_interrupt_handler(struct cphy *cphy)
 {
 	u32 val;
 	u16 val16;
@@ -85,33 +84,34 @@ static int my3126_interrupt_handler(struct cphy *cphy)
 		(void) mdio_read(cphy, 0x1, 0x1, &val);
 		val16 = (u16) val;
 		status = cphy->bmsr ^ val16;
-	
+
 		if (status & BMSR_LSTATUS) {
 			link_changed(adapter, 0);
 		}
 		cphy->bmsr = val16;
 
-		/* We have only enabled link change interrupts so it
-		   must be that
+		/*
+		 * We have only enabled link change interrupts so it
+		 * must be that.
 		 */
 		cphy->count = 0;
 	}
 	(void) t1_tpi_write(adapter, OFFSET(SUNI1x10GEXP_REG_MSTAT_CONTROL),
-                SUNI1x10GEXP_BITMSK_MSTAT_SNAP);
+	    SUNI1x10GEXP_BITMSK_MSTAT_SNAP);
 	(void) t1_tpi_read(adapter,
-		OFFSET(SUNI1x10GEXP_REG_MSTAT_COUNTER_1_LOW), &act_count);
+	    OFFSET(SUNI1x10GEXP_REG_MSTAT_COUNTER_1_LOW), &act_count);
 	(void) t1_tpi_read(adapter,
-		OFFSET(SUNI1x10GEXP_REG_MSTAT_COUNTER_33_LOW), &val);
+	    OFFSET(SUNI1x10GEXP_REG_MSTAT_COUNTER_33_LOW), &val);
 	act_count += val;
 	val = cphy->elmer_gpo;
 	if ((val & (1 << 8)) ||
-		(cphy->act_count == act_count) || (cphy->act_on)) {
+	    (cphy->act_count == act_count) || (cphy->act_on)) {
 		val |= (1 << 9);
 		(void) t1_tpi_write(adapter, A_ELMER0_GPO, val);
 		cphy->act_on = 0;
 	} else {
 		val &= ~(1 << 9);
-                (void) t1_tpi_write(adapter, A_ELMER0_GPO, val);
+		(void) t1_tpi_write(adapter, A_ELMER0_GPO, val);
 		cphy->act_on = 1;
 	}
 	cphy->elmer_gpo = val;
@@ -145,11 +145,11 @@ static int my3126_get_link_status(struct cphy *cphy,
 	val = cphy->elmer_gpo;
 	*link_ok = (val16 & BMSR_LSTATUS);
 	if (*link_ok) {
-		// Light the LED.
-		 val &= ~(1 << 8);
+		/* Light the LED. */
+		val &= ~(1 << 8);
 	} else {
-		// Turn off the LED.
-		 val |= (1 << 8);
+		/* Turn off the LED. */
+		val |= (1 << 8);
 	}
 	(void) t1_tpi_write(adapter, A_ELMER0_GPO, val);
 	cphy->elmer_gpo = val;
@@ -164,7 +164,7 @@ static int my3126_get_link_status(struct cphy *cphy,
 
 static void my3126_destroy(struct cphy *cphy)
 {
-	t1_os_free((void *) cphy, sizeof(*cphy));
+	t1_os_free(cphy, sizeof (*cphy));
 }
 
 #ifdef C99_NOT_SUPPORTED
@@ -185,29 +185,34 @@ static struct cphy_ops my3126_ops = {
 };
 #else
 static struct cphy_ops my3126_ops = {
-	.destroy           = my3126_destroy,
-	.reset             = my3126_reset,
-	.interrupt_enable  = my3126_interrupt_enable,
-	.interrupt_disable = my3126_interrupt_disable,
-	.interrupt_clear   = my3126_interrupt_clear,
-	.interrupt_handler = my3126_interrupt_handler,
-	.get_link_status   = my3126_get_link_status,
-	.set_loopback      = my3126_set_loopback,
+	.destroy		= my3126_destroy,
+	.reset			= my3126_reset,
+	.interrupt_enable	= my3126_interrupt_enable,
+	.interrupt_disable	= my3126_interrupt_disable,
+	.interrupt_clear	= my3126_interrupt_clear,
+	.interrupt_handler	= my3126_interrupt_handler,
+	.get_link_status	= my3126_get_link_status,
+	.set_loopback		= my3126_set_loopback,
 };
 #endif
 
-static struct cphy *my3126_phy_create(adapter_t *adapter, int phy_addr,
-				      struct mdio_ops *mdio_ops)
+static void
+my3126_cyclic_cb(void *ptr)
 {
-	struct cphy *cphy = t1_os_malloc_wait_zero(sizeof(*cphy));
+	(void) my3126_interrupt_handler(ptr);
+}
+
+static struct cphy *my3126_phy_create(adapter_t *adapter, int phy_addr,
+    struct mdio_ops *mdio_ops)
+{
+	struct cphy *cphy = t1_os_malloc_wait_zero(sizeof (*cphy));
 
 	if (cphy)
 		cphy_init(cphy, adapter, phy_addr, &my3126_ops, mdio_ops);
 
 	if (is_T2(adapter)) {
-        	ch_init_cyclic(adapter, &cphy->phy_update_cyclic,
-				(void (*)(void *))my3126_interrupt_handler,
-				cphy);
+		ch_init_cyclic(adapter, &cphy->phy_update_cyclic,
+		    my3126_cyclic_cb, cphy);
 		cphy->bmsr = 0;
 	}
 
@@ -215,7 +220,7 @@ static struct cphy *my3126_phy_create(adapter_t *adapter, int phy_addr,
 }
 
 /* Chip Reset */
-static int my3126_phy_reset(adapter_t * adapter)
+static int my3126_phy_reset(adapter_t *adapter)
 {
 	u32 val;
 

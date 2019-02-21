@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
@@ -154,7 +152,7 @@ getcidbyname_locked(char *clname, id_t *cidp)
 
 	ASSERT(MUTEX_HELD(&class_lock));
 
-	if (*clname == NULL)
+	if (*clname == '\0')
 		return (EINVAL);
 
 	for (clp = &sclass[0]; clp < &sclass[nclass]; clp++) {

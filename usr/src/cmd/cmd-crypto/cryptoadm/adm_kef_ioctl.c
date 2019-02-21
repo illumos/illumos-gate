@@ -23,6 +23,7 @@
  */
 /*
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <fcntl.h>
@@ -266,6 +267,7 @@ get_dev_list(crypto_get_dev_list_t **ppdevlist)
 	if ((fd = open(ADMIN_IOCTL_DEVICE, O_RDONLY)) == -1) {
 		cryptoerror(LOG_STDERR, gettext("failed to open %s: %s"),
 		    ADMIN_IOCTL_DEVICE, strerror(errno));
+		free(pdevlist);
 		return (FAILURE);
 	}
 
