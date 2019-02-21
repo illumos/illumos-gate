@@ -43,11 +43,15 @@
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
 .\" Copyright 2016 Joyent, Inc.
 .\" Copyright 2020 RackTop Systems, Inc.
+.\" Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.TH DLADM 1M "June 20, 2021"
+.TH DLADM 1M "October 20, 2021"
 .SH NAME
 dladm \- administer data links
 .SH SYNOPSIS
+\fBdladm help\fR
+
+.LP
 .nf
 \fBdladm show-link\fR [\fB-P\fR] [\fB-s\fR [\fB-i\fR \fIinterval\fR]] [[\fB-p\fR] \fB-o\fR \fIfield\fR[,...]] [\fIlink\fR]
 \fBdladm rename-link\fR [\fB-R\fR \fIroot-dir\fR] \fIlink\fR \fInew-link\fR
@@ -345,7 +349,21 @@ deletion, or renaming-should apply.
 .RE
 
 .SS "SUBCOMMANDS"
+When invoked with no arguments,
+\fBdladm\fR
+shows the link configuration information, in the same way as
+\fBdladm show-link\fR.
+.sp
 The following subcommands are supported:
+.sp
+.ne 2
+.na
+\fBdladm help\fR
+.ad
+.sp .6
+.RS 4n
+Display brief command usage.
+.RE
 .sp
 .ne 2
 .na

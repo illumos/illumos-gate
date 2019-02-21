@@ -23,6 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2020 Peter Tribble.
+ * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <stdio.h>
@@ -198,6 +199,7 @@ static ofmt_cb_t print_wifi_status_cb, print_link_attr_cb;
 
 typedef void cmdfunc_t(int, char **, const char *);
 
+static cmdfunc_t do_help;
 static cmdfunc_t do_show_link, do_show_wifi, do_show_phys;
 static cmdfunc_t do_create_aggr, do_delete_aggr, do_add_aggr, do_remove_aggr;
 static cmdfunc_t do_modify_aggr, do_show_aggr, do_up_aggr;
@@ -266,6 +268,7 @@ typedef struct	cmd {
 } cmd_t;
 
 static cmd_t	cmds[] = {
+	{ "help",		do_help,		NULL		},
 	{ "rename-link",	do_rename_link,
 	    "    rename-link      <oldlink> <newlink>"			},
 	{ "show-link",		do_show_link,
@@ -1440,7 +1443,7 @@ static dladm_handle_t handle = NULL;
 #define	DLADM_IS_ETHERSTUB(id)	(id == DATALINK_INVALID_LINKID)
 
 static void
-usage(void)
+usage_text(void)
 {
 	int	i;
 	cmd_t	*cmdp;
@@ -1451,12 +1454,24 @@ usage(void)
 		if (cmdp->c_usage != NULL)
 			(void) fprintf(stderr, "%s\n", gettext(cmdp->c_usage));
 	}
+}
+
+static void
+usage(void)
+{
+	usage_text();
 
 	/* close dladm handle if it was opened */
 	if (handle != NULL)
 		dladm_close(handle);
 
 	exit(EXIT_FAILURE);
+}
+
+static void
+do_help(int argc __unused, char *argv[] __unused, const char *use __unused)
+{
+	usage_text();
 }
 
 int
@@ -1472,10 +1487,15 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	progname = argv[0];
+	if ((progname = strrchr(argv[0], '/')) == NULL)
+		progname = argv[0];
+	else
+		progname++;
 
-	if (argc < 2)
-		usage();
+	if (argc < 2) {
+		argv[1] = "show-link";
+		argc = 2;
+	}
 
 	for (i = 0; i < sizeof (cmds) / sizeof (cmds[0]); i++) {
 		cmdp = &cmds[i];
