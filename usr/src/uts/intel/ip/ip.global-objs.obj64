@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2011 Nexenta Systems, Inc. All rights reserved
-# Copyright 2017 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 arp_m_tbl
@@ -119,11 +119,13 @@ ip_g_all_ones
 ip_helper_stream_info
 ip_helper_stream_rinit
 ip_helper_stream_winit
+ip_ill_mcast_reclaim
 ip_ioctl_ftbl
 ip_loopback_mtu_v6plus
 ip_loopback_mtuplus
 ip_m_tbl
 ip_max_frag_dups
+ip_max_ill_mcast_nces
 ip_min_frag_prune_time
 ip_minor_arena_la
 ip_minor_arena_sa

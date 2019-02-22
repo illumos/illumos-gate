@@ -24,7 +24,7 @@
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright (c) 2018 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019 Joyent, Inc. All rights reserved.
  */
 
 #include <sys/types.h>
@@ -13887,6 +13887,9 @@ ip_kstat2_init(netstackid_t stackid, ip_stat_t *ip_statisticsp)
 		{ "ip_ire_reclaim_deleted",	KSTAT_DATA_UINT64 },
 		{ "ip_nce_reclaim_calls",	KSTAT_DATA_UINT64 },
 		{ "ip_nce_reclaim_deleted",	KSTAT_DATA_UINT64 },
+		{ "ip_nce_mcast_reclaim_calls",	KSTAT_DATA_UINT64 },
+		{ "ip_nce_mcast_reclaim_deleted",	KSTAT_DATA_UINT64 },
+		{ "ip_nce_mcast_reclaim_tqfail",	KSTAT_DATA_UINT64 },
 		{ "ip_dce_reclaim_calls",	KSTAT_DATA_UINT64 },
 		{ "ip_dce_reclaim_deleted",	KSTAT_DATA_UINT64 },
 		{ "ip_tcp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },

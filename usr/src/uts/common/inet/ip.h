@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017, Joyent, Inc. All rights reserved.
+ * Copyright 2019, Joyent, Inc. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  */
@@ -1709,7 +1709,8 @@ typedef struct ill_s {
 
 		ill_manual_dst_linklocal : 1, /* same for pt-pt dst linklocal */
 
-		ill_pad_bit_31 : 27;
+		ill_mcast_ncec_cleanup : 1,	/* Reaping mcast ncecs. */
+		ill_pad_bit_31 : 26;
 
 	/*
 	 * Used in SIOCSIFMUXID and SIOCGIFMUXID for 'ifconfig unplumb'.
@@ -1777,6 +1778,7 @@ typedef struct ill_s {
 	 */
 	uint_t		ill_dl_bind_err;
 	avl_node_t	ill_avl_byppa; /* avl node based on ppa */
+	uint_t		ill_mcast_nces;	/* Number of NCEs that are multicast. */
 	list_t		ill_nce; /* pointer to nce_s list */
 	uint_t		ill_refcnt;	/* active refcnt by threads */
 	uint_t		ill_ire_cnt;	/* ires associated with this ill */
@@ -1948,6 +1950,7 @@ typedef struct ill_s {
  * ill_refcnt			ill_lock		ill_lock
  * ill_ire_cnt			ill_lock		ill_lock
  * ill_cv			ill_lock		ill_lock
+ * ill_mcast_nces		ill_lock		ill_lock
  * ill_ncec_cnt			ill_lock		ill_lock
  * ill_nce_cnt			ill_lock		ill_lock
  * ill_ilm_cnt			ill_lock		ill_lock
