@@ -17,23 +17,17 @@
 # x86 EFI pmbr build rules
 #
 include $(SRC)/Makefile.master
-
-ROOT_BOOT = $(ROOT)/boot
+include $(SRC)/boot/sys/boot/Makefile.inc
+include ../Makefile.inc
 
 PROG=	pmbr
 
-#AS=	$(GNU_ROOT)/bin/gas
-LD=	$(GNU_ROOT)/bin/gld
-STRIP=				# no strip is needed
 FILEMODE=0444
-MAN=
 OBJS=	pmbr.o
 SRCS=	$(OBJS:%.o=%.s)
 
 ORG=	0x600
 
-AS_CPPFLAGS=	# no CPP for now
-ASFLAGS=--32 --divide
 LDFLAGS=-e start -Ttext ${ORG} -N -S --oformat binary
 
 all: $(PROG)

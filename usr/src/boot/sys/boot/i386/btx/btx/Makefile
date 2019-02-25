@@ -14,14 +14,12 @@
 #
 
 include $(SRC)/Makefile.master
+include $(SRC)/boot/sys/boot/Makefile.inc
+include ../../Makefile.inc
 
 PROG=	btx
 SRCS=	btx.S
 OBJS=	btx.o
-
-AS=	$(GNU_ROOT)/bin/gas
-LD=	$(GNU_ROOT)/bin/gld
-CC=	$(GNUC_ROOT)/bin/gcc
 
 #.if defined(BOOT_BTX_NOHANG)
 #BOOT_BTX_FLAGS=0x1
@@ -29,11 +27,8 @@ CC=	$(GNUC_ROOT)/bin/gcc
 BOOT_BTX_FLAGS=0x0
 #.endif
 
-CFLAGS = -DBTX_FLAGS=${BOOT_BTX_FLAGS}
-CFLAGS += -I./../../common
-CFLAGS += -march=i386 -ffreestanding -mno-mmx -mno-3dnow -mno-sse -mno-sse2
-CFLAGS += -mno-sse3 -msoft-float -m32 -std=gnu99
-CFLAGS += -Wa,--divide
+CPPFLAGS += -DBTX_FLAGS=${BOOT_BTX_FLAGS}
+CPPFLAGS += -I./../../common
 
 #.if defined(BTX_SERIAL)
 #BOOT_COMCONSOLE_PORT?= 0x3f8
@@ -52,9 +47,6 @@ all install:	$(PROG)
 
 $(PROG): $(OBJS)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)
-
-.S.o:
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
 
 clobber: clean
 

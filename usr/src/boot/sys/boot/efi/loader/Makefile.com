@@ -19,14 +19,7 @@ include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
 include $(SRC)/boot/sys/boot/Makefile.inc
 
-CC=		$(GNUC_ROOT)/bin/gcc
-LD=		$(GNU_ROOT)/bin/gld
-OBJCOPY=	$(GNU_ROOT)/bin/gobjcopy
-OBJDUMP=	$(GNU_ROOT)/bin/gobjdump
-
 PROG=		loader.sym
-
-PNGLITE=	$(SRC)/common/pnglite
 
 # architecture-specific loader code
 SRCS=	\
@@ -69,8 +62,7 @@ OBJS=	\
 	tem.o \
 	vers.o
 
-CFLAGS=	-Os
-CPPFLAGS= -nostdinc -I../../../../../include -I../../..../
+CPPFLAGS += -I../../../../../include -I../../..../
 CPPFLAGS += -I../../../../../lib/libstand
 CPPFLAGS += -I../../../../../lib/libz
 
@@ -83,7 +75,7 @@ CPPFLAGS +=	-I../../include
 CPPFLAGS +=	-I../../include/$(MACHINE)
 CPPFLAGS +=	-I../../../..
 CPPFLAGS +=	-I../../../i386/libi386
-CPPFLAGS +=	-I../../../zfs
+CPPFLAGS +=	-I$(ZFSSRC)
 CPPFLAGS +=	-I../../../../cddl/boot/zfs
 CPPFLAGS +=	-I$(SRC)/uts/intel/sys/acpi
 CPPFLAGS +=	-I$(PNGLITE)
@@ -106,13 +98,10 @@ smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
 LIBSTAND=	../../../libstand/$(MACHINE)/libstand.a
 
 BOOT_FORTH=	yes
-CPPFLAGS +=	-DBOOT_FORTH -D_STANDALONE
+CPPFLAGS +=	-DBOOT_FORTH
 CPPFLAGS +=	-I$(SRC)/common/ficl
 CPPFLAGS +=	-I../../../libficl
 LIBFICL=	../../../libficl/$(MACHINE)/libficl.a
-
-CPPFLAGS +=	-I../../../zfs
-LIBZFSBOOT=	../../../zfs/$(MACHINE)/libzfsboot.a
 
 # Always add MI sources
 include	../Makefile.common
@@ -158,10 +147,8 @@ loader.bin: loader.sym
 LIBEFI=		../../libefi/$(MACHINE)/libefi.a
 LIBCRYPTO=	../../../libcrypto/$(MACHINE)/libcrypto.a
 
-DPADD=		$(LIBFICL) $(LIBZFSBOOT) $(LIBEFI) $(LIBCRYPTO) $(LIBSTAND) \
-		$(LDSCRIPT)
-LDADD=		$(LIBFICL) $(LIBZFSBOOT) $(LIBEFI) $(LIBCRYPTO) $(LIBSTAND)
-
+DPADD=		$(LIBFICL) $(LIBEFI) $(LIBCRYPTO) $(LIBSTAND) $(LDSCRIPT)
+LDADD=		$(LIBFICL) $(LIBEFI) $(LIBCRYPTO) $(LIBSTAND)
 
 loader.sym:	$(OBJS) $(DPADD)
 	$(LD) $(LDFLAGS) -o $@ $(OBJS) $(LDADD)

@@ -2263,3 +2263,24 @@ QEDE_GEN_OBJS += ecore_hw.o ecore_cxt.o ecore_selftest.o ecore_init_ops.o \
 		  ecore_init_fw_funcs.o ecore_sp_commands.o ecore_dcbx.o \
 		  ecore_dbg_fw_funcs.o ecore_mcp.o ecore_spq.o ecore_phy.o \
 		  ecore_dev.o ecore_l2.o ecore_int.o
+
+BNX_OBJS += \
+	bnxmod.o \
+	bnxcfg.o \
+	bnxdbg.o \
+	bnxgldv3.o \
+	bnxhwi.o \
+	bnxint.o \
+	bnxrcv.o \
+	bnxsnd.o \
+	bnxtmr.o \
+	bnx_kstat.o \
+	bnx_mm.o \
+	bnx_hw_cpu.o \
+	bnx_hw_misc.o \
+	bnx_hw_nvram.o \
+	bnx_hw_phy.o \
+	bnx_hw_reset.o \
+	bnx_lm_main.o \
+	bnx_lm_recv.o \
+	bnx_lm_send.o

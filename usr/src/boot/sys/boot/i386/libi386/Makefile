@@ -15,26 +15,17 @@
 #
 
 include $(SRC)/Makefile.master
+include $(SRC)/boot/sys/boot/Makefile.inc
 
-CFLAGS= -Os
-CPPFLAGS= -nostdinc -I../../../../include -I../../..
+CPPFLAGS += -I../../../../include -I../../..
 CPPFLAGS += -I../../../../lib/libz
-CPPFLAGS += -I../../zfs
-CPPFLAGS += -D_STANDALONE
+CPPFLAGS += -I$(ZFSSRC)
 
 all install: libi386.a
 
 clean: clobber
 clobber:
 	$(RM) machine x86 $(OBJS) libi386.a
-
-AS=	$(GNU_ROOT)/bin/gas
-CC=	$(GNUC_ROOT)/bin/gcc
-OBJCOPY= $(GNU_ROOT)/bin/gobjcopy
-AS_FLAGS=--32
-ASFLAGS=-m32
-AS_CPPFLAGS=
-COMPILE.s  = $(AS) $(AS_FLAGS)
 
 SRCS=	\
 	amd64_tramp.S \
@@ -103,13 +94,12 @@ OBJS=	\
 	vidconsole.o
 
 COMMON=  ../../common
-PNGLITE=$(SRC)/common/pnglite
 VGASUBR=$(SRC)/common/vga
 CPPFLAGS += -I$(PNGLITE)
 SRCS +=	$(COMMON)/gfx_fb.c $(PNGLITE)/pnglite.c
 OBJS +=	gfx_fb.o pnglite.o
-LIBZFS=  ../../zfs
-SRCS +=	$(LIBZFS)/devicename_stubs.c
+
+SRCS +=	$(ZFSSRC)/devicename_stubs.c
 OBJS +=	devicename_stubs.o
 
 BOOT_COMCONSOLE_PORT= 0x3f8
@@ -168,7 +158,7 @@ $(OBJS): machine x86
 libi386.a: $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
-%.o:	$(LIBZFS)/%.c
+%.o:	$(ZFSSRC)/%.c
 	$(COMPILE.c) -o $@ $<
 
 %.o:	$(COMMON)/%.c

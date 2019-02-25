@@ -367,7 +367,7 @@ dmareq_pplist_mapin(uint_t len, caddr_t addr, page_t **pplist, struct as *as,
  */
 static caddr_t
 ddi_dmareq_mapin(struct ddi_dma_req *dmareqp, caddr_t *mapaddrp,
-	offset_t *lenp)
+    offset_t *lenp)
 {
 	int sleep = (dmareqp->dmar_fp == DDI_DMA_SLEEP) ? VM_SLEEP: VM_NOSLEEP;
 
@@ -909,7 +909,7 @@ bofi_close(dev_t dev, int flag, int otyp, cred_t *credp)
 /* ARGSUSED */
 static int
 bofi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	struct bofi_errent *softc;
 	int	minor = (int)getminor(dev);
@@ -1730,7 +1730,7 @@ bofi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
  */
 static int
 bofi_errdef_alloc(struct bofi_errdef *errdefp, char *namep,
-	struct bofi_errent *softc)
+    struct bofi_errent *softc)
 {
 	struct bofi_errent *ep;
 	struct bofi_shadow *hp;
@@ -2291,7 +2291,7 @@ log_acc_event(struct bofi_errent *ep, uint_t at, offset_t offset, off_t len,
  */
 static void
 do_dma_corrupt(struct bofi_shadow *hp, struct bofi_errent *ep,
-	uint_t synctype, off_t off, off_t length)
+    uint_t synctype, off_t off, off_t length)
 {
 	uint64_t operand;
 	int i;
@@ -2405,7 +2405,7 @@ static uint64_t do_bofi_rd64(struct bofi_shadow *, caddr_t);
  */
 static uint64_t
 do_pior_corrupt(struct bofi_shadow *hp, caddr_t addr,
-	uint64_t (*func)(), size_t repcount, size_t accsize)
+    uint64_t (*func)(), size_t repcount, size_t accsize)
 {
 	struct bofi_errent *ep;
 	struct bofi_link   *lp;
@@ -2523,7 +2523,7 @@ do_pior_corrupt(struct bofi_shadow *hp, caddr_t addr,
  */
 static int
 do_piow_corrupt(struct bofi_shadow *hp, caddr_t addr, uint64_t *valuep,
-				size_t size, size_t repcount)
+    size_t size, size_t repcount)
 {
 	struct bofi_errent *ep;
 	struct bofi_link   *lp;
@@ -2843,7 +2843,7 @@ bofi_wr64(ddi_acc_impl_t *handle, uint64_t *addr, uint64_t value)
  */
 static void
 bofi_rep_rd8(ddi_acc_impl_t *handle, uint8_t *host_addr, uint8_t *dev_addr,
-	size_t repcount, uint_t flags)
+    size_t repcount, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	int i;
@@ -2870,7 +2870,7 @@ bofi_rep_rd8(ddi_acc_impl_t *handle, uint8_t *host_addr, uint8_t *dev_addr,
  */
 static void
 bofi_rep_rd16(ddi_acc_impl_t *handle, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	int i;
@@ -2897,7 +2897,7 @@ bofi_rep_rd16(ddi_acc_impl_t *handle, uint16_t *host_addr,
  */
 static void
 bofi_rep_rd32(ddi_acc_impl_t *handle, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	int i;
@@ -2924,7 +2924,7 @@ bofi_rep_rd32(ddi_acc_impl_t *handle, uint32_t *host_addr,
  */
 static void
 bofi_rep_rd64(ddi_acc_impl_t *handle, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	int i;
@@ -2964,7 +2964,7 @@ bofi_rep_rd64(ddi_acc_impl_t *handle, uint64_t *host_addr,
  */
 static void
 bofi_rep_wr8(ddi_acc_impl_t *handle, uint8_t *host_addr, uint8_t *dev_addr,
-	size_t repcount, uint_t flags)
+    size_t repcount, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	int i;
@@ -2995,7 +2995,7 @@ bofi_rep_wr8(ddi_acc_impl_t *handle, uint8_t *host_addr, uint8_t *dev_addr,
  */
 static void
 bofi_rep_wr16(ddi_acc_impl_t *handle, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags)
+    uint16_t *dev_addr, size_t repcount, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	int i;
@@ -3026,7 +3026,7 @@ bofi_rep_wr16(ddi_acc_impl_t *handle, uint16_t *host_addr,
  */
 static void
 bofi_rep_wr32(ddi_acc_impl_t *handle, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags)
+    uint32_t *dev_addr, size_t repcount, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	int i;
@@ -3057,7 +3057,7 @@ bofi_rep_wr32(ddi_acc_impl_t *handle, uint32_t *host_addr,
  */
 static void
 bofi_rep_wr64(ddi_acc_impl_t *handle, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags)
+    uint64_t *dev_addr, size_t repcount, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	int i;
@@ -3088,7 +3088,7 @@ bofi_rep_wr64(ddi_acc_impl_t *handle, uint64_t *host_addr,
  */
 static int
 bofi_map(dev_info_t *dip, dev_info_t *rdip,
-	ddi_map_req_t *reqp, off_t offset, off_t len, caddr_t *vaddrp)
+    ddi_map_req_t *reqp, off_t offset, off_t len, caddr_t *vaddrp)
 {
 	ddi_acc_impl_t *ap;
 	struct bofi_shadow *hp;
@@ -3339,7 +3339,7 @@ xbcopy(void *from, void *to, u_longlong_t len)
  */
 static int
 bofi_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
-	int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
+    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
 {
 	int retval = DDI_DMA_NORESOURCES;
 	struct bofi_shadow *hp, *xhp;
@@ -3365,7 +3365,7 @@ bofi_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 		 * what to do here? Wait a bit and try again
 		 */
 		if (waitfp != DDI_DMA_DONTWAIT)
-			(void) timeout((void (*)())waitfp, arg, 10);
+			(void) timeout((void (*)())(uintptr_t)waitfp, arg, 10);
 		return (retval);
 	}
 	(void) strncpy(hp->name, ddi_get_name(rdip), NAMESIZE);
@@ -3504,8 +3504,8 @@ bofi_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
  */
 static int
 bofi_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle, struct ddi_dma_req *dmareqp,
-	ddi_dma_cookie_t *cookiep, uint_t *ccountp)
+    ddi_dma_handle_t handle, struct ddi_dma_req *dmareqp,
+    ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 	int retval = DDI_DMA_NORESOURCES;
 	auto struct ddi_dma_req dmareq;
@@ -3610,7 +3610,7 @@ error:
 		/*
 		 * what to do here? Wait a bit and try again
 		 */
-		(void) timeout((void (*)())dmareqp->dmar_fp,
+		(void) timeout((void (*)())(uintptr_t)dmareqp->dmar_fp,
 		    dmareqp->dmar_arg, 10);
 	}
 error2:
@@ -3711,7 +3711,7 @@ bofi_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
  */
 static int
 bofi_dma_flush(dev_info_t *dip, dev_info_t *rdip,
-		ddi_dma_handle_t handle, off_t off, size_t len, uint_t flags)
+    ddi_dma_handle_t handle, off_t off, size_t len, uint_t flags)
 {
 	struct bofi_link *lp;
 	struct bofi_errent *ep;
@@ -3791,8 +3791,8 @@ bofi_dma_flush(dev_info_t *dip, dev_info_t *rdip,
  */
 static int
 bofi_dma_win(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle, uint_t win, off_t *offp,
-	size_t *lenp, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
+    ddi_dma_handle_t handle, uint_t win, off_t *offp,
+    size_t *lenp, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 	struct bofi_shadow *hp;
 	struct bofi_shadow *hhashp;
@@ -3833,8 +3833,8 @@ bofi_dma_win(dev_info_t *dip, dev_info_t *rdip,
  */
 static int
 bofi_dma_ctl(dev_info_t *dip, dev_info_t *rdip,
-		ddi_dma_handle_t handle, enum ddi_dma_ctlops request,
-		off_t *offp, size_t *lenp, caddr_t *objp, uint_t flags)
+    ddi_dma_handle_t handle, enum ddi_dma_ctlops request,
+    off_t *offp, size_t *lenp, caddr_t *objp, uint_t flags)
 {
 	struct bofi_shadow *hp;
 	struct bofi_shadow *hhashp;
@@ -4041,7 +4041,7 @@ bofi_dvma_reserve(dev_info_t *rdip, ddi_dma_handle_t handle)
  */
 static void
 bofi_dvma_kaddr_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
-	ddi_dma_cookie_t *cp)
+    ddi_dma_cookie_t *cp)
 {
 	struct bofi_shadow *dummyhp;
 	struct bofi_shadow *hp;
@@ -4449,7 +4449,7 @@ bofi_check_dma_hdl(ddi_dma_impl_t *handle)
 /* ARGSUSED */
 static int
 bofi_post_event(dev_info_t *dip, dev_info_t *rdip,
-		    ddi_eventcookie_t eventhdl, void *impl_data)
+    ddi_eventcookie_t eventhdl, void *impl_data)
 {
 	ddi_eventcookie_t ec;
 	struct ddi_fault_event_data *arg;

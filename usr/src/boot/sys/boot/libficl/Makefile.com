@@ -13,26 +13,27 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 #
 
+include $(SRC)/boot/sys/boot/Makefile.inc
 
-CC=		$(GNUC_ROOT)/bin/gcc
 FICLDIR=	$(SRC)/common/ficl
 PNGLITE=	$(SRC)/common/pnglite
 
-CPPFLAGS= -nostdinc -D_STANDALONE -I. -I.. -I../../../../include
+CPPFLAGS += -I. -I..
+CPPFLAGS += -I../../..
+CPPFLAGS += -I../../../../include
 CPPFLAGS += -I../../../../lib/libstand
-CPPFLAGS += -I../../..  -I$(FICLDIR) -I../../common -I$(PNGLITE)
+CPPFLAGS += -I$(FICLDIR) -I../../common -I$(PNGLITE)
 
 # For multiboot2.h, must be last, to avoid conflicts
 CPPFLAGS += -I$(SRC)/uts/common
-
-CFLAGS=		-Os -fPIC -Wall -ffreestanding -mno-mmx -mno-3dnow -mno-sse
-CFLAGS +=	-mno-sse2 -mno-sse3 -msoft-float -std=gnu99
 
 OBJECTS= dictionary.o system.o fileaccess.o float.o double.o prefix.o search.o
 OBJECTS += softcore.o stack.o tools.o vm.o primitives.o unix.o utility.o
 OBJECTS += hash.o callback.o word.o loader.o
 HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficlplatform/unix.h ../ficllocal.h
 #
+
+.PARALLEL:
 
 MAJOR = 4
 MINOR = 1.0

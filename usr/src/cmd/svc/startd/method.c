@@ -698,7 +698,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	if (inst->ri_mi_deleted)
 		return (ECANCELED);
 
-	*exit_code = 0;
+	*exit_code = SMF_EXIT_OK;
 
 	assert(0 <= type && type <= 2);
 	mname = method_names[type];
@@ -1034,7 +1034,8 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		}
 
 		*exit_code = WEXITSTATUS(ret_status);
-		if (*exit_code != 0 && *exit_code != SMF_EXIT_NODAEMON) {
+		if (*exit_code != SMF_EXIT_OK &&
+		    *exit_code != SMF_EXIT_NODAEMON) {
 			log_error(LOG_WARNING,
 			    "%s: Method \"%s\" failed with exit status %d.\n",
 			    inst->ri_i.i_fmri, method, WEXITSTATUS(ret_status));
@@ -1044,7 +1045,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		    "%d.", mname, *exit_code);
 
 		/* Note: we will take this path for SMF_EXIT_NODAEMON */
-		if (*exit_code != 0)
+		if (*exit_code != SMF_EXIT_OK)
 			goto contract_out;
 
 		end_time = time(NULL);
@@ -1095,7 +1096,7 @@ contract_out:
 	 * SMF_EXIT_NODAEMON & methods that fail.
 	 */
 	transient = method_is_transient(inst, type);
-	if ((transient || *exit_code != 0 || result != 0) &&
+	if ((transient || *exit_code != SMF_EXIT_OK || result != 0) &&
 	    (restarter_is_kill_method(method) < 0))
 		method_remove_contract(inst, !transient, B_TRUE);
 
@@ -1191,7 +1192,8 @@ retry:
 
 	r = method_run(&inst, info->sf_method_type, &exit_code);
 
-	if (r == 0 && (exit_code == 0 || exit_code == SMF_EXIT_NODAEMON)) {
+	if (r == 0 &&
+	    (exit_code == SMF_EXIT_OK || exit_code == SMF_EXIT_NODAEMON)) {
 		/* Success! */
 		assert(inst->ri_i.i_next_state != RESTARTER_STATE_NONE);
 

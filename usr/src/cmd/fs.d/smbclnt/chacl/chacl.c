@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * This is the smbfs/chacl command.
  * (just for testing - not installed)
  *
@@ -138,9 +142,8 @@ main(int argc, char **argv)
 	/*
 	 * Which parts of the SD are being modified?
 	 */
-	selector = 0;
-	if (acl)
-		selector |= DACL_SECURITY_INFORMATION;
+	selector = DACL_SECURITY_INFORMATION;
+
 	if (uid != (uid_t)-1)
 		selector |= OWNER_SECURITY_INFORMATION;
 	if (gid != (gid_t)-1)

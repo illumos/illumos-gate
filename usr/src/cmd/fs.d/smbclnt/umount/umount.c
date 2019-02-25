@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * smbfs umount
  */
 
@@ -179,6 +183,6 @@ mnttab_find(dirname)
 		}
 	}
 
-	fclose(fp);
+	(void) fclose(fp);
 	return (res);
 }

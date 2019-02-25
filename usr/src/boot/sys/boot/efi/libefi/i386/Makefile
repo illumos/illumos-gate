@@ -15,7 +15,6 @@
 #
 
 MACHINE=	$(MACH)
-ASFLAGS=	-m32
 
 all:		libefi.a
 

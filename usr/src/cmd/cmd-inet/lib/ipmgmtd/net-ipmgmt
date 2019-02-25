@@ -30,7 +30,7 @@
 . /lib/svc/share/smf_include.sh
 
 if [ -z "$SMF_FMRI" ]; then
-        echo "this script can only be invoked by smf(5)"        
+        echo "this script can only be invoked by smf(5)"
         exit $SMF_EXIT_ERR_NOSMF
 fi
 

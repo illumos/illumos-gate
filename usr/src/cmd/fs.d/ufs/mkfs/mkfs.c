@@ -37,6 +37,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * The maximum supported file system size (in sectors) is the
  * number of frags that can be represented in an int32_t field
  * (INT_MAX) times the maximum number of sectors per frag.  Since
@@ -235,6 +239,7 @@
 #include	<sys/int_const.h>
 #include	<signal.h>
 #include	<sys/efi_partition.h>
+#include	<fslib.h>
 #include	"roll_log.h"
 
 #define	bcopy(f, t, n)    (void) memcpy(t, f, n)

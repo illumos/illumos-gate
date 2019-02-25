@@ -13,6 +13,13 @@
 # Copyright 2017 Toomas Soome <tsoome@me.com>
 #
 
+# loader.help build needs better awk
+AWK=		/usr/xpg4/bin/awk
+LD=		$(GNU_ROOT)/bin/gld
+OBJCOPY=	$(GNU_ROOT)/bin/gobjcopy
+OBJDUMP=	$(GNU_ROOT)/bin/gobjdump
+GSTRIP=		$(GNU_ROOT)/bin/gstrip
+
 # Default Console font setup.
 # We want it to be the same as kernel.
 # We build compressed, stripped down version of the default font, so we have
@@ -21,6 +28,35 @@
 FONT=		8x16
 FONT_SRC=	ter-u16n.bdf
 FONT_DIR=	$(SRC)/data/consfonts
+
+PNGLITE=	$(SRC)/common/pnglite
+
+BOOTSRC=	$(SRC)/boot/sys/boot
+LIBSRC=		$(SRC)/boot/lib
+SASRC=		$(LIBSRC)/libstand
+ZFSSRC=		$(SASRC)/zfs
+
+# set standard values
+AS_CPPFLAGS=
+CPPFLAGS=	-D_STANDALONE -_gcc=-nostdinc
+CFLAGS64=	-_gcc=-mno-red-zone
+
+CFLAGS=		-_gcc=-Os -_gcc=-fPIC -_gcc=-ffreestanding -_gcc=-fno-builtin
+CFLAGS +=	-_gcc=-mno-mmx -_gcc=-mno-3dnow -_gcc=-mno-sse -_gcc=-mno-sse2
+CFLAGS +=	-_gcc=-mno-sse3 -_gcc=-msoft-float
+CFLAGS +=	-_gcc=-mno-avx -_gcc=-mno-aes
+CFLAGS +=	-_gcc=-Wall
+CFLAGS +=	$(CCNOAUTOINLINE) $(CCNOREORDER) $(CSTD_GNU99)
+CCASFLAGS=	-fPIC -Wa,--divide
+ASFLAGS=	--divide
+
+COMPILE.S=	$(CC) $(CCASFLAGS) $(CPPFLAGS) -c
+
+ROOT_BOOT=	$(ROOT)/boot
+ROOTBOOTPROG=$(PROG:%=$(ROOT_BOOT)/%)
+
+$(ROOT_BOOT)/%: %
+	$(INS.file)
 
 #.if ${MACHINE_CPUARCH} == "arm"
 # Do not generate movt/movw, because the relocation fixup for them does not

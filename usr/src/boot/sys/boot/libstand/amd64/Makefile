@@ -21,18 +21,18 @@ all install:    $(LIBRARY)
 
 include ../Makefile.com
 
-CFLAGS +=	-m64 -mno-red-zone
-ASFLAGS +=	-m64
+CFLAGS +=	-m64 $(CFLAGS64)
+CCASFLAGS +=	-m64
 
 CLEANFILES += x86
 
 # _setjmp/_longjmp
-SRCS += $(LIBSTAND_SRC)/amd64/_setjmp.S
+SRCS += $(SASRC)/amd64/_setjmp.S
 OBJS += _setjmp.o
 
 $(LIBRARY): $(SRCS) $(OBJS)
 
 $(OBJS): machine x86
 
-%.o: $(LIBSTAND_SRC)/amd64/%.S
+%.o: $(SASRC)/amd64/%.S
 	$(COMPILE.S) $<

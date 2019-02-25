@@ -23,6 +23,7 @@
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  * Copyright 2016 RackTop Systems.
+ * Copyright (c) 2012, Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_LIBSCF_H
@@ -340,7 +341,7 @@ typedef struct {
 #define	SCF_PROPERTY_GROUP			"group"
 #define	SCF_PROPERTY_GROUPING			"grouping"
 #define	SCF_PROPERTY_IGNORE			"ignore_error"
-#define	SCF_PROPERTY_INTERNAL_SEPARATORS 	"internal_separators"
+#define	SCF_PROPERTY_INTERNAL_SEPARATORS	"internal_separators"
 #define	SCF_PROPERTY_LIMIT_PRIVILEGES		"limit_privileges"
 #define	SCF_PROPERTY_MAINT_OFF			"maint_off"
 #define	SCF_PROPERTY_MAINT_ON			"maint_on"
@@ -390,7 +391,7 @@ typedef struct {
 #define	SCF_PROPERTY_TM_CHOICES_NAME		"choices_name"
 #define	SCF_PROPERTY_TM_CHOICES_RANGE		"choices_range"
 #define	SCF_PROPERTY_TM_CONSTRAINT_NAME		"constraint_name"
-#define	SCF_PROPERTY_TM_CONSTRAINT_RANGE 	"constraint_range"
+#define	SCF_PROPERTY_TM_CONSTRAINT_RANGE	"constraint_range"
 #define	SCF_PROPERTY_TM_MANPATH			"manpath"
 #define	SCF_PROPERTY_TM_NAME			"name"
 #define	SCF_PROPERTY_TM_PG_PATTERN		"pg_pattern"

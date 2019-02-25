@@ -394,6 +394,7 @@ DRV_KMODS	+= pvscsi
 DRV_KMODS	+= afe
 DRV_KMODS	+= atge
 DRV_KMODS	+= bfe
+DRV_KMODS	+= bnx
 DRV_KMODS	+= bnxe
 DRV_KMODS	+= dmfe
 DRV_KMODS	+= e1000g

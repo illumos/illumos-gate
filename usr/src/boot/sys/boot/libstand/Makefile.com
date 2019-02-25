@@ -14,27 +14,18 @@
 #
 
 include $(SRC)/Makefile.master
+include $(SRC)/boot/sys/boot/Makefile.inc
 
-AS=	$(GNU_ROOT)/bin/gas
-LD=	$(GNU_ROOT)/bin/gld
-CC=	$(GNUC_ROOT)/bin/gcc
-
-LIB_BASE=	$(SRC)/boot/lib
-LIBSTAND_SRC=	$(LIB_BASE)/libstand
-
-ASFLAGS =	-fPIC
-CPPFLAGS =	-nostdinc -I../../../../include -I$(LIBSTAND_SRC)
-CPPFLAGS +=	-I../../..  -I../../../sys -I. -I$(SRC)/common/bzip2
-CPPFLAGS +=	-D_STANDALONE
-
-CFLAGS =	-Os -fPIC -ffreestanding -Wformat
-CFLAGS +=	-mno-mmx -mno-3dnow -mno-sse -mno-sse2 -mno-sse3 -msoft-float
-CFLAGS +=	-Wall -Werror
+CPPFLAGS +=	-I../../../../include -I$(SASRC)
+CPPFLAGS +=	-I../../.. -I. -I$(SRC)/common/bzip2
 
 $(LIBRARY): $(SRCS) $(OBJS)
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
-include $(LIBSTAND_SRC)/Makefile.inc
+include $(SASRC)/Makefile.inc
+include $(ZFSSRC)/Makefile.inc
+
+CPPFLAGS +=	-I$(SRC)/uts/common
 
 clean: clobber
 clobber:
@@ -48,17 +39,17 @@ x86:
 	$(RM) x86
 	$(SYMLINK) ../../../x86/include x86
 
-%.o:	$(LIBSTAND_SRC)/%.c
+%.o:	$(SASRC)/%.c
 	$(COMPILE.c) $<
 
-%.o:	$(LIB_BASE)/libc/net/%.c
+%.o:	$(LIBSRC)/libc/net/%.c
 	$(COMPILE.c) $<
 
-%.o:	$(LIB_BASE)/libc/string/%.c
+%.o:	$(LIBSRC)/libc/string/%.c
 	$(COMPILE.c) $<
 
-%.o:	$(LIB_BASE)/libc/uuid/%.c
+%.o:	$(LIBSRC)/libc/uuid/%.c
 	$(COMPILE.c) $<
 
-%.o:	$(LIB_BASE)/libz/%.c
+%.o:	$(LIBSRC)/libz/%.c
 	$(COMPILE.c) $<

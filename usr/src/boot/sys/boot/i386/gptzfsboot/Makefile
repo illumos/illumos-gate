@@ -18,11 +18,7 @@
 
 include $(SRC)/Makefile.master
 include $(SRC)/boot/Makefile.version
-
-AS=	$(GNU_ROOT)/bin/gas
-LD=	$(GNU_ROOT)/bin/gld
-CC=	$(GNUC_ROOT)/bin/gcc
-OBJCOPY=	$(GNU_ROOT)/bin/gobjcopy
+include $(SRC)/boot/sys/boot/Makefile.inc
 
 PROG=		gptzfsboot
 MAN=		gptzfsboot.8
@@ -36,9 +32,7 @@ REL1=	0x700
 ORG1=	0x7c00
 ORG2=	0x0
 
-CPPFLAGS=
-CFLAGS=	-nostdinc -DBOOTPROG=\"gptzfsboot\" \
-	-O1 \
+CPPFLAGS += -DBOOTPROG=\"gptzfsboot\" \
 	-DGPT -DBOOT2 \
 	-DLOADER_MBR_SUPPORT -DLOADER_GPT_SUPPORT \
 	-DSIOPRT=${BOOT_COMCONSOLE_PORT} \
@@ -49,23 +43,14 @@ CFLAGS=	-nostdinc -DBOOTPROG=\"gptzfsboot\" \
 	-I../../../../lib/libz \
 	-I../../common \
 	-I../common \
-	-I../../zfs \
+	-I$(ZFSSRC) \
 	-I../../../cddl/boot/zfs \
 	-I../btx/lib -I. \
 	-I../../.. \
-	-I../libi386 \
-	-Wall -Waggregate-return -Wbad-function-cast -Wcast-align \
-	-Wmissing-declarations -Wmissing-prototypes -Wnested-externs \
-	-Wpointer-arith -Wshadow -Wwrite-strings \
-	-Winline -Wno-unknown-pragmas
-
-CFLAGS +=	--param max-inline-insns-single=100
-CFLAGS +=	-fno-reorder-functions
+	-I../libi386
 
 LD_FLAGS=-static -N --gc-sections
-CCASFLAGS=-Wa,--divide
 LIBSTAND=	../../libstand/$(MACH)/libstand.a
-LIBZFSBOOT=	../../zfs/$(MACH)/libzfsboot.a
 
 include ../Makefile.inc
 
@@ -101,9 +86,8 @@ CLEANFILES +=	gptzfsboot.bin gptzfsboot.out
 gptzfsboot.bin: gptzfsboot.out
 	${OBJCOPY} -S -O binary gptzfsboot.out $@
 
-gptzfsboot.out: ${BTXCRT} ${OBJS} ${LIBZFSBOOT} ${LIBSTAND}
-	${LD} ${LD_FLAGS} -Ttext ${ORG2} -o $@ ${BTXCRT} ${OBJS} \
-		${LIBZFSBOOT} ${LIBSTAND}
+gptzfsboot.out: ${BTXCRT} ${OBJS} ${LIBSTAND}
+	${LD} ${LD_FLAGS} -Ttext ${ORG2} -o $@ ${BTXCRT} ${OBJS} ${LIBSTAND}
 
 machine:
 	$(RM) machine
@@ -116,19 +100,16 @@ x86:
 $(OBJS): machine x86
 
 %.o:	../common/%.c
-	$(COMPILE.c) -o $@ $<
+	$(COMPILE.c) $<
 
 %.o:	../../common/%.c
-	$(COMPILE.c) -o $@ $<
+	$(COMPILE.c) $<
 
 multiboot.o: ../../common/multiboot.S
-	$(CC) $(CFLAGS) $(CCASFLAGS) -c -o $@ ../../common/$*.S
+	$(COMPILE.S) ../../common/multiboot.S
 
 %.o: ../libi386/%.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
-
-.S.o:
-	$(CC) $(CFLAGS) $(CCASFLAGS) -c -o $@ $<
+	$(COMPILE.c) $<
 
 clobber: clean
 

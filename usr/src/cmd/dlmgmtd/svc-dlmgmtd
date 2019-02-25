@@ -32,7 +32,9 @@
 # an empty contract.
 
 if smf_is_nonglobalzone; then
-	exit $SMF_EXIT_NODAEMON
+	[ -n "$SMF_EXIT_NODAEMON" ] && exit $SMF_EXIT_NODAEMON
+	(while true ; do sleep 3600 ; done) &
+	exit $SMF_EXIT_OK
 fi
 
 # Start the dlmgmtd daemon.

@@ -25,6 +25,10 @@ clobber	:=	TARGET = clobber
 all install: $(SUBDIRS)
 clean clobber: $(SUBDIRS)
 
+$(MACH) $(MACH64): softcore
+
+.PARALLEL:
+
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
 

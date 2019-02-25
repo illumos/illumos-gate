@@ -18,6 +18,8 @@
 ./kernel/drv/atiatom
 ./kernel/drv/bcm_sata
 ./kernel/drv/bnx
+./kernel/drv/bnx.conf
+./kernel/drv/amd64/bnx
 ./kernel/drv/bnxe
 ./kernel/drv/bnxe.conf
 ./kernel/drv/amd64/bnxe
