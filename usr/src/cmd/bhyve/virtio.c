@@ -422,6 +422,13 @@ vq_relchain(struct vqueue_info *vq, uint16_t idx, uint32_t iolen)
 	vue = &vuh->vu_ring[uidx++ & mask];
 	vue->vu_idx = idx;
 	vue->vu_tlen = iolen;
+#ifndef __FreeBSD__
+	/*
+	 * Ensure the used descriptor is visible before updating the index.
+	 * This is necessary on ISAs with memory ordering less strict than x86.
+	 */
+	wmb();
+#endif
 	vuh->vu_idx = uidx;
 }
 
@@ -459,6 +466,14 @@ vq_endchains(struct vqueue_info *vq, int used_all_avail)
 	vs = vq->vq_vs;
 	old_idx = vq->vq_save_used;
 	vq->vq_save_used = new_idx = vq->vq_used->vu_idx;
+#ifndef __FreeBSD__
+	/*
+	 * Use full memory barrier between vu_idx store from preceding
+	 * vq_relchain() call and the loads from VQ_USED_EVENT_IDX() or
+	 * va_flags below.
+	 */
+	mb();
+#endif
 	if (used_all_avail &&
 	    (vs->vs_negotiated_caps & VIRTIO_F_NOTIFY_ON_EMPTY))
 		intr = 1;

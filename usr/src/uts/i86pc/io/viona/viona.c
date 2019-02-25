@@ -1537,7 +1537,7 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT3U(ring->vr_state, ==, VRS_RUN);
 
-	atomic_or_16(ring->vr_used_flags, VRING_USED_F_NO_NOTIFY);
+	*ring->vr_used_flags |= VRING_USED_F_NO_NOTIFY;
 	mac_rx_set(link->l_mch, viona_rx, link);
 
 	do {
@@ -1578,7 +1578,7 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		boolean_t bail = B_FALSE;
 		uint_t ntx = 0;
 
-		atomic_or_16(ring->vr_used_flags, VRING_USED_F_NO_NOTIFY);
+		*ring->vr_used_flags |= VRING_USED_F_NO_NOTIFY;
 		while (viona_vr_num_avail(ring)) {
 			viona_tx(link, ring);
 
@@ -1590,14 +1590,18 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 			if (ntx++ >= ring->vr_size)
 				break;
 		}
-		atomic_and_16(ring->vr_used_flags, ~VRING_USED_F_NO_NOTIFY);
+		*ring->vr_used_flags &= ~VRING_USED_F_NO_NOTIFY;
 
 		VIONA_PROBE2(tx, viona_link_t *, link, uint_t, ntx);
 
 		/*
 		 * Check for available descriptors on the ring once more in
 		 * case a late addition raced with the NO_NOTIFY flag toggle.
+		 *
+		 * The barrier ensures that visibility of the vr_used_flags
+		 * store does not cross the viona_vr_num_avail() check below.
 		 */
+		membar_enter();
 		bail = VRING_NEED_BAIL(ring, p);
 		if (!bail && viona_vr_num_avail(ring)) {
 			continue;
@@ -2457,6 +2461,7 @@ pad_drop:
 		mp = next;
 	}
 
+	membar_enter();
 	if ((*ring->vr_avail_flags & VRING_AVAIL_F_NO_INTERRUPT) == 0) {
 		viona_intr_ring(ring);
 	}
@@ -2484,6 +2489,7 @@ viona_tx_done(viona_vring_t *ring, uint32_t len, uint16_t cookie)
 {
 	vq_pushchain(ring, len, cookie);
 
+	membar_enter();
 	if ((*ring->vr_avail_flags & VRING_AVAIL_F_NO_INTERRUPT) == 0) {
 		viona_intr_ring(ring);
 	}

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_ATOMIC_H_
@@ -238,6 +238,11 @@ atomic_swap_long(volatile u_long *p, u_long v)
 /* Operations on pointers. */
 #define	atomic_cmpset_ptr	atomic_cmpset_long
 
-#define      mb()    __asm __volatile("mfence;" : : : "memory")
+/* Needed for the membar functions */
+#include_next <sys/atomic.h>
+
+#define	mb()			membar_enter()
+#define	rmb()			membar_consumer()
+#define	wmb()			membar_producer()
 
 #endif	/* _COMPAT_FREEBSD_AMD64_MACHINE_ATOMIC_H_ */
