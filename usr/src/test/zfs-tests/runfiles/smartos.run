@@ -23,6 +23,10 @@ post_user = root
 post = cleanup
 outputdir = /var/tmp/test_results
 
+[/opt/zfs-tests/tests/functional/cli_root/zpool_get]
+tests = ['zpool_get_001_pos', 'zpool_get_003_pos',
+    'zpool_get_004_neg']
+
 [/opt/zfs-tests/tests/functional/cli_root/zpool_import]
 tests = ['zpool_import_001_pos', 'zpool_import_002_pos',
     'zpool_import_003_pos', 'zpool_import_004_pos', 'zpool_import_005_pos',
@@ -132,6 +136,10 @@ tests = ['inuse_001_pos', 'inuse_003_pos', 'inuse_004_pos',
     'inuse_009_pos']
 post =
 
+[/opt/zfs-tests/tests/functional/large_dnode]
+tests = ['large_dnode_001_pos', 'large_dnode_003_pos',
+    'large_dnode_004_neg', 'large_dnode_005_pos', 'large_dnode_007_neg']
+
 [/opt/zfs-tests/tests/functional/large_files]
 tests = ['large_files_001_pos']
 
@@ -214,12 +222,14 @@ tests = ['reservation_001_pos', 'reservation_002_pos', 'reservation_003_pos',
 tests = ['rootpool_003_neg']
 
 [/opt/zfs-tests/tests/functional/rsend]
-tests = ['rsend_001_pos', 'rsend_002_pos', 'rsend_003_pos', 'rsend_006_pos',
-    'rsend_007_pos', 'rsend_013_pos', 'rsend_014_pos',
+tests = ['rsend_001_pos', 'rsend_002_pos', 'rsend_003_pos', 'rsend_004_pos',
+    'rsend_005_pos', 'rsend_006_pos', 'rsend_007_pos',
+    'rsend_013_pos', 'rsend_014_pos',
     'rsend_019_pos', 'rsend_020_pos',
     'rsend_021_pos', 'rsend_022_pos', 'rsend_024_pos',
     'send-c_verify_ratio', 'send-c_verify_contents',
     'send-c_incremental',
+    'send-c_resume',
     'send-c_recv_dedup']
 
 [/opt/zfs-tests/tests/functional/slog]
