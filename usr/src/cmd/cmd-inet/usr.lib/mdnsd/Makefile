@@ -40,7 +40,7 @@ MDNSFLAGS=	-DNOT_HAVE_SA_LEN \
 		-D_XPG4_2 -D__EXTENSIONS__ -DHAVE_BROKEN_RECVIF_NAME \
 		-DHAVE_IPV6=1 -Dasm=__asm -DMDNSD_NOROOT \
 		-DPID_FILE=\"\" -DMDNSD_USER=\"noaccess\" \
-		-DMDNS_VERSIONSTR_NODTS
+		-DmDNSResponderVersion=878.1.1
 
 include	../../../Makefile.cmd
 
@@ -66,7 +66,7 @@ $(PROG): $(OBJS)
 
 include ../Makefile.lib
 
-CSTD = $(CSTD_GNU99)
+CSTD= $(CSTD_GNU99)
 CPPFLAGS += -D_REENTRANT $(MDNSFLAGS)
 CPPFLAGS += -I$(SRCDIR)/mDNSShared -I$(SRCDIR)/mDNSPosix
 CPPFLAGS += -I$(SRCDIR)/mDNSCore

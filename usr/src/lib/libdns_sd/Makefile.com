@@ -38,7 +38,7 @@ LDLIBS +=	-lsocket -lnsl -lc
 
 CSTD =	$(CSTD_GNU99)
 CPPFLAGS +=	-I$(SRCDIR) -DNOT_HAVE_SA_LEN -D_XPG4_2 -D__EXTENSIONS__
-CPPFLAGS +=	-DMDNS_VERSIONSTR_NODTS
+CPPFLAGS +=	-DMDNS_VERSIONSTR_NODTS -DmDNSResponderVersion=878.1.1
 
 pics/dnssd_clientstub.o := CERRWARN +=	-_gcc=-Wno-unused-but-set-variable
 
