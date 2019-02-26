@@ -428,7 +428,7 @@ env_screen_nounset(struct env_var *ev __unused)
 	if (tems.ts_p_dimension.width == 0 &&
 	    tems.ts_p_dimension.height == 0)
 		return (0);
-	return(EPERM);
+	return (EPERM);
 }
 
 static void
@@ -516,7 +516,8 @@ tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 				    malloc(font_data->uncompressed_size);
 				if (tems.ts_font.vf_bytes == NULL)
 					panic("out of memory\n");
-				(void)lz4_decompress(font_data->compressed_data,
+				(void) lz4_decompress(
+				    font_data->compressed_data,
 				    tems.ts_font.vf_bytes,
 				    font_data->compressed_size,
 				    font_data->uncompressed_size, 0);
@@ -696,9 +697,10 @@ tems_cursor(struct vis_conscursor *pca)
 static void
 tem_kdsetmode(int mode)
 {
-	if (tems.ts_hdl != NULL)
+	if (tems.ts_hdl != NULL) {
 		(void) tems.ts_hdl->c_ioctl(tems.ts_hdl, KDSETMODE,
-	     (void *)(intptr_t)mode);
+		    (void *)(intptr_t)mode);
+	}
 }
 
 static void
@@ -2392,7 +2394,7 @@ tem_cls(struct tem_vt_state *tem)
 	bg_color = DEFAULT_ANSI_BACKGROUND;
 	tem_get_color(&fg_color, &bg_color, c);
 	cl.bg_color = bg_color;
-	(void)tems_cls(&cl);
+	(void) tems_cls(&cl);
 
 	tem->tvs_c_cursor.row = 0;
 	tem->tvs_c_cursor.col = 0;
