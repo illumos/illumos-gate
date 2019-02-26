@@ -2684,7 +2684,7 @@ hxge_txdma_handle_sys_errors(p_hxge_t hxgep)
 	tdc_sys_stats = &hxgep->statsp->tdc_sys_stats;
 	if (fifo_stat.bits.reord_tbl_par_err) {
 		tdc_sys_stats->reord_tbl_par_err++;
-		HXGE_FM_REPORT_ERROR(hxgep, NULL,
+		HXGE_FM_REPORT_ERROR(hxgep, 0,
 		    HXGE_FM_EREPORT_TDMC_REORD_TBL_PAR);
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 		    "==> hxge_txdma_handle_sys_errors: fatal error: "
@@ -2693,7 +2693,7 @@ hxge_txdma_handle_sys_errors(p_hxge_t hxgep)
 
 	if (fifo_stat.bits.reord_buf_ded_err) {
 		tdc_sys_stats->reord_buf_ded_err++;
-		HXGE_FM_REPORT_ERROR(hxgep, NULL,
+		HXGE_FM_REPORT_ERROR(hxgep, 0,
 		    HXGE_FM_EREPORT_TDMC_REORD_BUF_DED);
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 		    "==> hxge_txdma_handle_sys_errors: "

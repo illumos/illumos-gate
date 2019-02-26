@@ -1,7 +1,7 @@
 /*
  * $NetBSD: panic.c,v 1.2 1997/03/22 01:48:36 thorpej Exp $
  */
-/*-
+/*
  * Copyright (c) 1996
  *	Matthias Drochner.  All rights reserved.
  *
@@ -34,7 +34,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <stand.h>
 #include <machine/stdarg.h>
@@ -42,9 +41,9 @@ __FBSDID("$FreeBSD$");
 extern void exit(int) __dead2;
 
 void
-panic(const char *fmt,...)
+panic(const char *fmt, ...)
 {
-	va_list         ap;
+	va_list ap;
 
 	printf("panic: ");
 	va_start(ap, fmt);

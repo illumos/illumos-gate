@@ -294,7 +294,7 @@ next:
 			MBPF_CLIENT_CLOSE(bpr, mcip);
 			mcip = 0;
 		}
-		if (mh != NULL) {
+		if (mh != 0) {
 			MBPF_CLOSE(bpr, mh);
 			mh = 0;
 		}
@@ -1386,7 +1386,7 @@ bpf_ifname(struct bpf_d *d, char *buffer, int bufsize)
 {
 
 	mutex_enter(&d->bd_lock);
-	if (d->bd_bif == NULL) {
+	if (d->bd_bif == 0) {
 		mutex_exit(&d->bd_lock);
 		return (EINVAL);
 	}

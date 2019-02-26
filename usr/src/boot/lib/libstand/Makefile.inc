@@ -29,7 +29,7 @@ SRCS += $(SASRC)/sbrk.c $(SASRC)/twiddle.c
 SRCS += $(SASRC)/zalloc.c $(SASRC)/zalloc_malloc.c
 
 OBJS=	__main.o assert.o bcd.o environment.o \
-	getopt.o gets.o globals.o pager.o printf.o \
+	getopt.o gets.o globals.o pager.o panic.o printf.o \
 	strdup.o strerror.o strtol.o strtoul.o random.o \
 	sbrk.o twiddle.o zalloc.o zalloc_malloc.o
 

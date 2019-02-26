@@ -1291,7 +1291,7 @@ proto_unitdata_req(dld_str_t *dsp, mblk_t *mp)
 	 * No lock can be held across modules and putnext()'s,
 	 * which can happen here with the call from DLD_TX().
 	 */
-	if (DLD_TX(dsp, bp, 0, 0) != NULL) {
+	if (DLD_TX(dsp, bp, 0, 0) != 0) {
 		/* flow-controlled */
 		DLD_SETQFULL(dsp);
 	}

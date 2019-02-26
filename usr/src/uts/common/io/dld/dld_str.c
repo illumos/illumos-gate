@@ -955,7 +955,7 @@ str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp, uintptr_t f_hint,
 		}
 	}
 
-	if ((cookie = DLD_TX(dsp, mp, f_hint, flag)) != NULL) {
+	if ((cookie = DLD_TX(dsp, mp, f_hint, flag)) != 0) {
 		DLD_SETQFULL(dsp);
 	}
 	return (cookie);
@@ -963,7 +963,7 @@ str_mdata_fastpath_put(dld_str_t *dsp, mblk_t *mp, uintptr_t f_hint,
 discard:
 	/* TODO: bump kstat? */
 	freemsg(mp);
-	return (NULL);
+	return (0);
 }
 
 /*
@@ -1025,7 +1025,7 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 			goto discard;
 	}
 
-	if (DLD_TX(dsp, mp, 0, 0) != NULL) {
+	if (DLD_TX(dsp, mp, 0, 0) != 0) {
 		/* Turn on flow-control for dld */
 		DLD_SETQFULL(dsp);
 	}

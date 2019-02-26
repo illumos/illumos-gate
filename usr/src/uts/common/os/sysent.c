@@ -28,7 +28,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -355,11 +355,11 @@ typedef int64_t	(*llfcn_t)();	/* for casting one-word returns */
  */
 	/* returns a 64-bit quantity for both ABIs */
 #define	SYSENT_C(name, call, narg)	\
-	{ (narg), SE_64RVAL, NULL, NULL, (llfcn_t)(call) }
+	{ (narg), SE_64RVAL, NULL, NULL, (llfcn_t)(uintptr_t)(call) }
 
 	/* returns one 32-bit value for both ABIs: r_val1 */
 #define	SYSENT_CI(name, call, narg)	\
-	{ (narg), SE_32RVAL1, NULL, NULL, (llfcn_t)(call) }
+	{ (narg), SE_32RVAL1, NULL, NULL, (llfcn_t)(uintptr_t)(call) }
 
 	/* returns 2 32-bit values: r_val1 & r_val2 */
 #define	SYSENT_2CI(name, call, narg)	\
@@ -420,7 +420,7 @@ typedef int64_t	(*llfcn_t)();	/* for casting one-word returns */
  * Initialization macro for loadable native system calls.
  */
 #define	SYSENT_LOADABLE()	\
-	{ 0, SE_LOADABLE, (int (*)())nosys, NULL, loadable_syscall }
+	{ 0, SE_LOADABLE, nosys32, NULL, loadable_syscall }
 
 /*
  * Initialization macro for loadable 32-bit compatibility system calls.
@@ -622,7 +622,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 157 */ SYSENT_CI("getitimer",	getitimer,	2),
 	/* 158 */ SYSENT_CI("setitimer",	setitimer,	3),
 	/* 159 */ SYSENT_CI("lwp_create",	syslwp_create,	3),
-	/* 160 */ SYSENT_CI("lwp_exit",	(int (*)())syslwp_exit,	0),
+	/* 160 */ SYSENT_CI("lwp_exit",		syslwp_exit,	0),
 	/* 161 */ SYSENT_CI("lwp_suspend",	syslwp_suspend,	1),
 	/* 162 */ SYSENT_CI("lwp_continue",	syslwp_continue, 1),
 	/* 163 */ SYSENT_CI("lwp_kill",		lwp_kill,	2),
@@ -820,7 +820,7 @@ extern int ucredsys32(int, int, caddr32_t);
 struct sysent sysent32[NSYSCALL] =
 {
 	/*  0 */ SYSENT_C("indir",		indir,		1),
-	/*  1 */ SYSENT_CI("exit",	(int (*)())rexit,	1),
+	/*  1 */ SYSENT_CI("exit",		rexit,		1),
 	/*  2 */ SYSENT_CI("psecflags",		psecflags,	3),
 	/*  3 */ SYSENT_CI("read",		read32,		3),
 	/*  4 */ SYSENT_CI("write",		write32,	3),
@@ -983,7 +983,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 157 */ SYSENT_CI("getitimer",	getitimer,	2),
 	/* 158 */ SYSENT_CI("setitimer",	setitimer,	3),
 	/* 159 */ SYSENT_CI("lwp_create",	syslwp_create,	3),
-	/* 160 */ SYSENT_CI("lwp_exit",	(int (*)())syslwp_exit,	0),
+	/* 160 */ SYSENT_CI("lwp_exit",		syslwp_exit,	0),
 	/* 161 */ SYSENT_CI("lwp_suspend",	syslwp_suspend,	1),
 	/* 162 */ SYSENT_CI("lwp_continue",	syslwp_continue, 1),
 	/* 163 */ SYSENT_CI("lwp_kill",		lwp_kill,	2),

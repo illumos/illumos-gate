@@ -4,7 +4,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*
  * Copyright (c) 1980, 1986, 1990 The Regents of the University of California.
@@ -24,8 +24,6 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,13 +48,13 @@ static int pass2check(struct inodesc *);
 void
 pass2(void)
 {
-	struct dinode 		*dp, *dp2, *dpattr;
-	struct inoinfo 		**inpp, *inp;
-	struct inoinfo 		**inpend;
-	struct inodesc 		curino;
-	struct inodesc 		ldesc;
-	struct dinode 		dino;
-	char 			pathbuf[MAXPATHLEN + 1];
+	struct dinode		*dp, *dp2, *dpattr;
+	struct inoinfo		**inpp, *inp;
+	struct inoinfo		**inpend;
+	struct inodesc		curino;
+	struct inodesc		ldesc;
+	struct dinode		dino;
+	char			pathbuf[MAXPATHLEN + 1];
 	int			found;
 	int			dirtype;
 	caddr_t			errmsg;
@@ -115,7 +113,7 @@ pass2(void)
 
 	default:
 		errexit("BAD STATE 0x%x FOR ROOT INODE\n",
-			statemap[UFSROOTINO]);
+		    statemap[UFSROOTINO]);
 	}
 	statemap[UFSROOTINO] = DFOUND;
 
@@ -169,12 +167,12 @@ pass2(void)
 			pwarn("DIRECTORY %s: LENGTH %lld NOT MULTIPLE OF %d",
 			    pathbuf, (longlong_t)inp->i_isize, DIRBLKSIZ);
 			inp->i_isize = roundup(inp->i_isize,
-					(offset_t)DIRBLKSIZ);
+			    (offset_t)DIRBLKSIZ);
 			if (preen || reply("ADJUST") == 1) {
 				dp = ginode(inp->i_number);
 				dp->di_size =
-					(u_offset_t)roundup(inp->i_isize,
-						    (offset_t)DIRBLKSIZ);
+				    (u_offset_t)roundup(inp->i_isize,
+				    (offset_t)DIRBLKSIZ);
 				inodirty();
 				if (preen)
 					(void) printf(" (ADJUSTED)\n");
@@ -197,7 +195,7 @@ pass2(void)
 		dp = &dino;
 		dp->di_size = (u_offset_t)inp->i_isize;
 		(void) memmove((void *)&dp->di_db[0], (void *)&inp->i_blks[0],
-			inp->i_blkssize);
+		    inp->i_blkssize);
 		init_inodesc(&curino);
 		curino.id_type = DATA;
 		curino.id_func = pass2check;
@@ -240,14 +238,14 @@ pass2(void)
 		 * directory-related states need to be checked.  There
 		 * should never be any flags associated with USTATE.
 		 */
-		if ((statemap[inp->i_number] & STMASK) == DCLEAR ||
+		if ((statemap[inp->i_number] & (STMASK | INCLEAR)) == DCLEAR ||
 		    statemap[inp->i_number] == USTATE) {
 			continue;
 		}
 		if (statemap[inp->i_parent] == DFOUND &&
 		    S_IS_DUNFOUND(statemap[inp->i_number])) {
 			statemap[inp->i_number] = DFOUND |
-				(statemap[inp->i_number] & INCLEAR);
+			    (statemap[inp->i_number] & INCLEAR);
 		}
 		if (inp->i_dotdot == inp->i_parent ||
 		    inp->i_dotdot == (fsck_ino_t)-1) {
@@ -340,7 +338,7 @@ pass2(void)
 			continue;
 		}
 		fileerror(inp->i_parent, inp->i_number,
-			"BAD INODE NUMBER FOR '..'");
+		    "BAD INODE NUMBER FOR '..'");
 		if (reply("FIX") == 0) {
 			iscorrupt = 1;
 			continue;
@@ -438,7 +436,7 @@ pass2check(struct inodesc *idesc)
 	entrysize = DIRSIZ(&proto);
 	if (dirp->d_ino != 0 && strcmp(dirp->d_name, "..") != 0) {
 		pfatal("CANNOT FIX, FIRST ENTRY IN DIRECTORY CONTAINS %s\n",
-			dirp->d_name);
+		    dirp->d_name);
 		iscorrupt = 1;
 	} else if ((int)dirp->d_reclen < entrysize) {
 		pfatal("CANNOT FIX, INSUFFICIENT SPACE TO ADD '.'\n");
@@ -549,7 +547,7 @@ chk1:
 		 * we get called on them.
 		 */
 		errexit("pass2check got NULL from getinoinfo at chk1 I=%d\n",
-			idesc->id_number);
+		    idesc->id_number);
 	}
 	proto.d_ino = inp->i_parent;
 	proto.d_namlen = 2;
@@ -625,7 +623,7 @@ chk1:
 			 * that we're still on the "." entry.
 			 */
 			fileerror(idesc->id_number, dirp->d_ino,
-						"I OUT OF RANGE");
+			    "I OUT OF RANGE");
 			dirp->d_ino = 0;
 			if (reply("FIX") == 1) {
 				ret |= ALTERED;
@@ -647,7 +645,7 @@ chk1:
 	if (dirp->d_ino != 0 && strcmp(dirp->d_name, "..") != 0) {
 		fileerror(inp->i_parent, idesc->id_number, "MISSING '..'");
 		pfatal("CANNOT FIX, SECOND ENTRY IN DIRECTORY CONTAINS %s\n",
-			dirp->d_name);
+		    dirp->d_name);
 		iscorrupt = 1;
 		inp->i_dotdot = (fsck_ino_t)-1;
 	} else if ((int)dirp->d_reclen < entrysize) {
@@ -783,8 +781,8 @@ again:
 					 * at this point.
 					 */
 					errexit("pass2check found a zero-len "
-						"reference to bad I=%d\n",
-						dirp->d_ino);
+					    "reference to bad I=%d\n",
+					    dirp->d_ino);
 				}
 				if (inp->i_parent != 0) {
 					(void) printf(
@@ -842,8 +840,8 @@ again:
 				 * zero-len case above.
 				 */
 				errexit("pass2check found bad reference to "
-					"hard-linked directory I=%d\n",
-					dirp->d_ino);
+				    "hard-linked directory I=%d\n",
+				    dirp->d_ino);
 			}
 			dp = ginode(idesc->id_number);
 			if (inp->i_parent != 0 && idesc->id_entryno > 2 &&
@@ -858,18 +856,21 @@ again:
 				pwarn(
 		    "%s IS AN EXTRANEOUS HARD LINK TO DIRECTORY %s\n",
 				    pathbuf, namebuf);
-				if (preen)
+				if (preen) {
 					(void) printf(" (IGNORED)\n");
-				else if ((act = reply(PASS2B_PROMPT,
-				    idesc->id_number)) == 1) {
-					update_lncntp = 1;
-					broke_dir_link = 1;
-					break;
+				} else {
+					act = reply(PASS2B_PROMPT,
+					    idesc->id_number);
+					if (act == 1) {
+						update_lncntp = 1;
+						broke_dir_link = 1;
+						break;
+					}
 				}
 			}
 
 			if ((idesc->id_entryno > 2) &&
-					(inp->i_extattr != idesc->id_number)) {
+			    (inp->i_extattr != idesc->id_number)) {
 				inp->i_parent = idesc->id_number;
 			}
 			/* FALLTHROUGH */
@@ -1003,7 +1004,7 @@ again:
 							pdirp = ginode(
 							    idesc->id_number);
 							if (pdirp->di_oeftflag
-								!= 0) {
+							    != 0) {
 							pdirp->di_oeftflag = 0;
 								inodirty();
 							}

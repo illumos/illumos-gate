@@ -102,7 +102,7 @@ hxge_kstat_index_t hxge_rdc_stats[] = {
 	{RDC_STAT_RCRTO, KSTAT_DATA_ULONG, "rdc_rcrto"},
 	{RDC_STAT_RCRTHRES, KSTAT_DATA_ULONG, "rdc_rcrthres"},
 	{RDC_STAT_PKT_DROP, KSTAT_DATA_ULONG, "rdc_pkt_drop"},
-	{RDC_STAT_END, NULL, NULL}
+	{RDC_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -118,7 +118,7 @@ hxge_kstat_index_t hxge_rdc_sys_stats[] = {
 	{RDC_SYS_STAT_CTRL_FIFO_DED, KSTAT_DATA_UINT64, "rdc_ctrl_fifo_ded"},
 	{RDC_SYS_STAT_DATA_FIFO_SEC, KSTAT_DATA_UINT64, "rdc_data_fifo_sec"},
 	{RDC_SYS_STAT_DATA_FIFO_DED, KSTAT_DATA_UINT64, "tdc_data_fifo_ded"},
-	{RDC_SYS_STAT_END, NULL, NULL}
+	{RDC_SYS_STAT_END, KSTAT_DATA_UINT64, NULL}
 };
 
 typedef enum {
@@ -184,7 +184,7 @@ hxge_kstat_index_t hxge_tdc_stats[] = {
 	{TDC_STAT_TX_JUMBO_PKTS, KSTAT_DATA_ULONG, "tdc_tx_jumbo_pkts"},
 	{TDC_STAT_TX_MAX_PEND, KSTAT_DATA_ULONG, "tdc_tx_max_pend"},
 	{TDC_STAT_TX_MARKS, KSTAT_DATA_ULONG, "tdc_tx_marks"},
-	{TDC_STAT_END, NULL, NULL}
+	{TDC_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -198,7 +198,7 @@ hxge_kstat_index_t hxge_tdc_sys_stats[] = {
 	{REORD_TBL_PAR_ERR, KSTAT_DATA_UINT64, "reord_tbl_par_err"},
 	{REORD_BUF_DED_ERR, KSTAT_DATA_UINT64, "reord_buf_ded_err"},
 	{REORD_BUF_SEC_ERR, KSTAT_DATA_UINT64, "reord_buf_sec_err"},
-	{TDC_SYS_STAT_END, NULL, NULL}
+	{TDC_SYS_STAT_END, KSTAT_DATA_UINT64, NULL}
 };
 
 typedef enum {
@@ -230,7 +230,7 @@ hxge_kstat_index_t hxge_vmac_stats[] = {
 	{VMAC_STAT_RX_PAUSE_CNT, KSTAT_DATA_UINT64, "vmac_rx_pause_cnt"},
 	{VMAC_STAT_RX_BCAST_FR_CNT, KSTAT_DATA_UINT64, "vmac_rx_bcast_fr_cnt"},
 	{VMAC_STAT_RX_MCAST_FR_CNT, KSTAT_DATA_UINT64, "vmac_rx_mcast_fr_cnt"},
-	{VMAC_STAT_END, NULL, NULL}
+	{VMAC_STAT_END, KSTAT_DATA_UINT64, NULL}
 };
 
 typedef enum {
@@ -259,7 +259,7 @@ hxge_kstat_index_t hxge_pfc_stats[] = {
 	    "  pfc_pkt_drop_class_code"},
 	{PFC_STAT_TCAM_DROP, KSTAT_DATA_ULONG, "  pfc_pkt_drop_tcam"},
 	{PFC_STAT_VLAN_DROP, KSTAT_DATA_ULONG, "  pfc_pkt_drop_vlan"},
-	{PFC_STAT_END, NULL, NULL}
+	{PFC_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -297,7 +297,7 @@ hxge_kstat_index_t hxge_peu_sys_stats[] = {
 	{NP_DATAQ_PARERR, KSTAT_DATA_UINT64, "np_dataq_parerr"},
 	{EIC_MSIX_PARERR, KSTAT_DATA_UINT64, "eic_msix_parerr"},
 	{HCR_PARERR, KSTAT_DATA_UINT64, "hcr_parerr"},
-	{TDC_SYS_STAT_END, NULL, NULL}
+	{TDC_SYS_STAT_END, KSTAT_DATA_UINT64, NULL}
 };
 
 typedef enum {
@@ -341,7 +341,7 @@ hxge_kstat_index_t hxge_mmac_stats[] = {
 	{MMAC_ADDR_POOL14, KSTAT_DATA_UINT64, "mmac_addr_14"},
 	{MMAC_ADDR_POOL15, KSTAT_DATA_UINT64, "mmac_addr_15"},
 	{MMAC_ADDR_POOL16, KSTAT_DATA_UINT64, "mmac_addr_16"},
-	{MMAC_STATS_END, NULL, NULL},
+	{MMAC_STATS_END, KSTAT_DATA_UINT64, NULL},
 };
 
 
@@ -624,8 +624,8 @@ hxge_peu_sys_stat_update(kstat_t *ksp, int rw)
 
 static kstat_t *
 hxge_setup_local_kstat(p_hxge_t hxgep, int instance, char *name,
-	const hxge_kstat_index_t *ksip, size_t count,
-	int (*update) (kstat_t *, int))
+    const hxge_kstat_index_t *ksip, size_t count,
+    int (*update) (kstat_t *, int))
 {
 	kstat_t		*ksp;
 	kstat_named_t	*knp;
