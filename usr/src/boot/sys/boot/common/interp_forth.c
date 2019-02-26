@@ -37,9 +37,9 @@ extern unsigned bootprog_rev;
 /* #define BFORTH_DEBUG */
 
 #ifdef BFORTH_DEBUG
-# define DEBUG(fmt, args...)	printf("%s: " fmt "\n" , __func__ , ## args)
+#define	DEBUG(fmt, args...)	printf("%s: " fmt "\n", __func__, ## args)
 #else
-# define DEBUG(fmt, args...)
+#define	DEBUG(fmt, args...)
 #endif
 
 /*
@@ -47,7 +47,7 @@ extern unsigned bootprog_rev;
  * elsewhere, possibly bootstrap.h. For now, just this code, used
  * just in this file, it is getting defined.
  */
-#define BF_PARSE 100
+#define	BF_PARSE 100
 
 /*
  * FreeBSD loader default dictionary cells
@@ -71,94 +71,100 @@ ficlVm	*bf_vm;
 static void
 bf_command(ficlVm *vm)
 {
-    char			*name, *line, *tail, *cp;
-    size_t			len;
-    struct bootblk_command	**cmdp;
-    bootblk_cmd_t		*cmd;
-    int				nstrings, i;
-    int				argc, result;
-    char			**argv;
+	char			*name, *line, *tail, *cp;
+	size_t			len;
+	struct bootblk_command	**cmdp;
+	bootblk_cmd_t		*cmd;
+	int			nstrings, i;
+	int			argc, result;
+	char			**argv;
 
-    /* Get the name of the current word */
-    name = vm->runningWord->name;
+	/* Get the name of the current word */
+	name = vm->runningWord->name;
 
-    /* Find our command structure */
-    cmd = NULL;
-    SET_FOREACH(cmdp, Xcommand_set) {
-	if (((*cmdp)->c_name != NULL) && !strcmp(name, (*cmdp)->c_name))
-	    cmd = (*cmdp)->c_fn;
-    }
-    if (cmd == NULL)
-	panic("callout for unknown command '%s'", name);
-
-    /* Check whether we have been compiled or are being interpreted */
-    if (ficlStackPopInteger(ficlVmGetDataStack(vm))) {
-	/*
-	 * Get parameters from stack, in the format:
-	 * an un ... a2 u2 a1 u1 n --
-	 * Where n is the number of strings, a/u are pairs of
-	 * address/size for strings, and they will be concatenated
-	 * in LIFO order.
-	 */
-	nstrings = ficlStackPopInteger(ficlVmGetDataStack(vm));
-	for (i = 0, len = 0; i < nstrings; i++)
-	    len += ficlStackFetch(ficlVmGetDataStack(vm), i * 2).i + 1;
-	line = malloc(strlen(name) + len + 1);
-	strcpy(line, name);
-
-	if (nstrings)
-	    for (i = 0; i < nstrings; i++) {
-		len = ficlStackPopInteger(ficlVmGetDataStack(vm));
-		cp = ficlStackPopPointer(ficlVmGetDataStack(vm));
-		strcat(line, " ");
-		strncat(line, cp, len);
-	    }
-    } else {
-	/* Get remainder of invocation */
-	tail = ficlVmGetInBuf(vm);
-
-	len = 0;
-	for (cp = tail; cp != vm->tib.end && *cp != 0 && *cp != '\n'; cp++)
-		len++;
-
-	line = malloc(strlen(name) + len + 2);
-	strcpy(line, name);
-	if (len > 0) {
-	    strcat(line, " ");
-	    strncat(line, tail, len);
-	    ficlVmUpdateTib(vm, tail + len);
+	/* Find our command structure */
+	cmd = NULL;
+	SET_FOREACH(cmdp, Xcommand_set) {
+		if (((*cmdp)->c_name != NULL) &&
+		    strcmp(name, (*cmdp)->c_name) == 0)
+			cmd = (*cmdp)->c_fn;
 	}
-    }
-    DEBUG("cmd '%s'", line);
+	if (cmd == NULL)
+		panic("callout for unknown command '%s'", name);
 
-    command_errmsg = command_errbuf;
-    command_errbuf[0] = 0;
-    if (!parse(&argc, &argv, line)) {
-	result = (cmd)(argc, argv);
-	free(argv);
-    } else {
-	result = BF_PARSE;
-    }
+	/* Check whether we have been compiled or are being interpreted */
+	if (ficlStackPopInteger(ficlVmGetDataStack(vm))) {
+		/*
+		 * Get parameters from stack, in the format:
+		 * an un ... a2 u2 a1 u1 n --
+		 * Where n is the number of strings, a/u are pairs of
+		 * address/size for strings, and they will be concatenated
+		 * in LIFO order.
+		 */
+		nstrings = ficlStackPopInteger(ficlVmGetDataStack(vm));
+		for (i = 0, len = 0; i < nstrings; i++) {
+			ficlStack *stack = ficlVmGetDataStack(vm);
+			len += ficlStackFetch(stack, i * 2).i + 1;
+		}
+		line = malloc(strlen(name) + len + 1);
+		strcpy(line, name);
 
-    switch (result) {
-    case CMD_CRIT:
-	printf("%s\n", command_errmsg);
-	command_errmsg = NULL;
-	break;
-    case CMD_FATAL:
-	panic("%s\n", command_errmsg);
-    }
+		if (nstrings)
+			for (i = 0; i < nstrings; i++) {
+				ficlStack *stack = ficlVmGetDataStack(vm);
 
-    free(line);
-    /*
-     * If there was error during nested ficlExec(), we may no longer have
-     * valid environment to return.  Throw all exceptions from here.
-     */
-    if (result != CMD_OK)
-	ficlVmThrow(vm, result);
+				len = ficlStackPopInteger(stack);
+				cp = ficlStackPopPointer(stack);
+				strcat(line, " ");
+				strncat(line, cp, len);
+			}
+	} else {
+		/* Get remainder of invocation */
+		tail = ficlVmGetInBuf(vm);
 
-    /* This is going to be thrown!!! */
-    ficlStackPushInteger(ficlVmGetDataStack(vm),result);
+		len = 0;
+		cp = tail;
+		for (; cp != vm->tib.end && *cp != 0 && *cp != '\n'; cp++)
+			len++;
+
+		line = malloc(strlen(name) + len + 2);
+		strcpy(line, name);
+		if (len > 0) {
+			strcat(line, " ");
+			strncat(line, tail, len);
+			ficlVmUpdateTib(vm, tail + len);
+		}
+	}
+	DEBUG("cmd '%s'", line);
+
+	command_errmsg = command_errbuf;
+	command_errbuf[0] = 0;
+	if (!parse(&argc, &argv, line)) {
+		result = (cmd)(argc, argv);
+		free(argv);
+	} else {
+		result = BF_PARSE;
+	}
+
+	switch (result) {
+	case CMD_CRIT:
+		printf("%s\n", command_errmsg);
+		command_errmsg = NULL;
+		break;
+	case CMD_FATAL:
+		panic("%s\n", command_errmsg);
+	}
+
+	free(line);
+	/*
+	 * If there was error during nested ficlExec(), we may no longer have
+	 * valid environment to return.  Throw all exceptions from here.
+	 */
+	if (result != CMD_OK)
+		ficlVmThrow(vm, result);
+
+	/* This is going to be thrown!!! */
+	ficlStackPushInteger(ficlVmGetDataStack(vm), result);
 }
 
 /*
@@ -229,25 +235,25 @@ bf_command(ficlVm *vm)
  * (if you edit this definition, pay attention to trailing spaces after
  *  each word -- I warned you! :-) )
  */
-#define BUILTIN_CONSTRUCTOR \
+#define	BUILTIN_CONSTRUCTOR \
 ": builtin: "		\
-  ">in @ "		/* save the tib index pointer */ \
-  "' "			/* get next word's xt */ \
-  "swap >in ! "		/* point again to next word */ \
-  "create "		/* create a new definition of the next word */ \
-  ", "			/* save previous definition's xt */ \
-  "immediate "		/* make the new definition an immediate word */ \
+	">in @ "		/* save the tib index pointer */ \
+	"' "			/* get next word's xt */ \
+	"swap >in ! "		/* point again to next word */ \
+	"create "		/* create a new definition of the next word */ \
+	", "			/* save previous definition's xt */ \
+	"immediate "	/* make the new definition an immediate word */ \
 			\
-  "does> "		/* Now, the *new* definition will: */ \
-  "state @ if "		/* if in compiling state: */ \
-    "1 postpone literal "	/* pass 1 flag to indicate compile */ \
-    "@ compile, "		/* compile in previous definition */ \
-    "postpone throw "		/* throw stack-returned result */ \
-  "else "		/* if in interpreting state: */ \
-    "0 swap "			/* pass 0 flag to indicate interpret */ \
-    "@ execute "		/* call previous definition */ \
-    "throw "			/* throw stack-returned result */ \
-  "then ; "
+	"does> "		/* Now, the *new* definition will: */ \
+	"state @ if "		/* if in compiling state: */ \
+	"1 postpone literal "	/* pass 1 flag to indicate compile */ \
+	"@ compile, "		/* compile in previous definition */ \
+	"postpone throw "	/* throw stack-returned result */ \
+	"else "		/* if in interpreting state: */ \
+	"0 swap "		/* pass 0 flag to indicate interpret */ \
+	"@ execute "		/* call previous definition */ \
+	"throw "			/* throw stack-returned result */ \
+	"then ; "
 
 /*
  * Initialise the Forth interpreter, create all our commands as words.
@@ -255,72 +261,73 @@ bf_command(ficlVm *vm)
 void
 bf_init(char *rc)
 {
-    struct bootblk_command	**cmdp;
-    char create_buf[41];	/* 31 characters-long builtins */
-    int fd, rv;
-    ficlDictionary *dict;
-    ficlDictionary *env;
+	struct bootblk_command	**cmdp;
+	char create_buf[41];	/* 31 characters-long builtins */
+	int fd, rv;
+	ficlDictionary *dict;
+	ficlDictionary *env;
 
-    fsi = malloc(sizeof(ficlSystemInformation));
-    ficlSystemInformationInitialize(fsi);
-    fsi->dictionarySize = BF_DICTSIZE;
+	fsi = malloc(sizeof (ficlSystemInformation));
+	ficlSystemInformationInitialize(fsi);
+	fsi->dictionarySize = BF_DICTSIZE;
 
-    bf_sys = ficlSystemCreate(fsi);
-    bf_vm = ficlSystemCreateVm(bf_sys);
+	bf_sys = ficlSystemCreate(fsi);
+	bf_vm = ficlSystemCreateVm(bf_sys);
 
-    /* Put all private definitions in a "builtins" vocabulary */
-    rv = ficlVmEvaluate(bf_vm, "vocabulary builtins also builtins definitions");
-    if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
-	panic("error interpreting forth: %d\n", rv);
-    }
-
-    /* Builtin constructor word  */
-    rv = ficlVmEvaluate(bf_vm, BUILTIN_CONSTRUCTOR);
-    if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
-	panic("error interpreting forth: %d\n", rv);
-    }
-
-    /* make all commands appear as Forth words */
-    dict = ficlSystemGetDictionary(bf_sys);
-    SET_FOREACH(cmdp, Xcommand_set) {
-	ficlDictionaryAppendPrimitive(dict, (char *)(*cmdp)->c_name,
-		bf_command, FICL_WORD_DEFAULT);
-	rv = ficlVmEvaluate(bf_vm, "forth definitions builtins");
+	/* Put all private definitions in a "builtins" vocabulary */
+	rv = ficlVmEvaluate(bf_vm,
+	    "vocabulary builtins also builtins definitions");
 	if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
 		panic("error interpreting forth: %d\n", rv);
 	}
-	sprintf(create_buf, "builtin: %s", (*cmdp)->c_name);
-	rv = ficlVmEvaluate(bf_vm, create_buf);
+
+	/* Builtin constructor word  */
+	rv = ficlVmEvaluate(bf_vm, BUILTIN_CONSTRUCTOR);
 	if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
 		panic("error interpreting forth: %d\n", rv);
 	}
-	rv = ficlVmEvaluate(bf_vm, "builtins definitions");
+
+	/* make all commands appear as Forth words */
+	dict = ficlSystemGetDictionary(bf_sys);
+	SET_FOREACH(cmdp, Xcommand_set) {
+		ficlDictionaryAppendPrimitive(dict, (char *)(*cmdp)->c_name,
+		    bf_command, FICL_WORD_DEFAULT);
+		rv = ficlVmEvaluate(bf_vm, "forth definitions builtins");
+		if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
+			panic("error interpreting forth: %d\n", rv);
+		}
+		sprintf(create_buf, "builtin: %s", (*cmdp)->c_name);
+		rv = ficlVmEvaluate(bf_vm, create_buf);
+		if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
+			panic("error interpreting forth: %d\n", rv);
+		}
+		rv = ficlVmEvaluate(bf_vm, "builtins definitions");
+		if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
+			panic("error interpreting forth: %d\n", rv);
+		}
+	}
+	rv = ficlVmEvaluate(bf_vm, "only forth definitions");
 	if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
 		panic("error interpreting forth: %d\n", rv);
 	}
-    }
-    rv = ficlVmEvaluate(bf_vm, "only forth definitions");
-    if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
-	panic("error interpreting forth: %d\n", rv);
-    }
 
-    /*
-     * Export some version numbers so that code can detect the loader/host
-     * version
-     */
-    env = ficlSystemGetEnvironment(bf_sys);
-    ficlDictionarySetConstant(env, "loader_version", bootprog_rev);
+	/*
+	 * Export some version numbers so that code can detect the loader/host
+	 * version
+	 */
+	env = ficlSystemGetEnvironment(bf_sys);
+	ficlDictionarySetConstant(env, "loader_version", bootprog_rev);
 
-    /* try to load and run init file if present */
-    if (rc == NULL)
-	rc = "/boot/forth/boot.4th";
-    if (*rc != '\0') {
-	fd = open(rc, O_RDONLY);
-	if (fd != -1) {
-	    (void)ficlExecFD(bf_vm, fd);
-	    close(fd);
+	/* try to load and run init file if present */
+	if (rc == NULL)
+		rc = "/boot/forth/boot.4th";
+	if (*rc != '\0') {
+		fd = open(rc, O_RDONLY);
+		if (fd != -1) {
+			(void) ficlExecFD(bf_vm, fd);
+			close(fd);
+		}
 	}
-    }
 }
 
 /*
@@ -329,39 +336,39 @@ bf_init(char *rc)
 int
 bf_run(char *line)
 {
-    int		result;
-    ficlString s;
+	int result;
+	ficlString s;
 
-    FICL_STRING_SET_FROM_CSTRING(s, line);
-    result = ficlVmExecuteString(bf_vm, s);
+	FICL_STRING_SET_FROM_CSTRING(s, line);
+	result = ficlVmExecuteString(bf_vm, s);
 
-    DEBUG("ficlExec '%s' = %d", line, result);
-    switch (result) {
-    case FICL_VM_STATUS_OUT_OF_TEXT:
-    case FICL_VM_STATUS_ABORTQ:
-    case FICL_VM_STATUS_QUIT:
-    case FICL_VM_STATUS_ERROR_EXIT:
-	break;
-    case FICL_VM_STATUS_USER_EXIT:
-	printf("No where to leave to!\n");
-	break;
-    case FICL_VM_STATUS_ABORT:
-	printf("Aborted!\n");
-	break;
-    case BF_PARSE:
-	printf("Parse error!\n");
-	break;
-    default:
-	if (command_errmsg != NULL) {
-	    printf("%s\n", command_errmsg);
-	    command_errmsg = NULL;
+	DEBUG("ficlExec '%s' = %d", line, result);
+	switch (result) {
+	case FICL_VM_STATUS_OUT_OF_TEXT:
+	case FICL_VM_STATUS_ABORTQ:
+	case FICL_VM_STATUS_QUIT:
+	case FICL_VM_STATUS_ERROR_EXIT:
+		break;
+	case FICL_VM_STATUS_USER_EXIT:
+		printf("No where to leave to!\n");
+		break;
+	case FICL_VM_STATUS_ABORT:
+		printf("Aborted!\n");
+		break;
+	case BF_PARSE:
+		printf("Parse error!\n");
+		break;
+	default:
+		if (command_errmsg != NULL) {
+			printf("%s\n", command_errmsg);
+			command_errmsg = NULL;
+		}
 	}
-    }
 
-    /* bye is same as reboot and will behave depending on platform */
-    if (result == FICL_VM_STATUS_USER_EXIT)
-	bf_run("reboot");
-    setenv("interpret", bf_vm->state ? "" : "ok", 1);
+	/* bye is same as reboot and will behave depending on platform */
+	if (result == FICL_VM_STATUS_USER_EXIT)
+		bf_run("reboot");
+	setenv("interpret", bf_vm->state ? "" : "ok", 1);
 
-    return (result);
+	return (result);
 }
