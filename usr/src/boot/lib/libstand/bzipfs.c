@@ -1,4 +1,4 @@
-/* 
+/*
  * Copyright (c) 1998 Michael Smith.
  * Copyright (c) 2000 Maxim Sobolev
  * All rights reserved.
@@ -37,71 +37,79 @@
 #include <sys/unistd.h>
 
 struct open_file {
-    int                 f_flags;        /* see F_* below */
-    void                *f_fsdata;      /* file system specific data */
+	int	f_flags;	/* see F_* below */
+	void	*f_fsdata;	/* file system specific data */
 };
-#define F_READ          0x0001  /* file opened for reading */
-#define EOFFSET (ELAST+8)       /* relative seek not supported */
-static inline u_int min(u_int a, u_int b) { return(a < b ? a : b); }
-#define panic(x, y) abort()
+#define	F_READ		0x0001	/* file opened for reading */
+#define	EOFFSET	(ELAST + 8)	/* relative seek not supported */
+#define	panic(x, y) abort()
+
+static inline uint_t
+min(uint_t a, uint_t b)
+{
+	return (a < b ? a : b);
+}
 #endif
 
 #include <sys/stat.h>
 #include <string.h>
 #include <bzlib.h>
 
-#define BZ_BUFSIZE 2048	/* XXX larger? */
+#define	BZ_BUFSIZE 2048	/* XXX larger? */
 
 struct bz_file
 {
-    int			bzf_rawfd;
-    bz_stream		bzf_bzstream;
-    char		bzf_buf[BZ_BUFSIZE];
-    int			bzf_endseen;
+	int		bzf_rawfd;
+	bz_stream	bzf_bzstream;
+	char		bzf_buf[BZ_BUFSIZE];
+	int		bzf_endseen;
 };
 
-static int	bzf_fill(struct bz_file *z);
-static int	bzf_open(const char *path, struct open_file *f);
-static int	bzf_close(struct open_file *f);
-static int	bzf_read(struct open_file *f, void *buf, size_t size, size_t *resid);
-static off_t	bzf_seek(struct open_file *f, off_t offset, int where);
-static int	bzf_stat(struct open_file *f, struct stat *sb);
+static int	bzf_fill(struct bz_file *);
+static int	bzf_open(const char *, struct open_file *);
+static int	bzf_close(struct open_file *);
+static int	bzf_read(struct open_file *, void *, size_t, size_t *);
+static off_t	bzf_seek(struct open_file *, off_t, int);
+static int	bzf_stat(struct open_file *, struct stat *);
 
 #ifndef REGRESSION
 struct fs_ops bzipfs_fsops = {
-    "bzip",
-    bzf_open, 
-    bzf_close, 
-    bzf_read,
-    null_write,
-    bzf_seek,
-    bzf_stat,
-    null_readdir
+	.fs_name = "bzip",
+	.fo_open = bzf_open,
+	.fo_close = bzf_close,
+	.fo_read = bzf_read,
+	.fo_write = null_write,
+	.fo_seek = bzf_seek,
+	.fo_stat = bzf_stat,
+	.fo_readdir = null_readdir
 };
 #endif
 
 static int
 bzf_fill(struct bz_file *bzf)
 {
-    int		result;
-    int		req;
-    
-    req = BZ_BUFSIZE - bzf->bzf_bzstream.avail_in;
-    result = 0;
-    
-    /* If we need more */
-    if (req > 0) {
-	/* move old data to bottom of buffer */
-	if (req < BZ_BUFSIZE)
-	    bcopy(bzf->bzf_buf + req, bzf->bzf_buf, BZ_BUFSIZE - req);
-	
-	/* read to fill buffer and update availibility data */
-	result = read(bzf->bzf_rawfd, bzf->bzf_buf + bzf->bzf_bzstream.avail_in, req);
-	bzf->bzf_bzstream.next_in = bzf->bzf_buf;
-	if (result >= 0)
-	    bzf->bzf_bzstream.avail_in += result;
-    }
-    return(result);
+	int		result;
+	int		req;
+
+	req = BZ_BUFSIZE - bzf->bzf_bzstream.avail_in;
+	result = 0;
+
+	/* If we need more */
+	if (req > 0) {
+		/* move old data to bottom of buffer */
+		if (req < BZ_BUFSIZE) {
+			bcopy(bzf->bzf_buf + req, bzf->bzf_buf,
+			    BZ_BUFSIZE - req);
+		}
+
+		/* read to fill buffer and update availibility data */
+		result = read(bzf->bzf_rawfd,
+		    bzf->bzf_buf + bzf->bzf_bzstream.avail_in, req);
+		bzf->bzf_bzstream.next_in = bzf->bzf_buf;
+		if (result >= 0)
+			bzf->bzf_bzstream.avail_in += result;
+	}
+	return (result);
 }
 
 /*
@@ -112,10 +120,10 @@ bzf_fill(struct bz_file *bzf)
 static int
 get_byte(struct bz_file *bzf)
 {
-    if ((bzf->bzf_bzstream.avail_in == 0) && (bzf_fill(bzf) == -1))
-	return(-1);
-    bzf->bzf_bzstream.avail_in--;
-    return(*(bzf->bzf_bzstream.next_in)++);
+	if ((bzf->bzf_bzstream.avail_in == 0) && (bzf_fill(bzf) == -1))
+		return (-1);
+	bzf->bzf_bzstream.avail_in--;
+	return (*(bzf->bzf_bzstream.next_in)++);
 }
 
 static int bz_magic[3] = {'B', 'Z', 'h'}; /* bzip2 magic header */
@@ -123,265 +131,274 @@ static int bz_magic[3] = {'B', 'Z', 'h'}; /* bzip2 magic header */
 static int
 check_header(struct bz_file *bzf)
 {
-    unsigned int len;
-    int		 c;
+	unsigned int len;
+	int		 c;
 
-    /* Check the bzip2 magic header */
-    for (len = 0; len < 3; len++) {
-	c = get_byte(bzf);
-	if (c != bz_magic[len]) {
-	    return(1);
+	/* Check the bzip2 magic header */
+	for (len = 0; len < 3; len++) {
+		c = get_byte(bzf);
+		if (c != bz_magic[len]) {
+			return (1);
+		}
 	}
-    }
-    /* Check that the block size is valid */
-    c = get_byte(bzf);
-    if (c < '1' || c > '9')
-	return(1);
+	/* Check that the block size is valid */
+	c = get_byte(bzf);
+	if (c < '1' || c > '9')
+		return (1);
 
-    /* Put back bytes that we've took from the input stream */
-    bzf->bzf_bzstream.next_in -= 4;
-    bzf->bzf_bzstream.avail_in += 4;
+	/* Put back bytes that we've took from the input stream */
+	bzf->bzf_bzstream.next_in -= 4;
+	bzf->bzf_bzstream.avail_in += 4;
 
-    return(0);
+	return (0);
 }
-	
+
 static int
 bzf_open(const char *fname, struct open_file *f)
 {
-    static char		*bzfname;
-    int			rawfd;
-    struct bz_file	*bzf;
-    char		*cp;
-    int			error;
-    struct stat		sb;
+	static char		*bzfname;
+	int			rawfd;
+	struct bz_file	*bzf;
+	char		*cp;
+	int			error;
+	struct stat		sb;
 
-    /* Have to be in "just read it" mode */
-    if (f->f_flags != F_READ)
-	return(EPERM);
+	/* Have to be in "just read it" mode */
+	if (f->f_flags != F_READ)
+		return (EPERM);
 
-    /* If the name already ends in .gz or .bz2, ignore it */
-    if ((cp = strrchr(fname, '.')) && (!strcmp(cp, ".gz")
-	    || !strcmp(cp, ".bz2") || !strcmp(cp, ".split")))
-	return(ENOENT);
+	/* If the name already ends in .gz or .bz2, ignore it */
+	if ((cp = strrchr(fname, '.')) &&
+	    ((strcmp(cp, ".gz") == 0) ||
+	    (strcmp(cp, ".bz2") == 0) ||
+	    (strcmp(cp, ".split") == 0)))
+		return (ENOENT);
 
-    /* Construct new name */
-    bzfname = malloc(strlen(fname) + 5);
-    if (bzfname == NULL)
-	return(ENOMEM);
-    sprintf(bzfname, "%s.bz2", fname);
+	/* Construct new name */
+	bzfname = malloc(strlen(fname) + 5);
+	if (bzfname == NULL)
+		return (ENOMEM);
+	sprintf(bzfname, "%s.bz2", fname);
 
-    /* Try to open the compressed datafile */
-    rawfd = open(bzfname, O_RDONLY);
-    free(bzfname);
-    if (rawfd == -1)
-	return(ENOENT);
+	/* Try to open the compressed datafile */
+	rawfd = open(bzfname, O_RDONLY);
+	free(bzfname);
+	if (rawfd == -1)
+		return (ENOENT);
 
-    if (fstat(rawfd, &sb) < 0) {
-	printf("bzf_open: stat failed\n");
-	close(rawfd);
-	return(ENOENT);
-    }
-    if (!S_ISREG(sb.st_mode)) {
-	printf("bzf_open: not a file\n");
-	close(rawfd);
-	return(EISDIR);			/* best guess */
-    }
+	if (fstat(rawfd, &sb) < 0) {
+		printf("bzf_open: stat failed\n");
+		close(rawfd);
+		return (ENOENT);
+	}
+	if (!S_ISREG(sb.st_mode)) {
+		printf("bzf_open: not a file\n");
+		close(rawfd);
+		return (EISDIR);		/* best guess */
+	}
 
-    /* Allocate a bz_file structure, populate it */
-    bzf = malloc(sizeof(struct bz_file));
-    if (bzf == NULL)
-	return(ENOMEM);
-    bzero(bzf, sizeof(struct bz_file));
-    bzf->bzf_rawfd = rawfd;
+	/* Allocate a bz_file structure, populate it */
+	bzf = malloc(sizeof (struct bz_file));
+	if (bzf == NULL)
+		return (ENOMEM);
+	bzero(bzf, sizeof (struct bz_file));
+	bzf->bzf_rawfd = rawfd;
 
-    /* Verify that the file is bzipped */
-    if (check_header(bzf)) {
-	close(bzf->bzf_rawfd);
-	free(bzf);
-	return(EFTYPE);
-    }
+	/* Verify that the file is bzipped */
+	if (check_header(bzf)) {
+		close(bzf->bzf_rawfd);
+		free(bzf);
+		return (EFTYPE);
+	}
 
-    /* Initialise the inflation engine */
-    if ((error = BZ2_bzDecompressInit(&(bzf->bzf_bzstream), 0, 1)) != BZ_OK) {
-	printf("bzf_open: BZ2_bzDecompressInit returned %d\n", error);
-	close(bzf->bzf_rawfd);
-	free(bzf);
-	return(EIO);
-    }
+	/* Initialise the inflation engine */
+	error = BZ2_bzDecompressInit(&(bzf->bzf_bzstream), 0, 1);
+	if (error != BZ_OK) {
+		printf("bzf_open: BZ2_bzDecompressInit returned %d\n", error);
+		close(bzf->bzf_rawfd);
+		free(bzf);
+		return (EIO);
+	}
 
-    /* Looks OK, we'll take it */
-    f->f_fsdata = bzf;
-    return(0);
+	/* Looks OK, we'll take it */
+	f->f_fsdata = bzf;
+	return (0);
 }
 
 static int
 bzf_close(struct open_file *f)
 {
-    struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
-    
-    BZ2_bzDecompressEnd(&(bzf->bzf_bzstream));
-    close(bzf->bzf_rawfd);
-    free(bzf);
-    return(0);
+	struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
+
+	BZ2_bzDecompressEnd(&(bzf->bzf_bzstream));
+	close(bzf->bzf_rawfd);
+	free(bzf);
+	return (0);
 }
- 
-static int 
+
+static int
 bzf_read(struct open_file *f, void *buf, size_t size, size_t *resid)
 {
-    struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
-    int			error;
+	struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
+	int			error;
 
-    bzf->bzf_bzstream.next_out = buf;			/* where and how much */
-    bzf->bzf_bzstream.avail_out = size;
+	bzf->bzf_bzstream.next_out = buf;	/* where and how much */
+	bzf->bzf_bzstream.avail_out = size;
 
-    while (bzf->bzf_bzstream.avail_out && bzf->bzf_endseen == 0) {
-	if ((bzf->bzf_bzstream.avail_in == 0) && (bzf_fill(bzf) == -1)) {
-	    printf("bzf_read: fill error\n");
-	    return(EIO);
-	}
-	if (bzf->bzf_bzstream.avail_in == 0) {		/* oops, unexpected EOF */
-	    printf("bzf_read: unexpected EOF\n");
-	    if (bzf->bzf_bzstream.avail_out == size)
-		return(EIO);
-	    break;
-	}
+	while (bzf->bzf_bzstream.avail_out && bzf->bzf_endseen == 0) {
+		if ((bzf->bzf_bzstream.avail_in == 0) &&
+		    (bzf_fill(bzf) == -1)) {
+			printf("bzf_read: fill error\n");
+			return (EIO);
+		}
+		if (bzf->bzf_bzstream.avail_in == 0) {
+			/* oops, unexpected EOF */
+			printf("bzf_read: unexpected EOF\n");
+			if (bzf->bzf_bzstream.avail_out == size)
+				return (EIO);
+			break;
+		}
 
-	error = BZ2_bzDecompress(&bzf->bzf_bzstream);	/* decompression pass */
-	if (error == BZ_STREAM_END) {			/* EOF, all done */
-	    bzf->bzf_endseen = 1;
-	    break;
+		/* decompression pass */
+		error = BZ2_bzDecompress(&bzf->bzf_bzstream);
+		if (error == BZ_STREAM_END) {		/* EOF, all done */
+			bzf->bzf_endseen = 1;
+			break;
+		}
+		if (error != BZ_OK) {	/* argh, decompression error */
+			printf("bzf_read: BZ2_bzDecompress returned %d\n",
+			    error);
+			return (EIO);
+		}
 	}
-	if (error != BZ_OK) {				/* argh, decompression error */
-	    printf("bzf_read: BZ2_bzDecompress returned %d\n", error);
-	    return(EIO);
-	}
-    }
-    if (resid != NULL)
-	*resid = bzf->bzf_bzstream.avail_out;
-    return(0);
+	if (resid != NULL)
+		*resid = bzf->bzf_bzstream.avail_out;
+	return (0);
 }
 
 static int
 bzf_rewind(struct open_file *f)
 {
-    struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
-    struct bz_file	*bzf_tmp;
+	struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
+	struct bz_file	*bzf_tmp;
 
-    /*
-     * Since bzip2 does not have an equivalent inflateReset function a crude
-     * one needs to be provided.  The functions all called in such a way that
-     * at any time an error occurs a roll back can be done (effectively making
-     * this rewind 'atomic', either the reset occurs successfully or not at all,
-     * with no 'undefined' state happening).
-     */
+	/*
+	 * Since bzip2 does not have an equivalent inflateReset function a crude
+	 * one needs to be provided. The functions all called in such a way that
+	 * at any time an error occurs a roll back can be done (effectively
+	 * making this rewind 'atomic', either the reset occurs successfully
+	 * or not at all, with no 'undefined' state happening).
+	 */
 
-    /* Allocate a bz_file structure, populate it */
-    bzf_tmp = malloc(sizeof(struct bz_file));
-    if (bzf_tmp == NULL)
-	return(-1);
-    bzero(bzf_tmp, sizeof(struct bz_file));
-    bzf_tmp->bzf_rawfd = bzf->bzf_rawfd;
+	/* Allocate a bz_file structure, populate it */
+	bzf_tmp = malloc(sizeof (struct bz_file));
+	if (bzf_tmp == NULL)
+		return (-1);
+	bzero(bzf_tmp, sizeof (struct bz_file));
+	bzf_tmp->bzf_rawfd = bzf->bzf_rawfd;
 
-    /* Initialise the inflation engine */
-    if (BZ2_bzDecompressInit(&(bzf_tmp->bzf_bzstream), 0, 1) != BZ_OK) {
-	free(bzf_tmp);
-	return(-1);
-    }
+	/* Initialise the inflation engine */
+	if (BZ2_bzDecompressInit(&(bzf_tmp->bzf_bzstream), 0, 1) != BZ_OK) {
+		free(bzf_tmp);
+		return (-1);
+	}
 
-    /* Seek back to the beginning of the file */
-    if (lseek(bzf->bzf_rawfd, 0, SEEK_SET) == -1) {
-	BZ2_bzDecompressEnd(&(bzf_tmp->bzf_bzstream));
-	free(bzf_tmp);
-	return(-1);
-    }
+	/* Seek back to the beginning of the file */
+	if (lseek(bzf->bzf_rawfd, 0, SEEK_SET) == -1) {
+		BZ2_bzDecompressEnd(&(bzf_tmp->bzf_bzstream));
+		free(bzf_tmp);
+		return (-1);
+	}
 
-    /* Free old bz_file data */
-    BZ2_bzDecompressEnd(&(bzf->bzf_bzstream));
-    free(bzf);
+	/* Free old bz_file data */
+	BZ2_bzDecompressEnd(&(bzf->bzf_bzstream));
+	free(bzf);
 
-    /* Use the new bz_file data */
-    f->f_fsdata = bzf_tmp;
+	/* Use the new bz_file data */
+	f->f_fsdata = bzf_tmp;
 
-    return(0);
+	return (0);
 }
 
 static off_t
 bzf_seek(struct open_file *f, off_t offset, int where)
 {
-    struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
-    off_t		target;
-    char		discard[16];
-    
-    switch (where) {
-    case SEEK_SET:
-	target = offset;
-	break;
-    case SEEK_CUR:
-	target = offset + bzf->bzf_bzstream.total_out_lo32;
-	break;
-    default:
-	errno = EINVAL;
-	return(-1);
-    }
+	struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
+	off_t		target;
+	char		discard[16];
 
-    /* Can we get there from here? */
-    if (target < bzf->bzf_bzstream.total_out_lo32 && bzf_rewind(f) != 0) {
-	errno = EOFFSET;
-	return -1;
-    }
+	switch (where) {
+	case SEEK_SET:
+		target = offset;
+		break;
+	case SEEK_CUR:
+		target = offset + bzf->bzf_bzstream.total_out_lo32;
+		break;
+	default:
+		errno = EINVAL;
+		return (-1);
+	}
 
-    /* if bzf_rewind was called then bzf has changed */
-    bzf = (struct bz_file *)f->f_fsdata;
+	/* Can we get there from here? */
+	if (target < bzf->bzf_bzstream.total_out_lo32 && bzf_rewind(f) != 0) {
+		errno = EOFFSET;
+		return (-1);
+	}
 
-    /* skip forwards if required */
-    while (target > bzf->bzf_bzstream.total_out_lo32) {
-	errno = bzf_read(f, discard, min(sizeof(discard),
-	    target - bzf->bzf_bzstream.total_out_lo32), NULL);
-	if (errno)
-	    return(-1);
-    }
-    /* This is where we are (be honest if we overshot) */
-    return(bzf->bzf_bzstream.total_out_lo32);
+	/* if bzf_rewind was called then bzf has changed */
+	bzf = (struct bz_file *)f->f_fsdata;
+
+	/* skip forwards if required */
+	while (target > bzf->bzf_bzstream.total_out_lo32) {
+		errno = bzf_read(f, discard, min(sizeof (discard),
+		    target - bzf->bzf_bzstream.total_out_lo32), NULL);
+		if (errno)
+			return (-1);
+	}
+	/* This is where we are (be honest if we overshot) */
+	return (bzf->bzf_bzstream.total_out_lo32);
 }
 
 static int
 bzf_stat(struct open_file *f, struct stat *sb)
 {
-    struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
-    int			result;
+	struct bz_file	*bzf = (struct bz_file *)f->f_fsdata;
+	int		result;
 
-    /* stat as normal, but indicate that size is unknown */
-    if ((result = fstat(bzf->bzf_rawfd, sb)) == 0)
-	sb->st_size = -1;
-    return(result);
+	/* stat as normal, but indicate that size is unknown */
+	if ((result = fstat(bzf->bzf_rawfd, sb)) == 0)
+		sb->st_size = -1;
+	return (result);
 }
 
 void
 bz_internal_error(int errorcode)
 {
-    panic("bzipfs: critical error %d in bzip2 library occured\n", errorcode);
+	panic("bzipfs: critical error %d in bzip2 library occured\n",
+	    errorcode);
 }
 
 #ifdef REGRESSION
 /* Small test case, open and decompress test.bz2 */
-int main()
+int
+main()
 {
-    struct open_file f;
-    char buf[1024];
-    size_t resid;
-    int err;
+	struct open_file f;
+	char buf[1024];
+	size_t resid;
+	int err;
 
-    memset(&f, '\0', sizeof(f));
-    f.f_flags = F_READ;
-    err = bzf_open("test", &f);
-    if (err != 0)
-	exit(1);
-    do {
-	err = bzf_read(&f, buf, sizeof(buf), &resid);
-    } while (err == 0 && resid != sizeof(buf));
+	memset(&f, '\0', sizeof (f));
+	f.f_flags = F_READ;
+	err = bzf_open("test", &f);
+	if (err != 0)
+		exit(1);
+	do {
+		err = bzf_read(&f, buf, sizeof (buf), &resid);
+	} while (err == 0 && resid != sizeof (buf));
 
-    if (err != 0)
-	exit(2);
-    exit(0);
+	if (err != 0)
+		exit(2);
+	exit(0);
 }
 #endif
