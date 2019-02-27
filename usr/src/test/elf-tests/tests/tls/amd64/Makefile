@@ -14,6 +14,6 @@
 # Copyright 2018 Joyent, Inc.
 #
 
-SUBDIRS = ie
+SUBDIRS = ie ld
 
 include $(SRC)/test/Makefile.com

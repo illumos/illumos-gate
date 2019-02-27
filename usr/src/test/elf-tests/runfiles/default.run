@@ -32,3 +32,6 @@ tests = ['amd64-ie-test']
 arch = i86pc
 tests = ['i386-ld-test']
 
+[/opt/elf-tests/tests/tls/amd64/ld]
+arch = i86pc
+tests = ['amd64-ld-test']

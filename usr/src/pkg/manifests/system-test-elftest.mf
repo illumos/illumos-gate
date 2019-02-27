@@ -27,6 +27,7 @@ dir path=opt/elf-tests/tests/assert-deflib
 dir path=opt/elf-tests/tests/tls
 dir path=opt/elf-tests/tests/tls/amd64
 dir path=opt/elf-tests/tests/tls/amd64/ie
+dir path=opt/elf-tests/tests/tls/amd64/ld
 dir path=opt/elf-tests/tests/tls/i386
 dir path=opt/elf-tests/tests/tls/i386/ld
 file path=opt/elf-tests/README mode=0444
@@ -44,6 +45,9 @@ file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-badness.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-r12.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-r13.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ld/Makefile.test mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ld/amd64-ld-test mode=0555
+file path=opt/elf-tests/tests/tls/amd64/ld/ld-with-addend.s mode=0444
 file path=opt/elf-tests/tests/tls/i386/ld/Makefile.test mode=0444
 file path=opt/elf-tests/tests/tls/i386/ld/half-ldm.s mode=0444
 file path=opt/elf-tests/tests/tls/i386/ld/i386-ld-test mode=0555
