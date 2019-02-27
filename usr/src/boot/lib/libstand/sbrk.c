@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith
  * All rights reserved.
  *
@@ -25,7 +25,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 /*
  * Minimal sbrk() emulation required for malloc support.
@@ -41,24 +40,23 @@ static void	*heapbase;
 void
 setheap(void *base, void *top)
 {
-    /* Align start address for the malloc code.  Sigh. */
-    heapbase = (void *)(((uintptr_t)base + MALLOCALIGN_MASK) & 
-        ~MALLOCALIGN_MASK);
-    maxheap = (char *)top - (char *)heapbase;
+	/* Align start address for the malloc code.  Sigh. */
+	heapbase = (void *)(((uintptr_t)base + MALLOCALIGN_MASK) &
+	    ~MALLOCALIGN_MASK);
+	maxheap = (char *)top - (char *)heapbase;
 }
 
 char *
 sbrk(int incr)
 {
-    char	*ret;
-    
-    if ((heapsize + incr) <= maxheap) {
-	ret = (char *)heapbase + heapsize;
-	bzero(ret, incr);
-	heapsize += incr;
-	return(ret);
-    }
-    errno = ENOMEM;
-    return((char *)-1);
-}
+	char	*ret;
 
+	if ((heapsize + incr) <= maxheap) {
+		ret = (char *)heapbase + heapsize;
+		bzero(ret, incr);
+		heapsize += incr;
+		return (ret);
+	}
+	errno = ENOMEM;
+	return ((char *)-1);
+}

@@ -6169,9 +6169,6 @@ ahci_alloc_port_state(ahci_ctl_t *ahci_ctlp, uint8_t port)
 	ahci_portp->ahciport_event_args->ahciea_addrp =
 	    kmem_zalloc(sizeof (ahci_addr_t), KM_SLEEP);
 
-	if (ahci_portp->ahciport_event_args == NULL)
-		goto err_case4;
-
 	/* Initialize the done queue */
 	ahci_portp->ahciport_doneq = NULL;
 	ahci_portp->ahciport_doneqtail = &ahci_portp->ahciport_doneq;
@@ -6180,9 +6177,6 @@ ahci_alloc_port_state(ahci_ctl_t *ahci_ctlp, uint8_t port)
 	mutex_exit(&ahci_portp->ahciport_mutex);
 
 	return (AHCI_SUCCESS);
-
-err_case4:
-	ddi_taskq_destroy(ahci_portp->ahciport_event_taskq);
 
 err_case3:
 	ahci_dealloc_cmd_list(ahci_ctlp, ahci_portp);
@@ -7932,7 +7926,7 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 			    (spkt->satapkt_cmd.satacmd_cmd_reg ==
 			    SATAC_ID_DEVICE) &&
 			    (task_abort_flag == 1))
-			goto out1;
+				goto out1;
 
 			/*
 			 * Won't emit the error message if it is an ATAPI PACKET

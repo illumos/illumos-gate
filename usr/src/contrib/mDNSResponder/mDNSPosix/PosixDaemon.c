@@ -273,8 +273,14 @@ asm (".desc ___crashreporter_info__, 0x10");
 #endif
 
 // For convenience when using the "strings" command, this is the last thing in the file
-#if mDNSResponderVersion > 1
-mDNSexport const char mDNSResponderVersionString_SCCS[] = "@(#) mDNSResponder-" STRINGIFY(mDNSResponderVersion) " (" __DATE__ " " __TIME__ ")";
+#if defined(mDNSResponderVersion)
+// Note: The C preprocessor stringify operator ('#') makes a string from its argument, without macro expansion
+// e.g. If "version" is #define'd to be "4", then STRINGIFY_AWE(version) will return the string "version", not "4"
+// To expand "version" to its value before making the string, use STRINGIFY(version) instead
+#define	STRINGIFY_ARGUMENT_WITHOUT_EXPANSION(s) # s
+#define	STRINGIFY(s) STRINGIFY_ARGUMENT_WITHOUT_EXPANSION(s)
+
+mDNSexport const char mDNSResponderVersionString_SCCS[] = "@(#) mDNSResponder-" STRINGIFY(mDNSResponderVersion);
 #elif MDNS_VERSIONSTR_NODTS
 mDNSexport const char mDNSResponderVersionString_SCCS[] = "@(#) mDNSResponder (Engineering Build)";
 #else

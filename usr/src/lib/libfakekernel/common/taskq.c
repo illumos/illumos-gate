@@ -101,7 +101,7 @@ again:	if ((t = tq->tq_freelist) != NULL && tq->tq_nalloc >= tq->tq_minalloc) {
 		tq->tq_freelist = t->tqent_next;
 	} else {
 		if (tq->tq_nalloc >= tq->tq_maxalloc) {
-			if (!(tqflags & KM_SLEEP))
+			if (tqflags & KM_NOSLEEP)
 				return (NULL);
 
 			/*
