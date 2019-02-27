@@ -135,6 +135,11 @@ my %old2posix = (
 	'u_short' => 'ushort_t',
 	'u_long' => 'ulong_t',
 	'u_char' => 'uchar_t',
+	'u_int8_t' => 'uint8_t',
+	'u_int16_t' => 'uint16_t',
+	'u_int32_t' => 'uint32_t',
+	'u_int64_t' => 'uint64_t',
+	'u_quad_t' => 'uint64_t',
 	'quad' => 'quad_t'
 );
 
@@ -712,7 +717,8 @@ line: while (<$filehandle>) {
 		# try to detect old non-POSIX types.
 		# POSIX requires all non-standard typedefs to end in _t,
 		# but historically these have been used.
-		if (/\b(unchar|ushort|uint|ulong|u_int|u_short|u_long|u_char|quad)\b/) {
+		my $types = join '|', keys %old2posix;
+		if (/\b($types)\b/) {
 			err("non-POSIX typedef $1 used: use $old2posix{$1} instead");
 		}
 	}
