@@ -2313,6 +2313,7 @@ f usr/bin/amd64/strings 0555 root bin
 f usr/bin/amd64/truss 0555 root bin
 h usr/bin/amd64/uptime=usr/bin/amd64/w
 f usr/bin/amd64/w 4555 root bin
+f usr/bin/amd64/ztest 4555 root bin
 f usr/bin/amt 0555 root bin
 h usr/bin/apropos=usr/bin/man
 f usr/bin/ar 0555 root bin
@@ -2756,6 +2757,7 @@ f usr/bin/ypwhich 0555 root other
 f usr/bin/zcat 0555 root bin
 f usr/bin/ziostat 0555 root bin
 s usr/bin/zonename=../../sbin/zonename
+h usr/bin/ztest=usr/lib/isaexec
 d usr/ccs 0755 root bin
 d usr/ccs/bin 0755 root bin
 d usr/ccs/bin/amd64 0755 root bin
