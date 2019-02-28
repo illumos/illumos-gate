@@ -86,16 +86,11 @@ bool vlapic_enabled(struct vlapic *vlapic);
 void vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
     int delmode, int vec);
 
-/* Reset the trigger-mode bits for all vectors to be edge-triggered */
-void vlapic_reset_tmr(struct vlapic *vlapic);
+void vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
+    bool lowprio, bool x2apic_dest);
 
-/*
- * Set the trigger-mode bit associated with 'vector' to level-triggered if
- * the (dest,phys,delmode) tuple resolves to an interrupt being delivered to
- * this 'vlapic'.
- */
-void vlapic_set_tmr_level(struct vlapic *vlapic, uint32_t dest, bool phys,
-    int delmode, int vector);
+void vlapic_tmr_update(struct vlapic *vlapic);
+void vlapic_tmr_set(struct vlapic *vlapic, uint8_t vector, bool active);
 
 void vlapic_set_cr8(struct vlapic *vlapic, uint64_t val);
 uint64_t vlapic_get_cr8(struct vlapic *vlapic);

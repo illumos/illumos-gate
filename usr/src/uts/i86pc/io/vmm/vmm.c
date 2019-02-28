@@ -118,6 +118,7 @@ struct vcpu {
 #ifndef __FreeBSD__
 	int		lastloccpu;	/* (o) last host cpu localized to */
 #endif
+	u_int		runblock;	/* (i) block vcpu from run state */
 	int		reqidle;	/* (i) request vcpu to idle */
 	struct vlapic	*vlapic;	/* (i) APIC device model */
 	enum x2apic_state x2apic_state;	/* (i) APIC mode */
@@ -185,14 +186,6 @@ struct vm {
 	int		suspend;		/* (i) stop VM execution */
 	volatile cpuset_t suspended_cpus; 	/* (i) suspended vcpus */
 	volatile cpuset_t halted_cpus;		/* (x) cpus in a hard halt */
-	cpuset_t	rendezvous_req_cpus;	/* (x) rendezvous requested */
-	cpuset_t	rendezvous_done_cpus;	/* (x) rendezvous finished */
-	void		*rendezvous_arg;	/* (x) rendezvous func/arg */
-	vm_rendezvous_func_t rendezvous_func;
-	struct mtx	rendezvous_mtx;		/* (o) rendezvous lock */
-#ifndef __FreeBSD__
-	kcondvar_t	rendezvous_cv;		/* (0) rendezvous condvar */
-#endif
 	struct mem_map	mem_maps[VM_MAX_MEMMAPS]; /* (i) guest address space */
 	struct mem_seg	mem_segs[VM_MAX_MEMSEGS]; /* (o) guest memory regions */
 	struct vmspace	*vmspace;		/* (o) guest's address space */
@@ -356,6 +349,7 @@ vcpu_init(struct vm *vm, int vcpu_id, bool create)
 
 	vcpu->vlapic = VLAPIC_INIT(vm->cookie, vcpu_id);
 	vm_set_x2apic_state(vm, vcpu_id, X2APIC_DISABLED);
+	vcpu->runblock = 0;
 	vcpu->reqidle = 0;
 	vcpu->exitintinfo = 0;
 	vcpu->nmi_pending = 0;
@@ -586,7 +580,6 @@ vm_create(const char *name, struct vm **retvm)
 	vm = malloc(sizeof(struct vm), M_VM, M_WAITOK | M_ZERO);
 	strcpy(vm->name, name);
 	vm->vmspace = vmspace;
-	mtx_init(&vm->rendezvous_mtx, "vm rendezvous lock", 0, MTX_DEF);
 
 	vm->sockets = 1;
 	vm->cores = cores_per_package;	/* XXX backwards compatibility */
@@ -1412,6 +1405,16 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 		break;
 	}
 
+	if (newstate == VCPU_RUNNING) {
+		while (vcpu->runblock != 0) {
+#ifdef __FreeBSD__
+			msleep_spin(&vcpu->state, &vcpu->mtx, "vcpublk", 0);
+#else
+			cv_wait(&vcpu->state_cv, &vcpu->mtx.m);
+#endif
+		}
+	}
+
 	if (error)
 		return (EBUSY);
 
@@ -1424,7 +1427,8 @@ vcpu_set_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate,
 	else
 		vcpu->hostcpu = NOCPU;
 
-	if (newstate == VCPU_IDLE) {
+	if (newstate == VCPU_IDLE ||
+	    (newstate == VCPU_FROZEN && vcpu->runblock != 0)) {
 #ifdef __FreeBSD__
 		wakeup(&vcpu->state);
 #else
@@ -1451,88 +1455,6 @@ vcpu_require_state_locked(struct vm *vm, int vcpuid, enum vcpu_state newstate)
 
 	if ((error = vcpu_set_state_locked(vm, vcpuid, newstate, false)) != 0)
 		panic("Error %d setting state to %d", error, newstate);
-}
-
-static void
-vm_set_rendezvous_func(struct vm *vm, vm_rendezvous_func_t func)
-{
-
-	KASSERT(mtx_owned(&vm->rendezvous_mtx), ("rendezvous_mtx not locked"));
-
-	/*
-	 * Update 'rendezvous_func' and execute a write memory barrier to
-	 * ensure that it is visible across all host cpus. This is not needed
-	 * for correctness but it does ensure that all the vcpus will notice
-	 * that the rendezvous is requested immediately.
-	 */
-	vm->rendezvous_func = func;
-#ifdef __FreeBSD__
-	wmb();
-#else
-	membar_producer();
-#endif
-}
-
-#define	RENDEZVOUS_CTR0(vm, vcpuid, fmt)				\
-	do {								\
-		if (vcpuid >= 0)					\
-			VCPU_CTR0(vm, vcpuid, fmt);			\
-		else							\
-			VM_CTR0(vm, fmt);				\
-	} while (0)
-
-static void
-vm_handle_rendezvous(struct vm *vm, int vcpuid)
-{
-
-	KASSERT(vcpuid == -1 || (vcpuid >= 0 && vcpuid < vm->maxcpus),
-	    ("vm_handle_rendezvous: invalid vcpuid %d", vcpuid));
-
-	mtx_lock(&vm->rendezvous_mtx);
-	while (vm->rendezvous_func != NULL) {
-		/* 'rendezvous_req_cpus' must be a subset of 'active_cpus' */
-		CPU_AND(&vm->rendezvous_req_cpus, &vm->active_cpus);
-
-		if (vcpuid != -1 &&
-		    CPU_ISSET(vcpuid, &vm->rendezvous_req_cpus) &&
-		    !CPU_ISSET(vcpuid, &vm->rendezvous_done_cpus)) {
-			VCPU_CTR0(vm, vcpuid, "Calling rendezvous func");
-			(*vm->rendezvous_func)(vm, vcpuid, vm->rendezvous_arg);
-			CPU_SET(vcpuid, &vm->rendezvous_done_cpus);
-		}
-		if (CPU_CMP(&vm->rendezvous_req_cpus,
-		    &vm->rendezvous_done_cpus) == 0) {
-			VCPU_CTR0(vm, vcpuid, "Rendezvous completed");
-			vm_set_rendezvous_func(vm, NULL);
-#ifdef __FreeBSD__
-			wakeup(&vm->rendezvous_func);
-#else
-			cv_broadcast(&vm->rendezvous_cv);
-#endif
-			break;
-		}
-		RENDEZVOUS_CTR0(vm, vcpuid, "Wait for rendezvous completion");
-#ifdef __FreeBSD__
-		mtx_sleep(&vm->rendezvous_func, &vm->rendezvous_mtx, 0,
-		    "vmrndv", 0);
-#else
-		/*
-		 * A cv_wait() call should be adequate for this, but since the
-		 * bhyve process could be killed in the middle of an unfinished
-		 * vm_smp_rendezvous, rendering its completion impossible, a
-		 * timed wait is necessary.  When bailing out early from a
-		 * rendezvous, the instance may be left in a bizarre state, but
-		 * that is preferable to a thread stuck waiting in the kernel.
-		 */
-		if (cv_reltimedwait_sig(&vm->rendezvous_cv,
-		    &vm->rendezvous_mtx.m, hz, TR_CLOCK_TICK) <= 0) {
-			if ((curproc->p_flag & SEXITING) != 0) {
-				break;
-			}
-		}
-#endif
-	}
-	mtx_unlock(&vm->rendezvous_mtx);
 }
 
 /*
@@ -1566,7 +1488,7 @@ vm_handle_hlt(struct vm *vm, int vcpuid, bool intr_disabled, bool *retu)
 		 * vcpu returned from VMRUN() and before it acquired the
 		 * vcpu lock above.
 		 */
-		if (vm->rendezvous_func != NULL || vm->suspend || vcpu->reqidle)
+		if (vm->suspend || vcpu->reqidle)
 			break;
 		if (vm_nmi_pending(vm, vcpuid))
 			break;
@@ -1773,10 +1695,6 @@ vm_handle_suspend(struct vm *vm, int vcpuid, bool *retu)
 
 	/*
 	 * Wait until all 'active_cpus' have suspended themselves.
-	 *
-	 * Since a VM may be suspended at any time including when one or
-	 * more vcpus are doing a rendezvous we need to call the rendezvous
-	 * handler while we are waiting to prevent a deadlock.
 	 */
 	vcpu_lock(vcpu);
 	while (1) {
@@ -1785,35 +1703,27 @@ vm_handle_suspend(struct vm *vm, int vcpuid, bool *retu)
 			break;
 		}
 
-		if (vm->rendezvous_func == NULL) {
-			VCPU_CTR0(vm, vcpuid, "Sleeping during suspend");
-			vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
+		VCPU_CTR0(vm, vcpuid, "Sleeping during suspend");
+		vcpu_require_state_locked(vm, vcpuid, VCPU_SLEEPING);
 #ifdef __FreeBSD__
-			msleep_spin(vcpu, &vcpu->mtx, "vmsusp", hz);
+		msleep_spin(vcpu, &vcpu->mtx, "vmsusp", hz);
 #else
-			/*
-			 * Like vm_handle_rendezvous, vm_handle_suspend could
-			 * become stuck in the kernel if the bhyve process
-			 * driving its vCPUs is killed.  Offer a bail-out in
-			 * that case, even though not all the vCPUs have
-			 * reached the suspended state.
-			 */
-			if (cv_reltimedwait_sig(&vcpu->vcpu_cv, &vcpu->mtx.m,
-			    hz, TR_CLOCK_TICK) <= 0) {
-				if ((curproc->p_flag & SEXITING) != 0) {
-					vcpu_require_state_locked(vm, vcpuid,
-					    VCPU_FROZEN);
-					break;
-				}
+		/*
+		 * To prevent vm_handle_suspend from becoming stuck in the
+		 * kernel if the bhyve process driving its vCPUs is killed,
+		 * offer a bail-out, even though not all the vCPUs have reached
+		 * the suspended state.
+		 */
+		if (cv_reltimedwait_sig(&vcpu->vcpu_cv, &vcpu->mtx.m,
+		    hz, TR_CLOCK_TICK) <= 0) {
+			if ((curproc->p_flag & SEXITING) != 0) {
+				vcpu_require_state_locked(vm, vcpuid,
+				    VCPU_FROZEN);
+				break;
 			}
-#endif
-			vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
-		} else {
-			VCPU_CTR0(vm, vcpuid, "Rendezvous during suspend");
-			vcpu_unlock(vcpu);
-			vm_handle_rendezvous(vm, vcpuid);
-			vcpu_lock(vcpu);
 		}
+#endif
+		vcpu_require_state_locked(vm, vcpuid, VCPU_FROZEN);
 	}
 	vcpu_unlock(vcpu);
 
@@ -1915,17 +1825,15 @@ vm_exit_debug(struct vm *vm, int vcpuid, uint64_t rip)
 }
 
 void
-vm_exit_rendezvous(struct vm *vm, int vcpuid, uint64_t rip)
+vm_exit_runblock(struct vm *vm, int vcpuid, uint64_t rip)
 {
 	struct vm_exit *vmexit;
-
-	KASSERT(vm->rendezvous_func != NULL, ("rendezvous not in progress"));
 
 	vmexit = vm_exitinfo(vm, vcpuid);
 	vmexit->rip = rip;
 	vmexit->inst_length = 0;
-	vmexit->exitcode = VM_EXITCODE_RENDEZVOUS;
-	vmm_stat_incr(vm, vcpuid, VMEXIT_RENDEZVOUS, 1);
+	vmexit->exitcode = VM_EXITCODE_RUNBLOCK;
+	vmm_stat_incr(vm, vcpuid, VMEXIT_RUNBLOCK, 1);
 }
 
 void
@@ -2087,7 +1995,7 @@ vm_run(struct vm *vm, struct vm_run *vmrun)
 	pmap = vmspace_pmap(vm->vmspace);
 	vcpu = &vm->vcpu[vcpuid];
 	vme = &vcpu->exitinfo;
-	evinfo.rptr = &vm->rendezvous_func;
+	evinfo.rptr = &vcpu->runblock;
 	evinfo.sptr = &vm->suspend;
 	evinfo.iptr = &vcpu->reqidle;
 
@@ -2177,9 +2085,7 @@ restart:
 			vioapic_process_eoi(vm, vcpuid,
 			    vme->u.ioapic_eoi.vector);
 			break;
-		case VM_EXITCODE_RENDEZVOUS:
-			vm_handle_rendezvous(vm, vcpuid);
-			error = 0;
+		case VM_EXITCODE_RUNBLOCK:
 			break;
 		case VM_EXITCODE_HLT:
 			intr_disabled = ((vme->u.hlt.rflags & PSL_I) == 0);
@@ -2807,6 +2713,54 @@ vcpu_get_state(struct vm *vm, int vcpuid, int *hostcpu)
 	return (state);
 }
 
+void
+vcpu_block_run(struct vm *vm, int vcpuid)
+{
+	struct vcpu *vcpu;
+
+	if (vcpuid < 0 || vcpuid >= VM_MAXCPU)
+		panic("vcpu_block_run: invalid vcpuid %d", vcpuid);
+
+	vcpu = &vm->vcpu[vcpuid];
+
+	vcpu_lock(vcpu);
+	vcpu->runblock++;
+	if (vcpu->runblock == 1 && vcpu->state == VCPU_RUNNING) {
+		vcpu_notify_event_locked(vcpu, false);
+	}
+	while (vcpu->state == VCPU_RUNNING) {
+#ifdef __FreeBSD__
+		msleep_spin(&vcpu->state, &vcpu->mtx, "vcpublk", 0);
+#else
+		cv_wait(&vcpu->state_cv, &vcpu->mtx.m);
+#endif
+	}
+	vcpu_unlock(vcpu);
+}
+
+void
+vcpu_unblock_run(struct vm *vm, int vcpuid)
+{
+	struct vcpu *vcpu;
+
+	if (vcpuid < 0 || vcpuid >= VM_MAXCPU)
+		panic("vcpu_block_run: invalid vcpuid %d", vcpuid);
+
+	vcpu = &vm->vcpu[vcpuid];
+
+	vcpu_lock(vcpu);
+	KASSERT(vcpu->runblock != 0, ("expected non-zero runblock"));
+	vcpu->runblock--;
+	if (vcpu->runblock == 0) {
+#ifdef __FreeBSD__
+		wakeup(&vcpu->state);
+#else
+		cv_broadcast(&vcpu->state_cv);
+#endif
+	}
+	vcpu_unlock(vcpu);
+}
+
 #ifndef	__FreeBSD__
 uint64_t
 vcpu_tsc_offset(struct vm *vm, int vcpuid)
@@ -3001,54 +2955,6 @@ vm_apicid2vcpuid(struct vm *vm, int apicid)
 	 * XXX apic id is assumed to be numerically identical to vcpu id
 	 */
 	return (apicid);
-}
-
-void
-vm_smp_rendezvous(struct vm *vm, int vcpuid, cpuset_t dest,
-    vm_rendezvous_func_t func, void *arg)
-{
-	int i;
-
-	/*
-	 * Enforce that this function is called without any locks
-	 */
-	WITNESS_WARN(WARN_PANIC, NULL, "vm_smp_rendezvous");
-	KASSERT(vcpuid == -1 || (vcpuid >= 0 && vcpuid < vm->maxcpus),
-	    ("vm_smp_rendezvous: invalid vcpuid %d", vcpuid));
-
-restart:
-	mtx_lock(&vm->rendezvous_mtx);
-	if (vm->rendezvous_func != NULL) {
-		/*
-		 * If a rendezvous is already in progress then we need to
-		 * call the rendezvous handler in case this 'vcpuid' is one
-		 * of the targets of the rendezvous.
-		 */
-		RENDEZVOUS_CTR0(vm, vcpuid, "Rendezvous already in progress");
-		mtx_unlock(&vm->rendezvous_mtx);
-		vm_handle_rendezvous(vm, vcpuid);
-		goto restart;
-	}
-	KASSERT(vm->rendezvous_func == NULL, ("vm_smp_rendezvous: previous "
-	    "rendezvous is still in progress"));
-
-	RENDEZVOUS_CTR0(vm, vcpuid, "Initiating rendezvous");
-	vm->rendezvous_req_cpus = dest;
-	CPU_ZERO(&vm->rendezvous_done_cpus);
-	vm->rendezvous_arg = arg;
-	vm_set_rendezvous_func(vm, func);
-	mtx_unlock(&vm->rendezvous_mtx);
-
-	/*
-	 * Wake up any sleeping vcpus and trigger a VM-exit in any running
-	 * vcpus so they handle the rendezvous as soon as possible.
-	 */
-	for (i = 0; i < vm->maxcpus; i++) {
-		if (CPU_ISSET(i, &dest))
-			vcpu_notify_event(vm, i, false);
-	}
-
-	vm_handle_rendezvous(vm, vcpuid);
 }
 
 struct vatpic *

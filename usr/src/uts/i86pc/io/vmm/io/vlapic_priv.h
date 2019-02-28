@@ -138,6 +138,8 @@ enum boot_state {
 
 #define VLAPIC_MAXLVT_INDEX	APIC_LVT_CMCI
 
+#define VLAPIC_TMR_CNT		8
+
 struct vlapic;
 
 struct vlapic_ops {
@@ -145,7 +147,7 @@ struct vlapic_ops {
 	int (*pending_intr)(struct vlapic *vlapic, int *vecptr);
 	void (*intr_accepted)(struct vlapic *vlapic, int vector);
 	void (*post_intr)(struct vlapic *vlapic, int hostcpu);
-	void (*set_tmr)(struct vlapic *vlapic, int vector, bool level);
+	void (*set_tmr)(struct vlapic *vlapic, const uint32_t *result);
 	void (*enable_x2apic_mode)(struct vlapic *vlapic);
 };
 
@@ -156,6 +158,7 @@ struct vlapic {
 	struct vlapic_ops	ops;
 
 	uint32_t		esr_pending;
+	uint32_t		tmr_pending;
 
 	struct callout	callout;	/* vlapic timer */
 	struct bintime	timer_fire_bt;	/* callout expiry time */
@@ -183,6 +186,19 @@ struct vlapic {
 	 */
 	uint32_t	svr_last;
 	uint32_t	lvt_last[VLAPIC_MAXLVT_INDEX + 1];
+
+	/*
+	 * Store intended modifications to the trigger-mode register state.
+	 * Along with the tmr_pending counter above, these are protected by the
+	 * vIOAPIC lock and can only be modified under specific conditions:
+	 *
+	 * 1. When holding the vIOAPIC lock, and the vCPU to which the vLAPIC
+	 *    belongs is prevented from entering the VCPU_RUNNING state.
+	 * 2. When the owning vCPU is in the VCPU_RUNNING state, and is
+	 *    applying the TMR modifications prior to interrupt injection.
+	 */
+	uint32_t	tmr_vec_deassert[VLAPIC_TMR_CNT];
+	uint32_t	tmr_vec_assert[VLAPIC_TMR_CNT];
 };
 
 void vlapic_init(struct vlapic *vlapic);

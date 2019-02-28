@@ -146,7 +146,7 @@ struct vm_guest_paging;
 struct pmap;
 
 struct vm_eventinfo {
-	void	*rptr;		/* rendezvous cookie */
+	u_int	*rptr;		/* runblock cookie */
 	int	*sptr;		/* suspend cookie */
 	int	*iptr;		/* reqidle cookie */
 };
@@ -275,38 +275,21 @@ int vm_resume_cpu(struct vm *vm, int vcpu);
 struct vm_exit *vm_exitinfo(struct vm *vm, int vcpuid);
 void vm_exit_suspended(struct vm *vm, int vcpuid, uint64_t rip);
 void vm_exit_debug(struct vm *vm, int vcpuid, uint64_t rip);
-void vm_exit_rendezvous(struct vm *vm, int vcpuid, uint64_t rip);
+void vm_exit_runblock(struct vm *vm, int vcpuid, uint64_t rip);
 void vm_exit_astpending(struct vm *vm, int vcpuid, uint64_t rip);
 void vm_exit_reqidle(struct vm *vm, int vcpuid, uint64_t rip);
 
 #ifdef _SYS__CPUSET_H_
-/*
- * Rendezvous all vcpus specified in 'dest' and execute 'func(arg)'.
- * The rendezvous 'func(arg)' is not allowed to do anything that will
- * cause the thread to be put to sleep.
- *
- * If the rendezvous is being initiated from a vcpu context then the
- * 'vcpuid' must refer to that vcpu, otherwise it should be set to -1.
- *
- * The caller cannot hold any locks when initiating the rendezvous.
- *
- * The implementation of this API may cause vcpus other than those specified
- * by 'dest' to be stalled. The caller should not rely on any vcpus making
- * forward progress when the rendezvous is in progress.
- */
-typedef void (*vm_rendezvous_func_t)(struct vm *vm, int vcpuid, void *arg);
-void vm_smp_rendezvous(struct vm *vm, int vcpuid, cpuset_t dest,
-    vm_rendezvous_func_t func, void *arg);
 cpuset_t vm_active_cpus(struct vm *vm);
 cpuset_t vm_debug_cpus(struct vm *vm);
 cpuset_t vm_suspended_cpus(struct vm *vm);
 #endif	/* _SYS__CPUSET_H_ */
 
 static __inline int
-vcpu_rendezvous_pending(struct vm_eventinfo *info)
+vcpu_runblocked(struct vm_eventinfo *info)
 {
 
-	return (*((uintptr_t *)(info->rptr)) != 0);
+	return (*info->rptr != 0);
 }
 
 static __inline int
@@ -345,6 +328,9 @@ enum vcpu_state {
 int vcpu_set_state(struct vm *vm, int vcpu, enum vcpu_state state,
     bool from_idle);
 enum vcpu_state vcpu_get_state(struct vm *vm, int vcpu, int *hostcpu);
+void vcpu_block_run(struct vm *, int);
+void vcpu_unblock_run(struct vm *, int);
+
 #ifndef __FreeBSD__
 uint64_t vcpu_tsc_offset(struct vm *vm, int vcpuid);
 #endif
@@ -579,7 +565,7 @@ enum vm_exitcode {
 	VM_EXITCODE_INST_EMUL,
 	VM_EXITCODE_SPINUP_AP,
 	VM_EXITCODE_DEPRECATED1,	/* used to be SPINDOWN_CPU */
-	VM_EXITCODE_RENDEZVOUS,
+	VM_EXITCODE_RUNBLOCK,
 	VM_EXITCODE_IOAPIC_EOI,
 	VM_EXITCODE_SUSPENDED,
 	VM_EXITCODE_INOUT_STR,

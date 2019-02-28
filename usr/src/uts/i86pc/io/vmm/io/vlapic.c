@@ -93,6 +93,7 @@ __FBSDID("$FreeBSD$");
 #define VLAPIC_BUS_FREQ		(128 * 1024 * 1024)
 
 static void vlapic_set_error(struct vlapic *, uint32_t, bool);
+static void vlapic_tmr_reset(struct vlapic *);
 
 static __inline uint32_t
 vlapic_get_id(struct vlapic *vlapic)
@@ -824,11 +825,11 @@ vlapic_icrtmr_write_handler(struct vlapic *vlapic)
 /*
  * This function populates 'dmask' with the set of vcpus that match the
  * addressing specified by the (dest, phys, lowprio) tuple.
- * 
+ *
  * 'x2apic_dest' specifies whether 'dest' is interpreted as x2APIC (32-bit)
  * or xAPIC (8-bit) destination field.
  */
-static void
+void
 vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
     bool lowprio, bool x2apic_dest)
 {
@@ -1452,7 +1453,7 @@ vlapic_reset(struct vlapic *vlapic)
 	lapic->dfr = 0xffffffff;
 	lapic->svr = APIC_SVR_VECTOR;
 	vlapic_mask_lvts(vlapic);
-	vlapic_reset_tmr(vlapic);
+	vlapic_tmr_reset(vlapic);
 
 	lapic->dcr_timer = 0;
 	vlapic_dcr_write_handler(vlapic);
@@ -1620,62 +1621,79 @@ vlapic_enabled(struct vlapic *vlapic)
 }
 
 static void
-vlapic_set_tmr(struct vlapic *vlapic, int vector, bool level)
+vlapic_tmr_reset(struct vlapic *vlapic)
 {
 	struct LAPIC *lapic;
-	uint32_t *tmrptr, mask;
-	int idx;
 
 	lapic = vlapic->apic_page;
-	tmrptr = &lapic->tmr0;
-	idx = (vector / 32) * 4;
-	mask = 1 << (vector % 32);
-	if (level)
-		tmrptr[idx] |= mask;
-	else
-		tmrptr[idx] &= ~mask;
-
-	if (vlapic->ops.set_tmr != NULL)
-		(*vlapic->ops.set_tmr)(vlapic, vector, level);
+	lapic->tmr0 = lapic->tmr1 = lapic->tmr2 = lapic->tmr3 = 0;
+	lapic->tmr4 = lapic->tmr5 = lapic->tmr6 = lapic->tmr7 = 0;
+	vlapic->tmr_pending = 1;
 }
 
+/*
+ * Synchronize TMR designations into the LAPIC state.
+ * The vCPU must be in the VCPU_RUNNING state.
+ */
 void
-vlapic_reset_tmr(struct vlapic *vlapic)
+vlapic_tmr_update(struct vlapic *vlapic)
 {
-	int vector;
+	struct LAPIC *lapic;
+	uint32_t *tmrptr;
+	uint32_t result[VLAPIC_TMR_CNT];
+	u_int i, tmr_idx;
 
-	VLAPIC_CTR0(vlapic, "vlapic resetting all vectors to edge-triggered");
-
-	for (vector = 0; vector <= 255; vector++)
-		vlapic_set_tmr(vlapic, vector, false);
-}
-
-void
-vlapic_set_tmr_level(struct vlapic *vlapic, uint32_t dest, bool phys,
-    int delmode, int vector)
-{
-	cpuset_t dmask;
-	bool lowprio;
-
-	KASSERT(vector >= 0 && vector <= 255, ("invalid vector %d", vector));
-
-	/*
-	 * A level trigger is valid only for fixed and lowprio delivery modes.
-	 */
-	if (delmode != APIC_DELMODE_FIXED && delmode != APIC_DELMODE_LOWPRIO) {
-		VLAPIC_CTR1(vlapic, "Ignoring level trigger-mode for "
-		    "delivery-mode %d", delmode);
+	if (vlapic->tmr_pending == 0) {
 		return;
 	}
 
-	lowprio = (delmode == APIC_DELMODE_LOWPRIO);
-	vlapic_calcdest(vlapic->vm, &dmask, dest, phys, lowprio, false);
+	lapic = vlapic->apic_page;
+	tmrptr = &lapic->tmr0;
 
-	if (!CPU_ISSET(vlapic->vcpuid, &dmask))
-		return;
+	VLAPIC_CTR0(vlapic, "synchronizing TMR");
+	for (i = 0; i < VLAPIC_TMR_CNT; i++) {
+		tmr_idx = i * 4;
 
-	VLAPIC_CTR1(vlapic, "vector %d set to level-triggered", vector);
-	vlapic_set_tmr(vlapic, vector, true);
+		tmrptr[tmr_idx] &= ~vlapic->tmr_vec_deassert[i];
+		tmrptr[tmr_idx] |= vlapic->tmr_vec_assert[i];
+		vlapic->tmr_vec_deassert[i] = 0;
+		vlapic->tmr_vec_assert[i] = 0;
+		result[i] = tmrptr[tmr_idx];
+	}
+	vlapic->tmr_pending = 0;
+
+	if (vlapic->ops.set_tmr != NULL) {
+		(*vlapic->ops.set_tmr)(vlapic, result);
+	}
+}
+
+/*
+ * Designate the TMR state for a given interrupt vector.
+ * The caller must hold the vIOAPIC lock and prevent the vCPU corresponding to
+ * this vLAPIC instance from being-in or entering the VCPU_RUNNING state.
+ */
+void
+vlapic_tmr_set(struct vlapic *vlapic, uint8_t vector, bool active)
+{
+	const uint32_t idx = vector / 32;
+	const uint32_t mask = 1 << (vector % 32);
+
+	VLAPIC_CTR2(vlapic, "TMR for vector %u %sasserted", vector,
+	    active ? "" : "de");
+	if (active) {
+		vlapic->tmr_vec_assert[idx] |= mask;
+		vlapic->tmr_vec_deassert[idx] &= ~mask;
+	} else {
+		vlapic->tmr_vec_deassert[idx] |= mask;
+		vlapic->tmr_vec_assert[idx] &= ~mask;
+	}
+
+	/*
+	 * Track the number of TMR changes between calls to vlapic_tmr_update.
+	 * While a simple boolean would suffice, this count may be useful when
+	 * tracing or debugging, and is cheap to calculate.
+	 */
+	vlapic->tmr_pending = MIN(UINT32_MAX - 1, vlapic->tmr_pending) + 1;
 }
 
 #ifndef __FreeBSD__

@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_SYS_CPUSET_H_
@@ -27,9 +27,13 @@
 #define	CPU_SETOF(cpu, set)		cpuset_only((set), (cpu))
 #define	CPU_ZERO(set)			cpuset_zero((cpuset_t *)(set))
 #define	CPU_CLR(cpu, set)		cpuset_del((set), (cpu))
+#define	CPU_EMPTY(set)			cpuset_isnull((set))
 #define	CPU_FFS(set)			cpusetobj_ffs(set)
 #define	CPU_ISSET(cpu, set)		cpu_in_set((cpuset_t *)(set), (cpu))
 #define	CPU_AND(dst, src)		cpuset_and(			\
+						(cpuset_t *)(dst),	\
+						(cpuset_t *)(src))
+#define	CPU_OR(dst, src)		cpuset_or(			\
 						(cpuset_t *)(dst),	\
 						(cpuset_t *)(src))
 #define	CPU_CMP(set1, set2)		(cpuset_isequal(		\
@@ -42,7 +46,6 @@
 						(cpuset_t *)(set),	\
 						(cpu))
 
-/* XXXJOY: The _ACQ variants appear to imply a membar too. Is that an issue? */
 #define	CPU_SET_ATOMIC_ACQ(cpu, set)	cpuset_atomic_add((set), (cpu))
 
 

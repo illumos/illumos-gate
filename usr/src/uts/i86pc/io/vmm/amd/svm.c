@@ -1629,6 +1629,8 @@ svm_inj_interrupts(struct svm_softc *sc, int vcpu, struct vlapic *vlapic)
 
 	need_intr_window = 0;
 
+	vlapic_tmr_update(vlapic);
+
 	if (vcpustate->nextrip != state->rip) {
 		ctrl->intr_shadow = 0;
 		VCPU_CTR2(sc->vm, vcpu, "Guest interrupt blocking "
@@ -2060,8 +2062,8 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		 * XXX
 		 * Setting 'vcpustate->lastcpu' here is bit premature because
 		 * we may return from this function without actually executing
-		 * the VMRUN  instruction. This could happen if a rendezvous
-		 * or an AST is pending on the first time through the loop.
+		 * the VMRUN  instruction. This could happen if an AST or yield
+		 * condition is pending on the first time through the loop.
 		 *
 		 * This works for now but any new side-effects of vcpu
 		 * migration should take this case into account.
@@ -2106,9 +2108,9 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			break;
 		}
 
-		if (vcpu_rendezvous_pending(evinfo)) {
+		if (vcpu_runblocked(evinfo)) {
 			enable_gintr();
-			vm_exit_rendezvous(vm, vcpu, state->rip);
+			vm_exit_runblock(vm, vcpu, state->rip);
 			break;
 		}
 

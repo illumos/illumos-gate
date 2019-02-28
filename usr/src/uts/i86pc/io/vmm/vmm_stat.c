@@ -168,5 +168,5 @@ VMM_STAT(VMEXIT_UNKNOWN, "number of vm exits for unknown reason");
 VMM_STAT(VMEXIT_ASTPENDING, "number of times astpending at exit");
 VMM_STAT(VMEXIT_REQIDLE, "number of times idle requested at exit");
 VMM_STAT(VMEXIT_USERSPACE, "number of vm exits handled in userspace");
-VMM_STAT(VMEXIT_RENDEZVOUS, "number of times rendezvous pending at exit");
+VMM_STAT(VMEXIT_RUNBLOCK, "number of times runblock at exit");
 VMM_STAT(VMEXIT_EXCEPTION, "number of vm exits due to exceptions");

@@ -1525,6 +1525,8 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 	int vector;
 	boolean_t extint_pending = B_FALSE;
 
+	vlapic_tmr_update(vlapic);
+
 	gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
 	info = vmcs_read(VMCS_ENTRY_INTR_INFO);
 
@@ -1700,6 +1702,8 @@ vmx_inject_interrupts(struct vmx *vmx, int vcpu, struct vlapic *vlapic,
 	int vector, need_nmi_exiting, extint_pending;
 	uint64_t rflags, entryinfo;
 	uint32_t gi, info;
+
+	vlapic_tmr_update(vlapic);
 
 	if (vmx->state[vcpu].nextrip != guestrip) {
 		gi = vmcs_read(VMCS_GUEST_INTERRUPTIBILITY);
@@ -3321,9 +3325,9 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			break;
 		}
 
-		if (vcpu_rendezvous_pending(evinfo)) {
+		if (vcpu_runblocked(evinfo)) {
 			enable_intr();
-			vm_exit_rendezvous(vmx->vm, vcpu, rip);
+			vm_exit_runblock(vmx->vm, vcpu, rip);
 			break;
 		}
 
@@ -4046,30 +4050,12 @@ vmx_intr_accepted(struct vlapic *vlapic, int vector)
 }
 
 static void
-vmx_set_tmr(struct vlapic *vlapic, int vector, bool level)
+vmx_set_tmr(struct vlapic *vlapic, const uint32_t *masks)
 {
-	struct vlapic_vtx *vlapic_vtx;
-	struct vmx *vmx;
-	struct vmcs *vmcs;
-	uint64_t mask, val;
-
-	KASSERT(vector >= 0 && vector <= 255, ("invalid vector %d", vector));
-	KASSERT(!vcpu_is_running(vlapic->vm, vlapic->vcpuid, NULL),
-	    ("vmx_set_tmr: vcpu cannot be running"));
-
-	vlapic_vtx = (struct vlapic_vtx *)vlapic;
-	vmx = vlapic_vtx->vmx;
-	vmcs = &vmx->vmcs[vlapic->vcpuid];
-	mask = 1UL << (vector % 64);
-
-	VMPTRLD(vmcs);
-	val = vmcs_read(VMCS_EOI_EXIT(vector));
-	if (level)
-		val |= mask;
-	else
-		val &= ~mask;
-	vmcs_write(VMCS_EOI_EXIT(vector), val);
-	VMCLEAR(vmcs);
+	vmcs_write(VMCS_EOI_EXIT0, ((uint64_t)masks[1] << 32) | masks[0]);
+	vmcs_write(VMCS_EOI_EXIT1, ((uint64_t)masks[3] << 32) | masks[2]);
+	vmcs_write(VMCS_EOI_EXIT2, ((uint64_t)masks[5] << 32) | masks[4]);
+	vmcs_write(VMCS_EOI_EXIT3, ((uint64_t)masks[7] << 32) | masks[6]);
 }
 
 static void

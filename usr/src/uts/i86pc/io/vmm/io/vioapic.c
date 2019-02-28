@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/cpuset.h>
 
 #include <x86/apicreg.h>
 #include <machine/vmm.h>
@@ -236,48 +237,139 @@ vioapic_pulse_irq(struct vm *vm, int irq)
 	return (vioapic_set_irqstate(vm, irq, IRQSTATE_PULSE));
 }
 
+#define	REDIR_IS_PHYS(reg)	(((reg) & IOART_DESTMOD) == IOART_DESTPHY)
+#define	REDIR_IS_LOWPRIO(reg)	(((reg) & IOART_DELMOD) == IOART_DELLOPRI)
+/* Level-triggered interrupts only valid in fixed and low-priority modes */
+#define	REDIR_IS_LVLTRIG(reg)						\
+    (((reg) & IOART_TRGRLVL) != 0 &&					\
+    (((reg) & IOART_DELMOD) == IOART_DELFIXED || REDIR_IS_LOWPRIO(reg)))
+#define	REDIR_DEST(reg)		((reg) >> (32 + APIC_ID_SHIFT))
+#define	REDIR_VECTOR(reg)	((reg) & IOART_INTVEC)
+
 /*
- * Reset the vlapic's trigger-mode register to reflect the ioapic pin
- * configuration.
+ * Given a redirection entry, determine which vCPUs would be targeted.
  */
 static void
-vioapic_update_tmr(struct vm *vm, int vcpuid, void *arg)
+vioapic_calcdest(struct vioapic *vioapic, uint64_t redir_ent, cpuset_t *dmask)
 {
-	struct vioapic *vioapic;
-	struct vlapic *vlapic;
-	uint32_t low, high, dest;
-	int delmode, pin, vector;
-	bool level, phys;
 
-	vlapic = vm_lapic(vm, vcpuid);
-	vioapic = vm_ioapic(vm);
-
-	VIOAPIC_LOCK(vioapic);
 	/*
-	 * Reset all vectors to be edge-triggered.
+	 * When calculating interrupt destinations with vlapic_calcdest(), the
+	 * legacy xAPIC format is assumed, since the system lacks interrupt
+	 * redirection hardware.
+	 * See vlapic_deliver_intr() for more details.
 	 */
-	vlapic_reset_tmr(vlapic);
-	for (pin = 0; pin < REDIR_ENTRIES; pin++) {
-		low = vioapic->rtbl[pin].reg;
-		high = vioapic->rtbl[pin].reg >> 32;
+	vlapic_calcdest(vioapic->vm, dmask, REDIR_DEST(redir_ent),
+	    REDIR_IS_PHYS(redir_ent), REDIR_IS_LOWPRIO(redir_ent), false);
+}
 
-		level = low & IOART_TRGRLVL ? true : false;
-		if (!level)
-			continue;
+/*
+ * Across all redirection entries utilizing a specified vector, determine the
+ * set of vCPUs which would be targeted by a level-triggered interrupt.
+ */
+static void
+vioapic_tmr_active(struct vioapic *vioapic, uint8_t vec, cpuset_t *result)
+{
+	u_int i;
 
-		/*
-		 * For a level-triggered 'pin' let the vlapic figure out if
-		 * an assertion on this 'pin' would result in an interrupt
-		 * being delivered to it. If yes, then it will modify the
-		 * TMR bit associated with this vector to level-triggered.
-		 */
-		phys = ((low & IOART_DESTMOD) == IOART_DESTPHY);
-		delmode = low & IOART_DELMOD;
-		vector = low & IOART_INTVEC;
-		dest = high >> APIC_ID_SHIFT;
-		vlapic_set_tmr_level(vlapic, dest, phys, delmode, vector);
+	CPU_ZERO(result);
+	if (vec == 0) {
+		return;
 	}
-	VIOAPIC_UNLOCK(vioapic);
+
+	for (i = 0; i < REDIR_ENTRIES; i++) {
+		cpuset_t dest;
+		const uint64_t val = vioapic->rtbl[i].reg;
+
+		if (!REDIR_IS_LVLTRIG(val) || REDIR_VECTOR(val) != vec) {
+			continue;
+		}
+
+		CPU_ZERO(&dest);
+		vioapic_calcdest(vioapic, val, &dest);
+		CPU_OR(result, &dest);
+	}
+}
+
+/*
+ * Update TMR state in vLAPICs after changes to vIOAPIC pin configuration
+ */
+static void
+vioapic_update_tmrs(struct vioapic *vioapic, int vcpuid, uint64_t oldval,
+    uint64_t newval)
+{
+	cpuset_t active, allset, newset, oldset;
+	struct vm *vm;
+	uint8_t newvec, oldvec;
+
+	vm = vioapic->vm;
+	CPU_ZERO(&allset);
+	CPU_ZERO(&newset);
+	CPU_ZERO(&oldset);
+	newvec = oldvec = 0;
+
+	if (REDIR_IS_LVLTRIG(oldval)) {
+		vioapic_calcdest(vioapic, oldval, &oldset);
+		CPU_OR(&allset, &oldset);
+		oldvec = REDIR_VECTOR(oldval);
+	}
+
+	if (REDIR_IS_LVLTRIG(newval)) {
+		vioapic_calcdest(vioapic, newval, &newset);
+		CPU_OR(&allset, &newset);
+		newvec = REDIR_VECTOR(newval);
+	}
+
+	if (CPU_EMPTY(&allset) ||
+	    (CPU_CMP(&oldset, &newset) == 0 && oldvec == newvec)) {
+		return;
+	}
+
+	/*
+	 * Since the write to the redirection table has already occurred, a
+	 * scan of level-triggered entries referencing the old vector will find
+	 * only entries which are now currently valid.
+	 */
+	vioapic_tmr_active(vioapic, oldvec, &active);
+
+	while (!CPU_EMPTY(&allset)) {
+		struct vlapic *vlapic;
+		u_int i;
+
+		i = CPU_FFS(&allset) - 1;
+		CPU_CLR(i, &allset);
+
+		if (oldvec == newvec &&
+		    CPU_ISSET(i, &oldset) && CPU_ISSET(i, &newset)) {
+			continue;
+		}
+
+		if (i != vcpuid) {
+			vcpu_block_run(vm, i);
+		}
+
+		vlapic = vm_lapic(vm, i);
+		if (CPU_ISSET(i, &oldset)) {
+			/*
+			 * Perform the deassertion if no other level-triggered
+			 * IOAPIC entries target this vCPU with the old vector
+			 *
+			 * Note: Sharing of vectors like that should be
+			 * extremely rare in modern operating systems and was
+			 * previously unsupported by the bhyve vIOAPIC.
+			 */
+			if (!CPU_ISSET(i, &active)) {
+				vlapic_tmr_set(vlapic, oldvec, false);
+			}
+		}
+		if (CPU_ISSET(i, &newset)) {
+			vlapic_tmr_set(vlapic, newvec, true);
+		}
+
+		if (i != vcpuid) {
+			vcpu_unblock_run(vm, i);
+		}
+	}
 }
 
 static uint32_t
@@ -321,7 +413,6 @@ vioapic_write(struct vioapic *vioapic, int vcpuid, uint32_t addr, uint32_t data)
 	uint64_t data64, mask64;
 	uint64_t last, changed;
 	int regnum, pin, lshift;
-	cpuset_t allvcpus;
 
 	regnum = addr & 0xff;
 	switch (regnum) {
@@ -357,18 +448,15 @@ vioapic_write(struct vioapic *vioapic, int vcpuid, uint32_t addr, uint32_t data)
 
 		/*
 		 * If any fields in the redirection table entry (except mask
-		 * or polarity) have changed then rendezvous all the vcpus
-		 * to update their vlapic trigger-mode registers.
+		 * or polarity) have changed then update the trigger-mode
+		 * registers on all the vlapics.
 		 */
 		changed = last ^ vioapic->rtbl[pin].reg;
 		if (changed & ~(IOART_INTMASK | IOART_INTPOL)) {
 			VIOAPIC_CTR1(vioapic, "ioapic pin%d: recalculate "
 			    "vlapic trigger-mode register", pin);
-			VIOAPIC_UNLOCK(vioapic);
-			allvcpus = vm_active_cpus(vioapic->vm);
-			vm_smp_rendezvous(vioapic->vm, vcpuid, allvcpus,
-			    vioapic_update_tmr, NULL);
-			VIOAPIC_LOCK(vioapic);
+			vioapic_update_tmrs(vioapic, vcpuid, last,
+			    vioapic->rtbl[pin].reg);
 		}
 
 		/*
