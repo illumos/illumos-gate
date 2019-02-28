@@ -3123,7 +3123,7 @@ dump_set_uuid(const char *uuidstr)
 
 	(void) strncpy(dump_osimage_uuid, uuidstr, 36 + 1);
 
-	cmn_err(CE_CONT, "?This Solaris instance has UUID %s\n",
+	cmn_err(CE_CONT, "?This illumos instance has UUID %s\n",
 	    dump_osimage_uuid);
 
 	return (0);
