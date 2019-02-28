@@ -228,7 +228,7 @@ xlate_common(topo_mod_t *mp, xmlNodePtr xn, topo_type_t ptype, nvlist_t *nvl,
 	double dbl;
 	uint_t i = 0, nelems = 0;
 	nvlist_t *fmri;
-	xmlChar *str, *estr;
+	xmlChar *str;
 	char **strarrbuf;
 	void *arrbuf;
 	nvlist_t **nvlarrbuf;

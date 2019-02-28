@@ -239,7 +239,7 @@ print_prop_nameval(topo_hdl_t *thp, tnode_t *node, nvlist_t *nvl)
 {
 	int err;
 	topo_type_t type;
-	char *tstr, *propn, buf[48], *factype;
+	char *tstr, *propn, *factype;
 	nvpair_t *pv_nvp;
 	int i;
 	uint_t nelem;
@@ -492,7 +492,6 @@ print_pgroup(topo_hdl_t *thp, tnode_t *node, const char *pgn, char *dstab,
     char *nstab, int32_t version)
 {
 	int err;
-	char buf[30];
 	topo_pgroup_info_t *pgi = NULL;
 
 	if (pgn == NULL)
