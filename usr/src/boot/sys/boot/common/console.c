@@ -221,7 +221,12 @@ cons_check(const char *string)
 				printf("console %s is invalid!\n", curpos);
 				failed++;
 			} else {
-				found++;
+				if ((consoles[cons]->c_flags &
+				    (C_PRESENTIN | C_PRESENTOUT)) !=
+				    (C_PRESENTIN | C_PRESENTOUT)) {
+					failed++;
+				} else
+					found++;
 			}
 		}
 	}
@@ -266,8 +271,8 @@ cons_change(const char *string)
 			consoles[cons]->c_flags |= C_ACTIVEIN | C_ACTIVEOUT;
 			consoles[cons]->c_init(consoles[cons], 0);
 			if ((consoles[cons]->c_flags &
-			    (C_PRESENTIN | C_PRESENTOUT)) ==
-			    (C_PRESENTIN | C_PRESENTOUT)) {
+			    (C_ACTIVEIN | C_ACTIVEOUT)) ==
+			    (C_ACTIVEIN | C_ACTIVEOUT)) {
 				active++;
 				continue;
 			}
@@ -293,8 +298,8 @@ cons_change(const char *string)
 			consoles[cons]->c_flags |= C_ACTIVEIN | C_ACTIVEOUT;
 			consoles[cons]->c_init(consoles[cons], 0);
 			if ((consoles[cons]->c_flags &
-			    (C_PRESENTIN | C_PRESENTOUT)) ==
-			    (C_PRESENTIN | C_PRESENTOUT))
+			    (C_ACTIVEIN | C_ACTIVEOUT)) ==
+			    (C_ACTIVEIN | C_ACTIVEOUT))
 				active++;
 	}
 
