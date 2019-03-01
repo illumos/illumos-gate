@@ -24,12 +24,10 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -193,7 +191,7 @@ getstr(char *p, char *file)
  * f_mkmtab - fills mtab array of magic table entries with
  *	values from the file magfile.
  *	May be called more than once if multiple magic
- * 	files were specified.
+ *	files were specified.
  *	Stores entries sequentially in one of two magic
  *	tables: mtab1, if first = 1; mtab2 otherwise.
  *
@@ -243,7 +241,7 @@ f_mkmtab(char *magfile, int cflg, int first)
 
 	/* mtab may have been allocated on a previous f_mkmtab call */
 	if (mtab == (Entry *)NULL) {
-		if ((mtab = calloc(sizeof (Entry), NENT)) == NULL) {
+		if ((mtab = calloc(NENT, sizeof (Entry))) == NULL) {
 			int err = errno;
 			(void) fprintf(stderr, gettext("%s: malloc "
 			    "failed: %s\n"), File, strerror(err));
@@ -365,7 +363,7 @@ f_mkmtab(char *magfile, int cflg, int first)
 			case 'l':
 				if (*(p+1) == 'l') {	/* llong */
 					ep->e_type = LLONG;
-				} else { 		/* long */
+				} else {		/* long */
 					ep->e_type = LONG;
 				}
 				break;
@@ -537,7 +535,7 @@ f_mkmtab(char *magfile, int cflg, int first)
 int
 f_ckmtab(char *buf, int bufsize, int first)
 {
-	int 		result;
+	int		result;
 	Entry		*mtab;
 	Entry		*ep;
 	char		*p;
@@ -849,7 +847,7 @@ f_ckmtab(char *buf, int bufsize, int first)
 #ifdef XPG4
 				if (ep->e_mask == 0) {
 					(void) printf(ep->e_str,
-						(int64_t)u64_val);
+					    (int64_t)u64_val);
 					break;
 				}
 #endif	/* XPG4 */
@@ -861,7 +859,7 @@ f_ckmtab(char *buf, int bufsize, int first)
 #ifdef XPG4
 				if (ep->e_mask == 0) {
 					(void) printf(ep->e_str,
-						(int32_t)u64_val);
+					    (int32_t)u64_val);
 					break;
 				}
 #endif	/* XPG4 */
@@ -874,7 +872,7 @@ f_ckmtab(char *buf, int bufsize, int first)
 #ifdef XPG4
 				if (ep->e_mask == 0) {
 					(void) printf(ep->e_str,
-						(int16_t)u64_val);
+					    (int16_t)u64_val);
 					break;
 				}
 #endif	/* XPG4 */
@@ -887,7 +885,7 @@ f_ckmtab(char *buf, int bufsize, int first)
 #ifdef XPG4
 				if (ep->e_mask == 0) {
 					(void) printf(ep->e_str,
-						(int8_t)u64_val);
+					    (int8_t)u64_val);
 					break;
 				}
 #endif	/* XPG4 */
@@ -1071,7 +1069,7 @@ f_prtmtab(void)
 	int	count;
 
 	(void) printf("%-7s %-7s %-10s %-7s %-11s %s\n",
-		"level", "off", "type", "opcode", "value", "string");
+	    "level", "off", "type", "opcode", "value", "string");
 	for (mtab = mtab1, count = 1; count <= 2; count++, mtab = mtab2) {
 		if (mtab == (Entry *)NULL) {
 			continue;

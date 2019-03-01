@@ -853,7 +853,8 @@ notas:
 	for (i = 0; i < Max; /* null */)
 		if (fbuf[i] & 0200) {
 			IS_ascii = 0;
-			if (fbuf[0] == '\100' && fbuf[1] == '\357') {
+			if ((fbuf[0] == '\100') &&
+			    ((uchar_t)fbuf[1] == (uchar_t)'\357')) {
 				(void) printf(gettext("troff output\n"));
 				return;
 			}
