@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <assert.h>
@@ -44,6 +44,9 @@ static int smb_door_decode(smb_doorarg_t *);
 static void smb_door_sethdr(smb_doorhdr_t *, uint32_t, uint32_t);
 static boolean_t smb_door_chkhdr(smb_doorarg_t *, smb_doorhdr_t *);
 static void smb_door_free(door_arg_t *arg);
+static int smb_lookup_name_int(const char *name, sid_type_t sidtype,
+    lsa_account_t *acct, int);
+static int smb_lookup_sid_int(const char *sid, lsa_account_t *acct, int);
 
 /*
  * Given a SID, make a door call to get  the associated name.
@@ -57,6 +60,20 @@ static void smb_door_free(door_arg_t *arg);
 int
 smb_lookup_sid(const char *sid, lsa_account_t *acct)
 {
+	return (smb_lookup_sid_int(sid, acct, SMB_DR_LOOKUP_SID));
+}
+/*
+ * Variant of smb_lookup_sid to do a "local-only" lookup.
+ */
+int
+smb_lookup_lsid(const char *sid, lsa_account_t *acct)
+{
+	return (smb_lookup_sid_int(sid, acct, SMB_DR_LOOKUP_LSID));
+}
+
+static int
+smb_lookup_sid_int(const char *sid, lsa_account_t *acct, int dop)
+{
 	int	rc;
 
 	assert((sid != NULL) && (acct != NULL));
@@ -64,7 +81,7 @@ smb_lookup_sid(const char *sid, lsa_account_t *acct)
 	bzero(acct, sizeof (lsa_account_t));
 	(void) strlcpy(acct->a_sid, sid, SMB_SID_STRSZ);
 
-	rc = smb_door_call(SMB_DR_LOOKUP_SID, acct, lsa_account_xdr,
+	rc = smb_door_call(dop, acct, lsa_account_xdr,
 	    acct, lsa_account_xdr);
 
 	if (rc != 0)
@@ -83,6 +100,19 @@ smb_lookup_sid(const char *sid, lsa_account_t *acct)
  */
 int
 smb_lookup_name(const char *name, sid_type_t sidtype, lsa_account_t *acct)
+{
+	return (smb_lookup_name_int(name, sidtype, acct, SMB_DR_LOOKUP_NAME));
+}
+
+int
+smb_lookup_lname(const char *name, sid_type_t sidtype, lsa_account_t *acct)
+{
+	return (smb_lookup_name_int(name, sidtype, acct, SMB_DR_LOOKUP_LNAME));
+}
+
+static int
+smb_lookup_name_int(const char *name, sid_type_t sidtype, lsa_account_t *acct,
+    int dop)
 {
 	char		tmp[MAXNAMELEN];
 	char		*dp = NULL;
@@ -104,7 +134,7 @@ smb_lookup_name(const char *name, sid_type_t sidtype, lsa_account_t *acct)
 		(void) strlcpy(acct->a_name, name, MAXNAMELEN);
 	}
 
-	rc = smb_door_call(SMB_DR_LOOKUP_NAME, acct, lsa_account_xdr,
+	rc = smb_door_call(dop, acct, lsa_account_xdr,
 	    acct, lsa_account_xdr);
 
 	if (rc != 0)

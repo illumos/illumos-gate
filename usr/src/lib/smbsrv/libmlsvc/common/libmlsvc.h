@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef	_LIBMLSVC_H
@@ -65,7 +65,9 @@ extern "C" {
 #endif
 
 uint32_t lsa_lookup_name(char *, uint16_t, smb_account_t *);
+uint32_t lsa_lookup_lname(char *, uint16_t, smb_account_t *);
 uint32_t lsa_lookup_sid(smb_sid_t *, smb_account_t *);
+uint32_t lsa_lookup_lsid(smb_sid_t *, smb_account_t *);
 
 /*
  * SMB domain API to discover a domain controller and obtain domain

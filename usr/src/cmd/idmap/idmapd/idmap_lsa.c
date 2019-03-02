@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -83,9 +83,9 @@ lookup_lsa_by_sid(
 
 	(void) snprintf(sid, sizeof (sid), "%s-%u", sidprefix, rid);
 
-	rc = smb_lookup_sid(sid, &acct);
+	rc = smb_lookup_lsid(sid, &acct);
 	if (rc != 0) {
-		idmapdlog(LOG_ERR, "Error:  smb_lookup_sid failed.");
+		idmapdlog(LOG_ERR, "Error: SMB lookup SID failed.");
 		idmapdlog(LOG_ERR,
 		    "Check SMB service (svc:/network/smb/server).");
 		idmapdlog(LOG_ERR,
@@ -100,7 +100,7 @@ lookup_lsa_by_sid(
 	}
 	if (acct.a_status != NT_STATUS_SUCCESS) {
 		idmapdlog(LOG_WARNING,
-		    "Warning:  smb_lookup_sid(%s) failed (0x%x)",
+		    "Warning:  SMB lookup SID(%s) failed (0x%x)",
 		    sid, acct.a_status);
 		/* Fail soft */
 		ret = IDMAP_ERR_NOTFOUND;
@@ -167,9 +167,9 @@ lookup_lsa_by_name(
 		goto out;
 	}
 
-	rc = smb_lookup_name(namedom, SidTypeUnknown, &acct);
+	rc = smb_lookup_lname(namedom, SidTypeUnknown, &acct);
 	if (rc != 0) {
-		idmapdlog(LOG_ERR, "Error:  smb_lookup_name failed.");
+		idmapdlog(LOG_ERR, "Error: SMB lookup name failed.");
 		idmapdlog(LOG_ERR,
 		    "Check SMB service (svc:/network/smb/server).");
 		idmapdlog(LOG_ERR,
@@ -183,7 +183,7 @@ lookup_lsa_by_name(
 	}
 	if (acct.a_status != NT_STATUS_SUCCESS) {
 		idmapdlog(LOG_WARNING,
-		    "Warning:  smb_lookup_name(%s) failed (0x%x)",
+		    "Warning: SMB lookup name(%s) failed (0x%x)",
 		    namedom, acct.a_status);
 		/* Fail soft */
 		ret = IDMAP_ERR_NOTFOUND;
