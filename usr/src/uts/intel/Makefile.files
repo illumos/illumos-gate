@@ -23,6 +23,7 @@
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, Joyent, Inc. All rights reserved.
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright (c) 2017 by Delphix. All rights reserved.
 #
 
 #
@@ -322,6 +323,55 @@ VMXNET3S_OBJS =	vmxnet3_main.o \
 		vmxnet3_rx.o \
 		vmxnet3_tx.o \
 		vmxnet3_utils.o
+
+#
+# Hyper-V VMBUS virtual bus
+#
+HV_VMBUS_OBJS =	\
+	vmbus_ic.o \
+	vmbus.o \
+	vmbus_xact.o \
+	vmbus_br.o \
+	vmbus_chan.o
+
+#
+# Hyper-V HYPERV misc driver
+#
+HV_HYPERV_OBJS = \
+	hyperv_busdma.o \
+	hyperv.o \
+	hyperv_machdep.o
+
+#
+# Hyper-V NETVSC driver
+#
+HV_NETVSC_OBJS = \
+	hn_nvs.o \
+	hn_rndis.o \
+	if_hn.o \
+	hn_gld.o \
+	subr_bufring.o
+
+#
+# Hyper-V STORVSC driver
+#
+HV_STORVSC_OBJS = \
+	hv_storvsc_drv_illumos.o
+
+#
+# Hyper-V Utility drivers
+#
+HV_HEARTBEAT_OBJS = \
+	vmbus_heartbeat.o
+
+HV_KVP_OBJS = \
+	hv_kvp.o
+
+HV_SHUTDOWN_OBJS = \
+	vmbus_shutdown.o
+
+HV_TIMESYNC_OBJS = \
+	vmbus_timesync.o
 
 #
 # VMware PVSCSI SCSI Controller

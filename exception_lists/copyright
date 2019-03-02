@@ -58,6 +58,8 @@ usr/src/cmd/acpi/common/utnonansi.c
 usr/src/cmd/acpi/common/utprint.c
 usr/src/cmd/acpi/common/utxferror.c
 usr/src/cmd/dtrace/test/tst/common/*/*.out
+usr/src/cmd/hyperv/kvp/THIRDPARTYLICENSE
+usr/src/cmd/hyperv/kvp/THIRDPARTYLICENSE.descrip
 usr/src/cmd/krb5/kadmin/cli/kadmin_ct.c
 usr/src/cmd/krb5/kadmin/cli/kadmin.h
 usr/src/cmd/krb5/kadmin/cli/ss_wrapper.c
@@ -394,6 +396,14 @@ usr/src/tools/btxld/elfh.c
 usr/src/tools/btxld/elfh.h
 usr/src/tools/btxld/imgact_aout.h
 usr/src/tools/smatch/src/*
+usr/src/uts/intel/io/hyperv/netvsc/THIRDPARTYLICENSE
+usr/src/uts/intel/io/hyperv/netvsc/THIRDPARTYLICENSE.descrip
+usr/src/uts/intel/io/hyperv/storvsc/THIRDPARTYLICENSE
+usr/src/uts/intel/io/hyperv/storvsc/THIRDPARTYLICENSE.descrip
+usr/src/uts/intel/io/hyperv/utilities/THIRDPARTYLICENSE
+usr/src/uts/intel/io/hyperv/utilities/THIRDPARTYLICENSE.descrip
+usr/src/uts/intel/io/hyperv/vmbus/THIRDPARTYLICENSE
+usr/src/uts/intel/io/hyperv/vmbus/THIRDPARTYLICENSE.descrip
 usr/src/uts/intel/nsmb/ioc_check.ref
 usr/src/uts/intel/os/splashimage.xpm
 usr/src/uts/common/gssapi/mechs/krb5/crypto/block_size.c

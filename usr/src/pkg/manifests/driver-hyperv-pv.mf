@@ -1,0 +1,50 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2017 by Delphix. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/hyperv/pv@$(PKGVERS)
+set name=pkg.description value="Hyper-V Enlightened Drivers"
+set name=pkg.summary value="Hyper-V Enlightened Drivers"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Virtualization
+set name=variant.arch value=i386
+dir path=kernel group=sys
+dir path=kernel/drv group=sys
+dir path=kernel/drv/$(ARCH64) group=sys
+dir path=kernel/misc group=sys
+dir path=kernel/misc/$(ARCH64) group=sys
+$(i386_ONLY)driver name=hv_heartbeat
+$(i386_ONLY)driver name=hv_kvp perms="* 0600 root sys"
+$(i386_ONLY)driver name=hv_netvsc
+$(i386_ONLY)driver name=hv_shutdown
+$(i386_ONLY)driver name=hv_storvsc class=scsi-self-identifying
+$(i386_ONLY)driver name=hv_timesync
+$(i386_ONLY)driver name=hv_vmbus
+file path=kernel/drv/$(ARCH64)/hv_heartbeat group=sys
+file path=kernel/drv/$(ARCH64)/hv_kvp group=sys
+file path=kernel/drv/$(ARCH64)/hv_netvsc group=sys
+file path=kernel/drv/$(ARCH64)/hv_shutdown group=sys
+file path=kernel/drv/$(ARCH64)/hv_storvsc group=sys
+file path=kernel/drv/$(ARCH64)/hv_timesync group=sys
+file path=kernel/drv/$(ARCH64)/hv_vmbus group=sys
+file path=kernel/drv/hv_netvsc.conf group=sys
+file path=kernel/drv/hv_vmbus.conf group=sys
+file path=kernel/misc/$(ARCH64)/hyperv group=sys mode=0755
+license lic_CDDL license=lic_CDDL

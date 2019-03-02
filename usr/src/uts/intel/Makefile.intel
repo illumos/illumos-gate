@@ -24,6 +24,7 @@
 # Copyright 2016 Joyent, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
+# Copyright (c) 2014, 2017 by Delphix. All rights reserved.
 #
 
 #
@@ -372,6 +373,18 @@ DRV_KMODS	+= pppt
 DRV_KMODS	+= iptun
 DRV_KMODS	+= vmxnet3s
 DRV_KMODS	+= pvscsi
+
+#
+# HYPER-V driver
+#
+DRV_KMODS	+= hv_vmbus
+DRV_KMODS	+= hv_heartbeat
+DRV_KMODS	+= hv_timesync
+DRV_KMODS	+= hv_shutdown
+DRV_KMODS	+= hv_kvp
+DRV_KMODS	+= hv_storvsc
+DRV_KMODS	+= hv_netvsc
+MISC_KMODS	+= hyperv
 
 #
 # Common code drivers

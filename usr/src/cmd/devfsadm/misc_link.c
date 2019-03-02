@@ -22,6 +22,7 @@
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 #include <regex.h>
@@ -202,6 +203,9 @@ static devfsadm_create_t misc_cbt[] = {
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_1, minor_name,
 	},
 	{ "pseudo", "ddi_pseudo", "tpm",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
+	},
+	{ "pseudo", "ddi_pseudo", "hv_kvp",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
 	},
 };

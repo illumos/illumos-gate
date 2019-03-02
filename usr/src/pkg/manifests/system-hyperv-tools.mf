@@ -1,0 +1,41 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright (c) 2017 by Delphix. All rights reserved.
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/system/hyperv/tools@$(PKGVERS)
+set name=pkg.description value="Supporting tools for the Hyper-V platform"
+set name=pkg.summary value="Supporting tools for the Hyper-V platform"
+set name=info.classification \
+    value=org.opensolaris.category.2008:System/Virtualization
+set name=variant.arch value=i386
+dir path=lib
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
+dir path=lib/svc/manifest/system/hyperv group=sys
+dir path=usr group=sys
+dir path=usr/lib
+dir path=usr/lib/hyperv
+file path=lib/svc/manifest/system/hyperv/kvp.xml group=sys mode=0444
+file path=usr/lib/hyperv/hv_get_dhcp_info mode=0555
+file path=usr/lib/hyperv/hv_get_dns_info mode=0555
+file path=usr/lib/hyperv/hv_kvp_daemon mode=0555
+license lic_CDDL license=lic_CDDL
+depend fmri=driver/hyperv/pv type=require

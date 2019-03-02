@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2017 Nexenta Systems, Inc.
+# Copyright (c) 2017 by Delphix. All rights reserved.
 #
 
 #
@@ -219,6 +220,26 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vgatext/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/vmxnet3s/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/hyperv/storvsc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/hyperv/netvsc/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/hyperv/utilities/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/hyperv/vmbus/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:	$(UTSBASE)/intel/io/hyperv/vmbus/$(SUBARCH_DIR)/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -429,6 +450,21 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/vgatext/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/vmxnet3s/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/hyperv/netvsc/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/hyperv/storvsc/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/hyperv/utilities/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/hyperv/vmbus/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:	$(UTSBASE)/intel/io/hyperv/vmbus/$(SUBARCH_DIR)/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/intel/io/scsi/adapters/pvscsi/%.c

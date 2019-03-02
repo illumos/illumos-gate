@@ -20,6 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2017 by Delphix. All rights reserved.
 #
 # Definitions common to command source.
 #
@@ -51,6 +52,7 @@ ROOTBIN=		$(ROOT)/usr/bin
 ROOTLIB=		$(ROOT)/usr/lib
 ROOTLIBSVCBIN=		$(ROOT)/lib/svc/bin
 ROOTLIBSVCMETHOD=	$(ROOT)/lib/svc/method
+ROOTLIBHYPERV=		$(ROOT)/usr/lib/hyperv
 ROOTLIBXEN=		$(ROOT)/usr/lib/xen/bin
 ROOTLIBZONES=		$(ROOT)/lib/zones
 
@@ -342,6 +344,9 @@ $(ROOTETCZONES)/%: %
 	$(INS.file)
 
 $(ROOTLIBZONES)/%: %
+	$(INS.file)
+
+$(ROOTLIBHYPERV)/%: %
 	$(INS.file)
 
 $(ROOTLIBXEN)/%: %
