@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -45,6 +45,8 @@ SYMBOL_VERSION SUNWprivate {
 	dfs_info_free;
 	dssetup_check_service;
 	dssetup_clear_domain_info;
+	lsa_lookup_lname;
+	lsa_lookup_lsid;
 	lsa_lookup_name;
 	lsa_lookup_sid;
 	mlsvc_disconnect;

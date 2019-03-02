@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -268,6 +268,8 @@ SYMBOL_VERSION SUNWprivate {
 	smb_logon_decode;
 	smb_logon_free;
 	smb_logon_xdr;
+	smb_lookup_lname;
+	smb_lookup_lsid;
 	smb_lookup_name;
 	smb_lookup_sid;
 	smb_match_netlogon_seqnum;
