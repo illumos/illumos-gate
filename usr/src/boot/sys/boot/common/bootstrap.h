@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * All rights reserved.
  *
@@ -37,11 +37,11 @@ typedef int	(bootblk_cmd_t)(int argc, char *argv[]);
 #define	COMMAND_ERRBUFSZ	(256)
 extern const char	*command_errmsg;
 extern char	command_errbuf[COMMAND_ERRBUFSZ];
-#define CMD_OK		0
-#define CMD_WARN	1
-#define CMD_ERROR	2
-#define CMD_CRIT	3
-#define CMD_FATAL	4
+#define	CMD_OK		0
+#define	CMD_WARN	1
+#define	CMD_ERROR	2
+#define	CMD_CRIT	3
+#define	CMD_FATAL	4
 
 /* interp.c */
 void	interact(const char *rc);
@@ -84,10 +84,10 @@ int	bcache_strategy(void *devdata, int rw, daddr_t blk,
  */
 struct bcache_devdata
 {
-    int         (*dv_strategy)(void *devdata, int rw, daddr_t blk,
-		    size_t size, char *buf, size_t *rsize);
-    void	*dv_devdata;
-    void	*dv_cache;
+	int	(*dv_strategy)(void *devdata, int rw, daddr_t blk,
+		size_t size, char *buf, size_t *rsize);
+	void	*dv_devdata;
+	void	*dv_cache;
 };
 
 /*
@@ -95,64 +95,78 @@ struct bcache_devdata
  */
 struct console
 {
-    const char	*c_name;
-    const char	*c_desc;
-    int		c_flags;
-#define C_PRESENTIN	(1<<0)	    /* console can provide input */
-#define C_PRESENTOUT	(1<<1)	    /* console can provide output */
-#define C_ACTIVEIN	(1<<2)	    /* user wants input from console */
-#define C_ACTIVEOUT	(1<<3)	    /* user wants output to console */
-#define C_WIDEOUT	(1<<4)	    /* c_out routine groks wide chars */
-#define C_MODERAW	(1<<5)	    /* raw mode */
-    void	(*c_probe)(struct console *);	/* set c_flags to match hardware */
-    int		(*c_init)(struct console *, int);	/* reinit XXX may need more args */
-    void	(*c_out)(struct console *, int);	/* emit c */
-    int		(*c_in)(struct console *);	/* wait for and return input */
-    int		(*c_ready)(struct console *);	/* return nonzer if input waiting */
-    int		(*c_ioctl)(struct console *, int, void *);
-    void	*c_private;		/* private data */
+	const char	*c_name;
+	const char	*c_desc;
+	int		c_flags;
+#define	C_PRESENTIN	(1<<0)		/* console can provide input */
+#define	C_PRESENTOUT	(1<<1)		/* console can provide output */
+#define	C_ACTIVEIN	(1<<2)		/* user wants input from console */
+#define	C_ACTIVEOUT	(1<<3)		/* user wants output to console */
+#define	C_WIDEOUT	(1<<4)		/* c_out routine groks wide chars */
+#define	C_MODERAW	(1<<5)		/* raw mode */
+
+	/* set c_flags to match hardware */
+	void	(*c_probe)(struct console *);
+	/* reinit XXX may need more args */
+	int		(*c_init)(struct console *, int);
+	/* emit c */
+	void		(*c_out)(struct console *, int);
+	/* wait for and return input */
+	int		(*c_in)(struct console *);
+	/* return nonzero if input is waiting */
+	int		(*c_ready)(struct console *);
+	int		(*c_ioctl)(struct console *, int, void *);
+	void		*c_private;	/* private data */
 };
 extern struct console	*consoles[];
-void		cons_probe(void);
-void		cons_mode(int);
-void		autoload_font(void);
+void	cons_probe(void);
+void	cons_mode(int);
+void	autoload_font(void);
 
 /*
  * Plug-and-play enumerator/configurator interface.
  */
 struct pnphandler
 {
-    const char	*pp_name;		/* handler/bus name */
-    void	(* pp_enumerate)(void);	/* enumerate PnP devices, add to chain */
+	const char	*pp_name;		/* handler/bus name */
+	/* enumerate PnP devices, add to chain */
+	void		(*pp_enumerate)(void);
 };
 
 struct pnpident
 {
-    char			*id_ident;	/* ASCII identifier, actual format varies with bus/handler */
-    STAILQ_ENTRY(pnpident)	id_link;
+	/* ASCII identifier, actual format varies with bus/handler */
+	char			*id_ident;
+	STAILQ_ENTRY(pnpident)	id_link;
 };
 
 struct pnpinfo
 {
-    char			*pi_desc;	/* ASCII description, optional */
-    int				pi_revision;	/* optional revision (or -1) if not supported */
-    char			*pi_module;	/* module/args nominated to handle device */
-    int				pi_argc;	/* module arguments */
-    char			**pi_argv;
-    struct pnphandler		*pi_handler;	/* handler which detected this device */
-    STAILQ_HEAD(,pnpident)	pi_ident;	/* list of identifiers */
-    STAILQ_ENTRY(pnpinfo)	pi_link;
+	/* ASCII description, optional */
+	char			*pi_desc;
+	/* optional revision (or -1) if not supported */
+	int			pi_revision;
+	/* module/args nominated to handle device */
+	char			*pi_module;
+	/* module arguments */
+	int			pi_argc;
+	char			**pi_argv;
+	/* handler which detected this device */
+	struct pnphandler	*pi_handler;
+	/* list of identifiers */
+	STAILQ_HEAD(, pnpident)	pi_ident;
+	STAILQ_ENTRY(pnpinfo)	pi_link;
 };
 
 STAILQ_HEAD(pnpinfo_stql, pnpinfo);
 
-extern struct pnphandler	*pnphandlers[];		/* provided by MD code */
+extern struct pnphandler *pnphandlers[];	/* provided by MD code */
 
 void			pnp_addident(struct pnpinfo *pi, char *ident);
 struct pnpinfo		*pnp_allocinfo(void);
 void			pnp_freeinfo(struct pnpinfo *pi);
 void			pnp_addinfo(struct pnpinfo *pi);
-char			*pnp_eisaformat(u_int8_t *data);
+char			*pnp_eisaformat(uint8_t *data);
 
 /*
  *  < 0	- No ISA in system
@@ -174,10 +188,11 @@ extern char bootprog_info[];
  */
 struct file_metadata
 {
-    size_t			md_size;
-    u_int16_t			md_type;
-    struct file_metadata	*md_next;
-    char			md_data[1];	/* data are immediately appended */
+	size_t			md_size;
+	uint16_t		md_type;
+	struct file_metadata	*md_next;
+	/* data are immediately appended */
+	char			md_data[1];
 };
 
 struct preloaded_file;
@@ -185,11 +200,11 @@ struct mod_depend;
 
 struct kernel_module
 {
-    char			*m_name;	/* module name */
-    int				m_version;	/* module version */
-    char			*m_args;	/* arguments for the module */
-    struct preloaded_file	*m_fp;
-    struct kernel_module	*m_next;
+	char			*m_name;	/* module name */
+	int			m_version;	/* module version */
+	char			*m_args;	/* arguments for the module */
+	struct preloaded_file	*m_fp;
+	struct kernel_module	*m_next;
 };
 
 /*
@@ -203,31 +218,40 @@ struct kernel_module
  */
 struct preloaded_file
 {
-    char			*f_name;	/* file name */
-    char			*f_type;	/* verbose file type, eg 'ELF kernel', 'pnptable', etc. */
-    char			*f_args;	/* arguments for the file */
-    struct file_metadata	*f_metadata;	/* metadata that will be placed in the module directory */
-    int				f_loader;	/* index of the loader that read the file */
-    vm_offset_t			f_addr;		/* load address */
-    size_t			f_size;		/* file size */
-    struct kernel_module	*f_modules;	/* list of modules if any */
-    struct preloaded_file	*f_next;	/* next file */
+	char			*f_name;	/* file name */
+	/* verbose file type, eg 'ELF kernel', 'pnptable', etc. */
+	char			*f_type;
+	char			*f_args;	/* arguments for the file */
+	/* metadata that will be placed in the module directory */
+	struct file_metadata	*f_metadata;
+	/* index of the loader that read the file */
+	int			f_loader;
+	vm_offset_t		f_addr;		/* load address */
+	size_t			f_size;		/* file size */
+	struct kernel_module	*f_modules;	/* list of modules if any */
+	struct preloaded_file	*f_next;	/* next file */
 };
 
 struct file_format
 {
-    /* Load function must return EFTYPE if it can't handle the module supplied */
-    int		(* l_load)(char *filename, u_int64_t dest, struct preloaded_file **result);
-    /* Only a loader that will load a kernel (first module) should have an exec handler */
-    int		(* l_exec)(struct preloaded_file *mp);
+	/*
+	 * Load function must return EFTYPE if it can't handle the module
+	 * supplied.
+	 */
+	int (*l_load)(char *, uint64_t, struct preloaded_file **);
+	/*
+	 * Only a loader that will load a kernel (first module)
+	 * should have an exec handler.
+	 */
+	int (*l_exec)(struct preloaded_file *);
 };
 
-extern struct file_format	*file_formats[];	/* supplied by consumer */
-extern struct preloaded_file	*preloaded_files;
+extern struct file_format *file_formats[];	/* supplied by consumer */
+extern struct preloaded_file *preloaded_files;
 
-int			mod_load(char *name, struct mod_depend *verinfo, int argc, char *argv[]);
-int			mod_loadkld(const char *name, int argc, char *argv[]);
-void			unload(void);
+int mod_load(char *name, struct mod_depend *verinfo, int argc, char *argv[]);
+int mod_loadkld(const char *name, int argc, char *argv[]);
+void unload(void);
 
 struct preloaded_file *file_alloc(void);
 struct preloaded_file *file_findfile(const char *name, const char *type);
@@ -235,9 +259,9 @@ struct file_metadata *file_findmetadata(struct preloaded_file *fp, int type);
 struct preloaded_file *file_loadraw(const char *name, char *type, int argc,
 	char **argv, int insert);
 void file_discard(struct preloaded_file *fp);
-void file_addmetadata(struct preloaded_file *fp, int type, size_t size, void *p);
-int  file_addmodule(struct preloaded_file *fp, char *modname, int version,
-	struct kernel_module **newmp);
+void file_addmetadata(struct preloaded_file *, int, size_t, void *);
+int  file_addmodule(struct preloaded_file *, char *, int,
+	struct kernel_module **);
 void build_environment_module(void);
 void build_font_module(void);
 vm_offset_t bi_copyenv(vm_offset_t);
@@ -246,14 +270,14 @@ bool sha1(void *, size_t, uint8_t *);
 /* MI module loaders */
 #ifdef __elfN
 /* Relocation types. */
-#define ELF_RELOC_REL	1
-#define ELF_RELOC_RELA	2
+#define	ELF_RELOC_REL	1
+#define	ELF_RELOC_RELA	2
 
 /* Relocation offset for some architectures */
-extern u_int64_t __elfN(relocation_offset);
+extern uint64_t __elfN(relocation_offset);
 
 struct elf_file;
-typedef Elf_Addr (symaddr_fn)(struct elf_file *ef, Elf_Size symidx);
+typedef Elf_Addr (symaddr_fn)(struct elf_file *, Elf_Size);
 
 int	elf64_loadfile(char *, uint64_t, struct preloaded_file **);
 int	elf32_loadfile(char *, uint64_t, struct preloaded_file **);
@@ -273,12 +297,12 @@ int	elf32_load_modmetadata(struct preloaded_file *, uint64_t);
  */
 struct bootblk_command
 {
-    const char		*c_name;
-    const char		*c_desc;
-    bootblk_cmd_t	*c_fn;
+	const char	*c_name;
+	const char	*c_desc;
+	bootblk_cmd_t	*c_fn;
 };
 
-#define COMMAND_SET(tag, key, desc, func)				\
+#define	COMMAND_SET(tag, key, desc, func)				\
     static bootblk_cmd_t func;						\
     static struct bootblk_command _cmd_ ## tag = { key, desc, func };	\
     DATA_SET(Xcommand_set, _cmd_ ## tag)
@@ -293,49 +317,55 @@ SET_DECLARE(Xcommand_set, struct bootblk_command);
  */
 struct arch_switch
 {
-    /* Automatically load modules as required by detected hardware */
-    int		(*arch_autoload)(void);
-    /* Locate the device for (name), return pointer to tail in (*path) */
-    int		(*arch_getdev)(void **dev, const char *name, const char **path);
-    /* Copy from local address space to module address space, similar to bcopy() */
-    ssize_t	(*arch_copyin)(const void *src, vm_offset_t dest,
-			       const size_t len);
-    /* Copy to local address space from module address space, similar to bcopy() */
-    ssize_t	(*arch_copyout)(const vm_offset_t src, void *dest,
+	/* Automatically load modules as required by detected hardware */
+	int	(*arch_autoload)(void);
+	/* Locate the device for (name), return pointer to tail in (*path) */
+	int	(*arch_getdev)(void **dev, const char *name, const char **path);
+	/*
+	 * Copy from local address space to module address space,
+	 * similar to bcopy()
+	 */
+	ssize_t	(*arch_copyin)(const void *src, vm_offset_t dest,
+		const size_t len);
+	/*
+	 * Copy to local address space from module address space,
+	 * similar to bcopy()
+	 */
+	ssize_t	(*arch_copyout)(const vm_offset_t src, void *dest,
 				const size_t len);
-    /* Read from file to module address space, same semantics as read() */
-    ssize_t	(*arch_readin)(const int fd, vm_offset_t dest,
-			       const size_t len);
-    /* Perform ISA byte port I/O (only for systems with ISA) */
-    int		(*arch_isainb)(int port);
-    void	(*arch_isaoutb)(int port, int value);
+	/* Read from file to module address space, same semantics as read() */
+	ssize_t	(*arch_readin)(const int fd, vm_offset_t dest,
+		const size_t len);
+	/* Perform ISA byte port I/O (only for systems with ISA) */
+	int	(*arch_isainb)(int port);
+	void	(*arch_isaoutb)(int port, int value);
 
-    /*
-     * Interface to adjust the load address according to the "object"
-     * being loaded.
-     */
-    vm_offset_t	(*arch_loadaddr)(u_int type, void *data, vm_offset_t addr);
+	/*
+	 * Interface to adjust the load address according to the "object"
+	 * being loaded.
+	 */
+	vm_offset_t (*arch_loadaddr)(uint_t type, void *data, vm_offset_t addr);
 #define	LOAD_ELF	1	/* data points to the ELF header. */
 #define	LOAD_RAW	2	/* data points to the module file name. */
 #define	LOAD_KERN	3	/* data points to the kernel file name. */
 #define	LOAD_MEM	4	/* data points to int for buffer size. */
-    /*
-     * Interface to release the load address.
-     */
-    void	(*arch_free_loadaddr)(vm_offset_t addr, size_t pages);
+	/*
+	 * Interface to release the load address.
+	 */
+	void	(*arch_free_loadaddr)(vm_offset_t addr, size_t pages);
 
-    /*
-     * Interface to inform MD code about a loaded (ELF) segment. This
-     * can be used to flush caches and/or set up translations.
-     */
+	/*
+	 * Interface to inform MD code about a loaded (ELF) segment. This
+	 * can be used to flush caches and/or set up translations.
+	 */
 #ifdef __elfN
-    void	(*arch_loadseg)(Elf_Ehdr *eh, Elf_Phdr *ph, uint64_t delta);
+	void	(*arch_loadseg)(Elf_Ehdr *eh, Elf_Phdr *ph, uint64_t delta);
 #else
-    void	(*arch_loadseg)(void *eh, void *ph, uint64_t delta);
+	void	(*arch_loadseg)(void *eh, void *ph, uint64_t delta);
 #endif
 
-    /* Probe ZFS pool(s), if needed. */
-    void	(*arch_zfs_probe)(void);
+	/* Probe ZFS pool(s), if needed. */
+	void	(*arch_zfs_probe)(void);
 };
 extern struct arch_switch archsw;
 
@@ -344,10 +374,10 @@ void	delay(int delay);
 
 void	dev_cleanup(void);
 
-#ifndef CTASSERT                /* Allow lint to override */
-#define CTASSERT(x)             _CTASSERT(x, __LINE__)
-#define _CTASSERT(x, y)         __CTASSERT(x, y)
-#define __CTASSERT(x, y)        typedef char __assert ## y[(x) ? 1 : -1]
+#ifndef CTASSERT		/* Allow lint to override */
+#define	CTASSERT(x)		_CTASSERT(x, __LINE__)
+#define	_CTASSERT(x, y)		__CTASSERT(x, y)
+#define	__CTASSERT(x, y)	typedef char __assert ## y[(x) ? 1 : -1]
 #endif
 
 #endif /* !_BOOTSTRAP_H_ */
