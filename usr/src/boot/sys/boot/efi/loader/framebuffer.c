@@ -44,9 +44,9 @@
 #include "gfx_fb.h"
 #include "framebuffer.h"
 
-static EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
+EFI_GUID gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 static EFI_GUID pciio_guid = EFI_PCI_IO_PROTOCOL_GUID;
-static EFI_GUID uga_guid = EFI_UGA_DRAW_PROTOCOL_GUID;
+EFI_GUID uga_guid = EFI_UGA_DRAW_PROTOCOL_GUID;
 static EFI_GUID active_edid_guid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
 static EFI_GUID discovered_edid_guid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
 

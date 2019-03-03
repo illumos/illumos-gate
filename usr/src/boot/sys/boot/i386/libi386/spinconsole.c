@@ -46,6 +46,7 @@ static int	spinc_init(struct console *cp, int arg);
 static void	spinc_putchar(struct console *cp, int c);
 static int	spinc_getchar(struct console *cp);
 static int	spinc_ischar(struct console *cp);
+static void	spinc_devinfo(struct console *cp);
 
 struct console spinconsole = {
 	.c_name = "spin",
@@ -57,8 +58,15 @@ struct console spinconsole = {
 	.c_in = spinc_getchar,
 	.c_ready = spinc_ischar,
 	.c_ioctl = NULL,
+	.c_devinfo = spinc_devinfo,
 	.c_private = NULL
 };
+
+static void
+spinc_devinfo(struct console *cp __unused)
+{
+	printf("\tsoftware device");
+}
 
 static void
 spinc_probe(struct console *cp)

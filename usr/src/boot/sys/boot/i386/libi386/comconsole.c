@@ -84,6 +84,7 @@ static int	comc_parse_mode(struct serial *, const char *);
 static int	comc_mode_set(struct env_var *, int, const void *);
 static int	comc_cd_set(struct env_var *, int, const void *);
 static int	comc_rtsdtr_set(struct env_var *, int, const void *);
+static void	comc_devinfo(struct console *);
 
 struct console ttya = {
 	.c_name = "ttya",
@@ -95,6 +96,7 @@ struct console ttya = {
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
 	.c_ioctl = comc_ioctl,
+	.c_devinfo = comc_devinfo,
 	.c_private = NULL
 };
 
@@ -108,6 +110,7 @@ struct console ttyb = {
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
 	.c_ioctl = comc_ioctl,
+	.c_devinfo = comc_devinfo,
 	.c_private = NULL
 };
 
@@ -121,6 +124,7 @@ struct console ttyc = {
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
 	.c_ioctl = comc_ioctl,
+	.c_devinfo = comc_devinfo,
 	.c_private = NULL
 };
 
@@ -134,8 +138,20 @@ struct console ttyd = {
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
 	.c_ioctl = comc_ioctl,
+	.c_devinfo = comc_devinfo,
 	.c_private = NULL
 };
+
+static void
+comc_devinfo(struct console *cp)
+{
+	struct serial *port = cp->c_private;
+
+	if (cp->c_flags != 0)
+		printf("\tport %#x", port->ioaddr);
+	else
+		printf("\tdevice is not present");
+}
 
 static void
 comc_probe(struct console *cp)

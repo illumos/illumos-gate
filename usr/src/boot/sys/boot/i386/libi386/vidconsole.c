@@ -55,6 +55,7 @@ static int	vidc_getchar(struct console *cp);
 static int	vidc_ischar(struct console *cp);
 static int	vidc_ioctl(struct console *cp, int cmd, void *data);
 static void	vidc_biosputchar(int c);
+static void	vidc_devinfo(struct console *cp);
 
 static int vidc_vbe_devinit(struct vis_devinit *);
 static void vidc_cons_cursor(struct vis_conscursor *);
@@ -92,6 +93,7 @@ struct console text = {
 	.c_in = vidc_getchar,
 	.c_ready = vidc_ischar,
 	.c_ioctl = vidc_ioctl,
+	.c_devinfo = vidc_devinfo,
 	.c_private = NULL
 };
 
@@ -781,6 +783,20 @@ vidc_ischar(struct console *cp __unused)
 	v86.eax = 0x100;
 	v86int();
 	return (!V86_ZR(v86.efl));
+}
+
+static void
+vidc_devinfo(struct console *cp __unused)
+{
+	if (plat_stdout_is_framebuffer()) {
+		printf("\tVESA %ux%ux%u framebuffer mode %#x",
+		    gfx_fb.framebuffer_common.framebuffer_width,
+		    gfx_fb.framebuffer_common.framebuffer_height,
+		    gfx_fb.framebuffer_common.framebuffer_bpp,
+		    vbe_get_mode());
+	} else {
+		printf("\tVGA %ux%u text mode", TEXT_COLS, TEXT_ROWS);
+	}
 }
 
 #if KEYBOARD_PROBE

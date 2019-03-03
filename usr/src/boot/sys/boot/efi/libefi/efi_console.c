@@ -93,6 +93,7 @@ static void efi_cons_efiputchar(int);
 static int efi_cons_getchar(struct console *);
 static int efi_cons_poll(struct console *);
 static int efi_cons_ioctl(struct console *cp, int cmd, void *data);
+static void efi_cons_devinfo(struct console *);
 
 static int efi_fb_devinit(struct vis_devinit *);
 static void efi_cons_cursor(struct vis_conscursor *);
@@ -112,6 +113,7 @@ struct console efi_console = {
 	.c_in = efi_cons_getchar,
 	.c_ready = efi_cons_poll,
 	.c_ioctl = efi_cons_ioctl,
+	.c_devinfo = efi_cons_devinfo,
 	.c_private = NULL
 };
 
@@ -748,4 +750,47 @@ efi_cons_efiputchar(int c)
 	if (EFI_ERROR(status))
 		buf[0] = '?';
 	conout->OutputString(conout, buf);
+}
+
+static void
+efi_cons_devinfo_print(EFI_HANDLE handle)
+{
+	EFI_DEVICE_PATH *dp;
+	CHAR16 *text;
+
+	dp = efi_lookup_devpath(handle);
+	if (dp == NULL)
+		return;
+
+	text = efi_devpath_name(dp);
+	if (text == NULL)
+		return;
+
+	printf("\t%S", text);
+	efi_free_devpath_name(text);
+}
+
+static void
+efi_cons_devinfo(struct console *cp __unused)
+{
+	EFI_HANDLE *handles;
+	UINTN nhandles;
+	extern EFI_GUID gop_guid;
+	extern EFI_GUID uga_guid;
+	EFI_STATUS status;
+
+	if (gop != NULL)
+		status = BS->LocateHandleBuffer(ByProtocol, &gop_guid, NULL,
+		    &nhandles, &handles);
+	else
+		status = BS->LocateHandleBuffer(ByProtocol, &uga_guid, NULL,
+		    &nhandles, &handles);
+
+	if (EFI_ERROR(status))
+		return;
+
+	for (UINTN i = 0; i < nhandles; i++)
+		efi_cons_devinfo_print(handles[i]);
+
+	BS->FreePool(handles);
 }

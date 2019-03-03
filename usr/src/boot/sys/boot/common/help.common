@@ -57,6 +57,14 @@
 	Displays statistics about disk cache usage.  For debugging only.
 
 ################################################################################
+# Tconsole DOutput information about console devices
+
+	console
+
+	Display the currently active console device(s) and show
+	information about available console devices.
+
+################################################################################
 # Tchain DChain load disk block
 
 	chain disk:
