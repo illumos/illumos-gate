@@ -27,8 +27,6 @@
 #ifndef _SYS_IEEEFP_H
 #define	_SYS_IEEEFP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS4.0 1.6	*/
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -60,6 +58,7 @@ enum fp_exception_type {	/* exceptions according to bit number */
 	fp_overflow	= 3,
 	fp_invalid	= 4
 };
+#define	N_IEEE_EXCEPTION 5	/* Number of floating-point exceptions. */
 
 enum fp_trap_enable_type {	/* trap enable bits according to bit number */
 	fp_trap_inexact	= 0,
@@ -93,6 +92,7 @@ enum fp_exception_type {	/* exceptions according to bit number */
 	fp_underflow	= 4,
 	fp_inexact	= 5
 };
+#define	N_IEEE_EXCEPTION 6	/* Number of floating-point exceptions. */
 
 enum fp_trap_enable_type {	/* trap enable bits according to bit number */
 	fp_trap_invalid	= 0,
@@ -109,7 +109,7 @@ enum fp_class_type {		/* floating-point classes */
 	fp_zero		= 0,
 	fp_subnormal	= 1,
 	fp_normal	= 2,
-	fp_infinity   	= 3,
+	fp_infinity	= 3,
 	fp_quiet	= 4,
 	fp_signaling	= 5
 };
