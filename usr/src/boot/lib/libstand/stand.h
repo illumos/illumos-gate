@@ -69,11 +69,14 @@
 /* this header intentionally exports NULL from <string.h> */
 #include <string.h>
 
-#define CHK(fmt, args...)	printf("%s(%d): " fmt "\n", __func__, __LINE__ , ##args)
-#define PCHK(fmt, args...)	{printf("%s(%d): " fmt "\n", __func__, __LINE__ , ##args); getchar();}
+#define	CHK(fmt, args...)	\
+	printf("%s(%d): " fmt "\n", __func__, __LINE__, ##args)
+#define	PCHK(fmt, args...)	{\
+	printf("%s(%d): " fmt "\n", __func__, __LINE__, ##args); getchar();\
+}
 
 /* Avoid unwanted userlandish components */
-#define _KERNEL
+#define	_KERNEL
 #include <sys/errno.h>
 #undef _KERNEL
 
@@ -81,7 +84,7 @@
 #define	EADAPT	(ELAST+1)	/* bad adaptor */
 #define	ECTLR	(ELAST+2)	/* bad controller */
 #define	EUNIT	(ELAST+3)	/* bad unit */
-#define ESLICE	(ELAST+4)	/* bad slice */
+#define	ESLICE	(ELAST+4)	/* bad slice */
 #define	EPART	(ELAST+5)	/* bad partition */
 #define	ERDLAB	(ELAST+6)	/* can't read disk label */
 #define	EUNLAB	(ELAST+7)	/* unlabeled disk */
@@ -99,16 +102,16 @@ struct open_file;
  *     filesystems that they require.
  */
 struct fs_ops {
-    const char	*fs_name;
-    int		(*fo_open)(const char *path, struct open_file *f);
-    int		(*fo_close)(struct open_file *f);
-    int		(*fo_read)(struct open_file *f, void *buf,
-			   size_t size, size_t *resid);
-    int		(*fo_write)(struct open_file *f, const void *buf,
-			    size_t size, size_t *resid);
-    off_t	(*fo_seek)(struct open_file *f, off_t offset, int where);
-    int		(*fo_stat)(struct open_file *f, struct stat *sb);
-    int		(*fo_readdir)(struct open_file *f, struct dirent *d);
+	const char *fs_name;
+	int (*fo_open)(const char *path, struct open_file *f);
+	int (*fo_close)(struct open_file *f);
+	int (*fo_read)(struct open_file *f, void *buf,
+	    size_t size, size_t *resid);
+	int (*fo_write)(struct open_file *f, const void *buf,
+	    size_t size, size_t *resid);
+	off_t (*fo_seek)(struct open_file *f, off_t offset, int where);
+	int (*fo_stat)(struct open_file *f, struct stat *sb);
+	int (*fo_readdir)(struct open_file *f, struct dirent *d);
 };
 
 /*
@@ -135,22 +138,22 @@ extern struct fs_ops pkgfs_fsops;
  * Device switch
  */
 struct devsw {
-    const char	dv_name[8];
-    int		dv_type;		/* opaque type constant, arch-dependant */
+	const char dv_name[8];
+	int dv_type;		/* opaque type constant, arch-dependant */
 #define	DEVT_NONE	0
 #define	DEVT_DISK	1
 #define	DEVT_NET	2
 #define	DEVT_CD		3
 #define	DEVT_ZFS	4
 #define	DEVT_FD		5
-    int		(*dv_init)(void);	/* early probe call */
-    int		(*dv_strategy)(void *devdata, int rw, daddr_t blk,
+	int (*dv_init)(void);	/* early probe call */
+	int (*dv_strategy)(void *devdata, int rw, daddr_t blk,
 			size_t size, char *buf, size_t *rsize);
-    int		(*dv_open)(struct open_file *f, ...);
-    int		(*dv_close)(struct open_file *f);
-    int		(*dv_ioctl)(struct open_file *f, u_long cmd, void *data);
-    int		(*dv_print)(int verbose);	/* print device information */
-    void	(*dv_cleanup)(void);
+	int (*dv_open)(struct open_file *f, ...);
+	int (*dv_close)(struct open_file *f);
+	int (*dv_ioctl)(struct open_file *f, ulong_t cmd, void *data);
+	int (*dv_print)(int verbose);	/* print device information */
+	void (*dv_cleanup)(void);
 };
 
 /*
@@ -166,22 +169,22 @@ extern int errno;
  * overlap.
  */
 struct devdesc {
-    struct devsw	*d_dev;
-    int			d_unit;
-    void		*d_opendata;
+	struct devsw	*d_dev;
+	int		d_unit;
+	void		*d_opendata;
 };
 
 struct open_file {
-    int			f_flags;	/* see F_* below */
-    struct devsw	*f_dev;		/* pointer to device operations */
-    void		*f_devdata;	/* device specific data */
-    struct fs_ops	*f_ops;		/* pointer to file system operations */
-    void		*f_fsdata;	/* file system specific data */
-    off_t		f_offset;	/* current file offset */
-    char		*f_rabuf;	/* readahead buffer pointer */
-    size_t		f_ralen;	/* valid data in readahead buffer */
-    off_t		f_raoffset;	/* consumer offset in readahead buffer */
-#define SOPEN_RASIZE	512
+	int		f_flags;	/* see F_* below */
+	struct devsw	*f_dev;		/* pointer to device operations */
+	void		*f_devdata;	/* device specific data */
+	struct fs_ops	*f_ops;		/* pointer to file system operations */
+	void		*f_fsdata;	/* file system specific data */
+	off_t		f_offset;	/* current file offset */
+	char		*f_rabuf;	/* readahead buffer pointer */
+	size_t		f_ralen;	/* valid data in readahead buffer */
+	off_t		f_raoffset; /* consumer offset in readahead buffer */
+#define	SOPEN_RASIZE	512
 };
 
 #define	SOPEN_MAX	64
@@ -198,51 +201,51 @@ extern struct open_file files[];
 /* Mode modifier for strategy() */
 #define	F_NORA		(0x01 << 16)	/* Disable Read-Ahead */
 
-#define isascii(c)	(((c) & ~0x7F) == 0)
+#define	isascii(c)	(((c) & ~0x7F) == 0)
 
 static __inline int isupper(int c)
 {
-    return c >= 'A' && c <= 'Z';
+	return (c >= 'A' && c <= 'Z');
 }
 
 static __inline int islower(int c)
 {
-    return c >= 'a' && c <= 'z';
+	return (c >= 'a' && c <= 'z');
 }
 
 static __inline int isspace(int c)
 {
-    return c == ' ' || (c >= 0x9 && c <= 0xd);
+	return (c == ' ' || (c >= 0x9 && c <= 0xd));
 }
 
 static __inline int isdigit(int c)
 {
-    return c >= '0' && c <= '9';
+	return (c >= '0' && c <= '9');
 }
 
 static __inline int isxdigit(int c)
 {
-    return isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+	return (isdigit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'));
 }
 
 static __inline int isalpha(int c)
 {
-    return isupper(c) || islower(c);
+	return (isupper(c) || islower(c));
 }
 
 static __inline int isalnum(int c)
 {
-    return isalpha(c) || isdigit(c);
+	return (isalpha(c) || isdigit(c));
 }
 
 static __inline int toupper(int c)
 {
-    return islower(c) ? c - 'a' + 'A' : c;
+	return (islower(c) ? c - 'a' + 'A' : c);
 }
 
 static __inline int tolower(int c)
 {
-    return isupper(c) ? c - 'A' + 'a' : c;
+	return (isupper(c) ? c - 'A' + 'a' : c);
 }
 
 /* sbrk emulation */
@@ -252,7 +255,6 @@ extern char	*sbrk(int incr);
 /* Matt Dillon's zalloc/zmalloc */
 extern void	*malloc(size_t bytes);
 extern void	free(void *ptr);
-/*#define free(p)	{CHK("free %p", p); free(p);} */ /* use for catching guard violations */
 extern void	*calloc(size_t n1, size_t n2);
 extern void	*realloc(void *ptr, size_t size);
 extern void	*reallocf(void *ptr, size_t size);
@@ -262,34 +264,35 @@ extern int	printf(const char *fmt, ...) __printflike(1, 2);
 extern void	vprintf(const char *fmt, __va_list);
 extern int	asprintf(char **buf, const char *cfmt, ...) __printflike(2, 3);
 extern int	sprintf(char *buf, const char *cfmt, ...) __printflike(2, 3);
-extern int	snprintf(char *buf, size_t size, const char *cfmt, ...) __printflike(3, 4);
+extern int	snprintf(char *buf, size_t size, const char *cfmt, ...) \
+		__printflike(3, 4);
 extern void	vsprintf(char *buf, const char *cfmt, __va_list);
 extern void	vsnprintf(char *buf, size_t size, const char *cfmt, __va_list);
 
-extern void	twiddle(u_int callerdiv);
-extern void	twiddle_divisor(u_int globaldiv);
+extern void	twiddle(uint_t callerdiv);
+extern void	twiddle_divisor(uint_t globaldiv);
 
 extern void	ngets(char *, int);
-#define gets(x)	ngets((x), 0)
+#define	gets(x)	ngets((x), 0)
 extern int	fgetstr(char *buf, int size, int fd);
 
 extern int	open(const char *, int);
 #define	O_RDONLY	0x0
-#define O_WRONLY	0x1
-#define O_RDWR		0x2
+#define	O_WRONLY	0x1
+#define	O_RDWR		0x2
 extern int	close(int);
 extern void	closeall(void);
 extern ssize_t	read(int, void *, size_t);
 extern ssize_t	write(int, const void *, size_t);
 extern struct	dirent *readdirfd(int);
 
-extern void	srandom(u_long seed);
-extern u_long	random(void);
+extern void	srandom(ulong_t seed);
+extern ulong_t	random(void);
 
 /* imports from stdlib, locally modified */
 extern long	strtol(const char *, char **, int);
 extern unsigned long	strtoul(const char *, char **, int);
-extern char	*optarg;			/* getopt(3) external variables */
+extern char	*optarg;		/* getopt(3) external variables */
 extern int	optind, opterr, optopt, optreset;
 extern int	getopt(int, char * const [], const char *);
 
@@ -300,13 +303,16 @@ extern int	pager_output(const char *lines);
 extern int	pager_file(const char *fname);
 
 /* No signal state to preserve */
-#define setjmp	_setjmp
-#define longjmp	_longjmp
+#define	setjmp	_setjmp
+#define	longjmp	_longjmp
 
 /* environment.c */
-#define EV_DYNAMIC	(1<<0)		/* value was dynamically allocated, free if changed/unset */
-#define EV_VOLATILE	(1<<1)		/* value is volatile, make a copy of it */
-#define EV_NOHOOK	(1<<2)		/* don't call hook when setting */
+/* value was dynamically allocated, free if changed/unset */
+#define	EV_DYNAMIC	(1<<0)
+/* value is volatile, make a copy of it */
+#define	EV_VOLATILE	(1<<1)
+/* don't call hook when setting */
+#define	EV_NOHOOK	(1<<2)
 
 struct env_var;
 typedef char	*(ev_format_t)(struct env_var *ev);
@@ -327,11 +333,11 @@ extern struct env_var	*environ;
 
 extern struct env_var	*env_getenv(const char *name);
 extern int		env_setenv(const char *name, int flags,
-				   const void *value, ev_sethook_t sethook,
-				   ev_unsethook_t unsethook);
+				const void *value, ev_sethook_t sethook,
+				ev_unsethook_t unsethook);
 extern char		*getenv(const char *name);
 extern int		setenv(const char *name, const char *value,
-			       int overwrite);
+				int overwrite);
 extern int		putenv(const char *string);
 extern int		unsetenv(const char *name);
 
@@ -339,8 +345,8 @@ extern ev_sethook_t	env_noset;		/* refuse set operation */
 extern ev_unsethook_t	env_nounset;		/* refuse unset operation */
 
 /* BCD conversions (undocumented) */
-extern u_char const	bcd2bin_data[];
-extern u_char const	bin2bcd_data[];
+extern uchar_t const	bcd2bin_data[];
+extern uchar_t const	bin2bcd_data[];
 extern char const	hex2ascii_data[];
 
 #define	bcd2bin(bcd)	(bcd2bin_data[bcd])
@@ -352,40 +358,40 @@ static __inline int imax(int a, int b) { return (a > b ? a : b); }
 static __inline int imin(int a, int b) { return (a < b ? a : b); }
 static __inline long lmax(long a, long b) { return (a > b ? a : b); }
 static __inline long lmin(long a, long b) { return (a < b ? a : b); }
-static __inline u_int max(u_int a, u_int b) { return (a > b ? a : b); }
-static __inline u_int min(u_int a, u_int b) { return (a < b ? a : b); }
+static __inline uint_t max(uint_t a, uint_t b) { return (a > b ? a : b); }
+static __inline uint_t min(uint_t a, uint_t b) { return (a < b ? a : b); }
 static __inline quad_t qmax(quad_t a, quad_t b) { return (a > b ? a : b); }
 static __inline quad_t qmin(quad_t a, quad_t b) { return (a < b ? a : b); }
-static __inline u_long ulmax(u_long a, u_long b) { return (a > b ? a : b); }
-static __inline u_long ulmin(u_long a, u_long b) { return (a < b ? a : b); }
+static __inline ulong_t ulmax(ulong_t a, ulong_t b) { return (a > b ? a : b); }
+static __inline ulong_t ulmin(ulong_t a, ulong_t b) { return (a < b ? a : b); }
 
 /* null functions for device/filesystem switches (undocumented) */
 extern int	nodev(void);
-extern int	noioctl(struct open_file *, u_long, void *);
+extern int	noioctl(struct open_file *, ulong_t, void *);
 extern void	nullsys(void);
 
-extern int	null_open(const char *path, struct open_file *f);
-extern int	null_close(struct open_file *f);
-extern int	null_read(struct open_file *f, void *buf, size_t size, size_t *resid);
-extern int	null_write(struct open_file *f, const void *buf, size_t size, size_t *resid);
-extern off_t	null_seek(struct open_file *f, off_t offset, int where);
-extern int	null_stat(struct open_file *f, struct stat *sb);
-extern int	null_readdir(struct open_file *f, struct dirent *d);
+extern int	null_open(const char *, struct open_file *);
+extern int	null_close(struct open_file *);
+extern int	null_read(struct open_file *, void *, size_t, size_t *);
+extern int	null_write(struct open_file *, const void *, size_t, size_t *);
+extern off_t	null_seek(struct open_file *, off_t, int);
+extern int	null_stat(struct open_file *, struct stat *);
+extern int	null_readdir(struct open_file *, struct dirent *);
 
 
 /*
  * Machine dependent functions and data, must be provided or stubbed by
  * the consumer
  */
-extern void		exit(int) __dead2;
-extern int		getchar(void);
-extern int		ischar(void);
-extern void		putchar(int);
-extern int		devopen(struct open_file *, const char *, const char **);
-extern int		devclose(struct open_file *f);
-extern void		panic(const char *, ...) __dead2 __printflike(1, 2);
-extern void		panic_action(void) __weak_symbol __dead2;
-extern time_t		getsecs(void);
+extern void	exit(int) __dead2;
+extern int	getchar(void);
+extern int	ischar(void);
+extern void	putchar(int);
+extern int	devopen(struct open_file *, const char *, const char **);
+extern int	devclose(struct open_file *f);
+extern void	panic(const char *, ...) __dead2 __printflike(1, 2);
+extern void	panic_action(void) __weak_symbol __dead2;
+extern time_t	getsecs(void);
 extern struct fs_ops	*file_system[];
 extern struct fs_ops	*exclusive_file_system;
 extern struct devsw	*devsw[];
@@ -415,15 +421,15 @@ void *Realloc(void *, size_t, const char *, int);
 void Free(void *, const char *, int);
 
 #if 1
-#define malloc(x)	Malloc(x, __FILE__, __LINE__)
-#define calloc(x, y)	Calloc(x, y, __FILE__, __LINE__)
-#define free(x)		Free(x, __FILE__, __LINE__)
-#define realloc(x, y)	Realloc(x, y, __FILE__, __LINE__)
+#define	malloc(x)	Malloc(x, __FILE__, __LINE__)
+#define	calloc(x, y)	Calloc(x, y, __FILE__, __LINE__)
+#define	free(x)		Free(x, __FILE__, __LINE__)
+#define	realloc(x, y)	Realloc(x, y, __FILE__, __LINE__)
 #else
-#define malloc(x)	Malloc(x, NULL, 0)
-#define calloc(x, y)	Calloc(x, y, NULL, 0)
-#define free(x)		Free(x, NULL, 0)
-#define realloc(x, y)	Realloc(x, y, NULL, 0)
+#define	malloc(x)	Malloc(x, NULL, 0)
+#define	calloc(x, y)	Calloc(x, y, NULL, 0)
+#define	free(x)		Free(x, NULL, 0)
+#define	realloc(x, y)	Realloc(x, y, NULL, 0)
 #endif
 
 #endif	/* STAND_H */

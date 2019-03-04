@@ -220,7 +220,7 @@ instr_size(dis_handle_t *dhp, uint8_t *ins, unsigned int i, size_t size)
 static boolean_t
 has_saved_fp(dis_handle_t *dhp, uint8_t *ins, int size)
 {
-	int 		i, j;
+	int		i, j;
 	uint32_t	n;
 	boolean_t	found_push = B_FALSE;
 	ssize_t		sz = 0;

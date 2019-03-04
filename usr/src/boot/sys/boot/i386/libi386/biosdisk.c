@@ -131,7 +131,7 @@ static int bd_realstrategy(void *devdata, int flag, daddr_t dblk, size_t size,
     char *buf, size_t *rsize);
 static int bd_open(struct open_file *f, ...);
 static int bd_close(struct open_file *f);
-static int bd_ioctl(struct open_file *f, u_long cmd, void *data);
+static int bd_ioctl(struct open_file *f, ulong_t cmd, void *data);
 static int bd_print(int verbose);
 static int cd_print(int verbose);
 static int fd_print(int verbose);
@@ -363,29 +363,29 @@ bc_add(int biosdev)
 	int nbcinfo = 0;
 
 	if (!STAILQ_EMPTY(&cdinfo))
-                return (-1);
+		return (-1);
 
-        v86.ctl = V86_FLAGS;
-        v86.addr = 0x13;
-        v86.eax = 0x4b01;
-        v86.edx = biosdev;
-        v86.ds = VTOPSEG(&bc_sp);
-        v86.esi = VTOPOFF(&bc_sp);
-        v86int();
-        if ((v86.eax & 0xff00) != 0)
-                return (-1);
+	v86.ctl = V86_FLAGS;
+	v86.addr = 0x13;
+	v86.eax = 0x4b01;
+	v86.edx = biosdev;
+	v86.ds = VTOPSEG(&bc_sp);
+	v86.esi = VTOPOFF(&bc_sp);
+	v86int();
+	if ((v86.eax & 0xff00) != 0)
+		return (-1);
 
 	if ((bd = calloc(1, sizeof (*bd))) == NULL)
 		return (-1);
 
 	bd->bd_flags = BD_CDROM;
-        bd->bd_unit = biosdev;
+	bd->bd_unit = biosdev;
 
 	/*
 	 * Ignore result from bd_int13probe(), we will use local
 	 * workaround below.
 	 */
-	(void)bd_int13probe(bd);
+	(void) bd_int13probe(bd);
 
 	if (bd->bd_cyl == 0) {
 		bd->bd_cyl = ((bc_sp.sp_cylsec & 0xc0) << 2) +
@@ -403,10 +403,10 @@ bc_add(int biosdev)
 		bd->bd_sectors = 4173824;
 
 	STAILQ_INSERT_TAIL(&cdinfo, bd, bd_link);
-        printf("BIOS CD is cd%d\n", nbcinfo);
-        nbcinfo++;
-        bcache_add_dev(nbcinfo);        /* register cd device in bcache */
-        return(0);
+	printf("BIOS CD is cd%d\n", nbcinfo);
+	nbcinfo++;
+	bcache_add_dev(nbcinfo);	/* register cd device in bcache */
+	return (0);
 }
 
 /*
@@ -789,7 +789,7 @@ bd_open(struct open_file *f, ...)
 			return (EIO);
 	}
 	if (bd->bd_bcache == NULL)
-	    bd->bd_bcache = bcache_allocate();
+		bd->bd_bcache = bcache_allocate();
 
 	if (bd->bd_open == 0)
 		bd->bd_sectors = bd_disk_get_sectors(dev);
@@ -824,8 +824,8 @@ bd_close(struct open_file *f)
 
 	bd->bd_open--;
 	if (bd->bd_open == 0) {
-	    bcache_free(bd->bd_bcache);
-	    bd->bd_bcache = NULL;
+		bcache_free(bd->bd_bcache);
+		bd->bd_bcache = NULL;
 	}
 	if (dev->dd.d_dev->dv_type == DEVT_DISK)
 		rc = disk_close(dev);
@@ -833,7 +833,7 @@ bd_close(struct open_file *f)
 }
 
 static int
-bd_ioctl(struct open_file *f, u_long cmd, void *data)
+bd_ioctl(struct open_file *f, ulong_t cmd, void *data)
 {
 	bdinfo_t *bd;
 	struct disk_devdesc *dev;
@@ -1298,7 +1298,7 @@ bd_getdev(struct i386_devdesc *d)
 		 * we pass -C to the boot args if we are the boot device.
 		 */
 		major = ACDMAJOR;
-		unit = 0;       /* XXX */
+		unit = 0;	/* XXX */
 	}
 
 	/* XXX a better kludge to set the root disk unit number */

@@ -22,9 +22,9 @@
 /*
  * Copyright (c) 1990 Mentat Inc.
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019, Joyent, Inc. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_INET_IP_H

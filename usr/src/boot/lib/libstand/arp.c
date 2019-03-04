@@ -51,11 +51,11 @@
 #include "net.h"
 
 /* Cache stuff */
-#define ARP_NUM 8			/* need at most 3 arp entries */
+#define	ARP_NUM 8			/* need at most 3 arp entries */
 
 struct arp_list {
 	struct in_addr	addr;
-	u_char		ea[6];
+	uchar_t		ea[6];
 } arp_list[ARP_NUM] = {
 	/* XXX - net order `INADDR_BROADCAST' must be a constant */
 	{ {0xffffffff}, BA }
@@ -67,7 +67,7 @@ static	ssize_t arpsend(struct iodesc *, void *, size_t);
 static	ssize_t arprecv(struct iodesc *, void **, void **, time_t, void *);
 
 /* Broadcast an ARP packet, asking who has addr on interface d */
-u_char *
+uchar_t *
 arpwhohas(struct iodesc *d, struct in_addr addr)
 {
 	int i;
@@ -78,7 +78,7 @@ arpwhohas(struct iodesc *d, struct in_addr addr)
 		struct ether_header eh;
 		struct {
 			struct ether_arp arp;
-			u_char pad[18]; 	/* 60 - sizeof(...) */
+			uchar_t pad[18];		/* 60 - sizeof (...) */
 		} data;
 	} wbuf;
 
@@ -94,21 +94,21 @@ arpwhohas(struct iodesc *d, struct in_addr addr)
 	}
 
 #ifdef ARP_DEBUG
- 	if (debug)
- 	    printf("arpwhohas: send request for %s\n", inet_ntoa(addr));
+	if (debug)
+		printf("arpwhohas: send request for %s\n", inet_ntoa(addr));
 #endif
 
-	bzero((char*)&wbuf.data, sizeof(wbuf.data));
+	bzero((char *)&wbuf.data, sizeof (wbuf.data));
 	ah = &wbuf.data.arp;
 	ah->arp_hrd = htons(ARPHRD_ETHER);
 	ah->arp_pro = htons(ETHERTYPE_IP);
-	ah->arp_hln = sizeof(ah->arp_sha); /* hardware address length */
-	ah->arp_pln = sizeof(ah->arp_spa); /* protocol address length */
+	ah->arp_hln = sizeof (ah->arp_sha); /* hardware address length */
+	ah->arp_pln = sizeof (ah->arp_spa); /* protocol address length */
 	ah->arp_op = htons(ARPOP_REQUEST);
 	MACPY(d->myea, ah->arp_sha);
-	bcopy(&d->myip, ah->arp_spa, sizeof(ah->arp_spa));
+	bcopy(&d->myip, ah->arp_spa, sizeof (ah->arp_spa));
 	/* Leave zeros in arp_tha */
-	bcopy(&addr, ah->arp_tpa, sizeof(ah->arp_tpa));
+	bcopy(&addr, ah->arp_tpa, sizeof (ah->arp_tpa));
 
 	/* Store ip address in cache (incomplete entry). */
 	al->addr = addr;
@@ -116,16 +116,15 @@ arpwhohas(struct iodesc *d, struct in_addr addr)
 	pkt = NULL;
 	ah = NULL;
 	i = sendrecv(d,
-	    arpsend, &wbuf.data, sizeof(wbuf.data),
+	    arpsend, &wbuf.data, sizeof (wbuf.data),
 	    arprecv, &pkt, (void **)&ah, NULL);
 	if (i == -1) {
-		panic("arp: no response for %s\n",
-			  inet_ntoa(addr));
+		panic("arp: no response for %s\n", inet_ntoa(addr));
 	}
 
 	/* Store ethernet address in cache */
 #ifdef ARP_DEBUG
- 	if (debug) {
+	if (debug) {
 		struct ether_header *eh;
 
 		eh = (struct ether_header *)((uintptr_t)pkt + ETHER_ALIGN);
@@ -146,7 +145,7 @@ arpsend(struct iodesc *d, void *pkt, size_t len)
 {
 
 #ifdef ARP_DEBUG
- 	if (debug)
+	if (debug)
 		printf("arpsend: called\n");
 #endif
 
@@ -162,18 +161,18 @@ arprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft, void *extra)
 {
 	ssize_t n;
 	struct ether_arp *ah;
-	u_int16_t etype;	/* host order */
+	uint16_t etype;	/* host order */
 	void *ptr;
 
 #ifdef ARP_DEBUG
- 	if (debug)
+	if (debug)
 		printf("arprecv: ");
 #endif
 
 	ptr = NULL;
 	n = readether(d, &ptr, (void **)&ah, tleft, &etype);
 	errno = 0;	/* XXX */
-	if (n == -1 || n < sizeof(struct ether_arp)) {
+	if (n == -1 || n < sizeof (struct ether_arp)) {
 #ifdef ARP_DEBUG
 		if (debug)
 			printf("bad len=%d\n", n);
@@ -194,9 +193,8 @@ arprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft, void *extra)
 	/* Ethernet address now checked in readether() */
 	if (ah->arp_hrd != htons(ARPHRD_ETHER) ||
 	    ah->arp_pro != htons(ETHERTYPE_IP) ||
-	    ah->arp_hln != sizeof(ah->arp_sha) ||
-	    ah->arp_pln != sizeof(ah->arp_spa) )
-	{
+	    ah->arp_hln != sizeof (ah->arp_sha) ||
+	    ah->arp_pln != sizeof (ah->arp_spa)) {
 #ifdef ARP_DEBUG
 		if (debug)
 			printf("bad hrd/pro/hln/pln\n");
@@ -225,9 +223,7 @@ arprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft, void *extra)
 	}
 
 	/* Is the reply from the source we want? */
-	if (bcmp(&arp_list[arp_num].addr,
-			 ah->arp_spa, sizeof(ah->arp_spa)))
-	{
+	if (bcmp(&arp_list[arp_num].addr, ah->arp_spa, sizeof (ah->arp_spa))) {
 #ifdef ARP_DEBUG
 		if (debug)
 			printf("unwanted address\n");
@@ -239,7 +235,7 @@ arprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft, void *extra)
 
 	/* We have our answer. */
 #ifdef ARP_DEBUG
- 	if (debug)
+	if (debug)
 		printf("got it\n");
 #endif
 	*pkt = ptr;
@@ -258,9 +254,8 @@ arp_reply(struct iodesc *d, void *pkt)
 
 	if (arp->arp_hrd != htons(ARPHRD_ETHER) ||
 	    arp->arp_pro != htons(ETHERTYPE_IP) ||
-	    arp->arp_hln != sizeof(arp->arp_sha) ||
-	    arp->arp_pln != sizeof(arp->arp_spa) )
-	{
+	    arp->arp_hln != sizeof (arp->arp_sha) ||
+	    arp->arp_pln != sizeof (arp->arp_spa)) {
 #ifdef ARP_DEBUG
 		if (debug)
 			printf("arp_reply: bad hrd/pro/hln/pln\n");
@@ -277,7 +272,7 @@ arp_reply(struct iodesc *d, void *pkt)
 	}
 
 	/* If we are not the target, ignore the request. */
-	if (bcmp(arp->arp_tpa, &d->myip, sizeof(arp->arp_tpa)))
+	if (bcmp(arp->arp_tpa, &d->myip, sizeof (arp->arp_tpa)))
 		return;
 
 #ifdef ARP_DEBUG
@@ -288,16 +283,16 @@ arp_reply(struct iodesc *d, void *pkt)
 
 	arp->arp_op = htons(ARPOP_REPLY);
 	/* source becomes target */
-	bcopy(arp->arp_sha, arp->arp_tha, sizeof(arp->arp_tha));
-	bcopy(arp->arp_spa, arp->arp_tpa, sizeof(arp->arp_tpa));
+	bcopy(arp->arp_sha, arp->arp_tha, sizeof (arp->arp_tha));
+	bcopy(arp->arp_spa, arp->arp_tpa, sizeof (arp->arp_tpa));
 	/* here becomes source */
-	bcopy(d->myea,  arp->arp_sha, sizeof(arp->arp_sha));
-	bcopy(&d->myip, arp->arp_spa, sizeof(arp->arp_spa));
+	bcopy(d->myea,  arp->arp_sha, sizeof (arp->arp_sha));
+	bcopy(&d->myip, arp->arp_spa, sizeof (arp->arp_spa));
 
 	/*
 	 * No need to get fancy here.  If the send fails, the
 	 * requestor will just ask again.
 	 */
-	(void) sendether(d, pkt, sizeof(*arp) + 18,
-	                 arp->arp_tha, ETHERTYPE_ARP);
+	(void) sendether(d, pkt, sizeof (*arp) + 18,
+	    arp->arp_tha, ETHERTYPE_ARP);
 }
