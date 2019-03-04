@@ -13,6 +13,7 @@
 
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -43,15 +44,15 @@
 #    snapshot right after you create a new test file.
 # 2. Start DTrace in the background to put a delay in the
 #    sync thread after it closes the empty bpobj and before
-#    it reopens it.
+#    it reopens it. The dtrace process is set to exit when this
+#    script exits.
 # 3. Start a process in the backgroud that runs zfs-destroy
 #    dry-runs in an infinite loop. The idea is to keep calling
 #    dsl_deadlist_space_range().
 # 4. Go ahead and start removing the test files. This should
 #    start populating the deadlist of each snapshot with
 #    entries and go through the dle_enqueue() target code.
-# 5. If the test passes, kill the process running on a loop
-#    and dtrace, and cleanup the dataset.
+# 5. Kill the 'zfs destroy' loop and clean up the dataset.
 #
 
 verify_runnable "both"
@@ -61,7 +62,7 @@ DLDS="dl_race"
 
 function cleanup
 {
-	log_must kill -9 $DLOOP_PID $DTRACE_PID
+	log_must kill -9 $DLOOP_PID
 	log_must zfs destroy -fR $TESTPOOL/$TESTFS/$DLDS
 }
 
@@ -86,8 +87,7 @@ log_onexit cleanup
 setup
 log_must sync
 
-log_must dtrace -qwn "fbt::bpobj_decr_empty:entry { chill(500000000); }" &
-DTRACE_PID="$!"
+log_must dtrace -p "$PPID" -qwn "fbt::bpobj_decr_empty:entry { chill(500000000); }" &
 sleep 1
 
 destroy_nv_loop &
@@ -100,5 +100,5 @@ done
 log_must sync
 
 log_pass "There should be no race condition when an administrative command" \
-    " attempts to read a deadlist's entries at the same time a that a sync" \
+    " attempts to read a deadlist's entries while a sync" \
     " thread is manipulating it."
