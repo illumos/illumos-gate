@@ -2548,6 +2548,9 @@ file path=opt/zfs-tests/tests/functional/rsend/send-c_volume mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send-c_zstreamdump mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send-cpL_varied_recsize \
     mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send_freeobjects mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send_realloc_dnode_size \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/setup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/scrub_mirror/default.cfg mode=0444
