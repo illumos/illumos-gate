@@ -182,7 +182,7 @@ ficlPrimitiveColon(ficlVm *vm)
 
 	vm->state = FICL_VM_STATE_COMPILE;
 	markControlTag(vm, colonTag);
-	ficlDictionaryAppendWord(dictionary, name,
+	(void) ficlDictionaryAppendWord(dictionary, name,
 	    (ficlPrimitive)ficlInstructionColonParen,
 	    FICL_WORD_DEFAULT | FICL_WORD_SMUDGED);
 
@@ -252,7 +252,7 @@ ficlPrimitiveConstant(ficlVm *vm)
 
 	FICL_STACK_CHECK(vm->dataStack, 1, 0);
 
-	ficlDictionaryAppendConstantInstruction(dictionary, name,
+	(void) ficlDictionaryAppendConstantInstruction(dictionary, name,
 	    ficlInstructionConstantParen, ficlStackPopInteger(vm->dataStack));
 }
 
@@ -264,7 +264,7 @@ ficlPrimitive2Constant(ficlVm *vm)
 
 	FICL_STACK_CHECK(vm->dataStack, 2, 0);
 
-	ficlDictionaryAppend2ConstantInstruction(dictionary, name,
+	(void) ficlDictionaryAppend2ConstantInstruction(dictionary, name,
 	    ficlInstruction2ConstantParen, ficlStackPop2Integer(vm->dataStack));
 }
 
@@ -281,8 +281,8 @@ ficlPrimitiveDot(ficlVm *vm)
 	FICL_STACK_CHECK(vm->dataStack, 1, 0);
 
 	c = ficlStackPop(vm->dataStack);
-	ficlLtoa((c).i, vm->pad, vm->base);
-	strcat(vm->pad, " ");
+	(void) ficlLtoa((c).i, vm->pad, vm->base);
+	(void) strcat(vm->pad, " ");
 	ficlVmTextOut(vm, vm->pad);
 }
 
@@ -294,8 +294,8 @@ ficlPrimitiveUDot(ficlVm *vm)
 	FICL_STACK_CHECK(vm->dataStack, 1, 0);
 
 	u = ficlStackPopUnsigned(vm->dataStack);
-	ficlUltoa(u, vm->pad, vm->base);
-	strcat(vm->pad, " ");
+	(void) ficlUltoa(u, vm->pad, vm->base);
+	(void) strcat(vm->pad, " ");
 	ficlVmTextOut(vm, vm->pad);
 }
 
@@ -307,8 +307,8 @@ ficlPrimitiveHexDot(ficlVm *vm)
 	FICL_STACK_CHECK(vm->dataStack, 1, 0);
 
 	u = ficlStackPopUnsigned(vm->dataStack);
-	ficlUltoa(u, vm->pad, 16);
-	strcat(vm->pad, " ");
+	(void) ficlUltoa(u, vm->pad, 16);
+	(void) strcat(vm->pad, " ");
 	ficlVmTextOut(vm, vm->pad);
 }
 
@@ -427,9 +427,10 @@ ficlPrimitiveSprintf(ficlVm *vm)
 				int integer;
 				integer = ficlStackPopInteger(vm->dataStack);
 				if (unsignedInteger)
-					ficlUltoa(integer, scratch, base);
+					(void) ficlUltoa(integer, scratch,
+					    base);
 				else
-					ficlLtoa(integer, scratch, base);
+					(void) ficlLtoa(integer, scratch, base);
 				base = 10;
 				unsignedInteger = 0; /* false */
 				source = scratch;
@@ -545,7 +546,7 @@ ficlPrimitiveBackslash(ficlVm *vm)
 static void
 ficlPrimitiveParenthesis(ficlVm *vm)
 {
-	ficlVmParseStringEx(vm, ')', 0);
+	(void) ficlVmParseStringEx(vm, ')', 0);
 }
 
 /*
@@ -868,7 +869,7 @@ ficlPrimitiveInterpret(ficlVm *vm)
 			    FICL_STRING_GET_POINTER(s));
 			ficlStackPushUnsigned(vm->dataStack,
 			    FICL_STRING_GET_LENGTH(s));
-			ficlVmExecuteXT(vm, word);
+			(void) ficlVmExecuteXT(vm, word);
 			if (ficlStackPopInteger(vm->dataStack))
 				return;
 		}
@@ -922,7 +923,7 @@ ficlPrimitiveAddParseStep(ficlVm *vm)
 
 	pStep = (ficlWord *)(ficlStackPop(vm->dataStack).p);
 	if ((pStep != NULL) && ficlDictionaryIsAWord(dictionary, pStep))
-		ficlSystemAddParseStep(vm->callback.system, pStep);
+		(void) ficlSystemAddParseStep(vm->callback.system, pStep);
 }
 
 /*
@@ -1089,7 +1090,7 @@ ficlPrimitiveVariable(ficlVm *vm)
 	ficlDictionary *dictionary = ficlVmGetDictionary(vm);
 	ficlString name = ficlVmGetWord(vm);
 
-	ficlDictionaryAppendWord(dictionary, name,
+	(void) ficlDictionaryAppendWord(dictionary, name,
 	    (ficlPrimitive)ficlInstructionVariableParen, FICL_WORD_DEFAULT);
 	ficlVmDictionaryAllotCells(vm, dictionary, 1);
 }
@@ -1100,7 +1101,7 @@ ficlPrimitive2Variable(ficlVm *vm)
 	ficlDictionary *dictionary = ficlVmGetDictionary(vm);
 	ficlString name = ficlVmGetWord(vm);
 
-	ficlDictionaryAppendWord(dictionary, name,
+	(void) ficlDictionaryAppendWord(dictionary, name,
 	    (ficlPrimitive)ficlInstructionVariableParen, FICL_WORD_DEFAULT);
 	ficlVmDictionaryAllotCells(vm, dictionary, 2);
 }
@@ -1285,7 +1286,7 @@ ficlPrimitiveCountedStringQuoteIm(ficlVm *vm)
 		ficlCountedString *counted = (ficlCountedString *)
 		    dictionary->here;
 
-		ficlVmGetString(vm, counted, '\"');
+		(void) ficlVmGetString(vm, counted, '\"');
 		ficlStackPushPointer(vm->dataStack, counted);
 
 		/*
@@ -1411,7 +1412,7 @@ ficlPrimitiveCreate(ficlVm *vm)
 	ficlDictionary *dictionary = ficlVmGetDictionary(vm);
 	ficlString name = ficlVmGetWord(vm);
 
-	ficlDictionaryAppendWord(dictionary, name,
+	(void) ficlDictionaryAppendWord(dictionary, name,
 	    (ficlPrimitive)ficlInstructionCreateParen, FICL_WORD_DEFAULT);
 	ficlVmDictionaryAllotCells(vm, dictionary, 1);
 }
@@ -1564,7 +1565,7 @@ ficlPrimitiveNumberSignGreater(ficlVm *vm)
 
 	counted = FICL_POINTER_TO_COUNTED_STRING(vm->pad);
 	counted->text[counted->length] = 0;
-	ficlStringReverse(counted->text);
+	(void) ficlStringReverse(counted->text);
 	ficlStackDrop(vm->dataStack, 2);
 	ficlStackPushPointer(vm->dataStack, counted->text);
 	ficlStackPushUnsigned(vm->dataStack, counted->length);
@@ -2030,7 +2031,7 @@ ficlPrimitiveStringQuoteIm(ficlVm *vm)
 	if (vm->state == FICL_VM_STATE_INTERPRET) {
 		ficlCountedString *counted;
 		counted = (ficlCountedString *)dictionary->here;
-		ficlVmGetString(vm, counted, '\"');
+		(void) ficlVmGetString(vm, counted, '\"');
 		ficlStackPushPointer(vm->dataStack, counted->text);
 		ficlStackPushUnsigned(vm->dataStack, counted->length);
 	} else {	/* FICL_VM_STATE_COMPILE state */
@@ -2069,7 +2070,7 @@ ficlPrimitiveType(ficlVm *vm)
 	if (s[length] != 0) {
 		char *here = (char *)ficlVmGetDictionary(vm)->here;
 		if (s != here)
-			strncpy(here, s, length);
+			(void) strncpy(here, s, length);
 
 		here[length] = '\0';
 		s = here;
@@ -2109,7 +2110,7 @@ ficlPrimitiveWord(ficlVm *vm)
 		FICL_STRING_SET_LENGTH(name, FICL_PAD_SIZE - 1);
 
 	counted->length = (ficlUnsigned8)FICL_STRING_GET_LENGTH(name);
-	strncpy(counted->text, FICL_STRING_GET_POINTER(name),
+	(void) strncpy(counted->text, FICL_STRING_GET_POINTER(name),
 	    FICL_STRING_GET_LENGTH(name));
 
 	/*
@@ -2336,7 +2337,7 @@ ficlPrimitiveUser(ficlVm *vm)
 		ficlVmThrowError(vm, "Error - out of user space");
 	}
 
-	ficlDictionaryAppendWord(dictionary, name,
+	(void) ficlDictionaryAppendWord(dictionary, name,
 	    (ficlPrimitive)ficlInstructionUserParen, FICL_WORD_DEFAULT);
 	ficlDictionaryAppendCell(dictionary, c);
 }
@@ -2505,7 +2506,7 @@ ficlLocalParen(ficlVm *vm, int isDouble, int isFloat)
 			instruction = ficlInstructionToLocalParen;
 		}
 
-		ficlDictionaryAppendWord(locals, name, code,
+		(void) ficlDictionaryAppendWord(locals, name, code,
 		    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
 		ficlDictionaryAppendUnsigned(locals,
 		    vm->callback.system->localsCount);
@@ -2605,7 +2606,6 @@ ficlPrimitiveToValue(ficlVm *vm)
 			    "to %.*s : local is of unknown type",
 			    FICL_STRING_GET_LENGTH(name),
 			    FICL_STRING_GET_POINTER(name));
-			return;
 		}
 
 		nLocal = word->param[0].i;
@@ -2648,30 +2648,30 @@ TO_GLOBAL:
 		instruction = ficlInstructionStore;
 		stack = vm->dataStack;
 		isDouble = FICL_FALSE;
-	break;
+		break;
 	case ficlInstruction2ConstantParen:
 		instruction = ficlInstruction2Store;
 		stack = vm->dataStack;
 		isDouble = FICL_TRUE;
-	break;
+		break;
 #if FICL_WANT_FLOAT
 	case ficlInstructionFConstantParen:
 		instruction = ficlInstructionFStore;
 		stack = vm->floatStack;
 		isDouble = FICL_FALSE;
-	break;
+		break;
 	case ficlInstructionF2ConstantParen:
 		instruction = ficlInstructionF2Store;
 		stack = vm->floatStack;
 		isDouble = FICL_TRUE;
-	break;
+		break;
 #endif /* FICL_WANT_FLOAT */
 	default:
 		ficlVmThrowError(vm,
 		    "to %.*s : value/constant is of unknown type",
 		    FICL_STRING_GET_LENGTH(name),
 		    FICL_STRING_GET_POINTER(name));
-	return;
+		break;
 	}
 
 	if (vm->state == FICL_VM_STATE_INTERPRET) {
@@ -3104,7 +3104,8 @@ ficlSystemCompileCore(ficlSystem *system)
 
 #define	FICL_TOKEN(token, description)
 #define	FICL_INSTRUCTION_TOKEN(token, description, flags)	\
-	ficlDictionarySetInstruction(dictionary, description, token, flags);
+	(void) ficlDictionarySetInstruction(dictionary, description, token, \
+		flags);
 #include "ficltokens.h"
 #undef FICL_TOKEN
 #undef FICL_INSTRUCTION_TOKEN
@@ -3113,208 +3114,208 @@ ficlSystemCompileCore(ficlSystem *system)
 	 * The Core word set
 	 * see softcore.c for definitions of: abs bl space spaces abort"
 	 */
-	ficlDictionarySetPrimitive(dictionary, "#", ficlPrimitiveNumberSign,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "#>",
+	(void) ficlDictionarySetPrimitive(dictionary, "#",
+	    ficlPrimitiveNumberSign, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "#>",
 	    ficlPrimitiveNumberSignGreater, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "#s", ficlPrimitiveNumberSignS,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "\'", ficlPrimitiveTick,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "(", ficlPrimitiveParenthesis,
-	    FICL_WORD_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "+loop",
+	(void) ficlDictionarySetPrimitive(dictionary, "#s",
+	    ficlPrimitiveNumberSignS, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "\'",
+	    ficlPrimitiveTick, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "(",
+	    ficlPrimitiveParenthesis, FICL_WORD_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "+loop",
 	    ficlPrimitivePlusLoopCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, ".", ficlPrimitiveDot,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, ".\"",
+	(void) ficlDictionarySetPrimitive(dictionary, ".",
+	    ficlPrimitiveDot, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, ".\"",
 	    ficlPrimitiveDotQuoteCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, ":", ficlPrimitiveColon,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, ";", ficlPrimitiveSemicolonCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "<#",
+	(void) ficlDictionarySetPrimitive(dictionary, ":",
+	    ficlPrimitiveColon, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, ";",
+	    ficlPrimitiveSemicolonCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "<#",
 	    ficlPrimitiveLessNumberSign, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, ">body", ficlPrimitiveToBody,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, ">in", ficlPrimitiveToIn,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, ">number", ficlPrimitiveToNumber,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "abort", ficlPrimitiveAbort,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "accept", ficlPrimitiveAccept,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "align", ficlPrimitiveAlign,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "aligned", ficlPrimitiveAligned,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "allot", ficlPrimitiveAllot,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "base", ficlPrimitiveBase,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "begin", ficlPrimitiveBeginCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "case", ficlPrimitiveCaseCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "char", ficlPrimitiveChar,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "char+", ficlPrimitiveCharPlus,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "chars", ficlPrimitiveChars,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "constant",
+	(void) ficlDictionarySetPrimitive(dictionary, ">body",
+	    ficlPrimitiveToBody, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, ">in",
+	    ficlPrimitiveToIn, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, ">number",
+	    ficlPrimitiveToNumber, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "abort",
+	    ficlPrimitiveAbort, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "accept",
+	    ficlPrimitiveAccept, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "align",
+	    ficlPrimitiveAlign, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "aligned",
+	    ficlPrimitiveAligned, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "allot",
+	    ficlPrimitiveAllot, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "base",
+	    ficlPrimitiveBase, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "begin",
+	    ficlPrimitiveBeginCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "case",
+	    ficlPrimitiveCaseCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "char",
+	    ficlPrimitiveChar, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "char+",
+	    ficlPrimitiveCharPlus, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "chars",
+	    ficlPrimitiveChars, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "constant",
 	    ficlPrimitiveConstant, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "count", ficlPrimitiveCount,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "cr", ficlPrimitiveCR,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "create", ficlPrimitiveCreate,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "decimal", ficlPrimitiveDecimal,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "depth", ficlPrimitiveDepth,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "do", ficlPrimitiveDoCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "does>", ficlPrimitiveDoesCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "else", ficlPrimitiveElseCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "emit", ficlPrimitiveEmit,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "endcase",
+	(void) ficlDictionarySetPrimitive(dictionary, "count",
+	    ficlPrimitiveCount, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "cr",
+	    ficlPrimitiveCR, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "create",
+	    ficlPrimitiveCreate, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "decimal",
+	    ficlPrimitiveDecimal, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "depth",
+	    ficlPrimitiveDepth, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "do",
+	    ficlPrimitiveDoCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "does>",
+	    ficlPrimitiveDoesCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "else",
+	    ficlPrimitiveElseCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "emit",
+	    ficlPrimitiveEmit, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "endcase",
 	    ficlPrimitiveEndcaseCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "endof", ficlPrimitiveEndofCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "environment?",
+	(void) ficlDictionarySetPrimitive(dictionary, "endof",
+	    ficlPrimitiveEndofCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "environment?",
 	    ficlPrimitiveEnvironmentQ, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "evaluate",
+	(void) ficlDictionarySetPrimitive(dictionary, "evaluate",
 	    ficlPrimitiveEvaluate, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "execute", ficlPrimitiveExecute,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "exit", ficlPrimitiveExitCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "fallthrough",
+	(void) ficlDictionarySetPrimitive(dictionary, "execute",
+	    ficlPrimitiveExecute, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "exit",
+	    ficlPrimitiveExitCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "fallthrough",
 	    ficlPrimitiveFallthroughCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "find", ficlPrimitiveCFind,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "fm/mod",
+	(void) ficlDictionarySetPrimitive(dictionary, "find",
+	    ficlPrimitiveCFind, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "fm/mod",
 	    ficlPrimitiveFMSlashMod, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "here", ficlPrimitiveHere,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "hold", ficlPrimitiveHold,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "if", ficlPrimitiveIfCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "immediate",
+	(void) ficlDictionarySetPrimitive(dictionary, "here",
+	    ficlPrimitiveHere, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "hold",
+	    ficlPrimitiveHold, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "if",
+	    ficlPrimitiveIfCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "immediate",
 	    ficlPrimitiveImmediate, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "literal",
+	(void) ficlDictionarySetPrimitive(dictionary, "literal",
 	    ficlPrimitiveLiteralIm, FICL_WORD_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "loop", ficlPrimitiveLoopCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "m*", ficlPrimitiveMStar,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "mod", ficlPrimitiveMod,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "of", ficlPrimitiveOfCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "postpone",
+	(void) ficlDictionarySetPrimitive(dictionary, "loop",
+	    ficlPrimitiveLoopCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "m*",
+	    ficlPrimitiveMStar, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "mod",
+	    ficlPrimitiveMod, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "of",
+	    ficlPrimitiveOfCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "postpone",
 	    ficlPrimitivePostponeCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "quit", ficlPrimitiveQuit,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "recurse",
+	(void) ficlDictionarySetPrimitive(dictionary, "quit",
+	    ficlPrimitiveQuit, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "recurse",
 	    ficlPrimitiveRecurseCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "repeat",
+	(void) ficlDictionarySetPrimitive(dictionary, "repeat",
 	    ficlPrimitiveRepeatCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "s\"",
+	(void) ficlDictionarySetPrimitive(dictionary, "s\"",
 	    ficlPrimitiveStringQuoteIm, FICL_WORD_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "sign", ficlPrimitiveSign,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "sm/rem",
+	(void) ficlDictionarySetPrimitive(dictionary, "sign",
+	    ficlPrimitiveSign, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "sm/rem",
 	    ficlPrimitiveSMSlashRem, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "source", ficlPrimitiveSource,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "state", ficlPrimitiveState,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "then", ficlPrimitiveEndifCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "type", ficlPrimitiveType,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "u.", ficlPrimitiveUDot,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "um*", ficlPrimitiveUMStar,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "um/mod",
+	(void) ficlDictionarySetPrimitive(dictionary, "source",
+	    ficlPrimitiveSource, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "state",
+	    ficlPrimitiveState, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "then",
+	    ficlPrimitiveEndifCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "type",
+	    ficlPrimitiveType, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "u.",
+	    ficlPrimitiveUDot, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "um*",
+	    ficlPrimitiveUMStar, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "um/mod",
 	    ficlPrimitiveUMSlashMod, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "until",
+	(void) ficlDictionarySetPrimitive(dictionary, "until",
 	    ficlPrimitiveUntilCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "variable",
+	(void) ficlDictionarySetPrimitive(dictionary, "variable",
 	    ficlPrimitiveVariable, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "while",
+	(void) ficlDictionarySetPrimitive(dictionary, "while",
 	    ficlPrimitiveWhileCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "word", ficlPrimitiveWord,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "[",
+	(void) ficlDictionarySetPrimitive(dictionary, "word",
+	    ficlPrimitiveWord, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "[",
 	    ficlPrimitiveLeftBracketCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "[\']",
+	(void) ficlDictionarySetPrimitive(dictionary, "[\']",
 	    ficlPrimitiveBracketTickCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "[char]", ficlPrimitiveCharCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "]", ficlPrimitiveRightBracket,
-	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "[char]",
+	    ficlPrimitiveCharCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "]",
+	    ficlPrimitiveRightBracket, FICL_WORD_DEFAULT);
 	/*
 	 * The Core Extensions word set...
 	 * see softcore.fr for other definitions
 	 */
 	/* "#tib" */
-	ficlDictionarySetPrimitive(dictionary, ".(", ficlPrimitiveDotParen,
-	    FICL_WORD_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, ".(",
+	    ficlPrimitiveDotParen, FICL_WORD_IMMEDIATE);
 	/* ".r" is in softcore */
-	ficlDictionarySetPrimitive(dictionary, ":noname",
+	(void) ficlDictionarySetPrimitive(dictionary, ":noname",
 	    ficlPrimitiveColonNoName, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "?do", ficlPrimitiveQDoCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "again", ficlPrimitiveAgainCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "c\"",
+	(void) ficlDictionarySetPrimitive(dictionary, "?do",
+	    ficlPrimitiveQDoCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "again",
+	    ficlPrimitiveAgainCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "c\"",
 	    ficlPrimitiveCountedStringQuoteIm, FICL_WORD_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "hex", ficlPrimitiveHex,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "pad", ficlPrimitivePad,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "parse", ficlPrimitiveParse,
-	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "hex",
+	    ficlPrimitiveHex, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "pad",
+	    ficlPrimitivePad, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "parse",
+	    ficlPrimitiveParse, FICL_WORD_DEFAULT);
 
 	/*
 	 * query restore-input save-input tib u.r u> unused
 	 * [FICL_VM_STATE_COMPILE]
 	 */
-	ficlDictionarySetPrimitive(dictionary, "refill", ficlPrimitiveRefill,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "source-id",
+	(void) ficlDictionarySetPrimitive(dictionary, "refill",
+	    ficlPrimitiveRefill, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "source-id",
 	    ficlPrimitiveSourceID, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "to", ficlPrimitiveToValue,
-	    FICL_WORD_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "value", ficlPrimitiveConstant,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "\\", ficlPrimitiveBackslash,
-	    FICL_WORD_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "to",
+	    ficlPrimitiveToValue, FICL_WORD_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "value",
+	    ficlPrimitiveConstant, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "\\",
+	    ficlPrimitiveBackslash, FICL_WORD_IMMEDIATE);
 
 	/*
 	 * Environment query values for the Core word set
 	 */
-	ficlDictionarySetConstant(environment, "/counted-string",
+	(void) ficlDictionarySetConstant(environment, "/counted-string",
 	    FICL_COUNTED_STRING_MAX);
-	ficlDictionarySetConstant(environment, "/hold", FICL_PAD_SIZE);
-	ficlDictionarySetConstant(environment, "/pad", FICL_PAD_SIZE);
-	ficlDictionarySetConstant(environment, "address-unit-bits", 8);
-	ficlDictionarySetConstant(environment, "core", FICL_TRUE);
-	ficlDictionarySetConstant(environment, "core-ext", FICL_FALSE);
-	ficlDictionarySetConstant(environment, "floored", FICL_FALSE);
-	ficlDictionarySetConstant(environment, "max-char", UCHAR_MAX);
-	ficlDictionarySetConstant(environment, "max-n", LONG_MAX);
-	ficlDictionarySetConstant(environment, "max-u", ULONG_MAX);
+	(void) ficlDictionarySetConstant(environment, "/hold", FICL_PAD_SIZE);
+	(void) ficlDictionarySetConstant(environment, "/pad", FICL_PAD_SIZE);
+	(void) ficlDictionarySetConstant(environment, "address-unit-bits", 8);
+	(void) ficlDictionarySetConstant(environment, "core", FICL_TRUE);
+	(void) ficlDictionarySetConstant(environment, "core-ext", FICL_FALSE);
+	(void) ficlDictionarySetConstant(environment, "floored", FICL_FALSE);
+	(void) ficlDictionarySetConstant(environment, "max-char", UCHAR_MAX);
+	(void) ficlDictionarySetConstant(environment, "max-n", LONG_MAX);
+	(void) ficlDictionarySetConstant(environment, "max-u", ULONG_MAX);
 
 	{
 		ficl2Integer id;
@@ -3323,25 +3324,25 @@ ficlSystemCompileCore(ficlSystem *system)
 		low = ULONG_MAX;
 		high = LONG_MAX;
 		FICL_2INTEGER_SET(high, low, id);
-		ficlDictionarySet2Constant(environment, "max-d", id);
+		(void) ficlDictionarySet2Constant(environment, "max-d", id);
 		high = ULONG_MAX;
 		FICL_2INTEGER_SET(high, low, id);
-		ficlDictionarySet2Constant(environment, "max-ud", id);
+		(void) ficlDictionarySet2Constant(environment, "max-ud", id);
 	}
 
-	ficlDictionarySetConstant(environment, "return-stack-cells",
+	(void) ficlDictionarySetConstant(environment, "return-stack-cells",
 	    FICL_DEFAULT_STACK_SIZE);
-	ficlDictionarySetConstant(environment, "stack-cells",
+	(void) ficlDictionarySetConstant(environment, "stack-cells",
 	    FICL_DEFAULT_STACK_SIZE);
 
 	/*
 	 * The optional Double-Number word set (partial)
 	 */
-	ficlDictionarySetPrimitive(dictionary, "2constant",
+	(void) ficlDictionarySetPrimitive(dictionary, "2constant",
 	    ficlPrimitive2Constant, FICL_WORD_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "2literal",
+	(void) ficlDictionarySetPrimitive(dictionary, "2literal",
 	    ficlPrimitive2LiteralIm, FICL_WORD_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "2variable",
+	(void) ficlDictionarySetPrimitive(dictionary, "2variable",
 	    ficlPrimitive2Variable, FICL_WORD_IMMEDIATE);
 	/*
 	 * D+ D- D. D.R D0< D0= D2* D2/ in softcore
@@ -3353,51 +3354,54 @@ ficlSystemCompileCore(ficlSystem *system)
 	/*
 	 * DOUBLE EXT
 	 */
-	ficlDictionarySetPrimitive(dictionary, "2rot",
+	(void) ficlDictionarySetPrimitive(dictionary, "2rot",
 	    ficlPrimitive2Rot, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "2value",
+	(void) ficlDictionarySetPrimitive(dictionary, "2value",
 	    ficlPrimitive2Constant, FICL_WORD_IMMEDIATE);
 	/* du< in softcore */
 	/*
 	 * The optional Exception and Exception Extensions word set
 	 */
-	ficlDictionarySetPrimitive(dictionary, "catch", ficlPrimitiveCatch,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "throw", ficlPrimitiveThrow,
-	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "catch",
+	    ficlPrimitiveCatch, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "throw",
+	    ficlPrimitiveThrow, FICL_WORD_DEFAULT);
 
-	ficlDictionarySetConstant(environment, "exception", FICL_TRUE);
-	ficlDictionarySetConstant(environment, "exception-ext", FICL_TRUE);
+	(void) ficlDictionarySetConstant(environment, "exception", FICL_TRUE);
+	(void) ficlDictionarySetConstant(environment, "exception-ext",
+	    FICL_TRUE);
 
 	/*
 	 * The optional Locals and Locals Extensions word set
 	 * see softcore.c for implementation of locals|
 	 */
 #if FICL_WANT_LOCALS
-	ficlDictionarySetPrimitive(dictionary, "doLocal",
+	(void) ficlDictionarySetPrimitive(dictionary, "doLocal",
 	    ficlPrimitiveDoLocalIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "(local)",
+	(void) ficlDictionarySetPrimitive(dictionary, "(local)",
 	    ficlPrimitiveLocalParen, FICL_WORD_COMPILE_ONLY);
-	ficlDictionarySetPrimitive(dictionary, "(2local)",
+	(void) ficlDictionarySetPrimitive(dictionary, "(2local)",
 	    ficlPrimitive2LocalParen, FICL_WORD_COMPILE_ONLY);
 
-	ficlDictionarySetConstant(environment, "locals", FICL_TRUE);
-	ficlDictionarySetConstant(environment, "locals-ext", FICL_TRUE);
-	ficlDictionarySetConstant(environment, "#locals", FICL_MAX_LOCALS);
+	(void) ficlDictionarySetConstant(environment, "locals", FICL_TRUE);
+	(void) ficlDictionarySetConstant(environment, "locals-ext", FICL_TRUE);
+	(void) ficlDictionarySetConstant(environment, "#locals",
+	    FICL_MAX_LOCALS);
 #endif
 
 	/*
 	 * The optional Memory-Allocation word set
 	 */
 
-	ficlDictionarySetPrimitive(dictionary, "allocate",
+	(void) ficlDictionarySetPrimitive(dictionary, "allocate",
 	    ficlPrimitiveAllocate, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "free", ficlPrimitiveFree,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "resize", ficlPrimitiveResize,
-	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "free",
+	    ficlPrimitiveFree, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "resize",
+	    ficlPrimitiveResize, FICL_WORD_DEFAULT);
 
-	ficlDictionarySetConstant(environment, "memory-alloc", FICL_TRUE);
+	(void) ficlDictionarySetConstant(environment, "memory-alloc",
+	    FICL_TRUE);
 
 	/*
 	 * The optional Search-Order word set
@@ -3420,41 +3424,41 @@ ficlSystemCompileCore(ficlSystem *system)
 	/*
 	 * Ficl extras
 	 */
-	ficlDictionarySetPrimitive(dictionary, ".ver", ficlPrimitiveVersion,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, ">name", ficlPrimitiveToName,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "add-parse-step",
+	(void) ficlDictionarySetPrimitive(dictionary, ".ver",
+	    ficlPrimitiveVersion, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, ">name",
+	    ficlPrimitiveToName, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "add-parse-step",
 	    ficlPrimitiveAddParseStep, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "body>", ficlPrimitiveFromBody,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "compile-only",
+	(void) ficlDictionarySetPrimitive(dictionary, "body>",
+	    ficlPrimitiveFromBody, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "compile-only",
 	    ficlPrimitiveCompileOnly, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "endif", ficlPrimitiveEndifCoIm,
-	    FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "last-word",
+	(void) ficlDictionarySetPrimitive(dictionary, "endif",
+	    ficlPrimitiveEndifCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
+	(void) ficlDictionarySetPrimitive(dictionary, "last-word",
 	    ficlPrimitiveLastWord, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "hash", ficlPrimitiveHash,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "objectify",
+	(void) ficlDictionarySetPrimitive(dictionary, "hash",
+	    ficlPrimitiveHash, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "objectify",
 	    ficlPrimitiveSetObjectFlag, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "?object",
+	(void) ficlDictionarySetPrimitive(dictionary, "?object",
 	    ficlPrimitiveIsObject, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "parse-word",
+	(void) ficlDictionarySetPrimitive(dictionary, "parse-word",
 	    ficlPrimitiveParseNoCopy, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "sfind", ficlPrimitiveSFind,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "sliteral",
+	(void) ficlDictionarySetPrimitive(dictionary, "sfind",
+	    ficlPrimitiveSFind, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "sliteral",
 	    ficlPrimitiveSLiteralCoIm, FICL_WORD_COMPILE_ONLY_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "sprintf", ficlPrimitiveSprintf,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "strlen", ficlPrimitiveStrlen,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "x.", ficlPrimitiveHexDot,
-	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "sprintf",
+	    ficlPrimitiveSprintf, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "strlen",
+	    ficlPrimitiveStrlen, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "x.",
+	    ficlPrimitiveHexDot, FICL_WORD_DEFAULT);
 #if FICL_WANT_USER
-	ficlDictionarySetPrimitive(dictionary, "user", ficlPrimitiveUser,
-	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "user",
+	    ficlPrimitiveUser, FICL_WORD_DEFAULT);
 #endif
 
 	/*
@@ -3462,9 +3466,9 @@ ficlSystemCompileCore(ficlSystem *system)
 	 */
 	interpret = ficlDictionarySetPrimitive(dictionary, "interpret",
 	    ficlPrimitiveInterpret, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "lookup", ficlPrimitiveLookup,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "(parse-step)",
+	(void) ficlDictionarySetPrimitive(dictionary, "lookup",
+	    ficlPrimitiveLookup, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "(parse-step)",
 	    ficlPrimitiveParseStepParen, FICL_WORD_DEFAULT);
 	system->exitInnerWord = ficlDictionarySetPrimitive(dictionary,
 	    "exit-inner", ficlPrimitiveExitInner, FICL_WORD_DEFAULT);
@@ -3475,7 +3479,7 @@ ficlSystemCompileCore(ficlSystem *system)
 	 * By default you only get the numbers (fi0, fiNeg1, etc).
 	 */
 #define	FICL_TOKEN(token, description)	\
-	ficlDictionarySetConstant(dictionary, #token, token);
+	(void) ficlDictionarySetConstant(dictionary, #token, token);
 #if 0
 #define	FICL_INSTRUCTION_TOKEN(token, description, flags)	\
 	ficlDictionarySetConstant(dictionary, #token, token);

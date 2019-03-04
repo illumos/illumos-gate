@@ -60,7 +60,7 @@ ficlPrimitiveFConstant(ficlVm *vm)
 
 	FICL_STACK_CHECK(vm->floatStack, 1, 0);
 
-	ficlDictionaryAppendWord(dictionary, name,
+	(void) ficlDictionaryAppendWord(dictionary, name,
 	    (ficlPrimitive)ficlInstructionFConstantParen, FICL_WORD_DEFAULT);
 	ficlDictionaryAppendCell(dictionary, ficlStackPop(vm->floatStack));
 }
@@ -98,7 +98,7 @@ ficlPrimitiveF2Constant(ficlVm *vm)
 
 	FICL_STACK_CHECK(vm->floatStack, 2, 0);
 
-	ficlDictionaryAppendWord(dictionary, name,
+	(void) ficlDictionaryAppendWord(dictionary, name,
 	    (ficlPrimitive)ficlInstructionF2ConstantParen, FICL_WORD_DEFAULT);
 	ficlDictionaryAppendCell(dictionary, ficlStackPop(vm->floatStack));
 	ficlDictionaryAppendCell(dictionary, ficlStackPop(vm->floatStack));
@@ -136,7 +136,7 @@ ficlPrimitiveFDot(ficlVm *vm)
 	FICL_STACK_CHECK(vm->floatStack, 1, 0);
 
 	f = ficlStackPopFloat(vm->floatStack);
-	sprintf(vm->pad, "%#f ", f);
+	(void) sprintf(vm->pad, "%#f ", f);
 	ficlVmTextOut(vm, vm->pad);
 }
 
@@ -152,7 +152,7 @@ ficlPrimitiveEDot(ficlVm *vm)
 	FICL_STACK_CHECK(vm->floatStack, 1, 0);
 
 	f = ficlStackPopFloat(vm->floatStack);
-	sprintf(vm->pad, "%#e ", f);
+	(void) sprintf(vm->pad, "%#e ", f);
 	ficlVmTextOut(vm, vm->pad);
 }
 
@@ -173,10 +173,11 @@ ficlFloatStackDisplayCallback(void *c, ficlCell *cell)
 	struct stackContext *context = (struct stackContext *)c;
 	char buffer[80];
 #ifdef	_LP64
-	snprintf(buffer, sizeof (buffer), "[0x%016lx %3d] %20e (0x%016lx)\n",
+	(void) snprintf(buffer, sizeof (buffer),
+	    "[0x%016lx %3d] %20e (0x%016lx)\n",
 	    (unsigned long) cell, context->count++, cell->f, cell->u);
 #else
-	snprintf(buffer, sizeof (buffer), "[0x%08x %3d] %12e (0x%08x)\n",
+	(void) snprintf(buffer, sizeof (buffer), "[0x%08x %3d] %12e (0x%08x)\n",
 	    (unsigned)cell, context->count++, cell->f, cell->u);
 #endif
 	ficlVmTextOut(context->vm, buffer);
@@ -417,31 +418,31 @@ ficlSystemCompileFloat(ficlSystem *system)
 	FICL_SYSTEM_ASSERT(system, environment);
 
 #if FICL_WANT_LOCALS
-	ficlDictionarySetPrimitive(dictionary, "(flocal)",
+	(void) ficlDictionarySetPrimitive(dictionary, "(flocal)",
 	    ficlPrimitiveFLocalParen, FICL_WORD_COMPILE_ONLY);
-	ficlDictionarySetPrimitive(dictionary, "(f2local)",
+	(void) ficlDictionarySetPrimitive(dictionary, "(f2local)",
 	    ficlPrimitiveF2LocalParen, FICL_WORD_COMPILE_ONLY);
 #endif /* FICL_WANT_LOCALS */
 
 #if FICL_WANT_FLOAT
-	ficlDictionarySetPrimitive(dictionary, "fconstant",
+	(void) ficlDictionarySetPrimitive(dictionary, "fconstant",
 	    ficlPrimitiveFConstant, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "fvalue",
+	(void) ficlDictionarySetPrimitive(dictionary, "fvalue",
 	    ficlPrimitiveFConstant, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "f2constant",
+	(void) ficlDictionarySetPrimitive(dictionary, "f2constant",
 	    ficlPrimitiveF2Constant, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "f2value",
+	(void) ficlDictionarySetPrimitive(dictionary, "f2value",
 	    ficlPrimitiveF2Constant, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "fdepth", ficlPrimitiveFDepth,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "fliteral",
+	(void) ficlDictionarySetPrimitive(dictionary, "fdepth",
+	    ficlPrimitiveFDepth, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "fliteral",
 	    ficlPrimitiveFLiteralImmediate, FICL_WORD_IMMEDIATE);
-	ficlDictionarySetPrimitive(dictionary, "f.", ficlPrimitiveFDot,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "f.s", ficlVmDisplayFloatStack,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "fe.", ficlPrimitiveEDot,
-	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "f.",
+	    ficlPrimitiveFDot, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "f.s",
+	    ficlVmDisplayFloatStack, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "fe.",
+	    ficlPrimitiveEDot, FICL_WORD_DEFAULT);
 
 	/*
 	 * Missing words:
@@ -462,13 +463,14 @@ ficlSystemCompileFloat(ficlSystem *system)
 #else
 	data.f = MAXFLOAT;
 #endif
-	ficlDictionarySetConstant(environment, "max-float",	data.i);
+	(void) ficlDictionarySetConstant(environment, "max-float", data.i);
 	/* not all required words are present */
-	ficlDictionarySetConstant(environment, "floating", FICL_FALSE);
-	ficlDictionarySetConstant(environment, "floating-ext", FICL_FALSE);
-	ficlDictionarySetConstant(environment, "floating-stack",
+	(void) ficlDictionarySetConstant(environment, "floating", FICL_FALSE);
+	(void) ficlDictionarySetConstant(environment, "floating-ext",
+	    FICL_FALSE);
+	(void) ficlDictionarySetConstant(environment, "floating-stack",
 	    system->stackSize);
 #else
-	ficlDictionarySetConstant(environment, "floating", FICL_FALSE);
+	(void) ficlDictionarySetConstant(environment, "floating", FICL_FALSE);
 #endif
 }

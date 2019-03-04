@@ -58,7 +58,7 @@ pager_open(void)
 	struct termios raw;
 	struct winsize ws;
 
-	tcgetattr(0, &orig_termios);
+	(void) tcgetattr(0, &orig_termios);
 	raw = orig_termios;
 	raw.c_lflag &= ~(ICANON | ECHO);
 	raw.c_cc[VMIN] = 1;
@@ -111,7 +111,7 @@ pager_output(const char *cp)
 		if (*cp == 0)
 			return (0);
 
-		putchar(*cp);		/* always emit character */
+		(void) putchar(*cp);		/* always emit character */
 
 		if (*(cp++) == '\n') {	/* got a newline? */
 			p_freelines--;
@@ -177,6 +177,6 @@ pager_file(const char *fname)
 			break;
 		}
 	}
-	close(fd);
+	(void) close(fd);
 	return (result);
 }

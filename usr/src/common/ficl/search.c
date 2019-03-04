@@ -351,37 +351,40 @@ ficlSystemCompileSearch(ficlSystem *system)
 	/*
 	 * optional SEARCH-ORDER word set
 	 */
-	ficlDictionarySetPrimitive(dictionary, ">search",
+	(void) ficlDictionarySetPrimitive(dictionary, ">search",
 	    ficlPrimitiveSearchPush, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "search>",
+	(void) ficlDictionarySetPrimitive(dictionary, "search>",
 	    ficlPrimitiveSearchPop, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "definitions",
+	(void) ficlDictionarySetPrimitive(dictionary, "definitions",
 	    ficlPrimitiveDefinitions, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "forth-wordlist",
+	(void) ficlDictionarySetPrimitive(dictionary, "forth-wordlist",
 	    ficlPrimitiveForthWordlist, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "get-current",
+	(void) ficlDictionarySetPrimitive(dictionary, "get-current",
 	    ficlPrimitiveGetCurrent, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "get-order",
+	(void) ficlDictionarySetPrimitive(dictionary, "get-order",
 	    ficlPrimitiveGetOrder, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "search-wordlist",
+	(void) ficlDictionarySetPrimitive(dictionary, "search-wordlist",
 	    ficlPrimitiveSearchWordlist, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "set-current",
+	(void) ficlDictionarySetPrimitive(dictionary, "set-current",
 	    ficlPrimitiveSetCurrent, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "set-order",
+	(void) ficlDictionarySetPrimitive(dictionary, "set-order",
 	    ficlPrimitiveSetOrder, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "ficl-wordlist",
+	(void) ficlDictionarySetPrimitive(dictionary, "ficl-wordlist",
 	    ficlPrimitiveFiclWordlist, FICL_WORD_DEFAULT);
 
 	/*
 	 * Set SEARCH environment query values
 	 */
-	ficlDictionarySetConstant(environment, "search-order", FICL_TRUE);
-	ficlDictionarySetConstant(environment, "search-order-ext", FICL_TRUE);
-	ficlDictionarySetConstant(environment, "wordlists", FICL_MAX_WORDLISTS);
-	ficlDictionarySetPrimitive(dictionary, "wid-get-name",
+	(void) ficlDictionarySetConstant(environment, "search-order",
+	    FICL_TRUE);
+	(void) ficlDictionarySetConstant(environment, "search-order-ext",
+	    FICL_TRUE);
+	(void) ficlDictionarySetConstant(environment, "wordlists",
+	    FICL_MAX_WORDLISTS);
+	(void) ficlDictionarySetPrimitive(dictionary, "wid-get-name",
 	    ficlPrimitiveWidGetName, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "wid-set-name",
+	(void) ficlDictionarySetPrimitive(dictionary, "wid-set-name",
 	    ficlPrimitiveWidSetName, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "wid-set-super",
+	(void) ficlDictionarySetPrimitive(dictionary, "wid-set-super",
 	    ficlPrimitiveSetParentWid, FICL_WORD_DEFAULT);
 }

@@ -151,6 +151,7 @@ extern "C" {
 #include <stdint.h>
 #include <string.h>
 
+#define	__dead2	__NORETURN
 extern void pager_open(void);
 extern int pager_output(const char *);
 extern void pager_close(void);
@@ -1073,9 +1074,9 @@ FICL_PLATFORM_EXTERN void ficlVmReset(ficlVm *vm);
 FICL_PLATFORM_EXTERN void
 ficlVmSetTextOut(ficlVm *vm, ficlOutputFunction textOut);
 FICL_PLATFORM_EXTERN void ficlVmThrow(ficlVm *vm, int except);
-FICL_PLATFORM_EXTERN void ficlVmThrowError(ficlVm *vm, char *fmt, ...);
+FICL_PLATFORM_EXTERN void ficlVmThrowError(ficlVm *vm, char *fmt, ...) __dead2;
 FICL_PLATFORM_EXTERN void
-ficlVmThrowErrorVararg(ficlVm *vm, char *fmt, va_list list);
+ficlVmThrowErrorVararg(ficlVm *vm, char *fmt, va_list list) __dead2;
 FICL_PLATFORM_EXTERN void ficlVmTextOut(ficlVm *vm, char *text);
 FICL_PLATFORM_EXTERN void ficlVmErrorOut(ficlVm *vm, char *text);
 

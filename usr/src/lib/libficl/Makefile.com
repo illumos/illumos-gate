@@ -43,9 +43,6 @@ pics/vm.o := CERRWARN += -_gcc=-Wno-clobbered
 
 LDLIBS +=	-luuid -lz -lc -lm -lumem
 
-# not linted
-SMATCH=off
-
 HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficltokens.h ../ficllocal.h \
 	$(FICLDIR)/ficlplatform/unix.h $(PNGLITE)/pnglite.h
 

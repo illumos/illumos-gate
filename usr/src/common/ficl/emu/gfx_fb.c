@@ -76,13 +76,13 @@ gfx_framework_init(void)
 	/* make sure we have GFX framebuffer */
 	if (ioctl(fb.fd, VIS_GETIDENTIFIER, &fb.ident) < 0 ||
 	    strcmp(fb.ident.name, "illumos_fb") != 0) {
-		close(fb.fd);
+		(void) close(fb.fd);
 		fb.fd = -1;
 		return;
 	}
 
 	if (ioctl(fb.fd, FBIOGATTR, &attr) < 0) {
-		close(fb.fd);
+		(void) close(fb.fd);
 		fb.fd = -1;
 		return;
 	}
@@ -112,14 +112,14 @@ gfx_framework_init(void)
 	    MAP_SHARED, fb.fd, 0);
 
 	if (fb.fb_addr == NULL) {
-		close(fb.fd);
+		(void) close(fb.fd);
 		fb.fd = -1;
 		return;
 	}
-	snprintf(buf, sizeof (buf), "%d", fb.fb_height);
-	setenv("screen-height", buf, 1);
-	snprintf(buf, sizeof (buf), "%d", fb.fb_width);
-	setenv("screen-width", buf, 1);
+	(void) snprintf(buf, sizeof (buf), "%d", fb.fb_height);
+	(void) setenv("screen-height", buf, 1);
+	(void) snprintf(buf, sizeof (buf), "%d", fb.fb_width);
+	(void) setenv("screen-width", buf, 1);
 }
 
 void
@@ -129,7 +129,7 @@ gfx_framework_fini(void)
 		return;
 
 	(void) munmap((caddr_t)fb.fb_addr, fb.fb_size);
-	close(fb.fd);
+	(void) close(fb.fd);
 	fb.fd = -1;
 }
 

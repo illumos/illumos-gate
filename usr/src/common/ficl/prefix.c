@@ -155,7 +155,7 @@ ficlSystemCompilePrefix(ficlSystem *system)
 	/*
 	 * Put __tempbase in the forth-wordlist
 	 */
-	ficlDictionarySetPrimitive(dictionary, "__tempbase",
+	(void) ficlDictionarySetPrimitive(dictionary, "__tempbase",
 	    ficlPrimitiveTempBase, FICL_WORD_DEFAULT);
 
 	/*
