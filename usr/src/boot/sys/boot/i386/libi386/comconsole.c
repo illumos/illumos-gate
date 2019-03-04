@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith (msmith@freebsd.org)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,12 +32,12 @@
 #include <dev/pci/pcireg.h>
 #include "libi386.h"
 
-#define COMC_TXWAIT	0x40000		/* transmit timeout */
-#define COMC_BPS(x)	(115200 / (x))	/* speed to DLAB divisor */
-#define COMC_DIV2BPS(x)	(115200 / (x))	/* DLAB divisor to speed */
+#define	COMC_TXWAIT	0x40000		/* transmit timeout */
+#define	COMC_BPS(x)	(115200 / (x))	/* speed to DLAB divisor */
+#define	COMC_DIV2BPS(x)	(115200 / (x))	/* DLAB divisor to speed */
 
 #ifndef	COMSPEED
-#define COMSPEED	9600
+#define	COMSPEED	9600
 #endif
 
 #define	COM1_IOADDR	0x3f8
@@ -147,18 +147,18 @@ comc_probe(struct console *cp)
 	if (cp->c_private != NULL)
 		return;
 
-	cp->c_private = malloc(sizeof(struct serial));
+	cp->c_private = malloc(sizeof (struct serial));
 	port = cp->c_private;
 	port->speed = COMSPEED;
 
 	if (strcmp(cp->c_name, "ttya") == 0)
-	    port->ioaddr = COM1_IOADDR;
+		port->ioaddr = COM1_IOADDR;
 	else if (strcmp(cp->c_name, "ttyb") == 0)
-	    port->ioaddr = COM2_IOADDR;
+		port->ioaddr = COM2_IOADDR;
 	else if (strcmp(cp->c_name, "ttyc") == 0)
-	    port->ioaddr = COM3_IOADDR;
+		port->ioaddr = COM3_IOADDR;
 	else if (strcmp(cp->c_name, "ttyd") == 0)
-	    port->ioaddr = COM4_IOADDR;
+		port->ioaddr = COM4_IOADDR;
 
 	port->lcr = BITS8;	/* 8,n,1 */
 	port->ignore_cd = 1;	/* ignore cd */
@@ -219,9 +219,9 @@ comc_probe(struct console *cp)
 	snprintf(name, sizeof (name), "%s-pcidev", cp->c_name);
 	env = getenv(name);
 	if (env != NULL) {
-	    port->locator = comc_parse_pcidev(env);
-	    if (port->locator != 0)
-		    comc_pcidev_handle(cp, port->locator);
+		port->locator = comc_parse_pcidev(env);
+		if (port->locator != 0)
+			comc_pcidev_handle(cp, port->locator);
 	}
 
 	unsetenv(name);
@@ -233,39 +233,39 @@ static int
 comc_init(struct console *cp, int arg __attribute((unused)))
 {
 
-    comc_setup(cp);
+	comc_setup(cp);
 
-    if ((cp->c_flags & (C_PRESENTIN | C_PRESENTOUT)) ==
-	(C_PRESENTIN | C_PRESENTOUT))
-	return (CMD_OK);
-    return (CMD_ERROR);
+	if ((cp->c_flags & (C_PRESENTIN | C_PRESENTOUT)) ==
+	    (C_PRESENTIN | C_PRESENTOUT))
+		return (CMD_OK);
+	return (CMD_ERROR);
 }
 
 static void
 comc_putchar(struct console *cp, int c)
 {
-    int wait;
-    struct serial *sp = cp->c_private;
+	int wait;
+	struct serial *sp = cp->c_private;
 
-    for (wait = COMC_TXWAIT; wait > 0; wait--)
-        if (inb(sp->ioaddr + com_lsr) & LSR_TXRDY) {
-	    outb(sp->ioaddr + com_data, (u_char)c);
-	    break;
-	}
+	for (wait = COMC_TXWAIT; wait > 0; wait--)
+		if (inb(sp->ioaddr + com_lsr) & LSR_TXRDY) {
+			outb(sp->ioaddr + com_data, (uchar_t)c);
+			break;
+		}
 }
 
 static int
 comc_getchar(struct console *cp)
 {
-    struct serial *sp = cp->c_private;
-    return (comc_ischar(cp) ? inb(sp->ioaddr + com_data) : -1);
+	struct serial *sp = cp->c_private;
+	return (comc_ischar(cp) ? inb(sp->ioaddr + com_data) : -1);
 }
 
 static int
 comc_ischar(struct console *cp)
 {
-    struct serial *sp = cp->c_private;
-    return (inb(sp->ioaddr + com_lsr) & LSR_RXRDY);
+	struct serial *sp = cp->c_private;
+	return (inb(sp->ioaddr + com_lsr) & LSR_RXRDY);
 }
 
 static int
@@ -381,7 +381,7 @@ get_console(char *name)
 {
 	struct console *cp = NULL;
 
-	switch(name[3]) {
+	switch (name[3]) {
 	case 'a': cp = &ttya;
 		break;
 	case 'b': cp = &ttyb;
@@ -397,76 +397,76 @@ get_console(char *name)
 static int
 comc_mode_set(struct env_var *ev, int flags, const void *value)
 {
-    struct console *cp;
+	struct console *cp;
 
-    if (value == NULL)
-	return (CMD_ERROR);
+	if (value == NULL)
+		return (CMD_ERROR);
 
-    if ((cp = get_console(ev->ev_name)) == NULL)
-	return (CMD_ERROR);
+	if ((cp = get_console(ev->ev_name)) == NULL)
+		return (CMD_ERROR);
 
-    if (comc_parse_mode(cp->c_private, value) == CMD_ERROR)
-	return (CMD_ERROR);
+	if (comc_parse_mode(cp->c_private, value) == CMD_ERROR)
+		return (CMD_ERROR);
 
-    comc_setup(cp);
+	comc_setup(cp);
 
-    env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
+	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
-    return (CMD_OK);
+	return (CMD_OK);
 }
 
 static int
 comc_cd_set(struct env_var *ev, int flags, const void *value)
 {
-    struct console *cp;
-    struct serial *sp;
+	struct console *cp;
+	struct serial *sp;
 
-    if (value == NULL)
-	return (CMD_ERROR);
+	if (value == NULL)
+		return (CMD_ERROR);
 
-    if ((cp = get_console(ev->ev_name)) == NULL)
-	return (CMD_ERROR);
+	if ((cp = get_console(ev->ev_name)) == NULL)
+		return (CMD_ERROR);
 
-    sp = cp->c_private;
-    if (strcmp(value, "true") == 0)
-	sp->ignore_cd = 1;
-    else if (strcmp(value, "false") == 0)
-	sp->ignore_cd = 0;
-    else
-	return (CMD_ERROR);
+	sp = cp->c_private;
+	if (strcmp(value, "true") == 0)
+		sp->ignore_cd = 1;
+	else if (strcmp(value, "false") == 0)
+		sp->ignore_cd = 0;
+	else
+		return (CMD_ERROR);
 
-    comc_setup(cp);
+	comc_setup(cp);
 
-    env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
+	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
-    return (CMD_OK);
+	return (CMD_OK);
 }
 
 static int
 comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 {
-    struct console *cp;
-    struct serial *sp;
+	struct console *cp;
+	struct serial *sp;
 
-    if (value == NULL)
-	return (CMD_ERROR);
+	if (value == NULL)
+		return (CMD_ERROR);
 
-    if ((cp = get_console(ev->ev_name)) == NULL)
-	return (CMD_ERROR);
+	if ((cp = get_console(ev->ev_name)) == NULL)
+		return (CMD_ERROR);
 
-    sp = cp->c_private;
-    if (strcmp(value, "true") == 0)
-	sp->rtsdtr_off = 1;
-    else if (strcmp(value, "false") == 0)
-	sp->rtsdtr_off = 0;
-    else
-	return (CMD_ERROR);
+	sp = cp->c_private;
+	if (strcmp(value, "true") == 0)
+		sp->rtsdtr_off = 1;
+	else if (strcmp(value, "false") == 0)
+		sp->rtsdtr_off = 0;
+	else
+		return (CMD_ERROR);
 
-    comc_setup(cp);
+	comc_setup(cp);
 
-    env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
+	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
-    return (CMD_OK);
+	return (CMD_OK);
 }
 
 /*
@@ -477,7 +477,7 @@ static uint32_t
 comc_parse_pcidev(const char *string)
 {
 #ifdef NO_PCI
-	(void)string;
+	(void) string;
 	return (0);
 #else
 	char *p, *p1;
@@ -487,26 +487,26 @@ comc_parse_pcidev(const char *string)
 
 	errno = 0;
 	pres = strtoul(string, &p, 10);
-	if (errno != 0 || p == string || *p != ':' || pres < 0 )
+	if (errno != 0 || p == string || *p != ':' || pres < 0)
 		return (0);
 	bus = pres;
 	p1 = ++p;
 
 	pres = strtoul(p1, &p, 10);
-	if (errno != 0 || p == string || *p != ':' || pres < 0 )
+	if (errno != 0 || p == string || *p != ':' || pres < 0)
 		return (0);
 	dev = pres;
 	p1 = ++p;
 
 	pres = strtoul(p1, &p, 10);
-	if (errno != 0 || p == string || (*p != ':' && *p != '\0') || pres < 0 )
+	if (errno != 0 || p == string || (*p != ':' && *p != '\0') || pres < 0)
 		return (0);
 	func = pres;
 
 	if (*p == ':') {
 		p1 = ++p;
 		pres = strtoul(p1, &p, 10);
-		if (errno != 0 || p == string || *p != '\0' || pres <= 0 )
+		if (errno != 0 || p == string || *p != '\0' || pres <= 0)
 			return (0);
 		bar = pres;
 	} else
@@ -521,15 +521,15 @@ static int
 comc_pcidev_handle(struct console *cp, uint32_t locator)
 {
 #ifdef NO_PCI
-	(void)cp;
-	(void)locator;
+	(void) cp;
+	(void) locator;
 	return (CMD_ERROR);
 #else
 	struct serial *sp = cp->c_private;
 	uint32_t port;
 
 	if (biospci_read_config(locator & 0xffff,
-				(locator & 0xff0000) >> 16, 2, &port) == -1) {
+	    (locator & 0xff0000) >> 16, 2, &port) == -1) {
 		printf("Cannot read bar at 0x%x\n", locator);
 		return (CMD_ERROR);
 	}
@@ -537,7 +537,7 @@ comc_pcidev_handle(struct console *cp, uint32_t locator)
 		printf("Memory bar at 0x%x\n", locator);
 		return (CMD_ERROR);
 	}
-        port &= PCIM_BAR_IO_BASE;
+	port &= PCIM_BAR_IO_BASE;
 
 	comc_setup(cp);
 	sp->locator = locator;
@@ -575,38 +575,38 @@ comc_pcidev_set(struct env_var *ev, int flags, const void *value)
 static void
 comc_setup(struct console *cp)
 {
-    struct serial *sp = cp->c_private;
-    static int TRY_COUNT = 1000000;
-    int tries;
+	struct serial *sp = cp->c_private;
+	static int TRY_COUNT = 1000000;
+	int tries;
 
-    if ((cp->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) == 0)
-	return;
+	if ((cp->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) == 0)
+		return;
 
-    outb(sp->ioaddr + com_cfcr, CFCR_DLAB | sp->lcr);
-    outb(sp->ioaddr + com_dlbl, COMC_BPS(sp->speed) & 0xff);
-    outb(sp->ioaddr + com_dlbh, COMC_BPS(sp->speed) >> 8);
-    outb(sp->ioaddr + com_cfcr, sp->lcr);
-    outb(sp->ioaddr + com_mcr,
-	sp->rtsdtr_off? ~(MCR_RTS | MCR_DTR):MCR_RTS | MCR_DTR);
+	outb(sp->ioaddr + com_cfcr, CFCR_DLAB | sp->lcr);
+	outb(sp->ioaddr + com_dlbl, COMC_BPS(sp->speed) & 0xff);
+	outb(sp->ioaddr + com_dlbh, COMC_BPS(sp->speed) >> 8);
+	outb(sp->ioaddr + com_cfcr, sp->lcr);
+	outb(sp->ioaddr + com_mcr,
+	    sp->rtsdtr_off? ~(MCR_RTS | MCR_DTR) : MCR_RTS | MCR_DTR);
 
-    tries = 0;
-    do
-        inb(sp->ioaddr + com_data);
-    while (inb(sp->ioaddr + com_lsr) & LSR_RXRDY && ++tries < TRY_COUNT);
+	tries = 0;
+	do {
+		inb(sp->ioaddr + com_data);
+	} while (inb(sp->ioaddr + com_lsr) & LSR_RXRDY && ++tries < TRY_COUNT);
 
-    if (tries < TRY_COUNT) {
-	cp->c_flags |= (C_PRESENTIN | C_PRESENTOUT);
-    } else
-	cp->c_flags &= ~(C_PRESENTIN | C_PRESENTOUT);
+	if (tries < TRY_COUNT)
+		cp->c_flags |= (C_PRESENTIN | C_PRESENTOUT);
+	else
+		cp->c_flags &= ~(C_PRESENTIN | C_PRESENTOUT);
 }
 
 static int
 comc_getspeed(struct serial *sp)
 {
-	u_int	divisor;
-	u_char	dlbh;
-	u_char	dlbl;
-	u_char	cfcr;
+	uint_t	divisor;
+	uchar_t	dlbh;
+	uchar_t	dlbl;
+	uchar_t	cfcr;
 
 	cfcr = inb(sp->ioaddr + com_cfcr);
 	outb(sp->ioaddr + com_cfcr, CFCR_DLAB | cfcr);
