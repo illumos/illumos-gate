@@ -43,14 +43,15 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2019, Joyent, Inc.
 .\"
-.TH MAKE 1 "Jun 24, 2015"
+.TH MAKE 1 "March 8, 2019"
 .SH NAME
 make \- maintain, update, and regenerate related programs and files
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/make\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
+\fB/usr/bin/make\fR [\fB-C\fR \fIdirectory\fR] [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
      [\fB-i\fR] [\fB-j\fR \fImaxjobs\fR] [\fB-k\fR] [\fB-m\fR \fI{serial | parallel}\fR]
      [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR]
      [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]...
@@ -58,7 +59,7 @@ make \- maintain, update, and regenerate related programs and files
 .fi
 
 .nf
-\fB/usr/bin/dmake\fR [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
+\fB/usr/bin/dmake\fR [\fB-C\fR \fIdirectory\fR] [\fB-d\fR] [\fB-dd\fR] [\fB-D\fR] [\fB-DD\fR] [\fB-e\fR]
      [\fB-i\fR] [\fB-j\fR \fImaxjobs\fR] [\fB-k\fR]  [\fB-m\fR \fI{serial | parallel}\fR]
      [\fB-n\fR] [\fB-p\fR] [\fB-P\fR] [\fB-q\fR] [\fB-r\fR] [\fB-s\fR] [\fB-S\fR] [\fB-t\fR] [\fB-V\fR]
      [\fB-f\fR \fImakefile\fR]... [\fB-K\fR \fIstatefile\fR]... [\fItarget\fR]...
@@ -148,6 +149,18 @@ message and halts.
 .SH OPTIONS
 .LP
 The following options are supported:
+.sp
+.ne 2
+.na
+\fB\fB-C\fR \fIdirectory\fR\fR
+.ad
+.RS 16n
+Changes the current working directory to the directory \fIdirectory\fR before
+attempting to open and process the Makefile or run any targets. This option may
+be specified more than once, each subsequent occurrence of the option is
+dependent on those that came before it.
+.RE
+
 .sp
 .ne 2
 .na
@@ -430,7 +443,7 @@ The usage of \fBmake\fR is described below:
 .SS "Reading Makefiles and the Environment"
 .LP
 When \fBmake\fR first starts, it reads the \fBMAKEFLAGS\fR environment variable
-to obtain any of the following options specified present in its value:
+to obtain any of the following options specified present in its value: \fB-C\fR,
 \fB-d\fR, \fB-D\fR, \fB-e\fR, \fB-i\fR, \fB-k\fR, \fB-n\fR, \fB-p\fR, \fB-q\fR,
 \fB-r\fR, \fB-s\fR, \fB-S\fR, or \fB-t\fR. Due to the implementation of POSIX.2
 (see \fBPOSIX.2\fR(5), the \fBMAKEFLAGS\fR values contains a leading \fB\(mi\fR

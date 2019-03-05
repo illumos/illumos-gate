@@ -21,6 +21,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -174,6 +176,8 @@
 	wchar_t		*wcs_ptr;
 	wchar_t		*wcs_ptr2;
 	long int	hostid;
+	Boolean		path_reset = false;
+	Boolean		rebuild_arg0 = false;
 
 /*
  * File table of contents

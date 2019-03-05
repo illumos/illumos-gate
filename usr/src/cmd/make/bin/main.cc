@@ -21,6 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -183,6 +185,7 @@ main(int argc, char *argv[])
 	register char		*cp;
 	char 			make_state_dir[MAXPATHLEN];
 	Boolean			parallel_flag = false;
+	Boolean			argv_zero_relative = false;
 	char			*prognameptr;
 	char 			*slash_ptr;
 	mode_t			um;
@@ -248,6 +251,7 @@ main(int argc, char *argv[])
 		               argv[0]);
 		argv_zero_string = strdup(tmp_string);
 		retmem_mb(tmp_string);
+		argv_zero_relative = true;
 	}
 
 	/* 
@@ -342,8 +346,6 @@ main(int argc, char *argv[])
 
 	setup_char_semantics();
 
-	setup_for_projectdir();
-
 	/*
 	 * If running with .KEEP_STATE, curdir will be set with
 	 * the connected directory.
@@ -362,6 +364,28 @@ main(int argc, char *argv[])
 		cp = getenv(makeflags->string_mb);
 		(void) printf(gettext("MAKEFLAGS value: %s\n"), cp == NULL ? "" : cp);
 	}
+
+	/*
+	 * Reset argv_zero_string if it was built from a relative path and the
+	 * -C option was specified.
+	 */
+	if (argv_zero_relative && rebuild_arg0) {
+		char	*tmp_current_path;
+		char	*tmp_string;
+
+		free(argv_zero_string);
+		tmp_current_path = get_current_path();
+		tmp_string = getmem(strlen(tmp_current_path) + 1 +
+		                    strlen(argv[0]) + 1);
+		(void) sprintf(tmp_string,
+		               "%s/%s",
+		               tmp_current_path,
+		               argv[0]);
+		argv_zero_string = strdup(tmp_string);
+		retmem_mb(tmp_string);
+	}
+
+	setup_for_projectdir();
 
 	setup_interrupt(handle_interrupt);
 
@@ -905,9 +929,9 @@ read_command_options(register int argc, register char **argv)
 	extern char		*optarg;
 	extern int		optind, opterr, optopt;
 
-#define SUNPRO_CMD_OPTS	"-~Bbc:Ddef:g:ij:K:kM:m:NnO:o:PpqRrSsTtuVvwx:"
+#define SUNPRO_CMD_OPTS	"-~Bbc:C:Ddef:g:ij:K:kM:m:NnO:o:PpqRrSsTtuVvwx:"
 
-#	define SVR4_CMD_OPTS   "-c:ef:g:ij:km:nO:o:pqrsTtVv"
+#	define SVR4_CMD_OPTS   "-c:C:ef:g:ij:km:nO:o:pqrsTtVv"
 
 	/*
 	 * Added V in SVR4_CMD_OPTS also, which is going to be a hidden
@@ -985,7 +1009,7 @@ read_command_options(register int argc, register char **argv)
 		if (ch == '?') {
 			if (svr4) {
 				fprintf(stderr,
-					gettext("Usage : dmake [ -f makefile ][ -c dmake_rcfile ][ -g dmake_group ]\n"));
+					gettext("Usage : dmake [ -f makefile ][ -c dmake_rcfile ][ -g dmake_group ][-C directory]\n"));
 				fprintf(stderr,
 					gettext("              [ -j dmake_max_jobs ][ -m dmake_mode ][ -o dmake_odir ]...\n"));
 				fprintf(stderr,
@@ -993,7 +1017,7 @@ read_command_options(register int argc, register char **argv)
 				tptr = strchr(SVR4_CMD_OPTS, optopt);
 			} else {
 				fprintf(stderr,
-					gettext("Usage : dmake [ -f makefile ][ -c dmake_rcfile ][ -g dmake_group ]\n"));
+					gettext("Usage : dmake [ -f makefile ][ -c dmake_rcfile ][ -g dmake_group ][-C directory]\n"));
 				fprintf(stderr,
 					gettext("              [ -j dmake_max_jobs ][ -K statefile ][ -m dmake_mode ][ -x MODE_NAME=VALUE ][ -o dmake_odir ]...\n"));
 				fprintf(stderr,
@@ -1060,6 +1084,9 @@ read_command_options(register int argc, register char **argv)
 				break;
 			case 1024: /* -x seen */
 				argv[i] = (char *)"-x";
+				break;
+			case 2048:
+				argv[i] = (char *)"-C";
 				break;
 			default: /* > 1 of -c, f, g, j, K, M, m, O, o, x seen */
 				fatal(gettext("Illegal command line. More than one option requiring\nan argument given in the same argument group"));
@@ -1314,6 +1341,8 @@ parse_command_option(register char ch)
 			dmake_rcfile_specified = true;
 		}
 		return 2;
+	case 'C':			/* Change directory */
+		return 2048;
 	case 'D':			 /* Show lines read */
 		if (invert_this) {
 			read_trace_level--;
@@ -2507,6 +2536,18 @@ enter_argv_values(int argc, char *argv[], ASCII_Dyn_Array *makeflags_and_macro)
 					argv[i] = argv[i + 1] = NULL;
 					continue;
 				}
+				break;
+			case 2048: /* -C seen */
+				if (argv[i + 1] == NULL) {
+					fatal(gettext("No argument after -C flag"));
+				}
+				if (chdir(argv[i + 1]) != 0) {
+					fatal(gettext("failed to change to directory %s: %s"),
+					    argv[i + 1], strerror(errno));
+				}
+				path_reset = true;
+				rebuild_arg0 = true;
+				(void) get_current_path();
 				break;
 			default: /* Shouldn't reach here */
 				argv[i] = NULL;
