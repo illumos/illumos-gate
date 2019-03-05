@@ -21,6 +21,8 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef _MK_DEFS_H
@@ -293,6 +295,8 @@ extern	wchar_t		wcs_buffer2[];
 extern	wchar_t		*wcs_ptr;
 extern	wchar_t		*wcs_ptr2;
 extern	long int	hostid;
+extern	Boolean		path_reset;
+extern	Boolean		rebuild_arg0;
 
 /*
  * Declarations of system defined variables

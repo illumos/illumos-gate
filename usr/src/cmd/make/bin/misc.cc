@@ -21,6 +21,8 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc. All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -250,15 +252,23 @@ char *
 get_current_path(void)
 {
 	char			pwd[(MAXPATHLEN * MB_LEN_MAX)];
-	static char		*current_path;
+	static char		*current_path = NULL;
 
-	if (current_path == NULL) {
+	/*
+	 * When we hit this with path_reset to true, we do not free the older
+	 * version of current_path at this time, as we don't have confidence
+	 * that we've properly caught all users of it and they haven't cached
+	 * the pointer somewhere. As such, since this is only currently set with
+	 * the -C option is passed in, it seems OK to just let that bit go.
+	 */
+	if (current_path == NULL || path_reset == true) {
 		getcwd(pwd, sizeof(pwd));
 		if (pwd[0] == (int) nul_char) {
 			pwd[0] = (int) slash_char;
 			pwd[1] = (int) nul_char;
 		}
 		current_path = strdup(pwd);
+		path_reset = false;
 	}
 	return current_path;
 }
