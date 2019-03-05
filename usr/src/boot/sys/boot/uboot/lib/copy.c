@@ -1,6 +1,6 @@
-/*-
+/*
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
- * Copyright (c) 2007 Semihalf, Rafal Jaworowski <raj@semihalf.com> 
+ * Copyright (c) 2007 Semihalf, Rafal Jaworowski <raj@semihalf.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +26,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 #include <sys/param.h>
 
 #include <stand.h>
@@ -37,7 +36,7 @@ __FBSDID("$FreeBSD$");
 #include "libuboot.h"
 
 /*
- * MD primitives supporting placement of module data 
+ * MD primitives supporting placement of module data
  */
 
 #ifdef __arm__
@@ -66,7 +65,7 @@ extern void _start(void); /* ubldr entry point address. */
  * that each object begins on a page boundary.
  */
 uint64_t
-uboot_loadaddr(u_int type, void *data, uint64_t addr)
+uboot_loadaddr(uint_t type, void *data, uint64_t addr)
 {
 	struct sys_info *si;
 	uint64_t sblock, eblock, subldr, eubldr;
@@ -121,7 +120,8 @@ uboot_loadaddr(u_int type, void *data, uint64_t addr)
 				}
 			} else if (subldr < sblock && eubldr < eblock) {
 				/* Loader is below or engulfs the sblock */
-				this_block = (eubldr < sblock) ? sblock : eubldr;
+				this_block = (eubldr < sblock) ?
+				    sblock : eubldr;
 				this_size = eblock - this_block;
 			} else {
 				this_block = 0;
@@ -136,13 +136,13 @@ uboot_loadaddr(u_int type, void *data, uint64_t addr)
 			panic("Not enough DRAM to load kernel\n");
 #if 0
 		printf("Loading kernel into region 0x%08jx-0x%08jx (%ju MiB)\n",
-		    (uintmax_t)biggest_block, 
+		    (uintmax_t)biggest_block,
 		    (uintmax_t)biggest_block + biggest_size - 1,
 		    (uintmax_t)biggest_size / 1024 / 1024);
 #endif
 		return (biggest_block);
 	}
-	return roundup2(addr, PAGE_SIZE);
+	return (roundup2(addr, PAGE_SIZE));
 }
 
 ssize_t

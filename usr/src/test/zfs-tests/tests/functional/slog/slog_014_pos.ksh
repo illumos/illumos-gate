@@ -28,6 +28,7 @@
 #
 # Copyright (c) 2013, 2018 by Delphix. All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2019 RackTop Systems.
 #
 
 . $STF_SUITE/tests/functional/slog/slog.kshlib
