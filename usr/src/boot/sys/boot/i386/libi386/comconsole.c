@@ -139,12 +139,14 @@ struct console ttyd = {
 static void
 comc_probe(struct console *cp)
 {
-    struct serial *port;
-    char name[20];
-    char value[20];
-    char *cons, *env;
+	struct serial *port;
+	char name[20];
+	char value[20];
+	char *cons, *env;
 
-    if (cp->c_private == NULL) {
+	if (cp->c_private != NULL)
+		return;
+
 	cp->c_private = malloc(sizeof(struct serial));
 	port = cp->c_private;
 	port->speed = COMSPEED;
@@ -224,8 +226,7 @@ comc_probe(struct console *cp)
 
 	unsetenv(name);
 	env_setenv(name, EV_VOLATILE, env, comc_pcidev_set, env_nounset);
-    }
-    comc_setup(cp);
+	comc_setup(cp);
 }
 
 static int
