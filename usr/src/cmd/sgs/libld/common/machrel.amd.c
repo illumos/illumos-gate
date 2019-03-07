@@ -740,7 +740,6 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		DBG_CALL(Dbg_reloc_transition(ofl->ofl_lml, M_MACH,
 		    R_AMD64_TPOFF32, arsp, ld_reloc_sym_name));
 		arsp->rel_rtype = R_AMD64_TPOFF32;
-		arsp->rel_raddend = 0;
 		return (FIX_RELOC);
 	}
 
@@ -764,7 +763,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 	 */
 	REL_CACHE_TRAVERSE(&ofl->ofl_actrels, idx, rcbp, arsp) {
 		uchar_t		*addr;
-		Xword 		value;
+		Xword		value;
 		Sym_desc	*sdp;
 		const char	*ifl_name;
 		Xword		refaddr;

@@ -20,8 +20,9 @@ function grep_test {
 	print -u2 "pass: $name"
     else
         print -u2 "FAIL: $name"
+        exit 1
     fi
-}        
+}
 
 function dis_test {
     name=${1}
@@ -32,7 +33,8 @@ function dis_test {
     dis -F${func} ${file} | grep_test "${name}" "${pattern}"
 }
 
-make PROTO="${1}"
+TESTDIR=$(dirname $0)
+make -f ${TESTDIR}/Makefile.test TESTDIR=${TESTDIR}
 
 dis_test "addq-->leaq 1" func style1 \
     'func+0x10: 48 8d 92 f8 ff ff  leaq   -0x8(%rdx),%rdx'
@@ -58,5 +60,5 @@ dis_test "movq-->movq w/REX" main style2-with-r13 \
 dis_test "movq-->movq incase of SIB" main style2-with-r12 \
     'main+0x4:  49 c7 c4 f0 ff ff  movq   $-0x10,%r12	<0xfffffffffffffff0>'
 
-make PROTO="${1}" fail 2>&1 | grep_test "bad insn sequence" \
+make -f ${TESTDIR}/Makefile.test fail TESTDIR=${TESTDIR} 2>&1 | grep_test "bad insn sequence" \
    'ld: fatal: relocation error: R_AMD64_TPOFF32: file style2-with-badness.o: symbol foo: section .text: offset 0x7, relocation against unknown TLS instruction sequence'

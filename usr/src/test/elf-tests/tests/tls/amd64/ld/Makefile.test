@@ -1,0 +1,38 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+# Copyright 2012, Richard Lowe.
+
+CC =		gcc
+CFLAGS =	-O1 -m64
+
+LINK.c =  $(CC) $(CFLAGS) -o $@ $^
+COMPILE.s = $(CC) $(CFLAGS) -c -o $@ $^
+
+.KEEP_STATE:
+
+install default: all
+
+%.o: $(TESTDIR)/%.s
+	$(COMPILE.s)
+
+# an R_AMD64_DTPOFF32 with an addend, which must be preserved
+PROGS +=	ld-with-addend
+
+ld-with-addend: ld-with-addend.o
+	$(LINK.c)
+
+all:	$(PROGS)
+
+clobber clean:
+	rm -f $(PROGS) ld-with-addend.o
+
+FRC:

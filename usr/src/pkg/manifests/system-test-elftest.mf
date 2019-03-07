@@ -1,0 +1,57 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2018, Richard Lowe.
+#
+
+set name=pkg.fmri value=pkg:/system/test/elftest@$(PKGVERS)
+set name=pkg.description value="ELF Unit Tests"
+set name=pkg.summary value="ELF Test Suite"
+set name=info.classification \
+    value=org.opensolaris.category.2008:Development/System
+set name=variant.arch value=$(ARCH)
+dir path=opt/elf-tests
+dir path=opt/elf-tests/bin
+dir path=opt/elf-tests/runfiles
+dir path=opt/elf-tests/tests
+dir path=opt/elf-tests/tests/assert-deflib
+dir path=opt/elf-tests/tests/tls
+dir path=opt/elf-tests/tests/tls/amd64
+dir path=opt/elf-tests/tests/tls/amd64/ie
+dir path=opt/elf-tests/tests/tls/amd64/ld
+dir path=opt/elf-tests/tests/tls/i386
+dir path=opt/elf-tests/tests/tls/i386/ld
+file path=opt/elf-tests/README mode=0444
+file path=opt/elf-tests/bin/elftest mode=0555
+file path=opt/elf-tests/runfiles/default.run mode=0444
+file path=opt/elf-tests/tests/assert-deflib/link.c mode=0444
+file path=opt/elf-tests/tests/assert-deflib/test-deflib mode=0555
+file path=opt/elf-tests/tests/tls/amd64/ie/Makefile.test mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/amd64-ie-test mode=0555
+file path=opt/elf-tests/tests/tls/amd64/ie/style1-func-with-r12.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/style1-func-with-r13.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/style1-func.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/style1-main.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-badness.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-r12.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-r13.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/style2.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ld/Makefile.test mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ld/amd64-ld-test mode=0555
+file path=opt/elf-tests/tests/tls/amd64/ld/ld-with-addend.s mode=0444
+file path=opt/elf-tests/tests/tls/i386/ld/Makefile.test mode=0444
+file path=opt/elf-tests/tests/tls/i386/ld/half-ldm.s mode=0444
+file path=opt/elf-tests/tests/tls/i386/ld/i386-ld-test mode=0555
+license lic_CDDL license=lic_CDDL
+depend fmri=developer/linker type=require
+depend fmri=developer/object-file type=require
+depend fmri=system/test/testrunner type=require

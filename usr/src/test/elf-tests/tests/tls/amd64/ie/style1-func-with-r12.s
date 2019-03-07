@@ -11,37 +11,29 @@
 
 /*
  * Copyright 2012, Richard Lowe.
- */	
+ */
 
 	.section	.rodata.str1.1,"aMS",@progbits,1
 .LC0:
-	.string	"foo: %p\n"
+	.string	"foo: %p bar: %p\n"
 	.text
-.globl main
-	.type	main, @function
-main:
+.globl func
+	.type	func, @function
+func:
 .LFB0:
 	pushq	%rbp
 .LCFI0:
 	movq	%rsp, %rbp
 .LCFI1:
-	leaq	foo@GOTTPOFF(%rip), %rsi
-	addq	%fs:0, %rsi
+	movq	%fs:0, %r12
+	movq	%r12, %rdx
+	addq	bar@GOTTPOFF(%rip), %rdx
+	addq	foo@GOTTPOFF(%rip), %r12
+	movq	%r12, %rsi
 	movl	$.LC0, %edi
 	movl	$0, %eax
 	call	printf
-	movl	$0, %eax
 	leave
 	ret
 .LFE0:
-	.size	main, .-main
-.globl foo
-	.section	.rodata.str1.1
-.LC1:
-	.string	"foo"
-	.section	.tdata,"awT",@progbits
-	.align 8
-	.type	foo, @object
-	.size	foo, 8
-foo:
-	.quad	.LC1
+	.size	func, .-func

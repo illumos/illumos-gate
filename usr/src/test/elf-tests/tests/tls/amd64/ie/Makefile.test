@@ -11,29 +11,21 @@
 
 # Copyright 2012, Richard Lowe.
 
-include $(SRC)/Makefile.master
+CC =		gcc
+CFLAGS =	-O1 -m64
 
-# We have to use GCC, and only GCC.  The best way is to ask cw(1) which GCC to use.
-CC_CMD =	$(ONBLD_TOOLS)/bin/$(MACH)/cw -_gcc -_compiler
-CC =		$(CC_CMD:sh)
-CFLAGS = 	-O1 -m64
-
-LINK.c = env LD_ALTEXEC=$(PROTO)/usr/bin/amd64/ld $(CC) $(CFLAGS) -o $@ $^
-COMPILE.c = $(CC) $(CFLAGS) -c -o $@ $^
+LINK.c =  $(CC) $(CFLAGS) -o $@ $^
 COMPILE.s = $(CC) $(CFLAGS) -c -o $@ $^
 
 .KEEP_STATE:
 
 install default: all
 
-.c.o:
-	$(COMPILE.c)
-
-.s.o:
+%.o: $(TESTDIR)/%.s
 	$(COMPILE.s)
 
 # A basic use of TLS that uses the movq m/r --> movq i/r variant
-PROGS += 	style2
+PROGS +=	style2
 STYLE2OBJS =	style2.o
 style2: $(STYLE2OBJS)
 	$(LINK.c)
@@ -78,7 +70,7 @@ style1-with-r12: $(STYLE1R12OBJS)
 
 all:	$(PROGS)
 
-clobber clean: 
+clobber clean:
 	rm -f $(PROGS) $(STYLE1OBJS) $(STYLE1R13OBJS) $(STYLE1R12OBJS) \
 	    $(STYLE2OBJS) $(STYLE2R13OBJS) $(STYLE2R12OBJS) $(STYLE2BADNESSOBJS)
 

@@ -515,7 +515,7 @@ tems_setup_terminal(struct vis_devinit *tp, size_t height, size_t width)
 				tems.ts_font.vf_bytes =
 				    malloc(font_data->uncompressed_size);
 				if (tems.ts_font.vf_bytes == NULL)
-					panic("out of memory\n");
+					panic("out of memory");
 				(void) lz4_decompress(
 				    font_data->compressed_data,
 				    tems.ts_font.vf_bytes,

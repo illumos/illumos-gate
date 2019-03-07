@@ -15,25 +15,33 @@
 
 	.section	.rodata.str1.1,"aMS",@progbits,1
 .LC0:
-	.string	"foo: %p bar: %p\n"
+	.string	"foo: %p\n"
 	.text
-.globl func
-	.type	func, @function
-func:
+.globl main
+	.type	main, @function
+main:
 .LFB0:
 	pushq	%rbp
 .LCFI0:
 	movq	%rsp, %rbp
 .LCFI1:
-	movq	%fs:0, %r12
-	movq	%r12, %rdx
-	addq	bar@GOTTPOFF(%rip), %rdx
-	addq	foo@GOTTPOFF(%rip), %r12
-        movq    %r12, %rsi     
+	movq	foo@GOTTPOFF(%rip), %rsi
+	addq	%fs:0, %rsi
 	movl	$.LC0, %edi
 	movl	$0, %eax
 	call	printf
+	movl	$0, %eax
 	leave
 	ret
 .LFE0:
-	.size	func, .-func
+	.size	main, .-main
+.globl foo
+	.section	.rodata.str1.1
+.LC1:
+	.string	"foo"
+	.section	.tdata,"awT",@progbits
+	.align 8
+	.type	foo, @object
+	.size	foo, 8
+foo:
+	.quad	.LC1

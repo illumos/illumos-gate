@@ -9,21 +9,30 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-#
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
-#
+# Copyright 2012, Richard Lowe.
 
-.PARALLEL: $(SUBDIRS)
+CC =		gcc
+CFLAGS =	-O1 -m32
 
-SUBDIRS = \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	os-tests \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
+LINK.c =  $(CC) $(CFLAGS) -o $@ $^
+COMPILE.s = $(CC) $(CFLAGS) -c -o $@ $^
 
-include Makefile.com
+.KEEP_STATE:
+
+install default: all
+
+%.o: $(TESTDIR)/%.s
+	$(COMPILE.s)
+
+# an R_386_TLS_LDM with a regular R_386_PLT32 not a R_386_TLS_LDM_PLT
+PROGS +=	half-ldm
+
+half-ldm: half-ldm.o
+	$(LINK.c)
+
+all:	$(PROGS)
+
+clobber clean:
+	rm -f $(PROGS) half-ldm.o
+
+FRC:

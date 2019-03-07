@@ -10,20 +10,12 @@
 #
 
 #
-# Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2018 Joyent, Inc.
 #
 
-.PARALLEL: $(SUBDIRS)
+SUBDIRS =		\
+	assert-deflib	\
+	tls
 
-SUBDIRS = \
-	crypto-tests \
-	elf-tests \
-	libc-tests \
-	os-tests \
-	smbclient-tests \
-	test-runner \
-	util-tests \
-	zfs-tests
-
-include Makefile.com
+include $(SRC)/test/Makefile.com

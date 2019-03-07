@@ -62,5 +62,5 @@ bio_free(void *ptr, size_t size)
 
 	bio_buffer_ptr -= size;
 	if (bio_buffer_ptr != ptr)
-		panic("bio_alloc()/bio_free() mismatch\n");
+		panic("bio_alloc()/bio_free() mismatch");
 }
