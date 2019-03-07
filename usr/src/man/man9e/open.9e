@@ -1,10 +1,11 @@
 '\" te
 .\"  Copyright 1989 AT&T
 .\"  Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved
+.\"  Copyright 2019, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH OPEN 9E "Apr 24, 2008"
+.TH OPEN 9E "March 7, 2019"
 .SH NAME
 open \- gain access to a device
 .SH SYNOPSIS
@@ -40,13 +41,11 @@ open \- gain access to a device
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Architecture independent level 1 (DDI/DKI). This entry point is required, but
 it can be \fBnulldev\fR(9F)
 .SH PARAMETERS
 .SS "Block and Character"
-.sp
 .ne 2
 .na
 \fB\fIdevp\fR\fR
@@ -163,7 +162,6 @@ Pointer to the user credential structure.
 .RE
 
 .SS "STREAMS"
-.sp
 .ne 2
 .na
 \fB\fIq\fR\fR
@@ -244,7 +242,6 @@ Pointer to the user credential structure.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The driver's  \fBopen()\fR function is called by the kernel during an
 \fBopen\fR(2) or a \fBmount\fR(2) on the special file for the device. A device
@@ -256,6 +253,13 @@ called. The function should verify that the minor number component of
 \fI*devp\fR is valid, that the type of access requested by \fIotyp\fR and
 \fIflag\fR is appropriate for the device, and, if required, check permissions
 using the user credentials pointed to by \fIcred_p\fR.
+.sp
+.LP
+When exclusive access is requested by including the \fBFEXCL\fR flag in
+\fIflag\fR or \fIoflag\fR, if the caller cannot be granted exclusive access
+to the device because it is already open, then the device driver should
+conventionally return \fBEBUSY\fR. If instead, exclusive opens are not
+supported, then the driver should return \fBENOTSUP\fR or \fBEINVAL\fR.
 .sp
 .LP
 The kernel provides \fBopen()\fR \fBclose()\fR exclusion guarantees to the
@@ -296,12 +300,10 @@ occurs.
 .in -2
 
 .SH RETURN VALUES
-.sp
 .LP
 The \fBopen()\fR function should return \fB0\fR for success, or the appropriate
 error number.
 .SH SEE ALSO
-.sp
 .LP
 \fBclose\fR(2), \fBexit\fR(2), \fBmmap\fR(2), \fBmount\fR(2), \fBmunmap\fR(2),
 \fBopen\fR(2), \fBIntro\fR(9E), \fBattach\fR(9E), \fBclose\fR(9E),
@@ -314,7 +316,6 @@ error number.
 .LP
 \fISTREAMS Programming Guide\fR
 .SH WARNINGS
-.sp
 .LP
 Do not attempt to change the major number.
 .sp
