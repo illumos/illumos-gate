@@ -21,6 +21,7 @@
  */
 
 #include <libctf_impl.h>
+#include <assert.h>
 #include <gelf.h>
 
 ctf_convert_f ctf_converters[] = {
@@ -29,76 +30,73 @@ ctf_convert_f ctf_converters[] = {
 
 #define	NCONVERTS	(sizeof (ctf_converters) / sizeof (ctf_convert_f))
 
-typedef enum ctf_convert_source {
-	CTFCONV_SOURCE_NONE = 0x0,
-	CTFCONV_SOURCE_UNKNOWN = 0x01,
-	CTFCONV_SOURCE_C = 0x02,
-	CTFCONV_SOURCE_S = 0x04
-} ctf_convert_source_t;
-
-static void
-ctf_convert_ftypes(Elf *elf, ctf_convert_source_t *types)
+ctf_hsc_ret_t
+ctf_has_c_source(Elf *elf, char *errmsg, size_t errlen)
 {
-	int i;
-	Elf_Scn *scn = NULL, *strscn;
-	*types = CTFCONV_SOURCE_NONE;
-	GElf_Shdr shdr;
+	ctf_hsc_ret_t ret = CHR_NO_C_SOURCE;
+	Elf_Scn *scn, *strscn;
 	Elf_Data *data, *strdata;
+	GElf_Shdr shdr;
+	ulong_t i;
 
+	scn = NULL;
 	while ((scn = elf_nextscn(elf, scn)) != NULL) {
-
-		if (gelf_getshdr(scn, &shdr) == NULL)
-			return;
+		if (gelf_getshdr(scn, &shdr) == NULL) {
+			(void) snprintf(errmsg, errlen,
+			    "failed to get section header: %s",
+			    elf_errmsg(elf_errno()));
+			return (CHR_ERROR);
+		}
 
 		if (shdr.sh_type == SHT_SYMTAB)
 			break;
 	}
 
 	if (scn == NULL)
-		return;
+		return (CHR_NO_C_SOURCE);
 
-	if ((strscn = elf_getscn(elf, shdr.sh_link)) == NULL)
-		return;
+	if ((strscn = elf_getscn(elf, shdr.sh_link)) == NULL) {
+		(void) snprintf(errmsg, errlen, "failed to get str section: %s",
+		    elf_errmsg(elf_errno()));
+		return (CHR_ERROR);
+	}
 
-	if ((data = elf_getdata(scn, NULL)) == NULL)
-		return;
+	if ((data = elf_getdata(scn, NULL)) == NULL) {
+		(void) snprintf(errmsg, errlen, "failed to read section: %s",
+		    elf_errmsg(elf_errno()));
+		return (CHR_ERROR);
+	}
 
-	if ((strdata = elf_getdata(strscn, NULL)) == NULL)
-		return;
+	if ((strdata = elf_getdata(strscn, NULL)) == NULL) {
+		(void) snprintf(errmsg, errlen,
+		    "failed to read string table: %s", elf_errmsg(elf_errno()));
+		return (CHR_ERROR);
+	}
 
 	for (i = 0; i < shdr.sh_size / shdr.sh_entsize; i++) {
 		GElf_Sym sym;
 		const char *file;
 		size_t len;
 
-		if (gelf_getsym(data, i, &sym) == NULL)
-			return;
+		if (gelf_getsym(data, i, &sym) == NULL) {
+			(void) snprintf(errmsg, errlen,
+			    "failed to read sym %lu: %s",
+			    i, elf_errmsg(elf_errno()));
+			return (CHR_ERROR);
+		}
 
 		if (GELF_ST_TYPE(sym.st_info) != STT_FILE)
 			continue;
 
 		file = (const char *)((uintptr_t)strdata->d_buf + sym.st_name);
 		len = strlen(file);
-		if (len < 2 || file[len - 2] != '.') {
-			*types |= CTFCONV_SOURCE_UNKNOWN;
-			continue;
-		}
-
-		switch (file[len - 1]) {
-		case 'c':
-			*types |= CTFCONV_SOURCE_C;
-			break;
-		case 'h':
-			/* We traditionally ignore header files... */
-			break;
-		case 's':
-			*types |= CTFCONV_SOURCE_S;
-			break;
-		default:
-			*types |= CTFCONV_SOURCE_UNKNOWN;
+		if (len >= 2 && strncmp(".c", &file[len - 2], 2) == 0) {
+			ret = CHR_HAS_C_SOURCE;
 			break;
 		}
 	}
+
+	return (ret);
 }
 
 ctf_file_t *
@@ -107,8 +105,6 @@ ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t nthrs, uint_t flags,
 {
 	int err, i;
 	ctf_file_t *fp = NULL;
-	boolean_t notsup = B_TRUE;
-	ctf_convert_source_t type;
 
 	if (errp == NULL)
 		errp = &err;
@@ -118,7 +114,7 @@ ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t nthrs, uint_t flags,
 		return (NULL);
 	}
 
-	if (flags & ~CTF_CONVERT_F_IGNNONC) {
+	if (flags & ~CTF_ALLOW_MISSING_DEBUG) {
 		*errp = EINVAL;
 		return (NULL);
 	}
@@ -128,47 +124,35 @@ ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t nthrs, uint_t flags,
 		return (NULL);
 	}
 
-	ctf_convert_ftypes(elf, &type);
-	ctf_dprintf("got types: %d\n", type);
-	if (flags & CTF_CONVERT_F_IGNNONC) {
-		if (type == CTFCONV_SOURCE_NONE ||
-		    (type & CTFCONV_SOURCE_UNKNOWN)) {
-			*errp = ECTF_CONVNOCSRC;
-			return (NULL);
-		}
+	switch (ctf_has_c_source(elf, errbuf, errlen)) {
+	case CHR_ERROR:
+		*errp = ECTF_ELF;
+		return (NULL);
+
+	case CHR_NO_C_SOURCE:
+		*errp = ECTF_CONVNOCSRC;
+		return (NULL);
+
+	default:
+		break;
 	}
 
 	for (i = 0; i < NCONVERTS; i++) {
-		ctf_conv_status_t cs;
-
 		fp = NULL;
-		cs = ctf_converters[i](fd, elf, nthrs, errp, &fp, errbuf,
-		    errlen);
-		if (cs == CTF_CONV_SUCCESS) {
-			notsup = B_FALSE;
+		err = ctf_converters[i](fd, elf, nthrs, flags,
+		    &fp, errbuf, errlen);
+
+		if (err != ECTF_CONVNODEBUG)
 			break;
-		}
-		if (cs == CTF_CONV_ERROR) {
-			fp = NULL;
-			notsup = B_FALSE;
-			break;
-		}
 	}
 
-	if (notsup == B_TRUE) {
-		if ((flags & CTF_CONVERT_F_IGNNONC) != 0 &&
-		    (type & CTFCONV_SOURCE_C) == 0) {
-			*errp = ECTF_CONVNOCSRC;
-			return (NULL);
-		}
-		*errp = ECTF_NOCONVBKEND;
+	if (err != 0) {
+		assert(fp == NULL);
+		*errp = err;
 		return (NULL);
 	}
 
-	/*
-	 * Succsesful conversion.
-	 */
-	if (fp != NULL && label != NULL) {
+	if (label != NULL) {
 		if (ctf_add_label(fp, label, fp->ctf_typemax, 0) == CTF_ERR) {
 			*errp = ctf_errno(fp);
 			ctf_close(fp);

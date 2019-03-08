@@ -22,7 +22,7 @@
 # Copyright 2015 Gary Mills
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2015, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 #
 # Definitions common to libraries.
@@ -229,7 +229,7 @@ objs/%.o pics/%.o: %.c
 
 objs/%.o pics/%.o: %.cc
 	$(COMPILE.cc) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_CC_O)
 
 .PRECIOUS: $(LIBS)
 

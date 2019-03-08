@@ -987,7 +987,7 @@ AS_BIGPICFLAGS=		-K PIC
 #
 # Default label for CTF sections
 #
-CTFCVTFLAGS=		-i -L VERSION
+CTFCVTFLAGS=		-L VERSION
 
 #
 # Override to pass module-specific flags to ctfmerge.  Currently used only by
@@ -1010,11 +1010,14 @@ CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 # Rules (normally from make.rules) and macros which are used for post
 # processing files. Normally, these do stripping of the comment section
 # automatically.
-#    RELEASE_CM:	Should be editted to reflect the release.
-#    POST_PROCESS_O:	Post-processing for `.o' files.
-#    POST_PROCESS_A:	Post-processing for `.a' files (currently null).
+#    RELEASE_CM:	Should be edited to reflect the release.
+#    POST_PROCESS_O:	Post-processing for `.o' files (typically C source)
+#    POST_PROCESS_S_O:	Post-processing for `.o' files built from asssembly
+#    POST_PROCESS_CC_O:	Post-processing for `.o' files built from C++
+#    POST_PROCESS_A:		Post-processing for `.a' files (currently null).
 #    POST_PROCESS_SO:	Post-processing for `.so' files.
 #    POST_PROCESS:	Post-processing for executable files (no suffix).
+#
 # Note that these macros are not completely generalized as they are to be
 # used with the file name to be processed following.
 #
@@ -1066,6 +1069,8 @@ STRIP_STABS=			   $(STRIP) -x $@
 $(SRCDBGBLD)STRIP_STABS=	   :
 
 POST_PROCESS_O=
+POST_PROCESS_S_O=
+POST_PROCESS_CC_O=
 POST_PROCESS_A=
 POST_PROCESS_SO=	$(PROCESS_COMMENT) $@ ; $(STRIP_STABS) ; \
 			$(ELFSIGN_OBJECT)
@@ -1111,7 +1116,7 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(RM) $%
 .s.o:
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 .s.a:
 	$(COMPILE.s) -o $% $<
 	$(PROCESS_COMMENT) $%
@@ -1122,7 +1127,7 @@ PKGPUBLISHER_NONREDIST=	on-extra
 	$(POST_PROCESS)
 .cc.o:
 	$(COMPILE.cc) $(OUTPUT_OPTION) $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_CC_O)
 .cc.a:
 	$(COMPILE.cc) -o $% $<
 	$(AR) $(ARFLAGS) $@ $%

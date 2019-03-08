@@ -24,9 +24,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the md5 crypto kernel module.
-#
-#	intel architecture dependent
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -103,7 +101,6 @@ md5_amd64.s: $(COMDIR)/amd64/md5_amd64.pl
 
 $(OBJS_DIR)/md5_amd64.o: md5_amd64.s
 	$(COMPILE.s) -o $@ md5_amd64.s
-	$(POST_PROCESS_O)
 
 $(OBJS_DIR)/md5_amd64.ln: md5_amd64.s
 	@($(LHEAD) $(LINT.c) md5_amd64.s $(LTAIL))

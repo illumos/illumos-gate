@@ -21,7 +21,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
 
@@ -48,7 +48,6 @@ GENUNIX_SRCS =		\
 	findstack.c	\
 	findstack_subr.c \
 	fm.c		\
-	gcore.c		\
 	gcore_isadep.c	\
 	genunix.c	\
 	group.c		\

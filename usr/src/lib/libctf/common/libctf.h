@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -75,11 +75,24 @@ extern int ctf_diff_functions(ctf_diff_t *, ctf_diff_func_f, void *);
 extern int ctf_diff_objects(ctf_diff_t *, ctf_diff_obj_f, void *);
 extern void ctf_diff_fini(ctf_diff_t *);
 
-#define	CTF_CONVERT_F_IGNNONC	0x01
+/*
+ * Normally, we return a failure if we find a C-derived compilation unit that
+ * lacks DWARF or CTF (as required).  This flag over-rides this check.
+ */
+#define	CTF_ALLOW_MISSING_DEBUG	0x01
+
 extern ctf_file_t *ctf_elfconvert(int, Elf *, const char *, uint_t, uint_t,
     int *, char *, size_t);
 extern ctf_file_t *ctf_fdconvert(int, const char *, uint_t, uint_t, int *,
     char *, size_t);
+
+typedef enum ctf_hsc_ret {
+	CHR_ERROR = -1,
+	CHR_NO_C_SOURCE = 0,
+	CHR_HAS_C_SOURCE = 1
+} ctf_hsc_ret_t;
+
+extern ctf_hsc_ret_t ctf_has_c_source(Elf *, char *, size_t);
 
 typedef struct ctf_merge_handle ctf_merge_t;
 extern ctf_merge_t *ctf_merge_init(int, int *);

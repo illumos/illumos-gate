@@ -18,16 +18,10 @@
 #
 # CDDL HEADER END
 #
-#
-# uts/intel/sha1/Makefile
-#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
-#	This makefile drives the production of the sha1 crypto kernel module.
-#
-#	intel architecture dependent
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -105,7 +99,6 @@ include $(UTSBASE)/intel/Makefile.targ
 
 $(OBJS_DIR)/sha1-x86_64.o: sha1-x86_64.s
 	$(COMPILE.s) -o $@ ${@F:.o=.s}
-	$(POST_PROCESS_O)
 
 $(OBJS_DIR)/sha1-x86_64.ln: sha1-x86_64.s
 	@($(LHEAD) $(LINT.c) ${@F:.ln=.s} $(LTAIL))

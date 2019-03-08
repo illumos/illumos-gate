@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 
 LIBRARY=	libtnfctl.a
 VERS=		.1
@@ -107,7 +107,7 @@ BUILD.s=	$(AS) $< -o $@
 
 objs/%.o pics/%.o: ../%.s
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 objs/%.o pics/%.o: ../%.c
 	$(COMPILE.c) -o $@ $<

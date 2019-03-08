@@ -23,9 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the AES KEF provider.
-#
-#	Intel implementation architecture dependent
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -97,11 +95,10 @@ $(OBJS_DIR)/%.ln: $(COM_DIR)/amd64/%.c
 
 $(OBJS_DIR)/%.o:  $(COM_DIR)/amd64/%.c
 	$(COMPILE.c) -o $@ $(COM_DIR)/amd64/${@F:.o=.c}
-	$(POST_PROCESS_O)
+	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o: $(COM_DIR)/amd64/%.s
 	$(COMPILE.s) -o $@ $(COM_DIR)/amd64/${@F:.o=.s}
-	$(POST_PROCESS_O)
 
 $(OBJS_DIR)/%.ln: $(COM_DIR)/amd64/%.s
 	@($(LHEAD) $(LINT.s) $(COM_DIR)/amd64/${@F:.ln=.s} $(LTAIL))

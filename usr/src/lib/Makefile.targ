@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2014, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -48,11 +48,11 @@ $(ROOTHDRDIR)/%: $(HDRDIR)/%
 $(ROOTLIBDIR)/%: %
 	$(INS.file)
 $(ROOTLIBDIR64)/%: %
-	$(INS.file)	
+	$(INS.file)
 $(ROOTFS_LIBDIR)/%: %
 	$(INS.file)
 $(ROOTFS_LIBDIR64)/%: %
-	$(INS.file)	
+	$(INS.file)
 
 $(ROOTLIBDIR)/$(LIBLINKS): $(ROOTLIBDIR)/$(LIBLINKS)$(VERS)
 	$(INS.liblink)
@@ -80,7 +80,7 @@ objs/%.o pics/%.o: $(SRCDIR)/%.c
 
 objs/%.o pics/%.o: $(SRCDIR)/%.cc
 	$(COMPILE.cc) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_CC_O)
 
 objs pics:
 	-@mkdir -p $@
@@ -99,7 +99,7 @@ $(DYNLIBCCC): pics .WAIT $$(PICS) $$(ALTPICS) $$(EXTPICS)
 	$(BUILDCCC.SO)
 	$(POST_PROCESS_SO)
 
-$(LINTLIB): $$(SRCS) 
+$(LINTLIB): $$(SRCS)
 	$(LINT.c) -o $(LIBNAME) $(SRCS) > $(LINTOUT) 2>&1
 
 lintcheck: $$(SRCS)

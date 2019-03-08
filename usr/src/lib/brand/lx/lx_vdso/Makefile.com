@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2016 Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 LIBRARY	=	lx_vdso.a
@@ -79,7 +79,7 @@ include $(SRC)/lib/commpage/Makefile.shared.targ
 
 pics/%.o: $(ISASRCDIR)/%.s
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 pics/vdso_main.o := CPPFLAGS += $(COMMPAGE_CPPFLAGS) -I$(SRCDIR)
 pics/vdso_subr.o := ASFLAGS += -I$(SRC)/uts/common/brand/lx -I$(SRCDIR)

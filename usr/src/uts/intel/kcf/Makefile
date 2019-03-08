@@ -22,7 +22,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -101,7 +101,6 @@ include $(UTSBASE)/intel/Makefile.targ
 
 $(OBJS_DIR)/%.o: $(COM_DIR)/modes/amd64/%.s
 	$(COMPILE.s) -o $@ $(COM_DIR)/modes/amd64/${@F:.o=.s}
-	$(POST_PROCESS_O)
 
 $(OBJS_DIR)/%.ln: $(COM_DIR)/modes/amd64/%.s
 	@($(LHEAD) $(LINT.s) $(COM_DIR)/modes/amd64/${@F:.ln=.s} $(LTAIL))

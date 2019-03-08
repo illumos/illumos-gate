@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -116,7 +116,7 @@ enum {
 	ECTF_ZLIB,		/* zlib library failure */
 	ECTF_CONVBKERR,		/* CTF conversion backend error */
 	ECTF_CONVNOCSRC,	/* No C source to convert from */
-	ECTF_NOCONVBKEND	/* No applicable conversion backend */
+	ECTF_CONVNODEBUG,	/* No debug info to convert into CTF */
 };
 
 /*

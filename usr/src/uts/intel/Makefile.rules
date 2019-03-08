@@ -21,7 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.  All rights reserved.
+# Copyright 2019 Joyent, Inc.  All rights reserved.
 # Copyright 2017 Nexenta Systems, Inc.
 #
 
@@ -302,7 +302,6 @@ $(OBJS_DIR)/kobj.o		:= CPPFLAGS += -D_DBOOT
 
 $(OBJS_DIR)/%.o:	$(UTSBASE)/intel/$(SUBARCH_DIR)/krtld/%.s
 	$(COMPILE.s) $(KRTLD_INC_PATH) $(KRTLD_CPPFLAGS) -o $@ $<
-	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:	$(SRC)/common/util/$(SUBARCH_DIR)/%.c
 	$(COMPILE.c) $(KRTLD_INC_PATH) $(KRTLD_CPPFLAGS) -o $@ $<

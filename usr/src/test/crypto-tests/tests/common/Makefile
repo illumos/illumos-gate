@@ -12,10 +12,11 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 include $(SRC)/cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.ctf
 include $(SRC)/test/Makefile.com
 
 BASEOBJS = testfuncs.o cryptotest_pkcs.o cryptotest_kcf.o
@@ -28,9 +29,11 @@ all install: $(OBJS)
 
 %.32.o: %.c
 	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 %.64.o: %.c
 	$(COMPILE64.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 lint:
 

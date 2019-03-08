@@ -23,9 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the ARCFOUR KEF provider.
-#
-#	Intel implementation architecture dependent
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -92,7 +90,6 @@ include $(UTSBASE)/intel/Makefile.targ
 
 $(OBJS_DIR)/arcfour-x86_64.o: arcfour-x86_64.s
 	$(COMPILE.s) -o $@ ${@F:.o=.s}
-	$(POST_PROCESS_O)
 
 $(OBJS_DIR)/arcfour-x86_64.ln: arcfour-x86_64.s
 	@($(LHEAD) $(LINT.s) ${@F:.ln=.s} $(LTAIL))

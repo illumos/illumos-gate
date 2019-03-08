@@ -3,7 +3,7 @@
 # Use is subject to license terms.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
@@ -158,6 +158,8 @@ $(NATIVETARGETS) :=	LDLIBS = -lc
 
 $(OBJS) :=		CFLAGS += $(CTF_FLAGS)
 $(OBJS) :=		CTFCONVERT_POST = $(CTFCONVERT_O)
+$(NATIVEOBJS) :=	CFLAGS += $(CTF_FLAGS)
+$(NATIVEOBJS) :=	CTFCONVERT_POST = $(CTFCONVERT_O)
 
 TCLBASE = /usr/sfw
 TCLVERS = tcl8.3

@@ -23,7 +23,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -87,6 +87,7 @@ SYMBOL_VERSION SUNWprivate_1.2 {
 	ctf_func_args_by_id;
 	ctf_func_info_by_id;
 	ctf_function_iter;
+	ctf_has_c_source;
 	ctf_kind_name;
 	ctf_label_info;
 	ctf_label_iter;

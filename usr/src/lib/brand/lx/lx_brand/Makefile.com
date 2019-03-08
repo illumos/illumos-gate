@@ -21,7 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 LX_CMN  =	$(SRC)/common/brand/lx
@@ -91,7 +91,7 @@ include ../../../../Makefile.usdt
 
 pics/%.o: $(ISASRCDIR)/%.s
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 pics/%.o: $(LX_CMN)/%.c
 	$(COMPILE.c) -o $@ $<
