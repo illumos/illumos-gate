@@ -29,15 +29,9 @@
 extern "C" {
 #endif
 
-typedef enum ctf_conv_status {
-	CTF_CONV_SUCCESS	= 0,
-	CTF_CONV_ERROR		= 1,
-	CTF_CONV_NOTSUP		= 2
-} ctf_conv_status_t;
-
-typedef ctf_conv_status_t (*ctf_convert_f)(int, Elf *, uint_t, int *,
+typedef int (*ctf_convert_f)(int, Elf *, uint_t, uint_t,
     ctf_file_t **, char *, size_t);
-extern ctf_conv_status_t ctf_dwarf_convert(int, Elf *, uint_t, int *,
+extern int ctf_dwarf_convert(int, Elf *, uint_t, uint_t,
     ctf_file_t **, char *, size_t);
 
 /*

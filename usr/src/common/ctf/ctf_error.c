@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <ctf_impl.h>
@@ -83,7 +83,7 @@ static const char *const _ctf_errlist[] = {
 	"Zlib library failure",				 /* ECTF_ZLIB */
 	"CTF conversion backend error",			 /* ECTF_CONVBKERR */
 	"No C source to convert from",			 /* ECTF_CONVNOCSRC */
-	"No applicable conversion backend"		 /* ECTF_NOCONVBKEND */
+	"No debug info found to convert from"		 /* ECTF_CONVNODEBUG */
 };
 
 static const int _ctf_nerr = sizeof (_ctf_errlist) / sizeof (_ctf_errlist[0]);

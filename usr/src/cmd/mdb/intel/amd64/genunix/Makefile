@@ -26,6 +26,8 @@
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 MODULE = genunix.so
 MDBTGT = kvm
@@ -40,6 +42,7 @@ KMODSRCS = \
 
 MODSRCS = \
 	$(COMMONSRCS) \
+	gcore.c \
 	typegraph.c
 
 #

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -69,12 +69,13 @@ ctfconvert_usage(const char *fmt, ...)
 		va_end(ap);
 	}
 
-	(void) fprintf(stderr, "Usage: %s [-is] [-j nthrs] [-l label | "
+	(void) fprintf(stderr, "Usage: %s [-ims] [-j nthrs] [-l label | "
 	    "-L labelenv] [-o outfile] input\n"
 	    "\n"
 	    "\t-i  ignore files not built partially from C sources\n"
 	    "\t-j  use nthrs threads to perform the merge\n"
 	    "\t-k  keep around original input file on failure\n"
+	    "\t-m  allow input to have missing debug info\n"
 	    "\t-o  copy input to outfile and add CTF\n"
 	    "\t-l  set output container's label to specified value\n"
 	    "\t-L  set output container's label to value from environment\n",
@@ -259,21 +260,16 @@ main(int argc, char *argv[])
 	char *eptr;
 	char buf[4096];
 	boolean_t optx = B_FALSE;
+	boolean_t ignore_non_c = B_FALSE;
 
 	ctfconvert_progname = basename(argv[0]);
 
 	ctfconvert_altexec(argv);
 
-	while ((c = getopt(argc, argv, ":j:kl:L:o:iX")) != -1) {
+	while ((c = getopt(argc, argv, ":ij:kl:L:mo:X")) != -1) {
 		switch (c) {
-		case 'k':
-			keep = B_TRUE;
-			break;
-		case 'l':
-			label = optarg;
-			break;
-		case 'L':
-			label = getenv(optarg);
+		case 'i':
+			ignore_non_c = B_TRUE;
 			break;
 		case 'j':
 			errno = 0;
@@ -285,11 +281,20 @@ main(int argc, char *argv[])
 			}
 			nthreads = (uint_t)argj;
 			break;
+		case 'k':
+			keep = B_TRUE;
+			break;
+		case 'l':
+			label = optarg;
+			break;
+		case 'L':
+			label = getenv(optarg);
+			break;
+		case 'm':
+			flags |= CTF_ALLOW_MISSING_DEBUG;
+			break;
 		case 'o':
 			outfile = optarg;
-			break;
-		case 'i':
-			flags |= CTF_CONVERT_F_IGNNONC;
 			break;
 		case 'X':
 			optx = B_TRUE;
@@ -307,8 +312,8 @@ main(int argc, char *argv[])
 	argv += optind;
 	argc -= optind;
 
-	if (argc < 1) {
-		ctfconvert_usage("Missing required input file\n");
+	if (argc != 1) {
+		ctfconvert_usage("Exactly one input file is required\n");
 		return (CTFCONVERT_USAGE);
 	}
 	infile = argv[0];
@@ -334,19 +339,32 @@ main(int argc, char *argv[])
 	    sizeof (buf));
 	if (ofp == NULL) {
 		/*
-		 * -i says that we shouldn't concern ourselves with source files
-		 * that weren't built from C source code in part. Because this
-		 * has been traditionally used across all of illumos, we still
-		 * honor it.
+		 * Normally, ctfconvert requires that its input file has at
+		 * least one C-source compilation unit, and that every C-source
+		 * compilation unit has DWARF. This is to avoid accidentally
+		 * leaving out useful CTF.
+		 *
+		 * However, for the benefit of intransigent build environments,
+		 * the -i and -m options can be used to relax this.
 		 */
-		if ((flags & CTF_CONVERT_F_IGNNONC) != 0 &&
-		    err == ECTF_CONVNOCSRC) {
+		if (err == ECTF_CONVNOCSRC && ignore_non_c) {
 			exit(CTFCONVERT_OK);
 		}
+
+		if (err == ECTF_CONVNODEBUG &&
+		    (flags & CTF_ALLOW_MISSING_DEBUG) != 0) {
+			exit(CTFCONVERT_OK);
+		}
+
 		if (keep == B_FALSE)
 			(void) unlink(infile);
-		ctfconvert_fatal("CTF conversion failed: %s\n",
-		    err == ECTF_CONVBKERR ? buf : ctf_errmsg(err));
+
+		if (err == ECTF_CONVBKERR || err == ECTF_CONVNODEBUG) {
+			ctfconvert_fatal("%s", buf);
+		} else {
+			ctfconvert_fatal("CTF conversion failed: %s\n",
+			    ctf_errmsg(err));
+		}
 	}
 
 	if (optx == B_TRUE)

@@ -23,6 +23,8 @@
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 COBJS =		brand_util.o
 ASOBJS =	crt.o handler.o runexe.o
@@ -74,6 +76,6 @@ $(OFFSETS_H): $(OFFSETS_SRC)
 
 pics/%.o: $(ISASRCDIR)/%.s
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 include $(SRC)/lib/Makefile.targ

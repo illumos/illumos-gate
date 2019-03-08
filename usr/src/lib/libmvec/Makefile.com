@@ -12,6 +12,8 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 LIBMDIR		= $(SRC)/lib/libm
 
@@ -159,7 +161,7 @@ LIBS		= $(DYNLIB)
 SRCDIR		= ../common/
 DYNFLAGS	+= $(ZIGNORE)
 
-LINTERROFF	= -erroff=E_FP_DIVISION_BY_ZERO 
+LINTERROFF	= -erroff=E_FP_DIVISION_BY_ZERO
 LINTERROFF	+= -erroff=E_FP_INVALID
 LINTERROFF	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTERROFF	+= -erroff=E_ASSIGMENT_CAUSE_LOSS_PREC
@@ -274,8 +276,8 @@ lint:	lintcheck
 
 pics/%.o: ../$(TARGET_ARCH)/src/%.S
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 pics/%.o: ../common/$$(CHIP)/%.S
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)

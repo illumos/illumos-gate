@@ -22,6 +22,8 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 BIGNUM_PSM_OBJS =	bignum_i386.o bignum_i386_asm.o
 
@@ -53,4 +55,4 @@ pics/bignum_i386.o: $(BIGNUM_DIR)/i386/bignum_i386.c
 
 pics/bignum_i386_asm.o: $(BIGNUM_DIR)/i386/bignum_i386_asm.s
 		$(COMPILE.s) -o $@ $(BIGNUM_DIR)/i386/bignum_i386_asm.s
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)

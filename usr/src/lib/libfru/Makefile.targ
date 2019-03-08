@@ -23,9 +23,7 @@
 # Copyright (c) 2000 by Sun Microsystems, Inc.
 # All rights reserved.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/libfru/Makefile.targ
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 include ../../Makefile.targ
@@ -33,15 +31,15 @@ include ../../Makefile.targ
 # build rules for pics.  (access sub directories)
 pics/%.o objs/%.o:	../libfru/%.cc
 	$(COMPILE.cc) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_CC_O)
 
 pics/%.o objs/%.o:	../libfrureg/%.cc
 	$(COMPILE.cc) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_CC_O)
 
 pics/%.o objs/%.o:	../libgenutil/%.cc
 	$(COMPILE.cc) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_CC_O)
 
 # some special rules for the yacc and lex parser.  (with sub directories)
 pics/y.tab.cc pics/y.tab.h: ../libfru/nameSyntaxYacc.y

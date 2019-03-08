@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 
 LIBRARY = libcpc.a
 VERS	= .1
@@ -31,7 +31,7 @@ OBJECTS = $(ASOBJS) $(MACHCOBJS) $(COBJS) $(V1_OBJS)
 
 include ../../Makefile.lib
 
-SRCS = 	$(ASOBJS:%.o=../$(MACH)/%.s)	\
+SRCS =	$(ASOBJS:%.o=../$(MACH)/%.s)	\
 	$(MACHCOBJS:%.o=../$(MACH)/%.c)	\
 	$(V1_OBJS:%.o=../common/%.c)	\
 	$(COBJS:%.o=../common/%.c)
@@ -66,4 +66,4 @@ pics/%.o: ../$(MACH)/%.c
 
 pics/%.o: ../$(MACH)/%.s
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)

@@ -26,17 +26,18 @@ if [[ -z "$TMPDIR" ]]; then
 	TMPDIR="/tmp"
 fi
 
+
 ctf_arg0=$(basename $0)
 ctf_root=$(cd $(dirname $0) && echo $PWD)
 ctf_tests=
-ctf_compiler="gcc"
+ctf_cc="gcc"
+ctf_cxx="g++"
+ctf_as="as"
 ctf_convert="ctfconvert"
 ctf_merge="ctfmerge"
 ctf_debugflags="-gdwarf-2 "
 ctf_mach32="-m32"
 ctf_mach64="-m64"
-ctf_32cflags="$ctf_mach32 $ctf_debugflags"
-ctf_64cflags="$ctf_mach64 $ctf_debugflags"
 ctf_temp="$TMPDIR/ctftest.$$.o"
 ctf_makefile="Makefile.ctftest"
 ctf_nerrs=0
@@ -46,18 +47,19 @@ usage()
 	typeset msg="$*"
 	[[ -z "$msg" ]] || echo "$msg" >&2
 	cat <<USAGE >&2
-Usage: $ctf_arg0  [-c compiler] [-g flags] [-m ctfmerge] [-t ctfconvert]
+Usage: $ctf_arg0 [-a as] [-c cc] [-C CC] [-g flags] [-m ctfmerge] [-t ctfconvert]
 
 	Runs the CTF test suite
 
-	-c compiler		Use the specified compiler, defaults to 'gcc'
-				on path.
+	-a assembler		Use the specified assembler, defaults to 'as'
+	-c compiler		Use the specified C compiler, defaults to 'gcc'
+	-C compiler		Use the specified C++ compiler, defaults to 'g++'
 	-g flags		Use flags to generate debug info. Defaults to
 				"-gdwarf-2".
 	-m ctfmerge		Use the specified ctfmerge, defaults to
-				'ctfmerge' on path.
+				'ctfmerge'
 	-t ctfconvert		Use the specified ctfconvert, defaults to
-				'ctfconvert' on path.
+				'ctfconvert'
 USAGE
 	exit 2
 }
@@ -80,22 +82,15 @@ fatal()
 	exit 1
 }
 
-check_env()
-{
-	if which "$1" 2>/dev/null >/dev/null; then
-		return
-	fi
-
-	[[ -f "$1" ]] || fatal "failed to find tool $1"
-}
-
 announce()
 {
 	cat << EOF
 Beginning CTF tests with the following settings:
-COMPILER:	$(which $ctf_compiler)
-CTFCONVERT:	$(which $ctf_convert)
-CTFMERGE:	$(which $ctf_merge)
+cc:		$(which $ctf_cc)
+CC:		$(which $ctf_cxx)
+as:		$(which $ctf_as)
+ctfconvert:	$(which $ctf_convert)
+ctfmerge:	$(which $ctf_merge)
 32-bit CFLAGS:	$ctf_32cflags
 64-bit CFLAGS:	$ctf_64cflags
 
@@ -106,7 +101,7 @@ run_one()
 {
 	typeset source=$1 checker=$2 flags=$3
 
-	if ! "$ctf_compiler" $flags -o "$ctf_temp" -c "$source"; then
+	if ! "$ctf_cc" $flags -o "$ctf_temp" -c "$source"; then
 		test_fail "failed to compile $source with flags: $flags"
 		return
 	fi
@@ -146,7 +141,7 @@ run_dir()
 
 	if ! make -C $dir -f Makefile.ctftest \
 	    BUILDDIR="$outdir" \
-	    CC="$ctf_compiler" \
+	    CC="$ctf_cc" \
 	    CFLAGS32="$ctf_mach32" \
 	    CFLAGS64="$ctf_mach64" \
 	    DEBUGFLAGS="$ctf_debugflags" \
@@ -210,12 +205,38 @@ run_tests()
 			test_fail "missing checker for $t"
 		fi
 	done
+
+	outdir="$TMPDIR/ctftest.$$"
+
+	for f in $(find "$ctf_root" -maxdepth 1 -type f -name 'ctftest-*'); do
+		if ! mkdir $outdir; then
+			fatal "failed to make temporary directory '$outdir'"
+		fi
+
+		echo "Running $f in $outdir"
+
+		(cd $outdir && $f)
+
+		if [[ $? -ne 0 ]]; then
+			test_fail "$f failed"
+		else
+			echo "TEST PASSED: $f"
+		fi
+
+		rm -rf $outdir
+	done
 }
 
-while getopts ":c:g:m:t:" c $@; do
+while getopts ":a:C:c:g:m:t:" c $@; do
 	case "$c" in
+	a)
+		ctf_as=$OPTARG
+		;;
+	C)
+		ctf_cxx=$OPTARG
+		;;
 	c)
-		ctf_compiler=$OPTARG
+		ctf_cc=$OPTARG
 		;;
 	g)
 		ctf_debugflags=$OPTARG
@@ -238,9 +259,8 @@ done
 ctf_32cflags="$ctf_mach32 $ctf_debugflags"
 ctf_64cflags="$ctf_mach64 $ctf_debugflags"
 
-check_env "$ctf_compiler"
-check_env "$ctf_convert"
-check_env "$ctf_merge"
+export ctf_as ctf_cc ctf_cxx ctf_debugflags ctf_merge ctf_convert
+
 announce
 
 run_tests
@@ -251,6 +271,7 @@ if [[ $ctf_nerrs -ne 0 ]]; then
 	else
 		printf "\n%s: %u tests failed\n" "$ctf_arg0" "$ctf_nerrs"
 	fi
+	exit 1
 else
 	printf "\n%s: All tests passed successfully\n" "$ctf_arg0"
 	exit 0

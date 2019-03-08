@@ -1,3 +1,5 @@
+#!/usr/bin/ksh
+#
 #
 # This file and its contents are supplied under the terms of the
 # Common Development and Distribution License ("CDDL"), version 1.0.
@@ -13,17 +15,25 @@
 # Copyright (c) 2019, Joyent, Inc.
 #
 
-#
-# This Makefile is shared between both libc and other consumers
-#
+unalias -a
 
-pics/%.o: $(SRC)/lib/commpage/common/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
+check_env()
+{
+	if which "$1" 2>/dev/null >/dev/null; then
+		return
+	fi
 
-pics/%.o: $(SRC)/lib/commpage/$(TARGET_ARCH)/%.s $(COMMPAGE_OFFSETS_H)
-	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_S_O)
+	[[ -f "$1" ]] || {
+		echo "failed to find $1" >&2
+		exit 1
+	}
+}
 
-$(COMMPAGE_OFFSETS_H): $(COMMPAGE_OFFSETS_SRC)
-	$(OFFSETS_CREATE) <$(COMMPAGE_OFFSETS_SRC) >$@
+check_env as
+check_env ctfconvert
+check_env ctfmerge
+check_env elfdump
+check_env gcc
+check_env g++
+check_env ld
+check_env make

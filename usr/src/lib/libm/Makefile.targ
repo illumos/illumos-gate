@@ -12,10 +12,12 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 pics/%.o: $(LIBMDIR)/$(TARGETMACH)/src/%.$(ASSUFFIX)
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 pics/%.o: $(SRCDIR)/C/%.c $(LM_IL)
 	$(COMPILE.c) -o $@ $<

@@ -22,6 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2016, Chris Fraire <cfraire@me.com>.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -74,7 +75,7 @@ objs/%.o pics/%.o: $(ISASRCDIR)/%.c
 
 objs/%.o pics/%.o: $(ISASRCDIR)/%.s
 	$(COMPILE.s) -o $@ $<
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 objs/%.o pics/%.o: ../common/%.c
 	$(COMPILE.c) -o $@ $<

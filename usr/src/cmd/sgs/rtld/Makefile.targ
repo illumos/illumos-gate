@@ -25,6 +25,8 @@
 #
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 # Don't generate separate sections for this module
 pics/debugdata.o :=	XFFLAG=
@@ -34,11 +36,11 @@ $(RTLD) :=	CTFMERGE_POST = $(CTFMERGE_LIB)
 
 pics/%.o:	%.s
 		$(BUILD.s)
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)
 
 pics/%.o:	$(CRTSRCS)/%.s
 		$(BUILD.s)
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)
 
 pics/%.o:	%.c
 		$(COMPILE.c) -o $@ $<

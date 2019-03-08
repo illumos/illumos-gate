@@ -18,7 +18,11 @@ include $(SRC)/Makefile.master
 ROOTOPTPKG = $(ROOT)/opt/util-tests
 TESTDIR = $(ROOTOPTPKG)/tests/ctf
 
-SCRIPTS =	ctftest.ksh
+SCRIPTS =	precheck.ksh \
+		ctftest.ksh \
+		ctftest-convert-non-c.ksh \
+		ctftest-convert-no-dwarf.ksh \
+		ctftest-merge-no-ctf.ksh \
 
 TESTS =		test-float.c \
 		test-reference.c \

@@ -22,6 +22,8 @@
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 #
+# Copyright (c) 2019, Joyent, Inc.
+#
 
 $(SYMCAP):	$(OBJCAP)
 $(OBJCAP):	$(PICS)
@@ -31,11 +33,11 @@ $(PICS):	pics
 
 pics/%.o:	../../$(TRG_PLATFORM)/common/%.s
 		$(COMPILE.s) $< -o $@
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)
 
 pics/%.o:	../../$(ALT_PLATFORM)/common/%.s
 		$(COMPILE.s) $< -o $@
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)
 
 # Combine all pic objects into one relocatable object.  Assign any capabilities
 # to this object, and define the interface.

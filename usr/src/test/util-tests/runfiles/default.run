@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
 [DEFAULT]
@@ -45,3 +45,7 @@ tests = ['json_00_blank', 'json_01_boolean', 'json_02_numbers',
 
 [/opt/util-tests/tests/demangle]
 tests = ['afl-fast', 'gcc-libstdc++', 'llvm-stdcxxabi']
+
+[/opt/util-tests/tests/ctf]
+pre = precheck
+tests = [ 'ctftest' ]

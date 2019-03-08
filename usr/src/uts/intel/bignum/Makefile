@@ -18,12 +18,12 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-#	This makefile drives the production of the RSA KEF provider.
-#
-#	intel implementation architecture dependent
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -41,9 +41,7 @@ OBJECTS		= $(BIGNUM_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(BIGNUM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
-BIGNUM_OBJS_32 = bignum_i386.o bignum_i386_asm.o
-BIGNUM_OBJS_64 = bignum_amd64.o bignum_amd64_asm.o
-BIGNUM_PSR_OBJS = $(BIGNUM_OBJS_$(CLASS))
+BIGNUM_PSR_OBJS = bignum_amd64.o bignum_amd64_asm.o
 
 #
 #	Include common rules.
@@ -90,5 +88,40 @@ install:	$(INSTALL_DEPS)
 #
 include $(UTSBASE)/intel/Makefile.targ
 
+# Bignum configuration (BIGNUM_CFG):
+#   PSR_MUL:
+#       There is a processor-specific implementation bignum multiply functions
+#   HWCAP:
+#       There are multiple implementations of bignum functions, and the
+#	appropriate one must be chosen at run time, based on testing
+#	hardware capabilites.
+#
+# -DPSR_MUL:
+# For AMD64, there is a processor-specific implementation of
+# the bignum multiply functions, which takes advantage of the
+# 64x64->128 bit multiply instruction.
+#
+# -UHWCAP:
+# There is only one implementation, because the 128 bit multiply using
+# general-purpose registers is faster than any MMX or SSE2 implementation.
 
-include Makefile.$(CLASS)
+BIGNUM_CFG = -DPSR_MUL
+CFLAGS	+= -xO4 -xcrossfile
+$(OBJS_DIR)/bignumimpl.o $(LINTS_DIR)/bignumimpl.ln := \
+	CPPFLAGS += $(BIGNUM_CFG)
+$(OBJS_DIR)/bignum_amd64.o $(LINTS_DIR)/bignum_amd64.ln := \
+	CPPFLAGS += $(BIGNUM_CFG)
+
+$(OBJS_DIR)/bignum_amd64.o: $(BIGNUMDIR)/amd64/bignum_amd64.c
+	$(COMPILE.c) -o $@ $(BIGNUM_CFG) $(BIGNUMDIR)/amd64/bignum_amd64.c
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/bignum_amd64_asm.o: $(BIGNUMDIR)/amd64/bignum_amd64_asm.s
+	$(COMPILE.s) -P -o $@ $(BIGNUM_CFG) \
+		$(BIGNUMDIR)/amd64/bignum_amd64_asm.s
+
+$(LINTS_DIR)/bignum_amd64.ln: $(BIGNUMDIR)/amd64/bignum_amd64.c
+	@($(LHEAD) $(LINT.c) $(BIGNUMDIR)/amd64/bignum_amd64.c $(LTAIL))
+
+$(LINTS_DIR)/bignum_amd64_asm.ln: $(BIGNUMDIR)/amd64/bignum_amd64_asm.s
+	@($(LHEAD) $(LINT.s) $(BIGNUMDIR)/amd64/bignum_amd64_asm.s $(LTAIL))

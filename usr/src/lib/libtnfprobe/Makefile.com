@@ -21,7 +21,7 @@
 #
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 
 LIBRARY=	libtnfprobe.a
 VERS=		.1
@@ -97,7 +97,7 @@ BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 
 objs/%.o pics/%.o: ../%.s
 		$(COMPILE.s) -o $@ $<
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)
 
 pics/%.o objs/%.o: ../%.c
 		$(COMPILE.c) -o $@ $<
