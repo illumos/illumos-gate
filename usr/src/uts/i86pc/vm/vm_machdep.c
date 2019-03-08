@@ -24,7 +24,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /* Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
@@ -160,7 +160,7 @@ typedef struct {
 		pgcnt_t	mnr_mts_pgcnt;
 		int	mnr_mts_colors;
 		pgcnt_t *mnr_mtsc_pgcnt;
-	} 	*mnr_mts;
+	}	*mnr_mts;
 #endif
 } mnoderange_t;
 
@@ -202,11 +202,11 @@ int nranges = NUM_MEM_RANGES;
  * This combines mem_node_config and memranges into one data
  * structure to be used for page list management.
  */
-mnoderange_t	*mnoderanges;
-int		mnoderangecnt;
-int		mtype4g;
-int		mtype16m;
-int		mtypetop;	/* index of highest pfn'ed mnoderange */
+static mnoderange_t *mnoderanges;
+static int mnoderangecnt;
+static int mtype4g;
+static int mtype16m;
+static int mtypetop;
 
 /*
  * 4g memory management variables for systems with more than 4g of memory:
@@ -262,9 +262,9 @@ static int	desfree4gshift = 4;	/* maxmem4g shift to derive DESFREE4G */
 
 #define	FREEMEM16M	MTYPE_FREEMEM(mtype16m)
 #define	DESFREE16M	desfree16m
-#define	RESTRICT16M_ALLOC(freemem, pgcnt, flags)		\
-	((freemem != 0) && ((flags & PG_PANIC) == 0) &&		\
-	    ((freemem >= (FREEMEM16M)) ||			\
+#define	RESTRICT16M_ALLOC(freemem, pgcnt, flags) \
+	(mtype16m != -1 && (freemem != 0) && ((flags & PG_PANIC) == 0) && \
+	    ((freemem >= (FREEMEM16M)) || \
 	    (FREEMEM16M  < (DESFREE16M + pgcnt))))
 
 static pgcnt_t	desfree16m = 0x380;
@@ -1387,39 +1387,46 @@ mnode_range_cnt(int mnode)
 #endif	/* __xpv */
 }
 
-/*
- * mnode_range_setup() initializes mnoderanges.
- */
+static int
+mnoderange_cmp(const void *v1, const void *v2)
+{
+	const mnoderange_t *m1 = v1;
+	const mnoderange_t *m2 = v2;
+
+	if (m1->mnr_pfnlo < m2->mnr_pfnlo)
+		return (-1);
+	return (m1->mnr_pfnlo > m2->mnr_pfnlo);
+}
+
 void
 mnode_range_setup(mnoderange_t *mnoderanges)
 {
-	mnoderange_t *mp = mnoderanges;
-	int	mnode, mri;
-	int	mindex = 0;	/* current index into mnoderanges array */
-	int	i, j;
-	pfn_t	hipfn;
-	int	last, hi;
+	mnoderange_t *mp;
+	size_t nr_ranges;
+	size_t mnode;
 
-	for (mnode = 0; mnode < max_mem_nodes; mnode++) {
+	for (mnode = 0, nr_ranges = 0, mp = mnoderanges;
+	    mnode < max_mem_nodes; mnode++) {
+		size_t mri = nranges - 1;
+
 		if (mem_node_config[mnode].exists == 0)
 			continue;
-
-		mri = nranges - 1;
 
 		while (MEMRANGEHI(mri) < mem_node_config[mnode].physbase)
 			mri--;
 
 		while (mri >= 0 && mem_node_config[mnode].physmax >=
 		    MEMRANGELO(mri)) {
-			mnoderanges->mnr_pfnlo = MAX(MEMRANGELO(mri),
+			mp->mnr_pfnlo = MAX(MEMRANGELO(mri),
 			    mem_node_config[mnode].physbase);
-			mnoderanges->mnr_pfnhi = MIN(MEMRANGEHI(mri),
+			mp->mnr_pfnhi = MIN(MEMRANGEHI(mri),
 			    mem_node_config[mnode].physmax);
-			mnoderanges->mnr_mnode = mnode;
-			mnoderanges->mnr_memrange = mri;
-			mnoderanges->mnr_exists = 1;
-			mnoderanges++;
-			mindex++;
+			mp->mnr_mnode = mnode;
+			mp->mnr_memrange = mri;
+			mp->mnr_next = -1;
+			mp->mnr_exists = 1;
+			mp++;
+			nr_ranges++;
 			if (mem_node_config[mnode].physmax > MEMRANGEHI(mri))
 				mri--;
 			else
@@ -1428,33 +1435,26 @@ mnode_range_setup(mnoderange_t *mnoderanges)
 	}
 
 	/*
-	 * For now do a simple sort of the mnoderanges array to fill in
-	 * the mnr_next fields.  Since mindex is expected to be relatively
-	 * small, using a simple O(N^2) algorithm.
+	 * mnoderangecnt can be larger than nr_ranges when memory DR is
+	 * supposedly supported.
 	 */
-	for (i = 0; i < mindex; i++) {
-		if (mp[i].mnr_pfnlo == 0)	/* find lowest */
-			break;
-	}
-	ASSERT(i < mindex);
-	last = i;
-	mtype16m = last;
-	mp[last].mnr_next = -1;
-	for (i = 0; i < mindex - 1; i++) {
-		hipfn = (pfn_t)(-1);
-		hi = -1;
-		/* find next highest mnode range */
-		for (j = 0; j < mindex; j++) {
-			if (mp[j].mnr_pfnlo > mp[last].mnr_pfnlo &&
-			    mp[j].mnr_pfnlo < hipfn) {
-				hipfn = mp[j].mnr_pfnlo;
-				hi = j;
-			}
-		}
-		mp[hi].mnr_next = last;
-		last = hi;
-	}
-	mtypetop = last;
+	VERIFY3U(nr_ranges, <=, mnoderangecnt);
+
+	qsort(mnoderanges, nr_ranges, sizeof (mnoderange_t), mnoderange_cmp);
+
+	/*
+	 * If some intrepid soul takes the axe to the memory DR code, we can
+	 * remove ->mnr_next altogether, as we just sorted by ->mnr_pfnlo order.
+	 *
+	 * The VERIFY3U() above can be "==" then too.
+	 */
+	for (size_t i = 1; i < nr_ranges; i++)
+		mnoderanges[i].mnr_next = i - 1;
+
+	mtypetop = nr_ranges - 1;
+	mtype16m = pfn_2_mtype(PFN_16MEG - 1); /* Can be -1 ... */
+	if (physmax4g)
+		mtype4g = pfn_2_mtype(0xfffff);
 }
 
 #ifndef	__xpv
@@ -1975,9 +1975,6 @@ page_coloring_setup(caddr_t pcmemaddr)
 	addr += (mnoderangecnt * sizeof (mnoderange_t));
 
 	mnode_range_setup(mnoderanges);
-
-	if (physmax4g)
-		mtype4g = pfn_2_mtype(0xfffff);
 
 	for (k = 0; k < NPC_MUTEX; k++) {
 		fpc_mutex[k] = (kmutex_t *)addr;
