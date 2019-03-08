@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019 Joyent, Inc.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  */
 
@@ -538,6 +538,13 @@ process_item(const umem_env_item_t *item, const char *item_arg)
 	case ITEM_UINT:
 	case ITEM_SIZE:
 		arg_required = 1;
+		break;
+
+	default:
+		/*
+		 * These are flags that aren't supported, so they'll error out
+		 * below.
+		 */
 		break;
 	}
 

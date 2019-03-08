@@ -22,7 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc. All rights reserved.
+ * Copyright 2019, Joyent, Inc.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -819,7 +819,7 @@ vmem_xalloc(vmem_t *vmp, size_t size, size_t align, size_t phase,
 {
 	vmem_seg_t *vsp;
 	vmem_seg_t *vbest = NULL;
-	uintptr_t addr, taddr, start, end;
+	uintptr_t addr = 0, taddr, start, end;
 	void *vaddr;
 	int hb, flist, resv;
 	uint32_t mtbf;
@@ -981,6 +981,9 @@ vmem_xalloc(vmem_t *vmp, size_t size, size_t align, size_t phase,
 		(void) pthread_setcancelstate(cancel_state, NULL);
 	}
 	if (vbest != NULL) {
+		if (addr == 0) {
+			umem_panic("vmem_xalloc(): addr == 0");
+		}
 		ASSERT(vbest->vs_type == VMEM_FREE);
 		ASSERT(vbest->vs_knext != vbest);
 		(void) vmem_seg_alloc(vmp, vbest, addr, size);
