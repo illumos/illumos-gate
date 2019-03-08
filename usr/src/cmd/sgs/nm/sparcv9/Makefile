@@ -43,7 +43,6 @@ INCLIST=	-I../../include -I../../include/sparc \
 		-I$(SRCBASE)/uts/$(ARCH)/sys
 DEFLIST=	-DTARGET=SPARC -DSPARC=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
-CERRWARN +=	-_gcc=-Wno-uninitialized
 LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
 
 

@@ -43,25 +43,25 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2007, Sun Microsystems, Inc.  All Rights Reserved
+.\" Copyright 2019, Joyent, Inc.
 .\"
-.TH NM 1 "Sep 10, 2013"
+.TH NM 1 "March 7, 2019"
 .SH NAME
 nm \- print name list of an object file
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/nm\fR [\fB-ACDhlnPprRsTuVv\fR] [\fB-efox\fR] [\fB-g\fR | \fB-u\fR]
+\fB/usr/bin/nm\fR [\fB-ACDhilnPprRsTuVv\fR] [\fB-efox\fR] [\fB-g\fR | \fB-u\fR]
      [\fB-t\fR \fIformat\fR] \fIfile\fR...
 .fi
 
 .LP
 .nf
-\fB/usr/xpg4/bin/nm\fR [\fB-ACDhlnPprRsTuVv\fR] [\fB-efox\fR] [\fB-g\fR | \fB-u\fR]
+\fB/usr/xpg4/bin/nm\fR [\fB-ACDhilnPprRsTuVv\fR] [\fB-efox\fR] [\fB-g\fR | \fB-u\fR]
      [\fB-t\fR \fIformat\fR] \fIfile\fR...
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBnm\fR utility displays the symbol table of each \fBELF\fR object file
 that is specified by \fIfile\fR.
@@ -70,7 +70,6 @@ that is specified by \fIfile\fR.
 If no symbolic information is available for a valid input file, the \fBnm\fR
 utility reports that fact, but not consider it an error condition.
 .SH OPTIONS
-.sp
 .LP
 The output of \fBnm\fR can be controlled using the following options:
 .sp
@@ -109,7 +108,7 @@ by \fBld.so.1\fR and is present even in stripped dynamic executables. If
 \fB\fB-e\fR\fR
 .ad
 .RS 13n
-See NOTES below.
+This option has been deprecated. For more information, see \fBNOTES\fR below.
 .RE
 
 .sp
@@ -118,7 +117,7 @@ See NOTES below.
 \fB\fB-f\fR\fR
 .ad
 .RS 13n
-See NOTES below.
+This option has been deprecated. For more information, see \fBNOTES\fR below.
 .RE
 
 .sp
@@ -151,6 +150,15 @@ present even in stripped dynamic executables. These symbols augment the global
 symbols that are found in \fBSHT_DYNSYM\fR symbol table. If \fB-L\fR is not
 specified, the default behavior is to display the \fBSHT_SYMTAB\fR symbol
 information.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-i\fR\fR
+.ad
+.RS 13n
+Display symbols in the existing symbol table order, do not sort the symbols.
 .RE
 
 .sp
@@ -392,11 +400,10 @@ The offset is written in hexadecimal.
 \fB\fB-T\fR\fR
 .ad
 .RS 13n
-See \fBNOTES\fR.
+This option has been deprecated. For more information, see \fBNOTES\fR below.
 .RE
 
 .SS "/usr/bin/nm"
-.sp
 .ne 2
 .na
 \fB\fB-u\fR\fR
@@ -406,7 +413,6 @@ Prints undefined symbols only.
 .RE
 
 .SS "/usr/xpg4/bin/nm"
-.sp
 .ne 2
 .na
 \fB\fB-u\fR\fR
@@ -452,7 +458,6 @@ appear anywhere in the command line. When conflicting options are specified
 and the second ignored with a warning message to the user. (See \fB-R\fR for
 exception.)
 .SH OPERANDS
-.sp
 .LP
 The following operand is supported:
 .sp
@@ -465,11 +470,9 @@ A path name of an object file, executable file or object-file library.
 .RE
 
 .SH OUTPUT
-.sp
 .LP
 This section describes the \fBnm\fR utility's output options.
 .SS "Standard Output"
-.sp
 .LP
 For each symbol, the following information is printed:
 .sp
@@ -814,13 +817,11 @@ following symbols:
 If \fB-P\fR is specified, but \fB-t\fR is not, the format is as if \fB-t\fR
 \fBx\fR had been specified.
 .SH ENVIRONMENT VARIABLES
-.sp
 .LP
 See \fBenviron\fR(5) for descriptions of the following environment variables
 that affect the execution of \fBnm\fR: \fBLANG\fR, \fBLC_ALL\fR,
 \fBLC_COLLATE\fR, \fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -842,13 +843,9 @@ An error occurred.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .SH /USR/XPG4/BIN/NM
-.sp
-
-.sp
 .TS
 box;
 c | c
@@ -859,13 +856,11 @@ Interface Stability	Committed
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBar\fR(1), \fBas\fR(1), \fBdump\fR(1), \fBld\fR(1), \fBld.so.1\fR(1),
 \fBar.h\fR(3HEAD), \fBa.out\fR(4), \fBattributes\fR(5), \fBenviron\fR(5),
 \fBstandards\fR(5)
 .SH NOTES
-.sp
 .LP
 The following options are obsolete because of changes to the object file format
 and might be deleted in a future release.

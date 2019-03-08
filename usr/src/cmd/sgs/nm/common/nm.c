@@ -26,6 +26,7 @@
  *
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Jason King
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -76,7 +77,7 @@ typedef struct {		/* structure to translate symbol table data */
 #define	REG_WEAK  "R*"
 #define	REG_LOCL  "r"
 
-#define	OPTSTR	":APDoxhvnursplLCVefgRTt:" /* option string for getopt() */
+#define	OPTSTR	":APDoxhvniursplLCVefgRTt:" /* option string for getopt() */
 
 #define	DATESIZE 60
 
@@ -116,6 +117,7 @@ static  int	/* flags: ?_flag corresponds to ? option */
 	h_flag = 0,	/* suppress printing of headings */
 	v_flag = 0,	/* sort external symbols by value */
 	n_flag = 0,	/* sort external symbols by name */
+	i_flag = 0,	/* don't sort symbols */
 	u_flag = 0,	/* print only undefined symbols */
 	r_flag = 0,	/* prepend object file or archive name */
 			/* to each symbol name */
@@ -210,141 +212,185 @@ main(int argc, char *argv[], char *envp[])
 
 	while ((optchar = getopt(argc, argv, optstr)) != -1) {
 		switch (optchar) {
-		case 'o':	if (COMPAT_FMT_FLAG(FMT_T_OCT))
-					fmt_flag = FMT_T_OCT;
-				else
-					(void) fprintf(stderr, gettext(
-					    "%s: -x or -t set, -o ignored\n"),
-					    prog_name);
-				break;
-		case 'x':	if (COMPAT_FMT_FLAG(FMT_T_HEX))
-					fmt_flag = FMT_T_HEX;
-				else
-					(void) fprintf(stderr, gettext(
-					    "%s: -o or -t set, -x ignored\n"),
-					    prog_name);
-				break;
-		case 'h':	h_flag = 1;
-				break;
-		case 'v':	if (!n_flag)
-					v_flag = 1;
-				else
-					(void) fprintf(stderr, gettext(
-					    "%s: -n set, -v ignored\n"),
-					    prog_name);
-				break;
-		case 'n':	if (!v_flag)
-					n_flag = 1;
-				else
-					(void) fprintf(stderr, gettext(
-					    "%s: -v set, -n ignored\n"),
-					    prog_name);
-				break;
-		case 'u':	if (!e_flag && !g_flag)
-					u_flag = 1;
-				else
-					(void) fprintf(stderr, gettext(
-					    "%s: -e or -g set, -u ignored\n"),
-					    prog_name);
-				break;
-		case 'e':	if (!u_flag && !g_flag)
-					e_flag = 1;
-				else
-					(void) fprintf(stderr, gettext(
-					    "%s: -u or -g set, -e ignored\n"),
-					    prog_name);
-				break;
-		case 'g':	if (!u_flag && !e_flag)
-					g_flag = 1;
-				else
-					(void) fprintf(stderr, gettext(
-					    "%s: -u or -e set, -g ignored\n"),
-					    prog_name);
-				break;
-		case 'r':	if (R_flag) {
-					R_flag = 0;
-					(void) fprintf(stderr, gettext(
-					    "%s: -r set, -R ignored\n"),
-					    prog_name);
-				}
-				r_flag = 1;
-				break;
-		case 's':	s_flag = 1;
-				break;
-		case 'p':	if (P_flag == 1) {
-					(void) fprintf(stderr, gettext(
-					    "nm: -P set. -p ignored\n"));
-				} else
-					p_flag = 1;
-				break;
-		case 'P':	if (p_flag == 1) {
-					(void) fprintf(stderr, gettext(
-					    "nm: -p set. -P ignored\n"));
-				} else
-					P_flag = 1;
-				break;
-		case 'l':	l_flag = 1;
-				break;
-		case 'L':	if (D_flag == 1) {
-					(void) fprintf(stderr, gettext(
-					    "nm: -D set. -L ignored\n"));
-				} else
-					L_flag = 1;
-				break;
-		case 'D':	if (L_flag == 1) {
-					(void) fprintf(stderr, gettext(
-					    "nm: -L set. -D ignored\n"));
-				} else
-					D_flag = 1;
-				break;
-		case 'C':
-				C_flag = 1;
-				break;
-		case 'A':	A_flag = 1;
-				break;
-		case 'V':	V_flag = 1;
-				(void) fprintf(stderr, "nm: %s %s\n",
-				    (const char *)SGU_PKG,
-				    (const char *)SGU_REL);
-				break;
-		case 'f':	/* -f is a noop, see man page */
-				break;
-		case 'R':	if (!r_flag)
-					R_flag = 1;
-				else
-					(void) fprintf(stderr, gettext(
-					    "%s: -r set, -R ignored\n"),
-					    prog_name);
-				break;
-		case 'T':
-				break;
-		case 't':	if (strcmp(optarg, "o") == 0) {
-					new_fmt_flag = FMT_T_OCT;
-				} else if (strcmp(optarg, "d") == 0) {
-					new_fmt_flag = FMT_T_DEC;
-				} else if (strcmp(optarg, "x") == 0) {
-					new_fmt_flag = FMT_T_HEX;
-				} else {
-					new_fmt_flag = FMT_T_NONE;
-				}
-				if (new_fmt_flag == FMT_T_NONE) {
-					errflag += 1;
-					(void) fprintf(stderr, gettext(
-"nm: -t requires radix value (d, o, x): %s\n"), optarg);
-				} else if (COMPAT_FMT_FLAG(new_fmt_flag)) {
-					fmt_flag = new_fmt_flag;
-				} else {
-					(void) fprintf(stderr, gettext(
-				"nm: -t or -o or -x set. -t ignored.\n"));
-				}
-				break;
-		case ':':	errflag += 1;
+		case 'o':
+			if (COMPAT_FMT_FLAG(FMT_T_OCT)) {
+				fmt_flag = FMT_T_OCT;
+			} else {
 				(void) fprintf(stderr, gettext(
-				    "nm: %c requires operand\n"), optopt);
-				break;
-		case '?':	errflag += 1;
-				break;
-		default:	break;
+				    "%s: -x or -t set, -o ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'x':
+			if (COMPAT_FMT_FLAG(FMT_T_HEX)) {
+				fmt_flag = FMT_T_HEX;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: -o or -t set, -x ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'h':
+			h_flag = 1;
+			break;
+		case 'v':
+			if (!n_flag && !i_flag) {
+				v_flag = 1;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: -n or -i set, -v ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'n':
+			if (!v_flag && !i_flag) {
+				n_flag = 1;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: -v or -i set, -n ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'i':
+			if (!n_flag && !v_flag) {
+				i_flag = 1;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: -n or -v set, -i ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'u':
+			if (!e_flag && !g_flag) {
+				u_flag = 1;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: -e or -g set, -u ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'e':
+			if (!u_flag && !g_flag) {
+				e_flag = 1;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: -u or -g set, -e ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'g':
+			if (!u_flag && !e_flag) {
+				g_flag = 1;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: -u or -e set, -g ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'r':
+			if (R_flag) {
+				R_flag = 0;
+				(void) fprintf(stderr, gettext(
+				    "%s: -r set, -R ignored\n"),
+				    prog_name);
+			}
+			r_flag = 1;
+			break;
+		case 's':
+			s_flag = 1;
+			break;
+		case 'p':
+			if (P_flag == 1) {
+				(void) fprintf(stderr, gettext(
+				    "nm: -P set. -p ignored\n"));
+			} else {
+				p_flag = 1;
+			}
+			break;
+		case 'P':
+			if (p_flag == 1) {
+				(void) fprintf(stderr, gettext(
+				    "nm: -p set. -P ignored\n"));
+			} else {
+				P_flag = 1;
+			}
+			break;
+		case 'l':
+			l_flag = 1;
+			break;
+		case 'L':
+			if (D_flag == 1) {
+				(void) fprintf(stderr, gettext(
+				    "nm: -D set. -L ignored\n"));
+			} else {
+				L_flag = 1;
+			}
+			break;
+		case 'D':
+			if (L_flag == 1) {
+				(void) fprintf(stderr, gettext(
+				    "nm: -L set. -D ignored\n"));
+			} else {
+				D_flag = 1;
+			}
+			break;
+		case 'C':
+			C_flag = 1;
+			break;
+		case 'A':
+			A_flag = 1;
+			break;
+		case 'V':
+			V_flag = 1;
+			(void) fprintf(stderr, "nm: %s %s\n",
+			    (const char *)SGU_PKG,
+			    (const char *)SGU_REL);
+			break;
+		case 'f':	/* -f is a noop, see man page */
+			break;
+		case 'R':
+			if (!r_flag) {
+				R_flag = 1;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "%s: -r set, -R ignored\n"),
+				    prog_name);
+			}
+			break;
+		case 'T':
+			break;
+		case 't':
+			if (strcmp(optarg, "o") == 0) {
+				new_fmt_flag = FMT_T_OCT;
+			} else if (strcmp(optarg, "d") == 0) {
+				new_fmt_flag = FMT_T_DEC;
+			} else if (strcmp(optarg, "x") == 0) {
+				new_fmt_flag = FMT_T_HEX;
+			} else {
+				new_fmt_flag = FMT_T_NONE;
+			}
+			if (new_fmt_flag == FMT_T_NONE) {
+				errflag += 1;
+				(void) fprintf(stderr, gettext(
+				    "nm: -t requires radix value (d, o, x): "
+				    "%s\n"), optarg);
+			} else if (COMPAT_FMT_FLAG(new_fmt_flag)) {
+				fmt_flag = new_fmt_flag;
+			} else {
+				(void) fprintf(stderr, gettext(
+				    "nm: -t or -o or -x set. -t ignored.\n"));
+			}
+			break;
+		case ':':
+			errflag += 1;
+			(void) fprintf(stderr, gettext(
+			    "nm: %c requires operand\n"), optopt);
+			break;
+		case '?':
+			errflag += 1;
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -381,7 +427,7 @@ static void
 usage()
 {
 	(void) fprintf(stderr, gettext(
-"Usage: nm [-ACDhLlnPpRrsTVv] [-efox] [-g | -u] [-t d|o|x] file ...\n"));
+"Usage: nm [-ACDhiLlnPpRrsTVv] [-efox] [-g | -u] [-t d|o|x] file ...\n"));
 }
 
 /*
@@ -451,20 +497,20 @@ each_file(char *filename)
 					(void) printf(gettext(
 				"\n\nUndefined symbols from %s:\n\n"),
 					    filename);
-			} else if (!h_flag & !P_flag)
+			} else if ((h_flag == 0) && (P_flag == 0)) {
 #else
-			if (!h_flag & !P_flag)
+			if ((h_flag == 0) && (P_flag == 0)) {
 #endif
-			{
-				if (p_flag)
+				if (p_flag) {
 					(void) printf("\n\n%s:\n", filename);
-				else {
-					if (A_flag != 0)
+				} else {
+					if (A_flag != 0) {
 						(void) printf("\n\n%s%s:\n",
 						    A_header, filename);
-					else
+					} else {
 						(void) printf("\n\n%s:\n",
 						    filename);
+					}
 				}
 			}
 			archive_name = (char *)0;
@@ -616,11 +662,11 @@ print_ar_files(int fd, Elf * elf_file, char *filename)
 			continue;
 		}
 
-		if (!h_flag & !P_flag) {
-			if (p_flag)
+		if ((h_flag == 0) && (P_flag == 0)) {
+			if (p_flag) {
 				(void) printf("\n\n%s[%s]:\n",
 				    filename, p_ar->ar_name);
-			else {
+			} else {
 				if (A_flag != 0)
 					(void) printf("\n\n%s%s[%s]:\n",
 					    A_header, filename, p_ar->ar_name);
@@ -715,8 +761,10 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 		    prog_name, filename);
 		return;
 	}
-	qsort((char *)sym_data, count-1, sizeof (SYM),
-	    (int (*)(const void *, const void *))compare);
+	if (i_flag == 0) {
+		qsort((char *)sym_data, count-1, sizeof (SYM),
+		    (int (*)(const void *, const void *))compare);
+	}
 	s = sym_data;
 	while (count > 1) {
 #ifndef XPG4
@@ -725,18 +773,19 @@ print_symtab(Elf *elf_file, unsigned int shstrndx,
 			 * U_flag specified
 			 */
 			print_with_uflag(sym_data, filename);
-		} else if (p_flag)
+		} else if (p_flag) {
 #else
-		if (p_flag)
+		if (p_flag) {
 #endif
 			print_with_pflag(ndigits, elf_file, shstrndx,
 			    sym_data, filename);
-		else if (P_flag)
+		} else if (P_flag) {
 			print_with_Pflag(ndigits, elf_file, shstrndx,
 			    sym_data);
-		else
+		} else {
 			print_with_otherflags(ndigits, elf_file,
 			    shstrndx, sym_data, filename);
+		}
 		sym_data++;
 		count--;
 	}
@@ -803,9 +852,9 @@ readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
 
 		buf->indx = i;
 		/* allow to work on machines where NULL-derefs dump core */
-		if (sym.st_name == 0)
+		if (sym.st_name == 0) {
 			buf->name = "";
-		else if (C_flag) {
+		} else if (C_flag) {
 			const char *dn = NULL;
 			char *name = (char *)elf_strptr(elf, link, sym.st_name);
 
@@ -817,9 +866,9 @@ readsyms(Elf_Data * data, GElf_Sxword num, Elf *elf,
 				name = FormatName(name, d_buf);
 			}
 			buf->name = name;
-		}
-		else
+		} else {
 			buf->name = (char *)elf_strptr(elf, link, sym.st_name);
+		}
 
 		buf->value	= sym.st_value;
 		buf->size	= sym.st_size;
@@ -1456,29 +1505,34 @@ parsename(char *s)
 void
 parse_fn_and_print(const char *str, char *s)
 {
-	char		c, *p1, *p2;
+	char		c = '\0', *p1, *p2;
 	int		yes = 1;
 
-	if ((p1 = p2 =  strstr(s, "_c_")) == NULL)
-		if ((p1 = p2 =  strstr(s, "_C_")) == NULL)
-			if ((p1 = p2 =  strstr(s, "_cc_")) == NULL)
-				if ((p1 = p2 =  strstr(s, "_cxx_")) == NULL)
+	if ((p1 = p2 =  strstr(s, "_c_")) == NULL) {
+		if ((p1 = p2 =  strstr(s, "_C_")) == NULL) {
+			if ((p1 = p2 =  strstr(s, "_cc_")) == NULL) {
+				if ((p1 = p2 =  strstr(s, "_cxx_")) == NULL) {
 					if ((p1 = p2 = strstr(s, "_h_")) ==
-					    NULL)
-			yes = 0;
-			else
+					    NULL) {
+						yes = 0;
+					} else {
 						p2 += 2;
-				else
+					}
+				} else {
 					p2 += 4;
-			else
+				}
+			} else {
 				p2 += 3;
-		else
+			}
+		} else {
 			p2 += 2;
-	else
+		}
+	} else {
 		p2 += 2;
+	}
 
 	if (yes) {
-	*p1 = '.';
+		*p1 = '.';
 		c = *p2;
 		*p2 = '\0';
 	}
