@@ -38,7 +38,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <assert.h>
@@ -1989,7 +1989,7 @@ recv_icmp_packet(struct addrinfo *ai_dst, int recv_sock6, int recv_sock,
 						    progname, strerror(errno));
 					}
 					continue;
-				} if (cc > 0) {
+				} else if (cc > 0) {
 					check_reply(ai_dst, &in_msg, cc,
 					    udp_src_port);
 				}

@@ -1,0 +1,10 @@
+drwx------ root .
+drwxr-xr-x daemon ./dst
+-rw-r--r-- root ./dst/file1
+-rw-r--r-- daemon ./file
+drwxr-xr-x daemon ./src
+lrwxrwxrwx root ./src/dstlink
+-rw-r--r-- daemon ./src/file2
+lrwxrwxrwx root ./src/tlink
+-rw-r--r-- daemon ./target
+lrwxrwxrwx root ./tlink

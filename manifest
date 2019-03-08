@@ -20832,8 +20832,8 @@ f usr/xpg4/bin/basename 0555 root bin
 f usr/xpg4/bin/batch 0555 root bin
 s usr/xpg4/bin/bg=../../bin/alias
 s usr/xpg4/bin/cd=../../bin/alias
-f usr/xpg4/bin/chgrp 0555 root bin
-f usr/xpg4/bin/chown 0555 root bin
+s usr/xpg4/bin/chgrp=../../bin/chgrp
+s usr/xpg4/bin/chown=../../bin/chown
 s usr/xpg4/bin/command=../../bin/alias
 f usr/xpg4/bin/cp 0555 root bin
 f usr/xpg4/bin/crontab 4555 root bin

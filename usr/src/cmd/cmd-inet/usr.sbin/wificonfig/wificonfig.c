@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -2531,7 +2533,7 @@ do_deletepf(int fd, int argc, char **argv)
 				    B_FALSE);
 				free(section_id);
 				p_section = p_sectionbak;
-					continue;
+				continue;
 			}
 			p_section = p_section->section_next;
 		}
@@ -2751,8 +2753,9 @@ do_rmprefer(int fd, int argc, char **argv)
 			return (B_FALSE);
 		pae = plist->ael_head;
 		while (pae != NULL) {
+			ae_t *next = pae->ae_next;
 			free(pae);
-			pae = pae->ae_next;
+			pae = next;
 		}
 		plist->ael_head = plist->ael_tail = NULL;
 		plist->ael_argc = 0;

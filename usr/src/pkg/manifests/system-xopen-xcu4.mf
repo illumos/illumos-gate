@@ -38,8 +38,6 @@ file path=usr/xpg4/bin/at group=sys mode=4755
 file path=usr/xpg4/bin/awk mode=0555
 file path=usr/xpg4/bin/basename mode=0555
 file path=usr/xpg4/bin/batch mode=0555
-file path=usr/xpg4/bin/chgrp mode=0555
-file path=usr/xpg4/bin/chown mode=0555
 file path=usr/xpg4/bin/cp mode=0555
 file path=usr/xpg4/bin/crontab mode=4555
 file path=usr/xpg4/bin/ctags mode=0555
@@ -83,6 +81,8 @@ license lic_OSBL_preamble license=lic_OSBL_preamble
 link path=usr/xpg4/bin/alias target=../../bin/alias
 link path=usr/xpg4/bin/bg target=../../bin/alias
 link path=usr/xpg4/bin/cd target=../../bin/alias
+link path=usr/xpg4/bin/chgrp target=../../bin/chgrp
+link path=usr/xpg4/bin/chown target=../../bin/chown
 link path=usr/xpg4/bin/command target=../../bin/alias
 link path=usr/xpg4/bin/df target=../../sbin/df
 link path=usr/xpg4/bin/egrep target=../../bin/grep

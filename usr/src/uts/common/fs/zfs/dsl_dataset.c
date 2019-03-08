@@ -56,7 +56,7 @@
 #include <sys/dsl_destroy.h>
 #include <sys/dsl_userhold.h>
 #include <sys/dsl_bookmark.h>
-#include <sys/dmu_send.h>
+#include <sys/dmu_recv.h>
 #include <sys/zio_checksum.h>
 #include <sys/zio_compress.h>
 #include <zfs_fletcher.h>

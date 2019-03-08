@@ -8,6 +8,11 @@
  *  as published by the Free Software Foundation; either version
  *  2 of the License, or (at your option) any later version.
  */
+
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -70,7 +75,7 @@ static int promptpass(char *user, char *passwd)
 	argv[0] = promptprog;
 	argv[1] = user == NULL ? "" : user;
 	argv[2] = remote_name;
-	slprintf(fdstr, sizeof (fdstr), "%d", p[1]);
+	(void) slprintf(fdstr, sizeof (fdstr), "%d", p[1]);
 	argv[3] = fdstr;
 	argv[4] = NULL;
 	(void) execv(*argv, argv);

@@ -1118,6 +1118,7 @@ file path=opt/util-tests/tests/awk/tests/T.redir mode=0555
 file path=opt/util-tests/tests/awk/tests/T.split mode=0555
 file path=opt/util-tests/tests/awk/tests/T.sub mode=0555
 file path=opt/util-tests/tests/awk/tests/T.system mode=0555
+file path=opt/util-tests/tests/chown_test mode=0555
 file path=opt/util-tests/tests/date_test mode=0555
 file path=opt/util-tests/tests/demangle/afl-fast mode=0555
 file path=opt/util-tests/tests/demangle/gcc-libstdc++ mode=0555
@@ -1291,6 +1292,18 @@ file path=opt/util-tests/tests/dis/risc-v/tst.supervisor.out mode=0444
 file path=opt/util-tests/tests/dis/risc-v/tst.supervisor.s mode=0444
 file path=opt/util-tests/tests/dis/sparc/tst.regs.out mode=0444
 file path=opt/util-tests/tests/dis/sparc/tst.regs.s mode=0444
+file path=opt/util-tests/tests/files/cout0 mode=0444
+file path=opt/util-tests/tests/files/cout1 mode=0444
+file path=opt/util-tests/tests/files/cout10 mode=0444
+file path=opt/util-tests/tests/files/cout11 mode=0444
+file path=opt/util-tests/tests/files/cout2 mode=0444
+file path=opt/util-tests/tests/files/cout3 mode=0444
+file path=opt/util-tests/tests/files/cout4 mode=0444
+file path=opt/util-tests/tests/files/cout5 mode=0444
+file path=opt/util-tests/tests/files/cout6 mode=0444
+file path=opt/util-tests/tests/files/cout7 mode=0444
+file path=opt/util-tests/tests/files/cout8 mode=0444
+file path=opt/util-tests/tests/files/cout9 mode=0444
 file path=opt/util-tests/tests/files/gout0 mode=0444
 file path=opt/util-tests/tests/files/gout1 mode=0444
 file path=opt/util-tests/tests/files/gout10 mode=0444

@@ -181,6 +181,7 @@
 #include <sys/dsl_scan.h>
 #include <sharefs/share.h>
 #include <sys/dmu_objset.h>
+#include <sys/dmu_recv.h>
 #include <sys/dmu_send.h>
 #include <sys/dsl_destroy.h>
 #include <sys/dsl_bookmark.h>

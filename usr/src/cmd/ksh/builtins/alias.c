@@ -68,9 +68,7 @@ bfastpathrec fastpath_builtins[] =
 	/* This list must be alphabetically sorted for |strcmp()| usage */
 	{ "basename",	b_basename	},
 	{ "cat",	b_cat		},
-	{ "chgrp",	b_chgrp		},
 	{ "chmod",	b_chmod		},
-	{ "chown",	b_chown		},
 #ifdef ENABLE_PERFORMANCE_PARADOXON
 	{ "cksum",	b_cksum		},
 #endif /* ENABLE_PERFORMANCE_PARADOXON */
@@ -98,7 +96,7 @@ bfastpathrec fastpath_builtins[] =
 	{ "mkfifo",	b_mkfifo	},
 	{ "mktemp",	b_mktemp	},
 	{ "mv",		b_mv		},
-	{ "paste",	b_paste 	},
+	{ "paste",	b_paste		},
 	{ "pathchk",	b_pathchk	},
 	{ "pids",	b_pids		},
 	{ "readlink",	b_readlink	},
@@ -119,7 +117,7 @@ bfastpathrec fastpath_builtins[] =
 	{ "uniq",	b_uniq		},
 	{ "wc",		b_wc		},
 	{ "xgrep",	b_xgrep		},
-	{ NULL, 	(int (*)(int, char **, void *))NULL }
+	{ NULL,		(int (*)(int, char **, void *))NULL }
 };
 
 static inline
