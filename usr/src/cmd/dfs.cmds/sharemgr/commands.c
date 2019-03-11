@@ -5656,46 +5656,46 @@ sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 			if (rsrc != NULL) {
 				if (share != sa_get_resource_parent(rsrc))
 					ret = SA_DUPLICATE_NAME;
-				} else {
-					rsrc = sa_add_resource(share, resource,
-					    persist, &ret);
-				}
-				if (features & SA_FEATURE_RESOURCE)
-					share = rsrc;
+			} else {
+				rsrc = sa_add_resource(share, resource,
+				    persist, &ret);
 			}
+			if (features & SA_FEATURE_RESOURCE)
+				share = rsrc;
+		}
 
-			/* Have a group to hold this share path */
-			if (ret == SA_OK && options != NULL &&
-			    strlen(options) > 0) {
-				ret = sa_parse_legacy_options(share,
-				    options,
+		/* Have a group to hold this share path */
+		if (ret == SA_OK && options != NULL &&
+		    strlen(options) > 0) {
+			ret = sa_parse_legacy_options(share,
+			    options,
+			    protocol);
+		}
+		if (!zfs) {
+			/*
+			 * ZFS shares never have a description
+			 * and we can't store the values so
+			 * don't try.
+			 */
+			if (ret == SA_OK && description != NULL)
+				ret = sa_set_share_description(share,
+				    description);
+		}
+		if (ret == SA_OK &&
+		    strcmp(groupstatus, "enabled") == 0) {
+			if (rsrc != share)
+				ret = sa_enable_share(share, protocol);
+			else
+				ret = sa_enable_resource(rsrc,
+				    protocol);
+			if (ret == SA_OK &&
+			    persist == SA_SHARE_PERMANENT) {
+				(void) sa_update_legacy(share,
 				    protocol);
 			}
-			if (!zfs) {
-				/*
-				 * ZFS shares never have a description
-				 * and we can't store the values so
-				 * don't try.
-				 */
-				if (ret == SA_OK && description != NULL)
-					ret = sa_set_share_description(share,
-					    description);
-			}
-			if (ret == SA_OK &&
-			    strcmp(groupstatus, "enabled") == 0) {
-				if (rsrc != share)
-					ret = sa_enable_share(share, protocol);
-				else
-					ret = sa_enable_resource(rsrc,
-					    protocol);
-				if (ret == SA_OK &&
-				    persist == SA_SHARE_PERMANENT) {
-					(void) sa_update_legacy(share,
-					    protocol);
-				}
-				if (ret == SA_OK)
-					ret = sa_update_config(handle);
-			}
+			if (ret == SA_OK)
+				ret = sa_update_config(handle);
+		}
 	}
 err:
 	if (ret != SA_OK) {

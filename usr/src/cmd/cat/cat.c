@@ -27,6 +27,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*
  *	Concatenate files.
@@ -271,10 +274,12 @@ main(int argc, char **argv)
 		    !S_ISBLK(target.st_mode) &&
 		    !S_ISSOCK(target.st_mode) &&
 		    IDENTICAL(target, source)) {
-			if (!silent)
-			(void) fprintf(stderr,
-			    gettext("cat: input/output files '%s' identical\n"),
-			    stdinflg?"-": *argv);
+			if (!silent) {
+				(void) fprintf(stderr, gettext("cat: "
+				    "input/output files '%s' identical\n"),
+				    stdinflg?"-": *argv);
+			}
+
 			if (fclose(fi) != 0)
 				(void) fprintf(stderr,
 				    gettext("cat: close error: %s\n"),

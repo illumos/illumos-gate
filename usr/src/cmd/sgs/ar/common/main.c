@@ -25,6 +25,10 @@
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include "inc.h"
 #include "conv.h"
 
@@ -277,7 +281,7 @@ setup(int argc, char *argv[], Cmd_info *cmd_info)
 				    MSG_ORIG(MSG_FMT_VERSION),
 				    (const char *)SGU_PKG,
 				    (const char *)SGU_REL);
-					Vflag++;
+				Vflag++;
 			}
 			break;
 		case 'C':

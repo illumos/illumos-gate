@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 #include <stdlib.h>
 #include <stdio.h>
@@ -316,7 +317,7 @@ delete_lu(int operandLen, char *operands[], cmdOptions_t *options,
 				notValidHexNumber = B_TRUE;
 				break;
 			}
-		sGuid[j] = tolower(operands[i][j]);
+			sGuid[j] = tolower(operands[i][j]);
 		}
 		if ((notValidHexNumber == B_TRUE) ||
 		    (strlen(operands[i]) != GUID_INPUT)) {

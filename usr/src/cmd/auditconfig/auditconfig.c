@@ -23,6 +23,10 @@
  */
 
 /*
+ * Copyright (c) 2019, Joyent, Inc.
+ */
+
+/*
  * auditconfig - set and display audit parameters
  */
 
@@ -2572,14 +2576,15 @@ strisnum(char *s)
 	if (s == NULL || !*s)
 		return (0);
 
-	for (; *s == '-' || *s == '+'; s++)
+	for (; *s == '-' || *s == '+'; s++) {
+		if (!*s)
+			return (0);
+	}
 
-	if (!*s)
-		return (0);
-
-	for (; *s; s++)
+	for (; *s; s++) {
 		if (!isdigit(*s))
 			return (0);
+	}
 
 	return (1);
 }

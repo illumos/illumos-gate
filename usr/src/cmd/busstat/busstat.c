@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -398,7 +400,7 @@ parse_cmd(int mode)
 					"event names or pic values not "
 					"permitted with -r option.\n"),
 					    pgmname);
-					usage();
+				usage();
 				exit(1);
 			}
 			/*

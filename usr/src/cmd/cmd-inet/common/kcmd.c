@@ -20,6 +20,10 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 /* derived from @(#)rcmd.c	5.17 (Berkeley) 6/27/88 */
 
 #include <unistd.h>
@@ -412,8 +416,11 @@ kcmd(int *sock, char **ahost, ushort_t rport,
 	*sock = s;
 
 	/* pass back credentials if wanted */
-	if (cred) (void) krb5_copy_creds(bsd_context, ret_cred, cred);
-		krb5_free_creds(bsd_context, ret_cred);
+	if (cred)
+		(void) krb5_copy_creds(bsd_context, ret_cred, cred);
+
+	krb5_free_creds(bsd_context, ret_cred);
+
 	/*
 	 * Initialize *authconp to auth_context, so
 	 * that the clients can make use of it

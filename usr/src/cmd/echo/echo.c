@@ -25,6 +25,9 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,16 +58,16 @@ main(int argc, char *argv[])
 	for (i = 1; i <= argc; i++) {
 		for (cp = argv[i], ep = cp + (int)strlen(cp);
 		    cp < ep; cp += b_len) {
-		if ((b_len = mbtowc(&wc, cp, MB_CUR_MAX)) <= 0) {
-			(void) putchar(*cp);
-			b_len = 1;
-			continue;
-		}
+			if ((b_len = mbtowc(&wc, cp, MB_CUR_MAX)) <= 0) {
+				(void) putchar(*cp);
+				b_len = 1;
+				continue;
+			}
 
-		if (wc != '\\') {
-			(void) putwchar(wc);
-			continue;
-		}
+			if (wc != '\\') {
+				(void) putwchar(wc);
+				continue;
+			}
 
 			cp += b_len;
 			b_len = 1;

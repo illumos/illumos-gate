@@ -28,7 +28,9 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdio.h>
 #include <ctype.h>
@@ -146,7 +148,7 @@ main(int argc, char **argv)
 	if (!invis) {
 		(void) fprintf(stderr,
 			gettext("Not enough memory\n"));
-			exit(1);
+		exit(1);
 	}
 	while ((c = getopt(argc, argv, "m:oni:l:f:ud:p:e:h:k:s:QW:?")) != EOF) {
 		/* check for invalid option */
@@ -197,7 +199,7 @@ main(int argc, char **argv)
 				if (!invis) {
 					(void) fprintf(stderr,
 						gettext("Not enough memory\n"));
-						exit(1);
+					exit(1);
 				}
 				(void) memset(invis + ninvis, 0,
 					(invismaxsize - ninvis) *

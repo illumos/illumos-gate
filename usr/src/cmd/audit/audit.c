@@ -23,6 +23,10 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 #include <fcntl.h>
 #include <libscf.h>
 #include <secdb.h>
@@ -232,7 +236,7 @@ is_audit_config_ok() {
 		if (strcmp((char *)&(*plugin_kva_ll).plugin_name,
 		    "audit_binfile") == 0) {
 			cval_str = kva_match(kvlist, "p_dir");
-			if (*cval_str == '\0' || cval_str == NULL) {
+			if (cval_str == NULL || cval_str[0] == '\0') {
 				(void) fprintf(stderr,
 				    gettext("%s: audit_binfile(5) \"p_dir:\" "
 				    "attribute empty\n"), progname);

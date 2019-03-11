@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -226,7 +227,7 @@ main(int argc, char **argv)
 	/* check for non-standard + option */
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "--") == 0)
-		break;
+			break;
 
 		if (argv[i][0] == '+') {
 			if (argv[i][1] == '/') {

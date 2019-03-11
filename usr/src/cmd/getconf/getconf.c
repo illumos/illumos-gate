@@ -30,6 +30,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * getconf -- POSIX.2 compatible utility to query configuration specific
  *	      parameters.
  *         -- XPG4 support added June/93
@@ -936,8 +940,9 @@ main(int argc, char **argv)
 		 * sort the table by the "name" field
 		 * so we print it in sorted order
 		 */
-	qsort(&sctab[0], (sizeof (sctab)/sizeof (struct sctab))-1,
-	    sizeof (struct sctab), namecmp);
+		qsort(&sctab[0], (sizeof (sctab) /
+		    sizeof (struct sctab)) - 1,
+		    sizeof (struct sctab), namecmp);
 
 		/*
 		 * print all the known symbols and their values

@@ -4,6 +4,10 @@
  */
 
 /*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
+/*
  * zdump 7.24
  * Taken from elsie.nci.nih.gov to replace the existing Solaris zdump,
  * which was based on an earlier version of the elsie code.
@@ -231,8 +235,9 @@ char	*argv[];
 					cutloyear = lo;
 					cuthiyear = hi;
 			} else {
-(void) fprintf(stderr, gettext("%s: wild -c argument %s\n"),
-					progname, cutarg);
+				(void) fprintf(stderr,
+				    gettext("%s: wild -c argument %s\n"),
+				    progname, cutarg);
 				exit(EXIT_FAILURE);
 			}
 		}

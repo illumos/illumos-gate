@@ -26,9 +26,9 @@
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2019, Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.13	*/
 
 /*
     NAME
@@ -185,9 +185,10 @@ allocvariables(int argc, int firstoptind)
 	    sizeof (struct strstruct));
 
 	/* Allocate array to keep track of which names have been used. */
-	if (use)
+	if (use) {
 		used = (char *) malloc((unsigned) (argc - firstoptind) *
 		    sizeof (char));
+	}
 
 	if ((ibool == NULL) || (num == NULL) || (str == NULL) ||
 	    (use && (used == NULL)))
@@ -203,8 +204,9 @@ allocvariables(int argc, int firstoptind)
 		if (nullseen || (boolfnames[i] == NULL)) {
 			ibool[i].fullname = "unknown_boolean";
 			nullseen = TRUE;
-		} else
+		} else {
 			ibool[i].fullname = boolfnames[i];
+		}
 		ibool[i].changed = FALSE;
 		ibool[i].seenagain = FALSE;
 	}
@@ -215,8 +217,9 @@ allocvariables(int argc, int firstoptind)
 		if (nullseen || (numfnames[i] == NULL)) {
 			ibool[i].fullname = "unknown_number";
 			nullseen = TRUE;
-		} else
+		} else {
 			num[i].fullname = numfnames[i];
+		}
 		num[i].changed = FALSE;
 		num[i].seenagain = FALSE;
 	}
@@ -227,8 +230,9 @@ allocvariables(int argc, int firstoptind)
 		if (nullseen || (strfnames[i] == NULL)) {
 			str[i].fullname = "unknown_string";
 			nullseen = TRUE;
-		} else
+		} else {
 			str[i].fullname = strfnames[i];
+		}
 		str[i].changed = FALSE;
 		str[i].seenagain = FALSE;
 	}
@@ -522,9 +526,10 @@ initfirstterm(char *term)
 {
 	register int i;
 
-	if (verbose)
+	if (verbose) {
 		(void) fprintf(trace, "setting up terminal type '%s'.\n",
 		    term);
+	}
 
 	(void) setupterm(term, devnull, (int *) 0);
 
@@ -542,8 +547,9 @@ initfirstterm(char *term)
 				_savettytype[TTYLEN] = '\0';
 				savettytype = _savettytype;
 			}
-		} else
+		} else {
 			(void) strcpy(_savettytype, ttytype);
+		}
 	}
 
 	if (printing != pr_none) {
@@ -554,12 +560,15 @@ initfirstterm(char *term)
 	/* Save the values for the first terminal. */
 	for (i = 0; i < numbools; i++) {
 		if ((ibool[i].val = tgetflag(ibool[i].capname)) &&
-		    printing != pr_none)
+		    printing != pr_none) {
 			pr_boolean(ibool[i].infoname, ibool[i].capname,
 			    ibool[i].fullname, 1);
-		if (verbose)
+		}
+
+		if (verbose) {
 			(void) fprintf(trace, "%s=%d.\n", ibool[i].infoname,
 			    ibool[i].val);
+		}
 	}
 
 	if (printing != pr_none) {
@@ -571,12 +580,15 @@ initfirstterm(char *term)
 
 	for (i = 0; i < numnums; i++) {
 		if (((num[i].val = tgetnum(num[i].capname)) > -1) &&
-		    printing != pr_none)
+		    printing != pr_none) {
 			pr_number(num[i].infoname, num[i].capname,
 			    num[i].fullname, num[i].val);
-		if (verbose)
+		}
+
+		if (verbose) {
 			(void) fprintf(trace, "%s=%d.\n", num[i].infoname,
 			    num[i].val);
+		}
 	}
 
 	if (printing != pr_none) {
@@ -588,9 +600,11 @@ initfirstterm(char *term)
 
 	for (i = 0; i < numstrs; i++) {
 		str[i].val = tgetstr(str[i].capname, (char **)0);
-		if ((str[i].val != NULL) && printing != pr_none)
+		if ((str[i].val != NULL) && printing != pr_none) {
 			pr_string(str[i].infoname, str[i].capname,
 			    str[i].fullname, str[i].val);
+		}
+
 		if (verbose) {
 			(void) fprintf(trace, "%s='", str[i].infoname);
 			PR(trace, str[i].val);
@@ -619,9 +633,10 @@ check_nth_terminal(char *nterm, int n)
 	if (use)
 		used[n] = FALSE;
 
-	if (verbose)
+	if (verbose) {
 		(void) fprintf(trace, "adding in terminal type '%s'.\n",
 		    nterm);
+	}
 
 	(void) setupterm(nterm, devnull, (int *) 0);
 
@@ -679,20 +694,24 @@ check_nth_terminal(char *nterm, int n)
 			}
 		}
 		if (boolval) {
-			if (printing != pr_none)
+			if (printing != pr_none) {
 				pr_boolean(ibool[i].infoname, ibool[i].capname,
 				    ibool[i].fullname, 1);
+			}
+
 			if (common && (ibool[i].val == boolval))
 				(void) printf("\t%s= T.\n", ibool[i].infoname);
-		} else if (neither && !ibool[i].val)
+		} else if (neither && !ibool[i].val) {
 			(void) printf("\t!%s.\n", ibool[i].infoname);
+		}
 		if (diff && (ibool[i].val != boolval))
 			(void) printf("\t%s: %c:%c.\n", ibool[i].infoname,
 			    ibool[i].val?'T':'F', boolval?'T':'F');
-		if (verbose)
+		if (verbose) {
 			(void) fprintf(trace, "%s: %d:%d, changed=%d, "
 			    "seen=%d.\n", ibool[i].infoname, ibool[i].val,
 			    boolval, ibool[i].changed, ibool[i].seenagain);
+		}
 	}
 
 	if (printing != pr_none) {
@@ -733,22 +752,31 @@ check_nth_terminal(char *nterm, int n)
 			}
 		}
 		if (numval > -1) {
-			if (printing != pr_none)
+			if (printing != pr_none) {
 				pr_number(num[i].infoname, num[i].capname,
 				    num[i].fullname, numval);
-			if (common && (num[i].val == numval))
+			}
+
+			if (common && (num[i].val == numval)) {
 				(void) printf("\t%s= %d.\n", num[i].infoname,
 				    numval);
-			} else if (neither && (num[i].val == -1))
-				(void) printf("\t!%s.\n", num[i].infoname);
-			if (diff && (num[i].val != numval))
-				(void) printf("\t%s: %d:%d.\n",
-				    num[i].infoname, num[i].val, numval);
-			if (verbose)
-				(void) fprintf(trace, "%s: %d:%d, "
-				    "changed = %d, seen = %d.\n",
-				    num[i].infoname, num[i].val, numval,
-				    num[i].changed, num[i].seenagain);
+			}
+
+		} else if (neither && (num[i].val == -1)) {
+			(void) printf("\t!%s.\n", num[i].infoname);
+		}
+
+		if (diff && (num[i].val != numval)) {
+			(void) printf("\t%s: %d:%d.\n",
+			    num[i].infoname, num[i].val, numval);
+		}
+
+		if (verbose) {
+			(void) fprintf(trace, "%s: %d:%d, "
+			    "changed = %d, seen = %d.\n",
+			    num[i].infoname, num[i].val, numval,
+			    num[i].changed, num[i].seenagain);
+		}
 	}
 
 	if (printing != pr_none) {
@@ -791,9 +819,11 @@ check_nth_terminal(char *nterm, int n)
 			}
 		}
 		if (strval != NULL) {
-			if (printing != pr_none)
+			if (printing != pr_none) {
 				pr_string(str[i].infoname, str[i].capname,
 				    str[i].fullname, strval);
+			}
+
 			if (common && EQUAL(str[i].val, strval)) {
 				(void) printf("\t%s= '", str[i].infoname);
 				PR(stdout, strval);
@@ -848,48 +878,57 @@ dorelative(int firstoptind, int argc, char **argv)
 	pr_bheading();
 
 	/* Print out all bools that are different. */
-	for (i = 0; i < numbools; i++)
-		if (!ibool[i].val && ibool[i].changed)
+	for (i = 0; i < numbools; i++) {
+		if (!ibool[i].val && ibool[i].changed) {
 			pr_boolean(ibool[i].infoname, (char *)0,
 			    (char *)0, -1);
-		else if (ibool[i].val && (ibool[i].changed ||
-		    !ibool[i].seenagain))
+		} else if (ibool[i].val && (ibool[i].changed ||
+		    !ibool[i].seenagain)) {
 			pr_boolean(ibool[i].infoname, (char *)0, (char *)0, 1);
+		}
+	}
 
 	pr_bfooting();
 	pr_nheading();
 
 	/* Print out all nums that are different. */
-	for (i = 0; i < numnums; i++)
-		if (num[i].val < 0 && num[i].changed)
+	for (i = 0; i < numnums; i++) {
+		if (num[i].val < 0 && num[i].changed) {
 			pr_number(num[i].infoname, (char *)0, (char *)0, -1);
-		else if (num[i].val >= 0 && (num[i].changed ||
-		    !num[i].seenagain))
+		} else if (num[i].val >= 0 && (num[i].changed ||
+		    !num[i].seenagain)) {
 			pr_number(num[i].infoname, (char *)0,
 			    (char *)0, num[i].val);
+		}
+	}
 
 	pr_nfooting();
 	pr_sheading();
 
 	/* Print out all strs that are different. */
-	for (i = 0; i < numstrs; i++)
-		if (str[i].val == NULL && str[i].changed)
+	for (i = 0; i < numstrs; i++) {
+		if (str[i].val == NULL && str[i].changed) {
 			pr_string(str[i].infoname, (char *)0, (char *)0,
 			    (char *)0);
-		else if ((str[i].val != NULL) &&
-		    (str[i].changed || !str[i].seenagain))
-	pr_string(str[i].infoname, (char *)0, (char *)0, str[i].val);
+		} else if ((str[i].val != NULL) &&
+		    (str[i].changed || !str[i].seenagain)) {
+			pr_string(str[i].infoname,
+			    (char *)0, (char *)0, str[i].val);
+		}
+	}
 
 	pr_sfooting();
 
 	/* Finish it up. */
-	for (i = firstoptind; i < argc; i++)
-		if (used[i - firstoptind])
+	for (i = firstoptind; i < argc; i++) {
+		if (used[i - firstoptind]) {
 			(void) printf("\tuse=%s,\n", argv[i]);
-		else
+		} else {
 			(void) fprintf(stderr,
 			    "%s: 'use=%s' did not add anything to the "
 			    "description.\n", progname, argv[i]);
+		}
+	}
 }
 
 void
@@ -903,9 +942,11 @@ local_setenv(char *termNinfo)
 	register int termlen;
 
 	if (termNinfo && *termNinfo) {
-		if (verbose)
+		if (verbose) {
 			(void) fprintf(trace, "setting TERMINFO=%s.\n",
 			    termNinfo);
+		}
+
 		termlen = strlen(termNinfo);
 		if (termlen + 10 > termsize) {
 			termsize = termlen + 20;
@@ -1052,12 +1093,13 @@ main(int argc, char **argv)
 				optind = 0;
 			}
 			pr_init(printing = pr_terminfo);
-		} else
+		} else {
 			diff++;
+		}
 	}
 
 	/* Set the default sorting order. */
-	if (sortorder == none)
+	if (sortorder == none) {
 		switch ((int) printing) {
 			case (int) pr_cap:
 				sortorder = by_cap; break;
@@ -1067,6 +1109,7 @@ main(int argc, char **argv)
 			case (int) pr_none:
 				sortorder = by_terminfo; break;
 		}
+	}
 
 	firstterm = argv[optind++];
 	firstoptind = optind;

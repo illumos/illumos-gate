@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -1424,7 +1425,7 @@ parse_intr_set_opts(char *input, uint64_t *flags_arg, uint32_t *cpu_arg)
 	} else {
 		(void) fprintf(stderr,
 		    "Unrecognized option for -i -m -w\n");
-			rval = FAILURE;
+		rval = FAILURE;
 	}
 
 	return (rval);

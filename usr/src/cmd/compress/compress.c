@@ -13,7 +13,9 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*
  * Compress - data compression program
@@ -815,7 +817,7 @@ main(int argc, char *argv[])
 		} else if (!quiet && !do_decomp) {
 			(void) fprintf(stderr, "%s: ",
 			    *fileptr);
-				newline_needed = 1;
+			newline_needed = 1;
 		}
 
 		/* Actually do the compression/decompression */
@@ -1308,7 +1310,7 @@ decompress()
 
 		if ((code == CLEAR) && block_compress) {
 			for (code = 255; code >= 0; code--)
-			tab_prefixof(code) = 0;
+				tab_prefixof(code) = 0;
 			clear_flg = 1;
 			free_ent = FIRST - 1;
 			if ((code = getcode()) == -1)	/* O, untimely death! */
@@ -1803,8 +1805,9 @@ cl_hash(count_int hsize)		/* reset code table */
 		*(htab_p-1) = m1;
 		htab_p -= 16;
 	} while ((i -= 16) >= 0);
-		for (i += 16; i > 0; i--)
-			*--htab_p = m1;
+
+	for (i += 16; i > 0; i--)
+		*--htab_p = m1;
 }
 
 static void
