@@ -135,7 +135,8 @@ static void ah_outbound_finish(mblk_t *, ip_xmit_attr_t *);
 
 static int ipsecah_open(queue_t *, dev_t *, int, int, cred_t *);
 static int ipsecah_close(queue_t *, int, cred_t *);
-static void ipsecah_wput(queue_t *, mblk_t *);
+static int ipsecah_rput(queue_t *, mblk_t *);
+static int ipsecah_wput(queue_t *, mblk_t *);
 static boolean_t ah_register_out(uint32_t, uint32_t, uint_t, ipsecah_stack_t *,
     cred_t *);
 static void	*ipsecah_stack_init(netstackid_t stackid, netstack_t *ns);
@@ -151,12 +152,12 @@ static struct module_info info = {
 };
 
 static struct qinit rinit = {
-	(pfi_t)putnext, NULL, ipsecah_open, ipsecah_close, NULL, &info,
+	ipsecah_rput, NULL, ipsecah_open, ipsecah_close, NULL, &info,
 	NULL
 };
 
 static struct qinit winit = {
-	(pfi_t)ipsecah_wput, NULL, ipsecah_open, ipsecah_close, NULL, &info,
+	ipsecah_wput, NULL, ipsecah_open, ipsecah_close, NULL, &info,
 	NULL
 };
 
@@ -1446,9 +1447,19 @@ ah_keysock_no_socket(mblk_t *mp, ipsecah_stack_t *ahstack)
 }
 
 /*
+ * AH module read put routine.
+ */
+static int
+ipsecah_rput(queue_t *q, mblk_t *mp)
+{
+	putnext(q, mp);
+	return (0);
+}
+
+/*
  * AH module write put routine.
  */
-static void
+static int
 ipsecah_wput(queue_t *q, mblk_t *mp)
 {
 	ipsec_info_t *ii;
@@ -1498,7 +1509,7 @@ ipsecah_wput(queue_t *q, mblk_t *mp)
 		case ND_GET:
 			if (nd_getset(q, ahstack->ipsecah_g_nd, mp)) {
 				qreply(q, mp);
-				return;
+				return (0);
 			} else {
 				iocp->ioc_error = ENOENT;
 			}
@@ -1512,7 +1523,7 @@ ipsecah_wput(queue_t *q, mblk_t *mp)
 			iocp->ioc_count = 0;
 			mp->b_datap->db_type = M_IOCACK;
 			qreply(q, mp);
-			return;
+			return (0);
 		}
 	default:
 		ah3dbg(ahstack,
@@ -1520,6 +1531,7 @@ ipsecah_wput(queue_t *q, mblk_t *mp)
 		    mp->b_datap->db_type));
 		putnext(q, mp);
 	}
+	return (0);
 }
 
 /* Refactor me */
@@ -2885,7 +2897,7 @@ ah_process_ip_options_v6(mblk_t *mp, ipsa_t *assoc, int *length_to_skip,
 {
 	ip6_t	*ip6h;
 	ip6_t	*oip6h;
-	mblk_t 	*phdr_mp;
+	mblk_t	*phdr_mp;
 	int option_length;
 	uint_t	ah_align_sz;
 	uint_t ah_offset;
@@ -3003,7 +3015,7 @@ ah_process_ip_options_v4(mblk_t *mp, ipsa_t *assoc, int *length_to_skip,
 	uint32_t option_length;
 	ipha_t	*ipha;
 	ipha_t	*oipha;
-	mblk_t 	*phdr_mp;
+	mblk_t	*phdr_mp;
 	int	 size;
 	uchar_t	*optptr;
 	uint8_t optval;
