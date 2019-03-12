@@ -322,8 +322,8 @@ typedef struct sppa {
 	spppstr_t	*ppa_ip6_cache;	/* ptr to PPP_IPV6 upper stream */
 
 	kmutex_t	ppa_npmutex;	/* protects the 2 fields below */
-	uint32_t 	ppa_npflag;	/* network protocols blocked */
-	uint32_t 	ppa_holdpkts[3]; /* # of packets blocked per np */
+	uint32_t	ppa_npflag;	/* network protocols blocked */
+	uint32_t	ppa_holdpkts[3]; /* # of packets blocked per np */
 
 	zoneid_t	ppa_zoneid;	/* zone where PPA is in use */
 } sppa_t;
@@ -363,13 +363,13 @@ extern int	sppp_close(queue_t *, int, cred_t *);
 extern mblk_t	*sppp_dladdud(spppstr_t *, mblk_t *, t_scalar_t, boolean_t);
 extern void	sppp_dlpi_pinfoinit(void);
 extern void	sppp_dlprsendup(spppstr_t *, mblk_t *, t_scalar_t, boolean_t);
-extern void	sppp_lrput(queue_t *, mblk_t *);
-extern void	sppp_lrsrv(queue_t *);
-extern void	sppp_lwsrv(queue_t *);
+extern int	sppp_lrput(queue_t *, mblk_t *);
+extern int	sppp_lrsrv(queue_t *);
+extern int	sppp_lwsrv(queue_t *);
 extern int	sppp_mproto(queue_t *, mblk_t *, spppstr_t *);
 extern int	sppp_open(queue_t *, dev_t *, int, int, cred_t *);
-extern void	sppp_uwput(queue_t *, mblk_t *);
-extern void	sppp_uwsrv(queue_t *);
+extern int	sppp_uwput(queue_t *, mblk_t *);
+extern int	sppp_uwsrv(queue_t *);
 extern void	sppp_remove_ppa(spppstr_t *sps);
 extern sppa_t	*sppp_find_ppa(uint32_t ppa_id);
 extern sppa_t	*sppp_create_ppa(uint32_t ppa_id, zoneid_t zoneid);

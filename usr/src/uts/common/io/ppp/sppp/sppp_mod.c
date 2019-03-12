@@ -93,8 +93,8 @@ static struct qinit sppp_urinit = {
 };
 
 static struct qinit sppp_uwinit = {
-	(int (*)())sppp_uwput,	/* qi_putp */
-	(int (*)())sppp_uwsrv,	/* qi_srvp */
+	sppp_uwput,		/* qi_putp */
+	sppp_uwsrv,		/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -103,8 +103,8 @@ static struct qinit sppp_uwinit = {
 };
 
 static struct qinit sppp_lrinit = {
-	(int (*)())sppp_lrput,	/* qi_putp */
-	(int (*)())sppp_lrsrv,	/* qi_srvp */
+	sppp_lrput,		/* qi_putp */
+	sppp_lrsrv,		/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -114,7 +114,7 @@ static struct qinit sppp_lrinit = {
 
 static struct qinit sppp_lwinit = {
 	NULL,			/* qi_putp */
-	(int (*)())sppp_lwsrv,	/* qi_srvp */
+	sppp_lwsrv,		/* qi_srvp */
 	NULL,			/* qi_qopen */
 	NULL,			/* qi_qclose */
 	NULL,			/* qi_qadmin */
@@ -162,10 +162,10 @@ static struct streamtab sppp_tab = {
  * the system's stability and performance.
  */
 DDI_DEFINE_STREAM_OPS(sppp_ops,						\
-	nulldev, nulldev,						\
-	_mi_driver_attach, _mi_driver_detach, nodev, _mi_driver_info,	\
-	D_NEW | D_MP | D_MTQPAIR | D_MTOUTPERIM | D_MTOCEXCL | D_MTPUTSHARED, \
-	&sppp_tab, ddi_quiesce_not_supported);
+    nulldev, nulldev,							\
+    _mi_driver_attach, _mi_driver_detach, nodev, _mi_driver_info,	\
+    D_NEW | D_MP | D_MTQPAIR | D_MTOUTPERIM | D_MTOCEXCL | D_MTPUTSHARED, \
+    &sppp_tab, ddi_quiesce_not_supported);
 
 static struct modldrv modldrv = {
 	&mod_driverops,				/* drv_modops */
