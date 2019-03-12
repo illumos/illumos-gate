@@ -24,13 +24,13 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <ctf_impl.h>
+#include <libctf_impl.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -769,7 +769,7 @@ ctf_version(int version)
  * A utility function for folks debugging CTF conversion and merging.
  */
 void
-ctf_phase_dump(ctf_file_t *fp, const char *phase)
+ctf_phase_dump(ctf_file_t *fp, const char *phase, const char *name)
 {
 	int fd;
 	static char *base;
@@ -778,11 +778,100 @@ ctf_phase_dump(ctf_file_t *fp, const char *phase)
 	if (base == NULL && (base = getenv("LIBCTF_WRITE_PHASES")) == NULL)
 		return;
 
-	(void) snprintf(path, sizeof (path), "%s/libctf.%s.%d.ctf", base,
+	if (name == NULL)
+		name = "libctf";
+
+	(void) snprintf(path, sizeof (path), "%s/%s.%s.%d.ctf", base, name,
 	    phase != NULL ? phase : "",
 	    ctf_phase);
 	if ((fd = open(path, O_CREAT | O_TRUNC | O_RDWR, 0777)) < 0)
 		return;
 	(void) ctf_write(fp, fd);
 	(void) close(fd);
+}
+
+void
+ctf_phase_bump(void)
+{
+	ctf_phase++;
+}
+
+int
+ctf_symtab_iter(ctf_file_t *fp, ctf_symtab_f func, void *arg)
+{
+	ulong_t i;
+	uintptr_t symbase;
+	uintptr_t strbase;
+	const char *file = NULL;
+	boolean_t primary = B_TRUE;
+
+	if (fp->ctf_symtab.cts_data == NULL ||
+	    fp->ctf_strtab.cts_data == NULL) {
+		return (ECTF_NOSYMTAB);
+	}
+
+	symbase = (uintptr_t)fp->ctf_symtab.cts_data;
+	strbase = (uintptr_t)fp->ctf_strtab.cts_data;
+
+	for (i = 0; i < fp->ctf_nsyms; i++) {
+		const char *name;
+		int ret;
+		uint_t type;
+		Elf64_Sym sym;
+
+		/*
+		 * The CTF library has historically tried to handle large file
+		 * offsets itself so that way clients can be unaware of such
+		 * isseus. Therefore, we translate everything to a 64-bit ELF
+		 * symbol, this is done to make it so that the rest of the
+		 * library doesn't have to know about these differences. For
+		 * more information see, lib/libctf/common/ctf_lib.c.
+		 */
+		if (fp->ctf_symtab.cts_entsize == sizeof (Elf32_Sym)) {
+			const Elf32_Sym *symp = (Elf32_Sym *)symbase + i;
+			uint_t bind, itype;
+
+			sym.st_name = symp->st_name;
+			sym.st_value = symp->st_value;
+			sym.st_size = symp->st_size;
+			bind = ELF32_ST_BIND(symp->st_info);
+			itype = ELF32_ST_TYPE(symp->st_info);
+			sym.st_info = ELF64_ST_INFO(bind, itype);
+			sym.st_other = symp->st_other;
+			sym.st_shndx = symp->st_shndx;
+		} else {
+			const Elf64_Sym *symp = (Elf64_Sym *)symbase + i;
+
+			sym = *symp;
+		}
+
+		type = ELF64_ST_TYPE(sym.st_info);
+		name = (const char *)(strbase + sym.st_name);
+
+		/*
+		 * Check first if we have an STT_FILE entry. This is used to
+		 * distinguish between various local symbols when merging.
+		 */
+		if (type == STT_FILE) {
+			if (file != NULL) {
+				primary = B_FALSE;
+			}
+			file = name;
+			continue;
+		}
+
+		/*
+		 * Check if this is a symbol that we care about.
+		 */
+		if (!ctf_sym_valid(strbase, type, sym.st_shndx, sym.st_value,
+		    sym.st_name)) {
+			continue;
+		}
+
+		if ((ret = func(&sym, i, file, name, primary, arg)) != 0) {
+			return (ret);
+		}
+	}
+
+	return (0);
 }

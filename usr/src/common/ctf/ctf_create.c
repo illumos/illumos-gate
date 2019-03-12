@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <sys/sysmacros.h>
@@ -2126,6 +2126,7 @@ ctf_add_label(ctf_file_t *fp, const char *name, ctf_id_t type, uint_t position)
 		return (ctf_set_errno(fp, EAGAIN));
 	}
 
+	ctf_dprintf("adding label %s, %ld\n", name, type);
 	dld->dld_type = type;
 	fp->ctf_dtstrlen += strlen(name) + 1;
 	ctf_dld_insert(fp, dld, position);

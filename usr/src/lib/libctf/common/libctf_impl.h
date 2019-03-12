@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _LIBCTF_IMPL_H
@@ -41,6 +41,13 @@ extern ctf_conv_status_t ctf_dwarf_convert(int, Elf *, uint_t, int *,
     ctf_file_t **, char *, size_t);
 
 /*
+ * Symbol walking
+ */
+typedef int (*ctf_symtab_f)(const Elf64_Sym *, ulong_t, const char *,
+    const char *, boolean_t, void *);
+extern int ctf_symtab_iter(ctf_file_t *, ctf_symtab_f, void *);
+
+/*
  * zlib compression routines
  */
 extern int ctf_compress(ctf_file_t *fp, void **, size_t *, size_t *);
@@ -50,7 +57,8 @@ extern int ctf_diff_self(ctf_diff_t *, ctf_diff_type_f, void *);
 /*
  * Internal debugging aids
  */
-extern void ctf_phase_dump(ctf_file_t *, const char *);
+extern void ctf_phase_dump(ctf_file_t *, const char *, const char *);
+extern void ctf_phase_bump(void);
 
 #ifdef __cplusplus
 }

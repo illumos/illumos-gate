@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -168,9 +168,7 @@ ctf_elfconvert(int fd, Elf *elf, const char *label, uint_t nthrs, uint_t flags,
 	/*
 	 * Succsesful conversion.
 	 */
-	if (fp != NULL) {
-		if (label == NULL)
-			label = "";
+	if (fp != NULL && label != NULL) {
 		if (ctf_add_label(fp, label, fp->ctf_typemax, 0) == CTF_ERR) {
 			*errp = ctf_errno(fp);
 			ctf_close(fp);
