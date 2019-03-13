@@ -821,20 +821,20 @@
  *
  * cpi_ncore_bits
  *
- * 	This indicates the number of bits that are required to represent all of
- * 	the cores in the system. As cores are derived based on their APIC IDs,
- * 	we aren't guaranteed a run of APIC IDs starting from zero. It's OK for
- * 	this value to be larger than the actual number of IDs that are present
- * 	in the system. This is used to size tables by the CMI framework. It is
- * 	only filled in for Intel and AMD CPUs.
+ *	This indicates the number of bits that are required to represent all of
+ *	the cores in the system. As cores are derived based on their APIC IDs,
+ *	we aren't guaranteed a run of APIC IDs starting from zero. It's OK for
+ *	this value to be larger than the actual number of IDs that are present
+ *	in the system. This is used to size tables by the CMI framework. It is
+ *	only filled in for Intel and AMD CPUs.
  *
  * cpi_nthread_bits
  *
- * 	This indicates the number of bits required to represent all of the IDs
- * 	that cover the logical CPUs that exist on a given core. It's OK for this
- * 	value to be larger than the actual number of IDs that are present in the
- * 	system.  This is used to size tables by the CMI framework. It is
- * 	only filled in for Intel and AMD CPUs.
+ *	This indicates the number of bits required to represent all of the IDs
+ *	that cover the logical CPUs that exist on a given core. It's OK for this
+ *	value to be larger than the actual number of IDs that are present in the
+ *	system.  This is used to size tables by the CMI framework. It is
+ *	only filled in for Intel and AMD CPUs.
  *
  * -----------
  * Hypervisors
