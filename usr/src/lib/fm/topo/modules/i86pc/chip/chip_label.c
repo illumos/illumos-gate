@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -561,8 +563,8 @@ get_num_chips(topo_mod_t *mod)
 			nchip = -1;
 			break;
 		}
-		if ((bitmap & (1 << chipid)) != 0) {
-			bitmap |= (1 << chipid);
+		if ((bitmap & (1ULL << chipid)) != 0) {
+			bitmap |= (1ULL << chipid);
 			nchip++;
 		}
 	}
@@ -660,7 +662,7 @@ a4fplus_chip_label(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
  *
  * This function computes the DIMM slot number using the following formula:
  *
- * 	slot = cs - (cs % 2) + channel + offset
+ *	slot = cs - (cs % 2) + channel + offset
  */
 /* ARGSUSED */
 int

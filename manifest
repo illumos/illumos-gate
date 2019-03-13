@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2019 Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 # Copyright 2017 ASS-Einrichtungssysteme GmbH
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
@@ -563,6 +563,7 @@ f kernel/drv/amd64/afe 0755 root sys
 f kernel/drv/amd64/aggr 0755 root sys
 f kernel/drv/amd64/ahci 0755 root sys
 f kernel/drv/amd64/amd8111s 0755 root sys
+f kernel/drv/amd64/amdf17nbdf 0755 root sys
 f kernel/drv/amd64/amr 0755 root sys
 f kernel/drv/amd64/arcmsr 0755 root sys
 f kernel/drv/amd64/arp 0755 root sys
@@ -583,6 +584,7 @@ f kernel/drv/amd64/cmdk 0755 root sys
 f kernel/drv/amd64/cn 0755 root sys
 f kernel/drv/amd64/conskbd 0755 root sys
 f kernel/drv/amd64/consms 0755 root sys
+f kernel/drv/amd64/coretemp 0755 root sys
 f kernel/drv/amd64/cpqary3 0755 root sys
 f kernel/drv/amd64/cpuid 0755 root sys
 f kernel/drv/amd64/cpunex 0755 root sys
@@ -760,6 +762,7 @@ f kernel/drv/cmdk.conf 0644 root sys
 f kernel/drv/cn.conf 0644 root sys
 f kernel/drv/conskbd.conf 0644 root sys
 f kernel/drv/consms.conf 0644 root sys
+f kernel/drv/coretemp.conf 0644 root sys
 f kernel/drv/cpqary3.conf 0644 root sys
 f kernel/drv/cpuid.conf 0644 root sys
 f kernel/drv/crypto.conf 0644 root sys
@@ -5434,6 +5437,7 @@ f usr/lib/devfsadm/linkmod/SUNW_misc_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_misc_link_i386.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_port_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_ramdisk_link.so 0755 root sys
+f usr/lib/devfsadm/linkmod/SUNW_sensor_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_sgen_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_smp_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_tape_link.so 0755 root sys
@@ -19037,6 +19041,7 @@ f usr/share/man/man7d/afe.7d 0444 root bin
 f usr/share/man/man7d/ahci.7d 0444 root bin
 s usr/share/man/man7d/allkmem.7d=mem.7d
 f usr/share/man/man7d/amd8111s.7d 0444 root bin
+f usr/share/man/man7d/amdf17nbdf.7d 0444 root bin
 f usr/share/man/man7d/amr.7d 0444 root bin
 f usr/share/man/man7d/arcmsr.7d 0444 root bin
 f usr/share/man/man7d/asy.7d 0444 root bin
@@ -19050,6 +19055,7 @@ f usr/share/man/man7d/bnxe.7d 0444 root bin
 f usr/share/man/man7d/chxge.7d 0444 root bin
 f usr/share/man/man7d/cmdk.7d 0444 root bin
 f usr/share/man/man7d/cpqary3.7d 0444 root bin
+f usr/share/man/man7d/coretemp.7d 0444 root bin
 f usr/share/man/man7d/cpuid.7d 0444 root bin
 f usr/share/man/man7d/devinfo.7d 0444 root bin
 f usr/share/man/man7d/dmfe.7d 0444 root bin

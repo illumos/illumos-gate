@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble
@@ -20,10 +20,11 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	7d
+MANSECT=	7d
 
 _MANFILES=	aac.7d		\
 		afe.7d		\
+		amdf17nbdf.7d	\
 		audio.7d	\
 		audio1575.7d	\
 		audioens.7d	\
@@ -38,6 +39,7 @@ _MANFILES=	aac.7d		\
 		bscv.7d		\
 		chxge.7d	\
 		console.7d	\
+		coretemp.7d	\
 		cpuid.7d	\
 		dca.7d		\
 		dcam1394.7d	\

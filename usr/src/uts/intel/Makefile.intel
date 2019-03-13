@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 #
@@ -214,7 +214,7 @@ DRV_KMODS	+= audiopci
 DRV_KMODS	+= audiosolo
 DRV_KMODS	+= audiots
 DRV_KMODS	+= audiovia823x
-DRV_KMODS	+= bl 
+DRV_KMODS	+= bl
 DRV_KMODS	+= blkdev
 DRV_KMODS	+= bge
 DRV_KMODS	+= bofi
@@ -360,7 +360,7 @@ DRV_KMODS	+= ural
 DRV_KMODS	+= uath
 DRV_KMODS	+= urtw
 DRV_KMODS	+= vgatext
-DRV_KMODS	+= vmxnet 
+DRV_KMODS	+= vmxnet
 DRV_KMODS	+= vnd
 DRV_KMODS	+= vnic
 DRV_KMODS	+= vscan
@@ -506,9 +506,9 @@ DRV_KMODS	+= xhci
 #
 DRV_KMODS	+= usbgem
 DRV_KMODS	+= axf
-DRV_KMODS	+= udmf 
+DRV_KMODS	+= udmf
 DRV_KMODS	+= upf
-DRV_KMODS	+= urf 
+DRV_KMODS	+= urf
 
 #
 #	1394 modules
@@ -522,7 +522,7 @@ DRV_KMODS	+= dcam1394
 #	InfiniBand pseudo drivers
 #
 DRV_KMODS	+= ib ibp eibnx eoib rdsib sdp iser daplt hermon tavor sol_ucma sol_uverbs
-DRV_KMODS	+= sol_umad 
+DRV_KMODS	+= sol_umad
 
 #
 #	Brand modules
@@ -753,3 +753,9 @@ DACF_KMODS	+= net_dacf
 # global cross check.
 #
 LINTFLAGS	+= -D_MACHDEP -I$(UTSBASE)/i86pc
+
+#
+#	Sensor related drivers
+#
+DRV_KMODS	+= amdf17nbdf
+DRV_KMODS	+= coretemp

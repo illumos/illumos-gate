@@ -21,9 +21,8 @@
 
 #
 # Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 # Copyright 2013 Garrett D'Amore <garrett@damore.org>
-# Copyright 2015, Joyent, Inc. All rights reserved.
 # Copyright 2013 Saso Kiselkov. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2017 Nexenta Systems, Inc.
@@ -518,6 +517,7 @@ CHKHDRS=			\
 	sema_impl.h		\
 	semaphore.h		\
 	sendfile.h		\
+	sensors.h		\
 	ser_sync.h		\
 	session.h		\
 	sha1.h			\

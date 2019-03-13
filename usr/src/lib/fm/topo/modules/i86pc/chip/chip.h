@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef _CHIP_H
@@ -221,6 +221,11 @@ extern const char *chip_rev_smbios_get(topo_mod_t *, id_t);
 extern id_t memnode_to_smbiosid(topo_mod_t *, uint16_t, const char *,
     uint64_t, void *);
 
+/*
+ * Prototypes for chip_temp.c
+ */
+extern int chip_create_chip_temp_sensor(topo_mod_t *, tnode_t *);
+extern int chip_create_core_temp_sensor(topo_mod_t *, tnode_t *);
 
 #ifdef __cplusplus
 }

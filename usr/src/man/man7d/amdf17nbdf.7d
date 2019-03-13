@@ -1,0 +1,53 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019, Joyent, Inc.
+.\"
+.Dd March 20, 2019
+.Dt AMDF17NBDF 7D
+.Os
+.Sh NAME
+.Nm amdf17nbdf
+.Nd AMD Family 17h Northbridge and Data Fabric Driver
+.Sh SYNOPSIS
+.Pa /dev/sensors/temperature/cpu/*
+.Sh DESCRIPTION
+The
+.Nm
+driver provides the system access to the Northbridge and Data Fabric
+devices on AMD Family 17h
+.Pq Zen
+processors allowing the operating system to communicate with the system
+management unit
+.Pq SMU .
+.Pp
+From this, the driver exposes temperature sensors.
+On Family 17h systems, temperature sensors exist for each Zeppelin die,
+of which there may be multiple in a single package.
+This means that each sensor covers more than one core.
+.Pp
+Temperature information is available to the system via the fault
+management architecture
+.Pq FMA .
+The file system location and programming interface to the
+.Nm
+driver are considered
+.Sy Volatile ,
+subject to change without notice, and should not be used directly.
+Raw temperature information can be dumped through the FMA developer
+utility fmtopo.
+.Sh SEE ALSO
+.Xr fmadm 1M
+.Rs
+.%A AMD
+.%B Open-Source Register Reference For AMD Family 17h Processors Models 00h-2Fh
+.%D July, 2018
+.Re

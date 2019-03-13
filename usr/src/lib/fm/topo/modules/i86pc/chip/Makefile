@@ -22,16 +22,22 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 
 MODULE = chip
 ARCH = i86pc
 CLASS = arch
+SHAREDDIR = ../../common/shared/
+
 MODULESRCS = chip.c chip_label.c chip_subr.c chip_amd.c chip_intel.c\
-chip_serial.c chip_smbios.c
+chip_serial.c chip_smbios.c chip_temp.o
+MODULESRCS += topo_sensor.c
 
 include ../../Makefile.plugin
 LDLIBS += -lipmi -lfmd_agent -lumem -lsmbios -lkstat
 
-# not linted
-SMATCH=off
+CPPFLAGS += -I$(SHAREDDIR)
+
+%.o: $(SHAREDDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)

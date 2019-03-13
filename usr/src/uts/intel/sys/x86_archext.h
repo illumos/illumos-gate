@@ -235,6 +235,38 @@ extern "C" {
 #define	CPUID_INTC_ECX_AHF64	0x00100000	/* LAHF and SAHF in long mode */
 
 /*
+ * Intel uses cpuid leaf 6 to cover various thermal and power control
+ * operations.
+ */
+#define	CPUID_INTC_EAX_DTS	0x00000001	/* Digital Thermal Sensor */
+#define	CPUID_INTC_EAX_TURBO	0x00000002	/* Turboboost */
+#define	CPUID_INTC_EAX_ARAT	0x00000004	/* APIC-Timer-Always-Running */
+/* bit 3 is reserved */
+#define	CPUID_INTC_EAX_PLN	0x00000010	/* Power limit notification */
+#define	CPUID_INTC_EAX_ECMD	0x00000020	/* Clock mod. duty cycle */
+#define	CPUID_INTC_EAX_PTM	0x00000040	/* Package thermal management */
+#define	CPUID_INTC_EAX_HWP	0x00000080	/* HWP base registers */
+#define	CPUID_INTC_EAX_HWP_NOT	0x00000100	/* HWP Notification */
+#define	CPUID_INTC_EAX_HWP_ACT	0x00000200	/* HWP Activity Window */
+#define	CPUID_INTC_EAX_HWP_EPR	0x00000400	/* HWP Energy Perf. Pref. */
+#define	CPUID_INTC_EAX_HWP_PLR	0x00000800	/* HWP Package Level Request */
+/* bit 12 is reserved */
+#define	CPUID_INTC_EAX_HDC	0x00002000	/* HDC */
+#define	CPUID_INTC_EAX_TURBO3	0x00004000	/* Turbo Boost Max Tech 3.0 */
+#define	CPUID_INTC_EAX_HWP_CAP	0x00008000	/* HWP Capabilities */
+#define	CPUID_INTC_EAX_HWP_PECI	0x00010000	/* HWP PECI override */
+#define	CPUID_INTC_EAX_HWP_FLEX	0x00020000	/* Flexible HWP */
+#define	CPUID_INTC_EAX_HWP_FAST	0x00040000	/* Fast IA32_HWP_REQUEST */
+/* bit 19 is reserved */
+#define	CPUID_INTC_EAX_HWP_IDLE	0x00100000	/* Ignore Idle Logical HWP */
+
+#define	CPUID_INTC_EBX_DTS_NTRESH(x)	((x) & 0xf)
+
+#define	CPUID_INTC_ECX_MAPERF	0x00000001	/* IA32_MPERF / IA32_APERF */
+/* bits 1-2 are reserved */
+#define	CPUID_INTC_ECX_PERFBIAS	0x00000008	/* IA32_ENERGY_PERF_BIAS */
+
+/*
  * Intel also uses cpuid leaf 7 to have additional instructions and features.
  * Like some other leaves, but unlike the current ones we care about, it
  * requires us to specify both a leaf in %eax and a sub-leaf in %ecx. To deal
@@ -481,6 +513,74 @@ extern "C" {
 #define	IA32_VMX_EPT_VPID_INVEPT_SINGLE	(1UL << 25)
 #define	IA32_VMX_EPT_VPID_INVEPT_ALL	(1UL << 26)
 
+/*
+ * Intel Thermal MSRs
+ */
+#define	MSR_IA32_THERM_INTERRUPT	0x19b
+#define	IA32_THERM_INTERRUPT_HIGH_IE	0x00000001
+#define	IA32_THERM_INTERRUPT_LOW_IE	0x00000002
+#define	IA32_THERM_INTERRUPT_PROCHOT_IE	0x00000004
+#define	IA32_THERM_INTERRUPT_FORCEPR_IE	0x00000008
+#define	IA32_THERM_INTERRUPT_CRIT_IE	0x00000010
+#define	IA32_THERM_INTERRUPT_TR1_VAL(x)	(((x) >> 8) & 0x7f)
+#define	IA32_THERM_INTTERUPT_TR1_IE	0x00008000
+#define	IA32_THERM_INTTERUPT_TR2_VAL(x)	(((x) >> 16) & 0x7f)
+#define	IA32_THERM_INTERRUPT_TR2_IE	0x00800000
+#define	IA32_THERM_INTERRUPT_PL_NE	0x01000000
+
+#define	MSR_IA32_THERM_STATUS		0x19c
+#define	IA32_THERM_STATUS_STATUS		0x00000001
+#define	IA32_THERM_STATUS_STATUS_LOG		0x00000002
+#define	IA32_THERM_STATUS_PROCHOT		0x00000004
+#define	IA32_THERM_STATUS_PROCHOT_LOG		0x00000008
+#define	IA32_THERM_STATUS_CRIT_STATUS		0x00000010
+#define	IA32_THERM_STATUS_CRIT_LOG		0x00000020
+#define	IA32_THERM_STATUS_TR1_STATUS		0x00000040
+#define	IA32_THERM_STATUS_TR1_LOG		0x00000080
+#define	IA32_THERM_STATUS_TR2_STATUS		0x00000100
+#define	IA32_THERM_STATUS_TR2_LOG		0x00000200
+#define	IA32_THERM_STATUS_POWER_LIMIT_STATUS	0x00000400
+#define	IA32_THERM_STATUS_POWER_LIMIT_LOG	0x00000800
+#define	IA32_THERM_STATUS_CURRENT_STATUS	0x00001000
+#define	IA32_THERM_STATUS_CURRENT_LOG		0x00002000
+#define	IA32_THERM_STATUS_CROSS_DOMAIN_STATUS	0x00004000
+#define	IA32_THERM_STATUS_CROSS_DOMAIN_LOG	0x00008000
+#define	IA32_THERM_STATUS_READING(x)		(((x) >> 16) & 0x7f)
+#define	IA32_THERM_STATUS_RESOLUTION(x)		(((x) >> 27) & 0x0f)
+#define	IA32_THERM_STATUS_READ_VALID		0x80000000
+
+#define	MSR_TEMPERATURE_TARGET		0x1a2
+#define	MSR_TEMPERATURE_TARGET_TARGET(x)	(((x) >> 16) & 0xff)
+/*
+ * Not all models support the offset. Refer to the Intel SDM Volume 4 for a list
+ * of which models have support for which bits.
+ */
+#define	MSR_TEMPERATURE_TARGET_OFFSET(x)	(((x) >> 24) & 0x0f)
+
+#define	MSR_IA32_PACKAGE_THERM_STATUS		0x1b1
+#define	IA32_PKG_THERM_STATUS_STATUS		0x00000001
+#define	IA32_PKG_THERM_STATUS_STATUS_LOG	0x00000002
+#define	IA32_PKG_THERM_STATUS_PROCHOT		0x00000004
+#define	IA32_PKG_THERM_STATUS_PROCHOT_LOG	0x00000008
+#define	IA32_PKG_THERM_STATUS_CRIT_STATUS	0x00000010
+#define	IA32_PKG_THERM_STATUS_CRIT_LOG		0x00000020
+#define	IA32_PKG_THERM_STATUS_TR1_STATUS	0x00000040
+#define	IA32_PKG_THERM_STATUS_TR1_LOG		0x00000080
+#define	IA32_PKG_THERM_STATUS_TR2_STATUS	0x00000100
+#define	IA32_PKG_THERM_STATUS_TR2_LOG		0x00000200
+#define	IA32_PKG_THERM_STATUS_READING(x)	(((x) >> 16) & 0x7f)
+
+#define	MSR_IA32_PACKAGE_THERM_INTERRUPT	0x1b2
+#define	IA32_PKG_THERM_INTERRUPT_HIGH_IE	0x00000001
+#define	IA32_PKG_THERM_INTERRUPT_LOW_IE		0x00000002
+#define	IA32_PKG_THERM_INTERRUPT_PROCHOT_IE	0x00000004
+#define	IA32_PKG_THERM_INTERRUPT_OVERHEAT_IE	0x00000010
+#define	IA32_PKG_THERM_INTERRUPT_TR1_VAL(x)	(((x) >> 8) & 0x7f)
+#define	IA32_PKG_THERM_INTTERUPT_TR1_IE		0x00008000
+#define	IA32_PKG_THERM_INTTERUPT_TR2_VAL(x)	(((x) >> 16) & 0x7f)
+#define	IA32_PKG_THERM_INTERRUPT_TR2_IE		0x00800000
+#define	IA32_PKG_THERM_INTERRUPT_PL_NE		0x01000000
+
 #define	MCI_CTL_VALUE		0xffffffff
 
 #define	MTRR_TYPE_UC		0
@@ -605,21 +705,13 @@ extern "C" {
 #define	X86FSET_TBM		90
 #define	X86FSET_AVX512VNNI	91
 #define	X86FSET_AMD_PCEC	92
+#define	X86FSET_CORE_THERMAL	93
+#define	X86FSET_PKG_THERMAL	94
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
  */
 #define	CPUID_TSC_CSTATE_INVARIANCE	(0x100)
-
-/*
- * Intel Deep C-state always-running local APIC timer
- */
-#define	CPUID_CSTATE_ARAT	(0x4)
-
-/*
- * Intel ENERGY_PERF_BIAS MSR indicated by feature bit CPUID.6.ECX[3].
- */
-#define	CPUID_EPB_SUPPORT	(1 << 3)
 
 /*
  * Intel TSC deadline timer
@@ -888,7 +980,9 @@ extern "C" {
  * Definitions for Intel processor models. These are all for Family 6
  * processors. This list and the Atom set below it are not exhuastive.
  */
+#define	INTC_MODEL_YONAH		0x0e
 #define	INTC_MODEL_MEROM		0x0f
+#define	INTC_MODEL_MEROM_L		0x16
 #define	INTC_MODEL_PENRYN		0x17
 #define	INTC_MODEL_DUNNINGTON		0x1d
 
@@ -974,7 +1068,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	93
+#define	NUM_X86_FEATURES	95
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

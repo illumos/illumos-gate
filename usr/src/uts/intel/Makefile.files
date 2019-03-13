@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
 #
 
@@ -101,7 +101,7 @@ GENUNIX_OBJS +=		\
 #
 CORE_OBJS +=		\
 	prmachdep.o
- 
+
 LX_CGROUP_OBJS +=	\
 	cgrps_node.o	\
 	cgrps_vfsops.o	\
@@ -423,3 +423,13 @@ VMXNET3S_OBJS =	vmxnet3_main.o \
 # VMware PVSCSI SCSI Controller
 #
 PVSCSI_OBJS =	pvscsi.o
+
+#
+# Intel Temperature Module
+#
+CORETEMP_OBJS =	coretemp.o
+
+#
+# AMD Family 17 northbridge driver
+#
+AMDF17NBDF_OBJS = amdf17nbdf.o

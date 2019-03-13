@@ -21,7 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2019 Joyent, Inc.  All rights reserved.
+# Copyright 2019, Joyent, Inc.
 # Copyright 2017 Nexenta Systems, Inc.
 #
 
@@ -154,7 +154,15 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/amd8111s/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/amdf17nbdf/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/amr/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/intel/io/coretemp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
