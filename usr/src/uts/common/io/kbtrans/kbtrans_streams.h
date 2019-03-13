@@ -56,11 +56,11 @@ struct  kbtrans {
 	struct kbtrans_lower	kbtrans_lower;	/* actual translation state */
 
 	/* Read and write queues */
-	queue_t 	*kbtrans_streams_readq;
-	queue_t 	*kbtrans_streams_writeq;
+	queue_t		*kbtrans_streams_readq;
+	queue_t		*kbtrans_streams_writeq;
 
 	/* Pending "ioctl" awaiting buffer */
-	mblk_t  	*kbtrans_streams_iocpending;
+	mblk_t		*kbtrans_streams_iocpending;
 
 	/* Number of times the keyboard overflowed input */
 	int		kbtrans_overflow_cnt;
@@ -71,11 +71,12 @@ struct  kbtrans {
 	/* id from qbufcall on allocb failure */
 	bufcall_id_t	kbtrans_streams_bufcallid;
 
+	unsigned	kbtrans_streams_count;
 	timeout_id_t	kbtrans_streams_rptid; /* timeout id for repeat */
 
 	int	kbtrans_streams_iocerror;	/* error return from "ioctl" */
 	int	kbtrans_streams_translate_mode;	/* Translate keycodes? */
-	int	kbtrans_streams_translatable;  	/* Keyboard is translatable? */
+	int	kbtrans_streams_translatable;	/* Keyboard is translatable? */
 
 	/* Vuid_id_addrs for various events */
 	struct {
