@@ -13,6 +13,7 @@
 .\" Copyright (c) 2013 by Delphix. All rights reserved.
 .\" Copyright 2018 Nexenta Systems, Inc.
 .\" Copyright (c) 2016-2017, Chris Fraire <cfraire@me.com>.
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\"
 .Dd February 6, 2018
 .Dt IPADM 1M
@@ -788,6 +789,17 @@ Packet forwarding
 .Pq Cm on Ns / Ns Cm off .
 .It Cm hoplimit
 The IPv6 hoplimit.
+.It Cm hostmodel
+IP packet handling on multi-homed systems
+.Pq Cm weak Ns / Ns Cm strong Ns / Ns Cm src-priority
+.Pq IPv4/IPv6 .
+.Cm weak
+and
+.Cm strong
+correspond to the model definitions defined in RFC 1122.
+.Cm src-priority
+is a hybrid mode where outbound packets are sent from the interface with the
+packet's source address if possible.
 .It Cm largest_anon_port
 Largest ephemeral port
 .Pq SCTP/TCP/UDP .
