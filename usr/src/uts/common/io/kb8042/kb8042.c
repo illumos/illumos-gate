@@ -20,7 +20,7 @@
  */
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
@@ -140,6 +140,7 @@ static void kb8042_process_key(struct kb8042 *, kbtrans_key_t, enum keystate);
 static int kb8042_polled_ischar(cons_polledio_arg_t arg);
 static int kb8042_polled_getchar(cons_polledio_arg_t arg);
 static void kb8042_cleanup(struct kb8042 *kb8042);
+static void kb8042_received_byte(struct kb8042 *, int);
 
 static struct kbtrans_callbacks kb8042_callbacks = {
 	kb8042_streams_setled,
@@ -156,7 +157,8 @@ static	char	module_name[] = "kb8042";
 static int kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag,
 			cred_t *credp);
 static int kb8042_close(queue_t *qp, int flag, cred_t *credp);
-static int kb8042_wsrv();
+static int kb8042_rsrv(queue_t *);
+static int kb8042_wsrv(queue_t *);
 
 struct module_info kb8042_sinfo = {
 	.mi_idnum = 42,			/* Module ID */
@@ -169,7 +171,7 @@ struct module_info kb8042_sinfo = {
 
 static struct qinit kb8042_rinit = {
 	.qi_putp = NULL,
-	.qi_srvp = NULL,
+	.qi_srvp = kb8042_rsrv,
 	.qi_qopen = kb8042_open,
 	.qi_qclose = kb8042_close,
 	.qi_qadmin = NULL,
@@ -208,7 +210,7 @@ static int kb8042_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 static int kb8042_attach(dev_info_t *, ddi_attach_cmd_t);
 static int kb8042_detach(dev_info_t *, ddi_detach_cmd_t);
 
-static 	struct cb_ops cb_kb8042_ops = {
+static struct cb_ops cb_kb8042_ops = {
 	.cb_open = nulldev,
 	.cb_close = nulldev,
 	.cb_strategy = nodev,
@@ -807,6 +809,22 @@ kb8042_close(queue_t *qp, int flag, cred_t *credp)
 }
 
 static int
+kb8042_rsrv(queue_t *qp)
+{
+	mblk_t *mp;
+	struct kb8042 *kb8042;
+
+	while ((mp = getq(qp)) != NULL) {
+		if (mp->b_datap->db_type == M_DATA) {
+			kb8042 = (struct kb8042 *)qp->q_ptr;
+			kb8042_received_byte(kb8042, *mp->b_rptr);
+		}
+		freemsg(mp);
+	}
+	return (0);
+}
+
+static int
 kb8042_wsrv(queue_t *qp)
 {
 	struct kb8042 *kb8042;
@@ -1040,24 +1058,6 @@ kb8042_received_byte(
 	enum keystate	state;
 	boolean_t	synthetic_release_needed;
 
-	/*
-	 * Intercept ACK and RESEND and signal the condition that
-	 * kb8042_send_and_wait is waiting for.
-	 */
-	if (scancode == KB_ACK) {
-		mutex_enter(&kb8042->w_hw_mutex);
-		kb8042->acked = 1;
-		cv_signal(&kb8042->cmd_cv);
-		mutex_exit(&kb8042->w_hw_mutex);
-		return;
-	} else if (scancode == KB_RESEND) {
-		mutex_enter(&kb8042->w_hw_mutex);
-		kb8042->need_retry = 1;
-		cv_signal(&kb8042->cmd_cv);
-		mutex_exit(&kb8042->w_hw_mutex);
-		return;
-	}
-
 	if (!kb8042->w_init)	/* can't do anything anyway */
 		return;
 
@@ -1164,12 +1164,39 @@ kb8042_intr(caddr_t arg)
 
 	while (ddi_get8(kb8042->handle, kb8042->addr + I8042_INT_INPUT_AVAIL)
 	    != 0) {
+		mblk_t *mp;
+
 		rc = DDI_INTR_CLAIMED;
 
 		scancode = ddi_get8(kb8042->handle,
 		    kb8042->addr + I8042_INT_INPUT_DATA);
 
-		kb8042_received_byte(kb8042, scancode);
+		/*
+		 * Intercept ACK and RESEND and signal the condition that
+		 * kb8042_send_and_wait is waiting for.
+		 */
+		switch (scancode) {
+		case KB_ACK:
+			mutex_enter(&kb8042->w_hw_mutex);
+			kb8042->acked = 1;
+			cv_signal(&kb8042->cmd_cv);
+			mutex_exit(&kb8042->w_hw_mutex);
+			return (rc);
+		case KB_RESEND:
+			mutex_enter(&kb8042->w_hw_mutex);
+			kb8042->need_retry = 1;
+			cv_signal(&kb8042->cmd_cv);
+			mutex_exit(&kb8042->w_hw_mutex);
+			return (rc);
+		default:
+			break;
+		}
+
+		if ((mp = allocb(sizeof (scancode), BPRI_HI)) == NULL)
+			return (rc);
+		*mp->b_wptr++ = scancode;
+		if (putq(RD(kb8042->w_qp), mp) == 0)
+			freemsg(mp);
 	}
 
 	return (rc);
