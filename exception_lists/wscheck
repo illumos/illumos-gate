@@ -98,3 +98,5 @@ usr/src/uts/i86pc/sys/vmm_dev.h
 usr/src/uts/i86pc/sys/vmm_instruction_emul.h
 usr/src/uts/common/io/qede/*
 usr/src/tools/smatch/src/*
+usr/src/data/hwdata/pci.ids
+usr/src/data/hwdata/usb.ids
