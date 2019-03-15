@@ -61,11 +61,11 @@ typedef void (*process_key_callback_t)(usbkbm_state_t *, int, enum keystate);
 static void usbkbm_streams_setled(struct kbtrans_hardware *, int);
 static void usbkbm_polled_setled(struct kbtrans_hardware *, int);
 static boolean_t usbkbm_polled_keycheck(struct kbtrans_hardware *,
-			int *, enum keystate *);
+    int *, enum keystate *);
 static void usbkbm_poll_callback(usbkbm_state_t *, int, enum keystate);
 static void usbkbm_streams_callback(usbkbm_state_t *, int, enum keystate);
 static void usbkbm_unpack_usb_packet(usbkbm_state_t *, process_key_callback_t,
-			uchar_t *);
+    uchar_t *);
 static boolean_t usbkbm_is_modkey(uchar_t);
 static void usbkbm_reioctl(void	*);
 static int usbkbm_polled_getchar(cons_polledio_arg_t);
@@ -85,6 +85,7 @@ static int	usbkbm_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	usbkbm_close(queue_t *, int, cred_t *);
 static int	usbkbm_wput(queue_t *, mblk_t *);
 static int	usbkbm_rput(queue_t *, mblk_t *);
+static int	usbkbm_rsrv(queue_t *);
 static ushort_t	usbkbm_get_state(usbkbm_state_t *);
 static void	usbkbm_get_scancode(usbkbm_state_t *, int *, enum keystate *);
 
@@ -346,7 +347,7 @@ static struct module_info usbkbm_minfo = {
 /* read side for key data and ioctl replies */
 static struct qinit usbkbm_rinit = {
 	usbkbm_rput,
-	NULL,		/* service not used */
+	usbkbm_rsrv,
 	usbkbm_open,
 	usbkbm_close,
 	NULL,
@@ -883,9 +884,9 @@ usbkbm_ioctl(register queue_t *q, register mblk_t *mp)
 
 		if (cycles == 0)
 			frequency = UINT16_MAX;
-		else if (cycles == UINT16_MAX)
+		else if (cycles == UINT16_MAX) {
 			frequency = 0;
-		else {
+		} else {
 			frequency = (PIT_HZ + cycles / 2) / cycles;
 			if (frequency > UINT16_MAX)
 				frequency = UINT16_MAX;
@@ -1022,13 +1023,12 @@ usbkbm_kioccmd(usbkbm_state_t *usbkbmd, register mblk_t *mp,
 	return (err);
 }
 
-
 /*
  * usbkbm_rput :
  *	Put procedure for input from driver end of stream (read queue).
  */
 static int
-usbkbm_rput(register queue_t *q, register mblk_t *mp)
+usbkbm_rput(queue_t *q, mblk_t *mp)
 {
 	usbkbm_state_t		*usbkbmd;
 
@@ -1037,9 +1037,8 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
 	    "usbkbm_rput");
 
-	if (usbkbmd == 0) {
+	if (usbkbmd == NULL) {
 		freemsg(mp);	/* nobody's listening */
-
 		return (0);
 	}
 
@@ -1095,29 +1094,53 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 		return (0);
 	}
 
-	/*
-	 * A data message, consisting of bytes from the keyboard.
-	 * Ram them through the translator, only if there are
-	 * correct no. of bytes.
-	 */
-	if (MBLKL(mp) == usbkbmd->usbkbm_report_format.tlen) {
-		if (usbkbmd->usbkbm_report_format.keyid !=
-		    HID_REPORT_ID_UNDEFINED) {
-			if (*(mp->b_rptr) !=
-			    usbkbmd->usbkbm_report_format.keyid) {
-				freemsg(mp);
+	if (putq(q, mp) == 0)
+		freemsg(mp);
+	return (0);
+}
 
-				return (0);
-			} else {
-				/* We skip the report id prefix */
-				mp->b_rptr++;
-			}
+static int
+usbkbm_rsrv(queue_t *q)
+{
+	usbkbm_state_t		*usbkbmd;
+	mblk_t *mp;
+
+	usbkbmd = (usbkbm_state_t *)q->q_ptr;
+
+	if (usbkbmd == NULL)
+		return (0);
+
+	while ((mp = getq(q)) != NULL) {
+		/* usbkbm_rput() should have filtered anything but M_DATA. */
+
+		if (mp->b_datap->db_type != M_DATA) {
+			freemsg(mp);
+			continue;
 		}
-		usbkbm_unpack_usb_packet(usbkbmd, usbkbm_streams_callback,
-		    mp->b_rptr);
-	}
 
-	freemsg(mp);
+		/*
+		 * A data message, consisting of bytes from the keyboard.
+		 * Ram them through the translator, only if there are
+		 * correct no. of bytes.
+		 */
+		if (MBLKL(mp) == usbkbmd->usbkbm_report_format.tlen) {
+			if (usbkbmd->usbkbm_report_format.keyid !=
+			    HID_REPORT_ID_UNDEFINED) {
+				if (*(mp->b_rptr) !=
+				    usbkbmd->usbkbm_report_format.keyid) {
+					freemsg(mp);
+					continue;
+				} else {
+					/* We skip the report id prefix */
+					mp->b_rptr++;
+				}
+			}
+			usbkbm_unpack_usb_packet(usbkbmd,
+			    usbkbm_streams_callback, mp->b_rptr);
+		}
+
+		freemsg(mp);
+	}
 	return (0);
 }
 
@@ -1703,44 +1726,44 @@ usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
 	if (mkb != lastmkb) {
 
 		if ((mkb & USB_LSHIFTBIT) != (lastmkb & USB_LSHIFTBIT)) {
-			(*func)(usbkbmd, USB_LSHIFTKEY, (mkb&USB_LSHIFTBIT) ?
+			(*func)(usbkbmd, USB_LSHIFTKEY, (mkb & USB_LSHIFTBIT) ?
 			    KEY_PRESSED : KEY_RELEASED);
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
 			    "unpack: sending USB_LSHIFTKEY");
 		}
 
 		if ((mkb & USB_LCTLBIT) != (lastmkb & USB_LCTLBIT)) {
-			(*func)(usbkbmd, USB_LCTLCKEY, mkb&USB_LCTLBIT ?
+			(*func)(usbkbmd, USB_LCTLCKEY, mkb & USB_LCTLBIT ?
 			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_LALTBIT) != (lastmkb & USB_LALTBIT)) {
-			(*func)(usbkbmd, USB_LALTKEY, mkb&USB_LALTBIT ?
+			(*func)(usbkbmd, USB_LALTKEY, mkb & USB_LALTBIT ?
 			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_LMETABIT) != (lastmkb & USB_LMETABIT)) {
-			(*func)(usbkbmd, USB_LMETAKEY, mkb&USB_LMETABIT ?
+			(*func)(usbkbmd, USB_LMETAKEY, mkb & USB_LMETABIT ?
 			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_RMETABIT) != (lastmkb & USB_RMETABIT)) {
-			(*func)(usbkbmd, USB_RMETAKEY, mkb&USB_RMETABIT ?
+			(*func)(usbkbmd, USB_RMETAKEY, mkb & USB_RMETABIT ?
 			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_RALTBIT) != (lastmkb & USB_RALTBIT)) {
-			(*func)(usbkbmd, USB_RALTKEY, mkb&USB_RALTBIT ?
+			(*func)(usbkbmd, USB_RALTKEY, mkb & USB_RALTBIT ?
 			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_RCTLBIT) != (lastmkb & USB_RCTLBIT)) {
-			(*func)(usbkbmd, USB_RCTLCKEY, mkb&USB_RCTLBIT ?
+			(*func)(usbkbmd, USB_RCTLCKEY, mkb & USB_RCTLBIT ?
 			    KEY_PRESSED : KEY_RELEASED);
 		}
 
 		if ((mkb & USB_RSHIFTBIT) != (lastmkb & USB_RSHIFTBIT)) {
-			(*func)(usbkbmd, USB_RSHIFTKEY, mkb&USB_RSHIFTBIT ?
+			(*func)(usbkbmd, USB_RSHIFTKEY, mkb & USB_RSHIFTBIT ?
 			    KEY_PRESSED : KEY_RELEASED);
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
 			    "unpack: sending USB_RSHIFTKEY");
