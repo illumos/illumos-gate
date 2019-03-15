@@ -281,7 +281,7 @@ static const mdb_dcmd_t dcmds[] = {
 int
 vfs_walk_init(mdb_walk_state_t *wsp)
 {
-	if (wsp->walk_addr == NULL &&
+	if (wsp->walk_addr == (uintptr_t)NULL &&
 	    mdb_readvar(&wsp->walk_addr, "rootvfs") == -1) {
 		mdb_warn("failed to read 'rootvfs'");
 		return (WALK_ERR);
