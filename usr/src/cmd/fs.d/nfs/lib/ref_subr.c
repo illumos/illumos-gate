@@ -191,7 +191,7 @@ nfs4_create_components(char *path, component4 *comp4)
 				bcopy(path, buf, slen);
 				buf[slen] = '\0';
 				if (str_to_utf8(buf, &comp4[ncomp]) == NULL)
-					return (NULL);
+					return (0);
 			}
 
 			ncomp++;	/* 1 valid component */

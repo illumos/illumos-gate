@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * quot
@@ -200,7 +198,7 @@ quotall()
 		(void) fprintf(stderr, "quot: no %s file\n", MNTTAB);
 		exit(32);
 	}
-	while (getmntent(fstab, &mntp) == NULL) {
+	while (getmntent(fstab, &mntp) == 0) {
 		if (strcmp(mntp.mnt_fstype, MNTTYPE_UFS) != 0)
 			continue;
 
@@ -252,7 +250,7 @@ check(char *file, char *fsdir)
 			(void) fprintf(stderr, "quot: no %s file\n", MNTTAB);
 			exit(32);
 		}
-		while (getmntent(fstab, &mntp) == NULL) {
+		while (getmntent(fstab, &mntp) == 0) {
 			if (strcmp(mntp.mnt_fstype, MNTTYPE_UFS) != 0)
 				continue;
 			if (strcmp(mntp.mnt_special, file) == 0) {
@@ -489,7 +487,7 @@ getdev(char **devpp)
 		(void) fprintf(stderr, "quot: no %s file\n", MNTTAB);
 		exit(32);
 	}
-	while (getmntent(fstab, &mntp) == NULL) {
+	while (getmntent(fstab, &mntp) == 0) {
 		if (strcmp(mntp.mnt_mountp, *devpp) == 0) {
 			if (strcmp(mntp.mnt_fstype, MNTTYPE_UFS) != 0) {
 				(void) fprintf(stderr,
@@ -585,7 +583,7 @@ static void
 cleanup()
 {
 	int		i;
-	struct du 	*ep, *next;
+	struct du	*ep, *next;
 
 	/*
 	 * Release memory from hash table and du

@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -264,7 +264,7 @@ showquotas(uid_t uid, char *name)
 	if (vflag)
 		heading(uid, name);
 	mtab = fopen(MNTTAB, "r");
-	while (getmntent(mtab, &mnt) == NULL) {
+	while (getmntent(mtab, &mnt) == 0) {
 		if (strcmp(mnt.mnt_fstype, MNTTYPE_ZFS) == 0) {
 			bzero(&dqblk, sizeof (dqblk));
 			if (getzfsquota(name, mnt.mnt_special, &dqblk))
@@ -684,7 +684,7 @@ quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 			zexit(32);
 		}
 		fd = -1;
-		while ((status = getmntent(fstab, &mnt)) == NULL) {
+		while ((status = getmntent(fstab, &mnt)) == 0) {
 			if (strcmp(mnt.mnt_fstype, MNTTYPE_UFS) != 0 ||
 			    hasopt(MNTOPT_RO, mnt.mnt_mntopts))
 				continue;
@@ -823,7 +823,7 @@ getnfsquota(char *hostp, char *path, uid_t uid, struct dqblk *dqp)
 
 int
 callaurpc(char *host, int prognum, int versnum, int procnum,
-		xdrproc_t inproc, char *in, xdrproc_t outproc, char *out)
+    xdrproc_t inproc, char *in, xdrproc_t outproc, char *out)
 {
 	static enum clnt_stat clnt_stat;
 	struct timeval tottimeout = {20, 0};

@@ -243,7 +243,7 @@ do_logon(int argc, char **argv)
 	if (argc > 2)
 		smb_ctx_setdomain(ctx, argv[2], B_TRUE);
 	if (argc > 3)
-		smb_ctx_setpassword(ctx, argv[3], NULL);
+		smb_ctx_setpassword(ctx, argv[3], 0);
 
 	/*
 	 * Resolve the server address, setup derived defaults.

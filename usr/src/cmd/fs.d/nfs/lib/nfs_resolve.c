@@ -299,11 +299,11 @@ setup_nb_parms(struct netconfig *nconf, struct t_bind *tbind,
 		netdir_free((void *)retaddrs, ND_ADDRLIST);
 		if (port) {
 			/* LINTED pointer alignment */
-			if (strcmp(nconf->nc_protofmly, NC_INET) == NULL)
+			if (strcmp(nconf->nc_protofmly, NC_INET) == 0)
 				((struct sockaddr_in *)
 				    tbind->addr.buf)->sin_port =
 				    htons((ushort_t)port);
-			else if (strcmp(nconf->nc_protofmly, NC_INET6) == NULL)
+			else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0)
 				((struct sockaddr_in6 *)
 				    tbind->addr.buf)->sin6_port =
 				    htons((ushort_t)port);
@@ -317,11 +317,11 @@ setup_nb_parms(struct netconfig *nconf, struct t_bind *tbind,
 	} else if (!file_handle) {
 		if (port) {
 			/* LINTED pointer alignment */
-			if (strcmp(nconf->nc_protofmly, NC_INET) == NULL)
+			if (strcmp(nconf->nc_protofmly, NC_INET) == 0)
 				((struct sockaddr_in *)
 				    tbind->addr.buf)->sin_port =
 				    htons((ushort_t)port);
-			else if (strcmp(nconf->nc_protofmly, NC_INET6) == NULL)
+			else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0)
 				((struct sockaddr_in6 *)
 				    tbind->addr.buf)->sin6_port =
 				    htons((ushort_t)port);

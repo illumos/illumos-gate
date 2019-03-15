@@ -406,15 +406,11 @@ sendreply:
 }
 
 int
-quotactl(cmd, mountp, uid, dqp)
-	int	cmd;
-	char	*mountp;
-	uid_t	uid;
-	struct dqblk *dqp;
+quotactl(int cmd, char *mountp, uid_t uid, struct dqblk *dqp)
 {
-	int 		fd;
-	int 		status;
-	struct quotctl 	quota;
+	int		fd;
+	int		status;
+	struct quotctl	quota;
 	char		mountpoint[256];
 	FILE		*fstab;
 	struct mnttab	mntp;
@@ -430,7 +426,7 @@ quotactl(cmd, mountp, uid, dqp)
 			return (-1);
 		}
 		fd = -1;
-		while ((status = getmntent(fstab, &mntp)) == NULL) {
+		while ((status = getmntent(fstab, &mntp)) == 0) {
 			if (strcmp(mntp.mnt_fstype, MNTTYPE_UFS) != 0 ||
 				!(hasmntopt(&mntp, MNTOPT_RQ) ||
 				hasmntopt(&mntp, MNTOPT_QUOTA)))
@@ -480,7 +476,7 @@ findfsq(char *dir)
 {
 	struct stat sb;
 	struct fsquot *fsqp;
-	static time_t lastmtime = 0; 	/* mount table's previous mtime */
+	static time_t lastmtime = 0;	/* mount table's previous mtime */
 
 	/*
 	 * If we've never looked at the mount table, or it has changed

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <malloc.h>
@@ -1231,7 +1229,7 @@ UdfTxName(uint16_t *unicode, int32_t count)
 			dot_loc = j;
 		}
 		if ((unicode[i] == SLASH) ||
-			(unicode[i] == NULL)) {
+			(unicode[i] == 0)) {
 			if (make_crc == 0) {
 				for (k = 0; k <= i; k++) {
 					crc += unicode[k];

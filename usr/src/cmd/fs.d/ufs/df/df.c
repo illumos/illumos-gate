@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -67,7 +67,7 @@ extern off_t	lseek();
  * Raw name to block device name translation function.
  * This comes from libadm.
  */
-extern char 	*getfullblkname();
+extern char	*getfullblkname();
 
 static  void		usage(), pheader();
 static  char		*mpath(char *);
@@ -84,7 +84,7 @@ static  void		dfreemnt(char *, struct mnttab *);
 static  void		print_totals();
 static  void		print_itotals();
 static  void		print_statvfs(struct statvfs64 *);
-static  int 		mdev(char *, struct mnttab **);
+static  int		mdev(char *, struct mnttab **);
 static struct mntlist	*mkmntlist();
 static struct mnttab	*mntdup(struct mnttab *mnt);
 static struct mntlist	*findmntent(char *, struct stat64 *, struct mntlist *);
@@ -109,7 +109,7 @@ int	iflag = 0;		/* information for inodes */
 int	nflag = 0;		/* print VFStype name */
 int	tflag = 0;		/* print totals */
 int	errflag = 0;
-int 	errcode = 0;
+int	errcode = 0;
 char	*typestr = "ufs";
 fsblkcnt64_t	t_totalblks, t_avail, t_free, t_used, t_reserved;
 int	t_inodes, t_iused, t_ifree;
@@ -150,7 +150,7 @@ char *subopts [] = {
 int
 main(int argc, char *argv[])
 {
-	struct mnttab 		mnt;
+	struct mnttab		mnt;
 	int			opt;
 	char			*suboptions, *value;
 
@@ -253,7 +253,7 @@ main(int argc, char *argv[])
 		 * Take this path when "/usr/lib/fs/ufs/df" is specified, and
 		 * there are no mountpoints specified.
 		 * E.g., these command lines take us down this path
-		 * 	/usr/lib/fs/ufs/df -o i
+		 *	/usr/lib/fs/ufs/df -o i
 		 *	/usr/lib/fs/ufs/df
 		 */
 		FILE *mtabp;
@@ -1031,7 +1031,7 @@ mkmntlist()
 		exit(1);
 	}
 	resetmnttab(mounted);
-	while (getextmntent(mounted, &mnt, sizeof (struct extmnttab)) == NULL) {
+	while (getextmntent(mounted, &mnt, sizeof (struct extmnttab)) == 0) {
 		mntl = (struct mntlist *)xmalloc(sizeof (*mntl));
 		mntl->mntl_mnt = mntdup((struct mnttab *)(&mnt));
 		mntl->mntl_next = mntst;

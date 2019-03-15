@@ -235,7 +235,7 @@ main(int argc, char *argv[])
 
 		if ((argc - optind) > 0) {
 			count = safe_strtoi(argv[optind], "invalid count");
-			if ((count <= 0) || (count == NULL))
+			if (count <= 0)
 				fail(0, "invalid count\n");
 		}
 		optind++;

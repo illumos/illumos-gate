@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Fix up / report on disc quotas & usage
@@ -194,7 +192,7 @@ main(int argc, char **argv)
 			perror(VFSTAB);
 			exit(31+8);
 		}
-		while (getvfsent(vfstab, &vfsbuf) == NULL) {
+		while (getvfsent(vfstab, &vfsbuf) == 0) {
 			if (strcmp(vfsbuf.vfs_fstype, MNTTYPE_UFS) != 0 ||
 			    (vfsbuf.vfs_mntopts == 0) ||
 			    hasvfsopt(&vfsbuf, MNTOPT_RO) ||
@@ -233,7 +231,7 @@ main(int argc, char **argv)
 			perror(MNTTAB);
 			exit(31+8);
 		}
-		while (getmntent(mtab, &mntp) == NULL) {
+		while (getmntent(mtab, &mntp) == 0) {
 			if (strcmp(mntp.mnt_fstype, MNTTYPE_UFS) == 0 &&
 			    !hasmntopt(&mntp, MNTOPT_RO) &&
 			    (oneof(mntp.mnt_special, listp, listcnt) ||
@@ -701,8 +699,8 @@ usage()
 int
 quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 {
-	int 		fd;
-	int 		status;
+	int		fd;
+	int		status;
 	struct quotctl	quota;
 	char		qfile[MAXPATHLEN];
 	FILE		*fstab;
@@ -721,7 +719,7 @@ quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 			exit(31+1);
 		}
 		fd = -1;
-		while ((status = getmntent(fstab, &mntp)) == NULL) {
+		while ((status = getmntent(fstab, &mntp)) == 0) {
 			if (strcmp(mntp.mnt_fstype, MNTTYPE_UFS) != 0 ||
 				hasmntopt(&mntp, MNTOPT_RO))
 				continue;

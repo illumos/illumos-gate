@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains functions that allow applications to roll the log.
  * It is intended for use by applications that open a raw device with the
@@ -208,12 +206,12 @@ is_mounted(log_info_t *lip, char *dev)
 	/* Search mnttab to see if it device is mounted. */
 	if ((mnttable = fopen(MNTTAB, "r")) == NULL)
 		return (rv);
-	while (getmntent(mnttable, &mntbuf) == NULL) {
+	while (getmntent(mnttable, &mntbuf) == 0) {
 		if (strcmp(mntbuf.mnt_fstype, MNTTYPE_UFS) == 0) {
 			/* Entry is UFS */
 			if ((strcmp(mntbuf.mnt_mountp, dev) == 0) ||
 			    (strcmp(mntbuf.mnt_special, lip->li_blkname)
-				== 0) ||
+			    == 0) ||
 			    (strcmp(mntbuf.mnt_special, dev) == 0)) {
 				lip->li_mntpoint = strdup(mntbuf.mnt_mountp);
 				rv = RL_TRUE;
@@ -251,7 +249,7 @@ make_mp(log_info_t *lip)
 	 * Note tmp_dir_list[] should all be directories in the
 	 * original root file system.
 	 */
-	static const char 	*tmp_dir_list[] = {
+	static const char	*tmp_dir_list[] = {
 							"/tmp/",
 							"/var/tmp/",
 							"/",
@@ -260,7 +258,7 @@ make_mp(log_info_t *lip)
 	char			tmp_dir[MAXPATHLEN + 1];
 	char			mountpt_dir[MAXPATHLEN + 1];
 	static size_t		list_len = sizeof (tmp_dir_list) /
-						sizeof (const char *);
+	    sizeof (const char *);
 	int			merr = 0;
 
 	/*
@@ -276,7 +274,7 @@ make_mp(log_info_t *lip)
 	for (i = 0; i < list_len; i++) {
 		/* Make the directory containing the mount-point */
 		(void) snprintf(tmp_dir, sizeof (tmp_dir), "%s%s",
-				tmp_dir_list[i], dirname);
+		    tmp_dir_list[i], dirname);
 		if (mkdir(tmp_dir, 0) == SYSERR) {
 			merr = errno;
 			continue;
@@ -284,7 +282,7 @@ make_mp(log_info_t *lip)
 
 		/* Now, make the mount-point */
 		(void) snprintf(mountpt_dir, sizeof (mountpt_dir), "%s/%s",
-				tmp_dir, dirname);
+		    tmp_dir, dirname);
 		if (mkdir(mountpt_dir, 0) == SYSERR) {
 			merr = errno;
 			continue;
@@ -315,15 +313,15 @@ make_mp(log_info_t *lip)
 		}
 
 		(void) fprintf(stderr, gettext(
-			"Unable to create temporary "
-			"directory in any of the directories listed "
-			"below:\n"));
+		    "Unable to create temporary "
+		    "directory in any of the directories listed "
+		    "below:\n"));
 		for (i = 0; i < list_len; i++) {
 			(void) fprintf(stderr, "\t%s\n", tmp_dir_list[i]);
 		}
 		(void) fprintf(stderr, gettext(
-			"Please correct this problem "
-			"and rerun the program.\n"));
+		    "Please correct this problem "
+		    "and rerun the program.\n"));
 	}
 
 	return (rv);
@@ -349,7 +347,7 @@ rlflush(log_info_t *lip)
 	rl_result_t		rv = RL_SUCCESS;
 
 	if ((fd = open((lip->li_mntpoint ? lip->li_mntpoint : lip->li_tmpmp),
-		O_RDONLY)) == SYSERR) {
+	    O_RDONLY)) == SYSERR) {
 		return (RL_SYSERR);
 	}
 	if (ioctl(fd, _FIOFFS, NULL) == SYSERR) {
@@ -403,11 +401,11 @@ rlmount(log_info_t *lip, int mntopt)
 		return (RL_FAIL);
 	}
 	(void) snprintf(opt, sizeof (opt), "%s,%s,%s",
-		optstr, MNTOPT_NOSUID, MNTOPT_LARGEFILES);
+	    optstr, MNTOPT_NOSUID, MNTOPT_LARGEFILES);
 	if (mount(lip->li_blkname, lip->li_tmpmp,
-			optflg | MS_DATA | MS_OPTIONSTR,
-			MNTTYPE_UFS, &args, sizeof (args),
-			opt, MAX_MNTOPT_STR) == SYSERR) {
+	    optflg | MS_DATA | MS_OPTIONSTR,
+	    MNTTYPE_UFS, &args, sizeof (args),
+	    opt, MAX_MNTOPT_STR) == SYSERR) {
 		rv = RL_SYSERR;
 	}
 	return (rv);
@@ -432,8 +430,8 @@ rlumount(log_info_t *lip)
 
 	if (umount(lip->li_blkname) == SYSERR) {
 		(void) fprintf(stderr, gettext(
-		"WARNING: rlumount(): Can't unmount %s\n"),
-			lip->li_blkname);
+		    "WARNING: rlumount(): Can't unmount %s\n"),
+		    lip->li_blkname);
 		rv = RL_SYSERR;
 	}
 	return (rv);

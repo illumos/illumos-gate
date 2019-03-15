@@ -472,7 +472,7 @@ main(int argc, char *argv[])
 	 * Unless it's already been set, the default prompt includes the
 	 * name of the special device.
 	 */
-	if (*prompt == NULL)
+	if (*prompt == '\0')
 		(void) sprintf(prompt, "%s > ", special);
 
 	/*
@@ -1152,13 +1152,13 @@ OTX:
 				colon = 0;
 			else
 				goto no_colon;
-			if (match("at", 2)) { 		/* access time */
+			if (match("at", 2)) {		/* access time */
 				acting_on_inode = 2;
 				should_print = 1;
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_atime;
 				value = get(LONG);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			goto bad_syntax;
@@ -1168,7 +1168,7 @@ OTX:
 				colon = 0;
 			else
 				goto no_colon;
-			if (match("block", 2)) { 	/* block conversion */
+			if (match("block", 2)) {	/* block conversion */
 				if (type == NUMB) {
 					value = addr;
 					cur_bytes = 0;
@@ -1191,7 +1191,7 @@ OTX:
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_blocks;
 				value = get(LONG);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			if (match("base", 2)) {		/* change/show base */
@@ -1301,7 +1301,7 @@ showbase:
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_ctime;
 				value = get(LONG);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			goto bad_syntax;
@@ -1311,7 +1311,7 @@ showbase:
 				colon = 0;
 			else
 				goto no_colon;
-			if (match("directory", 2)) { 	/* directory offsets */
+			if (match("directory", 2)) {	/* directory offsets */
 				if (type == NUMB)
 					value = addr;
 				objsz = DIRECTORY;
@@ -1435,7 +1435,7 @@ showbase:
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_gid;
 				value = get(SHORT);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			goto bad_syntax;
@@ -1449,7 +1449,7 @@ showbase:
 				if (c_count == 2) {
 					addr = cur_ino;
 					value = get(INODE);
-					type = NULL;
+					type = 0;
 					laststyle = '=';
 					lastpo = 'i';
 					should_print = 1;
@@ -1463,7 +1463,7 @@ showbase:
 				cur_ino = addr;
 				cur_inum = (long)value;
 				value = get(INODE);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			if (match("ib", 2)) {	/* indirect block */
@@ -1592,7 +1592,7 @@ showbase:
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_nlink;
 				value = get(SHORT);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			goto bad_syntax;
@@ -1605,13 +1605,13 @@ showbase:
 			addr = cur_ino;
 			if ((mode = icheck(addr)) == 0)
 				continue;
-			if (match("mt", 2)) { 		/* modification time */
+			if (match("mt", 2)) {		/* modification time */
 				acting_on_inode = 2;
 				should_print = 1;
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_mtime;
 				value = get(LONG);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			if (match("md", 2)) {		/* mode */
@@ -1620,7 +1620,7 @@ showbase:
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_mode;
 				value = get(SHORT);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			if (match("maj", 2)) {	/* major device number */
@@ -1635,7 +1635,7 @@ showbase:
 					dvalue = get(LONG);
 					value = major(dvalue);
 				}
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			if (match("min", 2)) {	/* minor device number */
@@ -1650,7 +1650,7 @@ showbase:
 					dvalue = (long)get(LONG);
 					value = minor(dvalue);
 				}
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			goto bad_syntax;
@@ -1673,7 +1673,7 @@ showbase:
 							(long)&dirp->d_ino);
 				addr = (long)&((struct direct *)
 						(uintptr_t)addr)->d_name[0];
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			goto bad_syntax;
@@ -1783,7 +1783,7 @@ showbase:
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_shadow;
 				value = get(LONG);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 
@@ -1793,7 +1793,7 @@ showbase:
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_size;
 				value = get(U_OFFSET_T);
-				type = NULL;
+				type = 0;
 				objsz = U_OFFSET_T;
 				laststyle = '=';
 				lastpo = 'X';
@@ -1812,7 +1812,7 @@ showbase:
 				addr = (long)&((struct dinode *)
 						(uintptr_t)cur_ino)->di_uid;
 				value = get(SHORT);
-				type = NULL;
+				type = 0;
 				continue;
 			}
 			goto bad_syntax;
@@ -2709,7 +2709,7 @@ compare(char *s1, char *s2, short at_start)
 	char	c, *s;
 
 	s = s2;
-	while ((c = *s1) != NULL) {
+	while ((c = *s1) != '\0') {
 		if (c == '*') {
 			if (at_start && s == s2 && !letter(*s2) && !digit(*s2))
 				return (0);
@@ -4911,11 +4911,11 @@ old_fsdb(int inum, char *special)
 static int
 isnumber(char *s)
 {
-	register int	c;
+	int	c;
 
 	if (s == NULL)
 		return (0);
-	while ((c = *s++) != NULL)
+	while ((c = *s++) != '\0')
 		if (c < '0' || c > '9')
 			return (0);
 	return (1);

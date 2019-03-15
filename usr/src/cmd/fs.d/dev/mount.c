@@ -239,7 +239,7 @@ parse_subopts(char *subopts)
 					return (-1);
 				mountargs.sdev_attrdir =
 				    (uint64_t)(uintptr_t)do_strdup(path);
-				if (mountargs.sdev_attrdir == NULL)
+				if (mountargs.sdev_attrdir == 0)
 					return (-1);
 			}
 			break;
@@ -343,7 +343,7 @@ main(int argc, char **argv)
 	/* Special checks if /dev is the mount point */
 	/* Remount of /dev requires an attribute directory */
 	if (strcmp(mountpt, "/dev") == 0 && remount &&
-	    mountargs.sdev_attrdir == NULL) {
+	    mountargs.sdev_attrdir == 0) {
 		(void) fprintf(stderr, gettext("%s: missing attribute "
 		    "directory\n"), typename);
 		return (1);
