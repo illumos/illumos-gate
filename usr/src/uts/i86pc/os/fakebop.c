@@ -2017,6 +2017,7 @@ bop_trap(ulong_t *tfp)
 	bop_printf(NULL, "flags register       0x%lx\n", tf->flags_reg);
 	bop_printf(NULL, "return %%rsp          0x%lx\n", tf->stk_ptr);
 	bop_printf(NULL, "return %%ss           0x%lx\n", tf->stk_seg & 0xffff);
+	bop_printf(NULL, "%%cr2			0x%lx\n", getcr2());
 
 	/* grab %[er]bp pushed by our code from the stack */
 	fakeframe.old_frame = (bop_frame_t *)*(tfp - 3);
