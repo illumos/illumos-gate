@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -50,8 +50,6 @@
 #include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
 #include "common.h"
-
-static int use_rap;
 
 void
 view_usage(void)
@@ -86,15 +84,6 @@ cmd_view(int argc, char *argv[])
 	while ((opt = getopt(argc, argv, STDPARAM_OPT)) != EOF) {
 		if (opt == '?')
 			view_usage();
-		/*
-		 * This is an undocumented option, just for testing.
-		 * Use the old LanMan Remote API Protocol (RAP) for
-		 * enumerating shares.
-		 */
-		if (opt == 'B') {
-			use_rap++;
-			continue;
-		}
 		error = smb_ctx_opt(ctx, opt, optarg);
 		if (error)
 			goto out;
@@ -137,12 +126,8 @@ again:
 
 	/*
 	 * Have IPC$ tcon, now list shares.
-	 * Try RPC; if that fails, do RAP.
 	 */
-	if (!use_rap)
-		error = share_enum_rpc(ctx, ctx->ct_fullserver);
-	if (error || use_rap)
-		error = share_enum_rap(ctx);
+	error = share_enum_rpc(ctx, ctx->ct_fullserver);
 
 out:
 	smb_ctx_free(ctx);

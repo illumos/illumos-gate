@@ -34,6 +34,8 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Portions Copyright (C) 2001 - 2013 Apple Inc. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -57,50 +59,19 @@
 #include <netsmb/smb_rq.h>
 #include <netsmb/smb_subr.h>
 
-/*
- * XXX:This conversion might not be fully MS-Compatible
- * for calculating hashes. The output length may differ
- * for some locales and needs to be handled from where
- * the call is made.
- */
-int
-smb_toupper(const char *inbuf, char *outbuf, size_t outlen)
-{
-	int err = 0;
-	size_t inlen, inrem, outrem;
-
-	inrem = inlen = strlen(inbuf);
-	outrem = outlen;
-	(void) u8_textprep_str((char *)inbuf, &inrem, outbuf, &outrem,
-	    U8_TEXTPREP_TOUPPER, U8_UNICODE_LATEST, &err);
-	/* inrem, outrem are bytes unused, remaining */
-	if (inrem) {
-		SMBSDEBUG("input %d remains: %s\n", (int)inrem, inbuf);
-		inlen -= inrem;
-	}
-	if (outrem) {
-		outlen -= outrem;
-		outbuf[outlen] = '\0';
-	}
-	if (outlen > inlen) {
-		SMBSDEBUG("outlen > inlen! (%d > %d)\n",
-		    (int)outlen, (int)inlen);
-		/* Truncate to inlen here? */
-	}
-
-	return (err);
-}
-
 void
 smb_credinit(struct smb_cred *scred, cred_t *cr)
 {
 	/* cr arg is optional */
 	if (cr == NULL)
 		cr = ddi_get_cred();
+#ifdef	_KERNEL
 	if (is_system_labeled()) {
 		cr = crdup(cr);
 		(void) setpflags(NET_MAC_AWARE, 1, cr);
-	} else {
+	} else
+#endif
+	{
 		crhold(cr);
 	}
 	scred->scr_cred = cr;
@@ -114,6 +85,14 @@ smb_credrele(struct smb_cred *scred)
 		scred->scr_cred = NULL;
 	}
 }
+
+#ifndef	_KERNEL
+/* ARGSUSED */
+void
+smb_debugmsg(const char *func, char *msg)
+{
+}
+#endif	/* _KERNEL */
 
 /*
  * Helper for the SMBERROR macro, etc.
@@ -137,6 +116,9 @@ smb_errmsg(int cel, const char *func_name, const char *fmt, ...)
 		DTRACE_PROBE2(debugmsg2,
 		    (char *), func_name,
 		    (char *), buf);
+#ifndef	_KERNEL
+		smb_debugmsg(func_name, buf);
+#endif
 	} else {
 		/*
 		 * This is one of our xxxERROR macros.
@@ -190,6 +172,9 @@ m_dumpm(mblk_t *m)
 #ifndef ETIME
 #define	ETIME ETIMEDOUT
 #endif
+#ifndef	EMOREDATA
+#define	EMOREDATA (0x7fff)
+#endif
 
 /*
  * Log any un-handled NT or DOS errors we encounter.
@@ -219,7 +204,9 @@ static const nt2errno_t nt2errno[] = {
 	{NT_STATUS_ACCOUNT_RESTRICTION,		EACCES},
 	{NT_STATUS_ADDRESS_ALREADY_EXISTS,	EADDRINUSE},
 	{NT_STATUS_BAD_NETWORK_NAME,		ENOENT},
-	{NT_STATUS_BUFFER_TOO_SMALL,		EMOREDATA},
+	{NT_STATUS_BAD_NETWORK_PATH,		ENOENT},
+	{NT_STATUS_BUFFER_TOO_SMALL,		E2BIG},
+	{NT_STATUS_CANCELLED,			ECANCELED},
 	{NT_STATUS_CANNOT_DELETE,		EACCES},
 	{NT_STATUS_CONFLICTING_ADDRESSES,	EADDRINUSE},
 	{NT_STATUS_CONNECTION_ABORTED,		ECONNABORTED},
@@ -233,59 +220,87 @@ static const nt2errno_t nt2errno[] = {
 	{NT_STATUS_DISK_FULL,			ENOSPC},
 	{NT_STATUS_DLL_NOT_FOUND,		ELIBACC},
 	{NT_STATUS_DUPLICATE_NAME,		EINVAL},
+	{NT_STATUS_EAS_NOT_SUPPORTED,		ENOTSUP},
+	{NT_STATUS_EA_TOO_LARGE,		E2BIG},
 	{NT_STATUS_END_OF_FILE,			ENODATA},
+	{NT_STATUS_FILE_CLOSED,			EBADF},
+	{NT_STATUS_FILE_DELETED,		ENOENT},
+	{NT_STATUS_FILE_INVALID,		EIO},
 	{NT_STATUS_FILE_IS_A_DIRECTORY,		EISDIR},
 	{NT_STATUS_FILE_LOCK_CONFLICT,		EAGAIN},
+	{NT_STATUS_FILE_RENAMED,		ENOENT},
 	{NT_STATUS_FLOAT_INEXACT_RESULT,	ERANGE},
 	{NT_STATUS_FLOAT_OVERFLOW,		ERANGE},
 	{NT_STATUS_FLOAT_UNDERFLOW,		ERANGE},
 	{NT_STATUS_HOST_UNREACHABLE,		EHOSTUNREACH},
-	{NT_STATUS_ILL_FORMED_PASSWORD,		EACCES},
+	{NT_STATUS_ILL_FORMED_PASSWORD,		EAUTH},
+	{NT_STATUS_INFO_LENGTH_MISMATCH,	EINVAL},
+	{NT_STATUS_INSUFFICIENT_RESOURCES,	EAGAIN},
+	{NT_STATUS_INSUFF_SERVER_RESOURCES,	EAGAIN},
 	{NT_STATUS_INTEGER_OVERFLOW,		ERANGE},
-	{NT_STATUS_INVALID_ACCOUNT_NAME,	EACCES},
+	{NT_STATUS_INVALID_ACCOUNT_NAME,	EAUTH},
+	{NT_STATUS_INVALID_BUFFER_SIZE,		EIO},
+	{NT_STATUS_INVALID_DEVICE_REQUEST,	EINVAL},
 	{NT_STATUS_INVALID_HANDLE,		EBADF},
+	{NT_STATUS_INVALID_INFO_CLASS,		EINVAL},
 	{NT_STATUS_INVALID_LEVEL,		ENOTSUP},
-	{NT_STATUS_INVALID_LOGON_HOURS,		EACCES},
+	{NT_STATUS_INVALID_LOCK_SEQUENCE,	EINVAL},
+	{NT_STATUS_INVALID_LOGON_HOURS,		EAUTH},
 	{NT_STATUS_INVALID_OWNER,		EINVAL},
 	{NT_STATUS_INVALID_PARAMETER,		EINVAL},
 	{NT_STATUS_INVALID_PIPE_STATE,		EPIPE},
 	{NT_STATUS_INVALID_PRIMARY_GROUP,	EINVAL},
 	{NT_STATUS_INVALID_WORKSTATION,		EACCES},
 	{NT_STATUS_IN_PAGE_ERROR,		EFAULT},
+	{NT_STATUS_IO_DEVICE_ERROR,		EIO},
 	{NT_STATUS_IO_TIMEOUT,			ETIMEDOUT},
-	{NT_STATUS_IP_ADDRESS_CONFLICT1,	ENOTUNIQ},
-	{NT_STATUS_IP_ADDRESS_CONFLICT2,	ENOTUNIQ},
+	{NT_STATUS_IP_ADDRESS_CONFLICT1,	EADDRINUSE},
+	{NT_STATUS_IP_ADDRESS_CONFLICT2,	EADDRINUSE},
 	{NT_STATUS_LICENSE_QUOTA_EXCEEDED,	EDQUOT},
 	{NT_STATUS_LOCK_NOT_GRANTED,		EAGAIN},
-	{NT_STATUS_LOGIN_TIME_RESTRICTION,	EACCES},
-	{NT_STATUS_LOGON_FAILURE,		EACCES},
+	{NT_STATUS_LOGIN_TIME_RESTRICTION,	EAUTH},
+	{NT_STATUS_LOGON_FAILURE,		EAUTH},
+	{NT_STATUS_LOGON_TYPE_NOT_GRANTED,	EAUTH},
 	{NT_STATUS_MEDIA_WRITE_PROTECTED,	EROFS},
 	{NT_STATUS_MEMORY_NOT_ALLOCATED,	EFAULT},
+	{NT_STATUS_MORE_PROCESSING_REQUIRED,	EINPROGRESS},
 	{NT_STATUS_NAME_TOO_LONG,		ENAMETOOLONG},
 	{NT_STATUS_NETWORK_ACCESS_DENIED,	EACCES},
 	{NT_STATUS_NETWORK_BUSY,		EBUSY},
+	{NT_STATUS_NETWORK_NAME_DELETED,	ENOENT},
 	{NT_STATUS_NETWORK_UNREACHABLE,		ENETUNREACH},
 	{NT_STATUS_NET_WRITE_FAULT,		ECOMM},
+	{NT_STATUS_NONEXISTENT_EA_ENTRY,	ENOENT},
 	{NT_STATUS_NONEXISTENT_SECTOR,		ESPIPE},
 	{NT_STATUS_NONE_MAPPED,			EINVAL},
 	{NT_STATUS_NOT_A_DIRECTORY,		ENOTDIR},
+	{NT_STATUS_NOT_FOUND,			ENOENT},
 	{NT_STATUS_NOT_IMPLEMENTED,		ENOTSUP},
+	{NT_STATUS_NOT_LOCKED,			ENOLCK},
 	{NT_STATUS_NOT_MAPPED_VIEW,		EINVAL},
 	{NT_STATUS_NOT_SUPPORTED,		ENOTSUP},
+	{NT_STATUS_NO_EAS_ON_FILE,		ENOENT},
+	{NT_STATUS_NO_LOGON_SERVERS,		EAUTH},
 	{NT_STATUS_NO_MEDIA,			ENOMEDIUM},
 	{NT_STATUS_NO_MEDIA_IN_DEVICE,		ENOMEDIUM},
 	{NT_STATUS_NO_MEMORY,			ENOMEM},
 	{NT_STATUS_NO_SUCH_DEVICE,		ENODEV},
 	{NT_STATUS_NO_SUCH_FILE,		ENOENT},
+	{NT_STATUS_NO_SUCH_LOGON_SESSION,	EAUTH},
+	{NT_STATUS_NO_SUCH_USER,		EAUTH},
+	{NT_STATUS_NO_TRUST_LSA_SECRET,		EAUTH},
+	{NT_STATUS_NO_TRUST_SAM_ACCOUNT,	EAUTH},
 	{NT_STATUS_OBJECT_NAME_COLLISION,	EEXIST},
 	{NT_STATUS_OBJECT_NAME_INVALID,		EINVAL},
 	{NT_STATUS_OBJECT_NAME_NOT_FOUND,	ENOENT},
 	{NT_STATUS_OBJECT_PATH_INVALID,		ENOTDIR},
 	{NT_STATUS_OBJECT_PATH_NOT_FOUND,	ENOENT},
+	{NT_STATUS_OBJECT_PATH_SYNTAX_BAD,	EINVAL},
+	{NT_STATUS_OBJECT_TYPE_MISMATCH,	EBADF},
 	{NT_STATUS_PAGEFILE_QUOTA,		EDQUOT},
-	{NT_STATUS_PASSWORD_EXPIRED,		EACCES},
-	{NT_STATUS_PASSWORD_MUST_CHANGE,	EACCES},
-	{NT_STATUS_PASSWORD_RESTRICTION,	EACCES},
+	{NT_STATUS_PASSWORD_EXPIRED,		EAUTH},
+	{NT_STATUS_PASSWORD_MUST_CHANGE,	EAUTH},
+	{NT_STATUS_PASSWORD_RESTRICTION,	EAUTH},
 	{NT_STATUS_PATH_NOT_COVERED,		ENOENT},
 	{NT_STATUS_PIPE_BROKEN,			EPIPE},
 	{NT_STATUS_PIPE_BUSY,			EPIPE},
@@ -293,11 +308,12 @@ static const nt2errno_t nt2errno[] = {
 	{NT_STATUS_PIPE_DISCONNECTED,		EPIPE},
 	{NT_STATUS_PIPE_NOT_AVAILABLE,		EBUSY},
 	{NT_STATUS_PORT_CONNECTION_REFUSED,	ECONNREFUSED},
+	{NT_STATUS_PORT_DISCONNECTED,		EBADF},
 	{NT_STATUS_PORT_MESSAGE_TOO_LONG,	EMSGSIZE},
 	{NT_STATUS_PORT_UNREACHABLE,		EHOSTUNREACH},
 	{NT_STATUS_PROTOCOL_UNREACHABLE,	ENOPROTOOPT},
 	{NT_STATUS_QUOTA_EXCEEDED,		EDQUOT},
-	{NT_STATUS_RANGE_NOT_LOCKED,		EIO},
+	{NT_STATUS_RANGE_NOT_LOCKED,		EAGAIN}, /* like F_SETLK */
 	{NT_STATUS_REGISTRY_QUOTA_LIMIT,	EDQUOT},
 	{NT_STATUS_REMOTE_DISCONNECT,		ESHUTDOWN},
 	{NT_STATUS_REMOTE_NOT_LISTENING,	ECONNREFUSED},
@@ -307,9 +323,11 @@ static const nt2errno_t nt2errno[] = {
 	{NT_STATUS_TIMER_NOT_CANCELED,		ETIME},
 	{NT_STATUS_TOO_MANY_LINKS,		EMLINK},
 	{NT_STATUS_TOO_MANY_OPENED_FILES,	EMFILE},
+	{NT_STATUS_TRUSTED_DOMAIN_FAILURE,	EAUTH},
+	{NT_STATUS_TRUSTED_RELATIONSHIP_FAILURE, EAUTH},
 	{NT_STATUS_UNABLE_TO_FREE_VM,		EADDRINUSE},
 	{NT_STATUS_UNSUCCESSFUL,		EINVAL},
-	{NT_STATUS_WRONG_PASSWORD,		EACCES},
+	{NT_STATUS_WRONG_PASSWORD,		EAUTH},
 	{0,	0}
 };
 
@@ -593,14 +611,6 @@ static const nt2doserr_t nt2doserr[] = {
 	{ERRHRD,	ERRgeneral,	NT_STATUS_NO_GUID_TRANSLATION},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_CANNOT_IMPERSONATE},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_IMAGE_ALREADY_LOADED},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_NOT_PRESENT},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_LID_NOT_EXIST},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_LID_ALREADY_OWNED},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_NOT_LID_OWNER},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_INVALID_COMMAND},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_INVALID_LID},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_SELECTOR_NOT_AVAILABLE},
-	{ERRHRD,	ERRgeneral,	NT_STATUS_ABIOS_INVALID_SELECTOR},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_NO_LDT},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_INVALID_LDT_SIZE},
 	{ERRHRD,	ERRgeneral,	NT_STATUS_INVALID_LDT_OFFSET},
@@ -868,6 +878,19 @@ smb_maperr32(uint32_t nterr)
 	return (EIO);
 }
 
+uint_t
+smb_doserr2status(int dclass, int derr)
+{
+	const nt2doserr_t *nt2d;
+
+	if (dclass == 0 && derr == 0)
+		return (0);
+
+	for (nt2d = nt2doserr; nt2d->nterr; nt2d++)
+		if (nt2d->dclass == dclass && nt2d->derr == derr)
+			return (nt2d->nterr);
+	return (NT_STATUS_UNSUCCESSFUL);
+}
 
 int
 smb_maperror(int eclass, int eno)
@@ -996,13 +1019,90 @@ smb_maperror(int eclass, int eno)
 	return (EIO);
 }
 
-#if defined(NOICONVSUPPORT) || defined(lint)
-extern int iconv_conv(void *handle, const char **inbuf,
-    size_t *inbytesleft, char **outbuf, size_t *outbytesleft);
-#endif
-
 #define	SMALL_CONV 256
 
+/*
+ * Decode an SMB OTW string (Unicode or OEM chars)
+ * converting to UTF-8 in the output buffer.
+ * outlen is in/out (max size on input)
+ * insize is the wire size (2 * chars if unicode)
+ * The output string is null terminated.
+ * Output length does not include the null.
+ */
+int
+smb_get_dstring(struct mdchain *mdc, struct smb_vc *vcp,
+	char *outbuf, size_t *outlen, int insize)
+{
+	uint16_t convbuf[SMALL_CONV];
+	uint16_t *cbuf;
+	size_t cbufalloc, inlen, outsize;
+	int error;
+
+	if (insize <= 0)
+		return (0);
+	/* Note: inlen is UTF-16 symbols. */
+	inlen = insize / 2;
+
+	if (*outlen < 2)
+		return (EINVAL);
+	outsize = *outlen - 1; /* room for null */
+
+	/*
+	 * Get a buffer for the conversion and fill it.
+	 * Use stack buffer if the string is
+	 * small enough, else allocate.
+	 */
+	if (insize < sizeof (convbuf)) {
+		cbufalloc = 0;
+		cbuf = convbuf;
+	} else {
+		cbufalloc = insize + 2;
+		cbuf = kmem_alloc(cbufalloc, KM_SLEEP);
+	}
+	error = md_get_mem(mdc, cbuf, insize, MB_MSYSTEM);
+	if (error != 0)
+		goto out;
+	cbuf[inlen] = 0;
+
+	/*
+	 * Handle the easy case (non-unicode).
+	 * XXX: Technically, we should convert
+	 * the string to OEM codeset first...
+	 * Modern servers all use Unicode, so
+	 * this is good enough.
+	 */
+	if (SMB_UNICODE_STRINGS(vcp) == 0) {
+		*outlen = strlcpy(outbuf, (char *)cbuf, outsize);
+		if (*outlen > outsize) {
+			*outlen = outsize;
+			error = E2BIG;
+		}
+	} else {
+		/*
+		 * Convert from UTF-16 to UTF-8
+		 */
+		error = uconv_u16tou8(cbuf, &inlen,
+		    (uchar_t *)outbuf, outlen,
+		    UCONV_IN_LITTLE_ENDIAN);
+		if (error == 0) {
+			outbuf[*outlen] = '\0';
+		}
+	}
+
+	ASSERT(*outlen == strlen(outbuf));
+
+out:
+	if (cbufalloc != 0)
+		kmem_free(cbuf, cbufalloc);
+
+	return (error);
+}
+
+/*
+ * It's surprising that this function does utf8-ucs2 conversion.
+ * One would expect only smb_put_dstring to do that.
+ * Fixing that will require changing a bunch of callers. XXX
+ */
 /*ARGSUSED*/
 int
 smb_put_dmem(struct mbchain *mbp, struct smb_vc *vcp, const char *src,
@@ -1077,6 +1177,133 @@ smb_put_dstring(struct mbchain *mbp, struct smb_vc *vcp, const char *src,
 	error = smb_put_dmem(mbp, vcp, src, len, caseopt, NULL);
 	if (error)
 		return (error);
+
+	return (error);
+}
+int
+smb_smb_ntcreate(struct smb_share *ssp, struct mbchain *name_mb,
+	uint32_t crflag, uint32_t req_acc, uint32_t efa, uint32_t sh_acc,
+	uint32_t disp, uint32_t createopt,  uint32_t impersonate,
+	struct smb_cred *scrp, smb_fh_t *fhp,
+	uint32_t *cr_act_p, struct smbfattr *fap)
+{
+	int err;
+
+	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
+		err = smb2_smb_ntcreate(ssp, name_mb, NULL, NULL,
+		   crflag, req_acc, efa, sh_acc, disp, createopt,
+		   impersonate, scrp, &fhp->fh_fid2, cr_act_p, fap);
+	} else {
+		err = smb1_smb_ntcreate(ssp, name_mb, crflag, req_acc,
+		    efa, sh_acc, disp, createopt,  impersonate, scrp,
+		    &fhp->fh_fid1, cr_act_p, fap);
+	}
+	return (err);
+}
+
+int
+smb_smb_close(struct smb_share *ssp, smb_fh_t *fhp,
+	struct smb_cred *scrp)
+{
+	int err;
+
+	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
+		err = smb2_smb_close(ssp, &fhp->fh_fid2, scrp);
+	} else {
+		err = smb1_smb_close(ssp, fhp->fh_fid1, NULL, scrp);
+	}
+
+	return (err);
+}
+
+/*
+ * Largest size to use with LARGE_READ/LARGE_WRITE.
+ * Specs say up to 64k data bytes, but Windows traffic
+ * uses 60k... no doubt for some good reason.
+ * (Probably to keep 4k block alignment.)
+ */
+uint32_t smb1_large_io_max = (60*1024);
+
+/*
+ * Common function for read/write with UIO.
+ * Called by netsmb smb_usr_rw,
+ *  smbfs_readvnode, smbfs_writevnode
+ */
+int
+smb_rwuio(smb_fh_t *fhp, uio_rw_t rw,
+	uio_t *uiop, smb_cred_t *scred, int timo)
+{
+	struct smb_share *ssp = FHTOSS(fhp);
+	struct smb_vc *vcp = SSTOVC(ssp);
+	ssize_t  save_resid;
+	uint32_t len, rlen, maxlen;
+	int error = 0;
+	int (*iofun)(smb_fh_t *, uint32_t *,
+	    uio_t *, smb_cred_t *, int);
+
+	/* After reconnect, the fid is invalid. */
+	if (fhp->fh_vcgenid != ssp->ss_vcgenid)
+		return (ESTALE);
+
+	if (SSTOVC(ssp)->vc_flags & SMBV_SMB2) {
+		if (rw == UIO_READ) {
+			iofun = smb2_smb_read;
+			maxlen = vcp->vc_sopt.sv2_maxread;
+		} else { /* UIO_WRITE */
+			iofun = smb2_smb_write;
+			maxlen = vcp->vc_sopt.sv2_maxwrite;
+		}
+	} else {
+		/*
+		 * Using NT LM 0.12, so readx, writex.
+		 * Make sure we can represent the offset.
+		 */
+		if ((vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_FILES) == 0 &&
+		    (uiop->uio_loffset + uiop->uio_resid) > UINT32_MAX)
+			return (EFBIG);
+
+		if (rw == UIO_READ) {
+			iofun = smb_smb_readx;
+			if (vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_READX)
+				maxlen = smb1_large_io_max;
+			else
+				maxlen = vcp->vc_rxmax;
+		} else { /* UIO_WRITE */
+			iofun = smb_smb_writex;
+			if (vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_WRITEX)
+				maxlen = smb1_large_io_max;
+			else
+				maxlen = vcp->vc_wxmax;
+		}
+	}
+
+	save_resid = uiop->uio_resid;
+	while (uiop->uio_resid > 0) {
+		/* Lint: uio_resid may be 64-bits */
+		rlen = len = (uint32_t)min(maxlen, uiop->uio_resid);
+		error = (*iofun)(fhp, &rlen, uiop, scred, timo);
+
+		/*
+		 * Note: the iofun called uio_update, so
+		 * not doing that here as one might expect.
+		 *
+		 * Quit the loop either on error, or if we
+		 * transferred less then requested.
+		 */
+		if (error || (rlen < len))
+			break;
+
+		timo = 0; /* only first I/O should wait */
+	}
+	if (error && (save_resid != uiop->uio_resid)) {
+		/*
+		 * Stopped on an error after having
+		 * successfully transferred data.
+		 * Suppress this error.
+		 */
+		SMBSDEBUG("error %d suppressed\n", error);
+		error = 0;
+	}
 
 	return (error);
 }

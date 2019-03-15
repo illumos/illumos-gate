@@ -33,9 +33,10 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -62,10 +63,16 @@
 
 #include "private.h"
 
+/*
+ * It's not actually necessary to call the CLOSEFH ioctl, but doing it
+ * makes debugging a little easier.  If we were to skip the ioctl,
+ * nsmb_close would cleanup the handle, here or in process exit.
+ */
 int
 smb_fh_close(int fd)
 {
-	return (close(fd));
+	(void) nsmb_ioctl(fd, SMBIOC_CLOSEFH, NULL);
+	return (nsmb_close(fd));
 }
 
 int
@@ -96,7 +103,7 @@ smb_fh_ntcreate(
 		goto errout;
 	}
 	from_fd = ctx->ct_dev_fd;
-	if (ioctl(new_fd, SMBIOC_DUP_DEV, &from_fd) == -1) {
+	if (nsmb_ioctl(new_fd, SMBIOC_DUP_DEV, &from_fd) == -1) {
 		err = errno;
 		goto errout;
 	}
@@ -111,7 +118,7 @@ smb_fh_ntcreate(
 	ioc.ioc_share_acc = share_acc;
 	ioc.ioc_open_disp = open_disp;
 	ioc.ioc_creat_opts = create_opts;
-	if (ioctl(new_fd, SMBIOC_NTCREATE, &ioc) == -1) {
+	if (nsmb_ioctl(new_fd, SMBIOC_NTCREATE, &ioc) == -1) {
 		err = errno;
 		goto errout;
 	}
@@ -120,7 +127,7 @@ smb_fh_ntcreate(
 
 errout:
 	if (new_fd != -1)
-		close(new_fd);
+		nsmb_close(new_fd);
 	errno = err;
 	return (-1);
 }
@@ -210,11 +217,10 @@ smb_fh_read(int fd, off64_t offset, size_t count,
 	struct smbioc_rw rwrq;
 
 	bzero(&rwrq, sizeof (rwrq));
-	rwrq.ioc_fh = -1;	/* tell driver to supply this */
 	rwrq.ioc_base = dst;
 	rwrq.ioc_cnt = count;
 	rwrq.ioc_offset = offset;
-	if (ioctl(fd, SMBIOC_READ, &rwrq) == -1) {
+	if (nsmb_ioctl(fd, SMBIOC_READ, &rwrq) == -1) {
 		return (-1);
 	}
 	return (rwrq.ioc_cnt);
@@ -227,11 +233,10 @@ smb_fh_write(int fd, off64_t offset, size_t count,
 	struct smbioc_rw rwrq;
 
 	bzero(&rwrq, sizeof (rwrq));
-	rwrq.ioc_fh = -1;	/* tell driver to supply this */
 	rwrq.ioc_base = (char *)src;
 	rwrq.ioc_cnt = count;
 	rwrq.ioc_offset = offset;
-	if (ioctl(fd, SMBIOC_WRITE, &rwrq) == -1) {
+	if (nsmb_ioctl(fd, SMBIOC_WRITE, &rwrq) == -1) {
 		return (-1);
 	}
 	return (rwrq.ioc_cnt);
@@ -251,21 +256,23 @@ smb_fh_xactnp(int fd,
 	int *rdlen, char *rdata,	/* receive */
 	int *more)
 {
-	int		err, rparamcnt;
-	uint16_t	setup[2];
+	smbioc_xnp_t	ioc;
 
-	setup[0] = TRANS_TRANSACT_NAMED_PIPE;
-	setup[1] = 0xFFFF; /* driver replaces this */
-	rparamcnt = 0;
+	/* this gets copyin & copyout */
+	bzero(&ioc, sizeof (ioc));
+	ioc.ioc_tdlen = tdlen;
+	ioc.ioc_rdlen = *rdlen;
+	ioc.ioc_more = 0;
+	ioc.ioc_tdata = (char *)tdata;
+	ioc.ioc_rdata = rdata;
 
-	err = smb_t2_request(fd, 2, setup, "\\PIPE\\",
-	    0, NULL,	/* TX paramcnt, params */
-	    tdlen, (void *)tdata,
-	    &rparamcnt, NULL,	/* no RX params */
-	    rdlen, rdata, more);
-
-	if (err)
+	if (nsmb_ioctl(fd, SMBIOC_XACTNP, &ioc) == -1) {
 		*rdlen = 0;
+		return (-1);
+	}
 
-	return (err);
+	*rdlen = ioc.ioc_rdlen;
+	*more  = ioc.ioc_more;
+
+	return (0);
 }

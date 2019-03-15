@@ -27,6 +27,8 @@
  * Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2018, Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2019, Carlos Neira <cneirabustos@gmail.com>
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -710,10 +712,12 @@ extern int proc_get_secflags(pid_t, prsecflags_t **);
  */
 #define	FLT2STR_MAX 32	/* max. string length of faults (like SIG2STR_MAX) */
 #define	SYS2STR_MAX 32	/* max. string length of syscalls (like SIG2STR_MAX) */
+#define	DMODELSTR_MAX 32 /* max. string length of data model names */
 
 extern char *proc_fltname(int, char *, size_t);
 extern char *proc_signame(int, char *, size_t);
 extern char *proc_sysname(int, char *, size_t);
+extern char *proc_dmodelname(int, char *, size_t);
 
 /*
  * Utility functions for debugging tools to convert fault, signal, and system

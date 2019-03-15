@@ -22,7 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -50,336 +51,89 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <uuid/uuid.h>
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
+#include <netsmb/mchain.h>
 #include <netsmb/netbios.h>
 #include <netsmb/nb_lib.h>
 #include <netsmb/smb_dev.h>
 
+#include <cflib.h>
+
 #include "charsets.h"
 #include "private.h"
-
-/*
- * SMB messages are up to 64K.
- * Let's leave room for two.
- */
-static int smb_tcpsndbuf = 0x20000;
-static int smb_tcprcvbuf = 0x20000;
-static int smb_connect_timeout = 30; /* seconds */
-int smb_recv_timeout = 30; /* seconds */
-
-int conn_tcp6(struct smb_ctx *, const struct sockaddr *, int);
-int conn_tcp4(struct smb_ctx *, const struct sockaddr *, int);
-int conn_nbt(struct smb_ctx *, const struct sockaddr *, char *);
-
-/*
- * Internal set sockopt for int-sized options.
- * Borrowed from: libnsl/rpc/ti_opts.c
- */
-static int
-smb_setopt_int(int fd, int level, int name, int val)
-{
-	struct t_optmgmt oreq, ores;
-	struct {
-		struct t_opthdr oh;
-		int ival;
-	} opts;
-
-	/* opt header */
-	opts.oh.len = sizeof (opts);
-	opts.oh.level = level;
-	opts.oh.name = name;
-	opts.oh.status = 0;
-	opts.ival = val;
-
-	oreq.flags = T_NEGOTIATE;
-	oreq.opt.buf = (void *)&opts;
-	oreq.opt.len = sizeof (opts);
-
-	ores.flags = 0;
-	ores.opt.buf = NULL;
-	ores.opt.maxlen = 0;
-
-	if (t_optmgmt(fd, &oreq, &ores) < 0) {
-		DPRINT("t_opgmgnt, t_errno = %d", t_errno);
-		if (t_errno == TSYSERR)
-			return (errno);
-		return (EPROTO);
-	}
-	if (ores.flags != T_SUCCESS) {
-		DPRINT("flags 0x%x, status 0x%x",
-		    (int)ores.flags, (int)opts.oh.status);
-		return (EPROTO);
-	}
-
-	return (0);
-}
+#include "smb_crypt.h"
 
 static int
-smb_setopts(int fd)
+smb__ssnsetup(struct smb_ctx *ctx,
+	struct mbdata *mbc1, struct mbdata *mbc2);
+
+int smb_ssnsetup_spnego(struct smb_ctx *, struct mbdata *);
+
+const char *
+smb_iod_state_name(enum smbiod_state st)
 {
-	int err;
+	const char *n = "(?)";
 
-	/*
-	 * Set various socket/TCP options.
-	 * Failures here are not fatal -
-	 * just log a complaint.
-	 *
-	 * We don't need these two:
-	 *   SO_RCVTIMEO, SO_SNDTIMEO
-	 */
-
-	err = smb_setopt_int(fd, SOL_SOCKET, SO_SNDBUF, smb_tcpsndbuf);
-	if (err) {
-		DPRINT("set SO_SNDBUF, err %d", err);
-	}
-
-	err = smb_setopt_int(fd, SOL_SOCKET, SO_RCVBUF, smb_tcprcvbuf);
-	if (err) {
-		DPRINT("set SO_RCVBUF, err %d", err);
-	}
-
-	err = smb_setopt_int(fd, SOL_SOCKET, SO_KEEPALIVE, 1);
-	if (err) {
-		DPRINT("set SO_KEEPALIVE, err %d", err);
-	}
-
-	err = smb_setopt_int(fd, IPPROTO_TCP, TCP_NODELAY, 1);
-	if (err) {
-		DPRINT("set TCP_NODELAY, err %d", err);
-	}
-
-	/* Set the connect timeout (in milliseconds). */
-	err = smb_setopt_int(fd, IPPROTO_TCP,
-	    TCP_CONN_ABORT_THRESHOLD,
-	    smb_connect_timeout * 1000);
-	if (err) {
-		DPRINT("set connect timeout, err %d", err);
-	}
-	return (0);
-}
-
-
-int
-conn_tcp6(struct smb_ctx *ctx, const struct sockaddr *sa, int port)
-{
-	struct sockaddr_in6 sin6;
-	char *dev = "/dev/tcp6";
-	char paddrbuf[INET6_ADDRSTRLEN];
-	struct t_call sndcall;
-	int fd, err;
-
-	if (sa->sa_family != AF_INET6) {
-		DPRINT("bad af %d", sa->sa_family);
-		return (EINVAL);
-	}
-	bcopy(sa, &sin6, sizeof (sin6));
-	sin6.sin6_port = htons(port);
-
-	DPRINT("tcp6: %s (%d)",
-	    inet_ntop(AF_INET6, &sin6.sin6_addr,
-	    paddrbuf, sizeof (paddrbuf)), port);
-
-	fd = t_open(dev, O_RDWR, NULL);
-	if (fd < 0) {
-		/* Assume t_errno = TSYSERR */
-		err = errno;
-		perror(dev);
-		return (err);
-	}
-	if ((err = smb_setopts(fd)) != 0)
-		goto errout;
-	if (t_bind(fd, NULL, NULL) < 0) {
-		DPRINT("t_bind t_errno %d", t_errno);
-		if (t_errno == TSYSERR)
-			err = errno;
-		else
-			err = EPROTO;
-		goto errout;
-	}
-	sndcall.addr.maxlen = sizeof (sin6);
-	sndcall.addr.len = sizeof (sin6);
-	sndcall.addr.buf = (void *) &sin6;
-	sndcall.opt.len = 0;
-	sndcall.udata.len = 0;
-	if (t_connect(fd, &sndcall, NULL) < 0) {
-		err = get_xti_err(fd);
-		DPRINT("connect, err %d", err);
-		goto errout;
-	}
-
-	DPRINT("tcp6: connected, fd=%d", fd);
-	ctx->ct_tran_fd = fd;
-	return (0);
-
-errout:
-	close(fd);
-	return (err);
-}
-
-/*
- * This is used for both SMB over TCP (port 445)
- * and NetBIOS - see conn_nbt().
- */
-int
-conn_tcp4(struct smb_ctx *ctx, const struct sockaddr *sa, int port)
-{
-	struct sockaddr_in sin;
-	char *dev = "/dev/tcp";
-	char paddrbuf[INET_ADDRSTRLEN];
-	struct t_call sndcall;
-	int fd, err;
-
-	if (sa->sa_family != AF_INET) {
-		DPRINT("bad af %d", sa->sa_family);
-		return (EINVAL);
-	}
-	bcopy(sa, &sin, sizeof (sin));
-	sin.sin_port = htons(port);
-
-	DPRINT("tcp4: %s (%d)",
-	    inet_ntop(AF_INET, &sin.sin_addr,
-	    paddrbuf, sizeof (paddrbuf)), port);
-
-	fd = t_open(dev, O_RDWR, NULL);
-	if (fd < 0) {
-		/* Assume t_errno = TSYSERR */
-		err = errno;
-		perror(dev);
-		return (err);
-	}
-	if ((err = smb_setopts(fd)) != 0)
-		goto errout;
-	if (t_bind(fd, NULL, NULL) < 0) {
-		DPRINT("t_bind t_errno %d", t_errno);
-		if (t_errno == TSYSERR)
-			err = errno;
-		else
-			err = EPROTO;
-		goto errout;
-	}
-	sndcall.addr.maxlen = sizeof (sin);
-	sndcall.addr.len = sizeof (sin);
-	sndcall.addr.buf = (void *) &sin;
-	sndcall.opt.len = 0;
-	sndcall.udata.len = 0;
-	if (t_connect(fd, &sndcall, NULL) < 0) {
-		err = get_xti_err(fd);
-		DPRINT("connect, err %d", err);
-		goto errout;
-	}
-
-	DPRINT("tcp4: connected, fd=%d", fd);
-	ctx->ct_tran_fd = fd;
-	return (0);
-
-errout:
-	close(fd);
-	return (err);
-}
-
-/*
- * Open a NetBIOS connection (session, port 139)
- *
- * The optional name parameter, if passed, means
- * we found the sockaddr via NetBIOS name lookup,
- * and can just use that for our session request.
- * Otherwise (if name is NULL), we're connecting
- * by IP address, and need to come up with the
- * NetBIOS name by other means.
- */
-int
-conn_nbt(struct smb_ctx *ctx, const struct sockaddr *saarg, char *name)
-{
-	struct sockaddr_in sin;
-	struct sockaddr *sa;
-	char server[NB_NAMELEN];
-	char workgroup[NB_NAMELEN];
-	int err, nberr, port;
-
-	bcopy(saarg, &sin, sizeof (sin));
-	sa = (struct sockaddr *)&sin;
-
-	switch (sin.sin_family) {
-	case AF_NETBIOS:	/* our fake AF */
-		sin.sin_family = AF_INET;
+	switch (st) {
+	case SMBIOD_ST_UNINIT:
+		n = "UNINIT!";
 		break;
-	case AF_INET:
+	case SMBIOD_ST_IDLE:
+		n = "IDLE";
 		break;
-	default:
-		DPRINT("bad af %d", sin.sin_family);
-		return (EINVAL);
-	}
-	port = IPPORT_NETBIOS_SSN;
-
-	/*
-	 * If we have a NetBIOS name, just use it.
-	 * This is the path taken when we've done a
-	 * NetBIOS name lookup on this name to get
-	 * the IP address in the passed sa. Otherwise,
-	 * we're connecting by IP address, and need to
-	 * figure out what NetBIOS name to use.
-	 */
-	if (name) {
-		strlcpy(server, name, sizeof (server));
-		DPRINT("given name: %s", server);
-	} else {
-		/*
-		 *
-		 * Try a NetBIOS node status query,
-		 * which searches for a type=[20] name.
-		 * If that doesn't work, just use the
-		 * (fake) "*SMBSERVER" name.
-		 */
-		DPRINT("try node status");
-		server[0] = '\0';
-		nberr = nbns_getnodestatus(ctx->ct_nb,
-		    &sin.sin_addr, server, workgroup);
-		if (nberr == 0 && server[0] != '\0') {
-			/* Found the name.  Save for reconnect. */
-			DPRINT("found name: %s", server);
-			strlcpy(ctx->ct_srvname, server,
-			    sizeof (ctx->ct_srvname));
-		} else {
-			DPRINT("getnodestatus, nberr %d", nberr);
-			strlcpy(server, "*SMBSERVER", sizeof (server));
-		}
+	case SMBIOD_ST_RECONNECT:
+		n = "RECONNECT";
+		break;
+	case SMBIOD_ST_RCFAILED:
+		n = "RCFAILED";
+		break;
+	case SMBIOD_ST_CONNECTED:
+		n = "CONNECTED";
+		break;
+	case SMBIOD_ST_NEGOTIATED:
+		n = "NEGOTIATED";
+		break;
+	case SMBIOD_ST_AUTHCONT:
+		n = "AUTHCONT";
+		break;
+	case SMBIOD_ST_AUTHFAIL:
+		n = "AUTHFAIL";
+		break;
+	case SMBIOD_ST_AUTHOK:
+		n = "AUTHOK";
+		break;
+	case SMBIOD_ST_VCACTIVE:
+		n = "VCACTIVE";
+		break;
+	case SMBIOD_ST_DEAD:
+		n = "DEAD";
+		break;
 	}
 
-	/*
-	 * Establish the TCP connection.
-	 * Careful to close it on errors.
-	 */
-	if ((err = conn_tcp4(ctx, sa, port)) != 0) {
-		DPRINT("TCP connect: err=%d", err);
-		goto out;
-	}
-
-	/* Connected.  Do NetBIOS session request. */
-	err = nb_ssn_request(ctx, server);
-	if (err)
-		DPRINT("ssn_rq, err %d", err);
-
-out:
-	if (err) {
-		if (ctx->ct_tran_fd != -1) {
-			close(ctx->ct_tran_fd);
-			ctx->ct_tran_fd = -1;
-		}
-	}
-	return (err);
+	return (n);
 }
 
 /*
  * Make a new connection, or reconnect.
+ *
+ * This is called first from the door service thread in smbiod
+ * (so that can report success or failure to the door client)
+ * and thereafter it's called when we need to reconnect after a
+ * network outage (or whatever might cause connection loss).
  */
 int
 smb_iod_connect(smb_ctx_t *ctx)
 {
-	struct sockaddr *sa;
-	int err, err2;
+	smbioc_ossn_t *ossn = &ctx->ct_ssn;
+	smbioc_ssn_work_t *work = &ctx->ct_work;
+	char *uuid_str;
+	int err;
 	struct mbdata blob;
+	char *nego_buf = NULL;
+	uint32_t nego_len;
 
 	memset(&blob, 0, sizeof (blob));
 
@@ -391,15 +145,6 @@ smb_iod_connect(smb_ctx_t *ctx)
 
 	if (smb_debug)
 		dump_ctx("smb_iod_connect", ctx);
-
-	/*
-	 * This may be a reconnect, so
-	 * cleanup if necessary.
-	 */
-	if (ctx->ct_tran_fd != -1) {
-		close(ctx->ct_tran_fd);
-		ctx->ct_tran_fd = -1;
-	}
 
 	/*
 	 * Get local machine name.
@@ -415,114 +160,235 @@ smb_iod_connect(smb_ctx_t *ctx)
 	}
 
 	/*
+	 * Get local machine uuid.
+	 */
+	uuid_str = cf_get_client_uuid();
+	if (uuid_str == NULL) {
+		err = EINVAL;
+		smb_error(dgettext(TEXT_DOMAIN,
+		    "can't get local UUID"), err);
+			return (err);
+	}
+	(void) uuid_parse(uuid_str, ctx->ct_work.wk_cl_guid);
+	free(uuid_str);
+	uuid_str = NULL;
+
+	/*
 	 * We're called with each IP address
 	 * already copied into ct_srvaddr.
 	 */
 	ctx->ct_flags |= SMBCF_RESOLVED;
 
-	sa = &ctx->ct_srvaddr.sa;
-	switch (sa->sa_family) {
-
-	case AF_INET6:
-		err = conn_tcp6(ctx, sa, IPPORT_SMB);
-		break;
-
-	case AF_INET:
-		err = conn_tcp4(ctx, sa, IPPORT_SMB);
-		/*
-		 * If port 445 was not listening, try port 139.
-		 * Note: Not doing NetBIOS name lookup here.
-		 * We already have the IP address.
-		 */
-		switch (err) {
-		case ECONNRESET:
-		case ECONNREFUSED:
-			err2 = conn_nbt(ctx, sa, NULL);
-			if (err2 == 0)
-				err = 0;
-		}
-		break;
-
-	case AF_NETBIOS:
-		/* Like AF_INET, but use NetBIOS ssn. */
-		err = conn_nbt(ctx, sa, ctx->ct_srvname);
-		break;
-
-	default:
-		DPRINT("skipped family %d", sa->sa_family);
-		err = EPROTONOSUPPORT;
-		break;
-	}
-
-
-	if (err) {
-		DPRINT("connect, err=%d", err);
+	/*
+	 * Ask the drvier to connect.
+	 */
+	DPRINT("Try ioctl connect...");
+	if (nsmb_ioctl(ctx->ct_dev_fd, SMBIOC_IOD_CONNECT, work) < 0) {
+		err = errno;
+		smb_error(dgettext(TEXT_DOMAIN,
+		    "%s: connect failed"),
+		    err, ossn->ssn_srvname);
 		return (err);
 	}
+	DPRINT("Connect OK, new state=%s",
+	    smb_iod_state_name(work->wk_out_state));
 
 	/*
-	 * Do SMB Negotiate Protocol.
+	 * Setup a buffer to recv the nego. hint.
 	 */
-	err = smb_negprot(ctx, &blob);
+	nego_len = 4096;
+	err = mb_init_sz(&blob, nego_len);
 	if (err)
 		goto out;
+	nego_buf = blob.mb_top->m_data;
+	work->wk_u_auth_rbuf.lp_ptr = nego_buf;
+	work->wk_u_auth_rlen = nego_len;
 
 	/*
-	 * Empty user name means an explicit request for
-	 * NULL session setup, which is a special case.
-	 * If negotiate determined that we want to do
-	 * SMB signing, we have to turn that off for a
-	 * NULL session. [MS-SMB 3.3.5.3].
+	 * Ask the driver for SMB negotiate
 	 */
-	if (ctx->ct_user[0] == '\0') {
-		/* Null user should have null domain too. */
-		ctx->ct_domain[0] = '\0';
-		ctx->ct_authflags = SMB_AT_ANON;
-		ctx->ct_clnt_caps &= ~SMB_CAP_EXT_SECURITY;
-		ctx->ct_vcflags &= ~SMBV_WILL_SIGN;
+	DPRINT("Try ioctl negotiate...");
+	if (nsmb_ioctl(ctx->ct_dev_fd, SMBIOC_IOD_NEGOTIATE, work) < 0) {
+		err = errno;
+		smb_error(dgettext(TEXT_DOMAIN,
+		    "%s: negotiate failed"),
+		    err, ossn->ssn_srvname);
+		goto out;
+	}
+	DPRINT("Negotiate OK, new state=%s",
+	    smb_iod_state_name(work->wk_out_state));
+
+	nego_len = work->wk_u_auth_rlen;
+	blob.mb_top->m_len = nego_len;
+
+	if (smb_debug) {
+		DPRINT("Sec. blob: %d", nego_len);
+		smb_hexdump(nego_buf, nego_len);
 	}
 
 	/*
 	 * Do SMB Session Setup (authenticate)
-	 *
-	 * If the server negotiated extended security,
-	 * run the SPNEGO state machine, otherwise do
-	 * one of the old-style variants.
+	 * Always "extended security" now (SPNEGO)
 	 */
-	if (ctx->ct_clnt_caps & SMB_CAP_EXT_SECURITY) {
-		err = smb_ssnsetup_spnego(ctx, &blob);
-	} else {
-		/*
-		 * Server did NOT negotiate extended security.
-		 * Try NTLMv2, NTLMv1, or ANON (if enabled).
-		 */
-		if (ctx->ct_authflags & SMB_AT_NTLM2) {
-			err = smb_ssnsetup_ntlm2(ctx);
-		} else if (ctx->ct_authflags & SMB_AT_NTLM1) {
-			err = smb_ssnsetup_ntlm1(ctx);
-		} else if (ctx->ct_authflags & SMB_AT_ANON) {
-			err = smb_ssnsetup_null(ctx);
-		} else {
-			/*
-			 * Don't return EAUTH, because a new
-			 * password prompt will not help.
-			 */
-			DPRINT("No NTLM authflags");
-			err = ENOTSUP;
-		}
+	DPRINT("Do session setup...");
+	err = smb_ssnsetup_spnego(ctx, &blob);
+	if (err != 0) {
+		DPRINT("Session setup err=%d", err);
+		goto out;
 	}
+
+	/*
+	 * Success! We return zero now, and our caller (normally
+	 * the smbiod program) will then call smb_iod_work in a
+	 * new thread to service this VC as long as necessary.
+	 */
+	DPRINT("Session setup OK");
 
 out:
 	mb_done(&blob);
 
+	return (err);
+}
+
+/*
+ * smb_ssnsetup_spnego
+ *
+ * This does an SMB session setup sequence using SPNEGO.
+ * The state changes seen during this sequence are there
+ * just to help track what's going on.
+ */
+int
+smb_ssnsetup_spnego(struct smb_ctx *ctx, struct mbdata *hint_mb)
+{
+	struct mbdata send_mb, recv_mb;
+	smbioc_ssn_work_t *work = &ctx->ct_work;
+	int		err;
+
+	bzero(&send_mb, sizeof (send_mb));
+	bzero(&recv_mb, sizeof (recv_mb));
+
+	err = ssp_ctx_create_client(ctx, hint_mb);
+	if (err)
+		goto out;
+
+	/* NULL input indicates first call. */
+	err = ssp_ctx_next_token(ctx, NULL, &send_mb);
 	if (err) {
-		close(ctx->ct_tran_fd);
-		ctx->ct_tran_fd = -1;
-	} else {
-		/* Tell library code we have a session. */
-		ctx->ct_flags |= SMBCF_SSNACTIVE;
-		DPRINT("tran_fd = %d", ctx->ct_tran_fd);
+		DPRINT("smb__ssnsetup, ssp next, err=%d", err);
+		goto out;
 	}
+	for (;;) {
+		err = smb__ssnsetup(ctx, &send_mb, &recv_mb);
+		DPRINT("smb__ssnsetup rc=%d, new state=%s", err,
+		    smb_iod_state_name(work->wk_out_state));
+
+		if (err == 0) {
+			/*
+			 * Session setup complete w/ success.
+			 * Should have state AUTHOK
+			 */
+			if (work->wk_out_state != SMBIOD_ST_AUTHOK) {
+				DPRINT("Wrong state (expected AUTHOK)");
+			}
+			break;
+		}
+
+		if (err != EINPROGRESS) {
+			/*
+			 * Session setup complete w/ failure.
+			 * Should have state AUTHFAIL
+			 */
+			if (work->wk_out_state != SMBIOD_ST_AUTHFAIL) {
+				DPRINT("Wrong state (expected AUTHFAIL)");
+			}
+			goto out;
+		}
+
+		/*
+		 * err == EINPROGRESS
+		 * Session setup continuing.
+		 * Should have state AUTHCONT
+		 */
+		if (work->wk_out_state != SMBIOD_ST_AUTHCONT) {
+			DPRINT("Wrong state (expected AUTHCONT)");
+		}
+
+		/* middle calls get both in, out */
+		err = ssp_ctx_next_token(ctx, &recv_mb, &send_mb);
+		if (err) {
+			DPRINT("smb__ssnsetup, ssp next, err=%d", err);
+			goto out;
+		}
+	}
+
+	/*
+	 * Only get here via break in the err==0 case above,
+	 * so we're finalizing a successful session setup.
+	 *
+	 * NULL output token here indicates the final call.
+	 */
+	(void) ssp_ctx_next_token(ctx, &recv_mb, NULL);
+
+	/*
+	 * The session key is in ctx->ct_ssnkey_buf
+	 * (a.k.a. ct_work.wk_u_ssn_key_buf)
+	 */
+
+out:
+	/* Done with ctx->ct_ssp_ctx */
+	ssp_ctx_destroy(ctx);
+
+	return (err);
+}
+
+int smb_max_authtok_sz = 0x10000;
+
+/*
+ * Session Setup function, calling the nsmb driver.
+ *
+ * Args
+ *	send_mb: [in]  outgoing blob data to send
+ *	recv_mb: [out] received blob data buffer
+ */
+static int
+smb__ssnsetup(struct smb_ctx *ctx,
+	struct mbdata *send_mb, struct mbdata *recv_mb)
+{
+	smbioc_ossn_t *ossn = &ctx->ct_ssn;
+	smbioc_ssn_work_t *work = &ctx->ct_work;
+	mbuf_t *m;
+	int err;
+
+	/* Setup receive buffer for the auth data. */
+	err = mb_init_sz(recv_mb, smb_max_authtok_sz);
+	if (err != 0)
+		return (err);
+	m = recv_mb->mb_top;
+	work->wk_u_auth_rbuf.lp_ptr = m->m_data;
+	work->wk_u_auth_rlen        = m->m_maxlen;
+
+	/* ... and the auth data to send. */
+	m = send_mb->mb_top;
+	work->wk_u_auth_wbuf.lp_ptr = m->m_data;
+	work->wk_u_auth_wlen        = m->m_len;
+
+	DPRINT("Session setup ioctl...");
+	if (nsmb_ioctl(ctx->ct_dev_fd, SMBIOC_IOD_SSNSETUP, work) < 0) {
+		err = errno;
+		if (err != 0 && err != EINPROGRESS) {
+			smb_error(dgettext(TEXT_DOMAIN,
+			    "%s: session setup "),
+			    err, ossn->ssn_srvname);
+		}
+	}
+	DPRINT("Session setup ret %d", err);
+
+	/* Free the auth data we sent. */
+	mb_done(send_mb);
+
+	/* Setup length of received auth data */
+	m = recv_mb->mb_top;
+	m->m_len = work->wk_u_auth_rlen;
 
 	return (err);
 }

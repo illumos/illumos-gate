@@ -40,6 +40,7 @@
  */
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/vnode.h>
 #include <sys/kstat.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
@@ -115,7 +116,7 @@ extern "C" {
 /*
  * Function types for the parameterized stream head.
  * The msgfunc_t takes the parameters:
- * 	msgfunc(vnode_t *vp, mblk_t *mp, strwakeup_t *wakeups,
+ *	msgfunc(vnode_t *vp, mblk_t *mp, strwakeup_t *wakeups,
  *		strsigset_t *firstmsgsigs, strsigset_t *allmsgsigs,
  *		strpollset_t *pollwakeups);
  * It returns an optional message to be processed by the stream head.
@@ -130,7 +131,7 @@ typedef short	strpollset_t;
 typedef uintptr_t callbparams_id_t;
 typedef	mblk_t	*(*msgfunc_t)(vnode_t *, mblk_t *, strwakeup_t *,
 			strsigset_t *, strsigset_t *, strpollset_t *);
-typedef int 	(*errfunc_t)(vnode_t *, int, int *);
+typedef int	(*errfunc_t)(vnode_t *, int, int *);
 
 /*
  * Per stream sd_lock in putnext may be replaced by per cpu stream_putlocks
@@ -276,7 +277,7 @@ typedef struct stdata {
 	/*		0x00020000	   unused */
 	/*		0x00040000	   unused */
 #define	STRTOSTOP	0x00080000	/* block background writes */
-#define	STRCMDWAIT	0x00100000 	/* someone is doing an _I_CMD */
+#define	STRCMDWAIT	0x00100000	/* someone is doing an _I_CMD */
 	/*		0x00200000	   unused */
 #define	STRMOUNT	0x00400000	/* stream is mounted */
 #define	STRNOTATMARK	0x00800000	/* Not at mark (when empty read q) */
@@ -410,7 +411,7 @@ typedef struct stdata {
  *
  * The new way is:
  *
- * 	mutex_enter(SQLOCK(sq));
+ *	mutex_enter(SQLOCK(sq));
  *	count = sq->sq_count;
  *	SQ_PUTLOCKS_ENTER(sq);
  *	SUM_SQ_PUTCOUNTS(sq, count);
@@ -459,8 +460,8 @@ struct syncq {
 	 */
 	uint16_t	sq_type;	/* type (concurrency) of syncq */
 	uint16_t	sq_rmqcount;	/* # threads inside removeq() */
-	kcondvar_t 	sq_wait;	/* block on this sync queue */
-	kcondvar_t 	sq_exitwait;	/* waiting for thread to leave the */
+	kcondvar_t	sq_wait;	/* block on this sync queue */
+	kcondvar_t	sq_exitwait;	/* waiting for thread to leave the */
 					/* inner perimeter */
 	/*
 	 * Handling synchronous callbacks such as qtimeout and qbufcall
@@ -1024,7 +1025,7 @@ typedef struct str_stack str_stack_t;
 /*
  * Copy modes for tty and I_STR ioctls
  */
-#define	U_TO_K 	01			/* User to Kernel */
+#define	U_TO_K	01			/* User to Kernel */
 #define	K_TO_K  02			/* Kernel to Kernel */
 
 /*
@@ -1077,7 +1078,7 @@ typedef struct str_stack str_stack_t;
 #define	STRUNLOCKMATES(X)	mutex_exit(&((X)->sd_lock)); \
 			mutex_exit(&(((X)->sd_mate)->sd_lock))
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern void strinit(void);
 extern int strdoioctl(struct stdata *, struct strioctl *, int, int,

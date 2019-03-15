@@ -34,7 +34,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -72,13 +73,6 @@
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_tran.h>
 #include <netsmb/smb_trantcp.h>
-
-/*
- * SMB messages are up to 64K.
- * Let's leave room for two.
- */
-static int smb_tcpsndbuf = 0x20000;
-static int smb_tcprcvbuf = 0x20000;
 
 static int  nb_disconnect(struct nbpcb *nbp);
 
@@ -163,7 +157,7 @@ nb_getmsg_mlen(struct nbpcb *nbp, mblk_t **mpp, size_t mlen)
 			case T_DISCON_IND:
 				/* Peer disconnected. */
 				NBDEBUG("T_DISCON_IND: reason=%d",
-				    pptr->discon_ind.DISCON_reason);
+				    (int)pptr->discon_ind.DISCON_reason);
 				goto discon;
 			case T_ORDREL_IND:
 				/* Peer disconnecting. */
@@ -176,11 +170,11 @@ nb_getmsg_mlen(struct nbpcb *nbp, mblk_t **mpp, size_t mlen)
 					goto discon;
 				default:
 					NBDEBUG("T_OK_ACK/prim=%d",
-					    pptr->ok_ack.CORRECT_prim);
+					    (int)pptr->ok_ack.CORRECT_prim);
 					goto discon;
 				}
 			default:
-				NBDEBUG("M_PROTO/type=%d", pptr->type);
+				NBDEBUG("M_PROTO/type=%d", (int)pptr->type);
 				goto discon;
 			}
 			break; /* M_PROTO, M_PCPROTO */
@@ -485,22 +479,45 @@ out:
  * This is called only by the thread creating this endpoint,
  * so we're single-threaded here.
  */
-/*ARGSUSED*/
 static int
 smb_nbst_create(struct smb_vc *vcp, cred_t *cr)
 {
-	struct nbpcb *nbp;
+	TIUSER *tiptr = NULL;
+	struct nbpcb *nbp = NULL;
+	dev_t dev;
+	int rc;
+	ushort_t fmode;
+
+	switch (vcp->vc_srvaddr.sa.sa_family) {
+	case AF_INET:
+		dev = nsmb_dev_tcp;
+		break;
+	case AF_INET6:
+		dev = nsmb_dev_tcp6;
+		break;
+	default:
+		return (EAFNOSUPPORT);
+	}
+
+	fmode = FREAD|FWRITE;
+	rc = t_kopen(NULL, dev, fmode, &tiptr, cr);
+	if (rc != 0) {
+		cmn_err(CE_NOTE, "t_kopen failed, rc=%d", rc);
+		return (rc);
+	}
+	ASSERT(tiptr != NULL);
 
 	nbp = kmem_zalloc(sizeof (struct nbpcb), KM_SLEEP);
 
 	nbp->nbp_timo.tv_sec = SMB_NBTIMO;
-	nbp->nbp_state = NBST_CLOSED; /* really IDLE */
+	nbp->nbp_state = NBST_IDLE;
 	nbp->nbp_vc = vcp;
-	nbp->nbp_sndbuf = smb_tcpsndbuf;
-	nbp->nbp_rcvbuf = smb_tcprcvbuf;
+	nbp->nbp_tiptr = tiptr;
+	nbp->nbp_fmode = fmode;
 	nbp->nbp_cred = cr;
 	crhold(cr);
 	mutex_init(&nbp->nbp_lock, NULL, MUTEX_DRIVER, NULL);
+
 	vcp->vc_tdata = nbp;
 
 	return (0);
@@ -541,25 +558,66 @@ smb_nbst_done(struct smb_vc *vcp)
 	return (0);
 }
 
-/*
- * Loan a transport file pointer (from user space) to this
- * IOD endpoint.  There should be no other thread using this
- * endpoint when we do this, but lock for consistency.
- */
 static int
-nb_loan_fp(struct nbpcb *nbp, struct file *fp, cred_t *cr)
+smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap)
 {
-	TIUSER *tiptr;
+	struct nbpcb *nbp = vcp->vc_tdata;
+	TIUSER *tiptr = nbp->nbp_tiptr;
 	int err;
 
-	err = t_kopen(fp, 0, 0, &tiptr, cr);
+	/* Only default bind supported. */
+	if (sap != NULL)
+		return (ENOTSUP);
+
+	err = t_kbind(tiptr, NULL, NULL);
+
+	return (err);
+}
+
+static int
+smb_nbst_unbind(struct smb_vc *vcp)
+{
+	struct nbpcb *nbp = vcp->vc_tdata;
+	TIUSER *tiptr = nbp->nbp_tiptr;
+	int err;
+
+	err = t_kunbind(tiptr);
+
+	return (err);
+}
+
+static int
+smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap)
+{
+	struct t_call	call;
+	struct nbpcb	*nbp = vcp->vc_tdata;
+	TIUSER		*tiptr = nbp->nbp_tiptr;
+	int alen, err;
+
+	/* Need the address length */
+	switch (sap->sa_family) {
+	case AF_INET:
+		alen = sizeof (struct sockaddr_in);
+		break;
+	case AF_INET6:
+		alen = sizeof (struct sockaddr_in6);
+		break;
+	default:
+		return (EAFNOSUPPORT);
+	}
+
+	/* sockaddr goes in the "addr" netbuf */
+	bzero(&call, sizeof (call));
+	call.addr.buf = (char *)sap;
+	call.addr.len = alen;
+	call.addr.maxlen = alen;
+
+	err = t_kconnect(tiptr, &call, NULL);
 	if (err != 0)
 		return (err);
 
 	mutex_enter(&nbp->nbp_lock);
 
-	nbp->nbp_tiptr = tiptr;
-	nbp->nbp_fmode = tiptr->fp->f_flag;
 	nbp->nbp_flags |= NBF_CONNECTED;
 	nbp->nbp_state = NBST_SESSION;
 
@@ -568,84 +626,6 @@ nb_loan_fp(struct nbpcb *nbp, struct file *fp, cred_t *cr)
 	return (0);
 }
 
-/*
- * Take back the transport file pointer we previously loaned.
- * It's possible there may be another thread in here, so let
- * others get out of the way before we pull the rug out.
- *
- * Some notes about the locking here:  The higher-level IOD code
- * serializes activity such that at most one reader and writer
- * thread can be active in this code (and possibly both).
- * Keeping nbp_lock held during the activities of these two
- * threads would lead to the possibility of nbp_lock being
- * held by a blocked thread, so this instead sets one of the
- * flags (NBF_SENDLOCK | NBF_RECVLOCK) when a sender or a
- * receiver is active (respectively).  Lastly, tear-down is
- * the only tricky bit (here) where we must wait for any of
- * these activities to get out of current calls so they will
- * notice that we've turned off the NBF_CONNECTED flag.
- */
-static void
-nb_unloan_fp(struct nbpcb *nbp)
-{
-
-	mutex_enter(&nbp->nbp_lock);
-
-	nbp->nbp_flags &= ~NBF_CONNECTED;
-	while (nbp->nbp_flags & (NBF_SENDLOCK | NBF_RECVLOCK)) {
-		nbp->nbp_flags |= NBF_LOCKWAIT;
-		cv_wait(&nbp->nbp_cv, &nbp->nbp_lock);
-	}
-	if (nbp->nbp_frag != NULL) {
-		freemsg(nbp->nbp_frag);
-		nbp->nbp_frag = NULL;
-	}
-	if (nbp->nbp_tiptr != NULL) {
-		(void) t_kclose(nbp->nbp_tiptr, 0);
-		nbp->nbp_tiptr = NULL;
-	}
-	nbp->nbp_state = NBST_CLOSED;
-
-	mutex_exit(&nbp->nbp_lock);
-}
-
-static int
-smb_nbst_loan_fp(struct smb_vc *vcp, struct file *fp, cred_t *cr)
-{
-	struct nbpcb *nbp = vcp->vc_tdata;
-	int error = 0;
-
-	/*
-	 * Un-loan the existing one, if any.
-	 */
-	(void) nb_disconnect(nbp);
-	nb_unloan_fp(nbp);
-
-	/*
-	 * Loan the new one passed in.
-	 */
-	if (fp != NULL) {
-		error = nb_loan_fp(nbp, fp, cr);
-	}
-
-	return (error);
-}
-
-/*ARGSUSED*/
-static int
-smb_nbst_bind(struct smb_vc *vcp, struct sockaddr *sap)
-{
-	return (ENOTSUP);
-}
-
-/*ARGSUSED*/
-static int
-smb_nbst_connect(struct smb_vc *vcp, struct sockaddr *sap)
-{
-	return (ENOTSUP);
-}
-
-/*ARGSUSED*/
 static int
 smb_nbst_disconnect(struct smb_vc *vcp)
 {
@@ -832,42 +812,78 @@ smb_nbst_poll(struct smb_vc *vcp, int ticks)
 	return (ENOTSUP);
 }
 
+/*ARGSUSED*/
 static int
 smb_nbst_getparam(struct smb_vc *vcp, int param, void *data)
 {
-	struct nbpcb *nbp = vcp->vc_tdata;
-
-	switch (param) {
-	case SMBTP_SNDSZ:
-		*(int *)data = nbp->nbp_sndbuf;
-		break;
-	case SMBTP_RCVSZ:
-		*(int *)data = nbp->nbp_rcvbuf;
-		break;
-	case SMBTP_TIMEOUT:
-		*(struct timespec *)data = nbp->nbp_timo;
-		break;
-#ifdef SMBTP_SELECTID
-	case SMBTP_SELECTID:
-		*(void **)data = nbp->nbp_selectid;
-		break;
-#endif
-#ifdef SMBTP_UPCALL
-	case SMBTP_UPCALL:
-		*(void **)data = nbp->nbp_upcall;
-		break;
-#endif
-	default:
-		return (EINVAL);
-	}
-	return (0);
+	return (EINVAL);
 }
 
-/*ARGSUSED*/
 static int
 smb_nbst_setparam(struct smb_vc *vcp, int param, void *data)
 {
-	return (EINVAL);
+	struct t_optmgmt oreq, ores;
+	struct {
+		struct T_opthdr oh;
+		int ival;
+	} opts;
+	struct nbpcb *nbp = vcp->vc_tdata;
+	int level, name, err;
+
+	switch (param) {
+	case SMBTP_TCP_NODELAY:
+		level = IPPROTO_TCP;
+		name = TCP_NODELAY;
+		break;
+
+	case SMBTP_TCP_CON_TMO:	/* int mSec */
+		level = IPPROTO_TCP;
+		name = TCP_CONN_ABORT_THRESHOLD;
+		break;
+
+	case SMBTP_KEEPALIVE:	// SO_KEEPALIVE
+	case SMBTP_SNDBUF:	// SO_SNDBUF
+	case SMBTP_RCVBUF:	// SO_RCVBUF
+	case SMBTP_RCVTIMEO:	// SO_RCVTIMEO
+		level = SOL_SOCKET;
+		name = param;
+		break;
+
+	default:
+		return (EINVAL);
+	}
+
+	/* opt header */
+	opts.oh.len = sizeof (opts);
+	opts.oh.level = level;
+	opts.oh.name = name;
+	opts.oh.status = 0;
+	opts.ival = *(int *)data;
+
+	oreq.flags = T_NEGOTIATE;
+	oreq.opt.buf = (void *)&opts;
+	oreq.opt.len = sizeof (opts);
+	oreq.opt.maxlen = oreq.opt.len;
+
+	ores.flags = 0;
+	ores.opt.buf = NULL;
+	ores.opt.len = 0;
+	ores.opt.maxlen = 0;
+
+	err = t_koptmgmt(nbp->nbp_tiptr, &oreq, &ores);
+	if (err != 0) {
+		cmn_err(CE_NOTE, "t_opgmgnt, err = %d", err);
+		return (EPROTO);
+	}
+
+	if ((ores.flags & T_SUCCESS) == 0) {
+		cmn_err(CE_NOTE, "smb_nbst_setparam: "
+		    "flags 0x%x, status 0x%x",
+		    (int)ores.flags, (int)opts.oh.status);
+		return (EPROTO);
+	}
+
+	return (0);
 }
 
 /*
@@ -893,12 +909,12 @@ struct smb_tran_desc smb_tran_nbtcp_desc = {
 	smb_nbst_create,
 	smb_nbst_done,
 	smb_nbst_bind,
+	smb_nbst_unbind,
 	smb_nbst_connect,
 	smb_nbst_disconnect,
 	smb_nbst_send,
 	smb_nbst_recv,
 	smb_nbst_poll,
-	smb_nbst_loan_fp,
 	smb_nbst_getparam,
 	smb_nbst_setparam,
 	smb_nbst_fatal,

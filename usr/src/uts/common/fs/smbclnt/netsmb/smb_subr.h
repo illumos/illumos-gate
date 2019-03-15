@@ -33,8 +33,8 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _NETSMB_SMB_SUBR_H_
@@ -43,7 +43,15 @@
 #include <sys/cmn_err.h>
 #include <sys/lock.h>
 #include <sys/note.h>
+#include <netsmb/mchain.h>
 #include <netsmb/smb_conn.h>
+
+/*
+ * Possible lock commands
+ */
+#define	SMB_LOCK_EXCL		0
+#define	SMB_LOCK_SHARED		1
+#define	SMB_LOCK_RELEASE	2
 
 struct msgb;	/* avoiding sys/stream.h here */
 
@@ -117,86 +125,131 @@ extern int smb_timo_open;
 extern int smb_timo_read;
 extern int smb_timo_write;
 extern int smb_timo_append;
+extern dev_t nsmb_dev_tcp;
+extern dev_t nsmb_dev_tcp6;
 
-#define	EMOREDATA (0x7fff)
+/*
+ * Tunable timeout values.  See: smb2_smb.c
+ */
+extern int smb2_timo_notice;
+extern int smb2_timo_default;
+extern int smb2_timo_open;
+extern int smb2_timo_read;
+extern int smb2_timo_write;
+extern int smb2_timo_append;
 
 void smb_credinit(struct smb_cred *scred, cred_t *cr);
 void smb_credrele(struct smb_cred *scred);
 
-void smb_oldlm_hash(const char *apwd, uchar_t *hash);
-void smb_ntlmv1hash(const char *apwd, uchar_t *hash);
-void smb_ntlmv2hash(const uchar_t *v1hash, const char *user,
-	const char *destination, uchar_t *v2hash);
-
-int  smb_lmresponse(const uchar_t *hash, const uchar_t *C8, uchar_t *RN);
-int  smb_ntlmv2response(const uchar_t *hash, const uchar_t *C8,
-    const uchar_t *blob, size_t bloblen, uchar_t **RN, size_t *RNlen);
 int  smb_maperror(int eclass, int eno);
 int  smb_maperr32(uint32_t eno);
+uint_t smb_doserr2status(int, int);
+int smb_get_dstring(struct mdchain *mdc, struct smb_vc *vcp,
+	char *outbuf, size_t *outlen, int inlen);
 int  smb_put_dmem(struct mbchain *mbp, struct smb_vc *vcp,
     const char *src, int len, int caseopt, int *lenp);
 int  smb_put_dstring(struct mbchain *mbp, struct smb_vc *vcp,
     const char *src, int caseopt);
 int  smb_put_string(struct smb_rq *rqp, const char *src);
 int  smb_put_asunistring(struct smb_rq *rqp, const char *src);
-int  smb_checksmp(void);
+
+int smb_smb_ntcreate(struct smb_share *ssp, struct mbchain *name_mb,
+	uint32_t crflag, uint32_t req_acc, uint32_t efa, uint32_t sh_acc,
+	uint32_t disp, uint32_t createopt,  uint32_t impersonate,
+	struct smb_cred *scrp, smb_fh_t *fhp,
+	uint32_t *cr_act_p, struct smbfattr *fap);
+
+int smb_smb_close(struct smb_share *ssp, smb_fh_t *fhp,
+	struct smb_cred *scrp);
+
+int smb_rwuio(smb_fh_t *fhp, uio_rw_t rw,
+	uio_t *uiop, smb_cred_t *scred, int timo);
 
 int smb_cmp_sockaddr(struct sockaddr *, struct sockaddr *);
 struct sockaddr *smb_dup_sockaddr(struct sockaddr *sa);
 void smb_free_sockaddr(struct sockaddr *sa);
-int smb_toupper(const char *, char *, size_t);
 
+int smb_sign_init(struct smb_vc *);
 void smb_rq_sign(struct smb_rq *);
 int smb_rq_verify(struct smb_rq *);
 int smb_calcv2mackey(struct smb_vc *, const uchar_t *,
 	const uchar_t *, size_t);
 int smb_calcmackey(struct smb_vc *, const uchar_t *,
 	const uchar_t *, size_t);
-void smb_crypto_mech_init(void);
 
+int smb2_sign_init(struct smb_vc *);
+void smb2_rq_sign(struct smb_rq *);
+int smb2_rq_verify(struct smb_rq *);
 
 /*
  * SMB protocol level functions
  */
+int  smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred);
+int  smb_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred);
+int  smb_smb_logoff(struct smb_vc *vcp, struct smb_cred *scred);
 int  smb_smb_echo(smb_vc_t *vcp, smb_cred_t *scred, int timo);
 int  smb_smb_treeconnect(smb_share_t *ssp, smb_cred_t *scred);
 int  smb_smb_treedisconnect(smb_share_t *ssp, smb_cred_t *scred);
 
-int
-smb_smb_ntcreate(struct smb_share *ssp, struct mbchain *name_mb,
+int smb1_smb_ntcreate(struct smb_share *ssp, struct mbchain *name_mb,
 	uint32_t crflag, uint32_t req_acc, uint32_t efa, uint32_t sh_acc,
 	uint32_t disp, uint32_t createopt,  uint32_t impersonate,
 	struct smb_cred *scrp, uint16_t *fidp,
 	uint32_t *cr_act_p, struct smbfattr *fap);
 
-int  smb_smb_close(struct smb_share *ssp, uint16_t fid,
+int smb1_smb_close(struct smb_share *ssp, uint16_t fid,
 	struct timespec *mtime, struct smb_cred *scrp);
 
-int
-smb_smb_open_prjob(struct smb_share *ssp, char *title,
+int smb_smb_open_prjob(struct smb_share *ssp, char *title,
 	uint16_t setuplen, uint16_t mode,
 	struct smb_cred *scrp, uint16_t *fidp);
 
 int  smb_smb_close_prjob(struct smb_share *ssp, uint16_t fid,
 	struct smb_cred *scrp);
 
-int smb_rwuio(smb_share_t *ssp, uint16_t fid, uio_rw_t rw,
+int smb_smb_readx(smb_fh_t *fhp, uint32_t *lenp,
+	uio_t *uiop, smb_cred_t *scred, int timo);
+int smb_smb_writex(smb_fh_t *fhp, uint32_t *lenp,
+	uio_t *uiop, smb_cred_t *scred, int timo);
+
+/*
+ * SMB2 protocol level functions
+ */
+int  smb2_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred);
+int  smb2_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred);
+int  smb2_smb_logoff(struct smb_vc *vcp, struct smb_cred *scred);
+int  smb2_smb_echo(smb_vc_t *vcp, smb_cred_t *scred, int timo);
+int  smb2_smb_treeconnect(smb_share_t *ssp, smb_cred_t *scred);
+int  smb2_smb_treedisconnect(smb_share_t *ssp, smb_cred_t *scred);
+
+int
+smb2_smb_ntcreate(struct smb_share *ssp, struct mbchain *name_mb,
+	struct mbchain *cctx_in, struct mdchain *cctx_out,
+	uint32_t crflag, uint32_t req_acc, uint32_t efa, uint32_t sh_acc,
+	uint32_t disp, uint32_t createopt,  uint32_t impersonate,
+	struct smb_cred *scrp, smb2fid_t *fidp,
+	uint32_t *cr_act_p, struct smbfattr *fap);
+
+int  smb2_smb_close(struct smb_share *ssp, smb2fid_t *fid,
+	struct smb_cred *scrp);
+
+int smb2_smb_ioctl(struct smb_share *ssp, smb2fid_t *fid,
+	struct mbchain *data_in, struct mdchain *data_out,
+	uint32_t *data_out_sz,	/* max / returned */
+	uint32_t ctl_code, struct smb_cred *scrp);
+
+int smb2_smb_read(smb_fh_t *fhp, uint32_t *lenp,
+	uio_t *uiop, smb_cred_t *scred, int timo);
+int smb2_smb_write(smb_fh_t *fhp, uint32_t *lenp,
 	uio_t *uiop, smb_cred_t *scred, int timo);
 
 /*
  * time conversions
  */
 
-void smb_time_init(void);
-void smb_time_fini(void);
-
 void  smb_time_local2server(struct timespec *tsp, int tzoff, long *seconds);
 void  smb_time_server2local(ulong_t seconds, int tzoff, struct timespec *tsp);
 void  smb_time_NT2local(uint64_t nsec, struct timespec *tsp);
 void  smb_time_local2NT(struct timespec *tsp, uint64_t *nsec);
-void  smb_time_unix2dos(struct timespec *tsp, int tzoff, uint16_t *ddp,
-	uint16_t *dtp, uint8_t *dhp);
-void smb_dos2unixtime(uint_t dd, uint_t dt, uint_t dh, int tzoff,
-	struct timespec *tsp);
 
 #endif /* !_NETSMB_SMB_SUBR_H_ */

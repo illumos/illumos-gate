@@ -10,8 +10,10 @@
 .\"
 .\"
 .\" Copyright 2018 Joyent, Inc.
+.\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd September 15, 2018
+.Dd February 22, 2019
 .Dt LIBPROC 3LIB
 .Os
 .Sh NAME
@@ -306,19 +308,19 @@ library.
 .It Sy Perror_printf Ta Sy proc_arg_grab
 .It Sy proc_arg_psinfo Ta Sy proc_arg_xgrab
 .It Sy proc_arg_xpsinfo Ta Sy proc_content2str
-.It Sy proc_finistdio Ta Sy proc_fltname
-.It Sy proc_fltset2str Ta Sy proc_flushstdio
-.It Sy proc_get_auxv Ta Sy proc_get_cred
-.It Sy proc_get_priv Ta Sy proc_get_psinfo
-.It Sy proc_get_status Ta Sy proc_initstdio
-.It Sy proc_lwp_in_set Ta Sy proc_lwp_range_valid
-.It Sy proc_signame Ta Sy proc_sigset2str
-.It Sy proc_str2content Ta Sy proc_str2flt
-.It Sy proc_str2fltset Ta Sy proc_str2sig
-.It Sy proc_str2sigset Ta Sy proc_str2sys
-.It Sy proc_str2sysset Ta Sy proc_sysname
-.It Sy proc_sysset2str Ta Sy proc_unctrl_psinfo
-.It Sy proc_walk Ta ""
+.It Sy proc_dmodelname Ta Sy proc_finistdio
+.It Sy proc_fltname Ta Sy proc_fltset2str
+.It Sy proc_flushstdio Ta Sy proc_proc_get_auxv
+.It Sy proc_get_cred Ta Sy proc_get_priv
+.It Sy proc_get_psinfo Ta Sy proc_get_status
+.It Sy proc_get_initstdio Ta Sy proc_lwp_in_set
+.It Sy proc_lwp_range_valid Ta Sy proc_signame
+.It Sy proc_sigset2str Ta Sy proc_str2content
+.It Sy proc_str2flt Ta Sy proc_str2fltset
+.It Sy proc_str2sig Ta Sy proc_str2sigset
+.It Sy proc_str2sys Ta Sy proc_str2sysset
+.It Sy proc_sysname Ta Sy proc_sysset2str
+.It Sy proc_unctrl_psinfo Ta ""
 .El
 .Ss x86 Specific Routines
 The following routines are specific to the x86, 32-bit and 64-bit,
@@ -1218,6 +1220,7 @@ changes may occur which break both source and binary compatibility.
 .Xr proc_arg_xgrab 3PROC ,
 .Xr proc_arg_xpsinfo 3PROC ,
 .Xr proc_content2str 3PROC ,
+.Xr proc_dmodelname 3PROC ,
 .Xr proc_finistdio 3PROC ,
 .Xr proc_fltname 3PROC ,
 .Xr proc_fltset2str 3PROC ,

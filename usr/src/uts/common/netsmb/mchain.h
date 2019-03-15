@@ -35,6 +35,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MCHAIN_H_
@@ -70,10 +72,10 @@
 #else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
 
 /* little-endian values on big-endian (swap) */
-#define	letohs(x) 	BSWAP_16(x)
-#define	htoles(x) 	BSWAP_16(x)
-#define	letohl(x) 	BSWAP_32(x)
-#define	htolel(x) 	BSWAP_32(x)
+#define	letohs(x)	BSWAP_16(x)
+#define	htoles(x)	BSWAP_16(x)
+#define	letohl(x)	BSWAP_32(x)
+#define	htolel(x)	BSWAP_32(x)
 #define	letohq(x)	BSWAP_64(x)
 #define	htoleq(x)	BSWAP_64(x)
 
@@ -93,7 +95,7 @@
  * wrappers for streams functions.  See: subr_mchain.c
  */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 /*
  * BSD-style mbuf "shim" for kernel code.  Note, this
@@ -103,6 +105,7 @@
  */
 
 #include <sys/stream.h> /* mblk_t */
+#include <sys/strsun.h> /* MBLKL */
 typedef mblk_t mbuf_t;
 
 /* BEGIN CSTYLED */
@@ -112,9 +115,9 @@ typedef mblk_t mbuf_t;
  *   m_data ... (m_data + m_len)
  * In Unix STREAMS, the mblk payload is:
  *   b_rptr ... b_wptr
- * 
+ *
  * Here are some handy conversion notes:
- * 
+ *
  * struct mbuf                     struct mblk
  *   m->m_next                       m->b_cont
  *   m->m_nextpkt                    m->b_next
@@ -124,7 +127,7 @@ typedef mblk_t mbuf_t;
  *   &m->m_dat[MLEN]                 m->b_datap->db_lim
  *   M_TRAILINGSPACE(m)              MBLKTAIL(m)
  *   m_freem(m)                      freemsg(m)
- * 
+ *
  * Note that mbufs chains also have a special "packet" header,
  * which has the length of the whole message.  In STREAMS one
  * typically just calls msgdsize(m) to get that.
@@ -177,7 +180,7 @@ void m_freem(mbuf_t *);
 #define	MB_MZERO	3		/* bzero(), mb_put_mem only */
 #define	MB_MCUSTOM	4		/* use an user defined function */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 struct mbchain {
 	mblk_t *mb_top;
@@ -224,6 +227,7 @@ void mb_initm(mbchain_t *, mbuf_t *);
 void mb_done(mbchain_t *);
 void *mb_reserve(mbchain_t *, int size);
 
+int  mb_put_align8(mbchain_t *mbp);
 int  mb_put_padbyte(mbchain_t *mbp);
 int  mb_put_uint8(mbchain_t *, uint8_t);
 int  mb_put_uint16be(mbchain_t *, uint16_t);
@@ -234,6 +238,7 @@ int  mb_put_uint64be(mbchain_t *, uint64_t);
 int  mb_put_uint64le(mbchain_t *, uint64_t);
 int  mb_put_mem(mbchain_t *, const void *, int, int);
 int  mb_put_mbuf(mbchain_t *, mbuf_t *);
+int  mb_put_mbchain(mbchain_t *, mbchain_t *);
 
 int  md_init(mdchain_t *mdp);
 void md_initm(mdchain_t *mbp, mbuf_t *m);
@@ -248,5 +253,7 @@ int  md_get_uint64be(mdchain_t *, uint64_t *);
 int  md_get_uint64le(mdchain_t *, uint64_t *);
 int  md_get_mem(mdchain_t *, void *, int, int);
 int  md_get_mbuf(mdchain_t *, int, mbuf_t **);
+int  md_seek(mdchain_t *, uint32_t);
+uint32_t md_tell(mdchain_t *);
 
 #endif	/* !_MCHAIN_H_ */

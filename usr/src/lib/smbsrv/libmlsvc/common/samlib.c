@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -37,7 +37,7 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/ntaccess.h>
+#include <smb/ntaccess.h>
 #include <lsalib.h>
 #include <samlib.h>
 
@@ -47,8 +47,8 @@
 #define	letohl(x)	((uint32_t)(x))
 #else	/* (BYTE_ORDER == LITTLE_ENDIAN) */
 /* little-endian values on big-endian (swap) */
-#define	letohl(x) 	BSWAP_32(x)
-#define	htolel(x) 	BSWAP_32(x)
+#define	letohl(x)	BSWAP_32(x)
+#define	htolel(x)	BSWAP_32(x)
 #endif	/* (BYTE_ORDER == LITTLE_ENDIAN) */
 
 /*

@@ -34,7 +34,7 @@
 
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -148,10 +148,6 @@ dump_ctx_flags(int flags)
 		printf("AUTHREQ ");
 	if (flags & SMBCF_KCSAVE)
 		printf("KCSAVE  ");
-	if (flags & SMBCF_XXX)
-		printf("XXX ");
-	if (flags & SMBCF_SSNACTIVE)
-		printf("SSNACTIVE ");
 	if (flags & SMBCF_KCDOMAIN)
 		printf("KCDOMAIN ");
 	printf("\n");
@@ -169,6 +165,8 @@ dump_iod_ssn(smb_iod_ssn_t *is)
 	    ssn->ssn_domain, ssn->ssn_user);
 	printf(" ct_vopt=0x%x, ct_owner=%d\n",
 	    ssn->ssn_vopt, ssn->ssn_owner);
+	printf(" ct_minver=0x%x, ct_maxver=0x%x\n",
+	    ssn->ssn_minver, ssn->ssn_maxver);
 	printf(" ct_authflags=0x%x\n", is->iod_authflags);
 
 	printf(" ct_nthash:");
@@ -254,16 +252,16 @@ smb_ctx_init(struct smb_ctx *ctx)
 
 	ctx->ct_dev_fd = -1;
 	ctx->ct_door_fd = -1;
-	ctx->ct_tran_fd = -1;
 	ctx->ct_parsedlevel = SMBL_NONE;
 	ctx->ct_minlevel = SMBL_NONE;
 	ctx->ct_maxlevel = SMBL_PATH;
 
 	/* Fill in defaults */
-	ctx->ct_vopt = SMBVOPT_EXT_SEC;
+	ctx->ct_vopt = SMBVOPT_SIGNING_ENABLED;
 	ctx->ct_owner = SMBM_ANY_OWNER;
 	ctx->ct_authflags = SMB_AT_DEFAULT;
 	ctx->ct_minauth = SMB_AT_MINAUTH;
+	ctx->ct_maxver = SMB2_DIALECT_MAX;
 
 	/*
 	 * Default domain, user, ...
@@ -333,7 +331,12 @@ smb_ctx_scan_argv(struct smb_ctx *ctx, int argc, char **argv,
 	cf_opt_lock();
 	/* Careful: no return/goto before cf_opt_unlock! */
 	while (error == 0) {
-		opt = cf_getopt(argc, argv, STDPARAM_OPT);
+		/*
+		 * Leading ':' tells this to skip unknown opts.
+		 * Just get -A and -U here so we know the user
+		 * for config file parsing.
+		 */
+		opt = cf_getopt(argc, argv, ":AU:");
 		if (opt == -1)
 			break;
 		arg = cf_optarg;
@@ -398,16 +401,12 @@ smb_ctx_done(struct smb_ctx *ctx)
 	rpc_cleanup_smbctx(ctx);
 
 	if (ctx->ct_dev_fd != -1) {
-		close(ctx->ct_dev_fd);
+		nsmb_close(ctx->ct_dev_fd);
 		ctx->ct_dev_fd = -1;
 	}
 	if (ctx->ct_door_fd != -1) {
 		close(ctx->ct_door_fd);
 		ctx->ct_door_fd = -1;
-	}
-	if (ctx->ct_tran_fd != -1) {
-		close(ctx->ct_tran_fd);
-		ctx->ct_tran_fd = -1;
 	}
 	if (ctx->ct_srvaddr_s) {
 		free(ctx->ct_srvaddr_s);
@@ -441,17 +440,9 @@ smb_ctx_done(struct smb_ctx *ctx)
 		free(ctx->ct_rpath);
 		ctx->ct_rpath = NULL;
 	}
-	if (ctx->ct_srv_OS) {
-		free(ctx->ct_srv_OS);
-		ctx->ct_srv_OS = NULL;
-	}
-	if (ctx->ct_srv_LM) {
-		free(ctx->ct_srv_LM);
-		ctx->ct_srv_LM = NULL;
-	}
-	if (ctx->ct_mackey) {
-		free(ctx->ct_mackey);
-		ctx->ct_mackey = NULL;
+	if (ctx->ct_ssnkey_buf) {
+		free(ctx->ct_ssnkey_buf);
+		ctx->ct_ssnkey_buf = NULL;
 	}
 }
 
@@ -868,6 +859,37 @@ smb_ctx_setsigning(struct smb_ctx *ctx, int enable, int require)
 	return (0);
 }
 
+/*
+ * Handle .nsmbrc "minver" option.
+ * Must be <= maxver
+ */
+int
+smb_ctx_setminver(struct smb_ctx *ctx, int ver)
+{
+	if (ver < 0 || ver > ctx->ct_maxver)
+		return (EINVAL);
+	ctx->ct_minver = (uint16_t)ver;
+	return (0);
+}
+
+/*
+ * Handle .nsmbrc "maxver" option.
+ * Must be >= minver
+ *
+ * Any "too high" value is just clamped, so the caller
+ * doesn't need to know what's the highest we support.
+ */
+int
+smb_ctx_setmaxver(struct smb_ctx *ctx, int ver)
+{
+	if (ver < 1 || ver < ctx->ct_minver)
+		return (EINVAL);
+	if (ver > SMB2_DIALECT_MAX)
+		ver = SMB2_DIALECT_MAX;
+	ctx->ct_maxver = (uint16_t)ver;
+	return (0);
+}
+
 static int
 smb_parse_owner(char *pair, uid_t *uid, gid_t *gid)
 {
@@ -899,12 +921,11 @@ smb_parse_owner(char *pair, uid_t *uid, gid_t *gid)
 }
 
 /*
- * Suport a securty options arg, i.e. -S noext,lm,ntlm
+ * Suport a securty options arg, i.e. -S lm,ntlm
  * for testing various type of authenticators.
  */
 static struct nv
 sectype_table[] = {
-	/* noext - handled below */
 	{ "anon",	SMB_AT_ANON },
 	{ "lm",		SMB_AT_LM1 },
 	{ "ntlm",	SMB_AT_NTLM1 },
@@ -929,13 +950,6 @@ smb_parse_secopts(struct smb_ctx *ctx, const char *arg)
 		nlen = strcspn(p, sep);
 		if (nlen == 0)
 			break;
-
-		if (nlen == 5 && 0 == strncmp(p, "noext", nlen)) {
-			/* Don't offer extended security. */
-			ctx->ct_vopt &= ~SMBVOPT_EXT_SEC;
-			p += nlen;
-			continue;
-		}
 
 		/* This is rarely called, so not optimized. */
 		for (nv = sectype_table; nv->name; nv++) {
@@ -1117,6 +1131,19 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 	assert(ctx->ct_addrinfo != NULL);
 
 	/*
+	 * Empty user name means an explicit request for
+	 * NULL session setup, which is a special case.
+	 * (No SMB signing, per [MS-SMB] 3.3.5.3)
+	 */
+	if (ctx->ct_user[0] == '\0') {
+		/* Null user should have null domain too. */
+		ctx->ct_domain[0] = '\0';
+		ctx->ct_authflags = SMB_AT_ANON;
+		ctx->ct_vopt |= SMBVOPT_ANONYMOUS;
+		ctx->ct_vopt &= ~SMBVOPT_SIGNING_REQUIRED;
+	}
+
+	/*
 	 * If we have a user name but no password,
 	 * check for a keychain entry.
 	 * XXX: Only for auth NTLM?
@@ -1127,13 +1154,18 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 		 * If we don't have a p/w yet,
 		 * try the keychain.
 		 */
-		if (ctx->ct_password[0] == '\0')
-			(void) smb_get_keychain(ctx);
+		if (ctx->ct_password[0] == '\0' &&
+		    smb_get_keychain(ctx) == 0) {
+			strlcpy(ctx->ct_password, "$HASH",
+			    sizeof (ctx->ct_password));
+		}
+
 		/*
 		 * Mask out disallowed auth types.
 		 */
 		ctx->ct_authflags &= ctx->ct_minauth;
 	}
+
 	if (ctx->ct_authflags == 0) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "no valid auth. types"), 0);
@@ -1147,6 +1179,10 @@ smb_ctx_resolve(struct smb_ctx *ctx)
 	return (0);
 }
 
+/*
+ * Note: The next three have NODIRECT binding so the
+ * "fksmbcl" development tool can provide its own.
+ */
 int
 smb_open_driver()
 {
@@ -1164,6 +1200,19 @@ smb_open_driver()
 }
 
 int
+nsmb_close(int fd)
+{
+	return (close(fd));
+}
+
+int
+nsmb_ioctl(int fd, int cmd, void *arg)
+{
+	return (ioctl(fd, cmd, arg));
+}
+
+
+int
 smb_ctx_gethandle(struct smb_ctx *ctx)
 {
 	int fd, err;
@@ -1171,9 +1220,8 @@ smb_ctx_gethandle(struct smb_ctx *ctx)
 
 	if (ctx->ct_dev_fd != -1) {
 		rpc_cleanup_smbctx(ctx);
-		close(ctx->ct_dev_fd);
+		nsmb_close(ctx->ct_dev_fd);
 		ctx->ct_dev_fd = -1;
-		ctx->ct_flags &= ~SMBCF_SSNACTIVE;
 	}
 
 	fd = smb_open_driver();
@@ -1187,12 +1235,12 @@ smb_ctx_gethandle(struct smb_ctx *ctx)
 	/*
 	 * Check the driver version (paranoia)
 	 */
-	if (ioctl(fd, SMBIOC_GETVERS, &version) < 0)
+	if (nsmb_ioctl(fd, SMBIOC_GETVERS, &version) < 0)
 		version = 0;
 	if (version != NSMB_VERSION) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "incorrect driver version"), 0);
-		close(fd);
+		nsmb_close(fd);
 		return (ENODEV);
 	}
 
@@ -1220,6 +1268,15 @@ smb_ctx_get_ssn(struct smb_ctx *ctx)
 	if (err == 0) {
 		DPRINT("found an existing VC");
 	} else {
+		/*
+		 * If we're authenticating (real user, not NULL session)
+		 * and we don't yet have a password, return EAUTH and
+		 * the caller will prompt for it and call again.
+		 */
+		if (ctx->ct_user[0] != '\0' &&
+		    ctx->ct_password[0] == '\0')
+			return (EAUTH);
+
 		/*
 		 * This calls the IOD to create a new session.
 		 */
@@ -1272,7 +1329,7 @@ smb_ctx_get_tree(struct smb_ctx *ctx)
 	 *
 	 * The driver does the actual TCON call.
 	 */
-	if (ioctl(ctx->ct_dev_fd, cmd, tcon) == -1) {
+	if (nsmb_ioctl(ctx->ct_dev_fd, cmd, tcon) == -1) {
 		err = errno;
 		goto out;
 	}
@@ -1303,7 +1360,7 @@ smb_ctx_flags2(struct smb_ctx *ctx)
 {
 	uint16_t flags2;
 
-	if (ioctl(ctx->ct_dev_fd, SMBIOC_FLAGS2, &flags2) == -1) {
+	if (nsmb_ioctl(ctx->ct_dev_fd, SMBIOC_FLAGS2, &flags2) == -1) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "can't get flags2 for a session"), errno);
 		return (-1);
@@ -1321,7 +1378,7 @@ smb_fh_getssnkey(int dev_fd, uchar_t *key, size_t len)
 	if (len < SMBIOC_HASH_SZ)
 		return (EINVAL);
 
-	if (ioctl(dev_fd, SMBIOC_GETSSNKEY, key) == -1)
+	if (nsmb_ioctl(dev_fd, SMBIOC_GETSSNKEY, key) == -1)
 		return (errno);
 
 	return (0);
@@ -1343,6 +1400,35 @@ minauth_table[] = {
 	{ NULL }
 };
 
+int
+smb_cf_minauth_from_str(char *str)
+{
+	struct nv *nvp;
+
+	for (nvp = minauth_table; nvp->name; nvp++)
+		if (strcmp(nvp->name, str) == 0)
+			return (nvp->value);
+	return (-1);
+}
+
+
+static struct nv
+smbver_table[] = {
+	{ "2.1",	SMB2_DIALECT_0210 },
+	{ "1",		1 },
+	{ NULL,		0 }
+};
+
+int
+smb_cf_version_from_str(char *str)
+{
+	struct nv *nvp;
+
+	for (nvp = smbver_table; nvp->name; nvp++)
+		if (strcmp(nvp->name, str) == 0)
+			return (nvp->value);
+	return (-1);
+}
 
 /*
  * level values:
@@ -1355,7 +1441,9 @@ static int
 smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 {
 	char *p;
+	int ival;
 	int error;
+	int minver, maxver;
 
 #ifdef	KICONV_SUPPORT
 	if (level > 0) {
@@ -1373,19 +1461,79 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 	if (level <= 1) {
 		/* Section is: [default] or [server] */
 
+		/*
+		 * Handle min_protocol, max_protocol
+		 * (SMB protocol versions)
+		 */
+		minver = -1;
+		rc_getstringptr(smb_rc, sname, "min_protocol", &p);
+		if (p != NULL) {
+			minver = smb_cf_version_from_str(p);
+			if (minver == -1) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid min_protocol value \"%s\" specified in the section %s"),
+				    0, p, sname);
+			}
+		}
+		maxver = -1;
+		rc_getstringptr(smb_rc, sname, "max_protocol", &p);
+		if (p != NULL) {
+			maxver = smb_cf_version_from_str(p);
+			if (maxver == -1) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid max_protocol value \"%s\" specified in the section %s"),
+				    0, p, sname);
+			}
+		}
+
+		/*
+		 * If setting both min/max protocol,
+		 * validate against each other
+		 */
+		if (minver != -1 && maxver != -1) {
+			if (minver > maxver) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid min/max protocol combination in the section %s"),
+				    0, sname);
+			} else {
+				ctx->ct_minver = minver;
+				ctx->ct_maxver = maxver;
+			}
+		}
+
+		/*
+		 * Setting just min or max, validate against
+		 * current settings
+		 */
+		if (minver != -1) {
+			if (minver > ctx->ct_maxver) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid min/max protocol combination in the section %s"),
+				    0, sname);
+			} else {
+				ctx->ct_minver = minver;
+			}
+		}
+		if (maxver != -1) {
+			if (maxver < ctx->ct_minver) {
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid min/max protocol combination in the section %s"),
+				    0, sname);
+			} else {
+				ctx->ct_maxver = maxver;
+			}
+		}
+
 		rc_getstringptr(smb_rc, sname, "minauth", &p);
 		if (p) {
 			/*
 			 * "minauth" was set in this section; override
 			 * the current minimum authentication setting.
 			 */
-			struct nv *nvp;
-			for (nvp = minauth_table; nvp->name; nvp++)
-				if (strcmp(p, nvp->name) == 0)
-					break;
-			if (nvp->name)
-				ctx->ct_minauth = nvp->value;
-			else {
+			ival = smb_cf_minauth_from_str(p);
+			if (ival != -1) {
+				ctx->ct_minauth = ival;
+			} else {
 				/*
 				 * Unknown minimum authentication level.
 				 */

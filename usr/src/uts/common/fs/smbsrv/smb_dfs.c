@@ -22,13 +22,13 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_dfs.h>
 #include <smbsrv/smb_door.h>
-#include <smbsrv/winioctl.h>
+#include <smb/winioctl.h>
 
 /*
  * Get Referral response header flags

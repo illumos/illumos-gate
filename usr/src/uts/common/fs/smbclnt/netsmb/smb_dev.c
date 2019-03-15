@@ -31,9 +31,10 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -61,17 +62,26 @@
 #include <sys/modctl.h>
 #include <sys/devops.h>
 #include <sys/thread.h>
-#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/zone.h>
 
 #include <netsmb/smb_osdep.h>
 #include <netsmb/mchain.h>		/* for "htoles()" */
 
 #include <netsmb/smb.h>
+#include <netsmb/smb2.h>
 #include <netsmb/smb_conn.h>
 #include <netsmb/smb_subr.h>
 #include <netsmb/smb_dev.h>
 #include <netsmb/smb_pass.h>
+
+#ifndef	_KERNEL
+#include <libfknsmb.h>
+
+#define	_init(v)	nsmb_drv_init(v)
+#define	_fini(v)	nsmb_drv_fini(v)
+
+#endif	/* _KERNEL */
 
 #define	NSMB_MIN_MINOR	1
 #define	NSMB_MAX_MINOR	L_MAXMIN32
@@ -79,16 +89,14 @@
 /* for version checks */
 const uint32_t nsmb_version = NSMB_VERSION;
 
+/* for smb_nbst_create() */
+dev_t nsmb_dev_tcp = NODEV;
+dev_t nsmb_dev_tcp6 = NODEV;
+
 static void *statep;
 static major_t nsmb_major;
 static minor_t last_minor = NSMB_MIN_MINOR;
-static dev_info_t *nsmb_dip;
 static kmutex_t  dev_lck;
-
-/* Zone support */
-zone_key_t nsmb_zone_key;
-extern void nsmb_zone_shutdown(zoneid_t zoneid, void *data);
-extern void nsmb_zone_destroy(zoneid_t zoneid, void *data);
 
 /*
  * cb_ops device operations.
@@ -98,6 +106,15 @@ static int nsmb_close(dev_t dev, int flag, int otyp, cred_t *credp);
 static int nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				cred_t *credp, int *rvalp);
 static int nsmb_close2(smb_dev_t *sdp, cred_t *cr);
+
+#ifdef	_KERNEL
+
+static dev_info_t *nsmb_dip;
+
+/* Zone support */
+zone_key_t nsmb_zone_key;
+extern void nsmb_zone_shutdown(zoneid_t zoneid, void *data);
+extern void nsmb_zone_destroy(zoneid_t zoneid, void *data);
 
 /* smbfs cb_ops */
 static struct cb_ops nsmb_cbops = {
@@ -160,10 +177,14 @@ static struct modlinkage nsmb_modlinkage = {
 	NULL
 };
 
+#endif	/* _KERNEL */
+
 int
 _init(void)
 {
+#ifdef	_KERNEL
 	int error;
+#endif	/* _KERNEL */
 
 	(void) ddi_soft_state_init(&statep, sizeof (smb_dev_t), 1);
 
@@ -176,12 +197,7 @@ _init(void)
 	/* Initialize password Key chain DB. */
 	smb_pkey_init();
 
-	/* Time conversion stuff. */
-	smb_time_init();
-
-	/* Initialize crypto mechanisms. */
-	smb_crypto_mech_init();
-
+#ifdef	_KERNEL
 	zone_key_create(&nsmb_zone_key, NULL, nsmb_zone_shutdown,
 	    nsmb_zone_destroy);
 
@@ -200,6 +216,14 @@ _init(void)
 
 		return (error);
 	}
+#else	/* _KERNEL */
+	streams_msg_init();
+	/* No attach, so need to set major. */
+	nsmb_major = 1;
+	/* And these, for smb_nbst_create() */
+	nsmb_dev_tcp = AF_INET;
+	nsmb_dev_tcp6 = AF_INET6;
+#endif	/* _KERNEL */
 
 	return (0);
 }
@@ -218,6 +242,7 @@ _fini(void)
 	if ((status = smb_pkey_idle()) != 0)
 		return (status);
 
+#ifdef	_KERNEL
 	/*
 	 * Remove the module.  Do this before destroying things,
 	 * to prevent new entrances while we're destorying.
@@ -227,9 +252,7 @@ _fini(void)
 	}
 
 	(void) zone_key_delete(nsmb_zone_key);
-
-	/* Time conversion stuff. */
-	smb_time_fini();
+#endif	/* _KERNEL */
 
 	/* Destroy password Key chain DB. */
 	smb_pkey_fini();
@@ -241,6 +264,8 @@ _fini(void)
 
 	return (status);
 }
+
+#ifdef	_KERNEL
 
 int
 _info(struct modinfo *modinfop)
@@ -270,6 +295,7 @@ nsmb_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 static int
 nsmb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
+	major_t tmaj;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -294,6 +320,20 @@ nsmb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	nsmb_major = ddi_name_to_major(NSMB_NAME);
 
+	/*
+	 * We also need major numbers for t_kopen
+	 */
+	tmaj = ddi_name_to_major("tcp");
+	if (tmaj == DDI_MAJOR_T_NONE)
+		cmn_err(CE_NOTE, "no tcp major?");
+	else
+		nsmb_dev_tcp = makedevice(tmaj, 0);
+	tmaj = ddi_name_to_major("tcp6");
+	if (tmaj == DDI_MAJOR_T_NONE)
+		cmn_err(CE_NOTE, "no tcp6 major?");
+	else
+		nsmb_dev_tcp6 = makedevice(tmaj, 0);
+
 	nsmb_dip = dip;
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
@@ -315,6 +355,65 @@ nsmb_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+#else	/* _KERNEL */
+
+/*
+ * Wrappers for libfknsmb: ioctl, open, close, load
+ */
+
+/*ARGSUSED*/
+int
+nsmb_drv_ioctl(dev32_t dev32, int cmd, intptr_t arg, int flags)
+{
+	dev_t dev = expldev(dev32);
+	cred_t *cr = CRED();
+	int err;
+
+	err = nsmb_ioctl(dev, cmd, arg, flags, cr, NULL);
+	return (err);
+}
+
+/*ARGSUSED*/
+int
+nsmb_drv_open(dev32_t *dev32p, int flags, int otyp)
+{
+	dev_t dev = expldev(*dev32p);
+	int err;
+
+	err = nsmb_open(&dev, flags, otyp, CRED());
+	if (err == 0) {
+		/*
+		 * We have NSMB_MAX_MINOR == L_MAXMIN32
+		 * therefore cmpldev never fails.
+		 */
+		VERIFY(cmpldev(dev32p, dev) != 0);
+	}
+	return (err);
+}
+
+/*ARGSUSED*/
+int
+nsmb_drv_close(dev32_t dev32, int flags, int otyp)
+{
+	dev_t dev = expldev(dev32);
+	int err;
+
+	err = nsmb_close(dev, flags, otyp, CRED());
+	return (err);
+}
+
+/*
+ * This function intentionally does nothing.  It's used only to
+ * force libfknsmb to load at program start so one can set
+ * breakpoints etc. without debugger "force load" tricks.
+ */
+void
+nsmb_drv_load(void)
+{
+}
+
+#endif	/* _KERNEL */
+
 /*ARGSUSED*/
 static int
 nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
@@ -325,7 +424,7 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 
 	sdp = ddi_get_soft_state(statep, getminor(dev));
 	if (sdp == NULL) {
-		return (DDI_FAILURE);
+		return (EBADF);
 	}
 	if ((sdp->sd_flags & NSMBFL_OPEN) == 0) {
 		return (EBADF);
@@ -346,107 +445,7 @@ nsmb_ioctl(dev_t dev, int cmd, intptr_t arg, int flags,	/* model.h */
 	 * check the zone status here on every ioctl call.
 	 */
 
-	/*
-	 * Serialize ioctl calls.  The smb_usr_... functions
-	 * don't expect concurrent calls on a given sdp.
-	 */
-	mutex_enter(&sdp->sd_lock);
-	if ((sdp->sd_flags & NSMBFL_IOCTL) != 0) {
-		mutex_exit(&sdp->sd_lock);
-		return (EBUSY);
-	}
-	sdp->sd_flags |= NSMBFL_IOCTL;
-	mutex_exit(&sdp->sd_lock);
-
-	err = 0;
-	switch (cmd) {
-	case SMBIOC_GETVERS:
-		(void) ddi_copyout(&nsmb_version, (void *)arg,
-		    sizeof (nsmb_version), flags);
-		break;
-
-	case SMBIOC_FLAGS2:
-		err = smb_usr_get_flags2(sdp, arg, flags);
-		break;
-
-	case SMBIOC_GETSSNKEY:
-		err = smb_usr_get_ssnkey(sdp, arg, flags);
-		break;
-
-	case SMBIOC_DUP_DEV:
-		err = smb_usr_dup_dev(sdp, arg, flags);
-		break;
-
-	case SMBIOC_REQUEST:
-		err = smb_usr_simplerq(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_T2RQ:
-		err = smb_usr_t2request(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_READ:
-	case SMBIOC_WRITE:
-		err = smb_usr_rw(sdp, cmd, arg, flags, cr);
-		break;
-
-	case SMBIOC_NTCREATE:
-		err = smb_usr_ntcreate(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_PRINTJOB:
-		err = smb_usr_printjob(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_CLOSEFH:
-		err = smb_usr_closefh(sdp, cr);
-		break;
-
-	case SMBIOC_SSN_CREATE:
-	case SMBIOC_SSN_FIND:
-		err = smb_usr_get_ssn(sdp, cmd, arg, flags, cr);
-		break;
-
-	case SMBIOC_SSN_KILL:
-	case SMBIOC_SSN_RELE:
-		err = smb_usr_drop_ssn(sdp, cmd);
-		break;
-
-	case SMBIOC_TREE_CONNECT:
-	case SMBIOC_TREE_FIND:
-		err = smb_usr_get_tree(sdp, cmd, arg, flags, cr);
-		break;
-
-	case SMBIOC_TREE_KILL:
-	case SMBIOC_TREE_RELE:
-		err = smb_usr_drop_tree(sdp, cmd);
-		break;
-
-	case SMBIOC_IOD_WORK:
-		err = smb_usr_iod_work(sdp, arg, flags, cr);
-		break;
-
-	case SMBIOC_IOD_IDLE:
-	case SMBIOC_IOD_RCFAIL:
-		err = smb_usr_iod_ioctl(sdp, cmd, arg, flags);
-		break;
-
-	case SMBIOC_PK_ADD:
-	case SMBIOC_PK_DEL:
-	case SMBIOC_PK_CHK:
-	case SMBIOC_PK_DEL_OWNER:
-	case SMBIOC_PK_DEL_EVERYONE:
-		err = smb_pkey_ioctl(cmd, arg, flags, cr);
-		break;
-
-	default:
-		err = ENOTTY;
-		break;
-	}
-
-	mutex_enter(&sdp->sd_lock);
-	sdp->sd_flags &= ~NSMBFL_IOCTL;
-	mutex_exit(&sdp->sd_lock);
+	err = smb_usr_ioctl(sdp, cmd, arg, flags, cr);
 
 	return (err);
 }
@@ -491,7 +490,6 @@ found:
 	*dev = makedevice(nsmb_major, m);
 	mutex_exit(&dev_lck);
 
-	sdp->sd_smbfid = -1;
 	sdp->sd_flags |= NSMBFL_OPEN;
 	sdp->zoneid = crgetzoneid(cr);
 	mutex_init(&sdp->sd_lock, NULL, MUTEX_DRIVER, NULL);
@@ -529,14 +527,17 @@ nsmb_close(dev_t dev, int flags, int otyp, cred_t *cr)
 	return (err);
 }
 
+/*ARGSUSED*/
 static int
 nsmb_close2(smb_dev_t *sdp, cred_t *cr)
 {
 	struct smb_vc *vcp;
 	struct smb_share *ssp;
+	struct smb_fh *fhp;
 
-	if (sdp->sd_smbfid != -1)
-		(void) smb_usr_closefh(sdp, cr);
+	fhp = sdp->sd_fh;
+	if (fhp != NULL)
+		smb_fh_rele(fhp);
 
 	ssp = sdp->sd_share;
 	if (ssp != NULL)
@@ -566,8 +567,10 @@ nsmb_close2(smb_dev_t *sdp, cred_t *cr)
 int
 smb_usr_dup_dev(smb_dev_t *sdp, intptr_t arg, int flags)
 {
+#ifdef	_KERNEL
 	file_t *fp = NULL;
 	vnode_t *vp;
+#endif	/* _KERNEL */
 	smb_dev_t *from_sdp;
 	dev_t dev;
 	int32_t ufd;
@@ -582,16 +585,24 @@ smb_usr_dup_dev(smb_dev_t *sdp, intptr_t arg, int flags)
 	 */
 	if (ddi_copyin((void *) arg, &ufd, sizeof (ufd), flags))
 		return (EFAULT);
+#ifdef	_KERNEL
 	if ((fp = getf(ufd)) == NULL)
 		return (EBADF);
 	/* rele fp below */
 	vp = fp->f_vnode;
 	dev = vp->v_rdev;
+#else	/* _KERNEL */
+	/*
+	 * No getf(ufd) -- ufd is really a dev32_t
+	 */
+	dev = expldev((dev32_t)ufd);
+#endif	/* _KERNEL */
 	if (dev == 0 || dev == NODEV ||
 	    getmajor(dev) != nsmb_major) {
 		err = EINVAL;
 		goto out;
 	}
+
 	from_sdp = ddi_get_soft_state(statep, getminor(dev));
 	if (from_sdp == NULL) {
 		err = EINVAL;
@@ -609,8 +620,10 @@ smb_usr_dup_dev(smb_dev_t *sdp, intptr_t arg, int flags)
 	err = 0;
 
 out:
+#ifdef	_KERNEL
 	if (fp)
 		releasef(ufd);
+#endif	/* _KERNEL */
 	return (err);
 }
 
@@ -621,19 +634,27 @@ out:
 int
 smb_dev2share(int fd, struct smb_share **sspp)
 {
+#ifdef	_KERNEL
 	file_t *fp = NULL;
 	vnode_t *vp;
+#endif	/* _KERNEL */
 	smb_dev_t *sdp;
 	smb_share_t *ssp;
 	dev_t dev;
 	int err;
 
+#ifdef	_KERNEL
 	if ((fp = getf(fd)) == NULL)
 		return (EBADF);
 	/* rele fp below */
-
 	vp = fp->f_vnode;
 	dev = vp->v_rdev;
+#else	/* _KERNEL */
+	/*
+	 * No getf(ufd) -- fd is really a dev32_t
+	 */
+	dev = expldev((dev32_t)fd);
+#endif	/* _KERNEL */
 	if (dev == 0 || dev == NODEV ||
 	    getmajor(dev) != nsmb_major) {
 		err = EINVAL;
@@ -660,7 +681,9 @@ smb_dev2share(int fd, struct smb_share **sspp)
 	err = 0;
 
 out:
+#ifdef	_KERNEL
 	if (fp)
 		releasef(fd);
+#endif	/* _KERNEL */
 	return (err);
 }

@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 RackTop Systems.
  * Copyright (c) 2018, Joyent, Inc.
  */
@@ -36,6 +36,7 @@
 #include <fakekernel.h>
 
 void	abort(void) __NORETURN;
+void	debug_enter(char *);
 
 char *volatile panicstr;
 va_list  panicargs;
@@ -100,6 +101,24 @@ fakekernel_cprintf(const char *fmt, va_list adx, int flags,
 	fakekernel_putlog(bufp, len, flags);
 }
 
+/* ARGSUSED */
+void
+vzprintf(zoneid_t zoneid, const char *fmt, va_list adx)
+{
+	fakekernel_cprintf(fmt, adx, SL_CONSOLE | SL_NOTE, "", "");
+}
+
+/*PRINTFLIKE2*/
+void
+zprintf(zoneid_t zoneid, const char *fmt, ...)
+{
+	va_list adx;
+
+	va_start(adx, fmt);
+	vzprintf(zoneid, fmt, adx);
+	va_end(adx);
+}
+
 /*
  * "User-level crash dump", if you will.
  */
@@ -116,6 +135,7 @@ vpanic(const char *fmt, va_list adx)
 
 	/* Call libc`assfail() so that mdb ::status works */
 	(void) vsnprintf(panicbuf, sizeof (panicbuf), fmt, adx);
+	debug_enter(panicbuf);
 	(void) assfail(panicbuf, "(panic)", 0);
 
 	abort();	/* avoid "noreturn" warnings */
@@ -163,4 +183,11 @@ cmn_err(int ce, const char *fmt, ...)
 	va_start(adx, fmt);
 	vcmn_err(ce, fmt, adx);
 	va_end(adx);
+}
+
+/* ARGSUSED */
+void
+debug_enter(char *str)
+{
+	/* Just a place for a break point. */
 }

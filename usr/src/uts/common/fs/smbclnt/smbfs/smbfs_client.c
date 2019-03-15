@@ -24,6 +24,8 @@
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All rights reserved.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/param.h>
@@ -60,6 +62,7 @@
 #include <smbfs/smbfs_node.h>
 #include <smbfs/smbfs_subr.h>
 
+#ifdef	_KERNEL
 #include <vm/hat.h>
 #include <vm/as.h>
 #include <vm/page.h>
@@ -67,6 +70,7 @@
 #include <vm/seg.h>
 #include <vm/seg_map.h>
 #include <vm/seg_vn.h>
+#endif	// _KERNEL
 
 #define	ATTRCACHE_VALID(vp)	(gethrtime() < VTOSMB(vp)->r_attrtime)
 
@@ -394,11 +398,23 @@ smbfs_getattr_cache(vnode_t *vp, struct smbfattr *fap)
 static int
 smbfs_getattr_otw(vnode_t *vp, struct smbfattr *fap, cred_t *cr)
 {
-	struct smbnode *np;
 	struct smb_cred scred;
+	smbnode_t	*np = VTOSMB(vp);
+	smb_share_t	*ssp = np->n_mount->smi_share;
+	smb_fh_t	*fhp = NULL;
 	int error;
 
-	np = VTOSMB(vp);
+	bzero(fap, sizeof (*fap));
+
+	/*
+	 * Special case the XATTR directory here (all fake).
+	 * OK to leave a,c,m times zero (expected).
+	 */
+	if (vp->v_flag & V_XATTRDIR) {
+		fap->fa_attr = SMB_FA_DIR;
+		fap->fa_size = DEV_BSIZE;
+		return (0);
+	}
 
 	/*
 	 * Here NFS uses the ACL RPC (if smi_flags & SMI_ACL)
@@ -412,8 +428,28 @@ smbfs_getattr_otw(vnode_t *vp, struct smbfattr *fap, cred_t *cr)
 		return (EINTR);
 	smb_credinit(&scred, cr);
 
-	bzero(fap, sizeof (*fap));
-	error = smbfs_smb_getfattr(np, fap, &scred);
+// Does the attr. open code path work for streams?
+// Trying that, and if it doesn't work enable this.
+#if 0	// XXX
+	/*
+	 * Extended attribute files
+	 */
+	if (np->n_flag & N_XATTR) {
+		error = smbfs_xa_getfattr(np, fap, scrp);
+		goto out;
+	}
+#endif	// XXX
+
+	if (np->n_fidrefs > 0 &&
+	    (fhp = np->n_fid) != NULL &&
+	    (fhp->fh_vcgenid == ssp->ss_vcgenid)) {
+		/* Use the FID we have. */
+		error = smbfs_smb_getfattr(np, fhp, fap, &scred);
+
+	} else {
+		/* This will do an attr open */
+		error = smbfs_smb_getpattr(np, fap, &scred);
+	}
 
 	smb_credrele(&scred);
 	smbfs_rw_exit(&np->r_lkserlock);
@@ -816,9 +852,8 @@ static void smbfs_cb_nop(smb_share_t *ss)
 
 smb_fscb_t smbfs_cb = {
 	.fscb_disconn	= smbfs_dead,
-	.fscb_connect	= smbfs_cb_nop,
-	.fscb_down	= smbfs_cb_nop,
-	.fscb_up	= smbfs_cb_nop };
+	.fscb_connect	= smbfs_cb_nop
+};
 
 #endif /* NEED_SMBFS_CALLBACKS */
 

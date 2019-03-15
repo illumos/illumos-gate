@@ -49,7 +49,7 @@ extern "C" {
  * Utilities shared among file system implementations.
  */
 
-#ifdef	_KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 extern int	fs_nosys();
 extern int	fs_inval();

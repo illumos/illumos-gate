@@ -76,7 +76,7 @@ extern "C" {
  * storing full names, then we are ok. The space savings are worth it.
  */
 typedef struct ncache {
-	struct ncache *hash_next; 	/* hash chain, MUST BE FIRST */
+	struct ncache *hash_next;	/* hash chain, MUST BE FIRST */
 	struct ncache *hash_prev;
 	struct vnode *vp;		/* vnode the name refers to */
 	struct vnode *dp;		/* vnode of parent of name */
@@ -169,7 +169,7 @@ struct nc_stats {
 		(namlen) = Xcp - (name);			\
 	}
 
-#if defined(_KERNEL)
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -205,7 +205,7 @@ void	dnlc_reduce_cache(void *);
  */
 typedef struct dcfree {
 	uint64_t df_handle;		/* fs supplied handle */
-	struct dcfree *df_next; 	/* link to next free entry in bucket */
+	struct dcfree *df_next;		/* link to next free entry in bucket */
 	uint_t df_len;			/* length of free entry */
 } dcfree_t;
 

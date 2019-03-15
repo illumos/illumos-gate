@@ -20,9 +20,10 @@
  */
 
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -59,21 +60,20 @@
 #include "private.h"
 
 /*
- * Be the reader thread for this VC.
+ * The user agent (smbiod) calls smb_iod_connect for the first
+ * connection to some server, and if that succeeds, will start a
+ * thread running this function, passing the smb_ctx_t
+ *
+ * This thread now enters the driver and stays there, reading
+ * network responses as long as the connection is alive.
  */
 int
 smb_iod_work(smb_ctx_t *ctx)
 {
 	smbioc_ssn_work_t *work = &ctx->ct_work;
-	int	vcst, err = 0;
+	int	err = 0;
 
 	DPRINT("server: %s", ctx->ct_srvname);
-
-	/* Calle should have opened these */
-	if (ctx->ct_tran_fd == -1 || ctx->ct_dev_fd == -1) {
-		err = EINVAL;
-		goto out;
-	}
 
 	/*
 	 * This is the reader / reconnect loop.
@@ -84,34 +84,35 @@ smb_iod_work(smb_ctx_t *ctx)
 	 *
 	 * XXX: Add some syslog calls in here?
 	 */
-	vcst = SMBIOD_ST_VCACTIVE;
 
 	for (;;) {
 
-		switch (vcst) {
+		DPRINT("state: %s",
+		    smb_iod_state_name(work->wk_out_state));
+
+		switch (work->wk_out_state) {
 		case SMBIOD_ST_IDLE:
 			/*
 			 * Wait for driver requests to arrive
 			 * for this VC, then return here.
 			 * Next state is normally RECONNECT.
 			 */
-			DPRINT("state: idle");
-			if (ioctl(ctx->ct_dev_fd,
-			    SMBIOC_IOD_IDLE, &vcst) == -1) {
+			DPRINT("Call _ioc_idle...");
+			if (nsmb_ioctl(ctx->ct_dev_fd,
+			    SMBIOC_IOD_IDLE, work) == -1) {
 				err = errno;
 				DPRINT("ioc_idle: err %d", err);
 				goto out;
 			}
+			DPRINT("Ret. from _ioc_idle");
 			continue;
 
 		case SMBIOD_ST_RECONNECT:
-			DPRINT("state: reconnect");
+			DPRINT("Call _iod_connect...");
 			err = smb_iod_connect(ctx);
-			if (err == 0) {
-				vcst = SMBIOD_ST_VCACTIVE;
+			if (err == 0)
 				continue;
-			}
-			DPRINT("_iod_connect: err %d", err);
+			DPRINT("iod_connect: err %d", err);
 			/*
 			 * If the error was EAUTH, retry is
 			 * not likely to succeed either, so
@@ -119,64 +120,57 @@ smb_iod_work(smb_ctx_t *ctx)
 			 * will need to run smbutil to get
 			 * a new thread with new auth info.
 			 */
-			if (err == EAUTH)
+			if (err == EAUTH) {
+				DPRINT("iod_connect: EAUTH (give up)");
 				goto out;
-			vcst = SMBIOD_ST_RCFAILED;
-			continue;
-
-		case SMBIOD_ST_RCFAILED:
-			DPRINT("state: rcfailed");
+			}
 			/*
-			 * Reconnect failed.  Kill off any
-			 * requests waiting in the driver,
-			 * then get ready to try again.
-			 * Next state is normally IDLE.
+			 * Reconnect failed.  Notify any requests
+			 * that we're not connected, and delay.
+			 * Next state will be IDLE or RECONNECT.
 			 */
-			if (ioctl(ctx->ct_dev_fd,
-			    SMBIOC_IOD_RCFAIL, &vcst) == -1) {
+			DPRINT("Call _iod_rcfail...");
+			if (nsmb_ioctl(ctx->ct_dev_fd,
+			    SMBIOC_IOD_RCFAIL, work) == -1) {
 				err = errno;
-				DPRINT("ioc_rcfail: err %d", err);
+				DPRINT("iod_rcfail: err %d", err);
 				goto out;
 			}
 			continue;
 
-		case SMBIOD_ST_VCACTIVE:
-			DPRINT("state: active");
-			if (ioctl(ctx->ct_dev_fd,
+		case SMBIOD_ST_AUTHOK:
+			/*
+			 * This is where we enter the driver and
+			 * stay there.  While the connection is up
+			 * the VC will have SMBIOD_ST_VCACTIVE
+			 */
+			DPRINT("Call _iod_work...");
+			if (nsmb_ioctl(ctx->ct_dev_fd,
 			    SMBIOC_IOD_WORK, work) == -1) {
 				err = errno;
-				DPRINT("ioc_work: err %d", err);
+				DPRINT("iod_work: err %d", err);
 				goto out;
 			}
-			vcst = work->wk_out_state;
-			/*
-			 * Go ahead and close the transport now,
-			 * rather than wait until reconnect to
-			 * this server.
-			 */
-			close(ctx->ct_tran_fd);
-			ctx->ct_tran_fd = -1;
+			DPRINT("Ret. from _ioc_work");
 			continue;
 
 		case SMBIOD_ST_DEAD:
-			DPRINT("state: dead");
+			DPRINT("got state=DEAD");
 			err = 0;
 			goto out;
 
 		default:
-			DPRINT("state: BAD(%d)", vcst);
+			DPRINT("Unexpected state: %d (%s)",
+			    work->wk_out_state,
+			    smb_iod_state_name(work->wk_out_state));
 			err = EFAULT;
 			goto out;
 		}
 	}
 
 out:
-	if (ctx->ct_tran_fd != -1) {
-		close(ctx->ct_tran_fd);
-		ctx->ct_tran_fd = -1;
-	}
 	if (ctx->ct_dev_fd != -1) {
-		close(ctx->ct_dev_fd);
+		nsmb_close(ctx->ct_dev_fd);
 		ctx->ct_dev_fd = -1;
 	}
 

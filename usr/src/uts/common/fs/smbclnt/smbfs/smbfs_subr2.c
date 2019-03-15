@@ -27,6 +27,7 @@
  */
 /*
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -39,7 +40,9 @@
 #include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/vnode.h>
+#include <sys/atomic.h>
 #include <sys/bitmap.h>
+#include <sys/buf.h>
 #include <sys/dnlc.h>
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
@@ -430,7 +433,7 @@ start:
 	np->r_vnode = vp;
 	np->n_mount = mi;
 
-	np->n_fid = SMB_FID_UNUSED;
+	np->n_fid = NULL;
 	np->n_uid = mi->smi_uid;
 	np->n_gid = mi->smi_gid;
 	/* Leave attributes "stale." */
@@ -1231,7 +1234,7 @@ smbfs_subrinit(void)
 	nsmbnode_max = (ulong_t)((kmem_maxavail() >> 2) /
 	    sizeof (struct smbnode));
 	if (nsmbnode > nsmbnode_max || (nsmbnode == 0 && ncsize == 0)) {
-		zcmn_err(GLOBAL_ZONEID, CE_NOTE,
+		cmn_err(CE_NOTE,
 		    "setting nsmbnode to max value of %ld", nsmbnode_max);
 		nsmbnode = nsmbnode_max;
 	}
@@ -1249,7 +1252,7 @@ smbfs_subrinit(void)
 	 * Assign unique major number for all smbfs mounts
 	 */
 	if ((smbfs_major = getudev()) == -1) {
-		zcmn_err(GLOBAL_ZONEID, CE_WARN,
+		cmn_err(CE_WARN,
 		    "smbfs: init: can't get unique device number");
 		smbfs_major = 0;
 	}

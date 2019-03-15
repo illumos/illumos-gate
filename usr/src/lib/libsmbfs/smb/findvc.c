@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -76,7 +78,7 @@ findvc(struct smb_ctx *ctx, struct addrinfo *ai)
 	bzero(&ssn->ssn_srvaddr, sizeof (ssn->ssn_srvaddr));
 	bcopy(ai->ai_addr, &ssn->ssn_srvaddr, ai->ai_addrlen);
 
-	if (ioctl(ctx->ct_dev_fd, SMBIOC_SSN_FIND, ssn) == -1)
+	if (nsmb_ioctl(ctx->ct_dev_fd, SMBIOC_SSN_FIND, ssn) == -1)
 		return (errno);
 
 	return (0);
@@ -119,7 +121,6 @@ smb_ctx_findvc(struct smb_ctx *ctx)
 
 		if (err == 0) {
 			/* re-use an existing VC */
-			ctx->ct_flags |= SMBCF_SSNACTIVE;
 			return (0);
 		}
 	}
@@ -137,7 +138,7 @@ int
 smb_ctx_kill(struct smb_ctx *ctx)
 {
 
-	if (ioctl(ctx->ct_dev_fd, SMBIOC_SSN_KILL, NULL) == -1)
+	if (nsmb_ioctl(ctx->ct_dev_fd, SMBIOC_SSN_KILL, NULL) == -1)
 		return (errno);
 
 	return (0);

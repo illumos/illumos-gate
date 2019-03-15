@@ -10,6 +10,8 @@
 .\"
 .\"
 .\" Copyright 2015 Joyent, Inc.
+.\" Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
+.\" Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 .\"
 .Dd May 11, 2016
 .Dt PROC_FLTNAME 3PROC
@@ -17,8 +19,9 @@
 .Sh NAME
 .Nm proc_fltname ,
 .Nm proc_signame ,
-.Nm proc_sysname
-.Nd convert a fault, signal, and system call to a name
+.Nm proc_sysname ,
+.Nm proc_dmodelname
+.Nd convert a fault, signal, system call and data model to a name
 .Sh SYNOPSIS
 .Lb libproc
 .In libproc.h
@@ -40,17 +43,25 @@
 .Fa "char *buf"
 .Fa "size_t bufsz"
 .Fc
+.Ft "char *"
+.Fo proc_dmodelname
+.Fa "int dmodel"
+.Fa "char *buf"
+.Fa "size_t bufsz"
+.Fc
 .Sh DESCRIPTION
 The
 .Fn proc_fltname ,
 .Fn proc_signame ,
-and
 .Fn proc_sysname
-functions respectively convert the fault, signal, and system call in
+and
+.Fn proc_dmodelname
+functions respectively convert the fault, signal, system call and data model in
 .Fa flt ,
 .Fa sig ,
-and
 .Fa sys
+and
+.Fa dmodel
 to a human-readable name and place the corresponding string in
 .Fa buf .
 Up to
@@ -61,8 +72,9 @@ characters, including the null terminator, will be written into
 Upon successful completion, the
 .Fn proc_fltname ,
 .Fn proc_signame ,
-and
 .Fn proc_sysname
+and
+.Fn proc_dmodelname
 functions return a pointer to
 .Fa buf .
 The contents of

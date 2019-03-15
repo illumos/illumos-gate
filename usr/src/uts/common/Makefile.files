@@ -1301,11 +1301,13 @@ VSCAN_OBJS +=	vscan_drv.o	vscan_svc.o vscan_door.o
 NSMB_OBJS +=	smb_conn.o	smb_dev.o	smb_iod.o	smb_pass.o \
 		smb_rq.o	smb_sign.o	smb_smb.o	smb_subrs.o \
 		smb_time.o	smb_tran.o	smb_trantcp.o	smb_usr.o \
-		subr_mchain.o
+		smb2_rq.o	smb2_sign.o	smb2_smb.o	subr_mchain.o \
+		nsmb_sign_kcf.o
 
 SMBFS_COMMON_OBJS += smbfs_ntacl.o
 SMBFS_OBJS +=	smbfs_vfsops.o	smbfs_vnops.o	smbfs_node.o	\
 		smbfs_acl.o	smbfs_client.o	smbfs_smb.o	\
+		smbfs_smb1.o	smbfs_smb2.o	\
 		smbfs_subr.o	smbfs_subr2.o	\
 		smbfs_rwlock.o	smbfs_xattr.o	\
 		$(SMBFS_COMMON_OBJS)

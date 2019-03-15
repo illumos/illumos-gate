@@ -226,6 +226,8 @@ FORBIDDEN_DEP usr/bin/amd64/ztest
 FORBIDDEN_DEP usr/bin/i86/ztest
 FORBIDDEN_DEP usr/bin/sparcv7/ztest
 FORBIDDEN_DEP usr/bin/sparcv9/ztest
+FORBIDDEN_DEP usr/lib/MACH(smbfs)/libfknsmb.so.1
+FORBIDDEN_DEP usr/lib/MACH(smbfs)/libfksmbfs.so.1
 FORBIDDEN_DEP usr/lib/MACH(smbsrv)/libfksmbsrv.so.1
 FORBIDDEN_DEP usr/lib/smbsrv/fksmbd
 FORBIDDEN_DEP usr/sbin/amd64/zdb

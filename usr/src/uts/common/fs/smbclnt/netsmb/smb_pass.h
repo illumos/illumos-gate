@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB_PASS_H
@@ -44,14 +46,13 @@ typedef struct smb_passid {
 	zoneid_t	zoneid;		/* Future Use */
 	char		*srvdom;	/* Windows Domain (or server) */
 	char		*username;	/* Windows User name */
-	uchar_t 	lmhash[SMBIOC_HASH_SZ];
-	uchar_t 	nthash[SMBIOC_HASH_SZ];
+	uchar_t		lmhash[SMBIOC_HASH_SZ];
+	uchar_t		nthash[SMBIOC_HASH_SZ];
 } smb_passid_t;
 
 /* Called from smb_dev.c */
 void smb_pkey_init(void);
 void smb_pkey_fini(void);
 int smb_pkey_idle(void);
-int smb_pkey_ioctl(int, intptr_t, int, cred_t *);
 
 #endif /* _SMB_PASS_H */

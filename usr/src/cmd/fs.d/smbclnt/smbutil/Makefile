@@ -23,7 +23,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
 #
 
@@ -34,7 +34,7 @@
 PROG=		smbutil
 
 OBJS=   smbutil.o discon.o info.o login.o lookup.o print.o status.o view.o \
-	shares_rap.o shares_rpc.o srvsvc1_clnt.o srvsvc1_ndr.o
+	shares_rpc.o srvsvc1_clnt.o srvsvc1_ndr.o
 
 SRCS=	$(OBJS:%.o=%.c)
 

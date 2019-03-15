@@ -32,13 +32,14 @@
  * $Id: smb_trantcp.h,v 1.8 2004/08/03 23:50:01 lindak Exp $
  */
 /*
- * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 #ifndef _NETSMB_SMB_TRANTCP_H_
 #define	_NETSMB_SMB_TRANTCP_H_
 
 enum nbstate {
 	NBST_CLOSED,
+	NBST_IDLE,
 	NBST_RQSENT,
 	NBST_SESSION,
 	NBST_RETARGET,

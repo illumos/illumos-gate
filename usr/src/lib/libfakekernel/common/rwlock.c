@@ -23,7 +23,6 @@
 #include <sys/errno.h>
 #include <sys/debug.h>
 #include <sys/param.h>
-#include <sys/synch32.h>
 #include <sys/thread.h>
 
 /* avoiding synch.h */

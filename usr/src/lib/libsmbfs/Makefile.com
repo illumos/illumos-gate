@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
 
@@ -57,21 +57,16 @@ OBJ_LIB=\
 	nb.o \
 	nb_name.o \
 	nb_net.o \
-	nb_ssn.o \
 	nbns_rq.o \
-	negprot.o \
 	newvc.o \
 	nls.o \
 	ntlm.o \
 	ntlmssp.o \
 	print.o \
-	rap.o \
 	rcfile.o \
-	rq.o \
-	signing.o \
+	rc_scf.o \
 	spnego.o \
 	spnegoparse.o \
-	ssnsetup.o \
 	ssp.o \
 	subr.o \
 	ui-sun.o \
@@ -95,7 +90,7 @@ $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CSTD=	$(CSTD_GNU99)
 
-LDLIBS += -lsocket -lnsl -lc -lmd -lpkcs11 -lkrb5 -lsec -lidmap
+LDLIBS += -lsocket -lnsl -lc -lmd -lpkcs11 -lkrb5 -lsec -lidmap -lscf -luuid
 
 # normal warnings...
 CFLAGS	+=	$(CCVERBOSE)
@@ -111,22 +106,20 @@ CPPFLAGS += -D__EXTENSIONS__ -D_REENTRANT -DMIA \
 	-I$(SRC)/uts/common \
 	-I$(SRC)/common/smbclnt
 
+# This is pretty mature code, so let's just ignore these.
+LINTCHECKFLAGS += -erroff=E_INCONS_ARG_DECL2
+LINTCHECKFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
+LINTCHECKFLAGS += -erroff=E_FUNC_RET_MAYBE_IGNORED2
+LINTCHECKFLAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+
 # Debugging
 ${NOT_RELEASE_BUILD} CPPFLAGS += -DDEBUG
 
-# Filter out the less important lint.
-# See lgrep.awk
-LGREP =	$(AWK) -f $(SRCDIR)/lgrep.awk
-LTAIL	+=	2>&1 | $(LGREP)
-
 all:	$(LIBS)
 
-lint:	lintcheck_t
+lint:	lintcheck
 
 include ../../Makefile.targ
-
-lintcheck_t: $$(SRCS)
-	$(LINT.c) $(LINTCHECKFLAGS) $(SRCS) $(LDLIBS) $(LTAIL)
 
 objs/%.o pics/%.o: $(CMNDIR)/%.c
 	$(COMPILE.c) -o $@ $<

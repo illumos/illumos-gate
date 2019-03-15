@@ -30,9 +30,12 @@
 #include <fakekernel.h>
 
 pri_t minclsyspri = 60;
+extern zone_t zone0;
 
 /* Some kernel code takes the address of this. */
-proc_t p0;
+proc_t p0 = {
+	.p_zone = &zone0, 0
+};
 
 proc_t *
 _curproc(void)
@@ -99,11 +102,10 @@ ddi_strtoul(const char *str, char **endp, int base, unsigned long *res)
 }
 
 int
-ddi_strtoull(const char *str, char **nptr, int base, u_longlong_t *res)
+ddi_strtoull(const char *str, char **endp, int base, u_longlong_t *res)
 {
-	char *end;
-
-	*res = strtoull(str, &end, base);
+	errno = 0;
+	*res = strtoull(str, endp, base);
 	if (*res == 0)
 		return (errno);
 	return (0);
@@ -116,6 +118,7 @@ delay(clock_t ticks)
 	(void) poll(0, 0, msec);
 }
 
+/* ARGSUSED */
 int
 issig(int why)
 {

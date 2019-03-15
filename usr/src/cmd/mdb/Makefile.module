@@ -24,6 +24,8 @@
 #
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 .KEEP_STATE:
@@ -177,7 +179,7 @@ lint: $$(LINTFILES)
 
 $(MODFILE): dmod .WAIT $(MODOBJS) $$(MAPFILE-EXT)
 	$(LINK.c) $(ZDEFS) $(ZIGNORE) $(MAPFILE-EXT:%=-M%) $(GSHARED) \
-	    $(MODOBJS) -o $@ $(LDLIBS) -lc
+	    $(MODOBJS) -o $@ $(LDLIBS) -lc -lproc
 	$(CTFMERGE) -L VERSION -o $@ $(MODOBJS)
 	$(POST_PROCESS_SO)
 

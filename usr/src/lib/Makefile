@@ -271,6 +271,7 @@ SUBDIRS +=				\
 	rpcsec_gss	\
 	sasl_plugins	\
 	scsi		\
+	smbclnt		\
 	smbsrv		\
 	smhba		\
 	sun_fc		\
@@ -722,6 +723,7 @@ raidcfg_plugins: libraidcfg librcm libcfgadm libpicl libpicltree
 rpcsec_gss:	libgss
 sasl_plugins:	pkcs11 libgss libsasl
 scsi:		libfru libumem libdevid libdevinfo
+smbclnt:	libfakekernel pkcs11
 smbsrv:		libxnet libpthread librt libshare libidmap pkcs11 libsqlite \
 		libcryptoutil libreparse libcmdutils libresolv2 libsmbfs \
 		libuuid libfakekernel libads libgss libldap5 krb5 libmlrpc

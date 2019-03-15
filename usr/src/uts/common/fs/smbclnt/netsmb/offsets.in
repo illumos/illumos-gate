@@ -20,7 +20,7 @@
 \
 
 \
-\ Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+\ Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 \ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
@@ -52,8 +52,10 @@ smbioc_ssn_ident
 	id_user
 
 smbioc_ossn
-	ssn_vopt
 	ssn_owner
+	ssn_vopt
+	ssn_minver
+	ssn_maxver
 	ssn_id
 	ssn_srvname
 
@@ -68,76 +70,29 @@ smbioc_tcon
 	tc_opt
 	tc_sh
 
-smb_sopt
-	sv_proto
-	sv_sm
-	sv_tz
-	sv_maxmux
-	sv_maxvcs
-	sv_rawmode
-	sv_maxtx
-	sv_maxraw
-	sv_skey
-	sv_caps
-
-smb_iods
-	is_tran_fd
-	is_vcflags
-	is_hflags
-	is_hflags2
-	is_smbuid
-	is_next_mid
-	is_txmax
-	is_rwmax
-	is_rxmax
-	is_wxmax
-	is_ssn_key
-	is_next_seq
-	is_u_maclen
-	is_u_mackey
-
 smbioc_ssn_work
-	wk_iods
-	wk_sopt
 	wk_out_state
-
-smbioc_rq	SIZEOF_SMBIOC_RQ
-	ioc_cmd
-	ioc_errclass	IOC_RQ_ERRCLASS
-	ioc_serror	IOC_RQ_SERROR
-	ioc_error	IOC_RQ_ERROR
-	ioc_tbufsz
-	ioc_rbufsz
-	_ioc_tbuf
-	_ioc_rbuf
-
-smbioc_t2rq	SIZEOF_SMBIOC_T2RQ
-	ioc_setup
-	ioc_setupcnt
-	ioc_name	IOC_T2_NAME
-	ioc_tparamcnt
-	ioc_tdatacnt
-	ioc_rparamcnt
-	ioc_rdatacnt
-	ioc_errclass	IOC_T2_ERRCLASS
-	ioc_serror	IOC_T2_SERROR
-	ioc_error	IOC_T2_ERROR
-	ioc_rpflags2
-	_ioc_tparam
-	_ioc_tdata
-	_ioc_rparam
-	_ioc_rdata
-
-smbioc_flags	SIZEOF_SMBIOC_FLAGS
-	ioc_level
-	ioc_mask
-	ioc_flags
+	wk_u_ssnkey_len
+	wk_u_ssnkey_buf
+	wk_u_auth_rlen
+	wk_u_auth_wlen
+	wk_u_auth_rbuf
+	wk_u_auth_wbuf
+	wk_cl_guid
 
 smbioc_rw	SIZEOF_SMBIOC_RW
-	ioc_fh
 	ioc_cnt
+	ioc_flags
 	_ioc_offset
 	_ioc_base
+
+smbioc_xnp	SIZEOF_SMBIOC_XNP
+	ioc_tdlen
+	ioc_rdlen
+	ioc_more
+	ioc_pad1
+	_ioc_tdata
+	_ioc_rdata
 
 smbioc_ntcreate	SIZEOF_NTCREATE
 	ioc_req_acc
