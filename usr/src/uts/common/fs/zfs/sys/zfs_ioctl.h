@@ -318,12 +318,14 @@ typedef struct zinject_record {
 	uint64_t	zi_timer;
 	uint64_t	zi_nlanes;
 	uint32_t	zi_cmd;
-	uint32_t	zi_pad;
+	uint32_t	zi_dvas;
 } zinject_record_t;
 
 #define	ZINJECT_NULL		0x1
 #define	ZINJECT_FLUSH_ARC	0x2
 #define	ZINJECT_UNLOAD_SPA	0x4
+
+#define	ZI_NO_DVA		(-1)
 
 typedef enum zinject_type {
 	ZINJECT_UNINITIALIZED,

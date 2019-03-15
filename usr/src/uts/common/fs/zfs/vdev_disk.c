@@ -606,6 +606,16 @@ skip_open:
 	 */
 	vd->vdev_nowritecache = B_FALSE;
 
+	/* Inform the ZIO pipeline that we are non-rotational */
+	vd->vdev_nonrot = B_FALSE;
+	if (ldi_prop_exists(dvd->vd_lh, DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "device-solid-state")) {
+		if (ldi_prop_get_int(dvd->vd_lh,
+		    LDI_DEV_T_ANY | DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+		    "device-solid-state", B_FALSE) != 0)
+			vd->vdev_nonrot = B_TRUE;
+	}
+
 	return (0);
 }
 

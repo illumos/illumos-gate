@@ -276,6 +276,8 @@ vdev_queue_init(vdev_t *vd)
 		avl_create(vdev_queue_class_tree(vq, p), compfn,
 		    sizeof (zio_t), offsetof(struct zio, io_queue_node));
 	}
+
+	vq->vq_last_offset = 0;
 }
 
 void
@@ -701,7 +703,7 @@ again:
 	 */
 	tree = vdev_queue_class_tree(vq, p);
 	search.io_timestamp = 0;
-	search.io_offset = vq->vq_last_offset + 1;
+	search.io_offset = vq->vq_last_offset - 1;
 	VERIFY3P(avl_find(tree, &search, &idx), ==, NULL);
 	zio = avl_nearest(tree, idx, AVL_AFTER);
 	if (zio == NULL)
@@ -729,7 +731,7 @@ again:
 	}
 
 	vdev_queue_pending_add(vq, zio);
-	vq->vq_last_offset = zio->io_offset;
+	vq->vq_last_offset = zio->io_offset + zio->io_size;
 
 	return (zio);
 }
@@ -849,12 +851,39 @@ vdev_queue_change_io_priority(zio_t *zio, zio_priority_t priority)
 	 */
 	tree = vdev_queue_class_tree(vq, zio->io_priority);
 	if (avl_find(tree, zio, NULL) == zio) {
+		spa_t *spa = zio->io_spa;
+		zio_priority_t oldpri = zio->io_priority;
+
 		avl_remove(vdev_queue_class_tree(vq, zio->io_priority), zio);
 		zio->io_priority = priority;
 		avl_add(vdev_queue_class_tree(vq, zio->io_priority), zio);
+
+		mutex_enter(&spa->spa_iokstat_lock);
+		ASSERT3U(spa->spa_queue_stats[oldpri].spa_queued, >, 0);
+		spa->spa_queue_stats[oldpri].spa_queued--;
+		spa->spa_queue_stats[zio->io_priority].spa_queued++;
+		mutex_exit(&spa->spa_iokstat_lock);
 	} else if (avl_find(&vq->vq_active_tree, zio, NULL) != zio) {
 		zio->io_priority = priority;
 	}
 
 	mutex_exit(&vq->vq_lock);
+}
+
+/*
+ * As these two methods are only used for load calculations we're not
+ * concerned if we get an incorrect value on 32bit platforms due to lack of
+ * vq_lock mutex use here, instead we prefer to keep it lock free for
+ * performance.
+ */
+int
+vdev_queue_length(vdev_t *vd)
+{
+	return (avl_numnodes(&vd->vdev_queue.vq_active_tree));
+}
+
+uint64_t
+vdev_queue_last_offset(vdev_t *vd)
+{
+	return (vd->vdev_queue.vq_last_offset);
 }
