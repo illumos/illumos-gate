@@ -33,7 +33,7 @@
 #define	_SYS_FILE_H
 
 #include <sys/t_lock.h>
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(_FAKE_KERNEL)
 #include <sys/model.h>
 #include <sys/user.h>
 #endif
