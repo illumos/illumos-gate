@@ -3631,7 +3631,6 @@ f usr/include/smbsrv/ndl/winreg.ndl 0644 root bin
 f usr/include/smbsrv/netbios.h 0644 root bin
 f usr/include/smbsrv/netrauth.h 0644 root bin
 f usr/include/smbsrv/nmpipes.h 0644 root bin
-f usr/include/smbsrv/ntaccess.h 0644 root bin
 f usr/include/smbsrv/ntifs.h 0644 root bin
 f usr/include/smbsrv/ntlocale.h 0644 root bin
 f usr/include/smbsrv/smb.h 0644 root bin
@@ -3653,7 +3652,6 @@ f usr/include/smbsrv/smb_xdr.h 0644 root bin
 f usr/include/smbsrv/smbinfo.h 0644 root bin
 f usr/include/smbsrv/string.h 0644 root bin
 f usr/include/smbsrv/svrapi.h 0644 root bin
-f usr/include/smbsrv/winioctl.h 0644 root bin
 f usr/include/smbsrv/winsvc.h 0644 root bin
 f usr/include/smhbaapi.h 0644 root bin
 f usr/include/spawn.h 0644 root bin
