@@ -1203,8 +1203,6 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		ahci_ctlp->ahcictl_flags |= AHCI_SUSPEND;
 
-		ahci_em_suspend(ahci_ctlp);
-
 		/* stop the watchdog handler */
 		if (ahci_ctlp->ahcictl_timeout_id) {
 			(void) untimeout(ahci_ctlp->ahcictl_timeout_id);
@@ -1212,6 +1210,8 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 
 		mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
+		ahci_em_suspend(ahci_ctlp);
 
 		/*
 		 * drain the taskq
