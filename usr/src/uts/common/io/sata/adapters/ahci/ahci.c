@@ -82,6 +82,7 @@
  */
 
 #include <sys/note.h>
+#include <sys/debug.h>
 #include <sys/scsi/scsi.h>
 #include <sys/pci.h>
 #include <sys/disp.h>
@@ -10839,22 +10840,19 @@ static void
 ahci_em_quiesce(ahci_ctl_t *ahci_ctlp)
 {
 	ASSERT(ahci_ctlp->ahcictl_em_flags & AHCI_EM_PRESENT);
+	VERIFY(mutex_owned(&ahci_ctlp->ahcictl_mutex));
 
-	mutex_enter(&ahci_ctlp->ahcictl_mutex);
 	ahci_ctlp->ahcictl_em_flags |= AHCI_EM_QUIESCE;
-	mutex_exit(&ahci_ctlp->ahcictl_mutex);
-
 	ddi_taskq_wait(ahci_ctlp->ahcictl_em_taskq);
 }
 
 static void
 ahci_em_suspend(ahci_ctl_t *ahci_ctlp)
 {
-	ahci_em_quiesce(ahci_ctlp);
+	VERIFY(mutex_owned(&ahci_ctlp->ahcictl_mutex));
 
-	mutex_enter(&ahci_ctlp->ahcictl_mutex);
+	ahci_em_quiesce(ahci_ctlp);
 	ahci_ctlp->ahcictl_em_flags &= ~AHCI_EM_READY;
-	mutex_exit(&ahci_ctlp->ahcictl_mutex);
 }
 
 static void
@@ -10875,7 +10873,10 @@ ahci_em_fini(ahci_ctl_t *ahci_ctlp)
 		return;
 	}
 
+	mutex_enter(&ahci_ctlp->ahcictl_mutex);
 	ahci_em_quiesce(ahci_ctlp);
+	mutex_exit(&ahci_ctlp->ahcictl_mutex);
+
 	ddi_taskq_destroy(ahci_ctlp->ahcictl_em_taskq);
 	ahci_ctlp->ahcictl_em_taskq = NULL;
 }
