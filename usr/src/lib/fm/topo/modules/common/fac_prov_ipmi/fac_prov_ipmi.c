@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 #include <unistd.h>
 #include <stdio.h>
@@ -347,14 +347,14 @@ static int
 ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
     nvlist_t *in, nvlist_t **out)
 {
-	char **entity_refs;
+	char **entity_refs, *sensor_class;
 	uint_t nelems;
 	ipmi_sdr_t *sdr = NULL;
 	ipmi_sensor_reading_t *reading;
 	ipmi_handle_t *hdl;
 	int err, i;
 	uint8_t sensor_num;
-	uint32_t e_id, e_inst;
+	uint32_t e_id, e_inst, state;
 	ipmi_sdr_full_sensor_t *fsensor;
 	ipmi_sdr_compact_sensor_t *csensor;
 	nvlist_t *nvl;
@@ -430,12 +430,31 @@ ipmi_sensor_state(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	strarr_free(mod, entity_refs, nelems);
 	topo_mod_ipmi_rele(mod);
 
+	if (topo_prop_get_string(node, TOPO_PGROUP_FACILITY, TOPO_SENSOR_CLASS,
+	    &sensor_class, &err) != 0) {
+		topo_mod_dprintf(mod, "Failed to lookup prop %s/%s on node %s ",
+		    "(%s)", TOPO_PGROUP_FACILITY, TOPO_SENSOR_CLASS,
+		    topo_node_name(node), topo_strerror(err));
+		return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+	}
+	/*
+	 * Mask off bits that are marked as reserved in the IPMI spec.
+	 * For threshold sensors, bits 6:7 are reserved.
+	 * For discrete sensors, bit 15 is reserved.
+	 */
+	state = reading->isr_state;
+	if (strcmp(sensor_class, TOPO_SENSOR_CLASS_THRESHOLD) == 0)
+		state = state & 0x3F;
+	else
+		state = state & 0x7FFF;
+
+	topo_mod_strfree(mod, sensor_class);
+
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
 	    nvlist_add_string(nvl, TOPO_PROP_VAL_NAME,
 	    TOPO_SENSOR_STATE) != 0 ||
 	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_TYPE, TOPO_TYPE_UINT32) != 0 ||
-	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_VAL, reading->isr_state)
-	    != 0) {
+	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_VAL, state) != 0) {
 		topo_mod_dprintf(mod, "Failed to allocate 'out' nvlist\n");
 		nvlist_free(nvl);
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
