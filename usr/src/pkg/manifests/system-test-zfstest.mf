@@ -13,7 +13,7 @@
 # Copyright (c) 2012, 2017 by Delphix. All rights reserved.
 # Copyright 2015, 2016 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright (c) 2018 Datto Inc.
 #
 
@@ -91,6 +91,7 @@ dir path=opt/zfs-tests/tests/functional/cli_root/zpool_replace
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_set
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_status
+dir path=opt/zfs-tests/tests/functional/cli_root/zpool_sync
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_upgrade
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_upgrade/blockfiles
 dir path=opt/zfs-tests/tests/functional/cli_user
@@ -1726,6 +1727,14 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_status/zpool_status_002_pos \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_sync/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_sync/setup mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_sync/zpool_sync_001_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_sync/zpool_sync_002_neg \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_upgrade/blockfiles/zfs-broken-mirror1.dat.bz2 \
