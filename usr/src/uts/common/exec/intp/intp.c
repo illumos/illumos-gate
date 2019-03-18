@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -56,7 +56,7 @@
 #include <sys/modctl.h>
 
 extern int intpexec(struct vnode *, struct execa *, struct uarg *,
-    struct intpdata *, int, long *, int, caddr_t, struct cred *, int *);
+    struct intpdata *, int, size_t *, int, caddr_t, struct cred *, int *);
 
 static struct execsw esw = {
 	intpmagicstr,
@@ -196,7 +196,7 @@ intpexec(
 	struct uarg *args,
 	struct intpdata *idatap,
 	int level,
-	long *execsz,
+	size_t *execsz,
 	int setid,
 	caddr_t exec_file,
 	struct cred *cred,

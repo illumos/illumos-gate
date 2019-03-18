@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2018, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -235,7 +235,7 @@ void (*lx_cgrp_freelwp)(vfs_t *, uint_t, id_t, pid_t);
 uint64_t lx_maxstack64 = LX_MAXSTACK64;
 
 static int lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
-    struct intpdata *idata, int level, long *execsz, int setid,
+    struct intpdata *idata, int level, size_t *execsz, int setid,
     caddr_t exec_file, struct cred *cred, int *brand_action);
 
 static boolean_t lx_native_exec(uint8_t, const char **);
@@ -2043,12 +2043,6 @@ restoreexecenv(struct execenv *ep, stack_t *sp)
 	lwp->lwp_sigaltstack.ss_flags = sp->ss_flags;
 }
 
-extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *, int *);
-
-extern int elf32exec(struct vnode *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *, int *);
-
 static uintptr_t
 lx_map_vdso(struct uarg *args, struct cred *cred)
 {
@@ -2113,10 +2107,10 @@ lx_map_vdso(struct uarg *args, struct cred *cred)
 /* ARGSUSED4 */
 static int
 lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
-    struct intpdata *idata, int level, long *execsz, int setid,
+    struct intpdata *idata, int level, size_t *execsz, int setid,
     caddr_t exec_file, struct cred *cred, int *brand_action)
 {
-	int		error, i;
+	int		error;
 	vnode_t		*nvp;
 	Ehdr		ehdr;
 	Addr		uphdr_vaddr;
@@ -2183,8 +2177,8 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		Ehdr ehdr;
 		Phdr *phdrp;
 		caddr_t phdrbase = NULL;
-		ssize_t phdrsize = 0;
-		int nphdrs, hsize;
+		size_t phdrsize = 0;
+		uint_t nphdrs, hsize;
 
 		if ((error = elfreadhdr(vp, cred, &ehdr, &nphdrs, &phdrbase,
 		    &phdrsize)) != 0) {
@@ -2194,7 +2188,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		hsize = ehdr.e_phentsize;
 		/* LINTED: alignment */
 		phdrp = (Phdr *)phdrbase;
-		for (i = nphdrs; i > 0; i--) {
+		for (uint_t i = nphdrs; i > 0; i--) {
 			switch (phdrp->p_type) {
 			case PT_GNU_STACK:
 				if ((phdrp->p_flags & PF_X) == 0) {
@@ -2212,8 +2206,8 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		Elf32_Ehdr ehdr;
 		Elf32_Phdr *phdrp;
 		caddr_t phdrbase = NULL;
-		ssize_t phdrsize = 0;
-		int nphdrs, hsize;
+		size_t phdrsize = 0;
+		uint_t nphdrs, hsize;
 
 		if ((error = elf32readhdr(vp, cred, &ehdr, &nphdrs, &phdrbase,
 		    &phdrsize)) != 0) {
@@ -2223,7 +2217,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 		hsize = ehdr.e_phentsize;
 		/* LINTED: alignment */
 		phdrp = (Elf32_Phdr *)phdrbase;
-		for (i = nphdrs; i > 0; i--) {
+		for (uint_t i = nphdrs; i > 0; i--) {
 			switch (phdrp->p_type) {
 			case PT_GNU_STACK:
 				if ((phdrp->p_flags & PF_X) == 0) {
@@ -2538,7 +2532,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * So we set AT_ENTRY to be the entry point of the linux executable,
 	 * but leave AT_BASE to be the address of the Solaris linker.
 	 */
-	for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
+	for (uint_t i = 0; i < __KERN_NAUXV_IMPL; i++) {
 		switch (up->u_auxv[i].a_type) {
 		case AT_ENTRY:
 			up->u_auxv[i].a_un.a_val = edp.ed_entry;

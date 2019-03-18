@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/errno.h>
@@ -61,7 +61,7 @@ void	s10_forklwp(klwp_t *, klwp_t *);
 void	s10_freelwp(klwp_t *);
 void	s10_lwpexit(klwp_t *);
 int	s10_elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-	long *, int, caddr_t, cred_t *, int *);
+    size_t *, int, caddr_t, cred_t *, int *);
 void	s10_sigset_native_to_s10(sigset_t *);
 void	s10_sigset_s10_to_native(sigset_t *);
 
@@ -423,7 +423,7 @@ s10_init_brand_data(zone_t *zone, kmutex_t *zsl)
 
 int
 s10_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
-    int level, long *execsz, int setid, caddr_t exec_file, cred_t *cred,
+    int level, size_t *execsz, int setid, caddr_t exec_file, cred_t *cred,
     int *brand_action)
 {
 	return (brand_solaris_elfexec(vp, uap, args, idatap, level, execsz,

@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -943,7 +943,7 @@ startover:
 
 	case PIOCNMAP:		/* get number of memory mappings */
 	{
-		int n;
+		uint_t n;
 		struct as *as = p->p_as;
 
 		if ((p->p_flag & SSYS) || as == &kas)
@@ -956,7 +956,7 @@ startover:
 			mutex_enter(&p->p_lock);
 		}
 		prunlock(pnp);
-		if (copyout(&n, cmaddr, sizeof (int)))
+		if (copyout(&n, cmaddr, sizeof (uint_t)))
 			error = EFAULT;
 		break;
 	}
@@ -2562,7 +2562,7 @@ startover:
 
 	case PIOCNMAP:		/* get number of memory mappings */
 	{
-		int n;
+		uint_t n;
 		struct as *as = p->p_as;
 
 		if ((p->p_flag & SSYS) || as == &kas)
@@ -2575,7 +2575,7 @@ startover:
 			mutex_enter(&p->p_lock);
 		}
 		prunlock(pnp);
-		if (copyout(&n, cmaddr, sizeof (int)))
+		if (copyout(&n, cmaddr, sizeof (uint_t)))
 			error = EFAULT;
 		break;
 	}

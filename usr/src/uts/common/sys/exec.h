@@ -27,7 +27,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2016, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_EXEC_H
@@ -83,7 +83,7 @@ typedef struct uarg {
 	ssize_t arglen;
 	char	*fname;
 	char	*pathname;
-	ssize_t	auxsize;
+	size_t	auxsize;
 	caddr_t	stackend;
 	size_t	stk_align;
 	size_t	stk_size;
@@ -182,7 +182,7 @@ struct execsw {
 	int	exec_maglen;
 	int	(*exec_func)(struct vnode *vp, struct execa *uap,
 		    struct uarg *args, struct intpdata *idata, int level,
-		    long *execsz, int setid, caddr_t exec_file,
+		    size_t *execsz, int setid, caddr_t exec_file,
 		    struct cred *cred, int *brand_action);
 	int	(*exec_core)(struct vnode *vp, struct proc *p,
 		    struct cred *cred, rlim64_t rlimit, int sig,
@@ -220,7 +220,7 @@ extern int exece(const char *fname, const char **argp, const char **envp);
 extern int exec_common(const char *fname, const char **argp,
     const char **envp, int brand_action);
 extern int gexec(vnode_t **vp, struct execa *uap, struct uarg *args,
-    struct intpdata *idata, int level, long *execsz, caddr_t exec_file,
+    struct intpdata *idata, int level, size_t *execsz, caddr_t exec_file,
     struct cred *cred, int *brand_action);
 extern struct execsw *allocate_execsw(char *name, char *magic,
     size_t magic_size);
@@ -246,32 +246,32 @@ extern void exec_set_sp(size_t);
  * when compiling the 32-bit compatability elf code in the elfexec module.
  */
 extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *, int *);
+    size_t *, int, caddr_t, cred_t *, int *);
 extern int mapexec_brand(vnode_t *, uarg_t *, Ehdr *, Addr *,
     intptr_t *, caddr_t, char **, caddr_t *, caddr_t *, size_t *,
     uintptr_t *, uintptr_t *);
-extern int elfreadhdr(vnode_t *, cred_t *, Ehdr *, int *, caddr_t *,
-    ssize_t *);
+extern int elfreadhdr(vnode_t *, cred_t *, Ehdr *, uint_t *, caddr_t *,
+    size_t *);
 #endif /* !_ELF32_COMPAT */
 
 #if defined(_LP64)
 extern int elf32exec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
-    long *, int, caddr_t, cred_t *, int *);
+    size_t *, int, caddr_t, cred_t *, int *);
 extern int mapexec32_brand(vnode_t *, uarg_t *, Elf32_Ehdr *, Elf32_Addr *,
     intptr_t *, caddr_t, char **, caddr_t *, caddr_t *, size_t *,
     uintptr_t *, uintptr_t *);
-extern int elf32readhdr(vnode_t *, cred_t *, Elf32_Ehdr *, int *, caddr_t *,
-    ssize_t *);
+extern int elf32readhdr(vnode_t *, cred_t *, Elf32_Ehdr *, uint_t *, caddr_t *,
+    size_t *);
 #endif  /* _LP64 */
 
 /*
  * Utility functions for exec module core routines:
  */
-extern int core_seg(proc_t *, vnode_t *, offset_t, caddr_t,
-    size_t, rlim64_t, cred_t *);
+extern int core_seg(proc_t *, vnode_t *, u_offset_t, caddr_t, size_t,
+    rlim64_t, cred_t *);
 
-extern int core_write(vnode_t *, enum uio_seg, offset_t,
-    const void *, size_t, rlim64_t, cred_t *);
+extern int core_write(vnode_t *, enum uio_seg, u_offset_t, const void *,
+    size_t, rlim64_t, cred_t *);
 
 /* a.out stuff */
 

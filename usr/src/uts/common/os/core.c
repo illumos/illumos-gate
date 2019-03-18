@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016, Joyent Inc.
+ * Copyright 2019 Joyent Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -795,13 +795,18 @@ clock_t	core_delay_usec = 10000;
  * using core_write() below, and so it has the same failure semantics.
  */
 int
-core_seg(proc_t *p, vnode_t *vp, offset_t offset, caddr_t addr, size_t size,
+core_seg(proc_t *p, vnode_t *vp, u_offset_t offset, caddr_t addr, size_t size,
     rlim64_t rlimit, cred_t *credp)
 {
 	caddr_t eaddr;
 	caddr_t base;
 	size_t len;
 	int err = 0;
+
+	if (offset > OFF_MAX || offset + size > OFF_MAX ||
+	    offset + size < offset) {
+		return (EOVERFLOW);
+	}
 
 	eaddr = addr + size;
 	for (base = addr; base < eaddr; base += len) {
@@ -843,15 +848,20 @@ core_seg(proc_t *p, vnode_t *vp, offset_t offset, caddr_t addr, size_t size,
  * unexpectedly returns zero but no progress has been made, we return ENOSPC.
  */
 int
-core_write(vnode_t *vp, enum uio_seg segflg, offset_t offset,
+core_write(vnode_t *vp, enum uio_seg segflg, u_offset_t offset,
     const void *buf, size_t len, rlim64_t rlimit, cred_t *credp)
 {
 	ssize_t resid = len;
 	int error = 0;
 
+	if (offset > OFF_MAX || offset + len > OFF_MAX ||
+	    offset + len < offset) {
+		return (EOVERFLOW);
+	}
+
 	while (len != 0) {
-		error = vn_rdwr(UIO_WRITE, vp, (caddr_t)buf, len, offset,
-		    segflg, 0, rlimit, credp, &resid);
+		error = vn_rdwr(UIO_WRITE, vp, (caddr_t)buf, len,
+		    (offset_t)offset, segflg, 0, rlimit, credp, &resid);
 
 		if (error != 0)
 			break;
