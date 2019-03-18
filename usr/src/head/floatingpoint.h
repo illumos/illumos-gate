@@ -62,8 +62,6 @@ extern "C" {
 typedef	__FILE FILE;
 #endif
 
-#define	N_IEEE_EXCEPTION 5	/* Number of floating-point exceptions. */
-
 typedef int sigfpe_code_type;	/* Type of SIGFPE code. */
 
 typedef void (*sigfpe_handler_type)();	/* Pointer to exception handler */

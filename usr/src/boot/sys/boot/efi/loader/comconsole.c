@@ -28,6 +28,7 @@
 #include <stand.h>
 #include <sys/errno.h>
 #include <bootstrap.h>
+#include <stdbool.h>
 
 #include <efi.h>
 #include <efilib.h>
@@ -59,7 +60,7 @@ static void	comc_putchar(struct console *, int);
 static int	comc_getchar(struct console *);
 static int	comc_ischar(struct console *);
 static int	comc_ioctl(struct console *, int, void *);
-static void	comc_setup(struct console *);
+static bool	comc_setup(struct console *);
 static char	*comc_asprint_mode(struct serial *);
 static int	comc_parse_mode(struct serial *, const char *);
 static int	comc_mode_set(struct env_var *, int, const void *);
@@ -243,18 +244,20 @@ comc_probe(struct console *cp)
 	    port->rtsdtr_off? "true" : "false");
 	unsetenv(name);
 	env_setenv(name, EV_VOLATILE, value, comc_rtsdtr_set, env_nounset);
-	comc_setup(cp);
+
+	cp->c_flags = 0;
+	if (comc_setup(cp))
+		cp->c_flags = C_PRESENTIN | C_PRESENTOUT;
 }
 
 static int
 comc_init(struct console *cp, int arg __attribute((unused)))
 {
 
-	comc_setup(cp);
-
-	if ((cp->c_flags & (C_PRESENTIN | C_PRESENTOUT)) ==
-	    (C_PRESENTIN | C_PRESENTOUT))
+	if (comc_setup(cp))
 		return (CMD_OK);
+
+	cp->c_flags = 0;
 	return (CMD_ERROR);
 }
 
@@ -495,7 +498,8 @@ comc_mode_set(struct env_var *ev, int flags, const void *value)
 	if (comc_parse_mode(cp->c_private, value) == CMD_ERROR)
 		return (CMD_ERROR);
 
-	comc_setup(cp);
+	(void) comc_setup(cp);
+
 	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
 	return (CMD_OK);
@@ -521,7 +525,8 @@ comc_cd_set(struct env_var *ev, int flags, const void *value)
 	else
 		return (CMD_ERROR);
 
-	comc_setup(cp);
+	(void) comc_setup(cp);
+
 	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
 	return (CMD_OK);
@@ -547,50 +552,48 @@ comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 	else
 		return (CMD_ERROR);
 
-	comc_setup(cp);
+	(void) comc_setup(cp);
+
 	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
 	return (CMD_OK);
 }
 
-static void
+/*
+ * In case of error, we also reset ACTIVE flags, so the console
+ * framefork will try alternate consoles.
+ */
+static bool
 comc_setup(struct console *cp)
 {
 	EFI_STATUS status;
 	UINT32 control;
 	struct serial *sp = cp->c_private;
 
-	if ((cp->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) == 0)
-		return;
-
 	/* port is not usable */
-	if (sp->sio == NULL) {
-		cp->c_flags &= ~(C_PRESENTIN | C_PRESENTOUT);
-		return;
-	}
+	if (sp->sio == NULL)
+		return (false);
 
-	cp->c_flags |= (C_PRESENTIN | C_PRESENTOUT);
 	status = sp->sio->Reset(sp->sio);
-	if (EFI_ERROR(status)) {
-		cp->c_flags &= ~(C_PRESENTIN | C_PRESENTOUT);
-	}
+	if (EFI_ERROR(status))
+		return (false);
 
 	status = sp->sio->SetAttributes(sp->sio, sp->baudrate, 0, 0, sp->parity,
 	    sp->databits, sp->stopbits);
-	if (EFI_ERROR(status)) {
-		cp->c_flags &= ~(C_PRESENTIN | C_PRESENTOUT);
-	}
+	if (EFI_ERROR(status))
+		return (false);
 
 	if (sp->rtsdtr_off) {
 		status = sp->sio->GetControl(sp->sio, &control);
-		if (EFI_ERROR(status)) {
-			cp->c_flags &= ~(C_PRESENTIN | C_PRESENTOUT);
-		}
+		if (EFI_ERROR(status))
+			return (false);
 		control &= ~(EFI_SERIAL_REQUEST_TO_SEND |
 		    EFI_SERIAL_DATA_TERMINAL_READY);
 		status = sp->sio->SetControl(sp->sio, control);
-		if (EFI_ERROR(status)) {
-			cp->c_flags &= ~(C_PRESENTIN | C_PRESENTOUT);
-		}
+		if (EFI_ERROR(status))
+			return (false);
 	}
+	/* Mark this port usable. */
+	cp->c_flags |= (C_PRESENTIN | C_PRESENTOUT);
+	return (true);
 }

@@ -27,6 +27,7 @@
 
 #include <stand.h>
 #include <bootstrap.h>
+#include <stdbool.h>
 #include <machine/cpufunc.h>
 #include <dev/ic/ns16550.h>
 #include <dev/pci/pcireg.h>
@@ -77,7 +78,7 @@ static int	comc_ioctl(struct console *, int, void *);
 static uint32_t comc_parse_pcidev(const char *);
 static int	comc_pcidev_set(struct env_var *, int, const void *);
 static int	comc_pcidev_handle(struct console *, uint32_t);
-static void	comc_setup(struct console *);
+static bool	comc_setup(struct console *);
 static char	*comc_asprint_mode(struct serial *);
 static int	comc_parse_mode(struct serial *, const char *);
 static int	comc_mode_set(struct env_var *, int, const void *);
@@ -226,18 +227,20 @@ comc_probe(struct console *cp)
 
 	unsetenv(name);
 	env_setenv(name, EV_VOLATILE, env, comc_pcidev_set, env_nounset);
-	comc_setup(cp);
+
+	cp->c_flags = 0;
+	if (comc_setup(cp))
+		cp->c_flags = C_PRESENTIN | C_PRESENTOUT;
 }
 
 static int
 comc_init(struct console *cp, int arg __attribute((unused)))
 {
 
-	comc_setup(cp);
-
-	if ((cp->c_flags & (C_PRESENTIN | C_PRESENTOUT)) ==
-	    (C_PRESENTIN | C_PRESENTOUT))
+	if (comc_setup(cp))
 		return (CMD_OK);
+
+	cp->c_flags = 0;
 	return (CMD_ERROR);
 }
 
@@ -408,7 +411,7 @@ comc_mode_set(struct env_var *ev, int flags, const void *value)
 	if (comc_parse_mode(cp->c_private, value) == CMD_ERROR)
 		return (CMD_ERROR);
 
-	comc_setup(cp);
+	(void) comc_setup(cp);
 
 	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
@@ -435,7 +438,7 @@ comc_cd_set(struct env_var *ev, int flags, const void *value)
 	else
 		return (CMD_ERROR);
 
-	comc_setup(cp);
+	(void) comc_setup(cp);
 
 	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
@@ -462,7 +465,7 @@ comc_rtsdtr_set(struct env_var *ev, int flags, const void *value)
 	else
 		return (CMD_ERROR);
 
-	comc_setup(cp);
+	(void) comc_setup(cp);
 
 	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
 
@@ -539,7 +542,8 @@ comc_pcidev_handle(struct console *cp, uint32_t locator)
 	}
 	port &= PCIM_BAR_IO_BASE;
 
-	comc_setup(cp);
+	(void) comc_setup(cp);
+
 	sp->locator = locator;
 
 	return (CMD_OK);
@@ -572,15 +576,24 @@ comc_pcidev_set(struct env_var *ev, int flags, const void *value)
 	return (CMD_OK);
 }
 
-static void
+/*
+ * In case of error, we also reset ACTIVE flags, so the console
+ * framefork will try alternate consoles.
+ */
+static bool
 comc_setup(struct console *cp)
 {
 	struct serial *sp = cp->c_private;
 	static int TRY_COUNT = 1000000;
 	int tries;
 
-	if ((cp->c_flags & (C_ACTIVEIN | C_ACTIVEOUT)) == 0)
-		return;
+#define	COMC_TEST	0xbb
+	/*
+	 * Write byte to scratch register and read it out.
+	 */
+	outb(sp->ioaddr + com_scr, COMC_TEST);
+	if (inb(sp->ioaddr + com_scr) != COMC_TEST)
+		return (false);
 
 	outb(sp->ioaddr + com_cfcr, CFCR_DLAB | sp->lcr);
 	outb(sp->ioaddr + com_dlbl, COMC_BPS(sp->speed) & 0xff);
@@ -594,10 +607,11 @@ comc_setup(struct console *cp)
 		inb(sp->ioaddr + com_data);
 	} while (inb(sp->ioaddr + com_lsr) & LSR_RXRDY && ++tries < TRY_COUNT);
 
-	if (tries < TRY_COUNT)
-		cp->c_flags |= (C_PRESENTIN | C_PRESENTOUT);
-	else
-		cp->c_flags &= ~(C_PRESENTIN | C_PRESENTOUT);
+	if (tries == TRY_COUNT)
+		return (false);
+	/* Mark this port usable. */
+	cp->c_flags |= (C_PRESENTIN | C_PRESENTOUT);
+	return (true);
 }
 
 static int

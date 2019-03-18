@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
 /*
@@ -458,12 +459,12 @@ vmem_span_create(vmem_t *vmp, void *vaddr, size_t size, uint8_t import)
 
 	span = vmem_seg_create(vmp, knext->vs_aprev, start, end);
 	span->vs_type = VMEM_SPAN;
+	span->vs_import = import;
 	VMEM_INSERT(knext->vs_kprev, span, k);
 
 	newseg = vmem_seg_create(vmp, span, start, end);
 	vmem_freelist_insert(vmp, newseg);
 
-	newseg->vs_import = import;
 	if (import)
 		vmp->vm_kstat.vk_mem_import += size;
 	vmp->vm_kstat.vk_mem_total += size;
@@ -483,7 +484,7 @@ vmem_span_destroy(vmem_t *vmp, vmem_seg_t *vsp)
 	ASSERT(MUTEX_HELD(&vmp->vm_lock));
 	ASSERT(span->vs_type == VMEM_SPAN);
 
-	if (vsp->vs_import)
+	if (span->vs_import)
 		vmp->vm_kstat.vk_mem_import -= size;
 	vmp->vm_kstat.vk_mem_total -= size;
 
@@ -686,7 +687,8 @@ vmem_advance(vmem_t *vmp, vmem_seg_t *walker, vmem_seg_t *afterme)
 	 * vsp could represent a complete imported span,
 	 * in which case we must return it to the source.
 	 */
-	if (vsp != NULL && vsp->vs_import && vmp->vm_source_free != NULL &&
+	if (vsp != NULL && vsp->vs_aprev->vs_import &&
+	    vmp->vm_source_free != NULL &&
 	    vsp->vs_aprev->vs_type == VMEM_SPAN &&
 	    vsp->vs_anext->vs_type == VMEM_SPAN) {
 		void *vaddr = (void *)vsp->vs_start;
@@ -813,7 +815,7 @@ vmem_nextfit_alloc(vmem_t *vmp, size_t size, int vmflag)
  */
 void *
 vmem_xalloc(vmem_t *vmp, size_t size, size_t align, size_t phase,
-	size_t nocross, void *minaddr, void *maxaddr, int vmflag)
+    size_t nocross, void *minaddr, void *maxaddr, int vmflag)
 {
 	vmem_seg_t *vsp;
 	vmem_seg_t *vbest = NULL;
@@ -1040,7 +1042,7 @@ vmem_xfree(vmem_t *vmp, void *vaddr, size_t size)
 	/*
 	 * If the entire span is free, return it to the source.
 	 */
-	if (vsp->vs_import && vmp->vm_source_free != NULL &&
+	if (vsp->vs_aprev->vs_import && vmp->vm_source_free != NULL &&
 	    vsp->vs_aprev->vs_type == VMEM_SPAN &&
 	    vsp->vs_anext->vs_type == VMEM_SPAN) {
 		vaddr = (void *)vsp->vs_start;
@@ -1364,7 +1366,7 @@ _vmem_extend_alloc(vmem_t *vmp, void *vaddr, size_t size, size_t alloc,
  */
 void
 vmem_walk(vmem_t *vmp, int typemask,
-	void (*func)(void *, void *, size_t), void *arg)
+    void (*func)(void *, void *, size_t), void *arg)
 {
 	vmem_seg_t *vsp;
 	vmem_seg_t *seg0 = &vmp->vm_seg0;
@@ -1428,8 +1430,8 @@ vmem_size(vmem_t *vmp, int typemask)
  */
 vmem_t *
 vmem_create(const char *name, void *base, size_t size, size_t quantum,
-	vmem_alloc_t *afunc, vmem_free_t *ffunc, vmem_t *source,
-	size_t qcache_max, int vmflag)
+    vmem_alloc_t *afunc, vmem_free_t *ffunc, vmem_t *source,
+    size_t qcache_max, int vmflag)
 {
 	int i;
 	size_t nqcache;

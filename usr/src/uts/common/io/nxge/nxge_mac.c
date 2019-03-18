@@ -2876,7 +2876,7 @@ fail:
 
 static int
 nxge_nlp2020_i2c_read(p_nxge_t nxgep, uint8_t ctrl_port, uint16_t address,
-	    uint16_t reg, uint8_t *data)
+    uint16_t reg, uint8_t *data)
 {
 	int  phy_dev, phy_reg;
 	uint16_t phy_data = 0;
@@ -3953,7 +3953,7 @@ nxge_tn1010_xcvr_init(p_nxge_t nxgep)
 	/*
 	 * The following 4 lines actually overwrites what ever the ndd command
 	 * has set. For example, by command
-	 * 	ndd -set /dev/nxge1 adv_autoneg_cap n (n = 0 or 1)
+	 *	ndd -set /dev/nxge1 adv_autoneg_cap n (n = 0 or 1)
 	 * we could set param_arr[param_autoneg].value to n.  However, because
 	 * here we assign constants to these parameters, whatever we set with
 	 * the "ndd -set" command will be replaced. So command
@@ -4314,8 +4314,8 @@ nxge_rx_mac_init(p_nxge_t nxgep)
 	uint8_t			portn;
 	npi_handle_t		handle;
 	npi_status_t		rs = NPI_SUCCESS;
-	uint16_t 		*addr16p;
-	uint16_t 		addr0, addr1, addr2;
+	uint16_t		*addr16p;
+	uint16_t		addr0, addr1, addr2;
 	xmac_rx_config_t	xconfig;
 	bmac_rx_config_t	bconfig;
 
@@ -4505,7 +4505,7 @@ nxge_status_t
 nxge_rx_mac_enable(p_nxge_t nxgep)
 {
 	npi_handle_t	handle;
-	uint8_t 	portn;
+	uint8_t		portn;
 	npi_status_t	rs = NPI_SUCCESS;
 	nxge_status_t	status = NXGE_OK;
 
@@ -5443,7 +5443,7 @@ fail:
 
 nxge_status_t
 nxge_mii_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
-		uint16_t *value)
+    uint16_t *value)
 {
 	npi_status_t rs = NPI_SUCCESS;
 
@@ -5482,7 +5482,7 @@ fail:
 
 nxge_status_t
 nxge_mii_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t xcvr_reg,
-		uint16_t value)
+    uint16_t value)
 {
 	npi_status_t rs = NPI_SUCCESS;
 
@@ -5521,10 +5521,10 @@ fail:
 /*
  * Perform write to Clause45 serdes / transceiver device
  * Arguments:
- *	xcvr_portn: 	The IEEE 802.3 Clause45 PHYAD, it is the same as port
+ *	xcvr_portn:	The IEEE 802.3 Clause45 PHYAD, it is the same as port
  *			number if nxge_mdio_write is used for accessing the
  *			internal LSIL serdes. Otherwise PHYAD is different
- * 			for different platforms.
+ *			for different platforms.
  *	device:		With each PHYAD, the driver can use MDIO to control
  *			multiple devices inside the PHY, here "device" is an
  *			MMD (MDIO managable device).
@@ -5534,7 +5534,7 @@ fail:
  */
 nxge_status_t
 nxge_mdio_read(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t device,
-		uint16_t xcvr_reg, uint16_t *value)
+    uint16_t xcvr_reg, uint16_t *value)
 {
 	npi_status_t rs = NPI_SUCCESS;
 
@@ -5565,7 +5565,7 @@ fail:
 
 nxge_status_t
 nxge_mdio_write(p_nxge_t nxgep, uint8_t xcvr_portn, uint8_t device,
-		uint16_t xcvr_reg, uint16_t value)
+    uint16_t xcvr_reg, uint16_t value)
 {
 	npi_status_t rs = NPI_SUCCESS;
 
@@ -5597,7 +5597,7 @@ fail:
 
 nxge_status_t
 nxge_mii_check(p_nxge_t nxgep, mii_bmsr_t bmsr, mii_bmsr_t bmsr_ints,
-		nxge_link_state_t *link_up)
+    nxge_link_state_t *link_up)
 {
 	p_nxge_param_t	param_arr;
 	p_nxge_stats_t	statsp;
@@ -6679,8 +6679,8 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 			 * argument to the check_link function.
 			 */
 			if (nxgep->xcvr.check_link) {
-				timerid = timeout(
-				    (fptrv_t)(nxgep->xcvr.check_link),
+				timerid = timeout((fptrv_t)(uintptr_t)
+				    (nxgep->xcvr.check_link),
 				    nxgep,
 				    drv_usectohz(LINK_MONITOR_PERIOD));
 				MUTEX_ENTER(&nxgep->poll_lock);
@@ -8105,7 +8105,7 @@ nxge_scan_ports_phy(p_nxge_t nxgep, p_nxge_hw_list_t hw_p)
 			goto error_exit;
 		}
 		break;
-	case 1: 	/* Only one clause45 port */
+	case 1:		/* Only one clause45 port */
 		switch (total_phy_fd) {	/* Number of clause22 ports */
 		case 3:
 			/*
@@ -8465,7 +8465,8 @@ nxge_is_valid_local_mac(ether_addr_st mac_addr)
 }
 
 static void
-nxge_bcm5464_link_led_off(p_nxge_t nxgep) {
+nxge_bcm5464_link_led_off(p_nxge_t nxgep)
+{
 
 	npi_status_t rs = NPI_SUCCESS;
 	uint8_t xcvr_portn;
@@ -8635,7 +8636,7 @@ nxge_get_num_of_xaui(uint32_t *port_pma_pmd_dev_id,
 
 	*num_xaui = 0;
 	if ((port_pma_pmd_dev_id[0]  == PHY_BCM8704_FAMILY &&
-	    port_pcs_dev_id[0] 	== PHY_BCM8704_FAMILY) ||
+	    port_pcs_dev_id[0] == PHY_BCM8704_FAMILY) ||
 	    (((port_pma_pmd_dev_id[0] & TN1010_DEV_ID_MASK)
 	    == TN1010_DEV_ID) &&
 	    ((port_pcs_dev_id[0] & TN1010_DEV_ID_MASK)
@@ -8748,8 +8749,8 @@ fail:
  * Teranetics TN1010 PHY chip supports both 1G and 10G modes, this function
  * figures out the speed of the PHY determined by the autonegotiation
  * process and sets the following 3 parameters,
- * 	nxgep->mac.portmode
- *     	nxgep->statsp->mac_stats.link_speed
+ *	nxgep->mac.portmode
+ *	nxgep->statsp->mac_stats.link_speed
  *	nxgep->statsp->mac_stats.xcvr_inuse
  */
 static nxge_status_t

@@ -98,7 +98,7 @@ static void	*mrsas_state = NULL;
 static volatile boolean_t	mrsas_relaxed_ordering = B_TRUE;
 volatile int	debug_level_g = CL_NONE;
 static volatile int	msi_enable = 1;
-static volatile int 	ctio_enable = 1;
+static volatile int	ctio_enable = 1;
 
 /* Default Timeout value to issue online controller reset */
 volatile int  debug_timeout_g  = 0xF0;		/* 0xB4; */
@@ -143,7 +143,7 @@ static void	mrsas_tran_dmafree(struct scsi_address *, struct scsi_pkt *);
 static void	mrsas_tran_sync_pkt(struct scsi_address *, struct scsi_pkt *);
 static int	mrsas_tran_quiesce(dev_info_t *dip);
 static int	mrsas_tran_unquiesce(dev_info_t *dip);
-static uint_t	mrsas_isr();
+static uint_t	mrsas_isr(caddr_t, caddr_t);
 static uint_t	mrsas_softintr();
 static void	mrsas_undo_resources(dev_info_t *, struct mrsas_instance *);
 
@@ -2289,7 +2289,7 @@ mrsas_tran_unquiesce(dev_info_t *dip)
 
 
 /*
- * mrsas_isr(caddr_t)
+ * mrsas_isr(caddr_t, caddr_t)
  *
  * The Interrupt Service Routine
  *
@@ -2297,8 +2297,9 @@ mrsas_tran_unquiesce(dev_info_t *dip)
  *
  */
 static uint_t
-mrsas_isr(struct mrsas_instance *instance)
+mrsas_isr(caddr_t arg1, caddr_t arg2 __unused)
 {
+	struct mrsas_instance *instance = (struct mrsas_instance *)arg1;
 	int		need_softintr;
 	uint32_t	producer;
 	uint32_t	consumer;
@@ -7352,8 +7353,7 @@ mrsas_add_intrs(struct mrsas_instance *instance, int intr_type)
 	/* Call ddi_intr_add_handler() */
 	for (i = 0; i < actual; i++) {
 		ret = ddi_intr_add_handler(instance->intr_htable[i],
-		    (ddi_intr_handler_t *)mrsas_isr, (caddr_t)instance,
-		    (caddr_t)(uintptr_t)i);
+		    mrsas_isr, (caddr_t)instance, (caddr_t)(uintptr_t)i);
 
 		if (ret != DDI_SUCCESS) {
 			con_log(CL_ANN, (CE_WARN, "mrsas_add_intrs:"

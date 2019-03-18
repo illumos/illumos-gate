@@ -17,7 +17,6 @@ sigfpe \- signal handling for specific SIGFPE codes
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsigfpe()\fR function allows signal handling to be specified for
 particular \fBSIGFPE\fR codes.  A call to \fBsigfpe()\fR defines a new handler
@@ -41,6 +40,15 @@ FPE_FLTOVF   fp_overflow \(mi floating-point overflow
 FPE_FLTINV   fp_invalid \(mi floating-point invalid operation
 .fi
 .in -2
+.LP
+And additionally on the x86 architecture:
+.sp
+.in +2
+.nf
+FPE_FLTDEN   fp_denormalized \(mi floating-point denormalized result
+.fi
+.in -2
+
 
 .sp
 .LP
@@ -140,7 +148,6 @@ main(void) {
 .in -2
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/usr/include/floatingpoint.h\fR\fR
@@ -161,7 +168,6 @@ main(void) {
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -177,12 +183,10 @@ MT-Level	Safe
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBsigaction\fR(2), \fBabort\fR(3C), \fBsignal\fR(3C), \fBattributes\fR(5),
 \fBfloatingpoint.h\fR(3HEAD)
 .SH DIAGNOSTICS
-.sp
 .LP
 The \fBsigfpe()\fR function returns (void(*)())-1 if \fIcode\fR is not zero or
 a defined \fBSIGFPE\fR code.

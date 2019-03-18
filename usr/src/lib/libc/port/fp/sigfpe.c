@@ -150,6 +150,11 @@ _sigfpe_master(int sig, siginfo_t *siginfo, void *arg)
 		case FPE_FLTOVF:
 			exception = fp_overflow;
 			goto ieee;
+#if defined(__i386) || defined(__amd64)
+		case FPE_FLTDEN:
+			exception = fp_denormalized;
+			goto ieee;
+#endif
 		default:	/* The common default treatment is to abort. */
 			break;
 		}
