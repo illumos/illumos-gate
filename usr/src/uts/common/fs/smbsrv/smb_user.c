@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -755,6 +755,57 @@ smb_user_setcred(smb_user_t *user, cred_t *cr, uint32_t privileges)
 	ASSERT(cr);
 	crhold(cr);
 
+	/*
+	 * See smb.4 bypass_traverse_checking
+	 *
+	 * For historical reasons, the Windows privilege is named
+	 * SeChangeNotifyPrivilege, though the description is
+	 * "Bypass traverse checking".
+	 */
+	if ((privileges & SMB_USER_PRIV_CHANGE_NOTIFY) != 0) {
+		(void) crsetpriv(cr, PRIV_FILE_DAC_SEARCH, NULL);
+	}
+
+	/*
+	 * Window's "take ownership privilege" is similar to our
+	 * PRIV_FILE_CHOWN privilege. It's normally given to members of the
+	 * "Administrators" group, which normally includes the the local
+	 * Administrator (like root) and when joined to a domain,
+	 * "Domain Admins".
+	 */
+	if ((privileges & SMB_USER_PRIV_TAKE_OWNERSHIP) != 0) {
+		(void) crsetpriv(cr,
+		    PRIV_FILE_CHOWN,
+		    PRIV_FILE_CHOWN_SELF,
+		    NULL);
+	}
+
+	/*
+	 * Bypass ACL for READ accesses.
+	 */
+	if ((privileges & SMB_USER_PRIV_READ_FILE) != 0) {
+		(void) crsetpriv(cr, PRIV_FILE_DAC_READ, NULL);
+	}
+
+	/*
+	 * Bypass ACL for WRITE accesses.
+	 * Include FILE_OWNER, as it covers WRITE_ACL and DELETE.
+	 */
+	if ((privileges & SMB_USER_PRIV_WRITE_FILE) != 0) {
+		(void) crsetpriv(cr,
+		    PRIV_FILE_DAC_WRITE,
+		    PRIV_FILE_OWNER,
+		    NULL);
+	}
+
+	/*
+	 * These privileges are used only when a file is opened with
+	 * 'backup intent'. These allow users to bypass certain access
+	 * controls. Administrators typically have these privileges,
+	 * and they are used during recursive take-ownership operations.
+	 * Some commonly used tools use 'backup intent' to administrate
+	 * files that do not grant explicit permissions to Administrators.
+	 */
 	if (privileges & (SMB_USER_PRIV_BACKUP | SMB_USER_PRIV_RESTORE))
 		privcred = crdup(cr);
 

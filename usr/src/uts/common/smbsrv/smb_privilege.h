@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #ifndef _SMB_PRIVILEGE_H
@@ -97,6 +97,8 @@ extern "C" {
 #define	SE_SYSTEM_ENVIRONMENT_NAME	"SeSystemEnvironmentPrivilege"
 #define	SE_CHANGE_NOTIFY_NAME		"SeChangeNotifyPrivilege"
 #define	SE_REMOTE_SHUTDOWN_NAME		"SeRemoteShutdownPrivilege"
+#define	SE_READ_FILE_NAME		"BypassAclRead"
+#define	SE_WRITE_FILE_NAME		"BypassAclWrite"
 
 #define	SE_MIN_LUID			2
 #define	SE_CREATE_TOKEN_LUID		2
@@ -122,7 +124,9 @@ extern "C" {
 #define	SE_SYSTEM_ENVIRONMENT_LUID	22
 #define	SE_CHANGE_NOTIFY_LUID		23
 #define	SE_REMOTE_SHUTDOWN_LUID		24
-#define	SE_MAX_LUID			24
+#define	SE_READ_FILE_LUID		25
+#define	SE_WRITE_FILE_LUID		26
+#define	SE_MAX_LUID			26
 
 /*
  * Privilege attributes

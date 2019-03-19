@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -96,35 +96,6 @@ smb_cred_create(smb_token_t *token)
 	crsetsid(cr, &ksid, KSID_OWNER);
 	ksidlist = smb_cred_set_sidlist(&token->tkn_win_grps);
 	crsetsidlist(cr, ksidlist);
-
-	/*
-	 * In the AD world, "take ownership privilege" is very much
-	 * like having Unix "root" privileges.  It's normally given
-	 * to members of the "Administrators" group, which normally
-	 * includes the the local Administrator (like root) and when
-	 * joined to a domain, "Domain Admins".
-	 */
-	if (smb_token_query_privilege(token, SE_TAKE_OWNERSHIP_LUID)) {
-		(void) crsetpriv(cr,
-		    PRIV_FILE_CHOWN,
-		    PRIV_FILE_DAC_READ,
-		    PRIV_FILE_DAC_SEARCH,
-		    PRIV_FILE_DAC_WRITE,
-		    PRIV_FILE_OWNER,
-		    NULL);
-	}
-
-	/*
-	 * See smb.4 bypass_traverse_checking
-	 *
-	 * For historical reasons, the Windows privilege is named
-	 * SeChangeNotifyPrivilege, though the description is
-	 * "Bypass traverse checking".
-	 */
-	if (smb_token_query_privilege(token, SE_CHANGE_NOTIFY_LUID)) {
-		(void) crsetpriv(cr, PRIV_FILE_DAC_SEARCH, NULL);
-	}
-
 
 	return (cr);
 }
