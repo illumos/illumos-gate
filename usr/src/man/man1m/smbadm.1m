@@ -16,9 +16,9 @@
 .\"
 .\"
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2017 Nexenta Systems, Inc.
+.\" Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
 .\"
-.Dd November 18, 2017
+.Dd June 6, 2019
 .Dt SMBADM 1M
 .Os
 .Sh NAME
@@ -252,6 +252,10 @@ to restore file system objects.
 .It Cm take-ownership Ns = Ns Cm on Ns | Ns Cm off
 Specifies whether members of the SMB local group can take ownership of file
 system objects.
+.It Cm bypass-read Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can always bypass Read access controls.
+.It Cm bypass-write Ns = Ns Cm on Ns | Ns Cm off
+Specifies whether members of the SMB local group can always bypass Write and Delete access controls.
 .El
 .It Xo
 .Cm add-member

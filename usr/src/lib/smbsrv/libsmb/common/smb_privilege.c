@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -79,7 +81,11 @@ static smb_privinfo_t priv_table[] = {
 	    "Modify firmware environment values", 0 },
 	{ 23, SE_CHANGE_NOTIFY_NAME, "Bypass traverse checking", 0 },
 	{ 24, SE_REMOTE_SHUTDOWN_NAME,
-	    "Force shutdown from a remote system", 0 }
+	    "Force shutdown from a remote system", 0 },
+	{ 25, SE_READ_FILE_NAME,
+	    "Bypass ACL for READ access", PF_PRESENTABLE },
+	{ 26, SE_WRITE_FILE_NAME,
+	    "Bypass ACL for WRITE and DELETE access", PF_PRESENTABLE },
 };
 
 /*

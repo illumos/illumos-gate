@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -1012,6 +1012,8 @@ typedef struct smb_session {
 #define	SMB_USER_PRIV_BACKUP		(1<<17)	/* SE_BACKUP_LUID */
 #define	SMB_USER_PRIV_RESTORE		(1<<18)	/* SE_RESTORE_LUID */
 #define	SMB_USER_PRIV_CHANGE_NOTIFY	(1<<23)	/* SE_CHANGE_NOTIFY_LUID */
+#define	SMB_USER_PRIV_READ_FILE		(1<<25)	/* SE_READ_FILE_LUID */
+#define	SMB_USER_PRIV_WRITE_FILE	(1<<26)	/* SE_WRITE_FILE_LUID */
 
 /*
  * See the long "User State Machine" comment in smb_user.c
