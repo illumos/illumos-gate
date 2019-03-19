@@ -71,8 +71,8 @@ typedef struct smb_buf32 {
  * SMB_ATF_BACKUPOP	Token belongs to a Power User member
  * SMB_ATF_ADMIN	Token belongs to a Domain Admins member
  */
-#define	SMB_ATF_GUEST		0x00000001
-#define	SMB_ATF_ANON		0x00000002
+#define	SMB_ATF_ANON		0x00000001
+#define	SMB_ATF_GUEST		0x00000002
 #define	SMB_ATF_POWERUSER	0x00000004
 #define	SMB_ATF_BACKUPOP	0x00000008
 #define	SMB_ATF_ADMIN		0x00000010
