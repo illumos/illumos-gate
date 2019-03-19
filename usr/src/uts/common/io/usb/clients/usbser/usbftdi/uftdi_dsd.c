@@ -290,7 +290,7 @@ uftdi_attach(ds_attach_info_t *aip)
 		break;
 	case USB_VENDOR_MARVELL:
 		switch (dd->idProduct) {
-		case USB_PRODUCT_MARVELL_SHEEVAPLUG_JTAG:
+		case USB_PRODUCT_MARVELL_SHEEVAPLUG:
 			break;
 		default:
 			recognized = B_FALSE;

@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -218,13 +218,15 @@ dls_unbind(dld_str_t *dsp)
 		mac_rx_bypass_enable(dsp->ds_mch);
 
 	/*
-	 * For VLAN SAP, there was a promisc handle registered when dls_bind.
-	 * When unbind this dls link, we need to remove the promisc handle.
-	 * See comments in dls_bind().
+	 * A VLAN SAP does not actually add itself to the STREAM head today.
+	 * While we initially set up a VLAN handle below, it's possible that
+	 * something else will have come in and clobbered it.
 	 */
-	if (dsp->ds_vlan_mph != NULL) {
-		mac_promisc_remove(dsp->ds_vlan_mph);
-		dsp->ds_vlan_mph = NULL;
+	if (dsp->ds_sap == ETHERTYPE_VLAN) {
+		if (dsp->ds_vlan_mph != NULL) {
+			mac_promisc_remove(dsp->ds_vlan_mph);
+			dsp->ds_vlan_mph = NULL;
+		}
 		return;
 	}
 

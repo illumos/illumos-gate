@@ -2625,6 +2625,26 @@ function get_objnum
 }
 
 #
+# Sync data to the pool
+#
+# $1 pool name
+# $2 boolean to force uberblock (and config including zpool cache file) update
+#
+function sync_pool #pool <force>
+{
+	typeset pool=${1:-$TESTPOOL}
+	typeset force=${2:-false}
+
+	if [[ $force == true ]]; then
+		log_must zpool sync -f $pool
+	else
+		log_must zpool sync $pool
+	fi
+
+	return 0
+}
+
+#
 # Prints the current time in seconds since UNIX Epoch.
 #
 function current_epoch
