@@ -2130,7 +2130,7 @@ ipsecesp_send_keepalive(ipsa_t *assoc)
 	mp->b_prev = (mblk_t *)(uintptr_t)ns->netstack_stackid;
 
 	if (taskq_dispatch(esp_taskq, actually_send_keepalive, mp,
-	    TQ_NOSLEEP) == 0) {
+	    TQ_NOSLEEP) == TASKQID_INVALID) {
 		/* Assume no memory if taskq_dispatch() fails. */
 		mp->b_prev = NULL;
 		ip_drop_packet(mp, B_FALSE, NULL,
@@ -3221,8 +3221,8 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		if (rc == 0) {
 			lpkt = sadb_clear_lpkt(larval);
 			if (lpkt != NULL) {
-				rc = !taskq_dispatch(esp_taskq, inbound_task,
-				    lpkt, TQ_NOSLEEP);
+				rc = taskq_dispatch(esp_taskq, inbound_task,
+				    lpkt, TQ_NOSLEEP) == TASKQID_INVALID;
 			}
 		}
 		IPSA_REFRELE(larval);

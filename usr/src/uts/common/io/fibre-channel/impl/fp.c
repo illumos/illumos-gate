@@ -4839,7 +4839,7 @@ fp_ulp_devc_cb(fc_local_port_t *port, fc_portmap_t *changelist,
 	}
 
 	ret = taskq_dispatch(port->fp_taskq, fctl_ulp_statec_cb, clist, sleep);
-	if (sync && ret) {
+	if (sync && ret != TASKQID_INVALID) {
 		mutex_enter(&clist->clist_mutex);
 		while (clist->clist_wait) {
 			cv_wait(&clist->clist_cv, &clist->clist_mutex);

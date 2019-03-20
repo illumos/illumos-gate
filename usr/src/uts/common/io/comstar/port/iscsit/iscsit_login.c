@@ -382,7 +382,8 @@ iscsit_login_sm_event_locked(iscsit_conn_t *ict, iscsit_login_event_t event,
 		if (lsm->icl_login_complete) {
 			lsm->icl_busy = B_TRUE;
 			if (taskq_dispatch(iscsit_global.global_dispatch_taskq,
-			    login_sm_complete, ict, DDI_SLEEP) == NULL) {
+			    login_sm_complete, ict, DDI_SLEEP) ==
+			    TASKQID_INVALID) {
 				cmn_err(CE_WARN, "iscsit_login_sm_event_locked:"
 				    " Failed to dispatch task");
 			}

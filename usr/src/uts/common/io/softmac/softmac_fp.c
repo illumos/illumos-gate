@@ -852,7 +852,8 @@ softmac_taskq_dispatch(void)
 			sup->su_taskq_scheduled = B_FALSE;
 			mutex_exit(&softmac_taskq_lock);
 			VERIFY(taskq_dispatch(system_taskq,
-			    softmac_wput_nondata_task, sup, TQ_SLEEP) != NULL);
+			    softmac_wput_nondata_task, sup, TQ_SLEEP) !=
+			    TASKQID_INVALID);
 			mutex_enter(&softmac_taskq_lock);
 			sup = list_head(&softmac_taskq_list);
 		}
@@ -893,7 +894,7 @@ softmac_wput_nondata(softmac_upper_t *sup, mblk_t *mp)
 	mutex_exit(&sup->su_disp_mutex);
 
 	if (taskq_dispatch(system_taskq, softmac_wput_nondata_task,
-	    sup, TQ_NOSLEEP) != NULL) {
+	    sup, TQ_NOSLEEP) != TASKQID_INVALID) {
 		return;
 	}
 

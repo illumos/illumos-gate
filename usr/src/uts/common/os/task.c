@@ -456,7 +456,7 @@ task_rele(task_t *tk)
 	 * the task fails.
 	 */
 	if (taskq_dispatch(exacct_queue, exacct_commit_task, tk,
-	    TQ_NOSLEEP | TQ_NOQUEUE) == (uintptr_t)NULL) {
+	    TQ_NOSLEEP | TQ_NOQUEUE) == TASKQID_INVALID) {
 		mutex_enter(&task_commit_lock);
 		if (task_commit_head == NULL) {
 			task_commit_head = task_commit_tail = tk;

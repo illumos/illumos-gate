@@ -2699,7 +2699,7 @@ schpc_event_filter(pcimsg_t *pmsg)
 		    "event alloc'd");
 
 		if (taskq_dispatch(schpc_event_taskq, schpc_event_handler,
-		    (void *)pevent, TQ_SLEEP) == NULL) {
+		    (void *)pevent, TQ_SLEEP) == TASKQID_INVALID) {
 			cmn_err(CE_WARN, "schpc: schpc_event_filter - "
 			    "taskq_dispatch failed to enqueue event");
 			kmem_free(pevent, sizeof (pcimsg_t));

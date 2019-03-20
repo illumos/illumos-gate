@@ -3084,7 +3084,8 @@ kmem_reap_start(void *flag)
 	 * we won't reap again until the current reap completes *and*
 	 * at least kmem_reap_interval ticks have elapsed.
 	 */
-	if (!taskq_dispatch(kmem_taskq, kmem_reap_done, flag, TQ_NOSLEEP))
+	if (taskq_dispatch(kmem_taskq, kmem_reap_done, flag, TQ_NOSLEEP) ==
+	    TASKQID_INVALID)
 		kmem_reap_done(flag);
 }
 
@@ -3103,7 +3104,8 @@ kmem_reap_common(void *flag_arg)
 	 * start the reap going with a TQ_NOALLOC dispatch.  If the dispatch
 	 * fails, we reset the flag, and the next reap will try again.
 	 */
-	if (!taskq_dispatch(kmem_taskq, kmem_reap_start, flag, TQ_NOALLOC))
+	if (taskq_dispatch(kmem_taskq, kmem_reap_start, flag, TQ_NOALLOC) ==
+	    TASKQID_INVALID)
 		*flag = 0;
 }
 
@@ -3378,7 +3380,8 @@ kmem_update(void *dummy)
 	 * kmem_update() becomes self-throttling: it won't schedule
 	 * new tasks until all previous tasks have completed.
 	 */
-	if (!taskq_dispatch(kmem_taskq, kmem_update_timeout, dummy, TQ_NOSLEEP))
+	if (taskq_dispatch(kmem_taskq, kmem_update_timeout, dummy, TQ_NOSLEEP)
+	    == TASKQID_INVALID)
 		kmem_update_timeout(NULL);
 }
 
@@ -4857,8 +4860,8 @@ kmem_move_begin(kmem_cache_t *cp, kmem_slab_t *sp, void *buf, int flags)
 
 	mutex_exit(&cp->cache_lock);
 
-	if (!taskq_dispatch(kmem_move_taskq, (task_func_t *)kmem_move_buffer,
-	    callback, TQ_NOSLEEP)) {
+	if (taskq_dispatch(kmem_move_taskq, (task_func_t *)kmem_move_buffer,
+	    callback, TQ_NOSLEEP) == TASKQID_INVALID) {
 		mutex_enter(&cp->cache_lock);
 		avl_remove(&cp->cache_defrag->kmd_moves_pending, callback);
 		mutex_exit(&cp->cache_lock);
@@ -5205,9 +5208,9 @@ kmem_cache_move_notify(kmem_cache_t *cp, void *buf)
 	if (args != NULL) {
 		args->kmna_cache = cp;
 		args->kmna_buf = buf;
-		if (!taskq_dispatch(kmem_taskq,
+		if (taskq_dispatch(kmem_taskq,
 		    (task_func_t *)kmem_cache_move_notify_task, args,
-		    TQ_NOSLEEP))
+		    TQ_NOSLEEP) == TASKQID_INVALID)
 			kmem_free(args, sizeof (kmem_move_notify_args_t));
 	}
 }

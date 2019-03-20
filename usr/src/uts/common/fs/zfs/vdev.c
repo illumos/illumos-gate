@@ -1352,7 +1352,7 @@ vdev_open_children(vdev_t *vd)
 
 	for (int c = 0; c < children; c++)
 		VERIFY(taskq_dispatch(tq, vdev_open_child, vd->vdev_child[c],
-		    TQ_SLEEP) != NULL);
+		    TQ_SLEEP) != TASKQID_INVALID);
 
 	taskq_destroy(tq);
 }

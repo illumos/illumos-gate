@@ -6069,8 +6069,8 @@ scrub_ecache_line_intr(caddr_t arg1, caddr_t arg2)
 static void
 cpu_delayed_check_ce_errors(void *arg)
 {
-	if (!taskq_dispatch(ch_check_ce_tq, cpu_check_ce_errors, arg,
-	    TQ_NOSLEEP)) {
+	if (taskq_dispatch(ch_check_ce_tq, cpu_check_ce_errors, arg,
+	    TQ_NOSLEEP) == TASKQID_INVALID) {
 		(void) timeout(cpu_delayed_check_ce_errors, arg,
 		    drv_usectohz((clock_t)cpu_ceen_delay_secs * MICROSEC));
 	}

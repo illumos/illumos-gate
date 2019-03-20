@@ -2225,8 +2225,8 @@ pciehpc_handle_power_fault(dev_info_t *dip)
 	 */
 	ndi_hold_devi(dip);
 
-	if (!taskq_dispatch(system_taskq, pciehpc_power_fault_handler, dip,
-	    TQ_NOSLEEP)) {
+	if (taskq_dispatch(system_taskq, pciehpc_power_fault_handler, dip,
+	    TQ_NOSLEEP) == TASKQID_INVALID) {
 		ndi_rele_devi(dip);
 		PCIE_DBG("pciehpc_intr(): "
 		    "Failed to dispatch power fault handler, dip %p\n", dip);

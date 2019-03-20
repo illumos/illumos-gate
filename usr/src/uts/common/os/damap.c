@@ -1454,7 +1454,7 @@ dam_addr_stable_cb(void *arg)
 	 */
 	if (spend) {
 		if (taskq_dispatch(system_taskq, dam_stabilize_map,
-		    mapp, TQ_NOSLEEP | TQ_NOQUEUE)) {
+		    mapp, TQ_NOSLEEP | TQ_NOQUEUE) != TASKQID_INVALID) {
 			DTRACE_PROBE2(damap__map__addr__stable__start,
 			    char *, mapp->dam_name, dam_t *, mapp);
 
@@ -1546,7 +1546,7 @@ dam_addrset_stable_cb(void *arg)
 	 */
 	if ((mapp->dam_flags & DAM_SPEND) ||
 	    (taskq_dispatch(system_taskq, dam_stabilize_map, mapp,
-	    TQ_NOSLEEP | TQ_NOQUEUE) == (uintptr_t)NULL)) {
+	    TQ_NOSLEEP | TQ_NOQUEUE) == TASKQID_INVALID)) {
 		DAM_INCR_STAT(mapp, dam_overrun);
 		mapp->dam_stable_overrun++;
 		dam_sched_timeout(dam_addrset_stable_cb, mapp,

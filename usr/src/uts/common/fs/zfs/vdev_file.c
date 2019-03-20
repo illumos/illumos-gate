@@ -245,7 +245,7 @@ vdev_file_io_start(zio_t *zio)
 	bp->b_iodone = vdev_file_io_intr;
 
 	VERIFY3U(taskq_dispatch(system_taskq, vdev_file_io_strategy, bp,
-	    TQ_SLEEP), !=, 0);
+	    TQ_SLEEP), !=, TASKQID_INVALID);
 }
 
 /* ARGSUSED */

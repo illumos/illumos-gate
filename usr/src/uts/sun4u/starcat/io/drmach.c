@@ -1700,7 +1700,7 @@ drmach_mbox_event(void)
 		/* schedule a reinit handshake if one isn't pending */
 		if (!drmach_mbox_ipending) {
 			if (taskq_dispatch(system_taskq, drmach_mbox_reinit,
-			    NULL, TQ_NOSLEEP) != NULL) {
+			    NULL, TQ_NOSLEEP) != TASKQID_INVALID) {
 				drmach_mbox_ipending = 1;
 			} else {
 				cmn_err(CE_WARN,
@@ -1727,7 +1727,7 @@ drmach_mbox_event(void)
 			if (!drmach_mbox_ipending) {
 				if (taskq_dispatch(system_taskq,
 				    drmach_mbox_reinit, NULL, TQ_NOSLEEP)
-				    != NULL) {
+				    != TASKQID_INVALID) {
 					drmach_mbox_ipending = 1;
 				} else {
 					cmn_err(CE_WARN, "failed to schedule "
@@ -1889,7 +1889,7 @@ drmach_mbox_getmsg()
 			if (!drmach_mbox_ipending) {
 				if (taskq_dispatch(system_taskq,
 				    drmach_mbox_reinit, NULL, TQ_NOSLEEP)
-				    != NULL) {
+				    != TASKQID_INVALID) {
 					drmach_mbox_ipending = 1;
 				} else {
 					cmn_err(CE_WARN, "failed to schedule "

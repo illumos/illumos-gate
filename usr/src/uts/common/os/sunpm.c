@@ -995,7 +995,8 @@ pm_rescan(void *arg)
 	 */
 	if (DEVI_IS_ATTACHING(dip) ||
 	    (scanp->ps_scan_flags & PM_SCAN_DISPATCHED) ||
-	    !taskq_dispatch(system_taskq, pm_scan, (void *)dip, TQ_NOSLEEP)) {
+	    taskq_dispatch(system_taskq, pm_scan, (void *)dip, TQ_NOSLEEP) ==
+	    TASKQID_INVALID) {
 		PMD(PMD_SCAN, ("%s: %s@%s(%s#%d): attaching, pm_scan already "
 		    "dispatched or dispatching failed\n", pmf, PM_DEVICE(dip)))
 		if (scanp->ps_scan_id) {

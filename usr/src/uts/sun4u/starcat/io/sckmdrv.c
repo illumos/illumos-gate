@@ -650,7 +650,8 @@ sckm_mbox_callback(void)
 		return;
 	}
 
-	if (!taskq_dispatch(sckm_taskq, sckm_mbox_task, NULL, KM_NOSLEEP)) {
+	if (taskq_dispatch(sckm_taskq, sckm_mbox_task, NULL, KM_NOSLEEP) ==
+	    TASKQID_INVALID) {
 		/*
 		 * Too many tasks already pending. Do not queue a new
 		 * request.

@@ -563,7 +563,7 @@ kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
 	 * block when handling client_finish messages.
 	 */
 	if (taskq_dispatch(system_taskq, kssl_input_asynch, handle,
-	    TQ_NOSLEEP) == NULL) {
+	    TQ_NOSLEEP) == TASKQID_INVALID) {
 		DTRACE_PROBE(kssl_err__taskq_dispatch_failed);
 		kssl_async_done(kssl->ksslf_ctx);
 	}

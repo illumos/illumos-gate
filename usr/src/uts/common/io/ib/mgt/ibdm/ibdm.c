@@ -1487,7 +1487,7 @@ ibdm_sweep_fabric(int reprobe_flag)
 		IBTF_DPRINTF_L4("ibdm", "\tsweep_fabric: gid_info = %p"
 		    " taskq_id = %x", gid_info, tid);
 		/* taskq failed to dispatch call it directly */
-		if (tid == NULL)
+		if (tid == TASKQID_INVALID)
 			ibdm_probe_gid_thread((void *)gid_info);
 	}
 
@@ -3432,7 +3432,7 @@ ibdm_ibmf_recv_cb(ibmf_handle_t ibmf_hdl, ibmf_msg_t *msg, void *arg)
 	taskq_args->tq_args = arg;
 
 	if (taskq_dispatch(system_taskq, ibdm_recv_incoming_mad, taskq_args,
-	    TQ_NOSLEEP) == 0) {
+	    TQ_NOSLEEP) == TASKQID_INVALID) {
 		IBTF_DPRINTF_L2("ibdm", "ibmf_recv_cb: taskq_dispatch failed");
 		if (ibmf_free_msg(ibmf_hdl, &msg) != IBMF_SUCCESS) {
 			IBTF_DPRINTF_L4("ibmf_recv_cb",
@@ -5849,7 +5849,7 @@ ibdm_saa_event_cb(ibmf_saa_handle_t ibmf_saa_handle,
 		if (node_gid_info == NULL) {
 			if (taskq_dispatch(system_taskq,
 			    ibdm_saa_handle_new_gid, (void *)gid_info,
-			    TQ_NOSLEEP) == NULL) {
+			    TQ_NOSLEEP) == TASKQID_INVALID) {
 				IBTF_DPRINTF_L2("ibdm", "\tsaa_event_cb: "
 				    "new_gid taskq_dispatch failed");
 				return;
@@ -5901,7 +5901,7 @@ ibdm_saa_event_cb(ibmf_saa_handle_t ibmf_saa_handle,
 		event_arg->callback_arg = callback_arg;
 
 		if (taskq_dispatch(system_taskq, ibdm_saa_event_taskq,
-		    (void *)event_arg, TQ_NOSLEEP) == NULL) {
+		    (void *)event_arg, TQ_NOSLEEP) == TASKQID_INVALID) {
 			IBTF_DPRINTF_L2("ibdm", "\tsaa_event_cb: "
 			    "taskq_dispatch failed");
 			ibdm_free_saa_event_arg(event_arg);

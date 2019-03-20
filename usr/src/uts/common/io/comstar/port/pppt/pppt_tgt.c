@@ -802,7 +802,7 @@ pppt_tgt_dereg_retry(void *arg)
 	 * If it fails we'll setup another timeout and try again later.
 	 */
 	if (taskq_dispatch(pppt_global.global_dispatch_taskq,
-	    pppt_tgt_dereg_task, tgt, KM_NOSLEEP) == NULL) {
+	    pppt_tgt_dereg_task, tgt, KM_NOSLEEP) == TASKQID_INVALID) {
 		/* Dispatch failed, try again later */
 		(void) timeout(pppt_tgt_dereg_retry, tgt,
 		    drv_usectohz(TGT_DEREG_RETRY_SECONDS * 1000000));

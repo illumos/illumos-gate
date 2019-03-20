@@ -482,7 +482,7 @@ ibcm_handle_get_path(ibt_path_attr_t *attrp, ibt_path_flags_t flags,
 	if (func != NULL) {		/* Non-Blocking */
 		IBTF_DPRINTF_L3(cmlog, "ibcm_handle_get_path: Non Blocking");
 		if (taskq_dispatch(ibcm_taskq, ibcm_process_async_get_paths,
-		    path_tq, TQ_NOSLEEP) == 0) {
+		    path_tq, TQ_NOSLEEP) == TASKQID_INVALID) {
 			IBTF_DPRINTF_L2(cmlog, "ibcm_handle_get_path: "
 			    "Failed to dispatch the TaskQ");
 			kmem_free(path_tq, len);
@@ -4169,7 +4169,7 @@ ibcm_get_ip_path(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
 	sleep_flag = ((func == NULL) ? TQ_SLEEP : TQ_NOSLEEP);
 	ret = taskq_dispatch(ibcm_taskq, ibcm_process_get_ip_paths, path_tq,
 	    sleep_flag);
-	if (ret == 0) {
+	if (ret == TASKQID_INVALID) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_get_ip_path: Failed to dispatch "
 		    "the TaskQ");
 		if (func == NULL) {		/* Blocking */

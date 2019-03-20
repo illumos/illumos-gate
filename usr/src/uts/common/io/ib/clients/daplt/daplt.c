@@ -1893,7 +1893,7 @@ daplka_timer_dispatch(void *arg)
 	 * taskq_dispatch succeeds.
 	 */
 	if (taskq_dispatch(daplka_taskq,
-	    daplka_timer_thread, arg, TQ_NOSLEEP) == 0) {
+	    daplka_timer_thread, arg, TQ_NOSLEEP) == TASKQID_INVALID) {
 		DERR("timer_dispatch: taskq_dispatch failed, retrying...\n");
 		(void) timeout(daplka_timer_dispatch, arg, 10);
 	}

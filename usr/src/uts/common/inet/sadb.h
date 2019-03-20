@@ -794,7 +794,7 @@ void sadb_clear_buf_pkt(void *ipkt);
 {									\
 	if (buf_pkt != NULL) {						\
 		if (taskq_dispatch(taskq, sadb_clear_buf_pkt,		\
-		    (void *) buf_pkt, TQ_NOSLEEP) == 0) {		\
+		    (void *) buf_pkt, TQ_NOSLEEP) == TASKQID_INVALID) {	\
 		    /* Dispatch was unsuccessful drop the packets. */	\
 			mblk_t		*tmp;				\
 			while (buf_pkt != NULL) {			\

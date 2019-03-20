@@ -1691,8 +1691,8 @@ usb_async_req(dev_info_t *dip,
 		tq_flag |= TQ_NOQUEUE;
 	}
 
-	if (!taskq_dispatch(system_taskq, func, (void *)arg,
-	    tq_flag)) {
+	if (taskq_dispatch(system_taskq, func, arg,
+	    tq_flag) == TASKQID_INVALID) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usbai_log_handle,
 		    "usb_async_req: failure");
 
@@ -1747,7 +1747,7 @@ usba_async_ph_req(usba_pipe_handle_data_t *ph_data,
 		tq_flag |= TQ_NOQUEUE;
 	}
 
-	if (!taskq_dispatch(taskq, func, (void *)arg, tq_flag)) {
+	if (taskq_dispatch(taskq, func, arg, tq_flag) == TASKQID_INVALID) {
 		USB_DPRINTF_L2(DPRINT_MASK_USBA, usbai_log_handle,
 		    "usba_async_ph_req: failure");
 

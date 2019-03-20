@@ -1029,7 +1029,7 @@ emul64_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	if ((emul64_usetaskq == 0) || (pkt->pkt_flags & FLAG_NOINTR) != 0) {
 		emul64_pkt_comp((caddr_t)pkt);
 	} else {
-		dispatched = NULL;
+		dispatched = TASKQID_INVALID;
 		if (emul64_collect_stats) {
 			/*
 			 * If we are collecting statistics, call
@@ -1042,14 +1042,14 @@ emul64_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			 */
 			dispatched = taskq_dispatch(emul64->emul64_taskq,
 			    emul64_pkt_comp, (void *)pkt, TQ_NOSLEEP);
-			if (dispatched == NULL) {
+			if (dispatched == TASKQID_INVALID) {
 				/* Queue was full.  dispatch failed. */
 				mutex_enter(&emul64_stats_mutex);
 				emul64_taskq_max++;
 				mutex_exit(&emul64_stats_mutex);
 			}
 		}
-		if (dispatched == NULL) {
+		if (dispatched == TASKQID_INVALID) {
 			(void) taskq_dispatch(emul64->emul64_taskq,
 			    emul64_pkt_comp, (void *)pkt, TQ_SLEEP);
 		}
