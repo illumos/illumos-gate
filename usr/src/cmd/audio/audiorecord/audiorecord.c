@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
+
 /* Command-line audio record utility */
 
 #include <stdio.h>
@@ -773,7 +777,7 @@ parse_sample_rate(char *s, unsigned *rate)
 		if (*cp != NULL) {
 			if ((*cp == 'k') || (*cp == 'K')) {
 				drate *= 1000.0;
-			} else if ((*cp != 'h') || (*cp != 'H')) {
+			} else if ((*cp != 'h') && (*cp != 'H')) {
 				/* bogus! */
 				Error(stderr,
 				    MGET("invalid sample rate: %s\n"), s);
