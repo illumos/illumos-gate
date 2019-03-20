@@ -2314,7 +2314,7 @@ i40e_tx_set_data_desc(i40e_trqpair_t *itrq, i40e_tx_context_t *tctx,
 	 * must be a value from 1 to 16K minus 1, inclusive.
 	 */
 	ASSERT3U(len, >=, 1);
-	ASSERT3U(len, <=, I40E_MAX_TX_BUFSZ - 1);
+	ASSERT3U(len, <=, I40E_MAX_TX_BUFSZ);
 
 	txdesc->buffer_addr = CPU_TO_LE64((uintptr_t)buff);
 	txdesc->cmd_type_offset_bsz =
@@ -2565,6 +2565,7 @@ i40e_lso_chain(i40e_trqpair_t *itrq, const mblk_t *mp,
 	size_t segsz = 0;
 	uint_t segdesc = 0;
 	uint_t needed_desc = 0;
+	size_t hdrcopied = 0;
 	const size_t hdrlen =
 	    meo->meoi_l2hlen + meo->meoi_l3hlen + meo->meoi_l4hlen;
 	const size_t mss = tctx->itc_ctx_mss;
@@ -2577,33 +2578,49 @@ i40e_lso_chain(i40e_trqpair_t *itrq, const mblk_t *mp,
 	 * We always copy the header in order to avoid more
 	 * complicated code dealing with various edge cases.
 	 */
-	ASSERT3U(MBLKL(mp), >=, hdrlen);
 	if ((tcb = i40e_tcb_alloc(itrq)) == NULL) {
 		txs->itxs_err_notcb.value.ui64++;
 		goto fail;
 	}
-	needed_desc++;
 
+	needed_desc++;
 	tcb_list_append(&tcbhead, &tcbtail, tcb);
-	i40e_tx_copy_fragment(tcb, mp, 0, hdrlen);
-	cpoff += hdrlen;
+
+	while (hdrcopied < hdrlen) {
+		const size_t tocopy = MIN(hdrlen - hdrcopied, mp_len);
+		i40e_tx_copy_fragment(tcb, mp, 0, tocopy);
+		hdrcopied += tocopy;
+		cpoff += tocopy;
+		if (tocopy == mp_len) {
+			/*
+			 * This is a bit of defensive programming. We
+			 * should never have a chain too short to
+			 * satisfy the headers -- but just in case.
+			 */
+			if ((mp = mp->b_cont) == NULL) {
+				txs->itxs_tx_short.value.ui64++;
+				goto fail;
+			}
+
+			while ((mp_len = MBLKL(mp)) == 0) {
+				if ((mp = mp->b_cont) == NULL) {
+					txs->itxs_tx_short.value.ui64++;
+					goto fail;
+				}
+			}
+			cpoff = 0;
+		}
+	}
+	ASSERT3U(hdrcopied, ==, hdrlen);
 
 	/*
 	 * A single descriptor containing both header and data is
 	 * counted twice by the controller.
 	 */
-	if ((mp_len > hdrlen && mp_len < i40e->i40e_tx_dma_min) ||
-	    (mp->b_cont != NULL &&
-	    MBLKL(mp->b_cont) < i40e->i40e_tx_dma_min)) {
+	if (mp_len < i40e->i40e_tx_dma_min) {
 		segdesc = 2;
 	} else {
 		segdesc = 1;
-	}
-
-	/* If this fragment was pure header, then move to the next one. */
-	if (cpoff == mp_len) {
-		mp = mp->b_cont;
-		cpoff = 0;
 	}
 
 	while (mp != NULL) {
@@ -2646,6 +2663,15 @@ force_copy:
 				segdesc++;
 				ASSERT3U(segdesc, <=, i40e_lso_num_descs);
 				tcb_list_append(&tcbhead, &tcbtail, tcb);
+			} else if (segdesc == 0) {
+				/*
+				 * We are copying into an existing TCB
+				 * but we just crossed the MSS
+				 * boundary. Make sure to increment
+				 * segdesc to track the descriptor
+				 * count as the hardware would.
+				 */
+				segdesc++;
 			}
 
 			tocopy = MIN(I40E_TCB_LEFT(tcb), mp_len - cpoff);
@@ -2710,8 +2736,8 @@ force_copy:
 				 * of the DMA.
 				 */
 				if (tsegsz >= mss) {
-					tsegdesc = 1;
 					tsegsz = tsegsz % mss;
+					tsegdesc = tsegsz == 0 ? 0 : 1;
 				}
 
 				/*

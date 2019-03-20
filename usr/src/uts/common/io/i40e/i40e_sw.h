@@ -542,6 +542,7 @@ typedef struct i40e_txq_stat {
 	kstat_named_t	itxs_hck_badl4;		/* Bad L4 Paylaod */
 	kstat_named_t	itxs_lso_nohck;		/* Missing offloads for LSO */
 	kstat_named_t	itxs_bind_fails;	/* DMA bind failures */
+	kstat_named_t	itxs_tx_short;		/* Tx chain too short */
 
 	kstat_named_t	itxs_err_notcb;		/* No tcb's available */
 	kstat_named_t	itxs_err_nodescs;	/* No tcb's available */
