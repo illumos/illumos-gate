@@ -12,6 +12,7 @@
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -38,6 +39,11 @@ kstat_create(const char *ks_module, int ks_instance, const char *ks_name,
 /*ARGSUSED*/
 void
 kstat_named_init(kstat_named_t *knp, const char *name, uchar_t type)
+{}
+
+/*ARGSUSED*/
+void
+kstat_named_setstr(kstat_named_t *knp, const char *src)
 {}
 
 /*ARGSUSED*/

@@ -13,7 +13,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2017, Joyent, Inc.
 # Copyright 2017 RackTop Systems.
-# Copyright 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
 #
@@ -155,6 +155,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	kstat_create;
 	kstat_create_zone;
 	kstat_named_init;
+	kstat_named_setstr;
 	kstat_delete;
 	kstat_install;
 	kstat_waitq_enter;

@@ -720,6 +720,7 @@ metaslab_group_activate(metaslab_group_t *mg)
 {
 	metaslab_class_t *mc = mg->mg_class;
 	metaslab_group_t *mgprev, *mgnext;
+	char kstat_name[KSTAT_STRLEN];
 
 	ASSERT3U(spa_config_held(mc->mc_spa, SCL_ALLOC, RW_WRITER), !=, 0);
 
@@ -744,6 +745,33 @@ metaslab_group_activate(metaslab_group_t *mg)
 		mgprev->mg_next = mg;
 		mgnext->mg_prev = mg;
 	}
+
+	/* Create a kstat to monitor the loading and unloading of metaslabs. */
+	(void) snprintf(kstat_name, sizeof (kstat_name), "%llx",
+	    (unsigned long long) mg->mg_vd->vdev_guid);
+
+	mutex_init(&mg->mg_kstat_lock, NULL, MUTEX_DEFAULT, NULL);
+	if ((mg->mg_kstat = kstat_create("zfs_metaslab_group", 0,
+	    kstat_name, "misc", KSTAT_TYPE_NAMED,
+	    sizeof (metaslab_group_kstat_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL)) != NULL) {
+
+		metaslab_group_kstat_t *mg_kstat = kmem_zalloc(
+		    sizeof (metaslab_group_kstat_t), KM_SLEEP);
+		kstat_named_init(&mg_kstat->mg_loads, "loads",
+		    KSTAT_DATA_UINT64);
+		kstat_named_init(&mg_kstat->mg_unloads, "unloads",
+		    KSTAT_DATA_UINT64);
+		kstat_named_init(&mg_kstat->mg_spa_name, "spa_name",
+		    KSTAT_DATA_STRING);
+		kstat_named_setstr(&mg_kstat->mg_spa_name,
+		    mg->mg_vd->vdev_spa->spa_name);
+
+		mg->mg_kstat->ks_data = mg_kstat;
+		mg->mg_kstat->ks_lock = &mg->mg_kstat_lock;
+		kstat_install(mg->mg_kstat);
+	}
+
 	mc->mc_rotor = mg;
 }
 
@@ -820,6 +848,11 @@ metaslab_group_passivate(metaslab_group_t *mg)
 
 	mg->mg_prev = NULL;
 	mg->mg_next = NULL;
+
+	if (mg->mg_kstat != NULL) {
+		kstat_delete(mg->mg_kstat);
+	}
+	mutex_destroy(&mg->mg_kstat_lock);
 }
 
 boolean_t
@@ -1538,6 +1571,7 @@ metaslab_load_impl(metaslab_t *msp)
 int
 metaslab_load(metaslab_t *msp, uint64_t txg)
 {
+	kstat_t *ksp;
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
 
 	/*
@@ -1548,6 +1582,12 @@ metaslab_load(metaslab_t *msp, uint64_t txg)
 	if (msp->ms_loaded)
 		return (0);
 	VERIFY(!msp->ms_loading);
+
+	ksp = msp->ms_group->mg_kstat;
+	if (ksp != NULL) {
+		metaslab_group_kstat_t *mg_ksp = ksp->ks_data;
+		atomic_inc_64(&mg_ksp->mg_loads.value.ui64);
+	}
 
 	msp->ms_loading = B_TRUE;
 	int error = metaslab_load_impl(msp);
@@ -1562,6 +1602,14 @@ void
 metaslab_unload(metaslab_t *msp)
 {
 	ASSERT(MUTEX_HELD(&msp->ms_lock));
+
+	if (msp->ms_group != NULL) {
+		kstat_t *ksp = msp->ms_group->mg_kstat;
+		if (ksp != NULL) {
+			metaslab_group_kstat_t *mg_ksp = ksp->ks_data;
+			atomic_inc_64(&mg_ksp->mg_unloads.value.ui64);
+		}
+	}
 	range_tree_vacate(msp->ms_allocatable, NULL, NULL);
 	msp->ms_loaded = B_FALSE;
 	msp->ms_loaded_txg = 0;

@@ -276,7 +276,16 @@ struct metaslab_group {
 	boolean_t		mg_initialize_updating;
 	kmutex_t		mg_ms_initialize_lock;
 	kcondvar_t		mg_ms_initialize_cv;
+
+	kstat_t			*mg_kstat;
+	kmutex_t		mg_kstat_lock;
 };
+
+typedef struct metaslab_group_kstat {
+	kstat_named_t	mg_loads;
+	kstat_named_t	mg_unloads;
+	kstat_named_t	mg_spa_name;
+} metaslab_group_kstat_t;
 
 /*
  * This value defines the number of elements in the ms_lbas array. The value
