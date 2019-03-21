@@ -2,17 +2,17 @@
 .\" Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 1983 Regents of the University of California. All rights reserved. The Berkeley software License Agreement specifies the terms and conditions for redistribution.
 .\" Copyright 2013 Nexenta Systems, Inc.  All Rights Reserved.
-.TH SAVECORE 1M "Jan 30, 2013"
+.\" Copyright 2019 Joyent, Inc.
+.TH SAVECORE 1M "February 22, 2019"
 .SH NAME
 savecore \- save a crash dump of the operating system
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/bin/savecore\fR [\fB-Lvd\fR] [\fB-f\fR \fIdumpfile\fR] [\fIdirectory\fR]
+\fB/usr/bin/savecore\fR [\fB-L\fR | \fB-r\fR] [\fB-vd\fR] [\fB-f\fR \fIdumpfile\fR] [\fIdirectory\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBsavecore\fR utility saves a crash dump of the kernel (assuming that one
 was made) and writes a reboot message in the shutdown log. By default, it is
@@ -42,7 +42,6 @@ The \fBsavecore\fR utility also logs a reboot message using facility
 \fBLOG_AUTH\fR (see \fBsyslog\fR(3C)). If the system crashed as a result of a
 panic, \fBsavecore\fR logs the panic string too.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
@@ -90,6 +89,18 @@ are not fully self-consistent.
 .sp
 .ne 2
 .na
+\fB\fB-r\fR\fR
+.ad
+.RS 15n
+Open the dump device or file as read-only, and don't update the dump header
+or do anything else that might modify the crash dump. This option can be used
+to recover a crash dump from a read-only device. This flag cannot be used in
+conjunction with \fB\fB-L\fR\fR.
+.RE
+
+.sp
+.ne 2
+.na
 \fB\fB-v\fR\fR
 .ad
 .RS 15n
@@ -97,7 +108,6 @@ Verbose. Enables verbose error messages from \fBsavecore\fR.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -112,7 +122,6 @@ specified, \fBsavecore\fR saves the crash dump files to the default
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fIdirectory\fR\fB/vmdump.\fR\fIn\fR\fR
@@ -167,12 +176,10 @@ default crash dump directory
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBadb\fR(1), \fBmdb\fR(1), \fBsvcs\fR(1), \fBdd\fR(1M), \fBdumpadm\fR(1M),
 \fBsvcadm\fR(1M), \fBsyslog\fR(3C), \fBattributes\fR(5), \fBsmf\fR(5)
 .SH NOTES
-.sp
 .LP
 The system crash dump service is managed by the service management facility,
 \fBsmf\fR(5), under the service identifier:
