@@ -25,7 +25,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #	i86pc architecture dependent
 #
@@ -38,7 +38,6 @@ UTSBASE	= ../../..
 #
 MODULE		= hvm_bootstrap
 OBJECTS		= $(HVM_BOOTSTRAP_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(HVM_BOOTSTRAP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_HVM_MISC_DIR)/$(MODULE)
 
 #
@@ -50,7 +49,6 @@ include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 # Overrides
@@ -68,12 +66,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

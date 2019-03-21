@@ -26,6 +26,7 @@
 # All rights reserved.
 #
 # Copyright 2016 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #	This makefile drives the production of the drmach_acpi loadable module.
 #
@@ -42,7 +43,6 @@ UTSBASE	= ../..
 #
 MODULE		= drmach_acpi
 OBJECTS		= $(DRMACH_ACPI_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(DRMACH_ACPI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
@@ -54,7 +54,6 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -65,9 +64,6 @@ ALL_BUILDS	= $(ALL_BUILDS64)
 
 $(OBJS_DIR)/drmach_acpi.o :=	CERRWARN	+= -_gcc=-Wno-unused-function
 
-#
-# lint pass one enforcement
-#
 CFLAGS += $(CCVERBOSE)
 
 #
@@ -90,12 +86,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

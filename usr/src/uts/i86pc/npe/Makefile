@@ -25,6 +25,7 @@
 # Use is subject to license terms.
 #
 # Copyright 2016 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #	This makefile drives the production of the PCI-E nexus driver
 #
@@ -41,7 +42,6 @@ UTSBASE	= ../..
 #
 MODULE		= npe
 OBJECTS		= $(PCI_E_NEXUS_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCI_E_NEXUS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 #
@@ -53,7 +53,6 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -70,16 +69,12 @@ LDFLAGS	+= -dy -Nmisc/acpica -Nmisc/pcie
 # PCI/PCI-express nexi
 #
 CFLAGS		+= -D_MODULE_NAME="\"$(MODULE)\""
-LINTFLAGS	+= -D_MODULE_NAME="\"$(MODULE)\""
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these checks; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-function
@@ -96,12 +91,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

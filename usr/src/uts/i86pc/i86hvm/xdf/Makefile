@@ -25,6 +25,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+#
 #	i86pc architecture dependent
 #
 #
@@ -37,7 +39,6 @@ UTSBASE	= ../../..
 #
 MODULE		= xdf
 OBJECTS		= $(XDF_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(XDF_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
 
 #
@@ -49,16 +50,11 @@ include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 # Overrides
 CPPFLAGS	+= -DHVMPV_XDF_VERS=2
 LDFLAGS		+= -dy -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
-
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-unused-label
@@ -76,12 +72,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

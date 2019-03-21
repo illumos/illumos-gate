@@ -23,20 +23,17 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 UTSBASE=	$(SRC)/uts
 
 MODULE=		cmdk
 OBJECTS=	$(PV_CMDK_OBJS:%=$(OBJS_DIR)/%)
-LINTS=		$(PV_CMDK_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE=	$(ROOT_HVM_DRV_DIR)/$(MODULE)
 
 include		$(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 
-LINT_MODULE=	pv_cmdk
-
 ALL_TARGET=	$(BINARY)
-LINT_TARGET=	$(LINT_MODULE).lint
 INSTALL_TARGET=	$(BINARY) $(ROOTMODULE)
 
 LDFLAGS +=	-dy
@@ -50,12 +47,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

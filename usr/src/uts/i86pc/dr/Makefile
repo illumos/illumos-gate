@@ -26,6 +26,7 @@
 # All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -38,7 +39,6 @@ PLATFORM = i86pc
 #
 MODULE		= dr
 OBJECTS		= $(DR_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(DR_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/i86pc/io/dr
 
@@ -51,7 +51,6 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
@@ -60,9 +59,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 DEF_BUILDS	= $(DEF_BUILDS64)
 ALL_BUILDS	= $(ALL_BUILDS64)
 
-#
-# lint pass one enforcement
-#
 CFLAGS += $(CCVERBOSE)
 
 CERRWARN += -_gcc=-Wno-parentheses
@@ -76,7 +72,7 @@ SMOFF += index_overflow
 # module dependencies
 #
 LDFLAGS += -dy -Nmisc/drmach_acpi
- 
+
 CLEANFILES +=	$(DR_GENERR)
 CLEANFILES +=	$(DR_IO)/dr_err.c
 
@@ -92,12 +88,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS) $(CONF_INSTALL_DEPS)
 

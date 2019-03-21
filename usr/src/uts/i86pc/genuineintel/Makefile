@@ -20,7 +20,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -34,7 +34,6 @@ UTSBASE = ../..
 MODULE		= cpu_ms.GenuineIntel
 #
 OBJECTS		= $(CPU_GENINTEL_OBJS:%=$(OBJS_DIR)/%)
-LINTS           = $(CPU_GENINTEL_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE      = $(ROOT_PSM_CPU_DIR)/$(MODULE)
 
 SRCDIR		= ../cpu/genuineintel
@@ -45,15 +44,9 @@ SRCDIR		= ../cpu/genuineintel
 include ../cpu/Makefile.cpu
 
 #
-#	Our lint library has a different name from that of the module we build.
-#
-LINT_MODULE	= genuineintel
-
-#
 #       Define targets
 #
 ALL_TARGET      = $(BINARY)
-LINT_TARGET     = $(LINT_MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE)
 
 #
@@ -75,12 +68,6 @@ all:            $(ALL_DEPS)
 clean:          $(CLEAN_DEPS)
 
 clobber:        $(CLOBBER_DEPS)
-
-lint:           $(LINT_DEPS)
-
-modlintlib:     $(MODLINTLIB_DEPS)
-
-clean.lint:     $(CLEAN_LINT_DEPS)
 
 install:        $(INSTALL_DEPS)
 
