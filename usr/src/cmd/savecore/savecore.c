@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1983, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 /*
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
@@ -92,6 +92,7 @@ static dumpdatahdr_t datahdr;		/* compression info */
 static long	coreblksize;		/* preferred write size (st_blksize) */
 static int	cflag;			/* run as savecore -c */
 static int	mflag;			/* run as savecore -m */
+static int	rflag;			/* run as savecore -r */
 
 /*
  * Payload information for the events we raise.  These are used
@@ -164,7 +165,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "usage: %s [-Lvd] [-f dumpfile] [dirname]\n", progname);
+	    "usage: %s [-L | -r] [-vd] [-f dumpfile] [dirname]\n", progname);
 	exit(1);
 }
 
@@ -229,7 +230,7 @@ logprint(uint32_t flags, char *message, ...)
 		 * raise if run as savecore -m.  If something in the
 		 * raise_event codepath calls logprint avoid recursion.
 		 */
-		if (!mflag && logprint_raised++ == 0)
+		if (!mflag && !rflag && logprint_raised++ == 0)
 			raise_event(SC_EVENT_SAVECORE_FAILURE, buf);
 		code = 2;
 		break;
@@ -240,7 +241,7 @@ logprint(uint32_t flags, char *message, ...)
 
 	case SC_EXIT_ERR:
 	default:
-		if (!mflag && logprint_raised++ == 0 && have_dumpfile)
+		if (!mflag && !rflag && logprint_raised++ == 0 && have_dumpfile)
 			raise_event(SC_EVENT_SAVECORE_FAILURE, buf);
 		code = 1;
 		break;
@@ -355,7 +356,7 @@ read_number_from_file(const char *filename, long default_value)
 static void
 read_dumphdr(void)
 {
-	if (filemode)
+	if (filemode || rflag)
 		dumpfd = Open(dumpfile, O_RDONLY, 0644);
 	else
 		dumpfd = Open(dumpfile, O_RDWR | O_DSYNC, 0644);
@@ -408,7 +409,7 @@ read_dumphdr(void)
 		/*
 		 * Clear valid bit so we don't complain on every invocation.
 		 */
-		if (!filemode)
+		if (!filemode && !rflag)
 			Pwrite(dumpfd, &dumphdr, sizeof (dumphdr), endoff);
 		logprint(SC_SL_ERR | SC_EXIT_ERR,
 		    "initial dump header corrupt");
@@ -660,7 +661,7 @@ copy_crashfile(const char *corefile)
 	 * Write out the modified dump header to the dump device.
 	 * The dump device has been processed, so DF_VALID is clear.
 	 */
-	if (!filemode)
+	if (!filemode && !rflag)
 		Pwrite(dumpfd, &dumphdr, sizeof (dumphdr), endoff);
 
 	(void) close(corefd);
@@ -1422,7 +1423,7 @@ build_corefile(const char *namelist, const char *corefile)
 	 * Write out the modified dump headers.
 	 */
 	Pwrite(corefd, &corehdr, sizeof (corehdr), 0);
-	if (!filemode)
+	if (!filemode && !rflag)
 		Pwrite(dumpfd, &dumphdr, sizeof (dumphdr), endoff);
 
 	(void) close(corefd);
@@ -1531,7 +1532,10 @@ stack_retrieve(char *stack)
 	    DUMP_ERPTSIZE);
 	dumpoff -= DUMP_SUMMARYSIZE;
 
-	dumpfd = Open(dumpfile, O_RDWR | O_DSYNC, 0644);
+	if (rflag)
+		dumpfd = Open(dumpfile, O_RDONLY, 0644);
+	else
+		dumpfd = Open(dumpfile, O_RDWR | O_DSYNC, 0644);
 	dumpoff = llseek(dumpfd, dumpoff, SEEK_END) & -DUMP_OFFSET;
 
 	Pread(dumpfd, &sd, sizeof (summary_dump_t), dumpoff);
@@ -1668,7 +1672,7 @@ main(int argc, char *argv[])
 	if (savedir != NULL)
 		savedir = strdup(savedir);
 
-	while ((c = getopt(argc, argv, "Lvcdmf:")) != EOF) {
+	while ((c = getopt(argc, argv, "Lvcdmf:r")) != EOF) {
 		switch (c) {
 		case 'L':
 			livedump++;
@@ -1684,6 +1688,9 @@ main(int argc, char *argv[])
 			break;
 		case 'm':
 			mflag++;
+			break;
+		case 'r':
+			rflag++;
 			break;
 		case 'f':
 			dumpfile = optarg;
@@ -1707,6 +1714,9 @@ main(int argc, char *argv[])
 	interactive = isatty(STDOUT_FILENO);
 
 	if (cflag && livedump)
+		usage();
+
+	if (rflag && (cflag || mflag || livedump))
 		usage();
 
 	if (dumpfile == NULL || livedump)
@@ -1752,7 +1762,7 @@ main(int argc, char *argv[])
 	 * We could extend it to handle this, but there doesn't seem to be
 	 * a general need for it, so we isolate the complexity here instead.
 	 */
-	if (dumphdr.dump_panicstring[0] != '\0') {
+	if (dumphdr.dump_panicstring[0] != '\0' && !rflag) {
 		int logfd = Open("/dev/conslog", O_WRONLY, 0644);
 		log_ctl_t lc;
 		struct strbuf ctl, dat;
@@ -1801,7 +1811,7 @@ main(int argc, char *argv[])
 	 * for the same event.  Also avoid raising an event for a
 	 * livedump, or when we inflating a compressed dump.
 	 */
-	if (!fm_panic && !livedump && !filemode)
+	if (!fm_panic && !livedump && !filemode && !rflag)
 		raise_event(SC_EVENT_DUMP_PENDING, NULL);
 
 	logprint(SC_SL_WARN, "System dump time: %s",
@@ -1857,7 +1867,7 @@ main(int argc, char *argv[])
 		 * has panicked. We know a reasonable amount about the
 		 * condition at this time, but the dump is still compressed.
 		 */
-		if (!livedump && !fm_panic)
+		if (!livedump && !fm_panic && !rflag)
 			raise_event(SC_EVENT_DUMP_AVAILABLE, NULL);
 
 		if (metrics_size > 0) {
@@ -1926,7 +1936,7 @@ main(int argc, char *argv[])
 
 		build_corefile(namelist, corefile);
 
-		if (!livedump && !filemode && !fm_panic)
+		if (!livedump && !filemode && !fm_panic && !rflag)
 			raise_event(SC_EVENT_DUMP_AVAILABLE, NULL);
 
 		if (access(METRICSFILE, F_OK) == 0) {
