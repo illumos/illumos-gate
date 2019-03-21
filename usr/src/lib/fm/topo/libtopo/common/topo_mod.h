@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2018, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _TOPO_MOD_H
@@ -298,6 +298,8 @@ extern int topo_mod_seterrno(topo_mod_t *, int);
  * Function used by a module to try and open a file based on FM's search path.
  */
 extern int topo_mod_file_search(topo_mod_t *, const char *file, int oflags);
+
+extern topo_method_f topo_mod_hc_occupied;
 
 #ifdef	__cplusplus
 }

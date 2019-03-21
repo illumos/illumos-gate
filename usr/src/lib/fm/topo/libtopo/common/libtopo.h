@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2018, Joyent, Inc. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc. All rights reserved.
  */
 
 #ifndef _LIBTOPO_H
@@ -142,6 +142,7 @@ extern int topo_node_facility(topo_hdl_t *, tnode_t *, const char *,
     uint32_t, topo_faclist_t *, int *);
 extern int topo_node_child_walk(topo_hdl_t *, tnode_t *, topo_walk_cb_t,
     void *, int *);
+extern int topo_node_occupied(tnode_t *, boolean_t *);
 
 /*
  * Node flags: denotes type of node

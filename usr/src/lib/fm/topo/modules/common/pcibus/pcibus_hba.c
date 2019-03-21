@@ -21,11 +21,13 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <sys/fm/protocol.h>
 #include <strings.h>
 #include <fm/topo_mod.h>
+#include <fm/topo_method.h>
 #include <sys/scsi/impl/inquiry.h>
 #include <sys/scsi/impl/scsi_sas.h>
 #include <sys/scsi/scsi_address.h>
@@ -34,6 +36,13 @@
 static const topo_pgroup_info_t storage_pgroup =
 	{ TOPO_PGROUP_STORAGE, TOPO_STABILITY_PRIVATE,
 	    TOPO_STABILITY_PRIVATE, 1 };
+
+static const topo_method_t recep_methods[] = {
+	{ TOPO_METH_OCCUPIED, TOPO_METH_OCCUPIED_DESC,
+	    TOPO_METH_OCCUPIED_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_mod_hc_occupied },
+	{ NULL }
+};
 
 void
 pci_di_prop_set(tnode_t *tn, di_node_t din, char *dpnm, char *tpnm)
@@ -312,6 +321,15 @@ pci_receptacle_instantiate(topo_mod_t *mod, tnode_t *parent, di_node_t pnode)
 		(void) topo_prop_set_string(recep, TOPO_PGROUP_STORAGE,
 		    TOPO_STORAGE_SAS_PHY_MASK,
 		    TOPO_PROP_IMMUTABLE, pm, &err);
+
+		if (topo_method_register(mod, recep, recep_methods) != 0) {
+			topo_mod_dprintf(mod, "topo_method_register() failed "
+			    "on %s=%d: %s", RECEPTACLE, i,
+			    topo_mod_errmsg(mod));
+			/* errno set */
+			continue;
+		}
+
 		pm = pm + strlen(pm) + 1;
 	}
 

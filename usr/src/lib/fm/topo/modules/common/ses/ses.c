@@ -267,6 +267,16 @@ static const topo_method_t ses_component_methods[] = {
 static const topo_method_t ses_bay_methods[] = {
 	{ TOPO_METH_FAC_ENUM, TOPO_METH_FAC_ENUM_DESC, 0,
 	    TOPO_STABILITY_INTERNAL, ses_node_enum_facility },
+	{ TOPO_METH_OCCUPIED, TOPO_METH_OCCUPIED_DESC,
+	    TOPO_METH_OCCUPIED_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_mod_hc_occupied },
+	{ NULL }
+};
+
+static const topo_method_t ses_recep_methods[] = {
+	{ TOPO_METH_OCCUPIED, TOPO_METH_OCCUPIED_DESC,
+	    TOPO_METH_OCCUPIED_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_mod_hc_occupied },
 	{ NULL }
 };
 
@@ -2161,6 +2171,15 @@ ses_create_esc_sasspecific(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 				    contn, connectors[i].scpd_pm) != 0) {
 					continue;
 				}
+				if (topo_method_register(mod, contn,
+				    ses_recep_methods) != 0) {
+					topo_mod_dprintf(mod,
+					    "topo_method_register() failed: "
+					    "%s",
+					    topo_mod_errmsg(mod));
+					continue;
+				}
+
 			}
 		}
 		/* end indentation change */

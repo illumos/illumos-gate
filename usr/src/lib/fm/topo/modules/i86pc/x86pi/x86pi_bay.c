@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -31,6 +32,7 @@
 #include <sys/types.h>
 #include <strings.h>
 #include <fm/topo_mod.h>
+#include <fm/topo_method.h>
 #include <fm/topo_hc.h>
 #include <sys/systeminfo.h>
 #include <sys/smbios_impl.h>
@@ -54,6 +56,13 @@ static const topo_pgroup_info_t binding_pgroup = {
 	TOPO_STABILITY_PRIVATE,
 	TOPO_STABILITY_PRIVATE,
 	1
+};
+
+static const topo_method_t bay_methods[] = {
+	{ TOPO_METH_OCCUPIED, TOPO_METH_OCCUPIED_DESC,
+	    TOPO_METH_OCCUPIED_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_mod_hc_occupied },
+	{ NULL }
 };
 
 /*
@@ -330,6 +339,14 @@ x86pi_gen_bay(topo_mod_t *mod, tnode_t *t_parent, smbios_port_ext_t *eport,
 	if (rv != 0) {
 		topo_mod_dprintf(mod, "%s: failed to decorate bay node\n", f);
 		return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
+	}
+
+	if (topo_method_register(mod, tn_bay, bay_methods) != 0) {
+		topo_mod_dprintf(mod, "topo_method_register() failed on "
+		    "%s=%d: %s", BAY, instance,
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		return (-1);
 	}
 
 	/*
