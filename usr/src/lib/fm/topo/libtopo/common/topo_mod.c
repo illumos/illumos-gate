@@ -937,3 +937,37 @@ topo_mod_file_search(topo_mod_t *mod, const char *file, int oflags)
 	topo_mod_strfree(mod, path);
 	return (ret);
 }
+
+/*ARGSUSED*/
+int
+topo_mod_hc_occupied(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	nvlist_t *nvl = NULL;
+	tnode_t *cnp;
+	boolean_t is_occupied = B_FALSE;
+
+	if (version > TOPO_METH_OCCUPIED_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	/*
+	 * Iterate though the child nodes.  If there are no non-facility
+	 * node children then it is unoccupied.
+	 */
+	for (cnp = topo_child_first(node); cnp != NULL;
+	    cnp = topo_child_next(node, cnp)) {
+		if (topo_node_flags(cnp) != TOPO_NODE_FACILITY)
+			is_occupied = B_TRUE;
+	}
+
+	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
+	    nvlist_add_boolean_value(nvl, TOPO_METH_OCCUPIED_RET,
+	    is_occupied) != 0) {
+		topo_mod_dprintf(mod, "Failed to allocate 'out' nvlist\n");
+		nvlist_free(nvl);
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	}
+	*out = nvl;
+
+	return (0);
+}

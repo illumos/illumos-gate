@@ -893,3 +893,20 @@ out:
 	topo_node_rele(pnode);
 	return (ret);
 }
+
+int
+topo_node_occupied(tnode_t *node, boolean_t *is_occupied)
+{
+	nvlist_t *out;
+	int err;
+
+	if (topo_method_invoke(node, TOPO_METH_OCCUPIED,
+	    TOPO_METH_OCCUPIED_VERSION, NULL, &out, &err) != 0) {
+		return (err);
+	}
+	(void) nvlist_lookup_boolean_value(out, TOPO_METH_OCCUPIED_RET,
+	    is_occupied);
+
+	nvlist_free(out);
+	return (0);
+}

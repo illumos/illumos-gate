@@ -89,7 +89,7 @@ usage(FILE *fp)
 	    "\t-p  display of FMRI protocol properties\n"
 	    "\t-R  set root directory for libtopo plug-ins and other files\n"
 	    "\t-s  display topology for the specified FMRI scheme\n"
-	    "\t-S  display FMRI status (present/usable)\n"
+	    "\t-S  display FMRI status (present/usable/occupied)\n"
 	    "\t-V  set verbose mode\n"
 	    "\t-x  display a xml formatted topology\n");
 
@@ -127,6 +127,7 @@ static void
 print_node(topo_hdl_t *thp, tnode_t *node, nvlist_t *nvl, const char *fmri)
 {
 	int err, ret;
+	boolean_t is_occupied;
 
 	(void) printf("%s\n", (char *)fmri);
 
@@ -174,6 +175,13 @@ print_node(topo_hdl_t *thp, tnode_t *node, nvlist_t *nvl, const char *fmri)
 		else
 			(void) printf("\tUnusable: %s\n",
 			    ret ? "true" : "false");
+
+		ret = topo_node_occupied(node, &is_occupied);
+		if (ret == 0)
+			(void) printf("\tOccupied: %s\n",
+			    is_occupied ? "true" : "false");
+		else if (ret != ETOPO_METHOD_NOTSUP)
+			(void) printf("\tOccupied: -\n");
 	}
 }
 

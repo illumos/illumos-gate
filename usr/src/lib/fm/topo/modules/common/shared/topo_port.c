@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <sys/fm/protocol.h>
@@ -29,6 +29,13 @@ static const topo_pgroup_info_t port_pgroup = {
 	TOPO_STABILITY_PRIVATE,
 	TOPO_STABILITY_PRIVATE,
 	1
+};
+
+static const topo_method_t port_methods[] = {
+	{ TOPO_METH_OCCUPIED, TOPO_METH_OCCUPIED_DESC,
+	    TOPO_METH_OCCUPIED_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_mod_hc_occupied },
+	{ NULL }
 };
 
 int
@@ -101,6 +108,13 @@ port_create_common(topo_mod_t *mod, tnode_t *pnode, topo_instance_t inst,
 	    TOPO_PROP_IMMUTABLE, type, &err) != 0) {
 		topo_mod_dprintf(mod, "failed to set %s property: %s\n",
 		    TOPO_PROP_PORT_TYPE, topo_strerror(err));
+		goto error;
+	}
+
+	if (topo_method_register(mod, tn, port_methods) != 0) {
+		topo_mod_dprintf(mod, "topo_method_register() failed on "
+		    "%s=%d: %s", PORT, inst, topo_mod_errmsg(mod));
+		/* errno set */
 		goto error;
 	}
 

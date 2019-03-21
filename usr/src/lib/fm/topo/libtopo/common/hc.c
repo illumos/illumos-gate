@@ -22,7 +22,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <stdio.h>
@@ -130,6 +130,13 @@ const topo_method_t hc_methods[] = {
 	{ TOPO_METH_FACILITY, TOPO_METH_FACILITY_DESC,
 	    TOPO_METH_FACILITY_VERSION, TOPO_STABILITY_INTERNAL,
 	    hc_fmri_facility },
+	{ NULL }
+};
+
+static const topo_method_t fru_container_methods[] = {
+	{ TOPO_METH_OCCUPIED, TOPO_METH_OCCUPIED_DESC,
+	    TOPO_METH_OCCUPIED_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_mod_hc_occupied },
 	{ NULL }
 };
 
@@ -279,6 +286,15 @@ hc_enum(topo_mod_t *mod, tnode_t *pnode, const char *name, topo_instance_t min,
 		nvlist_free(auth);
 		nvlist_free(nvl);
 		return (-1);
+	}
+	if (strcmp(name, BAY) == 0 || strcmp(name, PORT) == 0 ||
+	    strcmp(name, RECEPTACLE) == 0 || strcmp(name, SLOT) == 0) {
+		if (topo_method_register(mod, node, fru_container_methods) <
+		    0) {
+			topo_mod_dprintf(mod, "failed to register methods on "
+			    "%s=%d\n", name, min);
+			return (-1);
+		}
 	}
 
 	/*

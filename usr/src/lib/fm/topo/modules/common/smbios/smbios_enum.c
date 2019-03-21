@@ -10,13 +10,14 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #include <assert.h>
 #include <fcntl.h>
 #include <fm/libtopo.h>
 #include <fm/topo_mod.h>
+#include <fm/topo_method.h>
 #ifdef	__x86
 #include <sys/mc.h>
 #endif
@@ -33,6 +34,13 @@ typedef struct smb_enum_data {
 	smbios_info_t	*sme_smb_info;
 	char		*sme_slot_form;
 } smb_enum_data_t;
+
+static const topo_method_t slot_methods[] = {
+	{ TOPO_METH_OCCUPIED, TOPO_METH_OCCUPIED_DESC,
+	    TOPO_METH_OCCUPIED_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_mod_hc_occupied },
+	{ NULL }
+};
 
 /*
  * This function serves two purposes.  It filters out memory devices that
@@ -153,6 +161,14 @@ smbios_make_slot(smb_enum_data_t *smed, smbios_memdevice_t *smb_md)
 		return (NULL);
 	}
 	nvlist_free(fmri);
+
+	if (topo_method_register(mod, slotnode, slot_methods) != 0) {
+		topo_mod_dprintf(mod, "topo_method_register() failed on "
+		    "%s=%d: %s", SLOT, smed->sme_slot_inst,
+		    topo_mod_errmsg(mod));
+		/* errno set */
+		return (NULL);
+	}
 
 	pgi.tpi_name = TOPO_PGROUP_SLOT;
 	pgi.tpi_namestab = TOPO_STABILITY_PRIVATE;
