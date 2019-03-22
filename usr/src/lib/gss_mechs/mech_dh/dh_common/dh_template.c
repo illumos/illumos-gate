@@ -26,7 +26,9 @@
  *	All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 #include <stdlib.h>
 #include <string.h>
@@ -104,7 +106,7 @@ dh_getpublickey(const char *remote, keylen_t keylen, algtype_t algtype,
 	static const char NIS_SYMBOL[] = "__rpcsec_gss_is_server";
 
 	if (!init_nis_pubkey) {
-		mutex_lock(&init_nis_pubkey_lock);
+		(void) mutex_lock(&init_nis_pubkey_lock);
 		if (!init_nis_pubkey) {
 			void *dlhandle = dlopen(0, RTLD_NOLOAD);
 			if (dlhandle == 0) {
@@ -117,7 +119,7 @@ dh_getpublickey(const char *remote, keylen_t keylen, algtype_t algtype,
 			}
 			init_nis_pubkey = 1;
 		}
-		mutex_unlock(&init_nis_pubkey_lock);
+		(void) mutex_unlock(&init_nis_pubkey_lock);
 	}
 	if (nis_call && (*nis_call)()) {
 		int key_cached;

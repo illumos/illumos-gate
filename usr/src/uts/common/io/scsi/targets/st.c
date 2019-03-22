@@ -48,7 +48,7 @@
  * stats maintained only for reads/writes as commands
  * like rewind etc skew the wait/busy times
  */
-#define	IS_RW(bp) 	((bp)->b_bcount > 0)
+#define	IS_RW(bp)	((bp)->b_bcount > 0)
 #define	ST_DO_KSTATS(bp, kstat_function) \
 	if ((bp != un->un_sbufp) && un->un_stats && IS_RW(bp)) { \
 		kstat_function(IOSP); \
@@ -61,7 +61,7 @@
 		stp->x.value.ul++; \
 	}
 
-#define	FILL_SCSI1_LUN(devp, pkt) 					\
+#define	FILL_SCSI1_LUN(devp, pkt)					\
 	if ((devp)->sd_inq->inq_ansi == 0x1) {				\
 		int _lun;						\
 		_lun = ddi_prop_get_int(DDI_DEV_T_ANY, (devp)->sd_dev,	\
@@ -85,19 +85,19 @@
 	struct contig_mem *tmp_cp = NULL;				\
 	for ((cp) = (un)->un_contig_mem;				\
 	    (cp) != NULL;						\
-	    tmp_cp = (cp), (cp) = (cp)->cm_next) { 			\
-		if (((cp)->cm_len >= (len)) || 				\
-		    (!(big_enough) && ((cp)->cm_next == NULL))) { 	\
-			if (tmp_cp == NULL) { 				\
-				(un)->un_contig_mem = (cp)->cm_next; 	\
-			} else { 					\
-				tmp_cp->cm_next = (cp)->cm_next; 	\
-			} 						\
-			(cp)->cm_next = NULL; 				\
-			(un)->un_contig_mem_available_num--; 		\
-			break; 						\
-		} 							\
-	} 								\
+	    tmp_cp = (cp), (cp) = (cp)->cm_next) {			\
+		if (((cp)->cm_len >= (len)) ||				\
+		    (!(big_enough) && ((cp)->cm_next == NULL))) {	\
+			if (tmp_cp == NULL) {				\
+				(un)->un_contig_mem = (cp)->cm_next;	\
+			} else {					\
+				tmp_cp->cm_next = (cp)->cm_next;	\
+			}						\
+			(cp)->cm_next = NULL;				\
+			(un)->un_contig_mem_available_num--;		\
+			break;						\
+		}							\
+	}								\
 }
 
 #define	ST_NUM_MEMBERS(array)	(sizeof (array) / sizeof (array[0]))
@@ -454,7 +454,7 @@ static struct cb_ops st_cb_ops = {
 	D_64BIT | D_MP | D_NEW | D_HOTPLUG |
 	D_OPEN_RETURNS_EINTR,	/* cb_flag */
 	CB_REV,			/* cb_rev */
-	st_aread, 		/* async I/O read entry point */
+	st_aread,		/* async I/O read entry point */
 	st_awrite		/* async I/O write entry point */
 
 };
@@ -690,7 +690,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(st_drivetype scsi_address))
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* Type of module. This one is a driver */
-	"SCSI tape Driver", 	/* Name of the module. */
+	"SCSI tape Driver",	/* Name of the module. */
 	&st_ops			/* driver ops */
 };
 
@@ -863,9 +863,9 @@ st_probe(dev_info_t *devi)
 static int
 st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
-	int 	instance;
+	int	instance;
 	int	wide;
-	int 	dev_instance;
+	int	dev_instance;
 	int	ret_status;
 	struct	scsi_device *devp;
 	int	node_ix;
@@ -3433,7 +3433,7 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	    (flag & FREAD) &&		/* reading or at least asked to */
 	    (un->un_mediastate == MTIO_INSERTED) &&	/* tape loaded */
 	    (un->un_pos.pmode != invalid) &&		/* XXX position known */
-	    ((un->un_pos.blkno != 0) && 		/* inside a file */
+	    ((un->un_pos.blkno != 0) &&			/* inside a file */
 	    (un->un_lastop != ST_OP_WRITE) &&		/* Didn't just write */
 	    (un->un_lastop != ST_OP_WEOF))) {		/* or write filemarks */
 		switch (un->un_pos.eof) {
@@ -4968,7 +4968,7 @@ check_commands:
 		 * 64 bit ioctl
 		 */
 		struct mtget32		mtg_local32;
-		struct mtget32 		*mtget_32 = &mtg_local32;
+		struct mtget32		*mtget_32 = &mtg_local32;
 #endif /* _MULTI_DATAMODEL */
 
 			/* Get tape status */
@@ -5073,14 +5073,14 @@ check_commands:
 			 * Convert 64 bit back to 32 bit before doing
 			 * copyout. This is what the ILP32 app expects.
 			 */
-			mtget_32->mt_erreg = 	mtget->mt_erreg;
-			mtget_32->mt_resid = 	mtget->mt_resid;
-			mtget_32->mt_dsreg = 	mtget->mt_dsreg;
-			mtget_32->mt_fileno = 	(daddr32_t)mtget->mt_fileno;
-			mtget_32->mt_blkno = 	(daddr32_t)mtget->mt_blkno;
-			mtget_32->mt_type =  	mtget->mt_type;
-			mtget_32->mt_flags = 	mtget->mt_flags;
-			mtget_32->mt_bf = 	mtget->mt_bf;
+			mtget_32->mt_erreg = mtget->mt_erreg;
+			mtget_32->mt_resid = mtget->mt_resid;
+			mtget_32->mt_dsreg = mtget->mt_dsreg;
+			mtget_32->mt_fileno = (daddr32_t)mtget->mt_fileno;
+			mtget_32->mt_blkno = (daddr32_t)mtget->mt_blkno;
+			mtget_32->mt_type = mtget->mt_type;
+			mtget_32->mt_flags = mtget->mt_flags;
+			mtget_32->mt_bf = mtget->mt_bf;
 
 			if (ddi_copyout(mtget_32, (void *)arg,
 			    sizeof (struct mtget32), flag)) {
@@ -6490,7 +6490,7 @@ st_start(struct scsi_tape *un)
 			    un->un_throttle, un->un_ncmds);
 			if (un->un_ncmds == 0) {
 				typedef void (*func)();
-				func fnc = (func)st_runout;
+				func fnc = (func)(uintptr_t)st_runout;
 
 				scsi_log(ST_DEVINFO, st_label, SCSI_DEBUG,
 				    "Sending delayed start to st_runout()\n");
@@ -10120,7 +10120,7 @@ reset_target:
  */
 static int
 st_handle_intr_busy(struct scsi_tape *un, struct buf *bp,
-	clock_t timeout_interval)
+    clock_t timeout_interval)
 {
 
 	int queued;
@@ -10394,9 +10394,8 @@ ret:
  */
 
 static void
-st_update_error_stack(struct scsi_tape *un,
-			struct scsi_pkt *pkt,
-			struct scsi_arq_status *cmd)
+st_update_error_stack(struct scsi_tape *un, struct scsi_pkt *pkt,
+    struct scsi_arq_status *cmd)
 {
 	struct mterror_entry_stack *err_entry_tmp;
 	uchar_t *cdbp = (uchar_t *)pkt->pkt_cdbp;
@@ -12311,7 +12310,7 @@ st_clean_print(dev_info_t *dev, char *label, uint_t level,
     char *title, char *data, int len)
 {
 	int	i;
-	int 	c;
+	int	c;
 	char	*format;
 	char	buf[256];
 	uchar_t	byte;
@@ -13775,9 +13774,9 @@ st_check_sense_clean_bit(struct scsi_tape *un)
 /*
  * st_clear_unit_attention
  *
- *  	run test unit ready's to clear out outstanding
- * 	unit attentions.
- * 	returns zero for SUCCESS or the errno from st_cmd call
+ *	run test unit ready's to clear out outstanding
+ *	unit attentions.
+ *	returns zero for SUCCESS or the errno from st_cmd call
  */
 static int
 st_clear_unit_attentions(dev_t dev_instance, int max_trys)
@@ -16369,7 +16368,7 @@ static const char *mode[] = {
 
 static void
 st_print_position(dev_info_t *dev, char *label, uint_t level,
-const char *comment, tapepos_t *pos)
+    const char *comment, tapepos_t *pos)
 {
 	ST_FUNC(dev, st_print_position);
 

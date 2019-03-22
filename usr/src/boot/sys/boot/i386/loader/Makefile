@@ -169,13 +169,13 @@ install: all $(ROOT_BOOT_DEFAULTS) $(ROOT_BOOT_FORTH) \
 $(FONT).c: $(FONT_DIR)/$(FONT_SRC)
 	$(VTFONTCVT) -f compressed-source -o $@ $(FONT_DIR)/$(FONT_SRC)
 
-$(ROOT_BOOT)/%: ../../forth/%
+$(ROOT_BOOT)/%: ../../forth/% $(ROOT_BOOT)
 	$(INS.file)
 
-$(ROOT_BOOT_DEFAULTS)/%: ../../forth/%
+$(ROOT_BOOT_DEFAULTS)/%: ../../forth/% $(ROOT_BOOT_DEFAULTS)
 	$(INS.file)
 
-$(ROOT_BOOT_FORTH)/%: ../../forth/%
+$(ROOT_BOOT_FORTH)/%: ../../forth/% $(ROOT_BOOT_FORTH)
 	$(INS.file)
 
 $(ROOT_BOOT_DEFAULTS) $(ROOT_BOOT_CONF) $(ROOT_BOOT_FORTH):

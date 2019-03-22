@@ -2,6 +2,7 @@
  * Copyright 2017 Gary Mills
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -900,11 +901,10 @@ rt2860_free_rx_ring(struct rt2860_softc *sc, struct rt2860_rx_ring *ring)
 		rt2860_free_dma_mem(&ring->rxdesc_dma);
 
 	count = RT2860_RX_RING_COUNT;
-	if (ring->data != NULL) {
-		for (i = 0; i < count; i++) {
-			data = &ring->data[i];
-			rt2860_free_dma_mem(&data->rxbuf_dma);
-		}
+
+	for (i = 0; i < count; i++) {
+		data = &ring->data[i];
+		rt2860_free_dma_mem(&data->rxbuf_dma);
 	}
 }
 
