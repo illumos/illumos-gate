@@ -156,8 +156,19 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-$(LIBGEN):	$(GENUNIX) $(LIBSTUBS)
-	$(BUILD.SO) $(GENUNIX) $(LIBSTUBS)
+# Due to what seems to be an issue in GCC 4 generated DWARF containing
+# symbolic relocations against non-allocatable .debug sections, libgenunix.so
+# must be built from a stripped object, thus we create an intermediary
+# libgenunix.o we can safely strip.
+LIBGENUNIX_O = $(OBJS_DIR)/libgenunix.o
+CLEANFILES += $(LIBGENUNIX_O)
+
+$(LIBGENUNIX_O): $(OBJECTS)
+	$(LD) -r -o $(OBJS_DIR)/libgenunix.o $(OBJECTS)
+	$(STRIP) -x $(OBJS_DIR)/libgenunix.o
+
+$(LIBGEN):	$(LIBGENUNIX_O) $(LIBSTUBS)
+	$(BUILD.SO) $(LIBGENUNIX_O) $(LIBSTUBS)
 
 $(IPCTF_TARGET) ipctf_target: FRC
 	@cd $(IPDRV_DIR); pwd; $(MAKE) ipctf.$(OBJS_DIR)
