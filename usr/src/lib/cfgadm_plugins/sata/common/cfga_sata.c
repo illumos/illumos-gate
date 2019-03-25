@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -1745,7 +1746,7 @@ cfga_msg(struct cfga_msg *msgp, const char *str)
 	}
 
 	(void) strcpy(q, str);
-	(*msgp->message_routine)(msgp->appdata_ptr, q);
+	(void) (*msgp->message_routine)(msgp->appdata_ptr, q);
 
 	free(q);
 }

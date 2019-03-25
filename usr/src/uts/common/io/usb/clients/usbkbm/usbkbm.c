@@ -83,8 +83,8 @@ static int	usbkbm_get_vid_pid(usbkbm_state_t *);
 /* stream qinit functions defined here */
 static int	usbkbm_open(queue_t *, dev_t *, int, int, cred_t *);
 static int	usbkbm_close(queue_t *, int, cred_t *);
-static void	usbkbm_wput(queue_t *, mblk_t *);
-static void	usbkbm_rput(queue_t *, mblk_t *);
+static int	usbkbm_wput(queue_t *, mblk_t *);
+static int	usbkbm_rput(queue_t *, mblk_t *);
 static ushort_t	usbkbm_get_state(usbkbm_state_t *);
 static void	usbkbm_get_scancode(usbkbm_state_t *, int *, enum keystate *);
 
@@ -345,21 +345,21 @@ static struct module_info usbkbm_minfo = {
 
 /* read side for key data and ioctl replies */
 static struct qinit usbkbm_rinit = {
-	(int (*)())usbkbm_rput,
-	(int (*)())NULL,		/* service not used */
+	usbkbm_rput,
+	NULL,		/* service not used */
 	usbkbm_open,
 	usbkbm_close,
-	(int (*)())NULL,
+	NULL,
 	&usbkbm_minfo
 	};
 
 /* write side for ioctls */
 static struct qinit usbkbm_winit = {
-	(int (*)())usbkbm_wput,
-	(int (*)())NULL,
+	usbkbm_wput,
+	NULL,
 	usbkbm_open,
 	usbkbm_close,
-	(int (*)())NULL,
+	NULL,
 	&usbkbm_minfo
 	};
 
@@ -620,7 +620,7 @@ usbkbm_close(register queue_t *q, int flag, cred_t *crp)
  *	usb keyboard module output queue put procedure: handles M_IOCTL
  *	messages.
  */
-static void
+static int
 usbkbm_wput(register queue_t *q, register mblk_t *mp)
 {
 	usbkbm_state_t			*usbkbmd;
@@ -639,7 +639,7 @@ usbkbm_wput(register queue_t *q, register mblk_t *mp)
 		USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
 		    "usbkbm_wput exiting:2");
 
-		return;
+		return (0);
 	}
 
 	/* kbtrans didn't handle the message.  Try to handle it here */
@@ -665,7 +665,7 @@ usbkbm_wput(register queue_t *q, register mblk_t *mp)
 			USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
 			    "usbkbm_wput exiting:1");
 
-			return;
+			return (0);
 		}
 	default:
 		break;
@@ -679,6 +679,7 @@ usbkbm_wput(register queue_t *q, register mblk_t *mp)
 
 	USB_DPRINTF_L3(PRINT_MASK_ALL, usbkbm_log_handle,
 	    "usbkbm_wput exiting:3");
+	return (0);
 }
 
 /*
@@ -946,7 +947,7 @@ allocfailure:
  */
 static int
 usbkbm_kioccmd(usbkbm_state_t *usbkbmd, register mblk_t *mp,
-		char command, size_t *ioctlrepsize)
+    char command, size_t *ioctlrepsize)
 {
 	register mblk_t			*datap;
 	register struct iocblk		*iocp;
@@ -1026,7 +1027,7 @@ usbkbm_kioccmd(usbkbm_state_t *usbkbmd, register mblk_t *mp,
  * usbkbm_rput :
  *	Put procedure for input from driver end of stream (read queue).
  */
-static void
+static int
 usbkbm_rput(register queue_t *q, register mblk_t *mp)
 {
 	usbkbm_state_t		*usbkbmd;
@@ -1039,7 +1040,7 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 	if (usbkbmd == 0) {
 		freemsg(mp);	/* nobody's listening */
 
-		return;
+		return (0);
 	}
 
 	switch (mp->b_datap->db_type) {
@@ -1052,7 +1053,7 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 
 		freemsg(mp);
 
-		return;
+		return (0);
 	case M_BREAK:
 		/*
 		 * Will get M_BREAK only if this is not the system
@@ -1061,19 +1062,19 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 		 */
 		freemsg(mp);
 
-		return;
+		return (0);
 	case M_DATA:
 		if (!(usbkbmd->usbkbm_flags & USBKBM_OPEN)) {
 			freemsg(mp);	/* not ready to listen */
 
-			return;
+			return (0);
 		}
 
 		break;
 	case M_CTL:
 		usbkbm_mctl_receive(q, mp);
 
-		return;
+		return (0);
 	case M_ERROR:
 		usbkbmd->usbkbm_flags &= ~USBKBM_QWAIT;
 		if (*mp->b_rptr == ENODEV) {
@@ -1082,16 +1083,16 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 			freemsg(mp);
 		}
 
-		return;
+		return (0);
 	case M_IOCACK:
 	case M_IOCNAK:
 		putnext(q, mp);
 
-		return;
+		return (0);
 	default:
 		putnext(q, mp);
 
-		return;
+		return (0);
 	}
 
 	/*
@@ -1106,7 +1107,7 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 			    usbkbmd->usbkbm_report_format.keyid) {
 				freemsg(mp);
 
-				return;
+				return (0);
 			} else {
 				/* We skip the report id prefix */
 				mp->b_rptr++;
@@ -1117,6 +1118,7 @@ usbkbm_rput(register queue_t *q, register mblk_t *mp)
 	}
 
 	freemsg(mp);
+	return (0);
 }
 
 /*
@@ -1346,7 +1348,7 @@ usbkbm_streams_setled(struct kbtrans_hardware *kbtrans_hw, int state)
  */
 static boolean_t
 usbkbm_polled_keycheck(struct kbtrans_hardware *hw,
-	int *key, enum keystate *state)
+    int *key, enum keystate *state)
 {
 	usbkbm_state_t			*usbkbmd;
 	uchar_t				*buffer;
@@ -1674,7 +1676,7 @@ usbkbm_polled_exit(cons_polledio_arg_t arg)
  */
 static void
 usbkbm_unpack_usb_packet(usbkbm_state_t *usbkbmd, process_key_callback_t func,
-	uchar_t *usbpacket)
+    uchar_t *usbpacket)
 {
 	uchar_t		mkb;
 	uchar_t		lastmkb;

@@ -4,7 +4,7 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SRV 9E "Nov 12, 1992"
+.TH SRV 9E "Mar 15, 2019"
 .SH NAME
 srv \- service queued messages
 .SH SYNOPSIS
@@ -18,21 +18,19 @@ srv \- service queued messages
 
 
 
-\fBintprefix\fR\fBrsrv\fR(\fBqueue_t *\fR\fIq\fR/* read side */
+\fBint prefix\fR\fBrsrv\fR(\fBqueue_t *\fR\fIq\fR);	/* read side */
 .fi
 
 .LP
 .nf
-\fBintprefix\fR\fBwsrv\fR(\fBqueue_t *\fR\fIq\fR/* write side */
+\fBint prefix\fR\fBwsrv\fR(\fBqueue_t *\fR\fIq\fR);	/* write side */
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Architecture independent level 1 (DDI/DKI). This entry point is required for
 \fBSTREAMS\fR.
 .SH ARGUMENTS
-.sp
 .ne 2
 .na
 \fB\fIq\fR\fR
@@ -42,7 +40,6 @@ Pointer to the \fBqueue\fR(9S) structure.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 The optional service \fBsrv()\fR routine may be included in a \fBSTREAMS
 \fRmodule or driver for many possible reasons, including:
@@ -149,11 +146,9 @@ If the message cannot be passed, put it back on the queue with
 \fBputnext()\fR.
 .RE
 .SH RETURN VALUES
-.sp
 .LP
 Ignored.
 .SH SEE ALSO
-.sp
 .LP
 \fBput\fR(9E), \fBbcanput\fR(9F), \fBbcanputnext\fR(9F), \fBcanput\fR(9F),
 \fBcanputnext\fR(9F), \fBgetq\fR(9F), \fBnulldev\fR(9F), \fBputbq\fR(9F),
@@ -165,7 +160,6 @@ Ignored.
 .LP
 \fISTREAMS Programming Guide\fR
 .SH WARNINGS
-.sp
 .LP
 Each stream module must specify a read and a write service \fBsrv()\fR routine.
 If a service routine is not needed (because the \fBput()\fR routine processes

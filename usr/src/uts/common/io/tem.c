@@ -376,7 +376,7 @@ tems_failed(cred_t *credp, boolean_t finish_ioctl)
 		(void) ldi_ioctl(tems.ts_hdl, VIS_DEVFINI, 0,
 		    FWRITE|FKIOCTL, credp, &lyr_rval);
 
-	(void) ldi_close(tems.ts_hdl, NULL, credp);
+	(void) ldi_close(tems.ts_hdl, 0, credp);
 	tems.ts_hdl = NULL;
 	return (ENXIO);
 }
