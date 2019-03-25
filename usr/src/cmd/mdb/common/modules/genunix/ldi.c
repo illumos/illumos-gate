@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -290,7 +290,8 @@ ldi_ident(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 static void
-ldi_handle_header(int refs, int ident) {
+ldi_handle_header(int refs, int ident)
+{
 	mdb_printf("%-?s ", "HANDLE");
 
 	if (refs)
@@ -369,7 +370,7 @@ ldi_handle(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	int			refs = 1;
 
 	if (mdb_getopts(argc, argv,
-	    'i', MDB_OPT_SETBITS, TRUE, &ident) != argc)
+	    'i', MDB_OPT_SETBITS, TRUE, &ident, NULL) != argc)
 		return (DCMD_USAGE);
 
 	if (ident)

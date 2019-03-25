@@ -26,11 +26,35 @@
 
 /*
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
- *	Host to PCI-Express local bus driver
+ *	npe (Nexus PCIe driver): Host to PCI-Express local bus driver
+ *
+ *	npe serves as the driver for PCIe Root Complexes and as the nexus driver
+ *	for PCIe devices. See also: npe(7D). For more information about hotplug,
+ *	see the big theory statement at uts/common/os/ddi_hp_impl.c.
+ *
+ *
+ *	NDI EVENT HANDLING SUPPORT
+ *
+ *	npe supports NDI event handling. The only available event is surprise
+ *	removal of a device. Child drivers can register surprise removal event
+ *	callbacks by requesting an event cookie using ddi_get_eventcookie for
+ *	the DDI_DEVI_REMOVE_EVENT and add their callback using
+ *	ddi_add_event_handler. For an example, see the nvme driver in
+ *	uts/common/io/nvme/nvme.c.
+ *
+ *	The NDI events in npe are retrieved using NDI_EVENT_NOPASS, which
+ *	prevent them from being propagated up the tree once they reach the npe's
+ *	bus_get_eventcookie operations. This is important because npe maintains
+ *	the state of PCIe devices and their receptacles, via the PCIe hotplug
+ *	controller driver (pciehpc).
+ *
+ *	Hot removal events are ultimately posted by the PCIe hotplug controller
+ *	interrupt handler for hotplug events. Events are posted using the
+ *	ndi_post_event interface.
  */
 
 #include <sys/conf.h>
@@ -72,6 +96,15 @@ static int	npe_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
 		    ddi_intr_handle_impl_t *, void *);
 static int	npe_fm_init(dev_info_t *, dev_info_t *, int,
 		    ddi_iblock_cookie_t *);
+static int	npe_bus_get_eventcookie(dev_info_t *, dev_info_t *, char *,
+		    ddi_eventcookie_t *);
+static int	npe_bus_add_eventcall(dev_info_t *, dev_info_t *,
+		    ddi_eventcookie_t, void (*)(dev_info_t *,
+		    ddi_eventcookie_t, void *, void *),
+		    void *, ddi_callback_id_t *);
+static int	npe_bus_remove_eventcall(dev_info_t *, ddi_callback_id_t);
+static int	npe_bus_post_event(dev_info_t *, dev_info_t *,
+		    ddi_eventcookie_t, void *);
 
 static int	npe_fm_callback(dev_info_t *, ddi_fm_error_t *, const void *);
 
@@ -102,10 +135,10 @@ struct bus_ops npe_bus_ops = {
 	ddi_dma_mctl,
 	npe_ctlops,
 	ddi_bus_prop_op,
-	0,			/* (*bus_get_eventcookie)();	*/
-	0,			/* (*bus_add_eventcall)();	*/
-	0,			/* (*bus_remove_eventcall)();	*/
-	0,			/* (*bus_post_event)();		*/
+	npe_bus_get_eventcookie,
+	npe_bus_add_eventcall,
+	npe_bus_remove_eventcall,
+	npe_bus_post_event,
 	0,			/* (*bus_intr_ctl)(); */
 	0,			/* (*bus_config)(); */
 	0,			/* (*bus_unconfig)(); */
@@ -271,12 +304,27 @@ npe_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 	return (ret);
 }
 
+/*
+ * See big theory statement at the top of this file for more information about
+ * surprise removal events.
+ */
+#define	NPE_EVENT_TAG_HOT_REMOVAL	0
+static ndi_event_definition_t npe_ndi_event_defs[1] = {
+	{NPE_EVENT_TAG_HOT_REMOVAL, DDI_DEVI_REMOVE_EVENT, EPL_KERNEL,
+	NDI_EVENT_POST_TO_ALL}
+};
+
+static ndi_event_set_t npe_ndi_events = {
+	NDI_EVENTS_REV1, ARRAY_SIZE(npe_ndi_event_defs), npe_ndi_event_defs
+};
+
 /*ARGSUSED*/
 static int
 npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	int		instance = ddi_get_instance(devi);
 	pci_state_t	*pcip = NULL;
+	int		ret;
 
 	if (cmd == DDI_RESUME) {
 		/*
@@ -316,6 +364,22 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if (pcie_init(devi, NULL) != DDI_SUCCESS)
 		goto fail1;
 
+	ret = ndi_event_alloc_hdl(pcip->pci_dip, NULL, &pcip->pci_ndi_event_hdl,
+	    NDI_SLEEP);
+	if (ret == NDI_SUCCESS) {
+		ret = ndi_event_bind_set(pcip->pci_ndi_event_hdl,
+		    &npe_ndi_events, NDI_SLEEP);
+		if (ret != NDI_SUCCESS) {
+			dev_err(pcip->pci_dip, CE_WARN, "npe:	failed to bind "
+			    "NDI event set (error=%d)", ret);
+			goto fail1;
+		}
+	} else {
+		dev_err(pcip->pci_dip, CE_WARN, "npe:	failed to allocate "
+		    "event handle (error=%d)", ret);
+		goto fail1;
+	}
+
 	/* Second arg: initialize for pci_express root nexus */
 	if (pcitool_init(devi, B_TRUE) != DDI_SUCCESS)
 		goto fail2;
@@ -352,11 +416,36 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	int instance = ddi_get_instance(devi);
 	pci_state_t *pcip;
+	int ret;
 
 	pcip = ddi_get_soft_state(npe_statep, ddi_get_instance(devi));
 
 	switch (cmd) {
 	case DDI_DETACH:
+
+		/*
+		 * Clean up event handling first, to ensure there are no
+		 * oustanding callbacks registered.
+		 */
+		ret = ndi_event_unbind_set(pcip->pci_ndi_event_hdl,
+		    &npe_ndi_events, NDI_SLEEP);
+		if (ret == NDI_SUCCESS) {
+			/* ndi_event_free_hdl always succeeds. */
+			(void) ndi_event_free_hdl(pcip->pci_ndi_event_hdl);
+		} else {
+			/*
+			 * The event set will only fail to unbind if there are
+			 * outstanding callbacks registered for it, which
+			 * probably means a child driver still has one
+			 * registered and thus was not cleaned up properly
+			 * before npe's detach routine was called. Consequently,
+			 * we should fail the detach here.
+			 */
+			dev_err(pcip->pci_dip, CE_WARN, "npe:	failed to "
+			    "unbind NDI event set (error=%d)", ret);
+			return (DDI_FAILURE);
+		}
+
 		pcie_fab_fini_bus(devi, PCIE_BUS_INITIAL);
 
 		/* Uninitialize pcitool support. */
@@ -373,6 +462,7 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 		ddi_fm_fini(devi);
 		ddi_soft_state_free(npe_statep, instance);
+
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
@@ -414,7 +504,7 @@ static int
 npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
     off_t offset, off_t len, caddr_t *vaddrp)
 {
-	int 		rnumber;
+	int		rnumber;
 	int		space;
 	ddi_acc_impl_t	*ap;
 	ddi_acc_hdl_t	*hp;
@@ -1109,6 +1199,49 @@ npe_fm_init(dev_info_t *dip, dev_info_t *tdip, int cap,
 	*ibc = pcip->pci_fm_ibc;
 
 	return (pcip->pci_fmcap);
+}
+
+static int
+npe_bus_get_eventcookie(dev_info_t *dip, dev_info_t *rdip, char *eventname,
+    ddi_eventcookie_t *cookiep)
+{
+	pci_state_t *pcip = ddi_get_soft_state(npe_statep,
+	    ddi_get_instance(dip));
+
+	return (ndi_event_retrieve_cookie(pcip->pci_ndi_event_hdl, rdip,
+	    eventname, cookiep, NDI_EVENT_NOPASS));
+}
+
+static int
+npe_bus_add_eventcall(dev_info_t *dip, dev_info_t *rdip,
+    ddi_eventcookie_t cookie, void (*callback)(dev_info_t *dip,
+    ddi_eventcookie_t cookie, void *arg, void *bus_impldata),
+    void *arg, ddi_callback_id_t *cb_id)
+{
+	pci_state_t *pcip = ddi_get_soft_state(npe_statep,
+	    ddi_get_instance(dip));
+
+	return (ndi_event_add_callback(pcip->pci_ndi_event_hdl, rdip, cookie,
+	    callback, arg, NDI_SLEEP, cb_id));
+}
+
+static int
+npe_bus_remove_eventcall(dev_info_t *dip, ddi_callback_id_t cb_id)
+{
+	pci_state_t *pcip = ddi_get_soft_state(npe_statep,
+	    ddi_get_instance(dip));
+	return (ndi_event_remove_callback(pcip->pci_ndi_event_hdl, cb_id));
+}
+
+static int
+npe_bus_post_event(dev_info_t *dip, dev_info_t *rdip,
+    ddi_eventcookie_t cookie, void *impl_data)
+{
+	pci_state_t *pcip = ddi_get_soft_state(npe_statep,
+	    ddi_get_instance(dip));
+	return (ndi_event_do_callback(pcip->pci_ndi_event_hdl, rdip, cookie,
+	    impl_data));
+
 }
 
 /*ARGSUSED*/

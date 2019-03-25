@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 #include <strings.h>
 #include <fm/topo_hc.h>
@@ -185,6 +186,7 @@ fab_send_erpt(fmd_hdl_t *hdl, fab_data_t *data, fab_err_tbl_t *tbl)
 	fab_erpt_tbl_t	*erpt_tbl, *entry;
 	nvlist_t	*erpt;
 	uint32_t	reg;
+	int		err;
 
 	erpt_tbl = tbl->erpt_tbl;
 	if (tbl->reg_size == 16) {
@@ -200,7 +202,9 @@ fab_send_erpt(fmd_hdl_t *hdl, fab_data_t *data, fab_err_tbl_t *tbl)
 
 		if (nvlist_alloc(&erpt, NV_UNIQUE_NAME, 0) != 0)
 			goto done;
-		if (tbl->fab_prep(hdl, data, erpt, entry) != 0) {
+
+		err = tbl->fab_prep(hdl, data, erpt, entry);
+		if (err != 0 && err != PF_EREPORT_IGNORE) {
 			fmd_hdl_debug(hdl, "Prepping ereport failed: "
 			    "class = %s\n", entry->err_class);
 			nvlist_free(erpt);
@@ -394,7 +398,7 @@ fab_find_rppath_by_devbdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf)
 	xmlXPathObjectPtr xpathObj;
 	xmlNodeSetPtr nodes;
 	xmlNodePtr devNode;
-	char 	*retval, *temp;
+	char	*retval, *temp;
 	char	query[500];
 	int	i, size, bus, dev, fn;
 	char	*hcpath;
@@ -577,7 +581,7 @@ fail:
 char *
 fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf)
 {
-	char 	*retval;
+	char	*retval;
 	char	query[500];
 	int	bus, dev, fn;
 	char	rcpath[255];
@@ -705,7 +709,7 @@ found:
 propgroup:
 	/* Retrive the "dev" propval and return */
 	for (devNode = devNode->children; devNode; devNode = devNode->next) {
-		char 	*tprop;
+		char	*tprop;
 
 		tprop = GET_PROP(devNode, "name");
 		if (STRCMP(devNode->name, "propval") &&
@@ -866,8 +870,8 @@ fab_pr(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl)
 char *
 fab_get_rpdev(fmd_hdl_t *hdl)
 {
-	char 	*retval;
-	char 	query[500];
+	char	*retval;
+	char	query[500];
 
 	(void) snprintf(query, sizeof (query), "//propval["
 	    "@name='extended-capabilities' and contains(@value, '%s')]"
@@ -888,8 +892,8 @@ fab_send_erpt_all_rps(fmd_hdl_t *hdl, nvlist_t *erpt)
 {
 	xmlXPathObjectPtr xpathObj;
 	xmlNodeSetPtr nodes;
-	char 	*rppath, *hbpath;
-	char 	query[600];
+	char	*rppath, *hbpath;
+	char	query[600];
 	nvlist_t *detector, *nvl;
 	uint_t	i, size;
 	size_t len;

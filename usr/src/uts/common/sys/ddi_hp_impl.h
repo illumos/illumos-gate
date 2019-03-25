@@ -21,6 +21,12 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
+ * See the big theory statement in uts/common/os/ddi_hp_impl.c for more
+ * information about the structures and functions defined here.
  */
 
 #ifndef	_SYS_DDI_HP_IMPL_H

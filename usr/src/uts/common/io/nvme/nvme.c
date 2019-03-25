@@ -13,7 +13,7 @@
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2016 Tegile Systems, Inc. All rights reserved.
  * Copyright (c) 2016 The MathWorks, Inc.  All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation.
  */
 
@@ -58,7 +58,7 @@
  * but they share some driver state: the command array (holding pointers to
  * commands currently being processed by the hardware) and the active command
  * counter. Access to a submission queue and the shared state is protected by
- * nq_mutex, completion queue is protected by ncq_mutex.
+ * nq_mutex; completion queue is protected by ncq_mutex.
  *
  * When a command is submitted to a queue pair the active command counter is
  * incremented and a pointer to the command is stored in the command array. The
@@ -198,6 +198,23 @@
  *
  * The driver currently does not support fast reboot. A quiesce(9E) entry point
  * is still provided which is used to send a shutdown notification to the
+ * device.
+ *
+ *
+ * NVMe Hotplug:
+ *
+ * The driver supports hot removal. The driver uses the NDI event framework
+ * to register a callback, nvme_remove_callback, to clean up when a disk is
+ * removed. In particular, the driver will unqueue outstanding I/O commands and
+ * set n_dead on the softstate to true so that other operations, such as ioctls
+ * and command submissions, fail as well.
+ *
+ * While the callback registration relies on the NDI event framework, the
+ * removal event itself is kicked off in the PCIe hotplug framework, when the
+ * PCIe bridge driver ("pcieb") gets a hotplug interrupt indicatating that a
+ * device was removed from the slot.
+ *
+ * The NVMe driver instance itself will remain until the final close of the
  * device.
  *
  *
@@ -1017,6 +1034,10 @@ nvme_submit_admin_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 static int
 nvme_submit_io_cmd(nvme_qpair_t *qp, nvme_cmd_t *cmd)
 {
+	if (cmd->nc_nvme->n_dead) {
+		return (EIO);
+	}
+
 	if (sema_tryp(&qp->nq_sema) == 0)
 		return (EAGAIN);
 
@@ -3181,6 +3202,47 @@ nvme_fm_errcb(dev_info_t *dip, ddi_fm_error_t *fm_error, const void *arg)
 	return (fm_error->fme_status);
 }
 
+static void
+nvme_remove_callback(dev_info_t *dip, ddi_eventcookie_t cookie, void *a,
+    void *b)
+{
+	nvme_t *nvme = a;
+
+	nvme->n_dead = B_TRUE;
+
+	/*
+	 * Fail all outstanding commands, including those in the admin queue
+	 * (queue 0).
+	 */
+	for (uint_t i = 0; i < nvme->n_ioq_count + 1; i++) {
+		nvme_qpair_t *qp = nvme->n_ioq[i];
+
+		mutex_enter(&qp->nq_mutex);
+		for (size_t j = 0; j < qp->nq_nentry; j++) {
+			nvme_cmd_t *cmd = qp->nq_cmd[j];
+			nvme_cmd_t *u_cmd;
+
+			if (cmd == NULL) {
+				continue;
+			}
+
+			/*
+			 * Since we have the queue lock held the entire time we
+			 * iterate over it, it's not possible for the queue to
+			 * change underneath us. Thus, we don't need to check
+			 * that the return value of nvme_unqueue_cmd matches the
+			 * requested cmd to unqueue.
+			 */
+			u_cmd = nvme_unqueue_cmd(nvme, qp, cmd->nc_sqe.sqe_cid);
+			taskq_dispatch_ent((taskq_t *)cmd->nc_nvme->n_cmd_taskq,
+			    cmd->nc_callback, cmd, TQ_NOSLEEP, &cmd->nc_tqent);
+
+			ASSERT3P(u_cmd, ==, cmd);
+		}
+		mutex_exit(&qp->nq_mutex);
+	}
+}
+
 static int
 nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -3202,6 +3264,17 @@ nvme_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	nvme = ddi_get_soft_state(nvme_state, instance);
 	ddi_set_driver_private(dip, nvme);
 	nvme->n_dip = dip;
+
+	/* Set up event handlers for hot removal. */
+	if (ddi_get_eventcookie(nvme->n_dip, DDI_DEVI_REMOVE_EVENT,
+	    &nvme->n_rm_cookie) != DDI_SUCCESS) {
+		goto fail;
+	}
+	if (ddi_add_event_handler(nvme->n_dip, nvme->n_rm_cookie,
+	    nvme_remove_callback, nvme, &nvme->n_ev_rm_cb_id) !=
+	    DDI_SUCCESS) {
+		goto fail;
+	}
 
 	mutex_init(&nvme->n_minor.nm_mutex, NULL, MUTEX_DRIVER, NULL);
 
@@ -3510,6 +3583,12 @@ nvme_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (nvme->n_product != NULL)
 		strfree(nvme->n_product);
 
+	/* Clean up hot removal event handler. */
+	if (nvme->n_ev_rm_cb_id != NULL) {
+		(void) ddi_remove_event_handler(nvme->n_ev_rm_cb_id);
+	}
+	nvme->n_ev_rm_cb_id = NULL;
+
 	ddi_soft_state_free(nvme_state, instance);
 
 	return (DDI_SUCCESS);
@@ -3692,6 +3771,11 @@ static int
 nvme_bd_mediainfo(void *arg, bd_media_t *media)
 {
 	nvme_namespace_t *ns = arg;
+	nvme_t *nvme = ns->ns_nvme;
+
+	if (nvme->n_dead) {
+		return (EIO);
+	}
 
 	media->m_nblks = ns->ns_block_count;
 	media->m_blksize = ns->ns_block_size;
@@ -3712,8 +3796,9 @@ nvme_bd_cmd(nvme_namespace_t *ns, bd_xfer_t *xfer, uint8_t opc)
 	boolean_t poll;
 	int ret;
 
-	if (nvme->n_dead)
+	if (nvme->n_dead) {
 		return (EIO);
+	}
 
 	cmd = nvme_create_nvm_cmd(ns, opc, xfer);
 	if (cmd == NULL)
@@ -3794,6 +3879,11 @@ static int
 nvme_bd_devid(void *arg, dev_info_t *devinfo, ddi_devid_t *devid)
 {
 	nvme_namespace_t *ns = arg;
+	nvme_t *nvme = ns->ns_nvme;
+
+	if (nvme->n_dead) {
+		return (EIO);
+	}
 
 	/*LINTED: E_BAD_PTR_CAST_ALIGN*/
 	if (*(uint64_t *)ns->ns_eui64 != 0) {

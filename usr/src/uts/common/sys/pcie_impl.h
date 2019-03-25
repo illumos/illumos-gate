@@ -166,6 +166,7 @@ extern "C" {
 #define	PCIE_ADV_BDG_HDR(pfd_p, n) PCIE_ADV_BDG_REG(pfd_p)->pcie_sue_hdr[n]
 #define	PCIE_ADV_RP_REG(pfd_p) \
 	PCIE_ADV_REG(pfd_p)->pcie_ext.pcie_adv_rp_regs
+#define	PCIE_SLOT_REG(pfd_p)		pfd_p->pe_pcie_slot_regs
 #define	PFD_AFFECTED_DEV(pfd_p)	   pfd_p->pe_affected_dev
 #define	PFD_SET_AFFECTED_FLAG(pfd_p, aff_flag) \
 	PFD_AFFECTED_DEV(pfd_p)->pe_affected_flags = aff_flag
@@ -261,6 +262,18 @@ typedef struct pf_pcie_err_regs {
 	pf_pcie_rp_err_regs_t *pcie_rp_regs;	 /* pcie root complex regs */
 	pf_pcie_adv_err_regs_t *pcie_adv_regs; /* pcie aer regs */
 } pf_pcie_err_regs_t;
+
+/*
+ * Slot register values for hotplug-capable Downstream Ports or Root Ports with
+ * the Slot Implemented capability bit set. We gather these to help determine
+ * whether the slot's child device is physically present.
+ */
+typedef struct pf_pcie_slot_regs {
+	boolean_t pcie_slot_regs_valid; /* true if register values are valid */
+	uint32_t pcie_slot_cap;		/* pcie slot capabilities register */
+	uint16_t pcie_slot_control;	/* pcie slot control register */
+	uint16_t pcie_slot_status;	/* pcie slot status register */
+} pf_pcie_slot_regs_t;
 
 typedef enum {
 	PF_INTR_TYPE_NONE = 0,
@@ -431,6 +444,7 @@ struct pf_data {
 		pf_pcie_err_regs_t	*pe_pcie_regs;	/* PCIe error reg */
 	} pe_ext;
 	pf_pcix_bdg_err_regs_t *pe_pcix_bdg_regs; /* PCI-X bridge regs */
+	pf_pcie_slot_regs_t	*pe_pcie_slot_regs; /* PCIe slot regs */
 	pf_data_t		*pe_prev;	/* Next error in queue */
 	pf_data_t		*pe_next;	/* Next error in queue */
 	boolean_t		pe_rber_fatal;

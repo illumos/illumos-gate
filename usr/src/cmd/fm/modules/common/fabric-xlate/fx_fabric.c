@@ -22,10 +22,13 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 #include <stddef.h>
 #include <strings.h>
 #include <sys/fm/util.h>
+#include <sys/pcie.h>
 
 #include "fabric-xlate.h"
 
@@ -271,6 +274,24 @@ fab_pci_fabric_to_data(fmd_hdl_t *hdl, nvlist_t *nvl, fab_data_t *data)
 	FAB_LOOKUP(32,	"pcie_adv_rp_command",	&data->pcie_rp_err_cmd);
 	FAB_LOOKUP(16,	"pcie_adv_rp_ce_src_id", &data->pcie_rp_ce_src_id);
 	FAB_LOOKUP(16,	"pcie_adv_rp_ue_src_id", &data->pcie_rp_ue_src_id);
+
+	/*
+	 * PCIe Parent Slot Registers
+	 *
+	 * These are only passed in the ereport if the parent PCIe component
+	 * supports the registers and the registers have valid data. As such, we
+	 * look up one slot register value first: If that value is present in
+	 * the input ereport data, then we know the others should be there as
+	 * well. We also set the pcie_slot_data_valid flag to ensure we know
+	 * the slot register data is safe to use in the module.
+	 */
+	data->pcie_slot_data_valid = B_FALSE;
+	if (nvlist_lookup_uint32(nvl, "pcie_slot_cap", &data->pcie_slot_cap) ==
+	    0) {
+		FAB_LOOKUP(16,	"pcie_slot_control", &data->pcie_slot_control);
+		FAB_LOOKUP(16,	"pcie_slot_status", &data->pcie_slot_status);
+		data->pcie_slot_data_valid = B_TRUE;
+	}
 }
 
 static int
@@ -357,6 +378,38 @@ fab_prep_pcie_ue_erpt(fmd_hdl_t *hdl, fab_data_t *data, nvlist_t *erpt,
 	uint32_t first_err = 1 << (data->pcie_adv_ctl &
 	    PCIE_AER_CTL_FST_ERR_PTR_MASK);
 	int err = fab_prep_basic_erpt(hdl, data->nvl, erpt, B_FALSE);
+
+	if (data->pcie_slot_data_valid) {
+		(void) nvlist_add_uint32(erpt, "pcie_slot_cap",
+		    data->pcie_slot_cap);
+		(void) nvlist_add_uint16(erpt, "pcie_slot_control",
+		    data->pcie_slot_control);
+		(void) nvlist_add_uint16(erpt, "pcie_slot_status",
+		    data->pcie_slot_status);
+
+		/*
+		 * It is possible to see uncorrectable errors for a slot that
+		 * are related to the slot's child device being physically
+		 * removed from the slot. As such, in the case that the slot
+		 * reports that it is empty, we do not want to generate an
+		 * ereport for all errors. Generating an ereport here will cause
+		 * the eft module to fault the device and io-retire to
+		 * subsequently retire the device. Retiring the device makes
+		 * little sense given that the device is physically gone; more
+		 * confusingly, if plugged back into the slot, it would be
+		 * marked retired already.
+		 *
+		 * The only error ignored for this case is Completion Timeout.
+		 * It is possible more errors should be ignored, and if they
+		 * are seen in the field it might be worth broadening the set
+		 * of ignored errors.
+		 */
+		if (tbl->reg_bit == PCIE_AER_UCE_TO &&
+		    ((data->pcie_slot_status &
+		    PCIE_SLOTSTS_PRESENCE_DETECTED) == 0x0)) {
+			return (PF_EREPORT_IGNORE);
+		}
+	}
 
 	/* Generate an ereport for this error bit. */
 	(void) snprintf(fab_buf, FM_MAX_CLASS, "ereport.io.%s.%s",
@@ -776,7 +829,7 @@ fab_xlate_pcie_erpts(fmd_hdl_t *hdl, fab_data_t *data)
 
 	fmd_hdl_debug(hdl, "Sending Ereports Now");
 
-	/* Go through the error logs and send the relavant reports */
+	/* Go through the error logs and send the relevant reports */
 	for (tbl = fab_master_err_tbl; tbl->erpt_tbl; tbl++) {
 		fab_send_erpt(hdl, data, tbl);
 	}

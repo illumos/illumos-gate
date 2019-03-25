@@ -786,6 +786,13 @@ pcie_init_pfd(dev_info_t *dip)
 				    PCIE_ZALLOC(pf_pcix_ecc_regs_t);
 			}
 		}
+
+		PCIE_SLOT_REG(pfd_p) = PCIE_ZALLOC(pf_pcie_slot_regs_t);
+		PCIE_SLOT_REG(pfd_p)->pcie_slot_regs_valid = B_FALSE;
+		PCIE_SLOT_REG(pfd_p)->pcie_slot_cap = 0;
+		PCIE_SLOT_REG(pfd_p)->pcie_slot_control = 0;
+		PCIE_SLOT_REG(pfd_p)->pcie_slot_status = 0;
+
 	} else if (PCIE_IS_PCIX(bus_p)) {
 		if (PCIE_IS_BDG(bus_p)) {
 			PCIX_BDG_ERR_REG(pfd_p) =
