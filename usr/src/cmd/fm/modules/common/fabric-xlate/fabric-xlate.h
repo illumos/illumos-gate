@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _FABRIC_XLATE_H
@@ -31,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/pcie.h>
 #include <sys/fm/io/pci.h>
+#include <limits.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +46,17 @@ extern "C" {
 #define	PF_ADDR_DMA		(1 << 0)
 #define	PF_ADDR_PIO		(1 << 1)
 #define	PF_ADDR_CFG		(1 << 2)
+
+
+/*
+ * The fabric ereport preparation functions (fab_prep_*) in fab_erpt_tbl_t
+ * structures may return an error if the ereport could not be set up properly.
+ * Typically, these errors are errnos. It is possible that based on incoming
+ * ereport payload data, we might not want to generate an ereport at all: In
+ * this case, the preparation functions may instead return PF_EREPORT_IGNORE,
+ * which is set at a high value so as not to collide with the errnos.
+ */
+#define	PF_EREPORT_IGNORE	INT_MAX
 
 extern fmd_xprt_t *fab_fmd_xprt;	/* FMD transport layer handle */
 extern char fab_buf[];
@@ -121,8 +134,21 @@ typedef struct fab_data {
 	uint16_t pcie_rp_ctl;		/* root complex control register */
 	uint32_t pcie_rp_err_status;	/* pcie root complex error status reg */
 	uint32_t pcie_rp_err_cmd;	/* pcie root complex error cmd reg */
-	uint16_t pcie_rp_ce_src_id;	/* pcie root complex ce sourpe id */
-	uint16_t pcie_rp_ue_src_id;	/* pcie root complex ue sourpe id */
+	uint16_t pcie_rp_ce_src_id;	/* pcie root complex ce source id */
+	uint16_t pcie_rp_ue_src_id;	/* pcie root complex ue source id */
+
+	/*
+	 * The slot register values refer to the registers of the component's
+	 * parent slot, not the component itself.
+	 *
+	 * You should only use the register values -- i.e.,
+	 * pcie_slot_{cap,control,status} -- if pcie_slot_data_valid is set to
+	 * true.
+	 */
+	boolean_t pcie_slot_data_valid; /* true if slot data is valid */
+	uint32_t pcie_slot_cap;		/* pcie slot capabilities */
+	uint16_t pcie_slot_control;	/* pcie slot control */
+	uint16_t pcie_slot_status;	/* pcie slot status */
 
 	/* Flags */
 	boolean_t pcie_rp_send_all;	/* need to send ereports on all rps */
@@ -131,7 +157,6 @@ typedef struct fab_data {
 typedef struct fab_erpt_tbl {
 	const char	*err_class;	/* Final Ereport Class */
 	uint32_t	reg_bit;	/* Error Bit Mask */
-	/* Pointer to function that prepares the ereport body */
 	const char	*tgt_class;	/* Target Ereport Class */
 } fab_erpt_tbl_t;
 

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -380,13 +382,19 @@ ddihp_cn_req_handler(ddi_hp_cn_handle_t *hdlp,
 
 	ASSERT(DEVI_BUSY_OWNED(dip));
 
-	if (ddihp_cn_getstate(hdlp) != DDI_SUCCESS) {
-		DDI_HP_NEXDBG((CE_CONT, "ddihp_cn_req_handler: dip %p, "
-		    "hdlp %p ddi_cn_getstate failed\n", (void *)dip,
-		    (void *)hdlp));
-
-		return (NDI_UNCLAIMED);
-	}
+	/*
+	 * We do not want to fetch the state first, as calling ddihp_cn_getstate
+	 * will update the cn_state member of the connection handle. The
+	 * connector's hotplug operations rely on this value to know how
+	 * target_state compares to the last known state of the device and make
+	 * decisions about whether to clean up, post sysevents about the state
+	 * change, and so on.
+	 *
+	 * Instead, just carry out the request to change the state. The
+	 * connector's hotplug operations will update the state in the
+	 * connection handle after they complete their necessary state change
+	 * actions.
+	 */
 	if (hdlp->cn_info.cn_state != target_state) {
 		ddi_hp_cn_state_t result_state = 0;
 

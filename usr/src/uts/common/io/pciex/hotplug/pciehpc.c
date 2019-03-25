@@ -396,6 +396,21 @@ pciehpc_intr(dev_info_t *dip)
 				    control & ~PCIE_SLOTCTL_PWR_FAULT_EN);
 
 			/*
+			 * If supported, notify the child device driver that the
+			 * device is being removed.
+			 */
+			dev_info_t *cdip = ddi_get_child(dip);
+			if (cdip != NULL) {
+				ddi_eventcookie_t rm_cookie;
+				if (ddi_get_eventcookie(cdip,
+				    DDI_DEVI_REMOVE_EVENT,
+				    &rm_cookie) == DDI_SUCCESS) {
+					ndi_post_event(dip, cdip, rm_cookie,
+					    NULL);
+				}
+			}
+
+			/*
 			 * Ask DDI Hotplug framework to change state to Empty
 			 */
 			(void) ndi_hp_state_change_req(dip,

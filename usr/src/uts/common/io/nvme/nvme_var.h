@@ -114,20 +114,23 @@ struct nvme_cq {
 struct nvme_qpair {
 	size_t nq_nentry;
 
+	/* submission fields */
 	nvme_dma_t *nq_sqdma;
 	nvme_sqe_t *nq_sq;
 	uint_t nq_sqhead;
 	uint_t nq_sqtail;
 	uintptr_t nq_sqtdbl;
 
+	/* completion */
 	nvme_cq_t *nq_cq;
 
-	nvme_cmd_t **nq_cmd;
-	uint16_t nq_next_cmd;
-	uint_t nq_active_cmds;
+	/* shared structures for completion and submission */
+	nvme_cmd_t **nq_cmd;	/* active command array */
+	uint16_t nq_next_cmd;	/* next potential empty queue slot */
+	uint_t nq_active_cmds;	/* number of active cmds */
 
-	kmutex_t nq_mutex;
-	ksema_t nq_sema;
+	kmutex_t nq_mutex;	/* protects shared state */
+	ksema_t nq_sema; /* semaphore to ensure q always has >= 1 empty slot */
 };
 
 struct nvme {
@@ -188,7 +191,12 @@ struct nvme {
 
 	nvme_identify_ctrl_t *n_idctl;
 
+	/* Pointer to the admin queue, which is always queue 0 in n_ioq. */
 	nvme_qpair_t *n_adminq;
+	/*
+	 * All command queues, including the admin queue.
+	 * Its length is: n_ioq_count + 1.
+	 */
 	nvme_qpair_t **n_ioq;
 	nvme_cq_t **n_cq;
 
@@ -243,6 +251,10 @@ struct nvme {
 	uint32_t n_spare_event;
 	uint32_t n_vendor_event;
 	uint32_t n_unknown_event;
+
+	/* hot removal NDI event handling */
+	ddi_eventcookie_t n_rm_cookie;
+	ddi_callback_id_t n_ev_rm_cb_id;
 
 	/* DDI UFM handle */
 	ddi_ufm_handle_t *n_ufmh;

@@ -21,10 +21,237 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
  * Sun DDI hotplug implementation specific functions
+ */
+
+/*
+ *			HOTPLUG FRAMEWORK
+ *
+ * The hotplug framework (also referred to "SHP", for "Solaris Hotplug
+ * Framework") refers to a large set of userland and kernel interfaces,
+ * including those in this file, that provide functionality related to device
+ * hotplug.
+ *
+ * Hotplug is a broad term that refers to both removal and insertion of devices
+ * on a live system. Such operations can have varying levels of notification to
+ * the system. Coordinated hotplug means that the operating system is notified
+ * in advance that a device will have a hotplug operation performed on it.
+ * Non-coordinated hotplug, also called "surprise removal", does not have such
+ * notification, and the device is simply removed or inserted from the system.
+ *
+ * The goals of a correct hotplug operation will vary based on the device. In
+ * general, though, we want the system to gracefully notice the device change
+ * and clean up (or create) any relevant structures related to using the device
+ * in the system.
+ *
+ * The goals of the hotplug framework are to provide common interfaces for nexus
+ * drivers, device drivers, and userland programs to build a foundation for
+ * implementing hotplug for a variety of devices. Notably, common support for
+ * PCIe devices is available. See also: the nexus driver for PCIe devices at
+ * uts/i86pc/io/pciex/npe.c.
+ *
+ *
+ * TERMINOLOGY
+ *
+ *	The following terms may be useful when exploring hotplug-related code.
+ *
+ *	PHYSICAL HOTPLUG
+ *	Refers to hotplug operations on a physical hardware receptacle.
+ *
+ *	VIRTUAL HOTPLUG
+ *	Refers to hotplug operations on an arbitrary device node in the device
+ *	tree.
+ *
+ *	CONNECTION (often abbreviated "cn")
+ *	A place where either physical or virtual hotplug happens. This is a more
+ *	generic term to refer to "connectors" and "ports", which represent
+ *	physical and virtual places where hotplug happens, respectively.
+ *
+ *	CONNECTOR
+ *	A place where physical hotplug happens. For example: a PCIe slot, a USB
+ *	port, a SAS port, and a fiber channel port are all connectors.
+ *
+ *	PORT
+ *	A place where virtual hotplug happens. A port refers to an arbitrary
+ *	place under a nexus dev_info node in the device tree.
+ *
+ *
+ * CONNECTION STATE MACHINE
+ *
+ * Connections have the states below. Connectors and ports are grouped into
+ * the same state machine. It is worth noting that the edges here are incomplete
+ * -- it is possible for a connection to move straight from ENABLED to EMPTY,
+ * for instance, if there is a surprise removal of its device.
+ *
+ * State changes are kicked off through two ways:
+ *	- Through the nexus driver interface, ndi_hp_state_change_req. PCIe
+ *	nexus drivers that pass a hotplug interrupt through to pciehpc will kick
+ *	off state changes in this way.
+ *	- Through coordinated removal, ddihp_modctl. Both cfgadm(1M) and
+ *	hotplug(1M) pass state change requests through hotplugd, which uses
+ *	modctl to request state changes to the DDI hotplug framework. That
+ *	interface is ultimately implemented by ddihp_modctl.
+ *
+ *		(start)
+ *		   |
+ *		   v
+ *		EMPTY		no component plugged into connector
+ *		   ^
+ *		   v
+ *		PRESENT		component plugged into connector
+ *		   ^
+ *		   v
+ *		POWERED		connector is powered
+ *		   ^
+ *		   v
+ *		ENABLED		connector is fully functional
+ *		   |
+ *		   .
+ *		   .
+ *		   .
+ *		   v
+ *		(create port)
+ *		   |
+ *		   v
+ *		PORT EMPTY	port has no device occupying it
+ *		   ^
+ *		   v
+ *		PORT PRESENT	port occupied by device
+ *
+ *
+ * ARCHITECTURE DIAGRAM
+ *
+ * The following is a non-exhaustive summary of various components in the system
+ * that implement pieces of the hotplug framework. More detailed descriptions
+ * of some key components are below.
+ *
+ *				+------------+
+ *				| cfgadm(1M) |
+ *				+------------+
+ *				      |
+ *			    +-------------------+
+ *			    | SHP cfgadm plugin |
+ *			    +-------------------+
+ *				      |
+ *	+-------------+		 +------------+
+ *	| hotplug(1M) |----------| libhotplug |
+ *	+-------------+		 +------------+
+ *				      |
+ *				 +----------+
+ *				 | hotplugd |
+ *				 +----------+
+ *				      |
+ *			      +----------------+
+ *			      | modctl (HP op) |
+ *			      +----------------+
+ *				|
+ *				|
+ * User				|
+ * =============================|===============================================
+ * Kernel		        |
+ *			        |
+ *			        |
+ *	+------------------------+     +----------------+
+ *	| DDI hotplug interfaces | --- | Device Drivers |
+ *	+------------------------+     +----------------+
+ *	    |		|
+ *	    | +------------------------+
+ *	    | | NDI hotplug interfaces |
+ *	    | +------------------------+
+ *	    |   |
+ *	    |   |
+ *	+-------------+	   +--------------+	+---------------------------+
+ *	| `bus_hp_op` | -- |"pcie" module | --- | "npe" (PCIe nexus driver) |
+ *	+-------------+	   +--------------+	+---------------------------+
+ *				|     |
+ *				|  +-------------------+
+ *				|  | PCIe configurator |
+ *				|  +-------------------+
+ *				|
+ *			   +-------------------------------------+
+ *			   | "pciehpc" (PCIe hotplug controller) |
+ *			   +-------------------------------------+
+ *
+ *
+ *		.
+ *		.
+ *		.
+ *		.
+ *		.
+ *		|
+ *		|
+ *    +-----------------------------------+
+ *    |		I/O Subsystem		  |
+ *    | (LDI notifications and contracts) |
+ *    +-----------------------------------+
+ *
+ *
+ * KEY HOTPLUG SOFTWARE COMPONENTS
+ *
+ *	CFGADM(1M)
+ *
+ *	cfgadm is the canonical tool for hotplug operations. It can be used to
+ *	list connections on the system and change their state in a coordinated
+ *	fashion. For more information, see its manual page.
+ *
+ *
+ *	HOTPLUG(1M)
+ *
+ *	hotplug is a command line tool for managing hotplug connections for
+ *	connectors. For more information, see its manual page.
+ *
+ *
+ *	DDI HOTPLUG INTERFACES
+ *
+ *	This part of the framework provides interfaces for changing device state
+ *	for connectors, including onlining and offlining child devices. Many of
+ *	these functions are defined in this file.
+ *
+ *
+ *	NDI HOTPLUG INTERFACES
+ *
+ *	Nexus drivers can define their own hotplug bus implementations by
+ *	defining a bus_hp_op entry point. This entry point must implement
+ *	a set of hotplug related commands, including getting, probing, and
+ *	changing connection state, as well as port creation and removal.
+ *
+ *	Nexus drivers may also want to use the following interfaces for
+ *	implementing hotplug. Note that the PCIe Hotplug Controller ("pciehpc")
+ *	already takes care of using these:
+ *		ndi_hp_{register,unregister}
+ *		ndi_hp_state_change_req
+ *		ndi_hp_walk_cn
+ *
+ *	PCIe nexus drivers should use the common entry point pcie_hp_common_ops,
+ *	which implements hotplug commands for PCIe devices, calling into other
+ *	parts of the framework as needed.
+ *
+ *
+ *	NPE DRIVER ("npe")
+ *
+ *	npe is the common nexus driver for PCIe devices on x86. It implements
+ *	hotplug using the NDI interfaces. For more information, see
+ *	uts/i86pc/io/pciex/npe.c.
+ *
+ *	The equivalent driver for SPARC is "px".
+ *
+ *
+ *	PCIe HOTPLUG CONTROLLER DRIVER ("pciehpc")
+ *
+ *	All hotplug-capable PCIe buses will initialize their own PCIe HPC,
+ *	including the pcieb and ppb drivers. The controller maintains
+ *	hotplug-related state about the slots on its bus, including their status
+ *	and port state. It also features a common implementation of handling
+ *	hotplug-related PCIe interrupts.
+ *
+ *	For more information, see its interfaces in
+ *	uts/common/sys/hotplug/pci/pciehpc.h.
+ *
  */
 
 #include <sys/sysmacros.h>
@@ -163,7 +390,9 @@ done:
 }
 
 /*
- * Return the state of Hotplug Connection (CN)
+ * Fetch the state of Hotplug Connection (CN).
+ * This function will also update the state and last changed timestamp in the
+ * connection handle structure if the state has changed.
  */
 int
 ddihp_cn_getstate(ddi_hp_cn_handle_t *hdlp)
@@ -597,7 +826,7 @@ ddihp_cn_pre_change_state(ddi_hp_cn_handle_t *hdlp,
 	    curr_state == DDI_HP_CN_STATE_ENABLED) {
 		/*
 		 * If the Connection goes to a lower state from ENABLED,
-		 *  then offline all children under it.
+		 * then offline all children under it.
 		 */
 		rv = ddihp_cn_change_children_state(hdlp, B_FALSE);
 		if (rv != DDI_SUCCESS) {
@@ -640,7 +869,7 @@ ddihp_cn_pre_change_state(ddi_hp_cn_handle_t *hdlp,
 }
 
 /*
- * Jobs after change state of a Connector: update last change time,
+ * Jobs after change state of a Connector: update state, last change time,
  * probe, online, sysevent, etc.
  */
 static int
@@ -813,7 +1042,7 @@ ddihp_cn_change_children_state(ddi_hp_cn_handle_t *hdlp, boolean_t online)
 			    NDI_SUCCESS) {
 				cmn_err(CE_WARN,
 				    "(%s%d):"
-				    " failed to dettach driver for the device"
+				    " failed to detach driver for the device"
 				    " (%s%d) in the Connection %s\n",
 				    ddi_driver_name(dip), ddi_get_instance(dip),
 				    ddi_driver_name(cdip),
