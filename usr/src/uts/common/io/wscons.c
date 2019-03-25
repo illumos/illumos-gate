@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1987, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Toomas Soome <tsoome@me.com>
  */
 
 /*
@@ -181,6 +182,7 @@ ssize_t wc_cons_wrtvec(promif_redir_arg_t arg, uchar_t *s, size_t n);
 
 static int	wcopen(queue_t *, dev_t *, int, int, cred_t *);
 static int	wcclose(queue_t *, int, cred_t *);
+static int	wcuwsrv(queue_t *);
 static int	wcuwput(queue_t *, mblk_t *);
 static int	wclrput(queue_t *, mblk_t *);
 
@@ -205,7 +207,7 @@ static struct qinit wcurinit = {
 
 static struct qinit wcuwinit = {
 	wcuwput,
-	NULL,
+	wcuwsrv,
 	wcopen,
 	wcclose,
 	NULL,
@@ -250,13 +252,11 @@ DDI_DEFINE_STREAM_OPS(wc_ops, nulldev, nulldev, wc_attach, nodev, nodev,
     wc_info, D_MTPERMOD | D_MP, &wcinfo, ddi_quiesce_not_supported);
 
 static void	wcreioctl(void *);
-static void 	wcioctl(queue_t *, mblk_t *);
+static void	wcioctl(queue_t *, mblk_t *);
 #ifdef _HAVE_TEM_FIRMWARE
 static void	wcopoll(void *);
-static void	wconsout(void *);
 #endif /* _HAVE_TEM_FIRMWARE */
 static void	wcrstrt(void *);
-static void	wcstart(void *);
 static void	wc_open_kb_polledio(struct wscons_state *wc, queue_t *q,
 		    mblk_t *mp);
 static void	wc_close_kb_polledio(struct wscons_state *wc, queue_t *q,
@@ -269,6 +269,7 @@ static void	wc_polled_enter(cons_polledio_arg_t arg);
 static void	wc_polled_exit(cons_polledio_arg_t arg);
 void	wc_get_size(vc_state_t *pvc);
 static void	wc_modechg_cb(tem_modechg_cb_arg_t arg);
+static tem_vt_state_t wc_get_screen_tem(vc_state_t *);
 
 static struct dev_ops wc_ops;
 
@@ -365,7 +366,7 @@ wc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 /* ARGSUSED */
 static int
 wc_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
 	int error;
 
@@ -387,14 +388,6 @@ wc_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 	}
 	return (error);
 }
-
-#ifdef _HAVE_TEM_FIRMWARE
-/*
- * Output buffer. Protected by the per-module inner perimeter.
- */
-#define	MAXHIWAT	2000
-static char obuf[MAXHIWAT];
-#endif /* _HAVE_TEM_FIRMWARE */
 
 static void
 wc_init_polledio(void)
@@ -497,11 +490,166 @@ wcclose(queue_t *q, int flag, cred_t *crp)
 }
 
 /*
+ * Service procedure for upper write queue.
+ * We need to have service procedure to make sure the keyboard events
+ * are queued up for screen output and are not dependant on the screen
+ * updates.
+ */
+static int
+wcuwsrv(queue_t *q)
+{
+	vc_state_t *pvc = (vc_state_t *)q->q_ptr;
+	tem_vt_state_t ptem = NULL;
+	mblk_t *mp;
+	ssize_t cc;
+
+	while ((mp = getq(q)) != NULL) {
+		/*
+		 * If we're waiting for something to happen (delay timeout to
+		 * expire, current transmission to finish, output to be
+		 * restarted, output to finish draining), don't grab anything
+		 * new.
+		 */
+		if (pvc->vc_flags & (WCS_DELAY|WCS_BUSY|WCS_STOPPED)) {
+			putbq(q, mp);
+			return (0);
+		}
+
+		switch (mp->b_datap->db_type) {
+		default:	/* drop unknown type */
+			freemsg(mp);
+			continue;
+
+		case M_IOCTL:
+			wcioctl(q, mp);
+			continue;
+
+		case M_DELAY:
+			/*
+			 * Arrange for "wcrstrt" to be called when the
+			 * delay expires; it will turn WCS_DELAY off.
+			 */
+			if (pvc->vc_timeoutid != 0)
+				(void) quntimeout(q, pvc->vc_timeoutid);
+			pvc->vc_timeoutid = qtimeout(q, wcrstrt, pvc,
+			    (clock_t)(*(unsigned char *)mp->b_rptr + 6));
+
+			mutex_enter(&pvc->vc_state_lock);
+			pvc->vc_flags |= WCS_DELAY;
+			mutex_exit(&pvc->vc_state_lock);
+
+			freemsg(mp);
+			continue;
+
+		case M_DATA:
+			break;
+		}
+
+		if ((cc = mp->b_wptr - mp->b_rptr) == 0) {
+			freemsg(mp);
+			continue;
+		}
+
+#ifdef _HAVE_TEM_FIRMWARE
+		if (consmode == CONS_KFB) {
+#endif /* _HAVE_TEM_FIRMWARE */
+			ptem = wc_get_screen_tem(pvc);
+
+			if (ptem == NULL) {
+				freemsg(mp);
+				continue;
+			}
+
+			for (mblk_t *nbp = mp; nbp != NULL; nbp = nbp->b_cont) {
+				cc = nbp->b_wptr - nbp->b_rptr;
+
+				if (cc <= 0)
+					continue;
+
+				tem_write(ptem, nbp->b_rptr, cc, kcred);
+			}
+			freemsg(mp);
+#ifdef _HAVE_TEM_FIRMWARE
+			continue;
+		}
+
+		/* consmode = CONS_FW */
+		if (pvc->vc_minor != 0) {
+			freemsg(mp);
+			continue;
+		}
+
+		/*
+		 * Direct output to the frame buffer if this device
+		 * is not the "hardware" console.
+		 */
+		if (wscons.wc_defer_output) {
+			mutex_enter(&pvc->vc_state_lock);
+			pvc->vc_flags |= WCS_BUSY;
+			mutex_exit(&pvc->vc_state_lock);
+
+			pvc->vc_pendc = -1;
+
+			for (mblk_t *nbp = mp; nbp != NULL; nbp = nbp->b_cont) {
+				cc = nbp->b_wptr - nbp->b_rptr;
+
+				if (cc <= 0)
+					continue;
+
+				console_puts((const char *)nbp->b_rptr, cc);
+			}
+			freemsg(mp);
+			mutex_enter(&pvc->vc_state_lock);
+			pvc->vc_flags &= ~WCS_BUSY;
+			mutex_exit(&pvc->vc_state_lock);
+			continue;
+		}
+		for (boolean_t done = B_FALSE; done != B_TRUE; ) {
+			int c;
+
+			c = *mp->b_rptr++;
+			cc--;
+			if (prom_mayput((char)c) != 0) {
+
+				mutex_enter(&pvc->vc_state_lock);
+				pvc->vc_flags |= WCS_BUSY;
+				mutex_exit(&pvc->vc_state_lock);
+
+				pvc->vc_pendc = c;
+				if (pvc->vc_timeoutid != 0)
+					(void) quntimeout(q,
+					    pvc->vc_timeoutid);
+				pvc->vc_timeoutid = qtimeout(q, wcopoll,
+				    pvc, 1);
+				if (mp != NULL) {
+					/* not done with this message yet */
+					(void) putbq(q, mp);
+					return (0);
+				}
+				break;
+			}
+			while (cc <= 0) {
+				mblk_t *nbp = mp;
+				mp = mp->b_cont;
+				freeb(nbp);
+				if (mp == NULL) {
+					done = B_TRUE;
+					break;
+				}
+				/* LINTED E_PTRDIFF_OVERFLOW */
+				cc = mp->b_wptr - mp->b_rptr;
+			}
+		}
+#endif /* _HAVE_TEM_FIRMWARE */
+	}
+	return (0);
+}
+
+/*
  * Put procedure for upper write queue.
  * Respond to M_STOP, M_START, M_IOCTL, and M_FLUSH messages here;
  * queue up M_BREAK, M_DELAY, and M_DATA messages for processing by
- * the start routine, and then call the start routine; discard
- * everything else.
+ * the service routine. Discard everything else.
  */
 static int
 wcuwput(queue_t *q, mblk_t *mp)
@@ -523,7 +671,7 @@ wcuwput(queue_t *q, mblk_t *mp)
 		pvc->vc_flags &= ~WCS_STOPPED;
 		mutex_exit(&pvc->vc_state_lock);
 
-		wcstart(pvc);
+		qenable(q);
 		freemsg(mp);
 		break;
 
@@ -571,12 +719,11 @@ wcuwput(queue_t *q, mblk_t *mp)
 			 * The changes do not take effect until all
 			 * output queued before them is drained.
 			 * Put this message on the queue, so that
-			 * "wcstart" will see it when it's done
-			 * with the output before it.  Poke the
-			 * start routine, just in case.
+			 * "wcuwsrv" will see it when it's done
+			 * with the output before it.
 			 */
-			(void) putq(q, mp);
-			wcstart(pvc);
+			if (putq(q, mp) == 0)
+				freemsg(mp);
 			break;
 
 		case CONSSETABORTENABLE:
@@ -624,11 +771,10 @@ wcuwput(queue_t *q, mblk_t *mp)
 	case M_DELAY:
 	case M_DATA:
 		/*
-		 * Queue the message up to be transmitted,
-		 * and poke the start routine.
+		 * Queue the message up to be transmitted.
 		 */
-		(void) putq(q, mp);
-		wcstart(pvc);
+		if (putq(q, mp) == 0)
+			freemsg(mp);
 		break;
 
 	case M_IOCDATA:
@@ -1042,7 +1188,7 @@ wcopoll(void *arg)
 			pvc->vc_pendc = -1;
 			pvc->vc_flags &= ~WCS_BUSY;
 			if (!(pvc->vc_flags&(WCS_DELAY|WCS_STOPPED)))
-				wcstart(pvc);
+				qenable(q);
 		} else
 			pvc->vc_timeoutid = qtimeout(q, wcopoll, pvc, 1);
 	}
@@ -1066,7 +1212,7 @@ wcrstrt(void *arg)
 	pvc->vc_flags &= ~WCS_DELAY;
 	mutex_exit(&pvc->vc_state_lock);
 
-	wcstart(pvc);
+	qenable(pvc->vc_ttycommon.t_writeq);
 }
 
 /*
@@ -1081,247 +1227,6 @@ wc_get_screen_tem(vc_state_t *pvc)
 
 	return (pvc->vc_tem);
 }
-
-/*
- * Start console output
- */
-static void
-wcstart(void *arg)
-{
-	vc_state_t *pvc = (vc_state_t *)arg;
-	tem_vt_state_t ptem = NULL;
-#ifdef _HAVE_TEM_FIRMWARE
-	int c;
-	ssize_t cc;
-#endif /* _HAVE_TEM_FIRMWARE */
-	queue_t *q;
-	mblk_t *bp;
-	mblk_t *nbp;
-
-	/*
-	 * If we're waiting for something to happen (delay timeout to
-	 * expire, current transmission to finish, output to be
-	 * restarted, output to finish draining), don't grab anything
-	 * new.
-	 */
-	if (pvc->vc_flags & (WCS_DELAY|WCS_BUSY|WCS_STOPPED))
-		return;
-
-	q = pvc->vc_ttycommon.t_writeq;
-	/*
-	 * assumes that we have been called by whoever holds the
-	 * exclusionary lock on the write-side queue (protects
-	 * vc_flags and vc_pendc).
-	 */
-	for (;;) {
-		if ((bp = getq(q)) == NULL)
-			return;	/* nothing to transmit */
-
-		/*
-		 * We have a new message to work on.
-		 * Check whether it's a delay or an ioctl (the latter
-		 * occurs if the ioctl in question was waiting for the output
-		 * to drain).  If it's one of those, process it immediately.
-		 */
-		switch (bp->b_datap->db_type) {
-
-		case M_DELAY:
-			/*
-			 * Arrange for "wcrstrt" to be called when the
-			 * delay expires; it will turn WCS_DELAY off,
-			 * and call "wcstart" to grab the next message.
-			 */
-			if (pvc->vc_timeoutid != 0)
-				(void) quntimeout(q, pvc->vc_timeoutid);
-			pvc->vc_timeoutid = qtimeout(q, wcrstrt, pvc,
-			    (clock_t)(*(unsigned char *)bp->b_rptr + 6));
-
-			mutex_enter(&pvc->vc_state_lock);
-			pvc->vc_flags |= WCS_DELAY;
-			mutex_exit(&pvc->vc_state_lock);
-
-			freemsg(bp);
-			return;	/* wait for this to finish */
-
-		case M_IOCTL:
-			/*
-			 * This ioctl was waiting for the output ahead of
-			 * it to drain; obviously, it has.  Do it, and
-			 * then grab the next message after it.
-			 */
-			wcioctl(q, bp);
-			continue;
-		}
-
-#ifdef _HAVE_TEM_FIRMWARE
-		if (consmode == CONS_KFB) {
-#endif /* _HAVE_TEM_FIRMWARE */
-			if ((ptem = wc_get_screen_tem(pvc)) != NULL) {
-
-				for (nbp = bp; nbp != NULL; nbp = nbp->b_cont) {
-					if (nbp->b_wptr > nbp->b_rptr) {
-						(void) tem_write(ptem,
-						    nbp->b_rptr,
-						    /* LINTED */
-						    nbp->b_wptr - nbp->b_rptr,
-						    kcred);
-					}
-				}
-
-			}
-
-			freemsg(bp);
-
-#ifdef _HAVE_TEM_FIRMWARE
-			continue;
-		}
-
-		/* consmode = CONS_FW */
-		if (pvc->vc_minor != 0) {
-			freemsg(bp);
-			continue;
-		}
-
-		/* LINTED E_PTRDIFF_OVERFLOW */
-		if ((cc = bp->b_wptr - bp->b_rptr) == 0) {
-			freemsg(bp);
-			continue;
-		}
-		/*
-		 * Direct output to the frame buffer if this device
-		 * is not the "hardware" console.
-		 */
-		if (wscons.wc_defer_output) {
-			/*
-			 * Never do output here;
-			 * it takes forever.
-			 */
-			mutex_enter(&pvc->vc_state_lock);
-			pvc->vc_flags |= WCS_BUSY;
-			mutex_exit(&pvc->vc_state_lock);
-
-			pvc->vc_pendc = -1;
-			(void) putbq(q, bp);
-			if (q->q_count > 128) { /* do it soon */
-				softcall(wconsout, pvc);
-			} else {	/* wait a bit */
-				if (pvc->vc_timeoutid != 0)
-					(void) quntimeout(q,
-					    pvc->vc_timeoutid);
-				pvc->vc_timeoutid = qtimeout(q, wconsout,
-				    pvc, hz / 30);
-			}
-			return;
-		}
-		for (;;) {
-			c = *bp->b_rptr++;
-			cc--;
-			if (prom_mayput((char)c) != 0) {
-
-				mutex_enter(&pvc->vc_state_lock);
-				pvc->vc_flags |= WCS_BUSY;
-				mutex_exit(&pvc->vc_state_lock);
-
-				pvc->vc_pendc = c;
-				if (pvc->vc_timeoutid != 0)
-					(void) quntimeout(q,
-					    pvc->vc_timeoutid);
-				pvc->vc_timeoutid = qtimeout(q, wcopoll,
-				    pvc, 1);
-				if (bp != NULL)
-					/* not done with this message yet */
-					(void) putbq(q, bp);
-				return;
-			}
-			while (cc <= 0) {
-				nbp = bp;
-				bp = bp->b_cont;
-				freeb(nbp);
-				if (bp == NULL)
-					return;
-				/* LINTED E_PTRDIFF_OVERFLOW */
-				cc = bp->b_wptr - bp->b_rptr;
-			}
-		}
-#endif /* _HAVE_TEM_FIRMWARE */
-	}
-}
-
-#ifdef _HAVE_TEM_FIRMWARE
-/*
- * Output to frame buffer console.
- * It takes a long time to scroll.
- */
-/* ARGSUSED */
-static void
-wconsout(void *arg)
-{
-	vc_state_t *pvc = (vc_state_t *)arg;
-	uchar_t *cp;
-	ssize_t cc;
-	queue_t *q;
-	mblk_t *bp;
-	mblk_t *nbp;
-	char *current_position;
-	ssize_t bytes_left;
-
-	if ((q = pvc->vc_ttycommon.t_writeq) == NULL) {
-		return;	/* not attached to a stream */
-	}
-
-	/*
-	 * Set up to copy up to MAXHIWAT bytes.
-	 */
-	current_position = &obuf[0];
-	bytes_left = MAXHIWAT;
-	while ((bp = getq(q)) != NULL) {
-		if (bp->b_datap->db_type == M_IOCTL) {
-			/*
-			 * This ioctl was waiting for the output ahead of
-			 * it to drain; obviously, it has.  Put it back
-			 * so that "wcstart" can handle it, and transmit
-			 * what we've got.
-			 */
-			(void) putbq(q, bp);
-			goto transmit;
-		}
-
-		do {
-			cp = bp->b_rptr;
-			/* LINTED E_PTRDIFF_OVERFLOW */
-			cc = bp->b_wptr - cp;
-			while (cc != 0) {
-				if (bytes_left == 0) {
-					/*
-					 * Out of buffer space; put this
-					 * buffer back on the queue, and
-					 * transmit what we have.
-					 */
-					bp->b_rptr = cp;
-					(void) putbq(q, bp);
-					goto transmit;
-				}
-				*current_position++ = *cp++;
-				cc--;
-				bytes_left--;
-			}
-			nbp = bp;
-			bp = bp->b_cont;
-			freeb(nbp);
-		} while (bp != NULL);
-	}
-
-transmit:
-	if ((cc = MAXHIWAT - bytes_left) != 0)
-		console_puts(obuf, cc);
-
-	mutex_enter(&pvc->vc_state_lock);
-	pvc->vc_flags &= ~WCS_BUSY;
-	mutex_exit(&pvc->vc_state_lock);
-
-	wcstart(pvc);
-}
-#endif /* _HAVE_TEM_FIRMWARE */
 
 /*
  * Put procedure for lower read queue.
@@ -1367,7 +1272,7 @@ wclrput(queue_t *q, mblk_t *mp)
 		if ((upq = pvc->vc_ttycommon.t_readq) != NULL) {
 			if (!canput(upq->q_next)) {
 				ttycommon_qfull(&pvc->vc_ttycommon, upq);
-				wcstart(pvc);
+				qenable(WR(upq));
 				freemsg(mp);
 			} else {
 				putnext(upq, mp);
