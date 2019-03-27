@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2006 Marcel Moolenaar
  * All rights reserved.
  *
@@ -32,11 +32,14 @@
 #include <efilib.h>
 #include <libzfs.h>
 
+extern struct devsw vdisk_dev;
+
 struct devsw *devsw[] = {
 	&efipart_fddev,
 	&efipart_cddev,
 	&efipart_hddev,
 	&efinet_dev,
+	&vdisk_dev,
 	&zfs_dev,
 	NULL
 };
@@ -90,7 +93,7 @@ extern struct file_format multiboot2;
 
 struct file_format *file_formats[] = {
 #if defined(__amd64__) || defined(__i386__)
-        &multiboot2,
+	&multiboot2,
 #endif
-        NULL
+	NULL
 };
