@@ -103,6 +103,7 @@ file path=usr/share/man/man1m/zfs-program.1m
 file path=usr/share/man/man1m/zfs.1m
 file path=usr/share/man/man1m/zpool.1m
 file path=usr/share/man/man1m/zstreamdump.1m
+file path=usr/share/man/man1m/ztest.1m
 file path=usr/share/man/man5/zpool-features.5
 hardlink path=kernel/fs/$(ARCH64)/zfs target=../../../kernel/drv/$(ARCH64)/zfs
 hardlink path=usr/lib/fs/zfs/fstyp target=../../../sbin/fstyp

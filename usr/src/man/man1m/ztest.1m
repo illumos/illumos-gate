@@ -1,0 +1,169 @@
+.\"     $NetBSD: ztest.1,v 1.4 2018/12/10 03:58:30 sevan Exp $
+.\"
+.\" Copyright (c) 2018 The NetBSD Foundation, Inc.
+.\" All rights reserved.
+.\"
+.\" This code is derived from software contributed to The NetBSD Foundation
+.\" by Sevan Janiyan <sevan@NetBSD.org>
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+.\" ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+.\" TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+.\" PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+.\" BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+.\" CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+.\" SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+.\" INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+.\" CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+.\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+.\" POSSIBILITY OF SUCH DAMAGE.
+.\"/
+.Dd December 10, 2018
+.Dt ZTEST 1M
+.Os
+.Sh NAME
+.Nm ztest
+.Nd ZFS stress test utility
+.Sh SYNOPSIS
+.Nm
+.Op Fl EhV
+.Op Fl a Ar shift
+.Op Fl B Ar path
+.Op Fl d Ar datasets
+.Op Fl F Ar loops
+.Op Fl f Ar path
+.Op Fl g Ar threshold
+.Op Fl i Ar count
+.Op Fl k Ar percent
+.Op Fl m Ar copies
+.Op Fl P Ar passtime
+.Op Fl p Ar name
+.Op Fl R Ar parity
+.Op Fl r Ar disks
+.Op Fl s Ar size
+.Op Fl T Ar time
+.Op Fl t Ar threads
+.Op Fl v Ar vdevs
+.Sh DESCRIPTION
+The
+.Nm
+utility stress tests the DMU, ZAP, SPA components of ZFS from user space.
+.Pp
+.Nm
+provides a simple routine to test the functionality of a component task.
+These simple routines can then be used to stress test through parallel
+execution.
+Tests are run as child processes of the main process.
+.Pp
+The checksum and compression functions are changed each time a dataset is
+opened to introduce varying combinations of checksum and compression from block
+to block among objects.
+.Pp
+While tests are running, faults are injected into the pool to verify
+self-healing ability.
+.Pp
+To verify that the on-disk consistency is never lost after a crash, child
+processes are killed at random with a SIGKILL signal, after which the parent
+process invokes a new child to run the test again on the same storage pool.
+.Pp
+Many of the tests record the transaction group number as part of their data.
+When reading old data, tests verify that the transaction group number is less
+than the current, open state, transaction group to ensure the consistency of
+tests and detect unaccounted changes.
+It is advised that any new tests added to
+.Nm
+should also perform the same check with transaction group numbers, if
+applicable.
+.Pp
+The main
+.Nm
+process uses an
+.Xr mmap 2
+temporary file to pass information to child processes which allows shared
+memory to survive
+.Xr exec 3
+syscall.
+A copy of the
+.Vt ztest_shared_hdr_t
+struct containing information on the size and number of shared
+structures in the file is always stored at offset 0 of the file.
+.Pp
+For backwards compatibility testing
+.Nm
+can invoke an alternative version of
+.Nm
+after a
+.Dv SIGKILL
+signal using the
+.Fl B
+flag.
+.Pp
+The following options are available:
+.Bl -tag -width 5n
+.It Fl a Ar shift
+alignment shift (default: 9) use 0 for random
+.It Fl B Ar path
+alt ztest (default: <none>) alternate ztest path
+.It Fl d Ar datasets
+datasets (default: 7)
+.It Fl E
+use existing pool instead of creating new one
+.It Fl F Ar loops
+freezeloops (default: 50) max loops in
+.Fn spa_freeze
+.It Fl f Ar path
+dir (default:
+.Pa /tmp )
+file directory for vdev files
+.It Fl g Ar threshold
+gang block threshold (default: 32K)
+.It Fl h
+print help
+.It Fl i Ar count
+init count (default: 1) initialize pool
+.Ar count
+times
+.It Fl k Ar percent
+kill percentage (default: 70%)
+.It Fl m Ar copies
+mirror copies (default: 2)
+.It Fl P Ar passtime
+passtime (default: 60 sec) time per pass
+.It Fl p Ar name
+pool name (default: ztest)
+.It Fl R Ar parity
+raidz parity (default: 1)
+.It Fl r Ar disks
+raidz disks (default: 4)
+.It Fl s Ar size
+size of each vdev (default: 256M)
+.It Fl T Ar time
+time (default: 300 sec) total run time
+.It Fl t Ar threads
+threads (default: 23)
+.It Fl V
+verbose (use multiple times to increase verbosity)
+.It Fl v Ar vdevs
+number of vdevs (default: 5)
+.El
+.Sh AUTHORS
+This man page was written by
+.An Sevan Janiyan
+.Aq Mt sevan@NetBSD.org .
+.Sh CAVEATS
+To allow for backward compatibility testing using older versions of
+.Nm
+the information stored in the
+.Xr mmap 2
+temporary file passed from parent process to child must
+remain compatible with older versions of
+.Nm .

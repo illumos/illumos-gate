@@ -538,7 +538,8 @@ _MANFILES=	6to4relay.1m		\
 		zoneadmd.1m		\
 		zonecfg.1m		\
 		zpool.1m		\
-		zstreamdump.1m
+		zstreamdump.1m		\
+		ztest.1m
 
 i386_MANFILES=				\
 		acpidump.1m		\

@@ -100,12 +100,13 @@ png_get_bpp(png_t *png)
 static int
 png_read_ihdr(png_t *png)
 {
-	unsigned length;
+	unsigned length = 0;
 	unsigned orig_crc;
 	unsigned calc_crc;
 	uint8_t ihdr[13+4]; /* length should be 13, make room for type (IHDR) */
 
-	file_read_ul(png, &length);
+	if (file_read_ul(png, &length) != PNG_NO_ERROR)
+		return (PNG_FILE_ERROR);
 
 	if (length != 13)
 		return (PNG_CRC_ERROR);
@@ -113,7 +114,8 @@ png_read_ihdr(png_t *png)
 	if (file_read(png, ihdr, 1, 13+4) != 13+4)
 		return (PNG_EOF_ERROR);
 
-	file_read_ul(png, &orig_crc);
+	if (file_read_ul(png, &orig_crc) != PNG_NO_ERROR)
+		return (PNG_FILE_ERROR);
 
 	calc_crc = crc32(0L, Z_NULL, 0);
 	calc_crc = crc32(calc_crc, ihdr, 13+4);
@@ -220,7 +222,7 @@ done:
 
 	if (result != PNG_NO_ERROR) {
 		free(png->image);
-		close(png->fd);
+		(void) close(png->fd);
 		png->fd = -1;
 		return (result);
 	}
@@ -231,7 +233,7 @@ done:
 int
 png_close(png_t *png)
 {
-	close(png->fd);
+	(void) close(png->fd);
 	png->fd = -1;
 	free(png->image);
 	png->image = NULL;
@@ -329,7 +331,8 @@ png_read_idat(png_t *png, unsigned length)
 	calc_crc = crc32(calc_crc, (uint8_t *)"IDAT", 4);
 	calc_crc = crc32(calc_crc, (uint8_t *)png->readbuf, length);
 
-	file_read_ul(png, &orig_crc);
+	if (file_read_ul(png, &orig_crc) != PNG_NO_ERROR)
+		return (PNG_FILE_ERROR);
 
 	if (orig_crc != calc_crc)
 		return (PNG_CRC_ERROR);
@@ -344,9 +347,10 @@ png_process_chunk(png_t *png)
 	unsigned type;
 	unsigned length;
 
-	file_read_ul(png, &length);
+	if (file_read_ul(png, &length) != PNG_NO_ERROR)
+		return (PNG_FILE_ERROR);
 
-	if (file_read_ul(png, &type))
+	if (file_read_ul(png, &type) != PNG_NO_ERROR)
 		return (PNG_FILE_ERROR);
 
 	/*
@@ -373,7 +377,7 @@ png_process_chunk(png_t *png)
 	} else if (type == png_IEND)
 		return (PNG_DONE);
 	else
-		file_read(png, 0, 1, length + 4); /* unknown chunk */
+		(void) file_read(png, 0, 1, length + 4); /* unknown chunk */
 
 	return (result);
 }
@@ -571,7 +575,7 @@ png_get_data(png_t *png, uint8_t *data)
 		png->readbuflen = 0;
 	}
 	if (png->zs)
-		png_end_inflate(png);
+		(void) png_end_inflate(png);
 
 	if (result != PNG_DONE) {
 		free(png->png_data);

@@ -12451,6 +12451,7 @@ f usr/share/man/man1m/zoneadmd.1m 0444 root bin
 f usr/share/man/man1m/zonecfg.1m 0444 root bin
 f usr/share/man/man1m/zpool.1m 0444 root bin
 f usr/share/man/man1m/zstreamdump.1m 0444 root bin
+f usr/share/man/man1m/ztest.1m 0444 root bin
 d usr/share/man/man2 0755 root bin
 f usr/share/man/man2/Intro.2 0444 root bin
 s usr/share/man/man2/_Exit.2=exit.2
