@@ -23,7 +23,7 @@
  *
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 by Delphix. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -61,6 +61,8 @@
 #include <sys/archsystm.h>
 #include <sys/promif.h>
 #include <sys/pci_cfgspace.h>
+#include <sys/apic.h>
+#include <sys/apic_common.h>
 #include <sys/bootvfs.h>
 #include <sys/tsc.h>
 #ifdef __xpv
@@ -78,6 +80,8 @@ extern uint32_t cpuid_feature_ecx_include;
 extern uint32_t cpuid_feature_ecx_exclude;
 extern uint32_t cpuid_feature_edx_include;
 extern uint32_t cpuid_feature_edx_exclude;
+
+int nmi_action = NMI_ACTION_UNSET;
 
 /*
  * Set console mode
@@ -103,6 +107,7 @@ void
 mlsetup(struct regs *rp)
 {
 	u_longlong_t prop_value;
+	char prop_str[BP_MAX_STRLEN];
 	extern struct classfuncs sys_classfuncs;
 	extern disp_t cpu0_disp;
 	extern char t0stack[];
@@ -149,6 +154,19 @@ mlsetup(struct regs *rp)
 		cpuid_feature_edx_exclude = (uint32_t)prop_value;
 
 #if !defined(__xpv)
+	if (bootprop_getstr("nmi", prop_str, sizeof (prop_str)) == 0) {
+		if (strcmp(prop_str, "ignore") == 0) {
+			nmi_action = NMI_ACTION_IGNORE;
+		} else if (strcmp(prop_str, "panic") == 0) {
+			nmi_action = NMI_ACTION_PANIC;
+		} else if (strcmp(prop_str, "kmdb") == 0) {
+			nmi_action = NMI_ACTION_KMDB;
+		} else {
+			prom_printf("unix: ignoring unknown nmi=%s\n",
+			    prop_str);
+		}
+	}
+
 	/*
 	 * Check to see if KPTI has been explicitly enabled or disabled.
 	 * We have to check this before init_desctbls().

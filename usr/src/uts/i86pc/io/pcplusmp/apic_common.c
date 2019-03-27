@@ -23,7 +23,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  * Copyright (c) 2016, 2017 by Delphix. All rights reserved.
  */
 
@@ -808,6 +808,8 @@ gethrtime_again:
 void
 apic_nmi_intr(caddr_t arg, struct regs *rp)
 {
+	int action = nmi_action;
+
 	if (apic_shutdown_processors) {
 		apic_disable_local_apic();
 		return;
@@ -819,18 +821,41 @@ apic_nmi_intr(caddr_t arg, struct regs *rp)
 		return;
 	apic_num_nmis++;
 
-	if (apic_kmdb_on_nmi && psm_debugger()) {
-		debug_enter("NMI received: entering kmdb\n");
-	} else if (apic_panic_on_nmi) {
-		/* Keep panic from entering kmdb. */
-		nopanicdebug = 1;
-		panic("NMI received\n");
-	} else {
+	/*
+	 * "nmi_action" always over-rides the older way of doing this, unless we
+	 * can't actually drop into kmdb when requested.
+	 */
+	if (action == NMI_ACTION_KMDB && !psm_debugger())
+		action = NMI_ACTION_UNSET;
+
+	if (action == NMI_ACTION_UNSET) {
+		if (apic_kmdb_on_nmi && psm_debugger())
+			action = NMI_ACTION_KMDB;
+		else if (apic_panic_on_nmi)
+			action = NMI_ACTION_PANIC;
+		else
+			action = NMI_ACTION_IGNORE;
+	}
+
+	switch (action) {
+	case NMI_ACTION_IGNORE:
 		/*
 		 * prom_printf is the best shot we have of something which is
 		 * problem free from high level/NMI type of interrupts
 		 */
 		prom_printf("NMI received\n");
+		break;
+
+	case NMI_ACTION_PANIC:
+		/* Keep panic from entering kmdb. */
+		nopanicdebug = 1;
+		panic("NMI received\n");
+		break;
+
+	case NMI_ACTION_KMDB:
+	default:
+		debug_enter("NMI received: entering kmdb\n");
+		break;
 	}
 
 	lock_clear(&apic_nmi_lock);
