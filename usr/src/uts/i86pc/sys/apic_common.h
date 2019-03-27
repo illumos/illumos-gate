@@ -23,7 +23,7 @@
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef _SYS_APIC_COMMON_H
@@ -155,7 +155,6 @@ extern lock_t	apic_nmi_lock;
 extern lock_t	apic_error_lock;
 
 /* Patchable global variables. */
-extern int	apic_kmdb_on_nmi;	/* 0 - no, 1 - yes enter kmdb */
 extern uint32_t	apic_divide_reg_init;	/* 0 - divide by 2 */
 
 extern apic_intrmap_ops_t *apic_vt_ops;
@@ -201,6 +200,15 @@ extern int	apic_msix_enable;
 
 extern uint32_t apic_get_localapicid(uint32_t cpuid);
 extern uchar_t apic_get_ioapicid(uchar_t ioapicindex);
+
+typedef enum nmi_action {
+	NMI_ACTION_UNSET,
+	NMI_ACTION_PANIC,
+	NMI_ACTION_IGNORE,
+	NMI_ACTION_KMDB
+} nmi_action_t;
+
+extern nmi_action_t nmi_action;
 
 #ifdef	__cplusplus
 }

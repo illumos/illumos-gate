@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_SYS_BOOTCONF_H
@@ -45,6 +46,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define	BP_MAX_STRLEN	32
 
 /*
  * Boot property names
@@ -243,6 +246,7 @@ extern void bop_panic(const char *, ...)
 extern void boot_prop_finish(void);
 
 extern int bootprop_getval(const char *, u_longlong_t *);
+extern int bootprop_getstr(const char *, char *, size_t);
 
 /*
  * Back door to fakebop.c to get physical memory allocated.
