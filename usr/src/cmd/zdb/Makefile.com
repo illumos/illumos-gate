@@ -52,7 +52,6 @@ CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS) -DDEBUG
 # in Makefile.master
 CERRWARN += -_gcc=-Wmissing-braces
 CERRWARN += -_gcc=-Wsign-compare
-CERRWARN += -_gcc=-Wmissing-field-initializers
 
 SMOFF += 64bit_shift,all_func_returns
 

@@ -12,6 +12,7 @@
 /*
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -117,6 +118,15 @@ cv_timedwait_sig(kcondvar_t *cv, kmutex_t *mp, clock_t abstime)
 
 	delta = abstime - ddi_get_lbolt();
 	return (cv__twait(cv, mp, delta, 1, 0));
+}
+
+int
+cv_timedwait_sig_hrtime(kcondvar_t *cv, kmutex_t *mp, hrtime_t tim)
+{
+	clock_t delta;
+
+	delta = tim;
+	return (cv__twait(cv, mp, delta, 1, 1));
 }
 
 /*ARGSUSED*/

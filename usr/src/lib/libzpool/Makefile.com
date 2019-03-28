@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
 LIBRARY= libzpool.a
@@ -69,7 +69,7 @@ C99LMODE=	-Xc99=%all
 CFLAGS +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
 CFLAGS64 +=	$(CCGDEBUG) $(CCVERBOSE) $(CNOGLOBAL)
 LDLIBS +=	-lcmdutils -lumem -lavl -lnvpair -lz -lc -lsysevent -lmd \
-		-lfakekernel
+		-lfakekernel -lzfs
 CPPFLAGS.first =	-I$(SRC)/lib/libfakekernel/common
 CPPFLAGS +=	$(INCS)	-DDEBUG -D_FAKE_KERNEL
 
