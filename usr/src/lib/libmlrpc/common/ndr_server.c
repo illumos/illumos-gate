@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -640,7 +641,7 @@ ndr_reply_fault(ndr_xa_t *mxa, unsigned long drc)
 	ndr_stream_t *nds = &mxa->send_nds;
 	unsigned long fault_status;
 
-	NDS_RESET(nds);
+	(void) NDS_RESET(nds);
 
 	hdr->rpc_vers = 5;
 	hdr->rpc_vers_minor = 0;
