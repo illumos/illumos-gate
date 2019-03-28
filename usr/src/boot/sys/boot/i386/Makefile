@@ -33,7 +33,7 @@ all clean clobber: $(SUBDIRS)
 
 install: all .WAIT $(INSTDIRS)
 
-loader: libi386
+loader gptzfsboot: libi386
 pxeldr: loader
 cdboot gptzfsboot loader pxeldr isoboot: btx
 

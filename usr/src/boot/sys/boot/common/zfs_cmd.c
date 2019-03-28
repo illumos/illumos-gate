@@ -35,7 +35,6 @@
 
 #include "libzfs.h"
 
-#ifndef BOOT2
 COMMAND_SET(lszfs, "lszfs", "list child datasets of a zfs dataset",
 	    command_lszfs);
 
@@ -56,7 +55,6 @@ command_lszfs(int argc, char *argv[])
 	}
 	return (CMD_OK);
 }
-#endif
 
 uint64_t
 ldi_get_size(void *priv)

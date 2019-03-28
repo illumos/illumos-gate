@@ -304,10 +304,8 @@ fd_init(void)
 		}
 		if (bd->bd_sectors == 0)
 			bd->bd_flags |= BD_NO_MEDIA;
-#ifndef BOOT2
 		printf("BIOS drive %c: is %s%d\n", ('A' + unit),
 		    biosfd.dv_name, unit);
-#endif
 		STAILQ_INSERT_TAIL(&fdinfo, bd, bd_link);
 	}
 
@@ -333,10 +331,8 @@ bd_init(void)
 			free(bd);
 			break;
 		}
-#ifndef BOOT2
 		printf("BIOS drive %c: is %s%d\n", ('C' + unit),
 		    bioshd.dv_name, unit);
-#endif
 		STAILQ_INSERT_TAIL(&hdinfo, bd, bd_link);
 	}
 	bcache_add_dev(unit);

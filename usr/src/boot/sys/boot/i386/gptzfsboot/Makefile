@@ -35,9 +35,9 @@ ORG2=	0x0
 CPPFLAGS += -DBOOTPROG=\"gptzfsboot\" \
 	-DGPT -DBOOT2 \
 	-DLOADER_MBR_SUPPORT -DLOADER_GPT_SUPPORT \
-	-DSIOPRT=${BOOT_COMCONSOLE_PORT} \
-	-DSIOFMT=${B2SIOFMT} \
-	-DSIOSPD=${BOOT_COMCONSOLE_SPEED} \
+	-DSIOPRT=$(BOOT_COMCONSOLE_PORT) \
+	-DSIOFMT=$(B2SIOFMT) \
+	-DSIOSPD=$(BOOT_COMCONSOLE_SPEED) \
 	-I../../../../include \
 	-I../../../../lib/libstand \
 	-I../../common \
@@ -48,8 +48,11 @@ CPPFLAGS += -DBOOTPROG=\"gptzfsboot\" \
 	-I../../.. \
 	-I../libi386
 
-LD_FLAGS=-static -N --gc-sections
+LDSCRIPT=	../boot.ldscript
+LD_FLAGS=	-static -N --gc-sections
+LIBI386=	../libi386/libi386.a
 LIBSTAND=	../../libstand/$(MACH)/libstand.a
+LIBS=		$(LIBI386) $(LIBSTAND)
 
 include ../Makefile.inc
 
@@ -59,9 +62,8 @@ all: $(PROG)
 
 install: all $(ROOTBOOTPROG)
 
-OBJS =	multiboot.o zfsboot.o sio.o cons.o devopen.o bio.o \
-	part.o biosmem.o smbios.o biosdisk.o devicename.o disk.o bcache.o \
-	time.o zfs_cmd.o
+OBJS =	multiboot.o zfsboot.o sio.o cons.o devopen.o \
+	part.o disk.o bcache.o zfs_cmd.o
 
 part.o := CPPFLAGS += -I$(ZLIB)
 smbios.o := CPPFLAGS += -DSMBIOS_SERIAL_NUMBERS
@@ -69,25 +71,25 @@ smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
 
 CLEANFILES=	gptzfsboot $(OBJS)
 
-gptzfsboot: gptldr.bin gptzfsboot.bin ${BTXKERN}
-	$(BTXLD) -E ${ORG2} -f bin -b ${BTXKERN} -V ${BOOT_VERSION} -l \
+gptzfsboot: gptldr.bin gptzfsboot.bin $(BTXKERN)
+	$(BTXLD) -E $(ORG2) -f bin -b $(BTXKERN) -V $(BOOT_VERSION) -l \
 		gptldr.bin -o $@ gptzfsboot.bin
 
 CLEANFILES +=	gptldr.bin gptldr.out gptldr.o
 
 gptldr.bin: gptldr.out
-	${OBJCOPY} -S -O binary gptldr.out $@
+	$(OBJCOPY) -S -O binary gptldr.out $@
 
 gptldr.out: gptldr.o
-	${LD} ${LD_FLAGS} -e start -Ttext ${ORG1} -o $@ gptldr.o
+	$(LD) $(LD_FLAGS) -e start -Ttext $(ORG1) -o $@ gptldr.o
 
 CLEANFILES +=	gptzfsboot.bin gptzfsboot.out
 
 gptzfsboot.bin: gptzfsboot.out
-	${OBJCOPY} -S -O binary gptzfsboot.out $@
+	$(OBJCOPY) -S -O binary gptzfsboot.out $@
 
-gptzfsboot.out: ${BTXCRT} ${OBJS} ${LIBSTAND}
-	${LD} ${LD_FLAGS} -Ttext ${ORG2} -o $@ ${BTXCRT} ${OBJS} ${LIBSTAND}
+gptzfsboot.out: $(BTXCRT) $(OBJS) $(LIBSTAND)
+	$(LD) $(LD_FLAGS) -T $(LDSCRIPT) -o $@ $(BTXCRT) $(OBJS) $(LIBS)
 
 machine:
 	$(RM) machine
@@ -107,9 +109,6 @@ $(OBJS): machine x86
 
 multiboot.o: ../../common/multiboot.S
 	$(COMPILE.S) ../../common/multiboot.S
-
-%.o: ../libi386/%.c
-	$(COMPILE.c) $<
 
 clobber: clean
 

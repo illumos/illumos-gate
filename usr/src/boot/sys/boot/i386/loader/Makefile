@@ -38,11 +38,11 @@ ROOTBOOTFORTH=$(FORTH:%=$(ROOT_BOOT_FORTH)/%)
 ROOTBOOTDEFAULTS=$(DEFFILES:%=$(ROOT_BOOT_DEFAULTS)/%)
 FILEMODE=0444
 
-all: ${LOADER} loader.help
+all: $(LOADER) loader.help
 
 install: all $(ROOTBOOTLOADER)
 
-PROG=		${LOADER}.sym
+PROG=		$(LOADER).sym
 
 # architecture-specific loader code
 SRCS=		main.c conf.c vers.c chain.c
@@ -81,7 +81,7 @@ SRCS +=	interp_forth.c
 CPPFLAGS +=	-I../../common
 CPPFLAGS +=	-I.
 
-CLEANFILES=	vers.c ${LOADER} ${LOADER}.sym ${LOADER}.bin loader.help
+CLEANFILES=	vers.c $(LOADER) $(LOADER).sym $(LOADER).bin loader.help
 CLEANFILES +=	$(FONT).c
 
 LDFLAGS=	-static -Ttext 0x0
@@ -104,20 +104,20 @@ include ../Makefile.inc
 CPPFLAGS +=	-I$(SRC)/uts/common
 
 vers.c:	../../common/newvers.sh $(SRC)/boot/Makefile.version
-	$(SH) ../../common/newvers.sh ${LOADER_VERSION} ${NEWVERSWHAT}
+	$(SH) ../../common/newvers.sh $(LOADER_VERSION) $(NEWVERSWHAT)
 
-${LOADER}: ${LOADER}.bin ${BTXLDR} ${BTXKERN}
-	$(BTXLD) -f aout -e ${LOADER_ADDRESS} -o $@ -l ${BTXLDR} \
-		-b ${BTXKERN} ${LOADER}.bin
+$(LOADER): $(LOADER).bin $(BTXLDR) $(BTXKERN)
+	$(BTXLD) -f aout -e $(LOADER_ADDRESS) -o $@ -l $(BTXLDR) \
+		-b $(BTXKERN) $(LOADER).bin
 
-${LOADER}.bin: ${LOADER}.sym
+$(LOADER).bin: $(LOADER).sym
 	$(CP) $^ $@
 	$(GSTRIP) -R .comment -R .note $@
 
 loader.help: ../../common/help.common help.i386
 	$(CAT) $^ | $(AWK) -f ../../common/merge_help.awk > $@
 
-FILES=	${LOADER} loader.help
+FILES=	$(LOADER) loader.help
 
 include	../../forth/Makefile.inc
 FORTH +=	pcibios.4th
@@ -127,8 +127,8 @@ FORTH +=	menu.rc
 
 # XXX crt0.o needs to be first for pxeboot(8) to work
 
-DPADD=	${LIBFICL} ${LIBI386} ${LIBCRYPTO} ${LIBSTAND}
-LDADD=	${LIBFICL} ${LIBI386} ${LIBCRYPTO} ${LIBSTAND}
+DPADD=	$(LIBFICL) $(LIBI386) $(LIBCRYPTO) $(LIBSTAND)
+LDADD=	$(LIBFICL) $(LIBI386) $(LIBCRYPTO) $(LIBSTAND)
 
 CLEANFILES +=	machine x86
 
@@ -142,9 +142,9 @@ x86:
 
 OBJS=		$(SRCS:%.c=%.o)
 
-${OBJS}: machine x86
+$(OBJS): machine x86
 
-${PROG}: ${OBJS} $(LDADD)
+$(PROG): $(OBJS) $(LDADD)
 	$(LD) $(LDFLAGS) -o $@ $(BTXCRT) $(OBJS) $(LDADD)
 
 clean: clobber

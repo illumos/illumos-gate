@@ -43,6 +43,7 @@ CPPFLAGS=	-D_STANDALONE -_gcc=-nostdinc
 CFLAGS64=	-_gcc=-mno-red-zone
 
 CFLAGS=		-_gcc=-Os -_gcc=-fPIC -_gcc=-ffreestanding -_gcc=-fno-builtin
+CFLAGS +=	-_gcc=-ffunction-sections -_gcc=-fdata-sections
 CFLAGS +=	-_gcc=-mno-mmx -_gcc=-mno-3dnow -_gcc=-mno-sse -_gcc=-mno-sse2
 CFLAGS +=	-_gcc=-mno-sse3 -_gcc=-msoft-float
 CFLAGS +=	-_gcc=-mno-avx -_gcc=-mno-aes
