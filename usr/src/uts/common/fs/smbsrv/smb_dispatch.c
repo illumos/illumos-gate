@@ -801,6 +801,8 @@ andx_more:
 		(*sdd->sdt_post_op)(sr);
 		smbsr_cleanup(sr);
 	}
+
+	smb_server_inc_req(server);
 	smb_latency_add_sample(&sds->sdt_lat, gethrtime() - sr->sr_time_start);
 
 	atomic_add_64(&sds->sdt_txb,

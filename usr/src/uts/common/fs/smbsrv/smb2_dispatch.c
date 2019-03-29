@@ -395,6 +395,15 @@ cmd_start:
 	    sr->smb2_cmd_hdr, msg_len);
 
 	/*
+	 * We will consume the data for this request from smb_data.
+	 * That effectively consumes msg_len bytes from sr->command
+	 * but doesn't update its chain_offset, so we need to update
+	 * that here to make later received bytes accounting work.
+	 */
+	sr->command.chain_offset = sr->smb2_cmd_hdr + msg_len;
+	ASSERT(sr->command.chain_offset <= sr->command.max_bytes);
+
+	/*
 	 * Validate the commmand code, get dispatch table entries.
 	 * [MS-SMB2] 3.3.5.2.6 Handling Incorrectly Formatted...
 	 *
@@ -684,6 +693,7 @@ cmd_done:
 	/*
 	 * Record some statistics: latency, rx bytes, tx bytes.
 	 */
+	smb_server_inc_req(sr->sr_server);
 	smb_latency_add_sample(&sds->sdt_lat,
 	    gethrtime() - sr->sr_time_start);
 	atomic_add_64(&sds->sdt_rxb,
