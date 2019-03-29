@@ -252,8 +252,8 @@ ndi_hp_state_change_req(dev_info_t *dip, char *cn_name,
 	 */
 	ndi_hold_devi(dip);
 
-	if (!taskq_dispatch(system_taskq, ddihp_cn_run_event, eventp,
-	    TQ_NOSLEEP)) {
+	if (taskq_dispatch(system_taskq, ddihp_cn_run_event, eventp,
+	    TQ_NOSLEEP) == TASKQID_INVALID) {
 		ndi_rele_devi(dip);
 		DDI_HP_NEXDBG((CE_CONT, "ndi_hp_state_change_req: "
 		    "taskq_dispatch failed! dip %p "

@@ -1164,7 +1164,7 @@ vhci_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		if (!(vpkt->vpkt_state & VHCI_PKT_THRU_TASKQ)) {
 			if (taskq_dispatch(vhci->vhci_taskq,
 			    vhci_dispatch_scsi_start, (void *) vpkt,
-			    KM_NOSLEEP)) {
+			    KM_NOSLEEP) != TASKQID_INVALID) {
 				return (TRAN_ACCEPT);
 			} else {
 				return (TRAN_BUSY);
@@ -2964,7 +2964,7 @@ vhci_do_prin(struct vhci_pkt **intr_vpkt)
 		 * Dispatch the retry command
 		 */
 		if (taskq_dispatch(vhci->vhci_taskq, vhci_dispatch_scsi_start,
-		    (void *) new_vpkt, KM_NOSLEEP) == NULL) {
+		    (void *) new_vpkt, KM_NOSLEEP) == TASKQID_INVALID) {
 			if (path_holder) {
 				vpkt->vpkt_path = path_holder;
 				mdi_hold_path(path_holder);

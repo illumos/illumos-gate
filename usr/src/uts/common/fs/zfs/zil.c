@@ -1908,7 +1908,8 @@ zil_clean(zilog_t *zilog, uint64_t synced_txg)
 	ASSERT3P(zilog->zl_dmu_pool, !=, NULL);
 	ASSERT3P(zilog->zl_dmu_pool->dp_zil_clean_taskq, !=, NULL);
 	if (taskq_dispatch(zilog->zl_dmu_pool->dp_zil_clean_taskq,
-	    (void (*)(void *))zil_itxg_clean, clean_me, TQ_NOSLEEP) == NULL)
+	    (void (*)(void *))zil_itxg_clean, clean_me, TQ_NOSLEEP) ==
+	    TASKQID_INVALID)
 		zil_itxg_clean(clean_me);
 }
 

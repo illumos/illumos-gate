@@ -2367,7 +2367,7 @@ smb_server_create_session(smb_listener_daemon_t *ld, ksocket_t s_so)
 	 */
 	tqid = taskq_dispatch(ld->ld_sv->sv_receiver_pool,
 	    smb_server_receiver, rarg, TQ_NOQUEUE | TQ_SLEEP);
-	if (tqid == 0) {
+	if (tqid == TASKQID_INVALID) {
 		smb_mem_free(rarg);
 		smb_session_disconnect(session);
 		smb_server_destroy_session(ld, session);

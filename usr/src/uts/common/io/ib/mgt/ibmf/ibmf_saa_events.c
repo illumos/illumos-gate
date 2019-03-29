@@ -970,7 +970,7 @@ ibmf_saa_notify_event_clients(saa_port_t *saa_portp,
 		status = taskq_dispatch(saa_statep->saa_event_taskq,
 		    ibmf_saa_notify_event_client_task, event_taskq_args,
 		    KM_NOSLEEP);
-		if (status == 0) {
+		if (status == TASKQID_INVALID) {
 
 			IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
 			    ibmf_saa_notify_event_clients_err, IBMF_TNF_ERROR,

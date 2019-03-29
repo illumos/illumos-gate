@@ -1242,7 +1242,7 @@ scosmb_log_ecc_error(plat_ecc_message_type_t msg_type, void *datap)
 		 */
 		if (taskq_dispatch(scosmb_output_taskq,
 		    (task_func_t *)scosmb_process_output,
-		    (void *)msg_header_ptr, TQ_NOSLEEP) == 0) {
+		    (void *)msg_header_ptr, TQ_NOSLEEP) == TASKQID_INVALID) {
 #ifdef DEBUG
 			cmn_err(CE_WARN, "failed to dispatch a task to send "
 			    "ECC mailbox message.");

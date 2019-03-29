@@ -1342,7 +1342,7 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 
 		/* call vdc_validate() asynchronously to avoid blocking */
 		if (taskq_dispatch(system_taskq, vdc_validate_task,
-		    (void *)vdc, TQ_NOSLEEP) == NULL) {
+		    (void *)vdc, TQ_NOSLEEP) == TASKQID_INVALID) {
 			vdc_mark_closed(vdc, slice, flag, otyp);
 			mutex_exit(&vdc->lock);
 			return (ENXIO);
@@ -7572,7 +7572,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 			/* put the request on a task queue */
 			rv = taskq_dispatch(system_taskq, vdc_dkio_flush_cb,
 			    (void *)dkarg, DDI_SLEEP);
-			if (rv == NULL) {
+			if (rv == TASKQID_INVALID) {
 				/* clean up if dispatch fails */
 				mutex_enter(&vdc->lock);
 				vdc->dkio_flush_pending--;

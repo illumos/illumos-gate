@@ -28,7 +28,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright (c) 2018, Joyent, Inc.
+ */
 
 /*
  *
@@ -144,8 +146,6 @@ dat_dictionary_create(
 bail:
 	if (DAT_SUCCESS != status) {
 		if (NULL != p_dictionary) {
-			dat_os_free(p_dictionary, sizeof (DAT_DICTIONARY));
-
 			if (NULL != p_dictionary->head) {
 				dat_os_free(p_dictionary->head,
 				    sizeof (DAT_DICTIONARY_NODE));
@@ -155,7 +155,10 @@ bail:
 				dat_os_free(p_dictionary->tail,
 				    sizeof (DAT_DICTIONARY_NODE));
 			}
+
+			dat_os_free(p_dictionary, sizeof (DAT_DICTIONARY));
 		}
+
 	}
 
 	return (status);

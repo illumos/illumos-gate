@@ -657,8 +657,8 @@ usr/lib/mdb/proc/libfknsmb.so
 usr/lib/mdb/proc/libfksmbfs.so
 usr/lib/mdb/proc/amd64/libfknsmb.so	i386
 usr/lib/mdb/proc/amd64/libfksmbfs.so	i386
-usr/lib/mdb/proc/sparc/libfknsmb.so	sparc
-usr/lib/mdb/proc/sparc/libfksmbfs.so	sparc
+usr/lib/mdb/proc/sparcv9/libfknsmb.so	sparc
+usr/lib/mdb/proc/sparcv9/libfksmbfs.so	sparc
 usr/lib/smbfs/amd64			i386
 usr/lib/smbfs/sparcv9			sparc
 usr/lib/smbfs/fksmbcl

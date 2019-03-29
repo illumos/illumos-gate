@@ -5052,7 +5052,7 @@ dprov_taskq_dispatch(dprov_state_t *softc, dprov_req_t *taskq_req,
     task_func_t *func, int kmflag)
 {
 	if (taskq_dispatch(softc->ds_taskq, func, taskq_req,
-	    kmflag == KM_NOSLEEP ? TQ_NOSLEEP : TQ_SLEEP) == (taskqid_t)0) {
+	    kmflag == KM_NOSLEEP ? TQ_NOSLEEP : TQ_SLEEP) == TASKQID_INVALID) {
 		kmem_free(taskq_req, sizeof (dprov_req_t));
 		return (CRYPTO_HOST_MEMORY);
 	} else

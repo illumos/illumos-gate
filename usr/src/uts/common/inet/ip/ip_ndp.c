@@ -1219,7 +1219,7 @@ nce_graveyard_free(list_t *graveyard)
 	}
 	mutex_exit(&ill->ill_lock);
 	if (!doit || taskq_dispatch(system_taskq, ncec_mcast_reap,
-	    ill, TQ_NOSLEEP) == (taskqid_t)NULL) {
+	    ill, TQ_NOSLEEP) == TASKQID_INVALID) {
 		mutex_enter(&ill->ill_lock);
 		if (doit) {
 			IP_STAT(ill->ill_ipst, ip_nce_mcast_reclaim_tqfail);

@@ -1649,10 +1649,14 @@ CONSCONFIG_DACF_OBJS  += consconfig_dacf.o consplat.o
 TEM_OBJS += tem.o tem_safe.o
 
 #
-#	Font data for generated 8x16 font
+#	Font data for generated console fonts
 #
-FONT	= 8x16
-FONT_SRC= ter-u16n
+i386_FONT	= 8x16
+i386_FONT_SRC= ter-u16n
+sparc_FONT	= 12x22
+sparc_FONT_SRC= Gallant19
+FONT=$($(MACH)_FONT)
+FONT_SRC=$($(MACH)_FONT_SRC)
 FONT_DIR= $(SRC)/data/consfonts
 FONT_OBJS += font.o $(FONT).o
 

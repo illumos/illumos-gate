@@ -8918,7 +8918,7 @@ ddi_taskq_dispatch(ddi_taskq_t *tq, void (* func)(void *),
 	taskqid_t id = taskq_dispatch((taskq_t *)tq, func, arg,
 	    dflags == DDI_SLEEP ? TQ_SLEEP : TQ_NOSLEEP);
 
-	return (id != 0 ? DDI_SUCCESS : DDI_FAILURE);
+	return (id != TASKQID_INVALID ? DDI_SUCCESS : DDI_FAILURE);
 }
 
 void

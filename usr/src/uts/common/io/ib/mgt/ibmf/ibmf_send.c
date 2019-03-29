@@ -364,7 +364,7 @@ ibmf_i_handle_send_completion(ibmf_ci_t *cip, ibt_wc_t *wcp)
 	if ((clientp->ic_reg_flags & IBMF_REG_FLAG_NO_OFFLOAD) == 0) {
 		ret = taskq_dispatch(cclientp->ic_send_taskq, ibmf_i_do_send_cb,
 		    send_wqep, TQ_NOSLEEP);
-		if (ret == 0) {
+		if (ret == TASKQID_INVALID) {
 			IBMF_TRACE_1(IBMF_TNF_DEBUG, DPRINT_L4,
 			    ibmf_i_handle_send_err, IBMF_TNF_ERROR, "",
 			    "ibmf_i_handle_send_completion(): %s\n",

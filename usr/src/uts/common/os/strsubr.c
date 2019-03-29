@@ -4035,7 +4035,7 @@ esballoc_enqueue_mblk(mblk_t *mp)
 {
 
 	if (taskq_dispatch(system_taskq, (task_func_t *)esballoc_mblk_free, mp,
-	    TQ_NOSLEEP) == (uintptr_t)NULL) {
+	    TQ_NOSLEEP) == TASKQID_INVALID) {
 		mblk_t *first_mp = mp;
 		/*
 		 * System is low on resources and can't perform a non-sleeping

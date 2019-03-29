@@ -163,7 +163,7 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t tqflags)
 	ASSERT(tq->tq_flags & TASKQ_ACTIVE);
 	if ((t = task_alloc(tq, tqflags)) == NULL) {
 		mutex_exit(&tq->tq_lock);
-		return (0);
+		return (TASKQID_INVALID);
 	}
 	if (tqflags & TQ_FRONT) {
 		t->tqent_next = tq->tq_task.tqent_next;

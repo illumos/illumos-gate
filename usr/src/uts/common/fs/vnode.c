@@ -920,7 +920,7 @@ vn_rele_async(vnode_t *vp, taskq_t *taskq)
 	if (vp->v_count == 1) {
 		mutex_exit(&vp->v_lock);
 		VERIFY(taskq_dispatch(taskq, (task_func_t *)vn_rele_inactive,
-		    vp, TQ_SLEEP) != (uintptr_t)NULL);
+		    vp, TQ_SLEEP) != TASKQID_INVALID);
 		return;
 	}
 	VN_RELE_LOCKED(vp);

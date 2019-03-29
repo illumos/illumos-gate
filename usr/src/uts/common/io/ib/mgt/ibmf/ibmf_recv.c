@@ -309,7 +309,7 @@ ibmf_i_handle_recv_completion(ibmf_ci_t *cip, ibt_wc_t *wcp)
 			/* Dispatch the taskq thread to do further processing */
 			ret = taskq_dispatch(clientp->ic_recv_taskq,
 			    ibmf_i_do_recv_cb, recv_wqep, TQ_NOSLEEP);
-			if (ret == 0) {
+			if (ret == TASKQID_INVALID) {
 				mutex_enter(&clientp->ic_kstat_mutex);
 				IBMF_SUB32_KSTATS(clientp, recv_cb_active, 1);
 				mutex_exit(&clientp->ic_kstat_mutex);
@@ -391,7 +391,7 @@ ibmf_i_handle_recv_completion(ibmf_ci_t *cip, ibt_wc_t *wcp)
 			modlargsp->ibmf_class	= class;
 			ret = taskq_dispatch(ibmf_statep->ibmf_taskq,
 			    ibmf_module_load, modlargsp, TQ_NOSLEEP);
-			if (ret == 0) {
+			if (ret == TASKQID_INVALID) {
 				kmem_free(modlargsp,
 				    sizeof (ibmf_mod_load_args_t));
 				IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4,

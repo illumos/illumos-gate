@@ -929,8 +929,8 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		if (rc == 0) {
 			lpkt = sadb_clear_lpkt(larval);
 			if (lpkt != NULL) {
-				rc = !taskq_dispatch(ah_taskq, inbound_task,
-				    lpkt, TQ_NOSLEEP);
+				rc = taskq_dispatch(ah_taskq, inbound_task,
+				    lpkt, TQ_NOSLEEP) == TASKQID_INVALID;
 			}
 		}
 		IPSA_REFRELE(larval);

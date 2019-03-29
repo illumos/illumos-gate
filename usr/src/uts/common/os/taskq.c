@@ -160,7 +160,7 @@
  *	the caller is willing to block for memory.  The function returns an
  *	opaque value which is zero iff dispatch fails.  If flags is TQ_NOSLEEP
  *	or TQ_NOALLOC and the task can't be dispatched, taskq_dispatch() fails
- *	and returns (taskqid_t)0.
+ *	and returns TASKQID_INVALID.
  *
  *	ASSUMES: func != NULL.
  *
@@ -700,7 +700,7 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
 	taskq_random = (taskq_random * 2416 + 374441) % 1771875;\
 	if ((flag & TQ_NOSLEEP) &&				\
 	    taskq_random < 1771875 / taskq_dmtbf) {		\
-		return ((taskqid_t)NULL);			\
+		return (TASKQID_INVALID);			\
 	}
 
 #define	TASKQ_S_RANDOM_DISPATCH_FAILURE(tq, flag)		\
@@ -710,7 +710,7 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
 	    (tq->tq_nalloc > tq->tq_minalloc)) &&		\
 	    (taskq_random < (1771875 / taskq_smtbf))) {		\
 		mutex_exit(&tq->tq_lock);			\
-		return ((taskqid_t)NULL);			\
+		return (TASKQID_INVALID);			\
 	}
 #else
 #define	TASKQ_S_RANDOM_DISPATCH_FAILURE(tq, flag)

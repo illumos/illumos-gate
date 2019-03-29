@@ -1044,7 +1044,7 @@ plat_ecc_dispatch_task(plat_ecc_message_t *msg)
 	ASSERT(plat_ecc_taskq != NULL);
 
 	if (taskq_dispatch(plat_ecc_taskq, plat_ecc_send_msg,
-	    (void *)msg, TQ_NOSLEEP) == NULL) {
+	    (void *)msg, TQ_NOSLEEP) == TASKQID_INVALID) {
 		kmem_free(msg->ecc_msg_data, msg->ecc_msg_len);
 		kmem_free(msg, sizeof (plat_ecc_message_t));
 		return (ENOMEM);

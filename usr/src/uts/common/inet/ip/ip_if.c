@@ -2329,7 +2329,8 @@ ill_taskq_dispatch(ip_stack_t *ipst)
 			mp->b_next = NULL;
 
 			VERIFY(taskq_dispatch(system_taskq,
-			    ill_capability_ack_thr, mp, TQ_SLEEP) != 0);
+			    ill_capability_ack_thr, mp, TQ_SLEEP) !=
+			    TASKQID_INVALID);
 			mutex_enter(&ipst->ips_capab_taskq_lock);
 			mp = ipst->ips_capab_taskq_head;
 		}
@@ -2436,7 +2437,7 @@ ill_capability_ack(ill_t *ill, mblk_t *mp)
 	ASSERT(mp->b_next == NULL);
 
 	if (taskq_dispatch(system_taskq, ill_capability_ack_thr, mp,
-	    TQ_NOSLEEP) != 0)
+	    TQ_NOSLEEP) != TASKQID_INVALID)
 		return;
 
 	/*

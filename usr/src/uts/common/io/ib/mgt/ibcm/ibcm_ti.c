@@ -1392,7 +1392,7 @@ ibcm_close_rc_channel(ibt_channel_hdl_t channel, ibcm_state_data_t *statep,
 			if (mode == IBT_NONBLOCKING) {
 				if (taskq_dispatch(ibcm_taskq,
 				    ibcm_process_abort_via_taskq, statep,
-				    TQ_NOSLEEP) == 0) {
+				    TQ_NOSLEEP) == TASKQID_INVALID) {
 
 					IBCM_REF_CNT_DECR(statep);
 					statep->state = old_state;
@@ -4896,7 +4896,7 @@ ibt_join_mcg(ib_gid_t rgid, ibt_mcg_attr_t *mcg_attr,
 	if (func != NULL) {	/* Non-Blocking */
 		IBTF_DPRINTF_L3(cmlog, "ibt_join_mcg: Non-Blocking Call");
 		if (taskq_dispatch(ibcm_taskq, ibcm_process_async_join_mcg,
-		    mcg_tq, TQ_NOSLEEP) == 0) {
+		    mcg_tq, TQ_NOSLEEP) == TASKQID_INVALID) {
 			IBTF_DPRINTF_L2(cmlog, "ibt_join_mcg: Failed to "
 			    "Dispatch the TaskQ");
 			kmem_free(mcg_tq, sizeof (ibcm_join_mcg_tqarg_t));

@@ -812,7 +812,7 @@ ibcm_recv_timeout_cb(void *args)
 		ibcm_recv_tasks++;
 		mutex_exit(&ibcm_recv_mutex);
 		if (taskq_dispatch(ibcm_taskq, ibcm_recv_task, tq,
-		    TQ_NOQUEUE | TQ_NOSLEEP) == 0) {
+		    TQ_NOQUEUE | TQ_NOSLEEP) == TASKQID_INVALID) {
 			mutex_enter(&ibcm_recv_mutex);
 			if (--ibcm_recv_tasks == 0) {
 				(void) timeout(ibcm_recv_timeout_cb, tq, 1);
@@ -873,7 +873,8 @@ ibcm_recv_add_one(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 		tq->tq_args = args;
 		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*tq))
 		if (taskq_dispatch(ibcm_taskq, ibcm_recv_task, tq,
-		    TQ_NOQUEUE | TQ_NOSLEEP) == 0) {	/* dispatch failed */
+		    TQ_NOQUEUE | TQ_NOSLEEP) == TASKQID_INVALID) {
+			/* dispatch failed */
 			mutex_enter(&ibcm_recv_mutex);
 			if (--ibcm_recv_tasks == 0) {
 				/* try the dispatch again, after a tick */
@@ -3490,7 +3491,8 @@ ibcm_timeout_cb(void *arg)
 
 			/* if possible, do not slow down calling recycle func */
 			if (taskq_dispatch(ibcm_taskq, ibcm_process_rc_recycle,
-			    recycle_arg, TQ_NOQUEUE | TQ_NOSLEEP) == 0) {
+			    recycle_arg, TQ_NOQUEUE | TQ_NOSLEEP) ==
+			    TASKQID_INVALID) {
 
 				_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(
 				    statep->recycle_arg))

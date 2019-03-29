@@ -14458,7 +14458,7 @@ fcp_pass_to_hp(struct fcp_port *pptr, struct fcp_lun *plun,
 	}
 	mutex_exit(&plun->lun_mutex);
 	if (taskq_dispatch(DEVI(pdip)->devi_taskq, fcp_hp_task,
-	    (void *)elem, KM_NOSLEEP) == NULL) {
+	    (void *)elem, KM_NOSLEEP) == TASKQID_INVALID) {
 		mutex_enter(&plun->lun_mutex);
 		if (elem->what == FCP_ONLINE || elem->what == FCP_OFFLINE) {
 			plun->lun_event_count--;

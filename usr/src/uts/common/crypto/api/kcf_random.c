@@ -966,7 +966,8 @@ rnd_handler(void *arg)
 		 * cache becomes empty.
 		 */
 		if (taskq_dispatch(system_taskq, rngprov_task,
-		    (void *)(uintptr_t)len, TQ_NOSLEEP | TQ_NOQUEUE) == 0) {
+		    (void *)(uintptr_t)len, TQ_NOSLEEP | TQ_NOQUEUE) ==
+		    TASKQID_INVALID) {
 			rngprov_task_idle = B_TRUE;
 		}
 	}

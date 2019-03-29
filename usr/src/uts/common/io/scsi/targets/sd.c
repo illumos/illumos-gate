@@ -13466,7 +13466,7 @@ sd_mapblocksize_iodone(int index, struct sd_lun *un, struct buf *bp)
 		 * with the shadow buf at that point.
 		 */
 		if (taskq_dispatch(sd_wmr_tq, sd_read_modify_write_task, bp,
-		    KM_NOSLEEP) != 0) {
+		    KM_NOSLEEP) != TASKQID_INVALID) {
 			/*
 			 * Dispatch was successful so we are done. Return
 			 * without going any higher up the iodone chain. Do
@@ -18793,7 +18793,7 @@ sd_sense_key_unit_attention(struct sd_lun *un, 	uint8_t *sense_datap,
 #ifdef _LP64
 		if (un->un_blockcount + 1 > SD_GROUP1_MAX_ADDRESS) {
 			if (taskq_dispatch(sd_tq, sd_reenable_dsense_task,
-			    un, KM_NOSLEEP) == 0) {
+			    un, KM_NOSLEEP) == TASKQID_INVALID) {
 				/*
 				 * If we can't dispatch the task we'll just
 				 * live without descriptor sense.  We can
@@ -18824,7 +18824,7 @@ sd_sense_key_unit_attention(struct sd_lun *un, 	uint8_t *sense_datap,
 		 * encountered at a later time.)
 		 */
 		if (taskq_dispatch(sd_tq, sd_media_change_task, pktp,
-		    KM_NOSLEEP) == 0) {
+		    KM_NOSLEEP) == TASKQID_INVALID) {
 			/*
 			 * Cannot dispatch the request so fail the command.
 			 */
@@ -18870,7 +18870,7 @@ sd_sense_key_unit_attention(struct sd_lun *un, 	uint8_t *sense_datap,
 	    ((asc == 0x2a) && (ascq == 0x01)) ||
 	    ((asc == 0x3f) && (ascq == 0x0e))) {
 		if (taskq_dispatch(sd_tq, sd_target_change_task, un,
-		    KM_NOSLEEP) == 0) {
+		    KM_NOSLEEP) == TASKQID_INVALID) {
 			SD_ERROR(SD_LOG_ERROR, un,
 			    "sd_sense_key_unit_attention: "
 			    "Could not dispatch sd_target_change_task\n");

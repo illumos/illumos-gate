@@ -2817,7 +2817,7 @@ sbbc_mbox_queue_ecc_event(sbbc_ecc_mbox_t *sbbc_ecc_msgp)
 
 	if (taskq_dispatch(sbbc_ecc_mbox_taskq,
 	    (task_func_t *)sbbc_mbox_ecc_output, sbbc_ecc_msgp,
-	    TQ_NOSLEEP) == NULL) {
+	    TQ_NOSLEEP) == TASKQID_INVALID) {
 
 		if (sbbc_ecc_mbox_taskq_errs == 0) {
 			cmn_err(CE_NOTE, "Unable to send ECC event "

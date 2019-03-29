@@ -1686,7 +1686,7 @@ cma_generate_event(struct rdma_cm_id *idp, enum rdma_cm_event_type event,
 	}
 
 	if (taskq_dispatch(system_taskq, cma_generate_event_thr,
-	    (void *)event_arg, TQ_SLEEP) == 0) {
+	    (void *)event_arg, TQ_SLEEP) == TASKQID_INVALID) {
 		SOL_OFS_DPRINTF_L2(sol_rdmacm_dbg_str,
 		    "generate_event_async: taskq_dispatch() failed!!");
 		mutex_enter(&chanp->chan_mutex);

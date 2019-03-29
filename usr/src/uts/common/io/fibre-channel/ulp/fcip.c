@@ -4583,7 +4583,7 @@ fcip_handle_topology(struct fcip *fptr)
 		if (!(fptr->fcip_flags & FCIP_REG_INPROGRESS)) {
 			fptr->fcip_flags |= FCIP_REG_INPROGRESS;
 			if (taskq_dispatch(fptr->fcip_tq, fcip_port_ns,
-			    fptr, KM_NOSLEEP) == 0) {
+			    fptr, KM_NOSLEEP) == TASKQID_INVALID) {
 				fptr->fcip_flags &= ~FCIP_REG_INPROGRESS;
 			}
 		}
@@ -7258,7 +7258,7 @@ fcip_timeout(void *arg)
 
 					if (taskq_dispatch(fptr->fcip_tq,
 					    fcip_rte_remove_deferred, fptr,
-					    KM_NOSLEEP) == 0) {
+					    KM_NOSLEEP) == TASKQID_INVALID) {
 						/*
 						 * failed - so mark the entry
 						 * as invalid again.
@@ -7302,7 +7302,7 @@ fcip_timeout(void *arg)
 					mutex_exit(&fdestp->fcipd_mutex);
 					if (taskq_dispatch(fptr->fcip_tq,
 					    fcip_pkt_timeout, fcip_pkt,
-					    KM_NOSLEEP) == 0) {
+					    KM_NOSLEEP) == TASKQID_INVALID) {
 						/*
 						 * timeout immediately
 						 */

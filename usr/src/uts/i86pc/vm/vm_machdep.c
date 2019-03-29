@@ -2283,7 +2283,7 @@ create_contig_pfnlist(uint_t flags)
 		 */
 		if (!create_contig_pending) {
 			if (taskq_dispatch(system_taskq, call_create_contiglist,
-			    NULL, TQ_NOSLEEP) != NULL)
+			    NULL, TQ_NOSLEEP) != TASKQID_INVALID)
 				create_contig_pending = 1;
 		}
 		contig_pfnlist_buildfailed++;	/* count list build failures */

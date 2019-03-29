@@ -867,7 +867,7 @@ ibnex_ibtl_callback(ibtl_ibnex_cb_args_t *cb_args)
 		 * from interrupt context.
 		 */
 		if (taskq_dispatch(system_taskq, ibnex_handle_reprobe_dev,
-		    clnt_dip, TQ_SLEEP) == 0) {
+		    clnt_dip, TQ_SLEEP) == TASKQID_INVALID) {
 			IBTF_DPRINTF_L2("ibnex",
 			    "ibnex_ibtl_callback: taskq_dispatch failed");
 			mutex_enter(&ibnex.ibnex_mutex);

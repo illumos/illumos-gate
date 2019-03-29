@@ -288,7 +288,7 @@ console_vprintf(const char *fmt, va_list adx)
 		cm->cm_size = sizeof (*cm) + len;
 		(void) vsnprintf(cm->cm_text, len + 1, fmt, adx);
 		if (taskq_dispatch(console_taskq, (task_func_t *)console_putmsg,
-		    cm, TQ_NOSLEEP) != 0)
+		    cm, TQ_NOSLEEP) != TASKQID_INVALID)
 			return;
 		kmem_free(cm, cm->cm_size);
 	}
