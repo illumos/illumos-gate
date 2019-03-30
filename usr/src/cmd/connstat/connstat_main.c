@@ -461,6 +461,7 @@ print_timestamp(timestamp_fmt_t timestamp_fmt, boolean_t parsable)
 		if (len > 0) {
 			(void) printf("%s%s\n", pfx, dstr);
 		}
+		break;
 	}
 	default:
 		abort();
