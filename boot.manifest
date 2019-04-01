@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -19,14 +19,33 @@
 # image itself.
 #
 d boot 0755 root sys
-d boot/grub 0755 root sys
-d boot/grub/bin 0755 root sys
-f boot/grub/bin/grub 0755 root sys
-f boot/grub/fat_stage1_5 0644 root sys
-f boot/grub/iso9660_stage1_5 0644 root sys
-f boot/grub/pxegrub 0644 root sys
-f boot/grub/stage1 0644 root sys
-f boot/grub/stage2 0644 root sys
-f boot/grub/stage2_eltorito 0644 root sys
-f boot/grub/ufs_stage1_5 0644 root sys
-f boot/grub/zfs_stage1_5 0644 root sys
+d boot/defaults 0755 root sys
+f boot/defaults/loader.conf 0444 root sys
+d boot/forth 0755 root sys
+f boot/forth/beadm.4th 0444 root sys
+f boot/forth/beastie.4th 0444 root sys
+f boot/forth/brand-smartos.4th 0444 root sys
+f boot/forth/brand.4th 0444 root sys
+f boot/forth/check-password.4th 0444 root sys
+f boot/forth/color.4th 0444 root sys
+f boot/forth/delay.4th 0444 root sys
+f boot/forth/efi.4th 0444 root sys
+f boot/forth/frames.4th 0444 root sys
+f boot/forth/loader.4th 0444 root sys
+f boot/forth/logo-smartos.4th 0444 root sys
+f boot/forth/menu-commands.4th 0444 root sys
+f boot/forth/menu.4th 0444 root sys
+f boot/forth/menu.rc 0444 root sys
+f boot/forth/menusets.4th 0444 root sys
+f boot/forth/pcibios.4th 0444 root sys
+f boot/forth/screen.4th 0444 root sys
+f boot/forth/shortcuts.4th 0444 root sys
+f boot/forth/support.4th 0444 root sys
+f boot/forth/version.4th 0444 root sys
+f boot/gptzfsboot 0444 root sys
+f boot/illumos.png 0444 root sys
+f boot/loader 0444 root sys
+f boot/loader64.efi 0555 root sys
+f boot/loader.help 0444 root sys
+f boot/loader.rc 0444 root sys
+f boot/pmbr 0444 root sys

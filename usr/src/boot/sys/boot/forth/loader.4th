@@ -596,6 +596,24 @@ only forth definitions also support-functions
   then
 ;
 
+create pathname 1024 chars allot
+
+: set-platform ( c-addr u -- )
+	2dup
+	pathname place
+	s" /platform/i86pc/kernel/amd64/unix" pathname append
+	pathname count s" bootfile" setenv
+	pathname count erase
+	2dup
+	pathname place
+	s" /platform/i86pc/amd64/boot_archive" pathname append
+	pathname count s" boot_archive" set-module-path
+	pathname count erase
+	pathname place
+	s" /platform/i86pc/amd64/boot_archive.hash" pathname append
+	pathname count s" boot_archive.hash" set-module-path
+;
+
 \ Words to be used inside configuration files
 
 : retry false ;         \ For use in load error commands

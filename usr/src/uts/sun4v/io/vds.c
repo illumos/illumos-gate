@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -5832,7 +5833,7 @@ vd_setup_partition_efi(vd_t *vd)
 
 	gpt->efi_gpt_Signature = LE_64(EFI_SIGNATURE);
 	gpt->efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
-	gpt->efi_gpt_HeaderSize = LE_32(sizeof (efi_gpt_t));
+	gpt->efi_gpt_HeaderSize = LE_32(EFI_HEADER_SIZE);
 	gpt->efi_gpt_FirstUsableLBA = LE_64(first_u_lba);
 	gpt->efi_gpt_PartitionEntryLBA = LE_64(2ULL);
 	gpt->efi_gpt_SizeOfPartitionEntry = LE_32(sizeof (efi_gpe_t));
@@ -5869,7 +5870,7 @@ vd_setup_partition_efi(vd_t *vd)
 	CRC32(crc, gpe, sizeof (efi_gpe_t) * VD_MAXPART, -1U, crc32_table);
 	gpt->efi_gpt_PartitionEntryArrayCRC32 = LE_32(~crc);
 
-	CRC32(crc, gpt, sizeof (efi_gpt_t), -1U, crc32_table);
+	CRC32(crc, gpt, EFI_HEADER_SIZE, -1U, crc32_table);
 	gpt->efi_gpt_HeaderCRC32 = LE_32(~crc);
 
 	return (0);

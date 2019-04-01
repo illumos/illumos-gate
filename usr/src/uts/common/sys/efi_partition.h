@@ -22,12 +22,14 @@
  * Copyright (c) 2002, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2014 Toomas Soome <tsoome@me.com>
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 #ifndef	_SYS_EFI_PARTITION_H
 #define	_SYS_EFI_PARTITION_H
 
 #include <sys/uuid.h>
+#include <sys/stddef.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -45,6 +47,16 @@ extern "C" {
 			    (1 * (sizeof (struct uuid)))))
 
 #define	EFI_SIGNATURE	0x5452415020494645ULL
+
+/*
+ * Although the EFI spec is clear that sizeof (efi_gpt_t) is a valid value
+ * (512), at least one EFI system (AMI v4.6.4.1) incorrectly expects this to be
+ * exactly the size of the structure defined in the spec, that is, 92.
+ *
+ * As the reserved section is never used, the modified value works fine
+ * everywhere else.
+ */
+#define	EFI_HEADER_SIZE (offsetof(efi_gpt_t, efi_gpt_Reserved2))
 
 /* EFI Guid Partition Table Header -- little endian on-disk format */
 typedef struct efi_gpt {
@@ -222,7 +234,7 @@ typedef struct dk_efi {
 	diskaddr_t	 dki_lba;	/* starting block */
 	len_t		 dki_length;	/* length in bytes */
 	union {
-		efi_gpt_t 	*_dki_data;
+		efi_gpt_t	*_dki_data;
 		uint64_t	_dki_data_64;
 	} dki_un;
 #define	dki_data	dki_un._dki_data

@@ -3,6 +3,7 @@
 \ Copyright (c) 2006-2015 Devin Teske <dteske@FreeBSD.org>
 \ Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 \ All rights reserved.
+\ Copyright 2019 Joyent, Inc.
 \
 \ Redistribution and use in source and binary forms, with or without
 \ modification, are permitted provided that the following conditions
@@ -463,20 +464,20 @@ also menu-infrastructure definitions
 
 : osconsole-captions ( N -- )
   \ first entry
-  dup s" Os[C]onsole.. text" rot 48 menu_caption[x][y] setenv
-  dup s" Os^[1mC^[monsole.. ^[32;7mtext^[m" rot 48 ansi_caption[x][y] setenv
+  dup s" OS [C]onsole.......... text" rot 48 menu_caption[x][y] setenv
+  dup s" OS ^[1mC^[monsole........... ^[32;7mtext^[m" rot 48 ansi_caption[x][y] setenv
 
-  dup s" Os[C]onsole.. ttya" rot 49 menu_caption[x][y] setenv
-  dup s" Os^[1mC^[monsole.. ^[34;1mttya^[m" rot 49 ansi_caption[x][y] setenv
+  dup s" OS [C]onsole.......... ttya" rot 49 menu_caption[x][y] setenv
+  dup s" OS ^[1mC^[monsole........... ^[34;1mttya^[m" rot 49 ansi_caption[x][y] setenv
 
-  dup s" Os[C]onsole.. ttyb" rot 50 menu_caption[x][y] setenv
-  dup s" Os^[1mC^[monsole.. ^[34;1mttyb^[m" rot 50 ansi_caption[x][y] setenv
+  dup s" OS [C]onsole.......... ttyb" rot 50 menu_caption[x][y] setenv
+  dup s" OS ^[1mC^[monsole........... ^[34;1mttyb^[m" rot 50 ansi_caption[x][y] setenv
 
-  dup s" Os[C]onsole.. ttyc" rot 51 menu_caption[x][y] setenv
-  dup s" Os^[1mC^[monsole.. ^[34;1mttyc^[m" rot 51 ansi_caption[x][y] setenv
+  dup s" OS [C]onsole.......... ttyc" rot 51 menu_caption[x][y] setenv
+  dup s" OS ^[1mC^[monsole........... ^[34;1mttyc^[m" rot 51 ansi_caption[x][y] setenv
 
-  dup s" Os[C]onsole.. ttyd" rot 52 menu_caption[x][y] setenv
-  s" Os^[1mC^[monsole.. ^[34;1mttyd^[m" rot 52 ansi_caption[x][y] setenv
+  dup s" OS [C]onsole.......... ttyd" rot 52 menu_caption[x][y] setenv
+  s" OS ^[1mC^[monsole........... ^[34;1mttyd^[m" rot 52 ansi_caption[x][y] setenv
 ;
 
 \ This function creates the list of menu items. This function is called by the
@@ -486,7 +487,7 @@ also menu-infrastructure definitions
 
 	\ Print the frame caption at (x,y)
 	s" loader_menu_title" getenv dup -1 = if
-		drop s" Welcome to illumos"
+		drop s" Welcome to SmartOS"
 	then
 	TRUE ( use default alignment )
 	s" loader_menu_title_align" getenv dup -1 <> if
@@ -748,7 +749,18 @@ also menu-infrastructure definitions
 	dup 9 > if drop 9 then
 	dup 0 < if drop 0 then
 
-	s" Autoboot in N seconds. [Space] to pause" ( n -- n c-addr/u )
+	\ getenv? leaves -1 on stack if the env var exists.  Thus if both
+	\ headnode and ipxe exist then the sum of what will be left on the
+	\ stack should be -2.
+	s" headnode" getenv? s" ipxe" getenv? + -2 = if
+		s" ipxe" getenv s" true" compare 0= if
+			s" Autoboot in N seconds from PXE. [Space] to pause" ( n -- n c-addr/u )
+		else
+			s" Autoboot in N seconds from the USB Key. [Space] to pause" ( n -- n c-addr/u )
+		then
+	else
+		s" Autoboot in N seconds. [Space] to pause" ( n -- n c-addr/u )
+	then
 
 	2 pick 0> if
 		rot 48 + -rot ( n c-addr/u -- n' c-addr/u ) \ convert to ASCII

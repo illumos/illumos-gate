@@ -9872,7 +9872,9 @@ f usr/lib/mdb/proc/svc.configd.so 0555 root sys
 f usr/lib/mdb/proc/svc.startd.so 0555 root sys
 d usr/lib/mdb/raw 0755 root sys
 d usr/lib/mdb/raw/amd64 0755 root sys
+f usr/lib/mdb/raw/amd64/disk_label.so 0555 root sys
 f usr/lib/mdb/raw/amd64/dof.so 0555 root sys
+f usr/lib/mdb/raw/disk_label.so 0555 root sys
 f usr/lib/mdb/raw/dof.so 0555 root sys
 f usr/lib/more.help 0644 root bin
 f usr/lib/mpss.so.1 0755 root bin

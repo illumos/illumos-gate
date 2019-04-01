@@ -24,6 +24,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Toomas Soome <tsoome@me.com>
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -2747,7 +2748,7 @@ cmlb_validate_efi(efi_gpt_t *labp)
 {
 	if (labp->efi_gpt_Signature != EFI_SIGNATURE)
 		return (EINVAL);
-	/* at least 96 bytes in this version of the spec. */
+	/* at least 92 bytes in this version of the spec. */
 	if (sizeof (efi_gpt_t) - sizeof (labp->efi_gpt_Reserved2) >
 	    labp->efi_gpt_HeaderSize)
 		return (EINVAL);

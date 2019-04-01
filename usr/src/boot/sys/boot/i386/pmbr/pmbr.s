@@ -31,10 +31,12 @@
 #
 # Partly from: src/sys/boot/i386/mbr/mbr.s 1.7
 
+# Copyright (c) 2019, Joyent, Inc.
+
 # A 512 byte PMBR boot manager to read a boot program and run it.
 # The embedded MBR is set up for PMBR and default bootblock sector
 # is hardcoded to 256 and size 1. The actual values are supposed to be
-# updated by installboot.
+# updated by installboot (and smartos-live's format_image).
 
 		.set LOAD,0x7c00		# Load address
 		.set EXEC,0x600 		# Execution address

@@ -2,6 +2,12 @@
 \
 \ Includes additional commands
 include /boot/forth/loader.4th
+
+\ For SmartOS, override the default color scheme back to the more traditional
+\ black background and white foreground.
+set tem.fg_color=white
+set tem.bg_color=black
+
 try-include /boot/loader.rc.local
 
 \ Reads and processes loader.conf variables

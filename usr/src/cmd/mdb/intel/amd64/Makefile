@@ -21,12 +21,13 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include ../../Makefile.common
 
-MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_KVM) uhci
+MODULES = $(COMMON_MODULES_PROC) $(COMMON_MODULES_KVM)
+MODULES += disk_label uhci
 
 SUBDIRS = mdb mdb_ks kmdb libstandctf libstand .WAIT $(MODULES)
 

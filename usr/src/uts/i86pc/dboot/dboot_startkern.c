@@ -23,7 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.  All rights reserved.
  */
 
 
@@ -74,15 +74,6 @@ extern int have_cpuid(void);
 #include "dboot_elfload.h"
 
 #define	SHA1_ASCII_LENGTH	(SHA1_DIGEST_LENGTH * 2)
-
-/*
- * Region of memory that may be corrupted by external actors.  This can go away
- * once the firmware bug RICHMOND-16 is fixed and all systems with the bug are
- * upgraded.
- */
-#define	CORRUPT_REGION_START	0xc700000
-#define	CORRUPT_REGION_SIZE	0x100000
-#define	CORRUPT_REGION_END	(CORRUPT_REGION_START + CORRUPT_REGION_SIZE)
 
 /*
  * This file contains code that runs to transition us from either a multiboot
@@ -1469,6 +1460,80 @@ dboot_process_modules(void)
 	check_images();
 }
 
+#define	CORRUPT_REGION_START	0xc700000
+#define	CORRUPT_REGION_SIZE	0x100000
+#define	CORRUPT_REGION_END	(CORRUPT_REGION_START + CORRUPT_REGION_SIZE)
+
+static void
+dboot_add_memlist(uint64_t start, uint64_t end)
+{
+	if (end > max_mem)
+		max_mem = end;
+
+	/*
+	 * Well, this is sad.  On some systems, there is a region of memory that
+	 * can be corrupted until some number of seconds after we have booted.
+	 * And the BIOS doesn't tell us that this memory is unsafe to use.  And
+	 * we don't know how long it's dangerous.  So we'll chop out this range
+	 * from any memory list that would otherwise be usable.  Note that any
+	 * system of this type will give us the new-style (0x40) memlist, so we
+	 * need not fix up the other path below.
+	 *
+	 * However, if we're boot-loaded from something that doesn't have a
+	 * RICHMOND-16 workaround (which on many systems is just fine), it could
+	 * actually use this region for the boot modules; if we remove it from
+	 * the memlist, we'll keel over when trying to access the region.
+	 *
+	 * So, if we see that a module intersects the region, we presume it's
+	 * OK.
+	 */
+
+	if (find_boot_prop("disable-RICHMOND-16") != NULL)
+		goto out;
+
+	for (uint32_t i = 0; i < bi->bi_module_cnt; i++) {
+		native_ptr_t mod_start = modules[i].bm_addr;
+		native_ptr_t mod_end = modules[i].bm_addr + modules[i].bm_size;
+
+		if (mod_start < CORRUPT_REGION_END &&
+		    mod_end >= CORRUPT_REGION_START) {
+			if (prom_debug) {
+				dboot_printf("disabling RICHMOND-16 workaround "
+				"due to module #%u: "
+				"name %s addr %lx size %lx\n",
+				    i, (char *)(uintptr_t)modules[i].bm_name,
+				    (ulong_t)modules[i].bm_addr,
+				    (ulong_t)modules[i].bm_size);
+			}
+			goto out;
+		}
+	}
+
+	if (start < CORRUPT_REGION_START && end > CORRUPT_REGION_START) {
+		memlists[memlists_used].addr = start;
+		memlists[memlists_used].size =
+		    CORRUPT_REGION_START - start;
+		++memlists_used;
+		if (end > CORRUPT_REGION_END)
+			start = CORRUPT_REGION_END;
+		else
+			return;
+	}
+
+	if (start >= CORRUPT_REGION_START && start < CORRUPT_REGION_END) {
+		if (end <= CORRUPT_REGION_END)
+			return;
+		start = CORRUPT_REGION_END;
+	}
+
+out:
+	memlists[memlists_used].addr = start;
+	memlists[memlists_used].size = end - start;
+	++memlists_used;
+	if (memlists_used > MAX_MEMLIST)
+		dboot_panic("too many memlists");
+}
+
 /*
  * We then build the phys_install memlist from the multiboot information.
  */
@@ -1512,45 +1577,7 @@ dboot_process_mmap(void)
 			 */
 			switch (type) {
 			case 1:
-				if (end > max_mem)
-					max_mem = end;
-
-				/*
-				 * Well, this is sad.  One some systems, there
-				 * is a region of memory that can be corrupted
-				 * until some number of seconds after we have
-				 * booted.  And the BIOS doesn't tell us that
-				 * this memory is unsafe to use.  And we don't
-				 * know how long it's dangerous.  So we'll
-				 * chop out this range from any memory list
-				 * that would otherwise be usable.  Note that
-				 * any system of this type will give us the
-				 * new-style (0x40) memlist, so we need not
-				 * fix up the other path below.
-				 */
-				if (start < CORRUPT_REGION_START &&
-				    end > CORRUPT_REGION_START) {
-					memlists[memlists_used].addr = start;
-					memlists[memlists_used].size =
-					    CORRUPT_REGION_START - start;
-					++memlists_used;
-					if (end > CORRUPT_REGION_END)
-						start = CORRUPT_REGION_END;
-					else
-						continue;
-				}
-				if (start >= CORRUPT_REGION_START &&
-				    start < CORRUPT_REGION_END) {
-					if (end <= CORRUPT_REGION_END)
-						continue;
-					start = CORRUPT_REGION_END;
-				}
-
-				memlists[memlists_used].addr = start;
-				memlists[memlists_used].size = end - start;
-				++memlists_used;
-				if (memlists_used > MAX_MEMLIST)
-					dboot_panic("too many memlists");
+				dboot_add_memlist(start, end);
 				break;
 			case 2:
 				rsvdmemlists[rsvdmemlists_used].addr = start;

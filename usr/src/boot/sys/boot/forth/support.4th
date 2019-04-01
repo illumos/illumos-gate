@@ -226,6 +226,21 @@ create last_module_option sizeof module.next allot 0 last_module_option !
 	then
 ;
 
+\ Place string into an allocated buffer
+\
+\ e.g
+\ create mystring 32 chars allot
+\ s" Burning down " mystring place
+\
+: place over over >r >r char+ swap chars move r> r> c! ;
+
+\ Append string
+\
+\ e.g.
+\ s" the house!" mystring append
+\
+: append over over >r >r count chars + swap chars move r> r> dup >r c@ + r> c! ;
+
 \ Returns TRUE if the framebuffer is active, FALSE otherwise
 : framebuffer? ( -- flag )
 	\ Use the screen-height variable as a proxy for framebuffer
