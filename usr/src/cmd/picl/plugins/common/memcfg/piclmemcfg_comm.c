@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright (c) 2018, Joyent, Inc.
  */
 
 /*
@@ -422,9 +424,9 @@ create_logical_tree(picl_nodehdl_t memh, int fd)
 		/*
 		 * Add property, Size to memory-segment node
 		 */
-		if ((ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
+		err = ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
 		    PICL_PTYPE_UNSIGNED_INT, PICL_READ, sizeof (mcseg->size),
-		    PICL_PROP_SIZE, NULL, NULL)) != PICL_SUCCESS)
+		    PICL_PROP_SIZE, NULL, NULL);
 		if (err != PICL_SUCCESS)
 			break;
 

@@ -1291,7 +1291,7 @@ llc1_inforeq(queue_t *q, mblk_t *mp)
 			    lld->llc_mac_info->llcp_addrlen);
 		} else {
 			dlp->dl_addr_length = 0; /* not attached yet */
-			dlp->dl_addr_offset = NULL;
+			dlp->dl_addr_offset = 0;
 			dlp->dl_sap_length = 0; /* 1 bytes on end */
 		}
 		dlp->dl_version = DL_VERSION_2;
@@ -2831,9 +2831,8 @@ llc1remque(void *arg)
 
 /* VARARGS */
 static void
-llc1error(dip, fmt, a1, a2, a3, a4, a5, a6)
-	dev_info_t *dip;
-	char   *fmt, *a1, *a2, *a3, *a4, *a5, *a6;
+llc1error(dev_info_t *dip, char *fmt, char *a1, char *a2, char *a3,
+    char *a4, char *a5, char *a6)
 {
 	static long last;
 	static char *lastfmt;
@@ -2849,7 +2848,7 @@ llc1error(dip, fmt, a1, a2, a3, a4, a5, a6)
 	lastfmt = fmt;
 
 	cmn_err(CE_CONT, "%s%d:  ",
-		ddi_get_name(dip), ddi_get_instance(dip));
+	    ddi_get_name(dip), ddi_get_instance(dip));
 	cmn_err(CE_CONT, fmt, a1, a2, a3, a4, a5, a6);
 	cmn_err(CE_CONT, "\n");
 }
