@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019, Joyent, Inc.
  */
 
 
@@ -140,13 +141,13 @@ usba_devdb_get_conf_rec(struct _buf *file, usba_configrec_t **rec)
 	token_t		token;
 	char		tokval[MAXPATHLEN];
 	usba_configrec_t	*cfgrec;
-	config_field_t	cfgvar;
+	config_field_t	cfgvar = USB_NONE;
 	u_longlong_t	llptr;
 	u_longlong_t	value;
 	enum {
 		USB_NEWVAR, USB_CONFIG_VAR, USB_VAR_EQUAL, USB_VAR_VALUE,
 		    USB_ERROR
-		    } parse_state = USB_NEWVAR;
+	} parse_state = USB_NEWVAR;
 
 	cfgrec = (usba_configrec_t *)kmem_zalloc(
 	    sizeof (usba_configrec_t), KM_SLEEP);

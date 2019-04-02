@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2019, Joyent, Inc.
  */
 
 
@@ -45,16 +46,13 @@ extern usba_cfg_pwr_descr_t default_cfg_power;
 extern usba_if_pwr_descr_t default_if_power;
 
 size_t
-usb_parse_data(char	*format,
-	uchar_t 	*data,
-	size_t		datalen,
-	void		*structure,
-	size_t		structlen)
+usb_parse_data(char *format, const uchar_t  *data, size_t datalen,
+    void *structure, size_t structlen)
 {
 	int	fmt;
 	int	counter = 1;
 	int	multiplier = 0;
-	uchar_t	*dataend = data + datalen;
+	const uchar_t	*dataend = data + datalen;
 	char	*structstart = (char *)structure;
 	void	*structend = (void *)((intptr_t)structstart + structlen);
 
@@ -170,11 +168,8 @@ usb_parse_data(char	*format,
 
 
 size_t
-usb_parse_CV_descr(char *format,
-	uchar_t *data,
-	size_t	datalen,
-	void	*structure,
-	size_t	structlen)
+usb_parse_CV_descr(char *format, const uchar_t *data, size_t datalen,
+    void *structure, size_t structlen)
 {
 	return (usb_parse_data(format, data, datalen, structure,
 	    structlen));
@@ -186,16 +181,12 @@ usb_parse_CV_descr(char *format,
  *	type descr_type, unless the end of the buffer or a descriptor
  *	of type	stop_descr_type1 or stop_descr_type2 is encountered first.
  */
-static uchar_t *
-usb_nth_descr(uchar_t	*buf,
-	size_t		buflen,
-	int		descr_type,
-	uint_t		n,
-	int		stop_descr_type1,
-	int		stop_descr_type2)
+static const uchar_t *
+usb_nth_descr(const uchar_t *buf, size_t buflen, int descr_type, uint_t n,
+    int stop_descr_type1, int stop_descr_type2)
 {
-	uchar_t	*bufstart = buf;
-	uchar_t *bufend = buf + buflen;
+	const uchar_t	*bufstart = buf;
+	const uchar_t *bufend = buf + buflen;
 
 	if (buf == NULL) {
 
@@ -229,10 +220,8 @@ usb_nth_descr(uchar_t	*buf,
 
 
 size_t
-usb_parse_dev_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(DEVICE) */
-	size_t			buflen,
-	usb_dev_descr_t		*ret_descr,
-	size_t			ret_buf_len)
+usb_parse_dev_descr(const uchar_t *buf, size_t buflen,
+    usb_dev_descr_t *ret_descr, size_t ret_buf_len)
 {
 	if ((buf == NULL) || (ret_descr == NULL) ||
 	    (buflen < 2) || (buf[1] != USB_DESCR_TYPE_DEV)) {
@@ -246,10 +235,8 @@ usb_parse_dev_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(DEVICE) */
 
 
 size_t
-usb_parse_cfg_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	usb_cfg_descr_t		*ret_descr,
-	size_t			ret_buf_len)
+usb_parse_cfg_descr(const uchar_t *buf, size_t buflen,
+    usb_cfg_descr_t *ret_descr, size_t ret_buf_len)
 {
 	if ((buf == NULL) || (ret_descr == NULL) ||
 	    (buflen < 2) || (buf[1] != USB_DESCR_TYPE_CFG)) {
@@ -263,13 +250,10 @@ usb_parse_cfg_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 
 
 size_t
-usba_parse_cfg_pwr_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	usba_cfg_pwr_descr_t	*ret_descr,
-	size_t			ret_buf_len)
+usba_parse_cfg_pwr_descr(const uchar_t *buf, size_t buflen,
+    usba_cfg_pwr_descr_t *ret_descr, size_t ret_buf_len)
 {
-	uchar_t *bufend = buf + buflen;
+	const uchar_t *bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL)) {
 
@@ -298,13 +282,10 @@ usba_parse_cfg_pwr_descr(
 
 
 size_t
-usb_parse_ia_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	size_t			first_if,
-	usb_ia_descr_t		*ret_descr,
-	size_t			ret_buf_len)
+usb_parse_ia_descr(const uchar_t *buf, size_t buflen, size_t first_if,
+    usb_ia_descr_t *ret_descr, size_t ret_buf_len)
 {
-	uchar_t *bufend = buf + buflen;
+	const uchar_t *bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL)) {
 
@@ -332,14 +313,10 @@ usb_parse_ia_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 
 
 size_t
-usb_parse_if_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	uint_t			if_number,
-	uint_t			alt_if_setting,
-	usb_if_descr_t		*ret_descr,
-	size_t			ret_buf_len)
+usb_parse_if_descr(const uchar_t *buf, size_t buflen, uint_t if_number,
+    uint_t alt_if_setting, usb_if_descr_t *ret_descr, size_t ret_buf_len)
 {
-	uchar_t *bufend = buf + buflen;
+	const uchar_t *bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL)) {
 
@@ -367,14 +344,10 @@ usb_parse_if_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 }
 
 size_t
-usba_parse_if_pwr_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	uint_t			if_number,
-	uint_t			alt_if_setting,
-	usba_if_pwr_descr_t	*ret_descr,
-	size_t			ret_buf_len)
+usba_parse_if_pwr_descr(const uchar_t *buf, size_t buflen, uint_t if_number,
+    uint_t alt_if_setting, usba_if_pwr_descr_t *ret_descr, size_t ret_buf_len)
 {
-	uchar_t *bufend = buf + buflen;
+	const uchar_t *bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL)) {
 
@@ -422,15 +395,11 @@ usba_parse_if_pwr_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
  * the first endpoint
  */
 size_t
-usb_parse_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	uint_t			if_number,
-	uint_t			alt_if_setting,
-	uint_t			ep_index,
-	usb_ep_descr_t		*ret_descr,
-	size_t			ret_buf_len)
+usb_parse_ep_descr(const uchar_t *buf, size_t buflen, uint_t if_number,
+    uint_t alt_if_setting, uint_t ep_index, usb_ep_descr_t *ret_descr,
+    size_t ret_buf_len)
 {
-	uchar_t *bufend = buf + buflen;
+	const uchar_t *bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL)) {
 
@@ -473,14 +442,12 @@ usb_parse_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
  */
 /*ARGSUSED*/
 size_t
-usba_ascii_string_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(STRING) */
-	size_t			buflen,
-	char			*ret_descr,
-	size_t			ret_buf_len)
+usba_ascii_string_descr(const uchar_t *buf, size_t buflen, char *ret_descr,
+    size_t ret_buf_len)
 {
-	int	i = 1;
-	char	*retstart = ret_descr;
-	uchar_t *bufend = buf + buflen;
+	int		i = 1;
+	char		*retstart = ret_descr;
+	const uchar_t	*bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL) ||
 	    (ret_buf_len == 0) || (buflen < 2) ||
@@ -501,15 +468,10 @@ usba_ascii_string_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(STRING) */
 
 
 size_t
-usb_parse_CV_cfg_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	char			*fmt,
-	uint_t			descr_type,
-	uint_t			descr_index,
-	void			*ret_descr,
-	size_t			ret_buf_len)
+usb_parse_CV_cfg_descr(const uchar_t *buf, size_t buflen, char *fmt,
+    uint_t descr_type, uint_t descr_index, void *ret_descr, size_t ret_buf_len)
 {
-	uchar_t *bufend = buf + buflen;
+	const uchar_t *bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL) || (fmt == NULL) ||
 	    (buflen < 2) || ((buf = usb_nth_descr(buf, buflen, descr_type,
@@ -525,17 +487,11 @@ usb_parse_CV_cfg_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 
 
 size_t
-usb_parse_CV_if_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	char			*fmt,
-	uint_t			if_number,
-	uint_t			alt_if_setting,
-	uint_t			descr_type,
-	uint_t			descr_index,
-	void			*ret_descr,
-	size_t			ret_buf_len)
+usb_parse_CV_if_descr(const uchar_t *buf, size_t buflen, char *fmt,
+    uint_t if_number, uint_t alt_if_setting, uint_t descr_type,
+    uint_t descr_index, void *ret_descr, size_t ret_buf_len)
 {
-	uchar_t *bufend = buf + buflen;
+	const uchar_t *bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL) || (fmt == NULL)) {
 
@@ -570,18 +526,11 @@ usb_parse_CV_if_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 
 
 size_t
-usb_parse_CV_ep_descr(uchar_t	*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
-	size_t			buflen,
-	char			*fmt,
-	uint_t			if_number,
-	uint_t			alt_if_setting,
-	uint_t			ep_index,
-	uint_t			descr_type,
-	uint_t			descr_index,
-	void			*ret_descr,
-	size_t			ret_buf_len)
+usb_parse_CV_ep_descr(const uchar_t *buf, size_t buflen, char *fmt,
+    uint_t if_number, uint_t alt_if_setting, uint_t ep_index, uint_t descr_type,
+    uint_t descr_index, void *ret_descr, size_t ret_buf_len)
 {
-	uchar_t *bufend = buf + buflen;
+	const uchar_t *bufend = buf + buflen;
 
 	if ((buf == NULL) || (ret_descr == NULL) || (fmt == NULL)) {
 

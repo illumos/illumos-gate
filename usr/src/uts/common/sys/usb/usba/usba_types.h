@@ -22,6 +22,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_SYS_USB_USBA_USBA_TYPES_H
@@ -31,6 +32,7 @@
 #include <sys/taskq.h>
 #include <sys/usb/usba/usba_private.h>
 #include <sys/usb/usba/usbai_private.h>
+#include <sys/usb/usba/bos.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -241,7 +243,7 @@ typedef struct usb_client_dev_data_list {
 } usb_client_dev_data_list_t;
 
 /*
- * This	structure uniquely identifies a USB device
+ * This structure uniquely identifies a USB device
  * with all interfaces,	or just one interface of a USB device.
  * usba_device is associated with a devinfo node
  *
@@ -363,6 +365,14 @@ typedef struct usba_device {
 	 * Private data for HCD drivers
 	 */
 	void			*usb_hcd_private;
+
+	/*
+	 * Binary Object Store data
+	 */
+	mblk_t			*usb_bos_mp;
+	uint_t			usb_bos_nalloc;
+	uint_t			usb_bos_nents;
+	usb_bos_t		*usb_bos;
 } usba_device_t;
 
 #define	USBA_CLIENT_FLAG_SIZE		1

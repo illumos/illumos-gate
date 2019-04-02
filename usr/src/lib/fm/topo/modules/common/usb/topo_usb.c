@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright (c) 2019, Joyent, Inc.
  */
 
 /*
@@ -1403,6 +1403,8 @@ topo_usb_enum_lport(topo_mod_t *mod, tnode_t *pn, topo_usb_port_t *port,
 	int ret, inst;
 	int *vendid = NULL, *prodid = NULL, *revid = NULL, *release = NULL;
 	char *vend = NULL, *prod = NULL, *serial = NULL, *speed = NULL;
+	char *min_speed = NULL, *sup_speeds = NULL;
+	int nsup_speeds = 0;
 	char *driver, *devfs;
 	char revbuf[32], relbuf[32];
 	tnode_t *tn = NULL;
@@ -1455,6 +1457,14 @@ topo_usb_enum_lport(topo_mod_t *mod, tnode_t *pn, topo_usb_port_t *port,
 			speed = "high-speed";
 		} else if (strcmp(pname, "super-speed") == 0) {
 			speed = "super-speed";
+		} else if (strcmp(pname, "usb-minimum-speed") == 0) {
+			if (di_prop_strings(prop, &min_speed) != 1)
+				min_speed = NULL;
+		} else if (strcmp(pname, "usb-supported-speeds") == 0) {
+			nsup_speeds = di_prop_strings(prop, &sup_speeds);
+			if (nsup_speeds <= 0) {
+				sup_speeds = NULL;
+			}
 		}
 	}
 
@@ -1586,6 +1596,51 @@ topo_usb_enum_lport(topo_mod_t *mod, tnode_t *pn, topo_usb_port_t *port,
 		topo_mod_dprintf(mod, "failed to create property %s: %s",
 		    TOPO_PGROUP_USB_PROPS_SPEED, topo_strerror(ret));
 		goto error;
+	}
+
+	if (min_speed != NULL && topo_prop_set_string(tn, TOPO_PGROUP_USB_PROPS,
+	    TOPO_PGROUP_USB_PROPS_MIN_SPEED, TOPO_PROP_IMMUTABLE, min_speed,
+	    &ret) != 0) {
+		topo_mod_dprintf(mod, "failed to create property %s: %s",
+		    TOPO_PGROUP_USB_PROPS_MIN_SPEED, topo_strerror(ret));
+		goto error;
+	}
+
+	if (sup_speeds != NULL) {
+		const char **strings, *c;
+		int i, rval;
+
+		if ((strings = topo_mod_zalloc(mod, sizeof (char *) *
+		    nsup_speeds)) == NULL) {
+			topo_mod_dprintf(mod, "failed to allocate character "
+			    "array for property %s",
+			    TOPO_PGROUP_USB_PROPS_SUPPORTED_SPEEDS);
+			goto error;
+		}
+
+		/*
+		 * devinfo string properties are concatenated NUL-terminated
+		 * strings. We need to translate that to a string array.
+		 */
+		for (c = sup_speeds, i = 0; i < nsup_speeds; i++) {
+			size_t len;
+
+			strings[i] = c;
+			if (i + 1 < nsup_speeds) {
+				len = strlen(c);
+				c += len + 1;
+			}
+		}
+
+		rval = topo_prop_set_string_array(tn, TOPO_PGROUP_USB_PROPS,
+		    TOPO_PGROUP_USB_PROPS_SUPPORTED_SPEEDS, TOPO_PROP_IMMUTABLE,
+		    strings, nsup_speeds, &ret);
+		topo_mod_free(mod, strings, sizeof (char *) * nsup_speeds);
+		if (rval != 0) {
+			topo_mod_dprintf(mod, "failed to create property %s: "
+			    "%s", TOPO_PGROUP_USB_PROPS_SUPPORTED_SPEEDS,
+			    topo_strerror(ret));
+		}
 	}
 
 	/*

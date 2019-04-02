@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_USB_USBAI_H
@@ -789,7 +789,7 @@ void usb_client_detach(
 
 size_t usb_parse_data(
 	char			*format,
-	uchar_t 		*data,
+	const uchar_t 		*data,
 	size_t			datalen,
 	void			*structure,
 	size_t			structlen);

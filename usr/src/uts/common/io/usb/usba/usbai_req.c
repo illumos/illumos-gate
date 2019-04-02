@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -113,7 +114,7 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 	mblk_t			*data;
 	usb_cr_t		*cr;
 	usb_req_attrs_t		attrs;
-	usb_opaque_t		cb, exc_cb;
+	usb_opaque_t		cb = NULL, exc_cb = NULL;
 	uint_t			timeout = 0;
 	uchar_t			direction = ph_data->p_ep.bEndpointAddress &
 	    USB_EP_DIR_MASK;
@@ -144,6 +145,8 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 	case USB_EP_ATTR_ISOCH:
 		cr = &isoc_req->isoc_completion_reason;
 		break;
+	default:
+		return (USB_INVALID_REQUEST);
 	}
 
 	*cr = USB_CR_UNSPECIFIED_ERR;
@@ -220,6 +223,8 @@ _usba_check_req(usba_pipe_handle_data_t *ph_data, usb_opaque_t req,
 		cb = (usb_opaque_t)isoc_req->isoc_cb;
 		exc_cb = (usb_opaque_t)isoc_req->isoc_exc_cb;
 		break;
+	default:
+		return (USB_INVALID_REQUEST);
 	}
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBAI, usbai_log_handle,

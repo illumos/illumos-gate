@@ -24,6 +24,7 @@
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2016 James S. Blachly, MD <james.blachly@gmail.com>
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -775,6 +776,8 @@ usba_free_usba_device(usba_device_t *usba_device)
 			kmem_free(usba_device->usb_serialno_str,
 			    strlen(usba_device->usb_serialno_str) + 1);
 		}
+
+		usba_free_binary_object_store(usba_device);
 
 		usba_unset_usb_address(usba_device);
 	}
@@ -2262,6 +2265,17 @@ usba_ready_device_node(dev_info_t *child_dip)
 		}
 	}
 
+	if (usba_device->usb_port_status == USBA_FULL_SPEED_DEV) {
+		/* create boolean property */
+		rval = ndi_prop_create_boolean(DDI_DEV_T_NONE, child_dip,
+		    "full-speed");
+		if (rval != DDI_PROP_SUCCESS) {
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
+			    "usba_ready_device_node: "
+			    "full speed prop update failed");
+		}
+	}
+
 	if (usba_device->usb_port_status == USBA_HIGH_SPEED_DEV) {
 		/* create boolean property */
 		rval = ndi_prop_create_boolean(DDI_DEV_T_NONE, child_dip,
@@ -2282,6 +2296,8 @@ usba_ready_device_node(dev_info_t *child_dip)
 			    "super speed prop update failed");
 		}
 	}
+
+	usba_add_binary_object_store_props(child_dip, usba_device);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usba_log_handle,
 	    "%s%d at port %d: %s, dip=0x%p",
@@ -2905,7 +2921,6 @@ usba_get_mfg_prod_sn_str(
 
 	return (buffer);
 }
-
 
 /*
  * USB enumeration statistic functions

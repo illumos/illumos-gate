@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_SYS_USB_USBA_USBA_PRIVATE_H
@@ -88,21 +89,21 @@ extern "C" {
  * extended in a later rev of the spec.
  */
 size_t usb_parse_dev_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(DEVICE) */
+	const uchar_t		*buf,	/* from GET_DESCRIPTOR(DEVICE) */
 	size_t			buflen,
 	usb_dev_descr_t		*ret_descr,
 	size_t			ret_buf_len);
 
 
 size_t usb_parse_cfg_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
+	const uchar_t		*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	size_t			buflen,
 	usb_cfg_descr_t		*ret_descr,
 	size_t			ret_buf_len);
 
 
 size_t usb_parse_ia_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
+	const uchar_t		*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	size_t			buflen,
 	size_t			first_if,
 	usb_ia_descr_t		*ret_descr,
@@ -110,7 +111,7 @@ size_t usb_parse_ia_descr(
 
 
 size_t usb_parse_if_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
+	const uchar_t		*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	size_t			buflen,
 	uint_t			if_index,
 	uint_t			alt_if_setting,
@@ -123,7 +124,7 @@ size_t usb_parse_if_descr(
  * the first endpoint
  */
 size_t usb_parse_ep_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
+	const uchar_t		*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	size_t			buflen,
 	uint_t			if_index,
 	uint_t			alt_if_setting,
@@ -160,7 +161,7 @@ size_t usb_parse_ep_descr(
 #define	USB_DESCR_TYPE_ANY			-1	/* Wild card */
 
 size_t usb_parse_CV_cfg_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
+	const uchar_t		*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	size_t			buflen,
 	char			*fmt,
 	uint_t			descr_type,
@@ -170,7 +171,7 @@ size_t usb_parse_CV_cfg_descr(
 
 
 size_t usb_parse_CV_if_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
+	const uchar_t		*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	size_t			buflen,
 	char			*fmt,
 	uint_t			if_index,
@@ -182,7 +183,7 @@ size_t usb_parse_CV_if_descr(
 
 
 size_t usb_parse_CV_ep_descr(
-	uchar_t			*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
+	const uchar_t		*buf,	/* from GET_DESCRIPTOR(CONFIGURATION) */
 	size_t			buflen,
 	char			*fmt,
 	uint_t			if_index,
@@ -199,7 +200,7 @@ size_t usb_parse_CV_ep_descr(
  */
 size_t usb_parse_CV_descr(
 	char			*format,
-	uchar_t			*data,
+	const uchar_t		*data,
 	size_t			datalen,
 	void			*structure,
 	size_t			structlen);
@@ -270,8 +271,7 @@ typedef enum usba_event {
 	USBA_EVENT_TAG_HOT_REMOVAL = 0,
 	USBA_EVENT_TAG_HOT_INSERTION = 1,
 	USBA_EVENT_TAG_PRE_SUSPEND = 2,
-	USBA_EVENT_TAG_POST_RESUME = 3,
-	USBA_EVENT_TAG_CPR = -1
+	USBA_EVENT_TAG_POST_RESUME = 3
 } usba_event_t;
 
 #define	USBA_PRE_SUSPEND_EVENT	"SUNW,USBA:USBA_PRE_SUSPEND"
@@ -409,11 +409,11 @@ typedef struct usba_if_pwr_descr {
 	uint16_t	TransitionTimeFromD3;	/* D3 -> D0 transition time */
 } usba_if_pwr_descr_t;
 
-size_t usba_parse_cfg_pwr_descr(uchar_t *, size_t, usba_cfg_pwr_descr_t *,
-						size_t);
+size_t usba_parse_cfg_pwr_descr(const uchar_t *, size_t, usba_cfg_pwr_descr_t *,
+    size_t);
 
-size_t usba_parse_if_pwr_descr(uchar_t *, size_t buflen, uint_t,
-	uint_t, usba_if_pwr_descr_t *, size_t);
+size_t usba_parse_if_pwr_descr(const uchar_t *, size_t buflen, uint_t,
+    uint_t, usba_if_pwr_descr_t *, size_t);
 
 /*
  * Returns (at ret_descr) a null-terminated string.  Null termination is
@@ -423,7 +423,7 @@ size_t usba_parse_if_pwr_descr(uchar_t *, size_t buflen, uint_t,
  * XXX is this needed when there is usb_get_string_descriptor
  * If so, then more comments about how it differs?
  */
-size_t usba_ascii_string_descr(uchar_t *, size_t, char *, size_t);
+size_t usba_ascii_string_descr(const uchar_t *, size_t, char *, size_t);
 
 
 /*

@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -40,10 +41,8 @@
  * layers to initialize any state information.
  */
 int
-usb_console_input_init(dev_info_t		*dip,
-			usb_pipe_handle_t	pipe_handle,
-			uchar_t			**state_buf,
-			usb_console_info_t	*console_input_info)
+usb_console_input_init(dev_info_t *dip, usb_pipe_handle_t pipe_handle,
+    uchar_t **state_buf, usb_console_info_t *console_input_info)
 {
 	int			ret;
 	usba_device_t		*usba_device;
@@ -168,10 +167,8 @@ usb_console_input_enter(usb_console_info_t console_input_info)
 	/*
 	 * Call the lower layer to save state information.
 	 */
-	usba_device->usb_hcdi_ops->usba_hcdi_console_input_enter(
-	    usb_console_input);
-
-	return (USB_SUCCESS);
+	return (usba_device->usb_hcdi_ops->usba_hcdi_console_input_enter(
+	    usb_console_input));
 }
 
 
@@ -235,10 +232,8 @@ usb_console_input_exit(usb_console_info_t console_input_info)
 	/*
 	 * Restore the state information.
 	 */
-	usba_device->usb_hcdi_ops->usba_hcdi_console_input_exit(
-	    usb_console_input);
-
-	return (USB_SUCCESS);
+	return (usba_device->usb_hcdi_ops->usba_hcdi_console_input_exit(
+	    usb_console_input));
 }
 
 /*
@@ -345,10 +340,8 @@ usb_console_output_enter(usb_console_info_t console_output_info)
 	/*
 	 * Call the lower layer to save state information.
 	 */
-	usb_device->usb_hcdi_ops->usba_hcdi_console_output_enter(
-	    usb_console_output);
-
-	return (USB_SUCCESS);
+	return (usb_device->usb_hcdi_ops->usba_hcdi_console_output_enter(
+	    usb_console_output));
 }
 
 /*
@@ -358,7 +351,7 @@ usb_console_output_enter(usb_console_info_t console_output_info)
  */
 int
 usb_console_write(usb_console_info_t console_output_info,
-	uchar_t *buf, uint_t num_characters, uint_t *num_characters_written)
+    uchar_t *buf, uint_t num_characters, uint_t *num_characters_written)
 {
 	usba_device_t		*usb_device;
 	usb_console_info_impl_t	*usb_console_output;
@@ -402,8 +395,6 @@ usb_console_output_exit(usb_console_info_t console_output_info)
 	/*
 	 * Restore the state information.
 	 */
-	usb_device->usb_hcdi_ops->usba_hcdi_console_output_exit(
-	    usb_console_output);
-
-	return (USB_SUCCESS);
+	return (usb_device->usb_hcdi_ops->usba_hcdi_console_output_exit(
+	    usb_console_output));
 }
