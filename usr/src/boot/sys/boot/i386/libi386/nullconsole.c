@@ -45,6 +45,7 @@ static int	nullc_init(struct console *, int arg);
 static void	nullc_putchar(struct console *, int c);
 static int	nullc_getchar(struct console *);
 static int	nullc_ischar(struct console *);
+static void	nullc_devinfo(struct console *);
 
 struct console nullconsole = {
 	.c_name = "null",
@@ -56,8 +57,15 @@ struct console nullconsole = {
 	.c_in = nullc_getchar,
 	.c_ready = nullc_ischar,
 	.c_ioctl = NULL,
+	.c_devinfo = nullc_devinfo,
 	.c_private = NULL
 };
+
+static void
+nullc_devinfo(struct console *cp __unused)
+{
+	printf("\tsoftware device");
+}
 
 static void
 nullc_probe(struct console *cp)

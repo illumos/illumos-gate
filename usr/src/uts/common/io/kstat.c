@@ -689,7 +689,7 @@ kstat_ioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cr, int *rvalp)
 /* ARGSUSED */
 static int
 kstat_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
-	void **result)
+    void **result)
 {
 	switch (infocmd) {
 	case DDI_INFO_DEVT2DEVINFO:
@@ -709,7 +709,7 @@ kstat_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	if (ddi_create_minor_node(devi, "kstat", S_IFCHR,
-	    0, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    0, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		return (DDI_FAILURE);
 	}

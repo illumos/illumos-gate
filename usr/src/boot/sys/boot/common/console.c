@@ -238,12 +238,17 @@ cons_check(const char *string)
 
 	if (found == 0 || failed != 0) {
 		printf("Available consoles:\n");
-		for (cons = 0; consoles[cons] != NULL; cons++)
-			printf("    %s\n", consoles[cons]->c_name);
+		for (cons = 0; consoles[cons] != NULL; cons++) {
+			printf("    %s", consoles[cons]->c_name);
+			if (consoles[cons]->c_devinfo != NULL)
+				consoles[cons]->c_devinfo(consoles[cons]);
+			printf("\n");
+		}
 	}
 
 	return (found);
 }
+
 
 /*
  * Activate all the valid consoles listed in *string and disable all others.
@@ -331,6 +336,26 @@ twiddle_set(struct env_var *ev, int flags, const void *value)
 	}
 	twiddle_divisor((uint_t)tdiv);
 	env_setenv(ev->ev_name, flags | EV_NOHOOK, value, NULL, NULL);
+
+	return (CMD_OK);
+}
+
+COMMAND_SET(console, "console", "console info", command_console);
+
+static int
+command_console(int argc, char *argv[])
+{
+	if (argc > 1)
+		printf("%s: list info about available consoles\n", argv[0]);
+
+	printf("Current console: %s\n", getenv("console"));
+	printf("Available consoles:\n");
+	for (int cons = 0; consoles[cons] != NULL; cons++) {
+		printf("    %s", consoles[cons]->c_name);
+		if (consoles[cons]->c_devinfo != NULL)
+			consoles[cons]->c_devinfo(consoles[cons]);
+		printf("\n");
+	}
 
 	return (CMD_OK);
 }

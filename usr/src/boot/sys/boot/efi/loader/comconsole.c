@@ -62,6 +62,7 @@ static void	comc_putchar(struct console *, int);
 static int	comc_getchar(struct console *);
 static int	comc_ischar(struct console *);
 static int	comc_ioctl(struct console *, int, void *);
+static void	comc_devinfo(struct console *);
 static bool	comc_setup(struct console *);
 static char	*comc_asprint_mode(struct serial *);
 static int	comc_parse_mode(struct serial *, const char *);
@@ -79,6 +80,7 @@ struct console ttya = {
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
 	.c_ioctl = comc_ioctl,
+	.c_devinfo = comc_devinfo,
 	.c_private = NULL
 };
 
@@ -92,6 +94,7 @@ struct console ttyb = {
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
 	.c_ioctl = comc_ioctl,
+	.c_devinfo = comc_devinfo,
 	.c_private = NULL
 };
 
@@ -105,6 +108,7 @@ struct console ttyc = {
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
 	.c_ioctl = comc_ioctl,
+	.c_devinfo = comc_devinfo,
 	.c_private = NULL
 };
 
@@ -118,6 +122,7 @@ struct console ttyd = {
 	.c_in = comc_getchar,
 	.c_ready = comc_ischar,
 	.c_ioctl = comc_ioctl,
+	.c_devinfo = comc_devinfo,
 	.c_private = NULL
 };
 
@@ -381,6 +386,32 @@ static int
 comc_ioctl(struct console *cp __unused, int cmd __unused, void *data __unused)
 {
 	return (ENOTTY);
+}
+
+static void
+comc_devinfo(struct console *cp)
+{
+	struct serial *port = cp->c_private;
+	EFI_HANDLE handle;
+	EFI_DEVICE_PATH *dp;
+	CHAR16 *text;
+
+	handle = efi_serial_get_handle(port->ioaddr);
+	if (handle == NULL) {
+		printf("\tdevice is not present");
+		return;
+	}
+
+	dp = efi_lookup_devpath(handle);
+	if (dp == NULL)
+		return;
+
+	text = efi_devpath_name(dp);
+	if (text == NULL)
+		return;
+
+	printf("\t%S", text);
+	efi_free_devpath_name(text);
 }
 
 static char *

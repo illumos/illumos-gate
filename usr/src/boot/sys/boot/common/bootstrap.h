@@ -116,6 +116,8 @@ struct console
 	/* return nonzero if input is waiting */
 	int		(*c_ready)(struct console *);
 	int		(*c_ioctl)(struct console *, int, void *);
+	/* Print device info */
+	void		(*c_devinfo)(struct console *);
 	void		*c_private;	/* private data */
 };
 extern struct console	*consoles[];
