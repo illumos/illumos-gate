@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019, Joyent, Inc.
  */
 
 
@@ -80,7 +81,7 @@ usba10_usb_free_descr_tree(
 size_t
 usba10_usb_parse_data(
 	char			*format,
-	uchar_t 		*data,
+	const uchar_t 		*data,
 	size_t			datalen,
 	void			*structure,
 	size_t			structlen)

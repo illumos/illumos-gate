@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -1313,7 +1313,7 @@ usba_make_alts_sparse(usb_alt_if_data_t **array, uint_t *n_elements)
 	uint8_t largest_value;
 	uint8_t curr_value;
 	uint_t	in_order = 0;
-	usb_alt_if_data_t *orig_addr = *array; /* Non-sparse array base ptr */
+	usb_alt_if_data_t *orig_addr; /* Non-sparse array base ptr */
 	usb_alt_if_data_t *repl_array;	/* Base ptr to sparse array */
 	uint_t	n_repl_elements;	/* Number elements in the new array */
 	uint_t	i;
@@ -1328,6 +1328,7 @@ usba_make_alts_sparse(usb_alt_if_data_t **array, uint_t *n_elements)
 	    "make_sparse: array=0x%p, n_orig_elements=%d",
 	    (void *)array, n_orig_elements);
 
+	orig_addr = *array;
 	curr_value = orig_addr[0].altif_descr.bAlternateSetting;
 	smallest_value = largest_value = curr_value;
 
@@ -1635,7 +1636,7 @@ usba_dump_descr_tree(dev_info_t *dip, usb_client_dev_data_t *usb_reg,
 	usb_cfg_descr_t *config_descr; /* and its USB descriptor. */
 	char		*string;
 	char		*name_string = NULL;
-	int		name_string_size;
+	int		name_string_size = 0;
 
 	if ((usb_reg == NULL) || ((log_handle == NULL) && (dip == NULL))) {
 

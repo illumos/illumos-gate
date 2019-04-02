@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef _TOPO_HC_H
@@ -207,6 +207,9 @@ extern "C" {
 #define	TOPO_PGROUP_USB_PROPS_VERSION	"usb-version"
 #define	TOPO_PGROUP_USB_PROPS_SPEED	"usb-speed"
 #define	TOPO_PGROUP_USB_PROPS_PORT	"usb-port"
+#define	TOPO_PGROUP_USB_PROPS_SUPPORTED_SPEEDS	"usb-supported-speeds"
+#define	TOPO_PGROUP_USB_PROPS_MIN_SPEED	"usb-minimum-speed"
+
 
 /*
  * These properties will exist on nodes enumerated by the ipmi module. They

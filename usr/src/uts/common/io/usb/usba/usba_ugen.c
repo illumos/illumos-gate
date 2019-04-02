@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -409,11 +409,9 @@ usb_ugen_attach(usb_ugen_hdl_t usb_ugen_hdl, ddi_attach_cmd_t cmd)
 
 	return (DDI_SUCCESS);
 fail:
-	if (ugenp) {
-		USB_DPRINTF_L2(UGEN_PRINT_ATTA, ugenp->ug_log_hdl,
-		    "attach fail");
-		(void) ugen_cleanup(ugenp);
-	}
+	USB_DPRINTF_L2(UGEN_PRINT_ATTA, ugenp->ug_log_hdl,
+	    "attach fail");
+	(void) ugen_cleanup(ugenp);
 
 	return (DDI_FAILURE);
 }
@@ -2545,7 +2543,7 @@ ugen_epx_ctrl_req(ugen_state_t *ugenp, ugen_ep_t *epp,
 
 		goto fail;
 	}
-done:
+
 	*wait = B_TRUE;
 
 	return (USB_SUCCESS);

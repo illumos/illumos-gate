@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_SYS_USB_USBA_USBA_IMPL_H
@@ -34,6 +35,7 @@
 #include <sys/usb/usba/hubdi.h>
 #include <sys/usb/usba/usba_private.h>
 #include <sys/usb/usba/usba_types.h>
+#include <sys/usb/usba/bos.h>
 #include <sys/taskq.h>
 #include <sys/disp.h>
 
@@ -299,6 +301,13 @@ void usba_rem_root_hub(dev_info_t *dip);
  * number
  */
 void usba_get_dev_string_descrs(dev_info_t *, usba_device_t *);
+
+/*
+ * Retrieve the binary object store for the device.
+ */
+void usba_get_binary_object_store(dev_info_t *, usba_device_t *);
+void usba_add_binary_object_store_props(dev_info_t *, usba_device_t *);
+void usba_free_binary_object_store(usba_device_t *);
 
 /*
  * Check if we are not in interrupt context and have

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -540,7 +540,7 @@ usba_init_pipe_handle(dev_info_t *dip,
 	}
 
 	/* fix up the MaxPacketSize if it is the default endpoint descr */
-	if ((ep == &usba_default_ep_descr) && usba_device) {
+	if (ep == &usba_default_ep_descr) {
 		uint16_t	maxpktsize;
 
 		maxpktsize = usba_device->usb_dev_descr->bMaxPacketSize0;

@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -301,7 +302,7 @@ usb_get_string_descr(dev_info_t *dip,
 	    usba_get_dflt_pipe_handle(dip),
 	    USB_DEV_REQ_DEV_TO_HOST,
 	    USB_REQ_GET_DESCR,
-	    USB_DESCR_TYPE_STRING << 8 | index & 0xff,
+	    (USB_DESCR_TYPE_STRING << 8) | (index & 0xff),
 	    langid,
 	    4,
 	    &data, USB_ATTRS_SHORT_XFER_OK,
@@ -345,7 +346,7 @@ usb_get_string_descr(dev_info_t *dip,
 	    usba_get_dflt_pipe_handle(dip),
 	    USB_DEV_REQ_DEV_TO_HOST,
 	    USB_REQ_GET_DESCR,
-	    USB_DESCR_TYPE_STRING << 8 | index & 0xff,
+	    (USB_DESCR_TYPE_STRING << 8) | (index & 0xff),
 	    langid,
 	    length,
 	    &data, USB_ATTRS_SHORT_XFER_OK,
@@ -2009,7 +2010,7 @@ usb_serialize_access(
 	usb_serialization_t tokenp, uint_t how_to_wait, uint_t delta_timeout)
 {
 	int			rval = 1;	/* Must be initialized > 0 */
-	clock_t			abs_timeout;
+	clock_t			abs_timeout = 0;
 	usba_serialization_impl_t *impl_tokenp;
 
 	impl_tokenp = (usba_serialization_impl_t *)tokenp;

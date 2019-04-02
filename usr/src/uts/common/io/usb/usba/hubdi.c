@@ -22,7 +22,7 @@
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -1797,6 +1797,10 @@ usba_hubdi_power(dev_info_t *dip, int comp, int level)
 		retval = hubd_pwrlvl3(hubd);
 
 		break;
+	default:
+		retval = USB_FAILURE;
+
+		break;
 	}
 	mutex_exit(HUBD_MUTEX(hubd));
 
@@ -2133,11 +2137,11 @@ fail:
 		kmem_free(pathname, MAXPATHLEN);
 	}
 
-	mutex_enter(HUBD_MUTEX(hubd));
-	hubd_pm_idle_component(hubd, dip, 0);
-	mutex_exit(HUBD_MUTEX(hubd));
+	if (hubd != NULL) {
+		mutex_enter(HUBD_MUTEX(hubd));
+		hubd_pm_idle_component(hubd, dip, 0);
+		mutex_exit(HUBD_MUTEX(hubd));
 
-	if (hubd) {
 		rval = hubd_cleanup(dip, hubd);
 		if (rval != USB_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
@@ -2180,7 +2184,7 @@ usba_hubdi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 static int
 hubd_setdevaddr(hubd_t *hubd, usb_port_t port)
 {
-	int		rval;
+	int		rval = USB_FAILURE;
 	usb_cr_t	completion_reason;
 	usb_cb_flags_t	cb_flags;
 	usb_pipe_handle_t ph;
@@ -2235,8 +2239,8 @@ hubd_setdevaddr(hubd_t *hubd, usb_port_t port)
 	for (retry = 0; retry < hubd_retry_enumerate; retry++) {
 
 		/* open child's default pipe with USBA_DEFAULT_ADDR */
-		if (usb_pipe_open(child_dip, NULL, NULL,
-		    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED, &ph) !=
+		if ((rval = usb_pipe_open(child_dip, NULL, NULL,
+		    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED, &ph)) !=
 		    USB_SUCCESS) {
 			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 			    "hubd_setdevaddr: Unable to open default pipe");
@@ -6071,7 +6075,6 @@ hubd_ready_device(hubd_t *hubd, dev_info_t *child_dip, usba_device_t *child_ud,
 	return (child_dip);
 }
 
-
 /*
  * hubd_create_child
  *	- create child dip
@@ -6480,6 +6483,8 @@ hubd_create_child(dev_info_t *dip,
 		goto fail_cleanup;
 	}
 
+	/* Read the BOS data */
+	usba_get_binary_object_store(child_dip, child_ud);
 
 	/* get the device string descriptor(s) */
 	usba_get_dev_string_descrs(child_dip, child_ud);
@@ -9198,7 +9203,7 @@ usba_hubdi_reset_device(dev_info_t *dip, usb_dev_reset_lvl_t reset_level)
 	usb_port_t		port = 0;
 	dev_info_t		*hdip;
 	usb_pipe_state_t	prev_pipe_state = 0;
-	usba_device_t		*usba_device;
+	usba_device_t		*usba_device = NULL;
 	hubd_reset_arg_t	*arg;
 	int			i, ph_open_cnt;
 	int			rval = USB_FAILURE;
@@ -9372,6 +9377,7 @@ usba_hubdi_reset_device(dev_info_t *dip, usb_dev_reset_lvl_t reset_level)
 		    == USB_SUCCESS) {
 			mutex_exit(HUBD_MUTEX(hubd));
 			/* re-open the default pipe */
+			ASSERT3P(usba_device, !=, NULL);
 			rval = usba_persistent_pipe_open(usba_device);
 			mutex_enter(HUBD_MUTEX(hubd));
 			if (rval != USB_SUCCESS) {
