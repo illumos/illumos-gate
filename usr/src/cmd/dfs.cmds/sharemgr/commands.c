@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1770,7 +1771,7 @@ sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 			}
 			(void) printf(gettext("usage: %s\n"),
 			    sa_get_usage(USAGE_LIST));
-				return (ret);
+			return (ret);
 		}
 	}
 
