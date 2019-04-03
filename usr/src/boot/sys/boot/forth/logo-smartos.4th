@@ -24,7 +24,7 @@
 
 : logo ( x y -- ) \ color Illumos logo
 
-	0 0 0 0 0 s" /boot/illumos.png" fb-putimage if 2drop exit then
+	0 0 0 0 0 s" /boot/triton.png" fb-putimage if 2drop exit then
 
         s" @[31m--@[0;31m+--@[1;31m*@[0;33m--@[1;33m*" logo+
 	s" @[31m|@[1m\@[0m @[31m|\ |@[33m\ @[1m|\" logo+

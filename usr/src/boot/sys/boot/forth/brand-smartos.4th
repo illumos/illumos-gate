@@ -23,6 +23,8 @@
 
 : brand ( x y -- ) \ "joyent" [wide] logo in B/W (7 rows x 42 columns)
 
+	0 1 1 0 0 s" /boot/joyent.png" fb-putimage if 2drop exit then
+
 	s"       #                                   " brand+
 	s"       #  ####  #   # ###### #    # #####  " brand+
 	s"       # #    #  # #  #      ##   #   #    " brand+
