@@ -4,6 +4,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019, Joyent, Inc.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation is hereby granted, provided that the above copyright
@@ -1842,7 +1843,7 @@ sppp_lrsrv(queue_t *q)
 	mblk_t *mp;
 
 	while ((mp = getq(q)) != NULL)
-		sppp_lrput(q, mp);
+		(void) sppp_lrput(q, mp);
 	return (0);
 }
 

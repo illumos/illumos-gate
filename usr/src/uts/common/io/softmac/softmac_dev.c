@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
 
 #include <sys/types.h>
 #include <inet/common.h>
@@ -662,7 +665,7 @@ softmac_drv_wsrv(queue_t *wq)
 		 */
 		sup->su_tx_inprocess++;
 		mutex_exit(&sup->su_mutex);
-		dld_wsrv(wq);
+		(void) dld_wsrv(wq);
 		mutex_enter(&sup->su_mutex);
 		if (--sup->su_tx_inprocess == 0)
 			cv_signal(&sup->su_cv);
