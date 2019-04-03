@@ -23,10 +23,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
+
 #ifndef _RDSIB_DEBUG_H
 #define	_RDSIB_DEBUG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -99,10 +101,10 @@ void rds_dprintf3(
 		char		*name,
 		char		*fmt, ...);
 #else
-#define	RDS_DPRINTF_INTR	0 &&
-#define	RDS_DPRINTF5		0 &&
-#define	RDS_DPRINTF4		0 &&
-#define	RDS_DPRINTF3		0 &&
+#define	RDS_DPRINTF_INTR(...)
+#define	RDS_DPRINTF5(...)
+#define	RDS_DPRINTF4(...)
+#define	RDS_DPRINTF3(...)
 #endif
 
 #define	RDS_DPRINTF2	rds_dprintf2

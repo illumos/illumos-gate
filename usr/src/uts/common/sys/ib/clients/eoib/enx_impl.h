@@ -23,6 +23,10 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
+
 #ifndef _SYS_IB_EOIB_ENX_IMPL_H
 #define	_SYS_IB_EOIB_ENX_IMPL_H
 
@@ -71,9 +75,9 @@ extern "C" {
 #define	ENX_DPRINTF_ARGS	eibnx_dprintf_args
 #define	ENX_DPRINTF_VERBOSE	eibnx_dprintf_verbose
 #else
-#define	ENX_DPRINTF_DEBUG	0 &&
-#define	ENX_DPRINTF_ARGS	0 &&
-#define	ENX_DPRINTF_VERBOSE	0 &&
+#define	ENX_DPRINTF_DEBUG(...)
+#define	ENX_DPRINTF_ARGS(...)
+#define	ENX_DPRINTF_VERBOSE(...)
 #endif
 
 /*
@@ -93,7 +97,7 @@ extern "C" {
  * Portinfo list per HCA
  */
 typedef struct eibnx_port_s {
-	struct eibnx_port_s 	*po_next;
+	struct eibnx_port_s	*po_next;
 	ibt_hca_portinfo_t	*po_pi;
 	uint_t			po_pi_size;
 } eibnx_port_t;
@@ -102,7 +106,7 @@ typedef struct eibnx_port_s {
  * HCA details
  */
 typedef struct eibnx_hca_s {
-	struct eibnx_hca_s 	*hc_next;
+	struct eibnx_hca_s	*hc_next;
 	ib_guid_t		hc_guid;
 	ibt_hca_hdl_t		hc_hdl;
 	ibt_pd_hdl_t		hc_pd;

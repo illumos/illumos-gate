@@ -23,6 +23,10 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
+
 #ifndef _SYS_IB_EOIB_EIB_IMPL_H
 #define	_SYS_IB_EOIB_EIB_IMPL_H
 
@@ -88,10 +92,10 @@ extern "C" {
 #define	EIB_DPRINTF_PKT		eib_dprintf_pkt
 #define	EIB_DPRINTF_VERBOSE	eib_dprintf_verbose
 #else
-#define	EIB_DPRINTF_DEBUG	0 &&
-#define	EIB_DPRINTF_ARGS	0 &&
-#define	EIB_DPRINTF_PKT		0 &&
-#define	EIB_DPRINTF_VERBOSE	0 &&
+#define	EIB_DPRINTF_DEBUG(...)
+#define	EIB_DPRINTF_ARGS(...)
+#define	EIB_DPRINTF_PKT(...)
+#define	EIB_DPRINTF_VERBOSE(...)
 #endif
 
 /*

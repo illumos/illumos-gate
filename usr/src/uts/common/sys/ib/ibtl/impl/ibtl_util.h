@@ -24,10 +24,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
+
 #ifndef	_SYS_IB_IBTL_IMPL_IBTL_UTIL_H
 #define	_SYS_IB_IBTL_IMPL_IBTL_UTIL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtl_util.h
@@ -131,10 +133,10 @@ void ibtl_dprintf3(
 		char		*name,
 		char		*fmt, ...);
 #else
-#define	IBTF_DPRINTF_LINTR	0 &&
-#define	IBTF_DPRINTF_L5		0 &&
-#define	IBTF_DPRINTF_L4		0 &&
-#define	IBTF_DPRINTF_L3		0 &&
+#define	IBTF_DPRINTF_LINTR(...)
+#define	IBTF_DPRINTF_L5(...)
+#define	IBTF_DPRINTF_L4(...)
+#define	IBTF_DPRINTF_L3(...)
 #endif
 
 #define	IBTF_DPRINTF_L2	ibtl_dprintf2

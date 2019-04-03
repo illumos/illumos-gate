@@ -23,6 +23,10 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
+
 #ifndef _SRPT_IMPL_H_
 #define	_SRPT_IMPL_H_
 
@@ -92,7 +96,7 @@ struct srpt_target_port_s;
  * by a login.
  */
 typedef struct srpt_session_s {
-	krwlock_t 			ss_rwlock;
+	krwlock_t			ss_rwlock;
 	list_node_t			ss_node;
 
 	/*
@@ -167,7 +171,7 @@ typedef enum srpt_channel_state_e {
 } srpt_channel_state_t;
 
 typedef struct srpt_channel_s {
-	krwlock_t 			ch_rwlock;
+	krwlock_t			ch_rwlock;
 
 	kmutex_t			ch_reflock;
 	uint_t				ch_refcnt;
@@ -322,7 +326,7 @@ typedef struct srpt_target_port_s {
 typedef struct srpt_ioc_s {
 	list_node_t			ioc_node;
 
-	krwlock_t 			ioc_rwlock;
+	krwlock_t			ioc_rwlock;
 	ibt_hca_hdl_t			ioc_ibt_hdl;
 	ibt_hca_attr_t			ioc_attr;
 	ib_guid_t			ioc_guid;
@@ -518,8 +522,8 @@ extern uint_t srpt_errlevel;
 					cmn_err(CE_NOTE, __VA_ARGS__);\
 				}
 #else
-#define	SRPT_DPRINTF_L3		0 &&
-#define	SRPT_DPRINTF_L4		0 &&
+#define	SRPT_DPRINTF_L3(...)
+#define	SRPT_DPRINTF_L4(...)
 #endif
 
 #ifdef __cplusplus

@@ -22,6 +22,10 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
+
 #ifndef _SYS_PCIEB_H
 #define	_SYS_PCIEB_H
 
@@ -33,7 +37,7 @@ extern "C" {
 #define	PCIEB_DEBUG pcieb_dbg
 extern void pcieb_dbg(uint_t bit, dev_info_t *dip, char *fmt, ...);
 #else /* DEBUG */
-#define	PCIEB_DEBUG 0 &&
+#define	PCIEB_DEBUG(...)
 #endif /* DEBUG */
 
 typedef enum {	/* same sequence as pcieb_debug_sym[] */
@@ -160,12 +164,12 @@ extern void *pcieb_state;
 extern void	pcieb_set_pci_perf_parameters(dev_info_t *dip,
 		    ddi_acc_handle_t config_handle);
 extern void	pcieb_plat_attach_workaround(dev_info_t *dip);
-extern void 	pcieb_plat_intr_attach(pcieb_devstate_t *pcieb);
-extern void 	pcieb_plat_initchild(dev_info_t *child);
-extern void 	pcieb_plat_uninitchild(dev_info_t *child);
+extern void	pcieb_plat_intr_attach(pcieb_devstate_t *pcieb);
+extern void	pcieb_plat_initchild(dev_info_t *child);
+extern void	pcieb_plat_uninitchild(dev_info_t *child);
 extern int	pcieb_plat_ctlops(dev_info_t *rdip, ddi_ctl_enum_t ctlop,
     void *arg);
-extern int 	pcieb_plat_pcishpc_probe(dev_info_t *dip,
+extern int	pcieb_plat_pcishpc_probe(dev_info_t *dip,
     ddi_acc_handle_t config_handle);
 extern int	pcieb_plat_peekpoke(dev_info_t *dip, dev_info_t *rdip,
     ddi_ctl_enum_t ctlop, void *arg, void *result);

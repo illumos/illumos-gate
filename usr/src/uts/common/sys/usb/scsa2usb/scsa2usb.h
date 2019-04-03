@@ -21,7 +21,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef _SYS_USB_SCSA2USB_H
@@ -183,7 +183,7 @@ extern "C" {
  * SCSA2USB_ATTRS_NO_MEDIA_CHECK: AMI Virtual Floppy devices need to
  *		check if media is ready before issuing READ CAPACITY.
  * SCSA2USB_ATTRS_NO_CAP_ADJUST: Some devices return total logical block number
- * 		instead of highest logical block address on READ_CAPACITY cmd.
+ *		instead of highest logical block address on READ_CAPACITY cmd.
  *
  * NOTE: If a device simply STALLs the GET_MAX_LUN BO class-specific command
  * and recovers then it will not be added to the scsa2usb_blacklist[] table
@@ -280,7 +280,7 @@ typedef struct scsa2usb_ov {
 typedef struct scsa2usb_state {
 	int			scsa2usb_instance;	/* Instance number    */
 	int			scsa2usb_dev_state;	/* USB device state   */
-	int			scsa2usb_flags; 	/* Per instance flags */
+	int			scsa2usb_flags;		/* Per instance flags */
 	int			scsa2usb_intfc_num;	/* Interface number   */
 	dev_info_t		*scsa2usb_dip;		/* Per device. info   */
 	scsa2usb_power_t	*scsa2usb_pm;		/* PM state info */
@@ -539,7 +539,7 @@ typedef struct scsa2usb_cmd {
 	int			cmd_timeout;		/* copy of pkt_time */
 	uchar_t			cmd_cdb[SCSI_CDB_SIZE];	/* CDB */
 	uchar_t			cmd_dir;		/* direction */
-	uchar_t			cmd_actual_len; 	/* cdb len */
+	uchar_t			cmd_actual_len;		/* cdb len */
 	uchar_t			cmd_cdblen;		/* requested  cdb len */
 	struct scsi_arq_status	cmd_scb;		/* status, w/ arq */
 
@@ -655,7 +655,7 @@ typedef struct scsa2usb_read_cap {
 #ifdef	DEBUG
 #define	SCSA2USB_PRINT_CDB	scsa2usb_print_cdb
 #else
-#define	SCSA2USB_PRINT_CDB	0 &&
+#define	SCSA2USB_PRINT_CDB(...)
 #endif
 
 /* ugen support */

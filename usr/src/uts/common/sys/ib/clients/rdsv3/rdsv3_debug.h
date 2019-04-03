@@ -22,6 +22,10 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
+
 #ifndef _RDSV3_DEBUG_H
 #define	_RDSV3_DEBUG_H
 
@@ -96,10 +100,10 @@ void rdsv3_dprintf3(
 		char		*name,
 		char		*fmt, ...);
 #else
-#define	RDSV3_DPRINTF_INTR	0 &&
-#define	RDSV3_DPRINTF5		0 &&
-#define	RDSV3_DPRINTF4		0 &&
-#define	RDSV3_DPRINTF3		0 &&
+#define	RDSV3_DPRINTF_INTR(...)
+#define	RDSV3_DPRINTF5(...)
+#define	RDSV3_DPRINTF4(...)
+#define	RDSV3_DPRINTF3(...)
 #endif
 
 #define	RDSV3_DPRINTF2		rdsv3_dprintf2
