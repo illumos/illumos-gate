@@ -19,11 +19,6 @@
 
 #include <sys/cpuset.h>
 
-void	smp_rendezvous(void (*)(void *),
-		       void (*)(void *),
-		       void (*)(void *),
-		       void *arg);
-
 #define	IPI_AST	0
 
 void	ipi_cpu(int cpu, u_int ipi);

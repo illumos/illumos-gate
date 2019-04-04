@@ -142,19 +142,6 @@ cpusetobj_ffs(const cpuset_t *set)
 #endif
 }
 
-void
-smp_rendezvous(void (* setup_func)(void *), void (* action_func)(void *),
-    void (* teardown_func)(void *), void *arg)
-{
-	cpuset_t cpuset;
-
-	ASSERT(setup_func == NULL);
-	ASSERT(teardown_func == NULL);
-
-	CPUSET_ALL(cpuset);
-	xc_sync((xc_arg_t)arg, 0, 0, CPUSET2BV(cpuset), (xc_func_t)action_func);
-}
-
 struct kmem_item {
 	void			*addr;
 	size_t			size;

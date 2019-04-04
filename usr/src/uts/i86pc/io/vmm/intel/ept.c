@@ -49,6 +49,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
+#ifndef __FreeBSD__
+#include <sys/hma.h>
+#endif
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -167,6 +170,7 @@ ept_dump(uint64_t *ptp, int nlevels)
 }
 #endif
 
+#ifdef __FreeBSD__
 static void
 invept_single_context(void *arg)
 {
@@ -184,6 +188,13 @@ ept_invalidate_mappings(u_long eptp)
 
 	smp_rendezvous(NULL, invept_single_context, NULL, &invept_desc);
 }
+#else /* __FreeBSD__ */
+void
+ept_invalidate_mappings(u_long eptp)
+{
+	hma_vmx_invept_allcpus((uintptr_t)eptp);
+}
+#endif /* __FreeBSD__ */
 
 static int
 ept_pinit(pmap_t pmap)

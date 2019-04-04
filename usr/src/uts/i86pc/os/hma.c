@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/cpuvar.h>
@@ -51,9 +51,18 @@ typedef enum hma_cpu_state {
 } hma_cpu_state_t;
 static hma_cpu_state_t hma_cpu_status[NCPU];
 
+/* HMA-internal tracking of optional VMX capabilities */
+typedef enum {
+	HVC_EPT		= (1 << 0),
+	HVC_VPID	= (1 << 1),
+	HVC_INVEPT_ONE	= (1 << 2),
+	HVC_INVEPT_ALL	= (1 << 3),
+} hma_vmx_capab_t;
+
 static void *hma_vmx_vmxon_page[NCPU];
 static uintptr_t hma_vmx_vmxon_pa[NCPU];
 static uint32_t hma_vmx_revision;
+static hma_vmx_capab_t hma_vmx_capabs = 0;
 
 static boolean_t hma_svm_ready = B_FALSE;
 static const char *hma_svm_error = NULL;
@@ -68,6 +77,10 @@ static hma_svm_asid_t hma_svm_cpu_asid[NCPU];
 
 static int hma_vmx_init(void);
 static int hma_svm_init(void);
+
+/* Helpers from ml/hma_asm.s */
+int hma_vmx_do_invept(int, uintptr_t);
+int hma_vmx_vmxon(uintptr_t);
 
 void
 hma_init(void)
@@ -181,6 +194,11 @@ hma_vmx_vpid_alloc(void)
 {
 	id_t res;
 
+	/* Do not bother if the CPU lacks support */
+	if ((hma_vmx_capabs & HVC_VPID) == 0) {
+		return (0);
+	}
+
 	res = id_alloc_nosleep(hma_vmx_vpid);
 	if (res == -1) {
 		return (0);
@@ -197,8 +215,45 @@ hma_vmx_vpid_free(uint16_t vpid)
 	id_free(hma_vmx_vpid, (id_t)vpid);
 }
 
+#define	INVEPT_SINGLE_CONTEXT	1
+#define	INVEPT_ALL_CONTEXTS	2
 
-extern int hma_vmx_vmxon(uintptr_t);
+static int
+hma_vmx_invept_xcall(xc_arg_t arg1, xc_arg_t arg2, xc_arg_t arg3 __unused)
+{
+	int flag = (int)arg1;
+	uintptr_t eptp = (uintptr_t)arg2;
+
+	ASSERT(flag == INVEPT_SINGLE_CONTEXT || flag == INVEPT_ALL_CONTEXTS);
+
+	VERIFY0(hma_vmx_do_invept(flag, eptp));
+	return (0);
+}
+
+void
+hma_vmx_invept_allcpus(uintptr_t eptp)
+{
+	int flag = -1;
+	cpuset_t set;
+
+	if ((hma_vmx_capabs & HVC_INVEPT_ONE) != 0) {
+		flag = INVEPT_SINGLE_CONTEXT;
+	} else if ((hma_vmx_capabs & HVC_INVEPT_ALL) != 0) {
+		flag = INVEPT_ALL_CONTEXTS;
+		eptp = 0;
+	} else {
+		return;
+	}
+
+	cpuset_zero(&set);
+	mutex_enter(&cpu_lock);
+
+	cpuset_or(&set, &cpu_active_set);
+	xc_call((xc_arg_t)flag, (xc_arg_t)eptp, 0, CPUSET2BV(set),
+	    hma_vmx_invept_xcall);
+
+	mutex_exit(&cpu_lock);
+}
 
 static int
 hma_vmx_cpu_vmxon(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
@@ -245,18 +300,16 @@ hma_vmx_cpu_vmxon(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
 static int
 hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 {
+	hma_cpu_state_t state;
+
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(id >= 0 && id < NCPU);
 
-	switch (what) {
-	case CPU_CONFIG:
-	case CPU_ON:
-	case CPU_INIT:
-		break;
-	default:
+	if (what != CPU_ON) {
 		/*
-		 * Other events, such as CPU offlining, are of no interest.
-		 * Letting the VMX state linger should not cause any harm.
+		 * For the purposes of VMX setup, only the CPU_ON event is of
+		 * interest.  Letting VMX state linger on an offline CPU should
+		 * not cause any harm.
 		 *
 		 * This logic assumes that any offlining activity is strictly
 		 * administrative in nature and will not alter any existing
@@ -265,12 +318,12 @@ hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		return (0);
 	}
 
-	/* Perform initialization if it has not been previously attempted. */
-	if (hma_cpu_status[id] != HCS_UNINITIALIZED) {
-		return ((hma_cpu_status[id] == HCS_READY) ? 0 : -1);
+	state = hma_cpu_status[id];
+	if (state == HCS_ERROR) {
+		return (-1);
 	}
 
-	/* Allocate the VMXON page for this CPU */
+	/* Allocate the VMXON page for this CPU, if not already done */
 	if (hma_vmx_vmxon_page[id] == NULL) {
 		caddr_t va;
 		pfn_t pfn;
@@ -293,22 +346,94 @@ hma_vmx_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		VERIFY(hma_vmx_vmxon_pa[id] != 0);
 	}
 
-	kpreempt_disable();
-	if (CPU->cpu_seqid == id) {
-		/* Perform vmxon setup directly if this CPU is the target */
-		(void) hma_vmx_cpu_vmxon(0, 0, 0);
-		kpreempt_enable();
-	} else {
+	if (state == HCS_UNINITIALIZED) {
 		cpuset_t set;
 
-		/* Use a cross-call if a remote CPU is the target */
-		kpreempt_enable();
+		/* Activate VMX on this CPU */
 		cpuset_zero(&set);
 		cpuset_add(&set, id);
-		xc_sync(0, 0, 0, CPUSET2BV(set), hma_vmx_cpu_vmxon);
+		xc_call(0, 0, 0, CPUSET2BV(set), hma_vmx_cpu_vmxon);
+	} else {
+		VERIFY3U(state, ==, HCS_READY);
+
+		/*
+		 * If an already-initialized CPU is going back online, perform
+		 * an all-contexts invept to eliminate the possibility of
+		 * cached EPT state causing issues.
+		 */
+		if ((hma_vmx_capabs & HVC_INVEPT_ALL) != 0) {
+			cpuset_t set;
+
+			cpuset_zero(&set);
+			cpuset_add(&set, id);
+			xc_call((xc_arg_t)INVEPT_ALL_CONTEXTS, 0, 0,
+			    CPUSET2BV(set), hma_vmx_invept_xcall);
+		}
 	}
 
 	return (hma_cpu_status[id] != HCS_READY);
+}
+
+/*
+ * Determining the availability of VM execution controls is somewhat different
+ * from conventional means, where one simply checks for asserted bits in the
+ * MSR value.  Instead, these execution control MSRs are split into two halves:
+ * the lower 32-bits indicating capabilities which can be zeroed in the VMCS
+ * field and the upper 32-bits indicating capabilities which can be set to one.
+ *
+ * It is described in detail in Appendix A.3 of SDM volume 3.
+ */
+#define	VMX_CTL_ONE_SETTING(val, flag)	\
+	(((val) & ((uint64_t)(flag) << 32)) != 0)
+
+static const char *
+hma_vmx_query_details(void)
+{
+	boolean_t query_true_ctl = B_FALSE;
+	uint64_t msr;
+
+	/* The basic INS/OUTS functionality is cited as a necessary prereq */
+	msr = rdmsr(MSR_IA32_VMX_BASIC);
+	if ((msr & IA32_VMX_BASIC_INS_OUTS) == 0) {
+		return ("VMX does not support INS/OUTS");
+	}
+
+	/* Record the VMX revision for later VMXON usage */
+	hma_vmx_revision = (uint32_t)msr;
+
+	/*
+	 * Bit 55 in the VMX_BASIC MSR determines how VMX control information
+	 * can be queried.
+	 */
+	query_true_ctl = (msr & IA32_VMX_BASIC_TRUE_CTRLS) != 0;
+
+	/* Check for EPT and VPID support */
+	msr = rdmsr(query_true_ctl ?
+	    MSR_IA32_VMX_TRUE_PROCBASED_CTLS : MSR_IA32_VMX_PROCBASED_CTLS);
+	if (VMX_CTL_ONE_SETTING(msr, IA32_VMX_PROCBASED_2ND_CTLS)) {
+		msr = rdmsr(MSR_IA32_VMX_PROCBASED2_CTLS);
+		if (VMX_CTL_ONE_SETTING(msr, IA32_VMX_PROCBASED2_EPT)) {
+			hma_vmx_capabs |= HVC_EPT;
+		}
+		if (VMX_CTL_ONE_SETTING(msr, IA32_VMX_PROCBASED2_VPID)) {
+			hma_vmx_capabs |= HVC_VPID;
+		}
+	}
+
+	/* Check for INVEPT support */
+	if ((hma_vmx_capabs & HVC_EPT) != 0) {
+		msr = rdmsr(MSR_IA32_VMX_EPT_VPID_CAP);
+		if ((msr & IA32_VMX_EPT_VPID_INVEPT) != 0) {
+			if ((msr & IA32_VMX_EPT_VPID_INVEPT_SINGLE) != 0) {
+				hma_vmx_capabs |= HVC_INVEPT_ONE;
+			}
+			if ((msr & IA32_VMX_EPT_VPID_INVEPT_ALL) != 0) {
+				hma_vmx_capabs |= HVC_INVEPT_ALL;
+			}
+		}
+	}
+
+	return (NULL);
 }
 
 static int
@@ -332,14 +457,10 @@ hma_vmx_init(void)
 		goto bail;
 	}
 
-	/* Does VMX support basic INS/OUTS functionality */
-	msr = rdmsr(MSR_IA32_VMX_BASIC);
-	if ((msr & IA32_VMX_BASIC_INS_OUTS) == 0) {
-		msg = "VMX does not support INS/OUTS";
+	msg = hma_vmx_query_details();
+	if (msg != NULL) {
 		goto bail;
 	}
-	/* Record the VMX revision for later VMXON usage */
-	hma_vmx_revision = (uint32_t)msr;
 
 	mutex_enter(&cpu_lock);
 	/* Perform VMX configuration for already-online CPUs. */
@@ -518,7 +639,7 @@ hma_svm_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 		kpreempt_enable();
 		cpuset_zero(&set);
 		cpuset_add(&set, id);
-		xc_sync(0, 0, 0, CPUSET2BV(set), hma_svm_cpu_activate);
+		xc_call(0, 0, 0, CPUSET2BV(set), hma_svm_cpu_activate);
 	}
 
 	return (hma_cpu_status[id] != HCS_READY);

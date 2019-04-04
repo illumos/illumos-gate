@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_HMA_H
@@ -49,6 +49,11 @@ extern void hma_unregister(hma_reg_t *);
  */
 extern uint16_t hma_vmx_vpid_alloc(void);
 extern void hma_vmx_vpid_free(uint16_t);
+
+/*
+ * On all active CPUs, perform a single-context INVEPT on the given EPTP.
+ */
+extern void hma_vmx_invept_allcpus(uintptr_t);
 
 struct hma_svm_asid {
 	uint64_t hsa_gen;
