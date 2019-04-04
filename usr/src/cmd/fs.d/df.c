@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -28,6 +28,7 @@
 
 /*
  * Copyright 2016 Jason King
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <dlfcn.h>
@@ -1154,18 +1155,26 @@ number_to_string(
 			int unit_from,		/* from units of this size */
 			int unit_to)		/* to units of this size */
 {
-	if ((long long)number == (long long)-1)
+	if ((long long)number == (long long)-1) {
 		(void) strcpy(buf, "-1");
-	else {
-		if (unit_from == unit_to)
-			(void) sprintf(buf, "%llu", number);
-		else if (unit_from < unit_to)
-			(void) sprintf(buf, "%llu",
-			    number / (unsigned long long)(unit_to / unit_from));
-		else
-			(void) sprintf(buf, "%llu",
-			    number * (unsigned long long)(unit_from / unit_to));
+		return (buf);
 	}
+
+	/* don't crash if, i.e. fsp->f_frsize == 0 */
+	if (unit_from <= 0)
+		unit_from = 1;
+	if (unit_to <= 0)
+		unit_to = 1;
+
+	if (unit_from == unit_to)
+		(void) sprintf(buf, "%llu", number);
+	else if (unit_from < unit_to)
+		(void) sprintf(buf, "%llu",
+		    number / (unsigned long long)(unit_to / unit_from));
+	else
+		(void) sprintf(buf, "%llu",
+		    number * (unsigned long long)(unit_from / unit_to));
+
 	return (buf);
 }
 
@@ -1370,11 +1379,11 @@ k_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	fsblkcnt64_t	free_blocks		= fsp->f_bfree;
 	fsblkcnt64_t	available_blocks	= fsp->f_bavail;
 	fsblkcnt64_t	used_blocks;
-	char 		*file_system		= DFR_SPECIAL(dfrp);
+	char		*file_system		= DFR_SPECIAL(dfrp);
 	numbuf_t	total_blocks_buf;
 	numbuf_t	used_blocks_buf;
 	numbuf_t	available_blocks_buf;
-	char 		capacity_buf[LINEBUF_SIZE];
+	char		capacity_buf[LINEBUF_SIZE];
 
 	/*
 	 * If the free block count is -1, don't trust anything but the total
@@ -1492,7 +1501,7 @@ k_output(struct df_request *dfrp, struct statvfs64 *fsp)
  * The following is for internationalization support.
  */
 static bool_int strings_initialized;
-static char 	*files_str;
+static char	*files_str;
 static char	*blocks_str;
 static char	*total_str;
 static char	*kilobytes_str;
@@ -1728,8 +1737,8 @@ create_request_list(
 	struct df_request	*requests;
 	struct df_request	*dfrp;
 	size_t			size;
-	size_t 			i;
-	size_t 			request_index = 0;
+	size_t			i;
+	size_t			request_index = 0;
 	size_t			max_requests;
 	int			errors = 0;
 
@@ -1967,7 +1976,7 @@ do_df(int argc, char *argv[])
 			 * arguments, the filesystem types must match
 			 *
 			 * XXX: the alternative of doing this check here is to
-			 * 	invoke prune_list, but then we have to
+			 *	invoke prune_list, but then we have to
 			 *	modify this code to ignore invalid requests.
 			 */
 			if (F_option && ! EQ(fstype, FSType)) {
