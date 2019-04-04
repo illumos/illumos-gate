@@ -33,6 +33,9 @@ OBJECTS += hash.o callback.o word.o loader.o
 HEADERS= $(FICLDIR)/ficl.h $(FICLDIR)/ficlplatform/unix.h ../ficllocal.h
 #
 
+# disable inner loop variable 'fw' check
+vm.o := SMOFF += check_check_deref
+
 .PARALLEL:
 
 MAJOR = 4
