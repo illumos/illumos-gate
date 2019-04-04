@@ -19,7 +19,10 @@ include $(SRC)/boot/sys/boot/Makefile.inc
 ROOT_BOOT = $(ROOT)/boot
 
 DD=		/usr/bin/dd
-CFLAGS += -I../../..
+
+CPPFLAGS += -I../../..
+CPPFLAGS += -I../common
+
 CCASFLAGS= -Wa,--divide
 
 include ../Makefile.inc
@@ -45,8 +48,6 @@ FILEMODE=0444
 #.if defined(BOOT_PXELDR_ALWAYS_SERIAL)
 #CFLAGS+=-DALWAYS_SERIAL
 #.endif
-
-CFLAGS += -I../common
 
 LOADERBIN= ../loader/loader.bin
 
@@ -75,9 +76,6 @@ install: $(BOOT:%=$(ROOT_BOOT)/%)
 clobber: clean
 clean:
 	$(RM) $(CLEANFILES)
-
-.S.o:
-	$(CC) $(CFLAGS) $(CCASFLAGS) -c -o $@ $<
 
 $(ROOT_BOOT)/%: %
 	$(INS.file)
