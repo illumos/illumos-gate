@@ -120,6 +120,7 @@ dir path=opt/zfs-tests/tests/functional/link_count
 dir path=opt/zfs-tests/tests/functional/mdb
 dir path=opt/zfs-tests/tests/functional/migration
 dir path=opt/zfs-tests/tests/functional/mmap
+dir path=opt/zfs-tests/tests/functional/mmp
 dir path=opt/zfs-tests/tests/functional/mount
 dir path=opt/zfs-tests/tests/functional/mv_files
 dir path=opt/zfs-tests/tests/functional/nestedfs
@@ -188,6 +189,7 @@ file path=opt/zfs-tests/bin/rename_dir mode=0555
 file path=opt/zfs-tests/bin/rm_lnkcnt_zero_file mode=0555
 file path=opt/zfs-tests/bin/zfstest mode=0555
 file path=opt/zfs-tests/callbacks/zfs_dbgmsg mode=0555
+file path=opt/zfs-tests/callbacks/zfs_mmp mode=0555
 file path=opt/zfs-tests/include/commands.cfg mode=0444
 file path=opt/zfs-tests/include/default.cfg mode=0444
 file path=opt/zfs-tests/include/libtest.shlib mode=0444
@@ -2270,6 +2272,22 @@ file path=opt/zfs-tests/tests/functional/mmap/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/mmap/mmap_read_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/mmap/mmap_write_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/mmap/setup mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/cleanup mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp.cfg mode=0444
+file path=opt/zfs-tests/tests/functional/mmp/mmp.kshlib mode=0444
+file path=opt/zfs-tests/tests/functional/mmp/mmp_active_import mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_exported_import mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_inactive_import mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_interval mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_on_off mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_on_thread mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_on_uberblocks mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_on_zdb mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_reset_interval mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_write_distribution mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/mmp_write_uberblocks mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/multihost_history mode=0555
+file path=opt/zfs-tests/tests/functional/mmp/setup mode=0555
 file path=opt/zfs-tests/tests/functional/mount/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/mount/setup mode=0555
 file path=opt/zfs-tests/tests/functional/mount/umount_001 mode=0555

@@ -13,11 +13,11 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2014 Joyent, Inc. All rights reserved.
 # Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2018.7,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2019.1,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.description value="timezone information"
 set name=pkg.summary value="Timezone Information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -275,6 +275,7 @@ file path=usr/share/lib/zoneinfo/Asia/Oral
 file path=usr/share/lib/zoneinfo/Asia/Pontianak
 file path=usr/share/lib/zoneinfo/Asia/Pyongyang
 file path=usr/share/lib/zoneinfo/Asia/Qatar
+file path=usr/share/lib/zoneinfo/Asia/Qostanay
 file path=usr/share/lib/zoneinfo/Asia/Qyzylorda
 file path=usr/share/lib/zoneinfo/Asia/Riyadh
 file path=usr/share/lib/zoneinfo/Asia/Sakhalin
@@ -351,7 +352,6 @@ file path=usr/share/lib/zoneinfo/Etc/GMT-6
 file path=usr/share/lib/zoneinfo/Etc/GMT-7
 file path=usr/share/lib/zoneinfo/Etc/GMT-8
 file path=usr/share/lib/zoneinfo/Etc/GMT-9
-file path=usr/share/lib/zoneinfo/Etc/UCT
 file path=usr/share/lib/zoneinfo/Etc/UTC
 file path=usr/share/lib/zoneinfo/Europe/Amsterdam
 file path=usr/share/lib/zoneinfo/Europe/Andorra
@@ -631,6 +631,7 @@ hardlink path=usr/share/lib/zoneinfo/Etc/GMT+0 target=../Etc/GMT
 hardlink path=usr/share/lib/zoneinfo/Etc/GMT-0 target=../Etc/GMT
 hardlink path=usr/share/lib/zoneinfo/Etc/GMT0 target=../Etc/GMT
 hardlink path=usr/share/lib/zoneinfo/Etc/Greenwich target=../Etc/GMT
+hardlink path=usr/share/lib/zoneinfo/Etc/UCT target=UTC
 hardlink path=usr/share/lib/zoneinfo/Etc/Universal target=../Etc/UTC
 hardlink path=usr/share/lib/zoneinfo/Etc/Zulu target=../Etc/UTC
 hardlink path=usr/share/lib/zoneinfo/Europe/Belfast target=../Europe/London
@@ -695,7 +696,7 @@ hardlink path=usr/share/lib/zoneinfo/ROC target=Asia/Taipei
 hardlink path=usr/share/lib/zoneinfo/ROK target=Asia/Seoul
 hardlink path=usr/share/lib/zoneinfo/Singapore target=Asia/Singapore
 hardlink path=usr/share/lib/zoneinfo/Turkey target=Europe/Istanbul
-hardlink path=usr/share/lib/zoneinfo/UCT target=Etc/UCT
+hardlink path=usr/share/lib/zoneinfo/UCT target=Etc/UTC
 hardlink path=usr/share/lib/zoneinfo/US/Alaska target=../America/Anchorage
 hardlink path=usr/share/lib/zoneinfo/US/Aleutian target=../America/Adak
 hardlink path=usr/share/lib/zoneinfo/US/Arizona target=../America/Phoenix

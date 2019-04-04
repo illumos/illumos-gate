@@ -13,7 +13,7 @@
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2017, Joyent, Inc.
 # Copyright 2017 RackTop Systems.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -70,6 +70,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	cv_signal;
 	cv_timedwait;
 	cv_timedwait_sig;
+	cv_timedwait_sig_hrtime;
 	cv_timedwait_hires;
 	cv_wait;
 	cv_wait_sig;

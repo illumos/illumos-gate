@@ -201,12 +201,14 @@ extern int	apic_msix_enable;
 extern uint32_t apic_get_localapicid(uint32_t cpuid);
 extern uchar_t apic_get_ioapicid(uchar_t ioapicindex);
 
-#define	NMI_ACTION_UNSET (0)
-#define	NMI_ACTION_PANIC (1)
-#define	NMI_ACTION_IGNORE (2)
-#define	NMI_ACTION_KMDB (3)
+typedef enum nmi_action {
+	NMI_ACTION_UNSET,
+	NMI_ACTION_PANIC,
+	NMI_ACTION_IGNORE,
+	NMI_ACTION_KMDB
+} nmi_action_t;
 
-extern int nmi_action;
+extern nmi_action_t nmi_action;
 
 #ifdef	__cplusplus
 }

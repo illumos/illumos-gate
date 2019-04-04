@@ -81,7 +81,7 @@ extern uint32_t cpuid_feature_ecx_exclude;
 extern uint32_t cpuid_feature_edx_include;
 extern uint32_t cpuid_feature_edx_exclude;
 
-int nmi_action = NMI_ACTION_UNSET;
+nmi_action_t nmi_action = NMI_ACTION_UNSET;
 
 /*
  * Set console mode
