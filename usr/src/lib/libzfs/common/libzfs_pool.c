@@ -2909,7 +2909,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 
 	free(newname);
 
-	if (replacing && avail_spare && !vdev_online(newvd)) {
+	if (replacing && avail_spare && !vdev_is_online(newvd)) {
 		(void) zpool_standard_error(hdl, ENXIO, msg);
 		return (-1);
 	}
