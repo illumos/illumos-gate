@@ -705,7 +705,7 @@ libzfs_jni:	libdiskmgt libzfs
 libzonecfg:	libuuid libsysevent libsec libbrand libpool libscf libproc \
 		libuutil libbsm libsecdb
 libzonestat:	libcmdutils libumem
-libzpool:	libavl libumem libcmdutils libsysevent libfakekernel
+libzpool:	libavl libumem libcmdutils libsysevent libfakekernel libzfs
 madv:		libgen
 mpapi:		libpthread libdevinfo libsysevent
 mpss:		libgen
