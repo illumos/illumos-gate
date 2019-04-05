@@ -160,6 +160,10 @@ extern "C" {
 #define	CPUID_AMD_EDX_3DNowx	0x40000000	/* AMD: extensions to 3DNow! */
 #define	CPUID_AMD_EDX_3DNow	0x80000000	/* AMD: 3DNow! instructions */
 
+/*
+ * AMD extended function 0x80000001 %ecx
+ */
+
 #define	CPUID_AMD_ECX_AHF64	0x00000001	/* LAHF and SAHF in long mode */
 #define	CPUID_AMD_ECX_CMP_LGCY	0x00000002	/* AMD: multicore chip */
 #define	CPUID_AMD_ECX_SVM	0x00000004	/* AMD: secure VM */
@@ -600,6 +604,7 @@ extern "C" {
 #define	X86FSET_FMA4		89
 #define	X86FSET_TBM		90
 #define	X86FSET_AVX512VNNI	91
+#define	X86FSET_AMD_PCEC	92
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -969,7 +974,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	92
+#define	NUM_X86_FEATURES	93
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -139,6 +140,12 @@ kcpc_hw_init(cpu_t *cp)
 					strands_perfmon_shared = 1;
 				}
 			}
+		} else if (cpuid_getvendor(cpu[0]) == X86_VENDOR_AMD) {
+			/*
+			 * On AMD systems with HT, all of the performance
+			 * monitors exist on a per-logical CPU basis.
+			 */
+			strands_perfmon_shared = 0;
 		} else {
 			strands_perfmon_shared = 1;
 		}

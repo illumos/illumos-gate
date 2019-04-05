@@ -1842,6 +1842,7 @@ f platform/i86pc/kernel/misc/amd64/drmach_acpi 0755 root sys
 f platform/i86pc/kernel/misc/amd64/gfx_private 0755 root sys
 d platform/i86pc/kernel/pcbe 0755 root sys
 d platform/i86pc/kernel/pcbe/amd64 0755 root sys
+f platform/i86pc/kernel/pcbe/amd64/pcbe.AuthenticAMD 0755 root sys
 f platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.15 0755 root sys
 f platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.15 0755 root sys
 s platform/i86pc/kernel/pcbe/amd64/pcbe.GenuineIntel.6.23=pcbe.GenuineIntel.6.15
@@ -14360,6 +14361,7 @@ s usr/share/man/man3contract/ct_tmpl_set_cookie.3contract=ct_tmpl_activate.3cont
 s usr/share/man/man3contract/ct_tmpl_set_critical.3contract=ct_tmpl_activate.3contract
 s usr/share/man/man3contract/ct_tmpl_set_informative.3contract=ct_tmpl_activate.3contract
 d usr/share/man/man3cpc 0755 root bin
+f usr/share/man/man3cpc/amd_f17h_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bdw_de_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bdw_events.3cpc 0444 root bin
 f usr/share/man/man3cpc/bdx_events.3cpc 0444 root bin

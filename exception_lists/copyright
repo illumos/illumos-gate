@@ -121,6 +121,7 @@ usr/src/common/bzip2/bzlib_private.h
 usr/src/common/bzip2/huffman.c
 usr/src/common/ficl/*
 usr/src/contrib/*
+usr/src/data/amdpmc/*
 usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.descrip
 usr/src/data/hwdata/THIRDPARTYLICENSE.efifixes.tmpl
 usr/src/data/hwdata/pci.ids

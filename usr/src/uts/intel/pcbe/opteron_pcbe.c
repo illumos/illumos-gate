@@ -65,6 +65,7 @@
 
 /*
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -85,6 +86,9 @@
 #include <sys/privregs.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+
+#include "opteron_pcbe_table.h"
+#include <opteron_pcbe_cpcgen.h>
 
 static int opt_pcbe_init(void);
 static uint_t opt_pcbe_ncounters(void);
@@ -120,11 +124,33 @@ static pcbe_ops_t opt_pcbe_ops = {
 };
 
 /*
+ * Base MSR addresses for the PerfEvtSel registers and the counters themselves.
+ * Add counter number to base address to get corresponding MSR address.
+ */
+#define	PES_BASE_ADDR	0xC0010000
+#define	PIC_BASE_ADDR	0xC0010004
+
+/*
+ * Base MSR addresses for the PerfEvtSel registers and counters. The counter and
+ * event select registers are interleaved, so one needs to multiply the counter
+ * number by two to determine what they should be set to.
+ */
+#define	PES_EXT_BASE_ADDR	0xC0010200
+#define	PIC_EXT_BASE_ADDR	0xC0010201
+
+/*
+ * The number of counters present depends on which CPU features are present.
+ */
+#define	OPT_PCBE_DEF_NCOUNTERS	4
+#define	OPT_PCBE_EXT_NCOUNTERS	6
+
+/*
  * Define offsets and masks for the fields in the Performance
  * Event-Select (PES) registers.
  */
 #define	OPT_PES_HOST_SHIFT	41
 #define	OPT_PES_GUEST_SHIFT	40
+#define	OPT_PES_EVSELHI_SHIFT	32
 #define	OPT_PES_CMASK_SHIFT	24
 #define	OPT_PES_CMASK_MASK	0xFF
 #define	OPT_PES_INV_SHIFT	23
@@ -153,35 +179,53 @@ typedef struct _opt_pcbe_config {
 	uint64_t	opt_rawpic;	/* Raw counter value */
 } opt_pcbe_config_t;
 
-opt_pcbe_config_t nullcfgs[4] = {
+opt_pcbe_config_t nullcfgs[OPT_PCBE_EXT_NCOUNTERS] = {
 	{ 0, 0, 0 },
 	{ 1, 0, 0 },
 	{ 2, 0, 0 },
-	{ 3, 0, 0 }
+	{ 3, 0, 0 },
+	{ 4, 0, 0 },
+	{ 5, 0, 0 },
 };
 
-typedef struct _amd_event {
-	char		*name;
-	uint16_t	emask;		/* Event mask setting */
-} amd_event_t;
+typedef uint64_t (*opt_pcbe_addr_f)(uint_t);
 
-typedef struct _amd_generic_event {
-	char *name;
-	char *event;
-	uint8_t umask;
-} amd_generic_event_t;
+typedef struct opt_pcbe_data {
+	uint_t		opd_ncounters;
+	uint_t		opd_cmask;
+	opt_pcbe_addr_f	opd_pesf;
+	opt_pcbe_addr_f	opd_picf;
+} opt_pcbe_data_t;
 
-/*
- * Base MSR addresses for the PerfEvtSel registers and the counters themselves.
- * Add counter number to base address to get corresponding MSR address.
- */
-#define	PES_BASE_ADDR	0xC0010000
-#define	PIC_BASE_ADDR	0xC0010004
+opt_pcbe_data_t opd;
 
 #define	MASK48		0xFFFFFFFFFFFF
 
 #define	EV_END {NULL, 0}
 #define	GEN_EV_END {NULL, NULL, 0 }
+
+/*
+ * The following Macros are used to define tables of events that are used by
+ * various families and some generic classes of events.
+ *
+ * When programming a performance counter there are two different values that we
+ * need to set:
+ *
+ *   o Event - Determines the general class of event that is being used.
+ *   o Unit  - A further breakdown that gives more specific value.
+ *
+ * Prior to the introduction of family 17h support, all family specific events
+ * were programmed based on their event. The generic events, which tried to
+ * provide PAPI mappings to events specified an additional unit mask.
+ *
+ * Starting with Family 17h, CPU performance counters default to using both the
+ * unit mask and the event select. Generic events are always aliases to a
+ * specific event/unit pair, hence why the units for them are always zero. In
+ * addition, the naming of events in family 17h has been changed to reflect
+ * AMD's guide. While this is a departure from what people are used to, it is
+ * believed that matching the more detailed literature that folks are told to
+ * reference is more valuable.
+ */
 
 #define	AMD_cmn_events						\
 	{ "FP_dispatched_fpu_ops",			0x0 },	\
@@ -372,54 +416,70 @@ typedef struct _amd_generic_event {
 	{ "PAPI_l3_ldm",	"L3_miss",			0xf3 }, \
 	{ "PAPI_l3_tcm",	"L3_miss",			0xf7 }
 
-#define	AMD_PCBE_SUPPORTED(family) (((family) >= 0xf) && ((family) <= 0x11))
-
-static amd_event_t family_f_events[] = {
+static const amd_event_t family_f_events[] = {
 	AMD_cmn_events,
 	AMD_FAMILY_f_events,
 	EV_END
 };
 
-static amd_event_t family_10h_events[] = {
+static const amd_event_t family_10h_events[] = {
 	AMD_cmn_events,
 	AMD_FAMILY_10h_events,
 	EV_END
 };
 
-static amd_event_t family_11h_events[] = {
+static const amd_event_t family_11h_events[] = {
 	AMD_cmn_events,
 	AMD_FAMILY_11h_events,
 	EV_END
 };
 
-static amd_generic_event_t opt_generic_events[] = {
+static const amd_generic_event_t opt_generic_events[] = {
 	AMD_cmn_generic_events,
 	OPT_cmn_generic_events,
 	GEN_EV_END
 };
 
-static amd_generic_event_t family_10h_generic_events[] = {
+static const amd_generic_event_t family_10h_generic_events[] = {
 	AMD_cmn_generic_events,
 	AMD_FAMILY_10h_generic_events,
 	GEN_EV_END
 };
 
+/*
+ * For Family 17h, the cpcgen utility generates all of our events including ones
+ * that need specific unit codes, therefore we leave all unit codes out of
+ * these.
+ */
+static const amd_generic_event_t family_17h_papi_events[] = {
+	{ "PAPI_br_cn",		"ExRetCond" },
+	{ "PAPI_br_ins",	"ExRetBrnMis" },
+	{ "PAPI_fpu_idl",	"FpSchedEmpty" },
+	{ "PAPI_tot_cyc",	"LsNotHaltedCyc" },
+	{ "PAPI_tot_ins",	"ExRetInstr" },
+	{ "PAPI_tlb_dm",	"LsL1DTlbMiss" },
+	{ "PAPI_tlb_im",	"BpL1TlbMissL2Miss" },
+	{ "PAPI_tot_cyc",	"LsNotHaltedCyc" },
+	GEN_EV_END
+};
+
 static char	*evlist;
 static size_t	evlist_sz;
-static amd_event_t *amd_events = NULL;
-static uint_t amd_family;
-static amd_generic_event_t *amd_generic_events = NULL;
+static const amd_event_t *amd_events = NULL;
+static uint_t amd_family, amd_model;
+static const amd_generic_event_t *amd_generic_events = NULL;
 
-#define	AMD_CPUREF_SIZE	256
-static char amd_generic_bkdg[AMD_CPUREF_SIZE];
-static char amd_fam_f_rev_ae_bkdg[] = "See \"BIOS and Kernel Developer's " \
+static char amd_fam_f_rev_ae_bkdg[] = "See \"BIOS and Kernel Developer's "
 "Guide for AMD Athlon 64 and AMD Opteron Processors\" (AMD publication 26094)";
-static char amd_fam_f_NPT_bkdg[] = "See \"BIOS and Kernel Developer's Guide " \
+static char amd_fam_f_NPT_bkdg[] = "See \"BIOS and Kernel Developer's Guide "
 "for AMD NPT Family 0Fh Processors\" (AMD publication 32559)";
-static char amd_fam_10h_bkdg[] = "See \"BIOS and Kernel Developer's Guide " \
+static char amd_fam_10h_bkdg[] = "See \"BIOS and Kernel Developer's Guide "
 "(BKDG) For AMD Family 10h Processors\" (AMD publication 31116)";
-static char amd_fam_11h_bkdg[] = "See \"BIOS and Kernel Developer's Guide " \
+static char amd_fam_11h_bkdg[] = "See \"BIOS and Kernel Developer's Guide "
 "(BKDG) For AMD Family 11h Processors\" (AMD publication 41256)";
+static char amd_fam_17h_reg[] = "See \"Open-Source Register Reference For "
+"AMD Family 17h Processors Models 00h-2Fh\" (AMD publication 56255) and "
+"amd_f17h_events(3CPC)";
 
 static char amd_pcbe_impl_name[64];
 static char *amd_pcbe_cpuref;
@@ -428,14 +488,42 @@ static char *amd_pcbe_cpuref;
 #define	BITS(v, u, l)   \
 	(((v) >> (l)) & ((1 << (1 + (u) - (l))) - 1))
 
+static uint64_t
+opt_pcbe_pes_addr(uint_t counter)
+{
+	ASSERT3U(counter, <, opd.opd_ncounters);
+	return (PES_BASE_ADDR + counter);
+}
+
+static uint64_t
+opt_pcbe_pes_ext_addr(uint_t counter)
+{
+	ASSERT3U(counter, <, opd.opd_ncounters);
+	return (PES_EXT_BASE_ADDR + 2 * counter);
+}
+
+static uint64_t
+opt_pcbe_pic_addr(uint_t counter)
+{
+	ASSERT3U(counter, <, opd.opd_ncounters);
+	return (PIC_BASE_ADDR + 2 * counter);
+}
+
+static uint64_t
+opt_pcbe_pic_ext_addr(uint_t counter)
+{
+	ASSERT3U(counter, <, opd.opd_ncounters);
+	return (PIC_EXT_BASE_ADDR + 2 * counter);
+}
 
 static int
 opt_pcbe_init(void)
 {
-	amd_event_t		*evp;
-	amd_generic_event_t	*gevp;
+	const amd_event_t		*evp;
+	const amd_generic_event_t	*gevp;
 
 	amd_family = cpuid_getfamily(CPU);
+	amd_model = cpuid_getmodel(CPU);
 
 	/*
 	 * Make sure this really _is_ an Opteron or Athlon 64 system. The kernel
@@ -445,14 +533,29 @@ opt_pcbe_init(void)
 	if (cpuid_getvendor(CPU) != X86_VENDOR_AMD || amd_family < 0xf)
 		return (-1);
 
-	if (amd_family == 0xf)
+	if (amd_family == 0xf) {
 		/* Some tools expect this string for family 0fh */
 		(void) snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
 		    "AMD Opteron & Athlon64");
-	else
+	} else {
 		(void) snprintf(amd_pcbe_impl_name, sizeof (amd_pcbe_impl_name),
-		    "AMD Family %02xh%s", amd_family,
-		    AMD_PCBE_SUPPORTED(amd_family) ? "" :" (unsupported)");
+		    "AMD Family %02xh", amd_family);
+	}
+
+	/*
+	 * Determine whether or not the extended counter set is supported on
+	 * this processor.
+	 */
+	if (is_x86_feature(x86_featureset, X86FSET_AMD_PCEC)) {
+		opd.opd_ncounters = OPT_PCBE_EXT_NCOUNTERS;
+		opd.opd_pesf = opt_pcbe_pes_ext_addr;
+		opd.opd_picf = opt_pcbe_pic_ext_addr;
+	} else {
+		opd.opd_ncounters = OPT_PCBE_DEF_NCOUNTERS;
+		opd.opd_pesf = opt_pcbe_pes_addr;
+		opd.opd_picf = opt_pcbe_pic_addr;
+	}
+	opd.opd_cmask = (1 << opd.opd_ncounters) - 1;
 
 	/*
 	 * Figure out processor revision here and assign appropriate
@@ -478,22 +581,17 @@ opt_pcbe_init(void)
 		amd_pcbe_cpuref = amd_fam_11h_bkdg;
 		amd_events = family_11h_events;
 		amd_generic_events = opt_generic_events;
+	} else if (amd_family == 0x17 && amd_model <= 0x2f) {
+		amd_pcbe_cpuref = amd_fam_17h_reg;
+		amd_events = opteron_pcbe_f17h_events;
+		amd_generic_events = family_17h_papi_events;
 	} else {
-
-		amd_pcbe_cpuref = amd_generic_bkdg;
-		(void) snprintf(amd_pcbe_cpuref, AMD_CPUREF_SIZE,
-		    "See BIOS and Kernel Developer's Guide "    \
-		    "(BKDG) For AMD Family %02xh Processors. "  \
-		    "(Note that this pcbe does not explicitly " \
-		    "support this family)", amd_family);
-
 		/*
-		 * For families that are not explicitly supported we'll use
-		 * events for family 0xf. Even if they are not quite right,
-		 * it's OK --- we state that pcbe is unsupported.
+		 * Different families have different meanings on events and even
+		 * worse (like family 15h), different constraints around
+		 * programming these values.
 		 */
-		amd_events = family_f_events;
-		amd_generic_events = opt_generic_events;
+		return (-1);
 	}
 
 	/*
@@ -534,7 +632,7 @@ opt_pcbe_init(void)
 static uint_t
 opt_pcbe_ncounters(void)
 {
-	return (4);
+	return (opd.opd_ncounters);
 }
 
 static const char *
@@ -563,10 +661,10 @@ opt_pcbe_list_attrs(void)
 	return ("edge,pc,inv,cmask,umask");
 }
 
-static amd_generic_event_t *
+static const amd_generic_event_t *
 find_generic_event(char *name)
 {
-	amd_generic_event_t	*gevp;
+	const amd_generic_event_t	*gevp;
 
 	for (gevp = amd_generic_events; gevp->name != NULL; gevp++)
 		if (strcmp(name, gevp->name) == 0)
@@ -575,10 +673,10 @@ find_generic_event(char *name)
 	return (NULL);
 }
 
-static amd_event_t *
+static const amd_event_t *
 find_event(char *name)
 {
-	amd_event_t		*evp;
+	const amd_event_t	*evp;
 
 	for (evp = amd_events; evp->name != NULL; evp++)
 		if (strcmp(name, evp->name) == 0)
@@ -600,7 +698,7 @@ opt_pcbe_event_coverage(char *event)
 	/*
 	 * Fortunately, all counters can count all events.
 	 */
-	return (0xF);
+	return (opd.opd_cmask);
 }
 
 static uint64_t
@@ -610,7 +708,7 @@ opt_pcbe_overflow_bitmap(void)
 	 * Unfortunately, this chip cannot detect which counter overflowed, so
 	 * we must act as if they all did.
 	 */
-	return (0xF);
+	return (opd.opd_cmask);
 }
 
 /*ARGSUSED*/
@@ -618,12 +716,12 @@ static int
 opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
     uint_t nattrs, kcpc_attr_t *attrs, void **data, void *token)
 {
-	opt_pcbe_config_t	*cfg;
-	amd_event_t		*evp;
-	amd_event_t		ev_raw = { "raw", 0};
-	amd_generic_event_t	*gevp;
-	int			i;
-	uint64_t		evsel = 0, evsel_tmp = 0;
+	opt_pcbe_config_t		*cfg;
+	const amd_event_t		*evp;
+	amd_event_t			ev_raw = { "raw", 0};
+	const amd_generic_event_t	*gevp;
+	int				i;
+	uint64_t			evsel = 0, evsel_tmp = 0;
 
 	/*
 	 * If we've been handed an existing configuration, we need only preset
@@ -635,7 +733,7 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 		return (0);
 	}
 
-	if (picnum >= 4)
+	if (picnum >= opd.opd_ncounters)
 		return (CPC_INVALID_PICNUM);
 
 	if ((evp = find_event(event)) == NULL) {
@@ -674,9 +772,10 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 
 	/* Set bits [35:32] for extended part of Event Select field */
 	evsel_tmp = evp->emask & 0x0f00;
-	evsel |= evsel_tmp << 24;
+	evsel |= evsel_tmp << OPT_PES_EVSELHI_SHIFT;
 
 	evsel |= evp->emask & 0x00ff;
+	evsel |= evp->unit << OPT_PES_UMASK_SHIFT;
 
 	if (flags & CPC_COUNT_USER)
 		evsel |= OPT_PES_USR;
@@ -722,8 +821,10 @@ opt_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 static void
 opt_pcbe_program(void *token)
 {
-	opt_pcbe_config_t	*cfgs[4] = { &nullcfgs[0], &nullcfgs[1],
-						&nullcfgs[2], &nullcfgs[3] };
+	opt_pcbe_config_t	*cfgs[OPT_PCBE_EXT_NCOUNTERS] = { &nullcfgs[0],
+						&nullcfgs[1], &nullcfgs[2],
+						&nullcfgs[3], &nullcfgs[4],
+						&nullcfgs[5] };
 	opt_pcbe_config_t	*pcfg = NULL;
 	int			i;
 	ulong_t			curcr4 = getcr4();
@@ -743,7 +844,7 @@ opt_pcbe_program(void *token)
 		pcfg = (opt_pcbe_config_t *)kcpc_next_config(token, pcfg, NULL);
 
 		if (pcfg != NULL) {
-			ASSERT(pcfg->opt_picno < 4);
+			ASSERT(pcfg->opt_picno < opd.opd_ncounters);
 			cfgs[pcfg->opt_picno] = pcfg;
 		}
 	} while (pcfg != NULL);
@@ -754,13 +855,13 @@ opt_pcbe_program(void *token)
 	 * counters are all enabled as closely together in time as possible.
 	 */
 
-	for (i = 0; i < 4; i++) {
-		wrmsr(PES_BASE_ADDR + i, cfgs[i]->opt_evsel);
-		wrmsr(PIC_BASE_ADDR + i, cfgs[i]->opt_rawpic);
+	for (i = 0; i < opd.opd_ncounters; i++) {
+		wrmsr(opd.opd_pesf(i), cfgs[i]->opt_evsel);
+		wrmsr(opd.opd_picf(i), cfgs[i]->opt_rawpic);
 	}
 
-	for (i = 0; i < 4; i++) {
-		wrmsr(PES_BASE_ADDR + i, cfgs[i]->opt_evsel |
+	for (i = 0; i < opd.opd_ncounters; i++) {
+		wrmsr(opd.opd_pesf(i), cfgs[i]->opt_evsel |
 		    (uint64_t)(uintptr_t)OPT_PES_ENABLE);
 	}
 }
@@ -770,8 +871,8 @@ opt_pcbe_allstop(void)
 {
 	int		i;
 
-	for (i = 0; i < 4; i++)
-		wrmsr(PES_BASE_ADDR + i, 0ULL);
+	for (i = 0; i < opd.opd_ncounters; i++)
+		wrmsr(opd.opd_pesf(i), 0ULL);
 
 	/*
 	 * Disable non-privileged access to the counter registers.
@@ -782,16 +883,17 @@ opt_pcbe_allstop(void)
 static void
 opt_pcbe_sample(void *token)
 {
-	opt_pcbe_config_t	*cfgs[4] = { NULL, NULL, NULL, NULL };
+	opt_pcbe_config_t	*cfgs[OPT_PCBE_EXT_NCOUNTERS] = { NULL, NULL,
+						NULL, NULL, NULL, NULL };
 	opt_pcbe_config_t	*pcfg = NULL;
 	int			i;
-	uint64_t		curpic[4];
-	uint64_t		*addrs[4];
+	uint64_t		curpic[OPT_PCBE_EXT_NCOUNTERS];
+	uint64_t		*addrs[OPT_PCBE_EXT_NCOUNTERS];
 	uint64_t		*tmp;
 	int64_t			diff;
 
-	for (i = 0; i < 4; i++)
-		curpic[i] = rdmsr(PIC_BASE_ADDR + i);
+	for (i = 0; i < opd.opd_ncounters; i++)
+		curpic[i] = rdmsr(opd.opd_picf(i));
 
 	/*
 	 * Query kernel for all configs which are co-programmed.
@@ -800,13 +902,13 @@ opt_pcbe_sample(void *token)
 		pcfg = (opt_pcbe_config_t *)kcpc_next_config(token, pcfg, &tmp);
 
 		if (pcfg != NULL) {
-			ASSERT(pcfg->opt_picno < 4);
+			ASSERT3U(pcfg->opt_picno, <, opd.opd_ncounters);
 			cfgs[pcfg->opt_picno] = pcfg;
 			addrs[pcfg->opt_picno] = tmp;
 		}
 	} while (pcfg != NULL);
 
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < opd.opd_ncounters; i++) {
 		if (cfgs[i] == NULL)
 			continue;
 

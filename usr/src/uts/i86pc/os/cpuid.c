@@ -1036,7 +1036,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"xop",
 	"fma4",
 	"tbm",
-	"avx512_vnni"
+	"avx512_vnni",
+	"amd_pcec"
 };
 
 boolean_t
@@ -3129,6 +3130,10 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 
 			if (cp->cp_ecx & CPUID_AMD_ECX_TOPOEXT) {
 				add_x86_feature(featureset, X86FSET_TOPOEXT);
+			}
+
+			if (cp->cp_ecx & CPUID_AMD_ECX_PCEC) {
+				add_x86_feature(featureset, X86FSET_AMD_PCEC);
 			}
 
 			if (cp->cp_ecx & CPUID_AMD_ECX_XOP) {

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2017 Nexenta Systems, Inc.
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 COMMON_SUBDIRS=	consfonts \
@@ -20,11 +20,11 @@ COMMON_SUBDIRS=	consfonts \
 		terminfo \
 		zoneinfo
 
-i386_SUBDIRS=	perfmon ucode
+i386_SUBDIRS=	amdpmc perfmon ucode
 
 SUBDIRS = $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
-MSGSUBDIRS= 	zoneinfo
+MSGSUBDIRS=	zoneinfo
 
 all :=		TARGET=all
 clean :=	TARGET=clean

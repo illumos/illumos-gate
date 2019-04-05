@@ -3,7 +3,7 @@
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
 .\" Copyright (c) 2019, Joyent, Inc.
-.Dd January 8, 2019
+.Dd March 25, 2019
 .Dt CPC 3CPC
 .Os
 .Sh NAME
@@ -78,11 +78,10 @@ and
 .Xr cpc_walk_generic_events_pic 3CPC
 functions allow an application to determine the generic events supported
 on the underlying platform.
-.Ss Processor Specific Events
-Manual pages specific to events for recent Intel processors are
-available.
-The following manual pages cover the following Intel processor models
-which are listed in hexadecimal:
+.Ss Intel Processor Specific Events
+The following manual pages provide more detailed information on the
+events available for the specific Intel processor models.
+The covered processor models are listed in hexadecimal.
 .Bl -tag -width Xr
 .It Xr bdw_de_events 3CPC
 Intel Broadwell-DE events; covers model 56h.
@@ -126,6 +125,15 @@ Intel Westmere-EP-DP events; covers model 2ch.
 Intel Westmere-EP-SP events; covers model 25h.
 .It Xr wsm_ex_events 3CPC
 Intel Westmere-EX events; covers model 2fh.
+.El
+.Ss AMD Processor Specific Events
+The following manual pages provide more detailed information on the
+events available for the specific AMD processor models.
+The covered processor families are listed in hexadecimal.
+.Bl -tag -width Xr
+.It Xr amd_f17h_events 3CPC
+AMD Family 17h processors, including models 00-2fh.
+Include Ryzen, ThreadRipper, and EPYC branded processors.
 .El
 .Ss Using Attributes
 Some processors have advanced performance counter capabilities that are

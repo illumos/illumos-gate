@@ -1,0 +1,1043 @@
+[
+{
+	"mnemonic": "Core::X86::Pmc::Core::FpuPipeAssignment",
+	"name": "FpuPipeAssignment",
+	"code": "0x000",
+	"summary": "FPU Pipe Assignment",
+	"description": "The number of operations (uOps) and dual-pipeuOps dispatched to each of the 4 FPU execution pipelines. This event reflects how busy the FPU pipelines are and may be used for workload characterization. This includes all operations performed by x87, MMXTM, and SSE instructions, including moves. Each increment represents a one-cycle dispatch event. This event is a speculative event. (See Core::X86::Pmc::Core::ExRetMmxFpInstr). Since this event includes non- numeric operations it is not suitable for measuring MFLOPS.",
+	"units": [ {
+		"name": "Dual3",
+		"bit": 7,
+		"rw": "Read-only",
+		"description": "Total number multi-pipe uOps assigned to Pipe 3"
+	}, {
+		"name": "Dual2",
+		"bit": 6,
+		"rw": "Read-only",
+		"description": "Total number multi-pipe uOps assigned to Pipe 2"
+	}, {
+		"name": "Dual1",
+		"bit": 5,
+		"rw": "Read-only",
+		"description": "Total number multi-pipe uOps assigned to Pipe 1"
+	}, {
+		"name": "Dual0",
+		"bit": 4,
+		"rw": "Read-only",
+		"description": "Total number multi-pipe uOps assigned to Pipe 0"
+	}, {
+		"name": "Total3",
+		"bit": 3,
+		"rw": "Read-only",
+		"description": "Total number uOps assigned to Pipe 3"
+	}, {
+		"name": "Total2",
+		"bit": 2,
+		"rw": "Read-only",
+		"description": "Total number uOps assigned to Pipe 2"
+	}, {
+		"name": "Total1",
+		"bit": 1,
+		"rw": "Read-only",
+		"description": "Total number uOps assigned to Pipe 1"
+	}, {
+		"name": "Total0",
+		"bit": 0,
+		"rw": "Read-only",
+		"description": "Total number uOps assigned to Pipe 0"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::FpSchedEmpty",
+	"name": "FpSchedEmpty",
+	"code": "0x001",
+	"summary": "FP Scheduler Empty",
+	"description": "This is a speculative event. The number of cycles in which the FPU scheduler is empty. Note that some Ops like FP loads bypass the scheduler. Invert this (Core::X86::Msr::PERF_CTL[Inv] == 1) to count cycles in which at least one FPU operation is present in the FPU."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::FpRetx87FpOps",
+	"name": "FpRetx87FpOps",
+	"code": "0x002",
+	"summary": "Retired x87 Floating Point Operations",
+	"description": "The number of x87 floating-point Ops that have retired. The number of events logged per cycle can vary from 0 to 8.",
+	"units": [
+		{
+		"name": "DivSqrROps",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Divide and square root Ops"
+	}, {
+		"name": "MulOps",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Multiply Ops"
+	}, {
+		"name": "AddSubOps",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": " Add/subtract Ops"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::FpRetSseAvxOps",
+	"name": "FpRetSseAvxOps",
+	"code": "0x003",
+	"summary": "Retired SSE/AVX Operations",
+	"description": "This is a retire-based event. The number of retired SSE/AVX FLOPS. The number of events logged per cycle can vary from 0 to 64. This event can count above 15. See 2.1.11.2 [Large Increment per Cycle Events]",
+	"units": [
+		{
+		"name": "DpMultAddFlops",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "Double precision multiply-add FLOPS. Multiply-add counts as 2 FLOPS."
+	}, {
+		"name": "DpDivFlops",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "Double precision divide/square root FLOPS."
+	}, {
+		"name": "DpMultFlops",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "Double precision multiply FLOPS."
+	}, {
+		"name": "DpAddSubFlops",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Double precision add/subtract FLOPS."
+	}, {
+		"name": "SpMultAddFlops",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Single precision multiply-add FLOP. Multiply-add counts as 2 FLOPS."
+	}, {
+		"name": "SpDivFlops",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Single-precision divide/square root FLOPS"
+	}, {
+		"name": "SpMultFlops",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Single-precision multiply FLOPS"
+	}, {
+		"name": "SpAddSubFlops",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Single-precision add/subtract FLOPS"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::FpNumMovElimScalOp",
+	"name": "FpNumMovElimScalOp",
+	"code": "0x004",
+	"summary": "Number of Move Elimination and Scalar Op Optimization",
+	"description": "This is a dispatch based speculative event, and is useful for measuring the effectiveness of the Move elimination and Scalar code optimization schemes.",
+	"units": [ {
+		"name": "Optimized",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "Number of Scalar Ops optimized"
+	}, {
+		"name": "OptPotential",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Number of Ops that are candidates for optimization (have Z-bit either set or pass)."
+	}, {
+		"name": "SseMovOpsElim",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Number of SSE Move Ops eliminated"
+	}, {
+		"name": "SseMovOps",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Number of SSE Move Ops"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::FpRetiredSerOps",
+	"name": "FpRetiredSerOps",
+	"code": "0x005",
+	"summary": "Retired Serializing Ops",
+	"description": "The number of serializing Ops retired.",
+	"units": [ {
+		"name": "X87CtrlRet",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "x87 control word mispredict traps due to mispredictions in RC or PC, or changes in mask bits"
+	}, {
+		"name": "X87BotRet",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "x87 bottom-executing uOps retired"
+	}, {
+		"name": "SseCtrlRet",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "SSE control word mispredict traps due to mispredictions in RC, FTZ or DAZ, or changes in mask bits"
+	}, {
+		"name": "SseBotRet",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "SSE bottom-executing uOps retired"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsBadStatus2",
+	"name": "LsBadStatus2",
+	"code": "0x024",
+	"summary": "Bad Status 2",
+	"description": "Store To Load Interlock (STLI) are loads that were unable to complete because of a possible match with an older store, and the older store could not do STLF for some reason. There are a number of reasons why this occurs, and this perfmon organizes them into three major groups.",
+	"units": [ {
+		"name": "StlfNoData",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "The load is capable of forwarding from an older store (i.e. the address match/overlap between the load and the older store) was good and everything works from an address perspective, but the store's data has not been produced by EX or FP yet so it can't be forwarded."
+	}, {
+		"name": "StliOther",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "All the other reasons. The most common among these is that there is only a partial overlap between the store and the load, for example there's an 8B store to address A and a 16B load starting at address A. STLF can't be performed in this case because only some of the load's data is coming fromthe store, so the load gets StliOther. Another StliOther case is if the load hits a non-cacheable store that's sitting in the non-cacheable buffers (WCBs)."
+	}, {
+		"name": "StliNoState",
+		"bit": 0,
+		"rw": "Rewad-write",
+		"description": "The STLF is validated using DC way instead of an address compare. The store that wants to STLF is required to be a DC hit and have a valid DC way. The STLF candidate store is chosen based on address bits 11:0 overlap, and the DC way of that store is compared to the way of the load. If the store is in a DC miss state, then it doesn't have a valid DC way and so cannot validate STLF. The load gets StliNoState and can't complete.  Read-write"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsLocks",
+	"name": "LsLocks",
+	"code": "0x025",
+	"summary": "Locks",
+	"unit_mode": "or",
+	"units": [ {
+		"name": "SpecLockMapCommit",
+		"bit": 3,
+		"rw": "Read-write"
+	}, {
+		"name": "SpecLock",
+		"bit": 2,
+		"rw": "Read-write"
+	}, {
+		"name": "NonSpecLock",
+		"bit": 1,
+		"rw": "Read-write"
+	}, {
+		"name": "BusLock",
+		"bit": 0,
+		"rw": "Read-write"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsRetClClush",
+	"name": "LsRetClClush",
+	"code": "0x026",
+	"summary": "Retired CLFLUSH Instructions",
+	"description": "The number of retired CLFLUSH instructions. This is a non-speculative event."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsRetCpuid",
+	"name": "LsRetCpuid",
+	"code": "0x027",
+	"summary": "Retired CPUID Instructions",
+	"description": "The number of CPUID instructions retired."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsDispatch",
+	"name": "LsDispatch",
+	"code": "0x029",
+	"summary": "LS Dispatch",
+	"description": "Counts the number of operations dispatched to the LS unit.",
+	"unit_mode": "add",
+	"units": [ {
+		"name": "LdStDispatch",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Load-op-Stores"
+	}, {
+		"name": "StoreDispatch",
+		"bit": 1,
+		"rw": "Read-write"
+	}, {
+		"name": "LdDispatch",
+		"bit": 0,
+		"rw": "Read-write"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsSmiRx",
+	"name": "LsSmiRx",
+	"code": "0x02B",
+	"summary": "SMIs Received",
+	"description": "Counts the number of SMIs received."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsSTLF",
+	"name": "LsSTLF",
+	"code": "0x035",
+	"summary": "Store to Load Forward",
+	"description": "Number of STLF hits."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsStCommitCancel2",
+	"name": "LsStCommitCancel2",
+	"code": "0x037",
+	"summary": "Store Commit Cancels 2",
+	"units": [ {
+		"name": "StCommitCancelWcbFull",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "A non-cacheable store and the non-cacheable commit buffer is full."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsDcAccesses",
+	"name": "LsDcAccesses",
+	"code": "0x040",
+	"summary": "Data Cache Accesses",
+	"description": "The number of accesses to the data cache for load and store references. This may include certain microcode scratchpad accesses, although these are generally rare. Each increment represents an eight-byte access, although the instruction may only be accessing a portion of that. This event is a speculative event."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsRefillsFromSys",
+	"name": "LsRefillsFromSys",
+	"code": "0x043",
+	"summary": "Data Cache Refills from System",
+	"description": "Demand Data Cache Fills by Data Source.",
+	"units": [ {
+		"name": "LS_MABRESP_RMT_DRAM",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "DRAM or IO from different die."
+	}, {
+		"name": "LS_MABRESP_RMT_CACHE",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Hit in cache; Remote CCX and the address's Home Node is on a different die."
+	}, {
+		"name": "LS_MABRESP_LCL_DRAM",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "DRAM or IO from this thread's die."
+	}, {
+		"name": "LS_MABRESP_LCL_CACHE",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Hit in cache; local CCX (not Local L2), or Remote CCX and the address's Home Node is on this thread's die."
+	}, {
+		"name": "MABRESP_LCL_L2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Local L2 hit."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsL1DTlbMiss",
+	"name": "LsL1DTlbMiss",
+	"code": "0x045",
+	"summary": "L1 DTLB Miss",
+	"units": [ {
+		"name": "TlbReload1GL2Miss",
+		"bit": 7,
+		"rw": "Read-write"
+	}, {
+		"name": "TlbReload2ML2Miss",
+		"bit": 6,
+		"rw": "Read-write"
+	}, {
+		"name": "TlbReload32KL2Miss",
+		"bit": 5,
+		"rw": "Read-write"
+	}, {
+		"name": "TlbReload4KL2Miss",
+		"bit": 4,
+		"rw": "Read-write"
+	}, {
+		"name": "TlbReload1GL2Hit",
+		"bit": 3,
+		"rw": "Read-write"
+	}, {
+		"name": "TlbReload2ML2Hit",
+		"bit": 2,
+		"rw": "Read-write"
+	}, {
+		"name": "TlbReload32KL2Hit",
+		"bit": 1,
+		"rw": "Read-write"
+	}, {
+		"name": "TlbReload4KL2Hit",
+		"bit": 0,
+		"rw": "Read-write"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsTablewalker",
+	"name": "LsTablewalker",
+	"code": "0x046",
+	"summary": "Tablewalker allocation",
+	"units": [ {
+		"name": "PerfMonTablewalkAllocIside1",
+		"bit": 3,
+		"rw": "Read-write"
+	}, {
+		"name": "PerfMonTablewalkAllocIside0",
+		"bit": 2,
+		"rw": "Read-write"
+	}, {
+		"name": "PerfMonTablewalkAllocDside1",
+		"bit": 1,
+		"rw": "Read-write"
+	}, {
+		"name": "PerfMonTablewalkAllocDside0",
+		"bit": 0,
+		"rw": "Read-write"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsMisalAccesses",
+	"name": "LsMisalAccesses",
+	"code": "0x047",
+	"summary": "Misaligned loads"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsPrefInstrDisp",
+	"name": "LsPrefInstrDisp",
+	"code": "0x04B",
+	"summary": "Prefetch Instructions Dispatched",
+	"description": "Software Prefetch Instructions Dispatched.",
+	"units": [ {
+		"name": "PrefetchNTA",
+		"bit": 2,
+		"rw": "Read-write"
+	}, {
+		"name": "StorePrefetchW",
+		"bit": 1,
+		"rw": "Read-write"
+	}, {
+		"name": "LoadPrefetchW",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Prefetch, Prefetch_T0_T1_T2"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsInefSwPref",
+	"name": "LsInefSwPref",
+	"code": "0x052",
+	"summary": "Ineffective Software Prefetchs",
+	"description": "The number of software prefetches that did not fetch data outside of the processor core.",
+	"units": [ {
+		"name": "MabMchCnt",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Software PREFETCH instruction saw a match on an already-allocated miss request buffer."
+	}, {
+		"name": "DataPipeSwPfDcHit",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Software PREFETCH instruction saw a DC hit."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsSwPfDcFills",
+	"name": "LsSwPfDcFills",
+	"code": "0x059",
+	"summary": "Software Prefetch Data Cache Fills",
+	"description": "Software Prefetch Data Cache Fills by Data Source",
+	"units": [ {
+		"name": "LS_MABRESP_RMT_DRAM",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "DRAM or IO from different die."
+	}, {
+		"name": "LS_MABRESP_RMT_CACHE",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Hit in cache; Remote CCX and the address's Home Node is on a different die."
+	}, {
+		"name": "LS_MABRESP_LCL_DRAM",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "DRAM or IO from this thread's die."
+	}, {
+		"name": "LS_MABRESP_LCL_CACHE",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Hit in cache; local CCX (not Local L2), or Remote CCX and the address's Home Node is on this thread's die."
+	}, {
+		"name": "MABRESP_LCL_L2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Local L2 hit."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsHwPfDcFills",
+	"name": "LsHwPfDcFills",
+	"code": "0x05A",
+	"summary": "Hardware Prefetch Data Cache Fills",
+	"description": "Hardware Prefetch Data Cache Fills by Data Source",
+	"units": [ {
+		"name": "LS_MABRESP_RMT_DRAM",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "DRAM or IO from different die."
+	}, {
+		"name": "LS_MABRESP_RMT_CACHE",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Hit in cache; Remote CCX and the address's Home Node is on a different die."
+	}, {
+		"name": "LS_MABRESP_LCL_DRAM",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "DRAM or IO from this thread's die."
+	}, {
+		"name": "LS_MABRESP_LCL_CACHE",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Hit in cache; local CCX (not Local L2), or Remote CCX and the address's Home Node is on this thread's die."
+	}, {
+		"name": "MABRESP_LCL_L2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Local L2 hit."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsTwDcFills",
+	"name": "LsTwDcFills",
+	"code": "0x05B",
+	"summary": "Table Walker Data Cache Fills by Data Source",
+	"units": [ {
+		"name": "LS_MABRESP_RMT_DRAM",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "DRAM or IO from different die."
+	}, {
+		"name": "LS_MABRESP_RMT_CACHE",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "Hit in cache; Remote CCX and the address's Home Node is on a different die."
+	}, {
+		"name": "LS_MABRESP_LCL_DRAM",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "DRAM or IO from this thread's die."
+	}, {
+		"name": "LS_MABRESP_LCL_CACHE",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Hit in cache; local CCX (not Local L2), or Remote CCX and the address's Home Node is on this thread's die."
+	}, {
+		"name": "MABRESP_LCL_L2",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Local L2 hit."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::LsNotHaltedCyc",
+	"name": "LsNotHaltedCyc",
+	"code": "0x076",
+	"summary": "Cycles not in Halt"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::IcFw32",
+	"name": "IcFw32",
+	"code": "0x080",
+	"summary": "32 Byte Instruction Cache Fetch",
+	"description": "The number of 32B fetch windows transferred from IC pipe to DE instruction decoder (includes non-cacheable and cacheable fill responses)."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::IcFw32Miss",
+	"name": "IcFw32Miss",
+	"code": "0x081",
+	"summary": "32 Byte Instruction Cache Misses",
+	"description": "The number of 32B fetch windows tried to read the L1 IC and missed in the full tag."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::IcCacheFillL2",
+	"name": "IcCacheFillL2",
+	"code": "0x082",
+	"summary": "Instruction Cache Refills from L2",
+	"description": "The number of 64 byte instruction cache line was fulfilled from the L2 cache."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::IcCacheFillSys",
+	"name": "IcCacheFillSys",
+	"code": "0x083",
+	"summary": "Instruction Cache Refills from System",
+	"description": "The number of 64 byte instruction cache line fulfilled from system memory or another cache."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::BpL1TlbMissL2Hit",
+	"name": "BpL1TlbMissL2Hit",
+	"code": "0x084",
+	"summary": "L1 ITLB Miss, L2 ITLB Hit",
+	"description": "The number of instruction fetches that miss in the L1 ITLB but hit in the L2 ITLB."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::BpL1TlbMissL2Miss",
+	"name": "BpL1TlbMissL2Miss",
+	"code": "0x085",
+	"summary": "L1 ITLB Miss, L2 ITLB Miss",
+	"description": "The number of instruction fetches that miss in both the L1 and L2 TLBs"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::IcFetchStall",
+	"name": "IcFetchStall",
+	"code": "0x087",
+	"summary": "Instruction Pipe Stall",
+	"units": [ {
+		"name": "IcStallAny",
+		"bit": 2,
+		"rw": "Read-write ",
+		"description": "Instruction Cache pipeline was stalled during this clock cycle for any reason."
+	}, {
+		"name": "IcStallDqEmpty",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Instruction Cache pipeline was stalled during this clock cycle due to upstream not providing fetch addresses quickly."
+	}, {
+		"name": "IcStallBackPressure",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Instruction Cache pipeline was stalled during this clock cycle due to downstream queues being full."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::BpL1BTBCorrect",
+	"name": "BpL1BTBCorrect",
+	"code": "0x08A",
+	"summary": "L1 BTB Correction"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::BpL2BTBCorrect",
+	"name": "BpL2BTBCorrect",
+	"code": "0x08B",
+	"summary": "L2 BTB Correction"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::IcCacheInval",
+	"name": "IcCacheInval",
+	"code": "0x08C",
+	"summary": "Instruction Cache Lines Invalidated",
+	"description": "The number of instruction cache lines invalidated. A non-SMC event is CMC (cross modifying code), either from the other thread of the core or another core.",
+	"units": [ {
+		"name": "L2InvalidatingProbe",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "IC line invalidated due to L2 invalidating probe (external or LS)."
+	}, {
+		"name": "FillInvalidated",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "IC line invalidated due to overwriting fill response."
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::BpTlbRel",
+	"name": "BpTlbRel",
+	"code": "0x099",
+	"summary": "ITLB Reloads",
+	"description": "The number of ITLB reload requests."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::IcOcModeSwitch",
+	"name": "IcOcModeSwitch",
+	"code": "0x28A",
+	"summary": "OC Mode Switch",
+	"units": [ {
+		"name": "OcIcModeSwitch",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "OC to IC mode switch"
+	}, {
+		"name": "IcOcModeSwitch",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "IC to OC mode switch"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::DeDisDispatchTokenStalls0",
+	"name": "DeDisDispatchTokenStalls0",
+	"code": "0x0AF",
+	"summary": "Dynamic Tokens Dispatch Stall Cycles 0",
+	"description": "Cycles where a dispatch group is valid but does not get dispatched due to a token stall.",
+	"units": [ {
+		"name": "RetireTokenStall",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "RETIRE Tokens unavailable"
+	}, {
+		"name": "AGSQTokenStall",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "AGSQ Tokens unavailable"
+	}, {
+		"name": "ALUTokenStall",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "ALU tokens total unavailable"
+	}, {
+		"name": "ALSQ3_0_TokenStall",
+		"bit": 3,
+		"rw": "Read-write"
+	}, {
+		"name": "ALSQ3TokenStall",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "ALSQ 3 Tokens unavailable"
+	}, {
+		"name": "ALSQ2TokenStall",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "ALSQ 2 Tokens unavailable"
+	}, {
+		"name": "ALSQ1TokenStall",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "ALSQ 1 Tokens unavailable"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetInstr",
+	"name": "ExRetInstr",
+	"code": "0x0C0",
+	"summary": "Retired Instructions"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetCops",
+	"name": "ExRetCops",
+	"code": "0x0C1",
+	"summary": "Retired Uops",
+	"description": "The number of uOps retired. This includes all processor activity (instructions, exceptions, interrupts, microcode assists, etc.). The number of events logged per cycle can vary from 0 to 4."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetBrn",
+	"name": "ExRetBrn",
+	"code": "0x0C2",
+	"summary": "Retired Branch Instructions",
+	"description": "The number of branch instructions retired. This includes all types of architectural control flow changes, including exceptions and interrupts."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetBrnMisp",
+	"name": "ExRetBrnMisp",
+	"code": "0x0C3",
+	"summary": "Retired Branch Instructions Mispredicted",
+	"description": "The number of branch instructions retired, of any type, that were not correctly predicted. This includes those for which prediction is not attempted (far control transfers, exceptions and interrupts)."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetBrnTkn",
+	"name": "ExRetBrnTkn",
+	"code": "0x0C4",
+	"summary": "Retired Taken Branch Instructions",
+	"description": "The number of taken branches that were retired. This includes all types of architectural control flow changes, including exceptions and interrupts."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetBrnTknMisp",
+	"name": "ExRetBrnTknMisp",
+	"code": "0x0C5",
+	"summary": "Retired Taken Branch Instructions Mispredicted",
+	"description": "The number of retired taken branch instructions that were mispredicted."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetBrnFar",
+	"name": "ExRetBrnFar",
+	"code": "0x0C6",
+	"summary": "Retired Far Control Transfers",
+	"description": "The number of far control transfers retired including far call/jump/return, IRET, SYSCALL and SYSRET, plus exceptions and interrupts. Far control transfers are not subject to branch prediction."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetBrnResync",
+	"name": "ExRetBrnResync",
+	"code": "0x0C7",
+	"summary": "Retired Branch Resyncs",
+	"description": "The number of resync branches. These reflect pipeline restarts due to certain microcode assists and events such as writes to the active instruction stream, among other things. Each occurrence reflects a restart penalty similar to a branch mispredict. This is relatively rare."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetNearRet",
+	"name": "ExRetNearRet",
+	"code": "0x0C8",
+	"summary": "Retired Near Returns",
+	"description": "The number of near return instructions (RET or RET Iw) retired."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetNearRetMispred",
+	"name": "ExRetNearRetMispred",
+	"code": "0x0C9",
+	"summary": "Retired Near Returns Mispredicted",
+	"description": "The number of near returns retired that were not correctly predicted by the return address predictor. Each such mispredict incurs the same penalty as a mispredicted conditional branch instruction."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetBrnIndMisp",
+	"name": "ExRetBrnIndMisp",
+	"code": "0x0CA",
+	"summary": "Retired Indirect Branch Instructions Mispredicted"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetMmxFpInstr",
+	"name": "ExRetMmxFpInstr",
+	"code": "0x0CB",
+	"summary": "Retired MMXTM/FP Instructions",
+	"description": "The number of MMX, SSE or x87 instructions retired. The UnitMask allows the selection of the individual classes of instructions as given in the table. Each increment represents one complete instruction. Since this event includes non- numeric instructions it is not suitable for measuring MFLOPS.",
+	"units": [ {
+		"name": "SseInstr",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "SSE instructions (SSE, SSE2, SSE3, SSSE3, SSE4A, SSE41, SSE42, AVX)."
+	}, {
+		"name": "MmxInstr",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "MMX instructions."
+	}, {
+		"name": "X87Instr",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "x87 instructions"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExRetCond",
+	"name": "ExRetCond",
+	"code": "0x0D1",
+	"summary": "Retired Conditional Branch Instructions"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExDivBusy",
+	"name": "ExDivBusy",
+	"code": "0x0D3",
+	"summary": "Div Cycles Busy count"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExDivCount",
+	"name": "ExDivCount",
+	"code": "0x0D4",
+	"summary": "Div Op Count"
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::ExTaggedIbsOps",
+	"name": "ExTaggedIbsOps",
+	"code": "0x1CF",
+	"summary": "Tagged IBS Ops",
+	"units": [ {
+		"name": "IbsCountRollover",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Number of times an op could not be tagged by IBS because of a previous tagged op that has not retired."
+	}, {
+		"name": "IbsTaggedOpsRet",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Number of Ops tagged by IBS that retired"
+	}, {
+		"name": "IbsTaggedOps",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Number of Ops tagged by IBS"
+	} ]
+}, {
+	"mnemonic": "Core::X86::Pmc::Core::ExRetFusBrnchInst",
+	"name": "ExRetFusBrnchInst",
+	"code": "0x1D0",
+	"summary": "Retired Fused Branch Instructions",
+	"description": "The number of fused retired branch instructions retired per cycle. The number of events logged per cycle can vary from 0 to 3."
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::L2RequestG1",
+	"name": "L2RequestG1",
+	"code": "0x060",
+	"summary": "Requests to L2 Group1",
+	"units": [ {
+		"name": "RdBlkL",
+		"bit": 7,
+		"rw": "Read-write"
+	}, {
+		"name": "RdBlkX",
+		"bit": 6,
+		"rw": "Read-write"
+	}, {
+		"name": "LsRdBlkC_S",
+		"bit": 5,
+		"rw": "Read-write"
+	}, {
+		"name": "CacheableIcRead",
+		"bit": 4,
+		"rw": "Read-write"
+	}, {
+		"name": "ChangeToX",
+		"bit": 3,
+		"rw": "Read-write"
+	}, {
+		"name": "PrefetchL2",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "Assume core should also count these and allow the breakdown between H/W vs. S/W and LS vs. IC."
+	}, {
+		"name": "L2HwPf",
+		"bit": 1,
+		"rw": "Read-write"
+	}, {
+		"name": "OtherRequests",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Events covered by Core::X86::Pmc::Core::L2RequestG2."
+	} ]
+}, {
+	"mnemonic": "Core::X86::Pmc::Core::L2RequestG2",
+	"name": "L2RequestG2",
+	"code": "0x061",
+	"summary": "Requests to L2 Group2",
+	"description": "Multi-events in that LS and IF requests can be received simultaneous.",
+	"units": [ {
+		"name": "Group1",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "All Group 1 commands not in unit0."
+	}, {
+		"name": "LsRdSized",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "RdSized, RdSized32, RdSized64."
+	}, {
+		"name": "LsRdSizedNC",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "RdSizedNC, RdSized32NC, RdSized64NC."
+	}, {
+		"name": "IcRdSized",
+		"bit": 4,
+		"rw": "Read-write"
+	}, {
+		"name": "IcRdSizedNC",
+		"bit": 3,
+		"rw": "Read-write"
+	}, {
+		"name": "SmcInval",
+		"bit": 2,
+		"rw": "Read-write"
+	}, {
+		"name": "BusLocksOriginator",
+		"bit": 1,
+		"rw": "Read-write"
+	}, {
+		"name": "BusLocksResponses",
+		"bit": 0,
+		"rw": "Read-write"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::L2Latancy",
+	"name": "L2Latancy",
+	"code": "0x062",
+	"summary": "L2 Latency",
+	"description": "Total cycles spent waiting for L2 fills to complete from L3 or memory, divided by four. This may be used to calculate average latency by multiplying this count by four and then dividing by the total number of L2 fills (unit mask Core::X86::Pmc::Core::L2RequestG1 == FEh). Event counts are for both threads. To calculate average latency, the number of fills from both threads must be used.",
+	"units": [ {
+		"name": "L2CyclesWaitingOnFills",
+		"bit": 0,
+		"rw": "Read-write"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::L2WbcReq",
+	"name": "L2WbcReq",
+	"code": "0x063",
+	"summary": "LS to L2 WBC requests",
+	"units": [ {
+		"name": "WcbWrite",
+		"bit": 6,
+		"rw": "Read-write"
+	}, {
+		"name": "WcbClose",
+		"bit": 5,
+		"rw": "Read-write"
+	}, {
+		"name": "CacheLineFlush",
+		"bit": 4,
+		"rw": "Read-write"
+	}, {
+		"name": "I_LineFlush",
+		"bit": 3,
+		"rw": "Read-write"
+	}, {
+		"name": "ZeroByteStore",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "This becomes WriteNoData at SDP; this count does not include DVM Sync Ops and bus locks which are counted in Core::X86::Pmc::Core::L2RequestG2."
+	}, {
+		"name": "LocalIcClr",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "Local IC Clear"
+	}, {
+		"name": "CLZero",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "Cache Line Zero"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::L2CacheReqStat",
+	"name": "L2CacheReqStat",
+	"code": "0x064",
+	"summary": "Core to L2 Cacheable Request Access Status",
+	"description": "This event does not count accesses to the L2 cache by the L2 prefetcher, but it does count accesses by the L1 prefetcher.",
+	"units": [ {
+		"name": "LsRdBlkCS",
+		"bit": 7,
+		"rw": "Read-write",
+		"description": "LS ReadBlock C/S Hit"
+	}, {
+		"name": "LsRdBlkLHitX",
+		"bit": 6,
+		"rw": "Read-write",
+		"description": "LS Read Block L Hit X"
+	}, {
+		"name": "LsRdBlkLHitS",
+		"bit": 5,
+		"rw": "Read-write",
+		"description": "LsRdBlkL Hit Shared"
+	}, {
+		"name": "LsRdBlkX",
+		"bit": 4,
+		"rw": "Read-write",
+		"description": "LsRdBlkX/ChgToX Hit X. Count RdBlkX finding Shared as a Miss."
+	}, {
+		"name": "LsRdBlkC",
+		"bit": 3,
+		"rw": "Read-write",
+		"description": "LS Read Block C S L X Change to X Miss"
+	}, {
+		"name": "IcFillHitX",
+		"bit": 2,
+		"rw": "Read-write",
+		"description": "IC Fill Hit Exclusive Stale"
+	}, {
+		"name": "IcFillHitS",
+		"bit": 1,
+		"rw": "Read-write",
+		"description": "IC Fill Hit Shared"
+	}, {
+		"name": "IcFillMiss",
+		"bit": 0,
+		"rw": "Read-write",
+		"description": "IC Fill Miss"
+	} ]
+},
+{
+	"mnemonic": "Core::X86::Pmc::Core::L2FillPending",
+	"name": "L2FillPending",
+	"code": "0x06D",
+	"summary": "Cycles with fill pending from L2",
+	"description": "Total cycles spent with one or more fill requests in flight from L2.",
+	"units": [ {
+		"name": "L2FillBusy.",
+		"bit": 0,
+		"rw": "Read-write."
+	} ]
+}
+]
