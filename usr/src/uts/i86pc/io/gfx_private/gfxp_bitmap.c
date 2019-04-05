@@ -190,13 +190,18 @@ bitmap_kdsetmode(struct gfxp_fb_softc *softc, int mode)
 	switch (mode) {
 	case KD_TEXT:
 		if (softc->blt_ops.setmode != NULL)
-			softc->blt_ops.setmode(KD_TEXT);
+			if (softc->blt_ops.setmode(KD_TEXT) != 0)
+				return (EIO);
+
 		bitmap_kdsettext(softc);
 		break;
 	case KD_GRAPHICS:
 		bitmap_kdsetgraphics(softc);
 		if (softc->blt_ops.setmode != NULL)
-			softc->blt_ops.setmode(KD_GRAPHICS);
+			if (softc->blt_ops.setmode(KD_GRAPHICS) != 0) {
+				bitmap_kdsettext(softc);
+				return (EIO);
+			}
 		break;
 	case KD_RESETTEXT:
 		/*
@@ -667,13 +672,15 @@ bitmap_devmap(dev_t dev, devmap_cookie_t dhp, offset_t off,
     size_t len, size_t *maplen, uint_t model, void *ptr)
 {
 	struct gfxp_fb_softc *softc = (struct gfxp_fb_softc *)ptr;
-	union gfx_console *console = softc->console;
+	union gfx_console *console;
 	size_t length;
 
 	if (softc == NULL) {
 		cmn_err(CE_WARN, "bitmap: Can't find softstate");
 		return (ENXIO);
 	}
+
+	console = softc->console;
 
 	if (off >= console->fb.fb_size) {
 		cmn_err(CE_WARN, "bitmap: Can't map offset 0x%llx", off);
