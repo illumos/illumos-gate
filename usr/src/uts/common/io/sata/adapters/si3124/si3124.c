@@ -31,7 +31,7 @@
 /*
  *
  *
- * 			Few Design notes
+ *			Few Design notes
  *
  *
  * I. General notes
@@ -48,7 +48,7 @@
  * II. Data structures
  *
  * si_ctl_state_t: This holds the driver private information for each
- * 	controller instance. Each of the sata ports within a single
+ *	controller instance. Each of the sata ports within a single
  *	controller are represented by si_port_state_t. The
  *	sictl_global_acc_handle and sictl_global_address map the
  *	controller-wide global register space and are derived from pci
@@ -57,17 +57,17 @@
  *
  * si_port_state_t: This holds the per port information. The siport_mutex
  *	holds the per port mutex. The siport_pending_tags is the bit mask of
- * 	commands posted to controller. The siport_slot_pkts[] holds the
- * 	pending sata packets. The siport_port_type holds the device type
+ *	commands posted to controller. The siport_slot_pkts[] holds the
+ *	pending sata packets. The siport_port_type holds the device type
  *	connected directly to the port while the siport_portmult_state
- * 	holds the similar information for the devices behind a port
+ *	holds the similar information for the devices behind a port
  *	multiplier.
  *
  * si_prb_t: This contains the PRB being posted to the controller.
  *	The two SGE entries contained within si_prb_t itself are not
  *	really used to hold any scatter gather entries. The scatter gather
  *	list is maintained external to PRB and is linked from one
- * 	of the contained SGEs inside the PRB. For atapi devices, the
+ *	of the contained SGEs inside the PRB. For atapi devices, the
  *	first contained SGE holds the PACKET and second contained
  *	SGE holds the link to an external SGT. For non-atapi devices,
  *	the first contained SGE works as link to external SGT while
@@ -95,15 +95,15 @@
  *	respectively.
  *
  * Command completion: On a successful completion, intr_command_complete()
- * 	receives the control. The slot_status register holds the outstanding
+ *	receives the control. The slot_status register holds the outstanding
  *	commands. Any reading of slot_status register automatically clears
  *	the interrupt. By comparing the slot_status register contents with
  *	per port siport_pending_tags, we determine which of the previously
  *	posted commands have finished.
  *
  * Timeout handling: Every 5 seconds, the watchdog handler scans thru the
- * 	pending packets. The satapkt->satapkt_hba_driver_private field is
- * 	overloaded with the count of watchdog cycles a packet has survived.
+ *	pending packets. The satapkt->satapkt_hba_driver_private field is
+ *	overloaded with the count of watchdog cycles a packet has survived.
  *	If a packet has not completed within satapkt->satapkt_time, it is
  *	failed with error code of SATA_PKT_TIMEOUT. There is one watchdog
  *	handler running for each instance of controller.
@@ -111,7 +111,7 @@
  * Error handling: For 3124, whenever any single command has encountered
  *	an error, the whole port execution completely stalls; there is no
  *	way of canceling or aborting the particular failed command. If
- * 	the port is connected to a port multiplier, we can however RESUME
+ *	the port is connected to a port multiplier, we can however RESUME
  *	other non-error devices connected to the port multiplier.
  *	The only way to recover the failed commands is to either initialize
  *	the port or reset the port/device. Both port initialize and reset
@@ -134,7 +134,7 @@
  *		a Port Initialize.
  *
  *	  b) for SDBERROR: [SDBERROR means failed command is an NCQ command]
- * 		Handle exactly like DEVICEERROR handling.
+ *		Handle exactly like DEVICEERROR handling.
  *		After the Port Initialize done, do a Read Log Extended.
  *
  *	  c) for SENDFISERROR:
@@ -144,7 +144,7 @@
  *		 3) Perform a Port Initialize
  *
  *		If the port is not connected to port multiplier, issue
- * 		a Device Reset.
+ *		a Device Reset.
  *
  *	  d) for DATAFISERROR:
  *		If the port was executing an NCQ command, issue a Device
@@ -154,7 +154,7 @@
  *
  *	  e) for any other error, simply issue a Device Reset.
  *
- * 	To synchronize the interactions between various control flows (e.g.
+ *	To synchronize the interactions between various control flows (e.g.
  *	error recovery, timeout handling, si_poll_timeout, incoming flow
  *	from framework etc.), the following precautions are taken care of:
  *		a) During mopping_in_progress, no more commands are
@@ -165,7 +165,7 @@
  *		failing (possibly with a different error code)
  *
  * Atapi handling: For atapi devices, we use the first SGE within the PRB
- * 	to fill the scsi cdb while the second SGE points to external SGT.
+ *	to fill the scsi cdb while the second SGE points to external SGT.
  *
  * Queuing: Queue management is achieved external to the driver inside sd.
  *	Based on sata_hba_tran->qdepth and IDENTIFY data, the framework
@@ -189,7 +189,7 @@
  *
  * 1) Currently the atapi packet length is hard coded to 12 bytes
  *	This is wrong. The framework should determine it just like they
- * 	determine ad_cdb_len in legacy atapi.c. It should even reject
+ *	determine ad_cdb_len in legacy atapi.c. It should even reject
  *	init_pkt() for greater CDB lengths. See atapi.c. Revisit this
  *	in 2nd phase of framework project.
  *
@@ -303,10 +303,10 @@ static	void si_enable_port_interrupts(si_ctl_state_t *, int);
 static	void si_enable_all_interrupts(si_ctl_state_t *);
 static	void si_disable_port_interrupts(si_ctl_state_t *, int);
 static	void si_disable_all_interrupts(si_ctl_state_t *);
-static 	void fill_dev_sregisters(si_ctl_state_t *, int, sata_device_t *);
-static 	int si_add_legacy_intrs(si_ctl_state_t *);
-static 	int si_add_msi_intrs(si_ctl_state_t *);
-static 	void si_rem_intrs(si_ctl_state_t *);
+static	void fill_dev_sregisters(si_ctl_state_t *, int, sata_device_t *);
+static	int si_add_legacy_intrs(si_ctl_state_t *);
+static	int si_add_msi_intrs(si_ctl_state_t *);
+static	void si_rem_intrs(si_ctl_state_t *);
 
 static	int si_reset_dport_wait_till_ready(si_ctl_state_t *,
 				si_port_state_t *, int, int);
@@ -1006,9 +1006,7 @@ si_power(dev_info_t *dip, int component, int level)
  *
  */
 static int
-si_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
-		void *arg,
-		void **result)
+si_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
 #ifndef __lock_lint
 	_NOTE(ARGUNUSED(dip))
@@ -1047,7 +1045,7 @@ si_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
 static int
 si_register_sata_hba_tran(si_ctl_state_t *si_ctlp)
 {
-	struct 	sata_hba_tran	*sata_hba_tran;
+	struct	sata_hba_tran	*sata_hba_tran;
 
 	SIDBG_C(SIDBG_ENTRY, si_ctlp,
 	    "si_register_sata_hba_tran entry", NULL);
@@ -1172,7 +1170,7 @@ si_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 			mutex_exit(&si_portp->siport_mutex);
 			return (SATA_FAILURE);
 		} else {
-			si_portmultp = 	&si_portp->siport_portmult_state;
+			si_portmultp = &si_portp->siport_portmult_state;
 			port_type = si_portmultp->sipm_port_type[pmport];
 		}
 	} else {
@@ -1364,15 +1362,9 @@ si_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
  * WARNING!!! siport_mutex should be acquired before the function is called.
  */
 static void
-si_mop_commands(si_ctl_state_t *si_ctlp,
-		si_port_state_t *si_portp,
-		uint8_t	port,
-
-		uint32_t slot_status,
-		uint32_t failed_tags,
-		uint32_t timedout_tags,
-		uint32_t aborting_tags,
-		uint32_t reset_tags)
+si_mop_commands(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp,
+    uint8_t port, uint32_t slot_status, uint32_t failed_tags,
+    uint32_t timedout_tags, uint32_t aborting_tags, uint32_t reset_tags)
 {
 	uint32_t finished_tags, unfinished_tags;
 	int tmpslot;
@@ -2035,7 +2027,7 @@ si_alloc_sgbpool(si_ctl_state_t *si_ctlp, int port)
 	    NULL,
 	    (caddr_t *)&si_portp->siport_sgbpool,
 	    &ret_len,
-	    &si_portp->siport_sgbpool_acc_handle) != NULL) {
+	    &si_portp->siport_sgbpool_acc_handle) != DDI_SUCCESS) {
 
 		/*  error.. free the dma handle. */
 		ddi_dma_free_handle(&si_portp->siport_sgbpool_dma_handle);
@@ -2114,7 +2106,7 @@ si_alloc_prbpool(si_ctl_state_t *si_ctlp, int port)
 	    NULL,
 	    (caddr_t *)&si_portp->siport_prbpool,
 	    &ret_len,
-	    &si_portp->siport_prbpool_acc_handle) != NULL) {
+	    &si_portp->siport_prbpool_acc_handle) != DDI_SUCCESS) {
 
 		/* error.. free the dma handle. */
 		ddi_dma_free_handle(&si_portp->siport_prbpool_dma_handle);
@@ -2470,7 +2462,7 @@ si_poll_cmd(
 /*
  * Searches for and claims a free slot.
  *
- * Returns: 	SI_FAILURE if no slots found
+ * Returns:	SI_FAILURE if no slots found
  *		claimed slot number if successful
  *
  * WARNING, WARNING: The caller is expected to obtain the siport_mutex
@@ -2594,17 +2586,17 @@ si_deliver_satapkt(
 	case 0:
 		/*
 		 * satacmd_addr_type will be 0 for the commands below:
-		 * 	SATAC_PACKET
-		 * 	SATAC_IDLE_IM
-		 * 	SATAC_STANDBY_IM
-		 * 	SATAC_DOWNLOAD_MICROCODE
-		 * 	SATAC_FLUSH_CACHE
-		 * 	SATAC_SET_FEATURES
-		 * 	SATAC_SMART
-		 * 	SATAC_ID_PACKET_DEVICE
-		 * 	SATAC_ID_DEVICE
-		 * 	SATAC_READ_PORTMULT
-		 * 	SATAC_WRITE_PORTMULT
+		 *	SATAC_PACKET
+		 *	SATAC_IDLE_IM
+		 *	SATAC_STANDBY_IM
+		 *	SATAC_DOWNLOAD_MICROCODE
+		 *	SATAC_FLUSH_CACHE
+		 *	SATAC_SET_FEATURES
+		 *	SATAC_SMART
+		 *	SATAC_ID_PACKET_DEVICE
+		 *	SATAC_ID_DEVICE
+		 *	SATAC_READ_PORTMULT
+		 *	SATAC_WRITE_PORTMULT
 		 */
 		/* FALLTHRU */
 
@@ -3980,9 +3972,9 @@ si_intr_command_error(
 	    port,
 	    slot_status,
 	    failed_tags,
-	    0, 	/* timedout_tags */
-	    0, 	/* aborting_tags */
-	    0); 	/* reset_tags */
+	    0,	/* timedout_tags */
+	    0,	/* aborting_tags */
+	    0);	/* reset_tags */
 
 	ASSERT(si_portp->siport_pending_tags == 0);
 
@@ -5911,7 +5903,7 @@ si_log(si_ctl_state_t *si_ctlp, si_port_state_t *si_portp, char *fmt, ...)
 
 static void
 si_copy_out_regs(sata_cmd_t *scmd, si_ctl_state_t *si_ctlp, uint8_t port,
-	uint8_t slot)
+    uint8_t slot)
 {
 	uint32_t *fis_word_ptr;
 	si_prb_t *prb;

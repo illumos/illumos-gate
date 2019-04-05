@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 ROOT_HVM_DIR		= $(ROOT_PLAT_DIR)/i86hvm
 ROOT_HVM_MOD_DIR	= $(ROOT_HVM_DIR)/kernel
@@ -34,8 +35,6 @@ ROOT_HVM_MISC_DIR_32	= $(ROOT_HVM_MOD_DIR)/misc
 ROOT_HVM_MISC_DIR_64	= $(ROOT_HVM_MOD_DIR)/misc/$(MACH64)
 ROOT_HVM_MISC_DIR	= $(ROOT_HVM_MISC_DIR_$(CLASS))
 USR_HVM_DIR		= $(USR_PLAT_DIR)/i86hvm
-
-HVM_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/i86hvm/lint-libs/$(OBJS_DIR)
 
 #
 #       Define modules.
@@ -49,9 +48,6 @@ include $(UTSBASE)/i86pc/i86hvm/Makefile.files
 #       Include common rules.
 #
 include $(UTSBASE)/i86pc/Makefile.i86pc
-
-LINTS_DIR	= $(OBJS_DIR)
-LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
 
 #
 # Indicate that we are building for the i86hvm semi-platform.

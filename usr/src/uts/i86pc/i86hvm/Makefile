@@ -23,7 +23,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #	This makefile drives the production of the i86hvm platform modules.
 #
@@ -46,12 +46,8 @@ install		:=	TARGET= install
 install_h	:=	TARGET= install_h
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-lintlib		:=	TARGET= lintlib
-modlintlib	:=	TARGET= modlintlib
 modlist		:=	TARGET= modlist
 modlist		:=	NO_STATE= -K $$MODSTATE$$$$
-clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
@@ -61,7 +57,7 @@ check		:=	TARGET= check
 
 .PARALLEL: $(HVM_KMODS)
 
-def all clean clobber clean.lint modlist modlintlib:	$(HVM_KMODS)
+def all clean clobber modlist:	$(HVM_KMODS)
 
 install: install_implementations .WAIT \
 	$(HVM_KMODS)
@@ -76,31 +72,6 @@ $(HVM_KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 install_h check:	FRC
-
-lintlib lint:	modlintlib .WAIT $(LINT_DEPS)
-
-#
-# The 'lint.platmod' target lints the i86hvm platform modules against the i86pc
-# kernel.  This ends up doing all the kernel cross-checks.
-#
-LINT_TARGET	= lint.platmod
-INTEL_LIB_DIR	= $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
-INTEL_LINTS	= genunix
-LINT_LIBS	= $(LINT_LIB) \
-		  -L$(HVM_LINT_LIB_DIR) \
-		  -L$(LINT_LIB_DIR) \
-			$(GENUNIX_KMODS:%=-l%) \
-			$(PARALLEL_KMODS:%=-l%) \
-			$(CLOSED_KMODS:%=-l%) \
-		  -L$(INTEL_LIB_DIR) \
-			$(INTEL_LINTS:%=-l%)
-
-# workaround for multiply defined errors
-lint.platmod := LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
-
-lint.platmod:   modlintlib
-	@-$(ECHO) "\ni86hvm platform-dependent module: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 #
 #	Include common targets.

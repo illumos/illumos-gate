@@ -25,6 +25,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -44,7 +45,6 @@ UTSBASE	= ../..
 #
 MODULE		= pcplusmp
 OBJECTS		= $(PCPLUSMP_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCPLUSMP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MACH_DIR)/$(MODULE)
 
 #
@@ -56,7 +56,6 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 DEBUG_FLGS      =
@@ -82,12 +81,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

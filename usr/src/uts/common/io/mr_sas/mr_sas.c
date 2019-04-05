@@ -4214,7 +4214,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 				    (uint8_t)~MRDRV_TGT_VALID;
 				mutex_exit(&instance->config_dev_mtx);
 				rval = mrsas_service_evt(instance, tgt, 0,
-				    MRSAS_EVT_UNCONFIG_TGT, NULL);
+				    MRSAS_EVT_UNCONFIG_TGT, 0);
 				con_log(CL_ANN1, (CE_WARN,
 				    "mr_sas: CFG CLEARED AEN rval = %d "
 				    "tgt id = %d", rval, tgt));
@@ -4230,7 +4230,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 		mutex_exit(&instance->config_dev_mtx);
 		rval = mrsas_service_evt(instance,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id), 0,
-		    MRSAS_EVT_UNCONFIG_TGT, NULL);
+		    MRSAS_EVT_UNCONFIG_TGT, 0);
 		con_log(CL_ANN1, (CE_WARN, "mr_sas: LD DELETED AEN rval = %d "
 		    "tgt id = %d index = %d", rval,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id),
@@ -4241,7 +4241,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 	case MR_EVT_LD_CREATED: {
 		rval = mrsas_service_evt(instance,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id), 0,
-		    MRSAS_EVT_CONFIG_TGT, NULL);
+		    MRSAS_EVT_CONFIG_TGT, 0);
 		con_log(CL_ANN1, (CE_WARN, "mr_sas: LD CREATED AEN rval = %d "
 		    "tgt id = %d index = %d", rval,
 		    ddi_get16(acc_handle, &evt_detail->args.ld.target_id),
@@ -4264,7 +4264,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 			mutex_exit(&instance->config_dev_mtx);
 			rval = mrsas_service_evt(instance, ddi_get16(
 			    acc_handle, &evt_detail->args.pd.device_id),
-			    1, MRSAS_EVT_UNCONFIG_TGT, NULL);
+			    1, MRSAS_EVT_UNCONFIG_TGT, 0);
 			con_log(CL_ANN1, (CE_WARN, "mr_sas: PD_REMOVED:"
 			    "rval = %d tgt id = %d ", rval,
 			    ddi_get16(acc_handle,
@@ -4278,7 +4278,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 			rval = mrsas_service_evt(instance,
 			    ddi_get16(acc_handle,
 			    &evt_detail->args.pd.device_id),
-			    1, MRSAS_EVT_CONFIG_TGT, NULL);
+			    1, MRSAS_EVT_CONFIG_TGT, 0);
 			con_log(CL_ANN1, (CE_WARN, "mr_sas: PD_INSERTEDi_EXT:"
 			    "rval = %d tgt id = %d ", rval,
 			    ddi_get16(acc_handle,
@@ -4301,7 +4301,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 				rval = mrsas_service_evt(instance,
 				    ddi_get16(acc_handle,
 				    &evt_detail->args.pd.device_id),
-				    1, MRSAS_EVT_UNCONFIG_TGT, NULL);
+				    1, MRSAS_EVT_UNCONFIG_TGT, 0);
 				con_log(CL_ANN1, (CE_WARN, "mr_sas: PD_REMOVED:"
 				    "rval = %d tgt id = %d ", rval,
 				    ddi_get16(acc_handle,
@@ -4314,7 +4314,7 @@ service_mfi_aen(struct mrsas_instance *instance, struct mrsas_cmd *cmd)
 				rval = mrsas_service_evt(instance,
 				    ddi_get16(acc_handle,
 				    &evt_detail->args.pd.device_id),
-				    1, MRSAS_EVT_CONFIG_TGT, NULL);
+				    1, MRSAS_EVT_CONFIG_TGT, 0);
 				con_log(CL_ANN1, (CE_WARN,
 				    "mr_sas: PD_INSERTED: rval = %d "
 				    " tgt id = %d ", rval,
@@ -7590,7 +7590,7 @@ mrsas_config_ld(struct mrsas_instance *instance, uint16_t tgt,
 		}
 		if (instance->mr_ld_list[tgt].flag != MRDRV_TGT_VALID) {
 			rval = mrsas_service_evt(instance, tgt, 0,
-			    MRSAS_EVT_UNCONFIG_TGT, NULL);
+			    MRSAS_EVT_UNCONFIG_TGT, 0);
 			con_log(CL_ANN1, (CE_WARN,
 			    "mr_sas: DELETING STALE ENTRY rval = %d "
 			    "tgt id = %d ", rval, tgt));
@@ -7833,7 +7833,7 @@ mrsas_mode_sense_build(struct scsi_pkt *pkt)
 	if ((!bp) && bp->b_un.b_addr && bp->b_bcount && acmd->cmd_dmacount) {
 		con_log(CL_ANN1, (CE_WARN, "Failing MODESENSE Command"));
 		/* ADD pkt statistics as Command failed. */
-		return (NULL);
+		return (0);
 	}
 
 	bp_mapin(bp);
@@ -7871,5 +7871,5 @@ mrsas_mode_sense_build(struct scsi_pkt *pkt)
 		default:
 			break;
 	}
-	return (NULL);
+	return (0);
 }

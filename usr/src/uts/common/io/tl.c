@@ -392,7 +392,7 @@
 #define		TL_ID		(104)		/* module ID number */
 #define		TL_NAME		"tl"		/* module name */
 #define		TL_MINPSZ	(0)		/* min packet size */
-#define		TL_MAXPSZ	INFPSZ 		/* max packet size ZZZ */
+#define		TL_MAXPSZ	INFPSZ		/* max packet size ZZZ */
 #define		TL_HIWAT	(16*1024)	/* hi water mark */
 #define		TL_LOWAT	(256)		/* lo water mark */
 /*
@@ -400,8 +400,8 @@
  * We view the socket use as a separate mode to get a separate name space.
  */
 #define		TL_TICOTS	0	/* connection oriented transport */
-#define		TL_TICOTSORD 	1	/* COTS w/ orderly release */
-#define		TL_TICLTS 	2	/* connectionless transport */
+#define		TL_TICOTSORD	1	/* COTS w/ orderly release */
+#define		TL_TICLTS	2	/* connectionless transport */
 #define		TL_UNUSED	3
 #define		TL_SOCKET	4	/* Socket */
 #define		TL_SOCK_COTS	(TL_SOCKET|TL_TICOTS)
@@ -576,7 +576,7 @@ struct tl_endpt {
 	queue_t		*te_rq;		/* stream read queue */
 	queue_t		*te_wq;		/* stream write queue */
 	uint32_t	te_refcnt;
-	int32_t 	te_state;	/* TPI state of endpoint */
+	int32_t		te_state;	/* TPI state of endpoint */
 	minor_t		te_minor;	/* minor number */
 #define	te_seqno	te_minor
 	uint_t		te_flag;	/* flag field */
@@ -974,7 +974,7 @@ tl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		if (ddi_create_minor_node(devi,
 		    tl_transports[i].tr_name,
 		    S_IFCHR, tl_transports[i].tr_minor,
-		    DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    DDI_PSEUDO, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(devi, NULL);
 			return (DDI_FAILURE);
 		}
@@ -1363,7 +1363,7 @@ tl_hash_by_addr(void *hash_data, mod_hash_key_t key)
 static int
 tl_hash_cmp_addr(mod_hash_key_t key1, mod_hash_key_t key2)
 {
-#ifdef 	DEBUG
+#ifdef	DEBUG
 	tl_addr_t *ap1 = (tl_addr_t *)key1;
 	tl_addr_t *ap2 = (tl_addr_t *)key2;
 
@@ -3062,7 +3062,7 @@ tl_conn_req_ser(mblk_t *mp, tl_endpt_t *tep)
 	void		*addr_startp;
 	t_scalar_t	olen = creq->OPT_length;
 	t_scalar_t	ooff = creq->OPT_offset;
-	size_t 		ci_msz;
+	size_t		ci_msz;
 	size_t		size;
 	cred_t		*cr = NULL;
 	pid_t		cpid;
@@ -3337,7 +3337,7 @@ tl_conn_res(mblk_t *mp, tl_endpt_t *tep)
 	t_scalar_t		olen, ooff, err = 0;
 	t_scalar_t		prim = cres->PRIM_type;
 	uchar_t			*addr_startp;
-	tl_endpt_t 		*acc_ep = NULL, *cl_ep = NULL;
+	tl_endpt_t		*acc_ep = NULL, *cl_ep = NULL;
 	tl_icon_t		*tip;
 	size_t			size;
 	mblk_t			*ackmp, *respmp;
@@ -5536,7 +5536,7 @@ tl_co_unconnect(tl_endpt_t *tep)
 	tl_endpt_t	*peer_tep = tep->te_conp;
 	tl_endpt_t	*srv_tep = tep->te_oconp;
 	list_t		*l;
-	tl_icon_t  	*tip;
+	tl_icon_t	*tip;
 	tl_endpt_t	*cl_tep;
 	mblk_t		*d_mp;
 

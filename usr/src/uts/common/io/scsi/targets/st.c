@@ -1144,7 +1144,7 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		minor |= MTMINOR(instance);
 
 		if (ddi_create_minor_node(devi, name, S_IFCHR, minor,
-		    DDI_NT_TAPE, NULL) == DDI_SUCCESS) {
+		    DDI_NT_TAPE, 0) == DDI_SUCCESS) {
 			continue;
 		}
 

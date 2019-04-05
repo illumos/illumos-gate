@@ -1039,7 +1039,7 @@ rib_clnt_scq_handler(ibt_cq_hdl_t cq_hdl, void *arg)
 			default:
 /*
  *    RC Send Q Error Code		Local state     Remote State
- *    ==================== 		===========     ============
+ *    ====================		===========     ============
  *    IBT_WC_BAD_RESPONSE_ERR             ERROR           None
  *    IBT_WC_LOCAL_LEN_ERR                ERROR           None
  *    IBT_WC_LOCAL_CHAN_OP_ERR            ERROR           None
@@ -1797,7 +1797,7 @@ rib_conn_to_srv(rib_hca_t *hca, rib_qp_t *qp, rpcib_ping_t *rptp)
 	ibt_chan_sizes_t	chan_sizes;
 	ibt_rc_chan_alloc_args_t	qp_attr;
 	ibt_status_t		ibt_status;
-	ibt_rc_returns_t	ret_args;   	/* conn reject info */
+	ibt_rc_returns_t	ret_args;	/* conn reject info */
 	int refresh = REFRESH_ATTEMPTS;	/* refresh if IBT_CM_CONN_STALE */
 	ibt_ip_cm_info_t	ipcm_info;
 	uint8_t cmp_ip_pvt[IBT_IP_HDR_PRIV_DATA_SZ];
@@ -1963,7 +1963,7 @@ rib_ping_srv(int addr_type, struct netbuf *raddr, rpcib_ping_t *rptp)
 			continue;
 		}
 
-		ipattr.ipa_dst_ip 	= &rptp->dstip;
+		ipattr.ipa_dst_ip	= &rptp->dstip;
 		ipattr.ipa_hca_guid	= hca->hca_guid;
 		ipattr.ipa_ndst		= 1;
 		ipattr.ipa_max_paths	= 1;
@@ -3592,7 +3592,7 @@ rib_addreplylist(rib_qp_t *qp, uint32_t msgid)
 		return (NULL);
 	}
 	rep->xid = msgid;
-	rep->vaddr_cq = NULL;
+	rep->vaddr_cq = 0;
 	rep->bytes_xfer = 0;
 	rep->status = (uint_t)REPLY_WAIT;
 	rep->prev = NULL;
@@ -3672,7 +3672,7 @@ rib_registermem(CONN *conn,  caddr_t adsp, caddr_t buf, uint_t buflen,
 		buf_handle->mrc_lmr = (uint32_t)mr_desc.md_lkey;
 		buf_handle->mrc_rmr = (uint32_t)mr_desc.md_rkey;
 	} else {
-		buf_handle->mrc_linfo = NULL;
+		buf_handle->mrc_linfo = (uintptr_t)NULL;
 		buf_handle->mrc_lmr = 0;
 		buf_handle->mrc_rmr = 0;
 	}
@@ -3754,7 +3754,7 @@ rib_registermemsync(CONN *conn,  caddr_t adsp, caddr_t buf, uint_t buflen,
 		buf_handle->mrc_rmr = (uint32_t)mr_desc.md_rkey;
 		*sync_handle = (RIB_SYNCMEM_HANDLE)mr_hdl;
 	} else {
-		buf_handle->mrc_linfo = NULL;
+		buf_handle->mrc_linfo = (uintptr_t)NULL;
 		buf_handle->mrc_lmr = 0;
 		buf_handle->mrc_rmr = 0;
 	}
@@ -4707,7 +4707,7 @@ rib_close_a_channel(CONN *conn)
 static void
 rib_close_channels(rib_conn_list_t *connlist)
 {
-	CONN 		*conn, *tmp;
+	CONN		*conn, *tmp;
 
 	rw_enter(&connlist->conn_lock, RW_READER);
 	conn = connlist->conn_hd;
@@ -4750,7 +4750,7 @@ next:
 static void
 rib_purge_connlist(rib_conn_list_t *connlist)
 {
-	CONN 		*conn;
+	CONN		*conn;
 
 top:
 	rw_enter(&connlist->conn_lock, RW_READER);
@@ -5041,7 +5041,7 @@ rib_get_cache_buf(CONN *conn, uint32_t len)
 	cache_avl_struct_t	cas, *rcas;
 	rib_hca_t	*hca = (ctoqp(conn))->hca;
 	rib_lrc_entry_t *reply_buf;
-	avl_index_t where = NULL;
+	avl_index_t where = (uintptr_t)NULL;
 	uint64_t c_alloc = 0;
 
 	if (!hca->avl_init)
@@ -5152,7 +5152,7 @@ static void
 rib_free_cache_buf(CONN *conn, rib_lrc_entry_t *reg_buf)
 {
 	cache_avl_struct_t    cas, *rcas;
-	avl_index_t where = NULL;
+	avl_index_t where = (uintptr_t)NULL;
 	rib_hca_t	*hca = (ctoqp(conn))->hca;
 
 	if (!hca->avl_init)
@@ -5205,7 +5205,7 @@ rib_registermem_via_hca(rib_hca_t *hca, caddr_t adsp, caddr_t buf,
 		buf_handle->mrc_lmr = (uint32_t)mr_desc.md_lkey;
 		buf_handle->mrc_rmr = (uint32_t)mr_desc.md_rkey;
 	} else {
-		buf_handle->mrc_linfo = NULL;
+		buf_handle->mrc_linfo = (uintptr_t)NULL;
 		buf_handle->mrc_lmr = 0;
 		buf_handle->mrc_rmr = 0;
 	}

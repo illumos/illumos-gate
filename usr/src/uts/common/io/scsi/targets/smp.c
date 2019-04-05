@@ -247,7 +247,7 @@ smp_do_attach(dev_info_t *dip)
 	 * For simplicity, the minor number == the instance number
 	 */
 	if (ddi_create_minor_node(dip, "smp", S_IFCHR,
-	    instance, DDI_NT_SMP, NULL) == DDI_FAILURE) {
+	    instance, DDI_NT_SMP, 0) == DDI_FAILURE) {
 		smp_log(smp_state, CE_NOTE,
 		    "!smp_do_attach: minor node creation failed, "
 		    "device unit-address @%s", ddi_get_name_addr(dip));

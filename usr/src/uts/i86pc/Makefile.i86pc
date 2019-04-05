@@ -25,6 +25,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright 2017 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #
 #	This makefile contains the common definitions for the i86pc unix
@@ -59,12 +60,6 @@ UNIX_DIR	 = $(UTSBASE)/$(PLATFORM)/unix
 GENLIB_DIR	 = $(UTSBASE)/intel/genunix
 MODSTUBS_DIR	 = $(UNIX_DIR)
 DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
-LINTS_DIR	 = $(OBJS_DIR)
-LINT_LIB_DIR	 = $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
-GEN_LINT_LIB_DIR = $(UTSBASE)/intel/lint-libs/$(OBJS_DIR)
-
-LINT32_DIRS	 = $(LINT32_BUILDS:%=$(UTSBASE)/$(PLATFORM)/lint-libs/%)
-LINT32_FILES	 = $(LINT32_DIRS:%=%/llib-l$(MODULE).ln)
 
 DTRACESTUBS_O	 = $(OBJS_DIR)/dtracestubs.o
 DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
@@ -73,10 +68,7 @@ SYM_MOD		= $(OBJS_DIR)/unix.sym
 
 UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
-GENLIB	 	 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
-LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
-DBOOT_LINT_LIB	 = $(LINT_LIB_DIR)/llib-ldboot.ln
-GEN_LINT_LIB	 = $(GEN_LINT_LIB_DIR)/llib-lgenunix.ln
+GENLIB		 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
 
 #
 #	Include the makefiles which define build rule templates, the
@@ -259,7 +251,7 @@ DRV_KMODS	+= npe
 DRV_KMODS	+= pci-ide
 DRV_KMODS	+= xsvc
 DRV_KMODS	+= tzmon
-DRV_KMODS	+= acpi_drv 
+DRV_KMODS	+= acpi_drv
 DRV_KMODS	+= acpinex
 DRV_KMODS	+= amd_iommu
 DRV_KMODS	+= dr
@@ -274,7 +266,7 @@ DRV_KMODS	+= cpudrv
 
 #
 # Platform Power Modules
-# 
+#
 DRV_KMODS	+= ppm acpippm
 
 #
@@ -325,7 +317,7 @@ DACF_KMODS	+= consconfig_dacf
 #
 #	'Mach' Modules (/kernel/mach):
 #
-MACH_KMODS     	+= uppc
+MACH_KMODS	+= uppc
 
 #
 #	CPR Misc Module.

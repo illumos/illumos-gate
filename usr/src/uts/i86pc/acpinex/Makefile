@@ -25,6 +25,7 @@
 # All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #	This makefile drives the production of the ACPI virtual nexus
 #	kernel module.
@@ -42,7 +43,6 @@ UTSBASE	= ../..
 #
 MODULE		= acpinex
 OBJECTS		= $(ACPINEX_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(ACPINEX_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 #
@@ -54,7 +54,6 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
@@ -79,12 +78,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 

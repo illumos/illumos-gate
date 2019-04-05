@@ -114,22 +114,22 @@ static struct bus_ops pcieb_bus_ops = {
 	ndi_busop_remove_eventcall,	/* (*bus_remove_eventcall)();	*/
 	ndi_post_event,			/* (*bus_post_event)();		*/
 	NULL,				/* (*bus_intr_ctl)();		*/
-	NULL,				/* (*bus_config)(); 		*/
-	NULL,				/* (*bus_unconfig)(); 		*/
-	pcieb_fm_init_child,		/* (*bus_fm_init)(); 		*/
-	NULL,				/* (*bus_fm_fini)(); 		*/
-	i_ndi_busop_access_enter,	/* (*bus_fm_access_enter)(); 	*/
-	i_ndi_busop_access_exit,	/* (*bus_fm_access_exit)(); 	*/
-	pcie_bus_power,			/* (*bus_power)(); 	*/
-	pcieb_intr_ops,			/* (*bus_intr_op)(); 		*/
-	pcie_hp_common_ops		/* (*bus_hp_op)(); 		*/
+	NULL,				/* (*bus_config)();		*/
+	NULL,				/* (*bus_unconfig)();		*/
+	pcieb_fm_init_child,		/* (*bus_fm_init)();		*/
+	NULL,				/* (*bus_fm_fini)();		*/
+	i_ndi_busop_access_enter,	/* (*bus_fm_access_enter)();	*/
+	i_ndi_busop_access_exit,	/* (*bus_fm_access_exit)();	*/
+	pcie_bus_power,			/* (*bus_power)();		*/
+	pcieb_intr_ops,			/* (*bus_intr_op)();		*/
+	pcie_hp_common_ops		/* (*bus_hp_op)();		*/
 };
 
 static int	pcieb_open(dev_t *, int, int, cred_t *);
 static int	pcieb_close(dev_t, int, int, cred_t *);
 static int	pcieb_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int	pcieb_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
-static uint_t 	pcieb_intr_handler(caddr_t arg1, caddr_t arg2);
+static uint_t	pcieb_intr_handler(caddr_t arg1, caddr_t arg2);
 
 /* PM related functions */
 static int	pcieb_pwr_setup(dev_info_t *dip);
@@ -205,7 +205,7 @@ static struct modlinkage modlinkage = {
  * forward function declarations:
  */
 static void	pcieb_uninitchild(dev_info_t *);
-static int 	pcieb_initchild(dev_info_t *child);
+static int	pcieb_initchild(dev_info_t *child);
 static void	pcieb_create_ranges_prop(dev_info_t *, ddi_acc_handle_t);
 static boolean_t pcieb_is_pcie_device_type(dev_info_t *dip);
 
@@ -325,7 +325,7 @@ pcieb_41210_mps_wkrnd(dev_info_t *cdip)
 		}
 
 		/* get sdip's MPS/MRRS to compare to cdip's */
-		sdip_dev_ctrl = PCI_CAP_GET16(cfg_hdl, NULL, cap_ptr,
+		sdip_dev_ctrl = PCI_CAP_GET16(cfg_hdl, 0, cap_ptr,
 		    PCIE_DEVCTL);
 		sdip_mrrs_mps = sdip_dev_ctrl &
 		    (PCIE_DEVCTL_MAX_READ_REQ_MASK |
@@ -344,7 +344,7 @@ pcieb_41210_mps_wkrnd(dev_info_t *cdip)
 			    ~(PCIE_DEVCTL_MAX_READ_REQ_MASK |
 			    PCIE_DEVCTL_MAX_PAYLOAD_MASK)) | cdip_mrrs_mps;
 
-			PCI_CAP_PUT16(cfg_hdl, NULL, cap_ptr, PCIE_DEVCTL,
+			PCI_CAP_PUT16(cfg_hdl, 0, cap_ptr, PCIE_DEVCTL,
 			    sdip_dev_ctrl);
 		}
 
@@ -1166,7 +1166,7 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 
 	/* Get the MSI offset for hotplug/PME from the PCIe cap reg */
 	if (intr_type == DDI_INTR_TYPE_MSI) {
-		hp_msi_off = PCI_CAP_GET16(bus_p->bus_cfg_hdl, NULL,
+		hp_msi_off = PCI_CAP_GET16(bus_p->bus_cfg_hdl, 0,
 		    bus_p->bus_pcie_off, PCIE_PCIECAP) &
 		    PCIE_PCIECAP_INT_MSG_NUM;
 
@@ -1196,7 +1196,7 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 	if ((intr_type == DDI_INTR_TYPE_MSI) && PCIE_IS_RP(bus_p)) {
 		if (PCIE_HAS_AER(bus_p)) {
 			int aer_msi_off;
-			aer_msi_off = (PCI_XCAP_GET32(bus_p->bus_cfg_hdl, NULL,
+			aer_msi_off = (PCI_XCAP_GET32(bus_p->bus_cfg_hdl, 0,
 			    bus_p->bus_aer_off, PCIE_AER_RE_STS) >>
 			    PCIE_AER_RE_STS_MSG_NUM_SHIFT) &
 			    PCIE_AER_RE_STS_MSG_NUM_MASK;
@@ -1354,7 +1354,7 @@ pcieb_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 static int
 pcieb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
-	int *rvalp)
+    int *rvalp)
 {
 	int		inst = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
 	pcieb_devstate_t	*pcieb = ddi_get_soft_state(pcieb_state, inst);
@@ -1443,8 +1443,8 @@ FAIL:
  */
 static int
 pcieb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
-	ddi_dma_handle_t *handlep)
+    ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
+    ddi_dma_handle_t *handlep)
 {
 	int		ret;
 #ifdef	PCIEB_BCM
@@ -1495,8 +1495,8 @@ pcieb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 /*ARGSUSED*/
 static int
 pcieb_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
-	enum ddi_dma_ctlops cmd, off_t *offp, size_t *lenp, caddr_t *objp,
-	uint_t cache_flags)
+    enum ddi_dma_ctlops cmd, off_t *offp, size_t *lenp, caddr_t *objp,
+    uint_t cache_flags)
 {
 	int	ret;
 
@@ -1573,7 +1573,7 @@ pcieb_pwr_setup(dev_info_t *dip)
 	 * Save offset to pmcsr for future references.
 	 */
 	pwr_p->pwr_pmcsr_offset = cap_ptr + PCI_PMCSR;
-	pmcap = PCI_CAP_GET16(conf_hdl, NULL, cap_ptr, PCI_PMCAP);
+	pmcap = PCI_CAP_GET16(conf_hdl, 0, cap_ptr, PCI_PMCAP);
 	if (pmcap & PCI_PMCAP_D1) {
 		PCIEB_DEBUG(DBG_PWR, dip, "D1 state supported\n");
 		pwr_p->pwr_pmcaps |= PCIE_SUPPORTS_D1;
@@ -1752,7 +1752,7 @@ pcieb_id_props(pcieb_devstate_t *pcieb)
 #endif	/* PX_PLX */
 	if ((fic == 0) && ((PCI_CAP_LOCATE(config_handle,
 	    PCI_CAP_ID_SLOT_ID, &cap_ptr)) != DDI_FAILURE)) {
-		uint8_t esr = PCI_CAP_GET8(config_handle, NULL,
+		uint8_t esr = PCI_CAP_GET8(config_handle, 0,
 		    cap_ptr, PCI_CAP_ID_REGS_OFF);
 		if (PCI_CAPSLOT_FIC(esr))
 			fic = 1;
@@ -1761,10 +1761,10 @@ pcieb_id_props(pcieb_devstate_t *pcieb)
 	if ((PCI_CAP_LOCATE(config_handle,
 	    PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_SER), &cap_ptr)) != DDI_FAILURE) {
 		/* Serialid can be 0 thru a full 40b number */
-		serialid = PCI_XCAP_GET32(config_handle, NULL,
+		serialid = PCI_XCAP_GET32(config_handle, 0,
 		    cap_ptr, PCIE_SER_SID_UPPER_DW);
 		serialid <<= 32;
-		serialid |= PCI_XCAP_GET32(config_handle, NULL,
+		serialid |= PCI_XCAP_GET32(config_handle, 0,
 		    cap_ptr, PCIE_SER_SID_LOWER_DW);
 	}
 
@@ -1778,7 +1778,7 @@ pcieb_id_props(pcieb_devstate_t *pcieb)
 
 static void
 pcieb_create_ranges_prop(dev_info_t *dip,
-	ddi_acc_handle_t config_handle)
+    ddi_acc_handle_t config_handle)
 {
 	uint32_t base, limit;
 	ppb_ranges_t	ranges[PCIEB_RANGE_LEN];

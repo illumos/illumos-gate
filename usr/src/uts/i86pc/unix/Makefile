@@ -23,6 +23,7 @@
 # Copyright 2016 Joyent, Inc.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -39,13 +40,6 @@ OBJECTS		= $(SPECIAL_OBJS:%=$(OBJS_DIR)/%) \
 		  $(CORE_OBJS:%=$(OBJS_DIR)/%) \
 		  $(KRTLD_OBJS:%=$(OBJS_DIR)/%) \
 		  $(MACH_NOT_YET_KMODS:%=$(OBJS_DIR)/%)
-
-LINTS		= $(SPECIAL_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(CORE_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(KRTLD_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(MACH_NOT_YET_KMODS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(LINTS_DIR)/vers.ln \
-		  $(LINTS_DIR)/modstubs.ln
 
 ROOTMODULE	= $(ROOT_PSM_KERN_DIR)/$(UNIX)
 
@@ -67,9 +61,6 @@ DBOOT_OBJECTS	= $(DBOOT_OBJS:%=$(DBOOT_OBJS_DIR)/%)
 DBOOT_BIN	= $(DBOOT_OBJS_DIR)/$(DBOOT)
 DBOOT_O		= $(OBJS_DIR)/$(DBOOT).o
 DBOOT_S		= $(DBOOT_O:%.o=%.s)
-DBOOT_LINTS	= $(DBOOT_OBJS:%.o=$(DBOOT_OBJS_DIR)/%.ln)
-DBOOT_LINT	= $(i386_LINT)
-DBOOT_LINTTAGS	= -erroff=E_STATIC_UNUSED
 
 #
 #	Include common rules.
@@ -80,7 +71,6 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #	Define targets
 #
 ALL_TARGET	= $(UNIX_BIN)
-LINT_TARGET	= $(LINT_LIB) $(DBOOT_LINT_LIB)
 INSTALL_TARGET	= $(UNIX_BIN) $(ROOTMODULE)
 
 #
@@ -121,7 +111,6 @@ CLEANFILES	+= \
 	$(ZLIB_OBJS:%.o=$(OBJS_DIR)/%.ln)
 
 CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN)
-CLEANLINTFILES	+= $(LINT_LIB) $(DBOOT_LINT_LIB) $(DBOOT_LINTS)
 
 # instr_size needs a special header
 $(OBJS_DIR)/instr_size.o :=	EXTRA_OPTIONS	= -I$(SRC)/common/dis/i386
@@ -136,17 +125,10 @@ $(OBJS_DIR)/comm_page_ctf.o :=	CERRWARN += -_cc=-erroff=E_TKNS_IGNORED_AT_END_OF
 CFLAGS += -DDIS_MEM
 
 #
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
+# For now, disable these checks; maintainers should endeavor
+# to investigate and remove these for maximum coverage.
 # Please do not carry these forward to new Makefiles.
 #
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
-LINTTAGS	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-
 CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-char-subscripts
@@ -168,11 +150,6 @@ $(OBJS_DIR)/fmsmb.o := SMOFF += indenting
 $(OBJS_DIR)/zutil.o := SMOFF += indenting
 $(OBJS_DIR)/bootrd_cpio.o := SMOFF += allocating_enough_data
 
-# Ensure that lint sees 'struct cpu' containing a fully declared
-# embedded 'struct machcpu'
-#
-LINTFLAGS	+= -D_MACHDEP -I../../i86pc
-
 #
 #	Default build targets.
 #
@@ -185,10 +162,6 @@ all: $(ALL_DEPS)
 clean: $(CLEAN_DEPS)
 
 clobber: $(CLOBBER_DEPS)
-
-lint: $(LINT_DEPS)
-
-clean.lint: $(CLEAN_LINT_DEPS)
 
 install: $(INSTALL_DEPS)
 
@@ -235,30 +208,6 @@ $(OBJS_DIR)/comm_page_ctf.o:	$(COMMP_CTF_SRC)
 #
 $(DSF_DIR)/$(OBJS_DIR)/assym.h $(DSF_DIR)/$(OBJS_DIR)/kdi_assym.h:	FRC
 	@cd $(DSF_DIR); $(MAKE) all.targ
-
-#
-#	The global lint target builds the kernel lint library (llib-lunix.ln)
-#	which is equivalent to a lint of /unix.o. Then all kernel modules for
-#	this architecture are linted against the kernel lint library.
-#
-#	Note:	lint errors in the kernel lint library will be repeated for
-#		each module. It is important that the kernel lint library
-#		be clean to keep the textual output to a reasonable level.
-#
-
-$(LINT_LIB):	$(LINT_LIB_DIR) $(LINTS)
-	@pwd
-	@-$(ECHO) "\n$(UNIX): (library construction):"
-	@$(LINT) -o$(UNIX) $(LINTFLAGS) $(LINTS)
-	@$(MV) $(@F) $@
-
-$(DBOOT_LINT_LIB):	$(LINT_LIB_DIR) $(DBOOT_LINTS)
-	@pwd
-	@-$(ECHO) "\n$(DBOOT): (library construction):"
-	@$(LINT) -o$(DBOOT) $(DBOOT_LINTFLAGS) $(DBOOT_LINTS)
-	@$(MV) $(@F) $@
-
-lintlib:	$(LINT_DEPS)
 
 #
 #	Include common targets.

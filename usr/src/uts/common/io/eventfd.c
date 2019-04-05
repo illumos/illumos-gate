@@ -69,7 +69,7 @@ eventfd_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 	if (ddi_soft_state_zalloc(eventfd_softstate, minor) != DDI_SUCCESS) {
 		vmem_free(eventfd_minor, (void *)(uintptr_t)minor, 1);
 		mutex_exit(&eventfd_lock);
-		return (NULL);
+		return (ENXIO);
 	}
 
 	state = ddi_get_soft_state(eventfd_softstate, minor);
@@ -361,7 +361,7 @@ eventfd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "eventfd", S_IFCHR,
-	    EVENTFDMNRN_EVENTFD, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+	    EVENTFDMNRN_EVENTFD, DDI_PSEUDO, 0) == DDI_FAILURE) {
 		cmn_err(CE_NOTE, "/dev/eventfd couldn't create minor node");
 		ddi_soft_state_fini(&eventfd_softstate);
 		mutex_exit(&eventfd_lock);

@@ -184,7 +184,7 @@ ptsl_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	for (tty_num = 0; tty_num < npty; tty_num++) {
 		(void) sprintf(name, "tty%c%c", *tty_bank, *tty_digit);
 		if (ddi_create_minor_node(devi, name, S_IFCHR,
-		    tty_num, DDI_PSEUDO, NULL) == DDI_FAILURE) {
+		    tty_num, DDI_PSEUDO, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(devi, NULL);
 			return (-1);
 		}

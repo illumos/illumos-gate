@@ -24,6 +24,7 @@
 #
 # Copyright (c) 2010, Intel Corporation.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #	This Makefile defines file modules in the directory uts/i86pc
 #	and its children. These are the source files which are i86pc
@@ -297,9 +298,7 @@ INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/common/xen
 #
 # Since the assym files are derived, the dependencies must be explicit for
 # all files including this file. (This is only actually required in the
-# instance when the .nse_depinfo file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(__lint) is true.
+# instance when the .nse_depinfo file does not exist.)
 #
 
 ASSYM_DEPS      +=		\

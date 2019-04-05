@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 # Copyright (c) 2011 Bayard G. Bell. All rights reserved.
 # Copyright 2016, Joyent, Inc.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #	This makefile drives the production of the cpr misc kernel module.
 #
@@ -44,9 +45,6 @@ MODULE		= cpr
 OBJECTS		= $(CPR_IMPL_OBJS:%=$(OBJS_DIR)/%) \
 		  $(CPR_OBJS:%=$(OBJS_DIR)/%) \
 		  $(CPR_INTEL_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(CPR_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(CPR_IMPL_OBJS:%.o=$(LINTS_DIR)/%.ln) \
-		  $(CPR_INTEL_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
@@ -65,19 +63,15 @@ LDFLAGS		+= -dy -N misc/acpica -N misc/bootdev
 #	Define targets
 #
 ALL_TARGET	= $(BINARY)
-LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-# lint pass one enforcement
-#
 CFLAGS += $(CCVERBOSE)
 
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-label
 CERRWARN	+= -_gcc=-Wno-uninitialized
 CERRWARN	+= -_gcc=-Wno-parentheses
-$(OBJS_DIR)/cpr_impl.o := 	CERRWARN	+= -_gcc=-Wno-unused-function
+$(OBJS_DIR)/cpr_impl.o :=	CERRWARN	+= -_gcc=-Wno-unused-function
 
 #
 #	Default build targets.
@@ -91,12 +85,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
-
-modlintlib:	$(MODLINTLIB_DEPS)
-
-clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
