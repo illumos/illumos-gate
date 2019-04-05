@@ -306,10 +306,10 @@ cons_change(const char *string)
 			    (C_ACTIVEIN | C_ACTIVEOUT)) ==
 			    (C_ACTIVEIN | C_ACTIVEOUT))
 				active++;
-	}
+		}
 
-	if (active == 0)
-		return (CMD_ERROR); /* Recovery failed. */
+		if (active == 0)
+			return (CMD_ERROR); /* Recovery failed. */
 	}
 
 	return (CMD_OK);
