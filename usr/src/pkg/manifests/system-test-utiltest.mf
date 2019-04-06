@@ -128,6 +128,8 @@ file path=opt/util-tests/tests/dis/i386/32.avx2.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx2.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi1.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi1.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi2.out mode=0444
@@ -178,6 +180,8 @@ file path=opt/util-tests/tests/dis/i386/64.avx2.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx2.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi1.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi1.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi2.out mode=0444

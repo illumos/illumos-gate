@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_SYS_AUXV_386_H
@@ -112,9 +112,11 @@ extern "C" {
 #define	AV_386_2_CLWB		0x00800000 /* CLWB insn */
 #define	AV_386_2_MONITORX	0x01000000 /* MONITORX insns */
 #define	AV_386_2_CLZERO		0x02000000 /* CLZERO */
+#define	AV_386_2_AVX512_VNNI	0x04000000 /* AVX512_VNNI */
 
 #define	FMT_AV_386_2							\
-	"\32clzero\31monitorx\030clwb\027clflushopt\026fsgsbase"	\
+	"\033avx512_vnni"						\
+	"\032clzero\031monitorx\030clwb\027clflushopt\026fsgsbase"	\
 	"\025sha\024avx512_4fmaps\023avx512_4nniw\022avx512vpopcntdq"	\
 	"\021avx512vbmi\020avx512vl\017avx512bw\016avx512cd"		\
 	"\015avx512er\014avx512pf\013avx512ifma\012avx512dq\011avx512f"	\
