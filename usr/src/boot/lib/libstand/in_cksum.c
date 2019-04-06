@@ -16,7 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +36,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/types.h>
 #include <machine/endian.h>
@@ -50,12 +49,10 @@ __FBSDID("$FreeBSD$");
  * In particular, it should not be this one.
  */
 int
-in_cksum(p, len)
-	void *p;
-	int len;
+in_cksum(void *p, int len)
 {
 	int sum = 0, oddbyte = 0, v = 0;
-	u_char *cp = p;
+	uchar_t *cp = p;
 
 	/* we assume < 2^16 bytes being summed */
 	while (len > 0) {
@@ -65,7 +62,7 @@ in_cksum(p, len)
 		}
 		if (((long)cp & 1) == 0) {
 			while ((len -= 2) >= 0) {
-				sum += *(u_short *)cp;
+				sum += *(ushort_t *)cp;
 				cp += 2;
 			}
 		} else {

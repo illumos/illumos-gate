@@ -28,28 +28,22 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)strdup.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
 
 #include "stand.h"
 #include <stddef.h>
 #include <string.h>
 
 char *
-strdup(str)
-	const char *str;
+strdup(const char *str)
 {
 	size_t len;
 	char *copy = NULL;
 
 	if (str != NULL) {
-	    len = strlen(str) + 1;
-	    if ((copy = malloc(len)) == NULL)
-		return (NULL);
-	    memcpy(copy, str, len);
+		len = strlen(str) + 1;
+		if ((copy = malloc(len)) == NULL)
+			return (NULL);
+		memcpy(copy, str, len);
 	}
 	return (copy);
 }

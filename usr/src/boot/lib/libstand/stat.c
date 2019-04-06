@@ -1,6 +1,6 @@
 /*	$NetBSD: stat.c,v 1.4 1996/01/13 22:25:43 leo Exp $	*/
 
-/*-
+/*
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -12,7 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -32,14 +32,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include "stand.h"
 
 int
-stat(str, sb)
-	const char *str;
-	struct stat *sb;
+stat(const char *str, struct stat *sb)
 {
 	int fd, rv;
 
@@ -47,6 +44,6 @@ stat(str, sb)
 	if (fd < 0)
 		return (-1);
 	rv = fstat(fd, sb);
-	(void)close(fd);
+	(void) close(fd);
 	return (rv);
 }
