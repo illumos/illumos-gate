@@ -62,7 +62,6 @@ OBJS=	\
 
 CPPFLAGS += -I../../../../../include -I../../..../
 CPPFLAGS += -I../../../../../lib/libstand
-CPPFLAGS += -I../../../../../lib/libz
 
 include ../../Makefile.inc
 

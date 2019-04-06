@@ -18,7 +18,6 @@ include $(SRC)/Makefile.master
 include $(SRC)/boot/sys/boot/Makefile.inc
 
 CPPFLAGS += -I../../../../include -I../../..
-CPPFLAGS += -I../../../../lib/libz
 CPPFLAGS += -I$(ZFSSRC)
 
 all install: libi386.a
@@ -98,6 +97,8 @@ VGASUBR=$(SRC)/common/vga
 CPPFLAGS += -I$(PNGLITE)
 SRCS +=	$(COMMON)/gfx_fb.c $(PNGLITE)/pnglite.c
 OBJS +=	gfx_fb.o pnglite.o
+
+pnglite.o := CPPFLAGS += -I$(ZLIB)
 
 SRCS +=	$(ZFSSRC)/devicename_stubs.c
 OBJS +=	devicename_stubs.o

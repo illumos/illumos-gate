@@ -51,5 +51,5 @@ x86:
 %.o:	$(LIBSRC)/libc/uuid/%.c
 	$(COMPILE.c) $<
 
-%.o:	$(LIBSRC)/libz/%.c
+%.o:	$(ZLIB)/%.c
 	$(COMPILE.c) $<

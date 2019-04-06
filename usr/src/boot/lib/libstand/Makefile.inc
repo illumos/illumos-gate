@@ -20,7 +20,7 @@
 #
 
 # standalone components and stuff we have modified locally
-SRCS=	$(LIBSRC)/libz/gzguts.h $(LIBSRC)/libz/zutil.h
+SRCS=	$(ZLIB)/gzguts.h $(ZLIB)/zutil.h
 SRCS += $(SASRC)/__main.c $(SASRC)/assert.c
 SRCS +=	$(SASRC)/bcd.c $(SASRC)/environment.c
 SRCS += $(SASRC)/getopt.c $(SASRC)/strtol.c
@@ -81,7 +81,8 @@ OBJS += uuid_create_nil.o uuid_equal.o uuid_from_string.o uuid_is_nil.o \
 # decompression functionality from libbz2
 # NOTE: to actually test this functionality after libbz2 upgrade compile
 # loader(8) with LOADER_BZIP2_SUPPORT defined
-CFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
+_bzlib.o _crctable.o _decompress.o _huffman.o _randtable.o bzipfs.o \
+:= CFLAGS += -DBZ_LOADER -DBZ_NO_STDIO -DBZ_NO_COMPRESS
 SRCS +=	libstand_bzlib_private.h
 
 SRCS +=	_bzlib.c _crctable.c _decompress.c _huffman.c _randtable.c
@@ -107,29 +108,30 @@ CLEANFILES += libstand_bzlib_private.h
 libstand_bzlib_private.h: $(SRC)/common/bzip2/bzlib_private.h
 	sed -e 's|<stdlib.h>|"stand.h"|' $^ > $@
 
-# decompression functionality from libz
-CFLAGS += -DHAVE_MEMCPY -I$(LIBSRC)/libz
-SRCS +=	$(LIBSRC)/libz/adler32.c $(LIBSRC)/libz/crc32.c \
+# decompression functionality from zlib
+adler32.o crc32.o _infback.o _inffast.o _inflate.o _inftrees.o _zutil.o \
+gzipfs.o gzip.o := CPPFLAGS += -I$(ZLIB)
+SRCS +=	$(ZLIB)/adler32.c $(ZLIB)/crc32.c \
 	libstand_zutil.h libstand_gzguts.h
 OBJS +=	adler32.o crc32.o
 
-_infback.c: $(LIBSRC)/libz/infback.c
+_infback.c: $(ZLIB)/infback.c
 	sed -e "s|zutil\.h|libstand_zutil.h|" \
 	    -e "s|gzguts\.h|libstand_gzguts.h|" \
 	    $^ > $@
-_inffast.c: $(LIBSRC)/libz/inffast.c
+_inffast.c: $(ZLIB)/inffast.c
 	sed -e "s|zutil\.h|libstand_zutil.h|" \
 	    -e "s|gzguts\.h|libstand_gzguts.h|" \
 	    $^ > $@
-_inflate.c: $(LIBSRC)/libz/inflate.c
+_inflate.c: $(ZLIB)/inflate.c
 	sed -e "s|zutil\.h|libstand_zutil.h|" \
 	    -e "s|gzguts\.h|libstand_gzguts.h|" \
 	    $^ > $@
-_inftrees.c: $(LIBSRC)/libz/inftrees.c
+_inftrees.c: $(ZLIB)/inftrees.c
 	sed -e "s|zutil\.h|libstand_zutil.h|" \
 	    -e "s|gzguts\.h|libstand_gzguts.h|" \
 	    $^ > $@
-_zutil.c: $(LIBSRC)/libz/zutil.c
+_zutil.c: $(ZLIB)/zutil.c
 	sed -e "s|zutil\.h|libstand_zutil.h|" \
 	    -e "s|gzguts\.h|libstand_gzguts.h|" \
 	    $^ > $@
@@ -139,7 +141,7 @@ OBJS +=	_infback.o _inffast.o _inflate.o _inftrees.o _zutil.o
 CLEANFILES +=	_infback.c _inffast.c _inflate.c _inftrees.c _zutil.c
 
 # depend on stand.h being able to be included multiple times
-libstand_zutil.h: $(LIBSRC)/libz/zutil.h
+libstand_zutil.h: $(ZLIB)/zutil.h
 	sed -e 's|<fcntl.h>|"stand.h"|' \
 	    -e 's|<stddef.h>|"stand.h"|' \
 	    -e 's|<string.h>|"stand.h"|' \
@@ -147,7 +149,7 @@ libstand_zutil.h: $(LIBSRC)/libz/zutil.h
 	    -e 's|<stdlib.h>|"stand.h"|' \
 	    $^ > $@
 
-libstand_gzguts.h: $(LIBSRC)/libz/gzguts.h
+libstand_gzguts.h: $(ZLIB)/gzguts.h
 	sed -e 's|<fcntl.h>|"stand.h"|' \
 	    -e 's|<stddef.h>|"stand.h"|' \
 	    -e 's|<string.h>|"stand.h"|' \

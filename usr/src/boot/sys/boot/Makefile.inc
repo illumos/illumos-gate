@@ -35,6 +35,7 @@ BOOTSRC=	$(SRC)/boot/sys/boot
 LIBSRC=		$(SRC)/boot/lib
 SASRC=		$(LIBSRC)/libstand
 ZFSSRC=		$(SASRC)/zfs
+ZLIB=		$(SRC)/contrib/zlib
 
 # set standard values
 AS_CPPFLAGS=
