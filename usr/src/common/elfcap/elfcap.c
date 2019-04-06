@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /* LINTLIBRARY */
@@ -411,6 +411,10 @@ static const elfcap_desc_t hw2_386[ELFCAP_NUM_HW2_386] = {
 	{						/* 0x02000000 */
 		AV_386_2_CLZERO, STRDESC("AV_386_2_CLZERO"),
 		STRDESC("CLZERO"), STRDESC("clzero")
+	},
+	{						/* 0x04000000 */
+		AV_386_2_AVX512_VNNI, STRDESC("AV_386_2_AVX512_VNNI"),
+		STRDESC("AVX512_VNNI"), STRDESC("avx512_vnni")
 	}
 };
 

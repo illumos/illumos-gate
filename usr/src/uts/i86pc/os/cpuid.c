@@ -32,7 +32,7 @@
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -1035,7 +1035,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"clzero",
 	"xop",
 	"fma4",
-	"tbm"
+	"tbm",
+	"avx512_vnni"
 };
 
 boolean_t
@@ -2907,6 +2908,10 @@ cpuid_pass1(cpu_t *cpu, uchar_t *featureset)
 					add_x86_feature(featureset,
 					    X86FSET_AVX512VBMI);
 				if (cpi->cpi_std[7].cp_ecx &
+				    CPUID_INTC_ECX_7_0_AVX512VNNI)
+					add_x86_feature(featureset,
+					    X86FSET_AVX512VNNI);
+				if (cpi->cpi_std[7].cp_ecx &
 				    CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
 					add_x86_feature(featureset,
 					    X86FSET_AVX512VPOPCDQ);
@@ -3575,6 +3580,8 @@ cpuid_pass2(cpu_t *cpu)
 					    X86FSET_AVX512FMA);
 					remove_x86_feature(x86_featureset,
 					    X86FSET_AVX512VBMI);
+					remove_x86_feature(x86_featureset,
+					    X86FSET_AVX512VNNI);
 					remove_x86_feature(x86_featureset,
 					    X86FSET_AVX512VPOPCDQ);
 					remove_x86_feature(x86_featureset,
@@ -4390,6 +4397,8 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 
 				if (*ecx_7 & CPUID_INTC_ECX_7_0_AVX512VBMI)
 					hwcap_flags_2 |= AV_386_2_AVX512VBMI;
+				if (*ecx_7 & CPUID_INTC_ECX_7_0_AVX512VNNI)
+					hwcap_flags_2 |= AV_386_2_AVX512_VNNI;
 				if (*ecx_7 & CPUID_INTC_ECX_7_0_AVX512VPOPCDQ)
 					hwcap_flags_2 |= AV_386_2_AVX512VPOPCDQ;
 

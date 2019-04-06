@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
@@ -599,6 +599,7 @@ extern "C" {
 #define	X86FSET_XOP		88
 #define	X86FSET_FMA4		89
 #define	X86FSET_TBM		90
+#define	X86FSET_AVX512VNNI	91
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -968,7 +969,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	91
+#define	NUM_X86_FEATURES	92
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);

@@ -21,7 +21,7 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -1484,7 +1484,7 @@ const instable_t dis_opAVX62[256] = {
 /*  [48]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [4C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
-/*  [50]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [50]  */	TNSZ("vpdpbusd",EVEX_RMrX,16),TNSZ("vpdpbusds",EVEX_RMrX,16),TNSZ("vpdpwssd",EVEX_RMrX,16),TNSZ("vpdpwssds",EVEX_RMrX,16),
 /*  [54]  */	TSd("vandp",EVEX_RMrX), TSd("vandnp",EVEX_RMrX), TSd("vorp",EVEX_RMrX),		TSd("vxorp",EVEX_RMrX),
 /*  [58]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [5C]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -2664,6 +2664,12 @@ dtrace_evex_mnem_adjust(dis86_t *x, instable_t *dp, uint_t vex_W,
     uint_t evex_byte2)
 {
 #ifdef DIS_TEXT
+	/* No adjustments needed for VNNI instructions. */
+	if (dp == &dis_opAVX62[0x50] || dp == &dis_opAVX62[0x51] ||
+	    dp == &dis_opAVX62[0x52] || dp == &dis_opAVX62[0x53]) {
+		return;
+	}
+
 	if (dp == &dis_opAVX62[0x7f] ||		/* vmovdq */
 	    dp == &dis_opAVX62[0x6f]) {
 		/* Aligned or Unaligned? */
@@ -2688,7 +2694,6 @@ dtrace_evex_mnem_adjust(dis86_t *x, instable_t *dp, uint_t vex_W,
 				break;
 			}
 		}
-
 	} else {
 		if (dp->it_avxsuf == AVS5Q) {
 			(void) strlcat(x->d86_mnem, vex_W != 0 ?  "q" : "d",
