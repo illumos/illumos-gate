@@ -197,10 +197,10 @@ get_load_device(int *type, int *unit, int *slice, int *partition)
 	const char *p;
 	char *endp;
 
-	*type = -1;
+	*type = DEV_TYP_NONE;
 	*unit = -1;
-	*slice = 0;
-	*partition = -1;
+	*slice = D_SLICEWILD;
+	*partition = D_PARTWILD;
 
 	devstr = ub_env_get("loaderdev");
 	if (devstr == NULL) {
@@ -222,7 +222,7 @@ get_load_device(int *type, int *unit, int *slice, int *partition)
 
 	/* Malformed unit number. */
 	if (!isdigit(*p)) {
-		*type = -1;
+		*type = DEV_TYP_NONE;
 		return;
 	}
 
@@ -237,7 +237,7 @@ get_load_device(int *type, int *unit, int *slice, int *partition)
 
 	/* Device string is malformed beyond unit number. */
 	if (*p != ':') {
-		*type = -1;
+		*type = DEV_TYP_NONE;
 		*unit = -1;
 		return;
 	}
@@ -250,7 +250,7 @@ get_load_device(int *type, int *unit, int *slice, int *partition)
 
 	/* Only DEV_TYP_STOR devices can have a slice specification. */
 	if (!(*type & DEV_TYP_STOR)) {
-		*type = -1;
+		*type = DEV_TYP_NONE;
 		*unit = -1;
 		return;
 	}
@@ -259,9 +259,9 @@ get_load_device(int *type, int *unit, int *slice, int *partition)
 
 	/* Malformed slice number. */
 	if (p == endp) {
-		*type = -1;
+		*type = DEV_TYP_NONE;
 		*unit = -1;
-		*slice = 0;
+		*slice = D_SLICEWILD;
 		return;
 	}
 
@@ -273,9 +273,9 @@ get_load_device(int *type, int *unit, int *slice, int *partition)
 
 	/* Device string is malformed beyond slice number. */
 	if (*p != '.') {
-		*type = -1;
+		*type = DEV_TYP_NONE;
 		*unit = -1;
-		*slice = 0;
+		*slice = D_SLICEWILD;
 		return;
 	}
 
@@ -293,10 +293,10 @@ get_load_device(int *type, int *unit, int *slice, int *partition)
 		return;
 
 	/* Junk beyond partition number. */
-	*type = -1;
+	*type = DEV_TYP_NONE;
 	*unit = -1;
-	*slice = 0;
-	*partition = -1;
+	*slice = D_SLICEWILD;
+	*partition = D_PARTWILD;
 }
 
 static void
@@ -305,15 +305,22 @@ print_disk_probe_info()
 	char slice[32];
 	char partition[32];
 
-	if (currdev.d_disk.slice > 0)
-		sprintf(slice, "%d", currdev.d_disk.slice);
+	if (currdev.d_disk.slice == D_SLICENONE)
+		strlcpy(slice, "<none>", sizeof(slice));
+	else if (currdev.d_disk.d_slice == D_SLICEWILD)
+		strlcpy(slice, "<auto>", sizeof(slice));
 	else
-		strcpy(slice, "<auto>");
+		snprintf(slice, sizeof(slice), "%d", currdev.d_disk.d_slice);
 
-	if (currdev.d_disk.partition >= 0)
+	if (currdev.d_disk.partition == D_PARTNONE)
+		strlcpy(partition, "<none>", sizeof(partition));
+	else if (currdev.d_disk.d_partition == D_PARTWILD)
+		strlcpy(partition, "<auto>", sizeof(partition));
+	else
 		sprintf(partition, "%d", currdev.d_disk.partition);
 	else
-		strcpy(partition, "<auto>");
+		snprintf(partition, sizeof(partition), "%d",
+		    currdev.d_disk.d_partition);
 
 	printf("  Checking unit=%d slice=%s partition=%s...",
 	    currdev.dd.d_unit, slice, partition);
