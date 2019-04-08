@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_SYS_PCI_H
@@ -168,6 +168,7 @@ extern "C" {
 /*
  * PCI status register bits
  */
+#define	PCI_STAT_READY		0x1	/* Immediate Readiness */
 #define	PCI_STAT_INTR		0x8	/* Interrupt state */
 #define	PCI_STAT_CAP		0x10	/* Implements Capabilities */
 #define	PCI_STAT_66MHZ		0x20	/* 66 MHz capable */
@@ -928,6 +929,8 @@ typedef struct pcix_attr {
 #define	PCI_MSI_MME_SHIFT	0x4	/* Shift for MME bits */
 #define	PCI_MSI_64BIT_MASK	0x0080	/* 64bit support mask in MSI ctrl reg */
 #define	PCI_MSI_PVM_MASK	0x0100	/* PVM support mask in MSI ctrl reg */
+#define	PCI_MSI_EMD_MASK	0x0200	/* EMD Capable Mask */
+#define	PCI_MSI_EMD_ENABLE	0x0400	/* EMD Enable bit */
 
 /*
  * PCI Extended Message Signalled Interrupts (MSI-X) capability entry offsets
