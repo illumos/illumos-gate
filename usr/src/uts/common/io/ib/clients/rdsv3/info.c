@@ -137,7 +137,7 @@ rdsv3_info_ioctl(struct rsock *sock, int optname, char *optval,
 	RDSV3_DPRINTF4("rdsv3_info_ioctl",
 	    "optname: %d lenp: %llx datap: %llx", optname, arg.lenp, arg.datap);
 
-	if (arg.lenp == NULL) {
+	if (arg.lenp == (uintptr_t)NULL) {
 		RDSV3_DPRINTF2("rdsv3_info_ioctl", "arg.lenp is NULL");
 		return (EFAULT);
 	}
@@ -156,7 +156,7 @@ rdsv3_info_ioctl(struct rsock *sock, int optname, char *optval,
 	/* a 0 len call is just trying to probe its length */
 	if (ulen == 0) {
 		iter.addr = NULL;
-	} else if (arg.datap == NULL) {
+	} else if (arg.datap == (uintptr_t)NULL) {
 		RDSV3_DPRINTF2("rdsv3_info_ioctl",
 		    "arg.datap is NULL, ulen set to: %d", ulen);
 		return (EINVAL);

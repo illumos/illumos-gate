@@ -37,7 +37,7 @@
  * Use is subject to license terms.
  *
  * Portions Copyright (C) 2001 - 2013 Apple Inc. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifdef DEBUG
@@ -807,6 +807,13 @@ top:
 	}
 
 	/*
+	 * SMB2 Negotiate may return zero credits_granted,
+	 * in which case we should assume it granted one.
+	 */
+	if (command == SMB2_NEGOTIATE && credits_granted == 0)
+		credits_granted = 1;
+
+	/*
 	 * Apply the credit grant
 	 */
 	rw_enter(&vcp->iod_rqlock, RW_WRITER);
@@ -1423,12 +1430,12 @@ nsmb_iod_connect(struct smb_vc *vcp, cred_t *cr)
 	val = 1;
 	err = SMB_TRAN_SETPARAM(vcp, SMBTP_TCP_NODELAY, &val);
 	if (err != 0) {
-		cmn_err(CE_NOTE, "iod_connect: setopt TCP_NODELAY, err=%d", err);
+		cmn_err(CE_NOTE, "iod_connect: setopt TCP_NODELAY err=%d", err);
 	}
 	val = smb_connect_timeout * 1000;
 	err = SMB_TRAN_SETPARAM(vcp, SMBTP_TCP_CON_TMO, &val);
 	if (err != 0) {
-		cmn_err(CE_NOTE, "iod_connect: setopt TCP con tmo, err=%d", err);
+		cmn_err(CE_NOTE, "iod_connect: setopt TCP con tmo err=%d", err);
 	}
 
 	/*

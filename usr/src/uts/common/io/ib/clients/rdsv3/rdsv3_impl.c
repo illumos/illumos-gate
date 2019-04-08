@@ -69,7 +69,7 @@
 ddi_taskq_t		*rdsv3_taskq = NULL;
 extern kmem_cache_t	*rdsv3_alloc_cache;
 
-extern unsigned int 	ip_ocsum(ushort_t *address, int halfword_count,
+extern unsigned int	ip_ocsum(ushort_t *address, int halfword_count,
     unsigned int sum);
 
 /*
@@ -81,7 +81,7 @@ rdsv3_capable_interface(struct lifreq *lifrp)
 	char	ifname[LIFNAMSIZ];
 	char	drv[MAXLINKNAMELEN];
 	uint_t	ppa;
-	char 	*cp;
+	char	*cp;
 
 	RDSV3_DPRINTF4("rdsv3_capable_interface", "Enter");
 
@@ -286,7 +286,7 @@ rdsv3_capable_interface_old(struct ifreq *ifrp)
 	char	ifname[IFNAMSIZ];
 	char	drv[MAXLINKNAMELEN];
 	uint_t	ppa;
-	char 	*cp;
+	char	*cp;
 
 	RDSV3_DPRINTF4("rdsv3_capable_interface_old", "Enter");
 
@@ -1093,7 +1093,7 @@ rdsv3_trans_init()
 
 int
 rdsv3_put_cmsg(struct nmsghdr *msg, int level, int type, size_t size,
-	void *payload)
+    void *payload)
 {
 	struct cmsghdr *cp;
 	char *bp;
@@ -1300,13 +1300,13 @@ rdsv3_ib_free_hdrs(ib_device_t *dev, struct rdsv3_ib_connection *ic)
 	ASSERT(ic->i_mr != NULL);
 
 	ic->i_send_hdrs = NULL;
-	ic->i_send_hdrs_dma = NULL;
+	ic->i_send_hdrs_dma = 0;
 
 	ic->i_recv_hdrs = NULL;
-	ic->i_recv_hdrs_dma = NULL;
+	ic->i_recv_hdrs_dma = 0;
 
 	ic->i_ack = NULL;
-	ic->i_ack_dma = NULL;
+	ic->i_ack_dma = 0;
 
 	(void) ibt_deregister_mr(ib_get_ibt_hca_hdl(dev), ic->i_mr->hdl);
 
