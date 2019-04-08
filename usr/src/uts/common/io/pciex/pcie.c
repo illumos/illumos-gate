@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <sys/sysmacros.h>
@@ -1002,6 +1002,9 @@ pcie_capture_speeds(pcie_bus_t *bus_p, pcie_req_id_t bdf, dev_info_t *rcdip)
 	case PCIE_LINKSTS_SPEED_8:
 		bus_p->bus_cur_speed = PCIE_LINK_SPEED_8;
 		break;
+	case PCIE_LINKSTS_SPEED_16:
+		bus_p->bus_cur_speed = PCIE_LINK_SPEED_16;
+		break;
 	default:
 		bus_p->bus_cur_speed = PCIE_LINK_SPEED_UNKNOWN;
 		break;
@@ -1076,6 +1079,8 @@ pcie_capture_speeds(pcie_bus_t *bus_p, pcie_req_id_t bdf, dev_info_t *rcdip)
 			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_5;
 		if (cap2 & PCIE_LINKCAP2_SPEED_8)
 			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_8;
+		if (cap2 & PCIE_LINKCAP2_SPEED_16)
+			bus_p->bus_sup_speed |= PCIE_LINK_SPEED_16;
 
 		switch (cap & PCIE_LINKCAP_MAX_SPEED_MASK) {
 		case PCIE_LINKCAP_MAX_SPEED_2_5:
@@ -1086,6 +1091,9 @@ pcie_capture_speeds(pcie_bus_t *bus_p, pcie_req_id_t bdf, dev_info_t *rcdip)
 			break;
 		case PCIE_LINKCAP_MAX_SPEED_8:
 			bus_p->bus_max_speed = PCIE_LINK_SPEED_8;
+			break;
+		case PCIE_LINKCAP_MAX_SPEED_16:
+			bus_p->bus_max_speed = PCIE_LINK_SPEED_16;
 			break;
 		default:
 			bus_p->bus_max_speed = PCIE_LINK_SPEED_UNKNOWN;
