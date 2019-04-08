@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -44,7 +44,7 @@ libdis_test:
 	vmovaps		0x8(%esp), %zmm3
 	vmovaps		%zmm1, %zmm7{%k1}{z}
 	vmovaps		%zmm6, %zmm4{%k7}
-	vmovaps		%zmm2, %zmm3{z}
+	vmovaps		%zmm2, %zmm3
 
 	vmovaps		%xmm7, %xmm2{%k3}{z}
 	vmovaps		%ymm1, %ymm3{%k5}
@@ -53,7 +53,7 @@ libdis_test:
 
 	vmovups		%zmm7, 0x20(%ebp)
 	vmovups		0x8(%esp), %zmm7
-	vmovups		(%eax), %zmm3{z}
+	vmovups		(%eax), %zmm3
 
 	vmovupd		(%esp), %zmm1{%k2}
 	vmovupd		%zmm6, (%esp)
@@ -98,42 +98,42 @@ libdis_test:
 	vmovdqu32	(%esp), %zmm0
 	vmovdqu64	(%esp), %zmm0
 
-	vandnpd	%xmm0, %xmm1, %xmm2{z}
-	vandnpd	(%eax), %xmm3, %xmm4{z}
-	vandnpd	0x42(%ecx), %xmm5, %xmm6{z}
-	vandnpd	%ymm0, %ymm1, %ymm2{z}
-	vandnpd	(%ebx), %ymm3, %ymm4{z}
-	vandnpd	0x42(%edx), %ymm5, %ymm6{z}
+	vandnpd	%xmm0, %xmm1, %xmm2{%k1}{z}
+	vandnpd	(%eax), %xmm3, %xmm4{%k1}{z}
+	vandnpd	0x42(%ecx), %xmm5, %xmm6{%k1}{z}
+	vandnpd	%ymm0, %ymm1, %ymm2{%k1}
+	vandnpd	(%ebx), %ymm3, %ymm4{%k1}
+	vandnpd	0x42(%edx), %ymm5, %ymm6{%k1}
 	vandnpd	%zmm0, %zmm1, %zmm2
 	vandnpd	(%ebx), %zmm3, %zmm4
 	vandnpd	0x42(%edx), %zmm5, %zmm6
 
-	vandnps	%xmm0, %xmm1, %xmm2{z}
-	vandnps	(%eax), %xmm3, %xmm4{z}
-	vandnps	0x42(%ecx), %xmm5, %xmm6{z}
-	vandnps	%ymm0, %ymm1, %ymm2{z}
-	vandnps	(%ebx), %ymm3, %ymm4{z}
-	vandnps	0x42(%edx), %ymm5, %ymm6{z}
+	vandnps	%xmm0, %xmm1, %xmm2{%k1}{z}
+	vandnps	(%eax), %xmm3, %xmm4{%k1}{z}
+	vandnps	0x42(%ecx), %xmm5, %xmm6{%k1}{z}
+	vandnps	%ymm0, %ymm1, %ymm2{%k1}
+	vandnps	(%ebx), %ymm3, %ymm4{%k1}
+	vandnps	0x42(%edx), %ymm5, %ymm6{%k1}
 	vandnps	%zmm0, %zmm1, %zmm2
 	vandnps	(%ebx), %zmm3, %zmm4
 	vandnps	0x42(%edx), %zmm5, %zmm6
 
-	vandpd	%xmm0, %xmm1, %xmm2{z}
-	vandpd	(%eax), %xmm3, %xmm4{z}
-	vandpd	0x42(%ecx), %xmm5, %xmm6{z}
-	vandpd	%ymm0, %ymm1, %ymm2{z}
-	vandpd	(%ebx), %ymm3, %ymm4{z}
-	vandpd	0x42(%edx), %ymm5, %ymm6{z}
+	vandpd	%xmm0, %xmm1, %xmm2{%k1}{z}
+	vandpd	(%eax), %xmm3, %xmm4{%k1}{z}
+	vandpd	0x42(%ecx), %xmm5, %xmm6{%k1}{z}
+	vandpd	%ymm0, %ymm1, %ymm2{%k1}
+	vandpd	(%ebx), %ymm3, %ymm4{%k1}
+	vandpd	0x42(%edx), %ymm5, %ymm6{%k1}
 	vandpd	%zmm0, %zmm1, %zmm2
 	vandpd	(%ebx), %zmm3, %zmm4
 	vandpd	0x42(%edx), %zmm5, %zmm6
 
-	vandps	%xmm0, %xmm1, %xmm2{z}
-	vandps	(%eax), %xmm3, %xmm4{z}
-	vandps	0x42(%ecx), %xmm5, %xmm6{z}
-	vandps	%ymm0, %ymm1, %ymm2{z}
-	vandps	(%ebx), %ymm3, %ymm4{z}
-	vandps	0x42(%edx), %ymm5, %ymm6{z}
+	vandps	%xmm0, %xmm1, %xmm2{%k1}{z}
+	vandps	(%eax), %xmm3, %xmm4{%k1}{z}
+	vandps	0x42(%ecx), %xmm5, %xmm6{%k1}{z}
+	vandps	%ymm0, %ymm1, %ymm2{%k1}
+	vandps	(%ebx), %ymm3, %ymm4{%k1}
+	vandps	0x42(%edx), %ymm5, %ymm6{%k1}
 	vandps	%zmm0, %zmm1, %zmm2
 	vandps	(%ebx), %zmm3, %zmm4
 	vandps	0x42(%edx), %zmm5, %zmm6
@@ -178,22 +178,22 @@ libdis_test:
 	vpandnq	(%ebx), %zmm3, %zmm4
 	vpandnq	0x42(%edx), %zmm5, %zmm6
 
-	vorpd	%xmm0, %xmm1, %xmm2{z}
-	vorpd	(%eax), %xmm3, %xmm4{z}
-	vorpd	0x42(%ecx), %xmm5, %xmm6{z}
-	vorpd	%ymm0, %ymm1, %ymm2{z}
-	vorpd	(%ebx), %ymm3, %ymm4{z}
-	vorpd	0x42(%edx), %ymm5, %ymm6{z}
+	vorpd	%xmm0, %xmm1, %xmm2{%k1}{z}
+	vorpd	(%eax), %xmm3, %xmm4{%k1}{z}
+	vorpd	0x42(%ecx), %xmm5, %xmm6{%k1}{z}
+	vorpd	%ymm0, %ymm1, %ymm2{%k1}
+	vorpd	(%ebx), %ymm3, %ymm4{%k1}
+	vorpd	0x42(%edx), %ymm5, %ymm6{%k1}
 	vorpd	%zmm0, %zmm1, %zmm2
 	vorpd	(%eax), %zmm3, %zmm4
 	vorpd	0x42(%ecx), %zmm5, %zmm6
 
-	vorps	%xmm0, %xmm1, %xmm2{z}
-	vorps	(%eax), %xmm3, %xmm4{z}
-	vorps	0x42(%ecx), %xmm5, %xmm6{z}
-	vorps	%ymm0, %ymm1, %ymm2{z}
-	vorps	(%ebx), %ymm3, %ymm4{z}
-	vorps	0x42(%edx), %ymm5, %ymm6{z}
+	vorps	%xmm0, %xmm1, %xmm2{%k1}{z}
+	vorps	(%eax), %xmm3, %xmm4{%k1}{z}
+	vorps	0x42(%ecx), %xmm5, %xmm6{%k1}{z}
+	vorps	%ymm0, %ymm1, %ymm2{%k1}
+	vorps	(%ebx), %ymm3, %ymm4{%k1}
+	vorps	0x42(%edx), %ymm5, %ymm6{%k1}
 	vorps	%zmm0, %zmm1, %zmm2
 	vorps	(%eax), %zmm3, %zmm4
 	vorps	0x42(%ecx), %zmm5, %zmm6
@@ -238,22 +238,22 @@ libdis_test:
 	vpxorq	(%eax), %zmm3, %zmm4
 	vpxorq	0x42(%ecx), %zmm5, %zmm6
 
-	vxorpd	%xmm0, %xmm1, %xmm2{z}
-	vxorpd	(%eax), %xmm3, %xmm4{z}
-	vxorpd	0x42(%ecx), %xmm5, %xmm6{z}
-	vxorpd	%ymm0, %ymm1, %ymm2{z}
-	vxorpd	(%ebx), %ymm3, %ymm4{z}
-	vxorpd	0x42(%edx), %ymm5, %ymm6{z}
+	vxorpd	%xmm0, %xmm1, %xmm2{%k1}{z}
+	vxorpd	(%eax), %xmm3, %xmm4{%k1}{z}
+	vxorpd	0x42(%ecx), %xmm5, %xmm6{%k1}{z}
+	vxorpd	%ymm0, %ymm1, %ymm2{%k1}
+	vxorpd	(%ebx), %ymm3, %ymm4{%k1}
+	vxorpd	0x42(%edx), %ymm5, %ymm6{%k1}
 	vxorpd	%zmm0, %zmm1, %zmm2
 	vxorpd	(%ebx), %zmm3, %zmm4
 	vxorpd	0x42(%edx), %zmm5, %zmm6
 
-	vxorps	%xmm0, %xmm1, %xmm2{z}
-	vxorps	(%eax), %xmm3, %xmm4{z}
-	vxorps	0x42(%ecx), %xmm5, %xmm6{z}
-	vxorps	%ymm0, %ymm1, %ymm2{z}
-	vxorps	(%ebx), %ymm3, %ymm4{z}
-	vxorps	0x42(%edx), %ymm5, %ymm6{z}
+	vxorps	%xmm0, %xmm1, %xmm2{%k1}{z}
+	vxorps	(%eax), %xmm3, %xmm4{%k1}{z}
+	vxorps	0x42(%ecx), %xmm5, %xmm6{%k1}{z}
+	vxorps	%ymm0, %ymm1, %ymm2{%k1}
+	vxorps	(%ebx), %ymm3, %ymm4{%k1}
+	vxorps	0x42(%edx), %ymm5, %ymm6{%k1}
 	vxorps	%zmm0, %zmm1, %zmm2
 	vxorps	(%ebx), %zmm3, %zmm4
 	vxorps	0x42(%edx), %zmm5, %zmm6

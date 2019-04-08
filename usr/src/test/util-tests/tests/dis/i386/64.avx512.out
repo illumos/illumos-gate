@@ -52,7 +52,7 @@
                        24 08 00 00 00 
     libdis_test+0x11e: 62 c1 7c c9 28 cd  vmovaps %zmm13,%zmm17{%k1}{z}
     libdis_test+0x124: 62 21 7c 4f 28 c0  vmovaps %zmm16,%zmm24{%k7}
-    libdis_test+0x12a: 62 01 7c c8 28 ec  vmovaps %zmm28,%zmm29{z}
+    libdis_test+0x12a: 62 01 7c 48 28 ec  vmovaps %zmm28,%zmm29
     libdis_test+0x130: 62 21 7c 08 28 c8  vmovaps %xmm16,%xmm25
     libdis_test+0x136: 62 e1 7c 8b 28 e7  vmovaps %xmm7,%xmm20{%k3}{z}
     libdis_test+0x13c: 62 e1 7c 28 28 c1  vmovaps %ymm1,%ymm16
@@ -64,7 +64,7 @@
                        20 00 00 00 
     libdis_test+0x164: 62 e1 7c 48 10 8c  vmovups 0x8(%rsp),%zmm17
                        24 08 00 00 00 
-    libdis_test+0x16f: 62 e1 7c c8 10 38  vmovups (%rax),%zmm23{z}
+    libdis_test+0x16f: 62 e1 7c 48 10 38  vmovups (%rax),%zmm23
     libdis_test+0x175: 62 21 7c 08 10 c8  vmovups %xmm16,%xmm25
     libdis_test+0x17b: 62 21 7c 28 10 e8  vmovups %ymm16,%ymm29
     libdis_test+0x181: 62 41 fd 4a 10 3a  vmovupd (%r10),%zmm31{%k2}
@@ -160,49 +160,49 @@
                        24 
     libdis_test+0x313: 62 e1 fe 48 6f 24  vmovdqu64 (%rsp),%zmm20
                        24 
-    libdis_test+0x31a: 62 f1 f5 88 55 d0  vandnpd %xmm0,%xmm1,%xmm2{z}
-    libdis_test+0x320: 62 f1 e5 88 55 20  vandnpd (%rax),%xmm3,%xmm4{z}
-    libdis_test+0x326: 62 f1 d5 88 55 b1  vandnpd 0x42(%rcx),%xmm5,%xmm6{z}
+    libdis_test+0x31a: 62 f1 f5 89 55 d0  vandnpd %xmm0,%xmm1,%xmm2{%k1}{z}
+    libdis_test+0x320: 62 f1 e5 89 55 20  vandnpd (%rax),%xmm3,%xmm4{%k1}{z}
+    libdis_test+0x326: 62 f1 d5 89 55 b1  vandnpd 0x42(%rcx),%xmm5,%xmm6{%k1}{z}
                        42 00 00 00 
-    libdis_test+0x330: 62 f1 f5 a8 55 d0  vandnpd %ymm0,%ymm1,%ymm2{z}
-    libdis_test+0x336: 62 f1 e5 a8 55 23  vandnpd (%rbx),%ymm3,%ymm4{z}
-    libdis_test+0x33c: 62 f1 d5 a8 55 b2  vandnpd 0x42(%rdx),%ymm5,%ymm6{z}
+    libdis_test+0x330: 62 f1 f5 a9 55 d0  vandnpd %ymm0,%ymm1,%ymm2{%k1}{z}
+    libdis_test+0x336: 62 f1 e5 a9 55 23  vandnpd (%rbx),%ymm3,%ymm4{%k1}{z}
+    libdis_test+0x33c: 62 f1 d5 a9 55 b2  vandnpd 0x42(%rdx),%ymm5,%ymm6{%k1}{z}
                        42 00 00 00 
     libdis_test+0x346: 62 f1 f5 48 55 d0  vandnpd %zmm0,%zmm1,%zmm2
     libdis_test+0x34c: 62 f1 e5 48 55 23  vandnpd (%rbx),%zmm3,%zmm4
     libdis_test+0x352: 62 f1 d5 48 55 b2  vandnpd 0x42(%rdx),%zmm5,%zmm6
                        42 00 00 00 
-    libdis_test+0x35c: 62 f1 74 88 55 d0  vandnps %xmm0,%xmm1,%xmm2{z}
-    libdis_test+0x362: 62 f1 64 88 55 20  vandnps (%rax),%xmm3,%xmm4{z}
-    libdis_test+0x368: 62 f1 54 88 55 b1  vandnps 0x42(%rcx),%xmm5,%xmm6{z}
+    libdis_test+0x35c: 62 f1 74 89 55 d0  vandnps %xmm0,%xmm1,%xmm2{%k1}{z}
+    libdis_test+0x362: 62 f1 64 89 55 20  vandnps (%rax),%xmm3,%xmm4{%k1}{z}
+    libdis_test+0x368: 62 f1 54 89 55 b1  vandnps 0x42(%rcx),%xmm5,%xmm6{%k1}{z}
                        42 00 00 00 
-    libdis_test+0x372: 62 f1 74 a8 55 d0  vandnps %ymm0,%ymm1,%ymm2{z}
-    libdis_test+0x378: 62 f1 64 a8 55 23  vandnps (%rbx),%ymm3,%ymm4{z}
-    libdis_test+0x37e: 62 f1 54 a8 55 b2  vandnps 0x42(%rdx),%ymm5,%ymm6{z}
+    libdis_test+0x372: 62 f1 74 29 55 d0  vandnps %ymm0,%ymm1,%ymm2{%k1}
+    libdis_test+0x378: 62 f1 64 29 55 23  vandnps (%rbx),%ymm3,%ymm4{%k1}
+    libdis_test+0x37e: 62 f1 54 29 55 b2  vandnps 0x42(%rdx),%ymm5,%ymm6{%k1}
                        42 00 00 00 
     libdis_test+0x388: 62 f1 74 48 55 d0  vandnps %zmm0,%zmm1,%zmm2
     libdis_test+0x38e: 62 f1 64 48 55 23  vandnps (%rbx),%zmm3,%zmm4
     libdis_test+0x394: 62 f1 54 48 55 b2  vandnps 0x42(%rdx),%zmm5,%zmm6
                        42 00 00 00 
-    libdis_test+0x39e: 62 f1 f5 88 54 d0  vandpd %xmm0,%xmm1,%xmm2{z}
-    libdis_test+0x3a4: 62 f1 e5 88 54 20  vandpd (%rax),%xmm3,%xmm4{z}
-    libdis_test+0x3aa: 62 f1 d5 88 54 b1  vandpd 0x42(%rcx),%xmm5,%xmm6{z}
+    libdis_test+0x39e: 62 f1 f5 89 54 d0  vandpd %xmm0,%xmm1,%xmm2{%k1}{z}
+    libdis_test+0x3a4: 62 f1 e5 89 54 20  vandpd (%rax),%xmm3,%xmm4{%k1}{z}
+    libdis_test+0x3aa: 62 f1 d5 89 54 b1  vandpd 0x42(%rcx),%xmm5,%xmm6{%k1}{z}
                        42 00 00 00 
-    libdis_test+0x3b4: 62 f1 f5 a8 54 d0  vandpd %ymm0,%ymm1,%ymm2{z}
-    libdis_test+0x3ba: 62 f1 e5 a8 54 23  vandpd (%rbx),%ymm3,%ymm4{z}
-    libdis_test+0x3c0: 62 f1 d5 a8 54 b2  vandpd 0x42(%rdx),%ymm5,%ymm6{z}
+    libdis_test+0x3b4: 62 f1 f5 29 54 d0  vandpd %ymm0,%ymm1,%ymm2{%k1}
+    libdis_test+0x3ba: 62 f1 e5 29 54 23  vandpd (%rbx),%ymm3,%ymm4{%k1}
+    libdis_test+0x3c0: 62 f1 d5 29 54 b2  vandpd 0x42(%rdx),%ymm5,%ymm6{%k1}
                        42 00 00 00 
     libdis_test+0x3ca: 62 f1 f5 48 54 d0  vandpd %zmm0,%zmm1,%zmm2
     libdis_test+0x3d0: 62 f1 e5 48 54 23  vandpd (%rbx),%zmm3,%zmm4
     libdis_test+0x3d6: 62 f1 d5 48 54 b2  vandpd 0x42(%rdx),%zmm5,%zmm6
                        42 00 00 00 
-    libdis_test+0x3e0: 62 f1 74 88 54 d0  vandps %xmm0,%xmm1,%xmm2{z}
-    libdis_test+0x3e6: 62 f1 64 88 54 20  vandps (%rax),%xmm3,%xmm4{z}
-    libdis_test+0x3ec: 62 f1 54 88 54 b1  vandps 0x42(%rcx),%xmm5,%xmm6{z}
+    libdis_test+0x3e0: 62 f1 74 89 54 d0  vandps %xmm0,%xmm1,%xmm2{%k1}{z}
+    libdis_test+0x3e6: 62 f1 64 89 54 20  vandps (%rax),%xmm3,%xmm4{%k1}{z}
+    libdis_test+0x3ec: 62 f1 54 89 54 b1  vandps 0x42(%rcx),%xmm5,%xmm6{%k1}{z}
                        42 00 00 00 
-    libdis_test+0x3f6: 62 f1 74 a8 54 d0  vandps %ymm0,%ymm1,%ymm2{z}
-    libdis_test+0x3fc: 62 f1 64 a8 54 23  vandps (%rbx),%ymm3,%ymm4{z}
-    libdis_test+0x402: 62 f1 54 a8 54 b2  vandps 0x42(%rdx),%ymm5,%ymm6{z}
+    libdis_test+0x3f6: 62 f1 74 29 54 d0  vandps %ymm0,%ymm1,%ymm2{%k1}
+    libdis_test+0x3fc: 62 f1 64 29 54 23  vandps (%rbx),%ymm3,%ymm4{%k1}
+    libdis_test+0x402: 62 f1 54 29 54 b2  vandps 0x42(%rdx),%ymm5,%ymm6{%k1}
                        42 00 00 00 
     libdis_test+0x40c: 62 f1 74 48 54 d0  vandps %zmm0,%zmm1,%zmm2
     libdis_test+0x412: 62 f1 64 48 54 23  vandps (%rbx),%zmm3,%zmm4
@@ -256,25 +256,25 @@
     libdis_test+0x51a: 62 f1 e5 48 df 23  vpandnq (%rbx),%zmm3,%zmm4
     libdis_test+0x520: 62 f1 d5 48 df b2  vpandnq 0x42(%rdx),%zmm5,%zmm6
                        42 00 00 00 
-    libdis_test+0x52a: 62 f1 f5 88 56 d0  vorpd  %xmm0,%xmm1,%xmm2{z}
-    libdis_test+0x530: 62 f1 e5 88 56 20  vorpd  (%rax),%xmm3,%xmm4{z}
-    libdis_test+0x536: 62 f1 d5 88 56 b1  vorpd  0x42(%rcx),%xmm5,%xmm6{z}
+    libdis_test+0x52a: 62 f1 f5 89 56 d0  vorpd  %xmm0,%xmm1,%xmm2{%k1}{z}
+    libdis_test+0x530: 62 f1 e5 89 56 20  vorpd  (%rax),%xmm3,%xmm4{%k1}{z}
+    libdis_test+0x536: 62 f1 d5 89 56 b1  vorpd  0x42(%rcx),%xmm5,%xmm6{%k1}{z}
                        42 00 00 00 
-    libdis_test+0x540: 62 f1 f5 a8 56 d0  vorpd  %ymm0,%ymm1,%ymm2{z}
-    libdis_test+0x546: 62 f1 e5 a8 56 23  vorpd  (%rbx),%ymm3,%ymm4{z}
-    libdis_test+0x54c: 62 f1 d5 a8 56 b2  vorpd  0x42(%rdx),%ymm5,%ymm6{z}
+    libdis_test+0x540: 62 f1 f5 29 56 d0  vorpd  %ymm0,%ymm1,%ymm2{%k1}
+    libdis_test+0x546: 62 f1 e5 29 56 23  vorpd  (%rbx),%ymm3,%ymm4{%k1}
+    libdis_test+0x54c: 62 f1 d5 29 56 b2  vorpd  0x42(%rdx),%ymm5,%ymm6{%k1}
                        42 00 00 00 
     libdis_test+0x556: 62 f1 f5 48 56 d0  vorpd  %zmm0,%zmm1,%zmm2
     libdis_test+0x55c: 62 f1 e5 48 56 20  vorpd  (%rax),%zmm3,%zmm4
     libdis_test+0x562: 62 f1 d5 48 56 b1  vorpd  0x42(%rcx),%zmm5,%zmm6
                        42 00 00 00 
-    libdis_test+0x56c: 62 f1 74 88 56 d0  vorps  %xmm0,%xmm1,%xmm2{z}
-    libdis_test+0x572: 62 f1 64 88 56 20  vorps  (%rax),%xmm3,%xmm4{z}
-    libdis_test+0x578: 62 f1 54 88 56 b1  vorps  0x42(%rcx),%xmm5,%xmm6{z}
+    libdis_test+0x56c: 62 f1 74 89 56 d0  vorps  %xmm0,%xmm1,%xmm2{%k1}{z}
+    libdis_test+0x572: 62 f1 64 89 56 20  vorps  (%rax),%xmm3,%xmm4{%k1}{z}
+    libdis_test+0x578: 62 f1 54 89 56 b1  vorps  0x42(%rcx),%xmm5,%xmm6{%k1}{z}
                        42 00 00 00 
-    libdis_test+0x582: 62 f1 74 a8 56 d0  vorps  %ymm0,%ymm1,%ymm2{z}
-    libdis_test+0x588: 62 f1 64 a8 56 23  vorps  (%rbx),%ymm3,%ymm4{z}
-    libdis_test+0x58e: 62 f1 54 a8 56 b2  vorps  0x42(%rdx),%ymm5,%ymm6{z}
+    libdis_test+0x582: 62 f1 74 29 56 d0  vorps  %ymm0,%ymm1,%ymm2{%k1}
+    libdis_test+0x588: 62 f1 64 29 56 23  vorps  (%rbx),%ymm3,%ymm4{%k1}
+    libdis_test+0x58e: 62 f1 54 29 56 b2  vorps  0x42(%rdx),%ymm5,%ymm6{%k1}
                        42 00 00 00 
     libdis_test+0x598: 62 f1 74 48 56 d0  vorps  %zmm0,%zmm1,%zmm2
     libdis_test+0x59e: 62 f1 64 48 56 20  vorps  (%rax),%zmm3,%zmm4
@@ -328,25 +328,25 @@
     libdis_test+0x6a6: 62 f1 e5 48 ef 20  vpxorq (%rax),%zmm3,%zmm4
     libdis_test+0x6ac: 62 f1 d5 48 ef b1  vpxorq 0x42(%rcx),%zmm5,%zmm6
                        42 00 00 00 
-    libdis_test+0x6b6: 62 f1 f5 88 57 d0  vxorpd %xmm0,%xmm1,%xmm2{z}
-    libdis_test+0x6bc: 62 f1 e5 88 57 20  vxorpd (%rax),%xmm3,%xmm4{z}
-    libdis_test+0x6c2: 62 f1 d5 88 57 b1  vxorpd 0x42(%rcx),%xmm5,%xmm6{z}
+    libdis_test+0x6b6: 62 f1 f5 89 57 d0  vxorpd %xmm0,%xmm1,%xmm2{%k1}{z}
+    libdis_test+0x6bc: 62 f1 e5 89 57 20  vxorpd (%rax),%xmm3,%xmm4{%k1}{z}
+    libdis_test+0x6c2: 62 f1 d5 89 57 b1  vxorpd 0x42(%rcx),%xmm5,%xmm6{%k1}{z}
                        42 00 00 00 
-    libdis_test+0x6cc: 62 f1 f5 a8 57 d0  vxorpd %ymm0,%ymm1,%ymm2{z}
-    libdis_test+0x6d2: 62 f1 e5 a8 57 23  vxorpd (%rbx),%ymm3,%ymm4{z}
-    libdis_test+0x6d8: 62 f1 d5 a8 57 b2  vxorpd 0x42(%rdx),%ymm5,%ymm6{z}
+    libdis_test+0x6cc: 62 f1 f5 29 57 d0  vxorpd %ymm0,%ymm1,%ymm2{%k1}
+    libdis_test+0x6d2: 62 f1 e5 29 57 23  vxorpd (%rbx),%ymm3,%ymm4{%k1}
+    libdis_test+0x6d8: 62 f1 d5 29 57 b2  vxorpd 0x42(%rdx),%ymm5,%ymm6{%k1}
                        42 00 00 00 
     libdis_test+0x6e2: 62 f1 f5 48 57 d0  vxorpd %zmm0,%zmm1,%zmm2
     libdis_test+0x6e8: 62 f1 e5 48 57 23  vxorpd (%rbx),%zmm3,%zmm4
     libdis_test+0x6ee: 62 f1 d5 48 57 b2  vxorpd 0x42(%rdx),%zmm5,%zmm6
                        42 00 00 00 
-    libdis_test+0x6f8: 62 f1 74 88 57 d0  vxorps %xmm0,%xmm1,%xmm2{z}
-    libdis_test+0x6fe: 62 f1 64 88 57 20  vxorps (%rax),%xmm3,%xmm4{z}
-    libdis_test+0x704: 62 f1 54 88 57 b1  vxorps 0x42(%rcx),%xmm5,%xmm6{z}
+    libdis_test+0x6f8: 62 f1 74 89 57 d0  vxorps %xmm0,%xmm1,%xmm2{%k1}{z}
+    libdis_test+0x6fe: 62 f1 64 89 57 20  vxorps (%rax),%xmm3,%xmm4{%k1}{z}
+    libdis_test+0x704: 62 f1 54 89 57 b1  vxorps 0x42(%rcx),%xmm5,%xmm6{%k1}{z}
                        42 00 00 00 
-    libdis_test+0x70e: 62 f1 74 a8 57 d0  vxorps %ymm0,%ymm1,%ymm2{z}
-    libdis_test+0x714: 62 f1 64 a8 57 23  vxorps (%rbx),%ymm3,%ymm4{z}
-    libdis_test+0x71a: 62 f1 54 a8 57 b2  vxorps 0x42(%rdx),%ymm5,%ymm6{z}
+    libdis_test+0x70e: 62 f1 74 29 57 d0  vxorps %ymm0,%ymm1,%ymm2{%k1}
+    libdis_test+0x714: 62 f1 64 29 57 23  vxorps (%rbx),%ymm3,%ymm4{%k1}
+    libdis_test+0x71a: 62 f1 54 29 57 b2  vxorps 0x42(%rdx),%ymm5,%ymm6{%k1}
                        42 00 00 00 
     libdis_test+0x724: 62 f1 74 48 57 d0  vxorps %zmm0,%zmm1,%zmm2
     libdis_test+0x72a: 62 f1 64 48 57 23  vxorps (%rbx),%zmm3,%zmm4
