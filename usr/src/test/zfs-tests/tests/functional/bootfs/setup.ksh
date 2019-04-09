@@ -1,3 +1,4 @@
+#!/usr/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -20,26 +21,15 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-
-#
-# Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright 2019 Joyent, Inc.
 #
 
-export RESV_DELTA=10485760	# Amount of space (10MB) to leave unreserved
-export RESV_TOLERANCE=10485760	# Margin of error (10MB) for reservations
-export RESV_SIZE=52428800	# Default reservation size (50MB)
-export RESV_FREE_SPACE=52428800	# Amount of space (50MB) to leave free in a pool
-export RESV_NUM_FS=10		# Number of filesystems to create
-export RESV_ITER=10		# Number of iterations
+. $STF_SUITE/include/libtest.shlib
 
-export BLOCK_SIZE=1048576
-export ENOSPC=28
+verify_runnable "global"
 
-export TESTVOL=testvol$$
-export TESTVOL2=testvol2-$$
-export TESTFILE1=file1.$$
-export TESTFILE2=file2.$$
+if [[ ! -d $TESTDIR ]]; then
+	log_must mkdir "$TESTDIR"
+fi
+
+log_pass

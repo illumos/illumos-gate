@@ -45,7 +45,7 @@
 
 verify_runnable "global"
 
-log_assert "The primary side of a zpool mirror may be completely wiped" \
+log_assert "The secondary side of a zpool mirror may be completely wiped" \
 	"without affecting the content of the pool"
 
 overwrite_verify_mirror $SIDE_SECONDARY /dev/zero

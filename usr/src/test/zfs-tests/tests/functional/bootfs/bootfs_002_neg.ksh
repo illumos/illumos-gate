@@ -29,6 +29,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -44,7 +45,7 @@
 #
 # STRATEGY:
 #
-# 1. Create a zvol 
+# 1. Create a zvol
 # 2. Verify that we can't set the bootfs to that dataset
 #
 
@@ -74,7 +75,7 @@ fi
 log_assert "Invalid datasets are rejected as boot property values"
 log_onexit cleanup
 
-typeset VDEV=/bootfs_002_neg_a.$$.dat
+typeset VDEV=$TESTDIR/bootfs_002_neg_a.$$.dat
 
 log_must mkfile 400m $VDEV
 create_pool "$TESTPOOL" "$VDEV"

@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -51,7 +52,7 @@ function cleanup {
 	if poolexists $POOL; then
 		log_must zpool destroy $POOL
 	fi
-	rm /bootfs_004.$$.dat
+	log_must rm -f $VDEV
 }
 
 
@@ -77,8 +78,8 @@ done
 pools[${#pools[@]}]="$bigname"
 
 
-
-mkfile $MINVDEVSIZE /bootfs_004.$$.dat
+typeset VDEV=$TESTDIR/bootfs_004.$$.dat
+mkfile $MINVDEVSIZE $VDEV
 
 typeset -i i=0;
 

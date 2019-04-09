@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -59,7 +60,7 @@ function cleanup {
 typeset assert_msg="setting bootfs on a dataset which has gzip \
     compression enabled will not fail"
 
-typeset VDEV=/bootfs_008_pos_a.$$.dat
+typeset VDEV=$TESTDIR/bootfs_008_pos_a.$$.dat
 typeset COMP_FS=$TESTPOOL/COMP_FS
 
 log_onexit cleanup

@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -61,6 +62,11 @@ log_assert "Verify that NFS share options are propagated correctly."
 log_onexit cleanup
 
 cleanup
+
+# /var/nfs is the default nfs log directory in illumos.
+if [[ ! -d /var/nfs ]]; then
+	log_must mkdir /var/nfs
+fi
 
 typeset -i i=0
 while (( i < ${#shareopts[*]} ))
