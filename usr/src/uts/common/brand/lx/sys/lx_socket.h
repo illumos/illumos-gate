@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_LX_SOCKET_H
@@ -403,6 +404,10 @@ typedef struct lx_msghdr {
 	int		msg_flags;	/* flags on received message */
 } lx_msghdr_t;
 
+typedef struct lx_mmsghdr {
+	lx_msghdr_t	msg_hdr;	/* message header */
+	unsigned int	msg_len;	/* no. of bytes transmitted */
+} lx_mmsghdr_t;
 
 #if defined(_LP64)
 
@@ -415,6 +420,11 @@ typedef struct lx_msghdr32 {
 	uint32_t	msg_controllen;	/* ancillary data buffer len */
 	int32_t		msg_flags;	/* flags on received message */
 } lx_msghdr32_t;
+
+typedef struct lx_mmsghdr32 {
+	lx_msghdr32_t	msg_hdr;	/* message header */
+	unsigned int	msg_len;	/* no. of bytes transmitted */
+} lx_mmsghdr32_t;
 
 #endif
 

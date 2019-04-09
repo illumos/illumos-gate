@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/kmem.h>
@@ -564,7 +565,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"access",	lx_access,		0,		2}, /* 33 */
 	{"nice",	lx_nice,		0,		1}, /* 34 */
 	{"ftime",	NULL,			NOSYS_OBSOLETE,	0}, /* 35 */
-	{"sync",	lx_sync,		0, 		0}, /* 36 */
+	{"sync",	lx_sync,		0,		0}, /* 36 */
 	{"kill",	lx_kill,		0,		2}, /* 37 */
 	{"rename",	lx_rename,		0,		2}, /* 38 */
 	{"mkdir",	lx_mkdir,		0,		2}, /* 39 */
@@ -607,7 +608,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"getrlimit",	lx_oldgetrlimit,	0,		2}, /* 76 */
 	{"getrusage",	lx_getrusage,		0,		2}, /* 77 */
 	{"gettimeofday", lx_gettimeofday,	0,		2}, /* 78 */
-	{"settimeofday", NULL, 			0,		2}, /* 79 */
+	{"settimeofday", NULL,			0,		2}, /* 79 */
 	{"getgroups16",	NULL,			0,		2}, /* 80 */
 	{"setgroups16",	NULL,			0,		2}, /* 81 */
 	{"select",	NULL,			NOSYS_OBSOLETE,	0}, /* 82 */
@@ -869,7 +870,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"pwritev",	lx_pwritev32,		0,		5}, /* 334 */
 	{"rt_tgsigqueueinfo", NULL,		0,		4}, /* 335 */
 	{"perf_event_open", NULL,		NOSYS_NULL,	0}, /* 336 */
-	{"recvmmsg",	NULL,			NOSYS_NULL,	0}, /* 337 */
+	{"recvmmsg",	lx_recvmmsg,		0,		5}, /* 337 */
 	{"fanotify_init", NULL,			NOSYS_NULL,	0}, /* 338 */
 	{"fanotify_mark", NULL,			NOSYS_NULL,	0}, /* 339 */
 	{"prlimit64",	lx_prlimit64,		0,		4}, /* 340 */
@@ -877,7 +878,7 @@ lx_sysent_t lx_sysent32[] = {
 	{"open_by_handle_at", NULL,		NOSYS_NULL,	0}, /* 342 */
 	{"clock_adjtime", NULL,			NOSYS_NULL,	0}, /* 343 */
 	{"syncfs",	lx_syncfs,		0,		1}, /* 344 */
-	{"sendmmsg",	NULL,			NOSYS_NULL,	0}, /* 345 */
+	{"sendmmsg",	lx_sendmmsg,		0,		4}, /* 345 */
 	{"setns",	NULL,			NOSYS_NULL,	0}, /* 346 */
 	{"process_vm_readv", NULL,		NOSYS_NULL,	0}, /* 347 */
 	{"process_vm_writev", NULL,		NOSYS_NULL,	0}, /* 348 */
@@ -1196,9 +1197,9 @@ lx_sysent_t lx_sysent64[] = {
 	{"inotify_init1", NULL,			0,		1}, /* 294 */
 	{"preadv",	lx_preadv,		0,		4}, /* 295 */
 	{"pwritev",	lx_pwritev,		0,		4}, /* 296 */
-	{"rt_tgsigqueueinfo", NULL, 		0,		4}, /* 297 */
+	{"rt_tgsigqueueinfo", NULL,		0,		4}, /* 297 */
 	{"perf_event_open", NULL,		NOSYS_NULL,	0}, /* 298 */
-	{"recvmmsg",	NULL,			NOSYS_NULL,	0}, /* 299 */
+	{"recvmmsg",	lx_recvmmsg,		0,		5}, /* 299 */
 	{"fanotify_init", NULL,			NOSYS_NULL,	0}, /* 300 */
 	{"fanotify_mark", NULL,			NOSYS_NULL,	0}, /* 301 */
 	{"prlimit64",	lx_prlimit64,		0,		4}, /* 302 */
@@ -1206,7 +1207,7 @@ lx_sysent_t lx_sysent64[] = {
 	{"open_by_handle_at", NULL,		NOSYS_NULL,	0}, /* 304 */
 	{"clock_adjtime", NULL,			NOSYS_NULL,	0}, /* 305 */
 	{"syncfs",	lx_syncfs,		0,		1}, /* 306 */
-	{"sendmmsg",	NULL,			NOSYS_NULL,	0}, /* 307 */
+	{"sendmmsg",	lx_sendmmsg,		0,		4}, /* 307 */
 	{"setns",	NULL,			NOSYS_NULL,	0}, /* 309 */
 	{"getcpu",	lx_getcpu,		0,		3}, /* 309 */
 	{"process_vm_readv", NULL,		NOSYS_NULL,	0}, /* 310 */

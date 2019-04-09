@@ -23,6 +23,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/errno.h>
@@ -2103,6 +2104,120 @@ noiov:
 	return (res);
 }
 
+long
+lx_recvmmsg(int sock, void *msg, uint_t vlen, int flags, timespec_t *timeoutp)
+{
+	hrtime_t deadline = 0;
+	uint_t rcvd = 0;
+	long ret = 0;
+	boolean_t waitforone;
+
+	waitforone = ((flags & LX_MSG_WAITFORONE) != 0);
+	flags &= ~LX_MSG_WAITFORONE;
+
+	/*
+	 * We want to limit the work that a thread calling recvmmsg() can
+	 * perform in the kernel so that it cannot accrue too high a priority.
+	 * Artificially capping vlen means that the thread will return to
+	 * userspace after processing at most IOV_MAX messages, giving the
+	 * system a chance to reset the thread priority.
+	 *
+	 * Linux does not cap vlen here and recvmmsg() is expected to return
+	 * once vlen messages have been received, a timeout occurs, or if an
+	 * error is encountered; the artificial cap adds another case.
+	 *
+	 * It is possible that returning "early" in this emulation will
+	 * cause problems with some applications however a properly written
+	 * recvmmsg() consumer should consume only the received datagrams
+	 * and try again if it wants more. This may need revisiting in the
+	 * future.
+	 */
+	if (vlen > IOV_MAX)
+		vlen = IOV_MAX;
+
+	if (timeoutp != NULL) {
+		timespec_t timeout;
+		uhrtime_t utime = (uhrtime_t)gethrtime();
+
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			if (copyin(timeoutp, &timeout, sizeof (timestruc_t)))
+				return (set_errno(EFAULT));
+		} else {
+			timestruc32_t timeout32;
+			if (copyin(timeoutp, &timeout32,
+			    sizeof (timestruc32_t)))
+				return (set_errno(EFAULT));
+			timeout.tv_sec = (time_t)timeout32.tv_sec;
+			timeout.tv_nsec = timeout32.tv_nsec;
+		}
+
+		if (itimerspecfix(&timeout))
+			return (set_errno(EINVAL));
+
+		/*
+		 * Make sure that deadline will not overflow. itimerspecfix()
+		 * has already checked for negative values and too big a value
+		 * in tv_nsec
+		 */
+		if (timeout.tv_sec >= HRTIME_MAX / NANOSEC)
+			return (set_errno(EINVAL));
+
+		utime += timeout.tv_sec * NANOSEC;
+		utime += timeout.tv_nsec;
+
+		if (utime > HRTIME_MAX)
+			return (set_errno(EINVAL));
+
+		deadline = (hrtime_t)utime;
+	}
+
+	for (rcvd = 0; rcvd < vlen; rcvd++) {
+		uint_t *ptr;
+
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			lx_mmsghdr_t *hdr = (lx_mmsghdr_t *)msg;
+			hdr += rcvd;
+			ret = lx_recvmsg(sock, (lx_msghdr_t *)hdr, flags);
+			ptr = &hdr->msg_len;
+		} else {
+			lx_mmsghdr32_t *hdr = (lx_mmsghdr32_t *)msg;
+			hdr += rcvd;
+			ret = lx_recvmsg(sock, (lx_msghdr32_t *)hdr, flags);
+			ptr = &hdr->msg_len;
+		}
+		if (ttolwp(curthread)->lwp_errno != 0)
+			break;
+		copyout(&ret, ptr, sizeof (*ptr));
+		/*
+		 * If MSG_WAITFORONE is set, set MSG_DONTWAIT after the
+		 * first packet has been received.
+		 */
+		if (waitforone) {
+			flags |= LX_MSG_DONTWAIT;
+			waitforone = B_FALSE;
+		}
+		/*
+		 * The Linux man page documents the timeout option as
+		 * only being checked after each datagram is received.
+		 * The man page does not document ETIMEDOUT as a return
+		 * code so we do not set an errno.
+		 */
+		if (deadline > 0 && gethrtime() >= deadline)
+			break;
+	}
+
+	if (rcvd > 0) {
+		/*
+		 * Any error code is deliberately discarded if any message
+		 * was successfully received.
+		 */
+		ttolwp(curthread)->lwp_errno = 0;
+		return (rcvd);
+	}
+
+	return (ret);
+}
+
 /*
  * Custom version of socket_sendmsg for error-handling overrides.
  */
@@ -2440,6 +2555,50 @@ lx_sendmsg(int sock, void *msg, int flags)
 	}
 
 	return (res);
+}
+
+long
+lx_sendmmsg(int sock, void *msg, uint_t vlen, int flags)
+{
+	long ret = 0;
+	uint_t sent = 0;
+
+	/*
+	 * Linux caps vlen to UIO_MAXIOV (1024).
+	 */
+	if (vlen > IOV_MAX)
+		vlen = IOV_MAX;
+
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		lx_mmsghdr_t *hdr = msg;
+
+		for (sent = 0; sent < vlen; sent++, hdr++) {
+			ret = lx_sendmsg(sock, (lx_msghdr_t *)hdr, flags);
+			if (ttolwp(curthread)->lwp_errno != 0)
+				break;
+			copyout(&ret, &hdr->msg_len, sizeof (hdr->msg_len));
+		}
+	} else {
+		lx_mmsghdr32_t *hdr = msg;
+
+		for (sent = 0; sent < vlen; sent++, hdr++) {
+			ret = lx_sendmsg(sock, (lx_msghdr32_t *)hdr, flags);
+			if (ttolwp(curthread)->lwp_errno != 0)
+				break;
+			copyout(&ret, &hdr->msg_len, sizeof (hdr->msg_len));
+		}
+	}
+
+	if (sent > 0) {
+		/*
+		 * Any error code is deliberately discarded if any message
+		 * was successfully sent.
+		 */
+		ttolwp(curthread)->lwp_errno = 0;
+		return (sent);
+	}
+
+	return (ret);
 }
 
 /*
@@ -4318,8 +4477,8 @@ static struct {
 	lx_sendmsg,	3,	/* sendmsg */
 	lx_recvmsg,	3,	/* recvmsg */
 	lx_accept4,	4,	/* accept4 */
-	NULL,		5,	/* recvmmsg */
-	NULL,		4	/* sendmmsg */
+	lx_recvmmsg,	5,	/* recvmmsg */
+	lx_sendmmsg,	4	/* sendmmsg */
 };
 
 long

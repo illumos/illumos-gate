@@ -23,6 +23,7 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef _SYS_LINUX_SYSCALLS_H
@@ -191,6 +192,7 @@ extern long lx_readv();
 extern long lx_reboot();
 extern long lx_recv();
 extern long lx_recvmsg();
+extern long lx_recvmmsg();
 extern long lx_recvfrom();
 extern long lx_rename();
 extern long lx_renameat();
@@ -209,6 +211,7 @@ extern long lx_sched_yield();
 extern long lx_select();
 extern long lx_send();
 extern long lx_sendmsg();
+extern long lx_sendmmsg();
 extern long lx_sendto();
 extern long lx_set_robust_list();
 extern long lx_set_thread_area();
