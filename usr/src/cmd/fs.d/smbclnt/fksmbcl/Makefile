@@ -21,6 +21,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019, Joyent, Inc.
 #
 
 PROG=	fksmbcl
@@ -67,6 +68,9 @@ CPPFLAGS += -D_LARGEFILE64_SOURCE=1
 CPPFLAGS += -DFKSMBCL
 # Always want DEBUG here
 CPPFLAGS += -DDEBUG
+
+# needs work
+SMOFF += all_func_returns
 
 CSTD=		$(CSTD_GNU99)
 

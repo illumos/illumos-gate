@@ -24,6 +24,8 @@
 #
 # Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright 2019, Joyent, Inc.
+#
 
 LIBRARY =	libfksmbfs.a
 VERS =		.1
@@ -103,6 +105,9 @@ CPPFLAGS += -DDEBUG
 
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-parentheses
+
+# needs work
+SMOFF += all_func_returns,deref_check,signed,or_vs_and
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lfknsmb -lfakekernel -lidmap -lcmdutils -lavl -lc

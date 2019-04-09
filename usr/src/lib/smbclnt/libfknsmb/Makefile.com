@@ -24,6 +24,8 @@
 #
 # Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
+# Copyright 2019, Joyent, Inc.
+#
 
 LIBRARY =	libfknsmb.a
 VERS =		.1
@@ -89,6 +91,9 @@ CPPFLAGS += -D_FILE_OFFSET_BITS=64
 CPPFLAGS += -DDEBUG
 
 CERRWARN += -_gcc=-Wno-switch
+
+# needs work
+SMOFF += all_func_returns,deref_check,signed
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS +=	-lfakekernel -lpkcs11 -lnsl -lc
