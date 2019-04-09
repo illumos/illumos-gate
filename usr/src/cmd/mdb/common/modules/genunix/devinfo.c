@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1578,6 +1578,33 @@ soft_state_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
+	if (sst->ssw_ss.size == 0) {
+		mdb_warn("read invalid softstate: softstate item size is "
+		    "zero\n");
+		return (WALK_ERR);
+	}
+
+	if (sst->ssw_ss.n_items == 0) {
+		mdb_warn("read invalid softstate: softstate has no entries\n");
+		return (WALK_ERR);
+	}
+
+	/*
+	 * Try and pick arbitrary bounds to try and catch an illegal soft state
+	 * structure. While these may be larger than we expect, we also don't
+	 * want to throw off a valid use.
+	 */
+	if (sst->ssw_ss.size >= 1024 * 1024 * 1024) {
+		mdb_warn("softstate size is larger than 1 GiB (0x%lx), invalid "
+		    "softstate?\n", sst->ssw_ss.size);
+		return (WALK_ERR);
+	}
+
+	if (sst->ssw_ss.n_items >= INT_MAX / 1024) {
+		mdb_warn("softstate item count seems too large: found %ld "
+		    "items\n", sst->ssw_ss.n_items);
+		return (WALK_ERR);
+	}
 
 	/* Read array of pointers to state structs into local storage. */
 	sst->ssw_pointers = mdb_alloc((sst->ssw_ss.n_items * sizeof (void *)),
