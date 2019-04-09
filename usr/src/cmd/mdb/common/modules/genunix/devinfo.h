@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_DEVINFO_H
@@ -43,11 +44,13 @@ extern "C" {
 #define	DEVINFO_SUMMARY		0x10
 #define	DEVINFO_HP_PHYSICAL	0x20
 #define	DEVINFO_PIPE		0x40
+#define	DEVINFO_DRIVER		0x80
 
 typedef struct devinfo_cb_data {
 	uintptr_t	di_base;
 	uint_t		di_flags;
-	char 		*di_filter;
+	char		*di_filter;
+	uint64_t	di_instance;
 } devinfo_cb_data_t;
 
 extern int devinfo_walk_init(mdb_walk_state_t *);
@@ -88,6 +91,7 @@ extern int devt(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int softstate(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int devinfo_fm(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int devinfo_fmce(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int devinfo2bus(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 extern int soft_state_walk_init(mdb_walk_state_t *);
 extern int soft_state_walk_step(mdb_walk_state_t *);
@@ -120,6 +124,7 @@ extern int minornodes(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 extern void prtconf_help(void);
 extern void devinfo_help(void);
+extern void devinfo2bus_help(void);
 
 #ifdef	__cplusplus
 }

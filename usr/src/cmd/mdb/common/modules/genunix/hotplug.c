@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <sys/mdb_modapi.h>
@@ -115,6 +116,7 @@ hotplug(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	data.di_flags = 0;
 	data.di_filter = NULL;
+	data.di_instance = UINT64_MAX;
 	if (mdb_getopts(argc, argv,
 	    'p', MDB_OPT_SETBITS, DEVINFO_HP_PHYSICAL, &data.di_flags, NULL)
 	    != argc)
