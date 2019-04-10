@@ -23,6 +23,7 @@
  * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -850,7 +851,10 @@ metaslab_group_passivate(metaslab_group_t *mg)
 	mg->mg_next = NULL;
 
 	if (mg->mg_kstat != NULL) {
+		metaslab_group_kstat_t *data = mg->mg_kstat->ks_data;
+
 		kstat_delete(mg->mg_kstat);
+		kmem_free(data, sizeof (metaslab_group_kstat_t));
 	}
 	mutex_destroy(&mg->mg_kstat_lock);
 }
