@@ -11,7 +11,7 @@
  source.  A copy of the CDDL is also available via the Internet at
  http://www.illumos.org/license/CDDL.
 
- Copyright (c) 2018, Joyent, Inc.
+ Copyright (c) 2019, Joyent, Inc.
 
 -->
 
@@ -201,7 +201,7 @@
              <propgroup name='ipmi' version='1'
                name-stability='Private' data-stability='Private' >
                <propval name='entity-list' type='string_array' >
-                 <propitem value='P2-DIMMF1 Temp' />
+                 <propitem value='P2-DIMMF2 Temp' />
                </propval>
              </propgroup>
            </node>
