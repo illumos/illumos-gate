@@ -22,7 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2018 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -138,6 +138,7 @@ extern void mac_multicast_remove(mac_client_handle_t, const uint8_t *);
 
 extern void mac_rx_set(mac_client_handle_t, mac_rx_t, void *);
 extern void mac_rx_clear(mac_client_handle_t);
+extern void mac_rx_barrier(mac_client_handle_t);
 extern void mac_secondary_dup(mac_client_handle_t, mac_client_handle_t);
 extern void mac_secondary_cleanup(mac_client_handle_t);
 extern mac_tx_cookie_t mac_tx(mac_client_handle_t, mblk_t *,
