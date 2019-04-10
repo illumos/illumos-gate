@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_MAC_IMPL_H
@@ -108,6 +108,7 @@ typedef struct mac_cb_info_s {
 	kcondvar_t	mcbi_cv;
 	uint_t		mcbi_del_cnt;		/* Deleted callback cnt */
 	uint_t		mcbi_walker_cnt;	/* List walker count */
+	uint_t		mcbi_barrier_cnt;	/* Barrier waiter count */
 } mac_cb_info_t;
 
 typedef struct mac_notify_cb_s {
@@ -123,40 +124,18 @@ typedef struct mac_notify_cb_s {
  */
 typedef boolean_t (*mcb_func_t)(mac_cb_info_t *, mac_cb_t **, mac_cb_t *);
 
-#define	MAC_CALLBACK_WALKER_INC(mcbi) {				\
-	mutex_enter((mcbi)->mcbi_lockp);			\
-	(mcbi)->mcbi_walker_cnt++;				\
-	mutex_exit((mcbi)->mcbi_lockp);				\
-}
+#define	MAC_CALLBACK_WALKER_INC(mcbi) \
+	mac_callback_walker_enter(mcbi)
 
-#define	MAC_CALLBACK_WALKER_INC_HELD(mcbi)	(mcbi)->mcbi_walker_cnt++;
+#define	MAC_CALLBACK_WALKER_DCR(mcbi, headp) \
+	mac_callback_walker_exit(mcbi, headp, B_FALSE)
 
-#define	MAC_CALLBACK_WALKER_DCR(mcbi, headp) {			\
-	mac_cb_t	*rmlist;				\
-								\
-	mutex_enter((mcbi)->mcbi_lockp);			\
-	if (--(mcbi)->mcbi_walker_cnt == 0 && (mcbi)->mcbi_del_cnt != 0) { \
-		rmlist = mac_callback_walker_cleanup((mcbi), headp);	\
-		mac_callback_free(rmlist);			\
-		cv_broadcast(&(mcbi)->mcbi_cv);			\
-	}							\
-	mutex_exit((mcbi)->mcbi_lockp);				\
-}
+#define	MAC_PROMISC_WALKER_INC(mip) \
+	mac_callback_walker_enter(&(mip)->mi_promisc_cb_info)
 
-#define	MAC_PROMISC_WALKER_INC(mip)				\
-	MAC_CALLBACK_WALKER_INC(&(mip)->mi_promisc_cb_info)
-
-#define	MAC_PROMISC_WALKER_DCR(mip) {				\
-	mac_cb_info_t	*mcbi;					\
-								\
-	mcbi = &(mip)->mi_promisc_cb_info;			\
-	mutex_enter(mcbi->mcbi_lockp);				\
-	if (--mcbi->mcbi_walker_cnt == 0 && mcbi->mcbi_del_cnt != 0) { \
-		i_mac_promisc_walker_cleanup(mip);		\
-		cv_broadcast(&mcbi->mcbi_cv);			\
-	}							\
-	mutex_exit(mcbi->mcbi_lockp);				\
-}
+#define	MAC_PROMISC_WALKER_DCR(mip) \
+	mac_callback_walker_exit(&(mip)->mi_promisc_cb_info, \
+	    &(mip)->mi_promisc_list, B_TRUE)
 
 typedef struct mactype_s {
 	const char	*mt_ident;
@@ -753,12 +732,13 @@ extern void mac_rx_deliver(void *, mac_resource_handle_t, mblk_t *,
     mac_header_info_t *);
 extern void mac_tx_notify(mac_impl_t *);
 
-extern	boolean_t mac_callback_find(mac_cb_info_t *, mac_cb_t **, mac_cb_t *);
-extern	void	mac_callback_add(mac_cb_info_t *, mac_cb_t **, mac_cb_t *);
-extern	boolean_t mac_callback_remove(mac_cb_info_t *, mac_cb_t **, mac_cb_t *);
-extern	void	mac_callback_remove_wait(mac_cb_info_t *);
-extern	void	mac_callback_free(mac_cb_t *);
-extern	mac_cb_t *mac_callback_walker_cleanup(mac_cb_info_t *, mac_cb_t **);
+extern void mac_callback_add(mac_cb_info_t *, mac_cb_t **, mac_cb_t *);
+extern boolean_t mac_callback_remove(mac_cb_info_t *, mac_cb_t **, mac_cb_t *);
+extern void mac_callback_remove_wait(mac_cb_info_t *);
+extern void mac_callback_barrier(mac_cb_info_t *);
+extern void mac_callback_free(mac_cb_t *);
+extern void mac_callback_walker_enter(mac_cb_info_t *);
+extern void mac_callback_walker_exit(mac_cb_info_t *, mac_cb_t **, boolean_t);
 
 /* in mac_bcast.c */
 extern void mac_bcast_init(void);
@@ -872,7 +852,6 @@ extern void mac_tx_client_block(mac_client_impl_t *);
 extern void mac_tx_client_unblock(mac_client_impl_t *);
 extern void mac_tx_invoke_callbacks(mac_client_impl_t *, mac_tx_cookie_t);
 extern int i_mac_promisc_set(mac_impl_t *, boolean_t);
-extern void i_mac_promisc_walker_cleanup(mac_impl_t *);
 extern mactype_t *mactype_getplugin(const char *);
 extern void mac_addr_factory_init(mac_impl_t *);
 extern void mac_addr_factory_fini(mac_impl_t *);
