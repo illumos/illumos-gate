@@ -482,7 +482,7 @@ physmem_map_addrs(struct physmem_map_param *pmpp)
 
 	pp = page_numtopp_nolock(btop((size_t)req_paddr));
 	if (pp == NULL) {
-		pmpp->ret_va = NULL;
+		pmpp->ret_va = 0;
 		return (EPERM);
 	}
 
@@ -509,7 +509,7 @@ physmem_map_addrs(struct physmem_map_param *pmpp)
 	ret = page_trycapture(pp, 0, flags | CAPTURE_PHYSMEM, curproc);
 
 	if (ret != 0) {
-		pmpp->ret_va = NULL;
+		pmpp->ret_va = 0;
 		return (ret);
 	} else {
 		pmpp->ret_va = (uint64_t)(uintptr_t)uvaddr;

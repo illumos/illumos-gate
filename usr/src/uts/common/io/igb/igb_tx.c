@@ -218,7 +218,7 @@ igb_tx(igb_tx_ring_t *tx_ring, mblk_t *mp)
 			 * expect it to be copied into pre-allocated
 			 * page-aligned buffer
 			 */
-			hdr_new_mp = allocb(hdr_frag_len, NULL);
+			hdr_new_mp = allocb(hdr_frag_len, 0);
 			if (!hdr_new_mp) {
 				return (B_FALSE);
 			}

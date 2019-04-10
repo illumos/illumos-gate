@@ -278,7 +278,7 @@ igb_alloc_tbd_ring(igb_tx_ring_t *tx_ring)
 	if (ret != DDI_DMA_MAPPED) {
 		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not bind tbd dma resource: %x", ret);
-		tx_ring->tbd_area.dma_address = NULL;
+		tx_ring->tbd_area.dma_address = 0;
 		if (tx_ring->tbd_area.acc_handle != NULL) {
 			ddi_dma_mem_free(&tx_ring->tbd_area.acc_handle);
 			tx_ring->tbd_area.acc_handle = NULL;
@@ -320,7 +320,7 @@ igb_free_tbd_ring(igb_tx_ring_t *tx_ring)
 		tx_ring->tbd_area.dma_handle = NULL;
 	}
 	tx_ring->tbd_area.address = NULL;
-	tx_ring->tbd_area.dma_address = NULL;
+	tx_ring->tbd_area.dma_address = 0;
 	tx_ring->tbd_area.size = 0;
 
 	tx_ring->tbd_ring = NULL;
@@ -506,7 +506,7 @@ igb_alloc_rbd_ring(igb_rx_data_t *rx_data)
 	if (ret != DDI_DMA_MAPPED) {
 		igb_log(igb, IGB_LOG_ERROR,
 		    "Could not bind rbd dma resource: %x", ret);
-		rx_data->rbd_area.dma_address = NULL;
+		rx_data->rbd_area.dma_address = 0;
 		if (rx_data->rbd_area.acc_handle != NULL) {
 			ddi_dma_mem_free(&rx_data->rbd_area.acc_handle);
 			rx_data->rbd_area.acc_handle = NULL;
@@ -548,7 +548,7 @@ igb_free_rbd_ring(igb_rx_data_t *rx_data)
 		rx_data->rbd_area.dma_handle = NULL;
 	}
 	rx_data->rbd_area.address = NULL;
-	rx_data->rbd_area.dma_address = NULL;
+	rx_data->rbd_area.dma_address = 0;
 	rx_data->rbd_area.size = 0;
 
 	rx_data->rbd_ring = NULL;
@@ -602,7 +602,7 @@ igb_alloc_dma_buffer(igb_t *igb,
 	    DDI_DMA_DONTWAIT, NULL, &cookie, &cookie_num);
 
 	if (ret != DDI_DMA_MAPPED) {
-		buf->dma_address = NULL;
+		buf->dma_address = 0;
 		if (buf->acc_handle != NULL) {
 			ddi_dma_mem_free(&buf->acc_handle);
 			buf->acc_handle = NULL;
@@ -634,7 +634,7 @@ igb_free_dma_buffer(dma_buffer_t *buf)
 {
 	if (buf->dma_handle != NULL) {
 		(void) ddi_dma_unbind_handle(buf->dma_handle);
-		buf->dma_address = NULL;
+		buf->dma_address = 0;
 	} else {
 		return;
 	}

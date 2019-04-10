@@ -220,7 +220,7 @@ ixgbe_ring_tx(void *arg, mblk_t *mp)
 			 * expect to bcopy into pre-allocated page-aligned
 			 * buffer
 			 */
-			hdr_new_mp = allocb(hdr_frag_len, NULL);
+			hdr_new_mp = allocb(hdr_frag_len, 0);
 			if (!hdr_new_mp)
 				return (mp);
 			bcopy(hdr_nmp->b_rptr, hdr_new_mp->b_rptr,

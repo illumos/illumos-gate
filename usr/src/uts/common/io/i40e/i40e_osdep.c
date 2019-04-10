@@ -97,7 +97,7 @@ i40e_allocate_dma_mem(struct i40e_hw *hw, struct i40e_dma_mem *mem,
 	    DDI_DMA_RDWR | DDI_DMA_STREAMING, DDI_DMA_DONTWAIT, NULL,
 	    &cookie, &cookie_num);
 	if (rc != DDI_DMA_MAPPED) {
-		mem->pa = NULL;
+		mem->pa = 0;
 		ASSERT(mem->idm_acc_handle != NULL);
 		ddi_dma_mem_free(&mem->idm_acc_handle);
 		mem->idm_acc_handle = NULL;

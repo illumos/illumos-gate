@@ -912,7 +912,7 @@ iscsit_rx_pdu(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 		 * now we treat it as a protocol error.
 		 */
 		idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
-		idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
+		idm_conn_event(ic, CE_TRANSPORT_FAIL, 0);
 		break;
 	case ISCSI_OP_SCSI_TASK_MGT_MSG:
 		if (iscsit_check_cmdsn_and_queue(rx_pdu)) {
@@ -933,7 +933,7 @@ iscsit_rx_pdu(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 	default:
 		/* Protocol error */
 		idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
-		idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
+		idm_conn_event(ic, CE_TRANSPORT_FAIL, 0);
 		break;
 	}
 }
@@ -958,7 +958,7 @@ void
 iscsit_rx_scsi_rsp(idm_conn_t *ic, idm_pdu_t *rx_pdu)
 {
 	idm_pdu_complete(rx_pdu, IDM_STATUS_SUCCESS);
-	idm_conn_event(ic, CE_TRANSPORT_FAIL, NULL);
+	idm_conn_event(ic, CE_TRANSPORT_FAIL, 0);
 }
 
 void
@@ -1427,7 +1427,7 @@ iscsit_conn_logout(iscsit_conn_t *ict)
 	 */
 	mutex_enter(&ict->ict_mutex);
 	if (ict->ict_lost == B_FALSE && ict->ict_destroyed == B_FALSE) {
-		idm_conn_event(ict->ict_ic, CE_LOGOUT_SESSION_SUCCESS, NULL);
+		idm_conn_event(ict->ict_ic, CE_LOGOUT_SESSION_SUCCESS, 0);
 	}
 	mutex_exit(&ict->ict_mutex);
 }
@@ -1442,7 +1442,7 @@ iscsit_conn_logout(iscsit_conn_t *ict)
  * Target
  * Target portal (group?) == local port (really but we're not going to do this)
  *	iscsit needs to map connections to local ports (whatever we decide
- * 	they are)
+ *	they are)
  * Target == ?
  */
 
@@ -2349,9 +2349,9 @@ iscsit_op_scsi_task_mgmt(iscsit_conn_t *ict, idm_pdu_t *rx_pdu)
 	iscsit_task_t			*itask;
 	iscsit_task_t			*tm_itask;
 	scsi_task_t			*task;
-	iscsi_scsi_task_mgt_hdr_t 	*iscsi_tm =
+	iscsi_scsi_task_mgt_hdr_t	*iscsi_tm =
 	    (iscsi_scsi_task_mgt_hdr_t *)rx_pdu->isp_hdr;
-	iscsi_scsi_task_mgt_rsp_hdr_t 	*iscsi_tm_rsp =
+	iscsi_scsi_task_mgt_rsp_hdr_t	*iscsi_tm_rsp =
 	    (iscsi_scsi_task_mgt_rsp_hdr_t *)rx_pdu->isp_hdr;
 	uint32_t			rtt, cmdsn, refcmdsn;
 	uint8_t				tm_func;
@@ -2598,7 +2598,7 @@ iscsit_pdu_op_login_cmd(iscsit_conn_t	*ict, idm_pdu_t *rx_pdu)
 void
 iscsit_pdu_op_logout_cmd(iscsit_conn_t	*ict, idm_pdu_t *rx_pdu)
 {
-	iscsi_logout_hdr_t 	*logout_req =
+	iscsi_logout_hdr_t	*logout_req =
 	    (iscsi_logout_hdr_t *)rx_pdu->isp_hdr;
 	iscsi_logout_rsp_hdr_t	*logout_rsp;
 	idm_pdu_t *resp;
@@ -2712,7 +2712,7 @@ iscsit_send_async_event(iscsit_conn_t *ict, uint8_t event)
 	 */
 	abt = idm_pdu_alloc(sizeof (iscsi_hdr_t), 0);
 	if (abt == NULL) {
-		idm_conn_event(ict->ict_ic, CE_TRANSPORT_FAIL, NULL);
+		idm_conn_event(ict->ict_ic, CE_TRANSPORT_FAIL, 0);
 		return;
 	}
 
@@ -2762,7 +2762,7 @@ iscsit_send_reject(iscsit_conn_t *ict, idm_pdu_t *rejected_pdu, uint8_t reason)
 	reject_pdu = idm_pdu_alloc(sizeof (iscsi_hdr_t),
 	    rejected_pdu->isp_hdrlen);
 	if (reject_pdu == NULL) {
-		idm_conn_event(ict->ict_ic, CE_TRANSPORT_FAIL, NULL);
+		idm_conn_event(ict->ict_ic, CE_TRANSPORT_FAIL, 0);
 		return;
 	}
 	idm_pdu_init(reject_pdu, ict->ict_ic, NULL, NULL);
@@ -3188,7 +3188,7 @@ static void
 iscsit_add_pdu_to_queue(iscsit_sess_t *ist, idm_pdu_t *rx_pdu)
 {
 	iscsit_cbuf_t	*cbuf	= ist->ist_rxpdu_queue;
-	iscsit_conn_t	*ict 	= rx_pdu->isp_ic->ic_handle;
+	iscsit_conn_t	*ict	= rx_pdu->isp_ic->ic_handle;
 	uint32_t	cmdsn	=
 	    ((iscsi_scsi_cmd_hdr_t *)rx_pdu->isp_hdr)->cmdsn;
 	uint32_t	index;

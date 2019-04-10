@@ -46,7 +46,7 @@
 .\" Copyright (c) 2014 Gary Mills
 .\" Copyright 2014 Garrett D'Amore <garrett@damore.org>
 .\"
-.TH STRFTIME 3C "Jun 24, 2014"
+.TH STRFTIME 3C "Mar 30, 2019"
 .SH NAME
 strftime, strftime_l cftime, ascftime \- convert date and time to string
 .SH SYNOPSIS
@@ -75,7 +75,6 @@ strftime, strftime_l cftime, ascftime \- convert date and time to string
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBstrftime()\fR, \fBstrftime_l()\fR, \fBascftime()\fR, and \fBcftime()\fR
 functions place
@@ -91,7 +90,7 @@ that overlap, the behavior is undefined. For \fBstrftime()\fR, no more than
 behaves identically to \fBstrftime()\fR function, but instead of operating in
 the current locale, it operates in the locale specified by \fIloc\fR.
 .LP
-If \fIformat\fR is \fB(char *)0\fR, then the locale's default format is used.
+If \fIformat\fR is \fBNULL\fR, then the locale's default format is used.
 For \fBstrftime()\fR the default format is the same as \fB%c\fR; for
 \fBcftime()\fR and \fBascftime()\fR the default format is the same as \fB%+\fR.
 \fBcftime()\fR and \fBascftime()\fR first try to use the value of the

@@ -5135,10 +5135,10 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	 * another stream.  If another stream is already using the
 	 * requested IP address and port, the behavior depends on
 	 * "bind_to_req_port_only". If set the bind fails; otherwise we
-	 * search for any an unused port to bind to the stream.
+	 * search for any unused port to bind to the stream.
 	 *
 	 * As per the BSD semantics, as modified by the Deering multicast
-	 * changes, if udp_reuseaddr is set, then we allow multiple binds
+	 * changes, if conn_reuseaddr is set, then we allow multiple binds
 	 * to the same port independent of the local IP address.
 	 *
 	 * This is slightly different than in SunOS 4.X which did not

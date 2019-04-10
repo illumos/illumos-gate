@@ -2113,7 +2113,7 @@ igb_setup_rx_ring(igb_rx_ring_t *rx_ring)
 		rbd = &rx_data->rbd_ring[i];
 
 		rbd->read.pkt_addr = rcb->rx_buf.dma_address;
-		rbd->read.hdr_addr = NULL;
+		rbd->read.hdr_addr = 0;
 	}
 
 	/*

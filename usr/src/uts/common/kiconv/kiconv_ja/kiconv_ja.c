@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/sysmacros.h>
@@ -85,7 +83,7 @@ utf8_ucs(uint_t *p, uchar_t **pip, size_t *pileft, int *errno)
 	uchar_t	ic1;		/* 1st byte */
 	uchar_t	*ip = *pip;	/* next byte to read */
 	size_t	ileft = *pileft; /* number of bytes available */
-	size_t	rv = 0; 	/* return value of this function */
+	size_t	rv = 0;		/* return value of this function */
 	int	remaining_bytes;
 	int	u8_size;
 
@@ -151,11 +149,11 @@ utf8_ucs_replace(uint_t *p, uchar_t **pip, size_t *pileft, size_t *repnum)
 	uchar_t	ic1;		/* 1st byte */
 	uchar_t	*ip = *pip;	/* next byte to read */
 	size_t	ileft = *pileft; /* number of bytes available */
-	size_t	rv = 0; 	/* return value of this function */
+	size_t	rv = 0;		/* return value of this function */
 	int	remaining_bytes;
 	int	u8_size;
 
-	KICONV_JA_NGET_REP_TO_MB(ic1); 	/* read 1st byte */
+	KICONV_JA_NGET_REP_TO_MB(ic1);	/* read 1st byte */
 
 	if (ic1 < 0x80) {
 		/* successfully converted */
@@ -323,7 +321,7 @@ close_ja(void *kcd)
 
 static size_t
 _do_kiconv_fr_eucjp(void *kcd, char **inbuf, size_t *inbytesleft,
-		char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	uint_t		u32;		/* UTF-32 */
 	uint_t		index;		/* index for table lookup */
@@ -346,9 +344,9 @@ _do_kiconv_fr_eucjp(void *kcd, char **inbuf, size_t *inbytesleft,
 	oleft = *outbytesleft;
 
 	while (ileft != 0) {
-		KICONV_JA_NGET(ic1); 		/* get 1st byte */
+		KICONV_JA_NGET(ic1);		/* get 1st byte */
 
-		if (KICONV_JA_ISASC(ic1)) { 	/* ASCII; 1 byte */
+		if (KICONV_JA_ISASC(ic1)) {	/* ASCII; 1 byte */
 			u32 = kiconv_ja_jisx0201roman_to_ucs2[ic1];
 			KICONV_JA_PUTU(u32);
 		} else if (KICONV_JA_ISCS1(ic1)) { /* 0208 or UDC; 2 bytes */
@@ -425,7 +423,7 @@ ret:
 
 static size_t
 _do_kiconv_to_eucjp(void *kcd, char **inbuf, size_t *inbytesleft,
-		char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	uchar_t		ic;
 	size_t		rv = 0;
@@ -512,7 +510,7 @@ ret:
 
 static size_t
 _do_kiconvstr_fr_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno, uint8_t id)
+    size_t *outbytesleft, int flag, int *errno, uint8_t id)
 {
 	uint_t		u32;		/* UTF-32 */
 	uint_t		index;		/* index for table lookup */
@@ -526,7 +524,7 @@ _do_kiconvstr_fr_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 	boolean_t do_not_ignore_null;
 
-	if ((inbuf == NULL) || (*inbuf == NULL)) {
+	if ((inbuf == NULL) || (*inbuf == '\0')) {
 		return (0);
 	}
 
@@ -538,9 +536,9 @@ _do_kiconvstr_fr_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
 	do_not_ignore_null = ((flag & KICONV_IGNORE_NULL) == 0);
 
 	while (ileft != 0) {
-		KICONV_JA_NGET(ic1); 		/* get 1st byte */
+		KICONV_JA_NGET(ic1);		/* get 1st byte */
 
-		if (KICONV_JA_ISASC(ic1)) { 	/* ASCII; 1 byte */
+		if (KICONV_JA_ISASC(ic1)) {	/* ASCII; 1 byte */
 			if (ic1 == '\0' && do_not_ignore_null) {
 				return (0);
 			}
@@ -661,7 +659,7 @@ ret:
 
 static size_t
 _do_kiconvstr_to_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno, uint8_t id)
+    size_t *outbytesleft, int flag, int *errno, uint8_t id)
 {
 	uchar_t		ic;
 	size_t		rv = 0;
@@ -676,7 +674,7 @@ _do_kiconvstr_to_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 	boolean_t do_not_ignore_null;
 
-	if ((inbuf == NULL) || (*inbuf == NULL)) {
+	if ((inbuf == NULL) || (*inbuf == '\0')) {
 		return (0);
 	}
 
@@ -752,7 +750,7 @@ ret:
 
 static size_t
 kiconv_fr_eucjp(void *kcd, char **inbuf, size_t *inbytesleft,
-		char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	if (! kcd || kcd == (void *)-1) {
 		*errno = EBADF;
@@ -765,7 +763,7 @@ kiconv_fr_eucjp(void *kcd, char **inbuf, size_t *inbytesleft,
 
 static size_t
 kiconv_to_eucjp(void *kcd, char **inbuf, size_t *inbytesleft,
-		char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	if (! kcd || kcd == (void *)-1) {
 		*errno = EBADF;
@@ -778,7 +776,7 @@ kiconv_to_eucjp(void *kcd, char **inbuf, size_t *inbytesleft,
 
 static size_t
 kiconvstr_fr_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno)
+    size_t *outbytesleft, int flag, int *errno)
 {
 	return (_do_kiconvstr_fr_eucjp(inbuf, inbytesleft, outbuf,
 	    outbytesleft, flag, errno, KICONV_JA_TBLID_EUCJP));
@@ -786,7 +784,7 @@ kiconvstr_fr_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 static size_t
 kiconvstr_to_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno)
+    size_t *outbytesleft, int flag, int *errno)
 {
 	return (_do_kiconvstr_to_eucjp(inbuf, inbytesleft, outbuf,
 	    outbytesleft, flag, errno, KICONV_JA_TBLID_EUCJP));
@@ -794,7 +792,7 @@ kiconvstr_to_eucjp(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 static size_t
 kiconvstr_fr_eucjpms(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno)
+    size_t *outbytesleft, int flag, int *errno)
 {
 	return (_do_kiconvstr_fr_eucjp(inbuf, inbytesleft, outbuf,
 	    outbytesleft, flag, errno, KICONV_JA_TBLID_EUCJP_MS));
@@ -802,7 +800,7 @@ kiconvstr_fr_eucjpms(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 static size_t
 kiconvstr_to_eucjpms(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno)
+    size_t *outbytesleft, int flag, int *errno)
 {
 	return (_do_kiconvstr_to_eucjp(inbuf, inbytesleft, outbuf,
 	    outbytesleft, flag, errno, KICONV_JA_TBLID_EUCJP_MS));
@@ -810,7 +808,7 @@ kiconvstr_to_eucjpms(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 static size_t
 _do_kiconv_fr_sjis(void *kcd, char **inbuf, size_t *inbytesleft,
-		char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	uint_t	uni;			/* UTF-32 */
 	uint_t	index;			/* index for table lookup */
@@ -833,7 +831,7 @@ _do_kiconv_fr_sjis(void *kcd, char **inbuf, size_t *inbytesleft,
 	oleft = *outbytesleft;
 
 	while (ileft != 0) {
-		KICONV_JA_NGET(ic1); 			/* get 1st byte */
+		KICONV_JA_NGET(ic1);			/* get 1st byte */
 
 		if (KICONV_JA_ISASC((int)ic1)) {	/* ASCII; 1 byte */
 			uni = kiconv_ja_jisx0201roman_to_ucs2[ic1];
@@ -999,7 +997,7 @@ _kiconv_ja_lookuptbl(ushort_t dest)
 
 static size_t
 _do_kiconv_to_sjis(void *kcd, char **inbuf, size_t *inbytesleft,
-		char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	uchar_t	ic;
 	size_t		rv = 0;
@@ -1121,7 +1119,7 @@ ret:
 
 static size_t
 _do_kiconvstr_fr_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno, uint8_t id)
+    size_t *outbytesleft, int flag, int *errno, uint8_t id)
 {
 	uint_t		uni;		/* UTF-32 */
 	uint_t		index;		/* index for table lookup */
@@ -1135,7 +1133,7 @@ _do_kiconvstr_fr_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 	boolean_t do_not_ignore_null;
 
-	if ((inbuf == NULL) || (*inbuf == NULL)) {
+	if ((inbuf == NULL) || (*inbuf == '\0')) {
 		return (0);
 	}
 
@@ -1147,7 +1145,7 @@ _do_kiconvstr_fr_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
 	do_not_ignore_null = ((flag & KICONV_IGNORE_NULL) == 0);
 
 	while (ileft != 0) {
-		KICONV_JA_NGET(ic1); 			/* get 1st byte */
+		KICONV_JA_NGET(ic1);			/* get 1st byte */
 
 		if (KICONV_JA_ISASC((int)ic1)) {	/* ASCII; 1 byte */
 			if (ic1 == '\0' && do_not_ignore_null) {
@@ -1353,7 +1351,7 @@ ret:
 
 static size_t
 _do_kiconvstr_to_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno, uint8_t id)
+    size_t *outbytesleft, int flag, int *errno, uint8_t id)
 {
 	uchar_t		ic;
 	size_t		rv = 0;
@@ -1369,7 +1367,7 @@ _do_kiconvstr_to_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 	boolean_t do_not_ignore_null;
 
-	if ((inbuf == NULL) || (*inbuf == NULL)) {
+	if ((inbuf == NULL) || (*inbuf == '\0')) {
 		return (0);
 	}
 
@@ -1479,7 +1477,7 @@ ret:
 
 static size_t
 kiconv_fr_sjis(void *kcd, char **inbuf, size_t *inbytesleft,
-		char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	if (! kcd || kcd == (void *)-1) {
 		*errno = EBADF;
@@ -1492,7 +1490,7 @@ kiconv_fr_sjis(void *kcd, char **inbuf, size_t *inbytesleft,
 
 static size_t
 kiconv_to_sjis(void *kcd, char **inbuf, size_t *inbytesleft,
-		char **outbuf, size_t *outbytesleft, int *errno)
+    char **outbuf, size_t *outbytesleft, int *errno)
 {
 	if (! kcd || kcd == (void *)-1) {
 		*errno = EBADF;
@@ -1505,7 +1503,7 @@ kiconv_to_sjis(void *kcd, char **inbuf, size_t *inbytesleft,
 
 static size_t
 kiconvstr_fr_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno)
+    size_t *outbytesleft, int flag, int *errno)
 {
 	return (_do_kiconvstr_fr_sjis(inbuf, inbytesleft, outbuf,
 	    outbytesleft, flag, errno, KICONV_JA_TBLID_SJIS));
@@ -1513,7 +1511,7 @@ kiconvstr_fr_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 static size_t
 kiconvstr_to_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno)
+    size_t *outbytesleft, int flag, int *errno)
 {
 	return (_do_kiconvstr_to_sjis(inbuf, inbytesleft, outbuf,
 	    outbytesleft, flag, errno, KICONV_JA_TBLID_SJIS));
@@ -1521,7 +1519,7 @@ kiconvstr_to_sjis(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 static size_t
 kiconvstr_fr_cp932(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno)
+    size_t *outbytesleft, int flag, int *errno)
 {
 	return (_do_kiconvstr_fr_sjis(inbuf, inbytesleft, outbuf,
 	    outbytesleft, flag, errno, KICONV_JA_TBLID_CP932));
@@ -1529,7 +1527,7 @@ kiconvstr_fr_cp932(char *inbuf, size_t *inbytesleft, char *outbuf,
 
 static size_t
 kiconvstr_to_cp932(char *inbuf, size_t *inbytesleft, char *outbuf,
-	size_t *outbytesleft, int flag, int *errno)
+    size_t *outbytesleft, int flag, int *errno)
 {
 	return (_do_kiconvstr_to_sjis(inbuf, inbytesleft, outbuf,
 	    outbytesleft, flag, errno, KICONV_JA_TBLID_CP932));

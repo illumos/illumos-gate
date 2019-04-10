@@ -663,7 +663,7 @@ e1000g_free_rx_descriptors(e1000g_rx_data_t *rx_data)
 		ddi_dma_free_handle(&rx_data->rbd_dma_handle);
 		rx_data->rbd_dma_handle = NULL;
 	}
-	rx_data->rbd_dma_addr = NULL;
+	rx_data->rbd_dma_addr = 0;
 	rx_data->rbd_first = NULL;
 	rx_data->rbd_last = NULL;
 }
@@ -683,7 +683,7 @@ e1000g_free_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 		ddi_dma_free_handle(&tx_ring->tbd_dma_handle);
 		tx_ring->tbd_dma_handle = NULL;
 	}
-	tx_ring->tbd_dma_addr = NULL;
+	tx_ring->tbd_dma_addr = 0;
 	tx_ring->tbd_first = NULL;
 	tx_ring->tbd_last = NULL;
 }
@@ -1103,7 +1103,7 @@ e1000g_free_dma_buffer(dma_buffer_t *buf)
 		return;
 	}
 
-	buf->dma_address = NULL;
+	buf->dma_address = 0;
 
 	if (buf->acc_handle != NULL) {
 		ddi_dma_mem_free(&buf->acc_handle);

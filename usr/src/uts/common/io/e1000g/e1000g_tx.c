@@ -299,7 +299,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 			 * expect to bcopy into pre-allocated page-aligned
 			 * buffer
 			 */
-			new_mp = allocb(hdr_frag_len, NULL);
+			new_mp = allocb(hdr_frag_len, 0);
 			if (!new_mp)
 				return (B_FALSE);
 			bcopy(next_mp->b_rptr, new_mp->b_rptr, hdr_frag_len);
@@ -1196,7 +1196,7 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
  *	agents which fully-optimize the inter-transaction turn-around (zero
  *	additional initiator latency when pre-granted bus ownership).
  *
- *   	This issue does not exist in PCI bus mode, when any agent is operating
+ *	This issue does not exist in PCI bus mode, when any agent is operating
  *	in 32 bit only mode or on chipsets that do not do 32 bit split
  *	completions for 64 bit read requests (Serverworks chipsets). P64H2 does
  *	32 bit split completions for any read request that has bit 2 set to 1

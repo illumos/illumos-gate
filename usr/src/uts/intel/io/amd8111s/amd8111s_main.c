@@ -705,7 +705,7 @@ amd8111s_odlInit(struct LayerPointers *pLayerPointers)
 			pmem_set_array++;
 			*(pmem_set_array) = (unsigned long) kmem_zalloc(
 			    *(pmem_req_array), KM_NOSLEEP);
-			if (*pmem_set_array == NULL)
+			if (*pmem_set_array == 0)
 				goto odl_init_failure;
 			break;
 		}
@@ -720,7 +720,7 @@ amd8111s_odlInit(struct LayerPointers *pLayerPointers)
 
 	/* Allocate Rx/Tx descriptors */
 	if (amd8111s_allocate_descriptors(pLayerPointers) != B_TRUE) {
-		*pmem_set_array = NULL;
+		*pmem_set_array = 0;
 		goto odl_init_failure;
 	}
 
@@ -730,7 +730,7 @@ amd8111s_odlInit(struct LayerPointers *pLayerPointers)
 	 */
 	if (amd8111s_allocate_buffers(pLayerPointers) == B_FALSE) {
 		amd8111s_free_descriptors(pLayerPointers);
-		*pmem_set_array = NULL;
+		*pmem_set_array = 0;
 		goto odl_init_failure;
 	}
 	milInitGlbds(pLayerPointers);
@@ -920,8 +920,7 @@ amd8111s_free_descriptors(struct LayerPointers *pLayerPointers)
  */
 static boolean_t
 amd8111s_alloc_dma_ringbuf(struct LayerPointers *pLayerPointers,
-			struct amd8111s_dma_ringbuf *pRing,
-			uint32_t ring_size, uint32_t msg_size)
+    struct amd8111s_dma_ringbuf *pRing, uint32_t ring_size, uint32_t msg_size)
 {
 	uint32_t idx, msg_idx = 0, msg_acc;
 	dev_info_t *devinfo = pLayerPointers->pOdl->devinfo;
@@ -1658,7 +1657,7 @@ amd8111s_reset(struct LayerPointers *pLayerPointers)
  *
  * Called once for each board after successfully probed.
  * will do
- * 	a. creating minor device node for the instance.
+ *	a. creating minor device node for the instance.
  *	b. allocate & Initilize four layers (call odlInit)
  *	c. get MAC address
  *	d. initilize pLayerPointers to gld private pointer
@@ -1813,7 +1812,7 @@ attach_failure:
  * It is called for each device instance when the system is preparing to
  * unload a dynamically unloadable driver.
  * will Do
- * 	a. check if any driver buffers are held by OS.
+ *	a. check if any driver buffers are held by OS.
  *	b. do clean up of all allocated memory if it is not in use by OS.
  *	c. un register with GLD
  *	d. return DDI_SUCCESS on succes full free & unregister
@@ -1904,7 +1903,7 @@ amd8111s_m_stat(void *arg, uint_t stat, uint64_t *val)
 	 * Current Status
 	 */
 	case MAC_STAT_IFSPEED:
-		*val = 	pLayerPointers->pMdl->Speed * 1000000;
+		*val = pLayerPointers->pMdl->Speed * 1000000;
 		break;
 
 	case ETHER_STAT_LINK_DUPLEX:
