@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -345,17 +345,33 @@ static check_descent_t check_descent_forward[] = {
 	{ NULL }
 };
 
-static check_descent_t check_descent_regress[] = {
+static check_descent_test_t descents[] = {
+	{ "head", check_descent_head },
+	{ "forward", check_descent_forward },
+	{ NULL }
+};
+
+static check_descent_t check_descent_regress_gcc4[] = {
 	{ "const union regress [9]", CTF_K_CONST },
 	{ "union regress [9]", CTF_K_ARRAY, "union regress", 9 },
 	{ "union regress", CTF_K_UNION },
 	{ NULL }
 };
 
-static check_descent_test_t descents[] = {
-	{ "head", check_descent_head },
-	{ "forward", check_descent_forward },
-	{ "regress", check_descent_regress },
+static check_descent_t check_descent_regress_gcc7[] = {
+	{ "const union regress [9]", CTF_K_ARRAY, "const union regress", 9 },
+	{ "const union regress", CTF_K_CONST },
+	{ "union regress", CTF_K_UNION },
+	{ NULL }
+};
+
+/*
+ * See needed_array_qualifier(): applying this fix means the qualifier order is
+ * different between GCC versions. Accept either form.
+ */
+static check_descent_test_t alt_descents[] = {
+	{ "regress", check_descent_regress_gcc4 },
+	{ "regress", check_descent_regress_gcc7 },
 	{ NULL }
 };
 
@@ -370,6 +386,7 @@ main(int argc, char *argv[])
 
 	for (i = 1; i < argc; i++) {
 		ctf_file_t *fp;
+		int alt_ok = 0;
 		uint_t j;
 
 		if ((fp = ctf_open(argv[i], &ret)) == NULL) {
@@ -385,9 +402,23 @@ main(int argc, char *argv[])
 			ret = EXIT_FAILURE;
 		for (j = 0; descents[j].cdt_sym != NULL; j++) {
 			if (!ctftest_check_descent(descents[j].cdt_sym, fp,
-			    descents[j].cdt_tests)) {
+			    descents[j].cdt_tests, B_FALSE)) {
 				ret = EXIT_FAILURE;
 			}
+		}
+
+		for (j = 0; alt_descents[j].cdt_sym != NULL; j++) {
+			if (ctftest_check_descent(alt_descents[j].cdt_sym, fp,
+			    alt_descents[j].cdt_tests, B_TRUE)) {
+				alt_ok = 1;
+				break;
+			}
+		}
+
+		if (!alt_ok) {
+			warnx("all descents failed for %s",
+			    alt_descents[0].cdt_sym);
+			ret = EXIT_FAILURE;
 		}
 
 		for (j = 0; members[j].cmt_type != NULL; j++) {

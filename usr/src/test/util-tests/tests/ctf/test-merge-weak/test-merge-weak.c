@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <stdlib.h>
@@ -25,6 +25,8 @@ _mumble(void)
 {
 	return ((int)arc4random());
 }
+
+extern int mumble(void);
 
 int
 main(void)

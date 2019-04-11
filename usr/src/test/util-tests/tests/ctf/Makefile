@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -32,6 +32,7 @@ TESTS =		test-float.c \
 		test-forward.c \
 		test-sou.c \
 		test-function.c \
+		test-qualifiers.c \
 		test-merge-static/Makefile.ctftest \
 		test-merge-static/test-a.c \
 		test-merge-static/test-b.c \
@@ -73,6 +74,7 @@ CHECKS =	check-float-32 \
 		check-forward-32 \
 		check-forward-64 \
 		check-function \
+		check-qualifiers \
 		check-merge-static \
 		check-merge-forward-32 \
 		check-merge-forward-64 \
@@ -95,6 +97,8 @@ ROOTSCRIPTS	:= FILEMODE =	0555
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
+
+CSTD = $(CSTD_GNU99)
 
 LDLIBS +=	-lctf
 

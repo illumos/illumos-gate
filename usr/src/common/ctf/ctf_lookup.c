@@ -25,7 +25,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
 
 #include <sys/sysmacros.h>
 #include <ctf_impl.h>
@@ -309,5 +311,52 @@ ctf_func_args(ctf_file_t *fp, ulong_t symidx, uint_t argc, ctf_id_t *argv)
 	for (argc = MIN(argc, f.ctc_argc); argc != 0; argc--)
 		*argv++ = *dp++;
 
+	return (0);
+}
+
+/*
+ * Unlike the normal lookup routines, ctf_dyn_*() variants consult both the
+ * processed CTF contents of a ctf_file_t as well as the dynamic types in the
+ * dtdef list.
+ */
+
+const ctf_type_t *
+ctf_dyn_lookup_by_id(ctf_file_t *fp, ctf_id_t id)
+{
+	ctf_file_t **fpp = &fp;
+	const ctf_type_t *t;
+	ctf_dtdef_t *dtd;
+
+	if ((t = ctf_lookup_by_id(fpp, id)) != NULL)
+		return (t);
+
+	if ((dtd = ctf_dtd_lookup(fp, id)) == NULL)
+		return (NULL);
+
+	return (&dtd->dtd_data);
+}
+
+int
+ctf_dyn_array_info(ctf_file_t *infp, ctf_id_t id, ctf_arinfo_t *arinfop)
+{
+	ctf_file_t *fp = infp;
+	const ctf_type_t *t;
+	ctf_dtdef_t *dtd;
+
+	if ((t = ctf_lookup_by_id(&fp, id)) != NULL) {
+
+		if (LCTF_INFO_KIND(fp, t->ctt_info) != CTF_K_ARRAY)
+			return (ctf_set_errno(infp, ECTF_NOTARRAY));
+
+		return (ctf_array_info(fp, id, arinfop));
+	}
+
+	if ((dtd = ctf_dtd_lookup(fp, id)) == NULL)
+		return (ctf_set_errno(infp, ENOENT));
+
+	if (LCTF_INFO_KIND(fp, dtd->dtd_data.ctt_info) != CTF_K_ARRAY)
+		return (ctf_set_errno(infp, ECTF_NOTARRAY));
+
+	bcopy(&dtd->dtd_u.dtu_arr, arinfop, sizeof (*arinfop));
 	return (0);
 }

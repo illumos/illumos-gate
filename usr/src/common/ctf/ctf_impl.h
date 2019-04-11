@@ -25,7 +25,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_CTF_IMPL_H
@@ -314,6 +314,9 @@ extern ctf_id_t ctf_add_reftype(ctf_file_t *, uint_t, const char *, ctf_id_t,
     uint_t);
 extern boolean_t ctf_sym_valid(uintptr_t, int, uint16_t, uint64_t,
     uint32_t);
+
+extern const ctf_type_t *ctf_dyn_lookup_by_id(ctf_file_t *, ctf_id_t);
+extern int ctf_dyn_array_info(ctf_file_t *, ctf_id_t, ctf_arinfo_t *);
 
 extern const char _CTF_SECTION[];	/* name of CTF ELF section */
 extern const char _CTF_NULLSTR[];	/* empty string */
