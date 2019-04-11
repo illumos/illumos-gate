@@ -347,7 +347,7 @@ nxge_check_xaui_xfp(p_nxge_t nxgep)
 	}
 
 	if (status != NXGE_OK) {
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_XAUI_ERR);
 		if (DDI_FM_EREPORT_CAP(nxgep->fm_capabilities)) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,

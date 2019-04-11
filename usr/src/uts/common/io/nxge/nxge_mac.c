@@ -6944,7 +6944,7 @@ nxge_mac_intr(void *arg1, void *arg2)
 		if (status & ICFG_XMAC_TX_ALL) {
 			if (status & ICFG_XMAC_TX_UNDERRUN) {
 				statsp->xmac_stats.tx_underflow_err++;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_TXMAC_UNDERFLOW);
 			}
 			if (status & ICFG_XMAC_TX_MAX_PACKET_ERR) {
@@ -6956,12 +6956,12 @@ nxge_mac_intr(void *arg1, void *arg2)
 			}
 			if (status & ICFG_XMAC_TX_OVERFLOW) {
 				statsp->xmac_stats.tx_overflow_err++;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_TXMAC_OVERFLOW);
 			}
 			if (status & ICFG_XMAC_TX_FIFO_XFR_ERR) {
 				statsp->xmac_stats.tx_fifo_xfr_err++;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_TXMAC_TXFIFO_XFR_ERR);
 			}
 			if (status & ICFG_XMAC_TX_BYTE_CNT_EXP) {
@@ -6983,7 +6983,7 @@ nxge_mac_intr(void *arg1, void *arg2)
 				statsp->xmac_stats.rx_overflow_err++;
 			if (status & ICFG_XMAC_RX_UNDERFLOW) {
 				statsp->xmac_stats.rx_underflow_err++;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_RXMAC_UNDERFLOW);
 			}
 			/*
@@ -7082,12 +7082,12 @@ nxge_mac_intr(void *arg1, void *arg2)
 		if (status & ICFG_BMAC_TX_ALL) {
 			if (status & ICFG_BMAC_TX_UNDERFLOW) {
 				statsp->bmac_stats.tx_underrun_err++;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_TXMAC_UNDERFLOW);
 			}
 			if (status & ICFG_BMAC_TX_MAXPKTSZ_ERR) {
 				statsp->bmac_stats.tx_max_pkt_err++;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_TXMAC_MAX_PKT_ERR);
 			}
 			if (status & ICFG_BMAC_TX_BYTE_CNT_EXP) {
@@ -7115,19 +7115,19 @@ nxge_mac_intr(void *arg1, void *arg2)
 			if (status & ICFG_BMAC_RX_CRC_ERR_CNT_EXP) {
 				statsp->bmac_stats.rx_crc_err_cnt +=
 				    BMAC_CRC_ER_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_RXMAC_CRC_ERRCNT_EXP);
 			}
 			if (status & ICFG_BMAC_RX_LEN_ERR_CNT_EXP) {
 				statsp->bmac_stats.rx_len_err_cnt +=
 				    MAC_LEN_ER_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_RXMAC_LENGTH_ERRCNT_EXP);
 			}
 			if (status & ICFG_BMAC_RX_VIOL_ERR_CNT_EXP)
 				statsp->bmac_stats.rx_viol_err_cnt +=
 				    BMAC_CD_VIO_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_RXMAC_VIOL_ERRCNT_EXP);
 			}
 			if (status & ICFG_BMAC_RX_BYTE_CNT_EXP) {
@@ -7137,7 +7137,7 @@ nxge_mac_intr(void *arg1, void *arg2)
 			if (status & ICFG_BMAC_RX_ALIGNERR_CNT_EXP) {
 				statsp->bmac_stats.rx_align_err_cnt +=
 				    BMAC_AL_ER_CNT_MASK;
-				NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+				NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 				    NXGE_FM_EREPORT_RXMAC_ALIGN_ECNT_EXP);
 			}
 

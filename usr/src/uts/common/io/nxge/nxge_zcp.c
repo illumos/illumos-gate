@@ -127,7 +127,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_RRFIFO_UNDERRUN) {
 		statsp->rrfifo_underrun++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_RRFIFO_UNDERRUN);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: rrfifo_underrun"));
@@ -135,7 +135,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_RRFIFO_OVERRUN) {
 		statsp->rrfifo_overrun++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_RRFIFO_OVERRUN);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: buf_rrfifo_overrun"));
@@ -143,7 +143,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_RSPFIFO_UNCORR_ERR) {
 		statsp->rspfifo_uncorr_err++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_RSPFIFO_UNCORR_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: rspfifo_uncorr_err"));
@@ -151,7 +151,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_BUFFER_OVERFLOW) {
 		statsp->buffer_overflow++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_BUFFER_OVERFLOW);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: buffer_overflow"));
@@ -160,7 +160,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_STAT_TBL_PERR) {
 		statsp->stat_tbl_perr++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_STAT_TBL_PERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: stat_tbl_perr"));
@@ -168,7 +168,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_DYN_TBL_PERR) {
 		statsp->dyn_tbl_perr++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_DYN_TBL_PERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: dyn_tbl_perr"));
@@ -176,7 +176,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_BUF_TBL_PERR) {
 		statsp->buf_tbl_perr++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_BUF_TBL_PERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: buf_tbl_perr"));
@@ -184,7 +184,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_TT_PROGRAM_ERR) {
 		statsp->tt_program_err++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_TT_PROGRAM_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: tt_program_err"));
@@ -192,7 +192,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_RSP_TT_INDEX_ERR) {
 		statsp->rsp_tt_index_err++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_RSP_TT_INDEX_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: rsp_tt_index_err"));
@@ -200,7 +200,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_SLV_TT_INDEX_ERR) {
 		statsp->slv_tt_index_err++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_SLV_TT_INDEX_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: slv_tt_index_err"));
@@ -208,7 +208,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 	if (istatus & ICFG_ZCP_TT_INDEX_ERR) {
 		statsp->zcp_tt_index_err++;
-		NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+		NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 		    NXGE_FM_EREPORT_ZCP_TT_INDEX_ERR);
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    "nxge_zcp_err_evnts: tt_index_err"));
@@ -226,7 +226,7 @@ nxge_zcp_handle_sys_errors(p_nxge_t nxgep)
 
 		if (ue_ecc_valid) {
 			statsp->cfifo_ecc++;
-			NXGE_FM_REPORT_ERROR(nxgep, portn, NULL,
+			NXGE_FM_REPORT_ERROR(nxgep, portn, 0,
 			    NXGE_FM_EREPORT_ZCP_CFIFO_ECC);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			    "nxge_zcp_err_evnts: port%d buf_cfifo_ecc",

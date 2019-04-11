@@ -1762,7 +1762,7 @@ static struct cb_ops sd_cb_ops = {
 	0,			/* streamtab  */
 	D_64BIT | D_MP | D_NEW | D_HOTPLUG, /* Driver compatibility flags */
 	CB_REV,			/* cb_rev */
-	sdaread, 		/* async I/O read entry point */
+	sdaread,		/* async I/O read entry point */
 	sdawrite		/* async I/O write entry point */
 };
 
@@ -2809,7 +2809,7 @@ sdprobe(dev_info_t *devi)
  *    Function: sdinfo
  *
  * Description: This is the driver getinfo(9e) entry point function.
- * 		Given the device number, return the devinfo pointer from
+ *		Given the device number, return the devinfo pointer from
  *		the scsi_device structure or the instance number
  *		associated with the dev_t.
  *
@@ -3098,11 +3098,11 @@ sd_scsi_target_lun_fini(void)
  *    Function: sd_scsi_get_target_lun_count
  *
  * Description: This routine will check in the attached lun chain to see
- * 		how many luns are attached on the required SCSI controller
- * 		and target. Currently, some capabilities like tagged queue
+ *		how many luns are attached on the required SCSI controller
+ *		and target. Currently, some capabilities like tagged queue
  *		are supported per target based by HBA. So all luns in a
  *		target have the same capabilities. Based on this assumption,
- * 		sd should only set these capabilities once per target. This
+ *		sd should only set these capabilities once per target. This
  *		function is called when sd needs to decide how many luns
  *		already attached on a target.
  *
@@ -3113,7 +3113,7 @@ sd_scsi_target_lun_fini(void)
  * Return Code: The number of luns attached on the required target and
  *		controller.
  *		-1 if target ID is not in parallel SCSI scope or the given
- * 		dip is not in the chain.
+ *		dip is not in the chain.
  *
  *     Context: Kernel thread context
  */
@@ -3214,7 +3214,7 @@ sd_spin_up_unit(sd_ssc_t *ssc)
 	size_t	resid		= 0;
 	int	has_conflict	= FALSE;
 	uchar_t *bufaddr;
-	int 	status;
+	int	status;
 	struct sd_lun	*un;
 
 	ASSERT(ssc != NULL);
@@ -3834,7 +3834,7 @@ sd_read_unit_properties(struct sd_lun *un)
  *
  * If version = SD_CONF_VERSION_1 we have the following syntax:
  *
- * 	<data-property-name>:=<version>,<flags>,<prop0>,<prop1>,.....<propN>
+ *	<data-property-name>:=<version>,<flags>,<prop0>,<prop1>,.....<propN>
  *
  * where the prop0 value will be used to set prop0 if bit0 set in the
  * flags, prop1 if bit1 set, etc. and N = SD_CONF_MAX_ITEMS -1
@@ -4711,7 +4711,7 @@ sd_chk_vers1_data(struct sd_lun *un, int flags, int *prop_list,
  *		retrieved from the driver configuration file or static
  *		configuration table. Version 1 properties have the format:
  *
- * 	<data-property-name>:=<version>,<flags>,<prop0>,<prop1>,.....<propN>
+ *	<data-property-name>:=<version>,<flags>,<prop0>,<prop1>,.....<propN>
  *
  *		where the prop0 value will be used to set prop0 if bit0
  *		is set in the flags
@@ -5022,7 +5022,7 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	uchar_t	*p3bufp;
 	uchar_t	*p4bufp;
 	int	cdbsize;
-	int 	ret = EIO;
+	int	ret = EIO;
 	sd_ssc_t *ssc;
 	int	status;
 
@@ -5941,7 +5941,7 @@ sd_check_vpd_page_support(sd_ssc_t *ssc)
 	uchar_t	page_length	= 0xff;	/* Use max possible length */
 	uchar_t	evpd		= 0x01;	/* Set the EVPD bit */
 	uchar_t	page_code	= 0x00;	/* Supported VPD Pages */
-	int    	rval		= 0;
+	int	rval		= 0;
 	int	counter;
 	struct sd_lun		*un;
 
@@ -6605,8 +6605,8 @@ sd_ddi_resume(dev_info_t *devi)
  *    Function: sd_pm_state_change
  *
  * Description: Change the driver power state.
- * 		Someone else is required to actually change the driver
- * 		power level.
+ *		Someone else is required to actually change the driver
+ *		power level.
  *
  *   Arguments: un - driver soft state (unit) structure
  *              level - the power level that is changed to
@@ -9336,7 +9336,7 @@ static void
 sd_set_errstats(struct sd_lun *un)
 {
 	struct	sd_errstats	*stp;
-	char 			*sn;
+	char			*sn;
 
 	ASSERT(un != NULL);
 	ASSERT(un->un_errstats != NULL);
@@ -9776,14 +9776,14 @@ sd_cache_control(sd_ssc_t *ssc, int rcd_flag, int wce_flag)
  * NOTE: If ioctl is added to disable write cache, this sequence should
  * be followed so that no locking is required for accesses to
  * un->un_f_write_cache_enabled:
- * 	do mode select to clear wce
- * 	do synchronize cache to flush cache
- * 	set un->un_f_write_cache_enabled = FALSE
+ *	do mode select to clear wce
+ *	do synchronize cache to flush cache
+ *	set un->un_f_write_cache_enabled = FALSE
  *
  * Conversely, an ioctl to enable the write cache should be done
  * in this order:
- * 	set un->un_f_write_cache_enabled = TRUE
- * 	do mode select to set wce
+ *	set un->un_f_write_cache_enabled = TRUE
+ *	do mode select to set wce
  */
 
 static int
@@ -10646,7 +10646,7 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 	cp = &un->un_ocmap.chkd[0];
 	while (cp < &un->un_ocmap.chkd[OCSIZE]) {
-		if (*cp != NULL) {
+		if (*cp != '\0') {
 			break;
 		}
 		cp++;
@@ -12323,7 +12323,7 @@ sd_ssc_print(sd_ssc_t *ssc, int sd_severity)
 {
 	struct uscsi_cmd	*ucmdp;
 	struct scsi_device	*devp;
-	dev_info_t 		*devinfo;
+	dev_info_t		*devinfo;
 	uchar_t			*sensep;
 	int			senlen;
 	union scsi_cdb		*cdbp;
@@ -14177,7 +14177,7 @@ sd_setup_rw_pkt(struct sd_lun *un,
  *    Function: sd_setup_next_rw_pkt
  *
  * Description: Setup packet for partial DMA transfers, except for the
- * 		initial transfer.  sd_setup_rw_pkt should be used for
+ *		initial transfer.  sd_setup_rw_pkt should be used for
  *		the initial transfer.
  *
  *     Context: Kernel thread and may be called from interrupt context.
@@ -16558,16 +16558,16 @@ sd_mark_rqs_busy(struct sd_lun *un, struct buf *bp)
 		sense_xp->xb_pktp->pkt_path_instance =
 		    ((SD_GET_XBUF(bp))->xb_pktp)->pkt_path_instance;
 
-	sense_xp->xb_retry_count	= 0;
+	sense_xp->xb_retry_count = 0;
 	sense_xp->xb_victim_retry_count = 0;
-	sense_xp->xb_ua_retry_count	= 0;
-	sense_xp->xb_nr_retry_count 	= 0;
+	sense_xp->xb_ua_retry_count = 0;
+	sense_xp->xb_nr_retry_count = 0;
 	sense_xp->xb_dma_resid  = 0;
 
 	/* Clean up the fields for auto-request sense */
 	sense_xp->xb_sense_status = 0;
-	sense_xp->xb_sense_state  = 0;
-	sense_xp->xb_sense_resid  = 0;
+	sense_xp->xb_sense_state = 0;
+	sense_xp->xb_sense_resid = 0;
 	bzero(sense_xp->xb_sense_data, sizeof (sense_xp->xb_sense_data));
 
 	SD_TRACE(SD_LOG_IO_CORE, un, "sd_mark_rqs_busy: exit\n");
@@ -18750,7 +18750,7 @@ sd_sense_key_illegal_request(struct sd_lun *un, struct buf *bp,
  */
 
 static void
-sd_sense_key_unit_attention(struct sd_lun *un, 	uint8_t *sense_datap,
+sd_sense_key_unit_attention(struct sd_lun *un, uint8_t *sense_datap,
     struct buf *bp, struct sd_xbuf *xp, struct scsi_pkt *pktp)
 {
 	/*
@@ -23043,7 +23043,8 @@ skip_ready_valid:
 
 	case MHIOCGRP_INKEYS:
 		SD_TRACE(SD_LOG_IOCTL, un, "MHIOCGRP_INKEYS\n");
-		if (((err = drv_priv(cred_p)) != EPERM) && arg != NULL) {
+		if (((err = drv_priv(cred_p)) != EPERM) &&
+		    arg != (intptr_t)NULL) {
 			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
 				err = ENOTSUP;
 			} else {
@@ -23055,7 +23056,8 @@ skip_ready_valid:
 
 	case MHIOCGRP_INRESV:
 		SD_TRACE(SD_LOG_IOCTL, un, "MHIOCGRP_INRESV\n");
-		if (((err = drv_priv(cred_p)) != EPERM) && arg != NULL) {
+		if (((err = drv_priv(cred_p)) != EPERM) &&
+		    arg != (intptr_t)NULL) {
 			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
 				err = ENOTSUP;
 			} else {
@@ -23069,7 +23071,7 @@ skip_ready_valid:
 		if ((err = drv_priv(cred_p)) != EPERM) {
 			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
 				err = ENOTSUP;
-			} else if (arg != NULL) {
+			} else if (arg != (intptr_t)NULL) {
 				mhioc_register_t reg;
 				if (ddi_copyin((void *)arg, &reg,
 				    sizeof (mhioc_register_t), flag) != 0) {
@@ -23091,7 +23093,7 @@ skip_ready_valid:
 		if ((err = drv_priv(cred_p)) != EPERM) {
 			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
 				err = ENOTSUP;
-			} else if (arg != NULL) {
+			} else if (arg != (intptr_t)NULL) {
 				mhioc_register_t reg;
 				if (ddi_copyin((void *)arg, &reg,
 				    sizeof (mhioc_register_t), flag) != 0) {
@@ -23113,7 +23115,7 @@ skip_ready_valid:
 		if ((err = drv_priv(cred_p)) != EPERM) {
 			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
 				err = ENOTSUP;
-			} else if (arg != NULL) {
+			} else if (arg != (intptr_t)NULL) {
 				mhioc_resv_desc_t resv_desc;
 				if (ddi_copyin((void *)arg, &resv_desc,
 				    sizeof (mhioc_resv_desc_t), flag) != 0) {
@@ -23135,7 +23137,7 @@ skip_ready_valid:
 		if ((err = drv_priv(cred_p)) != EPERM) {
 			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
 				err = ENOTSUP;
-			} else if (arg != NULL) {
+			} else if (arg != (intptr_t)NULL) {
 				mhioc_preemptandabort_t preempt_abort;
 				if (ddi_copyin((void *)arg, &preempt_abort,
 				    sizeof (mhioc_preemptandabort_t),
@@ -23158,7 +23160,7 @@ skip_ready_valid:
 		if ((err = drv_priv(cred_p)) != EPERM) {
 			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
 				err = ENOTSUP;
-			} else if (arg != NULL) {
+			} else if (arg != (intptr_t)NULL) {
 				mhioc_registerandignorekey_t r_and_i;
 				if (ddi_copyin((void *)arg, (void *)&r_and_i,
 				    sizeof (mhioc_registerandignorekey_t),
@@ -24733,7 +24735,7 @@ done:
  *
  * Return Code: -1 - on error (log sense is optional and may not be supported).
  *		0  - log page not found.
- *  		1  - log page found.
+ *		1  - log page found.
  */
 
 static int
@@ -25413,7 +25415,7 @@ sd_mhd_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 	uint8_t				*sensep;
 	struct scsi_pkt			*pkt;
 	uchar_t				actual_sense_length;
-	dev_t  				dev = (dev_t)arg;
+	dev_t				dev = (dev_t)arg;
 
 	ASSERT(resultp != NULL);
 	statusp			= resultp->statusp;
@@ -26754,9 +26756,9 @@ sd_send_polled_RQS(struct sd_lun *un)
 	 * If the request sense buffer (and packet) is not in use,
 	 * let's set the un_sense_isbusy and send our packet
 	 */
-	un->un_sense_isbusy 	= 1;
-	rqs_pktp->pkt_resid  	= 0;
-	rqs_pktp->pkt_reason 	= 0;
+	un->un_sense_isbusy = 1;
+	rqs_pktp->pkt_resid = 0;
+	rqs_pktp->pkt_reason = 0;
 	rqs_pktp->pkt_flags |= FLAG_NOINTR;
 	bzero(rqs_bp->b_un.b_addr, SENSE_LENGTH);
 
@@ -26799,7 +26801,7 @@ sd_send_polled_RQS(struct sd_lun *un)
  *		Specifically this routine cures not ready, coming ready
  *		transition for power up and reset of sonoma's.  This can take
  *		up to 45 seconds for power-on and 20 seconds for reset of a
- * 		sonoma lun.
+ *		sonoma lun.
  *
  *   Arguments: scsi_pkt - The scsi_pkt being sent to a device
  *
@@ -27011,7 +27013,7 @@ sd_persistent_reservation_in_read_keys(struct sd_lun *un,
 	mhioc_inkeys_t		*ptr;
 	mhioc_key_list_t	li;
 	uchar_t			*data_bufp = NULL;
-	int 			data_len = 0;
+	int			data_len = 0;
 	int			rval = 0;
 	size_t			copysz = 0;
 	sd_ssc_t		*ssc;
@@ -27171,9 +27173,9 @@ sd_persistent_reservation_in_read_resv(struct sd_lun *un,
 	mhioc_inresvs_t		*ptr;
 	sd_readresv_desc_t	*readresv_ptr;
 	mhioc_resv_desc_list_t	resvlist;
-	mhioc_resv_desc_t 	resvdesc;
+	mhioc_resv_desc_t	resvdesc;
 	uchar_t			*data_bufp = NULL;
-	int 			data_len;
+	int			data_len;
 	int			rval = 0;
 	int			i;
 	size_t			copysz = 0;
@@ -28432,7 +28434,7 @@ sr_read_tocentry(dev_t dev, caddr_t data, int flag)
  *    Function: sr_read_tochdr()
  *
  * Description: This routine is the driver entry point for handling CD-ROM
- * 		ioctl requests to read the Table of Contents (TOC) header
+ *		ioctl requests to read the Table of Contents (TOC) header
  *		(CDROMREADTOHDR). The TOC header consists of the disk starting
  *		and ending track numbers
  *
@@ -29711,7 +29713,7 @@ sr_read_sony_session_offset(dev_t dev, caddr_t data, int flag)
  *    Function: sd_wm_cache_constructor()
  *
  * Description: Cache Constructor for the wmap cache for the read/modify/write
- * 		devices.
+ *		devices.
  *
  *   Arguments: wm      - A pointer to the sd_w_map to be initialized.
  *		un	- sd_lun structure for the device.
@@ -29735,7 +29737,7 @@ sd_wm_cache_constructor(void *wm, void *un, int flags)
  *    Function: sd_wm_cache_destructor()
  *
  * Description: Cache destructor for the wmap cache for the read/modify/write
- * 		devices.
+ *		devices.
  *
  *   Arguments: wm      - A pointer to the sd_w_map to be initialized.
  *		un	- sd_lun structure for the device.

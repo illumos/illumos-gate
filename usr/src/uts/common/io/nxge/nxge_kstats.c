@@ -134,7 +134,7 @@ nxge_kstat_index_t nxge_rdc_stats[] = {
 	{RDC_STAT_ID_MIS, KSTAT_DATA_ULONG, "rdc_id_mismatch"},
 	{RDC_STAT_ZCP_EOP, KSTAT_DATA_ULONG, "rdc_zcp_eop"},
 	{RDC_STAT_IPP_EOP, KSTAT_DATA_ULONG, "rdc_ipp_eop"},
-	{RDC_STAT_END, NULL, NULL}
+	{RDC_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -152,7 +152,7 @@ nxge_kstat_index_t nxge_rdc_sys_stats[] = {
 	{RDC_SYS_STAT_ID_MISMATCH, KSTAT_DATA_UINT64, "rdc_stat_id_mismatch"},
 	{RDC_SYS_STAT_IPP_EOP_ERR, KSTAT_DATA_UINT64, "rdc_ipp_eop_err"},
 	{RDC_SYS_STAT_ZCP_EOP_ERR, KSTAT_DATA_UINT64, "rdc_zcp_eop_err"},
-	{RDC_SYS_STAT_END, NULL, NULL}
+	{RDC_SYS_STAT_END, KSTAT_DATA_UINT64, NULL}
 };
 
 typedef enum {
@@ -213,7 +213,7 @@ nxge_kstat_index_t nxge_tdc_stats[] = {
 	{TDC_STAT_TX_DDI_PKTS, KSTAT_DATA_ULONG, "tdc_tx_ddi_pkts"},
 	{TDC_STAT_TX_DVMA_PKTS, KSTAT_DATA_ULONG, "tdc_tx_dvma_pkts"},
 	{TDC_STAT_TX_MAX_PEND, KSTAT_DATA_ULONG, "tdc_tx_max_pend"},
-	{TDC_STAT_END, NULL, NULL}
+	{TDC_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 /* IPP Statistics definitions */
@@ -240,7 +240,7 @@ nxge_kstat_index_t nxge_ipp_stats[] = {
 	{IPP_STAT_PFIFO_UND, KSTAT_DATA_ULONG, "rxipp_pfifo_und"},
 	{IPP_STAT_BAD_CS, KSTAT_DATA_ULONG, "rxipp_bad_cs"},
 	{IPP_STAT_BAD_DIS, KSTAT_DATA_ULONG, "rxipp_bad_dis"},
-	{IPP_STAT_END, NULL, NULL}
+	{IPP_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 /* TXC Statistics definitions */
@@ -271,7 +271,7 @@ nxge_kstat_index_t nxge_txc_stats[] = {
 	{TXC_STAT_LENGTH_FAILED, KSTAT_DATA_ULONG, "txc_length_failed"},
 	{TXC_STAT_PKT_ASSY_DEAD, KSTAT_DATA_ULONG, "txc_pkt_assy_dead"},
 	{TXC_STAT_REORDER_ERR, KSTAT_DATA_ULONG, "txc_reorder_err"},
-	{TXC_STAT_END, NULL, NULL}
+	{TXC_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -362,7 +362,7 @@ nxge_kstat_index_t nxge_xmac_stats[] = {
 	{XMAC_STAT_XPCS_SYMBOL_L3_ERR_CNT,
 		KSTAT_DATA_ULONG, "xpcs_ln3_symbol_err_cnt"},
 #endif
-	{XMAC_STAT_END, NULL, NULL}
+	{XMAC_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -398,7 +398,7 @@ nxge_kstat_index_t nxge_bmac_stats[] = {
 	{BMAC_STAT_RX_PAUSE_CNT, KSTAT_DATA_ULONG, "rxmac_pause_cnt"},
 	{BMAC_STAT_RX_PAUSE_STATE, KSTAT_DATA_ULONG, "txmac_pause_state"},
 	{BMAC_STAT_RX_NOPAUSE_STATE, KSTAT_DATA_ULONG, "tx_nopause_state"},
-	{BMAC_STAT_END, NULL, NULL}
+	{BMAC_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -437,7 +437,7 @@ nxge_kstat_index_t nxge_zcp_stats[] = {
 	{ZCP_STAT_ZCP_TT_INDEX_ERR, KSTAT_DATA_ULONG, "zcp_zcp_tt_index_err"},
 	{ZCP_STAT_ZCP_ACCESS_FAIL, KSTAT_DATA_ULONG, "zcp_access_fail"},
 	{ZCP_STAT_ZCP_ACCESS_FAIL, KSTAT_DATA_ULONG, "zcp_cfifo_ecc"},
-	{ZCP_STAT_END, NULL, NULL}
+	{ZCP_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -469,7 +469,7 @@ nxge_kstat_index_t nxge_fflp_stats[] = {
 	{FFLP_STAT_HASH_P5_PIO_ERR, KSTAT_DATA_ULONG, "fflp_hash_p5_pio_err"},
 	{FFLP_STAT_HASH_P6_PIO_ERR, KSTAT_DATA_ULONG, "fflp_hash_p6_pio_err"},
 	{FFLP_STAT_HASH_P7_PIO_ERR, KSTAT_DATA_ULONG, "fflp_hash_p7_pio_err"},
-	{FFLP_STAT_END, NULL, NULL}
+	{FFLP_STAT_END, KSTAT_DATA_ULONG, NULL}
 };
 
 typedef enum {
@@ -513,7 +513,7 @@ nxge_kstat_index_t nxge_mmac_stats[] = {
 	{MMAC_ADDR_POOL14, KSTAT_DATA_UINT64, "mmac_addr_14"},
 	{MMAC_ADDR_POOL15, KSTAT_DATA_UINT64, "mmac_addr_15"},
 	{MMAC_ADDR_POOL16, KSTAT_DATA_UINT64, "mmac_addr_16"},
-	{MMAC_STATS_END, NULL, NULL},
+	{MMAC_STATS_END, KSTAT_DATA_UINT64, NULL},
 };
 
 /* ARGSUSED */
