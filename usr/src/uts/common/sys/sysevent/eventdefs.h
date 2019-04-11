@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_SYSEVENT_EVENTDEFS_H
@@ -55,6 +55,7 @@ extern "C" {
 #define	EC_ZFS		"EC_zfs"	/* ZFS event */
 #define	EC_DATALINK	"EC_datalink"	/* datalink event */
 #define	EC_VRRP		"EC_vrrp"	/* VRRP event */
+#define	EC_PCIE		"EC_pcie"	/* PCIe event */
 
 /*
  * The following event class is reserved for exclusive use
@@ -223,6 +224,12 @@ extern "C" {
  * found in sys/sysevent/vrrp.h
  */
 #define	ESC_VRRP_STATE_CHANGE	"ESC_vrrp_state_change"
+
+/*
+ * PCIe subclass definitions. Supporting attributes for PCIe state found in
+ * sys/sysevent/pcie.h.
+ */
+#define	ESC_PCIE_LINK_STATE	"ESC_pcie_link_state"
 
 #ifdef	__cplusplus
 }

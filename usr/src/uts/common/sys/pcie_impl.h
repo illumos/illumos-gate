@@ -20,11 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019, Joyent, Inc.
- */
-
-/*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_PCIE_IMPL_H
@@ -36,6 +32,7 @@ extern "C" {
 
 #include <sys/pcie.h>
 #include <sys/pciev.h>
+#include <sys/taskq_impl.h>
 
 #define	PCI_GET_BDF(dip)	\
 	PCIE_DIP2BUS(dip)->bus_bdf
@@ -303,11 +300,21 @@ typedef enum pcie_link_width {
  */
 typedef enum pcie_link_speed {
 	PCIE_LINK_SPEED_UNKNOWN = 0x00,
-	PCIE_LINK_SPEED_2_5	= 0x01,
-	PCIE_LINK_SPEED_5	= 0x02,
-	PCIE_LINK_SPEED_8	= 0x04,
-	PCIE_LINK_SPEED_16	= 0x08
+	PCIE_LINK_SPEED_2_5	= 1 << 0,
+	PCIE_LINK_SPEED_5	= 1 << 1,
+	PCIE_LINK_SPEED_8	= 1 << 2,
+	PCIE_LINK_SPEED_16	= 1 << 3
 } pcie_link_speed_t;
+
+typedef enum pcie_link_flags {
+	PCIE_LINK_F_ADMIN_TARGET	= 1 << 1
+} pcie_link_flags_t;
+
+typedef enum {
+	PCIE_LBW_S_ENABLED	= 1 << 0,
+	PCIE_LBW_S_DISPATCHED	= 1 << 1,
+	PCIE_LBW_S_RUNNING	= 1 << 2
+} pcie_lbw_state_t;
 
 /*
  * For hot plugged device, these data are init'ed during during probe
@@ -367,11 +374,25 @@ typedef struct pcie_bus {
 	/*
 	 * Link speed specific fields.
 	 */
+	kmutex_t		bus_speed_mutex;
+	pcie_link_flags_t	bus_speed_flags;
 	pcie_link_width_t	bus_max_width;
 	pcie_link_width_t	bus_cur_width;
 	pcie_link_speed_t	bus_sup_speed;
 	pcie_link_speed_t	bus_max_speed;
 	pcie_link_speed_t	bus_cur_speed;
+	pcie_link_speed_t	bus_target_speed;
+
+	/*
+	 * Link Bandwidth Monitoring
+	 */
+	kmutex_t		bus_lbw_mutex;
+	kcondvar_t		bus_lbw_cv;
+	pcie_lbw_state_t	bus_lbw_state;
+	taskq_ent_t		bus_lbw_ent;
+	uint64_t		bus_lbw_nevents;
+	char			*bus_lbw_pbuf;
+	char			*bus_lbw_cbuf;
 } pcie_bus_t;
 
 /*
@@ -651,6 +672,15 @@ extern pcie_bus_t *pciev_get_affected_dev(pf_impl_t *, pf_data_t *,
     uint16_t, uint16_t);
 extern void pciev_eh_exit(pf_data_t *, uint_t);
 extern boolean_t pcie_in_domain(pcie_bus_t *, uint_t);
+
+/* Link Bandwidth Monitoring */
+extern boolean_t pcie_link_bw_supported(dev_info_t *);
+extern int pcie_link_bw_enable(dev_info_t *);
+extern int pcie_link_bw_disable(dev_info_t *);
+
+/* Link Management */
+extern int pcie_link_set_target(dev_info_t *, pcie_link_speed_t);
+extern int pcie_link_retrain(dev_info_t *);
 
 #define	PCIE_ZALLOC(data) kmem_zalloc(sizeof (data), KM_SLEEP)
 
