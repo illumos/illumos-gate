@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef _CHECK_COMMON_H
@@ -103,7 +103,7 @@ extern boolean_t ctftest_check_symbols(ctf_file_t *, const check_symbol_t *);
  * type and checks against it with each subsequent entry.
  */
 extern boolean_t ctftest_check_descent(const char *, ctf_file_t *,
-    const check_descent_t *);
+    const check_descent_t *, boolean_t);
 
 /*
  * Checks that all of the listed members of an enum are present and have the

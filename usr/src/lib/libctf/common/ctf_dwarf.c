@@ -28,7 +28,7 @@
  */
 
 /*
- * Copyright 2019 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -1485,6 +1485,75 @@ ctf_dwarf_create_array(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp, int isroot)
 	return (ctf_dwmap_add(cup, *idp, die, B_FALSE));
 }
 
+/*
+ * Given "const int const_array3[11]", GCC7 at least will create a DIE tree of
+ * DW_TAG_const_type:DW_TAG_array_type:DW_Tag_const_type:<member_type>.
+ *
+ * Given C's syntax, this renders out as "const const int const_array3[11]".  To
+ * get closer to round-tripping (and make the unit tests work), we'll peek for
+ * this case, and avoid adding the extraneous qualifier if we see that the
+ * underlying array referent already has the same qualifier.
+ *
+ * This is unfortunately less trivial than it could be: this issue applies to
+ * qualifier sets like "const volatile", as well as multi-dimensional arrays, so
+ * we need to descend down those.
+ *
+ * Returns CTF_ERR on error, or a boolean value otherwise.
+ */
+static int
+needed_array_qualifier(ctf_cu_t *cup, int kind, ctf_id_t ref_id)
+{
+	const ctf_type_t *t;
+	ctf_arinfo_t arinfo;
+	int akind;
+
+	if (kind != CTF_K_CONST && kind != CTF_K_VOLATILE &&
+	    kind != CTF_K_RESTRICT)
+		return (1);
+
+	if ((t = ctf_dyn_lookup_by_id(cup->cu_ctfp, ref_id)) == NULL)
+		return (CTF_ERR);
+
+	if (LCTF_INFO_KIND(cup->cu_ctfp, t->ctt_info) != CTF_K_ARRAY)
+		return (1);
+
+	if (ctf_dyn_array_info(cup->cu_ctfp, ref_id, &arinfo) != 0)
+		return (CTF_ERR);
+
+	ctf_id_t id = arinfo.ctr_contents;
+
+	for (;;) {
+		if ((t = ctf_dyn_lookup_by_id(cup->cu_ctfp, id)) == NULL)
+			return (CTF_ERR);
+
+		akind = LCTF_INFO_KIND(cup->cu_ctfp, t->ctt_info);
+
+		if (akind == kind)
+			break;
+
+		if (akind == CTF_K_ARRAY) {
+			if (ctf_dyn_array_info(cup->cu_ctfp,
+			    id, &arinfo) != 0)
+				return (CTF_ERR);
+			id = arinfo.ctr_contents;
+			continue;
+		}
+
+		if (akind != CTF_K_CONST && akind != CTF_K_VOLATILE &&
+		    akind != CTF_K_RESTRICT)
+			break;
+
+		id = t->ctt_type;
+	}
+
+	if (kind == akind) {
+		ctf_dprintf("ignoring extraneous %s qualifier for array %d\n",
+		    ctf_kind_name(cup->cu_ctfp, kind), ref_id);
+	}
+
+	return (kind != akind);
+}
+
 static int
 ctf_dwarf_create_reference(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
     int kind, int isroot)
@@ -1522,6 +1591,17 @@ ctf_dwarf_create_reference(ctf_cu_t *cup, Dwarf_Die die, ctf_id_t *idp,
 			ctf_free(name, namelen);
 			return (ret);
 		}
+	}
+
+	if ((ret = needed_array_qualifier(cup, kind, id)) <= 0) {
+		if (ret != 0) {
+			ret = (ctf_errno(cup->cu_ctfp));
+		} else {
+			*idp = id;
+		}
+
+		ctf_free(name, namelen);
+		return (ret);
 	}
 
 	if ((*idp = ctf_add_reftype(cup->cu_ctfp, isroot, name, id, kind)) ==
@@ -1821,7 +1901,7 @@ ctf_dwarf_function_count(ctf_cu_t *cup, Dwarf_Die die, ctf_funcinfo_t *fip,
 			return (ret);
 
 		/*
-		 * We have to check for a varargs type decleration. This will
+		 * We have to check for a varargs type declaration. This will
 		 * happen in one of two ways. If we have a function pointer
 		 * type, then it'll be done with a tag of type
 		 * DW_TAG_unspecified_parameters. However, it only means we have
@@ -1906,10 +1986,11 @@ ctf_dwarf_convert_fargs(ctf_cu_t *cup, Dwarf_Die die, ctf_funcinfo_t *fip,
 static int
 ctf_dwarf_convert_function(ctf_cu_t *cup, Dwarf_Die die)
 {
-	int ret;
-	char *name;
 	ctf_dwfunc_t *cdf;
 	Dwarf_Die tdie;
+	Dwarf_Bool b;
+	char *name;
+	int ret;
 
 	/*
 	 * Functions that don't have a name are generally functions that have
@@ -1923,7 +2004,25 @@ ctf_dwarf_convert_function(ctf_cu_t *cup, Dwarf_Die die)
 		return (ret);
 	}
 
-	ctf_dprintf("beginning work on function %s\n", name);
+	ctf_dprintf("beginning work on function %s (die %llx)\n",
+	    name, ctf_die_offset(die));
+
+	if ((ret = ctf_dwarf_boolean(cup, die, DW_AT_declaration, &b)) != 0) {
+		if (ret != ENOENT)
+			return (ret);
+	} else if (b != 0) {
+		/*
+		 * GCC7 at least creates empty DW_AT_declarations for functions
+		 * defined in headers.  As they lack details on the function
+		 * prototype, we need to ignore them.  If we later actually
+		 * see the relevant function's definition, we will see another
+		 * DW_TAG_subprogram that is more complete.
+		 */
+		ctf_dprintf("ignoring declaration of function %s (die %llx)\n",
+		    name, ctf_die_offset(die));
+		return (0);
+	}
+
 	if ((cdf = ctf_alloc(sizeof (ctf_dwfunc_t))) == NULL) {
 		ctf_free(name, strlen(name) + 1);
 		return (ENOMEM);

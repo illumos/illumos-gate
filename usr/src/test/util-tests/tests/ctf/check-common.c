@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -248,7 +248,7 @@ ctftest_check_symbols(ctf_file_t *fp, const check_symbol_t *tests)
 
 boolean_t
 ctftest_check_descent(const char *symbol, ctf_file_t *fp,
-    const check_descent_t *tests)
+    const check_descent_t *tests, boolean_t quiet)
 {
 	ctf_id_t base;
 	uint_t layer = 0;
@@ -268,65 +268,86 @@ ctftest_check_descent(const char *symbol, ctf_file_t *fp,
 		ctf_arinfo_t ari;
 
 		if (base == CTF_ERR) {
-			warnx("encountered non-reference type at layer %u "
-			    "while still expecting type %s for symbol %s",
-			    layer, tests->cd_tname, symbol);
+			if (!quiet) {
+				warnx("encountered non-reference type at layer "
+				    "%u while still expecting type %s for "
+				    "symbol %s", layer,
+				    tests->cd_tname, symbol);
+			}
 			return (B_FALSE);
 		}
 
 		tid = ctftest_lookup_type(fp, tests->cd_tname);
 		if (tid == CTF_ERR) {
-			warnx("failed to lookup type %s", tests->cd_tname);
+			if (!quiet) {
+				warnx("failed to lookup type %s",
+				    tests->cd_tname);
+			}
 			return (B_FALSE);
 		}
 
 		if (tid != base) {
-			warnx("type mismatch at layer %u: found id %u, but "
-			    "expecting type id %u for type %s, symbol %s",
-			    layer, base, tid, tests->cd_tname, symbol);
+			if (!quiet) {
+				warnx("type mismatch at layer %u: found id %u, "
+				    "but expecting type id %u for type %s, "
+				    "symbol %s", layer, base, tid,
+				    tests->cd_tname, symbol);
+			}
 			return (B_FALSE);
 		}
 
 		kind = ctf_type_kind(fp, base);
 		if (kind != tests->cd_kind) {
-			warnx("type kind mismatch at layer %u: found kind %u, "
-			    "but expected kind %u for %s, symbol %s", layer,
-			    kind, tests->cd_kind, tests->cd_tname, symbol);
+			if (!quiet) {
+				warnx("type kind mismatch at layer %u: found "
+				    "kind %u, but expected kind %u for %s, "
+				    "symbol %s", layer, kind, tests->cd_kind,
+				    tests->cd_tname, symbol);
+			}
 			return (B_FALSE);
 		}
 
 		switch (kind) {
 		case CTF_K_ARRAY:
 			if (ctf_array_info(fp, base, &ari) == CTF_ERR) {
-				warnx("failed to lookup array info at layer "
-				    "%u for type %s, symbol %s: %s", base,
-				    tests->cd_tname, symbol,
-				    ctf_errmsg(ctf_errno(fp)));
+				if (!quiet) {
+					warnx("failed to lookup array info at "
+					    "layer %u for type %s, symbol "
+					    "%s: %s", base, tests->cd_tname,
+					    symbol, ctf_errmsg(ctf_errno(fp)));
+				}
 				return (B_FALSE);
 			}
 
 			if (tests->cd_nents != ari.ctr_nelems) {
-				warnx("array element mismatch at layer %u "
-				    "for type %s, symbol %s: found %u, "
-				    "expected %u", layer, tests->cd_tname,
-				    symbol, ari.ctr_nelems, tests->cd_nents);
+				if (!quiet) {
+					warnx("array element mismatch at layer "
+					    "%u for type %s, symbol %s: found "
+					    "%u, expected %u", layer,
+					    tests->cd_tname, symbol,
+					    ari.ctr_nelems, tests->cd_nents);
+				}
 				return (B_FALSE);
 			}
 
 			tid = ctftest_lookup_type(fp, tests->cd_contents);
 			if (tid == CTF_ERR) {
-				warnx("failed to look up type %s",
-				    tests->cd_contents);
+				if (!quiet) {
+					warnx("failed to look up type %s",
+					    tests->cd_contents);
+				}
 				return (B_FALSE);
 			}
 
 			if (ari.ctr_contents != tid) {
-				warnx("array contents mismatch at layer %u "
-				    "for type %s, symbol %s: found %u, "
-				    "expected %s/%u", layer, tests->cd_tname,
-				    symbol, ari.ctr_contents,
-				    tests->cd_contents, tid);
-
+				if (!quiet) {
+					warnx("array contents mismatch at "
+					    "layer %u for type %s, symbol %s: "
+					    "found %u, expected %s/%u", layer,
+					    tests->cd_tname, symbol,
+					    ari.ctr_contents,
+					    tests->cd_contents, tid);
+				}
 				return (B_FALSE);
 			}
 			base = ari.ctr_contents;
@@ -341,8 +362,10 @@ ctftest_check_descent(const char *symbol, ctf_file_t *fp,
 	}
 
 	if (base != CTF_ERR) {
-		warnx("found additional type %u in chain, but expected no more",
-		    base);
+		if (!quiet) {
+			warnx("found additional type %u in chain, "
+			    "but expected no more", base);
+		}
 		return (B_FALSE);
 	}
 

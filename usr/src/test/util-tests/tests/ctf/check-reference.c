@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -131,18 +131,6 @@ static check_descent_t check_descent_g[] = {
 	{ NULL }
 };
 
-static check_descent_t check_descent_cvh[] = {
-	{ "const volatile foo_t *", CTF_K_POINTER },
-	{ "const volatile foo_t", CTF_K_CONST },
-	{ "volatile foo_t", CTF_K_VOLATILE },
-	{ "foo_t", CTF_K_TYPEDEF },
-	{ "int *const *", CTF_K_POINTER },
-	{ "int *const", CTF_K_CONST },
-	{ "int *", CTF_K_POINTER },
-	{ "int", CTF_K_INTEGER },
-	{ NULL }
-};
-
 static check_descent_test_t descents[] = {
 	{ "aa", check_descent_aa },
 	{ "b", check_descent_b },
@@ -156,8 +144,41 @@ static check_descent_test_t descents[] = {
 	{ "cve", check_descent_cve },
 	{ "f", check_descent_f },
 	{ "g", check_descent_g },
-	{ "cvh", check_descent_cvh },
 	{ NULL }
+};
+
+static check_descent_t check_descent_cvh_gcc4[] = {
+	{ "const volatile foo_t *", CTF_K_POINTER },
+	{ "const volatile foo_t", CTF_K_CONST },
+	{ "volatile foo_t", CTF_K_VOLATILE },
+	{ "foo_t", CTF_K_TYPEDEF },
+	{ "int *const *", CTF_K_POINTER },
+	{ "int *const", CTF_K_CONST },
+	{ "int *", CTF_K_POINTER },
+	{ "int", CTF_K_INTEGER },
+	{ NULL }
+};
+
+static check_descent_t check_descent_cvh_gcc7[] = {
+	{ "volatile const foo_t *", CTF_K_POINTER },
+	{ "volatile const foo_t", CTF_K_VOLATILE },
+	{ "const foo_t", CTF_K_CONST },
+	{ "foo_t", CTF_K_TYPEDEF },
+	{ "int *const *", CTF_K_POINTER },
+	{ "int *const", CTF_K_CONST },
+	{ "int *", CTF_K_POINTER },
+	{ "int", CTF_K_INTEGER },
+	{ NULL }
+};
+
+/*
+ * GCC versions differ in how they order qualifiers, which is a shame for
+ * round-tripping; but as they're clearly both valid, we should cope.  We'll
+ * just insist that at least one of these checks passes.
+ */
+static check_descent_test_t alt_descents[] = {
+	{ "cvh", check_descent_cvh_gcc4 },
+	{ "cvh", check_descent_cvh_gcc7 },
 };
 
 int
@@ -171,6 +192,7 @@ main(int argc, char *argv[])
 
 	for (i = 1; i < argc; i++) {
 		ctf_file_t *fp;
+		int alt_ok = 0;
 		uint_t d;
 
 		if ((fp = ctf_open(argv[i], &ret)) == NULL) {
@@ -186,10 +208,25 @@ main(int argc, char *argv[])
 			ret = EXIT_FAILURE;
 		for (d = 0; descents[d].cdt_sym != NULL; d++) {
 			if (!ctftest_check_descent(descents[d].cdt_sym, fp,
-			    descents[d].cdt_tests)) {
+			    descents[d].cdt_tests, B_FALSE)) {
 				ret = EXIT_FAILURE;
 			}
 		}
+
+		for (d = 0; alt_descents[d].cdt_sym != NULL; d++) {
+			if (ctftest_check_descent(alt_descents[d].cdt_sym, fp,
+			    alt_descents[d].cdt_tests, B_TRUE)) {
+				alt_ok = 1;
+				break;
+			}
+		}
+
+		if (!alt_ok) {
+			warnx("all descents failed for %s",
+			    alt_descents[0].cdt_sym);
+			ret = EXIT_FAILURE;
+		}
+
 		ctf_close(fp);
 	}
 

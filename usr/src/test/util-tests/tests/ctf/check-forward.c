@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -109,7 +109,7 @@ main(int argc, char *argv[])
 
 		for (j = 0; descents[j].cdt_sym != NULL; j++) {
 			if (!ctftest_check_descent(descents[j].cdt_sym, fp,
-			    descents[j].cdt_tests)) {
+			    descents[j].cdt_tests, B_FALSE)) {
 				ret = EXIT_FAILURE;
 			}
 		}
