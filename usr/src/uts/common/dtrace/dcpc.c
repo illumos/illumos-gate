@@ -1104,7 +1104,7 @@ dcpc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	if (ddi_create_minor_node(devi, "dcpc", S_IFCHR, 0,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE ||
+	    DDI_PSEUDO, 0) == DDI_FAILURE ||
 	    dtrace_register("cpc", &dcpc_attr, DTRACE_PRIV_KERNEL,
 	    NULL, &dcpc_pops, NULL, &dcpc_pid) != 0) {
 		ddi_remove_minor_node(devi, NULL);

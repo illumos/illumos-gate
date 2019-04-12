@@ -245,7 +245,7 @@ systrace_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	membar_enter();
 
 	if (ddi_create_minor_node(devi, "systrace", S_IFCHR, 0,
-	    DDI_PSEUDO, NULL) == DDI_FAILURE ||
+	    DDI_PSEUDO, 0) == DDI_FAILURE ||
 	    dtrace_register("syscall", &systrace_attr, DTRACE_PRIV_USER, NULL,
 	    &systrace_pops, NULL, &systrace_id) != 0) {
 		systrace_probe = systrace_stub;

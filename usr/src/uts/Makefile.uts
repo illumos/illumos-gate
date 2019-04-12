@@ -237,6 +237,12 @@ include $(SRC)/Makefile.smatch
 #
 SMOFF += sizeof
 
+#
+# DEBUG-only macros that define away to nothing confuse this check,
+# unfortunately.
+#
+$(RELEASE_BUILD)SMOFF += indenting
+
 CSTD = $(CSTD_GNU99)
 
 CFLAGS_uts		=

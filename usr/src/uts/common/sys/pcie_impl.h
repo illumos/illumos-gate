@@ -23,6 +23,10 @@
  * Copyright (c) 2017, Joyent, Inc.
  */
 
+/*
+ * Copyright 2019, Joyent, Inc.
+ */
+
 #ifndef	_SYS_PCIE_IMPL_H
 #define	_SYS_PCIE_IMPL_H
 
@@ -524,11 +528,11 @@ typedef struct {
 
 #else	/* DEBUG */
 
-#define	PCIE_DBG_CFG 0 &&
-#define	PCIE_DBG 0 &&
-#define	PCIE_ARI_DBG 0 &&
-#define	PCIE_DBG_CAP 0 &&
-#define	PCIE_DBG_AER 0 &&
+#define	PCIE_DBG_CFG(...)
+#define	PCIE_DBG(...)
+#define	PCIE_ARI_DBG(...)
+#define	PCIE_DBG_CAP(...)
+#define	PCIE_DBG_AER(...)
 
 #endif	/* DEBUG */
 
