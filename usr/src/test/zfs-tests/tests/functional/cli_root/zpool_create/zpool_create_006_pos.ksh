@@ -58,7 +58,7 @@ mntpnt=$(get_prop mountpoint $TESTPOOL)
 
 typeset -i i=0
 while ((i < 10)); do
-	log_must mkfile $MINVDEVSIZE $mntpnt/vdev$i
+	log_must truncate -s $MINVDEVSIZE $mntpnt/vdev$i
 
 	eval vdev$i=$mntpnt/vdev$i
 	((i += 1))
@@ -72,6 +72,12 @@ set -A valid_args \
 	"mirror $vdev0 $vdev1 mirror $vdev2 $vdev3 mirror $vdev4 $vdev5 \
 		spare $vdev6 $vdev7" \
 	"mirror $vdev0 $vdev1 spare $vdev2 mirror $vdev3 $vdev4" \
+	"mirror $vdev0 $vdev1 raidz $vdev2 $vdev3" \
+	"mirror $vdev0 $vdev1 raidz $vdev2 $vdev3 $vdev4" \
+	"mirror $vdev0 $vdev1 $vdev2 raidz2 $vdev3 $vdev4 $vdev5" \
+	"mirror $vdev0 $vdev1 $vdev2 $vdev3 \
+		raidz3 $vdev4 $vdev5 $vdev6 $vdev7" \
+	"raidz $vdev0 $vdev1 $vdev2 mirror $vdev3 $vdev4" \
 	"raidz $vdev0 $vdev1 $vdev2 raidz1 $vdev3 $vdev4 $vdev5" \
 	"raidz $vdev0 $vdev1 raidz1 $vdev2 $vdev3 raidz $vdev4 $vdev5" \
 	"raidz $vdev0 $vdev1 $vdev2 raidz1 $vdev3 $vdev4 $vdev5 \
@@ -79,6 +85,7 @@ set -A valid_args \
 	"raidz $vdev0 $vdev1 raidz1 $vdev2 $vdev3 raidz $vdev4 $vdev5 \
 		spare $vdev6 $vdev7" \
 	"raidz $vdev0 $vdev1 spare $vdev2 raidz $vdev3 $vdev4" \
+	"raidz2 $vdev0 $vdev1 $vdev2 mirror $vdev3 $vdev4 $vdev5" \
 	"raidz2 $vdev0 $vdev1 $vdev2 raidz2 $vdev3 $vdev4 $vdev5" \
 	"raidz2 $vdev0 $vdev1 $vdev2 raidz2 $vdev3 $vdev4 $vdev5 \
 		raidz2 $vdev6 $vdev7 $vdev8" \
@@ -86,7 +93,10 @@ set -A valid_args \
 		spare $vdev6" \
 	"raidz2 $vdev0 $vdev1 $vdev2 raidz2 $vdev3 $vdev4 $vdev5 \
 		raidz2 $vdev6 $vdev7 $vdev8 spare $vdev9" \
-	"raidz2 $vdev0 $vdev1 $vdev2 spare $vdev3 raidz2 $vdev4 $vdev5 $vdev6"
+	"raidz2 $vdev0 $vdev1 $vdev2 spare $vdev3 raidz2 $vdev4 $vdev5 $vdev6" \
+	"raidz3 $vdev0 $vdev1 $vdev2 $vdev3 \
+		mirror $vdev4 $vdev5 $vdev6 $vdev7" \
+	"spare $vdev0 $vdev1 $vdev2 mirror $vdev3 $vdev4 raidz $vdev5 $vdev6"
 
 set -A forced_args \
 	"$vdev0 raidz $vdev1 $vdev2 raidz1 $vdev3 $vdev4 $vdev5" \
@@ -103,12 +113,12 @@ set -A forced_args \
 		raidz2 $vdev4 $vdev5 $vdev6 spare $vdev7" \
 	"mirror $vdev0 $vdev1 raidz $vdev2 $vdev3 \
 		spare $vdev4 raidz2 $vdev5 $vdev6 $vdev7" \
-	"spare $vdev0 $vdev1 $vdev2 mirror $vdev3 $vdev4 raidz $vdev5 $vdev6"
+	"spare $vdev0 $vdev1 $vdev2 mirror $vdev3 $vdev4 \
+		raidz2 $vdev5 $vdev6 $vdev7"
 
 i=0
 while ((i < ${#valid_args[@]})); do
 	log_must zpool create $TESTPOOL1 ${valid_args[$i]}
-	sync; sync
 	log_must zpool destroy -f $TESTPOOL1
 
 	((i += 1))
@@ -118,7 +128,6 @@ i=0
 while ((i < ${#forced_args[@]})); do
 	log_mustnot zpool create $TESTPOOL1 ${forced_args[$i]}
 	log_must zpool create -f $TESTPOOL1 ${forced_args[$i]}
-	sync; sync
 	log_must zpool destroy -f $TESTPOOL1
 
 	((i += 1))

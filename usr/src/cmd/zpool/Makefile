@@ -22,6 +22,7 @@
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
 # Copyright (c) 2015 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 PROG= zpool
@@ -42,6 +43,9 @@ SRCS += $(STAT_COMMON_SRCS)
 LDLIBS += -lzfs -lnvpair -ldevid -lefi -ldiskmgt -luutil -lumem
 
 INCS += -I../../common/zfs -I$(STATCOMMONDIR)
+
+CSTD=	$(CSTD_GNU99)
+C99LMODE=	-Xc99=%all
 
 CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT $(INCS)
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
