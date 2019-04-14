@@ -92,6 +92,7 @@ CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-switch
 CERRWARN += -_gcc=-Wno-char-subscripts
 CERRWARN += -_gcc=-Wno-type-limits
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused
 
 SMOFF += no_if_block
 
