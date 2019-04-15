@@ -65,7 +65,7 @@ SRCS +=	load_elf64.c load_elf64_obj.c reloc_elf64.c
 
 SRCS +=	dev_net.c
 
-SRCS +=	disk.c part.c
+SRCS +=	disk.c part.c vdisk.c
 CPPFLAGS += -DLOADER_DISK_SUPPORT
 CPPFLAGS += -DLOADER_GPT_SUPPORT
 CPPFLAGS += -DLOADER_MBR_SUPPORT
