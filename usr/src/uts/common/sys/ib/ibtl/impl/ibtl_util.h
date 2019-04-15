@@ -133,10 +133,10 @@ void ibtl_dprintf3(
 		char		*name,
 		char		*fmt, ...);
 #else
-#define	IBTF_DPRINTF_LINTR(...)
-#define	IBTF_DPRINTF_L5(...)
-#define	IBTF_DPRINTF_L4(...)
-#define	IBTF_DPRINTF_L3(...)
+#define	IBTF_DPRINTF_LINTR(...)	(void)(0)
+#define	IBTF_DPRINTF_L5(...)	(void)(0)
+#define	IBTF_DPRINTF_L4(...)	(void)(0)
+#define	IBTF_DPRINTF_L3(...)	(void)(0)
 #endif
 
 #define	IBTF_DPRINTF_L2	ibtl_dprintf2

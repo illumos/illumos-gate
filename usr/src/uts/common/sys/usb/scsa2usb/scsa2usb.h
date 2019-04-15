@@ -655,7 +655,7 @@ typedef struct scsa2usb_read_cap {
 #ifdef	DEBUG
 #define	SCSA2USB_PRINT_CDB	scsa2usb_print_cdb
 #else
-#define	SCSA2USB_PRINT_CDB(...)
+#define	SCSA2USB_PRINT_CDB(...)	(void)(0)
 #endif
 
 /* ugen support */

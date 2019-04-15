@@ -101,10 +101,10 @@ void rds_dprintf3(
 		char		*name,
 		char		*fmt, ...);
 #else
-#define	RDS_DPRINTF_INTR(...)
-#define	RDS_DPRINTF5(...)
-#define	RDS_DPRINTF4(...)
-#define	RDS_DPRINTF3(...)
+#define	RDS_DPRINTF_INTR(...)	(void)(0)
+#define	RDS_DPRINTF5(...)	(void)(0)
+#define	RDS_DPRINTF4(...)	(void)(0)
+#define	RDS_DPRINTF3(...)	(void)(0)
 #endif
 
 #define	RDS_DPRINTF2	rds_dprintf2

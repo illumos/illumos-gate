@@ -37,7 +37,7 @@ extern "C" {
 #define	PCIEB_DEBUG pcieb_dbg
 extern void pcieb_dbg(uint_t bit, dev_info_t *dip, char *fmt, ...);
 #else /* DEBUG */
-#define	PCIEB_DEBUG(...)
+#define	PCIEB_DEBUG(...) (void)(0)
 #endif /* DEBUG */
 
 typedef enum {	/* same sequence as pcieb_debug_sym[] */

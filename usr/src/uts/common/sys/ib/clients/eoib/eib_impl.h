@@ -92,10 +92,10 @@ extern "C" {
 #define	EIB_DPRINTF_PKT		eib_dprintf_pkt
 #define	EIB_DPRINTF_VERBOSE	eib_dprintf_verbose
 #else
-#define	EIB_DPRINTF_DEBUG(...)
-#define	EIB_DPRINTF_ARGS(...)
-#define	EIB_DPRINTF_PKT(...)
-#define	EIB_DPRINTF_VERBOSE(...)
+#define	EIB_DPRINTF_DEBUG(...)	(void)(0)
+#define	EIB_DPRINTF_ARGS(...)	(void)(0)
+#define	EIB_DPRINTF_PKT(...)	(void)(0)
+#define	EIB_DPRINTF_VERBOSE(...) (void)(0)
 #endif
 
 /*
