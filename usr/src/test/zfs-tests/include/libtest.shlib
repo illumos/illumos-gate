@@ -307,6 +307,13 @@ function default_mirror_setup
 	log_pass
 }
 
+function default_mirror_2way_setup
+{
+	default_mirror_setup_noexit $1 $2
+
+	log_pass
+}
+
 #
 # Given a pair of disks, set up a storage pool and dataset for the mirror
 # @parameters: $1 the primary side of the mirror
@@ -323,7 +330,7 @@ function default_mirror_setup_noexit
 	[[ -z $secondary ]] && \
 		log_fail "$func: No secondary partition passed"
 	[[ -d /$TESTPOOL ]] && rm -rf /$TESTPOOL
-	log_must zpool create -f $TESTPOOL mirror $primary $secondary
+	log_must zpool create -f $TESTPOOL mirror $@
 	log_must zfs create $TESTPOOL/$TESTFS
 	log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 }

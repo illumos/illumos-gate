@@ -36,4 +36,4 @@ verify_disk_count "$DISKS" 3
 
 DISK=${DISKS%% *}
 
-default_mirror_setup $DISKS
+default_mirror_2way_setup $DISKS
