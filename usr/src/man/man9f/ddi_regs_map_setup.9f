@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2004, Sun Microsystems, Inc.
+.\" Copyright 2019, Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DDI_REGS_MAP_SETUP 9F "Nov 18, 2004"
+.TH DDI_REGS_MAP_SETUP 9F "April 18, 2019"
 .SH NAME
 ddi_regs_map_setup \- set up a mapping for a register address space
 .SH SYNOPSIS
@@ -20,11 +21,9 @@ ddi_regs_map_setup \- set up a mapping for a register address space
 .fi
 
 .SH INTERFACE LEVEL
-.sp
 .LP
 Solaris \fBDDI\fR specific (Solaris \fBDDI\fR).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIdip\fR\fR
@@ -39,7 +38,10 @@ Pointer to the device's \fBdev_info\fR structure.
 \fB\fIrnumber\fR\fR
 .ad
 .RS 12n
-Index number to the register address space set.
+Index of the desired tuple (0-based) in the register address space set.
+See the
+.B Register Numbers
+section for more information.
 .RE
 
 .sp
@@ -92,7 +94,6 @@ Pointer to a data access handle.
 .RE
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBddi_regs_map_setup()\fR maps in the register set given by \fIrnumber\fR. The
 register number determines which register set is mapped if more than one
@@ -114,8 +115,27 @@ The data access handle is returned in  \fIhandlep\fR. \fIhandlep\fR is opaque;
 drivers should not attempt to interpret its value. The handle is used by the
 system to encode information for subsequent data access function calls to
 maintain a consistent view between the host and the device.
-.SH RETURN VALUES
+
+.SS Register Numbers
+The \fIreg\fR property is an array of tuples. The size of each tuple
+varies based on the hardware device type. For example, PCI and PCI
+Express devices have one size, while ISA devices have a different size.
+Each tuple describes a register space that indicates a way to
+communicate with the device. The \fIrnumber\fR argument selects which of
+these to use.
 .sp
+.LP
+For example, with PCI and PCI Express devices, the first base address
+register (BAR) with a non-zero value is in \fIrnumber\fR \fB1\fR because
+it is the second tuple in the \fIreg\fR property.  The second BAR with a
+non-zero value is in the third tuple (\fIrnumber\fR \fB2\fR).
+.sp
+.LP
+For a full treatment of the meaning of the \fIreg\fR property for PCI
+devices, see \fBpci\fR(4). For PCI express devices, see \fBpcie\fR(4).
+For ISA devices, see \fBisa\fR(4). For cardbus, see \fBcardbus\fR(4).
+For SBus devices, see \fBsbus\fR(4).
+.SH RETURN VALUES
 .LP
 \fBddi_regs_map_setup()\fR returns:
 .sp
@@ -163,11 +183,9 @@ platforms. Also, there is potential overlap between \fBDDI_ME_RNUMBER_RANGE\fR
 and \fBDDI_FAILURE\fR. Drivers should check for \fB!=DDI_SUCCESS\fR rather than
 checking for a specific failure value.
 .SH CONTEXT
-.sp
 .LP
 \fBddi_regs_map_setup()\fR must be called from user or kernel context.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -183,8 +201,8 @@ Architecture	PCI Local Bus, SBus, ISA
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
+\fBcardbus\fR(4), \fBisa\fR(4), \fBpci\fR(4), \fBpcie\fR(4), \fBsbus\fR(4),
 \fBattributes\fR(5), \fBddi_regs_map_free\fR(9F), \fBddi_device_acc_attr\fR(9S)
 .sp
 .LP
