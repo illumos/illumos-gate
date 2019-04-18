@@ -247,7 +247,7 @@ ddi_device_acc_attr_t emlxs_data_acc_attr = {
  */
 #if (EMLXS_MODREV == EMLXS_MODREV5)
 	static fc_fca_tran_t emlxs_fca_tran = {
-	FCTL_FCA_MODREV_5, 		/* fca_version, with SUN NPIV support */
+	FCTL_FCA_MODREV_5,		/* fca_version, with SUN NPIV support */
 	MAX_VPORTS,			/* fca numerb of ports */
 	sizeof (emlxs_buf_t),		/* fca pkt size */
 	2048,				/* fca cmd max */
@@ -261,7 +261,7 @@ ddi_device_acc_attr_t emlxs_data_acc_attr = {
 	&emlxs_dma_attr_fcip_rsp,	/* fca dma fcip rsp attributes */
 	&emlxs_dma_attr_1sg,		/* fca dma fcsm cmd attributes */
 	&emlxs_dma_attr,		/* fca dma fcsm rsp attributes */
-	&emlxs_data_acc_attr,   	/* fca access atributes */
+	&emlxs_data_acc_attr,		/* fca access atributes */
 	0,				/* fca_num_npivports */
 	{0, 0, 0, 0, 0, 0, 0, 0},	/* Physical port WWPN */
 	emlxs_fca_bind_port,
@@ -493,8 +493,8 @@ static struct modlinkage emlxs_modlinkage = {
 /*		FC_EXPLN_NONE,		FC_ACTION_RETRYABLE */
 
 emlxs_xlat_err_t emlxs_iostat_tbl[] = {
-/* 	{f/w code, pkt_state, pkt_reason, 	*/
-/* 		pkt_expln, pkt_action}		*/
+/*	{f/w code, pkt_state, pkt_reason,	*/
+/*		pkt_expln, pkt_action}		*/
 
 	/* 0x00 - Do not remove */
 	{IOSTAT_SUCCESS, FC_PKT_SUCCESS, FC_REASON_NONE,
@@ -3024,7 +3024,7 @@ emlxs_fca_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 fail:
 
 	/* Clean the pool */
-	for (i = 0; tokens[i] != NULL; i++) {
+	for (i = 0; tokens[i] != 0; i++) {
 		/* Get the buffer object */
 		ubp = (fc_unsol_buf_t *)((unsigned long)tokens[i]);
 		ub_priv = (emlxs_ub_priv_t *)ubp->ub_fca_private;
@@ -8930,7 +8930,7 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 	uint32_t	i;
 	NODELIST	*ndlp;
 	uint32_t	did;
-	int32_t 	rval;
+	int32_t		rval;
 
 	pkt = PRIV2PKT(sbp);
 	cp = &hba->chan[hba->channel_ip];
@@ -9031,7 +9031,7 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 	uint32_t	did;
 	char		fcsp_msg[32];
 	int		rc;
-	int32_t 	rval;
+	int32_t		rval;
 	emlxs_config_t  *cfg = &CFG;
 
 	fcsp_msg[0] = 0;
@@ -9945,7 +9945,7 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 	NODELIST	*ndlp;
 	uint32_t	did;
 	CHANNEL		*cp;
-	int32_t 	rval;
+	int32_t		rval;
 
 	pkt = PRIV2PKT(sbp);
 	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
@@ -10057,7 +10057,7 @@ emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	IOCB		*iocb;
 	uint32_t	*cmd;
 	SLI_CT_REQUEST	*CtCmd;
-	int32_t 	rval;
+	int32_t		rval;
 
 	pkt = PRIV2PKT(sbp);
 	CtCmd = (SLI_CT_REQUEST *)pkt->pkt_cmd;
@@ -12165,7 +12165,7 @@ emlxs_fm_service_impact(emlxs_hba_t *hba, int impact)
 		return;
 	}
 
-	if (impact == NULL) {
+	if (impact == 0) {
 		return;
 	}
 

@@ -24,7 +24,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -724,8 +724,8 @@ nameinit(int fstype, char *name)
 }
 
 static mntopts_t nm_mntopts = {
-	NULL,
-	0
+	.mo_count = 0,
+	.mo_list = NULL
 };
 
 static vfsdef_t vfw = {

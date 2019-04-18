@@ -1435,7 +1435,7 @@ hs_copylabel(struct hs_volume *hvp, unsigned char *label, int isjoliet)
 	}
 	/* cdrom volid is at most 32 bytes */
 	bcopy(label, hvp->vol_id, 32);
-	hvp->vol_id[31] = NULL;
+	hvp->vol_id[31] = '\0';
 }
 
 /*

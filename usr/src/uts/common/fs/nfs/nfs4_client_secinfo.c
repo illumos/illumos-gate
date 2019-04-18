@@ -651,7 +651,7 @@ retry:
 	lookuparg.resp = &res;
 	lookuparg.header_len = 1;	/* Putrootfh */
 	lookuparg.trailer_len = 1;	/* Secinfo */
-	lookuparg.ga_bits = NULL;
+	lookuparg.ga_bits = 0;
 	lookuparg.mi = mi;
 
 	/* setup LOOKUPs for parent path */

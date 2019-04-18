@@ -166,7 +166,7 @@ tcli_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	dstatep->dip = devi;
 
 	rval = ddi_create_minor_node(devi, "client", S_IFCHR,
-	    (INST_TO_MINOR(instance)), DDI_PSEUDO, NULL);
+	    (INST_TO_MINOR(instance)), DDI_PSEUDO, 0);
 	if (rval == DDI_FAILURE) {
 		ddi_remove_minor_node(devi, NULL);
 		ddi_soft_state_free(dstates, instance);

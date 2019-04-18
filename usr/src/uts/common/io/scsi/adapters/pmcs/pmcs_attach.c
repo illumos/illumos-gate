@@ -167,9 +167,9 @@ const ddi_dma_attr_t pmcs_dattr = {
 	0x00000001,			/* dma_attr_minxfer	*/
 	0x00000000FFFFFFFFull,		/* dma_attr_maxxfer	*/
 	0x00000000FFFFFFFFull,		/* dma_attr_seg		*/
-	1,				/* dma_attr_sgllen 	*/
-	512,				/* dma_attr_granular 	*/
-	0				/* dma_attr_flags 	*/
+	1,				/* dma_attr_sgllen	*/
+	512,				/* dma_attr_granular	*/
+	0				/* dma_attr_flags	*/
 };
 
 static ddi_device_acc_attr_t rattr = {
@@ -767,7 +767,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 	}
 
-	if (pwp->flash_chunk_addr == NULL) {
+	if (pwp->flash_chunk_addr == 0) {
 		pwp->regdump_dma_attr.dma_attr_align = PMCS_FLASH_CHUNK_SIZE;
 		if (pmcs_dma_setup(pwp, &pwp->regdump_dma_attr,
 		    &pwp->regdump_acchdl,
@@ -1927,7 +1927,7 @@ pmcs_check_forward_progress(pmcs_hw_t *pwp)
 	uint32_t	cur_work_idx;
 	uint32_t	cur_msgu_tick;
 	uint32_t	cur_iop_tick;
-	int 		i;
+	int		i;
 
 	mutex_enter(&pwp->lock);
 
@@ -2974,7 +2974,7 @@ pmcs_prt_impl(pmcs_hw_t *pwp, pmcs_prt_level_t level,
 			break;
 		case CE_NOTE:
 		case CE_WARN:
-			local[0] = 0;
+			local[0] = '\0';
 			break;
 		default:
 			return;

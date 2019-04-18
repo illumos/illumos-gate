@@ -666,7 +666,7 @@ dls_devnet_prop_task(void *arg)
 
 	mutex_enter(&ddp->dd_mutex);
 	ddp->dd_prop_loaded = B_TRUE;
-	ddp->dd_prop_taskid = NULL;
+	ddp->dd_prop_taskid = 0;
 	cv_broadcast(&ddp->dd_cv);
 	mutex_exit(&ddp->dd_mutex);
 }
@@ -678,7 +678,7 @@ void
 dls_devnet_prop_task_wait(dls_dl_handle_t ddp)
 {
 	mutex_enter(&ddp->dd_mutex);
-	while (ddp->dd_prop_taskid != NULL)
+	while (ddp->dd_prop_taskid != 0)
 		cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
 	mutex_exit(&ddp->dd_mutex);
 }
@@ -942,6 +942,12 @@ dls_devnet_set(mac_handle_t mh, datalink_id_t linkid, zoneid_t zoneid,
 		    (mod_hash_val_t)ddp) == 0);
 		devnet_need_rebuild = B_TRUE;
 		stat_create = B_TRUE;
+		mutex_enter(&ddp->dd_mutex);
+		if (!ddp->dd_prop_loaded && (ddp->dd_prop_taskid == 0)) {
+			ddp->dd_prop_taskid = taskq_dispatch(system_taskq,
+			    dls_devnet_prop_task, ddp, TQ_SLEEP);
+		}
+		mutex_exit(&ddp->dd_mutex);
 	}
 	err = 0;
 done:
@@ -1026,7 +1032,7 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 	 */
 	VERIFY(ddp->dd_ref != 0);
 	if ((ddp->dd_ref != 1) || (!wait &&
-	    (ddp->dd_tref != 0 || ddp->dd_prop_taskid != NULL))) {
+	    (ddp->dd_tref != 0 || ddp->dd_prop_taskid != 0))) {
 		int zstatus = 0;
 
 		/*
@@ -1118,7 +1124,7 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 		 * deadlock, assert that the perim is never held here.
 		 */
 		ASSERT0(MAC_PERIM_HELD(mh));
-		while ((ddp->dd_tref != 0) || (ddp->dd_prop_taskid != NULL))
+		while ((ddp->dd_tref != 0) || (ddp->dd_prop_taskid != 0))
 			cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
 	} else {
 		VERIFY(ddp->dd_tref == 0);

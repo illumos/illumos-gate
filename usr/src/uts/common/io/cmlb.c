@@ -455,10 +455,10 @@ static void
 cmlb_v_log(dev_info_t *dev, const char *label, uint_t level, const char *fmt,
     va_list ap)
 {
-	static char 	name[256];
-	int 		log_only = 0;
-	int 		boot_only = 0;
-	int 		console_only = 0;
+	static char	name[256];
+	int		log_only = 0;
+	int		boot_only = 0;
+	int		console_only = 0;
 
 	mutex_enter(&cmlb_log_mutex);
 
@@ -534,7 +534,7 @@ cmlb_v_log(dev_info_t *dev, const char *label, uint_t level, const char *fmt,
 void
 cmlb_alloc_handle(cmlb_handle_t *cmlbhandlep)
 {
-	struct cmlb_lun 	*cl;
+	struct cmlb_lun	*cl;
 
 	cl = kmem_zalloc(sizeof (struct cmlb_lun), KM_SLEEP);
 	ASSERT(cmlbhandlep != NULL);
@@ -557,7 +557,7 @@ cmlb_alloc_handle(cmlb_handle_t *cmlbhandlep)
 void
 cmlb_free_handle(cmlb_handle_t *cmlbhandlep)
 {
-	struct cmlb_lun 	*cl;
+	struct cmlb_lun	*cl;
 
 	cl = (struct cmlb_lun *)*cmlbhandlep;
 	if (cl != NULL) {
@@ -573,8 +573,8 @@ cmlb_free_handle(cmlb_handle_t *cmlbhandlep)
  *	Attach handle to device, create minor nodes for device.
  *
  * Arguments:
- * 	devi		pointer to device's dev_info structure.
- * 	tgopsp		pointer to array of functions cmlb can use to callback
+ *	devi		pointer to device's dev_info structure.
+ *	tgopsp		pointer to array of functions cmlb can use to callback
  *			to target driver.
  *
  *	device_type	Peripheral device type as defined in
@@ -600,7 +600,7 @@ cmlb_free_handle(cmlb_handle_t *cmlbhandlep)
  *			geometry and label for DKIOCGGEOM and DKIOCGVTOC
  *			on architecture with VTOC8 label types.
  *
- * 			CMLB_OFF_BY_ONE: do the workaround for legacy off-by-
+ *			CMLB_OFF_BY_ONE: do the workaround for legacy off-by-
  *                      one bug in obtaining capacity (in sd):
  *			SCSI READ_CAPACITY command returns the LBA number of the
  *			last logical block, but sd once treated this number as
@@ -677,8 +677,8 @@ cmlb_free_handle(cmlb_handle_t *cmlbhandlep)
  *
  *
  * Return values:
- *	0 	Success
- * 	ENXIO 	creating minor nodes failed.
+ *	0	Success
+ *	ENXIO	creating minor nodes failed.
  *	EINVAL  invalid arg, unsupported tg_ops version
  */
 int
@@ -796,16 +796,16 @@ cmlb_detach(cmlb_handle_t cmlbhandle, void *tg_cookie)
  *
  *	ENOMEM		memory allocation failed
  *	EIO		i/o errors during read or get capacity
- * 	EACCESS		reservation conflicts
- * 	EINVAL		label was corrupt, or no default label was assumed
+ *	EACCESS		reservation conflicts
+ *	EINVAL		label was corrupt, or no default label was assumed
  *	ENXIO		invalid handle
  */
 int
 cmlb_validate(cmlb_handle_t cmlbhandle, int flags, void *tg_cookie)
 {
 	struct cmlb_lun *cl = (struct cmlb_lun *)cmlbhandle;
-	int 		rval;
-	int  		ret = 0;
+	int		rval;
+	int		ret = 0;
 
 	/*
 	 * Temp work-around checking cl for NULL since there is a bug
@@ -869,7 +869,7 @@ cmlb_invalidate(cmlb_handle_t cmlbhandle, void *tg_cookie)
 
 /*
  * cmlb_is_valid
- * 	Get status on whether the incore label/geom data is valid
+ *	Get status on whether the incore label/geom data is valid
  *
  * Arguments:
  *	cmlbhandle      cmlb handle associated with device.
@@ -908,7 +908,7 @@ cmlb_is_valid(cmlb_handle_t cmlbhandle)
  *			driver when we call back to it through tg_ops.
  * Return values:
  *	0	Success
- * 	ENXIO	Re-creating minor node failed.
+ *	ENXIO	Re-creating minor node failed.
  */
 /*ARGSUSED1*/
 int
@@ -942,11 +942,11 @@ cmlb_close(cmlb_handle_t cmlbhandle, void *tg_cookie)
  * Notes:
  *	It stores the block number of device id in the area pointed to
  *	by devidblockp.
- * 	with the block number of device id.
+ *	with the block number of device id.
  *
  * Return values:
  *	0	success
- *	EINVAL 	device id does not apply to current label type.
+ *	EINVAL	device id does not apply to current label type.
  */
 /*ARGSUSED2*/
 int
@@ -1435,7 +1435,7 @@ cmlb_create_minor(dev_info_t *dip, char *name, int spec_type,
  *    Function: cmlb_create_minor_nodes
  *
  * Description: Create or adjust the minor device nodes for the instance.
- * 		Minor nodes are created based on default label type,
+ *		Minor nodes are created based on default label type,
  *		current label type and last label type we created
  *		minor nodes based on.
  *
@@ -1495,7 +1495,7 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
 			if (cmlb_create_minor(CMLB_DEVINFO(cl), name,
 			    dmdp->type,
 			    (instance << shift) | dmdp->minor,
-			    cl->cl_node_type, NULL, internal) == DDI_FAILURE) {
+			    cl->cl_node_type, 0, internal) == DDI_FAILURE) {
 				/*
 				 * Clean up any nodes that may have been
 				 * created, in case this fails in the middle
@@ -1570,20 +1570,20 @@ cmlb_create_minor_nodes(struct cmlb_lun *cl)
 		ddi_remove_minor_node(CMLB_DEVINFO(cl), "h,raw");
 		(void) cmlb_create_minor(CMLB_DEVINFO(cl), "wd",
 		    S_IFBLK, (instance << shift) | WD_NODE,
-		    cl->cl_node_type, NULL, internal);
+		    cl->cl_node_type, 0, internal);
 		(void) cmlb_create_minor(CMLB_DEVINFO(cl), "wd,raw",
 		    S_IFCHR, (instance << shift) | WD_NODE,
-		    cl->cl_node_type, NULL, internal);
+		    cl->cl_node_type, 0, internal);
 	} else {
 		/* from efi to vtoc */
 		ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd");
 		ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd,raw");
 		(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h",
 		    S_IFBLK, (instance << shift) | WD_NODE,
-		    cl->cl_node_type, NULL, internal);
+		    cl->cl_node_type, 0, internal);
 		(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h,raw",
 		    S_IFCHR, (instance << shift) | WD_NODE,
-		    cl->cl_node_type, NULL, internal);
+		    cl->cl_node_type, 0, internal);
 	}
 
 	cl->cl_last_labeltype = newlabeltype;
@@ -1881,15 +1881,15 @@ cmlb_convert_geometry(struct cmlb_lun *cl, diskaddr_t capacity,
 	 * The following table (in order) illustrates some end result
 	 * calculations:
 	 *
-	 * Maximum number of blocks 		nhead	nsect
+	 * Maximum number of blocks		nhead	nsect
 	 *
 	 * 2097152 (1GB)			64	32
 	 * 16777216 (8GB)			128	32
-	 * 1052819775 (502.02GB)		255  	63
+	 * 1052819775 (502.02GB)		255	63
 	 * 2105639550 (0.98TB)			255	126
-	 * 3158459325 (1.47TB)			255  	189
-	 * 4211279100 (1.96TB)			255  	252
-	 * 5264098875 (2.45TB)			255  	315
+	 * 3158459325 (1.47TB)			255	189
+	 * 4211279100 (1.96TB)			255	252
+	 * 5264098875 (2.45TB)			255	315
 	 * ...
 	 *
 	 * For Solid State Drive(SSD), it uses 4K page size inside and may be
@@ -1953,7 +1953,7 @@ cmlb_convert_geometry(struct cmlb_lun *cl, diskaddr_t capacity,
  *            generated by issuing MODE SENSE commands.
  *
  *   Arguments:
- *	cl 		driver soft state (unit) structure
+ *	cl		driver soft state (unit) structure
  *	capacity	disk capacity in #blocks
  *	tg_cookie	cookie from target driver to be passed back to target
  *			driver when we call back to it through tg_ops.
@@ -1964,12 +1964,12 @@ static void
 cmlb_resync_geom_caches(struct cmlb_lun *cl, diskaddr_t capacity,
     void *tg_cookie)
 {
-	struct	cmlb_geom 	pgeom;
+	struct	cmlb_geom	pgeom;
 	struct	cmlb_geom	lgeom;
-	struct 	cmlb_geom	*pgeomp = &pgeom;
-	unsigned short 		nhead;
-	unsigned short 		nsect;
-	int 			spc;
+	struct	cmlb_geom	*pgeomp = &pgeom;
+	unsigned short		nhead;
+	unsigned short		nsect;
+	int			spc;
 	int			ret;
 
 	ASSERT(cl != NULL);
@@ -2081,7 +2081,7 @@ cmlb_update_ext_minor_nodes(struct cmlb_lun *cl, int num_parts)
 	struct driver_minor_data	*demdp, *demdpr;
 	char				*devnm;
 	dev_info_t			*pdip;
-	boolean_t 			internal;
+	boolean_t			internal;
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
 	ASSERT(cl->cl_update_ext_minor_nodes == 1);
@@ -2122,7 +2122,7 @@ cmlb_update_ext_minor_nodes(struct cmlb_lun *cl, int num_parts)
 		if (cmlb_create_minor(CMLB_DEVINFO(cl), name,
 		    demdp->type,
 		    (instance << shift) | demdp->minor,
-		    cl->cl_node_type, NULL, internal) == DDI_FAILURE) {
+		    cl->cl_node_type, 0, internal) == DDI_FAILURE) {
 			/*
 			 * Clean up any nodes that may have been
 			 * created, in case this fails in the middle
@@ -2136,7 +2136,7 @@ cmlb_update_ext_minor_nodes(struct cmlb_lun *cl, int num_parts)
 		if (ddi_create_minor_node(CMLB_DEVINFO(cl), name,
 		    demdpr->type,
 		    (instance << shift) | demdpr->minor,
-		    cl->cl_node_type, NULL) == DDI_FAILURE) {
+		    cl->cl_node_type, 0) == DDI_FAILURE) {
 			/*
 			 * Clean up any nodes that may have been
 			 * created, in case this fails in the middle
@@ -2289,7 +2289,7 @@ cmlb_is_linux_swap(struct cmlb_lun *cl, uint32_t part_start, void *tg_cookie)
 	int		rval = -1;
 	uint32_t	seek_offset;
 	uint32_t	linux_pg_size;
-	char 		*buf, *linux_swap_magic;
+	char		*buf, *linux_swap_magic;
 	int		sec_sz = cl->cl_sys_blocksize;
 	/* Known linux kernel page sizes */
 	uint32_t	linux_pg_size_arr[] = {4096, };
@@ -2395,7 +2395,7 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 	char		sigbuf[2];
 	caddr_t		bufp;
 	int		uidx;
-	int 		rval;
+	int		rval;
 	int		lba = 0;
 	uint_t		solaris_offset;	/* offset to solaris part. */
 	daddr_t		solaris_size;	/* size of solaris partition */
@@ -2814,7 +2814,7 @@ cmlb_use_efi(struct cmlb_lun *cl, diskaddr_t capacity, int flags,
 	int		iofailed = 0;
 	struct uuid	uuid_type_reserved = EFI_RESERVED;
 #if defined(_FIRMWARE_NEEDS_FDISK)
-	boolean_t 	is_mbr;
+	boolean_t	is_mbr;
 #endif
 
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
@@ -3597,7 +3597,7 @@ cmlb_has_max_chs_vals(struct ipart *fdp)
  *	arg		pointer to user provided dk_geom structure specifying
  *			the controller's notion of the current geometry.
  *
- *	flag 		this argument is a pass through to ddi_copyxxx()
+ *	flag		this argument is a pass through to ddi_copyxxx()
  *			directly from the mode argument of ioctl().
  *
  *	tg_cookie	cookie from target driver to be passed back to target
@@ -3686,7 +3686,7 @@ cmlb_dkio_get_geometry(struct cmlb_lun *cl, caddr_t arg, int flag,
  *	arg		pointer to user provided dk_geom structure used to set
  *			the controller's notion of the current geometry.
  *
- *	flag 		this argument is a pass through to ddi_copyxxx()
+ *	flag		this argument is a pass through to ddi_copyxxx()
  *			directly from the mode argument of ioctl().
  *
  *	tg_cookie	cookie from target driver to be passed back to target
@@ -4417,10 +4417,10 @@ cmlb_dkio_set_vtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 
 	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h",
 	    S_IFBLK, (CMLBUNIT(dev, shift) << shift) | WD_NODE,
-	    cl->cl_node_type, NULL, internal);
+	    cl->cl_node_type, 0, internal);
 	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h,raw",
 	    S_IFCHR, (CMLBUNIT(dev, shift) << shift) | WD_NODE,
-	    cl->cl_node_type, NULL, internal);
+	    cl->cl_node_type, 0, internal);
 	mutex_enter(CMLB_MUTEX(cl));
 
 	if ((rval = cmlb_build_label_vtoc(cl, &user_vtoc)) == 0) {
@@ -4505,10 +4505,10 @@ cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 
 	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h",
 	    S_IFBLK, (CMLBUNIT(dev, shift) << shift) | WD_NODE,
-	    cl->cl_node_type, NULL, internal);
+	    cl->cl_node_type, 0, internal);
 	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h,raw",
 	    S_IFCHR, (CMLBUNIT(dev, shift) << shift) | WD_NODE,
-	    cl->cl_node_type, NULL, internal);
+	    cl->cl_node_type, 0, internal);
 
 	mutex_enter(CMLB_MUTEX(cl));
 
@@ -5027,11 +5027,11 @@ cmlb_dkio_set_efi(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 			(void) cmlb_create_minor(CMLB_DEVINFO(cl), "wd",
 			    S_IFBLK,
 			    (CMLBUNIT(dev, shift) << shift) | WD_NODE,
-			    cl->cl_node_type, NULL, internal);
+			    cl->cl_node_type, 0, internal);
 			(void) cmlb_create_minor(CMLB_DEVINFO(cl), "wd,raw",
 			    S_IFCHR,
 			    (CMLBUNIT(dev, shift) << shift) | WD_NODE,
-			    cl->cl_node_type, NULL, internal);
+			    cl->cl_node_type, 0, internal);
 		} else
 			mutex_exit(CMLB_MUTEX(cl));
 

@@ -442,7 +442,7 @@ ses_doattach(dev_info_t *dip)
 	devp->sd_private = (opaque_t)ssc;
 	ssc->ses_devp = devp;
 	err = ddi_create_minor_node(dip, "0", S_IFCHR, inst,
-	    DDI_NT_SCSI_ENCLOSURE, NULL);
+	    DDI_NT_SCSI_ENCLOSURE, 0);
 	if (err == DDI_FAILURE) {
 		ddi_remove_minor_node(dip, NULL);
 		SES_LOG(ssc, CE_NOTE, "minor node creation failed");
@@ -584,7 +584,7 @@ ses_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 #if		!defined(lint)
 		_NOTE(NO_COMPETING_THREADS_NOW);
-#endif 		/* !defined(lint) */
+#endif		/* !defined(lint) */
 
 		(void) scsi_ifsetcap(SES_ROUTE(ssc), "auto-rqsense", 1, 0);
 		scsi_destroy_pkt(ssc->ses_rqpkt);
@@ -1038,7 +1038,7 @@ ses_start(struct buf *bp)
 
 #if	!defined(lint)
 	_NOTE(NO_COMPETING_THREADS_NOW);
-#endif 	/* !defined(lint) */
+#endif	/* !defined(lint) */
 	ssc->ses_retries = ses_retry_count;
 
 #if	!defined(lint)
@@ -1536,7 +1536,7 @@ ses_decode_sense(struct scsi_pkt *pkt, int *err)
 	    scmd->uscsi_cdb[0], err_action,
 	    sense->es_key, sense->es_add_code, sense->es_qual_code);
 
-#ifdef 	not
+#ifdef	not
 	/*
 	 * Dump cdb and sense data stat's for manufacturing.
 	 */
@@ -1574,7 +1574,7 @@ ses_decode_sense(struct scsi_pkt *pkt, int *err)
 		}
 		SES_LOG(ssc, SES_CE_DEBUG3, "%s", buf);
 	}
-#endif 	/* not */
+#endif	/* not */
 	return (action);
 }
 

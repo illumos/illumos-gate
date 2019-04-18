@@ -92,7 +92,7 @@ static int gen_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 static int gen_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int gen_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static void gen_event_cb(dev_info_t *dip, ddi_eventcookie_t cookie,
-	void *arg, void *impl_data);
+    void *arg, void *impl_data);
 
 static int gen_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
     void **result);
@@ -1387,7 +1387,7 @@ gen_create_display(dev_info_t *devi)
 	(void) sprintf(minor_name, "cgtwenty%d", instance);
 
 	return (ddi_create_minor_node(devi, minor_name, S_IFCHR,
-	    INST_TO_MINOR(instance), DDI_NT_DISPLAY, NULL));
+	    INST_TO_MINOR(instance), DDI_NT_DISPLAY, 0));
 }
 
 static int
@@ -1402,7 +1402,7 @@ gen_create_mn_disk_chan(dev_info_t *devi)
 	for (dmdp = disk_minor_data; dmdp->name != NULL; dmdp++) {
 		if (ddi_create_minor_node(devi, dmdp->name, dmdp->type,
 		    (INST_TO_MINOR(instance)) | dmdp->minor,
-		    DDI_NT_BLOCK_CHAN, NULL) != DDI_SUCCESS) {
+		    DDI_NT_BLOCK_CHAN, 0) != DDI_SUCCESS) {
 
 			return (DDI_FAILURE);
 		}
@@ -1459,7 +1459,7 @@ gen_create_mn_disk_wwn(dev_info_t *devi)
 	for (dmdp = disk_minor_data; dmdp->name != NULL; dmdp++) {
 		if (ddi_create_minor_node(devi, dmdp->name, dmdp->type,
 		    (INST_TO_MINOR(instance)) | dmdp->minor,
-		    DDI_NT_BLOCK_WWN, NULL) != DDI_SUCCESS) {
+		    DDI_NT_BLOCK_WWN, 0) != DDI_SUCCESS) {
 
 			return (DDI_FAILURE);
 		}
@@ -1476,7 +1476,7 @@ gen_create_mn_disk_cdrom(dev_info_t *devi)
 	for (dmdp = disk_minor_data; dmdp->name != NULL; dmdp++) {
 		if (ddi_create_minor_node(devi, dmdp->name, dmdp->type,
 		    (INST_TO_MINOR(instance)) | dmdp->minor,
-		    DDI_NT_CD_CHAN, NULL) != DDI_SUCCESS) {
+		    DDI_NT_CD_CHAN, 0) != DDI_SUCCESS) {
 
 			return (DDI_FAILURE);
 		}
@@ -1493,7 +1493,7 @@ gen_create_mn_disk_fd(dev_info_t *devi)
 	for (dmdp = disk_minor_data; dmdp->name != NULL; dmdp++) {
 		if (ddi_create_minor_node(devi, dmdp->name, dmdp->type,
 		    (INST_TO_MINOR(instance)) | dmdp->minor,
-		    DDI_NT_BLOCK_CHAN, NULL) != DDI_SUCCESS) {
+		    DDI_NT_BLOCK_CHAN, 0) != DDI_SUCCESS) {
 
 			return (DDI_FAILURE);
 		}
@@ -1510,7 +1510,7 @@ gen_create_serial(dev_info_t *devi)
 	for (dmdp = serial_minor_data; dmdp->name != NULL; dmdp++) {
 		if (ddi_create_minor_node(devi, dmdp->name, dmdp->type,
 		    (INST_TO_MINOR(instance)) | dmdp->minor,
-		    dmdp->node_type, NULL) != DDI_SUCCESS) {
+		    dmdp->node_type, 0) != DDI_SUCCESS) {
 
 			return (DDI_FAILURE);
 		}
@@ -1581,7 +1581,7 @@ gen_create_minor_nodes(dev_info_t *devi, struct dstate *dstatep)
 
 		/* the minor name is the same as the node name */
 		if (ddi_create_minor_node(devi, node_name, S_IFCHR,
-		    (INST_TO_MINOR(instance)), dstatep->node_type, NULL) !=
+		    (INST_TO_MINOR(instance)), dstatep->node_type, 0) !=
 		    DDI_SUCCESS) {
 			if (dstatep->node_type) {
 				kmem_free(dstatep->node_type,
