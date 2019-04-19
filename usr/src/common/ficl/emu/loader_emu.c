@@ -38,26 +38,12 @@
 #include <dirent.h>
 #include <macros.h>
 #include <sys/systeminfo.h>
+#include <sys/linker_set.h>
 #include <sys/queue.h>
 #include <sys/mnttab.h>
+#include "loader_emu.h"
 #include "gfx_fb.h"
 #include "ficl.h"
-
-/* Commands and return values; nonzero return sets command_errmsg != NULL */
-typedef int (bootblk_cmd_t)(int argc, char *argv[]);
-#define	CMD_OK		0
-#define	CMD_ERROR	1
-
-/*
- * Support for commands
- */
-struct bootblk_command
-{
-	const char *c_name;
-	const char *c_desc;
-	bootblk_cmd_t *c_fn;
-	STAILQ_ENTRY(bootblk_command) next;
-};
 
 #define	MDIR_REMOVED	0x0001
 #define	MDIR_NOHINTS	0x0002
@@ -112,7 +98,6 @@ static int command_framebuffer(int argc, char *argv[]);
 
 /* update when loader version will change */
 static const char bootprog_rev[] = "1.1";
-STAILQ_HEAD(cmdh, bootblk_command) commands;
 
 /*
  * BootForth   Interface to Ficl Forth interpreter.
@@ -505,7 +490,7 @@ bf_command(ficlVm *vm)
 {
 	char *name, *line, *tail, *cp;
 	size_t len;
-	struct bootblk_command *cmdp;
+	struct bootblk_command **cmdp;
 	bootblk_cmd_t *cmd;
 	int nstrings, i;
 	int argc, result;
@@ -516,9 +501,10 @@ bf_command(ficlVm *vm)
 
 	/* Find our command structure */
 	cmd = NULL;
-	STAILQ_FOREACH(cmdp, &commands, next) {
-		if ((cmdp->c_name != NULL) && strcmp(name, cmdp->c_name) == 0)
-			cmd = cmdp->c_fn;
+	SET_FOREACH(cmdp, Xcommand_set) {
+		if (((*cmdp)->c_name != NULL) &&
+		    strcmp(name, (*cmdp)->c_name) == 0)
+			cmd = (*cmdp)->c_fn;
 	}
 	if (cmd == NULL)
 		printf("callout for unknown command '%s'\n", name);
@@ -698,11 +684,6 @@ get_currdev(void)
 "then ; "
 
 extern int ficlExecFD(ficlVm *, int);
-#define	COMMAND_SET(ptr, name, desc, fn)		\
-	ptr = malloc(sizeof (struct bootblk_command));	\
-	ptr->c_name = (name);				\
-	ptr->c_desc = (desc);				\
-	ptr->c_fn = (fn);
 
 /*
  * Initialise the Forth interpreter, create all our commands as words.
@@ -710,57 +691,13 @@ extern int ficlExecFD(ficlVm *, int);
 ficlVm *
 bf_init(const char *rc, ficlOutputFunction out)
 {
-	struct bootblk_command *cmdp;
+	struct bootblk_command **cmdp;
 	char create_buf[41];	/* 31 characters-long builtins */
 	char *buf;
 	int fd, rv;
 	ficlSystemInformation *fsi;
 	ficlDictionary *dict;
 	ficlDictionary *env;
-
-	/* set up commands list */
-	STAILQ_INIT(&commands);
-	COMMAND_SET(cmdp, "help", "detailed help", command_help);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "?", "list commands", command_commandlist);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "show", "show variable(s)", command_show);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "printenv", "show variable(s)", command_show);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "set", "set a variable", command_set);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "setprop", "set a variable", command_setprop);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "unset", "unset a variable", command_unset);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "echo", "echo arguments", command_echo);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "read", "read input from the terminal", command_read);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "more", "show contents of a file", command_more);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "ls", "list files", command_ls);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "include", "read commands from a file",
-	    command_include);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "boot", "boot a file or loaded kernel", command_boot);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "autoboot", "boot automatically after a delay",
-	    command_autoboot);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "load", "load a kernel or module", command_load);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "unload", "unload all modules", command_unload);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "reboot", "reboot the system", command_reboot);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "sifting", "find words", command_sifting);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
-	COMMAND_SET(cmdp, "framebuffer", "framebuffer mode management",
-	    command_framebuffer);
-	STAILQ_INSERT_TAIL(&commands, cmdp, next);
 
 	fsi = malloc(sizeof (ficlSystemInformation));
 	ficlSystemInformationInitialize(fsi);
@@ -802,16 +739,17 @@ bf_init(const char *rc, ficlOutputFunction out)
 	/* make all commands appear as Forth words */
 	dict = ficlSystemGetDictionary(bf_sys);
 	cmdp = NULL;
-	STAILQ_FOREACH(cmdp, &commands, next) {
-		(void) ficlDictionaryAppendPrimitive(dict, (char *)cmdp->c_name,
-		    bf_command, FICL_WORD_DEFAULT);
+
+	SET_FOREACH(cmdp, Xcommand_set) {
+		(void) ficlDictionaryAppendPrimitive(dict,
+		    (char *)(*cmdp)->c_name, bf_command, FICL_WORD_DEFAULT);
 		rv = ficlVmEvaluate(bf_vm, "forth definitions builtins");
 		if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
 			printf("error interpreting forth: %d\n", rv);
 			exit(1);
 		}
 		(void) snprintf(create_buf, sizeof (create_buf), "builtin: %s",
-		    cmdp->c_name);
+		    (*cmdp)->c_name);
 		rv = ficlVmEvaluate(bf_vm, create_buf);
 		if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
 			printf("error interpreting forth: %d\n", rv);
@@ -1139,6 +1077,8 @@ help_emitsummary(char *topic, char *subtopic, char *desc)
 	return (pager_output("\n"));
 }
 
+COMMAND_SET(help, "help", "detailed help", command_help);
+
 static int
 command_help(int argc, char *argv[])
 {
@@ -1230,25 +1170,26 @@ command_help(int argc, char *argv[])
 	return (CMD_OK);
 }
 
+COMMAND_SET(commandlist, "?", "list commands", command_commandlist);
+
 static int
 command_commandlist(int argc __unused, char *argv[] __unused)
 {
-	struct bootblk_command *cmdp;
+	struct bootblk_command **cmdp;
 	int res;
 	char name[20];
 
 	res = 0;
 	pager_open();
 	res = pager_output("Available commands:\n");
-	cmdp = NULL;
-	STAILQ_FOREACH(cmdp, &commands, next) {
+	SET_FOREACH(cmdp, Xcommand_set) {
 		if (res)
 			break;
-		if (cmdp->c_name != NULL && cmdp->c_desc != NULL) {
+		if ((*cmdp)->c_name != NULL && (*cmdp)->c_desc != NULL) {
 			(void) snprintf(name, sizeof (name), "  %-15s  ",
-			    cmdp->c_name);
+			    (*cmdp)->c_name);
 			(void) pager_output(name);
-			(void) pager_output(cmdp->c_desc);
+			(void) pager_output((*cmdp)->c_desc);
 			res = pager_output("\n");
 		}
 	}
@@ -1260,6 +1201,9 @@ command_commandlist(int argc __unused, char *argv[] __unused)
  * XXX set/show should become set/echo if we have variable
  * substitution happening.
  */
+COMMAND_SET(show, "show", "show variable(s)", command_show);
+COMMAND_SET(printenv, "printenv", "show variable(s)", command_show);
+
 static int
 command_show(int argc, char *argv[])
 {
@@ -1294,6 +1238,7 @@ command_show(int argc, char *argv[])
 	return (CMD_OK);
 }
 
+COMMAND_SET(set, "set", "set a variable", command_set);
 static int
 command_set(int argc, char *argv[])
 {
@@ -1323,6 +1268,7 @@ command_set(int argc, char *argv[])
 	return (CMD_OK);
 }
 
+COMMAND_SET(setprop, "setprop", "set a variable", command_setprop);
 static int
 command_setprop(int argc, char *argv[])
 {
@@ -1340,6 +1286,7 @@ command_setprop(int argc, char *argv[])
 	return (CMD_OK);
 }
 
+COMMAND_SET(unset, "unset", "unset a variable", command_unset);
 static int
 command_unset(int argc, char *argv[])
 {
@@ -1357,6 +1304,7 @@ command_unset(int argc, char *argv[])
 	return (CMD_OK);
 }
 
+COMMAND_SET(echo, "echo", "echo arguments", command_echo);
 static int
 command_echo(int argc, char *argv[])
 {
@@ -1399,6 +1347,7 @@ ischar(void)
 	return (1);
 }
 
+COMMAND_SET(read, "read", "read input from the terminal", command_read);
 static int
 command_read(int argc, char *argv[])
 {
@@ -1456,6 +1405,7 @@ command_read(int argc, char *argv[])
 /*
  * File pager
  */
+COMMAND_SET(more, "more", "show contents of a file", command_more);
 static int
 command_more(int argc, char *argv[])
 {
@@ -1502,6 +1452,7 @@ page_file(char *filename)
 	return (result);
 }
 
+COMMAND_SET(ls, "ls", "list files", command_ls);
 static int
 command_ls(int argc, char *argv[])
 {
@@ -1646,6 +1597,7 @@ out:
 	return (-1);
 }
 
+COMMAND_SET(include, "include", "read commands from a file", command_include);
 static int
 command_include(int argc, char *argv[])
 {
@@ -1780,12 +1732,15 @@ include(const char *filename)
 	return (res);
 }
 
+COMMAND_SET(boot, "boot", "boot a file or loaded kernel", command_boot);
 static int
 command_boot(int argc, char *argv[])
 {
 	return (CMD_OK);
 }
 
+COMMAND_SET(autoboot, "autoboot", "boot automatically after a delay",
+    command_autoboot);
 static int
 command_autoboot(int argc, char *argv[])
 {
@@ -1928,6 +1883,7 @@ file_search(const char *name)
 	return (result);
 }
 
+COMMAND_SET(load, "load", "load a kernel or module", command_load);
 static int
 command_load(int argc, char *argv[])
 {
@@ -1980,6 +1936,7 @@ command_load(int argc, char *argv[])
 	return (CMD_OK);
 }
 
+COMMAND_SET(unload, "unload", "unload all modules", command_unload);
 static int
 command_unload(int argc, char *argv[])
 {
@@ -1987,6 +1944,7 @@ command_unload(int argc, char *argv[])
 	return (CMD_OK);
 }
 
+COMMAND_SET(reboot, "reboot", "reboot the system", command_reboot);
 static int
 command_reboot(int argc, char *argv[])
 {
@@ -1994,6 +1952,7 @@ command_reboot(int argc, char *argv[])
 	return (CMD_OK);
 }
 
+COMMAND_SET(sifting, "sifting", "find words", command_sifting);
 static int
 command_sifting(int argc, char *argv[])
 {
@@ -2006,6 +1965,8 @@ command_sifting(int argc, char *argv[])
 }
 
 /* Only implement get and list. Ignore arguments on, off and set. */
+COMMAND_SET(framebuffer, "framebuffer", "framebuffer mode management",
+    command_framebuffer);
 static int
 command_framebuffer(int argc, char *argv[])
 {

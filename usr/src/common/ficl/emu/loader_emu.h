@@ -16,6 +16,8 @@
 #ifndef _LOADER_EMU_H
 #define	_LOADER_EMU_H
 
+#include <sys/linker_set.h>
+
 /*
  * BootFORTH emulator interface.
  */
@@ -39,8 +41,14 @@ struct bootblk_command
 	const char	*c_name;
 	const char	*c_desc;
 	bootblk_cmd_t	*c_fn;
-	STAILQ_ENTRY(bootblk_command) next;
 };
+
+#define	COMMAND_SET(tag, key, desc, func)				\
+    static bootblk_cmd_t func;						\
+    static struct bootblk_command _cmd_ ## tag = { key, desc, func };	\
+    DATA_SET(Xcommand_set, _cmd_ ## tag)
+
+SET_DECLARE(Xcommand_set, struct bootblk_command);
 
 #ifdef __cplusplus
 }
