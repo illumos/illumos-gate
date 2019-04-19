@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -23,6 +23,7 @@
 
 int debug;
 char *domainname = NULL;
+char *sitename = NULL;
 
 void print_ds(ad_disc_ds_t *);
 void mylogger(int pri, const char *format, ...);
@@ -48,7 +49,9 @@ main(int argc, char *argv[])
 	}
 
 	if (optind < argc)
-		domainname = argv[optind];
+		domainname = argv[optind++];
+	if (optind < argc)
+		sitename = argv[optind++];
 
 	adutils_set_logger(mylogger);
 	adutils_set_debug(AD_DEBUG_ALL, debug);
@@ -58,6 +61,8 @@ main(int argc, char *argv[])
 
 	if (domainname)
 		(void) ad_disc_set_DomainName(ad_ctx, domainname);
+	if (sitename)
+		(void) ad_disc_set_SiteName(ad_ctx, sitename);
 
 	ad_disc_refresh(ad_ctx);
 
