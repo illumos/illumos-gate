@@ -1552,20 +1552,19 @@ command_ls(int argc, char *argv[])
 	while ((d = readdir(dir)) != NULL) {
 		if (strcmp(d->d_name, ".") && strcmp(d->d_name, "..")) {
 			/* stat the file, if possible */
-			sb.st_size = 0;
-			sb.st_mode = 0;
-			buf = malloc(strlen(path) + strlen(d->d_name) + 2);
 			if (path[0] == '\0') {
-				(void) snprintf(buf, sizeof (buf), "%s",
-				    d->d_name);
+				(void) asprintf(&buf, "%s", d->d_name);
 			} else {
-				(void) snprintf(buf, sizeof (buf), "%s/%s",
-				    path, d->d_name);
+				(void) asprintf(&buf, "%s/%s", path, d->d_name);
 			}
-			/* ignore return, could be symlink, etc. */
-			if (stat(buf, &sb))
-				sb.st_size = 0;
-			free(buf);
+			if (buf != NULL) {
+				/* ignore return, could be symlink, etc. */
+				if (stat(buf, &sb)) {
+					sb.st_size = 0;
+					sb.st_mode = 0;
+				}
+				free(buf);
+			}
 			if (verbose) {
 				(void) snprintf(lbuf, sizeof (lbuf),
 				    " %c %8d %s\n",
