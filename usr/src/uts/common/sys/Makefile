@@ -348,6 +348,7 @@ CHKHDRS=			\
 	lgrp_user.h		\
 	libc_kernel.h		\
 	link.h			\
+	linker_set.h		\
 	list.h			\
 	list_impl.h		\
 	llc1.h			\

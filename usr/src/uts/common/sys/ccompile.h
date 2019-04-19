@@ -149,7 +149,10 @@ extern "C" {
 #define	__CONST			__sun_attr__((__const__))
 #define	__PURE			__sun_attr__((__pure__))
 #define	__packed		__attribute__((__packed__))
+#define	__section(x)		__attribute__((__section__(x)))
 #define	__unused		__sun_attr__((__unused__))
+#define	__used			__attribute__((__used__))
+#define	__weak_symbol		__attribute__((__weak__))
 
 #ifdef	__cplusplus
 }
