@@ -17,7 +17,7 @@ OBJS +=		getresponse.o
 SRCS +=		$(SRC)/common/util/getresponse.c
 
 CPPFLAGS +=	-I../../common -I$(SRC)/common/util
-LDLIBS +=	-lfdisk -lefi -lfstyp -luuid
+LDLIBS +=	-ladm -lfdisk -lefi -lfstyp -luuid -lumem
 
 # getresponse.c and libfdisk.c need this
 LINTFLAGS += \

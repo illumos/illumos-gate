@@ -63,8 +63,7 @@ extern "C" {
 #define	BE_GRUB_STAGE_1		"/boot/grub/stage1"
 #define	BE_GRUB_STAGE_2		"/boot/grub/stage2"
 #define	BE_INSTALL_BOOT		"/usr/sbin/installboot"
-#define	BE_LOADER_STAGE_1	"/boot/pmbr"
-#define	BE_LOADER_STAGE_2	"/boot/gptzfsboot"
+#define	BE_LOADER_STAGES	"/boot"
 #define	BE_SPARC_BOOTBLK	"/lib/fs/zfs/bootblk"
 
 #define	ZFS_CLOSE(_zhp) \

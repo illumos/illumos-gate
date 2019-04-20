@@ -31,33 +31,46 @@
 extern "C" {
 #endif
 
+#include <stdbool.h>
 #include <sys/multiboot.h>
 #include <sys/types.h>
+#include <sys/queue.h>
 
 #define	SECTOR_SIZE	(512)
 
 /* partitioning type for device */
-enum ig_devtype_t {
-	IG_DEV_VTOC = 0,
-	IG_DEV_MBR,
-	IG_DEV_EFI
-};
+typedef enum ib_devtype {
+	IB_DEV_UNKNOWN = 0,
+	IB_DEV_VTOC,
+	IB_DEV_MBR,
+	IB_DEV_EFI
+} ib_devtype_t;
 
 /* file system type */
-enum ig_fstype_t {
-	IG_FS_NONE = 0,
-	IG_FS_ZFS,
-	IG_FS_UFS,
-	IG_FS_PCFS
-};
+typedef enum ib_fstype {
+	IB_FS_NONE = 0,
+	IB_FS_ZFS,
+	IB_FS_UFS,
+	IB_FS_PCFS
+} ib_fstype_t;
+
+/* boot block type */
+typedef enum ib_bblktype {
+	IB_BBLK_FILE,
+	IB_BBLK_MBR,		/* MBR/PMBR */
+	IB_BBLK_STAGE1,		/* BIOS stage 1 */
+	IB_BBLK_STAGE2,		/* BIOS stage 2 */
+	IB_BBLK_EFI		/* EFI Boot Program */
+} ib_bblktype_t;
 
 /* partition info for boot block location. */
 struct stage_part {
 	char *path;			/* device name */
-	int fd;				/* open file descriptor */
+	char *mntpnt;			/* mountpoint for stage fs */
 	int id;				/* partition/slice number */
-	enum ig_devtype_t devtype;	/* partitioning type */
-	enum ig_fstype_t fstype;	/* none or pcfs */
+	ib_devtype_t devtype;		/* partitioning type */
+	ib_fstype_t fstype;
+	uint16_t tag;			/* partition tag */
 	uint64_t start;			/* partition LBA */
 	uint64_t size;			/* partition size */
 	uint64_t offset;		/* block offset */
@@ -65,12 +78,9 @@ struct stage_part {
 
 /* boot device data */
 typedef struct _ib_device {
-	char		*path;			/* whole disk */
-	int		fd;			/* whole disk fd */
-	enum ig_devtype_t devtype;
+	ib_devtype_t devtype;
 	struct stage_part stage;		/* location of boot block */
 	struct stage_part target;		/* target file system */
-	char		mbr[SECTOR_SIZE];
 } ib_device_t;
 
 /* stage 2 location */
@@ -85,10 +95,39 @@ typedef struct _ib_bootblock {
 	uint32_t		extra_size;
 } ib_bootblock_t;
 
+struct partlist;
+
+struct part_cb {
+	bool (*read)(struct partlist *);
+	bool (*read_bbl)(struct partlist *);
+	bool (*compare)(struct partlist *);
+	void (*install)(void *, struct partlist *);
+	void (*print)(struct partlist *);
+};
+
+struct partlist {
+	char			*pl_devname;
+	ib_device_t		*pl_device;
+
+	/* boot block type */
+	ib_bblktype_t		pl_type;
+	/* stage from target disk, either stage1 or stage2 */
+	void			*pl_stage;
+	/* name of the source file */
+	const char		*pl_src_name;
+	/* stage data from source file. */
+	void			*pl_src_data;
+	struct part_cb		pl_cb;
+	STAILQ_ENTRY(partlist)	pl_next;
+};
+
+typedef STAILQ_HEAD(part_list, partlist) part_list_t;
+
 typedef struct _ib_data {
-	unsigned char	stage1[SECTOR_SIZE];	/* partition boot block */
 	ib_device_t	device;			/* boot device */
 	ib_bootblock_t	bootblock;		/* stage 2 */
+	struct stage_part target;		/* target file system */
+	part_list_t	*plist;			/* boot blocks */
 } ib_data_t;
 
 #define	BBLK_BLKLIST_OFF	50	/* vtoc/disk boot offset */
