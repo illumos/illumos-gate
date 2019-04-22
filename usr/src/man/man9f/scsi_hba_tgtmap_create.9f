@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright (c) 2017, Joyent, Inc.
+.\" Copyright 2019, Joyent, Inc.
 .\"
-.Dd Apr 18, 2017
+.Dd April 22, 2019
 .Dt SCSI_HBA_TGTMAP_CREATE 9F
 .Os
 .Sh NAME
@@ -58,7 +58,7 @@
 .Fc
 .Ft int
 .Fo scsi_hba_tgtmap_set_begin
-.Fa "scsi_hba_tgtmap_t *map"
+.Fa "scsi_hba_tgtmap_t *tgtmap"
 .Fc
 .Ft int
 .Fo scsi_hba_tgtmap_set_add
@@ -69,11 +69,12 @@
 .Fc
 .Ft int
 .Fo scsi_hba_tgtmap_set_end
-.Fa "scsi_hba_tgtmap_t *map"
+.Fa "scsi_hba_tgtmap_t *tgtmap"
+.Fa "uint_t flags"
 .Fc
 .Ft int
 .Fo scsi_hba_tgtmap_set_flush
-.Fa "scsi_hba_tgtmap_t *map"
+.Fa "scsi_hba_tgtmap_t *tgtmap"
 .Fc
 .Ft int
 .Fo scsi_hba_tgtmap_tgt_add
@@ -123,6 +124,10 @@ removed from the system.
 Pointer where the target map is stored.
 .It Fa tgtmap
 Pointer to an allocated target map.
+.It Fa flags
+Flags that modify the behavior of the function.
+Currently reserved and should be passed as
+.Sy 0 .
 .It Fa tgt_addr
 The address of the target map entry the callback is acting upon.
 .It Fa type
