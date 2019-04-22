@@ -1749,6 +1749,9 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/zpool_scrub_005_pos \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/zpool_scrub_print_repairing \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_set/zpool_set_001_pos \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_set/zpool_set_002_neg \
