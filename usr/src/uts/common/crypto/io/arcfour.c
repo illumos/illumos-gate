@@ -141,7 +141,7 @@ static crypto_provider_info_t rc4_prov_info = {
 	rc4_mech_info_tab
 };
 
-static crypto_kcf_provider_handle_t rc4_prov_handle = NULL;
+static crypto_kcf_provider_handle_t rc4_prov_handle = 0;
 
 static mblk_t *advance_position(mblk_t *, off_t, uchar_t **);
 static int crypto_arcfour_crypt(ARCFour_key *, uchar_t *, crypto_data_t *,
@@ -168,11 +168,11 @@ int
 _fini(void)
 {
 	/* Unregister from KCF if module is registered */
-	if (rc4_prov_handle != NULL) {
+	if (rc4_prov_handle != 0) {
 		if (crypto_unregister_provider(rc4_prov_handle))
 			return (EBUSY);
 
-		rc4_prov_handle = NULL;
+		rc4_prov_handle = 0;
 	}
 
 	return (mod_remove(&modlinkage));

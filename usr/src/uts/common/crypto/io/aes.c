@@ -220,7 +220,7 @@ static crypto_provider_info_t aes_prov_info = {
 	aes_mech_info_tab
 };
 
-static crypto_kcf_provider_handle_t aes_prov_handle = NULL;
+static crypto_kcf_provider_handle_t aes_prov_handle = 0;
 static crypto_data_t null_crypto_data = { CRYPTO_DATA_RAW };
 
 int
@@ -244,11 +244,11 @@ int
 _fini(void)
 {
 	/* Unregister from KCF if module is registered */
-	if (aes_prov_handle != NULL) {
+	if (aes_prov_handle != 0) {
 		if (crypto_unregister_provider(aes_prov_handle))
 			return (EBUSY);
 
-		aes_prov_handle = NULL;
+		aes_prov_handle = 0;
 	}
 
 	return (mod_remove(&modlinkage));

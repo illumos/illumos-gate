@@ -23,8 +23,6 @@
  * All rights reserved.  Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "drmP.h"
 #include <sys/kstat.h>
 #include <sys/ddi.h>
@@ -75,7 +73,7 @@ drm_init_kstats(drm_device_t *sc)
 	    KSTAT_TYPE_NAMED, sizeof (drmkstat_name)/sizeof (char *) - 1,
 	    KSTAT_FLAG_PERSISTENT);
 	if (ksp == NULL)
-		return (NULL);
+		return (0);
 
 	ksp->ks_private = sc;
 	ksp->ks_update = drm_kstat_update;

@@ -495,8 +495,9 @@ _NOTE(MUTEX_PROTECTS_DATA(ehci_state_t::ehci_int_mutex, ehci_pipe_private_t))
 /*
  * Pipe flag
  *
- * For polled mode flag.
+ * Interrupt or polled mode.
  */
+#define	EHCI_INTERRUPT_MODE_FLAG	0	/* Interrupt mode flag */
 #define	EHCI_POLLED_MODE_FLAG		1	/* Polled mode flag */
 
 /* Pipe specific flags */

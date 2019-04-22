@@ -119,7 +119,7 @@ usba_devdb_get_var_type(char *str)
 
 	cfgvar = &usba_cfg_varlist[0];
 	while (cfgvar->field != USB_NONE) {
-		if (strcasecmp(cfgvar->name, str) == NULL) {
+		if (strcasecmp(cfgvar->name, str) == 0) {
 			break;
 		} else {
 			cfgvar++;

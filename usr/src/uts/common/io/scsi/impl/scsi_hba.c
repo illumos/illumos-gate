@@ -6545,7 +6545,7 @@ done:		ASSERT(child);
 		 * detect new device_insert.
 		 */
 		if ((sdchild->sd_inq == NULL) ||
-		    ((pi == NULL) && ndi_devi_device_isremoved(child))) {
+		    ((pi == 0) && ndi_devi_device_isremoved(child))) {
 
 			/* hotplug_node can only be revived via hotplug. */
 			if ((se == SE_HP) || !ndi_dev_is_hotplug_node(child)) {
@@ -8880,7 +8880,6 @@ scsi_hba_tgtmap_set_end(scsi_hba_tgtmap_t *handle, uint_t flags)
 int
 scsi_hba_tgtmap_tgt_add(scsi_hba_tgtmap_t *handle,
     scsi_tgtmap_tgt_type_t tgt_type, char *tgt_addr, void *tgt_priv)
-
 {
 	impl_scsi_tgtmap_t	*tgtmap = (impl_scsi_tgtmap_t *)handle;
 	dev_info_t		*self = tgtmap->tgtmap_tran->tran_iport_dip;

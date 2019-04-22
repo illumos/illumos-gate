@@ -79,7 +79,7 @@
 
 /* Some handy macros */
 #define	EVTCHNDRV_MINOR2INST(minor)	((int)(minor))
-#define	EVTCHNDRV_DEFAULT_NCLONES 	256
+#define	EVTCHNDRV_DEFAULT_NCLONES	256
 #define	EVTCHNDRV_INST2SOFTS(inst)	\
 	(ddi_get_soft_state(evtchndrv_statep, (inst)))
 
@@ -620,7 +620,7 @@ evtchndrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    NULL);
 
 	error = ddi_create_minor_node(dip, "evtchn", S_IFCHR, unit,
-	    DDI_PSEUDO, NULL);
+	    DDI_PSEUDO, 0);
 	if (error != DDI_SUCCESS)
 		goto fail;
 
@@ -656,7 +656,7 @@ evtchndrv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 /* Solaris driver framework */
 
-static 	struct cb_ops evtchndrv_cb_ops = {
+static struct cb_ops evtchndrv_cb_ops = {
 	evtchndrv_open,		/* cb_open */
 	evtchndrv_close,	/* cb_close */
 	nodev,			/* cb_strategy */

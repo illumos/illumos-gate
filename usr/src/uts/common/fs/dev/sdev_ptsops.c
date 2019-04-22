@@ -228,7 +228,7 @@ devpts_prunedir(struct sdev_node *ddv)
 	vtor = (int (*)(struct sdev_node *))sdev_get_vtor(ddv);
 	ASSERT(vtor);
 
-	if (rw_tryupgrade(&ddv->sdev_contents) == NULL) {
+	if (rw_tryupgrade(&ddv->sdev_contents) == 0) {
 		rw_exit(&ddv->sdev_contents);
 		rw_enter(&ddv->sdev_contents, RW_WRITER);
 	}

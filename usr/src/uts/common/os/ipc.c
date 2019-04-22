@@ -469,8 +469,8 @@ _info(struct modinfo *modinfop)
  * fail in ipc_lookup or ipc_get.
  *
  * The arguments must be set up as follows:
- * 	p - Pointer to permission structure to verify
- * 	mode - Desired access permissions
+ *	p - Pointer to permission structure to verify
+ *	mode - Desired access permissions
  */
 int
 ipcperm_access(kipc_perm_t *p, int mode, cred_t *cr)
@@ -927,7 +927,7 @@ ipc_keylookup(ipc_service_t *service, key_t key, int flag, kipc_perm_t **permp)
 			return (EEXIST);
 		if ((flag & 0777) & ~perm->ipc_mode) {
 			if (AU_AUDITING())
-				audit_ipcget(NULL, (void *)perm);
+				audit_ipcget(0, (void *)perm);
 			return (EACCES);
 		}
 		*permp = perm;

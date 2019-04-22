@@ -158,7 +158,7 @@ devipnet_filldir(struct sdev_node *ddv)
 	sdev_node_t	*dv, *next;
 
 	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
-	if (rw_tryupgrade(&ddv->sdev_contents) == NULL) {
+	if (rw_tryupgrade(&ddv->sdev_contents) == 0) {
 		rw_exit(&ddv->sdev_contents);
 		rw_enter(&ddv->sdev_contents, RW_WRITER);
 		/*

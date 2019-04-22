@@ -241,7 +241,7 @@ apic_init_common(void)
 	iptr = (int *)&apic_irq_table[0];
 	for (i = 0; i <= APIC_MAX_VECTOR; i++) {
 		apic_level_intr[i] = 0;
-		*iptr++ = NULL;
+		*iptr++ = 0;
 		apic_vector_to_irq[i] = APIC_RESV_IRQ;
 
 		/* These *must* be initted to B_TRUE! */

@@ -1,5 +1,5 @@
 /* infback.c -- inflate using a call-back interface
- * Copyright (C) 1995-2011 Mark Adler
+ * Copyright (C) 1995-2016 Mark Adler
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
@@ -25,12 +25,8 @@ local void fixedtables OF((struct inflate_state FAR *state));
    windowBits is in the range 8..15, and window is a user-supplied
    window and output buffer that is 2**windowBits bytes.
  */
-int ZEXPORT inflateBackInit_(strm, windowBits, window, version, stream_size)
-z_streamp strm;
-int windowBits;
-unsigned char FAR *window;
-const char *version;
-int stream_size;
+int ZEXPORT inflateBackInit_(z_streamp strm, int windowBits,
+    unsigned char FAR *window, const char *version, int stream_size)
 {
     struct inflate_state FAR *state;
 
@@ -53,7 +49,7 @@ int stream_size;
 #ifdef Z_SOLO
         return Z_STREAM_ERROR;
 #else
-    strm->zfree = zcfree;
+        strm->zfree = zcfree;
 #endif
     state = (struct inflate_state FAR *)ZALLOC(strm, 1,
                                                sizeof(struct inflate_state));
@@ -61,7 +57,7 @@ int stream_size;
     Tracev((stderr, "inflate: allocated\n"));
     strm->state = (struct internal_state FAR *)state;
     state->dmax = 32768U;
-    state->wbits = windowBits;
+    state->wbits = (uInt)windowBits;
     state->wsize = 1U << windowBits;
     state->window = window;
     state->wnext = 0;
@@ -79,8 +75,7 @@ int stream_size;
    used for threaded applications, since the rewriting of the tables and virgin
    may not be thread-safe.
  */
-local void fixedtables(state)
-struct inflate_state FAR *state;
+local void fixedtables(struct inflate_state FAR *state)
 {
 #ifdef BUILDFIXED
     static int virgin = 1;
@@ -247,12 +242,8 @@ struct inflate_state FAR *state;
    inflateBack() can also return Z_STREAM_ERROR if the input parameters
    are not correct, i.e. strm is Z_NULL or the state was not initialized.
  */
-int ZEXPORT inflateBack(strm, in, in_desc, out, out_desc)
-z_streamp strm;
-in_func in;
-void FAR *in_desc;
-out_func out;
-void FAR *out_desc;
+int ZEXPORT inflateBack(z_streamp strm, in_func in, void FAR *in_desc,
+    out_func out, void FAR *out_desc)
 {
     struct inflate_state FAR *state;
     z_const unsigned char FAR *next;    /* next input */
@@ -477,7 +468,7 @@ void FAR *out_desc;
             }
             Tracev((stderr, "inflate:       codes ok\n"));
             state->mode = LEN;
-
+	    /* FALLTHROUGH */
         case LEN:
             /* use inflate_fast() if we have enough input and output */
             if (have >= 6 && left >= 258) {
@@ -628,8 +619,7 @@ void FAR *out_desc;
     return ret;
 }
 
-int ZEXPORT inflateBackEnd(strm)
-z_streamp strm;
+int ZEXPORT inflateBackEnd(z_streamp strm)
 {
     if (strm == Z_NULL || strm->state == Z_NULL || strm->zfree == (free_func)0)
         return Z_STREAM_ERROR;

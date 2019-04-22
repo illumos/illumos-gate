@@ -993,11 +993,11 @@ xen_parse_props(char *s, char *prop_map[], int n_prop)
 
 	do {
 		scp = cp;
-		while ((*cp != NULL) && (*cp != ':'))
+		while ((*cp != '\0') && (*cp != ':'))
 			cp++;
 
 		if ((scp != cp) && (*prop_name != NULL)) {
-			*cp = NULL;
+			*cp = '\0';
 			bsetprops(*prop_name, scp);
 		}
 

@@ -554,7 +554,7 @@ more:
 			 * ready to be made an SSL record.
 			 */
 			if ((copybp = copyb(mp)) == NULL)
-				return (NULL);
+				return (KSSL_CMD_NOT_SUPPORTED);
 
 			copybp->b_cont = mp->b_cont;
 			if (mp == firstmp) {

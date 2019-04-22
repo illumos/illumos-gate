@@ -504,7 +504,7 @@ parse_cmd(void)
 	        if (sio_init(115200 / comspeed) != 0)
 		    ioctrl &= ~IO_SERIAL;
 	    }
-	} if (c == '?') {
+	} else if (c == '?') {
 	    printf("\n");
 	    fs_list(arg);
 	    zfs_list(arg);

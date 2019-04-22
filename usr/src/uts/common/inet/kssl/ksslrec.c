@@ -1066,11 +1066,9 @@ kssl_get_hello_random(uchar_t *buf)
 }
 
 static int
-kssl_tls_P_hash(crypto_mechanism_t *mech, crypto_key_t *key,
-	size_t hashlen,
-	uchar_t *label, size_t label_len,
-	uchar_t *seed, size_t seedlen,
-	uchar_t *data, size_t datalen)
+kssl_tls_P_hash(crypto_mechanism_t *mech, crypto_key_t *key, size_t hashlen,
+    uchar_t *label, size_t label_len, uchar_t *seed, size_t seedlen,
+    uchar_t *data, size_t datalen)
 {
 	int rv = 0;
 	uchar_t A1[MAX_HASH_LEN], result[MAX_HASH_LEN];
@@ -1137,11 +1135,9 @@ end:
 
 /* ARGSUSED */
 static int
-kssl_tls_PRF(ssl_t *ssl,
-	uchar_t *secret, size_t secret_len,
-	uchar_t *label, size_t label_len,
-	uchar_t *seed, size_t seed_len,
-	uchar_t *prfresult, size_t prfresult_len)
+kssl_tls_PRF(ssl_t *ssl, uchar_t *secret, size_t secret_len, uchar_t *label,
+    size_t label_len, uchar_t *seed, size_t seed_len, uchar_t *prfresult,
+    size_t prfresult_len)
 {
 	/*
 	 * RFC 2246:
@@ -1310,13 +1306,8 @@ static char *ssl3_key_derive_seeds[9] = {"A", "BB", "CCC", "DDDD", "EEEEE",
 	"FFFFFF", "GGGGGGG", "HHHHHHHH", "IIIIIIIII"};
 
 static void
-kssl_ssl3_key_material_derive_step(
-	ssl_t *ssl,
-	uchar_t *secret,
-	size_t secretlen,
-	int step,
-	uchar_t *dst,
-	int sr_first)
+kssl_ssl3_key_material_derive_step(ssl_t *ssl, uchar_t *secret,
+    size_t secretlen, int step, uchar_t *dst, int sr_first)
 {
 	SHA1_CTX sha1, *sha1ctx;
 	MD5_CTX md5, *md5ctx;
@@ -1697,11 +1688,8 @@ kssl_send_finished(ssl_t *ssl, int update_hsh)
 }
 
 int
-kssl_mac_encrypt_record(ssl_t *ssl,
-	SSL3ContentType ct,
-	uchar_t *versionp,
-	uchar_t *rstart,
-	mblk_t *mp)
+kssl_mac_encrypt_record(ssl_t *ssl, SSL3ContentType ct, uchar_t *versionp,
+    uchar_t *rstart, mblk_t *mp)
 {
 	KSSLCipherSpec *spec;
 	int mac_sz;
@@ -2488,7 +2476,7 @@ kssl_free_context(ssl_t *ssl)
 	 * might submit a new cryto request.
 	 */
 	do {
-		if (ssl->job.kjob != NULL) {
+		if (ssl->job.kjob != 0) {
 			/*
 			 * Drop the lock before canceling the request;
 			 * otherwise we might deadlock if the completion
@@ -2500,7 +2488,7 @@ kssl_free_context(ssl_t *ssl)
 			mutex_enter(&ssl->kssl_lock);
 
 			/* completion callback might have done the cleanup */
-			if (ssl->job.kjob != NULL) {
+			if (ssl->job.kjob != 0) {
 				kmem_free(ssl->job.buf, ssl->job.buflen);
 				ssl->job.kjob = 0;
 				ssl->job.buf = NULL;
@@ -2509,7 +2497,7 @@ kssl_free_context(ssl_t *ssl)
 		}
 		while (ssl->async_ops_pending > 0)
 			cv_wait(&ssl->async_cv, &ssl->kssl_lock);
-	} while (ssl->job.kjob != NULL);
+	} while (ssl->job.kjob != 0);
 
 	kssl_mblksfree(ssl);
 	kssl_specsfree(ssl);

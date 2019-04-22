@@ -1976,7 +1976,7 @@ pmap_kgetport(struct knetconfig *knconf, struct netbuf *call_addr,
 		}
 
 		if (stat == RPC_SUCCESS) {
-			if ((ua != NULL) && (ua[0] != NULL)) {
+			if ((ua != NULL) && (ua[0] != '\0')) {
 				port = rpc_uaddr2port(AF_INET, ua);
 			} else {
 				/* Address unknown */

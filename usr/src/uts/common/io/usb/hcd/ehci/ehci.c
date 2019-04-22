@@ -88,7 +88,7 @@ static int	ehci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int	ehci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 static int	ehci_reset(dev_info_t *dip, ddi_reset_cmd_t cmd);
 static int	ehci_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
-				void *arg, void **result);
+    void *arg, void **result);
 
 static int	ehci_open(dev_t	*devp, int flags, int otyp, cred_t *credp);
 static int	ehci_close(dev_t dev, int flag, int otyp, cred_t *credp);
@@ -135,8 +135,8 @@ static struct dev_ops ehci_ops = {
  * The USBA library must be loaded for this driver.
  */
 static struct modldrv modldrv = {
-	&mod_driverops, 	/* Type of module. This one is a driver */
-	"USB EHCI Driver", /* Name of the module. */
+	&mod_driverops,		/* Type of module. This one is a driver */
+	"USB EHCI Driver",	/* Name of the module. */
 	&ehci_ops,		/* Driver ops */
 };
 
@@ -201,8 +201,7 @@ _fini(void)
  * Return     : DDI_SUCCESS / DDI_FAILURE.
  */
 static int
-ehci_attach(dev_info_t		*dip,
-	ddi_attach_cmd_t	cmd)
+ehci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int			instance;
 	ehci_state_t		*ehcip = NULL;
@@ -388,8 +387,7 @@ ehci_attach(dev_info_t		*dip,
  * Return     : DDI_SUCCESS / DDI_FAILURE
  */
 int
-ehci_detach(dev_info_t		*dip,
-	ddi_detach_cmd_t	cmd)
+ehci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	ehci_state_t		*ehcip = ehci_obtain_state(dip);
 
@@ -533,10 +531,7 @@ ehci_quiesce(dev_info_t *dip)
  */
 /* ARGSUSED */
 static int
-ehci_info(dev_info_t		*dip,
-	ddi_info_cmd_t		infocmd,
-	void			*arg,
-	void			**result)
+ehci_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
 	dev_t			dev;
 	ehci_state_t		*ehcip;
@@ -576,7 +571,7 @@ ehci_info(dev_info_t		*dip,
  * EHCI CB_OPS entry points.
  */
 static dev_info_t *
-ehci_get_dip(dev_t	dev)
+ehci_get_dip(dev_t dev)
 {
 	int		instance = EHCI_UNIT(dev);
 	ehci_state_t	*ehcip = ddi_get_soft_state(ehci_statep, instance);
@@ -592,10 +587,7 @@ ehci_get_dip(dev_t	dev)
 
 
 static int
-ehci_open(dev_t		*devp,
-	int		flags,
-	int		otyp,
-	cred_t		*credp)
+ehci_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 {
 	dev_info_t	*dip = ehci_get_dip(*devp);
 
@@ -604,10 +596,7 @@ ehci_open(dev_t		*devp,
 
 
 static int
-ehci_close(dev_t	dev,
-	int		flag,
-	int		otyp,
-	cred_t		*credp)
+ehci_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	dev_info_t	*dip = ehci_get_dip(dev);
 
@@ -616,12 +605,8 @@ ehci_close(dev_t	dev,
 
 
 static int
-ehci_ioctl(dev_t	dev,
-	int		cmd,
-	intptr_t	arg,
-	int		mode,
-	cred_t		*credp,
-	int		*rvalp)
+ehci_ioctl(dev_t dev, int cmd, intptr_t	arg, int mode, cred_t *credp,
+    int *rvalp)
 {
 	dev_info_t	*dip = ehci_get_dip(dev);
 
@@ -946,7 +931,7 @@ ehci_hcdi_pipe_open(
 	mutex_exit(&ph->p_mutex);
 
 	/* Allocate the host controller endpoint descriptor */
-	pp->pp_qh = ehci_alloc_qh(ehcip, ph, NULL);
+	pp->pp_qh = ehci_alloc_qh(ehcip, ph, EHCI_INTERRUPT_MODE_FLAG);
 
 	/* Initialize the halting flag */
 	pp->pp_halt_state = EHCI_HALT_STATE_FREE;

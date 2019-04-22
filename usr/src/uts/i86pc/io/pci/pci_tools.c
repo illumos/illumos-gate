@@ -873,7 +873,7 @@ pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages)
 			prom_printf("boundary violation: "
 			    "offset:0x%" PRIx64 ", size:%ld, pagesize:0x%lx\n",
 			    offset, (uintptr_t)size, (uintptr_t)MMU_PAGESIZE);
-		return (NULL);
+		return (0);
 
 	} else if ((offset + size) > MMU_PAGESIZE) {
 		(*num_pages)++;
@@ -884,7 +884,7 @@ pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages)
 	if (virt_base == NULL) {
 		if (pcitool_debug)
 			prom_printf("Couldn't get virtual base address.\n");
-		return (NULL);
+		return (0);
 	}
 
 	if (pcitool_debug)
@@ -1176,7 +1176,7 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 
 			virt_addr = pcitool_map(prg.phys_addr, size,
 			    &num_virt_pages);
-			if (virt_addr == NULL) {
+			if (virt_addr == 0) {
 				prg.status = PCITOOL_IO_ERROR;
 				rval = EIO;
 				goto done_reg;

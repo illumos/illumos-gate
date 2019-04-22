@@ -156,7 +156,7 @@ ud_vfs_remove(struct udf_vfs *udf_vfsp)
  */
 daddr_t
 ud_xlate_to_daddr(struct udf_vfs *udf_vfsp,
-	uint16_t prn, uint32_t blkno, int32_t nblks, uint32_t *count)
+    uint16_t prn, uint32_t blkno, int32_t nblks, uint32_t *count)
 {
 	int32_t i;
 	struct ud_map *map;
@@ -272,7 +272,7 @@ end:
 #ifdef	UNDEF
 uint32_t
 ud_xlate_to_addr(struct udf_vfs *udf_vfsp,
-	uint16_t prn, daddr_t blkno, int32_t lad)
+    uint16_t prn, daddr_t blkno, int32_t lad)
 {
 	int32_t i;
 	struct ud_part *ud_parts;
@@ -343,7 +343,7 @@ static uint32_t cum_sec_leap[] = {
 /* This holds good till yr 2100 */
 void
 ud_dtime2utime(struct timespec32 *utime,
-	struct tstamp const *dtime)
+    struct tstamp const *dtime)
 {
 	int16_t year, tzone;
 	int32_t	sec;
@@ -396,7 +396,7 @@ ud_dtime2utime(struct timespec32 *utime,
 
 void
 ud_utime2dtime(struct timespec32 const *utime,
-	struct tstamp *dtime)
+    struct tstamp *dtime)
 {
 	time32_t sec = utime->tv_sec;
 	int32_t usec = utime->tv_nsec / 1000;
@@ -788,7 +788,7 @@ ud_still_mounted(struct check_node *checkp)
 /* ARGSUSED */
 void
 ud_checkclean(struct vfs *vfsp,
-	struct udf_vfs *udf_vfsp, dev_t dev, time_t timev)
+    struct udf_vfs *udf_vfsp, dev_t dev, time_t timev)
 {
 	ud_printf("ud_checkclean\n");
 	udf_vfsp = (struct udf_vfs *)vfsp->vfs_data;
@@ -915,7 +915,7 @@ ud_update_regid(struct regid *reg)
 /* ARGSUSED4 */
 void
 ud_make_tag(struct udf_vfs *udf_vfsp,
-	struct tag *tag, uint16_t tag_id, uint32_t blkno, uint16_t crc_len)
+    struct tag *tag, uint16_t tag_id, uint32_t blkno, uint16_t crc_len)
 {
 	int32_t i;
 	uint16_t crc;
@@ -947,7 +947,7 @@ ud_make_tag(struct udf_vfs *udf_vfsp,
 
 int32_t
 ud_make_dev_spec_ear(struct dev_spec_ear *ds,
-	major_t major, minor_t minor)
+    major_t major, minor_t minor)
 {
 	int32_t attr_len;
 
@@ -969,7 +969,7 @@ ud_make_dev_spec_ear(struct dev_spec_ear *ds,
 
 int32_t
 ud_get_next_fid(struct ud_inode *ip, struct fbuf **fbp, uint32_t offset,
-	struct file_id **fid, uint8_t **name, uint8_t *buf)
+    struct file_id **fid, uint8_t **name, uint8_t *buf)
 {
 	struct vnode *vp = ITOV(ip);
 	caddr_t beg, end;
@@ -1176,7 +1176,7 @@ use_id_iu_len:
 
 int32_t
 ud_verify_tag_and_desc(struct tag *tag, uint16_t id, uint32_t blockno,
-			int32_t verify_desc, int32_t desc_len)
+    int32_t verify_desc, int32_t desc_len)
 {
 	int32_t i;
 	uint8_t *addr, cksum = 0;
@@ -1536,7 +1536,7 @@ ud_utf82utf16(uint8_t *s_8, uint16_t *c_16, int32_t count)
  */
 int32_t
 ud_compress(int32_t in_len, int32_t *out_len,
-		uint8_t *in_str, uint8_t *out_str)
+    uint8_t *in_str, uint8_t *out_str)
 {
 	int32_t error, in_index, out_index, index, c_tx_sz, out_str_len;
 	uint16_t w2_char, *w2_str;
@@ -1672,7 +1672,7 @@ ud_utf162utf8(uint16_t c_16, uint8_t *s_8)
 
 int32_t
 ud_uncompress(int32_t in_len, int32_t *out_len,
-		uint8_t *in_str, uint8_t *out_str)
+    uint8_t *in_str, uint8_t *out_str)
 {
 	uint8_t comp_id, utf8[6];
 	uint16_t w2_char, crc;
@@ -1740,7 +1740,7 @@ ud_uncompress(int32_t in_len, int32_t *out_len,
 		 * Get rid of invalid characters
 		 */
 		if ((w2_char == SLASH) ||
-		    (w2_char == NULL)) {
+		    (w2_char == 0)) {
 			make_crc = 1;
 			if (((comp_id == 8) &&
 			    (lic != (index - 1))) ||
@@ -1859,7 +1859,7 @@ begin:
  */
 int
 ud_sticky_remove_access(struct ud_inode *dir, struct ud_inode *entry,
-	struct cred *cr)
+    struct cred *cr)
 {
 	uid_t uid;
 

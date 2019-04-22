@@ -444,7 +444,7 @@ s1394_devi_find(dev_info_t *pdip, char *name, char *caddr)
 		 * GGGGGGGGGGGGGGGG[,AAAAAAAAAAAA], where GGGGGGGGGGGGGGGG is
 		 * the address and AAAAAAAAAAAA is the optional unit address)
 		 */
-		if (regptr[2] != NULL || regptr[3] != NULL) {
+		if (regptr[2] != 0 || regptr[3] != 0) {
 			(void) sprintf(addr, "%08x%08x,%04x%08x", regptr[0],
 			    regptr[1], regptr[2], regptr[3]);
 		} else {

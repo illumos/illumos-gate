@@ -26,7 +26,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All rights reserved.  	*/
+/*	  All rights reserved.	*/
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1844,7 +1844,7 @@ prioctl32(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 
 	case PIOCOPENM:		/* open mapped object for reading */
 		if (cmaddr == NULL)
-			un32.va = NULL;
+			un32.va = (caddr32_t)(uintptr_t)NULL;
 		else if (copyin(cmaddr, &un32.va, sizeof (un32.va)))
 			error = EFAULT;
 		break;

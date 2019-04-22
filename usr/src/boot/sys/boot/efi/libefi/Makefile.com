@@ -46,8 +46,9 @@ CPPFLAGS += -I../../include/$(MACHINE)
 CPPFLAGS += -I../../../../../lib/libstand
 CPPFLAGS += -I$(ZFSSRC)
 CPPFLAGS += -I../../../../cddl/boot/zfs
-CPPFLAGS += -I../../../../../lib/libz
-CPPFLAGS += -I$(PNGLITE)
+
+pnglite.o := CPPFLAGS += -I$(ZLIB)
+gfx_fb.o pnglite.o efi_console.o := CPPFLAGS += -I$(PNGLITE)
 
 # Pick up the bootstrap header for some interface items
 CPPFLAGS += -I../../../common

@@ -194,7 +194,7 @@ static crypto_provider_info_t blowfish_prov_info = {
 };
 
 
-static crypto_kcf_provider_handle_t blowfish_prov_handle = NULL;
+static crypto_kcf_provider_handle_t blowfish_prov_handle = 0;
 
 int
 _init(void)
@@ -218,11 +218,11 @@ int
 _fini(void)
 {
 	/* Unregister from KCF if module is registered */
-	if (blowfish_prov_handle != NULL) {
+	if (blowfish_prov_handle != 0) {
 		if (crypto_unregister_provider(blowfish_prov_handle))
 			return (EBUSY);
 
-		blowfish_prov_handle = NULL;
+		blowfish_prov_handle = 0;
 	}
 
 	return (mod_remove(&modlinkage));

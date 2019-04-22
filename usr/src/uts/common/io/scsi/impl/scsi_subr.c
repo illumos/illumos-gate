@@ -1067,7 +1067,7 @@ scsi_asc_search(uint_t asc, uint_t ascq,
 
 static char *
 scsi_asc_ascq_name(uint_t asc, uint_t ascq, char *tmpstr,
-	struct scsi_asq_key_strings *list)
+    struct scsi_asq_key_strings *list)
 {
 	char *message;
 
@@ -1186,7 +1186,7 @@ scsi_generic_errmsg(struct scsi_device *devp, char *label, int severity,
 		    (decode_fru != NULL)) {
 			(*decode_fru)(devp, buf, SCSI_ERRMSG_BUF_LEN,
 			    fru_code);
-			if (buf[0] != NULL) {
+			if (buf[0] != '\0') {
 				bzero(buf1, SCSI_ERRMSG_BUF_LEN);
 				(void) sprintf(&buf1[strlen(buf1)],
 				    "ASC: 0x%x (%s)", asc,
@@ -2529,7 +2529,7 @@ scsi_uscsi_pktinit(struct uscsi_cmd *uscmd, struct scsi_pkt *pkt)
  * Function: scsi_uscsi_pktfini
  *
  * Description: Target drivers call this function to transfer completed
- * 	scsi_pkt information back into uscsi_cmd.
+ *	scsi_pkt information back into uscsi_cmd.
  *
  *	NB: At this point the implementation is limited to path_instance.
  *	At some point more code could be removed from the target driver by

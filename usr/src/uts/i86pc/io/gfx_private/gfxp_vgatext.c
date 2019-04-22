@@ -395,14 +395,19 @@ vgatext_kdsetmode(struct gfxp_fb_softc *softc, int mode)
 	switch (mode) {
 	case KD_TEXT:
 		if (softc->blt_ops.setmode != NULL)
-			softc->blt_ops.setmode(KD_TEXT);
+			if (softc->blt_ops.setmode(KD_TEXT) != 0)
+				return (EIO);
+
 		vgatext_kdsettext(softc);
 		break;
 
 	case KD_GRAPHICS:
 		vgatext_kdsetgraphics(softc);
 		if (softc->blt_ops.setmode != NULL)
-			softc->blt_ops.setmode(KD_GRAPHICS);
+			if (softc->blt_ops.setmode(KD_GRAPHICS) != 0) {
+				vgatext_kdsettext(softc);
+				return (EIO);
+			}
 		break;
 
 	case KD_RESETTEXT:

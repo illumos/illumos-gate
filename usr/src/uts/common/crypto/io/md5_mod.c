@@ -233,7 +233,7 @@ static crypto_provider_info_t md5_prov_info = {
 	md5_mech_info_tab
 };
 
-static crypto_kcf_provider_handle_t md5_prov_handle = NULL;
+static crypto_kcf_provider_handle_t md5_prov_handle = 0;
 
 int
 _init(void)
@@ -261,12 +261,12 @@ _fini(void)
 	/*
 	 * Unregister from KCF if previous registration succeeded.
 	 */
-	if (md5_prov_handle != NULL) {
+	if (md5_prov_handle != 0) {
 		if ((ret = crypto_unregister_provider(md5_prov_handle)) !=
 		    CRYPTO_SUCCESS)
 			return (ret);
 
-		md5_prov_handle = NULL;
+		md5_prov_handle = 0;
 	}
 
 	return (mod_remove(&modlinkage));

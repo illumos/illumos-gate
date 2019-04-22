@@ -27,12 +27,12 @@
 #include <sys/cdefs.h>
 
 #include <stand.h>
+#include <stddef.h>
 #include <sys/param.h>
 #include <sys/diskmbr.h>
 #include <sys/disklabel.h>
 #include <sys/endian.h>
 #include <sys/gpt.h>
-#include <sys/stddef.h>
 #include <sys/queue.h>
 #include <sys/vtoc.h>
 

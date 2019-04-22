@@ -352,7 +352,7 @@ xenconsattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	/* create minor device node for this device */
 	ret = ddi_create_minor_node(devi, "xencons", S_IFCHR, instance,
-	    DDI_NT_SERIAL, NULL);
+	    DDI_NT_SERIAL, 0);
 	if (ret != DDI_SUCCESS) {
 		ddi_remove_minor_node(devi, NULL);
 		xencons_soft_state_free(xcp);

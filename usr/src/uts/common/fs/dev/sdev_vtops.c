@@ -362,15 +362,10 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 	cnt = VC_INSTANCES_COUNT;
 	mutex_exit(&vc_lock);
 
-/* We have to fool warlock this way, otherwise it will complain */
-#ifndef	__lock_lint
-	if (rw_tryupgrade(&sdvp->sdev_contents) == NULL) {
+	if (rw_tryupgrade(&sdvp->sdev_contents) == 0) {
 		rw_exit(&sdvp->sdev_contents);
 		rw_enter(&sdvp->sdev_contents, RW_WRITER);
 	}
-#else
-	rw_enter(&sdvp->sdev_contents, RW_WRITER);
-#endif
 
 	/* 1.  prune invalid nodes and rebuild stale symlinks */
 	devvt_prunedir(sdvp);
@@ -408,9 +403,9 @@ devvt_cleandir(struct vnode *dvp, struct cred *cred)
 		/* validate only ready nodes */
 		if (dv->sdev_state != SDEV_READY)
 			continue;
-		if ((strcmp(dv->sdev_name, DEVVT_ACTIVE_NAME) == NULL))
+		if ((strcmp(dv->sdev_name, DEVVT_ACTIVE_NAME) == 0))
 			found |= 0x01;
-		if ((strcmp(dv->sdev_name, DEVVT_CONSUSER_NAME) == NULL))
+		if ((strcmp(dv->sdev_name, DEVVT_CONSUSER_NAME) == 0))
 			found |= 0x02;
 
 		if ((found & 0x01) && (found & 0x02))

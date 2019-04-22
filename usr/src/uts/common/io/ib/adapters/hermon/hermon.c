@@ -267,7 +267,7 @@ static int
 hermon_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	dev_t		dev;
-	hermon_state_t 	*state;
+	hermon_state_t	*state;
 	minor_t		instance;
 
 	switch (cmd) {
@@ -303,7 +303,7 @@ static int
 hermon_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 {
 	hermon_state_t		*state;
-	hermon_rsrc_t 		*rsrcp;
+	hermon_rsrc_t		*rsrcp;
 	hermon_umap_db_entry_t	*umapdb, *umapdb2;
 	minor_t			instance;
 	uint64_t		key, value;
@@ -1542,7 +1542,7 @@ hermon_size_icm(hermon_state_t *state)
 	num_mcgs = (uint64_t)0x1 << cfg->cp_log_num_mcg;
 
 	size =
-	    num_cmpts 	* devlim->cmpt_entry_sz +
+	    num_cmpts	* devlim->cmpt_entry_sz +
 	    num_dmpts	* devlim->dmpt_entry_sz +
 	    num_mtts	* devlim->mtt_entry_sz +
 	    num_qpcs	* devlim->qpc_entry_sz +
@@ -3664,7 +3664,7 @@ static int
 hermon_internal_uarpg_init(hermon_state_t *state)
 {
 	int	status;
-	hermon_dbr_info_t 	*info;
+	hermon_dbr_info_t	*info;
 
 	/*
 	 * Allocate the UAR page for kernel use. This UAR page is
@@ -4594,7 +4594,7 @@ get_msix_ctrl(dev_info_t *dip)
 
 	if ((PCI_CAP_LOCATE(pci_cfg_hdl,
 	    PCI_CAP_ID_MSI_X, &caps_ctrl) == DDI_SUCCESS)) {
-		if ((msix_ctrl = PCI_CAP_GET16(pci_cfg_hdl, NULL, caps_ctrl,
+		if ((msix_ctrl = PCI_CAP_GET16(pci_cfg_hdl, 0, caps_ctrl,
 		    PCI_MSIX_CTRL)) == PCI_CAP_EINVAL16)
 			return (0);
 	}
@@ -4653,13 +4653,13 @@ hermon_set_msix_info(hermon_state_t *state)
 
 	if ((PCI_CAP_LOCATE(pci_cfg_hdl,
 	    PCI_CAP_ID_MSI_X, &caps_ctrl) == DDI_SUCCESS)) {
-		if ((msix_ctrl = PCI_CAP_GET16(pci_cfg_hdl, NULL, caps_ctrl,
+		if ((msix_ctrl = PCI_CAP_GET16(pci_cfg_hdl, 0, caps_ctrl,
 		    PCI_MSIX_CTRL)) == PCI_CAP_EINVAL16)
 			return;
 	}
 	ASSERT(msix_ctrl != 0);
 
-	state->hs_msix_tbl_offset = PCI_CAP_GET32(pci_cfg_hdl, NULL, caps_ctrl,
+	state->hs_msix_tbl_offset = PCI_CAP_GET32(pci_cfg_hdl, 0, caps_ctrl,
 	    PCI_MSIX_TBL_OFFSET);
 
 	/* Get the BIR for MSI-X table */
@@ -4709,7 +4709,7 @@ hermon_set_msix_info(hermon_state_t *state)
 		return;
 	}
 
-	state->hs_msix_pba_offset = PCI_CAP_GET32(pci_cfg_hdl, NULL, caps_ctrl,
+	state->hs_msix_pba_offset = PCI_CAP_GET32(pci_cfg_hdl, 0, caps_ctrl,
 	    PCI_MSIX_PBA_OFFSET);
 
 	/* Get the BIR for MSI-X PBA */
@@ -4782,7 +4782,7 @@ hermon_intr_disable(hermon_state_t *state)
 
 		if ((PCI_CAP_LOCATE(pci_cfg_hdl,
 		    PCI_CAP_ID_MSI_X, &caps_ctrl) == DDI_SUCCESS)) {
-			if ((msix_ctrl = PCI_CAP_GET16(pci_cfg_hdl, NULL,
+			if ((msix_ctrl = PCI_CAP_GET16(pci_cfg_hdl, 0,
 			    caps_ctrl, PCI_MSIX_CTRL)) == PCI_CAP_EINVAL16)
 				return (DDI_FAILURE);
 		}
@@ -4803,7 +4803,7 @@ hermon_intr_disable(hermon_state_t *state)
 
 		/* Disable MSI-X interrupts */
 		msix_ctrl &= ~PCI_MSIX_ENABLE_BIT;
-		PCI_CAP_PUT16(pci_cfg_hdl, NULL, caps_ctrl, PCI_MSIX_CTRL,
+		PCI_CAP_PUT16(pci_cfg_hdl, 0, caps_ctrl, PCI_MSIX_CTRL,
 		    msix_ctrl);
 
 	} else {

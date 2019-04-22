@@ -214,7 +214,7 @@ prof_make_dir(char *name, struct sdev_node **gdirp, struct sdev_node **dirp)
 		    NULL, 0, NULL, kcred, NULL, NULL, NULL);
 		if (error == 0) {
 			*gdirp = VTOSDEV(gnewdir);
-		} else { 	/* it's ok if there no global dir */
+		} else {	/* it's ok if there no global dir */
 			*gdirp = NULL;
 		}
 	}
@@ -897,7 +897,7 @@ copyin_nvlist(char *packed_usr, size_t packed_sz, nvlist_t **nvlp)
 
 	/* simple sanity check */
 	if (packed_usr == NULL || packed_sz == 0)
-		return (NULL);
+		return (err);
 
 	/* copyin packed profile nvlist */
 	packed = kmem_alloc(packed_sz, KM_NOSLEEP);

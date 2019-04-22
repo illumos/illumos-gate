@@ -1305,7 +1305,7 @@ udf_symlink(
 			}
 		}
 
-		while (*target != NULL) {
+		while (*target != '\0') {
 			sp = target;
 			while ((*target != '/') && (*target != '\0')) {
 				target ++;
@@ -1350,7 +1350,7 @@ udf_symlink(
 			while (*target == '/') {
 				target++;
 			}
-			if (*target == NULL) {
+			if (*target == '\0') {
 				break;
 			}
 		}
@@ -2107,16 +2107,9 @@ end:
 
 /* ARGSUSED */
 static int32_t
-udf_addmap(struct vnode *vp,
-	offset_t off,
-	struct as *as,
-	caddr_t addr,
-	size_t len,
-	uint8_t prot,
-	uint8_t maxprot,
-	uint32_t flags,
-	struct cred *cr,
-	caller_context_t *ct)
+udf_addmap(struct vnode *vp, offset_t off, struct as *as, caddr_t addr,
+    size_t len, uint8_t prot, uint8_t maxprot, uint32_t flags,
+    struct cred *cr, caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 
@@ -2135,16 +2128,9 @@ udf_addmap(struct vnode *vp,
 
 /* ARGSUSED */
 static int32_t
-udf_delmap(
-	struct vnode *vp, offset_t off,
-	struct as *as,
-	caddr_t addr,
-	size_t len,
-	uint32_t prot,
-	uint32_t maxprot,
-	uint32_t flags,
-	struct cred *cr,
-	caller_context_t *ct)
+udf_delmap(struct vnode *vp, offset_t off, struct as *as, caddr_t addr,
+    size_t len, uint32_t prot, uint32_t maxprot, uint32_t flags,
+    struct cred *cr, caller_context_t *ct)
 {
 	struct ud_inode *ip = VTOI(vp);
 
@@ -2155,7 +2141,7 @@ udf_delmap(
 	}
 
 	mutex_enter(&ip->i_tlock);
-	ip->i_mapcnt -= btopr(len); 	/* Count released mappings */
+	ip->i_mapcnt -= btopr(len);	/* Count released mappings */
 	ASSERT(ip->i_mapcnt >= 0);
 	mutex_exit(&ip->i_tlock);
 
@@ -2164,12 +2150,8 @@ udf_delmap(
 
 /* ARGSUSED */
 static int32_t
-udf_l_pathconf(
-	struct vnode *vp,
-	int32_t cmd,
-	ulong_t *valp,
-	struct cred *cr,
-	caller_context_t *ct)
+udf_l_pathconf(struct vnode *vp, int32_t cmd, ulong_t *valp, struct cred *cr,
+    caller_context_t *ct)
 {
 	int32_t error = 0;
 
@@ -2365,9 +2347,9 @@ udf_pageio(
 
 
 int32_t
-ud_rdwri(enum uio_rw rw, int32_t ioflag,
-	struct ud_inode *ip, caddr_t base, int32_t len,
-	offset_t offset, enum uio_seg seg, int32_t *aresid, struct cred *cr)
+ud_rdwri(enum uio_rw rw, int32_t ioflag, struct ud_inode *ip, caddr_t base,
+    int32_t len, offset_t offset, enum uio_seg seg, int32_t *aresid,
+    struct cred *cr)
 {
 	int32_t error;
 	struct uio auio;
@@ -2416,9 +2398,8 @@ int32_t ud_smallfile = 32 * 1024;
 
 /* ARGSUSED */
 int32_t
-ud_getpage_miss(struct vnode *vp, u_offset_t off,
-	size_t len, struct seg *seg, caddr_t addr, page_t *pl[],
-	size_t plsz, enum seg_rw rw, int32_t seq)
+ud_getpage_miss(struct vnode *vp, u_offset_t off, size_t len, struct seg *seg,
+    caddr_t addr, page_t *pl[], size_t plsz, enum seg_rw rw, int32_t seq)
 {
 	struct ud_inode *ip = VTOI(vp);
 	int32_t err = 0;
@@ -2482,8 +2463,7 @@ outmiss:
 
 /* ARGSUSED */
 void
-ud_getpage_ra(struct vnode *vp,
-	u_offset_t off, struct seg *seg, caddr_t addr)
+ud_getpage_ra(struct vnode *vp, u_offset_t off, struct seg *seg, caddr_t addr)
 {
 	page_t *pp;
 	size_t io_len;
@@ -2524,8 +2504,8 @@ ud_getpage_ra(struct vnode *vp,
 }
 
 int
-ud_page_fill(struct ud_inode *ip, page_t *pp, u_offset_t off,
-	uint32_t bflgs, u_offset_t *pg_off)
+ud_page_fill(struct ud_inode *ip, page_t *pp, u_offset_t off, uint32_t bflgs,
+    u_offset_t *pg_off)
 {
 	daddr_t bn;
 	struct buf *bp;
@@ -2660,8 +2640,8 @@ out:
 }
 
 int32_t
-ud_putpages(struct vnode *vp, offset_t off,
-	size_t len, int32_t flags, struct cred *cr)
+ud_putpages(struct vnode *vp, offset_t off, size_t len, int32_t flags,
+    struct cred *cr)
 {
 	struct ud_inode *ip;
 	page_t *pp;
@@ -2783,9 +2763,8 @@ ud_putpages(struct vnode *vp, offset_t off,
 
 /* ARGSUSED */
 int32_t
-ud_putapage(struct vnode *vp,
-	page_t *pp, u_offset_t *offp,
-	size_t *lenp, int32_t flags, struct cred *cr)
+ud_putapage(struct vnode *vp, page_t *pp, u_offset_t *offp,
+    size_t *lenp, int32_t flags, struct cred *cr)
 {
 	daddr_t bn;
 	size_t io_len;
@@ -3451,7 +3430,7 @@ out:
 
 int32_t
 ud_multi_strat(struct ud_inode *ip,
-	page_t *pp, struct buf *bp, u_offset_t start)
+    page_t *pp, struct buf *bp, u_offset_t start)
 {
 	daddr_t bn;
 	int32_t error = 0, io_count, contig, alloc_sz, i;

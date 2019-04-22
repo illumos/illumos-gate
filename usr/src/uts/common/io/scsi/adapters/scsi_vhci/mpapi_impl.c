@@ -572,7 +572,7 @@ vhci_get_dev_prod_list(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	mpapi_item_list_t	*ilist;
 
@@ -665,7 +665,7 @@ vhci_get_lu_list(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	mpapi_item_list_t	*ilist;
 	mpapi_lu_data_t		*ld;
@@ -715,7 +715,7 @@ vhci_get_lu_list_from_tpg(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *tpg_lu_list = NULL;
@@ -788,7 +788,7 @@ vhci_get_tpg_list_for_lu(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *mplu_tpg_list = NULL;
@@ -907,7 +907,7 @@ vhci_get_path_list_for_mp_lu(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *mplu_path_list = NULL;
@@ -992,7 +992,7 @@ vhci_get_path_list_for_init_port(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *mpinit_path_list = NULL;
@@ -1095,7 +1095,7 @@ vhci_get_path_list_for_target_port(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *mptp_path_list = NULL;
@@ -1226,7 +1226,7 @@ vhci_get_init_port_list(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	mpapi_item_list_t	*ilist;
 	mpapi_initiator_data_t	*initd;
@@ -1461,7 +1461,7 @@ vhci_get_target_port_list_for_tpg(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
     void *input_data, void *output_data, int mode)
 {
 	int			count = 0, rval = 0;
-	int			list_len = mpioc->mp_olen/sizeof (uint64_t);
+	int			list_len = mpioc->mp_olen / sizeof (uint64_t);
 	uint64_t		*oid_list = (uint64_t *)(output_data);
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *tpg_tp_list = NULL;
@@ -1686,7 +1686,7 @@ vhci_get_prop_lb_list(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	int		rval = 0;
 	uint64_t	*oid_list = (uint64_t *)(output_data);
 
-	oid_list[0] = NULL;
+	oid_list[0] = 0;
 
 	if (ddi_copyout(output_data, (void *)mpioc->mp_obuf,
 	    (sizeof (uint64_t)), mode) != 0) {
@@ -1898,7 +1898,7 @@ vhci_mpapi_hold_pip(struct scsi_vhci *vhci, mpapi_item_list_t *ilist, int flags)
  */
 static mp_uscsi_cmd_t *
 vhci_init_uscsi_cmd(struct scsi_vhci *vhci,
-	mp_iocdata_t *mpioc, uint64_t *oid, mpapi_item_list_t **list)
+    mp_iocdata_t *mpioc, uint64_t *oid, mpapi_item_list_t **list)
 {
 	int			arq_enabled;
 	mp_uscsi_cmd_t		*mp_uscmdp;
@@ -1923,7 +1923,7 @@ vhci_init_uscsi_cmd(struct scsi_vhci *vhci,
 
 	/* lock the pip */
 	if ((pip = vhci_mpapi_hold_pip(vhci, ilist,
-	    (MDI_SELECT_STANDBY_PATH|MDI_SELECT_ONLINE_PATH))) == 0) {
+	    (MDI_SELECT_STANDBY_PATH | MDI_SELECT_ONLINE_PATH))) == 0) {
 		VHCI_DEBUG(1, (CE_WARN, NULL,
 		    "vhci_init_uscsi_cmd: exit PATH_UNAVAIL"));
 		mpioc->mp_errno = MP_DRVR_PATH_UNAVAILABLE;
@@ -2149,7 +2149,7 @@ vhci_disable_path(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 /* ARGSUSED */
 static int
 vhci_mpapi_ioctl(dev_t dev, struct scsi_vhci *vhci, void *udata,
-	mp_iocdata_t *mpioc, int mode, cred_t *credp)
+    mp_iocdata_t *mpioc, int mode, cred_t *credp)
 {
 	int		rval = 0;
 	uint64_t	oid;
@@ -2636,7 +2636,7 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 				VHCI_DEBUG(1, (CE_WARN, NULL,
 				    "vhci_mpapi_create_item: initiator-"
 				    "-interconnect-type prop not found"));
-				len = strlen("UNKNOWN")+1;
+				len = strlen("UNKNOWN") + 1;
 				interconnect = kmem_zalloc(len, KM_SLEEP);
 				(void) strlcpy(interconnect, "UNKNOWN", len);
 				prop_not_ddi_alloced = 1;
@@ -2708,8 +2708,8 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			    vhci_mpapi_create_oid(vhci->mp_priv, obj_type);
 			tport = kmem_zalloc(sizeof (mpapi_tport_data_t),
 			    KM_SLEEP);
-			tgt_port_res = kmem_zalloc(strlen(res)+1, KM_SLEEP);
-			(void) strlcpy(tgt_port_res, res, strlen(res)+1);
+			tgt_port_res = kmem_zalloc(strlen(res) + 1, KM_SLEEP);
+			(void) strlcpy(tgt_port_res, res, strlen(res) + 1);
 			tport->resp = tgt_port_res;
 			tport->valid = 1;
 			tport->prop.id = item->oid.raw_oid;
@@ -2732,8 +2732,8 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			    vhci_mpapi_create_oid(vhci->mp_priv, obj_type);
 			tpg = kmem_zalloc(
 			    sizeof (mpapi_tpg_data_t), KM_SLEEP);
-			tpg_res = kmem_zalloc(strlen(res)+1, KM_SLEEP);
-			(void) strlcpy(tpg_res, res, strlen(res)+1);
+			tpg_res = kmem_zalloc(strlen(res) + 1, KM_SLEEP);
+			(void) strlcpy(tpg_res, res, strlen(res) + 1);
 			tpg->resp = tpg_res;
 			tpg->valid = 1;
 			tpg->prop.id = item->oid.raw_oid;

@@ -37,7 +37,7 @@
 
 /*
  * TODO:
- * 	implement DELAYED_START
+ *	implement DELAYED_START
  */
 
 /*
@@ -170,7 +170,7 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	int 	status;
+	int	status;
 
 	DPRINTF(2, (CE_CONT, "!usbgem: _init: called"));
 	status = mod_install(&modlinkage);
@@ -1004,7 +1004,7 @@ usbgem_tx_watcher_stop(struct usbgem_dev *dp)
 		dp->tx_watcher_stop = 1;
 		cv_signal(&dp->tx_watcher_cv);
 		thread_join(dp->tx_watcher_did);
-		dp->tx_watcher_did = NULL;
+		dp->tx_watcher_did = 0;
 	}
 }
 

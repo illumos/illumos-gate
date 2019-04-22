@@ -203,7 +203,8 @@ ehci_isoc_cleanup(
  */
 void ehci_isoc_pipe_cleanup(
 	ehci_state_t		*ehcip,
-	usba_pipe_handle_data_t *ph) {
+	usba_pipe_handle_data_t *ph)
+{
 	ehci_pipe_private_t	*pp = (ehci_pipe_private_t *)ph->p_hcd_private;
 	uint_t			pipe_state = pp->pp_state;
 	usb_cr_t		completion_reason;
@@ -576,7 +577,7 @@ ehci_insert_itd_req(
 
 		itw->itw_itd_free_list = ehci_itd_iommu_to_cpu(ehcip,
 		    Get_ITD(new_itd->itd_link_ptr));
-		Set_ITD(new_itd->itd_link_ptr, NULL);
+		Set_ITD(new_itd->itd_link_ptr, 0);
 
 		bzero(buf, EHCI_ITD_BUFFER_LIST_SIZE * sizeof (uint32_t));
 
@@ -804,7 +805,7 @@ ehci_insert_sitd_req(
 
 		itw->itw_itd_free_list = ehci_itd_iommu_to_cpu(ehcip,
 		    Get_ITD(new_sitd->itd_link_ptr));
-		Set_ITD(new_sitd->itd_link_ptr, NULL);
+		Set_ITD(new_sitd->itd_link_ptr, 0);
 
 		/* Fill in the new sitd */
 		Set_ITD_BODY(new_sitd, EHCI_SITD_CTRL, ctrl);

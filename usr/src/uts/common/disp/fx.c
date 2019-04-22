@@ -118,9 +118,9 @@ static struct modlinkage modlinkage = {
 #define	FX_ADJUST_PRI(pri)						\
 {									\
 	if (pri < 0)							\
-		pri = 0;  						\
-	else if (pri > fx_maxumdpri) 					\
-		pri = fx_maxumdpri;  					\
+		pri = 0;						\
+	else if (pri > fx_maxumdpri)					\
+		pri = fx_maxumdpri;					\
 }
 
 #define	FX_ADJUST_QUANTUM(q)						\
@@ -444,7 +444,7 @@ fx_enterclass(kthread_t *t, id_t cid, void *parmsp, cred_t *reqpcredp,
 	 */
 	fxpp->fx_flags = 0;
 	fxpp->fx_callback = NULL;
-	fxpp->fx_cookie = NULL;
+	fxpp->fx_cookie = 0;
 
 	if (fxkparmsp == NULL) {
 		/*
@@ -545,7 +545,7 @@ fx_exit(kthread_t *t)
 	if (FX_HAS_CB(fxpp)) {
 		FX_CB_EXIT(FX_CALLB(fxpp), fxpp->fx_cookie);
 		fxpp->fx_callback = NULL;
-		fxpp->fx_cookie = NULL;
+		fxpp->fx_cookie = 0;
 		thread_unlock(t);
 		FX_CB_LIST_DELETE(fxpp);
 		return;
@@ -568,7 +568,7 @@ fx_exitclass(void *procp)
 		FX_CB_EXIT(FX_CALLB(fxpp), fxpp->fx_cookie);
 
 		fxpp->fx_callback = NULL;
-		fxpp->fx_cookie = NULL;
+		fxpp->fx_cookie = 0;
 		thread_unlock(fxpp->fx_tp);
 		FX_CB_LIST_DELETE(fxpp);
 	} else
@@ -611,7 +611,7 @@ fx_fork(kthread_t *t, kthread_t *ct, void *bufp)
 	cfxpp->fx_uprilim = pfxpp->fx_uprilim;
 	cfxpp->fx_nice = pfxpp->fx_nice;
 	cfxpp->fx_callback = NULL;
-	cfxpp->fx_cookie = NULL;
+	cfxpp->fx_cookie = 0;
 	cfxpp->fx_flags = pfxpp->fx_flags & ~(FXBACKQ);
 	cpucaps_sc_init(&cfxpp->fx_caps);
 
@@ -1678,7 +1678,7 @@ fx_list_lookup(kt_did_t ktid)
  */
 int
 fx_register_callbacks(fx_callbacks_t *fx_callback, fx_cookie_t cookie,
-	pri_t pri, clock_t quantum)
+    pri_t pri, clock_t quantum)
 {
 
 	fxproc_t	*fxpp;
@@ -1760,7 +1760,7 @@ fx_unregister_callbacks()
 
 	thread_lock(fxpp->fx_tp);
 	fxpp->fx_callback = NULL;
-	fxpp->fx_cookie = NULL;
+	fxpp->fx_cookie = 0;
 	thread_unlock(fxpp->fx_tp);
 	fx_list_release(fxpp);
 

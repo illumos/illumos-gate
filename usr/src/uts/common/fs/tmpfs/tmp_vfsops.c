@@ -100,7 +100,7 @@ static char *noxattr_cancel[] = { MNTOPT_XATTR, NULL };
 static mntopt_t tmpfs_options[] = {
 	/* Option name		Cancel Opt	Arg	Flags		Data */
 	{ MNTOPT_XATTR,		xattr_cancel,	NULL,	MO_DEFAULT,	NULL},
-	{ MNTOPT_NOXATTR,	noxattr_cancel,	NULL,	NULL,		NULL},
+	{ MNTOPT_NOXATTR,	noxattr_cancel,	NULL,	0,		NULL},
 	{ "size",		NULL,		"0",	MO_HASVALUE,	NULL},
 	{ "mode",		NULL,		NULL,	MO_HASVALUE,	NULL}
 };

@@ -965,7 +965,7 @@ fix_ppb_res(uchar_t secbus, boolean_t prog_sub)
 		for (; range != 0; range--) {
 			if (memlist_find_with_startaddr(
 			    &pci_bus_res[parbus].bus_avail,
-			    subbus + 1, range, 1) != NULL)
+			    subbus + 1, range, 1) != 0)
 				break; /* find bus range resource at parent */
 		}
 		if (range != 0) {
@@ -2600,7 +2600,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 			if (config_op == CONFIG_INFO) {
 				/* take out of the resource map of the bus */
-				if (base != NULL) {
+				if (base != 0) {
 					/* remove from PMEM and MEM space */
 					(void) memlist_remove(mem_avail,
 					    base, len);
@@ -2617,7 +2617,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 					reprogram = 1;
 				}
 				pci_bus_res[bus].mem_size += len;
-			} else if ((*mem_avail && base == NULL) ||
+			} else if ((*mem_avail && base == 0) ||
 			    pci_bus_res[bus].mem_reprogram) {
 				/*
 				 * When desired, attempt a prefetchable
@@ -2626,7 +2626,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 				if (phys_hi & PCI_PREFETCH_B) {
 					base = (uint_t)memlist_find(pmem_avail,
 					    len, len);
-					if (base != NULL) {
+					if (base != 0) {
 						memlist_insert(pmem_used,
 						    base, len);
 						(void) memlist_remove(mem_avail,
@@ -2638,17 +2638,17 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 				 * desired, or failed, attempt ordinary
 				 * memory allocation
 				 */
-				if (base == NULL) {
+				if (base == 0) {
 					base = (uint_t)memlist_find(mem_avail,
 					    len, len);
-					if (base != NULL) {
+					if (base != 0) {
 						memlist_insert(mem_used,
 						    base, len);
 						(void) memlist_remove(
 						    pmem_avail, base, len);
 					}
 				}
-				if (base != NULL) {
+				if (base != 0) {
 					pci_putl(bus, dev, func, offset,
 					    base | type);
 					base = pci_getl(bus, dev, func, offset);
@@ -2700,7 +2700,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 		regs[nreg].pci_size_low = assigned[nasgn].pci_size_low = len;
 		nreg++, nasgn++;
 		/* take it out of the memory resource */
-		if (base != NULL) {
+		if (base != 0) {
 			(void) memlist_remove(mem_avail, base, len);
 			memlist_insert(mem_used, base, len);
 			pci_bus_res[bus].mem_size += len;

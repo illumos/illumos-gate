@@ -40,7 +40,6 @@ CPPFLAGS += -DBOOTPROG=\"gptzfsboot\" \
 	-DSIOSPD=${BOOT_COMCONSOLE_SPEED} \
 	-I../../../../include \
 	-I../../../../lib/libstand \
-	-I../../../../lib/libz \
 	-I../../common \
 	-I../common \
 	-I$(ZFSSRC) \
@@ -64,6 +63,7 @@ OBJS =	multiboot.o zfsboot.o sio.o cons.o devopen.o bio.o \
 	part.o biosmem.o smbios.o biosdisk.o devicename.o disk.o bcache.o \
 	time.o zfs_cmd.o
 
+part.o := CPPFLAGS += -I$(ZLIB)
 smbios.o := CPPFLAGS += -DSMBIOS_SERIAL_NUMBERS
 smbios.o := CPPFLAGS += -DSMBIOS_LITTLE_ENDIAN_UUID
 

@@ -275,7 +275,7 @@ tavor_kstat_picN_create(tavor_state_t *state, int num_pic, int num_evt,
 	drv_instance = ddi_get_instance(state->ts_dip);
 	(void) sprintf(pic_name, "pic%d", num_pic);
 	picN_ksp = kstat_create(drv_name, drv_instance, pic_name, "bus",
-	    KSTAT_TYPE_NAMED, num_evt, NULL);
+	    KSTAT_TYPE_NAMED, num_evt, 0);
 	if (picN_ksp == NULL) {
 		TNF_PROBE_0(tavor_kstat_picN_create_kstat_fail,
 		    TAVOR_TNF_ERROR, "");

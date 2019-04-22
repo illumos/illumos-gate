@@ -23,7 +23,7 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -1193,7 +1193,7 @@ ufs_dircheckforname(
 		break;
 	}
 	slotp->cached = 0;
-	caching = NULL;
+	caching = 0;
 	if (!noentry && tdp->i_size >= ufs_min_dir_cache) {
 		/*
 		 * if the directory caching disable time has expired
