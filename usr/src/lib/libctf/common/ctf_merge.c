@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019 Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -615,25 +615,34 @@ ctf_merge_fixup_type(ctf_merge_types_t *cmp, ctf_id_t id)
 }
 
 /*
- * Now that we've successfully merged everything, we're going to clean
- * up the merge type table. Traditionally if we had just two different
- * files that we were working between, the types would be fully
- * resolved. However, because we were comparing with ourself every step
- * of the way and not our reduced self, we need to go through and update
- * every mapped entry to what it now points to in the deduped file.
+ * Now that we've successfully merged everything, we're going to remap the type
+ * table.
+ *
+ * Remember we have two containers: ->cm_src is what we're working from, and
+ * ->cm_out is where we are building the de-duplicated CTF.
+ *
+ * The index of this table is always the type IDs in ->cm_src.
+ *
+ * When we built this table originally in ctf_diff_self(), if we found a novel
+ * type, we marked it as .cmt_missing to indicate it needs adding to ->cm_out.
+ * Otherwise, .cmt_map indicated the ->cm_src type ID that this type duplicates.
+ *
+ * Then, in ctf_merge_common(), we walked through and added all "cmt_missing"
+ * types to ->cm_out with ctf_merge_add_type(). These routines update cmt_map
+ * to be the *new* type ID in ->cm_out.  In this function, you can read
+ * "cmt_missing" as meaning "added to ->cm_out, and cmt_map updated".
+ *
+ * So at this point, we need to mop up all types where .cmt_missing == B_FALSE,
+ * making sure *their* .cmt_map values also point to the ->cm_out container.
  */
 static void
-ctf_merge_fixup_dedup_map(ctf_merge_types_t *cmp)
+ctf_merge_dedup_remap(ctf_merge_types_t *cmp)
 {
 	int i;
 
 	for (i = 1; i < cmp->cm_src->ctf_typemax + 1; i++) {
 		ctf_id_t tid;
 
-		/*
-		 * Missing types always have their id updated to exactly what it
-		 * should be.
-		 */
 		if (cmp->cm_tmap[i].cmt_missing == B_TRUE) {
 			VERIFY(cmp->cm_tmap[i].cmt_map != 0);
 			continue;
@@ -701,7 +710,7 @@ ctf_merge_common(ctf_merge_types_t *cmp)
 		return (ret);
 
 	if (cmp->cm_dedup == B_TRUE) {
-		ctf_merge_fixup_dedup_map(cmp);
+		ctf_merge_dedup_remap(cmp);
 	}
 
 	ctf_dprintf("Beginning merge pass 3\n");
@@ -712,10 +721,6 @@ ctf_merge_common(ctf_merge_types_t *cmp)
 			if (ret != 0)
 				return (ret);
 		}
-	}
-
-	if (cmp->cm_dedup == B_TRUE) {
-		ctf_merge_fixup_dedup_map(cmp);
 	}
 
 	return (0);
