@@ -2293,8 +2293,6 @@ bit_to_pix24(struct tem_vt_state *tem, tem_char_t c, text_color_t fg_color4,
 	uint32_t fg_color32, bg_color32;
 	uint8_t *dest;
 
-	ASSERT(fg_color4 < 16 && bg_color4 < 16);
-
 #ifdef _HAVE_TEM_FIRMWARE
 	fg_color32 = PIX4TO32(fg_color4);
 	bg_color32 = PIX4TO32(bg_color4);
@@ -2312,8 +2310,6 @@ bit_to_pix32(struct tem_vt_state *tem, tem_char_t c, text_color_t fg_color4,
     text_color_t bg_color4)
 {
 	uint32_t fg_color32, bg_color32, *dest;
-
-	ASSERT(fg_color4 < 16 && bg_color4 < 16);
 
 #ifdef _HAVE_TEM_FIRMWARE
 	fg_color32 = PIX4TO32(fg_color4);
