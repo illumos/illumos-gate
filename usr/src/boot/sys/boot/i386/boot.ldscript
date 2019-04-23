@@ -1,0 +1,48 @@
+/*
+ * This file and its contents are supplied under the terms of the
+ * Common Development and Distribution License ("CDDL"), version 1.0.
+ * You may only use this file in accordance with the terms of version
+ * 1.0 of the CDDL.
+ *
+ * A full copy of the text of the CDDL should have accompanied this
+ * source.  A copy of the CDDL is also available via the Internet at
+ * http://www.illumos.org/license/CDDL.
+ */
+/*
+ * Copyright 2019 Toomas Soome <tsoome@me.com>
+ */
+
+OUTPUT_FORMAT("elf32-i386-sol2", "elf32-i386-sol2", "elf32-i386-sol2")
+OUTPUT_ARCH(i386)
+ENTRY(_start)
+SECTIONS
+{
+	. = 0x0;
+	.text . :
+	{
+		*(.text .text.*)
+		*(.plt)
+	}
+	.data :
+	{
+		*(.rodata .rodata.*)
+		*(.rodata1)
+		*(.data .data.*)
+		*(.got.plt .got)
+		_edata = .;
+	}
+	.bss :
+	{
+		__bss_start = . ;
+		*(.bss .bss.*)
+		*(COMMON)
+	}
+	.edata :
+	{
+		_end = . ;
+	}
+	/DISCARD/ :		/* Not used in boot2 */
+	{
+		*(set_Xcommand_set)
+	}
+}

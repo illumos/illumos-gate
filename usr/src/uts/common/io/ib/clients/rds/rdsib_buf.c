@@ -369,7 +369,7 @@ rds_free_send_pool(rds_ep_t *ep)
 			}
 
 			kmem_free((void *)ep->ep_ack_addr, sizeof (uintptr_t));
-			ep->ep_ack_addr = NULL;
+			ep->ep_ack_addr = (uintptr_t)NULL;
 		}
 	}
 
@@ -392,7 +392,7 @@ rds_init_send_pool(rds_ep_t *ep, ib_guid_t hca_guid)
 	ibt_mr_desc_t   mem_desc;
 	uint8_t		*memp;
 	rds_buf_t	*bufmemp;
-	uintptr_t	ack_addr = NULL;
+	uintptr_t	ack_addr = (uintptr_t)NULL;
 	uint_t		memsize;
 	uint_t		nbuf;
 	rds_bufpool_t   *spool;
@@ -483,7 +483,7 @@ rds_init_send_pool(rds_ep_t *ep, ib_guid_t hca_guid)
 		    "failed: %d", ep, ret);
 		kmem_free(memp, memsize);
 		kmem_free(bufmemp, nbuf * sizeof (rds_buf_t));
-		if (ack_addr != NULL)
+		if (ack_addr != (uintptr_t)NULL)
 			kmem_free((void *)ack_addr, sizeof (uintptr_t));
 		return (-1);
 	}
@@ -588,7 +588,7 @@ rds_reinit_send_pool(rds_ep_t *ep, ib_guid_t hca_guid)
 			ep->ep_ack_rkey = 0;
 		}
 
-		ep->ep_hca_guid = NULL;
+		ep->ep_hca_guid = 0;
 	}
 
 	/* get the hcap for the new HCA */

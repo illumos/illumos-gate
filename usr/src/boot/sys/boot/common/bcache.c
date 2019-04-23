@@ -464,7 +464,6 @@ bcache_invalidate(struct bcache *bc, daddr_t blkno)
     }
 }
 
-#ifndef BOOT2
 COMMAND_SET(bcachestat, "bcachestat", "get disk block cache stats", command_bcache);
 
 static int
@@ -484,4 +483,3 @@ command_bcache(int argc, char *argv[] __attribute((unused)))
 	bcache_bypasses, bcache_hits, bcache_misses);
     return(CMD_OK);
 }
-#endif

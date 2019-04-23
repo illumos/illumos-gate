@@ -266,7 +266,7 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 	size_t		execsz;
 
 	if (lddatap != NULL)
-		*lddatap = NULL;
+		*lddatap = 0;
 
 	if (minaddrp != NULL)
 		*minaddrp = NULL;
@@ -1117,8 +1117,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * take care of the FPU entries.
 		 */
 #if defined(__amd64)
-		if (args->commpage != NULL ||
-		    (args->commpage = (uintptr_t)comm_page_mapin()) != NULL) {
+		if (args->commpage != (uintptr_t)NULL ||
+		    (args->commpage = (uintptr_t)comm_page_mapin()) !=
+		    (uintptr_t)NULL) {
 			ADDAUX(aux, AT_SUN_COMMPAGE, args->commpage)
 		} else {
 			/*

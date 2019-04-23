@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * hci1394_ixl_comp.c
  *    Isochronous IXL Compiler.
@@ -179,7 +177,7 @@ hci1394_compile_ixl_init(hci1394_comp_ixl_vars_t *wvp,
 	wvp->ctxtp = ctxtp;
 
 	/* init/clear ctxtp values */
-	ctxtp->dma_mem_execp = NULL;
+	ctxtp->dma_mem_execp = 0;
 	ctxtp->dma_firstp = NULL;
 	ctxtp->dma_last_time = 0;
 	ctxtp->xcs_firstp = NULL;
@@ -372,9 +370,9 @@ hci1394_parse_ixl(hci1394_comp_ixl_vars_t *wvp, ixl1394_command_t *ixlp)
 
 		/* error if xmit/recv mode not appropriate for current cmd */
 		if ((((wvp->ixl_io_mode & HCI1394_ISO_CTXT_RECV) != 0) &&
-			((ixlopcode & IXL1394_OPF_ONRECV) == 0)) ||
+		    ((ixlopcode & IXL1394_OPF_ONRECV) == 0)) ||
 		    (((wvp->ixl_io_mode & HCI1394_ISO_CTXT_RECV) == 0) &&
-			((ixlopcode & IXL1394_OPF_ONXMIT) == 0))) {
+		    ((ixlopcode & IXL1394_OPF_ONXMIT) == 0))) {
 
 			/* check if command op failed because it was invalid */
 			if (hci1394_is_opcode_valid(ixlopcode) != B_TRUE) {
@@ -835,13 +833,13 @@ hci1394_parse_ixl(hci1394_comp_ixl_vars_t *wvp, ixl1394_command_t *ixlp)
 			    ixlcurp;
 
 			if ((wvp->ixl_setskipmode_cmdp->skipmode !=
-				IXL1394_SKIP_TO_NEXT) &&
+			    IXL1394_SKIP_TO_NEXT) &&
 			    (wvp->ixl_setskipmode_cmdp->skipmode !=
-				IXL1394_SKIP_TO_SELF) &&
+			    IXL1394_SKIP_TO_SELF) &&
 			    (wvp->ixl_setskipmode_cmdp->skipmode !=
-				IXL1394_SKIP_TO_STOP) &&
+			    IXL1394_SKIP_TO_STOP) &&
 			    (wvp->ixl_setskipmode_cmdp->skipmode !=
-				IXL1394_SKIP_TO_LABEL)) {
+			    IXL1394_SKIP_TO_LABEL)) {
 
 				TNF_PROBE_3(hci1394_parse_ixl_dup_set_error,
 				    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string,
@@ -858,10 +856,10 @@ hci1394_parse_ixl(hci1394_comp_ixl_vars_t *wvp, ixl1394_command_t *ixlp)
 			 * references an IXL1394_OP_LABEL
 			 */
 			if ((wvp->ixl_setskipmode_cmdp->skipmode ==
-				IXL1394_SKIP_TO_LABEL) &&
+			    IXL1394_SKIP_TO_LABEL) &&
 			    ((wvp->ixl_setskipmode_cmdp->label == NULL) ||
 			    (wvp->ixl_setskipmode_cmdp->label->ixl_opcode !=
-				IXL1394_OP_LABEL))) {
+			    IXL1394_OP_LABEL))) {
 
 				TNF_PROBE_3(hci1394_parse_ixl_jump_error,
 				    HCI1394_TNF_HAL_ERROR_ISOCH, "", tnf_string,
@@ -1350,8 +1348,8 @@ hci1394_finalize_cur_xfer_desc(hci1394_comp_ixl_vars_t *wvp)
 	if (wvp->xfer_hci_flush != 0) {
 		if (((wvp->ixl_cur_xfer_stp->ixl_opcode &
 		    IXL1394_OPTY_XFER_PKT_ST) != 0) || ((wvp->xfer_hci_flush &
-			(UPDATEABLE_XFER | UPDATEABLE_SET | INITIATING_LBL)) !=
-			0)) {
+		    (UPDATEABLE_XFER | UPDATEABLE_SET | INITIATING_LBL)) !=
+		    0)) {
 
 			if (hci1394_flush_hci_cache(wvp) != DDI_SUCCESS) {
 				TNF_PROBE_0_DEBUG(
@@ -2386,7 +2384,7 @@ hci1394_set_next_xfer_buf(hci1394_comp_ixl_vars_t *wvp, uint32_t bufp,
 	    HCI1394_TNF_HAL_STACK_ISOCH, "");
 
 	/* error if buffer pointer is null (size may be 0) */
-	if (bufp == NULL) {
+	if (bufp == 0) {
 
 		wvp->dma_bld_error = IXL1394_ENULL_BUFFER_ADDR;
 
@@ -2444,7 +2442,7 @@ hci1394_flush_end_desc_check(hci1394_comp_ixl_vars_t *wvp, uint32_t count)
 
 	if ((count != 0) ||
 	    ((wvp->xfer_hci_flush & (UPDATEABLE_XFER | UPDATEABLE_SET |
-		INITIATING_LBL)) == 0)) {
+	    INITIATING_LBL)) == 0)) {
 
 		if (wvp->xfer_hci_flush & UPDATEABLE_JUMP) {
 			if (hci1394_flush_hci_cache(wvp) != DDI_SUCCESS) {
@@ -2575,7 +2573,7 @@ hci1394_alloc_storevalue_dma_mem(hci1394_comp_ixl_vars_t *wvp)
 		    tnf_opaque, ixl_commandp, wvp->ixl_cur_cmdp);
 		TNF_PROBE_0_DEBUG(hci1394_alloc_storevalue_dma_mem_exit,
 		    HCI1394_TNF_HAL_STACK_ISOCH, "");
-		return (NULL);
+		return (0);
 	}
 
 	TNF_PROBE_0_DEBUG(hci1394_alloc_storevalue_dma_mem_exit,
@@ -2669,7 +2667,7 @@ hci1394_alloc_dma_mem(hci1394_comp_ixl_vars_t *wvp, uint32_t size,
 	 */
 	if ((wvp->dma_currentp == NULL) ||
 	    (size > (wvp->dma_currentp->mem.bi_cookie.dmac_size -
-		wvp->dma_currentp->used))) {
+	    wvp->dma_currentp->used))) {
 #ifdef _KERNEL
 		/* kernel-mode memory allocation for driver */
 
@@ -2746,7 +2744,7 @@ hci1394_alloc_dma_mem(hci1394_comp_ixl_vars_t *wvp, uint32_t size,
 		/* user-mode memory allocation for user mode compiler tests */
 		/* allocate another dma_desc_mem struct */
 		if ((dma_new = (hci1394_idma_desc_mem_t *)
-			calloc(1, sizeof (hci1394_idma_desc_mem_t))) == NULL) {
+		    calloc(1, sizeof (hci1394_idma_desc_mem_t))) == NULL) {
 			TNF_PROBE_0_DEBUG(hci1394_alloc_dma_mem_exit,
 			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (NULL);
@@ -2754,7 +2752,7 @@ hci1394_alloc_dma_mem(hci1394_comp_ixl_vars_t *wvp, uint32_t size,
 		dma_new->mem.bi_dma_handle = NULL;
 		dma_new->mem.bi_handle = NULL;
 		if ((dma_new->mem.bi_kaddr = (caddr_t)calloc(1,
-			    HCI1394_IXL_PAGESIZE)) == NULL) {
+		    HCI1394_IXL_PAGESIZE)) == NULL) {
 			TNF_PROBE_0_DEBUG(hci1394_alloc_dma_mem_exit,
 			    HCI1394_TNF_HAL_STACK_ISOCH, "");
 			return (NULL);

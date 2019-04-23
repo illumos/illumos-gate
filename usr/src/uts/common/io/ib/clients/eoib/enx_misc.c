@@ -616,7 +616,7 @@ eibnx_make_nodename(eibnx_thr_info_t *info, uint16_t gw_portid)
 {
 	char *name;
 
-	if (info->ti_ident[0] == NULL)
+	if (info->ti_ident[0] == '\0')
 		return (NULL);
 
 	name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);

@@ -30,9 +30,9 @@ ORG2= 0x0
 ISOBOOTSIZE= 30720
 
 CPPFLAGS += -DBOOTPROG=\"isoboot\" \
-	-DSIOPRT=${BOOT_COMCONSOLE_PORT} \
-	-DSIOFMT=${B2SIOFMT} \
-	-DSIOSPD=${BOOT_COMCONSOLE_SPEED} \
+	-DSIOPRT=$(BOOT_COMCONSOLE_PORT) \
+	-DSIOFMT=$(B2SIOFMT) \
+	-DSIOSPD=$(BOOT_COMCONSOLE_SPEED) \
 	-I../../../../include \
 	-I../../../../lib/libstand \
 	-I. \
@@ -42,6 +42,7 @@ CPPFLAGS += -DBOOTPROG=\"isoboot\" \
 	-I../../common \
 	-I../gptzfsboot
 
+LDSCRIPT=	../boot.ldscript
 LD_FLAGS=	-static -N --gc-sections
 LIBSTAND=	../../libstand/$(MACH)/libstand.a
 
@@ -55,27 +56,27 @@ OBJS= multiboot.o isoboot.o sio.o drv.o cons.o gptldr.o
 
 CLEANFILES += isoboot
 
-isoboot: gptldr.bin isoboot.bin ${BTXKERN}
-	btxld -v -E ${ORG2} -f bin -b ${BTXKERN} -V ${BOOT_VERSION} -l \
+isoboot: gptldr.bin isoboot.bin $(BTXKERN)
+	btxld -v -E $(ORG2) -f bin -b $(BTXKERN) -V $(BOOT_VERSION) -l \
 		gptldr.bin -o $@ isoboot.bin
-	@set -- `ls -l $@`; x=$$((${ISOBOOTSIZE}-$$5)); \
+	@set -- `ls -l $@`; x=$$(($(ISOBOOTSIZE)-$$5)); \
 	    echo "$$x bytes available"; test $$x -ge 0
 
 CLEANFILES += gptldr.bin gptldr.out gptldr.o
 
 gptldr.bin: gptldr.out
-	${OBJCOPY} -S -O binary gptldr.out $@
+	$(OBJCOPY) -S -O binary gptldr.out $@
 
 gptldr.out:	gptldr.o
-	${LD} ${LD_FLAGS} -e start -Ttext ${ORG1} -o $@ gptldr.o
+	$(LD) $(LD_FLAGS) -e start -Ttext $(ORG1) -o $@ gptldr.o
 
-CLEANFILES += isoboot.bin isoboot.out ${OBJS}
+CLEANFILES += isoboot.bin isoboot.out $(OBJS)
 
 isoboot.bin: isoboot.out
-	${OBJCOPY} -S -O binary isoboot.out $@
+	$(OBJCOPY) -S -O binary isoboot.out $@
 
-isoboot.out: ${BTXCRT} ${OBJS}
-	${LD} ${LD_FLAGS} -Ttext ${ORG2} -o $@ ${BTXCRT} ${OBJS} ${LIBSTAND}
+isoboot.out: $(BTXCRT) $(OBJS)
+	$(LD) $(LD_FLAGS) -T $(LDSCRIPT) -o $@ $(BTXCRT) $(OBJS) $(LIBSTAND)
 
 machine:
 	$(RM) machine

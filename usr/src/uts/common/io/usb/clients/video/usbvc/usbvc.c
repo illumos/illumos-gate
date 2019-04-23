@@ -355,7 +355,7 @@ _info(struct modinfo *modinfop)
 /*ARGSUSED*/
 static int
 usbvc_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
-			void *arg, void **result)
+    void *arg, void **result)
 {
 	usbvc_state_t	*usbvcp;
 	int error = DDI_FAILURE;
@@ -808,7 +808,7 @@ usbvc_read(dev_t dev, struct uio *uio_p, cred_t *cred_p)
 
 	/* start polling if it is not started yet */
 	if (strm_if->start_polling != 1) {
-		if (usbvc_start_isoc_polling(usbvcp, strm_if, NULL) !=
+		if (usbvc_start_isoc_polling(usbvcp, strm_if, 0) !=
 		    USB_SUCCESS) {
 			USB_DPRINTF_L2(PRINT_MASK_READ,
 			    usbvcp->usbvc_log_handle,
@@ -964,7 +964,7 @@ usbvc_minphys(struct buf *bp)
 /*ARGSUSED*/
 static int
 usbvc_ioctl(dev_t dev, int cmd, intptr_t arg,
-		int mode, cred_t *cred_p, int *rval_p)
+    int mode, cred_t *cred_p, int *rval_p)
 {
 	int		rv = 0;
 	usbvc_state_t	*usbvcp =
@@ -1011,7 +1011,7 @@ usbvc_ioctl(dev_t dev, int cmd, intptr_t arg,
 /* Entry for mmap system call */
 static int
 usbvc_devmap(dev_t dev, devmap_cookie_t handle, offset_t off,
-	size_t len, size_t *maplen, uint_t model)
+    size_t len, size_t *maplen, uint_t model)
 {
 	usbvc_state_t		*usbvcp;
 	int			error, i;
@@ -2384,7 +2384,7 @@ usbvc_parse_stream_ifs(usbvc_state_t *usbvcp)
  */
 static void
 usbvc_parse_color_still(usbvc_state_t *usbvcp, usbvc_format_group_t *fmtgrp,
-	usb_cvs_data_t *cvs_data, uint_t cvs_num, uint_t altif_n_cvs)
+    usb_cvs_data_t *cvs_data, uint_t cvs_num, uint_t altif_n_cvs)
 {
 	uint8_t		frame_cnt;
 	uint_t		last_frame, i;
@@ -2469,7 +2469,7 @@ usbvc_parse_color_still(usbvc_state_t *usbvcp, usbvc_format_group_t *fmtgrp,
  */
 static void
 usbvc_parse_frames(usbvc_state_t *usbvcp, usbvc_format_group_t *fmtgrp,
-	usb_cvs_data_t *cvs_data, uint_t cvs_num, uint_t altif_n_cvs)
+    usb_cvs_data_t *cvs_data, uint_t cvs_num, uint_t altif_n_cvs)
 {
 	uint_t		last_frame;
 	usbvc_frames_t	*frm;
@@ -2558,7 +2558,7 @@ usbvc_parse_frames(usbvc_state_t *usbvcp, usbvc_format_group_t *fmtgrp,
 /* Parse one of the format groups in a stream interface */
 static int
 usbvc_parse_format_group(usbvc_state_t *usbvcp, usbvc_format_group_t *fmtgrp,
-	usb_cvs_data_t *cvs_data, uint_t cvs_num, uint_t altif_n_cvs)
+    usb_cvs_data_t *cvs_data, uint_t cvs_num, uint_t altif_n_cvs)
 {
 	usbvc_format_descr_t *fmt;
 
@@ -2919,7 +2919,7 @@ usbvc_free_read_bufs(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if)
  */
 int
 usbvc_alloc_map_bufs(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if,
-	int buf_cnt, int buf_len)
+    int buf_cnt, int buf_len)
 {
 	int		i = 0;
 	usbvc_buf_t	*bufs;
@@ -3401,7 +3401,7 @@ usbvc_set_alt(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if)
  */
 static int
 usbvc_decode_stream_header(usbvc_state_t *usbvcp, usbvc_buf_grp_t *bufgrp,
-	mblk_t *data, int actual_len)
+    mblk_t *data, int actual_len)
 {
 	uint32_t len, buf_left, data_len;
 	usbvc_stream_if_t *strm_if;
@@ -3631,7 +3631,7 @@ usbvc_vc_get_ctrl(usbvc_state_t *usbvcp, uint8_t req_code, uint8_t entity_id,
 /* Send req to video control interface to get ctrl */
 int
 usbvc_vc_set_ctrl(usbvc_state_t *usbvcp, uint8_t req_code,  uint8_t entity_id,
-	uint16_t cs, uint16_t wlength, mblk_t *data)
+    uint16_t cs, uint16_t wlength, mblk_t *data)
 {
 	usb_cb_flags_t	cb_flags;
 	usb_cr_t	cr;
@@ -3660,7 +3660,7 @@ usbvc_vc_set_ctrl(usbvc_state_t *usbvcp, uint8_t req_code,  uint8_t entity_id,
 /* Set probe or commit ctrl for video stream interface */
 int
 usbvc_vs_set_probe_commit(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if,
-	usbvc_vs_probe_commit_t *ctrl_pc, uchar_t cs)
+    usbvc_vs_probe_commit_t *ctrl_pc, uchar_t cs)
 {
 	mblk_t *data;
 	usb_cb_flags_t	cb_flags;
@@ -3717,7 +3717,7 @@ usbvc_vs_set_probe_commit(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if,
 /* Get probe ctrl for vodeo stream interface */
 int
 usbvc_vs_get_probe(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if,
-	usbvc_vs_probe_commit_t *ctrl_pc, uchar_t bRequest)
+    usbvc_vs_probe_commit_t *ctrl_pc, uchar_t bRequest)
 {
 	mblk_t *data = NULL;
 	usb_cb_flags_t	cb_flags;
