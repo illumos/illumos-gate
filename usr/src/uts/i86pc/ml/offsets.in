@@ -1,7 +1,7 @@
 \
 \ Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
 \ Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
-\ Copyright 2018 Joyent, Inc.
+\ Copyright 2019 Joyent, Inc.
 \
 \ CDDL HEADER START
 \
@@ -88,7 +88,6 @@ _kthread	THREAD_SIZE
 	t_lockstat
 	t_lockp
 	t_lock_flush
-	t_kpri_req
 	t_oldspl
 	t_pri
 	t_pil

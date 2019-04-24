@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(lint)
 #include <sys/types.h>
@@ -260,7 +259,7 @@ ulock_clear(lock_t *lp)
 
 /*
  * lock_set_spl(lp, new_pil, *old_pil_addr)
- * 	Sets pil to new_pil, grabs lp, stores old pil in *old_pil_addr.
+ *	Sets pil to new_pil, grabs lp, stores old pil in *old_pil_addr.
  */
 
 #if defined(lint)
@@ -337,7 +336,7 @@ lock_clear_splx(lock_t *lp, int s)
 
 /*
  * mutex_enter() and mutex_exit().
- * 
+ *
  * These routines handle the simple cases of mutex_enter() (adaptive
  * lock, not held) and mutex_exit() (adaptive lock, held, no waiters).
  * If anything complicated is going on we punt to mutex_vector_enter().
@@ -477,7 +476,7 @@ mutex_owner_running_critical_start:	! If interrupted restart here
 
 /*
  * rw_enter() and rw_exit().
- * 
+ *
  * These routines handle the simple cases of rw_enter (write-locking an unheld
  * lock or read-locking a lock that's neither write-locked nor write-wanted)
  * and rw_exit (no waiters or not the last reader).  If anything complicated
@@ -502,13 +501,10 @@ rw_exit(krwlock_t *lp)
 	cmp	%o1, RW_WRITER			! entering as writer?
 	be,a,pn	%icc, 2f			! if so, go do it ...
 	or	THREAD_REG, RW_WRITE_LOCKED, %o5 ! delay: %o5 = owner
-	ld	[THREAD_REG + T_KPRI_REQ], %o3	! begin THREAD_KPRI_REQUEST()
 	ldn	[%o0], %o4			! %o4 = old lock value
-	inc	%o3				! bump kpri
-	st	%o3, [THREAD_REG + T_KPRI_REQ]	! store new kpri
 1:
 	andcc	%o4, RW_WRITE_CLAIMED, %g0	! write-locked or write-wanted?
-	bz,pt	%xcc, 3f	 		! if so, prepare to block
+	bz,pt	%xcc, 3f			! if so, prepare to block
 	add	%o4, RW_READ_LOCK, %o5		! delay: increment hold count
 	sethi	%hi(rw_enter_sleep), %o2	! load up jump
 	jmp	%o2 + %lo(rw_enter_sleep)	! jmp to rw_enter_sleep
@@ -552,15 +548,14 @@ rw_exit(krwlock_t *lp)
 	bnz,pn	%xcc, 2f			! single reader, no waiters?
 	clr	%o1
 1:
-	ld	[THREAD_REG + T_KPRI_REQ], %g1	! begin THREAD_KPRI_RELEASE()
 	srl	%o4, RW_HOLD_COUNT_SHIFT, %o3	! %o3 = hold count (lockstat)
 	casx	[%o0], %o4, %o5			! try to drop lock
 	cmp	%o4, %o5			! did we succeed?
 	bne,pn	%xcc, rw_exit_wakeup		! if not, go to C
-	dec	%g1				! delay: drop kpri
+	nop					! delay: do nothing
 .rw_read_exit_lockstat_patch_point:
 	retl
-	st	%g1, [THREAD_REG + T_KPRI_REQ]	! delay: store new kpri
+	nop					! delay: do nothing
 2:
 	andcc	%o4, RW_WRITE_LOCKED, %g0	! are we a writer?
 	bnz,a,pt %xcc, 3f
@@ -689,7 +684,7 @@ lockstat_hot_patch(void)
  * Does not keep statistics on the lock.
  *
  * Entry:	%l6 - points to mutex
- * 		%l7 - address of call (returns to %l7+8)
+ *		%l7 - address of call (returns to %l7+8)
  * Uses:	%l6, %l5
  */
 #ifndef lint
@@ -700,7 +695,7 @@ lockstat_hot_patch(void)
 	tst	%l5
 	bnz	3f			! lock already held - go spin
 	nop
-2:	
+2:
 	jmp	%l7 + 8			! return
 	membar	#LoadLoad
 	!
@@ -716,7 +711,7 @@ lockstat_hot_patch(void)
 
 	sethi	%hi(panicstr) , %l5
 	ldn	[%l5 + %lo(panicstr)], %l5
-	tst 	%l5
+	tst	%l5
 	bnz	2b			! after panic, feign success
 	nop
 	b	4b
@@ -732,7 +727,7 @@ lockstat_hot_patch(void)
  * running at high level already.
  *
  * Entry:	%l6 - points to mutex
- * 		%l7 - address of call (returns to %l7+8)
+ *		%l7 - address of call (returns to %l7+8)
  * Uses:	none
  */
 #ifndef lint

@@ -21,9 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(lint) || defined(__lint)
 #include <sys/types.h>
@@ -322,7 +321,7 @@ lock_set_spl(lock_t *lp, int new_pil, u_short *old_pil)
 	movl	8(%esp), %eax		/* get priority level */
 	pushl	%eax
 	call	splr			/* raise priority level */
-	movl 	8(%esp), %ecx		/* ecx = lock addr */
+	movl	8(%esp), %ecx		/* ecx = lock addr */
 	movl	$-1, %edx
 	addl	$4, %esp
 	xchgb	%dl, (%ecx)		/* try to set lock */
@@ -569,7 +568,7 @@ mutex_exit(kmutex_t *lp)
 	ret					/* nop space for lfence */
 	nop
 	nop
-.mutex_enter_lockstat_6323525_patch_point:	/* new patch point if lfence */ 
+.mutex_enter_lockstat_6323525_patch_point:	/* new patch point if lfence */
 	nop
 #else	/* OPTERON_WORKAROUND_6323525 */
 	ret
@@ -916,10 +915,8 @@ rw_exit(krwlock_t *lp)
 #if defined(__amd64)
 
 	ENTRY(rw_enter)
-	movq	%gs:CPU_THREAD, %rdx		/* rdx = thread ptr */
 	cmpl	$RW_WRITER, %esi
 	je	.rw_write_enter
-	incl	T_KPRI_REQ(%rdx)		/* THREAD_KPRI_REQUEST() */
 	movq	(%rdi), %rax			/* rax = old rw_wwwh value */
 	testl	$RW_WRITE_LOCKED|RW_WRITE_WANTED, %eax
 	jnz	rw_enter_sleep
@@ -935,6 +932,7 @@ rw_exit(krwlock_t *lp)
 	movl	$RW_READER, %edx
 	jmp	lockstat_wrapper_arg
 .rw_write_enter:
+	movq	%gs:CPU_THREAD, %rdx
 	orq	$RW_WRITE_LOCKED, %rdx		/* rdx = write-locked value */
 	xorl	%eax, %eax			/* rax = unheld value */
 	lock
@@ -970,8 +968,6 @@ rw_exit(krwlock_t *lp)
 	lock
 	cmpxchgq %rdx, (%rdi)			/* try to drop read lock */
 	jnz	rw_exit_wakeup
-	movq	%gs:CPU_THREAD, %rcx		/* rcx = thread ptr */
-	decl	T_KPRI_REQ(%rcx)		/* THREAD_KPRI_RELEASE() */
 .rw_read_exit_lockstat_patch_point:
 	ret
 	movq	%rdi, %rsi			/* rsi = lock ptr */
@@ -1004,11 +1000,9 @@ rw_exit(krwlock_t *lp)
 #else
 
 	ENTRY(rw_enter)
-	movl	%gs:CPU_THREAD, %edx		/* edx = thread ptr */
 	movl	4(%esp), %ecx			/* ecx = lock ptr */
 	cmpl	$RW_WRITER, 8(%esp)
 	je	.rw_write_enter
-	incl	T_KPRI_REQ(%edx)		/* THREAD_KPRI_REQUEST() */
 	movl	(%ecx), %eax			/* eax = old rw_wwwh value */
 	testl	$RW_WRITE_LOCKED|RW_WRITE_WANTED, %eax
 	jnz	rw_enter_sleep
@@ -1023,6 +1017,7 @@ rw_exit(krwlock_t *lp)
 	pushl	$RW_READER
 	jmp	lockstat_wrapper_arg
 .rw_write_enter:
+	movl	%gs:CPU_THREAD, %edx
 	orl	$RW_WRITE_LOCKED, %edx		/* edx = write-locked value */
 	xorl	%eax, %eax			/* eax = unheld value */
 	lock
@@ -1058,8 +1053,6 @@ rw_exit(krwlock_t *lp)
 	lock
 	cmpxchgl %edx, (%ecx)			/* try to drop read lock */
 	jnz	rw_exit_wakeup
-	movl	%gs:CPU_THREAD, %edx		/* edx = thread ptr */
-	decl	T_KPRI_REQ(%edx)		/* THREAD_KPRI_RELEASE() */
 .rw_read_exit_lockstat_patch_point:
 	ret
 	movl	$LS_RW_EXIT_RELEASE, %eax
@@ -1184,7 +1177,7 @@ _lfence_insn:
 	addl	%ebx, %esi;			\
 	movl	$dstaddr, %edi;			\
 	addl	%ebx, %edi;			\
-0:      					\
+0:						\
 	decl	%esi;				\
 	decl	%edi;				\
 	pushl	$1;				\
@@ -1243,7 +1236,7 @@ lockstat_hot_patch(void)
 	movq	$normal_instr, %rsi;		\
 	movq	$active_instr, %rdi;		\
 	leaq	lockstat_probemap(%rip), %rax;	\
-	movl 	_MUL(event, DTRACE_IDSIZE)(%rax), %eax;	\
+	movl	_MUL(event, DTRACE_IDSIZE)(%rax), %eax;	\
 	testl	%eax, %eax;			\
 	jz	9f;				\
 	movq	%rdi, %rsi;			\

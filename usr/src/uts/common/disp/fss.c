@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1212,9 +1212,9 @@ fss_decay_usage()
 				 * If there is only one zone active on the pset
 				 * the above reduces to:
 				 *
-				 * 			zone_int_shares^2
+				 *			zone_int_shares^2
 				 * shusage = usage * ---------------------
-				 * 			kpj_shares^2
+				 *			kpj_shares^2
 				 *
 				 * If there's only one project active in the
 				 * zone this formula reduces to:
@@ -1372,8 +1372,6 @@ fss_update_list(int i)
 		 * is running with kernel mode priority.
 		 */
 		if (t->t_cid != fss_cid)
-			goto next;
-		if ((fssproc->fss_flags & FSSKPRI) != 0)
 			goto next;
 
 		fssproj = FSSPROC2FSSPROJ(fssproc);
@@ -1889,7 +1887,7 @@ fss_fork(kthread_t *pt, kthread_t *ct, void *bufp)
 	cpucaps_sc_init(&cfssproc->fss_caps);
 
 	cfssproc->fss_flags =
-	    pfssproc->fss_flags & ~(FSSKPRI | FSSBACKQ | FSSRESTORE);
+	    pfssproc->fss_flags & ~(FSSBACKQ | FSSRESTORE);
 	ct->t_cldata = (void *)cfssproc;
 	ct->t_schedflag |= TS_RUNQMATCH;
 	thread_unlock(pt);
@@ -1940,7 +1938,6 @@ fss_forkret(kthread_t *t, kthread_t *ct)
 	fssproc->fss_timeleft = fss_quantum;
 	t->t_pri = fssproc->fss_umdpri;
 	ASSERT(t->t_pri >= 0 && t->t_pri <= fss_maxglobpri);
-	fssproc->fss_flags &= ~FSSKPRI;
 	THREAD_TRANSITION(t);
 
 	/*
@@ -2038,11 +2035,6 @@ fss_parmsset(kthread_t *t, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	fssproc->fss_upri = reqfssupri;
 	fssproc->fss_nice = nice;
 	fss_newpri(fssproc, B_FALSE);
-
-	if ((fssproc->fss_flags & FSSKPRI) != 0) {
-		thread_unlock(t);
-		return (0);
-	}
 
 	fss_change_priority(t, fssproc);
 	thread_unlock(t);
@@ -2158,7 +2150,7 @@ fss_swapin(kthread_t *t, int flags)
 		time_t swapout_time;
 
 		swapout_time = (ddi_get_lbolt() - t->t_stime) / hz;
-		if (INHERITED(t) || (fssproc->fss_flags & FSSKPRI)) {
+		if (INHERITED(t)) {
 			epri = (long)DISP_PRIO(t) + swapout_time;
 		} else {
 			/*
@@ -2190,7 +2182,6 @@ fss_swapin(kthread_t *t, int flags)
 static pri_t
 fss_swapout(kthread_t *t, int flags)
 {
-	fssproc_t *fssproc = FSSPROC(t);
 	long epri = -1;
 	proc_t *pp = ttoproc(t);
 	time_t swapin_time;
@@ -2198,7 +2189,6 @@ fss_swapout(kthread_t *t, int flags)
 	ASSERT(THREAD_LOCK_HELD(t));
 
 	if (INHERITED(t) ||
-	    (fssproc->fss_flags & FSSKPRI) ||
 	    (t->t_proc_flag & TP_LWPEXIT) ||
 	    (t->t_state & (TS_ZOMB|TS_FREE|TS_STOPPED|TS_ONPROC|TS_WAIT)) ||
 	    !(t->t_schedflag & TS_LOAD) ||
@@ -2241,36 +2231,17 @@ fss_swapout(kthread_t *t, int flags)
 }
 
 /*
- * If thread is currently at a kernel mode priority (has slept) and is
- * returning to the userland we assign it the appropriate user mode priority
- * and time quantum here.  If we're lowering the thread's priority below that
- * of other runnable threads then we will set runrun via cpu_surrender() to
- * cause preemption.
+ * Run swap-out checks when returning to userspace.
  */
 static void
 fss_trapret(kthread_t *t)
 {
-	fssproc_t *fssproc = FSSPROC(t);
 	cpu_t *cp = CPU;
 
 	ASSERT(THREAD_LOCK_HELD(t));
 	ASSERT(t == curthread);
 	ASSERT(cp->cpu_dispthread == t);
 	ASSERT(t->t_state == TS_ONPROC);
-
-	t->t_kpri_req = 0;
-	if (fssproc->fss_flags & FSSKPRI) {
-		/*
-		 * If thread has blocked in the kernel
-		 */
-		THREAD_CHANGE_PRI(t, fssproc->fss_umdpri);
-		cp->cpu_dispatch_pri = DISP_PRIO(t);
-		ASSERT(t->t_pri >= 0 && t->t_pri <= fss_maxglobpri);
-		fssproc->fss_flags &= ~FSSKPRI;
-
-		if (DISP_MUST_SURRENDER(t))
-			cpu_surrender(t);
-	}
 
 	/*
 	 * Swapout lwp if the swapper is waiting for this thread to reach
@@ -2299,19 +2270,6 @@ fss_preempt(kthread_t *t)
 	ASSERT(t->t_state == TS_ONPROC);
 
 	/*
-	 * If preempted in the kernel, make sure the thread has a kernel
-	 * priority if needed.
-	 */
-	lwp = curthread->t_lwp;
-	if (!(fssproc->fss_flags & FSSKPRI) && lwp != NULL && t->t_kpri_req) {
-		fssproc->fss_flags |= FSSKPRI;
-		THREAD_CHANGE_PRI(t, minclsyspri);
-		ASSERT(t->t_pri >= 0 && t->t_pri <= fss_maxglobpri);
-		t->t_trapret = 1;	/* so that fss_trapret will run */
-		aston(t);
-	}
-
-	/*
 	 * This thread may be placed on wait queue by CPU Caps. In this case we
 	 * do not need to do anything until it is removed from the wait queue.
 	 * Do not enforce CPU caps on threads running at a kernel priority
@@ -2320,7 +2278,7 @@ fss_preempt(kthread_t *t)
 		(void) cpucaps_charge(t, &fssproc->fss_caps,
 		    CPUCAPS_CHARGE_ENFORCE);
 
-		if (!(fssproc->fss_flags & FSSKPRI) && CPUCAPS_ENFORCE(t))
+		if (CPUCAPS_ENFORCE(t))
 			return;
 	}
 
@@ -2329,6 +2287,7 @@ fss_preempt(kthread_t *t)
 	 * cannot be holding any kernel locks.
 	 */
 	ASSERT(t->t_schedflag & TS_DONT_SWAP);
+	lwp = ttolwp(t);
 	if (lwp != NULL && lwp->lwp_state == LWP_USER)
 		t->t_schedflag &= ~TS_DONT_SWAP;
 
@@ -2346,18 +2305,16 @@ fss_preempt(kthread_t *t)
 	if (t->t_schedctl && schedctl_get_nopreempt(t)) {
 		if (fssproc->fss_timeleft > -SC_MAX_TICKS) {
 			DTRACE_SCHED1(schedctl__nopreempt, kthread_t *, t);
-			if (!(fssproc->fss_flags & FSSKPRI)) {
-				/*
-				 * If not already remembered, remember current
-				 * priority for restoration in fss_yield().
-				 */
-				if (!(fssproc->fss_flags & FSSRESTORE)) {
-					fssproc->fss_scpri = t->t_pri;
-					fssproc->fss_flags |= FSSRESTORE;
-				}
-				THREAD_CHANGE_PRI(t, fss_maxumdpri);
-				t->t_schedflag |= TS_DONT_SWAP;
+			/*
+			 * If not already remembered, remember current
+			 * priority for restoration in fss_yield().
+			 */
+			if (!(fssproc->fss_flags & FSSRESTORE)) {
+				fssproc->fss_scpri = t->t_pri;
+				fssproc->fss_flags |= FSSRESTORE;
 			}
+			THREAD_CHANGE_PRI(t, fss_maxumdpri);
+			t->t_schedflag |= TS_DONT_SWAP;
 			schedctl_set_yield(t, 1);
 			setfrontdq(t);
 			return;
@@ -2374,13 +2331,10 @@ fss_preempt(kthread_t *t)
 		}
 	}
 
-	flags = fssproc->fss_flags & (FSSBACKQ | FSSKPRI);
+	flags = fssproc->fss_flags & FSSBACKQ;
 
 	if (flags == FSSBACKQ) {
 		fssproc->fss_timeleft = fss_quantum;
-		fssproc->fss_flags &= ~FSSBACKQ;
-		setbackdq(t);
-	} else if (flags == (FSSBACKQ | FSSKPRI)) {
 		fssproc->fss_flags &= ~FSSBACKQ;
 		setbackdq(t);
 	} else {
@@ -2404,12 +2358,7 @@ fss_setrun(kthread_t *t)
 	fssproc->fss_timeleft = fss_quantum;
 
 	fssproc->fss_flags &= ~FSSBACKQ;
-	/*
-	 * If previously were running at the kernel priority then keep that
-	 * priority and the fss_timeleft doesn't matter.
-	 */
-	if ((fssproc->fss_flags & FSSKPRI) == 0)
-		THREAD_CHANGE_PRI(t, fssproc->fss_umdpri);
+	THREAD_CHANGE_PRI(t, fssproc->fss_umdpri);
 
 	if (t->t_disp_time != ddi_get_lbolt())
 		setbackdq(t);
@@ -2418,8 +2367,7 @@ fss_setrun(kthread_t *t)
 }
 
 /*
- * Prepare thread for sleep. We reset the thread priority so it will run at the
- * kernel priority level when it wakes up.
+ * Prepare thread for sleep.
  */
 static void
 fss_sleep(kthread_t *t)
@@ -2437,31 +2385,6 @@ fss_sleep(kthread_t *t)
 	(void) CPUCAPS_CHARGE(t, &fssproc->fss_caps, CPUCAPS_CHARGE_ENFORCE);
 
 	fss_inactive(t);
-
-	/*
-	 * Assign a system priority to the thread and arrange for it to be
-	 * retained when the thread is next placed on the run queue (i.e.,
-	 * when it wakes up) instead of being given a new pri.  Also arrange
-	 * for trapret processing as the thread leaves the system call so it
-	 * will drop back to normal priority range.
-	 */
-	if (t->t_kpri_req) {
-		THREAD_CHANGE_PRI(t, minclsyspri);
-		fssproc->fss_flags |= FSSKPRI;
-		t->t_trapret = 1;	/* so that fss_trapret will run */
-		aston(t);
-	} else if (fssproc->fss_flags & FSSKPRI) {
-		/*
-		 * The thread has done a THREAD_KPRI_REQUEST(), slept, then
-		 * done THREAD_KPRI_RELEASE() (so no t_kpri_req is 0 again),
-		 * then slept again all without finishing the current system
-		 * call so trapret won't have cleared FSSKPRI
-		 */
-		fssproc->fss_flags &= ~FSSKPRI;
-		THREAD_CHANGE_PRI(t, fssproc->fss_umdpri);
-		if (DISP_MUST_SURRENDER(curthread))
-			cpu_surrender(t);
-	}
 	t->t_stime = ddi_get_lbolt();	/* time stamp for the swapper */
 }
 
@@ -2503,67 +2426,56 @@ fss_tick(kthread_t *t)
 	 * Do not surrender CPU if running in the SYS class.
 	 */
 	if (CPUCAPS_ON()) {
-		cpucaps_enforce = cpucaps_charge(t,
-		    &fssproc->fss_caps, CPUCAPS_CHARGE_ENFORCE) &&
-		    !(fssproc->fss_flags & FSSKPRI);
+		cpucaps_enforce = cpucaps_charge(t, &fssproc->fss_caps,
+		    CPUCAPS_CHARGE_ENFORCE);
 	}
 
-	/*
-	 * A thread's execution time for threads running in the SYS class
-	 * is not tracked.
-	 */
-	if ((fssproc->fss_flags & FSSKPRI) == 0) {
+	if (--fssproc->fss_timeleft <= 0) {
+		pri_t new_pri;
+
 		/*
-		 * If thread is not in kernel mode, decrement its fss_timeleft
+		 * If we're doing preemption control and trying to avoid
+		 * preempting this thread, just note that the thread should
+		 * yield soon and let it keep running (unless it's been a
+		 * while).
 		 */
-		if (--fssproc->fss_timeleft <= 0) {
-			pri_t new_pri;
-
-			/*
-			 * If we're doing preemption control and trying to
-			 * avoid preempting this thread, just note that the
-			 * thread should yield soon and let it keep running
-			 * (unless it's been a while).
-			 */
-			if (t->t_schedctl && schedctl_get_nopreempt(t)) {
-				if (fssproc->fss_timeleft > -SC_MAX_TICKS) {
-					DTRACE_SCHED1(schedctl__nopreempt,
-					    kthread_t *, t);
-					schedctl_set_yield(t, 1);
-					thread_unlock_nopreempt(t);
-					return;
-				}
+		if (t->t_schedctl && schedctl_get_nopreempt(t)) {
+			if (fssproc->fss_timeleft > -SC_MAX_TICKS) {
+				DTRACE_SCHED1(schedctl__nopreempt,
+				    kthread_t *, t);
+				schedctl_set_yield(t, 1);
+				thread_unlock_nopreempt(t);
+				return;
 			}
-			fssproc->fss_flags &= ~FSSRESTORE;
+		}
+		fssproc->fss_flags &= ~FSSRESTORE;
 
-			fss_newpri(fssproc, B_TRUE);
-			new_pri = fssproc->fss_umdpri;
-			ASSERT(new_pri >= 0 && new_pri <= fss_maxglobpri);
+		fss_newpri(fssproc, B_TRUE);
+		new_pri = fssproc->fss_umdpri;
+		ASSERT(new_pri >= 0 && new_pri <= fss_maxglobpri);
 
-			/*
-			 * When the priority of a thread is changed, it may
-			 * be necessary to adjust its position on a sleep queue
-			 * or dispatch queue. The function thread_change_pri
-			 * accomplishes this.
-			 */
-			if (thread_change_pri(t, new_pri, 0)) {
-				if ((t->t_schedflag & TS_LOAD) &&
-				    (lwp = t->t_lwp) &&
-				    lwp->lwp_state == LWP_USER)
-					t->t_schedflag &= ~TS_DONT_SWAP;
-				fssproc->fss_timeleft = fss_quantum;
-			} else {
-				call_cpu_surrender = B_TRUE;
-			}
-		} else if (t->t_state == TS_ONPROC &&
-		    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
-			/*
-			 * If there is a higher-priority thread which is
-			 * waiting for a processor, then thread surrenders
-			 * the processor.
-			 */
+		/*
+		 * When the priority of a thread is changed, it may be
+		 * necessary to adjust its position on a sleep queue or
+		 * dispatch queue. The function thread_change_pri accomplishes
+		 * this.
+		 */
+		if (thread_change_pri(t, new_pri, 0)) {
+			if ((t->t_schedflag & TS_LOAD) &&
+			    (lwp = t->t_lwp) &&
+			    lwp->lwp_state == LWP_USER)
+				t->t_schedflag &= ~TS_DONT_SWAP;
+			fssproc->fss_timeleft = fss_quantum;
+		} else {
 			call_cpu_surrender = B_TRUE;
 		}
+	} else if (t->t_state == TS_ONPROC &&
+	    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+		/*
+		 * If there is a higher-priority thread which is waiting for a
+		 * processor, then thread surrenders the processor.
+		 */
+		call_cpu_surrender = B_TRUE;
 	}
 
 	if (cpucaps_enforce && 2 * fssproc->fss_timeleft > fss_quantum) {
@@ -2618,32 +2530,13 @@ fss_wakeup(kthread_t *t)
 	fssproc = FSSPROC(t);
 	fssproc->fss_flags &= ~FSSBACKQ;
 
-	if (fssproc->fss_flags & FSSKPRI) {
-		/*
-		 * If we already have a kernel priority assigned, then we
-		 * just use it.
-		 */
-		setbackdq(t);
-	} else if (t->t_kpri_req) {
-		/*
-		 * Give thread a priority boost if we were asked.
-		 */
-		fssproc->fss_flags |= FSSKPRI;
-		THREAD_CHANGE_PRI(t, minclsyspri);
-		setbackdq(t);
-		t->t_trapret = 1;	/* so that fss_trapret will run */
-		aston(t);
+	/* Recalculate the priority. */
+	if (t->t_disp_time == ddi_get_lbolt()) {
+		setfrontdq(t);
 	} else {
-		/*
-		 * Otherwise, we recalculate the priority.
-		 */
-		if (t->t_disp_time == ddi_get_lbolt()) {
-			setfrontdq(t);
-		} else {
-			fssproc->fss_timeleft = fss_quantum;
-			THREAD_CHANGE_PRI(t, fssproc->fss_umdpri);
-			setbackdq(t);
-		}
+		fssproc->fss_timeleft = fss_quantum;
+		THREAD_CHANGE_PRI(t, fssproc->fss_umdpri);
+		setbackdq(t);
 	}
 }
 

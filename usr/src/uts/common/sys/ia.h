@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1997-1998 by Sun Microsystems, Inc.
  * All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -85,7 +86,7 @@ typedef struct iaproc {
 
 
 /* flags */
-#define	IAKPRI	0x01	/* thread at kernel mode priority */
+/* Formerly: IAKPRI 0x01 - thread at kernel model priority */
 #define	IABACKQ	0x02	/* thread goes to back of disp q when preempted */
 #define	IASLEPT	0x04	/* thread had long-term suspend - give new slice */
 

@@ -21,11 +21,11 @@
 
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -229,7 +229,6 @@ static void	ia_set_process_group(pid_t, pid_t, pid_t);
 
 static void	ts_change_priority(kthread_t *, tsproc_t *);
 
-extern pri_t	ts_maxkmdpri;	/* maximum kernel mode ts priority */
 static pri_t	ts_maxglobpri;	/* maximum global priority used by ts class */
 static kmutex_t	ts_dptblock;	/* protects time sharing dispatch table */
 static kmutex_t	ts_list_lock[TS_LISTS];	/* protects tsproc lists */
@@ -541,8 +540,8 @@ ts_admin(caddr_t uaddr, cred_t *reqpcredp)
  * to specified time-sharing priority.
  */
 static int
-ts_enterclass(kthread_t *t, id_t cid, void *parmsp,
-	cred_t *reqpcredp, void *bufp)
+ts_enterclass(kthread_t *t, id_t cid, void *parmsp, cred_t *reqpcredp,
+    void *bufp)
 {
 	tsparms_t	*tsparmsp = (tsparms_t *)parmsp;
 	tsproc_t	*tspp;
@@ -703,7 +702,7 @@ ts_fork(kthread_t *t, kthread_t *ct, void *bufp)
 	TS_NEWUMDPRI(ctspp);
 	ctspp->ts_nice = ptspp->ts_nice;
 	ctspp->ts_dispwait = 0;
-	ctspp->ts_flags = ptspp->ts_flags & ~(TSKPRI | TSBACKQ | TSRESTORE);
+	ctspp->ts_flags = ptspp->ts_flags & ~(TSBACKQ | TSRESTORE);
 	ctspp->ts_tp = ct;
 	cpucaps_sc_init(&ctspp->ts_caps);
 	thread_unlock(t);
@@ -754,7 +753,6 @@ ts_forkret(kthread_t *t, kthread_t *ct)
 	tspp->ts_dispwait = 0;
 	t->t_pri = ts_dptbl[tspp->ts_umdpri].ts_globpri;
 	ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
-	tspp->ts_flags &= ~TSKPRI;
 	THREAD_TRANSITION(t);
 	ts_setrun(t);
 	thread_unlock(t);
@@ -1217,11 +1215,6 @@ ts_parmsset(kthread_t *tx, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	TS_NEWUMDPRI(tspp);
 	tspp->ts_nice = nice;
 
-	if ((tspp->ts_flags & TSKPRI) != 0) {
-		thread_unlock(tx);
-		return (0);
-	}
-
 	tspp->ts_dispwait = 0;
 	ts_change_priority(tx, tspp);
 	thread_unlock(tx);
@@ -1237,7 +1230,7 @@ ia_parmsset(kthread_t *tx, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	proc_t		*p;
 	pid_t		pid, pgid, sid;
 	pid_t		on, off;
-	struct stdata 	*stp;
+	struct stdata	*stp;
 	int		sess_held;
 
 	/*
@@ -1373,33 +1366,20 @@ static void
 ts_preempt(kthread_t *t)
 {
 	tsproc_t	*tspp = (tsproc_t *)(t->t_cldata);
-	klwp_t		*lwp = curthread->t_lwp;
+	klwp_t		*lwp = ttolwp(t);
 	pri_t		oldpri = t->t_pri;
 
 	ASSERT(t == curthread);
 	ASSERT(THREAD_LOCK_HELD(curthread));
 
 	/*
-	 * If preempted in the kernel, make sure the thread has
-	 * a kernel priority if needed.
-	 */
-	if (!(tspp->ts_flags & TSKPRI) && lwp != NULL && t->t_kpri_req) {
-		tspp->ts_flags |= TSKPRI;
-		THREAD_CHANGE_PRI(t, ts_kmdpris[0]);
-		ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
-		t->t_trapret = 1;		/* so ts_trapret will run */
-		aston(t);
-	}
-
-	/*
 	 * This thread may be placed on wait queue by CPU Caps. In this case we
 	 * do not need to do anything until it is removed from the wait queue.
-	 * Do not enforce CPU caps on threads running at a kernel priority
 	 */
 	if (CPUCAPS_ON()) {
 		(void) cpucaps_charge(t, &tspp->ts_caps,
 		    CPUCAPS_CHARGE_ENFORCE);
-		if (!(tspp->ts_flags & TSKPRI) && CPUCAPS_ENFORCE(t))
+		if (CPUCAPS_ENFORCE(t))
 			return;
 	}
 
@@ -1425,18 +1405,16 @@ ts_preempt(kthread_t *t)
 	if (t->t_schedctl && schedctl_get_nopreempt(t)) {
 		if (tspp->ts_timeleft > -SC_MAX_TICKS) {
 			DTRACE_SCHED1(schedctl__nopreempt, kthread_t *, t);
-			if (!(tspp->ts_flags & TSKPRI)) {
-				/*
-				 * If not already remembered, remember current
-				 * priority for restoration in ts_yield().
-				 */
-				if (!(tspp->ts_flags & TSRESTORE)) {
-					tspp->ts_scpri = t->t_pri;
-					tspp->ts_flags |= TSRESTORE;
-				}
-				THREAD_CHANGE_PRI(t, ts_maxumdpri);
-				t->t_schedflag |= TS_DONT_SWAP;
+			/*
+			 * If not already remembered, remember current
+			 * priority for restoration in ts_yield().
+			 */
+			if (!(tspp->ts_flags & TSRESTORE)) {
+				tspp->ts_scpri = t->t_pri;
+				tspp->ts_flags |= TSRESTORE;
 			}
+			THREAD_CHANGE_PRI(t, ts_maxumdpri);
+			t->t_schedflag |= TS_DONT_SWAP;
 			schedctl_set_yield(t, 1);
 			setfrontdq(t);
 			goto done;
@@ -1456,12 +1434,9 @@ ts_preempt(kthread_t *t)
 		}
 	}
 
-	if ((tspp->ts_flags & (TSBACKQ|TSKPRI)) == TSBACKQ) {
+	if ((tspp->ts_flags & TSBACKQ) != 0) {
 		tspp->ts_timeleft = ts_dptbl[tspp->ts_cpupri].ts_quantum;
 		tspp->ts_dispwait = 0;
-		tspp->ts_flags &= ~TSBACKQ;
-		setbackdq(t);
-	} else if ((tspp->ts_flags & (TSBACKQ|TSKPRI)) == (TSBACKQ|TSKPRI)) {
 		tspp->ts_flags &= ~TSBACKQ;
 		setbackdq(t);
 	} else {
@@ -1485,11 +1460,8 @@ ts_setrun(kthread_t *t)
 		TS_NEWUMDPRI(tspp);
 		tspp->ts_timeleft = ts_dptbl[tspp->ts_cpupri].ts_quantum;
 		tspp->ts_dispwait = 0;
-		if ((tspp->ts_flags & TSKPRI) == 0) {
-			THREAD_CHANGE_PRI(t,
-			    ts_dptbl[tspp->ts_umdpri].ts_globpri);
-			ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
-		}
+		THREAD_CHANGE_PRI(t, ts_dptbl[tspp->ts_umdpri].ts_globpri);
+		ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
 	}
 
 	tspp->ts_flags &= ~TSBACKQ;
@@ -1509,14 +1481,12 @@ ts_setrun(kthread_t *t)
 
 
 /*
- * Prepare thread for sleep. We reset the thread priority so it will
- * run at the kernel priority level when it wakes up.
+ * Prepare thread for sleep.
  */
 static void
 ts_sleep(kthread_t *t)
 {
 	tsproc_t	*tspp = (tsproc_t *)(t->t_cldata);
-	int		flags;
 	pri_t		old_pri = t->t_pri;
 
 	ASSERT(t == curthread);
@@ -1527,18 +1497,7 @@ ts_sleep(kthread_t *t)
 	 */
 	(void) CPUCAPS_CHARGE(t, &tspp->ts_caps, CPUCAPS_CHARGE_ENFORCE);
 
-	flags = tspp->ts_flags;
-	if (t->t_kpri_req) {
-		tspp->ts_flags = flags | TSKPRI;
-		THREAD_CHANGE_PRI(t, ts_kmdpris[0]);
-		ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
-		t->t_trapret = 1;		/* so ts_trapret will run */
-		aston(t);
-	} else if (tspp->ts_dispwait > ts_dptbl[tspp->ts_umdpri].ts_maxwait) {
-		/*
-		 * If thread has blocked in the kernel (as opposed to
-		 * being merely preempted), recompute the user mode priority.
-		 */
+	if (tspp->ts_dispwait > ts_dptbl[tspp->ts_umdpri].ts_maxwait) {
 		tspp->ts_cpupri = ts_dptbl[tspp->ts_cpupri].ts_slpret;
 		TS_NEWUMDPRI(tspp);
 		tspp->ts_timeleft = ts_dptbl[tspp->ts_cpupri].ts_quantum;
@@ -1548,16 +1507,6 @@ ts_sleep(kthread_t *t)
 		    ts_dptbl[tspp->ts_umdpri].ts_globpri);
 		ASSERT(curthread->t_pri >= 0 &&
 		    curthread->t_pri <= ts_maxglobpri);
-		tspp->ts_flags = flags & ~TSKPRI;
-
-		if (DISP_MUST_SURRENDER(curthread))
-			cpu_surrender(curthread);
-	} else if (flags & TSKPRI) {
-		THREAD_CHANGE_PRI(curthread,
-		    ts_dptbl[tspp->ts_umdpri].ts_globpri);
-		ASSERT(curthread->t_pri >= 0 &&
-		    curthread->t_pri <= ts_maxglobpri);
-		tspp->ts_flags = flags & ~TSKPRI;
 
 		if (DISP_MUST_SURRENDER(curthread))
 			cpu_surrender(curthread);
@@ -1594,9 +1543,9 @@ ts_swapin(kthread_t *t, int flags)
 		time_t swapout_time;
 
 		swapout_time = (ddi_get_lbolt() - t->t_stime) / hz;
-		if (INHERITED(t) || (tspp->ts_flags & (TSKPRI | TSIASET)))
+		if (INHERITED(t) || (tspp->ts_flags & TSIASET)) {
 			epri = (long)DISP_PRIO(t) + swapout_time;
-		else {
+		} else {
 			/*
 			 * Threads which have been out for a long time,
 			 * have high user mode priority and are associated
@@ -1648,7 +1597,7 @@ ts_swapout(kthread_t *t, int flags)
 
 	ASSERT(THREAD_LOCK_HELD(t));
 
-	if (INHERITED(t) || (tspp->ts_flags & (TSKPRI | TSIASET)) ||
+	if (INHERITED(t) || (tspp->ts_flags & TSIASET) ||
 	    (t->t_proc_flag & TP_LWPEXIT) ||
 	    (t->t_state & (TS_ZOMB | TS_FREE | TS_STOPPED |
 	    TS_ONPROC | TS_WAIT)) ||
@@ -1717,62 +1666,59 @@ ts_tick(kthread_t *t)
 	 */
 	if (CPUCAPS_ON()) {
 		call_cpu_surrender = cpucaps_charge(t, &tspp->ts_caps,
-		    CPUCAPS_CHARGE_ENFORCE) && !(tspp->ts_flags & TSKPRI);
+		    CPUCAPS_CHARGE_ENFORCE);
 	}
 
-	if ((tspp->ts_flags & TSKPRI) == 0) {
-		if (--tspp->ts_timeleft <= 0) {
-			pri_t	new_pri;
+	if (--tspp->ts_timeleft <= 0) {
+		pri_t	new_pri;
 
-			/*
-			 * If we're doing preemption control and trying to
-			 * avoid preempting this thread, just note that
-			 * the thread should yield soon and let it keep
-			 * running (unless it's been a while).
-			 */
-			if (t->t_schedctl && schedctl_get_nopreempt(t)) {
-				if (tspp->ts_timeleft > -SC_MAX_TICKS) {
-					DTRACE_SCHED1(schedctl__nopreempt,
-					    kthread_t *, t);
-					schedctl_set_yield(t, 1);
-					thread_unlock_nopreempt(t);
-					return;
-				}
+		/*
+		 * If we're doing preemption control and trying to avoid
+		 * preempting this thread, just note that the thread should
+		 * yield soon and let it keep running (unless it's been a
+		 * while).
+		 */
+		if (t->t_schedctl && schedctl_get_nopreempt(t)) {
+			if (tspp->ts_timeleft > -SC_MAX_TICKS) {
+				DTRACE_SCHED1(schedctl__nopreempt,
+				    kthread_t *, t);
+				schedctl_set_yield(t, 1);
+				thread_unlock_nopreempt(t);
+				return;
+			}
 
-				TNF_PROBE_2(schedctl_failsafe,
-				    "schedctl TS ts_tick", /* CSTYLED */,
-				    tnf_pid, pid, ttoproc(t)->p_pid,
-				    tnf_lwpid, lwpid, t->t_tid);
-			}
-			tspp->ts_flags &= ~TSRESTORE;
-			tspp->ts_cpupri = ts_dptbl[tspp->ts_cpupri].ts_tqexp;
-			TS_NEWUMDPRI(tspp);
-			tspp->ts_dispwait = 0;
-			new_pri = ts_dptbl[tspp->ts_umdpri].ts_globpri;
-			ASSERT(new_pri >= 0 && new_pri <= ts_maxglobpri);
-			/*
-			 * When the priority of a thread is changed,
-			 * it may be necessary to adjust its position
-			 * on a sleep queue or dispatch queue.
-			 * The function thread_change_pri accomplishes
-			 * this.
-			 */
-			if (thread_change_pri(t, new_pri, 0)) {
-				if ((t->t_schedflag & TS_LOAD) &&
-				    (lwp = t->t_lwp) &&
-				    lwp->lwp_state == LWP_USER)
-					t->t_schedflag &= ~TS_DONT_SWAP;
-				tspp->ts_timeleft =
-				    ts_dptbl[tspp->ts_cpupri].ts_quantum;
-			} else {
-				call_cpu_surrender = B_TRUE;
-			}
-			TRACE_2(TR_FAC_DISP, TR_TICK,
-			    "tick:tid %p old pri %d", t, oldpri);
-		} else if (t->t_state == TS_ONPROC &&
-		    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+			TNF_PROBE_2(schedctl_failsafe,
+			    "schedctl TS ts_tick", /* CSTYLED */,
+			    tnf_pid, pid, ttoproc(t)->p_pid,
+			    tnf_lwpid, lwpid, t->t_tid);
+		}
+		tspp->ts_flags &= ~TSRESTORE;
+		tspp->ts_cpupri = ts_dptbl[tspp->ts_cpupri].ts_tqexp;
+		TS_NEWUMDPRI(tspp);
+		tspp->ts_dispwait = 0;
+		new_pri = ts_dptbl[tspp->ts_umdpri].ts_globpri;
+		ASSERT(new_pri >= 0 && new_pri <= ts_maxglobpri);
+		/*
+		 * When the priority of a thread is changed, it may be
+		 * necessary to adjust its position on a sleep queue or
+		 * dispatch queue.  The function thread_change_pri accomplishes
+		 * this.
+		 */
+		if (thread_change_pri(t, new_pri, 0)) {
+			if ((t->t_schedflag & TS_LOAD) &&
+			    (lwp = t->t_lwp) &&
+			    lwp->lwp_state == LWP_USER)
+				t->t_schedflag &= ~TS_DONT_SWAP;
+			tspp->ts_timeleft =
+			    ts_dptbl[tspp->ts_cpupri].ts_quantum;
+		} else {
 			call_cpu_surrender = B_TRUE;
 		}
+		TRACE_2(TR_FAC_DISP, TR_TICK,
+		    "tick:tid %p old pri %d", t, oldpri);
+	} else if (t->t_state == TS_ONPROC &&
+	    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+		call_cpu_surrender = B_TRUE;
 	}
 
 	if (call_cpu_surrender) {
@@ -1785,11 +1731,8 @@ ts_tick(kthread_t *t)
 
 
 /*
- * If thread is currently at a kernel mode priority (has slept)
- * we assign it the appropriate user mode priority and time quantum
- * here.  If we are lowering the thread's priority below that of
- * other runnable threads we will normally set runrun via cpu_surrender() to
- * cause preemption.
+ * If we are lowering the thread's priority below that of other runnable
+ * threads we will normally set runrun via cpu_surrender() to cause preemption.
  */
 static void
 ts_trapret(kthread_t *t)
@@ -1803,7 +1746,6 @@ ts_trapret(kthread_t *t)
 	ASSERT(cp->cpu_dispthread == t);
 	ASSERT(t->t_state == TS_ONPROC);
 
-	t->t_kpri_req = 0;
 	if (tspp->ts_dispwait > ts_dptbl[tspp->ts_umdpri].ts_maxwait) {
 		tspp->ts_cpupri = ts_dptbl[tspp->ts_cpupri].ts_slpret;
 		TS_NEWUMDPRI(tspp);
@@ -1817,27 +1759,14 @@ ts_trapret(kthread_t *t)
 		THREAD_CHANGE_PRI(t, ts_dptbl[tspp->ts_umdpri].ts_globpri);
 		cp->cpu_dispatch_pri = DISP_PRIO(t);
 		ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
-		tspp->ts_flags &= ~TSKPRI;
-
-		if (DISP_MUST_SURRENDER(t))
-			cpu_surrender(t);
-	} else if (tspp->ts_flags & TSKPRI) {
-		/*
-		 * If thread has blocked in the kernel (as opposed to
-		 * being merely preempted), recompute the user mode priority.
-		 */
-		THREAD_CHANGE_PRI(t, ts_dptbl[tspp->ts_umdpri].ts_globpri);
-		cp->cpu_dispatch_pri = DISP_PRIO(t);
-		ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
-		tspp->ts_flags &= ~TSKPRI;
 
 		if (DISP_MUST_SURRENDER(t))
 			cpu_surrender(t);
 	}
 
 	/*
-	 * Swapout lwp if the swapper is waiting for this thread to
-	 * reach a safe point.
+	 * Swapout lwp if the swapper is waiting for this thread to reach a
+	 * safe point.
 	 */
 	if ((t->t_schedflag & TS_SWAPENQ) && !(tspp->ts_flags & TSIASET)) {
 		thread_unlock(t);
@@ -1931,8 +1860,6 @@ ts_update_list(int i)
 		    tx->t_clfuncs != &ia_classfuncs.thread)
 			goto next;
 		tspp->ts_dispwait++;
-		if ((tspp->ts_flags & TSKPRI) != 0)
-			goto next;
 		if (tspp->ts_dispwait <= ts_dptbl[tspp->ts_umdpri].ts_maxwait)
 			goto next;
 		if (tx->t_schedctl && schedctl_get_nopreempt(tx))
@@ -1968,12 +1895,7 @@ next:
 }
 
 /*
- * Processes waking up go to the back of their queue.  We don't
- * need to assign a time quantum here because thread is still
- * at a kernel mode priority and the time slicing is not done
- * for threads running in the kernel after sleeping.  The proper
- * time quantum will be assigned by ts_trapret before the thread
- * returns to user mode.
+ * Processes waking up go to the back of their queue.
  */
 static void
 ts_wakeup(kthread_t *t)
@@ -1984,46 +1906,27 @@ ts_wakeup(kthread_t *t)
 
 	t->t_stime = ddi_get_lbolt();		/* time stamp for the swapper */
 
-	if (tspp->ts_flags & TSKPRI) {
-		tspp->ts_flags &= ~TSBACKQ;
+	if (tspp->ts_dispwait > ts_dptbl[tspp->ts_umdpri].ts_maxwait) {
+		tspp->ts_cpupri = ts_dptbl[tspp->ts_cpupri].ts_slpret;
+		TS_NEWUMDPRI(tspp);
+		tspp->ts_timeleft = ts_dptbl[tspp->ts_cpupri].ts_quantum;
+		tspp->ts_dispwait = 0;
+		THREAD_CHANGE_PRI(t, ts_dptbl[tspp->ts_umdpri].ts_globpri);
+		ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
+	}
+
+	tspp->ts_flags &= ~TSBACKQ;
+
+	if (tspp->ts_flags & TSIA) {
 		if (tspp->ts_flags & TSIASET)
 			setfrontdq(t);
 		else
 			setbackdq(t);
-	} else if (t->t_kpri_req) {
-		/*
-		 * Give thread a priority boost if we were asked.
-		 */
-		tspp->ts_flags |= TSKPRI;
-		THREAD_CHANGE_PRI(t, ts_kmdpris[0]);
-		setbackdq(t);
-		t->t_trapret = 1;	/* so that ts_trapret will run */
-		aston(t);
 	} else {
-		if (tspp->ts_dispwait > ts_dptbl[tspp->ts_umdpri].ts_maxwait) {
-			tspp->ts_cpupri = ts_dptbl[tspp->ts_cpupri].ts_slpret;
-			TS_NEWUMDPRI(tspp);
-			tspp->ts_timeleft =
-			    ts_dptbl[tspp->ts_cpupri].ts_quantum;
-			tspp->ts_dispwait = 0;
-			THREAD_CHANGE_PRI(t,
-			    ts_dptbl[tspp->ts_umdpri].ts_globpri);
-			ASSERT(t->t_pri >= 0 && t->t_pri <= ts_maxglobpri);
-		}
-
-		tspp->ts_flags &= ~TSBACKQ;
-
-		if (tspp->ts_flags & TSIA) {
-			if (tspp->ts_flags & TSIASET)
-				setfrontdq(t);
-			else
-				setbackdq(t);
-		} else {
-			if (t->t_disp_time != ddi_get_lbolt())
-				setbackdq(t);
-			else
-				setfrontdq(t);
-		}
+		if (t->t_disp_time != ddi_get_lbolt())
+			setbackdq(t);
+		else
+			setfrontdq(t);
 	}
 }
 
@@ -2179,7 +2082,7 @@ ts_doprio(kthread_t *t, cred_t *cr, int incr, int *retvalp)
  * and background processes as non-interactive iff the session
  * leader is interactive.  This routine is called from two places:
  *	strioctl:SPGRP when a new process group gets
- * 		control of the tty.
+ *		control of the tty.
  *	ia_parmsset-when the process in question is a session leader.
  * ia_set_process_group assumes that pidlock is held by the caller,
  * either strioctl or priocntlsys.  If the caller is priocntlsys
@@ -2189,7 +2092,7 @@ ts_doprio(kthread_t *t, cred_t *cr, int incr, int *retvalp)
 static void
 ia_set_process_group(pid_t sid, pid_t bg_pgid, pid_t fg_pgid)
 {
-	proc_t 		*leader, *fg, *bg;
+	proc_t		*leader, *fg, *bg;
 	tsproc_t	*tspp;
 	kthread_t	*tx;
 	int		plocked = 0;
@@ -2291,10 +2194,6 @@ ia_set_process_group(pid_t sid, pid_t bg_pgid, pid_t fg_pgid)
 			tspp->ts_flags |= TSIASET;
 			tspp->ts_boost = ia_boost;
 			TS_NEWUMDPRI(tspp);
-			if ((tspp->ts_flags & TSKPRI) != 0) {
-				thread_unlock(tx);
-				continue;
-			}
 			tspp->ts_dispwait = 0;
 			ts_change_priority(tx, tspp);
 			thread_unlock(tx);
@@ -2344,10 +2243,6 @@ skip:
 			tspp->ts_flags &= ~TSIASET;
 			tspp->ts_boost = -ia_boost;
 			TS_NEWUMDPRI(tspp);
-			if ((tspp->ts_flags & TSKPRI) != 0) {
-				thread_unlock(tx);
-				continue;
-			}
 
 			tspp->ts_dispwait = 0;
 			ts_change_priority(tx, tspp);

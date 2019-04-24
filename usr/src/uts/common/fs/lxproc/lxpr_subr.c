@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2017, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/varargs.h>
@@ -232,7 +232,6 @@ lxpr_lock(pid_t pid)
 	}
 
 	p->p_proc_flag |= P_PR_LOCK;
-	THREAD_KPRI_REQUEST();
 	return (p);
 }
 
@@ -251,7 +250,6 @@ lxpr_unlock(proc_t *p)
 	cv_signal(&pr_pid_cv[p->p_slot]);
 	p->p_proc_flag &= ~P_PR_LOCK;
 	mutex_exit(&p->p_lock);
-	THREAD_KPRI_RELEASE();
 }
 
 void

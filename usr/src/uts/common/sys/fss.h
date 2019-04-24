@@ -22,7 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2012 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_FSS_H
@@ -140,7 +140,7 @@ typedef struct fssproc {
  * than one cpu partition then it will have a few of these structures.
  */
 typedef struct fsszone {
-	struct zone 	*fssz_zone;	/* ptr to our zone structure	*/
+	struct zone	*fssz_zone;	/* ptr to our zone structure	*/
 	struct fsszone	*fssz_next;	/* next fsszone_t in fsspset_t	*/
 	struct fsszone	*fssz_prev;	/* prev fsszone_t in fsspset_t	*/
 	uint32_t	fssz_shares;	/* sum of all project shares	*/
@@ -160,7 +160,7 @@ typedef struct fsszone {
 /*
  * fss_flags
  */
-#define	FSSKPRI		0x01	/* the thread is in kernel mode	*/
+/* Formerly: FSSKPRI	0x01 - the thread is in kernel mode */
 #define	FSSBACKQ	0x02	/* thread should be placed at the back of */
 				/* the dispatch queue if preempted */
 #define	FSSRESTORE	0x04	/* thread was not preempted, due to schedctl */

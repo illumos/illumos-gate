@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -221,40 +222,22 @@ directio_wait_one(struct directio_buf *dbp, long *bytes_iop)
  * Wait for all of the direct IO operations to finish
  */
 
-uint32_t	ufs_directio_drop_kpri = 0;	/* enable kpri hack */
-
 static int
 directio_wait(struct directio_buf *tail, long *bytes_iop)
 {
 	int	error = 0, newerror;
 	struct directio_buf	*dbp;
-	uint_t	kpri_req_save;
 
 	/*
 	 * The linked list of directio buf structures is maintained
 	 * in reverse order (tail->last request->penultimate request->...)
 	 */
-	/*
-	 * This is the k_pri_req hack. Large numbers of threads
-	 * sleeping with kernel priority will cause scheduler thrashing
-	 * on an MP machine. This can be seen running Oracle using
-	 * directio to ufs files. Sleep at normal priority here to
-	 * more closely mimic physio to a device partition. This
-	 * workaround is disabled by default as a niced thread could
-	 * be starved from running while holding i_rwlock and i_contents.
-	 */
-	if (ufs_directio_drop_kpri) {
-		kpri_req_save = curthread->t_kpri_req;
-		curthread->t_kpri_req = 0;
-	}
 	while ((dbp = tail) != NULL) {
 		tail = dbp->next;
 		newerror = directio_wait_one(dbp, bytes_iop);
 		if (error == 0)
 			error = newerror;
 	}
-	if (ufs_directio_drop_kpri)
-		curthread->t_kpri_req = kpri_req_save;
 	return (error);
 }
 /*
@@ -262,8 +245,8 @@ directio_wait(struct directio_buf *tail, long *bytes_iop)
  */
 static void
 directio_start(struct ufsvfs *ufsvfsp, struct inode *ip, size_t nbytes,
-	offset_t offset, char *addr, enum seg_rw rw, struct proc *procp,
-	struct directio_buf **tailp, page_t **pplist)
+    offset_t offset, char *addr, enum seg_rw rw, struct proc *procp,
+    struct directio_buf **tailp, page_t **pplist)
 {
 	buf_t *bp;
 	struct directio_buf *dbp;
@@ -343,7 +326,7 @@ uint32_t	ufs_force_posix_sdi = 0;
 
 int
 ufs_directio_write(struct inode *ip, uio_t *arg_uio, int ioflag, int rewrite,
-	cred_t *cr, int *statusp)
+    cred_t *cr, int *statusp)
 {
 	long		resid, bytes_written;
 	u_offset_t	size, uoff;
@@ -414,11 +397,11 @@ ufs_directio_write(struct inode *ip, uio_t *arg_uio, int ioflag, int rewrite,
 
 	/*
 	 * Synchronous, allocating writes run very slow in Direct-Mode
-	 * 	XXX - can be fixed with bmap_write changes for large writes!!!
+	 *	XXX - can be fixed with bmap_write changes for large writes!!!
 	 *	XXX - can be fixed for updates to "almost-full" files
 	 *	XXX - WARNING - system hangs if bmap_write() has to
-	 * 			allocate lots of pages since pageout
-	 * 			suspends on locked inode
+	 *			allocate lots of pages since pageout
+	 *			suspends on locked inode
 	 */
 	if (!rewrite && (ip->i_flag & ISYNC)) {
 		if ((uoff + resid) > size)

@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -191,7 +192,7 @@ get_syscall32_args(klwp_t *lwp, int *argp, int *nargsp)
 #endif
 
 /*
- * 	Save the system call arguments in a safe place.
+ *	Save the system call arguments in a safe place.
  *	lwp->lwp_ap normally points to the out regs in the reg structure.
  *	If the user is going to change the out registers, g1, or the stack,
  *	and might want to get the args (for /proc tracing), it must copy
@@ -1004,7 +1005,7 @@ lock_syscall(struct sysent *table, uint_t code)
 /*
  * Loadable syscall support.
  *	If needed, load the module, then reserve it by holding a read
- * 	lock for the duration of the call.
+ *	lock for the duration of the call.
  *	Later, if the syscall is not unloadable, it could patch the vector.
  */
 /*ARGSUSED*/
@@ -1026,7 +1027,6 @@ loadable_syscall(
 	 * Try to autoload the system call if necessary.
 	 */
 	module_lock = lock_syscall(se, code);
-	THREAD_KPRI_RELEASE();	/* drop priority given by rw_enter */
 
 	/*
 	 * we've locked either the loaded syscall or nosys
@@ -1040,7 +1040,6 @@ loadable_syscall(
 		rval = syscall_ap();
 	}
 
-	THREAD_KPRI_REQUEST();	/* regain priority from read lock */
 	rw_exit(module_lock);
 	return (rval);
 }
@@ -1070,7 +1069,7 @@ indir(int code, long a0, long a1, long a2, long a3, long a4)
 	 * Handle argument setup, unless already done in pre_syscall().
 	 */
 	if (callp->sy_narg > 5) {
-		if (save_syscall_args()) 	/* move args to LWP array */
+		if (save_syscall_args())	/* move args to LWP array */
 			return ((int64_t)set_errno(EFAULT));
 	} else if (!lwp->lwp_argsaved) {
 		long *ap;

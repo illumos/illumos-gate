@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -366,7 +366,6 @@ retry:
 			goto retry;
 		} else {
 			p->p_proc_flag |= P_PR_LOCK;
-			THREAD_KPRI_REQUEST();
 		}
 	}
 

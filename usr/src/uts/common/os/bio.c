@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1380,7 +1380,6 @@ pageio_setup(struct page *pp, size_t len, struct vnode *vp, int flags)
 
 	VN_HOLD(vp);
 	bp->b_vp = vp;
-	THREAD_KPRI_RELEASE_N(btopr(len)); /* release kpri from page_locks */
 
 	/*
 	 * Caller sets dev & blkno and can adjust

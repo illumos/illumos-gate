@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 
@@ -364,7 +364,6 @@ page_lock_es(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim, int es)
 			retval = 0;
 		} else if ((pp->p_selock & ~SE_EWANTED) == 0) {
 			/* no reader/writer lock held */
-			THREAD_KPRI_REQUEST();
 			/* this clears our setting of the SE_EWANTED bit */
 			pp->p_selock = SE_WRITER;
 			retval = 1;
@@ -551,7 +550,6 @@ page_try_reclaim_lock(page_t *pp, se_t se, int es)
 	if (!(old & SE_EWANTED) || (es & SE_EXCL_WANTED)) {
 		if ((old & ~SE_EWANTED) == 0) {
 			/* no reader/writer lock held */
-			THREAD_KPRI_REQUEST();
 			/* this clears out our setting of the SE_EWANTED bit */
 			pp->p_selock = SE_WRITER;
 			mutex_exit(pse);
@@ -590,7 +588,6 @@ page_trylock(page_t *pp, se_t se)
 
 	if (se == SE_EXCL) {
 		if (pp->p_selock == 0) {
-			THREAD_KPRI_REQUEST();
 			pp->p_selock = SE_WRITER;
 			mutex_exit(pse);
 			return (1);
@@ -628,7 +625,6 @@ page_unlock_nocapture(page_t *pp)
 	} else if ((old & ~SE_EWANTED) == SE_DELETED) {
 		panic("page_unlock_nocapture: page %p is deleted", (void *)pp);
 	} else if (old < 0) {
-		THREAD_KPRI_RELEASE();
 		pp->p_selock &= SE_EWANTED;
 		if (CV_HAS_WAITERS(&pp->p_cv))
 			cv_broadcast(&pp->p_cv);
@@ -662,7 +658,6 @@ page_unlock(page_t *pp)
 	} else if ((old & ~SE_EWANTED) == SE_DELETED) {
 		panic("page_unlock: page %p is deleted", (void *)pp);
 	} else if (old < 0) {
-		THREAD_KPRI_RELEASE();
 		pp->p_selock &= SE_EWANTED;
 		if (CV_HAS_WAITERS(&pp->p_cv))
 			cv_broadcast(&pp->p_cv);
@@ -682,7 +677,6 @@ page_unlock(page_t *pp)
 		if ((pp->p_toxic & PR_CAPTURE) &&
 		    !(curthread->t_flag & T_CAPTURING) &&
 		    !PP_RETIRED(pp)) {
-			THREAD_KPRI_REQUEST();
 			pp->p_selock = SE_WRITER;
 			mutex_exit(pse);
 			page_unlock_capture(pp);
@@ -712,7 +706,6 @@ page_tryupgrade(page_t *pp)
 	if (!(pp->p_selock & SE_EWANTED)) {
 		/* no threads want exclusive access, try upgrade */
 		if (pp->p_selock == SE_READER) {
-			THREAD_KPRI_REQUEST();
 			/* convert to exclusive lock */
 			pp->p_selock = SE_WRITER;
 			mutex_exit(pse);
@@ -738,7 +731,6 @@ page_downgrade(page_t *pp)
 
 	mutex_enter(pse);
 	excl_waiting =  pp->p_selock & SE_EWANTED;
-	THREAD_KPRI_RELEASE();
 	pp->p_selock = SE_READER | excl_waiting;
 	if (CV_HAS_WAITERS(&pp->p_cv))
 		cv_broadcast(&pp->p_cv);
@@ -756,7 +748,6 @@ page_lock_delete(page_t *pp)
 	ASSERT(!PP_ISFREE(pp));
 
 	mutex_enter(pse);
-	THREAD_KPRI_RELEASE();
 	pp->p_selock = SE_DELETED;
 	if (CV_HAS_WAITERS(&pp->p_cv))
 		cv_broadcast(&pp->p_cv);

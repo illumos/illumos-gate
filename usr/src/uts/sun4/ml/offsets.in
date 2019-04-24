@@ -1,6 +1,7 @@
 \ offsets.in: input file to produce assym.h using the stabs program
 \ Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
 \ Copyright 2012 Garrett D'Amore <garett@damore.org>.  All rights reserved.
+\ Copyright 2019 Joyent, Inc.
 \
 \ CDDL HEADER START
 \
@@ -24,44 +25,44 @@
 \
 \
 \ Guidelines:
-\ 
+\
 \ A blank line is required between structure/union/intrinsic names.
-\ 
+\
 \ The general form is:
-\ 
+\
 \	name size_define [shift_define]
 \		member_name [offset_define]
 \	{blank line}
-\ 
+\
 \ If offset_define is not specified then the member_name is
 \ converted to all caps and used instead.  If the size of an item is
 \ a power of two then an optional shift count may be output using
 \ shift_define as the name but only if shift_define was specified.
-\ 
+\
 \ Arrays cause stabs to automatically output the per-array-item increment
 \ in addition to the base address:
-\ 
+\
 \	 foo FOO_SIZE
 \		array	FOO_ARRAY
-\ 
+\
 \ results in:
-\ 
+\
 \	#define	FOO_ARRAY	0x0
 \	#define	FOO_ARRAY_INCR	0x4
-\ 
+\
 \ which allows \#define's to be used to specify array items:
-\ 
+\
 \	#define	FOO_0	(FOO_ARRAY + (0 * FOO_ARRAY_INCR))
 \	#define	FOO_1	(FOO_ARRAY + (1 * FOO_ARRAY_INCR))
 \	...
 \	#define	FOO_n	(FOO_ARRAY + (n * FOO_ARRAY_INCR))
-\ 
+\
 \ There are several examples below (search for _INCR).
-\ 
+\
 \ There is currently no manner in which to identify "anonymous"
 \ structures or unions so if they are to be used in assembly code
 \ they must be given names.
-\ 
+\
 \ When specifying the offsets of nested structures/unions each nested
 \ structure or union must be listed separately then use the
 \ "\#define" escapes to add the offsets from the base structure/union
@@ -165,7 +166,6 @@ _kthread	THREAD_SIZE
 	_tu._ts._t_post_sys	T_POST_SYS
 	_tu._ts._t_trapret	T_TRAPRET
 	t_preempt_lk
-	t_kpri_req
 	t_lockstat
 	t_pil
 	t_intr_start
@@ -374,7 +374,7 @@ cpu	CPUSIZE
 	cpu_m.mpcb			CPU_MPCB
 	cpu_m.cpu_private		CPU_PRIVATE
 	cpu_m.cpu_mmu_idx		CPU_MMU_IDX
-	cpu_m.cpu_mmu_ctxp            	CPU_MMU_CTXP
+	cpu_m.cpu_mmu_ctxp		CPU_MMU_CTXP
 	cpu_m.ptl1_state		CPU_PTL1
 
 cpu_core_t	CPU_CORE_SIZE	CPU_CORE_SHIFT

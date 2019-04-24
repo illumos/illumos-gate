@@ -24,7 +24,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Gary Mills
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -112,35 +112,35 @@
 		ASSERT(_eaddr <= _rgnp->rgn_saddr + _rgnp->rgn_size);	\
 	}
 
-#define	SFMMU_VALIDATE_SHAREDHBLK(hmeblkp, srdp, rgnp, rid) 	 	 \
-{						 			 \
-		caddr_t _hsva;						 \
-		caddr_t _heva;						 \
-		caddr_t _rsva;					 	 \
-		caddr_t _reva;					 	 \
-		int	_ttesz = get_hblk_ttesz(hmeblkp);		 \
-		int	_flagtte;					 \
-		ASSERT((srdp)->srd_refcnt != 0);			 \
-		ASSERT((rid) < SFMMU_MAX_HME_REGIONS);			 \
-		ASSERT((rgnp)->rgn_id == rid);				 \
-		ASSERT(!((rgnp)->rgn_flags & SFMMU_REGION_FREE));	 \
-		ASSERT(((rgnp)->rgn_flags & SFMMU_REGION_TYPE_MASK) ==	 \
-		    SFMMU_REGION_HME);					 \
-		ASSERT(_ttesz <= (rgnp)->rgn_pgszc);			 \
-		_hsva = (caddr_t)get_hblk_base(hmeblkp);		 \
-		_heva = get_hblk_endaddr(hmeblkp);			 \
-		_rsva = (caddr_t)P2ALIGN(				 \
-		    (uintptr_t)(rgnp)->rgn_saddr, HBLK_MIN_BYTES);	 \
-		_reva = (caddr_t)P2ROUNDUP(				 \
-		    (uintptr_t)((rgnp)->rgn_saddr + (rgnp)->rgn_size),	 \
-		    HBLK_MIN_BYTES);					 \
-		ASSERT(_hsva >= _rsva);				 	 \
-		ASSERT(_hsva < _reva);				 	 \
-		ASSERT(_heva > _rsva);				 	 \
-		ASSERT(_heva <= _reva);				 	 \
-		_flagtte = (_ttesz < HBLK_MIN_TTESZ) ? HBLK_MIN_TTESZ :  \
-			_ttesz;						 \
-		ASSERT(rgnp->rgn_hmeflags & (0x1 << _flagtte));		 \
+#define	SFMMU_VALIDATE_SHAREDHBLK(hmeblkp, srdp, rgnp, rid)		\
+{									\
+		caddr_t _hsva;						\
+		caddr_t _heva;						\
+		caddr_t _rsva;						\
+		caddr_t _reva;						\
+		int	_ttesz = get_hblk_ttesz(hmeblkp);		\
+		int	_flagtte;					\
+		ASSERT((srdp)->srd_refcnt != 0);			\
+		ASSERT((rid) < SFMMU_MAX_HME_REGIONS);			\
+		ASSERT((rgnp)->rgn_id == rid);				\
+		ASSERT(!((rgnp)->rgn_flags & SFMMU_REGION_FREE));	\
+		ASSERT(((rgnp)->rgn_flags & SFMMU_REGION_TYPE_MASK) ==	\
+		    SFMMU_REGION_HME);					\
+		ASSERT(_ttesz <= (rgnp)->rgn_pgszc);			\
+		_hsva = (caddr_t)get_hblk_base(hmeblkp);		\
+		_heva = get_hblk_endaddr(hmeblkp);			\
+		_rsva = (caddr_t)P2ALIGN(				\
+		    (uintptr_t)(rgnp)->rgn_saddr, HBLK_MIN_BYTES);	\
+		_reva = (caddr_t)P2ROUNDUP(				\
+		    (uintptr_t)((rgnp)->rgn_saddr + (rgnp)->rgn_size),	\
+		    HBLK_MIN_BYTES);					\
+		ASSERT(_hsva >= _rsva);					\
+		ASSERT(_hsva < _reva);					\
+		ASSERT(_heva > _rsva);					\
+		ASSERT(_heva <= _reva);					\
+		_flagtte = (_ttesz < HBLK_MIN_TTESZ) ? HBLK_MIN_TTESZ : \
+			_ttesz;						\
+		ASSERT(rgnp->rgn_hmeflags & (0x1 << _flagtte));		\
 }
 
 #else /* DEBUG */
@@ -199,7 +199,7 @@ int	sfmmu_allow_nc_trans = 0;
 
 /*
  * Flag to disable large page support.
- * 	value of 1 => disable all large pages.
+ *	value of 1 => disable all large pages.
  *	bits 1, 2, and 3 are to disable 64K, 512K and 4M pages respectively.
  *
  * For example, use the value 0x4 to disable 512K pages.
@@ -247,7 +247,7 @@ static struct kmem_cache *sfmmu8_cache;
 static struct kmem_cache *sfmmu1_cache;
 static struct kmem_cache *pa_hment_cache;
 
-static kmutex_t 	ism_mlist_lock;	/* mutex for ism mapping list */
+static kmutex_t		ism_mlist_lock;	/* mutex for ism mapping list */
 /*
  * private data for ism
  */
@@ -393,7 +393,7 @@ int hat_check_vtop = 0;
  * Private sfmmu routines (prototypes)
  */
 static struct hme_blk *sfmmu_shadow_hcreate(sfmmu_t *, caddr_t, int, uint_t);
-static struct 	hme_blk *sfmmu_hblk_alloc(sfmmu_t *, caddr_t,
+static struct	hme_blk *sfmmu_hblk_alloc(sfmmu_t *, caddr_t,
 			struct hmehash_bucket *, uint_t, hmeblk_tag, uint_t,
 			uint_t);
 static caddr_t	sfmmu_hblk_unload(struct hat *, struct hme_blk *, caddr_t,
@@ -463,7 +463,7 @@ static void	sfmmu_tlb_range_demap(demap_range_t *);
 static void	sfmmu_invalidate_ctx(sfmmu_t *);
 static void	sfmmu_sync_mmustate(sfmmu_t *);
 
-static void 	sfmmu_tsbinfo_setup_phys(struct tsb_info *, pfn_t);
+static void	sfmmu_tsbinfo_setup_phys(struct tsb_info *, pfn_t);
 static int	sfmmu_tsbinfo_alloc(struct tsb_info **, int, int, uint_t,
 			sfmmu_t *);
 static void	sfmmu_tsb_free(struct tsb_info *);
@@ -561,8 +561,8 @@ struct hmehash_bucket *uhme_hash;	/* user hmeblk hash table */
 struct hmehash_bucket *khme_hash;	/* kernel hmeblk hash table */
 uint64_t	uhme_hash_pa;		/* PA of uhme_hash */
 uint64_t	khme_hash_pa;		/* PA of khme_hash */
-int 		uhmehash_num;		/* # of buckets in user hash table */
-int 		khmehash_num;		/* # of buckets in kernel hash table */
+int		uhmehash_num;		/* # of buckets in user hash table */
+int		khmehash_num;		/* # of buckets in kernel hash table */
 
 uint_t		max_mmu_ctxdoms = 0;	/* max context domains in the system */
 mmu_ctx_t	**mmu_ctxs_tbl;		/* global array of context domains */
@@ -705,7 +705,7 @@ struct sfmmu_tsbsize_stat sfmmu_tsbsize_stat;
 /*
  * Global data
  */
-sfmmu_t 	*ksfmmup;		/* kernel's hat id */
+sfmmu_t		*ksfmmup;		/* kernel's hat id */
 
 #ifdef DEBUG
 static void	chk_tte(tte_t *, tte_t *, tte_t *, struct hme_blk *);
@@ -857,7 +857,7 @@ sfmmu_vmem_xalloc_aligned_wrapper(vmem_t *vmp, size_t size, int vmflag)
 	if (ttesz == TTE8K || ttesz == TTE4M) {				\
 		sfmmu_unload_tsb(sfmmup, addr, ttesz);			\
 	} else {							\
-		caddr_t sva = ismhat ? addr : 				\
+		caddr_t sva = ismhat ? addr :				\
 		    (caddr_t)get_hblk_base(hmeblkp);			\
 		caddr_t eva = sva + get_hblk_span(hmeblkp);		\
 		ASSERT(addr >= sva && addr < eva);			\
@@ -1020,7 +1020,7 @@ static kphysm_setup_vector_t sfmmu_update_vec = {
 void
 hat_init_pagesizes()
 {
-	int 		i;
+	int		i;
 
 	mmu_exported_page_sizes = 0;
 	for (i = TTE8K; i < max_mmu_page_sizes; i++) {
@@ -1061,7 +1061,7 @@ hat_init_pagesizes()
 void
 hat_init(void)
 {
-	int 		i;
+	int		i;
 	uint_t		sz;
 	size_t		size;
 
@@ -2123,7 +2123,7 @@ hat_swapout(struct hat *sfmmup)
 /* ARGSUSED */
 int
 hat_dup(struct hat *hat, struct hat *newhat, caddr_t addr, size_t len,
-	uint_t flag)
+    uint_t flag)
 {
 	sf_srd_t *srdp;
 	sf_scd_t *scdp;
@@ -2188,7 +2188,7 @@ hat_dup(struct hat *hat, struct hat *newhat, caddr_t addr, size_t len,
 
 void
 hat_memload(struct hat *hat, caddr_t addr, struct page *pp,
-	uint_t attr, uint_t flags)
+    uint_t attr, uint_t flags)
 {
 	hat_do_memload(hat, addr, pp, attr, flags,
 	    SFMMU_INVALID_SHMERID);
@@ -2196,7 +2196,7 @@ hat_memload(struct hat *hat, caddr_t addr, struct page *pp,
 
 void
 hat_memload_region(struct hat *hat, caddr_t addr, struct page *pp,
-	uint_t attr, uint_t flags, hat_region_cookie_t rcookie)
+    uint_t attr, uint_t flags, hat_region_cookie_t rcookie)
 {
 	uint_t rid;
 	if (rcookie == HAT_INVALID_REGION_COOKIE) {
@@ -2216,7 +2216,7 @@ hat_memload_region(struct hat *hat, caddr_t addr, struct page *pp,
  */
 static void
 hat_do_memload(struct hat *hat, caddr_t addr, struct page *pp,
-	uint_t attr, uint_t flags, uint_t rid)
+    uint_t attr, uint_t flags, uint_t rid)
 {
 	tte_t tte;
 
@@ -2273,7 +2273,7 @@ hat_do_memload(struct hat *hat, caddr_t addr, struct page *pp,
  */
 void
 hat_devload(struct hat *hat, caddr_t addr, size_t len, pfn_t pfn,
-	uint_t attr, int flags)
+    uint_t attr, int flags)
 {
 	tte_t tte;
 	struct page *pp = NULL;
@@ -2414,7 +2414,7 @@ hat_devload(struct hat *hat, caddr_t addr, size_t len, pfn_t pfn,
 
 void
 hat_memload_array(struct hat *hat, caddr_t addr, size_t len,
-	struct page **pps, uint_t attr, uint_t flags)
+    struct page **pps, uint_t attr, uint_t flags)
 {
 	hat_do_memload_array(hat, addr, len, pps, attr, flags,
 	    SFMMU_INVALID_SHMERID);
@@ -2422,8 +2422,8 @@ hat_memload_array(struct hat *hat, caddr_t addr, size_t len,
 
 void
 hat_memload_array_region(struct hat *hat, caddr_t addr, size_t len,
-	struct page **pps, uint_t attr, uint_t flags,
-	hat_region_cookie_t rcookie)
+    struct page **pps, uint_t attr, uint_t flags,
+    hat_region_cookie_t rcookie)
 {
 	uint_t rid;
 	if (rcookie == HAT_INVALID_REGION_COOKIE) {
@@ -2449,7 +2449,7 @@ hat_memload_array_region(struct hat *hat, caddr_t addr, size_t len,
  */
 static void
 hat_do_memload_array(struct hat *hat, caddr_t addr, size_t len,
-	struct page **pps, uint_t attr, uint_t flags, uint_t rid)
+    struct page **pps, uint_t attr, uint_t flags, uint_t rid)
 {
 	int  ttesz;
 	size_t mapsz;
@@ -2559,7 +2559,7 @@ hat_do_memload_array(struct hat *hat, caddr_t addr, size_t len,
  */
 static void
 sfmmu_memload_batchsmall(struct hat *hat, caddr_t vaddr, page_t **pps,
-		    uint_t attr, uint_t flags, pgcnt_t npgs, uint_t rid)
+    uint_t attr, uint_t flags, pgcnt_t npgs, uint_t rid)
 {
 	tte_t	tte;
 	page_t *pp;
@@ -2675,7 +2675,7 @@ sfmmu_memtte(tte_t *ttep, pfn_t pfn, uint_t attr, int tte_sz)
  */
 void
 sfmmu_tteload(struct hat *sfmmup, tte_t *ttep, caddr_t vaddr, page_t *pp,
-	uint_t flags)
+    uint_t flags)
 {
 	ASSERT(sfmmup == ksfmmup);
 	(void) sfmmu_tteload_array(sfmmup, ttep, vaddr, &pp, flags,
@@ -2878,11 +2878,11 @@ sfmmu_select_tsb_szc(pgcnt_t pgcnt)
  */
 static int
 sfmmu_tteload_array(sfmmu_t *sfmmup, tte_t *ttep, caddr_t vaddr,
-	page_t **pps, uint_t flags, uint_t rid)
+    page_t **pps, uint_t flags, uint_t rid)
 {
 	struct hmehash_bucket *hmebp;
 	struct hme_blk *hmeblkp;
-	int 	ret;
+	int	ret;
 	uint_t	size;
 
 	/*
@@ -2947,7 +2947,7 @@ sfmmu_tteload_acquire_hashbucket(sfmmu_t *sfmmup, caddr_t vaddr, int size,
  */
 static struct hme_blk *
 sfmmu_tteload_find_hmeblk(sfmmu_t *sfmmup, struct hmehash_bucket *hmebp,
-	caddr_t vaddr, uint_t size, uint_t flags, uint_t rid)
+    caddr_t vaddr, uint_t size, uint_t flags, uint_t rid)
 {
 	hmeblk_tag hblktag;
 	int hmeshift;
@@ -3040,7 +3040,7 @@ ttearray_realloc:
  */
 static int
 sfmmu_tteload_addentry(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, tte_t *ttep,
-	caddr_t vaddr, page_t **pps, uint_t flags, uint_t rid)
+    caddr_t vaddr, page_t **pps, uint_t flags, uint_t rid)
 {
 	page_t *pp = *pps;
 	int hmenum, size, remap;
@@ -3386,7 +3386,7 @@ sfmmu_tteload_release_hashbucket(struct hmehash_bucket *hmebp)
 static int
 sfmmu_pagearray_setup(caddr_t addr, page_t **pps, tte_t *ttep, int remap)
 {
-	int 	i, index, ttesz;
+	int	i, index, ttesz;
 	pfn_t	pfnum;
 	pgcnt_t	npgs;
 	page_t *pp, *pp1;
@@ -3670,7 +3670,7 @@ sfmmu_shadow_hcreate(sfmmu_t *sfmmup, caddr_t vaddr, int ttesz, uint_t flags)
  */
 static void
 sfmmu_shadow_hcleanup(sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
-	struct hmehash_bucket *hmebp)
+    struct hmehash_bucket *hmebp)
 {
 	caddr_t addr, endaddr;
 	int hashno, size;
@@ -3698,7 +3698,7 @@ sfmmu_shadow_hcleanup(sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
 
 static void
 sfmmu_free_hblks(sfmmu_t *sfmmup, caddr_t addr, caddr_t endaddr,
-	int hashno)
+    int hashno)
 {
 	int hmeshift, shadow = 0;
 	hmeblk_tag hblktag;
@@ -4212,10 +4212,10 @@ readtte:
  */
 id_t
 hat_register_callback(int key,
-	int (*prehandler)(caddr_t, uint_t, uint_t, void *),
-	int (*posthandler)(caddr_t, uint_t, uint_t, void *, pfn_t),
-	int (*errhandler)(caddr_t, uint_t, uint_t, void *),
-	int capture_cpus)
+    int (*prehandler)(caddr_t, uint_t, uint_t, void *),
+    int (*posthandler)(caddr_t, uint_t, uint_t, void *, pfn_t),
+    int (*errhandler)(caddr_t, uint_t, uint_t, void *),
+    int capture_cpus)
 {
 	id_t id;
 
@@ -4288,17 +4288,17 @@ hat_register_callback(int key,
  */
 int
 hat_add_callback(id_t callback_id, caddr_t vaddr, uint_t len, uint_t flags,
-	void *pvt, pfn_t *rpfn, void **cookiep)
+    void *pvt, pfn_t *rpfn, void **cookiep)
 {
-	struct 		hmehash_bucket *hmebp;
-	hmeblk_tag 	hblktag;
+	struct		hmehash_bucket *hmebp;
+	hmeblk_tag	hblktag;
 	struct hme_blk	*hmeblkp;
-	int 		hmeshift, hashno;
-	caddr_t 	saddr, eaddr, baseaddr;
+	int		hmeshift, hashno;
+	caddr_t		saddr, eaddr, baseaddr;
 	struct pa_hment *pahmep;
 	struct sf_hment *sfhmep, *osfhmep;
 	kmutex_t	*pml;
-	tte_t   	tte;
+	tte_t		tte;
 	page_t		*pp;
 	vnode_t		*vp;
 	u_offset_t	off;
@@ -4517,7 +4517,7 @@ rehash:
  */
 void
 hat_delete_callback(caddr_t vaddr, uint_t len, void *pvt, uint_t flags,
-	void *cookie)
+    void *cookie)
 {
 	struct		hmehash_bucket *hmebp;
 	hmeblk_tag	hblktag;
@@ -4835,7 +4835,7 @@ hat_clrattr(struct hat *hat, caddr_t addr, size_t len, uint_t attr)
  */
 static void
 sfmmu_chgattr(struct hat *sfmmup, caddr_t addr, size_t len, uint_t attr,
-	int mode)
+    int mode)
 {
 	struct hmehash_bucket *hmebp;
 	hmeblk_tag hblktag;
@@ -4931,7 +4931,7 @@ sfmmu_chgattr(struct hat *sfmmup, caddr_t addr, size_t len, uint_t attr,
  */
 static caddr_t
 sfmmu_hblk_chgattr(struct hat *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
-	caddr_t endaddr, demap_range_t *dmrp, uint_t attr, int mode)
+    caddr_t endaddr, demap_range_t *dmrp, uint_t attr, int mode)
 {
 	tte_t tte, tteattr, tteflags, ttemod;
 	struct sf_hment *sfhmep;
@@ -5259,7 +5259,7 @@ hat_chgprot(struct hat *sfmmup, caddr_t addr, size_t len, uint_t vprot)
  */
 static caddr_t
 sfmmu_hblk_chgprot(sfmmu_t *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
-	caddr_t endaddr, demap_range_t *dmrp, uint_t vprot)
+    caddr_t endaddr, demap_range_t *dmrp, uint_t vprot)
 {
 	uint_t pprot;
 	tte_t tte, ttemod;
@@ -5418,24 +5418,24 @@ sfmmu_vtop_prot(uint_t vprot, uint_t *tteflagsp)
 	case (PROT_EXEC):
 	case (PROT_EXEC | PROT_READ):
 		*tteflagsp = TTE_PRIV_INT | TTE_WRPRM_INT | TTE_HWWR_INT;
-		return (TTE_PRIV_INT); 		/* set prv and clr wrt */
+		return (TTE_PRIV_INT);		/* set prv and clr wrt */
 	case (PROT_WRITE):
 	case (PROT_WRITE | PROT_READ):
 	case (PROT_EXEC | PROT_WRITE):
 	case (PROT_EXEC | PROT_WRITE | PROT_READ):
 		*tteflagsp = TTE_PRIV_INT | TTE_WRPRM_INT;
-		return (TTE_PRIV_INT | TTE_WRPRM_INT); 	/* set prv and wrt */
+		return (TTE_PRIV_INT | TTE_WRPRM_INT);	/* set prv and wrt */
 	case (PROT_USER | PROT_READ):
 	case (PROT_USER | PROT_EXEC):
 	case (PROT_USER | PROT_EXEC | PROT_READ):
 		*tteflagsp = TTE_PRIV_INT | TTE_WRPRM_INT | TTE_HWWR_INT;
-		return (0); 			/* clr prv and wrt */
+		return (0);			/* clr prv and wrt */
 	case (PROT_USER | PROT_WRITE):
 	case (PROT_USER | PROT_WRITE | PROT_READ):
 	case (PROT_USER | PROT_EXEC | PROT_WRITE):
 	case (PROT_USER | PROT_EXEC | PROT_WRITE | PROT_READ):
 		*tteflagsp = TTE_PRIV_INT | TTE_WRPRM_INT;
-		return (TTE_WRPRM_INT); 	/* clr prv and set wrt */
+		return (TTE_WRPRM_INT);		/* clr prv and set wrt */
 	default:
 		panic("sfmmu_vtop_prot -- bad prot %x", vprot);
 	}
@@ -5449,12 +5449,8 @@ sfmmu_vtop_prot(uint_t vprot, uint_t *tteflagsp)
  * hash table to find and remove mappings.
  */
 static void
-hat_unload_large_virtual(
-	struct hat		*sfmmup,
-	caddr_t			startaddr,
-	size_t			len,
-	uint_t			flags,
-	hat_callback_t		*callback)
+hat_unload_large_virtual(struct hat *sfmmup, caddr_t startaddr, size_t len,
+    uint_t flags, hat_callback_t *callback)
 {
 	struct hmehash_bucket *hmebp;
 	struct hme_blk *hmeblkp;
@@ -5592,12 +5588,8 @@ segkmap->s_base <= (addr) && (addr) < (segkmap->s_base + segkmap->s_size))
 
 
 void
-hat_unload_callback(
-	struct hat *sfmmup,
-	caddr_t addr,
-	size_t len,
-	uint_t flags,
-	hat_callback_t *callback)
+hat_unload_callback(struct hat *sfmmup, caddr_t addr, size_t len, uint_t flags,
+    hat_callback_t *callback)
 {
 	struct hmehash_bucket *hmebp;
 	hmeblk_tag hblktag;
@@ -5920,7 +5912,7 @@ fnd_mapping_sz(page_t *pp)
  */
 static caddr_t
 sfmmu_hblk_unload(struct hat *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
-	caddr_t endaddr, demap_range_t *dmrp, uint_t flags)
+    caddr_t endaddr, demap_range_t *dmrp, uint_t flags)
 {
 	tte_t	tte, ttemod;
 	struct	sf_hment *sfhmep;
@@ -6304,7 +6296,7 @@ hat_sync(struct hat *sfmmup, caddr_t addr, size_t len, uint_t clearflag)
 
 static caddr_t
 sfmmu_hblk_sync(struct hat *sfmmup, struct hme_blk *hmeblkp, caddr_t addr,
-	caddr_t endaddr, int clearflag)
+    caddr_t endaddr, int clearflag)
 {
 	tte_t	tte, ttemod;
 	struct sf_hment *sfhmep;
@@ -6379,7 +6371,7 @@ static void
 sfmmu_ttesync(struct hat *sfmmup, caddr_t addr, tte_t *ttep, page_t *pp)
 {
 	uint_t rm = 0;
-	int   	sz;
+	int	sz;
 	pgcnt_t	npgs;
 
 	ASSERT(TTE_IS_VALID(ttep));
@@ -6744,7 +6736,7 @@ static kmutex_t prl_mutex;
  *
  * Input:
  *
- * target : 	constituent pages are SE_EXCL locked.
+ * target :	constituent pages are SE_EXCL locked.
  * replacement:	constituent pages are SE_EXCL locked.
  *
  * Output:
@@ -7492,7 +7484,7 @@ retry:
  */
 static cpuset_t
 sfmmu_pagesync(struct page *pp, struct sf_hment *sfhme,
-	uint_t clearflag)
+    uint_t clearflag)
 {
 	caddr_t addr;
 	tte_t tte, ttemod;
@@ -8359,7 +8351,7 @@ size_t
 hat_get_mapped_size(struct hat *hat)
 {
 	size_t		assize = 0;
-	int 		i;
+	int		i;
 
 	if (hat == NULL)
 		return (0);
@@ -8459,12 +8451,12 @@ iment_sub(struct ism_ment *iment, struct hat *ism_hat)
  * HATOP_SHARE()/UNSHARE() return 0
  */
 int
-hat_share(struct hat *sfmmup, caddr_t addr,
-	struct hat *ism_hatid, caddr_t sptaddr, size_t len, uint_t ismszc)
+hat_share(struct hat *sfmmup, caddr_t addr, struct hat *ism_hatid,
+    caddr_t sptaddr, size_t len, uint_t ismszc)
 {
 	ism_blk_t	*ism_blkp;
 	ism_blk_t	*new_iblk;
-	ism_map_t 	*ism_map;
+	ism_map_t	*ism_map;
 	ism_ment_t	*ism_ment;
 	int		i, added;
 	hatlock_t	*hatlockp;
@@ -8689,11 +8681,11 @@ hat_share(struct hat *sfmmup, caddr_t addr,
 void
 hat_unshare(struct hat *sfmmup, caddr_t addr, size_t len, uint_t ismszc)
 {
-	ism_map_t 	*ism_map;
+	ism_map_t	*ism_map;
 	ism_ment_t	*free_ment = NULL;
 	ism_blk_t	*ism_blkp;
 	struct hat	*ism_hatid;
-	int 		found, i;
+	int		found, i;
 	hatlock_t	*hatlockp;
 	struct tsb_info	*tsbinfo;
 	uint_t		ismshift = page_get_shift(ismszc);
@@ -9299,7 +9291,7 @@ tst_tnc(page_t *pp, pgcnt_t npages)
 	tte_t	tte;
 	caddr_t	vaddr;
 	int	clr_valid = 0;
-	int 	color, color1, bcolor;
+	int	color, color1, bcolor;
 	int	i, ncolors;
 
 	ASSERT(pp != NULL);
@@ -9369,7 +9361,7 @@ tst_tnc(page_t *pp, pgcnt_t npages)
 
 void
 sfmmu_page_cache_array(page_t *pp, int flags, int cache_flush_flag,
-	pgcnt_t npages)
+    pgcnt_t npages)
 {
 	kmutex_t *pmtx;
 	int i, ncolors, bcolor;
@@ -10168,7 +10160,7 @@ sfmmu_check_page_sizes(sfmmu_t *sfmmup, int growing)
 
 static void
 sfmmu_size_tsb(sfmmu_t *sfmmup, int growing, uint64_t tte8k_cnt,
-	uint64_t tte4m_cnt, int sectsb_thresh)
+    uint64_t tte4m_cnt, int sectsb_thresh)
 {
 	int tsb_bits;
 	uint_t tsb_szc;
@@ -10309,7 +10301,7 @@ sfmmu_free_sfmmu(sfmmu_t *sfmmup)
 	ism_blk_t	*blkp, *nx_blkp;
 #ifdef	DEBUG
 	ism_map_t	*map;
-	int 		i;
+	int		i;
 #endif
 
 	ASSERT(sfmmup->sfmmu_ttecnt[TTE8K] == 0);
@@ -10882,7 +10874,6 @@ sfmmu_ismhat_enter(sfmmu_t *sfmmup, int hatlock_held)
 {
 	hatlock_t *hatlockp;
 
-	THREAD_KPRI_REQUEST();
 	if (!hatlock_held)
 		hatlockp = sfmmu_hat_enter(sfmmup);
 	while (SFMMU_FLAGS_ISSET(sfmmup, HAT_ISMBUSY))
@@ -10904,7 +10895,6 @@ sfmmu_ismhat_exit(sfmmu_t *sfmmup, int hatlock_held)
 	cv_broadcast(&sfmmup->sfmmu_tsb_cv);
 	if (!hatlock_held)
 		sfmmu_hat_exit(hatlockp);
-	THREAD_KPRI_RELEASE();
 }
 
 /*
@@ -10916,7 +10906,7 @@ sfmmu_ismhat_exit(sfmmu_t *sfmmup, int hatlock_held)
  *
  * (2) if we are allocating an hblk for mapping a slab in sfmmu_cache,
  *
- * 		(a) try to return an hblk from reserve pool of free hblks;
+ *		(a) try to return an hblk from reserve pool of free hblks;
  *		(b) if the reserve pool is empty, acquire hblk_reserve_lock
  *		    and return hblk_reserve.
  *
@@ -10933,8 +10923,8 @@ sfmmu_ismhat_exit(sfmmu_t *sfmmup, int hatlock_held)
  */
 static struct hme_blk *
 sfmmu_hblk_alloc(sfmmu_t *sfmmup, caddr_t vaddr,
-	struct hmehash_bucket *hmebp, uint_t size, hmeblk_tag hblktag,
-	uint_t flags, uint_t rid)
+    struct hmehash_bucket *hmebp, uint_t size, hmeblk_tag hblktag,
+    uint_t flags, uint_t rid)
 {
 	struct hme_blk *hmeblkp = NULL;
 	struct hme_blk *newhblkp;
@@ -11441,7 +11431,7 @@ sfmmu_hblk_steal(int size)
  */
 static int
 sfmmu_steal_this_hblk(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
-	uint64_t hblkpa, struct hme_blk *pr_hblk)
+    uint64_t hblkpa, struct hme_blk *pr_hblk)
 {
 	int shw_size, vshift;
 	struct hme_blk *shw_hblkp;
@@ -12066,14 +12056,14 @@ find_ism_rid(sfmmu_t *sfmmup, sfmmu_t *ism_sfmmup, caddr_t va, uint_t *ism_rid)
 /* ARGSUSED */
 static void
 sfmmu_ismtlbcache_demap(caddr_t addr, sfmmu_t *ism_sfmmup,
-	struct hme_blk *hmeblkp, pfn_t pfnum, int cache_flush_flag)
+    struct hme_blk *hmeblkp, pfn_t pfnum, int cache_flush_flag)
 {
-	cpuset_t 	cpuset;
-	caddr_t 	va;
+	cpuset_t	cpuset;
+	caddr_t		va;
 	ism_ment_t	*ment;
 	sfmmu_t		*sfmmup;
 #ifdef VAC
-	int 		vcolor;
+	int		vcolor;
 #endif
 
 	sf_scd_t	*scdp;
@@ -12163,8 +12153,8 @@ sfmmu_ismtlbcache_demap(caddr_t addr, sfmmu_t *ism_sfmmup,
  */
 static void
 sfmmu_tlbcache_demap(caddr_t addr, sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
-	pfn_t pfnum, int tlb_noflush, int cpu_flag, int cache_flush_flag,
-	int hat_lock_held)
+    pfn_t pfnum, int tlb_noflush, int cpu_flag, int cache_flush_flag,
+    int hat_lock_held)
 {
 #ifdef VAC
 	int vcolor;
@@ -12252,7 +12242,7 @@ sfmmu_tlbcache_demap(caddr_t addr, sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
  */
 static void
 sfmmu_tlb_demap(caddr_t addr, sfmmu_t *sfmmup, struct hme_blk *hmeblkp,
-	int tlb_noflush, int hat_lock_held)
+    int tlb_noflush, int hat_lock_held)
 {
 	cpuset_t cpuset;
 	hatlock_t *hatlockp;
@@ -12449,7 +12439,7 @@ sfmmu_invalidate_ctx(sfmmu_t *sfmmup)
 	/* set HAT cnum invalid across all context domains. */
 	for (i = 0; i < max_mmu_ctxdoms; i++) {
 
-		cnum = 	sfmmup->sfmmu_ctxs[i].cnum;
+		cnum = sfmmup->sfmmu_ctxs[i].cnum;
 		if (cnum == INVALID_CONTEXT) {
 			continue;
 		}
@@ -12638,7 +12628,7 @@ sfmmu_tsb_inv_ctx(sfmmu_t *sfmmup)
 /* ARGSUSED */
 static int
 sfmmu_tsb_post_relocator(caddr_t va, uint_t tsbsz, uint_t flags,
-	void *tsbinfo, pfn_t newpfn)
+    void *tsbinfo, pfn_t newpfn)
 {
 	hatlock_t *hatlockp;
 	struct tsb_info *tsbinfop = (struct tsb_info *)tsbinfo;
@@ -12682,7 +12672,7 @@ sfmmu_tsb_post_relocator(caddr_t va, uint_t tsbsz, uint_t flags,
  */
 static int
 sfmmu_tsbinfo_alloc(struct tsb_info **tsbinfopp, int tsb_szc, int tte_sz_mask,
-	uint_t flags, sfmmu_t *sfmmup)
+    uint_t flags, sfmmu_t *sfmmup)
 {
 	int err;
 
@@ -13812,15 +13802,9 @@ sfmmu_srdcache_destructor(void *buf, void *cdrarg)
  * the ism_map structure for ism segments.
  */
 hat_region_cookie_t
-hat_join_region(struct hat *sfmmup,
-	caddr_t r_saddr,
-	size_t r_size,
-	void *r_obj,
-	u_offset_t r_objoff,
-	uchar_t r_perm,
-	uchar_t r_pgszc,
-	hat_rgn_cb_func_t r_cb_function,
-	uint_t flags)
+hat_join_region(struct hat *sfmmup, caddr_t r_saddr, size_t r_size,
+    void *r_obj, u_offset_t r_objoff, uchar_t r_perm, uchar_t r_pgszc,
+    hat_rgn_cb_func_t r_cb_function, uint_t flags)
 {
 	sf_srd_t *srdp = sfmmup->sfmmu_srdp;
 	uint_t rhash;
@@ -15384,7 +15368,7 @@ sfmmu_scdcache_destructor(void *buf, void *cdrarg)
  * We cross-call to make sure that there are no threads on other cpus accessing
  * these hmblks and then complete the process of freeing them under the
  * following conditions:
- * 	The total number of pending hmeblks is greater than the threshold
+ *	The total number of pending hmeblks is greater than the threshold
  *	The reserve list has fewer than HBLK_RESERVE_CNT hmeblks
  *	It is at least 1 second since the last time we cross-called
  *
@@ -15462,7 +15446,7 @@ sfmmu_hblks_list_purge(struct hme_blk **listp, int dontfree)
  */
 void
 sfmmu_hblk_hash_add(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
-	uint64_t hblkpa)
+    uint64_t hblkpa)
 {
 	ASSERT(SFMMU_HASH_LOCK_ISHELD(hmebp));
 #ifdef	DEBUG
@@ -15518,8 +15502,7 @@ sfmmu_hblk_hash_add(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
  */
 void
 sfmmu_hblk_hash_rm(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
-    struct hme_blk *pr_hblk, struct hme_blk **listp,
-    int free_now)
+    struct hme_blk *pr_hblk, struct hme_blk **listp, int free_now)
 {
 	int shw_size, vshift;
 	struct hme_blk *shw_hblkp;

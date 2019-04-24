@@ -22,6 +22,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -78,7 +79,8 @@ typedef struct tsproc {
 } tsproc_t;
 
 /* flags */
-#define	TSKPRI		0x01	/* thread at kernel mode priority	*/
+
+/* Formerly: TSKPRI	0x01 - thread at kernel mode priority */
 #define	TSBACKQ		0x02	/* thread goes to back of dispq if preempted */
 #define	TSIA		0x04	/* thread is interactive		*/
 #define	TSIASET		0x08	/* interactive thread is "on"		*/
