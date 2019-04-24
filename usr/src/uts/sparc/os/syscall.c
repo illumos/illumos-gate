@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -1032,7 +1033,6 @@ loadable_syscall(
 	 * Try to autoload the system call if necessary.
 	 */
 	module_lock = lock_syscall(se, code);
-	THREAD_KPRI_RELEASE();	/* drop priority given by rw_enter */
 
 	/*
 	 * we've locked either the loaded syscall or nosys
@@ -1046,7 +1046,6 @@ loadable_syscall(
 		rval = syscall_ap();
 	}
 
-	THREAD_KPRI_REQUEST();	/* regain priority from read lock */
 	rw_exit(module_lock);
 	return (rval);
 }

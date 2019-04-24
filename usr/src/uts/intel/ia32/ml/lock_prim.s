@@ -280,7 +280,7 @@ ulock_clr:
 	ret					/* nop space for lfence */
 	nop
 	nop
-.mutex_enter_lockstat_6323525_patch_point:	/* new patch point if lfence */ 
+.mutex_enter_lockstat_6323525_patch_point:	/* new patch point if lfence */
 	nop
 #else	/* OPTERON_WORKAROUND_6323525 */
 	ret
@@ -439,10 +439,8 @@ mutex_exit_critical_size:
  */
 
 	ENTRY(rw_enter)
-	movq	%gs:CPU_THREAD, %rdx		/* rdx = thread ptr */
 	cmpl	$RW_WRITER, %esi
 	je	.rw_write_enter
-	incl	T_KPRI_REQ(%rdx)		/* THREAD_KPRI_REQUEST() */
 	movq	(%rdi), %rax			/* rax = old rw_wwwh value */
 	testl	$RW_WRITE_LOCKED|RW_WRITE_WANTED, %eax
 	jnz	rw_enter_sleep
@@ -458,6 +456,7 @@ mutex_exit_critical_size:
 	movl	$RW_READER, %edx
 	jmp	lockstat_wrapper_arg
 .rw_write_enter:
+	movq	%gs:CPU_THREAD, %rdx
 	orq	$RW_WRITE_LOCKED, %rdx		/* rdx = write-locked value */
 	xorl	%eax, %eax			/* rax = unheld value */
 	lock
@@ -493,8 +492,6 @@ mutex_exit_critical_size:
 	lock
 	cmpxchgq %rdx, (%rdi)			/* try to drop read lock */
 	jnz	rw_exit_wakeup
-	movq	%gs:CPU_THREAD, %rcx		/* rcx = thread ptr */
-	decl	T_KPRI_REQ(%rcx)		/* THREAD_KPRI_RELEASE() */
 .rw_read_exit_lockstat_patch_point:
 	ret
 	movq	%rdi, %rsi			/* rsi = lock ptr */
@@ -605,7 +602,7 @@ _lfence_insn:
 	movq	$normal_instr, %rsi;		\
 	movq	$active_instr, %rdi;		\
 	leaq	lockstat_probemap(%rip), %rax;	\
-	movl 	_MUL(event, DTRACE_IDSIZE)(%rax), %eax;	\
+	movl	_MUL(event, DTRACE_IDSIZE)(%rax), %eax;	\
 	testl	%eax, %eax;			\
 	jz	9f;				\
 	movq	%rdi, %rsi;			\

@@ -88,7 +88,6 @@ _kthread	THREAD_SIZE
 	t_lockstat
 	t_lockp
 	t_lock_flush
-	t_kpri_req
 	t_oldspl
 	t_pri
 	t_pil

@@ -193,32 +193,6 @@
  *	flag.  This flag currently has no effect, but marks threads which
  *	do bulk processing.
  *
- * - t_kpri_req
- *
- *	The TS and FSS scheduling classes pay attention to t_kpri_req,
- *	which provides a simple form of priority inheritance for
- *	synchronization primitives (such as rwlocks held as READER) which
- *	cannot be traced to a unique thread.  The SDC class does not honor
- *	t_kpri_req, for a few reasons:
- *
- *	1.  t_kpri_req is notoriously inaccurate.  A measure of its
- *	    inaccuracy is that it needs to be cleared every time a thread
- *	    returns to user mode, because it is frequently non-zero at that
- *	    point.  This can happen because "ownership" of synchronization
- *	    primitives that use t_kpri_req can be silently handed off,
- *	    leaving no opportunity to will the t_kpri_req inheritance.
- *
- *	2.  Unlike in TS and FSS, threads in SDC *will* eventually run at
- *	    kernel priority.  This means that even if an SDC thread
- *	    is holding a synchronization primitive and running at low
- *	    priority, its priority will eventually be raised above 60,
- *	    allowing it to drive on and release the resource.
- *
- *	3.  The first consumer of SDC uses the taskq subsystem, which holds
- *	    a reader lock for the duration of the task's execution.  This
- *	    would mean that SDC threads would never drop below kernel
- *	    priority in practice, which defeats one of the purposes of SDC.
- *
  * - Why not FSS?
  *
  *	It might seem that the existing FSS scheduling class could solve

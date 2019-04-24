@@ -26,6 +26,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/thread.h>
@@ -461,7 +462,7 @@ out:
 
 /*
  * Returns:
- * 	Function result in order of precedence:
+ *	Function result in order of precedence:
  *		 0 if a signal was received
  *		-1 if timeout occured
  *		>0 if awakened via cv_signal() or cv_broadcast().
@@ -552,7 +553,6 @@ cv_wait_sig_swap_core(kcondvar_t *cvp, kmutex_t *mp, int *sigret)
 	lwp->lwp_asleep = 1;
 	lwp->lwp_sysabort = 0;
 	thread_lock(t);
-	t->t_kpri_req = 0;	/* don't need kernel priority */
 	cv_block_sig(t, (condvar_impl_t *)cvp);
 	/* I can be swapped now */
 	curthread->t_schedflag &= ~TS_DONT_SWAP;
@@ -745,7 +745,7 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
  * that a timeout occurred until the future time is passed.
  * If 'when' is a NULL pointer, no timeout will occur.
  * Returns:
- * 	Function result in order of precedence:
+ *	Function result in order of precedence:
  *		 0 if a signal was received
  *		-1 if timeout occured
  *	        >0 if awakened via cv_signal() or cv_broadcast()
@@ -763,8 +763,8 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
  * does not need to deal with the time changing.
  */
 int
-cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
-	timestruc_t *when, int timecheck)
+cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp, timestruc_t *when,
+    int timecheck)
 {
 	timestruc_t now;
 	timestruc_t delta;

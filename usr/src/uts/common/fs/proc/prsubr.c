@@ -717,7 +717,6 @@ pr_p_lock(prnode_t *pnp)
 		mutex_enter(&p->p_lock);
 	}
 	p->p_proc_flag |= P_PR_LOCK;
-	THREAD_KPRI_REQUEST();
 	return (p);
 }
 
@@ -824,7 +823,6 @@ prunmark(proc_t *p)
 
 	cv_signal(&pr_pid_cv[p->p_slot]);
 	p->p_proc_flag &= ~P_PR_LOCK;
-	THREAD_KPRI_RELEASE();
 }
 
 void

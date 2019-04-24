@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/param.h>
@@ -269,9 +269,6 @@ void (*rw_lock_delay)(uint_t) = NULL;
 /*
  * Full-service implementation of rw_enter() to handle all the hard cases.
  * Called from the assembly version if anything complicated is going on.
- * The only semantic difference between calling rw_enter() and calling
- * rw_enter_sleep() directly is that we assume the caller has already done
- * a THREAD_KPRI_REQUEST() in the RW_READER cases.
  */
 void
 rw_enter_sleep(rwlock_impl_t *lp, krw_t rw)
@@ -342,15 +339,13 @@ rw_enter_sleep(rwlock_impl_t *lp, krw_t rw)
 		}
 
 		/*
-		 * We really are going to block.  Bump the stats, and drop
-		 * kpri if we're a reader.
+		 * We really are going to block, so bump the stats.
 		 */
 		ASSERT(lp->rw_wwwh & lock_wait);
 		ASSERT(lp->rw_wwwh & RW_LOCKED);
 
 		sleep_time = -gethrtime();
 		if (rw != RW_WRITER) {
-			THREAD_KPRI_RELEASE();
 			CPU_STATS_ADDQ(CPU, sys, rw_rdfails, 1);
 			(void) turnstile_block(ts, TS_READER_Q, lp,
 			    &rw_sobj_ops, NULL, NULL);
@@ -366,8 +361,8 @@ rw_enter_sleep(rwlock_impl_t *lp, krw_t rw)
 		    old >> RW_HOLD_COUNT_SHIFT);
 
 		/*
-		 * We wake up holding the lock (and having kpri if we're
-		 * a reader) via direct handoff from the previous owner.
+		 * We wake up holding the lock via direct handoff from the
+		 * previous owner.
 		 */
 		break;
 	}
@@ -394,7 +389,6 @@ rw_readers_to_wake(turnstile_t *ts)
 	while (next_reader != NULL) {
 		if (DISP_PRIO(next_reader) < wpri)
 			break;
-		next_reader->t_kpri_req++;
 		next_reader = next_reader->t_link;
 		count++;
 	}
@@ -523,7 +517,6 @@ rw_exit_wakeup(rwlock_impl_t *lp)
 	}
 
 	if (lock_value == RW_READ_LOCK) {
-		THREAD_KPRI_RELEASE();
 		LOCKSTAT_RECORD(LS_RW_EXIT_RELEASE, lp, RW_READER);
 	} else {
 		LOCKSTAT_RECORD(LS_RW_EXIT_RELEASE, lp, RW_WRITER);
@@ -539,11 +532,9 @@ rw_tryenter(krwlock_t *rwlp, krw_t rw)
 	if (rw != RW_WRITER) {
 		uint_t backoff = 0;
 		int loop_count = 0;
-		THREAD_KPRI_REQUEST();
 		for (;;) {
 			if ((old = lp->rw_wwwh) & (rw == RW_READER ?
 			    RW_WRITE_CLAIMED : RW_WRITE_LOCKED)) {
-				THREAD_KPRI_RELEASE();
 				return (0);
 			}
 			if (casip(&lp->rw_wwwh, old, old + RW_READ_LOCK) == old)
@@ -573,7 +564,6 @@ rw_downgrade(krwlock_t *rwlp)
 {
 	rwlock_impl_t *lp = (rwlock_impl_t *)rwlp;
 
-	THREAD_KPRI_REQUEST();
 	membar_exit();
 
 	if ((lp->rw_wwwh & RW_OWNER) != (uintptr_t)curthread) {
@@ -612,7 +602,6 @@ rw_tryupgrade(krwlock_t *rwlp)
 	} while (casip(&lp->rw_wwwh, old, new) != old);
 
 	membar_enter();
-	THREAD_KPRI_RELEASE();
 	LOCKSTAT_RECORD0(LS_RW_TRYUPGRADE_UPGRADE, lp);
 	ASSERT(rw_locked(lp, RW_WRITER));
 	return (1);
