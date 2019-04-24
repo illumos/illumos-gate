@@ -124,58 +124,58 @@
  * The second step is the triggering of events, which could be sent to a port.
  * Every event source implements an own method to generate events for a port:
  * PORT_SOURCE_AIO:
- * 	The sigevent structure of the standard POSIX-IO functions
- * 	was extended by an additional notification type.
- * 	Standard notification types:
- * 	SIGEV_NONE, SIGEV_SIGNAL and SIGEV_THREAD
- * 	Event ports introduced now SIGEV_PORT.
- * 	The notification type SIGEV_PORT specifies that a structure
- * 	of type port_notify_t has to be attached to the sigev_value.
- * 	The port_notify_t structure contains the event port file
- * 	descriptor and a user-defined pointer.
- * 	Internally the AIO implementation will use the kernel API
- * 	functions to allocate an event port slot per transaction (aiocb)
- * 	and sent the event to the port as soon as the transaction completes.
- * 	All the events submitted per transaction are of type
- * 	PORT_SOURCE_AIO.
+ *	The sigevent structure of the standard POSIX-IO functions
+ *	was extended by an additional notification type.
+ *	Standard notification types:
+ *	SIGEV_NONE, SIGEV_SIGNAL and SIGEV_THREAD
+ *	Event ports introduced now SIGEV_PORT.
+ *	The notification type SIGEV_PORT specifies that a structure
+ *	of type port_notify_t has to be attached to the sigev_value.
+ *	The port_notify_t structure contains the event port file
+ *	descriptor and a user-defined pointer.
+ *	Internally the AIO implementation will use the kernel API
+ *	functions to allocate an event port slot per transaction (aiocb)
+ *	and sent the event to the port as soon as the transaction completes.
+ *	All the events submitted per transaction are of type
+ *	PORT_SOURCE_AIO.
  * PORT_SOURCE_TIMER:
- * 	The timer_create() function uses the same method as the
- * 	PORT_SOURCE_AIO event source. It also uses the sigevent structure
- * 	to deliver the port information.
- * 	Internally the timer code will allocate a single event slot/struct
- * 	per timer and it will send the timer event as soon as the timer
- * 	fires. If the timer-fired event is not delivered to the application
- * 	before the next period elapsed, then an overrun counter will be
- * 	incremented. The timer event source uses a callback function to
- * 	detect the delivery of the event to the application. At that time
- * 	the timer callback function will update the event overrun counter.
+ *	The timer_create() function uses the same method as the
+ *	PORT_SOURCE_AIO event source. It also uses the sigevent structure
+ *	to deliver the port information.
+ *	Internally the timer code will allocate a single event slot/struct
+ *	per timer and it will send the timer event as soon as the timer
+ *	fires. If the timer-fired event is not delivered to the application
+ *	before the next period elapsed, then an overrun counter will be
+ *	incremented. The timer event source uses a callback function to
+ *	detect the delivery of the event to the application. At that time
+ *	the timer callback function will update the event overrun counter.
  * PORT_SOURCE_FD:
- * 	This event source uses the port_associate() function to allocate
- * 	an event slot/struct from a port. The application defines in the
- * 	events argument of port_associate() the type of events which it is
- * 	interested on.
- * 	The internal pollwakeup() function is used by all the file
- * 	systems --which are supporting the VOP_POLL() interface- to notify
- * 	the upper layer (poll(2), devpoll(7d) and now event ports) about
- * 	the event triggered (see valid events in poll(2)).
- * 	The pollwakeup() function forwards the event to the layer registered
- * 	to receive the current event.
- * 	The port_dissociate() function can be used to free the allocated
- * 	event slot from the port. Anyway, file descriptors deliver events
- * 	only one time and remain deactivated until the application
- * 	reactivates the association of a file descriptor with port_associate().
- * 	If an associated file descriptor is closed then the file descriptor
- * 	will be dissociated automatically from the port.
+ *	This event source uses the port_associate() function to allocate
+ *	an event slot/struct from a port. The application defines in the
+ *	events argument of port_associate() the type of events which it is
+ *	interested on.
+ *	The internal pollwakeup() function is used by all the file
+ *	systems --which are supporting the VOP_POLL() interface- to notify
+ *	the upper layer (poll(2), devpoll(7d) and now event ports) about
+ *	the event triggered (see valid events in poll(2)).
+ *	The pollwakeup() function forwards the event to the layer registered
+ *	to receive the current event.
+ *	The port_dissociate() function can be used to free the allocated
+ *	event slot from the port. Anyway, file descriptors deliver events
+ *	only one time and remain deactivated until the application
+ *	reactivates the association of a file descriptor with port_associate().
+ *	If an associated file descriptor is closed then the file descriptor
+ *	will be dissociated automatically from the port.
  *
  * PORT_SOURCE_ALERT:
- * 	This event type is generated when the port was previously set in
- * 	alert mode using the port_alert() function.
- * 	A single alert event is delivered to every thread which tries to
- * 	retrieve events from a port.
+ *	This event type is generated when the port was previously set in
+ *	alert mode using the port_alert() function.
+ *	A single alert event is delivered to every thread which tries to
+ *	retrieve events from a port.
  * PORT_SOURCE_USER:
- * 	This type of event is generated from user level using the port_send()
- * 	function to send a user event to a port or the port_sendn() function
- * 	to send an event to a list of ports.
+ *	This type of event is generated from user level using the port_send()
+ *	function to send a user event to a port or the port_sendn() function
+ *	to send an event to a list of ports.
  * PORT_SOURCE_FILE:
  *	This event source uses the port_associate() interface to register
  *	a file to be monitored for changes. The file name that needs to be
@@ -209,33 +209,33 @@
  * processes other than the owner of the event.
  *    Shareable event types are:
  *    PORT_SOURCE_USER events
- * 	This type of event is unconditionally shareable and without
- * 	limitations. If the parent process sends a user event and closes
- * 	the port afterwards, the event remains in the port and the child
- * 	process will still be able to retrieve the user event.
+ *	This type of event is unconditionally shareable and without
+ *	limitations. If the parent process sends a user event and closes
+ *	the port afterwards, the event remains in the port and the child
+ *	process will still be able to retrieve the user event.
  *    PORT_SOURCE_ALERT events
- * 	This type of event is shareable between processes.
- * 	Limitation:	The alert mode of the port is removed if the owner
- * 			(process which set the port in alert mode) of the
- * 			alert event closes the port.
+ *	This type of event is shareable between processes.
+ *	Limitation:	The alert mode of the port is removed if the owner
+ *			(process which set the port in alert mode) of the
+ *			alert event closes the port.
  *    PORT_SOURCE_FD events
- * 	This type of event is conditional shareable between processes.
- * 	After fork(2) all forked file descriptors are shareable between
- * 	the processes. The child process is allowed to retrieve events
- * 	from the associated file descriptors and it can also re-associate
- * 	the fd with the port.
- * 	Limitations:	The child process is not allowed to dissociate
- * 			the file descriptor from the port. Only the
- * 			owner (process) of the association is allowed to
- * 			dissociate the file descriptor from the port.
- * 			If the owner of the association closes the port
- * 			the association will be removed.
+ *	This type of event is conditional shareable between processes.
+ *	After fork(2) all forked file descriptors are shareable between
+ *	the processes. The child process is allowed to retrieve events
+ *	from the associated file descriptors and it can also re-associate
+ *	the fd with the port.
+ *	Limitations:	The child process is not allowed to dissociate
+ *			the file descriptor from the port. Only the
+ *			owner (process) of the association is allowed to
+ *			dissociate the file descriptor from the port.
+ *			If the owner of the association closes the port
+ *			the association will be removed.
  *    PORT_SOURCE_AIO events
- * 	This type of event is not shareable between processes.
+ *	This type of event is not shareable between processes.
  *    PORT_SOURCE_TIMER events
- * 	This type of event is not shareable between processes.
+ *	This type of event is not shareable between processes.
  *    PORT_SOURCE_FILE events
- * 	This type of event is not shareable between processes.
+ *	This type of event is not shareable between processes.
  *
  * FORK BEHAVIOUR
  * On fork(2) the child process inherits all opened file descriptors from
@@ -480,7 +480,7 @@ _init(void)
 	extern const	fs_operation_def_t port_vnodeops_template[];
 	vfsops_t	*port_vfsops;
 	int		error;
-	major_t 	major;
+	major_t		major;
 
 	if ((major = getudev()) == (major_t)-1)
 		return (ENXIO);
@@ -558,7 +558,7 @@ portfs(int opcode, uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 {
 	rval_t		r;
 	port_t		*pp;
-	int 		error = 0;
+	int		error = 0;
 	uint_t		nget;
 	file_t		*fp;
 	port_gettimer_t	port_timer;
@@ -603,7 +603,7 @@ portfs(int opcode, uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3,
 		port_timer.pgt_flags = PORTGET_ONE;
 		port_timer.pgt_loop = 0;
 		port_timer.pgt_rqtp = NULL;
-		if (a4 != NULL) {
+		if (a4 != 0) {
 			port_timer.pgt_timeout = &timeout;
 			timeout.tv_sec = (time_t)a2;
 			timeout.tv_nsec = (long)a3;
@@ -1162,8 +1162,8 @@ port_getn(port_t *pp, port_event_t *uevp, uint_t max, uint_t *nget,
     port_gettimer_t *pgt)
 {
 	port_queue_t	*portq;
-	port_kevent_t 	*pev;
-	port_kevent_t 	*lev;
+	port_kevent_t	*pev;
+	port_kevent_t	*lev;
 	int		error = 0;
 	uint_t		nmax;
 	uint_t		nevents;
@@ -1779,7 +1779,7 @@ port_get_timeout(timespec_t *timeout, timespec_t *rqtime, timespec_t **rqtp,
 				return (EFAULT);
 #ifdef	_SYSCALL32_IMPL
 		} else {
-			timespec32_t 	wait_time_32;
+			timespec32_t	wait_time_32;
 			if (copyin(timeout, &wait_time_32,
 			    sizeof (wait_time_32)))
 				return (EFAULT);

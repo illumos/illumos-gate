@@ -230,10 +230,10 @@ AcpiOsGetRootPointer()
 	 * in the acpi-root-tab property.
 	 */
 	Address = ddi_prop_get_int64(DDI_DEV_T_ANY, ddi_root_node(),
-	    DDI_PROP_DONTPASS, "acpi-root-tab", NULL);
+	    DDI_PROP_DONTPASS, "acpi-root-tab", 0);
 
-	if ((Address == NULL) && ACPI_FAILURE(AcpiFindRootPointer(&Address)))
-		Address = NULL;
+	if ((Address == 0) && ACPI_FAILURE(AcpiFindRootPointer(&Address)))
+		Address = 0;
 
 	return (Address);
 }

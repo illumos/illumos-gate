@@ -106,7 +106,7 @@ audit_init_module()
 
 	/* generate a system-booted audit record */
 	au_write((caddr_t *)&rp, au_to_text("booting kernel"));
-	audit_async_finish((caddr_t *)&rp, AUE_SYSTEMBOOT, NULL,
+	audit_async_finish((caddr_t *)&rp, AUE_SYSTEMBOOT, 0,
 	    &(p0.p_user.u_start));
 }
 

@@ -888,7 +888,7 @@ int ql_toggle_interrupt(ql_adapter_state_t *, uint16_t);
 	{MBC_PORT_RESET, "MBC_PORT_RESET"},				\
 	{MBC_SET_PORT_CONFIG, "MBC_SET_PORT_CONFIG"},			\
 	{MBC_GET_PORT_CONFIG, "MBC_GET_PORT_CONFIG"},			\
-	{NULL, "Unsupported"}						\
+	{0, "Unsupported"}						\
 }
 
 #ifdef	__cplusplus

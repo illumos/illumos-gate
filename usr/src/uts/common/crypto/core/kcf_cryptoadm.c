@@ -86,7 +86,7 @@ count_mechanisms(crypto_mech_name_t mechs[])
  * of kernel software providers.
  * Called from kcf module _init().
  */
-void
+	void
 kcf_soft_config_init(void)
 {
 	typedef struct {
@@ -133,51 +133,53 @@ kcf_soft_config_init(void)
 	 * cryptosvc runs), add to kcf_init_mech_tabs() in kcf_mech_tabs.c.
 	 */
 	static crypto_mech_name_t	des_mechs[] = {
-	    "CKM_DES_CBC", "CKM_DES_ECB", "CKM_DES3_CBC", "CKM_DES3_ECB", ""};
+		"CKM_DES_CBC", "CKM_DES_ECB", "CKM_DES3_CBC", "CKM_DES3_ECB",
+		""};
 	static crypto_mech_name_t	aes_mechs[] = {
-	    "CKM_AES_ECB", "CKM_AES_CBC", "CKM_AES_CTR", "CKM_AES_CCM",
-	    "CKM_AES_GCM", "CKM_AES_GMAC", "CKM_AES_CMAC", ""};
+		"CKM_AES_ECB", "CKM_AES_CBC", "CKM_AES_CTR", "CKM_AES_CCM",
+		"CKM_AES_GCM", "CKM_AES_GMAC", "CKM_AES_CMAC", ""};
 	static crypto_mech_name_t	arcfour_mechs[] = {
-	    "CKM_RC4", ""};
+		"CKM_RC4", ""};
 	static crypto_mech_name_t	blowfish_mechs[] = {
-	    "CKM_BLOWFISH_ECB", "CKM_BLOWFISH_CBC", ""};
+		"CKM_BLOWFISH_ECB", "CKM_BLOWFISH_CBC", ""};
 	static crypto_mech_name_t	ecc_mechs[] = {
-	    "CKM_EC_KEY_PAIR_GEN", "CKM_ECDH1_DERIVE", "CKM_ECDSA",
-	    "CKM_ECDSA_SHA1", ""};
+		"CKM_EC_KEY_PAIR_GEN", "CKM_ECDH1_DERIVE", "CKM_ECDSA",
+		"CKM_ECDSA_SHA1", ""};
 	static crypto_mech_name_t	sha1_mechs[] = {
-	    "CKM_SHA_1", "CKM_SHA_1_HMAC_GENERAL", "CKM_SHA_1_HMAC", ""};
+		"CKM_SHA_1", "CKM_SHA_1_HMAC_GENERAL", "CKM_SHA_1_HMAC", ""};
 	static crypto_mech_name_t	sha2_mechs[] = {
-	    "CKM_SHA256", "CKM_SHA256_HMAC", "CKM_SHA256_HMAC_GENERAL",
-	    "CKM_SHA384", "CKM_SHA384_HMAC", "CKM_SHA384_HMAC_GENERAL",
-	    "CKM_SHA512", "CKM_SHA512_HMAC", "CKM_SHA512_HMAC_GENERAL", ""};
+		"CKM_SHA256", "CKM_SHA256_HMAC", "CKM_SHA256_HMAC_GENERAL",
+		"CKM_SHA384", "CKM_SHA384_HMAC", "CKM_SHA384_HMAC_GENERAL",
+		"CKM_SHA512", "CKM_SHA512_HMAC", "CKM_SHA512_HMAC_GENERAL", ""};
 	static crypto_mech_name_t	md4_mechs[] = {
-	    "CKM_MD4", ""};
+		"CKM_MD4", ""};
 	static crypto_mech_name_t	md5_mechs[] = {
-	    "CKM_MD5", "CKM_MD5_HMAC_GENERAL", "CKM_MD5_HMAC", ""};
+		"CKM_MD5", "CKM_MD5_HMAC_GENERAL", "CKM_MD5_HMAC", ""};
 	static crypto_mech_name_t	rsa_mechs[] = {
-	    "CKM_RSA_PKCS", "CKM_RSA_X_509", "CKM_MD5_RSA_PKCS",
-	    "CKM_SHA1_RSA_PKCS", "CKM_SHA256_RSA_PKCS", "CKM_SHA384_RSA_PKCS",
-	    "CKM_SHA512_RSA_PKCS", ""};
+		"CKM_RSA_PKCS", "CKM_RSA_X_509", "CKM_MD5_RSA_PKCS",
+		"CKM_SHA1_RSA_PKCS", "CKM_SHA256_RSA_PKCS",
+		"CKM_SHA384_RSA_PKCS",
+		"CKM_SHA512_RSA_PKCS", ""};
 	static crypto_mech_name_t	swrand_mechs[] = {
-	    "random", NULL};
+		"random", ""};
 	static initial_soft_config_entry_t
-	    initial_soft_config_entry[] = {
-		"des", des_mechs,
-		"aes", aes_mechs,
-		"arcfour", arcfour_mechs,
-		"blowfish", blowfish_mechs,
-		"ecc", ecc_mechs,
-		"sha1", sha1_mechs,
-		"sha2", sha2_mechs,
-		"md4", md4_mechs,
-		"md5", md5_mechs,
-		"rsa", rsa_mechs,
-		"swrand", swrand_mechs
-	};
-	const int	initial_soft_config_entries =
+		initial_soft_config_entry[] = {
+			"des", des_mechs,
+			"aes", aes_mechs,
+			"arcfour", arcfour_mechs,
+			"blowfish", blowfish_mechs,
+			"ecc", ecc_mechs,
+			"sha1", sha1_mechs,
+			"sha2", sha2_mechs,
+			"md4", md4_mechs,
+			"md5", md5_mechs,
+			"rsa", rsa_mechs,
+			"swrand", swrand_mechs
+		};
+	const int initial_soft_config_entries =
 	    sizeof (initial_soft_config_entry)
 	    / sizeof (initial_soft_config_entry_t);
-	int		i;
+	int i;
 
 	mutex_init(&soft_config_mutex, NULL, MUTEX_DRIVER, NULL);
 
@@ -198,10 +200,11 @@ kcf_soft_config_init(void)
 		bcopy(p->mechs, mechsp, alloc_size);
 
 		r = add_soft_config(p->name, mech_count, mechsp);
-		if (r != 0)
+		if (r != 0) {
 			cmn_err(CE_WARN,
 			    "add_soft_config(%s) failed; returned %d\n",
 			    p->name, r);
+		}
 	}
 #if DEBUG
 	if (kcf_frmwrk_debug >= 1)

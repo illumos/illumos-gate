@@ -1888,7 +1888,7 @@ ql_enqueue_aen(ql_adapter_state_t *ha, uint16_t event_code, void *payload)
 	}
 	aen_queue = (EXT_ASYNC_EVENT *)xp->aen_tracking_queue;
 
-	if (aen_queue[xp->aen_q_tail].AsyncEventCode != NULL) {
+	if (aen_queue[xp->aen_q_tail].AsyncEventCode != 0) {
 		/* Need to change queue pointers to make room. */
 
 		/* Increment tail for adding new entry. */
@@ -6525,7 +6525,7 @@ ql_setup_fcache(ql_adapter_state_t *ha)
  *
  * Input:
  *	ha	= adapter state pointer.
- *	*bpf 	= Pointer to flash buffer.
+ *	*bpf	= Pointer to flash buffer.
  *	bsize	= Size of flash buffer.
  *
  * Returns:

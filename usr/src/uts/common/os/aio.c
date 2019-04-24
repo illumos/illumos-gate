@@ -416,7 +416,7 @@ aionotify(void)
 
 static int
 timeval2reltime(struct timeval *timout, timestruc_t *rqtime,
-	timestruc_t **rqtp, int *blocking)
+    timestruc_t **rqtp, int *blocking)
 {
 #ifdef	_SYSCALL32_IMPL
 	struct timeval32 wait_time_32;
@@ -479,7 +479,7 @@ timeval2reltime(struct timeval *timout, timestruc_t *rqtime,
 
 static int
 timespec2reltime(timespec_t *timout, timestruc_t *rqtime,
-	timestruc_t **rqtp, int *blocking)
+    timestruc_t **rqtp, int *blocking)
 {
 #ifdef	_SYSCALL32_IMPL
 	timespec32_t wait_time_32;
@@ -521,12 +521,9 @@ timespec2reltime(timespec_t *timout, timestruc_t *rqtime,
 
 /*ARGSUSED*/
 static int
-aiowait(
-	struct timeval	*timout,
-	int	dontblockflg,
-	long	*rval)
+aiowait(struct timeval *timout, int dontblockflg, long *rval)
 {
-	int 		error;
+	int		error;
 	aio_t		*aiop;
 	aio_req_t	*reqp;
 	clock_t		status;
@@ -611,7 +608,7 @@ aiowait(
 static int
 aiowaitn(void *uiocb, uint_t nent, uint_t *nwait, timespec_t *timout)
 {
-	int 		error = 0;
+	int		error = 0;
 	aio_t		*aiop;
 	aio_req_t	*reqlist = NULL;
 	caddr_t		iocblist = NULL;	/* array of iocb ptr's */
@@ -894,15 +891,10 @@ aio_reqlist_concat(aio_t *aiop, aio_req_t **reqlist, int max)
 
 /*ARGSUSED*/
 static int
-aiosuspend(
-	void	*aiocb,
-	int	nent,
-	struct	timespec	*timout,
-	int	flag,
-	long	*rval,
-	int	run_mode)
+aiosuspend(void	*aiocb, int nent, struct timespec *timout, int flag,
+    long *rval, int run_mode)
 {
-	int 		error;
+	int		error;
 	aio_t		*aiop;
 	aio_req_t	*reqp, *found, *next;
 	caddr_t		cbplist = NULL;
@@ -1157,7 +1149,7 @@ aiostart(void)
 
 static int
 aio_req_assoc_port_rw(port_notify_t *pntfy, aiocb_t *cbp,
-	aio_req_t *reqp, int event)
+    aio_req_t *reqp, int event)
 {
 	port_kevent_t	*pkevp = NULL;
 	int		error;
@@ -1679,8 +1671,8 @@ aio_list_get(aio_result_t *resultp)
 {
 	aio_lio_t	*head = NULL;
 	aio_t		*aiop;
-	aio_req_t 	**bucket;
-	aio_req_t 	*reqp;
+	aio_req_t	**bucket;
+	aio_req_t	*reqp;
 	long		index;
 
 	aiop = curproc->p_aio;
@@ -1754,7 +1746,7 @@ alio_cleanup(aio_t *aiop, aiocb_t **cbp, int nent, int run_mode)
 			caddr32_t *cbp32;
 
 			cbp32 = (caddr32_t *)cbp;
-			if (cbp32[i] == NULL)
+			if (cbp32[i] == 0)
 				continue;
 			if (run_mode == AIO_32) {
 				aiocb_32 = (aiocb32_t *)(uintptr_t)cbp32[i];
@@ -1842,17 +1834,13 @@ aioerror(void *cb, int run_mode)
 }
 
 /*
- * 	aio_cancel - if no requests outstanding,
+ *	aio_cancel - if no requests outstanding,
  *			return AIO_ALLDONE
  *			else
  *			return AIO_NOTCANCELED
  */
 static int
-aio_cancel(
-	int	fildes,
-	void 	*cb,
-	long	*rval,
-	int	run_mode)
+aio_cancel(int fildes, void *cb, long *rval, int run_mode)
 {
 	aio_t *aiop;
 	void *resultp;
@@ -2392,17 +2380,12 @@ aio_req_remove(aio_req_t *reqp)
 }
 
 static int
-aio_req_setup(
-	aio_req_t	**reqpp,
-	aio_t 		*aiop,
-	aiocb_t 	*arg,
-	aio_result_t 	*resultp,
-	vnode_t		*vp,
-	int		old_solaris_req)
+aio_req_setup(aio_req_t **reqpp, aio_t *aiop, aiocb_t *arg,
+    aio_result_t *resultp, vnode_t *vp, int old_solaris_req)
 {
 	sigqueue_t	*sqp = NULL;
-	aio_req_t 	*reqp;
-	struct uio 	*uio;
+	aio_req_t	*reqp;
+	struct uio	*uio;
 	struct sigevent *sigev;
 	int		error;
 
@@ -2776,7 +2759,7 @@ static int
 {
 	struct snode *sp;
 	dev_t		dev;
-	struct cb_ops  	*cb;
+	struct cb_ops	*cb;
 	major_t		major;
 	int		(*aio_func)();
 
@@ -2854,7 +2837,7 @@ static int
 driver_aio_write(vnode_t *vp, struct aio_req *aio, cred_t *cred_p)
 {
 	dev_t dev;
-	struct cb_ops  	*cb;
+	struct cb_ops	*cb;
 
 	ASSERT(vp->v_type == VCHR);
 	ASSERT(!IS_PXFSVP(vp));
@@ -2878,7 +2861,7 @@ static int
 driver_aio_read(vnode_t *vp, struct aio_req *aio, cred_t *cred_p)
 {
 	dev_t dev;
-	struct cb_ops  	*cb;
+	struct cb_ops	*cb;
 
 	ASSERT(vp->v_type == VCHR);
 	ASSERT(!IS_PXFSVP(vp));
@@ -3301,7 +3284,7 @@ aio_req_setupLF(
 	aio_req_t	*reqp;
 	struct uio	*uio;
 	struct sigevent32 *sigev;
-	int 		error;
+	int		error;
 
 	sigev = &arg->aio_sigevent;
 	if (sigev->sigev_notify == SIGEV_SIGNAL &&

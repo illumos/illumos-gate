@@ -1152,7 +1152,7 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 	pcmcia_adapters[i]->pca_number = i;
 	(void) strcpy(pcmcia_adapters[i]->pca_name, ddi_get_name(dip));
 	pcmcia_adapters[i]->
-	    pca_name[sizeof (pcmcia_adapters[i]->pca_name) - 1] = NULL;
+	    pca_name[sizeof (pcmcia_adapters[i]->pca_name) - 1] = '\0';
 
 	if (ls_if != NULL) {
 		inquire_adapter_t conf;

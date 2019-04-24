@@ -151,9 +151,9 @@ static char sata_rev_tag[] = {"1.46"};
 /*
  * SATA cb_ops functions
  */
-static 	int sata_hba_open(dev_t *, int, int, cred_t *);
-static 	int sata_hba_close(dev_t, int, int, cred_t *);
-static 	int sata_hba_ioctl(dev_t, int, intptr_t, int, cred_t *,	int *);
+static	int sata_hba_open(dev_t *, int, int, cred_t *);
+static	int sata_hba_close(dev_t, int, int, cred_t *);
+static	int sata_hba_ioctl(dev_t, int, intptr_t, int, cred_t *,	int *);
 
 /*
  * SCSA required entry points
@@ -164,17 +164,17 @@ static	int sata_scsi_tgt_probe(struct scsi_device *,
     int (*callback)(void));
 static void sata_scsi_tgt_free(dev_info_t *, dev_info_t *,
     scsi_hba_tran_t *, struct scsi_device *);
-static 	int sata_scsi_start(struct scsi_address *, struct scsi_pkt *);
-static 	int sata_scsi_abort(struct scsi_address *, struct scsi_pkt *);
-static 	int sata_scsi_reset(struct scsi_address *, int);
-static 	int sata_scsi_getcap(struct scsi_address *, char *, int);
-static 	int sata_scsi_setcap(struct scsi_address *, char *, int, int);
-static 	struct scsi_pkt *sata_scsi_init_pkt(struct scsi_address *,
+static	int sata_scsi_start(struct scsi_address *, struct scsi_pkt *);
+static	int sata_scsi_abort(struct scsi_address *, struct scsi_pkt *);
+static	int sata_scsi_reset(struct scsi_address *, int);
+static	int sata_scsi_getcap(struct scsi_address *, char *, int);
+static	int sata_scsi_setcap(struct scsi_address *, char *, int, int);
+static	struct scsi_pkt *sata_scsi_init_pkt(struct scsi_address *,
     struct scsi_pkt *, struct buf *, int, int, int, int, int (*)(caddr_t),
     caddr_t);
-static 	void sata_scsi_destroy_pkt(struct scsi_address *, struct scsi_pkt *);
-static 	void sata_scsi_dmafree(struct scsi_address *, struct scsi_pkt *);
-static 	void sata_scsi_sync_pkt(struct scsi_address *, struct scsi_pkt *);
+static	void sata_scsi_destroy_pkt(struct scsi_address *, struct scsi_pkt *);
+static	void sata_scsi_dmafree(struct scsi_address *, struct scsi_pkt *);
+static	void sata_scsi_sync_pkt(struct scsi_address *, struct scsi_pkt *);
 
 /*
  * SATA HBA interface functions are defined in sata_hba.h header file
@@ -281,25 +281,25 @@ static	int sata_ioctl_get_serialnumber_info(sata_hba_inst_t *,
 /*
  * Local functions
  */
-static 	void sata_remove_hba_instance(dev_info_t *);
-static 	int sata_validate_sata_hba_tran(dev_info_t *, sata_hba_tran_t *);
-static 	void sata_probe_ports(sata_hba_inst_t *);
+static	void sata_remove_hba_instance(dev_info_t *);
+static	int sata_validate_sata_hba_tran(dev_info_t *, sata_hba_tran_t *);
+static	void sata_probe_ports(sata_hba_inst_t *);
 static	void sata_probe_pmports(sata_hba_inst_t *, uint8_t);
-static 	int sata_reprobe_port(sata_hba_inst_t *, sata_device_t *, int);
-static 	int sata_reprobe_pmult(sata_hba_inst_t *, sata_device_t *, int);
-static 	int sata_reprobe_pmport(sata_hba_inst_t *, sata_device_t *, int);
+static	int sata_reprobe_port(sata_hba_inst_t *, sata_device_t *, int);
+static	int sata_reprobe_pmult(sata_hba_inst_t *, sata_device_t *, int);
+static	int sata_reprobe_pmport(sata_hba_inst_t *, sata_device_t *, int);
 static	int sata_alloc_pmult(sata_hba_inst_t *, sata_device_t *);
 static	void sata_free_pmult(sata_hba_inst_t *, sata_device_t *);
-static 	int sata_add_device(dev_info_t *, sata_hba_inst_t *, sata_device_t *);
+static	int sata_add_device(dev_info_t *, sata_hba_inst_t *, sata_device_t *);
 static	int sata_offline_device(sata_hba_inst_t *, sata_device_t *,
     sata_drive_info_t *);
-static 	dev_info_t *sata_create_target_node(dev_info_t *, sata_hba_inst_t *,
+static	dev_info_t *sata_create_target_node(dev_info_t *, sata_hba_inst_t *,
     sata_address_t *);
-static 	void sata_remove_target_node(sata_hba_inst_t *,
+static	void sata_remove_target_node(sata_hba_inst_t *,
     sata_address_t *);
-static 	int sata_validate_scsi_address(sata_hba_inst_t *,
+static	int sata_validate_scsi_address(sata_hba_inst_t *,
     struct scsi_address *, sata_device_t *);
-static 	int sata_validate_sata_address(sata_hba_inst_t *, int, int, int);
+static	int sata_validate_sata_address(sata_hba_inst_t *, int, int, int);
 static	sata_pkt_t *sata_pkt_alloc(sata_pkt_txlate_t *, int (*)(caddr_t));
 static	void sata_pkt_free(sata_pkt_txlate_t *);
 static	int sata_dma_buf_setup(sata_pkt_txlate_t *, int, int (*)(caddr_t),
@@ -308,14 +308,14 @@ static	void sata_common_free_dma_rsrcs(sata_pkt_txlate_t *);
 static	int sata_probe_device(sata_hba_inst_t *, sata_device_t *);
 static	sata_drive_info_t *sata_get_device_info(sata_hba_inst_t *,
     sata_device_t *);
-static 	int sata_identify_device(sata_hba_inst_t *, sata_drive_info_t *);
+static	int sata_identify_device(sata_hba_inst_t *, sata_drive_info_t *);
 static	void sata_reidentify_device(sata_pkt_txlate_t *);
 static	struct buf *sata_alloc_local_buffer(sata_pkt_txlate_t *, int);
-static 	void sata_free_local_buffer(sata_pkt_txlate_t *);
-static 	uint64_t sata_check_capacity(sata_drive_info_t *);
-void 	sata_adjust_dma_attr(sata_drive_info_t *, ddi_dma_attr_t *,
+static	void sata_free_local_buffer(sata_pkt_txlate_t *);
+static	uint64_t sata_check_capacity(sata_drive_info_t *);
+void	sata_adjust_dma_attr(sata_drive_info_t *, ddi_dma_attr_t *,
     ddi_dma_attr_t *);
-static 	int sata_fetch_device_identify_data(sata_hba_inst_t *,
+static	int sata_fetch_device_identify_data(sata_hba_inst_t *,
     sata_drive_info_t *);
 static	void sata_update_port_info(sata_hba_inst_t *, sata_device_t *);
 static	void sata_update_pmport_info(sata_hba_inst_t *, sata_device_t *);
@@ -469,7 +469,7 @@ static ddi_device_acc_attr_t sata_acc_attr = {
 static	kmutex_t sata_mutex;		/* protects sata_hba_list */
 static	kmutex_t sata_log_mutex;	/* protects log */
 
-static 	char sata_log_buf[256];
+static	char sata_log_buf[256];
 
 /*
  * sata trace debug
@@ -497,8 +497,8 @@ int	sata_atapidisk_write_cache = 1;	/* enabled */
 /*
  * Linked list of HBA instances
  */
-static 	sata_hba_inst_t *sata_hba_list = NULL;
-static 	sata_hba_inst_t *sata_hba_list_tail = NULL;
+static	sata_hba_inst_t *sata_hba_list = NULL;
+static	sata_hba_inst_t *sata_hba_list_tail = NULL;
 /*
  * Pointer to per-instance SATA HBA soft structure is stored in sata_hba_tran
  * structure and in sata soft state.
@@ -507,13 +507,13 @@ static 	sata_hba_inst_t *sata_hba_list_tail = NULL;
 /*
  * Event daemon related variables
  */
-static 	kmutex_t sata_event_mutex;
-static 	kcondvar_t sata_event_cv;
-static 	kthread_t *sata_event_thread = NULL;
-static 	int sata_event_thread_terminate = 0;
-static 	int sata_event_pending = 0;
-static 	int sata_event_thread_active = 0;
-extern 	pri_t minclsyspri;
+static	kmutex_t sata_event_mutex;
+static	kcondvar_t sata_event_cv;
+static	kthread_t *sata_event_thread = NULL;
+static	int sata_event_thread_terminate = 0;
+static	int sata_event_pending = 0;
+static	int sata_event_thread_active = 0;
+extern	pri_t minclsyspri;
 
 /*
  * NCQ error recovery command
@@ -1499,7 +1499,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				rv = EFAULT;
 				break;
 			}
-			ioc.cmd 	= (uint_t)ioc32.cmd;
+			ioc.cmd		= (uint_t)ioc32.cmd;
 			ioc.port	= (uint_t)ioc32.port;
 			ioc.get_size	= (uint_t)ioc32.get_size;
 			ioc.buf		= (caddr_t)(uintptr_t)ioc32.buf;
@@ -2890,12 +2890,12 @@ static int
 sata_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 {
 
-	sata_hba_inst_t 	*sata_hba_inst =
+	sata_hba_inst_t		*sata_hba_inst =
 	    (sata_hba_inst_t *)(ap->a_hba_tran->tran_hba_private);
 	sata_device_t		sata_device;
 	sata_drive_info_t	*sdinfo;
 	ddi_dma_attr_t		adj_dma_attr;
-	int 			rval;
+	int			rval;
 
 	SATADBG2(SATA_DBG_SCSI_IF, sata_hba_inst,
 	    "sata_scsi_getcap: target: 0x%x, cap: %s\n",
@@ -4990,7 +4990,7 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 	sata_drive_info_t *sdinfo;
 	sata_id_t *sata_id;
 	struct scsi_extended_sense *sense;
-	int 		len, bdlen, count, alc_len;
+	int		len, bdlen, count, alc_len;
 	int		pc;	/* Page Control code */
 	uint8_t		*buf;	/* mode sense buffer */
 	int		rval, reason;
@@ -5831,14 +5831,14 @@ sata_txlt_ata_pass_thru(sata_pkt_txlate_t *spx)
 /*
  * Translate command: Log Sense
  */
-static 	int
+static int
 sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 {
 	struct scsi_pkt	*scsipkt = spx->txlt_scsi_pkt;
 	struct buf	*bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
 	sata_drive_info_t *sdinfo;
 	struct scsi_extended_sense *sense;
-	int 		len, count, alc_len;
+	int		len, count, alc_len;
 	int		pc;	/* Page Control code */
 	int		page_code;	/* Page code */
 	uint8_t		*buf;	/* log sense buffer */
@@ -6901,7 +6901,7 @@ sata_reidentify_device(sata_pkt_txlate_t *spx)
  * Returns TRAN_ACCEPT or code returned by sata_hba_start() and
  * appropriate values in scsi_pkt fields.
  */
-static 	int
+static int
 sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 {
 	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
@@ -10439,12 +10439,12 @@ sata_remove_hba_instance(dev_info_t *dip)
  * when there is no device attached.
  */
 
-static 	void
+static void
 sata_probe_ports(sata_hba_inst_t *sata_hba_inst)
 {
 	dev_info_t		*dip = SATA_DIP(sata_hba_inst);
 	int			ncport;
-	sata_cport_info_t 	*cportinfo;
+	sata_cport_info_t	*cportinfo;
 	sata_drive_info_t	*drive;
 	sata_device_t		sata_device;
 	int			rval;
@@ -10579,7 +10579,7 @@ sata_probe_pmports(sata_hba_inst_t *sata_hba_inst, uint8_t ncport)
 {
 	dev_info_t		*dip = SATA_DIP(sata_hba_inst);
 	sata_pmult_info_t	*pmultinfo = NULL;
-	sata_pmport_info_t 	*pmportinfo = NULL;
+	sata_pmport_info_t	*pmportinfo = NULL;
 	sata_drive_info_t	*drive = NULL;
 	sata_device_t		sata_device;
 
@@ -10678,11 +10678,11 @@ reprobe_pmport:
  * device identification failed - adding a device could be retried.
  *
  */
-static 	int
+static int
 sata_add_device(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst,
     sata_device_t *sata_device)
 {
-	sata_cport_info_t 	*cportinfo;
+	sata_cport_info_t	*cportinfo;
 	sata_pmult_info_t	*pminfo;
 	sata_pmport_info_t	*pmportinfo;
 	dev_info_t		*cdip;		/* child dip */
@@ -12434,7 +12434,7 @@ sata_devt_to_devinfo(dev_t dev)
  * Returns:
  *	SATA_SUCCESS if device type was successfully probed and port-linked
  *		drive info structure was updated;
- * 	SATA_FAILURE if there is no device, or device was not probed
+ *	SATA_FAILURE if there is no device, or device was not probed
  *		successully;
  *	SATA_RETRY if device probe can be retried later.
  * If a device cannot be identified, sata_device's dev_state and dev_type
@@ -14348,7 +14348,7 @@ sata_get_target_dip(dev_info_t *dip, uint8_t cport, uint8_t pmport)
 {
 	dev_info_t	*cdip = NULL;
 	int		target, tgt;
-	int 		circ;
+	int		circ;
 	uint8_t		qual;
 
 	sata_hba_inst_t	*sata_hba_inst;
@@ -14413,7 +14413,7 @@ sata_get_scsi_target_dip(dev_info_t *dip, sata_address_t *saddr)
 {
 	dev_info_t	*cdip = NULL;
 	int		target, tgt;
-	int 		circ;
+	int		circ;
 
 	target = SATA_TO_SCSI_TARGET(saddr->cport, saddr->pmport, saddr->qual);
 
@@ -17543,8 +17543,8 @@ sata_log(sata_hba_inst_t *sata_hba_inst, uint_t level, char *fmt, ...)
 static void
 sata_event_thread_control(int startstop)
 {
-	static 	int sata_event_thread_terminating = 0;
-	static 	int sata_event_thread_starting = 0;
+	static int sata_event_thread_terminating = 0;
+	static int sata_event_thread_starting = 0;
 	int i;
 
 	mutex_enter(&sata_event_mutex);
@@ -18169,7 +18169,7 @@ sata_process_controller_events(sata_hba_inst_t *sata_hba_inst)
 		mutex_enter(&sata_hba_inst->satahba_mutex);
 		cportinfo = SATA_CPORT_INFO(sata_hba_inst, ncport);
 		mutex_exit(&sata_hba_inst->satahba_mutex);
-		if (cportinfo == NULL || cportinfo->cport_state == NULL)
+		if (cportinfo == NULL || cportinfo->cport_state == 0)
 			continue;
 
 		/* We have initialized controller port info */

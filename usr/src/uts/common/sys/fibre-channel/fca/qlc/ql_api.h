@@ -1518,8 +1518,8 @@ typedef struct ql_adapter_state {
 	fc_fca_tran_t		*tran;
 	uint32_t		instance;
 	int8_t			*devpath;
-	uint32_t   		fru_hba_index;
-	uint32_t   		fru_port_index;
+	uint32_t		fru_hba_index;
+	uint32_t		fru_port_index;
 	uint8_t			adapInfo[18];
 
 	/* Adapter context */
@@ -1780,13 +1780,13 @@ typedef struct ql_adapter_state {
 #define	CFG_FAST_TIMEOUT			BIT_30
 #define	CFG_LR_SUPPORT				BIT_31
 
-#define	CFG_CTRL_2425  		(CFG_CTRL_2422 | CFG_CTRL_25XX)
-#define	CFG_CTRL_8081  		(CFG_CTRL_8021 | CFG_CTRL_81XX)
-#define	CFG_CTRL_2581  		(CFG_CTRL_25XX | CFG_CTRL_81XX)
+#define	CFG_CTRL_2425		(CFG_CTRL_2422 | CFG_CTRL_25XX)
+#define	CFG_CTRL_8081		(CFG_CTRL_8021 | CFG_CTRL_81XX)
+#define	CFG_CTRL_2581		(CFG_CTRL_25XX | CFG_CTRL_81XX)
 #define	CFG_CTRL_242581		(CFG_CTRL_2422 | CFG_CTRL_25XX | CFG_CTRL_81XX)
 #define	CFG_CTRL_24258081	(CFG_CTRL_2425 | CFG_CTRL_8081)
-#define	CFG_CTRL_258081  	(CFG_CTRL_25XX | CFG_CTRL_8081)
-#define	CFG_CTRL_2480  		(CFG_CTRL_2422 | CFG_CTRL_8021)
+#define	CFG_CTRL_258081		(CFG_CTRL_25XX | CFG_CTRL_8081)
+#define	CFG_CTRL_2480		(CFG_CTRL_2422 | CFG_CTRL_8021)
 
 #define	CFG_IST(ha, cfgflags)	(ha->cfg_flags & cfgflags)
 
@@ -2093,7 +2093,7 @@ typedef struct cmd_table_entry {
 	{LA_ELS_FARP_REPLY, "LA_ELS_FARP_REPLY"},	\
 	{LA_ELS_RLS, "LA_ELS_RLS"},			\
 	{LA_ELS_RNID, "LA_ELS_RNID"},			\
-	{NULL, NULL}					\
+	{0, NULL}					\
 }
 
 /*

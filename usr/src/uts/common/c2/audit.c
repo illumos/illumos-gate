@@ -411,7 +411,7 @@ audit_symlink(struct pathname *pnp, struct pathname *sympath)
  *			the specified file/directory attr) should be audited or
  *			ignored.
  *
- * returns: 	1 - if audit policy and object attributes indicate that
+ * returns:	1 - if audit policy and object attributes indicate that
  *			file/directory is effectively public. read events for
  *			the file should not be audited.
  *		0 - otherwise
@@ -526,7 +526,7 @@ audit_exit(int code, int what)
 /*
  * ROUTINE:	AUDIT_CORE_START
  * PURPOSE:
- * CALLBY: 	PSIG
+ * CALLBY:	PSIG
  * NOTE:
  * TODO:
  */
@@ -928,7 +928,7 @@ audit_ipcget(int type, void *vp)
 		return;
 
 	switch (type) {
-	case NULL:
+	case 0:
 		au_uwrite(au_to_ipc_perm((struct kipc_perm *)vp));
 		break;
 	case AT_IPC_MSG:
@@ -1298,7 +1298,7 @@ audit_enterprom(int flg)
 	else
 		au_write((caddr_t *)&(rp), au_to_return32(ECANCELED, 0));
 
-	AUDIT_ASYNC_FINISH(rp, AUE_ENTERPROM, NULL, NULL);
+	AUDIT_ASYNC_FINISH(rp, AUE_ENTERPROM, 0, NULL);
 }
 
 
@@ -1331,7 +1331,7 @@ audit_exitprom(int flg)
 	else
 		au_write((caddr_t *)&(rp), au_to_return32(ECANCELED, 0));
 
-	AUDIT_ASYNC_FINISH(rp, AUE_EXITPROM, NULL, NULL);
+	AUDIT_ASYNC_FINISH(rp, AUE_EXITPROM, 0, NULL);
 }
 
 struct fcntla {

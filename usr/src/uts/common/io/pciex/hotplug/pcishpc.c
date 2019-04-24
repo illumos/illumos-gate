@@ -367,10 +367,10 @@ pcishpc_slot_get_property(pcie_hp_slot_t *slot_p, ddi_hp_property_t *arg,
 	ddi_hp_property32_t request32, result32;
 #endif
 	pcie_hp_ctrl_t	*ctrl_p = slot_p->hs_ctrl;
-	nvlist_t 	*prop_list;
+	nvlist_t	*prop_list;
 	nvlist_t	*prop_rlist; /* nvlist for return values */
-	nvpair_t 	*prop_pair;
-	char 		*name, *value;
+	nvpair_t	*prop_pair;
+	char		*name, *value;
 	int		ret = DDI_SUCCESS;
 	int		i, n;
 	boolean_t	get_all_prop = B_FALSE;
@@ -1920,7 +1920,7 @@ pcishpc_set_slot_name(pcie_hp_ctrl_t *ctrl_p, int slot)
 
 	/*
 	 * construct the slot_name:
-	 * 	if "slot-names" property exists then use that name
+	 *	if "slot-names" property exists then use that name
 	 *	else if valid slot number exists then it is "pci<slot-num>".
 	 *	else it will be "pci<sec-bus-number>dev<dev-number>"
 	 */
@@ -1968,7 +1968,7 @@ pcishpc_set_slot_name(pcie_hp_ctrl_t *ctrl_p, int slot)
 			 * before ours.
 			 */
 			while (slots_before) {
-				while (*s != NULL)
+				while (*s != '\0')
 					s++;
 				s++;
 				slots_before--;

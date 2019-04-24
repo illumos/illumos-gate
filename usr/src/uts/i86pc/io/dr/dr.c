@@ -554,7 +554,7 @@ int dr_enable = 1;
 /*ARGSUSED3*/
 static int
 dr_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
-	cred_t *cred_p, int *rval_p)
+    cred_t *cred_p, int *rval_p)
 {
 	int		rv = 0;
 	int		instance;
@@ -704,7 +704,7 @@ dr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int		rv, rv2;
 	int		bd;
-	int 		instance;
+	int		instance;
 	sbd_error_t	*err;
 	dr_softstate_t	*softsp;
 
@@ -764,7 +764,7 @@ dr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 			minor_num = DR_MAKE_MINOR(instance, bd);
 			rv = ddi_create_minor_node(dip, name, S_IFCHR,
-			    minor_num, DDI_NT_SBD_ATTACHMENT_POINT, NULL);
+			    minor_num, DDI_NT_SBD_ATTACHMENT_POINT, 0);
 			if (rv != DDI_SUCCESS)
 				rv = DDI_FAILURE;
 		}
@@ -802,7 +802,7 @@ dr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 dr_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	int 		instance;
+	int		instance;
 	dr_softstate_t	*softsp;
 
 	switch (cmd) {
@@ -1550,7 +1550,7 @@ dr_dev_is_target(dr_dev_unit_t *dp, int present_only, uint_t uset)
 
 static void
 dr_dev_make_list(dr_handle_t *hp, sbd_comp_type_t type, int present_only,
-	dr_common_unit_t ***devlist, int *devnum)
+    dr_common_unit_t ***devlist, int *devnum)
 {
 	dr_board_t	*bp = hp->h_bd;
 	int		 unum;
@@ -1670,10 +1670,10 @@ dr_dev_clean_up(dr_handle_t *hp, dr_common_unit_t **list, int devnum)
 
 static int
 dr_dev_walk(dr_handle_t *hp, sbd_comp_type_t type, int present_only,
-		int (*pre_op)(dr_handle_t *, dr_common_unit_t **, int),
-		void (*op)(dr_handle_t *, dr_common_unit_t *),
-		int (*post_op)(dr_handle_t *, dr_common_unit_t **, int),
-		void (*board_op)(dr_handle_t *, dr_common_unit_t **, int))
+    int (*pre_op)(dr_handle_t *, dr_common_unit_t **, int),
+    void (*op)(dr_handle_t *, dr_common_unit_t *),
+    int (*post_op)(dr_handle_t *, dr_common_unit_t **, int),
+    void (*board_op)(dr_handle_t *, dr_common_unit_t **, int))
 {
 	int			  devnum, rv;
 	dr_common_unit_t	**devlist;
@@ -1708,7 +1708,7 @@ dr_dev_noop(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 
 static void
 dr_attach_update_state(dr_handle_t *hp,
-	dr_common_unit_t **devlist, int devnum)
+    dr_common_unit_t **devlist, int devnum)
 {
 	dr_board_t	*bp = hp->h_bd;
 	int		i;
@@ -1809,7 +1809,7 @@ dr_dev_configure(dr_handle_t *hp)
 
 static void
 dr_release_update_state(dr_handle_t *hp,
-	dr_common_unit_t **devlist, int devnum)
+    dr_common_unit_t **devlist, int devnum)
 {
 	_NOTE(ARGUNUSED(devlist))
 	_NOTE(ARGUNUSED(devnum))
@@ -1933,7 +1933,7 @@ dr_dev_release(dr_handle_t *hp)
 
 static void
 dr_detach_update_state(dr_handle_t *hp,
-	dr_common_unit_t **devlist, int devnum)
+    dr_common_unit_t **devlist, int devnum)
 {
 	dr_board_t	*bp = hp->h_bd;
 	int		i;
@@ -2656,7 +2656,7 @@ dr_nt_to_dev_type(int nt)
  */
 static int
 dr_check_transition(dr_board_t *bp, dr_devset_t *devsetp,
-			struct dr_state_trans *transp, int cmd)
+    struct dr_state_trans *transp, int cmd)
 {
 	int			s, ut;
 	int			state_err = 0;

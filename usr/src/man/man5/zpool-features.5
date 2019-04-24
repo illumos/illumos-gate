@@ -15,7 +15,7 @@
 .\" CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your
 .\" own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH ZPOOL-FEATURES 5 "Jun 8, 2018"
+.TH ZPOOL-FEATURES 5 "Apr 19, 2019"
 .SH NAME
 zpool\-features \- ZFS pool feature descriptions
 .SH DESCRIPTION
@@ -661,6 +661,8 @@ ever had their checksum set to \fBedonr\fR are destroyed.
 
 Booting off of pools using \fBedonr\fR is supported.
 
+.RE
+
 .sp
 .ne 2
 .na
@@ -680,8 +682,6 @@ This feature becomes \fBactive\fR when a dedicated allocation class vdev
 (dedup or special) is created with zpool create or zpool add. With device
 removal, it can be returned to the \fBenabled\fR state if all the top-level
 vdevs from an allocation class are removed.
-
-.RE
 
 .SH "SEE ALSO"
 \fBzfs\fR(1M), \fBzpool\fR(1M)

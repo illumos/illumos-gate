@@ -46,7 +46,7 @@
 
 #ifdef _KERNEL
 #include <rpc/rpc.h>
-#endif 
+#endif
 
 #ifndef g_OID_copy /* SUNW15resync */
 #define	g_OID_copy(o1, o2)					\
@@ -154,9 +154,9 @@ typedef	OM_uint32	    (*gss_acquire_cred_with_password_sfct)(
  *
  * This contants all of the functions defined in gssapi.h except for
  * gss_release_buffer() and gss_release_oid_set(), which I am
- * assuming, for now, to be equal across mechanisms.  
+ * assuming, for now, to be equal across mechanisms.
  */
- 
+
 typedef struct gss_config {
 #if 0 /* Solaris Kerberos */
     OM_uint32	    priority;
@@ -495,7 +495,7 @@ typedef struct gss_config {
 } *gss_mechanism;
 
 
-	
+
 #ifndef _KERNEL
 /* This structure MUST NOT be used by any code outside libgss */
 typedef struct gss_config_ext {
@@ -536,7 +536,7 @@ gss_mechanism_ext __gss_get_mechanism_ext(const gss_OID);
 char *__gss_get_kmodName(const gss_OID);
 char *__gss_get_modOptions(const gss_OID);
 OM_uint32 __gss_import_internal_name(OM_uint32 *, const gss_OID,
- 	gss_union_name_t, gss_name_t *);
+	gss_union_name_t, gss_name_t *);
 OM_uint32 __gss_export_internal_name(OM_uint32 *, const gss_OID,
 	const gss_name_t, gss_buffer_t);
 OM_uint32 __gss_display_internal_name(OM_uint32 *, const gss_OID,
@@ -721,7 +721,7 @@ struct	kgss_ctx {
 	(((ctx) == GSS_C_NO_CONTEXT) ? (gssd_ctx_id_t)(uintptr_t)(ctx) : \
 	KCTX_TO_GSSD_CTX(ctx))
 #define	KGSS_CTX_TO_GSSD_CTXV(ctx)	\
-	(((ctx) == GSS_C_NO_CONTEXT) ? (NULL) : KCTX_TO_CTXV(ctx))
+	(((ctx) == GSS_C_NO_CONTEXT) ? (0) : KCTX_TO_CTXV(ctx))
 
 #ifdef _KERNEL
 #define	KCTX_TO_I_CTX(ctx)	(KCTX_TO_KGSS_CTX(ctx)->gssd_i_ctx)
