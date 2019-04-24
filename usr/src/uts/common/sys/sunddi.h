@@ -24,7 +24,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_SUNDDI_H
@@ -264,6 +264,7 @@ extern "C" {
  * Various device types used for sensors.
  */
 #define	DDI_NT_SENSOR_TEMP_CPU	"ddi_sensor:temperature:cpu"
+#define	DDI_NT_SENSOR_TEMP_PCH	"ddi_sensor:temperature:pch"
 
 /*
  * DDI event definitions

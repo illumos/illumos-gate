@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble
@@ -110,6 +110,7 @@ _MANFILES=	aac.7d		\
 		random.7d	\
 		rge.7d		\
 		rtls.7d		\
+		pchtemp.7d	\
 		sad.7d		\
 		sata.7d		\
 		scsa1394.7d	\

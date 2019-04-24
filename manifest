@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2017 ASS-Einrichtungssysteme GmbH
 #
 # This lists all the files that illumos-joyent delivers as part of a build.
@@ -663,6 +663,7 @@ f kernel/drv/amd64/ohci 0755 root sys
 f kernel/drv/amd64/openeepr 0755 root sys
 f kernel/drv/amd64/options 0755 root sys
 f kernel/drv/amd64/overlay 0755 root sys
+f kernel/drv/amd64/pchtemp 0755 root sys
 f kernel/drv/amd64/pci_pci 0755 root sys
 f kernel/drv/amd64/pcieb 0755 root sys
 f kernel/drv/amd64/physmem 0755 root sys
@@ -10427,6 +10428,7 @@ f usr/platform/i86pc/lib/fm/topo/maps/i86pc-legacy-hc-topology.xml 0444 root sys
 f usr/platform/i86pc/lib/fm/topo/maps/psu-hc-topology.xml 0444 root sys
 d usr/platform/i86pc/lib/fm/topo/plugins 0755 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/chip.so 0555 root sys
+f usr/platform/i86pc/lib/fm/topo/plugins/chipset.so 0555 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so 0555 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so 0555 root sys
 f usr/platform/i86pc/lib/fm/topo/plugins/x86pi.so 0555 root sys
@@ -19134,6 +19136,7 @@ f usr/share/man/man7d/nvme.7d 0444 root bin
 f usr/share/man/man7d/nxge.7d 0444 root bin
 f usr/share/man/man7d/ohci.7d 0444 root bin
 f usr/share/man/man7d/openprom.7d 0444 root bin
+f usr/share/man/man7d/pchtemp.7d 0444 root bin
 f usr/share/man/man7d/pcn.7d 0444 root bin
 f usr/share/man/man7d/physmem.7d 0444 root bin
 f usr/share/man/man7d/pm.7d 0444 root bin

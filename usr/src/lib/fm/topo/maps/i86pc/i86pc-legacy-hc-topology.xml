@@ -2,7 +2,7 @@
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
 Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright (c) 2018, Joyent, Inc. All rights reserved.
+Copyright 2019 Joyent, Inc.
 
  CDDL HEADER START
 
@@ -88,6 +88,9 @@ Copyright (c) 2018, Joyent, Inc. All rights reserved.
       </range>
       <range name='usb-mobo' min='0' max='100'>
         <enum-method name='usb' version='1' />
+      </range>
+      <range name='chipset' min='0' max='100'>
+        <enum-method name='chipset' version='1' />
       </range>
     </dependents>
 

@@ -21,7 +21,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 #
@@ -752,3 +752,4 @@ LINTFLAGS	+= -D_MACHDEP -I$(UTSBASE)/i86pc
 #
 DRV_KMODS	+= amdf17nbdf
 DRV_KMODS	+= coretemp
+DRV_KMODS	+= pchtemp
