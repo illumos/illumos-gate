@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _TOPO_HC_H
@@ -42,6 +42,7 @@ extern "C" {
 #define	CENTERPLANE	"centerplane"
 #define	CHASSIS		"chassis"
 #define	CHIP		"chip"
+#define	CHIPSET		"chipset"
 #define	CORE		"core"
 #define	STRAND		"strand"
 #define	CHIP_SELECT	"chip-select"

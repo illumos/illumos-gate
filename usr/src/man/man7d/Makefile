@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2016 Garrett D'Amore <garrett@damore.org>
-# Copyright 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble
@@ -217,6 +217,7 @@ i386_MANFILES=	ahci.7d		\
 		ntxn.7d		\
 		nv_sata.7d	\
 		nvme.7d		\
+		pchtemp.7d	\
 		pcn.7d		\
 		qede.7d		\
 		ral.7d		\

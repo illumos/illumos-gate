@@ -1,0 +1,69 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019 Joyent, Inc.
+.\"
+.Dd April 26, 2019
+.Dt PCHTEMP 7D
+.Os
+.Sh NAME
+.Nm pchtemp
+.Nd Intel platform controller hub temperature sensor driver
+.Sh SYNOPSIS
+.Pa /dev/sensors/temperature/pch/*
+.Sh DESCRIPTION
+The
+.Nm
+driver provides the system the ability to read the digital temperature
+sensor found on several Intel platform controller hub (PCH) chipsets.
+The following chipsets are supported which cover most Intel Core familiy
+(non-Atom) CPUs starting with the Haswell generation:
+.Bl -dash
+.It
+Intel 8 Series / C220 Series Chipset Platform Controller Hub
+.It
+Intel 9 Series Chipset Family Platform Controller Hub
+.It
+Intel C610 Series Chipset and X99 Chipset Platform Controller Hub
+.It
+Intel 100 Series Chipset Family Platform Controller Hub
+.It
+Intel C620 Series Chipset Platform Controller Hub
+.It
+Intel 200 and Z370 Series Chipset Families Platform Controller Hub
+.It
+Intel 7th/8th Generation Processor Family U/Y Platforms
+.It
+Intel 300 Series and Intel C240 Series Chipset Family Platform
+Controller Hub
+.El
+.Pp
+Temperature information is available to the system via the fault
+management architecture
+.Pq FMA .
+The file system location and programming interface to the
+.Nm
+driver are considered
+.Sy Volatile ,
+subject to change without notice, and should not be used directly.
+Raw temperature information can be dumped through the FMA developer
+utility
+.Sy fmtopo .
+.Sh SEE ALSO
+.Xr fmadm 1M
+.Rs
+.%A Intel Corporation
+.%B Intel 300 Series and Intel C240 Series Chipset Family Platform Controller Hub
+.%D March 2019
+.%O Document Number 337347-005
+.%V 1
+.%U https://www.intel.com/content/dam/www/public/us/en/documents/datasheets/300-series-chipset-pch-datasheet-vol-1.pdf
+.Re
