@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2017 Toomas Soome <tsoome@me.com>
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -799,11 +800,26 @@ mbi_size(struct preloaded_file *fp, char *cmdline)
 	return (size);
 }
 
+#if defined(EFI)
+static bool
+overlaps(uintptr_t start1, size_t size1, uintptr_t start2, size_t size2)
+{
+	if (start1 < start2 + size2 &&
+	    start1 + size1 >= start2) {
+		printf("overlaps: %zx-%zx, %zx-%zx\n",
+		    start1, start1 + size1, start2, start2 + size2);
+		return (true);
+	}
+
+	return (false);
+}
+#endif
+
 static int
 multiboot2_exec(struct preloaded_file *fp)
 {
+	multiboot2_info_header_t *mbi = NULL;
 	struct preloaded_file *mfp;
-	multiboot2_info_header_t *mbi;
 	char *cmdline = NULL;
 	struct devdesc *rootdev;
 	struct file_metadata *md;
@@ -813,14 +829,34 @@ multiboot2_exec(struct preloaded_file *fp)
 	struct bios_smap *smap;
 #if defined(EFI)
 	multiboot_tag_module_t *module, *mp;
+	struct relocator *relocator = NULL;
 	EFI_MEMORY_DESCRIPTOR *map;
 	UINTN map_size, desc_size;
-	struct relocator *relocator;
 	struct chunk_head *head;
 	struct chunk *chunk;
 	vm_offset_t tmp;
 
 	efi_getdev((void **)(&rootdev), NULL, NULL);
+
+	/*
+	 * We need 5 pages for relocation. We'll allocate from the heap: while
+	 * it's possible that our heap got placed low down enough to be in the
+	 * way of where we're going to relocate our kernel, it's hopefully not
+	 * likely.
+	 */
+	if ((relocator = malloc(EFI_PAGE_SIZE * 5)) == NULL) {
+		printf("relocator malloc failed!\n");
+		error = ENOMEM;
+		goto error;
+	}
+
+	if (overlaps((uintptr_t)relocator, EFI_PAGE_SIZE * 5,
+	    load_addr, fp->f_size)) {
+		printf("relocator pages overlap the kernel!\n");
+		error = EINVAL;
+		goto error;
+	}
+
 #else
 	i386_getdev((void **)(&rootdev), NULL, NULL);
 
@@ -830,7 +866,6 @@ multiboot2_exec(struct preloaded_file *fp)
 	}
 #endif
 
-	mbi = NULL;
 	error = EINVAL;
 	if (rootdev == NULL) {
 		printf("can't determine root device\n");
@@ -1175,25 +1210,7 @@ multiboot2_exec(struct preloaded_file *fp)
 		tag->mb_size = sizeof (*tag) + map_size;
 		tag->mb_descr_size = (uint32_t)desc_size;
 
-		/*
-		 * Find relocater pages. We assume we have free pages
-		 * below kernel load address.
-		 * In this version we are using 5 pages:
-		 * relocator data, trampoline, copy, memmove, stack.
-		 */
-		for (i = 0, map = (EFI_MEMORY_DESCRIPTOR *)tag->mb_efi_mmap;
-		    i < map_size / desc_size;
-		    i++, map = NextMemoryDescriptor(map, desc_size)) {
-			if (map->PhysicalStart == 0)
-				continue;
-			if (map->Type != EfiConventionalMemory)
-				continue;
-			if (map->PhysicalStart < load_addr &&
-			    map->NumberOfPages > 5)
-				break;
-		}
-		if (map->PhysicalStart == 0)
-			panic("Could not find memory for relocater");
+		map = (EFI_MEMORY_DESCRIPTOR *)tag->mb_efi_mmap;
 
 		if (keep_bs == 0) {
 			status = BS->ExitBootServices(IH, key);
@@ -1230,7 +1247,6 @@ multiboot2_exec(struct preloaded_file *fp)
 	 * physical address for MBI.
 	 * Now we must move all pieces to place and start the kernel.
 	 */
-	relocator = (struct relocator *)(uintptr_t)map->PhysicalStart;
 	head = &relocator->rel_chunk_head;
 	STAILQ_INIT(head);
 
@@ -1290,11 +1306,14 @@ multiboot2_exec(struct preloaded_file *fp)
 	panic("exec returned");
 
 error:
-	if (cmdline != NULL)
-		free(cmdline);
+	free(cmdline);
+
 #if defined(EFI)
+	free(relocator);
+
 	if (mbi != NULL)
 		efi_free_loadaddr((vm_offset_t)mbi, EFI_SIZE_TO_PAGES(size));
 #endif
+
 	return (error);
 }
