@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015 PALO, Richard
+ * Copyright 2019, Joyent, Inc.
  */
 #include <sys/types.h>
 #include <sys/scsi/generic/smp_frames.h>
@@ -68,6 +69,31 @@ fatal(int err, const char *fmt, ...)
 	(void) fflush(stderr);
 
 	_exit(err);
+}
+
+/*
+ * Print out a buffer of SMP character array data. The data in str is guaranteed
+ * to be at most len bytes long. While it is supposed to be ascii, we should not
+ * assume as such.
+ */
+static void
+smp_print_ascii(const char *header, const char *str, size_t len)
+{
+	size_t i, last = len;
+
+	while (last > 0 && str[last - 1] == ' ')
+		last--;
+
+	(void) printf("%s: ", header);
+	for (i = 0; i < last; i++) {
+		if (isascii(str[i]) != 0 && isalnum(str[i]) != 0) {
+			(void) putchar(str[i]);
+		} else {
+			(void) printf("\\x%x", str[i]);
+		}
+	}
+
+	(void) putchar('\n');
 }
 
 static char *
@@ -431,6 +457,12 @@ smp_validate_args(int argc, char *argv[])
 		fatal(-1, "Usage: %s <device> <function> ...\n", argv[0]);
 
 	switch (func) {
+	case SMP_FUNC_REPORT_GENERAL:
+	case SMP_FUNC_REPORT_MANUFACTURER_INFO:
+		if (argc != 3) {
+			fatal(-1, "Usage: %s <device> 0x%x\n", argv[0], func);
+		}
+		break;
 	case SMP_FUNC_DISCOVER:
 	case SMP_FUNC_REPORT_PHY_EVENT:
 	case SMP_FUNC_REPORT_PHY_ERROR_LOG: {
@@ -540,6 +572,13 @@ main(int argc, char *argv[])
 	}
 
 	switch (func) {
+	case SMP_FUNC_REPORT_GENERAL:
+	case SMP_FUNC_REPORT_MANUFACTURER_INFO:
+		/*
+		 * These functions have no additional request bytes. therefore
+		 * there is nothing for us to get and fill in here.
+		 */
+		break;
 	case SMP_FUNC_DISCOVER: {
 		smp_discover_req_t *dp;
 
@@ -615,6 +654,150 @@ main(int argc, char *argv[])
 	smp_get_response(B_TRUE);
 
 	switch (func) {
+	case SMP_FUNC_REPORT_GENERAL: {
+		smp_report_general_resp_t *gr =
+		    (smp_report_general_resp_t *)smp_resp;
+
+		(void) printf("Expander Route Indexes: %u\n",
+		    SCSI_READ16(&gr->srgr_exp_route_indexes));
+		(void) printf("Long Responses: %s\n",
+		    gr->srgr_long_response != 0 ? "Supported" : "Unsupported");
+		(void) printf("Phys: %d\n", gr->srgr_number_of_phys);
+		(void) printf("Features:\n");
+		if (gr->srgr_externally_configurable_route_table != 0) {
+			(void) printf("\tExternally Configurable Route "
+			    "Table\n");
+		}
+		if (gr->srgr_configuring != 0) {
+			(void) printf("\tConfiguring\n");
+		}
+		if (gr->srgr_configures_others != 0) {
+			(void) printf("\tConfigures Others\n");
+		}
+		if (gr->srgr_open_reject_retry_supported != 0) {
+			(void) printf("\tOpen Reject Retry\n");
+		}
+		if (gr->srgr_stp_continue_awt != 0) {
+			(void) printf("\tSTP Continue AWT\n");
+		}
+		if (gr->srgr_table_to_table_supported != 0) {
+			(void) printf("\tTable to Table\n");
+		}
+
+		(void) printf("Logical Identify: %016llx\n",
+		    SCSI_READ64(&gr->srgr_enclosure_logical_identifier));
+
+		(void) printf("STP Bus Inactivity Time Limit: %u us\n",
+		    SCSI_READ16(&gr->srgr_stp_bus_inactivity_time_limit) * 100);
+		(void) printf("STP Maximum Connect Time Limit: %u us\n",
+		    SCSI_READ16(&gr->srgr_stp_maximum_connect_time_limit) *
+		    100);
+		(void) printf("STP SMP I_T Nexus Loss Time: ");
+		if (gr->srgr_stp_smp_nexus_loss_time == 0) {
+			(void) printf("Vendor Specific\n");
+		} else if (gr->srgr_stp_smp_nexus_loss_time == UINT16_MAX) {
+			(void) printf("Retries Forever\n");
+		} else {
+			(void) printf("%u ms\n",
+			    SCSI_READ16(&gr->srgr_stp_smp_nexus_loss_time));
+		}
+
+		(void) printf("Physical Presence: %s, %s\n",
+		    gr->srgr_physical_presence_supported ? "Supported" :
+		    "Unsupported",
+		    gr->srgr_physical_presence_asserted ? "Enabled" :
+		    "Disabled");
+
+		(void) printf("Zoning:\n");
+		if (gr->srgr_zoning_supported != 0) {
+			(void) printf("\tSupported\n");
+		} else {
+			(void) printf("\tUnsupported\n");
+		}
+		if (gr->srgr_zoning_enabled != 0) {
+			(void) printf("\tEnabled\n");
+		} else {
+			(void) printf("\tDisabled\n");
+		}
+		if (gr->srgr_zone_locked != 0) {
+			(void) printf("\tLocked\n");
+		} else {
+			(void) printf("\tUnlocked\n");
+		}
+		if (gr->srgr_saving_zoning_enabled_supported != 0) {
+			(void) printf("\tSaving Zoning Enabled Supported\n");
+		}
+		if (gr->srgr_saving_zone_perm_table_supported != 0) {
+			(void) printf("\tSaving Zone Perm Table Supported\n");
+		}
+		if (gr->srgr_saving_zone_phy_info_supported != 0) {
+			(void) printf("\tSaving Zone Phy Info Supported\n");
+		}
+		if (gr->srgr_saving != 0) {
+			(void) printf("\tSaving\n");
+		}
+		(void) printf("\tActive Zone Manager SAS Address: %016llx\n",
+		    SCSI_READ64(&gr->srgr_active_zm_sas_addr));
+		(void) printf("\tZone Lock Inactivity Limit: %u ms\n",
+		    SCSI_READ16(&gr->srgr_zone_lock_inactivity_limit) * 100);
+
+		(void) printf("Maximum Routed SAS Addresses: %u\n",
+		    SCSI_READ16(&gr->srgr_max_routed_sas_addrs));
+
+		(void) printf("First Enclosure Connector Element Index: %u\n",
+		    gr->srgr_first_encl_conn_elem_idx);
+		(void) printf("Number of Enclosure Connector Elements: %u\n",
+		    gr->srgr_number_encl_conn_elem_idxs);
+
+		if (gr->srgr_reduced_functionality != 0) {
+			(void) printf("Time to Reduced Functionality: %u ms\n",
+			    gr->srgr_time_to_reduced_functionality * 100);
+		}
+		(void) printf("Initial Time to Reduced Functionality: %u ms\n",
+		    gr->srgr_initial_time_to_reduced_functionality * 100);
+		(void) printf("Maximum Time to Reduced Functionality: %u ms\n",
+		    gr->srgr_max_reduced_functionality_time * 100);
+		(void) printf("Last Self-configuration Status Index: %u\n",
+		    SCSI_READ16(&gr->srgr_last_self_conf_status_descr_idx));
+		(void) printf("Maximum Stored Self-configuration Statuses: "
+		    "%u\n", SCSI_READ16(
+		    &gr->srgr_max_stored_self_config_status_descrs));
+		(void) printf("Last Phy Event List Descriptor Index: %u\n",
+		    SCSI_READ16(&gr->srgr_last_phy_event_list_descr_idx));
+		(void) printf("Maximum Stored Phy Event List Descriptors: "
+		    "%u\n", SCSI_READ16(
+		    &gr->srgr_max_stored_phy_event_list_descrs));
+		(void) printf("STP Reject to Open Limit: %u us\n",
+		    SCSI_READ16(&gr->srgr_stp_reject_to_open_limit) * 10);
+		break;
+	}
+	case SMP_FUNC_REPORT_MANUFACTURER_INFO: {
+		smp_report_manufacturer_info_resp_t *mir =
+		    (smp_report_manufacturer_info_resp_t *)smp_resp;
+
+		smp_print_ascii("Vendor", mir->srmir_vendor_identification,
+		    sizeof (mir->srmir_vendor_identification));
+		smp_print_ascii("Product", mir->srmir_product_identification,
+		    sizeof (mir->srmir_product_identification));
+		smp_print_ascii("Revision", mir->srmir_product_revision_level,
+		    sizeof (mir->srmir_product_revision_level));
+		/*
+		 * The format of the following section was changed in the SAS
+		 * 1.1 specification. If this bit is not present, it is vendor
+		 * specific and therefore we don't print them.
+		 */
+		if (mir->srmir_sas_1_1_format == 0) {
+			break;
+		}
+		smp_print_ascii("Component Vendor",
+		    mir->srmir_component_vendor_identification,
+		    sizeof (mir->srmir_component_vendor_identification));
+		(void) printf("Component ID: 0x%x\n",
+		    SCSI_READ16(&mir->srmir_component_id));
+		(void) printf("Component Revision: 0x%x\n",
+		    mir->srmir_component_revision_level);
+		break;
+	}
 	case SMP_FUNC_DISCOVER: {
 		smp_discover_resp_t *rp = (smp_discover_resp_t *)smp_resp;
 		(void) printf("Addr: %016llx Phy: %02x\n",
