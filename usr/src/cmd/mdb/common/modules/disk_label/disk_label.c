@@ -26,6 +26,7 @@
 #include <sys/sysmacros.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/efi_partition.h>
+#include <sys/vtoc.h>
 
 #include <assert.h>
 #include <ctype.h>
@@ -55,6 +56,69 @@ typedef enum {
 	MBR_TYPE_LOADER,
 	MBR_TYPE_LOADER_JOYENT,
 } mbr_type_t;
+
+typedef struct stringval {
+	const char	*sv_text;
+	int		sv_value;
+} stringval_t;
+
+stringval_t ptag_array[] = {
+	{ "unassigned",		V_UNASSIGNED	},
+	{ "boot",		V_BOOT		},
+	{ "root",		V_ROOT		},
+	{ "swap",		V_SWAP		},
+	{ "usr",		V_USR		},
+	{ "backup",		V_BACKUP	},
+	{ "stand",		V_STAND		},
+	{ "var",		V_VAR		},
+	{ "home",		V_HOME		},
+	{ "alternates",		V_ALTSCTR	},
+	{ "reserved",		V_RESERVED	},
+	{ "system",		V_SYSTEM	},
+	{ "BIOS_boot",		V_BIOS_BOOT	},
+	{ "FreeBSD boot",	V_FREEBSD_BOOT	},
+	{ "FreeBSD swap",	V_FREEBSD_SWAP	},
+	{ "FreeBSD UFS",	V_FREEBSD_UFS	},
+	{ "FreeBSD ZFS",	V_FREEBSD_ZFS	},
+	{ "FreeBSD NANDFS",	V_FREEBSD_NANDFS },
+
+	{ NULL }
+};
+
+stringval_t pflag_array[] = {
+	{ "wm", 0			},
+	{ "wu", V_UNMNT			},
+	{ "rm", V_RONLY			},
+	{ "ru", V_RONLY | V_UNMNT	},
+	{ NULL }
+};
+
+static const char *
+array_find_string(stringval_t *array, int match_value)
+{
+	for (; array->sv_text != NULL; array++) {
+		if (array->sv_value == match_value) {
+			return (array->sv_text);
+		}
+	}
+
+	return (NULL);
+}
+
+static int
+array_widest_str(stringval_t *array)
+{
+	int	i;
+	int	width;
+
+	width = 0;
+	for (; array->sv_text != NULL; array++) {
+		if ((i = strlen(array->sv_text)) > width)
+			width = i;
+	}
+
+	return (width);
+}
 
 static void
 print_fdisk_part(struct ipart *ip, size_t nr)
@@ -129,30 +193,16 @@ print_fdisk_part(struct ipart *ip, size_t nr)
 	    nr, typestr, ip->bootid, begchs, endchs, ip->relsect, ip->numsect);
 }
 
-static int
-cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
+static mbr_type_t
+mbr_info(struct mboot *mbr)
 {
-	struct mboot mbr;
 	mbr_type_t type = MBR_TYPE_UNKNOWN;
 
-	CTASSERT(sizeof (mbr) == SECTOR_SIZE);
-
-	if (argc != 0)
-		return (DCMD_USAGE);
-
-	if (!(flags & DCMD_ADDRSPEC))
-		addr = 0;
-
-	if (mdb_vread(&mbr, sizeof (mbr), addr) == -1) {
-		mdb_warn("failed to read MBR");
-		return (DCMD_ERR);
-	}
-
-	if (*((uint16_t *)&mbr.bootinst[GRUB_VERSION_OFF]) == GRUB_VERSION) {
+	if (*((uint16_t *)&mbr->bootinst[GRUB_VERSION_OFF]) == GRUB_VERSION) {
 		type = MBR_TYPE_GRUB1;
-	} else if (mbr.bootinst[STAGE1_MBR_VERSION] == LOADER_VERSION) {
+	} else if (mbr->bootinst[STAGE1_MBR_VERSION] == LOADER_VERSION) {
 		type = MBR_TYPE_LOADER;
-	} else if (mbr.bootinst[STAGE1_MBR_VERSION] == LOADER_JOYENT_VERSION) {
+	} else if (mbr->bootinst[STAGE1_MBR_VERSION] == LOADER_JOYENT_VERSION) {
 		type = MBR_TYPE_LOADER_JOYENT;
 	}
 
@@ -171,25 +221,76 @@ cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
 		break;
 	}
 
-	mdb_printf("Signature: 0x%hx (%s)\n", mbr.signature,
-	    mbr.signature == MBB_MAGIC ? "valid" : "invalid");
+	mdb_printf("Signature: 0x%hx (%s)\n", mbr->signature,
+	    mbr->signature == MBB_MAGIC ? "valid" : "invalid");
 
 	mdb_printf("UniqueMBRDiskSignature: %#lx\n",
-	    *(uint32_t *)&mbr.bootinst[STAGE1_SIG]);
+	    *(uint32_t *)&mbr->bootinst[STAGE1_SIG]);
 
 	if (type == MBR_TYPE_LOADER || type == MBR_TYPE_LOADER_JOYENT) {
 		char uuid[UUID_PRINTABLE_STRING_LENGTH];
 
 		mdb_printf("Loader STAGE1_STAGE2_LBA: %llu\n",
-		    *(uint64_t *)&mbr.bootinst[STAGE1_STAGE2_LBA]);
+		    *(uint64_t *)&mbr->bootinst[STAGE1_STAGE2_LBA]);
 
 		mdb_printf("Loader STAGE1_STAGE2_SIZE: %hu\n",
-		    *(uint16_t *)&mbr.bootinst[STAGE1_STAGE2_SIZE]);
+		    *(uint16_t *)&mbr->bootinst[STAGE1_STAGE2_SIZE]);
 
-		uuid_unparse((uchar_t *)&mbr.bootinst[STAGE1_STAGE2_UUID],
+		uuid_unparse((uchar_t *)&mbr->bootinst[STAGE1_STAGE2_UUID],
 		    uuid);
 
 		mdb_printf("Loader STAGE1_STAGE2_UUID: %s\n", uuid);
+	}
+
+	return (type);
+}
+
+static int
+cmd_mbr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv __unused)
+{
+	struct mboot mbr;
+	mbr_type_t type;
+
+	CTASSERT(sizeof (mbr) == SECTOR_SIZE);
+
+	if (argc != 0)
+		return (DCMD_USAGE);
+
+	if (!(flags & DCMD_ADDRSPEC))
+		addr = 0;
+
+	if (mdb_vread(&mbr, sizeof (mbr), addr) == -1) {
+		mdb_warn("failed to read MBR");
+		return (DCMD_ERR);
+	}
+
+	type = mbr_info(&mbr);
+
+	/* If the magic is wrong, stop here. */
+	if (mbr.signature != MBB_MAGIC)
+		return (DCMD_ERR);
+
+	/* Also print volume boot record */
+	switch (type) {
+	case MBR_TYPE_LOADER:
+	case MBR_TYPE_LOADER_JOYENT:
+		if (*(uint16_t *)&mbr.bootinst[STAGE1_STAGE2_SIZE] == 1) {
+			struct mboot vbr;
+			uintptr_t vbrp;
+
+			vbrp = *(uint64_t *)&mbr.bootinst[STAGE1_STAGE2_LBA];
+			vbrp *= SECTOR_SIZE;
+			vbrp += addr;
+			if (mdb_vread(&vbr, sizeof (vbr), vbrp) == -1) {
+				mdb_warn("failed to read VBR");
+			} else {
+				mdb_printf("\nSTAGE1 in VBR:\n");
+				(void) mbr_info(&vbr);
+			}
+		}
+		break;
+	default:
+		break;
 	}
 
 	mdb_printf("\n%<u>%-4s %-21s %-7s %-11s %-11s %-10s %-9s%</u>\n",
@@ -484,9 +585,188 @@ gpt_help(void)
 	    "-g Show unique GUID for each table entry\n");
 }
 
+static int
+cmd_vtoc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint8_t buf[SECTOR_SIZE];
+	struct dk_label *dl;
+	struct dk_vtoc *dv;
+	uintptr_t vaddr;
+	int i, tag_width, cyl_width;
+	int show_absolute = B_TRUE;
+	int show_sectors = B_TRUE;
+	uint32_t cyl;
+
+	if (mdb_getopts(argc, argv,
+	    'c', MDB_OPT_CLRBITS, TRUE, &show_sectors,
+	    'r', MDB_OPT_CLRBITS, TRUE, &show_absolute,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (!(flags & DCMD_ADDRSPEC))
+		addr = 0;
+	else
+		addr *= SECTOR_SIZE;
+
+#if defined(_SUNOS_VTOC_16)
+	if (mdb_vread(&buf, sizeof (buf), addr) == -1) {
+		mdb_warn("failed to read VBR");
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("VBR info:\n");
+	(void) mbr_info((struct mboot *)buf);
+#endif
+
+	vaddr = addr + DK_LABEL_LOC * SECTOR_SIZE;
+
+	if (mdb_vread(&buf, sizeof (buf), vaddr) == -1) {
+		mdb_warn("failed to read VTOC");
+		return (DCMD_ERR);
+	}
+
+	dl = (struct dk_label *)&buf;
+	dv = (struct dk_vtoc *)&dl->dkl_vtoc;
+
+	mdb_printf("Label magic: 0x%hx (%s)\n", dl->dkl_magic,
+	    dl->dkl_magic == DKL_MAGIC ? "valid" : "invalid");
+	if (dl->dkl_magic != DKL_MAGIC)
+		return (DCMD_ERR);
+	mdb_printf("Label %s sane\n", dv->v_sanity == VTOC_SANE ?
+	    "is" : "is not");
+
+	mdb_printf("Label version: %#x\n", dv->v_version);
+	mdb_printf("Volume name = <%s>\n", dv->v_volume);
+	mdb_printf("ASCII name  = <%s>\n", dv->v_asciilabel);
+	mdb_printf("pcyl        = %4d\n", dl->dkl_pcyl);
+	mdb_printf("ncyl        = %4d\n", dl->dkl_ncyl);
+	mdb_printf("acyl        = %4d\n", dl->dkl_acyl);
+
+#if defined(_SUNOS_VTOC_16)
+	mdb_printf("bcyl        = %4d\n", dl->dkl_bcyl);
+#endif /* defined(_SUNOS_VTOC_16) */
+
+	mdb_printf("nhead       = %4d\n", dl->dkl_nhead);
+	mdb_printf("nsect       = %4d\n", dl->dkl_nsect);
+
+
+	if (!show_absolute)
+		addr = 0;
+	cyl = dl->dkl_nhead * dl->dkl_nsect;
+	if (show_sectors)
+		cyl = 1;
+	else
+		addr /= (cyl * SECTOR_SIZE);
+
+	tag_width = array_widest_str(ptag_array);
+
+	cyl_width = sizeof ("CYLINDERS");
+	for (i = 0; i < dv->v_nparts; i++) {
+		uint32_t start, end, size;
+		int w;
+
+#if defined(_SUNOS_VTOC_16)
+		start = addr + (dv->v_part[i].p_start / cyl);
+		size = dv->v_part[i].p_size;
+#elif defined(_SUNOS_VTOC_8)
+		start = dl->dkl_map[i].dkl_cylno;
+		start *= dl->dkl_nhead * dl->dkl_nsect; /* compute bytes */
+		start /= cyl;
+		start += addr;
+		size = dl->dkl_map[i].dkl_nblk;
+#else
+#error "No VTOC format defined."
+#endif
+		if (size == 0)
+			end = start = 0;
+		else
+			end = start + size / cyl - 1;
+
+		w = mdb_snprintf(NULL, 0, "%u - %u", start, end);
+		if (w > cyl_width)
+			cyl_width = w;
+	}
+
+	if (show_sectors == B_TRUE) {
+		mdb_printf("\n%<u>%-4s %-*s %-7s %-11s %-11s %-*s "
+		    "%-10s%</u>\n", "PART", tag_width, "TAG", "FLAG",
+		    "STARTLBA", "ENDLBA", MDB_NICENUM_BUFLEN, "SIZE", "BLOCKS");
+	} else {
+		mdb_printf("\n%<u>%-4s %-*s %-7s %-*s %-*s %-10s%</u>\n",
+		    "PART", tag_width, "TAG", "FLAG", cyl_width, "CYLINDERS",
+		    MDB_NICENUM_BUFLEN, "SIZE", "BLOCKS");
+	}
+
+	for (i = 0; i < dv->v_nparts; i++) {
+		uint16_t tag, flag;
+		uint32_t start, end, size;
+		const char *stag, *sflag;
+		char nnum[MDB_NICENUM_BUFLEN];
+
+#if defined(_SUNOS_VTOC_16)
+		tag = dv->v_part[i].p_tag;
+		flag = dv->v_part[i].p_flag;
+		start = addr + (dv->v_part[i].p_start / cyl);
+		size = dv->v_part[i].p_size;
+#elif defined(_SUNOS_VTOC_8)
+		tag = dv->v_part[i].p_tag;
+		flag = dv->v_part[i].p_flag;
+		start = dl->dkl_map[i].dkl_cylno;
+		start *= dl->dkl_nhead * dl->dkl_nsect; /* compute bytes */
+		start /= cyl;
+		start += addr;
+		size = dl->dkl_map[i].dkl_nblk;
+#else
+#error "No VTOC format defined."
+#endif
+		if (size == 0)
+			end = start = 0;
+		else
+			end = start + size / cyl - 1;
+
+		stag = array_find_string(ptag_array, tag);
+		if (stag == NULL)
+			stag = "?";
+		sflag = array_find_string(pflag_array, flag);
+		if (sflag == NULL)
+			sflag = "?";
+
+		mdb_printf("%-4d %-*s %-7s ", i, tag_width, stag, sflag);
+		mdb_nicenum(size * SECTOR_SIZE, nnum);
+		if (show_sectors) {
+			mdb_printf("%-11u %-11u %-*s %-10u\n", start, end,
+			    MDB_NICENUM_BUFLEN, nnum, size);
+		} else {
+			char cyls[10 * 2 + 4];
+
+			if (size == 0) {
+				mdb_snprintf(cyls, sizeof (cyls), "%-*u",
+				    cyl_width, size);
+			} else {
+				mdb_snprintf(cyls, sizeof (cyls), "%u - %u",
+				    start, end);
+			}
+			mdb_printf("%-*s %-*s %-10u\n", cyl_width, cyls,
+			    MDB_NICENUM_BUFLEN, nnum, size);
+		}
+	}
+
+	return (DCMD_OK);
+}
+
+void
+vtoc_help(void)
+{
+	mdb_printf("Display a Virtual Table of Content (VTOC).\n\n"
+	    "-r Display relative addresses\n"
+	    "-c Use cylinder based addressing\n");
+	mdb_printf("\nThe addr is in 512-byte disk blocks.\n");
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "mbr", NULL, "dump Master Boot Record information", cmd_mbr },
 	{ "gpt", "?[-ag]", "dump an EFI GPT", cmd_gpt, gpt_help },
+	{ "vtoc", "?[-cr]", "dump VTOC information", cmd_vtoc, vtoc_help },
 	{ NULL }
 };
 
