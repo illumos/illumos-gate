@@ -1274,6 +1274,10 @@ make_dynamic(Ofl_desc *ofl)
 			cnt++;
 	}
 
+	/* DT_SUNW_KMOD */
+	if (ofl->ofl_flags & FLG_OF_KMOD)
+		cnt++;
+
 	/*
 	 * Account for Architecture dependent .dynamic entries, and defaults.
 	 */
@@ -2432,7 +2436,7 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 	Is_desc		*isec;
 	size_t		size;
 	Xword		sh_flags;
-	char 		*sectname;
+	char		*sectname;
 	Os_desc		*rosp;
 	Word		relsize;
 	const char	*rel_prefix;
@@ -2663,7 +2667,7 @@ ld_make_sunwmove(Ofl_desc *ofl, int mv_nums)
 	Is_desc		*isec;
 	Aliste		idx;
 	Sym_desc	*sdp;
-	int 		cnt = 1;
+	int		cnt = 1;
 
 
 	if (new_section(ofl, SHT_SUNW_move, MSG_ORIG(MSG_SCN_SUNWMOVE),

@@ -1211,6 +1211,7 @@ conv_reject_desc(Rej_desc * rej, Conv_reject_desc_buf_t *reject_desc_buf,
 		    &reject_desc_buf->flags_buf));
 	case SGS_REJ_UNKFILE:
 	case SGS_REJ_ARCHIVE:
+	case SGS_REJ_KMOD:
 		return (NULL);
 	case SGS_REJ_STR:
 	case SGS_REJ_HWCAP_1:

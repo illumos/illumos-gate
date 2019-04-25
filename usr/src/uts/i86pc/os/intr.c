@@ -1162,7 +1162,7 @@ cpu_create_intrstat(cpu_t *cp)
 		zoneid = ALL_ZONES;
 
 	intr_ksp = kstat_create_zone("cpu", cp->cpu_id, "intrstat", "misc",
-	    KSTAT_TYPE_NAMED, PIL_MAX * 2, NULL, zoneid);
+	    KSTAT_TYPE_NAMED, PIL_MAX * 2, 0, zoneid);
 
 	/*
 	 * Initialize each PIL's named kstat

@@ -1452,7 +1452,7 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	 */
 	mac_client_add(mcip);
 
-	mcip->mci_share = NULL;
+	mcip->mci_share = 0;
 	if (share_desired)
 		i_mac_share_alloc(mcip);
 
@@ -1734,7 +1734,7 @@ mac_client_set_rings_prop(mac_client_impl_t *mcip, mac_resource_props_t *mrp,
 	uint_t			ringcnt;
 	boolean_t		unspec;
 
-	if (mcip->mci_share != NULL)
+	if (mcip->mci_share != 0)
 		return (EINVAL);
 
 	if (mrp->mrp_mask & MRP_RX_RINGS) {
@@ -3521,7 +3521,7 @@ mac_tx_cookie_t
 mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
     uint16_t flag, mblk_t **ret_mp)
 {
-	mac_tx_cookie_t		cookie = NULL;
+	mac_tx_cookie_t		cookie = 0;
 	int			error;
 	mac_tx_percpu_t		*mytx;
 	mac_soft_ring_set_t	*srs;
@@ -3538,7 +3538,7 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 		MAC_TX_TRY_HOLD(mcip, mytx, error);
 		if (error != 0) {
 			freemsgchain(mp_chain);
-			return (NULL);
+			return (0);
 		}
 	}
 
@@ -3626,7 +3626,7 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 
 		MAC_TX(mip, srs_tx->st_arg2, mp_chain, mcip);
 		if (mp_chain == NULL) {
-			cookie = NULL;
+			cookie = 0;
 			SRS_TX_STAT_UPDATE(srs, opackets, 1);
 			SRS_TX_STAT_UPDATE(srs, obytes, obytes);
 		} else {
@@ -3696,7 +3696,7 @@ mac_tx_is_flow_blocked(mac_client_handle_t mch, mac_tx_cookie_t cookie)
 	 */
 	if (mac_srs->srs_tx.st_mode == SRS_TX_FANOUT ||
 	    mac_srs->srs_tx.st_mode == SRS_TX_AGGR) {
-		if (cookie != NULL) {
+		if (cookie != 0) {
 			sringp = (mac_soft_ring_t *)cookie;
 			mutex_enter(&sringp->s_ring_lock);
 			if (sringp->s_ring_state & S_RING_TX_HIWAT)

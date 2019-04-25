@@ -24,6 +24,7 @@ dir path=opt/elf-tests/bin
 dir path=opt/elf-tests/runfiles
 dir path=opt/elf-tests/tests
 dir path=opt/elf-tests/tests/assert-deflib
+dir path=opt/elf-tests/tests/linker-sets
 dir path=opt/elf-tests/tests/tls
 dir path=opt/elf-tests/tests/tls/amd64
 dir path=opt/elf-tests/tests/tls/amd64/ie
@@ -35,6 +36,10 @@ file path=opt/elf-tests/bin/elftest mode=0555
 file path=opt/elf-tests/runfiles/default.run mode=0444
 file path=opt/elf-tests/tests/assert-deflib/link.c mode=0444
 file path=opt/elf-tests/tests/assert-deflib/test-deflib mode=0555
+file path=opt/elf-tests/tests/linker-sets/in-use-check mode=0555
+file path=opt/elf-tests/tests/linker-sets/simple mode=0555
+file path=opt/elf-tests/tests/linker-sets/simple-src.c mode=0444
+file path=opt/elf-tests/tests/linker-sets/simple.out mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/Makefile.test mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/amd64-ie-test mode=0555
 file path=opt/elf-tests/tests/tls/amd64/ie/style1-func-with-r12.s mode=0444
@@ -52,6 +57,8 @@ file path=opt/elf-tests/tests/tls/i386/ld/Makefile.test mode=0444
 file path=opt/elf-tests/tests/tls/i386/ld/half-ldm.s mode=0444
 file path=opt/elf-tests/tests/tls/i386/ld/i386-ld-test mode=0555
 license lic_CDDL license=lic_CDDL
+license usr/src/test/elf-tests/THIRDPARTYLICENSE \
+    license=usr/src/test/elf-tests/THIRDPARTYLICENSE
 depend fmri=developer/linker type=require
 depend fmri=developer/object-file type=require
 depend fmri=system/test/testrunner type=require

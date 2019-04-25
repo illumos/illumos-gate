@@ -633,9 +633,9 @@ static char *prm_dbg_str[] = {
 
 int prom_debug;
 
-#define	PRM_DEBUG(q)	if (prom_debug) 	\
+#define	PRM_DEBUG(q)	if (prom_debug)		\
 	prom_printf(prm_dbg_str[sizeof (q) >> 3], "startup.c", __LINE__, #q, q);
-#define	PRM_POINT(q)	if (prom_debug) 	\
+#define	PRM_POINT(q)	if (prom_debug)		\
 	prom_printf("%s:%d: %s\n", "startup.c", __LINE__, q);
 
 /*
@@ -653,13 +653,13 @@ size_t valloc_sz = 0;
 uintptr_t valloc_base;
 
 #define	ADD_TO_ALLOCATIONS(ptr, size) {					\
-		size = ROUND_UP_PAGE(size);		 		\
+		size = ROUND_UP_PAGE(size);				\
 		if (num_allocations == NUM_ALLOCATIONS)			\
 			panic("too many ADD_TO_ALLOCATIONS()");		\
 		allocations[num_allocations].al_ptr = (void**)&ptr;	\
 		allocations[num_allocations].al_size = size;		\
 		valloc_sz += size;					\
-		++num_allocations;				 	\
+		++num_allocations;					\
 	}
 
 /*
@@ -3087,7 +3087,7 @@ get_system_configuration(void)
 	if (BOP_GETPROPLEN(bootops, "kernelbase") > sizeof (prop) ||
 	    BOP_GETPROP(bootops, "kernelbase", prop) < 0 ||
 	    kobj_getvalue(prop, &lvalue) == -1)
-		eprom_kernelbase = NULL;
+		eprom_kernelbase = 0;
 	else
 		eprom_kernelbase = (uintptr_t)lvalue;
 

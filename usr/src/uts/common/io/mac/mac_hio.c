@@ -94,7 +94,7 @@ i_mac_share_free(mac_client_impl_t *mcip)
 	/* MAC clients are required to unbind they shares before freeing them */
 	ASSERT((mcip->mci_state_flags & MCIS_SHARE_BOUND) == 0);
 
-	if (mcip->mci_share == NULL) {
+	if (mcip->mci_share == 0) {
 		i_mac_perim_exit(mip);
 		return;
 	}
@@ -118,7 +118,7 @@ mac_share_bind(mac_client_handle_t mch, uint64_t cookie, uint64_t *rcookie)
 
 	i_mac_perim_enter(mip);
 
-	if (mcip->mci_share == NULL) {
+	if (mcip->mci_share == 0) {
 		i_mac_perim_exit(mip);
 		return (ENOTSUP);
 	}
@@ -168,7 +168,7 @@ mac_share_unbind(mac_client_handle_t mch)
 
 	i_mac_perim_enter(mip);
 
-	if (mcip->mci_share == NULL) {
+	if (mcip->mci_share == 0) {
 		i_mac_perim_exit(mip);
 		return;
 	}

@@ -3102,7 +3102,7 @@ do_symbols(struct module *mp, Elf64_Addr bss_base)
 	}
 	if (err)
 		return (err);
-	if (assign == 0 && mp->bss == NULL) {
+	if (assign == 0 && mp->bss == 0) {
 		mp->bss_align = bss_align;
 		mp->bss_size = bss_ptr;
 	} else if (resolved) {
@@ -4155,7 +4155,7 @@ kobj_segbrk(caddr_t *spp, size_t size, size_t align, caddr_t limit)
 		npva = (uintptr_t)BOP_ALLOC(ops, (caddr_t)pva,
 		    alloc_size, alloc_align);
 
-		if (npva == NULL) {
+		if (npva == 0) {
 			_kobj_printf(ops, "BOP_ALLOC failed, 0x%lx bytes",
 			    alloc_size);
 			_kobj_printf(ops, " aligned %lx", alloc_align);

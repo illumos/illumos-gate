@@ -56,9 +56,9 @@ static void *cbe_xcall_farg;
 static cpuset_t cbe_enabled;
 
 static ddi_softint_hdl_impl_t cbe_low_hdl =
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL};
 static ddi_softint_hdl_impl_t cbe_clock_hdl =
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL};
 
 cyclic_id_t cbe_hres_cyclic;
 int cbe_psm_timer_mode = TIMER_ONESHOT;

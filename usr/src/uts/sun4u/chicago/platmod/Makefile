@@ -94,8 +94,8 @@ check:
 
 LINT_LIB_DIR	= $(CHICAGO_LINT_LIB_DIR)
 
-$(PLATLIB):	$(BINARY)
-	$(BUILD.SO) $(BINARY)
+$(PLATLIB):	$(OBJECTS)
+	$(BUILD.SO) $(OBJECTS)
 
 $(SYM_MOD):	$(UNIX_O) $(PLATLIB)
 	@echo "resolving symbols against unix.o"

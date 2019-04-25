@@ -170,6 +170,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	_elf_sys_encoding;
 	_elf_swap_wrimage;
 	_gelf_getdyndtflags_1;
+	_gelf_getdynval;
 
 $if _ELF32
 	elf_demangle;

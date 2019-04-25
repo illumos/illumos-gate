@@ -2356,7 +2356,7 @@ process_group(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 static uintptr_t
 rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 {
-	Word 	rndx;
+	Word	rndx;
 	Is_desc	*risc;
 	Os_desc	*osp;
 	Shdr	*shdr = isc->is_shdr;
@@ -3190,6 +3190,21 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 			_rej.rej_name = name;
 			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej,
 			    ld_targ.t_m.m_mach));
+			if (rej->rej_type == 0) {
+				*rej = _rej;
+				rej->rej_name = strdup(_rej.rej_name);
+			}
+			return (0);
+		}
+
+		if (_gelf_getdynval(elf, DT_SUNW_KMOD) > 0) {
+			_rej.rej_name = name;
+			DBG_CALL(Dbg_file_rejected(ofl->ofl_lml, &_rej,
+			    ld_targ.t_m.m_mach));
+			_rej.rej_type = SGS_REJ_KMOD;
+			_rej.rej_str = elf_errmsg(-1);
+			_rej.rej_name = name;
+
 			if (rej->rej_type == 0) {
 				*rej = _rej;
 				rej->rej_name = strdup(_rej.rej_name);

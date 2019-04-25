@@ -20,9 +20,11 @@ timeout = 60
 post =
 outputdir = /var/tmp/test_results
 
+[/opt/elf-tests/tests/linker-sets]
+tests = ['simple', 'in-use-check']
+
 [/opt/elf-tests/tests/assert-deflib]
 tests = ['test-deflib']
-
 
 [/opt/elf-tests/tests/tls/amd64/ie]
 arch = i86pc

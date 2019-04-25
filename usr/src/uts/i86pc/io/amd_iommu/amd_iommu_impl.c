@@ -1211,13 +1211,13 @@ amd_iommu_fini(amd_iommu_t *iommu, int type)
 	if (type == AMD_IOMMU_QUIESCE)
 		return (DDI_SUCCESS);
 
-	if (iommu->aiomt_va != NULL) {
+	if (iommu->aiomt_va != 0) {
 		hat_unload(kas.a_hat, (void *)(uintptr_t)iommu->aiomt_va,
 		    iommu->aiomt_reg_size, HAT_UNLOAD_UNLOCK);
 		device_arena_free((void *)(uintptr_t)iommu->aiomt_va,
 		    ptob(iommu->aiomt_reg_pages));
-		iommu->aiomt_va = NULL;
-		iommu->aiomt_reg_va = NULL;
+		iommu->aiomt_va = 0;
+		iommu->aiomt_reg_va = 0;
 	}
 	mutex_destroy(&iommu->aiomt_eventlock);
 	mutex_destroy(&iommu->aiomt_cmdlock);

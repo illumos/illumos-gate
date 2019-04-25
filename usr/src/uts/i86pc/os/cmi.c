@@ -216,7 +216,7 @@ cmi_load_modctl(modctl_t *modp)
 			return (cmi);
 	}
 
-	if ((ver = modlookup_by_modctl(modp, "_cmi_api_version")) == NULL) {
+	if ((ver = modlookup_by_modctl(modp, "_cmi_api_version")) == 0) {
 		/*
 		 * Apparently a cpu module before versioning was introduced -
 		 * we call this version 0.

@@ -72,7 +72,7 @@ outdec64(unsigned char *out, unsigned char *chr, int num)
 
 	switch (num) {
 	case 0:
-	case 1: 	/* these are impossible */
+	case 1:		/* these are impossible */
 	default:
 		break;
 	case 2:		/* 2 base64 bytes == 1 decoded byte */
@@ -132,7 +132,7 @@ iscsi_base64_str_to_binary(char *hstr, int hstr_len,
 	*out_len = 0;
 	iptr = hstr;
 
-	while (((curchr = *(iptr++)) != NULL) &&
+	while (((curchr = *(iptr++)) != '\0') &&
 	    (((uintptr_t)iptr - (uintptr_t)hstr) <= hstr_len)) {
 		/* decode chars */
 		if (curchr == '=') /* if end */
@@ -186,7 +186,7 @@ int
 iscsi_binary_to_base64_str(uint8_t *in_buf, int in_buf_len,
     char *base64_str_buf, int base64_buf_len)
 {
-	uint8_t 	*iptr;
+	uint8_t		*iptr;
 	char		*optr;
 	int		in_bytes_remaining;
 

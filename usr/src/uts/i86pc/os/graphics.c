@@ -219,7 +219,7 @@ progressbar_key_abort(ldi_ident_t li)
 		    != 0)
 				cmn_err(CE_NOTE,
 				    "!ldi_ioctl for KD_RESETTEXT failed");
-		(void) ldi_close(hdl, NULL, kcred);
+		(void) ldi_close(hdl, 0, kcred);
 	}
 #endif
 }

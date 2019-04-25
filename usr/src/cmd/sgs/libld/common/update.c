@@ -184,7 +184,7 @@ update_osym(Ofl_desc *ofl)
 #endif
 	Addr		bssaddr, etext = 0, edata = 0, end = 0, start = 0;
 	Addr		tlsbssaddr = 0;
-	Addr 		parexpnbase, parexpnaddr;
+	Addr		parexpnbase, parexpnaddr;
 	int		start_set = 0;
 	Sym		_sym = {0}, *sym, *symtab = NULL;
 	Sym		*dynsym = NULL, *ldynsym = NULL;
@@ -1013,7 +1013,7 @@ update_osym(Ofl_desc *ofl)
 		if (sdp->sd_ref == REF_DYN_SEEN)
 			continue;
 
-		if (SYM_IS_HIDDEN(sdp) && (flags & FLG_OF_PROCRED))
+		if (ld_sym_reducable(ofl, sdp))
 			local = 1;
 		else
 			local = 0;
@@ -1224,7 +1224,7 @@ update_osym(Ofl_desc *ofl)
 		 * of the .symtab.  Retain the appropriate index for use in
 		 * version symbol indexing and relocation.
 		 */
-		if (SYM_IS_HIDDEN(sdp) && (flags & FLG_OF_PROCRED)) {
+		if (ld_sym_reducable(ofl, sdp)) {
 			local = 1;
 			if (!(sdp->sd_flags & FLG_SY_ELIM) && !dynsym)
 				sdp->sd_symndx = scopesym_ndx;
@@ -1333,7 +1333,7 @@ update_osym(Ofl_desc *ofl)
 				 *	keyword in a mapfile.
 				 *
 				 *  -	Symbol reference has been bound to a
-				 * 	dependency which was specified as
+				 *	dependency which was specified as
 				 *	requiring direct bindings with -zdirect.
 				 *
 				 *  -	All symbol references are required to
@@ -1768,6 +1768,19 @@ update_osym(Ofl_desc *ofl)
 				    ofl_osgot->os_scn);
 				sdp->sd_flags &= ~FLG_SY_SPECSEC;
 				break;
+			case SDAUX_ID_SECBOUND_START:
+				sym->st_value = sap->sa_boundsec->
+				    os_shdr->sh_addr;
+				sectndx = elf_ndxscn(sap->sa_boundsec->os_scn);
+				sdp->sd_flags &= ~FLG_SY_SPECSEC;
+				break;
+			case SDAUX_ID_SECBOUND_STOP:
+				sym->st_value = sap->sa_boundsec->
+				    os_shdr->sh_addr +
+				    sap->sa_boundsec->os_shdr->sh_size;
+				sectndx = elf_ndxscn(sap->sa_boundsec->os_scn);
+				sdp->sd_flags &= ~FLG_SY_SPECSEC;
+				break;
 			default:
 				/* NOTHING */
 				;
@@ -1889,7 +1902,7 @@ update_osym(Ofl_desc *ofl)
 		 * to maintain the binding of the original reference.
 		 */
 		if (SYM_IS_HIDDEN(sdp)) {
-			if (flags & FLG_OF_PROCRED)
+			if (ld_sym_reducable(ofl, sdp))
 				bind = STB_LOCAL;
 			else
 				bind = STB_WEAK;
@@ -2579,6 +2592,12 @@ update_odynamic(Ofl_desc *ofl)
 	dyn->d_un.d_val = ld_sunw_ldmach();
 	dyn++;
 
+	if (ofl->ofl_flags & FLG_OF_KMOD) {
+		dyn->d_tag = DT_SUNW_KMOD;
+		dyn->d_un.d_val = 1;
+		dyn++;
+	}
+
 	(*ld_targ.t_mr.mr_mach_update_odynamic)(ofl, &dyn);
 
 	for (cnt = 1 + DYNAMIC_EXTRA_ELTS; cnt--; dyn++) {
@@ -3157,7 +3176,7 @@ update_move(Ofl_desc *ofl)
 					    imvp->m_info);
 				}
 			} else {
-				Boolean 	isredloc = FALSE;
+				Boolean		isredloc = FALSE;
 
 				if ((ELF_ST_BIND(sym->st_info) == STB_LOCAL) &&
 				    (ofl->ofl_flags & FLG_OF_REDLSYM))
@@ -3652,7 +3671,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	DBG_CALL(Dbg_seg_title(ofl->ofl_lml));
 	for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 		Phdr		*phdr = &(sgp->sg_phdr);
-		Xword 		p_align;
+		Xword		p_align;
 		Aliste		idx2;
 		Sym_desc	*sdp;
 
@@ -3872,8 +3891,8 @@ ld_update_outfile(Ofl_desc *ofl)
 			 * Check overlaps
 			 */
 			for (i = 0; i < phdrndx - 1; i++) {
-				Addr 	p_s = (ofl->ofl_phdr[i]).p_vaddr;
-				Addr 	p_e;
+				Addr	p_s = (ofl->ofl_phdr[i]).p_vaddr;
+				Addr	p_e;
 
 				if ((ofl->ofl_phdr[i]).p_type != PT_LOAD)
 					continue;

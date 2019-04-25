@@ -213,7 +213,7 @@ cpupm_throttle(cpuset_t set,  uint32_t throtl_lvl)
 		CPUSET_DEL(set, CPU->cpu_id);
 	}
 	if (!CPUSET_ISNULL(set)) {
-		xc_call((xc_arg_t)throtl_lvl, NULL, NULL,
+		xc_call((xc_arg_t)throtl_lvl, 0, 0,
 		    CPUSET2BV(set), (xc_func_t)cpupm_tstate_transition);
 	}
 	kpreempt_enable();
@@ -290,7 +290,7 @@ static int
 cpupm_throttle_get_max(processorid_t cpu_id)
 {
 	cpu_t			*cp = cpu[cpu_id];
-	cpupm_mach_state_t 	*mach_state =
+	cpupm_mach_state_t	*mach_state =
 	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
 	cpu_acpi_handle_t	handle;
 	int			throtl_level;

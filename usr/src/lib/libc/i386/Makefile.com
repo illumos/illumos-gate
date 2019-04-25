@@ -1086,6 +1086,8 @@ CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-unused-function
 CERRWARN += -_gcc=-Wno-address
 
+$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused
+
 # not linted
 SMATCH=off
 

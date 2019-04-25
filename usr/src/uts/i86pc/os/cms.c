@@ -209,7 +209,7 @@ cms_load_modctl(modctl_t *modp)
 			return (cms);
 	}
 
-	if ((ver = modlookup_by_modctl(modp, "_cms_api_version")) == NULL) {
+	if ((ver = modlookup_by_modctl(modp, "_cms_api_version")) == 0) {
 		cmn_err(CE_WARN, "cpu model-specific module '%s' is invalid:  "
 		    "no _cms_api_version", modp->mod_modname);
 		return (NULL);

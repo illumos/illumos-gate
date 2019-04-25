@@ -194,7 +194,8 @@ typedef struct {
 #define	SGS_REJ_PLATCAP		16	/* platform capability mismatch */
 #define	SGS_REJ_HWCAP_2		17	/* hardware capabilities mismatch */
 #define	SGS_REJ_ARCHIVE		18	/* archive used in invalid context */
-#define	SGS_REJ_NUM		19
+#define	SGS_REJ_KMOD		19	/* object is a kernel module */
+#define	SGS_REJ_NUM		20
 
 #define	FLG_REJ_ALTER		0x01	/* object name is an alternative */
 

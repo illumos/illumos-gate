@@ -217,7 +217,7 @@ pci_cfgacc_check_io(pci_cfgacc_req_t *req)
 
 	bus = PCI_BDF_BUS(req->bdf);
 
-	if (pci_cfgacc_force_io || (mcfg_mem_base == NULL) ||
+	if (pci_cfgacc_force_io || (mcfg_mem_base == 0) ||
 	    (bus < mcfg_bus_start) || (bus > mcfg_bus_end) ||
 	    pci_cfgacc_find_workaround(req->bdf))
 		req->ioacc = B_TRUE;

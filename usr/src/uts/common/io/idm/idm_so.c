@@ -388,7 +388,7 @@ idm_v6_addr_okay(struct in6_addr *addr6)
 int
 idm_get_ipaddr(idm_addr_list_t **ipaddr_p)
 {
-	ksocket_t 		so4, so6;
+	ksocket_t		so4, so6;
 	struct lifnum		lifn;
 	struct lifconf		lifc;
 	struct lifreq		*lp;
@@ -622,7 +622,7 @@ idm_iov_sosend(ksocket_t so, iovec_t *iop, int iovlen, size_t total_len)
 {
 	struct msghdr		msg;
 	int			error;
-	size_t 			sent = 0;
+	size_t			sent = 0;
 
 	ASSERT(iop != NULL);
 
@@ -663,7 +663,7 @@ idm_iov_sorecv(ksocket_t so, iovec_t *iop, int iovlen, size_t total_len)
 	struct msghdr		msg;
 	int			error;
 	size_t			recv;
-	int 			flags;
+	int			flags;
 
 	ASSERT(iop != NULL);
 
@@ -981,7 +981,7 @@ idm_so_ini_conn_connect(idm_conn_t *ic)
 {
 	idm_so_conn_t	*so_conn;
 	struct sonode	*node = NULL;
-	int 		rc;
+	int		rc;
 	clock_t		lbolt, conn_login_max, conn_login_interval;
 	boolean_t	nonblock;
 
@@ -1324,7 +1324,7 @@ idm_so_svc_port_watcher(void *arg)
 	idm_so_svc_t		*so_svc;
 	int			rc;
 	const uint32_t		off = 0;
-	struct sockaddr_in6 	t_addr;
+	struct sockaddr_in6	t_addr;
 	socklen_t		t_addrlen;
 
 	bzero(&t_addr, sizeof (struct sockaddr_in6));
@@ -1386,7 +1386,7 @@ idm_so_svc_port_watcher(void *arg)
 		 * Kick the state machine.  At CS_S3_XPT_UP the state machine
 		 * will notify the client (target) about the new connection.
 		 */
-		idm_conn_event(ic, CE_CONNECT_ACCEPT, NULL);
+		idm_conn_event(ic, CE_CONNECT_ACCEPT, (uintptr_t)NULL);
 
 		mutex_enter(&svc->is_mutex);
 	}
@@ -2618,7 +2618,7 @@ idm_so_send_rtt_data(idm_conn_t *ic, idm_task_t *idt, idm_buf_t *idb,
 		mutex_enter(&ic->ic_state_mutex);
 		if (ic->ic_ffp)
 			idm_conn_event_locked(ic, CE_TRANSPORT_FAIL,
-			    NULL, CT_NONE);
+			    (uintptr_t)NULL, CT_NONE);
 		mutex_exit(&ic->ic_state_mutex);
 		mutex_exit(&idt->idt_mutex);
 		return;

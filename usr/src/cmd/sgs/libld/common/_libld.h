@@ -199,7 +199,7 @@ typedef struct {
 	const Rel_entry	*mr_reloc_table;
 
 	Word		(* mr_init_rel)(Rel_desc *, Word *, void *);
-	void 		(* mr_mach_eflags)(Ehdr *, Ofl_desc *);
+	void		(* mr_mach_eflags)(Ehdr *, Ofl_desc *);
 	void		(* mr_mach_make_dynamic)(Ofl_desc *, size_t *);
 	void		(* mr_mach_update_odynamic)(Ofl_desc *, Dyn **);
 	Xword		(* mr_calc_plt_addr)(Sym_desc *, Ofl_desc *);
@@ -754,6 +754,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_sym_nodirect		ld64_sym_nodirect
 #define	ld_sym_process		ld64_sym_process
 #define	ld_sym_resolve		ld64_sym_resolve
+#define	ld_sym_reducable	ld64_sym_reducable
 #define	ld_sym_spec		ld64_sym_spec
 #define	ld_targ			ld64_targ
 #define	ld_targ_init_sparc	ld64_targ_init_sparc
@@ -852,6 +853,7 @@ extern Sdf_desc		*sdf_find(const char *, APlist *);
 #define	ld_sym_nodirect		ld32_sym_nodirect
 #define	ld_sym_process		ld32_sym_process
 #define	ld_sym_resolve		ld32_sym_resolve
+#define	ld_sym_reducable	ld32_sym_reducable
 #define	ld_sym_spec		ld32_sym_spec
 #define	ld_targ			ld32_targ
 #define	ld_targ_init_sparc	ld32_targ_init_sparc
@@ -878,8 +880,8 @@ extern int		dbg_setup(Ofl_desc *, const char *, int);
 
 extern uintptr_t	ld_add_actrel(Word, Rel_desc *, Ofl_desc *);
 extern uintptr_t	ld_add_libdir(Ofl_desc *, const char *);
-extern void 		ld_adj_movereloc(Ofl_desc *, Rel_desc *);
-extern Sym_desc * 	ld_am_I_partial(Rel_desc *, Xword);
+extern void		ld_adj_movereloc(Ofl_desc *, Rel_desc *);
+extern Sym_desc *	ld_am_I_partial(Rel_desc *, Xword);
 extern void		ld_ar_member(Ar_desc *, Elf_Arsym *, Ar_aux *,
 			    Ar_mem *);
 extern Ar_desc		*ld_ar_setup(const char *, Elf *, Ofl_desc *);
@@ -997,6 +999,7 @@ extern uintptr_t	ld_sym_nodirect(Is_desc *, Ifl_desc *, Ofl_desc *);
 extern uintptr_t	ld_sym_process(Is_desc *, Ifl_desc *, Ofl_desc *);
 extern uintptr_t	ld_sym_resolve(Sym_desc *, Sym *, Ifl_desc *,
 			    Ofl_desc *, int, Word, sd_flag_t);
+extern Boolean		ld_sym_reducable(Ofl_desc *, Sym_desc *);
 extern uintptr_t	ld_sym_spec(Ofl_desc *);
 
 extern Target		ld_targ;

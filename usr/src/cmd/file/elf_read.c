@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
@@ -79,6 +79,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/elf.h>
+#include <sys/link.h>
 #include <elfcap.h>
 #include "file.h"
 #include "elf_read.h"
@@ -125,7 +126,7 @@ get_format(void)
 
 /*
  * file_xlatetom:	translate different headers from file
- * 			representation to memory representaion.
+ *			representation to memory representaion.
  */
 #define	HDRSZ 512
 static int
@@ -141,7 +142,7 @@ file_xlatetom(Elf_Type type, char *hdr)
 	/* will convert only these types */
 	if (type != ELF_T_EHDR && type != ELF_T_PHDR &&
 	    type != ELF_T_SHDR && type != ELF_T_WORD &&
-	    type != ELF_T_CAP)
+	    type != ELF_T_CAP && type != ELF_T_DYN)
 		return (ELF_READ_FAIL);
 
 	src.d_buf = (Elf_Void *)hdr;
@@ -162,7 +163,7 @@ file_xlatetom(Elf_Type type, char *hdr)
 
 /*
  * xlatetom_nhdr:	There is no routine to convert Note header
- * 			so we convert each field of this header.
+ *			so we convert each field of this header.
  */
 static int
 xlatetom_nhdr(Elf_Nhdr *nhdr)
@@ -177,7 +178,7 @@ xlatetom_nhdr(Elf_Nhdr *nhdr)
 
 /*
  * elf_read:	reads elf header, program, section headers to
- * 		collect all information needed for file(1)
+ *		collect all information needed for file(1)
  *		output and stores them in Elf_Info.
  */
 int
@@ -300,7 +301,7 @@ get_shdr(Elf_Info *EI, int inx)
 /*
  * process_phdr:	Read Program Headers and see if it is a core
  *			file of either new or (pre-restructured /proc)
- * 			type, read the name of the file that dumped this
+ *			type, read the name of the file that dumped this
  *			core, else see if this is a dynamically linked.
  */
 static int
@@ -415,17 +416,13 @@ process_phdr(Elf_Info *EI)
 static int
 process_shdr(Elf_Info *EI)
 {
-	int 		capn, mac;
-	int 		i, j, idx;
-	FILE_ELF_OFF_T	cap_off;
-	FILE_ELF_SIZE_T	csize;
+	int		mac;
+	int		i, idx;
 	char		*strtab;
 	size_t		strtab_sz;
-	Elf_Cap 	Chdr;
+	uint64_t	j;
 	Elf_Shdr	*shdr = &EI_Shdr;
 
-
-	csize = sizeof (Elf_Cap);
 	mac = EI_Ehdr.e_machine;
 
 	/* if there are no sections, return success anyway */
@@ -457,9 +454,15 @@ process_shdr(Elf_Info *EI)
 			continue;
 		}
 
-		cap_off = shdr->sh_offset;
 		if (shdr->sh_type == SHT_SUNW_cap) {
-			char capstr[128];
+			char		capstr[128];
+			Elf_Cap		Chdr;
+			FILE_ELF_OFF_T	cap_off;
+			FILE_ELF_SIZE_T	csize;
+			uint64_t capn;
+
+			cap_off = shdr->sh_offset;
+			csize = sizeof (Elf_Cap);
 
 			if (shdr->sh_size == 0 || shdr->sh_entsize == 0) {
 				(void) fprintf(stderr, ELF_ERR_ELFCAP1,
@@ -471,8 +474,8 @@ process_shdr(Elf_Info *EI)
 				/*
 				 * read cap and xlate the values
 				 */
-				if (pread64(EI->elffd, &Chdr, csize, cap_off)
-				    != csize ||
+				if ((pread64(EI->elffd, &Chdr, csize, cap_off)
+				    != csize) ||
 				    file_xlatetom(ELF_T_CAP, (char *)&Chdr)
 				    == 0) {
 					(void) fprintf(stderr, ELF_ERR_ELFCAP2,
@@ -502,6 +505,39 @@ process_shdr(Elf_Info *EI)
 
 				(void) strlcat(EI->cap_str, capstr,
 				    sizeof (EI->cap_str));
+			}
+		} else if (shdr->sh_type == SHT_DYNAMIC) {
+			Elf_Dyn dyn;
+			FILE_ELF_SIZE_T dsize;
+			FILE_ELF_OFF_T doff;
+			uint64_t dynn;
+
+			doff = shdr->sh_offset;
+			dsize = sizeof (Elf_Dyn);
+
+			if (shdr->sh_size == 0 || shdr->sh_entsize == 0) {
+				(void) fprintf(stderr, ELF_ERR_DYNAMIC1,
+				    File, EI->file);
+				return (ELF_READ_FAIL);
+			}
+
+			dynn = (shdr->sh_size / shdr->sh_entsize);
+			for (j = 0; j < dynn; j++) {
+				if (pread64(EI->elffd, &dyn, dsize, doff)
+				    != dsize ||
+				    file_xlatetom(ELF_T_DYN, (char *)&dyn)
+				    == 0) {
+					(void) fprintf(stderr, ELF_ERR_DYNAMIC2,
+					    File, EI->file);
+					return (ELF_READ_FAIL);
+				}
+
+				doff += dsize;
+
+				if ((dyn.d_tag == DT_SUNW_KMOD) &&
+				    (dyn.d_un.d_val == 1)) {
+					EI->kmod = B_TRUE;
+				}
 			}
 		}
 

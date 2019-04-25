@@ -70,11 +70,11 @@ struct mod_ops mod_psmops = {
 };
 
 static struct psm_sw psm_swtab = {
-	&psm_swtab, &psm_swtab, NULL, NULL
+	&psm_swtab, &psm_swtab, NULL, 0
 };
 
-kmutex_t psmsw_lock;			/* lock accesses to psmsw 	*/
-struct psm_sw *psmsw = &psm_swtab; 	/* start of all psm_sw		*/
+kmutex_t psmsw_lock;			/* lock accesses to psmsw	*/
+struct psm_sw *psmsw = &psm_swtab;	/* start of all psm_sw		*/
 
 static struct modlinkage *
 psm_modlinkage_alloc(struct psm_info *infop)
@@ -167,7 +167,7 @@ psm_mod_info(void **handlepp, struct psm_info *infop, struct modinfo *modinfop)
 	if (!*modlpp) {
 		mlinkp = psm_modlinkage_alloc(infop);
 		if (!mlinkp)
-			return ((int)NULL);
+			return (0);
 	} else
 		mlinkp = *modlpp;
 

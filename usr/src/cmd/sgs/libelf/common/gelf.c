@@ -698,7 +698,7 @@ gelf_update_dyn(Elf_Data *dst, int ndx, GElf_Dyn *src)
 
 GElf_Sym *
 gelf_getsymshndx(Elf_Data *symdata, Elf_Data *shndxdata,
-	int ndx, GElf_Sym *symptr, Elf32_Word *xshndx)
+    int ndx, GElf_Sym *symptr, Elf32_Word *xshndx)
 {
 	if (gelf_getsym(symdata, ndx, symptr) == 0)
 		return (NULL);
@@ -719,7 +719,7 @@ gelf_getsymshndx(Elf_Data *symdata, Elf_Data *shndxdata,
 
 int
 gelf_update_symshndx(Elf_Data *symdata, Elf_Data *shndxdata,
-	int ndx, GElf_Sym *symptr, Elf32_Word xshndx)
+    int ndx, GElf_Sym *symptr, Elf32_Word xshndx)
 {
 	if (gelf_update_sym(symdata, ndx, symptr) == 0)
 		return (0);
@@ -1091,7 +1091,7 @@ gelf_update_cap(Elf_Data *dst, int ndx, GElf_Cap *src)
  * Otherwise, return 0.
  */
 GElf_Xword
-_gelf_getdyndtflags_1(Elf *elf)
+_gelf_getdynval(Elf *elf, GElf_Sxword tag)
 {
 	Elf_Scn *scn = NULL;
 	Elf_Data *data;
@@ -1108,7 +1108,7 @@ _gelf_getdyndtflags_1(Elf *elf)
 			n = shdr.sh_size / shdr.sh_entsize;
 			for (i = 0; i < n; i++) {
 				(void) gelf_getdyn(data, i, &dyn);
-				if (dyn.d_tag == DT_FLAGS_1) {
+				if (dyn.d_tag == tag) {
 					return (dyn.d_un.d_val);
 				}
 			}
@@ -1116,4 +1116,10 @@ _gelf_getdyndtflags_1(Elf *elf)
 		break;
 	}
 	return (0);
+}
+
+GElf_Xword
+_gelf_getdyndtflags_1(Elf *elf)
+{
+	return (_gelf_getdynval(elf, DT_FLAGS_1));
 }

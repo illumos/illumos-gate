@@ -465,10 +465,6 @@ CERRWARN += -_gcc=-Wno-missing-field-initializers
 # Unfortunately, this option can misfire very easily and unfixably.
 CERRWARN +=	-_gcc=-Wno-array-bounds
 
-# DEBUG v. -nd make for frequent unused variables, empty conditions, etc. in
-# -nd builds
-$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-unused
-$(RELEASE_BUILD)CERRWARN += -_gcc=-Wno-empty-body
 
 CERRWARN += -_smatch=-p=illumos_user
 include $(SRC)/Makefile.smatch

@@ -550,7 +550,7 @@ mac_next_bind_cpu(cpupart_t *cpupart)
 
 	} while ((cp = cp->cpu_next_onln) != cp_start);
 
-	return (NULL);
+	return (-1);	/* No matching CPU found online */
 }
 
 /* ARGSUSED */
@@ -2082,7 +2082,7 @@ mac_srs_create(mac_client_impl_t *mcip, flow_entry_t *flent, uint32_t srs_type,
     mac_direct_rx_t rx_func, void *x_arg1, mac_resource_handle_t x_arg2,
     mac_ring_t *ring)
 {
-	mac_soft_ring_set_t 	*mac_srs;
+	mac_soft_ring_set_t	*mac_srs;
 	mac_srs_rx_t		*srs_rx;
 	mac_srs_tx_t		*srs_tx;
 	mac_bw_ctl_t		*mac_bw;
@@ -2396,7 +2396,7 @@ mac_rx_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 {
 	mac_impl_t		*mip = mcip->mci_mip;
 	mac_soft_ring_set_t	*mac_srs;
-	mac_ring_t 		*ring;
+	mac_ring_t		*ring;
 	uint32_t		fanout_type;
 	mac_group_t		*rx_group = flent->fe_rx_ring_group;
 	boolean_t		no_unicast;
@@ -3016,7 +3016,7 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		if (rgroup != NULL) {
 			if (rgroup != default_rgroup &&
 			    MAC_GROUP_NO_CLIENT(rgroup) &&
-			    (rxhw || mcip->mci_share != NULL)) {
+			    (rxhw || mcip->mci_share != 0)) {
 				MAC_RX_GRP_RESERVED(mip);
 				if (mip->mi_rx_group_type ==
 				    MAC_GROUP_TYPE_DYNAMIC) {
@@ -3045,7 +3045,7 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		if (tgroup != NULL) {
 			if (tgroup != default_tgroup &&
 			    MAC_GROUP_NO_CLIENT(tgroup) &&
-			    (txhw || mcip->mci_share != NULL)) {
+			    (txhw || mcip->mci_share != 0)) {
 				MAC_TX_GRP_RESERVED(mip);
 				if (mip->mi_tx_group_type ==
 				    MAC_GROUP_TYPE_DYNAMIC) {

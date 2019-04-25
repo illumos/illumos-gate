@@ -178,7 +178,7 @@ char panic_preempt;			/* t_preempt for panic_thread */
  */
 char *panic_bootstr = NULL;		/* mdboot string to use after panic */
 int panic_bootfcn = AD_BOOT;		/* mdboot function to use after panic */
-int halt_on_panic = 0;  		/* halt after dump instead of reboot? */
+int halt_on_panic = 0;			/* halt after dump instead of reboot? */
 int nopanicdebug = 0;			/* reboot instead of call debugger? */
 int in_sync = 0;			/* skip vfs_syncall() and just dump? */
 
@@ -311,7 +311,7 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 		splx(ipltospl(CLOCK_LEVEL));
 		panic_quiesce_hw(pdp);
 		(void) FTRACE_STOP();
-		(void) callb_execute_class(CB_CL_PANIC, NULL);
+		(void) callb_execute_class(CB_CL_PANIC, 0);
 
 		if (log_intrq != NULL)
 			log_flushq(log_intrq);

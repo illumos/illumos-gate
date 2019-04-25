@@ -89,8 +89,8 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-$(PLATLIB):	$(BINARY)
-	$(BUILD.SO) $(BINARY)
+$(PLATLIB):	$(OBJECTS)
+	$(BUILD.SO) $(OBJECTS)
 
 #
 #	Include common targets.

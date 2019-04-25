@@ -118,7 +118,7 @@ Interp		*interp = NULL;		/* ELF interpreter info */
 APlist		*hdl_alp[HDLIST_SZ+2];	/* dlopen() handle list */
 size_t		syspagsz = 0;		/* system page size */
 ulong_t		at_flags = 0;		/* machine specific file flags */
-Uts_desc	*uts = NULL; 		/* utsname descriptor */
+Uts_desc	*uts = NULL;		/* utsname descriptor */
 Isa_desc	*isa = NULL;		/* isalist descriptor */
 
 uint_t		audit_argcnt = 64;	/* no. of stack args to copy (default */
@@ -234,9 +234,10 @@ ldd_reject[SGS_REJ_NUM] = {
 		MSG_LDD_REJ_MACHCAP,	/* MSG_INTL(MSG_LDD_REJ_MACHCAP) */
 		MSG_LDD_REJ_PLATCAP,	/* MSG_INTL(MSG_LDD_REJ_PLATCAP) */
 		MSG_LDD_REJ_HWCAP_2,	/* MSG_INTL(MSG_LDD_REJ_HWCAP_2) */
-		MSG_LDD_REJ_ARCHIVE	/* MSG_INTL(MSG_LDD_REJ_ARCHIVE) */
+		MSG_LDD_REJ_ARCHIVE,	/* MSG_INTL(MSG_LDD_REJ_ARCHIVE) */
+		MSG_LDD_REJ_KMOD	/* MSG_INTL(MSG_LDD_REJ_KMOD) */
 	};
-#if SGS_REJ_NUM != (SGS_REJ_ARCHIVE + 1)
+#if SGS_REJ_NUM != (SGS_REJ_KMOD + 1)
 #error SGS_REJ_NUM has changed
 #endif
 
@@ -261,8 +262,9 @@ err_reject[SGS_REJ_NUM] = {
 		MSG_ERR_REJ_PLATCAP,	/* MSG_INTL(MSG_ERR_REJ_PLATCAP) */
 		MSG_ERR_REJ_HWCAP_2,	/* MSG_INTL(MSG_ERR_REJ_HWCAP_2) */
 		MSG_ERR_REJ_ARCHIVE,	/* MSG_INTL(MSG_ERR_REJ_ARCHIVE) */
+		MSG_ERR_REJ_KMOD,	/* MSG_INTL(MSG_ERR_REJ_KMOD) */
 	};
-#if SGS_REJ_NUM != (SGS_REJ_ARCHIVE + 1)
+#if SGS_REJ_NUM != (SGS_REJ_KMOD + 1)
 #error SGS_REJ_NUM has changed
 #endif
 
@@ -286,8 +288,9 @@ ldd_warn[SGS_REJ_NUM] = {
 		MSG_LDD_WARN_MACHCAP,	/* MSG_INTL(MSG_LDD_WARN_MACHCAP) */
 		MSG_LDD_WARN_PLATCAP,	/* MSG_INTL(MSG_LDD_WARN_PLATCAP) */
 		MSG_LDD_WARN_HWCAP_2,	/* MSG_INTL(MSG_LDD_WARN_HWCAP_2) */
-		MSG_STR_EMPTY
+		MSG_STR_EMPTY,
+		MSG_STR_EMPTY,
 	};
-#if SGS_REJ_NUM != (SGS_REJ_ARCHIVE + 1)
+#if SGS_REJ_NUM != (SGS_REJ_KMOD + 1)
 #error SGS_REJ_NUM has changed
 #endif

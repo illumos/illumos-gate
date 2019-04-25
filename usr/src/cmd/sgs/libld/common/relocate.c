@@ -76,12 +76,12 @@
  */
 typedef struct copy_rel {
 	Sym_desc	*c_sdp;		/* symbol descriptor to be copied */
-	Addr 		c_val;		/* original symbol value */
+	Addr		c_val;		/* original symbol value */
 } Copy_rel;
 
 /*
  * For each copy relocation symbol, determine if the symbol is:
- * 	1) to be *disp* relocated at runtime
+ *	1) to be *disp* relocated at runtime
  *	2) a reference symbol for *disp* relocation
  *	3) possibly *disp* relocated at ld time.
  *
@@ -2264,7 +2264,7 @@ get_move_entry(Is_desc *rsect, Xword roffset)
 	Shdr		*rshdr = rsect->is_shdr;
 	Is_desc		*misp;
 	Shdr		*mshdr;
-	Xword 		midx;
+	Xword		midx;
 	Move		*mvp;
 
 	/*
@@ -2296,8 +2296,8 @@ process_movereloc(Ofl_desc *ofl, Is_desc *rsect)
 {
 	Ifl_desc	*file = rsect->is_file;
 	Rel		*rend, *reloc;
-	Xword 		rsize, entsize;
-	Rel_desc 	reld;
+	Xword		rsize, entsize;
+	Rel_desc	reld;
 	Rel_aux	rel_aux;
 
 	rsize = rsect->is_shdr->sh_size;
@@ -2961,7 +2961,7 @@ Sym_desc *
 ld_am_I_partial(Rel_desc *reld, Xword val)
 {
 	Ifl_desc	*ifile = reld->rel_sym->sd_isc->is_file;
-	int 		nlocs = ifile->ifl_locscnt, i;
+	int		nlocs = ifile->ifl_locscnt, i;
 
 	for (i = 1; i < nlocs; i++) {
 		Sym		*osym;

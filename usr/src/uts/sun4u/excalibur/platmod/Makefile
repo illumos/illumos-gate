@@ -23,8 +23,6 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 #	This makefile drives the production of the sun4u excalibur platform
@@ -96,8 +94,8 @@ check:
 
 LINT_LIB_DIR	= $(EXCALIBUR_LINT_LIB_DIR)
 
-$(PLATLIB):	$(BINARY)
-	$(BUILD.SO) $(BINARY)
+$(PLATLIB):	$(OBJECTS)
+	$(BUILD.SO) $(OBJECTS)
 
 $(SYM_MOD):	$(UNIX_O) $(PLATLIB)
 	@echo "resolving symbols against unix.o"

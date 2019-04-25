@@ -1225,6 +1225,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_SUNW_CAPCHAINENT:
 			case DT_SUNW_CAPCHAINSZ:
 			case DT_SUNW_ASLR:
+			case DT_SUNW_KMOD:
 				(void) printf(pdyn_Fmtptr,
 				    EC_XWORD(p_dyn.d_un.d_val));
 				break;

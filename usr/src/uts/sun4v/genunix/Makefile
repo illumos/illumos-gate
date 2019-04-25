@@ -97,9 +97,9 @@ CLOBBERFILES	+= $(GENUNIX)
 IPCTF_TARGET	= $(IPCTF)
 $(PATCH_BUILD)IPCTF_TARGET =
 
-# 
-# lint pass one enforcement 
-# 
+#
+# lint pass one enforcement
+#
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -I$(SRC)/common
 CPPFLAGS += -I$(SRC)/uts/common/fs/zfs
@@ -156,10 +156,10 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:  	$(INSTALL_DEPS)
+install:	$(INSTALL_DEPS)
 
-$(LIBGEN):	$(GENUNIX) $(LIBSTUBS)
-	$(BUILD.SO) $(GENUNIX) $(LIBSTUBS)
+$(LIBGEN):	$(OBJECTS) $(LIBSTUBS)
+	$(BUILD.SO) $(OBJECTS) $(LIBSTUBS)
 
 $(GENUNIX): $(IPCTF_TARGET) $(OBJECTS)
 	@pwd

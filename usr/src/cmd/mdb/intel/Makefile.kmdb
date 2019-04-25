@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2019 Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
 PROMSRCS += \
@@ -55,6 +55,8 @@ CPPFLAGS += -DDIS_TEXT
 $(CTXOFFUSERS) $(CTXOFFUSERS:%.o=%.ln): kmdb_context_off.h
 
 kaif_activate.o kaif_activate.ln := CPPFLAGS += -D_MACHDEP -D_KMEMUSER
+
+$(RELEASE_BUILD)kaif.o := CERRWARN += -_gcc=-Wno-unused
 
 STANDLIBS += \
 	../libstandctf/libstandctf.so \

@@ -200,6 +200,7 @@
 @ MSG_LDD_REJ_PLATCAP	"  - platform capability (CA_SUNW_PLAT) unsupported: %s"
 @ MSG_LDD_REJ_HWCAP_2	"  - hardware capability (CA_SUNW_HW_2) unsupported: %s"
 @ MSG_LDD_REJ_ARCHIVE	"  - invalid archive use"
+@ MSG_LDD_REJ_KMOD	"  - invalid kernel module use"
 
 @ MSG_LDD_WARN_UNKCAP	"%s: unknown capability: %d"
 @ MSG_LDD_WARN_HWCAP_1	"%s: warning: hardware capability (CA_SUNW_HW_1) \
@@ -233,6 +234,7 @@
 @ MSG_ERR_REJ_PLATCAP	"%s: platform capability (CA_SUNW_PLAT) unsupported: %s"
 @ MSG_ERR_REJ_HWCAP_2	"%s: hardware capability (CA_SUNW_HW_2) unsupported: %s"
 @ MSG_ERR_REJ_ARCHIVE	"%s: invalid archive use"
+@ MSG_ERR_REJ_KMOD	"%s: invalid kernel module use"
 
 # Error TLS failures
 
@@ -242,7 +244,7 @@
 			 link-map list"
 @ MSG_TLS_STATSIZE	"%s: static TLS failure: object loaded after process \
 			 initialization: size (%#llx) exceeds available backup \
-			 reservation (%#llx)"  
+			 reservation (%#llx)"
 @ MSG_TLS_STATINIT	"%s: static TLS failure: object loaded after process \
 			 initialization: can not accommodate initialized data"
 

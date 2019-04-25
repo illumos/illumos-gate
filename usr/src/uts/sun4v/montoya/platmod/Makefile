@@ -23,11 +23,9 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
-#	This makefile drives the production of the sun4v montoya default 
+#	This makefile drives the production of the sun4v montoya default
 #	platform module.
 #
 #	sun4v implementation architecture dependent
@@ -101,10 +99,10 @@ install:	$(INSTALL_DEPS)
 
 check:
 
-LINT_LIB_DIR	=$(MONTOYA_LINT_LIB_DIR)
+LINT_LIB_DIR	= $(MONTOYA_LINT_LIB_DIR)
 
-$(PLATLIB):	$(BINARY)
-	$(BUILD.SO) $(BINARY)
+$(PLATLIB):	$(OBJECTS)
+	$(BUILD.SO) $(OBJECTS)
 
 $(SYM_MOD):	$(UNIX_O) $(PLATLIB)
 	@echo "resolving symbols against unix.o"

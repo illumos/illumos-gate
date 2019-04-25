@@ -262,7 +262,7 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	devtree_freeze();
 
 	if (invoke_cb)
-		(void) callb_execute_class(CB_CL_MDBOOT, NULL);
+		(void) callb_execute_class(CB_CL_MDBOOT, 0);
 
 	/*
 	 * Clear any unresolved UEs from memory.
@@ -1417,7 +1417,7 @@ dtrace_linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp)
  * and posts the softint for x86.
  */
 static ddi_softint_hdl_impl_t lbolt_softint_hdl =
-	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
+	{0, 0, NULL, NULL, 0, NULL, NULL, NULL};
 
 void
 lbolt_softint_add(void)

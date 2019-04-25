@@ -35,6 +35,7 @@ ld \- link-editor for object files
 [\fB-z\fR preinitarray=\fIfunction\fR] [\fB-z\fR redlocsym] [\fB-z\fR relaxreloc]
 [\fB-z\fR rescan-now] [\fB-z\fR recan] [\fB-z\fR rescan-start \fI\&...\fR \fB-z\fR rescan-end]]
 [\fB-z\fR target=sparc|x86] [\fB-z\fR text | textwarn | textoff]
+[\fB-z\fR type=\fIexec\fR|\fIkmod\fR|\fIreloc\fR|\fIshared\fR]
 [\fB-z\fR verbose] [\fB-z\fR wrap=\fIsymbol\fR] \fIfilename\fR...
 .fi
 
@@ -1578,6 +1579,56 @@ object.
 In dynamic mode only, lists a warning if any relocations against non-writable,
 allocatable sections remain. This mode is the default when building an
 executable.
+.RE
+
+.sp
+.ne 2
+.na
+\fB-z\fR \fBtype=exec|kmod|reloc|shared\fR
+.ad
+.sp .6
+.RS 4n
+Specifies the type of object to create.
+
+.sp
+.ne 2
+.na
+exec
+.ad
+.sp .6
+.RS 4n
+Dynamic executable
+.RE
+
+.sp
+.ne 2
+.na
+reloc
+.ad
+.sp .6
+.RS 4n
+Relocatable object
+.RE
+
+.sp
+.ne 2
+.na
+shared
+.ad
+.sp .6
+.RS 4n
+Dynamic shared object
+.RE
+
+.sp
+.ne 2
+.na
+kmod
+.ad
+.sp .6
+.RS 4n
+illumos kernel module
+.RE
 .RE
 
 .sp

@@ -16,6 +16,7 @@
 
 SUBDIRS =		\
 	assert-deflib	\
+	linker-sets	\
 	tls
 
 include $(SRC)/test/Makefile.com
