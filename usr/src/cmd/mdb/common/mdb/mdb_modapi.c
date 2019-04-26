@@ -58,6 +58,51 @@ static int
 call_idcmd(mdb_idcmd_t *idcp, uintmax_t addr, uintmax_t count,
     uint_t flags, mdb_argvec_t *argv);
 
+int
+mdb_snprintfrac(char *buf, int len,
+    uint64_t numerator, uint64_t denom, int frac_digits)
+{
+	int mul = 1;
+	int whole, frac, i;
+
+	for (i = frac_digits; i; i--)
+		mul *= 10;
+	whole = numerator / denom;
+	frac = mul * numerator / denom - mul * whole;
+	return (mdb_snprintf(buf, len, "%u.%0*u", whole, frac_digits, frac));
+}
+
+void
+mdb_nicenum(uint64_t num, char *buf)
+{
+	uint64_t n = num;
+	int index = 0;
+	char *u;
+
+	while (n >= 1024) {
+		n = (n + (1024 / 2)) / 1024; /* Round up or down */
+		index++;
+	}
+
+	u = &" \0K\0M\0G\0T\0P\0E\0"[index*2];
+
+	if (index == 0) {
+		(void) mdb_snprintf(buf, MDB_NICENUM_BUFLEN, "%llu",
+		    (u_longlong_t)n);
+	} else if (n < 10 && (num & (num - 1)) != 0) {
+		(void) mdb_snprintfrac(buf, MDB_NICENUM_BUFLEN,
+		    num, 1ULL << 10 * index, 2);
+		strcat(buf, u);
+	} else if (n < 100 && (num & (num - 1)) != 0) {
+		(void) mdb_snprintfrac(buf, MDB_NICENUM_BUFLEN,
+		    num, 1ULL << 10 * index, 1);
+		strcat(buf, u);
+	} else {
+		(void) mdb_snprintf(buf, MDB_NICENUM_BUFLEN, "%llu%s",
+		    (u_longlong_t)n, u);
+	}
+}
+
 ssize_t
 mdb_vread(void *buf, size_t nbytes, uintptr_t addr)
 {
