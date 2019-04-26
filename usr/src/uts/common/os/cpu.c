@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1217,7 +1217,7 @@ cpu_online(cpu_t *cp)
 	 * Handle on-line request.
 	 *	This code must put the new CPU on the active list before
 	 *	starting it because it will not be paused, and will start
-	 * 	using the active list immediately.  The real start occurs
+	 *	using the active list immediately.  The real start occurs
 	 *	when the CPU_QUIESCED flag is turned off.
 	 */
 
@@ -2766,7 +2766,7 @@ cpuset_only(cpuset_t *s, const uint_t cpu)
 }
 
 long
-cpu_in_set(cpuset_t *s, const uint_t cpu)
+cpu_in_set(const cpuset_t *s, const uint_t cpu)
 {
 	VERIFY(cpu < NCPU);
 	return (BT_TEST(s->cpub, cpu));
@@ -2787,7 +2787,7 @@ cpuset_del(cpuset_t *s, const uint_t cpu)
 }
 
 int
-cpuset_isnull(cpuset_t *s)
+cpuset_isnull(const cpuset_t *s)
 {
 	int i;
 
@@ -2799,7 +2799,7 @@ cpuset_isnull(cpuset_t *s)
 }
 
 int
-cpuset_isequal(cpuset_t *s1, cpuset_t *s2)
+cpuset_isequal(const cpuset_t *s1, const cpuset_t *s2)
 {
 	int i;
 
@@ -2811,7 +2811,7 @@ cpuset_isequal(cpuset_t *s1, cpuset_t *s2)
 }
 
 uint_t
-cpuset_find(cpuset_t *s)
+cpuset_find(const cpuset_t *s)
 {
 
 	uint_t	i;
@@ -2831,7 +2831,7 @@ cpuset_find(cpuset_t *s)
 }
 
 void
-cpuset_bounds(cpuset_t *s, uint_t *smallestid, uint_t *largestid)
+cpuset_bounds(const cpuset_t *s, uint_t *smallestid, uint_t *largestid)
 {
 	int	i, j;
 	uint_t	bit;
@@ -3230,9 +3230,9 @@ cpu_get_state_str(cpu_t *cpu)
 static void
 cpu_stats_kstat_create(cpu_t *cp)
 {
-	int 	instance = cp->cpu_id;
-	char 	*module = "cpu";
-	char 	*class = "misc";
+	int	instance = cp->cpu_id;
+	char	*module = "cpu";
+	char	*class = "misc";
 	kstat_t	*ksp;
 	zoneid_t zoneid;
 
@@ -3468,18 +3468,18 @@ cpu_stat_ks_update(kstat_t *ksp, int rw)
 		cso->cpu_sysinfo.cpu[CPU_USER] = msnsecs[CMS_USER];
 	if (cso->cpu_sysinfo.cpu[CPU_KERNEL] < msnsecs[CMS_SYSTEM])
 		cso->cpu_sysinfo.cpu[CPU_KERNEL] = msnsecs[CMS_SYSTEM];
-	cso->cpu_sysinfo.cpu[CPU_WAIT] 	= 0;
-	cso->cpu_sysinfo.wait[W_IO] 	= 0;
+	cso->cpu_sysinfo.cpu[CPU_WAIT]	= 0;
+	cso->cpu_sysinfo.wait[W_IO]	= 0;
 	cso->cpu_sysinfo.wait[W_SWAP]	= 0;
 	cso->cpu_sysinfo.wait[W_PIO]	= 0;
-	cso->cpu_sysinfo.bread 		= CPU_STATS(cp, sys.bread);
-	cso->cpu_sysinfo.bwrite 	= CPU_STATS(cp, sys.bwrite);
-	cso->cpu_sysinfo.lread 		= CPU_STATS(cp, sys.lread);
-	cso->cpu_sysinfo.lwrite 	= CPU_STATS(cp, sys.lwrite);
-	cso->cpu_sysinfo.phread 	= CPU_STATS(cp, sys.phread);
-	cso->cpu_sysinfo.phwrite 	= CPU_STATS(cp, sys.phwrite);
-	cso->cpu_sysinfo.pswitch 	= CPU_STATS(cp, sys.pswitch);
-	cso->cpu_sysinfo.trap 		= CPU_STATS(cp, sys.trap);
+	cso->cpu_sysinfo.bread		= CPU_STATS(cp, sys.bread);
+	cso->cpu_sysinfo.bwrite		= CPU_STATS(cp, sys.bwrite);
+	cso->cpu_sysinfo.lread		= CPU_STATS(cp, sys.lread);
+	cso->cpu_sysinfo.lwrite		= CPU_STATS(cp, sys.lwrite);
+	cso->cpu_sysinfo.phread		= CPU_STATS(cp, sys.phread);
+	cso->cpu_sysinfo.phwrite	= CPU_STATS(cp, sys.phwrite);
+	cso->cpu_sysinfo.pswitch	= CPU_STATS(cp, sys.pswitch);
+	cso->cpu_sysinfo.trap		= CPU_STATS(cp, sys.trap);
 	cso->cpu_sysinfo.intr		= 0;
 	for (i = 0; i < PIL_MAX; i++)
 		cso->cpu_sysinfo.intr += CPU_STATS(cp, sys.intr[i]);
