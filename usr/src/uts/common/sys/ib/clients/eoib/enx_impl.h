@@ -75,9 +75,9 @@ extern "C" {
 #define	ENX_DPRINTF_ARGS	eibnx_dprintf_args
 #define	ENX_DPRINTF_VERBOSE	eibnx_dprintf_verbose
 #else
-#define	ENX_DPRINTF_DEBUG(...)
-#define	ENX_DPRINTF_ARGS(...)
-#define	ENX_DPRINTF_VERBOSE(...)
+#define	ENX_DPRINTF_DEBUG(...)	(void)(0)
+#define	ENX_DPRINTF_ARGS(...)	(void)(0)
+#define	ENX_DPRINTF_VERBOSE(...) (void)(0)
 #endif
 
 /*

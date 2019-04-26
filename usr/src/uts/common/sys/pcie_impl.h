@@ -529,11 +529,11 @@ typedef struct {
 
 #else	/* DEBUG */
 
-#define	PCIE_DBG_CFG(...)
-#define	PCIE_DBG(...)
-#define	PCIE_ARI_DBG(...)
-#define	PCIE_DBG_CAP(...)
-#define	PCIE_DBG_AER(...)
+#define	PCIE_DBG_CFG(...)	(void)(0)
+#define	PCIE_DBG(...)		(void)(0)
+#define	PCIE_ARI_DBG(...)	(void)(0)
+#define	PCIE_DBG_CAP(...)	(void)(0)
+#define	PCIE_DBG_AER(...)	(void)(0)
 
 #endif	/* DEBUG */
 

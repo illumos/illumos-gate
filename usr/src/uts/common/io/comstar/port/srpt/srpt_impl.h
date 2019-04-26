@@ -522,8 +522,8 @@ extern uint_t srpt_errlevel;
 					cmn_err(CE_NOTE, __VA_ARGS__);\
 				}
 #else
-#define	SRPT_DPRINTF_L3(...)
-#define	SRPT_DPRINTF_L4(...)
+#define	SRPT_DPRINTF_L3(...) (void)(0)
+#define	SRPT_DPRINTF_L4(...) (void)(0)
 #endif
 
 #ifdef __cplusplus

@@ -100,10 +100,10 @@ void rdsv3_dprintf3(
 		char		*name,
 		char		*fmt, ...);
 #else
-#define	RDSV3_DPRINTF_INTR(...)
-#define	RDSV3_DPRINTF5(...)
-#define	RDSV3_DPRINTF4(...)
-#define	RDSV3_DPRINTF3(...)
+#define	RDSV3_DPRINTF_INTR(...)	(void)(0)
+#define	RDSV3_DPRINTF5(...)	(void)(0)
+#define	RDSV3_DPRINTF4(...)	(void)(0)
+#define	RDSV3_DPRINTF3(...)	(void)(0)
 #endif
 
 #define	RDSV3_DPRINTF2		rdsv3_dprintf2
