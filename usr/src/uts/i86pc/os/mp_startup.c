@@ -549,7 +549,7 @@ mp_cpu_unconfigure_common(struct cpu *cp, int error)
 		trap_trace_ctl_t *ttc = &trap_trace_ctl[cp->cpu_id];
 
 		kmem_free((void *)ttc->ttc_first, trap_trace_bufsize);
-		ttc->ttc_first = NULL;
+		ttc->ttc_first = (uintptr_t)NULL;
 	}
 #endif
 
