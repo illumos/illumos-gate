@@ -1668,7 +1668,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	ASSERT(un->un_rqs->pkt_resid == 0);
 	devp->sd_sense =
 	    (struct scsi_extended_sense *)un->un_rqs_bp->b_un.b_addr;
-	ASSERT(geterror(un->un_rqs_bp) == NULL);
+	ASSERT(geterror(un->un_rqs_bp) == 0);
 
 	(void) scsi_setup_cdb((union scsi_cdb *)un->un_rqs->pkt_cdbp,
 	    SCMD_REQUEST_SENSE, 0, MAX_SENSE_LENGTH, 0);
