@@ -6091,7 +6091,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 				uintptr_t a = (uintptr_t)svar->dtsv_data;
 				size_t lim;
 
-				ASSERT(a != NULL);
+				ASSERT(a != (uintptr_t)NULL);
 				ASSERT(svar->dtsv_size != 0);
 
 				if (regs[rd] == 0) {
@@ -10294,7 +10294,7 @@ dtrace_difo_destroy(dtrace_difo_t *dp, dtrace_vstate_t *vstate)
 			continue;
 
 		if (svar->dtsv_size != 0) {
-			ASSERT(svar->dtsv_data != NULL);
+			ASSERT(svar->dtsv_data != 0);
 			kmem_free((void *)(uintptr_t)svar->dtsv_data,
 			    svar->dtsv_size);
 		}
@@ -10490,8 +10490,8 @@ dtrace_actdesc_create(dtrace_actkind_t kind, uint32_t ntuple,
 {
 	dtrace_actdesc_t *act;
 
-	ASSERT(!DTRACEACT_ISPRINTFLIKE(kind) || (arg != NULL &&
-	    arg >= KERNELBASE) || (arg == NULL && kind == DTRACEACT_PRINTA));
+	ASSERT(!DTRACEACT_ISPRINTFLIKE(kind) || (arg != 0 &&
+	    arg >= KERNELBASE) || (arg == 0 && kind == DTRACEACT_PRINTA));
 
 	act = kmem_zalloc(sizeof (dtrace_actdesc_t), KM_SLEEP);
 	act->dtad_kind = kind;
@@ -11006,7 +11006,7 @@ dtrace_ecb_action_add(dtrace_ecb_t *ecb, dtrace_actdesc_t *desc)
 				    desc->dtad_kind == DTRACEACT_DIFEXPR);
 				format = 0;
 			} else {
-				ASSERT(arg != NULL);
+				ASSERT(arg != 0);
 				ASSERT(arg > KERNELBASE);
 				format = dtrace_format_add(state,
 				    (char *)(uintptr_t)arg);
@@ -15958,8 +15958,8 @@ dtrace_toxrange_add(uintptr_t base, uintptr_t limit)
 		dtrace_toxrange = range;
 	}
 
-	ASSERT(dtrace_toxrange[dtrace_toxranges].dtt_base == NULL);
-	ASSERT(dtrace_toxrange[dtrace_toxranges].dtt_limit == NULL);
+	ASSERT(dtrace_toxrange[dtrace_toxranges].dtt_base == (uintptr_t)NULL);
+	ASSERT(dtrace_toxrange[dtrace_toxranges].dtt_limit == (uintptr_t)NULL);
 
 	dtrace_toxrange[dtrace_toxranges].dtt_base = base;
 	dtrace_toxrange[dtrace_toxranges].dtt_limit = limit;
