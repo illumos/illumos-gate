@@ -36,6 +36,17 @@
 extern "C" {
 #endif
 
+#undef	FP_ZERO
+#define	FP_ZERO		0
+#undef	FP_SUBNORMAL
+#define	FP_SUBNORMAL	1
+#undef	FP_NORMAL
+#define	FP_NORMAL	2
+#undef	FP_INFINITE
+#define	FP_INFINITE	3
+#undef	FP_NAN
+#define	FP_NAN		4
+
 #if defined(_STDC_C99) || _XOPEN_SOURCE - 0 >= 600 || defined(__C99FEATURES__)
 #if defined(__GNUC__)
 #undef	HUGE_VAL
@@ -57,7 +68,12 @@ extern "C" {
 #if __GNUC__ >= 4
 #define	isnan(x)	__builtin_isnan(x)
 #define	isinf(x)	__builtin_isinf(x)
-#else
+#define	fpclassify(x)	__builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, \
+    FP_SUBNORMAL, FP_ZERO, x)
+#define	isfinite(x)	__builtin_isfinite(x)
+#define	isnormal(x)	__builtin_isnormal(x)
+#define	signbit(x)	__builtin_signbit(x)
+#else  /* __GNUC__ >= 4 */
 #define	isnan(x)	__extension__( \
 			{ __typeof(x) __x_n = (x); \
 			__builtin_isunordered(__x_n, __x_n); })
@@ -65,7 +81,6 @@ extern "C" {
 			{ __typeof(x) __x_i = (x); \
 			__x_i == (__typeof(__x_i)) INFINITY || \
 			__x_i == (__typeof(__x_i)) (-INFINITY); })
-#endif
 #undef	isfinite
 #define	isfinite(x)	__extension__( \
 			{ __typeof(x) __x_f = (x); \
@@ -99,7 +114,8 @@ extern "C" {
 			sizeof (__x_s) == sizeof (double) ? \
 			(int)(((unsigned *)&__x_s)[1] >> 31) : \
 			(int)(((unsigned short *)&__x_s)[4] >> 15)); })
-#endif
+#endif	/* defined(_BIG_ENDIAN) */
+#endif	/* __GNUC__ >= 4 */
 
 /*
  * C99 7.12.14 comparison macros
@@ -181,17 +197,6 @@ typedef double double_t;
 typedef long double float_t;
 typedef long double double_t;
 #endif
-
-#undef	FP_ZERO
-#define	FP_ZERO		0
-#undef	FP_SUBNORMAL
-#define	FP_SUBNORMAL	1
-#undef	FP_NORMAL
-#define	FP_NORMAL	2
-#undef	FP_INFINITE
-#define	FP_INFINITE	3
-#undef	FP_NAN
-#define	FP_NAN		4
 
 #undef	FP_ILOGB0
 #define	FP_ILOGB0	(-2147483647)
