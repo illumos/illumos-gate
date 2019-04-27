@@ -549,7 +549,7 @@ ath_rx_handler(ath_t *asc)
 			mutex_exit(&asc->asc_rxbuflock);
 			break;
 		}
-		ASSERT(bf->bf_dma.cookie.dmac_address != NULL);
+		ASSERT(bf->bf_dma.cookie.dmac_address != 0);
 		ds = bf->bf_desc;
 		if (ds->ds_link == bf->bf_daddr) {
 			/*
@@ -1283,8 +1283,8 @@ ath_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	    HAL_LED_INIT,	/* IEEE80211_S_INIT */
 	    HAL_LED_SCAN,	/* IEEE80211_S_SCAN */
 	    HAL_LED_AUTH,	/* IEEE80211_S_AUTH */
-	    HAL_LED_ASSOC, 	/* IEEE80211_S_ASSOC */
-	    HAL_LED_RUN, 	/* IEEE80211_S_RUN */
+	    HAL_LED_ASSOC,	/* IEEE80211_S_ASSOC */
+	    HAL_LED_RUN,	/* IEEE80211_S_RUN */
 	};
 	if (!ATH_IS_RUNNING(asc))
 		return (0);
@@ -2448,7 +2448,7 @@ ath_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 static int32_t
 ath_quiesce(dev_info_t *devinfo)
 {
-	ath_t 		*asc;
+	ath_t		*asc;
 	struct ath_hal	*ah;
 	int		i;
 
