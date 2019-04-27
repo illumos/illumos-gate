@@ -876,7 +876,7 @@ init_pgtable:
 	/*
 	 * The address in the cookie must be 4K aligned and >= table size
 	 */
-	ASSERT(pt->pt_cookie.dmac_cookie_addr != NULL);
+	ASSERT(pt->pt_cookie.dmac_cookie_addr != (uintptr_t)NULL);
 	ASSERT((pt->pt_cookie.dmac_cookie_addr & AMD_IOMMU_PGTABLE_ALIGN) == 0);
 	ASSERT(pt->pt_cookie.dmac_size >= pt->pt_mem_realsz);
 	ASSERT(pt->pt_cookie.dmac_size >= pt->pt_mem_reqsz);
