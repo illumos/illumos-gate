@@ -60,7 +60,7 @@ i_mac_share_alloc(mac_client_impl_t *mcip)
 
 	i_mac_perim_enter(mip);
 
-	ASSERT(mcip->mci_share == NULL);
+	ASSERT(mcip->mci_share == 0);
 
 	if (mac_share_capable((mac_handle_t)mcip->mci_mip) == 0) {
 		DTRACE_PROBE1(i__mac__share__alloc__not__sup,
