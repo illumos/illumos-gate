@@ -581,7 +581,7 @@ ehci_insert_async_qh(
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
 	/* Make sure this QH is not already in the list */
-	ASSERT((Get_QH(qh->qh_prev) & EHCI_QH_LINK_PTR) == NULL);
+	ASSERT((Get_QH(qh->qh_prev) & EHCI_QH_LINK_PTR) == 0);
 
 	qh_addr = ehci_qh_cpu_to_iommu(ehcip, qh);
 
@@ -679,7 +679,7 @@ ehci_insert_intr_qh(
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
 	/* Make sure this QH is not already in the list */
-	ASSERT((Get_QH(qh->qh_prev) & EHCI_QH_LINK_PTR) == NULL);
+	ASSERT((Get_QH(qh->qh_prev) & EHCI_QH_LINK_PTR) == 0);
 
 	/*
 	 * The appropriate high speed node was found
@@ -1304,7 +1304,7 @@ ehci_insert_qh_on_reclaim_list(
 		ehcip->ehci_reclaim_list = qh;
 	}
 
-	ASSERT(Get_QH(qh->qh_reclaim_next) == NULL);
+	ASSERT(Get_QH(qh->qh_reclaim_next) == 0);
 }
 
 
@@ -2506,7 +2506,7 @@ ehci_fill_in_qtd(
 
 	/* Set the transfer wrapper */
 	ASSERT(tw != NULL);
-	ASSERT(tw->tw_id != NULL);
+	ASSERT(tw->tw_id != 0);
 
 	Set_QTD(qtd->qtd_trans_wrapper, (uint32_t)tw->tw_id);
 }
@@ -2549,7 +2549,7 @@ ehci_insert_qtd_on_tw(
 
 		tw->tw_qtd_tail = qtd;
 
-		ASSERT(Get_QTD(qtd->qtd_tw_next_qtd) == NULL);
+		ASSERT(Get_QTD(qtd->qtd_tw_next_qtd) == 0);
 	}
 }
 
@@ -3100,7 +3100,7 @@ dmadone:
 	/* Get and Store 32bit ID */
 	tw->tw_id = EHCI_GET_ID((void *)tw);
 
-	ASSERT(tw->tw_id != NULL);
+	ASSERT(tw->tw_id != 0);
 
 	/* isoc ep will not come here */
 	if (EHCI_INTR_ENDPOINT(eptd)) {
@@ -3527,7 +3527,7 @@ ehci_free_tw(
 	    "ehci_free_tw: tw = 0x%p", (void *)tw);
 
 	ASSERT(tw != NULL);
-	ASSERT(tw->tw_id != NULL);
+	ASSERT(tw->tw_id != 0);
 
 	/* Free 32bit ID */
 	EHCI_FREE_ID((uint32_t)tw->tw_id);

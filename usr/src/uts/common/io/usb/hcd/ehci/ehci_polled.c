@@ -1784,7 +1784,7 @@ ehci_polled_insert_qtd_on_tw(
 
 		tw->tw_qtd_tail = qtd;
 
-		ASSERT(Get_QTD(qtd->qtd_tw_next_qtd) == NULL);
+		ASSERT(Get_QTD(qtd->qtd_tw_next_qtd) == 0);
 	}
 }
 
@@ -2135,7 +2135,7 @@ ehci_polled_insert_async_qh(
 	uintptr_t		qh_addr;
 
 	/* Make sure this QH is not already in the list */
-	ASSERT((Get_QH(qh->qh_prev) & EHCI_QH_LINK_PTR) == NULL);
+	ASSERT((Get_QH(qh->qh_prev) & EHCI_QH_LINK_PTR) == 0);
 
 	qh_addr = ehci_qh_cpu_to_iommu(ehcip, qh);
 

@@ -487,7 +487,7 @@ ehci_allocate_itw(
 
 	/* Get and Store 32bit ID */
 	itw->itw_id = EHCI_GET_ID((void *)itw);
-	ASSERT(itw->itw_id != NULL);
+	ASSERT(itw->itw_id != 0);
 
 	USB_DPRINTF_L3(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
 	    "ehci_create_itw: itw = 0x%p real_length = 0x%lx",
@@ -590,7 +590,7 @@ ehci_free_itw_dma(
 	    "ehci_free_itw_dma: itw = 0x%p", (void *)itw);
 
 	ASSERT(itw != NULL);
-	ASSERT(itw->itw_id != NULL);
+	ASSERT(itw->itw_id != 0);
 
 	/* Free 32bit ID */
 	EHCI_FREE_ID((uint32_t)itw->itw_id);
