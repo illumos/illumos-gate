@@ -735,7 +735,7 @@ idm_nvlist_add_list_of_values(nvlist_t *nvl,
 
 int
 idm_nvlist_to_textbuf(nvlist_t *nvl, char **textbuf, int *textbuflen,
-	int *validlen)
+    int *validlen)
 {
 	int rc = 0;
 	nvpair_t *nvp = NULL;
@@ -1546,7 +1546,7 @@ idm_pdu_list_to_nvlist(list_t *pdu_list, nvlist_t **nvlist,
 				goto cleanup;
 			}
 
-			ASSERT(split_kvbuflen != NULL);
+			ASSERT(split_kvbuflen != 0);
 			kmem_free(split_kvbuf, split_kvbuflen);
 
 			/* Now handle the remainder of the PDU as normal */
