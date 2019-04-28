@@ -954,7 +954,8 @@ dls_devnet_unset(const char *macname, datalink_id_t *id, boolean_t wait)
 		while ((ddp->dd_tref != 0) || (ddp->dd_prop_taskid != 0))
 			cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
 	} else {
-		ASSERT(ddp->dd_tref == 0 && ddp->dd_prop_taskid == NULL);
+		ASSERT(ddp->dd_tref == 0 &&
+		    ddp->dd_prop_taskid == (taskqid_t)NULL);
 	}
 
 	if (ddp->dd_linkid != DATALINK_INVALID_LINKID)
