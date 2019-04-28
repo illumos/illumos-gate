@@ -2023,7 +2023,7 @@ ohci_polled_insert_td_on_tw(
 		Set_TD(dummy->hctd_tw_next_td, ohci_td_cpu_to_iommu(ohcip, td));
 		tw->tw_hctd_tail = td;
 
-		ASSERT(Get_TD(td->hctd_tw_next_td) == NULL);
+		ASSERT(Get_TD(td->hctd_tw_next_td) == 0);
 	}
 }
 
@@ -2215,7 +2215,7 @@ ohci_polled_create_tw(
 	/* Get and Store 32bit ID */
 	tw->tw_id = OHCI_GET_ID((void *)tw);
 
-	ASSERT(tw->tw_id != NULL);
+	ASSERT(tw->tw_id != 0);
 
 	pipe_dir = ph->p_ep.bEndpointAddress & USB_EP_DIR_MASK;
 	tw->tw_direction = (pipe_dir == USB_EP_DIR_IN) ? HC_TD_IN : HC_TD_OUT;
