@@ -739,6 +739,21 @@ also menu-infrastructure definitions
 	then
 ;
 
+: do_ipxe ( -- bool)
+	\ getenv? leaves -1 on stack if the env var exists.  Thus if both
+	\ headnode and ipxe exist then the sum of what will be left on the
+	\ stack should be -2.
+	s" headnode" getenv? s" ipxe" getenv? + -2 = if
+		s" ipxe" getenv s" true" compare 0= if
+			true
+		else
+			false
+		then
+	else
+		false
+	then
+;
+
 \ Takes a single integer on the stack and updates the timeout display. The
 \ integer must be between 0 and 9 (we will only update a single digit in the
 \ source message).
@@ -749,11 +764,8 @@ also menu-infrastructure definitions
 	dup 9 > if drop 9 then
 	dup 0 < if drop 0 then
 
-	\ getenv? leaves -1 on stack if the env var exists.  Thus if both
-	\ headnode and ipxe exist then the sum of what will be left on the
-	\ stack should be -2.
-	s" headnode" getenv? s" ipxe" getenv? + -2 = if
-		s" ipxe" getenv s" true" compare 0= if
+	s" headnode" getenv? if
+		do_ipxe if
 			s" Autoboot in N seconds from PXE. [Space] to pause" ( n -- n c-addr/u )
 		else
 			s" Autoboot in N seconds from the USB Key. [Space] to pause" ( n -- n c-addr/u )
@@ -1208,8 +1220,16 @@ also menu-namespace
 		\ Ctrl-Enter/Ctrl-J (10)
 		dup over 13 = swap 10 = or if
 			drop ( no longer needed )
-			s" boot" evaluate
-			exit ( pedantic; never reached )
+			do_ipxe if
+				s" efi-version" getenv? if
+					s" ipxe_chainload" evaluate
+				else
+					s" ipxe_boot" evaluate
+				then
+			else
+				s" boot" evaluate
+				exit ( pedantic; never reached )
+			then
 		then
 
 		dup menureboot @ = if 0 reboot then
