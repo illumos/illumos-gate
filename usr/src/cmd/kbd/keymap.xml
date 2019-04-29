@@ -75,6 +75,7 @@
 		<property_group name='keymap' type='system'>
 			<propval name='keyboard_abort' type='astring' value='enable' />
 			<propval name='keyclick' type='boolean' value='false' />
+			<propval name='repeat_count' type='integer' value='-1' />
 			<propval name='repeat_delay' type='integer' value='500' />
 			<propval name='repeat_rate' type='integer' value='40' />
 			<propval name='layout' type='astring' value='US-English' />
@@ -123,7 +124,7 @@
 			<prop_pattern name='repeat_delay' type='integer' required='true'>
 				<description>
 					<loctext xml:lang='C'>
-						The autorepeat delay	
+						The autorepeat delay
 					</loctext>
 				</description>
 				<cardinality min="1" max="1"/>
@@ -131,7 +132,7 @@
 			<prop_pattern name='repeat_rate' type='integer' required='true'>
 				<description>
 					<loctext xml:lang='C'>
-						The autorepeat rate	
+						The autorepeat rate
 					</loctext>
 				</description>
 				<cardinality min="1" max="1"/>
@@ -139,7 +140,7 @@
 			<prop_pattern name='layout' type='astring' required='true'>
 				<description>
 					<loctext xml:lang='C'>
-						The keyboard layout	
+						The keyboard layout
 					</loctext>
 				</description>
 				<cardinality min="1" max="1"/>
@@ -147,7 +148,7 @@
 			<prop_pattern name='kbd_beeper_freq' type='integer' required='true'>
 				<description>
 					<loctext xml:lang='C'>
-						Keyboard beeper frequency	
+						Keyboard beeper frequency
 					</loctext>
 				</description>
 				<cardinality min="1" max="1"/>
@@ -158,7 +159,7 @@
 			<prop_pattern name='console_beeper_freq' type='integer' required='true'>
 				<description>
 					<loctext xml:lang='C'>
-						Console beeper frequency	
+						Console beeper frequency
 					</loctext>
 				</description>
 				<cardinality min="1" max="1"/>

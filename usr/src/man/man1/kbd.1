@@ -3,566 +3,333 @@
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH KBD 1 "Jan 29, 2007"
-.SH NAME
-kbd \- manipulate the state of keyboard, or display the type of keyboard, or
+.Dd April 29, 2019
+.Dt KBD 1
+.Os
+.Sh NAME
+.Nm kbd
+.Nd
+manipulate the state of keyboard, or display the type of keyboard, or
 change the default keyboard abort sequence effect
-.SH SYNOPSIS
-.LP
-.nf
-\fBkbd\fR [\fB-r\fR] [\fB-t\fR ] [\fB-l\fR] [\fB-a\fR enable | disable | alternate]
-     [\fB-c\fR on | off] [\fB-d\fR \fIkeyboard device\fR]
-     [\fB-D\fR \fIautorepeat delay\fR] [\fB-R\fR \fIautorepeat rate\fR]
-.fi
-
-.LP
-.nf
-\fBkbd\fR [\fB-i\fR] [\fB-d\fR \fIkeyboard device\fR]
-.fi
-
-.LP
-.nf
-\fBkbd\fR \fB-s\fR [\fIlanguage\fR]
-.fi
-
-.LP
-.nf
-\fBkbd\fR \fB-b\fR [\fBkeyboard\fR | \fBconsole\fR] \fIfrequency\fR
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBkbd\fR utility manipulates the state of the keyboard, or displays the
+.Sh SYNOPSIS
+.Nm
+.Op Fl r
+.Op Fl t
+.Op Fl l
+.Op Fl a Ar enable | Ar disable | Ar alternate
+.Op Fl c Ar on | Ar off
+.Op Fl d Ar keyboard device
+.Op Fl A Ar autorepeat count
+.Op Fl D Ar autorepeat delay
+.Op Fl R Ar autorepeat rate
+.Nm
+.Op Fl i
+.Op Fl d Ar keyboard device
+.Nm
+.Fl s Op Ar language
+.Nm
+.Fl b Op Ar keyboard | Ar console
+.Ar frequency
+.Sh DESCRIPTION
+The
+.Nm
+utility manipulates the state of the keyboard, or displays the
 keyboard type, or allows the default keyboard abort sequence effect to be
-changed. The abort sequence also applies to serial console devices. The
-\fBkbd\fR utility sets the \fB/dev/kbd\fR default keyboard device.
-.SH EXTENDED DESCRIPTION
-.LP
-The \fB-i\fR option reads and processes default values for the keyclick and
-keyboard abort settings from the \fB/etc/default/kbd\fR keyboard default file.
-Only keyboards that support a clicker respond to the \fB-c\fR option. To turn
-clicking on by default, add or change the value of the \fBKEYCLICK\fR variable
-in the \fB/etc/default/kbd\fR file to:
-.sp
-.in +2
-.nf
-KEYCLICK=on
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Next, run the command \fBkbd\fR \fB-i\fR to change the setting. Valid settings
-for the \fBKEYCLICK\fR variable are \fBon\fR and \fBoff\fR; all other values
-are ignored. If the \fBKEYCLICK\fR variable is not specified in the default
-file, the setting is unchanged.
-.sp
-.LP
+changed.
+The abort sequence also applies to serial console devices.
+The
+.Nm
+utility sets the
+.Pa /dev/kbd
+default keyboard device.
+.Sh EXTENDED DESCRIPTION
+The
+.Fl i
+option reads and processes default values for the keyclick and
+keyboard abort settings from the keyboard configuration service,
+.Sy svc:/system/keymap:default .
+Only keyboards that support a clicker respond to the
+.Fl c
+option.
+.Pp
 The keyboard abort sequence effect can only be changed by a super-user using
-the \fB-a\fR option. This sequence is typically Stop-A or L1-A and Shift-Pause
-on the keyboard on \fBSPARC\fR systems, F1-A and Shift-Pause on x86 systems,
+the
+.Fl a
+option.
+This sequence is typically Stop-A or L1-A and Shift-Pause on the keyboard on
+.Sy SPARC
+systems, F1-A and Shift-Pause on x86 systems,
 and BREAK on the serial console input device on most systems.
-.sp
-.LP
-A \fBBREAK\fR condition that originates from an erroneous electrical signal
-cannot be distinguished from one deliberately sent by remote \fBDCE\fR. As a
-remedy, use the \fB-a\fR option with Alternate Break to switch break
-interpretation. Due to the risk of incorrect sequence interpretation, binary
-protocols such as \fBSLIP\fR and others should not be run over the serial
-console port when Alternate Break sequence is in effect.
-.sp
-.LP
+.Pp
+A
+.Sy BREAK
+condition that originates from an erroneous electrical signal
+cannot be distinguished from one deliberately sent by remote
+.Sy DCE .
+As a remedy, use the
+.Fl a
+option with Alternate Break to switch break interpretation.
+Due to the risk of incorrect sequence interpretation, binary
+protocols such as
+.Sy SLIP
+and others should not be run over the serial console port when Alternate Break
+sequence is in effect.
+.Pp
 Although PPP is a binary protocol, it has the ability to avoid using characters
-that interfere with serial operation. The default alternate break sequence is
-CTRL-m \fB~\fR CTRL-b, or \fB0D 7E 02\fR in hexadecimal. In PPP, this can be
-avoided by setting either \fB0x00000004\fR or \fB0x00002000\fR in the ACCM.
+that interfere with serial operation.
+The default alternate break sequence is
+CTRL-m
+.Sy ~
+CTRL-b, or
+.Sy 0D 7E 02
+in hexadecimal.
+In PPP, this can be avoided by setting either
+.Sy 0x00000004
+or
+.Sy 0x00002000
+in the ACCM.
 This forces an escape for the CTRL-b or CTRL-m characters, respectively.
-.sp
-.LP
+.Pp
 To do this in Solaris PPP 4.0, add:
-.sp
-.in +2
-.nf
-asyncmap 0x00002000
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-to the \fB/etc/ppp/options\fR file or any of the other configuration files used
-for the connection. See \fBpppd\fR(1M).
-.sp
-.LP
+.Pp
+.Dl asyncmap 0x00002000
+.Pp
+to the
+.Pa /etc/ppp/options
+file or any of the other configuration files used for the connection.
+See
+.Xr pppd 1M .
+.Pp
 SLIP has no comparable capability, and must not be used if the Alternate Break
 sequence is in use.
-.sp
-.LP
-The Alternate Break sequence has no effect on the keyboard abort. For more
-information on the Alternate Break sequence, see \fBzs\fR(7D), \fBse\fR(7D),
-and \fBasy\fR(7D).
-.sp
-.LP
+.Pp
+The Alternate Break sequence has no effect on the keyboard abort.
+For more information on the Alternate Break sequence, see
+.Xr zs 7D ,
+.Xr se 7D ,
+and
+.Xr asy 7D .
+.Pp
 On many systems, the default effect of the keyboard abort sequence is to
-suspend the operating system and enter the debugger or the monitor. Some
-systems feature key switches with a \fBsecure\fR position. On these systems,
-setting the key switch to the \fBsecure\fR position overrides any software
-default set with this command.
-.sp
-.LP
-To permanently change the software default effect of the keyboard abort
-sequence, first add or change the value of the \fBKEYBOARD_ABORT\fR variable in
-the \fB/etc/default/kbd\fR file to:
-.sp
-.in +2
-.nf
-KEYBOARD_ABORT=disable
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Next, run the command \fBkbd\fR \fB-i\fR to change the setting. Valid settings
-are \fBenable\fR, \fBdisable\fR, and \fBalternate\fR; all other values are
-ignored. If the variable is not specified in the default file, the setting is
-unchanged.
-.sp
-.LP
-To set the abort sequence to the hardware BREAK, set the value of the
-\fBKEYBOARD_ABORT\fR variable in the \fB/etc/default/kbd\fR file to:
-.sp
-.in +2
-.nf
-KEYBOARD_ABORT=enable
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-To change the current setting, run the command \fBkbd\fR \fB-i\fR. To set the
-abort sequence to the Alternate Break character sequence, first set the current
-value of the \fBKEYBOARD_ABORT\fR variable in the \fB/etc/default/kbd\fR file
-to:
-.sp
-.in +2
-.nf
-KEYBOARD_ABORT=alternate
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Next, run the command \fBkbd\fR \fB-i\fR to change the setting. When the
-Alternate Break sequence is in effect, only serial console devices are
-affected.
-.sp
-.LP
-To set the autorepeat delay by default, set the \fBREPEAT_DELAY\fR variable in
-the file \fB/etc/default/kbd\fR to the expected value with units in
-milliseconds (ms). To avoid making the keyboard unusable due to a typographical
-error, delay values below \fBKIOCRPTDELAY_MIN\fR (defined in
-\fB/usr/include/sys/kbio.h\fR) are rejected with \fBEINVAL\fR:
-.sp
-.in +2
-.nf
-REPEAT_DELAY=500
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-To set the autorepeat rate by default, set the \fBREPEAT_RATE\fR variable in
-the file \fB/etc/default/kbd\fR to the expected value with units in
-milliseconds. Negative and zero repeat rates are ejected with \fBEINVAL\fR:
-.sp
-.in +2
-.nf
-REPEAT_RATE=33
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-To change the current settings of \fIdelay\fR and \fIrate\fR, run the command,
-\fBkbd\fR \fB-i\fR. When the Auto Repeat Delay and/or Auto Repeat Rate are in
-effect, only command line mode is affected.
-.sp
-.LP
-To set the language by default, set the \fBLAYOUT\fR variable in the file
-\fB/etc/default/kbd\fR to the expected language. These languages supported in
-kernel can be found by running \fBkbd\fR \fB-s\fR. Other values are ignored.
-For example, the following sets Spanish layout to the keyboard:
-.sp
-.in +2
-.nf
-LAYOUT=Spanish
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-Next, run the \fBkbd\fR \fB-i\fR to change the setting. When Solaris reboots,
-the Spanish key table is loaded into the kernel. These layouts are valid for
-\fBusb\fR and \fBps/2\fR keyboards.
-.sp
-.LP
-To set the keyboard beeper frequency by default, set the \fBKBD_BEEPER_FREQ\fR
-variable in the file \fB/etc/default/kbd\fR to the expected value with units in
-HZ. This value should be between 0 and 32767, inclusive. Otherwise will be
-rejected with \fBEINVAL\fR:
-.sp
-.in +2
-.nf
-KBD_BEEPER_FREQ=2000
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-To set the console beeper frequency by default, set the
-\fBCONSOLE_BEEPER_FREQ\fR variable in the file \fB/etc/default/kbd\fR to the
-expected value with units in HZ. This value should be between 0 and 32767,
-inclusive. Otherwise will be rejected with \fBEINVAL\fR:
-.sp
-.in +2
-.nf
-CONSOLE_BEEPER_FREQ=900
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-To change the current settings of keyboard beeper frequency and console beeper
-frequency, run \fBkbd\fR \fB-i\fR.
-.SH OPTIONS
-.LP
-The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR \fBenable\fR | \fBdisable\fR | \fBalternate\fR\fR
-.ad
-.sp .6
-.RS 4n
-Enables, disables, or alternates the keyboard abort sequence effect. By
-default, a keyboard abort sequence suspends the operating system on most
-systems. This sequence is typically Stop-A or L1-A and Shift-Pause on the
-keyboard on \fBSPARC\fR systems, F1-A and Shift-Pause on x86 systems, and BREAK
+suspend the operating system and enter the debugger or the monitor.
+Some systems feature key switches with a
+.Sy secure
+position.
+On these systems, setting the key switch to the
+.Sy secure
+position overrides any software default set with this command.
+.Sh OPTIONS
+The following options are suported:
+.Bl -hang
+.It Fl a Ar enable | Ar disable | Ar alternate
+.Pp
+Enables, disables, or alternates the keyboard abort sequence effect.
+By default, a keyboard abort sequence suspends the operating system on most
+systems.
+This sequence is typically
+.Sy Stop-A
+or
+.Sy L1-A
+and
+.Sy Shift-Pause
+on the keyboard on
+.Sy SPARC
+systems,
+.Sy F1-A
+and
+.Sy Shift-Pause
+on x86 systems, and
+.Sy BREAK
 on the serial console device.
-.sp
-The default keyboard behavior can be changed using this option. The \fB-a\fR
+.Pp
+The default keyboard behavior can be changed using this option.
+The
+.Fl a
 option can only be used by a super-user.
-.sp
-.ne 2
-.na
-\fB\fBenable\fR\fR
-.ad
-.RS 13n
+.Bl -hang
+.It Ar enable
 Enables the default effect of the keyboard abort sequence (suspend the
 operating system and enter the debugger or the monitor).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBdisable\fR\fR
-.ad
-.RS 13n
+.It Ar disable
 Disables the default/alternate effect and ignores keyboard abort sequences.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBalternate\fR\fR
-.ad
-.RS 13n
+.It Ar alternate
 Enables the alternate effect of the keyboard abort sequences (suspend the
 operating system and enter the debugger or the monitor) upon receiving the
-Alternate Break character sequence on the console. The Alternate Break sequence
-is defined by the drivers \fBzs\fR(7D), \fBse\fR(7D), \fBasy\fR(7D). Due to a
-risk of incorrect sequence interpretation, binary protocols cannot be run over
-the serial console port when this value is used.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-b\fR \fBkeyboard\fR | \fBconsole\fR\fR
-.ad
-.sp .6
-.RS 4n
+Alternate Break character sequence on the console.
+The Alternate Break sequence is defined by the drivers
+.Xr asy 7D ,
+.Xr se 7D ,
+.Xr zs 7D .
+Due to a risk of incorrect sequence interpretation, binary protocols cannot be
+run over the serial console port when this value is used.
+.El
+.It Fl A Ar count
+.Pp
+Sets autorepeat count.
+Value
+.Sy -1
+denotes unlimited autorepeat (default).
+.It Fl b Ar keyboard | Ar console
+.Pp
 Sets the beeper frequency for keyboard or console.
-.sp
-.ne 2
-.na
-\fB\fBkeyboard\fR\fR
-.ad
-.RS 12n
-Set the keyboard beeper frequency to the operand in HZ. See \fBOPERANDS\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBconsole\fR\fR
-.ad
-.RS 12n
-Sets the console beeper frequency to the operand in HZ. See \fBOPERANDS\fR.
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-c\fR \fBon\fR | \fBoff\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -hang
+.It Ar keyboard
+Set the keyboard beeper frequency to the operand in HZ.
+See
+.Sx OPERANDS .
+.It Ar console
+Sets the console beeper frequency to the operand in HZ.
+See
+.Sx OPERANDS .
+.El
+.It Fl c Ar on | Ar off
+.Pp
 Turns the clicking of the keyboard on or off.
-.sp
-.ne 2
-.na
-\fB\fBon\fR\fR
-.ad
-.RS 7n
+.Bl -hang
+.It Ar on
 Enables clicking
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBoff\fR\fR
-.ad
-.RS 7n
+.It Ar off
 Disables clicking
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-d\fR \fIkeyboard device\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the keyboard device being set. The default setting is \fB/dev/kbd\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-D\fR \fIautorepeat delay\fR\fR
-.ad
-.sp .6
-.RS 4n
+.El
+.It Fl d Ar keyboard device
+.Pp
+Specifies the keyboard device being set.
+The default setting is
+.Pa /dev/kbd .
+.It Fl D Ar autorepeat delay
+.Pp
 Sets the autorepeat delay in milliseconds.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sets keyboard properties from the keyboard default file. With the exception of
-\fB-d\fR \fIkeyboard device\fR, this option cannot be used with any other
-option. The \fB-i\fR option instructs the keyboard command to read and process
-keyclick and keyboard abort default values from the \fB/etc/default/kbd\fR
-file. The \fB-i\fR option can only be used by a user or role with the Device
-Security Rights Profile.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-l\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Fl i
+.Pp
+Sets keyboard properties from the keyboard default file.
+With the exception of
+.Fl d Ar keyboard device ,
+this option cannot be used with any other option.
+The
+.Fl i
+option instructs the keyboard command to read and process
+keyclick and keyboard abort default values from the keyboard configuration
+service,
+.Sy svc:/system/keymap:default .
+The
+.Fl i
+option can only be used by a user or role with the
+.Sy Device Security Rights Profile .
+.It Fl l
+.Pp
 Returns the layout code of the keyboard being used, and the autorepeat delay
 and autorepeat rate being used.
-.sp
-If used with -R or -D option, this option returns the value before the changes.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-r\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+If used with
+.Fl R
+or
+.Fl D
+option, this option returns the value before the changes.
+.It Fl r
 Resets the keyboard as if power-up.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-R\fR \fIautorepeat rate\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Fl R Ar autorepeat rate
+.Pp
 Sets the autorepeat rate in milliseconds.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB\fR\fB-s\fR \fB[\fR\fIlanguage\fR\fB]\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Fl s Op Ar language
+.Pp
 Sets the keyboard layout into the kernel.
-.sp
-If \fIlanguage\fR is specified, the layout is set to \fIlanguage\fR, and
-\fBloadkeys\fR(1) runs implicitly. If \fIlanguage\fR is not specified, a list
-of available layouts are presented, prompting for the user to specify the
-\fIlanguage\fR. See \fBOPERANDS\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-t\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+If
+.Ar language
+is specified, the layout is set to
+.Ar language ,
+and
+.Xr loadkeys 1
+runs implicitly.
+If
+.Ar language
+is not specified, a list of available layouts are presented, prompting for the
+user to specify the
+.Ar language .
+See
+.Sx OPERANDS .
+.It Fl t
+.Pp
 Returns the type of the keyboard being used.
-.RE
-
-.SH OPERANDS
-.LP
+.El
+.Sh OPERANDS
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fBfrequency\fR
-.ad
-.RS 13n
-The frequency value specified to be set in kernel. The receiver of this value
-is specified by the \fB-b\fR option. This value should be between 0 and 32767
-otherwise will be ejected with \fBEINVAL\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fBlanguage\fR
-.ad
-.RS 13n
-The language specified to be set in kernel. If the language is not found, the
-languages supported are listed for selection. It only applies to \fB-s\fR
+.Bl -hang
+.It Ar frequency
+The frequency value specified to be set in kernel.
+The receiver of this value is specified by the
+.Fl b
 option.
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRDisplaying the Keyboard Type
-.sp
-.LP
+This value should be between 0 and 32767 otherwise will be ejected with
+.Sy EINVAL .
+.It Ar language
+The language specified to be set in kernel.
+If the language is not found, the languages supported are listed for selection.
+It only applies to
+.Fl s
+option.
+.El
+.Sh FILES
+.Bl -ohang
+.It Pa /dev/kbd
+Keyboard device file.
+.El
+.Sh EXAMPLES
+.Bl -ohang
+.It Sy Example 1 Displaying the Keyboard Type
+.Pp
 The following example displays the keyboard type:
-
-.sp
-.in +2
-.nf
-example% kbd -t
-Type 4 Sun keyboard
-example%
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRSetting Keyboard Defaults
-.sp
-.LP
+.Pp
+.Dl example% kbd -t
+.Dl Type 4 Sun keyboard
+.Dl example%
+.El
+.Bl -ohang
+.It Sy Example 2 Setting Keyboard Defaults
+.Pp
 The following example sets the keyboard defaults as specified in the keyboard
 default file:
-
-.sp
-.in +2
-.nf
-example# kbd -i
-example#
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRDisplaying Information
-.sp
-.LP
-The following example displays keyboard type and layout code. It also displays
-auto repeat delay and rate settings.
-
-.sp
-.in +2
-.nf
-example% kbd -l
-type=4
-layout=43 (0x2b)
-delay(ms)=500
-rate(ms)=33
-example%
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 4 \fRSetting Keyboard Autorepeat Delay
-.sp
-.LP
+.Pp
+.Dl example# kbd -i
+.Dl example#
+.El
+.Bl -ohang
+.It Sy Example 3 Displaying Information
+.Pp
+The following example displays keyboard type and layout code.
+It also displays auto repeat delay, rate and count settings.
+.Pp
+.Dl example% kbd -l
+.Dl type=6
+.Dl layout=274 (0x112)
+.Dl delay(ms)=500
+.Dl rate(ms)=40
+.Dl count=unlimited
+.Dl example%
+.El
+.Bl -ohang
+.It Sy Example 4 Setting Keyboard Autorepeat Delay
+.Pp
 The following example sets the keyboard autorepeat delay:
-
-.sp
-.in +2
-.nf
-example% kbd -D 300
-example%
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 5 \fRSetting Keyboard Autorepeat Rate
-.sp
-.LP
+.Pp
+.Dl example% kbd -D 300
+.Dl example%
+.El
+.Bl -ohang
+.It Sy Example 5 Setting Keyboard Autorepeat Rate
+.Pp
 The following example sets the keyboard autorepeat rate:
-
-.sp
-.in +2
-.nf
-example% kbd -R 50
-example%
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 6 \fRSelecting and Setting the Keyboard Language
-.sp
-.LP
+.Pp
+.Dl example% kbd -R 50
+.Dl example%
+.El
+.Bl -ohang
+.It Sy Example 6 Selecting and Setting the Keyboard Language
+.Pp
 The following example selects and sets the keyboard language from a list of
 languages specified:
-
-.sp
-.in +2
-.nf
+.Pp
+.Bd -literal -offset indent -compact
 example% kbd -s
 1. Albanian                      16. Malta_UK
 2. Belarusian                    17. Malta_US
@@ -576,91 +343,66 @@ example% kbd -s
 To select the keyboard layout, enter a number [default n]:
 
 example%
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 The following example sets the keyboard language specified:
-
-.sp
-.in +2
-.nf
-example% kbd -s Dutch
-example%
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 7 \fRSetting the Keyboard Beeper Frequency
-.sp
-.LP
+.Pp
+.Dl example% kbd -s Dutch
+.Dl example%
+.El
+.Bl -ohang
+.It Sy Example 7 Setting the Keyboard Beeper Frequency
+.Pp
 The following example sets the keyboard beeper frequency:
-
-.sp
-.in +2
-.nf
-example% kbd -b keyboard 1000
-example%
-.fi
-.in -2
-.sp
-
-.SH FILES
-.ne 2
-.na
-\fB\fB/dev/kbd\fR\fR
-.ad
-.RS 20n
-Keyboard device file.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/etc/default/kbd\fR\fR
-.ad
-.RS 20n
-Keyboard default file containing software defaults for keyboard configurations.
-.RE
-
-.SH SEE ALSO
-.LP
-\fBloadkeys\fR(1), \fBsvcs\fR(1), \fBinetd\fR(1M), \fBinetadm\fR(1M),
-\fBkadb\fR(1M), \fBsvcadm\fR(1M), \fBpppd\fR(1M), \fBkeytables\fR(4),
-\fBattributes\fR(5), \fBsmf\fR(5), \fBkb\fR(7M), \fBzs\fR(7D), \fBse\fR(7D),
-\fBasy\fR(7D), \fBvirtualkm\fR(7D)
-.SH NOTES
-.LP
-Some server systems have key switches with a \fBsecure\fR key position that can
-be read by system software. This key position overrides the normal default of
-the keyboard abort sequence effect and changes the default so the effect is
-disabled. When the key switch is in the \fBsecure\fR position on these systems,
-the keyboard abort sequence effect cannot be overridden by the software
-default, which is settable with the \fBkbd\fR utility.
-.sp
-.LP
+.Pp
+.Dl example% kbd -b keyboard 1000
+.Dl example%
+.El
+.Sh SEE ALSO
+.Xr loadkeys 1 ,
+.Xr svcs 1 ,
+.Xr kadb 1M ,
+.Xr pppd 1M ,
+.Xr svcadm 1M ,
+.Xr keytables 4 ,
+.Xr attributes 5 ,
+.Xr smf 5 ,
+.Xr asy 7D ,
+.Xr se 7D ,
+.Xr virtualkm 7D ,
+.Xr zs 7D ,
+.Xr kb 7M
+.Sh NOTES
+Some server systems have key switches with a
+.Sy secure
+key position that can be read by system software.
+This key position overrides the normal default of the keyboard abort sequence
+effect and changes the default so the effect is disabled.
+When the key switch is in the
+.Sy secure
+position on these systems, the keyboard abort sequence effect cannot be
+overridden by the software default, which is settable with the
+.Nm
+utility.
+.Pp
 Currently, there is no way to determine the state of the keyboard click
 setting.
-.sp
-.LP
-The \fBkdb\fR service is managed by the service management facility,
-\fBsmf\fR(5), under the service identifier:
-.sp
-.in +2
-.nf
-svc:/system/keymap:default
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Pp
+The
+.Nm
+service is managed by the service management facility,
+.Xr smf 5 ,
+under the service identifier:
+.Pp
+.Dl svc:/system/keymap:default
+.Pp
 Administrative actions on this service, such as enabling, disabling, or
-requesting restart, can be performed using \fBsvcadm\fR(1M). Responsibility for
-initiating and restarting this service is delegated to \fBinetd\fR(1M). Use
-\fBinetadm\fR(1M) to make configuration changes and to view configuration
-information for this service. The service's status can be queried using the
-\fBsvcs\fR(1) command.
+requesting restart, can be performed using
+.Xr svcadm 1M .
+Use
+.Xr svccfg 1M
+to make configuration changes and to view configuration information for this
+service.
+The service's status can be queried using the
+.Xr svcs 1
+command.

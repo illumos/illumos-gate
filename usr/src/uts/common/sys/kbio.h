@@ -49,14 +49,14 @@ extern "C" {
  */
 #define	KIOCTRANS	(KIOC|30)	/* set keyboard translation */
 #define	KIOCGTRANS	(KIOC|35)	/* get keyboard translation */
-#define	KIOCTRANSABLE	(KIOC|36) 	/* set keyboard translatability */
+#define	KIOCTRANSABLE	(KIOC|36)	/* set keyboard translatability */
 #define	KIOCGTRANSABLE	(KIOC|37)	/* get keyboard translatability */
 
 #else	/* __i386 || __i386_COMPAT */
 
 #define	KIOCTRANS	(KIOC|0)	/* set keyboard translation */
 #define	KIOCGTRANS	(KIOC|5)	/* get keyboard translation */
-#define	KIOCTRANSABLE	(KIOC|6) 	/* set keyboard translatability */
+#define	KIOCTRANSABLE	(KIOC|6)	/* set keyboard translatability */
 #define	KIOCGTRANSABLE	(KIOC|7)	/* get keyboard translatability */
 
 #endif	/* __i386 || __i386_COMPAT */
@@ -236,6 +236,12 @@ struct freq_request {
 /* Used to control the AutoRepeat Min-delay and Min-Rate */
 #define	KIOCRPTDELAY_MIN	(100)
 #define	KIOCRPTRATE_MIN		(1)
+
+/*
+ * Get/Set Keyboard autorepeat count.
+ */
+#define	KIOCGRPTCOUNT	(KIOC|28)
+#define	KIOCSRPTCOUNT	(KIOC|29)
 
 #ifdef	__cplusplus
 }

@@ -25,8 +25,8 @@
 
 /*
  *	Usage: kbd [-r] [-t] [-l] [-c on|off] [-a enable|disable|alternate]
- *		   [-d keyboard device] [-D autorepeat dealy] [-R autorepeat
- *		   rate]
+ *		   [-d keyboard device] [-A autorepeat count]
+ *		   [-D autorepeat delay] [-R autorepeat rate]
  *	       kbd [-i] [-d keyboard device]
  *	       kbd -s [language]
  *	       kbd -b [keyboard|console] frequency
@@ -37,7 +37,8 @@
  *	-i			read in the default configuration file
  *	-c on|off		turn on|off clicking
  *	-a enable|disable|alternate	sets abort sequence
- *	-D autorepeat delay	sets autorepeat dealy, unit in ms
+ *	-A autorepeat count	sets autorepeat sequence length in chars.
+ *	-D autorepeat delay	sets autorepeat delay, unit in ms
  *	-R autorepeat rate	sets autorepeat rate, unit in ms
  *	-d keyboard device	chooses the kbd device, default /dev/kbd.
  *	-s keyboard layout	sets keyboard layout
@@ -61,6 +62,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <libscf.h>
+#include <limits.h>
 
 #define	KBD_DEVICE	"/dev/kbd"		/* default keyboard device */
 
@@ -76,6 +78,7 @@
 #define	KBD_PROP_KEYBOARD_ABORT	"keyboard_abort"
 #define	KBD_PROP_RPTDELAY	"repeat_delay"
 #define	KBD_PROP_RPTRATE	"repeat_rate"
+#define	KBD_PROP_RPTCOUNT	"repeat_count"
 #define	KBD_PROP_FREQ		"kbd_beeper_freq"
 #define	KBD_PROP_CONSFREQ	"console_beeper_freq"
 #define	KBD_MAX_NAME_LEN	1024
@@ -93,6 +96,8 @@ static void usage(void);
 
 static int click(char *, int);
 static int abort_enable(char *, int);
+static int set_repeat_count(char *, int);
+static int set_rptcount(int, int);
 static int set_repeat_delay(char *, int);
 static int set_rptdelay(int, int);
 static int set_repeat_rate(char *, int);
@@ -109,16 +114,17 @@ main(int argc, char **argv)
 {
 	int c, error;
 	int rflag, tflag, lflag, cflag, dflag, aflag, iflag, errflag,
-	    Dflag, Rflag, rtlacDRflag, sflag, bflag;
-	char *copt, *aopt, *delay, *rate, *layout_name, *b_type, *freq_str;
+	    Aflag, Dflag, Rflag, rtlacADRflag, sflag, bflag;
+	char *copt, *aopt, *count, *delay, *rate, *layout_name, *b_type;
+	char *freq_str;
 	char *kbdname = KBD_DEVICE, *endptr = NULL;
 	int kbd, freq_val;
 	extern char *optarg;
 	extern int optind;
 
 	rflag = tflag = cflag = dflag = aflag = iflag = errflag = lflag =
-	    Dflag = Rflag = sflag = bflag = 0;
-	copt = aopt = (char *)0;
+	    Aflag = Dflag = Rflag = sflag = bflag = 0;
+	copt = aopt = NULL;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -126,7 +132,7 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "rtlisc:a:d:D:R:b:")) != EOF) {
+	while ((c = getopt(argc, argv, "rtlisc:a:d:A:D:R:b:")) != EOF) {
 		switch (c) {
 		case 'r':
 			rflag++;
@@ -154,6 +160,10 @@ main(int argc, char **argv)
 		case 'd':
 			kbdname = optarg;
 			dflag++;
+			break;
+		case 'A':
+			count = optarg;
+			Aflag++;
 			break;
 		case 'D':
 			delay = optarg;
@@ -186,15 +196,22 @@ main(int argc, char **argv)
 
 	/*
 	 * kbd requires that the user specify either "-i" or "-s" or "-b" or
-	 * at least one of -[rtlacDR].  The "-d" option is, well, optional.
+	 * at least one of -[rtlacADR].  The "-d" option is, well, optional.
 	 * We don't care if it's there or not.
 	 */
-	rtlacDRflag = rflag + tflag + lflag + aflag + cflag + Dflag + Rflag;
-	if (!((iflag != 0 && sflag == 0 && bflag == 0 && rtlacDRflag == 0) ||
+	rtlacADRflag = rflag + tflag + lflag + aflag + cflag + Aflag +
+	    Dflag + Rflag;
+	if (!((iflag != 0 && sflag == 0 && bflag == 0 && rtlacADRflag == 0) ||
 	    (iflag == 0 && sflag != 0 && bflag == 0 && dflag == 0 &&
-	    rtlacDRflag == 0) ||
-	    (iflag == 0 && sflag == 0 && bflag == 0 && rtlacDRflag != 0) ||
-	    (iflag == 0 && sflag == 0 && bflag != 0 && rtlacDRflag == 0))) {
+	    rtlacADRflag == 0) ||
+	    (iflag == 0 && sflag == 0 && bflag == 0 && rtlacADRflag != 0) ||
+	    (iflag == 0 && sflag == 0 && bflag != 0 && rtlacADRflag == 0))) {
+		usage();
+		exit(1);
+	}
+
+	if (Aflag && atoi(count) < -1) {
+		(void) fprintf(stderr, "Invalid arguments: -A %s\n", count);
 		usage();
 		exit(1);
 	}
@@ -239,6 +256,9 @@ main(int argc, char **argv)
 		reset(kbd);
 
 	if (aflag && (error = abort_enable(aopt, kbd)) != 0)
+		exit(error);
+
+	if (Aflag && (error = set_repeat_count(count, kbd)) != 0)
 		exit(error);
 
 	if (Dflag && (error = set_repeat_delay(delay, kbd)) != 0)
@@ -483,8 +503,8 @@ get_layout(int kbd)
 {
 	int kbd_type;
 	int kbd_layout;
-	/* these two variables are used for getting delay&rate */
-	int delay, rate;
+	/* these three variables are used for getting delay&rate&count */
+	int delay, rate, count = -1;
 	delay = rate = 0;
 
 	if (ioctl(kbd, KIOCTYPE, &kbd_type)) {
@@ -511,8 +531,17 @@ get_layout(int kbd)
 		exit(1);
 	}
 
+	if (ioctl(kbd, KIOCGRPTCOUNT, &count)) {
+		perror("ioctl (kbd get repeat count)");
+		exit(1);
+	}
+
 	(void) printf("delay(ms)=%d\n", delay);
 	(void) printf("rate(ms)=%d\n", rate);
+	if (count == -1)
+		(void) printf("count=unlimited\n");
+	else
+		(void) printf("count=%d\n", count);
 }
 
 /*
@@ -565,6 +594,24 @@ abort_enable(char *aopt, int kbd)
 		return (1);
 	}
 	return (0);
+}
+
+static int
+set_rptcount(int count, int kbd)
+{
+	if (ioctl(kbd, KIOCSRPTCOUNT, &count) == -1) {
+		perror("kbd: set repeat count");
+		return (1);
+	}
+	return (0);
+}
+
+static int
+set_repeat_count(char *count_str, int kbd)
+{
+	int count = atoi(count_str);
+
+	return (set_rptcount(count, kbd));
 }
 
 static int
@@ -643,7 +690,7 @@ kbd_defaults(int kbd)
 	int layout_num;
 	char *val_layout = NULL, *val_abort = NULL;
 	uint8_t val_click;
-	int64_t val_delay, val_rate;
+	int64_t val_delay, val_rate, val_count;
 	int64_t val_kbd_beeper, val_console_beeper;
 
 	if ((h = scf_handle_create(SCF_VERSION)) == NULL ||
@@ -714,6 +761,18 @@ kbd_defaults(int kbd)
 			(void) fprintf(stderr, BAD_DEFAULT_STR,
 			    KBD_PROP_KEYBOARD_ABORT, val_abort);
 	}
+
+	if (scf_pg_get_property(pg, KBD_PROP_RPTCOUNT, prop) != 0 ||
+	    scf_property_get_value(prop, val) != 0 ||
+	    scf_value_get_integer(val, &val_count) == -1) {
+		(void) fprintf(stderr, "Can not get RPTCOUNT\n");
+	}
+
+	if (val_count == -1 || (val_count > 0 && val_count < INT_MAX))
+		(void) set_rptcount(val_count, kbd);
+	else
+		(void) fprintf(stderr,
+		    BAD_DEFAULT_LLINT, KBD_PROP_RPTCOUNT, val_count);
 
 	if (scf_pg_get_property(pg, KBD_PROP_RPTDELAY, prop) != 0 ||
 	    scf_property_get_value(prop, val) != 0 ||
@@ -869,15 +928,16 @@ set_layout(int kbd, int layout_num)
 	return (0);
 }
 
-static char *usage1 = "kbd [-r] [-t] [-l] [-a enable|disable|alternate]";
-static char *usage2 = "    [-c on|off][-D delay][-R rate][-d keyboard device]";
-static char *usage3 = "kbd -i [-d keyboard device]";
-static char *usage4 = "kbd -s [language]";
-static char *usage5 = "kbd -b [keyboard|console] frequency";
+static char *usage1 =
+	"kbd [-r] [-t] [-l] [-a enable|disable|alternate] [-c on|off]\n"
+	"\t    [-d keyboard device] [-A count] [-D delay] [-R rate]";
+static char *usage2 = "kbd -i [-d keyboard device]";
+static char *usage3 = "kbd -s [language]";
+static char *usage4 = "kbd -b [keyboard|console] frequency";
 
 static void
 usage(void)
 {
-	(void) fprintf(stderr, "Usage:\t%s\n\t%s\n\t%s\n\t%s\n\t%s\n", usage1,
-	    usage2, usage3, usage4, usage5);
+	(void) fprintf(stderr, "Usage:\t%s\n\t%s\n\t%s\n\t%s\n", usage1,
+	    usage2, usage3, usage4);
 }

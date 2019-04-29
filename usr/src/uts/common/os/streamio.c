@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 /*
@@ -3419,6 +3419,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			case KIOCSDIRECT:
 			case KIOCSCOMPAT:
 			case KIOCSKABORTEN:
+			case KIOCSRPTCOUNT:
 			case KIOCSRPTDELAY:
 			case KIOCSRPTRATE:
 			case VUIDSFORMAT:
@@ -3488,6 +3489,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 			case TCGETS:
 			case LDGETT:
 			case TIOCGETP:
+			case KIOCGRPTCOUNT:
 			case KIOCGRPTDELAY:
 			case KIOCGRPTRATE:
 				strioc.ic_len = 0;
@@ -5422,7 +5424,7 @@ strioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, int copyflag,
 		/*
 		 * Set/clear the write options. arg is a bit
 		 * mask with any of the following bits set...
-		 * 	SNDZERO - send zero length message
+		 *	SNDZERO - send zero length message
 		 *	SNDPIPE - send sigpipe to process if
 		 *		sd_werror is set and process is
 		 *		doing a write or putmsg.
@@ -5883,7 +5885,7 @@ out:
  *	ic_timout is not INFTIM).  Non-stream head errors may be returned if
  *	the ioc_error indicates that the driver/module had problems,
  *	an EFAULT was found when accessing user data, a lack of
- * 	resources, etc.
+ *	resources, etc.
  */
 int
 strdoioctl(

@@ -28,7 +28,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #include <stdio.h>
@@ -870,7 +870,7 @@ const struct ioc {
 	{ (uint_t)SIOCGLIFGROUPINFO,	"SIOCGLIFGROUPINFO", "lifgroupinfo" },
 	{ (uint_t)SIOCGDSTINFO,		"SIOCGDSTINFO",		NULL },
 	{ (uint_t)SIOCGIP6ADDRPOLICY,	"SIOCGIP6ADDRPOLICY",	NULL },
-	{ (uint_t)SIOCSIP6ADDRPOLICY,	"SIOCSIP6ADDRPOLICY", 	NULL },
+	{ (uint_t)SIOCSIP6ADDRPOLICY,	"SIOCSIP6ADDRPOLICY",	NULL },
 	{ (uint_t)SIOCSXARP,		"SIOCSXARP",		"xarpreq" },
 	{ (uint_t)SIOCGXARP,		"SIOCGXARP",		"xarpreq" },
 	{ (uint_t)SIOCDXARP,		"SIOCDXARP",		"xarpreq" },
@@ -893,15 +893,15 @@ const struct ioc {
 	{ (uint_t)SIOCGLIFHWADDR,	"SIOCGLIFHWADDR",	"lifreq" },
 
 	/* DES encryption */
-	{ (uint_t)DESIOCBLOCK,	"DESIOCBLOCK", 	"desparams" },
-	{ (uint_t)DESIOCQUICK,	"DESIOCQUICK", 	"desparams" },
+	{ (uint_t)DESIOCBLOCK,	"DESIOCBLOCK",	"desparams" },
+	{ (uint_t)DESIOCQUICK,	"DESIOCQUICK",	"desparams" },
 
 	/* Printing system */
-	{ (uint_t)PRNIOC_GET_IFCAP,	"PRNIOC_GET_IFCAP", 	NULL },
-	{ (uint_t)PRNIOC_SET_IFCAP,	"PRNIOC_SET_IFCAP", 	NULL },
+	{ (uint_t)PRNIOC_GET_IFCAP,	"PRNIOC_GET_IFCAP",	NULL },
+	{ (uint_t)PRNIOC_SET_IFCAP,	"PRNIOC_SET_IFCAP",	NULL },
 	{ (uint_t)PRNIOC_GET_IFINFO,	"PRNIOC_GET_IFINFO",
 	    "prn_interface_info" },
-	{ (uint_t)PRNIOC_GET_STATUS,	"PRNIOC_GET_STATUS", 	NULL },
+	{ (uint_t)PRNIOC_GET_STATUS,	"PRNIOC_GET_STATUS",	NULL },
 	{ (uint_t)PRNIOC_GET_1284_DEVID,	"PRNIOC_GET_1284_DEVID",
 	    "prn_1284_device_id" },
 	{ (uint_t)PRNIOC_GET_1284_STATUS,
@@ -910,7 +910,7 @@ const struct ioc {
 	    "prn_timeouts" },
 	{ (uint_t)PRNIOC_SET_TIMEOUTS,	"PRNIOC_SET_TIMEOUTS",
 	    "prn_timeouts" },
-	{ (uint_t)PRNIOC_RESET,	"PRNIOC_RESET", 	NULL },
+	{ (uint_t)PRNIOC_RESET,	"PRNIOC_RESET",	NULL },
 
 	/* DTrace */
 	{ (uint_t)DTRACEIOC_PROVIDER,	"DTRACEIOC_PROVIDER",	NULL },
@@ -1070,6 +1070,8 @@ const struct ioc {
 	{ (uint_t)KIOCSLAYOUT,		"KIOCSLAYOUT",	NULL },
 	{ (uint_t)KIOCLAYOUT,		"KIOCLAYOUT",	NULL },
 	{ (uint_t)KIOCSKABORTEN,	"KIOCSKABORTEN",	NULL },
+	{ (uint_t)KIOCGRPTCOUNT,	"KIOCGRPTCOUNT",	NULL },
+	{ (uint_t)KIOCSRPTCOUNT,	"KIOCSRPTCOUNT",	NULL },
 	{ (uint_t)KIOCGRPTDELAY,	"KIOCGRPTDELAY",	NULL },
 	{ (uint_t)KIOCSRPTDELAY,	"KIOCSRPTDELAY",	NULL },
 	{ (uint_t)KIOCGRPTRATE,		"KIOCGRPTRATE",	NULL },
@@ -1805,7 +1807,7 @@ si86name(int code)
 	case SI86DELMEM:	str = "SI86DELMEM";	break;
 	case SI86ADDMEM:	str = "SI86ADDMEM";	break;
 /* 71 through 74 reserved for VPIX */
-	case SI86V86: 		str = "SI86V86";	break;
+	case SI86V86:		str = "SI86V86";	break;
 	case SI86SLTIME:	str = "SI86SLTIME";	break;
 	case SI86DSCR:		str = "SI86DSCR";	break;
 	case RDUBLK:		str = "RDUBLK";		break;
@@ -1814,7 +1816,7 @@ si86name(int code)
 	case SI86VM86:		str = "SI86VM86";	break;
 	case SI86VMENABLE:	str = "SI86VMENABLE";	break;
 	case SI86LIMUSER:	str = "SI86LIMUSER";	break;
-	case SI86RDID: 		str = "SI86RDID";	break;
+	case SI86RDID:		str = "SI86RDID";	break;
 	case SI86RDBOOT:	str = "SI86RDBOOT";	break;
 /* Merged Product defines */
 	case SI86SHFIL:		str = "SI86SHFIL";	break;
@@ -1822,7 +1824,7 @@ si86name(int code)
 	case SI86BADVISE:	str = "SI86BADVISE";	break;
 	case SI86SHRGN:		str = "SI86SHRGN";	break;
 	case SI86CHIDT:		str = "SI86CHIDT";	break;
-	case SI86EMULRDA: 	str = "SI86EMULRDA";	break;
+	case SI86EMULRDA:	str = "SI86EMULRDA";	break;
 /* RTC commands */
 	case WTODC:		str = "WTODC";		break;
 	case SGMTL:		str = "SGMTL";		break;
