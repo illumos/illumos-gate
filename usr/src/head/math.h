@@ -66,14 +66,6 @@ extern "C" {
 #define	exception	__math_exception
 #endif
 
-#ifndef __P
-#ifdef __STDC__
-#define	__P(p)	p
-#else
-#define	__P(p)	()
-#endif
-#endif	/* !defined(__P) */
-
 #if defined(__EXTENSIONS__) || defined(_XOPEN_SOURCE) || \
 	!defined(_STRICT_STDC) && !defined(_POSIX_C_SOURCE)
 /*
@@ -147,10 +139,10 @@ struct exception {
  * SVID & X/Open
  */
 /* BEGIN adopted by C99 */
-extern double erf __P((double));
-extern double erfc __P((double));
-extern double hypot __P((double, double));
-extern double lgamma __P((double));
+extern double erf(double);
+extern double erfc(double);
+extern double hypot(double, double);
+extern double lgamma(double);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(erf, erfc, hypot)
@@ -159,7 +151,7 @@ extern double lgamma __P((double));
 #endif
 
 #if !defined(_STDC_C99) && _XOPEN_SOURCE - 0 < 600 && !defined(__C99FEATURES__)
-extern int isnan __P((double));
+extern int isnan(double);
 
 #pragma does_not_read_global_data(isnan)
 #pragma does_not_write_global_data(isnan)
@@ -168,14 +160,14 @@ extern int isnan __P((double));
 /* END adopted by C99 */
 
 #if defined(__EXTENSIONS__) || _XOPEN_SOURCE - 0 < 600
-extern double gamma __P((double));		/* deprecated; use lgamma */
+extern double gamma(double);		/* deprecated; use lgamma */
 #endif
-extern double j0 __P((double));
-extern double j1 __P((double));
-extern double jn __P((int, double));
-extern double y0 __P((double));
-extern double y1 __P((double));
-extern double yn __P((int, double));
+extern double j0(double);
+extern double j1(double);
+extern double jn(int, double);
+extern double y0(double);
+extern double y1(double);
+extern double yn(int, double);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(j0, j1, jn, y0, y1, yn)
@@ -188,7 +180,7 @@ extern double yn __P((int, double));
 /*
  * SVID & XPG 4.2/5
  */
-extern double scalb __P((double, double));
+extern double scalb(double, double);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(scalb)
@@ -197,21 +189,21 @@ extern double scalb __P((double, double));
 #endif
 
 /* BEGIN adopted by C99 */
-extern double acosh __P((double));
-extern double asinh __P((double));
-extern double atanh __P((double));
-extern double cbrt __P((double));
-extern double logb __P((double));
-extern double nextafter __P((double, double));
-extern double remainder __P((double, double));
+extern double acosh(double);
+extern double asinh(double);
+extern double atanh(double);
+extern double cbrt(double);
+extern double logb(double);
+extern double nextafter(double, double);
+extern double remainder(double, double);
 
 /*
  * XPG 4.2/5
  */
-extern double expm1 __P((double));
-extern int ilogb __P((double));
-extern double log1p __P((double));
-extern double rint __P((double));
+extern double expm1(double);
+extern int ilogb(double);
+extern double log1p(double);
+extern double rint(double);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(acosh, asinh, atanh, cbrt)
@@ -231,12 +223,12 @@ extern double rint __P((double));
 /*
  * SVID
  */
-extern int matherr __P((struct exception *));
+extern int matherr(struct exception *);
 
 /*
  * IEEE Test Vector
  */
-extern double significand __P((double));
+extern double significand(double);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(significand)
@@ -247,30 +239,30 @@ extern double significand __P((double));
 extern int signgamf;				/* deprecated; use signgam */
 extern int signgaml;				/* deprecated; use signgam */
 
-extern int isnanf __P((float));
-extern int isnanl __P((long double));
-extern float gammaf __P((float));		/* deprecated; use lgammaf */
-extern float gammaf_r __P((float, int *));	/* deprecated; use lgammaf_r */
-extern float j0f __P((float));
-extern float j1f __P((float));
-extern float jnf __P((int, float));
-extern float lgammaf_r __P((float, int *));
-extern float scalbf __P((float, float));
-extern float significandf __P((float));
-extern float y0f __P((float));
-extern float y1f __P((float));
-extern float ynf __P((int, float));
-extern long double gammal __P((long double));	/* deprecated; use lgammal */
-extern long double gammal_r __P((long double, int *));	/* deprecated */
-extern long double j0l __P((long double));
-extern long double j1l __P((long double));
-extern long double jnl __P((int, long double));
-extern long double lgammal_r __P((long double, int *));
-extern long double scalbl __P((long double, long double));
-extern long double significandl __P((long double));
-extern long double y0l __P((long double));
-extern long double y1l __P((long double));
-extern long double ynl __P((int, long double));
+extern int isnanf(float);
+extern int isnanl(long double);
+extern float gammaf(float);		/* deprecated; use lgammaf */
+extern float gammaf_r(float, int *);	/* deprecated; use lgammaf_r */
+extern float j0f(float);
+extern float j1f(float);
+extern float jnf(int, float);
+extern float lgammaf_r(float, int *);
+extern float scalbf(float, float);
+extern float significandf(float);
+extern float y0f(float);
+extern float y1f(float);
+extern float ynf(int, float);
+extern long double gammal(long double);	/* deprecated; use lgammal */
+extern long double gammal_r(long double, int *);	/* deprecated */
+extern long double j0l(long double);
+extern long double j1l(long double);
+extern long double jnl(int, long double);
+extern long double lgammal_r(long double, int *);
+extern long double scalbl(long double, long double);
+extern long double significandl(long double);
+extern long double y0l(long double);
+extern long double y1l(long double);
+extern long double ynl(int, long double);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(isnanf, isnanl)
@@ -293,9 +285,9 @@ extern long double ynl __P((int, long double));
 /*
  * for sin+cos->sincos transformation
  */
-extern void sincos __P((double, double *, double *));
-extern void sincosf __P((float, float *, float *));
-extern void sincosl __P((long double, long double *, long double *));
+extern void sincos(double, double *, double *);
+extern void sincosf(float, float *, float *);
+extern void sincosl(long double, long double *, long double *);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(sincos, sincosf, sincosl)
@@ -305,8 +297,8 @@ extern void sincosl __P((long double, long double *, long double *));
 /*
  * Functions callable from C, intended to support IEEE arithmetic.
  */
-extern double copysign __P((double, double));
-extern double scalbn __P((double, int));
+extern double copysign(double, double);
+extern double scalbn(double, int);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(copysign, scalbn)
@@ -319,15 +311,15 @@ extern double scalbn __P((double, int));
  * Reentrant version of gamma & lgamma; passes signgam back by reference
  * as the second argument; user must allocate space for signgam.
  */
-extern double gamma_r __P((double, int *));	/* deprecated; use lgamma_r */
-extern double lgamma_r __P((double, int *));
+extern double gamma_r(double, int *);	/* deprecated; use lgamma_r */
+extern double lgamma_r(double, int *);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(gamma_r, lgamma_r)
 #endif
 
 /* BEGIN adopted by C99 */
-extern float modff __P((float, float *));
+extern float modff(float, float *);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(modff)

@@ -35,14 +35,6 @@
 extern "C" {
 #endif
 
-#ifndef __P
-#ifdef __STDC__
-#define	__P(p)	p
-#else
-#define	__P(p)	()
-#endif
-#endif	/* !defined(__P) */
-
 /*
  * Rounding modes
  */
@@ -62,8 +54,8 @@ extern "C" {
 
 #endif
 
-extern int fegetround __P((void));
-extern int fesetround __P((int));
+extern int fegetround(void);
+extern int fesetround(int);
 
 #if (defined(__i386) || defined(__amd64)) && \
 	(!defined(_STRICT_STDC) || defined(__EXTENSIONS__))
@@ -72,8 +64,8 @@ extern int fesetround __P((int));
 #define	FE_DBLPREC	2
 #define	FE_LDBLPREC	3
 
-extern int fegetprec __P((void));
-extern int fesetprec __P((int));
+extern int fegetprec(void);
+extern int fesetprec(int);
 
 #endif
 
@@ -102,11 +94,11 @@ extern int fesetprec __P((int));
 
 typedef int fexcept_t;
 
-extern int feclearexcept __P((int));
-extern int feraiseexcept __P((int));
-extern int fetestexcept __P((int));
-extern int fegetexceptflag __P((fexcept_t *, int));
-extern int fesetexceptflag __P((const fexcept_t *, int));
+extern int feclearexcept(int);
+extern int feraiseexcept(int);
+extern int fetestexcept(int);
+extern int fegetexceptflag(fexcept_t *, int);
+extern int fesetexceptflag(const fexcept_t *, int);
 
 #if !defined(_STRICT_STDC) || defined(__EXTENSIONS__)
 
@@ -185,11 +177,11 @@ typedef struct fex_handler_data {
 	void	(*__handler)();
 } fex_handler_t[FEX_NUM_EXC];
 
-extern int fex_get_handling __P((int));
-extern int fex_set_handling __P((int, int, void (*)()));
+extern int fex_get_handling(int);
+extern int fex_set_handling(int, int, void (*)());
 
-extern void fex_getexcepthandler __P((fex_handler_t *, int));
-extern void fex_setexcepthandler __P((const fex_handler_t *, int));
+extern void fex_getexcepthandler(fex_handler_t *, int);
+extern void fex_setexcepthandler(const fex_handler_t *, int);
 
 #ifdef __STDC__
 #include <stdio_tag.h>
@@ -198,11 +190,11 @@ extern void fex_setexcepthandler __P((const fex_handler_t *, int));
 typedef	__FILE FILE;
 #endif
 #endif
-extern FILE *fex_get_log __P((void));
-extern int fex_set_log __P((FILE *));
-extern int fex_get_log_depth __P((void));
-extern int fex_set_log_depth __P((int));
-extern void fex_log_entry __P((const char *));
+extern FILE *fex_get_log(void);
+extern int fex_set_log(FILE *);
+extern int fex_get_log_depth(void);
+extern int fex_set_log_depth(int);
+extern void fex_log_entry(const char *);
 
 #define	__fex_handler_t	fex_handler_t
 
@@ -231,13 +223,13 @@ extern fenv_t __fenv_dfl_env;
 
 #define	FE_DFL_ENV	(&__fenv_dfl_env)
 
-extern int fegetenv __P((fenv_t *));
-extern int fesetenv __P((const fenv_t *));
-extern int feholdexcept __P((fenv_t *));
-extern int feupdateenv __P((const fenv_t *));
+extern int fegetenv(fenv_t *);
+extern int fesetenv(const fenv_t *);
+extern int feholdexcept(fenv_t *);
+extern int feupdateenv(const fenv_t *);
 
 #if !defined(_STRICT_STDC) || defined(__EXTENSIONS__)
-extern void fex_merge_flags __P((const fenv_t *));
+extern void fex_merge_flags(const fenv_t *);
 #endif
 
 #ifdef __cplusplus

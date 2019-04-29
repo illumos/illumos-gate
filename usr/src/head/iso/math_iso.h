@@ -35,14 +35,6 @@
 extern "C" {
 #endif
 
-#ifndef __P
-#ifdef __STDC__
-#define	__P(p)	p
-#else
-#define	__P(p)	()
-#endif
-#endif	/* !defined(__P) */
-
 #if !defined(_STDC_C99) && _XOPEN_SOURCE - 0 < 600 && !defined(__C99FEATURES__)
 typedef union _h_val {
 	unsigned long _i[sizeof (double) / sizeof (unsigned long)];
@@ -62,32 +54,32 @@ extern _h_val __huge_val;
 namespace std {
 #endif
 
-extern double acos __P((double));
-extern double asin __P((double));
-extern double atan __P((double));
-extern double atan2 __P((double, double));
-extern double cos __P((double));
-extern double sin __P((double));
-extern double tan __P((double));
+extern double acos(double);
+extern double asin(double);
+extern double atan(double);
+extern double atan2(double, double);
+extern double cos(double);
+extern double sin(double);
+extern double tan(double);
 
-extern double cosh __P((double));
-extern double sinh __P((double));
-extern double tanh __P((double));
+extern double cosh(double);
+extern double sinh(double);
+extern double tanh(double);
 
-extern double exp __P((double));
-extern double frexp __P((double, int *));
-extern double ldexp __P((double, int));
-extern double log __P((double));
-extern double log10 __P((double));
-extern double modf __P((double, double *));
+extern double exp(double);
+extern double frexp(double, int *);
+extern double ldexp(double, int);
+extern double log(double);
+extern double log10(double);
+extern double modf(double, double *);
 
-extern double pow __P((double, double));
-extern double sqrt __P((double));
+extern double pow(double, double);
+extern double sqrt(double);
 
-extern double ceil __P((double));
-extern double fabs __P((double));
-extern double floor __P((double));
-extern double fmod __P((double, double));
+extern double ceil(double);
+extern double fabs(double);
+extern double floor(double);
+extern double fmod(double, double);
 
 #if defined(__MATHERR_ERRNO_DONTCARE)
 #pragma does_not_read_global_data(acos, asin, atan, atan2)
@@ -158,8 +150,10 @@ extern "C++" {
 #undef	__X
 #undef	__Y
 	inline double abs(double __X) { return fabs(__X); }
-	inline double pow(double __X, int __Y) { return
-		pow(__X, (double) (__Y)); }
+
+	inline double pow(double __X, int __Y) {
+		return (pow(__X, (double)(__Y)));
+	}
 
 	inline float abs(float __X) { return __fabsf(__X); }
 	inline float acos(float __X) { return __acosf(__X); }
@@ -179,8 +173,11 @@ extern "C++" {
 	inline float log10(float __X) { return __log10f(__X); }
 	inline float modf(float __X, float *__Y) { return __modff(__X, __Y); }
 	inline float pow(float __X, float __Y) { return __powf(__X, __Y); }
-	inline float pow(float __X, int __Y) { return
-		pow((double) (__X), (double) (__Y)); }
+
+	inline float pow(float __X, int __Y) {
+		return (pow((double)(__X), (double)(__Y)));
+	}
+
 	inline float sin(float __X) { return __sinf(__X); }
 	inline float sinh(float __X) { return __sinhf(__X); }
 	inline float sqrt(float __X) { return __sqrtf(__X); }
@@ -191,28 +188,45 @@ extern "C++" {
 	inline long double acos(long double __X) { return __acosl(__X); }
 	inline long double asin(long double __X) { return __asinl(__X); }
 	inline long double atan(long double __X) { return __atanl(__X); }
-	inline long double atan2(long double __X, long double __Y) { return
-		__atan2l(__X, __Y); }
+
+	inline long double atan2(long double __X, long double __Y) {
+		return (__atan2l(__X, __Y));
+	}
+
 	inline long double ceil(long double __X) { return __ceill(__X); }
 	inline long double cos(long double __X) { return __cosl(__X); }
 	inline long double cosh(long double __X) { return __coshl(__X); }
 	inline long double exp(long double __X) { return __expl(__X); }
 	inline long double fabs(long double __X) { return __fabsl(__X); }
 	inline long double floor(long double __X) { return __floorl(__X); }
-	inline long double fmod(long double __X, long double __Y) { return
-		__fmodl(__X, __Y); }
-	inline long double frexp(long double __X, int *__Y) { return
-		__frexpl(__X, __Y); }
-	inline long double ldexp(long double __X, int __Y) { return
-		__ldexpl(__X, __Y); }
+
+	inline long double fmod(long double __X, long double __Y) {
+		return (__fmodl(__X, __Y));
+	}
+
+	inline long double frexp(long double __X, int *__Y) {
+		return (__frexpl(__X, __Y));
+	}
+
+	inline long double ldexp(long double __X, int __Y) {
+		return (__ldexpl(__X, __Y));
+	}
+
 	inline long double log(long double __X) { return __logl(__X); }
 	inline long double log10(long double __X) { return __log10l(__X); }
-	inline long double modf(long double __X, long double *__Y) { return
-		__modfl(__X, __Y); }
-	inline long double pow(long double __X, long double __Y) { return
-		__powl(__X, __Y); }
-	inline long double pow(long double __X, int __Y) { return
-		__powl(__X, (long double) (__Y)); }
+
+	inline long double modf(long double __X, long double *__Y) {
+		return (__modfl(__X, __Y));
+	}
+
+	inline long double pow(long double __X, long double __Y) {
+		return (__powl(__X, __Y));
+	}
+
+	inline long double pow(long double __X, int __Y) {
+		return (__powl(__X, (long double) (__Y)));
+	}
+
 	inline long double sin(long double __X) { return __sinl(__X); }
 	inline long double sinh(long double __X) { return __sinhl(__X); }
 	inline long double sqrt(long double __X) { return __sqrtl(__X); }
