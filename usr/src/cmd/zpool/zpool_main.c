@@ -29,6 +29,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2017 Datto Inc.
  * Copyright (c) 2017, Intel Corporation.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -1560,7 +1561,7 @@ static void
 print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
     nvlist_t *nv, int depth, boolean_t isspare)
 {
-	nvlist_t **child;
+	nvlist_t **child, *root;
 	uint_t c, children;
 	pool_scan_stat_t *ps = NULL;
 	vdev_stat_t *vs;
@@ -1686,7 +1687,10 @@ print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
 		}
 	}
 
-	(void) nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_SCAN_STATS,
+	/* The root vdev has the scrub/resilver stats */
+	root = fnvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
+	    ZPOOL_CONFIG_VDEV_TREE);
+	(void) nvlist_lookup_uint64_array(root, ZPOOL_CONFIG_SCAN_STATS,
 	    (uint64_t **)&ps, &c);
 
 	if (ps && ps->pss_state == DSS_SCANNING &&
@@ -1751,6 +1755,7 @@ print_status_config(zpool_handle_t *zhp, status_cbdata_t *cb, const char *name,
 
 		vname = zpool_vdev_name(g_zfs, zhp, child[c],
 		    cb->cb_name_flags | VDEV_NAME_TYPE_ID);
+
 		print_status_config(zhp, cb, vname, child[c], depth + 2,
 		    isspare);
 		free(vname);
@@ -2893,10 +2898,8 @@ static const char *class_name[] = {
  * Print out all the statistics for the given vdev.  This can either be the
  * toplevel configuration, or called recursively.  If 'name' is NULL, then this
  * is a verbose output, and we don't want to display the toplevel pool stats.
- *
- * Returns the number of stat lines printed.
  */
-static unsigned int
+static void
 print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
     nvlist_t *newnv, iostat_cbdata_t *cb, int depth)
 {
@@ -2905,12 +2908,11 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 	vdev_stat_t *oldvs, *newvs;
 	vdev_stat_t zerovs = { 0 };
 	char *vname;
-	int ret = 0;
 	uint64_t tdelta;
 	double scale;
 
 	if (strcmp(name, VDEV_TYPE_INDIRECT) == 0)
-		return (ret);
+		return;
 
 	if (oldnv != NULL) {
 		verify(nvlist_lookup_uint64_array(oldnv,
@@ -2958,15 +2960,15 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 	(void) printf("\n");
 
 	if (!cb->cb_verbose)
-		return (ret);
+		return;
 
 	if (nvlist_lookup_nvlist_array(newnv, ZPOOL_CONFIG_CHILDREN,
 	    &newchild, &children) != 0)
-		return (ret);
+		return;
 
 	if (oldnv && nvlist_lookup_nvlist_array(oldnv, ZPOOL_CONFIG_CHILDREN,
 	    &oldchild, &c) != 0)
-		return (ret);
+		return;
 
 	/*
 	 * print normal top-level devices
@@ -3019,7 +3021,7 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 
 			vname = zpool_vdev_name(g_zfs, zhp, newchild[c],
 			    cb->cb_name_flags);
-			ret += print_vdev_stats(zhp, vname, oldnv ?
+			print_vdev_stats(zhp, vname, oldnv ?
 			    oldchild[c] : NULL, newchild[c], cb, depth + 2);
 			free(vname);
 		}
@@ -3031,11 +3033,11 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 	 */
 	if (nvlist_lookup_nvlist_array(newnv, ZPOOL_CONFIG_L2CACHE,
 	    &newchild, &children) != 0)
-		return (ret);
+		return;
 
 	if (oldnv && nvlist_lookup_nvlist_array(oldnv, ZPOOL_CONFIG_L2CACHE,
 	    &oldchild, &c) != 0)
-		return (ret);
+		return;
 
 	if (children > 0) {
 		(void) printf("%-*s      -      -      -      -      -      "
@@ -3048,8 +3050,6 @@ print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
 			free(vname);
 		}
 	}
-
-	return (ret);
 }
 
 static int
