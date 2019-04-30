@@ -16,12 +16,12 @@ ficlPrimitiveSystem(ficlVm *vm)
 {
 	ficlCountedString *counted = (ficlCountedString *)vm->pad;
 
-	ficlVmGetString(vm, counted, '\n');
+	(void) ficlVmGetString(vm, counted, '\n');
 	if (FICL_COUNTED_STRING_GET_LENGTH(*counted) > 0) {
 		int returnValue = \
 		    system(FICL_COUNTED_STRING_GET_POINTER(*counted));
 		if (returnValue) {
-			sprintf(vm->pad, "System call returned %d\n",
+			(void) sprintf(vm->pad, "System call returned %d\n",
 			    returnValue);
 			ficlVmTextOut(vm, vm->pad);
 			ficlVmThrow(vm, FICL_VM_STATUS_QUIT);
@@ -51,7 +51,7 @@ ficlPrimitiveLoad(ficlVm *vm)
 	ficlCell oldSourceId;
 	ficlString s;
 
-	ficlVmGetString(vm, counted, '\n');
+	(void) ficlVmGetString(vm, counted, '\n');
 
 	if (FICL_COUNTED_STRING_GET_LENGTH(*counted) <= 0) {
 		ficlVmTextOut(vm, "Warning (load): nothing happened\n");
@@ -95,7 +95,7 @@ ficlPrimitiveLoad(ficlVm *vm)
 
 		default:
 			vm->sourceId = oldSourceId;
-			fclose(f);
+			(void) fclose(f);
 			ficlVmThrowError(vm, "Error loading file <%s> line %d",
 			    FICL_COUNTED_STRING_GET_POINTER(*counted), line);
 		break;
@@ -107,10 +107,10 @@ ficlPrimitiveLoad(ficlVm *vm)
 	 */
 	vm->sourceId.i = -1;
 	FICL_STRING_SET_FROM_CSTRING(s, "");
-	ficlVmExecuteString(vm, s);
+	(void) ficlVmExecuteString(vm, s);
 
 	vm->sourceId = oldSourceId;
-	fclose(f);
+	(void) fclose(f);
 
 	/* handle "bye" in loaded files. --lch */
 	if (result == FICL_VM_STATUS_USER_EXIT)
@@ -148,18 +148,18 @@ ficlPrimitiveSpewHash(ficlVm *vm)
 			word = word->link;
 		}
 
-		fprintf(f, "%d\t%d", i, n);
+		(void) fprintf(f, "%d\t%d", i, n);
 
 		word = hash->table[i];
 		while (word) {
-			fprintf(f, "\t%s", word->name);
+			(void) fprintf(f, "\t%s", word->name);
 			word = word->link;
 		}
 
-		fprintf(f, "\n");
+		(void) fprintf(f, "\n");
 	}
 
-	fclose(f);
+	(void) fclose(f);
 }
 
 static void
@@ -173,12 +173,12 @@ ficlSystemCompileExtras(ficlSystem *system)
 {
 	ficlDictionary *dictionary = ficlSystemGetDictionary(system);
 
-	ficlDictionarySetPrimitive(dictionary, "break", ficlPrimitiveBreak,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "load", ficlPrimitiveLoad,
-	    FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "spewhash",
+	(void) ficlDictionarySetPrimitive(dictionary, "break",
+	    ficlPrimitiveBreak, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "load",
+	    ficlPrimitiveLoad, FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "spewhash",
 	    ficlPrimitiveSpewHash, FICL_WORD_DEFAULT);
-	ficlDictionarySetPrimitive(dictionary, "system", ficlPrimitiveSystem,
-	    FICL_WORD_DEFAULT);
+	(void) ficlDictionarySetPrimitive(dictionary, "system",
+	    ficlPrimitiveSystem, FICL_WORD_DEFAULT);
 }

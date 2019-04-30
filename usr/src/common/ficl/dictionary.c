@@ -679,19 +679,19 @@ ficlDictionarySee(ficlDictionary *dictionary, ficlWord *word,
 
 			switch (kind) {
 			case FICL_WORDKIND_INSTRUCTION:
-				sprintf(trace, "%s (instruction %ld)",
+				(void) sprintf(trace, "%s (instruction %ld)",
 				    ficlDictionaryInstructionNames[(long)word],
 				    (long)word);
 			break;
 			case FICL_WORDKIND_INSTRUCTION_WITH_ARGUMENT:
 				c = *++cell;
-				sprintf(trace, "%s (instruction %ld), with "
-				    "argument %ld (%#lx)",
+				(void) sprintf(trace, "%s (instruction %ld), "
+				    "with argument %ld (%#lx)",
 				    ficlDictionaryInstructionNames[(long)word],
 				    (long)word, (long)c.i, (unsigned long)c.u);
 			break;
 			case FICL_WORDKIND_INSTRUCTION_WORD:
-				sprintf(trace,
+				(void) sprintf(trace,
 				    "%s :: executes %s (instruction word %ld)",
 				    word->name,
 				    ficlDictionaryInstructionNames[
@@ -702,25 +702,27 @@ ficlDictionarySee(ficlDictionary *dictionary, ficlWord *word,
 				if (ficlDictionaryIsAWord(dictionary, c.p) &&
 				    (c.i >= ficlInstructionLast)) {
 					ficlWord *word = (ficlWord *)c.p;
-					sprintf(trace, "%.*s ( %#lx literal )",
+					(void) sprintf(trace,
+					    "%.*s ( %#lx literal )",
 					    word->length, word->name,
 					    (unsigned long)c.u);
 				} else
-					sprintf(trace,
+					(void) sprintf(trace,
 					    "literal %ld (%#lx)", (long)c.i,
 					    (unsigned long)c.u);
 			break;
 			case FICL_WORDKIND_2LITERAL:
 				c = *++cell;
 				c2 = *++cell;
-				sprintf(trace, "2literal %ld %ld (%#lx %#lx)",
+				(void) sprintf(trace,
+				    "2literal %ld %ld (%#lx %#lx)",
 				    (long)c2.i, (long)c.i, (unsigned long)c2.u,
 				    (unsigned long)c.u);
 			break;
 #if FICL_WANT_FLOAT
 			case FICL_WORDKIND_FLITERAL:
 				c = *++cell;
-				sprintf(trace, "fliteral %f (%#lx)",
+				(void) sprintf(trace, "fliteral %f (%#lx)",
 				    (double)c.f, (unsigned long)c.u);
 			break;
 #endif /* FICL_WANT_FLOAT */
@@ -730,8 +732,8 @@ ficlDictionarySee(ficlDictionary *dictionary, ficlWord *word,
 				cell = (ficlCell *)
 				    ficlAlignPointer(counted->text +
 				    counted->length + 1) - 1;
-				sprintf(trace, "s\" %.*s\"", counted->length,
-				    counted->text);
+				(void) sprintf(trace, "s\" %.*s\"",
+				    counted->length, counted->text);
 			}
 			break;
 			case FICL_WORDKIND_CSTRING_LITERAL: {
@@ -740,54 +742,54 @@ ficlDictionarySee(ficlDictionary *dictionary, ficlWord *word,
 				cell = (ficlCell *)
 				    ficlAlignPointer(counted->text +
 				    counted->length + 1) - 1;
-				sprintf(trace, "c\" %.*s\"", counted->length,
-				    counted->text);
+				(void) sprintf(trace, "c\" %.*s\"",
+				    counted->length, counted->text);
 			}
 			break;
 			case FICL_WORDKIND_BRANCH0:
 				c = *++cell;
-				sprintf(trace, "branch0 %ld",
+				(void) sprintf(trace, "branch0 %ld",
 				    (long)(cell + c.i - param0));
 			break;
 			case FICL_WORDKIND_BRANCH:
 				c = *++cell;
-				sprintf(trace, "branch %ld",
+				(void) sprintf(trace, "branch %ld",
 				    (long)(cell + c.i - param0));
 			break;
 
 			case FICL_WORDKIND_QDO:
 				c = *++cell;
-				sprintf(trace, "?do (leave %ld)",
+				(void) sprintf(trace, "?do (leave %ld)",
 				    (long)((ficlCell *)c.p - param0));
 			break;
 			case FICL_WORDKIND_DO:
 				c = *++cell;
-				sprintf(trace, "do (leave %ld)",
+				(void) sprintf(trace, "do (leave %ld)",
 				    (long)((ficlCell *)c.p - param0));
 			break;
 			case FICL_WORDKIND_LOOP:
 				c = *++cell;
-				sprintf(trace, "loop (branch %ld)",
+				(void) sprintf(trace, "loop (branch %ld)",
 				    (long)(cell + c.i - param0));
 			break;
 			case FICL_WORDKIND_OF:
 				c = *++cell;
-				sprintf(trace, "of (branch %ld)",
+				(void) sprintf(trace, "of (branch %ld)",
 				    (long)(cell + c.i - param0));
 			break;
 			case FICL_WORDKIND_PLOOP:
 				c = *++cell;
-				sprintf(trace, "+loop (branch %ld)",
+				(void) sprintf(trace, "+loop (branch %ld)",
 				    (long)(cell + c.i - param0));
 			break;
 			default:
-				sprintf(trace, "%.*s", word->length,
+				(void) sprintf(trace, "%.*s", word->length,
 				    word->name);
 			break;
 			}
 		} else {
 			/* probably not a word - punt and print value */
-			sprintf(trace, "%ld ( %#lx )", (long)cell->i,
+			(void) sprintf(trace, "%ld ( %#lx )", (long)cell->i,
 			    (unsigned long)cell->u);
 		}
 

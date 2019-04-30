@@ -83,8 +83,10 @@ ficlSystemSetVersion(ficlSystem *system)
 	ficl2Integer combined;
 	ficlDictionary *environment = ficlSystemGetEnvironment(system);
 	FICL_2INTEGER_SET(major, minor, combined);
-	ficlDictionarySet2Constant(environment, "ficl-version", combined);
-	ficlDictionarySetConstant(environment, "ficl-robust",  FICL_ROBUST);
+	(void) ficlDictionarySet2Constant(environment, "ficl-version",
+	    combined);
+	(void) ficlDictionarySetConstant(environment, "ficl-robust",
+	    FICL_ROBUST);
 }
 
 /*
@@ -211,9 +213,9 @@ ficlSystemCreate(ficlSystemInformation *fsi)
 	 * presence of INTERPRET in the dictionary, so a VM can be created
 	 * before the dictionary is built. It just can't do much...
 	 */
-	ficlSystemCreateVm(system);
+	(void) ficlSystemCreateVm(system);
 #define	ADD_COMPILE_FLAG(name)	\
-	ficlDictionarySetConstant(environment, #name, name)
+	(void) ficlDictionarySetConstant(environment, #name, name)
 	ADD_COMPILE_FLAG(FICL_WANT_LZ4_SOFTCORE);
 	ADD_COMPILE_FLAG(FICL_WANT_FILE);
 	ADD_COMPILE_FLAG(FICL_WANT_FLOAT);
@@ -232,7 +234,7 @@ ficlSystemCreate(ficlSystemInformation *fsi)
 	ADD_COMPILE_FLAG(FICL_ROBUST);
 
 #define	ADD_COMPILE_STRING(name)	\
-	ficlDictionarySetConstantString(environment, #name, name)
+	(void) ficlDictionarySetConstantString(environment, #name, name)
 	ADD_COMPILE_STRING(FICL_PLATFORM_ARCHITECTURE);
 	ADD_COMPILE_STRING(FICL_PLATFORM_OS);
 
@@ -319,7 +321,7 @@ ficlSystemAddPrimitiveParseStep(ficlSystem *system, char *name,
 
 	c.fn = (void (*)(void))pStep;
 	ficlDictionaryAppendCell(dictionary, c);
-	ficlSystemAddParseStep(system, word);
+	(void) ficlSystemAddParseStep(system, word);
 }
 
 /*
