@@ -23,8 +23,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -308,46 +312,60 @@ uchar_t bcd_to_byte[256] = {		/* CSTYLED */
 
 /*
  * Hot-patch a single instruction in the kernel's text.
- * If you want to patch multiple instructions you must
- * arrange to do it so that all intermediate stages are
- * sane -- we don't stop other cpus while doing this.
+ *
+ * If you want to patch multiple instructions you must arrange to do it so that
+ * all intermediate stages are sane -- we don't stop other cpus while doing
+ * this.
+ *
  * Size must be 1, 2, or 4 bytes with iaddr aligned accordingly.
+ *
+ * The instruction itself might straddle a page boundary, so we have to account
+ * for that.
  */
 void
 hot_patch_kernel_text(caddr_t iaddr, uint32_t new_instr, uint_t size)
 {
+	const uintptr_t pageoff = (uintptr_t)iaddr & PAGEOFFSET;
+	const boolean_t straddles = (pageoff + size > PAGESIZE);
+	const size_t mapsize = straddles ? PAGESIZE * 2 : PAGESIZE;
+	caddr_t ipageaddr = iaddr - pageoff;
 	caddr_t vaddr;
 	page_t **ppp;
-	uintptr_t off = (uintptr_t)iaddr & PAGEOFFSET;
 
-	vaddr = vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
+	vaddr = vmem_alloc(heap_arena, mapsize, VM_SLEEP);
 
-	(void) as_pagelock(&kas, &ppp, iaddr - off, PAGESIZE, S_WRITE);
+	(void) as_pagelock(&kas, &ppp, ipageaddr, mapsize, S_WRITE);
 
 	hat_devload(kas.a_hat, vaddr, PAGESIZE,
-	    hat_getpfnum(kas.a_hat, iaddr - off),
-	    PROT_READ | PROT_WRITE, HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
+	    hat_getpfnum(kas.a_hat, ipageaddr), PROT_READ | PROT_WRITE,
+	    HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
+
+	if (straddles) {
+		hat_devload(kas.a_hat, vaddr + PAGESIZE, PAGESIZE,
+		    hat_getpfnum(kas.a_hat, ipageaddr + PAGESIZE),
+		    PROT_READ | PROT_WRITE, HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST);
+	}
 
 	switch (size) {
 	case 1:
-		*(uint8_t *)(vaddr + off) = new_instr;
+		*(uint8_t *)(vaddr + pageoff) = new_instr;
 		break;
 	case 2:
-		*(uint16_t *)(vaddr + off) = new_instr;
+		*(uint16_t *)(vaddr + pageoff) = new_instr;
 		break;
 	case 4:
-		*(uint32_t *)(vaddr + off) = new_instr;
+		*(uint32_t *)(vaddr + pageoff) = new_instr;
 		break;
 	default:
 		panic("illegal hot-patch");
 	}
 
 	membar_enter();
-	sync_icache(vaddr + off, size);
+	sync_icache(vaddr + pageoff, size);
 	sync_icache(iaddr, size);
-	as_pageunlock(&kas, ppp, iaddr - off, PAGESIZE, S_WRITE);
-	hat_unload(kas.a_hat, vaddr, PAGESIZE, HAT_UNLOAD_UNLOCK);
-	vmem_free(heap_arena, vaddr, PAGESIZE);
+	as_pageunlock(&kas, ppp, ipageaddr, mapsize, S_WRITE);
+	hat_unload(kas.a_hat, vaddr, mapsize, HAT_UNLOAD_UNLOCK);
+	vmem_free(heap_arena, vaddr, mapsize);
 }
 
 /*
