@@ -26,6 +26,9 @@
  * Copyright (c) 2009-2010, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sys/x86_archext.h>
 #include <sys/machsystm.h>
@@ -518,6 +521,19 @@ acpi_cpu_cstate(cpu_acpi_cstate_t *cstate)
 			if (cpu_idle_enter((uint_t)cs_type, 0,
 			    check_func, (void *)mcpu_mwait) == 0) {
 				if (*mcpu_mwait == MWAIT_WAKEUP_IPI) {
+					/*
+					 * The following calls will cause us to
+					 * halt which will cause the store
+					 * buffer to be repartitioned,
+					 * potentially exposing us to the Intel
+					 * CPU vulnerability MDS. As such, we
+					 * need to explicitly call that here.
+					 * The other idle methods in this
+					 * function do this automatically as
+					 * part of the implementation of
+					 * i86_mwait().
+					 */
+					x86_md_clear();
 					(void) cpu_acpi_read_port(
 					    cstate->cs_address, &value, 8);
 					acpica_get_global_FADT(&gbl_FADT);

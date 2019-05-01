@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -305,7 +305,7 @@ ht_acquire(void)
 
 	if (ht->ch_sib == NULL) {
 		/* For the "sequential" L1TF case. */
-		spec_l1d_flush();
+		spec_uarch_flush();
 		return (1);
 	}
 
@@ -346,7 +346,7 @@ ht_acquire(void)
 	    uint64_t, sibht->ch_intr_depth, clock_t, wait);
 
 	if (ret == 1)
-		spec_l1d_flush();
+		spec_uarch_flush();
 
 	return (ret);
 }

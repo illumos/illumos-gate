@@ -32,7 +32,7 @@
  * Portions Copyright 2009 Advanced Micro Devices, Inc.
  */
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1038,6 +1038,8 @@ static char *x86_feature_names[NUM_X86_FEATURES] = {
 	"tbm",
 	"avx512_vnni",
 	"amd_pcec",
+	"md_clear",
+	"mds_no",
 	"core_thermal",
 	"pkg_thermal"
 };
@@ -2123,17 +2125,125 @@ cpuid_amd_getids(cpu_t *cpu, uchar_t *features)
 }
 
 static void
-spec_l1d_flush_noop(void)
+spec_uarch_flush_noop(void)
 {
 }
 
+/*
+ * When microcode is present that mitigates MDS, this wrmsr will also flush the
+ * MDS-related micro-architectural state that would normally happen by calling
+ * x86_md_clear().
+ */
 static void
-spec_l1d_flush_msr(void)
+spec_uarch_flush_msr(void)
 {
 	wrmsr(MSR_IA32_FLUSH_CMD, IA32_FLUSH_CMD_L1D);
 }
 
-void (*spec_l1d_flush)(void) = spec_l1d_flush_noop;
+/*
+ * This function points to a function that will flush certain
+ * micro-architectural state on the processor. This flush is used to mitigate
+ * two different classes of Intel CPU vulnerabilities: L1TF and MDS. This
+ * function can point to one of three functions:
+ *
+ * - A noop which is done because we either are vulnerable, but do not have
+ *   microcode available to help deal with a fix, or because we aren't
+ *   vulnerable.
+ *
+ * - spec_uarch_flush_msr which will issue an L1D flush and if microcode to
+ *   mitigate MDS is present, also perform the equivalent of the MDS flush;
+ *   however, it only flushes the MDS related micro-architectural state on the
+ *   current hyperthread, it does not do anything for the twin.
+ *
+ * - x86_md_clear which will flush the MDS related state. This is done when we
+ *   have a processor that is vulnerable to MDS, but is not vulnerable to L1TF
+ *   (RDCL_NO is set).
+ */
+void (*spec_uarch_flush)(void) = spec_uarch_flush_noop;
+
+void (*x86_md_clear)(void) = x86_md_clear_noop;
+
+static void
+cpuid_update_md_clear(cpu_t *cpu, uchar_t *featureset)
+{
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	/*
+	 * While RDCL_NO indicates that one of the MDS vulnerabilities (MSBDS)
+	 * has been fixed in hardware, it doesn't cover everything related to
+	 * MDS. Therefore we can only rely on MDS_NO to determine that we don't
+	 * need to mitigate this.
+	 */
+	if (cpi->cpi_vendor != X86_VENDOR_Intel ||
+	    is_x86_feature(featureset, X86FSET_MDS_NO)) {
+		x86_md_clear = x86_md_clear_noop;
+		membar_producer();
+		return;
+	}
+
+	if (is_x86_feature(featureset, X86FSET_MD_CLEAR)) {
+		x86_md_clear = x86_md_clear_verw;
+	}
+
+	membar_producer();
+}
+
+static void
+cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
+{
+	boolean_t need_l1d, need_mds;
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	/*
+	 * If we're not on Intel or we've mitigated both RDCL and MDS in
+	 * hardware, then there's nothing left for us to do for enabling the
+	 * flush. We can also go ahead and say that HT exclusion is unnecessary.
+	 */
+	if (cpi->cpi_vendor != X86_VENDOR_Intel ||
+	    (is_x86_feature(featureset, X86FSET_RDCL_NO) &&
+	    is_x86_feature(featureset, X86FSET_MDS_NO))) {
+		extern int ht_exclusion;
+		ht_exclusion = 0;
+		spec_uarch_flush = spec_uarch_flush_noop;
+		membar_producer();
+		return;
+	}
+
+	/*
+	 * The locations where we need to perform an L1D flush are required both
+	 * for mitigating L1TF and MDS. When verw support is present in
+	 * microcode, then the L1D flush will take care of doing that as well.
+	 * However, if we have a system where RDCL_NO is present, but we don't
+	 * have MDS_NO, then we need to do a verw (x86_md_clear) and not a full
+	 * L1D flush.
+	 */
+	if (!is_x86_feature(featureset, X86FSET_RDCL_NO) &&
+	    is_x86_feature(featureset, X86FSET_FLUSH_CMD) &&
+	    !is_x86_feature(featureset, X86FSET_L1D_VM_NO)) {
+		need_l1d = B_TRUE;
+	} else {
+		need_l1d = B_FALSE;
+	}
+
+	if (!is_x86_feature(featureset, X86FSET_MDS_NO) &&
+	    is_x86_feature(featureset, X86FSET_MD_CLEAR)) {
+		need_mds = B_TRUE;
+	} else {
+		need_mds = B_FALSE;
+	}
+
+	if (need_l1d) {
+		spec_uarch_flush = spec_uarch_flush_msr;
+	} else if (need_mds) {
+		spec_uarch_flush = x86_md_clear;
+	} else {
+		/*
+		 * We have no hardware mitigations available to us.
+		 */
+		spec_uarch_flush = spec_uarch_flush_noop;
+	}
+	membar_producer();
+}
 
 static void
 cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
@@ -2164,6 +2274,10 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	    cpi->cpi_maxeax >= 7) {
 		struct cpuid_regs *ecp;
 		ecp = &cpi->cpi_std[7];
+
+		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_MD_CLEAR) {
+			add_x86_feature(featureset, X86FSET_MD_CLEAR);
+		}
 
 		if (ecp->cp_edx & CPUID_INTC_EDX_7_0_SPEC_CTRL) {
 			add_x86_feature(featureset, X86FSET_IBRS);
@@ -2209,6 +2323,10 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 					add_x86_feature(featureset,
 					    X86FSET_SSB_NO);
 				}
+				if (reg & IA32_ARCH_CAP_MDS_NO) {
+					add_x86_feature(featureset,
+					    X86FSET_MDS_NO);
+				}
 			}
 			no_trap();
 		}
@@ -2225,38 +2343,29 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 		return;
 
 	/*
-	 * We're the boot CPU, so let's figure out our L1TF status.
+	 * We need to determine what changes are required for mitigating L1TF
+	 * and MDS. If the CPU suffers from either of them, then HT exclusion is
+	 * required.
 	 *
-	 * First, if this is a RDCL_NO CPU, then we are not vulnerable: we don't
-	 * need to exclude with ht_acquire(), and we don't need to flush.
+	 * If any of these are present, then we need to flush u-arch state at
+	 * various points. For MDS, we need to do so whenever we change to a
+	 * lesser privilege level or we are halting the CPU. For L1TF we need to
+	 * flush the L1D cache at VM entry. When we have microcode that handles
+	 * MDS, the L1D flush also clears the other u-arch state that the
+	 * mb_clear does.
 	 */
-	if (is_x86_feature(featureset, X86FSET_RDCL_NO)) {
-		extern int ht_exclusion;
-		ht_exclusion = 0;
-		spec_l1d_flush = spec_l1d_flush_noop;
-		membar_producer();
-		return;
-	}
 
 	/*
-	 * If HT is enabled, we will need HT exclusion, as well as the flush on
-	 * VM entry.  If HT isn't enabled, we still need at least the flush for
-	 * the L1TF sequential case.
-	 *
-	 * However, if X86FSET_L1D_VM_NO is set, we're most likely running
-	 * inside a VM ourselves, and we don't need the flush.
-	 *
-	 * If we don't have the FLUSH_CMD available at all, we'd better just
-	 * hope HT is disabled.
+	 * Update whether or not we need to be taking explicit action against
+	 * MDS.
 	 */
-	if (is_x86_feature(featureset, X86FSET_FLUSH_CMD) &&
-	    !is_x86_feature(featureset, X86FSET_L1D_VM_NO)) {
-		spec_l1d_flush = spec_l1d_flush_msr;
-	} else {
-		spec_l1d_flush = spec_l1d_flush_noop;
-	}
+	cpuid_update_md_clear(cpu, featureset);
 
-	membar_producer();
+	/*
+	 * Determine whether HT exclusion is required and whether or not we need
+	 * to perform an l1d flush.
+	 */
+	cpuid_update_l1d_flush(cpu, featureset);
 }
 
 /*

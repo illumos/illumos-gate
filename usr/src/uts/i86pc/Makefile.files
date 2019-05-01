@@ -87,6 +87,7 @@ CORE_OBJS +=			\
 	mach_kdi.o		\
 	mach_sysconfig.o	\
 	machdep.o		\
+	md_clear.o		\
 	mem_config.o		\
 	mem_config_stubs.o	\
 	mem_config_arch.o	\

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -678,6 +678,16 @@ _syscall_after_brand:
 	ASSERT_CR0TS_ZERO(%r11)
 
 	/*
+	 * Unlike other cases, because we need to restore the user stack pointer
+	 * before exiting the kernel we must clear the microarch state before
+	 * getting here. This should be safe because it means that the only
+	 * values on the bus after this are based on the user's registers and
+	 * potentially the addresses where we stored them. Given the constraints
+	 * of sysret, that's how it has to be.
+	 */
+	call	*x86_md_clear
+
+	/*
 	 * To get back to userland, we need the return %rip in %rcx and
 	 * the return %rfl in %r11d.  The sysretq instruction also arranges
 	 * to fix up %cs and %ss; everything else is our responsibility.
@@ -1007,6 +1017,16 @@ _syscall32_after_brand:
 	ASSERT_CR0TS_ZERO(%r11)
 
 	/*
+	 * Unlike other cases, because we need to restore the user stack pointer
+	 * before exiting the kernel we must clear the microarch state before
+	 * getting here. This should be safe because it means that the only
+	 * values on the bus after this are based on the user's registers and
+	 * potentially the addresses where we stored them. Given the constraints
+	 * of sysret, that's how it has to be.
+	 */
+	call	*x86_md_clear
+
+	/*
 	 * To get back to userland, we need to put the return %rip in %rcx and
 	 * the return %rfl in %r11d.  The sysret instruction also arranges
 	 * to fix up %cs and %ss; everything else is our responsibility.
@@ -1317,6 +1337,7 @@ sys_sysenter()
 	popfq
 	movl	REGOFF_RSP(%rsp), %ecx	/* sysexit: %ecx -> %esp */
         ALTENTRY(sys_sysenter_swapgs_sysexit)
+	call	*x86_md_clear
 	jmp	tr_sysexit
 	SET_SIZE(sys_sysenter_swapgs_sysexit)
 	SET_SIZE(sys_sysenter)
@@ -1441,6 +1462,7 @@ nopop_syscall_int:
 	 * tr_iret_user are done on the user gsbase.
 	 */
 	ALTENTRY(sys_sysint_swapgs_iret)
+	call	*x86_md_clear
 	SWAPGS
 	jmp	tr_iret_user
 	/*NOTREACHED*/

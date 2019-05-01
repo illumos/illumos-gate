@@ -23,7 +23,7 @@
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_MACHPRIVREGS_H
@@ -129,7 +129,7 @@ extern "C" {
 	movq	REGOFF_RDI(%rsp), %rdi;	\
 	addq	$REGOFF_RIP, %rsp
 
-#define	FAST_INTR_RETURN	jmp tr_iret_user
+#define	FAST_INTR_RETURN	call *x86_md_clear; jmp tr_iret_user
 
 #elif defined(__i386)
 

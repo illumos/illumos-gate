@@ -22,7 +22,7 @@
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #	This Makefile defines file modules in the directory uts/i86xpv
@@ -75,6 +75,7 @@ CORE_OBJS +=			\
 	mach_kdi.o		\
 	mach_sysconfig.o	\
 	machdep.o		\
+	md_clear.o		\
 	mem_config_stubs.o	\
 	memnode.o		\
 	microcode.o		\

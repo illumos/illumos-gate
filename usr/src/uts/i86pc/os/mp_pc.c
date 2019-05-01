@@ -26,7 +26,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2018 Joyent, Inc
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -454,6 +454,7 @@ mach_cpu_halt(char *msg)
 void
 mach_cpu_idle(void)
 {
+	x86_md_clear();
 	i86_halt();
 }
 

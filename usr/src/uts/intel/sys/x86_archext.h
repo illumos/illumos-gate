@@ -27,7 +27,7 @@
  * All rights reserved.
  */
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2012 Jens Elkner <jel+illumos@cs.uni-magdeburg.de>
  * Copyright 2012 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
  * Copyright 2014 Josef 'Jeff' Sipek <jeffpc@josefsipek.net>
@@ -353,7 +353,9 @@ extern "C" {
 #define	CPUID_INTC_EDX_7_0_AVX5124NNIW	0x00000004	/* AVX512 4NNIW */
 #define	CPUID_INTC_EDX_7_0_AVX5124FMAPS	0x00000008	/* AVX512 4FMAPS */
 #define	CPUID_INTC_EDX_7_0_FSREPMOV	0x00000010	/* fast short rep mov */
-/* bits 5-17 are resreved */
+/* bits 5-9 are reserved */
+#define	CPUID_INTC_EDX_7_0_MD_CLEAR	0x00000400	/* MB VERW */
+/* bits 11-17 are reserved */
 #define	CPUID_INTC_EDX_7_0_PCONFIG	0x00040000	/* PCONFIG */
 /* bits 19-26 are reserved */
 #define	CPUID_INTC_EDX_7_0_SPEC_CTRL	0x04000000	/* Spec, IBPB, IBRS */
@@ -473,6 +475,7 @@ extern "C" {
 #define	IA32_ARCH_CAP_RSBA			0x0004
 #define	IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY	0x0008
 #define	IA32_ARCH_CAP_SSB_NO			0x0010
+#define	IA32_ARCH_CAP_MDS_NO			0x0020
 
 /*
  * Intel Speculation related MSRs
@@ -705,8 +708,10 @@ extern "C" {
 #define	X86FSET_TBM		90
 #define	X86FSET_AVX512VNNI	91
 #define	X86FSET_AMD_PCEC	92
-#define	X86FSET_CORE_THERMAL	93
-#define	X86FSET_PKG_THERMAL	94
+#define	X86FSET_MD_CLEAR	93
+#define	X86FSET_MDS_NO		94
+#define	X86FSET_CORE_THERMAL	95
+#define	X86FSET_PKG_THERMAL	96
 
 /*
  * Intel Deep C-State invariant TSC in leaf 0x80000007.
@@ -1068,7 +1073,7 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
-#define	NUM_X86_FEATURES	95
+#define	NUM_X86_FEATURES	97
 extern uchar_t x86_featureset[];
 
 extern void free_x86_featureset(void *featureset);
@@ -1087,11 +1092,20 @@ extern uint_t pentiumpro_bug4046376;
 
 extern const char CyrixInstead[];
 
-extern void (*spec_l1d_flush)(void);
+extern void (*spec_uarch_flush)(void);
 
 #endif
 
 #if defined(_KERNEL)
+
+/*
+ * x86_md_clear is the main entry point that should be called to deal with
+ * clearing u-arch buffers. Implementations are below because they're
+ * implemented in ASM. They shouldn't be used.
+ */
+extern void (*x86_md_clear)(void);
+extern void x86_md_clear_noop(void);
+extern void x86_md_clear_verw(void);
 
 /*
  * This structure is used to pass arguments and get return values back
