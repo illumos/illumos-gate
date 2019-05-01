@@ -782,17 +782,21 @@ do_console_io(zlog_t *zlogp, int consfd, int servfd, int conslog)
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
 				errno = 0;
 				cc = read(consfd, ibuf, BUFSIZ);
-				if (cc <= 0 && (errno != EINTR) &&
-				    (errno != EAGAIN))
-					break;
+				if (cc <= 0) {
+					if (errno != EINTR &&
+					    errno != EAGAIN) {
+						break;
+					}
+				} else {
+					logstream_write(conslog, ibuf, cc);
 
-				logstream_write(conslog, ibuf, cc);
-
-				/*
-				 * Lose I/O if no one is listening
-				 */
-				if (clifd != -1 && cc > 0)
-					(void) write(clifd, ibuf, cc);
+					/*
+					 * Lose I/O if no one is listening
+					 */
+					if (clifd != -1) {
+						(void) write(clifd, ibuf, cc);
+					}
+				}
 			} else {
 				pollerr = pollfds[0].revents;
 				zerror(zlogp, B_FALSE,
