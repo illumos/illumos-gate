@@ -625,7 +625,7 @@ core_pcbe_init(void)
 	uint64_t		j;
 	uint64_t		arch_events_vector_length;
 	size_t			arch_events_string_length;
-	uint_t			model;
+	uint_t			model, stepping;
 
 	if (cpuid_getvendor(CPU) != X86_VENDOR_Intel)
 		return (-1);
@@ -813,7 +813,8 @@ core_pcbe_init(void)
 
 		/* Non-architectural events list */
 		model = cpuid_getmodel(CPU);
-		events_table = core_cpcgen_table(model);
+		stepping = cpuid_getstep(CPU);
+		events_table = core_cpcgen_table(model, stepping);
 
 		for (i = 0; i < num_gpc; i++) {
 
@@ -993,8 +994,7 @@ core_pcbe_event_coverage(char *event)
 	} else {
 		if (find_generic_events(event, cmn_generic_events) != NULL) {
 			bitmap |= BITMASK_XBITS(num_gpc);
-		} else if (find_generic_events(event,
-		    generic_events_pic0) != NULL) {
+		} if (find_generic_events(event, generic_events_pic0) != NULL) {
 			bitmap |= 1ULL;
 		} else if (find_gpcevent_core_uarch(event,
 		    cmn_gpc_events_core_uarch) != NULL) {

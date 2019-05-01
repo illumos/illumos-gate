@@ -300,6 +300,18 @@
     "EdgeDetect": "0"
   },
   {
+    "Unit": "NCU",
+    "EventCode": "0x0",
+    "UMask": "0x01",
+    "EventName": "UNC_CLOCK.SOCKET",
+    "BriefDescription": "This 48-bit fixed counter counts the UCLK cycles.",
+    "PublicDescription": "This 48-bit fixed counter counts the UCLK cycles.",
+    "Counter": "FIXED",
+    "CounterMask": "0",
+    "Invert": "0",
+    "EdgeDetect": "0"
+  },
+  {
     "Unit": "iMPH-U",
     "EventCode": "0x80",
     "UMask": "0x01",
@@ -365,21 +377,9 @@
     "UMask": "0x01",
     "EventName": "UNC_ARB_TRK_OCCUPANCY.CYCLES_WITH_ANY_REQUEST",
     "BriefDescription": "Cycles with at least one request outstanding is waiting for data return from memory controller. Account for coherent and non-coherent requests initiated by IA Cores, Processor Graphics Unit, or LLC.",
-    "PublicDescription": "",
+    "PublicDescription": "tbd",
     "Counter": "0,",
     "CounterMask": "1",
-    "Invert": "0",
-    "EdgeDetect": "0"
-  },
-  {
-    "Unit": "NCU",
-    "EventCode": "0x0",
-    "UMask": "0x01",
-    "EventName": "UNC_CLOCK.SOCKET",
-    "BriefDescription": "This 48-bit fixed counter counts the UCLK cycles.",
-    "PublicDescription": "This 48-bit fixed counter counts the UCLK cycles.",
-    "Counter": "FIXED",
-    "CounterMask": "0",
     "Invert": "0",
     "EdgeDetect": "0"
   }

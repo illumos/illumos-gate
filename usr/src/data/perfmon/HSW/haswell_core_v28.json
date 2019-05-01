@@ -40,7 +40,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -62,7 +62,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -84,7 +84,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -106,7 +106,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -128,7 +128,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -150,7 +150,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -172,7 +172,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -194,7 +194,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -216,7 +216,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -238,7 +238,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -260,7 +260,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -282,7 +282,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -304,7 +304,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -326,7 +326,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -348,7 +348,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -370,7 +370,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -392,7 +392,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -414,7 +414,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -436,7 +436,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -458,7 +458,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -480,7 +480,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -502,7 +502,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -524,7 +524,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -546,7 +546,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -568,7 +568,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -590,7 +590,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -612,7 +612,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -656,7 +656,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -678,7 +678,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -722,7 +722,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -749,10 +749,10 @@
   },
   {
     "EventCode": "0x24",
-    "UMask": "0x41",
+    "UMask": "0xc1",
     "EventName": "L2_RQSTS.DEMAND_DATA_RD_HIT",
     "BriefDescription": "Demand Data Read requests that hit L2 cache",
-    "PublicDescription": "Demand data read requests that hit L2 cache.",
+    "PublicDescription": "Counts the number of demand Data Read requests, initiated by load instructions, that hit L2 cache",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "200003",
@@ -771,7 +771,7 @@
   },
   {
     "EventCode": "0x24",
-    "UMask": "0x42",
+    "UMask": "0xc2",
     "EventName": "L2_RQSTS.RFO_HIT",
     "BriefDescription": "RFO requests that hit L2 cache",
     "PublicDescription": "Counts the number of store RFO requests that hit the L2 cache.",
@@ -788,12 +788,12 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0x24",
-    "UMask": "0x44",
+    "UMask": "0xc4",
     "EventName": "L2_RQSTS.CODE_RD_HIT",
     "BriefDescription": "L2 cache hits when fetching instructions, code reads.",
     "PublicDescription": "Number of instruction fetches that hit the L2 cache.",
@@ -810,12 +810,12 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0x24",
-    "UMask": "0x50",
+    "UMask": "0xd0",
     "EventName": "L2_RQSTS.L2_PF_HIT",
     "BriefDescription": "L2 prefetch requests that hit L2 cache",
     "PublicDescription": "Counts all L2 HW prefetcher requests that hit L2.",
@@ -832,7 +832,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -876,7 +876,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -898,7 +898,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -942,7 +942,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -986,7 +986,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1008,7 +1008,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1030,7 +1030,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1052,7 +1052,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1074,7 +1074,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1096,7 +1096,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1118,7 +1118,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1130,8 +1130,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -1140,7 +1140,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1152,8 +1152,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -1162,7 +1162,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1184,7 +1184,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1196,8 +1196,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -1206,7 +1206,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1228,7 +1228,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1250,7 +1250,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1262,8 +1262,8 @@
     "Counter": "2",
     "CounterHTOff": "2",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "1",
     "Invert": "0",
@@ -1272,7 +1272,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1294,7 +1294,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1306,8 +1306,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "1",
     "Invert": "0",
@@ -1316,7 +1316,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1338,7 +1338,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1360,7 +1360,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1382,7 +1382,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1404,7 +1404,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1426,7 +1426,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1448,7 +1448,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1470,7 +1470,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1492,7 +1492,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1514,7 +1514,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1536,7 +1536,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1558,7 +1558,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1580,7 +1580,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1602,7 +1602,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1624,7 +1624,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1646,7 +1646,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1668,7 +1668,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1690,7 +1690,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1712,7 +1712,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1734,7 +1734,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1756,7 +1756,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1778,7 +1778,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1800,7 +1800,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1822,7 +1822,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1844,7 +1844,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1866,7 +1866,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1888,7 +1888,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1910,7 +1910,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1932,7 +1932,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1954,7 +1954,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1976,7 +1976,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -1998,7 +1998,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2020,7 +2020,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2042,7 +2042,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2064,7 +2064,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2086,7 +2086,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2142,8 +2142,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "6",
     "Invert": "0",
@@ -2284,7 +2284,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2306,7 +2306,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2350,7 +2350,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2372,7 +2372,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2394,7 +2394,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2416,7 +2416,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2438,7 +2438,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2460,7 +2460,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2482,7 +2482,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2504,7 +2504,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2526,7 +2526,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2548,7 +2548,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2570,7 +2570,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2592,7 +2592,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2614,7 +2614,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2636,7 +2636,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2658,7 +2658,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2680,7 +2680,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2702,7 +2702,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2724,7 +2724,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2746,7 +2746,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2768,7 +2768,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2790,7 +2790,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2812,7 +2812,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2834,7 +2834,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2856,7 +2856,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2878,7 +2878,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2900,7 +2900,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2922,7 +2922,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2944,7 +2944,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2966,7 +2966,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -2988,7 +2988,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3010,7 +3010,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3032,7 +3032,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3054,7 +3054,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3076,7 +3076,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3098,7 +3098,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3120,7 +3120,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3142,7 +3142,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3164,7 +3164,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3186,7 +3186,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3208,7 +3208,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3230,7 +3230,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3252,7 +3252,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3274,7 +3274,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3296,7 +3296,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3318,7 +3318,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3340,7 +3340,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3362,7 +3362,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3384,7 +3384,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3406,7 +3406,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3428,7 +3428,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3450,7 +3450,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3472,7 +3472,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3626,7 +3626,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3648,7 +3648,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3670,7 +3670,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3692,7 +3692,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3714,7 +3714,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3736,7 +3736,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3758,7 +3758,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3780,7 +3780,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3802,7 +3802,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3824,7 +3824,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3846,7 +3846,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3868,7 +3868,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3890,7 +3890,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3912,7 +3912,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3934,7 +3934,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3956,7 +3956,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -3978,7 +3978,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4000,7 +4000,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4022,7 +4022,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4044,7 +4044,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4066,7 +4066,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4088,7 +4088,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4110,7 +4110,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4132,7 +4132,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4176,7 +4176,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4198,7 +4198,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4220,7 +4220,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4264,7 +4264,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4286,7 +4286,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4308,7 +4308,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4330,7 +4330,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4352,7 +4352,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4374,7 +4374,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4396,7 +4396,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4418,7 +4418,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4440,7 +4440,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4462,7 +4462,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4484,7 +4484,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4528,7 +4528,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4550,7 +4550,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4572,7 +4572,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4716,8 +4716,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "1",
     "Invert": "0",
@@ -4738,8 +4738,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "2",
     "Invert": "0",
@@ -4760,8 +4760,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "3",
     "Invert": "0",
@@ -4782,8 +4782,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "4",
     "Invert": "0",
@@ -4804,8 +4804,8 @@
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
-    "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRIndex": "0x00",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "1",
@@ -4836,7 +4836,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4880,7 +4880,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4902,7 +4902,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4968,7 +4968,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -4990,7 +4990,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5056,7 +5056,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5078,7 +5078,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5100,7 +5100,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5122,7 +5122,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5144,7 +5144,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5166,7 +5166,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5188,7 +5188,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5210,7 +5210,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5232,7 +5232,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5254,7 +5254,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5306,7 +5306,7 @@
     "UMask": "0x02",
     "EventName": "INST_RETIRED.X87",
     "BriefDescription": "FP operations retired. X87 FP operations that have no exceptions: Counts also flows that have several X87 or flows that use X87 uops in the exception handling.",
-    "PublicDescription": "This is a non-precise version (that is, does not use PEBS) of the event that counts FP operations retired. For X87 FP operations that have no exceptions counting also includes flows that have several X87, or flows that use X87 uops in the exception handling.",
+    "PublicDescription": "This is a precise version (that is, uses PEBS) of the event that counts FP operations retired. For X87 FP operations that have no exceptions counting also includes flows that have several X87, or flows that use X87 uops in the exception handling.",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "2000003",
@@ -5317,18 +5317,18 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xC1",
     "UMask": "0x08",
     "EventName": "OTHER_ASSISTS.AVX_TO_SSE",
-    "BriefDescription": "Number of transitions from AVX-256 to legacy SSE when penalty applicable.",
-    "PublicDescription": "Number of transitions from AVX-256 to legacy SSE when penalty applicable.",
+    "BriefDescription": "Number of transitions from AVX-256 to legacy SSE when penalty applicable",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -5339,7 +5339,7 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
     "Errata": "HSD56, HSM57",
@@ -5349,8 +5349,8 @@
     "EventCode": "0xC1",
     "UMask": "0x10",
     "EventName": "OTHER_ASSISTS.SSE_TO_AVX",
-    "BriefDescription": "Number of transitions from SSE to AVX-256 when penalty applicable.",
-    "PublicDescription": "Number of transitions from SSE to AVX-256 when penalty applicable.",
+    "BriefDescription": "Number of transitions from legacy SSE to AVX-256 when penalty applicable ",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -5361,7 +5361,7 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
     "Errata": "HSD56, HSM57",
@@ -5371,8 +5371,8 @@
     "EventCode": "0xC1",
     "UMask": "0x40",
     "EventName": "OTHER_ASSISTS.ANY_WB_ASSIST",
-    "BriefDescription": "Number of times any microcode assist is invoked by HW upon uop writeback.",
-    "PublicDescription": "Number of microcode assists invoked by HW upon uop writeback.",
+    "BriefDescription": "tbd",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -5383,10 +5383,10 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5408,15 +5408,15 @@
     "PEBS": "1",
     "Data_LA": "1",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xC2",
     "UMask": "0x01",
     "EventName": "UOPS_RETIRED.STALL_CYCLES",
-    "BriefDescription": "Cycles without actually retired uops.",
-    "PublicDescription": "Cycles without actually retired uops.",
+    "BriefDescription": "Cycles no executable uops retired",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "2000003",
@@ -5427,18 +5427,18 @@
     "Invert": "1",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xC2",
     "UMask": "0x01",
     "EventName": "UOPS_RETIRED.TOTAL_CYCLES",
-    "BriefDescription": "Cycles with less than 10 actually retired uops.",
-    "PublicDescription": "Cycles with less than 10 actually retired uops.",
+    "BriefDescription": "Number of cycles using always true condition applied to  PEBS uops retired event.",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "2000003",
@@ -5449,18 +5449,18 @@
     "Invert": "1",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xC2",
     "UMask": "0x01",
     "EventName": "UOPS_RETIRED.CORE_STALL_CYCLES",
-    "BriefDescription": "Cycles without actually retired uops.",
-    "PublicDescription": "Cycles without actually retired uops.",
+    "BriefDescription": "Cycles no executable uops retired on core",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "2000003",
@@ -5471,10 +5471,10 @@
     "Invert": "1",
     "AnyThread": "1",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5496,7 +5496,7 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5518,7 +5518,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5531,7 +5531,7 @@
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
     "MSRIndex": "0",
-    "MSRValue": "0",
+    "MSRValue": "0x00",
     "TakenAlone": "0",
     "CounterMask": "1",
     "Invert": "0",
@@ -5540,7 +5540,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5562,7 +5562,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5584,7 +5584,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5606,7 +5606,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5628,7 +5628,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5650,7 +5650,7 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5672,7 +5672,7 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5694,7 +5694,7 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5716,7 +5716,7 @@
     "PEBS": "2",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5738,15 +5738,15 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xC4",
     "UMask": "0x10",
     "EventName": "BR_INST_RETIRED.NOT_TAKEN",
-    "BriefDescription": "Not taken branch instructions retired.",
-    "PublicDescription": "Counts the number of not taken branch instructions retired.",
+    "BriefDescription": "Counts all not taken macro branch instructions retired.",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "400009",
@@ -5757,10 +5757,10 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5782,15 +5782,15 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xC4",
     "UMask": "0x40",
     "EventName": "BR_INST_RETIRED.FAR_BRANCH",
-    "BriefDescription": "Far branch instructions retired.",
-    "PublicDescription": "Number of far branches retired.",
+    "BriefDescription": "Counts the number of far branch instructions retired.",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -5801,10 +5801,10 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5826,7 +5826,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5848,14 +5848,14 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xC5",
     "UMask": "0x04",
     "EventName": "BR_MISP_RETIRED.ALL_BRANCHES_PEBS",
-    "BriefDescription": "Mispredicted macro branch instructions retired.",
+    "BriefDescription": "Mispredicted macro branch instructions retired. ",
     "PublicDescription": "This event counts all mispredicted branch instructions retired. This is a precise event.",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
@@ -5870,7 +5870,7 @@
     "PEBS": "2",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5892,7 +5892,7 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5914,7 +5914,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5936,7 +5936,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5958,7 +5958,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -5980,7 +5980,7 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6002,7 +6002,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6024,7 +6024,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6046,7 +6046,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6090,7 +6090,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6112,7 +6112,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6134,7 +6134,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6156,7 +6156,7 @@
     "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6178,7 +6178,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6200,7 +6200,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6222,7 +6222,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6266,15 +6266,15 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xCA",
     "UMask": "0x02",
     "EventName": "FP_ASSIST.X87_OUTPUT",
-    "BriefDescription": "Number of X87 assists due to output value.",
-    "PublicDescription": "Number of X87 FP assists due to output values.",
+    "BriefDescription": "output - Numeric Overflow, Numeric Underflow, Inexact Result ",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -6285,18 +6285,18 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xCA",
     "UMask": "0x04",
     "EventName": "FP_ASSIST.X87_INPUT",
-    "BriefDescription": "Number of X87 assists due to input value.",
-    "PublicDescription": "Number of X87 FP assists due to input values.",
+    "BriefDescription": "input - Invalid Operation, Denormal Operand, SNaN Operand ",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -6307,18 +6307,18 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xCA",
     "UMask": "0x08",
     "EventName": "FP_ASSIST.SIMD_OUTPUT",
-    "BriefDescription": "Number of SIMD FP assists due to Output values",
-    "PublicDescription": "Number of SIMD FP assists due to output values.",
+    "BriefDescription": "SSE* FP micro-code assist when output value is invalid. ",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -6329,18 +6329,18 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xCA",
     "UMask": "0x10",
     "EventName": "FP_ASSIST.SIMD_INPUT",
-    "BriefDescription": "Number of SIMD FP assists due to input values",
-    "PublicDescription": "Number of SIMD FP assists due to input values.",
+    "BriefDescription": "Any input SSE* FP Assist ",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -6351,18 +6351,18 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xCA",
     "UMask": "0x1E",
     "EventName": "FP_ASSIST.ANY",
-    "BriefDescription": "Cycles with any input/output SSE or FP assist",
-    "PublicDescription": "Cycles with any input/output SSE* or FP assists.",
+    "BriefDescription": "Counts any FP_ASSIST umask was incrementing ",
+    "PublicDescription": "",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
@@ -6373,10 +6373,10 @@
     "Invert": "0",
     "AnyThread": "0",
     "EdgeDetect": "0",
-    "PEBS": "0",
+    "PEBS": "1",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -6398,15 +6398,15 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xCD",
     "UMask": "0x01",
     "EventName": "MEM_TRANS_RETIRED.LOAD_LATENCY_GT_4",
-    "BriefDescription": "Loads with latency value being above 4.",
-    "PublicDescription": "Loads with latency value being above 4.",
+    "BriefDescription": "Randomly selected loads with latency value being above 4.",
+    "PublicDescription": "Randomly selected loads with latency value being above 4.",
     "Counter": "3",
     "CounterHTOff": "3",
     "SampleAfterValue": "100003",
@@ -6427,8 +6427,8 @@
     "EventCode": "0xCD",
     "UMask": "0x01",
     "EventName": "MEM_TRANS_RETIRED.LOAD_LATENCY_GT_8",
-    "BriefDescription": "Loads with latency value being above 8.",
-    "PublicDescription": "Loads with latency value being above 8.",
+    "BriefDescription": "Randomly selected loads with latency value being above 8.",
+    "PublicDescription": "Randomly selected loads with latency value being above 8.",
     "Counter": "3",
     "CounterHTOff": "3",
     "SampleAfterValue": "50021",
@@ -6449,8 +6449,8 @@
     "EventCode": "0xCD",
     "UMask": "0x01",
     "EventName": "MEM_TRANS_RETIRED.LOAD_LATENCY_GT_16",
-    "BriefDescription": "Loads with latency value being above 16.",
-    "PublicDescription": "Loads with latency value being above 16.",
+    "BriefDescription": "Randomly selected loads with latency value being above 16.",
+    "PublicDescription": "Randomly selected loads with latency value being above 16.",
     "Counter": "3",
     "CounterHTOff": "3",
     "SampleAfterValue": "20011",
@@ -6471,8 +6471,8 @@
     "EventCode": "0xCD",
     "UMask": "0x01",
     "EventName": "MEM_TRANS_RETIRED.LOAD_LATENCY_GT_32",
-    "BriefDescription": "Loads with latency value being above 32.",
-    "PublicDescription": "Loads with latency value being above 32.",
+    "BriefDescription": "Randomly selected loads with latency value being above 32.",
+    "PublicDescription": "Randomly selected loads with latency value being above 32.",
     "Counter": "3",
     "CounterHTOff": "3",
     "SampleAfterValue": "100003",
@@ -6493,8 +6493,8 @@
     "EventCode": "0xCD",
     "UMask": "0x01",
     "EventName": "MEM_TRANS_RETIRED.LOAD_LATENCY_GT_64",
-    "BriefDescription": "Loads with latency value being above 64.",
-    "PublicDescription": "Loads with latency value being above 64.",
+    "BriefDescription": "Randomly selected loads with latency value being above 64.",
+    "PublicDescription": "Randomly selected loads with latency value being above 64.",
     "Counter": "3",
     "CounterHTOff": "3",
     "SampleAfterValue": "2003",
@@ -6515,8 +6515,8 @@
     "EventCode": "0xCD",
     "UMask": "0x01",
     "EventName": "MEM_TRANS_RETIRED.LOAD_LATENCY_GT_128",
-    "BriefDescription": "Loads with latency value being above 128.",
-    "PublicDescription": "Loads with latency value being above 128.",
+    "BriefDescription": "Randomly selected loads with latency value being above 128.",
+    "PublicDescription": "Randomly selected loads with latency value being above 128.",
     "Counter": "3",
     "CounterHTOff": "3",
     "SampleAfterValue": "1009",
@@ -6537,8 +6537,8 @@
     "EventCode": "0xCD",
     "UMask": "0x01",
     "EventName": "MEM_TRANS_RETIRED.LOAD_LATENCY_GT_256",
-    "BriefDescription": "Loads with latency value being above 256.",
-    "PublicDescription": "Loads with latency value being above 256.",
+    "BriefDescription": "Randomly selected loads with latency value being above 256.",
+    "PublicDescription": "Randomly selected loads with latency value being above 256.",
     "Counter": "3",
     "CounterHTOff": "3",
     "SampleAfterValue": "503",
@@ -6559,8 +6559,8 @@
     "EventCode": "0xCD",
     "UMask": "0x01",
     "EventName": "MEM_TRANS_RETIRED.LOAD_LATENCY_GT_512",
-    "BriefDescription": "Loads with latency value being above 512.",
-    "PublicDescription": "Loads with latency value being above 512.",
+    "BriefDescription": "Randomly selected loads with latency value being above 512.",
+    "PublicDescription": "Randomly selected loads with latency value being above 512.",
     "Counter": "3",
     "CounterHTOff": "3",
     "SampleAfterValue": "101",
@@ -7014,7 +7014,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7036,7 +7036,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7058,7 +7058,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7080,7 +7080,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7102,7 +7102,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7124,7 +7124,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7146,7 +7146,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7168,7 +7168,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7190,7 +7190,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7212,7 +7212,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7234,7 +7234,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7256,7 +7256,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7278,7 +7278,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7300,7 +7300,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7322,7 +7322,7 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
@@ -7330,7 +7330,7 @@
     "UMask": "0x10",
     "EventName": "SQ_MISC.SPLIT_LOCK",
     "BriefDescription": "Split locks in SQ",
-    "PublicDescription": "",
+    "PublicDescription": "tbd",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3,4,5,6,7",
     "SampleAfterValue": "100003",
@@ -7344,20 +7344,20 @@
     "PEBS": "0",
     "Data_LA": "0",
     "L1_Hit_Indication": "0",
-    "Errata": "null",
+    "Errata": "0",
     "Offcore": "0"
   },
   {
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_REQUESTS.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all requests that miss in the L3",
-    "PublicDescription": "Counts all requests that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all requests miss in the L3 ",
+    "PublicDescription": "Counts all requests miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc08fff",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC08FFF",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7373,13 +7373,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_REQUESTS.L3_HIT.ANY_RESPONSE",
-    "BriefDescription": "Counts all requests that hit in the L3",
-    "PublicDescription": "Counts all requests that hit in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all requests hit in the L3 ",
+    "PublicDescription": "Counts all requests hit in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3f803c8fff",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3F803C8FFF",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7395,13 +7395,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_READS.L3_MISS.LOCAL_DRAM",
-    "BriefDescription": "Counts all data/code/rfo reads (demand & prefetch) that miss the L3 and the data is returned from local dram",
-    "PublicDescription": "Counts all data/code/rfo reads (demand & prefetch) that miss the L3 and the data is returned from local dram Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "miss the L3 and the data is returned from local dram ",
+    "PublicDescription": "miss the L3 and the data is returned from local dram",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x01004007f7",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x01004007F7",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7417,13 +7417,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_READS.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all data/code/rfo reads (demand & prefetch) that miss in the L3",
-    "PublicDescription": "Counts all data/code/rfo reads (demand & prefetch) that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "miss in the L3 ",
+    "PublicDescription": "miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc007f7",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC007F7",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7439,13 +7439,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_READS.L3_HIT.HITM_OTHER_CORE",
-    "BriefDescription": "Counts all data/code/rfo reads (demand & prefetch) that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
-    "PublicDescription": "Counts all data/code/rfo reads (demand & prefetch) that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded ",
+    "PublicDescription": "hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x10003c07f7",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x10003C07F7",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7461,13 +7461,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_READS.L3_HIT.HIT_OTHER_CORE_NO_FWD",
-    "BriefDescription": "Counts all data/code/rfo reads (demand & prefetch) that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
-    "PublicDescription": "Counts all data/code/rfo reads (demand & prefetch) that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded ",
+    "PublicDescription": "hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x04003c07f7",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x04003C07F7",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7483,12 +7483,12 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_CODE_RD.L3_MISS.LOCAL_DRAM",
-    "BriefDescription": "Counts all demand & prefetch code reads that miss the L3 and the data is returned from local dram",
-    "PublicDescription": "Counts all demand & prefetch code reads that miss the L3 and the data is returned from local dram Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch code reads miss the L3 and the data is returned from local dram ",
+    "PublicDescription": "Counts all demand & prefetch code reads miss the L3 and the data is returned from local dram",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
+    "MSRIndex": "0x1a6, 0x1a7",
     "MSRValue": "0x0100400244",
     "TakenAlone": "0",
     "CounterMask": "0",
@@ -7505,13 +7505,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_CODE_RD.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all demand & prefetch code reads that miss in the L3",
-    "PublicDescription": "Counts all demand & prefetch code reads that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch code reads miss in the L3 ",
+    "PublicDescription": "Counts all demand & prefetch code reads miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00244",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00244",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7527,13 +7527,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_CODE_RD.L3_HIT.HIT_OTHER_CORE_NO_FWD",
-    "BriefDescription": "Counts all demand & prefetch code reads that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
-    "PublicDescription": "Counts all demand & prefetch code reads that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch code reads hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded ",
+    "PublicDescription": "Counts all demand & prefetch code reads hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x04003c0244",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x04003C0244",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7549,12 +7549,12 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_RFO.L3_MISS.LOCAL_DRAM",
-    "BriefDescription": "Counts all demand & prefetch RFOs that miss the L3 and the data is returned from local dram",
-    "PublicDescription": "Counts all demand & prefetch RFOs that miss the L3 and the data is returned from local dram Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch RFOs miss the L3 and the data is returned from local dram ",
+    "PublicDescription": "Counts all demand & prefetch RFOs miss the L3 and the data is returned from local dram",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
+    "MSRIndex": "0x1a6, 0x1a7",
     "MSRValue": "0x0100400122",
     "TakenAlone": "0",
     "CounterMask": "0",
@@ -7571,13 +7571,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_RFO.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all demand & prefetch RFOs that miss in the L3",
-    "PublicDescription": "Counts all demand & prefetch RFOs that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch RFOs miss in the L3 ",
+    "PublicDescription": "Counts all demand & prefetch RFOs miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00122",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00122",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7593,13 +7593,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_RFO.L3_HIT.HITM_OTHER_CORE",
-    "BriefDescription": "Counts all demand & prefetch RFOs that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
-    "PublicDescription": "Counts all demand & prefetch RFOs that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch RFOs hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded ",
+    "PublicDescription": "Counts all demand & prefetch RFOs hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x10003c0122",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x10003C0122",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7615,13 +7615,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_RFO.L3_HIT.HIT_OTHER_CORE_NO_FWD",
-    "BriefDescription": "Counts all demand & prefetch RFOs that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
-    "PublicDescription": "Counts all demand & prefetch RFOs that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch RFOs hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded ",
+    "PublicDescription": "Counts all demand & prefetch RFOs hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x04003c0122",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x04003C0122",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7637,12 +7637,12 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_DATA_RD.L3_MISS.LOCAL_DRAM",
-    "BriefDescription": "Counts all demand & prefetch data reads that miss the L3 and the data is returned from local dram",
-    "PublicDescription": "Counts all demand & prefetch data reads that miss the L3 and the data is returned from local dram Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch data reads miss the L3 and the data is returned from local dram ",
+    "PublicDescription": "Counts all demand & prefetch data reads miss the L3 and the data is returned from local dram",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
+    "MSRIndex": "0x1a6, 0x1a7",
     "MSRValue": "0x0100400091",
     "TakenAlone": "0",
     "CounterMask": "0",
@@ -7659,13 +7659,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_DATA_RD.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all demand & prefetch data reads that miss in the L3",
-    "PublicDescription": "Counts all demand & prefetch data reads that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch data reads miss in the L3 ",
+    "PublicDescription": "Counts all demand & prefetch data reads miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00091",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00091",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7681,13 +7681,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_DATA_RD.L3_HIT.HITM_OTHER_CORE",
-    "BriefDescription": "Counts all demand & prefetch data reads that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
-    "PublicDescription": "Counts all demand & prefetch data reads that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch data reads hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded ",
+    "PublicDescription": "Counts all demand & prefetch data reads hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x10003c0091",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x10003C0091",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7703,13 +7703,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.ALL_DATA_RD.L3_HIT.HIT_OTHER_CORE_NO_FWD",
-    "BriefDescription": "Counts all demand & prefetch data reads that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
-    "PublicDescription": "Counts all demand & prefetch data reads that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand & prefetch data reads hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded ",
+    "PublicDescription": "Counts all demand & prefetch data reads hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x04003c0091",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x04003C0091",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7725,13 +7725,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L3_CODE_RD.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts prefetch (that bring data to LLC only) code reads that miss in the L3",
-    "PublicDescription": "Counts prefetch (that bring data to LLC only) code reads that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts prefetch (that bring data to LLC only) code reads miss in the L3 ",
+    "PublicDescription": "Counts prefetch (that bring data to LLC only) code reads miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00200",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00200",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7747,13 +7747,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L3_CODE_RD.L3_HIT.ANY_RESPONSE",
-    "BriefDescription": "Counts prefetch (that bring data to LLC only) code reads that hit in the L3",
-    "PublicDescription": "Counts prefetch (that bring data to LLC only) code reads that hit in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts prefetch (that bring data to LLC only) code reads hit in the L3 ",
+    "PublicDescription": "Counts prefetch (that bring data to LLC only) code reads hit in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3f803c0200",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3F803C0200",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7769,13 +7769,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L3_RFO.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all prefetch (that bring data to LLC only) RFOs  that miss in the L3",
-    "PublicDescription": "Counts all prefetch (that bring data to LLC only) RFOs  that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all prefetch (that bring data to LLC only) RFOs miss in the L3 ",
+    "PublicDescription": "Counts all prefetch (that bring data to LLC only) RFOs miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00100",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00100",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7791,13 +7791,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L3_RFO.L3_HIT.ANY_RESPONSE",
-    "BriefDescription": "Counts all prefetch (that bring data to LLC only) RFOs  that hit in the L3",
-    "PublicDescription": "Counts all prefetch (that bring data to LLC only) RFOs  that hit in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all prefetch (that bring data to LLC only) RFOs hit in the L3 ",
+    "PublicDescription": "Counts all prefetch (that bring data to LLC only) RFOs hit in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3f803c0100",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3F803C0100",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7813,13 +7813,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L3_DATA_RD.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all prefetch (that bring data to LLC only) data reads that miss in the L3",
-    "PublicDescription": "Counts all prefetch (that bring data to LLC only) data reads that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all prefetch (that bring data to LLC only) data reads miss in the L3 ",
+    "PublicDescription": "Counts all prefetch (that bring data to LLC only) data reads miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00080",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00080",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7835,13 +7835,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L3_DATA_RD.L3_HIT.ANY_RESPONSE",
-    "BriefDescription": "Counts all prefetch (that bring data to LLC only) data reads that hit in the L3",
-    "PublicDescription": "Counts all prefetch (that bring data to LLC only) data reads that hit in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all prefetch (that bring data to LLC only) data reads hit in the L3 ",
+    "PublicDescription": "Counts all prefetch (that bring data to LLC only) data reads hit in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3f803c0080",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3F803C0080",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7857,13 +7857,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L2_CODE_RD.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all prefetch (that bring data to LLC only) code reads that miss in the L3",
-    "PublicDescription": "Counts all prefetch (that bring data to LLC only) code reads that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all prefetch (that bring data to LLC only) code reads miss in the L3 ",
+    "PublicDescription": "Counts all prefetch (that bring data to LLC only) code reads miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00040",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00040",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7879,13 +7879,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L2_CODE_RD.L3_HIT.ANY_RESPONSE",
-    "BriefDescription": "Counts all prefetch (that bring data to LLC only) code reads that hit in the L3",
-    "PublicDescription": "Counts all prefetch (that bring data to LLC only) code reads that hit in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all prefetch (that bring data to LLC only) code reads hit in the L3 ",
+    "PublicDescription": "Counts all prefetch (that bring data to LLC only) code reads hit in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3f803c0040",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3F803C0040",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7901,13 +7901,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L2_RFO.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all prefetch (that bring data to L2) RFOs that miss in the L3",
-    "PublicDescription": "Counts all prefetch (that bring data to L2) RFOs that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all prefetch (that bring data to L2) RFOs miss in the L3 ",
+    "PublicDescription": "Counts all prefetch (that bring data to L2) RFOs miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00020",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00020",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7923,13 +7923,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L2_RFO.L3_HIT.ANY_RESPONSE",
-    "BriefDescription": "Counts all prefetch (that bring data to L2) RFOs that hit in the L3",
-    "PublicDescription": "Counts all prefetch (that bring data to L2) RFOs that hit in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all prefetch (that bring data to L2) RFOs hit in the L3 ",
+    "PublicDescription": "Counts all prefetch (that bring data to L2) RFOs hit in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3f803c0020",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3F803C0020",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7945,13 +7945,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L2_DATA_RD.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts prefetch (that bring data to L2) data reads that miss in the L3",
-    "PublicDescription": "Counts prefetch (that bring data to L2) data reads that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts prefetch (that bring data to L2) data reads miss in the L3 ",
+    "PublicDescription": "Counts prefetch (that bring data to L2) data reads miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00010",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00010",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7967,13 +7967,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.PF_L2_DATA_RD.L3_HIT.ANY_RESPONSE",
-    "BriefDescription": "Counts prefetch (that bring data to L2) data reads that hit in the L3",
-    "PublicDescription": "Counts prefetch (that bring data to L2) data reads that hit in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts prefetch (that bring data to L2) data reads hit in the L3 ",
+    "PublicDescription": "Counts prefetch (that bring data to L2) data reads hit in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3f803c0010",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3F803C0010",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -7989,12 +7989,12 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_CODE_RD.L3_MISS.LOCAL_DRAM",
-    "BriefDescription": "Counts all demand code reads that miss the L3 and the data is returned from local dram",
-    "PublicDescription": "Counts all demand code reads that miss the L3 and the data is returned from local dram Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand code reads miss the L3 and the data is returned from local dram ",
+    "PublicDescription": "Counts all demand code reads miss the L3 and the data is returned from local dram",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
+    "MSRIndex": "0x1a6, 0x1a7",
     "MSRValue": "0x0100400004",
     "TakenAlone": "0",
     "CounterMask": "0",
@@ -8011,13 +8011,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_CODE_RD.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all demand code reads that miss in the L3",
-    "PublicDescription": "Counts all demand code reads that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand code reads miss in the L3 ",
+    "PublicDescription": "Counts all demand code reads miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00004",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00004",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -8033,13 +8033,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_CODE_RD.L3_HIT.HITM_OTHER_CORE",
-    "BriefDescription": "Counts all demand code reads that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
-    "PublicDescription": "Counts all demand code reads that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand code reads hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded ",
+    "PublicDescription": "Counts all demand code reads hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x10003c0004",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x10003C0004",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -8055,13 +8055,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_CODE_RD.L3_HIT.HIT_OTHER_CORE_NO_FWD",
-    "BriefDescription": "Counts all demand code reads that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
-    "PublicDescription": "Counts all demand code reads that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand code reads hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded ",
+    "PublicDescription": "Counts all demand code reads hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x04003c0004",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x04003C0004",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -8077,12 +8077,12 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_RFO.L3_MISS.LOCAL_DRAM",
-    "BriefDescription": "Counts all demand data writes (RFOs) that miss the L3 and the data is returned from local dram",
-    "PublicDescription": "Counts all demand data writes (RFOs) that miss the L3 and the data is returned from local dram Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand data writes (RFOs) miss the L3 and the data is returned from local dram ",
+    "PublicDescription": "Counts all demand data writes (RFOs) miss the L3 and the data is returned from local dram",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
+    "MSRIndex": "0x1a6, 0x1a7",
     "MSRValue": "0x0100400002",
     "TakenAlone": "0",
     "CounterMask": "0",
@@ -8099,13 +8099,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_RFO.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts all demand data writes (RFOs) that miss in the L3",
-    "PublicDescription": "Counts all demand data writes (RFOs) that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand data writes (RFOs) miss in the L3 ",
+    "PublicDescription": "Counts all demand data writes (RFOs) miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00002",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00002",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -8121,13 +8121,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_RFO.L3_HIT.HITM_OTHER_CORE",
-    "BriefDescription": "Counts all demand data writes (RFOs) that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
-    "PublicDescription": "Counts all demand data writes (RFOs) that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand data writes (RFOs) hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded ",
+    "PublicDescription": "Counts all demand data writes (RFOs) hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x10003c0002",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x10003C0002",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -8143,13 +8143,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_RFO.L3_HIT.HIT_OTHER_CORE_NO_FWD",
-    "BriefDescription": "Counts all demand data writes (RFOs) that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
-    "PublicDescription": "Counts all demand data writes (RFOs) that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts all demand data writes (RFOs) hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded ",
+    "PublicDescription": "Counts all demand data writes (RFOs) hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x04003c0002",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x04003C0002",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -8165,12 +8165,12 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_DATA_RD.L3_MISS.LOCAL_DRAM",
-    "BriefDescription": "Counts demand data reads that miss the L3 and the data is returned from local dram",
-    "PublicDescription": "Counts demand data reads that miss the L3 and the data is returned from local dram Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts demand data reads miss the L3 and the data is returned from local dram ",
+    "PublicDescription": "Counts demand data reads miss the L3 and the data is returned from local dram",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
+    "MSRIndex": "0x1a6, 0x1a7",
     "MSRValue": "0x0100400001",
     "TakenAlone": "0",
     "CounterMask": "0",
@@ -8187,13 +8187,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_DATA_RD.L3_MISS.ANY_RESPONSE",
-    "BriefDescription": "Counts demand data reads that miss in the L3",
-    "PublicDescription": "Counts demand data reads that miss in the L3 Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts demand data reads miss in the L3 ",
+    "PublicDescription": "Counts demand data reads miss in the L3",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x3fffc00001",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x3FFFC00001",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -8209,13 +8209,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_DATA_RD.L3_HIT.HITM_OTHER_CORE",
-    "BriefDescription": "Counts demand data reads that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
-    "PublicDescription": "Counts demand data reads that hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts demand data reads hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded ",
+    "PublicDescription": "Counts demand data reads hit in the L3 and the snoop to one of the sibling cores hits the line in M state and the line is forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x10003c0001",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x10003C0001",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",
@@ -8231,13 +8231,13 @@
     "EventCode": "0xB7, 0xBB",
     "UMask": "0x01",
     "EventName": "OFFCORE_RESPONSE.DEMAND_DATA_RD.L3_HIT.HIT_OTHER_CORE_NO_FWD",
-    "BriefDescription": "Counts demand data reads that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
-    "PublicDescription": "Counts demand data reads that hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded Offcore response can be programmed only with a specific pair of event select and counter MSR, and with specific event codes and predefine mask bit value in a dedicated MSR to specify attributes of the offcore transaction.",
+    "BriefDescription": "Counts demand data reads hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded ",
+    "PublicDescription": "Counts demand data reads hit in the L3 and the snoops to sibling cores hit in either E/S state and the line is not forwarded",
     "Counter": "0,1,2,3",
     "CounterHTOff": "0,1,2,3",
     "SampleAfterValue": "100003",
-    "MSRIndex": "0x1a6,0x1a7",
-    "MSRValue": "0x04003c0001",
+    "MSRIndex": "0x1a6, 0x1a7",
+    "MSRValue": "0x04003C0001",
     "TakenAlone": "0",
     "CounterMask": "0",
     "Invert": "0",

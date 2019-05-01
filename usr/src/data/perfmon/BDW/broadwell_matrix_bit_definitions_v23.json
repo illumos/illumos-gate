@@ -1,0 +1,326 @@
+[
+  {
+    "BitName": "DEMAND_DATA_RD",
+    "BitIndex": "0",
+    "Type": "1",
+    "Description": "Counts demand data reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "DEMAND_RFO",
+    "BitIndex": "1",
+    "Type": "1",
+    "Description": "Counts all demand data writes (RFOs)",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "BDM115"
+  },
+  {
+    "BitName": "DEMAND_CODE_RD",
+    "BitIndex": "2",
+    "Type": "1",
+    "Description": "Counts all demand code reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "COREWB",
+    "BitIndex": "3",
+    "Type": "1",
+    "Description": "Counts writebacks (modified to exclusive)",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "PF_L2_DATA_RD",
+    "BitIndex": "4",
+    "Type": "1",
+    "Description": "Counts prefetch (that bring data to L2) data reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "PF_L2_RFO",
+    "BitIndex": "5",
+    "Type": "1",
+    "Description": "Counts all prefetch (that bring data to L2) RFOs",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "BDM115"
+  },
+  {
+    "BitName": "PF_L2_CODE_RD",
+    "BitIndex": "6",
+    "Type": "1",
+    "Description": "Counts all prefetch (that bring data to LLC only) code reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "PF_L3_DATA_RD",
+    "BitIndex": "7",
+    "Type": "1",
+    "Description": "Counts all prefetch (that bring data to LLC only) data reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "PF_L3_RFO",
+    "BitIndex": "8",
+    "Type": "1",
+    "Description": "Counts all prefetch (that bring data to LLC only) RFOs",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "PF_L3_CODE_RD",
+    "BitIndex": "9",
+    "Type": "1",
+    "Description": "Counts prefetch (that bring data to LLC only) code reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "OTHER",
+    "BitIndex": "15",
+    "Type": "1",
+    "Description": "Counts any other requests",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ALL_PF_DATA_RD",
+    "BitIndex": "4,7",
+    "Type": "1",
+    "Description": "Counts all prefetch data reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ALL_PF_RFO",
+    "BitIndex": "5,8",
+    "Type": "1",
+    "Description": "Counts prefetch RFOs",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ALL_PF_CODE_RD",
+    "BitIndex": "6,9",
+    "Type": "1",
+    "Description": "Counts all prefetch code reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ALL_DATA_RD",
+    "BitIndex": "0,4,7",
+    "Type": "1",
+    "Description": "Counts all demand & prefetch data reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ALL_RFO",
+    "BitIndex": "1,5,8",
+    "Type": "1",
+    "Description": "Counts all demand & prefetch RFOs",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "BDM115"
+  },
+  {
+    "BitName": "ALL_CODE_RD",
+    "BitIndex": "2,6,9",
+    "Type": "1",
+    "Description": "Counts all demand & prefetch code reads",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ALL_READS",
+    "BitIndex": "0,1,2,4,5,6,7,8,9",
+    "Type": "1",
+    "Description": "Counts all data/code/rfo reads (demand & prefetch)",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ALL_REQUESTS",
+    "BitIndex": "0,1,2,3,4,5,6,7,8,9,10,11,15",
+    "Type": "1",
+    "Description": "Counts all requests",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ANY_RESPONSE",
+    "BitIndex": "16",
+    "Type": "2",
+    "Description": "have any response type.",
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SUPPLIER_NONE",
+    "BitIndex": "17",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "BDM115"
+  },
+  {
+    "BitName": "L3_HIT_M",
+    "BitIndex": "18",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "163,164,165,166,167,168,169,170,171",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_HIT_E",
+    "BitIndex": "19",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "163,164,165,166,167,168,169,170,171",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_HIT_S",
+    "BitIndex": "20",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "163,164,165,166,167,168,169,170,171",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_HIT_F",
+    "BitIndex": "21",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "163,164,165,166,167,168,169,170,171",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_HIT",
+    "BitIndex": "18,19,20,21",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "L3_MISS_LOCAL_DRAM",
+    "BitIndex": "26",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "BDM115"
+  },
+  {
+    "BitName": "L3_MISS",
+    "BitIndex": "26,27,28,29",
+    "Type": "3",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "169,170,171",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_NONE",
+    "BitIndex": "31",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_NOT_NEEDED",
+    "BitIndex": "32",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_MISS",
+    "BitIndex": "33",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_HIT_NO_FWD",
+    "BitIndex": "34",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_HIT_WITH_FWD",
+    "BitIndex": "35",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "na",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_HITM",
+    "BitIndex": "36",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "SNOOP_NON_DRAM",
+    "BitIndex": "37",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  },
+  {
+    "BitName": "ANY_SNOOP",
+    "BitIndex": "31,32,33,34,35,36,37",
+    "Type": "4",
+    "Description": null,
+    "MATRIX_REG": "0,1",
+    "BitsNotCombinedWith": "",
+    "Errata": "na"
+  }
+]
