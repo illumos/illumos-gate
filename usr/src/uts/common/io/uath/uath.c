@@ -4,6 +4,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * Copyright (c) 2006 Sam Leffler, Errno Consulting
  * Copyright (c) 2008-2009 Weongyo Jeong <weongyo@freebsd.org>
  * All rights reserved.
@@ -94,7 +98,7 @@ uint32_t uath_dbg_flags = 0;
 #define	UATH_DEBUG \
 	uath_debug
 #else
-#define	UATH_DEBUG
+#define	UATH_DEBUG(...) (void)(0)
 #endif
 
 /*

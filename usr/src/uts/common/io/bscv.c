@@ -23,6 +23,9 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 /*
  * bscv.c - multi-threaded lom driver for the Stiletto platform.
@@ -404,7 +407,7 @@ static int bscv_trace_flag = 1;
 
 #define	BSCV_TRACE   if (bscv_trace_flag != 0)	bscv_trace
 #else
-#define	BSCV_TRACE
+#define	BSCV_TRACE(...) (void)(0)
 #endif
 
 /*
