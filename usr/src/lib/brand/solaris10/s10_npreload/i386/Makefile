@@ -25,6 +25,6 @@
 
 include ../Makefile.com
 
-CLOBBERFILES	= $(ROOTLIBDIR)/$(DYNLIB) $(ROOTLIBDIR)/$(LINTLIB)
+CLOBBERFILES	= $(ROOTLIBDIR)/$(DYNLIB)
 
 install: all $(ROOTLIBS)
