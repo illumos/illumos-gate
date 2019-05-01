@@ -1,0 +1,11 @@
+AMD Performance Monitor Counters
+
+This directory contains structured forms of the AMD Performance Monitor
+Counters. These data files are created based on information in AMD's
+documentation. This data is transformed into manual pages and C files
+that are used to implement the kernel performance monitoring interfaces.
+For more information, see the cpcgen tool. This data is derived from the
+following documents:
+
+FAMILY	DOCUMENT
+17h	OSRR for AMD Family 17h processors, Models 00h-2Fh (56255 Rev 3.03 - July, 2018)
