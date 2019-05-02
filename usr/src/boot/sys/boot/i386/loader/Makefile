@@ -84,7 +84,8 @@ CPPFLAGS +=	-I.
 CLEANFILES=	vers.c $(LOADER) $(LOADER).sym $(LOADER).bin loader.help
 CLEANFILES +=	$(FONT).c
 
-LDFLAGS=	-static -Ttext 0x0
+LDSCRIPT=	ldscript.i386
+LDFLAGS=	-static -T $(LDSCRIPT) -N --gc-sections
 
 # i386 standalone support library
 CPPFLAGS +=	-I.. -I../../../../lib/libstand
