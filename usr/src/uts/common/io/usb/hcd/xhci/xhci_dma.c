@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -78,9 +78,10 @@ xhci_dma_transfer_attr(xhci_t *xhcip, ddi_dma_attr_t *attrp, uint_t sgl)
 	/*
 	 * The alignment and segment are related. The alignment describes the
 	 * alignment of the PA. The segment describes a boundary that the DMA
-	 * allocation cannot cross. In other words, for a given chunk of memory
-	 * it cannot cross a 64-byte boundary. However, the physical address
-	 * only needs to be aligned to align bytes.
+	 * allocation cannot cross. In other words, for a given chunk of
+	 * allocated DMA memory, the allocated buffer cannot cross a 64k aligned
+	 * boundary. However, the physical address only needs to be aligned to
+	 * 64 bytes.
 	 */
 	attrp->dma_attr_align = XHCI_DMA_ALIGN;
 	attrp->dma_attr_seg = XHCI_TRB_MAX_TRANSFER - 1;
