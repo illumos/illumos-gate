@@ -34,6 +34,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * Driver for the Marvell 88W8363 Wireless LAN controller.
  */
 #include <sys/stat.h>
@@ -128,7 +132,7 @@ uint32_t mwl_dbg_flags = 0x0;
 #define	MWL_DBG	\
 	mwl_debug
 #else
-#define	MWL_DBG
+#define	MWL_DBG(...) (void)(0)
 #endif
 
 /*

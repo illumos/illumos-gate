@@ -22,6 +22,8 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
+ * Copyright 2019 Joyent, Inc.
+ *
  * The "bscbus" driver provides access to the LOMlite2 virtual registers,
  * so that its clients (children) need not be concerned with the details
  * of the access mechanism, which in this case is implemented via a
@@ -404,7 +406,7 @@ bscbus_trace(struct bscbus_channel_state *csp, char code, const char *caller,
 	}
 }
 #else /* DEBUG */
-#define	bscbus_trace
+#define	bscbus_trace(...) (void)(0)
 #endif /* DEBUG */
 
 static struct bscbus_state *

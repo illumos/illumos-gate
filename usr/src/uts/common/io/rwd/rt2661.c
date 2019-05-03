@@ -25,6 +25,10 @@
  * http://www.ralinktech.com/
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/byteorder.h>
 #include <sys/conf.h>
@@ -77,7 +81,7 @@ uint32_t rt2661_dbg_flags = 0;
 #define	RWD_DEBUG \
 	rt2661_debug
 #else
-#define	RWD_DEBUG
+#define	RWD_DEBUG(...) (void)(0)
 #endif
 
 static void *rt2661_soft_state_p = NULL;

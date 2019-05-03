@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #ifndef	_FP_H
 #define	_FP_H
 
@@ -126,7 +130,7 @@ extern "C" {
 
 #else
 
-#define	FP_DTRACE
+#define	FP_DTRACE(...)		(void)(0)
 
 #endif
 

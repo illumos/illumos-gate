@@ -69,7 +69,7 @@ void			exit(int code);
 static void		i386_zfs_probe(void);
 
 /* XXX debugging */
-extern char end[];
+extern char _end[];
 
 static void *heap_top;
 static void *heap_bottom;
@@ -101,7 +101,7 @@ main(void)
 	    memtop_copyin = high_heap_base;
     } else {
 	heap_top = (void *)PTOV(bios_basemem);
-	heap_bottom = (void *)end;
+	heap_bottom = (void *)_end;
     }
     setheap(heap_bottom, heap_top);
 

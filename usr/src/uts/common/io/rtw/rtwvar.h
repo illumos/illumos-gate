@@ -1,6 +1,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 /*
  * Copyright (c) 2004, 2005 David Young.  All rights reserved.
@@ -78,7 +80,7 @@ extern void rtw_dbg(uint32_t dbg_flags, const int8_t *fmt, ...);
 #define	RTW_DPRINTF \
 	rtw_dbg
 #else /* DEBUG */
-#define	RTW_DPRINTF
+#define	RTW_DPRINTF(...) (void)(0)
 #endif /* DEBUG */
 
 enum rtw_locale {

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sid.h>
@@ -381,7 +381,11 @@ smb_fsop_create_stream(smb_request_t *sr, cred_t *cr,
 	/* Look up / create the unnamed stream, fname */
 	rc = smb_fsop_lookup(sr, cr, flags | SMB_FOLLOW_LINKS,
 	    sr->tid_tree->t_snode, dnode, fname, &fnode);
-	if (rc == ENOENT) {
+	if (rc == 0) {
+		if (smb_fsop_access(sr, sr->user_cr, fnode,
+		    sr->sr_open.desired_access) != 0)
+			rc = EACCES;
+	} else if (rc == ENOENT) {
 		fcreate = B_TRUE;
 		rc = smb_fsop_create_file(sr, cr, dnode, fname, flags,
 		    attr, &fnode);
@@ -2036,9 +2040,12 @@ smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	int flags = 0;
 	int access = 0;
 	acl_t *acl;
-	smb_node_t *unnamed_node;
 
 	ASSERT(cr);
+
+	/* Can't query security on named streams */
+	if (SMB_IS_STREAM(snode) != NULL)
+		return (EINVAL);
 
 	if (SMB_TREE_HAS_ACCESS(sr, ACE_READ_ACL) == 0)
 		return (EACCES);
@@ -2056,16 +2063,6 @@ smb_fsop_aclread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		}
 	}
 
-	unnamed_node = SMB_IS_STREAM(snode);
-	if (unnamed_node) {
-		ASSERT(unnamed_node->n_magic == SMB_NODE_MAGIC);
-		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
-		/*
-		 * Streams don't have ACL, any read ACL attempt on a stream
-		 * should be performed on the unnamed stream.
-		 */
-		snode = unnamed_node;
-	}
 
 	if (smb_tree_has_feature(sr->tid_tree, SMB_TREE_ACEMASKONACCESS))
 		flags = ATTR_NOACLCHECK;
@@ -2102,7 +2099,6 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	int flags = 0;
 	int access = 0;
 	acl_t *acl, *dacl, *sacl;
-	smb_node_t *unnamed_node;
 
 	ASSERT(cr);
 
@@ -2110,6 +2106,10 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	ASSERT(sr->tid_tree);
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
+
+	/* Can't set security on named streams */
+	if (SMB_IS_STREAM(snode) != NULL)
+		return (EINVAL);
 
 	if (SMB_TREE_HAS_ACCESS(sr, ACE_WRITE_ACL) == 0)
 		return (EACCES);
@@ -2136,17 +2136,6 @@ smb_fsop_aclwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 		break;
 	default:
 		return (EINVAL);
-	}
-
-	unnamed_node = SMB_IS_STREAM(snode);
-	if (unnamed_node) {
-		ASSERT(unnamed_node->n_magic == SMB_NODE_MAGIC);
-		ASSERT(unnamed_node->n_state != SMB_NODE_STATE_DESTROYING);
-		/*
-		 * Streams don't have ACL, any write ACL attempt on a stream
-		 * should be performed on the unnamed stream.
-		 */
-		snode = unnamed_node;
 	}
 
 	dacl = fs_sd->sd_zdacl;
@@ -2202,6 +2191,10 @@ smb_fsop_sdread(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 
 	ASSERT(cr);
 	ASSERT(fs_sd);
+
+	/* Can't query security on named streams */
+	if (SMB_IS_STREAM(snode) != NULL)
+		return (EINVAL);
 
 	/*
 	 * File's uid/gid is fetched in two cases:
@@ -2367,6 +2360,10 @@ smb_fsop_sdwrite(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
 	ASSERT(sr->tid_tree);
 	if (SMB_TREE_IS_READONLY(sr))
 		return (EROFS);
+
+	/* Can't set security on named streams */
+	if (SMB_IS_STREAM(snode) != NULL)
+		return (EINVAL);
 
 	bzero(&set_attr, sizeof (smb_attr_t));
 

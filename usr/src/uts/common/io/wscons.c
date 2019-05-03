@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1987, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Toomas Soome <tsoome@me.com>
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -511,7 +512,7 @@ wcuwsrv(queue_t *q)
 		 * new.
 		 */
 		if (pvc->vc_flags & (WCS_DELAY|WCS_BUSY|WCS_STOPPED)) {
-			putbq(q, mp);
+			(void) putbq(q, mp);
 			return (0);
 		}
 

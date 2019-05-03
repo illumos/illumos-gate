@@ -24,6 +24,7 @@
 /*
  * Copyright 2011 cyril.galibern@opensvc.com
  * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_SCSI_TARGETS_SDDEF_H
@@ -1170,10 +1171,10 @@ struct sd_fi_arq {
 #else
 
 #undef	SDDEBUG
-#define	SD_ERROR	{ if (0) sd_log_err; }
-#define	SD_TRACE	{ if (0) sd_log_trace; }
-#define	SD_INFO		{ if (0) sd_log_info; }
-#define	SD_DUMP_MEMORY	{ if (0) sd_dump_memory; }
+#define	SD_ERROR(...)		(void)(0)
+#define	SD_TRACE(...)		(void)(0)
+#define	SD_INFO(...)		(void)(0)
+#define	SD_DUMP_MEMORY(...)	(void)(0)
 #endif
 
 
