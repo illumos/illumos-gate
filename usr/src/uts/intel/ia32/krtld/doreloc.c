@@ -23,10 +23,16 @@
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
-#if	defined(_KERNEL)
-#include	<sys/types.h>
-#include	"reloc.h"
-#else
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
+ * While this is no longer relevant to the kernel, we keep it in its
+ * traditional location to match the other variants, used from the ld
+ * code.
+ */
+
 #define	ELF_TARGET_386
 #if defined(DO_RELOC_LIBLD)
 #undef DO_RELOC_LIBLD
@@ -39,7 +45,6 @@
 #include	"reloc.h"
 #include	"conv.h"
 #include	"msg.h"
-#endif
 
 /*
  * We need to build this code differently when it is used for
@@ -181,12 +186,7 @@ const Rel_entry	reloc_table[R_386_NUM] = {
  * been performed before calling this function except for the addition of
  * the addresses in the instructions.
  */
-#if defined(_KERNEL)
-#define	lml	0		/* Needed by arglist of REL_ERR_* macros */
-int
-do_reloc_krtld(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
-    const char *file)
-#elif defined(DO_RELOC_LIBLD)
+#if defined(DO_RELOC_LIBLD)
 /*ARGSUSED5*/
 int
 do_reloc_ld(Rel_desc *rdesc, uchar_t *off, Xword *value,
