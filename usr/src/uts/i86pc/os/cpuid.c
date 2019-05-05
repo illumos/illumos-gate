@@ -4488,6 +4488,8 @@ cpuid_pass4(cpu_t *cpu, uint_t *hwcap_out)
 		case X86_VENDOR_Intel:
 			if (*edx & CPUID_AMD_EDX_TSCP)
 				hwcap_flags |= AV_386_TSCP;
+			if (*ecx & CPUID_AMD_ECX_LZCNT)
+				hwcap_flags |= AV_386_AMD_LZCNT;
 			/*
 			 * Aarrgh.
 			 * Intel uses a different bit in the same word.
