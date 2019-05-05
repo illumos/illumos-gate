@@ -229,6 +229,10 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 	struct ptable_entry part;
 	int rc, slice, partition;
 
+	if (sectorsize == 0) {
+		DEBUG("unknown sector size");
+		return (ENXIO);
+	}
 	rc = 0;
 	/*
 	 * While we are reading disk metadata, make sure we do it relative
