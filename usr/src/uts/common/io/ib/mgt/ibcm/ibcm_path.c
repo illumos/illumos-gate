@@ -4040,7 +4040,7 @@ ibcm_val_ipattr(ibt_ip_path_attr_t *attrp, ibt_path_flags_t flags)
 	}
 
 	/* Validate the destination info */
-	if ((attrp->ipa_ndst == 0) || (attrp->ipa_ndst == NULL)) {
+	if ((attrp->ipa_ndst == 0) || (attrp->ipa_dst_ip == NULL)) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: DstIP Not provided "
 		    "dst_ip %p, ndst %d", attrp->ipa_dst_ip, attrp->ipa_ndst);
 		return (IBT_INVALID_PARAM);

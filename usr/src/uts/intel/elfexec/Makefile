@@ -23,7 +23,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
 #

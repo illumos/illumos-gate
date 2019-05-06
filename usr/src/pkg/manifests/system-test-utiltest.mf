@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 # Copyright 2017 Jason King.
 # Copyright 2018, Joyent, Inc.
 #
@@ -28,6 +28,12 @@ dir path=opt/util-tests
 dir path=opt/util-tests/bin
 dir path=opt/util-tests/runfiles
 dir path=opt/util-tests/tests
+dir path=opt/util-tests/tests/ctf
+dir path=opt/util-tests/tests/ctf/test-merge-dedup
+dir path=opt/util-tests/tests/ctf/test-merge-forward
+dir path=opt/util-tests/tests/ctf/test-merge-reduction
+dir path=opt/util-tests/tests/ctf/test-merge-static
+dir path=opt/util-tests/tests/ctf/test-merge-weak
 dir path=opt/util-tests/tests/demangle
 dir path=opt/util-tests/tests/dis
 dir path=opt/util-tests/tests/dis/i386
@@ -1120,6 +1126,68 @@ file path=opt/util-tests/tests/awk/tests/T.split mode=0555
 file path=opt/util-tests/tests/awk/tests/T.sub mode=0555
 file path=opt/util-tests/tests/awk/tests/T.system mode=0555
 file path=opt/util-tests/tests/chown_test mode=0555
+file path=opt/util-tests/tests/ctf/Makefile.ctftest.com mode=0555
+file path=opt/util-tests/tests/ctf/check-array mode=0555
+file path=opt/util-tests/tests/ctf/check-enum mode=0555
+file path=opt/util-tests/tests/ctf/check-float-32 mode=0555
+file path=opt/util-tests/tests/ctf/check-float-64 mode=0555
+file path=opt/util-tests/tests/ctf/check-forward-32 mode=0555
+file path=opt/util-tests/tests/ctf/check-forward-64 mode=0555
+file path=opt/util-tests/tests/ctf/check-function mode=0555
+file path=opt/util-tests/tests/ctf/check-int-32 mode=0555
+file path=opt/util-tests/tests/ctf/check-int-64 mode=0555
+file path=opt/util-tests/tests/ctf/check-merge-dedup mode=0555
+file path=opt/util-tests/tests/ctf/check-merge-forward-32 mode=0555
+file path=opt/util-tests/tests/ctf/check-merge-forward-64 mode=0555
+file path=opt/util-tests/tests/ctf/check-merge-reduction mode=0555
+file path=opt/util-tests/tests/ctf/check-merge-static mode=0555
+file path=opt/util-tests/tests/ctf/check-merge-weak mode=0555
+file path=opt/util-tests/tests/ctf/check-qualifiers mode=0555
+file path=opt/util-tests/tests/ctf/check-reference mode=0555
+file path=opt/util-tests/tests/ctf/check-sou-32 mode=0555
+file path=opt/util-tests/tests/ctf/check-sou-64 mode=0555
+file path=opt/util-tests/tests/ctf/check-weak mode=0555
+file path=opt/util-tests/tests/ctf/ctftest mode=0555
+file path=opt/util-tests/tests/ctf/ctftest-convert-no-dwarf mode=0555
+file path=opt/util-tests/tests/ctf/ctftest-convert-non-c mode=0555
+file path=opt/util-tests/tests/ctf/ctftest-merge-no-ctf mode=0555
+file path=opt/util-tests/tests/ctf/precheck mode=0555
+file path=opt/util-tests/tests/ctf/test-array.c mode=0555
+file path=opt/util-tests/tests/ctf/test-enum.c mode=0555
+file path=opt/util-tests/tests/ctf/test-float.c mode=0555
+file path=opt/util-tests/tests/ctf/test-forward.c mode=0555
+file path=opt/util-tests/tests/ctf/test-function.c mode=0555
+file path=opt/util-tests/tests/ctf/test-int.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-dedup/Makefile.ctftest mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-1.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-2.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-3.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-dedup/test-merge-dedup.c \
+    mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-forward/Makefile.ctftest \
+    mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-forward/test-impl.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-forward/test-merge.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-reduction/Makefile.ctftest \
+    mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-reduction/mapfile-vers mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-reduction/test-global.c \
+    mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-reduction/test-scoped.c \
+    mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-static/Makefile.ctftest \
+    mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-static/test-a.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-static/test-b.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-static/test-c.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-static/test-d.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-static/test-main.c mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-weak/Makefile.ctftest mode=0555
+file path=opt/util-tests/tests/ctf/test-merge-weak/test-merge-weak.c mode=0555
+file path=opt/util-tests/tests/ctf/test-qualifiers.c mode=0555
+file path=opt/util-tests/tests/ctf/test-reference.c mode=0555
+file path=opt/util-tests/tests/ctf/test-sou.c mode=0555
+file path=opt/util-tests/tests/ctf/test-weak.c mode=0555
 file path=opt/util-tests/tests/date_test mode=0555
 file path=opt/util-tests/tests/demangle/afl-fast mode=0555
 file path=opt/util-tests/tests/demangle/gcc-libstdc++ mode=0555
@@ -1138,6 +1206,8 @@ file path=opt/util-tests/tests/dis/i386/32.avx2.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx2.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.avx512.s mode=0444
+file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.out mode=0444
+file path=opt/util-tests/tests/dis/i386/32.avx512_vnni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi1.out mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi1.s mode=0444
 file path=opt/util-tests/tests/dis/i386/32.bmi2.out mode=0444
@@ -1188,6 +1258,8 @@ file path=opt/util-tests/tests/dis/i386/64.avx2.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx2.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.avx512.s mode=0444
+file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.out mode=0444
+file path=opt/util-tests/tests/dis/i386/64.avx512_vnni.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi1.out mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi1.s mode=0444
 file path=opt/util-tests/tests/dis/i386/64.bmi2.out mode=0444

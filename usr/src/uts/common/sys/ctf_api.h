@@ -116,7 +116,7 @@ enum {
 	ECTF_ZLIB,		/* zlib library failure */
 	ECTF_CONVBKERR,		/* CTF conversion backend error */
 	ECTF_CONVNOCSRC,	/* No C source to convert from */
-	ECTF_CONVNODEBUG,	/* No debug info to convert into CTF */
+	ECTF_CONVNODEBUG	/* No debug info to convert into CTF */
 };
 
 /*
