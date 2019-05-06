@@ -120,8 +120,10 @@ typedef uint32_t tem_char_t;	/* 32bit char to support UTF-8 */
  * Default foreground/background color
  */
 
+#if !defined(DEFAULT_ANSI_FOREGROUND) && !defined(DEFAULT_ANSI_BACKGROUND)
 #define	DEFAULT_ANSI_FOREGROUND	ANSI_COLOR_BLACK
 #define	DEFAULT_ANSI_BACKGROUND	ANSI_COLOR_WHITE
+#endif
 
 
 #define	BUF_LEN		160 /* Two lines of data can be processed at a time */

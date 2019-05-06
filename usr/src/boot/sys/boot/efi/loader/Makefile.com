@@ -60,6 +60,8 @@ OBJS=	\
 	tem.o \
 	vers.o
 
+tem.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR)
+
 CPPFLAGS += -I../../../../../include -I../../..../
 CPPFLAGS += -I../../../../../lib/libstand
 
