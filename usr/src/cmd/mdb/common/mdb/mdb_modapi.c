@@ -23,6 +23,7 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -92,11 +93,11 @@ mdb_nicenum(uint64_t num, char *buf)
 	} else if (n < 10 && (num & (num - 1)) != 0) {
 		(void) mdb_snprintfrac(buf, MDB_NICENUM_BUFLEN,
 		    num, 1ULL << 10 * index, 2);
-		strcat(buf, u);
+		(void) strcat(buf, u);
 	} else if (n < 100 && (num & (num - 1)) != 0) {
 		(void) mdb_snprintfrac(buf, MDB_NICENUM_BUFLEN,
 		    num, 1ULL << 10 * index, 1);
-		strcat(buf, u);
+		(void) strcat(buf, u);
 	} else {
 		(void) mdb_snprintf(buf, MDB_NICENUM_BUFLEN, "%llu%s",
 		    (u_longlong_t)n, u);
