@@ -124,6 +124,7 @@ SYMBOL_SCOPE {
 		mdb_memio_create		{ FLAGS = EXTERN };
 		mdb_name_to_major		{ FLAGS = EXTERN };
 		mdb_nhconvert			{ FLAGS = EXTERN };
+		mdb_nicenum			{ FLAGS = EXTERN };
 		mdb_object_iter			{ FLAGS = EXTERN };
 		mdb_one_bit			{ FLAGS = EXTERN };
 		mdb_page2pfn			{ FLAGS = EXTERN };
@@ -132,6 +133,7 @@ SYMBOL_SCOPE {
 		mdb_pid2proc			{ FLAGS = EXTERN };
 		mdb_pread			{ FLAGS = EXTERN };
 		mdb_printf			{ FLAGS = EXTERN };
+		mdb_snprintfrac			{ FLAGS = EXTERN };
 		mdb_prop_kernel			{ FLAGS = EXTERN };
 		mdb_prop_postmortem		{ FLAGS = EXTERN };
 		mdb_pwalk			{ FLAGS = EXTERN };

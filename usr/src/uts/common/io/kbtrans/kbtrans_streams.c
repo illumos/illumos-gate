@@ -63,6 +63,7 @@ int	kbtrans_errlevel;
  * Repeat rates set in static variables so they can be tweeked with
  * debugger.
  */
+static int kbtrans_repeat_count = -1;
 static int kbtrans_repeat_rate;
 static int kbtrans_repeat_delay;
 
@@ -109,43 +110,37 @@ _info(struct modinfo *modinfop)
 /*
  * Internal Function Prototypes
  */
-static char	*kbtrans_strsetwithdecimal(char *, uint_t, uint_t);
-static void	kbtrans_set_translation_callback(struct kbtrans *);
-static void	kbtrans_reioctl(void *);
-static void	kbtrans_send_esc_event(char, struct kbtrans *);
-static void	kbtrans_keypressed(struct kbtrans *, uchar_t, Firm_event *,
-			ushort_t);
-static void	kbtrans_putbuf(char *, queue_t *);
-static void	kbtrans_cancelrpt(struct kbtrans *);
-static void	kbtrans_queuepress(struct kbtrans *, uchar_t, Firm_event *);
-static void	kbtrans_putcode(register struct kbtrans *, uint_t);
-static void	kbtrans_keyreleased(struct kbtrans *, uchar_t);
-static void	kbtrans_queueevent(struct kbtrans *, Firm_event *);
-static void	kbtrans_untrans_keypressed_raw(struct kbtrans *, kbtrans_key_t);
-static void	kbtrans_untrans_keyreleased_raw(struct kbtrans *,
-			    kbtrans_key_t);
-static void	kbtrans_ascii_keypressed(struct kbtrans *, uint_t,
-			kbtrans_key_t, uint_t);
-static void	kbtrans_ascii_keyreleased(struct kbtrans *, kbtrans_key_t);
-static void	kbtrans_ascii_setup_repeat(struct kbtrans *, uint_t,
-			kbtrans_key_t);
-static void	kbtrans_trans_event_keypressed(struct kbtrans *, uint_t,
-			kbtrans_key_t, uint_t);
-static void	kbtrans_trans_event_keyreleased(struct kbtrans *,
-			kbtrans_key_t);
-static void	kbtrans_trans_event_setup_repeat(struct kbtrans *, uint_t,
-			kbtrans_key_t);
-static void	kbtrans_rpt(void *);
-static void	kbtrans_setled(struct kbtrans *);
-static void	kbtrans_flush(struct kbtrans *);
-static enum kbtrans_message_response 	kbtrans_ioctl(struct kbtrans *upper,
-						mblk_t *mp);
-static int	kbtrans_setkey(struct kbtrans_lower *, struct kiockey *,
-			cred_t *);
-static int	kbtrans_getkey(struct kbtrans_lower *, struct kiockey *);
-static int	kbtrans_skey(struct kbtrans_lower *, struct kiockeymap *,
-				cred_t *cr);
-static int 	kbtrans_gkey(struct kbtrans_lower *, struct kiockeymap *);
+static char *kbtrans_strsetwithdecimal(char *, uint_t, uint_t);
+static void kbtrans_set_translation_callback(struct kbtrans *);
+static void kbtrans_reioctl(void *);
+static void kbtrans_send_esc_event(char, struct kbtrans *);
+static void kbtrans_keypressed(struct kbtrans *, uchar_t, Firm_event *,
+    ushort_t);
+static void kbtrans_putbuf(char *, queue_t *);
+static void kbtrans_cancelrpt(struct kbtrans *);
+static void kbtrans_queuepress(struct kbtrans *, uchar_t, Firm_event *);
+static void kbtrans_putcode(register struct kbtrans *, uint_t);
+static void kbtrans_keyreleased(struct kbtrans *, uchar_t);
+static void kbtrans_queueevent(struct kbtrans *, Firm_event *);
+static void kbtrans_untrans_keypressed_raw(struct kbtrans *, kbtrans_key_t);
+static void kbtrans_untrans_keyreleased_raw(struct kbtrans *, kbtrans_key_t);
+static void kbtrans_ascii_keypressed(struct kbtrans *, uint_t,
+    kbtrans_key_t, uint_t);
+static void kbtrans_ascii_keyreleased(struct kbtrans *, kbtrans_key_t);
+static void kbtrans_ascii_setup_repeat(struct kbtrans *, uint_t, kbtrans_key_t);
+static void kbtrans_trans_event_keypressed(struct kbtrans *, uint_t,
+    kbtrans_key_t, uint_t);
+static void kbtrans_trans_event_keyreleased(struct kbtrans *, kbtrans_key_t);
+static void kbtrans_trans_event_setup_repeat(struct kbtrans *, uint_t,
+    kbtrans_key_t);
+static void kbtrans_rpt(void *);
+static void kbtrans_setled(struct kbtrans *);
+static void kbtrans_flush(struct kbtrans *);
+static enum kbtrans_message_response kbtrans_ioctl(struct kbtrans *, mblk_t *);
+static int kbtrans_setkey(struct kbtrans_lower *, struct kiockey *, cred_t *);
+static int kbtrans_getkey(struct kbtrans_lower *, struct kiockey *);
+static int kbtrans_skey(struct kbtrans_lower *, struct kiockeymap *, cred_t *);
+static int kbtrans_gkey(struct kbtrans_lower *, struct kiockeymap *);
 
 /*
  * Keyboard Translation Mode (TR_NONE)
@@ -223,14 +218,9 @@ progressbar_key_abort_thread(struct kbtrans *upper)
  *	Initialize the stream, keytables, callbacks, etc.
  */
 int
-kbtrans_streams_init(
-	queue_t 			*q,
-	int 				sflag,
-	struct kbtrans_hardware 	*hw,
-	struct kbtrans_callbacks 	*hw_cb,
-	struct kbtrans 			**ret_kbd,
-	int 				initial_leds,
-	int 				initial_led_mask)
+kbtrans_streams_init(queue_t *q, int sflag, struct kbtrans_hardware *hw,
+    struct kbtrans_callbacks *hw_cb, struct kbtrans **ret_kbd,
+    int initial_leds, int initial_led_mask)
 {
 	struct kbtrans *upper;
 	struct kbtrans_lower *lower;
@@ -247,8 +237,8 @@ kbtrans_streams_init(
 
 	/* Set these up only once so that they could be changed from adb */
 	if (!kbtrans_repeat_rate) {
-		kbtrans_repeat_rate = (hz+29)/30;
-		kbtrans_repeat_delay = hz/2;
+		kbtrans_repeat_rate = (hz + 29) / 30;
+		kbtrans_repeat_delay = hz / 2;
 	}
 
 	switch (sflag) {
@@ -421,7 +411,7 @@ kbtrans_streams_releaseall(struct kbtrans *upper)
  *	keyboard module output queue put procedure: handles M_IOCTL
  *	messages.
  *
- * 	Return KBTRANS_MESSAGE_HANDLED if the message was handled by
+ *	Return KBTRANS_MESSAGE_HANDLED if the message was handled by
  *	kbtrans and KBTRANS_MESSAGE_NOT_HANDLED otherwise. If
  *	KBTRANS_MESSAGE_HANDLED is returned, no further action is required.
  *	If KBTRANS_MESSAGE_NOT_HANDLED is returned, the hardware module
@@ -470,16 +460,14 @@ kbtrans_streams_message(struct kbtrans *upper, register mblk_t *mp)
 
 /*
  * kbtrans_streams_key:
- * 	When a key is pressed or released, the hardware module should
- * 	call kbtrans, passing the key number and its new
- * 	state.  kbtrans is responsible for autorepeat handling;
- * 	the hardware module should report only actual press/release
- * 	events, suppressing any hardware-generated autorepeat.
+ *	When a key is pressed or released, the hardware module should
+ *	call kbtrans, passing the key number and its new
+ *	state.  kbtrans is responsible for autorepeat handling;
+ *	the hardware module should report only actual press/release
+ *	events, suppressing any hardware-generated autorepeat.
  */
 void
-kbtrans_streams_key(
-    struct kbtrans *upper,
-    kbtrans_key_t key,
+kbtrans_streams_key(struct kbtrans *upper, kbtrans_key_t key,
     enum keystate state)
 {
 	struct kbtrans_lower *lower;
@@ -549,16 +537,13 @@ kbtrans_streams_key(
 
 /*
  * kbtrans_streams_set_keyboard:
- * 	At any time after calling kbtrans_streams_init, the hardware
- * 	module should make this call to report the id of the keyboard
- * 	attached. id is the keyboard type, typically KB_SUN4,
- * 	KB_PC, or KB_USB.
+ *	At any time after calling kbtrans_streams_init, the hardware
+ *	module should make this call to report the id of the keyboard
+ *	attached. id is the keyboard type, typically KB_SUN4,
+ *	KB_PC, or KB_USB.
  */
 void
-kbtrans_streams_set_keyboard(
-    struct kbtrans 	*upper,
-    int 		id,
-    struct keyboard 	*k)
+kbtrans_streams_set_keyboard(struct kbtrans *upper, int id, struct keyboard *k)
 {
 	upper->kbtrans_lower.kbtrans_keyboard = k;
 	upper->kbtrans_streams_id = id;
@@ -566,9 +551,9 @@ kbtrans_streams_set_keyboard(
 
 /*
  * kbtrans_streams_has_reset:
- * 	At any time between kbtrans_streams_init and kbtrans_streams_fini,
- * 	the hardware module can call this routine to report that the
- * 	keyboard has been reset, e.g. by being unplugged and reattached.
+ *	At any time between kbtrans_streams_init and kbtrans_streams_fini,
+ *	the hardware module can call this routine to report that the
+ *	keyboard has been reset, e.g. by being unplugged and reattached.
  */
 /*ARGSUSED*/
 void
@@ -663,8 +648,8 @@ kbtrans_streams_untimeout(struct kbtrans *upper)
 
 /*
  * kbtrans_reioctl:
- * 	This function is set up as call-back function should an ioctl fail
- * 	to allocate required resources.
+ *	This function is set up as call-back function should an ioctl fail
+ *	to allocate required resources.
  */
 static void
 kbtrans_reioctl(void	*arg)
@@ -683,7 +668,7 @@ kbtrans_reioctl(void	*arg)
 
 /*
  * kbtrans_ioctl:
- * 	process ioctls we recognize and own.  Otherwise, pass it down.
+ *	process ioctls we recognize and own.  Otherwise, pass it down.
  */
 static enum kbtrans_message_response
 kbtrans_ioctl(struct kbtrans *upper, register mblk_t *mp)
@@ -1164,7 +1149,7 @@ kbtrans_setled(struct kbtrans *upper)
 /*
  * kbtrans_rpt:
  *	If a key is held down, this function is set up to be called
- * 	after kbtrans_repeat_rate time elapses.
+ *	after kbtrans_repeat_rate time elapses.
  */
 static void
 kbtrans_rpt(void *arg)
@@ -1177,11 +1162,18 @@ kbtrans_rpt(void *arg)
 	    lower->kbtrans_repeatkey));
 
 	upper->kbtrans_streams_rptid = 0;
+	upper->kbtrans_streams_count++;
 
 	/*
 	 * NB:  polled code zaps kbtrans_repeatkey without cancelling
 	 * timeout.
 	 */
+	if (kbtrans_repeat_count > 0) {
+		/* If limit is set and reached, stop there. */
+		if (upper->kbtrans_streams_count > kbtrans_repeat_count)
+			lower->kbtrans_repeatkey = 0;
+	}
+
 	if (lower->kbtrans_repeatkey != 0) {
 		kbtrans_keyreleased(upper, lower->kbtrans_repeatkey);
 
@@ -1198,7 +1190,7 @@ kbtrans_rpt(void *arg)
 
 /*
  * kbtrans_cancelrpt:
- * 	Cancel the repeating key
+ *	Cancel the repeating key
  */
 static void
 kbtrans_cancelrpt(struct kbtrans	*upper)
@@ -1372,7 +1364,7 @@ add_event:
 
 /*
  * kbtrans_keyreleased:
- * 	Remove entry from the downs table
+ *	Remove entry from the downs table
  */
 static void
 kbtrans_keyreleased(register struct kbtrans *upper, uchar_t key_station)
@@ -1530,7 +1522,7 @@ kbtrans_queueevent(struct kbtrans *upper, Firm_event *fe)
 /*
  * kbtrans_set_translation_callback:
  *	This code sets the translation_callback pointer based on the
- * 	translation mode.
+ *	translation mode.
  */
 static void
 kbtrans_set_translation_callback(register struct kbtrans *upper)
@@ -1566,8 +1558,8 @@ kbtrans_set_translation_callback(register struct kbtrans *upper)
 /*
  * kbtrans_untrans_keypressed_raw:
  *	This is the callback we get if we are in TR_UNTRANS_EVENT and a
- * 	key is pressed.  This code will just send the scancode up the
- * 	stream.
+ *	key is pressed.  This code will just send the scancode up the
+ *	stream.
  */
 static void
 kbtrans_untrans_keypressed_raw(struct kbtrans *upper, kbtrans_key_t key)
@@ -1591,8 +1583,8 @@ kbtrans_untrans_keypressed_raw(struct kbtrans *upper, kbtrans_key_t key)
 /*
  * kbtrans_untrans_keyreleased_raw:
  *	This is the callback we get if we are in TR_UNTRANS_EVENT mode
- * 	and a key is released.  This code will just send the scancode up
- * 	the stream.
+ *	and a key is released.  This code will just send the scancode up
+ *	the stream.
  */
 static void
 kbtrans_untrans_keyreleased_raw(struct kbtrans *upper, kbtrans_key_t key)
@@ -1675,16 +1667,13 @@ kbtrans_vt_compose(struct kbtrans *upper, unsigned short keyid,
 /*
  * kbtrans_ascii_keypressed:
  *	This is the code if we are in TR_ASCII mode and a key
- * 	is pressed.  This is where we will do any special processing that
- * 	is specific to ASCII key translation.
+ *	is pressed.  This is where we will do any special processing that
+ *	is specific to ASCII key translation.
  */
 /* ARGSUSED */
 static void
-kbtrans_ascii_keypressed(
-    struct kbtrans	*upper,
-    uint_t 		entrytype,
-    kbtrans_key_t 	key,
-    uint_t 		entry)
+kbtrans_ascii_keypressed(struct kbtrans *upper, uint_t entrytype,
+    kbtrans_key_t  key, uint_t entry)
 {
 	register char	*cp;
 	register char	*bufp;
@@ -1695,7 +1684,7 @@ kbtrans_ascii_keypressed(
 	/*
 	 * Based on the type of key, we may need to do some ASCII
 	 * specific post processing. Note that the translated entry
-	 * is constructed as the actual keycode plus entrytype. see
+	 * is constructed as the actual keycode plus entrytype. See
 	 * sys/kbd.h for details of each entrytype.
 	 */
 	switch (entrytype) {
@@ -1815,8 +1804,8 @@ kbtrans_ascii_keypressed(
 /*
  * kbtrans_ascii_keyreleased:
  *	This is the function if we are in TR_ASCII mode and a key
- * 	is released.  ASCII doesn't have the concept of released keys,
- * 	or make/break codes.  So there is nothing for us to do except
+ *	is released.  ASCII doesn't have the concept of released keys,
+ *	or make/break codes.  So there is nothing for us to do except
  *      checking 'Alt/AltGraph' release key in order to reset the state
  *      of vt switch key sequence.
  */
@@ -1832,13 +1821,11 @@ kbtrans_ascii_keyreleased(struct kbtrans *upper, kbtrans_key_t key)
 /*
  * kbtrans_ascii_setup_repeat:
  *	This is the function if we are in TR_ASCII mode and the
- * 	translation module has decided that a key needs to be repeated.
+ *	translation module has decided that a key needs to be repeated.
  */
 /* ARGSUSED */
 static void
-kbtrans_ascii_setup_repeat(
-    struct kbtrans *upper,
-    uint_t entrytype,
+kbtrans_ascii_setup_repeat(struct kbtrans *upper, uint_t entrytype,
     kbtrans_key_t key)
 {
 	struct kbtrans_lower *lower = &upper->kbtrans_lower;
@@ -1858,6 +1845,7 @@ kbtrans_ascii_setup_repeat(
 	 * Start the timeout for repeating this key.  kbtrans_rpt will
 	 * be called to repeat the key.
 	 */
+	upper->kbtrans_streams_count = 0;
 	upper->kbtrans_streams_rptid = qtimeout(upper->kbtrans_streams_readq,
 	    kbtrans_rpt, (caddr_t)upper, kbtrans_repeat_delay);
 }
@@ -1865,15 +1853,12 @@ kbtrans_ascii_setup_repeat(
 /*
  * kbtrans_trans_event_keypressed:
  *	This is the function if we are in TR_EVENT mode and a key
- * 	is pressed.  This is where we will do any special processing that
- * 	is specific to EVENT key translation.
+ *	is pressed.  This is where we will do any special processing that
+ *	is specific to EVENT key translation.
  */
 static void
-kbtrans_trans_event_keypressed(
-	struct kbtrans 	*upper,
-	uint_t 		entrytype,
-	kbtrans_key_t 	key,
-	uint_t 		entry)
+kbtrans_trans_event_keypressed(struct kbtrans *upper, uint_t entrytype,
+    kbtrans_key_t key, uint_t entry)
 {
 	Firm_event	fe;
 	register char	*cp;
@@ -2023,7 +2008,7 @@ kbtrans_trans_event_keypressed(
 /*
  * kbtrans_trans_event_keyreleased:
  *	This is the function if we are in TR_EVENT mode and a key
- * 	is released.
+ *	is released.
  */
 /* ARGSUSED */
 static void
@@ -2039,13 +2024,11 @@ kbtrans_trans_event_keyreleased(struct kbtrans *upper, kbtrans_key_t key)
  * kbtrans_trans_event_setup_repeat:
  *	This is the function if we are in TR_EVENT mode and the
  *	translation module has decided that a key needs to be repeated.
- * 	We will set a timeout to retranslate the repeat key.
+ *	We will set a timeout to retranslate the repeat key.
  */
 static void
-kbtrans_trans_event_setup_repeat(
-	struct kbtrans	*upper,
-	uint_t 		entrytype,
-	kbtrans_key_t	key)
+kbtrans_trans_event_setup_repeat(struct kbtrans *upper, uint_t entrytype,
+    kbtrans_key_t key)
 {
 	struct kbtrans_lower *lower = &upper->kbtrans_lower;
 
@@ -2073,6 +2056,7 @@ kbtrans_trans_event_setup_repeat(
 	 * Start the timeout for repeating this key.  kbtrans_rpt will
 	 * be called to repeat the key.
 	 */
+	upper->kbtrans_streams_count = 0;
 	upper->kbtrans_streams_rptid = qtimeout(upper->kbtrans_streams_readq,
 	    kbtrans_rpt, (caddr_t)upper, kbtrans_repeat_delay);
 }

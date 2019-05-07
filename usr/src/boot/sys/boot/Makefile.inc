@@ -52,6 +52,14 @@ CFLAGS +=	$(CCNOAUTOINLINE) $(CCNOREORDER) $(CSTD_GNU99)
 CCASFLAGS=	-fPIC -Wa,--divide
 ASFLAGS=	--divide
 
+# smatch does not define __amd64 and __amd64__
+SMATCH_amd64=	-_smatch=-D__amd64 -_smatch=-D__amd64__
+
+# SMATCH_ARGS will bring in set of -Wno-* options.
+#CFLAGS +=	$(SMATCH_ARGS:%=-_smatch=%)
+CFLAGS +=	$(SMOFF:%=-_smatch=--disable=%)
+CFLAGS +=	$(SMATCH_$(MACHINE))
+
 COMPILE.S=	$(CC) $(SMATCH_off) $(CCASFLAGS) $(CPPFLAGS) -c
 
 ROOT_BOOT=	$(ROOT)/boot

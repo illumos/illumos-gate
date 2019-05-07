@@ -27,8 +27,8 @@
 #include <sys/modctl.h>
 #include <sys/zmod.h>
 
-#include "zlib.h"
-#include "zutil.h"
+#include <zlib.h>
+#include <zutil.h>
 
 /*
  * Uncompress the buffer 'src' into the buffer 'dst'.  The caller must store

@@ -32,6 +32,7 @@
 #include <locale.h>
 #include <strings.h>
 #include <libfdisk.h>
+#include <err.h>
 
 #include <sys/dktp/fdisk.h>
 #include <sys/dkio.h>
@@ -42,12 +43,13 @@
 #include <sys/sysmacros.h>
 #include <sys/efi_partition.h>
 #include <libfstyp.h>
+#include <libgen.h>
 #include <uuid/uuid.h>
 
 #include "installboot.h"
-#include "../../common/bblk_einfo.h"
-#include "../../common/boot_utils.h"
-#include "../../common/mboot_extra.h"
+#include "bblk_einfo.h"
+#include "boot_utils.h"
+#include "mboot_extra.h"
 #include "getresponse.h"
 
 #ifndef	TEXT_DOMAIN
@@ -133,7 +135,7 @@ static int handle_getinfo(char *, char **);
 static int handle_mirror(char *, char **);
 static boolean_t is_update_necessary(ib_data_t *, char *);
 static int propagate_bootblock(ib_data_t *, ib_data_t *, char *);
-static void usage(char *);
+static void usage(char *, int) __NORETURN;
 
 static int
 read_stage1_from_file(char *path, ib_data_t *dest)
@@ -1263,8 +1265,7 @@ handle_install(char *progname, char **argv)
 
 	if (!device_path || !bootblock || !stage1) {
 		(void) fprintf(stderr, gettext("Missing parameter"));
-		usage(progname);
-		goto out;
+		usage(progname, BC_ERROR);
 	}
 
 	BOOT_DEBUG("device path: %s, stage1 path: %s bootblock path: %s\n",
@@ -1339,8 +1340,7 @@ handle_getinfo(char *progname, char **argv)
 	device_path = strdup(argv[0]);
 	if (!device_path) {
 		(void) fprintf(stderr, gettext("Missing parameter"));
-		usage(progname);
-		goto out;
+		usage(progname, BC_ERROR);
 	}
 
 	if (stat(device_path, &sb) == -1) {
@@ -1436,8 +1436,7 @@ handle_mirror(char *progname, char **argv)
 
 	if (!curr_device_path || !attach_device_path) {
 		(void) fprintf(stderr, gettext("Missing parameter"));
-		usage(progname);
-		goto out;
+		usage(progname, BC_ERROR);
 	}
 	BOOT_DEBUG("Current device path is: %s, attaching device path is: "
 	    " %s\n", curr_device_path, attach_device_path);
@@ -1486,23 +1485,23 @@ out_devs:
 	cleanup_device(attach_device);
 out_currdev:
 	cleanup_device(curr_device);
-out:
 	free(curr_device_path);
 	free(attach_device_path);
 	return (retval);
 }
 
 #define	USAGE_STRING	"Usage:\t%s [-h|-m|-f|-n|-F|-u verstr] stage1 stage2 " \
-			"raw-device\n"					\
+			"raw-device\n"				\
 			"\t%s -M [-n] raw-device attach-raw-device\n"	\
 			"\t%s [-e|-V] -i raw-device | file\n"
 
 #define	CANON_USAGE_STR	gettext(USAGE_STRING)
 
 static void
-usage(char *progname)
+usage(char *progname, int rc)
 {
 	(void) fprintf(stdout, CANON_USAGE_STR, progname, progname, progname);
+	exit(rc);
 }
 
 int
@@ -1516,11 +1515,11 @@ main(int argc, char **argv)
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
-	if (init_yes() < 0) {
-		(void) fprintf(stderr, gettext(ERR_MSG_INIT_YES),
-		    strerror(errno));
-		exit(BC_ERROR);
-	}
+	if (init_yes() < 0)
+		errx(BC_ERROR, gettext(ERR_MSG_INIT_YES), strerror(errno));
+
+	/* Determine our name */
+	progname = basename(argv[0]);
 
 	while ((opt = getopt(argc, argv, "deFfhiMmnu:V")) != EOF) {
 		switch (opt) {
@@ -1537,8 +1536,7 @@ main(int argc, char **argv)
 			force_mbr = B_TRUE;
 			break;
 		case 'h':
-			usage(argv[0]);
-			exit(BC_SUCCESS);
+			usage(progname, BC_SUCCESS);
 			break;
 		case 'i':
 			do_getinfo = B_TRUE;
@@ -1557,12 +1555,11 @@ main(int argc, char **argv)
 		case 'u':
 			do_version = B_TRUE;
 
-			update_str = malloc(strlen(optarg) + 1);
+			update_str = strdup(optarg);
 			if (update_str == NULL) {
 				perror(gettext("Memory allocation failure"));
 				exit(BC_ERROR);
 			}
-			(void) strlcpy(update_str, optarg, strlen(optarg) + 1);
 			break;
 		case 'V':
 			verbose_dump = B_TRUE;
@@ -1575,10 +1572,8 @@ main(int argc, char **argv)
 
 	/* check arguments */
 	if (argc != optind + params) {
-		usage(argv[0]);
-		exit(BC_ERROR);
+		usage(progname, BC_ERROR);
 	}
-	progname = argv[0];
 	check_options(progname);
 	handle_args = argv + optind;
 
@@ -1603,8 +1598,7 @@ check_options(char *progname)
 	if (do_getinfo && do_mirror_bblk) {
 		(void) fprintf(stderr, gettext("Only one of -M and -i can be "
 		    "specified at the same time\n"));
-		usage(progname);
-		exit(BC_ERROR);
+		usage(progname, BC_ERROR);
 	}
 
 	if (do_mirror_bblk) {

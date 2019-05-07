@@ -131,53 +131,6 @@ strisprint(const char *cp)
 	return (B_TRUE);
 }
 
-#define	NICENUM_BUFLEN 6
-
-static int
-snprintfrac(char *buf, int len,
-    uint64_t numerator, uint64_t denom, int frac_digits)
-{
-	int mul = 1;
-	int whole, frac, i;
-
-	for (i = frac_digits; i; i--)
-		mul *= 10;
-	whole = numerator / denom;
-	frac = mul * numerator / denom - mul * whole;
-	return (mdb_snprintf(buf, len, "%u.%0*u", whole, frac_digits, frac));
-}
-
-static void
-mdb_nicenum(uint64_t num, char *buf)
-{
-	uint64_t n = num;
-	int index = 0;
-	char *u;
-
-	while (n >= 1024) {
-		n = (n + (1024 / 2)) / 1024; /* Round up or down */
-		index++;
-	}
-
-	u = &" \0K\0M\0G\0T\0P\0E\0"[index*2];
-
-	if (index == 0) {
-		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu",
-		    (u_longlong_t)n);
-	} else if (n < 10 && (num & (num - 1)) != 0) {
-		(void) snprintfrac(buf, NICENUM_BUFLEN,
-		    num, 1ULL << 10 * index, 2);
-		strcat(buf, u);
-	} else if (n < 100 && (num & (num - 1)) != 0) {
-		(void) snprintfrac(buf, NICENUM_BUFLEN,
-		    num, 1ULL << 10 * index, 1);
-		strcat(buf, u);
-	} else {
-		(void) mdb_snprintf(buf, NICENUM_BUFLEN, "%llu%s",
-		    (u_longlong_t)n, u);
-	}
-}
-
 /*
  * <addr>::sm_entries <buffer length in bytes>
  *
@@ -1552,7 +1505,7 @@ metaslab_stats(uintptr_t addr, int spa_flags)
 	for (int m = 0; m < vdev.vdev_ms_count; m++) {
 		mdb_metaslab_t ms;
 		mdb_space_map_t sm = { 0 };
-		char free[NICENUM_BUFLEN];
+		char free[MDB_NICENUM_BUFLEN];
 
 		if (mdb_ctf_vread(&ms, "metaslab_t", "mdb_metaslab_t",
 		    (uintptr_t)vdev_ms[m], 0) == -1)
@@ -1861,7 +1814,7 @@ metaslab_print_weight(uint64_t weight)
 		    weight & ~(METASLAB_ACTIVE_MASK | METASLAB_WEIGHT_TYPE),
 		    buf);
 	} else {
-		char size[NICENUM_BUFLEN];
+		char size[MDB_NICENUM_BUFLEN];
 		mdb_nicenum(1ULL << WEIGHT_GET_INDEX(weight), size);
 		(void) mdb_snprintf(buf, sizeof (buf), "%llu x %s",
 		    WEIGHT_GET_COUNT(weight), size);
@@ -2930,10 +2883,10 @@ zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    "\t  avg\t comp\t%%Total\tType\n");
 
 	for (t = 0; t <= DMU_OT_TOTAL; t++) {
-		char csize[NICENUM_BUFLEN], lsize[NICENUM_BUFLEN];
-		char psize[NICENUM_BUFLEN], asize[NICENUM_BUFLEN];
-		char avg[NICENUM_BUFLEN];
-		char comp[NICENUM_BUFLEN], pct[NICENUM_BUFLEN];
+		char csize[MDB_NICENUM_BUFLEN], lsize[MDB_NICENUM_BUFLEN];
+		char psize[MDB_NICENUM_BUFLEN], asize[MDB_NICENUM_BUFLEN];
+		char avg[MDB_NICENUM_BUFLEN];
+		char comp[MDB_NICENUM_BUFLEN], pct[MDB_NICENUM_BUFLEN];
 		char typename[64];
 		int l;
 
@@ -2979,9 +2932,9 @@ zfs_blkstats(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_nicenum(zb->zb_psize, psize);
 			mdb_nicenum(zb->zb_asize, asize);
 			mdb_nicenum(zb->zb_asize / zb->zb_count, avg);
-			(void) snprintfrac(comp, NICENUM_BUFLEN,
+			(void) mdb_snprintfrac(comp, MDB_NICENUM_BUFLEN,
 			    zb->zb_lsize, zb->zb_psize, 2);
-			(void) snprintfrac(pct, NICENUM_BUFLEN,
+			(void) mdb_snprintfrac(pct, MDB_NICENUM_BUFLEN,
 			    100 * zb->zb_asize, tzb->zb_asize, 2);
 
 			mdb_printf("%6s\t%5s\t%5s\t%5s\t%5s"

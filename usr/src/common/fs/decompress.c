@@ -33,7 +33,7 @@
 #include <sys/vnode.h>
 #include <sys/bootvfs.h>
 #include <sys/filep.h>
-#include <zmod/zlib.h>
+#include <zlib.h>
 
 #ifdef	_BOOT
 #include "../common/util.h"
@@ -111,7 +111,7 @@ cf_check_compressed(fileid_t *filep)
 	 * checking for a dcfs compressed file first would involve:
 	 *
 	 *	if (filep->fi_inode->i_cflags & ICOMPRESS)
-	 * 		filep->fi_flags |= FI_COMPRESSED;
+	 *		filep->fi_flags |= FI_COMPRESSED;
 	 */
 
 	/*

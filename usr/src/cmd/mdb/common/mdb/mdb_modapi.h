@@ -66,13 +66,7 @@ extern "C" {
 #define	MAX(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
-#ifdef MDB_API_VERSION
-#if (MDB_API_VERSION != 3 && MDB_API_VERSION != 4)
-#error "Only modapi versions three and four are supported."
-#endif
-#else /* !MDB_API_VERISON */
-#define	MDB_API_VERSION	4	/* Current API version number */
-#endif /* MDB_API_VERISON */
+#define	MDB_API_VERSION	5	/* Current API version number */
 
 /*
  * Debugger command function flags:
@@ -267,6 +261,11 @@ extern u_longlong_t mdb_strtoull(const char *);
 extern void *mdb_alloc(size_t, uint_t);
 extern void *mdb_zalloc(size_t, uint_t);
 extern void mdb_free(void *, size_t);
+
+#define	MDB_NICENUM_BUFLEN 6
+
+extern int mdb_snprintfrac(char *, int, uint64_t, uint64_t, int);
+extern void mdb_nicenum(uint64_t, char *);
 
 extern size_t mdb_snprintf(char *, size_t, const char *, ...);
 extern void mdb_printf(const char *, ...);
