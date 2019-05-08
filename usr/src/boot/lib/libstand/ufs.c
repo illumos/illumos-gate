@@ -39,30 +39,30 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *  
+ *
  *
  * Copyright (c) 1990, 1991 Carnegie Mellon University
  * All Rights Reserved.
  *
  * Author: David Golub
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
@@ -82,14 +82,13 @@
 #include "stand.h"
 #include "string.h"
 
-static int	ufs_open(const char *path, struct open_file *f);
-static int	ufs_write(struct open_file *f, const void *buf, size_t size,
-	size_t *resid);
-static int	ufs_close(struct open_file *f);
-static int	ufs_read(struct open_file *f, void *buf, size_t size, size_t *resid);
-static off_t	ufs_seek(struct open_file *f, off_t offset, int where);
-static int	ufs_stat(struct open_file *f, struct stat *sb);
-static int	ufs_readdir(struct open_file *f, struct dirent *d);
+static int	ufs_open(const char *, struct open_file *);
+static int	ufs_write(struct open_file *, const void *, size_t, size_t *);
+static int	ufs_close(struct open_file *);
+static int	ufs_read(struct open_file *, void *, size_t, size_t *);
+static off_t	ufs_seek(struct open_file *, off_t, int);
+static int	ufs_stat(struct open_file *, struct stat *);
+static int	ufs_readdir(struct open_file *, struct dirent *);
 
 struct fs_ops ufs_fsops = {
 	"ufs",
@@ -113,18 +112,22 @@ struct file {
 		struct ufs2_dinode di2;
 	}		f_di;		/* copy of on-disk inode */
 	int		f_nindir[NIADDR];
-					/* number of blocks mapped by
-					   indirect block at level i */
-	char		*f_blk[NIADDR];	/* buffer for indirect block at
-					   level i */
-	size_t		f_blksize[NIADDR];
-					/* size of buffer */
-	ufs2_daddr_t	f_blkno[NIADDR];/* disk address of block in buffer */
+					/*
+					 * number of blocks mapped by
+					 * indirect block at level i
+					 */
+	char		*f_blk[NIADDR];
+					/*
+					 * buffer for indirect block at
+					 * level i
+					 */
+	size_t		f_blksize[NIADDR]; /* size of buffer */
+	ufs2_daddr_t	f_blkno[NIADDR]; /* disk address of block in buffer */
 	ufs2_daddr_t	f_buf_blkno;	/* block number of data block */
 	char		*f_buf;		/* buffer for data block */
 	size_t		f_buf_size;	/* size of data block */
 };
-#define DIP(fp, field) \
+#define	DIP(fp, field) \
 	((fp)->f_fs->fs_magic == FS_UFS1_MAGIC ? \
 	(fp)->f_di.di1.field : (fp)->f_di.di2.field)
 
@@ -138,9 +141,7 @@ static int	search_directory(char *, struct open_file *, ino_t *);
  * Read a new inode into a file structure.
  */
 static int
-read_inode(inumber, f)
-	ino_t inumber;
-	struct open_file *f;
+read_inode(ino_t inumber, struct open_file *f)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct fs *fs = fp->f_fs;
@@ -149,7 +150,7 @@ read_inode(inumber, f)
 	int rc;
 
 	if (fs == NULL)
-	    panic("fs == NULL");
+		panic("fs == NULL");
 
 	/*
 	 * Read inode and save it.
@@ -157,8 +158,8 @@ read_inode(inumber, f)
 	buf = malloc(fs->fs_bsize);
 	twiddle(1);
 	rc = (f->f_dev->dv_strategy)(f->f_devdata, F_READ,
-		fsbtodb(fs, ino_to_fsba(fs, inumber)), fs->fs_bsize,
-		buf, &rsize);
+	    fsbtodb(fs, ino_to_fsba(fs, inumber)), fs->fs_bsize,
+	    buf, &rsize);
 	if (rc)
 		goto out;
 	if (rsize != fs->fs_bsize) {
@@ -186,7 +187,7 @@ read_inode(inumber, f)
 	fp->f_seekp = 0;
 out:
 	free(buf);
-	return (rc);	 
+	return (rc);
 }
 
 /*
@@ -194,10 +195,8 @@ out:
  * contains that block.
  */
 static int
-block_map(f, file_block, disk_block_p)
-	struct open_file *f;
-	ufs2_daddr_t file_block;
-	ufs2_daddr_t *disk_block_p;	/* out */
+block_map(struct open_file *f, ufs2_daddr_t file_block,
+    ufs2_daddr_t *disk_block_p)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct fs *fs = fp->f_fs;
@@ -262,15 +261,15 @@ block_map(f, file_block, disk_block_p)
 		}
 
 		if (fp->f_blkno[level] != ind_block_num) {
-			if (fp->f_blk[level] == (char *)0)
+			if (fp->f_blk[level] == NULL)
 				fp->f_blk[level] =
-					malloc(fs->fs_bsize);
+				    malloc(fs->fs_bsize);
 			twiddle(1);
 			rc = (f->f_dev->dv_strategy)(f->f_devdata, F_READ,
-				fsbtodb(fp->f_fs, ind_block_num),
-				fs->fs_bsize,
-				fp->f_blk[level],
-				&fp->f_blksize[level]);
+			    fsbtodb(fp->f_fs, ind_block_num),
+			    fs->fs_bsize,
+			    fp->f_blk[level],
+			    &fp->f_blksize[level]);
 			if (rc)
 				return (rc);
 			if (fp->f_blksize[level] != fs->fs_bsize)
@@ -299,10 +298,7 @@ block_map(f, file_block, disk_block_p)
  * Write a portion of a file from an internal buffer.
  */
 static int
-buf_write_file(f, buf_p, size_p)
-	struct open_file *f;
-	const char *buf_p;
-	size_t *size_p;		/* out */
+buf_write_file(struct open_file *f, const char *buf_p, size_t *size_p)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct fs *fs = fp->f_fs;
@@ -323,7 +319,7 @@ buf_write_file(f, buf_p, size_p)
 	if (rc)
 		return (rc);
 
- 	if (disk_block == 0)
+	if (disk_block == 0)
 		/* Because we can't allocate space on the drive */
 		return (EFBIG);
 
@@ -333,7 +329,7 @@ buf_write_file(f, buf_p, size_p)
 	 */
 	if (*size_p > DIP(fp, di_size) - fp->f_seekp)
 		*size_p = DIP(fp, di_size) - fp->f_seekp;
-	if (*size_p > block_size - off) 
+	if (*size_p > block_size - off)
 		*size_p = block_size - off;
 
 	/*
@@ -348,8 +344,8 @@ buf_write_file(f, buf_p, size_p)
 
 		twiddle(8);
 		rc = (f->f_dev->dv_strategy)(f->f_devdata, F_READ,
-			fsbtodb(fs, disk_block),
-			block_size, fp->f_buf, &fp->f_buf_size);
+		    fsbtodb(fs, disk_block),
+		    block_size, fp->f_buf, &fp->f_buf_size);
 		if (rc)
 			return (rc);
 
@@ -367,8 +363,8 @@ buf_write_file(f, buf_p, size_p)
 
 	twiddle(4);
 	rc = (f->f_dev->dv_strategy)(f->f_devdata, F_WRITE,
-		fsbtodb(fs, disk_block),
-		block_size, fp->f_buf, &fp->f_buf_size);
+	    fsbtodb(fs, disk_block),
+	    block_size, fp->f_buf, &fp->f_buf_size);
 	return (rc);
 }
 
@@ -377,10 +373,7 @@ buf_write_file(f, buf_p, size_p)
  * the location in the buffer and the amount in the buffer.
  */
 static int
-buf_read_file(f, buf_p, size_p)
-	struct open_file *f;
-	char **buf_p;		/* out */
-	size_t *size_p;		/* out */
+buf_read_file(struct open_file *f, char **buf_p, size_t *size_p)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct fs *fs = fp->f_fs;
@@ -408,8 +401,8 @@ buf_read_file(f, buf_p, size_p)
 		} else {
 			twiddle(4);
 			rc = (f->f_dev->dv_strategy)(f->f_devdata,
-				F_READ, fsbtodb(fs, disk_block),
-				block_size, fp->f_buf, &fp->f_buf_size);
+			    F_READ, fsbtodb(fs, disk_block),
+			    block_size, fp->f_buf, &fp->f_buf_size);
 			if (rc)
 				return (rc);
 		}
@@ -439,10 +432,7 @@ buf_read_file(f, buf_p, size_p)
  * i_number.
  */
 static int
-search_directory(name, f, inumber_p)
-	char *name;
-	struct open_file *f;
-	ino_t *inumber_p;		/* out */
+search_directory(char *name, struct open_file *f, ino_t *inumber_p)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	struct direct *dp;
@@ -467,7 +457,7 @@ search_directory(name, f, inumber_p)
 				goto next;
 			namlen = dp->d_namlen;
 			if (namlen == length &&
-			    !strcmp(name, dp->d_name)) {
+			    strcmp(name, dp->d_name) == 0) {
 				/* found entry */
 				*inumber_p = dp->d_ino;
 				return (0);
@@ -486,9 +476,7 @@ static int sblock_try[] = SBLOCKSEARCH;
  * Open a file.
  */
 static int
-ufs_open(upath, f)
-	const char *upath;
-	struct open_file *f;
+ufs_open(const char *upath, struct open_file *f)
 {
 	char *cp, *ncp;
 	int c;
@@ -503,8 +491,8 @@ ufs_open(upath, f)
 	char *path = NULL;
 
 	/* allocate file system specific data structure */
-	fp = malloc(sizeof(struct file));
-	bzero(fp, sizeof(struct file));
+	fp = malloc(sizeof (struct file));
+	bzero(fp, sizeof (struct file));
 	f->f_fsdata = (void *)fp;
 
 	/* allocate space and read super block */
@@ -521,11 +509,11 @@ ufs_open(upath, f)
 		if (rc)
 			goto out;
 		if ((fs->fs_magic == FS_UFS1_MAGIC ||
-		     (fs->fs_magic == FS_UFS2_MAGIC &&
-		      fs->fs_sblockloc == sblock_try[i])) &&
+		    (fs->fs_magic == FS_UFS2_MAGIC &&
+		    fs->fs_sblockloc == sblock_try[i])) &&
 		    buf_size == SBLOCKSIZE &&
 		    fs->fs_bsize <= MAXBSIZE &&
-		    fs->fs_bsize >= sizeof(struct fs))
+		    fs->fs_bsize >= sizeof (struct fs))
 			break;
 	}
 	if (sblock_try[i] == -1) {
@@ -552,8 +540,8 @@ ufs_open(upath, f)
 
 	cp = path = strdup(upath);
 	if (path == NULL) {
-	    rc = ENOMEM;
-	    goto out;
+		rc = ENOMEM;
+		goto out;
 	}
 	while (*cp) {
 
@@ -629,7 +617,7 @@ ufs_open(upath, f)
 					cp = (caddr_t)(fp->f_di.di1.di_db);
 				else
 					cp = (caddr_t)(fp->f_di.di2.di_db);
-				bcopy(cp, namebuf, (unsigned) link_len);
+				bcopy(cp, namebuf, (unsigned)link_len);
 			} else {
 				/*
 				 * Read file for symbolic link
@@ -643,11 +631,11 @@ ufs_open(upath, f)
 				rc = block_map(f, (ufs2_daddr_t)0, &disk_block);
 				if (rc)
 					goto out;
-				
+
 				twiddle(1);
 				rc = (f->f_dev->dv_strategy)(f->f_devdata,
-					F_READ, fsbtodb(fs, disk_block),
-					fs->fs_bsize, buf, &buf_size);
+				    F_READ, fsbtodb(fs, disk_block),
+				    fs->fs_bsize, buf, &buf_size);
 				if (rc)
 					goto out;
 
@@ -689,8 +677,7 @@ out:
 }
 
 static int
-ufs_close(f)
-	struct open_file *f;
+ufs_close(struct open_file *f)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	int level;
@@ -715,11 +702,7 @@ ufs_close(f)
  * Cross block boundaries when necessary.
  */
 static int
-ufs_read(f, start, size, resid)
-	struct open_file *f;
-	void *start;
-	size_t size;
-	size_t *resid;	/* out */
+ufs_read(struct open_file *f, void *start, size_t size, size_t *resid)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	size_t csize;
@@ -757,11 +740,7 @@ ufs_read(f, start, size, resid)
  * extend the file.
  */
 static int
-ufs_write(f, start, size, resid)
-	struct open_file *f;
-	const void *start;
-	size_t size;
-	size_t *resid;	/* out */
+ufs_write(struct open_file *f, const void *start, size_t size, size_t *resid)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	size_t csize;
@@ -789,10 +768,7 @@ ufs_write(f, start, size, resid)
 }
 
 static off_t
-ufs_seek(f, offset, where)
-	struct open_file *f;
-	off_t offset;
-	int where;
+ufs_seek(struct open_file *f, off_t offset, int where)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 
@@ -814,9 +790,7 @@ ufs_seek(f, offset, where)
 }
 
 static int
-ufs_stat(f, sb)
-	struct open_file *f;
-	struct stat *sb;
+ufs_stat(struct open_file *f, struct stat *sb)
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 

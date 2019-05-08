@@ -26,7 +26,7 @@
 #
 # Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
 # Copyright (c) 2012 by Delphix. All rights reserved.
-# Copyright (c) 2012 Joyent, Inc. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2018 Jason King
 #
 
@@ -108,8 +108,6 @@ CERRWARN += -_gcc=-Wno-clobbered
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-unused-label
 CERRWARN += -_gcc=-Wno-unused-variable
-
-SMOFF += all_func_returns
 
 #
 # -erroff=E_INCONS_ARG_DECL2 works around a problem where lint gets confused

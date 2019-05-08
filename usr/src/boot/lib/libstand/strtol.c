@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -28,11 +28,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)strtol.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
 
 #include "stand.h"
 #include <limits.h>
@@ -44,10 +39,7 @@ static char sccsid[] = "@(#)strtol.c	8.1 (Berkeley) 6/4/93";
  * alphabets and digits are each contiguous.
  */
 long
-strtol(nptr, endptr, base)
-	const char *nptr;
-	char **endptr;
-	int base;
+strtol(const char *nptr, char **endptr, int base)
 {
 	const char *s;
 	unsigned long acc;
@@ -57,9 +49,9 @@ strtol(nptr, endptr, base)
 
 	/* Be sensible about NULL strings */
 	if (nptr == NULL)
-	    nptr = "";
+		nptr = "";
 	s = nptr;
-	
+
 	/*
 	 * Skip white space and pick up leading +/- sign if any.
 	 * If base is 0, allow 0x for hex and 0 for octal, else
@@ -102,7 +94,7 @@ strtol(nptr, endptr, base)
 	cutoff = neg ? -(unsigned long)LONG_MIN : LONG_MAX;
 	cutlim = cutoff % (unsigned long)base;
 	cutoff /= (unsigned long)base;
-	for (acc = 0, any = 0;; c = *s++) {
+	for (acc = 0, any = 0; ; c = *s++) {
 		if (!isascii(c))
 			break;
 		if (isdigit(c))

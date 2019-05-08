@@ -16,7 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -59,22 +59,22 @@ sendether(struct iodesc *d, void *pkt, size_t len, uint8_t *dea, int etype)
 	struct ether_header *eh;
 
 #ifdef ETHER_DEBUG
- 	if (debug)
+	if (debug)
 		printf("sendether: called\n");
 #endif
 
 	eh = (struct ether_header *)pkt - 1;
-	len += sizeof(*eh);
+	len += sizeof (*eh);
 
 	MACPY(d->myea, eh->ether_shost);		/* by byte */
 	MACPY(dea, eh->ether_dhost);			/* by byte */
 	eh->ether_type = htons(etype);
 
 	n = netif_put(d, eh, len);
-	if (n == -1 || n < sizeof(*eh))
+	if (n == -1 || n < sizeof (*eh))
 		return (-1);
 
-	n -= sizeof(*eh);
+	n -= sizeof (*eh);
 	return (n);
 }
 
@@ -93,13 +93,13 @@ readether(struct iodesc *d, void **pkt, void **payload, time_t tleft,
 	void *ptr;
 
 #ifdef ETHER_DEBUG
- 	if (debug)
+	if (debug)
 		printf("readether: called\n");
 #endif
 
 	ptr = NULL;
 	n = netif_get(d, &ptr, tleft);
-	if (n == -1 || n < sizeof(*eh)) {
+	if (n == -1 || n < sizeof (*eh)) {
 		free(ptr);
 		return (-1);
 	}
@@ -118,10 +118,10 @@ readether(struct iodesc *d, void **pkt, void **payload, time_t tleft,
 	}
 
 	*pkt = ptr;
-	*payload = (void *)((uintptr_t)eh + sizeof(*eh));
+	*payload = (void *)((uintptr_t)eh + sizeof (*eh));
 	*etype = ntohs(eh->ether_type);
 
-	n -= sizeof(*eh);
+	n -= sizeof (*eh);
 	return (n);
 }
 
@@ -130,8 +130,7 @@ readether(struct iodesc *d, void **pkt, void **payload, time_t tleft,
  */
 static char digits[] = "0123456789abcdef";
 char *
-ether_sprintf(ap)
-        u_char *ap;
+ether_sprintf(uchar_t *ap)
 {
 	int i;
 	static char etherbuf[18];
