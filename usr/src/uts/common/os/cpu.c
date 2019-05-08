@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -108,6 +109,7 @@ kmutex_t	cpu_lock;
 cpu_t		*cpu_list;		/* list of all CPUs */
 cpu_t		*clock_cpu_list;	/* used by clock to walk CPUs */
 cpu_t		*cpu_active;		/* list of active CPUs */
+cpuset_t	cpu_active_set;		/* cached set of active CPUs */
 static cpuset_t	cpu_available;		/* set of available CPUs */
 cpuset_t	cpu_seqid_inuse;	/* which cpu_seqids are in use */
 
@@ -1194,7 +1196,7 @@ cpu_online(cpu_t *cp)
 	 * Handle on-line request.
 	 *	This code must put the new CPU on the active list before
 	 *	starting it because it will not be paused, and will start
-	 * 	using the active list immediately.  The real start occurs
+	 *	using the active list immediately.  The real start occurs
 	 *	when the CPU_QUIESCED flag is turned off.
 	 */
 
@@ -1724,6 +1726,7 @@ cpu_list_init(cpu_t *cp)
 	cp->cpu_part = &cp_default;
 
 	CPUSET_ADD(cpu_available, cp->cpu_id);
+	CPUSET_ADD(cpu_active_set, cp->cpu_id);
 }
 
 /*
@@ -1895,6 +1898,7 @@ cpu_add_active_internal(cpu_t *cp)
 	cp->cpu_prev_onln = cpu_active->cpu_prev_onln;
 	cpu_active->cpu_prev_onln->cpu_next_onln = cp;
 	cpu_active->cpu_prev_onln = cp;
+	CPUSET_ADD(cpu_active_set, cp->cpu_id);
 
 	if (pp->cp_cpulist) {
 		cp->cpu_next_part = pp->cp_cpulist;
@@ -1965,6 +1969,7 @@ cpu_remove_active(cpu_t *cp)
 	}
 	cp->cpu_next_onln = cp;
 	cp->cpu_prev_onln = cp;
+	CPUSET_DEL(cpu_active_set, cp->cpu_id);
 
 	cp->cpu_prev_part->cpu_next_part = cp->cpu_next_part;
 	cp->cpu_next_part->cpu_prev_part = cp->cpu_prev_part;
@@ -2704,13 +2709,18 @@ cpu_bind_thread(kthread_id_t tp, processorid_t bind, processorid_t *obind,
 	return (0);
 }
 
-#if CPUSET_WORDS > 1
 
-/*
- * Functions for implementing cpuset operations when a cpuset is more
- * than one word.  On platforms where a cpuset is a single word these
- * are implemented as macros in cpuvar.h.
- */
+cpuset_t *
+cpuset_alloc(int kmflags)
+{
+	return (kmem_alloc(sizeof (cpuset_t), kmflags));
+}
+
+void
+cpuset_free(cpuset_t *s)
+{
+	kmem_free(s, sizeof (cpuset_t));
+}
 
 void
 cpuset_all(cpuset_t *s)
@@ -2722,43 +2732,66 @@ cpuset_all(cpuset_t *s)
 }
 
 void
-cpuset_all_but(cpuset_t *s, uint_t cpu)
+cpuset_all_but(cpuset_t *s, const uint_t cpu)
 {
 	cpuset_all(s);
 	CPUSET_DEL(*s, cpu);
 }
 
 void
-cpuset_only(cpuset_t *s, uint_t cpu)
+cpuset_only(cpuset_t *s, const uint_t cpu)
 {
 	CPUSET_ZERO(*s);
 	CPUSET_ADD(*s, cpu);
 }
 
+long
+cpu_in_set(const cpuset_t *s, const uint_t cpu)
+{
+	VERIFY(cpu < NCPU);
+	return (BT_TEST(s->cpub, cpu));
+}
+
+void
+cpuset_add(cpuset_t *s, const uint_t cpu)
+{
+	VERIFY(cpu < NCPU);
+	BT_SET(s->cpub, cpu);
+}
+
+void
+cpuset_del(cpuset_t *s, const uint_t cpu)
+{
+	VERIFY(cpu < NCPU);
+	BT_CLEAR(s->cpub, cpu);
+}
+
 int
-cpuset_isnull(cpuset_t *s)
+cpuset_isnull(const cpuset_t *s)
 {
 	int i;
 
-	for (i = 0; i < CPUSET_WORDS; i++)
+	for (i = 0; i < CPUSET_WORDS; i++) {
 		if (s->cpub[i] != 0)
 			return (0);
+	}
 	return (1);
 }
 
 int
-cpuset_cmp(cpuset_t *s1, cpuset_t *s2)
+cpuset_isequal(const cpuset_t *s1, const cpuset_t *s2)
 {
 	int i;
 
-	for (i = 0; i < CPUSET_WORDS; i++)
+	for (i = 0; i < CPUSET_WORDS; i++) {
 		if (s1->cpub[i] != s2->cpub[i])
 			return (0);
+	}
 	return (1);
 }
 
 uint_t
-cpuset_find(cpuset_t *s)
+cpuset_find(const cpuset_t *s)
 {
 
 	uint_t	i;
@@ -2778,7 +2811,7 @@ cpuset_find(cpuset_t *s)
 }
 
 void
-cpuset_bounds(cpuset_t *s, uint_t *smallestid, uint_t *largestid)
+cpuset_bounds(const cpuset_t *s, uint_t *smallestid, uint_t *largestid)
 {
 	int	i, j;
 	uint_t	bit;
@@ -2822,7 +2855,72 @@ cpuset_bounds(cpuset_t *s, uint_t *smallestid, uint_t *largestid)
 	*smallestid = *largestid = CPUSET_NOTINSET;
 }
 
-#endif	/* CPUSET_WORDS */
+void
+cpuset_atomic_del(cpuset_t *s, const uint_t cpu)
+{
+	VERIFY(cpu < NCPU);
+	BT_ATOMIC_CLEAR(s->cpub, (cpu))
+}
+
+void
+cpuset_atomic_add(cpuset_t *s, const uint_t cpu)
+{
+	VERIFY(cpu < NCPU);
+	BT_ATOMIC_SET(s->cpub, (cpu))
+}
+
+long
+cpuset_atomic_xadd(cpuset_t *s, const uint_t cpu)
+{
+	long res;
+
+	VERIFY(cpu < NCPU);
+	BT_ATOMIC_SET_EXCL(s->cpub, cpu, res);
+	return (res);
+}
+
+long
+cpuset_atomic_xdel(cpuset_t *s, const uint_t cpu)
+{
+	long res;
+
+	VERIFY(cpu < NCPU);
+	BT_ATOMIC_CLEAR_EXCL(s->cpub, cpu, res);
+	return (res);
+}
+
+void
+cpuset_or(cpuset_t *dst, cpuset_t *src)
+{
+	for (int i = 0; i < CPUSET_WORDS; i++) {
+		dst->cpub[i] |= src->cpub[i];
+	}
+}
+
+void
+cpuset_xor(cpuset_t *dst, cpuset_t *src)
+{
+	for (int i = 0; i < CPUSET_WORDS; i++) {
+		dst->cpub[i] ^= src->cpub[i];
+	}
+}
+
+void
+cpuset_and(cpuset_t *dst, cpuset_t *src)
+{
+	for (int i = 0; i < CPUSET_WORDS; i++) {
+		dst->cpub[i] &= src->cpub[i];
+	}
+}
+
+void
+cpuset_zero(cpuset_t *dst)
+{
+	for (int i = 0; i < CPUSET_WORDS; i++) {
+		dst->cpub[i] = 0;
+	}
+}
+
 
 /*
  * Unbind threads bound to specified CPU.
@@ -3112,9 +3210,9 @@ cpu_get_state_str(cpu_t *cpu)
 static void
 cpu_stats_kstat_create(cpu_t *cp)
 {
-	int 	instance = cp->cpu_id;
-	char 	*module = "cpu";
-	char 	*class = "misc";
+	int	instance = cp->cpu_id;
+	char	*module = "cpu";
+	char	*class = "misc";
 	kstat_t	*ksp;
 	zoneid_t zoneid;
 
@@ -3350,18 +3448,18 @@ cpu_stat_ks_update(kstat_t *ksp, int rw)
 		cso->cpu_sysinfo.cpu[CPU_USER] = msnsecs[CMS_USER];
 	if (cso->cpu_sysinfo.cpu[CPU_KERNEL] < msnsecs[CMS_SYSTEM])
 		cso->cpu_sysinfo.cpu[CPU_KERNEL] = msnsecs[CMS_SYSTEM];
-	cso->cpu_sysinfo.cpu[CPU_WAIT] 	= 0;
-	cso->cpu_sysinfo.wait[W_IO] 	= 0;
+	cso->cpu_sysinfo.cpu[CPU_WAIT]	= 0;
+	cso->cpu_sysinfo.wait[W_IO]	= 0;
 	cso->cpu_sysinfo.wait[W_SWAP]	= 0;
 	cso->cpu_sysinfo.wait[W_PIO]	= 0;
-	cso->cpu_sysinfo.bread 		= CPU_STATS(cp, sys.bread);
-	cso->cpu_sysinfo.bwrite 	= CPU_STATS(cp, sys.bwrite);
-	cso->cpu_sysinfo.lread 		= CPU_STATS(cp, sys.lread);
-	cso->cpu_sysinfo.lwrite 	= CPU_STATS(cp, sys.lwrite);
-	cso->cpu_sysinfo.phread 	= CPU_STATS(cp, sys.phread);
-	cso->cpu_sysinfo.phwrite 	= CPU_STATS(cp, sys.phwrite);
-	cso->cpu_sysinfo.pswitch 	= CPU_STATS(cp, sys.pswitch);
-	cso->cpu_sysinfo.trap 		= CPU_STATS(cp, sys.trap);
+	cso->cpu_sysinfo.bread		= CPU_STATS(cp, sys.bread);
+	cso->cpu_sysinfo.bwrite		= CPU_STATS(cp, sys.bwrite);
+	cso->cpu_sysinfo.lread		= CPU_STATS(cp, sys.lread);
+	cso->cpu_sysinfo.lwrite		= CPU_STATS(cp, sys.lwrite);
+	cso->cpu_sysinfo.phread		= CPU_STATS(cp, sys.phread);
+	cso->cpu_sysinfo.phwrite	= CPU_STATS(cp, sys.phwrite);
+	cso->cpu_sysinfo.pswitch	= CPU_STATS(cp, sys.pswitch);
+	cso->cpu_sysinfo.trap		= CPU_STATS(cp, sys.trap);
 	cso->cpu_sysinfo.intr		= 0;
 	for (i = 0; i < PIL_MAX; i++)
 		cso->cpu_sysinfo.intr += CPU_STATS(cp, sys.intr[i]);

@@ -24,6 +24,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_CPUVAR_H
@@ -98,11 +99,11 @@ typedef struct cpu {
 	/*
 	 * Links to other CPUs.  It is safe to walk these lists if
 	 * one of the following is true:
-	 * 	- cpu_lock held
-	 * 	- preemption disabled via kpreempt_disable
-	 * 	- PIL >= DISP_LEVEL
-	 * 	- acting thread is an interrupt thread
-	 * 	- all other CPUs are paused
+	 *	- cpu_lock held
+	 *	- preemption disabled via kpreempt_disable
+	 *	- PIL >= DISP_LEVEL
+	 *	- acting thread is an interrupt thread
+	 *	- all other CPUs are paused
 	 */
 	struct cpu	*cpu_next;		/* next existing CPU */
 	struct cpu	*cpu_prev;		/* prev existing CPU */
@@ -130,7 +131,7 @@ typedef struct cpu {
 	 */
 	char		cpu_runrun;	/* scheduling flag - set to preempt */
 	char		cpu_kprunrun;		/* force kernel preemption */
-	pri_t		cpu_chosen_level; 	/* priority at which cpu */
+	pri_t		cpu_chosen_level;	/* priority at which cpu */
 						/* was chosen for scheduling */
 	kthread_t	*cpu_dispthread; /* thread selected for dispatch */
 	disp_lock_t	cpu_thread_lock; /* dispatcher lock on current thread */
@@ -286,7 +287,7 @@ extern cpu_core_t cpu_core[];
  * list in avintr.c.
  */
 #define	INTR_ACTIVE(cpup, level)	\
-	((level) <= LOCK_LEVEL ? 	\
+	((level) <= LOCK_LEVEL ?	\
 	((cpup)->cpu_intr_actv & (1 << (level))) : (CPU_ON_INTR(cpup)))
 
 /*
@@ -388,9 +389,6 @@ extern cpu_core_t cpu_core[];
 #define	CPU_DISP_DONTSTEAL	0x01	/* CPU undergoing context swtch */
 #define	CPU_DISP_HALTED		0x02	/* CPU halted waiting for interrupt */
 
-/* Note: inside ifdef: _KERNEL || _KMEMUSER || _BOOT */
-#if defined(_MACHDEP)
-
 /*
  * Macros for manipulating sets of CPUs as a bitmap.  Note that this
  * bitmap may vary in size depending on the maximum CPU id a specific
@@ -405,34 +403,60 @@ extern cpu_core_t cpu_core[];
 #define	CPUSET_WORDS	BT_BITOUL(NCPU)
 #define	CPUSET_NOTINSET	((uint_t)-1)
 
-#if	CPUSET_WORDS > 1
-
-typedef struct cpuset {
+#if defined(_MACHDEP)
+struct cpuset {
 	ulong_t	cpub[CPUSET_WORDS];
-} cpuset_t;
+};
+#else
+struct cpuset;
+#endif
+
+typedef struct cpuset cpuset_t;
+
+extern cpuset_t	*cpuset_alloc(int);
+extern void	cpuset_free(cpuset_t *);
 
 /*
- * Private functions for manipulating cpusets that do not fit in a
- * single word.  These should not be used directly; instead the
- * CPUSET_* macros should be used so the code will be portable
- * across different definitions of NCPU.
+ * Functions for manipulating cpusets.  These were previously considered
+ * private when some cpuset_t handling was performed in the CPUSET_* macros.
+ * They are now acceptable to use in non-_MACHDEP code.
  */
-extern	void	cpuset_all(cpuset_t *);
-extern	void	cpuset_all_but(cpuset_t *, uint_t);
-extern	int	cpuset_isnull(cpuset_t *);
-extern	int	cpuset_cmp(cpuset_t *, cpuset_t *);
-extern	void	cpuset_only(cpuset_t *, uint_t);
-extern	uint_t	cpuset_find(cpuset_t *);
-extern	void	cpuset_bounds(cpuset_t *, uint_t *, uint_t *);
+extern void	cpuset_all(cpuset_t *);
+extern void	cpuset_all_but(cpuset_t *, const uint_t);
+extern int	cpuset_isnull(const cpuset_t *);
+extern int	cpuset_isequal(const cpuset_t *, const cpuset_t *);
+extern void	cpuset_only(cpuset_t *, const uint_t);
+extern long	cpu_in_set(const cpuset_t *, const uint_t);
+extern void	cpuset_add(cpuset_t *, const uint_t);
+extern void	cpuset_del(cpuset_t *, const uint_t);
+extern uint_t	cpuset_find(const cpuset_t *);
+extern void	cpuset_bounds(const cpuset_t *, uint_t *, uint_t *);
+extern void	cpuset_atomic_del(cpuset_t *, const uint_t);
+extern void	cpuset_atomic_add(cpuset_t *, const uint_t);
+extern long	cpuset_atomic_xadd(cpuset_t *, const uint_t);
+extern long	cpuset_atomic_xdel(cpuset_t *, const uint_t);
+extern void	cpuset_or(cpuset_t *, cpuset_t *);
+extern void	cpuset_xor(cpuset_t *, cpuset_t *);
+extern void	cpuset_and(cpuset_t *, cpuset_t *);
+extern void	cpuset_zero(cpuset_t *);
+
+
+#if defined(_MACHDEP)
+
+/*
+ * Prior to the cpuset_t restructuring, the CPUSET_* macros contained
+ * significant logic, rather than directly invoking the backend functions.
+ * They are maintained here so that existing _MACHDEP code can use them.
+ */
 
 #define	CPUSET_ALL(set)			cpuset_all(&(set))
 #define	CPUSET_ALL_BUT(set, cpu)	cpuset_all_but(&(set), cpu)
 #define	CPUSET_ONLY(set, cpu)		cpuset_only(&(set), cpu)
-#define	CPU_IN_SET(set, cpu)		BT_TEST((set).cpub, cpu)
-#define	CPUSET_ADD(set, cpu)		BT_SET((set).cpub, cpu)
-#define	CPUSET_DEL(set, cpu)		BT_CLEAR((set).cpub, cpu)
+#define	CPU_IN_SET(set, cpu)		cpu_in_set(&(set), cpu)
+#define	CPUSET_ADD(set, cpu)		cpuset_add(&(set), cpu)
+#define	CPUSET_DEL(set, cpu)		cpuset_del(&(set), cpu)
 #define	CPUSET_ISNULL(set)		cpuset_isnull(&(set))
-#define	CPUSET_ISEQUAL(set1, set2)	cpuset_cmp(&(set1), &(set2))
+#define	CPUSET_ISEQUAL(set1, set2)	cpuset_isequal(&(set1), &(set2))
 
 /*
  * Find one CPU in the cpuset.
@@ -460,100 +484,33 @@ extern	void	cpuset_bounds(cpuset_t *, uint_t *, uint_t *);
  * deleting a cpu that's not in the cpuset)
  */
 
-#define	CPUSET_ATOMIC_DEL(set, cpu)	BT_ATOMIC_CLEAR((set).cpub, (cpu))
-#define	CPUSET_ATOMIC_ADD(set, cpu)	BT_ATOMIC_SET((set).cpub, (cpu))
+#define	CPUSET_ATOMIC_DEL(set, cpu)	cpuset_atomic_del(&(set), cpu)
+#define	CPUSET_ATOMIC_ADD(set, cpu)	cpuset_atomic_add(&(set), cpu)
 
-#define	CPUSET_ATOMIC_XADD(set, cpu, result) \
-	BT_ATOMIC_SET_EXCL((set).cpub, cpu, result)
+#define	CPUSET_ATOMIC_XADD(set, cpu, result)	\
+	(result) = cpuset_atomic_xadd(&(set), cpu)
 
-#define	CPUSET_ATOMIC_XDEL(set, cpu, result) \
-	BT_ATOMIC_CLEAR_EXCL((set).cpub, cpu, result)
+#define	CPUSET_ATOMIC_XDEL(set, cpu, result)	\
+	(result) = cpuset_atomic_xdel(&(set), cpu)
 
+#define	CPUSET_OR(set1, set2)	cpuset_or(&(set1), &(set2))
 
-#define	CPUSET_OR(set1, set2)		{		\
-	int _i;						\
-	for (_i = 0; _i < CPUSET_WORDS; _i++)		\
-		(set1).cpub[_i] |= (set2).cpub[_i];	\
-}
+#define	CPUSET_XOR(set1, set2)	cpuset_xor(&(set1), &(set2))
 
-#define	CPUSET_XOR(set1, set2)		{		\
-	int _i;						\
-	for (_i = 0; _i < CPUSET_WORDS; _i++)		\
-		(set1).cpub[_i] ^= (set2).cpub[_i];	\
-}
+#define	CPUSET_AND(set1, set2)	cpuset_and(&(set1), &(set2))
 
-#define	CPUSET_AND(set1, set2)		{		\
-	int _i;						\
-	for (_i = 0; _i < CPUSET_WORDS; _i++)		\
-		(set1).cpub[_i] &= (set2).cpub[_i];	\
-}
+#define	CPUSET_ZERO(set)	cpuset_zero(&(set))
 
-#define	CPUSET_ZERO(set)		{		\
-	int _i;						\
-	for (_i = 0; _i < CPUSET_WORDS; _i++)		\
-		(set).cpub[_i] = 0;			\
-}
+#endif /* defined(_MACHDEP) */
 
-#elif	CPUSET_WORDS == 1
-
-typedef	ulong_t	cpuset_t;	/* a set of CPUs */
-
-#define	CPUSET(cpu)			(1UL << (cpu))
-
-#define	CPUSET_ALL(set)			((void)((set) = ~0UL))
-#define	CPUSET_ALL_BUT(set, cpu)	((void)((set) = ~CPUSET(cpu)))
-#define	CPUSET_ONLY(set, cpu)		((void)((set) = CPUSET(cpu)))
-#define	CPU_IN_SET(set, cpu)		((set) & CPUSET(cpu))
-#define	CPUSET_ADD(set, cpu)		((void)((set) |= CPUSET(cpu)))
-#define	CPUSET_DEL(set, cpu)		((void)((set) &= ~CPUSET(cpu)))
-#define	CPUSET_ISNULL(set)		((set) == 0)
-#define	CPUSET_ISEQUAL(set1, set2)	((set1) == (set2))
-#define	CPUSET_OR(set1, set2)		((void)((set1) |= (set2)))
-#define	CPUSET_XOR(set1, set2)		((void)((set1) ^= (set2)))
-#define	CPUSET_AND(set1, set2)		((void)((set1) &= (set2)))
-#define	CPUSET_ZERO(set)		((void)((set) = 0))
-
-#define	CPUSET_FIND(set, cpu)		{		\
-	cpu = (uint_t)(lowbit(set) - 1);				\
-}
-
-#define	CPUSET_BOUNDS(set, smallest, largest)	{	\
-	smallest = (uint_t)(lowbit(set) - 1);		\
-	largest = (uint_t)(highbit(set) - 1);		\
-}
-
-#define	CPUSET_ATOMIC_DEL(set, cpu)	atomic_and_ulong(&(set), ~CPUSET(cpu))
-#define	CPUSET_ATOMIC_ADD(set, cpu)	atomic_or_ulong(&(set), CPUSET(cpu))
-
-#define	CPUSET_ATOMIC_XADD(set, cpu, result) \
-	{ result = atomic_set_long_excl(&(set), (cpu)); }
-
-#define	CPUSET_ATOMIC_XDEL(set, cpu, result) \
-	{ result = atomic_clear_long_excl(&(set), (cpu)); }
-
-#else	/* CPUSET_WORDS <= 0 */
-
-#error NCPU is undefined or invalid
-
-#endif	/* CPUSET_WORDS	*/
 
 extern cpuset_t cpu_seqid_inuse;
-
-#endif	/* _MACHDEP */
-#endif /* _KERNEL || _KMEMUSER || _BOOT */
-
-#define	CPU_CPR_OFFLINE		0x0
-#define	CPU_CPR_ONLINE		0x1
-#define	CPU_CPR_IS_OFFLINE(cpu)	(((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE) == 0)
-#define	CPU_CPR_IS_ONLINE(cpu)	((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE)
-#define	CPU_SET_CPR_FLAGS(cpu, flag)	((cpu)->cpu_cpr_flags |= flag)
-
-#if defined(_KERNEL) || defined(_KMEMUSER)
 
 extern struct cpu	*cpu[];		/* indexed by CPU number */
 extern struct cpu	**cpu_seq;	/* indexed by sequential CPU id */
 extern cpu_t		*cpu_list;	/* list of CPUs */
 extern cpu_t		*cpu_active;	/* list of active CPUs */
+extern cpuset_t		cpu_active_set;	/* cached set of active CPUs */
 extern int		ncpus;		/* number of CPUs present */
 extern int		ncpus_online;	/* number of CPUs not quiesced */
 extern int		max_ncpus;	/* max present before ncpus is known */
@@ -613,7 +570,13 @@ extern struct cpu *curcpup(void);
  */
 #define	CPU_NEW_GENERATION(cp)	((cp)->cpu_generation++)
 
-#endif /* _KERNEL || _KMEMUSER */
+#endif /* defined(_KERNEL) || defined(_KMEMUSER) */
+
+#define	CPU_CPR_OFFLINE		0x0
+#define	CPU_CPR_ONLINE		0x1
+#define	CPU_CPR_IS_OFFLINE(cpu)	(((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE) == 0)
+#define	CPU_CPR_IS_ONLINE(cpu)	((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE)
+#define	CPU_SET_CPR_FLAGS(cpu, flag)	((cpu)->cpu_cpr_flags |= flag)
 
 /*
  * CPU support routines (not for genassym.c)
