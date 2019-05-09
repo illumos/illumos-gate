@@ -419,13 +419,13 @@ cpcgen_parse_model(char *fsr, uint_t *family, uint_t *model, uint_t *nstepp,
 
 	errno = 0;
 	l = strtol(fam, &last, 16);
-	if (errno != 0 || l < 0 || l >= INT_MAX || *last != '\0') {
+	if (errno != 0 || l < 0 || l > UINT_MAX || *last != '\0') {
 		errx(EXIT_FAILURE, "failed to parse family \"%s\"", fam);
 	}
 	*family = (uint_t)l;
 
 	l = strtol(mod, &last, 16);
-	if (errno != 0 || l < 0 || l >= INT_MAX || *last != '\0') {
+	if (errno != 0 || l < 0 || l > UINT_MAX || *last != '\0') {
 		errx(EXIT_FAILURE, "failed to parse model \"%s\"", mod);
 	}
 	*model = (uint_t)l;

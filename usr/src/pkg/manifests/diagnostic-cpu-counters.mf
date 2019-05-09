@@ -66,10 +66,12 @@ file path=usr/lib/libpctx.so.1
 file path=usr/sbin/cpustat mode=0555
 file path=usr/share/man/man1/cputrack.1
 file path=usr/share/man/man1m/cpustat.1m
+$(i386_ONLY)file path=usr/share/man/man3cpc/amd_f17h_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/bdw_de_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/bdw_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/bdx_events.3cpc
 $(i386_ONLY)file path=usr/share/man/man3cpc/bnl_events.3cpc
+$(i386_ONLY)file path=usr/share/man/man3cpc/clx_events.3cpc
 file path=usr/share/man/man3cpc/cpc.3cpc
 file path=usr/share/man/man3cpc/cpc_access.3cpc
 file path=usr/share/man/man3cpc/cpc_bind_curlwp.3cpc

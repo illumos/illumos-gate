@@ -57,7 +57,7 @@ CPCGEN_OBJS	= \
 	core_pcbe_wsm_ex.o
 
 CPCGEN_COMMON	= core_pcbe_cpcgen.c
-CPCGEN_CMD 	= $(CPCGEN) -d $(SRC)/data/perfmon -o .
+CPCGEN_CMD	= $(CPCGEN) -d $(SRC)/data/perfmon -o .
 CPCGEN_SRCS	= $(CPCGEN_OBJS:%.o=%.c) core_pcbe_cpcgen.h
 
 #

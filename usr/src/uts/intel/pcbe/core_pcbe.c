@@ -994,8 +994,7 @@ core_pcbe_event_coverage(char *event)
 	} else {
 		if (find_generic_events(event, cmn_generic_events) != NULL) {
 			bitmap |= BITMASK_XBITS(num_gpc);
-		} else if (find_generic_events(event,
-		    generic_events_pic0) != NULL) {
+		} if (find_generic_events(event, generic_events_pic0) != NULL) {
 			bitmap |= 1ULL;
 		} else if (find_gpcevent_core_uarch(event,
 		    cmn_gpc_events_core_uarch) != NULL) {

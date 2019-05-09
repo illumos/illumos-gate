@@ -171,9 +171,9 @@ has_keyboard(void)
 	 * device path matches either the USB device path for keyboards or the
 	 * legacy device path for keyboards.
 	 */
-	hin_end = &hin[sz / sizeof(*hin)];
+	hin_end = &hin[sz / sizeof (*hin)];
 	for (walker = hin; walker < hin_end; walker++) {
-		status = BS->HandleProtocol(*walker, &devid, (VOID **)&path);
+		status = BS->HandleProtocol(*walker, &devid, (void **)&path);
 		if (EFI_ERROR(status))
 			continue;
 
@@ -187,11 +187,12 @@ has_keyboard(void)
 			 */
 			if (DevicePathType(path) == ACPI_DEVICE_PATH &&
 			    (DevicePathSubType(path) == ACPI_DP ||
-				DevicePathSubType(path) == ACPI_EXTENDED_DP)) {
+			    DevicePathSubType(path) == ACPI_EXTENDED_DP)) {
 				ACPI_HID_DEVICE_PATH  *acpi;
 
 				acpi = (ACPI_HID_DEVICE_PATH *)(void *)path;
-				if ((EISA_ID_TO_NUM(acpi->HID) & 0xff00) == 0x300 &&
+				if ((EISA_ID_TO_NUM(acpi->HID) & 0xff00) ==
+				    0x300 &&
 				    (acpi->HID & 0xffff) == PNP_EISA_ID_CONST) {
 					retval = true;
 					goto out;
@@ -201,14 +202,21 @@ has_keyboard(void)
 			 * PS/2 keyboard, these definitely only appear when
 			 * connected to the system.
 			 */
-			} else if (DevicePathType(path) == MESSAGING_DEVICE_PATH &&
+			} else if (DevicePathType(path) ==
+			    MESSAGING_DEVICE_PATH &&
 			    DevicePathSubType(path) == MSG_USB_CLASS_DP) {
 				USB_CLASS_DEVICE_PATH *usb;
 
+				/*
+				 * Check for:
+				 * DeviceClass: HID
+				 * DeviceSubClass: Boot devices
+				 * DeviceProtocol: Boot keyboards
+				 */
 				usb = (USB_CLASS_DEVICE_PATH *)(void *)path;
-				if (usb->DeviceClass == 3 && /* HID */
-				    usb->DeviceSubClass == 1 && /* Boot devices */
-				    usb->DeviceProtocol == 1) { /* Boot keyboards */
+				if (usb->DeviceClass == 3 &&
+				    usb->DeviceSubClass == 1 &&
+				    usb->DeviceProtocol == 1) {
 					retval = true;
 					goto out;
 				}
@@ -433,8 +441,9 @@ interactive_interrupt(const char *msg)
 		return (false);
 	do {
 		if (last != now) {
-			printf("press any key to interrupt reboot in %d seconds\r",
-			fail_timeout - (int)(now - then));
+			printf("press any key to interrupt reboot "
+			    "in %d seconds\r",
+			    fail_timeout - (int)(now - then));
 			last = now;
 		}
 
@@ -473,7 +482,7 @@ main(int argc, CHAR16 *argv[])
 	archsw.arch_zfs_probe = efi_zfs_probe;
 
 	/* Get our loaded image protocol interface structure. */
-	BS->HandleProtocol(IH, &imgid, (VOID**)&img);
+	BS->HandleProtocol(IH, &imgid, (void **)&img);
 
 	/* Init the time source */
 	efi_time_init();
@@ -496,16 +505,15 @@ main(int argc, CHAR16 *argv[])
 
 	/*
 	 * Parse the args to set the console settings, etc
-	 * boot1.efi passes these in, if it can read /boot.config or /boot/config
-	 * or iPXE may be setup to pass these in. Or the optional argument in the
+	 * iPXE may be setup to pass these in. Or the optional argument in the
 	 * boot environment was used to pass these arguments in (in which case
 	 * neither /boot.config nor /boot/config are consulted).
 	 *
 	 * Loop through the args, and for each one that contains an '=' that is
 	 * not the first character, add it to the environment.  This allows
 	 * loader and kernel env vars to be passed on the command line.  Convert
-	 * args from UCS-2 to ASCII (16 to 8 bit) as they are copied (though this
-	 * method is flawed for non-ASCII characters).
+	 * args from UCS-2 to ASCII (16 to 8 bit) as they are copied (though
+	 * this method is flawed for non-ASCII characters).
 	 */
 	howto = 0;
 	for (i = 1; i < argc; i++) {
@@ -534,8 +542,10 @@ main(int argc, CHAR16 *argv[])
 					howto |= RB_PAUSE;
 					break;
 				case 'P':
-					if (!has_kbd)
-						howto |= RB_SERIAL | RB_MULTIPLE;
+					if (!has_kbd) {
+						howto |= RB_SERIAL;
+						howto |= RB_MULTIPLE;
+					}
 					break;
 				case 'r':
 					howto |= RB_DFLTROOT;
@@ -547,19 +557,19 @@ main(int argc, CHAR16 *argv[])
 					if (argv[i][j + 1] == 0) {
 						if (i + 1 == argc) {
 							strncpy(var, "115200",
-							    sizeof(var));
+							    sizeof (var));
 						} else {
 							CHAR16 *ptr;
 							ptr = &argv[i + 1][0];
 							cpy16to8(ptr, var,
-							    sizeof(var));
+							    sizeof (var));
 						}
 						i++;
 					} else {
 						cpy16to8(&argv[i][j + 1], var,
-						    sizeof(var));
+						    sizeof (var));
 					}
-					strncat(var, ",8,n,1,-", sizeof(var));
+					strncat(var, ",8,n,1,-", sizeof (var));
 					setenv("ttya-mode", var, 1);
 					break;
 				case 'v':
@@ -570,7 +580,7 @@ main(int argc, CHAR16 *argv[])
 		} else {
 			vargood = false;
 			for (j = 0; argv[i][j] != 0; j++) {
-				if (j == sizeof(var)) {
+				if (j == sizeof (var)) {
 					vargood = false;
 					break;
 				}
@@ -594,13 +604,13 @@ main(int argc, CHAR16 *argv[])
 	 */
 	if (howto & RB_MULTIPLE) {
 		if (howto & RB_SERIAL)
-			setenv("console", "ttya text" , 1);
+			setenv("console", "ttya text", 1);
 		else
-			setenv("console", "text ttya" , 1);
+			setenv("console", "text ttya", 1);
 	} else if (howto & RB_SERIAL) {
-		setenv("console", "ttya" , 1);
+		setenv("console", "ttya", 1);
 	} else
-		setenv("console", "text" , 1);
+		setenv("console", "text", 1);
 
 	if ((s = getenv("fail_timeout")) != NULL)
 		fail_timeout = strtol(s, NULL, 10);
@@ -622,7 +632,7 @@ main(int argc, CHAR16 *argv[])
 	}
 	printf("\n");
 
-	printf("Image base: 0x%lx\n", (u_long)img->ImageBase);
+	printf("Image base: 0x%lx\n", (unsigned long)img->ImageBase);
 	printf("EFI version: %d.%02d\n", ST->Hdr.Revision >> 16,
 	    ST->Hdr.Revision & 0xffff);
 	printf("EFI Firmware: %S (rev %d.%02d)\n", ST->FirmwareVendor,
@@ -650,14 +660,14 @@ main(int argc, CHAR16 *argv[])
 	}
 
 	boot_current = 0;
-	sz = sizeof(boot_current);
+	sz = sizeof (boot_current);
 	efi_global_getenv("BootCurrent", &boot_current, &sz);
 	printf("   BootCurrent: %04x\n", boot_current);
 
-	sz = sizeof(boot_order);
+	sz = sizeof (boot_order);
 	efi_global_getenv("BootOrder", &boot_order, &sz);
 	printf("   BootOrder:");
-	for (i = 0; i < sz / sizeof(boot_order[0]); i++)
+	for (i = 0; i < sz / sizeof (boot_order[0]); i++)
 		printf(" %04x%s", boot_order[i],
 		    boot_order[i] == boot_current ? "[*]" : "");
 	printf("\n");
@@ -762,7 +772,7 @@ command_memmap(int argc __unused, char *argv[] __unused)
 
 	ndesc = sz / dsz;
 	snprintf(line, 80, "%23s %12s %12s %8s %4s\n",
-	       "Type", "Physical", "Virtual", "#Pages", "Attr");
+	    "Type", "Physical", "Virtual", "#Pages", "Attr");
 	pager_open();
 	rv = pager_output(line);
 	if (rv) {
@@ -771,7 +781,7 @@ command_memmap(int argc __unused, char *argv[] __unused)
 	}
 
 	for (i = 0, p = map; i < ndesc;
-	     i++, p = NextMemoryDescriptor(p, dsz)) {
+	    i++, p = NextMemoryDescriptor(p, dsz)) {
 		snprintf(line, 80, "%23s %012jx %012jx %08jx ",
 		    efi_memory_type(p->Type), p->PhysicalStart,
 		    p->VirtualStart, p->NumberOfPages);
@@ -820,7 +830,7 @@ command_configuration(int argc __unused, char *argv[] __unused)
 	char *name;
 
 	printf("NumberOfTableEntries=%lu\n",
-		(unsigned long)ST->NumberOfTableEntries);
+	    (unsigned long)ST->NumberOfTableEntries);
 	for (i = 0; i < ST->NumberOfTableEntries; i++) {
 		EFI_GUID *guid;
 
@@ -905,7 +915,7 @@ command_lsefi(int argc __unused, char *argv[] __unused)
 	EFI_HANDLE handle;
 	UINTN bufsz = 0, i, j;
 	EFI_STATUS status;
-	int ret;
+	int ret = 0;
 
 	status = BS->LocateHandle(AllHandles, NULL, NULL, &bufsz, buffer);
 	if (status != EFI_BUFFER_TOO_SMALL) {
@@ -985,40 +995,6 @@ command_lszfs(int argc, char *argv[])
 	return (CMD_OK);
 }
 
-#ifdef __FreeBSD__
-COMMAND_SET(reloadbe, "reloadbe", "refresh the list of ZFS Boot Environments",
-	    command_reloadbe);
-
-static int
-command_reloadbe(int argc, char *argv[])
-{
-	int err;
-	char *root;
-
-	if (argc > 2) {
-		command_errmsg = "wrong number of arguments";
-		return (CMD_ERROR);
-	}
-
-	if (argc == 2) {
-		err = zfs_bootenv(argv[1]);
-	} else {
-		root = getenv("zfs_be_root");
-		if (root == NULL) {
-			return (CMD_OK);
-		}
-		err = zfs_bootenv(root);
-	}
-
-	if (err != 0) {
-		command_errmsg = strerror(err);
-		return (CMD_ERROR);
-	}
-
-	return (CMD_OK);
-}
-#endif /* __FreeBSD__ */
-
 #ifdef LOADER_FDT_SUPPORT
 extern int command_fdt_internal(int argc, char *argv[]);
 
@@ -1079,13 +1055,13 @@ command_chain(int argc, char *argv[])
 	}
 	if (read(fd, buf, st.st_size) != st.st_size) {
 		command_errmsg = "error while reading the file";
-		(void)BS->FreePool(buf);
+		(void) BS->FreePool(buf);
 		close(fd);
 		return (CMD_ERROR);
 	}
 	close(fd);
 	status = BS->LoadImage(FALSE, IH, NULL, buf, st.st_size, &loaderhandle);
-	(void)BS->FreePool(buf);
+	(void) BS->FreePool(buf);
 	if (status != EFI_SUCCESS) {
 		command_errmsg = "LoadImage failed";
 		return (CMD_ERROR);
@@ -1101,7 +1077,7 @@ command_chain(int argc, char *argv[])
 			len += strlen(argv[i]) + 1;
 
 		len *= sizeof (*argp);
-		loaded_image->LoadOptions = argp = malloc (len);
+		loaded_image->LoadOptions = argp = malloc(len);
 		if (loaded_image->LoadOptions == NULL) {
 			(void) BS->UnloadImage(loaded_image);
 			return (CMD_ERROR);

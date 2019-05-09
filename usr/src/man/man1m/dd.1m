@@ -46,663 +46,699 @@
 .\" Copyright (c) 2014, Joyent, Inc.  All rights Reserved.
 .\" Copyright (c) 2014 by Delphix. All rights reserved.
 .\"
-.TH DD 1M "Dec 12, 2014"
-.SH NAME
-dd \- convert and copy a file
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/bin/dd\fR [\fIoperand=value\fR]...
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBdd\fR utility copies the specified input file to the specified output
-with possible conversions. The standard input and output are used by default.
+.Dd May 4, 2019
+.Dt DD 1M
+.Os
+.Sh NAME
+.Nm dd
+.Nd convert and copy a file
+.Sh SYNOPSIS
+.Nm
+.Op Ar operand Ns = Ns Ar value
+.Ar ...
+.Sh DESCRIPTION
+The
+.Nm
+utility copies the specified input file to the specified output
+with possible conversions.
+The standard input and output are used by default.
 The input and output block sizes may be specified to take advantage of raw
-physical I/O. Sizes are specified in bytes; a number may end with \fBk\fR,
-\fBb\fR, or \fBw\fR to specify multiplication by 1024, 512, or 2, respectively.
-Numbers may also be separated by \fBx\fR to indicate multiplication.
-.sp
-.LP
-The \fBdd\fR utility reads the input one block at a time, using the specified
-input block size. \fBdd\fR then processes the block of data actually returned,
-which could be smaller than the requested block size. \fBdd\fR applies any
-conversions that have been specified and writes the resulting data to the
-output in blocks of the specified output block size.
-.sp
-.LP
-\fBcbs\fR is used only if \fBascii\fR, \fBasciib\fR, \fBunblock\fR,
-\fBebcdic\fR, \fBebcdicb\fR, \fBibm\fR, \fBibmb\fR, or \fBblock\fR conversion
-is specified. In the first two cases, \fBcbs\fR characters are copied into the
-conversion buffer, any specified character mapping is done, trailing blanks are
-trimmed, and a \fBNEWLINE\fR is added before sending the line to output. In the
-last three cases, characters up to \fBNEWLINE\fR are read into the conversion
-buffer and blanks are added to make up an output record of size \fBcbs\fR.
-\fBASCII\fR files are presumed to contain \fBNEWLINE\fR characters. If
-\fBcbs\fR is unspecified or \fB0\fR, the \fBascii\fR, \fBasciib\fR,
-\fBebcdic\fR, \fBebcdicb\fR, \fBibm\fR, and \fBibmb\fR options convert the
-character set without changing the input file's block structure. The
-\fBunblock\fR and \fBblock\fR options become a simple file copy.
-.sp
-.LP
-After completion, \fBdd\fR reports the number of whole and partial input and
-output blocks.
-.SH OPERANDS
-.LP
+physical I/O.
+Sizes are specified in bytes; a number may end with
+.Sy k ,
+.Sy b ,
+or
+.Sy w
+to specify multiplication by 1024, 512, or 2, respectively.
+Numbers may also be separated by
+.Sy x
+to indicate multiplication.
+.Pp
+The
+.Nm
+utility reads the input one block at a time, using the specified
+input block size.
+.Nm
+then processes the block of data actually returned,
+which could be smaller than the requested block size unless the input flag
+.Ar fullblock
+is used.
+.Nm
+applies any conversions that have been specified and writes the resulting data
+to the output in blocks of the specified output block size.
+.Pp
+.Cm cbs
+is used only if
+.Cm ascii ,
+.Cm asciib ,
+.Cm unblock ,
+.Cm ebcdic ,
+.Cm ebcdicb ,
+.Cm ibm ,
+.Cm ibmb ,
+or
+.Cm block
+conversion is specified.
+In the first two cases,
+.Cm cbs
+characters are copied into the conversion buffer, any specified character
+mapping is done, trailing blanks are trimmed, and a
+.Cm NEWLINE
+is added before sending the line to output.
+In the last three cases, characters up to
+.Cm NEWLINE
+are read into the conversion buffer and blanks are added to make up an output
+record of size
+.Cm cbs .
+.Cm ASCII
+files are presumed to contain
+.Cm NEWLINE
+characters.
+If
+.Cm cbs
+is unspecified or
+.Cm 0 ,
+the
+.Cm ascii ,
+.Cm asciib ,
+.Cm ebcdic ,
+.Cm ebcdicb ,
+.Cm ibm ,
+and
+.Cm ibmb
+options convert the character set without changing the input file's block
+structure.
+The
+.Cm unblock
+and
+.Cm block
+options become a simple file copy.
+.Pp
+After completion,
+.Nm
+reports the number of whole and partial input and output blocks.
+.Sh OPERANDS
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fBif=\fR\fIfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the input path. Standard input is the default.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBof=\fR\fIfile\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the output path. Standard output is the default. If the
-\fBseek=\fR\fBexpr\fR conversion is not also specified, the output file will be
-truncated before the copy begins, unless \fBconv=notrunc\fR is specified. If
-\fBseek=\fR\fBexpr\fR is specified, but \fBconv=notrunc\fR is not, the effect
-of the copy will be to preserve the blocks in the output file over which
-\fBdd\fR seeks, but no other portion of the output file will be preserved. (If
-the size of the seek plus the size of the input file is less than the previous
-size of the output file, the output file is shortened by the copy.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBibs=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the input block size in \fIn\fR bytes (default is \fB512\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBobs=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the output block size in \fIn\fR bytes (default is \fB512\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBbs=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Sets both input and output block sizes to \fIn\fR bytes, superseding \fBibs=\fR
-and \fBobs=\fR. If no conversion other than \fBsync\fR,\fB noerror\fR, and
-\fBnotrunc\fR is specified, each input block is copied to the output as a
+.Bl -tag -width "if=file"
+.It Cm if= Ns Ar file
+.Pp
+Specifies the input path.
+Standard input is the default.
+.It Cm of= Ns Ar file
+.Pp
+Specifies the output path.
+Standard output is the default.
+If the
+.Cm seek Ns = Ns Ar expr
+conversion is not also specified, the output file will be truncated before
+the copy begins, unless
+.Cm conv Ns = Ns Ar notrunc
+is specified.
+If
+.Cm seek Ns = Ns Ar expr
+is specified, but
+.Cm conv Ns = Ns Ar notrunc
+is not, the effect of the copy will be to preserve the blocks in the output
+file over which
+.Nm
+seeks, but no other portion of the output file will be preserved.
+(If the size of the seek plus the size of the input file is less than the
+previous size of the output file, the output file is shortened by the copy.)
+.It Cm ibs Ns = Ns Ar n
+.Pp
+Specifies the input block size in
+.Ar n
+bytes (default is 512).
+.It Cm obs Ns = Ns Ar n
+.Pp
+Specifies the output block size in
+.Ar n
+bytes (default is 512).
+.It Cm bs Ns = Ns Ar n
+.Pp
+Sets both input and output block sizes to
+.Ar n
+bytes, superseding
+.Cm ibs Ns =
+and
+.Cm obs Ns = .
+If no conversion other than
+.Cm sync ,
+.Cm noerror ,
+and
+.Cm notrunc
+is specified, each input block is copied to the output as a
 single block without aggregating short blocks.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcbs=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Specifies the conversion block size for \fBblock\fR and \fBunblock\fR in bytes
-by \fIn\fR (default is \fB0\fR). If \fBcbs=\fR is omitted or given a value of
-\fB0\fR, using \fBblock\fR or \fBunblock\fR produces unspecified results.
-.sp
-This option is used only if \fBASCII\fR or \fBEBCDIC\fR conversion is
-specified. For the \fBascii\fR and \fBasciib\fR operands, the input is handled
-as described for the \fBunblock\fR operand except that characters are converted
-to \fBASCII\fR before the trailing \fBSPACE\fR characters are deleted. For the
-\fBebcdic\fR, \fBebcdicb\fR, \fBibm\fR, and \fBibmb\fR operands, the input is
-handled as described for the \fBblock\fR operand except that the characters are
-converted to \fBEBCDIC\fR or IBM \fBEBCDIC\fR after the trailing \fBSPACE\fR
+.It Cm cbs Ns = Ns Ar n
+.Pp
+Specifies the conversion block size for
+.Cm block
+and
+.Cm unblock
+in bytes by
+.Ar n
+(default is
+.Cm 0 Ns ).
+If
+.Cm cbs Ns =
+is omitted or given a value of
+.Cm 0 ,
+using
+.Cm block
+or
+.Cm unblock
+produces unspecified results.
+.Pp
+This option is used only if
+.Cm ASCII
+or
+.Cm EBCDIC
+conversion is specified.
+For the
+.Cm ascii
+and
+.Cm asciib
+operands, the input is handled as described for the
+.Cm unblock
+operand except that characters are converted to
+.Cm ASCII
+before the trailing
+.Cm SPACE
+characters are deleted.
+For the
+.Cm ebcdic ,
+.Cm ebcdicb ,
+.Cm ibm ,
+and
+.Cm ibmb
+operands, the input is handled as described for the
+.Cm block
+operand except that the characters are converted to
+.Cm EBCDIC
+or IBM
+.Cm EBCDIC
+after the trailing
+.Cm SPACE
 characters are added.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBfiles=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Copies and concatenates \fIn\fR input files before terminating (makes sense
+.It Cm files Ns = Ns Ar n
+.Pp
+Copies and concatenates
+.Ar n
+input files before terminating (makes sense
 only where input is a magnetic tape or similar device).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBskip=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Skips \fIn\fR input blocks (using the specified input block size) before
-starting to copy. On seekable files, the implementation reads the blocks or
-seeks past them. On non-seekable files, the blocks are read and the data is
-discarded.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBiseek=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Seeks \fIn\fR blocks from beginning of input file before copying (appropriate
-for disk files, where \fBskip\fR can be incredibly slow).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBoseek=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Seeks \fIn\fR blocks from beginning of output file before copying.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBseek=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Skips \fIn\fR blocks (using the specified output block size) from beginning of
-output file before copying. On non-seekable files, existing blocks are read and
-space from the current end-of-file to the specified offset, if any, is filled
-with null bytes. On seekable files, the implementation seeks to the specified
+.It Cm skip Ns = Ns Ar n
+.Pp
+Skips
+.Ar n
+input blocks (using the specified input block size) before starting to copy.
+On seekable files, the implementation reads the blocks or seeks past them.
+On non-seekable files, the blocks are read and the data is discarded.
+.It Cm iseek Ns = Ns Ar n
+.Pp
+Seeks
+.Ar n
+blocks from beginning of input file before copying (appropriate
+for disk files, where
+.Cm skip
+can be incredibly slow).
+.It Cm oseek Ns = Ns Ar n
+.Pp
+Seeks
+.Ar n
+blocks from beginning of output file before copying.
+.It Cm seek Ns = Ns Ar n
+.Pp
+Skips
+.Ar n
+blocks (using the specified output block size) from beginning of
+output file before copying.
+On non-seekable files, existing blocks are read and space from the current
+end-of-file to the specified offset, if any, is filled with null bytes.
+On seekable files, the implementation seeks to the specified
 offset or reads the blocks as described for non-seekable files.
-.RE
-
+.It Cm ostride Ns = Ns Ar n
+.Pp
+Writes every
+.Ar n Ns
+th block (using the specified output block size) when writing output.
+Skips
+.Ar n
+- 1 blocks after writing each record.
+.It Cm istride Ns = Ns Ar n
+.Pp
+Reads every
+.Ar n Ns
+th block (using the specified input block size) when reading input.
+Skips
+.Ar n
+- 1 blocks after reading each record.
+.It Cm stride Ns = Ns Ar n
+.Pp
+Reads every
+.Ar n Ns
+th block (using the specified input block size) when reading input.
+Skips
+.Ar n
+- 1 blocks after reading each record.
+Also writes every
+.Ar n Ns
+th block (using the specified output block size) when writing output.
+Skips
+.Ar n
+- 1 blocks after writing each record.
+.It Cm count Ns = Ns Ar n
+.Pp
+Copies only
+.Ar n
+input blocks.
+.It Cm conv Ns = Ns Ar value Ns Op , Ns  Ar value Ns ...
+.Pp
+Where
+.Ar value Ns
+s are comma-separated symbols from the following list:
+.Bl -hang
+.It Cm ascii
+Converts
+.Cm EBCDIC
+to
+.Cm ASCII .
 .sp
-.ne 2
-.na
-\fB\fBostride=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Writes every \fIn\fRth block (using the specified output block size) when
-writing output.  Skips \fIn\fR - 1 blocks after writing each record.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBistride=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Reads every \fIn\fRth block (using the specified input block size) when
-reading input.  Skips \fIn\fR - 1 blocks after reading each record.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBstride=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Reads every \fIn\fRth block (using the specified input block size) when
-reading input.  Skips \fIn\fR - 1 blocks after reading each record.  Also
-writes every \fIn\fRth block (using the specified output block size) when
-writing output.  Skips \fIn\fR - 1 blocks after writing each record.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBcount=\fR\fIn\fR\fR
-.ad
-.sp .6
-.RS 4n
-Copies only \fIn\fR input blocks.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBconv=\fR\fIvalue\fR[\fB,\fR\fIvalue\fR.\|.\|.\|]\fR
-.ad
-.sp .6
-.RS 4n
-Where \fIvalue\fRs are comma-separated symbols from the following list:
-.sp
-.ne 2
-.na
-\fB\fBascii\fR\fR
-.ad
-.RS 11n
-Converts \fBEBCDIC\fR to \fBASCII\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBasciib\fR\fR
-.ad
-.RS 11n
-Converts \fBEBCDIC\fR to \fBASCII\fR using \fBBSD\fR-compatible character
-translations.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBebcdic\fR\fR
-.ad
-.RS 11n
-Converts \fBASCII\fR to \fBEBCDIC\fR. If converting fixed-length \fBASCII\fR
-records without NEWLINEs, sets up a pipeline with \fBdd conv=unblock\fR
+.It Cm asciib
+Converts
+.Cm EBCDIC
+to
+.Cm ASCII
+using
+.Cm BSD Ns
+-compatible character translations.
+.It Cm ebcdic
+Converts
+.Cm ASCII
+to
+.Cm EBCDIC .
+If converting fixed-length
+.Cm ASCII
+records without
+.Cm NEWLINE Ns
+s, sets up a pipeline with
+.Nm
+.Cm conv Ns = Ns Ar unblock
 beforehand.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBebcdicb\fR\fR
-.ad
-.RS 11n
-Converts \fBASCII\fR to \fBEBCDIC\fR using \fBBSD\fR-compatible character
-translations. If converting fixed-length \fBASCII\fR records without
-\fBNEWLINE\fRs, sets up a pipeline with \fBdd conv=unblock\fR beforehand.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBibm\fR\fR
-.ad
-.RS 11n
-Slightly different map of \fBASCII\fR to \fBEBCDIC\fR. If converting
-fixed-length \fBASCII\fR records without \fBNEWLINE\fRs, sets up a pipeline
-with \fBdd conv=unblock\fR beforehand.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBibmb\fR\fR
-.ad
-.RS 11n
-Slightly different map of \fBASCII\fR to \fBEBCDIC\fR using
-\fBBSD\fR-compatible character translations. If converting fixed-length
-\fBASCII\fR records without \fBNEWLINE\fRs, sets up a pipeline with \fBdd
-conv=unblock\fR beforehand.
-.RE
-
-The \fBascii\fR (or \fBasciib\fR), \fBebcdic\fR (or \fBebcdicb\fR), and
-\fBibm\fR (or \fBibmb\fR) values are mutually exclusive.
-.sp
-.ne 2
-.na
-\fB\fBblock\fR\fR
-.ad
-.RS 11n
-Treats the input as a sequence of \fBNEWLINE\fR-terminated or
-\fBEOF\fR-terminated variable-length records independent of the input block
-boundaries. Each record is converted to a record with a fixed length specified
-by the conversion block size. Any \fBNEWLINE\fR character is removed from the
-input line. \fBSPACE\fR characters are appended to lines that are shorter than
-their conversion block size to fill the block. Lines that are longer than the
-conversion block size are truncated to the largest number of characters that
-will fit into that size. The number of truncated lines is reported.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBunblock\fR\fR
-.ad
-.RS 11n
-Converts fixed-length records to variable length. Reads a number of bytes equal
-to the conversion block size (or the number of bytes remaining in the input, if
-less than the conversion block size), delete all trailing \fBSPACE\fR
-characters, and append a \fBNEWLINE\fR character.
-.RE
-
-The  \fBblock\fR and \fBunblock\fR values are mutually exclusive.
-.sp
-.ne 2
-.na
-\fB\fBlcase\fR\fR
-.ad
-.RS 9n
-Maps upper-case characters specified by the \fBLC_CTYPE\fR keyword
-\fBtolower\fR to the corresponding lower-case character. Characters for which
-no mapping is specified are not modified by this conversion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBucase\fR\fR
-.ad
-.RS 9n
-Maps lower-case characters specified by the \fBLC_CTYPE\fR keyword
-\fBtoupper\fR to the corresponding upper-case character. Characters for which
-no mapping is specified are not modified by this conversion.
-.RE
-
-The \fBlcase\fR and \fBucase\fR symbols are mutually exclusive.
-.sp
-.ne 2
-.na
-\fB\fBswab\fR\fR
-.ad
-.RS 11n
-Swaps every pair of input bytes. If the current input record is an odd number
-of bytes, the last byte in the input record is ignored.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBnoerror\fR\fR
-.ad
-.RS 11n
-Does not stop processing on an input error. When an input error occurs, a
-diagnostic message is written on standard error, followed by the current input
-and output block counts in the same format as used at completion. If the
-\fBsync\fR conversion is specified, the missing input is replaced with null
-bytes and processed normally. Otherwise, the input block will be omitted from
-the output.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBnotrunc\fR\fR
-.ad
-.RS 11n
-Does not truncate the output file. Preserves blocks in the output file not
-explicitly written by this invocation of \fBdd\fR. (See also the preceding
-\fBof=\fR\fIfile\fR operand.)
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsync\fR\fR
-.ad
-.RS 11n
-Pads every input block to the size of the \fBibs=\fR buffer, appending null
-bytes. (If either \fBblock\fR or \fBunblock\fR is also specified, appends
-\fBSPACE\fR characters, rather than null bytes.)
-.RE
-
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBoflag=\fR\fIvalue\fR[\fB,\fR\fIvalue\fR.\|.\|.\|]\fR
+.It Cm ebcdicb
+Converts
+.Cm ASCII
+to
+.Cm EBCDIC
+using
+.Cm BSD Ns
+-compatible character translations.
+If converting fixed-length
+.Cm ASCII
+records without
+.Cm NEWLINE Ns
+s, sets up a pipeline with
+.Nm
+.Cm conv Ns = Ns Ar unblock
+beforehand.
+.It Cm ibm
+Slightly different map of
+.Cm ASCII
+to
+.Cm EBCDIC .
+If converting fixed-length
+.Cm ASCII
+records without
+.Cm NEWLINE Ns
+s, sets up a pipeline with
+.Nm
+.Cm conv Ns = Ns Ar unblock
+beforehand.
+.It Cm ibmb
+Slightly different map of
+.Cm ASCII
+to
+.Cm EBCDIC
+using
+.Cm BSD Ns
+-compatible character translations.
+If converting fixed-length
+.Cm ASCII
+records without
+.Cm NEWLINE Ns
+s, sets up a pipeline with
+.Nm
+.Cm conv Ns = Ns Ar unblock
+beforehand.
+.El
+.Pp
+The
+.Cm ascii
+(or
+.Cm asciib Ns ),
+.Cm ebcdic
+(or
+.Cm ebcdicb Ns ),
+and
+.Cm ibm
+(or
+.Cm ibmb )
+values are mutually exclusive.
+.Bl -hang
+.It Cm block
+Treats the input as a sequence of
+.Cm NEWLINE Ns
+-terminated or
+.Cm EOF Ns
+-terminated variable-length records independent of the input block boundaries.
+Each record is converted to a record with a fixed length specified
+by the conversion block size.
+Any
+.Cm NEWLINE
+character is removed from the input line.
+.Cm SPACE
+characters are appended to lines that are shorter than their conversion block
+size to fill the block.
+Lines that are longer than the conversion block size are truncated to the
+largest number of characters that will fit into that size.
+The number of truncated lines is reported.
+.It Cm unblock
+Converts fixed-length records to variable length.
+Reads a number of bytes equal to the conversion block size (or the number of
+bytes remaining in the input, if less than the conversion block size),
+delete all trailing
+.Cm SPACE
+characters, and append a
+.Cm NEWLINE
+character.
+.El
+.Pp
+The
+.Cm block
+and
+.Cm unblock
+values are mutually exclusive.
+.Bl -hang
+.It Cm lcase
+Maps upper-case characters specified by the
+.Cm LC_CTYPE
+keyword
+.Cm tolower
+to the corresponding lower-case character.
+Characters for which no mapping is specified are not modified by this
+conversion.
+.It Cm ucase
+Maps lower-case characters specified by the
+.Cm LC_CTYPE
+keyword
+.Cm toupper
+to the corresponding upper-case character.
+Characters for which no mapping is specified are not modified by this
+conversion.
+.El
+.Pp
+The
+.Cm lcase
+and
+.Cm ucase
+symbols are mutually exclusive.
+.Bl -hang
+.It Cm swab
+Swaps every pair of input bytes.
+If the current input record is an odd number of bytes, the last byte in the
+input record is ignored.
+.It Cm noerror
+Does not stop processing on an input error.
+When an input error occurs, a diagnostic message is written on standard error,
+followed by the current input and output block counts in the same format as
+used at completion.
+If the
+.Cm sync
+conversion is specified, the missing input is replaced with null
+bytes and processed normally.
+Otherwise, the input block will be omitted from the output.
+.It Cm notrunc
+Does not truncate the output file.
+Preserves blocks in the output file not explicitly written by this invocation
+of
+.Nm .
+(See also the preceding
+.Cm of Ns = Ns Ar file
+operand.)
+.It Cm sync
+Pads every input block to the size of the
+.Cm ibs Ns =
+buffer, appending null bytes.
+(If either
+.Cm block
+or
+.Cm unblock
+is also specified, appends
+.Cm SPACE
+characters, rather than null bytes.)
+.El
+.It Cm iflag Ns = Ns Ar value Ns Op , Ns Ar value ...
+.Pp
+Where
+.Ar value Ns
+s are comma-separated symbols from the following list which
+affect the behavior of reading from the input file:
+.Bl -hang
+.It Cm fullblock
+Accumulate full blocks of input.
+.El
+.It Cm oflag Ns = Ns Ar value Ns Op , Ns Ar value ...
 .ad
 .sp .6
-Where \fIvalue\fRs are comma-separated symbols from the following list which
+Where
+.Ar value Ns
+s are comma-separated symbols from the following list which
 affect the behavior of writing the output file:
-.sp
-.ne 2
-.na
-\fB\fBdsync\fR\fR
-.ad
-.RS 11n
-The output file is opened with the \fBO_DSYNC\fR flag set. All data writes will
-be synchronous. For more information on \fBO_DSYNC\fR see \fBfcntl.h\fR(3HEAD).
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBsync\fR\fR
-.ad
-.RS 11n
-The output file is opened with the \fBO_SYNC\fR flag set. All data and metadata
-writes will be synchronous. For more information on \fBO_SYNC\fR see
-\fBfcntl.h\fR(3HEAD).
-.RE
-
-.sp
-.LP
-If operands other than \fBconv=\fR and \fBoflag=\fR are specified more than once,
-the last specified \fBoperand=\fR\fIvalue\fR is used.
-.sp
-.LP
-For the \fBbs=\fR, \fBcbs=\fR, \fBibs=\fR, and \fBobs=\fR operands, the
-application must supply an expression specifying a size in bytes. The
-expression, \fBexpr\fR, can be:
-.RS +4
-.TP
-1.
+.Bl -hang
+.It Cm dsync
+The output file is opened with the
+.Cm O_DSYNC
+flag set.
+All data writes will be synchronous.
+For more information on
+.Cm O_DSYNC
+see
+.Xr fcntl.h 3HEAD .
+.It Cm sync
+The output file is opened with the
+.Cm O_SYNC .
+All data and metadata writes will be synchronous.
+For more information on
+.Cm O_SYNC
+see
+.Xr fcntl.h 3HEAD .
+.El
+.El
+.Pp
+If operands other than
+.Cm conv Ns =
+and
+.Cm oflag Ns =
+are specified more than once, the last specified
+.Cm operand Ns = Ns Ar value
+is used.
+.Pp
+For the
+.Cm bs Ns = ,
+.Cm cbs Ns = ,
+.Cm ibs Ns = ,
+and
+.Cm obs Ns =
+operands, the application must supply an expression specifying a size in bytes.
+The expression,
+.Cm expr ,
+can be:
+.Bl -enum -offset indent -compact
+.It
 a positive decimal number
-.RE
-.RS +4
-.TP
-2.
-a positive decimal number followed by \fBk\fR, specifying multiplication by
-1024
-.RE
-.RS +4
-.TP
-3.
-a positive decimal number followed by \fBM\fR, specifying multiplication by
-1024*1024
-.RE
-.RS +4
-.TP
-4.
-a positive decimal number followed by \fBG\fR, specifying multiplication by
-1024*1024*1024
-.RE
-.RS +4
-.TP
-5.
-a positive decimal number followed by \fBT\fR, specifying multiplication by
-1024*1024*1024*1024
-.RE
-.RS +4
-.TP
-6.
-a positive decimal number followed by \fBP\fR, specifying multiplication by
-1024*1024*1024*1024*1024
-.RE
-.RS +4
-.TP
-7.
-a positive decimal number followed by \fBE\fR, specifying multiplication by
-1024*1024*1024*1024*1024*1024
-.RE
-.RS +4
-.TP
-8.
-a positive decimal number followed by \fBZ\fR, specifying multiplication by
-1024*1024*1024*1024*1024*1024*1024
-.RE
-.RS +4
-.TP
-9.
-a positive decimal number followed by \fBb\fR, specifying multiplication by
-512
-.RE
-.RS +4
-.TP
-10.
-two or more positive decimal numbers (with or without \fBk\fR or \fBb\fR)
-separated by \fBx\fR, specifying the product of the indicated values.
-.RE
-.sp
-.LP
+.Pp
+.It
+a positive decimal number followed by
+.Sy k ,
+specifying multiplication by 1024
+.Pp
+.It
+a positive decimal number followed by
+.Sy M ,
+specifying multiplication by 1024*1024
+.Pp
+.It
+a positive decimal number followed by
+.Sy G ,
+specifying multiplication by 1024*1024*1024
+.Pp
+.It
+a positive decimal number followed by
+.Sy T ,
+specifying multiplication by 1024*1024*1024*1024
+.Pp
+.It
+a positive decimal number followed by
+.Sy P ,
+specifying multiplication by 1024*1024*1024*1024*1024
+.Pp
+.It
+a positive decimal number followed by
+.Sy E ,
+specifying multiplication by 1024*1024*1024*1024*1024*1024
+.Pp
+.It
+a positive decimal number followed by
+.Sy Z ,
+specifying multiplication by 1024*1024*1024*1024*1024*1024*1024
+.Pp
+.It
+a positive decimal number followed by
+.Sy b ,
+specifying multiplication by 512
+.Pp
+.It
+two or more positive decimal numbers (with or without
+.Sy k
+or
+.Sy b )
+separated by
+.Sy x ,
+specifying the product of the indicated values.
+.El
+.Pp
 All of the operands will be processed before any input is read.
-.SH SIGNALS
-.LP
-When \fBdd\fR receives either SIGINFO or SIGUSR1, \fBdd\fR will emit the current
-input and output block counts, total bytes written, total time elapsed, and the
-number of bytes per second to standard error. This is the same information
-format that \fBdd\fR emits when it successfully completes. Users may send
-SIGINFO via their terminal. The default character is ^T, see \fBstty\fR(1) for
-more information.
-.sp
-.LP
-For \fBSIGINT\fR, \fBdd\fR writes status information to standard error before
-exiting. \fBdd\fR takes the standard action for all other signals.
-
-.SH USAGE
-.LP
-See \fBlargefile\fR(5) for the description of the behavior of \fBdd\fR when
-encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRCopying from one tape drive to another
-.sp
-.LP
-The following example copies from tape drive \fB0\fR to tape drive \fB1\fR,
-using a common historical device naming convention.
-
-.sp
-.in +2
-.nf
-example% \fBdd if=/dev/rmt/0h  of=/dev/rmt/1h\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2 \fRStripping the first 10 bytes from standard input
-.sp
-.LP
-The following example strips the first 10 bytes from standard input:
-
-.sp
-.in +2
-.nf
-example% \fBdd ibs=10  skip=1\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 3 \fRReading a tape into an ASCII file
-.sp
-.LP
-This example reads an \fBEBCDIC\fR tape blocked ten 80-byte \fBEBCDIC\fR card
-images per block into the \fBASCII\fR file \fBx\fR:
-
-.sp
-.in +2
-.nf
-example% \fBdd if=/dev/tape of=x ibs=800 cbs=80 conv=ascii,lcase\fR
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 4 \fRUsing conv=sync to write to tape
-.sp
-.LP
-The following example uses \fBconv=sync\fR when writing to a tape:
-
-.sp
-.in +2
-.nf
-example% \fBtar cvf - . | compress | dd obs=1024k of=/dev/rmt/0 conv=sync\fR
-.fi
-.in -2
-.sp
-
-.SH ENVIRONMENT VARIABLES
-.LP
-See \fBenviron\fR(5) for descriptions of the following environment variables
-that affect the execution of \fBdd\fR: \fBLANG\fR, \fBLC_ALL\fR,
-\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-.SH EXIT STATUS
-.LP
+.Sh SIGNALS
+When
+.Nm
+receives either SIGINFO or SIGUSR1,
+.Nm
+will emit the current input and output block counts, total bytes written,
+total time elapsed, and the number of bytes per second to standard error.
+This is the same information format that
+.Nm
+emits when it successfully completes.
+Users may send SIGINFO via their terminal.
+The default character is ^T, see
+.Xr stty 1
+for more information.
+.Pp
+For
+.Sy SIGINT ,
+.Nm
+writes status information to standard error before exiting.
+.Nm
+takes the standard action for all other signals.
+.Sh USAGE
+See
+.Xr largefile 5
+for the description of the behavior of
+.Nm
+when encountering files greater than or equal to 2 Gbyte (2^31 bytes).
+.Sh EXIT STATUS
 The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 6n
+.Bl -tag -width ".It Cm >0"
+.It Cm 0
 The input file was copied successfully.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB>0\fR\fR
-.ad
-.RS 6n
+.It Cm >0
 An error occurred.
-.RE
-
-.sp
-.LP
-If an input error is detected and the \fBnoerror\fR conversion has not been
-specified, any partial output block will be written to the output file, a
-diagnostic message will be written, and the copy operation will be
-discontinued. If some other error is detected, a diagnostic message will be
+.El
+.Pp
+If an input error is detected and the
+.Cm noerror
+conversion has not been specified, any partial output block will be written
+to the output file, a diagnostic message will be written, and the copy
+operation will be discontinued.
+If some other error is detected, a diagnostic message will be
 written and the copy operation will be discontinued.
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(5) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.LP
-\fBcp\fR(1), \fBsed\fR(1), \fBtr\fR(1), \fBfcntl.h\fR(3HEAD),
-\fBattributes\fR(5), \fBenviron\fR(5), \fBlargefile\fR(5), \fBstandards\fR(5)
-.SH DIAGNOSTICS
-.ne 2
-.na
-\fB\fBf+p records in(out)\fR\fR
-.ad
-.RS 23n
+.Sh EXAMPLES
+.Bl -ohang
+.It Sy Example 1 No Copying from one tape drive to another
+.Pp
+The following example copies from tape drive
+.Sy 0
+to tape drive
+.Sy 1 ,
+using a common historical device naming convention.
+.Pp
+.Dl % dd if=/dev/rmt/0h of=/dev/rmt/1h
+.It Sy Example 2 No Stripping the first 10 bytes from standard input
+.Pp
+The following example strips the first 10 bytes from standard input:
+.Pp
+.Dl % dd ibs=10  skip=1
+.It Sy Example 3 No Reading a tape into an ASCII file
+.Pp
+This example reads an
+.Cm EBCDIC
+tape blocked ten 80-byte
+.Cm EBCDIC
+card images per block into the
+.Cm ASCII
+file
+.Sy x :
+.Pp
+.Dl % dd if=/dev/tape of=x ibs=800 cbs=80 conv=ascii,lcase
+.It Sy Example 4 No Using conv=sync to write to tape
+.Pp
+The following example uses
+.Cm conv Ns = Ns Ar sync
+when writing to a tape:
+.Pp
+.Dl % tar cvf - . | compress | dd obs=1024k of=/dev/rmt/0 conv=sync
+.El
+.Sh DIAGNOSTICS
+.Bl -hang
+.It Sy f+p records in(out)
 numbers of full and partial blocks read(written)
-.RE
-
-.SH NOTES
-.LP
-Do not use \fBdd\fR to copy files between file systems having different block
-sizes.
-.sp
-.LP
+.El
+.Sh ENVIRONMENT VARIABLES
+See
+.Xr environ 5
+for descriptions of the following environment variables
+that affect the execution of
+.Nm :
+.Ev LANG ,
+.Ev LC_ALL ,
+.Ev LC_CTYPE ,
+.Ev LC_MESSAGES ,
+and
+.Ev NLSPATH .
+.Sh INTERFACE STABILITY
+Standard
+.Sh SEE ALSO
+.Xr cp 1 ,
+.Xr sed 1 ,
+.Xr tr 1 ,
+.Xr fcntl.h 3HEAD ,
+.Xr attributes 5 ,
+.Xr environ 5 ,
+.Xr largefile 5 ,
+.Xr standards 5
+.Sh NOTES
+Do not use
+.Nm
+to copy files between file systems having different block sizes.
+.Pp
 Using a  blocked device to copy a file will result in extra nulls being added
 to the file to pad the final block to the block boundary.
-.sp
-.LP
-When  \fBdd\fR reads from a pipe, using the  \fBibs=X\fR and  \fBobs=Y\fR
-operands, the output will always be blocked in chunks of size Y. When
-\fBbs=Z\fR is used, the output blocks will be whatever was available to be read
+.Pp
+When
+.Nm
+reads from a pipe, using the
+.Cm ibs Ns = Ns Ar X
+and
+.Cm obs Ns = Ns Ar Y
+operands, the output will always be blocked in chunks of size Y.
+When
+.Cm bs Ns = Ns Ar Z
+is used, the output blocks will be whatever was available to be read
 from the pipe at the time.
-.sp
-.LP
-When using \fBdd\fR to copy files to a tape device, the file size must be a
-multiple of the device sector size (for example, 512 Kbyte).  To  copy files of
-arbitrary size to a tape device, use  \fBtar\fR(1) or  \fBcpio\fR(1).
+.Pp
+When using
+.Nm
+to copy files to a tape device, the file size must be a multiple of the
+device sector size (for example, 512 Kbyte).
+To copy files of arbitrary size to a tape device, use
+.Xr tar 1
+or
+.Xr cpio 1 .

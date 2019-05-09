@@ -98,6 +98,7 @@
 #define	SWAB		04	/* flag - swap bytes before conversion */
 #define	NERR		010	/* flag - proceed on input errors */
 #define	SYNC		020	/* flag - pad short input blocks with nulls */
+#define	FULLBLOCK	040	/* flag - accumulate full blocks of input */
 #define	BADLIMIT	5	/* give up if no progress after BADLIMIT trys */
 #define	SVR4XLATE	0	/* use default EBCDIC translation */
 #define	BSDXLATE	1	/* use BSD-compatible EBCDIC translation */
@@ -106,10 +107,10 @@
 	"usage: dd [if=file] [of=file] [ibs=n|nk|nb|nxm] [obs=n|nk|nb|nxm]\n"\
 	"	   [bs=n|nk|nb|nxm] [cbs=n|nk|nb|nxm] [files=n] [skip=n]\n"\
 	"	   [iseek=n] [oseek=n] [seek=n] [stride=n] [istride=n]\n"\
-	"	   [ostride=n] [count=n] [conv=[ascii] [,ebcdic][,ibm]\n"\
+	"	   [ostride=n] [count=n] [conv=[ascii][,ebcdic][,ibm]\n"\
 	"	   [,asciib][,ebcdicb][,ibmb][,block|unblock][,lcase|ucase]\n"\
 	"	   [,swab][,noerror][,notrunc][,sync]]\n"\
-	"	   [oflag=[dsync][sync]]\n"
+	"	   [iflag=[fullblock]] [oflag=[dsync][sync]]\n"
 
 /* Global references */
 
@@ -134,6 +135,7 @@ static unsigned cbc;	/* number of bytes in the conversion buffer */
 static int	ibf;	/* input file descriptor */
 static int	obf;	/* output file descriptor */
 static int	cflag;	/* conversion option flags */
+static int	iflag;	/* input flag options */
 static int	oflag;	/* output flag options */
 static int	skipf;	/* if skipf == 1, skip rest of input line */
 static unsigned long long	nifr;	/* count of full input records */
@@ -486,6 +488,30 @@ siginfo_handler(int sig, siginfo_t *sip, void *ucp)
 	nstats = 1;
 }
 
+static ssize_t
+iread(int fd, char *buf, size_t nbyte)
+{
+	ssize_t count;
+
+	count = 0;
+	while (nbyte != 0) {
+		ssize_t nr = read(fd, buf, nbyte);
+
+		if (nr < 0)
+			return (nr);
+
+		if (nr == 0)
+			break;
+		buf += nr;
+		count += nr;
+		nbyte -= nr;
+
+		if ((iflag & FULLBLOCK) == 0)
+			break;
+	}
+	return (count);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -658,6 +684,22 @@ main(int argc, char **argv)
 				}
 				if (match("sync")) {
 					cflag |= SYNC;
+					continue;
+				}
+				goto badarg;
+			}
+			continue;
+		}
+		if (match("iflag=")) {
+			for (;;) {
+				if (match(",")) {
+					continue;
+				}
+				if (*string == '\0') {
+					break;
+				}
+				if (match("fullblock")) {
+					iflag |= FULLBLOCK;
 					continue;
 				}
 				goto badarg;
@@ -919,7 +961,7 @@ main(int argc, char **argv)
 	/* Skip input blocks */
 
 	while (skip) {
-		ibc = read(ibf, (char *)ibuf, ibs);
+		ibc = iread(ibf, (char *)ibuf, ibs);
 		if (ibc == (unsigned)-1) {
 			if (++nbad > BADLIMIT) {
 				(void) fprintf(stderr, "dd: %s\n",
@@ -994,7 +1036,7 @@ main(int argc, char **argv)
 
 			/* Read the next input block */
 
-			ibc = read(ibf, (char *)ibuf, ibs);
+			ibc = iread(ibf, (char *)ibuf, ibs);
 
 			if (istriden > 0 && lseek(ibf, istriden * ((off_t)ibs),
 			    SEEK_CUR) == -1) {
