@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright (c) 2019, Joyent, Inc.
 #
 
 #
@@ -51,11 +51,15 @@ OBJECTS_library = \
 	umem_agent_support.o \
 	umem_fail.o \
 	umem_fork.o \
+	umem_genasm.o \
 	umem_update_thread.o \
 	vmem_mmap.o \
 	vmem_sbrk.o
 
-SRCS_library = $(OBJECTS_library:%.o=../common/%.c)
+SRCS_common_library = \
+	$(ISASRCDIR)/umem_genasm.c
+
+SRCS_library = $(OBJECTS_library:%.o=../common/%.c) $(SRC_common_library)
 
 # Files specific to the standalone version of libumem
 OBJECTS_standalone = \
@@ -67,12 +71,10 @@ SRCS_standalone = $(OBJECTS_standalone:%.o=../common/%.c)
 
 # Architecture-dependent files common to both versions of libumem
 OBJECTS_common_isadep = \
-	asm_subr.o \
-	umem_genasm.o	
+	asm_subr.o
 
 SRCS_common_isadep = \
-	$(ISASRCDIR)/asm_subr.s \
-	$(ISASRCDIR)/umem_genasm.c
+	$(ISASRCDIR)/asm_subr.s
 
 # Architecture-independent files common to both versions  of libumem
 OBJECTS_common_common = \
@@ -96,7 +98,6 @@ include ../../Makefile.rootfs
 
 SRCS = \
 	$(SRCS_$(CURTYPE)) \
-	$(SRCS_common_isadep) \
 	$(SRCS_common_common)
 
 SRCDIR = ../common
@@ -126,11 +127,6 @@ LDFLAGS = $(LDFLAGS_$(CURTYPE))
 ASFLAGS_standalone = -DUMEM_STANDALONE
 ASFLAGS_library =
 ASFLAGS += -P $(ASFLAGS_$(CURTYPE)) -D_ASM
-
-CERRWARN += -_gcc=-Wno-switch
-CERRWARN += -_gcc=-Wno-uninitialized
-
-SMOFF += deref_check
 
 $(LINTLIB) := SRCS = ../common/$(LINTSRC)
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2019 Joyent, Inc.
  */
 
 /*
@@ -35,9 +35,8 @@
 
 const int umem_genasm_supported = 0;
 
-/*ARGSUSED*/
-int
+boolean_t
 umem_genasm(int *alloc_sizes, umem_cache_t **caches, int ncaches)
 {
-	return (1);
+	return (B_FALSE);
 }

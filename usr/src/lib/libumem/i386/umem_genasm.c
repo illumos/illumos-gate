@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2019 Joyent, Inc.  All rights reserved.
  */
 
 /*
@@ -60,12 +60,17 @@
  * Each block of assembly has psuedocode that describes its purpose.
  */
 
+/*
+ * umem_base must be first.
+ */
+#include "umem_base.h"
+
 #include <inttypes.h>
 #include <strings.h>
 #include <umem_impl.h>
-#include "umem_base.h"
-
 #include <atomic.h>
+#include <sys/mman.h>
+#include <errno.h>
 
 const int umem_genasm_supported = 1;
 static uintptr_t umem_genasm_mptr = (uintptr_t)&_malloc;
@@ -536,19 +541,57 @@ genasm_free(void *base, size_t len, int nents, int *umem_alloc_sizes)
 	return (0);
 }
 
-int
+boolean_t
 umem_genasm(int *alloc_sizes, umem_cache_t **caches, int ncaches)
 {
 	int nents, i;
 	uint8_t *mptr;
 	uint8_t *fptr;
 	uint64_t v, *vptr;
+	size_t mplen, fplen;
+	uintptr_t mpbase, fpbase;
+	boolean_t ret = B_FALSE;
 
 	mptr = (void *)((uintptr_t)umem_genasm_mptr + 5);
 	fptr = (void *)((uintptr_t)umem_genasm_fptr + 5);
 	if (umem_genasm_mptr == 0 || umem_genasm_msize == 0 ||
-	    umem_genasm_fptr == 0 || umem_genasm_fsize == 0)
-		return (1);
+	    umem_genasm_fptr == 0 || umem_genasm_fsize == 0) {
+		return (B_FALSE);
+	}
+
+	mplen = P2ROUNDUP(umem_genasm_msize, pagesize);
+	mpbase = P2ALIGN((uintptr_t)umem_genasm_mptr, pagesize);
+	fplen = P2ROUNDUP(umem_genasm_fsize, pagesize);
+	fpbase = P2ALIGN((uintptr_t)umem_genasm_mptr, pagesize);
+
+	/*
+	 * If the values straddle a page boundary, then we might need to
+	 * actually remap two pages.
+	 */
+	if (P2ALIGN(umem_genasm_msize + (uintptr_t)umem_genasm_mptr,
+	    pagesize) != mpbase) {
+		mplen += pagesize;
+	}
+
+	if (P2ALIGN(umem_genasm_fsize + (uintptr_t)umem_genasm_fptr,
+	    pagesize) != fpbase) {
+		fplen += pagesize;
+	}
+
+	if (mprotect((void *)mpbase, mplen, PROT_READ | PROT_WRITE |
+	    PROT_EXEC) != 0) {
+		return (B_FALSE);
+	}
+
+	if (mprotect((void *)fpbase, fplen, PROT_READ | PROT_WRITE |
+	    PROT_EXEC) != 0) {
+		if (mprotect((void *)mpbase, mplen, PROT_READ | PROT_EXEC) !=
+		    0) {
+			umem_panic("genasm failed to restore memory "
+			    "protection: %d", errno);
+		}
+		return (B_FALSE);
+	}
 
 	/*
 	 * The total number of caches that we can service is the minimum of:
@@ -565,18 +608,26 @@ umem_genasm(int *alloc_sizes, umem_cache_t **caches, int ncaches)
 	if (ncaches < nents)
 		nents = ncaches;
 
-	/* Based on our constraints, this is not an error */
-	if (nents == 0 || umem_ptc_size == 0)
-		return (0);
+	/*
+	 * If the number of per-thread caches has been set to zero or the
+	 * per-thread cache size has been set to zero, don't bother trying to
+	 * write any assembly and just use the default malloc and free. When we
+	 * return, indicate that there is no PTC support.
+	 */
+	if (nents == 0 || umem_ptc_size == 0) {
+		goto out;
+	}
 
 	/* Take into account the jump */
 	if (genasm_malloc(mptr, umem_genasm_msize, nents,
-	    alloc_sizes) != 0)
-		return (1);
+	    alloc_sizes) != 0) {
+		goto out;
+	}
 
 	if (genasm_free(fptr, umem_genasm_fsize, nents,
-	    alloc_sizes) != 0)
-		return (1);
+	    alloc_sizes) != 0) {
+		goto out;
+	}
 
 	/* nop out the jump with a multibyte jump */
 	vptr = (void *)umem_genasm_mptr;
@@ -591,5 +642,17 @@ umem_genasm(int *alloc_sizes, umem_cache_t **caches, int ncaches)
 	for (i = 0; i < nents; i++)
 		caches[i]->cache_flags |= UMF_PTC;
 
-	return (0);
+	ret = B_TRUE;
+out:
+	if (mprotect((void *)mpbase, mplen, PROT_READ | PROT_EXEC) != 0) {
+		umem_panic("genasm failed to restore memory protection: %d",
+		    errno);
+	}
+
+	if (mprotect((void *)fpbase, fplen, PROT_READ | PROT_EXEC) != 0) {
+		umem_panic("genasm failed to restore memory protection: %d",
+		    errno);
+	}
+
+	return (ret);
 }
