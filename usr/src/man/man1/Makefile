@@ -479,8 +479,10 @@ MANLINKS=	batch.1		\
 		notify.1	\
 		onintr.1	\
 		page.1		\
+		pauxv.1		\
 		pcat.1		\
 		pcred.1		\
+		penv.1		\
 		pfcsh.1		\
 		pfiles.1	\
 		pfksh.1		\
@@ -659,6 +661,9 @@ snca.1		:= LINKSRC = nca.1
 
 pcat.1		:= LINKSRC = pack.1
 unpack.1	:= LINKSRC = pack.1
+
+pauxv.1		:= LINKSRC = pargs.1
+penv.1		:= LINKSRC = pargs.1
 
 pfcsh.1		:= LINKSRC = pfexec.1
 pfksh.1		:= LINKSRC = pfexec.1

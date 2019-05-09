@@ -1,20 +1,22 @@
 '\" te
 .\"  Copyright (c) 2006, Sun Microsystems, Inc. All Rights Reserved
+.\"  Copyright 2015 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PARGS 1 "Jun 19, 2006"
+.TH PARGS 1 "Oct 5, 2015"
 .SH NAME
-pargs \- print  process  arguments,  environment  variables,  or auxiliary
+pargs, penv, pauxv \- print  process  arguments,  environment  variables,  or auxiliary
 vector
 .SH SYNOPSIS
 .LP
 .nf
 \fBpargs\fR [\fB-aceFlx\fR] [\fIpid\fR | \fIcore\fR]...
+\fBpauxv\fR [\fB-cF\fR] [\fIpid\fR | \fIcore\fR]...
+\fBpenv\fR [\fB-cF\fR] [\fIpid\fR | \fIcore\fR]...
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBpargs\fR utility examines a target process or process core file and
 prints arguments, environment variables and values, or the process auxiliary
@@ -32,10 +34,18 @@ the target process and the \fBpargs\fR process do not share a common character
 encoding, \fBpargs\fR attempts to employ the \fBiconv\fR(3C) facility to
 generate a printable version of the extracted  strings. In the event that such
 a conversion is impossible, strings are displayed as 7-bit \fBASCII\fR.
-.SH OPTIONS
 .sp
 .LP
-The following options are supported:
+The \fBpauxv\fR command is equivalent to running \fBpargs\fR with the
+\fB-x\fR option.
+.sp
+.LP
+The \fBpenv\fR command is equivalent to running \fBpargs\fR with the
+\fB-e\fR option.
+.SH OPTIONS
+.LP
+The following options are supported by \fBpargs\fR. Only the \fB-c\fR
+and \fB-F\fR options are supported by \fBpauxv\fR and \fBpenv\fR:
 .sp
 .ne 2
 .na
@@ -98,7 +108,6 @@ Prints process auxiliary vector.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -120,7 +129,6 @@ Process core file.
 .RE
 
 .SH USAGE
-.sp
 .LP
 Caution should be exercised when using the \fB-F\fR flag. Imposing two
 controlling processes on one victim process can lead to chaos. Safety is
@@ -128,7 +136,6 @@ assured only if the primary controlling process, typically a debugger, has
 stopped the victim process and the primary controlling process is doing nothing
 at the moment of application of the \fBproc\fR tool in question.
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -151,7 +158,6 @@ option).
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/proc/pid/*\fR\fR
@@ -161,7 +167,6 @@ Process information and control files.
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -177,7 +182,6 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBproc\fR(1), \fBiconv\fR(3C), \fBproc\fR(4), \fBascii\fR(5),
 \fBattributes\fR(5), \fBenviron\fR(5), \fBformats\fR(5)
