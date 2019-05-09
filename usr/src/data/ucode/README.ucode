@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 Microcode Management
@@ -30,4 +30,4 @@ the release that the microcode was obtained from here.
 AMD: Updated in March 2012 as part of illumos#2546. Exact revision
 unknown.
 
-Intel: Linux 20180807 release
+Intel: Linux 20190514 release
