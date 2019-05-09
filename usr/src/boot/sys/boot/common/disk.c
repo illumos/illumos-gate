@@ -74,7 +74,7 @@ display_size(uint64_t size, uint_t sectorsize)
 		size /= 1024;
 		unit = 'M';
 	}
-	snprintf(buf, sizeof (buf), "%" PRIu64 "%cB", size, unit);
+	snprintf(buf, sizeof (buf), "%4" PRIu64 "%cB", size, unit);
 	return (buf);
 }
 
@@ -101,7 +101,6 @@ ptblread(void *d, void *buf, size_t blocks, uint64_t offset)
 	    blocks * od->sectorsize, (char *)buf, NULL));
 }
 
-#define	PWIDTH	35
 static int
 ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 {
@@ -110,51 +109,55 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 	struct open_disk *od;
 	struct ptable *table;
 	char line[80];
-	int ret = 0;
+	int res;
+	uint_t sectsize;
+	uint64_t partsize;
 
 	pa = (struct print_args *)arg;
 	od = (struct open_disk *)pa->dev->dd.d_opendata;
-	sprintf(line, "  %s%s: %s", pa->prefix, pname,
+	sectsize = od->sectorsize;
+	partsize = part->end - part->start + 1;
+	snprintf(line, sizeof (line), "  %s%s: %s", pa->prefix, pname,
 	    parttype2str(part->type));
-	if (pa->verbose)
-		sprintf(line, "%-*s%s", PWIDTH, line,
-		    display_size(part->end - part->start + 1,
-		    od->sectorsize));
-	strcat(line, "\n");
-	ret = pager_output(line);
-	if (ret != 0)
-		return (ret);
+	if (pager_output(line))
+		return (1);
+
+	if (pa->verbose) {
+		/* Emit extra tab when the line is shorter than 3 tab stops */
+		if (strlen(line) < 24)
+			(void) pager_output("\t");
+
+		snprintf(line, sizeof (line), "\t%s",
+		    display_size(partsize, sectsize));
+		if (pager_output(line))
+			return (1);
+	}
+	if (pager_output("\n"))
+		return (1);
+	res = 0;
 	if (part->type == PART_FREEBSD || part->type == PART_SOLARIS2) {
 		/* Open slice with BSD or VTOC label */
 		dev.dd.d_dev = pa->dev->dd.d_dev;
 		dev.dd.d_unit = pa->dev->dd.d_unit;
 		dev.d_slice = part->index;
 		dev.d_partition = -1;
-		if (disk_open(&dev, part->end - part->start + 1,
-		    od->sectorsize) == 0) {
-			enum ptable_type pt = PTABLE_NONE;
-
-			table = ptable_open(&dev, part->end - part->start + 1,
-			    od->sectorsize, ptblread);
-			if (table != NULL)
-				pt = ptable_gettype(table);
-
-			if (pt == PTABLE_BSD ||
-			    pt == PTABLE_VTOC8 ||
-			    pt == PTABLE_VTOC) {
-				sprintf(line, "  %s%s", pa->prefix, pname);
+		if (disk_open(&dev, partsize, sectsize) == 0) {
+			table = ptable_open(&dev, partsize, sectsize, ptblread);
+			if (table != NULL) {
+				snprintf(line, sizeof (line), "  %s%s",
+				    pa->prefix, pname);
 				bsd.dev = &dev;
 				bsd.prefix = line;
 				bsd.verbose = pa->verbose;
-				ret = ptable_iterate(table, &bsd, ptable_print);
+				res = ptable_iterate(table, &bsd, ptable_print);
+				ptable_close(table);
 			}
-			ptable_close(table);
 			disk_close(&dev);
 		}
 	}
-	return (ret);
+
+	return (res);
 }
-#undef PWIDTH
 
 int
 disk_print(struct disk_devdesc *dev, char *prefix, int verbose)
