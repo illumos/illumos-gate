@@ -502,8 +502,7 @@ build_environment_module(void)
 	if (fp == NULL || fp->f_name == NULL || fp->f_type == NULL) {
 		printf("Can not load environment module: %s\n",
 		    "out of memory");
-		if (fp != NULL)
-			file_discard(fp);
+		file_discard(fp);
 		return;
 	}
 
@@ -594,8 +593,7 @@ build_font_module(void)
 	if (fp == NULL || fp->f_name == NULL || fp->f_type == NULL) {
 		printf("Can not load font module: %s\n",
 		    "out of memory");
-		if (fp != NULL)
-			file_discard(fp);
+		file_discard(fp);
 		return;
 	}
 
@@ -709,7 +707,17 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
 
     /* Looks OK so far; create & populate control structure */
     fp = file_alloc();
-    fp->f_name = strdup(name);
+    if (fp == NULL) {
+	if (archsw.arch_free_loadaddr != NULL)
+	    archsw.arch_free_loadaddr(loadaddr,
+		(uint64_t)(roundup2(st.st_size, PAGE_SIZE) >> 12));
+	snprintf(command_errbuf, sizeof (command_errbuf),
+	    "no memory to load %s", name);
+	free(name);
+	close(fd);
+	return (NULL);
+    }
+    fp->f_name = name;
     fp->f_args = unargv(argc, argv);
     fp->f_type = strdup(type);
     fp->f_metadata = NULL;
@@ -717,6 +725,14 @@ file_loadraw(const char *fname, char *type, int argc, char **argv, int insert)
     fp->f_addr = loadaddr;
     fp->f_size = laddr - loadaddr;
 
+    if (fp->f_type == NULL ||
+        (argc != 0 && fp->f_args == NULL)) {
+	close(fd);
+	snprintf(command_errbuf, sizeof (command_errbuf),
+	    "no memory to load %s", name);
+	file_discard(fp);
+	return (NULL);
+    }
     /* recognise space consumption */
     loadaddr = laddr;
 
@@ -746,8 +762,7 @@ mod_load(char *modname, struct mod_depend *verinfo, int argc, char *argv[])
     /* see if module is already loaded */
     mp = file_findmodule(NULL, modname, verinfo);
     if (mp) {
-	if (mp->m_args)
-	    free(mp->m_args);
+	free(mp->m_args);
 	mp->m_args = unargv(argc, argv);
 	snprintf(command_errbuf, sizeof (command_errbuf),
 	    "warning: module '%s' already loaded", mp->m_name);
@@ -761,6 +776,7 @@ mod_load(char *modname, struct mod_depend *verinfo, int argc, char *argv[])
 	return (ENOENT);
     }
     err = mod_loadkld(filename, argc, argv);
+    free(filename);
     return (err);
 }
 
@@ -818,7 +834,7 @@ mod_loadkld(const char *kldname, int argc, char *argv[])
 	snprintf(command_errbuf, sizeof (command_errbuf),
 	    "don't know how to load module '%s'", filename);
     }
-    if (err && fp)
+    if (err)
 	file_discard(fp);
     free(filename);
     return (err);
@@ -886,14 +902,17 @@ file_findmodule(struct preloaded_file *fp, char *modname,
 void
 file_addmetadata(struct preloaded_file *fp, int type, size_t size, void *p)
 {
-    struct file_metadata	*md;
+	struct file_metadata	*md;
 
-    md = malloc(sizeof(struct file_metadata) - sizeof(md->md_data) + size);
-    md->md_size = size;
-    md->md_type = type;
-    bcopy(p, md->md_data, size);
-    md->md_next = fp->f_metadata;
-    fp->f_metadata = md;
+	md = malloc(sizeof (struct file_metadata) - sizeof (md->md_data) +
+	    size);
+	if (md != NULL) {
+		md->md_size = size;
+		md->md_type = type;
+		bcopy(p, md->md_data, size);
+		md->md_next = fp->f_metadata;
+	}
+	fp->f_metadata = md;
 }
 
 /*
@@ -1121,11 +1140,14 @@ file_addmodule(struct preloaded_file *fp, char *modname, int version,
     mp = file_findmodule(fp, modname, &mdepend);
     if (mp)
 	return (EEXIST);
-    mp = malloc(sizeof(struct kernel_module));
+    mp = calloc(1, sizeof(struct kernel_module));
     if (mp == NULL)
 	return (ENOMEM);
-    bzero(mp, sizeof(struct kernel_module));
     mp->m_name = strdup(modname);
+    if (mp->m_name == NULL) {
+	free(mp);
+	return (ENOMEM);
+    }
     mp->m_version = version;
     mp->m_fp = fp;
     mp->m_next = fp->f_modules;
@@ -1158,8 +1180,7 @@ file_discard(struct preloaded_file *fp)
     }
     mp = fp->f_modules;
     while (mp) {
-	if (mp->m_name)
-	    free(mp->m_name);
+	free(mp->m_name);
 	mp1 = mp;
 	mp = mp->m_next;
 	free(mp1);
@@ -1177,12 +1198,8 @@ file_discard(struct preloaded_file *fp)
 struct preloaded_file *
 file_alloc(void)
 {
-    struct preloaded_file	*fp;
 
-    if ((fp = malloc(sizeof(struct preloaded_file))) != NULL) {
-	bzero(fp, sizeof(struct preloaded_file));
-    }
-    return (fp);
+    return (calloc(1, sizeof (struct preloaded_file)));
 }
 
 /*
@@ -1253,10 +1270,8 @@ moduledir_readhints(struct moduledir *mdp)
     return;
 bad:
     close(fd);
-    if (mdp->d_hints) {
-	free(mdp->d_hints);
-	mdp->d_hints = NULL;
-    }
+    free(mdp->d_hints);
+    mdp->d_hints = NULL;
     mdp->d_flags |= MDIR_NOHINTS;
     return;
 }
@@ -1317,8 +1332,7 @@ moduledir_rebuild(void)
 	if ((mdp->d_flags & MDIR_REMOVED) == 0) {
 	    mdp = STAILQ_NEXT(mdp, d_link);
 	} else {
-	    if (mdp->d_hints)
-		free(mdp->d_hints);
+	    free(mdp->d_hints);
 	    mtmp = mdp;
 	    mdp = STAILQ_NEXT(mdp, d_link);
 	    STAILQ_REMOVE(&moduledir_list, mtmp, moduledir, d_link);
