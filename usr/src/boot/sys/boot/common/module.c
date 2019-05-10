@@ -68,6 +68,7 @@ static struct kernel_module *file_findmodule(struct preloaded_file *, char *,
 static int file_havepath(const char *);
 static char *mod_searchmodule(char *, struct mod_depend *);
 static void file_insert_tail(struct preloaded_file *);
+static void file_remove(struct preloaded_file *);
 struct file_metadata *metadata_next(struct file_metadata *, int);
 static void moduledir_readhints(struct moduledir *);
 static void moduledir_rebuild(void);
@@ -763,9 +764,10 @@ mod_load(char *modname, struct mod_depend *verinfo, int argc, char *argv[])
 int
 mod_loadkld(const char *kldname, int argc, char *argv[])
 {
-	struct preloaded_file *fp, *last_file;
+	struct preloaded_file *fp;
 	int err;
 	char *filename;
+	vm_offset_t loadaddr_saved;
 
 	/*
 	 * Get fully qualified KLD name
@@ -786,22 +788,19 @@ mod_loadkld(const char *kldname, int argc, char *argv[])
 		free(filename);
 		return (0);
 	}
-	for (last_file = preloaded_files;
-	    last_file != NULL && last_file->f_next != NULL;
-	    last_file = last_file->f_next)
-		;
 
 	do {
 		err = file_load(filename, loadaddr, &fp);
 		if (err)
 			break;
 		fp->f_args = unargv(argc, argv);
+		loadaddr_saved = loadaddr;
 		loadaddr = fp->f_addr + fp->f_size;
 		file_insert_tail(fp);	/* Add to the list of loaded files */
 		if (file_load_dependencies(fp) != 0) {
 			err = ENOENT;
-			last_file->f_next = NULL;
-			loadaddr = last_file->f_addr + last_file->f_size;
+			file_remove(fp);
+			loadaddr = loadaddr_saved;
 			fp = NULL;
 			break;
 		}
@@ -1202,6 +1201,29 @@ file_insert_tail(struct preloaded_file *fp)
 		for (cm = preloaded_files; cm->f_next != NULL; cm = cm->f_next)
 			;
 		cm->f_next = fp;
+	}
+}
+
+/*
+ * Remove module from the chain
+ */
+static void
+file_remove(struct preloaded_file *fp)
+{
+	struct preloaded_file   *cm;
+
+	if (preloaded_files == NULL)
+		return;
+
+	if (preloaded_files == fp) {
+		preloaded_files = fp->f_next;
+		return;
+	}
+	for (cm = preloaded_files; cm->f_next != NULL; cm = cm->f_next) {
+		if (cm->f_next == fp) {
+			cm->f_next = fp->f_next;
+			return;
+		}
 	}
 }
 
