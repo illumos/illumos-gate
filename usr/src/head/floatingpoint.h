@@ -48,15 +48,6 @@ extern "C" {
  *	IEEE floating-point arithmetic modes;
  *	IEEE floating-point arithmetic exception handling.
  */
-
-#ifndef __P
-#ifdef __STDC__
-#define	__P(p)	p
-#else
-#define	__P(p)	()
-#endif
-#endif	/* !defined(__P) */
-
 #if defined(__STDC__) && !defined(_FILEDEFED)
 #define	_FILEDEFED
 typedef	__FILE FILE;
@@ -70,7 +61,7 @@ typedef void (*sigfpe_handler_type)();	/* Pointer to exception handler */
 #define	SIGFPE_IGNORE  (void (*)())1	/* ignore this exception or code */
 #define	SIGFPE_ABORT   (void (*)())2	/* force abort on exception */
 
-extern sigfpe_handler_type sigfpe __P((sigfpe_code_type, sigfpe_handler_type));
+extern sigfpe_handler_type sigfpe(sigfpe_code_type, sigfpe_handler_type);
 
 /*
  * Types for IEEE floating point.
@@ -146,46 +137,46 @@ enum decimal_string_form {	/* Valid decimal number string formats. */
 	nanstring_form		/* nan(string)		*/
 };
 
-extern void single_to_decimal __P((single *, decimal_mode *, decimal_record *,
-				fp_exception_field_type *));
-extern void double_to_decimal __P((double *, decimal_mode *, decimal_record *,
-				fp_exception_field_type *));
-extern void extended_to_decimal __P((extended *, decimal_mode *,
-				decimal_record *, fp_exception_field_type *));
-extern void quadruple_to_decimal __P((quadruple *, decimal_mode *,
-				decimal_record *, fp_exception_field_type *));
+extern void single_to_decimal(single *, decimal_mode *, decimal_record *,
+    fp_exception_field_type *);
+extern void double_to_decimal(double *, decimal_mode *, decimal_record *,
+    fp_exception_field_type *);
+extern void extended_to_decimal(extended *, decimal_mode *,
+    decimal_record *, fp_exception_field_type *);
+extern void quadruple_to_decimal(quadruple *, decimal_mode *,
+    decimal_record *, fp_exception_field_type *);
 
-extern void decimal_to_single __P((single *, decimal_mode *, decimal_record *,
-				fp_exception_field_type *));
-extern void decimal_to_double __P((double *, decimal_mode *, decimal_record *,
-				fp_exception_field_type *));
-extern void decimal_to_extended __P((extended *, decimal_mode *,
-				decimal_record *, fp_exception_field_type *));
-extern void decimal_to_quadruple __P((quadruple *, decimal_mode *,
-				decimal_record *, fp_exception_field_type *));
+extern void decimal_to_single(single *, decimal_mode *, decimal_record *,
+    fp_exception_field_type *);
+extern void decimal_to_double(double *, decimal_mode *, decimal_record *,
+    fp_exception_field_type *);
+extern void decimal_to_extended(extended *, decimal_mode *,
+    decimal_record *, fp_exception_field_type *);
+extern void decimal_to_quadruple(quadruple *, decimal_mode *,
+    decimal_record *, fp_exception_field_type *);
 
-extern void string_to_decimal __P((char **, int, int, decimal_record *,
-				enum decimal_string_form *, char **));
-extern void func_to_decimal __P((char **, int, int, decimal_record *,
-				enum decimal_string_form *, char **,
-				int (*)(void), int *, int (*)(int)));
-extern void file_to_decimal __P((char **, int, int, decimal_record *,
-				enum decimal_string_form *, char **,
-				FILE *, int *));
+extern void string_to_decimal(char **, int, int, decimal_record *,
+    enum decimal_string_form *, char **);
+extern void func_to_decimal(char **, int, int, decimal_record *,
+    enum decimal_string_form *, char **,
+    int (*)(void), int *, int (*)(int));
+extern void file_to_decimal(char **, int, int, decimal_record *,
+    enum decimal_string_form *, char **,
+    FILE *, int *);
 
-extern char *seconvert __P((single *, int, int *, int *, char *));
-extern char *sfconvert __P((single *, int, int *, int *, char *));
-extern char *sgconvert __P((single *, int, int, char *));
-extern char *econvert __P((double, int, int *, int *, char *));
-extern char *fconvert __P((double, int, int *, int *, char *));
-extern char *gconvert __P((double, int, int, char *));
-extern char *qeconvert __P((quadruple *, int, int *, int *, char *));
-extern char *qfconvert __P((quadruple *, int, int *, int *, char *));
-extern char *qgconvert __P((quadruple *, int, int, char *));
+extern char *seconvert(single *, int, int *, int *, char *);
+extern char *sfconvert(single *, int, int *, int *, char *);
+extern char *sgconvert(single *, int, int, char *);
+extern char *econvert(double, int, int *, int *, char *);
+extern char *fconvert(double, int, int *, int *, char *);
+extern char *gconvert(double, int, int, char *);
+extern char *qeconvert(quadruple *, int, int *, int *, char *);
+extern char *qfconvert(quadruple *, int, int *, int *, char *);
+extern char *qgconvert(quadruple *, int, int, char *);
 
-extern char *ecvt __P((double, int, int *, int *));
-extern char *fcvt __P((double, int, int *, int *));
-extern char *gcvt __P((double, int, char *));
+extern char *ecvt(double, int, int *, int *);
+extern char *fcvt(double, int, int *, int *);
+extern char *gcvt(double, int, char *);
 
 #if __cplusplus >= 199711L
 namespace std {
@@ -194,8 +185,8 @@ namespace std {
  * ANSI C Standard says the following entry points should be
  * prototyped in <stdlib.h>.  They are now, but weren't before.
  */
-extern double atof __P((const char *));
-extern double strtod __P((const char *, char **));
+extern double atof(const char *);
+extern double strtod(const char *, char **);
 #if __cplusplus >= 199711L
 }
 

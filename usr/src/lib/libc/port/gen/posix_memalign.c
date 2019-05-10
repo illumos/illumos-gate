@@ -24,9 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
+
+#include <sys/sysmacros.h>
+
 #include <stdlib.h>
 #include <errno.h>
 
@@ -49,16 +50,19 @@ int
 posix_memalign(void **memptr, size_t alignment, size_t size)
 {
 	void *ptr = NULL;
-	int error = 0;
 
-	if (alignment == 0 ||
-	    (alignment & (sizeof (void *) - 1)) != 0 ||
-	    (alignment & (alignment - 1)) != 0)
-		error = EINVAL;
-	else if (size != 0 &&
-	    (ptr = memalign(alignment, size)) == NULL)
-		error = ENOMEM;
-
-	*memptr = ptr;
-	return (error);
+	if ((alignment == 0) || !ISP2(alignment) ||
+	    (alignment & (sizeof (void *) - 1)) != 0) {
+		return (EINVAL);
+	} else if (size == 0) {
+		*memptr = NULL;
+		return (0);
+	} else {
+		if ((ptr = memalign(alignment, size)) == NULL) {
+			return (ENOMEM);
+		} else {
+			*memptr = ptr;
+			return (0);
+		}
+	}
 }
