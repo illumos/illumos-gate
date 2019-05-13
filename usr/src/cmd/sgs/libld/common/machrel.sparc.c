@@ -145,7 +145,7 @@ ld_mach_eflags(Ehdr *ehdr, Ofl_desc *ofl)
 	 * Determine which memory model to mark the binary with.  The options
 	 * are (most restrictive to least):
 	 *
-	 *	EF_SPARCV9_TSO		0x0 	Total Store Order
+	 *	EF_SPARCV9_TSO		0x0	Total Store Order
 	 *	EF_SPARCV9_PSO		0x1	Partial Store Order
 	 *	EF_SPARCV9_RMO		0x2	Relaxed Memory Order
 	 *
@@ -779,7 +779,25 @@ ld_perform_outreloc(Rel_desc *orsp, Ofl_desc *ofl, Boolean *remain_seen)
 	if (orsp->rel_rtype == M_R_DTPMOD)
 		raddend = 0;
 
-	relbits = (char *)relosp->os_outdata->d_buf;
+	/*
+	 * Note that the other case which writes out the relocation, above, is
+	 * M_R_REGISTER specific and so does not need this check.
+	 */
+	if ((orsp->rel_rtype != M_R_NONE) &&
+	    (orsp->rel_rtype != M_R_REGISTER) &&
+	    (orsp->rel_rtype != M_R_RELATIVE)) {
+		if (ndx == 0) {
+			Conv_inv_buf_t	inv_buf;
+			Is_desc *isp = orsp->rel_isdesc;
+
+			ld_eprintf(ofl, ERR_FATAL, MSG_INTL(MSG_REL_NOSYMBOL),
+			    conv_reloc_type(ofl->ofl_nehdr->e_machine,
+			    orsp->rel_rtype, 0, &inv_buf),
+			    isp->is_file->ifl_name, EC_WORD(isp->is_scnndx),
+			    isp->is_name, EC_XWORD(roffset));
+			return (S_ERROR);
+		}
+	}
 
 	rea.r_info = ELF_R_INFO(ndx,
 	    ELF_R_TYPE_INFO(RELAUX_GET_TYPEDATA(orsp), orsp->rel_rtype));
@@ -792,6 +810,8 @@ ld_perform_outreloc(Rel_desc *orsp, Ofl_desc *ofl, Boolean *remain_seen)
 	 * Assert we haven't walked off the end of our relocation table.
 	 */
 	assert(relosp->os_szoutrels <= relosp->os_shdr->sh_size);
+
+	relbits = (char *)relosp->os_outdata->d_buf;
 
 	(void) memcpy((relbits + relosp->os_szoutrels),
 	    (char *)&rea, sizeof (Rela));
@@ -927,7 +947,7 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	case R_SPARC_TLS_IE_LDX:
 		/*
 		 * Current instruction:
-		 * 	ld{x}	[r1 + r2], r3
+		 *	ld{x}	[r1 + r2], r3
 		 *
 		 * Need to update this to:
 		 *
@@ -1009,7 +1029,7 @@ gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	case R_SPARC_GOTDATA_OP:
 		/*
 		 * Current instruction:
-		 * 	ld{x}	[r1 + r2], r3
+		 *	ld{x}	[r1 + r2], r3
 		 *
 		 * Need to update this to:
 		 *
@@ -1409,6 +1429,20 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 	 */
 	if (OFL_IS_STATIC_EXEC(ofl))
 		return (1);
+
+	/*
+	 * If the symbol will be reduced, we can't leave outstanding
+	 * relocations against it, as nothing will ever be able to satisfy them
+	 * (and the symbol won't be in .dynsym
+	 */
+	if ((sdp != NULL) &&
+	    (sdp->sd_sym->st_shndx == SHN_UNDEF) &&
+	    (rsp->rel_rtype != M_R_NONE) &&
+	    (rsp->rel_rtype != M_R_REGISTER) &&
+	    (rsp->rel_rtype != M_R_RELATIVE)) {
+		if (ld_sym_reducable(ofl, sdp))
+			return (1);
+	}
 
 	/*
 	 * Certain relocations do not make sense in a 64bit shared object,
