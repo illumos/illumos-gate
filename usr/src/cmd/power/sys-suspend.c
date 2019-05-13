@@ -64,7 +64,7 @@
 #include <sys/cpr.h>
 
 /* STATICUSED */
-struct utmpx 	utmp;
+struct utmpx	utmp;
 #define	NMAX		(sizeof (utmp.ut_name))
 
 /*
@@ -251,7 +251,8 @@ pm_poweroff(void)
  * make this function quite easy, though.
  */
 static int
-pm_check_suspend(void) {
+pm_check_suspend(void)
+{
 	/*
 	 * Use the uadmin(2) "CHECK" command to see if suspend is supported
 	 */
@@ -407,8 +408,8 @@ pm_suspend(void)
  */
 
 static void
-suspend_error(int error) {
-
+suspend_error(int error)
+{
 	switch (error) {
 	case EBUSY:
 		(void) printf(gettext("suspend: "
@@ -481,7 +482,7 @@ refresh_dt()
  * otherwise, return "xauthority" as it is.
  */
 static char *
-get_xauthority(char *xauthority)
+get_xauthority(char *xauthority, size_t buflen)
 {
 	pid_t uid;
 	char *home_dir;
@@ -515,10 +516,12 @@ get_xauthority(char *xauthority)
 	/*
 	 * If there is a .Xauthority file in home directory, reference it.
 	 */
-	/*LINTED*/
-	(void) sprintf(filepath, "%s/.Xauthority", home_dir);
-	if (stat(filepath, &stat_buf) == 0)
-		return (strcat(xauthority, filepath));
+	(void) snprintf(filepath, sizeof (filepath),
+	    "%s/.Xauthority", home_dir);
+	if (stat(filepath, &stat_buf) == 0) {
+		(void) strlcpy(xauthority, filepath, buflen);
+		return (xauthority);
+	}
 
 	/*
 	 * If Xsession can not access user's home directory, it creates the
@@ -533,21 +536,23 @@ get_xauthority(char *xauthority)
 
 	while ((dp = readdir(dirp)) != NULL) {
 		if (strstr(dp->d_name, ".Xauth") != NULL) {
-			/*LINTED*/
-			(void) sprintf(filepath, "%s/%s", DT_TMP, dp->d_name);
+			(void) snprintf(filepath, sizeof (filepath),
+			    "%s/%s", DT_TMP, dp->d_name);
 			if (stat(filepath, &stat_buf) == -1)
 				continue;
 			if (stat_buf.st_uid != uid)
 				continue;
 			if (stat_buf.st_ctime > latest) {
-				(void) strcpy(xauth, filepath);
+				(void) strlcpy(xauth, filepath,
+				    sizeof (xauth));
 				latest = stat_buf.st_ctime;
 			}
 		}
 	}
 	(void) closedir(dirp);
 
-	return (strcat(xauthority, xauth));
+	(void) strlcpy(xauthority, xauth, buflen);
+	return (xauthority);
 }
 
 /*
@@ -572,9 +577,8 @@ int
 main(int argc, char **argv)
 {
 	int		c;
-	char		display_name[MAXNAMELEN + 9] = "DISPLAY=";
-	char		xauthority[MAXPATHLEN + 12] = "XAUTHORITY=";
-	struct passwd 	*pw;
+	char		xauthority[MAXPATHLEN];
+	struct passwd	*pw;
 
 	(void) signal(SIGHUP, SIG_IGN);
 	(void) signal(SIGINT, SIG_IGN);
@@ -619,15 +623,8 @@ main(int argc, char **argv)
 				flags |= SHUTDOWN;
 				break;
 			case 'd':
-				/* Needswork */
 				/* Set the DISPLAY value in the environment */
-				if (strlen(optarg) >= MAXNAMELEN) {
-					(void) printf(gettext("Error: "
-					    "display name is too long.\n"));
-					return (1);
-				}
-				(void) strcat(display_name, optarg);
-				if (putenv(display_name) != 0) {
+				if (setenv("DISPLAY", optarg, 1) != 0) {
 					(void) printf(gettext("Error: "
 					    "unable to set DISPLAY "
 					    "environment variable.\n"));
@@ -715,7 +712,8 @@ main(int argc, char **argv)
 	 * one up.
 	 */
 	if (getenv("XAUTHORITY") == NULL)
-		(void) putenv(get_xauthority(xauthority));
+		(void) setenv("XAUTHORITY",
+		    get_xauthority(xauthority, MAXPATHLEN), 1);
 
 	/*
 	 * In case of "suspend" being called from daemon "powerd",
