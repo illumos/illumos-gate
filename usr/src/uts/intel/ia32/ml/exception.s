@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, 2014 by Delphix. All rights reserved.
- * Copyright (c) 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -308,6 +308,7 @@
 	call	av_dispatch_nmivect
 
 	INTR_POP
+	call	*x86_md_clear
 	jmp	tr_iret_auto
 	/*NOTREACHED*/
 	SET_SIZE(nmiint)
@@ -1085,6 +1086,7 @@ check_for_user_address:
 	ENTRY_NP(fast_null)
 	XPV_TRAP_POP
 	orq	$PS_C, 24(%rsp)	/* set carry bit in user flags */
+	call	*x86_md_clear
 	jmp	tr_iret_auto
 	/*NOTREACHED*/
 	SET_SIZE(fast_null)

@@ -23,7 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2014 by Delphix. All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -755,6 +755,7 @@ i86_mwait(uint32_t data, uint32_t extensions)
 
 	ENTRY_NP(i86_mwait)
 	pushq	%rbp
+	call	*x86_md_clear
 	movq	%rsp, %rbp
 	movq	%rdi, %rax		/* data */
 	movq	%rsi, %rcx		/* extensions */

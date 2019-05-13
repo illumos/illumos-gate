@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -88,6 +89,7 @@ ENTRY(XXX_brand_syscall32_callback)
 	mov	%rcx, SYSCALL_REG; /* save orig return addr in syscall_reg */
 	mov	SCR_REG, %rcx;	/* place new return addr in %rcx */
 	mov	%gs:CPU_RTMP_R15, SCR_REG; /* restore scratch register */
+	call	*x86_md_clear		/* Flush micro-arch state */
 	mov	V_SSP(SP_REG), SP_REG	/* restore user stack pointer */
 	jmp	nopop_sys_syscall32_swapgs_sysretl
 9:
@@ -107,6 +109,7 @@ ENTRY(XXX_brand_syscall_callback)
 	mov	%rcx, SYSCALL_REG; /* save orig return addr in syscall_reg */
 	mov	SCR_REG, %rcx;	/* place new return addr in %rcx */
 	mov	%gs:CPU_RTMP_R15, SCR_REG; /* restore scratch register */
+	call	*x86_md_clear		/* Flush micro-arch state */
 	mov	V_SSP(SP_REG), SP_REG	/* restore user stack pointer */
 	jmp	nopop_sys_syscall_swapgs_sysretq
 9:
