@@ -25,6 +25,7 @@
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_CPUVAR_H
@@ -503,16 +504,8 @@ extern void	cpuset_zero(cpuset_t *);
 
 #define	CPUSET_ZERO(set)	cpuset_zero(&(set))
 
-#endif /* _MACHDEP */
-#endif /* _KERNEL || _KMEMUSER || _BOOT */
+#endif /* defined(_MACHDEP) */
 
-#define	CPU_CPR_OFFLINE		0x0
-#define	CPU_CPR_ONLINE		0x1
-#define	CPU_CPR_IS_OFFLINE(cpu)	(((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE) == 0)
-#define	CPU_CPR_IS_ONLINE(cpu)	((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE)
-#define	CPU_SET_CPR_FLAGS(cpu, flag)	((cpu)->cpu_cpr_flags |= flag)
-
-#if defined(_KERNEL) || defined(_KMEMUSER)
 
 extern cpuset_t cpu_seqid_inuse;
 
@@ -588,6 +581,12 @@ extern struct cpu *curcpup(void);
 #define	CPU_NEW_GENERATION(cp)	((cp)->cpu_generation++)
 
 #endif /* defined(_KERNEL) || defined(_KMEMUSER) */
+
+#define	CPU_CPR_OFFLINE		0x0
+#define	CPU_CPR_ONLINE		0x1
+#define	CPU_CPR_IS_OFFLINE(cpu)	(((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE) == 0)
+#define	CPU_CPR_IS_ONLINE(cpu)	((cpu)->cpu_cpr_flags & CPU_CPR_ONLINE)
+#define	CPU_SET_CPR_FLAGS(cpu, flag)	((cpu)->cpu_cpr_flags |= flag)
 
 /*
  * CPU support routines (not for genassym.c)
