@@ -27,7 +27,7 @@
 /*	  All Rights Reserved		*/
 
 /*
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -74,6 +74,7 @@
 #include <sys/stack.h>
 #include <sys/brand.h>
 #include <sys/mmapobj.h>
+#include <sys/smt.h>
 
 #include <vm/as.h>
 #include <vm/seg_kmem.h>
@@ -625,6 +626,8 @@ main(void)
 	pm_cfb_setup_intr();
 #if defined(__x86)
 	fastboot_post_startup();
+
+	smt_late_init();
 #endif
 
 	/*

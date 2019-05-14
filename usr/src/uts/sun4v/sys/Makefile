@@ -22,7 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 # include global definitions
 UTSBASE	= ../..
@@ -46,7 +46,6 @@ SUN4_HDRS=			\
 	dvma.h			\
 	eeprom.h		\
 	fcode.h			\
-	ht.h			\
 	idprom.h		\
 	intr.h			\
 	intreg.h		\
@@ -56,6 +55,7 @@ SUN4_HDRS=			\
 	nexusdebug.h		\
 	prom_debug.h		\
 	scb.h			\
+	smt.h			\
 	sun4asi.h		\
 	tod.h			\
 	trapstat.h		\

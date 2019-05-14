@@ -10,11 +10,11 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
-#ifndef	_SYS_HT_H
-#define	_SYS_HT_H
+#ifndef	_SYS_SMT_H
+#define	_SYS_SMT_H
 
 #include <sys/types.h>
 #include <sys/thread.h>
@@ -23,16 +23,20 @@
 extern "C" {
 #endif
 
-#define	ht_init() {}
+#define	smt_init() {}
+#define	smt_late_init() {}
+#define	smt_disable() (ENOTSUP)
+#define	smt_can_enable(c, f) (0)
+#define	smt_force_enabled() {}
 
-#define	ht_should_run(t, c) (B_TRUE)
-#define	ht_adjust_cpu_score(t, c, p) (p)
-#define	ht_begin_unsafe(void) {}
-#define	ht_end_unsafe(void) {}
-#define	ht_end_intr(void) {}
+#define	smt_should_run(t, c) (B_TRUE)
+#define	smt_adjust_cpu_score(t, c, p) (p)
+#define	smt_begin_unsafe(void) {}
+#define	smt_end_unsafe(void) {}
+#define	smt_end_intr(void) {}
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_HT_H */
+#endif	/* _SYS_SMT_H */

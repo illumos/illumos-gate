@@ -59,6 +59,7 @@
 #include <sys/time.h>
 #include <sys/archsystm.h>
 #include <sys/sdt.h>
+#include <sys/smt.h>
 #if defined(__x86) || defined(__amd64)
 #include <sys/x86_archext.h>
 #endif
@@ -144,6 +145,7 @@ processorid_t max_cpu_seqid_ever = 0;
 
 int ncpus = 1;
 int ncpus_online = 1;
+int ncpus_intr_enabled = 1;
 
 /*
  * CPU that we're trying to offline.  Protected by cpu_lock.
@@ -1209,7 +1211,7 @@ cpu_flagged_active(cpu_flag_t cpu_flags)
  * Bring the indicated CPU online.
  */
 int
-cpu_online(cpu_t *cp)
+cpu_online(cpu_t *cp, int flags)
 {
 	int	error = 0;
 
@@ -1222,6 +1224,9 @@ cpu_online(cpu_t *cp)
 	 */
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if ((cp->cpu_flags & CPU_DISABLED) && !smt_can_enable(cp, flags))
+		return (EINVAL);
 
 	/*
 	 * Put all the cpus into a known safe place.
@@ -1236,8 +1241,12 @@ cpu_online(cpu_t *cp)
 			cp->cpu_flags &= ~CPU_FAULTED;
 			mp_cpu_faulted_exit(cp);
 		}
+
+		if (cp->cpu_flags & CPU_DISABLED)
+			smt_force_enabled();
+
 		cp->cpu_flags &= ~(CPU_QUIESCED | CPU_OFFLINE | CPU_FROZEN |
-		    CPU_SPARE);
+		    CPU_SPARE | CPU_DISABLED);
 		CPU_NEW_GENERATION(cp);
 		start_cpus();
 		cpu_stats_kstat_create(cp);
@@ -1278,9 +1287,12 @@ cpu_offline(cpu_t *cp, int flags)
 	lpl_t	*cpu_lpl;
 	proc_t	*p;
 	int	lgrp_diff_lpl;
-	boolean_t unbind_all_threads = (flags & CPU_FORCED) != 0;
+	boolean_t forced = (flags & CPU_FORCED) != 0;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if (cp->cpu_flags & CPU_DISABLED)
+		return (EINVAL);
 
 	/*
 	 * If we're going from faulted or spare to offline, just
@@ -1309,7 +1321,7 @@ cpu_offline(cpu_t *cp, int flags)
 	 * Unbind all soft-bound threads bound to our CPU and hard bound threads
 	 * if we were asked to.
 	 */
-	error = cpu_unbind(cp->cpu_id, unbind_all_threads);
+	error = cpu_unbind(cp->cpu_id, forced);
 	if (error != 0)
 		return (error);
 	/*
@@ -1614,6 +1626,9 @@ cpu_faulted(cpu_t *cp, int flags)
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(!cpu_is_poweredoff(cp));
 
+	if (cp->cpu_flags & CPU_DISABLED)
+		return (EINVAL);
+
 	if (cpu_is_offline(cp)) {
 		cp->cpu_flags &= ~CPU_SPARE;
 		cp->cpu_flags |= CPU_FAULTED;
@@ -1641,6 +1656,9 @@ cpu_spare(cpu_t *cp, int flags)
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(!cpu_is_poweredoff(cp));
+
+	if (cp->cpu_flags & CPU_DISABLED)
+		return (EINVAL);
 
 	if (cpu_is_offline(cp)) {
 		if (cp->cpu_flags & CPU_FAULTED) {
@@ -2267,28 +2285,9 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	if (cpuid_checkpass(cp, 1) == 0)
 		return (ENXIO);
 #endif
-	switch (cp->cpu_type_info.pi_state) {
-	case P_ONLINE:
-		pi_state = PS_ONLINE;
-		break;
-	case P_POWEROFF:
-		pi_state = PS_POWEROFF;
-		break;
-	case P_NOINTR:
-		pi_state = PS_NOINTR;
-		break;
-	case P_FAULTED:
-		pi_state = PS_FAULTED;
-		break;
-	case P_SPARE:
-		pi_state = PS_SPARE;
-		break;
-	case P_OFFLINE:
-		pi_state = PS_OFFLINE;
-		break;
-	default:
-		pi_state = "unknown";
-	}
+
+	pi_state = cpu_get_state_str(cp->cpu_flags);
+
 	(void) strcpy(cpu_info_template.ci_state.value.c, pi_state);
 	cpu_info_template.ci_state_begin.value.l = cp->cpu_state_begin;
 	(void) strncpy(cpu_info_template.ci_cpu_type.value.c,
@@ -3170,33 +3169,41 @@ cpu_set_state(cpu_t *cpu)
  * communication with user applications; cpu_flags provides the in-kernel
  * interface.
  */
+static int
+cpu_flags_to_state(cpu_flag_t flags)
+{
+	if (flags & CPU_DISABLED)
+		return (P_DISABLED);
+	else if (flags & CPU_POWEROFF)
+		return (P_POWEROFF);
+	else if (flags & CPU_FAULTED)
+		return (P_FAULTED);
+	else if (flags & CPU_SPARE)
+		return (P_SPARE);
+	else if ((flags & (CPU_READY | CPU_OFFLINE)) != CPU_READY)
+		return (P_OFFLINE);
+	else if (flags & CPU_ENABLE)
+		return (P_ONLINE);
+	else
+		return (P_NOINTR);
+}
+
 int
 cpu_get_state(cpu_t *cpu)
 {
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	if (cpu->cpu_flags & CPU_POWEROFF)
-		return (P_POWEROFF);
-	else if (cpu->cpu_flags & CPU_FAULTED)
-		return (P_FAULTED);
-	else if (cpu->cpu_flags & CPU_SPARE)
-		return (P_SPARE);
-	else if ((cpu->cpu_flags & (CPU_READY | CPU_OFFLINE)) != CPU_READY)
-		return (P_OFFLINE);
-	else if (cpu->cpu_flags & CPU_ENABLE)
-		return (P_ONLINE);
-	else
-		return (P_NOINTR);
+	return (cpu_flags_to_state(cpu->cpu_flags));
 }
 
 /*
  * Return processor_info(2) state as a string.
  */
 const char *
-cpu_get_state_str(cpu_t *cpu)
+cpu_get_state_str(cpu_flag_t flags)
 {
 	const char *string;
 
-	switch (cpu_get_state(cpu)) {
+	switch (cpu_flags_to_state(flags)) {
 	case P_ONLINE:
 		string = PS_ONLINE;
 		break;
@@ -3214,6 +3221,9 @@ cpu_get_state_str(cpu_t *cpu)
 		break;
 	case P_OFFLINE:
 		string = PS_OFFLINE;
+		break;
+	case P_DISABLED:
+		string = PS_DISABLED;
 		break;
 	default:
 		string = "unknown";

@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/var.h>
@@ -37,13 +41,15 @@
 #include <sys/processor.h>
 #include <sys/debug.h>
 #include <sys/policy.h>
+#include <sys/smt.h>
 
 /*
  * CPU state diagram
  *
- *                   P_SPARE
+ *                  P_SPARE
  * P_POWEROFF <---> P_OFFLINE <---> P_ONLINE <---> P_NOINTR
  *                  P_FAULTED
+ *                  P_DISABLED
  */
 int
 p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
@@ -53,10 +59,17 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 	int	error = 0;
 	int	flags = 0;
 
-	/*
-	 * Try to get a pointer to the requested CPU structure.
-	 */
 	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	if (cpun == P_ALL_SIBLINGS) {
+		if (new_status != P_DISABLED) {
+			error = EINVAL;
+			goto out;
+		}
+
+		return (smt_disable());
+	}
+
 	if ((cp = cpu_get(cpun)) == NULL) {
 		error = EINVAL;
 		goto out;
@@ -81,8 +94,10 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 		if (secpolicy_ponline(CRED()) != 0)
 			error = EPERM;
 		break;
+	case P_DISABLED:
 	default:
 		error = EINVAL;
+		break;
 	}
 
 	if (error)
@@ -105,6 +120,7 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 				break;
 			ASSERT(cpu_get_state(cp) == P_OFFLINE);
 			/* FALLTHROUGH */
+		case P_DISABLED:
 		case P_OFFLINE:
 		case P_FAULTED:
 		case P_SPARE:
@@ -112,7 +128,7 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 			 * If CPU is in one of the offline states,
 			 * bring it online.
 			 */
-			error = cpu_online(cp);
+			error = cpu_online(cp, flags);
 			break;
 		case P_NOINTR:
 			cpu_intr_enable(cp);
@@ -130,6 +146,7 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 			cpu_intr_enable(cp);
 			/* FALLTHROUGH */
 		case P_ONLINE:
+		case P_DISABLED:
 		case P_FAULTED:
 		case P_SPARE:
 			/*
@@ -143,6 +160,7 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 			 * If CPU is powered off, power it on.
 			 */
 			error = cpu_poweron(cp);
+			break;
 		}
 		break;
 
@@ -156,13 +174,14 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 				break;
 			ASSERT(cpu_get_state(cp) == P_OFFLINE);
 			/* FALLTHROUGH */
+		case P_DISABLED:
 		case P_OFFLINE:
 		case P_FAULTED:
 		case P_SPARE:
 			/*
 			 * First, bring the CPU online.
 			 */
-			if (error = cpu_online(cp))
+			if (error = cpu_online(cp, flags))
 				break;
 			/* FALLTHROUGH */
 		case P_ONLINE:
@@ -170,6 +189,7 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 			 * CPU is now online.  Try to disable interrupts.
 			 */
 			error = cpu_intr_disable(cp);
+			break;
 		}
 		break;
 
@@ -183,14 +203,16 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 				break;
 			ASSERT(cpu_get_state(cp) == P_OFFLINE);
 			/*FALLTHROUGH*/
+		case P_DISABLED:
 		case P_OFFLINE:
-		case P_SPARE:
 		case P_ONLINE:
 		case P_NOINTR:
+		case P_SPARE:
 			/*
 			 * Mark this CPU as faulted.
 			 */
 			error = cpu_faulted(cp, flags);
+			break;
 		}
 		break;
 
@@ -204,6 +226,7 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 				break;
 			ASSERT(cpu_get_state(cp) == P_OFFLINE);
 			/*FALLTHROUGH*/
+		case P_DISABLED:
 		case P_OFFLINE:
 		case P_FAULTED:
 		case P_ONLINE:
@@ -212,6 +235,7 @@ p_online_internal_locked(processorid_t cpun, int new_status, int *old_status)
 			 * Mark this CPU as a spare.
 			 */
 			error = cpu_spare(cp, flags);
+			break;
 		}
 		break;
 	}

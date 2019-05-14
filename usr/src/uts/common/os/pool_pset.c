@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sys/pool.h>
 #include <sys/pool_impl.h>
@@ -889,7 +891,7 @@ pool_pset_pack(ea_object_t *eo_system)
 			(void) nvlist_dup(cpu->cpu_props, &nvl, KM_SLEEP);
 			(void) nvlist_add_int64(nvl, "cpu.sys_id", cpu->cpu_id);
 			(void) nvlist_add_string(nvl, "cpu.status",
-			    (char *)cpu_get_state_str(cpu));
+			    (char *)cpu_get_state_str(cpu->cpu_flags));
 			buf = NULL;
 			bufsz = 0;
 			(void) nvlist_pack(nvl, &buf, &bufsz,
@@ -967,7 +969,7 @@ pool_cpu_propget(processorid_t cpuid, char *name, nvlist_t *nvl)
 	}
 	if (strcmp(name, "cpu.status") == 0) {
 		ret = nvlist_add_string(nvl, "cpu.status",
-		    (char *)cpu_get_state_str(cpu));
+		    (char *)cpu_get_state_str(cpu->cpu_flags));
 	} else {
 		ret = EINVAL;
 	}

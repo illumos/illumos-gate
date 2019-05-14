@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -60,7 +60,7 @@
 #include <sys/dtrace.h>
 #include <sys/sdt.h>
 #include <sys/archsystm.h>
-#include <sys/ht.h>
+#include <sys/smt.h>
 
 #include <vm/as.h>
 
@@ -1239,13 +1239,13 @@ setbackdq(kthread_t *tp)
 		 * We'll generally let this thread continue to run where
 		 * it last ran...but will consider migration if:
 		 * - The thread probably doesn't have much cache warmth.
-		 * - HT exclusion would prefer us to run elsewhere
+		 * - SMT exclusion would prefer us to run elsewhere
 		 * - The CPU where it last ran is the target of an offline
 		 *   request.
 		 * - The thread last ran outside its home lgroup.
 		 */
 		if ((!THREAD_HAS_CACHE_WARMTH(tp)) ||
-		    !ht_should_run(tp, tp->t_cpu) ||
+		    !smt_should_run(tp, tp->t_cpu) ||
 		    (tp->t_cpu == cpu_inmotion) ||
 		    !LGRP_CONTAINS_CPU(tp->t_lpl->lpl_lgrp, tp->t_cpu)) {
 			cp = disp_lowpri_cpu(tp->t_cpu, tp, tpri);
@@ -1277,7 +1277,7 @@ setbackdq(kthread_t *tp)
 					newcp = cp->cpu_next_part;
 				}
 
-				if (ht_should_run(tp, newcp) &&
+				if (smt_should_run(tp, newcp) &&
 				    RUNQ_LEN(newcp, tpri) < qlen) {
 					DTRACE_PROBE3(runq__balance,
 					    kthread_t *, tp,
@@ -2579,7 +2579,7 @@ disp_cpu_inactive(cpu_t *cp)
  *
  * Otherwise we'll use double the effective dispatcher priority for the CPU.
  *
- * We do this so ht_adjust_cpu_score() can increment the score if needed,
+ * We do this so smt_adjust_cpu_score() can increment the score if needed,
  * without ending up over-riding a dispatcher priority.
  */
 static pri_t
@@ -2599,7 +2599,7 @@ cpu_score(cpu_t *cp, kthread_t *tp)
 	if (2 * cp->cpu_chosen_level > score)
 		score = 2 * cp->cpu_chosen_level;
 
-	return (ht_adjust_cpu_score(tp, cp, score));
+	return (smt_adjust_cpu_score(tp, cp, score));
 }
 
 /*
@@ -2726,7 +2726,7 @@ disp_choose_best_cpu(void)
 	ASSERT(t->t_state == TS_ONPROC);
 	ASSERT(t->t_schedflag & TS_VCPU);
 
-	if (ht_should_run(t, curcpu))
+	if (smt_should_run(t, curcpu))
 		return (curcpu);
 
 	return (disp_lowpri_cpu(curcpu, t, t->t_pri));

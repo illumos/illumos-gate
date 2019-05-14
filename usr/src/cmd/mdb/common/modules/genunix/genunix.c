@@ -21,7 +21,7 @@
 /*
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2013 by Delphix. All rights reserved.
  */
 
@@ -3070,7 +3070,7 @@ cpuinfo_walk_cpu(uintptr_t addr, const cpu_t *cpu, cpuinfo_data_t *cid)
 	const char *flags[] = {
 	    "RUNNING", "READY", "QUIESCED", "EXISTS",
 	    "ENABLE", "OFFLINE", "POWEROFF", "FROZEN",
-	    "SPARE", "FAULTED", NULL
+	    "SPARE", "FAULTED", "DISABLED", NULL
 	};
 
 	if (cid->cid_cpu != -1) {

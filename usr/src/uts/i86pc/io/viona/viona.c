@@ -237,7 +237,7 @@
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
 #include <vm/seg_kmem.h>
-#include <sys/ht.h>
+#include <sys/smt.h>
 
 #include <sys/pattr.h>
 #include <sys/dls.h>
@@ -3002,9 +3002,9 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	 * We're potentially going deep into the networking layer; make sure the
 	 * guest can't run concurrently.
 	 */
-	ht_begin_unsafe();
+	smt_begin_unsafe();
 	mac_tx(link_mch, mp_head, 0, MAC_DROP_ON_NO_DESC, NULL);
-	ht_end_unsafe();
+	smt_end_unsafe();
 	return;
 
 drop_fail:

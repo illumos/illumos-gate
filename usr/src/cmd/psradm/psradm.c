@@ -24,7 +24,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
 
 #include <sys/types.h>
 #include <sys/procset.h>
@@ -38,6 +40,7 @@
 #include <time.h>
 #include <utmpx.h>
 #include <assert.h>
+#include <stdbool.h>
 
 static char	*cmdname;	/* command name for messages */
 
@@ -53,9 +56,11 @@ static char	*basename(char *);
 static void
 usage(void)
 {
-	(void) fprintf(stderr,
-	    "usage: \n\t%s [-F] -f|-n|-i|-s [-v] processor_id ...\n"
-	    "\t%s -a -f|-n|-i [-v]\n", cmdname, cmdname);
+	(void) fprintf(stderr, "usage:\n"
+	    "\t%s [-F] -f|-n|-i|-s [-v] processor_id ...\n"
+	    "\t%s -a -f|-n|-i [-v]\n"
+	    "\t%s -aS [-v]\n",
+	    cmdname, cmdname, cmdname);
 }
 
 /*
@@ -84,6 +89,7 @@ static psr_action_t psr_action[] = {
 	{ P_NOINTR,	"no-intr",	"set to",	"ni"	},
 	{ P_SPARE,	"spare",	"marked",	"spr"	},
 	{ P_FAULTED,	"faulted",	"marked",	"flt"	},
+	{ P_DISABLED,	"disabled",	"set as",	"dis"	},
 };
 
 static int	psr_actions = sizeof (psr_action) / sizeof (psr_action_t);
@@ -218,10 +224,11 @@ main(int argc, char *argv[])
 	char	*errptr;
 	int	errors;
 	psr_action_t	*pac;
+	bool disable_smt = 0;
 
 	cmdname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, "afFinsv")) != EOF) {
+	while ((c = getopt(argc, argv, "afFinsSv")) != EOF) {
 		switch (c) {
 
 		case 'a':		/* applies to all possible CPUs */
@@ -230,6 +237,10 @@ main(int argc, char *argv[])
 
 		case 'F':
 			force = 1;
+			break;
+
+		case 'S':
+			disable_smt = 1;
 			break;
 
 		case 'f':
@@ -254,6 +265,28 @@ main(int argc, char *argv[])
 			usage();
 			return (2);
 		}
+	}
+
+	if (disable_smt) {
+		if (!all_flag) {
+			fprintf(stderr, "%s: -S must be used with -a.\n",
+			    cmdname);
+			usage();
+			return (2);
+		}
+
+		if (force || action != 0 || argc != optind) {
+			usage();
+			return (2);
+		}
+
+		if (p_online(P_ALL_SIBLINGS, P_DISABLED) == -1) {
+			fprintf(stderr, "Failed to disable hyper-threading: "
+			    "%s\n", strerror(errno));
+			return (EXIT_FAILURE);
+		}
+
+		return (EXIT_SUCCESS);
 	}
 
 	switch (action) {

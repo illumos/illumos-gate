@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/note.h>
@@ -7487,7 +7488,7 @@ drmach_iocage_cpu_acquire(drmach_device_t *dp, cpu_flag_t *oflags)
 
 	if (cpu_poweroff(cp)) {
 		DRMACH_PR("%s: cpu_poweroff failed for CPU id %d", fn, cpuid);
-		if (cpu_online(cp)) {
+		if (cpu_online(cp, 0)) {
 			cmn_err(CE_WARN, "failed to online CPU id %d "
 			    "during I/O cage test selection", cpuid);
 		}
@@ -7509,7 +7510,7 @@ drmach_iocage_cpu_acquire(drmach_device_t *dp, cpu_flag_t *oflags)
 			dp->busy = 1;
 			return (-1);
 		}
-		if (cpu_poweron(cp) || cpu_online(cp)) {
+		if (cpu_poweron(cp) || cpu_online(cp, 0)) {
 			cmn_err(CE_WARN, "failed to %s CPU id %d "
 			    "during I/O cage test selection",
 			    cpu_is_poweredoff(cp) ?
@@ -7620,7 +7621,7 @@ drmach_iocage_cpu_return(drmach_device_t *dp, cpu_flag_t oflags)
 		return (-1);
 	}
 
-	if (cpu_poweron(cp) || cpu_online(cp)) {
+	if (cpu_poweron(cp) || cpu_online(cp, 0)) {
 		cmn_err(CE_WARN, "failed to %s CPU id %d after I/O "
 		    "cage test", cpu_is_poweredoff(cp) ?
 		    "poweron" : "online", cpuid);

@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2019 Joyent, Inc.
+ */
+
+/*
  * Virtual CPU management.
  *
  * VCPUs can be controlled in one of two ways; through the domain itself
@@ -680,6 +684,9 @@ poweroff_vcpu(struct cpu *cp)
 		ASSERT(cpu_phase[cp->cpu_id] == CPU_PHASE_SAFE);
 
 		CPUSET_DEL(cpu_ready_set, cp->cpu_id);
+
+		if (cp->cpu_flags & CPU_ENABLE)
+			ncpus_intr_enabled--;
 
 		cp->cpu_flags |= CPU_POWEROFF | CPU_OFFLINE;
 		cp->cpu_flags &=

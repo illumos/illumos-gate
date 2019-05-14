@@ -1,10 +1,11 @@
 '\" te
 .\"  Copyright (c) 2008 Sun Microsystems, Inc.
 .\" All Rights Reserved
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PSRADM 1M "April 9, 2016"
+.TH PSRADM 1M "Apr 25, 2019"
 .SH NAME
 psradm \- change processor operational status
 .SH SYNOPSIS
@@ -18,11 +19,16 @@ psradm \- change processor operational status
 \fBpsradm\fR \fB-a\fR \fB-f\fR | \fB-i\fR | \fB-n\fR | \fB-s\fR [\fB-v\fR] [\fB-F\fR]
 .fi
 
+.LP
+.nf
+\fBpsradm\fR \fB-aS\fR [\fB-v\fR]
+.fi
+
 .SH DESCRIPTION
 .LP
 The \fBpsradm\fR utility changes the operational status of processors. The
 legal states for the processor are \fBon-line\fR, \fBoff-line\fR, \fBspare\fR,
-\fBfaulted\fR, and \fBno-intr\fR.
+\fBfaulted\fR, \fBno-intr\fR, and \fBdisabled\fR.
 .sp
 .LP
 An \fBon-line\fR processor processes \fBLWPs\fR (lightweight processes) and can
@@ -51,12 +57,20 @@ A \fBno-intr\fR processor processes \fBLWPs\fR but is not interruptible by I/O
 devices.
 .sp
 .LP
-A processor can not be taken \fBoff-line\fR or made \fBspare\fR if there are
-LWPs that are bound to the processor unless the additional \fB-F\fR option is
-used. The \fB-F\fR option removes processor bindings of such LWPs before
-changing the processor's operational status. On some architectures, it might
-not be possible to take certain processors \fBoff-line\fR or \fBspare\fR if,
-for example, the system depends on some resource provided by the processor.
+With the \fB-aS\fR option, simultaneous multi-threading is disabled. The -a
+option means "apply to every core" and is currently required. Each CPU core has
+its SMT siblings in the \fBdisabled\fR state, and will effectively stay unused.
+That is, only one CPU in each core will be processing I/O, scheduling processes,
+etc. A CPU can only be moved back out of the \fBdisabled\fR state with the
+\fB-F\fR option.
+.sp
+.LP
+A processor can not be taken \fBoff-line\fR, \fBdisabled\fR, or made \fBspare\fR
+if there are LWPs that are bound to the processor unless the additional \fB-F\fR
+option is used. The \fB-F\fR option removes processor bindings of such LWPs
+before changing the processor's operational status. On some architectures, it
+might not be possible to take certain processors \fBoff-line\fR or \fBspare\fR
+if, for example, the system depends on some resource provided by the processor.
 .sp
 .LP
 At least one processor in the system must be able to process \fBLWPs.\fR At
@@ -125,6 +139,15 @@ Set the specified processors \fBno-intr\fR.
 .ad
 .RS 6n
 Bring the specified processors \fBon-line\fR.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-S\fR\fR
+.ad
+.RS 6n
+Disable simultaneous multi-threading (hyper-threading).
 .RE
 
 .sp

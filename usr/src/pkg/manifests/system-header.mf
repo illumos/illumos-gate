@@ -26,7 +26,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
 #
 
@@ -1682,7 +1682,6 @@ $(i386_ONLY)file path=usr/platform/i86pc/include/sys/ddi_subrdefs.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/debug_info.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/fastboot.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/hma.h
-$(i386_ONLY)file path=usr/platform/i86pc/include/sys/ht.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/mach_mmu.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/machclock.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/machcpuvar.h
@@ -1699,6 +1698,7 @@ $(i386_ONLY)file path=usr/platform/i86pc/include/sys/psm_types.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/rm_platter.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/sbd_ioctl.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/smp_impldefs.h
+$(i386_ONLY)file path=usr/platform/i86pc/include/sys/smt.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/vm_machparam.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/x_call.h
 $(i386_ONLY)file path=usr/platform/i86pc/include/sys/xc_levels.h
@@ -1737,7 +1737,6 @@ $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/errclassify.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/fhc.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/gpio_87317.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/hpc3130_events.h
-$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/ht.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/hpc3130.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/i2c_client.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/i2c/clients/lm75.h
@@ -1772,6 +1771,7 @@ $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sbd_ioctl.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/scb.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/scsb_led.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/simmstat.h
+$(sparc_ONLY)file path=usr/platform/sun4u/include/sys/smt.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/spitregs.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sram.h
 $(sparc_ONLY)file path=usr/platform/sun4u/include/sys/sun4asi.h
@@ -1800,7 +1800,6 @@ $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/dvma.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/eeprom.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/fcode.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/hsvc.h
-$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/ht.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/hypervisor_api.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/idprom.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/intr.h
@@ -1826,6 +1825,7 @@ $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/prom_plat.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/pte.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/qcn.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/scb.h
+$(sparc_ONLY)file path=usr/platform/sun4v/include/sys/smt.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/soft_state.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/sun4asi.h
 $(sparc_ONLY)file path=usr/platform/sun4v/include/sys/tod.h

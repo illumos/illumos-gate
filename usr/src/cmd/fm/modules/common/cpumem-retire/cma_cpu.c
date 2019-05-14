@@ -21,6 +21,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <cma.h>
@@ -302,6 +304,8 @@ p_online_state_fmt(int state)
 		return (PS_NOINTR);
 	case P_SPARE:
 		return (PS_SPARE);
+	case P_DISABLED:
+		return (PS_DISABLED);
 	default:
 		return ("unknown");
 	}

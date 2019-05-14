@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -1914,6 +1914,9 @@ get_pi_state(ptree_rarg_t *rarg, void *vbuf)
 	case P_POWEROFF:
 		(void) strlcpy(vbuf, PS_POWEROFF, MAX_STATE_SIZE);
 		break;
+	case P_DISABLED:
+		(void) strlcpy(vbuf, PS_DISABLED, MAX_STATE_SIZE);
+		break;
 	default:
 		(void) strlcpy(vbuf, "unknown", MAX_STATE_SIZE);
 		break;
@@ -2367,7 +2370,8 @@ process_devtree_conf_file(void)
 static	asr_conf_entries_t	*conf_name_asr_map = NULL;
 
 static void
-free_asr_conf_entries(asr_conf_entries_t *list) {
+free_asr_conf_entries(asr_conf_entries_t *list)
+{
 	asr_conf_entries_t  *el;
 	asr_conf_entries_t  *del;
 
@@ -2606,7 +2610,7 @@ add_status_prop(picl_nodehdl_t chdh, char *status)
 
 static void
 create_asr_node(char *parent, char *child, char *unitaddr, char *class,
-	char *status, char *props)
+    char *status, char *props)
 {
 	char			ptreepath[PATH_MAX];
 	char			nodename[PICL_PROPNAMELEN_MAX];

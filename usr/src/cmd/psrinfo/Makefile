@@ -23,18 +23,18 @@
 #
 # Copyright (c) 2012 DEY Storage Systems, Inc.  All rights reserved.
 #
-# cmd/psrinfo/Makefile
+# Copyright 2019 Joyent, Inc.
 #
 
-PROG=	psrinfo
+PROG = psrinfo
 
 include	../Makefile.cmd
 
-LDLIBS += -lkstat
-CERRWARN += -_gcc=-Wno-uninitialized
-XGETFLAGS +=  
-$(PROG).po	:= CPPFLAGS += -DXGETTEXT
+LDLIBS += -lkstat -ldevinfo
 
+$(PROG).po := CPPFLAGS += -DXGETTEXT
+
+CSTD=	$(CSTD_GNU99)
 
 .KEEP_STATE:
 
@@ -48,7 +48,5 @@ clean:
 
 $(ROOTUSRSBINBINPROG): $(PROG)
 	$(INS.file)
-
-lint:	lint_PROG
 
 include ../Makefile.targ

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018 Joyent, Inc.  All rights reserverd.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -466,7 +466,7 @@
 #include <sys/ontrap.h>
 #include <sys/x86_archext.h>
 #include <sys/promif.h>
-#include <sys/ht.h>
+#include <sys/smt.h>
 #include <vm/hat_i86.h>
 #if defined(__xpv)
 #include <sys/hypervisor.h>
@@ -597,7 +597,7 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 		}
 	}
 
-	ht_begin_intr(pil);
+	smt_begin_intr(pil);
 
 	/*
 	 * Store starting timestamp in CPU structure for this PIL.
@@ -703,7 +703,7 @@ hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
 			t->t_intr_start = now;
 	}
 
-	ht_end_intr();
+	smt_end_intr();
 
 	mcpu->mcpu_pri = oldpil;
 	(void) (*setlvlx)(oldpil, vecnum);
@@ -767,7 +767,7 @@ intr_thread_prolog(struct cpu *cpu, caddr_t stackptr, uint_t pil)
 	it->t_state = TS_ONPROC;
 
 	cpu->cpu_thread = it;		/* new curthread on this cpu */
-	ht_begin_intr(pil);
+	smt_begin_intr(pil);
 
 	it->t_pil = (uchar_t)pil;
 	it->t_pri = intr_pri + (pri_t)pil;
@@ -859,7 +859,7 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 	mcpu->mcpu_pri = pil;
 	(*setlvlx)(pil, vec);
 	t->t_intr_start = now;
-	ht_end_intr();
+	smt_end_intr();
 	cpu->cpu_thread = t;
 }
 
@@ -1047,7 +1047,7 @@ top:
 
 	it->t_intr = t;
 	cpu->cpu_thread = it;
-	ht_begin_intr(pil);
+	smt_begin_intr(pil);
 
 	/*
 	 * Set bit for this pil in CPU's interrupt active bitmask.
@@ -1108,7 +1108,7 @@ dosoftint_epilog(struct cpu *cpu, uint_t oldpil)
 	it->t_link = cpu->cpu_intr_thread;
 	cpu->cpu_intr_thread = it;
 	it->t_state = TS_FREE;
-	ht_end_intr();
+	smt_end_intr();
 	cpu->cpu_thread = t;
 
 	if (t->t_flag & T_INTR_THREAD)

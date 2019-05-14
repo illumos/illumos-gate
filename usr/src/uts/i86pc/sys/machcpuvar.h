@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_MACHCPUVAR_H
@@ -140,14 +140,14 @@ struct kpti_frame {
 	uint64_t	kf_upper_redzone;
 };
 
-typedef struct cpu_ht {
-	lock_t ch_lock;
-	char ch_pad[56];
-	struct cpu *ch_sib;
-	volatile uint64_t ch_intr_depth;
-	volatile uint64_t ch_state;
-	volatile uint64_t ch_sibstate;
-} cpu_ht_t;
+typedef struct cpu_smt {
+	lock_t cs_lock;
+	char cs_pad[56];
+	struct cpu *cs_sib;
+	volatile uint64_t cs_intr_depth;
+	volatile uint64_t cs_state;
+	volatile uint64_t cs_sibstate;
+} cpu_smt_t;
 
 /*
  * This first value, MACHCPU_SIZE is the size of all the members in the cpu_t
@@ -237,7 +237,7 @@ struct	machcpu {
 	 */
 	volatile uint32_t	mcpu_istamp;
 
-	cpu_ht_t		mcpu_ht;
+	cpu_smt_t		mcpu_smt;
 
 	char			mcpu_pad[MACHCPU_PAD];
 

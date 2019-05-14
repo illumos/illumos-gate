@@ -27,7 +27,7 @@
 #include <sys/cpuset.h>
 #include <sys/id_space.h>
 #include <sys/fs/sdev_plugin.h>
-#include <sys/ht.h>
+#include <sys/smt.h>
 
 #include <sys/kernel.h>
 #include <sys/hma.h>
@@ -378,7 +378,7 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 		vmrun.cpuid = vcpu;
 
 		if (!(curthread->t_schedflag & TS_VCPU))
-			ht_mark_as_vcpu();
+			smt_mark_as_vcpu();
 
 		error = vm_run(sc->vmm_vm, &vmrun);
 		/*

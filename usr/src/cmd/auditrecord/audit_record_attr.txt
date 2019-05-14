@@ -3,6 +3,7 @@
 # other comments are removed.
 ##
 ## Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+## Copyright 2019 Joyent, Inc.
 ##
 ## CDDL HEADER START
 ##
@@ -72,9 +73,9 @@ token=exit:exit
 
 # note names -- certain notes show up repeatedly; collected here
 #
-# To achieve the maximum line length to be less than 80 characters, the 
+# To achieve the maximum line length to be less than 80 characters, the
 # note names (message=) can be defined as a multi line, each line except the
-# last one finished with the backslash character. 
+# last one finished with the backslash character.
 
 message=ipc_perm:The ipc and ipc_perm tokens are not included if \
   the message ID is not valid.
@@ -108,15 +109,15 @@ user=head:subj:insert:ret
 #
 # comment is an array of strings separated by colons.  If comments
 # are listed on separate lines (recommended due to better
-# readability/sustainability of the file), the preceding comment 
-# must end with  a colon.  The array starts at 1. (If the comment 
+# readability/sustainability of the file), the preceding comment
+# must end with  a colon.  The array starts at 1. (If the comment
 # contains a colon, use "&colon;" without the quotes.)
 #
 # case is used to generate alternate descriptions for a given
 # record.
 #
 # Constraints - the string length; bear in mind, that any annotation of
-# primitives below longer than is specified, will be silently truncated 
+# primitives below longer than is specified, will be silently truncated
 # to given/defined amount of characters in the auditrecord(1M) runtime:
 #
 #     primitive <= max (non-truncated) string length
@@ -825,7 +826,7 @@ label=AUE_FCHOWN
 label=AUE_FCHOWNAT
 # obsolete
   see=openat(2)
-  case=With a valid absolute/relative file path 
+  case=With a valid absolute/relative file path
     format=path:[attr]
   case=With an file path eq. NULL and valid file descriptor
     format=kernel
@@ -852,14 +853,14 @@ label=AUE_FLOCK
 label=AUE_FORKALL
   format=[arg]1
     comment=0, pid, "child PID"
-  note=The forkall(2) return values are undefined because the audit record 
+  note=The forkall(2) return values are undefined because the audit record
   note=is produced at the point that the child process is spawned.
 # see audit.c
 
 label=AUE_FORK1
   format=[arg]1
     comment=0, pid, "child PID"
-  note=The fork1(2) return values are undefined because the audit record 
+  note=The fork1(2) return values are undefined because the audit record
   note=is produced at the point that the child process is spawned.
 # see audit.c
 
@@ -1254,7 +1255,7 @@ label=AUE_OPENAT_RW
 # obsolete
   see=openat(2)
   format=path:[path_attr]:[attr]
-# aui_fsat(): fm & O_RDWR 
+# aui_fsat(): fm & O_RDWR
 
 label=AUE_OPEN_RWC
   format=path:[path_attr]:[attr]
@@ -1385,7 +1386,7 @@ label=AUE_PUTPMSG
   see=putpmsg(2)
   format=arg1:[path]:[attr]:arg2:arg3
     comment=1, file descriptor, "fd":
-    comment=4, priority, "pri":   
+    comment=4, priority, "pri":
     comment=5, flags, "flags"
 
 label=AUE_P_ONLINE
@@ -1393,7 +1394,7 @@ label=AUE_P_ONLINE
     comment=1, processor ID, "processor ID":
     comment=2, flags value, "flags":
     comment=text form of flags.  Values&colon;  \
-      P_ONLINE, P_OFFLINE, P_NOINTR, P_SPARE, P_FAULTED, P_STATUS
+      P_ONLINE, P_OFFLINE, P_NOINTR, P_SPARE, P_FAULTED, P_STATUS, P_DISABLED
 
 label=AUE_QUOTACTL
   skip=Not used.
@@ -1441,7 +1442,7 @@ label=AUE_RECVFROM
     comment=4, flags, "flags":
     comment=from address:
     comment=6, address length, "tolen"
-  note=The socket token for a bad socket is reported as "argument 
+  note=The socket token for a bad socket is reported as "argument
   note=token (1, socket descriptor, "fd")"
 
 label=AUE_RECVMSG
@@ -1976,7 +1977,7 @@ label=AUE_SWAPON
 
 label=AUE_SYMLINK
   format=path:text1:[attr]
-    comment=symbolic link string 
+    comment=symbolic link string
 
 label=AUE_SYSINFO
   note=Only SI_SET_HOSTNAME and SI_SET_SRPC_DOMAIN commands
@@ -2031,7 +2032,7 @@ label=AUE_UTIMES
 label=AUE_VFORK
   format=arg1
     comment=0, pid, "child PID"
-  note=The vfork(2) return values are undefined because the audit record is 
+  note=The vfork(2) return values are undefined because the audit record is
   note=produced at the point that the child process is spawned.
 
 label=AUE_VPIXSYS

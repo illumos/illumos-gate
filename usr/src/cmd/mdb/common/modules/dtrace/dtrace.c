@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -824,6 +824,8 @@ dtracemdb_stat(void *varg, processorid_t cpu)
 		return (P_SPARE);
 	} else if (c.cpu_flags & CPU_FAULTED) {
 		return (P_FAULTED);
+	} else if (c.cpu_flags & CPU_DISABLED) {
+		return (P_DISABLED);
 	} else if ((c.cpu_flags & (CPU_READY | CPU_OFFLINE)) != CPU_READY) {
 		return (P_OFFLINE);
 	} else if (c.cpu_flags & CPU_ENABLE) {

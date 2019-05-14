@@ -61,7 +61,6 @@ CORE_OBJS +=			\
 	hment.o			\
 	hold_page.o		\
 	hrtimers.o		\
-	ht.o			\
 	htable.o		\
 	i86_mmu.o		\
 	ibft.o			\
@@ -96,6 +95,7 @@ CORE_OBJS +=			\
 	pci_orion.o		\
 	pmem.o			\
 	ppage.o			\
+	smt.o			\
 	startup.o		\
 	ssp.o			\
 	xpv_timestamp.o		\
