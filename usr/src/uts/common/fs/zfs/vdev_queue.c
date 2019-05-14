@@ -171,7 +171,7 @@ int zfs_vdev_async_write_active_max_dirty_percent = 60;
  * we include spans of optional I/Os to aid aggregation at the disk even when
  * they aren't able to help us aggregate at this level.
  */
-int zfs_vdev_aggregation_limit = SPA_OLD_MAXBLOCKSIZE;
+int zfs_vdev_aggregation_limit = 1 << 20;
 int zfs_vdev_read_gap_limit = 32 << 10;
 int zfs_vdev_write_gap_limit = 4 << 10;
 
@@ -280,6 +280,8 @@ vdev_queue_init(vdev_t *vd)
 		avl_create(vdev_queue_class_tree(vq, p), compfn,
 		    sizeof (zio_t), offsetof(struct zio, io_queue_node));
 	}
+
+	vq->vq_last_offset = 0;
 }
 
 void
@@ -525,6 +527,7 @@ static zio_t *
 vdev_queue_aggregate(vdev_queue_t *vq, zio_t *zio)
 {
 	zio_t *first, *last, *aio, *dio, *mandatory, *nio;
+	zio_link_t *zl = NULL;
 	uint64_t maxgap = 0;
 	uint64_t size;
 	boolean_t stretch = B_FALSE;
@@ -663,9 +666,18 @@ vdev_queue_aggregate(vdev_queue_t *vq, zio_t *zio)
 
 		zio_add_child(dio, aio);
 		vdev_queue_io_remove(vq, dio);
+	} while (dio != last);
+
+	/*
+	 * We need to drop the vdev queue's lock to avoid a deadlock that we
+	 * could encounter since this I/O will complete immediately.
+	 */
+	mutex_exit(&vq->vq_lock);
+	while ((dio = zio_walk_parents(aio, &zl)) != NULL) {
 		zio_vdev_io_bypass(dio);
 		zio_execute(dio);
-	} while (dio != last);
+	}
+	mutex_enter(&vq->vq_lock);
 
 	return (aio);
 }
@@ -697,7 +709,7 @@ again:
 	 */
 	tree = vdev_queue_class_tree(vq, p);
 	search.io_timestamp = 0;
-	search.io_offset = vq->vq_last_offset + 1;
+	search.io_offset = vq->vq_last_offset - 1;
 	VERIFY3P(avl_find(tree, &search, &idx), ==, NULL);
 #ifdef _KERNEL
 	zio = zfs_zone_schedule(vq, p, idx, tree);
@@ -729,7 +741,7 @@ again:
 	}
 
 	vdev_queue_pending_add(vq, zio);
-	vq->vq_last_offset = zio->io_offset;
+	vq->vq_last_offset = zio->io_offset + zio->io_size;
 
 	return (zio);
 }
@@ -806,4 +818,82 @@ vdev_queue_io_done(zio_t *zio)
 	}
 
 	mutex_exit(&vq->vq_lock);
+}
+
+void
+vdev_queue_change_io_priority(zio_t *zio, zio_priority_t priority)
+{
+	vdev_queue_t *vq = &zio->io_vd->vdev_queue;
+	avl_tree_t *tree;
+
+	/*
+	 * ZIO_PRIORITY_NOW is used by the vdev cache code and the aggregate zio
+	 * code to issue IOs without adding them to the vdev queue. In this
+	 * case, the zio is already going to be issued as quickly as possible
+	 * and so it doesn't need any reprioitization to help.
+	 */
+	if (zio->io_priority == ZIO_PRIORITY_NOW)
+		return;
+
+	ASSERT3U(zio->io_priority, <, ZIO_PRIORITY_NUM_QUEUEABLE);
+	ASSERT3U(priority, <, ZIO_PRIORITY_NUM_QUEUEABLE);
+
+	if (zio->io_type == ZIO_TYPE_READ) {
+		if (priority != ZIO_PRIORITY_SYNC_READ &&
+		    priority != ZIO_PRIORITY_ASYNC_READ &&
+		    priority != ZIO_PRIORITY_SCRUB)
+			priority = ZIO_PRIORITY_ASYNC_READ;
+	} else {
+		ASSERT(zio->io_type == ZIO_TYPE_WRITE);
+		if (priority != ZIO_PRIORITY_SYNC_WRITE &&
+		    priority != ZIO_PRIORITY_ASYNC_WRITE)
+			priority = ZIO_PRIORITY_ASYNC_WRITE;
+	}
+
+	mutex_enter(&vq->vq_lock);
+
+	/*
+	 * If the zio is in none of the queues we can simply change
+	 * the priority. If the zio is waiting to be submitted we must
+	 * remove it from the queue and re-insert it with the new priority.
+	 * Otherwise, the zio is currently active and we cannot change its
+	 * priority.
+	 */
+	tree = vdev_queue_class_tree(vq, zio->io_priority);
+	if (avl_find(tree, zio, NULL) == zio) {
+		spa_t *spa = zio->io_spa;
+		zio_priority_t oldpri = zio->io_priority;
+
+		avl_remove(vdev_queue_class_tree(vq, zio->io_priority), zio);
+		zio->io_priority = priority;
+		avl_add(vdev_queue_class_tree(vq, zio->io_priority), zio);
+
+		mutex_enter(&spa->spa_iokstat_lock);
+		ASSERT3U(spa->spa_queue_stats[oldpri].spa_queued, >, 0);
+		spa->spa_queue_stats[oldpri].spa_queued--;
+		spa->spa_queue_stats[zio->io_priority].spa_queued++;
+		mutex_exit(&spa->spa_iokstat_lock);
+	} else if (avl_find(&vq->vq_active_tree, zio, NULL) != zio) {
+		zio->io_priority = priority;
+	}
+
+	mutex_exit(&vq->vq_lock);
+}
+
+/*
+ * As these two methods are only used for load calculations we're not
+ * concerned if we get an incorrect value on 32bit platforms due to lack of
+ * vq_lock mutex use here, instead we prefer to keep it lock free for
+ * performance.
+ */
+int
+vdev_queue_length(vdev_t *vd)
+{
+	return (avl_numnodes(&vd->vdev_queue.vq_active_tree));
+}
+
+uint64_t
+vdev_queue_last_offset(vdev_t *vd)
+{
+	return (vd->vdev_queue.vq_last_offset);
 }

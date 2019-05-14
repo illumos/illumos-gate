@@ -1366,6 +1366,12 @@ taskq_wait(taskq_t *tq)
 	}
 }
 
+void
+taskq_wait_id(taskq_t *tq, taskqid_t id __unused)
+{
+	taskq_wait(tq);
+}
+
 /*
  * Suspend execution of tasks.
  *

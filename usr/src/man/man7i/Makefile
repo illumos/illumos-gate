@@ -18,7 +18,7 @@ include		$(SRC)/Makefile.master
 
 MANSECT= 	7i
 
-_MANFILES=	audio.7i	\
+MANFILES=	audio.7i	\
 		cdio.7i		\
 		dkio.7i		\
 		dsp.7i		\
@@ -40,10 +40,6 @@ _MANFILES=	audio.7i	\
 		uscsi.7i	\
 		visual_io.7i	\
 		vt.7i
-
-i386_MANFILES=	agpgart_io.7i
-
-MANFILES=	$(_MANFILES) $($(MACH)_MANFILES)
 
 .KEEP_STATE:
 

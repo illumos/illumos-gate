@@ -235,6 +235,12 @@ taskq_wait(taskq_t *tq)
 	mutex_exit(&tq->tq_lock);
 }
 
+void
+taskq_wait_id(taskq_t *tq, taskqid_t id __unused)
+{
+	taskq_wait(tq);
+}
+
 static void *
 taskq_thread(void *arg)
 {

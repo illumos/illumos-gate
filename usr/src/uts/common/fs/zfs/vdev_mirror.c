@@ -38,6 +38,65 @@
 #include <sys/fs/zfs.h>
 
 /*
+ * Vdev mirror kstats
+ */
+static kstat_t *mirror_ksp = NULL;
+
+typedef struct mirror_stats {
+	kstat_named_t vdev_mirror_stat_rotating_linear;
+	kstat_named_t vdev_mirror_stat_rotating_offset;
+	kstat_named_t vdev_mirror_stat_rotating_seek;
+	kstat_named_t vdev_mirror_stat_non_rotating_linear;
+	kstat_named_t vdev_mirror_stat_non_rotating_seek;
+
+	kstat_named_t vdev_mirror_stat_preferred_found;
+	kstat_named_t vdev_mirror_stat_preferred_not_found;
+} mirror_stats_t;
+
+static mirror_stats_t mirror_stats = {
+	/* New I/O follows directly the last I/O */
+	{ "rotating_linear",			KSTAT_DATA_UINT64 },
+	/* New I/O is within zfs_vdev_mirror_rotating_seek_offset of the last */
+	{ "rotating_offset",			KSTAT_DATA_UINT64 },
+	/* New I/O requires random seek */
+	{ "rotating_seek",			KSTAT_DATA_UINT64 },
+	/* New I/O follows directly the last I/O  (nonrot) */
+	{ "non_rotating_linear",		KSTAT_DATA_UINT64 },
+	/* New I/O requires random seek (nonrot) */
+	{ "non_rotating_seek",			KSTAT_DATA_UINT64 },
+	/* Preferred child vdev found */
+	{ "preferred_found",			KSTAT_DATA_UINT64 },
+	/* Preferred child vdev not found or equal load  */
+	{ "preferred_not_found",		KSTAT_DATA_UINT64 },
+
+};
+
+#define	MIRROR_STAT(stat)		(mirror_stats.stat.value.ui64)
+#define	MIRROR_INCR(stat, val)		atomic_add_64(&MIRROR_STAT(stat), val)
+#define	MIRROR_BUMP(stat)		MIRROR_INCR(stat, 1)
+
+void
+vdev_mirror_stat_init(void)
+{
+	mirror_ksp = kstat_create("zfs", 0, "vdev_mirror_stats",
+	    "misc", KSTAT_TYPE_NAMED,
+	    sizeof (mirror_stats) / sizeof (kstat_named_t), KSTAT_FLAG_VIRTUAL);
+	if (mirror_ksp != NULL) {
+		mirror_ksp->ks_data = &mirror_stats;
+		kstat_install(mirror_ksp);
+	}
+}
+
+void
+vdev_mirror_stat_fini(void)
+{
+	if (mirror_ksp != NULL) {
+		kstat_delete(mirror_ksp);
+		mirror_ksp = NULL;
+	}
+}
+
+/*
  * Virtual device vector for mirroring.
  */
 
@@ -45,48 +104,182 @@ typedef struct mirror_child {
 	vdev_t		*mc_vd;
 	uint64_t	mc_offset;
 	int		mc_error;
+	int		mc_load;
 	uint8_t		mc_tried;
 	uint8_t		mc_skipped;
 	uint8_t		mc_speculative;
 } mirror_child_t;
 
 typedef struct mirror_map {
+	int		*mm_preferred;
+	int		mm_preferred_cnt;
 	int		mm_children;
 	int		mm_resilvering;
-	int		mm_preferred;
 	int		mm_root;
-	mirror_child_t	mm_child[1];
+	mirror_child_t	mm_child[];
 } mirror_map_t;
 
 int vdev_mirror_shift = 21;
+
+/*
+ * The load configuration settings below are tuned by default for
+ * the case where all devices are of the same rotational type.
+ *
+ * If there is a mixture of rotating and non-rotating media, setting
+ * zfs_vdev_mirror_non_rotating_seek_inc to 0 may well provide better results
+ * as it will direct more reads to the non-rotating vdevs which are more likely
+ * to have a higher performance.
+ */
+
+/* Rotating media load calculation configuration. */
+static int zfs_vdev_mirror_rotating_inc = 0;
+static int zfs_vdev_mirror_rotating_seek_inc = 5;
+static int zfs_vdev_mirror_rotating_seek_offset = 1 * 1024 * 1024;
+
+/* Non-rotating media load calculation configuration. */
+static int zfs_vdev_mirror_non_rotating_inc = 0;
+static int zfs_vdev_mirror_non_rotating_seek_inc = 1;
+
+static inline size_t
+vdev_mirror_map_size(int children)
+{
+	return (offsetof(mirror_map_t, mm_child[children]) +
+	    sizeof (int) * children);
+}
+
+static inline mirror_map_t *
+vdev_mirror_map_alloc(int children, boolean_t resilvering, boolean_t root)
+{
+	mirror_map_t *mm;
+
+	mm = kmem_zalloc(vdev_mirror_map_size(children), KM_SLEEP);
+	mm->mm_children = children;
+	mm->mm_resilvering = resilvering;
+	mm->mm_root = root;
+	mm->mm_preferred = (int *)((uintptr_t)mm +
+	    offsetof(mirror_map_t, mm_child[children]));
+
+	return (mm);
+}
 
 static void
 vdev_mirror_map_free(zio_t *zio)
 {
 	mirror_map_t *mm = zio->io_vsd;
 
-	kmem_free(mm, offsetof(mirror_map_t, mm_child[mm->mm_children]));
+	kmem_free(mm, vdev_mirror_map_size(mm->mm_children));
 }
 
 static const zio_vsd_ops_t vdev_mirror_vsd_ops = {
-	vdev_mirror_map_free,
-	zio_vsd_default_cksum_report
+	.vsd_free = vdev_mirror_map_free,
+	.vsd_cksum_report = zio_vsd_default_cksum_report
 };
 
+static int
+vdev_mirror_load(mirror_map_t *mm, vdev_t *vd, uint64_t zio_offset)
+{
+	uint64_t last_offset;
+	int64_t offset_diff;
+	int load;
+
+	/* All DVAs have equal weight at the root. */
+	if (mm->mm_root)
+		return (INT_MAX);
+
+	/*
+	 * We don't return INT_MAX if the device is resilvering i.e.
+	 * vdev_resilver_txg != 0 as when tested performance was slightly
+	 * worse overall when resilvering with compared to without.
+	 */
+
+	/* Fix zio_offset for leaf vdevs */
+	if (vd->vdev_ops->vdev_op_leaf)
+		zio_offset += VDEV_LABEL_START_SIZE;
+
+	/* Standard load based on pending queue length. */
+	load = vdev_queue_length(vd);
+	last_offset = vdev_queue_last_offset(vd);
+
+	if (vd->vdev_nonrot) {
+		/* Non-rotating media. */
+		if (last_offset == zio_offset) {
+			MIRROR_BUMP(vdev_mirror_stat_non_rotating_linear);
+			return (load + zfs_vdev_mirror_non_rotating_inc);
+		}
+
+		/*
+		 * Apply a seek penalty even for non-rotating devices as
+		 * sequential I/O's can be aggregated into fewer operations on
+		 * the device, thus avoiding unnecessary per-command overhead
+		 * and boosting performance.
+		 */
+		MIRROR_BUMP(vdev_mirror_stat_non_rotating_seek);
+		return (load + zfs_vdev_mirror_non_rotating_seek_inc);
+	}
+
+	/* Rotating media I/O's which directly follow the last I/O. */
+	if (last_offset == zio_offset) {
+		MIRROR_BUMP(vdev_mirror_stat_rotating_linear);
+		return (load + zfs_vdev_mirror_rotating_inc);
+	}
+
+	/*
+	 * Apply half the seek increment to I/O's within seek offset
+	 * of the last I/O issued to this vdev as they should incur less
+	 * of a seek increment.
+	 */
+	offset_diff = (int64_t)(last_offset - zio_offset);
+	if (ABS(offset_diff) < zfs_vdev_mirror_rotating_seek_offset) {
+		MIRROR_BUMP(vdev_mirror_stat_rotating_offset);
+		return (load + (zfs_vdev_mirror_rotating_seek_inc / 2));
+	}
+
+	/* Apply the full seek increment to all other I/O's. */
+	MIRROR_BUMP(vdev_mirror_stat_rotating_seek);
+	return (load + zfs_vdev_mirror_rotating_seek_inc);
+}
+
 static mirror_map_t *
-vdev_mirror_map_alloc(zio_t *zio)
+vdev_mirror_map_init(zio_t *zio)
 {
 	mirror_map_t *mm = NULL;
 	mirror_child_t *mc;
 	vdev_t *vd = zio->io_vd;
-	int c, d;
+	int c;
 
 	if (vd == NULL) {
 		dva_t *dva = zio->io_bp->blk_dva;
 		spa_t *spa = zio->io_spa;
+		dsl_scan_t *scn = NULL;
 		dva_t dva_copy[SPA_DVAS_PER_BP];
 
-		c = BP_GET_NDVAS(zio->io_bp);
+		if (spa->spa_dsl_pool != NULL) {
+			scn = spa->spa_dsl_pool->dp_scan;
+		}
+		/*
+		 * The sequential scrub code sorts and issues all DVAs
+		 * of a bp separately. Each of these IOs includes all
+		 * original DVA copies so that repairs can be performed
+		 * in the event of an error, but we only actually want
+		 * to check the first DVA since the others will be
+		 * checked by their respective sorted IOs. Only if we
+		 * hit an error will we try all DVAs upon retrying.
+		 *
+		 * Note: This check is safe even if the user switches
+		 * from a legacy scrub to a sequential one in the middle
+		 * of processing, since scn_is_sorted isn't updated until
+		 * all outstanding IOs from the previous scrub pass
+		 * complete.
+		 */
+		if ((zio->io_flags & ZIO_FLAG_SCRUB) &&
+		    !(zio->io_flags & ZIO_FLAG_IO_RETRY) &&
+		    scn != NULL &&
+		    scn->scn_is_sorted &&
+		    dsl_scan_scrubbing(spa->spa_dsl_pool)) {
+			c = 1;
+		} else {
+			c = BP_GET_NDVAS(zio->io_bp);
+		}
 
 		/*
 		 * If we do not trust the pool config, some DVAs might be
@@ -110,24 +303,7 @@ vdev_mirror_map_alloc(zio_t *zio)
 			}
 		}
 
-		mm = kmem_zalloc(offsetof(mirror_map_t, mm_child[c]), KM_SLEEP);
-		mm->mm_children = c;
-		mm->mm_resilvering = B_FALSE;
-		mm->mm_preferred = spa_get_random(c);
-		mm->mm_root = B_TRUE;
-
-		/*
-		 * Check the other, lower-index DVAs to see if they're on
-		 * the same vdev as the child we picked.  If they are, use
-		 * them since they are likely to have been allocated from
-		 * the primary metaslab in use at the time, and hence are
-		 * more likely to have locality with single-copy data.
-		 */
-		for (c = mm->mm_preferred, d = c - 1; d >= 0; d--) {
-			if (DVA_GET_VDEV(&dva[d]) == DVA_GET_VDEV(&dva[c]))
-				mm->mm_preferred = d;
-		}
-
+		mm = vdev_mirror_map_alloc(c, B_FALSE, B_TRUE);
 		for (c = 0; c < mm->mm_children; c++) {
 			mc = &mm->mm_child[c];
 
@@ -135,12 +311,6 @@ vdev_mirror_map_alloc(zio_t *zio)
 			mc->mc_offset = DVA_GET_OFFSET(&dva[c]);
 		}
 	} else {
-		int replacing;
-
-		c = vd->vdev_children;
-
-		mm = kmem_zalloc(offsetof(mirror_map_t, mm_child[c]), KM_SLEEP);
-		mm->mm_children = c;
 		/*
 		 * If we are resilvering, then we should handle scrub reads
 		 * differently; we shouldn't issue them to the resilvering
@@ -164,25 +334,12 @@ vdev_mirror_map_alloc(zio_t *zio)
 		 * automatically removed from the pool after the user replaces
 		 * the device that originally failed.
 		 */
-		replacing = (vd->vdev_ops == &vdev_replacing_ops ||
-		    vd->vdev_ops == &vdev_spare_ops);
-		/*
-		 * If a spa load is in progress, then spa_dsl_pool may be
-		 * uninitialized.  But we shouldn't be resilvering during a spa
-		 * load anyway.
-		 */
-		if (replacing &&
-		    (spa_load_state(vd->vdev_spa) == SPA_LOAD_NONE) &&
-		    dsl_scan_resilvering(vd->vdev_spa->spa_dsl_pool)) {
-			mm->mm_resilvering = B_TRUE;
-		} else {
-			mm->mm_resilvering = B_FALSE;
-		}
-
-		mm->mm_preferred = mm->mm_resilvering ? 0 :
-		    (zio->io_offset >> vdev_mirror_shift) % c;
-		mm->mm_root = B_FALSE;
-
+		boolean_t replacing = (vd->vdev_ops == &vdev_replacing_ops ||
+		    vd->vdev_ops == &vdev_spare_ops) &&
+		    spa_load_state(vd->vdev_spa) == SPA_LOAD_NONE &&
+		    dsl_scan_resilvering(vd->vdev_spa->spa_dsl_pool);
+		mm = vdev_mirror_map_alloc(vd->vdev_children, replacing,
+		    B_FALSE);
 		for (c = 0; c < mm->mm_children; c++) {
 			mc = &mm->mm_child[c];
 			mc->mc_vd = vd->vdev_child[c];
@@ -269,6 +426,7 @@ vdev_mirror_scrub_done(zio_t *zio)
 		}
 		mutex_exit(&zio->io_lock);
 	}
+
 	abd_free(zio->io_abd);
 
 	mc->mc_error = zio->io_error;
@@ -277,6 +435,54 @@ vdev_mirror_scrub_done(zio_t *zio)
 }
 
 /*
+ * Check the other, lower-index DVAs to see if they're on the same
+ * vdev as the child we picked.  If they are, use them since they
+ * are likely to have been allocated from the primary metaslab in
+ * use at the time, and hence are more likely to have locality with
+ * single-copy data.
+ */
+static int
+vdev_mirror_dva_select(zio_t *zio, int p)
+{
+	dva_t *dva = zio->io_bp->blk_dva;
+	mirror_map_t *mm = zio->io_vsd;
+	int preferred;
+	int c;
+
+	preferred = mm->mm_preferred[p];
+	for (p--; p >= 0; p--) {
+		c = mm->mm_preferred[p];
+		if (DVA_GET_VDEV(&dva[c]) == DVA_GET_VDEV(&dva[preferred]))
+			preferred = c;
+	}
+	return (preferred);
+}
+
+static int
+vdev_mirror_preferred_child_randomize(zio_t *zio)
+{
+	mirror_map_t *mm = zio->io_vsd;
+	int p;
+
+	if (mm->mm_root) {
+		p = spa_get_random(mm->mm_preferred_cnt);
+		return (vdev_mirror_dva_select(zio, p));
+	}
+
+	/*
+	 * To ensure we don't always favour the first matching vdev,
+	 * which could lead to wear leveling issues on SSD's, we
+	 * use the I/O offset as a pseudo random seed into the vdevs
+	 * which have the lowest load.
+	 */
+	p = (zio->io_offset >> vdev_mirror_shift) % mm->mm_preferred_cnt;
+	return (mm->mm_preferred[p]);
+}
+
+/*
+ * Try to find a vdev whose DTL doesn't contain the block we want to read
+ * prefering vdevs based on determined load.
+ *
  * Try to find a child whose DTL doesn't contain the block we want to read.
  * If we can't, try the read on any vdev we haven't already tried.
  */
@@ -284,43 +490,64 @@ static int
 vdev_mirror_child_select(zio_t *zio)
 {
 	mirror_map_t *mm = zio->io_vsd;
-	mirror_child_t *mc;
 	uint64_t txg = zio->io_txg;
-	int i, c;
+	int c, lowest_load;
 
 	ASSERT(zio->io_bp == NULL || BP_PHYSICAL_BIRTH(zio->io_bp) == txg);
 
-	/*
-	 * Try to find a child whose DTL doesn't contain the block to read.
-	 * If a child is known to be completely inaccessible (indicated by
-	 * vdev_readable() returning B_FALSE), don't even try.
-	 */
-	for (i = 0, c = mm->mm_preferred; i < mm->mm_children; i++, c++) {
-		if (c >= mm->mm_children)
-			c = 0;
+	lowest_load = INT_MAX;
+	mm->mm_preferred_cnt = 0;
+	for (c = 0; c < mm->mm_children; c++) {
+		mirror_child_t *mc;
+
 		mc = &mm->mm_child[c];
 		if (mc->mc_tried || mc->mc_skipped)
 			continue;
-		if (!vdev_readable(mc->mc_vd)) {
+
+		if (mc->mc_vd == NULL || !vdev_readable(mc->mc_vd)) {
 			mc->mc_error = SET_ERROR(ENXIO);
 			mc->mc_tried = 1;	/* don't even try */
 			mc->mc_skipped = 1;
 			continue;
 		}
-		if (!vdev_dtl_contains(mc->mc_vd, DTL_MISSING, txg, 1))
-			return (c);
-		mc->mc_error = SET_ERROR(ESTALE);
-		mc->mc_skipped = 1;
-		mc->mc_speculative = 1;
+
+		if (vdev_dtl_contains(mc->mc_vd, DTL_MISSING, txg, 1)) {
+			mc->mc_error = SET_ERROR(ESTALE);
+			mc->mc_skipped = 1;
+			mc->mc_speculative = 1;
+			continue;
+		}
+
+		mc->mc_load = vdev_mirror_load(mm, mc->mc_vd, mc->mc_offset);
+		if (mc->mc_load > lowest_load)
+			continue;
+
+		if (mc->mc_load < lowest_load) {
+			lowest_load = mc->mc_load;
+			mm->mm_preferred_cnt = 0;
+		}
+		mm->mm_preferred[mm->mm_preferred_cnt] = c;
+		mm->mm_preferred_cnt++;
+	}
+
+	if (mm->mm_preferred_cnt == 1) {
+		MIRROR_BUMP(vdev_mirror_stat_preferred_found);
+		return (mm->mm_preferred[0]);
+	}
+
+	if (mm->mm_preferred_cnt > 1) {
+		MIRROR_BUMP(vdev_mirror_stat_preferred_not_found);
+		return (vdev_mirror_preferred_child_randomize(zio));
 	}
 
 	/*
 	 * Every device is either missing or has this txg in its DTL.
 	 * Look for any child we haven't already tried before giving up.
 	 */
-	for (c = 0; c < mm->mm_children; c++)
+	for (c = 0; c < mm->mm_children; c++) {
 		if (!mm->mm_child[c].mc_tried)
 			return (c);
+	}
 
 	/*
 	 * Every child failed.  There's no place left to look.
@@ -335,7 +562,7 @@ vdev_mirror_io_start(zio_t *zio)
 	mirror_child_t *mc;
 	int c, children;
 
-	mm = vdev_mirror_map_alloc(zio);
+	mm = vdev_mirror_map_init(zio);
 
 	if (mm == NULL) {
 		ASSERT(!spa_trust_config(zio->io_spa));
@@ -555,46 +782,49 @@ vdev_mirror_state_change(vdev_t *vd, int faulted, int degraded)
 }
 
 vdev_ops_t vdev_mirror_ops = {
-	vdev_mirror_open,
-	vdev_mirror_close,
-	vdev_default_asize,
-	vdev_mirror_io_start,
-	vdev_mirror_io_done,
-	vdev_mirror_state_change,
-	NULL,
-	NULL,
-	NULL,
-	vdev_default_xlate,
-	VDEV_TYPE_MIRROR,	/* name of this vdev type */
-	B_FALSE			/* not a leaf vdev */
+	.vdev_op_open = vdev_mirror_open,
+	.vdev_op_close = vdev_mirror_close,
+	.vdev_op_asize = vdev_default_asize,
+	.vdev_op_io_start = vdev_mirror_io_start,
+	.vdev_op_io_done = vdev_mirror_io_done,
+	.vdev_op_state_change = vdev_mirror_state_change,
+	.vdev_op_need_resilver = NULL,
+	.vdev_op_hold = NULL,
+	.vdev_op_rele = NULL,
+	.vdev_op_remap = NULL,
+	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_type = VDEV_TYPE_MIRROR,	/* name of this vdev type */
+	.vdev_op_leaf = B_FALSE			/* not a leaf vdev */
 };
 
 vdev_ops_t vdev_replacing_ops = {
-	vdev_mirror_open,
-	vdev_mirror_close,
-	vdev_default_asize,
-	vdev_mirror_io_start,
-	vdev_mirror_io_done,
-	vdev_mirror_state_change,
-	NULL,
-	NULL,
-	NULL,
-	vdev_default_xlate,
-	VDEV_TYPE_REPLACING,	/* name of this vdev type */
-	B_FALSE			/* not a leaf vdev */
+	.vdev_op_open = vdev_mirror_open,
+	.vdev_op_close = vdev_mirror_close,
+	.vdev_op_asize = vdev_default_asize,
+	.vdev_op_io_start = vdev_mirror_io_start,
+	.vdev_op_io_done = vdev_mirror_io_done,
+	.vdev_op_state_change = vdev_mirror_state_change,
+	.vdev_op_need_resilver = NULL,
+	.vdev_op_hold = NULL,
+	.vdev_op_rele = NULL,
+	.vdev_op_remap = NULL,
+	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_type = VDEV_TYPE_REPLACING,	/* name of this vdev type */
+	.vdev_op_leaf = B_FALSE			/* not a leaf vdev */
 };
 
 vdev_ops_t vdev_spare_ops = {
-	vdev_mirror_open,
-	vdev_mirror_close,
-	vdev_default_asize,
-	vdev_mirror_io_start,
-	vdev_mirror_io_done,
-	vdev_mirror_state_change,
-	NULL,
-	NULL,
-	NULL,
-	vdev_default_xlate,
-	VDEV_TYPE_SPARE,	/* name of this vdev type */
-	B_FALSE			/* not a leaf vdev */
+	.vdev_op_open = vdev_mirror_open,
+	.vdev_op_close = vdev_mirror_close,
+	.vdev_op_asize = vdev_default_asize,
+	.vdev_op_io_start = vdev_mirror_io_start,
+	.vdev_op_io_done = vdev_mirror_io_done,
+	.vdev_op_state_change = vdev_mirror_state_change,
+	.vdev_op_need_resilver = NULL,
+	.vdev_op_hold = NULL,
+	.vdev_op_rele = NULL,
+	.vdev_op_remap = NULL,
+	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_type = VDEV_TYPE_SPARE,	/* name of this vdev type */
+	.vdev_op_leaf = B_FALSE			/* not a leaf vdev */
 };

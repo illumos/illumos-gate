@@ -42,16 +42,21 @@
 #	3. Verify scrub failed until the resilver completed
 #
 
+function cleanup
+{
+	log_must set_tunable64 zfs_scan_vdev_limit $ZFS_SCAN_VDEV_LIMIT_DEFAULT
+}
+
 verify_runnable "global"
 
 log_assert "Resilver prevent scrub from starting until the resilver completes"
 
+log_must set_tunable64 zfs_scan_vdev_limit $ZFS_SCAN_VDEV_LIMIT_SLOW
 log_must zpool detach $TESTPOOL $DISK2
 log_must zpool attach $TESTPOOL $DISK1 $DISK2
 log_must is_pool_resilvering $TESTPOOL
 log_mustnot zpool scrub $TESTPOOL
 
-# Allow the resilver to finish, or it will interfere with the next test.
 while ! is_pool_resilvered $TESTPOOL; do
 	sleep 1
 done

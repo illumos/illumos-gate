@@ -1004,7 +1004,6 @@ d kernel/misc 0755 root sys
 d kernel/misc/amd64 0755 root sys
 f kernel/misc/amd64/ac97 0755 root sys
 f kernel/misc/amd64/acpica 0755 root sys
-f kernel/misc/amd64/agpmaster 0755 root sys
 f kernel/misc/amd64/bignum 0755 root sys
 f kernel/misc/amd64/bootdev 0755 root sys
 f kernel/misc/amd64/busra 0755 root sys
@@ -1015,7 +1014,6 @@ f kernel/misc/amd64/dadk 0755 root sys
 f kernel/misc/amd64/dcopy 0755 root sys
 s kernel/misc/amd64/des=../../../kernel/crypto/amd64/des
 f kernel/misc/amd64/dls 0755 root sys
-f kernel/misc/amd64/drm 0755 root sys
 f kernel/misc/amd64/edonr 0755 root sys
 f kernel/misc/amd64/fctl 0755 root sys
 f kernel/misc/amd64/fssnap_if 0755 root sys
@@ -3729,13 +3727,6 @@ f usr/include/sys/acl_impl.h 0644 root bin
 f usr/include/sys/acpi_drv.h 0644 root bin
 f usr/include/sys/aggr.h 0644 root bin
 f usr/include/sys/aggr_impl.h 0644 root bin
-d usr/include/sys/agp 0755 root bin
-f usr/include/sys/agp/agpamd64gart_io.h 0644 root bin
-f usr/include/sys/agp/agpdefs.h 0644 root bin
-f usr/include/sys/agp/agpgart_impl.h 0644 root bin
-f usr/include/sys/agp/agpmaster_io.h 0644 root bin
-f usr/include/sys/agp/agptarget_io.h 0644 root bin
-f usr/include/sys/agpgart.h 0644 root bin
 f usr/include/sys/aio.h 0644 root bin
 f usr/include/sys/aio_impl.h 0644 root bin
 f usr/include/sys/aio_req.h 0644 root bin
@@ -5457,7 +5448,6 @@ d usr/lib/devfsadm/linkmod 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_audio_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_cfg_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_dcam1394_link.so 0755 root sys
-f usr/lib/devfsadm/linkmod/SUNW_drm_link_i386.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_disk_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_dtrace_link.so 0755 root sys
 f usr/lib/devfsadm/linkmod/SUNW_fssnap_link.so 0755 root sys

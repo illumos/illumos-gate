@@ -1449,6 +1449,9 @@ file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_023_neg \
     mode=0555
 file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_024_pos \
+    mode=0555
+file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_create/zpool_create_features_001_pos \
     mode=0555
 file \
@@ -1748,6 +1751,12 @@ file \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/zpool_scrub_005_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/zpool_scrub_multiple_copies \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/zpool_scrub_offline_device \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/zpool_scrub_print_repairing \

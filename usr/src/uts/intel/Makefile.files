@@ -145,9 +145,6 @@ CORE_OBJS += ucode_utils.o
 #
 #	Driver modules
 #
-AGPGART_OBJS +=	agpgart.o agp_kstat.o
-AGPTARGET_OBJS += agptarget.o
-AMD64GART_OBJS += amd64_gart.o
 ARCMSR_OBJS += arcmsr.o
 ATA_OBJS += $(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
 	ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
@@ -253,7 +250,6 @@ ACPICA_OBJS	+= \
 		   osl_ml.o osl.o
 
 
-AGP_OBJS += agpmaster.o
 FBT_OBJS += fbt.o
 SDT_OBJS += sdt.o
 

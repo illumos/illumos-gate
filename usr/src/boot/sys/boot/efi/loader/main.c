@@ -96,8 +96,8 @@ efi_zfs_is_preferred(EFI_HANDLE *h)
 	node = efi_devpath_last_node(devpath);
 	if (node == NULL)
 		return (false);
-	if (DevicePathType(node) != MEDIA_DEVICE_PATH &&
-	    (DevicePathSubType(node) != MEDIA_FILEPATH_DP ||
+	if (DevicePathType(node) != MEDIA_DEVICE_PATH ||
+	    (DevicePathSubType(node) != MEDIA_FILEPATH_DP &&
 	    DevicePathSubType(node) != MEDIA_HARDDRIVE_DP)) {
 		return (false);
 	}

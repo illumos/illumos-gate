@@ -614,6 +614,16 @@ skip_open:
 	 */
 	vd->vdev_nowritecache = B_FALSE;
 
+	/* Inform the ZIO pipeline that we are non-rotational */
+	vd->vdev_nonrot = B_FALSE;
+	if (ldi_prop_exists(dvd->vd_lh, DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "device-solid-state")) {
+		if (ldi_prop_get_int(dvd->vd_lh,
+		    LDI_DEV_T_ANY | DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+		    "device-solid-state", B_FALSE) != 0)
+			vd->vdev_nonrot = B_TRUE;
+	}
+
 	return (0);
 }
 
@@ -897,18 +907,19 @@ vdev_disk_io_done(zio_t *zio)
 }
 
 vdev_ops_t vdev_disk_ops = {
-	vdev_disk_open,
-	vdev_disk_close,
-	vdev_default_asize,
-	vdev_disk_io_start,
-	vdev_disk_io_done,
-	NULL,
-	vdev_disk_hold,
-	vdev_disk_rele,
-	NULL,
-	vdev_default_xlate,
-	VDEV_TYPE_DISK,		/* name of this vdev type */
-	B_TRUE			/* leaf vdev */
+	.vdev_op_open = vdev_disk_open,
+	.vdev_op_close = vdev_disk_close,
+	.vdev_op_asize = vdev_default_asize,
+	.vdev_op_io_start = vdev_disk_io_start,
+	.vdev_op_io_done = vdev_disk_io_done,
+	.vdev_op_state_change = NULL,
+	.vdev_op_need_resilver = NULL,
+	.vdev_op_hold = vdev_disk_hold,
+	.vdev_op_rele = vdev_disk_rele,
+	.vdev_op_remap = NULL,
+	.vdev_op_xlate = vdev_default_xlate,
+	.vdev_op_type = VDEV_TYPE_DISK,		/* name of this vdev type */
+	.vdev_op_leaf = B_TRUE			/* leaf vdev */
 };
 
 /*

@@ -219,6 +219,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	taskq_member;
 	taskq_empty;
 	taskq_wait;
+	taskq_wait_id;
 
 	thread_create;
 	thread_join;

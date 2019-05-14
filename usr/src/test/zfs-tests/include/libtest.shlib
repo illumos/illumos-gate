@@ -1755,6 +1755,24 @@ function wait_for_degraded
 }
 
 #
+# Wait for a pool to be scrubbed
+#
+# $1 pool name
+# $2 number of seconds to wait (optional)
+#
+# Returns true when pool has been scrubbed, or false if there's a timeout or if
+# no scrub was done.
+#
+function wait_scrubbed
+{
+	typeset pool=${1:-$TESTPOOL}
+	while true ; do
+		is_pool_scrubbed $pool && break
+		log_must sleep 1
+	done
+}
+
+#
 # Use create_pool()/destroy_pool() to clean up the infomation in
 # in the given disk to avoid slice overlapping.
 #

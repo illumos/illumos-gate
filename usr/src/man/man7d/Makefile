@@ -211,7 +211,6 @@ i386_MANFILES=	ahci.7d		\
 		ecpp.7d		\
 		elxl.7d		\
 		i40e.7d		\
-		i915.7d		\
 		ipmi.7d		\
 		iprb.7d		\
 		ipw.7d		\
@@ -225,7 +224,6 @@ i386_MANFILES=	ahci.7d		\
 		nvme.7d		\
 		pcn.7d		\
 		qede.7d		\
-		radeon.7d	\
 		ral.7d		\
 		rtw.7d		\
 		rum.7d		\

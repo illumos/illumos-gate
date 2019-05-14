@@ -48,9 +48,9 @@ arc_read:arc-demand-hit-predictive-prefetch
 	@c["prefetched_demand_reads"] = count();
 }
 
-arc_read:arc-sync-wait-for-async
+arc_read:arc-upgrade-sync
 {
-	@c["sync_wait_for_async"] = count();
+	@c["async_upgrade_sync"] = count();
 }
 
 arc_read_done:entry
