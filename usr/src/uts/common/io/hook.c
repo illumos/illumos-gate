@@ -1883,7 +1883,7 @@ hook_register(hook_family_int_t *hfi, char *event, hook_t *h)
 	ASSERT(h != NULL);
 
 	if (hfi->hfi_stack->hks_shutdown)
-		return (NULL);
+		return (0);
 
 	/* Alloc hook_int_t and copy hook */
 	new = hook_copy(h);

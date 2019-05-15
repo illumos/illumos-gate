@@ -37,9 +37,9 @@ extern unsigned bootprog_rev;
 /* #define BFORTH_DEBUG */
 
 #ifdef BFORTH_DEBUG
-#define	DEBUG(fmt, args...)	printf("%s: " fmt "\n", __func__, ## args)
+#define	DPRINTF(fmt, args...)	printf("%s: " fmt "\n", __func__, ## args)
 #else
-#define	DEBUG(fmt, args...)
+#define	DPRINTF(fmt, args...)	((void)0)
 #endif
 
 /*
@@ -135,7 +135,7 @@ bf_command(ficlVm *vm)
 			ficlVmUpdateTib(vm, tail + len);
 		}
 	}
-	DEBUG("cmd '%s'", line);
+	DPRINTF("cmd '%s'", line);
 
 	command_errmsg = command_errbuf;
 	command_errbuf[0] = 0;
@@ -342,7 +342,7 @@ bf_run(char *line)
 	FICL_STRING_SET_FROM_CSTRING(s, line);
 	result = ficlVmExecuteString(bf_vm, s);
 
-	DEBUG("ficlExec '%s' = %d", line, result);
+	DPRINTF("ficlExec '%s' = %d", line, result);
 	switch (result) {
 	case FICL_VM_STATUS_OUT_OF_TEXT:
 	case FICL_VM_STATUS_ABORTQ:
