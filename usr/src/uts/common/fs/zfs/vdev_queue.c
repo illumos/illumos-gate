@@ -21,7 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -864,9 +864,11 @@ vdev_queue_change_io_priority(zio_t *zio, zio_priority_t priority)
 		spa_t *spa = zio->io_spa;
 		zio_priority_t oldpri = zio->io_priority;
 
+		zfs_zone_zio_dequeue(zio);
 		avl_remove(vdev_queue_class_tree(vq, zio->io_priority), zio);
 		zio->io_priority = priority;
 		avl_add(vdev_queue_class_tree(vq, zio->io_priority), zio);
+		zfs_zone_zio_enqueue(zio);
 
 		mutex_enter(&spa->spa_iokstat_lock);
 		ASSERT3U(spa->spa_queue_stats[oldpri].spa_queued, >, 0);
