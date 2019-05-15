@@ -463,8 +463,8 @@ logstream_init(zlog_t *zlogp)
 	 * file and reopen it during log rotation.  SIGUSR1 can be used to force
 	 * a log rotation.
 	 */
-	sigset(SIGHUP, logstream_sighandler);
-	sigset(SIGUSR1, logstream_sighandler);
+	(void) sigset(SIGHUP, logstream_sighandler);
+	(void) sigset(SIGUSR1, logstream_sighandler);
 }
 
 /*

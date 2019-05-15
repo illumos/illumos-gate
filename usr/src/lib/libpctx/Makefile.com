@@ -22,7 +22,7 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 Joyent, Inc.
 #
 
 LIBRARY = libpctx.a
@@ -40,7 +40,10 @@ LDLIBS +=	-lproc -lc
 SRCDIR =	../common
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS += 	-D_REENTRANT -I$(SRCDIR)
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
+
+# false positive: pctx_run() error: dereferencing freed memory 'pctx'
+SMOFF += free
 
 .KEEP_STATE:
 

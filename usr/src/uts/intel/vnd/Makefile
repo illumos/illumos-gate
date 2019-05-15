@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 UTSBASE	= ../..
@@ -37,6 +37,9 @@ LDFLAGS		+= -dy -Nmisc/neti -Nmisch/hook -Nfs/dev -Nmisc/gsqueue
 # functions are defined and unused.
 #
 CERRWARN	+= -_gcc=-Wno-unused-function
+
+# needs work
+SMOFF += or_vs_and
 
 .KEEP_STATE:
 

@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 PROG =		bhyvectl
@@ -36,6 +36,9 @@ CPPFLAGS =	-I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
 LDLIBS +=	-lvmmapi
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
+
+# main() is too hairy for smatch
+bhyvectl.o := SMATCH=off
 
 all: $(PROG)
 

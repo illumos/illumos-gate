@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 UTSBASE	= ../..
@@ -33,6 +33,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS		+= $(CCVERBOSE)
 
 LDFLAGS		+= -dy -Nbrand/lx_brand
+
+# needs work
+$(OBJS_DIR)/lxd_vnops.o := SMOFF += signed
 
 .KEEP_STATE:
 

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -611,7 +611,7 @@ sdev_plugin_register(const char *name, sdev_plugin_ops_t *ops, int *errp)
 	 * to make sure we really get to the global /dev (i.e.  escape both
 	 * CRED() and ->u_rdir).
 	 */
-	pn_get_buf("dev", UIO_SYSSPACE, &pn, buf, sizeof (buf));
+	(void) pn_get_buf("dev", UIO_SYSSPACE, &pn, buf, sizeof (buf));
 	VN_HOLD(rootdir);
 	ret = lookuppnvp(&pn, NULL, NO_FOLLOW, NULLVPP,
 	    &vp, rootdir, rootdir, kcred);

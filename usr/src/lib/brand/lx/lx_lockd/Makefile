@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 
 #
-# Copyright 2017 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 PROG =	lx_lockd
@@ -36,6 +36,9 @@ LDLIBS +=	-lnsl -lsocket
 CERRWARN += -_gcc=-Wno-parentheses
 CERRWARN += -_gcc=-Wno-uninitialized
 CERRWARN += -_gcc=-Wno-unused-function
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

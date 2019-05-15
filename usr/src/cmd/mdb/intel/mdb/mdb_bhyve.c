@@ -771,7 +771,7 @@ bhyve_vtol_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (vmm_vtol(bd->bd_vmm, bd->bd_curcpu, segreg, addr, &laddr) != 0) {
 		if (errno == EFAULT)
-			set_errno(EMDB_NOMAP);
+			(void) set_errno(EMDB_NOMAP);
 		return (DCMD_ERR);
 	}
 
@@ -1231,13 +1231,13 @@ bhyve_status(mdb_tgt_t *tgt, mdb_tgt_status_t *tsp)
 
 	switch (vmm_vcpu_isa(bd->bd_vmm, bd->bd_curcpu)) {
 	case VMM_ISA_16:
-		mdb_dis_select("ia16");
+		(void) mdb_dis_select("ia16");
 		break;
 	case VMM_ISA_32:
-		mdb_dis_select("ia32");
+		(void) mdb_dis_select("ia32");
 		break;
 	case VMM_ISA_64:
-		mdb_dis_select("amd64");
+		(void) mdb_dis_select("amd64");
 		break;
 	default:
 		break;
@@ -1301,7 +1301,7 @@ bhyve_cont(mdb_tgt_t *tgt, mdb_tgt_status_t *tsp)
 	}
 
 	tsp->st_state = MDB_TGT_RUNNING;
-	pause();
+	(void) pause();
 
 	(void) mdb_signal_sethandler(SIGINT, intf, intd);
 	(void) mdb_tgt_status(tgt, tsp);
@@ -1444,7 +1444,7 @@ mdb_bhyve_tgt_create(mdb_tgt_t *tgt, int argc, const char *argv[])
 	}
 
 	bd = mdb_zalloc(sizeof (bhyve_data_t) + strlen(argv[0]) + 1, UM_SLEEP);
-	strcpy(bd->bd_name, argv[0]);
+	(void) strcpy(bd->bd_name, argv[0]);
 	bd->bd_vmm = vmm;
 	bd->bd_curcpu = 0;
 	bd->bd_defseg = VMM_DESC_DS;

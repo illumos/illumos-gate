@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <strings.h>
 #include <stdlib.h>
 #include <netdir.h>
@@ -1027,7 +1031,7 @@ fmd_adm_xprt_iter(fmd_adm_t *ap, fmd_adm_xprt_f *func, void *arg)
 	}
 
 	for (i = 0; i < rxl.rxl_len; i++)
-		func(rxl.rxl_buf.rxl_buf_val[i], arg);
+		(void) func(rxl.rxl_buf.rxl_buf_val[i], arg);
 
 	xdr_free(xdr_fmd_rpc_xprtlist, (char *)&rxl);
 	return (0);

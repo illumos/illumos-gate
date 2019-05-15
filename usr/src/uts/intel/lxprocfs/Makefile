@@ -25,11 +25,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the lxprocfs file system
-#	kernel module.
-#
-#	intel architecture dependent
-#
+# Copyright 2019 Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -60,6 +56,10 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # Depends on procfs
 #
 LDFLAGS		+= -dy -Nfs/procfs
+
+# false positive
+# needs work
+$(OBJS_DIR)/lxpr_vnops.o := SMOFF += strcpy_overflow
 
 #
 #	Default build targets.

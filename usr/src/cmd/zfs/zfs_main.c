@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2011-2012 Pawel Jakub Dawidek. All rights reserved.
  * Copyright (c) 2013 Steven Hartland.  All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
@@ -1112,7 +1112,7 @@ destroy_callback(zfs_handle_t *zhp, void *data)
 	while ((err = zfs_destroy_snaps_nvl(g_zfs,
 	    cbp->cb_batchedsnaps, B_FALSE)) != 0) {
 		if (cbp->cb_wait && libzfs_errno(g_zfs) == EZFS_BUSY) {
-			nanosleep(&ts, NULL);
+			(void) nanosleep(&ts, NULL);
 			continue;
 		}
 		(void) fprintf(stderr, "%s: %s\n",

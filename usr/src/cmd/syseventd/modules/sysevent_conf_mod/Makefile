@@ -22,6 +22,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
+#
 
 LIBRARY =	sysevent_conf_mod
 
@@ -32,11 +34,14 @@ CPPFLAGS +=	-I ../../daemons/syseventconfd
 
 CERRWARN +=	-_gcc=-Wno-uninitialized
 
+# strange smatch false positive
+SMOFF +=	allocating_enough_data
+
 .KEEP_STATE:
 
 all: $(DYNLIB)
 
-install: all 				\
+install: all				\
 	$(ROOTLIBSYSEVENTDIR)		\
 	$(ROOTLIBDIR)			\
 	$(ROOTLIBS)

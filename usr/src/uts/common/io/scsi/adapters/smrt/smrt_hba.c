@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/scsi/adapters/smrt/smrt.h>
@@ -650,7 +650,7 @@ smrt_tran_start(struct scsi_address *sa, struct scsi_pkt *pkt)
 		 * the completion callback, so it may not be referenced again
 		 * after this call returns.
 		 */
-		smrt_poll_for(smrt, smcm);
+		(void) smrt_poll_for(smrt, smcm);
 	}
 
 	mutex_exit(&smrt->smrt_mutex);

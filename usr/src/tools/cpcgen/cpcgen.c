@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright (c) 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -892,7 +892,6 @@ cpcgen_manual_intel_file_before(FILE *f, cpc_map_t *map)
 		return (B_FALSE);
 	}
 
-	free(upper);
 	return (B_TRUE);
 }
 

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2015 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 UTSBASE = ../..
@@ -32,6 +32,8 @@ LDFLAGS += -dy -Nmisc/mac -Ndrv/dld -Nmisc/dls -Nmisc/ksocket
 
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+# needs work
+SMATCH=off
 
 .KEEP_STATE:
 

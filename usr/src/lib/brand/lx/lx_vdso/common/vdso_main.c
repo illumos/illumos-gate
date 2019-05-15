@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <cp_defs.h>
@@ -101,7 +101,7 @@ __vdso_gettimeofday(timespec_t *tp, struct lx_timezone *tz)
 			return (__vdso_sys_gettimeofday(tp, tz));
 		}
 
-		__cp_clock_gettime_realtime(cp, tp);
+		(void) __cp_clock_gettime_realtime(cp, tp);
 		tp->tv_nsec /= 1000;
 	}
 	return (0);
@@ -117,7 +117,7 @@ __vdso_time(time_t *tp)
 		return (__vdso_sys_time(tp));
 	}
 
-	__cp_clock_gettime_realtime(cp, &ts);
+	(void) __cp_clock_gettime_realtime(cp, &ts);
 	if (tp != NULL) {
 		*tp = ts.tv_sec;
 	}

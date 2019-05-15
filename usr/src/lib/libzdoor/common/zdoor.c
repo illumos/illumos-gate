@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <alloca.h>
@@ -381,7 +381,7 @@ out:
 	if (status != ZDOOR_OK) {
 		zdoor_debug("zdoor_open: status not ok, stopping and cleaning");
 		zdoor_stop(entry);
-		ztree_door_remove(handle, entry);
+		(void) ztree_door_remove(handle, entry);
 		zdoor_cookie_free(zdoor_cookie);
 	}
 	(void) pthread_mutex_unlock(&(handle->zdh_lock));

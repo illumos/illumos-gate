@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 PROG =		lxinit
@@ -46,6 +46,9 @@ UTSBASE =	$(SRC)/uts
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(UTSBASE)/common/brand/lx
 LDLIBS +=	-lzonecfg -lipadm -lsocket -linetutil -lnsl -lcustr -ldhcpagent
+
+# not linted
+SMATCH=off
 
 .KEEP_STATE:
 

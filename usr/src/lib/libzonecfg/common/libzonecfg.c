@@ -22,7 +22,7 @@
 /*
  * Copyright 2014 Gary Mills
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  */
 
@@ -1520,7 +1520,7 @@ zonecfg_notify_conf_change(const char *zname, char *os, char *ns)
 		return;
 
 	/* Current time since Jan 1 1970 but consumers expect NS */
-	gettimeofday(&now, NULL);
+	(void) gettimeofday(&now, NULL);
 	t = (now.tv_sec * NANOSEC) + (now.tv_usec * 1000);
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) == 0 &&

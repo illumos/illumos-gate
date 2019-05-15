@@ -1101,7 +1101,7 @@ do_subproc(zlog_t *zlogp, char *cmdbuf, char **retstr, boolean_t debug)
 		 * zoneadmd' to kill this child process before exec().  On
 		 * exec(), SIGHUP and SIGUSR1 will become SIG_DFL.
 		 */
-		sigset(SIGINT, SIG_DFL);
+		(void) sigset(SIGINT, SIG_DFL);
 
 		/*
 		 * Set up a pipe for the child to log to.

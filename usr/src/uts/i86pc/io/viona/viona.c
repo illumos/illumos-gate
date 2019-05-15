@@ -1568,7 +1568,7 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 {
 	proc_t *p = ttoproc(curthread);
 
-	thread_vsetname(curthread, "viona_rx_%p", ring);
+	(void) thread_vsetname(curthread, "viona_rx_%p", ring);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT3U(ring->vr_state, ==, VRS_RUN);
@@ -1593,7 +1593,7 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 {
 	proc_t *p = ttoproc(curthread);
 
-	thread_vsetname(curthread, "viona_tx_%p", ring);
+	(void) thread_vsetname(curthread, "viona_tx_%p", ring);
 
 	ASSERT(MUTEX_HELD(&ring->vr_lock));
 	ASSERT3U(ring->vr_state, ==, VRS_RUN);

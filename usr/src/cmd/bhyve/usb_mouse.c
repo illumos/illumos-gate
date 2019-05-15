@@ -663,11 +663,18 @@ umouse_request(void *scarg, struct usb_data_xfer *xfer)
 	}
 
 done:
+/* UT_WRITE is 0, so this is condition is never true. */
+#ifdef __FreeBSD__
 	if (xfer->ureq && (xfer->ureq->bmRequestType & UT_WRITE) &&
 	    (err == USB_ERR_NORMAL_COMPLETION) && (data != NULL))
 		data->blen = 0;
 	else if (eshort)
 		err = USB_ERR_SHORT_XFER;
+#else
+	if (eshort)
+		err = USB_ERR_SHORT_XFER;
+#endif
+
 
 	DPRINTF(("umouse request error code %d (0=ok), blen %u txlen %u\r\n",
 	        err, (data ? data->blen : 0), (data ? data->bdone : 0)));

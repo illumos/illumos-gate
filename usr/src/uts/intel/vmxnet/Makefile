@@ -17,8 +17,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright (c) 2012, Joyent, Inc. All rights reserved.
-# Use is subject to license terms.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -63,6 +62,9 @@ INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 CPPFLAGS +=  -I$(UTSBASE)/i86pc
 LDFLAGS += -dy -N misc/gld
+
+# needs work
+SMOFF += all_func_returns
 
 #
 #       Default build targets.

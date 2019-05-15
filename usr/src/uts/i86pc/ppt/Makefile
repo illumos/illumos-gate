@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -53,6 +53,9 @@ AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 LDFLAGS         += -dy -N drv/vmm -N misc/pcie
 
 $(OBJS_DIR)/ppt.o := CERRWARN	+= -_gcc=-Wno-unused-variable
+
+# needs work
+SMOFF += all_func_returns
 
 #
 #	Default build targets.

@@ -22,7 +22,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2016 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -77,6 +77,9 @@ LDFLAGS		+= -dy -Nfs/nfs
 # Please do not carry these forward to new Makefiles.
 #
 LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+
+# needs work
+SMOFF += all_func_returns
 
 #
 #	Default build targets.

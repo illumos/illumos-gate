@@ -2262,7 +2262,7 @@ i40e_config_def_vsi(i40e_t *i40e, i40e_hw_t *hw)
 			i40e_error(i40e, "Unexpected L2 filter count: %u"
 			    " (expected 0)",
 			    i40e->i40e_resources.ifr_nmacfilt_used);
-			    return (B_FALSE);
+			return (B_FALSE);
 		}
 	}
 

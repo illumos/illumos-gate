@@ -11,7 +11,7 @@
 
 #
 # Copyright 2013 Pluribus Networks Inc.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -75,6 +75,15 @@ LINTTAGS	+= -erroff=E_NOP_IF_STMT
 LINTTAGS	+= -erroff=E_ZERO_OR_NEGATIVE_SUBSCRIPT
 
 CERRWARN	+= -_gcc=-Wno-empty-body
+
+# 3rd party code
+SMOFF += all_func_returns
+
+# needs work
+$(OBJS_DIR)/vmm_sol_dev.o := SMOFF += signed_integer_overflow_check
+
+# a can't happen: vmx_setcap() warn: variable dereferenced before check 'pptr'
+$(OBJS_DIR)/vmx.o := SMOFF += deref_check
 
 # These sources only compile with gcc.  Workaround a confluence of cruft
 # regarding dmake and shadow compilation by neutering the sun compiler.

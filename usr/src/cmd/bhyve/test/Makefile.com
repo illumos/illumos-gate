@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 include $(SRC)/Makefile.master
@@ -40,6 +40,8 @@ CPPFLAGS =	-I$(SRC)/cmd/bhyve \
 		-I$(SRC)/lib/libdladm/common \
 		-DWITHOUT_CAPSICUM
 CPPFLAGS +=	-I$(COMPAT)/freebsd/amd64 -I$(CONTRIB)/freebsd/amd64
+
+SMOFF += all_func_returns
 
 CLEANFILES +=	$(EXETESTS)
 CLOBBERFILES +=	$(ROOTTESTS)

@@ -19,11 +19,14 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
 
 /*
  * Copyright (c) 1983-1998 by Sun Microsystems, Inc.
  * All rights reserved.
+ */
+
+/*
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -155,9 +158,8 @@ do_fmt(char *acp)
 		case 'S':
 		case 'i':
 			if (warnings) {
-				fprintf(stderr,
-				"Unknown format size \"%s\", assuming zero\n",
-				acp);
+				fprintf(stderr, "Unknown format size \"%s\", "
+				    "assuming zero\n", acp);
 				warns++;
 			}
 			width = 0;
@@ -167,7 +169,7 @@ do_fmt(char *acp)
 			exit(1);
 		}
 		for (i = 0; i < rcount; i++) {
-			putchar(*cp);
+			(void) putchar(*cp);
 		}
 		cp++;
 		sum += width * rcount;
@@ -186,8 +188,8 @@ format(char *name, size_t size, char *fmt)
 	fs = do_fmt(fmt);
 	if (fs != size && warnings) {
 		fprintf(stderr,
-			"warning: \"%s\" size is %ld, \"%s\" width is %d\n",
-			name, size, fmt, fs);
+		    "warning: \"%s\" size is %ld, \"%s\" width is %d\n",
+		    name, size, fmt, fs);
 		warns++;
 	}
 	last_off += fs;

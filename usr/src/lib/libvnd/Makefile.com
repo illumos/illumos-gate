@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 include		../../Makefile.lib
@@ -24,6 +24,9 @@ include ../../Makefile.lib
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc
 CPPFLAGS +=	-I../common
+
+# false positives in vnd_create()
+SMOFF +=	free
 
 SRCDIR =	../common
 

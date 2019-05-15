@@ -19,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2011 Joyent, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <search.h>
@@ -114,7 +113,7 @@ dtree_entry_free(dtree_entry_t *entry)
  */
 int
 ztree_zone_add(struct zdoor_handle *handle, const char *zonename,
-ztree_door_visitor visitor)
+    ztree_door_visitor visitor)
 {
 	ztree_entry_t *entry = NULL;
 	void *ret = NULL;
@@ -182,7 +181,7 @@ ztree_zone_remove(struct zdoor_handle *handle, ztree_entry_t *entry)
 	if (handle == NULL || entry == NULL)
 		return;
 
-	tdelete(entry, &(handle->zdh_ztree), _ztree_compare);
+	(void) tdelete(entry, &(handle->zdh_ztree), _ztree_compare);
 	ztree_entry_free(entry);
 }
 
@@ -196,7 +195,7 @@ ztree_zone_remove(struct zdoor_handle *handle, ztree_entry_t *entry)
  */
 int
 ztree_door_add(struct zdoor_handle *handle, const char *zonename,
-const char *service, zdoor_callback callback, zdoor_cookie_t *cookie)
+    const char *service, zdoor_callback callback, zdoor_cookie_t *cookie)
 {
 	dtree_entry_t *entry = NULL;
 	ztree_entry_t *znode = NULL;
@@ -247,7 +246,7 @@ const char *service, zdoor_callback callback, zdoor_cookie_t *cookie)
  */
 dtree_entry_t *
 ztree_door_find(struct zdoor_handle *handle, const char *zonename,
-const char *service)
+    const char *service)
 {
 	dtree_entry_t key = {0};
 	ztree_entry_t *znode = NULL;
@@ -284,7 +283,7 @@ ztree_door_remove(struct zdoor_handle *handle, dtree_entry_t *entry)
 	znode = entry->dte_parent;
 	cookie = entry->dte_cookie;
 
-	tdelete(entry, &(znode->zte_door_tree), _dtree_compare);
+	(void) tdelete(entry, &(znode->zte_door_tree), _dtree_compare);
 	dtree_entry_free(entry);
 
 	znode->zte_num_doors--;

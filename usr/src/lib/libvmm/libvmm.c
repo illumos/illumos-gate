@@ -228,13 +228,16 @@ vmm_unmap(vmm_t *vmm)
 	while (!list_is_empty(&vmm->vmm_memlist)) {
 		vmm_memseg_t *ms = list_remove_head(&vmm->vmm_memlist);
 
-		if (vmm->vmm_mem != MAP_FAILED)
-			munmap(vmm->vmm_mem + ms->vms_gpa, ms->vms_maplen);
+		if (vmm->vmm_mem != MAP_FAILED) {
+			(void) munmap(vmm->vmm_mem + ms->vms_gpa,
+			    ms->vms_maplen);
+		}
+
 		free(ms);
 	}
 
 	if (vmm->vmm_mem != MAP_FAILED)
-		munmap(vmm->vmm_mem, vmm->vmm_memsize);
+		(void) munmap(vmm->vmm_mem, vmm->vmm_memsize);
 
 	vmm->vmm_mem = MAP_FAILED;
 	vmm->vmm_memsize = 0;

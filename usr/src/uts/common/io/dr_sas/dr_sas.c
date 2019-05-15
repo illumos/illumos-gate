@@ -46,7 +46,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/types.h>
@@ -1299,7 +1299,8 @@ drsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 
 		cmd->sync_cmd = DRSAS_TRUE;
 
-		instance->func_ptr-> issue_cmd_in_poll_mode(instance, cmd);
+		(void) instance->func_ptr->
+		    issue_cmd_in_poll_mode(instance, cmd);
 
 		pkt->pkt_reason		= CMD_CMPLT;
 		pkt->pkt_statistics	= 0;
@@ -4524,6 +4525,7 @@ display_scsi_inquiry(caddr_t scsi_inq)
 #define	MAX_SCSI_DEVICE_CODE	14
 	int		i;
 	char		inquiry_buf[256] = {0};
+	int		bufsize = sizeof (inquiry_buf);
 	int		len;
 	const char	*const scsi_device_types[] = {
 		"Direct-Access    ",
@@ -4544,44 +4546,44 @@ display_scsi_inquiry(caddr_t scsi_inq)
 
 	len = 0;
 
-	len += snprintf(inquiry_buf + len, 265 - len, "  Vendor: ");
+	len += snprintf(inquiry_buf + len, bufsize - len, "  Vendor: ");
 	for (i = 8; i < 16; i++) {
-		len += snprintf(inquiry_buf + len, 265 - len, "%c",
+		len += snprintf(inquiry_buf + len, bufsize - len, "%c",
 		    scsi_inq[i]);
 	}
 
-	len += snprintf(inquiry_buf + len, 265 - len, "  Model: ");
+	len += snprintf(inquiry_buf + len, bufsize - len, "  Model: ");
 
 	for (i = 16; i < 32; i++) {
-		len += snprintf(inquiry_buf + len, 265 - len, "%c",
+		len += snprintf(inquiry_buf + len, bufsize - len, "%c",
 		    scsi_inq[i]);
 	}
 
-	len += snprintf(inquiry_buf + len, 265 - len, "  Rev: ");
+	len += snprintf(inquiry_buf + len, bufsize - len, "  Rev: ");
 
 	for (i = 32; i < 36; i++) {
-		len += snprintf(inquiry_buf + len, 265 - len, "%c",
+		len += snprintf(inquiry_buf + len, bufsize - len, "%c",
 		    scsi_inq[i]);
 	}
 
-	len += snprintf(inquiry_buf + len, 265 - len, "\n");
+	len += snprintf(inquiry_buf + len, bufsize - len, "\n");
 
 
 	i = scsi_inq[0] & 0x1f;
 
 
-	len += snprintf(inquiry_buf + len, 265 - len, "  Type:   %s ",
+	len += snprintf(inquiry_buf + len, bufsize - len, "  Type:   %s ",
 	    i < MAX_SCSI_DEVICE_CODE ? scsi_device_types[i] :
 	    "Unknown          ");
 
 
-	len += snprintf(inquiry_buf + len, 265 - len,
+	len += snprintf(inquiry_buf + len, bufsize - len,
 	    "                 ANSI SCSI revision: %02x", scsi_inq[2] & 0x07);
 
 	if ((scsi_inq[2] & 0x07) == 1 && (scsi_inq[3] & 0x0f) == 1) {
-		len += snprintf(inquiry_buf + len, 265 - len, " CCS\n");
+		len += snprintf(inquiry_buf + len, bufsize - len, " CCS\n");
 	} else {
-		len += snprintf(inquiry_buf + len, 265 - len, "\n");
+		len += snprintf(inquiry_buf + len, bufsize - len, "\n");
 	}
 
 	con_log(CL_ANN1, (CE_CONT, inquiry_buf));
@@ -5214,13 +5216,13 @@ drsas_parse_devname(char *devnm, int *tgt, int *lun)
 		if (ddi_strtol(tp, NULL, 0x10, &num)) {
 			return (DDI_FAILURE); /* Can declare this as constant */
 		}
-			*tgt = (int)num;
+		*tgt = (int)num;
 	}
 	if (lun && lp) {
 		if (ddi_strtol(lp, NULL, 0x10, &num)) {
 			return (DDI_FAILURE);
 		}
-			*lun = (int)num;
+		*lun = (int)num;
 	}
 	return (DDI_SUCCESS);  /* Success case */
 }

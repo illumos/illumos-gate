@@ -12,6 +12,7 @@
 #
 # Copyright 2013 Pluribus Networks Inc.
 #
+# Copyright 2019 Joyent, Inc.
 
 LIBRARY	= libvmmapi.a
 VERS		= .1
@@ -30,6 +31,9 @@ LIBS		= $(DYNLIB) $(LINTLIB)
 
 CPPFLAGS	= -I$(COMPAT)/freebsd -I$(CONTRIB)/freebsd \
 	$(CPPFLAGS.master) -I$(SRC)/uts/i86pc
+
+# not linted
+SMATCH=off
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 

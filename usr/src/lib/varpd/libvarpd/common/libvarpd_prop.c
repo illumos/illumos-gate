@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -200,7 +200,8 @@ libvarpd_prop_info_fill_int(varpd_prop_handle_t *vph, uint_t propid)
 	libvarpd_prop_set_prot(vph, OVERLAY_PROP_PERM_READ);
 	libvarpd_prop_set_type(vph, OVERLAY_PROP_T_STRING);
 	libvarpd_prop_set_nodefault(vph);
-	libvarpd_plugin_walk((varpd_handle_t *)infop->vprop_instance->vri_impl,
+	(void) libvarpd_plugin_walk(
+	    (varpd_handle_t *)infop->vprop_instance->vri_impl,
 	    libvarpd_prop_info_fill_int_cb, vph);
 	return (0);
 }

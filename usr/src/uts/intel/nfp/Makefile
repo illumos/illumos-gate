@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014, Joyent, Inc
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -48,12 +48,15 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# 	Driver-specific flags
+#	Driver-specific flags
 #
 CPPFLAGS	+= -DCH_KERNELVER=270
 LDFLAGS		+= -dy
 CERRWARN	+= -_gcc=-Wno-unused-variable
 CERRWARN	+= -_gcc=-Wno-unused-function
+
+# 3rd party code
+SMOFF += indenting
 
 #
 #	Default build targets.

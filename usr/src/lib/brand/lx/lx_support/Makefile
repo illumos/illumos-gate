@@ -22,6 +22,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Joyent, Inc.
 
 PROG =		lx_support
 PROGS =		$(PROG)
@@ -41,6 +42,8 @@ UTSBASE =	$(SRC)/uts
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(UTSBASE)/common/brand/lx
 LDLIBS +=	-lzonecfg
+
+SMOFF += signed
 
 .KEEP_STATE:
 

@@ -21,11 +21,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright 2017 Joyent, Inc.
-#
-#	This makefile drives the production of the kernel component of
-#	the lx brand
-#
+# Copyright 2019 Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -80,6 +76,9 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 # Due to zfs_ioctl.h inlines.  gcc catches non-inline ones during compilation.
 LINTTAGS	+= -erroff=E_STATIC_UNUSED
+
+# needs work
+SMATCH=off
 
 #
 #	Default build targets.

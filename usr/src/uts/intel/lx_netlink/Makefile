@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright (c) 2014 Joyent, Inc.  All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -42,6 +42,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CPPFLAGS	+= -I$(UTSBASE)/common/brand/lx
 LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs -Nbrand/lx_brand
+
+# needs work
+SMOFF += all_func_returns
 
 #
 #	Default build targets.

@@ -25,11 +25,7 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the hyprlofs file system
-#	kernel module.
-#
-#	intel architecture dependent
-#
+# Copyright 2019 Joyent, Inc.
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -55,6 +51,9 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+# needs work
+$(OBJS_DIR)/hyprlofs_vnops.o := SMOFF += signed
 
 #
 #	Default build targets.

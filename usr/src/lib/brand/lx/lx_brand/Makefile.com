@@ -21,7 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 LX_CMN  =	$(SRC)/common/brand/lx
@@ -76,6 +76,9 @@ CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I. -I../ -I$(UTSBASE)/common/brand/lx -I$(LX_CMN)
 ASFLAGS =	-P $(ASFLAGS_$(CURTYPE)) -D_ASM -I../	\
 			-I$(UTSBASE)/common/brand/lx
+
+# not linted
+SMATCH=off
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
