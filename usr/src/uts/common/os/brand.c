@@ -786,8 +786,8 @@ brand_solaris_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
 		}
 	}
 	/* Make sure the emulator has an entry point */
-	ASSERT(sed.sed_entry != NULL);
-	ASSERT(sed.sed_phdr != NULL);
+	ASSERT(sed.sed_entry != 0);
+	ASSERT(sed.sed_phdr != 0);
 
 	bzero(&env, sizeof (env));
 	if (args->to_model == DATAMODEL_NATIVE) {

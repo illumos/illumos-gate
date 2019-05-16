@@ -6492,7 +6492,7 @@ mac_reclaim_ring_from_grp(mac_impl_t *mip, mac_ring_type_t ring_type,
 	if (mcip == NULL)
 		mcip = mac_get_grp_primary(group);
 	ASSERT(mcip != NULL);
-	ASSERT(mcip->mci_share == NULL);
+	ASSERT(mcip->mci_share == 0);
 
 	mrp = MCIP_RESOURCE_PROPS(mcip);
 	if (ring_type == MAC_RING_TYPE_RX) {
@@ -8069,7 +8069,7 @@ mac_group_ring_modify(mac_client_impl_t *mcip, mac_group_t *group,
 	}
 
 	/* don't allow modifying rings for a share for now. */
-	ASSERT(mcip->mci_share == NULL);
+	ASSERT(mcip->mci_share == 0);
 
 	if (ringcnt == group->mrg_cur_count)
 		return (0);

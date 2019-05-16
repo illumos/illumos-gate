@@ -39,7 +39,6 @@
 #include <sys/segments.h>
 #include <sys/psw.h>
 
-#if !defined(__lint)
 #include "assym.h"
 
 /*
@@ -533,5 +532,3 @@ resume_from_intr_return:
 	movq	%rax, TSS_RSP0(%r9)
 	ret
 	SET_SIZE(thread_splitstack_cleanup)
-
-#endif /* !__lint */

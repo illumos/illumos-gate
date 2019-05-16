@@ -2728,7 +2728,7 @@ crypto_es_hash(struct module *mp, char *hash, char *shstrtab)
 			    " %s data size=%d\n", shstrtab + shp->sh_name,
 			    shp->sh_size);
 #endif
-		ASSERT(shp->sh_addr != NULL);
+		ASSERT(shp->sh_addr != 0);
 		SHA1Update(&ctx, (const uint8_t *)shp->sh_addr, shp->sh_size);
 	}
 

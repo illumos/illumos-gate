@@ -85,7 +85,7 @@ static void ibmf_send_busy(ibmf_mod_load_args_t *modlargsp);
 #define	IS_MANDATORY_CLASS(class)			\
 	((class == PERF_AGENT) || (class == BM_AGENT))
 
-char 	ibmf_client_modname[16];
+char	ibmf_client_modname[16];
 
 /*
  * ibmf_i_handle_recv_completion():
@@ -355,7 +355,7 @@ ibmf_i_handle_recv_completion(ibmf_ci_t *cip, ibt_wc_t *wcp)
 		 * boot and unregisters during detach and during
 		 * HCA unconfigure operation. We come here
 		 * 1. Before HCA registers with IBMF
-		 * 	Drop the MAD. Since this is a UD MAD,
+		 *	Drop the MAD. Since this is a UD MAD,
 		 *	sender will resend the request
 		 * 2. After HCA unregistered with IBMF during DR operation.
 		 *	Since HCA is going away, we can safely drop the PMA
@@ -476,7 +476,7 @@ ibmf_i_do_recv_cb(void *taskq_arg)
 		grhpresent = B_TRUE;
 		ib_grh = (ib_grh_t *)recv_wqep->recv_mem;
 		gid.gid_prefix	= b2h64(ib_grh->SGID.gid_prefix);
-		gid.gid_guid 	= b2h64(ib_grh->SGID.gid_guid);
+		gid.gid_guid	= b2h64(ib_grh->SGID.gid_guid);
 	} else {
 		grhpresent = B_FALSE;
 		lid = wcp->wc_slid;
@@ -1456,7 +1456,7 @@ ibmf_send_busy(ibmf_mod_load_args_t *modlargsp)
 	ibt_wr_ds_t		sgl[1];
 	ibmf_send_wqe_t		*send_wqep;
 	ibt_send_wr_t		*swrp;
-	ibmf_msg_impl_t 	*msgimplp;
+	ibmf_msg_impl_t		*msgimplp;
 	ibmf_ud_dest_t		*ibmf_ud_dest;
 	ibt_ud_dest_t		*ud_dest;
 	ib_mad_hdr_t		*smadhdrp, *rmadhdrp;
@@ -1586,7 +1586,7 @@ ibmf_send_busy(ibmf_mod_load_args_t *modlargsp)
 
 	/* use send wqe pointer as the WR ID */
 	swrp->wr_id		= (ibt_wrid_t)(uintptr_t)send_wqep;
-	ASSERT(swrp->wr_id != NULL);
+	ASSERT(swrp->wr_id != 0);
 	swrp->wr_flags		= IBT_WR_NO_FLAGS;
 	swrp->wr_opcode		= IBT_WRC_SEND;
 	swrp->wr_trans		= IBT_UD_SRV;

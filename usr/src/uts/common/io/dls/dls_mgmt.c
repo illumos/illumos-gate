@@ -1128,7 +1128,7 @@ dls_devnet_unset(mac_handle_t mh, datalink_id_t *id, boolean_t wait)
 			cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
 	} else {
 		VERIFY(ddp->dd_tref == 0);
-		VERIFY(ddp->dd_prop_taskid == NULL);
+		VERIFY(ddp->dd_prop_taskid == (taskqid_t)NULL);
 	}
 
 	if (ddp->dd_linkid != DATALINK_INVALID_LINKID) {

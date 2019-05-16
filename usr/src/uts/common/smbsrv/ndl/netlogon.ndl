@@ -22,7 +22,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _MLSVC_NETR_NDL_
@@ -395,6 +395,7 @@ struct netr_validation_info {
  * unmarshalled. NT does not clear out the unused bytes in the
  * DWORD so they must be cast to get the correct value.
  */
+ALIGN(2)
 OPERATION(NETR_OPNUM_SamLogon)
 struct netr_SamLogon {
 	IN		LPTSTR servername;
