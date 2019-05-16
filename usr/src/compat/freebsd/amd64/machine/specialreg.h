@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _COMPAT_FREEBSD_AMD64_MACHINE_SPECIALREG_H_
@@ -37,6 +37,7 @@
 #undef	CR4_VMXE
 #undef	CR4_SMEP
 #undef	CR4_SMAP
+#undef	CR4_PKE
 #undef	CR4_FSGSBASE
 #undef	CR4_PCIDE
 #endif /* _SYS_CONTROLREGS_H */
@@ -48,6 +49,7 @@
 #undef	IA32_ARCH_CAP_RSBA
 #undef	IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY
 #undef	IA32_ARCH_CAP_SSB_NO
+#undef	IA32_ARCH_CAP_MDS_NO
 #undef	IA32_SPEC_CTRL_IBRS
 #undef	IA32_SPEC_CTRL_STIBP
 #undef	IA32_SPEC_CTRL_SSBD

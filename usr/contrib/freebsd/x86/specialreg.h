@@ -77,6 +77,7 @@
 #define	CR4_XSAVE 0x00040000	/* XSETBV/XGETBV */
 #define	CR4_SMEP 0x00100000	/* Supervisor-Mode Execution Prevention */
 #define	CR4_SMAP 0x00200000	/* Supervisor-Mode Access Prevention */
+#define	CR4_PKE	0x00400000	/* Protection Keys Enable */
 
 /*
  * Bits in AMD64 special registers.  EFER is 64 bits wide.
@@ -447,6 +448,8 @@
 /*
  * CPUID instruction 7 Structured Extended Features, leaf 0 edx info
  */
+#define	CPUID_STDEXT3_MD_CLEAR	0x00000400
+#define	CPUID_STDEXT3_TSXFA	0x00002000
 #define	CPUID_STDEXT3_IBPB	0x04000000
 #define	CPUID_STDEXT3_STIBP	0x08000000
 #define	CPUID_STDEXT3_L1D_FLUSH	0x10000000
@@ -460,6 +463,7 @@
 #define	IA32_ARCH_CAP_RSBA	0x00000004
 #define	IA32_ARCH_CAP_SKIP_L1DFL_VMENTRY	0x00000008
 #define	IA32_ARCH_CAP_SSB_NO	0x00000010
+#define	IA32_ARCH_CAP_MDS_NO	0x00000020
 
 /*
  * CPUID manufacturers identifiers
@@ -505,6 +509,7 @@
 #define	MSR_MTRRcap		0x0fe
 #define	MSR_IA32_ARCH_CAP	0x10a
 #define	MSR_IA32_FLUSH_CMD	0x10b
+#define	MSR_TSX_FORCE_ABORT	0x10f
 #define	MSR_BBL_CR_ADDR		0x116
 #define	MSR_BBL_CR_DECC		0x118
 #define	MSR_BBL_CR_CTL		0x119
@@ -1041,6 +1046,7 @@
 #define	MSR_FSBASE	0xc0000100	/* base address of the %fs "segment" */
 #define	MSR_GSBASE	0xc0000101	/* base address of the %gs "segment" */
 #define	MSR_KGSBASE	0xc0000102	/* base address of the kernel %gs */
+#define	MSR_TSC_AUX	0xc0000103
 #define	MSR_PERFEVSEL0	0xc0010000
 #define	MSR_PERFEVSEL1	0xc0010001
 #define	MSR_PERFEVSEL2	0xc0010002
