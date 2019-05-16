@@ -1039,11 +1039,11 @@ sppptun_outpkt(queue_t *q, mblk_t **mpp)
 		case luCopy:
 			mp = copymsg(encmb);
 			if (mp != NULL)
-				sppptun_urput(RD(lowerq), mp);
+				(void) sppptun_urput(RD(lowerq), mp);
 			*mpp = encmb;
 			break;
 		case luSend:
-			sppptun_urput(RD(lowerq), encmb);
+			(void) sppptun_urput(RD(lowerq), encmb);
 			lowerq = NULL;
 			break;
 		}
