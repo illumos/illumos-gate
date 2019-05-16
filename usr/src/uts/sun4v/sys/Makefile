@@ -46,7 +46,6 @@ SUN4_HDRS=			\
 	dvma.h			\
 	eeprom.h		\
 	fcode.h			\
-	ht.h			\
 	idprom.h		\
 	intr.h			\
 	intreg.h		\

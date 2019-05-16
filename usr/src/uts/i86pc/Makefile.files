@@ -71,7 +71,6 @@ CORE_OBJS +=			\
 	hment.o			\
 	hold_page.o		\
 	hrtimers.o		\
-	ht.o			\
 	htable.o		\
 	hypercall.o		\
 	hypersubr.o		\

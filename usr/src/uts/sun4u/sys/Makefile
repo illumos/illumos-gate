@@ -48,7 +48,6 @@ SUN4_HDRS=			\
 	errclassify.h		\
 	fcode.h			\
 	fc_plat.h		\
-	ht.h			\
 	idprom.h		\
 	intr.h			\
 	intreg.h		\

@@ -61,7 +61,6 @@ CORE_OBJS +=			\
 	hment.o			\
 	hold_page.o		\
 	hrtimers.o		\
-	ht.o			\
 	htable.o		\
 	i86_mmu.o		\
 	ibft.o			\
