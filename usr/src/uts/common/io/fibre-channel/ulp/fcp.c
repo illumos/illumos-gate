@@ -14581,7 +14581,7 @@ fcp_fail_cmd(struct fcp_pkt *cmd, uchar_t reason, uint_t statistics)
 static void
 fcp_queue_pkt(struct fcp_port *pptr, struct fcp_pkt *cmd)
 {
-	ASSERT((cmd->cmd_pkt->pkt_flags & FLAG_NOQUEUE) == NULL);
+	ASSERT((cmd->cmd_pkt->pkt_flags & FLAG_NOQUEUE) == 0);
 
 	mutex_enter(&pptr->port_pkt_mutex);
 	cmd->cmd_flags |= CFLAG_IN_QUEUE;

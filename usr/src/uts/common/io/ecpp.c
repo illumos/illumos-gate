@@ -5943,7 +5943,7 @@ dma8237_dma_start(struct ecppunit *pp)
 
 	ASSERT(chn <= DMAE_CH3 &&
 	    pp->dma_cookie.dmac_size != 0 &&
-	    pp->dma_cookie.dmac_address != NULL);
+	    pp->dma_cookie.dmac_address != 0);
 
 	/* At this point Southbridge has not yet asserted DREQ */
 
@@ -6016,7 +6016,7 @@ x86_dma_start(struct ecppunit *pp)
 	chn = pp->uh.x86.chn;
 	ASSERT(chn <= DMAE_CH3 &&
 	    pp->dma_cookie.dmac_size != 0 &&
-	    pp->dma_cookie.dmac_address != NULL);
+	    pp->dma_cookie.dmac_address != 0);
 	bzero(&dmaereq, sizeof (struct ddi_dmae_req));
 	dmaereq.der_command =
 	    (pp->dma_dir & DDI_DMA_READ) ? DMAE_CMD_READ : DMAE_CMD_WRITE;

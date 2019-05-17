@@ -995,6 +995,43 @@ kbtrans_ioctl(struct kbtrans *upper, register mblk_t *mp)
 		 */
 		return (KBTRANS_MESSAGE_NOT_HANDLED);
 
+	case KIOCGRPTCOUNT:
+		/*
+		 * Report the autorepeat count
+		 */
+		DPRINTF(PRINT_L0, PRINT_MASK_ALL, (upper, "KIOCGRPTCOUNT\n"));
+		if ((datap = allocb(sizeof (int), BPRI_HI)) == NULL) {
+			ioctlrespsize = sizeof (int);
+			goto allocfailure;
+		}
+		*(int *)datap->b_wptr = kbtrans_repeat_count;
+		datap->b_wptr += sizeof (int);
+
+		/* free msg to prevent memory leak */
+		if (mp->b_cont != NULL)
+			freemsg(mp->b_cont);
+		mp->b_cont = datap;
+		iocp->ioc_count = sizeof (int);
+		break;
+
+	case KIOCSRPTCOUNT:
+		/*
+		 * Set the autorepeat count
+		 */
+		DPRINTF(PRINT_L0, PRINT_MASK_ALL, (upper, "KIOCSRPTCOUNT\n"));
+		err = miocpullup(mp, sizeof (int));
+
+		if (err != 0)
+			break;
+
+		/* validate the input */
+		if (*(int *)mp->b_cont->b_rptr < -1) {
+			err = EINVAL;
+			break;
+		}
+		kbtrans_repeat_count = (*(int *)mp->b_cont->b_rptr);
+		break;
+
 	case KIOCGRPTDELAY:
 		/*
 		 * Report the autorepeat delay, unit in millisecond

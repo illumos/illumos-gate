@@ -447,7 +447,7 @@ arn_rx_handler(struct arn_softc *sc)
 			mutex_exit(&sc->sc_rxbuflock);
 			break;
 		}
-		ASSERT(bf->bf_dma.cookie.dmac_address != NULL);
+		ASSERT(bf->bf_dma.cookie.dmac_address != 0);
 		ds = bf->bf_desc;
 
 		/*

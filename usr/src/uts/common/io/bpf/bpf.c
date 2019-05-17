@@ -252,8 +252,8 @@ bpf_attachd(struct bpf_d *d, const char *ifname, int dlt)
 	int hdrlen;
 	int error;
 
-	ASSERT(d->bd_bif == NULL);
-	ASSERT(d->bd_mcip == NULL);
+	ASSERT(d->bd_bif == (uintptr_t)NULL);
+	ASSERT(d->bd_mcip == (uintptr_t)NULL);
 	zone = d->bd_zone;
 	zonematch = B_TRUE;
 again:

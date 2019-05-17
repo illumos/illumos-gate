@@ -546,6 +546,11 @@ xbuf_iostart(ddi_xbuf_attr_t xap)
 	return (0);
 }
 
+static void
+xbuf_taskq_cb(void *arg)
+{
+	(void) xbuf_iostart(arg);
+}
 
 /*
  * Re-start IO processing if there is anything on the queue, AND if the
@@ -566,8 +571,7 @@ xbuf_dispatch(ddi_xbuf_attr_t xap)
 		 * schedule a timeout(9F) callback to try again later.
 		 */
 		if (taskq_dispatch(xap->xa_tq,
-		    (void (*)(void *)) xbuf_iostart, xap, KM_NOSLEEP) ==
-		    TASKQID_INVALID) {
+		    xbuf_taskq_cb, xap, KM_NOSLEEP) == TASKQID_INVALID) {
 			/*
 			 * Unable to enqueue the request for the taskq thread,
 			 * try again later.  Note that this will keep re-trying

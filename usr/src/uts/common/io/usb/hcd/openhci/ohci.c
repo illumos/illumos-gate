@@ -4605,7 +4605,7 @@ ohci_insert_ed_on_reclaim_list(
 		ohcip->ohci_reclaim_list = ept;
 	}
 
-	ASSERT(Get_ED(ept->hced_reclaim_next) == NULL);
+	ASSERT(Get_ED(ept->hced_reclaim_next) == 0);
 
 	/* Enable the SOF interrupt */
 	Set_OpReg(hcr_intr_enable, HCR_INTR_SOF);
@@ -6038,9 +6038,9 @@ ohci_fill_in_td(
 
 	/* Set the transfer wrapper */
 	ASSERT(tw != NULL);
-	ASSERT(tw->tw_id != NULL);
+	ASSERT(tw->tw_id != 0);
 
-	Set_TD(td->hctd_trans_wrapper, (uint32_t)tw->tw_id);
+	Set_TD(td->hctd_trans_wrapper, tw->tw_id);
 	Set_TD(td->hctd_tw_next_td, NULL);
 }
 
@@ -6404,7 +6404,7 @@ ohci_insert_td_on_tw(
 
 		tw->tw_hctd_tail = td;
 
-		ASSERT(Get_TD(td->hctd_tw_next_td) == NULL);
+		ASSERT(Get_TD(td->hctd_tw_next_td) == 0);
 	}
 }
 
@@ -6971,7 +6971,7 @@ dmadone:
 	/* Get and Store 32bit ID */
 	tw->tw_id = OHCI_GET_ID((void *)tw);
 
-	ASSERT(tw->tw_id != NULL);
+	ASSERT(tw->tw_id != 0);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
 	    "ohci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
@@ -7205,7 +7205,7 @@ ohci_create_isoc_transfer_wrapper(
 	/* Get and Store 32bit ID */
 	tw->tw_id = OHCI_GET_ID((void *)tw);
 
-	ASSERT(tw->tw_id != NULL);
+	ASSERT(tw->tw_id != 0);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ohcip->ohci_log_hdl,
 	    "ohci_create_isoc_transfer_wrapper: tw = 0x%p", (void *)tw);
@@ -7619,7 +7619,7 @@ ohci_free_tw(
 	    "ohci_free_tw: tw = 0x%p", (void *)tw);
 
 	ASSERT(tw != NULL);
-	ASSERT(tw->tw_id != NULL);
+	ASSERT(tw->tw_id != 0);
 
 	/* Free 32bit ID */
 	OHCI_FREE_ID((uint32_t)tw->tw_id);
