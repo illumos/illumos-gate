@@ -25,12 +25,21 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Joyent, Inc.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	!defined(_LP_PRINTERS_H)
 #define	_LP_PRINTERS_H
+
+/*
+ * The following conflicts are also defined in sys/processor.h.
+ */
+#if defined PS_FAULTED
+#undef	PS_FAULTED
+#endif
+#if defined PS_DISABLED
+#undef	PS_DISABLED
+#endif
 
 /*
  * Define the following to support administrator configurable

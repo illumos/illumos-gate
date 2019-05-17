@@ -29,9 +29,6 @@
 
 #include <pwd.h>
 #include <zone.h>
-#if defined PS_FAULTED
-#undef  PS_FAULTED
-#endif /* PS_FAULTED */
 #include <dial.h>
 
 #include <stdlib.h>
