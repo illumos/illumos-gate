@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2012, 2014 by Delphix. All rights reserved.
  */
 
@@ -6922,6 +6922,16 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 		return;
 
 	cookie = dtrace_interrupt_disable();
+
+	/*
+	 * Also refuse to process any probe firings that might happen on a
+	 * disabled CPU.
+	 */
+	if (CPU->cpu_flags & CPU_DISABLED) {
+		dtrace_interrupt_enable(cookie);
+		return;
+	}
+
 	probe = dtrace_probes[id - 1];
 	cpuid = CPU->cpu_id;
 	onintr = CPU_ON_INTR(CPU);

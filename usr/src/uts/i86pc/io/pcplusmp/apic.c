@@ -25,7 +25,7 @@
 /*
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -82,7 +82,7 @@
 #include <sys/hpet.h>
 #include <sys/apic_common.h>
 #include <sys/apic_timer.h>
-#include <sys/ht.h>
+#include <sys/smt.h>
 
 /*
  *	Local Function Prototypes
@@ -304,7 +304,7 @@ apic_init(void)
 	/*
 	 * For pcplusmp, we'll keep things simple and always disable this.
 	 */
-	ht_intr_alloc_pil(XC_CPUPOKE_PIL);
+	smt_intr_alloc_pil(XC_CPUPOKE_PIL);
 
 	apic_pir_vect = apic_get_ipivect(XC_CPUPOKE_PIL, -1);
 

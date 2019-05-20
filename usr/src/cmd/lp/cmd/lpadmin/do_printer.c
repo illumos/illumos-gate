@@ -40,9 +40,6 @@
 #include <bsm/devices.h>
 #include "lp.h"
 #include "class.h"
-#if defined PS_FAULTED
-#undef	PS_FAULTED
-#endif
 #include "printers.h"
 #include "msgs.h"
 

@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_THREAD_H
@@ -352,7 +352,7 @@ typedef struct _kthread {
 
 	char		*t_name;	/* thread name */
 
-	uint64_t	t_unsafe;	/* unsafe to run with HT VCPU thread */
+	uint64_t	t_unsafe;	/* unsafe to run with SMT VCPU thread */
 } kthread_t;
 
 /*

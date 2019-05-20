@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Joyent, Inc.
+ */
+
 #include <sys/sysmacros.h>
 #include <sys/prom_plat.h>
 #include <sys/prom_debug.h>
@@ -162,6 +166,10 @@ cold_flag_set(int cpuid)
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
 	cp = cpu[cpuid];
+
+	if (!(cpu->cpu_flags & CPU_ENABLE))
+		ncpus_intr_enabled++;
+
 	cp->cpu_flags |= CPU_RUNNING | CPU_ENABLE | CPU_EXISTS;
 	cpu_add_active(cp);
 	/*

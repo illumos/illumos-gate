@@ -1,9 +1,10 @@
 '\" te
 .\"  Copyright (c) 2004 Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Joyent, Inc.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PSRINFO 1M "Feb 21, 2004"
+.TH PSRINFO 1M "Apr 25, 2019"
 .SH NAME
 psrinfo \- displays information about processors
 .SH SYNOPSIS
@@ -14,37 +15,37 @@ psrinfo \- displays information about processors
 
 .LP
 .nf
-\fBpsrinfo\fR [\fB-p\fR] \fB-s\fR \fIprocessor_id\fR
+\fBpsrinfo\fR \fB-t\fR [\fB-S state\fR | \fB-c\fR | \fB-p\fR]
+.fi
+
+.LP
+.nf
+\fBpsrinfo\fR \fB-r\fR [\fB<propname>\fR | \fBall\fR]
 .fi
 
 .SH DESCRIPTION
+.LP
+\fBpsrinfo\fR displays information about processors. Each physical socket may
+contain multiple cores, which in turn can contain multiple virtual processors
+(also referred to as CPUs).  Each virtual processor is an entity
+with its own \fBID\fR, capable of executing independent threads.
 .sp
 .LP
-\fBpsrinfo\fR displays information about processors. Each physical processor
-may support multiple virtual processors. Each virtual processor is an entity
-with its own interrupt \fBID\fR, capable of executing independent threads.
-.sp
-.LP
-Without the \fIprocessor_id\fR operand, \fBpsrinfo\fR displays one line for
-each configured processor, displaying whether it is on-line, non-interruptible
-(designated by no-intr), spare, off-line, faulted or powered off, and when that
-status last changed. Use the processor_id operand to display information about
-a specific processor. See \fBOPERANDS\fR.
+Without the \fIprocessor_id\fR operand, \fBpsrinfo\fR displays one line for each
+configured processor, displaying whether it is on-line, non-interruptible
+(designated by no-intr), spare, off-line, faulted, disabled, or powered off, and
+when that status last changed. Use the processor_id operand to display
+information about a specific processor. See \fBOPERANDS\fR.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
 .sp
 .ne 2
 .na
-\fB\fB-s\fR\fI processor_id\fR\fR
+\fB\fB-c\fR\fR
 .ad
 .RS 19n
-Silent mode. Displays \fB1\fR if the specified processor is fully on-line.
-Displays \fB0\fR if the specified processor is non-interruptible, spare,
-off-line, faulted or powered off.
-.sp
-Use silent mode when using \fBpsrinfo\fR in shell scripts.
+When used with \fB-t\fR, report the total number of CPU cores.
 .RE
 
 .sp
@@ -53,10 +54,53 @@ Use silent mode when using \fBpsrinfo\fR in shell scripts.
 \fB\fB-p\fR\fR
 .ad
 .RS 19n
-Display the number of physical processors in a system.
+Display the number of physical sockets in a system.
 .sp
 When combined with the \fB-v\fR option, reports additional information about
-each physical processor.
+each physical socket.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-r\fR \fIpropname\fR\fR
+.ad
+.RS 19n
+Report CPU-specific properties that apply to the system as a whole. Supplying
+"all" will list all such properties in \fBkey=value\fR format. Currently, the
+only defined property is \fBsmt_enabled\fR, a boolean property indicating whether
+simultaneous multi-threading (hyper-threading) is active or not.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-S\fR \fIstate\fR\fR
+.ad
+.RS 19n
+When used with \fB-t\fR, report the total number of CPUs in the given state.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-s\fR\fI processor_id\fR\fR
+.ad
+.RS 19n
+Silent mode. Displays \fB1\fR if the specified processor is fully on-line,
+or \fB0\fR otherwise.
+.sp
+Use silent mode when using \fBpsrinfo\fR in shell scripts.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-t\fR\fR
+.ad
+.RS 19n
+Report totals. Without arguments, reports the total number of CPUs. This can be
+combined with the \fB-p\fR, \fB-c\fR, or \fB-S\fR options to modify the total.
 .RE
 
 .sp
@@ -74,7 +118,6 @@ each physical processor.
 .RE
 
 .SH OPERANDS
-.sp
 .LP
 The following operands are supported:
 .sp
@@ -91,6 +134,8 @@ Specify \fIprocessor_id\fR as an individual processor number (for example,
 3\fR), or a range of processor numbers (for example, \fB1-4\fR). It is also
 possible to combine ranges and (individual or multiple) \fIprocessor_id\fRs
 (for example, \fB1-3 5 7-8 9\fR).
+.sp
+This cannot be specified along with the \fB-r\fR or \fB-t\fR options.
 .RE
 
 .SH EXAMPLES
@@ -129,46 +174,44 @@ fi
 .sp
 
 .LP
-\fBExample 3 \fRDisplaying Information About the Physical Processors in the
+\fBExample 3 \fRDisplaying Information About the Physical Sockets in the
 System
 .sp
 .LP
-With no additional arguments, the \fB-p\fR option displays a single integer:
-the number of physical processors in the system:
+Use the \fB-tp\fR options to report the number of sockets.
 
 .sp
 .in +2
 .nf
-> psrinfo -p
-                8
+> psrinfo -tp
+                2
 .fi
 .in -2
 .sp
 
 .sp
 .LP
-\fBpsrinfo\fR also accepts command line arguments (processor \fBID\fRs):
+Without the \fB-t\fR option, \fB-p\fR also takes processor IDs:
 
 .sp
 .in +2
 .nf
-> psrinfo -p 0 512   # IDs 0 and 512 exist on the
-1                    # same physical processor
+> psrinfo -p 0 28    # IDs 0 and 28 exist on the
+1                    # same socket
 
 > psrinfo -p 0 1     # IDs 0 and 1 exist on different
-2                    # physical processors
+2                    # sockets
 .fi
 .in -2
 .sp
 
 .sp
 .LP
-In this example, virtual processors \fB0\fR and \fB512\fR exist on the same
-physical processor. Virtual processors \fB0\fR and \fB1\fR do not. This is
+In this example, virtual processors \fB0\fR and \fB28\fR exist on the same
+socket. Virtual processors \fB0\fR and \fB1\fR do not. This is
 specific to this example and is and not a general rule.
 
 .SH EXIT STATUS
-.sp
 .LP
 The following exit values are returned:
 .sp
@@ -190,12 +233,10 @@ An error occurred.
 .RE
 
 .SH SEE ALSO
-.sp
 .LP
 \fBpsradm\fR(1M), \fBp_online\fR(2), \fBprocessor_info\fR(2),
 \fBattributes\fR(5)
 .SH DIAGNOSTICS
-.sp
 .ne 2
 .na
 \fB\fBpsrinfo:\fR \fBprocessor\fR \fB9:\fR \fBInvalid\fR \fBargument\fR\fR

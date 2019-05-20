@@ -330,10 +330,13 @@ extern cpu_core_t cpu_core[];
  * suspended (in the suspend path), or have yet to be resumed (in the resume
  * case).
  *
+ * CPU_DISABLED is used for disabling SMT. It is similar to CPU_OFFLINE, but
+ * cannot be onlined without being forced.
+ *
  * On some platforms CPUs can be individually powered off.
  * The following flags are set for powered off CPUs: CPU_QUIESCED,
  * CPU_OFFLINE, and CPU_POWEROFF.  The following flags are cleared:
- * CPU_RUNNING, CPU_READY, CPU_EXISTS, and CPU_ENABLE.
+ * CPU_RUNNING, CPU_READY, CPU_EXISTS, CPU_DISABLED and CPU_ENABLE.
  */
 #define	CPU_RUNNING	0x001		/* CPU running */
 #define	CPU_READY	0x002		/* CPU ready for cross-calls */
@@ -345,10 +348,7 @@ extern cpu_core_t cpu_core[];
 #define	CPU_FROZEN	0x080		/* CPU is frozen via CPR suspend */
 #define	CPU_SPARE	0x100		/* CPU offline available for use */
 #define	CPU_FAULTED	0x200		/* CPU offline diagnosed faulty */
-
-#define	FMT_CPU_FLAGS							\
-	"\20\12fault\11spare\10frozen"					\
-	"\7poweroff\6offline\5enable\4exist\3quiesced\2ready\1run"
+#define	CPU_DISABLED	0x400		/* CPU explicitly disabled (HT) */
 
 #define	CPU_ACTIVE(cpu)	(((cpu)->cpu_flags & CPU_OFFLINE) == 0)
 
@@ -514,6 +514,7 @@ extern cpu_t		*cpu_active;	/* list of active CPUs */
 extern cpuset_t		cpu_active_set;	/* cached set of active CPUs */
 extern int		ncpus;		/* number of CPUs present */
 extern int		ncpus_online;	/* number of CPUs not quiesced */
+extern int		ncpus_intr_enabled; /* nr of CPUs taking I/O intrs */
 extern int		max_ncpus;	/* max present before ncpus is known */
 extern int		boot_max_ncpus;	/* like max_ncpus but for real */
 extern int		boot_ncpus;	/* # cpus present @ boot */
@@ -631,12 +632,12 @@ int	cpus_paused(void);
 void	cpu_pause_init(void);
 cpu_t	*cpu_get(processorid_t cpun);	/* get the CPU struct associated */
 
-int	cpu_online(cpu_t *cp);			/* take cpu online */
-int	cpu_offline(cpu_t *cp, int flags);	/* take cpu offline */
-int	cpu_spare(cpu_t *cp, int flags);	/* take cpu to spare */
-int	cpu_faulted(cpu_t *cp, int flags);	/* take cpu to faulted */
-int	cpu_poweron(cpu_t *cp);		/* take powered-off cpu to offline */
-int	cpu_poweroff(cpu_t *cp);	/* take offline cpu to powered-off */
+int	cpu_online(cpu_t *, int);	/* take cpu online */
+int	cpu_offline(cpu_t *, int);	/* take cpu offline */
+int	cpu_spare(cpu_t *, int);	/* take cpu to spare */
+int	cpu_faulted(cpu_t *, int);	/* take cpu to faulted */
+int	cpu_poweron(cpu_t *);		/* take powered-off cpu to offline */
+int	cpu_poweroff(cpu_t *);		/* take offline cpu to powered-off */
 
 cpu_t	*cpu_intr_next(cpu_t *cp);	/* get next online CPU taking intrs */
 int	cpu_intr_count(cpu_t *cp);	/* count # of CPUs handling intrs */
@@ -669,7 +670,7 @@ int	cpu_flagged_poweredoff(cpu_flag_t); /* flags show CPU is powered off */
  */
 void	cpu_set_state(cpu_t *);		/* record/timestamp current state */
 int	cpu_get_state(cpu_t *);		/* get current cpu state */
-const char *cpu_get_state_str(cpu_t *);	/* get current cpu state as string */
+const char *cpu_get_state_str(cpu_flag_t);
 
 
 void	cpu_set_curr_clock(uint64_t);	/* indicate the current CPU's freq */

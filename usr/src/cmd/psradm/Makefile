@@ -21,14 +21,16 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# cmd/psradm/Makefile
+# Copyright 2019 Joyent, Inc.
 #
 
-PROG=	psradm
+PROG = psradm
 
 include	../Makefile.cmd
 
 .KEEP_STATE:
+
+CSTD = $(CSTD_GNU99)
 
 all: $(PROG)
 

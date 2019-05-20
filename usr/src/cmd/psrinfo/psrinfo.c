@@ -12,6 +12,7 @@
 /*
  * Copyright (c) 2012 DEY Storage Systems, Inc.  All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -23,6 +24,9 @@
  * All the relevant kstats are in the cpu_info kstat module.
  */
 
+#include <sys/sysmacros.h>
+
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -33,17 +37,21 @@
 #include <libgen.h>
 #include <ctype.h>
 #include <errno.h>
+#include <err.h>
+
+#include <libdevinfo.h>
 
 #define	_(x)	gettext(x)
 #if XGETTEXT
-/* These CPU states are here for benefit of xgettext */
-_("on-line")
-_("off-line")
-_("faulted")
-_("powered-off")
-_("no-intr")
-_("spare")
-_("unknown")
+	/* These CPU states are here for benefit of xgettext */
+	_("on-line")
+	_("off-line")
+	_("faulted")
+	_("powered-off")
+	_("no-intr")
+	_("spare")
+	_("unknown")
+	_("disabled")
 #endif
 
 /*
@@ -106,6 +114,10 @@ static struct link *pchips = NULL;
 static struct link *cores = NULL;
 static struct link *vcpus = NULL;
 
+static uint_t nr_cpus;
+static uint_t nr_cores;
+static uint_t nr_chips;
+
 static const char *cmdname;
 
 static void
@@ -113,9 +125,12 @@ usage(char *msg)
 {
 	if (msg != NULL)
 		(void) fprintf(stderr, "%s: %s\n", cmdname, msg);
-	(void) fprintf(stderr, _("usage: \n" \
-	    "\t%s [-v] [-p] [processor_id ...]\n" \
-	    "\t%s -s [-p] processor_id\n"), cmdname, cmdname);
+	(void) fprintf(stderr, _("usage: \n"
+	    "\t%s -r propname\n"
+	    "\t%s [-v] [-p] [processor_id ...]\n"
+	    "\t%s -s [-p] processor_id\n"
+	    "\t%s -t [-S <state> | -c | -p]\n"),
+	    cmdname, cmdname, cmdname, cmdname);
 	exit(2);
 }
 
@@ -299,7 +314,7 @@ static void
 print_ps(void)
 {
 	int online = 1;
-	struct pchip *p;
+	struct pchip *p = NULL;
 	struct vcpu *v;
 	struct link *l;
 
@@ -432,6 +447,92 @@ print_normal(int nspec)
 	}
 }
 
+static bool
+valid_propname(const char *propname)
+{
+	size_t i;
+
+	const char *props[] = {
+		"smt_enabled",
+	};
+
+	for (i = 0; i < ARRAY_SIZE(props); i++) {
+		if (strcmp(propname, props[i]) == 0)
+			break;
+	}
+
+	return (i != ARRAY_SIZE(props));
+}
+
+static void
+read_property(const char *propname)
+{
+	di_prop_t prop = DI_PROP_NIL;
+	di_node_t root_node;
+	bool show_all = strcmp(propname, "all") == 0;
+
+	if (!show_all && !valid_propname(propname))
+		errx(EXIT_FAILURE, _("unknown CPU property %s"), propname);
+
+	if ((root_node = di_init("/", DINFOPROP)) == NULL)
+		err(EXIT_FAILURE, _("failed to read root node"));
+
+	while ((prop = di_prop_sys_next(root_node, prop)) != DI_PROP_NIL) {
+		const char *name = di_prop_name(prop);
+		char *val;
+		int nr_vals;
+
+		if (!valid_propname(name))
+			continue;
+
+		if (!show_all && strcmp(di_prop_name(prop), propname) != 0)
+			continue;
+
+		if ((nr_vals = di_prop_strings(prop, &val)) < 1) {
+			err(EXIT_FAILURE,
+			    _("error reading property %s"), name);
+		} else if (nr_vals != 1) {
+			errx(EXIT_FAILURE, _("invalid property %s"), name);
+		}
+
+		printf("%s=%s\n", name, val);
+
+		if (!show_all)
+			exit(EXIT_SUCCESS);
+	}
+
+	if (!show_all)
+		errx(EXIT_FAILURE, _("property %s was not found"), propname);
+
+	di_fini(root_node);
+}
+
+static void
+print_total(int opt_c, int opt_p, const char *opt_S)
+{
+	uint_t count = 0;
+
+	if (opt_c) {
+		printf("%u\n", nr_cores);
+		return;
+	} else if (opt_p) {
+		printf("%u\n", nr_chips);
+		return;
+	} else if (opt_S == NULL || strcmp(opt_S, "all") == 0) {
+		printf("%u\n", nr_cpus);
+		return;
+	}
+
+
+	for (struct link *l = vcpus; l != NULL; l = l->l_next) {
+		struct vcpu *v = l->l_ptr;
+		if (strcmp(opt_S, v->v_state) == 0)
+			count++;
+	}
+
+	printf("%u\n", count);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -445,8 +546,12 @@ main(int argc, char **argv)
 	char		*s;
 	int		nspec;
 	int		optc;
-	int		opt_s = 0;
+	int		opt_c = 0;
 	int		opt_p = 0;
+	const char	*opt_r = NULL;
+	const char	*opt_S = NULL;
+	int		opt_s = 0;
+	int		opt_t = 0;
 	int		opt_v = 0;
 	int		ex = 0;
 
@@ -483,6 +588,7 @@ main(int argc, char **argv)
 			vc->v_link_core.l_ptr = vc;
 			vc->v_link_pchip.l_ptr = vc;
 			ins_link(ins, &vc->v_link);
+			nr_cpus++;
 		}
 
 		if ((knp = kstat_data_lookup(ksp, "state")) != NULL) {
@@ -569,6 +675,7 @@ nocpuid:
 			chip->p_link.l_id = vc->v_pchip_id;
 			chip->p_link.l_ptr = chip;
 			ins_link(ins, &chip->p_link);
+			nr_chips++;
 		}
 		vc->v_pchip = chip;
 
@@ -587,6 +694,7 @@ nocpuid:
 			(void) find_link(&chip->p_cores, core->c_link.l_id,
 			    &ins);
 			ins_link(ins, &core->c_link_pchip);
+			nr_cores++;
 		}
 		vc->v_core = core;
 
@@ -606,13 +714,25 @@ nocpuid:
 
 	nspec = 0;
 
-	while ((optc = getopt(argc, argv, "pvs")) != EOF) {
+	while ((optc = getopt(argc, argv, "cpr:S:stv")) != EOF) {
 		switch (optc) {
-		case 's':
-			opt_s = 1;
+		case 'c':
+			opt_c = 1;
 			break;
 		case 'p':
 			opt_p = 1;
+			break;
+		case 'r':
+			opt_r = optarg;
+			break;
+		case 'S':
+			opt_S = optarg;
+			break;
+		case 's':
+			opt_s = 1;
+			break;
+		case 't':
+			opt_t = 1;
 			break;
 		case 'v':
 			opt_v = 1;
@@ -621,6 +741,33 @@ nocpuid:
 			usage(NULL);
 		}
 	}
+
+	if (opt_r != NULL) {
+		if (optind != argc)
+			usage(_("cannot specify CPUs with -r"));
+		if (opt_c || opt_p || opt_S != NULL || opt_s || opt_t || opt_v)
+			usage(_("cannot specify other arguments with -r"));
+
+		read_property(opt_r);
+		return (EXIT_SUCCESS);
+	}
+
+	if (opt_t != NULL) {
+		if (optind != argc)
+			usage(_("cannot specify CPUs with -t"));
+		if (opt_s || opt_v)
+			usage(_("cannot specify -s or -v with -t"));
+		if (opt_S != NULL && (opt_c || opt_p))
+			usage(_("cannot specify CPU state with -c or -p"));
+		if (opt_c && opt_p)
+			usage(_("cannot specify -c and -p"));
+
+		print_total(opt_c, opt_p, opt_S);
+		return (EXIT_SUCCESS);
+	}
+
+	if (opt_S != NULL || opt_c)
+		usage(_("cannot specify -S or -c without -t"));
 
 	while (optind < argc) {
 		long id;

@@ -342,7 +342,7 @@
 	call	smap_disable
 .nosmap:
 
-	call	ht_mark
+	call	smt_mark
 
 	/*
 	 * Restore non-volatile registers, then have spl0 return to the
@@ -464,7 +464,7 @@ resume_from_zombie_return:
 
 	STORE_INTR_START(%r12)
 
-	call	ht_mark
+	call	smt_mark
 
 	/*
 	 * Restore non-volatile registers, then have spl0 return to the

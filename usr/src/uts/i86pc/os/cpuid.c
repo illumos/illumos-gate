@@ -2195,13 +2195,14 @@ cpuid_update_l1d_flush(cpu_t *cpu, uchar_t *featureset)
 	/*
 	 * If we're not on Intel or we've mitigated both RDCL and MDS in
 	 * hardware, then there's nothing left for us to do for enabling the
-	 * flush. We can also go ahead and say that HT exclusion is unnecessary.
+	 * flush. We can also go ahead and say that SMT exclusion is
+	 * unnecessary.
 	 */
 	if (cpi->cpi_vendor != X86_VENDOR_Intel ||
 	    (is_x86_feature(featureset, X86FSET_RDCL_NO) &&
 	    is_x86_feature(featureset, X86FSET_MDS_NO))) {
-		extern int ht_exclusion;
-		ht_exclusion = 0;
+		extern int smt_exclusion;
+		smt_exclusion = 0;
 		spec_uarch_flush = spec_uarch_flush_noop;
 		membar_producer();
 		return;
@@ -2342,15 +2343,15 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 
 	/*
 	 * We need to determine what changes are required for mitigating L1TF
-	 * and MDS. If the CPU suffers from either of them, then HT exclusion is
-	 * required.
+	 * and MDS. If the CPU suffers from either of them, then SMT exclusion
+	 * is required.
 	 *
 	 * If any of these are present, then we need to flush u-arch state at
 	 * various points. For MDS, we need to do so whenever we change to a
 	 * lesser privilege level or we are halting the CPU. For L1TF we need to
 	 * flush the L1D cache at VM entry. When we have microcode that handles
 	 * MDS, the L1D flush also clears the other u-arch state that the
-	 * mb_clear does.
+	 * md_clear does.
 	 */
 
 	/*
@@ -2360,8 +2361,8 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	cpuid_update_md_clear(cpu, featureset);
 
 	/*
-	 * Determine whether HT exclusion is required and whether or not we need
-	 * to perform an l1d flush.
+	 * Determine whether SMT exclusion is required and whether or not we
+	 * need to perform an l1d flush.
 	 */
 	cpuid_update_l1d_flush(cpu, featureset);
 }

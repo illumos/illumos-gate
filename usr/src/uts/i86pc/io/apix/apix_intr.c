@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Western Digital Corporation.  All rights reserved.
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/cpuvar.h>
@@ -69,7 +69,7 @@
 #include <vm/hat_i86.h>
 #include <sys/stack.h>
 #include <sys/apix.h>
-#include <sys/ht.h>
+#include <sys/smt.h>
 
 static void apix_post_hardint(int);
 
@@ -282,7 +282,7 @@ apix_do_softint_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil,
 
 	it->t_intr = t;
 	cpu->cpu_thread = it;
-	ht_begin_intr(pil);
+	smt_begin_intr(pil);
 
 	/*
 	 * Set bit for this pil in CPU's interrupt active bitmask.
@@ -353,7 +353,7 @@ apix_do_softint_epilog(struct cpu *cpu, uint_t oldpil)
 	it->t_link = cpu->cpu_intr_thread;
 	cpu->cpu_intr_thread = it;
 	it->t_state = TS_FREE;
-	ht_end_intr();
+	smt_end_intr();
 	cpu->cpu_thread = t;
 
 	if (t->t_flag & T_INTR_THREAD)
@@ -471,7 +471,7 @@ apix_hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil,
 		}
 	}
 
-	ht_begin_intr(pil);
+	smt_begin_intr(pil);
 
 	/* store starting timestamp in CPu structure for this IPL */
 	mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)] = now;
@@ -563,7 +563,7 @@ apix_hilevel_intr_epilog(struct cpu *cpu, uint_t oldpil)
 			t->t_intr_start = now;
 	}
 
-	ht_end_intr();
+	smt_end_intr();
 
 	mcpu->mcpu_pri = oldpil;
 	if (pil < CBE_HIGH_PIL)
@@ -677,7 +677,7 @@ apix_intr_thread_prolog(struct cpu *cpu, uint_t pil, caddr_t stackptr)
 	it->t_state = TS_ONPROC;
 
 	cpu->cpu_thread = it;
-	ht_begin_intr(pil);
+	smt_begin_intr(pil);
 
 	/*
 	 * Initialize thread priority level from intr_pri
@@ -766,7 +766,7 @@ apix_intr_thread_epilog(struct cpu *cpu, uint_t oldpil)
 	cpu->cpu_intr_thread = it;
 	it->t_state = TS_FREE;
 
-	ht_end_intr();
+	smt_end_intr();
 	cpu->cpu_thread = t;
 
 	if (t->t_flag & T_INTR_THREAD)
