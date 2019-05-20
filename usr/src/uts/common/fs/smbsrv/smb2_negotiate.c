@@ -39,14 +39,15 @@ uint32_t smb2srv_capabilities =
  *
  * smb2_max_rwsize is what we put in the SMB2 negotiate response to tell
  * the client the largest read and write request size we'll support.
- * One megabyte is a compromise between efficiency on fast networks
- * and memory consumption (for the buffers) on the server side.
+ * For now, we're using contiguous allocations, so keep this at 64KB
+ * so that (even with message overhead) allocations stay below 128KB,
+ * avoiding kmem_alloc -> page_create_va thrashing.
  *
  * smb2_max_trans is the largest "transact" send or receive, which is
  * used for directory listings and info set/get operations.
  */
 uint32_t smb2_tcp_bufsize = (1<<22);	/* 4MB */
-uint32_t smb2_max_rwsize = (1<<20);	/* 1MB */
+uint32_t smb2_max_rwsize = (1<<16);	/* 64KB */
 uint32_t smb2_max_trans  = (1<<16);	/* 64KB */
 
 /*

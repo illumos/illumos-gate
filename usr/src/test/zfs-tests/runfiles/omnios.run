@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2013, 2017 by Delphix. All rights reserved.
 # Copyright 2016, OmniTI Computer Consulting, Inc. All rights reserved.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2019 RackTop Systems.
 #
 
@@ -93,6 +93,12 @@ tests = ['case_all_values', 'norm_all_values',
     'mixed_none_lookup', 'mixed_none_lookup_ci', 'mixed_none_delete',
     'mixed_formd_lookup', 'mixed_formd_lookup_ci', 'mixed_formd_delete']
 
+[/opt/zfs-tests/tests/functional/channel_program/lua_core]
+autotests = 1
+
+[/opt/zfs-tests/tests/functional/channel_program/synctask_core]
+autotests = 1
+
 [/opt/zfs-tests/tests/functional/checksum]
 tests = ['run_edonr_test', 'run_sha2_test', 'run_skein_test']
 pre =
@@ -147,7 +153,8 @@ tests = ['zfs_inherit_001_neg', 'zfs_inherit_002_neg', 'zfs_inherit_003_pos']
 tests = ['zfs_mount_001_pos', 'zfs_mount_002_pos', 'zfs_mount_003_pos',
     'zfs_mount_004_pos', 'zfs_mount_005_pos', 'zfs_mount_006_pos',
     'zfs_mount_007_pos', 'zfs_mount_008_pos', 'zfs_mount_009_neg',
-    'zfs_mount_010_neg', 'zfs_mount_011_neg', 'zfs_mount_all_001_pos']
+    'zfs_mount_010_neg', 'zfs_mount_011_neg', 'zfs_mount_012_neg',
+    'zfs_mount_all_001_pos', 'zfs_mount_all_fail', 'zfs_mount_all_mountpoints']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_program]
 tests = ['zfs_program_json']
@@ -165,7 +172,10 @@ tests = ['zfs_receive_001_pos', 'zfs_receive_002_pos', 'zfs_receive_003_pos',
     'zfs_receive_005_neg', 'zfs_receive_006_pos',
     'zfs_receive_007_neg', 'zfs_receive_008_pos', 'zfs_receive_009_neg',
     'zfs_receive_010_pos', 'zfs_receive_011_pos', 'zfs_receive_012_pos',
-    'zfs_receive_014_pos']
+    'zfs_receive_013_pos', 'zfs_receive_014_pos']
+
+[/opt/zfs-tests/tests/functional/cli_root/zfs_remap]
+tests = ['zfs_remap_cliargs', 'zfs_remap_obsolete_counts']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_rename]
 tests = ['zfs_rename_001_pos', 'zfs_rename_002_pos', 'zfs_rename_003_pos',
@@ -173,9 +183,6 @@ tests = ['zfs_rename_001_pos', 'zfs_rename_002_pos', 'zfs_rename_003_pos',
     'zfs_rename_007_pos', 'zfs_rename_008_pos', 'zfs_rename_009_neg',
     'zfs_rename_010_neg', 'zfs_rename_011_pos', 'zfs_rename_012_neg',
     'zfs_rename_013_pos', 'zfs_rename_014_neg']
-
-[/opt/zfs-tests/tests/functional/cli_root/zfs_remap]
-tests = ['zfs_remap_cliargs', 'zfs_remap_obsolete_counts']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_reservation]
 tests = ['zfs_reservation_001_pos', 'zfs_reservation_002_pos']
@@ -186,7 +193,8 @@ tests = ['zfs_rollback_001_pos', 'zfs_rollback_002_pos',
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_send]
 tests = ['zfs_send_001_pos', 'zfs_send_002_pos', 'zfs_send_003_pos',
-    'zfs_send_004_neg', 'zfs_send_005_pos', 'zfs_send_006_pos']
+    'zfs_send_004_neg', 'zfs_send_005_pos', 'zfs_send_006_pos',
+    'zfs_send_007_pos']
 
 [/opt/zfs-tests/tests/functional/cli_root/zfs_set]
 tests = ['cache_001_pos', 'cache_002_neg', 'canmount_001_pos',
@@ -291,12 +299,35 @@ tests = ['zpool_import_001_pos', 'zpool_import_002_pos',
     'zpool_import_features_001_pos', 'zpool_import_features_002_neg',
     'zpool_import_features_003_pos', 'zpool_import_missing_001_pos',
     'zpool_import_missing_002_pos', 'zpool_import_missing_003_pos',
-    'zpool_import_rename_001_pos']
+    'zpool_import_rename_001_pos',
+    'import_cachefile_device_added',
+    'import_cachefile_device_removed',
+    'import_cachefile_mirror_attached',
+    'import_cachefile_mirror_detached',
+    'import_cachefile_device_replaced',
+    'import_rewind_config_changed',
+    'import_cachefile_shared_device',
+    'import_paths_changed',
+    'import_devices_missing']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_labelclear]
 tests = ['zpool_labelclear_active', 'zpool_labelclear_exported']
 pre =
 post =
+
+[/opt/zfs-tests/tests/functional/cli_root/zpool_initialize]
+tests = ['zpool_initialize_attach_detach_add_remove',
+    'zpool_initialize_import_export',
+    'zpool_initialize_offline_export_import_online',
+    'zpool_initialize_online_offline',
+    'zpool_initialize_split',
+    'zpool_initialize_start_and_cancel_neg',
+    'zpool_initialize_start_and_cancel_pos',
+    'zpool_initialize_suspend_resume',
+    'zpool_initialize_unsupported_vdevs',
+    'zpool_initialize_verify_checksums',
+    'zpool_initialize_verify_initialized']
+pre =
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_offline]
 tests = ['zpool_offline_001_pos', 'zpool_offline_002_neg']
@@ -493,7 +524,8 @@ tests = ['quota_001_pos', 'quota_002_pos', 'quota_003_pos', 'quota_004_pos',
     'quota_005_pos', 'quota_006_neg']
 
 [/opt/zfs-tests/tests/functional/redundancy]
-tests = ['redundancy_001_pos', 'redundancy_002_pos', 'redundancy_003_pos']
+tests = ['redundancy_001_pos', 'redundancy_002_pos', 'redundancy_003_pos',
+    'redundancy_004_neg']
 
 [/opt/zfs-tests/tests/functional/refquota]
 tests = ['refquota_001_pos', 'refquota_002_pos', 'refquota_003_pos',
@@ -502,6 +534,19 @@ tests = ['refquota_001_pos', 'refquota_002_pos', 'refquota_003_pos',
 [/opt/zfs-tests/tests/functional/refreserv]
 tests = ['refreserv_001_pos', 'refreserv_002_pos', 'refreserv_003_pos',
     'refreserv_004_pos', 'refreserv_005_pos']
+
+[/opt/zfs-tests/tests/functional/removal]
+pre =
+tests = ['removal_sanity', 'removal_all_vdev', 'removal_check_space',
+    'removal_condense_export',
+    'removal_multiple_indirection', 'removal_remap',
+    'removal_remap_deadlists',
+    'removal_with_add', 'removal_with_create_fs', 'removal_with_dedup',
+    'removal_with_export', 'removal_with_ganging', 'removal_with_remap',
+    'removal_with_remove', 'removal_with_scrub', 'removal_with_send',
+    'removal_with_send_recv', 'removal_with_snapshot', 'removal_with_write',
+    'removal_with_zdb', 'removal_resume_export',
+    'remove_mirror', 'remove_mirror_sanity', 'remove_raidz']
 
 [/opt/zfs-tests/tests/functional/rename_dirs]
 tests = ['rename_dirs_001_pos']

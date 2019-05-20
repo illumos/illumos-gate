@@ -625,7 +625,7 @@ smb_server_start(smb_ioc_start_t *ioc)
 		sv->sv_lmshrd = smb_kshare_door_init(ioc->lmshrd);
 		if (sv->sv_lmshrd == NULL)
 			break;
-		if (rc = smb_kdoor_open(sv, ioc->udoor)) {
+		if ((rc = smb_kdoor_open(sv, ioc->udoor)) != 0) {
 			cmn_err(CE_WARN, "Cannot open smbd door");
 			break;
 		}
@@ -634,7 +634,7 @@ smb_server_start(smb_ioc_start_t *ioc)
 		fksmb_kdoor_open(sv, ioc->udoor_func);
 #endif	/* _KERNEL */
 
-		if (rc = smb_thread_start(&sv->si_thread_timers))
+		if ((rc = smb_thread_start(&sv->si_thread_timers)) != 0)
 			break;
 
 		family = AF_INET;
@@ -1644,8 +1644,24 @@ smb_server_listener(smb_thread_t *thread, void *arg)
 
 	DTRACE_PROBE1(so__wait__accept, struct sonode *, ld->ld_so);
 
-	while (ksocket_accept(ld->ld_so, NULL, NULL, &s_so, CRED())
-	    == 0) {
+	for (;;) {
+		int ret = ksocket_accept(ld->ld_so, NULL, NULL, &s_so, CRED());
+
+		switch (ret) {
+		case 0:
+			break;
+		case ECONNABORTED:
+			continue;
+		case EINTR:
+		case EBADF:	/* libfakekernel */
+			goto out;
+		default:
+			cmn_err(CE_WARN,
+			    "smb_server_listener: ksocket_accept(%d)",
+			    ret);
+			goto out;
+		}
+
 		DTRACE_PROBE1(so__accept, struct sonode *, s_so);
 
 		on = 1;
@@ -1665,6 +1681,7 @@ smb_server_listener(smb_thread_t *thread, void *arg)
 		 */
 		smb_server_create_session(ld, s_so);
 	}
+out:
 	/* Disconnect all the sessions this listener created. */
 	smb_llist_enter(&ld->ld_session_list, RW_READER);
 	session = smb_llist_head(&ld->ld_session_list);

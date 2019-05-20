@@ -36,8 +36,6 @@ pics/%.o:	$(SRC)/common/smbsrv/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-pics/%.o := CPPFLAGS += -I$(ROOTSMBHDRDIR)/ndl
-
 .KEEP_STATE:
 
 all: $(LIBS)

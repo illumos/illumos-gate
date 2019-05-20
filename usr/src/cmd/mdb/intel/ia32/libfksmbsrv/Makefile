@@ -23,13 +23,13 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
 #
 
 MODULE = libfksmbsrv.so
 MDBTGT = proc
 
-MODSRCS = smbsrv.c list.c
+MODSRCS = smbsrv.c smbsrv_pcap.c list.c
 
 include ../../../../Makefile.cmd
 include ../../Makefile.ia32

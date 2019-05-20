@@ -117,6 +117,7 @@ extern	int smb_opipe_threshold;
 extern	int smb_ssetup_timeout;
 extern	int smb_tcon_timeout;
 extern	int smb_opipe_timeout;
+extern	int smb_allow_advisory_locks;
 extern const uint32_t smb_vop_dosattr_settable;
 
 /* Thread priorities - see smb_init.c */

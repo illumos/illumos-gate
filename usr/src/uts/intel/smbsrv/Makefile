@@ -72,7 +72,6 @@ CLEANFILES	+= $(MODSTUBS_O)
 
 INC_PATH	+= -I$(SRC)/common
 
-CERRWARN	+= -_gcc=-Wno-parentheses
 CERRWARN	+= -_gcc=-Wno-switch
 
 # needs work

@@ -135,7 +135,7 @@ next:
 	/*
 	 * Process the next component of the pathname.
 	 */
-	if (error = pn_getcomponent(pnp, component)) {
+	if ((error = pn_getcomponent(pnp, component)) != 0) {
 		goto bad;
 	}
 
@@ -307,7 +307,7 @@ checkforroot:
 			goto bad;
 		}
 		pn_alloc(&linkpath);
-		if (error = pn_getsymlink(cvp, &linkpath, cr)) {
+		if ((error = pn_getsymlink(cvp, &linkpath, cr)) != 0) {
 			pn_free(&linkpath);
 			goto bad;
 		}

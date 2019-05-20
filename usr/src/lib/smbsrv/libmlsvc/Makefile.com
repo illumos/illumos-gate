@@ -82,6 +82,7 @@ include ../../../Makefile.lib
 include ../../Makefile.lib
 
 INCS += -I$(SRC)/common/smbsrv
+INCS += -I$(SRC)/uts/common/smbsrv/ndl
 
 LDLIBS +=	$(MACH_LDLIBS)
 LDLIBS += -lmlrpc -lsmb -lsmbns -lshare -lsmbfs -lnsl -lpkcs11 \

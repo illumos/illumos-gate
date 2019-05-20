@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -678,6 +678,9 @@ smb1sr_work(struct smb_request *sr)
 	    sr->smb_mid);
 	sr->first_smb_com = sr->smb_com;
 
+	/* Need this for early goto report_error cases. */
+	sr->cur_reply_offset = sr->reply.chain_offset;
+
 	if ((session->signing.flags & SMB_SIGNING_CHECK) != 0) {
 		if ((sr->smb_flg2 & SMB_FLAGS2_SMB_SECURITY_SIGNATURE) == 0 ||
 		    smb_sign_check_request(sr) != 0) {
@@ -798,6 +801,8 @@ andx_more:
 		(*sdd->sdt_post_op)(sr);
 		smbsr_cleanup(sr);
 	}
+
+	smb_server_inc_req(server);
 	smb_latency_add_sample(&sds->sdt_lat, gethrtime() - sr->sr_time_start);
 
 	atomic_add_64(&sds->sdt_txb,

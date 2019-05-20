@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -395,6 +395,15 @@ cmd_start:
 	    sr->smb2_cmd_hdr, msg_len);
 
 	/*
+	 * We will consume the data for this request from smb_data.
+	 * That effectively consumes msg_len bytes from sr->command
+	 * but doesn't update its chain_offset, so we need to update
+	 * that here to make later received bytes accounting work.
+	 */
+	sr->command.chain_offset = sr->smb2_cmd_hdr + msg_len;
+	ASSERT(sr->command.chain_offset <= sr->command.max_bytes);
+
+	/*
 	 * Validate the commmand code, get dispatch table entries.
 	 * [MS-SMB2] 3.3.5.2.6 Handling Incorrectly Formatted...
 	 *
@@ -684,6 +693,7 @@ cmd_done:
 	/*
 	 * Record some statistics: latency, rx bytes, tx bytes.
 	 */
+	smb_server_inc_req(sr->sr_server);
 	smb_latency_add_sample(&sds->sdt_lat,
 	    gethrtime() - sr->sr_time_start);
 	atomic_add_64(&sds->sdt_rxb,
@@ -958,10 +968,6 @@ smb2sr_go_async(smb_request_t *sr,
 	 * Turn on the "async" flag for both the (synchronous)
 	 * interim response and the (later) async response,
 	 * by storing that in flags before coping into ar.
-	 *
-	 * The "related" flag should always be off for the
-	 * async part because we're no longer operating on a
-	 * sequence of commands when we execute that.
 	 */
 	sr->smb2_hdr_flags |= SMB2_FLAGS_ASYNC_COMMAND;
 	sr->smb2_async_id = (uintptr_t)ar;
@@ -971,8 +977,7 @@ smb2sr_go_async(smb_request_t *sr,
 	ar->ar_cmd_len = sr->smb_data.max_bytes - sr->smb2_cmd_hdr;
 
 	ar->ar_cmd_code = sr->smb2_cmd_code;
-	ar->ar_hdr_flags = sr->smb2_hdr_flags &
-	    ~SMB2_FLAGS_RELATED_OPERATIONS;
+	ar->ar_hdr_flags = sr->smb2_hdr_flags;
 	ar->ar_messageid = sr->smb2_messageid;
 	ar->ar_pid = sr->smb_pid;
 	ar->ar_tid = sr->smb_tid;

@@ -1218,7 +1218,7 @@ smb_vop_acl_read(vnode_t *vp, acl_t **aclp, int flags, acl_type_t acl_type,
 		return (EINVAL);
 	}
 
-	if (error = VOP_GETSECATTR(vp, &vsecattr, flags, cr, &smb_ct))
+	if ((error = VOP_GETSECATTR(vp, &vsecattr, flags, cr, &smb_ct)) != 0)
 		return (error);
 
 	*aclp = smb_fsacl_from_vsa(&vsecattr, acl_type);
@@ -1448,11 +1448,31 @@ smb_vop_unshrlock(vnode_t *vp, uint32_t uniq_fid, cred_t *cr)
 	return (VOP_SHRLOCK(vp, F_UNSHARE, &shr, 0, cr, NULL));
 }
 
+/*
+ * Note about mandatory vs advisory locks:
+ *
+ * The SMB server really should always request mandatory locks, and
+ * if the file system does not support them, the SMB server should
+ * just tell the client it could not get the lock. If we were to
+ * tell the SMB client "you got the lock" when what they really
+ * got was only an advisory lock, we would be lying to the client
+ * about their having exclusive access to the locked range, which
+ * could easily lead to data corruption.  If someone really wants
+ * the (dangerous) behavior they can set: smb_allow_advisory_locks
+ */
 int
 smb_vop_frlock(vnode_t *vp, cred_t *cr, int flag, flock64_t *bf)
 {
-	int cmd = nbl_need_check(vp) ? F_SETLK_NBMAND : F_SETLK;
 	flk_callback_t flk_cb;
+	int cmd = F_SETLK_NBMAND;
+
+	if (smb_allow_advisory_locks != 0 && !nbl_need_check(vp)) {
+		/*
+		 * The file system does not support nbmand, and
+		 * smb_allow_advisory_locks is enabled. (danger!)
+		 */
+		cmd = F_SETLK;
+	}
 
 	flk_init_callback(&flk_cb, smb_lock_frlock_callback, NULL);
 

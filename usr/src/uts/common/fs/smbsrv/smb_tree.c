@@ -654,6 +654,7 @@ smb_tree_connect_disk(smb_request_t *sr, smb_arg_tcon_t *tcon)
 	char			*service = tcon->service;
 	char			last_component[MAXNAMELEN];
 	smb_tree_t		*tree;
+	cred_t			*kcr;
 	int			rc;
 	uint32_t		access;
 	smb_shr_execinfo_t	execinfo;
@@ -670,11 +671,14 @@ smb_tree_connect_disk(smb_request_t *sr, smb_arg_tcon_t *tcon)
 
 	/*
 	 * Check that the shared directory exists.
+	 * Client might not have access to the path _leading_ to the share,
+	 * so we use "kcred" to get to the share root.
 	 */
-	rc = smb_pathname_reduce(sr, user->u_cred, si->shr_path, 0, 0, &dnode,
+	kcr = zone_kcred();
+	rc = smb_pathname_reduce(sr, kcr, si->shr_path, 0, 0, &dnode,
 	    last_component);
 	if (rc == 0) {
-		rc = smb_fsop_lookup(sr, user->u_cred, SMB_FOLLOW_LINKS,
+		rc = smb_fsop_lookup(sr, kcr, SMB_FOLLOW_LINKS,
 		    sr->sr_server->si_root_smb_node, dnode, last_component,
 		    &snode);
 

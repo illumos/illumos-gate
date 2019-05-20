@@ -78,6 +78,8 @@ uint_t	smb_audit_flags =
     0;
 #endif
 
+int smb_allow_advisory_locks = 0;	/* See smb_vops.c */
+
 /*
  * Maximum number of simultaneous authentication, share mapping, pipe open
  * requests to be processed.

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -602,8 +602,11 @@ smb_session_reader(smb_session_t *session)
 
 		/*
 		 * Allocate a request context, read the whole message.
+		 * If the request alloc fails, we've disconnected and
+		 * won't be able to send the reply anyway, so bail now.
 		 */
-		sr = smb_request_alloc(session, hdr.xh_length);
+		if ((sr = smb_request_alloc(session, hdr.xh_length)) == NULL)
+			break;
 
 		req_buf = (uint8_t *)sr->sr_request_buf;
 		resid = hdr.xh_length;
@@ -614,8 +617,7 @@ smb_session_reader(smb_session_t *session)
 			break;
 		}
 
-		/* accounting: requests, received bytes */
-		smb_server_inc_req(sv);
+		/* accounting: received bytes */
 		smb_server_add_rxb(sv,
 		    (int64_t)(hdr.xh_length + NETBIOS_HDR_SZ));
 
@@ -1320,7 +1322,8 @@ smb_session_isclient(smb_session_t *sn, const char *client)
  * Allocate an smb_request_t structure from the kmem_cache.  Partially
  * initialize the found/new request.
  *
- * Returns pointer to a request
+ * Returns pointer to a request, or NULL if the session state is
+ * one in which new requests are no longer allowed.
  */
 smb_request_t *
 smb_request_alloc(smb_session_t *session, int req_length)
@@ -1353,7 +1356,36 @@ smb_request_alloc(smb_session_t *session, int req_length)
 		sr->sr_request_buf = kmem_alloc(req_length, KM_SLEEP);
 	sr->sr_magic = SMB_REQ_MAGIC;
 	sr->sr_state = SMB_REQ_STATE_INITIALIZING;
-	smb_slist_insert_tail(&session->s_req_list, sr);
+
+	/*
+	 * Only allow new SMB requests in some states.
+	 */
+	smb_rwx_rwenter(&session->s_lock, RW_WRITER);
+	switch (session->s_state) {
+	case SMB_SESSION_STATE_CONNECTED:
+	case SMB_SESSION_STATE_INITIALIZED:
+	case SMB_SESSION_STATE_ESTABLISHED:
+	case SMB_SESSION_STATE_NEGOTIATED:
+		smb_slist_insert_tail(&session->s_req_list, sr);
+		break;
+
+	default:
+		ASSERT(0);
+		/* FALLTHROUGH */
+	case SMB_SESSION_STATE_DISCONNECTED:
+	case SMB_SESSION_STATE_TERMINATED:
+		/* Disallow new requests in these states. */
+		if (sr->sr_request_buf)
+			kmem_free(sr->sr_request_buf, sr->sr_req_length);
+		sr->session = NULL;
+		sr->sr_magic = 0;
+		mutex_destroy(&sr->sr_mutex);
+		kmem_cache_free(smb_cache_request, sr);
+		sr = NULL;
+		break;
+	}
+	smb_rwx_rwexit(&session->s_lock);
+
 	return (sr);
 }
 
