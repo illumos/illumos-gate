@@ -410,7 +410,10 @@ typedef struct viona_vring {
 	uint16_t	vr_state_flags;
 	uint_t		vr_xfer_outstanding;
 	kthread_t	*vr_worker_thread;
-	viona_desb_t	*vr_desb;
+
+	/* ring-sized resources for TX activity */
+	viona_desb_t	*vr_txdesb;
+	struct iovec	*vr_txiov;
 
 	uint_t		vr_intr_enabled;
 	uint64_t	vr_msi_addr;
@@ -1263,16 +1266,24 @@ viona_ring_alloc(viona_link_t *link, viona_vring_t *ring)
 }
 
 static void
-viona_ring_desb_free(viona_vring_t *ring)
+viona_ring_misc_free(viona_vring_t *ring)
 {
-	viona_desb_t *dp = ring->vr_desb;
+	const uint_t cnt = ring->vr_size;
 
-	for (uint_t i = 0; i < ring->vr_size; i++, dp++) {
-		kmem_free(dp->d_headers, VIONA_MAX_HDRS_LEN);
+	if (ring->vr_txdesb != NULL) {
+		viona_desb_t *dp = ring->vr_txdesb;
+
+		for (uint_t i = 0; i < cnt; i++, dp++) {
+			kmem_free(dp->d_headers, VIONA_MAX_HDRS_LEN);
+		}
+		kmem_free(ring->vr_txdesb, sizeof (viona_desb_t) * cnt);
+		ring->vr_txdesb = NULL;
 	}
 
-	kmem_free(ring->vr_desb, sizeof (viona_desb_t) * ring->vr_size);
-	ring->vr_desb = NULL;
+	if (ring->vr_txiov != NULL) {
+		kmem_free(ring->vr_txiov, sizeof (struct iovec) * cnt);
+		ring->vr_txiov = NULL;
+	}
 }
 
 static void
@@ -1388,7 +1399,7 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 		viona_desb_t *dp;
 
 		dp = kmem_zalloc(sizeof (viona_desb_t) * cnt, KM_SLEEP);
-		ring->vr_desb = dp;
+		ring->vr_txdesb = dp;
 		for (uint_t i = 0; i < cnt; i++, dp++) {
 			dp->d_frtn.free_func = viona_desb_release;
 			dp->d_frtn.free_arg = (void *)dp;
@@ -1396,6 +1407,12 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 			dp->d_headers = kmem_zalloc(VIONA_MAX_HDRS_LEN,
 			    KM_SLEEP);
 		}
+	}
+
+	/* Allocate ring-sized iovec buffers for TX */
+	if (kri.ri_index == VIONA_VQ_TX) {
+		ring->vr_txiov = kmem_alloc(sizeof (struct iovec) * cnt,
+		    KM_SLEEP);
 	}
 
 	/* Zero out MSI-X configuration */
@@ -1417,9 +1434,7 @@ viona_ioc_ring_init(viona_link_t *link, void *udata, int md)
 	return (0);
 
 fail:
-	if (ring->vr_desb != NULL) {
-		viona_ring_desb_free(ring);
-	}
+	viona_ring_misc_free(ring);
 	ring->vr_size = 0;
 	ring->vr_mask = 0;
 	ring->vr_descr = NULL;
@@ -1658,11 +1673,6 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		 */
 		cv_wait(&ring->vr_cv, &ring->vr_lock);
 	}
-
-	/* Free any desb resources before the ring is completely stopped */
-	if (ring->vr_desb != NULL) {
-		viona_ring_desb_free(ring);
-	}
 }
 
 static void
@@ -1706,11 +1716,14 @@ viona_worker(void *arg)
 	}
 
 cleanup:
-	/* Free any desb resources before the ring is completely stopped */
-	if (ring->vr_desb != NULL) {
+	if (ring->vr_txdesb != NULL) {
+		/*
+		 * Transmit activity must be entirely concluded before the
+		 * associated descriptors can be cleaned up.
+		 */
 		VERIFY(ring->vr_xfer_outstanding == 0);
-		viona_ring_desb_free(ring);
 	}
+	viona_ring_misc_free(ring);
 
 	ring->vr_cur_aidx = 0;
 	ring->vr_state = VRS_RESET;
@@ -2814,7 +2827,8 @@ viona_tx_csum(viona_vring_t *ring, const struct virtio_net_hdr *hdr,
 static void
 viona_tx(viona_link_t *link, viona_vring_t *ring)
 {
-	struct iovec		iov[VTNET_MAXSEGS];
+	struct iovec		*iov = ring->vr_txiov;
+	const uint_t		max_segs = ring->vr_size;
 	uint16_t		cookie;
 	int			i, n;
 	uint32_t		len, base_off = 0;
@@ -2826,10 +2840,19 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 
 	mp_head = mp_tail = NULL;
 
-	n = vq_popchain(ring, iov, VTNET_MAXSEGS, &cookie);
-	if (n <= 0) {
+	ASSERT(iov != NULL);
+
+	n = vq_popchain(ring, iov, max_segs, &cookie);
+	if (n == 0) {
 		VIONA_PROBE1(tx_absent, viona_vring_t *, ring);
 		VIONA_RING_STAT_INCR(ring, tx_absent);
+		return;
+	} else if (n < 0) {
+		/*
+		 * Any error encountered in vq_popchain has already resulted in
+		 * specific probe and statistic handling.  Further action here
+		 * is unnecessary.
+		 */
 		return;
 	}
 
@@ -2841,8 +2864,8 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 	}
 
 	/* Make sure the packet headers are always in the first mblk. */
-	if (ring->vr_desb != NULL) {
-		dp = &ring->vr_desb[cookie];
+	if (ring->vr_txdesb != NULL) {
+		dp = &ring->vr_txdesb[cookie];
 
 		/*
 		 * If the guest driver is operating properly, each desb slot
