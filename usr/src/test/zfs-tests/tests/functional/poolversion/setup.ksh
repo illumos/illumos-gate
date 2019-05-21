@@ -27,19 +27,25 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
+. $STF_SUITE/tests/functional/poolversion/poolversion.cfg
 
 verify_runnable "global"
 
+if [[ ! -d $TESTDIR ]]; then
+	log_must mkdir $TESTDIR
+fi
+
 # create a version 1 pool
-log_must mkfile $MINVDEVSIZE /tmp/zpool_version_1.dat
-log_must zpool create -o version=1 $TESTPOOL /tmp/zpool_version_1.dat
+log_must mkfile $MINVDEVSIZE $VERS_FILE_1
+log_must zpool create -o version=1 $TESTPOOL $VERS_FILE_1
 
 
 # create another version 1 pool
-log_must mkfile $MINVDEVSIZE /tmp/zpool2_version_1.dat
-log_must zpool create -o version=1 $TESTPOOL2 /tmp/zpool2_version_1.dat
+log_must mkfile $MINVDEVSIZE $VERS_FILE_2
+log_must zpool create -o version=1 $TESTPOOL2 $VERS_FILE_2
 
 log_pass

@@ -47,6 +47,7 @@ CPPFLAGS += -I../../../../../lib/libstand
 CPPFLAGS += -I$(ZFSSRC)
 CPPFLAGS += -I../../../../cddl/boot/zfs
 
+gfx_fb.o := CPPFLAGS += $(DEFAULT_CONSOLE_COLOR)
 pnglite.o := CPPFLAGS += -I$(ZLIB)
 gfx_fb.o pnglite.o efi_console.o := CPPFLAGS += -I$(PNGLITE)
 

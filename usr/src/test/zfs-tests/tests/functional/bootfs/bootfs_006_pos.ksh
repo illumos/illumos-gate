@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -50,10 +51,10 @@ then
 	log_unsupported "bootfs pool property not supported on this release."
 fi
 
-VDEV1=/bootfs_006_pos_a.$$.dat
-VDEV2=/bootfs_006_pos_b.$$.dat
-VDEV3=/bootfs_006_pos_c.$$.dat
-VDEV4=/bootfs_006_pos_d.$$.dat
+VDEV1=$TESTDIR/bootfs_006_pos_a.$$.dat
+VDEV2=$TESTDIR/bootfs_006_pos_b.$$.dat
+VDEV3=$TESTDIR/bootfs_006_pos_c.$$.dat
+VDEV4=$TESTDIR/bootfs_006_pos_d.$$.dat
 
 function verify_bootfs { # $POOL
 	POOL=$1

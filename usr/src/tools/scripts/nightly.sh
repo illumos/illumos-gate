@@ -541,12 +541,19 @@ function set_non_debug_build_flags {
 	export RELEASE_BUILD ; RELEASE_BUILD=
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
+	if [ -n "$RELEASE_CONSOLE_COLOR" ]; then
+		export DEFAULT_CONSOLE_COLOR="$RELEASE_CONSOLE_COLOR"
+	fi
 }
 
 function set_debug_build_flags {
 	unset RELEASE_BUILD
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
+
+	if [ -n "$DEBUG_CONSOLE_COLOR" ]; then
+		export DEFAULT_CONSOLE_COLOR="$DEBUG_CONSOLE_COLOR"
+	fi
 }
 
 

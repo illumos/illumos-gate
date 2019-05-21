@@ -29,6 +29,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -68,7 +69,7 @@ fi
 log_assert "Valid datasets are accepted as bootfs property values"
 log_onexit cleanup
 
-typeset VDEV=/bootfs_001_pos_a.$$.dat
+typeset VDEV=$TESTDIR/bootfs_001_pos_a.$$.dat
 
 log_must mkfile $MINVDEVSIZE $VDEV
 create_pool "$TESTPOOL" "$VDEV"

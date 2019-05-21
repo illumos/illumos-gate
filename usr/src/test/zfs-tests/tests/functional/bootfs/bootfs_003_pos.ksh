@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -50,7 +51,7 @@ function cleanup {
 	if poolexists $POOL ; then
 		log_must zpool destroy $POOL
 	fi
-	rm /bootfs_003.$$.dat
+	log_must rm -f $VDEV
 }
 
 
@@ -63,14 +64,15 @@ fi
 log_onexit cleanup
 
 log_assert "Valid pool names are accepted by zpool set bootfs"
-mkfile $MINVDEVSIZE /bootfs_003.$$.dat
+typeset VDEV=$TESTDIR/bootfs_003.$$.dat
+mkfile $MINVDEVSIZE $VDEV
 
 typeset -i i=0;
 
 while [ $i -lt "${#pools[@]}" ]
 do
 	POOL=${pools[$i]}
-	log_must zpool create $POOL /bootfs_003.$$.dat
+	log_must zpool create $POOL $VDEV
 	log_must zfs create $POOL/$TESTFS
 
 	log_must zpool set bootfs=$POOL/$TESTFS $POOL

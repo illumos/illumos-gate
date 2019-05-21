@@ -27,16 +27,19 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
+. $STF_SUITE/tests/functional/poolversion/poolversion.cfg
 
 verify_runnable "global"
 
 log_must zpool destroy $TESTPOOL
 log_must zpool destroy $TESTPOOL2
 
-log_must rm /tmp/zpool_version_1.dat
-log_must rm /tmp/zpool2_version_1.dat
+log_must rm $VERS_FILE_1
+log_must rm $VERS_FILE_2
+log_must rmdir $TESTDIR
 
 default_cleanup

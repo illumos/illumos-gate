@@ -23,10 +23,12 @@
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
 
 DISK=${DISKS%% *}
 
+log_must coreadm -e process
 default_setup $DISK
