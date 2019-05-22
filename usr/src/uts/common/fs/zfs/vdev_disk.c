@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2018 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
- * Copyright (c) 2013 Joyent, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/zfs_context.h>
@@ -857,8 +857,15 @@ vdev_disk_io_start(zio_t *zio)
 	bp->b_bufsize = zio->io_size;
 	bp->b_iodone = vdev_disk_io_intr;
 
-	/* ldi_strategy() will return non-zero only on programming errors */
-	VERIFY(ldi_strategy(dvd->vd_lh, bp) == 0);
+	/*
+	 * In general we would expect ldi_strategy() to return non-zero only
+	 * because of programming errors, but we've also seen this fail shortly
+	 * after a disk dies.
+	 */
+	if (ldi_strategy(dvd->vd_lh, bp) != 0) {
+		zio->io_error = ENXIO;
+		zio_interrupt(zio);
+	}
 }
 
 static void
