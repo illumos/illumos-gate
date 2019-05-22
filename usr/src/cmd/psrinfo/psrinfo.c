@@ -752,7 +752,7 @@ nocpuid:
 		return (EXIT_SUCCESS);
 	}
 
-	if (opt_t != NULL) {
+	if (opt_t != 0) {
 		if (optind != argc)
 			usage(_("cannot specify CPUs with -t"));
 		if (opt_s || opt_v)
