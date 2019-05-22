@@ -243,12 +243,12 @@ add_mapping(struct glyph *gl, unsigned int c, unsigned int map_idx)
 static int
 dedup_mapping(unsigned int map_idx)
 {
-	struct mapping *mp_bold, *mp_normal;
+	struct mapping *tmp, *mp_bold, *mp_normal;
 	unsigned normal_map_idx = map_idx - VFNT_MAP_BOLD;
 
 	assert(map_idx == VFNT_MAP_BOLD || map_idx == VFNT_MAP_BOLD_RH);
 	mp_normal = TAILQ_FIRST(&maps[normal_map_idx]);
-	TAILQ_FOREACH(mp_bold, &maps[map_idx], m_list) {
+	TAILQ_FOREACH_SAFE(mp_bold, &maps[map_idx], m_list, tmp) {
 		while (mp_normal->m_char < mp_bold->m_char)
 			mp_normal = TAILQ_NEXT(mp_normal, m_list);
 		if (mp_bold->m_char != mp_normal->m_char)
