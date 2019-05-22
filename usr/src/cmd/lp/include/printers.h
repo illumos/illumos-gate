@@ -32,16 +32,6 @@
 #define	_LP_PRINTERS_H
 
 /*
- * The following conflicts are also defined in sys/processor.h.
- */
-#if defined PS_FAULTED
-#undef  PS_FAULTED
-#endif
-#if defined PS_DISABLED
-#undef  PS_DISABLED
-#endif
-
-/*
  * Define the following to support administrator configurable
  * streams modules:
  */
