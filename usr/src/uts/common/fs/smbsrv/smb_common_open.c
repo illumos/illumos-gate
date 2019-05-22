@@ -109,7 +109,7 @@ smb_omode_to_amask(uint32_t desired_access)
 		return (FILE_GENERIC_READ | FILE_GENERIC_WRITE);
 
 	case SMB_DA_ACCESS_EXECUTE:
-		return (FILE_GENERIC_EXECUTE);
+		return (FILE_GENERIC_READ | FILE_GENERIC_EXECUTE);
 
 	default:
 		return (FILE_GENERIC_ALL);
@@ -397,36 +397,11 @@ smb_open_subr(smb_request_t *sr)
 	cur_node = op->fqi.fq_dnode ?
 	    op->fqi.fq_dnode : sr->tid_tree->t_snode;
 
-	/*
-	 * if no path or filename are specified the stream should be
-	 * created on cur_node
-	 */
-	if (!is_dir && !pn->pn_pname && !pn->pn_fname && pn->pn_sname) {
-		/*
-		 * Can't currently handle a stream on the tree root.
-		 * If a stream is being opened return "not found", otherwise
-		 * return "access denied".
-		 */
-		if (cur_node == sr->tid_tree->t_snode) {
-			if (op->create_disposition == FILE_OPEN) {
-				return (NT_STATUS_OBJECT_NAME_NOT_FOUND);
-			}
-			return (NT_STATUS_ACCESS_DENIED);
-		}
-
-		(void) snprintf(op->fqi.fq_last_comp,
-		    sizeof (op->fqi.fq_last_comp),
-		    "%s%s", cur_node->od_name, pn->pn_sname);
-
-		op->fqi.fq_dnode = cur_node->n_dnode;
-		smb_node_ref(op->fqi.fq_dnode);
-	} else {
-		rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
-		    sr->tid_tree->t_snode, cur_node, &op->fqi.fq_dnode,
-		    op->fqi.fq_last_comp);
-		if (rc != 0) {
-			return (smb_errno2status(rc));
-		}
+	rc = smb_pathname_reduce(sr, sr->user_cr, pn->pn_path,
+	    sr->tid_tree->t_snode, cur_node, &op->fqi.fq_dnode,
+	    op->fqi.fq_last_comp);
+	if (rc != 0) {
+		return (smb_errno2status(rc));
 	}
 
 	/*
@@ -743,9 +718,16 @@ smb_open_subr(smb_request_t *sr)
 
 			/*
 			 * We set alloc_size = op->dsize later,
-			 * after we have an ofile.  See:
-			 * smb_set_open_attributes
+			 * (in smb_set_open_attributes) after we
+			 * have an ofile on which to save that.
+			 *
+			 * Legacy Open&X sets size to alloc_size
+			 * when creating a new file.
 			 */
+			if (sr->smb_com == SMB_COM_OPEN_ANDX) {
+				new_attr.sa_vattr.va_size = op->dsize;
+				new_attr.sa_mask |= SMB_AT_SIZE;
+			}
 
 			rc = smb_fsop_create(sr, sr->user_cr, dnode,
 			    op->fqi.fq_last_comp, &new_attr, &op->fqi.fq_fnode);

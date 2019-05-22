@@ -202,7 +202,15 @@ typedef uint32_t smb_utime_t;
 #define	NT_CREATE_FLAG_REQUEST_OPLOCK		0x02
 #define	NT_CREATE_FLAG_REQUEST_OPBATCH		0x04
 #define	NT_CREATE_FLAG_OPEN_TARGET_DIR		0x08
+#define	NT_CREATE_FLAG_EXTENDED_RESPONSE	0x10
 
+/*
+ * The option flags valid in the SMB nt_create_andx call are a subset of
+ * those defined in ntifs.h (ditto SMB nt_transact_create)
+ */
+#define	SMB_NTCREATE_VALID_OPTIONS (FILE_VALID_OPTION_FLAGS & ~( \
+	FILE_SYNCHRONOUS_IO_ALERT | FILE_SYNCHRONOUS_IO_NONALERT |\
+	FILE_RESERVE_OPFILTER))
 
 /*
  * Define the filter flags for NtNotifyChangeDirectoryFile
@@ -415,6 +423,23 @@ typedef uint32_t smb_utime_t;
 #define	NT_LM_0_12		11  /* The SMB protocol designed for NT */
 #define	DIALECT_SMB2002		12  /* SMB 2.002 (switch to SMB2) */
 #define	DIALECT_SMB2XXX		13  /* SMB 2.??? (switch to SMB2) */
+
+/*
+ * SMB_TREE_CONNECT_ANDX  request flags
+ *
+ * The tree specified by TID in the SMB header
+ * should be disconnected - disconnect errors
+ * should be ignored.
+ */
+#define	SMB_TCONX_DISCONECT_TID		0x0001
+/*
+ * Client request for signing key protection.
+ */
+#define	SMB_TCONX_EXTENDED_SIGNATURES	0x0004
+/*
+ * Client request for extended information.
+ */
+#define	SMB_TCONX_EXTENDED_RESPONSE	0x0008
 
 /*
  * SMB_TREE_CONNECT_ANDX OptionalSupport flags
@@ -637,11 +662,9 @@ typedef uint32_t smb_utime_t;
  *        3 - The file existed and was truncated
  */
 
-#define	SMB_OACT_LOCK			0x8000
 #define	SMB_OACT_OPENED			0x01
 #define	SMB_OACT_CREATED		0x02
 #define	SMB_OACT_TRUNCATED		0x03
-
 #define	SMB_OACT_OPLOCK			0x8000
 
 #define	SMB_FTYPE_DISK			0

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -907,10 +907,10 @@ smb_pathname_validate(smb_request_t *sr, smb_pathname_t *pn)
 		return (B_FALSE);
 	}
 
-	/* If fname is "." -> INVALID_OBJECT_NAME */
+	/* If fname is "." -> OBJECT_NAME_INVALID */
 	if (pn->pn_fname && (strcmp(pn->pn_fname, ".") == 0)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
-		    ERRDOS, ERROR_PATH_NOT_FOUND);
+		    ERRDOS, ERROR_INVALID_NAME);
 		return (B_FALSE);
 	}
 
@@ -984,19 +984,23 @@ smb_validate_object_name(smb_request_t *sr, smb_pathname_t *pn)
  *
  * smb_stream_parse_name should only be called for a path that
  * contains a valid named stream.  Path validation should have
- * been performed before this function is called.
+ * been performed before this function is called, typically by
+ * calling smb_is_stream_name() just before this.
  *
  * Find the last component of path and split it into filename
  * and stream name.
  *
  * On return the named stream type will be present.  The stream
  * type defaults to ":$DATA", if it has not been defined
- * For exmaple, 'stream' contains :<sname>:$DATA
+ * For example, 'stream' contains :<sname>:$DATA
+ *
+ * Output args: filename, stream both MAXNAMELEN
  */
 void
 smb_stream_parse_name(char *path, char *filename, char *stream)
 {
 	char *fname, *sname, *stype;
+	size_t flen, slen;
 
 	ASSERT(path);
 	ASSERT(filename);
@@ -1004,12 +1008,24 @@ smb_stream_parse_name(char *path, char *filename, char *stream)
 
 	fname = strrchr(path, '\\');
 	fname = (fname == NULL) ? path : fname + 1;
-	(void) strlcpy(filename, fname, MAXNAMELEN);
+	sname = strchr(fname, ':');
+	/* Caller makes sure there is a ':' in path. */
+	VERIFY(sname != NULL);
+	/* LINTED: possible ptrdiff_t overflow */
+	flen = sname - fname;
+	slen = strlen(sname);
 
-	sname = strchr(filename, ':');
-	(void) strlcpy(stream, sname, MAXNAMELEN);
-	*sname = '\0';
+	if (flen > (MAXNAMELEN-1))
+		flen = (MAXNAMELEN-1);
+	(void) strncpy(filename, fname, flen);
+	filename[flen] = '\0';
 
+	if (slen > (MAXNAMELEN-1))
+		slen = (MAXNAMELEN-1);
+	(void) strncpy(stream, sname, slen);
+	stream[slen] = '\0';
+
+	/* Add a "stream type" if there isn't one. */
 	stype = strchr(stream + 1, ':');
 	if (stype == NULL)
 		(void) strlcat(stream, ":$DATA", MAXNAMELEN);

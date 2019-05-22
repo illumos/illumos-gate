@@ -620,14 +620,23 @@ smb_vop_lookup(
 
 	pn_alloc(&rpn);
 
+	/*
+	 * Easier to not have junk in rpn, as not every FS type
+	 * will necessarily fill that in for us.
+	 */
+	bzero(rpn.pn_buf, rpn.pn_bufsize);
+
 	error = VOP_LOOKUP(dvp, np, vpp, NULL, option_flags, NULL, cr,
 	    &smb_ct, direntflags, &rpn);
 
 	if (error == 0) {
 		if (od_name) {
 			bzero(od_name, MAXNAMELEN);
-			np = (option_flags == FIGNORECASE) ? rpn.pn_buf : name;
-
+			if ((option_flags & FIGNORECASE) != 0 &&
+			    rpn.pn_buf[0] != '\0')
+				np = rpn.pn_buf;
+			else
+				np = name;
 			if (flags & SMB_CATIA)
 				smb_vop_catia_v4tov5(np, od_name, MAXNAMELEN);
 			else
@@ -677,6 +686,20 @@ smb_vop_create(vnode_t *dvp, char *name, smb_attr_t *attr, vnode_t **vpp,
 
 	error = VOP_CREATE(dvp, np, vap, EXCL, attr->sa_vattr.va_mode,
 	    vpp, cr, option_flags, &smb_ct, vsap);
+
+	/*
+	 * One could argue that filesystems should obey the size
+	 * if specified in the create attributes.  Unfortunately,
+	 * they only appear to let you truncate the size to zero.
+	 * SMB needs to set a non-zero size, so work-around.
+	 */
+	if (error == 0 && *vpp != NULL &&
+	    (vap->va_mask & AT_SIZE) != 0 &&
+	    vap->va_size > 0) {
+		vattr_t ta = *vap;
+		ta.va_mask = AT_SIZE;
+		(void) VOP_SETATTR(*vpp, &ta, 0, cr, &smb_ct);
+	}
 
 	return (error);
 }

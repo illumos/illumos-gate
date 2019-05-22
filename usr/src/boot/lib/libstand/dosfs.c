@@ -152,7 +152,7 @@ dos_read_fatblk(DOS_FS *fs, struct open_file *fd, uint_t blknum)
 	daddr_t offset_in_fat, max_offset_in_fat;
 
 	offset_in_fat = ((daddr_t)blknum) * FATBLKSZ;
-	max_offset_in_fat = secbyt(fs->spf);
+	max_offset_in_fat = secbyt((daddr_t)fs->spf);
 	io_size = FATBLKSZ;
 	if (offset_in_fat > max_offset_in_fat)
 		offset_in_fat = max_offset_in_fat;
@@ -692,7 +692,7 @@ cp_xdnm(uchar_t *lfn, DOS_XDE *xde)
 				return;
 		}
 	if (xde->seq & 0x40)
-	*lfn = 0;
+		*lfn = 0;
 }
 
 /*

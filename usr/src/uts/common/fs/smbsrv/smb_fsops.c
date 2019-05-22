@@ -1885,6 +1885,15 @@ smb_fsop_lookup(
 	if (SMB_TREE_SUPPORTS_ABE(sr))
 		flags |= SMB_ABE;
 
+	/*
+	 * Can have "" or "." when opening named streams on a directory.
+	 */
+	if (name[0] == '\0' || (name[0] == '.' && name[1] == '\0')) {
+		smb_node_ref(dnode);
+		*ret_snode = dnode;
+		return (0);
+	}
+
 	od_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	rc = smb_vop_lookup(dnode->vp, name, &vp, od_name, flags,

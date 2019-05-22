@@ -106,5 +106,7 @@ legacy pkg=SUNWsmbsu desc="SMB Server libraries and commands" \
     name="SMB Server (Usr)"
 license cr_Sun license=cr_Sun
 license lic_CDDL license=lic_CDDL
+license usr/src/uts/common/fs/smbsrv/THIRDPARTYLICENSE.apple \
+    license=usr/src/uts/common/fs/smbsrv/THIRDPARTYLICENSE.apple
 link path=usr/lib/reparse/libreparse_smb.so target=libreparse_smb.so.1
 link path=usr/lib/security/pam_smb_passwd.so target=pam_smb_passwd.so.1

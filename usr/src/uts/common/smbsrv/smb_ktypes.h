@@ -849,6 +849,10 @@ typedef enum {
 	SMB_SESSION_STATE_SENTINEL
 } smb_session_state_t;
 
+/* Bits in s_flags below */
+#define	SMB_SSN_AAPL_CCEXT	1	/* Saw "AAPL" create ctx. ext. */
+#define	SMB_SSN_AAPL_READDIR	2	/* Wants MacOS ext. readdir */
+
 typedef struct smb_session {
 	list_node_t		s_lnd;
 	uint32_t		s_magic;

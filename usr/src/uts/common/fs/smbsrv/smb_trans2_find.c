@@ -538,6 +538,21 @@ smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
 	int		rc = -1;
 	boolean_t	need_rewind = B_FALSE;
 
+	/*
+	 * EAs are not current supported, so a search for level
+	 * SMB_INFO_QUERY_EAS_FROM_LIST should always return an
+	 * empty list.  Returning zero for this case gives the
+	 * client an empty response, which is better than an
+	 * NT_STATUS_INVALID_LEVEL return (and test failures).
+	 *
+	 * If and when we do support EAs, this level will modify
+	 * the search here, and then return results just like
+	 * SMB_INFO_QUERY_EA_SIZE, but only including files
+	 * that have an EA in the provided list.
+	 */
+	if (args->fa_infolev == SMB_INFO_QUERY_EAS_FROM_LIST)
+		return (0);
+
 	if ((maxcount = args->fa_maxcount) == 0)
 		maxcount = 1;
 
@@ -629,6 +644,7 @@ smb_trans2_find_get_maxdata(smb_request_t *sr, uint16_t infolev, uint16_t fflag)
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
+	case SMB_INFO_QUERY_EAS_FROM_LIST:
 		if (fflag & SMB_FIND_RETURN_RESUME_KEYS)
 			maxdata += sizeof (int32_t);
 		maxdata += 2 + 2 + 2 + 4 + 4 + 2 + 4 + 1;
@@ -774,6 +790,7 @@ smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
+	case SMB_INFO_QUERY_EAS_FROM_LIST:
 		if (args->fa_fflag & SMB_FIND_RETURN_RESUME_KEYS)
 			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
 			    resume_key);

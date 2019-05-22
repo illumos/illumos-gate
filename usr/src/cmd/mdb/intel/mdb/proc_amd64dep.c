@@ -25,6 +25,7 @@
  */
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Doma Gergő Mihály <doma.gergo.mihaly@gmail.com>
  */
 
 /*
@@ -287,48 +288,110 @@ fpcw2str(uint32_t cw, char *buf, size_t nbytes)
 	buf[0] = '\0';
 
 	/*
-	 * Decode all masks in the 80387 control word.
+	 * Decode all exception masks in the x87 FPU Control Word.
+	 *
+	 * See here:
+	 * Intel® 64 and IA-32 Architectures Software Developer’s Manual,
+	 * Volume 1: Basic Architecture, 8.1.5 x87 FPU Control Word
 	 */
-	if (cw & FPIM)
+	if (cw & FPIM)	/* Invalid operation mask. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|IM");
-	if (cw & FPDM)
+	if (cw & FPDM)	/* Denormalized operand mask. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|DM");
-	if (cw & FPZM)
+	if (cw & FPZM)	/* Zero divide mask. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|ZM");
-	if (cw & FPOM)
+	if (cw & FPOM)	/* Overflow mask. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|OM");
-	if (cw & FPUM)
+	if (cw & FPUM)	/* Underflow mask. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|UM");
-	if (cw & FPPM)
+	if (cw & FPPM)	/* Precision mask. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|PM");
-	if (cw & FPPC)
-		p += mdb_snprintf(p, (size_t)(end - p), "|PC");
-	if (cw & FPRC)
-		p += mdb_snprintf(p, (size_t)(end - p), "|RC");
-	if (cw & FPIC)
-		p += mdb_snprintf(p, (size_t)(end - p), "|IC");
 
 	/*
-	 * Decode precision, rounding, and infinity options in control word.
+	 * Decode precision control options.
 	 */
-	if (cw & FPSIG53)
+	switch (cw & FPPC) {
+	case FPSIG24:
+		/* 24-bit significand, single precision. */
+		p += mdb_snprintf(p, (size_t)(end - p), "|SIG24");
+		break;
+	case FPSIG53:
+		/* 53-bit significand, double precision. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|SIG53");
-	if (cw & FPSIG64)
+		break;
+	case FPSIG64:
+		/* 64-bit significand, double extended precision. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|SIG64");
+		break;
+	default:
+		/*
+		 * Should never happen.
+		 * Value 0x00000100 is 'Reserved'.
+		 */
+		break;
+	}
 
-	if ((cw & FPRC) == (FPRD|FPRU))
-		p += mdb_snprintf(p, (size_t)(end - p), "|RTZ");
-	else if (cw & FPRD)
-		p += mdb_snprintf(p, (size_t)(end - p), "|RD");
-	else if (cw & FPRU)
-		p += mdb_snprintf(p, (size_t)(end - p), "|RU");
-	else
+	/*
+	 * Decode rounding control options.
+	 */
+	switch (cw & FPRC) {
+	case FPRTN:
+		/* Round to nearest, or to even if equidistant. */
 		p += mdb_snprintf(p, (size_t)(end - p), "|RTN");
+		break;
+	case FPRD:
+		/* Round down. */
+		p += mdb_snprintf(p, (size_t)(end - p), "|RD");
+		break;
+	case FPRU:
+		/* Round up. */
+		p += mdb_snprintf(p, (size_t)(end - p), "|RU");
+		break;
+	case FPCHOP:
+		/* Truncate. */
+		p += mdb_snprintf(p, (size_t)(end - p), "|RTZ");
+		break;
+	default:
+		/*
+		 * This is a two-bit field.
+		 * No other options left.
+		 */
+		break;
+	}
 
-	if (cw & FPA)
-		p += mdb_snprintf(p, (size_t)(end - p), "|A");
-	else
+	/*
+	 * Decode infinity control options.
+	 *
+	 * This field has been retained for compatibility with
+	 * the 287 and earlier co-processors.
+	 * In the more modern FPUs, this bit is disregarded and
+	 * both -infinity and +infinity are respected.
+	 * Comment source: SIMPLY FPU by Raymond Filiatreault
+	 */
+	switch (cw & FPIC) {
+	case FPP:
+		/*
+		 * Projective infinity.
+		 * Both -infinity and +infinity are treated as
+		 * unsigned infinity.
+		 */
 		p += mdb_snprintf(p, (size_t)(end - p), "|P");
+		break;
+	case FPA:
+		/*
+		 * Affine infinity.
+		 * Respects both -infinity and +infinity.
+		 */
+		p += mdb_snprintf(p, (size_t)(end - p), "|A");
+		break;
+	default:
+		/*
+		 * This is a one-bit field.
+		 * No other options left.
+		 */
+		break;
+	}
+
 	if (cw & WFPB17)
 		p += mdb_snprintf(p, (size_t)(end - p), "|WFPB17");
 	if (cw & WFPB24)

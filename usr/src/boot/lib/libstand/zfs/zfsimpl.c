@@ -1708,7 +1708,7 @@ fzap_list(const spa_t *spa, const dnode_phys_t *dnode, int (*callback)(const cha
 	zap_leaf_t zl;
 	zl.l_bs = z.zap_block_shift;
 	for (i = 0; i < zh.zap_num_leafs; i++) {
-		off_t off = (i + 1) << zl.l_bs;
+		off_t off = ((off_t)(i + 1)) << zl.l_bs;
 		char name[256], *p;
 		uint64_t value;
 
@@ -1871,7 +1871,7 @@ fzap_rlookup(const spa_t *spa, const dnode_phys_t *dnode, char *name, uint64_t v
 	zap_leaf_t zl;
 	zl.l_bs = z.zap_block_shift;
 	for (i = 0; i < zh.zap_num_leafs; i++) {
-		off_t off = (i + 1) << zl.l_bs;
+		off_t off = ((off_t)(i + 1)) << zl.l_bs;
 
 		if (dnode_read(spa, dnode, off, zap_scratch, bsize))
 			return (EIO);
