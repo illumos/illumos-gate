@@ -1440,14 +1440,21 @@ smb_fsop_read(smb_request_t *sr, cred_t *cr, smb_node_t *snode, uio_t *uio)
 		return (rc);
 	}
 
-	ct = smb_ct;
-	ct.cc_pid = sr->fid_ofile->f_uniqid;
-	rc = nbl_lock_conflict(snode->vp, NBL_READ, uio->uio_loffset,
-	    uio->uio_iov->iov_len, svmand, &ct);
-
-	if (rc) {
-		smb_node_end_crit(snode);
-		return (ERANGE);
+	/*
+	 * Note: SMB allows a zero-byte read, which should not
+	 * conflict with any locks.  However nbl_lock_conflict
+	 * takes a zero-byte length as lock to EOF, so we must
+	 * special case that here.
+	 */
+	if (uio->uio_resid > 0) {
+		ct = smb_ct;
+		ct.cc_pid = sr->fid_ofile->f_uniqid;
+		rc = nbl_lock_conflict(snode->vp, NBL_READ, uio->uio_loffset,
+		    uio->uio_resid, svmand, &ct);
+		if (rc != 0) {
+			smb_node_end_crit(snode);
+			return (ERANGE);
+		}
 	}
 
 	rc = smb_vop_read(snode->vp, uio, cr);
@@ -1527,14 +1534,21 @@ smb_fsop_write(
 		return (rc);
 	}
 
-	ct = smb_ct;
-	ct.cc_pid = of->f_uniqid;
-	rc = nbl_lock_conflict(vp, NBL_WRITE, uio->uio_loffset,
-	    uio->uio_iov->iov_len, svmand, &ct);
-
-	if (rc) {
-		smb_node_end_crit(snode);
-		return (ERANGE);
+	/*
+	 * Note: SMB allows a zero-byte write, which should not
+	 * conflict with any locks.  However nbl_lock_conflict
+	 * takes a zero-byte length as lock to EOF, so we must
+	 * special case that here.
+	 */
+	if (uio->uio_resid > 0) {
+		ct = smb_ct;
+		ct.cc_pid = of->f_uniqid;
+		rc = nbl_lock_conflict(vp, NBL_WRITE, uio->uio_loffset,
+		    uio->uio_resid, svmand, &ct);
+		if (rc != 0) {
+			smb_node_end_crit(snode);
+			return (ERANGE);
+		}
 	}
 
 	rc = smb_vop_write(vp, uio, ioflag, lcount, cr);
@@ -2644,6 +2658,14 @@ smb_fsop_frlock(smb_node_t *node, smb_lock_t *lock, boolean_t unlock,
 	 *    bytes. Interestingly if the same lock (same offset and length) is
 	 *    resubmitted Windows will consider that there is an overlap and
 	 *    the granting rules will then apply.
+	 *
+	 * 3) The SMB-level process IDs (smb_pid) are not passed down to the
+	 *    POSIX level in l_pid because (a) the rules about lock PIDs are
+	 *    different in SMB, and (b) we're putting our ofile f_uniqid in
+	 *    the POSIX l_pid field to segregate locks per SMB ofile.
+	 *    (We're also using a "remote" system ID in l_sysid.)
+	 *    All SMB locking PIDs are handled at the SMB level and
+	 *    not exposed in POSIX locking.
 	 */
 	if ((lock->l_length == 0) ||
 	    ((lock->l_start + lock->l_length - 1) < lock->l_start))

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -471,20 +471,49 @@ typedef struct smb_export {
 	smb_thread_t	e_unexport_thread;
 } smb_export_t;
 
-/* NOTIFY CHANGE */
-typedef struct smb_node_fcn {
-	kmutex_t	fcn_mutex;
-	uint32_t	fcn_count;
-	list_t		fcn_watchers;	/* smb_request_t, sr_ncr.nc_lnd */
-} smb_node_fcn_t;
+/*
+ * NOTIFY CHANGE, a.k.a. File Change Notification (FCN)
+ */
 
-typedef struct smb_notify_change_req {
-	list_node_t		nc_lnd;	/* n_fcn.fcn_watchers */
-	kcondvar_t		nc_cv;	/* prot: sr_mutex */
-	uint32_t		nc_flags;
-	uint32_t		nc_action;
-	char			*nc_fname;
-} smb_notify_change_req_t;
+/*
+ * These FCN filter mask values are not from MS-FSCC, but
+ * must not overlap with any FILE_NOTIFY_VALID_MASK values.
+ */
+#define	FILE_NOTIFY_CHANGE_EV_SUBDIR	0x00010000
+#define	FILE_NOTIFY_CHANGE_EV_DELETE	0x00020000
+#define	FILE_NOTIFY_CHANGE_EV_CLOSED	0x00040000
+#define	FILE_NOTIFY_CHANGE_EV_OVERFLOW	0x00080000
+
+/*
+ * Note: These FCN action values are not from MS-FSCC, but must
+ * follow in sequence from FILE_ACTION_MODIFIED_STREAM.
+ *
+ * FILE_ACTION_SUBDIR_CHANGED is used internally for
+ * "watch tree" support, posted to all parents of a
+ * directory that had one of the changes above.
+ *
+ * FILE_ACTION_DELETE_PENDING is used internally to tell
+ * notify change requests when the "delete-on-close" flag
+ * has been set on the directory being watched.
+ *
+ * FILE_ACTION_HANDLE_CLOSED is used to wakeup notify change
+ * requests when the watched directory handle is closed.
+ */
+#define	FILE_ACTION_SUBDIR_CHANGED	0x00000009
+#define	FILE_ACTION_DELETE_PENDING	0x0000000a
+#define	FILE_ACTION_HANDLE_CLOSED	0x0000000b
+
+/*
+ * Sub-struct within smb_ofile_t
+ */
+typedef struct smb_notify {
+	list_t			nc_waiters; /* Waiting SRs */
+	mbuf_chain_t		nc_buffer;
+	uint32_t		nc_filter;
+	uint32_t		nc_events;
+	int			nc_last_off;
+	boolean_t		nc_subscribed;
+} smb_notify_t;
 
 /*
  * SMB operates over a NetBIOS-over-TCP transport (NBT) or directly
@@ -584,10 +613,6 @@ typedef struct smb_oplock_grant {
 	uint32_t		og_magic;
 	uint8_t			og_breaking;
 	uint8_t			og_level;
-	uint16_t		og_fid;
-	uint16_t		og_tid;
-	uint16_t		og_uid;
-	struct smb_session	*og_session;
 	struct smb_ofile	*og_ofile;
 } smb_oplock_grant_t;
 
@@ -639,11 +664,13 @@ typedef struct smb_node {
 	uint32_t		n_open_count;
 	uint32_t		n_opening_count;
 	smb_llist_t		n_ofile_list;
-	smb_llist_t		n_lock_list;
+	/* If entering both, go in order n_lock_list, n_wlock_list */
+	smb_llist_t		n_lock_list;	/* active locks */
+	smb_llist_t		n_wlock_list;	/* waiting locks */
 	uint32_t		n_pending_dosattr;
 	volatile int		flags;
 	u_offset_t		n_allocsz;
-	smb_node_fcn_t		n_fcn;
+	uint32_t		n_fcn_count;
 	smb_oplock_t		n_oplock;
 	struct smb_node		*n_dnode;
 	struct smb_node		*n_unode;
@@ -660,7 +687,6 @@ typedef struct smb_node {
 #define	NODE_FLAGS_SYSTEM		0x00008000
 #define	NODE_FLAGS_WRITE_THROUGH	0x00100000
 #define	NODE_XATTR_DIR			0x01000000
-#define	NODE_FLAGS_WATCH_TREE		0x10000000	/* smb_notify.c */
 #define	NODE_FLAGS_DELETE_ON_CLOSE	0x40000000
 #define	NODE_FLAGS_EXECUTABLE		0x80000000
 
@@ -914,9 +940,6 @@ typedef struct smb_session {
 	int			reply_max_bytes;
 	uint16_t		smb_msg_size;
 	uint16_t		smb_max_mpx;
-	uchar_t			*outpipe_data;
-	int			outpipe_datalen;
-	int			outpipe_cookie;
 	smb_srqueue_t		*s_srqueue;
 	uint64_t		start_time;
 	unsigned char		MAC_key[44];
@@ -961,6 +984,7 @@ typedef struct smb_user {
 	struct smb_server	*u_server;
 	smb_session_t		*u_session;
 	ksocket_t		u_authsock;
+	timeout_id_t		u_auth_tmo;
 	uint16_t		u_name_len;
 	char			*u_name;
 	uint16_t		u_domain_len;
@@ -1287,6 +1311,7 @@ typedef struct smb_ofile {
 	boolean_t		f_written;
 	char			f_quota_resume[SMB_SID_STRSZ];
 	smb_oplock_grant_t	f_oplock_grant;
+	smb_notify_t		f_notify;
 } smb_ofile_t;
 
 typedef struct smb_fileinfo {
@@ -1317,19 +1342,13 @@ typedef struct smb_lock {
 	kmutex_t		l_mutex;
 	kcondvar_t		l_cv;
 
-	list_node_t		l_conflict_lnd;
-	smb_slist_t		l_conflict_list;
-
-	smb_session_t		*l_session;
 	smb_ofile_t		*l_file;
-	struct smb_request	*l_sr;
 
-	uint32_t		l_flags;
-	uint64_t		l_session_kid;
 	struct smb_lock		*l_blocked_by; /* Debug info only */
 
+	uint32_t		l_conflicts;
+	uint32_t		l_flags;
 	uint32_t		l_pid;
-	uint16_t		l_uid;
 	uint32_t		l_type;
 	uint64_t		l_start;
 	uint64_t		l_length;
@@ -1337,8 +1356,8 @@ typedef struct smb_lock {
 } smb_lock_t;
 
 #define	SMB_LOCK_FLAG_INDEFINITE	0x0004
-#define	SMB_LOCK_INDEFINITE_WAIT(lock) \
-	((lock)->l_flags & SMB_LOCK_FLAG_INDEFINITE)
+#define	SMB_LOCK_FLAG_CLOSED		0x0008
+#define	SMB_LOCK_FLAG_CANCELLED		0x0010
 
 #define	SMB_LOCK_TYPE_READWRITE		101
 #define	SMB_LOCK_TYPE_READONLY		102
@@ -1489,6 +1508,12 @@ typedef struct open_param {
 	boolean_t	op_oplock_levelII;	/* TRUE if levelII supported */
 } smb_arg_open_t;
 
+typedef struct smb_arg_lock {
+	void		*lvec;
+	uint32_t	lcnt;
+	uint32_t	lseq;
+} smb_arg_lock_t;
+
 struct smb_async_req;
 
 /*
@@ -1502,11 +1527,11 @@ struct smb_async_req;
  * | COMPLETED |                                                        |
  * +-----------+
  *      ^                                                               |
- *      | T15                      +----------+                         v
- * +------------+        T6        |          |                 +--------------+
- * | CLEANED_UP |<-----------------| CANCELED |                 | INITIALIZING |
- * +------------+                  |          |                 +--------------+
- *      |    ^                     +----------+                         |
+ *      | T15                      +-----------+                        v
+ * +------------+        T6        |           |                +--------------+
+ * | CLEANED_UP |<-----------------| CANCELLED |                | INITIALIZING |
+ * +------------+                  |           |                +--------------+
+ *      |    ^                     +-----------+                        |
  *      |    |                        ^  ^ ^ ^                          |
  *      |    |          +-------------+  | | |                          |
  *      |    |    T3    |                | | |               T13        | T1
@@ -1617,11 +1642,14 @@ typedef enum smb_req_state {
 	SMB_REQ_STATE_INITIALIZING,
 	SMB_REQ_STATE_SUBMITTED,
 	SMB_REQ_STATE_ACTIVE,
-	SMB_REQ_STATE_WAITING_EVENT,
-	SMB_REQ_STATE_EVENT_OCCURRED,
+	SMB_REQ_STATE_WAITING_AUTH,
+	SMB_REQ_STATE_WAITING_FCN1,
+	SMB_REQ_STATE_WAITING_FCN2,
 	SMB_REQ_STATE_WAITING_LOCK,
+	SMB_REQ_STATE_WAITING_PIPE,
 	SMB_REQ_STATE_COMPLETED,
-	SMB_REQ_STATE_CANCELED,
+	SMB_REQ_STATE_CANCEL_PENDING,
+	SMB_REQ_STATE_CANCELLED,
 	SMB_REQ_STATE_CLEANED_UP,
 	SMB_REQ_STATE_SENTINEL
 } smb_req_state_t;
@@ -1636,8 +1664,10 @@ typedef struct smb_request {
 	int32_t			sr_gmtoff;
 	smb_session_t		*session;
 	smb_kmod_cfg_t		*sr_cfg;
+	void			(*cancel_method)(struct smb_request *);
+	void			*cancel_arg2;
 
-	smb_notify_change_req_t	sr_ncr;
+	list_node_t		sr_waiters;	/* smb_notify.c */
 
 	/* Info from session service header */
 	uint32_t		sr_req_length; /* Excluding NBT header */
@@ -1645,7 +1675,6 @@ typedef struct smb_request {
 	/* Request buffer excluding NBT header */
 	void			*sr_request_buf;
 
-	smb_lock_t		*sr_awaiting;
 	struct mbuf_chain	command;
 	struct mbuf_chain	reply;
 	struct mbuf_chain	raw_data;
@@ -1691,9 +1720,11 @@ typedef struct smb_request {
 	uint16_t		smb2_cmd_code;
 	uint16_t		smb2_credit_request;
 	uint16_t		smb2_credit_response;
+	uint16_t		smb2_total_credits; /* in compound */
 	uint32_t		smb2_hdr_flags;
 	uint32_t		smb2_next_command;
 	uint64_t		smb2_messageid;
+	uint64_t		smb2_first_msgid;
 	/* uint32_t		smb2_pid; use smb_pid */
 	/* uint32_t		smb2_tid; use smb_tid */
 	/* uint64_t		smb2_ssnid; use smb_uid */
@@ -1731,6 +1762,7 @@ typedef struct smb_request {
 		smb_arg_tcon_t		tcon;
 		smb_arg_dirop_t		dirop;
 		smb_arg_open_t		open;
+		smb_arg_lock_t		lock;
 		smb_rw_param_t		*rw;
 		smb_oplock_grant_t	olbrk;	/* for async oplock break */
 		int32_t			timestamp;

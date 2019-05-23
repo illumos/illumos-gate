@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -206,7 +206,7 @@ smb2_newrq_negotiate(smb_request_t *sr)
 	    &struct_size,	/* w */
 	    &version_cnt,	/* w */
 	    &s->secmode,	/* w */
-	    /* reserved 	(..) */
+	    /* reserved		(..) */
 	    &s->capabilities);	/* l */
 	    /* clnt_uuid	 16. */
 	    /* start_time	  8. */

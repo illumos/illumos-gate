@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMB2_KPROTO_H_
@@ -35,8 +35,6 @@ void	smb2_dispatch_stats_update(smb_server_t *,
 		smb_kstat_req_t *, int, int);
 
 int	smb2sr_newrq(smb_request_t *);
-int	smb2sr_newrq_async(smb_request_t *);
-int	smb2sr_newrq_cancel(smb_request_t *);
 void	smb2sr_work(smb_request_t *);
 
 int smb2_decode_header(smb_request_t *);
@@ -65,7 +63,7 @@ smb_sdrc_t smb2_read(smb_request_t *);
 smb_sdrc_t smb2_write(smb_request_t *);
 smb_sdrc_t smb2_lock(smb_request_t *);
 smb_sdrc_t smb2_ioctl(smb_request_t *);
-/* No smb2_cancel() - see smb2_dispatch.c */
+smb_sdrc_t smb2_cancel(smb_request_t *);
 smb_sdrc_t smb2_echo(smb_request_t *);
 smb_sdrc_t smb2_query_dir(smb_request_t *);
 smb_sdrc_t smb2_change_notify(smb_request_t *);
@@ -74,6 +72,7 @@ smb_sdrc_t smb2_set_info(smb_request_t *);
 smb_sdrc_t smb2_oplock_break_ack(smb_request_t *);
 
 int smb2_newrq_negotiate(smb_request_t *);
+int smb2_newrq_cancel(smb_request_t *);
 
 uint32_t smb2_aapl_crctx(smb_request_t *,
 	mbuf_chain_t *, mbuf_chain_t *);
@@ -92,6 +91,8 @@ uint32_t smb2_setinfo_file(smb_request_t *, smb_setinfo_t *, int);
 uint32_t smb2_setinfo_fs(smb_request_t *, smb_setinfo_t *, int);
 uint32_t smb2_setinfo_sec(smb_request_t *, smb_setinfo_t *, uint32_t);
 uint32_t smb2_setinfo_quota(smb_request_t *, smb_setinfo_t *);
+
+void smb2sr_finish_async(smb_request_t *);
 
 #ifdef	__cplusplus
 }

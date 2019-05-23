@@ -21,8 +21,8 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Syneto S.R.L.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -136,6 +136,7 @@ extern	kmem_cache_t		*smb_cache_ofile;
 extern	kmem_cache_t		*smb_cache_odir;
 extern	kmem_cache_t		*smb_cache_opipe;
 extern	kmem_cache_t		*smb_cache_event;
+extern	kmem_cache_t		*smb_cache_lock;
 
 extern	kmem_cache_t		*smb_kshare_cache_vfs;
 
@@ -322,11 +323,15 @@ void smb2_oplock_break_notification(smb_request_t *, uint8_t);
  * range lock functions - node operations
  */
 uint32_t smb_lock_get_lock_count(smb_node_t *, smb_ofile_t *);
-uint32_t smb_unlock_range(smb_request_t *, smb_node_t *,
-    uint64_t, uint64_t);
+uint32_t smb_unlock_range(smb_request_t *, uint64_t, uint64_t, uint32_t);
 uint32_t smb_lock_range(smb_request_t *, uint64_t, uint64_t, uint32_t,
-    uint32_t locktype);
+    uint32_t, uint32_t);
+uint32_t smb_lock_range_cancel(smb_request_t *, uint64_t, uint64_t, uint32_t);
 void smb_lock_range_error(smb_request_t *, uint32_t);
+
+int smb_lock_range_access(smb_request_t *, smb_node_t *,
+    uint64_t, uint64_t, boolean_t);
+
 DWORD smb_nbl_conflict(smb_node_t *, uint64_t, uint64_t, nbl_op_t);
 
 void smb_mangle(const char *, ino64_t, char *, size_t);
@@ -376,6 +381,7 @@ void	smb_dispatch_stats_update(smb_server_t *,
 		smb_kstat_req_t *, int, int);
 
 int	smb1sr_newrq(smb_request_t *);
+int	smb1sr_newrq_cancel(smb_request_t *);
 void	smb1sr_work(smb_request_t *);
 
 int	smbsr_encode_empty_result(smb_request_t *);
@@ -414,9 +420,6 @@ int	smb_mbc_copy(mbuf_chain_t *, const mbuf_chain_t *, int, int);
 
 void	smbsr_encode_header(smb_request_t *sr, int wct,
 		    int bcc, const char *fmt, ...);
-
-int smb_lock_range_access(smb_request_t *, smb_node_t *,
-    uint64_t, uint64_t, boolean_t);
 
 void smb_encode_sd(mbuf_chain_t *, smb_sd_t *, uint32_t);
 void smb_encode_sid(mbuf_chain_t *, smb_sid_t *);
@@ -549,10 +552,10 @@ DWORD smb_node_rename_check(smb_node_t *);
 DWORD smb_node_delete_check(smb_node_t *);
 boolean_t smb_node_share_check(smb_node_t *);
 
-void smb_node_fcn_subscribe(smb_node_t *, smb_request_t *);
-void smb_node_fcn_unsubscribe(smb_node_t *, smb_request_t *);
+void smb_node_fcn_subscribe(smb_node_t *);
+void smb_node_fcn_unsubscribe(smb_node_t *);
 void smb_node_notify_change(smb_node_t *, uint_t, const char *);
-void smb_node_notify_parents(smb_node_t *);
+
 int smb_node_getattr(smb_request_t *, smb_node_t *, cred_t *,
     smb_ofile_t *, smb_attr_t *);
 int smb_node_setattr(smb_request_t *, smb_node_t *, cred_t *,
@@ -582,11 +585,15 @@ int smb_vfs_hold(smb_export_t *, vfs_t *);
 void smb_vfs_rele(smb_export_t *, vfs_t *);
 void smb_vfs_rele_all(smb_export_t *);
 
-/* NOTIFY CHANGE */
-
-uint32_t smb_notify_common(smb_request_t *, mbuf_chain_t *, uint32_t);
-void smb_notify_event(smb_node_t *, uint_t, const char *);
-void smb_notify_file_closed(smb_ofile_t *);
+/*
+ * smb_notify.c
+ */
+uint32_t smb_notify_act1(smb_request_t *, uint32_t, uint32_t);
+uint32_t smb_notify_act2(smb_request_t *);
+uint32_t smb_notify_act3(smb_request_t *);
+void smb_notify_ofile(smb_ofile_t *, uint_t, const char *);
+void smb_nt_transact_notify_finish(void *);
+void smb2_change_notify_finish(void *);
 
 int smb_fem_fcn_install(smb_node_t *);
 void smb_fem_fcn_uninstall(smb_node_t *);
@@ -620,7 +627,7 @@ void smb_request_wait(smb_request_t *);
  */
 int smb_authenticate_ext(smb_request_t *);
 int smb_authenticate_old(smb_request_t *);
-void smb_authsock_close(smb_user_t *);
+void smb_authsock_close(smb_user_t *, ksocket_t);
 
 /*
  * session functions (file smb_session.c)
@@ -733,9 +740,10 @@ void smb_odir_resume_at(smb_odir_t *, smb_odir_resume_t *);
 smb_user_t *smb_user_new(smb_session_t *);
 int smb_user_logon(smb_user_t *, cred_t *,
     char *, char *, uint32_t, uint32_t, uint32_t);
-smb_user_t *smb_user_dup(smb_user_t *);
 void smb_user_logoff(smb_user_t *);
 void smb_user_delete(void *);
+void smb_user_auth_tmo(void *);
+
 boolean_t smb_user_is_admin(smb_user_t *);
 boolean_t smb_user_namecmp(smb_user_t *, const char *);
 int smb_user_enum(smb_user_t *, smb_svcenum_t *);

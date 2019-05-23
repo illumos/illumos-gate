@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -85,247 +85,474 @@
  * FILE_ACTION_ADDED_STREAM     0x00000006
  * FILE_ACTION_REMOVED_STREAM   0x00000007
  * FILE_ACTION_MODIFIED_STREAM  0x00000008
+ *
+ * The internal interface between SMB1 and/or SMB2 protocol handlers
+ * and this module has some sophistication to allow for:
+ * (1) code sharing between SMB1 and SMB2(+)
+ * (2) efficient handling of non-blocking scenarios
+ * (3) long blocking calls without tying up a thread
+ *
+ * The interface has three calls (like a three act play)
+ *
+ * smb_notify_act1:
+ *	Validate parameters, setup ofile buffer.
+ *	If data already available, return it, all done.
+ * 	(In the "all done" case, skip act2 & act3.)
+ * 	If no data available, return a special error
+ *	("STATUS_PENDING") to tell the caller they must
+ *	proceed with calls to act2 & act3.
+ *
+ * smb_notify_act2:
+ *	Arrange wakeup after event delivery or cancellation.
+ *	Return leaving the SR with no worker thread.
+ *
+ * smb_notify_act3:
+ *	New taskq work thread runs this after the wakeup
+ *	or cancellation arranged in act2 happens.  This
+ *	returns the notification data and retires the SR.
+ *
+ * In the SMB2 notify handler, we call act1 during the initial
+ * synchronous handling of the request.  If that returns anything
+ * other than STATUS_PENDING, that request is fully complete.
+ * If act1 returns STATUS_PENDING, SMB2 calls act2 as it's
+ * "go async" handler, which arranges to call act3 later.
+ *
+ * In the SMB1 notify handler there is not separate sync. & async
+ * handler so act1 and (if necessary) act2 are both called during
+ * the initial handling of the request.
+ *
+ * About notify event buffering:
+ *
+ * An important (and poorly documented) feature of SMB notify is
+ * that once a notify call has happened on a given directory handle,
+ * the system CONTINUES to post events to the notify event buffer
+ * for the handle, even when SMB notify calls are NOT running.
+ * When the client next comes back with a notify call, we return
+ * any events that were posted while they were "away".  This is
+ * how clients track directory changes without missing events.
+ *
+ * About simultaneous notify calls:
+ *
+ * Note that SMB "notify" calls are destructive to events, much like
+ * reading data from a pipe.  It therefore makes little sense to
+ * allow multiple simultaneous callers.  However, we permit it
+ * (like Windows does) as follows:  When multiple notify calls
+ * are waiting for events, the next event wakes them all, and
+ * only the last one out clears the event buffer.  They all get
+ * whatever events are pending at the time they woke up.
+ *
+ * About NT_STATUS_NOTIFY_ENUM_DIR
+ *
+ * One more caution about NT_STATUS_NOTIFY_ENUM_DIR:  Some clients
+ * are stupid about re-reading the directory almost continuously when
+ * there are changes happening in the directory.  We want to bound
+ * the rate of such directory re-reading, so before returning an
+ * NT_STATUS_NOTIFY_ENUM_DIR, we delay just a little.  The length
+ * of the delay can be adjusted via smb_notify_enum_dir_delay,
+ * though it's not expected that should need to be changed.
  */
 
 #include <smbsrv/smb_kproto.h>
 #include <sys/sdt.h>
 
-static void smb_notify_sr(smb_request_t *, uint_t, const char *);
-static uint32_t smb_notify_encode_action(struct smb_request *,
-	mbuf_chain_t *, uint32_t, char *);
+/*
+ * Length of the short delay we impose before returning
+ * NT_STATUS_NOTIFY_ENUM_DIR (See above)
+ */
+int smb_notify_enum_dir_delay = 100; /* mSec. */
 
+static uint32_t smb_notify_get_events(smb_request_t *);
+static void smb_notify_cancel(smb_request_t *);
+static void smb_notify_wakeup(smb_request_t *);
+static void smb_notify_dispatch2(smb_request_t *);
+static void smb_notify_encode_action(smb_ofile_t *,
+	uint32_t, const char *);
+
+
+/*
+ * smb_notify_act1()
+ *
+ * Check for events and consume, non-blocking.
+ * Special return STATUS_PENDING means:
+ * No events; caller must call "act2" next.
+ *
+ * See overall design notes, top of file.
+ */
 uint32_t
-smb_notify_common(smb_request_t *sr, mbuf_chain_t *mbc,
-	uint32_t CompletionFilter)
+smb_notify_act1(smb_request_t *sr, uint32_t buflen, uint32_t filter)
 {
-	smb_notify_change_req_t *nc;
+	smb_ofile_t	*of;
 	smb_node_t	*node;
+	smb_notify_t	*nc;
 	uint32_t	status;
 
-	if (sr->fid_ofile == NULL)
+	/*
+	 * Validate parameters
+	 */
+	if ((of = sr->fid_ofile) == NULL)
 		return (NT_STATUS_INVALID_HANDLE);
-
-	node = sr->fid_ofile->f_node;
+	nc = &of->f_notify;
+	node = of->f_node;
 	if (node == NULL || !smb_node_is_dir(node)) {
-		/*
-		 * Notify change is only valid on directories.
-		 */
+		/* Notify change is only valid on directories. */
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	/*
-	 * Prepare to receive event data.
-	 */
-	nc = &sr->sr_ncr;
-	nc->nc_flags = CompletionFilter;
-	ASSERT(nc->nc_action == 0);
-	ASSERT(nc->nc_fname == NULL);
-	nc->nc_fname = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+	mutex_enter(&of->f_mutex);
 
 	/*
-	 * Subscribe to events on this node.
+	 * On the first FCN call with this ofile, subscribe to
+	 * events on the node.  The corresponding unsubscribe
+	 * happens in smb_ofile_delete().
 	 */
-	smb_node_fcn_subscribe(node, sr);
-
-	/*
-	 * Wait for subscribed events to arrive.
-	 * Expect SMB_REQ_STATE_EVENT_OCCURRED
-	 * or SMB_REQ_STATE_CANCELED when signaled.
-	 * Note it's possible (though rare) to already
-	 * have SMB_REQ_STATE_CANCELED here.
-	 */
-	mutex_enter(&sr->sr_mutex);
-	if (sr->sr_state == SMB_REQ_STATE_ACTIVE)
-		sr->sr_state = SMB_REQ_STATE_WAITING_EVENT;
-	while (sr->sr_state == SMB_REQ_STATE_WAITING_EVENT) {
-		cv_wait(&nc->nc_cv, &sr->sr_mutex);
-	}
-	if (sr->sr_state == SMB_REQ_STATE_EVENT_OCCURRED)
-		sr->sr_state = SMB_REQ_STATE_ACTIVE;
-	mutex_exit(&sr->sr_mutex);
-
-	/*
-	 * Unsubscribe from events on this node.
-	 */
-	smb_node_fcn_unsubscribe(node, sr);
-
-	/*
-	 * Why did we wake up?
-	 */
-	switch (sr->sr_state) {
-	case SMB_REQ_STATE_ACTIVE:
-		break;
-	case SMB_REQ_STATE_CANCELED:
-		status = NT_STATUS_CANCELLED;
-		goto out;
-	default:
-		status = NT_STATUS_INTERNAL_ERROR;
-		goto out;
-	}
-
-	/*
-	 * We have SMB_REQ_STATE_ACTIVE.
-	 *
-	 * If we have event data, marshall it now, else just
-	 * say "many things changed". Note that when we get
-	 * action FILE_ACTION_SUBDIR_CHANGED, we don't have
-	 * any event details and only know that some subdir
-	 * changed, so just report "many things changed".
-	 */
-	switch (nc->nc_action) {
-
-	case FILE_ACTION_ADDED:
-	case FILE_ACTION_REMOVED:
-	case FILE_ACTION_MODIFIED:
-	case FILE_ACTION_RENAMED_OLD_NAME:
-	case FILE_ACTION_RENAMED_NEW_NAME:
-	case FILE_ACTION_ADDED_STREAM:
-	case FILE_ACTION_REMOVED_STREAM:
-	case FILE_ACTION_MODIFIED_STREAM:
+	if (nc->nc_subscribed == B_FALSE) {
+		nc->nc_subscribed = B_TRUE;
+		smb_node_fcn_subscribe(node);
+		/* In case this happened before we subscribed. */
+		if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
+			nc->nc_events |= FILE_NOTIFY_CHANGE_EV_DELETE;
+		}
 		/*
-		 * Build the reply
+		 * Windows only lets you set these on the first call,
+		 * so we may as well do the same.
 		 */
-		status = smb_notify_encode_action(sr, mbc,
-		    nc->nc_action, nc->nc_fname);
-		break;
-
-	case FILE_ACTION_SUBDIR_CHANGED:
-		status = NT_STATUS_NOTIFY_ENUM_DIR;
-		break;
-
-	case FILE_ACTION_DELETE_PENDING:
-		status = NT_STATUS_DELETE_PENDING;
-		break;
-
-	default:
-		ASSERT(0);
-		status = NT_STATUS_INTERNAL_ERROR;
-		break;
+		nc->nc_buffer.max_bytes = buflen;
+		nc->nc_filter = filter;
+	}
+	/*
+	 * If we already have events, consume them.
+	 */
+	sr->raw_data.max_bytes = buflen;
+	if (nc->nc_events != 0) {
+		status = smb_notify_get_events(sr);
+	} else {
+		/* Caller will come back for act2 */
+		status = NT_STATUS_PENDING;
 	}
 
-out:
-	kmem_free(nc->nc_fname, MAXNAMELEN);
-	nc->nc_fname = NULL;
+	mutex_exit(&of->f_mutex);
+
+	/*
+	 * See: About NT_STATUS_NOTIFY_ENUM_DIR (above)
+	 */
+	if (status == NT_STATUS_NOTIFY_ENUM_DIR &&
+	    smb_notify_enum_dir_delay > 0)
+		delay(MSEC_TO_TICK(smb_notify_enum_dir_delay));
+
 	return (status);
 }
 
 /*
- * Encode a FILE_NOTIFY_INFORMATION struct.
+ * smb_notify_act2()
  *
- * We only ever put one of these in a response, so this
- * does not bother handling appending additional ones.
+ * Prepare to wait for events after act1 found that none were pending.
+ * Assume the wait may be for a very long time.  (hours, days...)
+ * Special return STATUS_PENDING means the SR will later be
+ * scheduled again on a new worker thread, and this thread
+ * MUST NOT touch it any longer (return SDRC_SR_KEPT).
+ *
+ * See overall design notes, top of file.
  */
+uint32_t
+smb_notify_act2(smb_request_t *sr)
+{
+	smb_ofile_t	*of;
+	smb_notify_t	*nc;
+	uint32_t	status;
+
+	/*
+	 * Sanity checks.
+	 */
+	if ((of = sr->fid_ofile) == NULL)
+		return (NT_STATUS_INVALID_HANDLE);
+	nc = &of->f_notify;
+
+	mutex_enter(&of->f_mutex);
+
+	/*
+	 * Prepare for a potentially long wait for events.
+	 * Normally transition from ACTIVE to WAITING_FCN1.
+	 *
+	 * Note we hold both of->f_mutex, sr->sr_mutex here,
+	 * taken in that order.
+	 */
+	mutex_enter(&sr->sr_mutex);
+	switch (sr->sr_state) {
+	case SMB_REQ_STATE_ACTIVE:
+		/*
+		 * This sr has no worker thread until smb_notify_act3
+		 * or smb_notify_cancel (later, via taskq_dispatch).
+		 */
+		sr->sr_state = SMB_REQ_STATE_WAITING_FCN1;
+		sr->cancel_method = smb_notify_cancel;
+		sr->sr_worker = NULL;
+		list_insert_tail(&nc->nc_waiters, sr);
+		status = NT_STATUS_PENDING;
+		break;
+
+	case SMB_REQ_STATE_CANCELLED:
+		status = NT_STATUS_CANCELLED;
+		break;
+	default:
+		status = NT_STATUS_INTERNAL_ERROR;
+		break;
+	}
+	mutex_exit(&sr->sr_mutex);
+
+	/*
+	 * In case we missed any events before setting
+	 * state FCN1, schedule our own wakeup.
+	 */
+	if (status == NT_STATUS_PENDING && nc->nc_events != 0) {
+		smb_notify_wakeup(sr);
+	}
+
+	mutex_exit(&of->f_mutex);
+
+	/* Note: Never NT_STATUS_NOTIFY_ENUM_DIR here. */
+	ASSERT(status != NT_STATUS_NOTIFY_ENUM_DIR);
+
+	return (status);
+}
+
+/*
+ * smb_notify_act3()
+ *
+ * This runs via the 2nd taskq_dispatch call, after we've either
+ * seen a change notify event, or the request has been cancelled.
+ * Complete it here.  This returns to SMB1 or SMB2 code to send
+ * the response and free the request.
+ *
+ * See overall design notes, top of file.
+ */
+uint32_t
+smb_notify_act3(smb_request_t *sr)
+{
+	smb_ofile_t	*of;
+	smb_notify_t	*nc;
+	uint32_t	status;
+
+	of = sr->fid_ofile;
+	ASSERT(of != NULL);
+	nc = &of->f_notify;
+
+	mutex_enter(&of->f_mutex);
+
+	mutex_enter(&sr->sr_mutex);
+	ASSERT3P(sr->sr_worker, ==, NULL);
+	sr->sr_worker = curthread;
+	sr->cancel_method = NULL;
+
+	list_remove(&nc->nc_waiters, sr);
+
+	switch (sr->sr_state) {
+	case SMB_REQ_STATE_WAITING_FCN2:
+		/*
+		 * Got smb_notify_wakeup.
+		 */
+		sr->sr_state = SMB_REQ_STATE_ACTIVE;
+		status = 0;
+		break;
+
+	case SMB_REQ_STATE_CANCEL_PENDING:
+		/*
+		 * Got smb_notify_cancel
+		 */
+		sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		status = NT_STATUS_CANCELLED;
+		break;
+	default:
+		status = NT_STATUS_INTERNAL_ERROR;
+		break;
+	}
+	mutex_exit(&sr->sr_mutex);
+
+	if (status == 0)
+		status = smb_notify_get_events(sr);
+
+	mutex_exit(&of->f_mutex);
+
+	/*
+	 * See: About NT_STATUS_NOTIFY_ENUM_DIR (above)
+	 */
+	if (status == NT_STATUS_NOTIFY_ENUM_DIR &&
+	    smb_notify_enum_dir_delay > 0)
+		delay(MSEC_TO_TICK(smb_notify_enum_dir_delay));
+
+	return (status);
+}
+
 static uint32_t
-smb_notify_encode_action(struct smb_request *sr, mbuf_chain_t *mbc,
-	uint32_t action, char *fname)
+smb_notify_get_events(smb_request_t *sr)
 {
-	uint32_t namelen;
+	smb_ofile_t	*of;
+	smb_notify_t	*nc;
+	uint32_t	status;
+	int		len;
 
-	ASSERT(FILE_ACTION_ADDED <= action &&
-	    action <= FILE_ACTION_MODIFIED_STREAM);
+	of = sr->fid_ofile;
+	ASSERT(of != NULL);
+	ASSERT(MUTEX_HELD(&of->f_mutex));
+	nc = &of->f_notify;
 
-	if (fname == NULL)
-		return (NT_STATUS_INTERNAL_ERROR);
-	namelen = smb_wcequiv_strlen(fname);
-	if (namelen == 0)
-		return (NT_STATUS_INTERNAL_ERROR);
+	DTRACE_PROBE2(notify__get__events,
+	    smb_request_t, sr,
+	    uint32_t, nc->nc_events);
 
-	if (smb_mbc_encodef(mbc, "%lllU", sr,
-	    0, /* NextEntryOffset */
-	    action, namelen, fname))
-		return (NT_STATUS_NOTIFY_ENUM_DIR);
+	/*
+	 * Special events which override other events
+	 */
+	if (nc->nc_events & FILE_NOTIFY_CHANGE_EV_CLOSED) {
+		status = NT_STATUS_NOTIFY_CLEANUP;
+		goto out;
+	}
+	if (nc->nc_events & FILE_NOTIFY_CHANGE_EV_DELETE) {
+		status = NT_STATUS_DELETE_PENDING;
+		goto out;
+	}
+	if (nc->nc_events & FILE_NOTIFY_CHANGE_EV_SUBDIR) {
+		status = NT_STATUS_NOTIFY_ENUM_DIR;
+		goto out;
+	}
+	if (nc->nc_events & FILE_NOTIFY_CHANGE_EV_OVERFLOW) {
+		status = NT_STATUS_NOTIFY_ENUM_DIR;
+		goto out;
+	}
 
-	return (0);
+	/*
+	 * Normal events (FILE_NOTIFY_VALID_MASK)
+	 *
+	 * At this point there should be some, or else
+	 * some sort of bug woke us up for nothing.
+	 */
+	if ((nc->nc_events & FILE_NOTIFY_VALID_MASK) == 0) {
+		status = NT_STATUS_INTERNAL_ERROR;
+		goto out;
+	}
+
+	/*
+	 * Many Windows clients call change notify with a
+	 * zero-length buffer, expecting all events to be
+	 * reported as _ENUM_DIR.  Testing max_bytes here
+	 * because ROOM_FOR check below says "yes" if both
+	 * max_bytes and the amount we ask for are zero.
+	 */
+	if (nc->nc_buffer.max_bytes <= 0) {
+		status = NT_STATUS_NOTIFY_ENUM_DIR;
+		goto out;
+	}
+
+	/*
+	 * Client gave us a non-zero output buffer, and
+	 * there was no overflow event (checked above)
+	 * so there should be some event data.
+	 */
+	if ((len = nc->nc_buffer.chain_offset) <= 0) {
+		status = NT_STATUS_INTERNAL_ERROR;
+		goto out;
+	}
+
+	/*
+	 * If the current SR has a smaller output buffer
+	 * then what was setup by some previous notify,
+	 * we could have more data than will fit.
+	 */
+	if (!MBC_ROOM_FOR(&sr->raw_data, len)) {
+		/* Would overflow caller's buffer. */
+		status = NT_STATUS_NOTIFY_ENUM_DIR;
+		goto out;
+	}
+
+	/*
+	 * Copy the event data to sr->raw_data.  In the copy,
+	 * zap the NextEntryOffset in the last entry, and
+	 * trim any extra bytes at the tail.
+	 */
+	(void) smb_mbc_copy(&sr->raw_data, &nc->nc_buffer, 0, len);
+	(void) smb_mbc_poke(&sr->raw_data, nc->nc_last_off, "l", 0);
+	smb_mbuf_trim(sr->raw_data.chain, len);
+	status = 0;
+
+out:
+	/*
+	 * If there are no other SRs waiting on this ofile,
+	 * mark all events consumed, except for those that
+	 * remain until the ofile is closed.  That means
+	 * clear all bits EXCEPT: _EV_CLOSED, _EV_DELETE
+	 *
+	 * If there are other waiters (rare) all will get
+	 * the currently pending events, and then the
+	 * the last one out will clear the events.
+	 */
+	if (list_is_empty(&nc->nc_waiters)) {
+		nc->nc_buffer.chain_offset = 0;
+		nc->nc_events &= (FILE_NOTIFY_CHANGE_EV_CLOSED |
+		    FILE_NOTIFY_CHANGE_EV_DELETE);
+	}
+
+	return (status);
 }
 
 /*
- * smb_notify_file_closed
- *
- * Cancel any change-notify calls on this open file.
+ * Called by common code after a transition from
+ * state WAITING_FCN1 to state CANCEL_PENDING.
  */
-void
-smb_notify_file_closed(struct smb_ofile *of)
+static void
+smb_notify_cancel(smb_request_t *sr)
 {
-	smb_session_t	*ses;
-	smb_request_t	*sr;
-	smb_slist_t	*list;
-
-	SMB_OFILE_VALID(of);
-	ses = of->f_session;
-	SMB_SESSION_VALID(ses);
-	list = &ses->s_req_list;
-
-	smb_slist_enter(list);
-
-	sr = smb_slist_head(list);
-	while (sr) {
-		SMB_REQ_VALID(sr);
-		if (sr->sr_state == SMB_REQ_STATE_WAITING_EVENT &&
-		    sr->fid_ofile == of) {
-			smb_request_cancel(sr);
-		}
-		sr = smb_slist_next(list, sr);
-	}
-
-	smb_slist_exit(list);
+	ASSERT3U(sr->sr_state, ==, SMB_REQ_STATE_CANCEL_PENDING);
+	smb_notify_dispatch2(sr);
 }
-
 
 /*
- * smb_notify_event
- *
- * Post an event to the watchers on a given node.
- *
- * This makes one exception for RENAME, where we expect a
- * pair of events for the {old,new} directory element names.
- * This only delivers an event for the "new" name.
- *
- * The event delivery mechanism does not implement delivery of
- * multiple events for one "NT Notify" call.  One could do that,
- * but modern clients don't actually use the event data.  They
- * set a max. received data size of zero, which means we discard
- * the data and send the special "lots changed" error instead.
- * Given that, there's not really any point in implementing the
- * delivery of multiple events.  In fact, we don't even need to
- * implement single event delivery, but do so for completeness,
- * for debug convenience, and to be nice to older clients that
- * may actually want some event data instead of the error.
- *
- * Given that we only deliver a single event for an "NT Notify"
- * caller, we want to deliver the "new" name event.  (The "old"
- * name event is less important, even ignored by some clients.)
- * Since we know these are delivered in pairs, we can simply
- * discard the "old" name event, knowing that the "new" name
- * event will be delivered immediately afterwards.
- *
- * So, why do event sources post the "old name" event at all?
- * (1) For debugging, so we see both {old,new} names here.
- * (2) If in the future someone decides to implement the
- * delivery of both {old,new} events, the changes can be
- * mostly isolated to this file.
+ * Called after ofile event delivery to take a waiting smb request
+ * from state FCN1 to state FCN2.  This may be called many times
+ * (as events are delivered) but it must (exactly once) schedule
+ * the taskq job to run smb_notify_act3().  Only the event that
+ * takes us from state FCN1 to FCN2 schedules the taskq job.
  */
-void
-smb_notify_event(smb_node_t *node, uint_t action, const char *name)
+static void
+smb_notify_wakeup(smb_request_t *sr)
 {
-	smb_request_t	*sr;
-	smb_node_fcn_t	*fcn;
+	boolean_t do_disp = B_FALSE;
 
-	SMB_NODE_VALID(node);
-	fcn = &node->n_fcn;
+	SMB_REQ_VALID(sr);
 
-	if (action == FILE_ACTION_RENAMED_OLD_NAME)
-		return; /* see above */
-
-	mutex_enter(&fcn->fcn_mutex);
-
-	sr = list_head(&fcn->fcn_watchers);
-	while (sr) {
-		smb_notify_sr(sr, action, name);
-		sr = list_next(&fcn->fcn_watchers, sr);
+	mutex_enter(&sr->sr_mutex);
+	if (sr->sr_state == SMB_REQ_STATE_WAITING_FCN1) {
+		sr->sr_state = SMB_REQ_STATE_WAITING_FCN2;
+		do_disp = B_TRUE;
 	}
+	mutex_exit(&sr->sr_mutex);
 
-	mutex_exit(&fcn->fcn_mutex);
+	if (do_disp) {
+		smb_notify_dispatch2(sr);
+	}
 }
+
+/*
+ * smb_notify_dispatch2()
+ * Schedule a 2nd taskq call to finish up a change notify request;
+ * (smb_notify_act3) either completing it or cancelling it.
+ */
+static void
+smb_notify_dispatch2(smb_request_t *sr)
+{
+	void (*tq_func)(void *);
+
+	/*
+	 * Both of these call smb_notify_act3(), returning
+	 * to version-specific code to send the response.
+	 */
+	if (sr->session->dialect >= SMB_VERS_2_BASE)
+		tq_func = smb2_change_notify_finish;
+	else
+		tq_func = smb_nt_transact_notify_finish;
+
+	(void) taskq_dispatch(sr->sr_server->sv_worker_pool,
+	    tq_func, sr, TQ_SLEEP);
+}
+
 
 /*
  * What completion filter (masks) apply to each of the
@@ -371,52 +598,158 @@ smb_notify_action_mask[] = {
 	FILE_NOTIFY_CHANGE_STREAM_WRITE,
 
 	/* FILE_ACTION_SUBDIR_CHANGED */
-	NODE_FLAGS_WATCH_TREE,
+	FILE_NOTIFY_CHANGE_EV_SUBDIR,
 
 	/* FILE_ACTION_DELETE_PENDING */
-	NODE_FLAGS_WATCH_TREE |
-	FILE_NOTIFY_VALID_MASK,
+	FILE_NOTIFY_CHANGE_EV_DELETE,
+
+	/* FILE_ACTION_HANDLE_CLOSED */
+	FILE_NOTIFY_CHANGE_EV_CLOSED,
 };
 static const int smb_notify_action_nelm =
 	sizeof (smb_notify_action_mask) /
 	sizeof (smb_notify_action_mask[0]);
 
 /*
- * smb_notify_sr
+ * smb_notify_ofile
  *
- * Post an event to an smb request waiting on some node.
- *
- * Note that node->fcn.mutex is held.  This implies a
- * lock order: node->fcn.mutex, then sr_mutex
+ * Post an event to the change notify buffer for this ofile,
+ * subject to the mask that selects subscribed event types.
+ * If an SR is waiting for events and we've delivered some,
+ * wake the SR.
  */
-static void
-smb_notify_sr(smb_request_t *sr, uint_t action, const char *name)
+void
+smb_notify_ofile(smb_ofile_t *of, uint_t action, const char *name)
 {
-	smb_notify_change_req_t	*ncr;
-	uint32_t	mask;
+	smb_notify_t	*nc;
+	smb_request_t	*sr;
+	uint32_t	filter, events;
 
-	SMB_REQ_VALID(sr);
-	ncr = &sr->sr_ncr;
+	SMB_OFILE_VALID(of);
+
+	mutex_enter(&of->f_mutex);
+	nc = &of->f_notify;
 
 	/*
-	 * Compute the completion filter mask bits for which
-	 * we will signal waiting notify requests.
+	 * Compute the filter & event bits for this action,
+	 * which determine whether we'll post the event.
+	 * Note: always sensitive to: delete, closed.
 	 */
+	filter = nc->nc_filter |
+	    FILE_NOTIFY_CHANGE_EV_DELETE |
+	    FILE_NOTIFY_CHANGE_EV_CLOSED;
 	VERIFY(action < smb_notify_action_nelm);
-	mask = smb_notify_action_mask[action];
+	events = smb_notify_action_mask[action];
+	if ((filter & events) == 0)
+		goto unlock_out;
 
-	mutex_enter(&sr->sr_mutex);
-	if (sr->sr_state == SMB_REQ_STATE_WAITING_EVENT &&
-	    (ncr->nc_flags & mask) != 0) {
-		sr->sr_state = SMB_REQ_STATE_EVENT_OCCURRED;
+	/*
+	 * OK, we're going to post this event.
+	 */
+	switch (action) {
+	case FILE_ACTION_ADDED:
+	case FILE_ACTION_REMOVED:
+	case FILE_ACTION_MODIFIED:
+	case FILE_ACTION_RENAMED_OLD_NAME:
+	case FILE_ACTION_RENAMED_NEW_NAME:
+	case FILE_ACTION_ADDED_STREAM:
+	case FILE_ACTION_REMOVED_STREAM:
+	case FILE_ACTION_MODIFIED_STREAM:
 		/*
-		 * Save event data in the sr_ncr field so the
-		 * reply handler can return it.
+		 * Append this event to the buffer.
+		 * Also keep track of events seen.
 		 */
-		ncr->nc_action = action;
-		if (name != NULL)
-			(void) strlcpy(ncr->nc_fname, name, MAXNAMELEN);
-		cv_signal(&ncr->nc_cv);
+		smb_notify_encode_action(of, action, name);
+		nc->nc_events |= events;
+		break;
+
+	case FILE_ACTION_SUBDIR_CHANGED:
+	case FILE_ACTION_DELETE_PENDING:
+	case FILE_ACTION_HANDLE_CLOSED:
+		/*
+		 * These are "internal" events, and therefore
+		 * are not appended to the response buffer.
+		 * Just record the event flags and wakeup.
+		 */
+		nc->nc_events |= events;
+		break;
+
+	default:
+		ASSERT(0);	/* bogus action */
+		break;
 	}
-	mutex_exit(&sr->sr_mutex);
+
+	sr = list_head(&nc->nc_waiters);
+	while (sr != NULL) {
+		smb_notify_wakeup(sr);
+		sr = list_next(&nc->nc_waiters, sr);
+	}
+
+unlock_out:
+	mutex_exit(&of->f_mutex);
+}
+
+/*
+ * Encode a FILE_NOTIFY_INFORMATION struct.
+ */
+static void
+smb_notify_encode_action(smb_ofile_t *of,
+    uint32_t action, const char *fname)
+{
+	smb_notify_t *nc = &of->f_notify;
+	mbuf_chain_t *mbc;
+	uint32_t namelen, totlen;
+
+	ASSERT(nc != NULL);
+	ASSERT(FILE_ACTION_ADDED <= action &&
+	    action <= FILE_ACTION_MODIFIED_STREAM);
+	ASSERT(fname != NULL);
+	ASSERT(MUTEX_HELD(&of->f_mutex));
+
+	/* Once we've run out of room, stop trying to append. */
+	if ((nc->nc_events & FILE_NOTIFY_CHANGE_EV_OVERFLOW) != 0)
+		return;
+
+	if (fname == NULL)
+		return;
+	namelen = smb_wcequiv_strlen(fname);
+	if (namelen == 0)
+		return;
+
+	/*
+	 * Layout is: 3 DWORDS, Unicode string, pad(4).
+	 */
+	mbc = &nc->nc_buffer;
+	totlen = (12 + namelen + 3) & ~3;
+	if (MBC_ROOM_FOR(mbc, totlen) == 0) {
+		nc->nc_events |= FILE_NOTIFY_CHANGE_EV_OVERFLOW;
+		return;
+	}
+
+	/*
+	 * Keep track of where this entry starts (nc_last_off)
+	 * because after we put all entries, we need to zap
+	 * the NextEntryOffset field in the last one.
+	 */
+	nc->nc_last_off = mbc->chain_offset;
+
+	/*
+	 * Encode this entry, then 4-byte alignment padding.
+	 *
+	 * Note that smb_mbc_encodef with a "U" code puts a
+	 * Unicode string with a null termination.  We don't
+	 * want a null, but do want alignment padding.  We
+	 * get that by encoding with "U.." at the end of the
+	 * encoding string, which gets us two bytes for the
+	 * Unicode NULL, and two more zeros for the "..".
+	 * We then "back up" the chain_offset (finger) so it's
+	 * correctly 4-byte aligned.  We will sometimes have
+	 * written a couple more bytes than needed, but we'll
+	 * just overwrite those with the next entry.  At the
+	 * end, we trim the mbuf chain to the correct length.
+	 */
+	(void) smb_mbc_encodef(mbc, "lllU..",
+	    totlen, /* NextEntryOffset */
+	    action, namelen, fname);
+	mbc->chain_offset = nc->nc_last_off + totlen;
 }

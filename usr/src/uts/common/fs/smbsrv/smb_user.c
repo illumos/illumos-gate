@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  */
 
@@ -210,6 +210,7 @@
 
 static int smb_user_enum_private(smb_user_t *, smb_svcenum_t *);
 static void smb_user_auth_logoff(smb_user_t *);
+static void smb_user_logoff_tq(void *);
 
 
 /*
@@ -266,6 +267,8 @@ smb_user_logon(
     uint32_t		privileges,
     uint32_t		audit_sid)
 {
+	ksocket_t authsock = NULL;
+	timeout_id_t tmo = NULL;
 
 	ASSERT(user->u_magic == SMB_USER_MAGIC);
 	ASSERT(cr);
@@ -279,7 +282,15 @@ smb_user_logon(
 		return (-1);
 	}
 
-	smb_authsock_close(user);
+	/*
+	 * In the transition from LOGGING_ON to LOGGED_ON,
+	 * we always have an auth. socket to close.
+	 */
+	authsock = user->u_authsock;
+	ASSERT(authsock != NULL);
+	user->u_authsock = NULL;
+	tmo = user->u_auth_tmo;
+	user->u_auth_tmo = NULL;
 
 	user->u_state = SMB_USER_STATE_LOGGED_ON;
 	user->u_flags = flags;
@@ -292,6 +303,13 @@ smb_user_logon(
 	smb_user_setcred(user, cr, privileges);
 
 	mutex_exit(&user->u_mutex);
+
+	/* Timeout callback takes u_mutex. See untimeout(9f) */
+	if (tmo != NULL)
+		(void) untimeout(tmo);
+
+	/* This close can block, so not under the mutex. */
+	smb_authsock_close(user, authsock);
 
 	return (0);
 }
@@ -306,19 +324,24 @@ void
 smb_user_logoff(
     smb_user_t		*user)
 {
+	ksocket_t authsock = NULL;
+	timeout_id_t tmo = NULL;
+
 	ASSERT(user->u_magic == SMB_USER_MAGIC);
 
 	mutex_enter(&user->u_mutex);
 	ASSERT(user->u_refcnt);
 	switch (user->u_state) {
-	case SMB_USER_STATE_LOGGING_ON: {
-		smb_authsock_close(user);
+	case SMB_USER_STATE_LOGGING_ON:
+		authsock = user->u_authsock;
+		user->u_authsock = NULL;
+		tmo = user->u_auth_tmo;
+		user->u_auth_tmo = NULL;
 		user->u_state = SMB_USER_STATE_LOGGED_OFF;
 		smb_server_dec_users(user->u_server);
 		break;
-	}
 
-	case SMB_USER_STATE_LOGGED_ON: {
+	case SMB_USER_STATE_LOGGED_ON:
 		/*
 		 * The user is moved into a state indicating that the log off
 		 * process has started.
@@ -331,7 +354,7 @@ smb_user_logoff(
 		user->u_state = SMB_USER_STATE_LOGGED_OFF;
 		smb_server_dec_users(user->u_server);
 		break;
-	}
+
 	case SMB_USER_STATE_LOGGED_OFF:
 	case SMB_USER_STATE_LOGGING_OFF:
 		break;
@@ -341,6 +364,15 @@ smb_user_logoff(
 		break;
 	}
 	mutex_exit(&user->u_mutex);
+
+	/* Timeout callback takes u_mutex. See untimeout(9f) */
+	if (tmo != NULL)
+		(void) untimeout(tmo);
+
+	/* This close can block, so not under the mutex. */
+	if (authsock != NULL) {
+		smb_authsock_close(user, authsock);
+	}
 }
 
 /*
@@ -409,6 +441,77 @@ smb_user_release(
 		break;
 	}
 	mutex_exit(&user->u_mutex);
+}
+
+/*
+ * Timeout handler for user logons that stay too long in
+ * state SMB_USER_STATE_LOGGING_ON.  This is setup by a
+ * timeout call in smb_authsock_open, and called in a
+ * callout thread, so schedule a taskq job to do the
+ * real work of logging off this user.
+ */
+void
+smb_user_auth_tmo(void *arg)
+{
+	smb_user_t *user = arg;
+	smb_request_t *sr;
+
+	SMB_USER_VALID(user);
+
+	/*
+	 * If we can't allocate a request, it means the
+	 * session is being torn down, so nothing to do.
+	 */
+	sr = smb_request_alloc(user->u_session, 0);
+	if (sr == NULL)
+		return;
+
+	/*
+	 * Check user state, and take a hold if it's
+	 * still logging on.  If not, we're done.
+	 */
+	mutex_enter(&user->u_mutex);
+	if (user->u_state != SMB_USER_STATE_LOGGING_ON) {
+		mutex_exit(&user->u_mutex);
+		smb_request_free(sr);
+		return;
+	}
+	/* smb_user_hold_internal */
+	user->u_refcnt++;
+	mutex_exit(&user->u_mutex);
+
+	/*
+	 * The user hold is given to the SR, and released in
+	 * smb_user_logoff_tq / smb_request_free
+	 */
+	sr->uid_user = user;
+	sr->user_cr = user->u_cred;
+	sr->sr_state = SMB_REQ_STATE_SUBMITTED;
+
+	(void) taskq_dispatch(
+	    user->u_server->sv_worker_pool,
+	    smb_user_logoff_tq, sr, TQ_SLEEP);
+}
+
+/*
+ * Helper for smb_user_auth_tmo()
+ */
+static void
+smb_user_logoff_tq(void *arg)
+{
+	smb_request_t	*sr = arg;
+
+	SMB_REQ_VALID(sr);
+
+	mutex_enter(&sr->sr_mutex);
+	sr->sr_worker = curthread;
+	sr->sr_state = SMB_REQ_STATE_ACTIVE;
+	mutex_exit(&sr->sr_mutex);
+
+	smb_user_logoff(sr->uid_user);
+
+	sr->sr_state = SMB_REQ_STATE_COMPLETED;
+	smb_request_free(sr);
 }
 
 /*
@@ -533,6 +636,7 @@ smb_user_delete(void *arg)
 	ASSERT(user->u_refcnt == 0);
 	ASSERT(user->u_state == SMB_USER_STATE_LOGGED_OFF);
 	ASSERT(user->u_authsock == NULL);
+	ASSERT(user->u_auth_tmo == NULL);
 
 	session = user->u_session;
 	smb_llist_enter(&session->s_user_list, RW_WRITER);

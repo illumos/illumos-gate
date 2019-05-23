@@ -231,9 +231,11 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	tsd_destroy;
 
 	tick_per_msec;
+	timeout;
 	tsignal;
 	uiomove;
 	uioskip;
+	untimeout;
 	usec_per_tick;
 	vcmn_err;
 	vmem_qcache_reap;

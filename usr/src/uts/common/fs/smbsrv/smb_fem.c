@@ -155,6 +155,11 @@ smb_fem_fini(void)
 	smb_fem_initialized = B_FALSE;
 }
 
+/*
+ * Install our fem hooks for change notify.
+ * Not using hold/rele function here because we
+ * remove the fem hooks before node destroy.
+ */
 int
 smb_fem_fcn_install(smb_node_t *node)
 {
@@ -163,7 +168,7 @@ smb_fem_fcn_install(smb_node_t *node)
 	if (smb_fcn_ops == NULL)
 		return (ENOSYS);
 	rc = fem_install(node->vp, smb_fcn_ops, (void *)node, OPARGUNIQ,
-	    (fem_func_t)smb_node_ref, (fem_func_t)smb_node_release);
+	    NULL, NULL);
 	return (rc);
 }
 

@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * SMB: lock_byte_range
@@ -72,11 +74,15 @@ smb_post_lock_byte_range(smb_request_t *sr)
 	DTRACE_SMB_1(op__LockByteRange__done, smb_request_t *, sr);
 }
 
+/*
+ * Legacy SMB command; takes an exclusive byte-range lock
+ */
 smb_sdrc_t
 smb_com_lock_byte_range(struct smb_request *sr)
 {
 	uint32_t	count;
 	uint32_t	off;
+	uint32_t	lk_pid;
 	DWORD		result;
 	int		rc;
 
@@ -90,14 +96,11 @@ smb_com_lock_byte_range(struct smb_request *sr)
 		return (SDRC_ERROR);
 	}
 
-	/*
-	 * The last parameter is lock type. This is dependent on
-	 * lock flag (3rd parameter). Since the lock flag is
-	 * set to be exclusive, lock type is passed as
-	 * normal lock (write lock).
-	 */
-	result = smb_lock_range(sr, (u_offset_t)off, (uint64_t)count,  0,
-	    SMB_LOCK_TYPE_READWRITE);
+	/* Note: SMB1 locking uses 16-bit PIDs. */
+	lk_pid = sr->smb_pid & 0xFFFF;
+
+	result = smb_lock_range(sr, (u_offset_t)off, (uint64_t)count,
+	    lk_pid, SMB_LOCK_TYPE_READWRITE, 0);
 	if (result != NT_STATUS_SUCCESS) {
 		smb_lock_range_error(sr, result);
 		return (SDRC_ERROR);

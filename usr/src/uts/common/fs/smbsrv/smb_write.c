@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sdt.h>
@@ -268,6 +268,7 @@ smb_sdrc_t
 smb_com_write_and_unlock(smb_request_t *sr)
 {
 	smb_rw_param_t *param = sr->arg.rw;
+	uint32_t lk_pid;
 	uint32_t status;
 	int rc = 0;
 
@@ -306,8 +307,12 @@ smb_com_write_and_unlock(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	status = smb_unlock_range(sr, sr->fid_ofile->f_node, param->rw_offset,
-	    (uint64_t)param->rw_count);
+
+	/* Note: SMB1 locking uses 16-bit PIDs. */
+	lk_pid = sr->smb_pid & 0xFFFF;
+
+	status = smb_unlock_range(sr, param->rw_offset,
+	    (uint64_t)param->rw_count, lk_pid);
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_error(sr, NT_STATUS_RANGE_NOT_LOCKED,
 		    ERRDOS, ERROR_NOT_LOCKED);

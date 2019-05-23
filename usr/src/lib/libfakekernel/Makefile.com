@@ -18,6 +18,7 @@ LIBRARY =	libfakekernel.a
 VERS =		.1
 
 COBJS = \
+	callout.o \
 	clock.o \
 	cond.o \
 	copy.o \

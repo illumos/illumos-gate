@@ -190,8 +190,9 @@
 		return (EINVAL); \
 	}
 
-#define	LOFI_TIMEOUT	30
+#define	LOFI_TIMEOUT	120
 
+int lofi_timeout = LOFI_TIMEOUT;
 static void *lofi_statep;
 static kmutex_t lofi_lock;		/* state lock */
 static id_space_t *lofi_id;		/* lofi ID values */
@@ -2782,25 +2783,36 @@ lofi_copy_devpath(struct lofi_ioctl *klip)
 	}
 
 	(void) snprintf(namebuf, sizeof (namebuf), "%d", klip->li_id);
-	ticks = ddi_get_lbolt() + LOFI_TIMEOUT * drv_usectohz(1000000);
 
 	mutex_enter(&lofi_devlink_cache.ln_lock);
-	error = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data, namebuf, &nvl);
-	while (error != 0) {
-		error = cv_timedwait(&lofi_devlink_cache.ln_cv,
-		    &lofi_devlink_cache.ln_lock, ticks);
-		if (error == -1)
-			break;
+	do {
 		error = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data,
 		    namebuf, &nvl);
-	}
 
-	if (nvl != NULL) {
-		if (nvlist_lookup_string(nvl, DEV_NAME, &str) == 0) {
-			(void) strlcpy(klip->li_devpath, str,
-			    sizeof (klip->li_devpath));
+		if (error != 0) {
+			/* No data in cache, wait for some. */
+			ticks = ddi_get_lbolt() +
+			    lofi_timeout * drv_usectohz(1000000);
+			error = cv_timedwait(&lofi_devlink_cache.ln_cv,
+			    &lofi_devlink_cache.ln_lock, ticks);
+			if (error == -1)
+				break;	/* timeout */
+			error = 1;
+			continue;	/* Read again. */
 		}
-	}
+
+		if (nvl != NULL) {
+			if (nvlist_lookup_string(nvl, DEV_NAME, &str) == 0) {
+				if (strncmp(str, "/dev/" LOFI_CHAR_NAME,
+				    sizeof ("/dev/" LOFI_CHAR_NAME) - 1) == 0) {
+					error = 1;
+					continue;
+				}
+				(void) strlcpy(klip->li_devpath, str,
+				    sizeof (klip->li_devpath));
+			}
+		}
+	} while (error != 0);
 	mutex_exit(&lofi_devlink_cache.ln_lock);
 }
 
@@ -3063,6 +3075,7 @@ lofi_unmap_file(struct lofi_ioctl *ulip, int byfilename,
 	/* Remove name from devlink cache */
 	mutex_enter(&lofi_devlink_cache.ln_lock);
 	(void) nvlist_remove_all(lofi_devlink_cache.ln_data, namebuf);
+	cv_broadcast(&lofi_devlink_cache.ln_cv);
 	mutex_exit(&lofi_devlink_cache.ln_lock);
 done:
 	mutex_exit(&lofi_lock);

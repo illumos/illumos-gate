@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * SMB Node State Machine
@@ -694,7 +694,7 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 	 * and get out of the way.  FILE_ACTION_DELETE_PENDING
 	 * is a special, internal-only action for this purpose.
 	 */
-	smb_notify_event(node, FILE_ACTION_DELETE_PENDING, NULL);
+	smb_node_notify_change(node, FILE_ACTION_DELETE_PENDING, NULL);
 
 	return (NT_STATUS_SUCCESS);
 }
@@ -847,73 +847,86 @@ smb_node_share_check(smb_node_t *node)
  */
 
 void
-smb_node_fcn_subscribe(smb_node_t *node, smb_request_t *sr)
+smb_node_fcn_subscribe(smb_node_t *node)
 {
-	smb_node_fcn_t		*fcn = &node->n_fcn;
 
-	mutex_enter(&fcn->fcn_mutex);
-	if (fcn->fcn_count == 0)
+	mutex_enter(&node->n_mutex);
+	if (node->n_fcn_count == 0)
 		(void) smb_fem_fcn_install(node);
-	fcn->fcn_count++;
-	list_insert_tail(&fcn->fcn_watchers, sr);
-	mutex_exit(&fcn->fcn_mutex);
+	node->n_fcn_count++;
+	mutex_exit(&node->n_mutex);
 }
 
 void
-smb_node_fcn_unsubscribe(smb_node_t *node, smb_request_t *sr)
+smb_node_fcn_unsubscribe(smb_node_t *node)
 {
-	smb_node_fcn_t		*fcn = &node->n_fcn;
 
-	mutex_enter(&fcn->fcn_mutex);
-	list_remove(&fcn->fcn_watchers, sr);
-	fcn->fcn_count--;
-	if (fcn->fcn_count == 0)
+	mutex_enter(&node->n_mutex);
+	node->n_fcn_count--;
+	if (node->n_fcn_count == 0)
 		smb_fem_fcn_uninstall(node);
-	mutex_exit(&fcn->fcn_mutex);
+	mutex_exit(&node->n_mutex);
 }
 
 void
 smb_node_notify_change(smb_node_t *node, uint_t action, const char *name)
 {
+	smb_ofile_t	*of;
+
 	SMB_NODE_VALID(node);
 
-	smb_notify_event(node, action, name);
+	smb_llist_enter(&node->n_ofile_list, RW_READER);
+	of = smb_llist_head(&node->n_ofile_list);
+	while (of) {
+		/*
+		 * We'd rather deliver events only to ofiles that have
+		 * subscribed.  There's no explicit synchronization with
+		 * where this flag is set, but other actions cause this
+		 * value to reach visibility soon enough for events to
+		 * start arriving by the time we need them to start.
+		 * Once nc_subscribed is set, it stays set for the
+		 * life of the ofile.
+		 */
+		if (of->f_notify.nc_subscribed)
+			smb_notify_ofile(of, action, name);
+		of = smb_llist_next(&node->n_ofile_list, of);
+	}
+	smb_llist_exit(&node->n_ofile_list);
 
 	/*
-	 * These two events come as a pair:
-	 *   FILE_ACTION_RENAMED_OLD_NAME
-	 *   FILE_ACTION_RENAMED_NEW_NAME
-	 * Only do the parent notify for "new".
+	 * After changes that add or remove a name,
+	 * we know the directory attributes changed,
+	 * and we can tell the immediate parent.
 	 */
-	if (action == FILE_ACTION_RENAMED_OLD_NAME)
-		return;
-
-	smb_node_notify_parents(node);
-}
-
-/*
- * smb_node_notify_parents
- *
- * Iterate up the directory tree notifying any parent
- * directories that are being watched for changes in
- * their sub directories.
- * Stop at the root node, which has a NULL parent node.
- */
-void
-smb_node_notify_parents(smb_node_t *dnode)
-{
-	smb_node_t *pnode;	/* parent */
-
-	SMB_NODE_VALID(dnode);
-	pnode = dnode->n_dnode;
-
-	while (pnode != NULL) {
-		SMB_NODE_VALID(pnode);
-		smb_notify_event(pnode, FILE_ACTION_SUBDIR_CHANGED, NULL);
-		/* cd .. */
-		dnode = pnode;
-		pnode = dnode->n_dnode;
+	switch (action) {
+	case FILE_ACTION_ADDED:
+	case FILE_ACTION_REMOVED:
+	case FILE_ACTION_RENAMED_NEW_NAME:
+		/*
+		 * Note: FILE_ACTION_RENAMED_OLD_NAME is intentionally
+		 * omitted, because it's always followed by another
+		 * event with FILE_ACTION_RENAMED_NEW_NAME posted to
+		 * the same directory, and we only need/want one.
+		 */
+		if (node->n_dnode != NULL) {
+			smb_node_notify_change(node->n_dnode,
+			    FILE_ACTION_MODIFIED, node->od_name);
+		}
+		break;
 	}
+
+	/*
+	 * If we wanted to support recursive notify events
+	 * (where a notify call on some directory receives
+	 * events from all objects below that directory),
+	 * we might deliver _SUBDIR_CHANGED to all our
+	 * parents, grandparents etc, here.  However, we
+	 * don't currently subscribe to changes on all the
+	 * child (and grandchild) objects that would be
+	 * needed to make that work. It's prohibitively
+	 * expensive to do that, and support for recursive
+	 * notify is optional anyway, so don't bother.
+	 */
 }
 
 /*
@@ -1195,6 +1208,7 @@ smb_node_free(smb_node_t *node)
 	node->n_magic = 0;
 	VERIFY(!list_link_active(&node->n_lnd));
 	VERIFY(node->n_lock_list.ll_count == 0);
+	VERIFY(node->n_wlock_list.ll_count == 0);
 	VERIFY(node->n_ofile_list.ll_count == 0);
 	VERIFY(node->n_oplock.ol_count == 0);
 	VERIFY(node->n_oplock.ol_xthread == NULL);
@@ -1221,9 +1235,8 @@ smb_node_constructor(void *buf, void *un, int kmflags)
 	    offsetof(smb_ofile_t, f_nnd));
 	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
-	mutex_init(&node->n_fcn.fcn_mutex, NULL, MUTEX_DEFAULT, NULL);
-	list_create(&node->n_fcn.fcn_watchers, sizeof (smb_request_t),
-	    offsetof(smb_request_t, sr_ncr.nc_lnd));
+	smb_llist_constructor(&node->n_wlock_list, sizeof (smb_lock_t),
+	    offsetof(smb_lock_t, l_lnd));
 	cv_init(&node->n_oplock.ol_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&node->n_oplock.ol_mutex, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&node->n_oplock.ol_grants, sizeof (smb_oplock_grant_t),
@@ -1249,9 +1262,8 @@ smb_node_destructor(void *buf, void *un)
 	rw_destroy(&node->n_lock);
 	cv_destroy(&node->n_oplock.ol_cv);
 	mutex_destroy(&node->n_oplock.ol_mutex);
-	list_destroy(&node->n_fcn.fcn_watchers);
-	mutex_destroy(&node->n_fcn.fcn_mutex);
 	smb_llist_destructor(&node->n_lock_list);
+	smb_llist_destructor(&node->n_wlock_list);
 	smb_llist_destructor(&node->n_ofile_list);
 	list_destroy(&node->n_oplock.ol_grants);
 }

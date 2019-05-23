@@ -281,8 +281,8 @@ main(int argc, char *argv[])
 		}
 
 		if (p_online(P_ALL_SIBLINGS, P_DISABLED) == -1) {
-			fprintf(stderr, "Failed to disable hyper-threading: "
-			    "%s\n", strerror(errno));
+			fprintf(stderr, "Failed to disable simultaneous "
+			    "multi-threading: %s\n", strerror(errno));
 			return (EXIT_FAILURE);
 		}
 

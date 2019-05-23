@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/atomic.h>
@@ -45,6 +45,25 @@ static volatile uint64_t smb_kids;
  * specifies it in seconds, so convert to minutes.
  */
 uint32_t smb_keep_alive = SMB_PI_KEEP_ALIVE_MIN / 60;
+
+/*
+ * There are many smbtorture test cases that send
+ * racing requests, and where the tests fail if we
+ * don't execute them in exactly the order sent.
+ * These are test bugs.  The protocol makes no
+ * guarantees about execution order of requests
+ * that are concurrently active.
+ *
+ * Nonetheless, smbtorture has many useful tests,
+ * so we have this work-around we can enable to
+ * basically force sequential execution.  When
+ * enabled, insert a delay after each request is
+ * issued a taskq job.  Enable this with mdb by
+ * setting smb_reader_delay to 10.  Don't make it
+ * more than 500 or so or the server will appear
+ * to be so slow that tests may time out.
+ */
+int smb_reader_delay = 0;  /* mSec. */
 
 static int  smbsr_newrq_initial(smb_request_t *);
 
@@ -417,6 +436,8 @@ smb_request_init_command_mbuf(smb_request_t *sr)
 void
 smb_request_cancel(smb_request_t *sr)
 {
+	void (*cancel_method)(smb_request_t *) = NULL;
+
 	mutex_enter(&sr->sr_mutex);
 	switch (sr->sr_state) {
 
@@ -424,36 +445,31 @@ smb_request_cancel(smb_request_t *sr)
 	case SMB_REQ_STATE_SUBMITTED:
 	case SMB_REQ_STATE_ACTIVE:
 	case SMB_REQ_STATE_CLEANED_UP:
-		sr->sr_state = SMB_REQ_STATE_CANCELED;
+		sr->sr_state = SMB_REQ_STATE_CANCELLED;
 		break;
 
+	case SMB_REQ_STATE_WAITING_AUTH:
+	case SMB_REQ_STATE_WAITING_FCN1:
 	case SMB_REQ_STATE_WAITING_LOCK:
+	case SMB_REQ_STATE_WAITING_PIPE:
 		/*
-		 * This request is waiting on a lock.  Wakeup everything
-		 * waiting on the lock so that the relevant thread regains
-		 * control and notices that is has been canceled.  The
-		 * other lock request threads waiting on this lock will go
-		 * back to sleep when they discover they are still blocked.
+		 * These are states that have a cancel_method.
+		 * Make the state change now, to ensure that
+		 * we call cancel_method exactly once.  Do the
+		 * method call below, after we drop sr_mutex.
+		 * When the cancelled request thread resumes,
+		 * it should re-take sr_mutex and set sr_state
+		 * to CANCELLED, then return STATUS_CANCELLED.
 		 */
-		sr->sr_state = SMB_REQ_STATE_CANCELED;
-
-		ASSERT(sr->sr_awaiting != NULL);
-		mutex_enter(&sr->sr_awaiting->l_mutex);
-		cv_broadcast(&sr->sr_awaiting->l_cv);
-		mutex_exit(&sr->sr_awaiting->l_mutex);
+		sr->sr_state = SMB_REQ_STATE_CANCEL_PENDING;
+		cancel_method = sr->cancel_method;
+		VERIFY(cancel_method != NULL);
 		break;
 
-	case SMB_REQ_STATE_WAITING_EVENT:
-		/*
-		 * This request is waiting in change notify.
-		 */
-		sr->sr_state = SMB_REQ_STATE_CANCELED;
-		cv_signal(&sr->sr_ncr.nc_cv);
-		break;
-
-	case SMB_REQ_STATE_EVENT_OCCURRED:
+	case SMB_REQ_STATE_WAITING_FCN2:
 	case SMB_REQ_STATE_COMPLETED:
-	case SMB_REQ_STATE_CANCELED:
+	case SMB_REQ_STATE_CANCEL_PENDING:
+	case SMB_REQ_STATE_CANCELLED:
 		/*
 		 * No action required for these states since the request
 		 * is completing.
@@ -465,6 +481,10 @@ smb_request_cancel(smb_request_t *sr)
 		SMB_PANIC();
 	}
 	mutex_exit(&sr->sr_mutex);
+
+	if (cancel_method != NULL) {
+		cancel_method(sr);
+	}
 }
 
 /*
@@ -632,6 +652,11 @@ smb_session_reader(smb_session_t *session)
 		sr = NULL;	/* enqueued or freed */
 		if (rc != 0)
 			break;
+
+		/* See notes where this is defined (above). */
+		if (smb_reader_delay) {
+			delay(MSEC_TO_TICK(smb_reader_delay));
+		}
 	}
 	return (rc);
 }
@@ -1170,8 +1195,8 @@ smb_session_disconnect_share(
 	while (tree) {
 		ASSERT3U(tree->t_magic, ==, SMB_TREE_MAGIC);
 		ASSERT(tree->t_session == session);
-		smb_session_cancel_requests(session, tree, NULL);
 		smb_tree_disconnect(tree, B_TRUE);
+		smb_session_cancel_requests(session, tree, NULL);
 		next = smb_session_lookup_share(session, sharename, tree);
 		smb_tree_release(tree);
 		tree = next;
@@ -1343,7 +1368,6 @@ smb_request_alloc(smb_session_t *session, int req_length)
 	bzero(sr, sizeof (smb_request_t));
 
 	mutex_init(&sr->sr_mutex, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&sr->sr_ncr.nc_cv, NULL, CV_DEFAULT, NULL);
 	smb_srm_init(sr);
 	sr->session = session;
 	sr->sr_server = session->s_server;
@@ -1400,7 +1424,6 @@ smb_request_free(smb_request_t *sr)
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 	ASSERT(sr->session);
 	ASSERT(sr->r_xa == NULL);
-	ASSERT(sr->sr_ncr.nc_fname == NULL);
 
 	if (sr->fid_ofile != NULL) {
 		smb_ofile_request_complete(sr->fid_ofile);
@@ -1412,6 +1435,12 @@ smb_request_free(smb_request_t *sr)
 
 	if (sr->uid_user != NULL)
 		smb_user_release(sr->uid_user);
+
+	/*
+	 * The above may have left work on the delete queues
+	 */
+	smb_llist_flush(&sr->session->s_tree_list);
+	smb_llist_flush(&sr->session->s_user_list);
 
 	smb_slist_remove(&sr->session->s_req_list, sr);
 
@@ -1429,7 +1458,6 @@ smb_request_free(smb_request_t *sr)
 		m_freem(sr->raw_data.chain);
 
 	sr->sr_magic = 0;
-	cv_destroy(&sr->sr_ncr.nc_cv);
 	mutex_destroy(&sr->sr_mutex);
 	kmem_cache_free(smb_cache_request, sr);
 }

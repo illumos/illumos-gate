@@ -186,7 +186,7 @@ smb_oplock_acquire(smb_request_t *sr, smb_node_t *node, smb_ofile_t *ofile)
 		if ((!op->op_oplock_levelII) ||
 		    (!smb_session_levelII_oplocks(session)) ||
 		    (smb_oplock_exclusive_grant(grants) != NULL) ||
-		    (smb_lock_range_access(sr, node, 0, 0, B_FALSE))) {
+		    (smb_lock_range_access(sr, node, 0, ~0, B_FALSE))) {
 			/*
 			 * LevelII (shared) oplock not allowed,
 			 * so reply with "none".
@@ -244,6 +244,7 @@ smb_oplock_break(smb_request_t *sr, smb_node_t *node, uint32_t flags)
 {
 	smb_oplock_t		*ol;
 	smb_oplock_grant_t	*og;
+	smb_ofile_t		*ofile;
 	list_t			*grants;
 	uint32_t		timeout;
 	uint8_t			brk;
@@ -262,6 +263,7 @@ smb_oplock_break(smb_request_t *sr, smb_node_t *node, uint32_t flags)
 	}
 
 	SMB_OPLOCK_GRANT_VALID(og);
+	ofile = og->og_ofile;	/* containing struct */
 
 	/* break levelII oplocks */
 	if (og->og_level == SMB_OPLOCK_LEVEL_II) {
@@ -283,7 +285,7 @@ smb_oplock_break(smb_request_t *sr, smb_node_t *node, uint32_t flags)
 	}
 
 	if ((flags & SMB_OPLOCK_BREAK_TO_LEVEL_II) &&
-	    smb_session_levelII_oplocks(og->og_session)) {
+	    smb_session_levelII_oplocks(ofile->f_session)) {
 		brk = SMB_OPLOCK_BREAK_TO_LEVEL_II;
 	} else {
 		brk = SMB_OPLOCK_BREAK_TO_NONE;
@@ -308,8 +310,7 @@ smb_oplock_break(smb_request_t *sr, smb_node_t *node, uint32_t flags)
 		return (EAGAIN);
 	}
 
-	if (sr && (sr->session == og->og_session) &&
-	    (sr->smb_uid == og->og_uid)) {
+	if (sr && (sr->uid_user == ofile->f_user)) {
 		timeout = smb_oplock_min_timeout;
 	} else {
 		timeout = smb_oplock_timeout;
@@ -415,11 +416,11 @@ smb_oplock_sched_async_break(smb_oplock_grant_t *og, uint8_t brk)
 	 * These holds are released via smb_request_free after
 	 * the oplock break has been sent.
 	 */
-	ofile = og->og_ofile;
+	ofile = og->og_ofile;	/* containing struct */
 	if (!smb_ofile_hold(ofile))
 		return;
 
-	if ((sr = smb_request_alloc(og->og_session, 0)) == NULL) {
+	if ((sr = smb_request_alloc(ofile->f_session, 0)) == NULL) {
 		smb_ofile_release(ofile);
 		return;
 	}
@@ -702,10 +703,7 @@ smb_oplock_set_grant(smb_ofile_t *of, uint8_t level)
 	og->og_breaking = 0;
 	og->og_level = level;
 	og->og_ofile = of;
-	og->og_fid = of->f_fid;
-	og->og_tid = of->f_tree->t_tid;
-	og->og_uid = of->f_user->u_uid;
-	og->og_session = of->f_session;
+
 	return (og);
 }
 

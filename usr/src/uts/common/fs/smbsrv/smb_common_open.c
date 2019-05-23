@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -309,6 +309,14 @@ smb_open_subr(smb_request_t *sr)
 	uint32_t	uniq_fid;
 	smb_pathname_t	*pn = &op->fqi.fq_path;
 	smb_server_t	*sv = sr->sr_server;
+
+	/* Get out now if we've been cancelled. */
+	mutex_enter(&sr->sr_mutex);
+	if (sr->sr_state != SMB_REQ_STATE_ACTIVE) {
+		mutex_exit(&sr->sr_mutex);
+		return (NT_STATUS_CANCELLED);
+	}
+	mutex_exit(&sr->sr_mutex);
 
 	is_dir = (op->create_options & FILE_DIRECTORY_FILE) ? 1 : 0;
 

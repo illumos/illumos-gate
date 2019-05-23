@@ -2353,7 +2353,7 @@ cpuid_scan_security(cpu_t *cpu, uchar_t *featureset)
 	 * lesser privilege level or we are halting the CPU. For L1TF we need to
 	 * flush the L1D cache at VM entry. When we have microcode that handles
 	 * MDS, the L1D flush also clears the other u-arch state that the
-	 * mb_clear does.
+	 * md_clear does.
 	 */
 
 	/*

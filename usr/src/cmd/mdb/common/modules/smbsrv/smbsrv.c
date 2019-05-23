@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 #include <mdb/mdb_modapi.h>
@@ -2092,20 +2092,37 @@ smb_vfs_walk_step(mdb_walk_state_t *wsp)
 typedef struct mdb_smb_node {
 	smb_node_state_t	n_state;
 	uint32_t		n_refcnt;
-
 	uint32_t		n_open_count;
 	uint32_t		n_opening_count;
 	smb_llist_t		n_ofile_list;
 	smb_llist_t		n_lock_list;
 	volatile int		flags;
-	smb_node_fcn_t		n_fcn;
 	smb_oplock_t		n_oplock;
 	struct smb_node		*n_dnode;
 	struct smb_node		*n_unode;
 	char			od_name[MAXNAMELEN];
 	vnode_t			*vp;
 	smb_audit_buf_node_t	*n_audit_buf;
+	/* Newer members (not in old kernels) - keep last! */
+	smb_llist_t		n_wlock_list;
 } mdb_smb_node_t;
+typedef struct mdb_smb_node_old {
+	/* Note: MUST be layout as above! */
+	smb_node_state_t	n_state;
+	uint32_t		n_refcnt;
+	uint32_t		n_open_count;
+	uint32_t		n_opening_count;
+	smb_llist_t		n_ofile_list;
+	smb_llist_t		n_lock_list;
+	volatile int		flags;
+	smb_oplock_t		n_oplock;
+	struct smb_node		*n_dnode;
+	struct smb_node		*n_unode;
+	char			od_name[MAXNAMELEN];
+	vnode_t			*vp;
+	smb_audit_buf_node_t	*n_audit_buf;
+	/* Newer members omitted from _old */
+} mdb_smb_node_old_t;
 
 static void
 smbnode_help(void)
@@ -2130,6 +2147,7 @@ smbnode_help(void)
 static int
 smbnode_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+	static smb_llist_t zero_llist = {0};
 	mdb_smb_node_t	node;
 	int		rc;
 	int		verbose = FALSE;
@@ -2162,34 +2180,21 @@ smbnode_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	/*
-	 * If this is the first invocation of the command, print a nice
-	 * header line for the output that will follow.
-	 */
-	if (DCMD_HDRSPEC(flags)) {
-		if (verbose) {
-			mdb_printf("%<b>%<u>SMB node information:%</u>%</b>\n");
-		} else {
-			mdb_printf(
-			    "%<b>%<u>%-?s "
-			    "%-?s "
-			    "%-18s "
-			    "%-6s "
-			    "%-6s "
-			    "%-8s "
-			    "%-6s%</u>%</b>\n",
-			    "ADDR", "VP", "NODE-NAME", "OFILES", "LOCKS",
-			    "OPLOCK", "REF");
-		}
-	}
-
-	/*
 	 * For each smb_node, we just need to read the smb_node_t struct, read
 	 * and then print out the following fields.
 	 */
 	if (mdb_ctf_vread(&node, SMBSRV_SCOPE "smb_node_t",
 	    "mdb_smb_node_t", addr, 0) < 0) {
-		mdb_warn("failed to read struct smb_node at %p", addr);
-		return (DCMD_ERR);
+		/*
+		 * Fall-back handling for mdb_smb_node_old_t
+		 * Should remove after a while.
+		 */
+		if (mdb_ctf_vread(&node, SMBSRV_SCOPE "smb_node_t",
+		    "mdb_smb_node_old_t", addr, 0) < 0) {
+			mdb_warn("failed to read struct smb_node at %p", addr);
+			return (DCMD_ERR);
+		}
+		node.n_wlock_list = zero_llist;
 	}
 
 	(void) mdb_snprintf(od_name, sizeof (od_name), "%s",
@@ -2205,25 +2210,43 @@ smbnode_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 	}
 	if (verbose) {
-		int nll_off, nol_off, ll_off;
+		int nll_off, wll_off, nol_off, ll_off;
 
 		GET_OFFSET(nll_off, smb_node_t, n_lock_list);
 		GET_OFFSET(nol_off, smb_node_t, n_oplock);
 		GET_OFFSET(ll_off, smb_llist_t, ll_list);
+		/* This one is optional (for now). */
+		/* GET_OFFSET(wll_off, smb_node_t, n_wlock_list); */
+		wll_off = mdb_ctf_offsetof_by_name(
+		    "smb_node_t", "n_wlock_list");
 
+		mdb_printf("%<b>%<u>SMB node information "
+		    "(%p):%</u>%</b>\n", addr);
 		mdb_printf("VP: %p\n", node.vp);
 		mdb_printf("Name: %s\n", od_name);
 		if (print_full_path)
 			mdb_printf("V-node Path: %s\n", path_name);
 		mdb_printf("Ofiles: %u\n", node.n_ofile_list.ll_count);
-		mdb_printf("Range Locks: %u\n",
+		mdb_printf("Granted Locks: %u\n",
 		    node.n_lock_list.ll_count);
 		if (node.n_lock_list.ll_count != 0) {
 			(void) mdb_inc_indent(SMB_DCMD_INDENT);
 			list_addr = addr + nll_off + ll_off;
 			if (mdb_pwalk_dcmd("list", "smblock", 0,
 			    NULL, list_addr)) {
-				mdb_warn("failed to walk node's active"
+				mdb_warn("failed to walk node's granted"
+				    " locks");
+			}
+			(void) mdb_dec_indent(SMB_DCMD_INDENT);
+		}
+		mdb_printf("Waiting Locks: %u\n",
+		    node.n_wlock_list.ll_count);
+		if (node.n_wlock_list.ll_count != 0 && wll_off != -1) {
+			(void) mdb_inc_indent(SMB_DCMD_INDENT);
+			list_addr = addr + wll_off + ll_off;
+			if (mdb_pwalk_dcmd("list", "smblock", 0,
+			    NULL, list_addr)) {
+				mdb_warn("failed to walk node's waiting"
 				    " locks");
 			}
 			(void) mdb_dec_indent(SMB_DCMD_INDENT);
@@ -2241,9 +2264,23 @@ smbnode_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 		mdb_printf("Reference Count: %u\n\n", node.n_refcnt);
 	} else {
-		mdb_printf("%-?p %-?p %-18s %-6d %-6d %-8d %-6d ",
+		if (DCMD_HDRSPEC(flags)) {
+			mdb_printf(
+			    "%<b>%<u>%-?s "
+			    "%-?s "
+			    "%-18s "
+			    "%-6s "
+			    "%-6s "
+			    "%-8s "
+			    "%-8s "
+			    "%-6s%</u>%</b>\n",
+			    "ADDR", "VP", "NODE-NAME", "OFILES", "LOCKS",
+			    "WLOCKS", "OPLOCK", "REF");
+		}
+
+		mdb_printf("%-?p %-?p %-18s %-6d %-6d %-8d %-8d %-6d ",
 		    addr, node.vp, od_name, node.n_ofile_list.ll_count,
-		    node.n_lock_list.ll_count,
+		    node.n_lock_list.ll_count, node.n_wlock_list.ll_count,
 		    node.n_oplock.ol_count, node.n_refcnt);
 
 		if (print_full_path)
@@ -2374,28 +2411,33 @@ smb_node_walk_step(mdb_walk_state_t *wsp)
  */
 
 typedef struct mdb_smb_lock {
-	smb_slist_t		l_conflict_list;
-
-	smb_session_t		*l_session;
 	smb_ofile_t		*l_file;
-	struct smb_request	*l_sr;
-
-	uint32_t		l_flags;
-	struct smb_lock		*l_blocked_by; /* Debug info only */
-
-	uint32_t		l_pid;
-	uint16_t		l_uid;
-	uint32_t		l_type;
+	struct smb_lock		*l_blocked_by;
 	uint64_t		l_start;
 	uint64_t		l_length;
+	uint32_t		l_pid;
+	uint32_t		l_type;
+	uint32_t		l_flags;
+	/* Newer members (not in old kernels) - keep last! */
+	uint32_t		l_conflicts;
 } mdb_smb_lock_t;
+typedef struct mdb_smb_lock_old {
+	/* Note: MUST be same layout as above! */
+	smb_ofile_t		*l_file;
+	struct smb_lock		*l_blocked_by;
+	uint64_t		l_start;
+	uint64_t		l_length;
+	uint32_t		l_pid;
+	uint32_t		l_type;
+	uint32_t		l_flags;
+	/* Newer members omitted from _old */
+} mdb_smb_lock_old_t;
 
 static int
 smblock_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	mdb_smb_lock_t	lock;
 	int		verbose = FALSE;
-	uintptr_t	list_addr;
 	char		*lock_type;
 
 	if (mdb_getopts(argc, argv,
@@ -2409,23 +2451,18 @@ smblock_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
-	/*
-	 * If this is the first invocation of the command, print a nice
-	 * header line for the output that will follow.
-	 */
-	if (DCMD_HDRSPEC(flags)) {
-		if (verbose)
-			mdb_printf("SMB lock information:\n\n");
-		else
-			mdb_printf("%<u>%-?s %4s %16s %8s %9s%</u>\n",
-			    "Locks: ", "TYPE", "START", "LENGTH",
-			    "CONFLICTS");
-	}
-
 	if (mdb_ctf_vread(&lock, SMBSRV_SCOPE "smb_lock_t",
 	    "mdb_smb_lock_t", addr, 0) < 0) {
-		mdb_warn("failed to read struct smb_request at %p", addr);
-		return (DCMD_ERR);
+		/*
+		 * Fall-back handling for mdb_smb_lock_old_t
+		 * Should remove after a while.
+		 */
+		if (mdb_ctf_vread(&lock, SMBSRV_SCOPE "smb_lock_t",
+		    "mdb_smb_lock_old_t", addr, 0) < 0) {
+			mdb_warn("failed to read struct smb_lock at %p", addr);
+			return (DCMD_ERR);
+		}
+		lock.l_conflicts = 0;
 	}
 
 	switch (lock.l_type) {
@@ -2436,50 +2473,39 @@ smblock_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		lock_type = "RO";
 		break;
 	default:
-		lock_type = "N/A";
+		lock_type = "?";
 		break;
 	}
 	if (verbose) {
-		int lcl_off, sl_off;
-
-		GET_OFFSET(lcl_off, smb_lock_t, l_conflict_list);
-		GET_OFFSET(sl_off, smb_slist_t, sl_list);
+		mdb_printf("%<b>%<u>SMB lock information "
+		    "(%p):%</u>%</b>\n", addr);
 
 		mdb_printf("Type             :\t%s (%u)\n",
 		    lock_type, lock.l_type);
-		mdb_printf("Start            :\t%llx\n",
+		mdb_printf("Start            :\t%llu\n",
 		    lock.l_start);
-		mdb_printf("Length           :\t%lx\n",
+		mdb_printf("Length           :\t%llu\n",
 		    lock.l_length);
-		mdb_printf("Session          :\t%p\n",
-		    lock.l_session);
-		mdb_printf("File             :\t%p\n",
+		mdb_printf("OFile            :\t%p\n",
 		    lock.l_file);
-		mdb_printf("User ID          :\t%u\n",
-		    lock.l_uid);
 		mdb_printf("Process ID       :\t%u\n",
 		    lock.l_pid);
 		mdb_printf("Conflicts        :\t%u\n",
-		    lock.l_conflict_list.sl_count);
-		if (lock.l_conflict_list.sl_count != 0) {
-			(void) mdb_inc_indent(SMB_DCMD_INDENT);
-			list_addr = addr + lcl_off + sl_off;
-			if (mdb_pwalk_dcmd("list", "smb_lock",
-			    0, NULL, list_addr)) {
-				mdb_warn("failed to walk conflict "
-				    "locks ");
-			}
-			(void) mdb_dec_indent(SMB_DCMD_INDENT);
-		}
+		    lock.l_conflicts);
 		mdb_printf("Blocked by       :\t%p\n",
 		    lock.l_blocked_by);
 		mdb_printf("Flags            :\t0x%x\n",
 		    lock.l_flags);
 		mdb_printf("\n");
 	} else {
-		mdb_printf("%?p %4s %16llx %08lx %9x", addr,
-		    lock_type, lock.l_start, lock.l_length,
-		    lock.l_conflict_list.sl_count);
+		if (DCMD_HDRSPEC(flags)) {
+			mdb_printf("%<u>%-?s %4s %16s %8s %9s %-?s%</u>\n",
+			    "Locks: ", "TYPE", "START", "LENGTH",
+			    "CONFLICTS", "BLOCKED-BY");
+		}
+		mdb_printf("%?p %4s %16llx %08llx %9u %?p",
+		    addr, lock_type, lock.l_start, lock.l_length,
+		    lock.l_conflicts, lock.l_blocked_by);
 	}
 
 	return (DCMD_OK);
@@ -2494,10 +2520,6 @@ smblock_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 typedef struct mdb_smb_oplock_grant {
 	uint8_t			og_breaking;
 	uint8_t			og_level;
-	uint16_t		og_fid;
-	uint16_t		og_tid;
-	uint16_t		og_uid;
-	struct smb_session	*og_session;
 	struct smb_ofile	*og_ofile;
 } mdb_smb_oplock_grant_t;
 

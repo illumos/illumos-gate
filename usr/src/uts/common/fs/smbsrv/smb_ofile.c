@@ -20,9 +20,9 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -189,8 +189,6 @@ smb_ofile_open(
 	uint16_t	fid;
 	smb_attr_t	attr;
 	int		rc;
-	enum errstates { EMPTY, FIDALLOC, CRHELD, MUTEXINIT };
-	enum errstates	state = EMPTY;
 
 	if (smb_idpool_alloc(&tree->t_fid_pool, &fid)) {
 		err->status = NT_STATUS_TOO_MANY_OPENED_FILES;
@@ -198,11 +196,16 @@ smb_ofile_open(
 		err->errcode = ERROR_TOO_MANY_OPEN_FILES;
 		return (NULL);
 	}
-	state = FIDALLOC;
 
 	of = kmem_cache_alloc(smb_cache_ofile, KM_SLEEP);
 	bzero(of, sizeof (smb_ofile_t));
 	of->f_magic = SMB_OFILE_MAGIC;
+
+	mutex_init(&of->f_mutex, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&of->f_notify.nc_waiters, sizeof (smb_request_t),
+	    offsetof(smb_request_t, sr_waiters));
+
+	of->f_state = SMB_OFILE_STATE_OPEN;
 	of->f_refcnt = 1;
 	of->f_fid = fid;
 	of->f_uniqid = uniqid;
@@ -213,10 +216,10 @@ smb_ofile_open(
 	of->f_cr = (op->create_options & FILE_OPEN_FOR_BACKUP_INTENT) ?
 	    smb_user_getprivcred(sr->uid_user) : sr->uid_user->u_cred;
 	crhold(of->f_cr);
-	state = CRHELD;
 	of->f_ftype = ftype;
 	of->f_server = tree->t_server;
 	of->f_session = tree->t_session;
+
 	/*
 	 * grab a ref for of->f_user
 	 * released in smb_ofile_delete()
@@ -225,10 +228,6 @@ smb_ofile_open(
 	of->f_user = sr->uid_user;
 	of->f_tree = tree;
 	of->f_node = node;
-
-	mutex_init(&of->f_mutex, NULL, MUTEX_DEFAULT, NULL);
-	state = MUTEXINIT;
-	of->f_state = SMB_OFILE_STATE_OPEN;
 
 	if (ftype == SMB_FTYPE_MESG_PIPE) {
 		/* See smb_opipe_open. */
@@ -246,9 +245,14 @@ smb_ofile_open(
 		if ((of->f_granted_access & FILE_DATA_ALL) == FILE_EXECUTE)
 			of->f_flags |= SMB_OFLAGS_EXECONLY;
 
+		/*
+		 * This is an "internal" getattr because we need the
+		 * UID and DOS attributes.  Don't want to fail here
+		 * due to permissions, so use kcred.
+		 */
 		bzero(&attr, sizeof (smb_attr_t));
 		attr.sa_mask = SMB_AT_UID | SMB_AT_DOSATTR;
-		rc = smb_node_getattr(NULL, node, of->f_cr, NULL, &attr);
+		rc = smb_node_getattr(NULL, node, zone_kcred(), NULL, &attr);
 		if (rc != 0) {
 			err->status = NT_STATUS_INTERNAL_ERROR;
 			err->errcls = ERRDOS;
@@ -299,22 +303,17 @@ smb_ofile_open(
 	return (of);
 
 errout:
-	switch (state) {
-	case MUTEXINIT:
-		mutex_destroy(&of->f_mutex);
-		smb_user_release(of->f_user);
-		/*FALLTHROUGH*/
-	case CRHELD:
-		crfree(of->f_cr);
-		of->f_magic = 0;
-		kmem_cache_free(smb_cache_ofile, of);
-		/*FALLTHROUGH*/
-	case FIDALLOC:
-		smb_idpool_free(&tree->t_fid_pool, fid);
-		/*FALLTHROUGH*/
-	case EMPTY:
-		break;
-	}
+	smb_user_release(of->f_user);
+	crfree(of->f_cr);
+
+	list_destroy(&of->f_notify.nc_waiters);
+	mutex_destroy(&of->f_mutex);
+
+	of->f_magic = 0;
+	kmem_cache_free(smb_cache_ofile, of);
+
+	smb_idpool_free(&tree->t_fid_pool, fid);
+
 	return (NULL);
 }
 
@@ -395,6 +394,25 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 			 */
 			if (of->f_odir != NULL)
 				smb_odir_close(of->f_odir);
+			/*
+			 * Cancel any notify change requests that
+			 * might be watching this open file (dir),
+			 * and unsubscribe it from node events.
+			 *
+			 * Can't hold f_mutex when calling smb_notify_ofile.
+			 * Don't really need it when unsubscribing, but
+			 * harmless, and consistent with subscribing.
+			 */
+			if (of->f_notify.nc_subscribed)
+				smb_notify_ofile(of,
+				    FILE_ACTION_HANDLE_CLOSED, NULL);
+			mutex_enter(&of->f_mutex);
+			if (of->f_notify.nc_subscribed) {
+				of->f_notify.nc_subscribed = B_FALSE;
+				smb_node_fcn_unsubscribe(of->f_node);
+				of->f_notify.nc_filter = 0;
+			}
+			mutex_exit(&of->f_mutex);
 		}
 		if (smb_node_dec_open_ofiles(of->f_node) == 0) {
 			/*
@@ -424,13 +442,6 @@ smb_ofile_close(smb_ofile_t *of, int32_t mtime_sec)
 			(void) smb_node_setattr(NULL, of->f_node,
 			    of->f_cr, NULL, pa);
 		}
-
-		/*
-		 * Cancel any notify change requests that
-		 * may be using this open instance.
-		 */
-		if (of->f_node->n_fcn.fcn_count)
-			smb_notify_file_closed(of);
 
 		smb_server_dec_files(of->f_server);
 		break;
@@ -969,6 +980,21 @@ smb_ofile_delete(void *arg)
 	atomic_dec_32(&tree->t_session->s_file_cnt);
 	smb_llist_exit(&tree->t_ofile_list);
 
+	/*
+	 * Remove this ofile from the node's n_ofile_list so it
+	 * can't be found by list walkers like notify or oplock.
+	 * Keep the node ref. until later in this function so
+	 * of->f_node remains valid while we destroy the ofile.
+	 */
+	if (of->f_ftype == SMB_FTYPE_DISK ||
+	    of->f_ftype == SMB_FTYPE_PRINTER) {
+		ASSERT(of->f_node != NULL);
+		/*
+		 * Note smb_ofile_close did smb_node_dec_open_ofiles()
+		 */
+		smb_node_rem_ofile(of->f_node, of);
+	}
+
 	mutex_enter(&of->f_mutex);
 	mutex_exit(&of->f_mutex);
 
@@ -979,9 +1005,16 @@ smb_ofile_delete(void *arg)
 		of->f_pipe = NULL;
 		break;
 	case SMB_FTYPE_DISK:
+		ASSERT(of->f_notify.nc_subscribed == B_FALSE);
+		MBC_FLUSH(&of->f_notify.nc_buffer);
 		if (of->f_odir != NULL)
 			smb_odir_release(of->f_odir);
-		smb_node_rem_ofile(of->f_node, of);
+		/* FALLTHROUGH */
+	case SMB_FTYPE_PRINTER:
+		/*
+		 * Did smb_node_rem_ofile above.
+		 */
+		ASSERT(of->f_node != NULL);
 		smb_node_release(of->f_node);
 		break;
 	default:
@@ -990,9 +1023,10 @@ smb_ofile_delete(void *arg)
 	}
 
 	of->f_magic = (uint32_t)~SMB_OFILE_MAGIC;
+	list_destroy(&of->f_notify.nc_waiters);
 	mutex_destroy(&of->f_mutex);
-	crfree(of->f_cr);
 	smb_user_release(of->f_user);
+	crfree(of->f_cr);
 	kmem_cache_free(smb_cache_ofile, of);
 }
 

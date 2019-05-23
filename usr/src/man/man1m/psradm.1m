@@ -59,10 +59,10 @@ devices.
 .LP
 With the \fB-aS\fR option, simultaneous multi-threading is disabled. The -a
 option means "apply to every core" and is currently required. Each CPU core has
-its SMT siblings in the \fBdisabled\fR state, and will effectively stay unused.
-That is, only one CPU in each core will be processing I/O, scheduling processes,
-etc. A CPU can only be moved back out of the \fBdisabled\fR state with the
-\fB-F\fR option.
+its SMT siblings placed in the \fBdisabled\fR state, and they will effectively
+stay unused. That is, only one CPU in each core will be processing I/O,
+scheduling processes, etc. A CPU can only be moved back out of the
+\fBdisabled\fR state with the \fB-F\fR option.
 .sp
 .LP
 A processor can not be taken \fBoff-line\fR, \fBdisabled\fR, or made \fBspare\fR

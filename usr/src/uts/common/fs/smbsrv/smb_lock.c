@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -38,17 +38,24 @@
 
 extern caller_context_t smb_ct;
 
+#ifdef	DEBUG
+int smb_lock_debug = 0;
+static void smb_lock_dump1(smb_lock_t *);
+static void smb_lock_dumplist(smb_llist_t *);
+static void smb_lock_dumpnode(smb_node_t *);
+#endif
+
 static void smb_lock_posix_unlock(smb_node_t *, smb_lock_t *, cred_t *);
 static boolean_t smb_is_range_unlocked(uint64_t, uint64_t, uint32_t,
     smb_llist_t *, uint64_t *);
 static int smb_lock_range_overlap(smb_lock_t *, uint64_t, uint64_t);
-static uint32_t smb_lock_range_lckrules(smb_request_t *, smb_ofile_t *,
-    smb_node_t *, smb_lock_t *, smb_lock_t **);
-static clock_t smb_lock_wait(smb_request_t *, smb_lock_t *, smb_lock_t *);
-static uint32_t smb_lock_range_ulckrules(smb_request_t *, smb_node_t *,
-    uint64_t, uint64_t, smb_lock_t **nodelock);
+static uint32_t smb_lock_range_lckrules(smb_ofile_t *, smb_lock_t *,
+    smb_lock_t **);
+static uint32_t smb_lock_wait(smb_request_t *, smb_lock_t *, smb_lock_t *);
+static uint32_t smb_lock_range_ulckrules(smb_ofile_t *,
+    uint64_t, uint64_t, uint32_t, smb_lock_t **);
 static smb_lock_t *smb_lock_create(smb_request_t *, uint64_t, uint64_t,
-    uint32_t, uint32_t);
+    uint32_t, uint32_t, uint32_t);
 static void smb_lock_destroy(smb_lock_t *);
 static void smb_lock_free(smb_lock_t *);
 
@@ -90,30 +97,54 @@ smb_lock_get_lock_count(smb_node_t *node, smb_ofile_t *of)
 uint32_t
 smb_unlock_range(
     smb_request_t	*sr,
-    smb_node_t		*node,
     uint64_t		start,
-    uint64_t		length)
+    uint64_t		length,
+    uint32_t		pid)
 {
+	smb_ofile_t	*file = sr->fid_ofile;
+	smb_node_t	*node = file->f_node;
 	smb_lock_t	*lock = NULL;
 	uint32_t	status;
 
+	if (length > 1 &&
+	    (start + length) < start)
+		return (NT_STATUS_INVALID_LOCK_RANGE);
+
+#ifdef	DEBUG
+	if (smb_lock_debug) {
+		cmn_err(CE_CONT, "smb_unlock_range "
+		    "off=0x%llx, len=0x%llx, f=%p, pid=%d\n",
+		    (long long)start, (long long)length,
+		    (void *)sr->fid_ofile, pid);
+	}
+#endif
+
 	/* Apply unlocking rules */
 	smb_llist_enter(&node->n_lock_list, RW_WRITER);
-	status = smb_lock_range_ulckrules(sr, node, start, length, &lock);
+	status = smb_lock_range_ulckrules(file, start, length, pid, &lock);
 	if (status != NT_STATUS_SUCCESS) {
 		/*
 		 * If lock range is not matching in the list
 		 * return error.
 		 */
 		ASSERT(lock == NULL);
-		smb_llist_exit(&node->n_lock_list);
-		return (status);
+	}
+	if (lock != NULL) {
+		smb_llist_remove(&node->n_lock_list, lock);
+		smb_lock_posix_unlock(node, lock, sr->user_cr);
 	}
 
-	smb_llist_remove(&node->n_lock_list, lock);
-	smb_lock_posix_unlock(node, lock, sr->user_cr);
+#ifdef	DEBUG
+	if (smb_lock_debug && lock == NULL) {
+		cmn_err(CE_CONT, "unlock failed, 0x%x\n", status);
+		smb_lock_dumpnode(node);
+	}
+#endif
+
 	smb_llist_exit(&node->n_lock_list);
-	smb_lock_destroy(lock);
+
+	if (lock != NULL)
+		smb_lock_destroy(lock);
 
 	return (status);
 }
@@ -140,58 +171,88 @@ smb_lock_range(
     smb_request_t	*sr,
     uint64_t		start,
     uint64_t		length,
-    uint32_t		timeout,
-    uint32_t		locktype)
+    uint32_t		pid,
+    uint32_t		locktype,
+    uint32_t		timeout)
 {
 	smb_ofile_t	*file = sr->fid_ofile;
 	smb_node_t	*node = file->f_node;
 	smb_lock_t	*lock;
-	smb_lock_t	*clock = NULL;
-	uint32_t	result = NT_STATUS_SUCCESS;
+	smb_lock_t	*conflict = NULL;
+	uint32_t	result;
+	int		rc;
 	boolean_t	lock_has_timeout =
 	    (timeout != 0 && timeout != UINT_MAX);
 
-	lock = smb_lock_create(sr, start, length, locktype, timeout);
+	if (length > 1 &&
+	    (start + length) < start)
+		return (NT_STATUS_INVALID_LOCK_RANGE);
+
+#ifdef	DEBUG
+	if (smb_lock_debug) {
+		cmn_err(CE_CONT, "smb_lock_range "
+		    "off=0x%llx, len=0x%llx, "
+		    "f=%p, pid=%d, typ=%d, tmo=%d\n",
+		    (long long)start, (long long)length,
+		    (void *)sr->fid_ofile, pid, locktype, timeout);
+	}
+#endif
+
+	lock = smb_lock_create(sr, start, length, pid, locktype, timeout);
 
 	smb_llist_enter(&node->n_lock_list, RW_WRITER);
 	for (;;) {
-		clock_t	rc;
 
 		/* Apply locking rules */
-		result = smb_lock_range_lckrules(sr, file, node, lock, &clock);
-
-		if ((result == NT_STATUS_CANCELLED) ||
-		    (result == NT_STATUS_SUCCESS) ||
-		    (result == NT_STATUS_RANGE_NOT_LOCKED)) {
-			ASSERT(clock == NULL);
+		result = smb_lock_range_lckrules(file, lock, &conflict);
+		switch (result) {
+		case NT_STATUS_LOCK_NOT_GRANTED: /* conflict! */
+			/* may need to wait */
 			break;
-		} else if (timeout == 0) {
-			break;
+		case NT_STATUS_SUCCESS:
+		case NT_STATUS_FILE_CLOSED:
+			goto break_loop;
+		default:
+			cmn_err(CE_CONT, "smb_lock_range1, status 0x%x\n",
+			    result);
+			goto break_loop;
 		}
+		if (timeout == 0)
+			goto break_loop;
 
-		ASSERT(result == NT_STATUS_LOCK_NOT_GRANTED);
-		ASSERT(clock);
 		/*
 		 * Call smb_lock_wait holding write lock for
 		 * node lock list.  smb_lock_wait will release
-		 * this lock if it blocks.
+		 * the node list lock if it blocks, so after
+		 * the call, (*conflict) may no longer exist.
 		 */
-		ASSERT(node == clock->l_file->f_node);
-
-		rc = smb_lock_wait(sr, lock, clock);
-		if (rc == 0) {
-			result = NT_STATUS_CANCELLED;
+		result = smb_lock_wait(sr, lock, conflict);
+		conflict = NULL;
+		switch (result) {
+		case NT_STATUS_SUCCESS:
+			/* conflict gone, try again */
 			break;
-		}
-		if (rc == -1)
+		case NT_STATUS_TIMEOUT:
+			/* try just once more */
 			timeout = 0;
-
-		clock = NULL;
+			break;
+		case NT_STATUS_CANCELLED:
+		case NT_STATUS_FILE_CLOSED:
+			goto break_loop;
+		default:
+			cmn_err(CE_CONT, "smb_lock_range2, status 0x%x\n",
+			    result);
+			goto break_loop;
+		}
 	}
 
+break_loop:
 	lock->l_blocked_by = NULL;
 
 	if (result != NT_STATUS_SUCCESS) {
+		if (result == NT_STATUS_FILE_CLOSED)
+			result = NT_STATUS_RANGE_NOT_LOCKED;
+
 		/*
 		 * Under certain conditions NT_STATUS_FILE_LOCK_CONFLICT
 		 * should be returned instead of NT_STATUS_LOCK_NOT_GRANTED.
@@ -241,11 +302,32 @@ smb_lock_range(
 		 * don't insert into the CIFS lock list unless the
 		 * posix lock worked
 		 */
-		if (smb_fsop_frlock(node, lock, B_FALSE, sr->user_cr))
+		rc = smb_fsop_frlock(node, lock, B_FALSE, sr->user_cr);
+		if (rc != 0) {
+#ifdef	DEBUG
+			if (smb_lock_debug)
+				cmn_err(CE_CONT, "fop_frlock, err=%d\n", rc);
+#endif
 			result = NT_STATUS_FILE_LOCK_CONFLICT;
-		else
-			smb_llist_insert_tail(&node->n_lock_list, lock);
+		} else {
+			/*
+			 * We want unlock to find exclusive locks before
+			 * shared locks, so insert those at the head.
+			 */
+			if (lock->l_type == SMB_LOCK_TYPE_READWRITE)
+				smb_llist_insert_head(&node->n_lock_list, lock);
+			else
+				smb_llist_insert_tail(&node->n_lock_list, lock);
+		}
 	}
+
+#ifdef	DEBUG
+	if (smb_lock_debug && result != 0) {
+		cmn_err(CE_CONT, "lock failed, 0x%x\n", result);
+		smb_lock_dumpnode(node);
+	}
+#endif
+
 	smb_llist_exit(&node->n_lock_list);
 
 	if (result == NT_STATUS_SUCCESS)
@@ -253,7 +335,6 @@ smb_lock_range(
 
 	return (result);
 }
-
 
 /*
  * smb_lock_range_access
@@ -271,12 +352,24 @@ smb_lock_range_access(
     smb_request_t	*sr,
     smb_node_t		*node,
     uint64_t		start,
-    uint64_t		length,	 /* zero means to EoF */
+    uint64_t		length,
     boolean_t		will_write)
 {
 	smb_lock_t	*lock;
 	smb_llist_t	*llist;
+	uint32_t	lk_pid = 0;
 	int		status = NT_STATUS_SUCCESS;
+
+	if (length == 0)
+		return (status);
+
+	/*
+	 * What PID to use for lock conflict checks?
+	 * SMB2 locking ignores PIDs (have lk_pid=0)
+	 * SMB1 uses low 16 bits of sr->smb_pid
+	 */
+	if (sr->session->dialect < SMB_VERS_2_BASE)
+		lk_pid = sr->smb_pid & 0xFFFF;
 
 	llist = &node->n_lock_list;
 	smb_llist_enter(llist, RW_READER);
@@ -293,10 +386,21 @@ smb_lock_range_access(
 			continue;
 
 		if (lock->l_type == SMB_LOCK_TYPE_READWRITE &&
-		    lock->l_session_kid == sr->session->s_kid &&
-		    lock->l_pid == sr->smb_pid)
+		    lock->l_file == sr->fid_ofile &&
+		    lock->l_pid == lk_pid)
 			continue;
 
+#ifdef	DEBUG
+		if (smb_lock_debug) {
+			cmn_err(CE_CONT, "smb_lock_range_access conflict: "
+			    "off=0x%llx, len=0x%llx, "
+			    "f=%p, pid=%d, typ=%d\n",
+			    (long long)lock->l_start,
+			    (long long)lock->l_length,
+			    (void *)lock->l_file,
+			    lock->l_pid, lock->l_type);
+		}
+#endif
 		status = NT_STATUS_FILE_LOCK_CONFLICT;
 		break;
 	}
@@ -304,6 +408,10 @@ smb_lock_range_access(
 	return (status);
 }
 
+/*
+ * The ofile is being closed.  Wake any waiting locks and
+ * clear any granted locks.
+ */
 void
 smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 {
@@ -313,6 +421,24 @@ smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 
 	SMB_NODE_VALID(node);
 	ASSERT(node->n_refcnt);
+
+	/*
+	 * Cancel any waiting locks for this ofile
+	 */
+	smb_llist_enter(&node->n_wlock_list, RW_READER);
+	for (lock = smb_llist_head(&node->n_wlock_list);
+	    lock != NULL;
+	    lock = smb_llist_next(&node->n_wlock_list, lock)) {
+
+		if (lock->l_file == file) {
+			mutex_enter(&lock->l_mutex);
+			lock->l_blocked_by = NULL;
+			lock->l_flags |= SMB_LOCK_FLAG_CLOSED;
+			cv_broadcast(&lock->l_cv);
+			mutex_exit(&lock->l_mutex);
+		}
+	}
+	smb_llist_exit(&node->n_wlock_list);
 
 	/*
 	 * Move locks matching the specified file from the node->n_lock_list
@@ -349,15 +475,75 @@ smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 	list_destroy(&destroy_list);
 }
 
+/*
+ * Cause a waiting lock to stop waiting and return an error.
+ * returns same status codes as unlock:
+ * NT_STATUS_SUCCESS, NT_STATUS_RANGE_NOT_LOCKED
+ */
+uint32_t
+smb_lock_range_cancel(smb_request_t *sr,
+    uint64_t start, uint64_t length, uint32_t pid)
+{
+	smb_node_t *node;
+	smb_lock_t *lock;
+	uint32_t status = NT_STATUS_RANGE_NOT_LOCKED;
+	int cnt = 0;
+
+	node = sr->fid_ofile->f_node;
+
+	smb_llist_enter(&node->n_wlock_list, RW_READER);
+
+#ifdef	DEBUG
+	if (smb_lock_debug) {
+		cmn_err(CE_CONT, "smb_lock_range_cancel:\n"
+		    "\tstart=0x%llx, len=0x%llx, of=%p, pid=%d\n",
+		    (long long)start, (long long)length,
+		    (void *)sr->fid_ofile, pid);
+	}
+#endif
+
+	for (lock = smb_llist_head(&node->n_wlock_list);
+	    lock != NULL;
+	    lock = smb_llist_next(&node->n_wlock_list, lock)) {
+
+		if ((start == lock->l_start) &&
+		    (length == lock->l_length) &&
+		    lock->l_file == sr->fid_ofile &&
+		    lock->l_pid == pid) {
+
+			mutex_enter(&lock->l_mutex);
+			lock->l_blocked_by = NULL;
+			lock->l_flags |= SMB_LOCK_FLAG_CANCELLED;
+			cv_broadcast(&lock->l_cv);
+			mutex_exit(&lock->l_mutex);
+			status = NT_STATUS_SUCCESS;
+			cnt++;
+		}
+	}
+
+#ifdef	DEBUG
+	if (smb_lock_debug && cnt != 1) {
+		cmn_err(CE_CONT, "cancel found %d\n", cnt);
+		smb_lock_dumpnode(node);
+	}
+#endif
+
+	smb_llist_exit(&node->n_wlock_list);
+
+	return (status);
+}
+
 void
 smb_lock_range_error(smb_request_t *sr, uint32_t status32)
 {
 	uint16_t errcode;
 
-	if (status32 == NT_STATUS_CANCELLED)
-		errcode = ERROR_OPERATION_ABORTED;
-	else
+	if (status32 == NT_STATUS_CANCELLED) {
+		status32 = NT_STATUS_FILE_LOCK_CONFLICT;
+		errcode = ERROR_LOCK_VIOLATION;
+	} else {
 		errcode = ERRlock;
+	}
 
 	smbsr_error(sr, status32, ERRDOS, errcode);
 }
@@ -514,28 +700,27 @@ smb_lock_range_overlap(struct smb_lock *lock, uint64_t start, uint64_t length)
  *	   irrespective of pid of smb client issuing lock request.
  *
  *	2. Read lock in the overlapped region of write lock
- *	   are allowed if the pervious lock is performed by the
+ *	   are allowed if the previous lock is performed by the
  *	   same pid and connection.
  *
  * return status:
- *	NT_STATUS_SUCCESS - Input lock range adapts to lock rules.
+ *	NT_STATUS_SUCCESS - Input lock range conforms to lock rules.
  *	NT_STATUS_LOCK_NOT_GRANTED - Input lock conflicts lock rules.
- *	NT_STATUS_CANCELLED - Error in processing lock rules
+ *	NT_STATUS_FILE_CLOSED
  */
 static uint32_t
 smb_lock_range_lckrules(
-    smb_request_t	*sr,
     smb_ofile_t		*file,
-    smb_node_t		*node,
-    smb_lock_t		*dlock,
-    smb_lock_t		**clockp)
+    smb_lock_t		*dlock,		/* desired lock */
+    smb_lock_t		**conflictp)
 {
+	smb_node_t	*node = file->f_node;
 	smb_lock_t	*lock;
 	uint32_t	status = NT_STATUS_SUCCESS;
 
 	/* Check if file is closed */
 	if (!smb_ofile_is_open(file)) {
-		return (NT_STATUS_RANGE_NOT_LOCKED);
+		return (NT_STATUS_FILE_CLOSED);
 	}
 
 	/* Caller must hold lock for node->n_lock_list */
@@ -563,21 +748,41 @@ smb_lock_range_lckrules(
 		 */
 		if ((dlock->l_type == SMB_LOCK_TYPE_READONLY) &&
 		    !(lock->l_type == SMB_LOCK_TYPE_READONLY)) {
-			if (lock->l_file == sr->fid_ofile &&
-			    lock->l_session_kid == sr->session->s_kid &&
-			    lock->l_pid == sr->smb_pid &&
-			    lock->l_uid == sr->smb_uid) {
+			if (lock->l_file == dlock->l_file &&
+			    lock->l_pid == dlock->l_pid) {
 				continue;
 			}
 		}
 
 		/* Conflict in overlapping lock element */
-		*clockp = lock;
+		*conflictp = lock;
 		status = NT_STATUS_LOCK_NOT_GRANTED;
 		break;
 	}
 
 	return (status);
+}
+
+/*
+ * Cancel method for smb_lock_wait()
+ *
+ * This request is waiting on a lock.  Wakeup everything
+ * waiting on the lock so that the relevant thread regains
+ * control and notices that is has been cancelled.  The
+ * other lock request threads waiting on this lock will go
+ * back to sleep when they discover they are still blocked.
+ */
+static void
+smb_lock_cancel_sr(smb_request_t *sr)
+{
+	smb_lock_t *lock = sr->cancel_arg2;
+
+	ASSERT(lock->l_magic == SMB_LOCK_MAGIC);
+	mutex_enter(&lock->l_mutex);
+	lock->l_blocked_by = NULL;
+	lock->l_flags |= SMB_LOCK_FLAG_CANCELLED;
+	cv_broadcast(&lock->l_cv);
+	mutex_exit(&lock->l_mutex);
 }
 
 /*
@@ -589,87 +794,134 @@ smb_lock_range_lckrules(
  * within this function during the sleep after the lock dependency has
  * been recorded.
  *
- * return value
- *
- *	0	The request was canceled.
- *	-1	The timeout was reached.
- *	>0	Condition met.
+ * Returns NT_STATUS_SUCCESS when the lock can be granted,
+ * otherwise NT_STATUS_CANCELLED, etc.
  */
-static clock_t
-smb_lock_wait(smb_request_t *sr, smb_lock_t *b_lock, smb_lock_t *c_lock)
+static uint32_t
+smb_lock_wait(smb_request_t *sr, smb_lock_t *lock, smb_lock_t *conflict)
 {
-	clock_t		rc = 0;
+	smb_node_t	*node;
+	clock_t		rc;
+	uint32_t	status = NT_STATUS_SUCCESS;
 
-	ASSERT(sr->sr_awaiting == NULL);
+	node = lock->l_file->f_node;
+	ASSERT(node == conflict->l_file->f_node);
 
+	/*
+	 * Let the blocked lock (lock) l_blocked_by point to the
+	 * conflicting lock (conflict), and increment a count of
+	 * conflicts with the latter.  When the conflicting lock
+	 * is destroyed, we'll search the list of waiting locks
+	 * (on the node) and wake any with l_blocked_by ==
+	 * the formerly conflicting lock.
+	 */
+	mutex_enter(&lock->l_mutex);
+	lock->l_blocked_by = conflict;
+	mutex_exit(&lock->l_mutex);
+
+	mutex_enter(&conflict->l_mutex);
+	conflict->l_conflicts++;
+	mutex_exit(&conflict->l_mutex);
+
+	/*
+	 * Put the blocked lock on the waiting list.
+	 */
+	smb_llist_enter(&node->n_wlock_list, RW_WRITER);
+	smb_llist_insert_tail(&node->n_wlock_list, lock);
+	smb_llist_exit(&node->n_wlock_list);
+
+#ifdef	DEBUG
+	if (smb_lock_debug) {
+		cmn_err(CE_CONT, "smb_lock_wait: lock=%p conflict=%p\n",
+		    (void *)lock, (void *)conflict);
+		smb_lock_dumpnode(node);
+	}
+#endif
+
+	/*
+	 * We come in with n_lock_list already held, and keep
+	 * that hold until we're done with conflict (are now).
+	 * Drop that now, and retake later.  Note that the lock
+	 * (*conflict) may go away once we exit this list.
+	 */
+	smb_llist_exit(&node->n_lock_list);
+	conflict = NULL;
+
+	/*
+	 * Before we actually start waiting, setup the hooks
+	 * smb_request_cancel uses to unblock this wait.
+	 */
 	mutex_enter(&sr->sr_mutex);
+	if (sr->sr_state == SMB_REQ_STATE_ACTIVE) {
+		sr->sr_state = SMB_REQ_STATE_WAITING_LOCK;
+		sr->cancel_method = smb_lock_cancel_sr;
+		sr->cancel_arg2 = lock;
+	} else {
+		status = NT_STATUS_CANCELLED;
+	}
+	mutex_exit(&sr->sr_mutex);
+
+	/*
+	 * Now we're ready to actually wait for the conflicting
+	 * lock to be removed, or for the wait to be ended by
+	 * an external cancel, or a timeout.
+	 */
+	mutex_enter(&lock->l_mutex);
+	while (status == NT_STATUS_SUCCESS &&
+	    lock->l_blocked_by != NULL) {
+		if (lock->l_flags & SMB_LOCK_FLAG_INDEFINITE) {
+			cv_wait(&lock->l_cv, &lock->l_mutex);
+		} else {
+			rc = cv_timedwait(&lock->l_cv,
+			    &lock->l_mutex, lock->l_end_time);
+			if (rc < 0)
+				status = NT_STATUS_TIMEOUT;
+		}
+	}
+	if (status == NT_STATUS_SUCCESS) {
+		if (lock->l_flags & SMB_LOCK_FLAG_CANCELLED)
+			status = NT_STATUS_CANCELLED;
+		if (lock->l_flags & SMB_LOCK_FLAG_CLOSED)
+			status = NT_STATUS_FILE_CLOSED;
+	}
+	mutex_exit(&lock->l_mutex);
+
+	/*
+	 * Done waiting.  Cleanup cancel hooks and
+	 * finish SR state transitions.
+	 */
+	mutex_enter(&sr->sr_mutex);
+	sr->cancel_method = NULL;
+	sr->cancel_arg2 = NULL;
 
 	switch (sr->sr_state) {
-	case SMB_REQ_STATE_ACTIVE:
-		/*
-		 * Wait up till the timeout time keeping track of actual
-		 * time waited for possible retry failure.
-		 */
-		sr->sr_state = SMB_REQ_STATE_WAITING_LOCK;
-		sr->sr_awaiting = c_lock;
-		mutex_exit(&sr->sr_mutex);
+	case SMB_REQ_STATE_WAITING_LOCK:
+		/* Normal wakeup.  Keep status from above. */
+		sr->sr_state = SMB_REQ_STATE_ACTIVE;
+		break;
 
-		mutex_enter(&c_lock->l_mutex);
-		/*
-		 * The conflict list (l_conflict_list) for a lock contains
-		 * all the locks that are blocked by and in conflict with
-		 * that lock.  Add the new lock to the conflict list for the
-		 * active lock.
-		 *
-		 * l_conflict_list is currently a fancy way of representing
-		 * the references/dependencies on a lock.  It could be
-		 * replaced with a reference count but this approach
-		 * has the advantage that MDB can display the lock
-		 * dependencies at any point in time.  In the future
-		 * we should be able to leverage the list to implement
-		 * an asynchronous locking model.
-		 *
-		 * l_blocked_by is the reverse of the conflict list.  It
-		 * points to the lock that the new lock conflicts with.
-		 * As currently implemented this value is purely for
-		 * debug purposes -- there are windows of time when
-		 * l_blocked_by may be non-NULL even though there is no
-		 * conflict list
-		 */
-		b_lock->l_blocked_by = c_lock;
-		smb_slist_insert_tail(&c_lock->l_conflict_list, b_lock);
-		smb_llist_exit(&c_lock->l_file->f_node->n_lock_list);
-
-		if (SMB_LOCK_INDEFINITE_WAIT(b_lock)) {
-			cv_wait(&c_lock->l_cv, &c_lock->l_mutex);
-		} else {
-			rc = cv_timedwait(&c_lock->l_cv,
-			    &c_lock->l_mutex, b_lock->l_end_time);
-		}
-
-		mutex_exit(&c_lock->l_mutex);
-
-		smb_llist_enter(&c_lock->l_file->f_node->n_lock_list,
-		    RW_WRITER);
-		smb_slist_remove(&c_lock->l_conflict_list, b_lock);
-
-		mutex_enter(&sr->sr_mutex);
-		sr->sr_awaiting = NULL;
-		if (sr->sr_state == SMB_REQ_STATE_CANCELED) {
-			rc = 0;
-		} else {
-			sr->sr_state = SMB_REQ_STATE_ACTIVE;
-		}
+	case SMB_REQ_STATE_CANCEL_PENDING:
+		/* Cancelled via smb_lock_cancel_sr */
+		sr->sr_state = SMB_REQ_STATE_CANCELLED;
+		/* FALLTHROUGH */
+	case SMB_REQ_STATE_CANCELLED:
+		if (status == NT_STATUS_SUCCESS)
+			status = NT_STATUS_CANCELLED;
 		break;
 
 	default:
-		ASSERT(sr->sr_state == SMB_REQ_STATE_CANCELED);
-		rc = 0;
 		break;
 	}
 	mutex_exit(&sr->sr_mutex);
 
-	return (rc);
+	/* Return to the caller with n_lock_list held. */
+	smb_llist_enter(&node->n_lock_list, RW_WRITER);
+
+	smb_llist_enter(&node->n_wlock_list, RW_WRITER);
+	smb_llist_remove(&node->n_wlock_list, lock);
+	smb_llist_exit(&node->n_wlock_list);
+
+	return (status);
 }
 
 /*
@@ -685,7 +937,7 @@ smb_lock_wait(smb_request_t *sr, smb_lock_t *b_lock, smb_lock_t *c_lock)
  * Return values
  *
  *	NT_STATUS_SUCCESS		Unlock request matches lock record
- *					pointed by 'nodelock' lock structure.
+ *					pointed by 'foundlock' lock structure.
  *
  *	NT_STATUS_RANGE_NOT_LOCKED	Unlock request doen't match any
  *					of lock record in node lock request or
@@ -693,12 +945,13 @@ smb_lock_wait(smb_request_t *sr, smb_lock_t *b_lock, smb_lock_t *c_lock)
  */
 static uint32_t
 smb_lock_range_ulckrules(
-    smb_request_t	*sr,
-    smb_node_t		*node,
+    smb_ofile_t		*file,
     uint64_t		start,
     uint64_t		length,
-    smb_lock_t		**nodelock)
+    uint32_t		pid,
+    smb_lock_t		**foundlock)
 {
+	smb_node_t	*node = file->f_node;
 	smb_lock_t	*lock;
 	uint32_t	status = NT_STATUS_RANGE_NOT_LOCKED;
 
@@ -709,11 +962,9 @@ smb_lock_range_ulckrules(
 
 		if ((start == lock->l_start) &&
 		    (length == lock->l_length) &&
-		    lock->l_file == sr->fid_ofile &&
-		    lock->l_session_kid == sr->session->s_kid &&
-		    lock->l_pid == sr->smb_pid &&
-		    lock->l_uid == sr->smb_uid) {
-			*nodelock = lock;
+		    lock->l_file == file &&
+		    lock->l_pid == pid) {
+			*foundlock = lock;
 			status = NT_STATUS_SUCCESS;
 			break;
 		}
@@ -727,6 +978,7 @@ smb_lock_create(
     smb_request_t *sr,
     uint64_t start,
     uint64_t length,
+    uint32_t pid,
     uint32_t locktype,
     uint32_t timeout)
 {
@@ -735,14 +987,12 @@ smb_lock_create(
 	ASSERT(locktype == SMB_LOCK_TYPE_READWRITE ||
 	    locktype == SMB_LOCK_TYPE_READONLY);
 
-	lock = kmem_zalloc(sizeof (smb_lock_t), KM_SLEEP);
+	lock = kmem_cache_alloc(smb_cache_lock, KM_SLEEP);
+	bzero(lock, sizeof (*lock));
 	lock->l_magic = SMB_LOCK_MAGIC;
-	lock->l_sr = sr; /* Invalid after lock is active */
-	lock->l_session_kid = sr->session->s_kid;
-	lock->l_session = sr->session;
 	lock->l_file = sr->fid_ofile;
-	lock->l_uid = sr->smb_uid;
-	lock->l_pid = sr->smb_pid;
+	/* l_file == fid_ofile implies same connection (see ofile lookup) */
+	lock->l_pid = pid;
 	lock->l_type = locktype;
 	lock->l_start = start;
 	lock->l_length = length;
@@ -756,8 +1006,6 @@ smb_lock_create(
 
 	mutex_init(&lock->l_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&lock->l_cv, NULL, CV_DEFAULT, NULL);
-	smb_slist_constructor(&lock->l_conflict_list, sizeof (smb_lock_t),
-	    offsetof(smb_lock_t, l_conflict_lnd));
 
 	return (lock);
 }
@@ -765,11 +1013,12 @@ smb_lock_create(
 static void
 smb_lock_free(smb_lock_t *lock)
 {
-	smb_slist_destructor(&lock->l_conflict_list);
+
+	lock->l_magic = 0;
 	cv_destroy(&lock->l_cv);
 	mutex_destroy(&lock->l_mutex);
 
-	kmem_free(lock, sizeof (smb_lock_t));
+	kmem_cache_free(smb_cache_lock, lock);
 }
 
 /*
@@ -780,19 +1029,49 @@ smb_lock_free(smb_lock_t *lock)
 static void
 smb_lock_destroy(smb_lock_t *lock)
 {
-	/*
-	 * Caller must hold node->n_lock_list lock.
-	 */
-	mutex_enter(&lock->l_mutex);
-	cv_broadcast(&lock->l_cv);
-	mutex_exit(&lock->l_mutex);
+	smb_lock_t *tl;
+	smb_node_t *node;
+	uint32_t ccnt;
 
 	/*
-	 * The cv_broadcast above should wake up any locks that previous
-	 * had conflicts with this lock.  Wait for the locking threads
-	 * to remove their references to this lock.
+	 * Wake any waiting locks that were blocked by this.
+	 * We want them to wake and continue in FIFO order,
+	 * so enter/exit the llist every time...
 	 */
-	smb_slist_wait_for_empty(&lock->l_conflict_list);
+	mutex_enter(&lock->l_mutex);
+	ccnt = lock->l_conflicts;
+	lock->l_conflicts = 0;
+	mutex_exit(&lock->l_mutex);
+
+	node = lock->l_file->f_node;
+	while (ccnt) {
+
+		smb_llist_enter(&node->n_wlock_list, RW_READER);
+
+		for (tl = smb_llist_head(&node->n_wlock_list);
+		    tl != NULL;
+		    tl = smb_llist_next(&node->n_wlock_list, tl)) {
+			mutex_enter(&tl->l_mutex);
+			if (tl->l_blocked_by == lock) {
+				tl->l_blocked_by = NULL;
+				cv_broadcast(&tl->l_cv);
+				mutex_exit(&tl->l_mutex);
+				goto woke_one;
+			}
+			mutex_exit(&tl->l_mutex);
+		}
+		/* No more in the list blocked by this lock. */
+		ccnt = 0;
+	woke_one:
+		smb_llist_exit(&node->n_wlock_list);
+		if (ccnt) {
+			/*
+			 * Let the thread we woke have a chance to run
+			 * before we wake competitors for their lock.
+			 */
+			delay(MSEC_TO_TICK(1));
+		}
+	}
 
 	smb_lock_free(lock);
 }
@@ -887,3 +1166,42 @@ smb_is_range_unlocked(uint64_t start, uint64_t end, uint32_t uniqid,
 	/* the range is completely unlocked */
 	return (B_TRUE);
 }
+
+#ifdef	DEBUG
+static void
+smb_lock_dump1(smb_lock_t *lock)
+{
+	cmn_err(CE_CONT, "\t0x%p: 0x%llx, 0x%llx, %p, %d\n",
+	    (void *)lock,
+	    (long long)lock->l_start,
+	    (long long)lock->l_length,
+	    (void *)lock->l_file,
+	    lock->l_pid);
+
+}
+
+static void
+smb_lock_dumplist(smb_llist_t *llist)
+{
+	smb_lock_t *lock;
+
+	for (lock = smb_llist_head(llist);
+	    lock != NULL;
+	    lock = smb_llist_next(llist, lock)) {
+		smb_lock_dump1(lock);
+	}
+}
+
+static void
+smb_lock_dumpnode(smb_node_t *node)
+{
+	cmn_err(CE_CONT, "Granted Locks on %p (%d)\n",
+	    (void *)node, node->n_lock_list.ll_count);
+	smb_lock_dumplist(&node->n_lock_list);
+
+	cmn_err(CE_CONT, "Waiting Locks on %p (%d)\n",
+	    (void *)node, node->n_wlock_list.ll_count);
+	smb_lock_dumplist(&node->n_wlock_list);
+}
+
+#endif
