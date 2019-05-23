@@ -184,7 +184,7 @@ Dbg_statistics_ar(Ofl_desc *ofl)
 
 		arsym = adp->ad_start;
 		aux = adp->ad_aux;
-		while (arsym->as_off) {
+		while ((arsym != NULL) && (arsym->as_off != NULL)) {
 			/*
 			 * Assume that symbols from the same member file are
 			 * adjacent within the archive symbol table.
@@ -199,10 +199,9 @@ Dbg_statistics_ar(Ofl_desc *ofl)
 		}
 		if ((count == 0) || (used == 0))
 			continue;
-#ifndef	UDIV_NOT_SUPPORTED
+
 		dbg_print(lml, MSG_INTL(MSG_STATS_AR), adp->ad_name, count,
 		    used, ((used * 100) / count));
-#endif
 	}
 	Dbg_util_nl(lml, DBG_NL_STD);
 }
