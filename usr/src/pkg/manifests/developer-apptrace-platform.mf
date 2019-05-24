@@ -53,8 +53,6 @@ dir path=usr/platform/SUNW,Sun-Blade-1500/lib
 dir path=usr/platform/SUNW,Sun-Blade-2500 group=sys
 dir path=usr/platform/SUNW,Sun-Blade-2500/lib
 dir path=usr/platform/SUNW,Sun-Fire group=sys
-dir path=usr/platform/SUNW,Sun-Fire-15000 group=sys
-dir path=usr/platform/SUNW,Sun-Fire-15000/lib
 dir path=usr/platform/SUNW,Sun-Fire-280R group=sys
 dir path=usr/platform/SUNW,Sun-Fire-280R/lib
 dir path=usr/platform/SUNW,Sun-Fire-480R group=sys

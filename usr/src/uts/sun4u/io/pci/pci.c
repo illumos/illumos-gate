@@ -27,6 +27,10 @@
  * PCI nexus driver interface
  */
 
+/*
+ * Copyright 2019 Peter Tribble.
+ */
+
 #include <sys/types.h>
 #include <sys/conf.h>		/* nulldev */
 #include <sys/stat.h>		/* devctl */
@@ -123,7 +127,7 @@ static struct dev_ops pci_ops = {
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
-	&mod_driverops, 			/* Type of module - driver */
+	&mod_driverops,				/* Type of module - driver */
 	"Sun4u Host to PCI nexus driver",	/* Name of module. */
 	&pci_ops,				/* driver ops */
 };
@@ -471,15 +475,15 @@ pci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 /*
  * bus map entry point:
  *
- * 	if map request is for an rnumber
+ *	if map request is for an rnumber
  *		get the corresponding regspec from device node
- * 	build a new regspec in our parent's format
+ *	build a new regspec in our parent's format
  *	build a new map_req with the new regspec
  *	call up the tree to complete the mapping
  */
 int
 pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
-	off_t off, off_t len, caddr_t *addrp)
+    off_t off, off_t len, caddr_t *addrp)
 {
 	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
 	struct regspec p_regspec;
@@ -538,14 +542,12 @@ pci_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	if (rval == DDI_SUCCESS) {
 		/*
 		 * Set-up access functions for FM access error capable drivers.
-		 * The axq workaround prevents fault management support
 		 */
 		if (DDI_FM_ACC_ERR_CAP(pci_p->pci_fm_cap) &&
 		    DDI_FM_ACC_ERR_CAP(ddi_fm_capable(rdip)) &&
 		    mp->map_handlep->ah_acc.devacc_attr_access !=
 		    DDI_DEFAULT_ACC)
 			pci_fm_acc_setup(mp, rdip);
-		pci_axq_setup(mp, pci_p->pci_pbm_p);
 	}
 
 done:
@@ -567,7 +569,7 @@ done:
  */
 int
 pci_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
-	ddi_dma_handle_t *handlep)
+    ddi_dma_handle_t *handlep)
 {
 	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
 	iommu_t *iommu_p = pci_p->pci_iommu_p;
@@ -633,7 +635,7 @@ freehandle:
  */
 int
 pci_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
-	int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
+    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
 {
 	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
 	ddi_dma_impl_t *mp;
@@ -690,8 +692,8 @@ pci_dma_freehdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
  */
 int
 pci_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle, ddi_dma_req_t *dmareq,
-	ddi_dma_cookie_t *cookiep, uint_t *ccountp)
+    ddi_dma_handle_t handle, ddi_dma_req_t *dmareq,
+    ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
 	iommu_t *iommu_p = pci_p->pci_iommu_p;
@@ -817,8 +819,8 @@ pci_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
  */
 int
 pci_dma_win(dev_info_t *dip, dev_info_t *rdip,
-	ddi_dma_handle_t handle, uint_t win, off_t *offp,
-	size_t *lenp, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
+    ddi_dma_handle_t handle, uint_t win, off_t *offp,
+    size_t *lenp, ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
 	DEBUG2(DBG_DMA_WIN, dip, "rdip=%s%d\n",
@@ -911,8 +913,8 @@ static char *pci_dmactl_str[] = {
  */
 int
 pci_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
-	enum ddi_dma_ctlops cmd, off_t *offp, size_t *lenp, caddr_t *objp,
-	uint_t cache_flags)
+    enum ddi_dma_ctlops cmd, off_t *offp, size_t *lenp, caddr_t *objp,
+    uint_t cache_flags)
 {
 	ddi_dma_impl_t *mp = (ddi_dma_impl_t *)handle;
 	DEBUG3(DBG_DMA_CTL, dip, "%s: rdip=%s%d\n", pci_dmactl_str[cmd],
@@ -1205,7 +1207,7 @@ get_reg_set_size(dev_info_t *child, int rnumber)
  */
 int
 pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
-	ddi_ctl_enum_t op, void *arg, void *result)
+    ddi_ctl_enum_t op, void *arg, void *result)
 {
 	pci_t *pci_p = get_pci_soft_state(ddi_get_instance(dip));
 

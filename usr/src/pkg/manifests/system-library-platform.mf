@@ -77,8 +77,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6300/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R group=sys
@@ -159,8 +157,6 @@ $(sparc_ONLY)file \
 $(sparc_ONLY)file path=usr/platform/SUNW,SPARC-Enterprise/lib/cfgadm/scsi.so.1
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,SPARC-Enterprise/lib/libprtdiag_psr.so.1
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Sun-Fire-15000/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-280R/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-480R/lib/libprtdiag_psr.so.1
 $(sparc_ONLY)file path=usr/platform/SUNW,Sun-Fire-880/lib/libprtdiag_psr.so.1
@@ -355,12 +351,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-T6320/lib/libpcp.so.1 \
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-T6320/sbin \
     target=../sun4v/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-T6340 target=SUNW,T5140
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-15000/lib/cfgadm \
-    target=../../sun4u/lib/cfgadm
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-15000/lib/fs \
-    target=../../sun4u/lib/fs
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-15000/sbin \
-    target=../sun4u/sbin
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-280R/lib/cfgadm \
     target=../../sun4u/lib/cfgadm
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-280R/lib/fs \

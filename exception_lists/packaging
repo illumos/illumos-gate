@@ -343,7 +343,6 @@ var/svc/manifest/platform/sun4u					i386
 var/svc/manifest/platform/sun4v					i386
 etc/svc/profile/platform_sun4v.xml				i386
 etc/svc/profile/platform_SUNW,SPARC-Enterprise.xml		i386
-etc/svc/profile/platform_SUNW,Sun-Fire-15000.xml		i386
 etc/svc/profile/platform_SUNW,Sun-Fire-880.xml			i386
 etc/svc/profile/platform_SUNW,Sun-Fire-V890.xml			i386
 etc/svc/profile/platform_SUNW,Sun-Fire.xml			i386

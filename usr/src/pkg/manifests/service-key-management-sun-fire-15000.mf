@@ -21,6 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
 
 #
@@ -30,41 +31,6 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri value=pkg:/service/key-management/sun-fire-15000@$(PKGVERS)
-set name=pkg.description value="Key Management Modules for Sun Fire 15000"
-set name=pkg.summary value="Key Management Modules for Sun Fire 15000"
-set name=info.classification \
-    value="org.opensolaris.category.2008:System/Enterprise Management"
+set name=pkg.obsolete value=true
+set name=org.opensolaris.noincorp value=true
 set name=variant.arch value=sparc
-dir path=lib
-dir path=lib/svc
-dir path=lib/svc/manifest group=sys
-dir path=lib/svc/manifest/platform group=sys
-dir path=lib/svc/manifest/platform/sun4u group=sys
-dir path=lib/svc/method
-dir path=platform group=sys
-dir path=platform/SUNW,Sun-Fire-15000 group=sys
-dir path=platform/SUNW,Sun-Fire-15000/kernel group=sys
-dir path=platform/SUNW,Sun-Fire-15000/kernel/drv group=sys
-dir path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64) group=sys
-dir path=usr group=sys
-dir path=usr/platform group=sys
-dir path=usr/platform/sun4u group=sys
-dir path=usr/platform/sun4u/lib
-dir path=usr/share/man/man1m
-driver name=sckmdrv perms="* 0600 root sys"
-file path=lib/svc/manifest/platform/sun4u/sckmd.xml group=sys mode=0444
-file path=lib/svc/method/svc-sckmd mode=0555
-file path=platform/SUNW,Sun-Fire-15000/kernel/drv/$(ARCH64)/sckmdrv group=sys
-file path=platform/SUNW,Sun-Fire-15000/kernel/drv/sckmdrv.conf group=sys
-file path=usr/platform/sun4u/lib/sckmd group=sys mode=0755
-file path=usr/share/man/man1m/sckmd.1m
-legacy pkg=SUNWsckm.u arch=$(ARCH).sun4u \
-    desc="Key Management Modules for Sun Fire 15000" \
-    name="Key Management Modules for Sun Fire 15000"
-legacy pkg=SUNWsckmr desc="SMF service for the Key Management daemon" \
-    name="SMF service for the Key Management daemon"
-legacy pkg=SUNWsckmu.u arch=$(ARCH).sun4u \
-    desc="Key Management daemon for exchanging security keys from the Service Processor" \
-    name="Key Management daemon"
-license cr_Sun license=cr_Sun
-license lic_CDDL license=lic_CDDL

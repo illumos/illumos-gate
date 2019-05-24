@@ -89,7 +89,7 @@ PX_OBJS		+= px_asm_4u.o px_err.o px_hlib.o px_lib4u.o px_tools_4u.o
 PCI_COMMON_OBJS	+= pci.o pci_util.o pci_dma.o pci_devctl.o \
 			pci_fdvma.o pci_iommu.o pci_sc.o pci_debug.o \
 			pci_cb.o pci_ib.o pci_ecc.o pci_pbm.o pci_intr.o \
-			pci_space.o pci_counters.o pci_axq.o \
+			pci_space.o pci_counters.o \
 			pci_fm.o pci_reloc.o pci_tools.o pci_asm.o
 RMCLOMV_OBJS	+= rmclomv.o
 
@@ -97,7 +97,7 @@ PSYCHO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcipsy.o
 SCHIZO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcisch_asm.o pcisch.o pcix.o
 SIMBA_PCI_OBJS	+= simba.o
 DB21554_OBJS	+= db21554.o
-US_OBJS 	+= cpudrv.o cpudrv_mach.o
+US_OBJS		+= cpudrv.o cpudrv_mach.o
 POWER_OBJS	+= power.o
 EPIC_OBJS	+= epic.o
 GRBEEP_OBJS	+= grbeep.o
@@ -136,7 +136,7 @@ I2BSC_OBJS	+= i2bsc.o
 GPTWOCFG_OBJS	+= gptwocfg.o
 GPTWO_CPU_OBJS	+= gptwo_cpu.o
 
-JBUSPPM_OBJS	+= jbusppm.o 
+JBUSPPM_OBJS	+= jbusppm.o
 RMC_COMM_OBJS	+= rmc_comm.o rmc_comm_crctab.o rmc_comm_dp.o rmc_comm_drvintf.o
 RMCADM_OBJS	+= rmcadm.o
 MEM_CACHE_OBJS	+= mem_cache.o panther_asm.o
@@ -161,7 +161,6 @@ SHA1_OBJS	+= sha1_asm.o
 TODMOSTEK_OBJS	+= todmostek.o
 TODDS1287_OBJS	+= todds1287.o
 TODDS1337_OBJS	+= todds1337.o
-TODSTARCAT_OBJS	+= todstarcat.o
 TODBLADE_OBJS	+= todblade.o
 TODM5819_OBJS	+= todm5819.o
 TODM5819P_RMC_OBJS	+= todm5819p_rmc.o
@@ -198,10 +197,10 @@ OPL_PCBE_OBJS	= opl_pcbe.o
 #			cpu modules
 #
 CPU_OBJ		+= $(OBJS_DIR)/mach_cpu_module.o
-SPITFIRE_OBJS 	= spitfire.o spitfire_asm.o spitfire_copy.o spitfire_kdi.o common_asm.o
+SPITFIRE_OBJS	= spitfire.o spitfire_asm.o spitfire_copy.o spitfire_kdi.o common_asm.o
 HUMMINGBIRD_OBJS= $(SPITFIRE_OBJS)
 US3_CMN_OBJS	= us3_common.o us3_common_mmu.o us3_common_asm.o us3_kdi.o cheetah_copy.o common_asm.o
-CHEETAH_OBJS 	= $(US3_CMN_OBJS) us3_cheetah.o us3_cheetah_asm.o
+CHEETAH_OBJS	= $(US3_CMN_OBJS) us3_cheetah.o us3_cheetah_asm.o
 CHEETAHPLUS_OBJS= $(US3_CMN_OBJS) us3_cheetahplus.o us3_cheetahplus_asm.o
 JALAPENO_OBJS   = $(US3_CMN_OBJS) us3_jalapeno.o us3_jalapeno_asm.o
 OLYMPUS_OBJS	= opl_olympus.o opl_olympus_asm.o opl_olympus_copy.o \

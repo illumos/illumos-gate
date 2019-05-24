@@ -21,6 +21,7 @@
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 # Makefile definitions for Sun Fire 15000 Key Management Daemon (sckmd)
 #
@@ -50,7 +51,7 @@ $(USRPSMPROG) :=	FILEMODE =	0755
 #
 # FLAGS:
 #
-CPPFLAGS= 	-I$(USR_PSM_INCL_DIR) -I$(SRC)/uts/sun4u/starcat $(CPPFLAGS.master)
+CPPFLAGS=	-I$(USR_PSM_INCL_DIR) -I$(SRC)/uts/sun4u/opl $(CPPFLAGS.master)
 
 LINT_FLAGS=	-c -Nlevel=4 -Ncheck
 

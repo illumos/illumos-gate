@@ -21,8 +21,7 @@
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2019 Peter Tribble.
 #
 #	This makefile drives the production of the oplkmdrv driver
 #	kernel module.
@@ -34,7 +33,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../../..
-INC_PATH	+= -I$(UTSBASE)/sun4u/starcat/
+INC_PATH	+= -I$(UTSBASE)/sun4u/opl/
 
 #
 #	Define the module and object file sets.

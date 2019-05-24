@@ -27,40 +27,16 @@
 #
 # Start script for dcs
 #
-# For modifying parameters passed to dcs, do not edit
-# this script. Instead use svccfg(1m) to modify the SMF
-# repository. For example:
-#
-# svccfg
-# svc:> select platform/sun4u/dcs
-# svc:/platform/sun4u/dcs> setprop dcs/ah_auth = "md5"
-# svc:/platform/sun4u/dcs> exit
-
 
 . /lib/svc/share/smf_include.sh
 
-getproparg() {
-	val=`svcprop -p $2 $SMF_FMRI`
-	[ -n "$val" ] && [ "$val" != 'none' ] &&  echo $1 $val
-}
-
 DCS=/usr/lib/dcs
 platform=`/sbin/uname -i`
-sf15k="SUNW,Sun-Fire-15000"
 opl="SUNW,SPARC-Enterprise"
 
-args=""
-if [ $platform = "$sf15k" ]; then
-	args="$args `getproparg -a dcs/ah_auth`"
-	args="$args `getproparg -e dcs/esp_encr`"
-	args="$args `getproparg -u dcs/esp_auth`"
-elif [ $platform = "$opl" ]; then
-	args="-l"
-fi
-
-if [ $platform = "$sf15k" -o $platform = "$opl" ]; then
-	$DCS $args			# Fail if can't execute
-	exit				# Use dcs's exit status
+if [ $platform = "$opl" ]; then
+	$DCS -l			# Fail if can't execute
+	exit			# Use dcs's exit status
 else
 	echo "$SMF_FMRI is not supported on this platform."
 	exit $SMF_EXIT_ERR_CONFIG

@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -180,7 +182,7 @@ pci_bus_exit(dev_info_t *dip, ddi_acc_handle_t handle)
 	if (derr.fme_status == DDI_FM_OK) {
 		if (pci_check_error(pci_p) != 0) {
 			(void) pci_pbm_err_handler(pci_p->pci_dip, &derr,
-					(const void *)pci_p, PCI_BUS_EXIT_CALL);
+			    (const void *)pci_p, PCI_BUS_EXIT_CALL);
 		}
 	}
 	mutex_exit(&pci_p->pci_common_p->pci_fm_mutex);
@@ -224,7 +226,7 @@ pci_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
 
 	if (pci_check_error(pci_p) != 0) {
 		int err = pci_pbm_err_handler(pci_p->pci_dip, derr,
-				(const void *)pci_p, PCI_TRAP_CALL);
+		    (const void *)pci_p, PCI_TRAP_CALL);
 		if (err == DDI_FM_FATAL)
 			fatal++;
 		else if (err == DDI_FM_NONFATAL)
@@ -258,10 +260,10 @@ pci_fm_create(pci_t *pci_p)
 	 */
 	if (pci_ecc_queue == NULL) {
 		pci_ecc_queue = errorq_create("pci_ecc_queue",
-				(errorq_func_t)ecc_err_drain,
-				(void *)pci_p->pci_ecc_p,
-				ECC_MAX_ERRS, sizeof (ecc_errstate_t),
-				PIL_2, ERRORQ_VITAL);
+		    (errorq_func_t)ecc_err_drain,
+		    (void *)pci_p->pci_ecc_p,
+		    ECC_MAX_ERRS, sizeof (ecc_errstate_t),
+		    PIL_2, ERRORQ_VITAL);
 		if (pci_ecc_queue == NULL)
 			panic("failed to create required system error queue");
 	}
@@ -273,20 +275,15 @@ pci_fm_create(pci_t *pci_p)
 
 	/*
 	 * Initialize FMA support
-	 * The axq workaround prevents fault management of access errors
 	 */
-	if (pci_p->pci_pbm_p->pbm_pio_limit == 0)
-		pci_p->pci_fm_cap = DDI_FM_EREPORT_CAPABLE |
-			DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE |
-			DDI_FM_ERRCB_CAPABLE;
-	else
-		pci_p->pci_fm_cap = DDI_FM_EREPORT_CAPABLE |
-			DDI_FM_DMACHK_CAPABLE | DDI_FM_ERRCB_CAPABLE;
+	pci_p->pci_fm_cap = DDI_FM_EREPORT_CAPABLE |
+	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE |
+	    DDI_FM_ERRCB_CAPABLE;
 	/*
 	 * Call parent to get it's capablity
 	 */
 	ddi_fm_init(pci_p->pci_dip, &pci_p->pci_fm_cap,
-			&pci_p->pci_fm_ibc);
+	    &pci_p->pci_fm_ibc);
 	/*
 	 * Need to be ereport and error handler cabable
 	 */
@@ -297,14 +294,13 @@ pci_fm_create(pci_t *pci_p)
 	 */
 	if (cmn_p->pci_common_refcnt == 0) {
 		mutex_init(&cmn_p->pci_fm_mutex, NULL, MUTEX_DRIVER,
-				(void *)pci_p->pci_fm_ibc);
+		    (void *)pci_p->pci_fm_ibc);
 	}
 
 	/*
 	 * Register error callback with our parent.
 	 */
-	ddi_fm_handler_register(pci_p->pci_dip, pci_err_callback,
-			pci_p);
+	ddi_fm_handler_register(pci_p->pci_dip, pci_err_callback, pci_p);
 
 }
 

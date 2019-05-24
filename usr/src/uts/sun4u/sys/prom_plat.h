@@ -253,16 +253,6 @@ extern	int		prom_serengeti_detach_board(uint_t node, uint_t board);
 extern	int		prom_serengeti_tunnel_switch(uint_t node, uint_t board);
 
 /*
- * Starcat-specific routines
- */
-extern	int		prom_starcat_switch_tunnel(uint_t portid,
-			    uint_t msgtype);
-extern	int		prom_starcat_iosram_read(uint32_t key, uint32_t offset,
-			    uint32_t len, caddr_t buf);
-extern	int		prom_starcat_iosram_write(uint32_t key, uint32_t offset,
-			    uint32_t len, caddr_t buf);
-
-/*
  * OPL-specific routines
  */
 extern	void		prom_opl_get_tod(time_t *time, int64_t *stickval);

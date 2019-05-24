@@ -20,7 +20,7 @@
 
 include		$(SRC)/Makefile.master
 
-MANSECT= 	7d
+MANSECT=	7d
 
 _MANFILES=	aac.7d		\
 		afe.7d		\
@@ -151,8 +151,6 @@ _MANFILES=	aac.7d		\
 sparc_MANFILES=	audiocs.7d	\
 		bbc_beep.7d	\
 		ctsmc.7d	\
-		cvc.7d		\
-		cvcredir.7d	\
 		dad.7d		\
 		dm2s.7d		\
 		dr.7d		\
@@ -170,7 +168,6 @@ sparc_MANFILES=	audiocs.7d	\
 		pcicmu.7d	\
 		pcipsy.7d	\
 		pcisch.7d	\
-		schpc.7d	\
 		sf.7d		\
 		smbus.7d	\
 		socal.7d	\

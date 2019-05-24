@@ -104,13 +104,13 @@ MODSTUBS_DIR	 = $(UNIX_DIR)
 DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
 LINTS_DIR	 = $(OBJS_DIR)
 LINT_LIB_DIR	 = $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
- 
+
 DTRACESTUBS_O	 = $(OBJS_DIR)/dtracestubs.o
 DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
 
 UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
-GENLIB	 	 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
+GENLIB		 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
 
 LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
 GEN_LINT_LIB	 = $(LINT_LIB_DIR)/llib-lgenunix.ln
@@ -158,33 +158,32 @@ include $(UTSBASE)/common/Makefile.files
 include $(UTSBASE)/Makefile.uts
 
 # These come after Makefile.uts.
-IMPLEMENTATIONS		 = tazmo 
-IMPLEMENTATIONS		+= javelin 
-IMPLEMENTATIONS		+= darwin 
-IMPLEMENTATIONS		+= quasar 
-IMPLEMENTATIONS		+= grover 
-IMPLEMENTATIONS		+= enchilada 
-IMPLEMENTATIONS		+= taco 
-IMPLEMENTATIONS		+= mpxu 
-IMPLEMENTATIONS		+= excalibur 
-IMPLEMENTATIONS		+= montecarlo 
-IMPLEMENTATIONS		+= serengeti 
-IMPLEMENTATIONS		+= littleneck 
-IMPLEMENTATIONS		+= starcat 
-IMPLEMENTATIONS		+= daktari 
-IMPLEMENTATIONS		+= cherrystone 
-IMPLEMENTATIONS		+= fjlite 
-IMPLEMENTATIONS		+= snowbird 
-IMPLEMENTATIONS		+= schumacher 
-IMPLEMENTATIONS		+= blade 
-IMPLEMENTATIONS		+= boston 
-IMPLEMENTATIONS		+= seattle 
-IMPLEMENTATIONS		+= chicago 
-IMPLEMENTATIONS		+= sunfire 
-IMPLEMENTATIONS		+= lw8 
-IMPLEMENTATIONS		+= makaha 
-IMPLEMENTATIONS		+= opl 
-IMPLEMENTATIONS		+= lw2plus 
+IMPLEMENTATIONS		 = tazmo
+IMPLEMENTATIONS		+= javelin
+IMPLEMENTATIONS		+= darwin
+IMPLEMENTATIONS		+= quasar
+IMPLEMENTATIONS		+= grover
+IMPLEMENTATIONS		+= enchilada
+IMPLEMENTATIONS		+= taco
+IMPLEMENTATIONS		+= mpxu
+IMPLEMENTATIONS		+= excalibur
+IMPLEMENTATIONS		+= montecarlo
+IMPLEMENTATIONS		+= serengeti
+IMPLEMENTATIONS		+= littleneck
+IMPLEMENTATIONS		+= daktari
+IMPLEMENTATIONS		+= cherrystone
+IMPLEMENTATIONS		+= fjlite
+IMPLEMENTATIONS		+= snowbird
+IMPLEMENTATIONS		+= schumacher
+IMPLEMENTATIONS		+= blade
+IMPLEMENTATIONS		+= boston
+IMPLEMENTATIONS		+= seattle
+IMPLEMENTATIONS		+= chicago
+IMPLEMENTATIONS		+= sunfire
+IMPLEMENTATIONS		+= lw8
+IMPLEMENTATIONS		+= makaha
+IMPLEMENTATIONS		+= opl
+IMPLEMENTATIONS		+= lw2plus
 
 #
 #	machine specific optimization, override default in Makefile.master
@@ -239,7 +238,7 @@ MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
 GENCONST_SRC	 = $(UTSBASE)/sun4/ml/genconst.c
 OFFSETS		 = $(UTSBASE)/sun4/ml/offsets.in
 PLATFORM_OFFSETS = $(UTSBASE)/sun4u/ml/mach_offsets.in
-FDOFFSETS 	 = $(UTSBASE)/sun/io/fd_offsets.in
+FDOFFSETS	 = $(UTSBASE)/sun/io/fd_offsets.in
 
 #
 #	Define the actual specific platforms
@@ -272,7 +271,7 @@ DEBUG_DEFS_DBG64	= -DDEBUG
 DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
 
 DEBUG_COND_OBJ64	= $(POUND_SIGN)
-DEBUG_COND_DBG64	= 
+DEBUG_COND_DBG64	=
 IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
 
 $(IF_DEBUG_OBJ)trap.o		:=	DEBUG_DEFS	+= -DTRAPDEBUG
@@ -286,7 +285,7 @@ IF_TRAPTRACE_OBJ = $(IF_DEBUG_OBJ)
 
 $(IF_TRAPTRACE_OBJ)mach_locore.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mlsetup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
-$(IF_TRAPTRACE_OBJ)syscall_trap.o 	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)syscall_trap.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mach_startup.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mp_startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
@@ -314,7 +313,7 @@ $(IF_TRAPTRACE_OBJ)opl_olympus_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 #$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
 #$(IF_DEBUG_OBJ)disp.o		:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
 
-# Comment these out if you don't want dispatcher debugging 
+# Comment these out if you don't want dispatcher debugging
 
 #$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_DEBUG
 
@@ -392,7 +391,7 @@ DRV_KMODS	+= rmcadm
 DRV_KMODS	+= rmclomv
 DRV_KMODS	+= sf
 DRV_KMODS	+= nxge
-DRV_KMODS	+= i2bsc 
+DRV_KMODS	+= i2bsc
 DRV_KMODS	+= mem_cache
 
 #
@@ -459,9 +458,9 @@ CPU_KMODS	+= cheetah cheetahplus jalapeno serrano spitfire hummingbird
 #
 #	sun4u 'TOD' Modules (/platform/.../kernel/tod):
 #
-TOD_KMODS	+= todds1287 todds1337 todmostek 
+TOD_KMODS	+= todds1287 todds1337 todmostek
 TOD_KMODS	+= todm5819 todblade todbq4802 todsg todopl
-TOD_KMODS	+= todm5819p_rmc todstarcat 
+TOD_KMODS	+= todm5819p_rmc
 
 #
 #	Performance Counter BackEnd Modules (/usr/kernel/pcbe):

@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2006 Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2019 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH WSCONS 7D "May 26, 2006"
+.TH WSCONS 7D "Apr 3, 2019"
 .SH NAME
 wscons \- workstation console
 .SH SYNOPSIS
@@ -23,7 +24,6 @@ wscons \- workstation console
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The \fBwscons\fR workstation console consists of a workstation keyboard and
 frame buffer that act together to emulate an \fBASCII\fR terminal. It includes
@@ -31,7 +31,6 @@ a redirection facility that allows I/O issued to the workstation console to be
 diverted to a STREAMS device, enabling window systems to redirect output that
 would otherwise appear directly on the frame buffer in corrupted form.
 .SS "Redirection"
-.sp
 .LP
 The \fBwscons\fR redirection facility maintains a list of devices that are
 designated as redirection targets through the \fBSRIOCSREDIR\fR ioctl described
@@ -65,7 +64,6 @@ device denoted by \fIfd\fR, and 0 if it is not.
 .RE
 
 .SS "ANSI Standard Terminal Emulation"
-.sp
 .LP
 The Solaris kernel terminal emulator provides ANSI X3.64 emulation both on
 SPARC and x86 systems.
@@ -111,7 +109,6 @@ right-bottom edge, the line-feed function is performed (see \fBCTRL-J\fR
 below). The line-feed function scrolls the screen up by one or more lines
 before moving the cursor to the first character position on the next line.
 .SS "Control Sequence Syntax"
-.sp
 .LP
 The \fBwscons\fR console defines a number of control sequences that may occur
 during input.  When a control sequence is written to the console, it affects
@@ -246,7 +243,6 @@ parameter value of 1.  Note that \fBESC[;5M\fR (interpreted as \fB`ESC[5M\fR')
 is \fInot\fR equivalent to \fBESC[5;M\fR (interpreted as `\fBESC[5;1M\fR')
 which is ultimately interpreted as `\fBESC[1M\fR').
 .SS "ANSI Control Functions"
-.sp
 .LP
 The following paragraphs specify the \fBANSI\fR control functions implemented
 by the console.  Each description provides:
@@ -288,7 +284,6 @@ Initial setting of the mode for functions that set a mode. To restore the
 initial settings, use the \fBSUNRESET\fR escape sequence.
 .RE
 .SS "Control Character Functions"
-.sp
 .LP
 The \fBwscons \fRcontrol character functions are:
 .sp
@@ -449,7 +444,6 @@ The cursor moves to the leftmost character position on the current line.
 .RE
 
 .SS "Escape Sequence Functions"
-.sp
 .LP
 The \fBwscons \fRescape sequence functions are:
 .sp
@@ -966,7 +960,6 @@ Takes no parameters.  Resets all modes to default, restores current font from
 .RE
 
 .SH RETURN VALUES
-.sp
 .LP
 When there are no errors, the redirection ioctls have return values as
 described above. Otherwise, they return  \fB\(mi1\fR and set \fBerrno\fR to
@@ -977,7 +970,6 @@ set accordingly.
 If the \fItarget\fR stream is in an error state, \fBerrno\fR is set
 accordingly.
 .SH ERRORS
-.sp
 .ne 2
 .na
 \fB\fBEBADF\fR\fR
@@ -996,7 +988,6 @@ accordingly.
 .RE
 
 .SH FILES
-.sp
 .ne 2
 .na
 \fB\fB/dev/wscons\fR\fR
@@ -1034,7 +1025,6 @@ Access system console
 .RE
 
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -1050,19 +1040,12 @@ Interface Stability	Stable
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBcvcd\fR(1M), \fBeeprom\fR(1M), \fBioctl\fR(2), \fBpoll\fR(2), \fBread\fR(2),
-\fBwrite\fR(2), \fBcvc\fR(7D), \fBconsole\fR(7D), \fBvisual_io\fR(7I)
+\fBeeprom\fR(1M), \fBioctl\fR(2), \fBpoll\fR(2), \fBread\fR(2),
+\fBwrite\fR(2), \fBconsole\fR(7D), \fBvisual_io\fR(7I)
 .SH WARNINGS
-.sp
 .LP
 The redirection ioctls block while there is I/O outstanding on the device
 instance being redirected. If you try to redirect the workstation console while
 there is a outstanding read, the workstation console will hang until the read
 completes.
-.SH NOTES
-.sp
-.LP
-The \fBcvc \fRfacility supersedes the SunOS \fBwscons \fRfacility and should
-not be used with \fBwscons\fR.
