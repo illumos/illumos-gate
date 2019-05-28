@@ -25,7 +25,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 #include <cda.h>
 
@@ -175,8 +177,7 @@ cda_platform_check_support(fmd_hdl_t *hdl)
 		return (0);
 	}
 
-	if (strcmp(buf, "SUNW,Sun-Fire-15000") == 0 ||
-	    strcmp(buf, "SUNW,Sun-Fire") == 0 ||
+	if (strcmp(buf, "SUNW,Sun-Fire") == 0 ||
 	    strcmp(buf, "SUNW,Netra-T12") == 0)
 		return (1);
 	else
@@ -209,7 +210,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	cda.cda_cpu_delay.tv_nsec = nsec % NANOSEC;
 
 	cda.cda_cpu_dooffline = fmd_prop_get_int32(hdl,
-		"cpu_offline_enable");
+	    "cpu_offline_enable");
 	cda.cda_cpu_forcedoffline = fmd_prop_get_int32(hdl,
 	    "cpu_forced_offline");
 }

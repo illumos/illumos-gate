@@ -140,7 +140,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1000 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-1500 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-2500 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-280R group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-480R group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-880 group=sys
@@ -1981,8 +1980,6 @@ $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-1000/include \
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-1500/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Blade-2500/include \
-    target=../sun4u/include
-$(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-15000/include \
     target=../sun4u/include
 $(sparc_ONLY)link path=usr/platform/SUNW,Sun-Fire-280R/include \
     target=../sun4u/include

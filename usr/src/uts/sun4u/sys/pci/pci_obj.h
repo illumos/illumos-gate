@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Peter Tribble.
+ */
+
 #ifndef	_SYS_PCI_OBJ_H
 #define	_SYS_PCI_OBJ_H
 
@@ -56,7 +60,6 @@ extern "C" {
 #ifdef PCI_DMA_TEST
 #include <sys/pci/pci_test.h>
 #endif
-#include <sys/pci/pci_axq.h>
 
 #ifdef	__cplusplus
 }

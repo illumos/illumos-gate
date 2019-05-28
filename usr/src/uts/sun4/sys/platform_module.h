@@ -23,10 +23,12 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2019 Peter Tribble.
+ */
+
 #ifndef _SYS_PLATFORM_MODULE_H
 #define	_SYS_PLATFORM_MODULE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/async.h>
 #include <sys/sunddi.h>
@@ -109,7 +111,6 @@ extern int plat_blacklist(int cmd, const char *scheme, nvlist_t *fmri,
     const char *class);
 
 extern caddr_t plat_startup_memlist(caddr_t alloc_base);
-extern int starcat_dr_name(char *name);
 
 #pragma	weak	plat_setprop_enter
 #pragma	weak	plat_setprop_exit

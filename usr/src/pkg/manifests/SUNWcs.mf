@@ -447,8 +447,6 @@ file path=etc/svc/profile/ns_nis.xml group=sys mode=0444
 file path=etc/svc/profile/ns_none.xml group=sys mode=0444
 $(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,SPARC-Enterprise.xml \
     group=sys mode=0444
-$(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-15000.xml \
-    group=sys mode=0444
 $(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire-880.xml \
     group=sys mode=0444
 $(sparc_ONLY)file path=etc/svc/profile/platform_SUNW,Sun-Fire.xml group=sys \

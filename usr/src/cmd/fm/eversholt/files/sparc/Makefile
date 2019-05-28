@@ -20,9 +20,10 @@
 #
 #
 # Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
 
-SUBDIRS=sun4u sun4v SUNW,Sun-Fire-15000
+SUBDIRS=sun4u sun4v
 EFT_COMMON_FILES=		\
 	disk.eft		\
 	neptune_xaui.eft	\
@@ -31,7 +32,7 @@ EFT_COMMON_FILES=		\
 	pciex.eft		\
 	pciexrc.eft		\
 	sca500.eft		\
-	sca1000.eft 		\
+	sca1000.eft		\
 	sensor.eft		\
 	storage.eft
 

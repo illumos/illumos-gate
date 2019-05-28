@@ -23,7 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2019 Peter Tribble.
+ */
 
 /*
  * PCI PBM implementation:
@@ -75,12 +77,12 @@ pbm_create(pci_t *pci_p)
 	pbm_p->pbm_pci_p = pci_p;
 
 	len = snprintf(pbm_p->pbm_nameinst_str,
-		sizeof (pbm_p->pbm_nameinst_str),
-		"%s%d", NAMEINST(dip));
+	    sizeof (pbm_p->pbm_nameinst_str),
+	    "%s%d", NAMEINST(dip));
 	pbm_p->pbm_nameaddr_str = pbm_p->pbm_nameinst_str + ++len;
 	(void) snprintf(pbm_p->pbm_nameaddr_str,
-		sizeof (pbm_p->pbm_nameinst_str) - len,
-		"%s@%s", NAMEADDR(dip));
+	    sizeof (pbm_p->pbm_nameinst_str) - len,
+	    "%s@%s", NAMEADDR(dip));
 
 	pci_pbm_setup(pbm_p);
 
@@ -109,11 +111,11 @@ pbm_create(pci_t *pci_p)
 	pbm_p->pbm_last_pfn = mmu_btop(last_addr);
 
 	DEBUG4(DBG_ATTACH, dip,
-		"pbm_create: ctrl=%x, afsr=%x, afar=%x, diag=%x\n",
-		pbm_p->pbm_ctrl_reg, pbm_p->pbm_async_flt_status_reg,
-		pbm_p->pbm_async_flt_addr_reg, pbm_p->pbm_diag_reg);
+	    "pbm_create: ctrl=%x, afsr=%x, afar=%x, diag=%x\n",
+	    pbm_p->pbm_ctrl_reg, pbm_p->pbm_async_flt_status_reg,
+	    pbm_p->pbm_async_flt_addr_reg, pbm_p->pbm_diag_reg);
 	DEBUG1(DBG_ATTACH, dip, "pbm_create: conf=%x\n",
-		pbm_p->pbm_config_header);
+	    pbm_p->pbm_config_header);
 
 	/*
 	 * Register a function to disable pbm error interrupts during a panic.
@@ -136,12 +138,6 @@ pbm_create(pci_t *pci_p)
 	}
 
 	pbm_configure(pbm_p);
-
-	/*
-	 * Determine if we need to apply the Sun Fire 15k AXQ/PIO
-	 * workaround.
-	 */
-	pci_axq_pio_limit(pbm_p);
 }
 
 int
@@ -234,7 +230,7 @@ pbm_error_intr(caddr_t a)
 		 */
 		ASSERT(MUTEX_HELD(&pbm_p->pbm_pokefault_mutex));
 		ddi_fm_acc_err_get(pbm_p->pbm_excl_handle, &derr,
-				DDI_FME_VERSION);
+		    DDI_FME_VERSION);
 		ASSERT(derr.fme_flag == DDI_FM_ERR_EXPECTED);
 		derr.fme_acc_handle = pbm_p->pbm_excl_handle;
 		err = pci_pbm_err_handler(pci_p->pci_dip, &derr, (void *)pci_p,
@@ -248,7 +244,7 @@ pbm_error_intr(caddr_t a)
 		membar_sync();
 		derr.fme_flag = DDI_FM_ERR_POKE;
 		err = pci_pbm_err_handler(pci_p->pci_dip, &derr, (void *)pci_p,
-				PCI_INTR_CALL);
+		    PCI_INTR_CALL);
 	} else if (pci_check_error(pci_p) != 0) {
 		/*
 		 * unprotected error, check for all errors.
@@ -257,15 +253,15 @@ pbm_error_intr(caddr_t a)
 			(void) ldphysio(pci_errtrig_pa);
 		derr.fme_flag = DDI_FM_ERR_UNEXPECTED;
 		err = pci_pbm_err_handler(pci_p->pci_dip, &derr, (void *)pci_p,
-				PCI_INTR_CALL);
+		    PCI_INTR_CALL);
 	}
 
 	if (err == DDI_FM_FATAL) {
 		if (pci_panic_on_fatal_errors) {
 			mutex_exit(&pci_p->pci_common_p->pci_fm_mutex);
 			fm_panic("%s-%d: Fatal PCI bus error(s)\n",
-				ddi_driver_name(pci_p->pci_dip),
-				ddi_get_instance(pci_p->pci_dip));
+			    ddi_driver_name(pci_p->pci_dip),
+			    ddi_get_instance(pci_p->pci_dip));
 		}
 	}
 

@@ -27,6 +27,7 @@
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright (c) 2017 Datto Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -47,6 +48,8 @@ function overwrite_verify_mirror
 	set -A files
 	set -A cksums
 	set -A newcksums
+
+	scrub_pool # Make sure we have a clean pool before starting the test.
 
 	while (( atfile < FILE_COUNT )); do
 		files[$atfile]=$TESTDIR/file.$atfile
@@ -85,4 +88,21 @@ function overwrite_verify_mirror
 	fi
 
 	sync_pool $TESTPOOL
+}
+
+# Scrub the pool and wait for completion.
+function scrub_pool
+{
+        typeset pool=$TESTPOOL
+        log_note "Scrubbing $TESTPOOL"
+
+        # Flush all the pool data.
+        log_must zpool scrub $pool
+
+        while ! is_pool_scrubbed $pool; do
+                if is_pool_resilvered $pool ; then
+                        log_fail "$pool should not have been resilvered"
+                fi
+                log_must sleep 2
+        done
 }

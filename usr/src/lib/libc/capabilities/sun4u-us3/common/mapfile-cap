@@ -34,7 +34,6 @@ CAPABILITY {
 	PLATFORM += "SUNW,Sun-Blade-1000";
 	PLATFORM += "SUNW,Sun-Blade-1500";
 	PLATFORM += "SUNW,Sun-Blade-2500";
-	PLATFORM += "SUNW,Sun-Fire-15000";
 	PLATFORM += "SUNW,Sun-Fire-280R";
 	PLATFORM += "SUNW,Sun-Fire-480R";
 	PLATFORM += "SUNW,Sun-Fire-880";

@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
+# Copyright 2019 RackTop Systems.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -98,7 +99,7 @@ log_must zfs create $TESTPOOL/$TESTFS1
 unmounted $TESTPOOL/$TESTFS1 || \
 	log_must force_unmount $TESTPOOL/$TESTFS1
 
-while [[ -n $mtpt ]] ; do
+while [[ $mtpt != $TESTDIR ]] ; do
 	(( depth == MAXDEPTH )) && \
 		log_note "Verify that 'zfs $mountcmd <filesystem>' " \
 		"which mountpoint be the identical of an existing one " \

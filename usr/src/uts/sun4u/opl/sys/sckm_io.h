@@ -24,10 +24,12 @@
  * All rights reserved.
  */
 
+/*
+ * Copyright 2019 Peter Tribble.
+ */
+
 #ifndef	_SYS_SCKM_IO_H
 #define	_SYS_SCKM_IO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {

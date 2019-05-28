@@ -1,20 +1,19 @@
 '\" te
 .\" Copyright 2005 (c), Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2019 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DCS 1M "Apr 25, 2006"
+.TH DCS 1M "Apr 3, 2019"
 .SH NAME
 dcs \- domain configuration server
 .SH SYNOPSIS
 .LP
 .nf
-\fB/usr/lib/dcs\fR [\fB-s\fR \fIsessions\fR]
-     [ [\fB-a\fR \fIauth\fR] [\fB-e\fR \fIencr\fR] [\fB-u\fR \fIesp_auth\fR] ] [\fB-l\fR]
+\fB/usr/lib/dcs\fR [\fB-s\fR \fIsessions\fR] [\fB-l\fR]
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 The Domain Configuration Server (DCS) is a daemon process that runs on Sun
 servers that support remote Dynamic Reconfiguration (DR) clients. It is started
@@ -26,7 +25,7 @@ returned to the client.
 .sp
 .LP
 The DCS listens on the network service labeled \fBsun-dr\fR. Its underlying
-protocol is TCP. It is invoked as a server program by the SMF using the TCP
+protocol is TCP. It is invoked as a server program by SMF using the TCP
 transport. The fault management resource identifier (FMRI) for DCS is:
 .sp
 .in +2
@@ -42,55 +41,14 @@ If you disable this service, DR operations initiated from a remote host fail.
 There is no negative impact on the server.
 .sp
 .LP
-Security for the DCS connection is provided differently based upon the
-architecture of the system. The SMF specifies the correct options when invoking
-the DCS daemon, based upon the current architecture. For all architectures,
-security is provided on a per-connection basis.
-.sp
-.LP
-The DCS daemon has no security options that are applicable when used on a Sun
-Enterprise 10000 system. So there are no options applicable to that
-architecture.
-.sp
-.LP
-The security options for Sun Fire high-end systems are based on IPsec options
-defined as SMF properties. These options include the \fB-a\fR \fIauth\fR,
-\fB-e\fR \fIencr\fR, and \fB-u\fR \fIesp_auth\fR options, and can be set using
-the \fBsvccfg\fR(1M) command. These options must match the IPsec policies
-defined for DCS on the system controller. Refer to the \fBkmd(1M)\fR man page
-in the \fISystem Management Services (SMS) Reference Manual\fR. The
-\fBkmd(1M)\fR man page is not part of the SunOS man page collection.
-.sp
-.LP
 Security on SPARC Enterprise Servers is not configurable. The DCS daemon uses a
 platform-specific library to configure its security options when running on
-such systems. The \fB-l\fR option is provided by the SMF when invoking the DCS
+such systems. The \fB-l\fR option is provided by SMF when invoking the DCS
 daemon on SPARC Enterprise Servers. No other security options to the DCS daemon
 should be used on SPARC Enterprise Servers.
 .SH OPTIONS
-.sp
 .LP
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-a\fR \fIauth\fR\fR
-.ad
-.RS 15n
-Controls the IPsec Authentication Header (AH) algorithm. \fIauth\fR can be one
-of \fBnone\fR, \fBmd5\fR, or \fBsha1\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-e\fR \fIencr\fR\fR
-.ad
-.RS 15n
-Controls the IPsec Encapsulating Security Payload (ESP) encryption algorithm.
-\fIencr\fR can be one of \fBnone\fR, \fBdes\fR, or \fB3des\fR.
-.RE
-
 .sp
 .ne 2
 .na
@@ -113,38 +71,7 @@ complete the execution of their DR operation. If this option is not specified,
 a default value of 128 is used.
 .RE
 
-.sp
-.ne 2
-.na
-\fB\fB-u\fR \fIesp_auth\fR\fR
-.ad
-.RS 15n
-Controls the IPsec Encapsulating Security Payload (ESP) authentication
-algorithm. \fIesp_auth\fR can be one of \fBnone\fR, \fBmd5\fR, or \fBsha1\fR.
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRSetting an IPSec Option
-.sp
-.LP
-The following command sets the Authentication Header algorithm for the DCS
-daemon to use the HMAC-MD5 authentication algorithm. These settings are only
-applicable for using the DCS daemon on a Sun Fire high-end system.
-
-.sp
-.in +2
-.nf
-# \fBsvccfg -s svc:/platform/sun4u/dcs setprop dcs/ah_auth = "md5"\fR
-# \fBsvccfg -s svc:/platform/sun4u/dcs setprop dcs/esp_encr = "none"\fR
-# \fBsvccfg -s svc:/platform/sun4u/dcs setprop dcs/esp_auth = "none"\fR
-# \fBsvcadm refresh svc:/platform/sun4u/dcs\fR
-.fi
-.in -2
-.sp
-
 .SH ERRORS
-.sp
 .LP
 The DCS uses \fBsyslog\fR(3C) to report status and error messages. All of the
 messages are logged with the \fBLOG_DAEMON\fR facility. Error messages are
@@ -153,7 +80,6 @@ informational messages are logged with the \fBLOG_INFO\fR priority. The default
 entries in the \fB/etc/syslog.conf\fR file log all of the DCS error messages to
 the \fB/var/adm/messages\fR log.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -169,13 +95,11 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBsvcs\fR(1), \fBcfgadm_sbd\fR(1M), \fBsvcadm\fR(1M), \fBsvccfg\fR(1M),
+\fBsvcs\fR(1), \fBcfgadm_sbd\fR(1M), \fBsvcadm\fR(1M),
 \fBsyslog\fR(3C), \fBconfig_admin\fR(3CFGADM), \fBlibcfgadm\fR(3LIB),
 \fBsyslog.conf\fR(4), \fBattributes\fR(5), \fBsmf\fR(5), \fBdr\fR(7D)
 .SH NOTES
-.sp
 .LP
 The \fBdcs\fR service is managed by the service management facility,
 \fBsmf\fR(5), under the fault management resource identifier (FMRI):

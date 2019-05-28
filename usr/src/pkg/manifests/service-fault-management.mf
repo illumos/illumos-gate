@@ -23,6 +23,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2019, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 Peter Tribble.
 #
 
 #
@@ -166,13 +167,6 @@ $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/fmd/plugins
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo/maps
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000 group=sys
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/eft
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/maps
-$(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/plugins
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200 group=sys
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200/lib
 $(sparc_ONLY)dir path=usr/platform/SUNW,Sun-Fire-T200/lib/fm
@@ -624,15 +618,6 @@ $(sparc_ONLY)file \
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Blade-T6320/lib/fm/topo/maps/Sun-Blade-T6320-hc-topology.xml \
     mode=0444
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/eft/SUNW,Sun-Fire-15000.eft \
-    mode=0444
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/maps/Sun-Fire-15000-hc-topology.xml \
-    mode=0444
-$(sparc_ONLY)file \
-    path=usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/plugins/ioboard.so \
-    mode=0555
 $(sparc_ONLY)file \
     path=usr/platform/SUNW,Sun-Fire-T200/lib/fm/fmd/plugins/etm.conf
 $(sparc_ONLY)file \

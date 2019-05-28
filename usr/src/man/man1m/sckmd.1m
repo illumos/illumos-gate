@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2019 Peter Tribble.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCKMD 1M "Apr 25, 2006"
+.TH SCKMD 1M "Apr 3, 2019"
 .SH NAME
 sckmd \- Sun cryptographic key management daemon
 .SH SYNOPSIS
@@ -13,13 +14,12 @@ sckmd \- Sun cryptographic key management daemon
 .fi
 
 .SH DESCRIPTION
-.sp
 .LP
 \fBsckmd\fR is a server process that resides on a high-end system domain to
 maintain the Internet Protocol Security (\fBIPsec\fR) Security Associations
 (\fBSAs\fR) needed to secure communications between a Service Processor or
 System Controller (SC) and platform management software running within a
-domain. The \fBcvcd\fR(1M) and \fBdcs\fR(1M) daemons use these Security
+domain. The \fBdcs\fR(1M) daemon uses these Security
 Associations. See \fBipsec\fR(7P) for a description of Security Associations.
 .sp
 .LP
@@ -42,7 +42,6 @@ svc:/platform/sun4u/sckmd:default
 .LP
 A domain supports only one running \fBsckmd\fR process at a time.
 .SH ATTRIBUTES
-.sp
 .LP
 See \fBattributes\fR(5) for descriptions of the following attributes:
 .sp
@@ -58,20 +57,18 @@ Interface Stability	Evolving
 .TE
 
 .SH SEE ALSO
-.sp
 .LP
-\fBcvcd\fR(1M), \fBdcs\fR(1M), \fBipsecconf\fR(1M), \fBipsecalgs\fR(1M),
+\fBdcs\fR(1M), \fBipsecconf\fR(1M), \fBipsecalgs\fR(1M),
 \fBattributes\fR(5), \fBipsec\fR(7P), \fBipsecah\fR(7P), \fBipsecesp\fR(7P),
 \fBpf_key\fR(7P)
 .SH NOTES
-.sp
 .LP
-The \fBsckmd\fR service is used only on Sun Fire high-end systems and the
-\fBSPARC\fR Enterprise Server family. It provides a mechanism for exchanging
+The \fBsckmd\fR service is used only on Sun Fire high-end systems.
+It provides a mechanism for exchanging
 \fBIPsec\fR keys between a domain and its System Controller (\fBSC\fR) or
 Service Processor. These platforms use \fBIPsec\fR to secure the communications
-between the \fBSC\fR or Service Processor and certain platform-specific daemons
-in the domain. Such daemons currently include \fBcvcd\fR(1M) and \fBdcs\fR(1M).
+between the \fBSC\fR or Service Processor and a platform-specific daemon
+in the domain, such as \fBdcs\fR(1M).
 .sp
 .LP
 The documentation for each platform that supports \fBsckmd\fR describes how to

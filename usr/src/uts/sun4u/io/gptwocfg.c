@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2019 Peter Tribble.
+ */
+
+/*
  * Safari Configurator  (gptwocfg)
  *
  */
@@ -48,7 +52,6 @@
 #include <sys/gp2cfg.h>
 #include <sys/machsystm.h>
 #include <sys/platform_module.h>
-#pragma weak starcat_dr_name
 
 #ifdef DEBUG
 int gptwocfg_debug = 0;
@@ -144,8 +147,7 @@ _fini(void)
 }
 
 int
-_info(modinfop)
-struct modinfo *modinfop;
+_info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
 }
@@ -239,12 +241,6 @@ gptwocfg_configure(dev_info_t *ap, spcd_t *pcd, gptwo_aid_t id)
 	mutex_enter(&gptwo_config_list_lock);
 	config = gptwo_config_list;
 	while (config != NULL) {
-		if (&starcat_dr_name) {
-			if (starcat_dr_name(ddi_node_name(ap)) < 0) {
-				config = config->gptwo_next;
-				continue;
-			}
-		}
 		if (config->gptwo_portid == id) {
 			cmn_err(CE_WARN, "gptwocfg: gptwocfg_configure: "
 			    "0x%x Port already configured\n", id);
@@ -556,13 +552,6 @@ gptwocfg_get_obp_created_nodes(dev_info_t *ap, uint_t id)
 	while (saf_dev != NULL) {
 		if (ddi_getprop(DDI_DEV_T_ANY, saf_dev, DDI_PROP_DONTPASS,
 		    "portid", -1) == id) {
-			if (&starcat_dr_name) {
-				if (starcat_dr_name(ddi_node_name(saf_dev))
-				    < 0) {
-					saf_dev = ddi_get_next_sibling(saf_dev);
-					continue;
-				}
-			}
 			nodes++;
 		}
 		saf_dev = ddi_get_next_sibling(saf_dev);
@@ -580,13 +569,6 @@ gptwocfg_get_obp_created_nodes(dev_info_t *ap, uint_t id)
 	while ((saf_dev != NULL) && (i < nodes)) {
 		if (ddi_getprop(DDI_DEV_T_ANY, saf_dev, DDI_PROP_DONTPASS,
 		    "portid", -1) == id) {
-			if (&starcat_dr_name) {
-				if (starcat_dr_name(ddi_node_name(saf_dev))
-				    < 0) {
-					saf_dev = ddi_get_next_sibling(saf_dev);
-					continue;
-				}
-			}
 			/*
 			 * Branch rooted at this dip must have been
 			 * held by the DR driver.

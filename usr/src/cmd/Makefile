@@ -495,7 +495,6 @@ i386_SUBDIRS=		\
 	xvm
 
 sparc_SUBDIRS=		\
-	cvcd		\
 	dcs		\
 	device_remap	\
 	drd		\

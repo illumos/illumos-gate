@@ -17,9 +17,10 @@
 # Copyright 2016 Toomas Soome <tsoome@me.com>
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
+# Copyright 2019 Peter Tribble
 #
 
-include	$(SRC)//Makefile.master
+include		$(SRC)/Makefile.master
 
 MANSECT=	1m
 
@@ -548,8 +549,7 @@ i386_MANFILES=				\
 		nvmeadm.1m		\
 		pptadm.1m
 
-sparc_MANFILES=	cvcd.1m			\
-		dcs.1m			\
+sparc_MANFILES=	dcs.1m			\
 		drd.1m			\
 		efdaemon.1m		\
 		ldmad.1m		\
