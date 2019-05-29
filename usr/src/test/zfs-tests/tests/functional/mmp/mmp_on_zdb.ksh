@@ -14,6 +14,7 @@
 #
 # Copyright (c) 2018 Lawrence Livermore National Security, LLC.
 # Copyright (c) 2018 by Nutanix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -38,9 +39,7 @@
 function cleanup
 {
 	datasetexists $TESTPOOL && destroy_pool $TESTPOOL
-	for DISK in $DISKS; do
-		zpool labelclear -f $DEV_RDSKDIR/$DISK
-	done
+	cleanup_devices $DISKS
 	log_must mmp_clear_hostid
 }
 
