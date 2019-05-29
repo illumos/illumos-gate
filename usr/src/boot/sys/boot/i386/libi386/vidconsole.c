@@ -40,6 +40,7 @@
 #include "libi386.h"
 #include "vbe.h"
 #include <gfx_fb.h>
+#include <rbx.h>
 #include <sys/vgareg.h>
 #include <sys/vgasubr.h>
 #include <machine/cpufunc.h>
@@ -666,7 +667,7 @@ vidc_init(struct console *cp, int arg)
 	/* default to text mode */
 	cp->c_private = &text_ops;
 
-	if (vbe_available()) {
+	if (OPT_CHECK(RBX_TEXT_MODE) == 0 && vbe_available()) {
 		rc = vbe_default_mode();
 		/* if rc is not legal VBE mode, use text mode */
 		if (VBE_VALID_MODE(rc)) {

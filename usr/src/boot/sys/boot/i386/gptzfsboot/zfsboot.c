@@ -48,7 +48,7 @@
 #include "libzfs.h"
 
 #define	ARGS		0x900
-#define	NOPT		14
+#define	NOPT		15
 #define	NDEV		3
 
 #define	BIOS_NUMDRIVES	0x475
@@ -70,7 +70,7 @@ extern uint32_t _end;
 extern const struct multiboot_header mb_header;
 extern uint64_t start_sector;
 
-static const char optstr[NOPT] = "DhaCcdgmnpqrsv"; /* Also 'P', 'S' */
+static const char optstr[NOPT] = "DhaCcdgmnpqrstv"; /* Also 'P', 'S' */
 static const unsigned char flags[NOPT] = {
     RBX_DUAL,
     RBX_SERIAL,
@@ -85,6 +85,7 @@ static const unsigned char flags[NOPT] = {
     RBX_QUIET,
     RBX_DFLTROOT,
     RBX_SINGLE,
+    RBX_TEXT_MODE,
     RBX_VERBOSE
 };
 uint32_t opts;

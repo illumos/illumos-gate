@@ -40,6 +40,7 @@
 #include <sys/disk.h>
 #include <sys/param.h>
 #include <sys/reboot.h>
+#include <rbx.h>
 
 #include "bootstrap.h"
 #include "common/bootargs.h"
@@ -54,9 +55,9 @@ CTASSERT(offsetof(struct bootargs, bootflags) == BA_BOOTFLAGS);
 CTASSERT(offsetof(struct bootinfo, bi_size) == BI_SIZE);
 
 /* Arguments passed in from the boot1/boot2 loader */
-static struct bootargs *kargs;
+struct bootargs *kargs;
 
-static uint32_t	initial_howto;
+uint32_t	opts;
 static uint32_t	initial_bootdev;
 static struct bootinfo	*initial_bootinfo;
 
@@ -81,7 +82,7 @@ main(void)
 
 	/* Pick up arguments */
 	kargs = (void *)__args;
-	initial_howto = kargs->howto;
+	opts = kargs->howto;
 	initial_bootdev = kargs->bootdev;
 	initial_bootinfo = kargs->bootinfo ?
 	    (struct bootinfo *)PTOV(kargs->bootinfo) : NULL;
@@ -116,15 +117,15 @@ main(void)
 	 * If the previous boot stage has requested a serial console,
 	 * prefer that.
 	 */
-	bi_setboothowto(initial_howto);
-	if (initial_howto & RB_MULTIPLE) {
-		if (initial_howto & RB_SERIAL)
+	bi_setboothowto(opts);
+	if (OPT_CHECK(RBX_DUAL)) {
+		if (OPT_CHECK(RBX_SERIAL))
 			setenv("console", "ttya text", 1);
 		else
 			setenv("console", "text ttya", 1);
-	} else if (initial_howto & RB_SERIAL) {
+	} else if (OPT_CHECK(RBX_SERIAL)) {
 		setenv("console", "ttya", 1);
-	} else if (initial_howto & RB_MUTE) {
+	} else if (OPT_CHECK(RBX_MUTE)) {
 		setenv("console", "null", 1);
 	}
 	cons_probe();
