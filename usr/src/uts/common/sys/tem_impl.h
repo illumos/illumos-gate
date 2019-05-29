@@ -283,7 +283,7 @@ void	tems_copy_layered(struct vis_conscopy *, cred_t *);
 void	tems_cursor_layered(struct vis_conscursor *, cred_t *);
 void	tems_safe_copy(struct vis_conscopy *, cred_t *, enum called_from);
 
-void	tem_pix_align(struct tem_vt_state *, cred_t *, enum called_from);
+void	tem_align(struct tem_vt_state *, cred_t *, enum called_from);
 void	tem_safe_check_first_time(struct tem_vt_state *tem, cred_t *,
 	    enum called_from);
 void	tem_safe_reset_display(struct tem_vt_state *, cred_t *,
