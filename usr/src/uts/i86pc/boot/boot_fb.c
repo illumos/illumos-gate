@@ -158,12 +158,11 @@ xbi_fb_init(struct xboot_info *xbi, bcons_dev_t *bcons_dev)
 	fb_info.cursor.visible = xbi_fb->cursor.visible;
 #endif
 
+	xbi_init_font(xbi);
 	tag = (multiboot_tag_framebuffer_t *)(uintptr_t)xbi_fb->framebuffer;
 	if (tag == NULL) {
 		return (B_FALSE);
 	}
-
-	xbi_init_font(xbi);
 
 	fb_info.paddr = tag->framebuffer_common.framebuffer_addr;
 	fb_info.pitch = tag->framebuffer_common.framebuffer_pitch;
