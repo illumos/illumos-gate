@@ -2990,8 +2990,22 @@ viona_tx(viona_link_t *link, viona_vring_t *ring)
 			goto drop_hook;
 		}
 
-		if (dp != NULL)
+		if (dp != NULL) {
 			dp->d_ref--;
+
+			/*
+			 * It is possible that the hook(s) accepted the packet,
+			 * but as part of its processing, it issued a pull-up
+			 * which released all references to the desb.  In that
+			 * case, go back to acting like the packet is entirely
+			 * copied (which it is).
+			 */
+			if (dp->d_ref == 1) {
+				dp->d_cookie = 0;
+				dp->d_ref = 0;
+				dp = NULL;
+			}
+		}
 	}
 
 	/*
