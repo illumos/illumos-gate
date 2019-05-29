@@ -21,7 +21,7 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 #
 
 set name=pkg.fmri value=pkg:/service/file-system/smb@$(PKGVERS)
@@ -49,6 +49,7 @@ dir path=usr/lib/fs/smb/$(ARCH64) group=sys
 dir path=usr/lib/mdb group=sys
 dir path=usr/lib/mdb/kvm group=sys
 dir path=usr/lib/mdb/kvm/$(ARCH64) group=sys
+dir path=usr/lib/mdb/proc group=sys
 dir path=usr/lib/reparse
 dir path=usr/lib/security
 dir path=usr/lib/smbsrv
@@ -74,6 +75,7 @@ file path=usr/kernel/kmdb/$(ARCH64)/smbsrv group=sys mode=0555
 file path=usr/lib/fs/smb/$(ARCH64)/libshare_smb.so.1
 file path=usr/lib/fs/smb/libshare_smb.so.1
 file path=usr/lib/mdb/kvm/$(ARCH64)/smbsrv.so group=sys mode=0555
+file path=usr/lib/mdb/proc/libmlsvc.so group=sys mode=0555
 file path=usr/lib/reparse/libreparse_smb.so.1
 file path=usr/lib/security/pam_smb_passwd.so.1
 file path=usr/lib/smbsrv/dtrace/smbd-all.d mode=0555

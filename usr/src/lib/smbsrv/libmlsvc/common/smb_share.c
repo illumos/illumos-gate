@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  */
 
 /*
@@ -389,6 +389,7 @@ smb_shr_add(smb_share_t *si)
 	struct stat st;
 	smb_share_t *cached_si;
 	nvlist_t *shrlist;
+	boolean_t created_zfs = B_FALSE;
 	uint32_t status;
 	int rc;
 
@@ -416,8 +417,34 @@ smb_shr_add(smb_share_t *si)
 		/*
 		 * If share type is STYPE_DISKTREE then the path to the
 		 * share should exist so that we can add the share to cache.
+		 * If path is ZFS, add the .zfs/shares/<share> entry.
+		 *
+		 * Both actions may require privileges that main dropped,
+		 * so we need to temporarily make those effective.
 		 */
-		rc = stat(si->shr_path, &st);
+		if (smb_proc_takesem() == 0) {
+
+			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+			    PRIV_FILE_DAC_READ,
+			    PRIV_FILE_DAC_SEARCH,
+			    PRIV_FILE_DAC_WRITE,
+			    NULL);
+
+			rc = stat(si->shr_path, &st);
+			if (rc == 0) {
+				smb_shr_zfs_add(si);
+				created_zfs = B_TRUE;
+			}
+
+			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+			    PRIV_FILE_DAC_READ,
+			    PRIV_FILE_DAC_SEARCH,
+			    PRIV_FILE_DAC_WRITE,
+			    NULL);
+			smb_proc_givesem();
+		} else {
+			rc = NERR_InternalError;
+		}
 		if (rc != 0) {
 			smb_shr_cache_unlock();
 			return (NERR_ItemNotFound);
@@ -425,6 +452,7 @@ smb_shr_add(smb_share_t *si)
 	}
 
 	if ((status = smb_shr_cache_addent(si)) != NERR_Success) {
+		/* This error should be impossible after findent above. */
 		smb_shr_cache_unlock();
 		return (status);
 	}
@@ -440,9 +468,6 @@ smb_shr_add(smb_share_t *si)
 		if (rc == 0) {
 			smb_shr_publish(si->shr_name, si->shr_container);
 
-			/* If path is ZFS, add the .zfs/shares/<share> entry. */
-			smb_shr_zfs_add(si);
-
 			if ((si->shr_flags & SMB_SHRF_DFSROOT) != 0)
 				dfs_namespace_load(si->shr_name);
 
@@ -450,9 +475,32 @@ smb_shr_add(smb_share_t *si)
 		}
 	}
 
+	/*
+	 * Error code path, i.e. when the kernel could not accept
+	 * the new share for some reason.
+	 */
 	if (smb_shr_cache_lock(SMB_SHR_CACHE_WRLOCK) == NERR_Success) {
 		smb_shr_cache_delent(si->shr_name);
 		smb_shr_cache_unlock();
+	}
+
+	if (created_zfs && smb_proc_takesem() == 0) {
+
+		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    NULL);
+
+		smb_shr_zfs_remove(si);
+
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    NULL);
+
+		smb_proc_givesem();
 	}
 
 	/*
@@ -505,9 +553,28 @@ smb_shr_remove(char *sharename)
 
 	/*
 	 * If path is ZFS, remove the .zfs/shares/<share> entry.  Need
-	 * to remove before cleanup of cache occurs.
+	 * to remove before cleanup of cache occurs.  These actions
+	 * require temporary elevation of privileges.
 	 */
-	smb_shr_zfs_remove(si);
+	if (smb_proc_takesem() == 0) {
+
+		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    NULL);
+
+		smb_shr_zfs_remove(si);
+
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    NULL);
+
+		smb_proc_givesem();
+	}
+
 	(void) smb_shr_encode(si, &shrlist);
 
 	(void) strlcpy(container, si->shr_container, sizeof (container));
@@ -570,9 +637,25 @@ smb_shr_rename(char *from_name, char *to_name)
 	bcopy(from_si, &to_si, sizeof (smb_share_t));
 	(void) strlcpy(to_si.shr_name, to_name, sizeof (to_si.shr_name));
 
-
 	/* If path is ZFS, rename the .zfs/shares/<share> entry. */
-	smb_shr_zfs_rename(from_si, &to_si);
+	if (smb_proc_takesem() == 0) {
+
+		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    NULL);
+
+		smb_shr_zfs_rename(from_si, &to_si);
+
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    NULL);
+
+		smb_proc_givesem();
+	}
 
 	if ((status = smb_shr_cache_addent(&to_si)) != NERR_Success) {
 		smb_shr_cache_unlock();
@@ -628,14 +711,15 @@ smb_shr_get(char *sharename, smb_share_t *si)
  *   o comment
  *   o AD container
  *   o host access
- *   o abe
+ *   o flags
  */
 uint32_t
 smb_shr_modify(smb_share_t *new_si)
 {
+	smb_share_t old_si;
 	smb_share_t *si;
 	boolean_t adc_changed = B_FALSE;
-	char old_container[MAXPATHLEN];
+	boolean_t quota_flag_changed = B_FALSE;
 	uint32_t access, flag;
 	nvlist_t *shrlist;
 
@@ -655,16 +739,20 @@ smb_shr_modify(smb_share_t *new_si)
 		return (ERROR_ACCESS_DENIED);
 	}
 
+	/*
+	 * Keep a copy of what the share entry looks like before we
+	 * modify it.  We need this for things like unpublishing
+	 * from the old share container, removing the quota dir.
+	 */
+	bcopy(si, &old_si, sizeof (old_si));
+
+	/* Share comment */
 	(void) strlcpy(si->shr_cmnt, new_si->shr_cmnt, sizeof (si->shr_cmnt));
 
-	adc_changed = (strcmp(new_si->shr_container, si->shr_container) != 0);
-	if (adc_changed) {
-		/* save current container - needed for unpublishing */
-		(void) strlcpy(old_container, si->shr_container,
-		    sizeof (old_container));
-		(void) strlcpy(si->shr_container, new_si->shr_container,
-		    sizeof (si->shr_container));
-	}
+	/* Container */
+	(void) strlcpy(si->shr_container, new_si->shr_container,
+	    sizeof (si->shr_container));
+	adc_changed = (strcmp(old_si.shr_container, si->shr_container) != 0);
 
 	flag = (new_si->shr_flags & SMB_SHRF_ABE);
 	si->shr_flags &= ~SMB_SHRF_ABE;
@@ -681,6 +769,12 @@ smb_shr_modify(smb_share_t *new_si)
 	flag = (new_si->shr_flags & SMB_SHRF_DFSROOT);
 	si->shr_flags &= ~SMB_SHRF_DFSROOT;
 	si->shr_flags |= flag;
+
+	flag = (new_si->shr_flags & SMB_SHRF_QUOTAS);
+	si->shr_flags &= ~SMB_SHRF_QUOTAS;
+	si->shr_flags |= flag;
+	if ((old_si.shr_flags ^ si->shr_flags) & SMB_SHRF_QUOTAS)
+		quota_flag_changed = B_TRUE;
 
 	flag = (new_si->shr_flags & SMB_SHRF_CSC_MASK);
 	si->shr_flags &= ~SMB_SHRF_CSC_MASK;
@@ -715,8 +809,29 @@ smb_shr_modify(smb_share_t *new_si)
 	}
 
 	if (adc_changed) {
-		smb_shr_unpublish(new_si->shr_name, old_container);
+		smb_shr_unpublish(old_si.shr_name, old_si.shr_container);
 		smb_shr_publish(new_si->shr_name, new_si->shr_container);
+	}
+
+	/* The following required privileges we dropped. */
+	if (quota_flag_changed && smb_proc_takesem() == 0) {
+
+		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    NULL);
+
+		smb_shr_zfs_remove(&old_si);
+		smb_shr_zfs_add(si);
+
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+		    PRIV_FILE_DAC_READ,
+		    PRIV_FILE_DAC_SEARCH,
+		    PRIV_FILE_DAC_WRITE,
+		    NULL);
+
+		smb_proc_givesem();
 	}
 
 	return (NERR_Success);
@@ -1447,10 +1562,7 @@ smb_shr_load(void *args)
 	char *gstate;
 	boolean_t gdisabled;
 
-	(void) mutex_lock(&smb_shr_exec_mtx);
-	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
-	    MAXPATHLEN);
-	(void) mutex_unlock(&smb_shr_exec_mtx);
+	smb_shr_load_execinfo();
 
 	if ((handle = smb_shr_sa_enter()) == NULL) {
 		syslog(LOG_ERR, "smb_shr_load: load failed");
@@ -1479,6 +1591,15 @@ smb_shr_load(void *args)
 	}
 	smb_shr_sa_exit();
 	return (NULL);
+}
+
+void
+smb_shr_load_execinfo()
+{
+	(void) mutex_lock(&smb_shr_exec_mtx);
+	(void) smb_config_get_execinfo(smb_shr_exec_map, smb_shr_exec_unmap,
+	    MAXPATHLEN);
+	(void) mutex_unlock(&smb_shr_exec_mtx);
 }
 
 /*
@@ -1646,6 +1767,16 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 	if (val != NULL) {
 		smb_shr_sa_setflag(val, si, SMB_SHRF_DFSROOT);
 		free(val);
+	}
+
+	val = smb_shr_sa_getprop(opts, SHOPT_QUOTAS);
+	if (val != NULL) {
+		/* Turn the flag on or off */
+		smb_shr_sa_setflag(val, si, SMB_SHRF_QUOTAS);
+		free(val);
+	} else {
+		/* Default for this is enabled. */
+		si->shr_flags |= SMB_SHRF_QUOTAS;
 	}
 
 	val = smb_shr_sa_getprop(opts, SHOPT_CSC);
@@ -2023,8 +2154,8 @@ smb_shr_publisher_flush(list_t *lst)
 
 /*
  * If the share path refers to a ZFS file system, add the
- * .zfs/shares/<share> object and call smb_quota_add_fs()
- * to initialize quota support for the share.
+ * .zfs/shares/<share> object and add or remove the special
+ * directory and file telling clients about quota support.
  */
 static void
 smb_shr_zfs_add(smb_share_t *si)
@@ -2051,11 +2182,18 @@ smb_shr_zfs_add(smb_share_t *si)
 		syslog(LOG_INFO, "share: failed to add ACL object: %s: %s\n",
 		    si->shr_name, strerror(errno));
 
-	if (zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT, buf, MAXPATHLEN,
-	    NULL, NULL, 0, B_FALSE) == 0) {
-		smb_quota_add_fs(buf);
+	ret = zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT,
+	    buf, MAXPATHLEN, NULL, NULL, 0, B_FALSE);
+	if (ret != 0) {
+		syslog(LOG_INFO, "share: failed to get mountpoint: "
+		    "%s\n", si->shr_name);
+	} else {
+		if ((si->shr_flags & SMB_SHRF_QUOTAS) != 0) {
+			smb_quota_add_fs(buf);
+		} else {
+			smb_quota_remove_fs(buf);
+		}
 	}
-
 
 	zfs_close(zfshd);
 	libzfs_fini(libhd);
@@ -2063,14 +2201,12 @@ smb_shr_zfs_add(smb_share_t *si)
 
 /*
  * If the share path refers to a ZFS file system, remove the
- * .zfs/shares/<share> object, and call smb_quota_remove_fs()
- * to end quota support for the share.
+ * .zfs/shares/<share> object.
  */
 static void
 smb_shr_zfs_remove(smb_share_t *si)
 {
 	libzfs_handle_t *libhd;
-	zfs_handle_t *zfshd;
 	int ret;
 	char buf[MAXPATHLEN];	/* dataset or mountpoint */
 
@@ -2080,23 +2216,18 @@ smb_shr_zfs_remove(smb_share_t *si)
 	if ((libhd = libzfs_init()) == NULL)
 		return;
 
-	if ((zfshd = zfs_open(libhd, buf, ZFS_TYPE_FILESYSTEM)) == NULL) {
-		libzfs_fini(libhd);
-		return;
-	}
-
 	errno = 0;
 	ret = zfs_smb_acl_remove(libhd, buf, si->shr_path, si->shr_name);
 	if (ret != 0 && errno != EAGAIN)
 		syslog(LOG_INFO, "share: failed to remove ACL object: %s: %s\n",
 		    si->shr_name, strerror(errno));
 
-	if (zfs_prop_get(zfshd, ZFS_PROP_MOUNTPOINT, buf, MAXPATHLEN,
-	    NULL, NULL, 0, B_FALSE) == 0) {
-		smb_quota_remove_fs(buf);
-	}
+	/*
+	 * We could remove the quotas directory here, but that adds
+	 * significantly to the time required for a zpool export,
+	 * so just leave it here and fixup when we share next.
+	 */
 
-	zfs_close(zfshd);
 	libzfs_fini(libhd);
 }
 
@@ -2415,9 +2546,11 @@ smb_shr_encode(smb_share_t *si, nvlist_t **nvlist)
 		rc |= nvlist_add_string(smb, SHOPT_GUEST, "true");
 	if ((si->shr_flags & SMB_SHRF_DFSROOT) != 0)
 		rc |= nvlist_add_string(smb, SHOPT_DFSROOT, "true");
+	if ((si->shr_flags & SMB_SHRF_QUOTAS) != 0)
+		rc |= nvlist_add_string(smb, SHOPT_QUOTAS, "true");
 
 	if ((si->shr_flags & SMB_SHRF_AUTOHOME) != 0) {
-		rc |= nvlist_add_string(smb, "Autohome", "true");
+		rc |= nvlist_add_string(smb, SHOPT_AUTOHOME, "true");
 		rc |= nvlist_add_uint32(smb, "uid", si->shr_uid);
 		rc |= nvlist_add_uint32(smb, "gid", si->shr_gid);
 	}

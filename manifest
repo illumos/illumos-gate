@@ -9885,6 +9885,7 @@ f usr/lib/mdb/proc/ld.so 0555 root sys
 f usr/lib/mdb/proc/libavl.so 0555 root sys
 f usr/lib/mdb/proc/libc.so 0555 root sys
 f usr/lib/mdb/proc/libcmdutils.so 0555 root sys
+f usr/lib/mdb/proc/libmlsvc.so 0555 root sys
 f usr/lib/mdb/proc/libnvpair.so 0555 root sys
 f usr/lib/mdb/proc/libproc.so 0555 root sys
 f usr/lib/mdb/proc/libpython2.6.so 0555 root sys

@@ -890,7 +890,9 @@ smb_kshare_decode(nvlist_t *share)
 	    SMB_SHRF_GUEST_OK);
 	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_DFSROOT,
 	    SMB_SHRF_DFSROOT);
-	tmp.shr_flags |= smb_kshare_decode_bool(smb, "Autohome",
+	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_QUOTAS,
+	    SMB_SHRF_QUOTAS);
+	tmp.shr_flags |= smb_kshare_decode_bool(smb, SHOPT_AUTOHOME,
 	    SMB_SHRF_AUTOHOME);
 
 	if ((tmp.shr_flags & SMB_SHRF_AUTOHOME) == SMB_SHRF_AUTOHOME) {

@@ -22,7 +22,7 @@
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2016 Joyent, Inc.
-# Copyright 2017 Nexenta Systems, Inc.
+# Copyright 2018 Nexenta Systems, Inc.
 #
 
 #
@@ -38,6 +38,7 @@ COMMON_MODULES_PROC = \
 	libfknsmb \
 	libfksmbfs \
 	libfksmbsrv \
+	libmlsvc \
 	libnvpair \
 	libproc \
 	libpython \

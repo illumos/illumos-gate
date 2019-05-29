@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -630,7 +630,9 @@ smbd_refresh_handler()
 	/* This reloads the in-kernel config. */
 	(void) smbd_kernel_bind();
 
-	smbd_load_shares();
+	/* On refresh load share properties only, not the shares themselves */
+	smb_shr_load_execinfo();
+
 	smbd_load_printers();
 	smbd_spool_start();
 }
@@ -689,7 +691,7 @@ static int
 smbd_already_running(void)
 {
 	door_info_t	info;
-	char 		*door_name;
+	char		*door_name;
 	int		door;
 
 	door_name = getenv("SMBD_DOOR_NAME");
@@ -833,6 +835,10 @@ smbd_load_shares(void)
 		smbd_report("unable to load disk shares: %s", strerror(errno));
 }
 
+/*
+ * This wrapper function is used to avoid casting smb_shr_load() in
+ * pthread_create() above. It is called very infrequently.
+ */
 static void *
 smbd_share_loader(void *args)
 {

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1406,13 +1406,14 @@ smbadm_group_add_del_member(char *gname, char *mname,
 		/*
 		 * We are given a SID.  Just use it.
 		 *
-		 * We'e like the real account type if we can get it,
+		 * We'd like the real account type if we can get it,
 		 * but don't want to error out if we can't get it.
+		 * Lacking other info, assume it's a group.
 		 */
 		sidstr = mname;
 		rc = smb_lookup_sid(sidstr, &acct);
 		if ((rc != 0) || (acct.a_status != NT_STATUS_SUCCESS))
-			acct.a_sidtype = SidTypeUnknown;
+			acct.a_sidtype = SidTypeGroup;
 	} else {
 		rc = smb_lookup_name(mname, SidTypeUnknown, &acct);
 		if ((rc != 0) || (acct.a_status != NT_STATUS_SUCCESS)) {
