@@ -945,7 +945,10 @@ static void
 vgatext_init(struct gfxp_fb_softc *softc)
 {
 	union gfx_console *console = softc->console;
+	bitmap_data_t *font_data;
 	unsigned char atr_mode;
+	short width, height;
+	int i;
 
 	atr_mode = vga_get_atr(&console->vga.regs, VGA_ATR_MODE);
 	if (atr_mode & VGA_ATR_MODE_GRAPH)
@@ -961,7 +964,21 @@ vgatext_init(struct gfxp_fb_softc *softc)
 	vga_set_atr(&console->vga.regs, VGA_ATR_BDR_CLR,
 	    vga_get_atr(&console->vga.regs, pc_black));
 #endif
-	vgatext_setfont(softc);	/* need selectable font? */
+
+	width = VGA_TEXT_COLS;
+	height = VGA_TEXT_ROWS;
+	font_data = set_font(&height, &width,
+	    16 * height + BORDER_PIXELS,
+	    8 * width + BORDER_PIXELS);
+	for (i = 0; i < VFNT_MAPS; i++) {
+		console->vga.font.vf_map[i] = font_data->font->vf_map[i];
+		console->vga.font.vf_map_count[i] =
+		    font_data->font->vf_map_count[i];
+	}
+	console->vga.font.vf_bytes = font_data->font->vf_bytes;
+	console->vga.font.vf_width = font_data->font->vf_width;
+	console->vga.font.vf_height = font_data->font->vf_height;
+	vgatext_setfont(softc);
 }
 
 #if	defined(USE_BORDERS)
@@ -1109,7 +1126,7 @@ vgatext_setfont(struct gfxp_fb_softc *softc)
 	f_offset = s * 8 * 1024;
 	for (i = 0; i < 256; i++) {
 		c = vga_cp437_to_uni(i);
-		from = font_lookup(font_data_8x16.font, c);
+		from = font_lookup(&console->vga.font, c);
 		to = (unsigned char *)console->vga.fb.addr + f_offset +
 		    i * 0x20;
 		for (j = 0; j < bpc; j++)

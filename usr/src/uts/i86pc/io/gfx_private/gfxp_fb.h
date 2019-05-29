@@ -77,6 +77,7 @@ struct gfx_vga {
 		unsigned char blue;
 	} colormap[VGA8_CMAP_ENTRIES];
 	unsigned char attrib_palette[VGA_ATR_NUM_PLT];
+	struct font font;
 };
 
 union gfx_console {
