@@ -65,8 +65,13 @@ tests = ['zpool_remove_002_pos', 'zpool_remove_003_pos']
 [/opt/zfs-tests/tests/functional/cli_root/zpool_replace]
 tests = ['zpool_replace_001_neg', 'zpool_replace_002_neg']
 
+[/opt/zfs-tests/tests/functional/cli_root/zpool_resilver]
+tests = ['zpool_resilver_bad_args', 'zpool_resilver_restart']
+
 [/opt/zfs-tests/tests/functional/cli_root/zpool_scrub]
-tests = ['zpool_scrub_001_neg', 'zpool_scrub_004_pos', 'zpool_scrub_005_pos']
+tests = ['zpool_scrub_001_neg',
+    'zpool_scrub_004_pos', 'zpool_scrub_005_pos', 'zpool_scrub_print_repairing',
+    'zpool_scrub_offline_device', 'zpool_scrub_multiple_copies']
 
 [/opt/zfs-tests/tests/functional/cli_root/zpool_set]
 tests = ['zpool_set_001_pos', 'zpool_set_002_neg', 'zpool_set_003_neg']
