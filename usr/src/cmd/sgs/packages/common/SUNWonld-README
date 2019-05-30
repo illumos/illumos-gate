@@ -1667,3 +1667,5 @@ Bugid   Risk Synopsis
 	producing relocatable objects
 10366	ld(1) should support GNU-style linker sets
 10581	ld(1) should know kernel modules are a thing
+11057	hidden undefined weak symbols should not leave relocations
+11067	debug statistics crash ld(1) when -z allextract

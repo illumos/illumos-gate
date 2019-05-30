@@ -22,6 +22,7 @@
 
 #
 # Copyright 2017, loli10K <ezomori.nozomu@gmail.com>. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -125,7 +126,8 @@ log_must wait_for_resilver_end $TESTPOOL2 $RESILVER_TIMEOUT
 zpool_scrub_sync $TESTPOOL2
 
 # 7. Verify data integrity
-cksum=$(zpool status $TESTPOOL2 | awk 'L{print $NF;L=0} /CKSUM$/{L=1}')
+cksum=$(zpool status $TESTPOOL2 | awk '{if ($NF == "CKSUM") {fnd=1; next} \
+    if (fnd && NF < 1) {fnd=0; next} if (fnd) csum += $NF} END {print csum}')
 if [[ $cksum != 0 ]]; then
 	log_fail "Unexpected CKSUM errors found on $TESTPOOL2 ($cksum)"
 fi

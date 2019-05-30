@@ -248,6 +248,7 @@ typedef struct tsol_zcent {
 } tsol_zcent_t;
 #define	TSOL_MLP_END(mlp)	((mlp)->mlp_ipp == 0 && (mlp)->mlp_port == 0)
 
+#if (defined(_KERNEL) || defined(_KMEMUSER))
 typedef struct tsol_tpc {
 	kmutex_t		tpc_lock;	/* lock for structure */
 	uint_t			tpc_refcnt;	/* reference count */
@@ -265,6 +266,7 @@ typedef struct tsol_tnrhc {
 	char			rhc_isbcast;	/* broadcast address */
 	char			rhc_local;	/* loopback or local interace */
 } tsol_tnrhc_t;
+#endif	/* _KERNEL || _KMEMUSER */
 
 /* Size of remote host hash tables in kernel */
 #define	TNRHC_SIZE 256
@@ -361,11 +363,13 @@ typedef struct tsol_address {
 	in_addr_t		ip_address;
 } tsol_address_t;
 
+#if (defined(_KERNEL) || defined(_KMEMUSER))
 /* This is shared between tcache and mdb */
 typedef struct tnrhc_hash_s {
 	tsol_tnrhc_t *tnrh_list;
 	kmutex_t tnrh_lock;
 } tnrhc_hash_t;
+#endif	/* _KERNEL || _KMEMUSER */
 
 #ifdef _KERNEL
 typedef enum {

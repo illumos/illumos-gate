@@ -141,6 +141,7 @@ typedef enum zfs_error {
 	EZFS_TOOMANY,		/* argument list too long */
 	EZFS_INITIALIZING,	/* currently initializing */
 	EZFS_NO_INITIALIZE,	/* no active initialize */
+	EZFS_NO_RESILVER_DEFER,	/* pool doesn't support resilver_defer */
 	EZFS_UNKNOWN
 } zfs_error_t;
 

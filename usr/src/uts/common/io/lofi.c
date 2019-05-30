@@ -25,6 +25,7 @@
  * Copyright (c) 2016 Andrey Sokolov
  * Copyright 2016 Toomas Soome <tsoome@me.com>
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -2785,34 +2786,28 @@ lofi_copy_devpath(struct lofi_ioctl *klip)
 	(void) snprintf(namebuf, sizeof (namebuf), "%d", klip->li_id);
 
 	mutex_enter(&lofi_devlink_cache.ln_lock);
-	do {
+	for (;;) {
 		error = nvlist_lookup_nvlist(lofi_devlink_cache.ln_data,
 		    namebuf, &nvl);
 
-		if (error != 0) {
-			/* No data in cache, wait for some. */
-			ticks = ddi_get_lbolt() +
-			    lofi_timeout * drv_usectohz(1000000);
-			error = cv_timedwait(&lofi_devlink_cache.ln_cv,
-			    &lofi_devlink_cache.ln_lock, ticks);
-			if (error == -1)
-				break;	/* timeout */
-			error = 1;
-			continue;	/* Read again. */
+		if (error == 0 &&
+		    nvlist_lookup_string(nvl, DEV_NAME, &str) == 0 &&
+		    strncmp(str, "/dev/" LOFI_CHAR_NAME,
+		    sizeof ("/dev/" LOFI_CHAR_NAME) - 1) != 0) {
+			(void) strlcpy(klip->li_devpath, str,
+			    sizeof (klip->li_devpath));
+			break;
 		}
-
-		if (nvl != NULL) {
-			if (nvlist_lookup_string(nvl, DEV_NAME, &str) == 0) {
-				if (strncmp(str, "/dev/" LOFI_CHAR_NAME,
-				    sizeof ("/dev/" LOFI_CHAR_NAME) - 1) == 0) {
-					error = 1;
-					continue;
-				}
-				(void) strlcpy(klip->li_devpath, str,
-				    sizeof (klip->li_devpath));
-			}
-		}
-	} while (error != 0);
+		/*
+		 * Either there is no data in the cache, or the
+		 * cache entry still has the wrong device name.
+		 */
+		ticks = ddi_get_lbolt() + lofi_timeout * drv_usectohz(1000000);
+		error = cv_timedwait(&lofi_devlink_cache.ln_cv,
+		    &lofi_devlink_cache.ln_lock, ticks);
+		if (error == -1)
+			break;	/* timeout */
+	}
 	mutex_exit(&lofi_devlink_cache.ln_lock);
 }
 

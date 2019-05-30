@@ -102,6 +102,7 @@
 #include <math.h>
 #include <umem.h>
 #include <locale.h>
+#include <sys/processor.h>
 #include <smbsrv/smb_kstat.h>
 
 #if !defined(TEXT_DOMAIN)

@@ -27,7 +27,7 @@
 .\" Copyright (c) 2017 George Melikov. All Rights Reserved.
 .\" Copyright 2019 Joyent, Inc.
 .\"
-.Dd April 27, 2018
+.Dd May 15, 2019
 .Dt ZPOOL 1M
 .Os
 .Sh NAME
@@ -156,6 +156,9 @@
 .Cm replace
 .Op Fl f
 .Ar pool Ar device Op Ar new_device
+.Nm
+.Cm resilver
+.Ar pool Ns ...
 .Nm
 .Cm scrub
 .Op Fl s | Fl p
@@ -1775,6 +1778,19 @@ Forces use of
 even if its appears to be in use.
 Not all devices can be overridden in this manner.
 .El
+.It Xo
+.Nm
+.Cm resilver
+.Ar pool Ns ...
+.Xc
+Starts a resilver.
+If an existing resilver is already running it will be restarted from the
+beginning.
+Any drives that were scheduled for a deferred resilver will be added to the
+new one.
+This requires the
+.Sy resilver_defer
+feature.
 .It Xo
 .Nm
 .Cm scrub

@@ -183,11 +183,14 @@ unsigned int zfs_free_min_time_ms = 1000; /* min millisecs to free per txg */
 unsigned int zfs_obsolete_min_time_ms = 500;
 /* min millisecs to resilver per txg */
 unsigned int zfs_resilver_min_time_ms = 3000;
+int zfs_scan_suspend_progress = 0; /* set to prevent scans from progressing */
 boolean_t zfs_no_scrub_io = B_FALSE; /* set to disable scrub i/o */
 boolean_t zfs_no_scrub_prefetch = B_FALSE; /* set to disable scrub prefetch */
 enum ddt_class zfs_scrub_ddt_class_max = DDT_CLASS_DUPLICATE;
 /* max number of blocks to free in a single TXG */
 uint64_t zfs_async_block_max_blocks = UINT64_MAX;
+
+int zfs_resilver_disable_defer = 0; /* set to disable resilver deferring */
 
 /*
  * We wait a few txgs after importing a pool to begin scanning so that
@@ -455,7 +458,6 @@ dsl_scan_init(dsl_pool_t *dp, uint64_t txg)
 	scn->scn_async_destroying = spa_feature_is_active(dp->dp_spa,
 	    SPA_FEATURE_ASYNC_DESTROY);
 
-	bcopy(&scn->scn_phys, &scn->scn_phys_cached, sizeof (scn->scn_phys));
 	avl_create(&scn->scn_queue, scan_ds_queue_compare, sizeof (scan_ds_t),
 	    offsetof(scan_ds_t, sds_node));
 	avl_create(&scn->scn_prefetch_queue, scan_prefetch_queue_compare,
@@ -512,6 +514,8 @@ dsl_scan_init(dsl_pool_t *dp, uint64_t txg)
 			    (longlong_t)scn->scn_restart_txg);
 		}
 	}
+
+	bcopy(&scn->scn_phys, &scn->scn_phys_cached, sizeof (scn->scn_phys));
 
 	/* reload the queue into the in-core state */
 	if (scn->scn_phys.scn_queue_obj != 0) {
@@ -751,6 +755,11 @@ dsl_scan(dsl_pool_t *dp, pool_scan_func_t func)
 	spa->spa_scrub_reopen = B_FALSE;
 	(void) spa_vdev_state_exit(spa, NULL, 0);
 
+	if (func == POOL_SCAN_RESILVER) {
+		dsl_resilver_restart(spa->spa_dsl_pool, 0);
+		return (0);
+	}
+
 	if (func == POOL_SCAN_SCRUB && dsl_scan_is_paused_scrub(scn)) {
 		/* got scrub start cmd, resume paused scrub */
 		int err = dsl_scrub_set_pause_resume(scn->scn_dp,
@@ -764,6 +773,41 @@ dsl_scan(dsl_pool_t *dp, pool_scan_func_t func)
 
 	return (dsl_sync_task(spa_name(spa), dsl_scan_setup_check,
 	    dsl_scan_setup_sync, &func, 0, ZFS_SPACE_CHECK_EXTRA_RESERVED));
+}
+
+/*
+ * Sets the resilver defer flag to B_FALSE on all leaf devs under vd. Returns
+ * B_TRUE if we have devices that need to be resilvered and are available to
+ * accept resilver I/Os.
+ */
+static boolean_t
+dsl_scan_clear_deferred(vdev_t *vd, dmu_tx_t *tx)
+{
+	boolean_t resilver_needed = B_FALSE;
+	spa_t *spa = vd->vdev_spa;
+
+	for (int c = 0; c < vd->vdev_children; c++) {
+		resilver_needed |=
+		    dsl_scan_clear_deferred(vd->vdev_child[c], tx);
+	}
+
+	if (vd == spa->spa_root_vdev &&
+	    spa_feature_is_active(spa, SPA_FEATURE_RESILVER_DEFER)) {
+		spa_feature_decr(spa, SPA_FEATURE_RESILVER_DEFER, tx);
+		vdev_config_dirty(vd);
+		spa->spa_resilver_deferred = B_FALSE;
+		return (resilver_needed);
+	}
+
+	if (!vdev_is_concrete(vd) || vd->vdev_aux ||
+	    !vd->vdev_ops->vdev_op_leaf)
+		return (resilver_needed);
+
+	if (vd->vdev_resilver_deferred)
+		vd->vdev_resilver_deferred = B_FALSE;
+
+	return (!vdev_is_dead(vd) && !vd->vdev_offline &&
+	    vdev_resilver_needed(vd, NULL, NULL));
 }
 
 /* ARGSUSED */
@@ -865,6 +909,25 @@ dsl_scan_done(dsl_scan_t *scn, boolean_t complete, dmu_tx_t *tx)
 		 * Let the async thread assess this and handle the detach.
 		 */
 		spa_async_request(spa, SPA_ASYNC_RESILVER_DONE);
+
+		/*
+		 * Clear any deferred_resilver flags in the config.
+		 * If there are drives that need resilvering, kick
+		 * off an asynchronous request to start resilver.
+		 * dsl_scan_clear_deferred() may update the config
+		 * before the resilver can restart. In the event of
+		 * a crash during this period, the spa loading code
+		 * will find the drives that need to be resilvered
+		 * when the machine reboots and start the resilver then.
+		 */
+		boolean_t resilver_needed =
+		    dsl_scan_clear_deferred(spa->spa_root_vdev, tx);
+		if (resilver_needed) {
+			spa_history_log_internal(spa,
+			    "starting deferred resilver", tx,
+			    "errors=%llu", spa_get_errlog_size(spa));
+			spa_async_request(spa, SPA_ASYNC_RESILVER);
+		}
 	}
 
 	scn->scn_phys.scn_end_time = gethrestime_sec();
@@ -935,6 +998,7 @@ dsl_scrub_pause_resume_sync(void *arg, dmu_tx_t *tx)
 		/* can't pause a scrub when there is no in-progress scrub */
 		spa->spa_scan_pass_scrub_pause = gethrestime_sec();
 		scn->scn_phys.scn_flags |= DSF_SCRUB_PAUSED;
+		scn->scn_phys_cached.scn_flags |= DSF_SCRUB_PAUSED;
 		dsl_scan_sync_state(scn, tx, SYNC_CACHED);
 		spa_event_notify(spa, NULL, NULL, ESC_ZFS_SCRUB_PAUSED);
 	} else {
@@ -949,6 +1013,7 @@ dsl_scrub_pause_resume_sync(void *arg, dmu_tx_t *tx)
 			    gethrestime_sec() - spa->spa_scan_pass_scrub_pause;
 			spa->spa_scan_pass_scrub_pause = 0;
 			scn->scn_phys.scn_flags &= ~DSF_SCRUB_PAUSED;
+			scn->scn_phys_cached.scn_flags &= ~DSF_SCRUB_PAUSED;
 			dsl_scan_sync_state(scn, tx, SYNC_CACHED);
 		}
 	}
@@ -2335,6 +2400,20 @@ dsl_scan_ddt_entry(dsl_scan_t *scn, enum zio_checksum checksum,
 	if (scn->scn_phys.scn_state != DSS_SCANNING)
 		return;
 
+	/*
+	 * This function is special because it is the only thing
+	 * that can add scan_io_t's to the vdev scan queues from
+	 * outside dsl_scan_sync(). For the most part this is ok
+	 * as long as it is called from within syncing context.
+	 * However, dsl_scan_sync() expects that no new sio's will
+	 * be added between when all the work for a scan is done
+	 * and the next txg when the scan is actually marked as
+	 * completed. This check ensures we do not issue new sio's
+	 * during this period.
+	 */
+	if (scn->scn_done_txg != 0)
+		return;
+
 	for (p = 0; p < DDT_PHYS_TYPES; p++, ddp++) {
 		if (ddp->ddp_phys_birth == 0 ||
 		    ddp->ddp_phys_birth > scn->scn_phys.scn_max_txg)
@@ -2986,6 +3065,26 @@ dsl_scan_active(dsl_scan_t *scn)
 }
 
 static boolean_t
+dsl_scan_check_deferred(vdev_t *vd)
+{
+	boolean_t need_resilver = B_FALSE;
+
+	for (int c = 0; c < vd->vdev_children; c++) {
+		need_resilver |=
+		    dsl_scan_check_deferred(vd->vdev_child[c]);
+	}
+
+	if (!vdev_is_concrete(vd) || vd->vdev_aux ||
+	    !vd->vdev_ops->vdev_op_leaf)
+		return (need_resilver);
+
+	if (!vd->vdev_resilver_deferred)
+		need_resilver = B_TRUE;
+
+	return (need_resilver);
+}
+
+static boolean_t
 dsl_scan_need_resilver(spa_t *spa, const dva_t *dva, size_t psize,
     uint64_t phys_birth)
 {
@@ -3030,6 +3129,13 @@ dsl_scan_need_resilver(spa_t *spa, const dva_t *dva, size_t psize,
 	 * is provided instead of asize to simplify the check for RAIDZ.
 	 */
 	if (!vdev_dtl_need_resilver(vd, DVA_GET_OFFSET(dva), psize))
+		return (B_FALSE);
+
+	/*
+	 * Check that this top-level vdev has a device under it which
+	 * is resilvering and is not deferred.
+	 */
+	if (!dsl_scan_check_deferred(vd))
 		return (B_FALSE);
 
 	return (B_TRUE);
@@ -3193,12 +3299,19 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 	int err = 0;
 	state_sync_type_t sync_type = SYNC_OPTIONAL;
 
+	if (spa->spa_resilver_deferred &&
+	    !spa_feature_is_active(dp->dp_spa, SPA_FEATURE_RESILVER_DEFER))
+		spa_feature_incr(spa, SPA_FEATURE_RESILVER_DEFER, tx);
+
 	/*
 	 * Check for scn_restart_txg before checking spa_load_state, so
 	 * that we can restart an old-style scan while the pool is being
-	 * imported (see dsl_scan_init).
+	 * imported (see dsl_scan_init). We also restart scans if there
+	 * is a deferred resilver and the user has manually disabled
+	 * deferred resilvers via the tunable.
 	 */
-	if (dsl_scan_restarting(scn, tx)) {
+	if (dsl_scan_restarting(scn, tx) ||
+	    (spa->spa_resilver_deferred && zfs_resilver_disable_defer)) {
 		pool_scan_func_t func = POOL_SCAN_SCRUB;
 		dsl_scan_done(scn, B_FALSE, tx);
 		if (vdev_resilver_needed(spa->spa_root_vdev, NULL, NULL))
@@ -3263,6 +3376,27 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 	 */
 	if (spa->spa_syncing_txg < spa->spa_first_txg + SCAN_IMPORT_WAIT_TXGS)
 		return;
+
+	/*
+	 * zfs_scan_suspend_progress can be set to disable scan progress.
+	 * We don't want to spin the txg_sync thread, so we add a delay
+	 * here to simulate the time spent doing a scan. This is mostly
+	 * useful for testing and debugging.
+	 */
+	if (zfs_scan_suspend_progress) {
+		uint64_t scan_time_ns = gethrtime() - scn->scn_sync_start_time;
+		int mintime = (scn->scn_phys.scn_func == POOL_SCAN_RESILVER) ?
+		    zfs_resilver_min_time_ms : zfs_scrub_min_time_ms;
+
+		while (zfs_scan_suspend_progress &&
+		    !txg_sync_waiting(scn->scn_dp) &&
+		    !spa_shutting_down(scn->scn_dp->dp_spa) &&
+		    NSEC2MSEC(scan_time_ns) < mintime) {
+			delay(hz);
+			scan_time_ns = gethrtime() - scn->scn_sync_start_time;
+		}
+		return;
+	}
 
 	/*
 	 * It is possible to switch from unsorted to sorted at any time,
@@ -3393,6 +3527,8 @@ dsl_scan_sync(dsl_pool_t *dp, dmu_tx_t *tx)
 			    (longlong_t)tx->tx_txg);
 		}
 	} else if (scn->scn_is_sorted && scn->scn_bytes_pending != 0) {
+		ASSERT(scn->scn_clearing);
+
 		/* need to issue scrubbing IOs from per-vdev queues */
 		scn->scn_zio_root = zio_root(dp->dp_spa, NULL,
 		    NULL, ZIO_FLAG_CANFAIL);

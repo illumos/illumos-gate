@@ -88,7 +88,9 @@ dir path=opt/zfs-tests/tests/functional/cli_root/zpool_labelclear
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_offline
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_online
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_remove
+dir path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_replace
+dir path=opt/zfs-tests/tests/functional/cli_root/zpool_resilver
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_set
 dir path=opt/zfs-tests/tests/functional/cli_root/zpool_status
@@ -1727,12 +1729,55 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_remove/zpool_remove_003_pos \
     mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/cleanup \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/setup mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen.cfg \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen.shlib \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen_001_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen_002_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen_003_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen_004_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen_005_pos \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen_006_neg \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_reopen/zpool_reopen_007_pos \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/cleanup \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/setup \
     mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_replace/zpool_replace_001_neg \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_resilver/cleanup \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/cli_root/zpool_resilver/setup \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_resilver/zpool_resilver.cfg \
+    mode=0444
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_resilver/zpool_resilver_bad_args \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_resilver/zpool_resilver_restart \
     mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_scrub/cleanup \
     mode=0555

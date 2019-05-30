@@ -1636,7 +1636,7 @@ acl_trivial_access_masks(mode_t mode, boolean_t isdir, trivial_acl_t *masks)
 int
 acl_trivial_create(mode_t mode, boolean_t isdir, ace_t **acl, int *count)
 {
-	int 		index = 0;
+	int		index = 0;
 	int		error;
 	trivial_acl_t	masks;
 
@@ -1696,7 +1696,7 @@ ace_trivial_common(void *acep, int aclcnt,
 	uint64_t cookie = 0;
 
 	while ((cookie = walk(acep, cookie, aclcnt, &flags, &type, &mask))
-	    != NULL) {
+	    != 0) {
 		switch (flags & ACE_TYPE_FLAGS) {
 		case ACE_OWNER:
 		case ACE_GROUP|ACE_IDENTIFIER_GROUP:

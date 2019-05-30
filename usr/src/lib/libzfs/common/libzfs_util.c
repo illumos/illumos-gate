@@ -263,6 +263,9 @@ libzfs_error_description(libzfs_handle_t *hdl)
 	case EZFS_NO_INITIALIZE:
 		return (dgettext(TEXT_DOMAIN, "there is no active "
 		    "initialization"));
+	case EZFS_NO_RESILVER_DEFER:
+		return (dgettext(TEXT_DOMAIN, "this action requires the "
+		    "resilver_defer feature"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

@@ -472,7 +472,7 @@ ld_ent_setup(Ofl_desc *ofl, Xword segalign)
 		    AL_CNT_SEGMENTS)) == NULL)
 			return (S_ERROR);
 
-#ifdef NDEBUG			/* assert() is enabled */
+#ifndef NDEBUG			/* assert() is enabled */
 		/*
 		 * Enforce the segment name rule: Any segment that can
 		 * be referenced by an entrance descriptor must have

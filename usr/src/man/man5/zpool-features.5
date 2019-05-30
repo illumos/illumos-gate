@@ -15,7 +15,7 @@
 .\" CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your
 .\" own identifying information:
 .\" Portions Copyright [yyyy] [name of copyright owner]
-.TH ZPOOL-FEATURES 5 "Apr 19, 2019"
+.TH ZPOOL-FEATURES 5 "May 15, 2019"
 .SH NAME
 zpool\-features \- ZFS pool feature descriptions
 .SH DESCRIPTION
@@ -682,6 +682,27 @@ This feature becomes \fBactive\fR when a dedicated allocation class vdev
 (dedup or special) is created with zpool create or zpool add. With device
 removal, it can be returned to the \fBenabled\fR state if all the top-level
 vdevs from an allocation class are removed.
+
+.RE
+.sp
+.ne 2
+.na
+\fB\fBresilver_defer\fR\fR
+.ad
+.RS 4n
+.TS
+l l .
+GUID	com.datto:resilver_defer
+READ\-ONLY COMPATIBLE	yes
+DEPENDENCIES	none
+.TE
+
+This feature allows zfs to postpone new resilvers if an existing one is already
+in progress. Without this feature, any new resilvers will cause the currently
+running one to be immediately restarted from the beginning.
+
+This feature becomes \fBactive\fR once a resilver has been deferred, and
+returns to being \fBenabled\fR when the deferred resilver begins.
 
 .SH "SEE ALSO"
 \fBzfs\fR(1M), \fBzpool\fR(1M)

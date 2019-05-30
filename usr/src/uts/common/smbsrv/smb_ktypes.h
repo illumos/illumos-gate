@@ -792,8 +792,6 @@ typedef struct tcon {
  */
 #define	SMB_SESSION_INACTIVITY_TIMEOUT		(15 * 60)
 
-#define	SMB_SESSION_OFILE_MAX			(16 * 1024)
-
 /* SMB1 signing */
 struct smb_sign {
 	unsigned int flags;

@@ -20,30 +20,39 @@
  */
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
- * Copyright 2018, Joyent, Inc.
  */
 
 #ifndef _SYS_ZONE_H
 #define	_SYS_ZONE_H
 
 #include <sys/types.h>
-#include <sys/mutex.h>
 #include <sys/param.h>
+#include <sys/tsol/label.h>
+#include <sys/uadmin.h>
+#include <netinet/in.h>
+
+#ifdef _KERNEL
+/*
+ * Many includes are kernel-only to reduce namespace pollution of
+ * userland applications.
+ */
+#include <sys/mutex.h>
 #include <sys/rctl.h>
 #include <sys/ipc_rctl.h>
 #include <sys/pset.h>
-#include <sys/tsol/label.h>
 #include <sys/cred.h>
 #include <sys/netstack.h>
-#include <sys/uadmin.h>
 #include <sys/ksynch.h>
 #include <sys/socket_impl.h>
 #include <sys/secflags.h>
-#include <netinet/in.h>
 #include <sys/cpu_uarray.h>
 #include <sys/nvpair.h>
+#include <sys/list.h>
+#include <sys/loadavg.h>
+#endif	/* _KERNEL */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -349,13 +358,6 @@ typedef struct zone_net_data {
 
 
 #ifdef _KERNEL
-
-/*
- * We need to protect the definition of 'list_t' from userland applications and
- * libraries which may be defining ther own versions.
- */
-#include <sys/list.h>
-#include <sys/loadavg.h>
 
 #define	GLOBAL_ZONEUNIQID	0	/* uniqid of the global zone */
 
