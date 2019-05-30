@@ -184,7 +184,7 @@ Dbg_statistics_ar(Ofl_desc *ofl)
 
 		arsym = adp->ad_start;
 		aux = adp->ad_aux;
-		while ((arsym != NULL) && (arsym->as_off != NULL)) {
+		while ((arsym != NULL) && (arsym->as_off != 0)) {
 			/*
 			 * Assume that symbols from the same member file are
 			 * adjacent within the archive symbol table.
