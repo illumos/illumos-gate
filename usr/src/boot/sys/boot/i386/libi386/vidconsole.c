@@ -79,8 +79,8 @@ static struct vis_modechg_arg *modechg_arg;
 static tem_vt_state_t tem;
 
 #define	KEYBUFSZ	10
-#define DEFAULT_FGCOLOR	7
-#define DEFAULT_BGCOLOR	0
+#define	DEFAULT_FGCOLOR	7
+#define	DEFAULT_BGCOLOR	0
 
 static uint8_t	keybuf[KEYBUFSZ];	/* keybuf for extended codes */
 
@@ -132,7 +132,7 @@ plat_stdout_is_framebuffer(void)
 	if (vbe_available() && VBE_VALID_MODE(vbe_get_mode())) {
 		return (1);
 	}
-        return (0);
+	return (0);
 }
 
 void
@@ -151,8 +151,8 @@ plat_tem_get_prom_pos(uint32_t *row, uint32_t *col)
 		*col = 0;
 	} else {
 		vidc_text_get_cursor(&y, &x);
-		*row = (uint32_t) y;
-		*col = (uint32_t) x;
+		*row = (uint32_t)y;
+		*col = (uint32_t)x;
 	}
 }
 
@@ -434,7 +434,7 @@ vga_get_cp437(tem_char_t c)
 	int min, mid, max;
 
 	min = 0;
-	max = (sizeof(cp437table) / sizeof(struct unicp437)) - 1;
+	max = (sizeof (cp437table) / sizeof (struct unicp437)) - 1;
 
 	if (c < cp437table[0].unicode_base ||
 	    c > cp437table[max].unicode_base + cp437table[max].length)
@@ -447,10 +447,10 @@ vga_get_cp437(tem_char_t c)
 		else if (c > cp437table[mid].unicode_base +
 		    cp437table[mid].length)
 			min = mid + 1;
-                else
+		else
 			return (c - cp437table[mid].unicode_base +
 			    cp437table[mid].cp437_base);
-        }
+	}
 
 	return ('?');
 }
@@ -469,7 +469,7 @@ vidc_text_cons_display(struct vis_consdisplay *da)
 	data = (tem_char_t *)da->data;
 	attr = (solaris_color_to_pc_color[da->bg_color & 0xf] << 4) |
 	    solaris_color_to_pc_color[da->fg_color & 0xf];
-	addr = (struct cgatext *) vgatext + (da->row * TEXT_COLS + da->col);
+	addr = (struct cgatext *)vgatext + (da->row * TEXT_COLS + da->col);
 
 	for (i = 0; i < da->width; i++) {
 		addr[i].ch = vga_get_cp437(data[i]);
@@ -632,6 +632,184 @@ vidc_probe(struct console *cp)
 	cp->c_flags |= C_PRESENTOUT;
 }
 
+/*
+ * Binary searchable table for CP437 to Unicode conversion.
+ */
+struct cp437uni {
+	uint8_t		cp437_base;
+	uint16_t	unicode_base;
+	uint8_t		length;
+};
+
+static const struct cp437uni cp437unitable[] = {
+	{   0, 0x0000, 0 }, {   1, 0x263A, 1 }, {   3, 0x2665, 1 },
+	{   5, 0x2663, 0 }, {   6, 0x2660, 0 }, {   7, 0x2022, 0 },
+	{   8, 0x25D8, 0 }, {   9, 0x25CB, 0 }, {  10, 0x25D9, 0 },
+	{  11, 0x2642, 0 }, {  12, 0x2640, 0 }, {  13, 0x266A, 1 },
+	{  15, 0x263C, 0 }, {  16, 0x25BA, 0 }, {  17, 0x25C4, 0 },
+	{  18, 0x2195, 0 }, {  19, 0x203C, 0 }, {  20, 0x00B6, 0 },
+	{  21, 0x00A7, 0 }, {  22, 0x25AC, 0 }, {  23, 0x21A8, 0 },
+	{  24, 0x2191, 0 }, {  25, 0x2193, 0 }, {  26, 0x2192, 0 },
+	{  27, 0x2190, 0 }, {  28, 0x221F, 0 }, {  29, 0x2194, 0 },
+	{  30, 0x25B2, 0 }, {  31, 0x25BC, 0 }, {  32, 0x0020, 0x5e },
+	{ 127, 0x2302, 0 }, { 128, 0x00C7, 0 }, { 129, 0x00FC, 0 },
+	{ 130, 0x00E9, 0 }, { 131, 0x00E2, 0 }, { 132, 0x00E4, 0 },
+	{ 133, 0x00E0, 0 }, { 134, 0x00E5, 0 }, { 135, 0x00E7, 0 },
+	{ 136, 0x00EA, 1 }, { 138, 0x00E8, 0 }, { 139, 0x00EF, 0 },
+	{ 140, 0x00EE, 0 }, { 141, 0x00EC, 0 }, { 142, 0x00C4, 1 },
+	{ 144, 0x00C9, 0 }, { 145, 0x00E6, 0 }, { 146, 0x00C6, 0 },
+	{ 147, 0x00F4, 0 }, { 148, 0x00F6, 0 }, { 149, 0x00F2, 0 },
+	{ 150, 0x00FB, 0 }, { 151, 0x00F9, 0 }, { 152, 0x00FF, 0 },
+	{ 153, 0x00D6, 0 }, { 154, 0x00DC, 0 }, { 155, 0x00A2, 1 },
+	{ 157, 0x00A5, 0 }, { 158, 0x20A7, 0 }, { 159, 0x0192, 0 },
+	{ 160, 0x00E1, 0 }, { 161, 0x00ED, 0 }, { 162, 0x00F3, 0 },
+	{ 163, 0x00FA, 0 }, { 164, 0x00F1, 0 }, { 165, 0x00D1, 0 },
+	{ 166, 0x00AA, 0 }, { 167, 0x00BA, 0 }, { 168, 0x00BF, 0 },
+	{ 169, 0x2310, 0 }, { 170, 0x00AC, 0 }, { 171, 0x00BD, 0 },
+	{ 172, 0x00BC, 0 }, { 173, 0x00A1, 0 }, { 174, 0x00AB, 0 },
+	{ 175, 0x00BB, 0 }, { 176, 0x2591, 2 }, { 179, 0x2502, 0 },
+	{ 180, 0x2524, 0 }, { 181, 0x2561, 1 }, { 183, 0x2556, 0 },
+	{ 184, 0x2555, 0 }, { 185, 0x2563, 0 }, { 186, 0x2551, 0 },
+	{ 187, 0x2557, 0 }, { 188, 0x255D, 0 }, { 189, 0x255C, 0 },
+	{ 190, 0x255B, 0 }, { 191, 0x2510, 0 }, { 192, 0x2514, 0 },
+	{ 193, 0x2534, 0 }, { 194, 0x252C, 0 }, { 195, 0x251C, 0 },
+	{ 196, 0x2500, 0 }, { 197, 0x253C, 0 }, { 198, 0x255E, 1 },
+	{ 200, 0x255A, 0 }, { 201, 0x2554, 0 }, { 202, 0x2569, 0 },
+	{ 203, 0x2566, 0 }, { 204, 0x2560, 0 }, { 205, 0x2550, 0 },
+	{ 206, 0x256C, 0 }, { 207, 0x2567, 1 }, { 209, 0x2564, 1 },
+	{ 211, 0x2559, 0 }, { 212, 0x2558, 0 }, { 213, 0x2552, 1 },
+	{ 215, 0x256B, 0 }, { 216, 0x256A, 0 }, { 217, 0x2518, 0 },
+	{ 218, 0x250C, 0 }, { 219, 0x2588, 0 }, { 220, 0x2584, 0 },
+	{ 221, 0x258C, 0 }, { 222, 0x2590, 0 }, { 223, 0x2580, 0 },
+	{ 224, 0x03B1, 0 }, { 225, 0x00DF, 0 }, { 226, 0x0393, 0 },
+	{ 227, 0x03C0, 0 }, { 228, 0x03A3, 0 }, { 229, 0x03C3, 0 },
+	{ 230, 0x00B5, 0 }, { 231, 0x03C4, 0 }, { 232, 0x03A6, 0 },
+	{ 233, 0x0398, 0 }, { 234, 0x03A9, 0 }, { 235, 0x03B4, 0 },
+	{ 236, 0x221E, 0 }, { 237, 0x03C6, 0 }, { 238, 0x03B5, 0 },
+	{ 239, 0x2229, 0 }, { 240, 0x2261, 0 }, { 241, 0x00B1, 0 },
+	{ 242, 0x2265, 0 }, { 243, 0x2264, 0 }, { 244, 0x2320, 1 },
+	{ 246, 0x00F7, 0 }, { 247, 0x2248, 0 }, { 248, 0x00B0, 0 },
+	{ 249, 0x2219, 0 }, { 250, 0x00B7, 0 }, { 251, 0x221A, 0 },
+	{ 252, 0x207F, 0 }, { 253, 0x00B2, 0 }, { 254, 0x25A0, 0 },
+	{ 255, 0x00A0, 0 }
+};
+
+static uint16_t
+vga_cp437_to_uni(uint8_t c)
+{
+	int min, mid, max;
+
+	min = 0;
+	max = (sizeof (cp437unitable) / sizeof (struct cp437uni)) - 1;
+
+	while (max >= min) {
+		mid = (min + max) / 2;
+		if (c < cp437unitable[mid].cp437_base)
+			max = mid - 1;
+		else if (c > cp437unitable[mid].cp437_base +
+		    cp437unitable[mid].length)
+			min = mid + 1;
+		else
+			return (c - cp437unitable[mid].cp437_base +
+			    cp437unitable[mid].unicode_base);
+	}
+
+	return ('?');
+}
+
+/*
+ * install font for text mode, borrowed from gfxp_vgatext.c
+ */
+static void
+vidc_install_font(tem_modechg_cb_arg_t arg __unused)
+{
+	static uchar_t fsreg[8] = {0x0, 0x30, 0x5, 0x35, 0xa, 0x3a, 0xf, 0x3f};
+	const uchar_t *from;
+	uchar_t volatile *to;
+	uint16_t c;
+	int i, j, s;
+	int bpc, f_offset;
+
+	if (plat_stdout_is_framebuffer())
+		return;
+
+	/* Sync-reset the sequencer registers */
+	vga_set_seq(VGA_REG_ADDR, 0x00, 0x01);
+	/*
+	 *  enable write to plane2, since fonts
+	 * could only be loaded into plane2
+	 */
+	vga_set_seq(VGA_REG_ADDR, 0x02, 0x04);
+	/*
+	 *  sequentially access data in the bit map being
+	 * selected by MapMask register (index 0x02)
+	 */
+	vga_set_seq(VGA_REG_ADDR, 0x04, 0x07);
+	/* Sync-reset ended, and allow the sequencer to operate */
+	vga_set_seq(VGA_REG_ADDR, 0x00, 0x03);
+
+	/*
+	 *  select plane 2 on Read Mode 0
+	 */
+	vga_set_grc(VGA_REG_ADDR, 0x04, 0x02);
+	/*
+	 *  system addresses sequentially access data, follow
+	 * Memory Mode register bit 2 in the sequencer
+	 */
+	vga_set_grc(VGA_REG_ADDR, 0x05, 0x00);
+	/*
+	 * set range of host memory addresses decoded by VGA
+	 * hardware -- A0000h-BFFFFh (128K region)
+	 */
+	vga_set_grc(VGA_REG_ADDR, 0x06, 0x00);
+
+	/*
+	 * This assumes 8x16 characters, which yield the traditional 80x25
+	 * screen.  It really should support other character heights.
+	 */
+	bpc = 16;
+	s = 0;		/* font slot, maybe should use tunable there. */
+	f_offset = s * 8 * 1024;
+	for (i = 0; i < 256; i++) {
+		c = vga_cp437_to_uni(i);
+		from = font_lookup(&tems.ts_font, c);
+		to = (unsigned char *)PTOV(VGA_MEM_ADDR) + f_offset +
+		    i * 0x20;
+		for (j = 0; j < bpc; j++)
+			*to++ = *from++;
+	}
+
+	/* Sync-reset the sequencer registers */
+	vga_set_seq(VGA_REG_ADDR, 0x00, 0x01);
+	/* enable write to plane 0 and 1 */
+	vga_set_seq(VGA_REG_ADDR, 0x02, 0x03);
+	/*
+	 * enable character map selection
+	 * and odd/even addressing
+	 */
+	vga_set_seq(VGA_REG_ADDR, 0x04, 0x03);
+	/*
+	 * select font map
+	 */
+	vga_set_seq(VGA_REG_ADDR, 0x03, fsreg[s]);
+	/* Sync-reset ended, and allow the sequencer to operate */
+	vga_set_seq(VGA_REG_ADDR, 0x00, 0x03);
+
+	/* restore graphic registers */
+
+	/* select plane 0 */
+	vga_set_grc(VGA_REG_ADDR, 0x04, 0x00);
+	/* enable odd/even addressing mode */
+	vga_set_grc(VGA_REG_ADDR, 0x05, 0x10);
+	/*
+	 * range of host memory addresses decoded by VGA
+	 * hardware -- B8000h-BFFFFh (32K region)
+	 */
+	vga_set_grc(VGA_REG_ADDR, 0x06, 0x0e);
+	/* enable all color plane */
+	vga_set_atr(VGA_REG_ADDR, 0x12, 0x0f);
+}
+
 static int
 vidc_init(struct console *cp, int arg)
 {
@@ -649,9 +827,9 @@ vidc_init(struct console *cp, int arg)
 	 * color/graphics adapter.
 	 */
 	if (vga_get_reg(VGA_REG_ADDR, VGA_MISC_R) & VGA_MISC_IOA_SEL)
-		vgatext = (uint16_t *) PTOV(VGA_MEM_ADDR + VGA_COLOR_BASE);
+		vgatext = (uint16_t *)PTOV(VGA_MEM_ADDR + VGA_COLOR_BASE);
 	else
-		vgatext = (uint16_t *) PTOV(VGA_MEM_ADDR + VGA_MONO_BASE);
+		vgatext = (uint16_t *)PTOV(VGA_MEM_ADDR + VGA_MONO_BASE);
 
 	/* set 16bit colors */
 	i = vga_get_atr(VGA_REG_ADDR, VGA_ATR_MODE);
@@ -678,6 +856,8 @@ vidc_init(struct console *cp, int arg)
 	}
 
 	gfx_framework_init(&fb_ops);
+	/* set up callback before calling tem_info_init(). */
+	tem_register_modechg_cb(vidc_install_font, (tem_modechg_cb_arg_t)cp);
 	rc = tem_info_init(cp);
 
 	if (rc != 0) {
@@ -692,9 +872,9 @@ vidc_init(struct console *cp, int arg)
 	}
 
 	for (i = 0; i < 10 && vidc_ischar(cp); i++)
-		(void)vidc_getchar(cp);
+		(void) vidc_getchar(cp);
 
-	return (0);	/* XXX reinit? */
+	return (0);
 }
 
 static void
@@ -801,21 +981,19 @@ vidc_devinfo(struct console *cp __unused)
 
 #if KEYBOARD_PROBE
 
-#define PROBE_MAXRETRY	5
-#define PROBE_MAXWAIT	400
-#define IO_DUMMY	0x84
-#define IO_KBD		0x060		/* 8042 Keyboard */
+#define	PROBE_MAXRETRY	5
+#define	PROBE_MAXWAIT	400
+#define	IO_DUMMY	0x84
+#define	IO_KBD		0x060		/* 8042 Keyboard */
 
 /* selected defines from kbdio.h */
 #define	KBD_STATUS_PORT		4	/* status port, read */
-#define KBD_DATA_PORT		0	/* data port, read/write
-					 * also used as keyboard command
-					 * and mouse command port
-					 */
-#define KBDC_ECHO		0x00ee
-#define KBDS_ANY_BUFFER_FULL	0x0001
-#define KBDS_INPUT_BUFFER_FULL	0x0002
-#define KBD_ECHO		0x00ee
+/* data port, read/write also used as keyboard command and mouse command port */
+#define	KBD_DATA_PORT		0
+#define	KBDC_ECHO		0x00ee
+#define	KBDS_ANY_BUFFER_FULL	0x0001
+#define	KBDS_INPUT_BUFFER_FULL	0x0002
+#define	KBD_ECHO		0x00ee
 
 /* 7 microsec delay necessary for some keyboard controllers */
 static void
@@ -844,7 +1022,7 @@ delay1ms(void)
 {
 	int i = 800;
 	while (--i >= 0)
-		(void)inb(0x84);
+		(void) inb(0x84);
 }
 
 /*
