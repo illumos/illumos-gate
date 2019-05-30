@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/tests/functional/cache/cache.cfg
@@ -40,6 +41,6 @@ fi
 
 log_must rm -rf $VDIR $VDIR2
 log_must mkdir -p $VDIR $VDIR2
-log_must mkfile $SIZE $VDEV $VDEV2
+log_must mkfile $SIZE $VDEV $VDEV2 $FILEDEV
 
 log_pass

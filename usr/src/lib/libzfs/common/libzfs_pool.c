@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>
  * Copyright (c) 2017 Datto Inc.
@@ -1277,11 +1277,6 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 			    "one or more devices is out of space"));
 			return (zfs_error(hdl, EZFS_BADDEV, msg));
 
-		case ENOTBLK:
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "cache device must be a disk or disk slice"));
-			return (zfs_error(hdl, EZFS_BADDEV, msg));
-
 		default:
 			return (zpool_standard_error(hdl, errno, msg));
 		}
@@ -1470,12 +1465,6 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 			    "root pool can not have multiple vdevs"
 			    " or separate logs"));
 			(void) zfs_error(hdl, EZFS_POOL_NOTSUP, msg);
-			break;
-
-		case ENOTBLK:
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "cache device must be a disk or disk slice"));
-			(void) zfs_error(hdl, EZFS_BADDEV, msg);
 			break;
 
 		default:
