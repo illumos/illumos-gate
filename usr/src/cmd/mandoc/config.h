@@ -40,6 +40,8 @@
 #define HAVE_WCHAR 1
 #define HAVE_OHASH 0
 
+#define OSENUM MANDOC_OS_OTHER
+
 #define BINM_APROPOS "apropos"
 #define BINM_MAKEWHATIS "man -w"
 #define BINM_MAN "man"
