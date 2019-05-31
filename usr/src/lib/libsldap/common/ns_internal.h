@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -63,9 +64,12 @@ extern "C" {
 #define	CREDFILE		0
 #define	CONFIGFILE		1
 #define	UIDNUMFILTER		"(&(objectclass=posixAccount)(uidnumber=%s))"
-#define	UIDNUMFILTER_SSD 	"(&(%%s)(uidnumber=%s))"
+#define	UIDNUMFILTER_SSD	"(&(%%s)(uidnumber=%s))"
 #define	UIDFILTER		"(&(objectclass=posixAccount)(uid=%s))"
 #define	UIDFILTER_SSD		"(&(%%s)(uid=%s))"
+#define	UIDDNFILTER	"(&(objectclass=posixAccount)(distinguishedName=%s))"
+#define	UIDDNFILTER_SSD		"(&(%%s)(distinguishedName=%s))"
+
 #define	HOSTFILTER		"(&(objectclass=ipHost)(cn=%s))"
 #define	HOSTFILTER_SSD		"(&(%%s)(cn=%s))"
 
@@ -455,7 +459,7 @@ typedef struct ns_default_config {
 	ns_conftype_t	config_type;	/* CLIENT/SERVER/CREDCONFIG */
 	ns_datatype_t	data_type;	/* ppc,pi,pc,int etc... */
 	int		single_valued;	/* TRUE OR FALSE */
-	ns_version_t 	version;	/* Version # for attribute */
+	ns_version_t	version;	/* Version # for attribute */
 	const char	*profile_name;	/* profile schema attribute name */
 	ns_param_t	defval;		/* config file parameter default */
 	int		(*ns_verify)(ParamIndexType i,
@@ -579,7 +583,7 @@ typedef struct connection {
 	LDAP			*ld;
 	thread_t		threadID;	/* thread ID using it */
 	struct ns_ldap_cookie	*cookieInfo;
-	char 			**controls;		/* from server_info */
+	char			**controls;		/* from server_info */
 	char			**saslMechanisms;	/* from server_info */
 } Connection;
 
@@ -626,7 +630,7 @@ typedef struct ns_ldap_cookie {
 
 		/* search filter callback */
 	int			use_filtercb;
-	int 	(*init_filter_cb)(const ns_ldap_search_desc_t *desc,
+	int	(*init_filter_cb)(const ns_ldap_search_desc_t *desc,
 			char **realfilter, const void *userdata);
 
 		/* user callback */
@@ -642,7 +646,7 @@ typedef struct ns_ldap_cookie {
 	const char * const	*i_attr;
 	const char		*i_sortattr;
 	const ns_cred_t		*i_auth;
-	int 			i_flags;
+	int			i_flags;
 
 	/* OUTPUTS */
 	ns_ldap_result_t	*result;
@@ -679,12 +683,12 @@ typedef struct ns_ldap_cookie {
 	char			**dns;
 	char			*currentdn;
 	int			flag;
-	struct berval   	*ctrlCookie;
+	struct berval		*ctrlCookie;
 
 	/* REFERRALS PROCESSING */
 	/* referralinfo list & position */
-	ns_referral_info_t  	*reflist;
-	ns_referral_info_t  	*refpos;
+	ns_referral_info_t	*reflist;
+	ns_referral_info_t	*refpos;
 	/* search timeout value */
 	struct timeval		search_timeout;
 	/* response control to hold account management information */
@@ -713,7 +717,7 @@ typedef struct ns_ldap_cookie {
 typedef struct ns_server_info {
 	char	*server;
 	char	*serverFQDN;
-	char 	**controls;
+	char	**controls;
 	char	**saslMechanisms;
 } ns_server_info_t;
 
@@ -873,7 +877,7 @@ __ns_ldap_check_all_preq(int foreground,
 		ns_ldap_error_t **errpp);
 
 /* internal un-exposed APIs */
-ns_cred_t 	*__ns_ldap_dupAuth(const ns_cred_t *authp);
+ns_cred_t	*__ns_ldap_dupAuth(const ns_cred_t *authp);
 boolean_t	__s_api_is_auth_matched(const ns_cred_t *auth1,
 		    const ns_cred_t *auth2);
 int		__s_api_get_SSD_from_SSDtoUse_service(const char *service,
@@ -901,10 +905,10 @@ void		__s_api_free_server_info(ns_server_info_t *sinfo);
 void		__s_api_freeConnection(Connection *con);
 
 /* internal referrals APIs */
-int 		__s_api_toFollowReferrals(const int flags,
+int		__s_api_toFollowReferrals(const int flags,
 			int *toFollow,
 			ns_ldap_error_t **errorp);
-int 		__s_api_addRefInfo(ns_referral_info_t **head,
+int		__s_api_addRefInfo(ns_referral_info_t **head,
 			char *url, char *baseDN, int *scope,
 			char *filter, LDAP *ld);
 void		__s_api_deleteRefInfo(ns_referral_info_t *head);

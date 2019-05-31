@@ -1,9 +1,9 @@
 /*
  * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -804,6 +804,16 @@ unescape_filterval( char *val )
 	escape = 0;
 	for ( s = d = val; *s; s++ ) {
 		if ( escape ) {
+			/*
+			 * need to leave escaped comma as-is, i.e.
+			 * val="CN=Last\, First,OU=..."
+			 */
+			if (*s == ',') {
+				*d++ = '\\';
+				*d++ = *s;
+				escape = 0;
+				continue;
+			}
 			/*
 			 * first try LDAPv3 escape (hexadecimal) sequence
 			 */
