@@ -48,7 +48,6 @@ SUN4_HDRS=			\
 	errclassify.h		\
 	fcode.h			\
 	fc_plat.h		\
-	ht.h			\
 	idprom.h		\
 	intr.h			\
 	intreg.h		\
@@ -58,6 +57,7 @@ SUN4_HDRS=			\
 	nexusdebug.h		\
 	prom_debug.h		\
 	scb.h			\
+	smt.h			\
 	sun4asi.h		\
 	tod.h			\
 	trapstat.h		\
