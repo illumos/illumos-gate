@@ -25,12 +25,13 @@
 #
 # Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2015 Gary Mills
+# Copyright 2019 Peter Tribble.
 #
 
 MODULE = libfksmbsrv.so
 MDBTGT = proc
 
-MODSRCS = smbsrv.c list.c
+MODSRCS = smbsrv.c smbsrv_pcap.c list.c
 
 include ../../../../Makefile.cmd
 include ../../Makefile.sparcv7
