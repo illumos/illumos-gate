@@ -21,18 +21,19 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 Peter Tribble.
 #
 
 include		../../Makefile.targ
 
 pics/aes_crypt_asm.o: $(AES_DIR)/sun4u/aes_crypt_asm.s
 		$(COMPILE.s) -o $@ $(AES_DIR)/sun4u/aes_crypt_asm.s
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)
 
 pics/arcfour_crypt_asm.o: $(ARCFOUR_DIR)/sun4u/arcfour_crypt_asm.s
 		$(COMPILE.s) -o $@ $(ARCFOUR_DIR)/sun4u/arcfour_crypt_asm.s
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)
 
 pics/des_crypt_asm.o: $(DES_DIR)/sun4u/des_crypt_asm.s
 		$(COMPILE.s) -o $@ $(DES_DIR)/sun4u/des_crypt_asm.s
-		$(POST_PROCESS_O)
+		$(POST_PROCESS_S_O)
