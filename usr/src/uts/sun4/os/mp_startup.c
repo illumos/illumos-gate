@@ -26,6 +26,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2019 Peter Tribble.
  */
 
 #include <sys/sysmacros.h>
@@ -167,7 +168,7 @@ cold_flag_set(int cpuid)
 
 	cp = cpu[cpuid];
 
-	if (!(cpu->cpu_flags & CPU_ENABLE))
+	if (!(cp->cpu_flags & CPU_ENABLE))
 		ncpus_intr_enabled++;
 
 	cp->cpu_flags |= CPU_RUNNING | CPU_ENABLE | CPU_EXISTS;
