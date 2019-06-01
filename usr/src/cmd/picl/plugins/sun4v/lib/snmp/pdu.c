@@ -22,9 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Peter Tribble.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SNMP PDU and packet transport related routines
@@ -36,7 +35,6 @@
 #include <sys/types.h>
 #include "asn1.h"
 #include "pdu.h"
-#include "debug.h"
 
 /*
  * Static declarations
@@ -275,8 +273,6 @@ snmp_add_null_vars(snmp_pdu_t *pdu, char *oidstrs, int n_oids, int row)
 		vp->val_len = 0;
 		vp->type = ASN_NULL;
 		vp->nextvar = NULL;
-
-		LOGVAR(TAG_NULL_VAR, vp);
 
 		prev = vp;
 		p += strlen(p) + 1;
@@ -601,8 +597,6 @@ snmp_parse_pdu(int reqid, uchar_t *msg, size_t *msgsz_p, snmp_pdu_t *reply_pdu)
 		vp = newvp;
 		if ((p = snmp_parse_variable(p, msgsz_p, vp)) == NULL)
 			return (NULL);
-
-		LOGVAR(TAG_RESPONSE_VAR, vp);
 	}
 
 	return (p);

@@ -22,9 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Peter Tribble.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ASN.1 encoding related routines
@@ -36,7 +35,6 @@
 #include <sys/types.h>
 #include "asn1.h"
 #include "pdu.h"
-#include "debug.h"
 
 /*
  * This routine builds a 'SEQUENCE OF' ASN.1 object in the buffer
@@ -60,8 +58,6 @@ asn_build_sequence(uchar_t *buf, size_t *bufsz_p, uchar_t id, size_t length)
 
 	if (bufsz_p)
 		*bufsz_p -= 4;
-
-	LOGASNSEQ(buf, 4);
 
 	return (buf + 4);
 }
@@ -91,8 +87,6 @@ asn_build_length(uchar_t *buf, size_t *bufsz_p, size_t length)
 		buf[0] = (uchar_t)length;
 		(*bufsz_p)--;
 
-		LOGASNLENGTH(buf, 1);
-
 		return (buf + 1);
 
 	} else if (length <= 0xFF) {
@@ -101,8 +95,6 @@ asn_build_length(uchar_t *buf, size_t *bufsz_p, size_t length)
 		buf[0] = (uchar_t)(ASN_LONG_LEN | 0x01);
 		buf[1] = (uchar_t)length;
 		*bufsz_p -= 2;
-
-		LOGASNLENGTH(buf, 2);
 
 		return (buf + 2);
 
@@ -114,8 +106,6 @@ asn_build_length(uchar_t *buf, size_t *bufsz_p, size_t length)
 		buf[1] = (uchar_t)((length >> 8) & 0xff);
 		buf[2] = (uchar_t)(length & 0xff);
 		*bufsz_p -= 3;
-
-		LOGASNLENGTH(buf, 3);
 
 		return (buf + 3);
 	}
@@ -171,8 +161,6 @@ asn_build_int(uchar_t *buf, size_t *bufsz_p, uchar_t id, int val)
 
 		*bufsz_p -= valsz;
 
-		LOGASNINT(buf, p + valsz - buf);
-
 		return (p + valsz);
 	}
 }
@@ -192,17 +180,15 @@ asn_build_string(uchar_t *buf, size_t *bufsz_p, uchar_t id, uchar_t *str,
 	if (*bufsz_p < slen)
 		return (NULL);
 	else {
-	    if (str) {
-		    (void) memcpy(p, str, slen);
-	    } else {
-		    (void) memset(p, 0, slen);
-	    }
+		if (str) {
+			(void) memcpy(p, str, slen);
+		} else {
+			(void) memset(p, 0, slen);
+		}
 
-	    *bufsz_p -= slen;
+		*bufsz_p -= slen;
 
-	    LOGASNOCTSTR(buf, p + slen - buf);
-
-	    return (p + slen);
+		return (p + slen);
 	}
 }
 
@@ -318,8 +304,6 @@ asn_build_objid(uchar_t *buf, size_t *bufsz_p, uchar_t id, void *oidp,
 
 	*bufsz_p -= oid_asnlen;
 
-	LOGASNOID(buf, p - buf);
-
 	return (p);
 }
 /*
@@ -331,8 +315,6 @@ asn_build_null(uchar_t *buf, size_t *bufsz_p, uchar_t id)
 	uchar_t	*p;
 
 	p = asn_build_header(buf, bufsz_p, id, 0);
-
-	LOGASNNULL(buf, p - buf);
 
 	return (p);
 }

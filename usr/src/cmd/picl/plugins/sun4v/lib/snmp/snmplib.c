@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Peter Tribble.
  */
 
 /*
@@ -47,7 +48,6 @@
 #include "snmplib.h"
 #include "asn1.h"
 #include "pdu.h"
-#include "debug.h"
 
 #pragma init(libpiclsnmp_init)		/* need this in .init */
 
@@ -68,13 +68,6 @@ static uint_t	n_mibcache_rows = 0;
 
 static mutex_t snmp_reqid_lock;
 static int snmp_reqid = 1;
-
-#ifdef SNMP_DEBUG
-uint_t snmp_nsends = 0;
-uint_t snmp_sentbytes = 0;
-uint_t snmp_nrecvs = 0;
-uint_t snmp_rcvdbytes = 0;
-#endif
 
 #ifdef USE_SOCKETS
 #define	SNMP_DEFAULT_PORT	161
@@ -176,8 +169,6 @@ libpiclsnmp_init(void)
 
 	(void) mutex_init(&refreshq_lock, USYNC_THREAD, NULL);
 	(void) mutex_init(&snmp_reqid_lock, USYNC_THREAD, NULL);
-
-	LOGINIT();
 }
 
 picl_snmphdl_t
@@ -877,19 +868,13 @@ fetch_single(struct picl_snmphdl *smd, char *prefix, int row, int *snmp_syserr)
 {
 	snmp_pdu_t	*pdu, *reply_pdu;
 
-	LOGGET(TAG_CMD_REQUEST, prefix, row);
-
 	if ((pdu = snmp_create_pdu(SNMP_MSG_GET, 0, prefix, 1, row)) == NULL)
 		return (NULL);
-
-	LOGPDU(TAG_REQUEST_PDU, pdu);
 
 	if (snmp_make_packet(pdu) < 0) {
 		snmp_free_pdu(pdu);
 		return (NULL);
 	}
-
-	LOGPKT(TAG_REQUEST_PKT, pdu->req_pkt, pdu->req_pktsz);
 
 	if (snmp_send_request(smd, pdu, snmp_syserr) < 0) {
 		snmp_free_pdu(pdu);
@@ -901,12 +886,8 @@ fetch_single(struct picl_snmphdl *smd, char *prefix, int row, int *snmp_syserr)
 		return (NULL);
 	}
 
-	LOGPKT(TAG_RESPONSE_PKT, pdu->reply_pkt, pdu->reply_pktsz);
-
 	reply_pdu = snmp_parse_reply(pdu->reqid, pdu->reply_pkt,
 	    pdu->reply_pktsz);
-
-	LOGPDU(TAG_RESPONSE_PDU, reply_pdu);
 
 	snmp_free_pdu(pdu);
 
@@ -920,8 +901,6 @@ fetch_bulk(struct picl_snmphdl *smd, char *oidstrs, int n_oids,
 	snmp_pdu_t	*pdu, *reply_pdu;
 	int		max_reps;
 
-	LOGBULK(TAG_CMD_REQUEST, n_oids, oidstrs, row);
-
 	/*
 	 * If we're fetching volatile properties using BULKGET, don't
 	 * venture to get multiple rows (passing max_reps=0 will make
@@ -933,8 +912,6 @@ fetch_bulk(struct picl_snmphdl *smd, char *oidstrs, int n_oids,
 	if (pdu == NULL)
 		return;
 
-	LOGPDU(TAG_REQUEST_PDU, pdu);
-
 	/*
 	 * Make an ASN.1 encoded packet from the PDU information
 	 */
@@ -942,8 +919,6 @@ fetch_bulk(struct picl_snmphdl *smd, char *oidstrs, int n_oids,
 		snmp_free_pdu(pdu);
 		return;
 	}
-
-	LOGPKT(TAG_REQUEST_PKT, pdu->req_pkt, pdu->req_pktsz);
 
 	/*
 	 * Send the request packet to the agent
@@ -962,8 +937,6 @@ fetch_bulk(struct picl_snmphdl *smd, char *oidstrs, int n_oids,
 		return;
 	}
 
-	LOGPKT(TAG_RESPONSE_PKT, pdu->reply_pkt, pdu->reply_pktsz);
-
 	/*
 	 * Parse the reply, validate the response and create a
 	 * reply-PDU out of the information. Populate the mibcache
@@ -972,8 +945,6 @@ fetch_bulk(struct picl_snmphdl *smd, char *oidstrs, int n_oids,
 	reply_pdu = snmp_parse_reply(pdu->reqid, pdu->reply_pkt,
 	    pdu->reply_pktsz);
 	if (reply_pdu) {
-		LOGPDU(TAG_RESPONSE_PDU, reply_pdu);
-
 		if (reply_pdu->errstat == SNMP_ERR_NOERROR) {
 			if (is_vol) {
 				/* Add a job to the cache refresh work queue */
@@ -995,20 +966,14 @@ fetch_next(struct picl_snmphdl *smd, char *prefix, int row, int *snmp_syserr)
 {
 	snmp_pdu_t	*pdu, *reply_pdu;
 
-	LOGNEXT(TAG_CMD_REQUEST, prefix, row);
-
 	pdu = snmp_create_pdu(SNMP_MSG_GETNEXT, 0, prefix, 1, row);
 	if (pdu == NULL)
 		return (NULL);
-
-	LOGPDU(TAG_REQUEST_PDU, pdu);
 
 	if (snmp_make_packet(pdu) < 0) {
 		snmp_free_pdu(pdu);
 		return (NULL);
 	}
-
-	LOGPKT(TAG_REQUEST_PKT, pdu->req_pkt, pdu->req_pktsz);
 
 	if (snmp_send_request(smd, pdu, snmp_syserr) < 0) {
 		snmp_free_pdu(pdu);
@@ -1020,12 +985,8 @@ fetch_next(struct picl_snmphdl *smd, char *prefix, int row, int *snmp_syserr)
 		return (NULL);
 	}
 
-	LOGPKT(TAG_RESPONSE_PKT, pdu->reply_pkt, pdu->reply_pktsz);
-
 	reply_pdu = snmp_parse_reply(pdu->reqid, pdu->reply_pkt,
 	    pdu->reply_pktsz);
-
-	LOGPDU(TAG_RESPONSE_PDU, reply_pdu);
 
 	snmp_free_pdu(pdu);
 
@@ -1049,8 +1010,6 @@ snmp_send_request(struct picl_snmphdl *smd, snmp_pdu_t *pdu, int *snmp_syserr)
 #ifdef USE_SOCKETS
 	ret = -1;
 	while (ret < 0) {
-		LOGIO(TAG_SENDTO, smd->fd, pdu->req_pkt, pdu->req_pktsz);
-
 		ret = sendto(smd->fd, pdu->req_pkt, pdu->req_pktsz, 0,
 		    (struct sockaddr *)&smd->agent_addr,
 		    sizeof (struct sockaddr));
@@ -1059,18 +1018,11 @@ snmp_send_request(struct picl_snmphdl *smd, snmp_pdu_t *pdu, int *snmp_syserr)
 		}
 	}
 #else
-	LOGIO(TAG_WRITE, smd->fd, pdu->req_pkt, pdu->req_pktsz);
-
 	if (write(smd->fd, pdu->req_pkt, pdu->req_pktsz) < 0) {
 		if (snmp_syserr)
 			*snmp_syserr = errno;
 		return (-1);
 	}
-#endif
-
-#ifdef SNMP_DEBUG
-	snmp_nsends++;
-	snmp_sentbytes += pdu->req_pktsz;
 #endif
 
 	return (0);
@@ -1084,7 +1036,7 @@ snmp_recv_reply(struct picl_snmphdl *smd, snmp_pdu_t *pdu, int *snmp_syserr)
 	uchar_t	*pkt;
 	extern int errno;
 #ifdef USE_SOCKETS
-	struct sockaddr_in 	from;
+	struct sockaddr_in	from;
 	int	fromlen;
 	ssize_t	msgsz;
 #endif
@@ -1098,8 +1050,6 @@ snmp_recv_reply(struct picl_snmphdl *smd, snmp_pdu_t *pdu, int *snmp_syserr)
 
 	fromlen = sizeof (struct sockaddr_in);
 
-	LOGIO(TAG_RECVFROM, smd->fd, pkt, SNMP_MAX_RECV_PKTSZ);
-
 	msgsz = recvfrom(smd->fd, pkt, SNMP_MAX_RECV_PKTSZ, 0,
 	    (struct sockaddr *)&from, &fromlen);
 	if (msgsz  < 0 || msgsz >= SNMP_MAX_RECV_PKTSZ) {
@@ -1109,8 +1059,6 @@ snmp_recv_reply(struct picl_snmphdl *smd, snmp_pdu_t *pdu, int *snmp_syserr)
 
 	pktsz = (size_t)msgsz;
 #else
-	LOGIO(TAG_IOCTL, smd->fd, DSSNMP_GETINFO, &snmp_info);
-
 	/*
 	 * The ioctl will block until we have snmp data available
 	 */
@@ -1124,8 +1072,6 @@ snmp_recv_reply(struct picl_snmphdl *smd, snmp_pdu_t *pdu, int *snmp_syserr)
 	if ((pkt = (uchar_t *)calloc(1, pktsz)) == NULL)
 		return (-1);
 
-	LOGIO(TAG_READ, smd->fd, pkt, pktsz);
-
 	if (read(smd->fd, pkt, pktsz) < 0) {
 		free(pkt);
 		if (snmp_syserr)
@@ -1136,11 +1082,6 @@ snmp_recv_reply(struct picl_snmphdl *smd, snmp_pdu_t *pdu, int *snmp_syserr)
 
 	pdu->reply_pkt = pkt;
 	pdu->reply_pktsz = pktsz;
-
-#ifdef SNMP_DEBUG
-	snmp_nrecvs++;
-	snmp_rcvdbytes += pktsz;
-#endif
 
 	return (0);
 }
