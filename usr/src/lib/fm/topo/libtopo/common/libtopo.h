@@ -23,7 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright (c) 2019, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _LIBTOPO_H
@@ -293,6 +293,7 @@ typedef enum topo_hdl_errno {
 
 extern const char *topo_strerror(int);
 extern void topo_hdl_strfree(topo_hdl_t *, char *);
+extern void topo_hdl_strfreev(topo_hdl_t *, char **, uint_t);
 extern void topo_debug_set(topo_hdl_t *, const char *, const char *);
 
 /*

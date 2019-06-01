@@ -1,6 +1,6 @@
 #
 # Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright (c) 2019, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 # CDDL HEADER START
 #
@@ -40,6 +40,7 @@ SYMBOL_SCOPE {
 	topo_mod_nvalloc		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_nvdup			{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_strfree		{ TYPE = FUNCTION; FLAGS = extern };
+	topo_mod_strfreev		{ TYPE = FUNCTION; FLAGS = extern };
 	topo_mod_strdup			{ TYPE = FUNCTION; FLAGS = extern };
 
 	topo_mod_clrdebug		{ TYPE = FUNCTION; FLAGS = extern };

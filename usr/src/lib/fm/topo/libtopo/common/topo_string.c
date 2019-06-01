@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <strings.h>
@@ -54,6 +54,15 @@ topo_hdl_strfree(topo_hdl_t *thp, char *s)
 {
 	if (s != NULL)
 		topo_hdl_free(thp, s, strlen(s) + 1);
+}
+
+void
+topo_hdl_strfreev(topo_hdl_t *thp, char **strarr, uint_t nelem)
+{
+	for (int i = 0; i < nelem; i++)
+		topo_hdl_strfree(thp, strarr[i]);
+
+	topo_hdl_free(thp, strarr, (nelem * sizeof (char *)));
 }
 
 char *
@@ -118,6 +127,12 @@ void
 topo_mod_strfree(topo_mod_t *mod, char *s)
 {
 	topo_hdl_strfree(mod->tm_hdl, s);
+}
+
+void
+topo_mod_strfreev(topo_mod_t *mod, char **strarr, uint_t nelem)
+{
+	topo_hdl_strfreev(mod->tm_hdl, strarr, nelem);
 }
 
 char *
