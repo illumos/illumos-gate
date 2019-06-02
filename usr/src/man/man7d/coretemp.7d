@@ -1,0 +1,49 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2019, Joyent, Inc.
+.\"
+.Dd March 20, 2019
+.Dt CORETEMP 7D
+.Os
+.Sh NAME
+.Nm coretemp
+.Nd Intel core-family temperature sensor driver
+.Sh SYNOPSIS
+.Pa /dev/sensors/temperature/cpu/*
+.Sh DESCRIPTION
+The
+.Nm
+driver provides the system with a means of reading the per-core and,
+when available, per-package digital temperature sensors on Intel CPUs.
+Currently, the
+.Nm
+driver supports Intel Core family processors after Penryn
+microarchitecture and Intel Atom processors starting with the Silvermont
+microarchitecure.
+.Pp
+Temperature information is available to the system via the fault
+management architecture
+.Pq FMA .
+The file system location and programming interface to the
+.Nm
+driver are considered
+.Sy Volatile ,
+subject to change without notice, and should not be used directly.
+Raw temperature information can be dumped through the FMA developer
+utility fmtopo.
+.Sh SEE ALSO
+.Xr fmadm 1M
+.Rs
+.%A Intel Corporation
+.%B Intel 64 and IA-32 Architectures Software Developer's Manual
+.%V Volume 3 (3A, 3B, 3C & 3D): System Programming Guide
+.Re

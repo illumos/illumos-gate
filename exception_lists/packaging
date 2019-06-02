@@ -845,3 +845,8 @@ usr/lib/libdwarf.so
 #
 usr/bin/ctfconvert
 usr/bin/ctfmerge
+
+#
+# SPARC doesn't currently use this today, though it may in the future.
+#
+usr/include/sys/sensors.h	sparc

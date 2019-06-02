@@ -24,6 +24,7 @@
  * Copyright 2012 Garrett D'Amore <garrett@damore.org>.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #ifndef	_SYS_SUNDDI_H
@@ -202,13 +203,13 @@ extern "C" {
 
 #define	DDI_NT_KEYBOARD	"ddi_keyboard"		/* keyboard device */
 
-#define	DDI_NT_PARALLEL "ddi_parallel"		/* parallel port */
+#define	DDI_NT_PARALLEL	"ddi_parallel"		/* parallel port */
 
 #define	DDI_NT_PRINTER	"ddi_printer"		/* printer device */
 
 #define	DDI_NT_UGEN	"ddi_generic:usb"	/* USB generic drv */
 
-#define	DDI_NT_SMP	"ddi_sas_smp" 		/* smp devcies */
+#define	DDI_NT_SMP	"ddi_sas_smp"		/* smp devcies */
 
 #define	DDI_NT_NEXUS	"ddi_ctl:devctl"	/* nexus drivers */
 
@@ -258,6 +259,11 @@ extern "C" {
 
 #define	DDI_NT_REGACC		"ddi_tool_reg"	/* tool register access */
 #define	DDI_NT_INTRCTL		"ddi_tool_intr"	/* tool intr access */
+
+/*
+ * Various device types used for sensors.
+ */
+#define	DDI_NT_SENSOR_TEMP_CPU	"ddi_sensor:temperature:cpu"
 
 /*
  * DDI event definitions
@@ -839,7 +845,7 @@ ddi_prop_op_nblocks_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
  *		allocated by property provider via kmem_alloc. Requester
  *		is responsible for freeing returned property via kmem_free.
  *
- * 	Arguments:
+ *	Arguments:
  *
  *	dev:	Input:	dev_t of property.
  *	dip:	Input:	dev_info_t pointer of child.
@@ -850,7 +856,7 @@ ddi_prop_op_nblocks_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
  *	valuep:	Output:	Addr of callers buffer pointer.
  *	lengthp:Output:	*lengthp will contain prop length on exit.
  *
- * 	Possible Returns:
+ *	Possible Returns:
  *
  *		DDI_PROP_SUCCESS:	Prop found and returned.
  *		DDI_PROP_NOT_FOUND:	Prop not found

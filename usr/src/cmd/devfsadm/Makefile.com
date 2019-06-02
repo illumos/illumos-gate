@@ -21,7 +21,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 
 # This target builds both a command (daemon) and various shared objects.  This
 # isn't a typical target, and the inclusion of both library and command
@@ -71,7 +71,8 @@ LINK_OBJS_CMN =			\
 	dtrace_link.o		\
 	vscan_link.o		\
 	zfs_link.o		\
-	zut_link.o
+	zut_link.o		\
+	sensor_link.o
 
 LINK_OBJS =	$(LINK_OBJS_CMN) \
 		$(LINK_OBJS_$(MACH))
@@ -164,7 +165,7 @@ install: all				\
 
 
 clean:
-	$(RM) $(OBJS) 
+	$(RM) $(OBJS)
 
 
 lint: $(DEVFSADM_MOD).ln $(LINT_MODULES)

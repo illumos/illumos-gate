@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 /*
@@ -230,7 +230,7 @@ mkrsrc(topo_mod_t *mod, tnode_t *pnode, const char *name, int inst,
 {
 	*nvl = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION, name,
 	    inst, NULL, auth, NULL, NULL, NULL);
-	return (nvl != NULL ? 0 : -1);	/* caller must free nvlist */
+	return (*nvl != NULL ? 0 : -1);	/* caller must free nvlist */
 }
 
 /*

@@ -22,7 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019, Joyent, Inc.
  */
 
 #include <unistd.h>
@@ -403,6 +403,13 @@ create_core(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 		if (topo_node_range_create(mod, core, STRAND_NODE_NAME,
 		    0, 255) != 0)
 			return (-1);
+
+		/*
+		 * Creating a temperature sensor may fail because the sensor
+		 * doesn't exist or due to internal reasons. At the moment, we
+		 * swallow any such errors that occur.
+		 */
+		(void) chip_create_core_temp_sensor(mod, core);
 	}
 
 	if (!is_xpv()) {
@@ -644,6 +651,13 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 		}
 
 		create_mc = B_TRUE;
+
+		/*
+		 * Creating a temperature sensor may fail because the sensor
+		 * doesn't exist or due to internal reasons. At the moment, we
+		 * swallow any such errors that occur.
+		 */
+		(void) chip_create_chip_temp_sensor(mod, chip);
 	}
 
 	if (FM_AWARE_SMBIOS(mod)) {
