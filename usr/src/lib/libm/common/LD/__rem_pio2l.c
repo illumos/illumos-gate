@@ -27,7 +27,8 @@
  * Use is subject to license terms.
  */
 
-/* __rem_pio2l(x,y)
+/*
+ * __rem_pio2l(x,y)
  *
  * return the remainder of x rem pi/2 in y[0]+y[1]
  * by calling __rem_pio2m
@@ -70,7 +71,7 @@ __rem_pio2l(long double x, long double *y)
 	w = (long double)v[0];
 	y[0] = z + w;
 	y[1] = z - (y[0] - w);
-	if (sign == 1) {
+	if (sign != 0) {
 		y[0] = -y[0];
 		y[1] = -y[1];
 		return (-n);

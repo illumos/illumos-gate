@@ -67,7 +67,8 @@ static const double
 /* INDENT ON */
 
 double
-tanh(double x) {
+tanh(double x)
+{
 	double t, y, z;
 	int signx;
 	volatile double dummy __unused;
@@ -94,7 +95,7 @@ tanh(double x) {
 	} else if (!finite(t))
 		return (copysign(1.0, x));
 	else
-		return (signx == 1 ? -z + small * small : z - small * small);
+		return ((signx != 0) ? -z + small * small : z - small * small);
 
-	return (signx == 1 ? -z : z);
+	return ((signx != 0) ? -z : z);
 }

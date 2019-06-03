@@ -68,7 +68,8 @@ zero = 0.0L,
 one  = 1.0L;
 
 GENERIC
-jnl(n, x) int n; GENERIC x; {
+jnl(int n, GENERIC x)
+{
 	int i, sgn;
 	GENERIC a, b, temp = 0, z, w;
 
@@ -80,11 +81,14 @@ jnl(n, x) int n; GENERIC x; {
 		n = -n;
 		x = -x;
 	}
-	if (n == 0) return (j0l(x));
-	if (n == 1) return (j1l(x));
-	if (x != x) return x+x;
+	if (n == 0)
+		return (j0l(x));
+	if (n == 1)
+		return (j1l(x));
+	if (x != x)
+		return (x+x);
 	if ((n&1) == 0)
-		sgn = 0; 			/* even n */
+		sgn = 0;			/* even n */
 	else
 		sgn = signbitl(x);	/* old n  */
 	x = fabsl(x);
@@ -94,7 +98,7 @@ jnl(n, x) int n; GENERIC x; {
 			 * Safe to use
 			 * J(n+1,x)=2n/x *J(n,x)-J(n-1,x)
 			 */
-	    if (x > 1.0e91L) {
+		if (x > 1.0e91L) {
 				/*
 				 * x >> n**2
 				 *  Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
@@ -105,139 +109,166 @@ jnl(n, x) int n; GENERIC x; {
 				 *	   n	sin(xn)*sqt2	cos(xn)*sqt2
 				 *	----------------------------------
 				 *	   0	 s-c		 c+s
-				 *	   1	-s-c 		-c+s
+				 *	   1	-s-c		-c+s
 				 *	   2	-s+c		-c-s
 				 *	   3	 s+c		 c-s
 				 */
-		switch (n&3) {
-		    case 0: temp =  cosl(x)+sinl(x); break;
-		    case 1: temp = -cosl(x)+sinl(x); break;
-		    case 2: temp = -cosl(x)-sinl(x); break;
-		    case 3: temp =  cosl(x)-sinl(x); break;
-		}
-		b = invsqrtpi*temp/sqrtl(x);
-	    } else {
+			switch (n&3) {
+			case 0:
+				temp =  cosl(x)+sinl(x);
+				break;
+			case 1:
+				temp = -cosl(x)+sinl(x);
+				break;
+			case 2:
+				temp = -cosl(x)-sinl(x);
+				break;
+			case 3:
+				temp =  cosl(x)-sinl(x);
+				break;
+			}
+			b = invsqrtpi*temp/sqrtl(x);
+		} else {
 			a = j0l(x);
 			b = j1l(x);
 			for (i = 1; i < n; i++) {
-		    temp = b;
-		    b = b*((GENERIC)(i+i)/x) - a; /* avoid underflow */
-		    a = temp;
+				temp = b;
+				/* avoid underflow */
+				b = b*((GENERIC)(i+i)/x) - a;
+				a = temp;
 			}
-	    }
+		}
 	} else {
-	    if (x < 1e-17L) {	/* use J(n,x) = 1/n!*(x/2)^n */
-		b = powl(0.5L*x, (GENERIC) n);
-		if (b != zero) {
-		    for (a = one, i = 1; i <= n; i++) a *= (GENERIC)i;
-		    b = b/a;
-		}
-	    } else {
-		/*
-		 * use backward recurrence
-		 * 			x      x^2      x^2
-		 *  J(n,x)/J(n-1,x) =  ----   ------   ------   .....
-		 *			2n  - 2(n+1) - 2(n+2)
-		 *
-		 * 			1      1        1
-		 *  (for large x)   =  ----  ------   ------   .....
-		 *			2n   2(n+1)   2(n+2)
-		 *			-- - ------ - ------ -
-		 *			 x     x         x
-		 *
-		 * Let w = 2n/x and h=2/x, then the above quotient
-		 * is equal to the continued fraction:
-		 *		    1
-		 *	= -----------------------
-		 *		       1
-		 *	   w - -----------------
-		 *			  1
-		 * 	        w+h - ---------
-		 *		       w+2h - ...
-		 *
-		 * To determine how many terms needed, let
-		 * Q(0) = w, Q(1) = w(w+h) - 1,
-		 * Q(k) = (w+k*h)*Q(k-1) - Q(k-2),
-		 * When Q(k) > 1e4	good for single
-		 * When Q(k) > 1e9	good for double
-		 * When Q(k) > 1e17	good for quaduple
-		 */
-	    /* determin k */
-		GENERIC t, v;
-		double q0, q1, h, tmp; int k, m;
-		w  = (n+n)/(double)x; h = 2.0/(double)x;
-		q0 = w;  z = w+h; q1 = w*z - 1.0; k = 1;
-		while (q1 < 1.0e17) {
-			k += 1; z += h;
-			tmp = z*q1 - q0;
-			q0 = q1;
-			q1 = tmp;
-		}
-		m = n+n;
-		for (t = zero, i = 2*(n+k); i >= m; i -= 2) t = one/(i/x-t);
-		a = t;
-		b = one;
+		if (x < 1e-17L) {	/* use J(n,x) = 1/n!*(x/2)^n */
+			b = powl(0.5L*x, (GENERIC)n);
+			if (b != zero) {
+				for (a = one, i = 1; i <= n; i++)
+					a *= (GENERIC)i;
+				b = b/a;
+			}
+		} else {
+			/* BEGIN CSTYLED */
+			/*
+			 * use backward recurrence
+			 *			x      x^2	x^2
+			 *  J(n,x)/J(n-1,x) =  ----   ------   ------   .....
+			 *			2n  - 2(n+1) - 2(n+2)
+			 *
+			 *			1      1	1
+			 *  (for large x)   =  ----  ------   ------   .....
+			 *			2n   2(n+1)   2(n+2)
+			 *			-- - ------ - ------ -
+			 *			 x     x         x
+			 *
+			 * Let w = 2n/x and h=2/x, then the above quotient
+			 * is equal to the continued fraction:
+			 *		    1
+			 *	= -----------------------
+			 *		       1
+			 *	   w - -----------------
+			 *			  1
+			 *		w+h - ---------
+			 *		       w+2h - ...
+			 *
+			 * To determine how many terms needed, let
+			 * Q(0) = w, Q(1) = w(w+h) - 1,
+			 * Q(k) = (w+k*h)*Q(k-1) - Q(k-2),
+			 * When Q(k) > 1e4	good for single
+			 * When Q(k) > 1e9	good for double
+			 * When Q(k) > 1e17	good for quaduple
+			 */
+			/* END CSTYLED */
+			/* determine k */
+			GENERIC t, v;
+			double q0, q1, h, tmp;
+			int k, m;
+			w  = (n+n)/(double)x;
+			h = 2.0/(double)x;
+			q0 = w;
+			z = w+h;
+			q1 = w*z - 1.0;
+			k = 1;
+			while (q1 < 1.0e17) {
+				k += 1;
+				z += h;
+				tmp = z*q1 - q0;
+				q0 = q1;
+				q1 = tmp;
+			}
+			m = n+n;
+			for (t = zero, i = 2*(n+k); i >= m; i -= 2)
+				t = one/(i/x-t);
+			a = t;
+			b = one;
 			/*
 			 * Estimate log((2/x)^n*n!) = n*log(2/x)+n*ln(n)
 			 * hence, if n*(log(2n/x)) > ...
-			 * single 8.8722839355e+01
-			 * double 7.09782712893383973096e+02
-			 * long double 1.1356523406294143949491931077970765006170e+04
+			 *  single:
+			 *    8.8722839355e+01
+			 *  double:
+			 *    7.09782712893383973096e+02
+			 *  long double:
+			 *    1.1356523406294143949491931077970765006170e+04
 			 * then recurrent value may overflow and the result is
 			 * likely underflow to zero.
 			 */
-		tmp = n;
-		v = two/x;
-		tmp = tmp*logl(fabsl(v*tmp));
-		if (tmp < 1.1356523406294143949491931077970765e+04L) {
+			tmp = n;
+			v = two/x;
+			tmp = tmp*logl(fabsl(v*tmp));
+			if (tmp < 1.1356523406294143949491931077970765e+04L) {
 				for (i = n-1; i > 0; i--) {
-				temp = b;
-				b = ((i+i)/x)*b - a;
-				a = temp;
+					temp = b;
+					b = ((i+i)/x)*b - a;
+					a = temp;
 				}
-		} else {
+			} else {
 				for (i = n-1; i > 0; i--) {
-				temp = b;
-				b = ((i+i)/x)*b - a;
-				a = temp;
-			if (b > 1e1000L) {
+					temp = b;
+					b = ((i+i)/x)*b - a;
+					a = temp;
+					if (b > 1e1000L) {
 						a /= b;
 						t /= b;
 						b  = 1.0;
 					}
 				}
-		}
+			}
 			b = (t*j0l(x)/b);
-	    }
+		}
 	}
-	if (sgn == 1)
-		return -b;
+	if (sgn != 0)
+		return (-b);
 	else
-		return b;
+		return (b);
 }
 
 GENERIC
-ynl(n, x) int n; GENERIC x; {
+ynl(int n, GENERIC x)
+{
 	int i;
 	int sign;
 	GENERIC a, b, temp = 0;
 
 	if (x != x)
-		return x+x;
+		return (x+x);
 	if (x <= zero) {
 		if (x == zero)
-			return -one/zero;
+			return (-one/zero);
 		else
-			return zero/zero;
+			return (zero/zero);
 	}
 	sign = 1;
 	if (n < 0) {
 		n = -n;
-		if ((n&1) == 1) sign = -1;
+		if ((n&1) == 1)
+			sign = -1;
 	}
-	if (n == 0) return (y0l(x));
-	if (n == 1) return (sign*y1l(x));
-	if (!finitel(x)) return zero;
+	if (n == 0)
+		return (y0l(x));
+	if (n == 1)
+		return (sign*y1l(x));
+	if (!finitel(x))
+		return (zero);
 
 	if (x > 1.0e91L) {
 				/*
@@ -249,16 +280,24 @@ ynl(n, x) int n; GENERIC x; {
 				 *
 				 *	   n	sin(xn)*sqt2	cos(xn)*sqt2
 				 *	----------------------------------
-				 * 	   0	 s-c		 c+s
-				 *	   1	-s-c 		-c+s
-				 * 	   2	-s+c		-c-s
+				 *	   0	 s-c		 c+s
+				 *	   1	-s-c		-c+s
+				 *	   2	-s+c		-c-s
 				 *	   3	 s+c		 c-s
 				 */
 		switch (n&3) {
-		    case 0: temp =  sinl(x)-cosl(x); break;
-		    case 1: temp = -sinl(x)-cosl(x); break;
-		    case 2: temp = -sinl(x)+cosl(x); break;
-		    case 3: temp =  sinl(x)+cosl(x); break;
+		case 0:
+			temp =  sinl(x)-cosl(x);
+			break;
+		case 1:
+			temp = -sinl(x)-cosl(x);
+			break;
+		case 2:
+			temp = -sinl(x)+cosl(x);
+			break;
+		case 3:
+			temp =  sinl(x)+cosl(x);
+			break;
 		}
 		b = invsqrtpi*temp/sqrtl(x);
 	} else {
@@ -277,7 +316,7 @@ ynl(n, x) int n; GENERIC x; {
 		}
 	}
 	if (sign > 0)
-		return b;
+		return (b);
 	else
-		return -b;
+		return (-b);
 }

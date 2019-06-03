@@ -69,7 +69,8 @@ static const GENERIC
 	one	= 1.0;
 
 GENERIC
-jn(int n, GENERIC x) {
+jn(int n, GENERIC x)
+{
 	int i, sgn;
 	GENERIC a, b, temp = 0;
 	GENERIC z, w, ox, on;
@@ -78,16 +79,18 @@ jn(int n, GENERIC x) {
 	 * J(-n,x) = (-1)^n * J(n, x), J(n, -x) = (-1)^n * J(n, x)
 	 * Thus, J(-n,x) = J(n,-x)
 	 */
-	ox = x; on = (GENERIC)n;
+	ox = x;
+	on = (GENERIC)n;
+
 	if (n < 0) {
 		n = -n;
 		x = -x;
 	}
 	if (isnan(x))
 		return (x*x);	/* + -> * for Cheetah */
-	if (!((int) _lib_version == libm_ieee ||
-		(__xpg6 & _C99SUSv3_math_errexcept) != 0)) {
-	    if (fabs(x) > X_TLOSS)
+	if (!((int)_lib_version == libm_ieee ||
+	    (__xpg6 & _C99SUSv3_math_errexcept) != 0)) {
+		if (fabs(x) > X_TLOSS)
 			return (_SVID_libm_err(on, ox, 38));
 	}
 	if (n == 0)
@@ -95,7 +98,7 @@ jn(int n, GENERIC x) {
 	if (n == 1)
 		return (j1(x));
 	if ((n&1) == 0)
-		sgn = 0; 			/* even n */
+		sgn = 0;			/* even n */
 	else
 		sgn = signbit(x);	/* old n  */
 	x = fabs(x);
@@ -105,7 +108,7 @@ jn(int n, GENERIC x) {
 					 * Safe to use
 					 *  J(n+1,x)=2n/x *J(n,x)-J(n-1,x)
 					 */
-	    if (x > 1.0e91) {
+		if (x > 1.0e91) {
 				/*
 				 * x >> n**2
 				 *    Jn(x) = cos(x-(2n+1)*pi/4)*sqrt(2/x*pi)
@@ -116,124 +119,147 @@ jn(int n, GENERIC x) {
 				 *	   n	sin(xn)*sqt2	cos(xn)*sqt2
 				 *	----------------------------------
 				 *	   0	 s-c		 c+s
-				 *	   1	-s-c 		-c+s
+				 *	   1	-s-c		-c+s
 				 *	   2	-s+c		-c-s
 				 *	   3	 s+c		 c-s
 				 */
-		switch (n&3) {
-		    case 0: temp =  cos(x)+sin(x); break;
-		    case 1: temp = -cos(x)+sin(x); break;
-		    case 2: temp = -cos(x)-sin(x); break;
-		    case 3: temp =  cos(x)-sin(x); break;
-		}
-		b = invsqrtpi*temp/sqrt(x);
-	    } else {
+			switch (n&3) {
+			case 0:
+				temp =  cos(x)+sin(x);
+				break;
+			case 1:
+				temp = -cos(x)+sin(x);
+				break;
+			case 2:
+				temp = -cos(x)-sin(x);
+				break;
+			case 3:
+				temp =  cos(x)-sin(x);
+				break;
+			}
+			b = invsqrtpi*temp/sqrt(x);
+		} else {
 			a = j0(x);
 			b = j1(x);
 			for (i = 1; i < n; i++) {
-		    temp = b;
-		    b = b*((GENERIC)(i+i)/x) - a; /* avoid underflow */
-		    a = temp;
-			}
-	    }
-	} else {
-	    if (x < 1e-9) {	/* use J(n,x) = 1/n!*(x/2)^n */
-		b = pow(0.5*x, (GENERIC) n);
-		if (b != zero) {
-		    for (a = one, i = 1; i <= n; i++) a *= (GENERIC)i;
-		    b = b/a;
-		}
-	    } else {
-		/*
-		 * use backward recurrence
-		 * 			x	  x^2	  x^2
-		 *  J(n,x)/J(n-1,x) =  ----   ------   ------   .....
-		 *			2n  - 2(n+1) - 2(n+2)
-		 *
-		 * 			1	  1	    1
-		 *  (for large x)   =  ----  ------   ------   .....
-		 *			2n   2(n+1)   2(n+2)
-		 *			-- - ------ - ------ -
-		 *			 x	 x		 x
-		 *
-		 * Let w = 2n/x and h = 2/x, then the above quotient
-		 * is equal to the continued fraction:
-		 *		    1
-		 *	= -----------------------
-		 *			   1
-		 *	   w - -----------------
-		 *			  1
-		 * 			w+h - ---------
-		 *			   w+2h - ...
-		 *
-		 * To determine how many terms needed, let
-		 * Q(0) = w, Q(1) = w(w+h) - 1,
-		 * Q(k) = (w+k*h)*Q(k-1) - Q(k-2),
-		 * When Q(k) > 1e4	good for single
-		 * When Q(k) > 1e9	good for double
-		 * When Q(k) > 1e17	good for quaduple
-		 */
-	    /* determin k */
-		GENERIC t, v;
-		double q0, q1, h, tmp; int k, m;
-		w  = (n+n)/(double)x; h = 2.0/(double)x;
-		q0 = w;  z = w + h; q1 = w*z - 1.0; k = 1;
-		while (q1 < 1.0e9) {
-			k += 1; z += h;
-			tmp = z*q1 - q0;
-			q0 = q1;
-			q1 = tmp;
-		}
-		m = n+n;
-		for (t = zero, i = 2*(n+k); i >= m; i -= 2) t = one/(i/x-t);
-		a = t;
-		b = one;
-		/*
-		 * estimate log((2/x)^n*n!) = n*log(2/x)+n*ln(n)
-		 *  hence, if n*(log(2n/x)) > ...
-		 *  single 8.8722839355e+01
-		 *  double 7.09782712893383973096e+02
-		 *  long double 1.1356523406294143949491931077970765006170e+04
-		 *  then recurrent value may overflow and the result is
-		 *  likely underflow to zero
-		 */
-		tmp = n;
-		v = two/x;
-		tmp = tmp*log(fabs(v*tmp));
-		if (tmp < 7.09782712893383973096e+02) {
-			    for (i = n-1; i > 0; i--) {
 				temp = b;
-				b = ((i+i)/x)*b - a;
-			    a = temp;
-				}
+				/* avoid underflow */
+				b = b*((GENERIC)(i+i)/x) - a;
+				a = temp;
+			}
+		}
+	} else {
+		if (x < 1e-9) {	/* use J(n,x) = 1/n!*(x/2)^n */
+			b = pow(0.5*x, (GENERIC) n);
+			if (b != zero) {
+				for (a = one, i = 1; i <= n; i++)
+					a *= (GENERIC)i;
+				b = b/a;
+			}
 		} else {
+			/*
+			 * use backward recurrence
+			 *			x	  x^2	  x^2
+			 *  J(n,x)/J(n-1,x) =  ----   ------   ------   .....
+			 *			2n  - 2(n+1) - 2(n+2)
+			 *
+			 *			1	  1	    1
+			 *  (for large x)   =  ----  ------   ------   .....
+			 *			2n   2(n+1)   2(n+2)
+			 *			-- - ------ - ------ -
+			 *			 x	 x		 x
+			 *
+			 * Let w = 2n/x and h = 2/x, then the above quotient
+			 * is equal to the continued fraction:
+			 *		    1
+			 *	= -----------------------
+			 *			   1
+			 *	   w - -----------------
+			 *			  1
+			 *			w+h - ---------
+			 *			   w+2h - ...
+			 *
+			 * To determine how many terms needed, let
+			 * Q(0) = w, Q(1) = w(w+h) - 1,
+			 * Q(k) = (w+k*h)*Q(k-1) - Q(k-2),
+			 * When Q(k) > 1e4	good for single
+			 * When Q(k) > 1e9	good for double
+			 * When Q(k) > 1e17	good for quaduple
+			 */
+			/* determine k */
+			GENERIC t, v;
+			double q0, q1, h, tmp;
+			int k, m;
+			w  = (n+n)/(double)x;
+			h = 2.0/(double)x;
+			q0 = w;
+			z = w + h;
+			q1 = w*z - 1.0;
+			k = 1;
+
+			while (q1 < 1.0e9) {
+				k += 1;
+				z += h;
+				tmp = z*q1 - q0;
+				q0 = q1;
+				q1 = tmp;
+			}
+			m = n+n;
+			for (t = zero, i = 2*(n+k); i >= m; i -= 2)
+				t = one/(i/x-t);
+			a = t;
+			b = one;
+			/*
+			 * estimate log((2/x)^n*n!) = n*log(2/x)+n*ln(n)
+			 * hence, if n*(log(2n/x)) > ...
+			 *  single:
+			 *    8.8722839355e+01
+			 *  double:
+			 *    7.09782712893383973096e+02
+			 *  long double:
+			 *    1.1356523406294143949491931077970765006170e+04
+			 * then recurrent value may overflow and the result is
+			 * likely underflow to zero
+			 */
+			tmp = n;
+			v = two/x;
+			tmp = tmp*log(fabs(v*tmp));
+			if (tmp < 7.09782712893383973096e+02) {
 				for (i = n-1; i > 0; i--) {
-				    temp = b;
-				    b = ((i+i)/x)*b - a;
-				    a = temp;
+					temp = b;
+					b = ((i+i)/x)*b - a;
+					a = temp;
+				}
+			} else {
+				for (i = n-1; i > 0; i--) {
+					temp = b;
+					b = ((i+i)/x)*b - a;
+					a = temp;
 					if (b > 1e100) {
 						a /= b;
 						t /= b;
 						b  = 1.0;
 					}
 				}
-		}
+			}
 			b = (t*j0(x)/b);
-	    }
+		}
 	}
-	if (sgn == 1)
+	if (sgn != 0)
 		return (-b);
 	else
 		return (b);
 }
 
 GENERIC
-yn(int n, GENERIC x) {
+yn(int n, GENERIC x)
+{
 	int i;
 	int sign;
 	GENERIC a, b, temp = 0, ox, on;
 
-	ox = x; on = (GENERIC)n;
+	ox = x;
+	on = (GENERIC)n;
 	if (isnan(x))
 		return (x*x);	/* + -> * for Cheetah */
 	if (x <= zero) {
@@ -245,9 +271,9 @@ yn(int n, GENERIC x) {
 			return (_SVID_libm_err((GENERIC)n, x, 13));
 		}
 	}
-	if (!((int) _lib_version == libm_ieee ||
-		(__xpg6 & _C99SUSv3_math_errexcept) != 0)) {
-	    if (x > X_TLOSS)
+	if (!((int)_lib_version == libm_ieee ||
+	    (__xpg6 & _C99SUSv3_math_errexcept) != 0)) {
+		if (x > X_TLOSS)
 			return (_SVID_libm_err(on, ox, 39));
 	}
 	sign = 1;
@@ -273,15 +299,23 @@ yn(int n, GENERIC x) {
 				 *    n	sin(xn)*sqt2	cos(xn)*sqt2
 				 *	----------------------------------
 				 *	 0	 s-c		 c+s
-				 *	 1	-s-c 		-c+s
+				 *	 1	-s-c		-c+s
 				 *	 2	-s+c		-c-s
 				 *	 3	 s+c		 c-s
 				 */
 		switch (n&3) {
-		    case 0: temp =  sin(x)-cos(x); break;
-		    case 1: temp = -sin(x)-cos(x); break;
-		    case 2: temp = -sin(x)+cos(x); break;
-		    case 3: temp =  sin(x)+cos(x); break;
+		case 0:
+			temp =  sin(x)-cos(x);
+			break;
+		case 1:
+			temp = -sin(x)-cos(x);
+			break;
+		case 2:
+			temp = -sin(x)+cos(x);
+			break;
+		case 3:
+			temp =  sin(x)+cos(x);
+			break;
 		}
 		b = invsqrtpi*temp/sqrt(x);
 	} else {
