@@ -104,24 +104,6 @@ CPPFLAGS_pmadvise =	-I$(PMAP) $(CINC)
 OBJS_pmadvise =		pmap_common.o $(COBJS)
 SRCS_pmadvise =		$(PMAP)/pmap_common.c
 
-CPPFLAGS_preap =	$(CINC)
-OBJS_preap =		$(COBJS)
-
-CPPFLAGS_psig =		$(CINC)
-OBJS_psig =		$(COBJS)
-
-CPPFLAGS_ptime =	$(CINC)
-OBJS_ptime =		$(COBJS)
-
-CPPFLAGS_ptree =	$(CINC)
-OBJS_ptree =		$(COBJS)
-
-CPPFLAGS_pwait =	$(CINC)
-OBJS_pwait =		$(COBJS)
-
-CPPFLAGS_pwdx =		$(CINC)
-OBJS_pwdx =		$(COBJS)
-
 LN_pargs =		penv pauxv
 
 CPPFLAGS +=	$(CPPFLAGS_$(PROG))
@@ -164,7 +146,7 @@ $(PROG): $$(OBJS)
 # Install the ptool, symlinking it into /usr/proc/bin if PTOOL_TYPE is set
 # to LEGACY.
 #
-install: all $(ROOTISAPROG) $(ROOTISALN)
+install: all $(ROOTISAPROG) $(ROOTISALN) $(ROOTBINLN)
 	-$(RM) $(ROOTBINPROG)
 	-$(LN) $(ISAEXEC) $(ROOTBINPROG)
 	-$(INSTALL_$(PTOOL_TYPE))

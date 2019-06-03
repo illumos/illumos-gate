@@ -69,7 +69,7 @@
  *  o The illumos SHA256_CTX does not have the digest as the first member of its
  *    context struct. As such, an offset has to be added to the digest argument
  *    to make sure that we get to the actual digest.
- *  o Update the function prototype block comment to reflect that we have are
+ *  o Update the function prototype block comment to reflect that we are
  *    passing the context and not the direct digest.
  */
 
@@ -119,7 +119,7 @@
 .align 32
 ENTRY_NP(SHA256TransformBlocks)
 
-	shl		$6, NUM_BLKS		/*  convert to bytes */
+	shl		$6, NUM_BLKS		/* convert to bytes */
 	jz		.Ldone_hash
 	add		DATA_PTR, NUM_BLKS	/* pointer to end of data */
 

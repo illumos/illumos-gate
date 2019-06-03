@@ -21,7 +21,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <unistd.h>
@@ -129,6 +129,10 @@ smb_token_idmap(smb_token_t *token, smb_idmap_batch_t *sib)
  * smb_token_sids2ids
  *
  * This will map all the SIDs of the access token to UIDs/GIDs.
+ * However, if there are some SIDs we can't map to UIDs/GIDs,
+ * we don't want to fail the logon, and instead just log the
+ * SIDs we could not map and continue as best we can.
+ * The flag SMB_IDMAP_SKIP_ERRS below does that.
  *
  * Returns 0 upon success.  Otherwise, returns -1.
  */
@@ -148,7 +152,8 @@ smb_token_sids2ids(smb_token_t *token)
 	else
 		nmaps = token->tkn_win_grps.i_cnt + 3;
 
-	stat = smb_idmap_batch_create(&sib, nmaps, SMB_IDMAP_SID2ID);
+	stat = smb_idmap_batch_create(&sib, nmaps,
+	    SMB_IDMAP_SID2ID | SMB_IDMAP_SKIP_ERRS);
 	if (stat != IDMAP_SUCCESS)
 		return (-1);
 

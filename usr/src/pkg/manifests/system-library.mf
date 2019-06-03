@@ -577,6 +577,10 @@ license usr/src/common/crypto/ecc/THIRDPARTYLICENSE \
     license=usr/src/common/crypto/ecc/THIRDPARTYLICENSE
 license usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE \
     license=usr/src/common/crypto/md5/amd64/THIRDPARTYLICENSE
+license usr/src/common/crypto/sha1/amd64/THIRDPARTYLICENSE.sha1-ni \
+    license=usr/src/common/crypto/sha1/amd64/THIRDPARTYLICENSE.sha1-ni
+license usr/src/common/crypto/sha2/amd64/THIRDPARTYLICENSE.sha256-ni \
+    license=usr/src/common/crypto/sha2/amd64/THIRDPARTYLICENSE.sha256-ni
 license usr/src/common/mpi/THIRDPARTYLICENSE \
     license=usr/src/common/mpi/THIRDPARTYLICENSE
 license usr/src/lib/libast/THIRDPARTYLICENSE \

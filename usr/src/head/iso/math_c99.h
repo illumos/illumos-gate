@@ -72,7 +72,7 @@ extern "C" {
     FP_SUBNORMAL, FP_ZERO, x)
 #define	isfinite(x)	__builtin_isfinite(x)
 #define	isnormal(x)	__builtin_isnormal(x)
-#define	signbit(x)	__builtin_signbit(x)
+#define	signbit(x)	(__builtin_signbit(x) > 0)
 #else  /* __GNUC__ >= 4 */
 #define	isnan(x)	__extension__( \
 			{ __typeof(x) __x_n = (x); \
