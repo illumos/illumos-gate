@@ -5,7 +5,7 @@
 # will fail validation. So here we go!
 #
 
-TMPFILE="/tmp/$(mktemp mtest.XXXXXX)"
+TMPFILE="$(mktemp -p /tmp mtest.XXXXXX)"
 if [[ -z "$TMPFILE" ]]; then
 	echo "Failed to get a temp file" 2>&1
 	exit 1

@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2017 Joyent, Inc.
+ */
+
+/*
  * Support for ::set dcmd.  The +/-o option processing code is provided in a
  * stand-alone function so it can be used by the command-line option processing
  * code in mdb_main.c.  This facility provides an easy way for us to add more
@@ -165,6 +169,7 @@ mdb_set_options(const char *s, int enable)
 		{ "pager", opt_pager, MDB_FL_PAGER },
 		{ "term", opt_set_term, 0 },
 
+		{ "autowrap", opt_set_mflags, MDB_FL_AUTOWRAP },
 		{ "ignoreeof", opt_set_mflags, MDB_FL_IGNEOF },
 		{ "repeatlast", opt_set_mflags, MDB_FL_REPLAST },
 		{ "latest", opt_set_mflags, MDB_FL_LATEST },
@@ -265,6 +270,13 @@ print_properties(void)
 	mdb_printf("%*s ", LABEL_INDENT, "debugger options:");
 	(void) mdb_inc_indent(LABEL_INDENT + 1);
 
+	/*
+	 * The ::set output implicitly relies on "autowrap" being enabled, so
+	 * we enable it for the duration of the command.
+	 */
+	oflags = mdb.m_flags;
+	mdb.m_flags |= MDB_FL_AUTOWRAP;
+
 	mdb_printf("follow_exec_mode=");
 	switch (mdb.m_execmode) {
 	case MDB_EM_ASK:
@@ -295,6 +307,8 @@ print_properties(void)
 
 	if (mdb.m_flags & MDB_FL_ADB)
 		COMMAFLAG("adb");
+	if (oflags & MDB_FL_AUTOWRAP)
+		COMMAFLAG("autowrap");
 	if (mdb.m_flags & MDB_FL_IGNEOF)
 		COMMAFLAG("ignoreeof");
 	if (mdb.m_flags & MDB_FL_LMRAW)
@@ -331,6 +345,8 @@ print_properties(void)
 		COMMAFLAG("no-stop");
 	mdb_printf("\n");
 	(void) mdb_dec_indent(LABEL_INDENT + 1);
+
+	mdb.m_flags = oflags;
 }
 
 /*ARGSUSED*/

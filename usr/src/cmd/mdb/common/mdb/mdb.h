@@ -25,7 +25,7 @@
 
 /*
  * Copyright (c) 2012 by Delphix. All rights reserved.
- * Copyright (c) 2012 Joyent, Inc. All rights reserved.
+ * Copyright (c) 2017 Joyent, Inc. All rights reserved.
  */
 
 #ifndef	_MDB_H
@@ -76,28 +76,29 @@ extern "C" {
 
 #define	MDB_ARR_NOLIMIT	-1UL	/* No limit on number of array elements */
 
-#define	MDB_FL_PSYM	0x00001	/* Print dot as symbol + offset when possible */
-#define	MDB_FL_LOG	0x00002	/* Logging is enabled */
-#define	MDB_FL_NOMODS	0x00004	/* Skip automatic mdb module loading */
-#define	MDB_FL_USECUP	0x00008	/* Use terminal cup initialization sequences */
-#define	MDB_FL_ADB	0x00010	/* Enable stricter adb(1) compatibility */
-#define	MDB_FL_SHOWLMID	0x00020	/* Always show link map id with symbol names */
-#define	MDB_FL_IGNEOF	0x00040	/* Ignore EOF as a synonym for ::quit */
-#define	MDB_FL_REPLAST	0x00080	/* Naked newline repeats previous command */
-#define	MDB_FL_PAGER	0x00100	/* Enable pager by default */
-#define	MDB_FL_LATEST	0x00200	/* Replace version string with "latest" */
-#define	MDB_FL_VCREATE	0x00400	/* Victim process was created by debugger */
-#define	MDB_FL_JOBCTL	0x00800	/* Victim process jobctl stopped on same tty */
-#define	MDB_FL_DEMANGLE	0x01000	/* Demangle symbols as part of %a processing */
-#define	MDB_FL_EXEC	0x02000	/* Debugger exec'd by a previous instance */
-#define	MDB_FL_NOCTF	0x04000	/* Skip automatic CTF data loading */
-#define	MDB_FL_BPTNOSYMSTOP 0x08000 /* Stop on deferred bkpts for unk symbols */
-#define	MDB_FL_TERMGUESS 0x10000 /* m_termtype derived from userland */
-#define	MDB_FL_READBACK	0x20000	/* Read value back after write */
+#define	MDB_FL_PSYM	0x000001	/* Print dot as symbol + offset */
+#define	MDB_FL_LOG	0x000002	/* Logging is enabled */
+#define	MDB_FL_NOMODS	0x000004	/* Skip automatic mdb module loading */
+#define	MDB_FL_USECUP	0x000008	/* Use term cup init sequences */
+#define	MDB_FL_ADB	0x000010	/* Enable stricter adb(1) compat */
+#define	MDB_FL_SHOWLMID	0x000020	/* Show link map id with symbol names */
+#define	MDB_FL_IGNEOF	0x000040	/* Ignore EOF as a synonym for ::quit */
+#define	MDB_FL_REPLAST	0x000080	/* Naked newline repeats prev command */
+#define	MDB_FL_PAGER	0x000100	/* Enable pager by default */
+#define	MDB_FL_LATEST	0x000200	/* Replace verstring with "latest" */
+#define	MDB_FL_VCREATE	0x000400	/* Victim process created by debugger */
+#define	MDB_FL_JOBCTL	0x000800	/* Victim process jobctl on same tty */
+#define	MDB_FL_DEMANGLE	0x001000	/* Demangle symbols as part of %a */
+#define	MDB_FL_EXEC	0x002000	/* Debugger exec'd by a prev instance */
+#define	MDB_FL_NOCTF	0x004000	/* Skip automatic CTF data loading */
+#define	MDB_FL_BPTNOSYMSTOP 0x008000	/* Stop on def bkpts for unk symbols */
+#define	MDB_FL_TERMGUESS 0x010000	/* m_termtype derived from userland */
+#define	MDB_FL_READBACK	0x020000	/* Read value back after write */
 #ifdef _KMDB
-#define	MDB_FL_NOUNLOAD	0x40000	/* Don't allow debugger unload */
+#define	MDB_FL_NOUNLOAD	0x040000	/* Don't allow debugger unload */
 #endif
-#define	MDB_FL_LMRAW	0x80000	/* Show unresolved link map object names */
+#define	MDB_FL_LMRAW	0x080000	/* Show unres link map object names */
+#define	MDB_FL_AUTOWRAP	0x100000	/* Autowrap lines at term width */
 
 #define	MDB_FL_VOLATILE	0x0001	/* Mask of all volatile flags to save/restore */
 
