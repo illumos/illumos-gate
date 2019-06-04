@@ -134,7 +134,7 @@ struct cmd {
 #define	SHELP_READY	"ready"
 #define	SHELP_SHUTDOWN	"shutdown [-r [-- boot_arguments]]"
 #define	SHELP_REBOOT	"reboot [-- boot_arguments]"
-#define	SHELP_LIST	"list [-cipv]"
+#define	SHELP_LIST	"list [-cinpv]"
 #define	SHELP_VERIFY	"verify"
 #define	SHELP_INSTALL	"install [brand-specific args]"
 #define	SHELP_UNINSTALL	"uninstall [-F] [brand-specific args]"
@@ -254,7 +254,7 @@ long_help(int cmd_num)
 		    "option.  When used with the general -z <zone> and/or -u "
 		    "<uuid-match>\n\toptions, lists only the specified "
 		    "matching zone, but lists it\n\tregardless of its state, "
-		    "and the -i and -c options are disallowed.  The\n\t-v "
+		    "and the -i, -c, and -n options are disallowed.  The\n\t-v "
 		    "option can be used to display verbose information: zone "
 		    "name, id,\n\tcurrent state, root directory and options.  "
 		    "The -p option can be used\n\tto request machine-parsable "
@@ -714,7 +714,8 @@ again:
 }
 
 static int
-zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable)
+zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable,
+    boolean_t exclude_global)
 {
 	int i;
 	zone_entry_t zent;
@@ -732,8 +733,11 @@ zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable)
 		 */
 		return (i);
 	}
-	for (i = 0; i < nzents; i++)
+	for (i = 0; i < nzents; i++) {
+		if (exclude_global && zents[i].zid == GLOBAL_ZONEID)
+			continue;
 		zone_print(&zents[i], verbose, parsable);
+	}
 	if (min_state >= ZONE_STATE_RUNNING)
 		return (Z_OK);
 	/*
@@ -1369,14 +1373,15 @@ list_func(int argc, char *argv[])
 {
 	zone_entry_t *zentp, zent;
 	int arg, retv;
-	boolean_t output = B_FALSE, verbose = B_FALSE, parsable = B_FALSE;
+	boolean_t output = B_FALSE, verbose = B_FALSE, parsable = B_FALSE,
+	    exclude_global = B_FALSE;
 	zone_state_t min_state = ZONE_STATE_RUNNING;
 	zoneid_t zone_id = getzoneid();
 
 	if (target_zone == NULL) {
 		/* all zones: default view to running but allow override */
 		optind = 0;
-		while ((arg = getopt(argc, argv, "?cipv")) != EOF) {
+		while ((arg = getopt(argc, argv, "?cinpv")) != EOF) {
 			switch (arg) {
 			case '?':
 				sub_usage(SHELP_LIST, CMD_LIST);
@@ -1397,6 +1402,9 @@ list_func(int argc, char *argv[])
 				    min_state);
 
 				break;
+			case 'n':
+				exclude_global = B_TRUE;
+				break;
 			case 'p':
 				parsable = B_TRUE;
 				break;
@@ -1414,7 +1422,8 @@ list_func(int argc, char *argv[])
 			return (Z_ERR);
 		}
 		if (zone_id == GLOBAL_ZONEID || is_system_labeled()) {
-			retv = zone_print_list(min_state, verbose, parsable);
+			retv = zone_print_list(min_state, verbose, parsable,
+			    exclude_global);
 		} else {
 			fake_up_local_zone(zone_id, &zent);
 			retv = Z_OK;
@@ -1424,7 +1433,7 @@ list_func(int argc, char *argv[])
 	}
 
 	/*
-	 * Specific target zone: disallow -i/-c suboptions.
+	 * Specific target zone: disallow -i/-c/-n suboptions.
 	 */
 	optind = 0;
 	while ((arg = getopt(argc, argv, "?pv")) != EOF) {
