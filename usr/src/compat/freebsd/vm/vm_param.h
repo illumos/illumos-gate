@@ -5,6 +5,9 @@
 
 #define	KERN_SUCCESS		0
 
+/* Not a direct correlation, but the primary necessity is being non-zero */
+#define	KERN_RESOURCE_SHORTAGE	ENOMEM
+
 /*
  * The VM_MAXUSER_ADDRESS is used to determine the upper limit size limit of a
  * vmspace, their 'struct as' equivalent.  The compat value is sized well below

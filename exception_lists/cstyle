@@ -1376,12 +1376,14 @@ usr/src/cmd/bhyve/pci_fbuf.c
 usr/src/cmd/bhyve/pci_hostbridge.c
 usr/src/cmd/bhyve/pci_irq.[ch]
 usr/src/cmd/bhyve/pci_lpc.[ch]
+usr/src/cmd/bhyve/pci_nvme.c
 usr/src/cmd/bhyve/pci_passthru.c
 usr/src/cmd/bhyve/pci_uart.c
 usr/src/cmd/bhyve/pci_virtio_block.c
 usr/src/cmd/bhyve/pci_virtio_console.c
 usr/src/cmd/bhyve/pci_virtio_net.c
 usr/src/cmd/bhyve/pci_virtio_rnd.c
+usr/src/cmd/bhyve/pci_virtio_scsi.c
 usr/src/cmd/bhyve/pci_xhci.[ch]
 usr/src/cmd/bhyve/pm.c
 usr/src/cmd/bhyve/pmtmr.c

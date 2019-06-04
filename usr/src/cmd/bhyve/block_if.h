@@ -41,16 +41,13 @@
 #include <sys/uio.h>
 #include <sys/unistd.h>
 
-#ifdef	__FreeBSD__
-#define BLOCKIF_IOV_MAX		33	/* not practical to be IOV_MAX */
-#else
 /*
- * Upstream is in the process of bumping this up to 128 for several reasons,
- * including Windows compatibility.  For the sake of our Windows support, we
- * will use the higher value now.
+ * BLOCKIF_IOV_MAX is the maximum number of scatter/gather entries in
+ * a single request.  BLOCKIF_RING_MAX is the maxmimum number of
+ * pending requests that can be queued.
  */
-#define	BLOCKIF_IOV_MAX		128
-#endif
+#define	BLOCKIF_IOV_MAX		128	/* not practical to be IOV_MAX */
+#define	BLOCKIF_RING_MAX	128
 
 struct blockif_req {
 	int		br_iovcnt;

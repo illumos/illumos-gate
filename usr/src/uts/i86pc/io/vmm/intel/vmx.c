@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
+ * Copyright (c) 2018 Joyent, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1044,6 +1045,7 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 	struct vmx *vmx;
 	struct vmcs *vmcs;
 	uint32_t exc_bitmap;
+	uint16_t maxcpus;
 
 	vmx = malloc(sizeof(struct vmx), M_VMX, M_WAITOK | M_ZERO);
 	if ((uintptr_t)vmx & PAGE_MASK) {
@@ -1105,7 +1107,8 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 		KASSERT(error == 0, ("vm_map_mmio(apicbase) error %d", error));
 	}
 
-	for (i = 0; i < VM_MAXCPU; i++) {
+	maxcpus = vm_get_maxcpus(vm);
+	for (i = 0; i < maxcpus; i++) {
 #ifndef __FreeBSD__
 		/*
 		 * Cache physical address lookups for various components which
@@ -3472,11 +3475,13 @@ vmx_vmcleanup(void *arg)
 {
 	int i;
 	struct vmx *vmx = arg;
+	uint16_t maxcpus;
 
 	if (apic_access_virtualization(vmx, 0))
 		vm_unmap_mmio(vmx->vm, DEFAULT_APIC_BASE, PAGE_SIZE);
 
-	for (i = 0; i < VM_MAXCPU; i++)
+	maxcpus = vm_get_maxcpus(vmx->vm);
+	for (i = 0; i < maxcpus; i++)
 		vpid_free(vmx->state[i].vpid);
 
 	free(vmx, M_VMX);
@@ -3873,7 +3878,7 @@ struct vlapic_vtx {
 	struct vlapic	vlapic;
 	struct pir_desc	*pir_desc;
 	struct vmx	*vmx;
-	uint_t pending_prio;
+	u_int	pending_prio;
 };
 
 #define VPR_PRIO_BIT(vpr)	(1 << ((vpr) >> 4))
@@ -3935,8 +3940,8 @@ vmx_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
 		notify = 1;
 		vlapic_vtx->pending_prio = 0;
 	} else {
-		const uint_t old_prio = vlapic_vtx->pending_prio;
-		const uint_t prio_bit = VPR_PRIO_BIT(vector & APIC_TPR_INT);
+		const u_int old_prio = vlapic_vtx->pending_prio;
+		const u_int prio_bit = VPR_PRIO_BIT(vector & APIC_TPR_INT);
 
 		if ((old_prio & prio_bit) == 0 && prio_bit > old_prio) {
 			atomic_set_int(&vlapic_vtx->pending_prio, prio_bit);
@@ -4014,6 +4019,7 @@ vmx_pending_intr(struct vlapic *vlapic, int *vecptr)
 			break;
 		}
 	}
+
 	/*
 	 * If the highest-priority pending interrupt falls short of the
 	 * processor priority of this vCPU, ensure that 'pending_prio' does not
@@ -4021,8 +4027,8 @@ vmx_pending_intr(struct vlapic *vlapic, int *vecptr)
 	 * from incurring a notification later.
 	 */
 	if (vpr <= ppr) {
-		const uint_t prio_bit = VPR_PRIO_BIT(vpr);
-		const uint_t old = vlapic_vtx->pending_prio;
+		const u_int prio_bit = VPR_PRIO_BIT(vpr);
+		const u_int old = vlapic_vtx->pending_prio;
 
 		if (old > prio_bit && (old & prio_bit) == 0) {
 			vlapic_vtx->pending_prio = prio_bit;

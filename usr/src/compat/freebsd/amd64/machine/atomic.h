@@ -241,6 +241,20 @@ atomic_swap_long(volatile u_long *p, u_long v)
 /* Needed for the membar functions */
 #include_next <sys/atomic.h>
 
+static __inline void
+atomic_thread_fence_rel(void)
+{
+	/* Equivalent to their __compiler_membar() */
+	__asm __volatile(" " : : : "memory");
+}
+
+static __inline void
+atomic_thread_fence_seq_cst(void)
+{
+	/* Equivalent to their !KERNEL storeload_barrer() */
+	__asm __volatile("lock; addl $0,-8(%%rsp)" : : : "memory", "cc");
+}
+
 #define	mb()			membar_enter()
 #define	rmb()			membar_consumer()
 #define	wmb()			membar_producer()

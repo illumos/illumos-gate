@@ -48,6 +48,7 @@
 
 struct vmctx;
 extern int guest_ncpus;
+extern uint16_t cores, sockets, threads;
 extern char *guest_uuid_str;
 extern char *vmname;
 #ifndef	__FreeBSD__
