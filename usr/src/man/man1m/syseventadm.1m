@@ -31,7 +31,7 @@ syseventadm \- sysevent event specification administration
 .fi
 
 .SH DESCRIPTION
-.sp
+
 .LP
 The \fBsyseventadm\fR command is an administrative front-end to add, remove and
 list \fBsysevent\fR event handlers. You can also restart the sysevent daemon by
@@ -75,7 +75,7 @@ The \fBsyseventadm\fR \fBrestart\fR command informs the \fBsyseventd\fR daemon
 to reread the \fBsysevent\fR registry after a change has been made by adding or
 removing one or more \fBsysevent\fR handler specifications.
 .SS "Argument Macro Substitution"
-.sp
+
 .LP
 The \fBsysevent\fR handling facility provides extensive macro capability for
 constructing the command line arguments to be executed in response to an event.
@@ -178,7 +178,7 @@ arguments.
 Array types are expanded with each element expanded as defined for that scalar
 type, with a space separating each element substitution.
 .SH OPTIONS
-.sp
+
 .LP
 The \fBadd\fR, \fBlist\fR and \fBremove\fR subcommands support the following
 options:
@@ -248,7 +248,7 @@ Sun-defined events use \fBSUNW\fR.
 .RE
 
 .SH OPERANDS
-.sp
+
 .LP
 The \fBadd\fR, \fBlist\fR and \fBremove\fR subcommands support the following
 options:
@@ -286,8 +286,8 @@ since the registry is maintained on \fB$ALTROOT\fR.
 .sp
 .in +2
 .nf
-# syseventadm add -R \$ALTROOT -v MYCO -c EC_ENV -s ESC_ENV_TEMP \e
-     /opt/MYCOenv/bin/ec_env_temp \e$class \e$subclass \e$pathname
+# syseventadm add -R $ALTROOT -v MYCO -c EC_ENV -s ESC_ENV_TEMP \e
+     /opt/MYCOenv/bin/ec_env_temp ${class} ${subclass} ${pathname}
 .fi
 .in -2
 .sp
@@ -306,8 +306,8 @@ The following example removes the event handler added in Example 1.
 .sp
 .in +2
 .nf
-# syseventadm remove -R \$ALTROOT -v MYCO -c EC_ENV -s ESC_ENV_TEMP \e
-     /opt/MYCOenv/bin/ec_env_temp \${class} \${subclass} \${pathname}
+# syseventadm remove -R $ALTROOT -v MYCO -c EC_ENV -s ESC_ENV_TEMP \e
+     /opt/MYCOenv/bin/ec_env_temp ${class} ${subclass} ${pathname}
 .fi
 .in -2
 .sp
@@ -329,7 +329,7 @@ The following example lists all event handlers for events of class
 .nf
 # syseventadm list -v MYCO -c EC_ENV -s ESC_ENV_TEMP \e
      vendor=MYCO class=EC_ENV subclass=ESC_ENV_TEMP \e
-     /opt/MYCOenv/bin/ec_env_temp \e${class} \e${subclass} \e${pathname}
+     /opt/MYCOenv/bin/ec_env_temp ${class} ${subclass} ${pathname}
 .fi
 .in -2
 .sp
@@ -396,7 +396,7 @@ The following example removes all event handlers specified to run the command
 .sp
 
 .SH EXIT STATUS
-.sp
+
 .LP
 The following exit values are returned:
 .sp
@@ -454,12 +454,12 @@ Out of memory.
 .RE
 
 .SH SEE ALSO
-.sp
+
 .LP
 \fBsyseventd\fR(1M), \fBsysevent_post_event\fR(3SYSEVENT), \fBattributes\fR(5),
 \fBddi_log_sysevent\fR(9F)
 .SH NOTES
-.sp
+
 .LP
 To avoid upgrade problems, packages delivering a sysevent event handler should
 install the event handler by running \fBsyseventadm\fR from the package's
