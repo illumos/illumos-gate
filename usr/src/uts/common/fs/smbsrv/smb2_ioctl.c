@@ -56,14 +56,15 @@ smb2_ioctl(smb_request_t *sr)
 	uint32_t MaxInputResp;
 	uint32_t OutputOffset;
 	uint32_t Flags;
-	uint32_t status;
+	uint32_t status = 0;
 	uint16_t StructSize;
 	int rc = 0;
 
+	/* Todo: put fsctl in sr->arg.ioctl (visible in dtrace probes) */
 	bzero(&in_mbc, sizeof (in_mbc));
 
 	/*
-	 * SMB2 Ioctl request
+	 * Decode SMB2 Ioctl request
 	 */
 	rc = smb_mbc_decodef(
 	    &sr->smb_data, "w..lqqlllllll4.",
@@ -83,10 +84,69 @@ smb2_ioctl(smb_request_t *sr)
 	if (rc || StructSize != 57)
 		return (SDRC_ERROR);
 
+	/*
+	 * If there's an input buffer, setup a shadow.
+	 */
+	if (fsctl.InputCount) {
+		if (InputOffset < (SMB2_HDR_SIZE + 56))
+			return (SDRC_ERROR);
+		if (fsctl.InputCount > smb2_max_trans)
+			return (SDRC_ERROR);
+		rc = MBC_SHADOW_CHAIN(&in_mbc, &sr->smb_data,
+		    sr->smb2_cmd_hdr + InputOffset, fsctl.InputCount);
+		if (rc) {
+			return (SDRC_ERROR);
+		}
+	}
+	fsctl.in_mbc = &in_mbc;
+
+	/*
+	 * If output is possible, setup the output mbuf_chain
+	 */
+	if (fsctl.MaxOutputResp > smb2_max_trans)
+		fsctl.MaxOutputResp = smb2_max_trans;
+	sr->raw_data.max_bytes = fsctl.MaxOutputResp;
+	fsctl.out_mbc = &sr->raw_data;
+
+	/*
+	 * [MS-SMB2] 3.3.5.15
+	 *
+	 * If the Flags field of the request is not SMB2_0_IOCTL_IS_FSCTL
+	 * the server MUST fail the request with STATUS_NOT_SUPPORTED.
+	 *
+	 * If the CtlCode is any of (... see switch below...) and the
+	 * value of FileId in the SMB2 Header of the request is not
+	 * 0xFFFFFFFFFFFFFFFF, then the server MUST fail the request
+	 * with STATUS_INVALID_PARAMETER.  (Otherwise lookup the FID.)
+	 */
 	if (Flags != SMB2_0_IOCTL_IS_FSCTL) {
 		status = NT_STATUS_NOT_SUPPORTED;
-		goto errout;
+	} else switch (fsctl.CtlCode) {
+	case FSCTL_DFS_GET_REFERRALS:
+	case FSCTL_DFS_GET_REFERRALS_EX:
+	case FSCTL_QUERY_NETWORK_INTERFACE_INFO:
+	case FSCTL_VALIDATE_NEGOTIATE_INFO:
+	case FSCTL_PIPE_WAIT:
+		if (smb2fid.temporal != ~0LL ||
+		    smb2fid.persistent != ~0LL) {
+			status = NT_STATUS_INVALID_PARAMETER;
+		}
+		break;
+	default:
+		status = smb2sr_lookup_fid(sr, &smb2fid);
+		if (status != 0) {
+			status = NT_STATUS_FILE_CLOSED;
+		}
+		break;
 	}
+
+	/*
+	 * Keep FID lookup before the start probe.
+	 */
+	DTRACE_SMB2_START(op__Ioctl, smb_request_t *, sr);
+
+	if (status)
+		goto errout;
 
 	for (te = smb2_ioc_tbl; te->te_code; te++) {
 		if (te->te_code == fsctl.CtlCode)
@@ -111,22 +171,6 @@ smb2_ioctl(smb_request_t *sr)
 	}
 
 	/*
-	 * Note: some ioctl commands don't need a FID.
-	 */
-	if (te->te_flags & ITF_NO_FID) {
-		if (smb2fid.temporal != ~0LL) {
-			status = NT_STATUS_INVALID_PARAMETER;
-			goto errout;
-		}
-	} else {
-		status = smb2sr_lookup_fid(sr, &smb2fid);
-		if (status) {
-			status = NT_STATUS_FILE_CLOSED;
-			goto errout;
-		}
-	}
-
-	/*
 	 * Note: some ioctls require a "disk" fid.
 	 */
 	if (te->te_flags & ITF_DISK_FID) {
@@ -138,38 +182,20 @@ smb2_ioctl(smb_request_t *sr)
 	}
 
 	/*
-	 * If there's an input buffer, setup a shadow.
-	 */
-	if (fsctl.InputCount) {
-		if (InputOffset < (SMB2_HDR_SIZE + 56)) {
-			status = NT_STATUS_INVALID_PARAMETER;
-			goto errout;
-		}
-		rc = MBC_SHADOW_CHAIN(&in_mbc, &sr->smb_data,
-		    sr->smb2_cmd_hdr + InputOffset, fsctl.InputCount);
-		if (rc) {
-			status = NT_STATUS_INVALID_PARAMETER;
-			goto errout;
-		}
-	}
-	fsctl.in_mbc = &in_mbc;
-
-	/*
-	 * If output is possible, setup the output mbuf_chain
-	 */
-	if (fsctl.MaxOutputResp > smb2_max_trans)
-		fsctl.MaxOutputResp = smb2_max_trans;
-	sr->raw_data.max_bytes = fsctl.MaxOutputResp;
-	fsctl.out_mbc = &sr->raw_data;
-
-	/*
 	 * Dispatch to the handler for CtlCode
 	 */
 	status = (te->te_func)(sr, &fsctl);
+
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__Ioctl, smb_request_t *, sr);
+
 	if (status != 0) {
-		sr->smb2_status = status;
-		if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_ERROR)
-			goto errout;
+		if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_ERROR) {
+			/* no error data */
+			smb2sr_put_error(sr, status);
+			return (SDRC_SUCCESS);
+		}
 		/* Warnings like NT_STATUS_BUFFER_OVERFLOW are OK. */
 	}
 
@@ -180,7 +206,7 @@ smb2_ioctl(smb_request_t *sr)
 	OutputOffset = (fsctl.OutputCount) ? InputOffset : 0;
 
 	/*
-	 * SMB2 Ioctl reply
+	 * Encode SMB2 Ioctl reply
 	 */
 	StructSize = 49;
 	rc = smb_mbc_encodef(
@@ -198,10 +224,9 @@ smb2_ioctl(smb_request_t *sr)
 	    /* reserved2		  4. */
 	    fsctl.OutputCount,		/* # */
 	    &sr->raw_data);		/* C */
-	return ((rc) ? SDRC_ERROR : SDRC_SUCCESS);
+	if (rc)
+		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
 
-errout:
-	smb2sr_put_error(sr, status);
 	return (SDRC_SUCCESS);
 }
 

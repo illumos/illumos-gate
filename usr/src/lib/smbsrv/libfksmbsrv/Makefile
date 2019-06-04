@@ -22,7 +22,13 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
 #
 
 include ../Makefile.smbsrv
+
+CLOBBERFILES +=  common/fksmb_dt.h
+all: install_h
+install_h: common/fksmb_dt.h
+common/fksmb_dt.h : common/fksmb_dt.d
+	$(DTRACE) -xnolibs -h -o $@ -s common/fksmb_dt.d

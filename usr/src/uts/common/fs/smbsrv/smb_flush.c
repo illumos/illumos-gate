@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2016 Syneto S.R.L. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -60,7 +61,7 @@ smb_pre_flush(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "w", &sr->smb_fid);
 
-	DTRACE_SMB_1(op__Flush__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Flush, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -68,7 +69,7 @@ smb_pre_flush(smb_request_t *sr)
 void
 smb_post_flush(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Flush__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Flush, smb_request_t *, sr);
 }
 
 smb_sdrc_t

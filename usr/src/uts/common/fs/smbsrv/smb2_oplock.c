@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -48,6 +48,7 @@ smb2_oplock_break_ack(smb_request_t *sr)
 		return (SDRC_ERROR);
 
 	status = smb2sr_lookup_fid(sr, &smb2fid);
+	DTRACE_SMB2_START(op__OplockBreak, smb_request_t *, sr);
 	if (status)
 		goto errout;
 	if ((node = sr->fid_ofile->f_node) == NULL) {
@@ -81,6 +82,14 @@ smb2_oplock_break_ack(smb_request_t *sr)
 
 	smb_oplock_ack(node, sr->fid_ofile, brk);
 
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__OplockBreak, smb_request_t *, sr);
+	if (status) {
+		smb2sr_put_error(sr, status);
+		return (SDRC_SUCCESS);
+	}
+
 	/*
 	 * Generate SMB2 Oplock Break response
 	 * [MS-SMB2] 2.2.25
@@ -93,10 +102,6 @@ smb2_oplock_break_ack(smb_request_t *sr)
 	    /* reserved			  5. */
 	    smb2fid.persistent,		/* q */
 	    smb2fid.temporal);		/* q */
-	return (SDRC_SUCCESS);
-
-errout:
-	smb2sr_put_error(sr, status);
 	return (SDRC_SUCCESS);
 }
 

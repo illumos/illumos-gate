@@ -159,9 +159,14 @@ smb1_negotiate_smb2(smb_request_t *sr)
 	sr->smb2_cmd_code = SMB2_NEGOTIATE;
 
 	rc = smb2_negotiate_common(sr, smb2_version);
+	smb2_send_reply(sr);
 	if (rc != 0)
 		return (SDRC_DROP_VC);
 
+	/*
+	 * We sent the reply, so tell the SMB1 dispatch
+	 * it should NOT (also) send a reply.
+	 */
 	return (SDRC_NO_REPLY);
 }
 
@@ -178,6 +183,9 @@ smb1_negotiate_smb2(smb_request_t *sr)
  * result of bypassing the normal dispatch mechanism.
  *
  * The caller always frees this request.
+ *
+ * Return value is 0 for success, and anything else will
+ * terminate the reader thread (drop the connection).
  */
 int
 smb2_newrq_negotiate(smb_request_t *sr)
@@ -196,7 +204,7 @@ smb2_newrq_negotiate(smb_request_t *sr)
 
 	if ((sr->smb2_cmd_code != SMB2_NEGOTIATE) ||
 	    (sr->smb2_next_command != 0))
-		return (SDRC_DROP_VC);
+		return (-1);
 
 	/*
 	 * Decode SMB2 Negotiate (fixed-size part)
@@ -213,7 +221,7 @@ smb2_newrq_negotiate(smb_request_t *sr)
 	if (rc != 0)
 		return (rc);
 	if (struct_size != 36 || version_cnt > 8)
-		return (SDRC_DROP_VC);
+		return (-1);
 
 	/*
 	 * Decode SMB2 Negotiate (variable part)
@@ -221,7 +229,9 @@ smb2_newrq_negotiate(smb_request_t *sr)
 	rc = smb_mbc_decodef(&sr->command,
 	    "#w", version_cnt, cl_versions);
 	if (rc != 0)
-		return (SDRC_DROP_VC);
+		return (rc);
+
+	DTRACE_SMB2_START(op__Negotiate, smb_request_t *, sr);
 
 	/*
 	 * The client offers an array of protocol versions it
@@ -242,16 +252,23 @@ smb2_newrq_negotiate(smb_request_t *sr)
 	s->newrq_func = smb2sr_newrq;
 
 	rc = smb2_negotiate_common(sr, best_version);
-	if (rc != 0)
-		return (SDRC_DROP_VC);
 
-	return (0);
+	/* sr->smb2_status was set */
+	DTRACE_SMB2_DONE(op__Negotiate, smb_request_t *, sr);
+
+	smb2_send_reply(sr);
+
+	return (rc);
 }
 
 /*
  * Common parts of SMB2 Negotiate, used for both the
  * SMB1-to-SMB2 style, and straight SMB2 style.
- * Do negotiation decisions, encode, send the reply.
+ * Do negotiation decisions and encode the reply.
+ * The caller does the network send.
+ *
+ * Return value is 0 for success, and anything else will
+ * terminate the reader thread (drop the connection).
  */
 static int
 smb2_negotiate_common(smb_request_t *sr, uint16_t version)
@@ -304,7 +321,7 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 	(void) smb2_encode_header(sr, B_FALSE);
 	if (sr->smb2_status != 0) {
 		smb2sr_put_error(sr, sr->smb2_status);
-		smb2_send_reply(sr);
+		/* smb2_send_reply(sr); in caller */
 		return (-1); /* will drop */
 	}
 
@@ -337,7 +354,7 @@ smb2_negotiate_common(smb_request_t *sr, uint16_t version)
 	    sr->sr_cfg->skc_negtok_len,	/* # */
 	    sr->sr_cfg->skc_negtok);	/* c */
 
-	smb2_send_reply(sr);
+	/* smb2_send_reply(sr); in caller */
 
 	(void) ksocket_setsockopt(s->sock, SOL_SOCKET,
 	    SO_SNDBUF, (const void *)&smb2_tcp_bufsize,

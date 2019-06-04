@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -23,6 +23,7 @@
 smb_sdrc_t
 smb2_write(smb_request_t *sr)
 {
+	smb_rw_param_t *param = NULL;
 	smb_ofile_t *of = NULL;
 	smb_vdb_t *vdb = NULL;
 	uint16_t StructSize;
@@ -42,7 +43,7 @@ smb2_write(smb_request_t *sr)
 	int rc = 0;
 
 	/*
-	 * SMB2 Write request
+	 * Decode SMB2 Write request
 	 */
 	rc = smb_mbc_decodef(
 	    &sr->smb_data,
@@ -63,43 +64,52 @@ smb2_write(smb_request_t *sr)
 	if (StructSize != 49)
 		return (SDRC_ERROR);
 
-	status = smb2sr_lookup_fid(sr, &smb2fid);
-	if (status) {
-		smb2sr_put_error(sr, status);
-		return (SDRC_SUCCESS);
-	}
-	of = sr->fid_ofile;
-
-	if (Length > smb2_max_rwsize) {
-		smb2sr_put_error(sr, NT_STATUS_INVALID_PARAMETER);
-		return (SDRC_SUCCESS);
-	}
+	/*
+	 * Setup an smb_rw_param_t which contains the VDB we need.
+	 * This is automatically free'd.
+	 */
+	param = smb_srm_zalloc(sr, sizeof (*param));
+	param->rw_offset = Offset;
+	param->rw_count = Length;
+	/* Note that the dtrace provider uses sr->arg.rw */
+	sr->arg.rw = param;
 
 	/*
 	 * Skip any padding before the write data.
 	 */
 	data_chain_off = sr->smb2_cmd_hdr + DataOff;
 	skip = data_chain_off - sr->smb_data.chain_offset;
-	if (skip < 0) {
-		smb2sr_put_error(sr, NT_STATUS_INVALID_PARAMETER);
-		return (SDRC_SUCCESS);
-	}
-	if (skip > 0) {
+	if (skip < 0)
+		return (SDRC_ERROR);
+	if (skip > 0)
 		(void) smb_mbc_decodef(&sr->smb_data, "#.", skip);
-	}
 
-	/* This is automatically free'd. */
-	vdb = smb_srm_zalloc(sr, sizeof (*vdb));
+	/*
+	 * Decode the write data (payload)
+	 */
+	if (Length > smb2_max_rwsize)
+		return (SDRC_ERROR);
+	vdb = &param->rw_vdb;
 	rc = smb_mbc_decodef(&sr->smb_data, "#B", Length, vdb);
-	if (rc != 0 || vdb->vdb_len != Length) {
-		smb2sr_put_error(sr, NT_STATUS_INVALID_PARAMETER);
-		return (SDRC_SUCCESS);
-	}
+	if (rc != 0 || vdb->vdb_len != Length)
+		return (SDRC_ERROR);
 	vdb->vdb_uio.uio_loffset = (offset_t)Offset;
+
+	/*
+	 * Want FID lookup before the start probe.
+	 */
+	status = smb2sr_lookup_fid(sr, &smb2fid);
+	of = sr->fid_ofile;
+
+	DTRACE_SMB2_START(op__Write, smb_request_t *, sr); /* arg.rw */
+
+	if (status)
+		goto errout; /* Bad FID */
+
 
 	XferCount = 0;
 	if (Length == 0)
-		goto doreply;
+		goto errout;
 
 	switch (of->f_tree->t_res_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
@@ -136,16 +146,20 @@ smb2_write(smb_request_t *sr)
 		rc = EACCES;
 		break;
 	}
+	status = smb_errno2status(rc);
 
-	if (rc) {
-		smb2sr_put_errno(sr, rc);
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__Write, smb_request_t *, sr); /* arg.rw */
+
+	if (status) {
+		smb2sr_put_error(sr, status);
 		return (SDRC_SUCCESS);
 	}
 
 	/*
-	 * SMB2 Write reply
+	 * Encode SMB2 Write reply
 	 */
-doreply:
 	DataOff = SMB2_HDR_SIZE + 16;
 	rc = smb_mbc_encodef(
 	    &sr->reply, "wwlll",
@@ -154,8 +168,10 @@ doreply:
 	    XferCount,			/* l */
 	    0, /* DataRemaining */	/* l */
 	    0); /* Channel Info */	/* l */
-	if (rc)
+	if (rc) {
+		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
 		return (SDRC_ERROR);
+	}
 
 	mutex_enter(&of->f_mutex);
 	of->f_seek_pos = Offset + XferCount;

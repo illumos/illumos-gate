@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -81,6 +81,12 @@ smb2_session_setup(smb_request_t *sr)
 		return (SDRC_ERROR);
 
 	/*
+	 * Decoded everything.  Dtrace probe,
+	 * then no more early returns.
+	 */
+	DTRACE_SMB2_START(op__SessionSetup, smb_request_t *, sr);
+
+	/*
 	 * The real auth. work happens in here.
 	 */
 	status = smb_authenticate_ext(sr);
@@ -114,6 +120,9 @@ smb2_session_setup(smb_request_t *sr)
 		break;
 	}
 
+	/* sr->smb2_status set above */
+	DTRACE_SMB2_DONE(op__SessionSetup, smb_request_t *, sr);
+
 	/*
 	 * SMB2 Session Setup reply
 	 */
@@ -128,7 +137,7 @@ smb2_session_setup(smb_request_t *sr)
 	    SecBufLength,		/* # */
 	    sinfo->ssi_osecblob);	/* c */
 	if (rc)
-		return (SDRC_ERROR);
+		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
 
 	return (SDRC_SUCCESS);
 }

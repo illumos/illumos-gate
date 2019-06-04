@@ -11,15 +11,13 @@
  */
 
 /*
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
  * User-level dtrace for fksmbd
  * Usage: dtrace -s Watch-all.d -p $PID
  */
-
-#pragma D option flowindent
 
 self int trace;
 self int mask;
@@ -34,7 +32,7 @@ pid$target:libmlrpc.so.2::entry,
 pid$target:libsmbns.so.1::entry,
 pid$target:libsmb.so.1::entry
 {
-  self->trace++;
+	self->trace++;
 }
 
 /*
@@ -48,10 +46,12 @@ pid$target:libsmbns.so.1::entry,
 pid$target:libsmb.so.1::entry
 /self->trace > 0 && self->mask == 0/
 {
-  printf("\t0x%x", arg0);
-  printf("\t0x%x", arg1);
-  printf("\t0x%x", arg2);
-  printf("\t0x%x", arg3);
+	printf("\t0x%x", arg0);
+	printf("\t0x%x", arg1);
+	printf("\t0x%x", arg2);
+	printf("\t0x%x", arg3);
+	printf("\t0x%x", arg4);
+	printf("\t0x%x", arg5);
 }
 
 /*
@@ -69,7 +69,7 @@ pid$target::smb_strlwr:entry,
 pid$target::smb_strupr:entry,
 pid$target::smb_wcequiv_strlen:entry
 {
-  self->mask++;
+	self->mask++;
 }
 
 /*
@@ -86,7 +86,7 @@ pid$target::smb_strlwr:return,
 pid$target::smb_strupr:return,
 pid$target::smb_wcequiv_strlen:return
 {
-  self->mask--;
+	self->mask--;
 }
 
 pid$target:fksmbd::return,
@@ -97,7 +97,7 @@ pid$target:libsmbns.so.1::return,
 pid$target:libsmb.so.1::return
 /self->trace > 0 && self->mask == 0/
 {
-  printf("\t0x%x", arg1);
+	printf("\t0x%x", arg1);
 }
 
 pid$target:fksmbd::return,
@@ -107,5 +107,55 @@ pid$target:libmlrpc.so.2::return,
 pid$target:libsmbns.so.1::return,
 pid$target:libsmb.so.1::return
 {
-  self->trace--;
+	self->trace--;
+}
+
+/*
+ * fksmb dtrace provder
+ */
+
+fksmb$target:::smb_start
+{
+	this->pn = copyinstr(arg0);
+	this->sr = (userland pid`smb_request_t *)arg1;
+
+	printf(" %s mid=0x%x uid=0x%x tid=0x%x\n",
+	    this->pn,
+	    this->sr->smb_mid,
+	    this->sr->smb_uid,
+	    this->sr->smb_tid);
+}
+
+fksmb$target:::smb_done
+{
+	this->pn = copyinstr(arg0);
+	this->sr = (userland pid`smb_request_t *)arg1;
+
+	printf(" %s mid=0x%x status=0x%x\n",
+	    this->pn,
+	    this->sr->smb_mid,
+	    this->sr->smb_error.status);
+}
+
+fksmb$target:::smb2_start
+{
+	this->pn = copyinstr(arg0);
+	this->sr = (userland pid`smb_request_t *)arg1;
+
+	printf(" %s mid=0x%x uid=0x%x tid=0x%x\n",
+	    this->pn,
+	    this->sr->smb2_messageid,
+	    this->sr->smb2_ssnid,
+	    this->sr->smb_tid);
+}
+
+fksmb$target:::smb2_done
+{
+	this->pn = copyinstr(arg0);
+	this->sr = (userland pid`smb_request_t *)arg1;
+
+	printf(" %s mid=0x%x status=0x%x\n",
+	    this->pn,
+	    this->sr->smb2_messageid,
+	    this->sr->smb2_status);
 }

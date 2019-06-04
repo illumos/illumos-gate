@@ -49,7 +49,7 @@ smb2_lock(smb_request_t *sr)
 	int rc;
 
 	/*
-	 * SMB2 Lock request
+	 * Decode SMB2 Lock request
 	 */
 	rc = smb_mbc_decodef(
 	    &sr->smb_data, "wwlqq",
@@ -61,9 +61,14 @@ smb2_lock(smb_request_t *sr)
 	if (rc || StructSize != 48)
 		return (SDRC_ERROR);
 
+	/*
+	 * Want FID lookup before the start probe.
+	 */
 	status = smb2sr_lookup_fid(sr, &smb2fid);
+	DTRACE_SMB2_START(op__Lock, smb_request_t *, sr);
+
 	if (status)
-		goto errout;
+		goto errout; /* Bad FID */
 	if (sr->fid_ofile->f_node == NULL || LockCount == 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 		goto errout;
@@ -107,20 +112,25 @@ smb2_lock(smb_request_t *sr)
 	} else {
 		status = smb2_locks(sr);
 	}
-	if (status)
-		goto errout;
+
+errout:
+	sr->smb2_status = status;
+	if (status != NT_STATUS_PENDING) {
+		DTRACE_SMB2_DONE(op__Lock, smb_request_t *, sr);
+	}
+
+	if (status) {
+		smb2sr_put_error(sr, status);
+		return (SDRC_SUCCESS);
+	}
 
 	/*
-	 * SMB2 Lock reply (sync)
+	 * Encode SMB2 Lock reply (sync)
 	 */
 	(void) smb_mbc_encodef(
 	    &sr->reply, "w..",
 	    4); /* StructSize	w */
 	    /* reserved		.. */
-	return (SDRC_SUCCESS);
-
-errout:
-	smb2sr_put_error(sr, status);
 	return (SDRC_SUCCESS);
 }
 
@@ -264,8 +274,15 @@ smb2_lock_async(smb_request_t *sr)
 
 	status = smb_lock_range(sr, lk->Offset, lk->Length, pid,
 	    ltype, timeout);
-	if (status != 0)
-		goto errout;
+
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__Lock, smb_request_t *, sr);
+
+	if (status != 0) {
+		smb2sr_put_error(sr, status);
+		return (SDRC_SUCCESS);
+	}
 
 	/*
 	 * SMB2 Lock reply (async)
@@ -274,9 +291,5 @@ smb2_lock_async(smb_request_t *sr)
 	    &sr->reply, "w..",
 	    4); /* StructSize	w */
 	    /* reserved		.. */
-	return (SDRC_SUCCESS);
-
-errout:
-	smb2sr_put_error(sr, status);
 	return (SDRC_SUCCESS);
 }

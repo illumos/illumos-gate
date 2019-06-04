@@ -21,6 +21,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -56,14 +58,14 @@
 smb_sdrc_t
 smb_pre_process_exit(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__ProcessExit__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__ProcessExit, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_process_exit(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__ProcessExit__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__ProcessExit, smb_request_t *, sr);
 }
 
 smb_sdrc_t

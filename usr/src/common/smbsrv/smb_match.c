@@ -142,7 +142,7 @@ smb_match_private(const char *pat, const char *str, struct match_priv *priv)
 	const char	*limit;
 	char		pc;		/* current pattern char */
 	int		rc;
-	smb_wchar_t	wcpat, wcstr;	/* current wchar in pat, str */
+	uint32_t	wcpat, wcstr;	/* current wchar in pat, str */
 	int		nbpat, nbstr;	/* multi-byte length of it */
 
 	if (priv->depth >= SMB_MATCH_DEPTH_MAX)

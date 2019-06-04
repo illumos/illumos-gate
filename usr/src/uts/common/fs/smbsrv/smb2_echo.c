@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -37,6 +37,9 @@ smb2_echo(smb_request_t *sr)
 		return (SDRC_ERROR);
 	if (StructSize != 4)
 		return (SDRC_ERROR);
+
+	DTRACE_SMB2_START(op__Echo, smb_request_t *, sr);
+	DTRACE_SMB2_DONE(op__Echo, smb_request_t *, sr);
 
 	/*
 	 * SMB2 Echo reply

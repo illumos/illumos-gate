@@ -230,6 +230,7 @@ FORBIDDEN_DEP usr/lib/MACH(smbfs)/libfknsmb.so.1
 FORBIDDEN_DEP usr/lib/MACH(smbfs)/libfksmbfs.so.1
 FORBIDDEN_DEP usr/lib/MACH(smbsrv)/libfksmbsrv.so.1
 FORBIDDEN_DEP usr/lib/smbsrv/fksmbd
+FORBIDDEN_DEP usr/lib/smbsrv/test-msgbuf
 FORBIDDEN_DEP usr/sbin/amd64/zdb
 FORBIDDEN_DEP usr/sbin/i86/zdb
 FORBIDDEN_DEP usr/sbin/sparcv7/zdb

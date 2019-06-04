@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * SMB: lock_byte_range
@@ -64,14 +64,14 @@
 smb_sdrc_t
 smb_pre_lock_byte_range(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__LockByteRange__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__LockByteRange, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_lock_byte_range(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__LockByteRange__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__LockByteRange, smb_request_t *, sr);
 }
 
 /*

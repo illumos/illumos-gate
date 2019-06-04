@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -78,8 +78,7 @@ smb_pre_open_print_file(smb_request_t *sr)
 
 	op->create_disposition = FILE_OVERWRITE_IF;
 	op->create_options = FILE_NON_DIRECTORY_FILE;
-	DTRACE_SMB_2(op__OpenPrintFile__start, smb_request_t *, sr,
-	    struct open_param *, op);
+	DTRACE_SMB_START(op__OpenPrintFile, smb_request_t *, sr); /* arg.open */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -87,7 +86,7 @@ smb_pre_open_print_file(smb_request_t *sr)
 void
 smb_post_open_print_file(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__OpenPrintFile__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__OpenPrintFile, smb_request_t *, sr);
 }
 
 /*
@@ -158,14 +157,14 @@ smb_pre_close_print_file(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "w", &sr->smb_fid);
 
-	DTRACE_SMB_1(op__ClosePrintFile__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__ClosePrintFile, smb_request_t *, sr);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 void
 smb_post_close_print_file(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__ClosePrintFile__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__ClosePrintFile, smb_request_t *, sr);
 }
 
 /*
@@ -209,14 +208,14 @@ smb_com_close_print_file(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_get_print_queue(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__GetPrintQueue__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__GetPrintQueue, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_get_print_queue(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__GetPrintQueue__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__GetPrintQueue, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -255,14 +254,14 @@ smb_pre_write_print_file(smb_request_t *sr)
 
 	rc = smbsr_decode_vwv(sr, "w", &sr->smb_fid);
 
-	DTRACE_SMB_1(op__WritePrintFile__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__WritePrintFile, smb_request_t *, sr);
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
 
 void
 smb_post_write_print_file(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__WritePrintFile__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__WritePrintFile, smb_request_t *, sr);
 
 	kmem_free(sr->arg.rw, sizeof (smb_rw_param_t));
 }

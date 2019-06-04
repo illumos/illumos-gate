@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -115,8 +115,7 @@ smb_pre_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		op->sd = NULL;
 	}
 
-	DTRACE_SMB_2(op__NtTransactCreate__start, smb_request_t *, sr,
-	    struct open_param *, op);
+	DTRACE_SMB_START(op__NtTransactCreate, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -125,9 +124,9 @@ void
 smb_post_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 {
 	smb_sd_t *sd = sr->arg.open.sd;
+	_NOTE(ARGUNUSED(xa))
 
-	DTRACE_SMB_2(op__NtTransactCreate__done, smb_request_t *, sr,
-	    smb_xa_t *, xa);
+	DTRACE_SMB_DONE(op__NtTransactCreate, smb_request_t *, sr);
 
 	if (sd) {
 		smb_sd_term(sd);

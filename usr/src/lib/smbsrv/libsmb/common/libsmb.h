@@ -32,6 +32,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/inttypes.h>
 #include <sys/list.h>
 #include <sys/avl.h>
 #include <arpa/inet.h>

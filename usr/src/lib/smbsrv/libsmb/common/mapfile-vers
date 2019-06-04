@@ -270,7 +270,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_lookup_name;
 	smb_lookup_sid;
 	smb_match_netlogon_seqnum;
-	smb_mbstos;
+	smb_mbstooem;
 	smb_mbstowcs;
 	smb_mbtowc;
 	smb_msgbuf_base;
@@ -309,6 +309,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_nic_getnum;
 	smb_nic_init;
 	smb_notify_dc_changed;
+	smb_oemtombs;
 	smb_priv_getbyname;
 	smb_priv_getbyvalue;
 	smb_priv_presentable_ids;
@@ -376,7 +377,6 @@ SYMBOL_VERSION SUNWprivate {
 	smb_smf_restart_service;
 	smb_smf_scf_fini;
 	smb_smf_scf_init;
-	smb_stombs;
 	smb_strcasecmp;
 	smb_string_decode;
 	smb_string_encode;

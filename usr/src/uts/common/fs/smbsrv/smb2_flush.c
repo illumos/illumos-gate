@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2016 Syneto S.R.L. All rights reserved.
  */
 
@@ -32,7 +32,7 @@ smb2_flush(smb_request_t *sr)
 	int rc = 0;
 
 	/*
-	 * SMB2 Flush request
+	 * Decode SMB2 Flush request
 	 */
 	rc = smb_mbc_decodef(
 	    &sr->smb_data, "wwlqq",
@@ -41,18 +41,25 @@ smb2_flush(smb_request_t *sr)
 	    &reserved2,			/* l */
 	    &smb2fid.persistent,	/* q */
 	    &smb2fid.temporal);		/* q */
-	if (rc)
-		return (SDRC_ERROR);
-	if (StructSize != 24)
+	if (rc || StructSize != 24)
 		return (SDRC_ERROR);
 
+	/*
+	 * Want FID lookup before the start probe.
+	 */
 	status = smb2sr_lookup_fid(sr, &smb2fid);
+	DTRACE_SMB2_START(op__Flush, smb_request_t *, sr);
+
+	if (status == 0)
+		smb_ofile_flush(sr, sr->fid_ofile);
+
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__Flush, smb_request_t *, sr);
+
 	if (status) {
 		smb2sr_put_error(sr, status);
 		return (SDRC_SUCCESS);
 	}
-
-	smb_ofile_flush(sr, sr->fid_ofile);
 
 	/*
 	 * SMB2 Flush reply

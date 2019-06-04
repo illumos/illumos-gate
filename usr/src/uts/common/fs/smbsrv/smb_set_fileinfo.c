@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -127,14 +127,14 @@ smb_com_trans2_set_path_information(smb_request_t *sr, smb_xa_t *xa)
 smb_sdrc_t
 smb_pre_set_information(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__SetInformation__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__SetInformation, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_set_information(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__SetInformation__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__SetInformation, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -167,14 +167,14 @@ smb_com_set_information(smb_request_t *sr)
 smb_sdrc_t
 smb_pre_set_information2(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__SetInformation2__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__SetInformation2, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_set_information2(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__SetInformation2__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__SetInformation2, smb_request_t *, sr);
 }
 
 smb_sdrc_t

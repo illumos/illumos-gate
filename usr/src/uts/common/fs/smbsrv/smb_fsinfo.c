@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -54,14 +54,14 @@ static int smb_trans2_set_fs_ctrl_info(smb_request_t *, smb_xa_t *);
 smb_sdrc_t
 smb_pre_query_information_disk(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__QueryInformationDisk__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__QueryInformationDisk, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_query_information_disk(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__QueryInformationDisk__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__QueryInformationDisk, smb_request_t *, sr);
 }
 
 smb_sdrc_t

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -73,8 +73,7 @@ smb_pre_read(smb_request_t *sr)
 	param->rw_count = (uint32_t)count;
 	param->rw_mincnt = 0;
 
-	DTRACE_SMB_2(op__Read__start, smb_request_t *, sr,
-	    smb_rw_param_t *, param);
+	DTRACE_SMB_START(op__Read, smb_request_t *, sr); /* arg.rw */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -82,8 +81,7 @@ smb_pre_read(smb_request_t *sr)
 void
 smb_post_read(smb_request_t *sr)
 {
-	DTRACE_SMB_2(op__Read__done, smb_request_t *, sr,
-	    smb_rw_param_t *, sr->arg.rw);
+	DTRACE_SMB_DONE(op__Read, smb_request_t *, sr); /* arg.rw */
 
 	kmem_free(sr->arg.rw, sizeof (smb_rw_param_t));
 }
@@ -159,8 +157,7 @@ smb_pre_lock_and_read(smb_request_t *sr)
 	param->rw_count = (uint32_t)count;
 	param->rw_mincnt = 0;
 
-	DTRACE_SMB_2(op__LockAndRead__start, smb_request_t *, sr,
-	    smb_rw_param_t *, param);
+	DTRACE_SMB_START(op__LockAndRead, smb_request_t *, sr); /* arg.rw */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -168,8 +165,7 @@ smb_pre_lock_and_read(smb_request_t *sr)
 void
 smb_post_lock_and_read(smb_request_t *sr)
 {
-	DTRACE_SMB_2(op__LockAndRead__done, smb_request_t *, sr,
-	    smb_rw_param_t *, sr->arg.rw);
+	DTRACE_SMB_DONE(op__LockAndRead, smb_request_t *, sr); /* arg.rw */
 
 	kmem_free(sr->arg.rw, sizeof (smb_rw_param_t));
 }
@@ -223,6 +219,35 @@ smb_com_lock_and_read(smb_request_t *sr)
 }
 
 /*
+ * The SMB_COM_READ_RAW protocol was a negotiated option introduced in
+ * SMB Core Plus to maximize performance when reading a large block
+ * of data from a server.  It's obsolete and no longer supported.
+ *
+ * We keep a handler for it so the dtrace provider can see if
+ * the client tried to use this command.
+ */
+smb_sdrc_t
+smb_pre_read_raw(smb_request_t *sr)
+{
+	DTRACE_SMB_START(op__ReadRaw, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_read_raw(smb_request_t *sr)
+{
+	DTRACE_SMB_DONE(op__ReadRaw, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_read_raw(smb_request_t *sr)
+{
+	smbsr_error(sr, NT_STATUS_NOT_SUPPORTED, ERRDOS,
+	    ERROR_NOT_SUPPORTED);
+	return (SDRC_ERROR);
+}
+
+/*
  * Read bytes from a file (SMB Core).  This request was extended in
  * LM 0.12 to support 64-bit offsets, indicated by sending a wct of
  * 12 and including additional offset information.
@@ -272,8 +297,7 @@ smb_pre_read_andx(smb_request_t *sr)
 
 	param->rw_mincnt = 0;
 
-	DTRACE_SMB_2(op__ReadX__start, smb_request_t *, sr,
-	    smb_rw_param_t *, param);
+	DTRACE_SMB_START(op__ReadX, smb_request_t *, sr); /* arg.rw */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -281,8 +305,7 @@ smb_pre_read_andx(smb_request_t *sr)
 void
 smb_post_read_andx(smb_request_t *sr)
 {
-	DTRACE_SMB_2(op__ReadX__done, smb_request_t *, sr,
-	    smb_rw_param_t *, sr->arg.rw);
+	DTRACE_SMB_DONE(op__ReadX, smb_request_t *, sr); /* arg.rw */
 
 	kmem_free(sr->arg.rw, sizeof (smb_rw_param_t));
 }

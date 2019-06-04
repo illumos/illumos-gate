@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -39,14 +39,13 @@
 #define	DECODE_ALLOCATION_ERROR	2
 #define	DECODE_CONVERSION_ERROR	3
 
-static int mbc_marshal_cstou8(char *, char *, size_t, char *, size_t);
 static int mbc_marshal_make_room(mbuf_chain_t *, int32_t);
 static void mbc_marshal_store_byte(mbuf_chain_t *, uint8_t);
 static int mbc_marshal_put_char(mbuf_chain_t *mbc, uint8_t);
 static int mbc_marshal_put_short(mbuf_chain_t *mbc, uint16_t);
 static int mbc_marshal_put_long(mbuf_chain_t *mbc, uint32_t);
 static int mbc_marshal_put_long_long(mbuf_chain_t *mbc, uint64_t);
-static int mbc_marshal_put_ascii_string(mbuf_chain_t *, char *, int);
+static int mbc_marshal_put_oem_string(mbuf_chain_t *, char *, int);
 static int mbc_marshal_put_unicode_string(mbuf_chain_t *, char *, int);
 static int mbc_marshal_put_uio(mbuf_chain_t *, struct uio *);
 static int mbc_marshal_put_mbufs(mbuf_chain_t *mbc, mbuf_t *m);
@@ -58,10 +57,10 @@ static int mbc_marshal_get_long(mbuf_chain_t *mbc, uint32_t *data);
 static uint64_t qswap(uint64_t ll);
 static int mbc_marshal_get_odd_long_long(mbuf_chain_t *mbc, uint64_t *data);
 static int mbc_marshal_get_long_long(mbuf_chain_t *mbc, uint64_t *data);
-static int mbc_marshal_get_ascii_string(smb_request_t *, mbuf_chain_t *,
-    uint8_t **ascii, int);
+static int mbc_marshal_get_oem_string(smb_request_t *, mbuf_chain_t *,
+    char **, int);
 static int mbc_marshal_get_unicode_string(smb_request_t *, mbuf_chain_t *,
-    uint8_t **, int);
+    char **, int);
 static int mbc_marshal_get_mbufs(mbuf_chain_t *, int32_t, mbuf_t **);
 static int mbc_marshal_get_mbuf_chain(mbuf_chain_t *, int32_t, mbuf_chain_t *);
 static int mbc_marshal_get_uio(mbuf_chain_t *, struct uio *);
@@ -152,7 +151,7 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, const char *fmt, va_list ap)
 	uint8_t		c;
 	uint8_t		cval;
 	uint8_t		*cvalp;
-	uint8_t		**cvalpp;
+	char		**charpp;
 	uint16_t	wval;
 	uint16_t	*wvalp;
 	uint32_t	*lvalp;
@@ -294,7 +293,7 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, const char *fmt, va_list ap)
 				return (-1);
 			if (cval != 2)
 				return (-1);
-			goto ascii_conversion;
+			goto oem_conversion;
 
 		case 'A':
 		case 'S':
@@ -310,27 +309,25 @@ smb_mbc_vdecodef(mbuf_chain_t *mbc, const char *fmt, va_list ap)
 				goto unicode_translation;
 			/* FALLTHROUGH */
 
-		case 's':
-ascii_conversion:
+		case 's':	/* get OEM string */
+oem_conversion:
 			ASSERT(sr != NULL);
-			cvalpp = va_arg(ap, uint8_t **);
+			charpp = va_arg(ap, char **);
 			if (!repc_specified)
 				repc = 0;
-			if (mbc_marshal_get_ascii_string(sr,
-			    mbc, cvalpp, repc) != 0)
+			if (mbc_marshal_get_oem_string(sr,
+			    mbc, charpp, repc) != 0)
 				return (-1);
 			break;
 
-		case 'U': /* Convert from unicode */
+		case 'U':	/* get UTF-16 string */
 unicode_translation:
 			ASSERT(sr != 0);
-			cvalpp = va_arg(ap, uint8_t **);
+			charpp = va_arg(ap, char **);
 			if (!repc_specified)
 				repc = 0;
-			if (mbc->chain_offset & 1)
-				mbc->chain_offset++;
 			if (mbc_marshal_get_unicode_string(sr,
-			    mbc, cvalpp, repc) != 0)
+			    mbc, charpp, repc) != 0)
 				return (-1);
 			break;
 
@@ -519,6 +516,7 @@ smb_mbc_peek(mbuf_chain_t *mbc, int offset, const char *fmt, ...)
 int
 smb_mbc_vencodef(mbuf_chain_t *mbc, const char *fmt, va_list ap)
 {
+	char		*charp;
 	uint8_t		*cvalp;
 	timestruc_t	*tvp;
 	smb_vdb_t	*vdp;
@@ -549,7 +547,6 @@ smb_mbc_vencodef(mbuf_chain_t *mbc, const char *fmt, va_list ap)
 			repc = va_arg(ap, int);
 			c = *fmt++;
 			repc_specified = B_TRUE;
-
 		}
 
 		switch (c) {
@@ -659,7 +656,7 @@ smb_mbc_vencodef(mbuf_chain_t *mbc, const char *fmt, va_list ap)
 
 		case 'L':
 			tag = 2;
-			goto ascii_conversion;
+			goto oem_conversion;
 
 		case 'S':
 		case 'A':
@@ -680,12 +677,23 @@ smb_mbc_vencodef(mbuf_chain_t *mbc, const char *fmt, va_list ap)
 				goto unicode_translation;
 			/* FALLTHROUGH */
 
-		case 's':	/* ASCII/multibyte string */
-ascii_conversion:	cvalp = va_arg(ap, uint8_t *);
+		case 's':	/* put OEM string */
+oem_conversion:
+			charp = va_arg(ap, char *);
 			if (!repc_specified)
 				repc = 0;
-			if (mbc_marshal_put_ascii_string(mbc,
-			    (char *)cvalp, repc) != 0)
+			if (mbc_marshal_put_oem_string(mbc,
+			    charp, repc) != 0)
+				return (DECODE_NO_MORE_DATA);
+			break;
+
+		case 'U':	/* put UTF-16 string */
+unicode_translation:
+			charp = va_arg(ap, char *);
+			if (!repc_specified)
+				repc = 0;
+			if (mbc_marshal_put_unicode_string(mbc,
+			    charp, repc) != 0)
 				return (DECODE_NO_MORE_DATA);
 			break;
 
@@ -726,18 +734,6 @@ ascii_conversion:	cvalp = va_arg(ap, uint8_t *);
 			while (repc-- > 0)
 				if (mbc_marshal_put_char(mbc, 0) != 0)
 					return (DECODE_NO_MORE_DATA);
-			break;
-
-		case 'U': /* Convert to unicode, align to word boundary */
-unicode_translation:
-			if (mbc->chain_offset & 1)
-				mbc->chain_offset++;
-			cvalp = va_arg(ap, uint8_t *);
-			if (!repc_specified)
-				repc = 0;
-			if (mbc_marshal_put_unicode_string(mbc,
-			    (char *)cvalp, repc) != 0)
-				return (DECODE_NO_MORE_DATA);
 			break;
 
 		default:
@@ -1068,79 +1064,149 @@ mbc_marshal_put_long_long(mbuf_chain_t *mbc, uint64_t data)
 }
 
 /*
- * When need to convert from UTF-8 (internal format) to a single
- * byte string (external format ) when marshalling a string.
+ * Marshal a UTF-8 string (str) into mbc, converting to OEM codeset.
+ * Also write a null unless the repc count limits the length we put.
+ * When (repc > 0) the length we marshal must be exactly repc, and
+ * truncate or pad the mbc data as necessary.
+ * See also: msgbuf_put_oem_string
  */
 static int
-mbc_marshal_put_ascii_string(mbuf_chain_t *mbc, char *mbs, int repc)
+mbc_marshal_put_oem_string(mbuf_chain_t *mbc, char *mbs, int repc)
 {
-	smb_wchar_t	wide_char;
-	int		nbytes;
-	int		length;
+	uint8_t		*oembuf = NULL;
+	uint8_t		*s;
+	int		oemlen;
+	int		rlen;
+	int		rc;
 
-	if ((length = smb_sbequiv_strlen(mbs)) == -1)
+	/*
+	 * Compute length of converted OEM string,
+	 * NOT including null terminator
+	 */
+	if ((oemlen = smb_sbequiv_strlen(mbs)) == -1)
 		return (DECODE_NO_MORE_DATA);
 
-	length += sizeof (char);
-
-	if ((repc > 0) && (repc < length))
-		length = repc;
-	if (mbc_marshal_make_room(mbc, length))
+	/*
+	 * If repc not specified, put whole string + NULL,
+	 * otherwise will truncate or pad as needed.
+	 */
+	if (repc <= 0)
+		repc = oemlen + 1;
+	if (mbc_marshal_make_room(mbc, repc))
 		return (DECODE_NO_MORE_DATA);
 
-	while (*mbs) {
-		/*
-		 * We should restore oem chars here.
-		 */
-		nbytes = smb_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
-		if (nbytes == -1)
-			return (DECODE_NO_MORE_DATA);
-
-		mbc_marshal_store_byte(mbc, (uint8_t)wide_char);
-
-		if (wide_char & 0xFF00)
-			mbc_marshal_store_byte(mbc, wide_char >> 8);
-
-		mbs += nbytes;
+	/*
+	 * Convert into a temporary buffer
+	 * Free oembuf before return.
+	 */
+	oembuf = smb_mem_zalloc(oemlen + 1);
+	ASSERT(oembuf != NULL);
+	rlen = smb_mbstooem(oembuf, mbs, oemlen);
+	if (rlen < 0) {
+		rc = DECODE_NO_MORE_DATA;
+		goto out;
 	}
+	if (rlen > oemlen)
+		rlen = oemlen;
+	oembuf[rlen] = '\0';
 
-	mbc_marshal_store_byte(mbc, 0);
-	return (0);
+	/*
+	 * Copy the converted string into the message,
+	 * truncated or paded as required.
+	 */
+	s = oembuf;
+	while (repc > 0) {
+		mbc_marshal_store_byte(mbc, *s);
+		if (*s != '\0')
+			s++;
+		repc--;
+	}
+	rc = 0;
+
+out:
+	if (oembuf != NULL)
+		smb_mem_free(oembuf);
+	return (rc);
 }
 
+/*
+ * Marshal a UTF-8 string (str) into mbc, converting to UTF-16.
+ * Also write a null unless the repc count limits the length.
+ * When (repc > 0) the length we marshal must be exactly repc,
+ * and truncate or pad the mbc data as necessary.
+ * See also: msgbuf_put_unicode_string
+ */
 static int
-mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *ascii, int repc)
+mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *mbs, int repc)
 {
-	smb_wchar_t	wchar;
-	int		consumed;
-	int		length;
+	smb_wchar_t	*wcsbuf = NULL;
+	smb_wchar_t	*wp;
+	size_t		wcslen, wcsbytes;
+	size_t		rlen;
+	int		rc;
 
-	if ((length = smb_wcequiv_strlen(ascii)) == -1)
+	/* align to word boundary */
+	if (mbc->chain_offset & 1) {
+		if (mbc_marshal_make_room(mbc, 1))
+			return (DECODE_NO_MORE_DATA);
+		mbc_marshal_store_byte(mbc, 0);
+	}
+
+	/*
+	 * Compute length of converted UTF-16 string,
+	 * NOT including null terminator (in bytes).
+	 */
+	wcsbytes = smb_wcequiv_strlen(mbs);
+	if (wcsbytes == (size_t)-1)
 		return (DECODE_NO_MORE_DATA);
 
-	length += sizeof (smb_wchar_t);
-
-	if ((repc > 0) && (repc < length))
-		length = repc;
-
-	if (mbc_marshal_make_room(mbc, length))
+	/*
+	 * If repc not specified, put whole string + NULL,
+	 * otherwise will truncate or pad as needed.
+	 */
+	if (repc <= 0)
+		repc = wcsbytes + 2;
+	if (mbc_marshal_make_room(mbc, repc))
 		return (DECODE_NO_MORE_DATA);
-	while (length > 0) {
-		consumed = smb_mbtowc(&wchar, ascii, MTS_MB_CHAR_MAX);
-		if (consumed == -1)
-			break;	/* Invalid sequence */
-		/*
-		 * Note that consumed will be 0 when the null terminator
-		 * is encountered and ascii will not be advanced beyond
-		 * that point. Length will continue to be decremented so
-		 * we won't get stuck here.
-		 */
-		ascii += consumed;
+
+	/*
+	 * Convert into a temporary buffer
+	 * Free wcsbuf before return.
+	 */
+	wcslen = wcsbytes / 2;
+	wcsbuf = smb_mem_zalloc(wcsbytes + 2);
+	ASSERT(wcsbuf != NULL);
+	rlen = smb_mbstowcs(wcsbuf, mbs, wcslen);
+	if (rlen == (size_t)-1) {
+		rc = DECODE_NO_MORE_DATA;
+		goto out;
+	}
+	if (rlen > wcslen)
+		rlen = wcslen;
+	wcsbuf[rlen] = 0;
+
+	/*
+	 * Copy the converted string into the message,
+	 * truncated or paded as required.  Preserve
+	 * little-endian order while copying.
+	 */
+	wp = wcsbuf;
+	while (repc > 1) {
+		smb_wchar_t wchar = LE_IN16(wp);
 		mbc_marshal_store_byte(mbc, wchar);
 		mbc_marshal_store_byte(mbc, wchar >> 8);
-		length -= sizeof (smb_wchar_t);
+		if (wchar != 0)
+			wp++;
+		repc -= sizeof (smb_wchar_t);
 	}
-	return (0);
+	if (repc > 0)
+		mbc_marshal_store_byte(mbc, 0);
+
+	rc = 0;
+out:
+	if (wcsbuf != NULL)
+		smb_mem_free(wcsbuf);
+	return (rc);
 }
 
 static int /*ARGSUSED*/
@@ -1375,101 +1441,159 @@ mbc_marshal_get_long_long(mbuf_chain_t *mbc, uint64_t *data)
 }
 
 /*
- * mbc_marshal_get_ascii_string
+ * mbc_marshal_get_oem_string
  *
- * The ascii string in smb includes oem chars. Since the
- * system needs utf8 encodes unicode char, conversion is
- * required to convert the oem char to unicode and then
- * to encode the converted wchars to utf8 format.
- * Therefore, the **ascii returned will be in such format
- * instead of the real ASCII format.
+ * Decode an OEM string, returning its UTF-8 form in strpp,
+ * allocated using smb_srm_zalloc (automatically freed).
+ * If max_bytes != 0, consume at most max_bytes of the mbc.
+ * See also: msgbuf_get_oem_string
  */
 static int
-mbc_marshal_get_ascii_string(
-    smb_request_t	*sr,
-    mbuf_chain_t	*mbc,
-    uint8_t		**ascii,
-    int			max_ascii)
+mbc_marshal_get_oem_string(smb_request_t *sr,
+    mbuf_chain_t *mbc, char **strpp, int max_bytes)
 {
-	char		*rcvbuf;
-	char		*ch;
-	int		max;
-	int		length = 0;
+	char		*mbs;
+	uint8_t		*oembuf = NULL;
+	int		oemlen, oemmax;
+	int		mbsmax;
+	int		rlen;
+	int		rc;
 
-	max = MALLOC_QUANTUM;
-	rcvbuf = smb_srm_zalloc(sr, max);
+	if (max_bytes == 0)
+		max_bytes = 0xffff;
 
-	if (max_ascii == 0)
-		max_ascii = 0xffff;
-
-	ch = rcvbuf;
-	for (;;) {
-		while (length < max) {
-			if (max_ascii-- <= 0) {
-				*ch++ = 0;
-				goto multibyte_encode;
-			}
-			if (MBC_ROOM_FOR(mbc, sizeof (char)) == 0) {
-				/* Data will never be available */
-				return (DECODE_NO_MORE_DATA);
-			}
-			if ((*ch++ = mbc_marshal_fetch_byte(mbc)) == 0)
-				goto multibyte_encode;
-			length++;
-		}
-		max += MALLOC_QUANTUM;
-		rcvbuf = smb_srm_rezalloc(sr, rcvbuf, max);
-		ch = rcvbuf + length;
-	}
-
-multibyte_encode:
 	/*
-	 * UTF-8 encode the string for internal system use.
+	 * Get the OtW data into a temporary buffer.
+	 * Free oembuf before return.
 	 */
-	length = strlen(rcvbuf) + 1;
-	*ascii = smb_srm_zalloc(sr, length * MTS_MB_CHAR_MAX);
-	return (mbc_marshal_cstou8("CP850", (char *)*ascii,
-	    (size_t)length * MTS_MB_CHAR_MAX, rcvbuf, (size_t)length));
+	oemlen = 0;
+	oemmax = MALLOC_QUANTUM;
+	oembuf = smb_mem_alloc(oemmax);
+	for (;;) {
+		uint8_t ch;
+
+		if (oemlen >= max_bytes)
+			break;
+		if ((oemlen + 2) >= oemmax) {
+			oemmax += MALLOC_QUANTUM;
+			oembuf = smb_mem_realloc(oembuf, oemmax);
+		}
+		if (mbc_marshal_get_char(mbc, &ch) != 0) {
+			rc = DECODE_NO_MORE_DATA;
+			goto out;
+		}
+		if (ch == 0)
+			break;
+		oembuf[oemlen++] = ch;
+	}
+	oembuf[oemlen] = '\0';
+
+	/*
+	 * Get the buffer we'll return and convert to UTF-8.
+	 * May take as much as double the space.
+	 */
+	mbsmax = oemlen * 2;
+	mbs = smb_srm_zalloc(sr, mbsmax + 1);
+	ASSERT(mbs != NULL);
+	rlen = smb_oemtombs(mbs, oembuf, mbsmax);
+	if (rlen < 0) {
+		rc = DECODE_NO_MORE_DATA;
+		goto out;
+	}
+	if (rlen > mbsmax)
+		rlen = mbsmax;
+	mbs[rlen] = '\0';
+	*strpp = mbs;
+	rc = 0;
+
+out:
+	if (oembuf != NULL)
+		smb_mem_free(oembuf);
+	return (rc);
 }
 
+/*
+ * mbc_marshal_get_unicode_string
+ *
+ * Decode a UTF-16 string, returning its UTF-8 form in strpp,
+ * allocated using smb_srm_zalloc (automatically freed).
+ * If max_bytes != 0, consume at most max_bytes of the mbc.
+ * See also: msgbuf_get_unicode_string
+ */
 static int
 mbc_marshal_get_unicode_string(smb_request_t *sr,
-    mbuf_chain_t *mbc, uint8_t **ascii, int max_unicode)
+    mbuf_chain_t *mbc, char **strpp, int max_bytes)
 {
-	int		max;
-	uint16_t	wchar;
-	char		*ch;
-	int		emitted;
-	int		length = 0;
+	char		*mbs;
+	uint16_t	*wcsbuf = NULL;
+	int		wcslen;		// wchar count
+	int		wcsmax;		// byte count
+	size_t		mbsmax;
+	size_t		rlen;
+	int		rc;
 
-	if (max_unicode == 0)
-		max_unicode = 0xffff;
+	if (max_bytes == 0)
+		max_bytes = 0xffff;
 
-	max = MALLOC_QUANTUM;
-	*ascii = smb_srm_zalloc(sr, max);
-
-	ch = (char *)*ascii;
-	for (;;) {
-		while ((length + MTS_MB_CHAR_MAX) < max) {
-			if (max_unicode <= 0)
-				goto done;
-			max_unicode -= 2;
-
-			if (mbc_marshal_get_short(mbc, &wchar) != 0)
-				return (DECODE_NO_MORE_DATA);
-
-			if (wchar == 0)	goto done;
-
-			emitted = smb_wctomb(ch, wchar);
-			length += emitted;
-			ch += emitted;
-		}
-		max += MALLOC_QUANTUM;
-		*ascii = smb_srm_rezalloc(sr, *ascii, max);
-		ch = (char *)*ascii + length;
+	/*
+	 * Unicode strings are always word aligned.
+	 */
+	if (mbc->chain_offset & 1) {
+		if (MBC_ROOM_FOR(mbc, sizeof (char)) == 0)
+			return (DECODE_NO_MORE_DATA);
+		mbc->chain_offset++;
 	}
-done:	*ch = 0;
-	return (0);
+
+	/*
+	 * Get the OtW data into a temporary buffer.
+	 * Free wcsbuf before return.
+	 */
+	wcslen = 0;
+	wcsmax = MALLOC_QUANTUM;
+	wcsbuf = smb_mem_alloc(wcsmax);
+	for (;;) {
+		uint16_t	wchar;
+
+		if ((wcslen * 2) >= max_bytes)
+			break;
+		if (((wcslen * 2) + 4) >= wcsmax) {
+			wcsmax += MALLOC_QUANTUM;
+			wcsbuf = smb_mem_realloc(wcsbuf, wcsmax);
+		}
+		if (mbc_marshal_get_short(mbc, &wchar) != 0) {
+			rc = DECODE_NO_MORE_DATA;
+			goto out;
+		}
+		if (wchar == 0)
+			break;
+		/* Keep in little-endian form. */
+		LE_OUT16(wcsbuf + wcslen, wchar);
+		wcslen++;
+	}
+	wcsbuf[wcslen] = 0;
+
+	/*
+	 * Get the buffer we'll return and convert to UTF-8.
+	 * May take as much 4X number of wide chars.
+	 */
+	mbsmax = wcslen * MTS_MB_CUR_MAX;
+	mbs = smb_srm_zalloc(sr, mbsmax + 1);
+	ASSERT(mbs != NULL);
+	rlen = smb_wcstombs(mbs, wcsbuf, mbsmax);
+	if (rlen == (size_t)-1) {
+		rc = DECODE_NO_MORE_DATA;
+		goto out;
+	}
+	if (rlen > mbsmax)
+		rlen = mbsmax;
+	mbs[rlen] = '\0';
+	*strpp = mbs;
+	rc = 0;
+
+out:
+	if (wcsbuf != NULL)
+		smb_mem_free(wcsbuf);
+	return (rc);
 }
 
 static int /*ARGSUSED*/
@@ -1570,30 +1694,4 @@ mbc_marshal_get_skip(mbuf_chain_t *mbc, uint_t skip)
 		return (DECODE_NO_MORE_DATA);
 	mbc->chain_offset += skip;
 	return (0);
-}
-
-/*
- * Converts oem string to UTF-8 string with an output string of max
- * maxconv bytes.  The string may be truncated or not null-terminated if
- * there is not enough room.
- *
- * returns -1, cnt (partial conversion)  or 0 (success)
- */
-
-static int
-mbc_marshal_cstou8(char *cs, char *outbuf, size_t maxconv,
-    char *inbuf, size_t srcbytes)
-{
-	kiconv_t	t2u;
-	size_t		inlen = srcbytes;
-	size_t		outlen = maxconv;
-	int		err = 0;
-	size_t		rc;
-
-	if ((t2u = kiconv_open("UTF-8", cs)) == (kiconv_t)-1)
-		return (-1);
-
-	rc = kiconv(t2u, &inbuf, &inlen, &outbuf, &outlen, &err);
-	(void) kiconv_close(t2u);
-	return ((int)rc);
 }

@@ -11,15 +11,13 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
  * Developer dtrace program for smbsrv
  * Usage: dtrace -s smbsrv.d
  */
-
-#pragma D option flowindent
 
 self int trace;
 self int mask;
@@ -86,4 +84,27 @@ fbt:smbsrv::return
 fbt:smbsrv::return
 {
 	self->trace--;
+}
+
+/*
+ * Use the "smb", "smb2" dtrace providers.
+ */
+
+smb:::op-*-start,
+smb2:::op-*-start
+{
+	printf("clnt=%s mid=0x%x uid=0x%x tid=0x%x\n",
+	       args[0]->ci_remote,
+	       args[1]->soi_mid,
+	       args[1]->soi_uid,
+	       args[1]->soi_tid);
+}
+
+smb:::op-*-done,
+smb2:::op-*-done
+{
+	printf("clnt=%s mid=0x%x status=0x%x\n",
+	       args[0]->ci_remote,
+	       args[1]->soi_mid,
+	       args[1]->soi_status);
 }

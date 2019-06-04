@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -47,8 +47,7 @@ smb_pre_create(smb_request_t *sr)
 	op->create_disposition = FILE_OVERWRITE_IF;
 	op->create_options = FILE_NON_DIRECTORY_FILE;
 
-	DTRACE_SMB_2(op__Create__start, smb_request_t *, sr,
-	    struct open_param *, op);
+	DTRACE_SMB_START(op__Create, smb_request_t *, sr); /* arg.open */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -56,7 +55,7 @@ smb_pre_create(smb_request_t *sr)
 void
 smb_post_create(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Create__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Create, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -89,8 +88,7 @@ smb_pre_create_new(smb_request_t *sr)
 
 	op->create_disposition = FILE_CREATE;
 
-	DTRACE_SMB_2(op__CreateNew__start, smb_request_t *, sr,
-	    struct open_param *, op);
+	DTRACE_SMB_START(op__CreateNew, smb_request_t *, sr); /* arg.open */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -98,7 +96,7 @@ smb_pre_create_new(smb_request_t *sr)
 void
 smb_post_create_new(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__CreateNew__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__CreateNew, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -132,8 +130,7 @@ smb_pre_create_temporary(smb_request_t *sr)
 
 	op->create_disposition = FILE_CREATE;
 
-	DTRACE_SMB_2(op__CreateTemporary__start, smb_request_t *, sr,
-	    struct open_param *, op);
+	DTRACE_SMB_START(op__CreateTemporary, smb_request_t *, sr);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -141,7 +138,7 @@ smb_pre_create_temporary(smb_request_t *sr)
 void
 smb_post_create_temporary(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__CreateTemporary__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__CreateTemporary, smb_request_t *, sr);
 }
 
 smb_sdrc_t

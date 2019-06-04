@@ -200,6 +200,7 @@ file path=usr/lib/dtrace/regs.d mode=0444
 file path=usr/lib/dtrace/sched.d mode=0444
 file path=usr/lib/dtrace/scsi.d mode=0444
 file path=usr/lib/dtrace/signal.d mode=0444
+file path=usr/lib/dtrace/smb.d mode=0444
 file path=usr/lib/dtrace/srp.d mode=0444
 file path=usr/lib/dtrace/sysevent.d mode=0444
 file path=usr/lib/dtrace/tcp.d mode=0444

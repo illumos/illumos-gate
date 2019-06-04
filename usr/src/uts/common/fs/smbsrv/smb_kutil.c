@@ -70,22 +70,36 @@ static const int days_in_month[] = {
 	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
 };
 
+/*
+ * Given a UTF-8 string (our internal form everywhere)
+ * return either the Unicode (UTF-16) length in bytes,
+ * or the OEM length in bytes.  Which we return is
+ * determined by whether the client supports Unicode.
+ * This length does NOT include the null.
+ */
 int
 smb_ascii_or_unicode_strlen(struct smb_request *sr, char *str)
 {
 	if (sr->session->dialect >= SMB_VERS_2_BASE ||
 	    (sr->smb_flg2 & SMB_FLAGS2_UNICODE) != 0)
 		return (smb_wcequiv_strlen(str));
-	return (strlen(str));
+	return (smb_sbequiv_strlen(str));
 }
 
+/*
+ * Given a UTF-8 string (our internal form everywhere)
+ * return either the Unicode (UTF-16) length in bytes,
+ * or the OEM length in bytes.  Which we return is
+ * determined by whether the client supports Unicode.
+ * This length DOES include the null.
+ */
 int
 smb_ascii_or_unicode_strlen_null(struct smb_request *sr, char *str)
 {
 	if (sr->session->dialect >= SMB_VERS_2_BASE ||
 	    (sr->smb_flg2 & SMB_FLAGS2_UNICODE) != 0)
 		return (smb_wcequiv_strlen(str) + 2);
-	return (strlen(str) + 1);
+	return (smb_sbequiv_strlen(str) + 1);
 }
 
 int

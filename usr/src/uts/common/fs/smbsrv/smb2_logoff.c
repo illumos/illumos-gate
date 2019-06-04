@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -40,7 +40,12 @@ smb2_logoff(smb_request_t *sr)
 
 	if (sr->uid_user == NULL)
 		return (SDRC_ERROR);
+
+	DTRACE_SMB2_START(op__Logoff, smb_request_t *, sr);
+
 	smb_user_logoff(sr->uid_user);
+
+	DTRACE_SMB2_DONE(op__Logoff, smb_request_t *, sr);
 
 	/*
 	 * SMB2 Logoff reply

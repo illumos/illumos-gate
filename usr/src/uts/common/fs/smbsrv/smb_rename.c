@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/synch.h>
@@ -72,8 +72,7 @@ smb_pre_rename(smb_request_t *sr)
 		dst_fqi->fq_sattr = 0;
 	}
 
-	DTRACE_SMB_2(op__Rename__start, smb_request_t *, sr,
-	    struct dirop *, &sr->arg.dirop);
+	DTRACE_SMB_START(op__Rename, smb_request_t *, sr); /* arg.dirop */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -81,7 +80,7 @@ smb_pre_rename(smb_request_t *sr)
 void
 smb_post_rename(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Rename__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Rename, smb_request_t *, sr);
 }
 
 smb_sdrc_t
@@ -146,8 +145,7 @@ smb_pre_nt_rename(smb_request_t *sr)
 		dst_fqi->fq_sattr = 0;
 	}
 
-	DTRACE_SMB_2(op__NtRename__start, smb_request_t *, sr,
-	    struct dirop *, &sr->arg.dirop);
+	DTRACE_SMB_START(op__NtRename, smb_request_t *, sr); /* arg.dirop */
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
 }
@@ -155,7 +153,7 @@ smb_pre_nt_rename(smb_request_t *sr)
 void
 smb_post_nt_rename(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__NtRename__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__NtRename, smb_request_t *, sr);
 }
 
 smb_sdrc_t

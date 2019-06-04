@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/sdt_impl.h>
@@ -97,6 +98,14 @@ static dtrace_pattr_t iscsi_attr = {
 { DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
 };
 
+static dtrace_pattr_t smb_attr = {
+{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_UNKNOWN },
+{ DTRACE_STABILITY_PRIVATE, DTRACE_STABILITY_PRIVATE, DTRACE_CLASS_ISA },
+{ DTRACE_STABILITY_EVOLVING, DTRACE_STABILITY_EVOLVING, DTRACE_CLASS_ISA },
+};
+
 /*
  * When adding a new provider you must add it before sdt as sdt is a catch all
  * for remaining probes.
@@ -117,6 +126,8 @@ sdt_provider_t sdt_providers[] = {
 	{ "iscsi", "__iscsi_", &iscsi_attr },
 	{ "nfsv3", "__nfsv3_", &stab_attr },
 	{ "nfsv4", "__nfsv4_", &stab_attr },
+	{ "smb", "__smb_", &smb_attr },
+	{ "smb2", "__smb2_", &smb_attr },
 	{ "xpv", "__xpv_", &xpv_attr },
 	{ "fc", "__fc_", &fc_attr },
 	{ "srp", "__srp_", &fc_attr },
@@ -879,6 +890,439 @@ sdt_argdesc_t sdt_args[] = {
 	{ "nfsv4", "cb-recall-done", 1, 1, "rfs4_deleg_state_t *",
 	    "nfsv4cbinfo_t *" },
 	{ "nfsv4", "cb-recall-done", 2, 2, "CB_RECALL4res *" },
+
+	/* Tables like this get really ugly when line-wrapped. */
+	/* BEGIN CSTYLED */
+	{ "smb", "op-Close-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Close-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Close-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Close-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-CloseAndTreeDisconnect-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CloseAndTreeDisconnect-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-CloseAndTreeDisconnect-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CloseAndTreeDisconnect-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Transaction-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Transaction-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Transaction-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Transaction-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-TransactionSecondary-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-TransactionSecondary-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-TransactionSecondary-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-TransactionSecondary-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Ioctl-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Ioctl-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Ioctl-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Ioctl-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Transaction2-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Transaction2-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Transaction2-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Transaction2-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Transaction2Secondary-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Transaction2Secondary-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Transaction2Secondary-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Transaction2Secondary-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-NtTransact-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtTransact-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-NtTransact-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtTransact-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-NtTransactSecondary-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtTransactSecondary-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-NtTransactSecondary-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtTransactSecondary-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Create-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Create-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Create-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb", "op-Create-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Create-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-CreateNew-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CreateNew-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-CreateNew-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb", "op-CreateNew-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CreateNew-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-CreateTemporary-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CreateTemporary-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-CreateTemporary-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb", "op-CreateTemporary-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CreateTemporary-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Delete-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Delete-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Delete-start", 2, 0, "smb_request_t *", "smb_name_args_t *" },
+	{ "smb", "op-Delete-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Delete-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-CreateDirectory-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CreateDirectory-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-CreateDirectory-start", 2, 0, "smb_request_t *", "smb_name_args_t *" },
+	{ "smb", "op-CreateDirectory-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CreateDirectory-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-DeleteDirectory-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-DeleteDirectory-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-DeleteDirectory-start", 2, 0, "smb_request_t *", "smb_name_args_t *" },
+	{ "smb", "op-DeleteDirectory-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-DeleteDirectory-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-CheckDirectory-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CheckDirectory-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-CheckDirectory-start", 2, 0, "smb_request_t *", "smb_name_args_t *" },
+	{ "smb", "op-CheckDirectory-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-CheckDirectory-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Invalid-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Invalid-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Invalid-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Invalid-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Echo-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Echo-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Echo-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Echo-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Search-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Search-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Search-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Search-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Find-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Find-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Find-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Find-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-FindClose-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-FindClose-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-FindClose-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-FindClose-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-FindUnique-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-FindUnique-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-FindUnique-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-FindUnique-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Flush-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Flush-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Flush-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Flush-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-QueryInformationDisk-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-QueryInformationDisk-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-QueryInformationDisk-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-QueryInformationDisk-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-LockByteRange-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-LockByteRange-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-LockByteRange-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-LockByteRange-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-LockingX-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-LockingX-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-LockingX-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-LockingX-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-LogoffX-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-LogoffX-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-LogoffX-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-LogoffX-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Negotiate-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Negotiate-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Negotiate-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Negotiate-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-NtCancel-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtCancel-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-NtCancel-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtCancel-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-NtCreateX-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtCreateX-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-NtCreateX-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb", "op-NtCreateX-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtCreateX-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-NtTransactCreate-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtTransactCreate-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-NtTransactCreate-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb", "op-NtTransactCreate-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtTransactCreate-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Open-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Open-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Open-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb", "op-Open-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Open-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-OpenX-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-OpenX-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-OpenX-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb", "op-OpenX-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-OpenX-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-OpenPrintFile-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-OpenPrintFile-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-OpenPrintFile-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb", "op-OpenPrintFile-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-OpenPrintFile-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-ClosePrintFile-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-ClosePrintFile-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-ClosePrintFile-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-ClosePrintFile-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-GetPrintQueue-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-GetPrintQueue-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-GetPrintQueue-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-GetPrintQueue-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-WritePrintFile-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WritePrintFile-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-WritePrintFile-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WritePrintFile-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-ProcessExit-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-ProcessExit-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-ProcessExit-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-ProcessExit-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-QueryInformation-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-QueryInformation-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-QueryInformation-start", 2, 0, "smb_request_t *", "smb_name_args_t *" },
+	{ "smb", "op-QueryInformation-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-QueryInformation-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-QueryInformation2-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-QueryInformation2-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-QueryInformation2-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-QueryInformation2-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Read-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Read-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Read-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb", "op-Read-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Read-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Read-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	{ "smb", "op-LockAndRead-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-LockAndRead-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-LockAndRead-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb", "op-LockAndRead-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-LockAndRead-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-LockAndRead-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	{ "smb", "op-ReadRaw-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-ReadRaw-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-ReadRaw-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-ReadRaw-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-ReadX-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-ReadX-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-ReadX-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb", "op-ReadX-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-ReadX-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-ReadX-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	{ "smb", "op-Rename-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Rename-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Rename-start", 2, 0, "smb_request_t *", "smb_name_args_t *" },
+	{ "smb", "op-Rename-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Rename-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-NtRename-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtRename-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-NtRename-start", 2, 0, "smb_request_t *", "smb_name_args_t *" },
+	{ "smb", "op-NtRename-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-NtRename-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Seek-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Seek-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Seek-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Seek-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-SessionSetupX-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-SessionSetupX-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-SessionSetupX-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-SessionSetupX-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-SetInformation-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-SetInformation-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-SetInformation-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-SetInformation-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-SetInformation2-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-SetInformation2-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-SetInformation2-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-SetInformation2-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-FindClose2-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-FindClose2-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-FindClose2-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-FindClose2-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-TreeConnect-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-TreeConnect-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-TreeConnect-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-TreeConnect-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-TreeConnectX-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-TreeConnectX-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-TreeConnectX-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-TreeConnectX-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-TreeDisconnect-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-TreeDisconnect-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-TreeDisconnect-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-TreeDisconnect-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-UnlockByteRange-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-UnlockByteRange-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-UnlockByteRange-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-UnlockByteRange-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-Write-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Write-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Write-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb", "op-Write-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-Write-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-Write-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	{ "smb", "op-WriteAndClose-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WriteAndClose-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-WriteAndClose-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb", "op-WriteAndClose-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WriteAndClose-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-WriteAndClose-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	{ "smb", "op-WriteAndUnlock-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WriteAndUnlock-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-WriteAndUnlock-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb", "op-WriteAndUnlock-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WriteAndUnlock-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-WriteAndUnlock-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	{ "smb", "op-WriteRaw-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WriteRaw-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-WriteRaw-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WriteRaw-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+
+	{ "smb", "op-WriteX-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WriteX-start", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-WriteX-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb", "op-WriteX-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb", "op-WriteX-done", 1, 0, "smb_request_t *", "smbopinfo_t *" },
+	{ "smb", "op-WriteX-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	{ "smb2", "op-Cancel-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Cancel-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Cancel-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Cancel-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-ChangeNotify-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-ChangeNotify-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-ChangeNotify-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-ChangeNotify-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Close-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Close-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Close-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Close-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Create-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Create-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Create-start", 2, 0, "smb_request_t *", "smb_open_args_t *" },
+	{ "smb2", "op-Create-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Create-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Echo-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Echo-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Echo-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Echo-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Flush-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Flush-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Flush-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Flush-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Ioctl-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Ioctl-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Ioctl-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Ioctl-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Lock-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Lock-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Lock-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Lock-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Logoff-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Logoff-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Logoff-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Logoff-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Negotiate-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Negotiate-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Negotiate-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Negotiate-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-OplockBreak-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-OplockBreak-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-OplockBreak-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-OplockBreak-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-QueryDirectory-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-QueryDirectory-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-QueryDirectory-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-QueryDirectory-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-QueryInfo-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-QueryInfo-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-QueryInfo-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-QueryInfo-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Read-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Read-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Read-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb2", "op-Read-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Read-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Read-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	{ "smb2", "op-SessionSetup-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-SessionSetup-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-SessionSetup-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-SessionSetup-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-SetInfo-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-SetInfo-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-SetInfo-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-SetInfo-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-TreeConnect-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-TreeConnect-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-TreeConnect-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-TreeConnect-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-TreeDisconnect-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-TreeDisconnect-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-TreeDisconnect-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-TreeDisconnect-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+
+	{ "smb2", "op-Write-start", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Write-start", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Write-start", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+	{ "smb2", "op-Write-done", 0, 0, "smb_request_t *", "conninfo_t *" },
+	{ "smb2", "op-Write-done", 1, 0, "smb_request_t *", "smb2opinfo_t *" },
+	{ "smb2", "op-Write-done", 2, 0, "smb_request_t *", "smb_rw_args_t *" },
+
+	/* END CSTYLED */
 
 	{ "ip", "send", 0, 0, "mblk_t *", "pktinfo_t *" },
 	{ "ip", "send", 1, 1, "conn_t *", "csinfo_t *" },

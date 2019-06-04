@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -38,11 +38,14 @@ smb2_tree_disconn(smb_request_t *sr)
 	if (StructSize != 4)
 		return (SDRC_ERROR);
 
-	if (sr->uid_user == NULL || sr->tid_tree == NULL)
-		return (SDRC_ERROR);
+	/* Dispatch makes sure we have uid_user, tid_tree */
+
+	DTRACE_SMB2_START(op__TreeDisconnect, smb_request_t *, sr);
 
 	smb_tree_disconnect(sr->tid_tree, B_TRUE);
 	smb_session_cancel_requests(sr->session, sr->tid_tree, sr);
+
+	DTRACE_SMB2_DONE(op__TreeDisconnect, smb_request_t *, sr);
 
 	/*
 	 * SMB2 Tree Disconnect reply

@@ -97,6 +97,7 @@ DLIBSRCS += \
 	sched.d \
 	signal.d \
 	scsi.d \
+	smb.d \
 	srp.d \
 	sysevent.d \
 	tcp.d \

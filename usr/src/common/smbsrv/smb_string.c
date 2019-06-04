@@ -174,8 +174,8 @@ smb_islower(int c)
  * If the specified character is lowercase, the uppercase value will
  * be returned. Otherwise the original value will be returned.
  */
-int
-smb_toupper(int c)
+uint32_t
+smb_toupper(uint32_t c)
 {
 	uint16_t mask = is_unicode ? 0xffff : 0xff;
 
@@ -187,8 +187,8 @@ smb_toupper(int c)
  * If the specified character is uppercase, the lowercase value will
  * be returned. Otherwise the original value will be returned.
  */
-int
-smb_tolower(int c)
+uint32_t
+smb_tolower(uint32_t c)
 {
 	uint16_t mask = is_unicode ? 0xffff : 0xff;
 
@@ -204,7 +204,7 @@ smb_tolower(int c)
 char *
 smb_strupr(char *s)
 {
-	smb_wchar_t c;
+	uint32_t c;
 	char *p = s;
 
 	while (*p) {
@@ -235,7 +235,7 @@ smb_strupr(char *s)
 char *
 smb_strlwr(char *s)
 {
-	smb_wchar_t c;
+	uint32_t c;
 	char *p = s;
 
 	while (*p) {
@@ -264,7 +264,7 @@ smb_strlwr(char *s)
 int
 smb_isstrlwr(const char *s)
 {
-	smb_wchar_t c;
+	uint32_t c;
 	int n;
 	const char *p = s;
 
@@ -295,7 +295,7 @@ smb_isstrlwr(const char *s)
 int
 smb_isstrupr(const char *s)
 {
-	smb_wchar_t c;
+	uint32_t c;
 	int n;
 	const char *p = s;
 
@@ -440,7 +440,7 @@ smb_unicode_init(void)
  * unc_server	server or domain name with no leading/trailing '\'
  * unc_share	share name with no leading/trailing '\'
  * unc_path	relative path to the share with no leading/trailing '\'
- * 		it is valid for unc_path to be NULL.
+ *		it is valid for unc_path to be NULL.
  *
  * Upon successful return of this function, smb_unc_free()
  * MUST be called when returned 'unc' is no longer needed.

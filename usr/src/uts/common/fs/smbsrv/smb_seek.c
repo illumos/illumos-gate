@@ -21,6 +21,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -80,14 +82,14 @@
 smb_sdrc_t
 smb_pre_seek(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Seek__start, smb_request_t *, sr);
+	DTRACE_SMB_START(op__Seek, smb_request_t *, sr);
 	return (SDRC_SUCCESS);
 }
 
 void
 smb_post_seek(smb_request_t *sr)
 {
-	DTRACE_SMB_1(op__Seek__done, smb_request_t *, sr);
+	DTRACE_SMB_DONE(op__Seek, smb_request_t *, sr);
 }
 
 smb_sdrc_t

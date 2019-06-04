@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -32,10 +32,9 @@ smb2_query_info(smb_request_t *sr)
 	smb2fid_t smb2fid;
 	uint16_t DataOff;
 	uint32_t status;
-	smb_sdrc_t sdrc = SDRC_SUCCESS;
 	int rc = 0;
 
-	qi = kmem_zalloc(sizeof (*qi), KM_SLEEP);
+	qi = smb_srm_zalloc(sr, sizeof (*qi));
 
 	/*
 	 * SMB2 Query Info request
@@ -53,19 +52,8 @@ smb2_query_info(smb_request_t *sr)
 	    &qi->qi_Flags,		/* l */
 	    &smb2fid.persistent,	/* q */
 	    &smb2fid.temporal);		/* q */
-	if (rc || StructSize != 41) {
-		sdrc = SDRC_ERROR;
-		goto out;
-	}
-
-	status = smb2sr_lookup_fid(sr, &smb2fid);
-	if (status) {
-		smb2sr_put_error(sr, status);
-		goto out;
-	}
-
-	if (oBufLength > smb2_max_trans)
-		oBufLength = smb2_max_trans;
+	if (rc || StructSize != 41)
+		return (SDRC_ERROR);
 
 	/*
 	 * If there's an input buffer, setup a shadow.
@@ -74,12 +62,19 @@ smb2_query_info(smb_request_t *sr)
 		rc = MBC_SHADOW_CHAIN(&qi->in_data, &sr->smb_data,
 		    sr->smb2_cmd_hdr + iBufOffset, iBufLength);
 		if (rc) {
-			smb2sr_put_error(sr, NT_STATUS_INVALID_PARAMETER);
-			goto out;
+			return (SDRC_ERROR);
 		}
 	}
 
+	if (oBufLength > smb2_max_trans)
+		oBufLength = smb2_max_trans;
 	sr->raw_data.max_bytes = oBufLength;
+
+	status = smb2sr_lookup_fid(sr, &smb2fid);
+	DTRACE_SMB2_START(op__QueryInfo, smb_request_t *, sr);
+
+	if (status)
+		goto errout;
 
 	switch (qi->qi_InfoType) {
 	case SMB2_0_INFO_FILE:
@@ -99,6 +94,10 @@ smb2_query_info(smb_request_t *sr)
 		break;
 	}
 
+errout:
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__QueryInfo, smb_request_t *, sr);
+
 	switch (status) {
 
 	case 0: /* success */
@@ -106,7 +105,6 @@ smb2_query_info(smb_request_t *sr)
 
 	case NT_STATUS_BUFFER_OVERFLOW:
 		/* Not really an error, per se.  Advisory. */
-		sr->smb2_status = status;
 		break;
 
 	case NT_STATUS_BUFFER_TOO_SMALL:
@@ -119,11 +117,11 @@ smb2_query_info(smb_request_t *sr)
 		 * that returns one of these errors.
 		 */
 		smb2sr_put_error_data(sr, status, &sr->raw_data);
-		goto out;
+		return (SDRC_SUCCESS);
 
 	default:
 		smb2sr_put_error(sr, status);
-		goto out;
+		return (SDRC_SUCCESS);
 	}
 
 	/*
@@ -138,10 +136,7 @@ smb2_query_info(smb_request_t *sr)
 	    oBufLength,			/* l */
 	    &sr->raw_data);		/* C */
 	if (rc)
-		sdrc = SDRC_ERROR;
+		sr->smb2_status = NT_STATUS_INTERNAL_ERROR;
 
-out:
-	kmem_free(qi, sizeof (*qi));
-
-	return (sdrc);
+	return (SDRC_SUCCESS);
 }

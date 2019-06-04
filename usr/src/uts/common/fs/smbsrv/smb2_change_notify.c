@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -63,8 +63,10 @@ smb2_change_notify(smb_request_t *sr)
 		return (SDRC_ERROR);
 
 	status = smb2sr_lookup_fid(sr, &smb2fid);
+	DTRACE_SMB2_START(op__ChangeNotify, smb_request_t *, sr);
+
 	if (status != 0)
-		goto puterror;
+		goto errout; /* Bad FID */
 
 	CompletionFilter &= FILE_NOTIFY_VALID_MASK;
 	if (iFlags & SMB2_WATCH_TREE)
@@ -84,9 +86,13 @@ smb2_change_notify(smb_request_t *sr)
 		status = smb2sr_go_async(sr, smb2_change_notify_async);
 	}
 
-	if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_SUCCESS) {
-		sr->smb2_status = status;
+errout:
+	sr->smb2_status = status;
+	if (status != NT_STATUS_PENDING) {
+		DTRACE_SMB2_DONE(op__ChangeNotify, smb_request_t *, sr);
+	}
 
+	if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_SUCCESS) {
 		oBufLength = sr->raw_data.chain_offset;
 		(void) smb_mbc_encodef(
 		    &sr->reply, "wwlC",
@@ -95,7 +101,6 @@ smb2_change_notify(smb_request_t *sr)
 		    oBufLength,			/* l */
 		    &sr->raw_data);		/* C */
 	} else {
-	puterror:
 		smb2sr_put_error(sr, status);
 	}
 
@@ -144,9 +149,11 @@ smb2_change_notify_finish(void *arg)
 	 * Common part of notify, puts data in sr->raw_data
 	 */
 	status = smb_notify_act3(sr);
-	if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_SUCCESS) {
-		sr->smb2_status = status;
 
+	sr->smb2_status = status;
+	DTRACE_SMB2_DONE(op__ChangeNotify, smb_request_t *, sr);
+
+	if (NT_SC_SEVERITY(status) == NT_STATUS_SEVERITY_SUCCESS) {
 		oBufLength = sr->raw_data.chain_offset;
 		(void) smb_mbc_encodef(
 		    &sr->reply, "wwlC",

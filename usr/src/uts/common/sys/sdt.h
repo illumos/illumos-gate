@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 by Delphix. All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SYS_SDT_H
@@ -244,11 +245,20 @@ extern "C" {
 #define	DTRACE_NFSV4_3(name, type1, arg1, type2, arg2, type3, arg3) \
 	DTRACE_PROBE3(__nfsv4_##name, type1, arg1, type2, arg2, type3, arg3);
 
-#define	DTRACE_SMB_1(name, type1, arg1) \
-	DTRACE_PROBE1(__smb_##name, type1, arg1);
+/*
+ * The SMB probes are done a little differently from the other probes
+ * in this file for the benefit of the libfksmbsrv USDT provider.
+ * See: lib/smbsrv/libfksmbsrv/common/sys/sdt.h
+ */
+#define	DTRACE_SMB_START(name, type1, arg1) \
+	DTRACE_PROBE1(__smb_##name##__start, type1, arg1);
+#define	DTRACE_SMB_DONE(name, type1, arg1) \
+	DTRACE_PROBE1(__smb_##name##__done, type1, arg1);
 
-#define	DTRACE_SMB_2(name, type1, arg1, type2, arg2) \
-	DTRACE_PROBE2(__smb_##name, type1, arg1, type2, arg2);
+#define	DTRACE_SMB2_START(name, type1, arg1) \
+	DTRACE_PROBE1(__smb2_##name##__start, type1, arg1);
+#define	DTRACE_SMB2_DONE(name, type1, arg1) \
+	DTRACE_PROBE1(__smb2_##name##__done, type1, arg1);
 
 #define	DTRACE_IP(name)						\
 	DTRACE_PROBE(__ip_##name);

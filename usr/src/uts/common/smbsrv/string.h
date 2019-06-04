@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  */
 
@@ -85,7 +85,7 @@ typedef enum codepage_id {
 /*
  * Maximum number of bytes per multi-byte character.
  */
-#define	MTS_MB_CUR_MAX		3
+#define	MTS_MB_CUR_MAX		4
 #define	MTS_MB_CHAR_MAX		MTS_MB_CUR_MAX
 
 typedef	uint16_t smb_wchar_t;
@@ -118,8 +118,8 @@ void smb_codepage_fini(void);
 
 int smb_isupper(int);
 int smb_islower(int);
-int smb_toupper(int);
-int smb_tolower(int);
+uint32_t smb_toupper(uint32_t);
+uint32_t smb_tolower(uint32_t);
 char *smb_strupr(char *);
 char *smb_strlwr(char *);
 int smb_isstrupr(const char *);
@@ -130,14 +130,14 @@ boolean_t smb_match(const char *, const char *, boolean_t);
 
 size_t smb_mbstowcs(smb_wchar_t *, const char *, size_t);
 size_t smb_wcstombs(char *, const smb_wchar_t *, size_t);
-int smb_mbtowc(smb_wchar_t *, const char *, size_t);
-int smb_wctomb(char *, smb_wchar_t);
+int smb_mbtowc(uint32_t *, const char *, size_t);
+int smb_wctomb(char *, uint32_t);
 
 size_t smb_wcequiv_strlen(const char *);
 size_t smb_sbequiv_strlen(const char *);
 
-int smb_stombs(char *, char *, int);
-int smb_mbstos(char *, const char *);
+int smb_oemtombs(char *, const uint8_t *, int);
+int smb_mbstooem(uint8_t *, const char *, int);
 
 size_t ucstooem(char *, const smb_wchar_t *, size_t, uint32_t);
 size_t oemtoucs(smb_wchar_t *, const char *, size_t, uint32_t);
