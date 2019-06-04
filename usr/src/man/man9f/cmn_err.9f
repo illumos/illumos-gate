@@ -188,11 +188,11 @@ is identical to the one described in
 with additional meaning of the first character affecting where the message will
 be written:
 .Bl -tag -width Ds
-.It Sy \!
+.It \&!
 The message goes only to the system log.
 .It Sy ^
 The message goes only to the console.
-.It Sy \?
+.It \&?
 If
 .Fa level
 is also
@@ -202,7 +202,7 @@ when the system has been booted in verbose mode.
 See
 .Xr kernel 1M .
 If neither condition is met, the
-.Qq Sy \?
+.Qq Sy \&?
 character has no effect and is simply ignored.
 .El
 .Pp
@@ -353,7 +353,7 @@ This example shows how to use the
 .Sy %b
 conversion specification.
 Because of the leading
-.Qq Sy \?
+.Qq Sy \&?
 character in the format string, this message will always be logged, but it will
 only be displayed when the kernel is booted in verbose mode.
 .Bd -literal
