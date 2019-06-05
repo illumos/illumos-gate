@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -49,11 +50,13 @@ function cleanup
 	if poolexists $TESTPOOL ; then
                 destroy_pool $TESTPOOL
         fi
-	if [ -d ${TESTPOOL}.root ]
+	if [ -d $TESTPOOL_DIR ]
 	then
-		log_must rmdir ${TESTPOOL}.root
+		log_must rmdir $TESTPOOL_DIR
 	fi
 }
+
+TESTPOOL_DIR=/${TESTPOOL}.root
 
 log_onexit cleanup
 
@@ -65,17 +68,17 @@ else
 	disk=$DISK0
 fi
 
-log_must mkdir /${TESTPOOL}.root
-log_must zpool create -R /${TESTPOOL}.root $TESTPOOL $disk
-if [ ! -d /${TESTPOOL}.root ]
+log_must mkdir $TESTPOOL_DIR
+log_must zpool create -R $TESTPOOL_DIR $TESTPOOL $disk
+if [ ! -d $TESTPOOL_DIR ]
 then
-	log_fail "Mountpoint was not create when using zpool with -R flag!"
+	log_fail "Mountpoint was not created when using zpool with -R flag!"
 fi
 
 FS=$(zfs list $TESTPOOL)
 if [ -z "$FS" ]
 then
-	log_fail "Mounted filesystem at /${TESTPOOL}.root isn't ZFS!"
+	log_fail "Mounted filesystem at $TESTPOOL_DIR isn't ZFS!"
 fi
 
 log_must zpool get all $TESTPOOL
@@ -89,7 +92,7 @@ then
 fi
 
 # check that the root = /mountpoint property is set correctly
-grep "$TESTPOOL[ ]*altroot[ ]*/${TESTPOOL}.root" /tmp/values.$$ > /dev/null 2>&1
+grep "$TESTPOOL[ ]*altroot[ ]*$TESTPOOL_DIR" /tmp/values.$$ > /dev/null 2>&1
 if [ $? -ne 0 ]
 then
 	log_fail "zpool property root was not found in pool output."
