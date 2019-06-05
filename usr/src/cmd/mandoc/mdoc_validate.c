@@ -3,7 +3,7 @@
  * Copyright (c) 2008-2012 Kristaps Dzonsons <kristaps@bsd.lv>
  * Copyright (c) 2010-2018 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2010 Joerg Sonnenberger <joerg@netbsd.org>
- * Copyright 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2428,9 +2428,9 @@ post_sh_head(POST_ARGS)
 	case SEC_ERRORS:
 		if (*mdoc->meta.msec == '4')
 			break;
-		if (*mdoc->meta.msec == '7' && *(mdoc->meta.msec + 1) == 'I')
+		if (*mdoc->meta.msec == '7')
 			break;
-		goodsec = "2, 3, 4, 7I, 9";
+		goodsec = "2, 3, 4, 7, 9";
 		/* FALLTHROUGH */
 	case SEC_RETURN_VALUES:
 	case SEC_LIBRARY:
