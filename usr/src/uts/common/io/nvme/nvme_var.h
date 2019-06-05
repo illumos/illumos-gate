@@ -13,6 +13,7 @@
  * Copyright 2018 Nexenta Systems, Inc.
  * Copyright 2016 The MathWorks, Inc. All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2019 Western Digital Corporation.
  */
 
 #ifndef _NVME_VAR_H
@@ -33,10 +34,10 @@ extern "C" {
 #endif
 
 #define	NVME_FMA_INIT			0x1
-#define	NVME_REGS_MAPPED 		0x2
-#define	NVME_ADMIN_QUEUE 		0x4
-#define	NVME_CTRL_LIMITS 		0x8
-#define	NVME_INTERRUPTS  		0x10
+#define	NVME_REGS_MAPPED		0x2
+#define	NVME_ADMIN_QUEUE		0x4
+#define	NVME_CTRL_LIMITS		0x8
+#define	NVME_INTERRUPTS			0x10
 
 #define	NVME_MIN_ADMIN_QUEUE_LEN	16
 #define	NVME_MIN_IO_QUEUE_LEN		16
@@ -52,6 +53,7 @@ typedef struct nvme_namespace nvme_namespace_t;
 typedef struct nvme_minor_state nvme_minor_state_t;
 typedef struct nvme_dma nvme_dma_t;
 typedef struct nvme_cmd nvme_cmd_t;
+typedef struct nvme_cq nvme_cq_t;
 typedef struct nvme_qpair nvme_qpair_t;
 typedef struct nvme_task_arg nvme_task_arg_t;
 
@@ -92,6 +94,20 @@ struct nvme_cmd {
 	nvme_t *nc_nvme;
 };
 
+struct nvme_cq {
+	size_t ncq_nentry;
+	uint16_t ncq_id;
+
+	nvme_dma_t *ncq_dma;
+	nvme_cqe_t *ncq_cq;
+	uint_t ncq_head;
+	uint_t ncq_tail;
+	uintptr_t ncq_hdbl;
+	int ncq_phase;
+
+	kmutex_t ncq_mutex;
+};
+
 struct nvme_qpair {
 	size_t nq_nentry;
 
@@ -101,16 +117,11 @@ struct nvme_qpair {
 	uint_t nq_sqtail;
 	uintptr_t nq_sqtdbl;
 
-	nvme_dma_t *nq_cqdma;
-	nvme_cqe_t *nq_cq;
-	uint_t nq_cqhead;
-	uint_t nq_cqtail;
-	uintptr_t nq_cqhdbl;
+	nvme_cq_t *nq_cq;
 
 	nvme_cmd_t **nq_cmd;
 	uint16_t nq_next_cmd;
 	uint_t nq_active_cmds;
-	int nq_phase;
 
 	kmutex_t nq_mutex;
 	ksema_t nq_sema;
@@ -142,7 +153,8 @@ struct nvme {
 	boolean_t n_strict_version;
 	boolean_t n_ignore_unknown_vendor_status;
 	uint32_t n_admin_queue_len;
-	uint32_t n_io_queue_len;
+	uint32_t n_io_squeue_len;
+	uint32_t n_io_cqueue_len;
 	uint16_t n_async_event_limit;
 	uint_t n_min_block_size;
 	uint16_t n_abort_command_limit;
@@ -154,6 +166,8 @@ struct nvme {
 	boolean_t n_auto_pst_supported;
 	boolean_t n_async_event_supported;
 	boolean_t n_progress_supported;
+	int n_submission_queues;
+	int n_completion_queues;
 
 	int n_nssr_supported;
 	int n_doorbell_stride;
@@ -165,12 +179,14 @@ struct nvme {
 	int n_pagesize;
 
 	int n_namespace_count;
-	uint16_t n_ioq_count;
+	uint_t n_ioq_count;
+	uint_t n_cq_count;
 
 	nvme_identify_ctrl_t *n_idctl;
 
 	nvme_qpair_t *n_adminq;
 	nvme_qpair_t **n_ioq;
+	nvme_cq_t **n_cq;
 
 	nvme_namespace_t *n_ns;
 
