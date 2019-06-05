@@ -322,8 +322,8 @@ By default, all running zones are listed. If you use this subcommand with the
 regardless of its state. In this case, the \fB-i\fR and \fB-c\fR options are
 disallowed.
 .sp
-If neither the \fB-i\fR or \fB-c\fR options are given, all running zones are
-listed.
+If neither the \fB-i\fR, \fB-c\fR, or \fB-n\fR options are given, all running
+zones are listed.
 .sp
 The following \fIlist_options\fR are supported:
 .sp
@@ -344,6 +344,16 @@ Display all configured zones. This option overrides the \fB-i\fR option.
 .sp .6
 .RS 4n
 Expand the display to all installed zones.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fB-n\fR\fR
+.ad
+.sp .6
+.RS 4n
+Do not include the global zone in the list of zones returned.
 .RE
 
 .sp

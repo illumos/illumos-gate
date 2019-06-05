@@ -374,7 +374,7 @@ tems_failed(cred_t *credp, boolean_t finish_ioctl)
 
 	if (finish_ioctl)
 		(void) ldi_ioctl(tems.ts_hdl, VIS_DEVFINI, 0,
-		    FWRITE|FKIOCTL, credp, &lyr_rval);
+		    FWRITE | FKIOCTL, credp, &lyr_rval);
 
 	(void) ldi_close(tems.ts_hdl, 0, credp);
 	tems.ts_hdl = NULL;
@@ -491,8 +491,7 @@ tem_info_init(char *pathname, cred_t *credp)
 	    p = list_next(&tems.ts_list, p)) {
 		mutex_enter(&p->tvs_lock);
 		tem_internal_init(p, credp, B_TRUE, B_FALSE);
-		if (temargs.mode == VIS_PIXEL)
-			tem_pix_align(p, credp, CALLED_FROM_NORMAL);
+		tem_align(p, credp, CALLED_FROM_NORMAL);
 		mutex_exit(&p->tvs_lock);
 	}
 
@@ -851,6 +850,9 @@ tem_adjust_row(struct tem_vt_state *tem, int prom_row, cred_t *credp,
 	int	prom_window_top = 0;
 	int	scroll_up_lines;
 
+	if (tems.ts_display_mode == VIS_TEXT)
+		return (prom_row);
+
 	plat_tem_get_prom_font_size(&prom_charheight, &prom_window_top);
 	if (prom_charheight == 0)
 		prom_charheight = PROM_DEFAULT_FONT_HEIGHT;
@@ -879,51 +881,47 @@ tem_adjust_row(struct tem_vt_state *tem, int prom_row, cred_t *credp,
 }
 
 void
-tem_pix_align(struct tem_vt_state *tem, cred_t *credp,
+tem_align(struct tem_vt_state *tem, cred_t *credp,
     enum called_from called_from)
 {
 	uint32_t row = 0;
 	uint32_t col = 0;
 
-	if (plat_stdout_is_framebuffer()) {
-		plat_tem_hide_prom_cursor();
+	plat_tem_hide_prom_cursor();
 
-		/*
-		 * We are getting the current cursor position in pixel
-		 * mode so that we don't over-write the console output
-		 * during boot.
-		 */
-		plat_tem_get_prom_pos(&row, &col);
+	/*
+	 * We are getting the current cursor position in pixel
+	 * mode so that we don't over-write the console output
+	 * during boot.
+	 */
+	plat_tem_get_prom_pos(&row, &col);
 
-		/*
-		 * Adjust the row if necessary when the font of our
-		 * kernel console tem is different with that of prom
-		 * tem.
-		 */
-		row = tem_adjust_row(tem, row, credp, called_from);
+	/*
+	 * Adjust the row if necessary when the font of our
+	 * kernel console tem is different with that of prom
+	 * tem.
+	 */
+	row = tem_adjust_row(tem, row, credp, called_from);
 
-		/* first line of our kernel console output */
-		tem->tvs_first_line = row + 1;
+	/* first line of our kernel console output */
+	tem->tvs_first_line = row + 1;
 
-		/* re-set and align cusror position */
-		tem->tvs_s_cursor.row = tem->tvs_c_cursor.row =
-		    (screen_pos_t)row;
-		tem->tvs_s_cursor.col = tem->tvs_c_cursor.col = 0;
+	/* re-set and align cursor position */
+	tem->tvs_s_cursor.row = tem->tvs_c_cursor.row =
+	    (screen_pos_t)row;
+	tem->tvs_s_cursor.col = tem->tvs_c_cursor.col = 0;
 
-		/*
-		 * When tem is starting up, part of the screen is filled
-		 * with information from boot loader and early boot.
-		 * For tem, the screen content above current cursor
-		 * should be treated as image.
-		 */
-		for (; row > 0; row--) {
-			for (col = 0; col < tems.ts_c_dimension.width; col++) {
-				tem->tvs_screen_rows[row][col].tc_char =
-				    TEM_ATTR(TEM_ATTR_IMAGE);
-			}
+	/*
+	 * When tem is starting up, part of the screen is filled
+	 * with information from boot loader and early boot.
+	 * For tem, the screen content above current cursor
+	 * should be treated as image.
+	 */
+	for (; row > 0; row--) {
+		for (col = 0; col < tems.ts_c_dimension.width; col++) {
+			tem->tvs_screen_rows[row][col].tc_char =
+			    TEM_ATTR(TEM_ATTR_IMAGE);
 		}
-	} else {
-		tem_safe_reset_display(tem, credp, called_from, B_TRUE, B_TRUE);
 	}
 }
 

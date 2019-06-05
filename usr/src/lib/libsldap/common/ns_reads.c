@@ -4293,7 +4293,7 @@ __ns_ldap_dn2uid(const char *dn,
 		(void) sprintf(errstr,
 		    gettext("Too many entries are returned for %s"), dn);
 		MKERROR(LOG_WARNING, *errorp, NS_LDAP_INTERNAL, strdup(errstr),
-		    NULL);
+		    0);
 		rc = NS_LDAP_INTERNAL;
 		goto out;
 	}

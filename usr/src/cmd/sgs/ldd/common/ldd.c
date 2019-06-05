@@ -372,14 +372,14 @@ main(int argc, char **argv, char **envp)
 			error = 1;
 			break;
 		case ELF_K_ELF:
-			if (elf_check(nfile, fname, cname, elf, fflag) != NULL)
+			if (elf_check(nfile, fname, cname, elf, fflag) != 0)
 				error = 1;
 			break;
 		default:
 			/*
 			 * This is either an unknown file or an aout format
 			 */
-			if (aout_check(nfile, fname, cname, var, fflag) != NULL)
+			if (aout_check(nfile, fname, cname, var, fflag) != 0)
 				error = 1;
 			break;
 		}
@@ -395,8 +395,8 @@ static int
 elf_check(int nfile, char *fname, char *cname, Elf *elf, int fflag)
 {
 	Conv_inv_buf_t	inv_buf;
-	GElf_Ehdr 	ehdr;
-	GElf_Phdr 	phdr;
+	GElf_Ehdr	ehdr;
+	GElf_Phdr	phdr;
 	int		dynamic = 0, interp = 0, cnt, class;
 
 	/*
