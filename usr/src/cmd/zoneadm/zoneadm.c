@@ -598,32 +598,12 @@ static int
 zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable,
     boolean_t exclude_global)
 {
-	int i;
 	zone_entry_t zent;
 	FILE *cookie;
 	struct zoneent *ze;
 
 	/*
-	 * First get the list of running zones from the kernel and print them.
-	 * If that is all we need, then return.
-	 */
-	if ((i = fetch_zents()) != Z_OK) {
-		/*
-		 * No need for error messages; fetch_zents() has already taken
-		 * care of this.
-		 */
-		return (i);
-	}
-	for (i = 0; i < nzents; i++) {
-		if (exclude_global && zents[i].zid == GLOBAL_ZONEID)
-			continue;
-		zone_print(&zents[i], verbose, parsable);
-	}
-	if (min_state >= ZONE_STATE_RUNNING)
-		return (Z_OK);
-	/*
-	 * Next, get the full list of zones from the configuration, skipping
-	 * any we have already printed.
+	 * Get the full list of zones from the configuration.
 	 */
 	cookie = setzoneent();
 	while ((ze = getzoneent_private(cookie)) != NULL) {
@@ -631,6 +611,8 @@ zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable,
 		zoneid_t zid;
 
 		zid = getzoneidbyname(name);
+		if (exclude_global && zid == GLOBAL_ZONEID)
+			continue;
 
 		if (ze->zone_brand[0] == '\0') {
 			/* old, incomplete index entry */
