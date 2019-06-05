@@ -598,6 +598,7 @@ static int
 zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable,
     boolean_t exclude_global)
 {
+	int i;
 	zone_entry_t zent;
 	FILE *cookie;
 	struct zoneent *ze;
