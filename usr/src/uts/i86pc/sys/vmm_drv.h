@@ -17,6 +17,9 @@
 #define	_VMM_DRV_H_
 
 #ifdef	_KERNEL
+
+#include <sys/file.h>
+
 struct vmm_hold;
 typedef struct vmm_hold vmm_hold_t;
 

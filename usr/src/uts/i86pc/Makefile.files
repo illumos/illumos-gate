@@ -285,7 +285,11 @@ VMM_OBJS += vmm.o \
 	vmm_support.o \
 	vmm_zsd.o
 
-VIONA_OBJS += viona.o
+VIONA_OBJS += viona_main.o \
+	viona_ring.o \
+	viona_rx.o \
+	viona_tx.o \
+	viona_hook.o \
 
 PPT_OBJS += ppt.o
 
