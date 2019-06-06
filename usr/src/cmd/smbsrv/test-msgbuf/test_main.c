@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -64,7 +65,7 @@ hexdump(const uchar_t *buf, int len)
 		idx++;
 		if ((idx & 3) == 0) {
 			*pa++ = ' ';
-			putchar(' ');
+			(void) putchar(' ');
 		}
 		if ((idx & 15) == 0) {
 			*pa = '\0';
@@ -77,7 +78,7 @@ hexdump(const uchar_t *buf, int len)
 		/* column align the last ascii row */
 		while ((idx & 15) != 0) {
 			if ((idx & 3) == 0)
-				putchar(' ');
+				(void) putchar(' ');
 			printf("   ");
 			idx++;
 		}

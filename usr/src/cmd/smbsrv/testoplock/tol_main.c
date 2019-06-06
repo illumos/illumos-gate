@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  */
 
 /*
@@ -165,9 +166,10 @@ do_open(int fid, char *arg2)
 		return;
 	}
 
-	if (arg2 != NULL)
-		strlcpy((char *)ofile->TargetOplockKey, arg2,
+	if (arg2 != NULL) {
+		(void) strlcpy((char *)ofile->TargetOplockKey, arg2,
 		    SMB_LEASE_KEY_SZ);
+	}
 
 	ofile->f_refcnt++;
 	node->n_open_count++;
@@ -397,7 +399,7 @@ main(int argc, char *argv[])
 
 	for (;;) {
 		if (prompt) {
-			fputs(prompt, stdout);
+			(void) fputs(prompt, stdout);
 			fflush(stdout);
 		}
 
@@ -409,7 +411,7 @@ main(int argc, char *argv[])
 
 		if (prompt == NULL) {
 			/* Put commands in the output too. */
-			fputs(cmdbuf, stdout);
+			(void) fputs(cmdbuf, stdout);
 		}
 		cmd = strtok_r(cmd, sep, &savep);
 		if (cmd == NULL)
@@ -419,7 +421,7 @@ main(int argc, char *argv[])
 		 * Commands with no args
 		 */
 		if (0 == strcmp(cmd, "help")) {
-			fputs(helpstr, stdout);
+			(void) fputs(helpstr, stdout);
 			continue;
 		}
 
