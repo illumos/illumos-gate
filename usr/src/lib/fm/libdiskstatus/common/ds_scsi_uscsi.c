@@ -1251,7 +1251,7 @@ uscsi_mode_sense(int fd, int page_code, int page_control, caddr_t page_data,
 	 */
 	if (hdr->length == 0) {
 		dprintf("\nMode sense page 0x%x: has header length for zero\n",
-		    hdr->length);
+		    page_code);
 		ddump("Mode sense:", mode_sense_buf, nbytes);
 		return (-1);
 	}
