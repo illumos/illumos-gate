@@ -630,8 +630,6 @@ vidc_probe(struct console *cp)
 
 	/* XXX for now, always assume we can do BIOS screen output */
 	cp->c_flags |= C_PRESENTOUT;
-	vbe_init();
-	tem = NULL;
 }
 
 static int
@@ -643,6 +641,7 @@ vidc_init(struct console *cp, int arg)
 		return (0);
 
 	vidc_started = 1;
+	vbe_init();
 
 	/*
 	 * Check Miscellaneous Output Register (Read at 3CCh, Write at 3C2h)
