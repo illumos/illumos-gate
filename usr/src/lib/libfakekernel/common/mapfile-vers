@@ -122,9 +122,9 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	kmem_zalloc;
 
 	kmutex_destroy;
-	kmutex_init;
 	kmutex_enter;
 	kmutex_exit;
+	kmutex_init;
 
 	ksema_destroy;
 	ksema_init;

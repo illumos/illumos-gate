@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _IDMAP_CONFIG_H
@@ -75,6 +75,7 @@ typedef struct idmap_trustedforest {
 
 typedef struct idmap_pg_config {
 	uint64_t	list_size_limit;
+	uint64_t	max_threads;
 	uint64_t	id_cache_timeout;
 	uint64_t	name_cache_timeout;
 	uint64_t	rediscovery_interval;
@@ -125,7 +126,7 @@ typedef struct idmap_cfg {
 } idmap_cfg_t;
 
 
-extern void 		idmap_cfg_unload(idmap_pg_config_t *);
+extern void		idmap_cfg_unload(idmap_pg_config_t *);
 extern int		idmap_cfg_load(idmap_cfg_t *, int);
 extern idmap_cfg_t	*idmap_cfg_init(void);
 extern int		idmap_cfg_fini(idmap_cfg_t *);

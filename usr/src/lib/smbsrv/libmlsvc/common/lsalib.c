@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -80,6 +80,9 @@ lsa_lookup_name(char *account, uint16_t type, smb_account_t *info)
 	char *name, *domain;
 	uint32_t status;
 	char *slash;
+
+	if (account == NULL)
+		return (NT_STATUS_NONE_MAPPED);
 
 	(void) strsubst(account, '/', '\\');
 	(void) strcanon(account, "\\");

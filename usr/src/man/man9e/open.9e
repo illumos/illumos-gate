@@ -256,7 +256,7 @@ using the user credentials pointed to by \fIcred_p\fR.
 .sp
 .LP
 When exclusive access is requested by including the \fBFEXCL\fR flag in
-\fIflag\fR or \fIoflag\fR, if the caller cannot be granted exclusive access
+\fIflag\fR or \fIoflag\fR, but the caller cannot be granted exclusive access
 to the device because it is already open, then the device driver should
 conventionally return \fBEBUSY\fR. If instead, exclusive opens are not
 supported, then the driver should return \fBENOTSUP\fR or \fBEINVAL\fR.

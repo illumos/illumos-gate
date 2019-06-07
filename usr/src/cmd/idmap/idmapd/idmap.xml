@@ -2,7 +2,7 @@
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
  Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 
  CDDL HEADER START
 
@@ -41,12 +41,12 @@
 	<single_instance />
 
 	<dependency
-		name='rpcbind' 
-		grouping='require_all' 
-		restart_on='restart' 
-		type='service'> 
-		<service_fmri value='svc:/network/rpc/bind' /> 
-	</dependency> 
+		name='rpcbind'
+		grouping='require_all'
+		restart_on='restart'
+		type='service'>
+		<service_fmri value='svc:/network/rpc/bind' />
+	</dependency>
 
 	<dependency name='filesystem-minimal'
 		grouping='require_all'
@@ -94,6 +94,10 @@
 			type='count'
 			value='0' />
 		<propval
+			name='max_threads'
+			type='count'
+			value='40' />
+		<propval
 			name='value_authorization'
 			type='astring'
 			value='solaris.smf.value.idmap' />
@@ -113,6 +117,10 @@
 			name='rediscovery_interval'
 			type='count'
 			value='3600' />
+		<propval
+			name='site_name'
+			type='astring'
+			value='' />
 		<propval
 			name='use_ads'
 			type='boolean'

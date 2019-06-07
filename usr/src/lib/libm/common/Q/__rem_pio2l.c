@@ -50,7 +50,8 @@ static const long double
 	pio4   = 0.7853981633974483096156608458198757210495L;
 
 int
-__rem_pio2l(long double x, long double *y) {
+__rem_pio2l(long double x, long double *y)
+{
 	long double z, w;
 	double t[5], v[5];
 	int e0, i, nx, n, sign;
@@ -66,19 +67,19 @@ __rem_pio2l(long double x, long double *y) {
 	e0 = ilogbl(z) - 23;
 	z = scalbnl(z, -e0);
 	for (i = 0; i < 5; i++) {
-		t[i] = (double) ((int) (z));
-		z = (z - (long double) t[i]) * two24l;
+		t[i] = (double)((int)(z));
+		z = (z - (long double)t[i]) * two24l;
 	}
 	nx = 5;
 	while (t[nx - 1] == 0.0)
 		nx--;		/* skip zero term */
 	ipio2 = _TBL_ipio2l_inf;
-	n = __rem_pio2m(t, v, e0, nx, 3, (const int *) ipio2);
-	z = (long double) v[2] + (long double) v[1];
-	w = (long double) v[0];
+	n = __rem_pio2m(t, v, e0, nx, 3, (const int *)ipio2);
+	z = (long double)v[2] + (long double)v[1];
+	w = (long double)v[0];
 	y[0] = z + w;
 	y[1] = z - (y[0] - w);
-	if (sign == 1) {
+	if (sign != 0) {
 		y[0] = -y[0];
 		y[1] = -y[1];
 		return (-n);

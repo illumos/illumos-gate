@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -907,7 +908,8 @@ winreg_s_QueryValue(void *arg, ndr_xa_t *mxa)
 
 	name = (char *)param->value_name.str;
 
-	if (strcasecmp(name, "PrimaryModule") == 0) {
+	if (name == NULL ||
+	    strcasecmp(name, "PrimaryModule") == 0) {
 		param->status = ERROR_FILE_NOT_FOUND;
 		return (NDR_DRC_OK);
 	}

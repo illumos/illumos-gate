@@ -26,6 +26,7 @@
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2018 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 Peter Tribble.
 #
 
 LIBCDIR=	$(SRC)/lib/libc
@@ -1331,7 +1332,7 @@ $(LIB_PIC): pics $$(PICS)
 # special cases
 $(STRETS:%=pics/%): $(LIBCBASE)/crt/stret.s
 	$(AS) $(ASFLAGS) -DSTRET$(@F:stret%.o=%) $(LIBCBASE)/crt/stret.s -o $@
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 $(LIBCBASE)/crt/_rtbootld.s:	$(LIBCBASE)/crt/_rtboot.s $(LIBCBASE)/crt/_rtld.c
 	$(CC) $(CPPFLAGS) $(CTF_FLAGS) -O -S $(C_PICFLAGS) \

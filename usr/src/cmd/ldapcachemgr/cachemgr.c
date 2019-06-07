@@ -21,6 +21,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2019 Nexenta Systems, Inc.
  */
 
 /*
@@ -225,13 +226,13 @@ static thread_key_t	server_key;
 static void *
 server_tsd_bind(void *arg)
 {
-	static void	*value = 0;
+	static void *value = "NON-NULL TSD";
 
 	/*
 	 * disable cancellation to prevent hangs when server
 	 * threads disappear
 	 */
-
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 	(void) thr_setspecific(server_key, value);
 	(void) door_return(NULL, 0, NULL, 0);
 
@@ -268,6 +269,7 @@ server_destroy(void *arg)
 	(void) mutex_lock(&create_lock);
 	num_servers--;
 	(void) mutex_unlock(&create_lock);
+	(void) thr_setspecific(server_key, NULL);
 }
 
 static void		client_killserver();
@@ -1198,7 +1200,7 @@ client_showstats(admin_t *ptr)
 static void
 detachfromtty(char *pgm)
 {
-	int 	status;
+	int	status;
 	pid_t	pid, wret;
 
 	(void) close(0);

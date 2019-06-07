@@ -22,8 +22,10 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Peter Tribble.
+#
 
-SYSOBJS=	 	\
+SYSOBJS=		\
 	setjmp.o	\
 	signal.o
 
@@ -35,7 +37,7 @@ BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 # sparc-specific rule
 pics/%.o: sys/%.s
 	$(BUILD.s)
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 .KEEP_STATE:
 

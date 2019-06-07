@@ -57,6 +57,7 @@ SUN4_HDRS=			\
 	nexusdebug.h		\
 	prom_debug.h		\
 	scb.h			\
+	smt.h			\
 	sun4asi.h		\
 	tod.h			\
 	trapstat.h		\

@@ -63,7 +63,7 @@
 
 static const long double
 	zero	=  0.0L,
-	tiny 	=  1.0e-40L,
+	tiny	=  1.0e-40L,
 	one	=  1.0L,
 	half	=  0.5L,
 	PI3o4	=  2.356194490192344928846982537459627163148L,
@@ -73,7 +73,8 @@ static const long double
 	PI_lo	=  8.671810130123781024797044026043351968762e-35L;
 
 long double
-atan2l(long double y, long double x) {
+atan2l(long double y, long double x)
+{
 	long double t, z;
 	int k, m, signy, signx;
 
@@ -83,7 +84,8 @@ atan2l(long double y, long double x) {
 	signx = signbitl(x);
 	if (x == one)
 		return (atanl(y));
-	m = signy + signx + signx;
+	/* Ensure sign indicators are boolean */
+	m = (signy != 0) + (signx != 0) + (signx != 0);
 
 	/* when y = 0 */
 	if (y == zero)
@@ -100,7 +102,7 @@ atan2l(long double y, long double x) {
 
 	/* when x = 0 */
 	if (x == zero)
-		return (signy == 1 ? -PIo2 - tiny : PIo2 + tiny);
+		return (signy != 0 ? -PIo2 - tiny : PIo2 + tiny);
 
 	/* when x is INF */
 	if (!finitel(x)) {
@@ -130,7 +132,7 @@ atan2l(long double y, long double x) {
 	}
 	/* when y is INF */
 	if (!finitel(y))
-		return (signy == 1 ? -PIo2 - tiny : PIo2 + tiny);
+		return (signy != 0 ? -PIo2 - tiny : PIo2 + tiny);
 
 	/* compute y/x */
 	x = fabsl(x);
@@ -156,5 +158,5 @@ atan2l(long double y, long double x) {
 		return ((z - t) - PI);	/* atan(-,-) */
 	}
 	/* NOTREACHED */
-    return 0.0L;
+	return (0.0L);
 }

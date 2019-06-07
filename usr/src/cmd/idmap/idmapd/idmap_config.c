@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -45,6 +45,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <note.h>
+#include <limits.h>
 #include "idmapd.h"
 #include "addisc.h"
 
@@ -76,6 +77,11 @@
  * (not configurable) seconds.
  */
 #define	MIN_REDISCOVERY_INTERVAL	60
+
+/*
+ * Max number of concurrent door calls
+ */
+#define	MAX_THREADS_DEFAULT	40
 
 enum event_type {
 	EVENT_NOTHING,	/* Woke up for no good reason */
@@ -1481,7 +1487,8 @@ idmap_cfg_start_updates(void)
  */
 static
 int
-valid_ldap_attr(const char *attr) {
+valid_ldap_attr(const char *attr)
+{
 	for (; *attr; attr++) {
 		if (!isalnum(*attr) && *attr != '-' &&
 		    *attr != '_' && *attr != '.' && *attr != ';')
@@ -1601,6 +1608,15 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (rc != 0)
 		(*errors)++;
 
+	rc = get_val_int(handles, "max_threads",
+	    &pgcfg->max_threads, SCF_TYPE_COUNT);
+	if (rc != 0)
+		(*errors)++;
+	if (pgcfg->max_threads == 0)
+		pgcfg->max_threads = MAX_THREADS_DEFAULT;
+	if (pgcfg->max_threads > UINT_MAX)
+		pgcfg->max_threads = UINT_MAX;
+
 	rc = get_val_int(handles, "id_cache_timeout",
 	    &pgcfg->id_cache_timeout, SCF_TYPE_COUNT);
 	if (rc != 0)
@@ -1632,9 +1648,10 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 			free(pgcfg->domain_name);
 			pgcfg->domain_name = NULL;
 		}
+		if (pgcfg->domain_name != NULL)
+			pgcfg->domain_name_auto_disc = B_FALSE;
 		(void) ad_disc_set_DomainName(handles->ad_ctx,
 		    pgcfg->domain_name);
-		pgcfg->domain_name_auto_disc = B_FALSE;
 	}
 
 	rc = get_val_astring(handles, "default_domain",
@@ -1727,16 +1744,30 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (rc != 0)
 		(*errors)++;
 	else {
+		if (pgcfg->forest_name != NULL &&
+		    pgcfg->forest_name[0] == '\0') {
+			free(pgcfg->forest_name);
+			pgcfg->forest_name = NULL;
+		}
+		if (pgcfg->forest_name != NULL)
+			pgcfg->forest_name_auto_disc = B_FALSE;
 		(void) ad_disc_set_ForestName(handles->ad_ctx,
 		    pgcfg->forest_name);
-		pgcfg->forest_name_auto_disc = B_FALSE;
 	}
 
 	rc = get_val_astring(handles, "site_name", &pgcfg->site_name);
 	if (rc != 0)
 		(*errors)++;
-	else
+	else {
+		if (pgcfg->site_name != NULL &&
+		    pgcfg->site_name[0] == '\0') {
+			free(pgcfg->site_name);
+			pgcfg->site_name = NULL;
+		}
+		if (pgcfg->site_name != NULL)
+			pgcfg->site_name_auto_disc = B_FALSE;
 		(void) ad_disc_set_SiteName(handles->ad_ctx, pgcfg->site_name);
+	}
 
 	rc = get_val_ds(handles, "global_catalog", 3268,
 	    &pgcfg->global_catalog);
@@ -2197,6 +2228,9 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	changed += update_uint64(&live_pgcfg->list_size_limit,
 	    &new_pgcfg.list_size_limit, "list_size_limit");
+
+	changed += update_uint64(&live_pgcfg->max_threads,
+	    &new_pgcfg.max_threads, "max_threads");
 
 	changed += update_uint64(&live_pgcfg->id_cache_timeout,
 	    &new_pgcfg.id_cache_timeout, "id_cache_timeout");

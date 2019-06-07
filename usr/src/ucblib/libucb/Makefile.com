@@ -22,6 +22,8 @@
 # Copyright (c) 1997, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2019 Peter Tribble.
+#
 
 LIBRARY=	libucb.a
 VERS=		.1
@@ -133,7 +135,7 @@ pics/%.o: sys/%.c
 
 pics/%.o: ../$(MACH)/sys/%.s
 	$(BUILD.s)
-	$(POST_PROCESS_O)
+	$(POST_PROCESS_S_O)
 
 #
 # Include library targets

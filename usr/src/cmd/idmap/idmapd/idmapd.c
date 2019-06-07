@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 
@@ -84,13 +84,14 @@ static uint32_t		max_threads = 40;
  * Server door thread start routine.
  *
  * Set a TSD value to the door thread. This enables the destructor to
- * be called when this thread exits.
+ * be called when this thread exits. Note that we need a non-NULL
+ * value for this or the TSD destructor is not called.
  */
 /*ARGSUSED*/
 static void *
 idmapd_door_thread_start(void *arg)
 {
-	static void *value = 0;
+	static void *value = "NON-NULL TSD";
 
 	/*
 	 * Disable cancellation to avoid memory leaks from not running
@@ -136,6 +137,8 @@ idmapd_door_thread_cleanup(void *arg)
 {
 	int num;
 
+	/* set TSD to NULL so we don't loop infinitely */
+	(void) pthread_setspecific(create_threads_key, NULL);
 	num = atomic_dec_32_nv(&num_threads);
 	idmapdlog(LOG_DEBUG,
 	    "exiting thread ID %d - %d threads currently active",
@@ -379,6 +382,13 @@ init_idmapd()
 		exit(error < -2 ? SMF_EXIT_ERR_CONFIG : 1);
 	}
 
+	/*
+	 * This means max_threads can't be updated without restarting idmap.
+	 */
+	RDLOCK_CONFIG();
+	max_threads = _idmapdstate.cfg->pgcfg.max_threads;
+	UNLOCK_CONFIG();
+
 	(void) door_server_create(idmapd_door_thread_create);
 	if ((error = pthread_key_create(&create_threads_key,
 	    idmapd_door_thread_cleanup)) != 0) {
@@ -521,7 +531,8 @@ restore_svc(void)
 
 /* printflike */
 void
-idmapdlog(int pri, const char *format, ...) {
+idmapdlog(int pri, const char *format, ...)
+{
 	static time_t prev_ts;
 	va_list args;
 	char cbuf[CBUFSIZ];

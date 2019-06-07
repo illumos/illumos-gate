@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -1002,11 +1002,11 @@ srvsvc_s_NetShareGetInfo(void *arg, ndr_xa_t *mxa)
 
 		status = srvsvc_share_getsd(mxa, &si, &sd);
 		if (status == ERROR_SUCCESS) {
-			info503->shi503_reserved = sd.sd_size;
-			info503->shi503_security_descriptor = sd.sd_buf;
+			info1501->shi1501_reserved = sd.sd_size;
+			info1501->shi1501_security_descriptor = sd.sd_buf;
 		} else {
-			info503->shi503_reserved = 0;
-			info503->shi503_security_descriptor = NULL;
+			info1501->shi1501_reserved = 0;
+			info1501->shi1501_security_descriptor = NULL;
 		}
 
 		param->result.ru.info1501 = info1501;
@@ -1622,8 +1622,8 @@ srvsvc_NetSessionEnumCommon(ndr_xa_t *mxa, srvsvc_infonres_t *info,
  * On success, the return value is NERR_Success/ERROR_SUCCESS.
  * On failure, the return value can be one of the following errors:
  *
- * ERROR_ACCESS_DENIED 		The user does not have access to the
- * 				requested information.
+ * ERROR_ACCESS_DENIED		The user does not have access to the
+ *				requested information.
  * ERROR_INVALID_PARAMETER	The specified parameter is invalid.
  * ERROR_NOT_ENOUGH_MEMORY	Insufficient memory is available.
  * NERR_ClientNameNotFound	A session does not exist with that

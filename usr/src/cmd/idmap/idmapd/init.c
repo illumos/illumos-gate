@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -357,6 +357,7 @@ print_idmapdstate(void)
 	pgcfg = &_idmapdstate.cfg->pgcfg;
 
 	idmapdlog(LOG_DEBUG, "list_size_limit=%llu", pgcfg->list_size_limit);
+	idmapdlog(LOG_DEBUG, "max_threads=%llu", pgcfg->max_threads);
 	idmapdlog(LOG_DEBUG, "default_domain=%s",
 	    CHECK_NULL(pgcfg->default_domain));
 	idmapdlog(LOG_DEBUG, "domain_name=%s", CHECK_NULL(pgcfg->domain_name));

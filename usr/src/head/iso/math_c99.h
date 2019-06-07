@@ -66,13 +66,13 @@ extern "C" {
 #undef	isnan
 #undef	isinf
 #if __GNUC__ >= 4
-#define	isnan(x)	__builtin_isnan(x)
-#define	isinf(x)	__builtin_isinf(x)
 #define	fpclassify(x)	__builtin_fpclassify(FP_NAN, FP_INFINITE, FP_NORMAL, \
     FP_SUBNORMAL, FP_ZERO, x)
-#define	isfinite(x)	__builtin_isfinite(x)
-#define	isnormal(x)	__builtin_isnormal(x)
-#define	signbit(x)	(__builtin_signbit(x) > 0)
+#define	isnan(x)	__builtin_isnan(x)
+#define	isinf(x)	__builtin_isinf(x)
+#define	isfinite(x)	(__builtin_isfinite(x) != 0)
+#define	isnormal(x)	(__builtin_isnormal(x) != 0)
+#define	signbit(x)	(__builtin_signbit(x) != 0)
 #else  /* __GNUC__ >= 4 */
 #define	isnan(x)	__extension__( \
 			{ __typeof(x) __x_n = (x); \

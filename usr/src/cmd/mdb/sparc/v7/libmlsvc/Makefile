@@ -23,35 +23,24 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
-# Copyright 2015 Gary Mills
+# Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2019 Peter Tribble.
 #
 
-MODULE = libfksmbsrv.so
+MODULE = libmlsvc.so
 MDBTGT = proc
 
-MODSRCS = smbsrv.c smbsrv_pcap.c list.c
+MODSRCS = mlsvc.c smb_ht.c
 
 include ../../../../Makefile.cmd
 include ../../Makefile.sparcv7
 include ../../../Makefile.module
 
-MODSRCS_DIR = ../../../common/modules/smbsrv
-GENUNIX_DIR = ../../../common/modules/genunix
+MODSRCS_DIR = ../../../common/modules/libmlsvc
 
-# Note: need our sys includes _before_ ENVCPPFLAGS, proto etc.
-CPPFLAGS.first += -I../../../../../lib/smbsrv/libfksmbsrv/common
-CPPFLAGS.first += -I../../../../../lib/libfakekernel/common
-
-CPPFLAGS += -I../../../../../uts/common
+# CPPFLAGS += -I$(SRC)/lib/smbsrv/libmlsvc
+CPPFLAGS += -I$(SRC)/uts/common
 
 CSTD=	$(CSTD_GNU99)
+C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
-
-dmod/%.o: $(GENUNIX_DIR)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-dmod/%.ln: $(GENUNIX_DIR)/%.c
-	$(LINT.c) -c $<

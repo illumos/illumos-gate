@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <smbsrv/smb_kproto.h>
@@ -371,6 +371,7 @@ smb_decode_sd(mbuf_chain_t *mbc, smb_sd_t *sd)
 	uint32_t group_offs;
 	uint32_t sacl_offs;
 	uint32_t dacl_offs;
+	int rc;
 
 	smb_sd_init(sd, SECURITY_DESCRIPTOR_REVISION);
 
@@ -378,12 +379,14 @@ smb_decode_sd(mbuf_chain_t *mbc, smb_sd_t *sd)
 	    mbc->chain_offset,
 	    mbc->max_bytes - mbc->chain_offset);
 
-	if (smb_mbc_decodef(&sdbuf, "b.wllll",
+	rc = smb_mbc_decodef(&sdbuf, "b.wllll",
 	    &sd->sd_revision, &sd->sd_control,
-	    &owner_offs, &group_offs, &sacl_offs, &dacl_offs))
-		goto decode_error;
+	    &owner_offs, &group_offs, &sacl_offs, &dacl_offs);
 
+	/* Prevent disallowed flags in smb_sd_term. */
 	sd->sd_control &= ~SE_SELF_RELATIVE;
+	if (rc != 0)
+		goto decode_error;
 
 	if (owner_offs != 0) {
 		if (owner_offs < SMB_SD_HDRSIZE)
