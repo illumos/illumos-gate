@@ -2024,18 +2024,27 @@ cpuid_amd_getids(cpu_t *cpu, uchar_t *features)
 	cpi->cpi_clogid = cpi->cpi_apicid & ((1 << coreidsz) - 1);
 
 	/*
-	 * The package core ID varies depending on the family. For family 17h,
-	 * we can get this directly from leaf CPUID_LEAF_EXT_1e. Otherwise, we
-	 * can use the clogid as is. When family 17h is virtualized, the clogid
-	 * should be sufficient as if we don't have valid data in the leaf, then
-	 * we won't think we have SMT, in which case the cpi_clogid should be
+	 * The package core ID varies depending on the family. While it may be
+	 * tempting to use the CPUID_LEAF_EXT_1e %ebx core id, unfortunately,
+	 * this value is the core id in the given node. For non-virtualized
+	 * family 17h, we need to take the logical core id and shift off the
+	 * threads like we do when getting the core id.  Otherwise, we can use
+	 * the clogid as is. When family 17h is virtualized, the clogid should
+	 * be sufficient as if we don't have valid data in the leaf, then we
+	 * won't think we have SMT, in which case the cpi_clogid should be
 	 * sufficient.
 	 */
 	if (cpi->cpi_family >= 0x17 &&
 	    is_x86_feature(x86_featureset, X86FSET_TOPOEXT) &&
 	    cpi->cpi_xmaxeax >= CPUID_LEAF_EXT_1e &&
 	    cpi->cpi_extd[0x1e].cp_ebx != 0) {
-		cpi->cpi_pkgcoreid = BITX(cpi->cpi_extd[0x1e].cp_ebx, 7, 0);
+		uint_t nthreads = BITX(cpi->cpi_extd[0x1e].cp_ebx, 15, 8) + 1;
+		if (nthreads > 1) {
+			VERIFY3U(nthreads, ==, 2);
+			cpi->cpi_pkgcoreid = cpi->cpi_clogid >> 1;
+		} else {
+			cpi->cpi_pkgcoreid = cpi->cpi_clogid;
+		}
 	} else {
 		cpi->cpi_pkgcoreid = cpi->cpi_clogid;
 	}
