@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _DID_PROPS_H
@@ -72,6 +72,14 @@ typedef struct txprop {
 #define	DI_AADDRPROP		"assigned-addresses"
 #define	DI_RECEPTACLE_PHYMASK	"receptacle-pm"
 #define	DI_RECEPTACLE_LABEL	"receptacle-label"
+
+#define	DI_PCIE_MAX_WIDTH	"pcie-link-maximum-width"
+#define	DI_PCIE_CUR_WIDTH	"pcie-link-current-width"
+#define	DI_PCIE_CUR_SPEED	"pcie-link-current-speed"
+#define	DI_PCIE_MAX_SPEED	"pcie-link-maximum-speed"
+#define	DI_PCIE_SUP_SPEEDS	"pcie-link-supported-speeds"
+#define	DI_PCIE_TARG_SPEED	"pcie-link-target-speed"
+#define	DI_PCIE_ADMIN_TAG	"pcie-link-admin-target-speed"
 
 extern int did_props_set(tnode_t *, did_t *, txprop_t[], int);
 extern tnode_t *find_predecessor(tnode_t *, char *);

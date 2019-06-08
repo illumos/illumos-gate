@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef	_SYS_PCIE_H
@@ -494,6 +494,11 @@ extern "C" {
 /*
  * Link Control 2 Register (2 bytes)
  */
+
+#define	PCIE_LINKCTL2_TARGET_SPEED_2_5	0x1	/* 2.5 GT/s Speed */
+#define	PCIE_LINKCTL2_TARGET_SPEED_5	0x2	/* 5.0 GT/s Speed */
+#define	PCIE_LINKCTL2_TARGET_SPEED_8	0x3	/* 8.0 GT/s Speed */
+#define	PCIE_LINKCTL2_TARGET_SPEED_16	0x4	/* 16.0 GT/s Speed */
 #define	PCIE_LINKCTL2_TARGET_SPEED_MASK	0x000f
 #define	PICE_LINKCTL2_ENTER_COMPLIANCE	0x0010
 #define	PCIE_LINKCTL2_HW_AUTO_SPEED_DIS	0x0020

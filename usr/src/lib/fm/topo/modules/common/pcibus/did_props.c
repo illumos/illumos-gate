@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <assert.h>
@@ -73,6 +73,14 @@ static int maybe_di_uint_to_dec_str(tnode_t *, did_t *,
 static int AADDR_set(tnode_t *, did_t *,
     const char *, const char *, const char *);
 static int maybe_pcidb_set(tnode_t *, did_t *,
+    const char *, const char *, const char *);
+static int maybe_di_int_to_uint32(tnode_t *, did_t *,
+    const char *, const char *, const char *);
+static int maybe_pcie_speed(tnode_t *, did_t *,
+    const char *, const char *, const char *);
+static int maybe_pcie_supported_speed(tnode_t *, did_t *,
+    const char *, const char *, const char *);
+static int maybe_pcie_target_speed(tnode_t *, did_t *,
     const char *, const char *, const char *);
 
 /*
@@ -169,7 +177,18 @@ txprop_t Fn_common_props[] = {
 txprop_t Dev_common_props[] = {
 	{ NULL, &protocol_pgroup, TOPO_PROP_LABEL, label_set },
 	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set },
-	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set }
+	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set },
+	{ DI_PCIE_MAX_WIDTH, &pci_pgroup, TOPO_PCI_MAX_WIDTH,
+	    maybe_di_int_to_uint32 },
+	{ DI_PCIE_CUR_WIDTH, &pci_pgroup, TOPO_PCI_CUR_WIDTH,
+	    maybe_di_int_to_uint32 },
+	{ DI_PCIE_MAX_SPEED, &pci_pgroup, TOPO_PCI_MAX_SPEED,
+	    maybe_pcie_speed },
+	{ DI_PCIE_CUR_SPEED, &pci_pgroup, TOPO_PCI_CUR_SPEED,
+	    maybe_pcie_speed },
+	{ DI_PCIE_SUP_SPEEDS, &pci_pgroup, TOPO_PCI_SUP_SPEED,
+	    maybe_pcie_supported_speed },
+	{ NULL, &pci_pgroup, TOPO_PCI_ADMIN_SPEED, maybe_pcie_target_speed }
 };
 
 txprop_t Bus_common_props[] = {
@@ -1054,6 +1073,97 @@ did_props_set(tnode_t *tn, did_t *pd, txprop_t txarray[], int txnum)
 			return (-1);
 		}
 		topo_mod_dprintf(mp, "succeeded.\n");
+	}
+	return (0);
+}
+
+static int
+maybe_di_int_to_uint32(tnode_t *tn, did_t *pd, const char *dpnm,
+    const char *tpgrp, const char *tpnm)
+{
+	int ret, *vals;
+
+	ret = di_prop_lookup_ints(DDI_DEV_T_ANY, did_dinode(pd), dpnm, &vals);
+	if (ret != 1) {
+		return (0);
+	}
+
+	if (topo_prop_set_uint32(tn, tpgrp, tpnm, 0, (uint32_t)*vals, &ret) !=
+	    0) {
+		return (topo_mod_seterrno(did_mod(pd), ret));
+	}
+
+	return (0);
+}
+
+static int
+maybe_pcie_speed(tnode_t *tn, did_t *pd, const char *dpnm, const char *tpgrp,
+    const char *tpnm)
+{
+	int ret;
+	int64_t *vals;
+
+	ret = di_prop_lookup_int64(DDI_DEV_T_ANY, did_dinode(pd), dpnm, &vals);
+	if (ret != 1) {
+		return (0);
+	}
+
+	if (topo_prop_set_uint64(tn, tpgrp, tpnm, 0, (uint64_t)*vals, &ret) !=
+	    0) {
+		return (topo_mod_seterrno(did_mod(pd), ret));
+	}
+	return (0);
+}
+
+static int
+maybe_pcie_supported_speed(tnode_t *tn, did_t *pd, const char *dpnm,
+    const char *tpgrp, const char *tpnm)
+{
+	int ret;
+	uint_t count;
+	int64_t *vals;
+
+	ret = di_prop_lookup_int64(DDI_DEV_T_ANY, did_dinode(pd), dpnm, &vals);
+	if (ret < 1) {
+		return (0);
+	}
+
+	count = (uint_t)ret;
+	if (topo_prop_set_uint64_array(tn, tpgrp, tpnm, 0, (uint64_t *)vals,
+	    count, &ret) != 0) {
+		return (topo_mod_seterrno(did_mod(pd), ret));
+	}
+	return (0);
+}
+
+static int
+maybe_pcie_target_speed(tnode_t *tn, did_t *pd, const char *dpnm,
+    const char *tpgrp, const char *tpnm)
+{
+	di_prop_t prop = DI_PROP_NIL;
+	boolean_t admin = B_FALSE;
+	int64_t *val = NULL;
+	int ret;
+
+	while ((prop = di_prop_next(did_dinode(pd), prop)) != DI_PROP_NIL) {
+		const char *n = di_prop_name(prop);
+
+		if (strcmp(DI_PCIE_ADMIN_TAG, n) == 0) {
+			admin = B_TRUE;
+		} else if (strcmp(DI_PCIE_TARG_SPEED, n) == 0) {
+			if (di_prop_int64(prop, &val) != 1) {
+				val = NULL;
+			}
+		}
+	}
+
+	if (!admin || val == NULL) {
+		return (0);
+	}
+
+	if (topo_prop_set_uint64(tn, tpgrp, tpnm, 0, (uint64_t)*val, &ret) !=
+	    0) {
+		return (topo_mod_seterrno(did_mod(pd), ret));
 	}
 	return (0);
 }

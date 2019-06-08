@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #ifndef _SYS_PCIEB_H
@@ -139,6 +139,7 @@ extern void *pcieb_state;
 #define	PCIEB_INTR_SRC_HP	0x1
 #define	PCIEB_INTR_SRC_PME	0x2
 #define	PCIEB_INTR_SRC_AER	0x4
+#define	PCIEB_INTR_SRC_LBW	0x8
 
 /*
  * Need to put vendor ids in a common file and not platform specific files

@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2019, Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  */
 
 #include <sys/sysmacros.h>
@@ -45,6 +45,9 @@
 #include <sys/hotplug/pci/pcishpc.h>
 #include <sys/hotplug/pci/pcicfg.h>
 #include <sys/pci_cfgacc.h>
+#include <sys/sysevent.h>
+#include <sys/sysevent/eventdefs.h>
+#include <sys/sysevent/pcie.h>
 
 /* Local functions prototypes */
 static void pcie_init_pfd(dev_info_t *);
@@ -141,12 +144,24 @@ uint32_t pcie_aer_suce_severity = PCIE_AER_SUCE_SERR_ASSERT | \
 int pcie_max_mps = PCIE_DEVCTL_MAX_PAYLOAD_4096 >> 5;
 int pcie_disable_ari = 0;
 
+/*
+ * Amount of time to wait for an in-progress retraining. The default is to try
+ * 500 times in 10ms chunks, thus a total of 5s.
+ */
+uint32_t pcie_link_retrain_count = 500;
+uint32_t pcie_link_retrain_delay_ms = 10;
+
+taskq_t *pcie_link_tq;
+kmutex_t pcie_link_tq_mutex;
+
 static void pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip,
 	int *max_supported);
 static int pcie_get_max_supported(dev_info_t *dip, void *arg);
 static int pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
     caddr_t *addrp, ddi_acc_handle_t *handlep);
 static void pcie_unmap_phys(ddi_acc_handle_t *handlep,	pci_regspec_t *ph);
+static int pcie_link_bw_intr(dev_info_t *);
+static void pcie_capture_speeds(dev_info_t *);
 
 dev_info_t *pcie_get_rc_dip(dev_info_t *dip);
 
@@ -182,8 +197,10 @@ _init(void)
 	pcie_nv_buf = kmem_alloc(ERPT_DATA_SZ, KM_SLEEP);
 	pcie_nvap = fm_nva_xcreate(pcie_nv_buf, ERPT_DATA_SZ);
 	pcie_nvl = fm_nvlist_create(pcie_nvap);
+	mutex_init(&pcie_link_tq_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	if ((rval = mod_install(&modlinkage)) != 0) {
+		mutex_destroy(&pcie_link_tq_mutex);
 		fm_nvlist_destroy(pcie_nvl, FM_NVA_RETAIN);
 		fm_nva_xdestroy(pcie_nvap);
 		kmem_free(pcie_nv_buf, ERPT_DATA_SZ);
@@ -197,6 +214,10 @@ _fini()
 	int		rval;
 
 	if ((rval = mod_remove(&modlinkage)) == 0) {
+		if (pcie_link_tq != NULL) {
+			taskq_destroy(pcie_link_tq);
+		}
+		mutex_destroy(&pcie_link_tq_mutex);
 		fm_nvlist_destroy(pcie_nvl, FM_NVA_RETAIN);
 		fm_nva_xdestroy(pcie_nvap);
 		kmem_free(pcie_nv_buf, ERPT_DATA_SZ);
@@ -215,6 +236,18 @@ int
 pcie_init(dev_info_t *dip, caddr_t arg)
 {
 	int	ret = DDI_SUCCESS;
+
+	/*
+	 * Our _init function is too early to create a taskq. Create the pcie
+	 * link management taskq here now instead.
+	 */
+	mutex_enter(&pcie_link_tq_mutex);
+	if (pcie_link_tq == NULL) {
+		pcie_link_tq = taskq_create("pcie_link", 1, minclsyspri, 0, 0,
+		    0);
+	}
+	mutex_exit(&pcie_link_tq_mutex);
+
 
 	/*
 	 * Create a "devctl" minor node to support DEVCTL_DEVICE_*
@@ -270,6 +303,10 @@ pcie_uninit(dev_info_t *dip)
 		return (ret);
 	}
 
+	if (pcie_link_bw_supported(dip)) {
+		(void) pcie_link_bw_disable(dip);
+	}
+
 	ddi_remove_minor_node(dip, "devctl");
 
 	return (ret);
@@ -319,7 +356,16 @@ pcie_hpintr_disable(dev_info_t *dip)
 int
 pcie_intr(dev_info_t *dip)
 {
-	return (pcie_hp_intr(dip));
+	int hp, lbw;
+
+	hp = pcie_hp_intr(dip);
+	lbw = pcie_link_bw_intr(dip);
+
+	if (hp == DDI_INTR_CLAIMED || lbw == DDI_INTR_CLAIMED) {
+		return (DDI_INTR_CLAIMED);
+	}
+
+	return (DDI_INTR_UNCLAIMED);
 }
 
 /* ARGSUSED */
@@ -657,6 +703,8 @@ pcie_initchild(dev_info_t *cdip)
 		pcie_enable_errors(cdip);
 
 		pcie_determine_serial(cdip);
+
+		pcie_capture_speeds(cdip);
 	}
 
 	bus_p->bus_ari = B_FALSE;
@@ -939,6 +987,120 @@ pcie_rc_fini_bus(dev_info_t *dip)
 	kmem_free(bus_p, sizeof (pcie_bus_t));
 }
 
+static int
+pcie_width_to_int(pcie_link_width_t width)
+{
+	switch (width) {
+	case PCIE_LINK_WIDTH_X1:
+		return (1);
+	case PCIE_LINK_WIDTH_X2:
+		return (2);
+	case PCIE_LINK_WIDTH_X4:
+		return (4);
+	case PCIE_LINK_WIDTH_X8:
+		return (8);
+	case PCIE_LINK_WIDTH_X12:
+		return (12);
+	case PCIE_LINK_WIDTH_X16:
+		return (16);
+	case PCIE_LINK_WIDTH_X32:
+		return (32);
+	default:
+		return (0);
+	}
+}
+
+/*
+ * Return the speed in Transfers / second. This is a signed quantity to match
+ * the ndi/ddi property interfaces.
+ */
+static int64_t
+pcie_speed_to_int(pcie_link_speed_t speed)
+{
+	switch (speed) {
+	case PCIE_LINK_SPEED_2_5:
+		return (2500000000LL);
+	case PCIE_LINK_SPEED_5:
+		return (5000000000LL);
+	case PCIE_LINK_SPEED_8:
+		return (8000000000LL);
+	case PCIE_LINK_SPEED_16:
+		return (16000000000LL);
+	default:
+		return (0);
+	}
+}
+
+/*
+ * Translate the recorded speed information into devinfo properties.
+ */
+static void
+pcie_speeds_to_devinfo(dev_info_t *dip, pcie_bus_t *bus_p)
+{
+	if (bus_p->bus_max_width != PCIE_LINK_WIDTH_UNKNOWN) {
+		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "pcie-link-maximum-width",
+		    pcie_width_to_int(bus_p->bus_max_width));
+	}
+
+	if (bus_p->bus_cur_width != PCIE_LINK_WIDTH_UNKNOWN) {
+		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "pcie-link-current-width",
+		    pcie_width_to_int(bus_p->bus_cur_width));
+	}
+
+	if (bus_p->bus_cur_speed != PCIE_LINK_SPEED_UNKNOWN) {
+		(void) ndi_prop_update_int64(DDI_DEV_T_NONE, dip,
+		    "pcie-link-current-speed",
+		    pcie_speed_to_int(bus_p->bus_cur_speed));
+	}
+
+	if (bus_p->bus_max_speed != PCIE_LINK_SPEED_UNKNOWN) {
+		(void) ndi_prop_update_int64(DDI_DEV_T_NONE, dip,
+		    "pcie-link-maximum-speed",
+		    pcie_speed_to_int(bus_p->bus_max_speed));
+	}
+
+	if (bus_p->bus_target_speed != PCIE_LINK_SPEED_UNKNOWN) {
+		(void) ndi_prop_update_int64(DDI_DEV_T_NONE, dip,
+		    "pcie-link-target-speed",
+		    pcie_speed_to_int(bus_p->bus_target_speed));
+	}
+
+	if ((bus_p->bus_speed_flags & PCIE_LINK_F_ADMIN_TARGET) != 0) {
+		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
+		    "pcie-link-admin-target-speed");
+	}
+
+	if (bus_p->bus_sup_speed != PCIE_LINK_SPEED_UNKNOWN) {
+		int64_t speeds[4];
+		uint_t nspeeds = 0;
+
+		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_2_5) {
+			speeds[nspeeds++] =
+			    pcie_speed_to_int(PCIE_LINK_SPEED_2_5);
+		}
+
+		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_5) {
+			speeds[nspeeds++] =
+			    pcie_speed_to_int(PCIE_LINK_SPEED_5);
+		}
+
+		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_8) {
+			speeds[nspeeds++] =
+			    pcie_speed_to_int(PCIE_LINK_SPEED_8);
+		}
+
+		if (bus_p->bus_sup_speed & PCIE_LINK_SPEED_16) {
+			speeds[nspeeds++] =
+			    pcie_speed_to_int(PCIE_LINK_SPEED_16);
+		}
+
+		(void) ndi_prop_update_int64_array(DDI_DEV_T_NONE, dip,
+		    "pcie-link-supported-speeds", speeds, nspeeds);
+	}
+}
+
 /*
  * We need to capture the supported, maximum, and current device speed and
  * width. The way that this has been done has changed over time.
@@ -952,18 +1114,20 @@ pcie_rc_fini_bus(dev_info_t *dip)
  * Now, a device may not implement some of these registers. To determine whether
  * or not it's here, we have to do the following. First, we need to check the
  * revision of the PCI express capability. The link capabilities 2 register did
- * not exist prior to version 2 of this register.
+ * not exist prior to version 2 of this capability. If a modern device does not
+ * implement it, it is supposed to return zero for the register.
  */
 static void
-pcie_capture_speeds(pcie_bus_t *bus_p, pcie_req_id_t bdf, dev_info_t *rcdip)
+pcie_capture_speeds(dev_info_t *dip)
 {
 	uint16_t	vers, status;
-	uint32_t	val, cap, cap2;
+	uint32_t	cap, cap2, ctl2;
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
 
 	if (!PCIE_IS_PCIE(bus_p))
 		return;
 
-	vers = pci_cfgacc_get16(rcdip, bdf, bus_p->bus_pcie_off + PCIE_PCIECAP);
+	vers = PCIE_CAP_GET(16, bus_p, PCIE_PCIECAP);
 	if (vers == PCI_EINVAL16)
 		return;
 	vers &= PCIE_PCIECAP_VER_MASK;
@@ -974,23 +1138,27 @@ pcie_capture_speeds(pcie_bus_t *bus_p, pcie_req_id_t bdf, dev_info_t *rcdip)
 	switch (vers) {
 	case PCIE_PCIECAP_VER_1_0:
 		cap2 = 0;
+		ctl2 = 0;
 		break;
 	case PCIE_PCIECAP_VER_2_0:
-		cap2 = pci_cfgacc_get32(rcdip, bdf, bus_p->bus_pcie_off +
-		    PCIE_LINKCAP2);
+		cap2 = PCIE_CAP_GET(32, bus_p, PCIE_LINKCAP2);
 		if (cap2 == PCI_EINVAL32)
 			cap2 = 0;
+		ctl2 = PCIE_CAP_GET(16, bus_p, PCIE_LINKCTL2);
+		if (ctl2 == PCI_EINVAL16)
+			ctl2 = 0;
 		break;
 	default:
 		/* Don't try and handle an unknown version */
 		return;
 	}
 
-	status = pci_cfgacc_get16(rcdip, bdf, bus_p->bus_pcie_off +
-	    PCIE_LINKSTS);
-	cap = pci_cfgacc_get32(rcdip, bdf, bus_p->bus_pcie_off + PCIE_LINKCAP);
+	status = PCIE_CAP_GET(16, bus_p, PCIE_LINKSTS);
+	cap = PCIE_CAP_GET(32, bus_p, PCIE_LINKCAP);
 	if (status == PCI_EINVAL16 || cap == PCI_EINVAL32)
 		return;
+
+	mutex_enter(&bus_p->bus_speed_mutex);
 
 	switch (status & PCIE_LINKSTS_SPEED_MASK) {
 	case PCIE_LINKSTS_SPEED_2_5:
@@ -1104,13 +1272,32 @@ pcie_capture_speeds(pcie_bus_t *bus_p, pcie_req_id_t bdf, dev_info_t *rcdip)
 			bus_p->bus_max_speed = PCIE_LINK_SPEED_5;
 			bus_p->bus_sup_speed = PCIE_LINK_SPEED_2_5 |
 			    PCIE_LINK_SPEED_5;
-		}
-
-		if (cap & PCIE_LINKCAP_MAX_SPEED_2_5) {
+		} else if (cap & PCIE_LINKCAP_MAX_SPEED_2_5) {
 			bus_p->bus_max_speed = PCIE_LINK_SPEED_2_5;
 			bus_p->bus_sup_speed = PCIE_LINK_SPEED_2_5;
 		}
 	}
+
+	switch (ctl2 & PCIE_LINKCTL2_TARGET_SPEED_MASK) {
+	case PCIE_LINKCTL2_TARGET_SPEED_2_5:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_2_5;
+		break;
+	case PCIE_LINKCTL2_TARGET_SPEED_5:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_5;
+		break;
+	case PCIE_LINKCTL2_TARGET_SPEED_8:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_8;
+		break;
+	case PCIE_LINKCTL2_TARGET_SPEED_16:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_16;
+		break;
+	default:
+		bus_p->bus_target_speed = PCIE_LINK_SPEED_UNKNOWN;
+		break;
+	}
+
+	pcie_speeds_to_devinfo(dip, bus_p);
+	mutex_exit(&bus_p->bus_speed_mutex);
 }
 
 /*
@@ -1186,7 +1373,7 @@ pcie_init_bus(dev_info_t *dip, pcie_req_id_t bdf, uint8_t flags)
 	uint16_t	status, base, baseptr, num_cap;
 	uint32_t	capid;
 	int		range_size;
-	pcie_bus_t	*bus_p;
+	pcie_bus_t	*bus_p = NULL;
 	dev_info_t	*rcdip;
 	dev_info_t	*pdip;
 	const char	*errstr = NULL;
@@ -1406,15 +1593,15 @@ initial_done:
 
 	pcie_init_plat(dip);
 
-	pcie_capture_speeds(bus_p, bdf, rcdip);
-
 final_done:
 
 	PCIE_DBG("Add %s(dip 0x%p, bdf 0x%x, secbus 0x%x)\n",
 	    ddi_driver_name(dip), (void *)dip, bus_p->bus_bdf,
 	    bus_p->bus_bdg_secbus);
 #ifdef DEBUG
-	pcie_print_bus(bus_p);
+	if (bus_p != NULL) {
+		pcie_print_bus(bus_p);
+	}
 #endif
 
 	return (bus_p);
@@ -2640,3 +2827,337 @@ pcie_check_io_mem_range(ddi_acc_handle_t cfg_hdl, boolean_t *empty_io_range,
 }
 
 #endif /* defined(__i386) || defined(__amd64) */
+
+boolean_t
+pcie_link_bw_supported(dev_info_t *dip)
+{
+	uint32_t linkcap;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+
+	if (!PCIE_IS_PCIE(bus_p)) {
+		return (B_FALSE);
+	}
+
+	if (!PCIE_IS_RP(bus_p) && !PCIE_IS_SWD(bus_p)) {
+		return (B_FALSE);
+	}
+
+	linkcap = PCIE_CAP_GET(32, bus_p, PCIE_LINKCAP);
+	return ((linkcap & PCIE_LINKCAP_LINK_BW_NOTIFY_CAP) != 0);
+}
+
+int
+pcie_link_bw_enable(dev_info_t *dip)
+{
+	uint16_t linkctl;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+
+	if (!pcie_link_bw_supported(dip)) {
+		return (DDI_FAILURE);
+	}
+
+	mutex_init(&bus_p->bus_lbw_mutex, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&bus_p->bus_lbw_cv, NULL, CV_DRIVER, NULL);
+	linkctl = PCIE_CAP_GET(16, bus_p, PCIE_LINKCTL);
+	linkctl |= PCIE_LINKCTL_LINK_BW_INTR_EN;
+	linkctl |= PCIE_LINKCTL_LINK_AUTO_BW_INTR_EN;
+	PCIE_CAP_PUT(16, bus_p, PCIE_LINKCTL, linkctl);
+
+	bus_p->bus_lbw_pbuf = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	bus_p->bus_lbw_cbuf = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	bus_p->bus_lbw_state |= PCIE_LBW_S_ENABLED;
+
+	return (DDI_SUCCESS);
+}
+
+int
+pcie_link_bw_disable(dev_info_t *dip)
+{
+	uint16_t linkctl;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+
+	if ((bus_p->bus_lbw_state & PCIE_LBW_S_ENABLED) == 0) {
+		return (DDI_FAILURE);
+	}
+
+	mutex_enter(&bus_p->bus_lbw_mutex);
+	while ((bus_p->bus_lbw_state &
+	    (PCIE_LBW_S_DISPATCHED | PCIE_LBW_S_RUNNING)) != 0) {
+		cv_wait(&bus_p->bus_lbw_cv, &bus_p->bus_lbw_mutex);
+	}
+	mutex_exit(&bus_p->bus_lbw_mutex);
+
+	linkctl = PCIE_CAP_GET(16, bus_p, PCIE_LINKCTL);
+	linkctl &= ~PCIE_LINKCTL_LINK_BW_INTR_EN;
+	linkctl &= ~PCIE_LINKCTL_LINK_AUTO_BW_INTR_EN;
+	PCIE_CAP_PUT(16, bus_p, PCIE_LINKCTL, linkctl);
+
+	bus_p->bus_lbw_state &= ~PCIE_LBW_S_ENABLED;
+	kmem_free(bus_p->bus_lbw_pbuf, MAXPATHLEN);
+	kmem_free(bus_p->bus_lbw_cbuf, MAXPATHLEN);
+	bus_p->bus_lbw_pbuf = NULL;
+	bus_p->bus_lbw_cbuf = NULL;
+
+	mutex_destroy(&bus_p->bus_lbw_mutex);
+	cv_destroy(&bus_p->bus_lbw_cv);
+
+	return (DDI_SUCCESS);
+}
+
+void
+pcie_link_bw_taskq(void *arg)
+{
+	dev_info_t *dip = arg;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+	dev_info_t *cdip;
+	boolean_t again;
+	sysevent_t *se;
+	sysevent_value_t se_val;
+	sysevent_id_t eid;
+	sysevent_attr_list_t *ev_attr_list;
+	int circular;
+
+top:
+	ndi_devi_enter(dip, &circular);
+	se = NULL;
+	ev_attr_list = NULL;
+	mutex_enter(&bus_p->bus_lbw_mutex);
+	bus_p->bus_lbw_state &= ~PCIE_LBW_S_DISPATCHED;
+	bus_p->bus_lbw_state |= PCIE_LBW_S_RUNNING;
+	mutex_exit(&bus_p->bus_lbw_mutex);
+
+	/*
+	 * Update our own speeds as we've likely changed something.
+	 */
+	pcie_capture_speeds(dip);
+
+	/*
+	 * Walk our children. We only care about updating this on function 0
+	 * because the PCIe specification requires that these all be the same
+	 * otherwise.
+	 */
+	for (cdip = ddi_get_child(dip); cdip != NULL;
+	    cdip = ddi_get_next_sibling(cdip)) {
+		pcie_bus_t *cbus_p = PCIE_DIP2BUS(cdip);
+
+		if (cbus_p == NULL) {
+			continue;
+		}
+
+		if ((cbus_p->bus_bdf & PCIE_REQ_ID_FUNC_MASK) != 0) {
+			continue;
+		}
+
+		/*
+		 * It's possible that this can fire while a child is otherwise
+		 * only partially constructed. Therefore, if we don't have the
+		 * config handle, don't bother updating the child.
+		 */
+		if (cbus_p->bus_cfg_hdl == NULL) {
+			continue;
+		}
+
+		pcie_capture_speeds(cdip);
+		break;
+	}
+
+	se = sysevent_alloc(EC_PCIE, ESC_PCIE_LINK_STATE,
+	    ILLUMOS_KERN_PUB "pcie", SE_SLEEP);
+
+	(void) ddi_pathname(dip, bus_p->bus_lbw_pbuf);
+	se_val.value_type = SE_DATA_TYPE_STRING;
+	se_val.value.sv_string = bus_p->bus_lbw_pbuf;
+	if (sysevent_add_attr(&ev_attr_list, PCIE_EV_DETECTOR_PATH, &se_val,
+	    SE_SLEEP) != 0) {
+		ndi_devi_exit(dip, circular);
+		goto err;
+	}
+
+	if (cdip != NULL) {
+		(void) ddi_pathname(cdip, bus_p->bus_lbw_cbuf);
+
+		se_val.value_type = SE_DATA_TYPE_STRING;
+		se_val.value.sv_string = bus_p->bus_lbw_cbuf;
+
+		/*
+		 * If this fails, that's OK. We'd rather get the event off and
+		 * there's a chance that there may not be anything there for us.
+		 */
+		(void) sysevent_add_attr(&ev_attr_list, PCIE_EV_CHILD_PATH,
+		    &se_val, SE_SLEEP);
+	}
+
+	ndi_devi_exit(dip, circular);
+
+	/*
+	 * Before we generate and send down a sysevent, we need to tell the
+	 * system that parts of the devinfo cache need to be invalidated. While
+	 * the function below takes several args, it ignores them all. Because
+	 * this is a global invalidation, we don't bother trying to do much more
+	 * than requesting a global invalidation, lest we accidentally kick off
+	 * several in a row.
+	 */
+	ddi_prop_cache_invalidate(DDI_DEV_T_NONE, NULL, NULL, 0);
+
+	if (sysevent_attach_attributes(se, ev_attr_list) != 0) {
+		goto err;
+	}
+	ev_attr_list = NULL;
+
+	if (log_sysevent(se, SE_SLEEP, &eid) != 0) {
+		goto err;
+	}
+
+err:
+	sysevent_free_attr(ev_attr_list);
+	sysevent_free(se);
+
+	mutex_enter(&bus_p->bus_lbw_mutex);
+	bus_p->bus_lbw_state &= ~PCIE_LBW_S_RUNNING;
+	cv_broadcast(&bus_p->bus_lbw_cv);
+	again = (bus_p->bus_lbw_state & PCIE_LBW_S_DISPATCHED) != 0;
+	mutex_exit(&bus_p->bus_lbw_mutex);
+
+	if (again) {
+		goto top;
+	}
+}
+
+int
+pcie_link_bw_intr(dev_info_t *dip)
+{
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+	uint16_t linksts;
+	uint16_t flags = PCIE_LINKSTS_LINK_BW_MGMT | PCIE_LINKSTS_AUTO_BW;
+	dev_info_t *cdip;
+	sysevent_t *se = NULL;
+	sysevent_value_t se_val;
+	sysevent_id_t eid;
+	sysevent_attr_list_t *ev_attr_list = NULL;
+
+	if ((bus_p->bus_lbw_state & PCIE_LBW_S_ENABLED) == 0) {
+		return (DDI_INTR_UNCLAIMED);
+	}
+
+	linksts = PCIE_CAP_GET(16, bus_p, PCIE_LINKSTS);
+	if ((linksts & flags) == 0) {
+		return (DDI_INTR_UNCLAIMED);
+	}
+
+	/*
+	 * Check if we've already dispatched this event. If we have already
+	 * dispatched it, then there's nothing else to do, we coalesce multiple
+	 * events.
+	 */
+	mutex_enter(&bus_p->bus_lbw_mutex);
+	bus_p->bus_lbw_nevents++;
+	if ((bus_p->bus_lbw_state & PCIE_LBW_S_DISPATCHED) == 0) {
+		if ((bus_p->bus_lbw_state & PCIE_LBW_S_RUNNING) == 0) {
+			taskq_dispatch_ent(pcie_link_tq, pcie_link_bw_taskq,
+			    dip, 0, &bus_p->bus_lbw_ent);
+		}
+
+		bus_p->bus_lbw_state |= PCIE_LBW_S_DISPATCHED;
+	}
+	mutex_exit(&bus_p->bus_lbw_mutex);
+
+	PCIE_CAP_PUT(16, bus_p, PCIE_LINKSTS, flags);
+	return (DDI_INTR_CLAIMED);
+}
+
+int
+pcie_link_set_target(dev_info_t *dip, pcie_link_speed_t speed)
+{
+	uint16_t ctl2, rval;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+
+	if (!PCIE_IS_PCIE(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	if (!PCIE_IS_RP(bus_p) && !PCIE_IS_SWD(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	switch (speed) {
+	case PCIE_LINK_SPEED_2_5:
+		rval = PCIE_LINKCTL2_TARGET_SPEED_2_5;
+		break;
+	case PCIE_LINK_SPEED_5:
+		rval = PCIE_LINKCTL2_TARGET_SPEED_5;
+		break;
+	case PCIE_LINK_SPEED_8:
+		rval = PCIE_LINKCTL2_TARGET_SPEED_8;
+		break;
+	case PCIE_LINK_SPEED_16:
+		rval = PCIE_LINKCTL2_TARGET_SPEED_16;
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	mutex_enter(&bus_p->bus_speed_mutex);
+	bus_p->bus_target_speed = speed;
+	bus_p->bus_speed_flags |= PCIE_LINK_F_ADMIN_TARGET;
+
+	ctl2 = PCIE_CAP_GET(16, bus_p, PCIE_LINKCTL2);
+	ctl2 &= ~PCIE_LINKCTL2_TARGET_SPEED_MASK;
+	ctl2 |= rval;
+	PCIE_CAP_PUT(16, bus_p, PCIE_LINKCTL2, ctl2);
+	mutex_exit(&bus_p->bus_speed_mutex);
+
+	/*
+	 * Make sure our updates have been reflected in devinfo.
+	 */
+	pcie_capture_speeds(dip);
+
+	return (0);
+}
+
+int
+pcie_link_retrain(dev_info_t *dip)
+{
+	uint16_t ctl;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+
+	if (!PCIE_IS_PCIE(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	if (!PCIE_IS_RP(bus_p) && !PCIE_IS_SWD(bus_p)) {
+		return (ENOTSUP);
+	}
+
+	/*
+	 * The PCIe specification suggests that we make sure that the link isn't
+	 * in training before issuing this command in case there was a state
+	 * machine transition prior to when we got here. We wait and then go
+	 * ahead and issue the command anyways.
+	 */
+	for (uint32_t i = 0; i < pcie_link_retrain_count; i++) {
+		uint16_t sts;
+
+		sts = PCIE_CAP_GET(16, bus_p, PCIE_LINKSTS);
+		if ((sts & PCIE_LINKSTS_LINK_TRAINING) == 0)
+			break;
+		delay(drv_usectohz(pcie_link_retrain_delay_ms * 1000));
+	}
+
+	ctl = PCIE_CAP_GET(16, bus_p, PCIE_LINKCTL);
+	ctl |= PCIE_LINKCTL_RETRAIN_LINK;
+	PCIE_CAP_PUT(16, bus_p, PCIE_LINKCTL, ctl);
+
+	/*
+	 * Wait again to see if it clears before returning to the user.
+	 */
+	for (uint32_t i = 0; i < pcie_link_retrain_count; i++) {
+		uint16_t sts;
+
+		sts = PCIE_CAP_GET(16, bus_p, PCIE_LINKSTS);
+		if ((sts & PCIE_LINKSTS_LINK_TRAINING) == 0)
+			break;
+		delay(drv_usectohz(pcie_link_retrain_delay_ms * 1000));
+	}
+
+	return (0);
+}
