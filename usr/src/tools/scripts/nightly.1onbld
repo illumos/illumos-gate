@@ -18,8 +18,9 @@
 .\" "
 .\" "Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
 .\" "Copyright 2012 Joshua M. Clulow <josh@sysmgr.org>
+.\" "Copyright 2019 Peter Tribble.
 .\" "
-.TH NIGHTLY 1ONBLD "Jul 2, 2017"
+.TH NIGHTLY 1ONBLD "Jun 9, 2019"
 .SH NAME
 .I nightly
 \- build an OS-Net consolidation overnight
@@ -67,9 +68,6 @@ copy updated proto area to parent
 .TP
 \(bu
 list shared lib interface and compare with previous list
-.TP
-\(bu
-perform a "make lint" of the kernel and report errors
 .TP
 \(bu
 perform a "make check" to report hdrchk/cstyle errors
@@ -136,8 +134,7 @@ Do not run pmodes (safe file permission checker)
 .B \-i
 Do an incremental build, suppressing the "make clobber" that by
 default removes all existing binaries and derived files.  From the
-command line, -i also suppresses the lint pass and the cstyle/hdrchk
-pass
+command line, -i also suppresses the cstyle/hdrchk pass
 .TP
 .B \-n
 Suppress the bringover so that the build will start immediately with
@@ -190,13 +187,10 @@ Check for cstyle/hdrchk errors
 .B \-f
 Check for unreferenced files.  Since the full workspace must be built
 in order to accurately identify unreferenced files, -f is ignored for
-incremental (-i) builds, or builds that do not include -l, and -p.
+incremental (-i) builds, or builds that do not include -p.
 .TP
 .B \-r
 Check the ELF runtime attributes of all dynamic objects
-.TP
-.B \-l
-Do "make lint" in $LINTDIRS (default: $SRC n)
 .TP
 .B \-N
 Do not run protocmp or checkpaths (note: this option is not
@@ -390,11 +384,6 @@ Set default flags to make; e.g., -k to build all targets regardless of errors.
 .RS 5
 Disables usage reporting by listed Devpro tools. Otherwise it sends mail
 to some Devpro machine every time the tools are used.
-.RE
-.LP
-.B LINTDIRS
-.RS 5
-Directories to lint with the \-l option.
 .RE
 .LP
 .B BUILD_TOOLS
