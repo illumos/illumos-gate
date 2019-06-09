@@ -46,14 +46,6 @@ $(sparc_ONLY)dir path=platform/SUNW,A70/kernel/crypto/$(ARCH64) group=sys
 $(sparc_ONLY)dir path=platform/SUNW,A70/kernel/drv group=sys
 $(sparc_ONLY)dir path=platform/SUNW,A70/kernel/misc group=sys
 $(sparc_ONLY)dir path=platform/SUNW,A70/kernel/misc/$(ARCH64) group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300 group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/misc group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/misc/$(ARCH64) \
-    group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/tod group=sys
-$(sparc_ONLY)dir path=platform/SUNW,Netra-CP2300/kernel/tod/$(ARCH64) \
-    group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010 group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/kernel group=sys
 $(sparc_ONLY)dir path=platform/SUNW,Netra-CP3010/kernel/crypto group=sys
@@ -341,7 +333,6 @@ $(i386_ONLY)driver name=balloon perms="* 0444 root sys"
 $(sparc_ONLY)driver name=bbc_beep alias=SUNW,bbc-beep
 $(sparc_ONLY)driver name=central
 $(i386_ONLY)driver name=cpudrv alias=cpu
-$(sparc_ONLY)driver name=ctsmc alias=nct-ds80ch11-smc
 $(sparc_ONLY)driver name=db21554 \
     alias=pci108e,6300 \
     alias=pci108e,6301 \
@@ -523,12 +514,6 @@ $(sparc_ONLY)driver name=zsh perms="* 0666 root sys"
 $(sparc_ONLY)file path=platform/SUNW,A70/kernel/drv/ppm.conf group=sys
 $(sparc_ONLY)file path=platform/SUNW,A70/kernel/misc/$(ARCH64)/platmod \
     group=sys mode=0755
-$(sparc_ONLY)file \
-    path=platform/SUNW,Netra-CP2300/kernel/misc/$(ARCH64)/platmod group=sys \
-    mode=0755
-$(sparc_ONLY)file \
-    path=platform/SUNW,Netra-CP2300/kernel/tod/$(ARCH64)/todds1307 group=sys \
-    mode=0755
 $(sparc_ONLY)file \
     path=platform/SUNW,Netra-CP3010/kernel/misc/$(ARCH64)/platmod group=sys \
     mode=0755
@@ -851,7 +836,6 @@ $(sparc_ONLY)file path=platform/sun4u/kernel/crypto/$(ARCH64)/sha1 group=sys \
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/adm1026 group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/adm1031 group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/bbc_beep group=sys
-$(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/ctsmc group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/db21554 group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/ebus group=sys
 $(sparc_ONLY)file path=platform/sun4u/kernel/drv/$(ARCH64)/epic group=sys
@@ -1002,7 +986,6 @@ $(sparc_ONLY)file path=platform/sun4v/kernel/misc/$(ARCH64)/vis group=sys \
 $(sparc_ONLY)file path=usr/share/man/man4/sbus.4
 $(i386_ONLY)file path=usr/share/man/man4/sysbus.4
 $(sparc_ONLY)file path=usr/share/man/man7d/bbc_beep.7d
-$(sparc_ONLY)file path=usr/share/man/man7d/ctsmc.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/dr.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/fd.7d
 $(sparc_ONLY)file path=usr/share/man/man7d/gpio_87317.7d

@@ -12,6 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2016 Nexenta Systems, Inc.
+# Copyright 2019 Peter Tribble.
 # Copyright 2019 Joyent, Inc.
 #
 
@@ -45,7 +46,6 @@ file path=usr/share/man/man7d/st.7d
 file path=usr/share/man/man7d/sysmsg.7d
 file path=usr/share/man/man7d/ticlts.7d
 file path=usr/share/man/man7d/tty.7d
-file path=usr/share/man/man7d/ttymux.7d
 file path=usr/share/man/man7d/tzmon.7d
 file path=usr/share/man/man7d/ufm.7d
 file path=usr/share/man/man7d/virtualkm.7d

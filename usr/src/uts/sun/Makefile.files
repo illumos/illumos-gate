@@ -22,6 +22,7 @@
 #
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Peter Tribble.
 #
 # uts/sun/Makefile.files
 #
@@ -67,17 +68,11 @@ DADA_OBJS +=	dcd_hba.o       dcd_transport.o \
 
 SSD_OBJS +=	sd.o sd_xbuf.o
 
-WSDRV_OBJS += 	wsdrv.o
+WSDRV_OBJS +=	wsdrv.o
 
 ZS_OBJS +=	zs_async.o	zs_common.o
 
 ZSH_OBJS +=	zs_hdlc.o
-
-#
-#			streams modules
-#
-
-TTYMUX_OBJS +=	ttymux.o ttymux_ioctl.o
 
 #
 #	Section 3:	Misc.

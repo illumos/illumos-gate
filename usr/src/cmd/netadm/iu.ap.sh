@@ -20,6 +20,7 @@
 # CDDL HEADER END
 #
 #
+# Copyright 2019 Peter Tribble.
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -72,7 +73,6 @@ case "$MACH" in
 	usbsprl -1	0	ldterm ttcompat
 	usbsksp -1	0	ldterm ttcompat
 	usbftdi	-1	0	ldterm ttcompat
-	ttymux	-1	0	ldterm ttcompat
 	ipsecesp -1	0	ipsecesp
 	ipsecah	-1	0	ipsecah
 	oplmsu	0	0	ldterm ttcompat
