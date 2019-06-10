@@ -470,7 +470,7 @@ smb_delete_check_dosattr(smb_request_t *sr, smb_error_t *err)
 static int
 smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 {
-	int rc, count;
+	int rc;
 	uint32_t status;
 	smb_fqi_t *fqi;
 	smb_node_t *node;
@@ -484,28 +484,22 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 	 * has a file open, this will force a flush or close,
 	 * which may affect the outcome of any share checking.
 	 */
-	(void) smb_oplock_break(sr, node,
-	    SMB_OPLOCK_BREAK_TO_LEVEL_II | SMB_OPLOCK_BREAK_BATCH);
-
-	/*
-	 * Wait (a little) for the oplock break to be
-	 * responded to by clients closing handles.
-	 * Hold node->n_lock as reader to keep new
-	 * ofiles from showing up after we check.
-	 */
-	smb_node_rdlock(node);
-	for (count = 0; count <= 12; count++) {
-		status = smb_node_delete_check(node);
-		if (status != NT_STATUS_SHARING_VIOLATION)
-			break;
-		smb_node_unlock(node);
-		delay(MSEC_TO_TICK(100));
-		smb_node_rdlock(node);
+	status = smb_oplock_break_DELETE(node, NULL);
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		(void) smb_oplock_wait_break(node, 0);
+		status = 0;
 	}
+	if (status != 0) {
+		err->status = status;
+		return (-1);
+	}
+
+	smb_node_rdlock(node);
+	status = smb_node_delete_check(node);
 	if (status != NT_STATUS_SUCCESS) {
+		smb_node_unlock(node);
 		smb_delete_error(err, NT_STATUS_SHARING_VIOLATION,
 		    ERRDOS, ERROR_SHARING_VIOLATION);
-		smb_node_unlock(node);
 		return (-1);
 	}
 
@@ -544,18 +538,12 @@ smb_delete_remove_file(smb_request_t *sr, smb_error_t *err)
 	rc = smb_fsop_remove(sr, sr->user_cr, node->n_dnode,
 	    node->od_name, flags);
 	if (rc != 0) {
-		if (rc == ENOENT)
-			smb_delete_error(err, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-		else
-			smbsr_map_errno(rc, err);
-
-		smb_node_end_crit(node);
-		return (-1);
+		smbsr_map_errno(rc, err);
+		rc = -1;
 	}
 
 	smb_node_end_crit(node);
-	return (0);
+	return (rc);
 }
 
 

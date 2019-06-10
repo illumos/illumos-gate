@@ -528,8 +528,8 @@ smb_common_write(smb_request_t *sr, smb_rw_param_t *param)
 		 */
 		ofile->f_written = B_TRUE;
 
-		if (!smb_node_is_dir(node))
-			smb_oplock_break_levelII(node);
+		/* This revokes read cache delegations. */
+		(void) smb_oplock_break_WRITE(node, ofile);
 
 		param->rw_count = lcount;
 		break;

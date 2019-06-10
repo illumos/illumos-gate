@@ -243,7 +243,7 @@ smb_com_open(smb_request_t *sr)
 {
 	struct open_param *op = &sr->arg.open;
 	smb_ofile_t *of;
-	smb_attr_t attr;
+	uint32_t mtime_sec;
 	uint32_t status;
 	uint16_t file_attr;
 	int rc;
@@ -265,17 +265,24 @@ smb_com_open(smb_request_t *sr)
 	} else {
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 	}
-	op->op_oplock_levelII = B_FALSE;
 
 	if (smb_open_dsize_check && op->dsize > UINT_MAX) {
 		smbsr_error(sr, 0, ERRDOS, ERRbadaccess);
 		return (SDRC_ERROR);
 	}
 
+	/*
+	 * The real open call.   Note: this gets attributes into
+	 * op->fqi.fq_fattr (SMB_AT_ALL).  We need those below.
+	 */
 	status = smb_common_open(sr);
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
+	if (op->op_oplock_level != SMB_OPLOCK_NONE) {
+		/* Oplock req. in op->op_oplock_level etc. */
+		smb1_oplock_acquire(sr, B_FALSE);
 	}
 
 	/*
@@ -291,19 +298,14 @@ smb_com_open(smb_request_t *sr)
 	}
 
 	file_attr = op->dattr & FILE_ATTRIBUTE_MASK;
-	bzero(&attr, sizeof (attr));
-	attr.sa_mask = SMB_AT_MTIME;
-	rc = smb_node_getattr(sr, of->f_node, of->f_cr, of, &attr);
-	if (rc != 0) {
-		smbsr_errno(sr, rc);
-		goto errout;
-	}
+	mtime_sec = smb_time_gmt_to_local(sr,
+	    op->fqi.fq_fattr.sa_vattr.va_mtime.tv_sec);
 
 	rc = smbsr_encode_result(sr, 7, 0, "bwwllww",
 	    7,
 	    sr->smb_fid,
 	    file_attr,
-	    smb_time_gmt_to_local(sr, attr.sa_vattr.va_mtime.tv_sec),
+	    mtime_sec,
 	    (uint32_t)op->dsize,
 	    op->omode,
 	    (uint16_t)0);	/* bcc */
@@ -311,7 +313,6 @@ smb_com_open(smb_request_t *sr)
 	if (rc == 0)
 		return (SDRC_SUCCESS);
 
-errout:
 	smb_ofile_close(of, 0);
 	return (SDRC_ERROR);
 }
@@ -349,10 +350,10 @@ smb_pre_open_andx(smb_request_t *sr)
 		 * The openx_flags use some "extended" flags that
 		 * happen to match some of the NtCreateX flags.
 		 */
-		if (openx_flags & NT_CREATE_FLAG_REQUEST_OPLOCK)
-			op->op_oplock_level = SMB_OPLOCK_EXCLUSIVE;
-		else if (openx_flags & NT_CREATE_FLAG_REQUEST_OPBATCH)
+		if (openx_flags & NT_CREATE_FLAG_REQUEST_OPBATCH)
 			op->op_oplock_level = SMB_OPLOCK_BATCH;
+		else if (openx_flags & NT_CREATE_FLAG_REQUEST_OPLOCK)
+			op->op_oplock_level = SMB_OPLOCK_EXCLUSIVE;
 		else
 			op->op_oplock_level = SMB_OPLOCK_NONE;
 		if (openx_flags & NT_CREATE_FLAG_EXTENDED_RESPONSE)
@@ -401,8 +402,6 @@ smb_com_open_andx(smb_request_t *sr)
 	if (op->omode & SMB_DA_WRITE_THROUGH)
 		op->create_options |= FILE_WRITE_THROUGH;
 
-	op->op_oplock_levelII = B_FALSE;
-
 	if (smb_open_dsize_check && op->dsize > UINT_MAX) {
 		smbsr_error(sr, 0, ERRDOS, ERRbadaccess);
 		return (SDRC_ERROR);
@@ -412,6 +411,10 @@ smb_com_open_andx(smb_request_t *sr)
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
+	if (op->op_oplock_level != SMB_OPLOCK_NONE) {
+		/* Oplock req. in op->op_oplock_level etc. */
+		smb1_oplock_acquire(sr, B_FALSE);
 	}
 
 	/*
@@ -563,12 +566,15 @@ smb_com_trans2_open2(smb_request_t *sr, smb_xa_t *xa)
 	} else {
 		op->op_oplock_level = SMB_OPLOCK_NONE;
 	}
-	op->op_oplock_levelII = B_FALSE;
 
 	status = smb_common_open(sr);
 	if (status != NT_STATUS_SUCCESS) {
 		smbsr_status(sr, status, 0, 0);
 		return (SDRC_ERROR);
+	}
+	if (op->op_oplock_level != SMB_OPLOCK_NONE) {
+		/* Oplock req. in op->op_oplock_level etc. */
+		smb1_oplock_acquire(sr, B_FALSE);
 	}
 
 	if (op->op_oplock_level != SMB_OPLOCK_NONE)

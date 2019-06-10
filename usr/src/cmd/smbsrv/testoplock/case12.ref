@@ -1,0 +1,54 @@
+open 1 1
+ open 1 OK
+req 1 0x807
+ req oplock fid=1 ret oplock=0x807 status=0x0 (SUCCESS)
+show
+ ol_state=0x17 ( EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=1 Lease=1 OgState=0x807 Brk=0x0 Excl=Y onlist:   
+open 2
+ open 2 OK
+brk-open 2
+*smb_oplock_ind_break fid=1 NewLevel=0x3, AckReq=1, ComplStatus=0x0 (SUCCESS)
+ brk-open 2 ret status=0x108 (OPLOCK_BREAK_IN_PROGRESS)
+waiters 2 1
+ waiters 0 -> 1
+show
+ ol_state=0x30017 ( BREAK_TO_HANDLE_CACHING BREAK_TO_READ_CACHING EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=1 OgState=0x807 Brk=0x30000 Excl=Y onlist:   
+  fid=2 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+open 3
+ open 3 OK
+brk-open 3 4
+ brk-open 3 ret status=0x108 (OPLOCK_BREAK_IN_PROGRESS)
+waiters 3 2
+ waiters 1 -> 2
+show
+ ol_state=0x80017 ( BREAK_TO_NO_CACHING EXCLUSIVE WRITE_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=Y (FID=1) cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=3
+  fid=1 Lease=1 OgState=0x807 Brk=0x30000 Excl=Y onlist:   
+  fid=2 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=3 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+ack 1 0x803
+*smb_oplock_ind_break fid=1 NewLevel=0x0, AckReq=1, ComplStatus=0x8000002e (CANNOT_GRANT_REQUESTED_OPLOCK)
+ ack: break fid=1, newstate=0x803, status=0x0 (SUCCESS)
+show
+ ol_state=0x80003 ( BREAK_TO_NO_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=1
+ ofile_cnt=3
+  fid=1 Lease=1 OgState=0x803 Brk=0x80000 Excl=N onlist:    RHBQ(to none)
+  fid=2 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=3 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+ack 1 0x800
+ ack: break fid=1, newstate=0x800, status=0x0 (SUCCESS)
+show
+ ol_state=0x10000000 ( NO_OPLOCK )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=3
+  fid=1 Lease=1 OgState=0x800 Brk=0x0 Excl=N onlist:   
+  fid=2 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=3 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   

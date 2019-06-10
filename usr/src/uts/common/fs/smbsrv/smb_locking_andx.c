@@ -248,11 +248,11 @@ smb_com_locking_andx(smb_request_t *sr)
 	unsigned short	unlock_num;	/* # unlock range structs */
 	unsigned short	lock_num;	/* # lock range structs */
 	DWORD		result;
-	int 		rc;
+	int		rc;
 	uint32_t	ltype;
+	uint32_t	status;
 	smb_ofile_t	*ofile;
 	uint16_t	tmp_pid;	/* locking uses 16-bit pids */
-	uint8_t		brk;
 	uint32_t	lrv_tot;
 	struct lreq	*lrv_ul;
 	struct lreq	*lrv_lk;
@@ -288,11 +288,16 @@ smb_com_locking_andx(smb_request_t *sr)
 		ltype = SMB_LOCK_TYPE_READWRITE;
 
 	if (lock_type & LOCKING_ANDX_OPLOCK_RELEASE) {
+		uint32_t NewLevel;
 		if (oplock_level == 0)
-			brk = SMB_OPLOCK_BREAK_TO_NONE;
+			NewLevel = OPLOCK_LEVEL_NONE;
 		else
-			brk = SMB_OPLOCK_BREAK_TO_LEVEL_II;
-		smb_oplock_ack(ofile->f_node, ofile, brk);
+			NewLevel = OPLOCK_LEVEL_TWO;
+		status = smb_oplock_ack_break(sr, ofile, &NewLevel);
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+			(void) smb_oplock_wait_break(ofile->f_node, 0);
+			status = 0;
+		}
 		if (unlock_num == 0 && lock_num == 0)
 			return (SDRC_NO_REPLY);
 	}
@@ -415,21 +420,25 @@ out:
  * The caller will send it and free the request.
  */
 void
-smb1_oplock_break_notification(smb_request_t *sr, uint8_t brk)
+smb1_oplock_break_notification(smb_request_t *sr, uint32_t NewLevel)
 {
 	smb_ofile_t *ofile = sr->fid_ofile;
 	uint16_t fid;
 	uint8_t lock_type;
 	uint8_t oplock_level;
 
-	switch (brk) {
+	/*
+	 * Convert internal level to SMB1
+	 */
+	switch (NewLevel) {
 	default:
 		ASSERT(0);
 		/* FALLTHROUGH */
-	case SMB_OPLOCK_BREAK_TO_NONE:
+	case OPLOCK_LEVEL_NONE:
 		oplock_level = 0;
 		break;
-	case SMB_OPLOCK_BREAK_TO_LEVEL_II:
+
+	case OPLOCK_LEVEL_TWO:
 		oplock_level = 1;
 		break;
 	}

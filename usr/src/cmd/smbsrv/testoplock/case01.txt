@@ -1,0 +1,10 @@
+# Input for testoplock, case 01
+open 1
+req 1
+show
+brk-open 2
+show
+ack 1
+open 2
+req 2 0x100
+show

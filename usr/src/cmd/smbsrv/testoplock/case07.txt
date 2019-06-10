@@ -1,0 +1,8 @@
+# Input for testoplock, case 07
+# Modeled after smbtorture smb2.lease.upgrade
+open 1 3
+req 1 0x803
+show
+open 2 3
+req 2 0x807
+show

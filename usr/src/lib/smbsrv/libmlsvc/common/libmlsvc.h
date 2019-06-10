@@ -50,6 +50,16 @@
 #include <smbsrv/smb_dfs.h>
 #include <smbsrv/libsmb.h>
 
+/*
+ * XXX: Some temporary left-overs from the old ntstatus.h
+ * Should eliminate uses of these macros when convenient.
+ */
+/* This used to OR in the severity bits. */
+#define	NT_SC_ERROR(S)		(S)
+/* This used to mask off the severity bits. */
+#define	NT_SC_VALUE(S)		(S)
+/* XXX end of temporary left-overs. */
+
 #ifdef	__cplusplus
 extern "C" {
 #endif

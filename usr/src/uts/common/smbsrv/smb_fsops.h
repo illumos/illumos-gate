@@ -22,7 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #ifndef _SMBSRV_SMB_FSOPS_H
@@ -123,6 +123,7 @@ int smb_fsop_frlock(smb_node_t *, smb_lock_t *, boolean_t, cred_t *);
 #define	SMB_CATIA		0x00000004
 #define	SMB_ABE			0x00000008
 #define	SMB_CASE_SENSITIVE	0x00000010
+#define	SMB_EDIRENT		0x00000020
 
 /*
  * Increased MAXPATHLEN for SMB.  Essentially, we want to allow a

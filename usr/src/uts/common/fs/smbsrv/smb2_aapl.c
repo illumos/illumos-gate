@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -39,6 +39,8 @@ uint64_t smb2_aapl_server_caps =
  * kAAPL_UNIX_BASED flag.  Later we might set this flag and return
  * modes only when we have a trivial ACL.
  */
+
+uint64_t smb2_aapl_volume_caps = kAAPL_SUPPORTS_FULL_SYNC;
 
 /*
  * Normally suppress file IDs for MacOS because it
@@ -130,7 +132,7 @@ smb2_aapl_srv_query(smb_request_t *sr,
 		(void) smb_mbc_encodef(mbcout, "q", server_caps);
 	}
 	if ((server_bitmap & kAAPL_VOLUME_CAPS) != 0) {
-		(void) smb_mbc_encodef(mbcout, "q", 0);
+		(void) smb_mbc_encodef(mbcout, "q", smb2_aapl_volume_caps);
 	}
 
 	/* Pad2, null model string. */

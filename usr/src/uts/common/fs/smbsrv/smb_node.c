@@ -99,7 +99,6 @@
 #include <fs/fs_reparse.h>
 
 uint32_t smb_is_executable(char *);
-static void smb_node_delete_on_close(smb_node_t *);
 static void smb_node_create_audit_buf(smb_node_t *, int);
 static void smb_node_destroy_audit_buf(smb_node_t *);
 static void smb_node_audit(smb_node_t *);
@@ -190,6 +189,7 @@ smb_node_fini(void)
 
 #ifdef DEBUG
 	for (i = 0; i <= SMBND_HASH_MASK; i++) {
+		smb_llist_t	*bucket;
 		smb_node_t	*node;
 
 		/*
@@ -205,8 +205,13 @@ smb_node_fini(void)
 		 * smb_node_lookup() and smb_node_release(). You must track that
 		 * down.
 		 */
-		node = smb_llist_head(&smb_node_hash_table[i]);
-		ASSERT(node == NULL);
+		bucket = &smb_node_hash_table[i];
+		node = smb_llist_head(bucket);
+		while (node != NULL) {
+			cmn_err(CE_NOTE, "leaked node: 0x%p %s",
+			    (void *)node, node->od_name);
+			node = smb_llist_next(bucket, node);
+		}
 	}
 #endif
 
@@ -482,7 +487,9 @@ smb_node_release(smb_node_t *node)
 			/*
 			 * Check if the file was deleted
 			 */
-			smb_node_delete_on_close(node);
+			if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
+				smb_node_delete_on_close(node);
+			}
 
 			if (node->n_dnode) {
 				ASSERT(node->n_dnode->n_magic ==
@@ -507,7 +514,7 @@ smb_node_release(smb_node_t *node)
 	mutex_exit(&node->n_mutex);
 }
 
-static void
+void
 smb_node_delete_on_close(smb_node_t *node)
 {
 	smb_node_t	*d_snode;
@@ -515,19 +522,23 @@ smb_node_delete_on_close(smb_node_t *node)
 	uint32_t	flags = 0;
 
 	d_snode = node->n_dnode;
-	if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
-		node->flags &= ~NODE_FLAGS_DELETE_ON_CLOSE;
-		flags = node->n_delete_on_close_flags;
-		ASSERT(node->od_name != NULL);
 
-		if (smb_node_is_dir(node))
-			rc = smb_fsop_rmdir(0, node->delete_on_close_cred,
-			    d_snode, node->od_name, flags);
-		else
-			rc = smb_fsop_remove(0, node->delete_on_close_cred,
-			    d_snode, node->od_name, flags);
-		crfree(node->delete_on_close_cred);
-	}
+	ASSERT((node->flags & NODE_FLAGS_DELETE_ON_CLOSE) != 0);
+
+	node->flags &= ~NODE_FLAGS_DELETE_ON_CLOSE;
+	node->flags |= NODE_FLAGS_DELETE_COMMITTED;
+	flags = node->n_delete_on_close_flags;
+	ASSERT(node->od_name != NULL);
+
+	if (smb_node_is_dir(node))
+		rc = smb_fsop_rmdir(0, node->delete_on_close_cred,
+		    d_snode, node->od_name, flags);
+	else
+		rc = smb_fsop_remove(0, node->delete_on_close_cred,
+		    d_snode, node->od_name, flags);
+	crfree(node->delete_on_close_cred);
+	node->delete_on_close_cred = NULL;
+
 	if (rc != 0)
 		cmn_err(CE_WARN, "File %s could not be removed, rc=%d\n",
 		    node->od_name, rc);
@@ -600,40 +611,47 @@ smb_node_root_init(smb_server_t *sv, smb_node_t **svrootp)
  * and check for anything other than "." or ".." in the readdir buf.
  */
 static uint32_t
-smb_rmdir_possible(smb_node_t *n, uint32_t flags)
+smb_rmdir_possible(smb_node_t *n)
 {
 	ASSERT(n->vp->v_type == VDIR);
-	char buf[512]; /* Only large enough to see if the dir is empty. */
-	int eof, bsize = sizeof (buf), reclen = 0;
-	char *name;
-	boolean_t edp = vfs_has_feature(n->vp->v_vfsp, VFSFT_DIRENTFLAGS);
+	char *buf;
+	char *bufptr;
+	struct dirent64	*dp;
+	uint32_t status = NT_STATUS_SUCCESS;
+	int bsize = SMB_ODIR_BUFSIZE;
+	int eof = 0;
 
-	union {
-		char		*u_bufptr;
-		struct edirent	*u_edp;
-		struct dirent64	*u_dp;
-	} u;
-#define	bufptr	u.u_bufptr
-#define	extdp	u.u_edp
-#define	dp	u.u_dp
+	buf = kmem_alloc(SMB_ODIR_BUFSIZE, KM_SLEEP);
 
-	if (smb_vop_readdir(n->vp, 0, buf, &bsize, &eof, flags, zone_kcred()))
-		return (NT_STATUS_INTERNAL_ERROR);
-	if (bsize == 0)
-		return (0); /* empty dir */
-	bufptr = buf;
-	while ((bufptr += reclen) < buf + bsize) {
-		if (edp) {
-			reclen = extdp->ed_reclen;
-			name = extdp->ed_name;
-		} else {
-			reclen = dp->d_reclen;
-			name = dp->d_name;
-		}
-		if (strcmp(name, ".") != 0 && strcmp(name, "..") != 0)
-			return (NT_STATUS_DIRECTORY_NOT_EMPTY);
+	/* Flags zero: no edirent, no ABE wanted here */
+	if (smb_vop_readdir(n->vp, 0, buf, &bsize, &eof, 0, zone_kcred())) {
+		status = NT_STATUS_INTERNAL_ERROR;
+		goto out;
 	}
-	return (0);
+
+	bufptr = buf;
+	while (bsize > 0) {
+		/* LINTED pointer alignment */
+		dp = (struct dirent64 *)bufptr;
+
+		bufptr += dp->d_reclen;
+		bsize  -= dp->d_reclen;
+		if (bsize < 0) {
+			/* partial record */
+			status = NT_STATUS_DIRECTORY_NOT_EMPTY;
+			break;
+		}
+
+		if (strcmp(dp->d_name, ".") != 0 &&
+		    strcmp(dp->d_name, "..") != 0) {
+			status = NT_STATUS_DIRECTORY_NOT_EMPTY;
+			break;
+		}
+	}
+
+out:
+	kmem_free(buf, SMB_ODIR_BUFSIZE);
+	return (status);
 }
 
 /*
@@ -661,7 +679,7 @@ smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 	 * "File System Behavior Overview" doc section 4.3.2
 	 */
 	if (smb_node_is_dir(node)) {
-		status = smb_rmdir_possible(node, flags);
+		status = smb_rmdir_possible(node);
 		if (status != 0) {
 			return (status);
 		}
@@ -733,6 +751,10 @@ smb_node_open_check(smb_node_t *node, uint32_t desired_access,
 			break;
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
+			DTRACE_PROBE3(conflict3,
+			    smb_ofile_t, of,
+			    uint32_t, desired_access,
+			    uint32_t, share_access);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
@@ -765,6 +787,7 @@ smb_node_rename_check(smb_node_t *node)
 			break;
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
+			DTRACE_PROBE1(conflict1, smb_ofile_t, of);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
@@ -802,6 +825,7 @@ smb_node_delete_check(smb_node_t *node)
 			break;
 		default:
 			ASSERT(status == NT_STATUS_SHARING_VIOLATION);
+			DTRACE_PROBE1(conflict1, smb_ofile_t, of);
 			smb_llist_exit(&node->n_ofile_list);
 			return (status);
 		}
@@ -1160,7 +1184,6 @@ smb_node_alloc(
 	node->n_refcnt = 1;
 	node->n_hash_bucket = bucket;
 	node->n_hashkey = hashkey;
-	node->n_pending_dosattr = 0;
 	node->n_open_count = 0;
 	node->n_allocsz = 0;
 	node->n_dnode = NULL;
@@ -1168,9 +1191,6 @@ smb_node_alloc(
 	node->delete_on_close_cred = NULL;
 	node->n_delete_on_close_flags = 0;
 	node->n_oplock.ol_fem = B_FALSE;
-	node->n_oplock.ol_xthread = NULL;
-	node->n_oplock.ol_count = 0;
-	node->n_oplock.ol_break = SMB_OPLOCK_NO_BREAK;
 
 	(void) strlcpy(node->od_name, od_name, sizeof (node->od_name));
 	if (strcmp(od_name, XATTR_DIR) == 0)
@@ -1201,8 +1221,6 @@ smb_node_free(smb_node_t *node)
 	VERIFY(node->n_lock_list.ll_count == 0);
 	VERIFY(node->n_wlock_list.ll_count == 0);
 	VERIFY(node->n_ofile_list.ll_count == 0);
-	VERIFY(node->n_oplock.ol_count == 0);
-	VERIFY(node->n_oplock.ol_xthread == NULL);
 	VERIFY(node->n_oplock.ol_fem == B_FALSE);
 	VERIFY(MUTEX_NOT_HELD(&node->n_mutex));
 	VERIFY(!RW_LOCK_HELD(&node->n_lock));
@@ -1223,15 +1241,13 @@ smb_node_constructor(void *buf, void *un, int kmflags)
 	bzero(node, sizeof (smb_node_t));
 
 	smb_llist_constructor(&node->n_ofile_list, sizeof (smb_ofile_t),
-	    offsetof(smb_ofile_t, f_nnd));
+	    offsetof(smb_ofile_t, f_node_lnd));
 	smb_llist_constructor(&node->n_lock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
 	smb_llist_constructor(&node->n_wlock_list, sizeof (smb_lock_t),
 	    offsetof(smb_lock_t, l_lnd));
-	cv_init(&node->n_oplock.ol_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&node->n_oplock.ol_mutex, NULL, MUTEX_DEFAULT, NULL);
-	list_create(&node->n_oplock.ol_grants, sizeof (smb_oplock_grant_t),
-	    offsetof(smb_oplock_grant_t, og_lnd));
+	cv_init(&node->n_oplock.WaitingOpenCV, NULL, CV_DEFAULT, NULL);
 	rw_init(&node->n_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&node->n_mutex, NULL, MUTEX_DEFAULT, NULL);
 	smb_node_create_audit_buf(node, kmflags);
@@ -1251,12 +1267,11 @@ smb_node_destructor(void *buf, void *un)
 	smb_node_destroy_audit_buf(node);
 	mutex_destroy(&node->n_mutex);
 	rw_destroy(&node->n_lock);
-	cv_destroy(&node->n_oplock.ol_cv);
+	cv_destroy(&node->n_oplock.WaitingOpenCV);
 	mutex_destroy(&node->n_oplock.ol_mutex);
 	smb_llist_destructor(&node->n_lock_list);
 	smb_llist_destructor(&node->n_wlock_list);
 	smb_llist_destructor(&node->n_ofile_list);
-	list_destroy(&node->n_oplock.ol_grants);
 }
 
 /*
@@ -1382,9 +1397,9 @@ smb_node_is_system(smb_node_t *node)
  * smb_node_file_is_readonly
  *
  * Checks if the file (which node represents) is marked readonly
- * in the filesystem. No account is taken of any pending readonly
- * in the node, which must be handled by the callers.
- * (See SMB_OFILE_IS_READONLY and SMB_PATHFILE_IS_READONLY)
+ * in the filesystem.  Note that there may be handles open with
+ * modify rights, and those continue to allow access even after
+ * the DOS read-only flag has been set in the file system.
  */
 boolean_t
 smb_node_file_is_readonly(smb_node_t *node)
@@ -1393,9 +1408,6 @@ smb_node_file_is_readonly(smb_node_t *node)
 
 	if (node == NULL)
 		return (B_FALSE);	/* pipes */
-
-	if (node->n_pending_dosattr & FILE_ATTRIBUTE_READONLY)
-		return (B_TRUE);
 
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_DOSATTR;
@@ -1568,40 +1580,18 @@ smb_node_setattr(smb_request_t *sr, smb_node_t *node,
 		 */
 	}
 
-	/*
-	 * After this point, tmp_attr is what we will actually
-	 * store in the file system _now_, which may differ
-	 * from the callers attr and f_pending_attr w.r.t.
-	 * the DOS readonly flag etc.
-	 */
-	bcopy(attr, &tmp_attr, sizeof (tmp_attr));
-	if (attr->sa_mask & (SMB_AT_DOSATTR | SMB_AT_ALLOCSZ)) {
+	if ((attr->sa_mask & SMB_AT_ALLOCSZ) != 0) {
 		mutex_enter(&node->n_mutex);
-		if ((attr->sa_mask & SMB_AT_DOSATTR) != 0) {
-			tmp_attr.sa_dosattr &= smb_vop_dosattr_settable;
-			if (((tmp_attr.sa_dosattr &
-			    FILE_ATTRIBUTE_READONLY) != 0) &&
-			    (node->n_open_count != 0)) {
-				/* Delay setting readonly */
-				node->n_pending_dosattr =
-				    tmp_attr.sa_dosattr;
-				tmp_attr.sa_dosattr &=
-				    ~FILE_ATTRIBUTE_READONLY;
-			} else {
-				node->n_pending_dosattr = 0;
-			}
-		}
 		/*
 		 * Simulate n_allocsz persistence only while
 		 * there are opens.  See smb_node_getattr
 		 */
-		if ((attr->sa_mask & SMB_AT_ALLOCSZ) != 0 &&
-		    node->n_open_count != 0)
+		if (node->n_open_count != 0)
 			node->n_allocsz = attr->sa_allocsz;
 		mutex_exit(&node->n_mutex);
 	}
 
-	rc = smb_fsop_setattr(sr, cr, node, &tmp_attr);
+	rc = smb_fsop_setattr(sr, cr, node, attr);
 	if (rc != 0)
 		return (rc);
 
@@ -1650,21 +1640,7 @@ smb_node_getattr(smb_request_t *sr, smb_node_t *node, cred_t *cr,
 
 	mutex_enter(&node->n_mutex);
 
-	/*
-	 * When there are open handles, and one of them has
-	 * set the DOS readonly flag (in n_pending_dosattr),
-	 * it will not have been stored in the file system.
-	 * In this case use n_pending_dosattr. Note that
-	 * n_pending_dosattr has only the settable bits,
-	 * (setattr masks it with smb_vop_dosattr_settable)
-	 * so we need to keep any non-settable bits we got
-	 * from the file-system above.
-	 */
 	if (attr->sa_mask & SMB_AT_DOSATTR) {
-		if (node->n_pending_dosattr) {
-			attr->sa_dosattr &= ~smb_vop_dosattr_settable;
-			attr->sa_dosattr |= node->n_pending_dosattr;
-		}
 		if (attr->sa_dosattr == 0) {
 			attr->sa_dosattr = (isdir) ?
 			    FILE_ATTRIBUTE_DIRECTORY:

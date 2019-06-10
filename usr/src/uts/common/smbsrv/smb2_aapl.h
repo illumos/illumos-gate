@@ -22,8 +22,8 @@
  */
 
 /*
- * This content was published as: smb-759.0/kernel/netsmb/smb_2.h
- * in http://opensource.apple.com/source/smb/smb-759.0.tar.gz
+ * This file contains excerpts of content published under:
+ * http://opensource.apple.com/source/smb/smb-759.40.1.1
  */
 
 #ifndef	_SMB2AAPL_H
@@ -111,8 +111,20 @@ enum {
 /* Define Volume Capabilities bitmap */
 enum {
 	kAAPL_SUPPORT_RESOLVE_ID = 0x01,
-	kAAPL_CASE_SENSITIVE = 0x02
+	kAAPL_CASE_SENSITIVE = 0x02,
+	kAAPL_SUPPORTS_FULL_SYNC = 0x04
 };
+
+/*
+ * kAAPL_SUPPORTS_FULL_SYNC - Full Sync Request
+ * If the volume supports Full Sync, then when a F_FULLSYNC is done on the
+ * client side, the client will flush its buffers and then a SMB Flush Request
+ * with Reserved1 (uint16_t) set to 0xFFFF will be sent to the server. The
+ * server should flush all its buffer for that file and then call the
+ * filesystem to perform a F_FULLSYNC on that file.
+ * Refer to "man fsync" and "man fcntl" in OS X for more information on
+ * F_FULLSYNC
+ */
 
 /*
  * Resolve ID Request

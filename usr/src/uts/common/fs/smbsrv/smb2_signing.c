@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * These routines provide the SMB MAC signing for the SMB2 server.
@@ -48,6 +48,41 @@
 #define	SMB2_SIG_OFFS	48
 #define	SMB2_SIG_SIZE	16
 
+typedef struct mac_ops {
+	int (*mac_init)(smb_sign_ctx_t *, smb_sign_mech_t *,
+			uint8_t *, size_t);
+	int (*mac_update)(smb_sign_ctx_t, uint8_t *, size_t);
+	int (*mac_final)(smb_sign_ctx_t, uint8_t *);
+} mac_ops_t;
+
+static int smb2_sign_calc_common(smb_request_t *, struct mbuf_chain *,
+    uint8_t *, mac_ops_t *);
+
+static int smb3_do_kdf(void *, void *, size_t, uint8_t *, uint32_t);
+
+/*
+ * SMB2 wrapper functions
+ */
+
+static mac_ops_t
+smb2_sign_ops = {
+	smb2_hmac_init,
+	smb2_hmac_update,
+	smb2_hmac_final
+};
+
+static int
+smb2_sign_calc(smb_request_t *sr,
+    struct mbuf_chain *mbc,
+    uint8_t *digest16)
+{
+	int rv;
+
+	rv = smb2_sign_calc_common(sr, mbc, digest16, &smb2_sign_ops);
+
+	return (rv);
+}
+
 /*
  * Called during session destroy.
  */
@@ -63,20 +98,84 @@ smb2_sign_fini(smb_session_t *s)
 }
 
 /*
+ * SMB3 wrapper functions
+ */
+
+static struct mac_ops
+smb3_sign_ops = {
+	smb3_cmac_init,
+	smb3_cmac_update,
+	smb3_cmac_final
+};
+
+static int
+smb3_sign_calc(smb_request_t *sr,
+    struct mbuf_chain *mbc,
+    uint8_t *digest16)
+{
+	int rv;
+
+	rv = smb2_sign_calc_common(sr, mbc, digest16, &smb3_sign_ops);
+
+	return (rv);
+}
+
+/*
+ * Input to KDF for SigningKey.
+ * See comment for smb3_do_kdf for content.
+ */
+static uint8_t sign_kdf_input[29] = {
+	0, 0, 0, 1, 'S', 'M', 'B', '2',
+	'A', 'E', 'S', 'C', 'M', 'A', 'C', 0,
+	0, 'S', 'm', 'b', 'S', 'i', 'g', 'n',
+	0, 0, 0, 0, 0x80 };
+
+void
+smb2_sign_init_mech(smb_session_t *s)
+{
+	smb_sign_mech_t *mech;
+	int (*get_mech)(smb_sign_mech_t *);
+	int (*sign_calc)(smb_request_t *, struct mbuf_chain *, uint8_t *);
+	int rc;
+
+	if (s->sign_mech != NULL)
+		return;
+
+	if (s->dialect >= SMB_VERS_3_0) {
+		get_mech = smb3_cmac_getmech;
+		sign_calc = smb3_sign_calc;
+	} else {
+		get_mech = smb2_hmac_getmech;
+		sign_calc = smb2_sign_calc;
+	}
+
+	mech = kmem_zalloc(sizeof (*mech), KM_SLEEP);
+	rc = get_mech(mech);
+	if (rc != 0) {
+		kmem_free(mech, sizeof (*mech));
+		return;
+	}
+	s->sign_mech = mech;
+	s->sign_calc = sign_calc;
+	s->sign_fini = smb2_sign_fini;
+}
+
+/*
  * smb2_sign_begin
+ * Handles both SMB2 & SMB3
  *
  * Get the mechanism info.
  * Intializes MAC key based on the user session key and store it in
  * the signing structure.  This begins signing on this session.
  */
-int
+void
 smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
 {
 	smb_session_t *s = sr->session;
 	smb_user_t *u = sr->uid_user;
 	struct smb_key *sign_key = &u->u_sign_key;
-	smb_sign_mech_t *mech;
-	int rc;
+
+	sign_key->len = 0;
 
 	/*
 	 * We should normally have a session key here because
@@ -84,41 +183,36 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
 	 * However, buggy clients could get us here without a
 	 * session key, in which case we'll fail later when a
 	 * request that requires signing can't be checked.
+	 * Also, don't bother initializing if we don't have a mechanism.
 	 */
-	if (token->tkn_ssnkey.val == NULL || token->tkn_ssnkey.len == 0)
-		return (0);
-
-	/*
-	 * Session-level initialization (once per session)
-	 * Get mech handle, sign_fini function.
-	 */
-	smb_rwx_rwenter(&s->s_lock, RW_WRITER);
-	if (s->sign_mech == NULL) {
-		mech = kmem_zalloc(sizeof (*mech), KM_SLEEP);
-		rc = smb2_hmac_getmech(mech);
-		if (rc != 0) {
-			kmem_free(mech, sizeof (*mech));
-			smb_rwx_rwexit(&s->s_lock);
-			return (rc);
-		}
-		s->sign_mech = mech;
-		s->sign_fini = smb2_sign_fini;
-	}
-	smb_rwx_rwexit(&s->s_lock);
+	if (token->tkn_ssnkey.val == NULL || token->tkn_ssnkey.len == 0 ||
+	    s->sign_mech == NULL)
+		return;
 
 	/*
 	 * Compute and store the signing key, which lives in
 	 * the user structure.
 	 */
-	sign_key->len = SMB2_SIG_SIZE;
-
-	/*
-	 * For SMB2, the signing key is just the first 16 bytes
-	 * of the session key (truncated or padded with zeros).
-	 * [MS-SMB2] 3.2.5.3.1
-	 */
-	bcopy(token->tkn_ssnkey.val, sign_key->key,
-	    MIN(token->tkn_ssnkey.len, sign_key->len));
+	if (s->dialect >= SMB_VERS_3_0) {
+		/*
+		 * For SMB3, the signing key is a "KDF" hash of the
+		 * session key.
+		 */
+		if (smb3_do_kdf(sign_key->key, sign_kdf_input,
+		    sizeof (sign_kdf_input), token->tkn_ssnkey.val,
+		    token->tkn_ssnkey.len) != 0)
+			return;
+		sign_key->len = SMB3_KEYLEN;
+	} else {
+		/*
+		 * For SMB2, the signing key is just the first 16 bytes
+		 * of the session key (truncated or padded with zeros).
+		 * [MS-SMB2] 3.2.5.3.1
+		 */
+		sign_key->len = SMB2_SIG_SIZE;
+		bcopy(token->tkn_ssnkey.val, sign_key->key,
+		    MIN(token->tkn_ssnkey.len, sign_key->len));
+	}
 
 	mutex_enter(&u->u_mutex);
 	if (s->secmode & SMB2_NEGOTIATE_SIGNING_ENABLED)
@@ -136,25 +230,23 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
 	 */
 	if (u->u_sign_flags & SMB_SIGNING_ENABLED)
 		sr->smb2_hdr_flags |= SMB2_FLAGS_SIGNED;
-
-	return (0);
 }
 
 /*
- * smb2_sign_calc
+ * smb2_sign_calc_common
  *
  * Calculates MAC signature for the given buffer and returns
  * it in the mac_sign parameter.
  *
- * The signature is in the last 16 bytes of the SMB2 header.
- * The signature algorighm is to compute HMAC SHA256 over the
- * entire command, with the signature field set to zeros.
+ * The signature algorithm is to compute HMAC SHA256 or AES_CMAC
+ * over the entire command, with the signature field set to zeros.
  *
  * Return 0 if  success else -1
  */
+
 static int
-smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
-    uint8_t *digest)
+smb2_sign_calc_common(smb_request_t *sr, struct mbuf_chain *mbc,
+    uint8_t *digest, mac_ops_t *ops)
 {
 	uint8_t tmp_hdr[SMB2_HDR_SIZE];
 	smb_sign_ctx_t ctx = 0;
@@ -167,7 +259,8 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
 	if (s->sign_mech == NULL || sign_key->len == 0)
 		return (-1);
 
-	rc = smb2_hmac_init(&ctx, s->sign_mech, sign_key->key, sign_key->len);
+	/* smb2_hmac_init or smb3_cmac_init */
+	rc = ops->mac_init(&ctx, s->sign_mech, sign_key->key, sign_key->len);
 	if (rc != 0)
 		return (rc);
 
@@ -182,7 +275,8 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
 	if (smb_mbc_peek(mbc, offset, "#c", tlen, tmp_hdr) != 0)
 		return (-1);
 	bzero(tmp_hdr + SMB2_SIG_OFFS, SMB2_SIG_SIZE);
-	if ((rc = smb2_hmac_update(ctx, tmp_hdr, tlen)) != 0)
+	/* smb2_hmac_update or smb3_cmac_update */
+	if ((rc = ops->mac_update(ctx, tmp_hdr, tlen)) != 0)
 		return (rc);
 	offset += tlen;
 	resid -= tlen;
@@ -210,7 +304,8 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
 	tlen = mbuf->m_len - offset;
 	if (tlen > resid)
 		tlen = resid;
-	rc = smb2_hmac_update(ctx, (uint8_t *)mbuf->m_data + offset, tlen);
+	/* smb2_hmac_update or smb3_cmac_update */
+	rc = ops->mac_update(ctx, (uint8_t *)mbuf->m_data + offset, tlen);
 	if (rc != 0)
 		return (rc);
 	resid -= tlen;
@@ -225,17 +320,20 @@ smb2_sign_calc(smb_request_t *sr, struct mbuf_chain *mbc,
 		tlen = mbuf->m_len;
 		if (tlen > resid)
 			tlen = resid;
-		rc = smb2_hmac_update(ctx, (uint8_t *)mbuf->m_data, tlen);
+		rc = ops->mac_update(ctx, (uint8_t *)mbuf->m_data, tlen);
 		if (rc != 0)
 			return (rc);
 		resid -= tlen;
 	}
 
 	/*
+	 * smb2_hmac_final or smb3_cmac_final
 	 * Note: digest is _always_ SMB2_SIG_SIZE,
 	 * even if the mech uses a longer one.
+	 *
+	 * smb2_hmac_update or smb3_cmac_update
 	 */
-	if ((rc = smb2_hmac_final(ctx, digest)) != 0)
+	if ((rc = ops->mac_final(ctx, digest)) != 0)
 		return (rc);
 
 	return (0);
@@ -260,6 +358,7 @@ smb2_sign_check_request(smb_request_t *sr)
 	uint8_t req_sig[SMB2_SIG_SIZE];
 	uint8_t vfy_sig[SMB2_SIG_SIZE];
 	struct mbuf_chain *mbc = &sr->smb_data;
+	smb_session_t *s = sr->session;
 	smb_user_t *u = sr->uid_user;
 	int sig_off;
 
@@ -267,8 +366,12 @@ smb2_sign_check_request(smb_request_t *sr)
 	 * Don't check commands with a zero session ID.
 	 * [MS-SMB2] 3.3.4.1.1
 	 */
-	if (sr->smb_uid == 0 || u == NULL)
+	if (sr->smb2_ssnid == 0 || u == NULL)
 		return (0);
+
+	/* In case _sign_begin failed. */
+	if (s->sign_calc == NULL)
+		return (-1);
 
 	/* Get the request signature. */
 	sig_off = sr->smb2_cmd_hdr + SMB2_SIG_OFFS;
@@ -277,8 +380,9 @@ smb2_sign_check_request(smb_request_t *sr)
 
 	/*
 	 * Compute the correct signature and compare.
+	 * smb2_sign_calc() or smb3_sign_calc()
 	 */
-	if (smb2_sign_calc(sr, mbc, vfy_sig) != 0)
+	if (s->sign_calc(sr, mbc, vfy_sig) != 0)
 		return (-1);
 	if (memcmp(vfy_sig, req_sig, SMB2_SIG_SIZE) != 0) {
 		cmn_err(CE_NOTE, "smb2_sign_check_request: bad signature");
@@ -300,10 +404,13 @@ smb2_sign_reply(smb_request_t *sr)
 {
 	uint8_t reply_sig[SMB2_SIG_SIZE];
 	struct mbuf_chain tmp_mbc;
+	smb_session_t *s = sr->session;
 	smb_user_t *u = sr->uid_user;
 	int hdr_off, msg_len;
 
 	if (u == NULL)
+		return;
+	if (s->sign_calc == NULL)
 		return;
 
 	msg_len = sr->reply.chain_offset - sr->smb2_reply_hdr;
@@ -312,8 +419,9 @@ smb2_sign_reply(smb_request_t *sr)
 
 	/*
 	 * Calculate the MAC signature for this reply.
+	 * smb2_sign_calc() or smb3_sign_calc()
 	 */
-	if (smb2_sign_calc(sr, &tmp_mbc, reply_sig) != 0)
+	if (s->sign_calc(sr, &tmp_mbc, reply_sig) != 0)
 		return;
 
 	/*
@@ -322,4 +430,55 @@ smb2_sign_reply(smb_request_t *sr)
 	hdr_off = sr->smb2_reply_hdr + SMB2_SIG_OFFS;
 	(void) smb_mbc_poke(&sr->reply, hdr_off, "#c",
 	    SMB2_SIG_SIZE, reply_sig);
+}
+
+/*
+ * Derive SMB3 key as described in [MS-SMB2] 3.1.4.2
+ * and [NIST SP800-108]
+ *
+ * r = 32, L = 128, PRF = HMAC-SHA256, key = (session key)
+ *
+ * Note that these describe pre-3.1.1 inputs.
+ *
+ * Session.SigningKey for binding a session:
+ * - Session.SessionKey as K1
+ * - label = SMB2AESCMAC (size 12)
+ * - context = SmbSign (size 8)
+ * Channel.SigningKey for for all other requests
+ * - if SMB2_SESSION_FLAG_BINDING, GSS key (in Session.SessionKey?) as K1;
+ * - otherwise, Session.SessionKey as K1
+ * - label = SMB2AESCMAC (size 12)
+ * - context = SmbSign (size 8)
+ * Session.ApplicationKey for ... (not sure what yet)
+ * - Session.SessionKey as K1
+ * - label = SMB2APP (size 8)
+ * - context = SmbRpc (size 7)
+ */
+static int
+smb3_do_kdf(void *outbuf, void *input, size_t input_len,
+    uint8_t *key, uint32_t key_len)
+{
+	uint8_t digest32[SHA256_DIGEST_LENGTH];
+	smb_sign_mech_t mech;
+	smb_sign_ctx_t hctx = 0;
+	int rc;
+
+	bzero(&mech, sizeof (mech));
+	if ((rc = smb2_hmac_getmech(&mech)) != 0)
+		return (rc);
+
+	/* Limit the SessionKey input to its maximum size (16 bytes) */
+	rc = smb2_hmac_init(&hctx, &mech, key, MIN(key_len, SMB2_KEYLEN));
+	if (rc != 0)
+		return (rc);
+
+	if ((rc = smb2_hmac_update(hctx, input, input_len)) != 0)
+		return (rc);
+
+	if ((rc = smb2_hmac_final(hctx, digest32)) != 0)
+		return (rc);
+
+	/* Output is first 16 bytes of digest. */
+	bcopy(digest32, outbuf, SMB3_KEYLEN);
+	return (0);
 }

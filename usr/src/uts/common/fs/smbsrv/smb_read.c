@@ -385,11 +385,8 @@ smb_com_read_andx(smb_request_t *sr)
  * function.  We can't move the fid lookup here because lock-and-read
  * requires the fid to do locking before attempting the read.
  *
- * Reading from a file should break oplocks on the file to LEVEL_II.
- * A call to smb_oplock_break(SMB_OPLOCK_BREAK_TO_LEVEL_II) is not
- * required as it is a no-op. If there's anything greater than a
- * LEVEL_II oplock on the file, the oplock MUST be owned by the ofile
- * on which the read is occuring and therefore would not be broken.
+ * Reading from a file does not break oplocks because any need for
+ * breaking before read is handled in open.
  *
  * Returns errno values.
  */

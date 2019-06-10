@@ -309,7 +309,7 @@ static uint32_t
 smb2_find_entries(smb_request_t *sr, smb_odir_t *od, smb2_find_args_t *args)
 {
 	smb_odir_resume_t odir_resume;
-	char 		*tbuf = NULL;
+	char		*tbuf = NULL;
 	size_t		tbuflen = 0;
 	uint16_t	count;
 	uint16_t	minsize;
@@ -437,7 +437,7 @@ smb2_find_mbc_encode(smb_request_t *sr, smb2_find_args_t *args)
 	smb_macinfo_t	*macinfo = &args->fa_mi;
 	uint8_t		buf83[26];
 	smb_msgbuf_t	mb;
-	int		namelen, padsz;
+	int		namelen;
 	int		shortlen = 0;
 	int		rc, starting_offset;
 	uint32_t	next_entry_offset;
@@ -647,11 +647,8 @@ smb2_find_mbc_encode(smb_request_t *sr, smb2_find_args_t *args)
 		return (NT_STATUS_BUFFER_OVERFLOW);
 
 	/* Next entry needs to be 8-byte aligned. */
-	padsz = sr->raw_data.chain_offset & 7;
-	if (padsz) {
-		padsz = 8 - padsz;
-		(void) smb_mbc_encodef(&sr->raw_data, "#.", padsz);
-	}
+	(void) smb_mbc_put_align(&sr->raw_data, 8);
+
 	next_entry_offset = sr->raw_data.chain_offset -	starting_offset;
 	(void) smb_mbc_poke(&sr->raw_data, starting_offset, "l",
 	    next_entry_offset);

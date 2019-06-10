@@ -10,8 +10,7 @@
 #
 
 #
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
-# Copyright (c) 2017, Joyent, Inc.
+# Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 # Copyright 2017 RackTop Systems.
 # Copyright 2019 Joyent, Inc.
 #
@@ -53,6 +52,7 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	cyclic_reprogram;
 
 	crfree;
+	crgetsid;
 	crgetuid;
 	crgetruid;
 	crgetgid;
@@ -97,9 +97,10 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	gethrestime_sec;
 	gethrtime_unscaled;
 
-	hz;
-
+	highbit;
 	highbit64;
+
+	hz;
 
 	issig;
 

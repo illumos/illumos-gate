@@ -1,0 +1,65 @@
+open 2 4
+ open 2 OK
+req 2 0x803
+ req oplock fid=2 ret oplock=0x803 status=0x0 (SUCCESS)
+show
+ ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=1 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=2 Lease=4 OgState=0x803 Brk=0x0 Excl=N onlist:   RH
+open 3 4
+ open 3 OK
+req 3 0x803
+*smb_oplock_ind_break fid=2 NewLevel=0x3, AckReq=0, ComplStatus=0x215 (OPLOCK_SWITCHED_TO_NEW_HANDLE)
+ req oplock fid=3 ret oplock=0x803 status=0x0 (SUCCESS)
+show
+ ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=1 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=2 Lease=4 OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=3 Lease=4 OgState=0x803 Brk=0x0 Excl=N onlist:   RH
+open 1
+ open 1 OK
+brk-write 1
+*smb_oplock_ind_break fid=3 NewLevel=0x0, AckReq=1, ComplStatus=0x0 (SUCCESS)
+ brk-write 1 ret status=0x0 (SUCCESS)
+show
+ ol_state=0x80003 ( BREAK_TO_NO_CACHING HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=1
+ ofile_cnt=3
+  fid=2 Lease=4 OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=3 Lease=4 OgState=0x803 Brk=0x80000 Excl=N onlist:    RHBQ(to none)
+  fid=1 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+ack 3
+ ack: break fid=3, newstate=0x800, status=0x0 (SUCCESS)
+show
+ ol_state=0x10000000 ( NO_OPLOCK )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=3
+  fid=2 Lease=4 OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=3 Lease=4 OgState=0x800 Brk=0x0 Excl=N onlist:   
+  fid=1 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+open 4 4
+ open 4 OK
+req 4 0x803
+ req oplock fid=4 ret oplock=0x803 status=0x0 (SUCCESS)
+show
+ ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=1 cnt_RHBQ=0
+ ofile_cnt=4
+  fid=2 Lease=4 OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=3 Lease=4 OgState=0x800 Brk=0x0 Excl=N onlist:   
+  fid=1 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=4 Lease=4 OgState=0x803 Brk=0x0 Excl=N onlist:   RH
+close 4
+*smb_oplock_ind_break fid=4 NewLevel=0x0, AckReq=0, ComplStatus=0x216 (OPLOCK_HANDLE_CLOSED)
+ close OK
+req 3 0x803
+ req oplock fid=3 ret oplock=0x803 status=0x0 (SUCCESS)
+show
+ ol_state=0x3 ( HANDLE_CACHING READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=0 cnt_RH=1 cnt_RHBQ=0
+ ofile_cnt=3
+  fid=2 Lease=4 OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=3 Lease=4 OgState=0x803 Brk=0x0 Excl=N onlist:   RH
+  fid=1 Lease= OgState=0x0 Brk=0x0 Excl=N onlist:   

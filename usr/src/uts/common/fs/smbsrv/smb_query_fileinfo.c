@@ -329,11 +329,7 @@ smb_query_by_path(smb_request_t *sr, smb_xa_t *xa, uint16_t infolev)
 	}
 
 	if (rc != 0) {
-		if (rc == ENOENT)
-			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
-			    ERRDOS, ERROR_FILE_NOT_FOUND);
-		else
-			smbsr_errno(sr, rc);
+		smbsr_errno(sr, rc);
 
 		kmem_free(qinfo, sizeof (smb_queryinfo_t));
 		return (-1);
@@ -654,9 +650,11 @@ smb_query_stream_info(smb_request_t *sr, mbuf_chain_t *mbc,
 	switch (status) {
 	case 0:
 		break;
+	case NT_STATUS_OBJECT_NAME_NOT_FOUND:
 	case NT_STATUS_NO_SUCH_FILE:
 	case NT_STATUS_NOT_SUPPORTED:
 		/* No streams. */
+		status = 0;
 		done = B_TRUE;
 		break;
 	default:

@@ -64,9 +64,6 @@ static int smb_drv_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
  * environment. When in doubt use 37KB.
  */
 int	smb_maxbufsize = SMB_NT_MAXBUF;
-int	smb_oplock_levelII = 1;
-int	smb_oplock_timeout = OPLOCK_STD_TIMEOUT;
-int	smb_oplock_min_timeout = OPLOCK_MIN_TIMEOUT;
 int	smb_flush_required = 1;
 int	smb_dirsymlink_enable = 1;
 int	smb_sign_debug = 0;

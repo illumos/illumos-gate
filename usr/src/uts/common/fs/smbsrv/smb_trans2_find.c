@@ -344,7 +344,8 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	if (count == 0) {
 		smb_odir_close(od);
 		smb_odir_release(od);
-		smbsr_errno(sr, ENOENT);
+		smbsr_status(sr, NT_STATUS_NO_SUCH_FILE,
+		    ERRDOS, ERROR_FILE_NOT_FOUND);
 		return (SDRC_ERROR);
 	}
 

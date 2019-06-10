@@ -1,0 +1,12 @@
+# Input for testoplock, case 10
+# Modeled after smbtorture smb2.lease.oplock
+open 1
+req 1 0x100
+show
+open 2 2
+brk-open 2
+show
+req 2 0x807
+req 2 0x803
+req 2 0x801
+show

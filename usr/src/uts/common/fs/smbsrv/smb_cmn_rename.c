@@ -20,11 +20,11 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/synch.h>
-#include <smbsrv/smb_kproto.h>
+#include <smbsrv/smb2_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <sys/nbmlock.h>
 
@@ -36,6 +36,7 @@
 static int smb_rename_check_stream(smb_fqi_t *, smb_fqi_t *);
 static int smb_rename_check_attr(smb_request_t *, smb_node_t *, uint16_t);
 static int smb_rename_lookup_src(smb_request_t *);
+static uint32_t smb_rename_check_src(smb_request_t *, smb_fqi_t *);
 static void smb_rename_release_src(smb_request_t *);
 static uint32_t smb_rename_errno2status(int);
 
@@ -99,7 +100,7 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 	smb_node_t *tnode;
 	char *new_name, *path;
 	DWORD status;
-	int rc, count;
+	int rc;
 
 	tnode = sr->tid_tree->t_snode;
 	path = dst_fqi->fq_path.pn_path;
@@ -111,22 +112,36 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 
 	/*
 	 * The source node may already have been provided,
-	 * i.e. when called by SMB1/SMB2 smb_setinfo_rename.
-	 * Not provided by smb_com_rename, smb_com_nt_rename.
+	 * i.e. when called by SMB1/SMB2 smb_setinfo_rename
+	 * with an ofile.  When we have an ofile, open has
+	 * already checked for sharing violations.  For
+	 * path-based operations, do sharing check here.
 	 */
 	if (src_fqi->fq_fnode) {
-		smb_node_start_crit(src_fqi->fq_fnode, RW_READER);
-		smb_node_ref(src_fqi->fq_fnode);
 		smb_node_ref(src_fqi->fq_dnode);
+		smb_node_ref(src_fqi->fq_fnode);
 	} else {
 		/* lookup and validate src node */
 		rc = smb_rename_lookup_src(sr);
 		if (rc != 0)
 			return (smb_rename_errno2status(rc));
+		/* Holding refs on dnode, fnode */
 	}
-
 	src_fnode = src_fqi->fq_fnode;
 	src_dnode = src_fqi->fq_dnode;
+
+	/* Break oplocks, and check share modes. */
+	status = smb_rename_check_src(sr, src_fqi);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (status);
+	}
+	/*
+	 * NB: src_fnode is now "in crit" (critical section)
+	 * as if we did smb_node_start_crit(..., RW_READER);
+	 * Call smb_rename_release_src(sr) on errors.
+	 */
 
 	/*
 	 * Find the destination dnode and last component.
@@ -234,24 +249,22 @@ smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 			return (NT_STATUS_OBJECT_NAME_COLLISION);
 		}
 
-		(void) smb_oplock_break(sr, dst_fnode,
-		    SMB_OPLOCK_BREAK_TO_NONE | SMB_OPLOCK_BREAK_BATCH);
-
-		/*
-		 * Wait (a little) for the oplock break to be
-		 * responded to by clients closing handles.
-		 * Hold node->n_lock as reader to keep new
-		 * ofiles from showing up after we check.
-		 */
-		smb_node_rdlock(dst_fnode);
-		for (count = 0; count <= 12; count++) {
-			status = smb_node_delete_check(dst_fnode);
-			if (status != NT_STATUS_SHARING_VIOLATION)
-				break;
-			smb_node_unlock(dst_fnode);
-			delay(MSEC_TO_TICK(100));
-			smb_node_rdlock(dst_fnode);
+		status = smb_oplock_break_DELETE(dst_fnode, NULL);
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+			if (sr->session->dialect >= SMB_VERS_2_BASE)
+				(void) smb2sr_go_async(sr);
+			(void) smb_oplock_wait_break(dst_fnode, 0);
+			status = 0;
 		}
+		if (status != 0) {
+			smb_rename_release_src(sr);
+			smb_node_release(dst_fnode);
+			smb_node_release(dst_dnode);
+			return (status);
+		}
+
+		smb_node_rdlock(dst_fnode);
+		status = smb_node_delete_check(dst_fnode);
 		if (status != NT_STATUS_SUCCESS) {
 			smb_node_unlock(dst_fnode);
 			smb_rename_release_src(sr);
@@ -434,21 +447,29 @@ smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 
 	/* The source node may already have been provided */
 	if (src_fqi->fq_fnode) {
-		smb_node_start_crit(src_fqi->fq_fnode, RW_READER);
-		smb_node_ref(src_fqi->fq_fnode);
 		smb_node_ref(src_fqi->fq_dnode);
+		smb_node_ref(src_fqi->fq_fnode);
 	} else {
 		/* lookup and validate src node */
 		rc = smb_rename_lookup_src(sr);
 		if (rc != 0)
 			return (smb_rename_errno2status(rc));
+		/* Holding refs on dnode, fnode */
 	}
 
 	/* Not valid to create hardlink for directory */
 	if (smb_node_is_dir(src_fqi->fq_fnode)) {
-		smb_rename_release_src(sr);
+		smb_node_release(src_fqi->fq_dnode);
+		smb_node_release(src_fqi->fq_fnode);
 		return (NT_STATUS_FILE_IS_A_DIRECTORY);
 	}
+
+	/*
+	 * Unlike in rename, we will not unlink the src,
+	 * so skip the smb_rename_check_src() call, and
+	 * just "start crit" instead.
+	 */
+	smb_node_start_crit(src_fqi->fq_fnode, RW_READER);
 
 	/*
 	 * Find the destination dnode and last component.
@@ -510,24 +531,19 @@ smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 /*
  * smb_rename_lookup_src
  *
- * Lookup the src node, checking for sharing violations and
- * breaking any existing BATCH oplock.
- * Populate sr->arg.dirop.fqi
+ * Lookup the src node for a path-based link or rename.
  *
- * Upon success, the dnode and fnode will have holds and the
- * fnode will be in a critical section. These should be
- * released using smb_rename_release_src().
+ * On success, fills in sr->arg.dirop.fqi, and returns with
+ * holds on the source dnode and fnode.
  *
  * Returns errno values.
  */
 static int
 smb_rename_lookup_src(smb_request_t *sr)
 {
-	smb_node_t *src_node, *tnode;
-	DWORD status;
-	int rc;
-	int count;
+	smb_node_t *tnode;
 	char *path;
+	int rc;
 
 	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
 
@@ -541,6 +557,7 @@ smb_rename_lookup_src(smb_request_t *sr)
 	    &src_fqi->fq_dnode, src_fqi->fq_last_comp);
 	if (rc != 0)
 		return (rc);
+	/* hold fq_dnode */
 
 	rc = smb_fsop_lookup(sr, sr->user_cr, 0, tnode,
 	    src_fqi->fq_dnode, src_fqi->fq_last_comp, &src_fqi->fq_fnode);
@@ -548,43 +565,93 @@ smb_rename_lookup_src(smb_request_t *sr)
 		smb_node_release(src_fqi->fq_dnode);
 		return (rc);
 	}
-	src_node = src_fqi->fq_fnode;
+	/* hold fq_dnode, fq_fnode */
 
-	rc = smb_rename_check_attr(sr, src_node, src_fqi->fq_sattr);
+	rc = smb_rename_check_attr(sr, src_fqi->fq_fnode, src_fqi->fq_sattr);
 	if (rc != 0) {
 		smb_node_release(src_fqi->fq_fnode);
 		smb_node_release(src_fqi->fq_dnode);
 		return (rc);
 	}
 
+	return (0);
+}
+
+/*
+ * smb_rename_check_src
+ *
+ * Check for sharing violations on the file we'll unlink, and
+ * break oplocks for the rename operation.  Note that we've
+ * already done oplock breaks associated with opening a handle
+ * on the file to rename.
+ *
+ * On success, returns with fnode in a critical section,
+ * as if smb_node_start_crit were called with the node.
+ * Caller should release using smb_rename_release_src().
+ */
+static uint32_t
+smb_rename_check_src(smb_request_t *sr, smb_fqi_t *src_fqi)
+{
+	smb_node_t *src_node = src_fqi->fq_fnode;
+	uint32_t status;
+
 	/*
 	 * Break BATCH oplock before ofile checks. If a client
 	 * has a file open, this will force a flush or close,
 	 * which may affect the outcome of any share checking.
+	 *
+	 * This operation may have either a handle or path for
+	 * the source node (that will be unlinked via rename).
 	 */
-	(void) smb_oplock_break(sr, src_node,
-	    SMB_OPLOCK_BREAK_TO_LEVEL_II | SMB_OPLOCK_BREAK_BATCH);
+
+	if (sr->fid_ofile != NULL) {
+		status = smb_oplock_break_SETINFO(src_node, sr->fid_ofile,
+		    FileRenameInformation);
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+			if (sr->session->dialect >= SMB_VERS_2_BASE)
+				(void) smb2sr_go_async(sr);
+			(void) smb_oplock_wait_break(src_node, 0);
+			status = 0;
+		}
+
+		/*
+		 * Sharing violations were checked at open time.
+		 * Just "start crit" to be consistent with the
+		 * state returned for path-based rename.
+		 */
+		smb_node_start_crit(src_fqi->fq_fnode, RW_READER);
+		return (NT_STATUS_SUCCESS);
+	}
 
 	/*
-	 * Wait (a little) for the oplock break to be
-	 * responded to by clients closing handles.
-	 * Hold node->n_lock as reader to keep new
-	 * ofiles from showing up after we check.
+	 * This code path operates without a real open, so
+	 * break oplocks now as if we opened for delete.
+	 * Note: SMB2 does only ofile-based rename.
+	 *
+	 * Todo:  Use an "internal open" for path-based
+	 * rename and delete, then delete this code.
+	 */
+	ASSERT(sr->session->dialect < SMB_VERS_2_BASE);
+	status = smb_oplock_break_DELETE(src_node, NULL);
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		(void) smb_oplock_wait_break(src_node, 0);
+	}
+
+	/*
+	 * Path-based access to the src file (no ofile)
+	 * so check for sharing violations here.
 	 */
 	smb_node_rdlock(src_node);
-	for (count = 0; count <= 12; count++) {
-		status = smb_node_rename_check(src_node);
-		if (status != NT_STATUS_SHARING_VIOLATION)
-			break;
-		smb_node_unlock(src_node);
-		delay(MSEC_TO_TICK(100));
-		smb_node_rdlock(src_node);
-	}
+	status = smb_node_rename_check(src_node);
 	if (status != NT_STATUS_SUCCESS) {
 		smb_node_unlock(src_node);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		return (EPIPE); /* = ERRbadshare */
+		return (status);
+	}
+
+	status = smb_oplock_break_SETINFO(src_node, NULL,
+	    FileRenameInformation);
+	if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS) {
+		(void) smb_oplock_wait_break(src_node, 0);
 	}
 
 	/*
@@ -605,15 +672,10 @@ smb_rename_lookup_src(smb_request_t *sr)
 	status = smb_nbl_conflict(src_node, 0, UINT64_MAX, NBL_RENAME);
 	if (status != NT_STATUS_SUCCESS) {
 		smb_node_end_crit(src_node);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		if (status == NT_STATUS_SHARING_VIOLATION)
-			return (EPIPE); /* = ERRbadshare */
-		return (EACCES);
 	}
 
-	/* NB: Caller expects holds on src_fqi fnode, dnode */
-	return (0);
+	/* NB: Caller expects to be "in crit" on fnode. */
+	return (status);
 }
 
 /*

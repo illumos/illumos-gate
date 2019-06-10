@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -65,7 +65,7 @@ static void smb_lock_free(smb_lock_t *);
 uint32_t
 smb_lock_get_lock_count(smb_node_t *node, smb_ofile_t *of)
 {
-	smb_lock_t 	*lock;
+	smb_lock_t	*lock;
 	smb_llist_t	*llist;
 	uint32_t	count = 0;
 
@@ -330,8 +330,10 @@ break_loop:
 
 	smb_llist_exit(&node->n_lock_list);
 
-	if (result == NT_STATUS_SUCCESS)
-		smb_oplock_break_levelII(node);
+	if (result == NT_STATUS_SUCCESS) {
+		/* This revokes read cache delegations. */
+		(void) smb_oplock_break_WRITE(node, file);
+	}
 
 	return (result);
 }
@@ -345,7 +347,7 @@ break_loop:
  *
  * Return values
  *	NT_STATUS_SUCCESS		lock access granted.
- *	NT_STATUS_FILE_LOCK_CONFLICT 	access denied due to lock conflict.
+ *	NT_STATUS_FILE_LOCK_CONFLICT	access denied due to lock conflict.
  */
 int
 smb_lock_range_access(
@@ -415,6 +417,7 @@ smb_lock_range_access(
 void
 smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 {
+	cred_t		*kcr = zone_kcred();
 	smb_lock_t	*lock;
 	smb_lock_t	*nxtl;
 	list_t		destroy_list;
@@ -457,7 +460,7 @@ smb_node_destroy_lock_by_ofile(smb_node_t *node, smb_ofile_t *file)
 		nxtl = smb_llist_next(&node->n_lock_list, lock);
 		if (lock->l_file == file) {
 			smb_llist_remove(&node->n_lock_list, lock);
-			smb_lock_posix_unlock(node, lock, file->f_user->u_cred);
+			smb_lock_posix_unlock(node, lock, kcr);
 			list_insert_tail(&destroy_list, lock);
 		}
 		lock = nxtl;

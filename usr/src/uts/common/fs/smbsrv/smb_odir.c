@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -264,6 +264,7 @@ static int smb_odir_next_odirent(smb_odir_t *, smb_odirent_t *);
 static boolean_t smb_odir_lookup_link(smb_request_t *, smb_odir_t *,
     char *, smb_node_t **);
 static boolean_t smb_odir_match_name(smb_odir_t *, smb_odirent_t *);
+static void smb_odir_delete(void *);
 
 
 /*
@@ -282,7 +283,7 @@ smb_odir_openpath(smb_request_t *sr, char *path, uint16_t sattr,
 	smb_tree_t	*tree;
 	smb_node_t	*dnode;
 	char		pattern[MAXNAMELEN];
-	uint16_t 	odid;
+	uint16_t	odid;
 	cred_t		*cr;
 
 	ASSERT(sr);
@@ -445,6 +446,8 @@ smb_odir_hold(smb_odir_t *od)
 void
 smb_odir_release(smb_odir_t *od)
 {
+	smb_tree_t *tree = od->d_tree;
+
 	SMB_ODIR_VALID(od);
 
 	mutex_enter(&od->d_mutex);
@@ -462,7 +465,8 @@ smb_odir_release(smb_odir_t *od)
 		od->d_refcnt--;
 		if (od->d_refcnt == 0) {
 			od->d_state = SMB_ODIR_STATE_CLOSED;
-			smb_tree_post_odir(od->d_tree, od);
+			smb_llist_post(&tree->t_odir_list, od,
+			    smb_odir_delete);
 		}
 		break;
 	case SMB_ODIR_STATE_CLOSED:
@@ -989,7 +993,7 @@ smb_odir_reopen(smb_odir_t *od, const char *pattern, uint16_t sattr)
  * Remove the odir from the tree list before freeing resources
  * associated with the odir.
  */
-void
+static void
 smb_odir_delete(void *arg)
 {
 	smb_tree_t	*tree;
@@ -1007,6 +1011,13 @@ smb_odir_delete(void *arg)
 	atomic_dec_32(&tree->t_session->s_dir_cnt);
 	smb_llist_exit(&tree->t_odir_list);
 
+	/*
+	 * This odir is no longer on t_odir_list, however...
+	 *
+	 * This is called via smb_llist_post, which means it may run
+	 * BEFORE smb_odir_release drops d_mutex (if another thread
+	 * flushes the delete queue before we do).  Synchronize.
+	 */
 	mutex_enter(&od->d_mutex);
 	mutex_exit(&od->d_mutex);
 
@@ -1048,11 +1059,16 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 	dirent64_t	*dp;
 	edirent_t	*edp;
 	char		*np;
-	uint32_t	abe_flag = 0;
+	uint32_t	rddir_flags = 0;
 
 	ASSERT(MUTEX_HELD(&od->d_mutex));
 
 	bzero(odirent, sizeof (smb_odirent_t));
+
+	if (od->d_flags & SMB_ODIR_FLAG_ABE)
+		rddir_flags |= SMB_ABE;
+	if (od->d_flags & SMB_ODIR_FLAG_EDIRENT)
+		rddir_flags |= SMB_EDIRENT;
 
 	if (od->d_bufptr != NULL) {
 		if (od->d_flags & SMB_ODIR_FLAG_EDIRENT)
@@ -1075,11 +1091,8 @@ smb_odir_next_odirent(smb_odir_t *od, smb_odirent_t *odirent)
 
 		od->d_bufsize = sizeof (od->d_buf);
 
-		if (od->d_flags & SMB_ODIR_FLAG_ABE)
-			abe_flag = SMB_ABE;
-
 		rc = smb_vop_readdir(od->d_dnode->vp, od->d_offset,
-		    od->d_buf, &od->d_bufsize, &eof, abe_flag, od->d_cred);
+		    od->d_buf, &od->d_bufsize, &eof, rddir_flags, od->d_cred);
 
 		if ((rc == 0) && (od->d_bufsize == 0))
 			rc = ENOENT;

@@ -132,8 +132,8 @@ smb2_write(smb_request_t *sr)
 		if (rc)
 			break;
 		of->f_written = B_TRUE;
-		if (!smb_node_is_dir(of->f_node))
-			smb_oplock_break_levelII(of->f_node);
+		/* This revokes read cache delegations. */
+		(void) smb_oplock_break_WRITE(of->f_node, of);
 		break;
 
 	case STYPE_IPC:

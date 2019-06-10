@@ -1,0 +1,20 @@
+open 1 3
+ open 1 OK
+req 1 0x801
+ req oplock fid=1 ret oplock=0x801 status=0x0 (SUCCESS)
+show
+ ol_state=0x1 ( READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=1 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=1
+  fid=1 Lease=3 OgState=0x801 Brk=0x0 Excl=N onlist:  R 
+open 2 3
+ open 2 OK
+req 2 0x801
+*smb_oplock_ind_break fid=1 NewLevel=0x1, AckReq=0, ComplStatus=0x215 (OPLOCK_SWITCHED_TO_NEW_HANDLE)
+ req oplock fid=2 ret oplock=0x801 status=0x0 (SUCCESS)
+show
+ ol_state=0x1 ( READ_CACHING )
+ Excl=n cnt_II=0 cnt_R=1 cnt_RH=0 cnt_RHBQ=0
+ ofile_cnt=2
+  fid=1 Lease=3 OgState=0x0 Brk=0x0 Excl=N onlist:   
+  fid=2 Lease=3 OgState=0x801 Brk=0x0 Excl=N onlist:  R 

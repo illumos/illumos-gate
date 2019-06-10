@@ -1,0 +1,24 @@
+# Input for testoplock, case 06
+# Modeled after smbtorture smb2.lease.nobreakself
+open 1 1
+req 1 0x801
+open 2 2
+req 2 0x801
+# both 1,2 should have R
+show
+# write 1 should leave 1:R 2:none
+brk-write 1
+show
+# upgrade 2 back to R
+open 3 2
+req 3 0x801
+close 3
+# ind_break will "move" the lease to h2 (1:R 2:R)
+req 2 0x801
+show
+# write 2 should leave 1:none 2:R
+brk-write 2
+show
+# write 1 should leave 1:none 2:none
+brk-write 1
+show

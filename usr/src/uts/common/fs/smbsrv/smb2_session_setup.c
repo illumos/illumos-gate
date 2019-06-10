@@ -37,7 +37,7 @@ smb2_session_setup(smb_request_t *sr)
 	uint32_t Channel;
 	uint16_t SecBufOffset;
 	uint16_t SecBufLength;
-	uint64_t PrevSessionId;
+	uint64_t PrevSsnId;
 	uint16_t SessionFlags;
 	uint32_t status;
 	int skip;
@@ -55,9 +55,22 @@ smb2_session_setup(smb_request_t *sr)
 	    &Channel,		/* l */
 	    &SecBufOffset,	/* w */
 	    &SecBufLength,	/* w */
-	    &PrevSessionId);	/* q */
+	    &PrevSsnId);	/* q */
 	if (rc)
 		return (SDRC_ERROR);
+
+	/*
+	 * SMB3 multi-channel features are not supported.
+	 * Once they are, this will check the dialect and
+	 * whether multi-channel was negotiated, i.e.
+	 *	if (sr->session->dialect < SMB_VERS_3_0 ||
+	 *	    s->IsMultiChannelCapable == False)
+	 *		return (error...)
+	 */
+	if (Flags & SMB2_SESSION_FLAG_BINDING) {
+		status = NT_STATUS_REQUEST_NOT_ACCEPTED;
+		goto errout;
+	}
 
 	/*
 	 * We're normally positioned at the security buffer now,
@@ -103,6 +116,19 @@ smb2_session_setup(smb_request_t *sr)
 		if (sr->uid_user->u_flags & SMB_USER_FLAG_ANON)
 			SessionFlags |= SMB2_SESSION_FLAG_IS_NULL;
 		smb2_ss_adjust_credits(sr);
+
+		/*
+		 * PrevSsnId is a session that the client is reporting as
+		 * having gone away, and for which we might not yet have seen
+		 * a disconnect. We need to log off the previous session so
+		 * any durable handles in that session will become orphans
+		 * that can be reclaimed in this new session.  Note that
+		 * either zero or the _current_ session ID means there is
+		 * no previous session to logoff.
+		 */
+		if (PrevSsnId != 0 &&
+		    PrevSsnId != sr->smb2_ssnid)
+			smb_server_logoff_ssnid(sr, PrevSsnId);
 		break;
 
 	/*
@@ -115,6 +141,7 @@ smb2_session_setup(smb_request_t *sr)
 		break;
 
 	default:
+errout:
 		SecBufLength = 0;
 		sr->smb2_status = status;
 		break;

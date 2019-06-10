@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  */
 
 #include <sys/types.h>
@@ -351,11 +351,8 @@ smb_mangle(const char *name, ino64_t fid, char *buf, size_t buflen)
  * smb_unmangle should only be called on names for which
  * smb_maybe_mangled() is true
  *
- * File systems which support VFSFT_EDIRENT_FLAGS will return the
- * directory entries as a buffer of edirent_t structure. Others will
- * return a buffer of dirent64_t structures. A union is used for the
- * the pointer into the buffer (bufptr, edp and dp).
- * The ed_name/d_name is NULL terminated by the file system.
+ * The flags arg is no longer used, but retained just to avoid
+ * changing the many callers of this function.
  *
  * Returns:
  *   0       - SUCCESS. Unmangled name is returned in namebuf.
@@ -368,21 +365,17 @@ int
 smb_unmangle(smb_node_t *dnode, char *name, char *namebuf,
     int buflen, uint32_t flags)
 {
-	int		err, eof, bufsize, reclen;
+	_NOTE(ARGUNUSED(flags))	// avoid changing all callers
+	int		err, eof, bufsize;
 	uint64_t	offset;
 	ino64_t		ino;
-	boolean_t	is_edp;
 	char		*namep, *buf;
 	char		shortname[SMB_SHORTNAMELEN];
 	vnode_t		*vp;
-	union {
-		char		*u_bufptr;
-		edirent_t	*u_edp;
-		dirent64_t	*u_dp;
-	} u;
-#define	bufptr		u.u_bufptr
-#define	edp		u.u_edp
-#define	dp		u.u_dp
+	char		*bufptr;
+	dirent64_t	*dp;
+	cred_t		*cr = zone_kcred();
+	int		rc = ENOENT;
 
 	if (dnode == NULL || name == NULL || namebuf == NULL || buflen == 0)
 		return (EINVAL);
@@ -394,57 +387,62 @@ smb_unmangle(smb_node_t *dnode, char *name, char *namebuf,
 
 	vp = dnode->vp;
 	*namebuf = '\0';
-	is_edp = vfs_has_feature(vp->v_vfsp, VFSFT_DIRENTFLAGS);
 
 	buf = kmem_alloc(SMB_UNMANGLE_BUFSIZE, KM_SLEEP);
-	bufsize = SMB_UNMANGLE_BUFSIZE;
-	offset = 0;
+	bufptr = buf;
+	bufsize = 0;
+	offset = 0;	// next entry offset
+	eof = B_FALSE;
 
-	while ((err = smb_vop_readdir(vp, offset, buf, &bufsize,
-	    &eof, flags, zone_kcred())) == 0) {
-		if (bufsize == 0) {
-			err = ENOENT;
+	for (;;) {
+		/*
+		 * Read some entries, if buffer empty or
+		 * we've scanned all of it.  Flags zero
+		 * (no edirent, no ABE wanted here)
+		 */
+		if (bufsize <= 0) {
+			bufsize = SMB_UNMANGLE_BUFSIZE;
+			rc = smb_vop_readdir(vp, offset, buf,
+			    &bufsize, &eof, 0, cr);
+			if (rc != 0)
+				break; /* error */
+			if (bufsize == 0) {
+				eof = B_TRUE;
+				rc = ENOENT;
+				break;
+			}
+			bufptr = buf;
+		}
+		/* LINTED pointer alignment */
+		dp = (dirent64_t *)bufptr;
+
+		/*
+		 * Partial records are not supposed to happen,
+		 * but let's be defensive. If this happens,
+		 * restart at the current offset.
+		 */
+		bufptr += dp->d_reclen;
+		bufsize -= dp->d_reclen;
+		if (bufsize < 0)
+			continue;
+
+		offset = dp->d_off;
+		ino = dp->d_ino;
+		namep = dp->d_name;
+
+		/* skip non utf8 filename */
+		if (u8_validate(namep, strlen(namep), NULL,
+		    U8_VALIDATE_ENTIRE, &err) < 0)
+			continue;
+
+		smb_mangle(namep, ino, shortname, SMB_SHORTNAMELEN);
+		if (smb_strcasecmp(name, shortname, 0) == 0) {
+			(void) strlcpy(namebuf, namep, buflen);
+			rc = 0;
 			break;
 		}
-
-		bufptr = buf;
-		reclen = 0;
-
-		while ((bufptr += reclen) < buf + bufsize) {
-			if (is_edp) {
-				reclen = edp->ed_reclen;
-				offset = edp->ed_off;
-				ino = edp->ed_ino;
-				namep = edp->ed_name;
-			} else {
-				reclen = dp->d_reclen;
-				offset = dp->d_off;
-				ino = dp->d_ino;
-				namep = dp->d_name;
-			}
-
-			/* skip non utf8 filename */
-			if (u8_validate(namep, strlen(namep), NULL,
-			    U8_VALIDATE_ENTIRE, &err) < 0)
-				continue;
-
-			smb_mangle(namep, ino, shortname, SMB_SHORTNAMELEN);
-
-			if (smb_strcasecmp(name, shortname, 0) == 0) {
-				(void) strlcpy(namebuf, namep, buflen);
-				kmem_free(buf, SMB_UNMANGLE_BUFSIZE);
-				return (0);
-			}
-		}
-
-		if (eof) {
-			err = ENOENT;
-			break;
-		}
-
-		bufsize = SMB_UNMANGLE_BUFSIZE;
 	}
 
 	kmem_free(buf, SMB_UNMANGLE_BUFSIZE);
-	return (err);
+	return (rc);
 }

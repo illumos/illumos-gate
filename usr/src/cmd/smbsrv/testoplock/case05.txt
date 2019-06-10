@@ -1,0 +1,18 @@
+# Input for testoplock, case 05
+open 2 4
+req 2 0x803
+show
+open 3 4
+req 3 0x803
+show
+open 1
+brk-write 1
+show
+ack 3
+show
+open 4 4
+req 4 0x803
+show
+close 4
+req 3 0x803
+show

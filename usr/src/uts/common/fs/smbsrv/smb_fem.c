@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2015 Joyent, Inc.
  */
 
@@ -81,7 +81,6 @@ static int smb_fem_oplock_write(femarg_t *, uio_t *, int, cred_t *,
     struct caller_context *);
 static int smb_fem_oplock_setattr(femarg_t *, vattr_t *, int, cred_t *,
     caller_context_t *);
-static int smb_fem_oplock_rwlock(femarg_t *, int, caller_context_t *);
 static int smb_fem_oplock_space(femarg_t *, int, flock64_t *, int,
     offset_t, cred_t *, caller_context_t *);
 static int smb_fem_oplock_vnevent(femarg_t *, vnevent_t, vnode_t *, char *,
@@ -92,13 +91,12 @@ static const fs_operation_def_t smb_oplock_tmpl[] = {
 	VOPNAME_READ,	{ .femop_read = smb_fem_oplock_read },
 	VOPNAME_WRITE,	{ .femop_write = smb_fem_oplock_write },
 	VOPNAME_SETATTR, { .femop_setattr = smb_fem_oplock_setattr },
-	VOPNAME_RWLOCK, { .femop_rwlock = smb_fem_oplock_rwlock },
 	VOPNAME_SPACE,	{ .femop_space = smb_fem_oplock_space },
 	VOPNAME_VNEVENT, { .femop_vnevent = smb_fem_oplock_vnevent },
 	NULL, NULL
 };
 
-static int smb_fem_oplock_break(femarg_t *, caller_context_t *, uint32_t);
+static int smb_fem_oplock_wait(smb_node_t *, caller_context_t *);
 
 /*
  * smb_fem_init
@@ -428,15 +426,36 @@ smb_fem_oplock_open(
     cred_t		*cr,
     caller_context_t	*ct)
 {
-	uint32_t	flags;
+	smb_node_t	*node;
+	uint32_t	status;
 	int		rc = 0;
 
 	if (ct != &smb_ct) {
-		if (mode & (FWRITE|FTRUNC))
-			flags = SMB_OPLOCK_BREAK_TO_NONE;
-		else
-			flags = SMB_OPLOCK_BREAK_TO_LEVEL_II;
-		rc = smb_fem_oplock_break(arg, ct, flags);
+		uint32_t req_acc = FILE_READ_DATA;
+		uint32_t cr_disp = FILE_OPEN_IF;
+
+		node = (smb_node_t *)(arg->fa_fnode->fn_available);
+		SMB_NODE_VALID(node);
+
+		/*
+		 * Get req_acc, cr_disp just accurate enough so
+		 * the oplock break call does the right thing.
+		 */
+		if (mode & FWRITE) {
+			req_acc = FILE_READ_DATA | FILE_WRITE_DATA;
+			cr_disp = (mode & FTRUNC) ?
+			    FILE_OVERWRITE_IF : FILE_OPEN_IF;
+		} else {
+			req_acc = FILE_READ_DATA;
+			cr_disp = FILE_OPEN_IF;
+		}
+
+		status = smb_oplock_break_OPEN(node, NULL,
+		    req_acc, cr_disp);
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS)
+			rc = smb_fem_oplock_wait(node, ct);
+		else if (status != 0)
+			rc = EIO;
 	}
 	if (rc == 0)
 		rc = vnext_open(arg, mode, cr, ct);
@@ -457,11 +476,19 @@ smb_fem_oplock_read(
     cred_t		*cr,
     caller_context_t	*ct)
 {
+	smb_node_t	*node;
+	uint32_t	status;
 	int	rc = 0;
 
 	if (ct != &smb_ct) {
-		rc = smb_fem_oplock_break(arg, ct,
-		    SMB_OPLOCK_BREAK_TO_LEVEL_II);
+		node = (smb_node_t *)(arg->fa_fnode->fn_available);
+		SMB_NODE_VALID(node);
+
+		status = smb_oplock_break_READ(node, NULL);
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS)
+			rc = smb_fem_oplock_wait(node, ct);
+		else if (status != 0)
+			rc = EIO;
 	}
 	if (rc == 0)
 		rc = vnext_read(arg, uiop, ioflag, cr, ct);
@@ -482,10 +509,20 @@ smb_fem_oplock_write(
     cred_t		*cr,
     caller_context_t	*ct)
 {
+	smb_node_t	*node;
+	uint32_t	status;
 	int	rc = 0;
 
-	if (ct != &smb_ct)
-		rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_NONE);
+	if (ct != &smb_ct) {
+		node = (smb_node_t *)(arg->fa_fnode->fn_available);
+		SMB_NODE_VALID(node);
+
+		status = smb_oplock_break_WRITE(node, NULL);
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS)
+			rc = smb_fem_oplock_wait(node, ct);
+		else if (status != 0)
+			rc = EIO;
+	}
 	if (rc == 0)
 		rc = vnext_write(arg, uiop, ioflag, cr, ct);
 
@@ -500,34 +537,23 @@ smb_fem_oplock_setattr(
     cred_t		*cr,
     caller_context_t	*ct)
 {
+	smb_node_t	*node;
+	uint32_t	status;
 	int	rc = 0;
 
-	if (ct != &smb_ct && (vap->va_mask & AT_SIZE) != 0)
-		rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_NONE);
-	if (rc == 0)
-		rc = vnext_setattr(arg, vap, flags, cr, ct);
-	return (rc);
-}
+	if (ct != &smb_ct && (vap->va_mask & AT_SIZE) != 0) {
+		node = (smb_node_t *)(arg->fa_fnode->fn_available);
+		SMB_NODE_VALID(node);
 
-static int
-smb_fem_oplock_rwlock(
-    femarg_t		*arg,
-    int			write_lock,
-    caller_context_t	*ct)
-{
-	uint32_t	flags;
-	int		rc = 0;
-
-	if (ct != &smb_ct) {
-		if (write_lock)
-			flags = SMB_OPLOCK_BREAK_TO_NONE;
-		else
-			flags = SMB_OPLOCK_BREAK_TO_LEVEL_II;
-		rc = smb_fem_oplock_break(arg, ct, flags);
+		status = smb_oplock_break_SETINFO(node, NULL,
+		    FileEndOfFileInformation);
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS)
+			rc = smb_fem_oplock_wait(node, ct);
+		else if (status != 0)
+			rc = EIO;
 	}
 	if (rc == 0)
-		rc = vnext_rwlock(arg, write_lock, ct);
-
+		rc = vnext_setattr(arg, vap, flags, cr, ct);
 	return (rc);
 }
 
@@ -541,10 +567,21 @@ smb_fem_oplock_space(
     cred_t		*cr,
     caller_context_t	*ct)
 {
+	smb_node_t	*node;
+	uint32_t	status;
 	int	rc = 0;
 
-	if (ct != &smb_ct)
-		rc = smb_fem_oplock_break(arg, ct, SMB_OPLOCK_BREAK_TO_NONE);
+	if (ct != &smb_ct) {
+		node = (smb_node_t *)(arg->fa_fnode->fn_available);
+		SMB_NODE_VALID(node);
+
+		status = smb_oplock_break_SETINFO(node, NULL,
+		    FileAllocationInformation);
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS)
+			rc = smb_fem_oplock_wait(node, ct);
+		else if (status != 0)
+			rc = EIO;
+	}
 	if (rc == 0)
 		rc = vnext_space(arg, cmd, bfp, flag, offset, cr, ct);
 	return (rc);
@@ -572,28 +609,33 @@ smb_fem_oplock_vnevent(
     char		*name,
     caller_context_t	*ct)
 {
-	uint32_t	flags;
+	smb_node_t	*node;
+	uint32_t	status;
 	int		rc = 0;
 
 	if (ct != &smb_ct) {
+		node = (smb_node_t *)(arg->fa_fnode->fn_available);
+		SMB_NODE_VALID(node);
+
 		switch (vnevent) {
 		case VE_REMOVE:
 		case VE_PRE_RENAME_DEST:
 		case VE_RENAME_DEST:
-			flags = SMB_OPLOCK_BREAK_TO_NONE |
-			    SMB_OPLOCK_BREAK_BATCH;
-			rc = smb_fem_oplock_break(arg, ct, flags);
+			status = smb_oplock_break_HANDLE(node, NULL);
 			break;
 		case VE_PRE_RENAME_SRC:
 		case VE_RENAME_SRC:
-			flags = SMB_OPLOCK_BREAK_TO_LEVEL_II |
-			    SMB_OPLOCK_BREAK_BATCH;
-			rc = smb_fem_oplock_break(arg, ct, flags);
+			status = smb_oplock_break_SETINFO(node, NULL,
+			    FileRenameInformation);
 			break;
 		default:
-			rc = 0;
+			status = 0;
 			break;
 		}
+		if (status == NT_STATUS_OPLOCK_BREAK_IN_PROGRESS)
+			rc = smb_fem_oplock_wait(node, ct);
+		else if (status != 0)
+			rc = EIO;
 	}
 	if (rc == 0)
 		rc = vnext_vnevent(arg, vnevent, dvp, name, ct);
@@ -601,24 +643,22 @@ smb_fem_oplock_vnevent(
 	return (rc);
 }
 
-static int
-smb_fem_oplock_break(femarg_t *arg, caller_context_t *ct, uint32_t flags)
-{
-	smb_node_t	*node;
-	int		rc;
+int smb_fem_oplock_timeout = 5000; /* mSec. */
 
-	node = (smb_node_t *)((arg)->fa_fnode->fn_available);
-	SMB_NODE_VALID(node);
+static int
+smb_fem_oplock_wait(smb_node_t *node, caller_context_t *ct)
+{
+	int		rc = 0;
 
 	ASSERT(ct != &smb_ct);
 
 	if (ct && (ct->cc_flags & CC_DONTBLOCK)) {
-		flags |= SMB_OPLOCK_BREAK_NOWAIT;
-		rc = smb_oplock_break(NULL, node, flags);
-		if (rc == EAGAIN)
-			ct->cc_flags |= CC_WOULDBLOCK;
+		ct->cc_flags |= CC_WOULDBLOCK;
+		rc = EAGAIN;
 	} else {
-		rc = smb_oplock_break(NULL, node, flags);
+		(void) smb_oplock_wait_break(node,
+		    smb_fem_oplock_timeout);
+		rc = 0;
 	}
 
 	return (rc);
