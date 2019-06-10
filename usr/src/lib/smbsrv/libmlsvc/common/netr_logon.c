@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 /*
@@ -56,7 +56,6 @@ static void netr_network_samlogon(ndr_heap_t *, netr_info_t *,
     smb_logon_t *, struct netr_logon_info2 *);
 static void netr_setup_identity(ndr_heap_t *, smb_logon_t *,
     netr_logon_id_t *);
-static boolean_t netr_isadmin(struct netr_validation_info3 *);
 static uint32_t netr_setup_domain_groups(struct netr_validation_info3 *,
     smb_ids_t *);
 static uint32_t netr_setup_krb5res_groups(struct krb5_validation_info *,
@@ -818,7 +817,7 @@ netr_setup_identity(ndr_heap_t *heap, smb_logon_t *user_info,
  * token.  Called after domain groups have been added.
  */
 static uint32_t
-netr_setup_token_wingrps(struct netr_validation_info3 *info3,
+netr_setup_token_wingrps(struct netr_validation_info3 *info3 __unused,
     smb_token_t *token)
 {
 	uint32_t status;
@@ -827,9 +826,6 @@ netr_setup_token_wingrps(struct netr_validation_info3 *info3,
 	    &token->tkn_win_grps);
 	if (status != NT_STATUS_SUCCESS)
 		return (status);
-
-	if (netr_isadmin(info3))
-		token->tkn_flags |= SMB_ATF_ADMIN;
 
 	status = smb_wka_token_groups(token->tkn_flags, &token->tkn_win_grps);
 
@@ -922,31 +918,4 @@ static uint32_t netr_setup_krb5res_groups(struct krb5_validation_info *info,
 	}
 
 	return (0);
-}
-
-/*
- * Determines if the given user is the domain Administrator or a
- * member of Domain Admins
- */
-static boolean_t
-netr_isadmin(struct netr_validation_info3 *info3)
-{
-	smb_domain_t di;
-	int i;
-
-	if (!smb_domain_lookup_sid((smb_sid_t *)info3->LogonDomainId, &di))
-		return (B_FALSE);
-
-	if (di.di_type != SMB_DOMAIN_PRIMARY)
-		return (B_FALSE);
-
-	if ((info3->UserId == DOMAIN_USER_RID_ADMIN) ||
-	    (info3->PrimaryGroupId == DOMAIN_GROUP_RID_ADMINS))
-		return (B_TRUE);
-
-	for (i = 0; i < info3->GroupCount; i++)
-		if (info3->GroupIds[i].rid == DOMAIN_GROUP_RID_ADMINS)
-			return (B_TRUE);
-
-	return (B_FALSE);
 }
