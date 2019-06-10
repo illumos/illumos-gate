@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013 RackTop Systems.
- * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <stdlib.h>
@@ -2398,6 +2398,8 @@ smb_lgrp_set_default_privs(smb_group_t *grp)
 {
 	if (smb_strcasecmp(grp->sg_name, "Administrators", 0) == 0) {
 		smb_privset_enable(grp->sg_privs, SE_TAKE_OWNERSHIP_LUID);
+		smb_privset_enable(grp->sg_privs, SE_BACKUP_LUID);
+		smb_privset_enable(grp->sg_privs, SE_RESTORE_LUID);
 		return;
 	}
 
