@@ -23,7 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011, 2016 by Delphix. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
- * Copyright (c) 2012, Joyent, Inc. All rights reserved.
+ * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2011-2012 Pawel Jakub Dawidek. All rights reserved.
  * Copyright (c) 2013 Steven Hartland.  All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
@@ -876,10 +876,11 @@ zfs_do_create(int argc, char **argv)
 			zpool_close(zpool_handle);
 			goto error;
 		}
-		zpool_close(zpool_handle);
 
-		volsize = zvol_volsize_to_reservation(volsize, real_props);
+		volsize = zvol_volsize_to_reservation(zpool_handle, volsize,
+		    real_props);
 		nvlist_free(real_props);
+		zpool_close(zpool_handle);
 
 		if (nvlist_lookup_string(props, zfs_prop_to_name(resv_prop),
 		    &strval) != 0) {

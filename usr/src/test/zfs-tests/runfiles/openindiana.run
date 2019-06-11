@@ -536,7 +536,8 @@ tests = ['refquota_001_pos', 'refquota_002_pos', 'refquota_003_pos',
 
 [/opt/zfs-tests/tests/functional/refreserv]
 tests = ['refreserv_001_pos', 'refreserv_002_pos', 'refreserv_003_pos',
-    'refreserv_004_pos', 'refreserv_005_pos']
+    'refreserv_004_pos', 'refreserv_005_pos', 'refreserv_raidz',
+    'refreserv_multi_raidz']
 
 [/opt/zfs-tests/tests/functional/removal]
 pre =

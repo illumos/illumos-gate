@@ -2521,6 +2521,9 @@ file path=opt/zfs-tests/tests/functional/refreserv/refreserv_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_003_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_004_pos mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/refreserv_005_pos mode=0555
+file path=opt/zfs-tests/tests/functional/refreserv/refreserv_multi_raidz \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/refreserv/refreserv_raidz mode=0555
 file path=opt/zfs-tests/tests/functional/refreserv/setup mode=0555
 file path=opt/zfs-tests/tests/functional/removal/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/removal/removal.kshlib mode=0444
