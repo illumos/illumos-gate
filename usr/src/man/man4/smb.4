@@ -1,10 +1,22 @@
 '\" te
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
-.\" Copyright 2011, Nexenta Systems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License"). You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
-.\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE. If applicable, add the following below this CDDL HEADER, with the
-.\" fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SMB 4 "Sep 25, 2009"
+.\" Copyright 2016, Nexenta Systems, Inc. All Rights Reserved.
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.TH SMB 4 "Apr 23, 2015"
 .SH NAME
 smb \- configuration properties for Solaris CIFS server
 .SH DESCRIPTION
@@ -100,7 +112,31 @@ value is \fBfalse\fR.
 .sp
 .ne 2
 .na
-\fB\fBipv6_enabled\fR\fR
+\fB\fBencrypt\fR\fR
+.ad
+.sp .6
+.RS 4n
+Controls SMB3 Encryption. For requests on a particular share, the server's
+behavior is controlled by the stricter of this option and the per-share
+"encrypt" option.
+.sp
+When set to \fBdisabled\fR, the server will not ask clients to encrypt requests.
+When set to \fBenabled\fR, the server will ask clients to encrypt requests,
+but will not require that they do so. Any message that can be encrypted
+will be encrypted.
+When set to \fBrequired\fR, the server will deny access to or disconnect
+any client that does not support encryption or fails to encrypt requests
+that they should.
+.sp
+In other words, the \fBenabled\fR behavior is that any message that CAN
+be encrypted SHOULD be encrypted, while the \fBrequired\fR behavior is that any
+message that CAN be encrypted MUST be encrypted.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBipv6_enable\fR\fR
 .ad
 .sp .6
 .RS 4n

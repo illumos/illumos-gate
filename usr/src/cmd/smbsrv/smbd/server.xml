@@ -22,7 +22,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 CDDL HEADER END
 
 Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 
 NOTE:  This service manifest is not editable; its contents will
@@ -229,6 +229,8 @@ file.
 			value='true' override='true'/>
 		<propval name='max_protocol' type='astring'
 			value='' override='true'/>
+		<propval name='encrypt' type='astring'
+			value='disabled' override='true'/>
 		<propval name='initial_credits' type='integer'
 			value='20' override='true'/>
 		<propval name='maximum_credits' type='integer'

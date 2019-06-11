@@ -589,6 +589,8 @@ int smb_sign_check_secondary(smb_request_t *, unsigned int);
 void smb_sign_reply(smb_request_t *, mbuf_chain_t *);
 /* SMB2, but here because it's called from common code. */
 void smb2_sign_begin(smb_request_t *, smb_token_t *);
+void smb3_encrypt_begin(smb_request_t *, smb_token_t *);
+void smb3_encrypt_fini(smb_session_t *);
 
 boolean_t smb_sattr_check(uint16_t, uint16_t);
 

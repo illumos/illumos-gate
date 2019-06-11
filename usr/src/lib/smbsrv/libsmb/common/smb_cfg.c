@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  */
 
 /*
@@ -146,8 +146,27 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_INITIAL_CREDITS, "initial_credits", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_MAXIMUM_CREDITS, "maximum_credits", SCF_TYPE_INTEGER, 0},
 	{SMB_CI_MAX_PROTOCOL, "max_protocol", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_ENCRYPT, "encrypt", SCF_TYPE_ASTRING, 0},
 
 	/* SMB_CI_MAX */
+};
+
+/*
+ * We store the max SMB protocol version in SMF as a string,
+ * (for convenience of svccfg etc) but the programmatic get/set
+ * interfaces use the numeric form.
+ *
+ * The numeric values are as defined in the [MS-SMB2] spec.
+ * except for how we represent "1" (for SMB1) which is an
+ * arbitrary value below SMB2_VERS_BASE.
+ */
+static struct str_val
+smb_versions[] = {
+	{ "3.0",	SMB_VERS_3_0 },
+	{ "2.1",	SMB_VERS_2_1 },
+	{ "2.002",	SMB_VERS_2_002 },
+	{ "1",		SMB_VERS_1 },
+	{ NULL,		0 }
 };
 
 static smb_cfg_param_t *smb_config_getent(smb_cfg_id_t);
@@ -159,6 +178,20 @@ static int smb_config_get_idmap_preferred_dc(char *, int);
 static int smb_config_set_idmap_preferred_dc(char *);
 static int smb_config_get_idmap_site_name(char *, int);
 static int smb_config_set_idmap_site_name(char *);
+
+static uint32_t
+smb_convert_version_str(const char *version)
+{
+	uint32_t dialect = 0;
+	int i;
+
+	for (i = 0; smb_versions[i].str != NULL; i++) {
+		if (strcmp(version, smb_versions[i].str) == 0)
+			dialect = smb_versions[i].val;
+	}
+
+	return (dialect);
+}
 
 char *
 smb_config_getname(smb_cfg_id_t id)
@@ -631,7 +664,22 @@ smb_config_setstr(smb_cfg_id_t id, char *value)
 		value = tmp;
 	}
 
-	rc = smb_smf_set_string_property(handle, cfg->sc_name, value);
+	/*
+	 * We don't want people who care enough about protecting their data
+	 * by requiring encryption to accidentally expose their data
+	 * by lowering the protocol, so prevent them from going below 3.0
+	 * if encryption is required.
+	 */
+	if (id == SMB_CI_MAX_PROTOCOL &&
+	    smb_config_get_require(SMB_CI_ENCRYPT) == SMB_CONFIG_REQUIRED &&
+	    smb_config_get_max_protocol() >= SMB_VERS_3_0 &&
+	    smb_convert_version_str(value) < SMB_VERS_3_0) {
+		syslog(LOG_ERR, "Cannot set smbd/max_protocol below 3.0"
+		    " while smbd/encrypt == required.");
+		rc = SMBD_SMF_INVALID_ARG;
+	} else {
+		rc = smb_smf_set_string_property(handle, cfg->sc_name, value);
+	}
 
 	free(tmp);
 	(void) smb_smf_end_transaction(handle);
@@ -1118,43 +1166,27 @@ smb_config_getent(smb_cfg_id_t id)
 	return (NULL);
 }
 
-
 /*
- * We store the max SMB protocol version in SMF as a string,
- * (for convenience of svccfg etc) but the programmatic get/set
- * interfaces use the numeric form.
- *
- * The numeric values are as defined in the [MS-SMB2] spec.
- * except for how we represent "1" (for SMB1) which is an
- * arbitrary value below SMB2_VERS_BASE.
+ * The service manifest has empty values by default for min_protocol and
+ * max_protocol. The expectation is that when those values are empty, we don't
+ * constrain the range of supported protocol versions (and allow use of the
+ * whole range that we implement). For that reason, this should usually be the
+ * highest protocol version we implement.
  */
-static struct str_val
-smb_versions[] = {
-	{ "3.0",	SMB_VERS_3_0 },
-	{ "2.1",	SMB_VERS_2_1 },
-	{ "2.002",	SMB_VERS_2_002 },
-	{ "1",		SMB_VERS_1 },
-	{ NULL,		0 }
-};
-
-/*
- * This really should be the latest (SMB_VERS_3_0)
- * but we're being cautious with SMB3 for a while.
- */
-uint32_t max_protocol_default = SMB_VERS_2_1;
+uint32_t max_protocol_default = SMB_VERS_3_0;
 
 uint32_t
 smb_config_get_max_protocol(void)
 {
 	char str[SMB_VERSTR_LEN];
-	int i, rc;
+	int rc;
+	uint32_t max;
 
 	rc = smb_config_getstr(SMB_CI_MAX_PROTOCOL, str, sizeof (str));
 	if (rc == SMBD_SMF_OK) {
-		for (i = 0; smb_versions[i].str != NULL; i++) {
-			if (strcmp(str, smb_versions[i].str) == 0)
-				return (smb_versions[i].val);
-		}
+		max = smb_convert_version_str(str);
+		if (max != 0)
+			return (max);
 		if (str[0] != '\0') {
 			syslog(LOG_ERR, "smbd/max_protocol value invalid");
 		}
@@ -1166,12 +1198,8 @@ smb_config_get_max_protocol(void)
 int
 smb_config_check_protocol(char *value)
 {
-	int i;
-
-	for (i = 0; smb_versions[i].str != NULL; i++) {
-		if (strcmp(value, smb_versions[i].str) == 0)
-			return (0);
-	}
+	if (smb_convert_version_str(value) != 0)
+		return (0);
 
 	return (-1);
 }
@@ -1278,4 +1306,22 @@ void
 smb_config_upgrade(void)
 {
 	upgrade_smb2_enable();
+}
+
+smb_cfg_val_t
+smb_config_get_require(smb_cfg_id_t id)
+{
+	int rc;
+	char str[sizeof ("required")];
+
+	rc = smb_config_getstr(id, str, sizeof (str));
+	if (rc != SMBD_SMF_OK)
+		return (SMB_CONFIG_DISABLED);
+
+	if (strncmp(str, "required", sizeof (str)) == 0)
+		return (SMB_CONFIG_REQUIRED);
+	if (strncmp(str, "enabled", sizeof (str)) == 0)
+		return (SMB_CONFIG_ENABLED);
+
+	return (SMB_CONFIG_DISABLED);
 }

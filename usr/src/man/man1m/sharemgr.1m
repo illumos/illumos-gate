@@ -1,5 +1,6 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License. You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.
 .\"  See the License for the specific language governing permissions and limitations under the License. When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with
 .\" the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
@@ -1065,6 +1066,33 @@ seconds (8.3 hours). This property is ignored for security modes other than
 .sp
 .LP
 The general properties supported for SMB are:
+.sp
+.ne 2
+.na
+\fB\fBencrypt=\fR\fIstring\fR\fR
+.ad
+.sp .6
+.RS 4n
+Controls SMB3 per-share encryption. This is similar to the global smbd/encrypt
+option. For requests on a particular share, the server's behavior is controlled
+by the stricter of this option and smbd/encrypt.
+.sp
+When set to \fBdisabled\fR, the server will not ask clients to encrypt requests.
+When set to \fBenabled\fR, the server will ask clients to encrypt requests,
+but will not require that they do so. Any message than can be encrypted
+will be encrypted.
+When set to \fBrequired\fR, the server will deny access to or disconnect
+any client that does not support encryption or fails to encrypt requests
+that they should.
+.sp
+In other words, the \fBenabled\fR behavior is that any message that CAN
+be encrypted SHOULD be encrypted, while the \fBrequired\fR behavior is that any
+message that CAN be encrypted MUST be encrypted.
+.sp
+This property is not defined by default.
+.sp
+.RE
+
 .sp
 .ne 2
 .na

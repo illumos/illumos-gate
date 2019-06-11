@@ -260,6 +260,25 @@ smb_tree_connect_core(smb_request_t *sr)
 	tcon->name = name;
 	sr->sr_tcon.si = si;
 
+	/*
+	 * [MS-SMB2] 3.3.5.7 Receiving an SMB2 TREE_CONNECT Request
+	 *
+	 * If we support 3.x, RejectUnencryptedAccess is TRUE,
+	 * if Tcon.EncryptData is TRUE or global EncryptData is TRUE,
+	 * and the connection doesn't support encryption,
+	 * return ACCESS_DENIED.
+	 *
+	 * If RejectUnencryptedAccess is TRUE, we force max_protocol
+	 * to at least 3.0. Additionally, if the tree requires encryption,
+	 * we don't care what we support, we still enforce encryption.
+	 */
+	if ((sr->sr_server->sv_cfg.skc_encrypt == SMB_CONFIG_REQUIRED ||
+	    si->shr_encrypt == SMB_CONFIG_REQUIRED) &&
+	    (sr->session->srv_cap & SMB2_CAP_ENCRYPTION) == 0) {
+		status = NT_STATUS_ACCESS_DENIED;
+		goto out;
+	}
+
 	switch (si->shr_type & STYPE_MASK) {
 	case STYPE_DISKTREE:
 		status = smb_tree_connect_disk(sr, &sr->sr_tcon);
@@ -275,6 +294,7 @@ smb_tree_connect_core(smb_request_t *sr)
 		break;
 	}
 
+out:
 	smb_kshare_release(sr->sr_server, si);
 	sr->sr_tcon.si = NULL;
 
@@ -1079,6 +1099,7 @@ static int
 smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
 {
 	vfs_t *vfsp = SMB_NODE_VFS(node);
+	smb_cfg_val_t srv_encrypt;
 
 	ASSERT(vfsp);
 
@@ -1087,6 +1108,19 @@ smb_tree_getattr(const smb_kshare_t *si, smb_node_t *node, smb_tree_t *tree)
 
 	smb_tree_get_volname(vfsp, tree);
 	smb_tree_get_flags(si, vfsp, tree);
+
+	srv_encrypt = tree->t_session->s_server->sv_cfg.skc_encrypt;
+	if (tree->t_session->dialect >= SMB_VERS_3_0) {
+		if (si->shr_encrypt == SMB_CONFIG_REQUIRED ||
+		    srv_encrypt == SMB_CONFIG_REQUIRED)
+			tree->t_encrypt = SMB_CONFIG_REQUIRED;
+		else if (si->shr_encrypt == SMB_CONFIG_ENABLED ||
+		    srv_encrypt == SMB_CONFIG_ENABLED)
+			tree->t_encrypt = SMB_CONFIG_ENABLED;
+		else
+			tree->t_encrypt = SMB_CONFIG_DISABLED;
+	} else
+		tree->t_encrypt = SMB_CONFIG_DISABLED;
 
 	VFS_RELE(vfsp);
 	return (0);

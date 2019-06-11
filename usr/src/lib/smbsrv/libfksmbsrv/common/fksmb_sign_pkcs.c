@@ -23,7 +23,7 @@
 
 #include <stdlib.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/smb_signing.h>
+#include <smbsrv/smb_kcrypt.h>
 #include <security/cryptoki.h>
 #include <security/pkcs11.h>
 
@@ -31,7 +31,7 @@
  * Common function to see if a mech is available.
  */
 static int
-find_mech(smb_sign_mech_t *mech, ulong_t mid)
+find_mech(smb_crypto_mech_t *mech, ulong_t mid)
 {
 	CK_SESSION_HANDLE hdl;
 	CK_RV rv;
@@ -59,7 +59,7 @@ find_mech(smb_sign_mech_t *mech, ulong_t mid)
  * Find out if we have this mech.
  */
 int
-smb_md5_getmech(smb_sign_mech_t *mech)
+smb_md5_getmech(smb_crypto_mech_t *mech)
 {
 	return (find_mech(mech, CKM_MD5));
 }
@@ -68,7 +68,7 @@ smb_md5_getmech(smb_sign_mech_t *mech)
  * Start PKCS#11 session.
  */
 int
-smb_md5_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech)
+smb_md5_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech)
 {
 	CK_RV rv;
 
@@ -120,7 +120,7 @@ smb_md5_final(smb_sign_ctx_t ctx, uint8_t *digest16)
  * Find out if we have this mech.
  */
 int
-smb2_hmac_getmech(smb_sign_mech_t *mech)
+smb2_hmac_getmech(smb_crypto_mech_t *mech)
 {
 	return (find_mech(mech, CKM_SHA256_HMAC));
 }
@@ -129,7 +129,7 @@ smb2_hmac_getmech(smb_sign_mech_t *mech)
  * Start PKCS#11 session, load the key.
  */
 int
-smb2_hmac_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech,
+smb2_hmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
     uint8_t *key, size_t key_len)
 {
 	CK_OBJECT_HANDLE hkey = 0;
@@ -194,7 +194,7 @@ smb2_hmac_final(smb_sign_ctx_t ctx, uint8_t *digest16)
  * Find out if we have this mech.
  */
 int
-smb3_cmac_getmech(smb_sign_mech_t *mech)
+smb3_cmac_getmech(smb_crypto_mech_t *mech)
 {
 	return (find_mech(mech, CKM_AES_CMAC));
 }
@@ -203,7 +203,7 @@ smb3_cmac_getmech(smb_sign_mech_t *mech)
  * Start PKCS#11 session, load the key.
  */
 int
-smb3_cmac_init(smb_sign_ctx_t *ctxp, smb_sign_mech_t *mech,
+smb3_cmac_init(smb_sign_ctx_t *ctxp, smb_crypto_mech_t *mech,
     uint8_t *key, size_t key_len)
 {
 	CK_OBJECT_HANDLE hkey = 0;

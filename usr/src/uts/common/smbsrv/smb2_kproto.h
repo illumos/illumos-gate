@@ -34,6 +34,9 @@ extern uint32_t smb2_res_def_timeout;
 extern uint32_t smb2_res_max_timeout;
 extern int smb2_enable_dh;
 
+#define	SMB3_CLIENT_ENCRYPTS(sr) \
+	((sr->session->capabilities & SMB2_CAP_ENCRYPTION) != 0)
+
 void	smb2_dispatch_stats_init(smb_server_t *);
 void	smb2_dispatch_stats_fini(smb_server_t *);
 void	smb2_dispatch_stats_update(smb_server_t *,
@@ -46,6 +49,9 @@ void smb2sr_append_postwork(smb_request_t *, smb_request_t *);
 
 int smb2_decode_header(smb_request_t *);
 int smb2_encode_header(smb_request_t *, boolean_t);
+int smb3_decode_tform_header(smb_request_t *);
+int smb3_encode_tform_header(smb_request_t *, struct mbuf_chain *mbc);
+
 void smb2_send_reply(smb_request_t *);
 void smb2sr_put_error(smb_request_t *, uint32_t);
 void smb2sr_put_error_data(smb_request_t *, uint32_t, mbuf_chain_t *);
@@ -57,8 +63,12 @@ int smb2_sign_check_request(smb_request_t *);
 void smb2_sign_reply(smb_request_t *);
 void smb2_sign_init_mech(smb_session_t *);
 
-uint32_t smb2_fsctl_vneginfo(smb_request_t *, smb_fsctl_t *);
+int smb3_encrypt_sr(smb_request_t *, struct mbuf_chain *, struct mbuf_chain *);
+int smb3_decrypt_sr(smb_request_t *);
+int smb3_encrypt_init_mech(smb_session_t *s);
+
 uint32_t smb2_fsctl_resiliency(smb_request_t *, smb_fsctl_t *);
+uint32_t smb2_fsctl_vneginfo(smb_request_t *, smb_fsctl_t *);
 
 smb_sdrc_t smb2_negotiate(smb_request_t *);
 smb_sdrc_t smb2_session_setup(smb_request_t *);

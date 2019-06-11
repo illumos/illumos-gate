@@ -22,6 +22,13 @@ extern "C" {
 
 #define	SMB2_PROTOCOL_ID	{ 0xFE, 'S', 'M', 'B' }
 #define	SMB2_HDR_SIZE	64
+#define	SMB3_TFORM_HDR_SIZE	52
+
+/*
+ * Protocol ID as a 32-bit little-endian integer.
+ */
+#define	SMB2_PROTOCOL_MAGIC	0x424d53fe
+#define	SMB3_ENCRYPTED_MAGIC	0x424d53fd
 
 /*
  * SMB2 header command codes.

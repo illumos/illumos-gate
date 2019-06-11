@@ -46,13 +46,13 @@ HDRS=	alloc.h			\
 	smb_idmap.h		\
 	smb_inet.h		\
 	smb_ioctl.h		\
+	smb_kcrypt.h		\
 	smb_kproto.h		\
 	smb_kstat.h		\
 	smb_ktypes.h		\
 	smb_oplock.h		\
 	smb_privilege.h		\
 	smb_share.h		\
-	smb_signing.h		\
 	smb_token.h		\
 	smb_vops.h		\
 	smb_xdr.h		\

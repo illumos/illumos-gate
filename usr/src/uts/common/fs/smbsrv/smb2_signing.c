@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
  */
 /*
  * These routines provide the SMB MAC signing for the SMB2 server.
@@ -39,8 +39,8 @@
  */
 
 #include <sys/uio.h>
-#include <smbsrv/smb_kproto.h>
-#include <smbsrv/smb_signing.h>
+#include <smbsrv/smb2_kproto.h>
+#include <smbsrv/smb_kcrypt.h>
 #include <sys/isa_defs.h>
 #include <sys/byteorder.h>
 #include <sys/cmn_err.h>
@@ -49,7 +49,7 @@
 #define	SMB2_SIG_SIZE	16
 
 typedef struct mac_ops {
-	int (*mac_init)(smb_sign_ctx_t *, smb_sign_mech_t *,
+	int (*mac_init)(smb_sign_ctx_t *, smb_crypto_mech_t *,
 			uint8_t *, size_t);
 	int (*mac_update)(smb_sign_ctx_t, uint8_t *, size_t);
 	int (*mac_final)(smb_sign_ctx_t, uint8_t *);
@@ -57,8 +57,6 @@ typedef struct mac_ops {
 
 static int smb2_sign_calc_common(smb_request_t *, struct mbuf_chain *,
     uint8_t *, mac_ops_t *);
-
-static int smb3_do_kdf(void *, void *, size_t, uint8_t *, uint32_t);
 
 /*
  * SMB2 wrapper functions
@@ -89,7 +87,7 @@ smb2_sign_calc(smb_request_t *sr,
 static void
 smb2_sign_fini(smb_session_t *s)
 {
-	smb_sign_mech_t *mech;
+	smb_crypto_mech_t *mech;
 
 	if ((mech = s->sign_mech) != NULL) {
 		kmem_free(mech, sizeof (*mech));
@@ -133,8 +131,8 @@ static uint8_t sign_kdf_input[29] = {
 void
 smb2_sign_init_mech(smb_session_t *s)
 {
-	smb_sign_mech_t *mech;
-	int (*get_mech)(smb_sign_mech_t *);
+	smb_crypto_mech_t *mech;
+	int (*get_mech)(smb_crypto_mech_t *);
 	int (*sign_calc)(smb_request_t *, struct mbuf_chain *, uint8_t *);
 	int rc;
 
@@ -209,15 +207,16 @@ smb2_sign_begin(smb_request_t *sr, smb_token_t *token)
 		 * of the session key (truncated or padded with zeros).
 		 * [MS-SMB2] 3.2.5.3.1
 		 */
-		sign_key->len = SMB2_SIG_SIZE;
+		sign_key->len = SMB2_KEYLEN;
 		bcopy(token->tkn_ssnkey.val, sign_key->key,
 		    MIN(token->tkn_ssnkey.len, sign_key->len));
 	}
 
 	mutex_enter(&u->u_mutex);
-	if (s->secmode & SMB2_NEGOTIATE_SIGNING_ENABLED)
+	if ((s->srv_secmode & SMB2_NEGOTIATE_SIGNING_ENABLED) != 0)
 		u->u_sign_flags |= SMB_SIGNING_ENABLED;
-	if (s->secmode & SMB2_NEGOTIATE_SIGNING_REQUIRED)
+	if ((s->srv_secmode & SMB2_NEGOTIATE_SIGNING_REQUIRED) != 0 ||
+	    (s->cli_secmode & SMB2_NEGOTIATE_SIGNING_REQUIRED) != 0)
 		u->u_sign_flags |=
 		    SMB_SIGNING_ENABLED | SMB_SIGNING_CHECK;
 	mutex_exit(&u->u_mutex);
@@ -453,13 +452,22 @@ smb2_sign_reply(smb_request_t *sr)
  * - Session.SessionKey as K1
  * - label = SMB2APP (size 8)
  * - context = SmbRpc (size 7)
+ * Session.EncryptionKey for encrypting server messages
+ * - Session.SessionKey as K1
+ * - label = "SMB2AESCCM" (size 11)
+ * - context = "ServerOut" (size 10)
+ * Session.DecryptionKey for decrypting client requests
+ * - Session.SessionKey as K1
+ * - label = "SMB2AESCCM" (size 11)
+ * - context = "ServerIn " (size 10) (Note the space)
  */
-static int
+
+int
 smb3_do_kdf(void *outbuf, void *input, size_t input_len,
     uint8_t *key, uint32_t key_len)
 {
 	uint8_t digest32[SHA256_DIGEST_LENGTH];
-	smb_sign_mech_t mech;
+	smb_crypto_mech_t mech;
 	smb_sign_ctx_t hctx = 0;
 	int rc;
 

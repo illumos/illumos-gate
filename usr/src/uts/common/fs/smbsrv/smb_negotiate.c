@@ -403,7 +403,7 @@ smb_post_negotiate(smb_request_t *sr)
 smb_sdrc_t
 smb_com_negotiate(smb_request_t *sr)
 {
-	smb_session_t 		*session = sr->session;
+	smb_session_t		*session = sr->session;
 	smb_arg_negotiate_t	*negprot = sr->sr_negprot;
 	uint16_t		secmode;
 	uint32_t		sesskey;
@@ -437,9 +437,9 @@ smb_com_negotiate(smb_request_t *sr)
 		return (rc);
 	}
 
-	session->secmode = NEGOTIATE_ENCRYPT_PASSWORDS |
+	session->srv_secmode = NEGOTIATE_ENCRYPT_PASSWORDS |
 	    NEGOTIATE_USER_SECURITY;
-	secmode = session->secmode;
+	secmode = session->srv_secmode;
 	sesskey = session->sesskey;
 
 	negprot->ni_servertime.tv_sec = gethrestime_sec();
@@ -532,7 +532,7 @@ smb_com_negotiate(smb_request_t *sr)
 				secmode |=
 				    NEGOTIATE_SECURITY_SIGNATURES_REQUIRED;
 
-			session->secmode = secmode;
+			session->srv_secmode = secmode;
 		}
 
 		/*

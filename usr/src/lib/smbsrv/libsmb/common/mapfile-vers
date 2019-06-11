@@ -19,7 +19,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
 #
 
 #
@@ -93,6 +93,7 @@ SYMBOL_VERSION SUNWprivate {
 	smb_cache_ready;
 	smb_cache_refreshing;
 	smb_cache_remove;
+	smb_cfg_set_require;
 	smb_chk_hostaccess;
 	smb_codepage_init;
 	smb_common_decode;

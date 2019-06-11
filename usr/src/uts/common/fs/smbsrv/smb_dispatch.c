@@ -906,19 +906,8 @@ reply_ready:
 	smbsr_send_reply(sr);
 
 drop_connection:
-	if (disconnect) {
-		smb_rwx_rwenter(&session->s_lock, RW_WRITER);
-		switch (session->s_state) {
-		case SMB_SESSION_STATE_DISCONNECTED:
-		case SMB_SESSION_STATE_TERMINATED:
-			break;
-		default:
-			smb_soshutdown(session->sock);
-			session->s_state = SMB_SESSION_STATE_DISCONNECTED;
-			break;
-		}
-		smb_rwx_rwexit(&session->s_lock);
-	}
+	if (disconnect)
+		smb_session_disconnect(session);
 
 out:
 	if (sr != NULL) {

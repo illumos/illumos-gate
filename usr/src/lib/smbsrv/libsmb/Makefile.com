@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2017 Nexenta Systems, Inc.  All rights reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
 
@@ -28,6 +28,7 @@ LIBRARY= libsmb.a
 VERS= .1
 
 OBJS_SHARED = 			\
+	smb_cfg_util.o		\
 	smb_door_legacy.o 	\
 	smb_inet.o		\
 	smb_msgbuf.o		\
