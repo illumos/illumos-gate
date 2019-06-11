@@ -21,11 +21,18 @@
 
 #
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
-<transform file path=var/svc/manifest/.*\.xml -> add restart_fmri svc:/system/manifest-import:default>
-<transform file path=lib/svc/manifest/.*\.xml -> add restart_fmri svc:/system/manifest-import:default>
-<transform file path=etc/security/[^/]+_attr.d/.+ -> add restart_fmri svc:/system/rbac:default>
-<transform file path=etc/user_attr.d/.+ -> add restart_fmri svc:/system/rbac:default>
+<transform file path=var/svc/manifest/.*\.xml -> \
+    add restart_fmri svc:/system/manifest-import:default>
+<transform file path=lib/svc/manifest/.*\.xml -> \
+    add restart_fmri svc:/system/manifest-import:default>
+<transform file path=etc/security/[^/]+_attr.d/.+ -> \
+    add restart_fmri svc:/system/rbac:default>
+<transform file path=etc/user_attr.d/.+ -> \
+    add restart_fmri svc:/system/rbac:default>
 <transform file path=usr/share/applications/.*\.desktop -> \
-	add restart_fmri svc:/application/desktop-cache/desktop-mime-cache:default>
+    add restart_fmri svc:/application/desktop-cache/desktop-mime-cache:default>
+<transform file link path=usr/(share|has)/man/.*\.\d[a-z]*$ -> \
+    add restart_fmri svc:/system/update-man-index:default>

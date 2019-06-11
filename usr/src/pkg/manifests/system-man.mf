@@ -12,6 +12,7 @@
 #
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 
 set name=pkg.fmri value=pkg:/system/man@$(PKGVERS)
@@ -21,12 +22,18 @@ set name=pkg.summary value="Reference Manual Pages Tools"
 set name=info.classification \
     value="org.opensolaris.category.2008:System/Text Tools"
 set name=variant.arch value=$(ARCH)
+dir path=lib/svc
+dir path=lib/svc/manifest group=sys
+dir path=lib/svc/manifest/system group=sys
+dir path=lib/svc/method
 dir path=usr/bin
 dir path=usr/share
 dir path=usr/share/man
 dir path=usr/share/man/man1
 dir path=usr/share/man/man1m
 dir path=usr/share/man/man5
+file path=lib/svc/manifest/system/update-man-index.xml group=sys mode=0444
+file path=lib/svc/method/update-man-index mode=0555
 file path=usr/bin/man mode=0555
 file path=usr/bin/mandoc mode=0555
 file path=usr/share/man/man1/apropos.1
