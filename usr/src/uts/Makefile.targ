@@ -20,7 +20,7 @@
 #
 #
 # Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2015, Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 #
@@ -51,7 +51,7 @@ $(OBJECTS): $(INLINES)
 #	Partially link .o files to generate the kmod. The fake dependency
 #	on modstubs simplifies things...
 #
-$(BINARY):		$(OBJECTS) $(DTRACE_MAPFILE)
+$(BINARY):		$(OBJECTS) $(DTRACE_MAPFILE) $(MAPFILE)
 	$(LD) -r $(LDFLAGS) -o $@ $(OBJECTS)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)

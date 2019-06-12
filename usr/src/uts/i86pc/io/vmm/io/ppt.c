@@ -29,7 +29,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc
+ * Copyright 2019 Joyent, Inc
  */
 
 #include <sys/cdefs.h>
@@ -623,7 +623,7 @@ static struct dev_ops ppt_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"ppt",
+	"bhyve pci pass-thru",
 	&ppt_ops
 };
 

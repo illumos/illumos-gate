@@ -27,6 +27,7 @@ OBJECTS	= $(VIONA_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(VIONA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/i86pc/io/viona
+MAPFILE		= $(UTSBASE)/i86pc/io/viona/viona.mapfile
 
 #
 # Include common rules.
@@ -58,6 +59,7 @@ DEF_BUILDS	= $(DEF_BUILDSONLY64)
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/dls -Ndrv/vmm -Nmisc/neti
 LDFLAGS		+= -Nmisc/hook
+LDFLAGS		+= -M $(MAPFILE)
 
 #
 #	Default build targets.

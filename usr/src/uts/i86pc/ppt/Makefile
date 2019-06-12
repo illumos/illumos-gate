@@ -27,6 +27,7 @@ OBJECTS		= $(PPT_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(PPT_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/i86pc/io/vmm/io
+MAPFILE		= $(UTSBASE)/i86pc/io/vmm/io/ppt.mapfile
 
 #
 #	Include common rules.
@@ -51,6 +52,7 @@ INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(UTSBASE)/i86pc/io/vmm/io
 AS_INC_PATH	+= -I$(UTSBASE)/i86pc/io/vmm -I$(OBJS_DIR)
 
 LDFLAGS         += -dy -N drv/vmm -N misc/pcie
+LDFLAGS         += -M $(MAPFILE)
 
 $(OBJS_DIR)/ppt.o := CERRWARN	+= -_gcc=-Wno-unused-variable
 

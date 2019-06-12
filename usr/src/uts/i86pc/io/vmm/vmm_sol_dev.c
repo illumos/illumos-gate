@@ -1994,7 +1994,7 @@ static struct dev_ops vmm_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,
-	"vmm",
+	"bhyve vmm",
 	&vmm_ops
 };
 
