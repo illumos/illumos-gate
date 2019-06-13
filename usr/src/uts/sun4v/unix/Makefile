@@ -22,6 +22,7 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -102,7 +103,7 @@ CLOBBERFILES	= $(CLEANFILES) $(UNIX_BIN)
 CLEANLINTFILES	+= $(LINT_LIB)
 
 #
-# lint pass one enforcement 
+# lint pass one enforcement
 # Turn on doubleword alignment for 64 bit counter timer registers
 #
 CFLAGS += $(CCVERBOSE) -dalign
@@ -148,13 +149,13 @@ lint:		$(LINT_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:  	$(INSTALL_DEPS)
+install:	$(INSTALL_DEPS)
 
 
-$(UNIX_BIN):	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(MAPFILE) $(LIBS) \
-		$(DTRACESTUBS) 
-	$(LD) -dy -b -o $@ -e _start -M $(MAPFILE) \
-	    $(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS) 
+$(UNIX_BIN):	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(UNIX_MAPFILE) $(LIBS) \
+		$(DTRACESTUBS)
+	$(LD) -dy -b -o $@ -e _start -M $(UNIX_MAPFILE) \
+	    $(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS)
 	$(CTFMERGE_UNIQUIFY_AGAINST_GENUNIX)
 	$(POST_PROCESS)
 
@@ -162,7 +163,7 @@ $(UNIX32_LINK):	$(ROOT_PSM_KERN_DIR_32) $(UNIX_BIN)
 	-$(RM) $@; ln -s $(SUBDIR64)/$(UNIX) $@
 
 symcheck:	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBS)
-	$(LD) -dy -b -o $(SYM_MOD) -M $(MAPFILE) \
+	$(LD) -dy -b -o $(SYM_MOD) -M $(UNIX_MAPFILE) \
 	$(UNIX_O) $(KRTLD_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS)
 
 $(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o

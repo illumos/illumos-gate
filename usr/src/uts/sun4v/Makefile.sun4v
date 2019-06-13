@@ -23,6 +23,7 @@
 # Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 #	This makefile contains the common definitions for the sun4v unix
 #	and all sun4v implementation architecture dependent modules.
@@ -114,7 +115,7 @@ DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
 
 UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
-GENLIB	 	 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
+GENLIB		 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
 
 LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
 GEN_LINT_LIB	 = $(LINT_LIB_DIR)/llib-lgenunix.ln
@@ -206,19 +207,19 @@ LINT_DEFS	= -m64
 #
 #	The following must be defined for all implementations:
 #
-#	MAPFILE:		ld mapfile for the build of kernel/unix.
+#	UNIX_MAPFILE:		ld mapfile for the build of kernel/unix.
 #	MODSTUBS:		Module stubs source file.
 #	GENCONST_SRC:		genconst.c
 #	OFFSETS:		offsets.in
 #	PLATFORM_OFFSETS:	Platform specific mach_offsets.in
 #	FDOFFSETS:		fd_offsets.in
 #
-MAPFILE		 = $(UTSBASE)/sun4/conf/Mapfile
+UNIX_MAPFILE	 = $(UTSBASE)/sun4/conf/Mapfile
 MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
 GENCONST_SRC	 = $(UTSBASE)/sun4/ml/genconst.c
 OFFSETS		 = $(UTSBASE)/sun4/ml/offsets.in
 PLATFORM_OFFSETS = $(UTSBASE)/sun4v/ml/mach_offsets.in
-FDOFFSETS 	 = $(UTSBASE)/sun/io/fd_offsets.in
+FDOFFSETS	 = $(UTSBASE)/sun/io/fd_offsets.in
 
 #
 #	Define the actual specific platforms
@@ -266,7 +267,7 @@ IF_TRAPTRACE_OBJ = $(IF_DEBUG_OBJ)
 
 $(IF_TRAPTRACE_OBJ)mach_locore.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mlsetup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
-$(IF_TRAPTRACE_OBJ)syscall_trap.o 	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)syscall_trap.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mach_startup.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mp_startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
