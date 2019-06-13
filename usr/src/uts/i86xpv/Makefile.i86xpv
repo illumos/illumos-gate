@@ -25,6 +25,7 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 #
@@ -60,7 +61,7 @@ SYM_MOD		= $(OBJS_DIR)/unix.sym
 
 UNIX_O		 = $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 MODSTUBS_O	 = $(MODSTUBS_DIR)/$(OBJS_DIR)/modstubs.o
-GENLIB	 	 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
+GENLIB		 = $(GENLIB_DIR)/$(OBJS_DIR)/libgenunix.so
 LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
 DBOOT_LINT_LIB	 = $(LINT_LIB_DIR)/llib-ldboot.ln
 GEN_LINT_LIB	 = $(GEN_LINT_LIB_DIR)/llib-lgenunix.ln
@@ -136,11 +137,11 @@ AS_INC_PATH		+= -I$(DSF_DIR)/$(OBJS_DIR)
 #
 #	The following must be defined for all implementations:
 #
-#	MAPFILE:	ld mapfile for the build of kernel/unix.
+#	UNIX_MAPFILE:	ld mapfile for the build of kernel/unix.
 #	MODSTUBS:	Module stubs source file.
 #	GENASSYM_SRC:	genassym.c
 
-MAPFILE		= $(UTSBASE)/$(PLATFORM)/conf/Mapfile
+UNIX_MAPFILE	= $(UTSBASE)/$(PLATFORM)/conf/Mapfile
 MODSTUBS	= $(UTSBASE)/intel/ia32/ml/modstubs.s
 GENASSYM_SRC	= $(UTSBASE)/i86pc/ml/genassym.c
 OFFSETS_SRC	= $(UTSBASE)/i86pc/ml/offsets.in
@@ -312,7 +313,7 @@ DACF_KMODS	+= consconfig_dacf
 #
 #	'Mach' Modules (/kernel/mach):
 #
-MACH_KMODS     	+= xpv_psm xpv_uppc
+MACH_KMODS	+= xpv_psm xpv_uppc
 
 #
 #	'TOD' modules (/platform/.../kernel/tod):

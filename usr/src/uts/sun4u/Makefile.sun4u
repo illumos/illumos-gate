@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
 # Copyright 2019 Peter Tribble.
+# Copyright 2019 Joyent, Inc.
 #
 #	This makefile contains the common definitions for the sun4u unix
 #	and all sun4u implementation architecture dependent modules.
@@ -226,14 +227,14 @@ LINT_DEFS = -m64
 #
 #	The following must be defined for all implementations:
 #
-#	MAPFILE:		ld mapfile for the build of kernel/unix.
+#	UNIX_MAPFILE:		ld mapfile for the build of kernel/unix.
 #	MODSTUBS:		Module stubs source file.
 #	GENCONST_SRC:		genconst.c
 #	OFFSETS:		offsets.in
 #	PLATFORM_OFFSETS:	Platform specific mach_offsets.in
 #	FDOFFSETS:		fd_offsets.in
 #
-MAPFILE		 = $(UTSBASE)/sun4/conf/Mapfile
+UNIX_MAPFILE	 = $(UTSBASE)/sun4/conf/Mapfile
 MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
 GENCONST_SRC	 = $(UTSBASE)/sun4/ml/genconst.c
 OFFSETS		 = $(UTSBASE)/sun4/ml/offsets.in

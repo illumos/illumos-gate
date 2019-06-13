@@ -24,7 +24,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
-# Copyright 2017 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 #
 #
@@ -139,11 +139,11 @@ AS_INC_PATH		+= -I$(DSF_DIR)/$(OBJS_DIR)
 #
 #	The following must be defined for all implementations:
 #
-#	MAPFILE:	ld mapfile for the build of kernel/unix.
+#	UNIX_MAPFILE:	ld mapfile for the build of kernel/unix.
 #	MODSTUBS:	Module stubs source file.
 #	GENASSYM_SRC:	genassym.c
 #
-MAPFILE		 = $(UTSBASE)/$(PLATFORM)/conf/Mapfile
+UNIX_MAPFILE	 = $(UTSBASE)/$(PLATFORM)/conf/Mapfile
 MODSTUBS	 = $(UTSBASE)/intel/ia32/ml/modstubs.s
 GENASSYM_SRC	 = $(UTSBASE)/$(PLATFORM)/ml/genassym.c
 OFFSETS_SRC	 = $(UTSBASE)/$(PLATFORM)/ml/offsets.in
