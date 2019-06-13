@@ -1149,5 +1149,3 @@ $(sparc_ONLY)link path=platform/sun4v/kernel/unix target=$(ARCH64)/unix
 $(i386_ONLY)link path=usr/share/man/man4/isa.4 target=sysbus.4
 $(sparc_ONLY)link path=usr/share/man/man7d/drmach.7d target=dr.7d
 link path=usr/share/man/man7d/fdc.7d target=fd.7d
-$(sparc_ONLY)link path=usr/share/man/man7d/ngdr.7d target=dr.7d
-$(sparc_ONLY)link path=usr/share/man/man7d/ngdrmach.7d target=dr.7d

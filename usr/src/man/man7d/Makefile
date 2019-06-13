@@ -248,9 +248,7 @@ _MANLINKS=	1394.7d		\
 		urandom.7d	\
 		usb.7d
 
-sparc_MANLINKS=	drmach.7d	\
-		ngdr.7d		\
-		ngdrmach.7d
+sparc_MANLINKS=	drmach.7d
 
 MANFILES =	$(_MANFILES) $($(MACH)_MANFILES)
 MANLINKS =	$(_MANLINKS) $($(MACH)_MANLINKS)
@@ -259,8 +257,6 @@ bscbus.7d	:= LINKSRC = bscv.7d
 i2bsc.7d	:= LINKSRC = bscv.7d
 
 drmach.7d	:= LINKSRC = dr.7d
-ngdr.7d		:= LINKSRC = dr.7d
-ngdrmach.7d	:= LINKSRC = dr.7d
 
 fdc.7d		:= LINKSRC = fd.7d
 
