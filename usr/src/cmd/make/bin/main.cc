@@ -2545,6 +2545,8 @@ enter_argv_values(int argc, char *argv[], ASCII_Dyn_Array *makeflags_and_macro)
 					fatal(gettext("failed to change to directory %s: %s"),
 					    argv[i + 1], strerror(errno));
 				}
+				MBSTOWCS(wcs_buffer, "DMAKE_CDIR");
+				name = GETNAME(wcs_buffer, FIND_LENGTH);
 				path_reset = true;
 				rebuild_arg0 = true;
 				(void) get_current_path();
