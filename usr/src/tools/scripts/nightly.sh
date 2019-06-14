@@ -28,6 +28,7 @@
 # Copyright (c) 2017 by Delphix. All rights reserved.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2019 Peter Trible.
 #
 # Based on the nightly script from the integration folks,
 # Mostly modified and owned by mike_s.
@@ -37,17 +38,8 @@
 # The default is the old behavior of CLONE_WS
 #
 # -i on the command line, means fast options, so when it's on the
-# command line (only), lint and check builds are skipped no matter what
+# command line (only), check builds are skipped no matter what
 # the setting of their individual flags are in NIGHTLY_OPTIONS.
-#
-# LINTDIRS can be set in the env file, format is a list of:
-#
-#	/dirname-to-run-lint-on flag
-#
-#	Where flag is:	y - enable lint noise diff output
-#			n - disable lint noise diff output
-#
-#	For example: LINTDIRS="$SRC/uts n $SRC/stand y $SRC/psm y"
 #
 # OPTHOME  may be set in the environment to override /opt
 #
@@ -361,99 +353,6 @@ function build {
 	ROOT=$ORIGROOT
 }
 
-# Usage: dolint /dir y|n
-# Arg. 2 is a flag to turn on/off the lint diff output
-function dolint {
-	if [ ! -d "$1" ]; then
-		echo "dolint error: $1 is not a directory"
-		exit 1
-	fi
-
-	if [ "$2" != "y" -a "$2" != "n" ]; then
-		echo "dolint internal error: $2 should be 'y' or 'n'"
-		exit 1
-	fi
-
-	lintdir=$1
-	dodiff=$2
-	base=`basename $lintdir`
-	LINTOUT=$lintdir/lint-${MACH}.out
-	LINTNOISE=$lintdir/lint-noise-${MACH}
-	export ENVLDLIBS1=`myldlibs $ROOT`
-	export ENVCPPFLAGS1=`myheaders $ROOT`
-
-	set_debug_build_flags
-
-	#
-	#	'$MAKE lint' in $lintdir
-	#
-	echo "\n==== Begin '$MAKE lint' of $base at `date` ====\n" >> $LOGFILE
-
-	# remove old lint.out
-	rm -f $lintdir/lint.out $lintdir/lint-noise.out
-	if [ -f $lintdir/lint-noise.ref ]; then
-		mv $lintdir/lint-noise.ref ${LINTNOISE}.ref
-	fi
-
-	rm -f $LINTOUT
-	cd $lintdir
-	#
-	# Remove all .ln files to ensure a full reference file
-	#
-	rm -f Nothing_to_remove \
-	    `find . \( -name SCCS -o -name .hg -o -name .svn -o -name .git \) \
-		-prune -o -type f -name '*.ln' -print `
-
-	/bin/time $MAKE -ek lint 2>&1 | \
-	    tee -a $LINTOUT >> $LOGFILE
-
-	echo "\n==== '$MAKE lint' of $base ERRORS ====\n" >> $mail_msg_file
-
-	grep "$MAKE:" $LINTOUT |
-		egrep -v "Ignoring unknown host" | \
-		tee $TMPDIR/lint_errs >> $mail_msg_file
-	if [[ -s $TMPDIR/lint_errs ]]; then
-		build_extras_ok=n
-	fi
-
-	echo "\n==== Ended '$MAKE lint' of $base at `date` ====\n" >> $LOGFILE
-
-	echo "\n==== Elapsed time of '$MAKE lint' of $base ====\n" \
-		>>$mail_msg_file
-	tail -3  $LINTOUT >>$mail_msg_file
-
-	rm -f ${LINTNOISE}.ref
-	if [ -f ${LINTNOISE}.out ]; then
-		mv ${LINTNOISE}.out ${LINTNOISE}.ref
-	fi
-        grep : $LINTOUT | \
-		egrep -v '^(real|user|sys)' |
-		egrep -v '(library construction)' | \
-		egrep -v ': global crosschecks' | \
-		egrep -v 'Ignoring unknown host' | \
-		egrep -v '\.c:$' | \
-		sort | uniq > ${LINTNOISE}.out
-	if [ ! -f ${LINTNOISE}.ref ]; then
-		cp ${LINTNOISE}.out ${LINTNOISE}.ref
-	fi
-
-	if [ "$dodiff" != "n" ]; then
-		echo "\n==== lint warnings $base ====\n" \
-			>>$mail_msg_file
-		# should be none, though there are a few that were filtered out
-		# above
-		egrep -i '(warning|lint):' ${LINTNOISE}.out \
-			| sort | uniq | tee $TMPDIR/lint_warns >> $mail_msg_file
-		if [[ -s $TMPDIR/lint_warns ]]; then
-			build_extras_ok=n
-		fi
-		echo "\n==== lint noise differences $base ====\n" \
-			>> $mail_msg_file
-		diff ${LINTNOISE}.ref ${LINTNOISE}.out \
-			>> $mail_msg_file
-	fi
-}
-
 #
 # Build and install the onbld tools.
 #
@@ -567,7 +466,7 @@ fi
 USAGE='Usage: nightly [-in] [+t] [-V VERS ] <env_file>
 
 Where:
-	-i	Fast incremental options (no clobber, lint, check)
+	-i	Fast incremental options (no clobber, check)
 	-n      Do not do a bringover
 	+t	Use the build tools in $ONBLD_TOOLS/bin
 	-V VERS set the build version string to VERS
@@ -593,7 +492,6 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-V VERS set the build version string to VERS
 	-f	find unreferenced files
 	-i	do an incremental build (no "make clobber")
-	-l	do "make lint" in $LINTDIRS (default: $SRC y)
 	-m	send mail to $MAILTO at end of build
 	-n      do not do a bringover
 	-p	create packages
@@ -617,7 +515,6 @@ D_FLAG=n
 F_FLAG=n
 f_FLAG=n
 i_FLAG=n; i_CMD_LINE_FLAG=n
-l_FLAG=n
 M_FLAG=n
 m_FLAG=n
 N_FLAG=n
@@ -801,7 +698,7 @@ check_closed_bins
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts +ABCDdFfGIilMmNnpRrtUuwW FLAG $NIGHTLY_OPTIONS
+while getopts +ABCDdFfGIiMmNnpRrtUuwW FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
@@ -823,8 +720,6 @@ do
 		u_FLAG=y
 		;;
 	  i )	i_FLAG=y
-		;;
-	  l )	l_FLAG=y
 		;;
 	  M )	M_FLAG=y
 		;;
@@ -1285,27 +1180,14 @@ EOF
 	echo "" | tee -a $mail_msg_file >> $LOGFILE
 fi
 
-if [ "$D_FLAG" = "n" -a "$l_FLAG" = "y" ]; then
-	#
-	# In the past we just complained but went ahead with the lint
-	# pass, even though the proto area was built non-DEBUG.  It's
-	# unlikely that non-DEBUG headers will make a difference, but
-	# rather than assuming it's a safe combination, force the user
-	# to specify a DEBUG build.
-	#
-	echo "WARNING: DEBUG build not requested; disabling lint.\n" \
-	    | tee -a $mail_msg_file >> $LOGFILE
-	l_FLAG=n
-fi
-
 if [ "$f_FLAG" = "y" ]; then
 	if [ "$i_FLAG" = "y" ]; then
 		echo "WARNING: the -f flag cannot be used during incremental" \
 		    "builds; ignoring -f\n" | tee -a $mail_msg_file >> $LOGFILE
 		f_FLAG=n
 	fi
-	if [ "${l_FLAG}${p_FLAG}" != "yy" ]; then
-		echo "WARNING: the -f flag requires -l, and -p;" \
+	if [ "${p_FLAG}" != "y" ]; then
+		echo "WARNING: the -f flag requires -p;" \
 		    "ignoring -f\n" | tee -a $mail_msg_file >> $LOGFILE
 		f_FLAG=n
 	fi
@@ -1916,7 +1798,7 @@ if [[ ($build_ok = y) && (($A_FLAG = y) || ($r_FLAG = y)) ]]; then
 		if [[ "$ELF_DATA_BASELINE_DIR" != '' ]]; then
 			base_ifile="$ELF_DATA_BASELINE_DIR/interface"
 
-		       	echo "\n==== Compare versioning and ABI information" \
+			echo "\n==== Compare versioning and ABI information" \
 			    "to baseline ====\n"  | \
 			    tee -a $LOGFILE >> $mail_msg_file
 			echo "Baseline:	 $base_ifile\n" >> $LOGFILE
@@ -2010,21 +1892,6 @@ if [[ ($build_ok = y) && (($A_FLAG = y) || ($r_FLAG = y)) ]]; then
 			done
 		)
 	fi
-fi
-
-# DEBUG lint of kernel begins
-
-if [ "$i_CMD_LINE_FLAG" = "n" -a "$l_FLAG" = "y" ]; then
-	if [ "$LINTDIRS" = "" ]; then
-		# LINTDIRS="$SRC/uts y $SRC/stand y $SRC/psm y"
-		LINTDIRS="$SRC y"
-	fi
-	set $LINTDIRS
-	while [ $# -gt 0 ]; do
-		dolint $1 $2; shift; shift
-	done
-else
-	echo "\n==== No '$MAKE lint' ====\n" >> $LOGFILE
 fi
 
 # "make check" begins
