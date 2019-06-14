@@ -101,10 +101,6 @@ $(ROOTELFEDITDIR64)/%: %
 $(SGSMSGDIR)/elfedit_%: $(SGSMSG) ../common/%.msg
 		$(SGSMSG) $(SGSMSGFLAGS) -l -m $(SGSMSGDIR)/elfedit_$* $<
 
-$(SGSMSG):
-		@ cd $(SGSTOOLS)/$(MACH); pwd; $(MAKE) catalog
-		@ pwd
-
 catalog:	$(SGSMSGDIR)/elfedit_cap \
 		$(SGSMSGDIR)/elfedit_dyn \
 		$(SGSMSGDIR)/elfedit_ehdr \

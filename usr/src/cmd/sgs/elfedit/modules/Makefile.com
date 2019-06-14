@@ -67,8 +67,8 @@ STR_PICS=	$(STR_OBJ:%.o=$(PICDIR)/%.o)
 SYM_PICS=	$(SYM_OBJ:%.o=$(PICDIR)/%.o)
 SYMINFO_PICS=	$(SYMINFO_OBJ:%.o=$(PICDIR)/%.o)
 
-LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
-		$(CONVLIBDIR) $(CONV_LIB) -lc
+LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) -llddbg \
+		$(CONVLIBDIR) -lconv -lc
 
 $(CAP_LIB):=		PICS = $(CAP_PICS)
 $(DYN_LIB):=		PICS = $(DYN_PICS)
@@ -92,10 +92,10 @@ $(SYMINFO_LIB):=	SONAME = $(SYMINFO_LIB)
 MAPFILES = ../common/mapfile-vers
 
 CPPFLAGS +=	-I../../../include -I../../../include/$(MACH) \
-		-I../$(SRCBASE)/lib/libc/inc  -D_REENTRANT
+		-I$(SRC)/lib/libc/inc  -D_REENTRANT
 LLDFLAGS =	'-R$$ORIGIN/../../../lib'
 LLDFLAGS64 =	'-R$$ORIGIN/../../../../lib/$(MACH64)'
-LDFLAGS +=	$(CC_USE_PROTO) $(LLDFLAGS)
+LDFLAGS +=	$(LLDFLAGS)
 DYNFLAGS +=	$(VERSREF)
 
 CERRWARN +=	-_gcc=-Wno-switch

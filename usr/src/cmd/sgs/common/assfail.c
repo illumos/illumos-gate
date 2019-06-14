@@ -24,32 +24,18 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sys/types.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 /*
- * function that will find a prime'ish number.  Usefull for
- * hashbuckets and related things.
+ * Provide assfail() for ASSERT() statements,
+ * see <sys/debug.h> for further details.
  */
-uint_t
-findprime(uint_t count)
+int
+assfail(const char *a, const char *f, int l)
 {
-	uint_t	h, f;
-
-	if (count <= 3)
-		return (3);
-
-
-	/*
-	 * Check to see if divisible by two, if so
-	 * increment.
-	 */
-	if ((count & 0x1) == 0)
-		count++;
-
-	for (h = count, f = 2; f * f <= h; f++)
-		if ((h % f) == 0)
-			h += f = 1;
-	return (h);
+	(void) printf("assertion failed: %s, file: %s, line: %d\n",
+	    a, f, l);
+	abort();
+	return (0);
 }

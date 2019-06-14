@@ -31,10 +31,17 @@ $(OBJDIR)/%.o:	../common/%.c
 		$(POST_PROCESS_O)
 
 # DEMO DELETE START
-$(ROOTONLDBIN)/%: %
+
+$(ROOTONLDBIN):
+		$(INS.dir)
+
+$(ROOTONLDBIN)/$(MACH64):
+		$(INS.dir)
+
+$(ROOTONLDBIN)/%: % $(ROOTONLDBIN)
 		$(INS.file)
 
-$(ROOTONLDBIN)/$(MACH64)/%: %
+$(ROOTONLDBIN)/$(MACH64)/%: % $(ROOTONLDBIN)/$(MACH64)
 		$(INS.file)
 # DEMO DELETE END
 
@@ -91,6 +98,10 @@ clean: FRC
 
 clobber: clean FRC
 		$(RM) $(PROG)
+
+# DEMO DELETE START
+catalog check chkmsg:
+# DEMO DELETE END
 
 FRC:
 

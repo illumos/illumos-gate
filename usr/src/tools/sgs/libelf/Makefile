@@ -18,31 +18,31 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 
-include		$(SRC)/Makefile.master
+include		../Makefile.com
+include		../../Makefile.tools
+include		$(SGSHOME)/libelf/Makefile.com
 
-PKGARCHIVE=	.
-DATAFILES=	copyright prototype_com prototype_$(MACH) postinstall \
-		preremove depend checkinstall
-README=		SUNWonld-README
-FILES=		$(DATAFILES) pkginfo
-PACKAGE=	SUNWonld
-ROOTONLD=	$(ROOT)/opt/SUNWonld
-ROOTREADME=	$(README:%=$(ROOTONLD)/%)
+CONVLIBDIR =	-L../libconv
+CPPFLAGS =	$(NATIVE_CPPFLAGS)
+CFLAGS =	$(NATIVE_CFLAGS)
+SGSMSGTARG +=	$(SGSMSG32)
+CW_LINKER =
 
-CLEANFILES=	$(FILES) awk_pkginfo ../bld_awk_pkginfo
-CLOBBERFILES=	$(PACKAGE)
+.KEEP_STATE:
 
-../%:		../common/%.ksh
-		$(RM) $@
-		cp $< $@
-		chmod +x $@
+install:	all $(ROOTONBLDLIBMACH)/$(DYNLIB) $(ROOTONBLDLIBMACH)/$(LIBLINKS)
 
-$(ROOTONLD)/%:	../common/%
-		$(RM) $@
-		cp $< $@
-		chmod +x $@
+$(ROOTONBLDLIBMACH)/$(DYNLIB): $(PICS) $(ROOTONBLDLIBMACH)
+		$(BUILD.SO)
+		$(POST_PROCESS_SO)
+
+$(ROOTONBLDLIBMACH)/$(LIBLINKS): $(ROOTONBLDLIBMACH)/$(DYNLIB)
+		@$(RM) $(ROOTONBLDLIBMACH)/$(LIBLINKS)
+		$(SYMLINK) $(DYNLIB) $(ROOTONBLDLIBMACH)/$(LIBLINKS)
+
+include		$(SGSHOME)/libelf/Makefile.targ

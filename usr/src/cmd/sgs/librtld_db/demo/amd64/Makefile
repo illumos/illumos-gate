@@ -48,6 +48,8 @@ test:		$(TESTS)
 # DEMO DELETE START
 DEMOCFLAGS=
 
+catalog:
+
 install:	all $(ROOTONLDBINPROG64)
 # DEMO DELETE END
 

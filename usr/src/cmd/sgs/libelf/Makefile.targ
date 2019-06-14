@@ -30,24 +30,21 @@ pics/%.o:	%.c
 		$(POST_PROCESS_O)
 
 objs/%64.o \
-pics/%64.o:	../common/%.c
+pics/%64.o:	$(SRCDIR)/common/%.c
 		$(COMPILE.c) -D_ELF64 -o $@ $<
 		$(POST_PROCESS_O)
 
 objs/%.o \
-pics/%.o:	../misc/%.c
+pics/%.o:	$(SRCDIR)/misc/%.c
 		$(COMPILE.c) -DELF -o $@ $<
 		$(POST_PROCESS_O)
 
 objs/%.o \
-pics/%.o:	../common/%.c
+pics/%.o:	$(SRCDIR)/common/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 all:		$(BLTSRCS) .WAIT $(LIBS) $(LIBLINKS)
-
-install:	all .WAIT $(ROOTFS_LIBS) $(ROOTFS_LINKS) \
-		.WAIT $(ROOTDEMODIRS) .WAIT $(ROOTDEMOFILES)
 
 delete:
 		$(RM) $(DYNLIB)
@@ -63,11 +60,11 @@ CLOBBERFILES += $(LIBLINKS)
 include		$(SRC)/lib/Makefile.targ
 include		$(SRC)/cmd/sgs/Makefile.targ
 
-xlate.c:	../common/xlate.m4
-		$(M4) < ../common/xlate.m4 > xlate.c
+xlate.c:	$(SRCDIR)/common/xlate.m4
+		$(M4) < $(SRCDIR)/common/xlate.m4 > xlate.c
 
-xlate64.c:	../common/xlate64.m4
-		$(M4) < ../common/xlate64.m4 > xlate64.c
+xlate64.c:	$(SRCDIR)/common/xlate64.m4
+		$(M4) < $(SRCDIR)/common/xlate64.m4 > xlate64.c
 
 
 objs/msg.o \
@@ -82,21 +79,7 @@ pics/ar.o:	msg.h
 objs/xlate.o \
 pics/xlate.o:	xlate.c
 
-# Special target for native builds (ie. when we need to build a version of ld
-# to build a version of ld :-).
-
-native:		$(SGSLIBDIR)/$(LIBLINKS)
-
 $(PICS):	pics
-
-$(SGSLIBDIR)/$(DYNLIB): $(PICS) $(SGSLIBDIR)
-		$(BUILD.SO)
-		$(POST_PROCESS_SO)
-
-$(SGSLIBDIR)/$(LIBLINKS): $(SGSLIBDIR)/$(DYNLIB)
-		-@$(RM) $(SGSLIBDIR)/$(LIBLINKS)
-		$(SYMLINK) $(DYNLIB) $(SGSLIBDIR)/$(LIBLINKS)
-
 
 # Derived source and header files (messaging).  Make sure that the sgsmsg
 # command is constructed - libelf might not be built with the whole sgs.
@@ -107,14 +90,10 @@ chkmsg:		$(LIBSRCS)
 		sh $(CHKMSG) $(CHKMSGFLAGS) $(LIBSRCS)
 
 $(BLTDEFS) + \
-$(BLTDATA):	$(SGSMSG) $(SGSMSGTARG)
+$(BLTDATA):	$(SGSMSGTARG)
 		$(SGSMSG) $(SGSMSGFLAGS2) $(SGSMSGTARG)
 
-$(BLTMESG):	$(SGSMSG) $(SGSMSGALL) xlate.c xlate64.c
+$(BLTMESG):	$(SGSMSGALL) xlate.c xlate64.c
 		$(SGSMSG) $(SGSMSGFLAGS1) $(SGSMSGALL)
-
-$(SGSMSG):	FRC
-		@ cd $(SGSTOOLS)/$(MACH); pwd; $(MAKE) catalog
-		@ pwd
 
 FRC:

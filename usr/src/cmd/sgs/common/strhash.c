@@ -24,20 +24,22 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <stdlib.h>
-#include <stdio.h>
+#include <sgs.h>
 
 /*
- * Provide assfail() for ASSERT() statements,
- * see <sys/debug.h> for further details.
+ * classic Bernstein k=33 hash function
+ *
+ * This routine is to be used for internal hashing of strings.  It's not
+ * to be confused with elf_hash() which is the required ELF hashing
+ * tool for ELF structures.
  */
-int
-assfail(const char *a, const char *f, int l)
+uint_t
+sgs_str_hash(const char *str)
 {
-	(void) printf("assertion failed: %s, file: %s, line: %d\n",
-		a, f, l);
-	abort();
-	return (0);
+	uint_t	hash = 5381;
+	int		c;
+
+	while ((c = *str++) != 0)
+		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+	return (hash);
 }

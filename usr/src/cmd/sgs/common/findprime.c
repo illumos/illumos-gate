@@ -24,24 +24,30 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sgs.h>
+#include <sys/types.h>
 
 /*
- * classic Bernstein k=33 hash function
- *
- * This routine is to be used for internal hashing of strings.  It's not
- * to be confused with elf_hash() which is the required ELF hashing
- * tool for ELF structures.
+ * function that will find a prime'ish number.  Usefull for
+ * hashbuckets and related things.
  */
 uint_t
-sgs_str_hash(const char *str)
+findprime(uint_t count)
 {
-	uint_t	hash = 5381;
-	int		c;
+	uint_t	h, f;
 
-	while ((c = *str++) != 0)
-		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-	return (hash);
+	if (count <= 3)
+		return (3);
+
+
+	/*
+	 * Check to see if divisible by two, if so
+	 * increment.
+	 */
+	if ((count & 0x1) == 0)
+		count++;
+
+	for (h = count, f = 2; f * f <= h; f++)
+		if ((h % f) == 0)
+			h += f = 1;
+	return (h);
 }

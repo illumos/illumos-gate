@@ -61,12 +61,19 @@ COMMON_SUBDIRS= \
 	onbld \
 	protocmp \
 	protolist \
-	scripts
+	scripts \
+	sgs
 
 #
 #  special versions of commands for use only in build
 #
 UNSHIPPED_SUBDIRS = \
+	$(SGSMSG) \
+	$(SGSLIBCONV) \
+	$(SGSLIBELF) \
+	$(SGSLIBLDDBG) \
+	$(SGSLIBLD) \
+	$(SGSLD) \
 	localedef \
 	mandoc \
 	tic \
@@ -84,6 +91,8 @@ i386_SUBDIRS=		\
 	elfextract	\
 	mbh_patch	\
 	btxld
+
+$(INTEL_BLD)sgs: aw
 
 SUBDIRS= \
 	$($(MACH)_SUBDIRS) \

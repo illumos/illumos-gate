@@ -39,9 +39,8 @@ $(CCSLIBS) :=	CFLAGS64 +=	$(C_PICFLAGS64) $(NO_ASM_WARN)
 all:		$(PICDIR) .WAIT $(CCSLIBS) $(CCSSCRIPTS) \
 		$(ONSCRIPTS) $(ONLIBS)
 
-install:	all $(ROOTCCSLIB64) .WAIT $(ROOTCCSLIBS64)
-
-package:	install .WAIT $(ROOTONLDLIBS64)
+install:	all $(ROOTCCSLIB64) .WAIT $(ROOTCCSLIBS64) \
+		.WAIT $(ROOTONLDLIBS64)
 
 include		../Makefile.targ
 include		../../Makefile.sub.64

@@ -29,13 +29,13 @@ RTLD=		ld.so.1
 
 AVLOBJ=		avl.o
 DTROBJ=		dtrace_data.o
-TOOLOBJS=	alist.o strhash.o
+SGSCOMMONOBJ=	alist.o strhash.o
 BLTOBJ=		msg.o
 ELFCAPOBJ=	elfcap.o
 OBJECTS=	$(BLTOBJ) \
 		$(AVLOBJ) \
 		$(DTROBJ) \
-		$(TOOLOBJS) \
+		$(SGSCOMMONOBJ) \
 		$(ELFCAPOBJ) \
 		$(P_ASOBJS)   $(P_COMOBJS)   $(P_MACHOBJS)   $(G_MACHOBJS)  \
 		$(S_ASOBJS)   $(S_COMOBJS)   $(S_MACHOBJS)   $(CP_MACHOBJS)
@@ -75,10 +75,10 @@ ROOTDYNLIB64=	$(RTLD:%=$(ROOTFS_LIBDIR64)/%)
 
 FILEMODE =	755
 
-CPPFLAGS +=	-I$(SRCBASE)/lib/libc/inc \
-		-I$(SRCBASE)/uts/common/krtld \
-		-I$(SRCBASE)/uts/$(PLAT) \
-		-I$(SRCBASE)/uts/$(PLAT)/krtld \
+CPPFLAGS +=	-I$(SRC)/lib/libc/inc \
+		-I$(SRC)/uts/common/krtld \
+		-I$(SRC)/uts/$(PLAT) \
+		-I$(SRC)/uts/$(PLAT)/krtld \
 		-I$(SRC)/common/sgsrtcid \
 		-I$(ELFCAP) \
 		 $(CPPFEATUREMACROS)
@@ -101,11 +101,11 @@ CPICLIB =	$(VAR_RTLD_CPICLIB)
 CPICLIB64 =	$(VAR_RTLD_CPICLIB64)
 CLIB =		-lc_pic
 
-LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) \
+LDLIBS +=	$(CONVLIBDIR) -lconv \
 		$(CPICLIB) $(CLIB) \
-		$(LDDBGLIBDIR) $(LDDBG_LIB) \
+		$(LDDBGLIBDIR) -llddbg \
 		$(RTLDLIB) -lrtld \
-		$(LDLIB) $(LD_LIB)
+		$(LDLIB) -lld
 
 DYNFLAGS +=	-i -e _rt_boot $(VERSREF) $(ZNODLOPEN) \
 		$(ZINTERPOSE) -zdtrace=dtrace_data '-R$$ORIGIN'
@@ -138,9 +138,9 @@ SGSMSGFLAGS2=	$(SGSMSGFLAGS) -h $(BLTDEFS) -d $(BLTDATA) -n rtld_msg
 
 SRCS=		$(AVLOBJ:%.o=$(VAR_AVLDIR)/%.c) \
 		$(DTROBJ:%.o=$(VAR_DTRDIR)/%.c) \
-		$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
+		$(SGSCOMMONOBJ:%.o=$(SGSCOMMON)/%.c) \
 		$(COMOBJS:%.o=../common/%.c)  $(MACHOBJS:%.o=%.c) $(BLTDATA) \
-		$(G_MACHOBJS:%.o=$(SRCBASE)/uts/$(PLAT)/krtld/%.c) \
+		$(G_MACHOBJS:%.o=$(SRC)/uts/$(PLAT)/krtld/%.c) \
 		$(CP_MACHOBJS:%.o=../$(MACH)/%.c) \
 		$(ASOBJS:%.o=%.s)
 

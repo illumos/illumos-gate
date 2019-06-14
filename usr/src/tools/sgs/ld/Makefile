@@ -19,18 +19,23 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1993 by Sun Microsystems, Inc.
-#
+# Copyright (c) 1996 by Sun Microsystems, Inc.
+# All rights reserved.
 
+include		../Makefile.com
+include		../../Makefile.tools
+include		$(SGSHOME)/ld/Makefile.com
 
-include ../Makefile.com
+LDLIBS =	-L../libconv -L$(ROOTONBLDLIBMACH) -lld -lelf -lconv
+CPPFLAGS =	$(NATIVE_CPPFLAGS)
+CFLAGS =	$(NATIVE_CFLAGS)
+MAPFILES =	$(SRCDIR)/common/mapfile-intf
+CW_LINKER =
+VAR_LD_LLDFLAGS=	'-R$$ORIGIN/../../lib/$(MACH)'
+VAR_LD_LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
+
+install: $(ROOTONBLDMACHPROG)
 
 .KEEP_STATE:
 
-all: $(FILES)
-install: all $(ROOTREADME) .WAIT pkg
-
-include ../Makefile.targ
+include		$(SGSHOME)/ld/Makefile.targ

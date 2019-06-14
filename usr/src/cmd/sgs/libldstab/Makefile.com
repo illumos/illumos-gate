@@ -38,12 +38,11 @@ include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
-SRCBASE=	../../../..
 
 CPPFLAGS +=	-I$(ELFCAP)
 
-LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB) $(ELFLIBDIR) -lelf -lc
-DYNFLAGS +=	$(VERSREF) $(CC_USE_PROTO)
+LDLIBS +=	$(CONVLIBDIR) -lconv $(ELFLIBDIR) -lelf -lc
+DYNFLAGS +=	$(VERSREF)
 
 SRCS=		$(COMOBJS:%.o=../common/%.c)
 

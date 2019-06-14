@@ -22,12 +22,9 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-
 #
 # Generate a revision number for the sgs linker components, based
-# on usr/src/cmd/sgs/packages/common/SUNWonld-README.
+# on usr/src/cmd/sgs/tools/SUNWonld-README.
 #
 #	usage: readme_revision [-d] [readme-file]
 #
@@ -128,7 +125,6 @@ if ($debug == 0) {
 }
 
 # For debug mode, add diagnostic data
-# 
 ($wsname = $ENV{'CODEMGR_WS'}) ne '' || ($wsname = 'unknown');
 @wsname = split /\//, $wsname;
 $wsname = $wsname[$#wsname];

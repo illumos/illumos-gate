@@ -862,6 +862,7 @@ $(__SUNC)PRIMARY_CCC=	studio12,$(SPRO_VROOT)/bin/CC,sun
 CW_CC_COMPILERS=	$(PRIMARY_CC:%=--primary %) $(SHADOW_CCS:%=--shadow %)
 CW_CCC_COMPILERS=	$(PRIMARY_CCC:%=--primary %) $(SHADOW_CCCS:%=--shadow %)
 
+CW_LINKER=		--linker $(LD)
 
 # Till SS12u1 formally becomes the NV CBE, LINT is hard
 # coded to be picked up from the $SPRO_ROOT/sunstudio12.1/
@@ -875,10 +876,10 @@ CW_CCC_COMPILERS=	$(PRIMARY_CCC:%=--primary %) $(SHADOW_CCCS:%=--shadow %)
 #
 CW=			$(ONBLD_TOOLS)/bin/$(MACH)/cw
 
-BUILD_CC=		$(CW) $(CW_CC_COMPILERS) --
-BUILD_CCC=		$(CW) -C $(CW_CCC_COMPILERS) --
+BUILD_CC=		$(CW) $(CW_LINKER) $(CW_CC_COMPILERS) --
+BUILD_CCC=		$(CW) -C $(CW_LINKER) $(CW_CCC_COMPILERS) --
 BUILD_CPP=		/usr/ccs/lib/cpp
-BUILD_LD=		/usr/ccs/bin/ld
+BUILD_LD=		$(ONBLD_TOOLS)/bin/$(MACH)/ld
 BUILD_LINT=		$(SPRO_ROOT)/sunstudio12.1/bin/lint
 
 $(MACH)_CC=		$(BUILD_CC)

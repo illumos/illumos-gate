@@ -33,6 +33,8 @@ all:		$(OBJDIR) .WAIT $(PROG)
 test:		$(TESTS)
 
 # DEMO DELETE START
+catalog:
+
 install:	all $(ROOTONLDBINPROG)
 # DEMO DELETE END
 

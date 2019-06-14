@@ -31,8 +31,6 @@
 
 include		$(SRC)/cmd/sgs/Makefile.var
 
-SRCBASE =	../../../..
-
 i386_ARCH =	intel
 sparc_ARCH =	sparc
 
@@ -52,6 +50,8 @@ CSTD_GNU89 =	$(CSTD_GNU99)
 CFLAGS +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 CFLAGS64 +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
 
+NATIVE_CFLAGS +=	$(CCVERBOSE) $(DEBUG) $(XFFLAG)
+
 CERRWARN +=	-_gcc=-Wno-type-limits
 CERRWARN +=	-_gcc=-Wno-parentheses
 CERRWARN +=	-_gcc=-Wno-unused-value
@@ -63,7 +63,7 @@ ELFCAP=		$(SRC)/common/elfcap
 
 # Reassign CPPFLAGS so that local search paths are used before any parent
 # $ROOT paths.
-CPPFLAGS =	-I. -I../common -I../../include -I../../include/$(MACH) \
+CPPFLAGS =	-I. -I../common -I$(SGSHOME)/include -I$(SGSHOME)/include/$(MACH) \
 		$(CPPFLAGS.master) -I$(ELFCAP)
 
 # PICS64 is unique to our environment
@@ -77,19 +77,13 @@ DYNFLAGS +=	$(ZIGNORE)
 # Establish the local tools, proto and package area.
 
 SGSHOME =	$(SRC)/cmd/sgs
-SGSPROTO =	$(SGSHOME)/proto/$(MACH)
+SGSCOMMON =	$(SGSHOME)/common
 SGSTOOLS =	$(SGSHOME)/tools
 SGSMSGID =	$(SGSHOME)/messages
 SGSMSGDIR =	$(SGSHOME)/messages/$(MACH)
 SGSONLD =	$(ROOT)/opt/SUNWonld
 SGSRPATH =	/usr/lib
 SGSRPATH64 =	$(SGSRPATH)/$(MACH64)
-
-# Mimic the structure of an installed system.
-
-SGSLIBDIR =	$(SGSPROTO)/lib
-SGSPREFIX =	$(SGSPROTO)/usr
-SGSBINDIR =	$(SGSPREFIX)/bin
 
 #
 # Macros to be used to include link against libconv and include vernote.o
@@ -117,33 +111,10 @@ DTEXTDOM =
 # Define any generic sgsmsg(1l) flags.  The default message generation system
 # is to use gettext(3i), add the -C flag to switch to catgets(3c).
 
-SGSMSG =		$(SGSTOOLS)/$(MACH)/sgsmsg
+SGSMSG =		$(ONBLD_TOOLS)/bin/$(MACH)/sgsmsg
 SGSMSG_PIGLATIN_NL =	perl $(SGSTOOLS)/common/sgsmsg_piglatin_nl.pl
-CHKMSG =		$(SGSTOOLS)/chkmsg.sh
+CHKMSG =		$(SGSHOME)/tools/chkmsg.sh
 
 SGSMSGVFLAG =
 SGSMSGFLAGS =	$(SGSMSGVFLAG) -i $(SGSMSGID)/sgs.ident
 CHKMSGFLAGS =	$(SGSMSGTARG:%=-m %) $(SGSMSGCHK:%=-m %)
-
-# Native targets should use the minimum of ld(1) flags to allow building on
-# previous releases.  We use mapfiles to scope, but don't bother versioning.
-
-native :=	DYNFLAGS = -R$(SGSLIBDIR) -L$(SGSLIBDIR) $(ZNOVERSION) \
-			$(HSONAME)
-
-# Comment out the following two lines to have the sgs built from the system
-# link-editor, rather than the local proto link-editor.
-CC_USE_PROTO =	-Yl,$(SGSBINDIR)
-LD_USE_PROTO =	$(SGSBINDIR)/
-
-LD_LIB =	-lld
-LD_LIB32 =	-lld32
-LD_LIB64 =	-lld64
-
-LDDBG_LIB =	-llddbg
-LDDBG_LIB32 =	-llddbg32
-LDDBG_LIB64 =	-llddbg64
-
-CONV_LIB =	-lconv
-CONV_LIB32 =	-lconv32
-CONV_LIB64 =	-lconv64

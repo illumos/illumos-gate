@@ -80,19 +80,28 @@ $(ROOTCCSLIB)/%: %
 $(ROOTCCSLIB64)/%: %
 		$(INS.file)
 
-$(ROOTONLDBIN)/%: %
+$(ROOTONLDBIN)/%: % $(ROOTONLDBIN)
 		$(INS.file)
 
-$(ROOTONLDLIB)/%: %
+$(ROOTONLDLIB)/%: % $(ROOTONLDLIB)
 		$(INS.file)
 
-$(ROOTONLDLIB64)/%: %
+$(ROOTONLDLIB64)/%: % $(ROOTONLDLIB64)
 		$(INS.file)
 
 $(ROOTCCSLIB):
 	$(INS.dir)
 
 $(ROOTCCSLIB64):
+	$(INS.dir)
+
+$(ROOTONLDBIN):
+	$(INS.dir)
+
+$(ROOTONLDLIB):
+	$(INS.dir)
+
+$(ROOTONLDLIB64):
 	$(INS.dir)
 
 include		../../../../lib/Makefile.targ

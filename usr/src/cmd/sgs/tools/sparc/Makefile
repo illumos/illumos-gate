@@ -19,9 +19,6 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright (c) 1996 by Sun Microsystems, Inc.
 # All rights reserved.
 
@@ -29,9 +26,7 @@ include		$(SRC)/cmd/sgs/tools/Makefile.com
 
 .KEEP_STATE:
 
-all:		native $(PROGS) $(LIBS)
-
-native:		$(NATIVE)
+all:		$(NATIVE) $(PROGS) $(LIBS)
 
 install:	all $(ROOTPROGS) $(ROOTLIBS)
 

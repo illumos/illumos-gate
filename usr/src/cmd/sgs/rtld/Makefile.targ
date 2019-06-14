@@ -58,11 +58,11 @@ pics/%.o:	$(VAR_DTRDIR)/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics/%.o:	$(SGSTOOLS)/common/%.c
+pics/%.o:	$(SGSCOMMON)/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
-pics/%.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
+pics/%.o:	$(SRC)/uts/$(PLAT)/krtld/%.c
 		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
@@ -71,7 +71,7 @@ pics/elfcap.o:	$(ELFCAP)/elfcap.c
 		$(POST_PROCESS_O)
 
 $(RTLD):	pics $(PICS) $(CRTS)
-		$(LD_USE_PROTO)ld -o $@ -dy -G $(DYNFLAGS) $(CRTI) $(PICS) \
+		$(LD) -o $@ -dy -G $(DYNFLAGS) $(CRTI) $(PICS) \
 		    $(LDLIBS) $(CRTN)
 		$(POST_PROCESS_SO)
 

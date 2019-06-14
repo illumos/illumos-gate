@@ -69,8 +69,8 @@ VAR_PLAT_amd64=		intel/amd64
 # files avl.c, avl.h and avl_impl.h until these files are back ported into
 # the system.
 #
-VAR_AVLDIR=		$(SRCBASE)/common/avl
-VAR_AVLINCDIR=		-I $(SRCBASE)/uts/common
+VAR_AVLDIR=		$(SRC)/common/avl
+VAR_AVLINCDIR=		-I $(SRC)/uts/common
 
 #
 # VAR_DTRDIR - directory to find dtrace_data.c in.
@@ -78,7 +78,7 @@ VAR_AVLINCDIR=		-I $(SRCBASE)/uts/common
 # In Solaris 10 and earlier releases, dtrace_data.c was maintained as separate
 # files under sgs/rtld.  This file is now under usr/src/common/dtrace.
 #
-VAR_DTRDIR=             $(SRCBASE)/common/dtrace
+VAR_DTRDIR=             $(SRC)/common/dtrace
 
 #
 # VAR_SGSBINPROG

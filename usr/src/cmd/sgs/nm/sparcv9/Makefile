@@ -40,10 +40,10 @@ SRCS=		$(COMOBJS:%.o=../common/%.c)
 
 LDFLAGS +=	'-R$$ORIGIN/../../../lib/$(MACH64)'
 INCLIST=	-I../../include -I../../include/sparc \
-		-I$(SRCBASE)/uts/$(ARCH)/sys
+		-I$(SRC)/uts/$(ARCH)/sys
 DEFLIST=	-DTARGET=SPARC -DSPARC=1 -D$(ARFORMAT) -DELF
 CPPFLAGS=	$(INCLIST) $(DEFLIST) $(CPPFLAGS.master) -I$(ELFCAP)
-LDLIBS +=	$(CONVLIBDIR64) $(CONV_LIB) $(ELFLIBDIR) -lelf
+LDLIBS +=	$(CONVLIBDIR64) -lconv $(ELFLIBDIR) -lelf
 
 
 %.o:		../common/%.c
