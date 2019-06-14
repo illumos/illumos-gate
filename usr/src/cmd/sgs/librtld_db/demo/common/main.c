@@ -169,7 +169,7 @@ main(int argc, char *argv[])
 	 */
 	if ((cpid = fork()) == 0) {
 		(void) execv(argv[optind], &argv[optind]);
-		perr(argv[1]);
+		perr(argv[optind]);
 	}
 
 	if (cpid == -1)	/* fork() failure */
