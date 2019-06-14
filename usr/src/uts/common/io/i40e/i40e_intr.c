@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2018 Joyent, Inc.
+ * Copyright 2019 Joyent, Inc.
  * Copyright 2017 Tegile Systems, Inc.  All rights reserved.
  */
 
@@ -326,7 +326,7 @@ i40e_intr_io_disable_all(i40e_t *i40e)
 void
 i40e_intr_io_clear_cause(i40e_t *i40e)
 {
-	int i;
+	uint32_t i;
 	i40e_hw_t *hw = &i40e->i40e_hw_space;
 
 	if (i40e->i40e_intr_type != DDI_INTR_TYPE_MSIX) {
@@ -336,16 +336,9 @@ i40e_intr_io_clear_cause(i40e_t *i40e)
 		return;
 	}
 
-	for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+	for (i = 0; i < i40e->i40e_intr_count - 1; i++) {
 		uint32_t reg;
-#ifdef DEBUG
-		/*
-		 * Verify that the interrupt in question is disabled. This is a
-		 * prerequisite of modifying the data in question.
-		 */
-		reg = I40E_READ_REG(hw, I40E_PFINT_DYN_CTLN(i));
-		VERIFY0(reg & I40E_PFINT_DYN_CTLN_INTENA_MASK);
-#endif
+
 		reg = I40E_QUEUE_TYPE_EOL;
 		I40E_WRITE_REG(hw, I40E_PFINT_LNKLSTN(i), reg);
 	}
@@ -370,7 +363,7 @@ i40e_intr_chip_fini(i40e_t *i40e)
 	 * and the interrupt linked lists have been zeroed.
 	 */
 	if (i40e->i40e_intr_type == DDI_INTR_TYPE_MSIX) {
-		for (i = 0; i < i40e->i40e_num_trqpairs; i++) {
+		for (i = 0; i < i40e->i40e_intr_count - 1; i++) {
 			reg = I40E_READ_REG(hw, I40E_PFINT_DYN_CTLN(i));
 			VERIFY0(reg & I40E_PFINT_DYN_CTLN_INTENA_MASK);
 
@@ -472,7 +465,7 @@ i40e_intr_init_queue_msix(i40e_t *i40e)
 		boolean_t head = B_TRUE;
 
 		for (uint_t qidx = vec; qidx < i40e->i40e_num_trqpairs;
-		     qidx += intr_count) {
+		    qidx += intr_count) {
 			uint_t next_qidx = qidx + intr_count;
 
 			next_qidx = (next_qidx > i40e->i40e_num_trqpairs) ?
@@ -764,7 +757,7 @@ i40e_intr_msix(void *arg1, void *arg2)
 	 * performed during i40e_map_intrs_to_vectors().
 	 */
 	for (uint_t i = vector_idx - 1; i < i40e->i40e_num_trqpairs;
-	     i += (i40e->i40e_intr_count - 1)) {
+	    i += (i40e->i40e_intr_count - 1)) {
 		i40e_trqpair_t *itrq = &i40e->i40e_trqpairs[i];
 
 		ASSERT3U(i, <, i40e->i40e_num_trqpairs);
