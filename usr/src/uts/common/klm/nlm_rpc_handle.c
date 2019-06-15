@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -130,6 +130,7 @@ update_host_rpcbinding(struct nlm_host *hostp, int vers)
 static int
 refresh_nlm_rpc(struct nlm_host *hostp, nlm_rpc_t *rpcp)
 {
+	uint32_t zero = 0;
 	int ret;
 
 	if (rpcp->nr_handle == NULL) {
@@ -175,6 +176,12 @@ refresh_nlm_rpc(struct nlm_host *hostp, nlm_rpc_t *rpcp)
 			if (NLM_STALE_CLNT(stat)) {
 				ret = ESTALE;
 			}
+			/*
+			 * Need to reset the XID after the null call above,
+			 * otherwise we'll reuse the XID from that call.
+			 */
+			(void) CLNT_CONTROL(rpcp->nr_handle, CLSET_XID,
+			    (char *)&zero);
 		}
 	}
 
@@ -209,7 +216,8 @@ again:
 			rc = cv_wait_sig(&hostp->nh_rpcb_cv, &hostp->nh_lock);
 			if (rc == 0) {
 				mutex_exit(&hostp->nh_lock);
-				return (EINTR);
+				rc = EINTR;
+				goto errout;
 			}
 		}
 
@@ -229,7 +237,8 @@ again:
 		 */
 		if (hostp->nh_rpcb_ustat != RPC_SUCCESS) {
 			mutex_exit(&hostp->nh_lock);
-			return (ENOENT);
+			rc = ENOENT;
+			goto errout;
 		}
 	}
 
@@ -263,7 +272,7 @@ again:
 		}
 
 		destroy_rpch(rpcp);
-		return (rc);
+		goto errout;
 	}
 
 	DTRACE_PROBE2(end, struct nlm_host *, hostp,
@@ -271,6 +280,10 @@ again:
 
 	*rpcpp = rpcp;
 	return (0);
+
+errout:
+	NLM_ERR("Can't get RPC client handle for: %s", hostp->nh_name);
+	return (rc);
 }
 
 void

@@ -26,7 +26,7 @@
  */
 
 /*
- * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
 
@@ -63,7 +63,7 @@
  * 32-bit lock ranges.
  */
 static void
-nlm_convert_to_nlm_lock(struct nlm_lock *dst, struct nlm4_lock *src)
+nlm_convert_to_nlm_lock(struct nlm_lock *dst, const struct nlm4_lock *src)
 {
 	dst->caller_name = src->caller_name;
 	dst->fh = src->fh;
@@ -76,12 +76,22 @@ nlm_convert_to_nlm_lock(struct nlm_lock *dst, struct nlm4_lock *src)
 }
 
 /*
+ * Up-convert for v1 granted response
+ */
+static void
+nlm_convert_to_nlm4_res(struct nlm4_res *dst, const struct nlm_res *src)
+{
+	dst->cookie = src->cookie;
+	dst->stat.stat = (nlm4_stats) src->stat.stat;
+}
+
+/*
  * Up-convert for v1 svc functions with a 32-bit lock range arg.
  * Note that lock range checks (like overflow) are done later,
  * in nlm_init_flock().
  */
 static void
-nlm_convert_to_nlm4_lock(struct nlm4_lock *dst, struct nlm_lock *src)
+nlm_convert_to_nlm4_lock(struct nlm4_lock *dst, const struct nlm_lock *src)
 {
 
 	dst->caller_name = src->caller_name;
@@ -93,7 +103,7 @@ nlm_convert_to_nlm4_lock(struct nlm4_lock *dst, struct nlm_lock *src)
 }
 
 static void
-nlm_convert_to_nlm4_share(struct nlm4_share *dst, struct nlm_share *src)
+nlm_convert_to_nlm4_share(struct nlm4_share *dst, const struct nlm_share *src)
 {
 
 	dst->caller_name = src->caller_name;
@@ -113,7 +123,7 @@ nlm_convert_to_nlm4_share(struct nlm4_share *dst, struct nlm_share *src)
  * valid 32-bit lock range.
  */
 static void
-nlm_convert_to_nlm_holder(struct nlm_holder *dst, struct nlm4_holder *src)
+nlm_convert_to_nlm_holder(struct nlm_holder *dst, const struct nlm4_holder *src)
 {
 	dst->exclusive = src->exclusive;
 	dst->svid = src->svid;
@@ -133,7 +143,7 @@ nlm_convert_to_nlm_stats(enum nlm4_stats src)
 }
 
 static void
-nlm_convert_to_nlm_res(struct nlm_res *dst, struct nlm4_res *src)
+nlm_convert_to_nlm_res(struct nlm_res *dst, const struct nlm4_res *src)
 {
 	dst->cookie = src->cookie;
 	dst->stat.stat = nlm_convert_to_nlm_stats(src->stat.stat);
@@ -175,7 +185,7 @@ nlm_test_1_svc(struct nlm_testargs *argp, nlm_testres *resp,
  * Callback functions for nlm_lock_1_svc
  */
 static bool_t nlm_lock_1_reply(SVCXPRT *, nlm4_res *);
-static enum clnt_stat nlm_granted_1_cb(nlm4_testargs *, void *, CLIENT *);
+static enum clnt_stat nlm_granted_1_cb(nlm4_testargs *, nlm4_res *, CLIENT *);
 
 bool_t
 nlm_lock_1_svc(nlm_lockargs *argp, nlm_res *resp,
@@ -215,7 +225,7 @@ nlm_lock_1_reply(SVCXPRT *transp, nlm4_res *resp)
 }
 
 static enum clnt_stat
-nlm_granted_1_cb(nlm4_testargs *argp, void *resp, CLIENT *clnt)
+nlm_granted_1_cb(nlm4_testargs *argp, nlm4_res *resp, CLIENT *clnt)
 {
 	nlm_testargs args1;
 	nlm_res res1;
@@ -229,9 +239,7 @@ nlm_granted_1_cb(nlm4_testargs *argp, void *resp, CLIENT *clnt)
 
 	rv = nlm_granted_1(&args1, &res1, clnt);
 
-	/* NB: We have a result our caller will not free. */
-	xdr_free((xdrproc_t)xdr_nlm_res, (void *)&res1);
-	(void) resp;
+	nlm_convert_to_nlm4_res(resp, &res1);
 
 	return (rv);
 }
@@ -355,7 +363,8 @@ nlm_test_res_1_cb(nlm4_testres *res4, void *null, CLIENT *clnt)
  * Callback functions for nlm_lock_msg_1_svc
  */
 static enum clnt_stat nlm_lock_res_1_cb(nlm4_res *, void *, CLIENT *);
-static enum clnt_stat nlm_granted_msg_1_cb(nlm4_testargs *, void *, CLIENT *);
+static enum clnt_stat nlm_granted_msg_1_cb(nlm4_testargs *, nlm4_res *,
+    CLIENT *);
 
 bool_t
 nlm_lock_msg_1_svc(nlm_lockargs *argp, void *resp,
@@ -396,16 +405,22 @@ nlm_lock_res_1_cb(nlm4_res *resp, void *null, CLIENT *clnt)
 }
 
 static enum clnt_stat
-nlm_granted_msg_1_cb(nlm4_testargs *argp, void *null, CLIENT *clnt)
+nlm_granted_msg_1_cb(nlm4_testargs *argp, nlm4_res *resp, CLIENT *clnt)
 {
 	nlm_testargs args1;
+	int rv;
 
 	args1.cookie = argp->cookie;
 	args1.exclusive = argp->exclusive;
 	nlm_convert_to_nlm_lock(&args1.alock, &argp->alock);
 
-	return (nlm_granted_msg_1(&args1, null, clnt));
+	rv = nlm_granted_msg_1(&args1, NULL, clnt);
 
+	/* MSG call doesn't fill in *resp, so do it here. */
+	if (rv != RPC_SUCCESS)
+		resp->stat.stat = nlm4_failed;
+
+	return (rv);
 }
 
 
@@ -693,7 +708,6 @@ nlm4_test_4_svc(nlm4_testargs *argp, nlm4_testres *resp, struct svc_req *sr)
  * Callback functions for nlm4_lock_4_svc
  */
 static bool_t nlm4_lock_4_reply(SVCXPRT *, nlm4_res *);
-static enum clnt_stat nlm4_granted_4_cb(nlm4_testargs *, void *, CLIENT *);
 
 bool_t
 nlm4_lock_4_svc(nlm4_lockargs *argp, nlm4_res *resp,
@@ -703,7 +717,7 @@ nlm4_lock_4_svc(nlm4_lockargs *argp, nlm4_res *resp,
 	/* NLM4_LOCK */
 	nlm_do_lock(argp, resp, sr,
 	    nlm4_lock_4_reply, NULL,
-	    nlm4_granted_4_cb);
+	    nlm4_granted_4);
 
 	/* above does its own reply */
 	return (FALSE);
@@ -713,22 +727,6 @@ static bool_t
 nlm4_lock_4_reply(SVCXPRT *transp, nlm4_res *resp)
 {
 	return (svc_sendreply(transp, xdr_nlm4_res, (char *)resp));
-}
-
-static enum clnt_stat
-nlm4_granted_4_cb(nlm4_testargs *argp, void *resp, CLIENT *clnt)
-{
-	nlm4_res res4;
-	int rv;
-
-	bzero(&res4, sizeof (res4));
-	rv = nlm4_granted_4(argp, &res4, clnt);
-
-	/* NB: We have a result our caller will not free. */
-	xdr_free((xdrproc_t)xdr_nlm4_res, (void *)&res4);
-	(void) resp;
-
-	return (rv);
 }
 
 bool_t
@@ -773,6 +771,8 @@ nlm4_test_msg_4_svc(nlm4_testargs *argp, void *resp, struct svc_req *sr)
  * Callback functions for nlm4_lock_msg_4_svc
  * (using the RPC client stubs directly)
  */
+static enum clnt_stat nlm4_granted_msg_4_cb(nlm4_testargs *, nlm4_res *,
+    CLIENT *);
 
 bool_t
 nlm4_lock_msg_4_svc(nlm4_lockargs *argp, void *resp,
@@ -784,7 +784,7 @@ nlm4_lock_msg_4_svc(nlm4_lockargs *argp, void *resp,
 	bzero(&res4, sizeof (res4));
 	nlm_do_lock(argp, &res4, sr,
 	    NULL, nlm4_lock_res_4,
-	    nlm4_granted_msg_4);
+	    nlm4_granted_msg_4_cb);
 
 	/* NB: We have a result our caller will not free. */
 	xdr_free((xdrproc_t)xdr_nlm4_res, (void *)&res4);
@@ -792,6 +792,20 @@ nlm4_lock_msg_4_svc(nlm4_lockargs *argp, void *resp,
 
 	/* The _msg_ calls get no reply. */
 	return (FALSE);
+}
+
+static enum clnt_stat
+nlm4_granted_msg_4_cb(nlm4_testargs *argp, nlm4_res *resp, CLIENT *clnt)
+{
+	int rv;
+
+	rv = nlm4_granted_msg_4(argp, NULL, clnt);
+
+	/* MSG call doesn't fill in *resp, so do it here. */
+	if (rv != RPC_SUCCESS)
+		resp->stat.stat = nlm4_failed;
+
+	return (rv);
 }
 
 bool_t
