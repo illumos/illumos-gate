@@ -330,7 +330,7 @@ ps_lgetregs(struct ps_prochandle *ph, lwpid_t lid, prgregset_t gregset)
 	if (read(lwpfd, &lwpstatus, sizeof (lwpstatus)) == -1)
 		return (PS_ERR);
 
-	gregset = lwpstatus.pr_reg;
+	(void) memcpy(gregset, lwpstatus.pr_reg, sizeof (*gregset));
 
 	(void) close(lwpfd);
 	return (PS_OK);

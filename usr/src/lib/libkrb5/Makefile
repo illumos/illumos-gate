@@ -35,7 +35,7 @@ COMERRH =	$(SRC)/lib/gss_mechs/mech_krb5/include/com_err.h
 LOCPLUGH =	$(SRC)/lib/gss_mechs/mech_krb5/include/locate_plugin.h
 KRB5H =		$(SRC)/uts/common/gssapi/mechs/krb5/include/krb5.h
 
-KRB5INCDIR= 	$(ROOT)/usr/include/kerberosv5
+KRB5INCDIR=	$(ROOT)/usr/include/kerberosv5
 
 COMERRHINST =	$(KRB5INCDIR)/com_err.h
 LOCPLUGHINST =	$(KRB5INCDIR)/locate_plugin.h
@@ -60,10 +60,10 @@ $(SUBDIRS):	FRC
 install_h:	$(KRB5INCDIR) $(KRB5HDRS)
 
 $(COMERRHINST):	$(COMERRH)
-	install -s -m 644 -f $(KRB5INCDIR) $(COMERRH)
+	$(INS) -s -m $(FILEMODE) -f $(KRB5INCDIR) $(COMERRH)
 $(KRB5HINST):	$(KRB5H)
-	install -s -m 644 -f $(KRB5INCDIR) $(KRB5H)
+	$(INS) -s -m $(FILEMODE) -f $(KRB5INCDIR) $(KRB5H)
 $(LOCPLUGHINST): $(LOCPLUGH)
-	install -s -m 644 -f $(KRB5INCDIR) $(LOCPLUGH)
+	$(INS) -s -m $(FILEMODE) -f $(KRB5INCDIR) $(LOCPLUGH)
 
 FRC:

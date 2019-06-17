@@ -60,7 +60,7 @@ simp: ../tests/simp.c libsub.so.1
 		$(LINK.c) $(LDFLAG) -o $@ ../tests/simp.c -R. ./libsub.so.1
 
 libsub.so.1: ../tests/sub.c
-		$(LINK.c) $(LDFLAG) -o $@ -G -Kpic -hlibsub.so.1 ../tests/sub.c
+		$(LINK.c) $(LDFLAG) -o $@ -G -fpic -hlibsub.so.1 ../tests/sub.c
 
 #
 # RDB sample runs & tests

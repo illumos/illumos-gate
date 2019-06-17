@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2019 Peter Tribble.
+#
 
 #
 # cmd/picl/plugins/sun4v/lib/snmp/Makefile
@@ -30,7 +32,7 @@
 
 LIBRARY=	libpiclsnmp.a
 VERS=		.1
-OBJECTS=	snmplib.o pdu.o asn1.o debug.o
+OBJECTS=	snmplib.o pdu.o asn1.o
 
 # include library definitions
 include $(SRC)/Makefile.psm
@@ -53,12 +55,6 @@ CPPFLAGS +=	-I. -I../../include -I$(SRC)/uts/sun4v
 CPPFLAGS +=	-D_REENTRANT
 
 #
-# Be careful when enabling SNMP_DEBUG; the debug log can quickly grow
-# very very large. Never run cycle stress test with SNMP_DEBUG enabled!
-#
-#CPPFLAGS +=	-DSNMP_DEBUG
-
-#
 # Do NOT uncomment the following two lines, unless you want to test
 # the behavior of the library with an SNMP agent over network.
 #
@@ -67,11 +63,6 @@ CPPFLAGS +=	-D_REENTRANT
 
 CFLAGS +=	$(CCVERBOSE) -DBIG_ENDIAN
 LDLIBS +=	-lc -lnvpair
-
-# It's OK not to build debug.c except when SNMP_DEBUG is enabled.
-# Don't let lint complain about it.
-#
-ALWAYS_LINT_DEFS +=	-erroff=E_EMPTY_TRANSLATION_UNIT
 
 .KEEP_STATE:
 

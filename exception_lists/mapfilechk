@@ -33,7 +33,7 @@
 #
 # This file provides an exception mechanism for specifying files
 # that match this pattern that should be skipped.
-# 
+#
 
 syntax: glob
 exception_lists/mapfilechk

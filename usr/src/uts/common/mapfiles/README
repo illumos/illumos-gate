@@ -38,7 +38,7 @@ closely:
   use the 'SYMBOL_SCOPE' directive.
 * These mapfiles do not hide symbols! Library mapfiles always have
   something to catch all local symbols. That should *never* be used
-  here. These mapfiles should not effect visibility.
+  here. These mapfiles should not affect visibility.
 * All symbols in these mapfiles should be marked 'EXTERN' to indicate
   that they are not provided by the kernel module but by another.
 * These mapfiles do not declare what is or isn't a public interface,

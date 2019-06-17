@@ -376,7 +376,7 @@ continue_to_break(struct ps_prochandle *ph)
 		handle_sp_break(ph);
 
 	if (ph->pp_flags & FLG_PP_LMAPS) {
-		if (get_linkmaps(ph) != PS_OK)
+		if (get_linkmaps(ph) != RET_OK)
 			(void) fprintf(stderr, "problem loading linkmaps\n");
 	}
 
@@ -499,7 +499,7 @@ step_n(struct ps_prochandle *ph, size_t count, sn_flags_e flgs)
 		perr("stn: PRCFAULT");
 
 	if ((flgs & FLG_SN_VERBOSE) && (ph->pp_flags & FLG_PP_LMAPS)) {
-		if (get_linkmaps(ph) != PS_OK)
+		if (get_linkmaps(ph) != RET_OK)
 			(void) fprintf(stderr, "problem loading linkmaps\n");
 	}
 

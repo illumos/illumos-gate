@@ -31,7 +31,7 @@ DTRACE_MAPFILE = $(OBJS_DIR)/dtrace.mapfile
 LDFLAGS += -z defs $(MAPFILES:%=-M $(MAPBASE)/%.mapfile) -M $(DTRACE_MAPFILE)
 
 #
-# Definitions and rulesto assemble the DTrace probe mapfile. There's no
+# Definitions and rules to assemble the DTrace probe mapfile. There's no
 # good way to automatically do this, hence we have a slightly gross
 # series of automated tools. This does mean that we have a bit more work
 # to do, but also means that probes can be added arbitrarily without
