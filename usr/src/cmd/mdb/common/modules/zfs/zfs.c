@@ -22,7 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
- * Copyright (c) 2017, Joyent, Inc.  All rights reserved.
+ * Copyright (c) 2019 Joyent, Inc.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -1461,7 +1461,6 @@ typedef struct mdb_space_map_phys_t {
 typedef struct mdb_space_map {
 	uint64_t sm_size;
 	uint8_t sm_shift;
-	int64_t sm_alloc;
 	uintptr_t sm_phys;
 } mdb_space_map_t;
 
@@ -1505,6 +1504,7 @@ metaslab_stats(uintptr_t addr, int spa_flags)
 	for (int m = 0; m < vdev.vdev_ms_count; m++) {
 		mdb_metaslab_t ms;
 		mdb_space_map_t sm = { 0 };
+		mdb_space_map_phys_t smp;
 		char free[MDB_NICENUM_BUFLEN];
 
 		if (mdb_ctf_vread(&ms, "metaslab_t", "mdb_metaslab_t",
@@ -1516,7 +1516,13 @@ metaslab_stats(uintptr_t addr, int spa_flags)
 		    ms.ms_sm, 0) == -1)
 			return (DCMD_ERR);
 
-		mdb_nicenum(ms.ms_size - sm.sm_alloc, free);
+		if (sm.sm_phys != 0) {
+			(void) mdb_ctf_vread(&smp, "space_map_phys_t",
+			    "mdb_space_map_phys_t", sm.sm_phys, 0);
+			mdb_nicenum(ms.ms_size - smp.smp_alloc, free);
+		} else {
+			(void) mdb_snprintf(free, MDB_NICENUM_BUFLEN, "-");
+		}
 
 		mdb_printf("%0?p %6llu %20llx %10s ", vdev_ms[m], ms.ms_id,
 		    ms.ms_start, free);
@@ -1526,13 +1532,8 @@ metaslab_stats(uintptr_t addr, int spa_flags)
 			mdb_printf("%9llu%%\n", ms.ms_fragmentation);
 
 		if ((spa_flags & SPA_FLAG_HISTOGRAMS) && ms.ms_sm != 0) {
-			mdb_space_map_phys_t smp;
-
 			if (sm.sm_phys == 0)
 				continue;
-
-			(void) mdb_ctf_vread(&smp, "space_map_phys_t",
-			    "mdb_space_map_phys_t", sm.sm_phys, 0);
 
 			dump_histogram(smp.smp_histogram,
 			    SPACE_MAP_HISTOGRAM_SIZE, sm.sm_shift);
@@ -2076,7 +2077,6 @@ typedef struct space_data {
 	uint64_t ms_freed;
 	uint64_t ms_allocatable;
 	int64_t ms_deferspace;
-	uint64_t avail;
 	uint64_t nowavail;
 } space_data_t;
 
@@ -2135,7 +2135,6 @@ space_cb(uintptr_t addr, const void *unknown, void *arg)
 	}
 
 	sd->ms_deferspace += ms.ms_deferspace;
-	sd->avail += sm.sm_size - sm.sm_alloc;
 	sd->nowavail += sm.sm_size - smp.smp_alloc;
 
 	return (WALK_NEXT);
@@ -2220,8 +2219,6 @@ spa_space(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    sd.ms_allocatable >> shift, suffix);
 	mdb_printf("ms_deferspace = %llu%s\n",
 	    sd.ms_deferspace >> shift, suffix);
-	mdb_printf("last synced avail = %llu%s\n",
-	    sd.avail >> shift, suffix);
 	mdb_printf("current syncing avail = %llu%s\n",
 	    sd.nowavail >> shift, suffix);
 
