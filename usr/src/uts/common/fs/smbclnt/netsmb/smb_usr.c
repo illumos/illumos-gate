@@ -36,7 +36,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2019 Nexenta by DDN, Inc. All rights reserved.
  */
 
 #include <sys/param.h>
@@ -180,6 +180,8 @@ smb_usr_xnp(smb_dev_t *sdp, intptr_t arg, int flags, cred_t *cr)
 
 out:
 	kmem_free(ioc, sizeof (*ioc));
+	md_done(&recv_md);
+	mb_done(&send_mb);
 
 	return (err);
 }
