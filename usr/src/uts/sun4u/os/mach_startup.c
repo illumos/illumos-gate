@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1993, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2019 Peter Tribble.
  */
 
 #include <sys/machsystm.h>
@@ -492,26 +493,6 @@ void
 load_mach_drivers(void)
 {
 	/* Currently no machine class (sun4u) specific drivers to load */
-}
-
-/*
- * Return true if the machine we're running on is a Positron.
- * (Positron is an unsupported developers platform.)
- */
-int
-iam_positron(void)
-{
-	char model[32];
-	const char proto_model[] = "SUNW,501-2732";
-	pnode_t root = prom_rootnode();
-
-	if (prom_getproplen(root, "model") != sizeof (proto_model))
-		return (0);
-
-	(void) prom_getprop(root, "model", model);
-	if (strcmp(model, proto_model) == 0)
-		return (1);
-	return (0);
 }
 
 /*
