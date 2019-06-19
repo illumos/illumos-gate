@@ -252,7 +252,7 @@ hash_string(const char *s, long modulo)
 	unsigned int	result = 0;
 	int		i = 1;
 
-	while (*s != NULL) {
+	while (*s != '\0') {
 		result += (*s++ << i++);
 	}
 

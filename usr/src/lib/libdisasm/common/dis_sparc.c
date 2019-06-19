@@ -129,7 +129,7 @@ dis_sparc_handle_attach(dis_handle_t *dhp)
 
 	if ((dhx = dis_zalloc(sizeof (dis_handle_sparc_t))) == NULL) {
 		(void) dis_seterrno(E_DIS_NOMEM);
-		return (NULL);
+		return (0);
 	}
 	dhx->dhx_debug = DIS_DEBUG_COMPAT;
 	dhp->dh_arch_private = dhx;

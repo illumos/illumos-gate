@@ -92,7 +92,7 @@ static DBG_options _Dbg_options_ld[] = {	/* ld only options */
 static DBG_options _Dbg_options_rtld[] = {	/* ld.so.1 only options */
 	{MSG_ORIG(MSG_TOK_AUDIT),	DBG_C_AUDITING,	0},
 	{MSG_ORIG(MSG_TOK_BINDINGS),	DBG_C_BINDINGS,	0},
-	{MSG_ORIG(MSG_TOK_DL),   	DBG_C_DL,	0},
+	{MSG_ORIG(MSG_TOK_DL),		DBG_C_DL,	0},
 	{MSG_ORIG(MSG_TOK_INIT),	DBG_C_INIT,	0},
 	{NULL,				0,		0},
 };
@@ -327,7 +327,7 @@ process_lmid(char *name, Dbg_desc *dbp)
 		{MSG_ORIG(MSG_TOK_LMID_ALL),	0,	DBG_E_LMID_ALL},
 		{MSG_ORIG(MSG_TOK_LMID_BASE),	0,	DBG_E_LMID_BASE},
 		{MSG_ORIG(MSG_TOK_LMID_LDSO),	0,	DBG_E_LMID_LDSO},
-		{NULL,				NULL},
+		{NULL,				0,	0},
 	};
 
 	Dbg_desc	tmp_db;

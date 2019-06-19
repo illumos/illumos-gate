@@ -99,7 +99,7 @@ __rtld(Elf32_Boot *ebp, const char *strings[], int (*funcs[])())
 	 * Discover things about our environment: auxiliary vector (if
 	 * any), arguments, program name, and the like.
 	 */
-	while (ebp->eb_tag != NULL) {
+	while (ebp->eb_tag != 0) {
 		switch (ebp->eb_tag) {
 		case EB_ARGV:
 			program_name = *((char **)ebp->eb_un.eb_ptr);

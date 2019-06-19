@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "mtlib.h"
 #define	_KMEMUSER
@@ -260,7 +258,7 @@ mq_getmsg(mqhdr_t *mqhp, char *msgp, uint_t *msg_prio)
 	MQ_ASSERT_PTR(mqhp, currentp);
 	curbuf = MQ_PTR(mqhp, currentp);
 
-	if ((*headpp = curbuf->msg_next) == NULL) {
+	if ((*headpp = curbuf->msg_next) == 0) {
 		/*
 		 * We just nuked the last message in this priority's queue.
 		 * Twiddle this priority's bit, and then find the next bit
@@ -275,7 +273,7 @@ mq_getmsg(mqhdr_t *mqhp, char *msgp, uint_t *msg_prio)
 				break;
 		mqhp->mq_curmaxprio = prio;
 
-		*tailpp = NULL;
+		*tailpp = 0;
 	}
 
 	/*
@@ -312,7 +310,7 @@ mq_putmsg(mqhdr_t *mqhp, const char *msgp, ssize_t len, uint_t prio)
 	 * Remove a message from the free list, and copy in the new contents.
 	 */
 	mqhp->mq_freep = curbuf->msg_next;
-	curbuf->msg_next = NULL;
+	curbuf->msg_next = 0;
 	(void) memcpy((char *)&curbuf[1], msgp, len);
 	curbuf->msg_len = len;
 

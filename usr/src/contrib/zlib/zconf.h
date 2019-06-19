@@ -22,8 +22,10 @@
  * We define our own memory allocation and deallocation routines that use kmem.
  */
 #define	MY_ZCALLOC
-#endif
+#define	NO_MEMCPY
+#else
 #define	HAVE_MEMCPY
+#endif
 #define	ZLIB_CONST
 #define	Z_PREFIX
 

@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * fmtmsg.c
  *
@@ -992,7 +990,7 @@ writemsg(char *buf, size_t size,
 	/* Write the TEXT, if requested */
 	if (dotext) {
 		p = (char *)text;
-		for (c = *p++; c != NULL && buf < ebuf; c = *p++) {
+		for (c = *p++; c != '\0' && buf < ebuf; c = *p++) {
 			*buf++ = c;
 			if (c == '\n') {
 				for (i = 0; i < textindent && buf < ebuf; i++)
@@ -1017,7 +1015,7 @@ writemsg(char *buf, size_t size,
 
 		/* Write the "action" string */
 		p = (char *)action;
-		for (c = *p++; c != NULL && buf < ebuf; c = *p++) {
+		for (c = *p++; c != '\0' && buf < ebuf; c = *p++) {
 			*buf++ = c;
 			if (c == '\n') {
 				for (i = 0; i < actindent && buf < ebuf; i++)

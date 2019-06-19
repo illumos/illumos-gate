@@ -128,8 +128,8 @@ userdisk_print(int verbose)
 		pager_output(line);
 		dev.dd.d_dev = &userboot_disk;
 		dev.dd.d_unit = i;
-		dev.d_slice = -1;
-		dev.d_partition = -1;
+		dev.d_slice = D_SLICENONE;
+		dev.d_partition = D_SLICENONE;
 		if (disk_open(&dev, ud_info[i].mediasize,
 		    ud_info[i].sectorsize) == 0) {
 			sprintf(line, "    disk%d", i);

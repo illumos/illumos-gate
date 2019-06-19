@@ -26,8 +26,8 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	All Rights Reserved	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#include <stdio.h>
+#include <stdarg.h>
 #include "ldefs.h"
 #include <limits.h>
 
@@ -88,23 +88,23 @@ digit(int c)
 	return (c >= '0' && c <= '9');
 }
 
-/* VARARGS1 */
 void
-error(s, p, d)
-char *s;
-int p, d;
+error(char *s, ...)
 {
+	va_list ap;
+
 	/* if(!eof) */
-	if (!yyline)
+	if (!yyline) {
 		(void) fprintf(errorf, "Command line: ");
-	else {
+	} else {
 		(void) fprintf(errorf,
-			!no_input ? "" : "\"%s\":", sargv[optind]);
+		    !no_input ? "" : "\"%s\":", sargv[optind]);
 		(void) fprintf(errorf, "line %d: ", yyline);
 	}
 	(void) fprintf(errorf, "Error: ");
-	/*LINTED: E_SEC_PRINTF_VAR_FMT*/
-	(void) fprintf(errorf, s, p, d);
+	va_start(ap, s);
+	(void) vfprintf(errorf, s, ap);
+	va_end(ap);
 	(void) putc('\n', errorf);
 	if (fatal)
 		error_tail();
@@ -126,24 +126,24 @@ error_tail(void)
 	/* NOTREACHED */
 }
 
-/* VARARGS1 */
 void
-warning(s, p, d)
-char *s;
-int p, d;
+warning(char *s, ...)
 {
+	va_list ap;
+
 	if (!eof)
 		if (!yyline)
 			(void) fprintf(errorf, "Command line: ");
 		else {
 			(void) fprintf(errorf,
-				!no_input?"":"\"%s\":", sargv[optind]);
+			    !no_input ? "" : "\"%s\":", sargv[optind]);
 			(void) fprintf(errorf,
-				"line %d: ", yyline);
+			    "line %d: ", yyline);
 		}
 	(void) fprintf(errorf, "Warning: ");
-	/*LINTED: E_SEC_PRINTF_VAR_FMT*/
-	(void) fprintf(errorf, s, p, d);
+	va_start(ap, s);
+	(void) vfprintf(errorf, s, ap);
+	va_end(ap);
 	(void) putc('\n', errorf);
 	(void) fflush(errorf);
 	if (fout)
@@ -490,7 +490,7 @@ cpycom(CHR *p)
 		 * FIX BUG #1058428, not parsing comments correctly
 		 * that span more than one line
 		 */
-		if (*t != NULL)
+		if (*t != 0)
 			(void) putc(*t++, fout);
 	}
 	(void) putc('\n', fout);

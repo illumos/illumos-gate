@@ -126,10 +126,10 @@ process_nls_path(char *name, int oflag)
 			while (s && *s) {
 				if (*s == '_') {
 					s1 = s;
-					*s1++ = NULL;
+					*s1++ = '\0';
 				} else if (*s == '.') {
 					s2 = s;
-					*s2++ = NULL;
+					*s2++ = '\0';
 				}
 				s++;
 			}
@@ -206,7 +206,7 @@ process_nls_path(char *name, int oflag)
 	s = name;
 	while (*s && t < pathname + PATH_MAX)
 		*t++ = *s++;
-	*t = NULL;
+	*t = '\0';
 	return (file_open(pathname, SAFE_F));
 }
 
@@ -269,7 +269,7 @@ replace_nls_option(char *s, char *name, char *pathname, char *locale,
 		}
 		++s;
 	}
-	*t = NULL;
+	*t = '\0';
 	return (s);
 }
 

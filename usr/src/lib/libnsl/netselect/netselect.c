@@ -476,7 +476,7 @@ setnetpath(void)
 			/* Skip all leading ':'s */
 			while (*tp && *tp == ':')
 				tp++;
-			if (*tp == NULL)
+			if (*tp == '\0')
 				break;  /* last one */
 			netid = tp;
 			while (*tp && *tp != ':')

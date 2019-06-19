@@ -214,7 +214,7 @@ getflags(Half flags)
 static INSCFG_RET
 scanconfig(Crle_desc * crle, Addr addr, int c_class)
 {
-	Conv_inv_buf_t 		inv_buf1, inv_buf2, inv_buf3, inv_buf4;
+	Conv_inv_buf_t		inv_buf1, inv_buf2, inv_buf3, inv_buf4;
 	Conv_dl_flag_buf_t	dl_flag_buf;
 	Rtc_id		*id;
 	Rtc_head	*head;
@@ -976,7 +976,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		const char		*str;
 		Word			_ndx;
 
-		if (*hash == NULL)
+		if (*hash == 0)
 			continue;
 
 		obj = objtbl + *hash;

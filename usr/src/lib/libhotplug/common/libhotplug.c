@@ -345,14 +345,14 @@ hp_last_change(hp_node_t node)
 	if (node == NULL) {
 		i_hp_dprintf("hp_last_change: invalid arguments.\n");
 		errno = EINVAL;
-		return (NULL);
+		return (0);
 	}
 
 	if ((node->hp_type != HP_NODE_CONNECTOR) &&
 	    (node->hp_type != HP_NODE_PORT)) {
 		i_hp_dprintf("hp_last_change: operation not supported.\n");
 		errno = ENOTSUP;
-		return (NULL);
+		return (0);
 	}
 
 	return (node->hp_last_change);
@@ -794,7 +794,7 @@ hp_unpack(char *packed_buf, size_t packed_len, hp_node_t *retp)
 	if (nvlist_next_nvpair(nvl, NULL) == NULL) {
 		nvlist_free(nvl);
 		errno = EINVAL;
-		return (NULL);
+		return (0);
 	}
 
 	for (nvp = NULL; nvp = nvlist_next_nvpair(nvl, nvp); ) {

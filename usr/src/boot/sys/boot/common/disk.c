@@ -140,7 +140,7 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 		dev.dd.d_dev = pa->dev->dd.d_dev;
 		dev.dd.d_unit = pa->dev->dd.d_unit;
 		dev.d_slice = part->index;
-		dev.d_partition = -1;
+		dev.d_partition = D_PARTNONE;
 		if (disk_open(&dev, partsize, sectsize) == 0) {
 			table = ptable_open(&dev, partsize, sectsize, ptblread);
 			if (table != NULL) {
@@ -227,6 +227,7 @@ disk_ioctl(struct disk_devdesc *dev, unsigned long cmd, void *data)
 int
 disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 {
+	struct disk_devdesc partdev;
 	struct open_disk *od;
 	struct ptable *table;
 	struct ptable_entry part;
@@ -237,14 +238,6 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 		return (ENXIO);
 	}
 	rc = 0;
-	/*
-	 * While we are reading disk metadata, make sure we do it relative
-	 * to the start of the disk
-	 */
-	dev->d_offset = 0;
-	table = NULL;
-	slice = dev->d_slice;
-	partition = dev->d_partition;
 	od = (struct open_disk *)malloc(sizeof (struct open_disk));
 	if (od == NULL) {
 		DPRINTF("no memory");
@@ -254,11 +247,25 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 	od->entrysize = 0;
 	od->mediasize = mediasize;
 	od->sectorsize = sectorsize;
+	/*
+	 * While we are reading disk metadata, make sure we do it relative
+	 * to the start of the disk
+	 */
+	memcpy(&partdev, dev, sizeof(partdev));
+	partdev.d_offset = 0;
+	partdev.d_slice = D_SLICENONE;
+	partdev.d_partition = D_PARTNONE;
+
+	dev->d_offset = 0;
+	table = NULL;
+	slice = dev->d_slice;
+	partition = dev->d_partition;
+
 	DPRINTF("%s unit %d, slice %d, partition %d => %p", disk_fmtdev(dev),
 	    dev->dd.d_unit, dev->d_slice, dev->d_partition, od);
 
 	/* Determine disk layout. */
-	od->table = ptable_open(dev, mediasize / sectorsize, sectorsize,
+	od->table = ptable_open(&partdev, mediasize / sectorsize, sectorsize,
 	    ptblread);
 	if (od->table == NULL) {
 		DPRINTF("Can't read partition table");
@@ -272,7 +279,8 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 	}
 	od->mediasize = mediasize;
 
-	if (ptable_gettype(od->table) == PTABLE_BSD &&
+	if ((ptable_gettype(od->table) == PTABLE_BSD ||
+	    ptable_gettype(od->table) == PTABLE_VTOC) &&
 	    partition >= 0) {
 		/* It doesn't matter what value has d_slice */
 		rc = ptable_getpart(od->table, &part, partition);
@@ -295,24 +303,38 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 		od->entrysize = part.end - part.start + 1;
 		slice = part.index;
 		if (ptable_gettype(od->table) == PTABLE_GPT) {
-			partition = 255;
+			partition = D_PARTISGPT;
 			goto out; /* Nothing more to do */
-		} else if (partition == 255) {
+		} else if (partition == D_PARTISGPT) {
 			/*
 			 * When we try to open GPT partition, but partition
-			 * table isn't GPT, reset d_partition value to -1
-			 * and try to autodetect appropriate value.
+			 * table isn't GPT, reset partition value to
+			 * D_PARTWILD and try to autodetect appropriate value.
 			 */
-			partition = -1;
+			partition = D_PARTWILD;
 		}
+
 		/*
-		 * If d_partition < 0 and we are looking at a BSD/VTOC slice,
-		 * then try to read label, otherwise return the
-		 * whole MBR slice.
+		 * If partition is D_PARTNONE, then disk_open() was called
+		 * to open raw MBR slice.
 		 */
-		if (partition == -1 &&
-		    (part.type != PART_FREEBSD || part.type != PART_SOLARIS2))
+		if (partition == D_PARTNONE)
 			goto out;
+
+		/*
+		 * If partition is D_PARTWILD and we are looking at a
+		 * BSD/VTOC slice, then try to read label, otherwise return
+		 * the whole MBR slice.
+		 */
+		if (partition == D_PARTWILD) {
+			switch (part.type) {
+			case PART_FREEBSD:
+			case PART_SOLARIS2:
+				break;
+			default:
+				goto out;
+			}
+		}
 		/* Try to read label */
 		table = ptable_open(dev, part.end - part.start + 1,
 		    od->sectorsize, ptblread);
@@ -322,12 +344,12 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 			goto out;
 		}
 		/*
-		 * If slice contains BSD/VTOC label and d_partition < 0, then
+		 * If slice contains BSD/VTOC label and partition < 0, then
 		 * assume the 'a' partition. Otherwise just return the
 		 * whole MBR slice, because it can contain ZFS.
 		 */
 		if (partition < 0) {
-			if (ptable_gettype(table) != PTABLE_BSD ||
+			if (ptable_gettype(table) != PTABLE_BSD &&
 			    ptable_gettype(table) != PTABLE_VTOC)
 				goto out;
 			partition = 0;
@@ -376,9 +398,9 @@ disk_fmtdev(struct disk_devdesc *dev)
 	char *cp;
 
 	cp = buf + sprintf(buf, "%s%d", dev->dd.d_dev->dv_name, dev->dd.d_unit);
-	if (dev->d_slice >= 0) {
+	if (dev->d_slice > D_SLICENONE) {
 #ifdef LOADER_GPT_SUPPORT
-		if (dev->d_partition == 255) {
+		if (dev->d_partition == D_PARTISGPT) {
 			sprintf(cp, "p%d:", dev->d_slice);
 			return (buf);
 		} else
@@ -387,7 +409,7 @@ disk_fmtdev(struct disk_devdesc *dev)
 			cp += sprintf(cp, "s%d", dev->d_slice);
 #endif
 	}
-	if (dev->d_partition >= 0)
+	if (dev->d_partition > D_PARTNONE)
 		cp += sprintf(cp, "%c", dev->d_partition + 'a');
 	strcat(cp, ":");
 	return (buf);
@@ -401,7 +423,21 @@ disk_parsedev(struct disk_devdesc *dev, const char *devspec, const char **path)
 	char *cp;
 
 	np = devspec;
-	unit = slice = partition = -1;
+	unit = -1;
+	/*
+	 * If there is path/file info after the device info, then any missing
+	 * slice or partition info should be considered a request to search for
+	 * an appropriate partition.  Otherwise we want to open the raw device
+	 * itself and not try to fill in missing info by searching.
+	 */
+	if ((cp = strchr(np, ':')) != NULL && cp[1] != '\0') {
+		slice = D_SLICEWILD;
+		partition = D_PARTWILD;
+	} else {
+		slice = D_SLICENONE;
+		partition = D_PARTNONE;
+	}
+
 	if (*np != '\0' && *np != ':') {
 		unit = strtol(np, &cp, 10);
 		if (cp == np)
@@ -415,7 +451,7 @@ disk_parsedev(struct disk_devdesc *dev, const char *devspec, const char **path)
 			/* we don't support nested partitions on GPT */
 			if (*cp != '\0' && *cp != ':')
 				return (EINVAL);
-			partition = 255;
+			partition = D_PARTISGPT;
 		} else
 #endif
 #ifdef LOADER_MBR_SUPPORT

@@ -298,7 +298,7 @@ _doexeclist(nss_XbyY_args_t *argp)
 		else
 			status = 0;
 	}
-	(void) memset(argp->buf.buffer, NULL, argp->buf.buflen);
+	(void) memset(argp->buf.buffer, 0, argp->buf.buflen);
 
 	return (status);
 

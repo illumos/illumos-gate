@@ -99,7 +99,7 @@ _enum_common_p(const char *cprofiles,
 	if (cprofiles == NULL)
 		return (0);
 
-	if (*pcnt > 0 && strcmp(profs[*pcnt - 1], PROFILE_STOP) == NULL)
+	if (*pcnt > 0 && strcmp(profs[*pcnt - 1], PROFILE_STOP) == 0)
 		return (0);
 
 	COPYTOSTACK(profiles, cprofiles)
@@ -333,7 +333,7 @@ _auth_match_noun(const char *pattern, const char *auth,
 	if (strncmp(pattern, auth, pattern_len - 1) == 0) {
 		grant = strrchr(auth, '.');
 		if (grant != NULL) {
-			if (strncmp(grant + 1, "grant", 5) != NULL)
+			if (strncmp(grant + 1, "grant", 5) != 0)
 				return (1);
 		}
 	}

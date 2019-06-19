@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "mt.h"
 #include "rpc_mt.h"
 #include <stdio.h>
@@ -425,11 +423,11 @@ clnt_create_service_timed(const char *host, const char *service,
 		netdir_free((void *)raddrs, ND_ADDRLIST);
 
 		if (port) {
-			if (strcmp(nconf->nc_protofmly, NC_INET) == NULL)
+			if (strcmp(nconf->nc_protofmly, NC_INET) == 0)
 				/* LINTED pointer alignment */
 				((struct sockaddr_in *)
 				tbind->addr.buf)->sin_port = htons(port);
-			else if (strcmp(nconf->nc_protofmly, NC_INET6) == NULL)
+			else if (strcmp(nconf->nc_protofmly, NC_INET6) == 0)
 				/* LINTED pointer alignment */
 				((struct sockaddr_in6 *)
 				tbind->addr.buf)->sin6_port = htons(port);

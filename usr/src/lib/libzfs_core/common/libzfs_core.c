@@ -154,7 +154,7 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 		}
 		zc.zc_nvlist_dst = (uint64_t)(uintptr_t)
 		    malloc(zc.zc_nvlist_dst_size);
-		if (zc.zc_nvlist_dst == NULL) {
+		if (zc.zc_nvlist_dst == 0) {
 			error = ENOMEM;
 			goto out;
 		}
@@ -174,7 +174,7 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 			zc.zc_nvlist_dst_size *= 2;
 			zc.zc_nvlist_dst = (uint64_t)(uintptr_t)
 			    malloc(zc.zc_nvlist_dst_size);
-			if (zc.zc_nvlist_dst == NULL) {
+			if (zc.zc_nvlist_dst == 0) {
 				error = ENOMEM;
 				goto out;
 			}
@@ -1003,16 +1003,16 @@ lzc_channel_program(const char *pool, const char *program, uint64_t instrlimit,
  *	checkpoint at most, at any given time.
  *
  * ZFS_ERR_DISCARDING_CHECKPOINT
- * 	ZFS is in the middle of discarding a checkpoint for this pool.
- * 	The pool can be checkpointed again once the discard is done.
+ *	ZFS is in the middle of discarding a checkpoint for this pool.
+ *	The pool can be checkpointed again once the discard is done.
  *
  * ZFS_DEVRM_IN_PROGRESS
- * 	A vdev is currently being removed. The pool cannot be
- * 	checkpointed until the device removal is done.
+ *	A vdev is currently being removed. The pool cannot be
+ *	checkpointed until the device removal is done.
  *
  * ZFS_VDEV_TOO_BIG
- * 	One or more top-level vdevs exceed the maximum vdev size
- * 	supported for this feature.
+ *	One or more top-level vdevs exceed the maximum vdev size
+ *	supported for this feature.
  */
 int
 lzc_pool_checkpoint(const char *pool)
@@ -1038,10 +1038,10 @@ lzc_pool_checkpoint(const char *pool)
  * This method may also return:
  *
  * ZFS_ERR_NO_CHECKPOINT
- * 	The pool does not have a checkpoint.
+ *	The pool does not have a checkpoint.
  *
  * ZFS_ERR_DISCARDING_CHECKPOINT
- * 	ZFS is already in the middle of discarding the checkpoint.
+ *	ZFS is already in the middle of discarding the checkpoint.
  */
 int
 lzc_pool_checkpoint_discard(const char *pool)

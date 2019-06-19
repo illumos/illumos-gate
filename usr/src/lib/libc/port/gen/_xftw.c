@@ -27,8 +27,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *	_xftw - file tree walk the uses expanded stat structure
  *
@@ -348,7 +346,7 @@ nocdstat(const char *path, struct stat *statp, struct Var *vp, int sym)
 				(void) close(fd);
 				(void) free(dirp);
 				errno = ENAMETOOLONG;
-				return (NULL);
+				return (0);
 			    }
 			    (void) close(fd);
 			    fd = cfd;

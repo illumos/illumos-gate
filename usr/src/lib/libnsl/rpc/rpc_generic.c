@@ -32,8 +32,6 @@
  * California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Miscl routines for RPC.
  */
@@ -168,7 +166,7 @@ getnettype(const char *nettype)
 {
 	int i;
 
-	if ((nettype == NULL) || (nettype[0] == NULL))
+	if ((nettype == NULL) || (nettype[0] == '\0'))
 		return (_RPC_NETPATH);	/* Default */
 
 	for (i = 0; _rpctypelist[i].name; i++)
@@ -250,7 +248,7 @@ __rpc_getconfip(char *nettype)
 		netid = netid_tcp;
 	else
 		return (NULL);
-	if ((netid == NULL) || (netid[0] == NULL))
+	if ((netid == NULL) || (netid[0] == '\0'))
 		return (NULL);
 	return (getnetconfigent(netid));
 }

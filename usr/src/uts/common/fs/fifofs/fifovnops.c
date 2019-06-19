@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All rights reserved.  	*/
+/*	  All rights reserved.		*/
 
 
 /*
@@ -561,11 +561,11 @@ fifo_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *crp,
 	/*
 	 * If this a pipe and this is the first end to close,
 	 * then we have a bit of cleanup work to do.
-	 * 	Mark both ends of pipe as closed.
-	 * 	Wake up anybody blocked at the other end and for named pipes,
+	 *	Mark both ends of pipe as closed.
+	 *	Wake up anybody blocked at the other end and for named pipes,
 	 *	Close down this end of the stream
 	 *	Allow other opens/closes to continue
-	 * 	force an unmount of other end.
+	 *	force an unmount of other end.
 	 * Otherwise if this is last close,
 	 *	flush messages,
 	 *	close down the stream
@@ -1136,6 +1136,21 @@ fifo_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
 	    fifo_strioctl(vp, cmd, arg, mode, cr, rvalp));
 }
 
+static inline int
+fifo_ioctl_getpeercred(fifonode_t *fnp, intptr_t arg, int mode)
+{
+	k_peercred_t *kp = (k_peercred_t *)arg;
+
+	if (mode == FKIOCTL && fnp->fn_pcredp != NULL) {
+		crhold(fnp->fn_pcredp);
+		kp->pc_cr = fnp->fn_pcredp;
+		kp->pc_cpid = fnp->fn_cpid;
+		return (0);
+	} else {
+		return (ENOTSUP);
+	}
+}
+
 static int
 fifo_fastioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
     int *rvalp)
@@ -1356,6 +1371,10 @@ fifo_fastioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
 		*rvalp = 0;
 		break;
 
+	case _I_GETPEERCRED:
+		error = fifo_ioctl_getpeercred(fnp, arg, mode);
+		break;
+
 	/*
 	 * invalid calls for stream head or fifos
 	 */
@@ -1403,17 +1422,8 @@ fifo_strioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
 	int		error;
 	fifolock_t	*fn_lock;
 
-	if (cmd == _I_GETPEERCRED) {
-		if (mode == FKIOCTL && fnp->fn_pcredp != NULL) {
-			k_peercred_t *kp = (k_peercred_t *)arg;
-			crhold(fnp->fn_pcredp);
-			kp->pc_cr = fnp->fn_pcredp;
-			kp->pc_cpid = fnp->fn_cpid;
-			return (0);
-		} else {
-			return (ENOTSUP);
-		}
-	}
+	if (cmd == _I_GETPEERCRED)
+		return (fifo_ioctl_getpeercred(fnp, arg, mode));
 
 	error = strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp);
 

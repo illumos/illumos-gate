@@ -658,7 +658,7 @@ pututxline(const struct utmpx *entry)
 		 */
 		if (getutxid(&tmpxbuf) == NULL) {
 			lock++;
-			if (lockf(fd, F_LOCK, 0) < NULL)
+			if (lockf(fd, F_LOCK, 0) < 0)
 				return (NULL);
 			(void) fseek(fp, 0, SEEK_END);
 		} else

@@ -426,7 +426,7 @@ label:
 
 		case 'Y':
 		case 'y':
-			if (*buf == NULL || isspace(*buf))
+			if (*buf == '\0' || isspace(*buf))
 				break;
 
 			if (!isdigit(*buf))

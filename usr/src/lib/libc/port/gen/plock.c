@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * plock - lock "segments" in physical memory.
  *
@@ -117,7 +115,7 @@ plock(int op)				/* desired operation */
 		 * memcntl backs them out automatically.
 		 */
 		e = memcntl(NULL, 0, MC_LOCKAS, (caddr_t)MCL_CURRENT,
-		    PROC_TEXT|PRIVATE, (int)NULL);
+		    PROC_TEXT|PRIVATE, 0);
 		if (!e)
 			lock_state |= TXTLOCK;
 		lmutex_unlock(&plock_lock);
@@ -144,7 +142,7 @@ plock(int op)				/* desired operation */
 		 * memcntl undoes the locks internally.
 		 */
 		e = memcntl(NULL, 0, MC_LOCKAS, (caddr_t)MCL_CURRENT,
-		    PROC_DATA|PRIVATE, (int)NULL);
+		    PROC_DATA|PRIVATE, 0);
 		if (e) {
 			lmutex_unlock(&plock_lock);
 			return (-1);
@@ -160,7 +158,7 @@ plock(int op)				/* desired operation */
 		if (e) {
 			e = errno;
 			(void) memcntl(NULL, 0, MC_UNLOCKAS,
-			    (caddr_t)MCL_CURRENT, PROC_DATA|PRIVATE, (int)NULL);
+			    (caddr_t)MCL_CURRENT, PROC_DATA|PRIVATE, 0);
 			errno = e;
 			lmutex_unlock(&plock_lock);
 			return (-1);
