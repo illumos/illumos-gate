@@ -15,7 +15,7 @@
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2016 Nexenta Systems, Inc.
-# Copyright 2018 Joyent, Inc.
+# Copyright 2019 Joyent, Inc.
 #
 
 export PATH="/usr/bin"
@@ -130,17 +130,17 @@ function constrain_path
 	# Special case links
 	ln -s /usr/gnu/bin/dd $PATHDIR/gnu_dd
 
-	# SmartOS does not ship sudo or truncate. Link to them in the
-	# package manager's namespace.
-	if [[ ! -x $PATHDIR/sudo ]]; then
-		rm $PATHDIR/sudo && ln -s /opt/local/bin/sudo $PATHDIR/sudo ||
-			fail "Couldn't link sudo"
-	fi
-	if [[ ! -x $PATHDIR/truncate ]]; then
-		rm $PATHDIR/truncate &&
-			ln -s /opt/local/bin/truncate $PATHDIR/truncate ||
-			fail "Couldn't link truncate"
-	fi
+	# SmartOS does not ship some required packages by default.
+	# Link to them in the package manager's namespace.
+	pkgsrc_bin=/opt/local/bin
+	pkgsrc_packages="sudo truncate python base64"
+	for pkg in $pkgsrc_packages; do
+		if [[ ! -x $PATHDIR/$pkg ]]; then
+			rm $PATHDIR/$pkg &&
+			    ln -s $pkgsrc_bin/$pkg $PATHDIR/$pkg ||
+			    fail "Couldn't link $pkg"
+		fi
+	done
 }
 
 constrain_path

@@ -57,7 +57,7 @@ do
 	log_must zpool create $TESTPOOL $type $ZPOOL_DISKS \
 	    special $stype $sdisks
 	log_must zpool export $TESTPOOL
-	log_must zpool import -d /var/tmp $imp_opt $TESTPOOL
+	log_must zpool import -d $TEST_BASE_DIR $imp_opt $TESTPOOL
 	log_must display_status $TESTPOOL
 	log_must zpool destroy -f $TESTPOOL
 done

@@ -13,6 +13,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2019 Joyent, Inc.
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -42,12 +43,12 @@ log_assert "nopwrite works for sync writes"
 
 log_must zfs set compress=on $origin
 log_must zfs set checksum=sha256 $origin
-gnu_dd if=/dev/urandom of=$TESTDIR/file bs=1024k count=$MEGS oflag=sync \
+dd if=/dev/urandom of=$TESTDIR/file bs=1024k count=$MEGS oflag=sync \
     conv=notrunc >/dev/null 2>&1 || log_fail "dd into $TESTDIR/file failed."
 zfs snapshot $origin@a || log_fail "zfs snap failed"
 log_must zfs clone $origin@a $origin/clone
 
-gnu_dd if=/$TESTDIR/file of=/$TESTDIR/clone/file bs=1024k count=$MEGS \
+dd if=/$TESTDIR/file of=/$TESTDIR/clone/file bs=1024k count=$MEGS \
     oflag=sync conv=notrunc >/dev/null 2>&1 || log_fail "dd failed."
 
 log_must verify_nopwrite $origin $origin@a $origin/clone
