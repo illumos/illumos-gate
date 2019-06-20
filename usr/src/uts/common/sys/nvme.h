@@ -12,6 +12,7 @@
 /*
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2019 Western Digital Corporation
  */
 
 #ifndef _SYS_NVME_H
@@ -48,7 +49,9 @@ extern "C" {
 #define	NVME_IOC_FORMAT			(NVME_IOC | 8)
 #define	NVME_IOC_DETACH			(NVME_IOC | 9)
 #define	NVME_IOC_ATTACH			(NVME_IOC | 10)
-#define	NVME_IOC_MAX			NVME_IOC_ATTACH
+#define	NVME_IOC_FIRMWARE_DOWNLOAD	(NVME_IOC | 11)
+#define	NVME_IOC_FIRMWARE_COMMIT	(NVME_IOC | 12)
+#define	NVME_IOC_MAX			NVME_IOC_FIRMWARE_COMMIT
 
 #define	IS_NVME_IOC(x)			((x) > NVME_IOC && (x) <= NVME_IOC_MAX)
 #define	NVME_IOC_CMD(x)			((x) & 0xff)
@@ -435,10 +438,12 @@ typedef struct {
 
 typedef struct {
 	uint8_t fw_afi:3;		/* Active Firmware Slot */
-	uint8_t fw_rsvd1:5;
-	uint8_t fw_rsvd2[7];
+	uint8_t fw_rsvd1:1;
+	uint8_t fw_next:3;		/* Next Active Firmware Slot */
+	uint8_t fw_rsvd2:1;
+	uint8_t fw_rsvd3[7];
 	char fw_frs[7][8];		/* Firmware Revision / Slot */
-	uint8_t fw_rsvd3[512 - 64];
+	uint8_t fw_rsvd4[512 - 64];
 } nvme_fwslot_log_t;
 
 
@@ -636,8 +641,116 @@ typedef union {
 	uint32_t r;
 } nvme_software_progress_marker_t;
 
+/*
+ * Firmware Commit - Command Dword 10
+ */
+#define	NVME_FWC_SAVE		0x0	/* Save image only */
+#define	NVME_FWC_SAVE_ACTIVATE	0x1	/* Save and activate at next reset */
+#define	NVME_FWC_ACTIVATE	0x2	/* Activate slot at next reset */
+#define	NVME_FWC_ACTIVATE_IMMED	0x3	/* Activate slot immediately */
+
+/*
+ * Firmware slot number is only 3 bits, and zero is not allowed.
+ * Valid range is 1 to 7.
+ */
+#define	NVME_FW_SLOT_MIN	1	/* lowest allowable slot number ... */
+#define	NVME_FW_SLOT_MAX	7	/* ... and highest */
+
+/*
+ * Some constants to make verification of DWORD variables and arguments easier.
+ * A DWORD is 4 bytes.
+ */
+#define	NVME_DWORD_SHIFT	2
+#define	NVME_DWORD_SIZE		(1 << NVME_DWORD_SHIFT)
+#define	NVME_DWORD_MASK		(NVME_DWORD_SIZE - 1)
+
+/*
+ * Maximum offset a firmware image can be load at is the number of
+ * DWORDS in a 32 bit field. Expressed in bytes its is:
+ */
+#define	NVME_FW_OFFSETB_MAX	((u_longlong_t)UINT32_MAX << NVME_DWORD_SHIFT)
+
+typedef union {
+	struct {
+		uint32_t fc_slot:3;	/* Firmware slot */
+		uint32_t fc_action:3;	/* Commit action */
+		uint32_t fc_rsvd:26;
+	} b;
+	uint32_t r;
+} nvme_firmware_commit_dw10_t;
+
 #pragma pack() /* pack(1) */
 
+/* NVMe completion status code type */
+#define	NVME_CQE_SCT_GENERIC	0	/* Generic Command Status */
+#define	NVME_CQE_SCT_SPECIFIC	1	/* Command Specific Status */
+#define	NVME_CQE_SCT_INTEGRITY	2	/* Media and Data Integrity Errors */
+#define	NVME_CQE_SCT_VENDOR	7	/* Vendor Specific */
+
+/* NVMe completion status code (generic) */
+#define	NVME_CQE_SC_GEN_SUCCESS		0x0	/* Successful Completion */
+#define	NVME_CQE_SC_GEN_INV_OPC		0x1	/* Invalid Command Opcode */
+#define	NVME_CQE_SC_GEN_INV_FLD		0x2	/* Invalid Field in Command */
+#define	NVME_CQE_SC_GEN_ID_CNFL		0x3	/* Command ID Conflict */
+#define	NVME_CQE_SC_GEN_DATA_XFR_ERR	0x4	/* Data Transfer Error */
+#define	NVME_CQE_SC_GEN_ABORT_PWRLOSS	0x5	/* Cmds Aborted / Pwr Loss */
+#define	NVME_CQE_SC_GEN_INTERNAL_ERR	0x6	/* Internal Error */
+#define	NVME_CQE_SC_GEN_ABORT_REQUEST	0x7	/* Command Abort Requested */
+#define	NVME_CQE_SC_GEN_ABORT_SQ_DEL	0x8	/* Cmd Aborted / SQ deletion */
+#define	NVME_CQE_SC_GEN_ABORT_FUSE_FAIL	0x9	/* Cmd Aborted / Failed Fused */
+#define	NVME_CQE_SC_GEN_ABORT_FUSE_MISS	0xa	/* Cmd Aborted / Missing Fusd */
+#define	NVME_CQE_SC_GEN_INV_NS		0xb	/* Inval Namespace or Format */
+#define	NVME_CQE_SC_GEN_CMD_SEQ_ERR	0xc	/* Command Sequence Error */
+#define	NVME_CQE_SC_GEN_INV_SGL_LAST	0xd	/* Inval SGL Last Seg Desc */
+#define	NVME_CQE_SC_GEN_INV_SGL_NUM	0xe	/* Inval Number of SGL Desc */
+#define	NVME_CQE_SC_GEN_INV_DSGL_LEN	0xf	/* Data SGL Length Invalid */
+#define	NVME_CQE_SC_GEN_INV_MSGL_LEN	0x10	/* Metadata SGL Length Inval */
+#define	NVME_CQE_SC_GEN_INV_SGL_DESC	0x11	/* SGL Descriptor Type Inval */
+#define	NVME_CQE_SC_GEN_INV_USE_CMB	0x12	/* Inval use of Ctrl Mem Buf */
+#define	NVME_CQE_SC_GEN_INV_PRP_OFF	0x13	/* PRP Offset Invalid */
+#define	NVME_CQE_SC_GEN_AWU_EXCEEDED	0x14	/* Atomic Write Unit Exceeded */
+
+/* NVMe completion status code (generic NVM commands) */
+#define	NVME_CQE_SC_GEN_NVM_LBA_RANGE	0x80	/* LBA Out Of Range */
+#define	NVME_CQE_SC_GEN_NVM_CAP_EXC	0x81	/* Capacity Exceeded */
+#define	NVME_CQE_SC_GEN_NVM_NS_NOTRDY	0x82	/* Namespace Not Ready */
+#define	NVME_CQE_SC_GEN_NVM_RSV_CNFLCT	0x83	/* Reservation Conflict */
+
+/* NVMe completion status code (command specific) */
+#define	NVME_CQE_SC_SPC_INV_CQ		0x0	/* Completion Queue Invalid */
+#define	NVME_CQE_SC_SPC_INV_QID		0x1	/* Invalid Queue Identifier */
+#define	NVME_CQE_SC_SPC_MAX_QSZ_EXC	0x2	/* Max Queue Size Exceeded */
+#define	NVME_CQE_SC_SPC_ABRT_CMD_EXC	0x3	/* Abort Cmd Limit Exceeded */
+#define	NVME_CQE_SC_SPC_ASYNC_EVREQ_EXC	0x5	/* Async Event Request Limit */
+#define	NVME_CQE_SC_SPC_INV_FW_SLOT	0x6	/* Invalid Firmware Slot */
+#define	NVME_CQE_SC_SPC_INV_FW_IMG	0x7	/* Invalid Firmware Image */
+#define	NVME_CQE_SC_SPC_INV_INT_VECT	0x8	/* Invalid Interrupt Vector */
+#define	NVME_CQE_SC_SPC_INV_LOG_PAGE	0x9	/* Invalid Log Page */
+#define	NVME_CQE_SC_SPC_INV_FORMAT	0xa	/* Invalid Format */
+#define	NVME_CQE_SC_SPC_FW_RESET	0xb	/* FW Application Reset Reqd */
+#define	NVME_CQE_SC_SPC_INV_Q_DEL	0xc	/* Invalid Queue Deletion */
+#define	NVME_CQE_SC_SPC_FEAT_SAVE	0xd	/* Feature Id Not Saveable */
+#define	NVME_CQE_SC_SPC_FEAT_CHG	0xe	/* Feature Not Changeable */
+#define	NVME_CQE_SC_SPC_FEAT_NS_SPEC	0xf	/* Feature Not Namespace Spec */
+#define	NVME_CQE_SC_SPC_FW_NSSR		0x10	/* FW Application NSSR Reqd */
+#define	NVME_CQE_SC_SPC_FW_NEXT_RESET	0x11	/* FW Application Next Reqd */
+#define	NVME_CQE_SC_SPC_FW_MTFA		0x12	/* FW Application Exceed MTFA */
+#define	NVME_CQE_SC_SPC_FW_PROHIBITED	0x13	/* FW Application Prohibited */
+#define	NVME_CQE_SC_SPC_FW_OVERLAP	0x14	/* Overlapping FW ranges */
+
+/* NVMe completion status code (NVM command specific */
+#define	NVME_CQE_SC_SPC_NVM_CNFL_ATTR	0x80	/* Conflicting Attributes */
+#define	NVME_CQE_SC_SPC_NVM_INV_PROT	0x81	/* Invalid Protection */
+#define	NVME_CQE_SC_SPC_NVM_READONLY	0x82	/* Write to Read Only Range */
+
+/* NVMe completion status code (data / metadata integrity) */
+#define	NVME_CQE_SC_INT_NVM_WRITE	0x80	/* Write Fault */
+#define	NVME_CQE_SC_INT_NVM_READ	0x81	/* Unrecovered Read Error */
+#define	NVME_CQE_SC_INT_NVM_GUARD	0x82	/* Guard Check Error */
+#define	NVME_CQE_SC_INT_NVM_APPL_TAG	0x83	/* Application Tag Check Err */
+#define	NVME_CQE_SC_INT_NVM_REF_TAG	0x84	/* Reference Tag Check Err */
+#define	NVME_CQE_SC_INT_NVM_COMPARE	0x85	/* Compare Failure */
+#define	NVME_CQE_SC_INT_NVM_ACCESS	0x86	/* Access Denied */
 
 #ifdef __cplusplus
 }

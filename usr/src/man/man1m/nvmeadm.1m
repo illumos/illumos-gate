@@ -10,8 +10,9 @@
 .\"
 .\"
 .\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2019 Western Digital Corporation.
 .\"
-.Dd January 19, 2018
+.Dd June 27, 2019
 .Dt NVMEADM 1M
 .Os
 .Sh NAME
@@ -57,6 +58,22 @@
 .Op Fl dv
 .Cm attach
 .Ar ctl[/ns]
+.Nm
+.Op Fl dv
+.Cm load-firmware
+.Ar ctl
+.Ar firmware-file
+.Op Ar offset
+.Nm
+.Op Fl dv
+.Cm commit-firmware
+.Ar ctl
+.Ar slot
+.Nm
+.Op Fl dv
+.Cm activate-firmware
+.Ar ctl
+.Ar slot
 .Sh DESCRIPTION
 The
 .Nm
@@ -133,6 +150,30 @@ with the
 .Nm
 .Cm identify
 command.
+.It Ar firmware-file
+Specifies the name of a firmware file to be loaded into the controller
+using the
+.Cm load-firmware
+command.
+.It Ar offset
+Specifies the byte offset at which to load
+.Ar firmware-file
+within the controller's upload buffer.
+Vendors may require multiple images to be loaded at different offsets
+before a firmware set is committed to a
+.Ar slot .
+.It Ar slot
+Specifies the firmware slot into which a firmware set is committed
+using the
+.Cm commit-firmware
+command, and subsequently activated with the
+.Cm activate-firmware
+command.
+Slots and their contents can be printed using
+.Cm nvmeadm get-logpage
+to request the
+.Ar firmware
+logpage.
 .El
 .Sh COMMANDS
 .Bl -tag -width ""
@@ -303,6 +344,41 @@ previous
 .Nm
 .Cm detach
 command.
+.It Xo
+.Nm
+.Cm load-firmware
+.Ar ctl
+.Ar firmware-file
+.Op Ar offset
+.Xc
+Loads
+.Ar firmware-file
+into the controller's upload memory at
+.Ar offset ,
+the default is 0. A vendor may require multiple files to be loaded
+at different offsets before the firmware is committed to a
+.Ar slot .
+.It Xo
+.Nm
+.Cm commit-firmware
+.Ar ctl
+.Ar slot
+.Xc
+Commits firmware previously loaded by the
+.Cm load-firmware
+command to
+.Ar slot .
+.It Xo
+.Nm
+.Cm activate-firmware
+.Ar ctl
+.Ar slot
+.Xc
+Activates the firmware in slot
+.Ar slot .
+The firmware image in
+.Ar slot
+is activated at the next NVM controller reset.
 .El
 .Sh EXIT STATUS
 .Ex -std
@@ -392,6 +468,41 @@ nvme4: Get Features
     Volatile Memory Backup failed:          disabled
   Power Management
     Power State:                            0
+.Ed
+.It Sy Example 5: Load and activate firmware
+.Bd -literal
+# nvmeadm get-logpage nvme3 firmware
+nvme3: Firmware Slot Information
+  Active Firmware Slot:                     4
+  Next Firmware Slot:                       4
+  Firmware Revision for Slot 1:             KNGND110
+  Firmware Revision for Slot 2:             KNGND110
+  Firmware Revision for Slot 3:             KNGND110
+  Firmware Revision for Slot 4:             KNGND112
+  Firmware Revision for Slot 5:             KNGND110
+  Firmware Revision for Slot 6:             <Unused>
+  Firmware Revision for Slot 7:             <Unused>
+
+# nvmeadm -v load-firmware nvme3 KNGND113.bin
+1740544 bytes downloaded.
+
+# nvmeadm -v commit-firmware nvme3 5
+Firmware committed to slot 5.
+
+# nvmeadm -v activate-firmware nvme3 5
+Slot 5 activated: NVM subsystem reset required - power cycle your system.
+
+# nvmeadm get-logpage nvme3 firmware
+nvme3: Firmware Slot Information
+  Active Firmware Slot:                     4
+  Next Firmware Slot:                       5
+  Firmware Revision for Slot 1:             KNGND110
+  Firmware Revision for Slot 2:             KNGND110
+  Firmware Revision for Slot 3:             KNGND110
+  Firmware Revision for Slot 4:             KNGND112
+  Firmware Revision for Slot 5:             KNGND113
+  Firmware Revision for Slot 6:             <Unused>
+  Firmware Revision for Slot 7:             <Unused>
 .Ed
 .El
 .Sh INTERFACE STABILITY

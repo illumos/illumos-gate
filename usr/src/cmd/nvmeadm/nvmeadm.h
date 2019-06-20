@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright 2019 Western Digital Corporation
  */
 
 #ifndef _NVMEADM_H
@@ -64,6 +65,7 @@ extern void nvme_print_feat_auto_pst(uint64_t, void *, size_t,
     nvme_identify_ctrl_t *);
 extern void nvme_print_feat_progress(uint64_t, void *, size_t,
     nvme_identify_ctrl_t *);
+extern const char *nvme_str_error(int, int);
 
 /* device node functions */
 extern int nvme_open(di_minor_t);
@@ -79,6 +81,8 @@ extern int nvme_intr_cnt(int);
 extern boolean_t nvme_format_nvm(int, uint8_t, uint8_t);
 extern boolean_t nvme_detach(int);
 extern boolean_t nvme_attach(int);
+extern boolean_t nvme_firmware_load(int, void *, size_t, offset_t);
+extern boolean_t nvme_firmware_commit(int fd, int, int, uint16_t *, uint16_t *);
 
 #ifdef __cplusplus
 }
