@@ -126,7 +126,7 @@
 #define	SMB2_DIALECT_0302	0x0302
 
 /* Maximum supported dialect (for ssn_maxver) */
-#define	SMB2_DIALECT_MAX	SMB2_DIALECT_0210
+#define	SMB2_DIALECT_MAX	SMB2_DIALECT_0302
 
 /*
  * Option flags in smbioc_oshare.ioc_opt

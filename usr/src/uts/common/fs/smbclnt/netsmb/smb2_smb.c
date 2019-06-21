@@ -50,9 +50,15 @@
 #include <netsmb/smb_rq.h>
 #include <netsmb/smb2_rq.h>
 
-#define	NDIALECTS	1
-static const uint16_t smb2_dialects[1] = {
-	SMB2_DIALECT_0210
+/*
+ * Supported dialects.  Keep sorted by number because of how the
+ * vc_maxver check below may truncate this list.
+ */
+#define	NDIALECTS	3
+static const uint16_t smb2_dialects[NDIALECTS] = {
+	SMB2_DIALECT_0210,
+	SMB2_DIALECT_0300,
+	SMB2_DIALECT_0302,
 };
 
 /* Optional capabilities we advertise (none yet). */
@@ -113,13 +119,13 @@ smb2_parse_smb1nego_resp(struct smb_rq *rqp)
 	md_get_uint16le(mdp, &sp->sv2_security_mode);
 
 	/* Get Dialect. */
-	error = md_get_uint16le(mdp, &sp->sv2_dialect);
+	error = md_get_uint16le(mdp, &sp->sv_proto);
 	if (error != 0)
 		return (error);
 
 	/* What dialect did we get? */
-	if (sp->sv2_dialect != SMB2_DIALECT_02ff) {
-		SMBERROR("Unknown dialect 0x%x\n", sp->sv2_dialect);
+	if (sp->sv_proto != SMB2_DIALECT_02ff) {
+		SMBERROR("Unknown dialect 0x%x\n", sp->sv_proto);
 		return (EINVAL);
 	}
 	/* Set our (internal) SMB1 dialect also. */
@@ -148,6 +154,7 @@ smb2_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 	struct smb_rq *rqp = NULL;
 	struct mbchain *mbp = NULL;
 	struct mdchain *mdp = NULL;
+	uint16_t *ndialects_p;
 	uint16_t ndialects = NDIALECTS;
 	boolean_t will_sign = B_FALSE;
 	uint16_t length = 0;
@@ -174,15 +181,18 @@ smb2_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 	 */
 	smb_rq_getrequest(rqp, &mbp);
 	mb_put_uint16le(mbp, 36);		/* Struct Size */
-	mb_put_uint16le(mbp, ndialects);	/* Dialect Count */
+	ndialects_p = mb_reserve(mbp, 2);	/* Dialect Count */
 	mb_put_uint16le(mbp, security_mode);
 	mb_put_uint16le(mbp, 0);		/*  Reserved */
 	mb_put_uint32le(mbp, smb2_clnt_caps);
 	mb_put_mem(mbp, vcp->vc_cl_guid, 16, MB_MSYSTEM);
 	mb_put_uint64le(mbp, 0);		/* Start Time */
 	for (i = 0; i < ndialects; i++) {	/* Dialects */
+		if (smb2_dialects[i] > vcp->vc_maxver)
+			break;
 		mb_put_uint16le(mbp, smb2_dialects[i]);
 	}
+	*ndialects_p = htoles(i);
 
 	/*
 	 * Do the OTW call.
@@ -209,7 +219,7 @@ smb2_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 	}
 
 	md_get_uint16le(mdp, &sp->sv2_security_mode);
-	md_get_uint16le(mdp, &sp->sv2_dialect);
+	md_get_uint16le(mdp, &sp->sv_proto); /* dialect */
 	md_get_uint16le(mdp, NULL);	/* reserved */
 	md_get_mem(mdp, sp->sv2_guid, 16, MB_MSYSTEM);
 	md_get_uint32le(mdp, &sp->sv2_capabilities);
@@ -254,7 +264,7 @@ smb2_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 		}
 		wk->wk_u_auth_rlen = sec_buf_len;
 		err = md_get_mem(mdp, wk->wk_u_auth_rbuf.lp_ptr,
-				 sec_buf_len, MB_MUSER);
+		    sec_buf_len, MB_MUSER);
 		if (err) {
 			goto errout;
 		}
@@ -472,7 +482,7 @@ smb2_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred)
 		}
 		wk->wk_u_auth_rlen = sec_buf_len;
 		err = md_get_mem(mdp, wk->wk_u_auth_rbuf.lp_ptr,
-				 sec_buf_len, MB_MUSER);
+		    sec_buf_len, MB_MUSER);
 		if (err != 0) {
 			ret = err;
 			goto out;
@@ -813,7 +823,7 @@ smb2_smb_ntcreate(
 	mb_put_uint16le(mbp, StructSize);
 	mb_put_uint8(mbp, 0);				/* Security flags */
 	mb_put_uint8(mbp, SMB2_OPLOCK_LEVEL_NONE);	/* Oplock level */
-	mb_put_uint32le(mbp, impersonate);		/* Impersonation Level */
+	mb_put_uint32le(mbp, impersonate);	/* Impersonation Level */
 	mb_put_uint64le(mbp, cr_flags);
 	mb_put_uint64le(mbp, 0);			/* Reserved */
 	mb_put_uint32le(mbp, req_acc);

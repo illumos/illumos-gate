@@ -70,7 +70,7 @@ typedef struct smb_cred {
 #define	SMBV_EXT_SEC		0x0080	/* conn to use extended security */
 #define	SMBV_SIGNING		0x0100	/* negotiated signing */
 #define	SMBV_SMB2		0x0200	/* VC using SMB 2 or 3 */
-#define	SMBV_HAS_FILEIDS	0x0400	/* Use File IDs for hash and inode numbers */
+#define	SMBV_HAS_FILEIDS	0x0400	/* Use File IDs for hash and inums */
 #define	SMBV_NO_WRITE_THRU	0x0800	/* Can't use ... */
 
 /*
@@ -165,7 +165,7 @@ enum smbco_level {
  * SMB1 Negotiated protocol parameters
  */
 struct smb_sopt {
-	int16_t		sv_proto;	/* protocol dialect */
+	uint16_t	sv_proto;	/* protocol dialect */
 	uchar_t		sv_sm;		/* security mode */
 	int16_t		sv_tz;		/* offset in min relative to UTC */
 	uint16_t	sv_maxmux;	/* max number of outstanding rq's */
@@ -178,13 +178,12 @@ struct smb_sopt {
 
 	/* SMB2+ fields */
 	uint32_t	sv2_sessflags;	/* final session setup reply flags */
-	uint16_t	sv2_dialect;	/* dialect (non zero for SMB 2/3 */
 	uint32_t	sv2_capabilities;	/* capabilities */
 	uint32_t	sv2_maxtransact;	/* max transact size */
 	uint32_t	sv2_maxread;	/* max read size */
 	uint32_t	sv2_maxwrite;	/* max write size */
-	uint8_t		sv2_guid[16];	/* GUID */
 	uint16_t	sv2_security_mode;	/* security mode */
+	uint8_t		sv2_guid[16];	/* GUID */
 };
 typedef struct smb_sopt smb_sopt_t;
 
@@ -226,6 +225,7 @@ typedef struct smb_vc {
 	uint8_t			*vc_mackey;	/* MAC key buffer */
 	uint8_t			*vc_ssnkey;	/* session key buffer */
 	smb_sign_mech_t		vc_signmech;
+	struct smb_mac_ops	*vc_sign_ops;
 
 	struct smb_tran_desc	*vc_tdesc;	/* transport ops. vector */
 	void			*vc_tdata;	/* transport control block */

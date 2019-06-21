@@ -1411,10 +1411,16 @@ smb_cf_minauth_from_str(char *str)
 	return (-1);
 }
 
-
+/*
+ * SMB 2.1 is the oldest SMB2 dialect implemented (we skipped SMB 2.002)
+ * so if we see a_protocol value of just "2" assume they meant 2.1
+ */
 static struct nv
 smbver_table[] = {
+	{ "3.02",	SMB2_DIALECT_0302 },
+	{ "3.0",	SMB2_DIALECT_0300 },
 	{ "2.1",	SMB2_DIALECT_0210 },
+	{ "2",		SMB2_DIALECT_0210 },
 	{ "1",		1 },
 	{ NULL,		0 }
 };
