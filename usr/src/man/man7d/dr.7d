@@ -1,12 +1,12 @@
 '\" te
+.\" Copyright 2019 Peter Tribble.
 .\"  Copyright (c) 2001 Sun Microsystems, Inc.  All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DR 7D "Sep 29, 2003"
+.TH DR 7D "Jun 13, 2019"
 .SH NAME
-dr, drmach, ngdr, ngdrmach \- Sun Enterprise 10000  dynamic reconfiguration
-driver
+dr, drmach \- dynamic reconfiguration driver
 .SH SYNOPSIS
 .LP
 .nf
@@ -18,18 +18,7 @@ driver
 \fBdrmach\fR
 .fi
 
-.LP
-.nf
-\fBngdr\fR
-.fi
-
-.LP
-.nf
-\fBngdrmach\fR
-.fi
-
 .SH DESCRIPTION
-.sp
 .LP
 The dynamic reconfiguration (DR) driver consists of a platform-independent
 driver and a platform-specific module. The DR driver uses standard features of
@@ -41,43 +30,6 @@ nodes in the file system that serve as attachment points for DR operations.
 The DR driver provides a pseudo-driver interface to sequence attach and detach
 operations on system boards using file system entry points referred to as
 "attachment points." The attachment point form depends on the platform.
-.SS "Sun Enterprise 10000 Server"
-.sp
-.LP
-On the Sun Enterprise 10000 server, the DR driver consists of a
-platform-independent driver (\fBngdr\fR) and a platform-specific module
-(\fBngdrmach\fR).
-.sp
-.LP
-The domain configuration server (DCS) accepts DR requests from the system
-services processor (SSP) and uses the \fBlibcfgadm\fR(3LIB) interface to
-initiate the DR operation. After the operation is performed, the results are
-returned to the SSP. For more information about the DCS on the Sun Enterprise
-10000, refer to the \fBdcs\fR(1M) man page and the \fISun Enterprise 10000
-Dynamic Reconfiguration User Guide\fR.
-.sp
-.LP
-The DR driver creates physical attachment points for system board slots that
-takes the following form:
-.sp
-.in +2
-.nf
-/devices/pseudo/ngdr@0:SB\fIx\fR
-.fi
-.in -2
-
-.sp
-.LP
-Where \fIx\fR represents the slot number (0 to 15) for a particular board.
-.sp
-.LP
-The \fBcfgadm_sbd\fR(1M) plugin creates dynamic attachment points that refer to
-components on system boards, including CPUs, memory, or I/O devices. Refer to
-the \fBcfgadm_sbd\fR(1M) man page for more details.
 .SH SEE ALSO
-.sp
 .LP
-\fBcfgadm_sbd\fR(1M), \fBioctl\fR(2), \fBlibcfgadm(3LIB)\fR
-.sp
-.LP
-\fISun Enterprise 10000 Dynamic Reconfiguration User Guide\fR
+\fBioctl\fR(2), \fBlibcfgadm(3LIB)\fR

@@ -1,9 +1,10 @@
 '\" te
+.\" Copyright 2019 Peter Tribble.
 .\"  Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH EEPROM 1M "Oct 27, 2018"
+.TH EEPROM 1M "Jun 13, 2019"
 .SH NAME
 eeprom \- EEPROM display and load utility
 .SH SYNOPSIS
@@ -399,8 +400,8 @@ If \fBtrue\fR, enable keyboard click. Defaults to \fBfalse\fR.
 .ad
 .sp .6
 .RS 4n
-A string that specifies the layout  name  for  non-self-identifying  keyboards
-(type 7c). Invoke \fBkbd\fR \fB-s\fR to obtain a list  of acceptable layout
+A string that specifies the layout name for non-self-identifying keyboards
+(type 7c). Invoke \fBkbd\fR \fB-s\fR to obtain a list of acceptable layout
 names. See \fBkbd\fR(1).
 .RE
 
@@ -705,28 +706,6 @@ Output device used at power-on (usually \fBscreen\fR, \fBttya\fR,
 .sp
 .ne 2
 .na
-\fBredmode-reboot?\fR
-.ad
-.sp .6
-.RS 4n
-Specify \fBtrue\fR to reboot after a redmode reset trap. Defaults to
-\fBtrue\fR. (Sun Enterprise 10000 only.)
-.RE
-
-.sp
-.ne 2
-.na
-\fBredmode-sync?\fR
-.ad
-.sp .6
-.RS 4n
-Specify \fBtrue\fR to invoke OpenBoot PROM's \fBsync\fR word after a redmode
-reset trap. Defaults to \fBfalse\fR. (Sun Enterprise 10000 only.)
-.RE
-
-.sp
-.ne 2
-.na
 \fBrootpath\fR
 .ad
 .sp .6
@@ -843,18 +822,6 @@ Retype new password:
 .RS 4n
 Megabytes of \fBRAM\fR to test. Ignored if \fBdiag-switch?\fR is \fBtrue\fR.
 Defaults to \fB1\fR.
-.RE
-
-.sp
-.ne 2
-.na
-\fBsir-sync?\fR
-.ad
-.sp .6
-.RS 4n
-Specify \fBtrue\fR to invoke OpenBoot PROM's \fBsync\fR word after a
-software-initiated reset (\fBSIR\fR) trap. Defaults to \fBfalse\fR. (Sun
-Enterprise 10000 only.)
 .RE
 
 .sp
@@ -1124,28 +1091,6 @@ Defaults to \fBtrue\fR.
 If \fBtrue\fR, reboot after watchdog reset. Defaults to \fBfalse\fR.
 .RE
 
-.sp
-.ne 2
-.na
-\fBwatchdog-sync?\fR
-.ad
-.sp .6
-.RS 4n
-Specify \fBtrue\fR to invoke OpenBoot PROM's \fBsync\fR word after a watchdog
-reset trap. Defaults to \fBfalse\fR. ( Sun Enterprise 10000 only.)
-.RE
-
-.sp
-.ne 2
-.na
-\fBxir-sync?\fR
-.ad
-.sp .6
-.RS 4n
-Specify \fBtrue\fR to invoke OpenBoot PROM's \fBsync\fR word after an \fBXIR\fR
-trap. Defaults to \fBfalse\fR. (Sun Enterprise 10000 only.)
-.RE
-
 .SH EXAMPLES
 .LP
 \fBExample 1 \fRChanging the Number of Megabytes of RAM.
@@ -1319,7 +1264,7 @@ Platform-specific version of \fBeeprom\fR. Use \fBuname\fR \fB-i\fR to obtain
 
 .SH SEE ALSO
 .LP
-\fBpasswd\fR(1), \fBsh\fR(1), \fBsvcs\fR(1),  \fBtip\fR(1),  \fBuname\fR(1),
+\fBpasswd\fR(1), \fBsh\fR(1), \fBsvcs\fR(1), \fBtip\fR(1), \fBuname\fR(1),
 \fBboot\fR(1M), \fBkadb\fR(1M), \fBkernel\fR(1M), \fBinit\fR(1M),
 \fBsvcadm\fR(1M), \fBattributes\fR(5), \fBsmf\fR(5)
 .sp

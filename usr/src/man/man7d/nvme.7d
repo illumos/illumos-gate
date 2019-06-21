@@ -11,6 +11,7 @@
 .\"
 .\" Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
 .\" Copyright (c) 2018, Joyent, Inc.
+.\" Copyright 2019, Western Digital Corporation
 .\"
 .Dd July 31, 2018
 .Dt NVME 7D
@@ -58,9 +59,17 @@ status.
 .It Va admin-queue-len
 This is the number of entries in the admin command queue.
 Legal values are between 16 and 4096, the default value is 256.
-.It Va io-queue-len
-This is the number of entries in each I/O command queue.
+.It Va io-squeue-len
+This is the number of entries in each I/O submission queue.
 Legal values are between 16 and 65536, the default value is 1024.
+.It Va io-cqueue-len
+This is the number of entries in each I/O completion queue.
+Legal values are between 16 and 65536, the default value is 2048.
+When the number of submission and completion queues are the same,
+the queue lengths will be both set to the lesser of
+.Va io-squeue-len
+and
+.Va io-cqueue-len .
 .It Va async-event-limit
 This is the maximum number of asynchronous event requests issued by
 the driver.
@@ -78,6 +87,26 @@ This is the minimum physical block size that is reported to
 This value must be a power of 2 greater than or equal to 512.
 If the device reports a best block size larger than what is
 specified here the driver will ignore the value specified here.
+.It Va max-submission-queues
+This is the maximum number of submission queues the driver will create per
+device.
+Legal values are between 1 and 65535, the default is to
+match the number for
+.Em max-completion-queues .
+The number of queues created will not be allowed to exceed the
+drive's hardware limitation.
+If the number of submission queues is larger than
+.Em max-completion-queues
+the completion queues will be shared across the submission
+queues.
+.It Va max-completion-queues
+This is the maximum number of completion queues the driver will create per
+device.
+Legal values are between 1 and 65535, the default is to match
+the number of interrupt vectors allocated to the drive.
+The number of queues created will not exceed the number of interrupt vectors,
+.Em max-submission-queues ,
+or the drive's hardware limitation.
 .El
 .
 .Sh FILES
