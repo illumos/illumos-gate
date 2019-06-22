@@ -232,7 +232,6 @@ add_supported_locales(papi_attribute_t ***attributes)
 	papiAttributeListAddString(attributes, PAPI_ATTR_REPLACE,
 			"generated-natural-language-supported", "en-us");
 
-#ifndef __linux__	/* this is Solaris specific */
 	if ((fp = fopen("/usr/lib/locale/lcttab", "r")) != NULL) {
 		char buf[1024];
 
@@ -241,6 +240,8 @@ add_supported_locales(papi_attribute_t ***attributes)
 			int i, passed = 1;
 
 			name = strtok(buf, " \t\n");
+			if (name == NULL)
+				continue;
 
 			for (i = 0; ((passed == 1) && (name[i] != NULL)); i++)
 				if (isalpha(name[i]) != 0)
@@ -264,8 +265,8 @@ add_supported_locales(papi_attribute_t ***attributes)
 					name);
 			}
 		}
+		(void) fclose(fp);
 	}
-#endif
 }
 
 void
