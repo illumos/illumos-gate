@@ -27,8 +27,6 @@
 
 /* $Id: common.c 155 2006-04-26 02:34:54Z ktou $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,7 +51,6 @@ ipp_svc_status_mesg(papi_service_t svc, papi_status_t status)
 char *
 destination_from_printer_uri(char *uri)
 {
-	static char buf[64];
 	char *result = NULL;
 
 	if (uri != NULL)
@@ -63,11 +60,6 @@ destination_from_printer_uri(char *uri)
 		result = uri;
 	else
 		result++;
-
-#ifdef FORCE_LPSCHED_URI
-	snprintf(buf, sizeof (buf), "lpsched://localhost/printers/%s", result);
-	result = buf;
-#endif /* FORCE_LPSCHED_URI */
 
 	return (result);
 }
